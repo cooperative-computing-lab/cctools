@@ -16,6 +16,15 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 	IBCP
 	Developed new support for Parrot to work with the EGEE software and bioinformatics applications.
 
+	Hoang Bui
+	Notre Dame
+	Created the chirp_distribute and chirp_matrix modules.
+
+	Peter Bui
+	Notre Dame
+	Contributed the Parrot-HDFS module and an implementation
+	of Map-Reduce
+
 	Benjamin Couturier
 	CERN
 	Provided patches to work with the CASTOR name space.
@@ -43,7 +52,12 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 
 	Chris Moretti
 	University of Notre Dame
-	Improved the fail-over semantics of multi volumes.
+	Contributed extensively to the implementation of Chirp
+	and abstractions for distributed computing.
+
+	Francesco Prelz
+	INFN Milan
+	Contributed numerous bug fixes and performance improvements to Parrot.
 
 	Sander Klous
 	NIKHEF
@@ -73,5 +87,9 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 	Ulrich Schwickerath	
 	FZH Hamburg
 	Contributed RFIO driver and Infiniband support for Parrot.
+
+	Li Yu
+	Notre Dame
+	Contributed to the multicore all-pairs implementation.
 
 Thanks to one and all!
