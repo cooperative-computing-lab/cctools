@@ -1,0 +1,77 @@
+
+This package is developed primarily by:
+
+	Douglas Thain
+	Cooperative Computing Lab
+	University of Notre Dame
+	http://www.cse.nd.edu/~ccl
+
+Many thanks go a host of contributors and colleagues, in alphabetical order.
+
+	John Bent
+	University of Wisconsin
+	Debugged early versions of parrot on many applications with NeST.
+
+	Christophe Blanchet
+	IBCP
+	Developed new support for Parrot to work with the EGEE software and bioinformatics applications.
+
+	Benjamin Couturier
+	CERN
+	Provided patches to work with the CASTOR name space.
+	
+	Michael Ernst, Patrick Fuhrmann, and Tigran Mkrtchyan
+	Fermi National Labs and DESY
+	Provided invaluable help installing, configuring, and using dcache
+	for use with Parrot.
+	
+	Jamie Frey
+	University of Wisconsin
+	Debugged and deployed ftp_lite.
+
+	Jeffrey Hemmes
+	University of Notre Dame
+	Developed support for distributed access control lists.
+
+	Miron Livny
+	University of Wisconsin	
+	Provided excellent strategic and technical advice as my Ph.D. advisor.
+
+	Zach Miller
+	University of Wisconsin
+	Tested and deployed parrot with BLAST.
+
+	Chris Moretti
+	University of Notre Dame
+	Improved the fail-over semantics of multi volumes.
+
+	Sander Klous
+	NIKHEF
+	Tested and deployed parrot with BaBar and Objectivity.
+
+	Igor Sfiligoi, Aureliano Rama, Simone Pagan Griso, Donatella Lucchesi
+	INFN Padova and Fermi National Laboratory
+	Contributed to the Design and implementation of the GROW filesystem.
+
+	Peter Kunszt
+	CERN
+	Patches to run on variations of Linux
+	Glite-IO module.
+
+	Paul Madrid
+	University of Notre Dame
+	Implemented the reservation ACL feature.
+
+	Alain Roy
+	University of Wisconsin
+	Tested and deployed ftsh with the Virtual Data Toolkit.
+
+	Hugh Sasse
+	De Montfort University, U.K.
+	Contributed to the Fault TOlerant Shell
+
+	Ulrich Schwickerath	
+	FZH Hamburg
+	Contributed RFIO driver and Infiniband support for Parrot.
+
+Thanks to one and all!

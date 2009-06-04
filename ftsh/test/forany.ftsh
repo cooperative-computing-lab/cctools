@@ -1,0 +1,39 @@
+#
+# Figure out that 3*5 = 15
+#
+
+try
+	forany i in 1 2 3 4 5
+		j=$i .mul. 5
+		if $j .eq. 15
+			echo "$j"
+		else
+			failure
+		end
+	end
+	echo "correct success"
+catch
+	echo "incorrect failure"
+	failure
+end
+
+#
+# Without it, you can't find it.
+#
+
+try
+	try for 5 seconds
+		forany i in 1 2 4 5
+			j=$i .mul. 5
+			if $j .eq. 15
+				echo "$j"
+			else
+				failure
+			end
+		end
+	end
+	echo "incorrect success"
+catch
+	echo "correct failure"
+end
+

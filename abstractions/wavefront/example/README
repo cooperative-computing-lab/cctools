@@ -1,0 +1,49 @@
+
+This is an example problem to use with the Wavefront abstraction.
+The abstraction computes the contents of a large matrix M such that:
+
+M[i,j] = F(M[i-1,j],M[i,j-1],M[i-1,j-1])
+
+To run Wavefront, you need to set up an input file with the
+initial boundary values of M, and provide a function that computes
+a new cell from the adjacent cells.  The abstraction will produce
+an output file with all of the values of the matrix.
+
+This directory contains a toy problem provided by Dr. Kenneth Judd
+at Stanford University.  It represents a common category of problems
+found in economics.  The function computes the Nash equilibrium between
+two players in a game.  
+
+Compile the example function like this:
+
+% gcc example.func.c -o example.func -lm
+
+To run a sample problem, start the Wavefront master process,
+specify the size of the problem, the function, the input data,
+and where to place the output data:
+
+% wavefront_master 10 10 example.func example.input.data example.output.data
+
+Then, start one or more worker processes, and tell them to contact
+the master process using host name and port number:
+
+% worker mymachine.somewhere.edu 9068
+
+The master process will then output a series of lines detailing the
+progress of the entire computation.  If the master fails or is killed,
+it can simply be restarted with the same command.  It will read in the
+already completed work, and continue where it left off.
+
+Enough input is provided for a problem of up to 500x500.
+
+Each function call takes about 5 seconds to execute on a modern
+desktop processor.  Sequentially the problem is O(n^2).  By adding
+workers, you can parallelize the work into O(n) time.
+
+problem   sequential  parallel
+size            time      time
+------------------------------
+10x10           500s       50s
+100x100       50000s      500s
+500x500     1250000s     2500s
+

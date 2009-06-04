@@ -1,0 +1,15 @@
+#
+# Rules for building various sorts of files
+#
+
+.c.o:
+	${CCTOOLS_CC} ${CCTOOLS_INTERNAL_CCFLAGS} -c $< -o $@
+
+.cc.o:
+	${CCTOOLS_CXX} ${CCTOOLS_INTERNAL_CXXFLAGS} -c $< -o $@
+
+.C.o:
+	${CCTOOLS_CXX} ${CCTOOLS_INTERNAL_CXXFLAGS} -c $< -o $@
+
+.o.a:
+	${CCTOOLS_AR} rv $@ $^

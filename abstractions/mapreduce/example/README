@@ -1,0 +1,102 @@
+--------------------------------------------------------------------------------
+mapreduce: number count and sort example
+--------------------------------------------------------------------------------
+
+The example included here will count and sort a list of random numbers between
+0 and 9999.  This means that the final output will be a sorted list of numbers
+and the number of times those particular numbers appear in the input files.
+
+The following will explain how to setup the environment to run the example, and
+how to run it using the mapreduce abstraction.
+
+Setup
+-----
+
+The MapReduce implementation in this package follows the streaming interface,
+which means that the inputlist argument to the mapreduce program is a
+line-delimited list of input files as so:
+
+/pathtofile/filename
+/pathtofile/filename
+/pathtofile/filename
+...
+/pathtofile/filename
+
+Note that the inputlist must include the absolute path to the input files.
+Additionally, if Condor is being used, these files must be stored in a globally
+accessible location.  
+
+For this example, we will assume the use of a Chirp server as the globally
+accessible file store.  To generate the input files, copy the
+number_generate_data.py to the globally accessible directory and run it to
+generate the set of input files.  Next, create a list of those generated input
+files.  The following commands are an example of how to do this:
+
+$ parrot sh
+$ mkdir /chirp/ccl07.cse.nd.edu:9094/tmp
+$ cp number_generate_data.py /chirp/ccl07.cse.nd.edu:9094/tmp
+$ cd /chirp/ccl07.cse.nd.edu:9094/tmp
+$ ./number_generate_data.py record 1000 100
+$ find /chirp/ccl07.cse.nd.edu:9094/tmp/ -type f | grep record > inputlist
+$ chirp ccl07.cse.nd.edu
+  chirp:ccl07.cse.nd.edu:/> setacl tmp hostname:*.nd.edu rl
+$ cd -
+$ cp /chirp/ccl07.cse.nd.edu:9094/tmp/inputlist .
+
+number_generate_data.py produces a specified amount of input files with a
+certain amount of numbers.  Simply run ./number_generate_data.py without any
+arguments to get more details.
+
+Run
+---
+
+Once the inputlist is setup, we can now run the mapreduce abstraction.
+Included in this example are two scripts: number_map.py and number_reduce.py;
+the former is the mapper and the latter is the reducer.  In the streaming
+MapReduce model, the mapper reads data from STDIN and then outputs to STDOUT
+key, value pairs in the form of key<TAB>value.  
+
+In this example, number_map.py reads STDIN and outputs something like so:
+
+0024	1
+0004	1
+...
+1485	1
+
+Likewise, in the streaming model, the reducer will read in sorted key value
+pairs from STDIN and will output some sort of aggregate also in the form of
+key<TAB>value.
+
+In this example, number_reduce.py reads STDIN and outputs something like so:
+
+0004	4
+0024	2
+...
+1485	1
+
+To run this example, the following command can be used:
+
+$ mapreduce -M -m 4 -r 8 ./number_map.py ./number_reduce.py inputlist
+
+This will execute the mapreduce abstraction.  The implementation creates a
+sandbox in the form /tmp/mapreduce-UID-PID, and stores any input and output
+files in that location (it will report the location of the sandbox in the
+program output).
+
+The -M flag specifies that a final merge should occur, and the final results
+will be in <sandbox>/merge.output.  Otherwise, the output will be in
+<sandbox>/reduce.output.*.
+
+The -m flag specifies the number of mappers to try to run concurrently, and the
+-r flag specifies the number of reducers to run concurrently.  Unlike the
+Google or Hadoop implementation of MapReduce, the mappers and runners in this
+implementation run in distinct phases; that is the mappers run first, and then
+the reducers.
+
+For more options run mapreduce -h.
+
+To check the output of the results, you can run:
+
+$ env LC_ALL=C sort -c merge.output
+
+--------------------------------------------------------------------------------

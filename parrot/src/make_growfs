@@ -1,0 +1,236 @@
+#!/usr/bin/perl -w
+
+# make_growfs
+#
+# This script simply traverses a directory structure and
+# creates a file named .growfsdir that lists all the files
+# in the directory structure recursively.  
+# The Parrot growfs module uses this information in order to 
+# make a web server look like a filesystem.
+# 
+# Example use:
+#    make_growfs /home/fred/www
+#    parrot tcsh
+#    cd /growfs/my.web.server/~fred
+#    ls -la
+
+use Fcntl ":mode";
+
+$verbose_mode = 0;
+$verbose_changes = 1;
+$follow_mode = "a";
+$checksum_mode = 1;
+
+$total_dirs = 0;
+$total_files = 0;
+$total_links = 0;
+$total_checksums = 0;
+
+$name = 0;
+$GROW_EPOCH = 1199163600;
+
+sub load_cache
+{
+	my $dirpath = shift;
+	my $type;
+	my $name;
+	my $mode;
+	my $size;
+	my $mtime;
+	my $checksum;
+
+	while(<DIRFILE>) {
+		($type,$name,$mode,$size,$mtime,$checksum) = split;
+		if($type eq "D") {
+			load_cache("$dirpath/$name");
+		} elsif($type eq "E") {
+			return;
+		} else {
+			$mtime_cache{"$dirpath/$name"} = "$mtime";
+			$size_cache{"$dirpath/$name"} = "$size";
+			$checksum_cache{"$dirpath/$name"} = "$checksum";
+		}
+		return if(!defined DIRFILE);
+	}
+
+}
+
+sub reorder_stat
+{
+	my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,$blksize,$blocks) = @_;
+	return ($mode,$size,$mtime-$GROW_EPOCH);
+}
+
+sub listdir
+{
+	my $dirname = shift;
+	my $dir;
+	my $d;
+	my $subdirname;
+
+	opendir $dir, $dirname or die "make_growfs: couldn't open $dirname\n";
+
+	while( $d = readdir($dir) ) {
+
+		if( $d =~ ".growfs.*") {
+			next;
+		}
+
+		if( $d eq "." || $d eq ".." ) {
+			next;
+		}
+
+		$subdirname = "$dirname/$d";
+
+		print "$subdirname\n" if($verbose_mode);
+
+		if($follow_mode eq "y") {
+			# if we are following symbolic links, then
+			# stat the item the link points to.
+			@info = stat $subdirname;
+
+			# but if that fails, it could be a broken link,
+			# so try to get that instead.
+			if(!@info) {
+				@info = lstat $subdirname;
+				if(@info) {
+					print STDERR "make_growfs: broken symbolic link $subdirname\n";
+				}
+			}
+		} else {
+			# if we are not following symbolic links,
+			# then look at the link itself and report that
+			@info = lstat $subdirname;
+		}
+
+		retry_link:
+
+		if(!@info) {
+			print STDERR "make_growfs: couldn't access $subdirname\n";
+			next;
+		}
+
+		@info = reorder_stat @info;
+
+		if( S_ISLNK($info[0]) ) {
+			$linkname = readlink "$subdirname";
+			if(substr($linkname,0,1) eq "/") {
+				$toplength = length $topdir;
+				if(substr($linkname,0,$toplength) eq $topdir) {
+					$linkname = substr($linkname,$toplength);
+					if(substr($linkname,0,1) ne "/") {
+						$linkname = "/" . $linkname;
+					}
+				} else {
+					if( $follow_mode eq "a" ) {
+						print STDERR "make_growfs: following link $subdirname to $linkname\n";
+						@info = stat $subdirname;
+						goto retry_link;
+					} else {
+						print STDERR "make_growfs: symbolic link $subdirname points to $linkname outside the root $topdir\n";
+					}
+				}
+			}
+			print DIRFILE "L $d\t@info 0 $linkname\n";
+			$total_links++;
+		} elsif( S_ISDIR($info[0]) ) {
+			print DIRFILE "D $d\t@info 0\n";
+			listdir($subdirname);
+			print DIRFILE "E\n";
+			$total_dirs++;
+		} else {
+			if($checksum_mode) {
+				$mtime = $mtime_cache{$subdirname};
+				$size = $size_cache{$subdirname};
+				if(defined $mtime && $mtime==$info[2] && defined $size && $size==$info[1]) {
+					$checksum = $checksum_cache{$subdirname};
+				} else {
+					($checksum,$name) = split " ", `sha1sum \"$subdirname\"`;
+					$total_checksums++;
+					print "$subdirname changed: $checksum\n" if($verbose_mode || $verbose_changes);
+				}
+			} else {
+				$checksum = 0;
+			}
+			print DIRFILE "F $d\t@info $checksum\n";
+			$total_files++;
+		}
+	}
+	closedir $dir;
+}
+
+sub show_help
+{
+print "Use: $0 [options] <directory>
+Where options are:
+  -v  Give verbose messages.
+  -K  Create checksums for files. (default)
+  -k  Disable checksums for files.
+  -f  Follow all symbolic links.
+  -F  Do not follow any symbolic links.
+  -a  Only follow links that fall outside the root.  (default)
+  -h  Show this help file.
+";
+}
+
+while( defined $ARGV[0] ) {
+	$arg = $ARGV[0];
+	if( $arg eq "-f" ) {
+		$follow_mode = "y";
+	} elsif( $arg eq "-F" ) {
+		$follow_mode = "n";
+	} elsif( $arg eq "-a" ) {
+		$follow_mode = "a";
+	} elsif( $arg eq "-v" ) {
+		$verbose_mode = 1;
+	} elsif( $arg eq "-c" ) {
+		$verbose_changes = 1;
+	} elsif( $arg eq "-k" ) {
+		$checksum_mode = 0;
+	} elsif( $arg eq "-K" ) {
+		$checksum_mode = 1;
+	} elsif( $arg eq "-h" ) {
+		show_help();
+		exit(0);
+	} elsif( $arg =~ "-.*" ) {
+		print "make_growfs: unknown argion: $arg (-h for help)\n";
+		exit(0);
+	} else {
+		$topdir = $arg;
+	}
+	shift @ARGV;
+}
+
+if(!defined $topdir) {
+	print "make_growfs: please give me a directory name (-h for help)\n";
+	exit(0);
+}
+
+$dirfile = "$topdir/.growfsdir";
+
+print "make_growfs: loading existing directory from $dirfile\n";
+
+if(open DIRFILE, "$topdir/.growfsdir") {
+	<DIRFILE>;
+	load_cache($topdir);
+	close(DIRFILE);
+} else {
+	print "make_growfs: no directory exists, this might be quite slow...\n";
+}
+
+print "make_growfs: scanning directory tree for changes...\n";
+
+open DIRFILE, ">$topdir/.growfsdirtmp" or die "make_growfs: cannot write to directory file $topdir/.growfsdirtmp\n";
+@info = reorder_stat stat $topdir;
+print DIRFILE "D root\t@info 0\n";
+
+listdir "$topdir";
+
+print DIRFILE "E\n";
+close DIRFILE;
+
+rename "$topdir/.growfsdirtmp", "$topdir/.growfsdir";
+system "sha1sum < $topdir/.growfsdir > $topdir/.growfschecksum";
+
+printf "make_growfs: $total_files files, $total_links links, $total_dirs dirs, $total_checksums checksums computed\n";
+exit 0;

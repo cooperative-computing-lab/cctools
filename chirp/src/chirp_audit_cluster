@@ -1,0 +1,176 @@
+#!/usr/bin/perl
+
+#
+# This tool automatically audits all hosts in a Chirp cluster
+# in parallel, and then produces four text reports listing the
+# storage consumption, by user, by host, and then for the
+# combination of all users and hosts.
+#
+
+use POSIX;
+
+print "Auditing entire Chirp cluster.\n";
+$pwd=`pwd`;
+$nerrors=0;
+mkdir "/tmp/audit-$<";
+
+print "Getting list of hosts from catalog:...\n";
+$hostlist=`chirp_status -s`;
+@hosts = split /[ \t\n]/, $hostlist;
+
+print "Auditing $#hosts hosts in parallel, this could take a while...\n";
+`multirun -d -p 100 -f /tmp/audit-$</data -t 300 "chirp %s audit -r" @hosts`;
+
+print "Collating data...\n";
+
+foreach $host (@hosts) {
+	open FILE, "/tmp/audit-$</data.$host";
+	next if(!FILE);
+	while(<FILE>) {
+		chomp;
+
+		($nfiles, $ndirs, $nbytes, $user) = split;
+
+		if($nfiles eq "couldn't") {
+			print "error auditing $host: $_\n";
+			$nerrors++;
+			next;
+		}
+
+
+		$hostfiles{$host} += $nfiles;
+		$hostdirs{$host} += $ndirs;
+		$hostbytes{$host} += $nbytes;
+		$hostusers{$host}++;
+
+		$userfiles{$user} += $nfiles;
+		$userdirs{$user} += $ndirs;
+		$userbytes{$user} += $nbytes;
+		$userhosts{$user}++;
+		$users{$user}++;
+
+		$userhostfiles{$user}{$host} += $nfiles;
+		$userhostdirs{$user}{$host} += $ndirs;
+		$userhostbytes{$user}{$host} += $nbytes;
+
+		$hostuserfiles{$host}{$user} += $nfiles;
+		$hostuserdirs{$host}{$user} += $ndirs;
+		$hostuserbytes{$host}{$user} += $nbytes;
+
+		$totalfiles += $nfiles;
+		$totaldirs += $ndirs;
+		$totalbytes += $nbytes;
+		$totalhosts ++;
+	}
+}
+
+@users = keys %users;
+
+sub sort_by_host_bytes
+{
+	return $hostbytes{$b} <=> $hostbytes{$a};
+}
+
+sub sort_by_user_bytes
+{
+	return $userbytes{$b} <=> $userbytes{$a};
+}
+
+sub sort_by_userhost_bytes
+{
+	return $userhostbytes{$user}{$b} <=> $userhostbytes{$user}{$a};
+}
+
+sub sort_by_hostuser_bytes
+{
+	return $hostuserbytes{$host}{$b} <=> $hostuserbytes{$host}{$a};
+}
+
+$totalgb = int($totalbytes/1024.0/1024.0/1024.0);
+$date = `date`;
+
+print "Generating audit.user.txt\n";
+
+open FILE, ">audit.user.txt" or die;
+
+print FILE "Chirp Storage Audit by User\n";
+print FILE "$date\n";
+print FILE "$#users users, $#hosts hosts, $totalgb GB data, $totalfiles files, $totaldirs dirs\n";
+if($nerrors) {
+	print FILE "($nerrors hosts could not be audited)\n";
+}
+
+print FILE "\n   HOSTS    FILES     DIRS      TOTAL DATA OWNER\n";
+
+foreach $user (sort sort_by_user_bytes @users) {
+	printf FILE "%8s %8s %8s %12.1f MB %s\n",$userhosts{$user},$userfiles{$user},$userdirs{$user},$userbytes{$user}/1048576,$user;
+}
+close FILE;
+
+print "Generating audit.host.txt\n";
+
+open FILE, ">audit.host.txt" or die;
+
+print FILE "Chirp Storage Audit by Host\n";
+print FILE "$date\n";
+print FILE "$#users users, $#hosts hosts, $totalgb GB data, $totalfiles files, $totaldirs dirs\n";
+if($nerrors) {
+	print FILE "($nerrors hosts could not be audited)\n";
+}
+print FILE "\n   USERS    FILES     DIRS      TOTAL DATA HOSTNAME\n";
+
+foreach $host (sort sort_by_host_bytes @hosts) {
+	next if($hostbytes{$host}==0);
+	printf FILE "%8s %8s %8s %12.1f MB %s\n",$hostusers{$host},$hostfiles{$host},$hostdirs{$host},$hostbytes{$host}/1048576,$host;
+}
+close FILE;
+
+print "Generating audit.host.user.txt\n";
+
+open FILE, ">audit.host.user.txt" or die;
+
+print FILE "Chirp Storage Audit by Host and User\n";
+print FILE "$date\n";
+print FILE "$#users users, $#hosts hosts, $totalgb GB data, $totalfiles files, $totaldirs dirs\n";
+if($nerrors) {
+	print FILE "($nerrors hosts could not be audited)\n";
+}
+print FILE "\n   USERS    FILES     DIRS      TOTAL DATA HOSTNAME / USER\n";
+
+foreach $host (sort sort_by_host_bytes @hosts) {
+	next if($hostbytes{$host}==0);
+	printf FILE "--------------------------------------------------------------------------------\n";
+	printf FILE "%8s %8s %8s %12.1f MB %s\n",$hostusers{$host},$hostfiles{$host},$hostdirs{$host},$hostbytes{$host}/1048576,$host;
+	printf FILE "--------------------------------------------------------------------------------\n";
+	foreach $user (sort sort_by_hostuser_bytes @users) {
+		next if($hostuserbytes{$host}{$user}==0);
+		printf FILE "%8s %8s %8s %12.1f MB  -  %s\n","",$hostuserfiles{$host}{$user},$hostuserdirs{$host}{$user},$hostuserbytes{$host}{$user}/1048576,$user;
+	}
+}
+close FILE;
+
+
+print "Generating audit.user.host.txt\n";
+
+open FILE, ">audit.user.host.txt" or die;
+
+print FILE "Chirp Storage Audit by User and Host\n";
+print FILE "$date\n";
+print FILE "$#users users, $#hosts hosts, $totalgb GB data, $totalfiles files, $totaldirs dirs\n";
+if($nerrors) {
+	print FILE "($nerrors hosts could not be audited)\n";
+}
+print FILE "\n   HOSTS    FILES     DIRS      TOTAL DATA USER/HOSTNAME\n";
+
+foreach $user (sort sort_by_user_bytes @users) {
+	next if($userbytes{$user}==0);
+	printf FILE "--------------------------------------------------------------------------------\n";
+	printf FILE "%8s %8s %8s %12.1f MB %s\n",$userhosts{$user},$userfiles{$user},$userdirs{$user},$userbytes{$user}/1048576,$user;
+	printf FILE "--------------------------------------------------------------------------------\n";
+	foreach $host (sort sort_by_userhost_bytes @hosts) {
+		next if($userhostbytes{$user}{$host}==0);
+		printf FILE "%8s %8s %8s %12.1f MB  -  %s\n","",$userhostfiles{$user}{$host},$userhostdirs{$user}{$host},$userhostbytes{$user}{$host}/1048576,$host;
+	}
+}
+close FILE;
+print "Audit complete with $nerrors errors.\n";

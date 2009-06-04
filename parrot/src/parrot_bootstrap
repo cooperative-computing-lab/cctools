@@ -1,0 +1,41 @@
+#!/bin/sh
+
+#
+# This simple shell script identifies your CPU type,
+# then downloads and executes the proper Parrot.
+#
+
+uid=`id -u`
+tmp=/tmp/parrot.$uid
+arch=`uname -p`
+
+mkdir -p $tmp
+
+if [ -x $tmp/parrot ]
+then
+	exec $tmp/parrot "$@"
+fi
+
+case $arch in
+	[iI][0-9]86|x86)
+		cpu=i686
+		;;
+	[xX]86_64)
+		cpu=x86_64
+		;;
+	*)
+		echo "sorry, I don't know about CPU type $cpu"
+		exit 1
+esac
+
+if wget http://www.nd.edu/~ccl/software/files/cctools-current-$cpu-linux-2.6/bin/parrot -O $tmp/parrot.part
+then
+	mv $tmp/parrot.part $tmp/parrot
+	chmod 755 $tmp/parrot
+	exec $tmp/parrot "$@"
+else
+	echo "sorry, unable to download the right Parrot for CPU $cpu"
+	exit 1
+fi
+
+

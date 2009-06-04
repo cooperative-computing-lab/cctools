@@ -1,0 +1,41 @@
+/*
+Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
+Copyright (C) 2005- The University of Notre Dame
+This software is distributed under a BSD-style license.
+See the file COPYING for details.
+*/
+
+#ifndef CHIRP_PROTOCOL_H
+#define CHIRP_PROTOCOL_H
+
+#define CHIRP_LINE_MAX 1024
+#define CHIRP_PATH_MAX 1024
+#define CHIRP_VERSION 3
+#define CHIRP_PORT 9094
+
+#define CHIRP_ERROR_NOT_AUTHENTICATED -1
+#define CHIRP_ERROR_NOT_AUTHORIZED -2
+#define CHIRP_ERROR_DOESNT_EXIST -3
+#define CHIRP_ERROR_ALREADY_EXISTS -4
+#define CHIRP_ERROR_TOO_BIG -5
+#define CHIRP_ERROR_NO_SPACE -6
+#define CHIRP_ERROR_NO_MEMORY -7
+#define CHIRP_ERROR_INVALID_REQUEST -8
+#define CHIRP_ERROR_TOO_MANY_OPEN -9
+#define CHIRP_ERROR_BUSY -10
+#define CHIRP_ERROR_TRY_AGAIN -11
+#define CHIRP_ERROR_BAD_FD -12
+#define CHIRP_ERROR_IS_DIR -13
+#define CHIRP_ERROR_NOT_DIR -14
+#define CHIRP_ERROR_NOT_EMPTY -15
+#define CHIRP_ERROR_CROSS_DEVICE_LINK -16
+#define CHIRP_ERROR_OFFLINE -17
+#define CHIRP_ERROR_TIMED_OUT -18
+#define CHIRP_ERROR_DISCONNECTED -19
+#define CHIRP_ERROR_GRP_UNREACHABLE -20
+#define CHIRP_ERROR_NO_SUCH_PROCESS -21
+#define CHIRP_ERROR_IS_A_PIPE -22
+
+#define CHIRP_ERROR_UNKNOWN -127
+
+#endif

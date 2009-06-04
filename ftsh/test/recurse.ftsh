@@ -1,0 +1,23 @@
+#!../src/ftsh
+
+#
+# This script recurses on itself until the
+# outermost time limit is reached, whereupon it
+# will start to kill itself.
+#
+
+try
+	try for 5 seconds
+		#
+		# Sleep a little bit so as not to create
+		# thousands of sub-processes.
+		#
+		sleep 1
+		./recurse.ftsh
+	end
+	echo "Zoiks, it accidentally succeeded!"
+catch
+	echo "Script terminated, success!"
+end
+
+

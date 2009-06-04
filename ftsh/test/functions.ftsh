@@ -1,0 +1,49 @@
+
+#
+# Test a simple function to copy some files around.
+#
+
+function copy_and_compress
+	echo "Removing ${2}.gz..."
+	rm -f ${2}.gz
+	echo "Copying ${1} to ${2}..."
+	cp ${1} ${2}
+	echo "Compressing ${1}..."
+	gzip ${2}
+end
+
+for name in /etc/hosts /etc/passwd
+	basename ${name} -> bname
+	copy_and_compress ${name} /tmp/${bname}
+end
+
+#
+# Check that argument passing respects quotation.
+#
+
+function print_args
+	echo ${1}
+	echo ${2}
+	echo ${3}
+end
+
+print_args foo bar baz
+print_args "foo bar baz"
+print_args 'foo bar baz' "three blind mice" monkey\ shines
+
+#
+# Make sure that recursion is stopped at a respectable limit.
+#
+
+function endless_recursion
+	endless_recursion
+end
+
+try
+	endless_recursion
+	echo "Zoiks, endless recursion should have failed..."
+catch
+	echo "Endless recursion was stopped correctly."
+end
+
+

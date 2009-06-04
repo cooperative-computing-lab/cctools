@@ -1,0 +1,30 @@
+/*
+Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
+Copyright (C) 2005- The University of Notre Dame
+This software is distributed under a BSD-style license.
+See the file COPYING for details.
+*/
+
+#include "auth_all.h"
+
+#include <string.h>
+
+int auth_register_byname( const char *name )
+{
+	if(!strcmp(name,"kerberos")) return auth_kerberos_register();
+	if(!strcmp(name,"globus")) return auth_globus_register();
+	if(!strcmp(name,"unix")) return auth_unix_register();
+	if(!strcmp(name,"hostname")) return auth_hostname_register();
+	if(!strcmp(name,"address")) return auth_address_register();
+	return 0;
+}
+
+int auth_register_all()
+{
+	return
+		auth_kerberos_register() +
+		auth_globus_register() +
+		auth_unix_register() +
+		auth_hostname_register() +
+		auth_address_register();
+}
