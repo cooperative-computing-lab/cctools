@@ -502,14 +502,6 @@ else
         echo "*** skipping fuse..."
 fi
 
-if [ ${zlib_path} != /usr ] 
-then
-	ldflags="${ldflags} -L${zlib_path}/lib"
-	ccflags="${ccflags} -I${zlib_path}/include"
-fi
-
-ldflags="${ldflags} -lz"
-
 optional_function strsignal /usr/include/string.h HAS_STRSIGNAL
 optional_function pread /usr/include/unistd.h HAS_PREAD
 optional_function pwrite /usr/include/unistd.h HAS_PWRITE
@@ -524,7 +516,16 @@ then
 else
 	ldflags="${ldflags} -lm -lc"
 fi
+
 linker="gcc"
+
+if [ ${zlib_path} != /usr ]
+then
+        ldflags="${ldflags} -L${zlib_path}/lib"
+        ccflags="${ccflags} -I${zlib_path}/include"
+fi
+
+ldflags="${ldflags} -lz"
 
 optional_library resolv HAS_LIBRESOLV
 optional_library crypt HAS_LIBCRYPT
