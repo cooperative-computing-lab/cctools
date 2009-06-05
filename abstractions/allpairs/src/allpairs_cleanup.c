@@ -13,7 +13,7 @@ void printUsage(char* cmd) {
 	printf(" -a <mode>      Explicit authentication mode.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	//printf(" -t <string>    Timeout, e.g. 60s\n");
-	//printf(" -D             Download Results Matrix.\n");
+	printf(" -D <file>      Download Results Matrix to a file.\n");
 	printf(" -R             Remove remote state.\n");
 	printf(" -L             Remove local state.\n");
 	printf(" -M             Remove results matrix.\n");
@@ -24,11 +24,14 @@ int main(int argc, char** argv) {
     char cl;
     int did_explicit_auth = 0;
     int download,rm_local,rm_remote,rm_mat,file_provided;
+    int rm_remote_error = 0;
+    char matrix_target[CHIRP_PATH_MAX];
     char finalize_file[CHIRP_PATH_MAX];
+    time_t stoptime = time(0)+3600;
     
     download=rm_local=rm_remote=rm_mat=file_provided=0;
 
-    while((cl=getopt(argc,argv,"+a:d:hDLRMF:"))!=(char)-1) {
+    while((cl=getopt(argc,argv,"+a:d:hD:LRMF:"))!=(char)-1) {
 	switch(cl) {
 	case 'a':
 	    auth_register_byname(optarg);
@@ -43,6 +46,7 @@ int main(int argc, char** argv) {
 		break;
 	case 'D': // download matrix data to local disk
 	    download=1;
+	    strcpy(matrix_target,optarg);
 	    break;
 	case 'L': // force LOCAL state removal
 	    rm_local=1;
@@ -87,7 +91,7 @@ int main(int argc, char** argv) {
 
     // 0th item is workload id
     if(fscanf(fp, " wID=%i ",&strlentmp) == 1) {
-	wID = malloc(strlentmp*sizeof(char));
+	wID = malloc((strlentmp+1)*sizeof(char));
 	if(!wID)
 	{
 	    fprintf(stderr,"Could not allocate %i bytes for workload ID\n",strlentmp);
@@ -102,7 +106,7 @@ int main(int argc, char** argv) {
     
     // first item is local prefix -- remove everything.
     if(fscanf(fp, " local_dir=%i ",&strlentmp) == 1) {
-	local_dir = (char*) malloc(strlentmp*sizeof(char));
+	local_dir = (char*) malloc((strlentmp+1)*sizeof(char));
 	if(!local_dir)
 	{
 	    fprintf(stderr,"Could not allocate %i bytes for local directory\n",strlentmp);
@@ -117,7 +121,7 @@ int main(int argc, char** argv) {
     // second item is matrix host -\ remove
     // third item is matrix path  -/ matrix
     if(fscanf(fp, " mat_host=%i ",&strlentmp) == 1) {
-	mat_host = (char *) malloc(strlentmp*sizeof(char));
+	mat_host = (char *) malloc((strlentmp+1)*sizeof(char));
 	if(!mat_host)
 	{
 	    fprintf(stderr,"Could not allocate %i bytes for matrix host\n",strlentmp);
@@ -130,7 +134,7 @@ int main(int argc, char** argv) {
     }
 
     if(fscanf(fp, " mat_path=%i ",&strlentmp) == 1) {
-	mat_path = (char *) malloc(strlentmp*sizeof(char));
+	mat_path = (char *) malloc((strlentmp+1)*sizeof(char));
 	if(!mat_path)
 	{
 	    fprintf(stderr,"Could not allocate %i bytes for matrix path\n",strlentmp);
@@ -145,7 +149,7 @@ int main(int argc, char** argv) {
 
     // 4th item is chirp_dirname
     if(fscanf(fp, " remote_dir=%i ",&strlentmp) == 1) {
-	remote_dir = (char *) malloc(strlentmp*sizeof(char));
+	remote_dir = (char *) malloc((strlentmp+1)*sizeof(char));
 	if(!remote_dir)
 	{
 	    fprintf(stderr,"Could not allocate %i bytes for remote path\n",strlentmp);
@@ -156,10 +160,14 @@ int main(int argc, char** argv) {
 	    exit(2);
 	}
     }
+    if(rm_remote==1) {
+	fprintf(stderr,"Asked to remove remote state, but there is no remote state specified.\n");
+	rm_remote_error = 1;
+    }
      
     // 7th item is full goodstring
     if(fscanf(fp, " node_list=%i ",&strlentmp) == 1) {
-	node_list = (char *) malloc(strlentmp*sizeof(char));
+	node_list = (char *) malloc((strlentmp+1)*sizeof(char));
 	if(!node_list)
 	{
 	    fprintf(stderr,"Could not allocate %i bytes for remote hosts\n",strlentmp);
@@ -170,10 +178,14 @@ int main(int argc, char** argv) {
 	    exit(2);
 	}
     }
+    if(rm_remote==1 && rm_remote_error == 0) {
+	fprintf(stderr,"Asked to remove remote state, but there is no remote state specified.\n");
+	rm_remote_error = 1;
+    }
 
     // 9th item is hostname
     if(fscanf(fp, " host=%i ",&strlentmp) == 1) {
-	hn = malloc(strlentmp*sizeof(char));
+	hn = malloc((strlentmp+1)*sizeof(char));
 	if(!hn)
 	{
 	    fprintf(stderr,"Could not allocate %i bytes for hostname\n",strlentmp);
@@ -184,10 +196,14 @@ int main(int argc, char** argv) {
 	    exit(2);
 	}
     }
+    if(rm_remote==1 && rm_remote_error == 0) {
+	fprintf(stderr,"Asked to remove remote state, but there is no remote state specified.\n");
+	rm_remote_error = 1;
+    }
     
     // 10th item is full function directory -- remove tarball, exception list
     if(fscanf(fp, " fun_path=%i ",&strlentmp) == 1) {
-	fun_path = (char *) malloc(strlentmp*sizeof(char));
+	fun_path = (char *) malloc((strlentmp+1)*sizeof(char));
 	if(!fun_path)
 	{
 	    fprintf(stderr,"Could not allocate %i bytes for function directory\n",strlentmp);
@@ -220,12 +236,32 @@ int main(int argc, char** argv) {
     // end parsing finalize file
     
     // next, download if desired.
+   
     if(download) {
 	fprintf(stderr,"Download Matrix Mode\n");
-	
+	FILE* mt = fopen(matrix_target, "w");
+	struct chirp_matrix* m =  chirp_matrix_open( mat_host, mat_path, stoptime);
+	if(m) {
+	int w = chirp_matrix_width( m );
+	int h = chirp_matrix_height( m );
+	//int e = chirp_matrix_element_size( m );
+	double* buf = malloc(w*sizeof(double));
+	int x,y;
+	for(y=0; y < h; y++) {
+	    chirp_matrix_get_row( m , y, buf, stoptime );
+	    for(x=0; x<w; x++) {
+		fprintf(mt,"%i %i %.2lf\n",y,x,buf[x]);
+	    }
+	}
+	}
+	else
+	{
+	    printf("Could not open matrix %s %s\n",mat_host,mat_path);
+	    return 1;
+	}
     }
     // next, delete remote state if desired.
-    if(rm_remote) {
+    if(rm_remote && !rm_remote_error) {
 	fprintf(stderr,"Remove Remote State Mode\n");
 	cmd = (char *) malloc(strlen("chirp_distribute -a hostname -X ")+10+(2*strlen(hn))+1+strlen(remote_dir)+1+strlen(node_list)+1);
 	if(cmd == NULL) {

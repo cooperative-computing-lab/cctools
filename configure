@@ -502,20 +502,13 @@ else
         echo "*** skipping fuse..."
 fi
 
-if check_file "${zlib_path}/lib/libz.a" || check_file "${zlib_path}/lib/libz.so"
+if [ ${zlib_path} != /usr ] 
 then
-	if [ ${zlib_path} != /usr ] 
-	then
-		ldflags="${ldflags} -L${zlib_path}/lib"
-		ccflags="${ccflags} -I${zlib_path}/include"
-	fi
-
-	ldflags="${ldflags} -lz"
-else
-	echo "*** Sorry, I couldn't find libz.a in ${zlib_path}/lib"
-	echo "*** Check --with-zlib-path and try again."
-	exit 1
+	ldflags="${ldflags} -L${zlib_path}/lib"
+	ccflags="${ccflags} -I${zlib_path}/include"
 fi
+
+ldflags="${ldflags} -lz"
 
 optional_function strsignal /usr/include/string.h HAS_STRSIGNAL
 optional_function pread /usr/include/unistd.h HAS_PREAD
