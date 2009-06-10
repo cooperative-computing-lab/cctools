@@ -151,17 +151,25 @@ int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARG
 		args[2] = t->regs.regs64.rdx;
 		args[3] = t->regs.regs64.rsi;
 		args[4] = t->regs.regs64.rdi;
-		args[5] = t->regs.regs64.r9;
-
-		// Note that the last argument really should be:
-		// args[5] = t->regs.regs64.rbp;
-		// Except, due to a widely-deployed bug in Linux
-		// ptrace, rbp is corrupted and r9 is incidentally correct.
-		// See: http://lkml.org/lkml/2007/1/31/317
+		args[5] = t->regs.regs64.rbp;
 	}
 #endif
 
 	return 1;
+}
+
+INT64_T tracer_args_get_alternate_args5( struct tracer *t )
+{
+	// Due to a widely-deployed bug in Linux
+	// ptrace, rbp is corrupted and r9 is incidentally correct,
+	// when tracing a 32-bit program on a 64-bit machine.
+	// See: http://lkml.org/lkml/2007/1/31/317
+
+#ifdef CCTOOLS_CPU_I386
+	return t->regs.regs32.ebp;
+#else
+	return t->regs.regs64.r9;
+#endif
 }
 
 int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS_MAX], int nargs )

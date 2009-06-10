@@ -22,6 +22,8 @@ void		tracer_continue( struct tracer *t, int signum );
 int             tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARGS_MAX] );
 int             tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS_MAX], int nargs );
 
+INT64_T		tracer_args_get_alternate_args5( struct tracer *t );
+
 int             tracer_result_get( struct tracer *t, INT64_T *result );
 int             tracer_result_set( struct tracer *t, INT64_T result );
 
