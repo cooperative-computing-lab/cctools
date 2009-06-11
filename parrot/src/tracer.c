@@ -62,6 +62,7 @@ struct tracer {
 		struct i386_registers regs32;
 		struct x86_64_registers regs64;
 	} regs;
+	int has_args5_bug;
 };
 
 void tracer_prepare()
@@ -80,6 +81,7 @@ struct tracer * tracer_attach( pid_t pid )
 
 	t->pid = pid;
 	t->gotregs = 0;
+	t->has_args5_bug = 0;
 
 	sprintf(path,"/proc/%d/mem",pid);
 	t->memory_file = open64(path,O_RDWR);
@@ -151,7 +153,8 @@ int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARG
 		args[2] = t->regs.regs64.rdx;
 		args[3] = t->regs.regs64.rsi;
 		args[4] = t->regs.regs64.rdi;
-		args[5] = t->regs.regs64.rbp;
+		if (t->has_args5_bug) args[5] = t->regs.regs64.r9;
+		else                  args[5] = t->regs.regs64.rbp;
 	}
 #endif
 
@@ -169,6 +172,7 @@ INT64_T tracer_args_get_alternate_args5( struct tracer *t )
 	return t->regs.regs32.ebp;
 #else
 	return t->regs.regs64.r9;
+	t->has_args5_bug = 1;
 #endif
 }
 
@@ -203,13 +207,10 @@ int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS
 		if(nargs>=3) t->regs.regs64.rdx = args[2];
 		if(nargs>=4) t->regs.regs64.rsi = args[3];
 		if(nargs>=5) t->regs.regs64.rdi  = args[4];
-		if(nargs>=6) t->regs.regs64.r9  = args[5];
-
-		// Note that the last argument really should be:
-		// if(nargs>=6) t->regs.regs64.rbp  = args[5];
-		// Except, due to a widely-deployed bug in Linux
-		// ptrace, rbp is corrupted and r9 is incidentally correct.
-		// See: http://lkml.org/lkml/2007/1/31/317
+		if(nargs>=6) {
+			if (t->has_args5_bug) t->regs.regs64.r9 = args[5];
+			else                  t->regs.regs64.rbp = args[5];
+		}
 	}
 #endif
 
