@@ -710,14 +710,14 @@ INT64_T work_queue_task_add_standard_input_buf( struct work_queue_task* t, const
 	tf->remote_name = malloc(11*sizeof(char));
 	string_cookie( tf->remote_name , 10);
 	if(t->command) {
-		char* tmp = malloc((strlen(t->command)+length+1)*sizeof(char));
+		char* tmp = malloc((strlen(t->command)+strlen(tf->remote_name)+1)*sizeof(char));
 		sprintf(tmp,"%s %s",t->command,tf->remote_name);
 		free(t->command);
 		t->command = NULL;
 		t->command = tmp;
 	}
 	else {
-		char* tmp = malloc((strlen("/bin/cat ")+length+1)*sizeof(char));
+		char* tmp = malloc((strlen("/bin/cat ")+strlen(tf->remote_name)+1)*sizeof(char));
 		sprintf(tmp,"/bin/cat %s",tf->remote_name);
 		t->command = tmp;	
 	}
@@ -737,10 +737,26 @@ INT64_T work_queue_task_add_standard_input_file( struct work_queue_task* t, cons
 	tf->fname_or_literal = FNAME;
 	tf->cacheable = 0;
 	tf->length = strlen(fname);
-	tf->payload = malloc(tf->length);
+	tf->payload = malloc((tf->length+1)*sizeof(char));
 	strcpy(tf->payload,fname);
 	tf->remote_name = malloc(11*sizeof(char));
 	string_cookie( tf->remote_name , 10);
+	if(t->command) {
+		char* tmp = malloc((strlen(t->command)+strlen(tf->remote_name)+1)*sizeof(char));
+		sprintf(tmp,"%s %s",t->command,tf->remote_name);
+		free(t->command);
+		t->command = NULL;
+		t->command = tmp;
+	}
+	else {
+		char* tmp = malloc((strlen("/bin/cat ")+strlen(tf->remote_name)+1)*sizeof(char));
+		sprintf(tmp,"/bin/cat %s",tf->remote_name);
+		t->command = tmp;	
+	}
+	if(t->command)
+		debug(D_DEBUG,"Current command: '%s'\n",t->command);
+	else
+		debug(D_DEBUG,"No command!\n");
 	if(!t->standard_input_files)
 		t->standard_input_files = list_create();
 	return list_push_tail(t->standard_input_files,tf);
