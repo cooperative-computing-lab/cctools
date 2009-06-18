@@ -173,6 +173,7 @@ static int confirm_output(char* output) {
 		free(buf);
 		return i;
 	    }
+	    debug(D_DEBUG,"Confirm Output Error. Buffer:\n=====\n%s\n=====\n",buf);
 	    if(sscanf(rec," {OVL afr:%s bfr:%s ", A_sequence_name,B_sequence_name) == 2)
 		fprintf(stderr, "Unexpected output format for comarison of %s and %s. ", A_sequence_name,B_sequence_name);
 	    else
@@ -234,6 +235,7 @@ static int handle_done_task(struct work_queue_task *t) {
     
     if(t->result==0) {
 	if(confirm_output(t->output)) {
+	    debug(D_DEBUG,"Completed task!\n");
 	    fputs(t->output,logfile);
 	    fflush(logfile);
 	    tasks_done++;
@@ -245,7 +247,7 @@ static int handle_done_task(struct work_queue_task *t) {
 	    return 0;
 	}
     } else {
-	fprintf(stderr,"Function failed: %s\non host: %s",t->output,t->host);
+	fprintf(stderr,"Function failed: %s\non host: %s\n",t->output,t->host);
 	return 0;
     }
     work_queue_task_delete(t);
@@ -268,50 +270,20 @@ static int get_task_ratio(  struct work_queue *q ) {
 static int task_consider( void* taskfiledata, int size )
 {
 	char cmd[2*MAX_FILENAME+4];
-	char job_filename[10];
-	string_cookie( job_filename, 10 );
+	//char job_filename[10];
+	//string_cookie( job_filename, 10 );
+	struct work_queue_task* t;
 
-	
-	struct task_file* infileList = NULL;
-	while(!infileList) {
-	    infileList = (struct task_file*) malloc(2*sizeof(struct task_file));
-	    if(!infileList)
-	    {
-		fprintf(stderr,"Out of memory for task! Waiting for a bit.\n");
-		handle_done_task(work_queue_wait(queue));
-	    }
+
+	while(!work_queue_hungry(queue)) {
+	    handle_done_task(work_queue_wait(queue, 5));
 	}
-	infileList[0].fname_or_literal = 0;
-	infileList[0].payload = strdup(function);
-	infileList[0].remote_name = strdup(function);
-	infileList[1].fname_or_literal = 1;
-	infileList[1].payload = malloc(size);
-	memcpy(infileList[1].payload,taskfiledata,size);
-	infileList[1].length = size;
-	infileList[1].remote_name = strdup(job_filename);
-
-	sprintf(cmd,"%s %s",function,job_filename);
-	
-	work_queue_submit(queue,work_queue_task_create(job_filename,cmd,infileList,2,0,0 ));
-		
+	t = work_queue_task_create(function,"");
+	work_queue_task_add_extra_staged_file( t, function, function);
+	work_queue_task_add_standard_input_buf( t, taskfiledata, size);
+	work_queue_submit(queue,t);
 	global_count++;
-	
-	if(fast_fill > 0) {
-	    // more workers are ready than there are tasks available to run, submit more tasks fast!
-	    handle_done_task(work_queue_wait_time(queue,0));
-	    fast_fill--;
-	}
-	else {
-	    fast_fill = get_task_ratio(queue);
-	    handle_done_task(work_queue_wait(queue));
-	}
-	if(time(0)!=last_display_time) display_progress(queue);
-	
-	//free(infileList[0].payload);
-	//free(infileList[0].remote_name);
-	//free(infileList[1].payload);
-	//free(infileList[1].remote_name);
-	free(infileList);
+
 	return 1;
 }
 
@@ -347,7 +319,7 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 	    if(!buf)
 	    {
 		fprintf(stderr,"Out of memory for buf! Waiting for a bit.\n");
-		handle_done_task(work_queue_wait(queue));
+		handle_done_task(work_queue_wait(queue,WAITFORTASK));
 	    }
     }
     ins = buf;
@@ -557,16 +529,8 @@ int main( int argc, char *argv[] )
 	}
 
 	time_t loop_time = time(0);
-	do {
-	    queue = work_queue_create(port);
-	    if(!queue)
-	    {
-		fprintf(stderr,"couldn't create queue on port %i, trying again\n",port);
-		sleep(10);
-	    }
-	} while(!queue && (time(0) < loop_time + 300));
-	if(!queue)
-	{
+	queue = work_queue_create(port,loop_time+300);
+	if(!queue) {
 	    fprintf(stderr,"couldn't create queue on port %i, timed out\n",port);
 	    return 1;
 	}
@@ -596,7 +560,7 @@ int main( int argc, char *argv[] )
 
 	while(1) {
 		if(time(0)!=last_display_time) display_progress(queue);
-		t = work_queue_wait(queue);
+		t = work_queue_wait(queue,WAITFORTASK);
 		if(! handle_done_task(t)) break;		
 	}
 	
