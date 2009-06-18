@@ -460,15 +460,8 @@ int main( int argc, char *argv[] )
 				wavefront_mode = WAVEFRONT_MODE_CLUSTER;
 				break;
 			case 'T':
-				if(!strcmp(optarg,"condor")) {
-					batch_system_type = BATCH_QUEUE_TYPE_CONDOR;
-				} else if(!strcmp(optarg,"sge")) {
-					batch_system_type = BATCH_QUEUE_TYPE_SGE;
-				} else if(!strcmp(optarg,"unix")) {
-					batch_system_type = BATCH_QUEUE_TYPE_UNIX;
-				} else if(!strcmp(optarg,"work_queue")) {
-					batch_system_type = BATCH_QUEUE_TYPE_WORK_QUEUE;
-				} else {
+				batch_system_type = batch_queue_type_from_string(optarg);
+				if(batch_system_type==BATCH_QUEUE_TYPE_UNKNOWN) {
 					fprintf(stderr,"unknown batch system type: %s\n",optarg);
 					exit(1);
 				}
