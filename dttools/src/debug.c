@@ -37,7 +37,7 @@ static pid_t (*debug_getpid)() = getpid;
 
 struct flag_info {
 	const char *name;
-	int flag;
+	INT64_T flag;
 };
 
 static struct flag_info table[] = {
@@ -72,6 +72,7 @@ static struct flag_info table[] = {
 	{ "debug",    D_DEBUG },
 	{ "login",    D_LOGIN },
 	{ "irods",    D_IRODS },
+	{ "wq",       D_WQ },
 	{ "all",      ~0 },
 	{ "time",     0 },	/* backwards compatibility */
 	{ "pid",     0 },	/* backwards compatibility */

@@ -67,6 +67,7 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_CACHE    0x10000000  /**< Debug cache operations in Parrot. */
 #define D_POLL     0x20000000  /**< Debug FD polling in Parrot. */
 #define D_HDFS	   0x40000000  /**< Debug the HDFS module in Parrot. */
+#define D_WQ	   0x80000000  /**< Debug the Work Queue operations. */
 
 /** Debug all remote I/O operations. */
 #define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS)

@@ -344,7 +344,7 @@ int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const c
 	if(extra_input_files) strcat(ip,extra_input_files);
 	if(extra_output_files) strcat(op,extra_output_files);
 
-	t = work_queue_task_create(0,cmd,0,0,outfiles,0);
+	t = work_queue_task_create(cmd,"");
 	if(t) {
 		work_queue_submit(q->work_queue,t);
 		return t->taskid;
@@ -355,7 +355,7 @@ int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const c
 
 batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_job_info *info )
 {
-	struct work_queue_task *t = work_queue_wait(q->work_queue);
+	struct work_queue_task *t = work_queue_wait(q->work_queue,WAITFORTASK);
 	if(t) {
 		int taskid = t->taskid;
 		work_queue_task_delete(t);
@@ -466,7 +466,7 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 	q->job_table = itable_create(0);
 
 	if(type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		q->work_queue = work_queue_create(9123);
+		q->work_queue = work_queue_create(9123, time(0)+60);
 	} else {
 		q->work_queue = 0;
 	}
