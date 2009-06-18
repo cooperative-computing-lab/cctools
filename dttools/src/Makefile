@@ -10,6 +10,7 @@ OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
 LIBRARIES = libdttools.a
 PROGRAMS = catalog_server watchdog multirun tar_stream worker worker_condor_submit
+PROGRAM_SOURCES = ${PROGRAMS:%=%.c}
 CYGWINLIB = cygwin1.dll
 
 all: ${LIBRARIES} $(PROGRAMS)
@@ -43,7 +44,7 @@ libdttools.a: ${OBJECTS}
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
 
-${SOURCES}: int_sizes.h
+${SOURCES} ${PROGRAM_SOURCES} : int_sizes.h
 
 int_sizes.h: make_int_sizes
 	./$< > $@
