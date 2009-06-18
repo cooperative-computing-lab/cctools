@@ -58,11 +58,7 @@ static void print_mr_config( struct mr_config *cfg ) {
 	printf("\tMapper:\t%s\n", cfg->mapper);
 	printf("\tReducer:\t%s\n", cfg->reducer);
 	printf("\tInputlist:\t%s\n", cfg->inputlist);
-	if (cfg->bqtype == BATCH_QUEUE_TYPE_CONDOR) {
-		printf("\tBatch Queue Type:\tcondor\n");
-	} else {
-		printf("\tBatch Queue Type:\tunix\n");
-	}
+	printf("\tBatch Queue Type:\t%s\n",batch_queue_type_to_string(cfg->bqtype));
 	printf("\tNumber of Mappers:\t%d\n", cfg->nmappers);
 	printf("\tNumber of Reducers:\t%d\n", cfg->nreducers);
 	printf("\tDo Final Merge:\t%s\n", (cfg->do_merge ? "true" : "false"));
@@ -256,7 +252,7 @@ static int reduce( struct mr_config *cfg ) {
 		jobs[i] = xxmalloc(sizeof(struct mr_job));
 		
 		snprintf(jobs[i]->args, MR_MAX_STRLEN, "reduce %s %d %d %d", cfg->scratch_dir, i, cfg->nmappers, cfg->nreducers);
-		if (cfg->bqtype == BATCH_QUEUE_TYPE_CONDOR && cfg->scratch_dir == MR_DEFAULT_SCRATCH_DIR) {
+		if (cfg->bqtype != BATCH_QUEUE_TYPE_UNIX && cfg->scratch_dir == MR_DEFAULT_SCRATCH_DIR) {
 			snprintf(buffer, MR_MAX_STRLEN, "tar cf reduce.input.%d.tar map.output.*.%d", i, i);
 			if (system(buffer) < 0) {
 				fprintf(stderr, "\tunable to archive map.output.*.%d into reduce.input.%d.tar: %s", i, i, strerror(errno));
@@ -380,11 +376,8 @@ int main( int argc, char *argv[] ) {
 				cfg.do_merge = 1;
 				break;
 			case 'q':
-				if (strcmp(optarg, "unix") == 0) {
-					cfg.bqtype = BATCH_QUEUE_TYPE_UNIX;
-				} else if (strcmp(optarg, "condor") == 0) {
-					cfg.bqtype = BATCH_QUEUE_TYPE_CONDOR;
-				} else {
+				cfg.bqtype = batch_queue_type_from_string(optarg);
+				if(cfg.bqtype==BATCH_QUEUE_TYPE_UNKNOWN) {
 					fprintf(stderr, "unknown batch queue type: %s\n", optarg);
 					exit(EXIT_FAILURE);
 				}
