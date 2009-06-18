@@ -22,9 +22,10 @@ See the file COPYING for details.
 #define BATCH_JOB_LINE_MAX 1024
 
 struct batch_queue {
-       batch_queue_type_t type;
-       struct itable *job_table;
-       struct work_queue *work_queue;
+	batch_queue_type_t type;
+	struct itable *job_table;
+	struct itable *output_table;
+	struct work_queue *work_queue;
 };
 
 static int batch_job_submit_condor( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
@@ -348,6 +349,8 @@ int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const c
 
 	work_queue_submit(q->work_queue,t);
 
+	itable_insert(q->output_table,t->taskid,strdup(outfile));
+
 	return t->taskid;
 }
 
@@ -362,8 +365,19 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 		info->exit_code = t->result;
 		info->exit_signal = 0;
 
+		char *outfile = itable_remove(q->output_table,t->taskid);
+		if(outfile) {
+			FILE *file = fopen(outfile,"w");
+			if(file) {
+				fwrite(t->output,strlen(t->output),1,file);
+				fclose(file);
+			}
+			free(outfile);			
+		}
+
 		int taskid = t->taskid;
 		work_queue_task_delete(t);
+
 		return taskid;
 	} else {
 		return -1;
@@ -493,6 +507,7 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 	q = malloc(sizeof(*q));
 	q->type = type;
 	q->job_table = itable_create(0);
+	q->output_table = itable_create(0);
 
 	if(type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		q->work_queue = work_queue_create(9123, time(0)+60);
