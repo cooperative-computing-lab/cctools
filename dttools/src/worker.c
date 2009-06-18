@@ -3,7 +3,6 @@
 #include "copy_stream.h"
 #include "memory_info.h"
 #include "disk_info.h"
-#include "fast_popen.h"
 #include "link.h"
 #include "debug.h"
 #include "stringtools.h"
@@ -117,7 +116,6 @@ int main( int argc, char *argv[] )
 	while(1) {
 		char line[WORK_QUEUE_LINE_MAX];
 		int result, length, mode, fd;
-		int fast;
 		char filename[WORK_QUEUE_LINE_MAX];
 		char *buffer;
 		FILE *stream;
@@ -143,34 +141,23 @@ int main( int argc, char *argv[] )
 				link_read(master,buffer,length,time(0)+timeout);
 				buffer[length] = 0;
 				debug(D_DEBUG,"%s",buffer);
-				if(strpos(buffer,'|') != -1) {
-					stream = popen(buffer, "r");
-					fast = 0;
-				}
-				else {
-					stream = fast_popen(buffer);
-					fast = 1;
-				}
+				stream = popen(buffer,"r");
 				free(buffer);
 				if(stream) {
-				    length = copy_stream_to_buffer(stream,&buffer);
-				    if(length<0) length = 0;
-				    if(fast)
-					result = fast_pclose(stream);
-				    else
+					length = copy_stream_to_buffer(stream,&buffer);
+					if(length<0) length = 0;
 					result = pclose(stream);
 				} else {
-				    length = 0;
+					length = 0;
 					result = -1;
 					buffer = 0;
 				}
 				sprintf(line,"result %d %d\n",result,length);
+				debug(D_DEBUG,"%s",line);
 				link_write(master,line,strlen(line),time(0)+timeout);
 				link_write(master,buffer,length,time(0)+timeout);
 				if(buffer) free(buffer);
 			} else if(sscanf(line,"put %s %d %o",filename,&length,&mode)==3) {
-				if(strchr(filename,'/')) goto recover;
-
 				fd = open(filename,O_WRONLY|O_CREAT|O_TRUNC,mode);
 				if(fd<0) goto recover;
 
