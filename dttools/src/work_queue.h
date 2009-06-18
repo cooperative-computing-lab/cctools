@@ -41,6 +41,7 @@ struct work_queue_task {
     	int taskid;			/**< A unique task id number. */
 	int result;			/**< The exit code of the command line. */
 	char host[32];			/**< The name of the host on which it ran. */
+  timestamp_t submit_time;		/**< The time the task was submitted. */
 	timestamp_t start_time;		/**< The time at which the task began. */
 	timestamp_t finish_time;	/**< The time at which it completed. */
     	INT64_T total_bytes_transfered;

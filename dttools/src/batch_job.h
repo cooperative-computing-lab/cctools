@@ -21,11 +21,24 @@ typedef int batch_job_id_t;
 
 /** Indicates which type of batch submission to use. */
 typedef enum {
-	BATCH_QUEUE_TYPE_UNIX,	/**< Batch jobs will run as local Unix processes. */
-	BATCH_QUEUE_TYPE_CONDOR,	/**< Batch jobs will be sent to Condor pool. */
-	BATCH_QUEUE_TYPE_SGE,	/**< Batch jobs will be sent to Sun Grid Engine. */
+	BATCH_QUEUE_TYPE_UNKNOWN=-1, /**< An invalid batch queue type. */
+	BATCH_QUEUE_TYPE_UNIX,	     /**< Batch jobs will run as local Unix processes. */
+	BATCH_QUEUE_TYPE_CONDOR,     /**< Batch jobs will be sent to Condor pool. */
+	BATCH_QUEUE_TYPE_SGE,	     /**< Batch jobs will be sent to Sun Grid Engine. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE  /**< Batch jobs will be send to the Work Queue. */
 } batch_queue_type_t;
+
+/** Converts a string into a batch queue type.
+@param str A string indicating the work queue type, which may be "unix", "condor", "sge", or "wq".
+@return The batch queue type corresponding to the string, or BATCH_QUEUE_TYPE_UNKNOWN if the string is invalid.
+*/
+batch_queue_type_t batch_queue_type_from_string( const char *str );
+
+/** Converts a batch queue type to a string.
+@param t A @ref batch_queue_type_t.
+@return A string corresponding to the batch queue type.
+*/
+const char * batch_queue_type_to_string( batch_queue_type_t t );
 
 /** Create a new batch queue.
 @param type The type of the queue.

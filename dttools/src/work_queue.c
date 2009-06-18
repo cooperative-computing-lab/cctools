@@ -192,6 +192,8 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 {
 	char *key, *value;
 
+	debug(D_DEBUG,"worker %s removed",w->addrport);
+
 	hash_table_firstkey(w->current_files);
 	while(hash_table_nextkey(w->current_files,&key,(void**)&value)) {
 		hash_table_remove(w->current_files,key);
@@ -202,7 +204,6 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 	change_worker_state(q,w,WORKER_STATE_NONE);
 	if(w->link) link_close(w->link);
 	free(w);
-	debug(D_DEBUG,"worker %s removed",w->addrport);
 }
 
 static int get_extra_created_files( struct work_queue_task *t, struct work_queue_worker *w )
@@ -334,7 +335,7 @@ static int build_poll_table( struct work_queue *q )
 static int send_standard_input_files( struct work_queue_task *t, struct work_queue_worker *w )
 {
 	struct task_file* tf;
-	int actual;
+	int actual=0;
 	int total_bytes=0;
 	timestamp_t open_time=0;
 	timestamp_t close_time=0;
@@ -350,7 +351,7 @@ static int send_standard_input_files( struct work_queue_task *t, struct work_que
 
 			if(tf->fname_or_literal == LITERAL) {
 				fl = tf->length;
-				time_t stoptime = time(0) + MAX(1.0,fl/1250000.0);
+				time_t stoptime = time(0) + MAX(2.0,fl/1250000.0);
 				debug(D_DEBUG,"%s (%s) needs buffer data as %s",w->hostname,w->addrport,tf->remote_name);
 				open_time = timestamp_get();
 				link_printf(w->link,"put %s %d %o\n",tf->remote_name,fl,0777);
@@ -374,7 +375,7 @@ static int send_standard_input_files( struct work_queue_task *t, struct work_que
 					debug(D_DEBUG,"%s (%s) needs file %s",w->hostname,w->addrport,tf->payload);
 					int fd = open(tf->payload,O_RDONLY,0);
 					if(fd<0) goto failure;
-					time_t stoptime = time(0) + MAX(1.0,local_info.st_size/1250000.0);
+					time_t stoptime = time(0) + MAX(2.0,local_info.st_size/1250000.0);
 					open_time = timestamp_get();
 					link_printf(w->link,"put %s %d %o\n",tf->remote_name,(int)local_info.st_size,local_info.st_mode&0777);
 					actual = link_stream_from_fd(w->link,fd,local_info.st_size,stoptime);
@@ -403,16 +404,16 @@ static int send_standard_input_files( struct work_queue_task *t, struct work_que
 
 	failure:
 	if(tf->fname_or_literal == FNAME) 
-	    debug(D_DEBUG,"%s (%s) failed to receive %s (%i bytes received).",w->hostname,w->addrport,tf->payload,actual);
+	    debug(D_DEBUG,"%s (%s) failed to send %s (%i bytes received).",w->hostname,w->addrport,tf->payload,actual);
 	else
-	    debug(D_DEBUG,"%s (%s) failed to receive buffer data (%i bytes received).",w->hostname,w->addrport,actual);
+	    debug(D_DEBUG,"%s (%s) failed to send buffer data (%i bytes received).",w->hostname,w->addrport,actual);
 	return 0;
 }
 
 static int send_extra_staged_files( struct work_queue_task *t, struct work_queue_worker *w )
 {
 	struct task_file* tf;
-	int actual;
+	int actual=0;
 	int total_bytes=0;
 	timestamp_t open_time=0;
 	timestamp_t close_time=0;
@@ -428,7 +429,7 @@ static int send_extra_staged_files( struct work_queue_task *t, struct work_queue
 
 			if(tf->fname_or_literal == LITERAL) {
 				fl = tf->length;
-				time_t stoptime = time(0) + MAX(1.0,fl/1250000.0);
+				time_t stoptime = time(0) + MAX(2.0,fl/1250000.0);
 				debug(D_DEBUG,"%s (%s) needs buffer data as %s",w->hostname,w->addrport,tf->remote_name);
 				open_time = timestamp_get();
 				link_printf(w->link,"put %s %d %o\n",tf->remote_name,fl,0777);
@@ -452,7 +453,7 @@ static int send_extra_staged_files( struct work_queue_task *t, struct work_queue
 					debug(D_DEBUG,"%s (%s) needs file %s",w->hostname,w->addrport,tf->payload);
 					int fd = open(tf->payload,O_RDONLY,0);
 					if(fd<0) goto failure;
-					time_t stoptime = time(0) + MAX(1.0,local_info.st_size/1250000.0);
+					time_t stoptime = time(0) + MAX(2.0,local_info.st_size/1250000.0);
 					open_time = timestamp_get();
 					link_printf(w->link,"put %s %d %o\n",tf->remote_name,(int)local_info.st_size,local_info.st_mode&0777);
 					actual = link_stream_from_fd(w->link,fd,local_info.st_size,stoptime);
@@ -481,9 +482,9 @@ static int send_extra_staged_files( struct work_queue_task *t, struct work_queue
 
 	failure:
 	if(tf->fname_or_literal == FNAME) 
-	    debug(D_DEBUG,"%s (%s) failed to receive %s (%i bytes received).",w->hostname,w->addrport,tf->payload,actual);
+	    debug(D_DEBUG,"%s (%s) failed to send %s (%i bytes received).",w->hostname,w->addrport,tf->payload,actual);
 	else
-	    debug(D_DEBUG,"%s (%s) failed to receive buffer data (%i bytes received).",w->hostname,w->addrport,actual);
+	    debug(D_DEBUG,"%s (%s) failed to send buffer data (%i bytes received).",w->hostname,w->addrport,actual);
 	return 0;
 }
 
@@ -630,6 +631,7 @@ void work_queue_delete( struct work_queue *q )
 void work_queue_submit( struct work_queue *q, struct work_queue_task *t )
 {
 	list_push_tail(q->ready_list,t);
+	t->submit_time = timestamp_get();
 	q->total_tasks_submitted++;
 }
 
@@ -737,8 +739,7 @@ INT64_T work_queue_task_add_standard_input_file( struct work_queue_task* t, cons
 	tf->fname_or_literal = FNAME;
 	tf->cacheable = 0;
 	tf->length = strlen(fname);
-	tf->payload = malloc((tf->length+1)*sizeof(char));
-	strcpy(tf->payload,fname);
+	tf->payload = strdup(fname);
 	tf->remote_name = malloc(11*sizeof(char));
 	string_cookie( tf->remote_name , 10);
 	if(t->command) {
@@ -767,10 +768,8 @@ INT64_T work_queue_task_add_extra_created_file( struct work_queue_task* t, const
 	tf->fname_or_literal = FNAME;
 	tf->cacheable = 0;
 	tf->length = strlen(fname);
-	tf->payload = malloc(tf->length);
-	strcpy(tf->payload,fname);
-	tf->remote_name = malloc(strlen(rname));
-	strcpy(tf->remote_name,rname);
+	tf->payload = strdup(fname);
+	tf->remote_name = strdup(rname);
 	if(!t->extra_created_files)
 		t->extra_created_files = list_create();
 	return list_push_tail(t->extra_created_files,tf);
@@ -783,8 +782,7 @@ INT64_T work_queue_task_add_extra_staged_buf( struct work_queue_task* t, const c
 	tf->length = length;
 	tf->payload = malloc(length);
 	memcpy(tf->payload, buf, length);
-	tf->remote_name = malloc(strlen(rname));
-	strcpy(tf->remote_name,rname);
+	tf->remote_name = strdup(rname);
 	if(!t->extra_staged_files)
 		t->extra_staged_files = list_create();
 	return list_push_tail(t->extra_staged_files,tf);
@@ -795,10 +793,8 @@ INT64_T work_queue_task_add_extra_staged_file( struct work_queue_task* t, const 
 	tf->fname_or_literal = FNAME;
 	tf->cacheable = 1;
 	tf->length = strlen(fname);
-	tf->payload = malloc(tf->length);
-	strcpy(tf->payload,fname);
-	tf->remote_name = malloc(strlen(rname));
-	strcpy(tf->remote_name,rname);
+	tf->payload = strdup(fname);
+	tf->remote_name = strdup(rname);
 	if(!t->extra_staged_files)
 		t->extra_staged_files = list_create();
 	return list_push_tail(t->extra_staged_files,tf);

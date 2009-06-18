@@ -319,44 +319,49 @@ int batch_job_remove_sge( struct batch_queue *q, batch_job_id_t jobid )
 int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
 {
 	struct work_queue_task *t;
+	char *f, *files;
+	
+	t = work_queue_task_create(cmd,args);
 
-	char infiles[BATCH_JOB_LINE_MAX];
-	char outfiles[BATCH_JOB_LINE_MAX];
-	char fullcmd[BATCH_JOB_LINE_MAX];
-
-	// Note that this function does not quite work yet,
-	// since the work queue api is going to change shortly.
-
-	return -1;
-
-	sprintf(fullcmd,"%s <work_queue_stdin >work_queue_stdout 2>work_queue_stderr",cmd);
-
-	infiles[0] = 0;
-	outfiles[0] = 0;
-
-	char *ip = infiles;
-	char *op = outfiles;
-
-	if(infile) ip += sprintf(ip,"%s=work_queue_stdin,",infile);
-	if(outfile) op += sprintf(op,"%s=work_queue_stdout,",outfile);
-	if(errfile) op += sprintf(op,",%s=work_queue_stderr,",errfile);
-
-	if(extra_input_files) strcat(ip,extra_input_files);
-	if(extra_output_files) strcat(op,extra_output_files);
-
-	t = work_queue_task_create(cmd,"");
-	if(t) {
-		work_queue_submit(q->work_queue,t);
-		return t->taskid;
-	} else {
-		return -1;
+	if(infile) work_queue_task_add_standard_input_file(t,infile);
+	if(cmd) work_queue_task_add_extra_staged_file(t,cmd,cmd);
+	
+	if(extra_input_files) {
+		files = strdup(extra_input_files);
+		f = strtok(files," \t,");
+		while(f) {
+			 work_queue_task_add_extra_staged_file(t,f,f);
+			 f = strtok(0," \t,");
+		}
+		free(files);
 	}
+
+	if(extra_output_files) {
+		files = strdup(extra_output_files);
+		f = strtok(files," \t,");
+		while(f) {
+			work_queue_task_add_extra_created_file(t,f,f);
+			f = strtok(0," \t,");
+		}
+		free(files);
+	}
+
+	work_queue_submit(q->work_queue,t);
+
+	return t->taskid;
 }
 
 batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_job_info *info )
 {
 	struct work_queue_task *t = work_queue_wait(q->work_queue,WAITFORTASK);
 	if(t) {
+		info->submitted = t->submit_time/1000000;
+		info->started = t->start_time/1000000;
+		info->finished = t->finish_time/1000000;
+		info->exited_normally = 1;
+		info->exit_code = t->result;
+		info->exit_signal = 0;
+
 		int taskid = t->taskid;
 		work_queue_task_delete(t);
 		return taskid;
@@ -459,9 +464,33 @@ int batch_job_remove_unix( struct batch_queue *q, batch_job_id_t jobid )
 
 /***************************************************************************************/
 
+batch_queue_type_t batch_queue_type_from_string( const char *str )
+{
+	if(!strcmp(str,"condor")) return BATCH_QUEUE_TYPE_CONDOR;
+	if(!strcmp(str,"sge"))    return BATCH_QUEUE_TYPE_CONDOR;
+	if(!strcmp(str,"unix"))   return BATCH_QUEUE_TYPE_CONDOR;
+	if(!strcmp(str,"wq"))     return BATCH_QUEUE_TYPE_WORK_QUEUE;
+	return BATCH_QUEUE_TYPE_UNKNOWN;
+}
+
+const char * batch_queue_type_to_string( batch_queue_type_t t )
+{
+	switch(t) {
+		  case BATCH_QUEUE_TYPE_UNIX:        return "unix";
+		  case BATCH_QUEUE_TYPE_CONDOR:      return "condor";
+		  case BATCH_QUEUE_TYPE_SGE:         return "sge";
+		  case BATCH_QUEUE_TYPE_WORK_QUEUE:  return "wq";
+		  default: return "unknown";
+	}
+}
+
 struct batch_queue * batch_queue_create( batch_queue_type_t type )
 {
-	struct batch_queue *q = malloc(sizeof(*q));
+	struct batch_queue *q;
+
+	if(type==BATCH_QUEUE_TYPE_UNKNOWN) return 0;
+
+	q = malloc(sizeof(*q));
 	q->type = type;
 	q->job_table = itable_create(0);
 
