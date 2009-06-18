@@ -118,8 +118,7 @@ static int do_chirp_acl_get( const char *filename, const char *dirname, const ch
 		}
 		chirp_acl_close(aclfile);
 	} else {
-		/* errno is still set from chirp_acl_open */
-		if(errno==ENOENT) errno = EACCES;
+		errno = EACCES;
 	}
 
 	if(read_only_mode) {
@@ -143,7 +142,7 @@ int chirp_acl_check_dir( const char *dirname, const char *subject, int flags )
 	if( ( flags & myflags ) == flags ) {
 		return 1;
 	} else {
-		if(errno==0) errno = EACCES;
+		errno = EACCES;
 		return 0;
 	}
 }
