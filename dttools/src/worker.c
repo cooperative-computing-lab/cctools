@@ -128,11 +128,11 @@ int main( int argc, char *argv[] )
 				sleep(5);
 				continue;
 			}
-		}
 
-		link_tune(master,LINK_TUNE_INTERACTIVE);
-		sprintf(line,"ready %s %d %llu %llu %llu %llu\n",hostname,ncpus,memory_avail,memory_total,disk_avail,disk_total);
-		link_write(master,line,strlen(line),time(0)+timeout);
+			link_tune(master,LINK_TUNE_INTERACTIVE);
+			sprintf(line,"ready %s %d %llu %llu %llu %llu\n",hostname,ncpus,memory_avail,memory_total,disk_avail,disk_total);
+			link_write(master,line,strlen(line),time(0)+timeout);
+		}
 
 		if(link_readline(master,line,sizeof(line),time(0)+timeout)) {
 			debug(D_DEBUG,"%s",line);
@@ -170,7 +170,8 @@ int main( int argc, char *argv[] )
 				if(fd>=0) {
 					struct stat info;
 					fstat(fd,&info);
-					sprintf(line,"%d\n",(int)info.st_size);
+					length = info.st_size;
+					sprintf(line,"%d\n",(int)length);
 					link_write(master,line,strlen(line),time(0)+timeout);
 					int actual = link_stream_from_fd(master,fd,length,time(0)+timeout);
 					close(fd);

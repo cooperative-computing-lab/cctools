@@ -226,7 +226,7 @@ static int get_extra_created_files( struct work_queue_task *t, struct work_queue
 			if(fd<0) goto failure;
 			actual = link_stream_to_fd(w->link,fd,length,time(0)+short_timeout);
 			close(fd);
-			if(actual!=0) { unlink(tf->payload); goto failure; }
+			if(actual!=length) { unlink(tf->payload); goto failure; }
 		}
 	}
 	return 1;
@@ -255,13 +255,21 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			}
 		} else if(sscanf(line,"result %d %d",&result,&output_length)) {
 			struct work_queue_task *t = w->current_task;
+			int actual;
+
 			t->output = malloc(output_length+1);
-			int actual = link_read(l,t->output,output_length,time(0)+short_timeout);
-			if(actual!=output_length) {
-				free(t->output);
-				t->output = 0;
-				goto failure;
+
+			if(output_length>0) {
+				actual = link_read(l,t->output,output_length,time(0)+short_timeout);
+				if(actual!=output_length) {
+					free(t->output);
+					t->output = 0;
+					goto failure;
+				}
+			} else {
+				actual = 0;
 			}
+
 			t->output[actual] = 0;
 			t->result = result;
 
