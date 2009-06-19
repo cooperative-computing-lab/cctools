@@ -12,7 +12,8 @@ See the file COPYING for details.
 
 /** @file batch_job.h Batch job submission.
 This module implements batch job submission to multiple systems,
-currently Condor and plain Unix processes.  The simplifies the construction
+including Condor, SGE, Work Queue, and local Unix processes.
+This simplifies the construction
 of parallel abstractions that need a simple form of parallel process execution.
 */
 
@@ -61,7 +62,21 @@ struct batch_job_info {
 	int exit_signal;	/**< The signal by which the job was killed, if it exited abnormally. */
 };
 
-/** Submit a batch job..
+/** Submit a simple batch job.
+@param q The queue to submit to.
+@param cmdline The command line to execute.  This line will be interpreted by the shell, so it may include output redirection, multiple commands, pipes, and so forth.
+@param input_files A comma separated list of all input files that will be required by the job.  Null pointer is equivalent to empty string.  This must also include the executable and any dependent programs.
+@param output_files A comma separated list of all output files to retrieve from the job.  Null pointer is equivalent to empty string.
+@return A unique identifier for the batch job.
+*/
+
+batch_job_id_t batch_job_submit_simple(
+	struct batch_queue *q,
+	const char *cmdline,
+	const char *input_files,
+	const char *output_files );
+
+/** Submit a batch job.
 @param q The queue to submit to.
 @param cmd The command to execute.
 @param args The command line arguments.

@@ -77,6 +77,26 @@ static int batch_job_submit_condor( struct batch_queue *q, const char *cmd, cons
 	return -1;
 }
 
+static int batch_job_submit_simple_condor( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
+{
+	FILE *file;
+
+	file = fopen("condor.sh","w");
+	if(!file) {
+		debug(D_DEBUG,"could not create condor.sh: %s",strerror(errno));
+		return -1;
+	}
+
+	fprintf(file,"#!/bin/sh\n");
+	fprintf(file,"%s\n",cmd);
+	fprintf(file,"exit $?\n");
+	fclose(file);
+
+	chmod("condor.sh",0755);
+
+	return batch_job_submit_condor(q,"condor.sh",0,0,0,0,extra_input_files,extra_output_files);
+}
+
 batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_info *info_out )
 {
 	static FILE * logfile = 0;
@@ -195,11 +215,12 @@ static int setup_sge_wrapper( const char *wrapperfile )
 	fprintf(file,"#!/bin/sh\n");
 	fprintf(file,"logfile=status.${JOB_ID}\n");
 	fprintf(file,"starttime=`date +%%s`\n");
-	fprintf(file,"$@\n");
+	fprintf(file,"eval \"$@\"\n");
 	fprintf(file,"stoptime=`date +%%s`\n");
 	fprintf(file,"cat > $logfile <<EOF\n");
 	fprintf(file,"start $starttime\n");
 	fprintf(file,"stop $? $stoptime\n");
+	fprintf(file,"EOF\n");
 	fclose(file);
 
 	chmod(wrapperfile,0755);
@@ -207,7 +228,7 @@ static int setup_sge_wrapper( const char *wrapperfile )
 	return 0;
 }
 
-batch_job_id_t batch_job_submit_sge( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
+batch_job_id_t batch_job_submit_simple_sge( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
 {
 	char line[BATCH_JOB_LINE_MAX];
 	batch_job_id_t jobid;
@@ -215,14 +236,11 @@ batch_job_id_t batch_job_submit_sge( struct batch_queue *q, const char *cmd, con
 
 	FILE *file;
 
-	if(setup_sge_wrapper("sge_wrapper")<0) return -1;
+	if(setup_sge_wrapper("sgewrap")<0) return -1;
 
-	sprintf(line,"qsub -N wavefront ");
-	if(outfile) sprintf(&line[strlen(line)],"-o %s ",outfile);
-	if(errfile) sprintf(&line[strlen(line)],"-e %s ",errfile);
-	sprintf(&line[strlen(line)],"sge_wrapper %s %s",cmd,args);
+	sprintf(line,"qsub sgewrap \"%s\"",cmd);
 
-	debug(D_DEBUG,"submitting sge job: %s",line);
+	debug(D_DEBUG,"%s",line);
 
 	file = popen(line,"r");
 	if(!file) {
@@ -251,6 +269,18 @@ batch_job_id_t batch_job_submit_sge( struct batch_queue *q, const char *cmd, con
 	}
 }
 
+batch_job_id_t batch_job_submit_sge( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
+{
+	char command[BATCH_JOB_LINE_MAX];
+
+	sprintf(command,"%s %s",cmd,args);
+
+	if(infile) sprintf(&command[strlen(command)]," <%s",infile);
+	if(outfile) sprintf(&command[strlen(command)]," >%s",outfile);
+	if(errfile) sprintf(&command[strlen(command)]," 2>%s",errfile);
+	
+	return batch_job_submit_simple_sge(q,command,extra_input_files,extra_output_files);
+}
 
 batch_job_id_t batch_job_wait_sge( struct batch_queue *q, struct batch_job_info *info_out )
 {
@@ -354,6 +384,38 @@ int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const c
 	return t->taskid;
 }
 
+int batch_job_submit_simple_work_queue( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
+{
+	struct work_queue_task *t;
+	char *f, *files;
+	
+	t = work_queue_task_create(cmd,"");
+
+	if(extra_input_files) {
+		files = strdup(extra_input_files);
+		f = strtok(files," \t,");
+		while(f) {
+			 work_queue_task_add_extra_staged_file(t,f,f);
+			 f = strtok(0," \t,");
+		}
+		free(files);
+	}
+
+	if(extra_output_files) {
+		files = strdup(extra_output_files);
+		f = strtok(files," \t,");
+		while(f) {
+			work_queue_task_add_extra_created_file(t,f,f);
+			f = strtok(0," \t,");
+		}
+		free(files);
+	}
+
+	work_queue_submit(q->work_queue,t);
+
+	return t->taskid;
+}
+
 batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_job_info *info )
 {
 	struct work_queue_task *t = work_queue_wait(q->work_queue,WAITFORTASK);
@@ -393,25 +455,15 @@ int batch_job_remove_work_queue( struct batch_queue *q, batch_job_id_t jobid )
 
 /***************************************************************************************/
 
-int batch_job_submit_unix( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
+int batch_job_submit_simple_unix( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
 {
-	char line[BATCH_JOB_LINE_MAX];
 	batch_job_id_t jobid;
-
-	if(!cmd) return -1;
-
-	if(!args)    args = "";
-	if(!infile)  infile = "/dev/null";
-	if(!outfile) outfile = "/dev/null";
-	if(!errfile) errfile = "/dev/null";
-
-	sprintf(line,"%s %s <%s >%s 2>%s",cmd,args,infile,outfile,errfile);
 
 	fflush(0);
 
 	jobid = fork();
 	if(jobid>0) {
-		debug(D_DEBUG,"started process %d: %s",jobid,line);
+		debug(D_DEBUG,"started process %d: %s",jobid,cmd);
 		struct batch_job_info *info = malloc(sizeof(*info));
 		memset(info,0,sizeof(*info));
 		info->submitted = time(0);
@@ -422,13 +474,30 @@ int batch_job_submit_unix( struct batch_queue *q, const char *cmd, const char *a
 		debug(D_DEBUG,"couldn't create new process: %s\n",strerror(errno));
 		return -1;
 	} else {
-		int result = system(line);
+		int result = system(cmd);
 		if(WIFEXITED(result)) {
 			_exit(WEXITSTATUS(result));
 		} else {
 			_exit(1);
 		}
 	}
+	
+}
+
+int batch_job_submit_unix( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
+{
+	char line[BATCH_JOB_LINE_MAX];
+
+	if(!cmd) return -1;
+
+	if(!args)    args = "";
+	if(!infile)  infile = "/dev/null";
+	if(!outfile) outfile = "/dev/null";
+	if(!errfile) errfile = "/dev/null";
+
+	sprintf(line,"%s %s <%s >%s 2>%s",cmd,args,infile,outfile,errfile);
+
+	return batch_job_submit_simple_unix(q,line,extra_input_files,extra_output_files);
 }
 
 batch_job_id_t batch_job_wait_unix( struct batch_queue *q, struct batch_job_info *info_out )
@@ -481,8 +550,8 @@ int batch_job_remove_unix( struct batch_queue *q, batch_job_id_t jobid )
 batch_queue_type_t batch_queue_type_from_string( const char *str )
 {
 	if(!strcmp(str,"condor")) return BATCH_QUEUE_TYPE_CONDOR;
-	if(!strcmp(str,"sge"))    return BATCH_QUEUE_TYPE_CONDOR;
-	if(!strcmp(str,"unix"))   return BATCH_QUEUE_TYPE_CONDOR;
+	if(!strcmp(str,"sge"))    return BATCH_QUEUE_TYPE_SGE;
+	if(!strcmp(str,"unix"))   return BATCH_QUEUE_TYPE_UNIX;
 	if(!strcmp(str,"wq"))     return BATCH_QUEUE_TYPE_WORK_QUEUE;
 	return BATCH_QUEUE_TYPE_UNKNOWN;
 }
@@ -530,6 +599,24 @@ batch_job_id_t batch_job_submit( struct batch_queue *q, const char *cmd, const c
 		return batch_job_submit_sge(q,cmd,args,infile,outfile,errfile,extra_input_files,extra_output_files);
 	} else if(q->type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_submit_work_queue(q,cmd,args,infile,outfile,errfile,extra_input_files,extra_output_files);
+	} else {
+		errno = EINVAL;
+		return -1;
+	}
+}
+
+batch_job_id_t batch_job_submit_simple( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
+{
+	if(!q->job_table) q->job_table = itable_create(0);
+
+	if(q->type==BATCH_QUEUE_TYPE_UNIX) {
+		return batch_job_submit_simple_unix(q,cmd,extra_input_files,extra_output_files);
+	} else if(q->type==BATCH_QUEUE_TYPE_CONDOR) {
+		return batch_job_submit_simple_condor(q,cmd,extra_input_files,extra_output_files);
+	} else if(q->type==BATCH_QUEUE_TYPE_SGE) {
+		return batch_job_submit_simple_sge(q,cmd,extra_input_files,extra_output_files);
+	} else if(q->type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
+		return batch_job_submit_simple_work_queue(q,cmd,extra_input_files,extra_output_files);
 	} else {
 		errno = EINVAL;
 		return -1;
