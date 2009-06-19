@@ -22,7 +22,7 @@ allpairs_cleanup: allpairs_cleanup.o ${CCTOOLS_HOME}/chirp/src/libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 allpairs_multicore: allpairs_multicore.o ${CCTOOLS_HOME}/chirp/src/libchirp.a
-	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS} -lpthread
+	${CCTOOLS_LD} -o $@ $^ -lpthread ${LOCAL_LDFLAGS}
 
 test:
 
