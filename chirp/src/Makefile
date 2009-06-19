@@ -57,7 +57,7 @@ chirp_md5sum: chirp_md5sum.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 chirp_local_allpairs_multicore: chirp_local_allpairs_multicore.o libchirp.a
-	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS} -lpthread
+	${CCTOOLS_LD} -o $@ $^ -lpthread ${LOCAL_LDFLAGS}
 
 chirp_partition_stream: chirp_partition_stream.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
