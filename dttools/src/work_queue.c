@@ -222,11 +222,16 @@ static int get_extra_created_files( struct work_queue_task *t, struct work_queue
 			link_printf(w->link,"get %s\n",tf->remote_name);
 			if(!link_readline(w->link,line,sizeof(line),time(0)+short_timeout)) goto failure;
 			if(sscanf(line,"%d",&length)!=1) goto failure;
-			fd = open(tf->payload,O_WRONLY|O_TRUNC|O_CREAT,0700);
-			if(fd<0) goto failure;
-			actual = link_stream_to_fd(w->link,fd,length,time(0)+short_timeout);
-			close(fd);
-			if(actual!=length) { unlink(tf->payload); goto failure; }
+			if(length>=0) {
+				fd = open(tf->payload,O_WRONLY|O_TRUNC|O_CREAT,0700);
+				if(fd<0) goto failure;
+				actual = link_stream_to_fd(w->link,fd,length,time(0)+short_timeout);
+				close(fd);
+				if(actual!=length) { unlink(tf->payload); goto failure; }
+			} else {
+				debug(D_DEBUG,"%s (%s) did not create expected file %s",tf->remote_name);
+				t->result = 1;
+			}
 		}
 	}
 	return 1;
@@ -500,14 +505,14 @@ void build_full_command(struct work_queue_task *t) {
 	if(t->command)
 	{
 		char* tmp = malloc((strlen(t->command)+strlen(" | ./")+strlen(t->program)+1+strlen(t->args)+1)*sizeof(char));
-		sprintf(tmp,"%s | ./%s %s",t->command, t->program, t->args);
+		sprintf(tmp,"%s | %s %s",t->command, t->program, t->args);
 		free(t->command);
 		t->command = tmp;
 		debug(D_DEBUG,"Full command (with inputs): '%s'",t->command);
 	}
 	else {
 		char* tmp = malloc((2+strlen(t->program)+1+strlen(t->args)+1)*sizeof(char));
-		sprintf(tmp,"./%s %s", t->program, t->args);
+		sprintf(tmp,"%s %s", t->program, t->args);
 		t->command = tmp;
 		debug(D_DEBUG,"Full command (no inputs): '%s'",t->command);
 	}
