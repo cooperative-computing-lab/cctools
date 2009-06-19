@@ -32,7 +32,7 @@ See the file COPYING for details.
 
 #define WAVEFRONT_MODE_AUTO 0
 #define WAVEFRONT_MODE_MULTICORE 1
-#define WAVEFRONT_MODE_CLUSTER 2
+#define WAVEFRONT_MODE_DISTRIBUTED 2
 
 static int wavefront_mode = WAVEFRONT_MODE_MULTICORE;
 
@@ -42,7 +42,6 @@ static const char * progress_bitmap_file = 0;
 static int progress_bitmap_interval = 5;
 static FILE * progress_log_file = 0;
 static int abort_mode = 0;
-static int use_parameter_files = 0;
 static int block_size = 1;
 static int batch_system_type = BATCH_QUEUE_TYPE_CONDOR;
 static int verify_mode = 0;
@@ -108,25 +107,14 @@ int task_submit_recursive( struct task *n )
 {
 	int i,j;
 
-	char args[PATH_MAX];
-	char outfile[PATH_MAX];
-	char errfile[PATH_MAX];
-	char filename[PATH_MAX];
 	char extra_input_files[PATH_MAX*100];
+	char extra_output_files[PATH_MAX];
+	char command[PATH_MAX];
+	char filename[PATH_MAX];
 
-	sprintf(outfile,"output.%d.%d",n->x,n->y);
-	sprintf(errfile,"error.%d.%d",n->x,n->y);
-	sprintf(args,"-M -X %d -Y %d %s %s %d %d",n->x,n->y,use_parameter_files?"-p":"",function,n->width,n->height);
-	sprintf(extra_input_files,"wavefront,%s,",function);
-
-	if(use_parameter_files) {
-		for(i=0;i<n->width;i++) {
-			for(j=0;j<n->height;j++) {
-				sprintf(filename,"P.%d.%d,",n->x+i,n->y+j);
-				strcat(extra_input_files,filename);
-			}
-		}
-	}
+	sprintf(command,"./wavefront -M -X %d -Y %d ./%s %d %d >output.%d.%d 2>&1",n->x,n->y,function,n->width,n->height,n->x,n->y);
+	sprintf(extra_output_files,"output.%d.%d",n->x,n->y);
+	sprintf(extra_input_files,"wavefront,%s",function);
 
 	for(i=-1;i<n->width;i++) {
 		strcat(extra_input_files,",");
@@ -140,39 +128,26 @@ int task_submit_recursive( struct task *n )
 		strcat(extra_input_files,filename);
 	}
 
-	return batch_job_submit(batch_q,"./wavefront",args,0,outfile,errfile,extra_input_files,0);
+	return batch_job_submit_simple(batch_q,command,extra_input_files,extra_output_files);
 }
 
 int task_submit_single( struct task *n )
 {
-	char args[PATH_MAX];
-	char outfile[PATH_MAX];
-	char errfile[PATH_MAX];
+	char command[PATH_MAX];
 	char leftfile[PATH_MAX];
 	char bottomfile[PATH_MAX];
 	char diagfile[PATH_MAX];
-	char extra_input_files[PATH_MAX];
-	char paramfile[PATH_MAX];
+	char extra_input_files[PATH_MAX*4];
 
 	sprintf(leftfile,"R.%d.%d",n->x-1,n->y);
 	sprintf(bottomfile,"R.%d.%d",n->x,n->y-1);
 	sprintf(diagfile,"R.%d.%d",n->x-1,n->y-1);
 
-	sprintf(args,"%s %s %s",leftfile,bottomfile,diagfile);
-	sprintf(extra_input_files,"%s,%s,%s",leftfile,bottomfile,diagfile);
-	sprintf(paramfile,"P.%d.%d",n->x,n->y);
+	sprintf(extra_input_files,"%s,%s,%s,%s",function,leftfile,bottomfile,diagfile);
 
-	if(use_parameter_files) {
-		strcat(extra_input_files,",");
-		strcat(extra_input_files,paramfile);
-		strcat(args," ");
-		strcat(args,paramfile);
-	}
+	sprintf(command,"./%s %s %s %s >R.%d.%d",function,leftfile,bottomfile,diagfile,n->x,n->y);
 
-	sprintf(outfile,"R.%d.%d",n->x,n->y);
-	sprintf(errfile,"E.%d.%d",n->x,n->y);
-
-	return batch_job_submit(batch_q,function,args,0,outfile,errfile,extra_input_files,0);
+	return batch_job_submit_simple(batch_q,command,extra_input_files,0);
 }
 
 int task_submit( struct task *n )
@@ -252,7 +227,7 @@ static double wavefront_multicore_model( int size, int cpus, double tasktime )
 	return runtime;		
 }
 
-static double wavefront_cluster_model( int size, int nodes, int cpus_per_node, double tasktime, int blocksize, double dispatchtime )
+static double wavefront_distributed_model( int size, int nodes, int cpus_per_node, double tasktime, int blocksize, double dispatchtime )
 {
 	double blocktime = wavefront_multicore_model(blocksize,cpus_per_node,tasktime);
 	double runtime = wavefront_multicore_model( size/blocksize,nodes,blocktime+dispatchtime);
@@ -267,7 +242,7 @@ static int find_best_block_size( int size, int nodes, int cpus_per_node, double 
 	int b;
 
 	for(b=1;b<(xsize/4);b++) {
-		t = wavefront_cluster_model(size,nodes,cpus_per_node,task_time,b,dispatch_time);
+		t = wavefront_distributed_model(size,nodes,cpus_per_node,task_time,b,dispatch_time);
 		if(t>lasttime) {
 			b--;
 			break;
@@ -398,12 +373,11 @@ static void show_help(const char *cmd)
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -l <file>      Save progress log to this file.\n");
-	printf(" -p             Pass parameter files named P.x.y to each job.\n");
 	printf(" -i <file.bmp>  Save progress image to this file.\n");
 	printf(" -t <secs>      Interval between image writes, in seconds. (default=%d)\n",progress_bitmap_interval);
 	printf(" -A             Automatically choose between multicore and batch mode.\n");
 	printf(" -M             Run the whole problem locally in multicore mode. (default)\n");
-	printf(" -C             Run the whole problem in cluster mode.\n");
+	printf(" -D             Run the whole problem in distributed mode.\n");
 	printf(" -T <type>      Specify the type of the batch system: condor or sge\n");
 	printf(" -V             Verify mode: check the configuration and then exit.\n");
 	printf(" -v             Show version string\n");
@@ -420,7 +394,7 @@ int main( int argc, char *argv[] )
 
 	progress_log_file = stdout;
 
-	while((c=getopt(argc,argv,"n:b:d:o:l:pi:t:qAMCT:VX:Y:vh"))!=(char)-1) {
+	while((c=getopt(argc,argv,"n:b:d:o:l:i:t:qAMDT:VX:Y:vh"))!=(char)-1) {
 		switch(c) {
 			case 'n':
 				manual_max_jobs_running = atoi(optarg);
@@ -433,9 +407,6 @@ int main( int argc, char *argv[] )
 				break;
 			case 'o':
 				debug_config_file(optarg);
-				break;
-			case 'p':
-				use_parameter_files = 1;
 				break;
 			case 'i':
 				progress_bitmap_file = optarg;
@@ -456,8 +427,8 @@ int main( int argc, char *argv[] )
 			case 'M':
 				wavefront_mode = WAVEFRONT_MODE_MULTICORE;
 				break;
-			case 'C':
-				wavefront_mode = WAVEFRONT_MODE_CLUSTER;
+			case 'D':
+				wavefront_mode = WAVEFRONT_MODE_DISTRIBUTED;
 				break;
 			case 'T':
 				batch_system_type = batch_queue_type_from_string(optarg);
@@ -505,7 +476,7 @@ int main( int argc, char *argv[] )
 		printf("Each function takes %.02lfs to run.\n",task_time);
 
 		block_size = find_best_block_size(xsize,1000,2,task_time,average_dispatch_time);
-		double cluster_time = wavefront_cluster_model(xsize,1000,2,task_time,block_size,average_dispatch_time);
+		double distributed_time = wavefront_distributed_model(xsize,1000,2,task_time,block_size,average_dispatch_time);
 		double multicore_time = wavefront_multicore_model(xsize,ncpus,task_time);
 		double ideal_multicore_time = wavefront_multicore_model(xsize,xsize,task_time);
 		double sequential_time = wavefront_multicore_model(xsize,1,task_time);
@@ -515,14 +486,14 @@ int main( int argc, char *argv[] )
 		printf("%.02lfs sequentially\n",sequential_time);
 		printf("%.02lfs on this %d-core machine\n",multicore_time,ncpus);
 		printf("%.02lfs on a %d-core machine\n",ideal_multicore_time,xsize);
-		printf("%.02lfs on a 1000-node cluster with block size %d\n",cluster_time,block_size);
+		printf("%.02lfs on a 1000-node distributed system with block size %d\n",distributed_time,block_size);
 		printf("---------------------------------\n");
 
 		if(wavefront_mode==WAVEFRONT_MODE_AUTO) {
-			if(multicore_time < cluster_time*2) {
+			if(multicore_time < distributed_time*2) {
 				wavefront_mode = WAVEFRONT_MODE_MULTICORE;
 			} else {
-				wavefront_mode = WAVEFRONT_MODE_CLUSTER;
+				wavefront_mode = WAVEFRONT_MODE_DISTRIBUTED;
 			}
 		}
 	}
@@ -545,7 +516,7 @@ int main( int argc, char *argv[] )
 	if(wavefront_mode==WAVEFRONT_MODE_MULTICORE) {
 		printf("Running in multicore mode with %d CPUs.\n",max_jobs_running);
 	} else {
-		printf("Running in cluster mode with block size %d on up to %d CPUs\n",block_size,max_jobs_running);
+		printf("Running in distributed mode with block size %d on up to %d CPUs\n",block_size,max_jobs_running);
 	}
 
 	batch_q = batch_queue_create(batch_system_type);
