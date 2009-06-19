@@ -79,6 +79,7 @@ struct work_queue_task * work_queue_task_create( const char *program, const char
 	memset(t,0,sizeof(*t));
 	t->program = strdup(program);
 	t->args = strdup(args);
+	t->tag = NULL;
 	t->output = NULL;
 	t->standard_input_files = NULL;
 	t->extra_staged_files = NULL;
@@ -97,6 +98,7 @@ void work_queue_task_delete( struct work_queue_task *t )
 	if(t) {
 		if(t->program) free(t->program);
 		if(t->args) free(t->args);
+		if(t->tag) free(t->tag);
 		if(t->output) free(t->output);
 		if(t->standard_input_files) {
 			for(i=0; i<list_size(t->standard_input_files); i++) {
@@ -712,6 +714,15 @@ int work_queue_hungry(struct work_queue* q)
 	i = (1.1*(info.workers_init + info.workers_ready + info.workers_busy));
 	j = (info.tasks_waiting);
 	return MAX(i-j,0);
+}
+
+
+INT64_T work_queue_task_add_tag( struct work_queue_task* t, const char* tag) {
+    if(t->tag)
+	free(t->tag);
+    t->tag = malloc((strlen(tag)+1)*sizeof(char));
+    strcpy(t->tag,tag);
+    return 0;
 }
 
 INT64_T work_queue_task_add_standard_input_buf( struct work_queue_task* t, const char* buf, int length) {

@@ -31,6 +31,7 @@ struct task_file {
 /** A task description.  This structure should only be created with @ref work_queue_task_create and delete with @ref work_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.
 */
 struct work_queue_task {
+	char *tag;
         char *program;			/**< The program to execute. */
 	char *args;			/**< The arguments line. */
 	char *output;			/**< The standard output of the task. */
@@ -106,6 +107,12 @@ void work_queue_task_delete( struct work_queue_task *t );
 @param args The arguments to the command.
 */
 struct work_queue_task * work_queue_task_create( const char* program, const char *args);
+
+/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
+@param t The task to which to add parameters
+@param tag The tag to attatch to tast t.
+*/
+INT64_T work_queue_task_add_tag( struct work_queue_task* t, const char* tag);
 
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. If no buffer or file is defined, the program will have default stdin.
 @param t The task to which to add parameters

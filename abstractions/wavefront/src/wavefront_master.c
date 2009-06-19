@@ -38,10 +38,15 @@ static double sequential_run_time = 7.75;
 static time_t start_time = 0;
 static time_t last_display_time = 0;
 
+static const time_t long_wait = 60;
+static const time_t short_wait = 5; 
+
 static int task_consider( int x, int y )
 {
-	char cmd[WAVEFRONT_LINE_MAX];
+	char args[WAVEFRONT_LINE_MAX];
 	char tag[WAVEFRONT_LINE_MAX];
+	
+	struct work_queue_task* t;
 
 	if(x>=xsize) return 1;
 	if(y>=ysize) return 1;
@@ -54,31 +59,16 @@ static int task_consider( int x, int y )
 
 	if(!left || !bottom || !diag) return 1;
 
-	sprintf(cmd,"./%s %d %d xfile yfile dfile",function,x,y);
+	sprintf(args,"%d %d xfile yfile dfile",x,y);
 	sprintf(tag,"%d %d",x,y);
-
-	struct task_file files[4];
-
-	files[0].fname_or_literal = 0;
-	files[0].payload = strdup(function);
-	files[0].remote_name = strdup(function);
-
-	files[1].fname_or_literal = 1;
-	files[1].payload = strdup(left);
-	files[1].length = strlen(left);
-	files[1].remote_name = strdup("xfile");
-
-	files[2].fname_or_literal = 1;
-	files[2].payload = strdup(bottom);
-	files[2].length = strlen(bottom);
-	files[2].remote_name = strdup("yfile");
-
-	files[3].fname_or_literal = 1;
-	files[3].payload = strdup(diag);
-	files[3].length = strlen(diag);
-	files[3].remote_name = strdup("dfile");
-
-	work_queue_submit(queue,work_queue_task_create(tag,cmd,files,4,0,0));
+	
+	t = work_queue_task_create(function,args);
+	work_queue_task_add_tag(t,tag);
+	work_queue_task_add_extra_staged_file(t, function, function);
+	work_queue_task_add_extra_staged_buf(t, left, strlen(left), "xfile");
+	work_queue_task_add_extra_staged_buf(t, bottom, strlen(bottom), "yfile");
+	work_queue_task_add_extra_staged_buf(t, diag, strlen(diag), "dfile");
+	work_queue_submit(queue,t);
 
 	return 1;
 }
@@ -193,7 +183,7 @@ int main( int argc, char *argv[] )
 		return 1;
 	}
 
-	queue = work_queue_create(port);
+	queue = work_queue_create(port,time(0)+long_wait);
 
 	task_prime();
 
@@ -202,7 +192,7 @@ int main( int argc, char *argv[] )
 	while(1) {
 		if(time(0)!=last_display_time) display_progress(queue);
 
-		t = work_queue_wait(queue);
+		t = work_queue_wait(queue,short_wait);
 		if(!t) break;
 		
 		if(t->result==0) {
