@@ -946,7 +946,12 @@ static void chirp_handler( struct link *l, const char *subject )
 			FILE *aclfile;
 
 			if(!chirp_path_fix(path)) goto failure;
-			if(!chirp_acl_check_dir(path,subject,CHIRP_ACL_LIST)) goto failure;
+
+			// Previously, the LIST right was necessary to view the ACL.
+			// However, this has caused much confusion with debugging permissions problems.
+			// As an experiment, let's trying making getacl accessible to everyone.
+	
+			// if(!chirp_acl_check_dir(path,subject,CHIRP_ACL_LIST)) goto failure;
 
 			aclfile = chirp_acl_open(path);
 			if(aclfile) {
@@ -1292,7 +1297,7 @@ static void chirp_handler( struct link *l, const char *subject )
 			if(!chirp_acl_check(path,subject,CHIRP_ACL_LIST) && !chirp_acl_check(path,"system:localuser",CHIRP_ACL_LIST)) goto failure;
 			result = chirp_alloc_stat(path,&info);
 			if(result>=0) {
-				sprintf(line,"%d\n",strlen(path));
+				sprintf(line,"%d\n",(int)strlen(path));
 				link_write(l,line,strlen(line),stalltime);
 				link_write(l,path,strlen(path),stalltime);
 				do_no_result = 1;
