@@ -25,10 +25,10 @@ See the file COPYING for details.
 
 #define PATH_MAX 256
 
-#define TASK_STATE_COMPLETE   MAKE_RGBA(0,0,255,0)
-#define TASK_STATE_RUNNING    MAKE_RGBA(0,255,0,0)
-#define TASK_STATE_READY      MAKE_RGBA(255,255,0,0)
-#define TASK_STATE_NOTREADY   MAKE_RGBA(255,0,0,0)
+#define WAVEFRONT_TASK_STATE_COMPLETE   MAKE_RGBA(0,0,255,0)
+#define WAVEFRONT_TASK_STATE_RUNNING    MAKE_RGBA(0,255,0,0)
+#define WAVEFRONT_TASK_STATE_READY      MAKE_RGBA(255,255,0,0)
+#define WAVEFRONT_TASK_STATE_NOTREADY   MAKE_RGBA(255,0,0,0)
 
 #define WAVEFRONT_MODE_AUTO 0
 #define WAVEFRONT_MODE_MULTICORE 1
@@ -64,16 +64,16 @@ static int total_cells = 0;
 static double average_dispatch_time = 30.0;
 static double average_task_time = 1.0;
 
-struct task {
+struct wavefront_task {
        int x;
        int y;
        int width;
        int height;
 };
 
-struct task * task_create( int x, int y, int w, int h )
+struct wavefront_task * wavefront_task_create( int x, int y, int w, int h )
 {
-	struct task *n = malloc(sizeof(*n));
+	struct wavefront_task *n = malloc(sizeof(*n));
 	n->x = x;
 	n->y = y;
 	n->width = w;
@@ -81,29 +81,29 @@ struct task * task_create( int x, int y, int w, int h )
 	return n;
 }
 
-void task_delete( struct task *n )
+void wavefront_task_delete( struct wavefront_task *n )
 {
 	free(n);
 }
 
-void task_initialize( struct bitmap *b, struct list * list )
+void wavefront_task_initialize( struct bitmap *b, struct list * list )
 {
 	int i, j;
 
-	bitmap_reset(b,TASK_STATE_NOTREADY);
+	bitmap_reset(b,WAVEFRONT_TASK_STATE_NOTREADY);
 
 	for(i=0;i<=xsize;i++) {
-		bitmap_set(b,i,0,TASK_STATE_COMPLETE);
+		bitmap_set(b,i,0,WAVEFRONT_TASK_STATE_COMPLETE);
 	}
 
 	for(j=0;j<=ysize;j++) {
-		bitmap_set(b,0,j,TASK_STATE_COMPLETE);
+		bitmap_set(b,0,j,WAVEFRONT_TASK_STATE_COMPLETE);
 	}
 
-	list_push_head(list,task_create(xstart,ystart,block_size,block_size));
+	list_push_head(list,wavefront_task_create(xstart,ystart,block_size,block_size));
 }
 
-int task_submit_recursive( struct task *n )
+int wavefront_task_submit_recursive( struct wavefront_task *n )
 {
 	int i,j;
 
@@ -131,7 +131,7 @@ int task_submit_recursive( struct task *n )
 	return batch_job_submit_simple(batch_q,command,extra_input_files,extra_output_files);
 }
 
-int task_submit_single( struct task *n )
+int wavefront_task_submit_single( struct wavefront_task *n )
 {
 	char command[PATH_MAX];
 	char leftfile[PATH_MAX];
@@ -150,17 +150,17 @@ int task_submit_single( struct task *n )
 	return batch_job_submit_simple(batch_q,command,extra_input_files,0);
 }
 
-int task_submit( struct task *n )
+int wavefront_task_submit( struct wavefront_task *n )
 {
 	if(n->width==1 && n->height==1) {
-		return task_submit_single(n);
+		return wavefront_task_submit_single(n);
 	} else {
-		return task_submit_recursive(n);
+		return wavefront_task_submit_recursive(n);
 	}
 }
 
 
-void task_mark_range( struct task *t, struct bitmap *b, int state )
+void wavefront_task_mark_range( struct wavefront_task *t, struct bitmap *b, int state )
 {
 	int i,j;
 
@@ -171,31 +171,31 @@ void task_mark_range( struct task *t, struct bitmap *b, int state )
 	}
 }
 
-void task_consider( struct bitmap *b, struct list *list, int x, int y )
+void wavefront_task_consider( struct bitmap *b, struct list *list, int x, int y )
 {
 	int i,j;
 
 	for(i=0;(i<block_size) && (x+i-xstart+1)<=xsize;i++) {
-		if(bitmap_get(b,x+i-xstart+1,y-ystart)!=TASK_STATE_COMPLETE) break;
+		if(bitmap_get(b,x+i-xstart+1,y-ystart)!=WAVEFRONT_TASK_STATE_COMPLETE) break;
 	}
 
 	for(j=0;(j<block_size) && (y+j-ystart+1)<=ysize;j++) {
-		if(bitmap_get(b,x-xstart,y+j-ystart+1)!=TASK_STATE_COMPLETE) break;
+		if(bitmap_get(b,x-xstart,y+j-ystart+1)!=WAVEFRONT_TASK_STATE_COMPLETE) break;
 	}
 
 	if(i==0 || j==0) return;
 
-	struct task *t = task_create(x,y,i,j);
-	task_mark_range(t,b,TASK_STATE_READY);
+	struct wavefront_task *t = wavefront_task_create(x,y,i,j);
+	wavefront_task_mark_range(t,b,WAVEFRONT_TASK_STATE_READY);
 	list_push_head(list,t);
 }
 
-void task_complete( struct bitmap *b, struct list *list, struct task *t )
+void wavefront_task_complete( struct bitmap *b, struct list *list, struct wavefront_task *t )
 {
-	task_mark_range(t,b,TASK_STATE_COMPLETE);
-	task_consider(b,list,t->x+t->width,t->y);
-	task_consider(b,list,t->x,t->y+t->height);
-	task_delete(t);
+	wavefront_task_mark_range(t,b,WAVEFRONT_TASK_STATE_COMPLETE);
+	wavefront_task_consider(b,list,t->x+t->width,t->y);
+	wavefront_task_consider(b,list,t->x,t->y+t->height);
+	wavefront_task_delete(t);
 }
 
 static double wavefront_multicore_model( int size, int cpus, double tasktime )
@@ -316,7 +316,7 @@ static int check_configuration( const char *function, int xsize, int ysize )
 
 static double measure_task_time()
 {
-	struct task *t = task_create(1,1,1,1);
+	struct wavefront_task *t = wavefront_task_create(1,1,1,1);
 	struct batch_job_info info;
 	batch_job_id_t jobid;
 	int test_jobs_complete = 0;
@@ -326,10 +326,10 @@ static double measure_task_time()
 	timestamp_t start = timestamp_get();
 	timestamp_t stop;
 
-	printf("Measuring task execution time...\n");
+	printf("Measuring wavefront_task execution time...\n");
 
 	do {
-		jobid = task_submit_single(t);
+		jobid = wavefront_task_submit_single(t);
 		if(jobid<0) {
 			fprintf(stderr,"wavefront: couldn't create a local process: %s\n",strerror(errno));
 			exit(1);
@@ -529,9 +529,9 @@ int main( int argc, char *argv[] )
 
 	struct batch_job_info info;
 	batch_job_id_t jobid;
-	struct task *task;
+	struct wavefront_task *task;
 
-	task_initialize(b,ready_list);
+	wavefront_task_initialize(b,ready_list);
 
 	printf("Starting workload...\n");
 
@@ -541,7 +541,7 @@ int main( int argc, char *argv[] )
 
 		if(abort_mode) {
 			while((task=list_pop_tail(ready_list))) {
-				task_delete(task);
+				wavefront_task_delete(task);
 			}
 
 			itable_firstkey(running_table);
@@ -558,10 +558,10 @@ int main( int argc, char *argv[] )
 			task = list_pop_tail(ready_list);
 			if(!task) break;
 			
-			jobid = task_submit(task);
+			jobid = wavefront_task_submit(task);
 			if(jobid>0) {
 				itable_insert(running_table,jobid,task);
-				task_mark_range(task,b,TASK_STATE_RUNNING);
+				wavefront_task_mark_range(task,b,WAVEFRONT_TASK_STATE_RUNNING);
 			} else {
 				abort();
 				sleep(1);
@@ -585,7 +585,7 @@ int main( int argc, char *argv[] )
 					average_dispatch_time = 1.0*total_dispatch_time / total_jobs_complete;
 					average_task_time = 1.0*total_execute_time / total_cells_complete;
 
-					task_complete(b,ready_list,task);
+					wavefront_task_complete(b,ready_list,task);
 				} else {
 					printf("job %d failed, aborting this workload\n",jobid);
 					abort_mode = 1;
