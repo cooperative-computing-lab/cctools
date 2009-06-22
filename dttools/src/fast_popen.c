@@ -40,7 +40,7 @@ FILE * fast_popen( const char *command )
 
 		if(!process_table) process_table = itable_create(0);
 
-		itable_insert(process_table,fds[0],(void*)pid);
+		itable_insert(process_table,fds[0],(void*)(PTRINT_T)pid);
 		return fdopen(fds[0],"r");
 
 	} else if(pid==0) {
@@ -69,7 +69,7 @@ int fast_pclose( FILE * file )
 	int result;
 	int status;
 
-	pid = (int) itable_remove(process_table,fileno(file));
+	pid = (PTRINT_T) itable_remove(process_table,fileno(file));
 
 	fclose(file);
 
