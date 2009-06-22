@@ -26,6 +26,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 struct mr_config {
 	char   *mapper;
