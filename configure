@@ -82,7 +82,7 @@ config_krb5_path=no
 config_nest_path=no
 config_classad_path=no
 config_gcb_path=no
-config_fuse_path=no
+config_fuse_path=auto
 config_egee_path=no
 config_rfio_path=no
 config_dcap_path=no
@@ -230,8 +230,11 @@ do
 	then
 		echo "package $p found"
 		packages="${packages} $p"
-		internal_ccflags="${internal_ccflags} -I`pwd`/$p/src"
-		internal_ldflags="${internal_ldflags} -L`pwd`/$p/src"
+		if [ -d `pwd`/$p/src ]
+		then
+			internal_ccflags="${internal_ccflags} -I`pwd`/$p/src"
+			internal_ldflags="${internal_ldflags} -L`pwd`/$p/src"
+		fi
 	else
 		echo "package $p not found (that's ok)"
 	fi
