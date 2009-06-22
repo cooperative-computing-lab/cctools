@@ -312,11 +312,3 @@ static void do_help( const char *x, const char *y )
 	}
 }
 
-/*
-Ugly hack: Globus 4.0 relies on the dynamic linker to
-add extension modules, even when statically linked.
-This supresses certain linker errors.
-*/
- 
-int _dl_load_lock=0;
-
