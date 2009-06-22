@@ -48,7 +48,8 @@ static int batch_job_submit_condor( struct batch_queue *q, const char *cmd, cons
 	if(outfile) fprintf(file,"output = %s\n",outfile);
 	if(errfile) fprintf(file,"error = %s\n",errfile);
 	if(extra_input_files) fprintf(file,"transfer_input_files = %s\n",extra_input_files);
-	if(extra_output_files) fprintf(file,"transfer_output_files = %s\n",extra_output_files);
+	// Note that we do not use transfer_output_files, because that causes the job
+	// to get stuck in a system hold if the files are not created.
 	fprintf(file,"should_transfer_files = yes\n");
 	fprintf(file,"when_to_transfer_output = on_exit\n");
 	fprintf(file,"log = condor.logfile\n");
