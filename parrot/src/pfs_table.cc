@@ -164,6 +164,42 @@ void pfs_table::complete_path( const char *short_path, char *full_path )
         }
 }
 
+void pfs_table::follow_symlink( const char *cname, struct pfs_name *pname )
+{
+	struct pfs_stat rstat;
+	struct pfs_name new_pname = *pname;
+
+	int sres = new_pname.service->lstat(pname,&rstat);
+	if (sres >= 0 && S_ISLNK(rstat.st_mode)) {
+		char link_target[PFS_PATH_MAX];
+		char absolute_link_target[PFS_PATH_MAX];
+		const char *basename_start;
+		char *name_to_resolve = link_target;
+		int dirname_len;
+		int rlres;
+		rlres = new_pname.service->readlink(pname,link_target,PFS_PATH_MAX-1);
+		if (rlres > 0) {
+			/* readlink does not NULL-terminate */
+			link_target[rlres] = '\000';
+			/* Is link target relative ? */
+			if (link_target[0] != '/') {
+				 basename_start = string_basename(cname);
+				 if (basename_start) {
+					dirname_len = basename_start - cname;
+					snprintf(absolute_link_target,
+						PFS_PATH_MAX, "%*.*s%s",
+						dirname_len, dirname_len, cname, 
+						link_target);
+					name_to_resolve = absolute_link_target;
+				}
+			}
+			if (resolve_name(name_to_resolve, &new_pname, true)) {
+				*pname = new_pname;
+			}
+		}
+	}
+}
+
 /*
 Given a logical name from the application, expand it into
 a fully-qualified logical name, resolve it according to
@@ -172,7 +208,7 @@ in the name structure. Return true on success, false otherwise.
 */
 extern int pfs_master_timeout;
 
-int pfs_table::resolve_name( const char *cname, struct pfs_name *pname ) {
+int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_follow_symlink ) {
 	char full_logical_name[PFS_PATH_MAX];
 	char tmp[PFS_PATH_MAX];
 	pfs_resolve_t result;
@@ -226,6 +262,10 @@ int pfs_table::resolve_name( const char *cname, struct pfs_name *pname ) {
 				memmove(pname->rest,&pname->rest[1],strlen(pname->rest));
 			}
 			pname->is_local = 0;
+			/* The remote file may be a symlink to a local file (or a cached file). Do we need to follow it ? */
+			if (do_follow_symlink) {
+				follow_symlink( cname, pname );
+			}
 			return 1;
 		}
 	}
@@ -247,7 +287,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
                 force_stream = 1;
         }
                                                                                                   
-	if(resolve_name(lname,&pname)) {
+	if(resolve_name(lname,&pname,true)) {
 		if(flags&O_DIRECTORY) {
 			file = pname.service->getdir(&pname);
 		} else if(pname.service->is_local()) {

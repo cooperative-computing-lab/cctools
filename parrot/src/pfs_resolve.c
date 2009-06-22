@@ -171,13 +171,16 @@ static pfs_resolve_t mount_entry_check( const char *logical_name, const char *pr
 				strcpy(physical_name,logical_name);
 				result = PFS_RESOLVE_CHANGED;
 			} else {
+				int retstat;
 				strncpy(physical_name, local_prefix, local_prefix_len);
 				physical_name[local_prefix_len] = '\000';
 				if(llen>plen) {
 					strcat(physical_name,"/");
 					strcat(physical_name,&logical_name[plen]);
 				}
-				if (stat64(physical_name, &statbuf) < 0) {
+				retstat = stat64(physical_name, &statbuf);
+				/* All directories and all missing files are to be handled remotely */
+				if (retstat < 0 || (retstat >= 0 && S_ISDIR(statbuf.st_mode))) {
 					remote_prefix = prefix_sep+1;
 					strcpy(physical_name,remote_prefix);
 					if(llen>plen) {
