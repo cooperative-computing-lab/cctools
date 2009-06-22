@@ -8,8 +8,8 @@ See the file COPYING for details.
 #ifndef DATAGRAM_H
 #define DATAGRAM_H
 
-/* Maximum number of characters in a datagram address */
-#define DATAGRAM_ADDRESS_MAX 17
+/* Maximum number of characters in a text formatted datagram address.  Note that this must be enough characters to accomodate an IPv6 address. */
+#define DATAGRAM_ADDRESS_MAX 48
 
 /* Maximum number of bytes in a datagram payload */
 #define DATAGRAM_PAYLOAD_MAX 65536

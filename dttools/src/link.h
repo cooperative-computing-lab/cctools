@@ -48,8 +48,8 @@ link_close(link);
 #include <stdio.h>
 #include <sys/types.h>
 
-/** Maximum number of characters in a link address */
-#define LINK_ADDRESS_MAX 32
+/** Maximum number of characters in the text representation of a link address.  This must be large enough to accomodate ipv6 in the future. */
+#define LINK_ADDRESS_MAX 48
 
 /** Value to usewhen any listen port is acceptable */
 #define LINK_PORT_ANY 0
