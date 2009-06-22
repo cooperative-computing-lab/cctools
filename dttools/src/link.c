@@ -60,7 +60,7 @@ void link_window_set( int send_buffer, int recv_buffer )
 
 void link_window_get( struct link *l, int *send_buffer, int *recv_buffer )
 {
-	int length = sizeof(*send_buffer);
+	socklen_t length = sizeof(*send_buffer);
 	getsockopt(l->fd, SOL_SOCKET, SO_SNDBUF, (void*)send_buffer,&length);
 	getsockopt(l->fd, SOL_SOCKET, SO_RCVBUF, (void*)recv_buffer,&length);
 }
