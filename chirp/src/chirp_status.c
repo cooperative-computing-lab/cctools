@@ -67,7 +67,7 @@ int compare_entries( struct nvpair **a, struct nvpair **b )
 	y = nvpair_lookup_string(*b,"type");
 	if(!y) y = "unknown";
 
-	result = strcmp(x,y);
+	result = strcasecmp(x,y);
 	if(result!=0) return result;
 
         x = nvpair_lookup_string(*a,"name");
@@ -76,7 +76,7 @@ int compare_entries( struct nvpair **a, struct nvpair **b )
         y = nvpair_lookup_string(*b,"name");
         if(!y) y = "unknown";
 
-        return strcmp(x,y);
+        return strcasecmp(x,y);
 }
 
 static struct nvpair *table[10000];
