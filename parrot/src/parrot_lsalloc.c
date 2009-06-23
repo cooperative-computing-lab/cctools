@@ -1,5 +1,5 @@
-
 #include "tracer.table.h"
+#include "tracer.table64.h"
 #include "int_sizes.h"
 #include "stringtools.h"
 
@@ -11,7 +11,11 @@
 
 int lsalloc( const char *path, char *alloc_path, INT64_T *total, INT64_T *inuse )
 {
+#ifdef CCTOOLS_ARCH_I386
 	return syscall(SYSCALL32_parrot_lsalloc,path,alloc_path,total,inuse);
+#else
+	return syscall(SYSCALL64_parrot_lsalloc,path,alloc_path,total,inuse);
+#endif
 }
 
 int main( int argc, char *argv[] )

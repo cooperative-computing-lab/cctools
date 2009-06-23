@@ -1,5 +1,5 @@
-
 #include "tracer.table.h"
+#include "tracer.table64.h"
 #include "md5.h"
 
 #include <stdio.h>
@@ -9,7 +9,11 @@
 
 int parrot_md5( const char *filename, char *digest )
 {
+#ifdef CCTOOLS_ARCH_I386
 	return syscall(SYSCALL32_parrot_md5,filename,digest);
+#else
+	return syscall(SYSCALL64_parrot_md5,filename,digest);
+#endif
 }
 
 int main( int argc, char *argv[] )

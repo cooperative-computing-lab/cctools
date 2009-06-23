@@ -1,5 +1,5 @@
-
 #include "tracer.table.h"
+#include "tracer.table64.h"
 #include "int_sizes.h"
 #include "stringtools.h"
 
@@ -11,7 +11,11 @@
 
 int parrot_getacl( const char *path, char *buf, int size )
 {
+#ifdef CCTOOLS_ARCH_I386
 	return syscall(SYSCALL32_parrot_getacl,path,buf,size);
+#else
+	return syscall(SYSCALL64_parrot_getacl,path,buf,size);
+#endif
 }
 
 int main( int argc, char *argv[] )
