@@ -52,6 +52,7 @@ static int batch_job_submit_condor( struct batch_queue *q, const char *cmd, cons
 	// to get stuck in a system hold if the files are not created.
 	fprintf(file,"should_transfer_files = yes\n");
 	fprintf(file,"when_to_transfer_output = on_exit\n");
+	fprintf(file,"copy_to_spool = true\n");
 	fprintf(file,"log = condor.logfile\n");
 	fprintf(file,"queue\n");
 
@@ -112,8 +113,6 @@ batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_in
 	}
 
 	while(1) {
-		if(itable_size(q->job_table)<=0) return 0;
-
 		while(fgets(line,sizeof(line),logfile)) {
 			int type, proc, subproc;
 			batch_job_id_t jobid;
@@ -130,18 +129,20 @@ batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_in
 
 				current = mktime(&tm);
 
+				info = itable_lookup(q->job_table,jobid);
+				if(!info) {
+					info = malloc(sizeof(*info));
+					memset(info,0,sizeof(*info));
+					itable_insert(q->job_table,jobid,info);
+				}
+
 				if(type==0) {
-					info = itable_lookup(q->job_table,jobid);
-					if(info) info->submitted = current;
+					info->submitted = current;
 				} else if(type==1) {
-					info = itable_lookup(q->job_table,jobid);
-					if(info) {
-						 info->started = current;				
-						 debug(D_DEBUG,"job %d running now",jobid);
-					}
+					info->started = current;				
+					debug(D_DEBUG,"job %d running now",jobid);
 				} else if(type==9) {
-					info = itable_remove(q->job_table,jobid);
-					if(!info) continue;
+					itable_remove(q->job_table,jobid);
 
 					info->finished = current;
 					info->exited_normally = 0;
@@ -153,8 +154,7 @@ batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_in
 
 					return jobid;
 				} else if(type==5) {
-					info = itable_remove(q->job_table,jobid);
-					if(!info) continue;
+					itable_remove(q->job_table,jobid);
 
 					info->finished = current;
 
@@ -178,6 +178,9 @@ batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_in
 				}
 			}
 		}
+		// If we get to the end of the log, and there are no
+		// more jobs remaining in the table, then everything has exited.
+		if(itable_size(q->job_table)<=0) return 0;
 		sleep(1);
 	}
 
@@ -524,7 +527,7 @@ batch_job_id_t batch_job_wait_unix( struct batch_queue *q, struct batch_job_info
 			memcpy(info_out,info,sizeof(*info));
 
 			return jobid;
-		} else if(errno==ESRCH) {
+		} else if(errno==ESRCH || errno==ECHILD) {
 			return 0;
 		}
 	}
