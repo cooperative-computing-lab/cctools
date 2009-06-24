@@ -23,6 +23,7 @@ See the file COPYING for details.
 
 struct batch_queue {
 	batch_queue_type_t type;
+	char *logfile;
 	struct itable *job_table;
 	struct itable *output_table;
 	struct work_queue *work_queue;
@@ -53,7 +54,7 @@ static int batch_job_submit_condor( struct batch_queue *q, const char *cmd, cons
 	fprintf(file,"should_transfer_files = yes\n");
 	fprintf(file,"when_to_transfer_output = on_exit\n");
 	fprintf(file,"copy_to_spool = true\n");
-	fprintf(file,"log = condor.logfile\n");
+	fprintf(file,"log = %s\n",q->logfile);
 	fprintf(file,"queue\n");
 
 	fclose(file);
@@ -96,7 +97,7 @@ static int batch_job_submit_simple_condor( struct batch_queue *q, const char *cm
 
 	chmod("condor.sh",0755);
 
-	return batch_job_submit_condor(q,"condor.sh",0,0,0,0,extra_input_files,extra_output_files);
+	return batch_job_submit_condor(q,"condor.sh",cmd,0,0,0,extra_input_files,extra_output_files);
 }
 
 batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_info *info_out )
@@ -105,9 +106,9 @@ batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_in
 	char line[BATCH_JOB_LINE_MAX];
 
 	if(!logfile) {
-		logfile = fopen("condor.logfile","r");
+		logfile = fopen(q->logfile,"r");
 		if(!logfile) {
-			debug(D_NOTICE,"couldn't open logfile %s: %s\n","condor.logfile",strerror(errno));
+			debug(D_NOTICE,"couldn't open logfile %s: %s\n",q->logfile,strerror(errno));
 			return -1;
 		}
 	}
@@ -581,6 +582,7 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 	q->type = type;
 	q->job_table = itable_create(0);
 	q->output_table = itable_create(0);
+	q->logfile = strdup("condor.logfile");
 
 	if(type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		q->work_queue = work_queue_create(9123, time(0)+60);
@@ -589,6 +591,12 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 	}
 
 	return q;
+}
+
+void batch_queue_logfile( struct batch_queue *q, const char *logfile )
+{
+	free(q->logfile);
+	q->logfile = strdup(logfile);
 }
 
 batch_job_id_t batch_job_submit( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )

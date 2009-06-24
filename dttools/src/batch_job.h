@@ -47,6 +47,14 @@ const char * batch_queue_type_to_string( batch_queue_type_t t );
 */
 struct batch_queue * batch_queue_create( batch_queue_type_t type );
 
+/** Set the log file used by the batch queue.
+This is an optional call that will only affect batch queue types
+that use an internal logfile; currently only Condor.
+@param q The batch queue to adjust.
+@param logfile Name of the logfile to use.
+*/
+void batch_queue_logfile( struct batch_queue *q, const char *logfile );
+
 /** Delete a batch queue.
 @param q The batch queue to delete.
 */
