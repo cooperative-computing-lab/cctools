@@ -418,26 +418,37 @@ void string_cookie( char *s, int length )
 char * string_subst( char *value, string_subst_lookup_t lookup, void *arg )
 {
 	char *subvalue, *newvalue;
-	char *dollar, *lbrace, *rbrace;
+	char *dollar, *ldelim, *rdelim;
 	int length;
  
 	while(1) {
 		dollar = strchr(value,'$');
 		if(!dollar) return value;
+
+		while(dollar>value && *(dollar-1)=='\\') {
+			dollar = strchr(dollar+1,'$');
+			if(!dollar) return value;
+		}
  
-		lbrace = strchr(dollar,'{');
-		if(!lbrace) return value;
+		ldelim = dollar+1;
+		if(*ldelim=='(') {
+			rdelim = ldelim+1;
+			while(*rdelim!=')') rdelim++;
+		} else if(*ldelim=='{') {
+			rdelim = ldelim+1;
+			while(*rdelim!='}') rdelim++;
+		} else {
+			ldelim--;
+			rdelim = ldelim+1;
+			while(isalpha(*rdelim)) rdelim++;
+		}
+
+		*rdelim = 0;
  
-		rbrace = strchr(lbrace,'}');
-		if(!rbrace) return value;
+		subvalue = lookup(ldelim+1,arg);
+		if(!subvalue) subvalue = strdup("");
  
-		*rbrace = 0;
- 
-		subvalue = lookup(lbrace+1,arg);
-		*rbrace = '}';
-		if(!subvalue) return 0;
- 
-		length = strlen(value) - (rbrace-dollar) + strlen(subvalue) + 1;
+		length = strlen(value) - (rdelim-dollar) + strlen(subvalue) + 1;
 		newvalue = malloc(length);
 		if(!newvalue) {
 			free(subvalue);
@@ -449,7 +460,7 @@ char * string_subst( char *value, string_subst_lookup_t lookup, void *arg )
 
 		strcpy(newvalue,value);
 		strcat(newvalue,subvalue);
-		strcat(newvalue,rbrace+1);
+		strcat(newvalue,rdelim+1);
 
 		free(subvalue);
 		free(value);
