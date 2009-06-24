@@ -35,7 +35,7 @@ int buffer_open_input( const char *tag )
 
 	if(!buffer_init()) return 0;
 
-	fd = (int) (long) hash_table_lookup(table,tag);
+	fd = (PTRINT_T) hash_table_lookup(table,tag);
 	if(fd==0) {
 		errno = ENOENT;
 		return -1;
@@ -69,7 +69,7 @@ static int buffer_open( const char *tag, int do_truncate )
 
 	unlink(path);
 
-	old = (int) hash_table_remove(table,tag);
+	old = (PTRINT_T) hash_table_remove(table,tag);
 	if(old) close(old);
 
 	if(!hash_table_insert(table,tag,(void*)fd)) {
