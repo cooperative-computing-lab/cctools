@@ -1,0 +1,15 @@
+#!/bin/sh
+
+makeflow=`which makeflow`
+dagfile=$1
+
+condor_submit << EOF
+universe = local
+cmd = $makeflow
+arguments = -T condor -l makeflow.\$(CLUSTER).makeflowlog -L makeflow.\$(CLUSTER).condorlog $dagfile
+output = makeflow.\$(CLUSTER).output
+error = makeflow.\$(CLUSTER).error
+log = makeflow.\$(CLUSTER).condorlog
+getenv = true
+queue
+EOF

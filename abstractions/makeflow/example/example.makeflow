@@ -1,0 +1,17 @@
+capitol.jpg: 
+	/usr/bin/curl http://www.doa.state.wi.us/dsf/images/capitol_cleaned_w450.jpg -o capitol.jpg
+
+capitol.90.jpg: capitol.jpg
+	/usr/bin/convert -swirl 90 capitol.jpg capitol.90.jpg
+
+capitol.180.jpg: capitol.jpg
+	/usr/bin/convert -swirl 180 capitol.jpg capitol.180.jpg
+
+capitol.270.jpg: capitol.jpg
+	/usr/bin/convert -swirl 270 capitol.jpg capitol.270.jpg
+
+capitol.360.jpg: capitol.jpg
+	/usr/bin/convert -swirl 360 capitol.jpg capitol.360.jpg
+
+capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
+	/usr/bin/convert -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
