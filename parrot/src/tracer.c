@@ -161,19 +161,14 @@ int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARG
 	return 1;
 }
 
-INT64_T tracer_args_get_alternate_args5( struct tracer *t )
+void tracer_has_args5_bug( struct tracer *t )
 {
 	// Due to a widely-deployed bug in Linux
 	// ptrace, rbp is corrupted and r9 is incidentally correct,
 	// when tracing a 32-bit program on a 64-bit machine.
 	// See: http://lkml.org/lkml/2007/1/31/317
 
-#ifdef CCTOOLS_CPU_I386
-	return t->regs.regs32.ebp;
-#else
-	return t->regs.regs64.r9;
 	t->has_args5_bug = 1;
-#endif
 }
 
 int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS_MAX], int nargs )

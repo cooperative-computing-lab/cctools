@@ -1206,19 +1206,22 @@ void decode_mmap( struct pfs_process *p, int syscall, int entering, INT64_T *arg
 			source_offset = nargs[5];
 		} else {
 			source_offset = nargs[5]*getpagesize();
-
-			// Note that on many versions of Linux, nargs[5]
-			// is corrupted in mmap2 on a 64-bit machine.
-			// See comments in tracer.c and
-			// http://lkml.org/lkml/2007/1/31/317
-
-			#ifdef CCTOOLS_CPU_X86_64
-			if(source_offset > orig_length) {
-				debug(D_SYSCALL,"detected kernel ptrace args[5] bug");
-				source_offset = tracer_args_get_alternate_args5(p->tracer)*getpagesize();
-			}
-			#endif
 		}
+
+		// Note that on many versions of Linux, nargs[5]
+		// is corrupted in mmap2 on a 64-bit machine.
+		// See comments in tracer.c and
+		// http://lkml.org/lkml/2007/1/31/317
+
+		#ifdef CCTOOLS_CPU_X86_64
+		if(p->syscall==SYSCALL32_mmap2 && (source_offset & 0x80000000 )) {
+			debug(D_SYSCALL,"detected kernel bug in ptrace: offset has suspicious value of 0x%llx",source_offset);
+			tracer_has_args5_bug(p->tracer);
+			tracer_args_get(p->tracer,&p->syscall,p->syscall_args);
+			source_offset = args[5]*getpagesize();
+			debug(D_SYSCALL,"detected kernel bug in ptrace: new offset is 0x%llx",source_offset);
+		}
+		#endif
 
 		debug(D_SYSCALL,"mmap addr=0x%x len=0x%x prot=0x%x flags=0x%x fd=%d offset=0x%llx",addr,orig_length,prot,flags,fd,source_offset);
 
