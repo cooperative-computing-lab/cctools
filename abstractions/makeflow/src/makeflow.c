@@ -401,7 +401,7 @@ static void show_help(const char *cmd)
 	printf("Use: %s [options] <dagfile>\n", cmd);
 	printf("where options are:\n");
 	printf(" -c             Clean up: remove logfile and all targets.\n");
-	printf(" -T <type>      Batch system type: condor, sge, unix, wq.  (default is condor)\n");
+	printf(" -T <type>      Batch system type: condor, sge, unix, wq.  (default is unix)\n");
 	printf(" -p <port>      Port number to use with work queue.        (default=9123)\n");
 	printf(" -l <logfile>   Use this file for the makeflow log.        (default=<dagfile>.makeflowlog)\n");
 	printf(" -L <logfile>   Use this file for the batch system log.    (default=<dagfile>.condorlog)\n");
