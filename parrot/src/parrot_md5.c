@@ -9,7 +9,7 @@
 
 int parrot_md5( const char *filename, char *digest )
 {
-#ifdef CCTOOLS_ARCH_I386
+#ifdef CCTOOLS_CPU_I386
 	return syscall(SYSCALL32_parrot_md5,filename,digest);
 #else
 	return syscall(SYSCALL64_parrot_md5,filename,digest);

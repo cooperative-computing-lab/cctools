@@ -11,7 +11,7 @@
 
 int mkalloc( const char *path, INT64_T size, mode_t mode )
 {
-#ifdef CCTOOLS_ARCH_I386
+#ifdef CCTOOLS_CPU_I386
 	return syscall(SYSCALL32_parrot_mkalloc,path,&size,mode);
 #else
 	return syscall(SYSCALL64_parrot_mkalloc,path,&size,mode);

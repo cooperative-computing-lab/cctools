@@ -122,7 +122,7 @@ int copyfile( const char *source, const char *target )
 	} else if(hardlink_mode) {
 		return link(source,target);
 	} else {
-#ifdef CCTOOLS_ARCH_I386
+#ifdef CCTOOLS_CPU_I386
 		result = syscall(SYSCALL32_parrot_copyfile,source,target);
 #else
 		result = syscall(SYSCALL64_parrot_copyfile,source,target);
