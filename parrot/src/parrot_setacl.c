@@ -11,7 +11,7 @@
 
 static int parrot_setacl( const char *path, const char *subject, const char *rights )
 {
-#ifdef CCTOOLS_ARCH_I386
+#ifdef CCTOOLS_CPU_I386
 	return syscall(SYSCALL32_parrot_setacl,path,subject,rights);
 #else
 	return syscall(SYSCALL64_parrot_setacl,path,subject,rights);
