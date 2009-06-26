@@ -23,7 +23,7 @@ executable = $worker
 arguments = $host $port
 should_transfer_files = yes
 when_to_transfer_output = on_exit
-log = workers.log
+log = /tmp/${USER}-workers.log
 queue $count
 EOF
 
