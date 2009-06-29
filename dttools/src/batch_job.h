@@ -115,6 +115,16 @@ Blocks until a batch job completes.
 
 batch_job_id_t batch_job_wait( struct batch_queue *q, struct batch_job_info *info );
 
+/** Wait for any batch job to complete, with a timeout.
+Blocks until a batch job completes or the current time exceeds @ref stoptime.
+@param q The queue to wait on.
+@param info Pointer to a @ref batch_job_info structure that will be filled in with the details of the completed job.
+@param stoptime An absolute time at which to stop waiting.
+@return If greater than zero, indicates the job id number of the completed job.  If equal to zero, there were no more jobs to wait for.  If less than zero, then no jobs completed before the time expired.
+*/
+
+batch_job_id_t batch_job_wait_timeout( struct batch_queue *q, struct batch_job_info *info, time_t stoptime );
+
 /** Remove a batch job.
 This call will start the removal process.
 You must still call @ref batch_job_wait to wait for the removal to complete.

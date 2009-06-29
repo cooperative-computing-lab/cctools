@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "work_queue.h"
 #include "itable.h"
 #include "debug.h"
+#include "macros.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -100,7 +101,7 @@ static int batch_job_submit_simple_condor( struct batch_queue *q, const char *cm
 	return batch_job_submit_condor(q,"condor.sh",cmd,0,0,0,extra_input_files,extra_output_files);
 }
 
-batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_info *info_out )
+batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime )
 {
 	static FILE * logfile = 0;
 	char line[BATCH_JOB_LINE_MAX];
@@ -181,7 +182,11 @@ batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_in
 		}
 		// If we get to the end of the log, and there are no
 		// more jobs remaining in the table, then everything has exited.
+
 		if(itable_size(q->job_table)<=0) return 0;
+
+		if(stoptime!=0 && time(0)>stoptime) return -1;
+
 		sleep(1);
 	}
 
@@ -287,7 +292,7 @@ batch_job_id_t batch_job_submit_sge( struct batch_queue *q, const char *cmd, con
 	return batch_job_submit_simple_sge(q,command,extra_input_files,extra_output_files);
 }
 
-batch_job_id_t batch_job_wait_sge( struct batch_queue *q, struct batch_job_info *info_out )
+batch_job_id_t batch_job_wait_sge( struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime )
 {
 	struct batch_job_info *info;
 	batch_job_id_t jobid;
@@ -296,7 +301,7 @@ batch_job_id_t batch_job_wait_sge( struct batch_queue *q, struct batch_job_info 
 	char line[BATCH_JOB_LINE_MAX];
 	int t,c;
 
-	while(itable_size(q->job_table)) {
+	while(1) {
 		itable_firstkey(q->job_table);
 		while(itable_nextkey(q->job_table,&jobid,(void**)&info)) {
 			sprintf(statusfile,"status.%d",jobid);
@@ -324,10 +329,15 @@ batch_job_id_t batch_job_wait_sge( struct batch_queue *q, struct batch_job_info 
 				}
 			}
 		}
+
+		if(itable_size(q->job_table)<=0) return 0;
+
+		if(stoptime!=0 && time(0)>stoptime) return -1;
+
 		sleep(1);
 	}
 
-	return 0;
+	return -1;
 }
 
 int batch_job_remove_sge( struct batch_queue *q, batch_job_id_t jobid )
@@ -421,9 +431,9 @@ int batch_job_submit_simple_work_queue( struct batch_queue *q, const char *cmd, 
 	return t->taskid;
 }
 
-batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_job_info *info )
+batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_job_info *info, time_t stoptime )
 {
-	struct work_queue_task *t = work_queue_wait(q->work_queue,WAITFORTASK);
+	struct work_queue_task *t = work_queue_wait(q->work_queue,stoptime==0 ? WAITFORTASK : stoptime );
 	if(t) {
 		info->submitted = t->submit_time/1000000;
 		info->started = t->start_time/1000000;
@@ -446,10 +456,13 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 		work_queue_task_delete(t);
 
 		return taskid;
-	} else {
-		return -1;
 	}
 
+	if(time(0)>stoptime) {
+		return -1;
+	} else {
+		return 0;
+	}
 }
 
 int batch_job_remove_work_queue( struct batch_queue *q, batch_job_id_t jobid )
@@ -505,13 +518,36 @@ int batch_job_submit_unix( struct batch_queue *q, const char *cmd, const char *a
 	return batch_job_submit_simple_unix(q,line,extra_input_files,extra_output_files);
 }
 
-batch_job_id_t batch_job_wait_unix( struct batch_queue *q, struct batch_job_info *info_out )
+static void handle_alarm( int sig )
+{
+}
+
+batch_job_id_t batch_job_wait_unix( struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime )
 {
 	batch_job_id_t jobid;
 	int status;
 
 	while(1) {
-		jobid = wait(&status);
+		int timeout;
+
+		if(stoptime==0) {
+			timeout = 0;
+		} else {
+			timeout = MAX(1,stoptime-time(0));
+			if(timeout>0) {
+				signal(SIGALRM,handle_alarm);
+				alarm(timeout);
+			} else {
+				timeout = 0;
+			}
+		}
+
+		if(timeout>0) {
+			jobid = wait(&status);
+		} else {
+			jobid = waitpid(-1,&status,WNOHANG);
+		}
+	
 		if(jobid>0) {
 			struct batch_job_info *info = itable_remove(q->job_table,jobid);
 			if(!info) continue;
@@ -531,6 +567,8 @@ batch_job_id_t batch_job_wait_unix( struct batch_queue *q, struct batch_job_info
 		} else if(errno==ESRCH || errno==ECHILD) {
 			return 0;
 		}
+
+		if(stoptime!=0 && time(0)>stoptime) return -1;
 	}
 }
 
@@ -637,16 +675,21 @@ batch_job_id_t batch_job_submit_simple( struct batch_queue *q, const char *cmd, 
 
 batch_job_id_t batch_job_wait( struct batch_queue *q, struct batch_job_info *info )
 {
+	return batch_job_wait_timeout(q,info,0);
+}
+
+batch_job_id_t batch_job_wait_timeout( struct batch_queue *q, struct batch_job_info *info, time_t stoptime )
+{
 	if(!q->job_table) q->job_table = itable_create(0);
 
 	if(q->type==BATCH_QUEUE_TYPE_UNIX) {
-		return batch_job_wait_unix(q,info);
+		return batch_job_wait_unix(q,info,stoptime);
 	} else if(q->type==BATCH_QUEUE_TYPE_CONDOR) {
-		return batch_job_wait_condor(q,info);
+		return batch_job_wait_condor(q,info,stoptime);
 	} else if(q->type==BATCH_QUEUE_TYPE_SGE) {
-		return batch_job_wait_sge(q,info);
+		return batch_job_wait_sge(q,info,stoptime);
 	} else if(q->type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		return batch_job_wait_work_queue(q,info);
+		return batch_job_wait_work_queue(q,info,stoptime);
 	} else {
 		errno = EINVAL;
 		return -1;
