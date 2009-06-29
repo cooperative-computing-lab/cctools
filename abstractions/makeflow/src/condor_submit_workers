@@ -13,17 +13,24 @@ then
 	exit 1
 fi
 
+mkdir /tmp/${USER}-workers
+cd /tmp/${USER}-workers
+cp $worker .
+
 host=$1
 port=$2
 count=$3
 
 condor_submit << EOF
 universe = vanilla
-executable = $worker
+executable = worker
 arguments = $host $port
+transfer_input_files = worker
 should_transfer_files = yes
 when_to_transfer_output = on_exit
-log = /tmp/${USER}-workers.log
+output = worker.\$(PROCESS).output
+error = worker.\$(PROCESS).error
+log = workers.log
 queue $count
 EOF
 

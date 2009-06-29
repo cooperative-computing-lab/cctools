@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <signal.h>
 
 #include "macros.h"
 #include "hash_table.h"
@@ -13,7 +14,7 @@
 #include "batch_job.h"
 #include "stringtools.h"
 
-static FILE *logfile = 0;
+static int dag_abort_flag = 0;
 
 #define DAG_LINE_MAX 1024
 
@@ -21,7 +22,8 @@ typedef enum {
 	DAG_NODE_STATE_WAITING=0,
 	DAG_NODE_STATE_RUNNING=1,
 	DAG_NODE_STATE_COMPLETE=2,
-	DAG_NODE_STATE_FAILED=3
+	DAG_NODE_STATE_FAILED=3,
+	DAG_NODE_STATE_ABORTED=4,
 } dag_node_state_t;
 
 struct dag {
@@ -30,6 +32,7 @@ struct dag {
 	struct itable     *node_table;
 	struct itable     *job_table;
 	struct hash_table *file_table;
+	FILE * logfile;
 	int linenum;
 	int jobs_running;
 	int jobs_max;
@@ -58,6 +61,7 @@ const char * dag_node_state_name( dag_node_state_t state )
 		case DAG_NODE_STATE_RUNNING:	return "running";
 		case DAG_NODE_STATE_COMPLETE:	return "complete";
 		case DAG_NODE_STATE_FAILED:	return "failed";
+		case DAG_NODE_STATE_ABORTED:	return "aborted";
 		default:			return "unknown";
 	}
 }
@@ -83,10 +87,24 @@ void dag_node_add_target_file( struct dag_node *n, const char *filename )
 void dag_node_state_change( struct dag *d, struct dag_node *n, int newstate )
 {
 	debug(D_DEBUG,"node %d %s -> %s\n",n->nodeid,dag_node_state_name(n->state),dag_node_state_name(newstate));
-	fprintf(logfile,"%u %d %d %d\n",(unsigned)time(0),n->nodeid,newstate,n->jobid);
-	fflush(logfile);
-	fsync(fileno(logfile));
+	fprintf(d->logfile,"%u %d %d %d\n",(unsigned)time(0),n->nodeid,newstate,n->jobid);
+	fflush(d->logfile);
+	fsync(fileno(d->logfile));
 	n->state = newstate;
+}
+
+void dag_abort_all( struct dag *d, struct batch_queue *q )
+{
+	int jobid;
+	struct dag_node *n;
+
+	printf("makeflow: got abort signal...\n");
+
+	itable_firstkey(d->job_table);
+	while(itable_nextkey(d->job_table,&jobid,(void**)&n)) {
+		printf("makeflow: aborting job %d\n",jobid);
+		batch_job_remove(q,jobid);
+	}
 }
 
 void remove_target( const char *filename )
@@ -121,9 +139,9 @@ void dag_log_recover( struct dag *d, const char *filename )
 	int nodeid, state, jobid;
 	struct dag_node *n;
 
-	logfile = fopen(filename,"r");
-	if(logfile) {
-		while(fgets(line,sizeof(line),logfile)) {
+	d->logfile = fopen(filename,"r");
+	if(d->logfile) {
+		while(fgets(line,sizeof(line),d->logfile)) {
 			linenum++;
 			if(sscanf(line,"%*u %d %d %d",&nodeid,&state,&jobid)==3) {
 				n = itable_lookup(d->node_table,nodeid);
@@ -138,15 +156,15 @@ void dag_log_recover( struct dag *d, const char *filename )
 			fprintf(stderr,"makeflow: %s appears to be corrupted on line %d\n",filename,linenum);	
 			exit(1);
 		}
-		fclose(logfile);
+		fclose(d->logfile);
 	}
 }
 
 void dag_log_init( struct dag *d, const char *logfilename )
 {
 
-	logfile = fopen(logfilename,"a");
-	if(!logfile) {
+	d->logfile = fopen(logfilename,"a");
+	if(!d->logfile) {
 		fprintf(stderr,"makeflow: couldn't open logfile %s: %s\n",logfilename,strerror(errno));
 		exit(1);
 	}
@@ -382,13 +400,22 @@ void dag_run( struct dag *d, struct batch_queue *q )
 		}
 	}
 
-	while(d->jobs_running>0 && (jobid=batch_job_wait(q,&info))!=0) {
+	while(!dag_abort_flag && d->jobs_running>0 && (jobid=batch_job_wait_timeout(q,&info,time(0)+5))!=0) {
 		if(jobid<0) continue;
 		n = itable_remove(d->job_table,jobid);
 		if(n) dag_node_complete(q,d,n,&info);
 	}
 
+	if(dag_abort_flag) {
+		dag_abort_all(d,q);
+	}
+
 	printf("makeflow: nothing left to do.\n");
+}
+
+static void handle_abort( int sig )
+{
+	dag_abort_flag = 1;
 }
 
 static void show_version(const char *cmd)
@@ -426,7 +453,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "p:cd:T:l:L:o:v")) != (char) -1) {
+	while((c = getopt(argc, argv, "p:cd:T:l:L:j:o:v")) != (char) -1) {
 		switch (c) {
 		case 'p':
 			port = atoi(optarg);
@@ -502,6 +529,11 @@ int main( int argc, char *argv[] )
 	if(batchlogfilename) batch_queue_logfile(q,batchlogfilename);
 	if(batchtype==BATCH_QUEUE_TYPE_CONDOR) dag_log_recover(d,logfilename);
 	dag_log_init(d,logfilename);
+
+	signal(SIGINT,handle_abort);
+	signal(SIGQUIT,handle_abort);
+	signal(SIGTERM,handle_abort);
+
 	dag_run(d,q);
 
 	return 0;
