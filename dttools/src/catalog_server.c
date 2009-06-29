@@ -111,7 +111,7 @@ int compare_nvpair( const void *a, const void *b )
 	if(!sa) sa = "unknown";
 	if(!sb) sb = "unknown";
 
-	return strcmp(sa,sb);
+	return strcasecmp(sa,sb);
 }
 
 int update_one_catalog(void *outgoing_host, const void *text)
