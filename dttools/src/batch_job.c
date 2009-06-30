@@ -366,17 +366,29 @@ int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const c
 {
 	struct work_queue_task *t;
 	char *f, *files;
-	
-	t = work_queue_task_create(cmd,args);
+	char *full_command; 
 
-	if(infile) work_queue_task_add_standard_input_file(t,infile);
-	if(cmd) work_queue_task_add_extra_staged_file(t,cmd,cmd);
+	full_command = (char*) malloc((strlen(cmd)+strlen(args)+2)*sizeof(char));
+	if(!full_command) {
+	    debug(D_DEBUG,"couldn't create new work_queue task: out of memory\n");
+	    return -1;
+	}
+
+	if(infile)
+	    sprintf(full_command,"%s %s < %s",cmd,args,infile);
+	else
+	    sprintf(full_command,"%s %s",cmd,args);
+	
+	t = work_queue_task_create(cmd);
+
+	if(infile) work_queue_task_specify_input_file(t,infile,infile);
+	if(cmd) work_queue_task_specify_input_file(t,cmd,cmd);
 	
 	if(extra_input_files) {
 		files = strdup(extra_input_files);
 		f = strtok(files," \t,");
 		while(f) {
-			 work_queue_task_add_extra_staged_file(t,f,f);
+			 work_queue_task_specify_input_file(t,f,f);
 			 f = strtok(0," \t,");
 		}
 		free(files);
@@ -386,7 +398,7 @@ int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const c
 		files = strdup(extra_output_files);
 		f = strtok(files," \t,");
 		while(f) {
-			work_queue_task_add_extra_created_file(t,f,f);
+			work_queue_task_specify_output_file(t,f,f);
 			f = strtok(0," \t,");
 		}
 		free(files);
@@ -404,13 +416,13 @@ int batch_job_submit_simple_work_queue( struct batch_queue *q, const char *cmd, 
 	struct work_queue_task *t;
 	char *f, *files;
 	
-	t = work_queue_task_create(cmd,"");
+	t = work_queue_task_create(cmd);
 
 	if(extra_input_files) {
 		files = strdup(extra_input_files);
 		f = strtok(files," \t,");
 		while(f) {
-			 work_queue_task_add_extra_staged_file(t,f,f);
+			 work_queue_task_specify_input_file(t,f,f);
 			 f = strtok(0," \t,");
 		}
 		free(files);
@@ -420,7 +432,7 @@ int batch_job_submit_simple_work_queue( struct batch_queue *q, const char *cmd, 
 		files = strdup(extra_output_files);
 		f = strtok(files," \t,");
 		while(f) {
-			work_queue_task_add_extra_created_file(t,f,f);
+			work_queue_task_specify_output_file(t,f,f);
 			f = strtok(0," \t,");
 		}
 		free(files);
@@ -439,7 +451,7 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 		info->started = t->start_time/1000000;
 		info->finished = t->finish_time/1000000;
 		info->exited_normally = 1;
-		info->exit_code = t->result;
+		info->exit_code = t->return_status;
 		info->exit_signal = 0;
 
 		char *outfile = itable_remove(q->output_table,t->taskid);
