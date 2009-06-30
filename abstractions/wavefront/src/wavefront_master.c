@@ -43,7 +43,7 @@ static const time_t short_wait = 5;
 
 static int task_consider( int x, int y )
 {
-	char args[WAVEFRONT_LINE_MAX];
+	char command[WAVEFRONT_LINE_MAX];
 	char tag[WAVEFRONT_LINE_MAX];
 	
 	struct work_queue_task* t;
@@ -59,15 +59,15 @@ static int task_consider( int x, int y )
 
 	if(!left || !bottom || !diag) return 1;
 
-	sprintf(args,"%d %d xfile yfile dfile",x,y);
+	sprintf(command,"./%s %d %d xfile yfile dfile",function,x,y);
 	sprintf(tag,"%d %d",x,y);
 	
-	t = work_queue_task_create(function,args);
-	work_queue_task_add_tag(t,tag);
-	work_queue_task_add_extra_staged_file(t, function, function);
-	work_queue_task_add_extra_staged_buf(t, left, strlen(left), "xfile");
-	work_queue_task_add_extra_staged_buf(t, bottom, strlen(bottom), "yfile");
-	work_queue_task_add_extra_staged_buf(t, diag, strlen(diag), "dfile");
+	t = work_queue_task_create(command);
+	work_queue_task_specify_tag(t,tag);
+	work_queue_task_specify_input_file(t, function, function);
+	work_queue_task_specify_input_buf(t, left, strlen(left), "xfile");
+	work_queue_task_specify_input_buf(t, bottom, strlen(bottom), "yfile");
+	work_queue_task_specify_input_buf(t, diag, strlen(diag), "dfile");
 	work_queue_submit(queue,t);
 
 	return 1;
@@ -192,10 +192,10 @@ int main( int argc, char *argv[] )
 	while(1) {
 		if(time(0)!=last_display_time) display_progress(queue);
 
-		t = work_queue_wait(queue,short_wait);
+		t = work_queue_wait(queue,WAITFORTASK);
 		if(!t) break;
 		
-		if(t->result==0) {
+		if(t->return_status==0) {
 			int x,y;
 			if(sscanf(t->tag,"%d %d",&x,&y)==2) {
 				text_array_set(array,x,y,t->output);
@@ -204,12 +204,14 @@ int main( int argc, char *argv[] )
 				fflush(logfile);
 				tasks_done++;
 			} else {
-				fprintf(stderr,"unexpected output: %s\nfrom command: %s\non host: %s",t->output,t->command,t->host);
+				fprintf(stderr,"unexpected output: %s\nfrom command: %s\non host: %s",t->output,t->command_line,t->host);
 			}
 		} else {
-			fprintf(stderr,"function failed: %s\non host: %s",t->output,t->host);
+		    fprintf(stderr,"function failed return value (%i) result (%i) on host %s. output:\n%s\n",t->return_status,t->result,t->host,t->output);
 		}
 		work_queue_task_delete(t);
+		if(work_queue_empty(queue))
+		    break;
 	}
 
 	display_progress(queue);

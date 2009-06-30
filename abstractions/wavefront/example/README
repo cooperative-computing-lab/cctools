@@ -22,7 +22,7 @@ To run a sample problem, start the Wavefront master process,
 specify the size of the problem, the function, the input data,
 and where to place the output data:
 
-% wavefront_master 10 10 example.func example.input.data example.output.data
+% wavefront_master example.func 10 10 example.input.data example.output.data
 
 Then, start one or more worker processes, and tell them to contact
 the master process using host name and port number:
