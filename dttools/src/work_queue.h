@@ -14,35 +14,25 @@ and port of the master.
 #include "timestamp.h"
 
 #define WORK_QUEUE_LINE_MAX 1024
-#define FNAME 0
-#define LITERAL 1
+
 
 #define WAITFORTASK -1
 
-/** A file for input to a task. */
-struct task_file {
-    short fname_or_literal; //0 or 1
-    short cacheable; // 0=no, 1=yes.
-    int length;
-    void* payload; // name on master machine or buffer of data.
-    char* remote_name; // name on remote machine.
-};
+
 
 /** A task description.  This structure should only be created with @ref work_queue_task_create and delete with @ref work_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.
 */
 struct work_queue_task {
 	char *tag;
-        char *program;			/**< The program to execute. */
-	char *args;			/**< The arguments line. */
+        char *command_line;		/**< The program(s) to execute, as a shell command line. */
 	char *output;			/**< The standard output of the task. */
-	struct list * standard_input_files;  /**< The files to send to the task for use as the task's standard input. */
-	struct list * extra_staged_files;    /**< The files to transfer to the worker and make available to be opened by the task. */
-	struct list * extra_created_files;		/**< The output files (other than the standard output stream) created by the program to retrieve from the task. */
-	char *command;			/**< The full command that gets executed. */
-    	int taskid;			/**< A unique task id number. */
-	int result;			/**< The exit code of the command line. */
-	char host[32];			/**< The name of the host on which it ran. */
-  timestamp_t submit_time;		/**< The time the task was submitted. */
+	struct list * input_files;      /**< The files to transfer to the worker and place in the executing directory. */
+	struct list * output_files;	/**< The output files (other than the standard output stream) created by the program expected to be retrieved from the task. */
+	int taskid;			/**< A unique task id number. */
+	int return_status;		/**< The exit code of the command line. */
+	int result;			/**< The result of the task (successful, failed return_status, missing input file, missing output file). */
+	char* host;			/**< The name of the host on which it ran. */
+	timestamp_t submit_time;	/**< The time the task was submitted. */
 	timestamp_t start_time;		/**< The time at which the task began. */
 	timestamp_t finish_time;	/**< The time at which it completed. */
     	INT64_T total_bytes_transfered;
@@ -52,21 +42,22 @@ struct work_queue_task {
 /** Statistics describing a work queue. */
 
 struct work_queue_stats {
-	int workers_init;		/** Number of workers initializing. */
-	int workers_ready;		/** Number of workers ready for tasks. */
-	int workers_busy;		/** Number of workers running tasks. */
-	int tasks_running;		/** Number of tasks currently running. */
-	int tasks_waiting;		/** Number of tasks waiting for a CPU. */
-	int tasks_complete;		/** Number of tasks waiting to be returned to user. */
-	int total_tasks_dispatched;	/** Total number of tasks dispatch to workers. */
-	int total_tasks_complete;	/** Total number of tasks returned complete. */
-	int total_workers_joined;	/** Total number of times a worker joined the queue. */
-	int total_workers_removed;	/** Total number of times a worker was removed from the queue. */
+	int workers_init;		/**< Number of workers initializing. */
+	int workers_ready;		/**< Number of workers ready for tasks. */
+	int workers_busy;		/**< Number of workers running tasks. */
+	int tasks_running;		/**< Number of tasks currently running. */
+	int tasks_waiting;		/**< Number of tasks waiting for a CPU. */
+	int tasks_complete;		/**< Number of tasks waiting to be returned to user. */
+	int total_tasks_dispatched;	/**< Total number of tasks dispatch to workers. */
+	int total_tasks_complete;	/**< Total number of tasks returned complete. */
+	int total_workers_joined;	/**< Total number of times a worker joined the queue. */
+	int total_workers_removed;	/**< Total number of times a worker was removed from the queue. */
 };
 
 /** Create a new work queue.
 @param port The port number to listen on, or zero to choose a default.
-@return A new work queue, or zero if it could not be created.
+@param stoptime The time at which to return null if not yet able to be created.
+@return A new work queue, or null if it could not be created.
 */
 struct work_queue * work_queue_create( int port , time_t stoptime);
 
@@ -83,7 +74,7 @@ void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s );
 
 /** Wait for tasks to complete.  This call will block until the timeout has elapsed.
 @param q The work queue to wait on.
-@param timeout The length of time to wait for a completed task before returning.  Use an integer time to set the timeout or the constant WAITFORTASK to block until a task has completed.
+@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant WAITFORTASK to block until a task has completed.
 @returns A completed task description, or null if the queue is empty or the timeout was reached without a completed task.
 */
 struct work_queue_task * work_queue_wait( struct work_queue *q , time_t timeout);
@@ -99,53 +90,38 @@ void work_queue_submit( struct work_queue *q, struct work_queue_task *t );
 */
 void work_queue_task_delete( struct work_queue_task *t );
 
-
-
-
 /** Create a new task specification.  Once created, the task may be passed to @ref work_queue_submit.
-@param program The command to be executed.
-@param args The arguments to the command.
+@param full_command The shell command line to be executed by the task.
 */
-struct work_queue_task * work_queue_task_create( const char* program, const char *args);
+struct work_queue_task * work_queue_task_create( const char* full_command);
 
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
 @param t The task to which to add parameters
 @param tag The tag to attatch to tast t.
 */
-INT64_T work_queue_task_add_tag( struct work_queue_task* t, const char* tag);
+INT64_T work_queue_task_specify_tag( struct work_queue_task* t, const char* tag);
 
-/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. If no buffer or file is defined, the program will have default stdin.
+/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
 @param t The task to which to add parameters
-@param buf The data buffer to send to the program on standard input.
+@param buf A pointer to the data buffer to send to the worker to be available to the commands.
+@param length The number of bytes of data in the buffer
+@param rname The name of the file in which to store the buffer data on the worker
 */
-INT64_T work_queue_task_add_standard_input_buf( struct work_queue_task* t, const char* buf, int length);
+INT64_T work_queue_task_specify_input_buf( struct work_queue_task* t, const char* buf, int length, const char* rname);
 
-/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. If no buffer or file is defined, the program will have default stdin.
+/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
 @param t The task to which to add parameters
-@param buf The name of the data file to send to the program on standard input.
+@param fname The name of the data file to send to the worker to be available to the commands.
+@param rname The name of the file in which to store the buffer data on the worker
 */
-INT64_T work_queue_task_add_standard_input_file( struct work_queue_task* t, const char* fname);
+INT64_T work_queue_task_specify_input_file( struct work_queue_task* t, const char* fname, const char* rname);
 
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. If no file is defined, the program will have default (no) output files retrieved.
 @param t The task to which to add parameters
 @param rname The name of a file created by the program when it runs.
 @param fname The name of the file local target for copying rname back.
 */
-INT64_T work_queue_task_add_extra_created_file( struct work_queue_task* t, const char* rname, const char* fname);
-
-/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit.
-@param t The task to which to add parameters
-@param buf The data buffer to send to the worker to be available to the program as a file.
-@param rname The name of the file on the remote worker.
-*/
-INT64_T work_queue_task_add_extra_staged_buf( struct work_queue_task* t, const char* buf, int length, const char* rname);
-
-/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit.
-@param t The task to which to add parameters
-@param buf The name of the data file to send to the worker to be available to the program.
-@param rname The name of the file on the remote worker.
-*/
-INT64_T work_queue_task_add_extra_staged_file( struct work_queue_task* t, const char* fname, const char* rname);
+INT64_T work_queue_task_specify_output_file( struct work_queue_task* t, const char* rname, const char* fname);
 
 /** Determine whether the queue can support more tasks. Returns the number of additional tasks it can support if "hungry" and 0 if "sated".
 @param q A pointer to the queue to query.
@@ -157,15 +133,7 @@ int work_queue_hungry (struct work_queue* q);
 */
 int work_queue_empty (struct work_queue* q);
 
-/** Resubmit a completed task with the exact same specification, for instance, if it failed and you want to retry it.
-@param q A pointer to the queue to query.
-@param t A fully defined task struct to resubmit.
-*/
-//int work_queue_resubmit (struct work_queue* q, struct work_queue_task* t);
-
-
-
-/** Shut down workers connected to the work_queue system. Gives a best effort and then returns the number of workers successfully shut down.
+/** Shut down workers connected to the work_queue system. Gives a best effort and then returns the number of workers given the shut down order.
 @param q A pointer to the queue to query.
 @param n The number to shut down. All workers if given "0".
 */
@@ -177,5 +145,10 @@ int work_queue_shut_down_workers (struct work_queue* q, int n);
 */
 //int work_queue_delete_local_state (struct work_queue* q, struct task_file* exceptions);
 
+/** Resubmit a completed task with the exact same specification, for instance, if it failed and you want to retry it.
+@param q A pointer to the queue to query.
+@param t A fully defined task struct to resubmit.
+*/
+//int work_queue_resubmit (struct work_queue* q, struct work_queue_task* t);
 
 #endif
