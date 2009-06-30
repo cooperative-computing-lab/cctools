@@ -23,6 +23,12 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
+// Maximum time to wait before aborting if there is no connection to the master.
+static int idle_timeout=900;
+
+// Maximum time to wait when actively communicating with the master.
+static int active_timeout=3600;
+
 static void show_version(const char *cmd)
 {
 	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
@@ -33,7 +39,7 @@ static void show_help(const char *cmd)
 	printf("Use: %s <masterhost> <port>\n", cmd);
 	printf("where options are:\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
-	printf(" -t <time>      Abort after this amount of idle time. (default=1h)\n");
+	printf(" -t <time>      Abort after this amount of idle time. (default=%ds)\n",idle_timeout);
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -w <size>      Set TCP window size.\n");
@@ -50,9 +56,6 @@ int main( int argc, char *argv[] )
 	UINT64_T disk_avail, disk_total;
 	int ncpus;
 	char c;
-	int timeout=3600;
-	int idle_abort_timeout=3600;
-	time_t idle_abort_time;
 	char hostname[DOMAIN_NAME_MAX];
 	int w;
 
@@ -68,7 +71,7 @@ int main( int argc, char *argv[] )
 			debug_flags_set(optarg);
 			break;
 		case 't':
-			idle_abort_timeout = string_time_parse(optarg);
+			idle_timeout = string_time_parse(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -111,7 +114,7 @@ int main( int argc, char *argv[] )
 
 	domain_name_cache_guess(hostname);
 
-	idle_abort_time = time(0) + idle_abort_timeout;
+	time_t idle_stoptime = time(0) + idle_timeout;
 
 	while(1) {
 		char line[WORK_QUEUE_LINE_MAX];
@@ -120,10 +123,13 @@ int main( int argc, char *argv[] )
 		char *buffer;
 		FILE *stream;
 
-		if(time(0)>idle_abort_time) break;
+		if(time(0)>idle_stoptime) {
+			printf("worker: gave up after waiting for %ds to connect to the master.\n",idle_timeout);
+			break;
+		}
 
 		if(!master) {
-			master = link_connect(addr,port,time(0)+timeout);
+			master = link_connect(addr,port,idle_stoptime);
 			if(!master) {
 				sleep(5);
 				continue;
@@ -131,14 +137,14 @@ int main( int argc, char *argv[] )
 
 			link_tune(master,LINK_TUNE_INTERACTIVE);
 			sprintf(line,"ready %s %d %llu %llu %llu %llu\n",hostname,ncpus,memory_avail,memory_total,disk_avail,disk_total);
-			link_write(master,line,strlen(line),time(0)+timeout);
+			link_write(master,line,strlen(line),time(0)+active_timeout);
 		}
 
-		if(link_readline(master,line,sizeof(line),time(0)+timeout)) {
+		if(link_readline(master,line,sizeof(line),time(0)+active_timeout)) {
 			debug(D_DEBUG,"%s",line);
 			if(sscanf(line,"work %d",&length)) {
 				buffer = malloc(length+1);
-				link_read(master,buffer,length,time(0)+timeout);
+				link_read(master,buffer,length,time(0)+active_timeout);
 				buffer[length] = 0;
 				debug(D_DEBUG,"%s",buffer);
 				stream = popen(buffer,"r");
@@ -154,14 +160,14 @@ int main( int argc, char *argv[] )
 				}
 				sprintf(line,"result %d %d\n",result,length);
 				debug(D_DEBUG,"%s",line);
-				link_write(master,line,strlen(line),time(0)+timeout);
-				link_write(master,buffer,length,time(0)+timeout);
+				link_write(master,line,strlen(line),time(0)+active_timeout);
+				link_write(master,buffer,length,time(0)+active_timeout);
 				if(buffer) free(buffer);
 			} else if(sscanf(line,"put %s %d %o",filename,&length,&mode)==3) {
 				fd = open(filename,O_WRONLY|O_CREAT|O_TRUNC,mode);
 				if(fd<0) goto recover;
 
-				int actual = link_stream_to_fd(master,fd,length,time(0)+timeout);
+				int actual = link_stream_to_fd(master,fd,length,time(0)+active_timeout);
 				close(fd);
 				if(actual!=length) goto recover;
 
@@ -172,21 +178,21 @@ int main( int argc, char *argv[] )
 					fstat(fd,&info);
 					length = info.st_size;
 					sprintf(line,"%d\n",(int)length);
-					link_write(master,line,strlen(line),time(0)+timeout);
-					int actual = link_stream_from_fd(master,fd,length,time(0)+timeout);
+					link_write(master,line,strlen(line),time(0)+active_timeout);
+					int actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
 					close(fd);
 					if(actual!=length) goto recover;
 				} else {
 					sprintf(line,"-1\n");
-					link_write(master,line,strlen(line),time(0)+timeout);
+					link_write(master,line,strlen(line),time(0)+active_timeout);
 				}					
 			} else if(!strcmp(line,"exit")) {
 				exit(0);
 			} else {
-				link_write(master,"error\n",6,time(0)+timeout);
+				link_write(master,"error\n",6,time(0)+active_timeout);
 			}
 
-			idle_abort_time = time(0) + idle_abort_timeout;
+			idle_stoptime = time(0) + idle_timeout;
 
 		} else {
 			recover:
