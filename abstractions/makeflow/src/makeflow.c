@@ -191,6 +191,8 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 			string_chomp(line);
 			if(!line[0]) {
 				continue;
+			} else if(line[0]=='#') {
+				continue;
 			} else if(strchr(line,'=')) {
 				putenv(strdup(line));
 				continue;
