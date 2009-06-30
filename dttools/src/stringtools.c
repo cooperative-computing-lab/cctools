@@ -419,6 +419,7 @@ char * string_subst( char *value, string_subst_lookup_t lookup, void *arg )
 {
 	char *subvalue, *newvalue;
 	char *dollar, *ldelim, *rdelim;
+	char oldrdelim;
 	int length;
  
 	while(1) {
@@ -443,11 +444,14 @@ char * string_subst( char *value, string_subst_lookup_t lookup, void *arg )
 			while(isalpha(*rdelim)) rdelim++;
 		}
 
+		oldrdelim = *rdelim;
 		*rdelim = 0;
  
 		subvalue = lookup(ldelim+1,arg);
 		if(!subvalue) subvalue = strdup("");
- 
+
+		*rdelim = oldrdelim;
+
 		length = strlen(value) - (rdelim-dollar) + strlen(subvalue) + 1;
 		newvalue = malloc(length);
 		if(!newvalue) {
@@ -456,11 +460,12 @@ char * string_subst( char *value, string_subst_lookup_t lookup, void *arg )
 			return 0;
 		}
 
+		if(ldelim!=dollar) rdelim++;
 		*dollar = 0;
 
 		strcpy(newvalue,value);
 		strcat(newvalue,subvalue);
-		strcat(newvalue,rdelim+1);
+		strcat(newvalue,rdelim);
 
 		free(subvalue);
 		free(value);
