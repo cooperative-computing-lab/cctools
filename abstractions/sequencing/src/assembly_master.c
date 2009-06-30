@@ -162,6 +162,10 @@ static int confirm_output(char* output) {
 
     char* buf = strdup(output);
     char* rec = strtok(buf,"}");
+    if(!rec) {
+	debug(D_DEBUG,"No } found! Output:\n%s\n",buf);
+	return 0;
+    }
     while(rec) {
 	if(sscanf(rec," {OVL afr:%s bfr:%s ori:%c olt:%c ahg:%i bhg:%i qua:%f mno:%i mxo:%i pct:%i ",A_sequence_name,B_sequence_name,&ori,&olt,&ahg,&bhg,&qua,&mno,&mxo,&pct) == 10) {
 	    i++;
@@ -233,7 +237,7 @@ static int handle_done_task(struct work_queue_task *t) {
     if(!t)
 	return 0;
     
-    if(t->result==0) {
+    if(t->return_status==0) {
 	if(confirm_output(t->output)) {
 	    debug(D_DEBUG,"Completed task!\n");
 	    fputs(t->output,logfile);
@@ -243,11 +247,11 @@ static int handle_done_task(struct work_queue_task *t) {
 	    tasks_filetime+=t->total_transfer_time;
 	}
 	else { // error in output
-	    fprintf(stderr,"Failure of task on host %s:\n%s",t->host,t->output);
+	    fprintf(stderr,"Failure of task on host %s. Output not confirmed:\n%s\n",t->host,t->output);
 	    return 0;
 	}
     } else {
-	fprintf(stderr,"Function failed: %s\non host: %s\n",t->output,t->host);
+	fprintf(stderr,"Failure of task on host %s. Failed with result: %i and return value %i. Output:\n%s\n",t->host,t->result,t->return_status,t->output);
 	return 0;
     }
     work_queue_task_delete(t);
@@ -270,17 +274,19 @@ static int get_task_ratio(  struct work_queue *q ) {
 static int task_consider( void* taskfiledata, int size )
 {
 	char cmd[2*MAX_FILENAME+4];
-	//char job_filename[10];
-	//string_cookie( job_filename, 10 );
-	struct work_queue_task* t;
+	char job_filename[10];
+	string_cookie( job_filename, 10 );
+	sprintf(cmd,"./%s < %s",function,job_filename);
 
+	struct work_queue_task* t;
+	
 
 	while(!work_queue_hungry(queue)) {
 	    handle_done_task(work_queue_wait(queue, 5));
 	}
-	t = work_queue_task_create(function,"");
-	work_queue_task_add_extra_staged_file( t, function, function);
-	work_queue_task_add_standard_input_buf( t, taskfiledata, size);
+	t = work_queue_task_create(cmd);
+	work_queue_task_specify_input_file( t, function, function);
+	work_queue_task_specify_input_buf( t, taskfiledata, size, job_filename);
 	work_queue_submit(queue,t);
 	global_count++;
 
