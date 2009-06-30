@@ -54,6 +54,38 @@ struct dag_node {
 	struct dag_node *next;
 };
 
+void dag_print( struct dag *d )
+{
+	char name[DAG_LINE_MAX];
+
+	struct dag_node *n;
+	struct dag_file *f;
+
+	printf("digraph {\n");
+
+	printf("node [shape=ellipse,style=filled,fillcolor=green];\n");
+
+	for(n=d->nodes;n;n=n->next) {
+		strcpy(name,n->command);
+		char * label = strtok(name," \t\n");
+		printf("N%d [label=\"%s\"];\n",n->nodeid,label);
+	}
+
+	printf("node [shape=box,style=filled,fillcolor=skyblue];\n");
+
+	for(n=d->nodes;n;n=n->next) {
+		for(f=n->source_files;f;f=f->next) {
+			printf("\"%s\" -> N%d;\n",f->filename,n->nodeid);
+		}
+		for(f=n->target_files;f;f=f->next) {
+			printf("N%d -> \"%s\";\n",n->nodeid,f->filename);
+		}
+	}
+
+	printf("}\n");
+}
+
+
 const char * dag_node_state_name( dag_node_state_t state )
 {
 	switch(state) {
@@ -434,6 +466,7 @@ static void show_help(const char *cmd)
 	printf(" -p <port>      Port number to use with work queue.        (default=9123)\n");
 	printf(" -l <logfile>   Use this file for the makeflow log.        (default=<dagfile>.makeflowlog)\n");
 	printf(" -L <logfile>   Use this file for the batch system log.    (default=<dagfile>.condorlog)\n");
+	printf(" -D             Display the Makefile as a Dot graph.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
@@ -448,6 +481,7 @@ int main( int argc, char *argv[] )
 	char logfilename[DAG_LINE_MAX];
 	char batchlogfilename[DAG_LINE_MAX];
 	int clean_mode = 0;
+	int display_mode = 0;
 	int explicit_jobs_max = 0;
 
 	logfilename[0] = 0;
@@ -455,7 +489,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "p:cd:T:l:L:j:o:v")) != (char) -1) {
+	while((c = getopt(argc, argv, "p:cd:DT:l:L:j:o:v")) != (char) -1) {
 		switch (c) {
 		case 'p':
 			port = atoi(optarg);
@@ -468,6 +502,9 @@ int main( int argc, char *argv[] )
 			break;
 		case 'L':
 			strcpy(batchlogfilename,optarg);
+			break;
+		case 'D':
+			display_mode = 1;
 			break;
 		case 'j':
 			explicit_jobs_max = atoi(optarg);
@@ -515,6 +552,11 @@ int main( int argc, char *argv[] )
 		} else {
 			d->jobs_max = 1000;
 		}
+	}
+
+	if(display_mode) {
+		dag_print(d);
+		return 0;
 	}
 
 	if(clean_mode) {
