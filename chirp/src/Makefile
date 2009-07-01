@@ -76,7 +76,7 @@ install: all
 	install chirp ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_get ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_put ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_server ${CCTOOLS_INSTALL_DIR}/bin
+	install --backup chirp_server ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_status ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_benchmark ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_matrix_benchmark ${CCTOOLS_INSTALL_DIR}/bin
