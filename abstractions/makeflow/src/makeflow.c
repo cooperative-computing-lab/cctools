@@ -323,11 +323,27 @@ struct dag * dag_create( const char *filename )
 	return d;
 }
 
+void dag_node_complete( struct batch_queue *q, struct dag *d, struct dag_node *n, struct batch_job_info *info );
+
 void dag_node_submit( struct batch_queue *q, struct dag *d, struct dag_node *n )
 {
 	char input_files[DAG_LINE_MAX];
 	char output_files[DAG_LINE_MAX];
 	struct dag_file *f;
+
+	printf("makeflow: %s\n",n->command);
+
+	if(!strncmp(n->command,"LOCAL ",6)) {
+		struct batch_job_info info;
+		memset(&info,0,sizeof(info));
+		dag_node_state_change(d,n,DAG_NODE_STATE_RUNNING);
+		int result = system(&n->command[6]);
+		info.exited_normally = 1;
+		info.exit_code = result;
+		d->jobs_running++;
+		dag_node_complete(q,d,n,&info);
+		return;
+	}
 
 	input_files[0] = 0;
 	output_files[0] = 0;
@@ -341,8 +357,6 @@ void dag_node_submit( struct batch_queue *q, struct dag *d, struct dag_node *n )
 		strcat(output_files,f->filename);
 		strcat(output_files,",");
 	}
-
-	printf("makeflow: %s\n",n->command);
 
 	n->jobid = batch_job_submit_simple(q,n->command,input_files,output_files);
 	dag_node_state_change(d,n,DAG_NODE_STATE_RUNNING);
