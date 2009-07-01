@@ -25,6 +25,7 @@ fault-prone distributed systems.  The components of the cctools are:
 <li> <a href=makeflow.html>Makeflow</a> - A workflow engine similar to Make.
 <li> <a href=ftsh.html>ftsh</a> - A fault tolerant shell language.
 <li> <a href=watchdog.html>Watchdog</a> - A reliable process manager.
+<li> <a href=ftp_lite.html>FTP-Lite</a> - A light weight FTP client library.
 </dir>
 
 This short manual describes how to install the cctools.
@@ -49,7 +50,7 @@ Simply set up your path as follows:
 
 <dir>
 <pre>
-% setenv PATH /afs/nd.edu/user37/ccl/software/stable/bin
+% setenv PATH /afs/nd.edu/user37/ccl/software/stable/bin:$PATH
 </pre>
 </dir>
 
@@ -59,25 +60,36 @@ From any other location, we recommend that you install a binary
 package from the <a href=http://www.cse.nd.edu/~ccl/software/download.shtml>cctools web page</a>.
 Simply unpack the tarball in any directory that you like,
 and then add the <code>bin</code> directory to your path.
-For example, to install in /home/fred/cctools:
+For example, to install in $HOME/cctools:
 
 <dir>
 <pre>
-% cd /home/fred
+% cd $HOME
 % gunzip cctools-xxx-yyy.tar.gz
 % tar xvf cctools-xxx-yyy.tar
-% setenv PATH /home/fred/cctools/bin:$PATH
+% setenv PATH $HOME/cctools/bin:$PATH
 </pre>
 </dir>
 
 <h3>Installation From a Source Package </h3>
 
-Building the cctools from source can be quite complicated simply because
-the cctools works with a number of completely independent systems that
-are quite complex themselves.  Begin by downloading a source package:
+Building the CCTools from source is very easy.
+Just download a source package:
 <ol>
-<li> <a href=http://www.cse.nd.edu/~ccl/software/download.shtml>cctools</a> (Required)
+<li> <a href=http://www.cse.nd.edu/~ccl/software/download.shtml>CCTools Download</a> (Required)
 </ol>
+
+And follow this recipe:
+<pre>
+<pre>
+% gunzip cctools-xxx-src.tar.gz
+% tar xvf cctools-xxx-src.tar
+% cd cctools-xxx-src
+% ./configure --prefix ${HOME}/cctools
+% make
+% make install
+% setenv PATH ${HOME}/cctools/bin:$PATH
+</pre>
 
 The software will happily build and run without installing
 any external packages.  Optionally, the cctools will interoperate
@@ -87,8 +99,9 @@ To use these, you must download and install them separately:
 <ol>
 <li> <a href=http://web.mit.edu/kerberos>Kerberos V</a> (Optional)
 <li> <a href=http://www.globus.org>Globus</a> (Optional) (Tested with Globus 2.2, 2.4, and 4.0.)
-<li> <a href=http://www.cs.wisc.edu/condor/nest>NeST</a> (Optional)
 <li> <a href=http://glite.web.cern.ch/glite/packages/R3.0/>EGEE GLite</a> (Optional)
+<li> <a href=http://hadoop.apache.org>Hadoop</a> (Optional)
+<li> <a href=http://www.irods.org>iRODS</a> (Optional)
 </ol>
 
 Once the desired packages are correctly installed, unpack the cctools and
@@ -99,16 +112,9 @@ installations.  Then, make and install.  For example:
 % gunzip cctools-xxx.tar.gz
 % tar xvf cctools-xxx.tar
 % cd cctools-xxx
-% ./configure --prefix /home/fred/cctools --with-krb5-path /usr/kerberos --with-globus-path /usr/local/globus ...
+% ./configure --prefix $HOME/cctools --with-krb5-path /usr/kerberos --with-globus-path /usr/local/globus ...
 % make
 % make install
-</pre>
-</dir>
-
-Finally, add the cctools to your path:
-
-<dir>
-<pre>
-% setenv PATH /home/fred/cctools/bin:$PATH
+% setenv PATH ${HOME}/cctools/bin:$PATH
 </pre>
 </dir>
