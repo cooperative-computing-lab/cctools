@@ -7,7 +7,7 @@
 
 CURL=/usr/bin/curl
 CONVERT=/usr/bin/convert
-URL=http://www.doa.state.wi.us/dsf/images/capitol_cleaned_w450.jpg
+URL=http://www.cse.nd.edu/~ccl/images/capitol.jpg
 
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
 	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
@@ -26,3 +26,4 @@ capitol.360.jpg: capitol.jpg
 
 capitol.jpg:
 	$CURL -o capitol.jpg $URL
+

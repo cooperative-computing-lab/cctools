@@ -37,7 +37,9 @@ void   string_split_path( const char *str, char *first, char *rest );
 void   string_collapse_path( const char *longpath, char *shortpath, int remove_dotdot );
 void   string_tolower( char *str );
 void   string_toupper( char *str );
+int    string_isspace( const char *str );
 int    string_is_integer( const char *str );
+void   string_replace_backslash_codes( const char *instr, char *outstr );
 
 int strpos(char *str, char c);
 int strrpos(char *str, char c);

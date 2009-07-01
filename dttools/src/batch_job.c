@@ -25,6 +25,7 @@ See the file COPYING for details.
 struct batch_queue {
 	batch_queue_type_t type;
 	char *logfile;
+	char *options_text;
 	struct itable *job_table;
 	struct itable *output_table;
 	struct work_queue *work_queue;
@@ -56,8 +57,8 @@ static int batch_job_submit_condor( struct batch_queue *q, const char *cmd, cons
 	fprintf(file,"when_to_transfer_output = on_exit\n");
 	fprintf(file,"copy_to_spool = true\n");
 	fprintf(file,"log = %s\n",q->logfile);
+	if(q->options_text) fprintf(file,"%s\n",q->options_text);
 	fprintf(file,"queue\n");
-
 	fclose(file);
 
 	file = popen("condor_submit condor.submit","r");
@@ -248,7 +249,7 @@ batch_job_id_t batch_job_submit_simple_sge( struct batch_queue *q, const char *c
 
 	if(setup_sge_wrapper("sgewrap")<0) return -1;
 
-	sprintf(line,"qsub sgewrap \"%s\"",cmd);
+	sprintf(line,"qsub %s sgewrap \"%s\"",q->options_text ? q->options_text : "",cmd);
 
 	debug(D_DEBUG,"%s",line);
 
@@ -630,6 +631,7 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 
 	q = malloc(sizeof(*q));
 	q->type = type;
+	q->options_text = 0;
 	q->job_table = itable_create(0);
 	q->output_table = itable_create(0);
 	q->logfile = strdup("condor.logfile");
@@ -643,10 +645,35 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 	return q;
 }
 
-void batch_queue_logfile( struct batch_queue *q, const char *logfile )
+void batch_queue_delete( struct batch_queue *q )
+{
+	if(q) {
+	      if(q->options_text) free(q->options_text);
+	      if(q->job_table)    itable_delete(q->job_table);
+	      if(q->output_table) itable_delete(q->output_table);
+	      if(q->logfile)      free(q->logfile);
+	      if(q->work_queue)   work_queue_delete(q->work_queue);
+	      free(q);
+	}
+}
+
+void batch_queue_set_logfile( struct batch_queue *q, const char *logfile )
 {
 	free(q->logfile);
 	q->logfile = strdup(logfile);
+}
+
+void batch_queue_set_options( struct batch_queue *q, const char *options_text )
+{
+	if(q->options_text) {
+		free(q->options_text);
+	}
+
+	if(options_text) {
+		q->options_text = strdup(options_text);
+	} else {
+		q->options_text = 0;
+	}
 }
 
 batch_job_id_t batch_job_submit( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )

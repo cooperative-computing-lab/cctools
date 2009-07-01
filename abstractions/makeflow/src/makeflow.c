@@ -180,7 +180,7 @@ void dag_log_recover( struct dag *d, const char *filename )
 				if(n) {
 					n->state = state;
 					n->jobid = jobid;
-					if(state==DAG_NODE_STATE_RUNNING) itable_insert(d->job_table,jobid,n);
+					if(state==DAG_NODE_STATE_RUNNING && jobid>0) itable_insert(d->job_table,jobid,n);
 					continue;
 				}
 			}
@@ -207,39 +207,69 @@ static char * lookupenv( const char *name, void *arg )
 	return strdup(getenv(name));
 }
 
+char * dag_readline( struct dag *d, FILE *file )
+{
+	char rawline[DAG_LINE_MAX];
+
+	if(fgets(rawline,sizeof(rawline),file)) {
+		d->linenum++;
+
+		string_chomp(rawline);
+
+		char *hash = strchr(rawline,'#');
+		if(hash) *hash = 0;
+
+		char *substline = strdup(rawline);
+		substline = string_subst(substline,lookupenv,0);
+
+		char * cookedline = strdup(substline);
+
+		string_replace_backslash_codes(substline,cookedline);
+		free(substline);
+
+		return cookedline;
+	}
+
+	return 0;
+}
+
 struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 {
 	static int nodeid_counter = 0;
-	char line[DAG_LINE_MAX];
 
+	char *line;
+	char *eq;
 	char *colon;
 	char *targetfiles;
 	char *sourcefiles;
 	char *filename;
 
 	while(1) {
-		d->linenum++;
-		if(fgets(line,sizeof(line),file)) {
-			string_chomp(line);
-			if(!line[0]) {
-				continue;
-			} else if(line[0]=='#') {
-				continue;
-			} else if(strchr(line,'=')) {
-				putenv(strdup(line));
-				continue;
-			} else if(strchr(line,':')) {
-				break;
-			} else {
-				return 0;
-			}
-		} else {
-			return 0;
+		line = dag_readline(d,file);
+		if(!line) return 0;
+
+		if(string_isspace(line)) {
+			free(line);
+			continue;
 		}
+
+		eq = strchr(line,'=');
+		colon = strchr(line,':');
+
+		if(eq) {
+			if(!colon || colon>eq) {
+				putenv(line);
+				continue;
+			}
+		}
+
+		break;
 	}
 
-	char *wline = strdup(line);
-	wline = string_subst(wline,lookupenv,0);
+	if(!colon) {
+		printf("makeflow: error at %s:%d: %s\n",d->filename,d->linenum,line);
+		exit(1);
+	}
 
 	struct dag_node *n = malloc(sizeof(*n));
 	memset(n,0,sizeof(*n));
@@ -247,14 +277,9 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 	n->state = DAG_NODE_STATE_WAITING;
 	n->nodeid = nodeid_counter++;
 
-	colon=strchr(wline,':');
-	if(colon) {
-		*colon = 0;
-		targetfiles = wline;
-		sourcefiles = colon+1;
-	} else {
-		return 0;
-	}
+	*colon = 0;
+	targetfiles = line;
+	sourcefiles = colon+1;
 
 	filename = strtok(targetfiles," \t\n");
 	while(filename) {
@@ -268,21 +293,19 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 		filename = strtok(0," \t\n");
 	}
 
-	free(wline);
+	free(line);
 
-	d->linenum++;
-	if(fgets(line,sizeof(line),file)) {
-		string_chomp(line);
-		char *wline = strdup(line);
-		wline = string_subst(wline,lookupenv,0);
-		char *c=wline;
-		while(*c && isspace(*c)) c++;
-		n->command = strdup(c);
-		free(wline);
-		return n;
-	} else {
-		return 0;
+	line = dag_readline(d,file);
+	if(!line) {
+		printf("makeflow: error at %s:%d: expected a command\n",d->filename,d->linenum);
+		exit(1);
 	}
+
+	char *c=line;
+	while(*c && isspace(*c)) c++;
+	n->command = strdup(c);
+	free(line);
+	return n;
 }
 
 struct dag * dag_create( const char *filename )
@@ -358,12 +381,16 @@ void dag_node_submit( struct batch_queue *q, struct dag *d, struct dag_node *n )
 		strcat(output_files,",");
 	}
 
+	batch_queue_set_options(q,getenv("BATCH_OPTIONS"));
+
 	n->jobid = batch_job_submit_simple(q,n->command,input_files,output_files);
-	dag_node_state_change(d,n,DAG_NODE_STATE_RUNNING);
-
-	itable_insert(d->job_table,n->jobid,n);
-
-	d->jobs_running++;
+	if(n->jobid>=0) {
+		dag_node_state_change(d,n,DAG_NODE_STATE_RUNNING);
+		itable_insert(d->job_table,n->jobid,n);
+		d->jobs_running++;
+	} else {
+		dag_node_state_change(d,n,DAG_NODE_STATE_FAILED);
+	}
 }
 
 int dag_node_ready( struct dag *d, struct dag_node *n )
@@ -457,7 +484,6 @@ void dag_run( struct dag *d, struct batch_queue *q )
 	if(dag_abort_flag) {
 		dag_abort_all(d,q);
 	}
-
 	printf("makeflow: nothing left to do.\n");
 }
 
@@ -477,10 +503,12 @@ static void show_help(const char *cmd)
 	printf("where options are:\n");
 	printf(" -c             Clean up: remove logfile and all targets.\n");
 	printf(" -T <type>      Batch system type: condor, sge, unix, wq.  (default is unix)\n");
+	printf(" -D             Display the Makefile as a Dot graph.\n");
+	printf(" -B <options>   Add these options to all batch submit files.\n");
 	printf(" -p <port>      Port number to use with work queue.        (default=9123)\n");
 	printf(" -l <logfile>   Use this file for the makeflow log.        (default=<dagfile>.makeflowlog)\n");
 	printf(" -L <logfile>   Use this file for the batch system log.    (default=<dagfile>.condorlog)\n");
-	printf(" -D             Display the Makefile as a Dot graph.\n");
+	printf(" -A             Disable the check for AFS. (experts only.)\n");;
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
@@ -497,14 +525,19 @@ int main( int argc, char *argv[] )
 	int clean_mode = 0;
 	int display_mode = 0;
 	int explicit_jobs_max = 0;
+	int skip_afs_check = 0;
+	const char *batch_submit_options = 0;
 
 	logfilename[0] = 0;
 	batchlogfilename[0] = 0;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "p:cd:DT:l:L:j:o:v")) != (char) -1) {
+	while((c = getopt(argc, argv, "Ap:cd:DT:iB:l:L:j:o:v")) != (char) -1) {
 		switch (c) {
+		case 'A':
+			skip_afs_check = 1;
+			break;
 		case 'p':
 			port = atoi(optarg);
 			break;
@@ -523,9 +556,11 @@ int main( int argc, char *argv[] )
 		case 'j':
 			explicit_jobs_max = atoi(optarg);
 			break;
-		case 'd':
-			debug_flags_set(optarg);
+		case 'B':
+			batch_submit_options = optarg;
 			break;
+		case 'd':
+			debug_flags_set(optarg);			break;
 		case 'o':
 			debug_config_file(optarg);
 			break;
@@ -557,6 +592,10 @@ int main( int argc, char *argv[] )
 	if(!batchlogfilename[0]) sprintf(batchlogfilename,"%s.condorlog",dagfile);
 
 	struct dag *d = dag_create(dagfile);
+	if(!d) {
+		fprintf(stderr,"makeflow: couldn't load %s: %s\n",dagfile,strerror(errno));
+		return 1;
+	}
 
 	if(explicit_jobs_max) {
 		d->jobs_max = explicit_jobs_max;
@@ -580,11 +619,24 @@ int main( int argc, char *argv[] )
 		return 0;
 	}
 
+	if(batchtype==BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
+		char cwd[DAG_LINE_MAX];
+		if(getcwd(cwd,sizeof(cwd))>=0) {
+			if(!strncmp(cwd,"/afs",4)) {
+				fprintf(stderr,"makeflow: This won't work because Condor is not able to write to files in AFS.\n");
+				fprintf(stderr,"makeflow: Instead, run makeflow from a local disk like /tmp.\n");
+				fprintf(stderr,"makeflow: Or, use the work queue with -T wq and condor_submit_workers.\n");
+				exit(1);
+			}
+		}
+	}
+
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
 	struct batch_queue *q = batch_queue_create(batchtype);
-	if(batchlogfilename) batch_queue_logfile(q,batchlogfilename);
+	if(batch_submit_options)   batch_queue_set_options(q,batch_submit_options);
+	if(batchlogfilename) batch_queue_set_logfile(q,batchlogfilename);
 	if(batchtype==BATCH_QUEUE_TYPE_CONDOR) dag_log_recover(d,logfilename);
 	dag_log_init(d,logfilename);
 

@@ -53,10 +53,27 @@ that use an internal logfile; currently only Condor.
 @param q The batch queue to adjust.
 @param logfile Name of the logfile to use.
 */
-void batch_queue_logfile( struct batch_queue *q, const char *logfile );
+void batch_queue_set_logfile( struct batch_queue *q, const char *logfile );
+
+/** Add extra options to pass to the underlying batch system.
+This call specifies additional options to be passed to the batch system each
+time a job is submitted.  It may be called once to apply to all subsequent
+jobs, or it may be called before each submission.  If the queue type
+is @ref BATCH_QUEUE_TYPE_CONDOR, the options must be valid submit file
+properties like <tt>requirements = (Memory>100)</tt>.
+If the batch queue type is @ref BATCH_QUEUE_TYPE_SGE, the extra text will be added as options to
+the <tt>qsub</tt> command.  This call has no effect on other queue types.
+@param q The batch queue to adjust.
+@param options The options to pass to the batch system.
+*/
+void batch_queue_set_options( struct batch_queue *q, const char *options );
 
 /** Delete a batch queue.
-@param q The batch queue to delete.
+Note that this function just destroys the internal data structures,
+it does not abort running jobs.  To properly clean up running jobs,
+you must call @ref batch_queue_wait until it returns zero, or
+call @batch_job_remove on all runnings jobs.
+@param q The queue to delete.
 */
 void batch_queue_delete( struct batch_queue *q );
 

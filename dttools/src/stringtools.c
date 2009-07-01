@@ -430,7 +430,7 @@ char * string_subst( char *value, string_subst_lookup_t lookup, void *arg )
 			dollar = strchr(dollar+1,'$');
 			if(!dollar) return value;
 		}
- 
+
 		ldelim = dollar+1;
 		if(*ldelim=='(') {
 			rdelim = ldelim+1;
@@ -446,7 +446,7 @@ char * string_subst( char *value, string_subst_lookup_t lookup, void *arg )
 
 		oldrdelim = *rdelim;
 		*rdelim = 0;
- 
+
 		subvalue = lookup(ldelim+1,arg);
 		if(!subvalue) subvalue = strdup("");
 
@@ -662,6 +662,42 @@ int string_is_integer( const char *s )
 		s++;
 	}
 	return 1;
+}
+
+int string_isspace( const char *s )
+{
+	while(*s) {
+		if(!isspace(*s)) return 0;
+		s++;
+	}
+
+	return 1;
+}
+
+void string_replace_backslash_codes( const char *a, char *b )
+{
+	while(*a) {
+		if(*a=='\\') {
+			a++;
+			char c;
+			switch(*a) {
+				case 'a': c = 7;  break; // bell
+				case 'b': c = 8;  break; // backspace
+				case 't': c = 9;  break; // tab
+				case 'n': c = 10; break; // newline
+				case 'v': c = 11; break; // vertical tab
+				case 'f': c = 12; break; // formfeed
+				case 'r': c = 13; break; // return
+				default:  c = *a; break;
+			}
+			*b++ = c;
+			a++;
+		} else {
+			*b++ = *a++;
+		}
+	}
+
+	*b = 0;
 }
 
 int strpos(char *str, char c) {
