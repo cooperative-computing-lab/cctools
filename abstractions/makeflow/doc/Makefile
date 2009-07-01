@@ -1,5 +1,5 @@
-include ../../Makefile.config
-include ../../Makefile.rules
+include ../../../Makefile.config
+include ../../../Makefile.rules
 
 all:
 
