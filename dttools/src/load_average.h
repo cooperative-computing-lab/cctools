@@ -10,7 +10,7 @@ Uses different techniques on each platform to get the current 1, 5, and 15 minut
 
 void load_average_get( double *avg );
 
-/** Get the number of CPU cores..
+/** Get the number of CPU cores.
 This function returns the number of CPU cores that the operating system assumes are actually available for use.  Due to hyperthreading, BIOS settings, operating system configuration, and so forth, this may not actually be the physical number of CPU cores.  A more accurate description might be the number of programs that the operating system can efficiently run at once.
 @return The number of CPU cores.
 */

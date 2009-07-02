@@ -5,37 +5,6 @@ This software is distributed under a BSD-style license.
 See the file COPYING for details.
 */
 
-/** @mainpage Chirp API Documentation
-
-This is the reference manual for the Chirp Application Programming Interface (API).
-Note that this documentation is a work in progress.
-Only the most widely used interfaces are documented here.
-Less used interfaces are not documented, but can still be browsed through this interface.
-
-- <b><a href=http://www.cse.nd.edu/~ccl/software/howto/code.shtml>Writing Your First Program with Chirp</a></b>
-
-The most important interfaces for accessing remote file servers are:
-
-- @ref chirp_reli.h
-- @ref chirp_stream.h
-- @ref chirp_matrix.h
-- @ref chirp_types.h
-
-In addition, these modules are used through the Chirp code for common tasks such as debugging, communication, and authorization.
-
-- @ref debug.h
-- @ref auth_all.h
-- @ref md5.h
-- <b><a href=files.html>(see all modules)</a></b>
-
-For more information about Chirp in general:
-
-- <a href=http://www.cse.nd.edu/~ccl/software/chirp>Chirp Software Overview</a>
-- <a href=http://www.cse.nd.edu/~ccl/software/manuals/chirp.html>Chirp User's Manual</a>
-- <a href=http://www.cse.nd.edu/~ccl/software/howto/index.shtml>HOWTO Manuals</a>
-
-*/
-
 /** @file chirp_reli.h The primary user API for accessing Chirp servers.
 
 @ref chirp_reli.h is designed to look similar to the Unix I/O interface.
@@ -861,7 +830,7 @@ an individual operation from @ref chirp_reli.h.  Note that only
 a select few operations are available through this interface.
 Future versions of the API may be more complete.
 @param list The list of operations to be performed.
-@param count The number of entries in @ref list.
+@param count The number of entries in list.
 @param stoptime The absolute time at which to abort.
 @returns On success, returns greater than or equal to zero.  On failure, returns less than zero and sets errno appropriately.  Note that "success" means all the operations were successfully dispatched.  Each individual operation will have it success or failure and errno recorded in the corresponding @ref chirp_bulkio structure.
 */

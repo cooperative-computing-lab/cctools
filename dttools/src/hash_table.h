@@ -22,7 +22,7 @@ file = hash_table_remove(h,pathname);
 
 </pre>
 
-To list all of the items in a hash table, use @ref hash_table_firstkey and @ref hash_table_nextkey:
+To list all of the items in a hash table, use @ref hash_table_firstkey and @ref hash_table_nextkey like this:
 
 <pre>
 char *key;
