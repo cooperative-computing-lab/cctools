@@ -108,7 +108,7 @@ Note that if you run it a second time, nothing will happen, because all of the f
 makeflow: nothing left to do
 </pre>
 
-Use the <tt>-c</tt> option to clean everything job before trying it again:
+Use the <tt>-c</tt> option to clean everything up before trying it again:
 
 <pre>
 % makeflow -c example.makeflow
@@ -118,7 +118,7 @@ If you have access to a <a href=http://www.cs.wisc.edu/condor>Condor Pool</a>,
 then you can direct Makeflow to run your jobs there:
 
 <pre>
-% makeflow -T condor -c example.makeflow
+% makeflow -T condor example.makeflow
 </pre>
 
 To submit Makeflow as a Condor job that submits more Condor jobs:
@@ -151,7 +151,7 @@ Logging submit event(s)..........
 
 Or, you can start workers manually on any other machine you can log into:
 <pre>
-% worker barney.nd.edu 9023
+% worker barney.nd.edu 9123
 </pre>
 
 Once the workers begin running, Makeflow will dispatch multiple
