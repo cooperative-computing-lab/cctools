@@ -22,12 +22,21 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/signal.h>
 
 // Maximum time to wait before aborting if there is no connection to the master.
 static int idle_timeout=900;
 
 // Maximum time to wait when actively communicating with the master.
 static int active_timeout=3600;
+
+// Flag gets set on receipt of a terminal signal.
+static int abort_flag = 0;
+
+static void handle_abort( int sig )
+{
+	abort_flag = 1;
+}
 
 static void show_version(const char *cmd)
 {
@@ -98,14 +107,24 @@ int main( int argc, char *argv[] )
 	host = argv[optind];
 	port = atoi(argv[optind+1]);
 
+	signal(SIGTERM,handle_abort);
+	signal(SIGQUIT,handle_abort);
+	signal(SIGINT,handle_abort);
+	
+	const char *workdir;
+
 	if(getenv("_CONDOR_SCRATCH_DIR")) {
-		chdir(getenv("_CONDOR_SCRATCH_DIR"));
+		workdir = getenv("_CONDOR_SCRATCH_DIR");
 	} else {
-		char tempdir[WORK_QUEUE_LINE_MAX];
-		sprintf(tempdir,"/tmp/worker-%d-%d",getuid(),getpid());
-		mkdir(tempdir,0700);
-		chdir(tempdir);
+		workdir = "/tmp";
 	}
+
+	char tempdir[WORK_QUEUE_LINE_MAX];
+	sprintf(tempdir,"/tmp/worker-%d-%d",getuid(),getpid());
+
+	printf("worker: working in %s\n",tempdir);
+	mkdir(tempdir,0700);
+	chdir(tempdir);
 
 	if(!domain_name_cache_lookup(host,addr)) {
 		printf("couldn't lookup address of host %s\n",host);
@@ -116,7 +135,7 @@ int main( int argc, char *argv[] )
 
 	time_t idle_stoptime = time(0) + idle_timeout;
 
-	while(1) {
+	while(!abort_flag) {
 		char line[WORK_QUEUE_LINE_MAX];
 		int result, length, mode, fd;
 		char filename[WORK_QUEUE_LINE_MAX];
@@ -187,7 +206,7 @@ int main( int argc, char *argv[] )
 					link_write(master,line,strlen(line),time(0)+active_timeout);
 				}					
 			} else if(!strcmp(line,"exit")) {
-				exit(0);
+				break;
 			} else {
 				link_write(master,"error\n",6,time(0)+active_timeout);
 			}
@@ -201,6 +220,11 @@ int main( int argc, char *argv[] )
 			sleep(5);
 		}
 	}
+
+	char deletecmd[WORK_QUEUE_LINE_MAX];
+	printf("worker: cleaning up %s\n",tempdir);
+	sprintf(deletecmd,"rm -rf %s",tempdir);
+	system(deletecmd);
 
 	return 0;
 }
