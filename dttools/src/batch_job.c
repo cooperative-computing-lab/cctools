@@ -446,7 +446,15 @@ int batch_job_submit_simple_work_queue( struct batch_queue *q, const char *cmd, 
 
 batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_job_info *info, time_t stoptime )
 {
-	struct work_queue_task *t = work_queue_wait(q->work_queue,stoptime==0 ? WAITFORTASK : stoptime );
+	int timeout;
+
+	if(stoptime==0) {
+		timeout = WAITFORTASK;
+	} else {
+		timeout = MAX(0,stoptime-time(0));
+	}
+
+	struct work_queue_task *t = work_queue_wait(q->work_queue,timeout);
 	if(t) {
 		info->submitted = t->submit_time/1000000;
 		info->started = t->start_time/1000000;
@@ -480,7 +488,6 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 
 int batch_job_remove_work_queue( struct batch_queue *q, batch_job_id_t jobid )
 {
-	debug(D_NOTICE,"batch_job: cannot remove task from work_queue");
 	return -1;
 }
 

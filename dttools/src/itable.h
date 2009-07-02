@@ -22,7 +22,7 @@ pathname = itable_remove(h,id);
 
 </pre>
 
-To list all of the items in a itable, use @ref itable_firstkey and @ref itable_nextkey:
+To list all of the items in a itable, use @ref itable_firstkey and @ref itable_nextkey like this:
 
 <pre>
 int  key;

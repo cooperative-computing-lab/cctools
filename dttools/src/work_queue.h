@@ -77,7 +77,7 @@ void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s );
 @param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant WAITFORTASK to block until a task has completed.
 @returns A completed task description, or null if the queue is empty or the timeout was reached without a completed task.
 */
-struct work_queue_task * work_queue_wait( struct work_queue *q , time_t timeout);
+struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout );
 
 /** Submit a job to a work queue.
 @param q A work queue returned from @ref work_queue_create.

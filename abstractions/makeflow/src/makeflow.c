@@ -15,6 +15,7 @@
 #include "stringtools.h"
 
 static int dag_abort_flag = 0;
+static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
 
 #define DAG_LINE_MAX 1024
 
@@ -139,7 +140,7 @@ void dag_abort_all( struct dag *d, struct batch_queue *q )
 	}
 }
 
-void remove_target( const char *filename )
+void file_clean( const char *filename )
 {
 	if(unlink(filename)==0) {
 		printf("makeflow: deleted %s\n",filename);
@@ -152,16 +153,16 @@ void remove_target( const char *filename )
 	}
 }
 
+void dag_node_clean( struct dag_node *n )
+{
+	struct dag_file *f;
+	for(f=n->target_files;f;f=f->next) file_clean(f->filename);
+}
+
 void dag_clean( struct dag *d )
 {
 	struct dag_node *n;
-	struct dag_file *f;
-
-	for(n=d->nodes;n;n=n->next) {
-		for(f=n->target_files;f;f=f->next) {
-			remove_target(f->filename);
-		}
-	}
+	for(n=d->nodes;n;n=n->next) dag_node_clean(n);
 }
 
 void dag_log_recover( struct dag *d, const char *filename )
@@ -180,7 +181,6 @@ void dag_log_recover( struct dag *d, const char *filename )
 				if(n) {
 					n->state = state;
 					n->jobid = jobid;
-					if(state==DAG_NODE_STATE_RUNNING && jobid>0) itable_insert(d->job_table,jobid,n);
 					continue;
 				}
 			}
@@ -190,15 +190,23 @@ void dag_log_recover( struct dag *d, const char *filename )
 		}
 		fclose(d->logfile);
 	}
-}
 
-void dag_log_init( struct dag *d, const char *logfilename )
-{
-
-	d->logfile = fopen(logfilename,"a");
+	d->logfile = fopen(filename,"a");
 	if(!d->logfile) {
-		fprintf(stderr,"makeflow: couldn't open logfile %s: %s\n",logfilename,strerror(errno));
+		fprintf(stderr,"makeflow: couldn't open logfile %s: %s\n",filename,strerror(errno));
 		exit(1);
+	}
+
+	for(n=d->nodes;n;n=n->next) {
+		if(n->state==DAG_NODE_STATE_RUNNING && batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
+			printf("makeflow: rule still running: %s\n",n->command);
+			itable_insert(d->job_table,n->jobid,n);
+			d->jobs_running++;
+		} else if(n->state==DAG_NODE_STATE_RUNNING || n->state==DAG_NODE_STATE_FAILED || n->state==DAG_NODE_STATE_FAILED) {
+			printf("makeflow: will retry failed rule: %s\n",n->command);
+			dag_node_clean(n);
+			dag_node_state_change(d,n,DAG_NODE_STATE_WAITING);
+		}
 	}
 }
 
@@ -463,6 +471,25 @@ void dag_node_complete( struct batch_queue *q, struct dag *d, struct dag_node *n
 	}
 }
 
+int dag_check( struct dag *d )
+{
+	struct dag_node *n;
+	struct dag_file *f;
+
+	printf("makeflow: checking rules for consistency...\n");
+
+	for(n=d->nodes;n;n=n->next) {
+		for(f=n->source_files;f;f=f->next) {
+		  if(hash_table_lookup(d->file_table,f->filename)) continue;
+			if(access(f->filename,R_OK)==0) continue;
+			printf("makeflow: error: %s does not exist, and is not created by any rule.\n",f->filename);
+			return 0;
+		}
+	}
+
+	return 1;			
+}
+
 void dag_run( struct dag *d, struct batch_queue *q )
 {
 	struct dag_node *n;
@@ -519,7 +546,6 @@ int main( int argc, char *argv[] )
 {
 	int port = 9123;
 	char c;
-	batch_queue_type_t batchtype = BATCH_QUEUE_TYPE_UNIX;
 	char logfilename[DAG_LINE_MAX];
 	char batchlogfilename[DAG_LINE_MAX];
 	int clean_mode = 0;
@@ -560,7 +586,8 @@ int main( int argc, char *argv[] )
 			batch_submit_options = optarg;
 			break;
 		case 'd':
-			debug_flags_set(optarg);			break;
+			debug_flags_set(optarg);
+			break;
 		case 'o':
 			debug_config_file(optarg);
 			break;
@@ -568,9 +595,9 @@ int main( int argc, char *argv[] )
 			show_version(argv[0]);
 			return 0;
 		case 'T':
-			batchtype = batch_queue_type_from_string(optarg);
-			if(batchtype==BATCH_QUEUE_TYPE_UNKNOWN) {
-				fprintf(stderr,"dag: unknown batch queue type: %s\n",optarg);
+			batch_queue_type = batch_queue_type_from_string(optarg);
+			if(batch_queue_type==BATCH_QUEUE_TYPE_UNKNOWN) {
+				fprintf(stderr,"makeflow: unknown batch queue type: %s\n",optarg);
 				return 1;
 			}
 			break;
@@ -600,7 +627,7 @@ int main( int argc, char *argv[] )
 	if(explicit_jobs_max) {
 		d->jobs_max = explicit_jobs_max;
 	} else {
-		if(batchtype==BATCH_QUEUE_TYPE_UNIX) {
+		if(batch_queue_type==BATCH_QUEUE_TYPE_UNIX) {
 			d->jobs_max = 2;
 		} else {
 			d->jobs_max = 1000;
@@ -614,12 +641,14 @@ int main( int argc, char *argv[] )
 
 	if(clean_mode) {
 		dag_clean(d);
-		remove_target(logfilename);
-		remove_target(batchlogfilename);
+		file_clean(logfilename);
+		file_clean(batchlogfilename);
 		return 0;
 	}
 
-	if(batchtype==BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
+	if(!dag_check(d)) return 1;
+
+	if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
 		char cwd[DAG_LINE_MAX];
 		if(getcwd(cwd,sizeof(cwd))>=0) {
 			if(!strncmp(cwd,"/afs",4)) {
@@ -634,11 +663,10 @@ int main( int argc, char *argv[] )
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	struct batch_queue *q = batch_queue_create(batchtype);
+	struct batch_queue *q = batch_queue_create(batch_queue_type);
 	if(batch_submit_options)   batch_queue_set_options(q,batch_submit_options);
 	if(batchlogfilename) batch_queue_set_logfile(q,batchlogfilename);
-	if(batchtype==BATCH_QUEUE_TYPE_CONDOR) dag_log_recover(d,logfilename);
-	dag_log_init(d,logfilename);
+	dag_log_recover(d,logfilename);
 
 	signal(SIGINT,handle_abort);
 	signal(SIGQUIT,handle_abort);
