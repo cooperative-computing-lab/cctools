@@ -24,6 +24,8 @@
 
 #define ASSEMBLY_LINE_MAX 4096
 #define SEQUENCE_ID_MAX 255
+#define SEQUENCE_METADATA_MAX 255
+#define CAND_FILE_LINE_MAX 512
 #define MAX_FILENAME 255
 
 struct sequence {
@@ -31,6 +33,7 @@ struct sequence {
     int num_bases;
     int num_bytes;
     unsigned char* sequence_data;
+	unsigned char* metadata;
 };
 
 
