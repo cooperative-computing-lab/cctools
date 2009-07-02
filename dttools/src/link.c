@@ -793,7 +793,7 @@ static int poll_to_link( int events )
 	return r;
 }
 
-int  link_poll( struct link_info *links, int nlinks, int usec )
+int  link_poll( struct link_info *links, int nlinks, int msec )
 {
 	struct pollfd *fds = malloc(nlinks*sizeof(struct pollfd));
 	int i;
@@ -804,7 +804,7 @@ int  link_poll( struct link_info *links, int nlinks, int usec )
 		fds[i].events = link_to_poll(links[i].events);
 	}
 
-	result = poll(fds,nlinks,usec);
+	result = poll(fds,nlinks,msec);
 
 	if(result>=0) {
 		for(i=0;i<nlinks;i++) {

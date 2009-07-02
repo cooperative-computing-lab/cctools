@@ -584,17 +584,17 @@ void work_queue_submit( struct work_queue *q, struct work_queue_task *t )
 	q->total_tasks_submitted++;
 }
 
-struct work_queue_task * work_queue_wait( struct work_queue *q , time_t timeout)
+struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout)
 {
 	struct work_queue_task *t;
 	int i;
-	time_t end_time;
+	time_t stoptime;
 	int result;
 	
 	if(timeout != WAITFORTASK)
-		end_time = time(0) + timeout;
+		stoptime = time(0) + timeout;
 	else
-		end_time = 0;
+		stoptime = 0;
 	
 	while(1) {
 		t = list_pop_head(q->complete_list);
@@ -606,7 +606,8 @@ struct work_queue_task * work_queue_wait( struct work_queue *q , time_t timeout)
 
 		int n = build_poll_table(q);
 
-		result = link_poll(q->poll_table,n,1000000);
+		result = link_poll(q->poll_table,n,1000);
+		if(stoptime && time(0)>stoptime) return 0;
 		if(result<=0) continue;
 
 		if(q->poll_table[0].revents) {
@@ -617,11 +618,9 @@ struct work_queue_task * work_queue_wait( struct work_queue *q , time_t timeout)
 			if(q->poll_table[i].revents) {
 				handle_worker(q,q->poll_table[i].link);
 			}
-			if(end_time && time(0) > end_time)
+			if(stoptime && time(0) > stoptime)
 			{
-				t = list_pop_head(q->complete_list);
-				if(t) return t;
-				return 0;
+				return list_pop_head(q->complete_list);
 			}
 		}
 
