@@ -407,7 +407,9 @@ int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const c
 
 	work_queue_submit(q->work_queue,t);
 
-	itable_insert(q->output_table,t->taskid,strdup(outfile));
+	if (outfile) {
+	    itable_insert(q->output_table,t->taskid,strdup(outfile));
+	}
 
 	return t->taskid;
 }
