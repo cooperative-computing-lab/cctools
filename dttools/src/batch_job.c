@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "itable.h"
 #include "debug.h"
 #include "macros.h"
+#include "process.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -181,12 +182,13 @@ batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_in
 				}
 			}
 		}
-		// If we get to the end of the log, and there are no
-		// more jobs remaining in the table, then everything has exited.
+
 
 		if(itable_size(q->job_table)<=0) return 0;
 
-		if(stoptime!=0 && time(0)>stoptime) return -1;
+		if(stoptime!=0 && time(0)>=stoptime) return -1;
+
+		if(process_pending()) return -1;
 
 		sleep(1);
 	}
@@ -333,7 +335,9 @@ batch_job_id_t batch_job_wait_sge( struct batch_queue *q, struct batch_job_info 
 
 		if(itable_size(q->job_table)<=0) return 0;
 
-		if(stoptime!=0 && time(0)>stoptime) return -1;
+		if(stoptime!=0 && time(0)>=stoptime) return -1;
+
+		if(process_pending()) return -1;
 
 		sleep(1);
 	}
@@ -481,10 +485,10 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 		return taskid;
 	}
 
-	if(time(0)>stoptime) {
-		return -1;
-	} else {
+	if(work_queue_empty(q->work_queue)) {
 		return 0;
+	} else {
+		return -1;
 	}
 }
 
@@ -540,57 +544,45 @@ int batch_job_submit_unix( struct batch_queue *q, const char *cmd, const char *a
 	return batch_job_submit_simple_unix(q,line,extra_input_files,extra_output_files);
 }
 
-static void handle_alarm( int sig )
-{
-}
-
 batch_job_id_t batch_job_wait_unix( struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime )
 {
-	batch_job_id_t jobid;
-	int status;
-
 	while(1) {
 		int timeout;
 
-		if(stoptime==0) {
-			timeout = 0;
+		if(stoptime>0) {
+			timeout = MAX(0,stoptime-time(0));
 		} else {
-			timeout = MAX(1,stoptime-time(0));
-			if(timeout>0) {
-				signal(SIGALRM,handle_alarm);
-				alarm(timeout);
-			} else {
-				timeout = 0;
-			}
+			timeout = 5;
 		}
 
-		if(timeout>0) {
-			jobid = wait(&status);
-		} else {
-			jobid = waitpid(-1,&status,WNOHANG);
-		}
-	
-		if(jobid>0) {
-			struct batch_job_info *info = itable_remove(q->job_table,jobid);
-			if(!info) continue;
+		struct process_info *p = process_wait(timeout);
+		if(p) {
+			struct batch_job_info *info = itable_remove(q->job_table,p->pid);
+			if(!info) {
+				process_putback(p);
+				return -1;
+			}
 
 			info->finished = time(0);
-			if(WIFEXITED(status)) {
+			if(WIFEXITED(p->status)) {
 				info->exited_normally = 1;
-				info->exit_code = WEXITSTATUS(status);
+				info->exit_code = WEXITSTATUS(p->status);
 			} else {
 				info->exited_normally = 0;
-				info->exit_signal = WTERMSIG(status);
+				info->exit_signal = WTERMSIG(p->status);
 			}
 
 			memcpy(info_out,info,sizeof(*info));
 
+			int jobid = p->pid;
+			free(p);
 			return jobid;
+
 		} else if(errno==ESRCH || errno==ECHILD) {
 			return 0;
 		}
 
-		if(stoptime!=0 && time(0)>stoptime) return -1;
+		if(stoptime!=0 && time(0)>=stoptime) return -1;
 	}
 }
 

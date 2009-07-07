@@ -41,7 +41,7 @@ struct batch_job_info {
 
 /** Create a new batch queue.
 @param type The type of the queue.
-@return A new batch queue object.
+@return A new batch queue object on success, null on failure.
 */
 struct batch_queue * batch_queue_create( batch_queue_type_t type );
 
@@ -68,7 +68,7 @@ batch_job_id_t batch_job_submit_simple(
 @param errfile The standard error file.
 @param extra_input_files A comma separated list of extra input files that will be required by the job.  Null pointer is equivalent to empty string.
 @param extra_output_files A comma separated list of extra output files to retrieve from the job.  Null pointer is equivalent to empty string.
-@return On success, returns a unique identifier for the batch job.  On failure, returns a negative number.
+@return On success, returns a unique positive jobid.  Zero or a negative number indicates a failure to submit this job.
 */
 
 batch_job_id_t batch_job_submit(
@@ -85,7 +85,9 @@ batch_job_id_t batch_job_submit(
 Blocks until a batch job completes.
 @param q The queue to wait on.
 @param info Pointer to a @ref batch_job_info structure that will be filled in with the details of the completed job.
-@return If greater than zero, indicates the job id number of the completed job.  If equal to zero, there were no more jobs to wait for.  If less than zero, an error occurred while waiting, but the operation may be tried again.
+@return If greater than zero, indicates the jobid of the completed job.
+If equal to zero, there were no more jobs to wait for.
+If less than zero, the operation was interrupted by a system event, but may be tried again.
 */
 
 batch_job_id_t batch_job_wait( struct batch_queue *q, struct batch_job_info *info );
@@ -94,8 +96,11 @@ batch_job_id_t batch_job_wait( struct batch_queue *q, struct batch_job_info *inf
 Blocks until a batch job completes or the current time exceeds stoptime.
 @param q The queue to wait on.
 @param info Pointer to a @ref batch_job_info structure that will be filled in with the details of the completed job.
-@param stoptime An absolute time at which to stop waiting.
-@return If greater than zero, indicates the job id number of the completed job.  If equal to zero, there were no more jobs to wait for.  If less than zero, then no jobs completed before the time expired.
+@param stoptime An absolute time at which to stop waiting.  If less than or equal to the current time,
+then this function will check for a complete job but will not block.
+@return If greater than zero, indicates the jobid of the completed job.
+If equal to zero, there were no more jobs to wait for.
+If less than zero, the operation timed out or was interrupted by a system event, but may be tried again.
 */
 
 batch_job_id_t batch_job_wait_timeout( struct batch_queue *q, struct batch_job_info *info, time_t stoptime );

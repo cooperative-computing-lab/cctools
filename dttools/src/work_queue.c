@@ -8,6 +8,7 @@
 #include "itable.h"
 #include "list.h"
 #include "macros.h"
+#include "process.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +18,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#include <sys/wait.h>
 
 #define WORKER_STATE_INIT  0
 #define WORKER_STATE_READY 1
@@ -584,7 +586,7 @@ void work_queue_submit( struct work_queue *q, struct work_queue_task *t )
 	q->total_tasks_submitted++;
 }
 
-struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout)
+struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 {
 	struct work_queue_task *t;
 	int i;
@@ -605,9 +607,17 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout)
 		start_tasks(q);
 
 		int n = build_poll_table(q);
+		int msec = MAX(0,(time(0)-stoptime)*1000);
 
-		result = link_poll(q->poll_table,n,1000);
+		result = link_poll(q->poll_table,n,msec);
+
+		// If time has expired, return without a task.
 		if(stoptime && time(0)>stoptime) return 0;
+
+		// If a process is waiting to complete, return without a task.
+		if(process_pending()) return 0;
+
+		// If nothing was awake, restart the loop.
 		if(result<=0) continue;
 
 		if(q->poll_table[0].revents) {
