@@ -367,7 +367,8 @@ struct dag * dag_create( const char *filename )
 		for(f=n->target_files;f;f=f->next) {
 			m = hash_table_lookup(d->file_table,f->filename);
 			if(m) {
-				fatal("%s is defined multiple times at %s:%d and %s:%d\n",f->filename,d->filename,n->linenum,d->filename,m->linenum);
+				printf("makeflow: %s is defined multiple times at %s:%d and %s:%d\n",f->filename,d->filename,n->linenum,d->filename,m->linenum);
+				exit(1);
 			} else {
 				hash_table_insert(d->file_table,f->filename,n);
 			}
