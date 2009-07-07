@@ -13,9 +13,14 @@
 #include "debug.h"
 #include "batch_job.h"
 #include "stringtools.h"
+#include "load_average.h"
 
 static int dag_abort_flag = 0;
+static int dag_failed_flag = 0;
+
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
+static struct batch_queue *local_queue = 0;
+static struct batch_queue *remote_queue = 0;
 
 #define DAG_LINE_MAX 1024
 
@@ -31,12 +36,15 @@ struct dag {
 	const char *filename;
 	struct dag_node   *nodes;
 	struct itable     *node_table;
-	struct itable     *job_table;
+	struct itable     *local_job_table;
+	struct itable     *remote_job_table;
 	struct hash_table *file_table;
 	FILE * logfile;
 	int linenum;
-	int jobs_running;
-	int jobs_max;
+	int local_jobs_running;
+	int local_jobs_max;
+	int remote_jobs_running;
+	int remote_jobs_max;
 };
 
 struct dag_file {
@@ -47,6 +55,7 @@ struct dag_file {
 struct dag_node {
 	int linenum;
 	int nodeid;
+	int local_job;
 	dag_node_state_t state;
 	const char *command;
 	struct dag_file *source_files;
@@ -126,17 +135,23 @@ void dag_node_state_change( struct dag *d, struct dag_node *n, int newstate )
 	n->state = newstate;
 }
 
-void dag_abort_all( struct dag *d, struct batch_queue *q )
+void dag_abort_all( struct dag *d )
 {
 	int jobid;
 	struct dag_node *n;
 
 	printf("makeflow: got abort signal...\n");
 
-	itable_firstkey(d->job_table);
-	while(itable_nextkey(d->job_table,&jobid,(void**)&n)) {
-		printf("makeflow: aborting job %d\n",jobid);
-		batch_job_remove(q,jobid);
+	itable_firstkey(d->local_job_table);
+	while(itable_nextkey(d->local_job_table,&jobid,(void**)&n)) {
+		printf("makeflow: aborting local job %d\n",jobid);
+		batch_job_remove(local_queue,jobid);
+	}
+
+	itable_firstkey(d->remote_job_table);
+	while(itable_nextkey(d->remote_job_table,&jobid,(void**)&n)) {
+		printf("makeflow: aborting remote job %d\n",jobid);
+		batch_job_remove(remote_queue,jobid);
 	}
 }
 
@@ -198,10 +213,10 @@ void dag_log_recover( struct dag *d, const char *filename )
 	}
 
 	for(n=d->nodes;n;n=n->next) {
-		if(n->state==DAG_NODE_STATE_RUNNING && batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
+		if(n->state==DAG_NODE_STATE_RUNNING && !n->local_job && batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
 			printf("makeflow: rule still running: %s\n",n->command);
-			itable_insert(d->job_table,n->jobid,n);
-			d->jobs_running++;
+			itable_insert(d->remote_job_table,n->jobid,n);
+			d->remote_jobs_running++;
 		} else if(n->state==DAG_NODE_STATE_RUNNING || n->state==DAG_NODE_STATE_FAILED || n->state==DAG_NODE_STATE_FAILED) {
 			printf("makeflow: will retry failed rule: %s\n",n->command);
 			dag_node_clean(n);
@@ -284,6 +299,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 	n->linenum = d->linenum;
 	n->state = DAG_NODE_STATE_WAITING;
 	n->nodeid = nodeid_counter++;
+	n->local_job = 0;
 
 	*colon = 0;
 	targetfiles = line;
@@ -311,6 +327,10 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 
 	char *c=line;
 	while(*c && isspace(*c)) c++;
+	if(!strncmp(c,"LOCAL ",6)) {
+		n->local_job = 1;
+		c+=6;
+	}		
 	n->command = strdup(c);
 	free(line);
 	return n;
@@ -326,10 +346,13 @@ struct dag * dag_create( const char *filename )
 	d->linenum = 0;
 	d->filename = strdup(filename);
 	d->node_table = itable_create(0);
-	d->job_table = itable_create(0);
+	d->local_job_table = itable_create(0);
+	d->remote_job_table = itable_create(0);
 	d->file_table = hash_table_create(0,0);
-	d->jobs_running = 0;
-	d->jobs_max = 1000;
+	d->local_jobs_running = 0;
+	d->local_jobs_max = 1;
+	d->remote_jobs_running = 0;
+	d->remote_jobs_max = 1000;
 
 	struct dag_node *n,*m;
 	struct dag_file *f;
@@ -354,27 +377,23 @@ struct dag * dag_create( const char *filename )
 	return d;
 }
 
-void dag_node_complete( struct batch_queue *q, struct dag *d, struct dag_node *n, struct batch_job_info *info );
+void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info *info );
 
-void dag_node_submit( struct batch_queue *q, struct dag *d, struct dag_node *n )
+void dag_node_submit( struct dag *d, struct dag_node *n )
 {
 	char input_files[DAG_LINE_MAX];
 	char output_files[DAG_LINE_MAX];
 	struct dag_file *f;
 
-	printf("makeflow: %s\n",n->command);
+	struct batch_queue *thequeue;
 
-	if(!strncmp(n->command,"LOCAL ",6)) {
-		struct batch_job_info info;
-		memset(&info,0,sizeof(info));
-		dag_node_state_change(d,n,DAG_NODE_STATE_RUNNING);
-		int result = system(&n->command[6]);
-		info.exited_normally = 1;
-		info.exit_code = result;
-		d->jobs_running++;
-		dag_node_complete(q,d,n,&info);
-		return;
+	if(n->local_job) {
+		thequeue = local_queue;
+	} else {
+		thequeue = remote_queue;
 	}
+
+	printf("makeflow: %s\n",n->command);
 
 	input_files[0] = 0;
 	output_files[0] = 0;
@@ -389,15 +408,21 @@ void dag_node_submit( struct batch_queue *q, struct dag *d, struct dag_node *n )
 		strcat(output_files,",");
 	}
 
-	batch_queue_set_options(q,getenv("BATCH_OPTIONS"));
+	batch_queue_set_options(thequeue,getenv("BATCH_OPTIONS"));
 
-	n->jobid = batch_job_submit_simple(q,n->command,input_files,output_files);
+	n->jobid = batch_job_submit_simple(thequeue,n->command,input_files,output_files);
 	if(n->jobid>=0) {
 		dag_node_state_change(d,n,DAG_NODE_STATE_RUNNING);
-		itable_insert(d->job_table,n->jobid,n);
-		d->jobs_running++;
+		if(n->local_job) {
+			itable_insert(d->local_job_table,n->jobid,n);
+			d->local_jobs_running++;
+		} else {
+			itable_insert(d->remote_job_table,n->jobid,n);
+			d->remote_jobs_running++;
+		}
 	} else {
 		dag_node_state_change(d,n,DAG_NODE_STATE_FAILED);
+		dag_failed_flag = 1;
 	}
 }
 
@@ -428,7 +453,7 @@ int dag_node_ready( struct dag *d, struct dag_node *n )
 	return 0;
 }
 
-void dag_node_complete( struct batch_queue *q, struct dag *d, struct dag_node *n, struct batch_job_info *info )
+void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info *info )
 {
 	struct dag_node *m;
 	struct dag_file *f;
@@ -436,7 +461,11 @@ void dag_node_complete( struct batch_queue *q, struct dag *d, struct dag_node *n
 
 	if(n->state!=DAG_NODE_STATE_RUNNING) return;
 
-	d->jobs_running--;
+	if(n->local_job) {
+		d->local_jobs_running--;
+	} else {
+		d->remote_jobs_running--;
+	}
 
 	if(info->exited_normally && info->exit_code==0) {
 		for(f=n->target_files;f;f=f->next) {
@@ -456,6 +485,7 @@ void dag_node_complete( struct batch_queue *q, struct dag *d, struct dag_node *n
 
 	if(job_failed) {
 		dag_node_state_change(d,n,DAG_NODE_STATE_FAILED);
+		dag_failed_flag = 1;
 		return;
 	} else {
 		dag_node_state_change(d,n,DAG_NODE_STATE_COMPLETE);
@@ -463,10 +493,19 @@ void dag_node_complete( struct batch_queue *q, struct dag *d, struct dag_node *n
 
 	for(m=d->nodes;m;m=m->next) {
 
-		if(d->jobs_running>=d->jobs_max) break;
+		int remote_full = d->remote_jobs_running >= d->remote_jobs_max;
+		int local_full  = d->local_jobs_running  >= d->local_jobs_max;
+
+		if(remote_full && local_full) break;
+
+		if(m->local_job) {
+			if(local_full) continue;
+		} else {
+			if(remote_full) continue;
+		}
 
 		if(dag_node_ready(d,m)) {
-			dag_node_submit(q,d,m);
+			dag_node_submit(d,m);
 		}
 	}
 }
@@ -490,7 +529,7 @@ int dag_check( struct dag *d )
 	return 1;			
 }
 
-void dag_run( struct dag *d, struct batch_queue *q )
+void dag_run( struct dag *d )
 {
 	struct dag_node *n;
 	batch_job_id_t jobid;
@@ -498,20 +537,42 @@ void dag_run( struct dag *d, struct batch_queue *q )
 
 	for(n=d->nodes;n;n=n->next) {
 		if(dag_node_ready(d,n)) {
-			dag_node_submit(q,d,n);
+			dag_node_submit(d,n);
 		}
 	}
 
-	while(!dag_abort_flag && d->jobs_running>0 && (jobid=batch_job_wait_timeout(q,&info,time(0)+5))!=0) {
-		if(jobid<0) continue;
-		n = itable_remove(d->job_table,jobid);
-		if(n) dag_node_complete(q,d,n,&info);
+	while(!dag_abort_flag) {
+
+		if(d->local_jobs_running==0 && d->remote_jobs_running==0) break;
+
+		if(d->remote_jobs_running) {
+			jobid = batch_job_wait_timeout(remote_queue,&info,time(0)+5);
+			if(jobid>0) {
+				n = itable_remove(d->remote_job_table,jobid);
+				if(n) dag_node_complete(d,n,&info);
+			}
+		}
+
+		if(d->local_jobs_running) {
+			time_t stoptime;
+
+			if(d->remote_jobs_running) {
+				stoptime = time(0);
+			} else {
+				stoptime = time(0)+5;
+			}
+
+			jobid = batch_job_wait_timeout(local_queue,&info,stoptime);
+			if(jobid>0) {
+				n = itable_remove(d->local_job_table,jobid);
+				if(n) dag_node_complete(d,n,&info);
+			}
+		}
 	}
 
 	if(dag_abort_flag) {
-		dag_abort_all(d,q);
+		dag_abort_all(d);
 	}
-	printf("makeflow: nothing left to do.\n");
 }
 
 static void handle_abort( int sig )
@@ -529,12 +590,14 @@ static void show_help(const char *cmd)
 	printf("Use: %s [options] <dagfile>\n", cmd);
 	printf("where options are:\n");
 	printf(" -c             Clean up: remove logfile and all targets.\n");
-	printf(" -T <type>      Batch system type: condor, sge, unix, wq.  (default is unix)\n");
+	printf(" -T <type>      Batch system type: condor, sge, unix, wq.   (default is unix)\n");
+	printf(" -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
+	printf(" -J <#>         Max number of remote jobs to run at once.   (default is 1000)\n");
 	printf(" -D             Display the Makefile as a Dot graph.\n");
 	printf(" -B <options>   Add these options to all batch submit files.\n");
-	printf(" -p <port>      Port number to use with work queue.        (default=9123)\n");
-	printf(" -l <logfile>   Use this file for the makeflow log.        (default=<dagfile>.makeflowlog)\n");
-	printf(" -L <logfile>   Use this file for the batch system log.    (default=<dagfile>.condorlog)\n");
+	printf(" -p <port>      Port number to use with work queue.         (default is 9123)\n");
+	printf(" -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
+	printf(" -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
 	printf(" -A             Disable the check for AFS. (experts only.)\n");;
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
 	printf(" -o <file>      Send debugging to this file.\n");
@@ -550,7 +613,8 @@ int main( int argc, char *argv[] )
 	char batchlogfilename[DAG_LINE_MAX];
 	int clean_mode = 0;
 	int display_mode = 0;
-	int explicit_jobs_max = 0;
+	int explicit_remote_jobs_max = 0;
+	int explicit_local_jobs_max = 0;
 	int skip_afs_check = 0;
 	const char *batch_submit_options = 0;
 
@@ -559,7 +623,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "Ap:cd:DT:iB:l:L:j:o:v")) != (char) -1) {
+	while((c = getopt(argc, argv, "Ap:cd:DT:iB:l:L:j:J:o:v")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -580,7 +644,10 @@ int main( int argc, char *argv[] )
 			display_mode = 1;
 			break;
 		case 'j':
-			explicit_jobs_max = atoi(optarg);
+			explicit_local_jobs_max = atoi(optarg);
+			break;
+		case 'J':
+			explicit_remote_jobs_max = atoi(optarg);
 			break;
 		case 'B':
 			batch_submit_options = optarg;
@@ -624,13 +691,19 @@ int main( int argc, char *argv[] )
 		return 1;
 	}
 
-	if(explicit_jobs_max) {
-		d->jobs_max = explicit_jobs_max;
+	if(explicit_local_jobs_max) {
+		d->local_jobs_max = explicit_local_jobs_max;
+	} else {
+		d->local_jobs_max = load_average_get_cpus();
+	}
+
+	if(explicit_remote_jobs_max) {
+		d->remote_jobs_max = explicit_remote_jobs_max;
 	} else {
 		if(batch_queue_type==BATCH_QUEUE_TYPE_UNIX) {
-			d->jobs_max = 2;
+			d->remote_jobs_max = load_average_get_cpus();
 		} else {
-			d->jobs_max = 1000;
+			d->remote_jobs_max = 1000;
 		}
 	}
 
@@ -663,18 +736,36 @@ int main( int argc, char *argv[] )
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	struct batch_queue *q = batch_queue_create(batch_queue_type);
-	if(batch_submit_options)   batch_queue_set_options(q,batch_submit_options);
-	if(batchlogfilename) batch_queue_set_logfile(q,batchlogfilename);
+	local_queue = batch_queue_create(BATCH_QUEUE_TYPE_UNIX);
+
+	remote_queue = batch_queue_create(batch_queue_type);
+
+	if(batch_submit_options) {
+		batch_queue_set_options(remote_queue,batch_submit_options);
+	}
+
+	if(batchlogfilename) {
+		batch_queue_set_logfile(remote_queue,batchlogfilename);
+	}
+
 	dag_log_recover(d,logfilename);
 
 	signal(SIGINT,handle_abort);
 	signal(SIGQUIT,handle_abort);
 	signal(SIGTERM,handle_abort);
 
-	dag_run(d,q);
+	dag_run(d);
 
-	return 0;
+	if(dag_abort_flag) {
+		printf("makeflow: workflow was aborted.\n");
+		return 1;
+	} else if(dag_failed_flag) {
+		printf("makeflow: workflow failed.\n");
+		return 1;
+	} else {
+		printf("makeflow: nothing left to do.\n");
+		return 0;
+	}
 }
 
 
