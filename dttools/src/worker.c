@@ -120,7 +120,7 @@ int main( int argc, char *argv[] )
 	}
 
 	char tempdir[WORK_QUEUE_LINE_MAX];
-	sprintf(tempdir,"/tmp/worker-%d-%d",getuid(),getpid());
+	sprintf(tempdir,"%s/worker-%d-%d",workdir,getuid(),getpid());
 
 	printf("worker: working in %s\n",tempdir);
 	mkdir(tempdir,0700);
