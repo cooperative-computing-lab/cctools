@@ -45,6 +45,7 @@ struct work_queue {
 	INT64_T total_tasks_submitted;
 	INT64_T total_tasks_complete;
 	INT64_T total_task_time;
+	double fast_abort_multiplier;
 };
 
 
@@ -504,11 +505,24 @@ static void start_tasks( struct work_queue *q )
 	}
 }
 
+int work_queue_activate_fast_abort(struct work_queue* q, double multiplier)
+{
+	if(multiplier >= 1) {
+		q->fast_abort_multiplier = multiplier;
+		return 0;
+	}
+	else {
+		debug(D_DEBUG,"Bad multiplier (%.03lf) given for fast abort. Using the default (10)", multiplier);
+		q->fast_abort_multiplier = 10;
+		return 1;
+	}
+}
+
 void abort_slow_workers( struct work_queue *q )
 {
 	struct work_queue_worker *w;
 	char *key;
-	const double multiplier = 10.0;
+	const double multiplier = q->fast_abort_multiplier;
 	
 	if(q->total_tasks_complete<10) return;
 
@@ -520,7 +534,7 @@ void abort_slow_workers( struct work_queue *q )
 		if(w->state==WORKER_STATE_BUSY) {
 			timestamp_t runtime = current - w->current_task->start_time;
 			if(runtime>(average_task_time*multiplier)) {
-				debug(D_NOTICE,"%s (%s) has run too long: %.02lfs (average is %.02lfs)",w->hostname,w->addrport,runtime/1000000.0,average_task_time/1000000.0);
+				debug(D_NOTICE,"%s (%s) has run too long: %.02lf s (average is %.02lf s)",w->hostname,w->addrport,runtime/1000000.0,average_task_time/1000000.0);
 				remove_worker(q,w);
 			}
 		}
@@ -563,6 +577,8 @@ struct work_queue * work_queue_create( int port , time_t stoptime)
 	for(i=0;i<WORKER_STATE_MAX;i++) {
 		q->workers_in_state[i] = 0;
 	}
+
+	q->fast_abort_multiplier = -1.0;
 	
 	return q;
 }
@@ -634,7 +650,8 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			}
 		}
 
-		abort_slow_workers(q);
+		if(q->fast_abort_multiplier > 0) // fast abort is turned on. 
+			abort_slow_workers(q);
 	}
 
 	return 0;

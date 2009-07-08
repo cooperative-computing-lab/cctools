@@ -72,6 +72,13 @@ void work_queue_delete( struct work_queue *q );
 */
 void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s );
 
+/** Turn on fast abort functionality for a given queue.
+@param q A pointer to the queue to modify.
+@param multiplier The multiplier of the average task time at which point to abort.
+@returns 0 if activated with appropriate multiplier, 1 if activated with the default multiplier.
+*/
+int work_queue_activate_fast_abort(struct work_queue* q, double multiplier);
+
 /** Wait for tasks to complete.  This call will block until the timeout has elapsed.
 @param q The work queue to wait on.
 @param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant WAITFORTASK to block until a task has completed.
