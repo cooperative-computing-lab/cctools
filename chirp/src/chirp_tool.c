@@ -142,7 +142,7 @@ static struct command list[] =
 {"mkdir",   1, 1, 1, "<dir>",                    do_mkdir},
 {"rmdir",   1, 1, 1, "<dir>",                    do_rmdir},
 {"stat",    1, 1, 1, "<file>",                   do_stat},
-{"df",      1, 0, 0, "",                   	 do_statfs},
+{"df",      1, 0, 1, "[-k|-m|-g|-t]",         	 do_statfs},
 {"md5",     1, 1, 1,  "<path>",                  do_md5},
 {"localpath",  1, 0, 1, "[remotepath]",          do_localpath},
 {"audit",   1, 0, 1,  "[-r]",                    do_audit},
@@ -932,13 +932,29 @@ static int do_stat( int argc, char **argv )
 static int do_statfs( int argc, char **argv )
 {
 	struct chirp_statfs info;
+	int metric_power = -1;
+
+	if(argc>1) {
+		if(!strcmp(argv[1],"-k")) {
+			metric_power = 1;
+		} else if(!strcmp(argv[1],"-m")) {
+			metric_power = 2;
+		} else if(!strcmp(argv[1],"-g")) {
+			metric_power = 3;
+		} else if(!strcmp(argv[1],"-t")) {
+			metric_power = 4;
+		} else {
+			errno = EINVAL;
+			return -1;
+		}
+	}
 
 	if(chirp_reli_statfs(current_host,"/",&info,stoptime)<0) {
 		return -1;
 	} else {
 		printf("/\n");
-		printf("%sB TOTAL\n",string_metric(info.f_blocks*info.f_bsize,-1,0));
-		printf("%sB INUSE\n",string_metric((info.f_blocks-info.f_bfree)*info.f_bsize,-1,0));
+		printf("%sB TOTAL\n",string_metric(info.f_blocks*info.f_bsize,metric_power,0));
+		printf("%sB INUSE\n",string_metric((info.f_blocks-info.f_bfree)*info.f_bsize,metric_power,0));
 		return 0;
 	}
 }
