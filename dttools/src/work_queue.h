@@ -18,6 +18,11 @@ and port of the master.
 
 #define WAITFORTASK -1
 
+#define WQ_RESULT_UNSET 0
+#define WQ_RESULT_INPUT_FAIL 1
+#define WQ_RESULT_FUNCTION_FAIL 2
+#define WQ_RESULT_OUTPUT_FAIL 3
+
 
 
 /** A task description.  This structure should only be created with @ref work_queue_task_create and delete with @ref work_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.

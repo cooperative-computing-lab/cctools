@@ -29,10 +29,7 @@
 #define FNAME 0
 #define LITERAL 1
 
-#define RESULT_UNSET 0
-#define RESULT_INPUT_FAIL 1
-#define RESULT_FUNCTION_FAIL 2
-#define RESULT_OUTPUT_FAIL 3
+
 
 struct work_queue {
 	struct link * master_link;
@@ -104,7 +101,7 @@ struct work_queue_task * work_queue_task_create( const char *command_line)
 	t->input_files = NULL;
 	t->output_files = NULL;
 	t->return_status = 0;
-	t->result = RESULT_UNSET;
+	t->result = WQ_RESULT_UNSET;
 	t->taskid = next_taskid++;
 
 	t->submit_time = t->start_time = t->finish_time = t->total_bytes_transfered = t->total_transfer_time = 0;
@@ -244,7 +241,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 				if(actual!=length) { unlink(tf->payload); goto failure; }
 			} else {
 				debug(D_DEBUG,"%s (%s) did not create expected file %s",tf->remote_name);
-				t->result = RESULT_OUTPUT_FAIL;
+				if(t->result == WQ_RESULT_UNSET) t->result = WQ_RESULT_OUTPUT_FAIL;
 				t->return_status = 1;
 			}
 		}
@@ -295,7 +292,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			t->output[actual] = 0;
 			t->return_status = result;
 			if(t->return_status != 0)
-				t->result = RESULT_FUNCTION_FAIL;
+				t->result = WQ_RESULT_FUNCTION_FAIL;
 			
 			if(!get_output_files(t,w)) {
 				free(t->output);
@@ -442,7 +439,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 	else
 	    debug(D_DEBUG,"%s (%s) failed to send buffer data (%i bytes received).",w->hostname,w->addrport,actual);
 	t->return_status = 1;
-	t->result = RESULT_INPUT_FAIL;
+	t->result = WQ_RESULT_INPUT_FAIL;
 	return 0;
 }
 
