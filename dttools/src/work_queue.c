@@ -240,7 +240,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 				close(fd);
 				if(actual!=length) { unlink(tf->payload); goto failure; }
 			} else {
-				debug(D_DEBUG,"%s (%s) did not create expected file %s",tf->remote_name);
+				debug(D_DEBUG,"%s (%s) did not create expected file %s",w->hostname,w->addrport,tf->remote_name);
 				if(t->result == WQ_RESULT_UNSET) t->result = WQ_RESULT_OUTPUT_FAIL;
 				t->return_status = 1;
 			}
