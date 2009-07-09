@@ -328,7 +328,8 @@ static int task_consider( void* taskfiledata, int size )
 	return 1;
 }
 
-static int get_next_cand_line(FILE * fp, char * sequence_name1, char * sequence_name2, int * alignment_flag, int * start_pos1, int * start_pos2)
+//static int get_next_cand_line(FILE * fp, char * sequence_name1, char * sequence_name2, int * alignment_flag, int * start_pos1, int * start_pos2)
+static int get_next_cand_line(FILE * fp, char * sequence_name1, char * sequence_name2, int * alignment_flag, char * extra_data)
 {
 	char line[CAND_FILE_LINE_MAX];
 	char * result;
@@ -368,9 +369,11 @@ static int get_next_cand_line(FILE * fp, char * sequence_name1, char * sequence_
 		return GET_CAND_LINE_RESULT_EOF;
 
 	// Get the actual data out of the line.
-	if (sscanf(line, "%s %s %i %i %i", sequence_name1, sequence_name2, alignment_flag, start_pos1, start_pos2) != 5)
+	int resulta = sscanf(line, "%s %s %i%[^\n]%*1[\n]", sequence_name1, sequence_name2, alignment_flag, extra_data);
+	//if (sscanf(line, "%s %s %i %i %i", sequence_name1, sequence_name2, alignment_flag, start_pos1, start_pos2) != 5)
+	if ((resulta != 4) && ( !( (resulta == 3) && !strcmp(extra_data, ""))))
 	{
-		fprintf(stderr, "Bad line: %s\n", line);
+		fprintf(stderr, "Bad line: %s, alignment_flag: %d, extra_data: |%s|, %d, resulta = %d\n", line, *alignment_flag, extra_data, *extra_data, resulta);
 		return GET_CAND_LINE_RESULT_BAD_FORMAT;
 	}
 
@@ -441,9 +444,11 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 	    }
     }
     ins = buf;
+	char extra_data[128] = "";
     while(pair_count == 0) {
 	//if(fscanf(fp,"%s %s %i",sequence_name1,sequence_name2, &alignment_flag ) == 3) {
-	if ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, &start_pos_1, &start_pos_2)) == GET_CAND_LINE_RESULT_SUCCESS)
+	//if ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, &start_pos_1, &start_pos_2)) == GET_CAND_LINE_RESULT_SUCCESS)
+	if ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, extra_data)) == GET_CAND_LINE_RESULT_SUCCESS)
 	{
 	    sprintf(tmp,"%s-%s",sequence_name1,sequence_name2);
 	    if(!hash_table_lookup(t,tmp)) {
@@ -453,7 +458,7 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 		ins+=res;
 		memcpy(ins,s1->sequence_data,s1->num_bytes);
 		ins+=s1->num_bytes;
-		res = sprintf(ins,"\n>%s %i %i %i %i %i\n",s2->sequence_name,s2->num_bases,s2->num_bytes,alignment_flag, start_pos_1, start_pos_2);
+		res = sprintf(ins,"\n>%s %i %i %i%s\n",s2->sequence_name,s2->num_bases,s2->num_bytes,alignment_flag, extra_data);
 		ins+=res;
 		memcpy(ins,s2->sequence_data,s2->num_bytes);
 		ins+=s2->num_bytes;
@@ -512,7 +517,8 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
     }
     
     //while(fscanf(fp,"%s %s %i",sequence_name1,sequence_name2, &alignment_flag) == 3)
-	while ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, &start_pos_1, &start_pos_2)) != GET_CAND_LINE_RESULT_EOF)
+	//while ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, &start_pos_1, &start_pos_2)) != GET_CAND_LINE_RESULT_EOF)
+	while ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, extra_data)) != GET_CAND_LINE_RESULT_EOF)
     {
 	if(time(0)!=last_display_time) display_progress(queue);
 	if (get_line_result == GET_CAND_LINE_RESULT_SUCCESS)
@@ -526,7 +532,7 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 			    fprintf(stderr,"No such sequence: %s",sequence_name2);
 		    	exit(1);
 			}
-			res = sprintf(ins,"\n>%s %i %i %i %i %i\n",s2->sequence_name,s2->num_bases,s2->num_bytes,alignment_flag, start_pos_1, start_pos_2);
+			res = sprintf(ins,"\n>%s %i %i %i%s\n",s2->sequence_name,s2->num_bases,s2->num_bytes,alignment_flag, extra_data);
 			ins+=res;
 			memcpy(ins,s2->sequence_data,s2->num_bytes);
 			ins+=s2->num_bytes;
@@ -565,7 +571,7 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 			ins+=res;
 			memcpy(ins,s1->sequence_data,s1->num_bytes);
 			ins+=s1->num_bytes;
-			res = sprintf(ins,"\n>%s %i %i %i %i %i\n",s2->sequence_name,s2->num_bases,s2->num_bytes,alignment_flag, start_pos_1, start_pos_2);
+			res = sprintf(ins,"\n>%s %i %i %i%s\n",s2->sequence_name,s2->num_bases,s2->num_bytes,alignment_flag, extra_data);
 			ins+=res;
 			memcpy(ins,s2->sequence_data,s2->num_bytes);
 			ins+=s2->num_bytes;
