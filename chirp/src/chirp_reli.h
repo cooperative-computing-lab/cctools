@@ -214,6 +214,7 @@ INT64_T chirp_reli_fsync( struct chirp_file *file, time_t stoptime );
 
 /** Get an entire file efficiently.
 Reads an entire remote file, and write the contents to a standard FILE stream.
+To get an entire directory tree, see @ref chirp_recursive_get instead.
 @param host The name and port of the Chirp server to access.
 @param path The pathname of the file to access.
 @param stream A standard FILE stream obtained from fopen(). Such a stream may be obtained from fopen(), or could be the standard globals
@@ -227,6 +228,7 @@ INT64_T chirp_reli_getfile( const char *host, const char *path, FILE *stream, ti
 
 /** Get an entire file efficiently to memory.
 Reads an entire remote file into newly allocated memory.
+To get an entire directory tree, see @ref chirp_recursive_get instead.
 @param host The name and port of the Chirp server to access.
 @param path The pathname of the file to access.
 @param buffer A pointer to an uninitialized pointer.
@@ -239,6 +241,7 @@ INT64_T chirp_reli_getfile_buffer( const char *host, const char *path, char **bu
 
 /** Put an entire file efficiently.
 Reads data out of a standard I/O stream and writes it to a remote file.
+To put an entire directory tree, see @ref chirp_recursive_put instead.
 @param host The name and port of the Chirp server to access.
 @param path The pathname of the file to access.
 @param stream A standard FILE stream obtained from fopen(). Such a stream may be obtained from fopen(), or could be the standard globals
@@ -253,6 +256,7 @@ INT64_T chirp_reli_putfile( const char *host, const char *path, FILE *stream, IN
 
 /** Put an entire file efficiently from memory.
 Reads data out of memory and writes it to a remote file.
+To put an entire directory tree, see @ref chirp_recursive_put instead.
 @param host The name and port of the Chirp server to access.
 @param path The pathname of the file to access.
 @param buffer A pointer to the file data to write.

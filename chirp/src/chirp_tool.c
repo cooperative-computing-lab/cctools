@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include <fcntl.h>
 
 #include "chirp_reli.h"
+#include "chirp_recursive.h"
 #include "chirp_protocol.h"
 #include "chirp_acl.h"
 #include "chirp_group.h"
@@ -104,9 +105,6 @@ static char current_host[CHIRP_PATH_MAX] = {0};
 static char current_local_dir[CHIRP_PATH_MAX];
 static char current_remote_dir[CHIRP_PATH_MAX];
 int interactive_mode=0;
-
-static INT64_T xfer_items = 0;
-static INT64_T xfer_bytes = 0;
 
 static int long_information = 0;
 
@@ -419,128 +417,6 @@ static int do_lpwd( int argc, char **argv )
 	return 0;
 }
 
-static void add_to_list( const char *name, void *list )
-{
-	list_push_tail(list,xstrdup(name));
-}
-
-static INT64_T do_get_one_dir( const char *source_file, const char *target_file, int mode )
-{
-	char new_source_file[CHIRP_PATH_MAX];
-	char new_target_file[CHIRP_PATH_MAX];
-	struct list *work_list;
-	const char *name;
-	INT64_T result;
-
-	work_list = list_create();
-
-	result = mkdir(target_file,mode);
-	if(result==0 || errno==EEXIST ) {
-		result = chirp_reli_getdir(current_host,source_file,add_to_list,work_list,stoptime);
-		if(result>=0) {
-			while((name=list_pop_head(work_list))) {
-				if(!strcmp(name,".")) continue;
-				if(!strcmp(name,"..")) continue;
-				sprintf(new_source_file,"%s/%s",source_file,name);
-				sprintf(new_target_file,"%s/%s",target_file,name);
-				result = do_get_recursive(new_source_file,new_target_file);
-				free((char*)name);
-				if(result<0) break;
-			}
-		} else {
-			result = -1;
-		}
-	} else {
-		result = -1;
-	}
-
-	while((name=list_pop_head(work_list))) free((char*)name);
-	list_delete(work_list);
-
-	return result;
-}
-
-static INT64_T do_get_one_link( const char *source_file, const char *target_file )
-{
-	char linkdata[CHIRP_PATH_MAX];
-	INT64_T result;
-
-	result = chirp_reli_readlink(current_host,source_file,linkdata,sizeof(linkdata),stoptime);
-	if(result>0) {
-		linkdata[result] = 0;
-		unlink(target_file);
-		result = symlink(linkdata,target_file);
-		if(result>=0) result = 0;
-	}
-
-	return result;
-}
-
-static INT64_T do_get_one_file( const char *source_file, const char *target_file, int mode, INT64_T length )
-{
-	FILE *file;
-	int save_errno;
-	INT64_T actual;
-
-	file = fopen64(target_file,"w");
-	if(!file) return -1;
-
-	fchmod(fileno(file),mode);
-
-	actual = chirp_reli_getfile(current_host,source_file,file,stoptime);
-	if(actual!=length) {
-		save_errno = errno;
-		fclose(file);
-		errno = save_errno;
-		return -1;
-	}
-
-	if(length>=0) {
-		fclose(file);
-		return length;
-	} else {
-		save_errno = errno;
-		fclose(file);
-		errno = save_errno;
-		return -1;
-	}
-}
-
-static INT64_T do_get_recursive( const char *source_file, const char *target_file )
-{
-	INT64_T result;
-	struct chirp_stat info;
-
-	result = chirp_reli_lstat(current_host,source_file,&info,stoptime);
-	if(result<0) {
-		result = -1;
-	} else {
-		if(S_ISLNK(info.cst_mode)) {
-			printf("link %s\n",target_file);
-			result = do_get_one_link(source_file,target_file);
-		} else if(S_ISDIR(info.cst_mode)) {
-			printf("dir  %s\n",target_file);
-			result = do_get_one_dir(source_file,target_file,info.cst_mode);
-		} else if(S_ISREG(info.cst_mode)) {
-			printf("file %s [%sB]\n",target_file,string_metric(info.cst_size,-1,0));
-			result = do_get_one_file(source_file,target_file,info.cst_mode,info.cst_size);
-			if(result>=0) xfer_bytes += result;
-		} else {
-			printf("???  %s\n",target_file);
-			result = 0;
-		}
-		xfer_items++;
-	}
-
-	if(result<0) {
-		printf("couldn't get %s: %s\n",source_file,strerror(errno));
-	} else {
-		result = 0;
-	}
-
-	return result;
-}
-
 static int do_get( int argc, char **argv )
 {
 	char target_full_path[CHIRP_PATH_MAX];
@@ -554,145 +430,15 @@ static int do_get( int argc, char **argv )
 	complete_remote_path(argv[1],source_full_path);
 	complete_local_path(argv[2],target_full_path);
 
-	xfer_items = 0;
-	xfer_bytes = 0;
-
 	start = timestamp_get();
-	result = do_get_recursive(source_full_path,target_full_path);
+	result = chirp_recursive_get(current_host,source_full_path,target_full_path,stoptime);
 	stop = timestamp_get();
 
 	elapsed = (stop-start)/1000000.0;
 
-	printf("%lld files and %sB read in %.2fs ",
-		xfer_items,
-		string_metric(xfer_bytes,-1,0),
-		elapsed);
-
-	printf(" (%sB/s)\n",string_metric(xfer_bytes/elapsed,-1,0));
-
-	return result;
-}
-
-
-static INT64_T do_put_one_dir( const char *source_file, const char *target_file, int mode )
-{
-	char new_source_file[CHIRP_PATH_MAX];
-	char new_target_file[CHIRP_PATH_MAX];
-	struct list *work_list;
-	const char *name;
-	INT64_T result;
-	struct dirent *d;
-	DIR *dir;
-
-	work_list = list_create();
-
-	result = chirp_reli_mkdir(current_host,target_file,mode,stoptime);
-	if(result==0 || errno==EEXIST ) {
-		result = 0;
-		dir = opendir(source_file);
-		if(dir) {
-			while((d=readdir(dir))) {
-				if(!strcmp(d->d_name,".")) continue;
-				if(!strcmp(d->d_name,"..")) continue;
-				list_push_tail(work_list,xstrdup(d->d_name));
-			}
-			closedir(dir);
-			while((name=list_pop_head(work_list))) {
-				sprintf(new_source_file,"%s/%s",source_file,name);
-				sprintf(new_target_file,"%s/%s",target_file,name);
-				result = do_put_recursive(new_source_file,new_target_file);
-				free((char*)name);
-				if(result<0) break;
-			}
-		} else {
-			result = -1;
-		}
-	} else {
-		result = -1;
-	}
-
-	while((name=list_pop_head(work_list))) free((char*)name);
-	list_delete(work_list);
-
-	return result;
-}
-
-static INT64_T do_put_one_link( const char *source_file, const char *target_file )
-{
-	char linkdata[CHIRP_PATH_MAX];
-	INT64_T result;
-
-	result = readlink(source_file,linkdata,sizeof(linkdata));
 	if(result>0) {
-		char linkdatafull[CHIRP_PATH_MAX];
-		linkdata[result] = 0;
-		complete_local_path(linkdata,linkdatafull);
-		chirp_reli_unlink(current_host,target_file,stoptime);
-       		result = chirp_reli_symlink(current_host,linkdatafull,target_file,stoptime);
-		if(result>=0) result = 0;
-	}
-
-	return result;
-}
-
-static INT64_T do_put_one_file( const char *source_file, const char *target_file, int mode, INT64_T length )
-{
-	FILE *file;
-	int save_errno;
-
-	file = fopen64(source_file,"r");
-	if(!file) return -1;
-
-	length = chirp_reli_putfile(current_host,target_file,file,mode,length,stoptime);
-	if(length<0) {
-		save_errno = errno;
-		fclose(file);
-		errno = save_errno;
-		return -1;
-	}
-
-	if(length>=0) {
-		fclose(file);
-		return length;
-	} else {
-		save_errno = errno;
-		fclose(file);
-		errno = save_errno;
-		return -1;
-	}
-}
-
-static INT64_T do_put_recursive( const char *source_file, const char *target_file )
-{
-	INT64_T result;
-	struct stat64 info;
-
-	result = lstat64(source_file,&info);
-	if(result<0) {
-		result = -1;
-	} else {
-		if(S_ISLNK(info.st_mode)) {
-			printf("link %s\n",target_file);
-			result = do_put_one_link(source_file,target_file);
-		} else if(S_ISDIR(info.st_mode)) {
-			printf("dir  %s\n",target_file);
-			result = do_put_one_dir(source_file,target_file,0700);
-		} else if(S_ISREG(info.st_mode)) {
-			printf("file %s [%sB]\n",target_file,string_metric(info.st_size,-1,0));
-			result = do_put_one_file(source_file,target_file,info.st_mode,info.st_size);
-			if( result >= 0 ) xfer_bytes += result;
-		} else {
-			printf("???  %s\n",target_file);
-			result = 0;
-		}
-		if( result >= 0 )
-		  xfer_items++;
-	}
-
-	if(result<0) {
-		printf("couldn't put %s: %s\n",source_file,strerror(errno));
-	} else {
-		result = 0;
+		printf("%sB read in %.2fs ",string_metric(result,-1,0),elapsed);
+		printf("(%sB/s)\n",string_metric(result/elapsed,-1,0));
 	}
 
 	return result;
@@ -711,20 +457,16 @@ static int do_put( int argc, char **argv )
 	complete_local_path(argv[1],source_full_path);
 	complete_remote_path(argv[2],target_full_path);
 
-	xfer_items = 0;
-	xfer_bytes = 0;
-
 	start = timestamp_get();
-	result = do_put_recursive(source_full_path,target_full_path);
+	result = chirp_recursive_put(current_host,source_full_path,target_full_path,stoptime);
 	stop = timestamp_get();
 
 	elapsed = (stop-start)/1000000.0;
 
-	printf("%lld files and %sB written in %.2fs ",
-	       xfer_items,
-	       string_metric(xfer_bytes,-1,0),
-	       elapsed);
-	printf(" (%sB/s)\n",string_metric(xfer_bytes/elapsed,-1,0));
+	if(result>0) {
+		printf("%sB written in %.2fs ",string_metric(result,-1,0),elapsed);
+		printf("(%sB/s)\n",string_metric(result/elapsed,-1,0));
+	}
 
 	return result;
 }
