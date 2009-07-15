@@ -322,6 +322,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
 					w->current_task = t;
 				} else {
 					debug(D_DEBUG,"%s (%s) removed because couldn't send task.",w->hostname,w->addrport);
+					w->current_task = t;
 					remove_worker(q,w);
 				}
 			}
@@ -497,6 +498,7 @@ static void start_tasks( struct work_queue *q )
 			w->current_task = t;
 		} else {
 			debug(D_DEBUG,"%s (%s) removed because couldn't send task.",w->hostname,w->addrport);
+			w->current_task = t;
 			remove_worker(q,w);
 		}
 	}
