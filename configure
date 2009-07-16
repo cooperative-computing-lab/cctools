@@ -69,7 +69,7 @@ irods_path="/usr"
 hdfs_path="/usr"
 zlib_path="/usr"
 
-globus_flavor=gcc32dbg
+globus_flavor=auto
 has_egee=no
 
 ccompiler=gcc
@@ -78,7 +78,7 @@ ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unk
 
 config_readline_path=auto
 config_globus_path=no
-config_krb5_path=no
+config_krb5_path=auto
 config_nest_path=no
 config_classad_path=no
 config_gcb_path=no
@@ -89,6 +89,7 @@ config_dcap_path=no
 config_irods_path=no
 config_hdfs_path=no
 config_zlib_path=yes
+config_mysql_path=auto
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
 then
@@ -174,6 +175,11 @@ do
 			zlib_path=$1
 			config_zlib_path=yes
 			;;
+		--with-mysql-path)
+			shift
+			mysql_path=$1
+			config_mysql_path=yes
+			;;
 		--with-*-path)
 			echo "ignoring unknown package $1"
 			shift
@@ -201,6 +207,7 @@ Where PACKAGE may be:
     irods
     hdfs
     zlib
+    mysql
 EOF
 			exit 1
 			;;
@@ -247,7 +254,7 @@ require_gnu_make
 require_path flex
 require_path bison
 
-if [ $config_readline_path != no ] && check_file /usr/lib/libreadline.a
+if [ $config_readline_path != no ] && check_library /usr/lib/libbreadline
 then
 	if [ ${readline_path} != /usr ]
 	then
@@ -259,7 +266,7 @@ then
 	ldflags="${ldflags} -lreadline"
 	
 	# Some, but not all versions of readline require ncurses.
-	optional_library ncurses HAS_LIBNCURSES
+	optional_library ncurses
 else
 	echo "*** skipping readline..."
 fi
@@ -362,11 +369,24 @@ if [ $has_egee = yes ]
 then	
 	echo "using egee version of globus"
 else
+	if [ $globus_flavor = auto ]
+	then
+		if [ $build_cpu = X86_64 ] 
+		then
+			globus_flavor=gcc64
+		else
+			globus_flavor=gcc32
+		fi
+	fi
+
+	echo "using a globus flavor of $globus_flavor"
+	echo "if this is wrong, use the --globus-flavor argument"
+
 	if [ $config_globus_path != no ] && check_file ${globus_path}/include/${globus_flavor}/globus_common.h
 	then
-		fix_globus_install ${globus_path} ${globus_flavor}
 		ccflags="${ccflags} -I${globus_path}/include/${globus_flavor} -DHAS_GLOBUS_GSS"
-		ldflags="${ldflags} -L${globus_path}/lib -lglobus_gss_assist_${globus_flavor} -lglobus_gssapi_gsi_${globus_flavor} -lglobus_gsi_proxy_core_${globus_flavor} -lglobus_gsi_credential_${globus_flavor} -lglobus_gsi_callback_${globus_flavor} -lglobus_oldgaa_${globus_flavor} -lglobus_gsi_sysconfig_${globus_flavor} -lglobus_gsi_cert_utils_${globus_flavor} -lglobus_openssl_${globus_flavor} -lglobus_proxy_ssl_${globus_flavor} -lglobus_openssl_error_${globus_flavor} -lglobus_common_${globus_flavor} -lldap_${globus_flavor} -llber_${globus_flavor} -lsasl -lssl_${globus_flavor} -lcrypto_${globus_flavor} -lltdl_${globus_flavor} -llutil_${globus_flavor}"
+		ldflags="${ldflags} -L${globus_path}/lib -lglobus_gss_assist_${globus_flavor} -lglobus_gssapi_gsi_${globus_flavor} -lglobus_gsi_proxy_core_${globus_flavor} -lglobus_gsi_credential_${globus_flavor} -lglobus_gsi_callback_${globus_flavor} -lglobus_oldgaa_${globus_flavor} -lglobus_gsi_sysconfig_${globus_flavor} -lglobus_gsi_cert_utils_${globus_flavor} -lglobus_openssl_${globus_flavor} -lglobus_openssl_error_${globus_flavor} -lglobus_callout_${globus_flavor} -lglobus_proxy_ssl_${globus_flavor} -lglobus_common_${globus_flavor} -lltdl_${globus_flavor} -lssl -lcrypto -lgssapi_krb5 -lkrb5 -lcom_err -lk5crypto"
+
 	else
 		if [ $config_globus_path = yes ]
 		then
@@ -379,7 +399,7 @@ else
 	fi
 fi
 
-if [ $config_irods_path != no ] && check_file "${irods_path}/lib/core/obj/libRodsAPIs.a"
+if [ $config_irods_path != no ] && check_library "${irods_path}/lib/core/obj/libRodsAPIs"
 then
 	ccflags="${ccflags} -I${irods_path}/lib/core/include -I${irods_path}/lib/api/include -I${irods_path}/lib/md5/include -I${irods_path}/server/core/include -I${irods_path}/server/api/include -I${irods_path}/server/icat/include -I${irods_path}/server/drivers/include -I${irods_path}/server/re/include -DHAS_IRODS"
 	ldflags="${ldflags} -L${irods_path}/lib/core/obj -lRodsAPIs"
@@ -442,7 +462,7 @@ else
 	fi
 fi
 
-if [ $config_krb5_path != no ] && check_file "${krb5_path}/lib/libkrb5.a" && check_file "${krb5_path}/include/krb5.h"
+if [ $config_krb5_path != no ] && check_file "${krb5_path}/include/krb5.h"
 then
 	if [ ${krb5_path} != /usr ]
 	then
@@ -453,26 +473,11 @@ then
 	ccflags="${ccflags} -DHAS_KRB5"
 	ldflags="${ldflags} -lkrb5"
  
-	if check_file "${krb5_path}/lib/libk5crypto.a"
-	then
-		ldflags="${ldflags} -lk5crypto"
-	fi
-
-	if check_file "${krb5_path}/lib/libcrypto.a"
-	then
-		ldflags="${ldflags} -lcrypto"
-	fi
-
-	if check_file "${krb5_path}/lib/libcom_err.a"
-	then
-		ldflags="${ldflags} -lcom_err"
-	fi
-
-	if check_file "${krb5_path}/lib/libkrb5support.a"
-	then
-		ldflags="${ldflags} -lkrb5support"
-	fi
-
+	optional_library k5crypto    "${krb5_path}/lib"
+	optional_library crypto      "${krb5_path}/lib"
+	optional_library com_err     "${krb5_path}/lib"
+	optional_library krb5support "${krb5_path}/lib"
+	optional_library selinux     "${krb5_path}/lib"
 else
 	if [ $config_krb5_path = yes ]
 	then
@@ -505,6 +510,26 @@ else
         echo "*** skipping fuse..."
 fi
 
+if [ $config_mysql_path != no ] && check_file ${mysql_path}/include/mysql/mysql.h
+then
+	if [ ${mysql_path} != /usr ]
+	then
+		ccflags="${cclflags} -I${mysql_path}/include"
+		ldflags="${ldflags} -L${mysql_path}/lib/mysql"
+	fi
+
+	ldflags="${ldflags} -lmysqlclient -lmystrings -lmysys"
+else
+	if [ $config_mysql_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find MySQL in $mysql_path"
+		echo "*** Check --with-mysql-path and try again."
+		exit 1
+	else
+		echo "*** skipping mysql..."
+	fi
+fi
+
 optional_function strsignal /usr/include/string.h HAS_STRSIGNAL
 optional_function pread /usr/include/unistd.h HAS_PREAD
 optional_function pwrite /usr/include/unistd.h HAS_PWRITE
@@ -513,32 +538,27 @@ optional_file /usr/include/sys/statfs.h HAS_SYS_STATFS_H
 optional_file /usr/include/sys/statvfs.h HAS_SYS_STATVFS_H
 optional_file /usr/include/alloca.h HAS_ALLOCA_H
 
-if [ $build_sys = LINUX ]
-then
-	ldflags="${ldflags} -Xlinker -Bdynamic -lm -lc"
-else
-	ldflags="${ldflags} -lm -lc"
-fi
-
-linker="gcc"
-
 if [ ${zlib_path} != /usr ]
 then
         ldflags="${ldflags} -L${zlib_path}/lib"
         ccflags="${ccflags} -I${zlib_path}/include"
 fi
 
-ldflags="${ldflags} -lz"
+linker="gcc"
 
-optional_library resolv HAS_LIBRESOLV
-optional_library crypt HAS_LIBCRYPT
-optional_library m HAS_LIBM
-optional_library nsl HAS_LIBNSL
-optional_library socket HAS_LIBSOCKET
-optional_library pthread HAS_LIBPTHREAD
-optional_library dl HAS_LIBLDL
-optional_library iconv HAS_LIBICONV
-optional_library rt HAS_LIBRT
+if [ $build_sys = LINUX ]
+then
+	ldflags="${ldflags} -lz -Xlinker -Bdynamic -lc -lm"
+else
+	ldflags="${ldflags} -lz -lc -lm"
+fi
+
+optional_library resolv   /usr/lib
+optional_library socket   /usr/lib
+optional_library pthread  /usr/lib
+optional_library dl       /usr/lib
+optional_library iconv    /usr/lib
+optional_library rt       /usr/lib
 
 if check_path doxygen
 then

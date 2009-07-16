@@ -41,15 +41,8 @@ check_path ()
 
 check_library()
 {
-	if [ X$2 != X ]
-	then
-		LDDIR=$2
-	else
-		LDDIR=/usr/lib
-	fi
-
-	echo -n "checking for lib${1} in $LDDIR..."
-	if [ -f ${LDDIR}/lib${1}.a -o -f ${LDDIR}/lib${1}.so ]
+	echo -n "checking for ${1}..."
+	if [ -f ${1}.a -o -f ${1}.so ]
 	then
 		echo "yes"
 		return 0
@@ -118,9 +111,12 @@ require_function ()
 
 optional_library()
 {
-	if check_library $1
+	if check_library $2/lib$1
 	then
-		ccflags="${ccflags} -D$2"
+		if [ X$3 != X ]
+		then
+			ccflags="${ccflags} -D$3"
+		fi
 		ldflags="${ldflags} -l$1"
 		return 0
 	else
@@ -279,9 +275,9 @@ check_for_globus_flavors()
 	# Now search for any flavor we can think of...
 	#
 
-	for compiler in gcc32 vendorcc32
+	for compiler in gcc64 gcc32 vendorcc32
 	do
-		for debug in dbg ""
+		for debug in "" dbg
 		do
 			if check_for_globus "$1" "$2" "${compiler}${debug}" "${GMH}"
 			then
