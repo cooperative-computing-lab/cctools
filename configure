@@ -78,7 +78,7 @@ ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unk
 
 config_readline_path=auto
 config_globus_path=no
-config_krb5_path=no
+config_krb5_path=auto
 config_nest_path=no
 config_classad_path=no
 config_gcb_path=no
@@ -224,10 +224,14 @@ export IFS
 
 if [ $build_sys = LINUX ]
 then
-	ldflags="-dynamic -Xlinker -Bstatic -lstdc++ -static-libgcc"
+	DYNAMIC_MODE="-Xlinker -Bdynamic"
+	STATIC_MODE="-dynamic -Xlinker -Bstatic"
 else
-	ldflags=""
+	DYNAMIC_MODE=""
+	STATIC_MODE=""
 fi
+
+ldflags="${STATIC_MODE} -lstdc++ -static-libgcc"
 
 rm -f Makefile.config
 echo "checking for all the things I know how to build..."
@@ -464,6 +468,8 @@ fi
 
 if [ $config_krb5_path != no ] && check_file "${krb5_path}/include/krb5.h"
 then
+	ldflags="${ldflags} ${DYNAMIC_MODE}"
+
 	if [ ${krb5_path} != /usr ]
 	then
 		ccflags="${ccflags} -I${krb5_path}/include"
@@ -477,6 +483,8 @@ then
 	optional_library crypto      "${krb5_path}/lib"
 	optional_library com_err     "${krb5_path}/lib"
 	optional_library krb5support "${krb5_path}/lib"
+
+	ldflags="${ldflags} ${STATIC_MODE}"
 else
 	if [ $config_krb5_path = yes ]
 	then
@@ -545,12 +553,7 @@ fi
 
 linker="gcc"
 
-if [ $build_sys = LINUX ]
-then
-	ldflags="${ldflags} -lz -Xlinker -Bdynamic -lc -lm"
-else
-	ldflags="${ldflags} -lz -lc -lm"
-fi
+ldflags="${ldflags} -lz ${DYNAMIC_MODE} -lc -lm"
 
 optional_library selinux  /usr/lib
 optional_library keyutils-1.2 /lib
