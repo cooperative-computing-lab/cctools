@@ -41,7 +41,7 @@ static void show_version( const char *cmd )
 
 static void show_help( const char *cmd )
 {
-	printf("use: %s [options] [fields] ...\n",cmd);
+	printf("chirp_status [options] [ <name> <value> ]\n");
 	printf("where options are:\n");
 	printf(" -c <host>  Query the catalog on this host.\n");
 	printf(" -d <flag>  Enable debugging for this sybsystem\n");
@@ -92,6 +92,8 @@ int main( int argc, char *argv[] )
 	int count=0;
 	int mode = MODE_TABLE;
 	INT64_T total=0, avail=0;
+	const char *filter_name = 0;
+	const char *filter_value = 0;
 
 	debug_config(argv[0]);
 
@@ -134,6 +136,19 @@ int main( int argc, char *argv[] )
 		}
 	}
 
+	if(argc-optind==0) {
+		// fine, keep going
+	} else if((argc-optind)==1) {
+		filter_name = "name";
+		filter_value = argv[optind];
+	} else if((argc-optind)==2) {
+		filter_name = argv[optind];
+		filter_value = argv[optind+1];
+	} else {
+		show_help(argv[0]);
+		return 1;
+	}
+
 	stoptime = time(0)+timeout;
 
 	q = catalog_query_create(catalog_host,0,stoptime);
@@ -158,6 +173,12 @@ int main( int argc, char *argv[] )
 				continue;
 			}
 		}
+
+		if(filter_name) {
+			const char *v = nvpair_lookup_string(table[i],filter_name);
+			if(!v || strcmp(filter_value,v)) continue;
+		}
+
 		if(mode==MODE_SHORT) {
 			const char *t = nvpair_lookup_string(table[i],"type");
 			if(t && !strcmp(t,"chirp")) {
