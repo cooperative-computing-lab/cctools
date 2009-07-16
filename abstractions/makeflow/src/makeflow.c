@@ -292,7 +292,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 	}
 
 	if(!colon) {
-		printf("makeflow: error at %s:%d: %s\n",d->filename,d->linenum,line);
+		fprintf(stderr,"makeflow: error at %s:%d: %s\n",d->filename,d->linenum,line);
 		exit(1);
 	}
 
@@ -323,7 +323,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 
 	line = dag_readline(d,file);
 	if(!line) {
-		printf("makeflow: error at %s:%d: expected a command\n",d->filename,d->linenum);
+		fprintf(stderr,"makeflow: error at %s:%d: expected a command\n",d->filename,d->linenum);
 		exit(1);
 	}
 
@@ -369,7 +369,7 @@ struct dag * dag_create( const char *filename )
 		for(f=n->target_files;f;f=f->next) {
 			m = hash_table_lookup(d->file_table,f->filename);
 			if(m) {
-				printf("makeflow: %s is defined multiple times at %s:%d and %s:%d\n",f->filename,d->filename,n->linenum,d->filename,m->linenum);
+				fprintf(stderr,"makeflow: %s is defined multiple times at %s:%d and %s:%d\n",f->filename,d->filename,n->linenum,d->filename,m->linenum);
 				exit(1);
 			} else {
 				hash_table_insert(d->file_table,f->filename,n);
@@ -473,15 +473,15 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 	if(info->exited_normally && info->exit_code==0) {
 		for(f=n->target_files;f;f=f->next) {
 			if(access(f->filename,R_OK)!=0) {
-				printf("makeflow: %s did not create file %s\n",n->command,f->filename);
+				fprintf(stderr,"makeflow: %s did not create file %s\n",n->command,f->filename);
 				job_failed=1;
 			}
 		}
 	} else {
 		if(info->exited_normally) {
-			printf("makeflow: %s failed with exit code %d\n",n->command,info->exit_code);
+			fprintf(stderr,"makeflow: %s failed with exit code %d\n",n->command,info->exit_code);
 		} else {
-			printf("makeflow: %s crashed with signal %d (%s)\n",n->command,info->exit_signal,strsignal(info->exit_signal));
+			fprintf(stderr,"makeflow: %s crashed with signal %d (%s)\n",n->command,info->exit_signal,strsignal(info->exit_signal));
 		}
 		job_failed = 1;
 	}
@@ -524,7 +524,7 @@ int dag_check( struct dag *d )
 		for(f=n->source_files;f;f=f->next) {
 		  if(hash_table_lookup(d->file_table,f->filename)) continue;
 			if(access(f->filename,R_OK)==0) continue;
-			printf("makeflow: error: %s does not exist, and is not created by any rule.\n",f->filename);
+			fprintf(stderr,"makeflow: error: %s does not exist, and is not created by any rule.\n",f->filename);
 			return 0;
 		}
 	}
@@ -760,10 +760,10 @@ int main( int argc, char *argv[] )
 	dag_run(d);
 
 	if(dag_abort_flag) {
-		printf("makeflow: workflow was aborted.\n");
+		fprintf(stderr,"makeflow: workflow was aborted.\n");
 		return 1;
 	} else if(dag_failed_flag) {
-		printf("makeflow: workflow failed.\n");
+		fprintf(stderr,"makeflow: workflow failed.\n");
 		return 1;
 	} else {
 		printf("makeflow: nothing left to do.\n");
