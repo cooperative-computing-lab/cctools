@@ -22,7 +22,9 @@ static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
-#define DAG_LINE_MAX 65536
+// A line length this long is not ideal, but it will have to do
+// until we can parse lines of arbitrary length.
+#define DAG_LINE_MAX 1048576
 
 typedef enum {
 	DAG_NODE_STATE_WAITING=0,
