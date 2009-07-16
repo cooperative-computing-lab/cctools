@@ -26,7 +26,7 @@ static int use_delegated_credential = 0;
 static int read_token(void *link, void **bufp, size_t *sizep)
 {
 	char line[AUTH_LINE_MAX];
-	time_t stoptime = time(0)+60;
+	time_t stoptime = time(0)+3600;
 	int result;
 
 	if(link_readline(link,line,sizeof(line),stoptime)) {
@@ -47,7 +47,7 @@ static int read_token(void *link, void **bufp, size_t *sizep)
 static int write_token(void *link, void *buf, size_t size)
 {
 	char line[AUTH_LINE_MAX];
-	time_t stoptime = time(0)+60;
+	time_t stoptime = time(0)+3600;
 
 	sprintf(line,"%d\n",size);
 	link_write(link,line,strlen(line),stoptime);
@@ -66,6 +66,8 @@ static int auth_globus_assert( struct link *link, time_t stoptime )
 	int token;
 	int success = 0;
 
+	globus_module_activate(GLOBUS_GSI_GSS_ASSIST_MODULE);
+
 	if(use_delegated_credential && delegated_credential!=GSS_C_NO_CREDENTIAL) {
 		debug(D_AUTH,"globus: using delegated credential");
 		credential = delegated_credential;
@@ -79,7 +81,7 @@ static int auth_globus_assert( struct link *link, time_t stoptime )
 		debug(D_AUTH,"globus: waiting for server to get ready");
 		if(auth_barrier(link,"yes\n",stoptime)) {
 			debug(D_AUTH,"globus: authenticating with server");
-			major = globus_gss_assist_init_sec_context( &minor, credential, &context, "GSI-NO-TARGET", GSS_C_DELEG_FLAG, &flags, &token, read_token, link, write_token, link );
+			major = globus_gss_assist_init_sec_context( &minor, credential, &context, "GSI-NO-TARGET", 0, &flags, &token, read_token, link, write_token, link );
 			if(major==GSS_S_COMPLETE) {
 				debug(D_AUTH,"globus: credentials accepted!");
 				success = 1;
@@ -102,6 +104,8 @@ static int auth_globus_assert( struct link *link, time_t stoptime )
 		auth_barrier(link,"no\n",stoptime);
 	}
 
+	globus_module_deactivate(GLOBUS_GSI_GSS_ASSIST_MODULE);
+
 	return success;
 }
 
@@ -112,6 +116,8 @@ static int auth_globus_accept( struct link *link, char **subject, time_t stoptim
 	OM_uint32 major, minor, flags=0;
 	int token;
 	int success = 0;
+
+	globus_module_activate(GLOBUS_GSI_GSS_ASSIST_MODULE);
 
 	*subject = 0;
 
@@ -147,6 +153,8 @@ static int auth_globus_accept( struct link *link, char **subject, time_t stoptim
 		debug(D_AUTH,"globus: couldn't load my credentials: did you run grid-proxy-init?");
 		auth_barrier(link,"no\n",stoptime);
 	}
+
+	globus_module_deactivate(GLOBUS_GSI_GSS_ASSIST_MODULE);
 
 	return success;
 }
