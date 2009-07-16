@@ -45,6 +45,8 @@ int strpos(char *str, char c);
 int strrpos(char *str, char c);
 int getDateString(char* str);
 
+#ifndef CCTOOLS_OPSYS_LINUX
 char * strsep (char **stringp, const char *delim);
+#endif
 
 #endif
