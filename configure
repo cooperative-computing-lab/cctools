@@ -477,7 +477,6 @@ then
 	optional_library crypto      "${krb5_path}/lib"
 	optional_library com_err     "${krb5_path}/lib"
 	optional_library krb5support "${krb5_path}/lib"
-	optional_library selinux     "${krb5_path}/lib"
 else
 	if [ $config_krb5_path = yes ]
 	then
@@ -553,6 +552,8 @@ else
 	ldflags="${ldflags} -lz -lc -lm"
 fi
 
+optional_library selinux  /usr/lib
+optional_library keyutils-1.2 /lib
 optional_library resolv   /usr/lib
 optional_library socket   /usr/lib
 optional_library pthread  /usr/lib
