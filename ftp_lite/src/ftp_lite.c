@@ -936,7 +936,7 @@ int ftp_lite_data_channel_auth( struct ftp_lite_server *s, FILE *data )
 
 	debug(D_FTP,"data channel authentication in progress...");
 
-	major = globus_gss_assist_init_sec_context( &minor, s->credential, &s->data_context, 0, GSS_C_MUTUAL_FLAG|GSS_C_DELEG_FLAG, &flags, &token, globus_gss_assist_token_get_fd, data, globus_gss_assist_token_send_fd, data );
+	major = globus_gss_assist_init_sec_context( &minor, s->credential, &s->data_context, 0, 0, &flags, &token, globus_gss_assist_token_get_fd, data, globus_gss_assist_token_send_fd, data );
 	if( major!=GSS_S_COMPLETE ) {
 		char *reason;
 		globus_gss_assist_display_status_str(&reason,"",major,minor,token);
