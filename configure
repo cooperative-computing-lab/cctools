@@ -78,7 +78,7 @@ ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unk
 
 config_readline_path=auto
 config_globus_path=no
-config_krb5_path=auto
+config_krb5_path=no
 config_nest_path=no
 config_classad_path=no
 config_gcb_path=no
@@ -265,8 +265,8 @@ then
 	ccflags="${ccflags} -DHAS_LIBREADLINE"
 	ldflags="${ldflags} -lreadline"
 	
-	# Some, but not all versions of readline require ncurses.
-	optional_library ncurses
+	optional_library history ${readline_path}
+	optional_library ncurses /usr/lib
 else
 	echo "*** skipping readline..."
 fi
