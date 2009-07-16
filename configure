@@ -254,7 +254,7 @@ require_gnu_make
 require_path flex
 require_path bison
 
-if [ $config_readline_path != no ] && check_library /usr/lib/libbreadline
+if [ $config_readline_path != no ] && check_library ${readline_path}/lib/libreadline
 then
 	if [ ${readline_path} != /usr ]
 	then
