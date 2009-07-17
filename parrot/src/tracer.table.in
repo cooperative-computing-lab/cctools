@@ -298,7 +298,7 @@ unknown296 296
 unknown297 297
 unknown298 298
 unknown299 299
-unknown300 300
+fstatat64 300
 unknown301 301
 unknown302 302
 unknown303 303
@@ -318,7 +318,7 @@ unknown316 316
 unknown317 317
 unknown318 318
 unknown319 319
-unknown320 320
+utimensat 320
 unknown321 321
 unknown322 322
 unknown323 323
