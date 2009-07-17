@@ -437,6 +437,12 @@ int dag_node_ready( struct dag *d, struct dag_node *n )
 
 	if(n->state!=DAG_NODE_STATE_WAITING) return 0;
 
+	if(n->local_job) {
+		if(d->local_jobs_running>=d->local_jobs_max) return 0;
+	} else {
+		if(d->remote_jobs_running>=d->remote_jobs_max) return 0;
+	}
+
 	for(f=n->source_files;f;f=f->next) {
 		if(stat(f->filename,&info)==0) {
 			age = MAX(age,info.st_mtime);
@@ -456,9 +462,22 @@ int dag_node_ready( struct dag *d, struct dag_node *n )
 	return 0;
 }
 
+void dag_dispatch_ready_jobs( struct dag *d )
+{
+	struct dag_node *n;
+
+	for(n=d->nodes;n;n=n->next) {
+
+		if( d->remote_jobs_running >= d->remote_jobs_max && d->local_jobs_running  >= d->local_jobs_max) break;
+
+		if(dag_node_ready(d,n)) {
+			dag_node_submit(d,n);
+		}
+	}
+}
+
 void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info *info )
 {
-	struct dag_node *m;
 	struct dag_file *f;
 	int job_failed = 0;
 
@@ -493,24 +512,6 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 	} else {
 		dag_node_state_change(d,n,DAG_NODE_STATE_COMPLETE);
 	}
-
-	for(m=d->nodes;m;m=m->next) {
-
-		int remote_full = d->remote_jobs_running >= d->remote_jobs_max;
-		int local_full  = d->local_jobs_running  >= d->local_jobs_max;
-
-		if(remote_full && local_full) break;
-
-		if(m->local_job) {
-			if(local_full) continue;
-		} else {
-			if(remote_full) continue;
-		}
-
-		if(dag_node_ready(d,m)) {
-			dag_node_submit(d,m);
-		}
-	}
 }
 
 int dag_check( struct dag *d )
@@ -538,13 +539,9 @@ void dag_run( struct dag *d )
 	batch_job_id_t jobid;
 	struct batch_job_info info;
 
-	for(n=d->nodes;n;n=n->next) {
-		if(dag_node_ready(d,n)) {
-			dag_node_submit(d,n);
-		}
-	}
-
 	while(!dag_abort_flag) {
+
+		dag_dispatch_ready_jobs(d);
 
 		if(d->local_jobs_running==0 && d->remote_jobs_running==0) break;
 
