@@ -436,7 +436,7 @@ then
 		exit 1
 	fi
 
-	libhdfs="${hdfs_path}/libhdfs/libhdfs.so"
+	libhdfs="${hdfs_path}/c++/$(uname)-i386-32/lib/libhdfs.so"
 	if ! check_file "$libhdfs"; then
 	    libhdfs="${hdfs_path}/lib/libhdfs.so"
 	    if ! check_file "$libhdfs"; then

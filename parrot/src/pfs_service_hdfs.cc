@@ -32,10 +32,6 @@ extern gid_t pfs_gid;
 extern int pfs_master_timeout;
 extern int pfs_enable_small_file_optimizations;
 
-/* Hack b/c libhdfs doesn't read hdfs-default.xml, which means these values are not defined */
-#define HDFS_BUFSIZE 4096	/* io.file.buffer.size */
-#define HDFS_REP     3		/* dfs.replication */
-#define HDFS_BLKSIZE 8388608	/* dfs.block.size */
 #define HDFS_DEFAULT_PORT 9100
 
 #define HDFS_STAT_MODE (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IWOTH|S_IXOTH)
@@ -148,6 +144,7 @@ public:
 	virtual pfs_ssize_t write( const void *data, pfs_size_t length, pfs_off_t offset ) {
 		pfs_ssize_t result;
 
+		/* Ignore offset since HDFS does not support seekable writes. */
 		debug(D_HDFS, "writing to file %s ", name.rest);
 		result = hdfs->write(fs, handle, data, length);
 		HDFS_END
@@ -232,7 +229,7 @@ public:
 			return 0;
 		}
 
-		handle = hdfs.open(fs, name->rest, flags, HDFS_BUFSIZE, HDFS_REP, HDFS_BLKSIZE);
+		handle = hdfs.open(fs, name->rest, flags, 0, 0, 0);
 		if (handle != NULL) {
 			file = new pfs_file_hdfs(name, &hdfs, fs, handle);
 			if (!file) {
