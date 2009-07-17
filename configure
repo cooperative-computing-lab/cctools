@@ -225,7 +225,7 @@ export IFS
 if [ $build_sys = LINUX ]
 then
 	DYNAMIC_MODE="-Xlinker -Bdynamic"
-	STATIC_MODE="-dynamic -Xlinker -Bstatic"
+	STATIC_MODE="-dynamic -Xlinker --as-needed -Xlinker -Bstatic"
 else
 	DYNAMIC_MODE=""
 	STATIC_MODE=""
