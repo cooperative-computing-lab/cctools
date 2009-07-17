@@ -47,6 +47,7 @@ static int batch_job_submit_condor( struct batch_queue *q, const char *cmd, cons
 
 	fprintf(file,"universe = vanilla\n");
 	fprintf(file,"executable = %s\n",cmd);
+	fprintf(file,"getenv = true\n");
 	if(args) fprintf(file,"arguments = %s\n",args);
 	if(infile) fprintf(file,"input = %s\n",infile);
 	if(outfile) fprintf(file,"output = %s\n",outfile);
