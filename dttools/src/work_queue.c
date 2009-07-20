@@ -29,8 +29,6 @@
 #define FNAME 0
 #define LITERAL 1
 
-
-
 struct work_queue {
 	struct link * master_link;
 	struct list * ready_list;
@@ -541,13 +539,18 @@ void abort_slow_workers( struct work_queue *q )
 
 }
 
-struct work_queue * work_queue_create( int port , time_t stoptime)
+struct work_queue * work_queue_create( int port, time_t stoptime)
 {
 	struct work_queue *q = malloc(sizeof(*q));
 	int waittime = 1;
 	
 	if(port == 0) {
-		port = 9123;
+		const char *portstring = getenv("WORK_QUEUE_PORT");
+		if(portstring) {
+			port = atoi(portstring);
+		} else {
+			port = WORK_QUEUE_DEFAULT_PORT;
+		}
 	}
 
 	memset(q,0,sizeof(*q));

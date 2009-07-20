@@ -12,6 +12,7 @@
 #include "itable.h"
 #include "debug.h"
 #include "batch_job.h"
+#include "work_queue.h"
 #include "stringtools.h"
 #include "load_average.h"
 
@@ -595,7 +596,7 @@ static void show_help(const char *cmd)
 	printf(" -J <#>         Max number of remote jobs to run at once.   (default is 1000)\n");
 	printf(" -D             Display the Makefile as a Dot graph.\n");
 	printf(" -B <options>   Add these options to all batch submit files.\n");
-	printf(" -p <port>      Port number to use with work queue.         (default is 9123)\n");
+	printf(" -p <port>      Port number to use with work queue.         (default is %d)\n",WORK_QUEUE_DEFAULT_PORT);
 	printf(" -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
 	printf(" -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
 	printf(" -A             Disable the check for AFS. (experts only.)\n");;
@@ -607,7 +608,7 @@ static void show_help(const char *cmd)
 
 int main( int argc, char *argv[] )
 {
-	int port = 9123;
+	int port = 0;
 	char c;
 	char logfilename[DAG_LINE_MAX];
 	char batchlogfilename[DAG_LINE_MAX];
@@ -680,6 +681,12 @@ int main( int argc, char *argv[] )
 		return 1;
 	}
 
+	if(port!=0) {
+		char line[1024];
+		sprintf(line,"WORK_QUEUE_PORT=%d",port);
+		putenv(strdup(line));
+	}
+
 	const char *dagfile = argv[optind];
 
 	if(!logfilename[0]) sprintf(logfilename,"%s.makeflowlog",dagfile);
@@ -737,7 +744,6 @@ int main( int argc, char *argv[] )
 	setlinebuf(stderr);
 
 	local_queue = batch_queue_create(BATCH_QUEUE_TYPE_UNIX);
-
 	remote_queue = batch_queue_create(batch_queue_type);
 
 	if(batch_submit_options) {

@@ -13,8 +13,8 @@ and port of the master.
 
 #include "timestamp.h"
 
+#define WORK_QUEUE_DEFAULT_PORT 9123
 #define WORK_QUEUE_LINE_MAX 1024
-
 
 #define WAITFORTASK -1
 
@@ -22,8 +22,6 @@ and port of the master.
 #define WQ_RESULT_INPUT_FAIL 1
 #define WQ_RESULT_FUNCTION_FAIL 2
 #define WQ_RESULT_OUTPUT_FAIL 3
-
-
 
 /** A task description.  This structure should only be created with @ref work_queue_task_create and delete with @ref work_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.
 */
@@ -60,7 +58,7 @@ struct work_queue_stats {
 };
 
 /** Create a new work queue.
-@param port The port number to listen on, or zero to choose a default.
+@param port The port number to listen on, or zero to choose a default.  The default port is 9123, but can be overridden by the environment variable WORK_QUEUE_PORT.
 @param stoptime The time at which to return null if not yet able to be created.
 @return A new work queue, or null if it could not be created.
 */
