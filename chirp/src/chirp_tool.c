@@ -95,8 +95,6 @@ static int do_matrix_create(    int argc, char **argv );
 static int do_matrix_list(      int argc, char **argv );
 static int do_matrix_delete(    int argc, char **argv );
 
-static INT64_T do_put_recursive( const char *local_file, const char *remote_file );
-static INT64_T do_get_recursive( const char *remote_file, const char *local_file );
 static int process_command( int argc, char **argv );
 
 static int timeout=3600;
