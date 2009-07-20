@@ -22,18 +22,6 @@ See the file COPYING for details.
 #define SERVICE "host"
 #define VERSION "dttools_auth_protocol_1"
 
-int krb5_net_read( krb5_context context, int fd, void *data, int length )
-{
-  struct link *link = (struct link*)(PTRINT_T)fd;
-	return link_read(link,data,length,time(0)+60);
-}
-
-int krb5_net_write( krb5_context context, int fd, void *data, int length )
-{
-  struct link *link = (struct link*)(PTRINT_T)fd;
-	return link_write(link,data,length,time(0)+60);
-}
-
 int auth_kerberos_assert( struct link *link, time_t stoptime )
 {
 	krb5_context context;
@@ -81,7 +69,11 @@ int auth_kerberos_assert( struct link *link, time_t stoptime )
 						debug(D_AUTH,"kerberos: waiting for server");
 						if(auth_barrier(link,"yes\n",stoptime)) {
 							debug(D_AUTH,"kerberos: authenticating with server");
-							if(!krb5_sendauth(context,&auth_context,(krb5_pointer)&link,VERSION,client,server,AP_OPTS_MUTUAL_REQUIRED,&cksum,0,ccdef,&err_ret,&rep_ret,0)) {
+							int fd = link_fd(link);
+							link_nonblocking(link,0);
+							int result = krb5_sendauth(context,&auth_context,&fd,VERSION,client,server,AP_OPTS_MUTUAL_REQUIRED,&cksum,0,ccdef,&err_ret,&rep_ret,0);
+							link_nonblocking(link,1);
+							if(result==0) {
 								debug(D_AUTH,"kerberos: credentials accepted!");
 								krb5_free_ap_rep_enc_part(context,rep_ret);
 								krb5_auth_con_free(context,auth_context);
@@ -151,7 +143,11 @@ int auth_kerberos_accept( struct link *link, char **subject, time_t stoptime )
 					if(auth_barrier(link,"yes\n",stoptime)) {
 
 						debug(D_AUTH,"kerberos: receiving client credentials");
-						if(!krb5_recvauth(context,&auth_context,(krb5_pointer)&link,VERSION,principal,0,0,&ticket)) {
+						int fd = link_fd(link);
+						link_nonblocking(link,0);
+						int result = krb5_recvauth(context,&auth_context,&fd,VERSION,principal,0,0,&ticket);
+						link_nonblocking(link,1);
+						if(result==0) {
 
 							char myrealm[AUTH_SUBJECT_MAX];
 							char userrealm[AUTH_SUBJECT_MAX];
