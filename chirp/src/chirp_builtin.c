@@ -50,11 +50,11 @@ static INT64_T chirp_builtin_rmall( const char *subject, const char *path )
 	}
 }
 
-static INT64_T chirp_builtin_checksum_recursive( const char *subject, const char *path, INT64_T *bytes, INT64_T *files, INT64_T *dirs, char *digest )
+static INT64_T chirp_builtin_checksum_recursive( const char *subject, const char *path, INT64_T *bytes, INT64_T *files, INT64_T *dirs, unsigned char *digest )
 {
 	INT64_T result;
 	char subpath[CHIRP_PATH_MAX];
-	char subdigest[MD5_DIGEST_LENGTH];
+	unsigned char subdigest[MD5_DIGEST_LENGTH];
 	struct chirp_stat info;
 	int i;
 
@@ -85,7 +85,7 @@ static INT64_T chirp_builtin_checksum_recursive( const char *subject, const char
 			if(result<0) break;
 
 			if(digest) {
-				md5_update(&context,list[i],strlen(list[i]));
+				md5_update(&context,(unsigned char*)list[i],strlen(list[i]));
 				md5_update(&context,subdigest,sizeof(subdigest));
 			}
 		}
@@ -94,7 +94,7 @@ static INT64_T chirp_builtin_checksum_recursive( const char *subject, const char
 
 		if(digest) md5_final(digest,&context);
 
-		(*dirs++);
+		(*dirs)++;
 		return result;
 	} else if(S_ISREG(info.cst_mode)) {
 		(*bytes)+=info.cst_size;

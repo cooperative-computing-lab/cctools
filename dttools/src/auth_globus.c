@@ -49,7 +49,7 @@ static int write_token(void *link, void *buf, size_t size)
 	char line[AUTH_LINE_MAX];
 	time_t stoptime = time(0)+3600;
 
-	sprintf(line,"%d\n",size);
+	sprintf(line,"%d\n",(int)size);
 	link_write(link,line,strlen(line),stoptime);
 	if(link_write(link,buf,size,stoptime)==size) {
 		return GLOBUS_SUCCESS;

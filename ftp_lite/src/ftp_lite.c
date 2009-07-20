@@ -839,9 +839,12 @@ static int ftp_lite_send_gss( void *arg, void *buffer, size_t length )
 {
 	struct ftp_lite_server *s = (struct ftp_lite_server *)arg;
 	char line[FTP_LITE_LINE_MAX];
+	int ilength = length;
+
 	sprintf(line,"MIC ");
-	if(!ftp_lite_radix_encode(buffer,&line[4],&length)) return -1;
-	line[length+4] = 0;
+	if(!ftp_lite_radix_encode(buffer,(unsigned char*)&line[4],&ilength)) return -1;
+	line[ilength+4] = 0;
+
 	if(ftp_lite_send_command_raw(s,line)) {
 		return 0;
 	} else {
@@ -868,7 +871,9 @@ static int ftp_lite_get_gss( void *arg, void **buffer, size_t *length )
 	*buffer = malloc(*length+1);
 	if(!*buffer) return -1;
 
-	if(!ftp_lite_radix_decode(&line[4],*buffer,length)) return -1;
+	int ilength = *length;
+	if(!ftp_lite_radix_decode((unsigned char*)&line[4],*buffer,&ilength)) return -1;
+	*length = ilength;
 
 	return 0;
 }
@@ -877,7 +882,7 @@ static int ftp_lite_get_response_gss( struct ftp_lite_server *s, char *outbuffer
 {
 	OM_uint32 major, minor;
 	int token;
-	int length;
+	size_t length;
 	char *buffer;
 
 	major = globus_gss_assist_get_unwrap(&minor,s->context,&buffer,&length,&token,ftp_lite_get_gss,s,stderr);
@@ -891,7 +896,7 @@ static int ftp_lite_get_response_gss( struct ftp_lite_server *s, char *outbuffer
 	}
 }
 
-static int ftp_lite_get_adat( void *arg, void **outbuf, size_t *size )
+static int ftp_lite_get_adat( void *arg, void **outbuf, size_t *length )
 {	
 	char buffer[FTP_LITE_LINE_MAX];
 	struct ftp_lite_server *s = (struct ftp_lite_server *)arg;
@@ -902,14 +907,17 @@ static int ftp_lite_get_adat( void *arg, void **outbuf, size_t *size )
 	
 	if(strncmp(buffer,"335 ADAT=",9)) return -1;
 	
-	*size = strlen(buffer)-9;
-	*outbuf = malloc(*size+1);
+	*length = strlen(buffer)-9;
+	*outbuf = malloc(*length+1);
 	if(!*outbuf) return -1;
 
-	if(!ftp_lite_radix_decode(&buffer[9],(char *)*outbuf,size)) {
+	int ilength = *length;
+	if(!ftp_lite_radix_decode((unsigned char*)&buffer[9],(unsigned char *)*outbuf,&ilength)) {
 		free(*outbuf);
 		return -1;
 	}
+
+	*length = ilength;
 
 	return 0;
 }
@@ -919,8 +927,9 @@ static int ftp_lite_put_adat( void *arg, void *buf, size_t size )
 	char buffer[FTP_LITE_LINE_MAX];
 	struct ftp_lite_server *s = (struct ftp_lite_server *)arg;
 
-	if(!ftp_lite_radix_encode((char *)buf,buffer,&size)) return -1;
-
+	int ilength = size;
+	if(!ftp_lite_radix_encode((unsigned char *)buf,(unsigned char*)buffer,&ilength)) return -1;
+	
 	ftp_lite_send_command(s,"ADAT %s",buffer);
 	return 0;
 }

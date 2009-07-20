@@ -621,7 +621,7 @@ int pfs_copyfile( const char *source, const char *target )
 	END
 }
 
-int pfs_md5( const char *path, char *digest )
+int pfs_md5( const char *path, unsigned char *digest )
 {
 	BEGIN
 	debug(D_LIBCALL,"md5 %s",path);

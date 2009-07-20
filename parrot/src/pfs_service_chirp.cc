@@ -431,7 +431,7 @@ public:
 		}
 	}
 
-	virtual int md5( pfs_name *path, char *digest )
+	virtual int md5( pfs_name *path, unsigned char *digest )
 	{
 		chirp_dircache_invalidate();
 		return chirp_global_md5(path->hostport,path->rest,digest,time(0)+pfs_master_timeout);

@@ -2420,7 +2420,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 			if(entering) {
 				char digest[16];
 				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
-				p->syscall_result = pfs_md5(path,digest);
+				p->syscall_result = pfs_md5(path,(unsigned char*)digest);
 				if(p->syscall_result>=0) {
 					tracer_copy_out(p->tracer,digest,POINTER(args[1]),sizeof(digest));
 				}

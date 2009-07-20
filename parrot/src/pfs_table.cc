@@ -1628,7 +1628,7 @@ int pfs_table::copyfile_slow( const char *source, const char *target )
 	}
 }
 
-int pfs_table::md5( const char *path, char *digest )
+int pfs_table::md5( const char *path, unsigned char *digest )
 {
 	pfs_name pname;
 	int result;
@@ -1649,7 +1649,7 @@ int pfs_table::md5( const char *path, char *digest )
 	return result;
 }
 
-int pfs_table::md5_slow( const char *path, char *digest )
+int pfs_table::md5_slow( const char *path, unsigned char *digest )
 {
 	md5_context_t context;
 	pfs_file *file;
@@ -1680,7 +1680,7 @@ int pfs_table::md5_slow( const char *path, char *digest )
 	free(buffer);
 
 	if(result==0) {
-		md5_final((unsigned char*)digest,&context);
+		md5_final(digest,&context);
 		return 0;
 	} else {
 		return -1;

@@ -24,13 +24,13 @@ See the file COPYING for details.
 
 int krb5_net_read( krb5_context context, int fd, void *data, int length )
 {
-	struct link *link = (struct link*)fd;
+  struct link *link = (struct link*)(PTRINT_T)fd;
 	return link_read(link,data,length,time(0)+60);
 }
 
 int krb5_net_write( krb5_context context, int fd, void *data, int length )
 {
-	struct link *link = (struct link*)fd;
+  struct link *link = (struct link*)(PTRINT_T)fd;
 	return link_write(link,data,length,time(0)+60);
 }
 

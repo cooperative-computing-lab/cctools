@@ -53,7 +53,7 @@ INT64_T chirp_global_lchown( const char *host, const char *path, INT64_T uid, IN
 INT64_T chirp_global_truncate( const char *host, const char *path, INT64_T length, time_t stoptime );
 INT64_T chirp_global_utime( const char *host, const char *path, time_t actime, time_t modtime, time_t stoptime );
 INT64_T chirp_global_thirdput( const char *host, const char *path, const char *thirdhost, const char *thirdpath, time_t stoptime );
-INT64_T chirp_global_md5( const char *host, const char *path, char *digest, time_t stoptime );
+INT64_T chirp_global_md5( const char *host, const char *path, unsigned char *digest, time_t stoptime );
 INT64_T chirp_global_mkalloc( const char *host, const char *path, INT64_T size, INT64_T mode, time_t stoptime );
 INT64_T chirp_global_lsalloc( const char *host, const char *path, char *alloc_path, INT64_T *size, INT64_T *inuse , time_t stoptime );
 

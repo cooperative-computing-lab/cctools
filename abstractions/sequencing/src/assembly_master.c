@@ -238,7 +238,7 @@ static struct hash_table* build_sequence_library(const char* filename)
 		fprintf(stderr, "Error reading sequence file. Only read %d items: %s", num_items, line);
 		exit(1);
 	}
-	s.metadata = strdup(tmp+1);
+	s.metadata = (unsigned char*) strdup(tmp+1);
 	s.sequence_data = malloc(s.num_bytes);
 	if(s.sequence_data) {
 	    if(fread(s.sequence_data,1,s.num_bytes,infile) == s.num_bytes) {
@@ -291,6 +291,7 @@ static int handle_done_task(struct work_queue_task *t) {
     return 1;
 }
 
+/*
 static int get_task_ratio(  struct work_queue *q ) {
     struct work_queue_stats info;
     int i,j;
@@ -303,6 +304,7 @@ static int get_task_ratio(  struct work_queue *q ) {
     j = (info.tasks_waiting);
     return i-j;
 }
+*/
 
 static int task_consider( void* taskfiledata, int size )
 {
@@ -414,8 +416,6 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
     struct sequence* s2;
 
     int alignment_flag;
-	int start_pos_1;
-	int start_pos_2;
 
     int already_done = hash_table_size(t);
     char *key;

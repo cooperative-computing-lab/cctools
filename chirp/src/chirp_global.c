@@ -825,7 +825,7 @@ INT64_T chirp_global_thirdput( const char *host, const char *path, const char *t
 	}
 }
 
-INT64_T chirp_global_md5( const char *host, const char *path, char *digest, time_t stoptime )
+INT64_T chirp_global_md5( const char *host, const char *path, unsigned char *digest, time_t stoptime )
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];

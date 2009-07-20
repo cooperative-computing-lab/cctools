@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <unistd.h>
 
-int parrot_md5( const char *filename, char *digest )
+int parrot_md5( const char *filename, unsigned char *digest )
 {
 #ifdef CCTOOLS_CPU_I386
 	return syscall(SYSCALL32_parrot_md5,filename,digest);
@@ -19,7 +19,7 @@ int parrot_md5( const char *filename, char *digest )
 int main( int argc, char *argv[] )
 {
 	int i;
-	char digest[16];
+	unsigned char digest[16];
 
 	if(argc<2) {
 		printf("use: parrot_md5 <file> ...\n");

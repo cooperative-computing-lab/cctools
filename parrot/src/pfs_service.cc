@@ -247,7 +247,7 @@ int pfs_service::thirdput( pfs_name *source, pfs_name *target )
 	return -1;
 }
 
-int pfs_service::md5( pfs_name *source, char *digest )
+int pfs_service::md5( pfs_name *source, unsigned char *digest )
 {
 	errno = ENOSYS;
 	return -1;

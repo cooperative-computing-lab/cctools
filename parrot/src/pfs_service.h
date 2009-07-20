@@ -56,7 +56,7 @@ public:
 	virtual int putfile( pfs_name *source, pfs_name *target );
 	virtual int getfile( pfs_name *source, pfs_name *target );
 	virtual int thirdput( pfs_name *source, pfs_name *target );
-	virtual int md5( pfs_name *source, char *digest );
+	virtual int md5( pfs_name *source, unsigned char *digest );
 };
 
 

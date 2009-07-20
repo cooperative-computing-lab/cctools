@@ -97,7 +97,7 @@ int		pfs_whoami( const char *path, char *buf, int size );
 int		pfs_getacl( const char *path, char *buf, int size );
 int		pfs_setacl( const char *path, const char *subject, const char *rights );
 int		pfs_copyfile( const char *source, const char *target );
-int		pfs_md5( const char *path, char *digest );
+int		pfs_md5( const char *path, unsigned char *digest );
 
 int		pfs_get_real_fd( int fd );
 int		pfs_get_full_name( int fd, char *name );

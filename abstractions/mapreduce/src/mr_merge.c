@@ -35,8 +35,8 @@ static int merge_streams( FILE *lfp, FILE *rfp, FILE *ofp ) {
 	int lready = 0, rready = 0;
 
 	do {
-		if (!lready) lready = (int)fgets(lbuffer, MR_MAX_STRLEN, lfp);
-		if (!rready) rready = (int)fgets(rbuffer, MR_MAX_STRLEN, rfp);
+		if (!lready) lready = fgets(lbuffer, MR_MAX_STRLEN, lfp)!=0;
+		if (!rready) rready = fgets(rbuffer, MR_MAX_STRLEN, rfp)!=0;
 
 		if (lready && rready) {
 			if (strncmp(lbuffer, rbuffer, MR_MAX_STRLEN) <= 0) {
@@ -48,11 +48,11 @@ static int merge_streams( FILE *lfp, FILE *rfp, FILE *ofp ) {
 			}
 		} else if (lready && !rready) {
 			fputs(lbuffer, ofp);
-			while ((lready = (int)fgets(lbuffer, MR_MAX_STRLEN, lfp)))
+			while ((lready = fgets(lbuffer, MR_MAX_STRLEN, lfp)!=0))
 				fputs(lbuffer, ofp);
 		} else if (!lready && rready) {
 			fputs(rbuffer, ofp);
-			while ((rready = (int)fgets(rbuffer, MR_MAX_STRLEN, rfp)))
+			while ((rready = fgets(rbuffer, MR_MAX_STRLEN, rfp)!=0))
 				fputs(rbuffer, ofp);
 		}
 	} while (lready || rready);
