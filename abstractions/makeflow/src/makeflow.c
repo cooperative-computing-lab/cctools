@@ -287,6 +287,29 @@ static void filename_error( struct dag *d, const char *filename )
 	exit(1);
 }
 
+void dag_parse_assignment( struct dag *d, char *line )
+{
+	char *name = line;
+	char *eq = strchr(line,'=');
+	char *value=eq+1;
+
+	// advance value to the first non-whitespace
+	while(*value && isspace(*value)) value++;
+
+	// set = and any preceding whitespace to null
+	do {
+		*eq=0;
+		eq--;
+	} while(eq>line && isspace(*eq));
+
+	if(eq==name) {
+		fprintf(stderr,"makeflow: error at %s:%d: variable assignment has no name!\n",d->filename,d->linenum);
+		exit(1);
+	}
+
+	setenv(name,value,1);
+}
+
 struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 {
 	char *line;
@@ -310,7 +333,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 
 		if(eq) {
 			if(!colon || colon>eq) {
-				putenv(line);
+				dag_parse_assignment(d,line);
 				continue;
 			}
 		}
