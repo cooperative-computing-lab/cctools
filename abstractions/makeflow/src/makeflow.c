@@ -33,6 +33,7 @@ typedef enum {
 	DAG_NODE_STATE_COMPLETE=2,
 	DAG_NODE_STATE_FAILED=3,
 	DAG_NODE_STATE_ABORTED=4,
+	DAG_NODE_STATE_MAX=5
 } dag_node_state_t;
 
 struct dag {
@@ -48,6 +49,7 @@ struct dag {
 	int local_jobs_max;
 	int remote_jobs_running;
 	int remote_jobs_max;
+	int nodeid_counter;
 };
 
 struct dag_file {
@@ -129,13 +131,32 @@ void dag_node_add_target_file( struct dag_node *n, const char *filename )
 	n->target_files = dag_file_create(filename,n->target_files);
 }
 
+void dag_count_states( struct dag *d, int states[DAG_NODE_STATE_MAX] )
+{
+	struct dag_node *n;
+	int i;
+
+	for(i=0;i<DAG_NODE_STATE_MAX;i++) {
+		states[i] = 0;
+	}
+
+	for(n=d->nodes;n;n=n->next) {
+		states[n->state]++;
+	}	
+}
+
 void dag_node_state_change( struct dag *d, struct dag_node *n, int newstate )
 {
+	int states[DAG_NODE_STATE_MAX];
+
 	debug(D_DEBUG,"node %d %s -> %s\n",n->nodeid,dag_node_state_name(n->state),dag_node_state_name(newstate));
-	fprintf(d->logfile,"%u %d %d %d\n",(unsigned)time(0),n->nodeid,newstate,n->jobid);
+
+	n->state = newstate;
+	dag_count_states(d,states);
+
+	fprintf(d->logfile,"%u %d %d %d %d %d %d %d %d %d\n",(unsigned)time(0),n->nodeid,newstate,n->jobid,states[0],states[1],states[2],states[3],states[4],d->nodeid_counter);
 	fflush(d->logfile);
 	fsync(fileno(d->logfile));
-	n->state = newstate;
 }
 
 void dag_abort_all( struct dag *d )
@@ -268,8 +289,6 @@ static void filename_error( struct dag *d, const char *filename )
 
 struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 {
-	static int nodeid_counter = 0;
-
 	char *line;
 	char *eq;
 	char *colon;
@@ -308,7 +327,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 	memset(n,0,sizeof(*n));
 	n->linenum = d->linenum;
 	n->state = DAG_NODE_STATE_WAITING;
-	n->nodeid = nodeid_counter++;
+	n->nodeid = d->nodeid_counter++;
 	n->local_job = 0;
 
 	*colon = 0;
@@ -365,6 +384,7 @@ struct dag * dag_create( const char *filename )
 	d->local_jobs_max = 1;
 	d->remote_jobs_running = 0;
 	d->remote_jobs_max = 1000;
+	d->nodeid_counter = 0;
 
 	struct dag_node *n,*m;
 	struct dag_file *f;
