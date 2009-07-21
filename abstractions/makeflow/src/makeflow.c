@@ -259,6 +259,13 @@ char * dag_readline( struct dag *d, FILE *file )
 	return 0;
 }
 
+static void filename_error( struct dag *d, const char *filename )
+{
+	fprintf(stderr,"makeflow: Error at %s:%d: %s contains a slash.\n",d->filename,d->linenum,filename);
+	fprintf(stderr,"makeflow: Rules can only refer to files in the current directory.\n");
+	exit(1);
+}
+
 struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 {
 	static int nodeid_counter = 0;
@@ -310,12 +317,14 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 
 	filename = strtok(targetfiles," \t\n");
 	while(filename) {
+		if(strchr(filename,'/')) filename_error(d,filename);
 		dag_node_add_target_file(n,filename);
 		filename = strtok(0," \t\n");
 	}
 
 	filename = strtok(sourcefiles," \t\n");
 	while(filename) {
+		if(strchr(filename,'/')) filename_error(d,filename);
 		dag_node_add_source_file(n,filename);
 		filename = strtok(0," \t\n");
 	}
