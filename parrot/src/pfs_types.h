@@ -67,8 +67,8 @@ extern gid_t pfs_gid;
 	(b).st_ino = (a).st_ino;\
 	(b).st_mode = (a).st_mode;\
 	(b).st_nlink = (a).st_nlink;\
-	(b).st_uid = pfs_uid;\
-	(b).st_gid = pfs_gid;\
+	(b).st_uid = (a).st_uid;\
+	(b).st_gid = (a).st_gid;\
 	(b).st_rdev = (a).st_rdev;\
 	(b).st_size = (a).st_size;\
 	(b).st_blksize = (a).st_blksize;\

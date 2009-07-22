@@ -13,6 +13,7 @@ See the file COPYING for details.
 
 extern "C" {
 #include "debug.h"
+#include "hash_table.h"
 }
 
 #include "hdfs.h"
@@ -25,6 +26,8 @@ extern "C" {
 #include <errno.h>
 #include <utime.h>
 #include <dlfcn.h>
+#include <pwd.h>
+#include <grp.h>
 #include <sys/statfs.h>
 
 extern uid_t pfs_uid;
@@ -154,10 +157,20 @@ public:
 class pfs_service_hdfs : public pfs_service {
 private:
 	struct hdfs_services hdfs;
+	struct hash_table *uid_table;
+	struct hash_table *gid_table;
+
 	bool is_initialized;
 public:
 	pfs_service_hdfs() {
+		uid_table = hash_table_create(0, 0);
+		gid_table = hash_table_create(0, 0);
 		is_initialized = false;
+	}
+
+	~pfs_service_hdfs() {
+		hash_table_delete(uid_table);
+		hash_table_delete(gid_table);
 	}
 
 	int initialize() {
@@ -173,6 +186,44 @@ public:
 		}
 
 		HDFS_END
+	}
+
+	int get_uid_from_name( const char *name ) {
+		int key;
+		
+		key = (int)hash_table_lookup(uid_table, name);
+		if (key) {
+			return key;
+		} else {
+			struct passwd *owner;
+
+			owner = getpwnam(name);
+			if (owner) {
+				hash_table_insert(uid_table, name, (void*)owner->pw_uid);
+				return owner->pw_uid;
+			} else {
+				return -1;
+			}
+		}
+	}
+	
+	int get_gid_from_name( const char *name ) {
+		int key;
+		
+		key = (int)hash_table_lookup(gid_table, name);
+		if (key) {
+			return key;
+		} else {
+			struct group *group;
+
+			group = getgrnam(name);
+			if (group) {
+				hash_table_insert(gid_table, name, (void*)group->gr_gid);
+				return group->gr_gid;
+			} else {
+				return -1;
+			}
+		}
 	}
 
 	virtual void * connect( pfs_name *name ) {
@@ -280,6 +331,9 @@ public:
 
 	virtual int stat( pfs_name *name, struct pfs_stat *buf ) {
 		int result;
+		int file_uid;
+		int file_gid;
+
 		hdfsFileInfo *file_info = 0;
 		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
 		
@@ -298,10 +352,20 @@ public:
 				buf->st_mode = S_IFREG;
 			}
 				
-			buf->st_mode |= HDFS_STAT_MODE;
+			buf->st_mode |= file_info->mPermissions;
 			buf->st_size  = file_info->mSize;
-			buf->st_atime = file_info->mLastMod;
 			buf->st_mtime = file_info->mLastMod;
+			buf->st_atime = file_info->mLastAccess;
+			
+			file_uid = get_uid_from_name(file_info->mOwner);
+			if (file_uid >= 0) {
+				buf->st_uid = file_uid;
+			}
+
+			file_gid = get_gid_from_name(file_info->mGroup);
+			if (file_gid >= 0) {
+				buf->st_gid = file_gid;
+			}
 		
 			hdfs.free_stat(file_info, 1);
 			result = 0;
