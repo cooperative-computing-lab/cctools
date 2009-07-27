@@ -78,7 +78,7 @@ void dag_print( struct dag *d )
 
 	printf("digraph {\n");
 
-	printf("node [shape=ellipse,style=filled,fillcolor=green];\n");
+	printf("node [shape=ellipse];\n");
 
 	for(n=d->nodes;n;n=n->next) {
 		strcpy(name,n->command);
@@ -86,7 +86,7 @@ void dag_print( struct dag *d )
 		printf("N%d [label=\"%s\"];\n",n->nodeid,label);
 	}
 
-	printf("node [shape=box,style=filled,fillcolor=skyblue];\n");
+	printf("node [shape=box];\n");
 
 	for(n=d->nodes;n;n=n->next) {
 		for(f=n->source_files;f;f=f->next) {
