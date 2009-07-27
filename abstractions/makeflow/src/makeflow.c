@@ -406,7 +406,7 @@ struct dag * dag_create( const char *filename )
 	d->local_jobs_running = 0;
 	d->local_jobs_max = 1;
 	d->remote_jobs_running = 0;
-	d->remote_jobs_max = 1000;
+	d->remote_jobs_max = 100;
 	d->nodeid_counter = 0;
 
 	struct dag_node *n,*m;
@@ -645,7 +645,7 @@ static void show_help(const char *cmd)
 	printf(" -c             Clean up: remove logfile and all targets.\n");
 	printf(" -T <type>      Batch system type: condor, sge, unix, wq.   (default is unix)\n");
 	printf(" -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
-	printf(" -J <#>         Max number of remote jobs to run at once.   (default is 1000)\n");
+	printf(" -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
 	printf(" -D             Display the Makefile as a Dot graph.\n");
 	printf(" -B <options>   Add these options to all batch submit files.\n");
 	printf(" -p <port>      Port number to use with work queue.         (default is %d)\n",WORK_QUEUE_DEFAULT_PORT);
@@ -762,7 +762,7 @@ int main( int argc, char *argv[] )
 		if(batch_queue_type==BATCH_QUEUE_TYPE_UNIX) {
 			d->remote_jobs_max = load_average_get_cpus();
 		} else {
-			d->remote_jobs_max = 1000;
+			d->remote_jobs_max = 100;
 		}
 	}
 
