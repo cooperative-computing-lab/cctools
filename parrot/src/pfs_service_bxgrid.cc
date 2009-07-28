@@ -189,37 +189,35 @@ int bxgrid_bvf_stat( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, int id
 
 int bxgrid_lookup_replicaid( MYSQL *mysql_cxn, int fileid, int nid )
 {
-#define BXGRID_REPLICAID_QUERY "SELECT replicaid FROM replicas WHERE fileid = '%d'"
-#define BXGRID_REPLICAID_COUNT "SELECT COUNT(replicaid) FROM replicas WHERE fileid = '%d'"
+#define BXGRID_REPLICAID_QUERY "SELECT replicaid FROM replicas WHERE fileid = '%d' ORDER BY %s"
 	MYSQL_RES *rep_res;
 	MYSQL_ROW  rep_row;
 	int nreplicas;
 	int replicaid;
 
-	BXGRID_QUERY_AND_CHECK(rep_res, mysql_cxn, BXGRID_REPLICAID_COUNT, fileid);
-	BXGRID_FETCH_AND_CHECK(rep_row, rep_res);
+	if (nid < 0) {
+		BXGRID_QUERY_AND_CHECK(rep_res, mysql_cxn, BXGRID_REPLICAID_QUERY, fileid, "RAND()");
+	} else {
+		BXGRID_QUERY_AND_CHECK(rep_res, mysql_cxn, BXGRID_REPLICAID_QUERY, fileid, "replicaid");
+	}
 
-	nreplicas = strtol(rep_row[0], NULL, 10);
+	nreplicas = mysql_num_rows(rep_res);
+	debug(D_BXGRID, "fileid %d has %d replicas", fileid, nreplicas);
 	if (nreplicas == 0) return -1;
-	mysql_free_result(rep_res);
 
-	BXGRID_QUERY_AND_CHECK(rep_res, mysql_cxn, BXGRID_REPLICAID_QUERY, fileid);
 	BXGRID_FETCH_AND_CHECK(rep_row, rep_res);
-
-	if (nid < 0) nid = rand() % nreplicas;
-
 	for (int i = 0; i < nid; i++) {
 		BXGRID_FETCH_AND_CHECK(rep_row, rep_res);
 	}
-	
 	replicaid = strtol(rep_row[0], NULL, 10);
+
 	mysql_free_result(rep_res);
 	return replicaid;
 }
 
 int bxgrid_lookup_replica_path( MYSQL *mysql_cxn, int replicaid, char *host, char *path)
 {
-#define BXGRID_REPLICA_PATH_QUERY "SELECT host, path FROM replicas WHERE replicaid= '%d'"
+#define BXGRID_REPLICA_PATH_QUERY "SELECT host, path FROM replicas WHERE replicaid = '%d'"
 	MYSQL_RES *rep_res;
 	MYSQL_ROW  rep_row;
 
@@ -251,10 +249,13 @@ pfs_file *bxgrid_bvf_open( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, 
 	}
 
 	do {
+		debug(D_BXGRID, "opening fileid %d using replicaid %d", fileid, replicaid);
 		if (bxgrid_lookup_replica_path(mysql_cxn, replicaid, host, path) >= 0) {
 			struct chirp_file *cfile;
 			cfile = chirp_global_open(host, path, flags, mode, time(0)+pfs_master_timeout);
-			return new pfs_file_bxgrid(name, cfile);
+			if (cfile) {
+				return new pfs_file_bxgrid(name, cfile);
+			}
 		}
 
 		if (fileid >= 0) {
