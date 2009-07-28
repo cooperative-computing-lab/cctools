@@ -33,6 +33,7 @@ case "$build_cpu" in
 esac
 
 potential_packages="dttools ftp_lite chirp ftsh"
+pfs_optional_services=""
 
 if [ -d parrot -a $build_sys = LINUX ]
 then
@@ -521,7 +522,7 @@ if [ $config_mysql_path != no ] && check_file ${mysql_path}/include/mysql/mysql.
 then
 	if [ ${mysql_path} != /usr ]
 	then
-		ccflags="${ccflags} -I${mysql_path}/include"
+		ccflags="${ccflags} -I${mysql_path}/include -DHAS_MYSQL"
 		ldflags="${ldflags} -L${mysql_path}/lib/mysql"
 	fi
 
@@ -571,6 +572,9 @@ then
 else
     doxygen=true
 fi
+	
+optional_pfs_service bxgrid mysql
+optional_pfs_service hdfs   libhdfs java
 
 ccflags="${ccflags} -DINSTALL_PATH=\\\"${install_path}\\\" -g -D_REENTRANT -D_GNU_SOURCE -DBUILD_USER=\\\"$build_user\\\" -DBUILD_HOST=\\\"$build_host\\\" -DCCTOOLS_VERSION_MAJOR=$major -DCCTOOLS_VERSION_MINOR=$minor -DCCTOOLS_VERSION_MICRO=$micro -DCCTOOLS_OPSYS_${build_sys} -DCCTOOLS_CPU_${build_cpu}"
 
@@ -609,6 +613,7 @@ CCTOOLS_YACC=bison
 CCTOOLS_LEX=flex
 CCTOOLS_DOXYGEN=${doxygen}
 
+PFS_OPTIONAL_SERVICES=${pfs_optional_services}
 EOF
 
 echo ""

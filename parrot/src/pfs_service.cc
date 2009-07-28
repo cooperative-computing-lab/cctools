@@ -311,6 +311,11 @@ pfs_service * pfs_service_lookup( const char *name )
                 extern pfs_service *pfs_service_hdfs;
 		return pfs_service_hdfs;
 #endif
+#ifdef HAS_BXGRID
+        } else if(!strcmp(name,"bxgrid")) {
+                extern pfs_service *pfs_service_bxgrid;
+		return pfs_service_bxgrid;
+#endif
 	} else {
 		return 0;
 	}

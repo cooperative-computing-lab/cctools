@@ -146,6 +146,29 @@ optional_file()
 	fi
 }
 
+optional_pfs_service()
+{
+	service=$1
+	shift 1
+
+	echo -n "include pfs_service_${service}..."
+
+	for lib in $@; do
+		if ! echo $ccflags | grep "$lib" > /dev/null 2>&1 ; then
+			echo "no"
+			return 1
+		fi
+	done
+
+	echo "yes"
+	ccflag="HAS_$(echo ${service} | tr [a-z] [A-Z])"
+	if ! echo $ccflags | grep $ccflag > /dev/null 2>&1 ; then
+	    ccflags="${ccflags} -D${ccflag}"
+	fi
+	pfs_optional_services="${pfs_optional_services} pfs_service_${service}.o"
+	return 0
+}
+
 check_gnu_make()
 {
 	if check_path $1

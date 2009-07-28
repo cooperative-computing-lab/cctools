@@ -32,7 +32,7 @@ static int debug_fd = 2;
 static char *debug_file = 0;
 static int debug_file_size = 10485760;
 static const char *program_name = "";
-static int debug_flags = D_NOTICE;
+static INT64_T debug_flags = D_NOTICE;
 static pid_t (*debug_getpid)() = getpid;
 
 struct flag_info {
@@ -68,6 +68,7 @@ static struct flag_info table[] = {
 	{ "cache",    D_CACHE },
 	{ "poll",     D_POLL },
 	{ "hdfs",     D_HDFS },
+	{ "bxgrid",   D_BXGRID },
 	{ "remote",   D_REMOTE },
 	{ "debug",    D_DEBUG },
 	{ "login",    D_LOGIN },
@@ -110,7 +111,7 @@ void debug_flags_print( FILE *stream )
 	}
 }
 
-static const char * flag_to_name( int flag )
+static const char * flag_to_name( INT64_T flag )
 {
 	struct flag_info *i;
 
@@ -121,7 +122,7 @@ static const char * flag_to_name( int flag )
 	return "debug";
 }
 
-static void do_debug( int is_fatal, int flags, const char *fmt, va_list args )
+static void do_debug( int is_fatal, INT64_T flags, const char *fmt, va_list args )
 {
 	char newfmt[65536];
 	char buffer[65536];
@@ -164,7 +165,7 @@ static void do_debug( int is_fatal, int flags, const char *fmt, va_list args )
 	full_write(debug_fd,buffer,length);
 }
 
-void debug( int flags, const char *fmt, ... )
+void debug( INT64_T flags, const char *fmt, ... )
 {
 	va_list args;
 	va_start(args,fmt);
@@ -247,13 +248,12 @@ void debug_config_getpid( pid_t (*getpidfunc)() )
 
 int debug_flags_clear()
 {
-	int result = debug_flags;
+	INT64_T result = debug_flags;
 	debug_flags = 0;
 	return result;	
-	debug_flags = 0;
 }
 
-void debug_flags_restore( int fl )
+void debug_flags_restore( INT64_T fl )
 {
 	debug_flags = fl;
 }
