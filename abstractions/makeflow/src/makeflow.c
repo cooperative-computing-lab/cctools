@@ -18,6 +18,7 @@
 
 static int dag_abort_flag = 0;
 static int dag_failed_flag = 0;
+static int dag_submit_timeout = 3600;
 
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
 static struct batch_queue *local_queue = 0;
@@ -466,7 +467,25 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 
 	batch_queue_set_options(thequeue,getenv("BATCH_OPTIONS"));
 
-	n->jobid = batch_job_submit_simple(thequeue,n->command,input_files,output_files);
+	time_t stoptime = time(0) + dag_submit_timeout;
+	int waittime = 1;
+
+	while(1) {
+		n->jobid = batch_job_submit_simple(thequeue,n->command,input_files,output_files);
+		if(n->jobid>=0) break;
+
+		fprintf(stderr,"makeflow: couldn't submit batch job, still trying...\n");
+
+		if(time(0)>stoptime) {
+			fprintf(stderr,"makeflow: unable to submit job after %d seconds!\n",dag_submit_timeout);
+			break;
+		}
+
+		sleep(waittime);
+		waittime *= 2;
+		if(waittime>60) waittime=60;
+	}
+
 	if(n->jobid>=0) {
 		dag_node_state_change(d,n,DAG_NODE_STATE_RUNNING);
 		if(n->local_job) {
@@ -646,9 +665,10 @@ static void show_help(const char *cmd)
 	printf(" -T <type>      Batch system type: condor, sge, unix, wq.   (default is unix)\n");
 	printf(" -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	printf(" -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
+	printf(" -p <port>      Port number to use with work queue.         (default is %d)\n",WORK_QUEUE_DEFAULT_PORT);
 	printf(" -D             Display the Makefile as a Dot graph.\n");
 	printf(" -B <options>   Add these options to all batch submit files.\n");
-	printf(" -p <port>      Port number to use with work queue.         (default is %d)\n",WORK_QUEUE_DEFAULT_PORT);
+	printf(" -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n",dag_submit_timeout);
 	printf(" -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
 	printf(" -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
 	printf(" -A             Disable the check for AFS. (experts only.)\n");;
