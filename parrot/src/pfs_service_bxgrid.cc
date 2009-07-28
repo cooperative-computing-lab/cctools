@@ -435,7 +435,7 @@ public:
 	}
 
 	virtual int is_seekable() {
-		return 0;
+		return 1;
 	}
 };
 
