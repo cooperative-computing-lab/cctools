@@ -799,6 +799,8 @@ int  link_poll( struct link_info *links, int nlinks, int msec )
 	int i;
 	int result;
 
+	memset(fds,0,nlinks*sizeof(struct pollfd));
+
 	for(i=0;i<nlinks;i++) {
 		fds[i].fd     = links[i].link->fd;
 		fds[i].events = link_to_poll(links[i].events);
@@ -811,6 +813,8 @@ int  link_poll( struct link_info *links, int nlinks, int msec )
 			links[i].revents = poll_to_link(fds[i].revents);
 		}
 	}
+
+	free(fds);
 
 	return result;
 }
