@@ -385,7 +385,9 @@ int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const c
 	else
 	    sprintf(full_command,"%s %s",cmd,args);
 	
-	t = work_queue_task_create(cmd);
+	t = work_queue_task_create(full_command);
+
+	free(full_command);
 
 	if(infile) work_queue_task_specify_input_file(t,infile,infile);
 	if(cmd) work_queue_task_specify_input_file(t,cmd,cmd);
