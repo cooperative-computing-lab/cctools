@@ -268,10 +268,9 @@ then
 	fi
 	
 	ccflags="${ccflags} -DHAS_LIBREADLINE"
-	ldflags="${ldflags} -lreadline"
+	ldflags="${ldflags} -lreadline -lncurses"
 	
 	optional_library history ${readline_path}/lib
-	optional_library ncurses /usr/lib
 else
 	echo "*** skipping readline..."
 fi
