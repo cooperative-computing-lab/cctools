@@ -19,6 +19,7 @@
 static int dag_abort_flag = 0;
 static int dag_failed_flag = 0;
 static int dag_submit_timeout = 3600;
+static int dag_retry_flag = 0;
 
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
 static struct batch_queue *local_queue = 0;
@@ -579,8 +580,12 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 
 	if(job_failed) {
 		dag_node_state_change(d,n,DAG_NODE_STATE_FAILED);
-		dag_failed_flag = 1;
-		return;
+		if(dag_retry_flag || info->exit_code==101) {
+			fprintf(stderr,"makeflow: will retry failed job %s\n",n->command);
+			dag_node_state_change(d,n,DAG_NODE_STATE_WAITING);
+		} else {
+			dag_failed_flag = 1;
+		}
 	} else {
 		dag_node_state_change(d,n,DAG_NODE_STATE_COMPLETE);
 	}
@@ -669,6 +674,7 @@ static void show_help(const char *cmd)
 	printf(" -D             Display the Makefile as a Dot graph.\n");
 	printf(" -B <options>   Add these options to all batch submit files.\n");
 	printf(" -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n",dag_submit_timeout);
+	printf(" -R             Automatically retry failed batch jobs.\n");
 	printf(" -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
 	printf(" -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
 	printf(" -A             Disable the check for AFS. (experts only.)\n");;
@@ -696,7 +702,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "Ap:cd:DT:iB:l:L:j:J:o:v")) != (char) -1) {
+	while((c = getopt(argc, argv, "Ap:cd:DT:iB:S:Rl:L:j:J:o:v")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -715,6 +721,12 @@ int main( int argc, char *argv[] )
 			break;
 		case 'D':
 			display_mode = 1;
+			break;
+		case 'S':
+			dag_submit_timeout = atoi(optarg);
+			break;
+		case 'R':
+			dag_retry_flag = 1;
 			break;
 		case 'j':
 			explicit_local_jobs_max = atoi(optarg);
@@ -834,6 +846,9 @@ int main( int argc, char *argv[] )
 
 	dag_run(d);
 
+	batch_queue_delete(local_queue);
+	batch_queue_delete(remote_queue);
+
 	if(dag_abort_flag) {
 		fprintf(stderr,"makeflow: workflow was aborted.\n");
 		return 1;
@@ -844,6 +859,7 @@ int main( int argc, char *argv[] )
 		printf("makeflow: nothing left to do.\n");
 		return 0;
 	}
+
 }
 
 
