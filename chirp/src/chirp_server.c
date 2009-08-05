@@ -88,6 +88,7 @@ static int max_job_wait_timeout = 300;
 static int did_explicit_auth = 0;
 static int max_child_procs = 0;
 static int total_child_procs = 0;
+static int exit_if_parent_fails = 0;
 
 struct chirp_stats *global_stats = 0;
 struct chirp_stats *local_stats = 0;
@@ -115,6 +116,7 @@ static void show_help( const char *cmd )
 	printf(" -d <flag>   Enable debugging for this sybsystem\n");
 	printf(" -c <dir>    Challenge directory for filesystem authentication.\n");
 	printf(" -C          Do not create a core dump, even due to a crash.\n");
+	printf(" -E          Exit if parent process dies.\n");
 	printf(" -F <size>   Leave this much space free in the filesystem.\n");
 	printf(" -G <url>    Base url for group lookups. (default: disabled)\n");
 	printf(" -h          This message.\n");
@@ -294,7 +296,7 @@ int main( int argc, char *argv[] )
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c_input = getopt( argc,argv,"A:a:c:CF:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:")) != -1 ) {
+	while((c_input = getopt( argc,argv,"A:a:c:CEF:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:")) != -1 ) {
 	        c = ( char ) c_input;
 		switch(c) {
 		case 'A':
@@ -313,6 +315,9 @@ int main( int argc, char *argv[] )
 			break;
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case 'E':
+			exit_if_parent_fails = 1;
 			break;
 		case 'F':
 			minimum_space_free = string_metric_parse(optarg);
@@ -498,6 +503,13 @@ int main( int argc, char *argv[] )
 		struct link *l;
 		pid_t pid;
 
+		if(exit_if_parent_fails) {
+			if(getppid()<5) {
+				debug(D_NOTICE,"server is stopping because parent process died.");
+				exit(0);
+			}
+		}
+
 		if(time(0)>advertise_alarm) {
 			update_all_catalogs();
 			advertise_alarm = time(0)+advertise_timeout;
@@ -505,7 +517,8 @@ int main( int argc, char *argv[] )
 
 		if(max_child_procs>0) {
 			if(total_child_procs>=max_child_procs) {
-				sleep(1);
+				// Note that this will be interrupted by SIGCHILD
+				sleep(5);
 				continue;
 			}
 		}
