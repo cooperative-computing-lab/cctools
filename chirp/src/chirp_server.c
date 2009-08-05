@@ -110,37 +110,39 @@ static void show_version( const char *cmd )
 static void show_help( const char *cmd )
 {
 	printf("use: %s [options]\n",cmd);
-	printf("where options are:\n");
+	printf("The most common options are:\n");
+	printf(" -r <dir>    Root of storage directory. (default is current dir)\n");
+	printf(" -d <flag>   Enable debugging for this sybsystem\n");
+	printf(" -o <file>   Send debugging output to this file.\n");
+	printf(" -u <host>   Send status updates to this host. (default is %s)\n",CATALOG_HOST);
+	printf(" -v          Show version info.\n");
+	printf(" -h          This message.\n");
+
+	printf("\nLess common options are:\n");
 	printf(" -A <file>   Use this file as the default ACL.\n");
 	printf(" -a <method> Enable this authentication method.\n");
-	printf(" -d <flag>   Enable debugging for this sybsystem\n");
 	printf(" -c <dir>    Challenge directory for filesystem authentication.\n");
 	printf(" -C          Do not create a core dump, even due to a crash.\n");
 	printf(" -E          Exit if parent process dies.\n");
 	printf(" -F <size>   Leave this much space free in the filesystem.\n");
 	printf(" -G <url>    Base url for group lookups. (default: disabled)\n");
-	printf(" -h          This message.\n");
 	printf(" -I <addr>   Listen only on this network interface.\n");
-	printf(" -o <file>   Send debugging output to this file.\n");
 	printf(" -O <bytes>  Rotate debug file once it reaches this size.\n");
 	printf(" -n <name>   Use this name when reporting to the catalog.\n");
 	printf(" -M <count>  Set the maximum number of clients to accept at once. (default unlimited)\n");
+	printf(" -N          Disable identity boxing for execution.  (discouraged)\n");
 	printf(" -p <port>   Listen on this port (default is %d)\n",port);
 	printf(" -P <user>   Superuser for all directories. (default is none)\n");
 	printf(" -Q <size>   Enforce this root quota in software.\n");
-	printf(" -r <dir>    Root of storage directory. (default is current dir)\n");
 	printf(" -R          Read-only / read-everything mode.\n");
 	printf(" -s <time>   Abort stalled operations after this long. (default is %ds)\n",stall_timeout);
 	printf(" -S          Single process mode, do not fork.\n");
 	printf(" -t <time>   Disconnect idle clients after this time. (default is %ds)\n",idle_timeout);
 	printf(" -T <time>   Maximum time to cache group information. (default is %ds)\n",chirp_group_cache_time);
-	printf(" -u <host>   Send status updates to this host. (default is %s)\n",CATALOG_HOST);
 	printf(" -U <time>   Send status updates at this interval. (default is 5m)\n");
-	printf(" -v          Show version info.\n");
 	printf(" -w <name>   The name of this server's owner.  (default is username)\n");
 	printf(" -W <file>   Use alternate password file for unix authentication\n");
 	printf(" -X          Enable remote execution.\n");
-	printf(" -N          Disable identity boxing for execution.  (discouraged)\n");
 	printf("\n");
 	printf("Where debug flags are: ");
 	debug_flags_print(stdout);
