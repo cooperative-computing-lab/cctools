@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "macros.h"
 #include "process.h"
+#include "stringtools.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -227,12 +228,14 @@ static int setup_sge_wrapper( const char *wrapperfile )
 	if(!file) return -1;
 
 	fprintf(file,"#!/bin/sh\n");
-	fprintf(file,"logfile=status.${JOB_ID}\n");
+	fprintf(file,"logfile=sge.status.${JOB_ID}\n");
 	fprintf(file,"starttime=`date +%%s`\n");
-	fprintf(file,"eval \"$@\"\n");
-	fprintf(file,"stoptime=`date +%%s`\n");
 	fprintf(file,"cat > $logfile <<EOF\n");
 	fprintf(file,"start $starttime\n");
+	fprintf(file,"EOF\n\n");
+	fprintf(file,"eval \"$@\"\n\n");
+	fprintf(file,"stoptime=`date +%%s`\n");
+	fprintf(file,"cat >> $logfile <<EOF\n");
 	fprintf(file,"stop $? $stoptime\n");
 	fprintf(file,"EOF\n");
 	fclose(file);
@@ -245,14 +248,19 @@ static int setup_sge_wrapper( const char *wrapperfile )
 batch_job_id_t batch_job_submit_simple_sge( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
 {
 	char line[BATCH_JOB_LINE_MAX];
+	char name[BATCH_JOB_LINE_MAX];
 	batch_job_id_t jobid;
 	struct batch_job_info *info;
 
 	FILE *file;
 
-	if(setup_sge_wrapper("sgewrap")<0) return -1;
+	if(setup_sge_wrapper("sge.wrapper")<0) return -1;
 
-	sprintf(line,"qsub %s sgewrap \"%s\"",q->options_text ? q->options_text : "",cmd);
+	strcpy(name,cmd);
+	char *s = strchr(name,' ');
+	if(s) *s = 0;
+
+	sprintf(line,"qsub -o /dev/null -j y -N '%s' %s sge.wrapper \"%s\"",string_basename(name),q->options_text ? q->options_text : "",cmd);
 
 	debug(D_DEBUG,"%s",line);
 
@@ -308,7 +316,7 @@ batch_job_id_t batch_job_wait_sge( struct batch_queue *q, struct batch_job_info 
 	while(1) {
 		itable_firstkey(q->job_table);
 		while(itable_nextkey(q->job_table,&jobid,(void**)&info)) {
-			sprintf(statusfile,"status.%d",jobid);
+			sprintf(statusfile,"sge.status.%d",jobid);
 			file = fopen(statusfile,"r");
 			if(file) {
 				while(fgets(line,sizeof(line),file)) {
