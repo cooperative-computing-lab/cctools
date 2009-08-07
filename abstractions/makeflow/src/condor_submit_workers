@@ -2,7 +2,7 @@
 
 if [ X$3 = X ]
 then
-	echo "use: worker <servername> <port> <num-workers>"
+	echo "use: condor_submit_workers <servername> <port> <num-workers>"
 	exit 1
 fi
 
