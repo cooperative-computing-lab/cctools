@@ -23,5 +23,7 @@ install: all
 	install makeflow ${CCTOOLS_INSTALL_DIR}/bin
 	chmod 755 condor_submit_makeflow
 	chmod 755 condor_submit_workers
-	install condor_submit_makeflow ${CCTOOLS_INSTALL_DIR}/bin
+	chmod 755 sge_submit_workers
+	install sge_submit_workers ${CCTOOLS_INSTALL_DIR}/bin
 	install condor_submit_workers ${CCTOOLS_INSTALL_DIR}/bin
+	install condor_submit_makeflow ${CCTOOLS_INSTALL_DIR}/bin

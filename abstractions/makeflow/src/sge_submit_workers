@@ -1,0 +1,41 @@
+#!/bin/sh
+
+if [ X$3 = X ]
+then
+	echo "use: sge_submit_workers <servername> <port> <num-workers>"
+	exit 1
+fi
+
+worker=`which worker 2>/dev/null`
+if [ $? != 0 ]
+then
+	echo "$0: please add 'worker' to your PATH."
+	exit 1
+fi
+
+qsub=`which qsub 2>/dev/null`
+if [ $? != 0 ]
+then
+	echo "$0: please add 'qsub' to your PATH."
+	exit 1
+fi
+
+host=$1
+port=$2
+count=$3
+
+mkdir -p ${USER}-workers
+cd ${USER}-workers
+cp $worker .
+
+cat >worker.sh <<EOF
+#!/bin/sh
+./worker $host $port
+EOF
+
+chmod 755 worker.sh
+
+for n in `seq 1 $count`
+do
+	qsub worker.sh
+done
