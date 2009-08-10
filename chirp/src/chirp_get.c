@@ -41,7 +41,9 @@ static void show_help( const char *cmd )
 int main( int argc, char *argv[] )
 {	
 	int did_explicit_auth = 0;
+	int stdout_mode = 0;
 	const char *hostname, *source_file, *target_file;
+	char *tmp_file;
 	time_t stoptime;
 	FILE *file;
 	INT64_T result;
@@ -83,15 +85,22 @@ int main( int argc, char *argv[] )
 	hostname = argv[optind];
 	source_file = argv[optind+1];
 	target_file = argv[optind+2];
-
+	tmp_file = (char*) malloc((strlen(target_file)+5)*sizeof(char));
+	if(!tmp_file) {
+	    fprintf(stderr,"couldn't allocate memory to manage %s\n",target_file);
+	    return 1;
+	}
+	sprintf(tmp_file,"%s_tmp",target_file);
+	
 	stoptime = time(0) + timeout;
 
 	if(!strcmp(target_file,"-")) {
+		stdout_mode = 1;
 		file = stdout;
 	} else {
-		file = fopen(target_file,"w");
+		file = fopen(tmp_file,"w");
 		if(!file) {
-			fprintf(stderr,"couldn't open %s: %s\n",target_file,strerror(errno));
+			fprintf(stderr,"couldn't open temporary file %s to store new contents of %s: %s\n",tmp_file,target_file,strerror(errno));
 			return 1;
 		}
 	}
@@ -99,8 +108,21 @@ int main( int argc, char *argv[] )
 	result = chirp_reli_getfile(hostname,source_file,file,stoptime);
 	if(result<0) {
 		fprintf(stderr,"couldn't get %s:%s: %s\n",hostname,source_file,strerror(errno));
+		if(!stdout_mode) {
+			if(remove(tmp_file)) //if removing the failed tmp_file fails
+				fprintf(stderr,"couldn't remove failed temporary file %s: %s\n",tmp_file,strerror(errno));
+		}
 		return 1;
 	} else {
+		if(!stdout_mode) {
+			if(rename(tmp_file,target_file)) {
+				fprintf(stderr,"couldn't move temporary file %s to target %s: %s\n",tmp_file,target_file,strerror(errno));
+				if(remove(tmp_file)) //if removing the tmp_file fails
+					fprintf(stderr,"couldn't remove temporary file %s: %s\n",tmp_file,strerror(errno));
+				return 1;
+			}
+		}
+
 		return 0;
 	}
 }
