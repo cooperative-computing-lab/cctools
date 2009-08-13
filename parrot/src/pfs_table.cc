@@ -164,7 +164,7 @@ void pfs_table::complete_path( const char *short_path, char *full_path )
         }
 }
 
-void pfs_table::follow_symlink( const char *cname, struct pfs_name *pname )
+int pfs_table::follow_symlink( const char *cname, struct pfs_name *pname )
 {
 	struct pfs_stat rstat;
 	struct pfs_name new_pname = *pname;
@@ -197,7 +197,10 @@ void pfs_table::follow_symlink( const char *cname, struct pfs_name *pname )
 				*pname = new_pname;
 			}
 		}
+		return 1;
 	}
+
+	return 0;
 }
 
 /*
@@ -242,7 +245,6 @@ int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_
 			strcpy(pname->hostport,"localhost");
 			strcpy(pname->rest,pname->path);
 			pname->is_local = 1;
-			return 1;
 		} else {
 			string_split_path(tmp,pname->host,pname->rest);
 			if(!pname->host[0]) {
@@ -262,12 +264,17 @@ int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_
 				memmove(pname->rest,&pname->rest[1],strlen(pname->rest));
 			}
 			pname->is_local = 0;
-			/* The remote file may be a symlink to a local file (or a cached file). Do we need to follow it ? */
-			if (do_follow_symlink) {
-				follow_symlink( cname, pname );
-			}
-			return 1;
 		}
+
+		/* Enable cross service symlink resolution
+		 * FIXME: Possible security risky? */
+		if (do_follow_symlink) {
+		    if (follow_symlink(cname, pname)) {
+			strcpy(tmp, pname->path);
+			return resolve_name(tmp, pname, do_follow_symlink); 
+		    }
+		}
+		return 1;
 	}
 }
 
