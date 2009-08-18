@@ -189,7 +189,7 @@ int bxgrid_bvf_stat( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, int id
 
 int bxgrid_lookup_replicaid( MYSQL *mysql_cxn, int fileid, int nid )
 {
-#define BXGRID_REPLICAID_QUERY "SELECT replicaid FROM replicas WHERE fileid = '%d' ORDER BY %s"
+#define BXGRID_REPLICAID_QUERY "SELECT replicaid FROM replicas WHERE fileid = '%d' and state = 'OK' ORDER BY %s"
 	MYSQL_RES *rep_res;
 	MYSQL_ROW  rep_row;
 	int nreplicas;
@@ -228,6 +228,8 @@ int bxgrid_lookup_replica_path( MYSQL *mysql_cxn, int replicaid, char *host, cha
 
 	strncpy(host, rep_row[0], PFS_PATH_MAX);
 	strncpy(path, rep_row[1], PFS_PATH_MAX);
+
+	debug(D_BXGRID, "replicaid %d is on %s at %s", replicaid, host, path);
 	
 	mysql_free_result(rep_res);
 	return 0;

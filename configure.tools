@@ -151,7 +151,7 @@ optional_pfs_service()
 	service=$1
 	shift 1
 
-	echo -n "include pfs_service_${service}..."
+	echo -n "including pfs_service_${service}..."
 
 	for lib in $@; do
 		if ! echo $ccflags | grep "$lib" > /dev/null 2>&1 ; then
