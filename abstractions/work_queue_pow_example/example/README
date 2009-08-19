@@ -1,0 +1,44 @@
+--------------------------------------------------------------------------------
+pow: simple work queue math example
+--------------------------------------------------------------------------------
+
+The example included here produces mathematical equations describing
+results of results of the application of a pow function for 252 small
+computations.  The example is executed as a script (pow_example.sh)
+that will run a given pow(x,y) function a set of (x,y) pairs given in
+the file pairs.  The resulting answers are compared against a correct
+key as verification.
+
+The following will explain how to run the example, and describe the
+common execution steps included in the example script. The pow program
+used as an example here takes x and y on standard input and uses a
+simple iterative multiplication algorithm to determine the result.
+
+Setup and Execution
+-------------------
+
+The pow_example.sh script is meant to be run in-place. Once the
+CCTools have been made, it can be executed simply as:
+./pow_example.sh
+
+--First, the example script builds the pow.exe tool.
+
+--The example script then creates links to the executable "worker" in
+  the dttools/src folder and the master executable "work_queue_pow_example" 
+  in the abstractions/work_queue_pow_example/src/ folder. Thus, the 
+  example cannot be run until after the CCTools have been made 
+  successfully.
+
+--Next, the example script starts a worker running on localhost,
+  looking for a master on localhost port 9068.
+
+--The example script next starts the master process, which controls
+  the workload execution, feeding it as input the pairs to compute.
+
+--Once the master process has completed, the output is compared
+  against a correct version of the results, and the example
+  script waits for the worker to time-out.
+
+--The created files are then deleted (except for the results)
+
+--------------------------------------------------------------------------------
