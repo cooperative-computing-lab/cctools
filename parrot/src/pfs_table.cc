@@ -164,7 +164,7 @@ void pfs_table::complete_path( const char *short_path, char *full_path )
         }
 }
 
-int pfs_table::follow_symlink( const char *cname, struct pfs_name *pname )
+void pfs_table::follow_symlink( const char *cname, struct pfs_name *pname, int depth )
 {
 	struct pfs_stat rstat;
 	struct pfs_name new_pname = *pname;
@@ -193,14 +193,11 @@ int pfs_table::follow_symlink( const char *cname, struct pfs_name *pname )
 					name_to_resolve = absolute_link_target;
 				}
 			}
-			if (resolve_name(name_to_resolve, &new_pname, true)) {
+			if (resolve_name(name_to_resolve, &new_pname, true, depth + 1)) {
 				*pname = new_pname;
 			}
 		}
-		return 1;
 	}
-
-	return 0;
 }
 
 /*
@@ -211,10 +208,14 @@ in the name structure. Return true on success, false otherwise.
 */
 extern int pfs_master_timeout;
 
-int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_follow_symlink ) {
+int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_follow_symlink, int depth ) {
 	char full_logical_name[PFS_PATH_MAX];
 	char tmp[PFS_PATH_MAX];
 	pfs_resolve_t result;
+
+	if (depth > PFS_MAX_RESOLVE_DEPTH) {
+	    return ELOOP;
+	}
 
 	complete_path(cname,full_logical_name);
 
@@ -266,13 +267,9 @@ int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_
 			pname->is_local = 0;
 		}
 
-		/* Enable cross service symlink resolution
-		 * FIXME: Possible security risky? */
+		/* Enable cross service symlink resolution */
 		if (do_follow_symlink) {
-		    if (follow_symlink(cname, pname)) {
-			strcpy(tmp, pname->path);
-			return resolve_name(tmp, pname, do_follow_symlink); 
-		    }
+		    follow_symlink(cname, pname, depth + 1);
 		}
 		return 1;
 	}

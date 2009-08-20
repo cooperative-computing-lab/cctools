@@ -16,6 +16,8 @@ class pfs_file;
 class pfs_pointer;
 class pfs_service;
 
+#define PFS_MAX_RESOLVE_DEPTH	8
+
 class pfs_table : public pfs_refcount {
 public:
 	pfs_table();
@@ -97,8 +99,8 @@ public:
 	int	socketpair( int domain, int type, int protocol, int *fds );
 	int	accept( int fd, struct sockaddr *addr, int * addrlen );
 
-	int	follow_symlink( const char *cname, struct pfs_name *pname);
-	int	resolve_name( const char *cname, pfs_name *pname, bool do_follow_symlink = false );
+	void	follow_symlink( const char *cname, struct pfs_name *pname, int depth = 0 );
+	int	resolve_name( const char *cname, pfs_name *pname, bool do_follow_symlink = false, int depth = 0 );
 
 	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );
 
