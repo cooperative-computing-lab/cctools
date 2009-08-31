@@ -21,4 +21,4 @@ for f in ${HADOOP_HOME}/lib/*.jar; do
 done
 export CLASSPATH
 
-exec parrot $@
+exec $(dirname $0)/parrot $@

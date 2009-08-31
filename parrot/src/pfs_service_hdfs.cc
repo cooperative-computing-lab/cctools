@@ -30,11 +30,6 @@ extern "C" {
 #include <grp.h>
 #include <sys/statfs.h>
 
-extern uid_t pfs_uid;
-extern gid_t pfs_gid;
-extern int pfs_master_timeout;
-extern int pfs_enable_small_file_optimizations;
-
 #define HDFS_DEFAULT_PORT 9100
 
 #define HDFS_STAT_MODE (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IWOTH|S_IXOTH)
