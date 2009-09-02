@@ -730,7 +730,11 @@ int work_queue_shut_down_workers (struct work_queue* q, int n)
     struct work_queue_worker *w;
     char *key;
     int i=0;
+    if(!q)
+	return -1;
+    
     // send worker exit.
+    hash_table_firstkey( q->worker_table);
     while((n==0 || i<n) && hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 	link_printf(w->link,"exit\n");
 	remove_worker(q,w);
