@@ -36,10 +36,16 @@ static void show_help(const char *cmd)
 static void do_stat(const char *path)
 {
 	struct stat buf;
+	int result;
 
 	timer_start(OP_STAT); 
-	stat(path, &buf);
+	result = stat(path, &buf);
 	timer_stop(OP_STAT);
+
+	if (result < 0) {
+		printf("could not stat %s: %s\n", path, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
 }
 
 static void do_open(const char *path, int *fd)
@@ -57,10 +63,16 @@ static void do_open(const char *path, int *fd)
 static void do_read(int fd)
 {
 	char buffer[BUFFER_SIZE];
+	int result;
 
 	timer_start(OP_READ);
-	read(fd, buffer, BUFFER_SIZE);
+	result = read(fd, buffer, BUFFER_SIZE);
 	timer_stop(OP_READ);
+
+	if (result < 0) {
+		printf("could not read: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
 }
 
 static void do_close(int fd)
