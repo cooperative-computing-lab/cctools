@@ -2,14 +2,14 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-SOURCES = auth.c auth_all.c auth_unix.c auth_globus.c auth_kerberos.c auth_hostname.c auth_address.c batch_job.c bitmap.c catalog_query.c change_process_title.c console_login.c clean_dir.c copy_stream.c create_dir.c datagram.c debug.c delete_dir.c disk_info.c domain_name.c domain_name_cache.c fast_popen.c full_io.c file_cache.c get_canonical_path.c hash_cache.c hash_table.c hash_table_to_list.c http_query.c itable.c link.c list.c load_average.c memory_info.c mergesort.c md5.c nvpair.c nvpair_database.c preadwrite.c process.c sha1.c sleeptools.c sort_dir.c stringtools.c text_array.c timestamp.c url_encode.c username.c work_queue.c worker_condor_submit.c xmalloc.c
+SOURCES = auth.c auth_all.c auth_unix.c auth_globus.c auth_kerberos.c auth_hostname.c auth_address.c batch_job.c bitmap.c catalog_query.c change_process_title.c console_login.c clean_dir.c copy_stream.c create_dir.c datagram.c debug.c delete_dir.c disk_info.c domain_name.c domain_name_cache.c fast_popen.c full_io.c file_cache.c get_canonical_path.c hash_cache.c hash_table.c hash_table_to_list.c http_query.c itable.c link.c list.c load_average.c memory_info.c mergesort.c md5.c nvpair.c nvpair_database.c preadwrite.c process.c sha1.c sleeptools.c sort_dir.c stringtools.c text_array.c timestamp.c timer.c url_encode.c username.c work_queue.c worker_condor_submit.c xmalloc.c
 
 EXTRA_HEADERS = int_sizes.h macros.h
 
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
 LIBRARIES = libdttools.a
-PROGRAMS = catalog_server watchdog multirun tar_stream worker worker_condor_submit
+PROGRAMS = catalog_server watchdog microbench multirun tar_stream worker worker_condor_submit
 PROGRAM_SOURCES = ${PROGRAMS:%=%.c}
 CYGWINLIB = cygwin1.dll
 
@@ -22,6 +22,9 @@ catalog_server: catalog_server.o libdttools.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 watchdog: watchdog.o libdttools.a
+	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
+
+microbench: microbench.o libdttools.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 multirun: multirun.o libdttools.a
