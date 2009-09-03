@@ -49,6 +49,7 @@ extern "C" {
 
 extern int pfs_force_stream;
 extern int pfs_force_sync;
+extern int pfs_follow_symlinks;
 extern int pfs_auto_gzip;
 extern int pfs_enable_small_file_optimizations;
 
@@ -268,7 +269,7 @@ int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_
 		}
 
 		/* Enable cross service symlink resolution */
-		if (do_follow_symlink) {
+		if (do_follow_symlink && pfs_follow_symlinks) {
 		    follow_symlink(cname, pname, depth + 1);
 		}
 		return 1;

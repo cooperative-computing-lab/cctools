@@ -48,6 +48,7 @@ int pfs_trap_after_fork = 0;
 int pfs_force_stream = 0;
 int pfs_force_cache = 0;
 int pfs_force_sync = 0;
+int pfs_follow_symlinks = 1;
 int pfs_session_cache = 0;
 int pfs_use_helper = 1;
 int pfs_checksum_files = 1;
@@ -195,6 +196,7 @@ static void show_use( const char *cmd )
 	printf("  -d <name>  Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n");
 	printf("  -D         Disable small file optimizations.\n");
 	printf("  -F         Enable file snapshot caching for all protocols.\n");
+	printf("  -f         Disable following symlinks.\n");
 	printf("  -E <url>   Endpoint for gLite combined catalog ifc. (PARROT_GLITE_CCURL)\n");
 	printf("  -G <num>   Fake this gid; Real gid stays the same.          (PARROT_GID)\n");
 	printf("  -H         Disable use of helper library.\n");
@@ -460,6 +462,9 @@ int main( int argc, char *argv[] )
 
 	s = getenv("PARROT_FORCE_CACHE");
 	if(s) pfs_force_cache = 1;
+	
+	s = getenv("PARROT_FOLLOW_SYMLINKS");
+	if(s) pfs_follow_symlinks = atoi(s);
 
 	s = getenv("PARROT_SESSION_CACHE");
 	if(s) pfs_session_cache = 1;
@@ -514,7 +519,7 @@ int main( int argc, char *argv[] )
 
 	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
 
-	while((c=getopt(argc,argv,"+hA:a:b:B:d:DE:FG:HkKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
+	while((c=getopt(argc,argv,"+hA:a:b:B:d:DE:FfG:HkKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
 		switch(c) {
 		case 'a':
 			if(!auth_register_byname(optarg)) {
@@ -544,6 +549,9 @@ int main( int argc, char *argv[] )
 		case 'F':
 			pfs_force_cache = 1;
 			break;	
+		case 'f':
+			pfs_follow_symlinks = 0;
+			break;
 		case 'G':
 			pfs_gid = atoi(optarg);
 			break;
