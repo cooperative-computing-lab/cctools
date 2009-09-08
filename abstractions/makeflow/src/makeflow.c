@@ -45,6 +45,7 @@ struct dag {
 	struct itable     *local_job_table;
 	struct itable     *remote_job_table;
 	struct hash_table *file_table;
+	struct hash_table *completed_files;
 	FILE * logfile;
 	int linenum;
 	int local_jobs_running;
@@ -194,16 +195,19 @@ void file_clean( const char *filename )
 	}
 }
 
-void dag_node_clean( struct dag_node *n )
+void dag_node_clean( struct dag *d, struct dag_node *n )
 {
 	struct dag_file *f;
-	for(f=n->target_files;f;f=f->next) file_clean(f->filename);
+	for(f=n->target_files;f;f=f->next) {
+		file_clean(f->filename);
+		hash_table_remove(d->completed_files,f->filename);
+	}
 }
 
 void dag_clean( struct dag *d )
 {
 	struct dag_node *n;
-	for(n=d->nodes;n;n=n->next) dag_node_clean(n);
+	for(n=d->nodes;n;n=n->next) dag_node_clean(d,n);
 }
 
 void dag_log_recover( struct dag *d, const char *filename )
@@ -245,7 +249,7 @@ void dag_log_recover( struct dag *d, const char *filename )
 			d->remote_jobs_running++;
 		} else if(n->state==DAG_NODE_STATE_RUNNING || n->state==DAG_NODE_STATE_FAILED || n->state==DAG_NODE_STATE_FAILED) {
 			printf("makeflow: will retry failed rule: %s\n",n->command);
-			dag_node_clean(n);
+			dag_node_clean(d,n);
 			dag_node_state_change(d,n,DAG_NODE_STATE_WAITING);
 		}
 	}
@@ -405,6 +409,7 @@ struct dag * dag_create( const char *filename )
 	d->local_job_table = itable_create(0);
 	d->remote_job_table = itable_create(0);
 	d->file_table = hash_table_create(0,0);
+	d->completed_files = hash_table_create(0,0);
 	d->local_jobs_running = 0;
 	d->local_jobs_max = 1;
 	d->remote_jobs_running = 0;
@@ -504,9 +509,7 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 
 int dag_node_ready( struct dag *d, struct dag_node *n )
 {
-	struct stat info;
 	struct dag_file *f;
-	time_t age = 0;
 
 	if(n->state!=DAG_NODE_STATE_WAITING) return 0;
 
@@ -517,22 +520,14 @@ int dag_node_ready( struct dag *d, struct dag_node *n )
 	}
 
 	for(f=n->source_files;f;f=f->next) {
-		if(stat(f->filename,&info)==0) {
-			age = MAX(age,info.st_mtime);
+		if(hash_table_lookup(d->completed_files,f->filename)) {
+			continue;
 		} else {
 			return 0;
 		}
 	}
 
-	for(f=n->target_files;f;f=f->next) {
-		if(stat(f->filename,&info)==0) {
-			if(info.st_mtime<age) return 1;
-		} else {
-			return 1;
-		}
-	}
-
-	return 0;
+	return 1;
 }
 
 void dag_dispatch_ready_jobs( struct dag *d )
@@ -587,6 +582,11 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 			dag_failed_flag = 1;
 		}
 	} else {
+
+		for(f=n->target_files;f;f=f->next) {
+			hash_table_insert(d->completed_files,f->filename,f->filename);
+		}
+
 		dag_node_state_change(d,n,DAG_NODE_STATE_COMPLETE);
 	}
 }
@@ -600,8 +600,19 @@ int dag_check( struct dag *d )
 
 	for(n=d->nodes;n;n=n->next) {
 		for(f=n->source_files;f;f=f->next) {
-		  if(hash_table_lookup(d->file_table,f->filename)) continue;
-			if(access(f->filename,R_OK)==0) continue;
+			if(hash_table_lookup(d->completed_files,f->filename)) {
+				continue;
+			}
+
+			if(access(f->filename,R_OK)==0) {
+				hash_table_insert(d->completed_files,f->filename,f->filename);
+				continue;
+			}
+
+			if(hash_table_lookup(d->file_table,f->filename)) {
+				continue;
+			}
+
 			fprintf(stderr,"makeflow: error: %s does not exist, and is not created by any rule.\n",f->filename);
 			return 0;
 		}
