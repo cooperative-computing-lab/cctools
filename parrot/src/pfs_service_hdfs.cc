@@ -74,13 +74,13 @@ int load_hdfs_services(struct hdfs_services *hdfs) {
 
 	handle = dlopen(LIBJVM_PATH, RTLD_LAZY);
 	if (!handle) {
-		debug(D_HDFS, "can't open %s: %s\n", LIBJVM_PATH, dlerror());
+		debug(D_NOTICE|D_HDFS, "%s", dlerror());
 		return -1;
 	}
 
 	handle = dlopen(LIBHDFS_PATH, RTLD_LAZY);
 	if (!handle) {
-		debug(D_HDFS, "can't open %s: %s\n", LIBHDFS_PATH, dlerror());
+		debug(D_NOTICE|D_HDFS, "%s", dlerror());
 		return -1;
 	}
 
