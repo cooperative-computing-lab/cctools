@@ -267,15 +267,7 @@ pfs_file * pfs_cache_open( pfs_name *name, int flags, mode_t mode )
 		delete rfile;
 		errno = save_errno;
 	} else if(ok_to_fail) {
-		if (flags&O_RDWR && !name->service->is_readwritable()) {
-			if (flags&O_CREAT) {
-			    result = name->service->open(name,O_WRONLY,mode);
-			} else {
-			    result = name->service->open(name,O_RDONLY,mode);
-			}
-		} else {
-			result = name->service->open(name,flags,mode);
-		}
+		result = name->service->open(name,flags,mode);
 		if(result) {
 			result->close();
 			result = new pfs_file_cached(name,fd,mode,buf.st_ctime,buf.st_ino);

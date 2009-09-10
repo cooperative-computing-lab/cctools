@@ -481,10 +481,6 @@ public:
 	virtual int is_seekable() {
 		return 1;
 	}
-	
-	virtual int is_readwritable() {
-		return 0;
-	}
 };
 
 static pfs_service_hdfs pfs_service_hdfs_instance;

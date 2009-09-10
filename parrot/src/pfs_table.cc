@@ -302,11 +302,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 				file = pfs_cache_open(&pname,flags,mode);
 				allow_gzip = 0;
 			} else {
-				if (flags&O_RDWR && !pname.service->is_readwritable()) {
-					file = pfs_cache_open(&pname,flags,mode);
-				} else {
-					file = pname.service->open(&pname,flags,mode);
-				}
+				file = pname.service->open(&pname,flags,mode);
 			}
 		} else {
 			if(force_stream) {

@@ -62,11 +62,6 @@ int pfs_service::is_local()
 	return 0;
 }
 
-int pfs_service::is_readwritable()
-{
-	return 1;
-}
-
 pfs_file * pfs_service::open( pfs_name *name, int flags, mode_t mode )
 {
 	errno = ENOENT;
