@@ -386,11 +386,11 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 				open_time = timestamp_get();
 				link_printf(w->link,"put %s %d %o\n",tf->remote_name,fl,0777);
 				debug(D_DEBUG,"Limit sending %i bytes to %.02lfs seconds (or 1 if <0)",fl,(fl)/1250000.0);
-			    actual = link_write(w->link, tf->payload, fl,stoptime);
-			    close_time = timestamp_get();
-			    if(actual!=(fl)) goto failure;
-			    total_bytes+=actual;
-			    sum_time+=(close_time-open_time);
+				actual = link_write(w->link, tf->payload, fl,stoptime);
+				close_time = timestamp_get();
+				if(actual!=(fl)) goto failure;
+				total_bytes+=actual;
+				sum_time+=(close_time-open_time);
 			}
 			else {
 				if(stat(tf->payload,&local_info)<0) goto failure;
@@ -412,10 +412,11 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 					close(fd);
 					close_time = timestamp_get();
 					if(actual!=local_info.st_size) goto failure;
-					
-					remote_info = malloc(sizeof(*remote_info));
-					memcpy(remote_info,&local_info,sizeof(local_info));
-					hash_table_insert(w->current_files,tf->payload,remote_info);
+					if(tf->cacheable) {
+						remote_info = malloc(sizeof(*remote_info));
+						memcpy(remote_info,&local_info,sizeof(local_info));
+						hash_table_insert(w->current_files,tf->payload,remote_info);
+					}
 					total_bytes+=actual;
 					sum_time+=(close_time-open_time);
 				}
@@ -702,7 +703,7 @@ INT64_T work_queue_task_specify_output_file( struct work_queue_task* t, const ch
 INT64_T work_queue_task_specify_input_buf( struct work_queue_task* t, const char* buf, int length, const char* rname) {
 	struct task_file* tf = malloc(sizeof(struct task_file));
 	tf->fname_or_literal = LITERAL;
-	tf->cacheable = 1;
+	tf->cacheable = 0;
 	tf->length = length;
 	tf->payload = malloc(length);
 	memcpy(tf->payload, buf, length);
