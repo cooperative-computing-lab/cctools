@@ -12,6 +12,8 @@ See the file COPYING for details.
 extern "C" {
 #include "chirp_global.h"
 #include "debug.h"
+#include "domain_name.h"
+#include "hash_table.h"
 #include "stringtools.h"
 #include "xmalloc.h"
 }
@@ -33,9 +35,7 @@ extern "C" {
 #include <mysql/mysql.h>
 }
 
-#define BXGRID_USER	"anonymous"
-#define	BXGRID_PASS	""
-#define	BXGRID_DBNAME	"biometrics"
+#define BXGRID_ID_MAX	16
 #define BXGRID_REG_MODE	(S_IFREG | 0400)
 #define BXGRID_DIR_MODE	(S_IFDIR | 0755)
 
@@ -54,6 +54,38 @@ enum BXGRID_FLAGS {
 	BXGRID_LISTABLE		= 0x000004
 };
 
+enum BXGRID_REPLICA {
+	BXGRID_CLOSEST_REPLICA	= -2,
+	BXGRID_RANDOM_REPLICA	= -1
+};
+
+static const char *bxgrid_dbname = "biometrics";
+static const char *bxgrid_user   = "anonymous";
+static const char *bxgrid_pass   = "";
+static int bxgrid_cache_stat_query = 1;
+static int bxgrid_cache_ftor_query = 1;
+static int bxgrid_cache_rtol_query = 1;
+static struct hash_table *bxgrid_stat_query_cache = NULL;
+static struct hash_table *bxgrid_ftor_query_cache = NULL;
+static struct hash_table *bxgrid_rtol_query_cache = NULL;
+static char bxgrid_hostname[PFS_LINE_MAX];
+
+struct bxgrid_file_info {
+	int mode;
+	int size;
+	int mtime;
+};
+
+struct bxgrid_replica_list {
+	int    nreplicas;
+	char **replicas;
+};
+
+struct bxgrid_replica_location {
+	char *host;
+	char *path;
+};
+
 struct bxgrid_virtual_folder {
 	const char	*name;
 	const char	*query;
@@ -69,12 +101,12 @@ static struct bxgrid_virtual_folder BXGRID_VIRTUAL_FOLDERS[] = {
 	},
 	{ "/fileid",
 	  "SELECT fileid FROM files",
-	  "SELECT size, UNIX_TIMESTAMP(lastcheck) FROM files WHERE fileid = '%d'",
+	  "SELECT size, UNIX_TIMESTAMP(lastcheck) FROM files WHERE fileid = '%s'",
 	  BXGRID_FILE_QUERY
 	},
 	{ "/replicaid",
 	  "SELECT replicaid FROM replicas",
-	  "SELECT size, UNIX_TIMESTAMP(replicas.lastcheck) FROM files LEFT JOIN replicas USING(fileid) WHERE replicaid = '%d'",
+	  "SELECT size, UNIX_TIMESTAMP(replicas.lastcheck) FROM files LEFT JOIN replicas USING(fileid) WHERE replicaid = '%s'",
 	  BXGRID_FILE_QUERY
 	},
 	{ NULL, NULL, NULL, 0 }
@@ -163,96 +195,227 @@ public:
 	} 
 };
 
-#define BXGRID_QUERY_AND_CHECK( res, cxn, ... ) \
+#define BXGRID_QUERY_AND_CHECK( res, cxn, reterr, ... ) \
 	(res) = bxgrid_db_query(cxn, __VA_ARGS__); \
-	if ((res) == NULL) return -1;
+	if ((res) == NULL) return (reterr);
 
-#define BXGRID_FETCH_AND_CHECK( row, res ) \
+#define BXGRID_FETCH_AND_CHECK( row, res, reterr ) \
 	(row) = mysql_fetch_row(res); \
-	if ((row) == NULL) { mysql_free_result(res); return -1; }
+	if ((row) == NULL) { mysql_free_result(res); return (reterr); }
 
-int bxgrid_bvf_stat( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, int id, struct pfs_stat *buf )
+int bxgrid_bvf_stat( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, struct pfs_name *name, struct pfs_stat *buf )
 {
-	MYSQL_RES *file_res;
-	MYSQL_ROW  file_row;
-	
-	BXGRID_QUERY_AND_CHECK(file_res, mysql_cxn, bvf->stat_query, id);
-	BXGRID_FETCH_AND_CHECK(file_row, file_res);
+	MYSQL_RES  *file_res;
+	MYSQL_ROW   file_row;
+	const char *file_path;
+	struct bxgrid_file_info *file_info = NULL;
 
-	buf->st_mode  = BXGRID_REG_MODE;
-	buf->st_size  = strtol(file_row[0], NULL, 10);
-	buf->st_mtime = strtol(file_row[1], NULL, 10);
+	file_path = name->rest;
+	if (bxgrid_cache_stat_query) {
+		file_info = (struct bxgrid_file_info *)hash_table_lookup(bxgrid_stat_query_cache, file_path);
+		debug(D_BXGRID, "%s is %s the stat_query_cache", file_path, (file_info ? "in" : "not in"));
+	}
 
-	mysql_free_result(file_res);
+	if (!file_info) {
+		BXGRID_QUERY_AND_CHECK(file_res, mysql_cxn, -1, bvf->stat_query, string_basename(file_path));
+		BXGRID_FETCH_AND_CHECK(file_row, file_res, -1);
+		
+		if (bxgrid_cache_stat_query) {
+			file_info = (struct bxgrid_file_info *)xxmalloc(sizeof(struct bxgrid_file_info));
+			buf->st_mode  = file_info->mode  = BXGRID_REG_MODE;
+			buf->st_size  = file_info->size  = strtol(file_row[0], NULL, 10);
+			buf->st_mtime = file_info->mtime = (file_row[1] ? strtol(file_row[1], NULL, 10) : 0);
+
+			hash_table_insert(bxgrid_stat_query_cache, file_path, file_info);
+		} else {
+			buf->st_mode  = BXGRID_REG_MODE;
+			buf->st_size  = strtol(file_row[0], NULL, 10);
+			buf->st_mtime = (file_row[1] ? strtol(file_row[1], NULL, 10) : 0);
+
+		}
+		
+		mysql_free_result(file_res);
+	}
+
 	return 0;
 }
 
-int bxgrid_lookup_replicaid( MYSQL *mysql_cxn, int fileid, int nid )
+const char *bxgrid_lookup_replicaid( MYSQL *mysql_cxn, const char *fileid, int nid )
 {
-#define BXGRID_REPLICAID_QUERY "SELECT replicaid FROM replicas WHERE fileid = '%d' and state = 'OK' ORDER BY %s"
-	MYSQL_RES *rep_res;
-	MYSQL_ROW  rep_row;
-	int nreplicas;
-	int replicaid;
+#define BXGRID_REPLICAID_QUERY "SELECT replicaid,host,path FROM replicas WHERE fileid = '%s' and state = 'OK'"
+	static char replicaid[BXGRID_ID_MAX];
 
-	if (nid < 0) {
-		BXGRID_QUERY_AND_CHECK(rep_res, mysql_cxn, BXGRID_REPLICAID_QUERY, fileid, "RAND()");
+	MYSQL_RES  *rep_res;
+	MYSQL_ROW   rep_row;
+	struct bxgrid_replica_list *replica_list;
+	struct bxgrid_replica_location *replica_location;
+
+	if (bxgrid_cache_ftor_query) {
+		replica_list = (struct bxgrid_replica_list*)hash_table_lookup(bxgrid_ftor_query_cache, fileid);
+		debug(D_BXGRID, "file %s is %s the ftor_query_cache", fileid, (replica_list ? "in" : "not in"));
+
+		if (!replica_list) {
+			BXGRID_QUERY_AND_CHECK(rep_res, mysql_cxn, NULL, BXGRID_REPLICAID_QUERY, fileid);
+			replica_list = (struct bxgrid_replica_list *)xxmalloc(sizeof(struct bxgrid_replica_list));
+
+			replica_list->nreplicas = mysql_num_rows(rep_res);
+			debug(D_BXGRID, "fileid %s has %d replicas", fileid, replica_list->nreplicas);
+
+			replica_list->replicas = (char **)xxmalloc(sizeof(char *) * replica_list->nreplicas);
+			for (int i = 0; i < replica_list->nreplicas; i++) {
+				BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
+				replica_list->replicas[i] = xstrdup(rep_row[0]);
+				debug(D_BXGRID, "= %s", replica_list->replicas[i]);
+
+				if (bxgrid_cache_rtol_query) {
+					replica_location = (struct bxgrid_replica_location *)xxmalloc(sizeof(struct bxgrid_replica_location));
+					replica_location->host = xstrdup(rep_row[1]);
+					replica_location->path = xstrdup(rep_row[2]);
+					hash_table_insert(bxgrid_rtol_query_cache, replica_list->replicas[i], replica_location);
+				}
+			}
+
+			hash_table_insert(bxgrid_ftor_query_cache, fileid, replica_list);
+			mysql_free_result(rep_res);
+		}
+
+		if (replica_list->nreplicas == 0 || nid >= replica_list->nreplicas) return NULL;
+
+		switch (nid) {
+			case BXGRID_CLOSEST_REPLICA:
+				int i;
+				for (i = 0; i < replica_list->nreplicas; i++) {
+					if (strcmp(bxgrid_hostname, replica_list->replicas[i]) == 0) 
+						break;
+				}
+
+				if (i < replica_list->nreplicas) {
+					strncpy(replicaid, replica_list->replicas[i], BXGRID_ID_MAX);
+				} else {
+					strncpy(replicaid, replica_list->replicas[0], BXGRID_ID_MAX);
+				}
+				debug(D_BXGRID, "selecting closest replica %s", replicaid);
+				break;
+			case BXGRID_RANDOM_REPLICA:
+				strncpy(replicaid, replica_list->replicas[rand() % replica_list->nreplicas], BXGRID_ID_MAX);
+				debug(D_BXGRID, "selecting random replica %s", replicaid);
+				break;
+			default:
+				strncpy(replicaid, replica_list->replicas[nid], BXGRID_ID_MAX);
+				debug(D_BXGRID, "selecting replica %d %s", nid, replicaid);
+				break;
+		}
 	} else {
-		BXGRID_QUERY_AND_CHECK(rep_res, mysql_cxn, BXGRID_REPLICAID_QUERY, fileid, "replicaid");
+		BXGRID_QUERY_AND_CHECK(rep_res, mysql_cxn, NULL, BXGRID_REPLICAID_QUERY, fileid);
+
+		int nreplicas = mysql_num_rows(rep_res);
+		debug(D_BXGRID, "fileid %s has %d replicas", fileid, nreplicas);
+
+		if (nreplicas == 0 || nid >= nreplicas) return NULL;
+		switch (nid) {
+			case BXGRID_CLOSEST_REPLICA:
+				BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
+				for (int i = 0; i < nid; i++) {
+					if (strcmp(bxgrid_hostname, rep_row[0]) == 0) 
+						break;
+					BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
+				}
+				strncpy(replicaid, rep_row[0], BXGRID_ID_MAX);
+				debug(D_BXGRID, "selecting closest replica %s", replicaid);
+				break;
+			case BXGRID_RANDOM_REPLICA:
+				BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
+				for (int i = 0; i < rand() % nreplicas; i++) {
+					BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
+				}
+				strncpy(replicaid, rep_row[0], BXGRID_ID_MAX);
+				debug(D_BXGRID, "selecting random replica %s", replicaid);
+				break;
+			default:
+				BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
+				for (int i = 0; i < nid; i++) {
+					BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
+				}
+				strncpy(replicaid, rep_row[0], BXGRID_ID_MAX);
+				debug(D_BXGRID, "selecting replica %d %s", nid, replicaid);
+				break;
+		}
+		mysql_free_result(rep_res);
 	}
 
-	nreplicas = mysql_num_rows(rep_res);
-	debug(D_BXGRID, "fileid %d has %d replicas", fileid, nreplicas);
-	if (nreplicas == 0) return -1;
-
-	BXGRID_FETCH_AND_CHECK(rep_row, rep_res);
-	for (int i = 0; i < nid; i++) {
-		BXGRID_FETCH_AND_CHECK(rep_row, rep_res);
-	}
-	replicaid = strtol(rep_row[0], NULL, 10);
-
-	mysql_free_result(rep_res);
 	return replicaid;
 }
 
-int bxgrid_lookup_replica_path( MYSQL *mysql_cxn, int replicaid, char *host, char *path)
+int bxgrid_lookup_replica_location( MYSQL *mysql_cxn, const char *replicaid, char *host, char *path)
 {
-#define BXGRID_REPLICA_PATH_QUERY "SELECT host, path FROM replicas WHERE replicaid = '%d'"
+#define BXGRID_REPLICA_PATH_QUERY "SELECT host, path FROM replicas WHERE replicaid = '%s'"
 	MYSQL_RES *rep_res;
 	MYSQL_ROW  rep_row;
+	struct bxgrid_replica_location *replica_location;
 
-	if (replicaid < 0) return -1;
-	
-	BXGRID_QUERY_AND_CHECK(rep_res, mysql_cxn, BXGRID_REPLICA_PATH_QUERY, replicaid);
-	BXGRID_FETCH_AND_CHECK(rep_row, rep_res);
+	if (replicaid == NULL) return -1;
+				
+	if (bxgrid_cache_rtol_query) {
+		replica_location = (struct bxgrid_replica_location*)hash_table_lookup(bxgrid_rtol_query_cache, replicaid);
+		debug(D_BXGRID, "replica %s is %s the rtol_query_cache", replicaid, (replica_location ? "in" : "not in"));
 
-	strncpy(host, rep_row[0], PFS_PATH_MAX);
-	strncpy(path, rep_row[1], PFS_PATH_MAX);
+		if (!replica_location) {
+			BXGRID_QUERY_AND_CHECK(rep_res, mysql_cxn, -1, BXGRID_REPLICA_PATH_QUERY, replicaid);
+			BXGRID_FETCH_AND_CHECK(rep_row, rep_res, -1);
 
-	debug(D_BXGRID, "replicaid %d is on %s at %s", replicaid, host, path);
-	
-	mysql_free_result(rep_res);
+			replica_location = (struct bxgrid_replica_location *)xxmalloc(sizeof(struct bxgrid_replica_location));
+			replica_location->host = xstrdup(rep_row[0]);
+			replica_location->path = xstrdup(rep_row[1]);
+			hash_table_insert(bxgrid_rtol_query_cache, replicaid, replica_location);
+			mysql_free_result(rep_res);
+		}
+		
+		strncpy(host, replica_location->host, PFS_PATH_MAX);
+		strncpy(path, replica_location->path, PFS_PATH_MAX);
+	} else {
+		BXGRID_QUERY_AND_CHECK(rep_res, mysql_cxn, -1, BXGRID_REPLICA_PATH_QUERY, replicaid);
+		BXGRID_FETCH_AND_CHECK(rep_row, rep_res, -1);
+
+		strncpy(host, rep_row[0], PFS_PATH_MAX);
+		strncpy(path, rep_row[1], PFS_PATH_MAX);
+
+		mysql_free_result(rep_res);
+	}
+		
+	debug(D_BXGRID, "replicaid %s is on %s at %s", replicaid, host, path);
+
 	return 0;
 }
+
+/** 
+ *
+ * Open a file using the bxgrid virtual folder abstraction
+ *
+ * If the item is a file, then we will attempt to open the closest replica
+ * first, then a random one, then the replicas in order.
+ *
+ * If the item is a replica, then we will attemp to open the specified replica.
+ *
+ */
 
 pfs_file *bxgrid_bvf_open( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, pfs_name *name, int flags, mode_t mode )
 {
 	char host[PFS_PATH_MAX];
 	char path[PFS_PATH_MAX];
-	int fileid, replicaid;
-	int nattempt = -1;
+	const char *fileid, *replicaid;
+	int nattempt = BXGRID_CLOSEST_REPLICA;
 
 	if (strcmp(bvf->name, "/fileid") == 0) {
-		fileid    = strtol(string_basename(name->rest), NULL, 10);
-		replicaid = bxgrid_lookup_replicaid(mysql_cxn, fileid, nattempt); // Select random replica
+		fileid    = string_basename(name->rest);
+		replicaid = bxgrid_lookup_replicaid(mysql_cxn, fileid, nattempt);
 	} else {
-		fileid    = -1;
-		replicaid = strtol(string_basename(name->rest), NULL, 10);
+		fileid    = NULL;
+		replicaid = string_basename(name->rest);
 	}
 
 	do {
-		debug(D_BXGRID, "opening fileid %d using replicaid %d", fileid, replicaid);
-		if (bxgrid_lookup_replica_path(mysql_cxn, replicaid, host, path) >= 0) {
+		debug(D_BXGRID, "opening fileid %s using replicaid %s", fileid, replicaid);
+		if (bxgrid_lookup_replica_location(mysql_cxn, replicaid, host, path) >= 0) {
 			struct chirp_file *cfile;
 			cfile = chirp_global_open(host, path, flags, mode, time(0)+pfs_master_timeout);
 			if (cfile) {
@@ -260,30 +423,75 @@ pfs_file *bxgrid_bvf_open( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, 
 			}
 		}
 
-		if (fileid >= 0) {
-			replicaid = bxgrid_lookup_replicaid(mysql_cxn, fileid, nattempt++);
+		if (fileid) {
+			replicaid = bxgrid_lookup_replicaid(mysql_cxn, fileid, ++nattempt);
 		} else {
-			replicaid = -1;
+			replicaid = NULL;
 		}
-	} while (replicaid >= 0);
+	} while (replicaid);
 
 	return 0;
 }
 
 class pfs_service_bxgrid : public pfs_service {
 public:
-	pfs_service_bxgrid() {
+	/** Environmental variables:
+	 * BXGRID_DBNAME: database name     (default: biometrics)
+	 * BXGRID_USER:	  database user     (default: anonymous)
+	 * BXGRID_PASS:	  database password (default: )
+	 *
+	 * BXGRID_CACHE_QUERIES:    cache all query results		(deafult: true)
+	 * BXGRID_CACHE_STAT_QUERY: cache stat query results            (default: true)
+	 * BXGRID_CACHE_FTOR_QUERY: cache file to replica query results (default: true)
+	 * BXGRID_CACHE_RTOL_QUERY: cache replica to path query results (default: true)
+	 **/
+	pfs_service_bxgrid()  {
+		char *s;
+
+		s = getenv("BXGRID_DBNAME");
+		if (s) bxgrid_dbname = s;
+		
+		s = getenv("BXGRID_USER");
+		if (s) bxgrid_user = s;
+		
+		s = getenv("BXGRID_PASS");
+		if (s) bxgrid_pass = s;
+		
+		s = getenv("BXGRID_CACHE_QUERIES");
+		if (s) bxgrid_cache_stat_query = bxgrid_cache_ftor_query = bxgrid_cache_rtol_query = atoi(s);
+		
+		s = getenv("BXGRID_CACHE_STAT_QUERY");
+		if (s) bxgrid_cache_stat_query = atoi(s);
+		
+		s = getenv("BXGRID_CACHE_FTOR_QUERY");
+		if (s) bxgrid_cache_ftor_query = atoi(s);
+		
+		s = getenv("BXGRID_CACHE_RTOL_QUERY");
+		if (s) bxgrid_cache_rtol_query = atoi(s);
+
+		if (bxgrid_cache_stat_query) bxgrid_stat_query_cache = hash_table_create(0, 0);
+		if (bxgrid_cache_ftor_query) bxgrid_ftor_query_cache = hash_table_create(0, 0);
+		if (bxgrid_cache_rtol_query) bxgrid_rtol_query_cache = hash_table_create(0, 0);
+
+		if (gethostname(bxgrid_hostname, PFS_LINE_MAX) >= 0) {
+			char ip_address[PFS_LINE_MAX];
+			if (domain_name_lookup(bxgrid_hostname, ip_address))
+				domain_name_lookup_reverse(ip_address, bxgrid_hostname);
+		} else {
+			strncpy(bxgrid_hostname, "localhost", PFS_LINE_MAX);
+		}
 	}
 
 	virtual void *connect( pfs_name *name ) {
 		MYSQL *mysql_cxn;
 		
+		debug(D_BXGRID, "hostname is %s", bxgrid_hostname);
 		debug(D_BXGRID, "initializing MySQL");
 		mysql_cxn = mysql_init(NULL);
 
 		debug(D_BXGRID, "connect %s:%d", name->host, name->port);
-		if (!mysql_real_connect(mysql_cxn, name->host, BXGRID_USER, BXGRID_PASS, BXGRID_DBNAME, name->port, 0, 0)) {
-			debug(D_BXGRID, "failed to connect to %s: %s", name->host, mysql_error(mysql_cxn));
+		if (!mysql_real_connect(mysql_cxn, name->host, bxgrid_user, bxgrid_pass, bxgrid_dbname, name->port, 0, 0)) {
+			debug(D_NOTICE|D_BXGRID, "failed to connect to %s: %s", name->host, mysql_error(mysql_cxn));
 			return NULL;
 		}
 
@@ -346,35 +554,53 @@ public:
 
 		debug(D_BXGRID, "stat %s", name->rest);
 		if (mysql_cxn) {
-			struct bxgrid_virtual_folder *bvf = bxgrid_bvf_find(name->rest);
-			if (bvf) {
-				BXGRID_MAKE_DIR_STAT(name, buf);
-				result = 0;
-			} else {
-				bvf = bxgrid_bvf_find_base(name->rest);
-				if (bvf) {
-					if (bvf->flags & BXGRID_FILE_LIST) {	// BXGRID_FILE_LIST
-						if (strstr(bvf->query, string_basename(name->rest))) {
-							BXGRID_MAKE_DIR_STAT(name, buf);
-							result = 0;
-						} else {
-							errno = ENOENT;
-						}
-					} else {				// BXGRID_FILE_QUERY
-						int id = strtol(string_basename(name->rest), NULL, 10);
-						pfs_service_emulate_stat(name, buf); 
-
-						if (bxgrid_bvf_stat(mysql_cxn, bvf, id, buf) >= 0) {
-							result = 0;
-						} else {
-							errno = ENOENT;
-						}
-					}
-				} else {
-					errno = ENOENT;
-				}
-			}
+			result = this->_stat(mysql_cxn, name, buf);
 			pfs_service_disconnect_cache(name, (void *)mysql_cxn, 0);
+		}
+		BXGRID_END
+	}
+
+	virtual int lstat( pfs_name *name, struct pfs_stat *buf ) {
+		int result;
+		MYSQL *mysql_cxn = (MYSQL *)pfs_service_connect_cache(name);
+
+		debug(D_BXGRID, "lstat %s", name->rest);
+		if (mysql_cxn) {
+			result = this->_stat(mysql_cxn, name, buf);
+			pfs_service_disconnect_cache(name, (void *)mysql_cxn, 0);
+		}
+		BXGRID_END
+	}
+	
+	virtual int _stat( MYSQL *mysql_cxn, pfs_name *name, struct pfs_stat *buf ) {
+		int result = -1;
+		struct bxgrid_virtual_folder *bvf = bxgrid_bvf_find(name->rest);
+
+		if (bvf) {
+			BXGRID_MAKE_DIR_STAT(name, buf);
+			result = 0;
+		} else {
+			bvf = bxgrid_bvf_find_base(name->rest);
+			if (bvf) {
+				if (bvf->flags & BXGRID_FILE_LIST) {	// BXGRID_FILE_LIST
+					if (strstr(bvf->query, string_basename(name->rest))) {
+						BXGRID_MAKE_DIR_STAT(name, buf);
+						result = 0;
+					} else {
+						errno = ENOENT;
+					}
+				} else {				// BXGRID_FILE_QUERY
+					pfs_service_emulate_stat(name, buf); 
+
+					if (bxgrid_bvf_stat(mysql_cxn, bvf, name, buf) >= 0) {
+						result = 0;
+					} else {
+						errno = ENOENT;
+					}
+				}
+			} else {
+				errno = ENOENT;
+			}
 		}
 		BXGRID_END
 	}
@@ -393,7 +619,7 @@ public:
 				struct pfs_stat buf;
 				int result;
 				
-				result = this->stat(name, &buf);
+				result = this->_stat(mysql_cxn, name, &buf);
 				if (result < 0) return 0;
 				if (!result && S_ISDIR(buf.st_mode)) { errno = EISDIR; return 0; }
 				if ((flags&O_ACCMODE) != O_RDONLY) { errno = ENOTSUP; return 0; }
@@ -405,14 +631,6 @@ public:
 		}
 
 		return file;
-	}
-
-	virtual int lstat( pfs_name *name, struct pfs_stat *buf ) {
-		int result;
-
-		debug(D_BXGRID, "lstat %s", name->rest);
-		result = this->stat(name, buf);
-		BXGRID_END
 	}
 
 	virtual int chdir( pfs_name *name, char *newname ) {
