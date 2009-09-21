@@ -528,6 +528,7 @@ static void show_help( const char *cmd )
 	printf(" -a <flag>    Require this authentication mode.\n");
 	printf(" -d <flag>    Enable debugging for this subsystem.\n");
 	printf(" -o <file>    Send debugging output to this file.\n");
+	printf(" -f           Run in foreground for debugging.\n");
 	printf(" -v           Show program version.\n");
 	printf(" -h           This message.\n");
 }
