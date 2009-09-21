@@ -41,42 +41,20 @@ static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void parsepath( const char *path, char *newpath, char *host )
 {
-	int slashcnt = 0, n=0, pathn=0, serven=0;
-	if(!strcmp(path, "/")) // if we're in the root directory
-	{
+	memset(newpath, 0, CHIRP_PATH_MAX);
+	memset(host, 0, CHIRP_PATH_MAX);
+	
+	if(!strcmp(path, "/")) {
+	// path is the root directory
 		strcpy(host, "/");
 		strcpy(newpath, "/");
-	}
-	else
-	{
-		while(path[n] != '\0')
-		{
-			if(path[n] == '/')
-			{
-				slashcnt++;
-			}
-
-			if(slashcnt == 1 && path[n] != '/') // part of server
-			{
-				host[serven] = path[n];
-				serven++;
-			}
-			else if(slashcnt > 1)
-			{
-				newpath[pathn] = path[n];
-				pathn++;
-			}
-
-			n++;
-		}
-	}
-	newpath[pathn]='\0';
-	host[serven] = '\0';
-	
-	if(slashcnt == 0) // if there are no slashes in the path...i.e. we are lsing the root dir
-	{
-		strcpy(host, path);
-		strcpy(newpath, "/");
+	} else if (*path == '/') {
+	// path is absolute
+		sscanf(path, "/%[^/]%s", host, newpath);
+	} else {
+	// path is relative
+		strcpy(host, "/");
+		strcpy(newpath, path);
 	}
 
 }
@@ -106,16 +84,14 @@ static int chirp_fuse_getattr(const char *path, struct stat *info)
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 
-	parsepath(path,newpath,host); 
+	parsepath(path,newpath,host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_stat(host, newpath, &cinfo, time(0)+chirp_fuse_timeout );
+	result = chirp_global_lstat(host, newpath, &cinfo, time(0)+chirp_fuse_timeout );
 	pthread_mutex_unlock(&mutex);
 
 	if(result<0) return -errno;
-
 	chirp_stat_to_fuse_stat(&cinfo,info);
-
 	return 0;
 }
 
@@ -214,17 +190,21 @@ static int chirp_fuse_rmdir(const char *path)
 	return 0;
 }
 
-static int chirp_fuse_symlink(const char *from, const char *to)
+static int chirp_fuse_symlink(const char *source, const char *target)
+/*		source: relative filename
+		target: full pathname
+*/
 {
 	INT64_T result;
-	char frompath[CHIRP_PATH_MAX], topath[CHIRP_PATH_MAX];
+	char dest_path[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	parsepath(from,frompath,host); 
-	parsepath(to,topath,host);
+	
+	parsepath(target,dest_path,host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_symlink( host, frompath, topath, time(0)+ chirp_fuse_timeout );
+	result = chirp_global_symlink( host, source, dest_path, time(0)+ chirp_fuse_timeout );
 	pthread_mutex_unlock(&mutex);
+
 
 	if(result<0) return -errno;
 	return 0;
