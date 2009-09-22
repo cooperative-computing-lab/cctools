@@ -28,6 +28,7 @@ and port of the master.
 struct work_queue_task {
 	char *tag;
         char *command_line;		/**< The program(s) to execute, as a shell command line. */
+	int worker_algorithm;           /**< How to choose worker to run the task. */
 	char *output;			/**< The standard output of the task. */
 	struct list * input_files;      /**< The files to transfer to the worker and place in the executing directory. */
 	struct list * output_files;	/**< The output files (other than the standard output stream) created by the program expected to be retrieved from the task. */

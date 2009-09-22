@@ -29,6 +29,11 @@
 #define FNAME 0
 #define LITERAL 1
 
+#define CHOOSE_BY_DEFAULT 0
+#define CHOOSE_BY_FILES 1
+#define CHOOSE_BY_TIME 2
+
+
 struct work_queue {
 	struct link * master_link;
 	struct list * ready_list;
@@ -95,6 +100,7 @@ struct work_queue_task * work_queue_task_create( const char *command_line)
 	memset(t,0,sizeof(*t));
 	t->command_line = strdup(command_line);
 	t->tag = NULL;
+	t->worker_algorithm = CHOOSE_BY_FILES;
 	t->output = NULL;
 	t->input_files = NULL;
 	t->output_files = NULL;
@@ -311,7 +317,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			w->total_task_time += (t->finish_time-t->start_time);
 			debug(D_DEBUG,"%s (%s) done in %.02lfs total tasks %d average %.02lfs",w->hostname,w->addrport,(t->finish_time-t->start_time)/1000000.0,w->total_tasks_complete,w->total_task_time/w->total_tasks_complete/1000000.0);
 
-			/* If this worker completed a job ok, then send it a new one. */
+			/* If this worker completed a job ok, then send it a new one.
 
 			t = list_pop_head(q->ready_list);
 			if(t) {
@@ -323,7 +329,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
 					w->current_task = t;
 					remove_worker(q,w);
 				}
-			}
+			} */
 
 		} else {
 			goto failure;
@@ -385,7 +391,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 				stoptime = time(0) + MAX(1.0,fl/1250000.0);
 				open_time = timestamp_get();
 				link_printf(w->link,"put %s %d %o\n",tf->remote_name,fl,0777);
-				debug(D_DEBUG,"Limit sending %i bytes to %.02lfs seconds (or 1 if <0)",fl,(fl)/1250000.0);
+				debug(D_DEBUG,"Limit sending %i bytes to %.03lfs seconds (or 1 if <0)",fl,(fl)/1250000.0);
 				actual = link_write(w->link, tf->payload, fl,stoptime);
 				close_time = timestamp_get();
 				if(actual!=(fl)) goto failure;
@@ -427,7 +433,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 		t->total_transfer_time += sum_time;
 		w->total_bytes_transfered += total_bytes;
 		w->total_transfer_time += sum_time;
-		debug(D_DEBUG,"%s (%s) got %d bytes in %.02lfs (%.02lfs Mbps) average %.02lfs Mbps",w->hostname,w->addrport,total_bytes,sum_time/1000000.0,((8.0*total_bytes)/sum_time),(8.0*w->total_bytes_transfered)/w->total_transfer_time);
+		debug(D_DEBUG,"%s (%s) got %d bytes in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps",w->hostname,w->addrport,total_bytes,sum_time/1000000.0,((8.0*total_bytes)/sum_time),(8.0*w->total_bytes_transfered)/w->total_transfer_time);
 	}
 	
 
@@ -455,7 +461,7 @@ int start_one_task( struct work_queue_task *t, struct work_queue_worker *w )
 	return 1;
 }
 
-struct work_queue_worker * find_best_worker( struct work_queue *q )
+struct work_queue_worker * find_worker_by_time( struct work_queue *q )
 {
 	char *key;
 	struct work_queue_worker *w;
@@ -481,17 +487,84 @@ struct work_queue_worker * find_best_worker( struct work_queue *q )
 	return best_worker;
 }
 
+struct work_queue_worker * find_worker_by_cache( struct work_queue *q , struct work_queue_task *t )
+{
+	char *key;
+	struct work_queue_worker *w;
+	struct work_queue_worker *best_worker = 0;
+	INT64_T most_task_cached_bytes = 0;
+	INT64_T task_cached_bytes;
+	struct stat *remote_info;
+	struct task_file* tf;
+	int i,j;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+		if(w->state==WORKER_STATE_READY) {
+			task_cached_bytes = 0;
+			j = list_size(t->input_files);
+			for(i=0; i<j ; i++) {
+				tf = list_pop_head(t->input_files);
+				if(tf->fname_or_literal == FNAME && tf->cacheable) {
+					remote_info = hash_table_lookup(w->current_files,tf->payload);
+					if(remote_info)
+						task_cached_bytes += remote_info->st_size;
+				}
+				list_push_tail(t->input_files, tf);
+			}
+			
+			if(!best_worker || task_cached_bytes>most_task_cached_bytes) {
+				best_worker = w;
+				most_task_cached_bytes = task_cached_bytes;
+			}
+		}
+	}
+	if(best_worker) debug(D_DEBUG,"Worker %s has the most cached bytes for this task (%ld)\n",best_worker->hostname,most_task_cached_bytes);
+	return best_worker;
+}
+
+struct work_queue_worker * find_worker_by_available( struct work_queue *q )
+{
+	char *key;
+	struct work_queue_worker *w;
+	struct work_queue_worker *best_worker = 0;
+	
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+		if(w->state==WORKER_STATE_READY) {
+		    return w;
+		}
+	}
+
+	return best_worker;
+}
+
+struct work_queue_worker * find_best_worker( struct work_queue *q, struct work_queue_task *t ) {
+
+    if(t->worker_algorithm==CHOOSE_BY_FILES)
+	return find_worker_by_cache(q,t);
+    else if(t->worker_algorithm==CHOOSE_BY_TIME)
+	return find_worker_by_time(q);
+    else
+	return find_worker_by_available(q);
+    
+}
+
 static void start_tasks( struct work_queue *q )
 {
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
 	while(list_size(q->ready_list)) {
-
-		w = find_best_worker(q);
-		if(!w) return;
 		
 		t = list_pop_head(q->ready_list);
+		w = find_best_worker(q,t);
+		
+		if(!w) {
+			list_push_head(q->ready_list,t);
+			return;
+		}
+		
 		if(start_one_task(t,w)) {
 			change_worker_state(q,w,WORKER_STATE_BUSY);
 			w->current_task = t;
