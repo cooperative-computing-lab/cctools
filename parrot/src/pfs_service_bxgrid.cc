@@ -54,11 +54,6 @@ enum BXGRID_FLAGS {
 	BXGRID_LISTABLE		= 0x000004
 };
 
-enum BXGRID_REPLICA {
-	BXGRID_CLOSEST_REPLICA	= -2,
-	BXGRID_RANDOM_REPLICA	= -1
-};
-
 static const char *bxgrid_dbname = "biometrics";
 static const char *bxgrid_user   = "anonymous";
 static const char *bxgrid_pass   = "";
@@ -281,29 +276,22 @@ const char *bxgrid_lookup_replicaid( MYSQL *mysql_cxn, const char *fileid, int n
 
 		if (replica_list->nreplicas == 0 || nid >= replica_list->nreplicas) return NULL;
 
-		switch (nid) {
-			case BXGRID_CLOSEST_REPLICA:
-				int i;
-				for (i = 0; i < replica_list->nreplicas; i++) {
-					if (strcmp(bxgrid_hostname, replica_list->replicas[i]) == 0) 
-						break;
-				}
+		if (nid < 0) {
+			int i;
+			for (i = 0; i < replica_list->nreplicas; i++) 
+				if (strcmp(bxgrid_hostname, replica_list->replicas[i]) == 0) 
+					break;
 
-				if (i < replica_list->nreplicas) {
-					strncpy(replicaid, replica_list->replicas[i], BXGRID_ID_MAX);
-				} else {
-					strncpy(replicaid, replica_list->replicas[0], BXGRID_ID_MAX);
-				}
+			if (i < replica_list->nreplicas) {
+				strncpy(replicaid, replica_list->replicas[i], BXGRID_ID_MAX);
 				debug(D_BXGRID, "selecting closest replica %s", replicaid);
-				break;
-			case BXGRID_RANDOM_REPLICA:
+			} else {
 				strncpy(replicaid, replica_list->replicas[rand() % replica_list->nreplicas], BXGRID_ID_MAX);
 				debug(D_BXGRID, "selecting random replica %s", replicaid);
-				break;
-			default:
-				strncpy(replicaid, replica_list->replicas[nid], BXGRID_ID_MAX);
-				debug(D_BXGRID, "selecting replica %d %s", nid, replicaid);
-				break;
+			}
+		} else {
+			strncpy(replicaid, replica_list->replicas[nid], BXGRID_ID_MAX);
+			debug(D_BXGRID, "selecting replica %d %s", nid, replicaid);
 		}
 	} else {
 		BXGRID_QUERY_AND_CHECK(rep_res, mysql_cxn, NULL, BXGRID_REPLICAID_QUERY, fileid);
@@ -312,33 +300,32 @@ const char *bxgrid_lookup_replicaid( MYSQL *mysql_cxn, const char *fileid, int n
 		debug(D_BXGRID, "fileid %s has %d replicas", fileid, nreplicas);
 
 		if (nreplicas == 0 || nid >= nreplicas) return NULL;
-		switch (nid) {
-			case BXGRID_CLOSEST_REPLICA:
-				BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
-				for (int i = 0; i < nid; i++) {
-					if (strcmp(bxgrid_hostname, rep_row[0]) == 0) 
-						break;
+		if (nid < 0) {
+			int i, ri = rand() % nreplicas;
+			BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
+			for (i = 0; i < nreplicas; i++) {
+				if (ri == i) 
+					strncpy(replicaid, rep_row[0], BXGRID_ID_MAX);
+				if (strcmp(bxgrid_hostname, rep_row[0]) == 0) 
+					break;
+				if (i < (nreplicas - 1)) {
 					BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
 				}
+			}
+
+			if (i < nreplicas) {
 				strncpy(replicaid, rep_row[0], BXGRID_ID_MAX);
 				debug(D_BXGRID, "selecting closest replica %s", replicaid);
-				break;
-			case BXGRID_RANDOM_REPLICA:
-				BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
-				for (int i = 0; i < rand() % nreplicas; i++) {
-					BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
-				}
-				strncpy(replicaid, rep_row[0], BXGRID_ID_MAX);
+			} else {
 				debug(D_BXGRID, "selecting random replica %s", replicaid);
-				break;
-			default:
+			}
+		} else {
+			BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
+			for (int i = 0; i < nid; i++) {
 				BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
-				for (int i = 0; i < nid; i++) {
-					BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
-				}
-				strncpy(replicaid, rep_row[0], BXGRID_ID_MAX);
-				debug(D_BXGRID, "selecting replica %d %s", nid, replicaid);
-				break;
+			}
+			strncpy(replicaid, rep_row[0], BXGRID_ID_MAX);
+			debug(D_BXGRID, "selecting replica %d %s", nid, replicaid);
 		}
 		mysql_free_result(rep_res);
 	}
@@ -403,7 +390,7 @@ pfs_file *bxgrid_bvf_open( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, 
 	char host[PFS_PATH_MAX];
 	char path[PFS_PATH_MAX];
 	const char *fileid, *replicaid;
-	int nattempt = BXGRID_CLOSEST_REPLICA;
+	int nattempt = -1; // Start with closest/random
 
 	if (strcmp(bvf->name, "/fileid") == 0) {
 		fileid    = string_basename(name->rest);
