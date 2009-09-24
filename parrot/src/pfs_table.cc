@@ -1224,7 +1224,7 @@ int pfs_table::stat( const char *n, struct pfs_stat *b )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(n,&pname)) {
+	if(resolve_name(n,&pname,true)) {
 		result = pname.service->stat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pfs_service_get_block_size();
