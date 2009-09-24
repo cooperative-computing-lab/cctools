@@ -69,7 +69,7 @@ struct hdfs_services {
 };
 
 /* TODO: Clean up handles? */
-int load_hdfs_services(struct hdfs_services *hdfs) {
+static int load_hdfs_services(struct hdfs_services *hdfs) {
 	void *handle;
 
 	handle = dlopen(LIBJVM_PATH, RTLD_LAZY);
@@ -270,7 +270,7 @@ public:
 		}
 			
 		struct pfs_stat buf;
-		if (!this->stat(name, &buf) && S_ISDIR(buf.st_mode)) {
+		if (!this->_stat(fs, name, &buf) && S_ISDIR(buf.st_mode)) {
 			errno = EISDIR;
 			return 0;
 		}
@@ -286,9 +286,7 @@ public:
 			file = 0;
 		}
 
-		if (!file) {
-			pfs_service_disconnect_cache(name, fs, (errno == EINTERNAL));
-		}
+		pfs_service_disconnect_cache(name, fs, (errno == EINTERNAL));
 
 		debug(D_HDFS, "= %ld", file);
 		return file;
@@ -321,21 +319,44 @@ public:
 			hdfs.free_stat(file_list, num_entries);
 		}
 		
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
 		return dir;
 	}
-
+	
 	virtual int stat( pfs_name *name, struct pfs_stat *buf ) {
 		int result;
-		int file_uid;
-		int file_gid;
-
-		hdfsFileInfo *file_info = 0;
 		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
 		
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
-
+		
 		debug(D_HDFS, "getting stat of %s", name->rest);
+		result = this->_stat(fs, name, buf);
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+
+		HDFS_END
+	}
+	
+	virtual int lstat( pfs_name *name, struct pfs_stat *buf ) {
+		int result;
+		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
+		
+		HDFS_CHECK_INIT(-1)
+		HDFS_CHECK_FS(-1)
+		
+		debug(D_HDFS, "getting stat of %s", name->rest);
+		result = this->_stat(fs, name, buf);
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+
+		HDFS_END
+	}
+
+	virtual int _stat( hdfsFS fs, pfs_name *name, struct pfs_stat *buf ) {
+		int result;
+		int file_uid;
+		int file_gid;
+		hdfsFileInfo *file_info = 0;
+
 		file_info = hdfs.stat(fs, name->rest);
 
 		if (file_info != NULL) {
@@ -369,18 +390,6 @@ public:
 			result = -1;
 		}
 		
-		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
-		HDFS_END
-	}
-
-	virtual int lstat( pfs_name *name, struct pfs_stat *buf ) {
-		int result;
-		
-		HDFS_CHECK_INIT(-1)
-		
-		debug(D_HDFS, "getting lstat of %s", name->rest);
-		result = this->stat(name, buf);
-		
 		HDFS_END
 	}
 
@@ -401,11 +410,13 @@ public:
 	virtual int chdir( pfs_name *name, char *newname ) {
 		int result = -1;
 		struct pfs_stat buf;
+		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
 		
 		HDFS_CHECK_INIT(-1)
+		HDFS_CHECK_FS(-1)
 
 		debug(D_HDFS, "change directory to %s", name->rest);
-		if (this->stat(name, &buf) >= 0) {
+		if (this->_stat(fs, name, &buf) >= 0) {
 			if (S_ISDIR(buf.st_mode)) {
 				sprintf(newname, "/%s/%s:%d%s", name->service_name, name->host, name->port, name->rest);
 				result = 0;
@@ -415,6 +426,7 @@ public:
 			}
 		}
 
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
 		HDFS_END
 	}
 
