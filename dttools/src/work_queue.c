@@ -29,11 +29,6 @@
 #define FNAME 0
 #define LITERAL 1
 
-#define CHOOSE_BY_DEFAULT 0
-#define CHOOSE_BY_FILES 1
-#define CHOOSE_BY_TIME 2
-
-
 struct work_queue {
 	struct link * master_link;
 	struct list * ready_list;
@@ -100,7 +95,7 @@ struct work_queue_task * work_queue_task_create( const char *command_line)
 	memset(t,0,sizeof(*t));
 	t->command_line = strdup(command_line);
 	t->tag = NULL;
-	t->worker_algorithm = CHOOSE_BY_FILES;
+	t->worker_selection_algorithm = CHOOSE_HOST_BY_DEFAULT;
 	t->output = NULL;
 	t->input_files = NULL;
 	t->output_files = NULL;
@@ -541,9 +536,9 @@ struct work_queue_worker * find_worker_by_available( struct work_queue *q )
 
 struct work_queue_worker * find_best_worker( struct work_queue *q, struct work_queue_task *t ) {
 
-    if(t->worker_algorithm==CHOOSE_BY_FILES)
+    if(t->worker_selection_algorithm==CHOOSE_HOST_BY_FILES)
 	return find_worker_by_cache(q,t);
-    else if(t->worker_algorithm==CHOOSE_BY_TIME)
+    else if(t->worker_selection_algorithm==CHOOSE_HOST_BY_TIME)
 	return find_worker_by_time(q);
     else
 	return find_worker_by_available(q);
@@ -796,6 +791,16 @@ INT64_T work_queue_task_specify_input_file( struct work_queue_task* t, const cha
 	if(!t->input_files)
 		t->input_files = list_create();
 	return list_push_tail(t->input_files,tf);
+}
+
+INT64_T work_queue_task_specify_algorithm( struct work_queue_task* t, int alg) {
+	if(t && alg >= CHOOSE_HOST_BY_DEFAULT && alg <= CHOOSE_HOST_MAX) {
+		t->worker_selection_algorithm = alg;
+		return 0;
+	}
+	else {
+		return 1;
+	}
 }
 
 int work_queue_shut_down_workers (struct work_queue* q, int n)

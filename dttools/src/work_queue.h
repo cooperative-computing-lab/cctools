@@ -23,12 +23,17 @@ and port of the master.
 #define WQ_RESULT_FUNCTION_FAIL 2
 #define WQ_RESULT_OUTPUT_FAIL 3
 
+#define CHOOSE_HOST_BY_DEFAULT 0
+#define CHOOSE_HOST_BY_FILES 1
+#define CHOOSE_HOST_BY_TIME 2
+#define CHOOSE_HOST_MAX 2
+
 /** A task description.  This structure should only be created with @ref work_queue_task_create and delete with @ref work_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.
 */
 struct work_queue_task {
 	char *tag;
         char *command_line;		/**< The program(s) to execute, as a shell command line. */
-	int worker_algorithm;           /**< How to choose worker to run the task. */
+	int worker_selection_algorithm;           /**< How to choose worker to run the task. */
 	char *output;			/**< The standard output of the task. */
 	struct list * input_files;      /**< The files to transfer to the worker and place in the executing directory. */
 	struct list * output_files;	/**< The output files (other than the standard output stream) created by the program expected to be retrieved from the task. */
@@ -111,6 +116,12 @@ struct work_queue_task * work_queue_task_create( const char* full_command);
 @param tag The tag to attatch to tast t.
 */
 INT64_T work_queue_task_specify_tag( struct work_queue_task* t, const char* tag);
+
+/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
+@param t The task to which to add parameters
+@param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "CHOOSE_HOST_BY" values.
+*/
+INT64_T work_queue_task_specify_algorithm( struct work_queue_task* t, int alg);
 
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
 @param t The task to which to add parameters
