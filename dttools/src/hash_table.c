@@ -16,6 +16,7 @@ See the file COPYING for details.
 struct entry {
 	char *key;
 	void *value;
+	unsigned hash;
 	struct entry *next;
 };
 
@@ -74,17 +75,17 @@ void hash_table_delete( struct hash_table *h )
 	free(h);
 }
 
-
 void * hash_table_lookup( struct hash_table *h, const char *key )
 {
 	struct entry *e;
-	unsigned index;
+	unsigned hash, index;
 
-	index = h->hash_func(key) % h->bucket_count;
+	hash = h->hash_func(key);
+	index = hash % h->bucket_count;
 	e = h->buckets[index];
 
 	while(e) {
-		if(!strcmp(key,e->key)) {
+		if(hash==e->hash && !strcmp(key,e->key)) {
 			return e->value;
 		}
 		e=e->next;
@@ -101,13 +102,14 @@ int hash_table_size( struct hash_table *h )
 int hash_table_insert( struct hash_table *h, const char *key, const void *value )
 {
 	struct entry *e;
-	unsigned index;
+	unsigned hash, index;
 
-	index = h->hash_func(key) % h->bucket_count;
+	hash = h->hash_func(key);
+	index = hash % h->bucket_count;
 	e = h->buckets[index];
 
 	while(e) {
-		if(!strcmp(key,e->key)) return 0;
+		if(hash==e->hash && !strcmp(key,e->key)) return 0;
 		e=e->next;
 	}
 
@@ -121,6 +123,7 @@ int hash_table_insert( struct hash_table *h, const char *key, const void *value 
 	}
 
 	e->value = (void*) value;
+	e->hash = hash;
 	e->next = h->buckets[index];
 	h->buckets[index] = e;
 	h->size++;
@@ -132,14 +135,15 @@ void * hash_table_remove( struct hash_table *h, const char *key )
 {
 	struct entry *e,*f;
 	void *value;
-	unsigned index;
+	unsigned hash, index;
 
-	index = h->hash_func(key) % h->bucket_count;
+	hash = h->hash_func(key);
+	index = hash % h->bucket_count;
 	e = h->buckets[index];
 	f = 0;
 
 	while(e) {
-		if(!strcmp(key,e->key)) {
+		if(hash==e->hash && !strcmp(key,e->key)) {
 			if(f) {
 				f->next = e->next;
 			} else {
