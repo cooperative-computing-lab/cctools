@@ -23,10 +23,12 @@ and port of the master.
 #define WQ_RESULT_FUNCTION_FAIL 2
 #define WQ_RESULT_OUTPUT_FAIL 3
 
-#define CHOOSE_HOST_BY_DEFAULT 0
-#define CHOOSE_HOST_BY_FILES 1
-#define CHOOSE_HOST_BY_TIME 2
-#define CHOOSE_HOST_MAX 2
+#define WORK_QUEUE_CHOOSE_HOST_BY_FCFS 0
+#define WORK_QUEUE_CHOOSE_HOST_BY_FILES 1
+#define WORK_QUEUE_CHOOSE_HOST_BY_TIME 2
+#define WORK_QUEUE_CHOOSE_HOST_MAX 2
+#define WORK_QUEUE_CHOOSE_HOST_BY_DEFAULT 0
+
 
 /** A task description.  This structure should only be created with @ref work_queue_task_create and delete with @ref work_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.
 */
