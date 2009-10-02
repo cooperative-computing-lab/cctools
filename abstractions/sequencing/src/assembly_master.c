@@ -732,9 +732,12 @@ int main( int argc, char *argv[] )
 	while(1) {
 		if(time(0)!=last_display_time) display_progress(queue);
 		t = work_queue_wait(queue,WAITFORTASK);
-		if(! handle_done_task(t)) break;		
+		if((!handle_done_task(t)) && (work_queue_empty(q))) {
+		    break;		
+		}
 	}
-	
+
+	printf("%7s | %4s %4s %4s | %6s %4s %4s %4s | %6s %6s %6s %8s | %s\n","Time","WI","WR","WB","TS","TW","TR","TC","TD","AR","AF","WS","Speedup");
 	display_progress(queue);
 	work_queue_delete(queue);
 	printf("Completed %i tasks in %i seconds\n",tasks_done,(int)(time(0)-start_time));
