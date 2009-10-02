@@ -732,7 +732,7 @@ int main( int argc, char *argv[] )
 	while(1) {
 		if(time(0)!=last_display_time) display_progress(queue);
 		t = work_queue_wait(queue,WAITFORTASK);
-		if((!handle_done_task(t)) && (work_queue_empty(q))) {
+		if((!handle_done_task(t)) && (work_queue_empty(queue))) {
 		    break;		
 		}
 	}
