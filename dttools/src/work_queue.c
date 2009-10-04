@@ -29,6 +29,9 @@
 #define FNAME 0
 #define LITERAL 1
 
+double wq_option_fast_abort_multiplier = -1.0;
+int wq_option_worker_selection_algorithm = WORK_QUEUE_CHOOSE_HOST_DEFAULT;
+
 struct work_queue {
 	struct link * master_link;
 	struct list * ready_list;
@@ -593,9 +596,13 @@ int work_queue_activate_fast_abort(struct work_queue* q, double multiplier)
 		q->fast_abort_multiplier = multiplier;
 		return 0;
 	}
+	else if(multiplier < 0) {
+		q->fast_abort_multiplier = multiplier;
+		return 0;
+	}
 	else {
-		debug(D_DEBUG,"Bad multiplier (%.03lf) given for fast abort. Using the default (10)", multiplier);
-		q->fast_abort_multiplier = 10;
+		debug(D_DEBUG,"Bad multiplier (%.02lf) given for fast abort. Deactivating fast abort");
+		q->fast_abort_multiplier = -1.0;
 		return 1;
 	}
 }
@@ -605,7 +612,7 @@ void abort_slow_workers( struct work_queue *q )
 	struct work_queue_worker *w;
 	char *key;
 	const double multiplier = q->fast_abort_multiplier;
-	
+
 	if(q->total_tasks_complete<10) return;
 
 	timestamp_t average_task_time = q->total_task_time / q->total_tasks_complete;
@@ -665,9 +672,11 @@ struct work_queue * work_queue_create( int port, time_t stoptime)
 		q->workers_in_state[i] = 0;
 	}
 
-	q->fast_abort_multiplier = -1.0;
-	q->worker_selection_algorithm = WORK_QUEUE_CHOOSE_HOST_DEFAULT;
-	
+	q->fast_abort_multiplier = wq_option_fast_abort_multiplier; // set from global variable
+	q->worker_selection_algorithm = wq_option_worker_selection_algorithm; // set from global variable
+	debug(D_WQ,"In w_q_c q->multiplier = %.02lf. global multiplier = %.02lf.",q->fast_abort_multiplier,wq_option_fast_abort_multiplier);
+	debug(D_WQ,"In w_q_c q->w_s_a = %i. global w_s_ = %i.",q->worker_selection_algorithm,wq_option_worker_selection_algorithm);
+
 	return q;
 }
 

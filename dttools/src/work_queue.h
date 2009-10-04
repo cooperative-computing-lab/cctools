@@ -31,6 +31,9 @@ and port of the master.
 #define WORK_QUEUE_CHOOSE_HOST_DEFAULT 1 // default setting for queue.
 
 
+extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
+extern int wq_option_worker_selection_algorithm; /**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
+
 /** A task description.  This structure should only be created with @ref work_queue_task_create and delete with @ref work_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.
 */
 struct work_queue_task {
@@ -84,10 +87,10 @@ void work_queue_delete( struct work_queue *q );
 */
 void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s );
 
-/** Turn on fast abort functionality for a given queue.
+/** Turn on or off fast abort functionality for a given queue.
 @param q A pointer to the queue to modify.
-@param multiplier The multiplier of the average task time at which point to abort.
-@returns 0 if activated with appropriate multiplier, 1 if activated with the default multiplier.
+@param multiplier The multiplier of the average task time at which point to abort; if negative (and by default) fast_abort is deactivated.
+@returns 0 if activated or deactivated with an appropriate multiplier, 1 if deactivated due to inappropriate multiplier.
 */
 int work_queue_activate_fast_abort(struct work_queue* q, double multiplier);
 
