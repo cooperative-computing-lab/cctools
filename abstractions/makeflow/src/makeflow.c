@@ -689,10 +689,13 @@ static void show_help(const char *cmd)
 	printf(" -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
 	printf(" -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
 	printf(" -A             Disable the check for AFS. (experts only.)\n");;
+	printf(" -F <#>         WQ fast abort multiplier for new queue.     (default is -1, deactivated)\n");
+	printf(" -W <#>         WQ worker selection algorithm.              (default is defined in work_queue.h)\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
+	
 }
 
 int main( int argc, char *argv[] )
