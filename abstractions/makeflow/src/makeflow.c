@@ -713,7 +713,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "Ap:cd:DT:iB:S:Rl:L:j:J:o:v")) != (char) -1) {
+	while((c = getopt(argc, argv, "Ap:cd:DT:iB:S:Rl:L:j:J:o:vF:W:")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -763,6 +763,12 @@ int main( int argc, char *argv[] )
 				fprintf(stderr,"makeflow: unknown batch queue type: %s\n",optarg);
 				return 1;
 			}
+			break;
+		case 'F':
+			wq_option_fast_abort_multiplier = atof(optarg);
+			break;
+		case 'W':
+			wq_option_worker_selection_algorithm = atoi(optarg);
 			break;
 		case 'h':
 		default:
