@@ -3,7 +3,7 @@ CCTOOLS_HOME = ../../../
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
-TARGETS = allpairs allpairs_multicore allpairs_status allpairs_wait allpairs_cleanup
+TARGETS = allpairs allpairs_multicore allpairs_status allpairs_wait allpairs_cleanup allpairs_workqueue
 
 LOCAL_LDFLAGS=-lchirp -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
@@ -23,6 +23,9 @@ allpairs_cleanup: allpairs_cleanup.o ${CCTOOLS_HOME}/chirp/src/libchirp.a
 
 allpairs_multicore: allpairs_multicore.o ${CCTOOLS_HOME}/chirp/src/libchirp.a
 	${CCTOOLS_LD} -o $@ $^ -lpthread ${LOCAL_LDFLAGS}
+
+allpairs_workqueue: allpairs_workqueue.o
+	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 test:
 
