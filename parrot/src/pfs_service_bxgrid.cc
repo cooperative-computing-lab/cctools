@@ -163,31 +163,6 @@ public:
 	virtual pfs_ssize_t read( void *data, pfs_size_t length, pfs_off_t offset ) {   
 		return chirp_global_pread(file,data,length,offset,time(0)+pfs_master_timeout);  
 	}
-
-	virtual int fstat( struct pfs_stat *buf ) {
-		int result;
-		struct chirp_stat cbuf;
-		result = chirp_global_fstat(file,&cbuf,time(0)+pfs_master_timeout);             
-		if(result==0) COPY_CSTAT(cbuf,*buf);
-		return result;
-	}       
-
-	virtual int fstatfs( struct pfs_statfs *buf ) {
-		int result;
-		struct chirp_statfs cbuf;
-		result = chirp_global_fstatfs(file,&cbuf,time(0)+pfs_master_timeout);           
-		if(result==0) COPY_STATFS(cbuf,*buf);
-		return result;
-	}
-
-	virtual pfs_ssize_t get_size() {
-		struct pfs_stat buf;
-		if(this->fstat(&buf)==0) {
-			return buf.st_size;
-		} else {
-			return -1;
-		}       
-	} 
 };
 
 #define BXGRID_QUERY_AND_CHECK( res, cxn, reterr, ... ) \
@@ -211,7 +186,7 @@ int bxgrid_bvf_stat( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, struct
 		debug(D_BXGRID, "%s is %s the stat_query_cache", file_path, (file_info ? "in" : "not in"));
 	}
 
-	if (!file_info) {
+	if (!file_info) { // Cache miss or no caching
 		BXGRID_QUERY_AND_CHECK(file_res, mysql_cxn, -1, bvf->stat_query, string_basename(file_path));
 		BXGRID_FETCH_AND_CHECK(file_row, file_res, -1);
 		
@@ -219,17 +194,20 @@ int bxgrid_bvf_stat( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, struct
 			file_info = (struct bxgrid_file_info *)xxmalloc(sizeof(struct bxgrid_file_info));
 			buf->st_mode  = file_info->mode  = BXGRID_REG_MODE;
 			buf->st_size  = file_info->size  = strtol(file_row[0], NULL, 10);
-			buf->st_mtime = file_info->mtime = (file_row[1] ? strtol(file_row[1], NULL, 10) : 0);
+			buf->st_mtime = file_info->mtime = (file_row[1] ? strtol(file_row[1], NULL, 10) : time(NULL));
 
 			hash_table_insert(bxgrid_stat_query_cache, file_path, file_info);
 		} else {
 			buf->st_mode  = BXGRID_REG_MODE;
 			buf->st_size  = strtol(file_row[0], NULL, 10);
-			buf->st_mtime = (file_row[1] ? strtol(file_row[1], NULL, 10) : 0);
-
+			buf->st_mtime = (file_row[1] ? strtol(file_row[1], NULL, 10) : time(NULL));
 		}
 		
 		mysql_free_result(file_res);
+	} else { // Cache hit
+		buf->st_mode  = file_info->mode;
+		buf->st_size  = file_info->size;
+		buf->st_mtime = file_info->mtime;
 	}
 
 	return 0;
