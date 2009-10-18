@@ -292,7 +292,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
                 force_stream = 1;
         }
                                                                                                   
-	if(resolve_name(lname,&pname,true)) {
+	if(resolve_name(lname,&pname)) {
 		if(flags&O_DIRECTORY) {
 			file = pname.service->getdir(&pname);
 		} else if(pname.service->is_local()) {
@@ -1175,7 +1175,7 @@ int pfs_table::lchown( const char *n, uid_t uid, gid_t gid )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(n,&pname)) {
+	if(resolve_name(n,&pname,false)) {
 		result = pname.service->lchown(&pname,uid,gid);
 	}
 
@@ -1211,7 +1211,7 @@ int pfs_table::unlink( const char *n )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(n,&pname)) {
+	if(resolve_name(n,&pname,false)) {
 		result = pname.service->unlink(&pname);
 		if(result==0) pfs_cache_invalidate(&pname);
 	}
@@ -1224,7 +1224,7 @@ int pfs_table::stat( const char *n, struct pfs_stat *b )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(n,&pname,true)) {
+	if(resolve_name(n,&pname)) {
 		result = pname.service->stat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pfs_service_get_block_size();
@@ -1255,7 +1255,7 @@ int pfs_table::lstat( const char *n, struct pfs_stat *b )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(n,&pname)) {
+	if(resolve_name(n,&pname,false)) {
 		result = pname.service->lstat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pfs_service_get_block_size();
@@ -1274,7 +1274,7 @@ int pfs_table::rename( const char *n1, const char *n2 )
 	pfs_name p1, p2;
 	int result = -1;
 
-	if(resolve_name(n1,&p1) && resolve_name(n2,&p2)) {
+	if(resolve_name(n1,&p1,false) && resolve_name(n2,&p2,false)) {
 		if(p1.service==p2.service) {
 			result = p1.service->rename(&p1,&p2);
 			if(result==0) {
@@ -1294,7 +1294,7 @@ int pfs_table::link( const char *n1, const char *n2 )
 	pfs_name p1, p2;
 	int result = -1;
 
-	if(resolve_name(n1,&p1) && resolve_name(n2,&p2)) {
+	if(resolve_name(n1,&p1,false) && resolve_name(n2,&p2,false)) {
 		if(p1.service==p2.service) {
 			result = p1.service->link(&p1,&p2);
 		} else {
@@ -1319,7 +1319,7 @@ int pfs_table::symlink( const char *n1, const char *n2 )
 	verbatim down to the needed driver.
 	*/
 
-	if(resolve_name(n2,&pname)) {
+	if(resolve_name(n2,&pname,false)) {
 		result = pname.service->symlink(n1,&pname);
 	}
 
@@ -1331,7 +1331,7 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(n,&pname)) {
+	if(resolve_name(n,&pname,false)) {
 		int pid, fd;
 		if(sscanf(pname.path,"/proc/%d/fd/%d",&pid,&fd)==2) {
 			struct pfs_process *target = pfs_process_lookup(pid);
@@ -1385,7 +1385,7 @@ int pfs_table::rmdir( const char *n )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(n,&pname)) {
+	if(resolve_name(n,&pname,false)) {
 		result = pname.service->rmdir(&pname);
 	}
 
