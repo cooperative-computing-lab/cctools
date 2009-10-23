@@ -533,6 +533,11 @@ INT64_T chirp_reli_resetacl( const char *host, const char *path, const char *rig
 	RETRY_ATOMIC( result = chirp_client_resetacl(client,path,rights,stoptime); )
 }
 
+INT64_T chirp_reli_locate( const char *host, const char *path, chirp_loc_t callback, void *arg, time_t stoptime )
+{
+	RETRY_ATOMIC( result = chirp_client_locate(client,path,callback,arg,stoptime); )
+}
+
 INT64_T chirp_reli_unlink( const char *host, const char *path, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_unlink(client,path,stoptime); )

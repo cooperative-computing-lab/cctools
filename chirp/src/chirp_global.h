@@ -35,6 +35,7 @@ INT64_T chirp_global_getlongdir( const char *host, const char *path, chirp_longd
 INT64_T chirp_global_getdir( const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime );
 INT64_T chirp_global_getacl( const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime );
 INT64_T chirp_global_setacl( const char *host, const char *path, const char *subject, const char *rights, time_t stoptime );
+INT64_T chirp_global_locate( const char *host, const char *path, chirp_loc_t callback, void *arg, time_t stoptime);
 INT64_T chirp_global_unlink( const char *host, const char *path, time_t stoptime );
 INT64_T chirp_global_rename( const char *host, const char *path, const char *newpath, time_t stoptime );
 INT64_T chirp_global_link( const char *host, const char *path, const char *newpath, time_t stoptime );

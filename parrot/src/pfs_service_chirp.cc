@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include "pfs_table.h"
 #include "pfs_service.h"
+#include "pfs_location.h"
 
 extern "C" {
 #include "chirp_global.h"
@@ -454,6 +455,20 @@ public:
 	virtual int setacl( pfs_name *name, const char *subject, const char *rights ) {
 		chirp_dircache_invalidate();
 		return chirp_global_setacl(name->hostport,name->rest,subject,rights,time(0)+pfs_master_timeout);
+	}
+	
+	virtual pfs_location* locate( pfs_name *name ) {
+		int result = -1;
+		pfs_location *loc = new pfs_location();
+		
+		result = chirp_global_locate(name->host,name->path,add_to_loc,(void*)loc,time(0)+pfs_master_timeout);
+		
+		if(result>=0) {
+			return loc;
+		} else {
+			delete loc;
+			return 0;
+		}
 	}
 
 	virtual int get_default_port() {

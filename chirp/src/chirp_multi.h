@@ -31,6 +31,7 @@ INT64_T chirp_multi_putfile_buffer( const char *volume, const char *path, const 
 INT64_T chirp_multi_getdir( const char *volume, const char *path, chirp_dir_t callback, void *arg, time_t stoptime );
 INT64_T chirp_multi_getacl( const char *volume, const char *path, chirp_dir_t callback, void *arg, time_t stoptime );
 INT64_T chirp_multi_setacl( const char *volume, const char *path, const char *subject, const char *rights, time_t stoptime );
+INT64_T chirp_multi_locate( const char *volume, const char *path, chirp_loc_t callback, void *arg, time_t stoptime );
 INT64_T chirp_multi_whoami( const char *volume, char *buf, INT64_T length, time_t stoptime );
 INT64_T chirp_multi_unlink( const char *volume, const char *path, time_t stoptime );
 INT64_T chirp_multi_rename( const char *volume, const char *path, const char *newpath, time_t stoptime );

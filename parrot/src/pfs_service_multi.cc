@@ -248,6 +248,20 @@ public:
 		return chirp_multi_setacl(name->hostport,name->rest,subject,rights,time(0)+pfs_master_timeout);
 	}
 
+	virtual pfs_location* locate( pfs_name *name) {	
+		int result = -1;
+		pfs_location *loc = new pfs_location();
+		
+		result = chirp_multi_locate(name->hostport,name->rest,add_to_loc,(void*)loc,time(0)+pfs_master_timeout);
+		
+		if(result>=0) {
+			return loc;
+		} else {
+			delete loc;
+			return 0;
+		}
+	}
+
 	virtual int get_default_port() {
 		return 9094;
 	}

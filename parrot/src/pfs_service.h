@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "pfs_name.h"
 #include "pfs_file.h"
 #include "pfs_dir.h"
+#include "pfs_location.h"
 
 class pfs_service {
 public:
@@ -51,6 +52,7 @@ public:
 	virtual int whoami( pfs_name *name, char *buf, int size );
 	virtual int getacl( pfs_name *name, char *buf, int size );
 	virtual int setacl( pfs_name *name, const char *subject, const char *rights );
+	virtual pfs_location* locate( pfs_name *name );
 
 	virtual int putfile( pfs_name *source, pfs_name *target );
 	virtual int getfile( pfs_name *source, pfs_name *target );

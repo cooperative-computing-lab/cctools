@@ -489,6 +489,21 @@ public:
 		END
 	}
 
+	virtual pfs_location* locate( pfs_name *name ) {
+		int result;
+		struct pfs_stat buf;
+		char path[PFS_PATH_MAX];
+		pfs_location *loc;
+		if(!pfs_acl_check_dir(name,CHIRP_ACL_LIST)) return 0;
+		debug(D_LOCAL,"locate %s",name->rest);
+		result = stat(name, &buf);
+		if(result < 0) return 0;
+		snprintf(path, PFS_PATH_MAX, "dev %lld: %s", buf.st_dev, name->path);
+		loc = new pfs_location();
+		loc->append(path);
+		return loc;
+	}
+
 	virtual int is_seekable() {
 		return 1;
 	}

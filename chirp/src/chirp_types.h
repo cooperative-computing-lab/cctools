@@ -170,4 +170,14 @@ to display or otherwise act upon all active storage jobs in a server.
 
 typedef void (*chirp_joblist_t) ( struct chirp_job_state *state, void *arg );
 
+/** A callback function typedef used to display a file's location(s).
+A function matching this type is called by @ref chirp_reli_locate
+to display or otherwise act upon each location at which a given file is stored.
+@param location The location of a file (usually hostname:local_path).
+@param arg  A convenience pointer corresponding to the <tt>arg</tt> passed from @ref chirp_reli_locate.
+@see chirp_reli_locate
+*/
+
+typedef void (*chirp_loc_t) ( const char *location, void *arg );
+
 #endif

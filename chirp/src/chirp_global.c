@@ -451,6 +451,24 @@ INT64_T chirp_global_whoami( const char *host, const char *path, char *buf, INT6
 	}
 }
 
+INT64_T chirp_global_locate( const char *host, const char *path, chirp_loc_t callback, void *arg, time_t stoptime)
+{
+	if(is_multi_path(host)) {
+		errno = EINVAL;
+		return -1;
+		/*char mhost[CHIRP_PATH_MAX];
+		char mpath[CHIRP_PATH_MAX];
+		parse_multi_path(path,mhost,mpath);
+		return chirp_multi_locate(mhost,mpath,callback,arg,stoptime);
+		*/
+	} else if(not_empty(host)) {
+		return chirp_reli_locate(host,path,callback,arg,stoptime);
+	} else {
+		errno = EINVAL;
+		return -1;
+	}
+}
+
 INT64_T chirp_global_unlink( const char *host, const char *path, time_t stoptime )
 {
 	if(is_multi_path(host)) {

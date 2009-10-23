@@ -371,6 +371,16 @@ INT64_T chirp_reli_setacl( const char *host, const char *path, const char *subje
 
 INT64_T chirp_reli_resetacl( const char *host, const char *path, const char *rights, time_t stoptime );
 
+/** Identify the true location of a path. 
+@param host The name and port of the Chirp server to access.
+@param path The pathname of the file to locate.
+@param callback A function to call for each location of the file.
+@param arg An additional argument to pass to the callback.
+@param stoptime The absolute time at which to abort.
+@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
+*/
+INT64_T chirp_reli_locate( const char *host, const char *path, chirp_loc_t callback, void *arg, time_t stoptime );
+
 /** Return the caller's identity.
 @param host The name and port of the Chirp server to access.
 @param subject The buffer to fill with the caller's identity.

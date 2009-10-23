@@ -422,6 +422,13 @@ INT64_T chirp_multi_setacl( const char *volume, const char *path, const char *su
 	return chirp_reli_setacl(current_volume->host,lpath,subject,rights,stoptime);
 }
 
+INT64_T chirp_multi_locate( const char *volume, const char *path, chirp_loc_t callback, void *arg, time_t stoptime )
+{
+	struct file_info info;
+	if(!chirp_multi_lookup(volume,path,&info,stoptime)) return -1;
+	return chirp_reli_locate(info.rhost,info.rpath,callback,arg,stoptime);
+}
+
 INT64_T chirp_multi_whoami( const char *volume, char *buf, INT64_T length, time_t stoptime )
 {
 	char lpath[CHIRP_PATH_MAX];

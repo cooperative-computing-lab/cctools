@@ -183,6 +183,7 @@ INT64_T chirp_client_lookup( struct chirp_client *c, const char *logical_name, c
 	INT64_T actual;
 
 	result = simple_command(c,stoptime,"lookup %s\n",logical_name);
+	fprintf(stderr, "%d\n", result);
 
 	if(result>0) {
 		*url = malloc(result);
@@ -325,6 +326,16 @@ INT64_T chirp_client_resetacl( struct chirp_client *c, const char *path, const c
 	char safepath[CHIRP_LINE_MAX];
 	url_encode(path,safepath,sizeof(safepath));
 	return simple_command(c,stoptime,"resetacl %s %s\n",safepath,acl);
+}
+
+INT64_T chirp_client_locate( struct chirp_client *c, const char *path, chirp_loc_t callback, void *arg, time_t stoptime )
+{
+	char location[CHIRP_PATH_MAX];
+	char host[CHIRP_PATH_MAX];
+	sscanf(c->hostport, "%[^:]%*s", host);
+	snprintf(location,CHIRP_PATH_MAX,"%s:%s",host,path);
+	callback(location,arg);
+	return 1;
 }
 
 INT64_T chirp_client_open( struct chirp_client *c, const char *path, INT64_T flags, INT64_T mode, struct chirp_stat *info, time_t stoptime  )
@@ -817,6 +828,7 @@ INT64_T chirp_client_symlink( struct chirp_client *c, const char *oldpath, const
 	url_encode(oldpath,safeoldpath,sizeof(safeoldpath));
 	url_encode(newpath,safenewpath,sizeof(safenewpath));
 
+	debug(D_CHIRP, "symlink %s %s", safeoldpath, safenewpath);
 	return simple_command(c,stoptime,"symlink %s %s\n",safeoldpath,safenewpath);
 }
 

@@ -60,6 +60,7 @@ INT64_T chirp_client_openacl( struct chirp_client *c, const char *path, time_t s
 const char * chirp_client_readacl( struct chirp_client *c, time_t stoptime );
 INT64_T chirp_client_setacl( struct chirp_client *c, const char *path, const char *user, const char *acl, time_t stoptime );
 INT64_T chirp_client_resetacl( struct chirp_client *c, const char *path, const char *acl, time_t stoptime );
+INT64_T chirp_client_locate( struct chirp_client *c, const char *path, chirp_loc_t callback, void *arg, time_t stoptime );
 INT64_T chirp_client_whoami( struct chirp_client *c, char *buf, INT64_T length, time_t stoptime );
 INT64_T chirp_client_whoareyou( struct chirp_client *c, const char *rhost, char *buffer, INT64_T length, time_t stoptime  );
 INT64_T chirp_client_mkfifo( struct chirp_client *c, const char *path, time_t stoptime );

@@ -1533,6 +1533,35 @@ int pfs_table::setacl( const char *n, const char *subject, const char *rights )
 	return result;
 }
 
+int pfs_table::locate( const char *n, char *buf, int length )
+{
+	static pfs_location *loc = 0;
+	pfs_name pname;
+	
+	if(n && strlen(n)) {
+		if(loc) delete(loc);
+		loc = 0;
+		
+		if(resolve_name(n, &pname)) {
+			loc = pname.service->locate(&pname);
+		}
+	}
+	
+	if(loc) {
+		int result = 0;
+		char path[PFS_PATH_MAX];
+		
+		result = loc->retrieve(path, PFS_PATH_MAX);
+		if(result) {
+			strncpy(buf, path, length);
+			return result;
+		}
+	}
+	
+	return -1;
+
+}
+
 
 int pfs_table::copyfile( const char *source, const char *target )
 {

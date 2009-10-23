@@ -305,3 +305,4 @@ parrot_setacl   303
 parrot_whoami   304
 parrot_copyfile 305
 parrot_md5      306
+parrot_locate   307

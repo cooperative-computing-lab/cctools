@@ -89,6 +89,7 @@ public:
 	int	whoami( const char *path, char *buf, int size );
 	int	getacl( const char *path, char *buf, int size );
 	int	setacl( const char *path, const char *subject, const char *rights );
+	int	locate( const char *path, char *buf, int size );
 	int	copyfile( const char *source, const char *target );
 	int	copyfile_slow( const char *source, const char *target );
 	int	md5( const char *path, unsigned char *digest );

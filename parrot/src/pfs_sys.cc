@@ -613,6 +613,14 @@ int pfs_setacl( const char *path, const char *subject, const char *rights )
 	END
 }
 
+int pfs_locate( const char *path, char *buf, int size )
+{
+	BEGIN
+	debug(D_LIBCALL, "pfs_locate %s %x %d", path, buf, size);
+	result = pfs_current->table->locate(path,buf,size);
+	END
+}
+
 int pfs_copyfile( const char *source, const char *target )
 {
 	BEGIN

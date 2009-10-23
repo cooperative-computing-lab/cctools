@@ -224,6 +224,12 @@ int pfs_service::setacl( pfs_name *name, const char *subject, const char *rights
 	return -1;
 }
 
+pfs_location* pfs_service::locate( pfs_name *name )
+{
+	errno = ENOSYS;
+	return 0;
+}
+
 int pfs_service::putfile( pfs_name *source, pfs_name *target )
 {
 	errno = ENOSYS;
