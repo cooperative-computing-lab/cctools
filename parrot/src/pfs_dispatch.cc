@@ -2407,9 +2407,13 @@ void decode_syscall( struct pfs_process *p, int entering )
 				char buffer[4096];
 				unsigned size=args[2];
 				
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
-				if(size>sizeof(buffer)) size = sizeof(buffer);
-				
+				if (args[0]) {
+					tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+					if(size>sizeof(buffer)) size = sizeof(buffer);
+				} else {
+					path[0] = 0;
+				}
+
 				p->syscall_result = pfs_locate(path,buffer,sizeof(buffer));
 				
 				if(p->syscall_result>=0) {

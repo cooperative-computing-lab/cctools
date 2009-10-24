@@ -1537,7 +1537,7 @@ int pfs_table::locate( const char *n, char *buf, int length )
 {
 	static pfs_location *loc = 0;
 	pfs_name pname;
-	
+
 	if(n && strlen(n)) {
 		if(loc) delete(loc);
 		loc = 0;

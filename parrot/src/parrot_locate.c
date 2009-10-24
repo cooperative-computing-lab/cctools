@@ -36,7 +36,7 @@ int main( int argc, char *argv[] )
 	}
 
 	result = parrot_locate(path,buf,sizeof(buf));
-	if(result >= 0) {
+	if(result < 0) {
 		if(errno==ENOSYS || errno==EINVAL)
 			fprintf(stderr,"locate: This filesystem doesn't support parrot_locate\n");
 		else

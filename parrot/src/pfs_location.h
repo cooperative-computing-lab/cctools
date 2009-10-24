@@ -7,9 +7,7 @@ See the file COPYING for details.
 #ifndef PFS_LOCATION_H
 #define PFS_LOCATION_H
 
-extern "C" {
-#include "list.h"
-}
+struct list;
 
 class pfs_location {
 public:

@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "pfs_types.h"
 
 extern "C" {
+#include "debug.h"
 #include "list.h"
 #include "stringtools.h"
 }
@@ -47,7 +48,7 @@ int pfs_location::retrieve( char* buf, int buf_len )
 	char *name;
 	
 	if(!data || list_size(data)<=0) return 0;
-	
+
 	name = (char*)list_pop_head(data);
 	strncpy(buf, name, buf_len);
 	buf[buf_len-1] = 0;
