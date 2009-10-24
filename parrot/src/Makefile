@@ -74,4 +74,5 @@ install: all
 	install parrot_whoami ${CCTOOLS_INSTALL_DIR}/bin
 	install parrot_md5 ${CCTOOLS_INSTALL_DIR}/bin
 	install parrot_cp ${CCTOOLS_INSTALL_DIR}/bin
+	install parrot_locate ${CCTOOLS_INSTALL_DIR}/bin
 	test -x parrot_hdfs && install parrot_hdfs ${CCTOOLS_INSTALL_DIR}/bin || true
