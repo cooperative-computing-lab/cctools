@@ -45,6 +45,6 @@ int main( int argc, char *argv[] )
 	} else do {
 		buf[result] = 0;
 		printf("%s\n",buf);
-	} while( (result = parrot_locate(NULL,buf,sizeof(buf))) >= 0);
+	} while( (result = parrot_locate(NULL,buf,sizeof(buf))) > 0);
 	return 0;
 }

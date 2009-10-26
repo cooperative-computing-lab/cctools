@@ -46,7 +46,8 @@ int pfs_location::append( const char *srcname )
 int pfs_location::retrieve( char* buf, int buf_len )
 {
 	char *name;
-	
+
+	debug(D_SYSCALL, "retrieving location");
 	if(!data || list_size(data)<=0) return 0;
 
 	name = (char*)list_pop_head(data);

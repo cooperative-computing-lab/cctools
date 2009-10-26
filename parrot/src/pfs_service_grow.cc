@@ -331,7 +331,7 @@ struct grow_dirent * grow_dirent_lookup_recursive( const char *path, struct grow
 		return 0;
 	}
 
-	char *subpath = strchr(path,'/');
+	const char *subpath = strchr(path,'/');
 	if(!subpath) subpath = "\0";
 
 	if(compare_path_element(".",path)) {
