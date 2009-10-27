@@ -69,6 +69,8 @@ struct hdfs_services {
 	int		(*rename)	(hdfsFS, const char *, const char *);
 	hdfsFileInfo*	(*stat)		(hdfsFS, const char *);
 	void		(*free_stat)	(hdfsFileInfo *, int);
+	char***		(*get_hosts)	(hdfsFS, const char *, tOffset, tOffset);
+	void		(*free_hosts)	(char ***);
 };
 
 /* TODO: Clean up handles? */
@@ -101,6 +103,8 @@ static int load_hdfs_services(struct hdfs_services *hdfs) {
 	HDFS_LOAD_FUNC(rename,     "hdfsRename",	int(*)(hdfsFS, const char *, const char *))
 	HDFS_LOAD_FUNC(stat,	   "hdfsGetPathInfo",	hdfsFileInfo *(*)(hdfsFS, const char *))
 	HDFS_LOAD_FUNC(free_stat,  "hdfsFreeFileInfo",	void(*)(hdfsFileInfo *, int))
+	HDFS_LOAD_FUNC(get_hosts,  "hdfsGetHosts",	char ***(*)(hdfsFS, const char *, tOffset, tOffset))
+	HDFS_LOAD_FUNC(free_hosts, "hdfsFreeHosts",	void(*)(char ***))
 
 	return 0;
 }
@@ -242,10 +246,11 @@ public:
 			buf->st_mode = S_IFREG;
 		}
 
-		buf->st_mode |= file_info->mPermissions;
-		buf->st_size  = file_info->mSize;
-		buf->st_mtime = file_info->mLastMod;
-		buf->st_atime = file_info->mLastAccess;
+		buf->st_mode   |= file_info->mPermissions;
+		buf->st_size    = file_info->mSize;
+		buf->st_mtime   = file_info->mLastMod;
+		buf->st_atime   = file_info->mLastAccess;
+		buf->st_blksize = file_info->mBlockSize;
 
 		file_uid = get_uid_from_name(file_info->mOwner);
 		if (file_uid >= 0) {
@@ -379,7 +384,7 @@ public:
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
 		
-		debug(D_HDFS, "getting stat of %s", name->rest);
+		debug(D_HDFS, "stat %s", name->rest);
 		result = this->_stat(fs, name, buf);
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
 
@@ -393,7 +398,7 @@ public:
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
 		
-		debug(D_HDFS, "getting lstat of %s", name->rest);
+		debug(D_HDFS, "lstat %s", name->rest);
 		result = this->_stat(fs, name, buf);
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
 
@@ -429,7 +434,7 @@ public:
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
 
-		debug(D_HDFS, "getting access of %s", name->rest);
+		debug(D_HDFS, "access %s", name->rest);
 		result = hdfs.exists(fs, name->rest);
 		
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
@@ -444,7 +449,7 @@ public:
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
 
-		debug(D_HDFS, "change directory to %s", name->rest);
+		debug(D_HDFS, "chdir %s", name->rest);
 		if (this->_stat(fs, name, &buf) >= 0) {
 			if (S_ISDIR(buf.st_mode)) {
 				sprintf(newname, "/%s/%s:%d%s", name->service_name, name->host, name->port, name->rest);
@@ -468,7 +473,7 @@ public:
 		
 		hdfs_dircache.invalidate();
 		
-		debug(D_HDFS, "making directory %s", name->rest);
+		debug(D_HDFS, "mkdir %s", name->rest);
 		result = hdfs.mkdir(fs, name->rest);
 
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
@@ -484,7 +489,7 @@ public:
 		
 		hdfs_dircache.invalidate();
 		
-		debug(D_HDFS, "removing directory %s", name->rest);
+		debug(D_HDFS, "rmdir %s", name->rest);
 		result = hdfs.unlink(fs, name->rest);
 
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
@@ -500,7 +505,7 @@ public:
 
 		hdfs_dircache.invalidate();
 		
-		debug(D_HDFS, "unlinking %s", name->rest);
+		debug(D_HDFS, "unlink %s", name->rest);
 		result = hdfs.unlink(fs, name->rest);
 
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
@@ -516,11 +521,44 @@ public:
 
 		hdfs_dircache.invalidate();
 		
-		debug(D_HDFS, "renaming %s to %s", name->rest, newname->rest);
+		debug(D_HDFS, "rename %s to %s", name->rest, newname->rest);
 		result = hdfs.rename(fs, name->rest, newname->rest);
 
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
 		HDFS_END
+	}
+
+	/**
+	 * locate file
+	 *
+	 * Returns locations of first block of file. */
+	virtual pfs_location *locate( pfs_name *name ) {
+		struct pfs_stat buf;
+		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
+		pfs_location *loc = NULL;
+		char ***hosts;
+
+		HDFS_CHECK_FS(NULL)
+		
+		debug(D_HDFS, "locate %s", name->rest);
+		if (this->_stat(fs, name, &buf) >= 0) {
+			if (S_ISDIR(buf.st_mode)) {
+				errno = ENOTSUP;
+			} else {
+				hosts = hdfs.get_hosts(fs, name->rest, 0, buf.st_blksize);
+				if (hosts) {
+					loc = new pfs_location();
+					for (int i = 0; hosts[i]; i++)
+						for (int j = 0; hosts[i][j]; j++)
+							loc->append(hosts[i][j]);
+					hdfs.free_hosts(hosts);
+				}
+			}
+
+		}
+
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+		return loc;
 	}
 
 	virtual int get_default_port() {
