@@ -615,6 +615,48 @@ public:
 		BXGRID_END
 	}
 
+	virtual pfs_location* locate( pfs_name *name ) {
+		struct pfs_stat buf;
+		pfs_location *loc = NULL;
+		MYSQL *mysql_cxn = (MYSQL *)pfs_service_connect_cache(name);
+
+		debug(D_BXGRID, "locate %s", name->rest);
+
+		if (this->_stat(mysql_cxn, name, &buf) >= 0) {
+			const char *fileid, *replicaid;
+			char host[PFS_PATH_MAX], path[PFS_PATH_MAX], location[PFS_PATH_MAX];
+			struct bxgrid_virtual_folder *bvf;
+			
+			if (S_ISDIR(buf.st_mode)) {
+				errno = ENOTSUP;
+			} else {
+				bvf = bxgrid_bvf_find_base(name->rest);
+				loc = new pfs_location();
+
+				if (strcmp(bvf->name, "/fileid") == 0) {
+					int nid = 0;
+
+					fileid = string_basename(name->rest);
+					while ((replicaid = bxgrid_lookup_replicaid(mysql_cxn, fileid, nid++))) {
+						if (bxgrid_lookup_replica_location(mysql_cxn, replicaid, host, path) >= 0) {
+							snprintf(location, PFS_PATH_MAX, "%s:%s", host, path);
+							loc->append(location);
+						}
+					}
+				} else {
+					replicaid = string_basename(name->rest);
+					if (bxgrid_lookup_replica_location(mysql_cxn, replicaid, host, path) >= 0) {
+						snprintf(location, PFS_PATH_MAX, "%s:%s", host, path);
+						loc->append(location);
+					}
+				}
+			}
+		}
+			
+		pfs_service_disconnect_cache(name, (void *)mysql_cxn, 0);
+		return loc;
+	}
+
 	virtual int get_default_port() {
 		return 0;
 	}
