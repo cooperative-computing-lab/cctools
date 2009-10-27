@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #ifdef HAS_HDFS
 
+#include "pfs_dircache.h"
 #include "pfs_table.h"
 #include "pfs_service.h"
 #include "pfs_service_hdfs.h"
@@ -29,6 +30,8 @@ extern "C" {
 #include <pwd.h>
 #include <grp.h>
 #include <sys/statfs.h>
+
+extern int pfs_enable_small_file_optimizations;
 
 #define HDFS_DEFAULT_PORT 9100
 
@@ -102,6 +105,8 @@ static int load_hdfs_services(struct hdfs_services *hdfs) {
 	return 0;
 }
 
+static pfs_dircache hdfs_dircache;
+
 class pfs_file_hdfs : public pfs_file
 {
 private:
@@ -126,6 +131,8 @@ public:
 	virtual int fsync() {
 		int result; 
 
+		hdfs_dircache.invalidate();
+
 		debug(D_HDFS, "flushing file %s ", name.rest);
 		result = hdfs->flush(fs, handle);
 		HDFS_END
@@ -141,6 +148,8 @@ public:
 	
 	virtual pfs_ssize_t write( const void *data, pfs_size_t length, pfs_off_t offset ) {
 		pfs_ssize_t result;
+
+		hdfs_dircache.invalidate();
 
 		/* Ignore offset since HDFS does not support seekable writes. */
 		debug(D_HDFS, "writing to file %s ", name.rest);
@@ -221,6 +230,34 @@ public:
 		}
 	}
 
+	void hdfs_copy_fileinfo(pfs_name *name, hdfsFileInfo *file_info, struct pfs_stat *buf) {
+		int file_uid;
+		int file_gid;
+
+		pfs_service_emulate_stat(name, buf);
+
+		if (file_info->mKind == kObjectKindDirectory) {
+			buf->st_mode  = S_IFDIR;
+		} else {
+			buf->st_mode = S_IFREG;
+		}
+
+		buf->st_mode |= file_info->mPermissions;
+		buf->st_size  = file_info->mSize;
+		buf->st_mtime = file_info->mLastMod;
+		buf->st_atime = file_info->mLastAccess;
+
+		file_uid = get_uid_from_name(file_info->mOwner);
+		if (file_uid >= 0) {
+			buf->st_uid = file_uid;
+		}
+
+		file_gid = get_gid_from_name(file_info->mGroup);
+		if (file_gid >= 0) {
+			buf->st_gid = file_gid;
+		}
+	}
+
 	virtual void * connect( pfs_name *name ) {
 		hdfsFS fs;
 		
@@ -248,6 +285,8 @@ public:
 
 		HDFS_CHECK_INIT(0)
 		HDFS_CHECK_FS(0)
+
+		hdfs_dircache.invalidate();
 
 		switch (flags&O_ACCMODE) {
 			case O_RDONLY:
@@ -302,6 +341,10 @@ public:
 		HDFS_CHECK_INIT(0)
 		HDFS_CHECK_FS(0)
 
+		if (pfs_enable_small_file_optimizations) {
+			hdfs_dircache.begin(name->path);
+		}
+
 		debug(D_HDFS, "checking if directory %s exists", name->rest);
 		if (hdfs.exists(fs, name->rest) < 0) {
 			errno = EINVAL;
@@ -311,10 +354,16 @@ public:
 
 		debug(D_HDFS, "getting directory of %s", name->rest);
 		file_list = hdfs.listdir(fs, name->rest, &num_entries);
-
+		struct pfs_stat buf;
 		if (file_list != NULL) {
-			for (int i = 0; i < num_entries; i++) 
-				dir->append(file_list[i].mName);
+			for (int i = 0; i < num_entries; i++) {
+				if (pfs_enable_small_file_optimizations) {
+					hdfs_copy_fileinfo(name, &file_list[i], &buf);
+					hdfs_dircache.insert(file_list[i].mName, &buf, dir);
+				} else {
+					dir->append(file_list[i].mName);
+				}
+			}
 			
 			hdfs.free_stat(file_list, num_entries);
 		}
@@ -344,7 +393,7 @@ public:
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
 		
-		debug(D_HDFS, "getting stat of %s", name->rest);
+		debug(D_HDFS, "getting lstat of %s", name->rest);
 		result = this->_stat(fs, name, buf);
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
 
@@ -353,41 +402,21 @@ public:
 
 	virtual int _stat( hdfsFS fs, pfs_name *name, struct pfs_stat *buf ) {
 		int result;
-		int file_uid;
-		int file_gid;
 		hdfsFileInfo *file_info = 0;
 
-		file_info = hdfs.stat(fs, name->rest);
-
-		if (file_info != NULL) {
-			pfs_service_emulate_stat(name, buf);
-
-			if (file_info->mKind == kObjectKindDirectory) {
-				buf->st_mode = S_IFDIR;
-			} else {
-				buf->st_mode = S_IFREG;
-			}
-				
-			buf->st_mode |= file_info->mPermissions;
-			buf->st_size  = file_info->mSize;
-			buf->st_mtime = file_info->mLastMod;
-			buf->st_atime = file_info->mLastAccess;
-			
-			file_uid = get_uid_from_name(file_info->mOwner);
-			if (file_uid >= 0) {
-				buf->st_uid = file_uid;
-			}
-
-			file_gid = get_gid_from_name(file_info->mGroup);
-			if (file_gid >= 0) {
-				buf->st_gid = file_gid;
-			}
-		
-			hdfs.free_stat(file_info, 1);
+		if (hdfs_dircache.lookup(name->rest, buf)) {
 			result = 0;
 		} else {
-			errno = ENOENT;
-			result = -1;
+			file_info = hdfs.stat(fs, name->rest);
+
+			if (file_info != NULL) {
+				hdfs_copy_fileinfo(name, file_info, buf);
+				hdfs.free_stat(file_info, 1);
+				result = 0;
+			} else {
+				errno = ENOENT;
+				result = -1;
+			}
 		}
 		
 		HDFS_END
@@ -437,6 +466,8 @@ public:
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
 		
+		hdfs_dircache.invalidate();
+		
 		debug(D_HDFS, "making directory %s", name->rest);
 		result = hdfs.mkdir(fs, name->rest);
 
@@ -451,6 +482,8 @@ public:
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
 		
+		hdfs_dircache.invalidate();
+		
 		debug(D_HDFS, "removing directory %s", name->rest);
 		result = hdfs.unlink(fs, name->rest);
 
@@ -464,6 +497,8 @@ public:
 		
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
+
+		hdfs_dircache.invalidate();
 		
 		debug(D_HDFS, "unlinking %s", name->rest);
 		result = hdfs.unlink(fs, name->rest);
@@ -478,6 +513,8 @@ public:
 		
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
+
+		hdfs_dircache.invalidate();
 		
 		debug(D_HDFS, "renaming %s to %s", name->rest, newname->rest);
 		result = hdfs.rename(fs, name->rest, newname->rest);
