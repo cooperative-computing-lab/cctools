@@ -8,7 +8,6 @@ See the file COPYING for details.
 #ifndef LIST_H
 #define LIST_H
 
-
 /*
 It turns out that many libraries and tools make use of
 symbols like "debug" and "fatal".  This causes strange
@@ -17,27 +16,23 @@ all of our code, we simply insert these defines to
 transparently modify the linker namespace we are using.
 */
 
-
-
 #define list_delete			cctools_list_delete
-#define list_pop_head			cctools_pop_head 
-#define list_peek_head			cctools_peek_head
-#define list_pop_tail			cctools_pop_tail
-#define list_peek_tail			cctools_peek_tail
-#define list_remove			cctools_remove
-#define list_find			cctools_find
+#define list_pop_head			cctools_list_pop_head 
+#define list_peek_head			cctools_list_peek_head
+#define list_pop_tail			cctools_list_pop_tail
+#define list_peek_tail			cctools_list_peek_tail
+#define list_remove			cctools_list_remove
+#define list_find			cctools_list_find
 #define list_create			cctools_list_create
 #define list_splice			cctools_list_splice
 #define list_size			cctools_list_size
-#define list_push_priority		cctools_push_priority
-#define list_push_head			cctools_push_head
-#define list_push_tail			cctools_push_tail
-#define list_iterate			cctools_iterate
-#define list_iterate_reverse		cctools_iterate_reverse
-
-
-
-
+#define list_push_priority		cctools_list_push_priority
+#define list_push_head			cctools_list_push_head
+#define list_push_tail			cctools_list_push_tail
+#define list_iterate			cctools_list_iterate
+#define list_iterate_reverse		cctools_list_iterate_reverse
+#define list_first_item			cctools_list_first_item
+#define list_next_item			cctools_list_next_item
 
 struct list_node {
 	void *data;
@@ -49,6 +44,7 @@ struct list_node {
 struct list {
 	struct list_node *head;
 	struct list_node *tail;
+	struct list_node *iter;
 	int size;
 };
 
@@ -73,5 +69,8 @@ void *        list_remove( struct list *l, const void *value );
 void *        list_find( struct list *l, list_op_t cmp, const void *arg );
 int           list_iterate( struct list *l, list_op_t op, const void *arg );
 int           list_iterate_reverse( struct list *l, list_op_t op, const void *arg );
+
+void          list_first_item( struct list *list );
+void *        list_next_item( struct list *list );
 
 #endif

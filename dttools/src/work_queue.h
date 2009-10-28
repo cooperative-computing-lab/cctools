@@ -16,12 +16,12 @@ and port of the master.
 #define WORK_QUEUE_DEFAULT_PORT 9123
 #define WORK_QUEUE_LINE_MAX 1024
 
-#define WAITFORTASK -1
+#define WORK_QUEUE_WAITFORTASK -1
 
-#define WQ_RESULT_UNSET 0
-#define WQ_RESULT_INPUT_FAIL 1
-#define WQ_RESULT_FUNCTION_FAIL 2
-#define WQ_RESULT_OUTPUT_FAIL 3
+#define WORK_QUEUE_RESULT_UNSET 0
+#define WORK_QUEUE_RESULT_INPUT_FAIL 1
+#define WORK_QUEUE_RESULT_FUNCTION_FAIL 2
+#define WORK_QUEUE_RESULT_OUTPUT_FAIL 3
 
 #define WORK_QUEUE_CHOOSE_HOST_UNSET 0 // default setting for task.
 #define WORK_QUEUE_CHOOSE_HOST_BY_FCFS 1
@@ -37,7 +37,7 @@ extern int wq_option_worker_selection_algorithm; /**< Initial setting for algori
 /** A task description.  This structure should only be created with @ref work_queue_task_create and delete with @ref work_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.
 */
 struct work_queue_task {
-	char *tag;
+	char *tag;			/**< An optional user-defined logical name for the task. */
         char *command_line;		/**< The program(s) to execute, as a shell command line. */
 	int worker_selection_algorithm;           /**< How to choose worker to run the task. */
 	char *output;			/**< The standard output of the task. */
@@ -97,11 +97,12 @@ int work_queue_activate_fast_abort(struct work_queue* q, double multiplier);
 /** Wait for tasks to complete.  This call will block until the timeout has elapsed.
 @param q The work queue to wait on.
 @param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant WAITFORTASK to block until a task has completed.
-@returns A completed task description, or null if the queue is empty or the timeout was reached without a completed task.
+@returns A completed task description, or null if the queue is empty or the timeout was reached without a completed task.  The returned task must be deleted with @ref work_queue_task_delete or resubmitted with @ref work_queue_submit.
 */
 struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout );
 
 /** Submit a job to a work queue.
+It is safe to re-submit a task returned by @ref work_queue_wait.
 @param q A work queue returned from @ref work_queue_create.
 @param t A task description returned from @ref work_queue_task_create.
 */
@@ -115,19 +116,20 @@ void work_queue_task_delete( struct work_queue_task *t );
 /** Create a new task specification.  Once created, the task may be passed to @ref work_queue_submit.
 @param full_command The shell command line to be executed by the task.
 */
-struct work_queue_task * work_queue_task_create( const char* full_command);
+struct work_queue_task * work_queue_task_create( const char *full_command);
 
-/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
+/** Attach a user defined logical name to the task.
+This field is not interpreted by the work queue, but simply maintained to help the user track tasks.
 @param t The task to which to add parameters
-@param tag The tag to attatch to tast t.
+@param tag The tag to attach to task t.
 */
-INT64_T work_queue_task_specify_tag( struct work_queue_task* t, const char* tag);
+void work_queue_task_specify_tag( struct work_queue_task *t, const char *tag );
 
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
 @param t The task to which to add parameters
 @param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "CHOOSE_HOST_BY" values.
 */
-INT64_T work_queue_task_specify_algorithm( struct work_queue_task* t, int alg);
+int work_queue_task_specify_algorithm( struct work_queue_task *t, int alg );
 
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
 @param t The task to which to add parameters
@@ -135,48 +137,36 @@ INT64_T work_queue_task_specify_algorithm( struct work_queue_task* t, int alg);
 @param length The number of bytes of data in the buffer
 @param rname The name of the file in which to store the buffer data on the worker
 */
-INT64_T work_queue_task_specify_input_buf( struct work_queue_task* t, const char* buf, int length, const char* rname);
+void work_queue_task_specify_input_buf( struct work_queue_task *t, const char *buf, int length, const char *rname);
 
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
 @param t The task to which to add parameters
 @param fname The name of the data file to send to the worker to be available to the commands.
 @param rname The name of the file in which to store the buffer data on the worker
 */
-INT64_T work_queue_task_specify_input_file( struct work_queue_task* t, const char* fname, const char* rname);
+void work_queue_task_specify_input_file( struct work_queue_task *t, const char *fname, const char *rname);
 
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. If no file is defined, the program will have default (no) output files retrieved.
 @param t The task to which to add parameters
 @param rname The name of a file created by the program when it runs.
 @param fname The name of the file local target for copying rname back.
 */
-INT64_T work_queue_task_specify_output_file( struct work_queue_task* t, const char* rname, const char* fname);
+void work_queue_task_specify_output_file( struct work_queue_task *t, const char *rname, const char *fname);
 
 /** Determine whether the queue can support more tasks. Returns the number of additional tasks it can support if "hungry" and 0 if "sated".
 @param q A pointer to the queue to query.
 */
-int work_queue_hungry (struct work_queue* q);
+int work_queue_hungry (struct work_queue *q);
 
 /** Determine whether there are any known tasks queued, running, or waiting to be collected. Returns 1 if so and 0 if "empty".
 @param q A pointer to the queue to query.
 */
-int work_queue_empty (struct work_queue* q);
+int work_queue_empty (struct work_queue *q);
 
 /** Shut down workers connected to the work_queue system. Gives a best effort and then returns the number of workers given the shut down order.
 @param q A pointer to the queue to query.
 @param n The number to shut down. All workers if given "0".
 */
-int work_queue_shut_down_workers (struct work_queue* q, int n);
-
-/** Delete files stored on the workers.
-@param q A pointer to the queue to query.
-@param exceptions A list of files to keep, null if empty.
-*/
-//int work_queue_delete_local_state (struct work_queue* q, struct task_file* exceptions);
-
-/** Resubmit a completed task with the exact same specification, for instance, if it failed and you want to retry it.
-@param q A pointer to the queue to query.
-@param t A fully defined task struct to resubmit.
-*/
-//int work_queue_resubmit (struct work_queue* q, struct work_queue_task* t);
+int work_queue_shut_down_workers (struct work_queue *q, int n);
 
 #endif

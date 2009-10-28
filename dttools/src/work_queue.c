@@ -67,16 +67,13 @@ struct work_queue_worker {
 	timestamp_t total_transfer_time;
 };
 
-struct task_file {
+struct work_queue_file {
     short fname_or_literal; //0 or 1
     short cacheable; // 0=no, 1=yes.
     int length;
     void* payload; // name on master machine or buffer of data.
     char* remote_name; // name on remote machine.
 };
-
-
-
 
 int start_one_task( struct work_queue_task *t, struct work_queue_worker *w );
 
@@ -101,10 +98,10 @@ struct work_queue_task * work_queue_task_create( const char *command_line)
 	t->tag = NULL;
 	t->worker_selection_algorithm = WORK_QUEUE_CHOOSE_HOST_UNSET;
 	t->output = NULL;
-	t->input_files = NULL;
-	t->output_files = NULL;
+	t->input_files = list_create();
+	t->output_files = list_create();
 	t->return_status = 0;
-	t->result = WQ_RESULT_UNSET;
+	t->result = WORK_QUEUE_RESULT_UNSET;
 	t->taskid = next_taskid++;
 
 	t->submit_time = t->start_time = t->finish_time = t->total_bytes_transfered = t->total_transfer_time = 0;
@@ -114,31 +111,24 @@ struct work_queue_task * work_queue_task_create( const char *command_line)
 
 void work_queue_task_delete( struct work_queue_task *t )
 {
-	int i;
-	struct task_file* tf;
+	struct work_queue_file* tf;
 	if(t) {
 		if(t->command_line) free(t->command_line);
 		if(t->tag) free(t->tag);
 		if(t->output) free(t->output);
 		if(t->input_files) {
-			for(i=0; i<list_size(t->input_files); i++) {
-				tf = list_pop_tail(t->input_files);
-				if(tf) {
-					if(tf->payload) free(tf->payload);
-					if(tf->remote_name) free(tf->remote_name);
-					free(tf);
-				}
+			while((tf=list_pop_tail(t->input_files))) {
+				if(tf->payload) free(tf->payload);
+				if(tf->remote_name) free(tf->remote_name);
+				free(tf);
 			}
 			list_delete(t->input_files);
 		}
 		if(t->output_files) {
-			for(i=0; i<list_size(t->output_files); i++) {
-				tf = list_pop_tail(t->output_files);
-				if(tf) {
-					if(tf->payload) free(tf->payload);
-					if(tf->remote_name) free(tf->remote_name);
-					free(tf);
-				}
+			while((tf=list_pop_tail(t->output_files))) {
+				if(tf->payload) free(tf->payload);
+				if(tf->remote_name) free(tf->remote_name);
+				free(tf);
 			}
 			list_delete(t->output_files);
 		}
@@ -198,8 +188,6 @@ static void add_worker( struct work_queue *q )
 	}
 }
 
-
-
 static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 {
 	char *key, *value;
@@ -221,14 +209,14 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 static int get_output_files( struct work_queue_task *t, struct work_queue_worker *w )
 {
 	char line[WORK_QUEUE_LINE_MAX];
-	struct task_file* tf;
+	struct work_queue_file* tf;
 	int actual,fd;
 	int length;
 	time_t stoptime;
 	
 	if(t->output_files) {
-		while((tf = list_pop_head(t->output_files)) != NULL)
-		{
+		list_first_item(t->output_files);
+		while((tf=list_next_item(t->output_files))) {
 			if(strlen(tf->remote_name) < 255 && strlen(tf->payload) < 255)
 				debug(D_DEBUG,"%s (%s) sending back %s to %s",w->hostname,w->addrport,tf->remote_name, tf->payload);
 
@@ -244,7 +232,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 				if(actual!=length) { unlink(tf->payload); goto failure; }
 			} else {
 				debug(D_DEBUG,"%s (%s) did not create expected file %s",w->hostname,w->addrport,tf->remote_name);
-				if(t->result == WQ_RESULT_UNSET) t->result = WQ_RESULT_OUTPUT_FAIL;
+				if(t->result == WORK_QUEUE_RESULT_UNSET) t->result = WORK_QUEUE_RESULT_OUTPUT_FAIL;
 				t->return_status = 1;
 			}
 		}
@@ -295,7 +283,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			t->output[actual] = 0;
 			t->return_status = result;
 			if(t->return_status != 0)
-				t->result = WQ_RESULT_FUNCTION_FAIL;
+				t->result = WORK_QUEUE_RESULT_FUNCTION_FAIL;
 			
 			if(!get_output_files(t,w)) {
 				free(t->output);
@@ -368,22 +356,20 @@ static int build_poll_table( struct work_queue *q )
 
 static int send_input_files( struct work_queue_task *t, struct work_queue_worker *w )
 {
-	struct task_file* tf;
+	struct work_queue_file* tf;
 	int actual=0;
 	int total_bytes=0;
 	timestamp_t open_time=0;
 	timestamp_t close_time=0;
 	timestamp_t sum_time=0;
-	int i;
 	int fl;
 	time_t stoptime;
 	
 	if(t->input_files) {
-		for(i=0; i< list_size(t->input_files); i++) {
+		list_first_item(t->input_files);
+		while((tf=list_next_item(t->input_files))) {
 			struct stat local_info;
 			struct stat *remote_info;
-			tf = list_pop_head(t->input_files);
-
 			if(tf->fname_or_literal == LITERAL) {
 				debug(D_DEBUG,"%s (%s) needs buffer data as %s",w->hostname,w->addrport,tf->remote_name);
 				fl = tf->length;
@@ -400,6 +386,10 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 			else {
 				if(stat(tf->payload,&local_info)<0) goto failure;
 				
+				/* normalize the mode so as not to set up invalid permissions */
+				local_info.st_mode |= 0600;
+				local_info.st_mode &= 0777;
+
 				remote_info = hash_table_lookup(w->current_files,tf->payload);
 				if(!remote_info || remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size ) {
 					if(remote_info) {
@@ -412,7 +402,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 					if(fd<0) goto failure;
 					stoptime = time(0) + MAX(1.0,local_info.st_size/1250000.0);
 					open_time = timestamp_get();
-					link_printf(w->link,"put %s %d %o\n",tf->remote_name,(int)local_info.st_size,local_info.st_mode&0777);
+					link_printf(w->link,"put %s %d 0%o\n",tf->remote_name,(int)local_info.st_size,local_info.st_mode);
 					actual = link_stream_from_fd(w->link,fd,local_info.st_size,stoptime);
 					close(fd);
 					close_time = timestamp_get();
@@ -426,7 +416,6 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 					sum_time+=(close_time-open_time);
 				}
 			}
-			list_push_tail(t->input_files, tf);
 		}
 		t->total_bytes_transfered += total_bytes;
 		t->total_transfer_time += sum_time;
@@ -444,7 +433,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 	else
 	    debug(D_DEBUG,"%s (%s) failed to send buffer data (%i bytes received).",w->hostname,w->addrport,actual);
 	t->return_status = 1;
-	t->result = WQ_RESULT_INPUT_FAIL;
+	t->result = WORK_QUEUE_RESULT_INPUT_FAIL;
 	return 0;
 }
 
@@ -494,7 +483,7 @@ struct work_queue_worker * find_worker_by_cache( struct work_queue *q , struct w
 	INT64_T most_task_cached_bytes = 0;
 	INT64_T task_cached_bytes;
 	struct stat *remote_info;
-	struct task_file* tf;
+	struct work_queue_file* tf;
 	int i,j;
 
 	hash_table_firstkey(q->worker_table);
@@ -595,12 +584,10 @@ int work_queue_activate_fast_abort(struct work_queue* q, double multiplier)
 	if(multiplier >= 1) {
 		q->fast_abort_multiplier = multiplier;
 		return 0;
-	}
-	else if(multiplier < 0) {
+	} else if(multiplier < 0) {
 		q->fast_abort_multiplier = multiplier;
 		return 0;
-	}
-	else {
+	} else {
 		debug(D_DEBUG,"Bad multiplier (%.02lf) given for fast abort. Deactivating fast abort");
 		q->fast_abort_multiplier = -1.0;
 		return 1;
@@ -694,6 +681,20 @@ void work_queue_delete( struct work_queue *q )
 
 void work_queue_submit( struct work_queue *q, struct work_queue_task *t )
 {
+	/* If the task has been used before, clear out accumlated state. */
+
+	if(t->output) {
+		free(t->output);
+		t->output = 0;
+	}
+	if(t->host) {
+		free(t->host);
+		t->host = 0;
+	}
+	t->total_transfer_time = 0;
+
+	/* Then, add it to the ready list and mark it as submitted. */
+
 	list_push_tail(q->ready_list,t);
 	t->submit_time = timestamp_get();
 	q->total_tasks_submitted++;
@@ -706,7 +707,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 	time_t stoptime;
 	int result;
 	
-	if(timeout != WAITFORTASK)
+	if(timeout != WORK_QUEUE_WAITFORTASK)
 		stoptime = time(0) + timeout;
 	else
 		stoptime = 0;
@@ -741,8 +742,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			if(q->poll_table[i].revents) {
 				handle_worker(q,q->poll_table[i].link);
 			}
-			if(stoptime && time(0) > stoptime)
-			{
+			if(stoptime && time(0) > stoptime) {
 				return list_pop_head(q->complete_list);
 			}
 		}
@@ -757,7 +757,6 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 
 int work_queue_hungry(struct work_queue* q)
 {
-	
 	struct work_queue_stats info;
 	int i,j;
 	work_queue_get_stats(q,&info);
@@ -773,75 +772,67 @@ int work_queue_hungry(struct work_queue* q)
 }
 
 
-INT64_T work_queue_task_specify_tag( struct work_queue_task* t, const char* tag) {
-    if(t->tag)
-	free(t->tag);
-    t->tag = malloc((strlen(tag)+1)*sizeof(char));
-    strcpy(t->tag,tag);
-    return 0;
+void work_queue_task_specify_tag( struct work_queue_task *t, const char *tag )
+{
+	if(t->tag) free(t->tag);
+	t->tag = strdup(tag);
 }
 
 
-INT64_T work_queue_task_specify_output_file( struct work_queue_task* t, const char* rname, const char* fname) {
-	struct task_file* tf = malloc(sizeof(struct task_file));
+void work_queue_task_specify_output_file( struct work_queue_task* t, const char* rname, const char* fname)
+{
+	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
 	tf->fname_or_literal = FNAME;
 	tf->cacheable = 0;
 	tf->length = strlen(fname);
 	tf->payload = strdup(fname);
 	tf->remote_name = strdup(rname);
-	if(!t->output_files)
-		t->output_files = list_create();
-	return list_push_tail(t->output_files,tf);
+	list_push_tail(t->output_files,tf);
 }
 
-INT64_T work_queue_task_specify_input_buf( struct work_queue_task* t, const char* buf, int length, const char* rname) {
-	struct task_file* tf = malloc(sizeof(struct task_file));
+void work_queue_task_specify_input_buf( struct work_queue_task* t, const char* buf, int length, const char* rname)
+{
+	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
 	tf->fname_or_literal = LITERAL;
 	tf->cacheable = 0;
 	tf->length = length;
 	tf->payload = malloc(length);
 	memcpy(tf->payload, buf, length);
 	tf->remote_name = strdup(rname);
-	if(!t->input_files)
-		t->input_files = list_create();
-	return list_push_tail(t->input_files,tf);
+	list_push_tail(t->input_files,tf);
 }
 
-INT64_T work_queue_task_specify_input_file( struct work_queue_task* t, const char* fname, const char* rname) {
-	struct task_file* tf = malloc(sizeof(struct task_file));
+void work_queue_task_specify_input_file( struct work_queue_task* t, const char* fname, const char* rname)
+{
+	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
 	tf->fname_or_literal = FNAME;
 	tf->cacheable = 1;
 	tf->length = strlen(fname);
 	tf->payload = strdup(fname);
 	tf->remote_name = strdup(rname);
-	if(!t->input_files)
-		t->input_files = list_create();
-	return list_push_tail(t->input_files,tf);
+	list_push_tail(t->input_files,tf);
 }
 
-INT64_T work_queue_task_specify_algorithm( struct work_queue_task* t, int alg) {
+int work_queue_task_specify_algorithm( struct work_queue_task* t, int alg) {
 	if(t && alg >= WORK_QUEUE_CHOOSE_HOST_UNSET && alg <= WORK_QUEUE_CHOOSE_HOST_MAX) {
 		t->worker_selection_algorithm = alg;
 		return 0;
-	}
-	else {
+	} else {
 		return 1;
 	}
 }
 
-INT64_T work_queue_specify_algorithm( struct work_queue* q, int alg) {
+int work_queue_specify_algorithm( struct work_queue* q, int alg) {
 	if(q && alg > WORK_QUEUE_CHOOSE_HOST_UNSET && alg <= WORK_QUEUE_CHOOSE_HOST_MAX) {
 		q->worker_selection_algorithm = alg;
 		return 0;
-	}
-	else {
+	} else {
 		return 1;
 	}
 }
 
 int work_queue_shut_down_workers (struct work_queue* q, int n)
 {
-
     struct work_queue_worker *w;
     char *key;
     int i=0;
@@ -860,7 +851,7 @@ int work_queue_shut_down_workers (struct work_queue* q, int n)
 }
 
 
-int work_queue_empty (struct work_queue* q) {
-
-    return ((list_size(q->ready_list)+list_size(q->complete_list)+q->workers_in_state[WORKER_STATE_BUSY])==0);
+int work_queue_empty (struct work_queue* q)
+{
+	return ((list_size(q->ready_list)+list_size(q->complete_list)+q->workers_in_state[WORKER_STATE_BUSY])==0);
 }

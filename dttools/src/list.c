@@ -19,6 +19,7 @@ struct list * list_create()
 	l->head=0;
 	l->tail=0;
 	l->size=0;
+	l->iter=0;
 
 	return l;
 }
@@ -43,6 +44,7 @@ struct list * list_splice( struct list *top, struct list *bottom )
 	bottom->tail = 0;
 
 	top->size += bottom->size;
+	top->iter = 0;
 
 	list_delete( bottom );
 	return top;	
@@ -251,4 +253,18 @@ int list_iterate_reverse( struct list *l, list_op_t operator, const void *arg )
 	return alltheway;
 }
 
+void list_first_item( struct list *list )
+{
+	list->iter = list->head;
+}
 
+void *list_next_item( struct list *list )
+{
+	if(list->iter) {
+		void *v = list->iter->data;
+		list->iter = list->iter->next;
+		return v;
+	} else {
+		return 0;
+	}
+}
