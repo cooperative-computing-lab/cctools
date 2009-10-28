@@ -192,7 +192,7 @@ int main( int argc, char *argv[] )
 	while(1) {
 		if(time(0)!=last_display_time) display_progress(queue);
 
-		t = work_queue_wait(queue,WAITFORTASK);
+		t = work_queue_wait(queue,WORK_QUEUE_WAITFORTASK);
 		if(!t) break;
 		
 		if(t->return_status==0) {

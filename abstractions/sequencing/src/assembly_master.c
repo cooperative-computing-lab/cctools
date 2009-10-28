@@ -440,7 +440,7 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 	    {
 		fprintf(stderr,"Out of memory for buf! Waiting for a bit.\n");
 		if (last_display_time != time(0)) display_progress(queue);
-		handle_done_task(work_queue_wait(queue,WAITFORTASK));
+		handle_done_task(work_queue_wait(queue,WORK_QUEUE_WAITFORTASK));
 	    }
     }
     ins = buf;
@@ -731,7 +731,7 @@ int main( int argc, char *argv[] )
 
 	while(1) {
 		if(time(0)!=last_display_time) display_progress(queue);
-		t = work_queue_wait(queue,WAITFORTASK);
+		t = work_queue_wait(queue,WORK_QUEUE_WAITFORTASK);
 		if((!handle_done_task(t)) && (work_queue_empty(queue))) {
 		    break;		
 		}
