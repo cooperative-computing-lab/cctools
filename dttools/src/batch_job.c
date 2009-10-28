@@ -466,7 +466,7 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 	int timeout;
 
 	if(stoptime==0) {
-		timeout = WAITFORTASK;
+		timeout = WORK_QUEUE_WAITFORTASK;
 	} else {
 		timeout = MAX(0,stoptime-time(0));
 	}
