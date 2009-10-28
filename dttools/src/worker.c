@@ -183,6 +183,9 @@ int main( int argc, char *argv[] )
 				link_write(master,buffer,length,time(0)+active_timeout);
 				if(buffer) free(buffer);
 			} else if(sscanf(line,"put %s %d %o",filename,&length,&mode)==3) {
+
+				mode = mode | 0600;
+
 				fd = open(filename,O_WRONLY|O_CREAT|O_TRUNC,mode);
 				if(fd<0) goto recover;
 
