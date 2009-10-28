@@ -1,7 +1,7 @@
 #ifndef PARROTCLIENT_H_
 #define PARROTCLIENT_H_
 
-#include <int_sizes.h>
+#include "int_sizes.h"
 #include <stdlib.h>
 
 int parrot_whoami( const char *path, char *buf, int size );

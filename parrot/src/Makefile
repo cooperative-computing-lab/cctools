@@ -42,8 +42,9 @@ libparrot.a: pfs_sys.o pfs_table.o pfs_resolve.o pfs_service.o pfs_file.o pfs_fi
 
 libparrot_client.a: parrot_client.o
 	ar rv $@ $^
+
 libparrot_client.so: parrot_client.c
-	gcc -shared -Wl,-rpath=/lib64 -fPIC $< -o $@
+	${CCTOOLS_CC} ${CCTOOLS_INTERNAL_CCFLAGS} -shared -Wl,-rpath=/lib64 -fPIC $< -o $@
 
 pfs_main.o pfs_dispatch.o pfs_dispatch64.o pfs_process.o tracer.o: tracer.table.h tracer.table.c tracer.table64.h tracer.table64.c
 
