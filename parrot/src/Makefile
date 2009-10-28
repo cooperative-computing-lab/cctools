@@ -1,7 +1,7 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-TARGETS = parrot libparrot.a libparrot_client.a libparrot_client.so parrot_helper.so parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp
+TARGETS = parrot libparrot.a libparrot_client.a parrot_helper.so parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp
 
 LOCAL_LDFLAGS=-lchirp -ldttools -lftp_lite -ldl ${CCTOOLS_INTERNAL_LDFLAGS}
 
@@ -42,9 +42,6 @@ libparrot.a: pfs_sys.o pfs_table.o pfs_resolve.o pfs_service.o pfs_file.o pfs_fi
 
 libparrot_client.a: parrot_client.o
 	ar rv $@ $^
-
-libparrot_client.so: parrot_client.c
-	${CCTOOLS_CC} ${CCTOOLS_INTERNAL_CCFLAGS} -shared -Wl,-rpath=/lib64 -fPIC $< -o $@
 
 pfs_main.o pfs_dispatch.o pfs_dispatch64.o pfs_process.o tracer.o: tracer.table.h tracer.table.c tracer.table64.h tracer.table64.c
 
