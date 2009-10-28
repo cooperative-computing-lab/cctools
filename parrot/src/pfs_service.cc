@@ -317,6 +317,11 @@ pfs_service * pfs_service_lookup( const char *name )
                 extern pfs_service *pfs_service_bxgrid;
 		return pfs_service_bxgrid;
 #endif
+#ifdef HAS_SAMBA
+	} else if(!strcmp(name,"samba")) {
+		extern pfs_service *pfs_service_samba;
+		return pfs_service_samba;
+#endif
 	} else {
 		return 0;
 	}

@@ -1,22 +1,12 @@
-#include "tracer.table.h"
-#include "tracer.table64.h"
 #include "int_sizes.h"
 #include "stringtools.h"
+#include "parrot_client.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
-
-int lsalloc( const char *path, char *alloc_path, INT64_T *total, INT64_T *inuse )
-{
-#ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_lsalloc,path,alloc_path,total,inuse);
-#else
-	return syscall(SYSCALL64_parrot_lsalloc,path,alloc_path,total,inuse);
-#endif
-}
 
 int main( int argc, char *argv[] )
 {
@@ -35,7 +25,7 @@ int main( int argc, char *argv[] )
 		return 0;
 	}
 
-	if(lsalloc(path,alloc_path,&total,&inuse)==0) {
+	if(parrot_lsalloc(path,alloc_path,&total,&inuse)==0) {
 		printf("%s\n",alloc_path);
 		printf("%sB TOTAL\n",string_metric(total,-1,0));
 		printf("%sB INUSE\n",string_metric(inuse,-1,0));
@@ -43,9 +33,9 @@ int main( int argc, char *argv[] )
 		return 0;
 	} else {
 		if(errno==ENOSYS || errno==EINVAL) {
-			fprintf(stderr,"lsalloc: This filesystem does not support allocations.\n");
+			fprintf(stderr,"parrot_lsalloc: This filesystem does not support allocations.\n");
 		} else {
-			fprintf(stderr,"lsalloc: %s\n",strerror(errno));
+			fprintf(stderr,"parrot_lsalloc: %s\n",strerror(errno));
 		}
 		return 1;
 	}

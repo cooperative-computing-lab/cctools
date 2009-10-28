@@ -1,7 +1,6 @@
 #include "pfs_types.h"
-#include "tracer.table.h"
-#include "tracer.table64.h"
 #include "full_io.h"
+#include "parrot_client.h"
 
 #include <stdio.h>
 #include <syscall.h>
@@ -122,11 +121,7 @@ int copyfile( const char *source, const char *target )
 	} else if(hardlink_mode) {
 		return link(source,target);
 	} else {
-#ifdef CCTOOLS_CPU_I386
-		result = syscall(SYSCALL32_parrot_copyfile,source,target);
-#else
-		result = syscall(SYSCALL64_parrot_copyfile,source,target);
-#endif
+		result = parrot_cp(source,target);
 		if(result<0 && errno==ENOSYS) {
 			return copyfile_slow(source,target);
 		} else {

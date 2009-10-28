@@ -1,22 +1,10 @@
-#include "tracer.table.h"
-#include "tracer.table64.h"
-#include "int_sizes.h"
-#include "stringtools.h"
+#include "parrot_client.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
-
-int parrot_locate( const char *path, char *buf, int size )
-{
-#ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_locate,path,buf,size);
-#else
-	return syscall(SYSCALL64_parrot_locate,path,buf,size);
-#endif
-}
 
 int main( int argc, char *argv[] )
 {
