@@ -235,6 +235,9 @@ int chirp_job_execute( INT64_T jobid, struct chirp_job_info *info )
 	if(pid==0) {
 		int result;
 
+		/* start a new session so as no to see signals from the parent. */
+		setsid();
+
 		/* Put our standard input, output, and error in the expected fds */
 		dup2(fds[0],0);
 		dup2(fds[1],1);
