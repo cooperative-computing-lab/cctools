@@ -70,7 +70,6 @@ install: all parrot_client.h
 	install -d ${CCTOOLS_INSTALL_DIR}/include
 	install parrot ${CCTOOLS_INSTALL_DIR}/bin
 	install libparrot_client.a ${CCTOOLS_INSTALL_DIR}/lib
-	install libparrot_client.so ${CCTOOLS_INSTALL_DIR}/lib
 	install parrot_client.h ${CCTOOLS_INSTALL_DIR}/include
 	install parrot_helper.so ${CCTOOLS_INSTALL_DIR}/bin
 	install parrot_identity_box ${CCTOOLS_INSTALL_DIR}/bin
