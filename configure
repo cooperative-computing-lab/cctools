@@ -32,8 +32,7 @@ case "$build_cpu" in
 	;;
 esac
 
-potential_packages="dttools ftp_lite chirp ftsh"
-pfs_optional_services=""
+potential_packages="dttools ftp_lite chirp ftsh abstractions"
 
 if [ -d parrot -a $build_sys = LINUX ]
 then
@@ -48,13 +47,9 @@ else
 	echo "skipping parrot, because this system is ${build_sys}, not LINUX"
 fi
 
-potential_packages="${potential_packages} abstractions"
-
 install_path="/usr/local"
 globus_path="/usr/local"
 krb5_path="/usr"
-nest_path="/usr/local"
-classad_path="/usr/local"
 gcb_path="/usr/local"
 readline_path="/usr"
 if [ ${build_sys} = DARWIN -o ${build_sys} = FREEBSD ]
@@ -69,6 +64,7 @@ dcap_path="/usr"
 irods_path="/usr"
 hdfs_path="/usr"
 zlib_path="/usr"
+mysql_path="/usr"
 
 globus_flavor=auto
 has_egee=no
@@ -80,8 +76,6 @@ ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unk
 config_readline_path=auto
 config_globus_path=no
 config_krb5_path=auto
-config_nest_path=no
-config_classad_path=no
 config_gcb_path=no
 config_fuse_path=auto
 config_egee_path=no
@@ -120,16 +114,6 @@ do
 			shift
 			krb5_path=$1
 			config_krb5_path=yes
-			;;
-		--with-nest-path)
-			shift
-			nest_path=$1
-			config_nest_path=yes
-			;;
-		--with-classad-path)
-			shift
-			classad_path=$1
-			config_classad_path=yes
 			;;
 		--with-gcb-path)
 			shift
@@ -202,8 +186,6 @@ Where PACKAGE may be:
     fuse
     rfio
     dcap
-    classad
-    nest
     globus
     irods
     hdfs
@@ -259,22 +241,6 @@ require_gnu_make
 require_path flex
 require_path bison
 
-if [ $config_readline_path != no ] && check_library ${readline_path}/lib/libreadline
-then
-	if [ ${readline_path} != /usr ]
-	then
-		ccflags="${ccflags} -I${readline_path}/include"
-		ldflags="${ldflags} -L${readline_path}/lib"
-	fi
-	
-	ccflags="${ccflags} -DHAS_LIBREADLINE"
-	ldflags="${ldflags} -lreadline -lncurses"
-	
-	optional_library history ${readline_path}/lib
-else
-	echo "*** skipping readline..."
-fi
-
 if [ $config_egee_path != no ] && check_file "${egee_path}/lcg/include/lcg_util.h"
 then
 	has_egee=yes
@@ -291,31 +257,6 @@ else
 		exit 1
 	else
 		echo "*** skipping egee support"
-	fi
-fi
-
-if [ $config_nest_path != no ] && check_file "${nest_path}/include/nest_speak.h"
-then
-	ccflags="${ccflags} -I${nest_path}/include -DHAS_NEST"
-	ldflags="${ldflags} -L${nest_path}/lib -lnest-client"
-
-	if check_file "${classad_path}/include/classad.h"
-	then
-		ccflags="${ccflags} -I${classad_path}/include -DHAS_CLASSAD"
-		ldflags="${ldflags} -L${classad_path}/lib -lclassad"
-	else
-		echo "*** Sorry, you can't have NeST without ClassAds."
-		echo "*** Consider using the --with-classad-path option."
-		exit 1
-	fi
-else
-	if [ $config_nest_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find Nest in $nest_path"
-		echo "*** Check --with-nest-path and try again."
-		exit 1
-	else
-		echo "*** skipping nest support"
 	fi
 fi
 
@@ -471,25 +412,35 @@ else
 	fi
 fi
 
-if [ $config_krb5_path != no ] && check_file "${krb5_path}/include/krb5.h"
+if [ $config_readline_path != no ] && library_search readline ${readline_path}
 then
-	ldflags="${ldflags} ${DYNAMIC_MODE}"
+	if [ ${readline_path} != /usr ]
+	then
+		ccflags="${ccflags} -I${readline_path}/include"
+	fi
+	
+	ccflags="${ccflags} -DHAS_LIBREADLINE"
 
+	library_search ncurses ${readline_path}
+	library_search history ${readline_path}
+else
+	echo "*** skipping readline..."
+fi
+
+if [ $config_krb5_path != no ] && check_file ${krb5_path}/include/krb5.h
+then
 	if [ ${krb5_path} != /usr ]
 	then
 		ccflags="${ccflags} -I${krb5_path}/include"
-		ldflags="${ldflags} -L${krb5_path}/lib"
 	fi
 
 	ccflags="${ccflags} -DHAS_KRB5"
-	ldflags="${ldflags} -lkrb5"
- 
-	optional_library k5crypto    "${krb5_path}/lib"
-	optional_library crypto      "${krb5_path}/lib"
-	optional_library com_err     "${krb5_path}/lib"
-	optional_library krb5support "${krb5_path}/lib"
-
-	ldflags="${ldflags} ${STATIC_MODE}"
+	
+	library_search krb5        "${krb5_path}"
+	library_search k5crypto    "${krb5_path}"
+	library_search crypto      "${krb5_path}"
+	library_search com_err     "${krb5_path}"
+	library_search krb5support "${krb5_path}"
 else
 	if [ $config_krb5_path = yes ]
 	then
@@ -501,36 +452,35 @@ else
 	fi
 fi
 
-if [ $config_fuse_path != no ] && check_file ${fuse_path}/include/fuse.h
+if [ $config_fuse_path != no ] && library_search fuse ${fuse_path}
 then
         if [ ${fuse_path} != /usr ]
         then
                 ccflags="${ccflags} -I${fuse_path}/include"
-                ldflags="${ldflags} -L${fuse_path}/lib"
-
-                # On Linux, FUSE is often installed with libtool
-                # such that the real static library is under .libs
-
-                if [ -f ${fuse_path}/lib/.libs ]
-                then
-                        ldflags="${ldflags} -L${fuse_path}/lib/.libs"
-                fi
         fi
         ccflags="${ccflags} -DHAS_FUSE"
-        ldflags="${ldflags} -lfuse"
 else
-        echo "*** skipping fuse..."
+	if [ $config_fuse_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find Fuse in $fuse_path"
+		echo "*** Check --with-fuse-path and try again."
+		exit 1
+	else
+		echo "*** skipping fuse support"
+	fi
 fi
 
-if [ $config_mysql_path != no ] && check_file ${mysql_path}/include/mysql/mysql.h
+if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysql
 then
 	if [ ${mysql_path} != /usr ]
 	then
-		ccflags="${ccflags} -I${mysql_path}/include -DHAS_MYSQL"
-		ldflags="${ldflags} -L${mysql_path}/lib/mysql"
+		ccflags="${ccflags} -I${mysql_path}/include -DHAS_MYSQL -DHAS_BXGRID"
 	fi
 
-	ldflags="${ldflags} -lmysqlclient -lmystrings -lmysys"
+	ccflags="${ccflags} -DHAS_MYSQL"
+
+	library_search mystrings ${mysql_path} mysql
+	library_search mysys ${mysql_path} mysql
 else
 	if [ $config_mysql_path = yes ]
 	then
@@ -538,7 +488,7 @@ else
 		echo "*** Check --with-mysql-path and try again."
 		exit 1
 	else
-		echo "*** skipping mysql..."
+		echo "*** skipping mysql support"
 	fi
 fi
 
@@ -560,15 +510,16 @@ linker="gcc"
 
 ldflags="${ldflags} -lz ${DYNAMIC_MODE} -lc -lm -ldl"
 
-optional_library selinux  /usr/lib
-optional_library keyutils-1.2 /lib
-optional_library resolv   /usr/lib
-optional_library socket   /usr/lib
-optional_library nsl      /usr/lib
-optional_library pthread  /usr/lib
-optional_library dl       /usr/lib
-optional_library iconv    /usr/lib
-optional_library rt       /usr/lib
+library_search selinux  /usr
+library_search sepol    /usr
+library_search keyutils-1.2 /
+library_search resolv   /usr
+library_search socket   /usr
+library_search nsl      /usr
+library_search pthread  /usr
+library_search dl       /usr
+library_search iconv    /usr
+library_search rt       /usr
 
 if check_path doxygen
 then
@@ -577,9 +528,6 @@ else
     doxygen=true
 fi
 	
-optional_pfs_service bxgrid mysql
-optional_pfs_service hdfs   libhdfs java
-
 ccflags="${ccflags} -DINSTALL_PATH=\\\"${install_path}\\\" -g -D_REENTRANT -D_GNU_SOURCE -DBUILD_USER=\\\"$build_user\\\" -DBUILD_HOST=\\\"$build_host\\\" -DCCTOOLS_VERSION_MAJOR=$major -DCCTOOLS_VERSION_MINOR=$minor -DCCTOOLS_VERSION_MICRO=$micro -DCCTOOLS_OPSYS_${build_sys} -DCCTOOLS_CPU_${build_cpu}"
 
 echo "Creating Makefile.config..."
@@ -617,7 +565,6 @@ CCTOOLS_YACC=bison
 CCTOOLS_LEX=flex
 CCTOOLS_DOXYGEN=${doxygen}
 
-PFS_OPTIONAL_SERVICES=${pfs_optional_services}
 EOF
 
 echo ""

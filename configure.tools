@@ -124,6 +124,37 @@ optional_library()
 	fi
 }
 
+library_search()
+{
+	if [ -d $2/lib64 ]
+	then
+		libdir=$2/lib64
+	else
+		libdir=$2/lib
+	fi
+
+	if [ X$3 != X -a -d "$libdir/$3" ]
+	then
+		libdir="$libdir/$3"
+	fi
+
+	if check_file $libdir/lib$1.a
+	then
+		ldflags="${ldflags} $libdir/lib$1.a"
+		return 0
+	elif check_file $libdir/lib$1.so || check_file $libdir/lib$1.dylib
+	then
+		if [ $2 != / -a $2 != /usr ]
+		then
+			ldflags="${ldflags} -L$libdir -R$libdir"
+		fi
+		ldflags="${ldflags} -l$1"
+		return 0
+	fi
+
+	return 1
+}
+
 optional_function()
 {
 	if check_function $1 $2
@@ -154,7 +185,10 @@ optional_pfs_service()
 	echo -n "including pfs_service_${service}..."
 
 	for lib in $@; do
-		if ! echo $ccflags | grep "$lib" > /dev/null 2>&1 ; then
+		if echo $ccflags | grep "$lib" > /dev/null 2>&1
+		then
+			true
+		else
 			echo "no"
 			return 1
 		fi
@@ -162,8 +196,11 @@ optional_pfs_service()
 
 	echo "yes"
 	ccflag="HAS_$(echo ${service} | tr [a-z] [A-Z])"
-	if ! echo $ccflags | grep $ccflag > /dev/null 2>&1 ; then
-	    ccflags="${ccflags} -D${ccflag}"
+	if echo $ccflags | grep $ccflag > /dev/null 2>&1
+	then
+		true
+	else
+		ccflags="${ccflags} -D${ccflag}"
 	fi
 	pfs_optional_services="${pfs_optional_services} pfs_service_${service}.o"
 	return 0
