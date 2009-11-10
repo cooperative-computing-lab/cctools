@@ -39,19 +39,6 @@ check_path ()
 	return 1
 }
 
-check_library()
-{
-	echo -n "checking for ${1}..."
-	if [ -f ${1}.a -o -f ${1}.so ]
-	then
-		echo "yes"
-		return 0
-	else
-		echo "no"
-		return 1
-	fi
-}
-
 check_function()
 {
 	echo -n "checking for $1 in $2..."
@@ -87,17 +74,6 @@ require_path ()
 	fi
 }
 
-require_library ()
-{
-	if check_library $1 $2
-	then
-		return 0
-	else
-		echo "Sorry, I can't proceed without library $1";
-		exit 1
-	fi
-}
-
 require_function ()
 {
 	if check_function $1 $2
@@ -109,28 +85,20 @@ require_function ()
 	fi
 }
 
-optional_library()
-{
-	if check_library $2/lib$1
-	then
-		if [ X$3 != X ]
-		then
-			ccflags="${ccflags} -D$3"
-		fi
-		ldflags="${ldflags} -l$1"
-		return 0
-	else
-		return 1
-	fi
-}
-
 library_search()
 {
-	if [ -d $2/lib64 ]
+	if [ $build_cpu = X86_64 -a -d $2/lib64 ]
 	then
 		libdir=$2/lib64
 	else
 		libdir=$2/lib
+	fi
+
+	if [ $build_sys = DARWIN ]
+	then
+		dynamic_suffix=dylib
+	else
+		dynamic_suffix=so
 	fi
 
 	if [ X$3 != X -a -d "$libdir/$3" ]
@@ -142,7 +110,7 @@ library_search()
 	then
 		ldflags="${ldflags} $libdir/lib$1.a"
 		return 0
-	elif check_file $libdir/lib$1.so || check_file $libdir/lib$1.dylib
+	elif check_file $libdir/lib$1.$dynamic_suffix
 	then
 		if [ $2 != / -a $2 != /usr ]
 		then
