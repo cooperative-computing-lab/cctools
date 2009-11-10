@@ -32,7 +32,7 @@ struct process_info {
 };
 
 /** Wait for a process to complete, and return its status.
-Wait for up to @ref timeout seconds for a child process to complete.
+Wait for up to timeout seconds for a child process to complete.
 If a process has completed, its status will be returned in a @ref process_info
 structure.  The caller may either call <tt>free</tt> to release the structure,
 or may return it via @ref process_putback in order to allow another caller to retrieve it.
