@@ -177,33 +177,6 @@ INT64_T chirp_client_login( struct chirp_client *c, const char *name, const char
 	return simple_command(c,stoptime,"login %s %s\n",name,password);
 }
 
-INT64_T chirp_client_lookup( struct chirp_client *c, const char *logical_name, char **url, time_t stoptime  )
-{
-	INT64_T result;
-	INT64_T actual;
-
-	result = simple_command(c,stoptime,"lookup %s\n",logical_name);
-	fprintf(stderr, "%d\n", result);
-
-	if(result>0) {
-		*url = malloc(result);
-		if(*url) {
-			actual = link_read(c->link,*url,result,stoptime);
-			if(actual!=result) {
-				c->broken = 1;
-				errno = ECONNRESET;
-				return -1;
-			}
-		} else {
-			c->broken = 1;
-			errno = ECONNRESET;
-			return -1;
-		}
-	}
-
-	return result;
-}
-
 INT64_T chirp_client_getlongdir( struct chirp_client *c, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime )
 {
 	char name[CHIRP_LINE_MAX];

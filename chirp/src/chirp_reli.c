@@ -475,11 +475,6 @@ INT64_T chirp_reli_whoareyou( const char *host, const char *rhost, char *buffer,
 	RETRY_ATOMIC( result = chirp_client_whoareyou(client,rhost,buffer,length,stoptime); );
 }
 
-INT64_T chirp_reli_lookup( const char *host, const char *path, char **redirect, time_t stoptime )
-{
-	RETRY_ATOMIC( result = chirp_client_lookup(client,path,redirect,stoptime); );
-}
-
 INT64_T chirp_reli_getfile( const char *host, const char *path, FILE *stream, time_t stoptime )
 {
 	RETRY_ATOMIC(\

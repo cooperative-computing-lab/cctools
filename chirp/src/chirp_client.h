@@ -50,7 +50,6 @@ INT64_T chirp_client_putstream( struct chirp_client *c, const char *path, time_t
 INT64_T chirp_client_putstream_write( struct chirp_client *c, const char *data, INT64_T length, time_t stoptime );
 
 INT64_T chirp_client_cookie( struct chirp_client *c, const char *cookie, time_t stoptime );
-INT64_T chirp_client_lookup( struct chirp_client *c, const char *logical_name, char **url, time_t stoptime );
 INT64_T chirp_client_getlongdir( struct chirp_client *c, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime );
 INT64_T chirp_client_getdir( struct chirp_client *c, const char *path, chirp_dir_t callback, void *arg, time_t stoptime );
 INT64_T chirp_client_opendir( struct chirp_client *c, const char *path, time_t stoptime );
