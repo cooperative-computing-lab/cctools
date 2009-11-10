@@ -427,11 +427,20 @@ else
 	echo "*** skipping readline..."
 fi
 
-if [ $config_krb5_path != no ] && check_file ${krb5_path}/include/krb5.h
+# Solaris places kerberos includes in a strange place.
+
+if [ -d ${krb5_path}/include/kerberosv5 ]
 then
-	if [ ${krb5_path} != /usr ]
+	krb5_include_path=${krb5_path}/include/kerberosv5
+else
+	krb5_include_path=${krb5_path}/include
+fi
+
+if [ $config_krb5_path != no ] && check_file ${krb5_include_path}/krb5.h
+then
+	if [ ${krb5_include_path} != /usr/include ]
 	then
-		ccflags="${ccflags} -I${krb5_path}/include"
+		ccflags="${ccflags} -I${krb5_include_path}"
 	fi
 
 	ccflags="${ccflags} -DHAS_KRB5"
