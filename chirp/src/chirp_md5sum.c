@@ -26,7 +26,7 @@ int main( int argc, char *argv[] )
 	const char *host = argv[1];
 	char *path = argv[2];
 	INT64_T result;
-	char digest[16];
+	unsigned char digest[16];
 
 	result = chirp_reli_md5(host,path,digest,time(0)+30);
 	if(result>=0) {
