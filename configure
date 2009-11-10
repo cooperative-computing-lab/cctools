@@ -279,10 +279,9 @@ if [ $has_egee = yes ]
 then
 	echo "using egee version of rfio"
 else
-	if [ $config_rfio_path != no ] && check_file "${rfio_path}/include/rfio_api.h"
+	if [ $config_rfio_path != no ] && library_search shift ${rfio_path}
 	then
 		ccflags="${ccflags} -I${rfio_path}/include -DHAS_RFIO"
-		ldflags="${ldflags} -L${rfio_path}/lib -ldpm"
 	else
 		if [ $config_rfio_path = yes ]
 		then
@@ -295,10 +294,9 @@ else
 	fi
 fi
 
-if [ $config_dcap_path != no ] && check_file "${dcap_path}/dcap/dcap.h"
+if [ $config_dcap_path != no ] && library_search dcap ${dcap_path}
 then
 	ccflags="${ccflags} -I${dcap_path}/dcap -DHAS_DCAP"
-	ldflags="${ldflags} -L${dcap_path}/lib -ldcap"
 else
 	if [ $config_dcap_path = yes ]
 	then
@@ -343,10 +341,9 @@ else
 	fi
 fi
 
-if [ $config_irods_path != no ] && check_library "${irods_path}/lib/core/obj/libRodsAPIs"
+if [ $config_irods_path != no ] && library_search RodsAPIs "${irods_path}" core/obj
 then
 	ccflags="${ccflags} -I${irods_path}/lib/core/include -I${irods_path}/lib/api/include -I${irods_path}/lib/md5/include -I${irods_path}/server/core/include -I${irods_path}/server/api/include -I${irods_path}/server/icat/include -I${irods_path}/server/drivers/include -I${irods_path}/server/re/include -DHAS_IRODS"
-	ldflags="${ldflags} -L${irods_path}/lib/core/obj -lRodsAPIs"
 else
 	if [ $config_irods_path = yes ]
 	then
@@ -501,6 +498,19 @@ else
 	fi
 fi
 
+if [ $config_zlib_path != no ] && library_search z ${zlib_path}
+then
+	if [ ${zlib_path} != /usr ]
+	then	
+        	ccflags="${ccflags} -I${zlib_path}/include"
+	fi
+
+	ccflags="${ccflags} -DHAS_ZLIB"
+else
+	echo "*** Sorry, you must have zlib to build this package."
+	exit 1
+fi
+
 optional_function strsignal /usr/include/string.h HAS_STRSIGNAL
 optional_function pread /usr/include/unistd.h HAS_PREAD
 optional_function pwrite /usr/include/unistd.h HAS_PWRITE
@@ -509,15 +519,9 @@ optional_file /usr/include/sys/statfs.h HAS_SYS_STATFS_H
 optional_file /usr/include/sys/statvfs.h HAS_SYS_STATVFS_H
 optional_file /usr/include/alloca.h HAS_ALLOCA_H
 
-if [ ${zlib_path} != /usr ]
-then
-        ldflags="${ldflags} -L${zlib_path}/lib"
-        ccflags="${ccflags} -I${zlib_path}/include"
-fi
-
 linker="gcc"
 
-ldflags="${ldflags} -lz ${DYNAMIC_MODE} -lc -lm -ldl"
+ldflags="${ldflags} ${DYNAMIC_MODE} -lc -lm -ldl"
 
 library_search selinux  /usr
 library_search sepol    /usr
