@@ -25,6 +25,8 @@ See the file COPYING for details.
 #include <fcntl.h>
 #include <errno.h>
 #include <math.h>
+#include <signal.h>
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -126,7 +128,7 @@ int main( int argc, char *argv[] )
 	}
 
 	char tempdir[WORK_QUEUE_LINE_MAX];
-	sprintf(tempdir,"%s/worker-%d-%d",workdir,getuid(),getpid());
+	sprintf(tempdir,"%s/worker-%d-%d",workdir,(int)getuid(),(int)getpid());
 
 	printf("worker: working in %s\n",tempdir);
 	mkdir(tempdir,0700);

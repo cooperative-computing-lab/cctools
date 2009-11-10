@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
 	int cntr;
 
     // Variables defined by Li
-    int i,j; // for multiprocess calculation
+    int i; // for multiprocess calculation
     int numOfMovingElements, numOfStableElements;
     //int setACount, setBCount;
     int setAPos, setBPos;

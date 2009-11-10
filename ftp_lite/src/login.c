@@ -14,11 +14,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
-
-// The following extern is commented out to allow for
-// compilation with new gcc (to fix the __builtin_alloca bug).
-// Commenting it out may very well affect portability!
-//extern char * alloca( size_t size );
+#include <alloca.h>
 
 static int setecho( int fd, int onoff )
 {

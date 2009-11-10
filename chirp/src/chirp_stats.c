@@ -24,7 +24,7 @@ static struct chirp_stats *table = 0;
 
 void chirp_stats_init()
 {
-	table = mmap(0,SHARED_SEGMENT_SIZE,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+	table = (void*)mmap(0,SHARED_SEGMENT_SIZE,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
 	if(table==(void*)-1) fatal("couldn't allocate shared page: %s\n",strerror(errno));
 
 	memset(table,0,SHARED_SEGMENT_SIZE);
@@ -32,7 +32,7 @@ void chirp_stats_init()
 
 void chirp_stats_sync()
 {
-	msync(table,SHARED_SEGMENT_SIZE,MS_SYNC|MS_INVALIDATE);
+	msync((void*)table,SHARED_SEGMENT_SIZE,MS_SYNC|MS_INVALIDATE);
 }
 
 

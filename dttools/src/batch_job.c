@@ -18,6 +18,8 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <signal.h>
+
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/signal.h>

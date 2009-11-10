@@ -419,7 +419,7 @@ int main( int argc, char *argv[] ) {
 	cfg.inputlist = argv[optind + 2];
 
 	getcwd(cfg.curr_dir, MR_MAX_STRLEN);
-	snprintf(cfg.work_dir, MR_MAX_STRLEN, "/tmp/mapreduce-%d-%d", getuid(), getpid());
+	snprintf(cfg.work_dir, MR_MAX_STRLEN, "/tmp/mapreduce-%d-%d", (int)getuid(), (int)getpid());
 	
 	char path[MR_MAX_STRLEN];
 	snprintf(path, MR_MAX_STRLEN, "%s/parrot_hdfs", cfg.bin_dir);

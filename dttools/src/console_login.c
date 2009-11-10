@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
+#include <alloca.h>
 
 static int setecho( int fd, int onoff )
 {
