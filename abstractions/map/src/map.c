@@ -1,6 +1,6 @@
 /*
 Copyright (C) 2009- The University of Notre Dame
-This software is distributed under a BSD-style license.
+This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 First version written by Connor Keenan in 2009.
 */

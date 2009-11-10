@@ -1,6 +1,6 @@
 /*
 Copyright (C) 2004 Douglas Thain
-This work is made available under a BSD-style license.
+This work is made available under the GNU General Public License.
 See the file COPYING for details.
 */
 

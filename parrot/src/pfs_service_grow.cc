@@ -4,7 +4,7 @@ This module was written by Aureliano Rama and  Simone Pagan Griso,
 and modified by Douglas Thain.  Igor Sfiligoi and Donatella Lucchesi
 contributed significantly to the design and debugging of this system.
 
-This software is distributed under a BSD-style license.
+This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 

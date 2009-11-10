@@ -1,5 +1,13 @@
+/*
+Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
+Copyright (C) 2005- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #ifndef ASSEMBLY_MASTER_H
 #define ASSEMBLY_MASTER_H
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>

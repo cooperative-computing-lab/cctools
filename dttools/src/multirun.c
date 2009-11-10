@@ -1,4 +1,11 @@
 /*
+Copyright (C) 2004-2005 Douglas Thain and The University of Notre Dame
+Copyright (C) 2005- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
+/*
 Run a series of commands in parallel processes, substituting
 a parameter in each command, and tagging the output.
 Each parameter is substituted into the command using the

@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2008- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #include "chirp_types.h"
 
 const char * chirp_job_state_string( chirp_job_state_t state )

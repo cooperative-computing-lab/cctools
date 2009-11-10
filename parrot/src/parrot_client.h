@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2008- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #ifndef PARROTCLIENT_H_
 #define PARROTCLIENT_H_
 

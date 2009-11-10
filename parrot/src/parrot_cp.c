@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2008- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #include "pfs_types.h"
 #include "full_io.h"
 #include "parrot_client.h"

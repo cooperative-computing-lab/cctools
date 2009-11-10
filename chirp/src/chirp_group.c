@@ -1,3 +1,8 @@
+/*
+Copyright (C) 2008- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 
 #include "chirp_group.h"
 #include "chirp_types.h"

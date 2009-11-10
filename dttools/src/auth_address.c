@@ -1,13 +1,13 @@
 /*
 Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
 Copyright (C) 2005- The University of Notre Dame
-This software is distributed under a BSD-style license.
+This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 /*
 Copyright (C) 2003-2004 Douglas Thain
 Copyright (C) 2005- The University of Notre Dame
-This work is made available under a BSD-style license.
+This work is made available under the GNU General Public License.
 See the file COPYING for details.
 */
 

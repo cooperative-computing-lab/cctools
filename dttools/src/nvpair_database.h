@@ -1,3 +1,8 @@
+/*
+Copyright (C) 2008- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 
 #ifndef NVPAIR_DATABASE_H
 #define NVPAIR_DATABASE_H

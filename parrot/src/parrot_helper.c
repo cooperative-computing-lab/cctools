@@ -1,4 +1,10 @@
 /*
+Copyright (C) 2008- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
+/*
 This helper library works alongside the main parrot code in
 order to avoid operations that are complex or unsupported by Parrot.
 Parrot locates the helper library and uses the LD_PRELOAD linker
