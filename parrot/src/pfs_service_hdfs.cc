@@ -10,7 +10,6 @@ See the file COPYING for details.
 #include "pfs_dircache.h"
 #include "pfs_table.h"
 #include "pfs_service.h"
-#include "pfs_service_hdfs.h"
 
 extern "C" {
 #include "debug.h"
@@ -77,13 +76,13 @@ struct hdfs_services {
 static int load_hdfs_services(struct hdfs_services *hdfs) {
 	void *handle;
 
-	handle = dlopen(LIBJVM_PATH, RTLD_LAZY);
+	handle = dlopen(getenv("LIBJVM_PATH"), RTLD_LAZY);
 	if (!handle) {
 		debug(D_NOTICE|D_HDFS, "%s", dlerror());
 		return -1;
 	}
 
-	handle = dlopen(LIBHDFS_PATH, RTLD_LAZY);
+	handle = dlopen(getenv("LIBHDFS_PATH"), RTLD_LAZY);
 	if (!handle) {
 		debug(D_NOTICE|D_HDFS, "%s", dlerror());
 		return -1;
