@@ -8,10 +8,7 @@ SCRIPTS = mr_wrapper.sh
 
 LOCAL_LDFLAGS=-ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
-all: mr_config.h ${TARGETS}
-
-mr_config.h:
-	echo "#define CCTOOLS_INSTALL_DIR \"${CCTOOLS_INSTALL_DIR}\"" > mr_config.h
+all: ${TARGETS}
 
 mr_map: mr_map.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS} -lm
@@ -28,7 +25,7 @@ mapreduce: mapreduce.o
 test:
 
 clean:
-	rm -f core *~ *.o *.a mr_config.h ${TARGETS} 
+	rm -f core *~ *.o *.a ${TARGETS} 
 
 install: all
 	install -d ${CCTOOLS_INSTALL_DIR}/bin

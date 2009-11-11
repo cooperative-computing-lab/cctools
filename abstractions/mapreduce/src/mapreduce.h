@@ -7,14 +7,13 @@ See the file COPYING for details.
 #ifndef MAPREDUCE_H
 #define MAPREDUCE_H
 
-#include "mr_config.h"
 #include "batch_job.h"
 
 /* Default values */
 #define MR_DEFAULT_NMAPPERS	32
 #define MR_DEFAULT_NREDUCERS	16
 #define MR_DEFAULT_BQTYPE	BATCH_QUEUE_TYPE_CONDOR
-#define MR_DEFAULT_BIN_DIR	CCTOOLS_INSTALL_DIR"/bin"
+#define MR_DEFAULT_BIN_DIR	INSTALL_PATH "/bin"
 #define MR_DEFAULT_SCRATCH_DIR  "."
 
 /* Constants */
