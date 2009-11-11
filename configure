@@ -207,14 +207,10 @@ export IFS
 
 if [ $build_sys = LINUX ]
 then
-	DYNAMIC_MODE="-Xlinker -Bdynamic"
-	STATIC_MODE="-dynamic -Xlinker --as-needed -Xlinker -Bstatic"
+	ldflags="-Xlinker -Bstatic -Xlinker --as-needed -lstdc++ -static-libgcc -Xlinker -Bdynamic"
 else
-	DYNAMIC_MODE=""
-	STATIC_MODE=""
+	ldflags="-lstdc++ -static-libgcc"
 fi
-
-ldflags="${STATIC_MODE} -lstdc++ -static-libgcc"
 
 rm -f Makefile.config
 echo "checking for all the things I know how to build..."
@@ -521,7 +517,7 @@ optional_file /usr/include/alloca.h HAS_ALLOCA_H
 
 linker="gcc"
 
-ldflags="${ldflags} ${DYNAMIC_MODE} -lc -lm -ldl"
+ldflags="${ldflags} -lc -lm -ldl"
 
 library_search selinux  /usr
 library_search sepol    /usr
