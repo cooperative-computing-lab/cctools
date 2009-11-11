@@ -73,9 +73,22 @@ struct hdfs_services {
 };
 
 /* TODO: Clean up handles? */
-static int load_hdfs_services(struct hdfs_services *hdfs) {
+static int load_hdfs_services(struct hdfs_services *hdfs)
+{
 	void *handle;
 
+	if(!getenv("JAVA_HOME") || !getenv("HADOOP_HOME") || !getenv("CLASSPATH") || !getenv("LIBHDFS_PATH") || !getenv("LIBJVM_PATH")) {
+		static int did_hdfs_warning=0;
+		if(!did_hdfs_warning) {
+			fprintf(stderr,"Sorry, to use Parrot with HDFS, you need to set up Java and Hadoop first.\n");
+			fprintf(stderr,"Set JAVA_HOME, HADOOP_HOME, CLASSPATH, LIBHDFS_PATH, and LIBJVM_PATH appropriately.\n");
+			fprintf(stderr,"Or just run parrot_hdfs, which sets up everything for you.\n");
+			did_hdfs_warning = 1;
+		}
+		errno = ENOSYS;		
+		return -1;
+	}
+	
 	handle = dlopen(getenv("LIBJVM_PATH"), RTLD_LAZY);
 	if (!handle) {
 		debug(D_NOTICE|D_HDFS, "%s", dlerror());
