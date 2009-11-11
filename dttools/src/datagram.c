@@ -108,8 +108,8 @@ int datagram_recv( struct datagram *d, char *data, int length, char *addr, int *
 
 	while(1) {
 
-		tm.tv_sec = timeout;
-		tm.tv_usec = 0;
+		tm.tv_sec = timeout/1000000;
+		tm.tv_usec = timeout%1000000;
 
 		FD_ZERO(&fds);
 		FD_SET(d->fd,&fds);
