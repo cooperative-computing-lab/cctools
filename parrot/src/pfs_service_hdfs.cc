@@ -199,7 +199,7 @@ public:
 	int get_uid_from_name( const char *name ) {
 		int key;
 		
-		key = (int)hash_table_lookup(uid_table, name);
+		key = (PTRINT_T)hash_table_lookup(uid_table, name);
 		if (key) {
 			return key;
 		} else {
@@ -218,7 +218,7 @@ public:
 	int get_gid_from_name( const char *name ) {
 		int key;
 		
-		key = (int)hash_table_lookup(gid_table, name);
+		key = (PTRINT_T)hash_table_lookup(gid_table, name);
 		if (key) {
 			return key;
 		} else {
