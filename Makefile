@@ -12,6 +12,7 @@ install: all docs Makefile.config
 	if [ -d api ]; then cp -r api ${CCTOOLS_INSTALL_DIR}/doc; fi
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/etc
 	cp Makefile.config ${CCTOOLS_INSTALL_DIR}/etc/Makefile.config
+	cp COPYING ${CCTOOLS_INSTALL_DIR}/doc
 
 Makefile.config:
 	@echo "You must run 'configure' before '${MAKE}'."
