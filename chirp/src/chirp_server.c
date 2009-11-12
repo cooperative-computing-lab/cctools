@@ -88,11 +88,11 @@ static int max_job_wait_timeout = 300;
 static int did_explicit_auth = 0;
 static int max_child_procs = 0;
 static int total_child_procs = 0;
-static int exit_if_parent_fails = 0;
 
 struct chirp_stats *global_stats = 0;
 struct chirp_stats *local_stats = 0;
 
+int        exit_if_parent_fails = 0;
 int        enable_identity_boxing = 1;
 const char *chirp_server_path = 0;
 const char *listen_on_interface = 0;
@@ -507,7 +507,7 @@ int main( int argc, char *argv[] )
 
 		if(exit_if_parent_fails) {
 			if(getppid()<5) {
-				debug(D_NOTICE,"server is stopping because parent process died.");
+				fatal("stopping because parent process died.");
 				exit(0);
 			}
 		}

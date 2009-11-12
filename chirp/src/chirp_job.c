@@ -440,6 +440,8 @@ and used to execute one active storage job at a time.
 
 static int job_cleanup_time = 7*24*60*60;
 
+extern int exit_if_parent_fails;
+
 void chirp_job_starter()
 {
 	char path[CHIRP_PATH_MAX];
@@ -457,6 +459,13 @@ void chirp_job_starter()
 	mkdir(path,0700);
 
 	while(1) {
+                if(exit_if_parent_fails) {
+                        if(getppid()<5) {
+                                fatal("stopping because parent process died.");
+                                exit(0);
+                        }
+                }
+
 		run_count = 0;
 
 		job_list = chirp_job_scan();
