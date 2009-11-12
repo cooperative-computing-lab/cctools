@@ -82,4 +82,5 @@ install: all parrot_client.h
 	install parrot_md5 ${CCTOOLS_INSTALL_DIR}/bin
 	install parrot_cp ${CCTOOLS_INSTALL_DIR}/bin
 	install parrot_locate ${CCTOOLS_INSTALL_DIR}/bin
-	test -x parrot_hdfs && install parrot_hdfs ${CCTOOLS_INSTALL_DIR}/bin || true
+	chmod 755 parrot_hdfs
+	install parrot_hdfs ${CCTOOLS_INSTALL_DIR}/bin
