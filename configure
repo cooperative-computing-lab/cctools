@@ -496,18 +496,22 @@ optional_file /usr/include/alloca.h HAS_ALLOCA_H
 
 linker="gcc"
 
-ldflags="${ldflags} -lc -lm -ldl"
-
 library_search selinux  /usr
 library_search sepol    /usr
 library_search keyutils-1.2 /
 library_search resolv   /usr
 library_search socket   /usr
 library_search nsl      /usr
-library_search pthread  /usr
-library_search dl       /usr
 library_search iconv    /usr
-library_search rt       /usr
+
+# Finally, add in standard system libraries that are better off being dynamically linked.
+
+if [ $build_sys != DARWIN ]
+then
+	ldflags="${ldflags} -lrt"
+fi
+
+ldflags="${ldflags} -ldl -lpthread -lm -lc"
 
 if check_path doxygen
 then
