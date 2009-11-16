@@ -107,6 +107,12 @@ static struct bxgrid_virtual_folder BXGRID_VIRTUAL_FOLDERS[] = {
 	{ NULL, NULL, NULL, 0 }
 };
 
+/** 
+ * Find virtual folder based on path
+ *
+ * Returns pointer to virtual folder structure if found.
+ **/
+
 struct bxgrid_virtual_folder *bxgrid_bvf_find( const char *path ) 
 {
 	struct bxgrid_virtual_folder *bvf;
@@ -256,9 +262,11 @@ const char *bxgrid_lookup_replicaid( MYSQL *mysql_cxn, const char *fileid, int n
 
 		if (nid < 0) {
 			int i;
-			for (i = 0; i < replica_list->nreplicas; i++) 
-				if (strcmp(bxgrid_hostname, replica_list->replicas[i]) == 0) 
+			for (i = 0; i < replica_list->nreplicas; i++) {
+				replica_location = (struct bxgrid_replica_location *)hash_table_lookup(bxgrid_rtol_query_cache, replica_list->replicas[i]);
+				if (strcmp(bxgrid_hostname, replica_location->host) == 0)
 					break;
+			}
 
 			if (i < replica_list->nreplicas) {
 				strncpy(replicaid, replica_list->replicas[i], BXGRID_ID_MAX);
@@ -284,7 +292,7 @@ const char *bxgrid_lookup_replicaid( MYSQL *mysql_cxn, const char *fileid, int n
 			for (i = 0; i < nreplicas; i++) {
 				if (ri == i) 
 					strncpy(replicaid, rep_row[0], BXGRID_ID_MAX);
-				if (strcmp(bxgrid_hostname, rep_row[0]) == 0) 
+				if (strcmp(bxgrid_hostname, rep_row[1]) == 0) 
 					break;
 				if (i < (nreplicas - 1)) {
 					BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
