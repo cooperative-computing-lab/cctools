@@ -57,16 +57,16 @@ if(length>0) {
 
 */
 
-/**< Maximum number of characters in a text formatted datagram address. */
+/** Maximum number of characters in a text formatted datagram address. */
 #define DATAGRAM_ADDRESS_MAX 48
 
-/**< Maximum number of bytes in a datagram payload */
+/** Maximum number of bytes in a datagram payload */
 #define DATAGRAM_PAYLOAD_MAX 65536
 
-/**< Used to indicate any available port. */
+/** Used to indicate any available port. */
 #define DATAGRAM_PORT_ANY 0
 
-/**< The address to send to for broadcasting. */
+/** The address to send to for broadcasting. */
 #define DATAGRAM_ADDRESS_BROADCAST "255.255.255.255"
 
 /** Create a new port for sending or receiving datagrams.
