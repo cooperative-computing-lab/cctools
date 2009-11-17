@@ -493,7 +493,9 @@ int main( int argc, char *argv[] )
 
 	if(allow_execute) {
 		if(fork()==0) {
+			link_close(link);
 			chirp_job_starter();
+			_exit(0);
 		}
 	}
 
