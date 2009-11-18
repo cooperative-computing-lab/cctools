@@ -27,3 +27,4 @@ install: all
 	install sge_submit_workers ${CCTOOLS_INSTALL_DIR}/bin
 	install condor_submit_workers ${CCTOOLS_INSTALL_DIR}/bin
 	install condor_submit_makeflow ${CCTOOLS_INSTALL_DIR}/bin
+	install makeflow_log_parser ${CCTOOLS_INSTALL_DIR}/bin
