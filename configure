@@ -455,10 +455,10 @@ if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysq
 then
 	if [ ${mysql_path} != /usr ]
 	then
-		ccflags="${ccflags} -I${mysql_path}/include -DHAS_MYSQL -DHAS_BXGRID"
+		ccflags="${ccflags} -I${mysql_path}/include"
 	fi
 
-	ccflags="${ccflags} -DHAS_MYSQL"
+	ccflags="${ccflags} -DHAS_MYSQL -DHAS_BXGRID"
 
 	library_search mystrings ${mysql_path} mysql
 	library_search mysys ${mysql_path} mysql
