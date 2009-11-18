@@ -518,9 +518,12 @@ int main(int argc, char *argv[]) {
     mathost=optind+3;
     matpath=optind+4;
 	
-	// Deletion should be done, otherwise, it will open the previous matrix whose size is not determined
-	// TODO check matrix size here, because you shouldn't delete the matrix in the distributed context
-	chirp_matrix_delete(argv[mathost], argv[matpath], stoptime);
+	/**
+	 * 	Deletion should be done for local test purposes, otherwise, it will open a previous created matrix whose size is not determined.
+	 * 	To delete the matrix, add the following line:
+			chirp_matrix_delete(argv[mathost], argv[matpath], stoptime);
+	 *	NOTE: You shouldn't delete the matrix in the distributed context.
+	*/
 	
     // Create matrix at specified host and path to store results
     mat=chirp_matrix_open(argv[mathost], argv[matpath], stoptime);
