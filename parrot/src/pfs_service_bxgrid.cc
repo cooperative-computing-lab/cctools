@@ -35,6 +35,7 @@ extern "C" {
 #include <mysql/mysql.h>
 }
 
+#define	BXGRID_TIMEOUT	2
 #define BXGRID_ID_MAX	16
 #define BXGRID_REG_MODE	(S_IFREG | 0400)
 #define BXGRID_DIR_MODE	(S_IFDIR | 0755)
@@ -46,12 +47,12 @@ extern "C" {
 
 #define BXGRID_END	debug(D_BXGRID,"= %d %s",(int)result,((result>=0) ? "" : strerror(errno))); return result;
 
-extern int pfs_master_timeout;
+static int bxgrid_timeout = BXGRID_TIMEOUT;
 
 enum BXGRID_FLAGS {
-	BXGRID_FILE_LIST	= 0x000001,
-	BXGRID_FILE_QUERY	= 0x000002,
-	BXGRID_LISTABLE		= 0x000004
+	BXGRID_FILE_LIST  = 0x000001,
+	BXGRID_FILE_QUERY = 0x000002,
+	BXGRID_LISTABLE	  = 0x000004
 };
 
 static const char *bxgrid_dbname = "biometrics";
@@ -163,21 +164,21 @@ public:
 	}       
 
 	virtual int close() {
-		return chirp_global_close(file,time(0)+pfs_master_timeout);
+		return chirp_global_close(file,time(0)+bxgrid_timeout);
 	}       
 
 	virtual pfs_ssize_t read( void *data, pfs_size_t length, pfs_off_t offset ) {   
-		return chirp_global_pread(file,data,length,offset,time(0)+pfs_master_timeout);  
+		return chirp_global_pread(file,data,length,offset,time(0)+bxgrid_timeout);  
 	}
 };
 
 #define BXGRID_QUERY_AND_CHECK( res, cxn, reterr, ... ) \
 	(res) = bxgrid_db_query(cxn, __VA_ARGS__); \
-	if ((res) == NULL) return (reterr);
+	if ((res) == NULL) { debug(D_BXGRID|D_NOTICE, "%s", mysql_error(mysql_cxn)); return (reterr); }
 
 #define BXGRID_FETCH_AND_CHECK( row, res, reterr ) \
 	(row) = mysql_fetch_row(res); \
-	if ((row) == NULL) { mysql_free_result(res); return (reterr); }
+	if ((row) == NULL) { debug(D_BXGRID|D_NOTICE, "%s", mysql_error(mysql_cxn)); mysql_free_result(res); return (reterr); }
 
 int bxgrid_bvf_stat( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, struct pfs_name *name, struct pfs_stat *buf )
 {
@@ -221,7 +222,8 @@ int bxgrid_bvf_stat( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, struct
 
 const char *bxgrid_lookup_replicaid( MYSQL *mysql_cxn, const char *fileid, int nid )
 {
-#define BXGRID_REPLICAID_QUERY "SELECT replicaid,host,path FROM replicas WHERE fileid = '%s' and state = 'OK'"
+#define BXGRID_REPLICAID_QUERY "SELECT replicas.replicaid, replicas.host, replicas.path FROM replicas LEFT JOIN fileservers ON replicas.host = fileservers.name WHERE fileservers.state = 'ok' AND replicas.fileid = '%s' AND replicas.state = 'OK'"
+
 	static char replicaid[BXGRID_ID_MAX];
 
 	MYSQL_RES  *rep_res;
@@ -390,7 +392,7 @@ pfs_file *bxgrid_bvf_open( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, 
 		debug(D_BXGRID, "opening fileid %s using replicaid %s", fileid, replicaid);
 		if (bxgrid_lookup_replica_location(mysql_cxn, replicaid, host, path) >= 0) {
 			struct chirp_file *cfile;
-			cfile = chirp_global_open(host, path, flags, mode, time(0)+pfs_master_timeout);
+			cfile = chirp_global_open(host, path, flags, mode, time(0)+bxgrid_timeout);
 			if (cfile) {
 				return new pfs_file_bxgrid(name, cfile);
 			}
@@ -413,10 +415,12 @@ public:
 	 * BXGRID_USER:	  database user     (default: anonymous)
 	 * BXGRID_PASS:	  database password (default: )
 	 *
-	 * BXGRID_CACHE_QUERIES:    cache all query results		(deafult: true)
+	 * BXGRID_CACHE_QUERIES:    cache all query results		(default: true)
 	 * BXGRID_CACHE_STAT_QUERY: cache stat query results            (default: true)
 	 * BXGRID_CACHE_FTOR_QUERY: cache file to replica query results (default: true)
 	 * BXGRID_CACHE_RTOL_QUERY: cache replica to path query results (default: true)
+	 *
+	 * BXGRID_TIMEOUT: timeout in seconds (default: 1)
 	 **/
 	pfs_service_bxgrid()  {
 		char *s;
@@ -441,10 +445,13 @@ public:
 		
 		s = getenv("BXGRID_CACHE_RTOL_QUERY");
 		if (s) bxgrid_cache_rtol_query = atoi(s);
-
+		
 		if (bxgrid_cache_stat_query) bxgrid_stat_query_cache = hash_table_create(0, 0);
 		if (bxgrid_cache_ftor_query) bxgrid_ftor_query_cache = hash_table_create(0, 0);
 		if (bxgrid_cache_rtol_query) bxgrid_rtol_query_cache = hash_table_create(0, 0);
+		
+		s = getenv("BXGRID_TIMEOUT");
+		if (s) bxgrid_timeout = atoi(s);
 
 		if (gethostname(bxgrid_hostname, PFS_LINE_MAX) >= 0) {
 			char ip_address[PFS_LINE_MAX];
