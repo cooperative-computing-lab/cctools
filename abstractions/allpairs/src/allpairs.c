@@ -44,18 +44,13 @@ See the file COPYING for details.
 #include "md5.h"
 #include "macros.h"
 
+#include "ragged_array.h"
 
 const int MAXFILENAME = 256;
 const int MAXRESULTLINE = 1024;
 int limit;
 
 static time_t stoptime=0;
-
-struct ragged_array {
-    char** arr;
-    int row_count;
-};
-
 
 static void show_help(const char *cmd)
 {
@@ -231,66 +226,15 @@ static INT64_T do_put_recursive( const char *source_file, const char *target_hos
 	return result;
 }
 
-
 struct ragged_array getsetarray(char *setdir) {
-
-    int len = MAXFILENAME;
-    int numset=0;
     char* setfile;
-    char* tmpstr;
-    char** set;
-    char** tmpptr;
-    int setarraysize=10;
-
-    struct ragged_array retset;
-    retset.arr = NULL;
-    retset.row_count = 0;
-
-    tmpstr = (char *) malloc(MAXFILENAME * sizeof(char));
-    if(tmpstr == NULL) {fprintf(stderr,"Allocating input string failed!\n"); return retset;}
+    struct ragged_array nullset = ragged_array_initialize(0);
     setfile = (char*) malloc((strlen(setdir)+1+strlen("set.list")+1)*sizeof(char));
-    if(setfile == NULL) {fprintf(stderr,"Allocating set name failed!\n"); return retset;}
-    set = (char **) malloc(setarraysize * sizeof(char *));
-    if(set == NULL) {fprintf(stderr,"Allocating ragged array failed!\n"); return retset;}
-
+    if(setfile == NULL) {fprintf(stderr,"Allocating set name failed!\n"); return nullset;}
     sprintf(setfile,"%s/set.list",setdir);
-    FILE*  setfileID = fopen(setfile, "r");
-    if(!setfileID) {fprintf(stderr,"Couldn't open set %s!\n",setfile); return retset;}    
-    set[numset] = (char *) malloc(MAXFILENAME * sizeof(char));
-    if(set[numset] == NULL) {fprintf(stderr,"Allocating set[%i] failed!\n",numset); return retset;}
-    fgets(tmpstr, len, setfileID);
-    if (tmpstr != NULL) {
-	size_t last = strlen (tmpstr) - 1;
-	if (tmpstr[last] == '\n') tmpstr[last] = '\0';
-	//printf("set[%i] = %s\n", numset, set[numset]);
-    }
-    sprintf(set[numset],"%s/%s",setdir,tmpstr);
-    
-    while(!feof(setfileID)) {
-	numset++;
-	if(numset >= setarraysize) {
-	    //printf("Preparing for setA element number %i, increasing setA element array from %i to %i\n", numset+1, setarraysize, 2*setarraysize);
-	    tmpptr = realloc(set, (2 * setarraysize) * sizeof(char *));
-	    if(tmpptr == NULL) {fprintf(stderr,"Realloc failed!\n"); return retset;}
-	    else {set=tmpptr; setarraysize = 2*setarraysize;}
-	}
-	
-	set[numset] = (char *) malloc(MAXFILENAME * sizeof(char));
-	if(set[numset] == NULL) {fprintf(stderr,"Allocating set[%i] failed!\n",numset); return retset;}
-	fgets(tmpstr, len, setfileID);
-	if (tmpstr != NULL) {
-            size_t last = strlen (tmpstr) - 1;
-	    if (tmpstr[last] == '\n') tmpstr[last] = '\0';
-	    //printf("set[%i] = %s\n", numset, set[numset]);
-	}
-	sprintf(set[numset],"%s/%s",setdir,tmpstr);
-    }
 
-    fclose(setfileID);
 
-    retset.arr = set; 
-    retset.row_count = numset;
-    return retset;
+    return ragged_array_populate(setfile,setdir,strlen(setdir)+CHIRP_PATH_MAX);
 }
 
 int compare_entries( struct nvpair **a, struct nvpair **b )
@@ -318,22 +262,6 @@ int compare_entries( struct nvpair **a, struct nvpair **b )
 
 struct ragged_array predist_hosts(double constraint) {
 
-    /* struct nvpair_header headers[] = {
-	{ "type",    NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT,   8 },
-	{ "name",    NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT,  25 },
-	{ "port",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT,   5 },
-	{ "owner",   NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT,  10 },
-	{ "version", NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT,   8 },
-	{ "total",   NVPAIR_MODE_METRIC,  NVPAIR_ALIGN_RIGHT,  8 },
-	{ "avail",   NVPAIR_MODE_METRIC,  NVPAIR_ALIGN_RIGHT,  8 },
-	{ 0, }
-	};*/
-    /*
-    const int MODE_TABLE = 1;
-    const int MODE_SHORT = 2;
-    const int MODE_LONG  = 3;
-    const int MODE_TOTAL = 4;
-    */
     struct catalog_query *q;
     struct nvpair *n;
     time_t timeout=60, stoptime;
@@ -344,24 +272,20 @@ struct ragged_array predist_hosts(double constraint) {
     struct nvpair *table[10000];
     INT64_T minavail=constraint;
 
-    struct ragged_array retset;
-    retset.arr = NULL;
-    retset.row_count = 0;
+    struct ragged_array nullset;
+    nullset.arr = NULL;
+    nullset.row_count = 0;
+    nullset.array_size = 0;
 
-
-    char** set;
-    char** tmpptr;
-    int setarraysize=10;
-    int numset=0;
-    set = (char **) malloc(setarraysize * sizeof(char *));
-    if(set == NULL) {fprintf(stderr,"Allocating set failed!\n"); return retset;}
-
+    struct ragged_array retset = ragged_array_initialize(10);
+    if(retset.array_size == 0) {fprintf(stderr,"Allocating set failed!\n"); return nullset;}
+    
     stoptime = time(0)+timeout;
 
     q = catalog_query_create(catalog_host,0,stoptime);
     if(!q) {
 	fprintf(stderr,"couldn't query catalog: %s\n",strerror(errno));
-	return retset;
+	return nullset;
     }
 
     while((n = catalog_query_read(q,stoptime))) {
@@ -379,44 +303,32 @@ struct ragged_array predist_hosts(double constraint) {
 
 	const char *t = nvpair_lookup_string(table[i],"type");
 	if(t && !strcmp(t,"chirp")) {
-	    if(numset >= setarraysize) {
-		tmpptr = realloc(set, (2 * setarraysize) * sizeof(char *));
-		if(tmpptr == NULL) {fprintf(stderr,"Realloc failed!\n"); return retset;}
-		else {set=tmpptr; setarraysize = 2*setarraysize;}
-	    }
 	    // if(1) { /*replace line below to access all nodes in chirp pool */
 	    if(strstr(nvpair_lookup_string(table[i],"name"),"sc0-") != NULL) {
-		set[numset] = (char *) malloc((strlen(nvpair_lookup_string(table[i],"name"))+1+10+1)* sizeof(char));
-		if(set[numset] == NULL) {fprintf(stderr,"Allocating set[%i] failed!\n",numset); return retset;}
-		sprintf(set[numset],"%s",nvpair_lookup_string(table[i],"name"));
-		numset++;
+		if(ragged_array_add_line(&retset,nvpair_lookup_string(table[i],"name")) < 0) {
+		    fprintf(stderr,"Allocating set[%i] failed!\n",retset.row_count+1);
+		    return nullset;
+		}
 	    }
 	}
     }
-    
 	
-    retset.arr = set; 
-    retset.row_count = numset;
     return retset;
 }
 
 struct ragged_array postdist_hosts(FILE* fd) {
 
     int len = MAXRESULTLINE;
-    int numset=0;
-    char** set;
-    char** tmpptr;
     char* line;
-    char* yessed_host;
-    int setarraysize=10;
     
-    struct ragged_array retset;
-    retset.arr = NULL;
-    retset.row_count = 0;
-    
-    set = (char **) malloc(setarraysize * sizeof(char *));
-    if(set == NULL) {fprintf(stderr,"Allocating set failed!\n"); return retset;}
+    struct ragged_array nullset;
+    nullset.arr = NULL;
+    nullset.row_count = 0;
+    nullset.array_size = 0;
 
+    struct ragged_array retset = ragged_array_initialize(10);
+    if(retset.array_size == 0) {fprintf(stderr,"Allocating set failed!\n"); return nullset;}
+    
     line = (char *) malloc(MAXFILENAME * sizeof(char));
     if(line == NULL) {fprintf(stderr,"Allocating line failed!\n"); return retset;}
     fgets(line, len, fd);
@@ -426,20 +338,10 @@ struct ragged_array postdist_hosts(FILE* fd) {
     }
     while(!feof(fd)) {
 	if((strpos(line,'Y') == 0)&&(strpos(line,'E') == 1)&&(strpos(line,'S') == 2)&&(strpos(line,' ') == 3)) {// a YES verification
-	    // realloc if needed
-	    if(numset >= setarraysize) {
-		tmpptr = realloc(set, (2 * setarraysize) * sizeof(char *));
-		if(tmpptr == NULL) {fprintf(stderr,"Realloc failed!\n"); return retset;}
-		else {set=tmpptr; setarraysize = 2*setarraysize;}
+	    if(ragged_array_add_line(&retset,&(line[4])) < 0) {
+		fprintf(stderr,"Allocating set[%i] failed!\n",retset.row_count+1);
+		return nullset;
 	    }
-	    // allocate memory for new hostname
-	    set[numset] = (char *) malloc(MAXFILENAME * sizeof(char));
-	    if(set[numset] == NULL) {fprintf(stderr,"Allocating set[%i] failed!\n",numset); return retset;}
-
-	    // copy new hostname into ragged array
-	    yessed_host = &(line[4]); //hostname starts at 5th character of YES verification line
-	    strcpy(set[numset],yessed_host);
-	    numset++;
 	}
 	// else, do nothing, we just throw away the line.
 	// get next line
@@ -459,9 +361,6 @@ struct ragged_array postdist_hosts(FILE* fd) {
 /* 	$parrot rm -rf /chirp/$w/${wai}_${fname} */
 /*     fi */
 
-
-    retset.arr = set; 
-    retset.row_count = numset;
     return retset;
 }
 
@@ -1262,7 +1161,11 @@ int main(int argc, char** argv)
     free(command); // free the command string
     command = NULL; // reset the command string
 
-
+    if(goodset.row_count == 0)
+    {
+	fprintf(stderr,"Did not distribute to any nodes! Cannot build jobs!\n");
+	return 12;
+    }
 
     /****************************************************************************************
       main function Section 4
@@ -1325,7 +1228,7 @@ int main(int argc, char** argv)
 	FILE* excludep = fopen("exclude.list","w");
 	if(!excludep) {
 	    fprintf(stderr,"Could not open exclusion list for writing.\n");
-	    return 12;
+	    return 13;
 	}
 	fprintf(excludep,"exclude.list\n"); // write the exclude list into itself. Duh.
 	fprintf(excludep,"%s.func.tar\n",argv[workloadID_index]); // write the function tarball itself into the exclude list.
