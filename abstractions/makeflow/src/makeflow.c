@@ -25,6 +25,7 @@ static int dag_abort_flag = 0;
 static int dag_failed_flag = 0;
 static int dag_submit_timeout = 3600;
 static int dag_retry_flag = 0;
+static int dag_retry_max = 100;
 
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
 static struct batch_queue *local_queue = 0;
@@ -69,6 +70,7 @@ struct dag_node {
 	int linenum;
 	int nodeid;
 	int local_job;
+	int failure_count;
 	dag_node_state_t state;
 	const char *command;
 	struct dag_file *source_files;
@@ -363,6 +365,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 	n->state = DAG_NODE_STATE_WAITING;
 	n->nodeid = d->nodeid_counter++;
 	n->local_job = 0;
+	n->failure_count = 0;
 
 	*colon = 0;
 	targetfiles = line;
@@ -581,8 +584,14 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 	if(job_failed) {
 		dag_node_state_change(d,n,DAG_NODE_STATE_FAILED);
 		if(dag_retry_flag || info->exit_code==101) {
-			fprintf(stderr,"makeflow: will retry failed job %s\n",n->command);
-			dag_node_state_change(d,n,DAG_NODE_STATE_WAITING);
+			n->failure_count++;
+			if(n->failure_count>dag_retry_max) {
+				fprintf(stderr,"makeflow: job %s failed too many times.\n",n->command);
+				dag_failed_flag = 1;
+			} else {
+				fprintf(stderr,"makeflow: will retry failed job %s\n",n->command);
+				dag_node_state_change(d,n,DAG_NODE_STATE_WAITING);
+			}
 		} else {
 			dag_failed_flag = 1;
 		}
@@ -690,7 +699,7 @@ static void show_help(const char *cmd)
 	printf(" -D             Display the Makefile as a Dot graph.\n");
 	printf(" -B <options>   Add these options to all batch submit files.\n");
 	printf(" -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n",dag_submit_timeout);
-	printf(" -R             Automatically retry failed batch jobs.\n");
+	printf(" -r <n>         Automatically retry failed batch jobs up to n times.\n");
 	printf(" -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
 	printf(" -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
 	printf(" -A             Disable the check for AFS. (experts only.)\n");;
@@ -721,7 +730,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "Ap:cd:DT:iB:S:Rl:L:j:J:o:vF:W:")) != (char) -1) {
+	while((c = getopt(argc, argv, "Ap:cd:DT:iB:S:Rr:l:L:j:J:o:vF:W:")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -746,6 +755,10 @@ int main( int argc, char *argv[] )
 			break;
 		case 'R':
 			dag_retry_flag = 1;
+			break;
+		case 'r':
+			dag_retry_flag = 1;
+			dag_retry_max = atoi(optarg);
 			break;
 		case 'j':
 			explicit_local_jobs_max = atoi(optarg);
