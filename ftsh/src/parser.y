@@ -123,6 +123,7 @@ To force the expression-list interpretation, use this instead:
 %type <number> time_units fortype
 %type <word> word wordequals
 %type <expr> expr expr_list opt_expr_comma_list expr_comma_list
+%type <token> TOKEN_FUNCTION TOKEN_END TOKEN_DELIMITER TOKEN_WHILE TOKEN_FOR TOKEN_IN TOKEN_IF TOKEN_ELSE TOKEN_TRY TOKEN_CATCH TOKEN_ASSIGN TOKEN_ATOM TOKEN_OR TOKEN_AND TOKEN_EQ TOKEN_NE TOKEN_EQL TOKEN_NEQL TOKEN_LT TOKEN_LE TOKEN_GT TOKEN_GE TOKEN_ADD TOKEN_SUB TOKEN_MUL TOKEN_DIV TOKEN_MOD TOKEN_NOT TOKEN_EXISTS TOKEN_ISR TOKEN_ISW TOKEN_ISX TOKEN_ISBLOCK TOKEN_ISCHAR TOKEN_ISDIR TOKEN_ISFILE TOKEN_ISLINK TOKEN_ISPIPE TOKEN_ISSOCK TOKEN_POW TOKEN_LPAREN TOKEN_RPAREN TOKEN_TO TOKEN_SHIFT TOKEN_LEFT_ARROW TOKEN_RIGHT_ARROW TOKEN_DOUBLE_RIGHT_ARROW TOKEN_NUMBERED_SQUIGGLY_RIGHT_ARROW TOKEN_NUMBERED_DOUBLE_SQUIGGLY_RIGHT_ARROW TOKEN_SQUIGGLY_RIGHT_ARROW TOKEN_LONG_LEFT_ARROW TOKEN_LONG_RIGHT_ARROW TOKEN_LONG_DOUBLE_RIGHT_ARROW TOKEN_LONG_SQUIGGLY_RIGHT_ARROW TOKEN_LONG_DOUBLE_SQUIGGLY_RIGHT_ARROW TOKEN_DOUBLE_SQUIGGLY_RIGHT_ARROW
 
 %nonassoc TOKEN_TO
 %nonassoc TOKEN_STEP
@@ -199,7 +200,7 @@ command
 
 function
 	: TOKEN_FUNCTION word TOKEN_DELIMITER group TOKEN_END TOKEN_DELIMITER
-		{ $$ = ast_function_create( $1.token.line, $5.token.line, $2, $4 ); }
+		{ $$ = ast_function_create( $1.line, $5.line, $2, $4 ); }
 	;
 
 /*
@@ -210,17 +211,17 @@ try
 	: TOKEN_TRY try_limit TOKEN_DELIMITER group TOKEN_END TOKEN_DELIMITER
 		{
 			$$ = $2;
-			$$->try_line=$1.token.line;
-			$$->catch_line=$5.token.line;
-			$$->end_line=$5.token.line;
+			$$->try_line=$1.line;
+			$$->catch_line=$5.line;
+			$$->end_line=$5.line;
 			$$->body=$4;
 		}
 	| TOKEN_TRY try_limit TOKEN_DELIMITER group TOKEN_CATCH TOKEN_DELIMITER group TOKEN_END TOKEN_DELIMITER
 		{
 			$$ = $2;
-			$$->try_line=$1.token.line;
-			$$->catch_line=$5.token.line;
-			$$->end_line=$8.token.line;
+			$$->try_line=$1.line;
+			$$->catch_line=$5.line;
+			$$->end_line=$8.line;
 			$$->body=$4;
 			$$->catch_block=$7;
 		}
@@ -275,7 +276,7 @@ time_units
 
 forloop
 	: fortype word TOKEN_IN expr_list TOKEN_DELIMITER group TOKEN_END TOKEN_DELIMITER
-		{ $$ = ast_forloop_create( $1, $3.token.line, $7.token.line, $2, $4, $6 ); }
+		{ $$ = ast_forloop_create( $1, $3.line, $7.line, $2, $4, $6 ); }
 	;
 
 fortype
@@ -289,43 +290,43 @@ fortype
 
 whileloop
 	: TOKEN_WHILE expr TOKEN_DELIMITER group TOKEN_END TOKEN_DELIMITER
-		{ $$ = ast_whileloop_create( $1.token.line, $3.token.line, $5.token.line, $2, $4 ); }
+		{ $$ = ast_whileloop_create( $1.line, $3.line, $5.line, $2, $4 ); }
 	;
 
 conditional
 	: TOKEN_IF expr TOKEN_DELIMITER group TOKEN_END TOKEN_DELIMITER
-		{ $$ = ast_conditional_create( $1.token.line, $3.token.line, $5.token.line, $5.token.line, $2, $4, 0 ); }
+		{ $$ = ast_conditional_create( $1.line, $3.line, $5.line, $5.line, $2, $4, 0 ); }
 	| TOKEN_IF expr TOKEN_DELIMITER group TOKEN_ELSE TOKEN_DELIMITER group TOKEN_END TOKEN_DELIMITER
-		{ $$ = ast_conditional_create( $1.token.line, $3.token.line, $8.token.line, $8.token.line, $2, $4, $7 ); }
+		{ $$ = ast_conditional_create( $1.line, $3.line, $8.line, $8.line, $2, $4, $7 ); }
 	| TOKEN_IF expr TOKEN_DELIMITER group TOKEN_ELSE conditional
 		{
 			struct ast_group *g = ast_group_create( ast_command_create( AST_COMMAND_CONDITIONAL, $6 ), 0 );
-			$$ = ast_conditional_create( $1.token.line, $3.token.line, $5.token.line, $5.token.line, $2, $4, g );
+			$$ = ast_conditional_create( $1.line, $3.line, $5.line, $5.line, $2, $4, g );
 		}
 	;
 
 shift_line
 	: TOKEN_SHIFT expr TOKEN_DELIMITER
-		{ $$ = ast_shift_create($1.token.line,$2); }
+		{ $$ = ast_shift_create($1.line,$2); }
 	| TOKEN_SHIFT TOKEN_DELIMITER
-		{ $$ = ast_shift_create($1.token.line,0); }
+		{ $$ = ast_shift_create($1.line,0); }
 	;
 
 assign_line
 	: wordequals expr TOKEN_DELIMITER
-		{ $$ = ast_assign_create( $3.token.line, $1, $2 ); }
+		{ $$ = ast_assign_create( $3.line, $1, $2 ); }
 	| wordequals TOKEN_DELIMITER
-		{ $$ = ast_assign_create( $2.token.line, $1, 0 ); }
+		{ $$ = ast_assign_create( $2.line, $1, 0 ); }
 	;
 
 return_line
 	: TOKEN_RETURN expr TOKEN_DELIMITER
-		{ $$ = ast_return_create( $3.token.line, $2 ); }
+		{ $$ = ast_return_create( $3.line, $2 ); }
 	;
 
 simple_line
 	: simple TOKEN_DELIMITER
-		{ $$ = $1; $1->line = $2.token.line; }
+		{ $$ = $1; $1->line = $2.line; }
 	;
 
 simple
@@ -353,40 +354,40 @@ simple
 
 redirect
 	: TOKEN_LEFT_ARROW word
-		{ $$ = ast_redirect_create( AST_REDIRECT_FILE, $1.token.firstint, $2, AST_REDIRECT_INPUT ); }
+		{ $$ = ast_redirect_create( AST_REDIRECT_FILE, $1.firstint, $2, AST_REDIRECT_INPUT ); }
 	| TOKEN_RIGHT_ARROW word
-		{ $$ = ast_redirect_create( AST_REDIRECT_FILE, $1.token.firstint, $2, AST_REDIRECT_OUTPUT ); }
+		{ $$ = ast_redirect_create( AST_REDIRECT_FILE, $1.firstint, $2, AST_REDIRECT_OUTPUT ); }
 	| TOKEN_DOUBLE_RIGHT_ARROW word
-		{ $$ = ast_redirect_create( AST_REDIRECT_FILE, $1.token.firstint, $2, AST_REDIRECT_APPEND ); }
+		{ $$ = ast_redirect_create( AST_REDIRECT_FILE, $1.firstint, $2, AST_REDIRECT_APPEND ); }
 	| TOKEN_NUMBERED_SQUIGGLY_RIGHT_ARROW word
-		{ $$ = ast_redirect_create( AST_REDIRECT_FD, $1.token.firstint, $2, AST_REDIRECT_OUTPUT ); }
+		{ $$ = ast_redirect_create( AST_REDIRECT_FD, $1.firstint, $2, AST_REDIRECT_OUTPUT ); }
 	| TOKEN_NUMBERED_DOUBLE_SQUIGGLY_RIGHT_ARROW word
-		{ $$ = ast_redirect_create( AST_REDIRECT_FD, $1.token.firstint, $2, AST_REDIRECT_APPEND ); }
+		{ $$ = ast_redirect_create( AST_REDIRECT_FD, $1.firstint, $2, AST_REDIRECT_APPEND ); }
 	| TOKEN_SQUIGGLY_RIGHT_ARROW word
 		{
 		$$ = ast_redirect_create( AST_REDIRECT_FILE, 1, $2, AST_REDIRECT_OUTPUT );
-		$$->next = ast_redirect_create( AST_REDIRECT_FD, 2, ast_word_create($1.token.line,"1"), AST_REDIRECT_APPEND );
+		$$->next = ast_redirect_create( AST_REDIRECT_FD, 2, ast_word_create($1.line,"1"), AST_REDIRECT_APPEND );
 		}
 	| TOKEN_DOUBLE_SQUIGGLY_RIGHT_ARROW word
 		{
 		$$ = ast_redirect_create( AST_REDIRECT_FILE, 1, $2, AST_REDIRECT_APPEND );
-		$$->next = ast_redirect_create( AST_REDIRECT_FD, 2, ast_word_create($1.token.line,"1"), AST_REDIRECT_APPEND );
+		$$->next = ast_redirect_create( AST_REDIRECT_FD, 2, ast_word_create($1.line,"1"), AST_REDIRECT_APPEND );
 		}
 	| TOKEN_LONG_LEFT_ARROW word
-		{ $$ = ast_redirect_create( AST_REDIRECT_BUFFER, $1.token.firstint, $2, AST_REDIRECT_INPUT ); }
+		{ $$ = ast_redirect_create( AST_REDIRECT_BUFFER, $1.firstint, $2, AST_REDIRECT_INPUT ); }
 	| TOKEN_LONG_RIGHT_ARROW word
-		{ $$ = ast_redirect_create( AST_REDIRECT_BUFFER, $1.token.firstint, $2, AST_REDIRECT_OUTPUT ); }
+		{ $$ = ast_redirect_create( AST_REDIRECT_BUFFER, $1.firstint, $2, AST_REDIRECT_OUTPUT ); }
 	| TOKEN_LONG_DOUBLE_RIGHT_ARROW word
-		{ $$ = ast_redirect_create( AST_REDIRECT_BUFFER, $1.token.firstint, $2, AST_REDIRECT_APPEND ); }
+		{ $$ = ast_redirect_create( AST_REDIRECT_BUFFER, $1.firstint, $2, AST_REDIRECT_APPEND ); }
 	| TOKEN_LONG_SQUIGGLY_RIGHT_ARROW word
 		{
 		$$ = ast_redirect_create( AST_REDIRECT_BUFFER, 1, $2, AST_REDIRECT_OUTPUT );
-		$$->next = ast_redirect_create( AST_REDIRECT_FD, 2, ast_word_create($1.token.line,"1"), AST_REDIRECT_APPEND );
+		$$->next = ast_redirect_create( AST_REDIRECT_FD, 2, ast_word_create($1.line,"1"), AST_REDIRECT_APPEND );
 		}
 	| TOKEN_LONG_DOUBLE_SQUIGGLY_RIGHT_ARROW word
 		{
 		$$ = ast_redirect_create( AST_REDIRECT_BUFFER, 1, $2, AST_REDIRECT_APPEND );
-		$$->next = ast_redirect_create( AST_REDIRECT_FD, 2, ast_word_create($1.token.line,"1"), AST_REDIRECT_APPEND );
+		$$->next = ast_redirect_create( AST_REDIRECT_FD, 2, ast_word_create($1.line,"1"), AST_REDIRECT_APPEND );
 		}
 	;
 
@@ -413,81 +414,81 @@ expr_list
 
 expr
 	: expr TOKEN_TO expr %prec TOKEN_TO
-		{ $$ = expr_create($2.token.line,EXPR_TO,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_TO,0,$1,$3,0); }
 	| expr TOKEN_TO expr TOKEN_STEP expr %prec TOKEN_STEP
-		{ $$ = expr_create($2.token.line,EXPR_TO,0,$1,$3,$5); }
+		{ $$ = expr_create($2.line,EXPR_TO,0,$1,$3,$5); }
 	| expr TOKEN_OR expr
-		{ $$ = expr_create($2.token.line,EXPR_OR,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_OR,0,$1,$3,0); }
 	| expr TOKEN_AND expr
-		{ $$ = expr_create($2.token.line,EXPR_AND,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_AND,0,$1,$3,0); }
 	| expr TOKEN_EQ expr
-		{ $$ = expr_create($2.token.line,EXPR_EQ,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_EQ,0,$1,$3,0); }
 	| expr TOKEN_NE expr
-		{ $$ = expr_create($2.token.line,EXPR_NE,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_NE,0,$1,$3,0); }
 	| expr TOKEN_EQL expr
-		{ $$ = expr_create($2.token.line,EXPR_EQL,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_EQL,0,$1,$3,0); }
 	| expr TOKEN_NEQL expr
-		{ $$ = expr_create($2.token.line,EXPR_NEQL,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_NEQL,0,$1,$3,0); }
 	| expr TOKEN_LT expr
-		{ $$ = expr_create($2.token.line,EXPR_LT,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_LT,0,$1,$3,0); }
 	| expr TOKEN_LE expr
-		{ $$ = expr_create($2.token.line,EXPR_LE,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_LE,0,$1,$3,0); }
 	| expr TOKEN_GT expr
-		{ $$ = expr_create($2.token.line,EXPR_GT,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_GT,0,$1,$3,0); }
 	| expr TOKEN_GE expr
-		{ $$ = expr_create($2.token.line,EXPR_GE,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_GE,0,$1,$3,0); }
 	| expr TOKEN_ADD expr
-		{ $$ = expr_create($2.token.line,EXPR_ADD,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_ADD,0,$1,$3,0); }
 	| expr TOKEN_SUB expr
-		{ $$ = expr_create($2.token.line,EXPR_SUB,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_SUB,0,$1,$3,0); }
 	| expr TOKEN_MUL expr
-		{ $$ = expr_create($2.token.line,EXPR_MUL,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_MUL,0,$1,$3,0); }
 	| expr TOKEN_DIV expr
-		{ $$ = expr_create($2.token.line,EXPR_DIV,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_DIV,0,$1,$3,0); }
 	| expr TOKEN_MOD expr
-		{ $$ = expr_create($2.token.line,EXPR_MOD,0,$1,$3,0); }
+		{ $$ = expr_create($2.line,EXPR_MOD,0,$1,$3,0); }
 	| TOKEN_NOT expr
-		{ $$ = expr_create( $1.token.line, EXPR_NOT, 0, $2, 0, 0); }
+		{ $$ = expr_create( $1.line, EXPR_NOT, 0, $2, 0, 0); }
 	| TOKEN_EXISTS expr
-		{ $$ = expr_create( $1.token.line, EXPR_EXISTS, 0, $2, 0, 0); }
+		{ $$ = expr_create( $1.line, EXPR_EXISTS, 0, $2, 0, 0); }
 	| TOKEN_ISR expr
-		{ $$ = expr_create( $1.token.line, EXPR_ISR, 0, $2, 0, 0); }
+		{ $$ = expr_create( $1.line, EXPR_ISR, 0, $2, 0, 0); }
 	| TOKEN_ISW expr
-		{ $$ = expr_create( $1.token.line, EXPR_ISW, 0, $2, 0, 0); }
+		{ $$ = expr_create( $1.line, EXPR_ISW, 0, $2, 0, 0); }
 	| TOKEN_ISX expr
-		{ $$ = expr_create( $1.token.line, EXPR_ISX, 0, $2, 0, 0); }
+		{ $$ = expr_create( $1.line, EXPR_ISX, 0, $2, 0, 0); }
 	| TOKEN_ISBLOCK expr
-		{ $$ = expr_create( $1.token.line, EXPR_ISBLOCK, 0, $2, 0, 0); }
+		{ $$ = expr_create( $1.line, EXPR_ISBLOCK, 0, $2, 0, 0); }
 	| TOKEN_ISCHAR expr
-		{ $$ = expr_create( $1.token.line, EXPR_ISCHAR, 0, $2, 0, 0); }
+		{ $$ = expr_create( $1.line, EXPR_ISCHAR, 0, $2, 0, 0); }
 	| TOKEN_ISDIR expr
-		{ $$ = expr_create( $1.token.line, EXPR_ISDIR, 0, $2, 0, 0); }
+		{ $$ = expr_create( $1.line, EXPR_ISDIR, 0, $2, 0, 0); }
 	| TOKEN_ISFILE expr
-		{ $$ = expr_create( $1.token.line, EXPR_ISFILE, 0, $2, 0, 0); }
+		{ $$ = expr_create( $1.line, EXPR_ISFILE, 0, $2, 0, 0); }
 	| TOKEN_ISLINK expr
-		{ $$ = expr_create( $1.token.line, EXPR_ISLINK, 0, $2, 0, 0); }
+		{ $$ = expr_create( $1.line, EXPR_ISLINK, 0, $2, 0, 0); }
 	| TOKEN_ISPIPE expr
-		{ $$ = expr_create( $1.token.line, EXPR_ISPIPE, 0, $2, 0, 0); }
+		{ $$ = expr_create( $1.line, EXPR_ISPIPE, 0, $2, 0, 0); }
 	| TOKEN_ISSOCK expr
-		{ $$ = expr_create( $1.token.line, EXPR_ISSOCK, 0, $2, 0, 0); }
+		{ $$ = expr_create( $1.line, EXPR_ISSOCK, 0, $2, 0, 0); }
 	| expr TOKEN_POW expr
-		{ $$ = expr_create( $2.token.line, EXPR_POW, 0, $1, $3, 0 ); }
+		{ $$ = expr_create( $2.line, EXPR_POW, 0, $1, $3, 0 ); }
 	| TOKEN_LPAREN expr TOKEN_RPAREN %prec PREC_EXPR
-		{ $$ = expr_create($1.token.line,EXPR_EXPR,0,$2,0,0); }
+		{ $$ = expr_create($1.line,EXPR_EXPR,0,$2,0,0); }
 	| word %prec PREC_LITERAL
 		{ $$ = expr_create($1->line,EXPR_LITERAL,$1,0,0,0); }
 	| word TOKEN_LPAREN opt_expr_comma_list TOKEN_RPAREN %prec PREC_FCALL
-		{ $$ = expr_create($2.token.line,EXPR_FCALL,$1,$3,0,0); }
+		{ $$ = expr_create($2.line,EXPR_FCALL,$1,$3,0,0); }
 	;
 
 wordequals
 	: TOKEN_ASSIGN
-		{ $$ = ast_word_create( $1.token.line, yytext ); }
+		{ $$ = ast_word_create( $1.line, yytext ); }
 	;
 
 word
 	: TOKEN_ATOM
-		{ $$ = ast_word_create( $1.token.line, yytext ); }
+		{ $$ = ast_word_create( $1.line, yytext ); }
 	;
 
 %%
