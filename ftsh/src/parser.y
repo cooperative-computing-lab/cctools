@@ -242,8 +242,11 @@ try_limit
 
 opt_conj
 	: TOKEN_FOR
+		{ }
 	| TOKEN_OR
-	| /* nothing */
+		{ }
+	|
+		{ }
 	;
 
 time_limit
