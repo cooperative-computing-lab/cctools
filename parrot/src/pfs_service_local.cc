@@ -10,6 +10,7 @@ See the file COPYING for details.
 extern "C" {
 #include "debug.h"
 #include "get_canonical_path.h"
+#include "username.h"
 #include "chirp_acl.h"
 #include "chirp_local.h"
 }
@@ -487,6 +488,19 @@ public:
 			result = ::rmdir(name->rest);
 		}
 		END
+	}
+
+	virtual int whoami( pfs_name *name, char *buf, int size ) {
+	    int result;
+	    debug(D_LOCAL,"whoami %s",name->rest);
+	    if (pfs_username) {
+		strncpy(buf, pfs_username, size);
+		result = strlen(buf);
+	    } else {
+		result = username_get(buf);
+		result = strlen(buf);
+	    }
+	    END
 	}
 
 	virtual pfs_location* locate( pfs_name *name ) {
