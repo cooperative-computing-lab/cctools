@@ -100,6 +100,12 @@ void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s );
 */
 int work_queue_activate_fast_abort(struct work_queue* q, double multiplier);
 
+/** Change the worker selection algorithm for a given queue.
+@param q A pointer to the queue to modify.
+@param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "CHOOSE_HOST_BY" values.
+*/
+int work_queue_specify_algorithm( struct work_queue* q, int alg);
+
 /** Wait for tasks to complete.  This call will block until the timeout has elapsed.
 @param q The work queue to wait on.
 @param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant WAITFORTASK to block until a task has completed.
