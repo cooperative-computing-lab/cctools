@@ -170,7 +170,7 @@ void work_queue_task_specify_output_file( struct work_queue_task *t, const char 
 */
 int work_queue_hungry (struct work_queue *q);
 
-/** Determine whether there are any known tasks queued, running, or waiting to be collected. Returns 1 if so and 0 if "empty".
+/** Determine whether there are any known tasks queued, running, or waiting to be collected. Returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
 @param q A pointer to the queue to query.
 */
 int work_queue_empty (struct work_queue *q);
