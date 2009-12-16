@@ -1554,6 +1554,7 @@ int pfs_table::locate( const char *n, char *buf, int length )
 		char path[PFS_PATH_MAX];
 		result = loc->retrieve(path, PFS_PATH_MAX);
 		if(result) {
+			memset(buf, 0, length);
 			strncpy(buf, path, length);
 			return result;
 		}

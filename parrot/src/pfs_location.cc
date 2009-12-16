@@ -51,6 +51,7 @@ int pfs_location::retrieve( char* buf, int buf_len )
 	if(!data || list_size(data)<=0) return 0;
 
 	name = (char*)list_pop_head(data);
+	memset(buf, 0, buf_len);
 	strncpy(buf, name, buf_len);
 	buf[buf_len-1] = 0;
 	free(name);

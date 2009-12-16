@@ -512,7 +512,7 @@ public:
 		debug(D_LOCAL,"locate %s",name->rest);
 		result = stat(name, &buf);
 		if(result < 0) return 0;
-		snprintf(path, PFS_PATH_MAX, "dev %lld: %s", buf.st_dev, name->path);
+		snprintf(path, PFS_PATH_MAX, "localhost:dev%lld:%s", buf.st_dev, name->path);
 		loc = new pfs_location();
 		loc->append(path);
 		return loc;
