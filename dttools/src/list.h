@@ -19,6 +19,7 @@ transparently modify the linker namespace we are using.
 */
 
 #define list_delete			cctools_list_delete
+#define list_free			cctools_list_free
 #define list_pop_head			cctools_list_pop_head 
 #define list_peek_head			cctools_list_peek_head
 #define list_pop_tail			cctools_list_pop_tail
@@ -27,6 +28,7 @@ transparently modify the linker namespace we are using.
 #define list_find			cctools_list_find
 #define list_create			cctools_list_create
 #define list_splice			cctools_list_splice
+#define list_split			cctools_list_split
 #define list_size			cctools_list_size
 #define list_push_priority		cctools_list_push_priority
 #define list_push_head			cctools_list_push_head
@@ -66,6 +68,13 @@ it does not delete the items referred to by the list.
 
 void list_delete( struct list *list );
 
+/** Free every item referred to by the list.
+Note that this function does not delete the list itself.
+@param list The list to free.
+*/
+
+void list_free( struct list *list );
+
 /** Splice two lists together.
 @param top A linked list that will be destroyed in the process.
 @param bottom A linked list that will be destroyed in the process.
@@ -73,6 +82,17 @@ void list_delete( struct list *list );
 */
 
 struct list * list_splice( struct list *top, struct list *bottom );
+
+/** Split a list into two at the given item
+If arg is NULL or not found, list_split returns NULL and the list is unaffected.
+Otherwise src will contain all elements [src->head, arg) and a new list will be created with all elements [arg, src->tail].
+@param src The linked list to be split
+@param cmp The comparison function.  Should return non-zero on a match.
+@param arg The data element to split on.
+@return A new linked list with arg as the head and all elements after arg as elements of the new list.
+*/
+
+struct list * list_split( struct list *src, list_op_t cmp, const void *arg );
 
 /** Count the elements in a list.
 @param list The list to count.
@@ -126,6 +146,25 @@ void * list_pop_tail( struct list *list );
 @return The item at the list tail, or null if list is empty.
 */
 void * list_peek_tail( struct list *list );
+
+/** Find an element within a list
+This function searches the list, comparing each element in the list to arg, and returns a pointer to the first matching element.
+@param list The list to search
+@param cmp The comparison function.  Should return non-zero on a match.
+@param arg The element to compare against
+@return A pointer to the first matched element, or NULL if no elements match.
+*/
+
+void * list_find( struct list *list, list_op_t cmp, const void *arg );
+
+/** Remove an item from the list
+This function searches the list for the item pointed to by value and removes it.
+@param list The list to search
+@param value The item to remove
+@return The removed item.
+*/
+
+void * list_remove( struct list *list, const void *value );
 
 /** Begin traversing a list.
 This function sets the internal list iterator to the first item.

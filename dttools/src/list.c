@@ -50,6 +50,34 @@ struct list * list_splice( struct list *top, struct list *bottom )
 	return top;	
 }
 
+struct list * list_split( struct list *l, list_op_t comparator, const void *arg )
+{
+	struct list *nl;
+	struct list_node *n;
+	int count = 0;
+
+	if(!arg || l->size < 2) return NULL;
+
+	for(n=l->head;n;n=n->next) {
+		if(comparator(n->data,arg)) break;
+		else count++;
+	}
+	if(!n || !count) return NULL;
+
+	nl = list_create();
+	nl->tail = l->tail;
+	l->tail = n->prev;
+	nl->head = n;
+
+	l->tail->next = 0;
+	nl->head->prev = 0;
+
+	nl->size = l->size - count;
+	l->size = count;
+
+	return nl;
+}
+
 void list_delete( struct list *l )
 {
 	struct list_node *n,*m;
@@ -62,6 +90,15 @@ void list_delete( struct list *l )
 	}
 
 	free(l);
+}
+
+void list_free( struct list *l )
+{
+	struct list_node *n;
+	if(!l) return;
+	for( n=l->head; n; n=n->next ) {
+		free(n->data);
+	}
 }
 
 int list_size( struct list *l )
@@ -89,9 +126,19 @@ int list_push_priority( struct list *l, void *item, int priority )
 {
 	struct list_node *n;
 	struct list_node *node;
+	int result;
 
-	if(!l->head) return list_push_head(l,item);
-	if(l->head->priority<priority) return list_push_head(l,item);
+	if(!l->head) {
+		result = list_push_head(l,item);
+		if(result) l->head->priority = priority;
+		return result;
+	}
+
+	if(l->head->priority<priority) {
+		result = list_push_head(l,item);
+		if(result) l->head->priority = priority;
+		return result;
+	}
 
 	for(n=l->head;n;n=n->next) {
 		if(n->priority<priority) {
@@ -101,7 +148,9 @@ int list_push_priority( struct list *l, void *item, int priority )
 		}
 	}
 	
-	return list_push_tail(l,item);
+	result = list_push_tail(l,item);
+	if(result) l->tail->priority = priority;
+	return result;
 }
 
 int list_push_head( struct list *l, void *item )
