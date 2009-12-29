@@ -39,15 +39,15 @@ See the file COPYING for details.
 #define USING_INNER_FUNCTION 0
 #define USING_OUTER_FUNCTION 1
 
-static int timeout=3600;
-static int buffer_size=1048576;
+int wq = 0;
+
 int *thr_status;
 int *thr_count_within_block;
 
 double (*compare_two_files)(const void *mmap1, size_t size1, const void *mmap2, size_t size2) = NULL;
 
-INT64_T get_local_path(char *, char *, time_t);
-int resolve_block_size(const char *, const char *, int *, int *);
+void get_absolute_path(char *, char *);
+int resolve_block_size(const char *, const char *, int *, int *, int *, int *, int *, int *);
 int get_element_size(const char *);
 int file_line_count(const char *);
 
@@ -350,36 +350,24 @@ static void show_version(const char *cmd)
 
 static void show_help( const char *cmd )
 {
-	printf("use: %s [options] <set A> <set B> <compare function> <hostname[:port]> <remote-file>\n",cmd);
+	printf("Usage: %s [options] <set A> <set B> <compare function>\n",cmd);
 	printf("where options are:\n");
-	printf(" -a <flag>  Require this authentication mode.\n");
-	printf(" -b <size>  Set transfer buffer size. (default is %d bytes)\n",buffer_size);
-	printf(" -d <flag>  Enable debugging for this subsystem.\n");
-	printf(" -f         Follow input file like tail -f.\n");
-	printf(" -t <time>  Timeout for failure. (default is %ds)\n",timeout);
-	printf(" -w <width>  Matrix width.\n");
-	printf(" -i <height>  Matrix height.\n");
-	printf(" -e <size>  Size of each element in the matrix. (default is 8)\n");
-	printf(" -n <count>  Number of hosts. (default is 1)\n");
-	printf(" -x <width>  Block width. (default is chosen according to hardware conditions)\n");
-	printf(" -y <height>  Block width. (default is chosen according to hardware conditions)\n");
-	printf(" -p <x1>  x coordinate of the starting point of computation in the matrix. \n");
-	printf(" -q <y1>  y coordinate of the starting point of computation in the matrix. \n");
-	printf(" -r <x2>  x coordinate of the ending point of computation in the matrix. \n");
-	printf(" -s <y2>  y coordinate of the ending point of computation in the matrix. \n");
-	printf(" -X <X>  x coordinate of starting point in distributed context.\n");
-	printf(" -Y <Y>  y coordinate of starting point in distributed context.\n");
-	printf(" -c <core>  Number of cores to be used.\n");
-	printf(" -v         Show program version.\n");
-	printf(" -h         This message.\n");
+	printf(" -d <string>	Enable debugging for this subsystem.\n");
+	printf(" -i <integer>  	x coordinate of the start point of computation in the matrix. \n");
+	printf(" -j <integer>  	y coordinate of the start point of computation in the matrix. \n");
+	printf(" -k <integer>  	x coordinate of the end point of computation in the matrix. \n");
+	printf(" -l <integer>  	y coordinate of the end point of computation in the matrix. \n");
+	printf(" -x <integer>	Block width.  (default is chosen according to hardware conditions)\n");
+	printf(" -y <integer>	Block height. (default is chosen according to hardware conditions)\n");
+	printf(" -X <integer> 	x coordinate of starting point in a distributed context.\n");
+	printf(" -Y <integer>  	y coordinate of starting point in a distributed context.\n");
+	printf(" -c <integer>	Number of cores to be used.\n");
+	printf(" -v         	Show program version.\n");
+	printf(" -h         	Display this message.\n");
 }
 
 int main(int argc, char *argv[]) {
 
-
-    int did_explicit_auth = 0;
-    int follow_mode = 0;
-    time_t stoptime;
     char c;
 
     int setAindex, setBindex, funcindex;
@@ -391,8 +379,6 @@ int main(int argc, char *argv[]) {
     char setAfilename[CHIRP_PATH_MAX];
     char setBfilename[CHIRP_PATH_MAX];
     int len = CHIRP_PATH_MAX;
-    struct chirp_matrix *mat = NULL;
-    int mathost, matpath;
 
     int i,j,k,l; 
     int numOfMovingElements, numOfStableElements;
@@ -411,12 +397,7 @@ int main(int argc, char *argv[]) {
 			
 	
 	int init_threads = 0;
-    
-    int w,h,e,n;
-    w=10;
-    h=10;
-    e=8;
-    n=1;
+
     
     numOfMovingElements = -1;
     numOfStableElements = -1;
@@ -434,35 +415,10 @@ int main(int argc, char *argv[]) {
 	*/
 	register_compare_function("compare_bitdumb", compare_bitdumb);
 	
-    while((c=getopt(argc,argv,"a:b:d:ft:vhw:i:e:n:x:y:p:q:r:s:X:Y:c:"))!=(char)-1) {
+    while((c=getopt(argc,argv,"d:vhx:y:i:j:k:l:X:Y:c:r"))!=(char)-1) {
 			switch(c) {
-				case 'a':
-					auth_register_byname(optarg);
-					did_explicit_auth = 1;
-					break;
-				case 'b':
-					buffer_size = atoi(optarg);
-					break;
 				case 'd':
 					debug_flags_set(optarg);
-					break;
-				case 'f':
-					follow_mode = 1;
-					break;
-				case 't':
-					timeout = string_time_parse(optarg);
-					break;
-				case 'w':
-					w = atoi(optarg);
-					break;
-				case 'i':
-					h = atoi(optarg);
-					break;
-				case 'e':
-					e = atoi(optarg);
-					break;
-				case 'n':
-					n = atoi(optarg);
 					break;
 				case 'v':
 					show_version(argv[0]);
@@ -478,16 +434,16 @@ int main(int argc, char *argv[]) {
 				case 'y':
 					numOfMovingElements = atoi(optarg);
 					break;
-				case 'p':
+				case 'i':
 					x1 = atoi(optarg);
 					break;
-				case 'q':
+				case 'j':
 					y1 = atoi(optarg);
 					break;
-				case 'r':
+				case 'k':
 					x2 = atoi(optarg);
 					break;
-				case 's':
+				case 'l':
 					y2 = atoi(optarg);
 					break;
 				case 'X':
@@ -499,36 +455,22 @@ int main(int argc, char *argv[]) {
         		case 'c':
             		numOfCores = atoi(optarg);
             		break;
+        		case 'r':
+            		wq = 1;
+            		break;
 	    
 			}
     }
 
-    if(!did_explicit_auth) auth_register_all();
-
-    if( (argc-optind)<5 ) {
-		fprintf(stderr, "allpairs_multicore: after all options, you must have: setA setB function mathost matpath\n");
+    if( (argc-optind)<3 ) {
+		fprintf(stderr, "allpairs_multicore: after all options, you must have: setA setB function\n");
 		exit(1);
     }
     
-    stoptime = time(0) + timeout;
-
     setAindex=optind;
     setBindex=optind+1;
     funcindex=optind+2;
-    mathost=optind+3;
-    matpath=optind+4;
 	
-    // Create matrix at specified host and path to store results
-    mat=chirp_matrix_open(argv[mathost], argv[matpath], stoptime);
-    if(mat == NULL)
-    {
-	mat=chirp_matrix_create( argv[mathost], argv[matpath], w, h, e, n, stoptime);
-	if(mat == NULL) {
-	    fprintf(stderr, "allpairs_multicore: Cannot create matrix at %s:%s : %s\n", argv[mathost], argv[matpath], strerror(errno));
-	    exit(1);
-	}
-	
-    }
 	// Set compare function: INNER or OUTER
 	if(set_compare_function(argv[funcindex]) == 0) {
 		// Cannot find a internal function for the specified function name, try external function
@@ -543,12 +485,15 @@ int main(int argc, char *argv[]) {
     	debug(D_DEBUG, "Using inner function.\n");
 	}
 	
-    // Get local path for data sets directories
-    if(get_local_path(setApath, argv[setAindex], stoptime) != 0 || get_local_path(setBpath, argv[setBindex], stoptime) != 0) {
-        fprintf(stderr, "allpairs_multicore: Path to data sets - %s is invalid! : %s\n", setApath, strerror(errno));
-        exit(1);
-    }
-
+    // Get absolute paths for data sets directories
+	if(wq) {
+		strcpy(setApath, "setA.");
+		strcpy(setBpath, "setB.");
+	} else {
+    	get_absolute_path(setApath, argv[setAindex]);
+		get_absolute_path(setBpath, argv[setBindex]);
+	}
+		
     // setA and setB each contains a list of file names that points to the data files
     char setAlistfile[CHIRP_PATH_MAX];
     char setBlistfile[CHIRP_PATH_MAX];
@@ -566,17 +511,28 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "allpairs_multicore: Cannot open setB list file - %s! : %s\n", setBlistfile, strerror(errno));
         exit(1);
     }
+	
+    
     // Resolve block size and number of cores 
     if(numOfCores <= 0) {
         numOfCores = load_average_get_cpus();
     } else {
         numOfCores = numOfCores > load_average_get_cpus() ? load_average_get_cpus() : numOfCores;
     }
-    resolve_block_size(setAlistfile, setBlistfile, &numOfStableElements, &numOfMovingElements);
+    resolve_block_size(setAlistfile, setBlistfile, &numOfStableElements, &numOfMovingElements, &x1, &y1, &x2, &y2);
+
+	if(x1==-1 && x2==-1 && y1==-1 && y2==-1) {
+		x1 = 0;
+		y1 = 0;
+    	x2 = file_line_count(setAlistfile);
+    	y2 = file_line_count(setBlistfile);
+	}
 
 
 	// Stable and moving elements max are 100000!!!
-    debug(D_DEBUG, "\nNumber of  Moving Elements: %d\nNumber of Stalbe Elements: %d\nNumber of Cores: %d\n", numOfMovingElements, numOfStableElements, numOfCores);
+    debug(D_DEBUG, "Number of Stalbe Elements: %d\n", numOfStableElements);
+    debug(D_DEBUG, "Number of Moving Elements: %d\n", numOfMovingElements);
+    debug(D_DEBUG, "Number of Cores: %d\n", numOfCores);
     debug(D_DEBUG, "Top left X: %d ; Top left Y: %d \n", topLeftX, topLeftY);
    
 	// Multithread control initializing
@@ -793,7 +749,13 @@ int main(int argc, char *argv[]) {
 			
 			// Write data to the remote matrix
             debug(D_DEBUG, "Output to matrix at (%d, %d), width:%d, height:%d.\n", topLeftX+x1+x_rel, topLeftY+y1+y_rel, numOfAvailableStableElements, numOfMovingElements);
-	    	chirp_matrix_set_range( mat, topLeftX + x1 + x_rel, topLeftY + y1 + y_rel, numOfAvailableStableElements, numOfAvailableMovingElements, resbuff, stoptime );
+			
+			int x, y;
+			x = topLeftX + x1 + x_rel;
+			y = topLeftY + y1 + y_rel;
+			for(i = 0; i < numOfAvailableMovingElements; i++)
+				for(j = 0; j < numOfAvailableStableElements; j++)
+					printf("%d\t%d\t%f\n", x+j, y+i, resbuff[i*numOfAvailableStableElements+j]);
 	    	gnum = 0;
             y_rel += numOfAvailableMovingElements;
 		}
@@ -809,10 +771,8 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-INT64_T get_local_path(char *local_path, char *path, time_t stoptime) {
-    char *hostname, *chirp_path; 
+void get_absolute_path(char *local_path, char *path) {
     char *p;
-    int i, count;
 
     p = strchr(path, '/');
     if(p == NULL || p != path) {
@@ -820,76 +780,59 @@ INT64_T get_local_path(char *local_path, char *path, time_t stoptime) {
         strcat(local_path, "/");
         strcat(local_path, path);
         if(local_path[strlen(local_path)-1] != '/') strcat(local_path, "/");
-        return 0;
     } else {
-        if(strncmp(p+1, "chirp/", 6) != 0) {
-            // Given path is already a local path, return directly.
-            strcpy(local_path, path);
-            if(local_path[strlen(local_path)-1] != '/') strcat(local_path, "/");
-            return 0;
-        }
-   }
-
-    hostname = (char *) malloc(CHIRP_PATH_MAX*sizeof(char)); // allocate space for the source host
-    if(hostname == NULL) {
-        fprintf(stderr, "allpairs_multicore: Allocating memory in function 'get_local_path' failed. : %s \n", strerror(errno));
-        return -1;
-    }
-
-    gethostname(hostname, CHIRP_PATH_MAX); // this may not have domain name, though!
-    if(hostname == NULL) {
-        printf("no hostname!\n");
-        return -1;
-    }
-    
-   
-    INT64_T retval;
-
-    // get chirp path
-    count = 0;
-    for(i = 0; i < strlen(path); i++) {
-        if(path[i] == '/') count++;
-        if(count == 3) break;
-    }
-    if(count != 3) {
-        fprintf(stderr, "allpairs_multicore: Cannot resolve chirp path - %s. \n", path);
-        return -1;
-    }
-    while(i < strlen(path)) {
-        i++;
-        if(path[i] != '/') break;
-    }
-
-    chirp_path = path + i - 1;        
-    for(i = 0; i < CHIRP_PATH_MAX; i++) local_path[i] = '\0'; 
-    debug(D_DEBUG, "chirp_path: %s\n", chirp_path);
-    debug(D_DEBUG, "local_path before resolve: %s\n", local_path);
- 
-    // get local path for the given chirp path on current machine   
-    retval = chirp_reli_localpath(hostname, chirp_path, local_path, CHIRP_PATH_MAX, stoptime);
-    if(retval < 0) {
-        fprintf(stderr, "allpairs_multicore: Cannot resolve chirp path - %s. !\n", path);
-        return retval;
-    } else {
-        debug(D_DEBUG, "local_path after resolve: %s\n", local_path);
+		// Given path is an absolute path
+		strcpy(local_path, path);
         if(local_path[strlen(local_path)-1] != '/') strcat(local_path, "/");
-        return 0;
-    }
+   }
 }
 
-int resolve_block_size(const char *file1, const char *file2, int *x, int *y) {
+int resolve_block_size(const char *file1, const char *file2, int *x, int *y, int *p, int *q, int *r, int *s) {
     UINT64_T free_mem, total_mem;
-    int lineCount1, lineCount2, m, n;
+    int m, n;
+	int x1, y1, x2, y2;
+	int lineCount1, lineCount2;
     long numOfFileInCache;
     int element_size;
-    FILE *p;
+    FILE *fp;
     char setAElementPath[CHIRP_PATH_MAX];
     char setAElementFilename[CHIRP_PATH_MAX];
     char *last_slash;
+	int coordsInvalid = 1;
 
+	x1 = *p;
+	y1 = *q;
+	x2 = *r;
+	y2 = *s;
+	
     lineCount1 = file_line_count(file1);
     lineCount2 = file_line_count(file2);
-    
+	
+	if(x1!=-1 && x2!=-1 && y1!=-1 && y2!=-1) {
+		if(x1 >= 0 && x1 <= lineCount1 && x2 >= 0 && x2 <= lineCount1 && x2 > x1 && \
+			y1 >= 0 && y1 <= lineCount2 && y2 >= 0 && y2 <= lineCount2 && y2 > y1) {
+				lineCount1 = x2 - x1 + 1;
+				lineCount2 = y2 - y1 + 1;
+				coordsInvalid = 0;
+		} 	//else {
+				// optional coordinates error, compute the whole matrix
+			//}
+	} 	
+	//else if (x1==-1 && x2 ==-1 && y1==-1 && y2==-1) {
+		// no optional coordinates, compute the whole matrix
+	//} else {
+		// missing optional coordinates, compute the whole matrix
+	//}
+	
+	if(coordsInvalid) {
+		*p = 0;
+		*q = 0;
+		*r = lineCount1 - 1;
+		*s = lineCount2 - 1;
+	}
+    debug(D_DEBUG, "Start point:\t[%d, %d]\n", *p, *q);
+    debug(D_DEBUG, "End point:\t[%d, %d]\n", *r, *s);
+
     if(*x > 0 && *y > 0) {
         if(*x > lineCount1) *x = lineCount1;
         if(*y > lineCount2) *y = lineCount2;
@@ -903,24 +846,29 @@ int resolve_block_size(const char *file1, const char *file2, int *x, int *y) {
     *y = 10;
 
     // get a single element's file name (relative)
-    if((p=fopen(file1,"r")) == NULL) return -1;   
-    fgets(setAElementFilename, CHIRP_PATH_MAX, p);
+    if((fp=fopen(file1,"r")) == NULL) return -1;   
+    fgets(setAElementFilename, CHIRP_PATH_MAX, fp);
     if (setAElementFilename != NULL) {
         size_t last = strlen (setAElementFilename) - 1;
 	if (setAElementFilename[last] == '\n') setAElementFilename[last] = '\0';
     } else {
-        fclose(p);
+        fclose(fp);
         return -1;
     }
-    fclose(p);
+    fclose(fp);
     
     // get element absolute path
-    strcpy(setAElementPath, file1);
-    last_slash = strrchr(setAElementPath, '/');
-    *(last_slash+1) = '\0';
+	if(wq) {
+		strcpy(setAElementPath, "setA.");
+	} else {
+   		strcpy(setAElementPath, file1);
+    	last_slash = strrchr(setAElementPath, '/');
+    	*(last_slash+1) = '\0';
+	}
     strcat(setAElementPath, setAElementFilename);
     element_size = get_element_size(setAElementPath);
-    debug(D_DEBUG, "Estimate element size using file - %s\nElement size: %d Bytes = %d KB = %d MB\n", setAElementPath, element_size, element_size>>10, element_size>>20);
+    debug(D_DEBUG, "Estimate element size using file - %s\n", setAElementPath);
+    debug(D_DEBUG, "Element size: %d Bytes = %d KB = %d MB\n", element_size, element_size>>10, element_size>>20);
 
     if(free_mem == -1 || element_size == -1) return -1;
 
@@ -940,8 +888,8 @@ int resolve_block_size(const char *file1, const char *file2, int *x, int *y) {
         n = lineCount2;    
         if(m > lineCount1) m = lineCount1;
     } else {
-		m = lineCount1;
-		n = lineCount2;
+		//m = lineCount1;
+		//n = lineCount2;
     }
  
     *x = m;
@@ -959,17 +907,23 @@ int get_element_size(const char *filename) { // In Bytes
 
     
 int file_line_count(const char *filename){
-    FILE *p;
-    char c;
+    FILE *fp;
+    char buffer[MAX_FILENAME_LEN]; 
     int count = 0;
+	int i;
 
-    if((p=fopen(filename, "r")) == NULL) return -1;
+    if((fp=fopen(filename, "r")) == NULL) return -1;
 
-    while((c = fgetc(p)) != EOF) {
-       if(c == '\n') count++;
+    while(fgets(buffer, MAX_FILENAME_LEN, fp) != NULL) {
+       	for(i = 0; i < strlen(buffer); i++) {
+			if(isspace(buffer[i]) != 1) {
+				count++;
+				break;
+			}
+		}
     }
 
-    fclose(p);
+    fclose(fp);
 
     return count;
 }
