@@ -71,7 +71,12 @@ has_egee=no
 
 ccompiler=gcc
 cxxcompiler=g++
-ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions -fPIC"
+ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
+
+if [ ${build_sys} != CYGWIN ]
+then
+	ccflags="${ccflags} -fPIC"
+fi
 
 config_readline_path=auto
 config_globus_path=no

@@ -87,12 +87,29 @@ require_function ()
 
 library_search()
 {
+	# If the second argument is root, and we are not careful,
+	# we will end up with a path that has two slashes, which
+	# means something unintended in Windows
+
+	if [ $2 = / ]
+	then
+		basedir=
+	else
+		basedir=$2
+	fi
+
+	# If we are running on a 64-bit platform, then the native libraries
+	# for compiling will be found in /lib64, if it exists.  The files in
+	# /lib are compatibilities libraries for 32-bit.
+	
 	if [ $build_cpu = X86_64 -a -d $2/lib64 ]
 	then
-		libdir=$2/lib64
+		libdir=$basedir/lib64
 	else
-		libdir=$2/lib
+		libdir=$basedir/lib
 	fi
+
+	# Darwin uses dylib for dynamic libraries, other platforms use .so
 
 	if [ $build_sys = DARWIN ]
 	then
@@ -101,10 +118,16 @@ library_search()
 		dynamic_suffix=so
 	fi
 
+	# If a third argument is given, it means libraries are found in
+	# a subdirectory of lib, such as "mysql".
+
 	if [ X$3 != X -a -d "$libdir/$3" ]
 	then
 		libdir="$libdir/$3"
 	fi
+
+	# Now check for the library file in all of the known places,
+	# and add it to the link line as appropriate for the type and platform.
 
 	if check_file $libdir/lib$1.a
 	then

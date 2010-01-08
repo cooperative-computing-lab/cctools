@@ -25,18 +25,6 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <sys/stat.h>
 
-/*
-Note, Cygwin does not support file locking, and thus cannot
-support space allocation, at least using this implementation.
-These defines are just used to get through the file cleanly.
-*/
-
-#ifdef CCTOOLS_OPSYS_CYGWIN
-#define F_LOCK 0
-#define F_TLOCK 0
-#define lockf(x,y,z) (0)
-#endif
-
 static struct hash_table * alloc_table = 0;
 static struct hash_table * root_table = 0;
 static struct itable * fd_table = 0;
