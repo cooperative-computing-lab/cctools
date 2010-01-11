@@ -441,7 +441,7 @@ char * string_subst( char *value, string_subst_lookup_t lookup, void *arg )
 		} else {
 			ldelim--;
 			rdelim = ldelim+1;
-			while(isalpha(*rdelim)) rdelim++;
+			while(isalnum(*rdelim) || *rdelim == '_') rdelim++;
 		}
 
 		oldrdelim = *rdelim;
