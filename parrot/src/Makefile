@@ -11,7 +11,7 @@ parrot: pfs_main.o pfs_poll.o tracer.o pfs_dispatch.o pfs_dispatch64.o pfs_proce
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 parrot_helper.so: parrot_helper.c
-	gcc -shared -Wl,-rpath=/lib64 -fPIC $< -o $@
+	gcc -shared -fPIC $< -o $@
 
 parrot_lsalloc: parrot_lsalloc.o parrot_client.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
