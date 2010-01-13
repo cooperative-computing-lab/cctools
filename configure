@@ -465,22 +465,28 @@ else
 	fi
 fi
 
-if [ $config_fuse_path != no ] && library_search fuse ${fuse_path}
+if [ $config_fuse_path != no ]
 then
-        if [ ${fuse_path} != /usr ]
+        if library_search fuse ${fuse_path} || library_search fuse /
         then
-                ccflags="${ccflags} -I${fuse_path}/include"
+                if [ x${fuse_path} != x/ -a x${fuse_path} != x/usr ]
+                then
+                        ccflags="${ccflags} -I${fuse_path}/include"
+                fi
+                ccflags="${ccflags} -DHAS_FUSE"
+        else
+                if [ $config_fuse_path = yes ]
+                then
+
+        		echo "*** Sorry, I couldn't find Fuse in $fuse_path"
+        		echo "*** Check --with-fuse-path and try again."
+        		exit 1
+                else
+                        echo "*** skipping fuse support"
+                fi
         fi
-        ccflags="${ccflags} -DHAS_FUSE"
 else
-	if [ $config_fuse_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find Fuse in $fuse_path"
-		echo "*** Check --with-fuse-path and try again."
-		exit 1
-	else
-		echo "*** skipping fuse support"
-	fi
+	echo "*** skipping fuse support"
 fi
 
 if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysql

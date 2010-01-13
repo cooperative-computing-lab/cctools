@@ -488,8 +488,8 @@ static void exit_handler( int sig )
 {
 	if(fuse_instance) {
 		fuse_exit(fuse_instance);
-		fuse_destroy(fuse_instance);
 		fuse_unmount(fuse_mountpoint,fuse_chan);
+		fuse_destroy(fuse_instance);
 	}
 	_exit(0);
 }
@@ -594,8 +594,8 @@ int main(int argc, char *argv[])
 
 	fuse_loop(fuse_instance);
 
-	fuse_destroy(fuse_instance);
 	fuse_unmount(fuse_mountpoint,fuse_chan);
+	fuse_destroy(fuse_instance);
 
 	return 0;
 }
