@@ -163,7 +163,6 @@ static void handle_updates(struct datagram *update_port)
 	int port;
 	int result;
 	struct nvpair *nv;
-	const char *pname;
 
 	while(1) {
 		result = datagram_recv(update_port, data, DATAGRAM_PAYLOAD_MAX, addr, &port, 0);
@@ -190,18 +189,13 @@ static void handle_updates(struct datagram *update_port)
 			}
 		}
 
-		/* If the server doesn't know its own name, try to figure it out. */
+		/* Do not believe the server's reported name, just resolve it backwards. */
 
-		pname = nvpair_lookup_string(nv,"name");
-		if(pname && !strncmp(pname,"localhost",9)) {
-			const char *addr = nvpair_lookup_string(nv,"address");
-			if(addr) {
-				char name[DOMAIN_NAME_MAX];
-				if(domain_name_cache_lookup_reverse(addr,name)) {
-					debug(D_DEBUG,"fixed name from %s to %s for %s",pname,name,addr);
-					nvpair_insert_string(nv,"name",name);
-				}
-			}
+		char name[DOMAIN_NAME_MAX];
+		if(domain_name_cache_lookup_reverse(addr,name)) {
+			nvpair_insert_string(nv,"name",name);
+		} else {
+			nvpair_insert_string(nv,"name",addr);
 		}
 
 		make_hash_key(nv, key);
