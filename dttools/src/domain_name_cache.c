@@ -137,6 +137,10 @@ int domain_name_cache_guess( char *name )
 		if(guess_dns_domain(domain)) {
 			sprintf(name,"%s.%s",n.nodename,domain);
 			debug(D_DNS,"but /etc/resolv.conf says domain = %s so hostname = %s",domain,name);
+			if (!domain_name_cache_lookup(name,addr)) {
+				debug(D_DNS,"unfortunately %s is meaningless, so going back to %s",name,n.nodename);
+				sprintf(name,"%s",n.nodename);
+			}
 		} else {
 			strcpy(name,n.nodename);
 			debug(D_DNS,"cannot find any more info, so use hostname = %s",n.nodename);
