@@ -315,21 +315,23 @@ static void show_version(const char *cmd)
 static void show_help( const char *cmd )
 {
 	printf("Usage: %s [options] <set A> <set B> <compare function>\n",cmd);
-	printf("where options are:\n");
+	printf("The most common options are:\n");
 	printf(" -d <string>	Enable debugging for this subsystem.\n");
+	printf(" -v         	Show program version.\n");
+	printf(" -h         	Display this message.\n");
+	printf(" -p <integer>	The port that the Master will be listening on.\n");
 	printf(" -i <integer>  	x coordinate of the start point of computation in the matrix. \n");
 	printf(" -j <integer>  	y coordinate of the start point of computation in the matrix. \n");
 	printf(" -k <integer>  	x coordinate of the end point of computation in the matrix. \n");
 	printf(" -l <integer>  	y coordinate of the end point of computation in the matrix. \n");
+	printf("\n");
+	printf("Less common options are:\n");
 	printf(" -x <integer>	Block width.  (default is chosen according to hardware conditions)\n");
 	printf(" -y <integer>	Block height. (default is chosen according to hardware conditions)\n");
 	printf(" -X <integer> 	x coordinate of starting point in a distributed context.\n");
 	printf(" -Y <integer>  	y coordinate of starting point in a distributed context.\n");
 	printf(" -c <integer>	Number of workers to be used.\n");
-	printf(" -p <integer>	The port that the Master will be listening on.\n");
-	printf(" -f 			Indicate that workqueue use inner compare function in allpairs_multicore.\n");
-	printf(" -v         	Show program version.\n");
-	printf(" -h         	Display this message.\n");
+	printf(" -f 			Indicate that workqueue uses an inner compare function embedded in allpairs_multicore.\n");
 }
 
 // Test function starts below
