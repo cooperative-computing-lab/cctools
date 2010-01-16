@@ -32,7 +32,7 @@ case "$build_cpu" in
 	;;
 esac
 
-potential_packages="dttools ftp_lite chirp ftsh abstractions"
+potential_packages="dttools ftp_lite chirp ftsh abstractions sand"
 
 if [ -d parrot -a $build_sys = LINUX ]
 then
