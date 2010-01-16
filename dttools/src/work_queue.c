@@ -370,6 +370,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 	timestamp_t sum_time=0;
 	int fl;
 	time_t stoptime;
+	char* hash_name;
 	
 	if(t->input_files) {
 		list_first_item(t->input_files);
@@ -396,10 +397,13 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 				local_info.st_mode |= 0600;
 				local_info.st_mode &= 0777;
 
-				remote_info = hash_table_lookup(w->current_files,tf->payload);
+				hash_name = (char*) malloc((strlen(tf->payload)+strlen(tf->remote_name)+2)*sizeof(char));
+				sprintf(hash_name,"%s-%s",(char*)tf->payload,tf->remote_name);
+				
+				remote_info = hash_table_lookup(w->current_files,hash_name);
 				if(!remote_info || remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size ) {
 					if(remote_info) {
-						hash_table_remove(w->current_files,tf->payload);
+						hash_table_remove(w->current_files,hash_name);
 						free(remote_info);
 					}
 					
@@ -416,11 +420,12 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 					if(tf->cacheable) {
 						remote_info = malloc(sizeof(*remote_info));
 						memcpy(remote_info,&local_info,sizeof(local_info));
-						hash_table_insert(w->current_files,tf->payload,remote_info);
+						hash_table_insert(w->current_files,hash_name,remote_info);
 					}
 					total_bytes+=actual;
 					sum_time+=(close_time-open_time);
 				}
+				free(hash_name);
 			}
 		}
 		t->total_bytes_transfered += total_bytes;
@@ -491,6 +496,7 @@ struct work_queue_worker * find_worker_by_cache( struct work_queue *q , struct w
 	struct stat *remote_info;
 	struct work_queue_file* tf;
 	int i,j;
+	char* hash_name;
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
@@ -500,9 +506,12 @@ struct work_queue_worker * find_worker_by_cache( struct work_queue *q , struct w
 			for(i=0; i<j ; i++) {
 				tf = list_pop_head(t->input_files);
 				if(tf->fname_or_literal == FNAME && tf->cacheable) {
-					remote_info = hash_table_lookup(w->current_files,tf->payload);
+					hash_name = malloc((strlen(tf->payload)+strlen(tf->remote_name)+2)*sizeof(char));
+					sprintf(hash_name,"%s-%s",(char*)tf->payload,tf->remote_name);
+					remote_info = hash_table_lookup(w->current_files,hash_name);
 					if(remote_info)
 						task_cached_bytes += remote_info->st_size;
+					free(hash_name);
 				}
 				list_push_tail(t->input_files, tf);
 			}
