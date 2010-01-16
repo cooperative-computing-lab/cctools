@@ -9,8 +9,10 @@ See the file COPYING for details.
 #include <string.h>
 
 int main(int argc, char** argv) {
-    if(argc < 2)
+    if(argc != 2) {
+	fprintf(stderr,"Usage: %s <condor-logfile>\n",argv[0]);
 	return 1;
+    }
     char* command = (char *) malloc((strlen("condor_wait   ")+strlen(argv[1]))*sizeof(char));
     sprintf(command,"condor_wait %s",argv[1]); 
     system(command);
