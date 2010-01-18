@@ -50,6 +50,12 @@ void get_absolute_path(char *, char *);
 int resolve_block_size(const char *, const char *, int *, int *, int *, int *, int *, int *);
 int get_element_size(const char *);
 int file_line_count(const char *);
+/** To developers: ADD YOUR COSTUMIZED COMPARE FUNCTION HERE!!
+ *  The function should look like this:
+ *  double function_name(const void *mmap1, size_t size1, const void *mmap2, size_t size2) {
+ *  	real code...
+ *  }
+ */
 
 // Inner compare function for irises application
 double compare_irises(const void *mmap1, size_t size1, const void *mmap2, size_t size2) {
@@ -411,10 +417,15 @@ int main(int argc, char *argv[]) {
 
     debug_config(argv[0]);
 	
-	/**
-		To register an inner compare function, add code in the following format:
-		register_compare_function("YOUR INNER FUNCTION NAME", YOUR INNER FUNCTION);
-	*/
+	/** To developers: REGISTER YOUR COMPARE FUNCTION BELOW:
+	  *	To register an inner compare function, add code in the following format:
+	  *		register_compare_function("YOUR_COMPARE_FUNCTION'S_NAME", YOUR_COMPARE_FUNCTION);
+	  * YOUR_COMPARE_FUNCTION is the compare function you just added at the top.
+	  * For example, the following function is the one just added:
+ 	  *	    double my_function(const void *mmap1, size_t size1, const void *mmap2, size_t size2) {}
+	  *	Then the line you should add below would be:
+	  *		register_compare_function("my_function", my_function);
+	  */
 	register_compare_function("compare_bitdumb", compare_bitdumb);
 	
     while((c=getopt(argc,argv,"d:vhx:y:i:j:k:l:X:Y:c:r"))!=(char)-1) {
