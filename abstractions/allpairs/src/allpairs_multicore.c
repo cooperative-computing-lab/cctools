@@ -38,6 +38,7 @@ See the file COPYING for details.
 #define MAX_THREAD_NUMBER 128
 #define USING_INNER_FUNCTION 0
 #define USING_OUTER_FUNCTION 1
+#define NO_COMPARE_FUNCTION 2
 
 int wq = 0;
 
@@ -50,7 +51,7 @@ void get_absolute_path(char *, char *);
 int resolve_block_size(const char *, const char *, int *, int *, int *, int *, int *, int *);
 int get_element_size(const char *);
 int file_line_count(const char *);
-/** To developers: ADD YOUR COSTUMIZED COMPARE FUNCTION HERE!!
+/** To developers: ADD YOUR CUSTOMIZED COMPARE FUNCTION HERE!!
  *  The function should look like this:
  *  double function_name(const void *mmap1, size_t size1, const void *mmap2, size_t size2) {
  *  	real code...
@@ -337,6 +338,8 @@ int set_compare_function(const char *function_name) {
 	
 	if(!compare_function_head) return 0;
 	p = compare_function_head;
+
+	// Go through the registered compare function list to find a name match
 	while((p = p->next) != NULL) {
 		if(strcmp(p->name, function_name) == 0) {
 			compare_two_files = p->pointer;
@@ -344,7 +347,7 @@ int set_compare_function(const char *function_name) {
 		}
 	}
 
-	if(!p) return 0;
+	if(!p) return 0; // Cannot find a registered compare function
 	else return 1;
 }
 
@@ -398,6 +401,7 @@ int main(int argc, char *argv[]) {
 	
 	FILE *tmpresult[CHIRP_PROCESSOR_MAX];
 	
+	int testCompareFunction = 0;
 	int function_flag;
 	int thread_err;
 	void *tret;
@@ -428,7 +432,7 @@ int main(int argc, char *argv[]) {
 	  */
 	register_compare_function("compare_bitdumb", compare_bitdumb);
 	
-    while((c=getopt(argc,argv,"d:vhx:y:i:j:k:l:X:Y:c:r"))!=(char)-1) {
+    while((c=getopt(argc,argv,"d:vhx:y:i:j:k:l:X:Y:c:rf"))!=(char)-1) {
 			switch(c) {
 				case 'd':
 					debug_flags_set(optarg);
@@ -471,7 +475,9 @@ int main(int argc, char *argv[]) {
         		case 'r':
             		wq = 1;
             		break;
-	    
+				case 'f':
+					testCompareFunction = 1;
+	    			break;
 			}
     }
 
@@ -489,13 +495,21 @@ int main(int argc, char *argv[]) {
 		// Cannot find a internal function for the specified function name, try external function
 		function_flag = USING_OUTER_FUNCTION;
 		if(access(argv[funcindex], X_OK) != 0) {
-			fprintf(stderr, "allpairs_multicore: Cannot execute program - %s (no permission or program does not exist)! : %s\n", argv[funcindex], strerror(errno));
+			if(testCompareFunction == 0) {
+				fprintf(stderr, "allpairs_multicore: Cannot execute program - %s (no permission or program does not exist)! : %s\n", argv[funcindex], strerror(errno));
+			} else {
+				printf("%d", NO_COMPARE_FUNCTION);
+			}
 			exit(1);
 		}
     	debug(D_DEBUG, "Using outer function.\n");
 	} else {
 		function_flag = USING_INNER_FUNCTION;
     	debug(D_DEBUG, "Using inner function.\n");
+	}
+	if(testCompareFunction == 1) {
+		printf("%d", function_flag);
+		exit(0);
 	}
 	
     // Get absolute paths for data sets directories

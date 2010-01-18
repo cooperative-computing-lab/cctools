@@ -21,6 +21,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "work_queue.h"
+#include "fast_popen.h"
 #include "text_array.h"
 #include "hash_table.h"
 #include "stringtools.h"
@@ -30,6 +31,9 @@ See the file COPYING for details.
 #define EXAMPLE_LINE_MAX 4096
 #define MAX_FILENAME_LEN 1024
 #define DEFAULT_PORT 9068
+#define USING_INNER_FUNCTION 0
+#define USING_OUTER_FUNCTION 1
+#define NO_COMPARE_FUNCTION 2
 
 int file_line_count(const char *);
 int validate_coordinates(const char *, const char *, int *, int *, int *, int *);
@@ -377,7 +381,7 @@ int main(int argc, char** argv) { // or other primary control function.
 
 	x1 = y1 = x2 = y2 = -1;
 	
-    while((c=getopt(argc,argv,"d:vhx:y:i:j:k:l:X:Y:c:f"))!=(char)-1) {
+    while((c=getopt(argc,argv,"d:vhx:y:i:j:k:l:X:Y:c:"))!=(char)-1) {
 			switch(c) {
 				case 'd':
 					debug_flags_set(optarg);
@@ -420,9 +424,6 @@ int main(int argc, char** argv) { // or other primary control function.
         		case 'p':
             		port = atoi(optarg);
             		break;
-        		case 'f':
-            		usingInnerFunc = 1;
-            		break;
 			}
     }
 	
@@ -438,6 +439,32 @@ int main(int argc, char** argv) { // or other primary control function.
     setA = init_setarray(argv[setAindex]);
     setB = init_setarray(argv[setBindex]);
 	compare_function = argv[funcindex];
+
+
+	// Check if the compare function exists. 
+	FILE *tmpresult;
+	int function_flag;
+	char cmdrun[256];
+	sprintf(cmdrun, "allpairs_multicore -f setA.set.list setB.set.list %s", compare_function);
+	if((tmpresult = fast_popen(cmdrun)) == NULL){
+		fprintf(stderr, "allpairs_workqueue: Cannot execute allpairs_multicore. : %s\n", strerror(errno));
+		exit(1);
+	}
+	fscanf(tmpresult, "%d", &function_flag);
+	printf("Function flag: %d\n", function_flag); 
+	fast_pclose(tmpresult);
+	exit(1);
+    if(function_flag == USING_INNER_FUNCTION) {
+		usingInnerFunc = 1;
+		debug(D_DEBUG, "Using inner function.\n");
+	} else if(function_flag == USING_OUTER_FUNCTION) {
+		usingInnerFunc = 0;
+		debug(D_DEBUG, "Using outer function.\n");
+	} else {
+		// function_flag == NO_COMPARE_FUNCTION
+		fprintf(stderr, "allpairs_workqueue: no compare function is found, either internal or external.\n");
+		exit(1);
+	}
 
 	validate_coordinates(argv[setAindex], argv[setBindex], &x1, &y1, &x2, &y2);
 	debug(D_DEBUG, "validated coords: [%d, %d]\t[%d, %d]\n", x1, y1, x2, y2);
