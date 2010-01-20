@@ -291,6 +291,8 @@ void *thr_function_compare(void *arg) {
 		rowInBlock = (int)(count/numOfAvailableStableElements);
 		colInBlock = count % numOfAvailableStableElements;
 		
+		//debug(D_DEBUG, "compare stable[%d] with moving[%d]\n", colInBlock, rowInBlock);
+		//printf("compare stable[%d] with moving[%d]\n", colInBlock, rowInBlock);
 		rval = compare_two_files(stableData[colInBlock], stableSize[colInBlock], movingData[rowInBlock], movingSize[rowInBlock]);
 
 		resbuff[gnum+count] = rval;
@@ -431,6 +433,7 @@ int main(int argc, char *argv[]) {
 	  *		register_compare_function("my_function", my_function);
 	  */
 	register_compare_function("compare_bitdumb", compare_bitdumb);
+	register_compare_function("compare_bitwise", compare_bitwise);
 	
     while((c=getopt(argc,argv,"d:vhx:y:i:j:k:l:X:Y:c:rf"))!=(char)-1) {
 			switch(c) {
@@ -766,14 +769,6 @@ int main(int argc, char *argv[]) {
 				}
 			}
 			
-			
-			if(function_flag == USING_INNER_FUNCTION) {
-				for(i = 1; i < numOfAvailableStableElements; i++) {
-					if(munmap(stableData[i], stableSize[i]) == -1)
-						fprintf(stderr, "allpairs_multicore: Attempt to munmap file - %s failed. : %s\n", stableElements[i], strerror(errno));
-				}
-			}
-			
 			// Write data to the remote matrix
             debug(D_DEBUG, "Output to matrix at (%d, %d), width:%d, height:%d.\n", topLeftX+x1+x_rel, topLeftY+y1+y_rel, numOfAvailableStableElements, numOfMovingElements);
 			
@@ -788,6 +783,14 @@ int main(int argc, char *argv[]) {
 		}
         x_rel += numOfAvailableStableElements;
         y_rel = 0;		
+
+
+		if(function_flag == USING_INNER_FUNCTION) {
+			for(i = 1; i < numOfAvailableStableElements; i++) {
+				if(munmap(stableData[i], stableSize[i]) == -1)
+					fprintf(stderr, "allpairs_multicore: Attempt to munmap file - %s failed. : %s\n", stableElements[i], strerror(errno));
+			}
+		}
     }
    
     free(resbuff);
