@@ -267,8 +267,7 @@ static char * lookupenv( const char *name, void *arg )
 {
 	const char *env = getenv(name);
 	
-	if (env)
-		return strdup(env);
+	if (env) return strdup(env);
 
 	return NULL;
 }
@@ -279,7 +278,6 @@ char * dag_readline( struct dag *d, FILE *file )
 	char *rawline;
 
 	rawline = get_line(file, rawline_buffer, sizeof(rawline_buffer));
-	printf("Line %d: %s\n", d->linenum + 1, rawline); 
 
 	//if(fgets(rawline,sizeof(rawline),file)) {
 	if (rawline) {
