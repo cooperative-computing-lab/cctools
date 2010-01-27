@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "work_queue.h"
 #include "stringtools.h"
 #include "load_average.h"
+#include "get_line.h"
 
 static int dag_abort_flag = 0;
 static int dag_failed_flag = 0;
@@ -33,7 +34,7 @@ static struct batch_queue *remote_queue = 0;
 
 // A line length this long is not ideal, but it will have to do
 // until we can parse lines of arbitrary length.
-#define DAG_LINE_MAX 1048576
+#define DAG_LINE_MAX 8
 
 typedef enum {
 	DAG_NODE_STATE_WAITING=0,
@@ -264,14 +265,24 @@ void dag_log_recover( struct dag *d, const char *filename )
 
 static char * lookupenv( const char *name, void *arg )
 {
-	return strdup(getenv(name));
+	const char *env = getenv(name);
+	
+	if (env)
+		return strdup(env);
+
+	return NULL;
 }
 
 char * dag_readline( struct dag *d, FILE *file )
 {
-	char rawline[DAG_LINE_MAX];
+	char rawline_buffer[DAG_LINE_MAX];
+	char *rawline;
 
-	if(fgets(rawline,sizeof(rawline),file)) {
+	rawline = get_line(file, rawline_buffer, sizeof(rawline_buffer));
+	printf("Line %d: %s\n", d->linenum + 1, rawline); 
+
+	//if(fgets(rawline,sizeof(rawline),file)) {
+	if (rawline) {
 		d->linenum++;
 
 		string_chomp(rawline);
