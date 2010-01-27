@@ -197,6 +197,7 @@ int main( int argc, char *argv[] )
 	char **user_argv=0;
 	int user_argc;
 	char c;
+	int ch;
 	int result;
 
 	debug_config(argv[0]);
@@ -244,6 +245,11 @@ int main( int argc, char *argv[] )
 	if((argc-optind)>1) {
 		return !process_command(argc-optind-1,&argv[optind+1]);
 	}
+
+	if (!interactive_mode && (ch = getc(stdin)) == '#') /* shebang? */
+	  while ((ch = getc(stdin)) != EOF && ch != '\n') ; /* skip first line */
+    else
+      ungetc(ch, stdin); /* put it back */
 
 	while(1) {
 		if(interactive_mode) {
