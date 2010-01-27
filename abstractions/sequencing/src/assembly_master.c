@@ -60,7 +60,7 @@ static void display_progress( struct work_queue *q )
 {
         struct work_queue_stats info;
         time_t current = time(0);
-        work_queue_get_stats(queue,&info);
+        work_queue_get_stats(q,&info);
         if(current==start_time) current++;
         //double speedup = (sequential_run_time*tasks_done)/(current-start_time);
 		double speedup = (((double)tasks_runtime/1000000.0)/ (time(0)-start_time));
