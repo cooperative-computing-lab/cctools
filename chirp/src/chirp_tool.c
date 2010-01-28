@@ -188,16 +188,13 @@ static void show_help( const char *cmd )
 
 int main( int argc, char *argv[] )
 {	
-#ifdef HAS_LIBREADLINE
 	char *temp;
-#endif
 	int did_explicit_auth = 0;
 	char prompt[CHIRP_LINE_MAX];
 	char line[CHIRP_LINE_MAX];
 	char **user_argv=0;
 	int user_argc;
 	char c;
-	int ch;
 	int result;
 
 	debug_config(argv[0]);
@@ -246,11 +243,6 @@ int main( int argc, char *argv[] )
 		return !process_command(argc-optind-1,&argv[optind+1]);
 	}
 
-	if (!interactive_mode && (ch = getc(stdin)) == '#') /* shebang? */
-	  while ((ch = getc(stdin)) != EOF && ch != '\n') ; /* skip first line */
-    else
-      ungetc(ch, stdin); /* put it back */
-
 	while(1) {
 		if(interactive_mode) {
 			sprintf(prompt," chirp:%s:%s> ",current_host,current_remote_dir);
@@ -270,6 +262,13 @@ int main( int argc, char *argv[] )
 #endif
 
 		if(!line[0]) continue;
+
+        if (!interactive_mode && (temp = strchr(line, '#'))) { /* comment? */
+			for (temp--; temp > line && isspace(*temp); temp--)
+              ; /* preceding space? */
+			if (temp <= line) continue; /* else not comment */
+		}
+
 #ifdef HAS_LIBREADLINE
 		add_history(line);
 #endif
