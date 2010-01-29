@@ -19,24 +19,28 @@ margin: 20px;
 }
 </style>
 <h1>Work Queue User's Manual</h1>
-<b>Last Updated July 2009</b>
+<b>Last Updated January 2010</b>
 <p>
 Work Queue is Copyright (C) 2009 The University of Notre Dame.
-This software is distributed under a BSD-style license.
+This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 <p>
 <h2>Overview</h2>
 
-<p>Work Queue is a framework for building master/worker
-applications. The framework is comprised of an API and several
-pre-written applications, such as the worker process. Users write the
-master processes for their application using the API calls, such as in
-the suggested "recipe" shown below. In general these calls initialize
-a queue, create and fully specify tasks, submit those tasks, and then
-wait for the tasks to complete. Once complete, users run both the
-master and the worker processes; many workers may service the same
-master.</p>
-
+<p>
+Work Queue is a framework for building master/worker applications.
+In Work Queue, a Master process is a custom, application-specific program
+that uses the Work Queue API to define and submit a large number
+of small tasks.  The tasks are executed by many Worker processes,
+which can run on any available machine.  A single Master may direct
+hundreds to thousands of Workers, allowing users to easily construct
+highly scalable programs.
+<p>
+Work Queue is a stable framework that has been used to create
+highly scalable scientific applications in biometrics, bioinformatics,
+economics, and other fields.  It can also be used as an execution engine
+for the <a href=http://www.cse.nd.edu/~ccl/software/makeflow>Makeflow</a> workflow engine.
+<p>
 <p>Work Queue is part of the <a
 href=http://www.cse.nd.edu/~ccl/software>Cooperating Computing
 Tools</a>.  You can download the CCTools from <a
@@ -47,58 +51,115 @@ href=http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html>we
 or from within the CCTools you can view documentation for the full set
 features of the Work Queue API.</p>
 
-<h2>Running an Existing Master</h2>
 
-If you are given an existing master, it should be executed as specified in its own documentation. Many masters may require you to submit workers separately from running the master. If this is the case, you can run workers on your own machine, using your own cluster resources, or using Notre Dame's Condor pool. You can submit worker processes (10 in this example) to Condor like this:
+<h2>Building and Running Work Queue</h2>
+
+Let's begin by running a simple but complete example of a master and a worker.
+After trying it out, we will then show how to write a program from scratch.
+<p>
+We assume that you have already downloaded and installed the cctools in
+the directory CCTOOLS.  Next,  download <a href=work_queue_example.c>work_queue_example.c</a>
+and compile it like this:
 
 <pre>
-% condor_submit_workers barney.nd.edu 9123 10
+gcc work_queue_example.c -o work_queue_example -I${CCTOOLS}/include -L${CCTOOLS}/lib -ldttools -lm
+</pre>
+
+This example program simply compresses a bunch of files in parallel.  List the files to be
+compressed on the command line.  Each will be transmitted to a remote worker, compressed,
+and then sent back to the master.  (This isn't necessarily faster than doing it locally,
+but it is easy to run.)
+For example, to compress files <tt>a</tt>, <tt>b</tt>, and <tt>c</tt>, run this:
+<pre>
+./work_queue_example a b c
+</pre>
+You will see this right away:
+<pre>
+listening on port 9123...
+submitted task: /usr/bin/gzip < a > a.gz
+submitted task: /usr/bin/gzip < b > b.gz
+submitted task: /usr/bin/gzip < c > c.gz
+waiting for tasks to complete...
+</pre>
+
+The master is now waiting for workers to connect and begin requesting work.
+(Without any workers, it will wait forever.)  You can start one worker on the
+same machine by opening a new shell and running:
+
+<pre>
+worker MACHINENAME 9123
+</pre>
+
+(Obviously, substitute the name of your machine for MACHINENAME.)  If you have
+access to other machines, you can <tt>ssh</tt> there and run workers as well.
+In general, the more you start, the faster the work gets done.
+If a worker should fail, the work queue infrastructure will retry the work
+elsewhere, so it is safe to submit many workers to an unreliable
+system.
+<p>
+If you have access to a Condor pool, you can use this shortcut to submit
+ten workers at once via Condor:
+<pre>
+% condor_submit_workers MACHINENAME 9123 10
 Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 </pre>
 
-Or, you can start workers manually on any other machine you can log into:
+Or, if you have access to an SGE cluster, do this:
 <pre>
-% worker barney.nd.edu 9123
+% sge_submit_workers MACHINENAME 9123 10
+Your job 153083 ("worker.sh") has been submitted
+Your job 153084 ("worker.sh") has been submitted
+Your job 153085 ("worker.sh") has been submitted
+...
 </pre>
-
-Once the workers begin running, a master running on barney.nd.edu on
-port 9123 will dispatch multiple tasks to each one very quickly.  If a
-worker should fail, the work queue infrastructure will retry the work
-elsewhere, so it is safe to submit many workers to an unreliable
-system.
 <p>
 When the master completes, if the workers were not shut down in the
 master, your workers will still be available, so you can either run
 another master with the same workers, or you can remove the workers
-like this: 
-<pre> % condor_rm 298 </pre>
+with <tt>kill</tt>, <tt>condor_rm</tt>, or <tt>qdel</tt> as appropriate.
+If you forget to remove them, they will exit automatically after fifteen minutes.
+(This can be adjusted with the <tt>-t</tt> option to <tt>worker</tt>.)
 
+<h2>Writing a Master Program</h2>
 
-<h2>Using Work Queue API Functions</h2>
-A Work Queue master process creates a queue given a port and time to give up:
+To write your own program using Work Queue, begin with <a href=work_queue_example.c>work_queue_example.c</a>
+as a starting point.  Here is a basic outline for a Work Queue master:
+
 <pre>
-struct work_queue *q = work_queue_create( port , time(0)+60 ); 
+q = work_queue_create(port,time);
+
+    for(all tasks) {
+         t = work_queue_task_create(command);
+         /* add to the task description */
+         work_queue_submit(q,t);
+    }
+
+    while(!work_queue_empty(q)) {
+        t = work_queue_wait(q);
+        work_queue_task_delete(t);
+    }
+
+work_queue_delete(q);
 </pre>
 
-The master then creates tasks to submit to the queue, specifying a
-command line and the data that will be transferred. Data can be sent
-to a task, either from a file or from a local memory buffer, by
-providing the source location and a remote name. Data that shall be
-created by the task can be transferred back by giving the source on
-the worker node and the local file to which the data should be
-transferred. In this example, we specify a command that takes a
-configuration file and an input file and creates an output file. The
-application and the configuration file are specified to the task, then
-the data buffer that will be used as the input file is specified, then
-the output file that will be created is specified: 
-<pre> 
-struct work_queue_task* t = work_queue_task_create("./app.exe -p prime.txt < in.txt > out.txt"); 
-work_queue_task_specify_input_file(t,"app.exe");
-work_queue_task_specify_input_file(t,"my_standard_priming_runs.txt","prime.txt");
-work_queue_task_specify_input_buf(t,data_buffer,data_buffer_size,"in.txt");
-work_queue_task_specify_output_file(t,"out.txt","my_application-created_file.txt");
+First create a queue that is listening on a particular TCP port:
+<pre>
+q = work_queue_create( port , time(0)+60 ); 
+</pre>
+
+The master then creates tasks to submit to the queue.
+Each task consists of a command line to run and a statement of
+what data is needed, and what data will be produced by the command.
+Input data can be provided in the form of a file or a local memory buffer.
+Output data can be provided in the form of a file or the standard output of the program.
+In the example, we specify a command that takes a single input file
+and produces a single output file:
+<pre>
+t = work_queue_task_create("/usr/bin/gzip -9 < infile > outfile.gz");
+work_queue_task_specify_input_file(t,"infile","infile");
+work_queue_task_specify_output_file(t,"outfile.gz","outfile.gz");
 </pre>
 
 Once a task has been fully specified, it can be submitted to the queue:
@@ -106,41 +167,60 @@ Once a task has been fully specified, it can be submitted to the queue:
 work_queue_submit(q,t);
 </pre>
 
-Tasks will actually begin execution on workers when the user
-waits. Wait takes as an argument a timeout, so that task submission
-can be pipelined. If no tasks have completed by the timeout,
-work_queue_wait returns NULL: 
-<pre> returned_task = work_queue_wait(q,short_timeout);</pre>
+Next, wait for a task to complete, stating how long you are willing
+to wait for a result, in seconds.  (If no tasks have completed by the timeout,
+<tt>work_queue_wait</tt> will returns null.)
 
-When a task is completed, it is returned to the master and can be
-verified as correct within the master by examining return value,
-correctness of standard output (which is stored in the task
-structure), and correctness of the output files that were transferred
-back. The task structure can then be deleted. Here is an example using
-some hypothetical user-created functions within the master:
 <pre>
-returned_task = work_queue_wait(q,short_timeout); 
-if(task) { 
-    if (returned_task->return_status != correct_value) DoFailure();  
-    if (validOutput(returned_task->output) == 0) DoFailure();
-    if (validFiles(returned_task->output_files) == 0)  DoFailure();
-    storeResults(returned_task);
-    work_queue_task_delete(returned_task);
-}
+t = work_queue_wait(q,5);
 </pre>
 
-This work can be completed in a loop, throttling based on whether or
-not the queue can support more tasks' being submitted: 
+A completed task will have its output files written to disk.
+You may examine the standard output of the task in <tt>t->output</tt>
+and the exit code in <tt>t->exit_status</tt>  When you are done
+with the task, delete it:
+
 <pre>
-while(work_queue_hungry(q)) { // while the work queue can support more tasks
-...
-} 
+work_queue_task_delete(t);
 </pre>
 
-A full "recipe" of one way to design your own master (with pseudocode
-for application-dependent parts) is available <a
-href="http://www.cse.nd.edu/~ccl/software/workqueue/work_queue_master_recipe.c">here</a>. A simple example that is distributed with the CCTools to compile into a working executable is available  <a
-href="http://www.cse.nd.edu/~ccl/software/workqueue/work_queue_pow_example.c">here</a>.
+Continue submitting and waiting for tasks until all work is complete.
+You may check to make sure that the queue is empty with <tt>work_queue_empty</tt>
+When all is done, delete the queue:
+
+<pre>
+work_queue_delete(q);
+</pre>
+
+Full details of all of the Work Queue functions can be found in
+the <a href=http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html>Work Queue API</a>.
+
+<h2>Advanced Usage</h2>
+
+The technique described above is suitable for distributed programs of
+tens to hundreds of workers.  As you scale your program up to larger sizes,
+you may find the following features helpful.  All are described in the
+<a href=http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html>Work Queue API</a>.
+
+<dir>
+<li><b>Pipelined Submission.</b>  If you have a <b>very</b> large number of tasks to run,
+it may not be possible to submit all of the tasks, and then wait for all of them.  Instead,
+submit a small number of tasks, then alternate waiting and submiting to keep a constant
+number in the queue.  <tt>work_queue_hungry</tt> will tell you if more submission are warranted.
+<p>
+<li><b>Fast Abort.</b>  A large computation can often be slowed down by stragglers.  If you have
+a large number of small tasks that take a short amount of time, then Fast Abort can help.
+The Fast Abort feature keeps statistics on tasks execution times and proactively aborts tasks
+that are statistical outliers.  See <tt>work_queue_activate_fast_abort</tt>.
+<p>
+<li><b>Immediate Data.</b>  For a large number of tasks or workers, it may be impractical
+to create local input files for each one.  If the master already has the necessary input
+data in memory, it can pass the data directly to the remote task with <tt>work_queue_task_specify_input_buf</tt>.
+<p>
+<li><b>Statistics.</b>  The queue tracks a fair number of statistics that count the number
+of tasks, number of workers, number of failures, and so forth.  Obtain this data with <tt>work_queue_get_stats</tt>
+in order to make a progress bar or other user-visible information.
+</dir>
 
 <h2>For More Information</h2>
 
