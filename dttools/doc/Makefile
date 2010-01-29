@@ -11,4 +11,5 @@ install:
 	install -d ${CCTOOLS_INSTALL_DIR}/doc
 	install install.html ${CCTOOLS_INSTALL_DIR}/doc
 	install watchdog.html ${CCTOOLS_INSTALL_DIR}/doc
+	install workqueue.html ${CCTOOLS_INSTALL_DIR}/doc
 

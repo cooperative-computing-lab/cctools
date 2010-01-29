@@ -1,0 +1,153 @@
+<html>
+
+<head>
+<title>Work Queue User's Manual</title>
+</head>
+
+<body>
+
+<style type="text/css">
+pre {
+background: #ffffcc;
+font-family: monospace;
+font-size: 75%
+font-align: left;
+white-space: pre;
+border: solid 1px black;
+padding: 5px;
+margin: 20px;
+}
+</style>
+<h1>Work Queue User's Manual</h1>
+<b>Last Updated July 2009</b>
+<p>
+Work Queue is Copyright (C) 2009 The University of Notre Dame.
+This software is distributed under a BSD-style license.
+See the file COPYING for details.
+<p>
+<h2>Overview</h2>
+
+<p>Work Queue is a framework for building master/worker
+applications. The framework is comprised of an API and several
+pre-written applications, such as the worker process. Users write the
+master processes for their application using the API calls, such as in
+the suggested "recipe" shown below. In general these calls initialize
+a queue, create and fully specify tasks, submit those tasks, and then
+wait for the tasks to complete. Once complete, users run both the
+master and the worker processes; many workers may service the same
+master.</p>
+
+<p>Work Queue is part of the <a
+href=http://www.cse.nd.edu/~ccl/software>Cooperating Computing
+Tools</a>.  You can download the CCTools from <a
+href=http://www.cse.nd.edu/~ccl/software/download>this web page</a>,
+follow the <a href=install.html>installation instructions</a>, and you
+are ready to go. From the same <a
+href=http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html>website</a>,
+or from within the CCTools you can view documentation for the full set
+features of the Work Queue API.</p>
+
+<h2>Running an Existing Master</h2>
+
+If you are given an existing master, it should be executed as specified in its own documentation. Many masters may require you to submit workers separately from running the master. If this is the case, you can run workers on your own machine, using your own cluster resources, or using Notre Dame's Condor pool. You can submit worker processes (10 in this example) to Condor like this:
+
+<pre>
+% condor_submit_workers barney.nd.edu 9123 10
+Submitting job(s)..........
+Logging submit event(s)..........
+10 job(s) submitted to cluster 298.
+</pre>
+
+Or, you can start workers manually on any other machine you can log into:
+<pre>
+% worker barney.nd.edu 9123
+</pre>
+
+Once the workers begin running, a master running on barney.nd.edu on
+port 9123 will dispatch multiple tasks to each one very quickly.  If a
+worker should fail, the work queue infrastructure will retry the work
+elsewhere, so it is safe to submit many workers to an unreliable
+system.
+<p>
+When the master completes, if the workers were not shut down in the
+master, your workers will still be available, so you can either run
+another master with the same workers, or you can remove the workers
+like this: 
+<pre> % condor_rm 298 </pre>
+
+
+<h2>Using Work Queue API Functions</h2>
+A Work Queue master process creates a queue given a port and time to give up:
+<pre>
+struct work_queue *q = work_queue_create( port , time(0)+60 ); 
+</pre>
+
+The master then creates tasks to submit to the queue, specifying a
+command line and the data that will be transferred. Data can be sent
+to a task, either from a file or from a local memory buffer, by
+providing the source location and a remote name. Data that shall be
+created by the task can be transferred back by giving the source on
+the worker node and the local file to which the data should be
+transferred. In this example, we specify a command that takes a
+configuration file and an input file and creates an output file. The
+application and the configuration file are specified to the task, then
+the data buffer that will be used as the input file is specified, then
+the output file that will be created is specified: 
+<pre> 
+struct work_queue_task* t = work_queue_task_create("./app.exe -p prime.txt < in.txt > out.txt"); 
+work_queue_task_specify_input_file(t,"app.exe");
+work_queue_task_specify_input_file(t,"my_standard_priming_runs.txt","prime.txt");
+work_queue_task_specify_input_buf(t,data_buffer,data_buffer_size,"in.txt");
+work_queue_task_specify_output_file(t,"out.txt","my_application-created_file.txt");
+</pre>
+
+Once a task has been fully specified, it can be submitted to the queue:
+<pre>
+work_queue_submit(q,t);
+</pre>
+
+Tasks will actually begin execution on workers when the user
+waits. Wait takes as an argument a timeout, so that task submission
+can be pipelined. If no tasks have completed by the timeout,
+work_queue_wait returns NULL: 
+<pre> returned_task = work_queue_wait(q,short_timeout);</pre>
+
+When a task is completed, it is returned to the master and can be
+verified as correct within the master by examining return value,
+correctness of standard output (which is stored in the task
+structure), and correctness of the output files that were transferred
+back. The task structure can then be deleted. Here is an example using
+some hypothetical user-created functions within the master:
+<pre>
+returned_task = work_queue_wait(q,short_timeout); 
+if(task) { 
+    if (returned_task->return_status != correct_value) DoFailure();  
+    if (validOutput(returned_task->output) == 0) DoFailure();
+    if (validFiles(returned_task->output_files) == 0)  DoFailure();
+    storeResults(returned_task);
+    work_queue_task_delete(returned_task);
+}
+</pre>
+
+This work can be completed in a loop, throttling based on whether or
+not the queue can support more tasks' being submitted: 
+<pre>
+while(work_queue_hungry(q)) { // while the work queue can support more tasks
+...
+} 
+</pre>
+
+A full "recipe" of one way to design your own master (with pseudocode
+for application-dependent parts) is available <a
+href="http://www.cse.nd.edu/~ccl/software/workqueue/work_queue_master_recipe.c">here</a>. A simple example that is distributed with the CCTools to compile into a working executable is available  <a
+href="http://www.cse.nd.edu/~ccl/software/workqueue/work_queue_pow_example.c">here</a>.
+
+<h2>For More Information</h2>
+
+For the latest information about Work Queue, please visit our <a
+href=http://www.cse.nd.edu/~ccl/software/workqueue>web site</a> and
+subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing
+list</a>.
+
+</body>
+</html>
