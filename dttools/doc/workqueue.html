@@ -162,6 +162,17 @@ work_queue_task_specify_input_file(t,"infile","infile");
 work_queue_task_specify_output_file(t,"outfile.gz","outfile.gz");
 </pre>
 
+You can also run a program that is not necessarily installed at the
+remote location, by specifying it as an input file.  If the file
+is installed on the local machine, then specify the full local path,
+and the plain remote path.  For example:
+<pre>
+t = work_queue_task_create("./my_compress_program < infile > outfile.gz");
+work_queue_task_specify_input_file(t,"/usr/local/bin/my_compress_program","my_compress_program");
+work_queue_task_specify_input_file(t,"infile","infile");
+work_queue_task_specify_output_file(t,"outfile.gz","outfile.gz");
+</pre>
+
 Once a task has been fully specified, it can be submitted to the queue:
 <pre>
 work_queue_submit(q,t);
