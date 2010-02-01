@@ -25,7 +25,7 @@ int main( int argc, char *argv[] )
 	int port = WORK_QUEUE_DEFAULT_PORT;
 	int i;
 
-	if(argc<1) {
+	if(argc<2) {
 		printf("work_queue_example <file1> [file2] [file3] ...\n");
 		printf("Each file given on the command line will be compressed using a remote worker.\n");
 		return 0;
