@@ -29,15 +29,14 @@ See the file COPYING for details.
 #include "xmalloc.h"
 #include "macros.h"
 
+#include "allpairs_util.h"
+
 #define EXAMPLE_LINE_MAX 4096
 #define MAX_FILENAME_LEN 1024
 #define DEFAULT_PORT 9068
 #define USING_INNER_FUNCTION 0
 #define USING_OUTER_FUNCTION 1
 #define NO_COMPARE_FUNCTION 2
-
-int file_line_count(const char *);
-int validate_coordinates(const char *, const char *, int *, int *, int *, int *);
 
 int total_done = 0;
 
@@ -67,21 +66,10 @@ struct ragged_array read_in_set(const char *setdir) {
     char *tmpstr;
 	char buffer[MAX_FILENAME_LEN];
 	char filepath[MAX_FILENAME_LEN];
-	//char **set;
     int setarraysize;
 
     struct ragged_array setarray;
 
-   /**
-	setarray = (struct ragged_array *)malloc(sizeof(struct ragged_array));
-    if(setarray == NULL) {
-		fprintf(stderr,"Allocating set array failed!\n"); 
-		return NULL;
-	}
-	setarray->array = NULL;
-    setarray->size = 0;
-*/
-	
 	// get location of set.list file
     setfile = (char*) malloc((strlen(setdir)+1+strlen("set.list")+1)*sizeof(char));
     if(setfile == NULL) {
@@ -94,40 +82,15 @@ struct ragged_array read_in_set(const char *setdir) {
 	// allocate char * array to store a list file names
 	setarraysize = file_line_count(setfile);
 	if(setarraysize == -1) goto FAIL;
-
 	setarray = ragged_array_initialize(setarraysize);
 
-	/**
-    set = (char **) malloc(setarraysize * sizeof(char *));
-    if(set == NULL) {
-		fprintf(stderr,"Allocating ragged array failed!\n"); 
-		return NULL;
-	}
-*/
+	// read in each line
 	tmpstr = buffer;
     FILE *setfileID = fopen(setfile, "r");
     if(!setfileID) {
 		fprintf(stderr,"Couldn't open set %s!\n",setfile); 
 		goto FAIL;
 	}    
-	
-	/**
-    set[numset] = (char *) malloc(MAX_FILENAME_LEN * sizeof(char));
-    if(set[numset] == NULL) {
-		fprintf(stderr,"Allocating set[%i] failed!\n",numset); 
-		return NULL;
-	}
-    tmpstr = fgets(tmpstr, MAX_FILENAME_LEN, setfileID);
-    if (tmpstr != NULL) {
-		size_t last = strlen (tmpstr) - 1;
-		if (tmpstr[last] == '\n') tmpstr[last] = '\0';
-    } else {
-		fprintf(stderr, "Set file - %s is empty!\n", setfile);
-		return NULL;
-	}
-    sprintf(set[numset],"%s/%s",setdir,tmpstr);
-	numset++;
-    */
 	
     while(!feof(setfileID)) {
 		tmpstr = fgets(tmpstr, MAX_FILENAME_LEN, setfileID);
@@ -144,14 +107,6 @@ struct ragged_array read_in_set(const char *setdir) {
 			goto FAIL;
 		}
 		
-		/**
-		set[numset] = (char *) malloc(MAX_FILENAME_LEN * sizeof(char));
-		if(set[numset] == NULL) {
-			fprintf(stderr,"Allocating set[%i] failed!\n",numset); 
-			return NULL;
-		}
-		sprintf(set[numset],"%s/%s",setdir,tmpstr);
-		*/
 		numset++;
     }
     fclose(setfileID);
@@ -167,10 +122,6 @@ struct ragged_array read_in_set(const char *setdir) {
 	}
 
 	goto SUCCESS;
-/**
-    setarray->array = set; 
-    setarray->size = setarraysize;
-	*/
 
 FAIL:
 	setarray.arr = NULL;
@@ -264,17 +215,21 @@ int init_worklist(int n, int x1, int y1, int x2, int y2) {
 	return total;
 }
 
-FILE *tasklog;
+// TODO for measurement
+//FILE *tasklog;
+
 int work_accept(struct work_queue_task * task)
 {
     if (task->return_status != 0) return 0;
     fputs(task->output,stdout);
     fflush(stdout);
     total_done++;
+	
+	/**
 	// for measurement only
 	// taskid, computation time(including transfer result back), bytes_transfered, transfer_time
 	fprintf(tasklog, "%d\t%.02lfs\t%lld\t%.02lfs\t%s\n", task->taskid, (task->finish_time-task->start_time)/1000000.0, task->total_bytes_transfered, task->total_transfer_time/1000000.0, task->command_line);
-
+*/
 					
     fprintf(stderr,"Completed task with command: %s\n",task->command_line);
     fprintf(stderr,"%i tasks done so far.\n",total_done);
@@ -406,6 +361,8 @@ int main(int argc, char** argv) { // or other primary control function.
 
 	int setAindex, setBindex, funcindex;
 	
+	char *setAfile;
+	char *setBfile;
 	int x1, y1, x2, y2;
 	int numOfStableElements;
 	int numOfMovingElements;
@@ -466,7 +423,7 @@ int main(int argc, char** argv) { // or other primary control function.
     }
 	
 	// TODO measurement only
-	tasklog = fopen("task_stats.log", "w");
+	//tasklog = fopen("task_stats.log", "w");
 
     setAindex = optind;
     setBindex = optind+1;
@@ -476,12 +433,6 @@ int main(int argc, char** argv) { // or other primary control function.
     setB = read_in_set(argv[setBindex]);
 	compare_function = argv[funcindex];
 
-	printf("setA\n");
-	display_ragged_array(&setA);
-	printf("setB\n");
-	display_ragged_array(&setB);
-
-//	exit(0);
 	// Check if the compare function exists. 
 	FILE *tmpresult;
 	int function_flag;
@@ -506,21 +457,42 @@ int main(int argc, char** argv) { // or other primary control function.
 		exit(1);
 	}
 
-	validate_coordinates(argv[setAindex], argv[setBindex], &x1, &y1, &x2, &y2);
+
+	// get location of set.list file
+    setAfile = (char*) malloc((strlen(argv[setAindex])+1+strlen("set.list")+1)*sizeof(char));
+    if(setAfile == NULL) {
+		fprintf(stderr,"Allocating set name failed!\n"); 
+		return -1;
+	}
+    sprintf(setAfile,"%s/set.list",argv[setBindex]);
+
+
+	// get location of set.list file
+    setBfile = (char*) malloc((strlen(argv[setBindex])+1+strlen("set.list")+1)*sizeof(char));
+    if(setBfile == NULL) {
+		fprintf(stderr,"Allocating set name failed!\n"); 
+		return -1;
+	}
+    sprintf(setBfile,"%s/set.list",argv[setBindex]);
+
+
+	validate_coordinates(setAfile, setBfile, &x1, &y1, &x2, &y2);
 	debug(D_DEBUG, "validated coords: [%d, %d]\t[%d, %d]\n", x1, y1, x2, y2);
+
+	free(setAfile);
+	free(setBfile);
 
     ret = init_worklist(numOfWorkers, x1, y1, x2, y2);
 	debug(D_DEBUG, "Number of tasks: %d. They are:\n", ret);
-	display_work_list();
-	
-	//exit(1);
+	//display_work_list();
 	
     q = work_queue_create( 9068 , time(0)+60 ); // create a queue
     if(!q) {	// if it could not be created
 	    fprintf(stderr,"Could not create queue.\n");
 	    return 1;
     }
-//	work_queue_activate_fast_abort(q, 2);
+	
+	//work_queue_activate_fast_abort(q, 2);
     
     while(1) {
 		while(work_queue_hungry(q)) { // while the work queue can support more tasks
@@ -552,93 +524,6 @@ int main(int argc, char** argv) { // or other primary control function.
     fprintf(stderr,"%i workers shut down.\n",sum);
     work_queue_delete(q);
 
-	fclose(tasklog);
+	//fclose(tasklog);
     return 0;
-}
-
-int validate_coordinates(const char *setAdir, const char *setBdir, int *p, int *q, int *r, int *s) {
-	int x1, y1, x2, y2;
-	int lineCount1, lineCount2;
-	int coordsInvalid = 1;
-	char *setAfile;
-	char *setBfile;
-
-
-	// get location of set.list file
-    setAfile = (char*) malloc((strlen(setAdir)+1+strlen("set.list")+1)*sizeof(char));
-    if(setAfile == NULL) {
-		fprintf(stderr,"Allocating set name failed!\n"); 
-		return -1;
-	}
-    sprintf(setAfile,"%s/set.list",setAdir);
-
-
-	// get location of set.list file
-    setBfile = (char*) malloc((strlen(setBdir)+1+strlen("set.list")+1)*sizeof(char));
-    if(setBfile == NULL) {
-		fprintf(stderr,"Allocating set name failed!\n"); 
-		return -1;
-	}
-    sprintf(setBfile,"%s/set.list",setBdir);
-
-	x1 = *p;
-	y1 = *q;
-	x2 = *r;
-	y2 = *s;
-	
-    lineCount1 = file_line_count(setAfile);
-    lineCount2 = file_line_count(setBfile);
-	
-	if(x1!=-1 && x2!=-1 && y1!=-1 && y2!=-1) {
-		if(x1 >= 0 && x1 <= lineCount1 && x2 >= 0 && x2 <= lineCount1 && x2 > x1 && \
-			y1 >= 0 && y1 <= lineCount2 && y2 >= 0 && y2 <= lineCount2 && y2 > y1) {
-				lineCount1 = x2 - x1 + 1;
-				lineCount2 = y2 - y1 + 1;
-				coordsInvalid = 0;
-		} 	//else {
-				// optional coordinates error, compute the whole matrix
-			//}
-	} 	
-	//else if (x1==-1 && x2 ==-1 && y1==-1 && y2==-1) {
-		// no optional coordinates, compute the whole matrix
-	//} else {
-		// missing optional coordinates, compute the whole matrix
-	//}
-	
-	if(coordsInvalid) {
-		*p = 0;
-		*q = 0;
-		*r = lineCount1 - 1;
-		*s = lineCount2 - 1;
-	}
-    debug(D_DEBUG, "Start point:\t[%d, %d]\n", *p, *q);
-    debug(D_DEBUG, "End point:  \t[%d, %d]\n", *r, *s);
-
-	free(setAfile);
-	free(setBfile);
-
-	return 0;
-}
-
-
-int file_line_count(const char *filename){
-    FILE *fp;
-    char buffer[MAX_FILENAME_LEN]; 
-    int count = 0;
-	int i;
-
-    if((fp=fopen(filename, "r")) == NULL) return -1;
-
-    while(fgets(buffer, MAX_FILENAME_LEN, fp) != NULL) {
-       	for(i = 0; i < strlen(buffer); i++) {
-			if(isspace(buffer[i]) != 1) {
-				count++;
-				break;
-			}
-		}
-    }
-
-    fclose(fp);
-
-    return count;
 }
