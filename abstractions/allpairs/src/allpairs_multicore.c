@@ -817,8 +817,44 @@ void get_absolute_path(char *local_path, char *path) {
    }
 }
 
+// This function count "cached" memory as free memory besides the standard "free" memory
+long get_free_mem() { // kb
+    FILE *meminfo;
+    int mem_free, mem_buffer, mem_cached, tmp;
+    char buffer[128];
+    char item[20];
+    //int shiftbytes = 10;
+    if((meminfo = fopen("/proc/meminfo", "r")) == NULL) {
+        fprintf(stderr, "Cannot open /proc/meminfo!\n");
+        return -1;
+    }
+
+    mem_free = mem_buffer = mem_cached = -1;
+
+    while(fgets(buffer, 128, meminfo) != NULL) {
+        if(mem_free != -1 && mem_buffer != -1 && mem_cached != -1) break;
+        if(sscanf(buffer, "%s%d", item, &tmp) == 2) {
+            if(!strcmp(item, "MemFree:")) {
+                mem_free = tmp;
+            } else if (!strcmp(item, "Buffers:")) {
+                mem_buffer = tmp;
+            } else if (!strcmp(item, "Cached:")) {
+                mem_cached = tmp;
+            } else {
+            }
+         }
+    }
+
+    fclose(meminfo);
+    if(mem_free == -1 || mem_buffer == -1 || mem_cached == -1) 
+        return -1;
+    else 
+        return (long)((mem_free + mem_buffer + mem_cached)*1024); // >> shiftbytes;
+}
+
 int resolve_block_size(const char *file1, const char *file2, int *x, int *y, int *p, int *q, int *r, int *s) {
     UINT64_T free_mem, total_mem;
+	//long free_mem;
     int m, n;
 	int x1, y1, x2, y2;
 	int lineCount1, lineCount2;
@@ -868,8 +904,12 @@ int resolve_block_size(const char *file1, const char *file2, int *x, int *y, int
         if(*y > lineCount2) *y = lineCount2;
         return 1;
     }
+	
     memory_info_get(&free_mem, &total_mem);
     debug(D_DEBUG, "Free memory: %lld KB = %lld MB\n", free_mem>>10, free_mem>>20);
+	
+	//free_mem = get_free_mem();
+    //debug(D_DEBUG, "Free memory: %ld KB = %ld MB\n", free_mem>>10, free_mem>>20);
 
     // default block size: 10 * 10
     *x = 10;

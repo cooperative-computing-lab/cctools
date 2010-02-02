@@ -23,6 +23,7 @@ See the file COPYING for details.
 #include "work_queue.h"
 #include "fast_popen.h"
 #include "text_array.h"
+#include "ragged_array.h"
 #include "hash_table.h"
 #include "stringtools.h"
 #include "xmalloc.h"
@@ -47,11 +48,6 @@ int usingInnerFunc = 0;
 char *allpairs_multicore = "allpairs_multicore";
 char *compare_function = NULL;
 
-struct ragged_array {
-    char **array;
-    int size;
-};
-
 struct block {
 	int x1;
 	int y1;
@@ -60,55 +56,62 @@ struct block {
 	struct block *next;
 };
 
-struct ragged_array *setA = NULL;
-struct ragged_array *setB = NULL;
+struct ragged_array setA;
+struct ragged_array setB;
 
 struct block *pCurrentBlock = NULL;
 
-struct ragged_array *init_setarray(const char *setdir) {
+struct ragged_array read_in_set(const char *setdir) {
     int numset=0;
     char *setfile;
     char *tmpstr;
 	char buffer[MAX_FILENAME_LEN];
-    char **set;
+	char filepath[MAX_FILENAME_LEN];
+	//char **set;
     int setarraysize;
 
-    struct ragged_array *setarray;
+    struct ragged_array setarray;
 
-   
-	setarray= (struct ragged_array *)malloc(sizeof(struct ragged_array));
+   /**
+	setarray = (struct ragged_array *)malloc(sizeof(struct ragged_array));
     if(setarray == NULL) {
 		fprintf(stderr,"Allocating set array failed!\n"); 
 		return NULL;
 	}
 	setarray->array = NULL;
     setarray->size = 0;
-
+*/
+	
 	// get location of set.list file
     setfile = (char*) malloc((strlen(setdir)+1+strlen("set.list")+1)*sizeof(char));
     if(setfile == NULL) {
 		fprintf(stderr,"Allocating set name failed!\n"); 
-		return NULL;
+		goto FAIL;
 	}
     sprintf(setfile,"%s/set.list",setdir);
 	
 	
 	// allocate char * array to store a list file names
 	setarraysize = file_line_count(setfile);
-	if(setarraysize == -1) return NULL;
+	if(setarraysize == -1) goto FAIL;
+
+	setarray = ragged_array_initialize(setarraysize);
+
+	/**
     set = (char **) malloc(setarraysize * sizeof(char *));
     if(set == NULL) {
 		fprintf(stderr,"Allocating ragged array failed!\n"); 
 		return NULL;
 	}
-
+*/
 	tmpstr = buffer;
     FILE *setfileID = fopen(setfile, "r");
     if(!setfileID) {
 		fprintf(stderr,"Couldn't open set %s!\n",setfile); 
-		return NULL;
+		goto FAIL;
 	}    
 	
+	/**
     set[numset] = (char *) malloc(MAX_FILENAME_LEN * sizeof(char));
     if(set[numset] == NULL) {
 		fprintf(stderr,"Allocating set[%i] failed!\n",numset); 
@@ -124,7 +127,8 @@ struct ragged_array *init_setarray(const char *setdir) {
 	}
     sprintf(set[numset],"%s/%s",setdir,tmpstr);
 	numset++;
-    
+    */
+	
     while(!feof(setfileID)) {
 		tmpstr = fgets(tmpstr, MAX_FILENAME_LEN, setfileID);
 		if (tmpstr != NULL) {
@@ -133,28 +137,51 @@ struct ragged_array *init_setarray(const char *setdir) {
 		} else {
 			continue;
 		}
+
+		sprintf(filepath,"%s/%s",setdir,tmpstr);
+		if(ragged_array_add_line(&setarray, filepath) != 0) {
+			fprintf(stderr,"Allocating set[%i] failed!\n",numset); 
+			goto FAIL;
+		}
+		
+		/**
 		set[numset] = (char *) malloc(MAX_FILENAME_LEN * sizeof(char));
 		if(set[numset] == NULL) {
 			fprintf(stderr,"Allocating set[%i] failed!\n",numset); 
 			return NULL;
 		}
 		sprintf(set[numset],"%s/%s",setdir,tmpstr);
+		*/
 		numset++;
     }
-
     fclose(setfileID);
+
+	if(numset == 0) {
+		fprintf(stderr, "Error: Set file - %s is empty!\n", setfile);
+		goto FAIL;
+	}
 
 	if(numset != setarraysize) {
 		fprintf(stderr,"Error counting number of items in %s.\n", setfile); 
-		return NULL;
+		goto FAIL;
 	}
 
+	goto SUCCESS;
+/**
     setarray->array = set; 
     setarray->size = setarraysize;
+	*/
+
+FAIL:
+	setarray.arr = NULL;
+	setarray.row_count = 0;
+	setarray.array_size = 0;
+
+SUCCESS:
     return setarray;
 }
 
-int divideBlock(struct block *p) {
+int divide_block(struct block *p) {
 	struct block *q;
 	int width, height;
 	int i;
@@ -220,7 +247,7 @@ int init_worklist(int n, int x1, int y1, int x2, int y2) {
 
 	for(i = 0; i < n; i++) {
 		while(p) {
-			ret = divideBlock(p);
+			ret = divide_block(p);
 			if(ret == 1) {
 				p = (p->next)->next;
 				total++;
@@ -237,12 +264,18 @@ int init_worklist(int n, int x1, int y1, int x2, int y2) {
 	return total;
 }
 
+FILE *tasklog;
 int work_accept(struct work_queue_task * task)
 {
     if (task->return_status != 0) return 0;
     fputs(task->output,stdout);
     fflush(stdout);
     total_done++;
+	// for measurement only
+	// taskid, computation time(including transfer result back), bytes_transfered, transfer_time
+	fprintf(tasklog, "%d\t%.02lfs\t%lld\t%.02lfs\t%s\n", task->taskid, (task->finish_time-task->start_time)/1000000.0, task->total_bytes_transfered, task->total_transfer_time/1000000.0, task->command_line);
+
+					
     fprintf(stderr,"Completed task with command: %s\n",task->command_line);
     fprintf(stderr,"%i tasks done so far.\n",total_done);
     return 1;
@@ -295,14 +328,14 @@ struct work_queue_task* work_create(struct block *q, char *setAdir, char *setBdi
 	work_queue_task_specify_input_file(t, setBfile, "setB.set.list");
 
 	for(i = q->x1; i <= q->x2; i++) {
-		sprintf(input_file,"setA.%s", strrchr(setA->array[i], '/')+1);
-		debug(D_DEBUG, "specified %s as %s\n", setA->array[i], input_file);
-		work_queue_task_specify_input_file(t,setA->array[i], input_file);
+		sprintf(input_file,"setA.%s", strrchr(setA.arr[i], '/')+1);
+		debug(D_DEBUG, "specified %s as %s\n", setA.arr[i], input_file);
+		work_queue_task_specify_input_file(t,setA.arr[i], input_file);
 	}
 	for(i = q->y1; i <= q->y2; i++) {
-		sprintf(input_file,"setB.%s", strrchr(setB->array[i], '/')+1);
-		debug(D_DEBUG, "specified %s as %s\n", setB->array[i], input_file);
-		work_queue_task_specify_input_file(t,setB->array[i], input_file);
+		sprintf(input_file,"setB.%s", strrchr(setB.arr[i], '/')+1);
+		debug(D_DEBUG, "specified %s as %s\n", setB.arr[i], input_file);
+		work_queue_task_specify_input_file(t,setB.arr[i], input_file);
 	}
 	
 	free(setAfile);
@@ -345,9 +378,9 @@ void display_ragged_array(struct ragged_array *t) {
 
 	if(!t) return;
 
-	printf("Array size: %d; Elements are as follow:\n", t->size);
-	for(i = 0; i < t->size; i++) {
-		printf("\t%s\n", t->array[i]);
+	printf("Array size: %d; Elements are as follow:\n", t->array_size);
+	for(i = 0; i < t->array_size; i++) {
+		printf("\t%s\n", t->arr[i]);
 	}
 	printf("\n");
 }
@@ -376,7 +409,7 @@ int main(int argc, char** argv) { // or other primary control function.
 	int x1, y1, x2, y2;
 	int numOfStableElements;
 	int numOfMovingElements;
-	int numOfWorkers;
+	int numOfWorkers = 0;
 	int port = DEFAULT_PORT;
 
 	x1 = y1 = x2 = y2 = -1;
@@ -432,15 +465,23 @@ int main(int argc, char** argv) { // or other primary control function.
 		exit(1);
     }
 	
+	// TODO measurement only
+	tasklog = fopen("task_stats.log", "w");
+
     setAindex = optind;
     setBindex = optind+1;
     funcindex = optind+2;
 
-    setA = init_setarray(argv[setAindex]);
-    setB = init_setarray(argv[setBindex]);
+    setA = read_in_set(argv[setAindex]);
+    setB = read_in_set(argv[setBindex]);
 	compare_function = argv[funcindex];
 
+	printf("setA\n");
+	display_ragged_array(&setA);
+	printf("setB\n");
+	display_ragged_array(&setB);
 
+//	exit(0);
 	// Check if the compare function exists. 
 	FILE *tmpresult;
 	int function_flag;
@@ -451,9 +492,8 @@ int main(int argc, char** argv) { // or other primary control function.
 		exit(1);
 	}
 	fscanf(tmpresult, "%d", &function_flag);
-	printf("Function flag: %d\n", function_flag); 
 	fast_pclose(tmpresult);
-	exit(1);
+
     if(function_flag == USING_INNER_FUNCTION) {
 		usingInnerFunc = 1;
 		debug(D_DEBUG, "Using inner function.\n");
@@ -480,6 +520,7 @@ int main(int argc, char** argv) { // or other primary control function.
 	    fprintf(stderr,"Could not create queue.\n");
 	    return 1;
     }
+//	work_queue_activate_fast_abort(q, 2);
     
     while(1) {
 		while(work_queue_hungry(q)) { // while the work queue can support more tasks
@@ -511,6 +552,7 @@ int main(int argc, char** argv) { // or other primary control function.
     fprintf(stderr,"%i workers shut down.\n",sum);
     work_queue_delete(q);
 
+	fclose(tasklog);
     return 0;
 }
 
