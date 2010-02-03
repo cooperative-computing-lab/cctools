@@ -21,10 +21,10 @@ allpairs_wait: allpairs_wait.o ${CCTOOLS_HOME}/chirp/src/libchirp.a
 allpairs_cleanup: allpairs_cleanup.o ${CCTOOLS_HOME}/chirp/src/libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-allpairs_multicore: allpairs_multicore.o ${CCTOOLS_HOME}/chirp/src/libchirp.a
+allpairs_multicore: allpairs_multicore.o allpairs_util.o ${CCTOOLS_HOME}/chirp/src/libchirp.a
 	${CCTOOLS_LD} -o $@ $^ -lpthread ${LOCAL_LDFLAGS}
 
-allpairs_workqueue: allpairs_workqueue.o
+allpairs_workqueue: allpairs_workqueue.o allpairs_util.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 test:
