@@ -61,7 +61,7 @@ int main( int argc, char *argv[] )
 
 		t = work_queue_wait(q,5);
 		if(t) {
-		  printf("task complete: %s\n",t->command_line,t->return_status);
+			printf("task complete: %s (return code %d)\n",t->command_line,t->return_status);
 			work_queue_task_delete(t);
 		}
 	}
@@ -69,5 +69,7 @@ int main( int argc, char *argv[] )
 	printf("all tasks complete!\n");
 
 	work_queue_delete(q);
+
+	return 0;
 }
 
