@@ -1,11 +1,11 @@
 CCTOOLS_HOME = ../../..
-
+SAND_HOME = ../../
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
 TARGETS =  sand_align banded_alignment sw_alignment
 
-LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+LOCAL_LDFLAGS= -ldttools -lsandtools ${CCTOOLS_INTERNAL_LDFLAGS} 
 
 all: ${TARGETS}
 

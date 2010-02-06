@@ -1,11 +1,11 @@
 CCTOOLS_HOME = ../../..
-
+SAND_HOME = ../../
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
 TARGETS =  filter_master filter_mer_seq
 
-LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+LOCAL_LDFLAGS= -ldttools -lsandtools ${CCTOOLS_INTERNAL_LDFLAGS}
 
 all: ${TARGETS}
 
