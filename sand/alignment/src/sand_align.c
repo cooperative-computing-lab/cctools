@@ -58,24 +58,24 @@ static void show_help(const char *cmd)
 
 static void display_progress( struct work_queue *q )
 {
-        struct work_queue_stats info;
-        time_t current = time(0);
-        work_queue_get_stats(q,&info);
-        if(current==start_time) current++;
-        //double speedup = (sequential_run_time*tasks_done)/(current-start_time);
-		double speedup = (((double)tasks_runtime/1000000.0)/ (time(0)-start_time));
-        printf("%6ds | %4d %4d %4d | %6d %4d %4d %4d | %6d %6.02lf %6.02lf %8.02lf | %.02lf\n",
-		(int)(time(0)-start_time),
-		info.workers_init,info.workers_ready,info.workers_busy,
-		global_count,info.tasks_waiting,info.tasks_running,info.tasks_complete,
-		tasks_done,(tasks_runtime/1000000.0)/tasks_done,(tasks_filetime/1000000.0)/tasks_done,(tasks_runtime/1000000.0)/(tasks_filetime/1000000.0),
-		speedup);
-        last_display_time = current;
-		if (current - last_flush_time >= 5)
-		{
-			fflush(stdout);
-			last_flush_time = current;
-		}
+	struct work_queue_stats info;
+	time_t current = time(0);
+	work_queue_get_stats(q,&info);
+	if(current==start_time) current++;
+	//double speedup = (sequential_run_time*tasks_done)/(current-start_time);
+	double speedup = (((double)tasks_runtime/1000000.0)/ (time(0)-start_time));
+	printf("%6ds | %4d %4d %4d | %6d %4d %4d %4d | %6d %6.02lf %6.02lf %8.02lf | %.02lf\n",
+	   (int)(time(0)-start_time),
+	   info.workers_init,info.workers_ready,info.workers_busy,
+	   global_count,info.tasks_waiting,info.tasks_running,info.tasks_complete,
+	   tasks_done,(tasks_runtime/1000000.0)/tasks_done,(tasks_filetime/1000000.0)/tasks_done,(tasks_runtime/1000000.0)/(tasks_filetime/1000000.0),
+	   speedup);
+	last_display_time = current;
+	if (current - last_flush_time >= 5)
+	{
+		fflush(stdout);
+		last_flush_time = current;
+	}
 }
 
 struct sequence* seqdup(struct sequence* s) {
@@ -316,7 +316,7 @@ static int task_consider( void* taskfiledata, int size )
 	
 
 	while(!work_queue_hungry(queue)) {
-		if (last_display_time != time(0)) display_progress(queue);
+		if (last_display_time < time(0)) display_progress(queue);
 	    handle_done_task(work_queue_wait(queue, 5));
 	}
 
@@ -396,7 +396,7 @@ static void wait_for_cands(struct work_queue * queue, int wait_time)
 	time_t give_up_time = time(0)+wait_time;
 	while (time(0) <= give_up_time)
 	{
-		if (time(0) != last_display_time) display_progress(queue);
+		if (last_display_time < time(0) ) display_progress(queue);
 		t = work_queue_wait(queue, give_up_time - time(0));
 		if (t)
 			handle_done_task(t);
@@ -438,7 +438,7 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 	    if(!buf)
 	    {
 		fprintf(stderr,"Out of memory for buf! Waiting for a bit.\n");
-		if (last_display_time != time(0)) display_progress(queue);
+		if (last_display_time < time(0)) display_progress(queue);
 		handle_done_task(work_queue_wait(queue,WORK_QUEUE_WAITFORTASK));
 	    }
     }
@@ -519,7 +519,7 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 	//while ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, &start_pos_1, &start_pos_2)) != GET_CAND_LINE_RESULT_EOF)
 	while ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, extra_data)) != GET_CAND_LINE_RESULT_EOF)
     {
-	if(time(0)!=last_display_time) display_progress(queue);
+	if(last_display_time < time(0)) display_progress(queue);
 	if (get_line_result == GET_CAND_LINE_RESULT_SUCCESS)
 	{
 	sprintf(tmp,"%s-%s",sequence_name1,sequence_name2);
@@ -729,7 +729,7 @@ int main( int argc, char *argv[] )
 
 
 	while(1) {
-		if(time(0)!=last_display_time) display_progress(queue);
+		if(last_display_time < time(0)) display_progress(queue);
 		t = work_queue_wait(queue,WORK_QUEUE_WAITFORTASK);
 		if((!handle_done_task(t)) && (work_queue_empty(queue))) {
 		    break;		
