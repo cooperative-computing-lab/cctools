@@ -3,9 +3,10 @@
 #include "sequence_compression.h"
 #include "sand_align_macros.h"
 
+#define MAX_ID SEQUENCE_ID_MAX
+#define MAX_METADATA SEQUENCE_METADATA_MAX 
 
-#define MAX_ID 100
-#define MAX_METADATA 100
+
 
 static short mer_add_base(short mer, char base);
 static short translate_8mer(const char * str, int start);

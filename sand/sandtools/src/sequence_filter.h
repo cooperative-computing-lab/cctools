@@ -9,7 +9,7 @@
 #include "memory_info.h"
 
 #define TIME time(0) - start_time
-#define NUM_SEQUENCES 1801182
+//#define NUM_SEQUENCES 1801182
 #define KB_PER_SEQUENCE 9  // Defined by running some tests, not very exact.
 
 #define CANDIDATE_FORMAT_OVL 1

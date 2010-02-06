@@ -12,7 +12,7 @@ CYGWINLIB = cygwin1.dll
 
 all: ${LIBRARIES}
 
-libsandtools.a: ${OBJECTS} 
+libsandtools.a: ${OBJECTS}
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
 

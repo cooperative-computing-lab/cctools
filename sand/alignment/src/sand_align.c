@@ -230,7 +230,7 @@ static struct hash_table* build_sequence_library(const char* filename)
     }
     //while(fscanf(infile," >%s %i %i%*1[ ]%*1[\n]",s.sequence_name,&s.num_bases,&s.num_bytes) == 3) {
     //while((num_items = fscanf(infile,">%s %i %i%[^\n]%*1[\n]",s.sequence_name,&s.num_bases,&s.num_bytes, tmp)) == 4) {
-	while (fgets(line, 2048, infile))
+	while (fgets(line, SEQUENCE_FILE_LINE_MAX, infile))
 	{
 	if ((num_items = sscanf(line,">%s %i %i%[^\n]%*1[\n]",s.sequence_name,&s.num_bases,&s.num_bytes, tmp)) != 4)
 	{
@@ -443,7 +443,7 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 	    }
     }
     ins = buf;
-	char extra_data[128] = "";
+	char extra_data[ALIGNMENT_METADATA_MAX] = "";
     while(pair_count == 0) {
 	//if(fscanf(fp,"%s %s %i",sequence_name1,sequence_name2, &alignment_flag ) == 3) {
 	//if ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, &start_pos_1, &start_pos_2)) == GET_CAND_LINE_RESULT_SUCCESS)

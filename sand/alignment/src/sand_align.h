@@ -19,6 +19,8 @@ See the file COPYING for details.
 
 #include <sys/stat.h>
 
+#include "../../sandtools/src/sand_align_macros.h"
+
 #include "debug.h"
 #include "work_queue.h"
 #include "text_array.h"
@@ -29,11 +31,7 @@ See the file COPYING for details.
 
 #include <sys/resource.h>
 
-#define ASSEMBLY_LINE_MAX 4096
-#define SEQUENCE_ID_MAX 255
-#define SEQUENCE_METADATA_MAX 255
-#define CAND_FILE_LINE_MAX 512
-#define MAX_FILENAME 255
+
 
 struct sequence {
     char sequence_name[SEQUENCE_ID_MAX];
