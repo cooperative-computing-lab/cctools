@@ -483,7 +483,6 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 
 void dag_node_submit( struct dag *d, struct dag_node *n )
 {
-	//FIXME: Need to make sure dag_node_submit works with arbitrary string lengths
 	char *input_files = NULL;
 	char *output_files = NULL;
 	struct dag_file *f;
