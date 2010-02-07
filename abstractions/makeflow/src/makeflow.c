@@ -76,13 +76,17 @@ struct dag_node {
 	const char *command;
 	struct dag_file *source_files;
 	struct dag_file *target_files;
+	int source_file_names_size;
+	int target_file_names_size;
 	batch_job_id_t jobid;
 	struct dag_node *next;
 };
 
 void dag_print( struct dag *d )
 {
-	char name[DAG_LINE_MAX];
+	char *name;
+	int nameSize = DAG_LINE_MAX;
+	name = malloc(DAG_LINE_MAX * sizeof(char));
 
 	struct dag_node *n;
 	struct dag_file *f;
@@ -92,7 +96,20 @@ void dag_print( struct dag *d )
 	printf("node [shape=ellipse];\n");
 
 	for(n=d->nodes;n;n=n->next) {
-		strcpy(name,n->command);
+		int s = strlen(n->command);
+		if (s > nameSize) {
+			nameSize = s;
+			char *tmp = realloc(name, nameSize * sizeof(char));
+			if (!tmp)
+			{
+				free(name);
+				fprintf(stderr, "Out of memory\n");
+				exit(1);
+			}
+			name = tmp;
+		}
+		
+		strncpy(name, n->command, s);
 		char * label = strtok(name," \t\n");
 		printf("N%d [label=\"%s\"];\n",n->nodeid,label);
 	}
@@ -109,6 +126,8 @@ void dag_print( struct dag *d )
 	}
 
 	printf("}\n");
+
+	free(name);
 }
 
 
@@ -221,13 +240,14 @@ void dag_clean( struct dag *d )
 void dag_log_recover( struct dag *d, const char *filename )
 {
 	int linenum = 0;
-	char line[DAG_LINE_MAX];
+	char rawline[DAG_LINE_MAX];
+	char *line;
 	int nodeid, state, jobid;
 	struct dag_node *n;
 
 	d->logfile = fopen(filename,"r");
 	if(d->logfile) {
-		while(fgets(line,sizeof(line),d->logfile)) {
+		while ((line = get_line(d->logfile, rawline, sizeof(rawline)))) {
 			linenum++;
 			if(sscanf(line,"%*u %d %d %d",&nodeid,&state,&jobid)==3) {
 				n = itable_lookup(d->node_table,nodeid);
@@ -384,6 +404,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 	while(filename) {
 		if(strchr(filename,'/')) filename_error(d,filename);
 		dag_node_add_target_file(n,filename);
+		n->target_file_names_size += strlen(filename)+1;
 		filename = strtok(0," \t\n");
 	}
 
@@ -391,6 +412,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 	while(filename) {
 		if(strchr(filename,'/')) filename_error(d,filename);
 		dag_node_add_source_file(n,filename);
+		n->source_file_names_size += strlen(filename)+1;
 		filename = strtok(0," \t\n");
 	}
 
@@ -461,8 +483,9 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 
 void dag_node_submit( struct dag *d, struct dag_node *n )
 {
-	char input_files[DAG_LINE_MAX];
-	char output_files[DAG_LINE_MAX];
+	//FIXME: Need to make sure dag_node_submit works with arbitrary string lengths
+	char *input_files = NULL;
+	char *output_files = NULL;
 	struct dag_file *f;
 
 	struct batch_queue *thequeue;
@@ -475,14 +498,13 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 
 	printf("makeflow: %s\n",n->command);
 
-	input_files[0] = 0;
-	output_files[0] = 0;
-
+	input_files = malloc((n->source_file_names_size + 1) * sizeof(char));
 	for(f=n->source_files;f;f=f->next) {
 		strcat(input_files,f->filename);
 		strcat(input_files,",");
 	}
 
+	output_files = malloc((n->target_file_names_size + 1) * sizeof(char));
 	for(f=n->target_files;f;f=f->next) {
 		strcat(output_files,f->filename);
 		strcat(output_files,",");
@@ -725,17 +747,14 @@ int main( int argc, char *argv[] )
 {
 	int port = 0;
 	char c;
-	char logfilename[DAG_LINE_MAX];
-	char batchlogfilename[DAG_LINE_MAX];
+	char *logfilename = NULL;
+	char *batchlogfilename = NULL;
 	int clean_mode = 0;
 	int display_mode = 0;
 	int explicit_remote_jobs_max = 0;
 	int explicit_local_jobs_max = 0;
 	int skip_afs_check = 0;
 	const char *batch_submit_options = 0;
-
-	logfilename[0] = 0;
-	batchlogfilename[0] = 0;
 
 	debug_config(argv[0]);
 
@@ -751,9 +770,11 @@ int main( int argc, char *argv[] )
 			clean_mode = 1;
 			break;
 		case 'l':
+			logfilename = malloc((strlen(optarg)+1) * sizeof(char));
 			strcpy(logfilename,optarg);
 			break;
 		case 'L':
+			batchlogfilename = malloc((strlen(optarg)+1) * sizeof(char));
 			strcpy(batchlogfilename,optarg);
 			break;
 		case 'D':
@@ -819,13 +840,24 @@ int main( int argc, char *argv[] )
 	}
 
 	const char *dagfile = argv[optind];
+	int dagfile_namesize = strlen(dagfile);
 
-	if(!logfilename[0]) sprintf(logfilename,"%s.makeflowlog",dagfile);
-	if(!batchlogfilename[0]) sprintf(batchlogfilename,"%s.condorlog",dagfile);
+	if(!logfilename)
+	{
+		logfilename = malloc((dagfile_namesize+13)*sizeof(char));
+		sprintf(logfilename,"%s.makeflowlog",dagfile);
+	}
+	if(!batchlogfilename)
+	{
+		batchlogfilename = malloc((dagfile_namesize+11)*sizeof(char));
+		sprintf(batchlogfilename,"%s.condorlog",dagfile);
+	}
 
 	struct dag *d = dag_create(dagfile);
 	if(!d) {
 		fprintf(stderr,"makeflow: couldn't load %s: %s\n",dagfile,strerror(errno));
+		free(logfilename);
+		free(batchlogfilename);
 		return 1;
 	}
 
@@ -846,6 +878,8 @@ int main( int argc, char *argv[] )
 	}
 
 	if(display_mode) {
+		free(logfilename);
+		free(batchlogfilename);
 		dag_print(d);
 		return 0;
 	}
@@ -854,10 +888,17 @@ int main( int argc, char *argv[] )
 		dag_clean(d);
 		file_clean(logfilename);
 		file_clean(batchlogfilename);
+		free(logfilename);
+		free(batchlogfilename);
 		return 0;
 	}
 
-	if(!dag_check(d)) return 1;
+	if(!dag_check(d))
+	{
+		free(logfilename);
+		free(batchlogfilename);
+		return 1;
+	}
 
 	if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
 		char cwd[DAG_LINE_MAX];
@@ -866,6 +907,10 @@ int main( int argc, char *argv[] )
 				fprintf(stderr,"makeflow: This won't work because Condor is not able to write to files in AFS.\n");
 				fprintf(stderr,"makeflow: Instead, run makeflow from a local disk like /tmp.\n");
 				fprintf(stderr,"makeflow: Or, use the work queue with -T wq and condor_submit_workers.\n");
+				
+				free(logfilename);
+				free(batchlogfilename);
+
 				exit(1);
 			}
 		}
@@ -895,6 +940,9 @@ int main( int argc, char *argv[] )
 
 	batch_queue_delete(local_queue);
 	batch_queue_delete(remote_queue);
+
+	if (logfilename) free(logfilename);
+	if (batchlogfilename) free(batchlogfilename);
 
 	if(dag_abort_flag) {
 		fprintf(stderr,"makeflow: workflow was aborted.\n");
