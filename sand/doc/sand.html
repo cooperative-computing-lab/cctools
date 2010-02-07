@@ -1,0 +1,186 @@
+<html>
+
+<head>
+<title>SAND User's Manual</title>
+</head>
+
+<body>
+
+<style type="text/css">
+pre {
+background: #ffffcc;
+font-family: monospace;
+font-size: 75%
+font-align: left;
+white-space: pre;
+border: solid 1px black;
+padding: 5px;
+margin: 20px;
+}
+</style>
+<h1>SAND User's Manual</h1>
+<b>Last Updated February 2010</b>
+<p>
+SAND is Copyright (C) 2009 The University of Notre Dame.
+This software is distributed under a BSD-style license.
+See the file COPYING for details.
+<p>
+<h2>Overview</h2>
+
+<p>SAND is a set of modules for genome assembly that are built atop
+the <a href="http://www.cse.nd.edu/~ccl/software/workqueue/">Work
+Queue</a> platform for large-scale distributed computation on
+clusters, clouds, grids, or assorted collections of machines. SAND was
+designed as a modular replacement for the conventional overlapper in
+the Celera assembler, separated into two distinct steps: candidate
+selection and alignment. Given a set of sequences, the modules can
+produce a set of candidate pairs of sequences and compute the
+alignments on those pairs, storing the alignment results in OVL format
+for use farther down the Celera pipeline.</p>
+
+<p>SAND is part of the <a
+href=http://www.cse.nd.edu/~ccl/software>Cooperating Computing
+Tools</a>.  You can download the CCTools from <a
+href=http://www.cse.nd.edu/~ccl/software/download>this web page</a>,
+follow the <a href=install.html>installation instructions</a>, and you
+are ready to go.</p>
+
+<h2>The SAND modules</h2>
+
+<p>The two SAND modules are very similar to the combined Overlapper
+module in Celera, except that they facilitate easy and flexible
+parallelization on distributed resources.</p>
+
+<p>SAND requires data in formats that differ slightly from other
+bioinformatics applications. Included in the SAND package is a set of
+tools that allow users to convert data into the formats required by
+SAND. The primary difference is that sequences data is used in a compressed fasta-like format, which by convention we call .cfa. The details of this format are discussed in the next paragraph, and conversion to this format is dicussed in the <b>Example Execution</b> section.
+</p>
+
+
+<p>The candidate selection module produces a set of promising pairs of
+sequences to align.  By default, the module uses <em>k</em>-mer
+filtering, which selects a pair of sequences for alignment if it has a
+perfect match on a short alignment. The filtering is done by a serial
+program that is included with the SAND candidate selection module, but
+alternate candidate selection routines can be specified in its
+place. The candidate selection module requires a list of sequences in
+compressed fasta-like format, which encodes the actual sequence data {A,C,T,G} into a 2-bit format, but retains human-readable metadata:
+<pre>
+>sequence_1_name number_of_bases number_of_bytes\n
+Sequence encoded into 2-bit Format, with a trailing newline\n
+>sequence_2_name number_of_bases number_of_bytes\n
+Sequence encoded into 2-bit Format, with a trailing newline\n
+>sequence_3_name number_of_bases number_of_bytes\n
+...
+</pre>
+</p>
+
+<p>The alignment module computes sequence alignments using a
+user-supplied alignment algorithm. It requires a list of sequences in
+the same compressed fasta-like format as the candidate selection
+module, a list of candidate pairs, and an alignment executable. The
+list of candidate pairs, which may be either pre-chosen or selected
+concurrently in a production pipeline as candidates are selected, is a
+file in the format:
+<pre>
+sequence_1_name sequence_2_name alignment_flag extra_data
+sequence_1_name sequence_3_name alignment_flag extra_data
+sequence_2_name sequence_3_name alignment_flag extra_data
+sequence_3_name sequence_4_name alignment_flag extra_data
+...
+</pre>
+The alignment flag is the direction of alignment, signified by either
+"1" (forward, left to right) or "-1" (backward, right to left). The
+extra data is a free-form field of up to 128 ASCII characters that may
+be used as additional information to the alignment algorithm.  In the
+case of the algorithms bundled with the SAND modules, it is used only
+for metadata about the candidate. The algorithms bundled with the SAND
+alignment module are simple implementations of a Smith-Waterman
+alignment, and a basic banded alignment heuristic. The modules use the
+same OVL record format as used by the Celera assembler.</p>
+
+<h2>Example execution</h2>
+
+<p>Given a a set of sequences in fasta format <em>my_sequences.fa</em>
+and alignment executable <em>align.exe</em> that implements an
+arbitrary alignment algorithm based on the data formats described
+above, this section will walk through the process of creating the
+compressed fasta-like format, completing the candidate selection, and
+computing the alignments. This walk-through is nearly identical to the
+example provided within the SAND distribution, which includes 20
+sequences (in actuality, 10 duplicated to ensure that there are viable
+candidates), and a correct final set of alignment records to compare
+against.</p>
+
+<h4>Data Conversion</h4> 
+<p>The primary data conversion tool is <tt>compress_reads</tt>, which
+converts fasta files into the compressed fasta-like format used with
+our modules.  
+<pre> % compress_reads < my_sequences.fa > my_sequences.cfa </pre> 
+The compressed file <em>my_sequences.cfa</em> is then used to filter
+out a list of candidates. This is the first step in the pipeline that
+uses the Work Queue, so let us discuss that here.</p>
+
+<h4>Procuring Resources</h4>
+<p>To begin, let's assume that you are logged into a machine named
+<tt>barney.nd.edu</tt>. In order to procure workers, you can use your
+batch system (such as those running running <a
+href=http://www.sun.com/software/sge>SGE</a>, or <a
+href=http://www.cs.wisc.edu/condor>Condor</a>), or you can execute the
+workers yourself. In order to make this a little easier, we have
+written some tools, provided in the CCTools, that submit workers to
+each of these two common batch systems.<br/>
+
+This is an example of submitting 10 worker processes to Condor:
+<pre>
+% condor_submit_workers barney.nd.edu 9123 10
+Submitting job(s)..........
+Logging submit event(s)..........
+10 job(s) submitted to cluster 298.
+</pre>
+
+Or, submitting 10 worker processes to SGE:
+<pre>
+% sge_submit_workers barney.nd.edu 9123 10
+</pre>
+
+Or, you can start workers manually on any other machine you can log into, using the worker executable built in the CCTools:
+<pre>
+% worker barney.nd.edu 9123
+</pre>
+
+Once the workers begin running, the SAND modules can dispatch tasks to
+each one very quickly.  If a worker should fail, Work Queue will retry
+the work elsewhere, so it is safe to submit many workers to an
+unreliable system.</p>
+<p>When the SAND module's master process completes, your workers will
+still be available, so you can either run another master with the
+same workers, remove them from the batch system, or wait for them to
+expire.  If you do nothing for 15 minutes, they will automatically
+exit.</p>
+<p>Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>
+are simple shells scripts, so you can edit them directly if you would
+like to change batch options or other details.</p>
+
+<h4>Candidate Selection</h4>
+
+<p>The candidate selection master takes the newly-created <em>my_sequences.cfa</em> as its only input requirement. Its only output requirement is the candidate list to be created, which this document will refer to as <em>my_candidates.cand</em>. A custom filtering executable is optional (without it, the standard one provided with the module, <tt>filter_mer_seq</tt>, will be used). The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), the number of subsets to split the workload into, and the -b option because we are using the binary cfa format.
+<pre>
+% filter_master -p 9123 -s 10000 -b my_sequences.cfa my_candidates.cand
+</pre>
+Note that a progress table will be printed to standard out, while more detailed performance information is printed to standard error. We strongly suggest redirecting at least standard error, if not both, to a file while executing.</p>
+
+<h4>Alignment</h4>
+
+<p>The alignment master takes the sequence file <em>my_sequences.cfa</em> and the newly created <em>my_candidates.cand</em> as its input data requirements. It also requires a serial alignment executable, which we proposed above as <em>align.exe</em>.  The only output argument is the set of alignment computations, <em>my_results.ovl</em>. The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), and the number of individual alignments per Work Queue task.
+<pre>
+% sand_aligner  -p 9090 -n 1000 align.exe my_candidates.cand my_sequences.cfa  my_results.ovl
+</pre>
+Again, a progress table will be printed to standard out, while more detailed performance information is printed to standard error. We strongly suggest redirecting at least standard error, if not both, to a file while executing.</p>
+
+<h2>For More Information</h2>
+
+For the latest information about SAND, please visit our <a href=http://www.cse.nd.edu/~ccl/software/sand>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
+</body>
+</html>
