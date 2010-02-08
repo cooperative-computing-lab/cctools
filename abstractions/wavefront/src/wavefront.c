@@ -377,7 +377,7 @@ static void show_help(const char *cmd)
 	printf(" -A             Automatically choose between multicore and batch mode.\n");
 	printf(" -M             Run the whole problem locally in multicore mode. (default)\n");
 	printf(" -D             Run the whole problem in distributed mode.\n");
-	printf(" -T <type>      Specify the type of the batch system: condor or sge\n");
+	printf(" -T <type>      Type of batch system: %s\n",batch_queue_type_string());
 	printf(" -V             Verify mode: check the configuration and then exit.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");

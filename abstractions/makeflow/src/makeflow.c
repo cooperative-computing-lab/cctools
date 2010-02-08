@@ -722,7 +722,7 @@ static void show_help(const char *cmd)
 	printf("Use: %s [options] <dagfile>\n", cmd);
 	printf("where options are:\n");
 	printf(" -c             Clean up: remove logfile and all targets.\n");
-	printf(" -T <type>      Batch system type: condor, sge, unix, wq.   (default is unix)\n");
+	printf(" -T <type>      Batch system type: %s. (default is unix)\n",batch_queue_type_string());
 	printf(" -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	printf(" -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
 	printf(" -p <port>      Port number to use with work queue.         (default is %d)\n",WORK_QUEUE_DEFAULT_PORT);
