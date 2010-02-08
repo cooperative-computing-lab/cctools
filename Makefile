@@ -5,7 +5,7 @@ all test clean: Makefile.config
 	for p in ${CCTOOLS_PACKAGES} ; do cd $$p && ${MAKE} $@ && cd .. ; done
 
 docs:
-	${CCTOOLS_DOXYGEN} doxygen.config
+	${CCTOOLS_DOXYGEN} cctools.doxygen.config
 
 install: all docs Makefile.config
 	for p in ${CCTOOLS_PACKAGES} ; do cd $$p && ${MAKE} $@ && cd .. ; done
