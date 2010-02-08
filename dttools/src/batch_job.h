@@ -157,4 +157,12 @@ call @ref batch_job_remove on all runnings jobs.
 */
 void batch_queue_delete( struct batch_queue *q );
 
+/** Return
+Returns the list of queue types supported by this module.
+Useful for including in help-option outputs.
+@return A static string listing the types of queues supported.
+*/
+
+const char * batch_queue_type_string();
+
 #endif

@@ -617,12 +617,18 @@ int batch_job_remove_unix( struct batch_queue *q, batch_job_id_t jobid )
 
 /***************************************************************************************/
 
+const char * batch_queue_type_string()
+{
+	return "unix, condor, sge, workqueue";
+}
+
 batch_queue_type_t batch_queue_type_from_string( const char *str )
 {
 	if(!strcmp(str,"condor")) return BATCH_QUEUE_TYPE_CONDOR;
 	if(!strcmp(str,"sge"))    return BATCH_QUEUE_TYPE_SGE;
 	if(!strcmp(str,"unix"))   return BATCH_QUEUE_TYPE_UNIX;
 	if(!strcmp(str,"wq"))     return BATCH_QUEUE_TYPE_WORK_QUEUE;
+	if(!strcmp(str,"workqueue")) return BATCH_QUEUE_TYPE_WORK_QUEUE;
 	return BATCH_QUEUE_TYPE_UNKNOWN;
 }
 
