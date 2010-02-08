@@ -79,7 +79,6 @@ install: all
 	install chirp_fuse ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_audit_cluster ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_distribute ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_migrate ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_md5sum ${CCTOOLS_INSTALL_DIR}/bin
 	install libchirp.a ${CCTOOLS_INSTALL_DIR}/lib
 	install chirp_global.h ${CCTOOLS_INSTALL_DIR}/include
