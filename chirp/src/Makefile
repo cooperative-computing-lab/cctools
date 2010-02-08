@@ -1,7 +1,7 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-TARGETS = chirp_server chirp_get chirp_put libchirp.a chirp chirp_benchmark chirp_status chirp_fuse chirp_distribute chirp_migrate chirp_matrix_benchmark chirp_md5sum chirp_partition_stream chirp_matrix_roc chirp_matrix_verify
+TARGETS = chirp_server chirp_get chirp_put libchirp.a chirp chirp_benchmark chirp_status chirp_fuse chirp_distribute chirp_matrix_benchmark chirp_md5sum chirp_partition_stream chirp_matrix_roc chirp_matrix_verify
 LOCAL_LDFLAGS = -ldttools -lchirp ${CCTOOLS_INTERNAL_LDFLAGS}
 
 LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_types.c chirp_acl.c chirp_local.c chirp_group.c
@@ -39,9 +39,6 @@ chirp_multi: chirp_multi_tool.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 chirp_distribute: chirp_distribute.o libchirp.a
-	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-
-chirp_migrate: chirp_migrate.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 chirp_matrix_benchmark: chirp_matrix_benchmark.o libchirp.a
