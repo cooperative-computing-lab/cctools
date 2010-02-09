@@ -1,7 +1,7 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-TARGETS = chirp_server chirp_get chirp_put libchirp.a chirp chirp_benchmark chirp_status chirp_fuse chirp_distribute chirp_md5sum chirp_partition_stream
+TARGETS = chirp_server chirp_get chirp_put libchirp.a chirp chirp_benchmark chirp_status chirp_fuse chirp_distribute chirp_md5sum chirp_stream_files
 LOCAL_LDFLAGS = -ldttools -lchirp ${CCTOOLS_INTERNAL_LDFLAGS}
 
 LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_types.c chirp_acl.c chirp_local.c chirp_group.c
@@ -50,7 +50,7 @@ chirp_matrix_verify: chirp_matrix_verify.o libchirp.a
 chirp_md5sum: chirp_md5sum.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-chirp_partition_stream: chirp_partition_stream.o libchirp.a
+chirp_stream_files: chirp_stream_files.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 test:
@@ -71,7 +71,7 @@ install: all
 	install chirp_server ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_status ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_benchmark ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_partition_stream ${CCTOOLS_INSTALL_DIR}/bin
+	install chirp_stream_files ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_fuse ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_audit_cluster ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_distribute ${CCTOOLS_INSTALL_DIR}/bin
