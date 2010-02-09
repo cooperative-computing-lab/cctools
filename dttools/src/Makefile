@@ -9,12 +9,13 @@ EXTRA_HEADERS = int_sizes.h macros.h
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
 LIBRARIES = libdttools.a
-PROGRAMS = catalog_server watchdog microbench multirun tar_stream worker worker_condor_submit work_queue_example
-PROGRAM_SOURCES = ${PROGRAMS:%=%.c}
+PROGRAMS = catalog_server watchdog multirun worker worker_condor_submit
+TEST_PROGRAMS = work_queue_example microbench
+PROGRAM_SOURCES = ${PROGRAMS:%=%.c} ${TEST_PROGRAMS:%=%.c}
 SCRIPTS = condor_submit_workers sge_submit_workers
 CYGWINLIB = cygwin1.dll
 
-all: ${LIBRARIES} $(PROGRAMS)
+all: ${LIBRARIES} $(PROGRAMS) $(TEST_PROGRAMS)
 
 auth_test: auth_test.o libdttools.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
@@ -29,9 +30,6 @@ microbench: microbench.o libdttools.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 multirun: multirun.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-tar_stream: tar_stream.o libdttools.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 worker: worker.o libdttools.a
