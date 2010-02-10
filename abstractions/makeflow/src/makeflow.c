@@ -84,9 +84,15 @@ struct dag_node {
 
 void dag_print( struct dag *d )
 {
+	/* The commented-out code below is code introduced by Kevin Partington
+	   to allow for dynamic allocation for command names. It has since been
+	   reverted (commented out) for KISS reasons. -KP, 10 February 2010 */
+	/*
 	char *name;
 	int nameSize = DAG_LINE_MAX;
 	name = malloc(DAG_LINE_MAX * sizeof(char));
+	*/
+	char name[DAG_LINE_MAX];
 
 	struct dag_node *n;
 	struct dag_file *f;
@@ -96,6 +102,7 @@ void dag_print( struct dag *d )
 	printf("node [shape=ellipse];\n");
 
 	for(n=d->nodes;n;n=n->next) {
+		/*
 		int s = strlen(n->command);
 		if (s > nameSize) {
 			nameSize = s;
@@ -110,6 +117,8 @@ void dag_print( struct dag *d )
 		}
 		
 		strncpy(name, n->command, s);
+		*/
+		strncpy(name, n->command, DAG_LINE_MAX);
 		char * label = strtok(name," \t\n");
 		printf("N%d [label=\"%s\"];\n",n->nodeid,label);
 	}
@@ -127,7 +136,9 @@ void dag_print( struct dag *d )
 
 	printf("}\n");
 
+	/*
 	free(name);
+	*/
 }
 
 
@@ -240,14 +251,13 @@ void dag_clean( struct dag *d )
 void dag_log_recover( struct dag *d, const char *filename )
 {
 	int linenum = 0;
-	char rawline[DAG_LINE_MAX];
 	char *line;
 	int nodeid, state, jobid;
 	struct dag_node *n;
 
 	d->logfile = fopen(filename,"r");
 	if(d->logfile) {
-		while ((line = get_line(d->logfile, rawline, sizeof(rawline)))) {
+		while ((line = get_line(d->logfile))) {
 			linenum++;
 			if(sscanf(line,"%*u %d %d %d",&nodeid,&state,&jobid)==3) {
 				n = itable_lookup(d->node_table,nodeid);
@@ -294,10 +304,8 @@ static char * lookupenv( const char *name, void *arg )
 
 char * dag_readline( struct dag *d, FILE *file )
 {
-	char rawline_buffer[DAG_LINE_MAX];
 	char *rawline;
-
-	rawline = get_line(file, rawline_buffer, sizeof(rawline_buffer));
+	rawline = get_line(file);
 
 	//if(fgets(rawline,sizeof(rawline),file)) {
 	if (rawline) {
@@ -498,12 +506,14 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 	printf("makeflow: %s\n",n->command);
 
 	input_files = malloc((n->source_file_names_size + 1) * sizeof(char));
+	input_files[0] = '\0';
 	for(f=n->source_files;f;f=f->next) {
 		strcat(input_files,f->filename);
 		strcat(input_files,",");
 	}
 
 	output_files = malloc((n->target_file_names_size + 1) * sizeof(char));
+	output_files[0] = '\0';
 	for(f=n->target_files;f;f=f->next) {
 		strcat(output_files,f->filename);
 		strcat(output_files,",");
@@ -828,6 +838,7 @@ int main( int argc, char *argv[] )
 	}
 
 	if((argc-optind)!=1) {
+		//TODO: Consider allowing for "./Makeflow" as default filename?
 		show_help(argv[0]);
 		return 1;
 	}
