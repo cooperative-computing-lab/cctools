@@ -8,15 +8,12 @@ See the file COPYING for details.
 #ifndef __LINEREADER_H__
 #define __LINEREADER_H__
 
+#define LINE_MAX 1048576
+
 /** Read a line of any length from a file.
-The function is invoked with a stack buffer ("buffer") of a set size.
-It will try to populate the stack buffer as much as it can, and if a newline
-is not found in the string (possibly meaning a line is too long), then a heap
-buffer ("other") allocated to the appropriate size will be used instead. The
-user does not know which buffer is returned (either the stack buffer or the
-heap buffer), nor does the user need to care. Even at EOF, the function must be
-called again, so the heap buffer will be freed.
+@param fp A file pointer, pointing to the beginning of the next line to be read.
+@return A pointer to the line read. This should be used instead of the original buffer pointer once the function returns.
  **/
-char * get_line( FILE *fp, char *buffer, int size );
+char * get_line( FILE *fp );
 
 #endif

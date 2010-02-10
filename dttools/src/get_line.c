@@ -11,9 +11,10 @@ See the file COPYING for details.
 
 #include "get_line.h"
 
-char * get_line( FILE *fp, char *buffer, int size )
+char * get_line( FILE *fp )
 {
 	static char *other = NULL;
+	static char buffer[LINE_MAX];
 
 	/* Free the other buffer, if we have used it. */
 	if (other)
@@ -22,7 +23,7 @@ char * get_line( FILE *fp, char *buffer, int size )
 		other = NULL;
 	}
 
-	if (!fgets(buffer, size, fp))
+	if (!fgets(buffer, LINE_MAX, fp))
 	{
 		return NULL;
 	}
@@ -30,9 +31,9 @@ char * get_line( FILE *fp, char *buffer, int size )
 	/* If the main buffer is completely filled and there is more
 	   to read... (second condition is for slackers who don't put newlines
 	   at the end of their text files) */
-	if (!strrchr(buffer, '\n') && strlen(buffer) == size - 1)
+	if (!strrchr(buffer, '\n') && strlen(buffer) == LINE_MAX - 1)
 	{
-		int s = size;
+		int s = LINE_MAX;
 
 		/* ...use the heap buffer ("other"), doubling its size
 		   repeatedly until it is filled. */
