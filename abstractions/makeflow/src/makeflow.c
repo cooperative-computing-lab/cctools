@@ -779,12 +779,11 @@ int main( int argc, char *argv[] )
 			clean_mode = 1;
 			break;
 		case 'l':
-			logfilename = malloc((strlen(optarg)+1) * sizeof(char));
-			strcpy(logfilename,optarg);
+			logfilename = strdup(optarg);
 			break;
 		case 'L':
 			batchlogfilename = malloc((strlen(optarg)+1) * sizeof(char));
-			strcpy(batchlogfilename,optarg);
+			batchlogfilename = strdup(optarg);
 			break;
 		case 'D':
 			display_mode = 1;
