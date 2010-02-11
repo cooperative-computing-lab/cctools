@@ -32,8 +32,9 @@ static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
-// A line length this long is not ideal, but it will have to do
-// until we can parse lines of arbitrary length.
+/* A line length this long is not ideal, but it will have to do until we
+   can parse lines of arbitrary length.
+   UPDATE (10 Februrary 2010): Finally we can! -KP */
 #define DAG_LINE_MAX 1048576
 
 typedef enum {
@@ -53,6 +54,8 @@ struct dag {
 	struct itable     *remote_job_table;
 	struct hash_table *file_table;
 	struct hash_table *completed_files;
+	struct hash_table *filename_translation_rev;
+	struct hash_table *filename_translation_fwd;
 	FILE * logfile;
 	int linenum;
 	int local_jobs_running;
@@ -220,15 +223,15 @@ void dag_abort_all( struct dag *d )
 	}
 }
 
-void file_clean( const char *filename )
+void file_clean( const char *filename, int silent )
 {
 	if(unlink(filename)==0) {
-		printf("makeflow: deleted %s\n",filename);
+		if (!silent) printf("makeflow: deleted %s\n",filename);
 	} else {
 		if(errno==ENOENT) {
 			// nothing
 		} else {
-			printf("makeflow: couldn't delete %s: %s\n",filename,strerror(errno));
+			if (!silent) printf("makeflow: couldn't delete %s: %s\n",filename,strerror(errno));
 		}
 	}
 }
@@ -237,8 +240,22 @@ void dag_node_clean( struct dag *d, struct dag_node *n )
 {
 	struct dag_file *f;
 	for(f=n->target_files;f;f=f->next) {
-		file_clean(f->filename);
+		file_clean(f->filename, 0);
 		hash_table_remove(d->completed_files,f->filename);
+	}
+}
+
+void clean_symlinks( struct dag *d, int silent )
+{
+	/* Clean up all symlinks created by makeflow. */
+
+	hash_table_firstkey(d->filename_translation_rev);
+
+	char *key;
+	void *value;
+	while (hash_table_nextkey(d->filename_translation_rev, &key, &value))
+	{
+		file_clean(key, silent);
 	}
 }
 
@@ -246,6 +263,9 @@ void dag_clean( struct dag *d )
 {
 	struct dag_node *n;
 	for(n=d->nodes;n;n=n->next) dag_node_clean(d,n);
+
+	/* Since we are in clean mode, remove symlinks verbosely */
+	clean_symlinks(d, 0);
 }
 
 void dag_log_recover( struct dag *d, const char *filename )
@@ -337,6 +357,131 @@ static void filename_error( struct dag *d, const char *filename )
 	exit(1);
 }
 
+static char *translate_filename( struct dag *d, const char *filename )
+{
+	/* Translate an absolute path filename into a unique slash-less name
+	   to allow for the sending of any file */
+	
+	if (!d->filename_translation_rev)
+	{
+		d->filename_translation_rev = hash_table_create(0, NULL);
+		if (!d->filename_translation_rev)
+		{
+			fprintf(stderr, "makeflow: Filename translation hash creation failed. Out of memory\n");
+			exit(1);
+		}
+	}
+
+	if (!d->filename_translation_fwd)
+	{
+		d->filename_translation_fwd = hash_table_create(0, NULL);
+		if (!d->filename_translation_fwd)
+		{
+			fprintf(stderr, "makeflow: Filename translation hash creation failed. Out of memory\n");
+			exit(1);
+		}
+	}
+
+	char *newname = strdup(filename);
+	char *c;
+
+	for (c = newname; *c; ++c)
+	{
+		if (*c == '/') *c = '_';
+	}
+
+	while (!hash_table_insert(d->filename_translation_rev, newname, filename))
+	{
+		char *val = (char *)hash_table_lookup(
+			d->filename_translation_rev,
+			newname);
+
+		if (!strcmp(val, filename)) return newname;
+		
+		/* It's not 100% collision-proof, technically, but the odds of
+		   an unresolvable collision are unbelievably slim. */
+		c = strchr(newname, '_');
+		if (c)
+		{
+			*c = '~';
+		}
+		else
+		{
+			c = strchr(newname, '~');
+			if (c)
+			{
+				*c = '-';
+			}
+			else
+			{
+				return NULL;
+			}
+		}
+	}
+
+	hash_table_insert(d->filename_translation_fwd, filename, strdup(newname));
+
+	return newname;
+}
+
+static char *translate_command( struct dag *d, char *old_command )
+{
+	char *new_command = malloc(strlen(old_command) * sizeof(char));
+	new_command[0] = '\0';
+
+	char *token = strtok(old_command, " \t\n");
+	int first = 1;
+	char prefix;
+
+	while (token)
+	{
+		/* Remove (and store) the shell metacharacter prefix, if
+		   there is one. */
+		switch (token[0])
+		{
+			case '<':
+			case '>':
+				prefix = token[0];
+				++token;
+				break;
+			default:
+				prefix = '\0';
+		}
+		
+		char *val = (char *)hash_table_lookup(
+			d->filename_translation_fwd,
+			token);
+		int len;
+
+		if (!first)
+		{
+			strncat(new_command, " ", 1);
+		}
+
+		/* Append the shell metacharacter prefix, if there is one. */
+		if (prefix)
+		{
+			strncat(new_command, &prefix, 1);
+		}
+
+		if (val)
+		{
+			len = strlen(val);
+			strncat(new_command, val, len);
+		}
+		else
+		{
+			len = strlen(token);
+			strncat(new_command, token, len);
+		}
+
+		first = 0;
+		token = strtok(NULL, " \t\n");
+	}
+
+	return new_command;
+}
+
 void dag_parse_assignment( struct dag *d, char *line )
 {
 	char *name = line;
@@ -360,7 +505,7 @@ void dag_parse_assignment( struct dag *d, char *line )
 	setenv(name,value,1);
 }
 
-struct dag_node * dag_node_parse( struct dag *d, FILE *file )
+struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 {
 	char *line;
 	char *eq;
@@ -409,17 +554,52 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 	sourcefiles = colon+1;
 
 	filename = strtok(targetfiles," \t\n");
+	int rv;
 	while(filename) {
-		if(strchr(filename,'/')) filename_error(d,filename);
-		dag_node_add_target_file(n,filename);
+		if(strchr(filename,'/'))
+		{
+			char *newname = translate_filename(d, filename);
+			if (!clean_mode)
+			{
+				rv = symlink(filename, newname);
+				if (rv < 0 && errno != EEXIST)
+				{
+					fprintf(stderr, "makeflow: could not create symbolic link (%s)\n", strerror(errno));
+					exit(1);
+				}
+			}
+			dag_node_add_target_file(n, newname);
+			free(newname);
+		}
+		else
+		{
+			dag_node_add_target_file(n,filename);
+		}
 		n->target_file_names_size += strlen(filename)+1;
 		filename = strtok(0," \t\n");
 	}
 
 	filename = strtok(sourcefiles," \t\n");
 	while(filename) {
-		if(strchr(filename,'/')) filename_error(d,filename);
-		dag_node_add_source_file(n,filename);
+		if(strchr(filename,'/'))
+		{
+			char *newname = translate_filename(d, filename);
+			if (!clean_mode)
+			{
+				rv = symlink(filename, newname);
+				if (rv < 0 && errno != EEXIST)
+				{
+					fprintf(stderr, "makeflow: could not create symbolic link (%s)\n", strerror(errno));
+					exit(1);
+				}
+				dag_node_add_source_file(n, newname);
+				free(newname);
+			}
+		}
+		else
+		{
+			dag_node_add_source_file(n,filename);
+		}
 		n->source_file_names_size += strlen(filename)+1;
 		filename = strtok(0," \t\n");
 	}
@@ -437,13 +617,16 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file )
 	if(!strncmp(c,"LOCAL ",6)) {
 		n->local_job = 1;
 		c+=6;
-	}		
-	n->command = strdup(c);
+	}
+
+	n->command = translate_command(d, c);
+
+	/*printf("Command: %s\n", n->command);*/
 	free(line);
 	return n;
 }
 
-struct dag * dag_create( const char *filename )
+struct dag * dag_create( const char *filename, int clean_mode )
 {
 	FILE *file = fopen(filename,"r");
 	if(!file) return 0;
@@ -466,7 +649,7 @@ struct dag * dag_create( const char *filename )
 	struct dag_node *n,*m;
 	struct dag_file *f;
 
-	while((n=dag_node_parse(d,file))) {
+	while((n=dag_node_parse(d,file,clean_mode))) {
 		n->next = d->nodes;
 		d->nodes = n;
 		itable_insert(d->node_table,n->nodeid,n);
@@ -491,6 +674,7 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 
 void dag_node_submit( struct dag *d, struct dag_node *n )
 {
+	//TODO: Figure out whether translated or original names need to be used
 	char *input_files = NULL;
 	char *output_files = NULL;
 	struct dag_file *f;
@@ -523,6 +707,9 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 
 	time_t stoptime = time(0) + dag_submit_timeout;
 	int waittime = 1;
+
+	//TODO: Figure out if translation hashtable needs to be sent on
+	// batch_job_submit_simple function call
 
 	while(1) {
 		n->jobid = batch_job_submit_simple(thequeue,n->command,input_files,output_files);
@@ -862,7 +1049,7 @@ int main( int argc, char *argv[] )
 		sprintf(batchlogfilename,"%s.condorlog",dagfile);
 	}
 
-	struct dag *d = dag_create(dagfile);
+	struct dag *d = dag_create(dagfile, clean_mode);
 	if(!d) {
 		fprintf(stderr,"makeflow: couldn't load %s: %s\n",dagfile,strerror(errno));
 		free(logfilename);
@@ -895,8 +1082,8 @@ int main( int argc, char *argv[] )
 
 	if(clean_mode) {
 		dag_clean(d);
-		file_clean(logfilename);
-		file_clean(batchlogfilename);
+		file_clean(logfilename, 0);
+		file_clean(batchlogfilename, 0);
 		free(logfilename);
 		free(batchlogfilename);
 		return 0;
@@ -949,6 +1136,8 @@ int main( int argc, char *argv[] )
 
 	batch_queue_delete(local_queue);
 	batch_queue_delete(remote_queue);
+
+	clean_symlinks(d, 1);	/* Silently remove symlinks */
 
 	if (logfilename) free(logfilename);
 	if (batchlogfilename) free(batchlogfilename);
