@@ -371,7 +371,7 @@ int main(int argc, char** argv) { // or other primary control function.
 
 	x1 = y1 = x2 = y2 = -1;
 	
-    while((c=getopt(argc,argv,"d:vhx:y:i:j:k:l:X:Y:c:"))!=(char)-1) {
+    while((c=getopt(argc,argv,"d:vhx:p:y:i:j:k:l:X:Y:c:"))!=(char)-1) {
 			switch(c) {
 				case 'd':
 					debug_flags_set(optarg);
@@ -486,7 +486,7 @@ int main(int argc, char** argv) { // or other primary control function.
 	debug(D_DEBUG, "Number of tasks: %d. They are:\n", ret);
 	//display_work_list();
 	
-    q = work_queue_create( 9068 , time(0)+60 ); // create a queue
+    q = work_queue_create( port, time(0)+60 ); // create a queue
     if(!q) {	// if it could not be created
 	    fprintf(stderr,"Could not create queue.\n");
 	    return 1;

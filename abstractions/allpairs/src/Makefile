@@ -41,3 +41,4 @@ install: all
 	install allpairs_cleanup ${CCTOOLS_INSTALL_DIR}/bin	
 	install allpairs_wrapper.sh ${CCTOOLS_INSTALL_DIR}/bin
 	install allpairs_multicore ${CCTOOLS_INSTALL_DIR}/bin
+	install allpairs_workqueue ${CCTOOLS_INSTALL_DIR}/bin
