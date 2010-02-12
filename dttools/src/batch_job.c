@@ -482,6 +482,20 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 		info->exit_code = t->return_status;
 		info->exit_signal = 0;
 
+		/*
+		If the standard ouput of the job is not empty,
+		then print it, because this is analogous to a Unix
+		job, and would otherwise be lost.  Important for
+		capturing errors from the program.
+		*/
+
+		if(t->output[0]) {
+			if(t->output[1] || t->output[0]!='\n') {
+				string_chomp(t->output);
+				printf("%s\n",t->output);
+			}
+		}
+
 		char *outfile = itable_remove(q->output_table,t->taskid);
 		if(outfile) {
 			FILE *file = fopen(outfile,"w");
