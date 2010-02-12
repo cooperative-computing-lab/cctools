@@ -2229,6 +2229,23 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			}
 			break;
 
+		case SYSCALL64_parrot_timeout:
+			if(entering) {
+				char buffer[1024];
+				if (args[0]) {
+					tracer_copy_in_string(p->tracer,buffer,(void*)args[0],sizeof(buffer));
+					p->syscall_result = pfs_timeout(buffer);
+				} else {
+					p->syscall_result = pfs_timeout(NULL);
+				}
+
+				if(p->syscall_result<0) {
+					p->syscall_result = -errno;
+				}
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
 		case SYSCALL64_parrot_copyfile:
 			if(entering) {
 				char source[PFS_PATH_MAX];

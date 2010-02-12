@@ -16,6 +16,7 @@ extern "C" {
 #include "debug.h"
 #include "full_io.h"
 #include "file_cache.h"
+#include "stringtools.h"
 }
 
 #include <errno.h>
@@ -570,6 +571,18 @@ int pfs_shutdown( int fd, int how )
 	BEGIN
 	debug(D_LIBCALL,"shutdown %d %d",fd,how);
 	result = ::shutdown(pfs_current->table->get_real_fd(fd),how);
+	END
+}
+
+extern int pfs_master_timeout;
+int pfs_timeout( const char *str )
+{
+	BEGIN
+	debug(D_LIBCALL, "timeout %s", str);
+	if(str) pfs_master_timeout = string_time_parse(str);
+	else if(isatty(0)) pfs_master_timeout = 300;
+	else pfs_master_timeout = 3600;
+	result = pfs_master_timeout;
 	END
 }
 

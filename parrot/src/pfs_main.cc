@@ -242,7 +242,6 @@ static void show_use( const char *cmd )
 	if(pfs_service_lookup("lfc"))		printf(" lfc");
 	if(pfs_service_lookup("irods"))		printf(" irods");
 	if(pfs_service_lookup("hdfs"))		printf(" hdfs");
-	if(pfs_service_lookup("samba"))		printf(" samba");
 	if(pfs_service_lookup("bxgrid"))	printf(" bxgrid");
 	printf("\n");
 	exit(1);

@@ -2415,10 +2415,27 @@ void decode_syscall( struct pfs_process *p, int entering )
 				}
 
 				p->syscall_result = pfs_locate(path,buffer,sizeof(buffer));
-				
+
 				if(p->syscall_result>=0) {
 					tracer_copy_out(p->tracer,buffer,POINTER(args[1]),p->syscall_result);
 				} else {
+					p->syscall_result = -errno;
+				}
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_parrot_timeout:
+			if(entering) {
+				char buffer[1024];
+				if (args[0]) {
+					tracer_copy_in_string(p->tracer,buffer,POINTER(args[0]),sizeof(buffer));
+					p->syscall_result = pfs_timeout(buffer);
+				} else {
+					p->syscall_result = pfs_timeout(NULL);
+				}
+
+				if(p->syscall_result<0) {
 					p->syscall_result = -errno;
 				}
 				divert_to_dummy(p,p->syscall_result);

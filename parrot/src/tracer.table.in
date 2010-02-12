@@ -406,3 +406,4 @@ parrot_whoami	404
 parrot_copyfile 405
 parrot_md5      406
 parrot_locate   407
+parrot_timeout  408

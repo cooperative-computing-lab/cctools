@@ -1,7 +1,7 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-TARGETS = parrot libparrot.a libparrot_client.a parrot_helper.so parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp
+TARGETS = parrot libparrot.a libparrot_client.a parrot_helper.so parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp parrot_timeout
 
 LOCAL_LDFLAGS=-lchirp -ldttools -lftp_lite -ldl ${CCTOOLS_INTERNAL_LDFLAGS}
 
@@ -29,6 +29,9 @@ parrot_whoami: parrot_whoami.o parrot_client.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 parrot_locate: parrot_locate.o parrot_client.o
+	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
+
+parrot_timeout: parrot_timeout.o parrot_client.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 parrot_md5: parrot_md5.o parrot_client.o
@@ -82,5 +85,6 @@ install: all parrot_client.h
 	install parrot_md5 ${CCTOOLS_INSTALL_DIR}/bin
 	install parrot_cp ${CCTOOLS_INSTALL_DIR}/bin
 	install parrot_locate ${CCTOOLS_INSTALL_DIR}/bin
+	install parrot_timeout ${CCTOOLS_INSTALL_DIR}/bin
 	chmod 755 parrot_hdfs
 	install parrot_hdfs ${CCTOOLS_INSTALL_DIR}/bin

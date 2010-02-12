@@ -83,3 +83,12 @@ int parrot_lsalloc( const char *path, char *alloc_path, INT64_T *total, INT64_T 
 #endif
 }
 
+int parrot_timeout( const char *time )
+{
+#ifdef CCTOOLS_CPU_I386
+	return syscall(SYSCALL32_parrot_timeout,time);
+#else
+	return syscall(SYSCALL64_parrot_timeout,time);
+#endif
+}
+
