@@ -361,26 +361,6 @@ static char *translate_filename( struct dag *d, const char *filename )
 {
 	/* Translate an absolute path filename into a unique slash-less name
 	   to allow for the sending of any file */
-	
-	if (!d->filename_translation_rev)
-	{
-		d->filename_translation_rev = hash_table_create(0, NULL);
-		if (!d->filename_translation_rev)
-		{
-			fprintf(stderr, "makeflow: Filename translation hash creation failed. Out of memory\n");
-			exit(1);
-		}
-	}
-
-	if (!d->filename_translation_fwd)
-	{
-		d->filename_translation_fwd = hash_table_create(0, NULL);
-		if (!d->filename_translation_fwd)
-		{
-			fprintf(stderr, "makeflow: Filename translation hash creation failed. Out of memory\n");
-			exit(1);
-		}
-	}
 
 	char *newname = strdup(filename);
 	char *c;
@@ -632,6 +612,7 @@ struct dag * dag_create( const char *filename, int clean_mode )
 	if(!file) return 0;
 
 	struct dag *d = malloc(sizeof(*d));
+	memset(d,0,sizeof(*d));
 	d->nodes = 0;
 	d->linenum = 0;
 	d->filename = strdup(filename);
@@ -645,6 +626,8 @@ struct dag * dag_create( const char *filename, int clean_mode )
 	d->remote_jobs_running = 0;
 	d->remote_jobs_max = 100;
 	d->nodeid_counter = 0;
+	d->filename_translation_rev = hash_table_create(0,0);
+	d->filename_translation_fwd = hash_table_create(0,0);
 
 	struct dag_node *n,*m;
 	struct dag_file *f;
