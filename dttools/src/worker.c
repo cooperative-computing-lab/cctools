@@ -170,9 +170,10 @@ int main( int argc, char *argv[] )
 		if(link_readline(master,line,sizeof(line),time(0)+active_timeout)) {
 			debug(D_DEBUG,"%s",line);
 			if(sscanf(line,"work %d",&length)) {
-				buffer = malloc(length+1);
+				buffer = malloc(length+10);
 				link_read(master,buffer,length,time(0)+active_timeout);
 				buffer[length] = 0;
+				strcat(buffer," 2>&1");
 				debug(D_DEBUG,"%s",buffer);
 				stream = popen(buffer,"r");
 				free(buffer);
