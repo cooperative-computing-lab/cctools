@@ -143,6 +143,7 @@ int list_push_priority( struct list *l, void *item, int priority )
 	for(n=l->head;n;n=n->next) {
 		if(n->priority<priority) {
 			node = new_node(item,n->prev,n);
+			l->size++;
 			node->priority = priority;
 			return 1;
 		}
