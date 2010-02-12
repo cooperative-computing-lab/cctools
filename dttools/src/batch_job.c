@@ -273,7 +273,7 @@ batch_job_id_t batch_job_submit_simple_sge( struct batch_queue *q, const char *c
 	}
 
 	if(fgets(line,sizeof(line),file)) {
-		if(sscanf(line,"your job %d",&jobid)==1) {
+		if(sscanf(line,"Your job %d",&jobid)==1) {
 			debug(D_DEBUG,"job %d submitted",jobid);
 			pclose(file);
 			info = malloc(sizeof(*info));
