@@ -23,7 +23,7 @@ int main( int argc, char *argv[] )
 		buf = argv[1];
 	}
 
-	if(argc>2 || buf && buf[0]=='-') {
+	if(argc>2 || (buf && buf[0]=='-')) {
 		printf("use: parrot_timeout [time]\n");
 		return 0;
 	}
