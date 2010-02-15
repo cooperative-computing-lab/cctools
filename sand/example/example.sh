@@ -14,13 +14,13 @@ echo "Getting serial filter program"
 ln -s ${SAND_HOME}/filtering/src/filter_mer_seq ./filter_mer_seq || { echo "Please build sand first."; exit 1 ; }
 
 echo "Getting filter master"
-ln -s ${SAND_HOME}/filtering/src/filter_master ./filter_master || { echo "Please build sand first."; exit 1 ; }
+ln -s ${SAND_HOME}/filtering/src/sand_filter_master ./sand_filter_master || { echo "Please build sand first."; exit 1 ; }
 
 echo "Getting serial alignment program"
 ln -s ${SAND_HOME}/alignment/src/sw_alignment ./sw_alignment || { echo "Please build sand first."; exit 1 ; }
 
 echo "Getting alignment master"
-ln -s ${SAND_HOME}/alignment/src/sand_align ./sand_align || { echo "Please build sand first."; exit 1 ; }
+ln -s ${SAND_HOME}/alignment/src/sand_align_master ./sand_align_master || { echo "Please build sand first."; exit 1 ; }
 
 # compress reads
 echo "Compressing reads"
@@ -33,7 +33,7 @@ wpid=$!
 echo "Worker is process $wpid"
 
 echo "Starting filter master"
-./filter_master -s 10 -p 9090 -b test_20.cfa test_20.cand || { echo "Error in filtering."; kill -9 $wpid; exit 1 ; }
+./sand_filter_master -s 10 -p 9090 -b test_20.cfa test_20.cand || { echo "Error in filtering."; kill -9 $wpid; exit 1 ; }
 
 echo "Waiting for worker to exit"
 wait $wpid
@@ -45,7 +45,7 @@ wpid=$!
 echo "Worker is process $wpid"
 
 echo "Starting assembly_master"
-./sand_align -n 1 -p 9090 sw_alignment test_20.cand test_20.cfa test_20.ovl || { echo "Error in alignment."; kill -9 $wpid; exit 1 ; }
+./sand_align_master -n 1 -p 9090 sw_alignment test_20.cand test_20.cfa test_20.ovl || { echo "Error in alignment."; kill -9 $wpid; exit 1 ; }
 echo "Checking results"
 diff --brief test_20.ovl test_20.right && echo "Files test_20.ovl and test_20.right are the same";
 echo "Waiting for worker to exit"

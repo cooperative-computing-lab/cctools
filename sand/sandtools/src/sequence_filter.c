@@ -81,7 +81,7 @@ int CAND_TABLE_BUCKETS= 5000011; //20000003;
 //mer_hash_element * mer_table[MER_TABLE_BUCKETS];
 cand_list_element ** candidates;
 mer_hash_element ** mer_table;
-int_hash * repeat_mer_table = 0;
+struct itable * repeat_mer_table = 0;
 int rectangle_size = 1000;
 int num_seqs = 0;
 
@@ -250,7 +250,7 @@ int init_repeat_mer_table(FILE * repeats, unsigned long buckets, int max_mer_rep
 	char str[1024];
 	int *count = malloc(sizeof(int));;
 	mer_t mer, rev;
-	repeat_mer_table = int_hash_create(bucket_pow, 0);
+	repeat_mer_table = itable_create(bucket_pow);
 	if (k_mask == 0) set_k_mask();
 
 	while (fscanf(repeats, ">%d %s\n", count, str) == 2)
@@ -260,14 +260,14 @@ int init_repeat_mer_table(FILE * repeats, unsigned long buckets, int max_mer_rep
 			mer = make_mer(str);
 			rev = rev_comp_mer(mer);
 			if (MER_VALUE(mer) < MER_VALUE(rev))
-				int_hash_insert(repeat_mer_table, mer, count);
+				itable_insert(repeat_mer_table, mer, count);
 			else
-				int_hash_insert(repeat_mer_table, rev, count);
+				itable_insert(repeat_mer_table, rev, count);
 		}
 		count = malloc(sizeof(int));
 	}
 
-	return int_hash_size(repeat_mer_table);
+	return itable_size(repeat_mer_table);
 }
 
 mer_t make_mer(const char * str)
@@ -1071,7 +1071,7 @@ void add_sequence_to_mer(mer_t mer, int seq_num, char dir, short loc)
 	//else { mer_key = rev; dir = -1; }
 
 	//printf("add_sequence_to_mer %u (%d): ", mer, (int) dir); print_16mer(mer);
-	if (repeat_mer_table && int_hash_lookup(repeat_mer_table, mer))
+	if (repeat_mer_table && itable_lookup(repeat_mer_table, mer))
 	{
 		//fprintf(stderr, "Filtering out mer %010lx due to high count.\n");
 		return;

@@ -71,7 +71,7 @@ struct task_id
 	int x;
 	int y;
 };
-static int_hash * task_id_map = 0;
+static struct itable * task_id_map = 0;
 
 static struct work_queue * q = 0;
 
@@ -632,7 +632,7 @@ int main(int argc, char ** argv)
 	load_sequences(sequence_filename);
 	//load_rectangles(sequence_filename);
 	load_rectangles_to_files();
-	task_id_map = int_hash_create(12, 0);
+	task_id_map = itable_create(12);
 
 	// Load checkpointing info
 	init_checkpoint();

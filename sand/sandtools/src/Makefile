@@ -2,7 +2,7 @@ CCTOOLS_HOME = ../../..
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
-SOURCES =  int_hash.c sequence_alignment.c sequence_compression.c sequence_filter.c ${CCTOOLS_HOME}/dttools/src/memory_info.c
+SOURCES =  int_hash.c sequence_alignment.c sequence_compression.c sequence_filter.c ${CCTOOLS_HOME}/dttools/src/memory_info.c ${CCTOOLS_HOME}/dttools/src/itable.c
 
 EXTRA_HEADERS = sand_align_macros.h 
 OBJECTS = ${SOURCES:%.c=%.o}

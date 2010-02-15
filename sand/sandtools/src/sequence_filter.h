@@ -5,7 +5,8 @@
 #include "sequence_compression.h"
 #include "sand_align_macros.h"
 
-#include "int_hash.h"
+//#include "int_hash.h"
+#include "itable.h"
 #include "memory_info.h"
 
 #define TIME time(0) - start_time
