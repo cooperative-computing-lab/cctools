@@ -18,7 +18,6 @@
 #include "macros.h"
 #include "sequence_compression.h"
 #include "sequence_filter.h"
-#include "int_hash.h"
 
 #include <sys/resource.h>
 
