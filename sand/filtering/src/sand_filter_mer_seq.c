@@ -39,8 +39,7 @@ static char * output_filename = 0;
 
 static void show_version(const char *cmd)
 {
-	//printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-	printf("%s version 0.1\n", cmd);
+	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
 }
 
 static void show_help(const char *cmd)
@@ -143,7 +142,7 @@ int main(int argc, char ** argv)
 
 	int start_x, end_x, start_y, end_y;
 
-	get_options(argc, argv, "filter_mer_seq");
+	get_options(argc, argv, "sand_filter_mer_seq");
 
 	start_time = TIME;
 	unsigned long start_mem, cand_mem, table_mem;
@@ -170,8 +169,6 @@ int main(int argc, char ** argv)
 	else
 		output = stdout;
 
-	//fprintf(stderr, "Testing error messages\n");
-	
 
 	// Data is in the form:
 	// >id metadata

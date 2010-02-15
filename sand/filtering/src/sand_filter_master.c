@@ -49,7 +49,6 @@ static int convert_cand_binary_to_ascii(FILE * outfile, const char * fname);
 
 // GLOBALS
 static int port = 9090;
-static int FILE_MAX_SIZE;
 static int kmer_size = 22;
 static int window_size = 22;
 static int rectangle_size = 0;
@@ -101,8 +100,7 @@ static int BINARY_OUTPUT = 0;
 
 static void show_version(const char *cmd)
 {
-	//printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-	printf("%s version 0.1\n", cmd);
+	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
 }
 
 static void show_help(const char *cmd)
@@ -608,7 +606,7 @@ static void display_progress()
 
 int main(int argc, char ** argv)
 {
-	const char *progname = "filter_master";
+	const char *progname = "sand_filter_master";
 
 	debug_config(progname);
 
