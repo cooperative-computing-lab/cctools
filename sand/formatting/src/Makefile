@@ -3,19 +3,19 @@ SAND_HOME = ../../
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
-TARGETS =  ucopy uncompress_reads compress_reads
+TARGETS =  sand_ucopy sand_uncompress_reads sand_compress_reads
 
 LOCAL_LDFLAGS= -ldttools -lsandtools ${CCTOOLS_INTERNAL_LDFLAGS}
 
 all: ${TARGETS}
 
-ucopy: ucopy.o
+sand_ucopy: sand_ucopy.o
 	${CCTOOLS_LD} -g -o $@ $^ ${LOCAL_LDFLAGS} -lm 
 
-uncompress_reads: uncompress_reads.o
+sand_uncompress_reads: sand_uncompress_reads.o
 	${CCTOOLS_LD} -g -o $@ $^ ${LOCAL_LDFLAGS} -lm 
 
-compress_reads: compress_reads.o
+sand_compress_reads: sand_compress_reads.o
 	${CCTOOLS_LD} -g -o $@ $^ ${LOCAL_LDFLAGS} -lm 
 
 test:
@@ -26,7 +26,7 @@ clean:
 install: all
 	install -d ${CCTOOLS_INSTALL_DIR}/
 	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install ucopy ${CCTOOLS_INSTALL_DIR}/bin/
-	install uncompress_reads ${CCTOOLS_INSTALL_DIR}/bin/
-	install compress_reads ${CCTOOLS_INSTALL_DIR}/bin/
+	install sand_ucopy ${CCTOOLS_INSTALL_DIR}/bin/
+	install sand_uncompress_reads ${CCTOOLS_INSTALL_DIR}/bin/
+	install sand_compress_reads ${CCTOOLS_INSTALL_DIR}/bin/
 

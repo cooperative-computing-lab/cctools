@@ -3,7 +3,7 @@ SAND_HOME = ../../
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
-TARGETS =  sand_filter_master filter_mer_seq
+TARGETS =  sand_filter_master sand_filter_mer_seq
 
 LOCAL_LDFLAGS= -ldttools -lsandtools ${CCTOOLS_INTERNAL_LDFLAGS}
 
@@ -12,7 +12,7 @@ all: ${TARGETS}
 sand_filter_master: sand_filter_master.o
 	${CCTOOLS_LD} -g -o $@ $^ ${LOCAL_LDFLAGS} -lm 
 
-filter_mer_seq: filter_mer_seq.o
+sand_filter_mer_seq: sand_filter_mer_seq.o
 	${CCTOOLS_LD} -g -o $@ $^ ${LOCAL_LDFLAGS} -lm 
 
 test:
@@ -24,5 +24,5 @@ install: all
 	install -d ${CCTOOLS_INSTALL_DIR}/
 	install -d ${CCTOOLS_INSTALL_DIR}/bin
 	install sand_filter_master ${CCTOOLS_INSTALL_DIR}/bin/
-	install filter_mer_seq ${CCTOOLS_INSTALL_DIR}/bin/
+	install sand_filter_mer_seq ${CCTOOLS_INSTALL_DIR}/bin/
 

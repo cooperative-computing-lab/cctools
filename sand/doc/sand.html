@@ -114,10 +114,10 @@ candidates), and a correct final set of alignment records to compare
 against.</p>
 
 <h4>Data Conversion</h4> 
-<p>The primary data conversion tool is <tt>compress_reads</tt>, which
+<p>The primary data conversion tool is <tt>sand_compress_reads</tt>, which
 converts fasta files into the compressed fasta-like format used with
 our modules.  
-<pre> % compress_reads < my_sequences.fa > my_sequences.cfa </pre> 
+<pre> % sand_compress_reads < my_sequences.fa > my_sequences.cfa </pre> 
 The compressed file <em>my_sequences.cfa</em> is then used to filter
 out a list of candidates. This is the first step in the pipeline that
 uses the Work Queue, so let us discuss that here.</p>
@@ -165,7 +165,7 @@ like to change batch options or other details.</p>
 
 <h4>Candidate Selection</h4>
 
-<p>The candidate selection master takes the newly-created <em>my_sequences.cfa</em> as its only input requirement. Its only output requirement is the candidate list to be created, which this document will refer to as <em>my_candidates.cand</em>. A custom filtering executable is optional (without it, the standard one provided with the module, <tt>filter_mer_seq</tt>, will be used). The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), the number of subsets to split the workload tasks into, and the -b option because we are using the binary cfa format.
+<p>The candidate selection master takes the newly-created <em>my_sequences.cfa</em> as its only input requirement. Its only output requirement is the candidate list to be created, which this document will refer to as <em>my_candidates.cand</em>. A custom filtering executable is optional (without it, the standard one provided with the module, <tt>sand_filter_mer_seq</tt>, will be used). The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), the number of subsets to split the workload tasks into, and the -b option because we are using the binary cfa format.
 <pre>
 % sand_filter_master -p 9123 -s 10000 -b my_sequences.cfa my_candidates.cand
 </pre>
@@ -173,7 +173,7 @@ Note that a progress table will be printed to standard out, while more detailed 
 
 <h4>Alignment</h4>
 
-<p>The alignment master takes the sequence file <em>my_sequences.cfa</em> and the newly created <em>my_candidates.cand</em> as its input data requirements. It also requires a serial alignment executable, which we proposed above as <em>align.exe</em> (examples of serial alignment executables provided with the SAND modules are <tt>sw_alignment</tt> (a standard Smith-Waterman alignment algorithm) and <tt>banded_alignment</tt> (a simple banding heuristic). The only output argument is the set of alignment computations, <em>my_results.ovl</em>. The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), and the number of individual alignments per Work Queue task.
+<p>The alignment master takes the sequence file <em>my_sequences.cfa</em> and the newly created <em>my_candidates.cand</em> as its input data requirements. It also requires a serial alignment executable, which we proposed above as <em>align.exe</em> (examples of serial alignment executables provided with the SAND modules are <tt>sand_sw_alignment</tt> (a standard Smith-Waterman alignment algorithm) and <tt>sand_banded_alignment</tt> (a simple banding heuristic). The only output argument is the set of alignment computations, <em>my_results.ovl</em>. The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), and the number of individual alignments per Work Queue task.
 <pre>
 % sand_align_master  -p 9090 -n 1000 align.exe my_candidates.cand my_sequences.cfa  my_results.ovl
 </pre>
