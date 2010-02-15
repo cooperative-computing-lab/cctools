@@ -165,19 +165,37 @@ like to change batch options or other details.</p>
 
 <h4>Candidate Selection</h4>
 
-<p>The candidate selection master takes the newly-created <em>my_sequences.cfa</em> as its only input requirement. Its only output requirement is the candidate list to be created, which this document will refer to as <em>my_candidates.cand</em>. A custom filtering executable is optional (without it, the standard one provided with the module, <tt>filter_mer_seq</tt>, will be used). The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), the number of subsets to split the workload into, and the -b option because we are using the binary cfa format.
+<p>The candidate selection master takes the newly-created <em>my_sequences.cfa</em> as its only input requirement. Its only output requirement is the candidate list to be created, which this document will refer to as <em>my_candidates.cand</em>. A custom filtering executable is optional (without it, the standard one provided with the module, <tt>filter_mer_seq</tt>, will be used). The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), the number of subsets to split the workload tasks into, and the -b option because we are using the binary cfa format.
 <pre>
-% filter_master -p 9123 -s 10000 -b my_sequences.cfa my_candidates.cand
+% sand_filter_master -p 9123 -s 10000 -b my_sequences.cfa my_candidates.cand
 </pre>
 Note that a progress table will be printed to standard out, while more detailed performance information is printed to standard error. We strongly suggest redirecting at least standard error, if not both, to a file while executing.</p>
 
 <h4>Alignment</h4>
 
-<p>The alignment master takes the sequence file <em>my_sequences.cfa</em> and the newly created <em>my_candidates.cand</em> as its input data requirements. It also requires a serial alignment executable, which we proposed above as <em>align.exe</em>.  The only output argument is the set of alignment computations, <em>my_results.ovl</em>. The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), and the number of individual alignments per Work Queue task.
+<p>The alignment master takes the sequence file <em>my_sequences.cfa</em> and the newly created <em>my_candidates.cand</em> as its input data requirements. It also requires a serial alignment executable, which we proposed above as <em>align.exe</em> (examples of serial alignment executables provided with the SAND modules are <tt>sw_alignment</tt> (a standard Smith-Waterman alignment algorithm) and <tt>banded_alignment</tt> (a simple banding heuristic). The only output argument is the set of alignment computations, <em>my_results.ovl</em>. The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), and the number of individual alignments per Work Queue task.
 <pre>
-% sand_aligner  -p 9090 -n 1000 align.exe my_candidates.cand my_sequences.cfa  my_results.ovl
+% sand_align_master  -p 9090 -n 1000 align.exe my_candidates.cand my_sequences.cfa  my_results.ovl
 </pre>
-Again, a progress table will be printed to standard out, while more detailed performance information is printed to standard error. We strongly suggest redirecting at least standard error, if not both, to a file while executing.</p>
+Again, a progress table will be printed to standard out, while more detailed performance information is printed to standard error. We strongly suggest redirecting at least standard error, if not both, to a file while executing. The progress table is formatted as:
+<pre>
+   Time |   WI   WR   WB |     TS   TW   TR   TC |     TD     AR     AF       WS | Speedup
+    90s |    0    0    0 |      0    0    0    0 |      0    nan    nan      nan | 0.00
+    96s |   30    0    6 |    100   94    6    0 |      0    nan    nan      nan | 0.00
+   101s |   34    1    5 |    100   93    5    0 |      2   7.96   0.28    28.00 | 0.16
+   103s |   35    2   12 |    100   84   12    0 |      4   8.12   0.21    38.02 | 0.32
+</pre>
+where:
+<ul>
+ <li>"Time" is the elapsed time the master has been running</li>
+ <li>"WI", "WR", and "WB" are the number of workers who have connected and are in the "initializing", "ready", and "busy" states, respectively.</li>
+ <li>"TS", "TW", "TR", and "TC" are the total number of tasks submitted, number of tasks waiting, number of tasks running, and the number that have completed and are waiting to be post-processed, respectively.</li>
+ <li>"TD" is the number of tasks that are finished.</li>
+ <li>"AR" and "AF" are the average runtime and average file-transfer time for the tasks that are finished.  
+ <li>"WS" is an approximate number of workers supportable based on the average runtimes and file-transfer times. Note that many systems are limited to approximately 1024 workers supportable based on available file descriptors open per process.</li>
+ <li>"Speedup" is a calculated speedup-factor for the workload compared with a serial calculation. Note that because serial completion time may not be known and because there are heterogeneous workers this is calculated based on the average task runtime for all finished tasks.</li>
+</ul>
+</p>
 
 <h2>For More Information</h2>
 
