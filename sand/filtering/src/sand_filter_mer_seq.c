@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <time.h>
+
 #include "sequence_alignment.h"
 #include "sequence_compression.h"
 #include "sand_align_macros.h"
@@ -205,11 +207,11 @@ int main(int argc, char ** argv)
 		num_seqs = load_seqs_two_files(input, 0, &end_x, input2, 0, &end_y);
 		start_x = 0;
 		start_y = end_x;
-		if (verbose_level > -1) fprintf(stderr, "%6ds : First file contains %d sequences, stored from (%d,%d].\n", TIME, end_x, start_x, end_x);
-		if (verbose_level > -1) fprintf(stderr, "%6ds : Second file contains %d sequences, stored from (%d,%d].\n", TIME, end_y, start_y, end_y);
+		if (verbose_level > -1) fprintf(stderr, "%6lds : First file contains %d sequences, stored from (%d,%d].\n", TIME, end_x, start_x, end_x);
+		if (verbose_level > -1) fprintf(stderr, "%6lds : Second file contains %d sequences, stored from (%d,%d].\n", TIME, end_y, start_y, end_y);
 	}
 	fclose(input);
-	if (verbose_level > -1) fprintf(stderr, "%6ds : Loaded %d sequences\n", TIME, num_seqs);
+	if (verbose_level > -1) fprintf(stderr, "%6lds : Loaded %d sequences\n", TIME, num_seqs);
 	//printf("Hit enter to continue.\n"); scanf("%*c");
 
 	MER_TABLE_BUCKETS = num_seqs*5;
@@ -221,14 +223,14 @@ int main(int argc, char ** argv)
 	{
 		int repeat_count = init_repeat_mer_table(repeats, 2000000, 0);
 		fclose(repeats);
-		if (verbose_level > -1) fprintf(stderr, "%6ds : Loaded %d repeated mers\n", TIME, repeat_count);
+		if (verbose_level > -1) fprintf(stderr, "%6lds : Loaded %d repeated mers\n", TIME, repeat_count);
 	}
 
 	if (rectangle_size == -1)
 	{
 		// Do get_mem_avail*0.95 to leave some memory for overhead
 		rectangle_size = DYNAMIC_RECTANGLE_SIZE(max_mem_kb);
-		if (verbose_level > -1) fprintf(stderr, "%6ds : Mem avail: %lu, rectangle size: %d\n", TIME, (unsigned long) MEMORY_FOR_MERS(max_mem_kb), rectangle_size);
+		if (verbose_level > -1) fprintf(stderr, "%6lds : Mem avail: %lu, rectangle size: %d\n", TIME, (unsigned long) MEMORY_FOR_MERS(max_mem_kb), rectangle_size);
 	}
 
 	// Testing out mer generation.
@@ -252,27 +254,27 @@ int main(int argc, char ** argv)
 	{
 		while (curr_start_x < end_x)
 		{
-			if ((start_x == start_y) && (verbose_level > -1)) fprintf(stderr, "%6ds : Loading mer table (%d,%d)\n", TIME, curr_rect_x, curr_rect_y);
-			else if (verbose_level > -1) fprintf(stderr, "%6ds : Loading mer table for [%d,%d) and [%d,%d)\n", TIME, curr_start_x, MIN(curr_start_x+rectangle_size, end_x), curr_start_y, MIN(curr_start_y+rectangle_size, end_y));
+			if ((start_x == start_y) && (verbose_level > -1)) fprintf(stderr, "%6lds : Loading mer table (%d,%d)\n", TIME, curr_rect_x, curr_rect_y);
+			else if (verbose_level > -1) fprintf(stderr, "%6lds : Loading mer table for [%d,%d) and [%d,%d)\n", TIME, curr_start_x, MIN(curr_start_x+rectangle_size, end_x), curr_start_y, MIN(curr_start_y+rectangle_size, end_y));
 			//load_mer_table(0);
 			start_mem = get_mem_usage();
 			load_mer_table_subset(verbose_level, curr_start_x, MIN(curr_start_x+rectangle_size, end_x), curr_start_y, MIN(curr_start_y+rectangle_size, end_y), (curr_start_x == curr_start_y));
 			table_mem = get_mem_usage();
-			if (verbose_level > -1) fprintf(stderr, "%6ds : Finished loading, now generating candidates\n", TIME);
-			if (verbose_level > -1) fprintf(stderr, "%6ds : Memory used: %lu\n", TIME, table_mem - start_mem);
+			if (verbose_level > -1) fprintf(stderr, "%6lds : Finished loading, now generating candidates\n", TIME);
+			if (verbose_level > -1) fprintf(stderr, "%6lds : Memory used: %lu\n", TIME, table_mem - start_mem);
 			generate_candidates(verbose_level);
 			cand_mem = get_mem_usage();
-			if (verbose_level > -1) fprintf(stderr, "%6ds : Total candidates generated: %llu\n", TIME, (long long unsigned int) total_cand);
+			if (verbose_level > -1) fprintf(stderr, "%6lds : Total candidates generated: %llu\n", TIME, (long long unsigned int) total_cand);
 			output_list = retrieve_candidates(&num_in_list);
 			output_candidate_list(output, output_list, num_in_list, output_format);
-			//if (verbose_level > -1) fprintf(stderr, "%6ds : Memory used: %lu\n", TIME, cand_mem - table_mem);
+			//if (verbose_level > -1) fprintf(stderr, "%6lds : Memory used: %lu\n", TIME, cand_mem - table_mem);
 			free(output_list);
 			//output_candidates(output, output_format);
 			fflush(output);
-			if (verbose_level > -1) fprintf(stderr, "%6ds : Now freeing\n", TIME);
+			if (verbose_level > -1) fprintf(stderr, "%6lds : Now freeing\n", TIME);
 			free_cand_table();
 			free_mer_table();
-			if (verbose_level > -1) fprintf(stderr, "%6ds : Successfully output and freed!\n", TIME);
+			if (verbose_level > -1) fprintf(stderr, "%6lds : Successfully output and freed!\n", TIME);
 			curr_rect_x++;
 			curr_start_x += rectangle_size;
 		}
