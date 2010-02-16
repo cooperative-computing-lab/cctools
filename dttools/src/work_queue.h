@@ -29,16 +29,16 @@ and port of the master.
 #define WORK_QUEUE_RESULT_FUNCTION_FAIL 2
 #define WORK_QUEUE_RESULT_OUTPUT_FAIL 3
 
-#define WORK_QUEUE_CHOOSE_HOST_UNSET 0 // default setting for task.
-#define WORK_QUEUE_CHOOSE_HOST_BY_FCFS 1
-#define WORK_QUEUE_CHOOSE_HOST_BY_FILES 2
-#define WORK_QUEUE_CHOOSE_HOST_BY_TIME 3
-#define WORK_QUEUE_CHOOSE_HOST_MAX 3
-#define WORK_QUEUE_CHOOSE_HOST_DEFAULT 1 // default setting for queue.
+#define WORK_QUEUE_SCHEDULE_UNSET 0 // default setting for task.
+#define WORK_QUEUE_SCHEDULE_FCFS 1
+#define WORK_QUEUE_SCHEDULE_FILES 2
+#define WORK_QUEUE_SCHEDULE_TIME 3
+#define WORK_QUEUE_SCHEDULE_MAX 3
+#define WORK_QUEUE_SCHEDULE_DEFAULT 3 // default setting for queue.
 
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
-extern int wq_option_worker_selection_algorithm; /**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
+extern int wq_option_scheduler; /**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
 
 /** A task description.  This structure should only be created with @ref work_queue_task_create and delete with @ref work_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.
 */
@@ -102,9 +102,9 @@ int work_queue_activate_fast_abort(struct work_queue* q, double multiplier);
 
 /** Change the worker selection algorithm for a given queue.
 @param q A pointer to the queue to modify.
-@param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "CHOOSE_HOST_BY" values.
+@param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
 */
-int work_queue_specify_algorithm( struct work_queue* q, int alg);
+int work_queue_specify_scheduler( struct work_queue* q, int alg);
 
 /** Wait for tasks to complete.  This call will block until the timeout has elapsed.
 @param q The work queue to wait on.
@@ -139,9 +139,9 @@ void work_queue_task_specify_tag( struct work_queue_task *t, const char *tag );
 
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
 @param t The task to which to add parameters
-@param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "CHOOSE_HOST_BY" values.
+@param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
 */
-int work_queue_task_specify_algorithm( struct work_queue_task *t, int alg );
+int work_queue_task_specify_scheduler( struct work_queue_task *t, int alg );
 
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
 @param t The task to which to add parameters

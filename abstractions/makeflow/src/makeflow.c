@@ -877,9 +877,9 @@ static void show_help(const char *cmd)
 	printf(" -r <n>         Automatically retry failed batch jobs up to n times.\n");
 	printf(" -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
 	printf(" -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
-	printf(" -A             Disable the check for AFS. (experts only.)\n");;
-	printf(" -F <#>         WQ fast abort multiplier for new queue.     (default is -1, deactivated)\n");
-	printf(" -W <#>         WQ worker selection algorithm.              (default is defined in work_queue.h)\n");
+	printf(" -A             Disable the check for AFS.                  (experts only.)\n");;
+	printf(" -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
+	printf(" -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
@@ -962,7 +962,16 @@ int main( int argc, char *argv[] )
 			wq_option_fast_abort_multiplier = atof(optarg);
 			break;
 		case 'W':
-			wq_option_worker_selection_algorithm = atoi(optarg);
+			if(!strcmp(optarg,"files")) {
+				wq_option_scheduler = WORK_QUEUE_SCHEDULE_FILES;
+			} else if(!strcmp(optarg,"time")) {
+				wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
+			} else if(!strcmp(optarg,"fcfs")) {
+				wq_option_scheduler = WORK_QUEUE_SCHEDULE_FCFS;
+			} else {
+				fprintf(stderr,"makeflow: unknown scheduling mode %s\n",optarg);
+				return 1;
+			}
 			break;
 		case 'h':
 		default:
