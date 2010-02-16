@@ -75,7 +75,7 @@ static struct work_queue * q = 0;
 
 static const char * sequence_filename;
 static const char * repeat_filename = 0;
-static const char * filter_program_name = "filter_mer_seq";
+static const char * filter_program_name = "sand_filter_mer_seq";
 static const char * wrapper_program_name = 0;
 static const char * checkpoint_filename = 0;
 static char filter_program_args[255];
@@ -119,7 +119,7 @@ static void show_help(const char *cmd)
 	printf(" -c <file>      The file which contains checkpoint information. If it exists,\n");
 	printf("                it will be used, otherwise it will be created.\n");
 	printf("                will be converted to when the master finishes.\n");
-	printf(" -a <file>      The wrapper to be passed to filter_mer_seq. Can technically\n");
+	printf(" -a <file>      The wrapper to be passed to sand_filter_mer_seq. Can technically\n");
 	printf("                be anything, but generally should be run_exe.pl, which\n");
 	printf("                replaces the repeat mer file with a chirp file.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
