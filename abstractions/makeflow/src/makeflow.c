@@ -1051,6 +1051,8 @@ int main( int argc, char *argv[] )
 	} else {
 		if(batch_queue_type==BATCH_QUEUE_TYPE_UNIX) {
 			d->remote_jobs_max = load_average_get_cpus();
+		} else if(batch_queue_type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
+			d->remote_jobs_max = 1000;
 		} else {
 			d->remote_jobs_max = 100;
 		}
