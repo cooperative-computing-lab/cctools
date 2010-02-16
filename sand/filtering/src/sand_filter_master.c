@@ -629,7 +629,7 @@ int main(int argc, char ** argv)
 	load_sequences(sequence_filename);
 	//load_rectangles(sequence_filename);
 	load_rectangles_to_files();
-	task_id_map = itable_create(12);
+	task_id_map = itable_create(4096);
 
 	// Load checkpointing info
 	init_checkpoint();
