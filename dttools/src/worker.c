@@ -151,7 +151,11 @@ int main( int argc, char *argv[] )
 		FILE *stream;
 
 		if(time(0)>idle_stoptime) {
-			printf("worker: gave up after waiting for %ds to connect to the master.\n",idle_timeout);
+			if(master) {
+				printf("worker: gave up after waiting %ds to receive a task.\n",idle_timeout);
+			} else {
+				printf("worker: gave up after waiting %ds to connect to %s port %d.\n",idle_timeout,host,port);
+			}
 			break;
 		}
 
