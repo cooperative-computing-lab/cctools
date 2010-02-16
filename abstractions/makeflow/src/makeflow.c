@@ -32,9 +32,6 @@ static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
-/* A line length this long is not ideal, but it will have to do until we
-   can parse lines of arbitrary length.
-   UPDATE (10 Februrary 2010): Finally we can! -KP */
 #define DAG_LINE_MAX 1048576
 
 typedef enum {
@@ -87,14 +84,6 @@ struct dag_node {
 
 void dag_print( struct dag *d )
 {
-	/* The commented-out code below is code introduced by Kevin Partington
-	   to allow for dynamic allocation for command names. It has since been
-	   reverted (commented out) for KISS reasons. -KP, 10 February 2010 */
-	/*
-	char *name;
-	int nameSize = DAG_LINE_MAX;
-	name = malloc(DAG_LINE_MAX * sizeof(char));
-	*/
 	char name[DAG_LINE_MAX];
 
 	struct dag_node *n;
@@ -105,22 +94,6 @@ void dag_print( struct dag *d )
 	printf("node [shape=ellipse];\n");
 
 	for(n=d->nodes;n;n=n->next) {
-		/*
-		int s = strlen(n->command);
-		if (s > nameSize) {
-			nameSize = s;
-			char *tmp = realloc(name, nameSize * sizeof(char));
-			if (!tmp)
-			{
-				free(name);
-				fprintf(stderr, "Out of memory\n");
-				exit(1);
-			}
-			name = tmp;
-		}
-		
-		strncpy(name, n->command, s);
-		*/
 		strncpy(name, n->command, DAG_LINE_MAX);
 		char * label = strtok(name," \t\n");
 		printf("N%d [label=\"%s\"];\n",n->nodeid,label);
@@ -138,12 +111,7 @@ void dag_print( struct dag *d )
 	}
 
 	printf("}\n");
-
-	/*
-	free(name);
-	*/
 }
-
 
 const char * dag_node_state_name( dag_node_state_t state )
 {
@@ -324,10 +292,8 @@ static char * lookupenv( const char *name, void *arg )
 
 char * dag_readline( struct dag *d, FILE *file )
 {
-	char *rawline;
-	rawline = get_line(file);
+	char *rawline = get_line(file);
 
-	//if(fgets(rawline,sizeof(rawline),file)) {
 	if (rawline) {
 		d->linenum++;
 
@@ -601,7 +567,6 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 
 	n->command = translate_command(d, c);
 
-	/*printf("Command: %s\n", n->command);*/
 	free(line);
 	return n;
 }
