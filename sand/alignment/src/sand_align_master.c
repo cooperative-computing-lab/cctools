@@ -623,7 +623,7 @@ int main( int argc, char *argv[] )
 {
 	char c;
 
-	const char *progname = "assembly";
+	const char *progname = "sand_align_master";
 	
 	debug_config(progname);
 
