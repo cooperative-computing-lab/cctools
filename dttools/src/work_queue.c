@@ -692,6 +692,7 @@ void work_queue_submit( struct work_queue *q, struct work_queue_task *t )
 		t->host = 0;
 	}
 	t->total_transfer_time = 0;
+	t->result = WORK_QUEUE_RESULT_UNSET;
 
 	/* Then, add it to the ready list and mark it as submitted. */
 
