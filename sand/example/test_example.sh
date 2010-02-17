@@ -65,6 +65,6 @@ echo "Waiting for worker to exit"
 wait $wpid
 echo "Removing created files"
 rm -f sand_compress_reads worker sand_filter_mer_seq sand_filter_master sand_sw_alignment sand_align_master test_20.cand test_20.cfa;
-rm -i test_20.ovl;
+rm -f test_20.ovl;
 
 exit 0;
