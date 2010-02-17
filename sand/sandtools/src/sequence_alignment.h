@@ -63,6 +63,8 @@ void print_alignment(FILE * file, const char * str1, const char * str2, delta tb
 void print_local(FILE * file, const char * str1, const char * str2, delta tb, int line_width);
 void print_delta(FILE * file, delta tb, const char * id1, const char * id2);
 void print_OVL_message(FILE * file, delta tb, const char * id1, const char * id2);
+void print_OVL_envelope_start(FILE * file);
+void print_OVL_envelope_end(FILE * file);
 void free_delta(delta tb);
 void revcomp(seq * s);
 void print_sequence(FILE * file, seq s);

@@ -129,6 +129,7 @@ static struct hash_table* build_completed_table(const char* filename, int* numDo
     if(!infile)
 	return t;
     int j;
+    
     while((j = fscanf(infile," %cOVL afr:%s bfr:%s ori:%c olt:%c ahg:%i bhg:%i qua:%f mno:%i mxo:%i pct:%i %c",&ob,A_sequence_name,B_sequence_name,&ori,&olt,&ahg,&bhg,&qua,&mno,&mxo,&pct,&cb)) == 12 && ob=='{' && cb == '}') {
 	sprintf(tmp,"%s-%s",A_sequence_name,B_sequence_name);
 	if(hash_table_insert(t,tmp,"") != 1) {
@@ -156,6 +157,7 @@ static struct hash_table* build_completed_table(const char* filename, int* numDo
     
 }
 
+// returns 1 if all whitespace, 0 if not.
 int isAllWhitespace(char* s) {
     int i;
     for(i=0; i<strlen(s); i++)
@@ -164,10 +166,183 @@ int isAllWhitespace(char* s) {
     return 1;
 }
 
+// returns 1 if valid, 0 if not.
+int isValidClosing(char* s) {
+    int i;
+    int closeFound = 0;
+    for(i=0;i<strlen(s);i++)
+    {
+	if(s[i]==']') {
+	    if(closeFound) {
+		fprintf(stderr, "Multiple OVL Record Envelope Closing Characters in task!\n");
+		return 0;
+	    }
+	    else {
+		closeFound=1;
+	    }
+	}
+	else { //make sure nothing except close and whitespace 
+	    if(!isspace(s[i])) {
+		return 0;
+	    }
+	}
+    }
+    if(closeFound)
+	return 1;
+    return 0;
+}
+
+
+// returns -1 on error, 0 on blank output (just an open and close envelope), and the index into s of the first record if valid and non-blank.
+int findFirstOVLRecord(char* s) {
+
+    int i;
+    int openFound = 0;
+    int closeFound = 0;
+    int firstOVLRecord = strpos(s,'{');
+    char next_char_to_find;
+        
+    if(firstOVLRecord != -1) { // there's at least one OVL record opener '{'
+	next_char_to_find = '[';
+	for(i=0;i<firstOVLRecord;i++) // up until then, the only thing should be a [ and maybe whitespace
+	{
+	    if(s[i]==next_char_to_find) {
+		if(openFound) {
+		    fprintf(stderr, "Multiple OVL Record Envelope Opening Characters in task!\n");
+		    return -1;
+		}
+		else {
+		    openFound=1;
+		}
+	    }
+	    else { //make sure nothing except an open and whitespace before first record
+		if(!isspace(s[i])) {
+		    fprintf(stderr, "Non-whitespace before first OVL Record in task!\n");
+		    return -1;
+		}
+	    }
+	}
+	if(!openFound) { // if we did not find a '[', fail.
+	    fprintf(stderr, "No OVL Record Envelope Opening Character in task!\n");
+	    return -1;
+	}
+	// if we're here, we have a successful start.
+	return firstOVLRecord;
+    }
+    else {// there's no OVL record opener '{', s must be of the format "(whitespace)*[(whitespace)*](whitespace)*"
+	next_char_to_find = '[';
+	for(i=0;i<strlen(s);i++)
+	{
+	    if(s[i]==next_char_to_find) {
+		if(!openFound) { //we've hit the '['.
+		    openFound=1;
+		    next_char_to_find = ']';
+		}
+		else { // we've hit the ']'
+		    closeFound=1;
+		    next_char_to_find = '\0';
+		}
+	    }
+	    else { //make sure nothing except an open and whitespace before first record
+		if(!isspace(s[i])) {
+		    fprintf(stderr, "Non-whitespace before first OVL Record in task!\n");
+		    return -1;
+		}
+	    }
+	}
+	if(!openFound) { // if we did not find a '[', fail.
+	    fprintf(stderr, "No OVL Record Envelope Opening Character in presumed blank task! Output:\n%s\n",s);
+	    return -1;
+	}
+	if(!closeFound) { // if we did not find a ']', fail.
+	    fprintf(stderr, "No OVL Record Envelope Closing Character in presumed blank task! Output:\n%s\n",s);
+	    return -1;
+	}
+	return 0;
+    }
+}
+
+
+char* removeEnvelope(char* output) {
+
+    char A_sequence_name[ASSEMBLY_LINE_MAX];
+    char B_sequence_name[ASSEMBLY_LINE_MAX];
+    
+    int i = 0;
+    int firstOVLRecord;
+    
+    char ori;
+    char olt;
+    int ahg;
+    int bhg;
+    float qua;
+    int mno;
+    int mxo;
+    int pct;
+
+    char* obuf = strdup(output);
+    char* final_buf;
+    firstOVLRecord=findFirstOVLRecord(obuf);     // find envelope opening.
+    if(firstOVLRecord==-1) { // error
+	debug(D_DEBUG,"Unexpected output format parsing OVL envelope! Output:\n%s\n",obuf);
+	free(obuf);
+	return NULL;
+    }
+    if(firstOVLRecord==0) { // blank task
+	free(obuf);
+	final_buf = malloc(1*sizeof(char));
+	final_buf[0]='\0';
+	return final_buf;
+    }
+    //else, i is the first character of the first record.
+    char* buf = &(obuf[firstOVLRecord]);
+    char* rec = strtok(buf,"}");
+    if(!rec) {
+	debug(D_DEBUG,"No } found! Output:\n%s\n",obuf);
+	buf=NULL;
+	free(obuf);
+	return NULL;
+    }
+    while(rec) {
+	if(sscanf(rec," {OVL afr:%s bfr:%s ori:%c olt:%c ahg:%i bhg:%i qua:%f mno:%i mxo:%i pct:%i ",A_sequence_name,B_sequence_name,&ori,&olt,&ahg,&bhg,&qua,&mno,&mxo,&pct) == 10) {
+	    i++;
+	    rec = strtok(0,"}");
+	}
+	else
+	{
+	    if(isValidClosing(rec)) { // all that's left is an envelope closing and whitespace
+		rec[0] = '\0'; // cut off closing envelope.
+		final_buf = (char*) malloc((strlen(buf)+3)*sizeof(char));
+		strcpy(final_buf,buf); // cut off starting envelope.
+		strcat(final_buf,"}\n"); // replace the '}' that we're using for our tokenizing
+		buf=NULL;
+		free(obuf);
+		//debug(D_DEBUG,"Removed Envelope. Buffer:\n=====\n%s\n=====\n",final_buf);
+		return final_buf;
+	    }
+	    debug(D_DEBUG,"Confirm Output Error. Buffer:\n=====\n%s\n=====\n",buf);
+	    if(sscanf(rec," {OVL afr:%s bfr:%s ", A_sequence_name,B_sequence_name) == 2)
+		fprintf(stderr, "Unexpected output format for comparison of %s and %s. ", A_sequence_name,B_sequence_name);
+	    else
+		fprintf(stderr, "Unexpected output format. ");
+	    buf=NULL;
+	    free(obuf);
+	    return NULL;
+	}
+    }
+    //if we got here, we didn't have a valid closing.
+    debug(D_DEBUG,"Unexpected output format parsing OVL envelope! Output:\n%s\n",obuf);
+    buf=NULL;
+    free(obuf);
+    return NULL;
+}
+
+
 static int confirm_output(char* output) {
 
     char A_sequence_name[ASSEMBLY_LINE_MAX];
     char B_sequence_name[ASSEMBLY_LINE_MAX];
+    
     int i = 0;
 
     char ori;
@@ -192,22 +367,22 @@ static int confirm_output(char* output) {
 	}
 	else
 	{
-	    if(isAllWhitespace(rec)) { // all that's left is a newline
+	    if(isAllWhitespace(rec)) { // all that's left is whitespace
 		free(buf);
 		return i;
 	    }
 	    debug(D_DEBUG,"Confirm Output Error. Buffer:\n=====\n%s\n=====\n",buf);
 	    if(sscanf(rec," {OVL afr:%s bfr:%s ", A_sequence_name,B_sequence_name) == 2)
-		fprintf(stderr, "Unexpected output format for comarison of %s and %s. ", A_sequence_name,B_sequence_name);
+		fprintf(stderr, "Unexpected output format for comparison of %s and %s. ", A_sequence_name,B_sequence_name);
 	    else
 		fprintf(stderr, "Unexpected output format. ");
+	    free(buf);
 	    return 0;
 	}
     }
     free(buf);
     return i;
-}
-    
+}    
 
 static struct hash_table* build_sequence_library(const char* filename)
 {
@@ -266,22 +441,33 @@ static struct hash_table* build_sequence_library(const char* filename)
 
 
 static int handle_done_task(struct work_queue_task *t) {
+
+    char* final_output;
     if(!t)
 	return 0;
     
     if(t->return_status==0) {
-	if(confirm_output(t->output)) {
-	    debug(D_DEBUG,"Completed task!\n");
-	    fputs(t->output,logfile);
-	    fflush(logfile);
-	    tasks_done++;
-	    tasks_runtime+=(t->finish_time-t->start_time);
-	    tasks_filetime+=t->total_transfer_time;
+	final_output = removeEnvelope(t->output); // NULL on error, empty on blank, otherwise OVL records remaining.
+	if( final_output != NULL ) { // successfully removed envelope. valid so far.
+	    if(!strcmp(final_output,"") || confirm_output(final_output)) { // if we have a blank task or if we successfully confirm the output
+		debug(D_DEBUG,"Completed task!\n");
+		fputs(final_output,logfile);
+		fflush(logfile);
+		tasks_done++;
+		tasks_runtime+=(t->finish_time-t->start_time);
+		tasks_filetime+=t->total_transfer_time;
+		free(final_output); // free final_output because it is what we strduped in removeEnvelope
+	    } // drop to end to delete task.
+	    else { // error in output, free final_output because it is what we strduped in removeEnvelope
+		fprintf(stderr,"Failure of task on host %s. Output not confirmed:\n%s\n",t->host,t->output);
+		free(final_output);
+		return 0;
+	    }
 	}
-	else { // error in output
-	    fprintf(stderr,"Failure of task on host %s. Output not confirmed:\n%s\n",t->host,t->output);
+	else { // if(output_status == NULL) --> error in output envelope, don't free final_output because it has already been freed above.
+	    fprintf(stderr,"Failure of task on host %s. Output not confirmed, bad OVL record envelope:\n%s\n",t->host,t->output);
 	    return 0;
-	}
+	} 
     } else {
 	fprintf(stderr,"Function failed with results %d: %s\non host: %s\n",t->result, t->output,t->host);
 	return 0;

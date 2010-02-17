@@ -40,6 +40,8 @@ int main(int argc, char ** argv)
 
 	s1 = get_next_sequence_wrapper(input);
 
+	print_OVL_envelope_start(stdout);
+
 	while (!feof(input))
 	{
 #ifdef SPEEDTEST
@@ -118,7 +120,7 @@ int main(int argc, char ** argv)
 
 	free_seq(s1);
 	fclose(input);
-
+	print_OVL_envelope_end(stdout);
 	return 0;
 }
 

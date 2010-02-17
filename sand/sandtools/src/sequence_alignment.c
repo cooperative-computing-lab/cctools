@@ -1065,6 +1065,16 @@ void print_OVL_message(FILE * file, delta tb, const char * id1, const char * id2
 	fprintf(file, "}\n");
 }
 
+void print_OVL_envelope_start(FILE * file)
+{
+    fprintf(file, "[\n");
+}
+
+void print_OVL_envelope_end(FILE * file)
+{
+    fprintf(file, "]\n");
+}
+
 int abs(int i) { return (i >= 0) ? i : -i; }
 
 void print_local(FILE * file, const char * str1, const char * str2, delta tb, int line_width)
