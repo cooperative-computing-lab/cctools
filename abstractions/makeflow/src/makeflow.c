@@ -323,12 +323,32 @@ static void filename_error( struct dag *d, const char *filename )
 	exit(1);
 }
 
-static char *translate_filename( struct dag *d, const char *filename )
+static int translate_filename( struct dag *d, const char *filename, char **newname_ptr )
 {
-	/* Translate an absolute path filename into a unique slash-less name
-	   to allow for the sending of any file */
+	/* The purpose of this function is to translate an absolute path
+	   filename into a unique slash-less name to allow for the sending
+	   of any file to remote systems. Function returns 1 on success, 0 if
+	   filename has already been translated. */
 
-	char *newname = strdup(filename);
+	if (!newname_ptr) return 0;
+
+	/* First check for if the filename has already been translated-- if so,
+	   use that translation */
+
+	char *newname;
+	newname = (char *)hash_table_lookup(
+		d->filename_translation_fwd,
+		filename);
+
+	if (newname) /* Filename has been translated before */
+	{
+		char *temp = newname;
+		newname = strdup(temp);
+		*newname_ptr = newname;
+		return 0;
+	}
+
+	newname = strdup(filename);
 	char *c;
 
 	for (c = newname; *c; ++c)
@@ -336,16 +356,11 @@ static char *translate_filename( struct dag *d, const char *filename )
 		if (*c == '/') *c = '_';
 	}
 
-	while (!hash_table_insert(d->filename_translation_rev, newname, filename))
+	while (!hash_table_insert(d->filename_translation_rev, newname, strdup(filename)))
 	{
-		char *val = (char *)hash_table_lookup(
-			d->filename_translation_rev,
-			newname);
-
-		if (!strcmp(val, filename)) return newname;
-		
 		/* It's not 100% collision-proof, technically, but the odds of
 		   an unresolvable collision are unbelievably slim. */
+
 		c = strchr(newname, '_');
 		if (c)
 		{
@@ -360,19 +375,21 @@ static char *translate_filename( struct dag *d, const char *filename )
 			}
 			else
 			{
-				return NULL;
+				*newname_ptr = NULL;
+				return 0;
 			}
 		}
 	}
 
 	hash_table_insert(d->filename_translation_fwd, filename, strdup(newname));
 
-	return newname;
+	*newname_ptr = newname;
+	return 1;
 }
 
 static char *translate_command( struct dag *d, char *old_command )
 {
-	char *new_command = malloc(strlen(old_command) * sizeof(char));
+	char *new_command = malloc( (strlen(old_command)+2) * sizeof(char));
 	new_command[0] = '\0';
 
 	char *token = strtok(old_command, " \t\n");
@@ -412,6 +429,13 @@ static char *translate_command( struct dag *d, char *old_command )
 
 		if (val)
 		{
+			/* If the executable has a hashtable entry, then we
+			   need to prepend "./" to the symlink name */
+			if (first)
+			{
+				strncat(new_command, "./", 2);
+			}
+			
 			len = strlen(val);
 			strncat(new_command, val, len);
 		}
@@ -504,12 +528,15 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 	while(filename) {
 		if(strchr(filename,'/'))
 		{
-			char *newname = translate_filename(d, filename);
-			if (!clean_mode)
+			char *newname = NULL;
+			rv = translate_filename(d, filename, &newname);
+			if (rv && !clean_mode)
 			{
+				printf("makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
 				rv = symlink(filename, newname);
 				if (rv < 0 && errno != EEXIST)
 				{
+					//TODO: Check for if symlink points to right place
 					fprintf(stderr, "makeflow: could not create symbolic link (%s)\n", strerror(errno));
 					exit(1);
 				}
@@ -529,12 +556,15 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 	while(filename) {
 		if(strchr(filename,'/'))
 		{
-			char *newname = translate_filename(d, filename);
-			if (!clean_mode)
+			char *newname = NULL;
+			rv = translate_filename(d, filename, &newname);
+			if (rv && !clean_mode)
 			{
+				printf("makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
 				rv = symlink(filename, newname);
 				if (rv < 0 && errno != EEXIST)
 				{
+					//TODO: Check for if symlink points to right place
 					fprintf(stderr, "makeflow: could not create symbolic link (%s)\n", strerror(errno));
 					exit(1);
 				}
@@ -882,6 +912,7 @@ static void show_help(const char *cmd)
 	printf(" -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
 	printf(" -o <file>      Send debugging to this file.\n");
+	printf(" -P             Preserve (i.e., do not clean) intermediate symbolic links\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
 	
@@ -898,11 +929,12 @@ int main( int argc, char *argv[] )
 	int explicit_remote_jobs_max = 0;
 	int explicit_local_jobs_max = 0;
 	int skip_afs_check = 0;
+	int preserve_symlinks = 0;
 	const char *batch_submit_options = 0;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "Ap:cd:DT:iB:S:Rr:l:L:j:J:o:vF:W:")) != (char) -1) {
+	while((c = getopt(argc, argv, "Ap:cd:DT:iB:S:Rr:l:L:j:J:o:vF:W:P")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -972,6 +1004,9 @@ int main( int argc, char *argv[] )
 				fprintf(stderr,"makeflow: unknown scheduling mode %s\n",optarg);
 				return 1;
 			}
+			break;
+		case 'P':
+			preserve_symlinks = 1;
 			break;
 		case 'h':
 		default:
@@ -1096,7 +1131,11 @@ int main( int argc, char *argv[] )
 	batch_queue_delete(local_queue);
 	batch_queue_delete(remote_queue);
 
-	clean_symlinks(d, 1);	/* Silently remove symlinks */
+	if (!preserve_symlinks)
+	{
+		printf("makeflow: cleaning up intermediate symlinks...\n");
+		clean_symlinks(d, 1);	/* Silently remove symlinks */
+	}
 
 	if (logfilename) free(logfilename);
 	if (batchlogfilename) free(batchlogfilename);
