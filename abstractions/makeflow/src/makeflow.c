@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "load_average.h"
 #include "get_line.h"
+#include "int_sizes.h"
 
 static int dag_abort_flag = 0;
 static int dag_failed_flag = 0;
@@ -193,6 +194,8 @@ void dag_abort_all( struct dag *d )
 
 void file_clean( const char *filename, int silent )
 {
+	if (!filename) return;
+
 	if(unlink(filename)==0) {
 		if (!silent) printf("makeflow: deleted %s\n",filename);
 	} else {
@@ -208,7 +211,14 @@ void dag_node_clean( struct dag *d, struct dag_node *n )
 {
 	struct dag_file *f;
 	for(f=n->target_files;f;f=f->next) {
+		
 		file_clean(f->filename, 0);
+
+		/* Make sure to clobber the original file too if it exists */
+		char *name = (char *) hash_table_lookup(d->filename_translation_rev, f->filename);
+
+		if (name) file_clean(name, 0);
+		
 		hash_table_remove(d->completed_files,f->filename);
 	}
 }
@@ -296,6 +306,12 @@ char * dag_readline( struct dag *d, FILE *file )
 
 	if (rawline) {
 		d->linenum++;
+		if (d->linenum % 1000 == 0)
+		{
+			debug(D_DEBUG, "read line %d\n", d->linenum);
+			if (d->linenum % 100000 == 0)
+				fprintf(stderr, "makeflow: reading line %d\n", d->linenum);
+		}
 
 		string_chomp(rawline);
 
@@ -331,14 +347,18 @@ static int translate_filename( struct dag *d, const char *filename, char **newna
 	   filename has already been translated. */
 
 	if (!newname_ptr) return 0;
+	if (!strncmp(filename, "./", 2))
+	{
+		/* Assume this is a current working directory path */
+		*newname_ptr = NULL;
+		return 0;
+	}
 
 	/* First check for if the filename has already been translated-- if so,
 	   use that translation */
 
 	char *newname;
-	newname = (char *)hash_table_lookup(
-		d->filename_translation_fwd,
-		filename);
+	newname = (char *)hash_table_lookup(d->filename_translation_fwd, filename);
 
 	if (newname) /* Filename has been translated before */
 	{
@@ -396,6 +416,8 @@ static char *translate_command( struct dag *d, char *old_command )
 	int first = 1;
 	char prefix;
 
+	UPTRINT_T current_length = (UPTRINT_T)0;
+
 	while (token)
 	{
 		/* Remove (and store) the shell metacharacter prefix, if
@@ -411,20 +433,20 @@ static char *translate_command( struct dag *d, char *old_command )
 				prefix = '\0';
 		}
 		
-		char *val = (char *)hash_table_lookup(
-			d->filename_translation_fwd,
-			token);
+		char *val = (char *)hash_table_lookup(d->filename_translation_fwd, token);
 		int len;
 
 		if (!first)
 		{
-			strncat(new_command, " ", 1);
+			strncat(new_command + current_length, " ", 1);
+			++current_length;
 		}
 
 		/* Append the shell metacharacter prefix, if there is one. */
 		if (prefix)
 		{
-			strncat(new_command, &prefix, 1);
+			strncat(new_command + current_length, &prefix, 1);
+			++current_length;
 		}
 
 		if (val)
@@ -433,16 +455,19 @@ static char *translate_command( struct dag *d, char *old_command )
 			   need to prepend "./" to the symlink name */
 			if (first)
 			{
-				strncat(new_command, "./", 2);
+				strncat(new_command + current_length, "./", 2);
+				current_length += 2;
 			}
 			
 			len = strlen(val);
-			strncat(new_command, val, len);
+			strncat(new_command + current_length, val, len);
+			current_length += len;
 		}
 		else
 		{
 			len = strlen(token);
-			strncat(new_command, token, len);
+			strncat(new_command + current_length, token, len);
+			current_length += len;
 		}
 
 		first = 0;
@@ -532,7 +557,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 			rv = translate_filename(d, filename, &newname);
 			if (rv && !clean_mode)
 			{
-				printf("makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
+				fprintf(stderr, "makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
 				rv = symlink(filename, newname);
 				if (rv < 0 && errno != EEXIST)
 				{
@@ -560,7 +585,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 			rv = translate_filename(d, filename, &newname);
 			if (rv && !clean_mode)
 			{
-				printf("makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
+				fprintf(stderr, "makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
 				rv = symlink(filename, newname);
 				if (rv < 0 && errno != EEXIST)
 				{
@@ -632,6 +657,9 @@ struct dag * dag_create( const char *filename, int clean_mode )
 		d->nodes = n;
 		itable_insert(d->node_table,n->nodeid,n);
 	}
+
+	debug(D_DEBUG, "checking for duplicate targets...\n");
+	fprintf(stderr, "makeflow: checking for duplicate targets...\n");
 	
 	for(n=d->nodes;n;n=n->next) {
 		for(f=n->target_files;f;f=f->next) {
@@ -644,6 +672,9 @@ struct dag * dag_create( const char *filename, int clean_mode )
 			}
 		}
 	}
+
+	debug(D_DEBUG, "DAG created.\n");
+	fprintf(stderr, "makeflow: DAG created.\n");
 	
 	return d;
 }
@@ -815,7 +846,7 @@ int dag_check( struct dag *d )
 	struct dag_node *n;
 	struct dag_file *f;
 
-	printf("makeflow: checking rules for consistency...\n");
+	fprintf(stderr, "makeflow: checking rules for consistency...\n");
 
 	for(n=d->nodes;n;n=n->next) {
 		for(f=n->source_files;f;f=f->next) {
@@ -1133,7 +1164,7 @@ int main( int argc, char *argv[] )
 
 	if (!preserve_symlinks)
 	{
-		printf("makeflow: cleaning up intermediate symlinks...\n");
+		fprintf(stderr, "makeflow: cleaning up intermediate symlinks...\n");
 		clean_symlinks(d, 1);	/* Silently remove symlinks */
 	}
 
