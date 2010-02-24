@@ -1,9 +1,30 @@
 #!/bin/sh
 
+show_help() 
+{
+	echo "Use: condor_submit_workers [options] <servername> <port> <num-workers>"
+	echo "options:"
+	echo "  -t <time> Abort after this amount of idle time. (default=900s)"
+	echo "  -h        Show this help message."
+	exit 1
+}
+
+timeout=900
+
+while getopts ht: opt 
+do
+	case "$opt" in
+		t)  timeout=$OPTARG ;;
+		h)  show_help;;
+		\?) show_help;;
+	esac
+done
+
+shift $(expr $OPTIND - 1)
+
 if [ X$3 = X ]
 then
-	echo "use: condor_submit_workers <servername> <port> <num-workers>"
-	exit 1
+	show_help	
 fi
 
 worker=`which worker`
@@ -24,7 +45,7 @@ count=$3
 condor_submit << EOF
 universe = vanilla
 executable = worker
-arguments = $host $port
+arguments = -t $timeout $host $port
 transfer_input_files = worker
 should_transfer_files = yes
 when_to_transfer_output = on_exit
