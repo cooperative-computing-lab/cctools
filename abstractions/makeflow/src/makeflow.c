@@ -267,6 +267,7 @@ void dag_log_recover( struct dag *d, const char *filename )
 			}
 
 			fprintf(stderr,"makeflow: %s appears to be corrupted on line %d\n",filename,linenum);	
+			clean_symlinks(d, 1);
 			exit(1);
 		}
 		fclose(d->logfile);
@@ -275,6 +276,7 @@ void dag_log_recover( struct dag *d, const char *filename )
 	d->logfile = fopen(filename,"a");
 	if(!d->logfile) {
 		fprintf(stderr,"makeflow: couldn't open logfile %s: %s\n",filename,strerror(errno));
+		clean_symlinks(d, 1);
 		exit(1);
 	}
 
@@ -489,7 +491,7 @@ void dag_parse_assignment( struct dag *d, char *line )
 	// set = and any preceding whitespace to null
 	do {
 		*eq=0;
-		eq--;
+		if (eq > line) eq--;
 	} while(eq>line && isspace(*eq));
 
 	if(eq==name) {
@@ -864,6 +866,7 @@ int dag_check( struct dag *d )
 			}
 
 			fprintf(stderr,"makeflow: error: %s does not exist, and is not created by any rule.\n",f->filename);
+			clean_symlinks(d, 1);
 			return 0;
 		}
 	}
