@@ -58,13 +58,13 @@ SAND. The primary difference is that sequences data is used in a compressed fast
 </p>
 
 
-<p>The candidate selection module produces a set of promising pairs of
+<p>The candidate filtering module produces a set of promising pairs of
 sequences to align.  By default, the module uses <em>k</em>-mer
 filtering, which selects a pair of sequences for alignment if it has a
 perfect match on a short alignment. The filtering is done by a serial
-program that is included with the SAND candidate selection module, but
+program that is included with the SAND candidate filtering module, but
 alternate candidate selection routines can be specified in its
-place. The candidate selection module requires a list of sequences in
+place. The candidate filtering module requires a list of sequences in
 compressed fasta-like format, which encodes the actual sequence data {A,C,T,G} into a 2-bit format, but retains human-readable metadata:
 <pre>
 >sequence_1_name number_of_bases number_of_bytes\n
@@ -78,7 +78,7 @@ Sequence encoded into 2-bit Format, with a trailing newline\n
 
 <p>The alignment module computes sequence alignments using a
 user-supplied alignment algorithm. It requires a list of sequences in
-the same compressed fasta-like format as the candidate selection
+the same compressed fasta-like format as the candidate filtering
 module, a list of candidate pairs, and an alignment executable. The
 list of candidate pairs, which may be either pre-chosen or selected
 concurrently in a production pipeline as candidates are selected, is a
@@ -106,7 +106,7 @@ same OVL record format as used by the Celera assembler.</p>
 and alignment executable <em>align.exe</em> that implements an
 arbitrary alignment algorithm based on the data formats described
 above, this section will walk through the process of creating the
-compressed fasta-like format, completing the candidate selection, and
+compressed fasta-like format, completing the candidate filtering, and
 computing the alignments. This walk-through is nearly identical to the
 example provided within the SAND distribution, which includes 20
 sequences (in actuality, 10 duplicated to ensure that there are viable
@@ -163,13 +163,19 @@ exit.</p>
 are simple shells scripts, so you can edit them directly if you would
 like to change batch options or other details.</p>
 
-<h4>Candidate Selection</h4>
+<h4>Candidate Filtering</h4>
 
-<p>The candidate selection master takes the newly-created <em>my_sequences.cfa</em> as its only input requirement. Its only output requirement is the candidate list to be created, which this document will refer to as <em>my_candidates.cand</em>. A custom filtering executable is optional (without it, the standard one provided with the module, <tt>sand_filter_mer_seq</tt>, will be used). The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), the number of subsets to split the workload tasks into, and the -b option because we are using the binary cfa format.
+<p>The candidate filtering master takes the newly-created <em>my_sequences.cfa</em> as its only input requirement. Its only output requirement is the candidate list to be created, which this document will refer to as <em>my_candidates.cand</em>. A custom filtering executable is optional (without it, the standard one provided with the module, <tt>sand_filter_mer_seq</tt>, will be used). The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), the number of subsets to split the workload tasks into, and the -b option because we are using the binary cfa format. The filtering executable must be in the same directory as the filtering master.
 <pre>
 % sand_filter_master -p 9123 -s 10000 -b my_sequences.cfa my_candidates.cand
 </pre>
 Note that a progress table will be printed to standard out, while more detailed performance information is printed to standard error. We strongly suggest redirecting at least standard error, if not both, to a file while executing.</p>
+
+<p>For many large datasets, preprocessing must be done before candidate filtering in order to discard subsequences that are repeated so often that they will not be useful. Failing to do so does not change the correctness of the filtering, but will increase its runtime significantly. Given the original list of (uncompressed) sequences, we can create a list (called repeats.meryl) of short sequences of length <em>k</em> that are repeated <em>n</em> times with the following commands. In this case <em>k</em> is 24 and <em>n</em> is 100.
+<pre>
+% meryl -B -m 24 -C -L 100 -v -o output.meryl -s my_sequences.fa
+% meryl -Dt -s output.meryl -n 100 > repeats.meryl
+</pre>
 
 <h4>Alignment</h4>
 
