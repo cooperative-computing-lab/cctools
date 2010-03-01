@@ -416,6 +416,8 @@ static char *translate_command( struct dag *d, char *old_command )
 
 	char *token = strtok(old_command, " \t\n");
 	int first = 1;
+	int cmd_done = 0;
+	int wait = 0; /* Wait for next token before prepending "./"? */
 	char prefix;
 
 	UPTRINT_T current_length = (UPTRINT_T)0;
@@ -435,6 +437,13 @@ static char *translate_command( struct dag *d, char *old_command )
 				prefix = '\0';
 		}
 		
+		if (prefix && !token)
+		{
+			/* Indicates "< input" or "> output", i.e., with
+			   space after the shell metacharacter */
+			wait = 1;
+		}
+
 		char *val = (char *)hash_table_lookup(d->filename_translation_fwd, token);
 		int len;
 
@@ -455,10 +464,18 @@ static char *translate_command( struct dag *d, char *old_command )
 		{
 			/* If the executable has a hashtable entry, then we
 			   need to prepend "./" to the symlink name */
-			if (first)
+			if (!cmd_done)
 			{
-				strncat(new_command + current_length, "./", 2);
-				current_length += 2;
+				if (wait)
+				{
+					wait = 0;
+				}
+				else
+				{
+					strncat(new_command + current_length, "./", 2);
+					current_length += 2;
+					cmd_done = 1;
+				}
 			}
 			
 			len = strlen(val);
