@@ -677,8 +677,11 @@ struct dag * dag_create( const char *filename, int clean_mode )
 		itable_insert(d->node_table,n->nodeid,n);
 	}
 
-	debug(D_DEBUG, "checking for duplicate targets...\n");
-	fprintf(stderr, "makeflow: checking for duplicate targets...\n");
+	if (!clean_mode)
+	{
+		debug(D_DEBUG, "checking for duplicate targets...\n");
+		fprintf(stderr, "makeflow: checking for duplicate targets...\n");
+	}
 	
 	for(n=d->nodes;n;n=n->next) {
 		for(f=n->target_files;f;f=f->next) {
@@ -692,8 +695,11 @@ struct dag * dag_create( const char *filename, int clean_mode )
 		}
 	}
 
-	debug(D_DEBUG, "DAG created.\n");
-	fprintf(stderr, "makeflow: DAG created.\n");
+	if (!clean_mode)
+	{
+		debug(D_DEBUG, "DAG created.\n");
+		fprintf(stderr, "makeflow: DAG created.\n");
+	}
 	
 	return d;
 }
