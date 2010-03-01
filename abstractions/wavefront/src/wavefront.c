@@ -527,7 +527,7 @@ int main( int argc, char *argv[] )
 	struct itable *running_table = itable_create(0);
 
 	struct batch_job_info info;
-	batch_job_id_t jobid;
+	UINT64_T jobid;
 	struct wavefront_task *task;
 
 	wavefront_task_initialize(b,ready_list);
@@ -586,7 +586,7 @@ int main( int argc, char *argv[] )
 
 					wavefront_task_complete(b,ready_list,task);
 				} else {
-					printf("job %d failed, aborting this workload\n",jobid);
+					printf("job %llu failed, aborting this workload\n",jobid);
 					abort_mode = 1;
 				}
 			}

@@ -174,20 +174,20 @@ void dag_node_state_change( struct dag *d, struct dag_node *n, int newstate )
 
 void dag_abort_all( struct dag *d )
 {
-	int jobid;
+	UINT64_T jobid;
 	struct dag_node *n;
 
 	printf("makeflow: got abort signal...\n");
 
 	itable_firstkey(d->local_job_table);
 	while(itable_nextkey(d->local_job_table,&jobid,(void**)&n)) {
-		printf("makeflow: aborting local job %d\n",jobid);
+		printf("makeflow: aborting local job %llu\n",jobid);
 		batch_job_remove(local_queue,jobid);
 	}
 
 	itable_firstkey(d->remote_job_table);
 	while(itable_nextkey(d->remote_job_table,&jobid,(void**)&n)) {
-		printf("makeflow: aborting remote job %d\n",jobid);
+		printf("makeflow: aborting remote job %llu\n",jobid);
 		batch_job_remove(remote_queue,jobid);
 	}
 }
@@ -332,13 +332,6 @@ char * dag_readline( struct dag *d, FILE *file )
 	}
 
 	return 0;
-}
-
-static void filename_error( struct dag *d, const char *filename )
-{
-	fprintf(stderr,"makeflow: Error at %s:%d: %s contains a slash.\n",d->filename,d->linenum,filename);
-	fprintf(stderr,"makeflow: Rules can only refer to files in the current directory.\n");
-	exit(1);
 }
 
 static int translate_filename( struct dag *d, const char *filename, char **newname_ptr )

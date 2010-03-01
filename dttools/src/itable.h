@@ -8,6 +8,8 @@ See the file COPYING for details.
 #ifndef ITABLE_H
 #define ITABLE_H
 
+#include "int_sizes.h"
+
 /** @file itable.h An integer-indexed hash table.
 This hash table module map integers to arbitrary objects (void pointers).
 For example, to store a filename using the file descriptor as a key:
@@ -25,7 +27,7 @@ pathname = itable_remove(h,id);
 To list all of the items in a itable, use @ref itable_firstkey and @ref itable_nextkey like this:
 
 <pre>
-int  key;
+UINT64_T  key;
 void *value;
 
 itable_firstkey(h);
@@ -68,7 +70,7 @@ Also note that you cannot insert a null value into the table.
 @return One if the insert succeeded, failure otherwise
 */
 
-int itable_insert( struct itable *h, int key, const void *value );
+int itable_insert( struct itable *h, UINT64_T key, const void *value );
 
 /** Look up a value by key.
 @param h A pointer to an integer table.
@@ -76,7 +78,7 @@ int itable_insert( struct itable *h, int key, const void *value );
 @return If found, the pointer associated with the key, otherwise null.
 */
 
-void * itable_lookup( struct itable *h, int key );
+void * itable_lookup( struct itable *h, UINT64_T key );
 
 /** Remove a value by key.
 @param h A pointer to an integer table.
@@ -84,7 +86,7 @@ void * itable_lookup( struct itable *h, int key );
 @return If found, the pointer associated with the key, otherwise null.
 */
 
-void * itable_remove( struct itable *h, int key );
+void * itable_remove( struct itable *h, UINT64_T key );
 
 /** Begin iteration over all keys.
 This function begins a new iteration over an integer table,
@@ -103,6 +105,6 @@ This function returns the next key and value in the iteration.
 @return Zero if there are no more elements to visit, one otherwise.
 */
 
-int    itable_nextkey( struct itable *h, int *key, void **value );
+int    itable_nextkey( struct itable *h, UINT64_T *key, void **value );
 
 #endif

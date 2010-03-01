@@ -316,8 +316,10 @@ batch_job_id_t batch_job_wait_sge( struct batch_queue *q, struct batch_job_info 
 	int t,c;
 
 	while(1) {
+		UINT64_T ujobid;
 		itable_firstkey(q->job_table);
-		while(itable_nextkey(q->job_table,&jobid,(void**)&info)) {
+		while(itable_nextkey(q->job_table,&ujobid,(void**)&info)) {
+			jobid = ujobid;
 			sprintf(statusfile,"sge.status.%d",jobid);
 			file = fopen(statusfile,"r");
 			if(file) {

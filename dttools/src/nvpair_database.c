@@ -22,7 +22,7 @@ struct nvpair_database {
 	struct itable *table;
 	char *filename;
 	INT64_T logsize;
-	INT64_T nextkey;
+	UINT64_T nextkey;
 };
 
 static void nvpair_database_error( struct nvpair_database *db )
@@ -45,7 +45,7 @@ struct nvpair_database * nvpair_database_open( const char *filename )
 	char name[DB_LINE_MAX];
 	char value[DB_LINE_MAX];
 	char line[DB_LINE_MAX];
-	INT64_T key;
+	UINT64_T key;
 
 	db = malloc(sizeof(*db));
 	db->table = itable_create(0);
@@ -93,7 +93,7 @@ void nvpair_database_compress( struct nvpair_database *db )
 {
 	char newfilename[DB_LINE_MAX];
 	FILE *file;
-	int key;
+	UINT64_T key;
 	struct nvpair *nv;
 
 	if(db->logsize < itable_size(db->table)*3 ) return;
@@ -105,7 +105,7 @@ void nvpair_database_compress( struct nvpair_database *db )
 
 	itable_firstkey(db->table);
 	while(itable_nextkey(db->table,&key,(void**)&nv)) {
-		fprintf(file,"I %d\n",key);
+		fprintf(file,"I %llu\n",key);
 		nvpair_print_text(nv,file);
 	}
 	fprintf(file,"N %lld\n",db->nextkey);
@@ -128,7 +128,7 @@ void nvpair_database_close( struct nvpair_database *db )
 		}
 
 		if(db->table) {
-			int key;
+			UINT64_T key;
 			struct nvpair *nv;
 			itable_firstkey(db->table);
 			while(itable_nextkey(db->table,&key,(void**)&nv)) {
@@ -145,7 +145,7 @@ void nvpair_database_close( struct nvpair_database *db )
 	}
 }
 
-int nvpair_database_insert( struct nvpair_database *db, INT64_T *key, struct nvpair *nv )
+int nvpair_database_insert( struct nvpair_database *db, UINT64_T *key, struct nvpair *nv )
 {
 	*key = db->nextkey++;
 
@@ -159,7 +159,7 @@ int nvpair_database_insert( struct nvpair_database *db, INT64_T *key, struct nvp
 	return 1;
 }
 
-struct nvpair * nvpair_database_remove( struct nvpair_database *db, INT64_T key )
+struct nvpair * nvpair_database_remove( struct nvpair_database *db, UINT64_T key )
 {
 	struct nvpair *nv;
 
@@ -173,12 +173,12 @@ struct nvpair * nvpair_database_remove( struct nvpair_database *db, INT64_T key 
 	return nv;
 }
 
-struct nvpair * nvpair_database_lookup( struct nvpair_database *db, INT64_T key )
+struct nvpair * nvpair_database_lookup( struct nvpair_database *db, UINT64_T key )
 {
 	return itable_lookup(db->table,key);
 }
 
-int nvpair_database_update_string( struct nvpair_database *db, INT64_T key, const char *name, const char *value )
+int nvpair_database_update_string( struct nvpair_database *db, UINT64_T key, const char *name, const char *value )
 {
 	struct nvpair *nv;
 
@@ -194,7 +194,7 @@ int nvpair_database_update_string( struct nvpair_database *db, INT64_T key, cons
 	}
 }
 
-int nvpair_database_update_integer( struct nvpair_database *db, INT64_T key, const char *name, INT64_T value )
+int nvpair_database_update_integer( struct nvpair_database *db, UINT64_T key, const char *name, INT64_T value )
 {
 	struct nvpair *nv;
 
@@ -210,7 +210,7 @@ int nvpair_database_update_integer( struct nvpair_database *db, INT64_T key, con
 	}
 }
 
-const char * nvpair_database_lookup_string( struct nvpair_database *db, INT64_T key, const char *name )
+const char * nvpair_database_lookup_string( struct nvpair_database *db, UINT64_T key, const char *name )
 {
 	struct nvpair *nv;
 
@@ -222,7 +222,7 @@ const char * nvpair_database_lookup_string( struct nvpair_database *db, INT64_T 
 	}
 }
 
-INT64_T nvpair_database_lookup_integer( struct nvpair_database *db, INT64_T key, const char *name )
+INT64_T nvpair_database_lookup_integer( struct nvpair_database *db, UINT64_T key, const char *name )
 {
 	struct nvpair *nv;
 
@@ -239,13 +239,7 @@ void nvpair_database_firstkey( struct nvpair_database *db )
 	itable_firstkey(db->table);
 }
 
-int nvpair_database_nextkey( struct nvpair_database *db, INT64_T *key, struct nvpair **nv )
+int nvpair_database_nextkey( struct nvpair_database *db, UINT64_T *key, struct nvpair **nv )
 {
-	int skey;
-	if(itable_nextkey(db->table,&skey,(void**)nv)) {
-		*key = skey;
-		return 1;
-	} else {
-		return 0;
-	}
+	return itable_nextkey(db->table,key,(void**)nv);
 }

@@ -36,7 +36,6 @@ static void get_options(int argc, char ** argv, const char * progname);
 static void show_version(const char *cmd);
 static void show_help(const char *cmd);
 static void load_sequences(const char * file);
-static void load_rectangles();
 static void load_rectangles_to_files();
 static void delete_rectangles();
 static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x, int curr_rect_y);
@@ -59,7 +58,6 @@ static unsigned long int cand_count = 0;
 
 static cseq * sequences = 0;
 static int num_seqs = 0;
-static char ** rectangles = 0;
 static int num_rectangles = 0;
 static size_t * sizes = 0;
 static size_t * rectangle_sizes = 0;
@@ -225,58 +223,6 @@ void delete_rectangles()
 		sprintf(tmpfilename, "%s/rect%03d.cfa", outdirname, curr_rect);
 		unlink(tmpfilename);
 	}
-
-}
-
-void load_rectangles()
-{
-	int curr_rect;
-	num_rectangles = ceil((float)num_seqs / (float)rectangle_size);
-
-	/*checkpoint = malloc(num_rectangles * sizeof(int *));
-	for (i=0; i < num_rectangles; i++)
-	{
-		checkpoint[i] = calloc(num_rectangles,sizeof(int));
-	}*/
-
-	rectangles = malloc(num_rectangles*sizeof(char *));
-	rectangle_sizes = malloc(num_rectangles*sizeof(size_t));
-	int start, end, curr;
-	size_t size;
-	char * ins;
-
-	for (curr_rect = 0; curr_rect < num_rectangles; curr_rect++)
-	{
-		start = curr_rect * rectangle_size;
-		end = MIN(start+rectangle_size, num_seqs);
-		size = 0;
-
-		// Get the size of this rectangle.
-		for (curr = start; curr < end; curr++)
-		{
-			size += sizes[curr];
-		}
-
-		// Allocate enough space for this rectangle.
-		rectangles[curr_rect] = malloc(size+1);
-
-		ins = rectangles[curr_rect];
-		// Copy the sequences into this rectangle.
-		for (curr = start; curr < end; curr++)
-		{			
-			// Copy this sequence into the rectangle.
-			ins += sprint_cseq(ins, sequences[curr]);
-
-			// Free this sequence, it is no longer needed.
-			free_cseq(sequences[curr]);
-		}
-
-		rectangle_sizes[curr_rect] = size;
-	}
-
-	// We no longer need the sequences array, and it has
-	// all been freed anyway.
-	free(sequences);
 
 }
 
@@ -522,7 +468,7 @@ static int convert_cand_binary_to_ascii(FILE * outputfile, const char * fname)
 	FILE * infile;
 	long infile_size;
 	candidate_t * buffer;
-	size_t result;
+	long result;
 	int count;
 
 	infile = fopen(fname, "rb");
@@ -550,7 +496,7 @@ static int convert_cand_binary_to_ascii(FILE * outputfile, const char * fname)
 	result = fread(buffer, sizeof(candidate_t), count, infile);
 	if (result*sizeof(candidate_t) != infile_size)
 	{
-		fprintf(stderr, "Read %lu bytes from the file, expected %lu\n", result, infile_size);
+		fprintf(stderr, "Read %ld bytes from the file, expected %ld\n", result, infile_size);
 		return 0;
 	}
 

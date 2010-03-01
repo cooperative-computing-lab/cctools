@@ -6,11 +6,8 @@
 #define MAX_ID SEQUENCE_ID_MAX
 #define MAX_METADATA SEQUENCE_METADATA_MAX 
 
-
-
 static short mer_add_base(short mer, char base);
 static short translate_8mer(const char * str, int start);
-static void print_mer(FILE * file, int mer);
 static int get_mercount(int length);
 
 cseq compress_seq(seq s)
@@ -73,7 +70,6 @@ static short translate_8mer(const char * str, int start)
 		if (str[i] == '\0') { return mer; }
 		mer = mer_add_base(mer, str[i]);
 	}
-	//print_mer(stderr, mer);
 	return mer;
 }
 
@@ -194,7 +190,6 @@ seq uncompress_seq(cseq m)
 
 void translate_to_str(int mer, char * str, int length)
 {
-	//print_mer(stderr, mer);
 	int i;
 
 	// 2 bits represent each base. So, to get the first base, we the
@@ -212,11 +207,6 @@ void translate_to_str(int mer, char * str, int length)
 	str[length] = '\0';
 }
 
-
-static void print_mer(FILE * file, int mer)
-{
-	fprintf(file, "%d\n", mer);
-}
 
 void free_cseq(cseq m)
 {

@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include <string.h>
 
 struct entry {
-	int key;
+	UINT64_T key;
 	void *value;
 	struct entry *next;
 };
@@ -73,10 +73,10 @@ int itable_size( struct itable *h )
 	return h->size;
 }
 
-void * itable_lookup( struct itable *h, int key )
+void * itable_lookup( struct itable *h, UINT64_T key )
 {
 	struct entry *e;
-	int index;
+	UINT64_T index;
 	
 	index = key % h->bucket_count;
 	e = h->buckets[index];
@@ -91,10 +91,10 @@ void * itable_lookup( struct itable *h, int key )
 	return 0;
 }
 
-int itable_insert( struct itable *h, int key, const void *value )
+int itable_insert( struct itable *h, UINT64_T key, const void *value )
 {
 	struct entry *e;
-	int index;
+	UINT64_T index;
 
 	index = key % h->bucket_count;
 	e = h->buckets[index];
@@ -119,11 +119,11 @@ int itable_insert( struct itable *h, int key, const void *value )
 	return 1;
 }
 
-void * itable_remove( struct itable *h, int key )
+void * itable_remove( struct itable *h, UINT64_T key )
 {
 	struct entry *e,*f;
 	void *value;
-	int index;
+	UINT64_T index;
 
 	index = key % h->bucket_count;
 	e = h->buckets[index];
@@ -157,7 +157,7 @@ void itable_firstkey( struct itable *h )
 	}
 }
 
-int itable_nextkey( struct itable *h, int *key, void **value )
+int itable_nextkey( struct itable *h, UINT64_T *key, void **value )
 {
 	if(h->ientry) {
 		*key = h->ientry->key;
