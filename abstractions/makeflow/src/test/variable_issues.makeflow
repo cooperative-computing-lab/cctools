@@ -1,0 +1,13 @@
+# variable_issues.makeflow: Problems with variable names.
+#
+# Expected test case result: Failure (a variable assignment has no name).
+#
+# Created by K. Partington, 28 February 2010.
+# Copyright University of Notre Dame, 2010. See file COPYING for details.
+
+VAR=cool
+=bad
+
+output:
+	touch output
+
