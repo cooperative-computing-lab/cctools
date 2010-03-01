@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 #include "chirp_reli.h"
 #include "chirp_recursive.h"
