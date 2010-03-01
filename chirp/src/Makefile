@@ -53,7 +53,8 @@ chirp_md5sum: chirp_md5sum.o libchirp.a
 chirp_stream_files: chirp_stream_files.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-test:
+test:	all
+	cd test/ && make test && cd ..
 
 clean:
 	rm -f core *~ *.o *.os *.a *.so ${TARGETS}
