@@ -159,7 +159,11 @@ int link_sleep( struct link *link, time_t stoptime, int reading, int writing )
 	if(stoptime==LINK_FOREVER) {
 		tptr = 0;
 	} else {
-		timeout = MAX(1,stoptime-time(0));
+		timeout = stoptime-time(0);
+		if(timeout<0) {
+			errno = ECONNRESET;
+			return 0;
+		}
 		tm.tv_sec = timeout;
 		tm.tv_usec = 0;
 		tptr = &tm;
