@@ -701,7 +701,6 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 
 void dag_node_submit( struct dag *d, struct dag_node *n )
 {
-	//TODO: Figure out whether translated or original names need to be used
 	char *input_files = NULL;
 	char *output_files = NULL;
 	struct dag_file *f;
@@ -734,9 +733,6 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 
 	time_t stoptime = time(0) + dag_submit_timeout;
 	int waittime = 1;
-
-	//TODO: Figure out if translation hashtable needs to be sent on
-	// batch_job_submit_simple function call
 
 	while(1) {
 		n->jobid = batch_job_submit_simple(thequeue,n->command,input_files,output_files);
@@ -1069,10 +1065,22 @@ int main( int argc, char *argv[] )
 		}
 	}
 
+	const char *dagfile;
+	
 	if((argc-optind)!=1) {
-		//TODO: Consider allowing for "./Makeflow" as default filename?
-		show_help(argv[0]);
-		return 1;
+		int rv = access("./Makeflow",R_OK);
+		if (rv < 0)
+		{
+			fprintf(stderr, "makeflow: No makeflow specified and file \"./Makeflow\" could not be found.\n");
+			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
+			return 1;
+		}
+		
+		dagfile = "./Makeflow";
+	}
+	else
+	{
+		dagfile = argv[optind];
 	}
 
 	if(port!=0) {
@@ -1081,7 +1089,6 @@ int main( int argc, char *argv[] )
 		putenv(strdup(line));
 	}
 
-	const char *dagfile = argv[optind];
 	int dagfile_namesize = strlen(dagfile);
 
 	if(!logfilename)

@@ -5,6 +5,8 @@ include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
 test: ${MAKEFLOW}
+	@# Run sample ./Makeflow
+	${MAKEFLOW} >/dev/null && ${MAKEFLOW} -c >/dev/null
 	@# Check syntax of the site's example makeflow
 	@${MAKEFLOW} -C test.makeflow
 	@# Execute the two meta-makeflows, checking for proper name translation
