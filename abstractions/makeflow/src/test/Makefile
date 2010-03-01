@@ -5,14 +5,11 @@ include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
 test: ${MAKEFLOW}
-	${MAKEFLOW} test.makeflow && exit 0
-	${MAKEFLOW} -c test.makeflow && exit 0
-	${MAKEFLOW} typo.makeflow || exit 0
-	${MAKEFLOW} exec_dependencies.makeflow && exit 0
-	${MAKEFLOW} -c exec_dependencies.makeflow && exit 0
-	${MAKEFLOW} long_line_test.makeflow || exit 0
-	${MAKEFLOW} variable_issues.makeflow || exit 0
-	${MAKEFLOW} meta.makeflow && exit 0
-	${MAKEFLOW} -c meta.makeflow && exit 0
+	${MAKEFLOW} test.makeflow && ${MAKEFLOW} -c test.makeflow
+	${MAKEFLOW} meta.makeflow && ${MAKEFLOW} -c meta.makeflow
+	${MAKEFLOW} exec_dependencies.makeflow && ${MAKEFLOW} -c exec_dependencies.makeflow
+	$(SHELL) -c 'if ${MAKEFLOW} typo.makeflow ; then exit 1; else exit 0; fi'
+	$(SHELL) -c 'if ${MAKEFLOW} long_line_test.makeflow ; then exit 1; else exit 0; fi'
+	$(SHELL) -c 'if ${MAKEFLOW} variable_issues.makeflow ; then exit 1; else exit 0; fi'
 	echo "All tests have been run successfully."
 
