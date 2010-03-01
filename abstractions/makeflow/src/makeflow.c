@@ -976,6 +976,7 @@ int main( int argc, char *argv[] )
 	char *batchlogfilename = NULL;
 	int clean_mode = 0;
 	int display_mode = 0;
+	int syntax_check = 0;
 	int explicit_remote_jobs_max = 0;
 	int explicit_local_jobs_max = 0;
 	int skip_afs_check = 0;
@@ -984,7 +985,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "Ap:cd:DT:iB:S:Rr:l:L:j:J:o:vF:W:P")) != (char) -1) {
+	while((c = getopt(argc, argv, "Ap:cd:DCT:iB:S:Rr:l:L:j:J:o:vF:W:P")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1004,6 +1005,9 @@ int main( int argc, char *argv[] )
 			break;
 		case 'D':
 			display_mode = 1;
+			break;
+		case 'C':
+			syntax_check = 1;
 			break;
 		case 'S':
 			dag_submit_timeout = atoi(optarg);
@@ -1091,12 +1095,18 @@ int main( int argc, char *argv[] )
 		sprintf(batchlogfilename,"%s.condorlog",dagfile);
 	}
 
-	struct dag *d = dag_create(dagfile, clean_mode);
+	struct dag *d = dag_create(dagfile, clean_mode || syntax_check);
 	if(!d) {
 		fprintf(stderr,"makeflow: couldn't load %s: %s\n",dagfile,strerror(errno));
 		free(logfilename);
 		free(batchlogfilename);
 		return 1;
+	}
+
+	if (syntax_check)
+	{
+		printf("makeflow: %s: Syntax OK.\n", dagfile);
+		return 0;
 	}
 
 	if(explicit_local_jobs_max) {
