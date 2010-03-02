@@ -1137,7 +1137,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			tracer_copy_in(p->tracer,argv,POINTER(args[1]),sizeof(argv));
 			for(argc=0;argv[argc] && argc<PFS_ARG_MAX;argc++) {
 				debug_argv[sizeof(debug_argv)-1] = 0;
-				tracer_copy_in(p->tracer,debug_argv,(void *)argv[argc],sizeof(debug_argv)-1);
+				tracer_copy_in(p->tracer,debug_argv,POINTER(argv[argc]),sizeof(debug_argv)-1);
 				debug(D_PROCESS,"execve: argv[%d] == \"%s\"", argc, debug_argv);
 			}
 		}
