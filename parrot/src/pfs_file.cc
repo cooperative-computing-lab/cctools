@@ -60,8 +60,7 @@ int pfs_file::ftruncate( pfs_size_t length )
 
 int pfs_file::fsync()
 {
-	errno = EINVAL;
-	return -1;
+	return 0;
 }
 
 int pfs_file::fcntl( int cmd, void *arg )
