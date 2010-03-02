@@ -219,7 +219,7 @@ public:
 
 			owner = getpwnam(name);
 			if (owner) {
-				hash_table_insert(uid_table, name, (void*)owner->pw_uid);
+				hash_table_insert(uid_table, name, (void*)(PTRINT_T)owner->pw_uid);
 				return owner->pw_uid;
 			} else {
 				return -1;
@@ -238,7 +238,7 @@ public:
 
 			group = getgrnam(name);
 			if (group) {
-				hash_table_insert(gid_table, name, (void*)group->gr_gid);
+				hash_table_insert(gid_table, name, (void*)(PTRINT_T)group->gr_gid);
 				return group->gr_gid;
 			} else {
 				return -1;
