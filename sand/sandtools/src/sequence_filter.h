@@ -17,7 +17,7 @@
 #define CANDIDATE_FORMAT_LINE 2
 #define CANDIDATE_FORMAT_BINARY 3
 
-typedef unsigned long mer_t;
+typedef UINT64_T mer_t;
 
 struct candidate_s
 {
