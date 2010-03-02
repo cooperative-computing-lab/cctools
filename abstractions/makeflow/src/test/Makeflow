@@ -1,0 +1,54 @@
+CP=/bin/cp
+BASEDIR=/afs/nd.edu/user32/kparting/www/db/psychoGrid
+
+db_utilities.php: $BASEDIR/db_utilities.php
+	$CP $BASEDIR/db_utilities.php db_utilities.php
+
+forum.php: $BASEDIR/forum.php
+	$CP $BASEDIR/forum.php forum.php
+
+game.php: $BASEDIR/game.php
+	$CP $BASEDIR/game.php game.php
+
+header.php: $BASEDIR/header.php
+	$CP $BASEDIR/header.php header.php
+
+index.htm: $BASEDIR/index.htm
+	$CP $BASEDIR/index.htm index.htm
+
+login.php: $BASEDIR/login.php
+	$CP $BASEDIR/login.php login.php
+
+newgame.php: $BASEDIR/newgame.php
+	$CP $BASEDIR/newgame.php newgame.php
+
+newThread.php: $BASEDIR/newThread.php
+	$CP $BASEDIR/newThread.php newThread.php
+
+profile.php: $BASEDIR/profile.php
+	$CP $BASEDIR/profile.php profile.php
+
+psychoGrid.css: $BASEDIR/psychoGrid.css
+	$CP $BASEDIR/psychoGrid.css psychoGrid.css
+
+register.php: $BASEDIR/register.php
+	$CP $BASEDIR/register.php register.php
+
+rules.php: $BASEDIR/rules.php
+	$CP $BASEDIR/rules.php rules.php
+
+submitPost.php: $BASEDIR/submitPost.php
+	$CP $BASEDIR/submitPost.php submitPost.php
+
+submitThread.php: $BASEDIR/submitThread.php
+	$CP $BASEDIR/submitThread.php submitThread.php
+
+utilities.js: $BASEDIR/utilities.js
+	$CP $BASEDIR/utilities.js utilities.js
+
+viewThread.php: $BASEDIR/viewThread.php
+	$CP $BASEDIR/viewThread.php viewThread.php
+
+total_word_count.txt: db_utilities.php forum.php game.php header.php index.htm login.php newgame.php newThread.php profile.php psychoGrid.css register.php rules.php submitPost.php submitThread.php utilities.js viewThread.php
+	LOCAL cat db_utilities.php forum.php game.php header.php index.htm login.php newgame.php newThread.php profile.php psychoGrid.css register.php rules.php submitPost.php submitThread.php utilities.js viewThread.php | wc -l > total_word_count.txt
+
