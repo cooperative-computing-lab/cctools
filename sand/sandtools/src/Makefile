@@ -36,6 +36,6 @@ install: all
 	install -d ${CCTOOLS_INSTALL_DIR}/lib
 	install -d ${CCTOOLS_INSTALL_DIR}/include
 	for file in ${LIBRARIES} ; do install $$file ${CCTOOLS_INSTALL_DIR}/lib/$$file ; done
-	for file in ${HEADERS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/include/$$file ; done
+	for file in ${HEADERS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/include/$$(basename $$file) ; done
 	if [ -f /bin/${CYGWINLIB} ] ; then install /bin/${CYGWINLIB} ${CCTOOLS_INSTALL_DIR}/bin/${CYGWINLIB} ; fi
 
