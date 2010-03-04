@@ -24,6 +24,7 @@ extern "C" {
 #include "pfs_resolve.h"
 #include "chirp_acl.h"
 #include "chirp_global.h"
+#include "ftp_lite.h"
 }
 
 #include <stdlib.h>
@@ -193,6 +194,7 @@ static void show_use( const char *cmd )
 	printf("  -a <list>  Use these Chirp authentication methods.   (PARROT_CHIRP_AUTH)\n");
 	printf("  -A <file>  Use this file as a default ACL.          (PARROT_DEFAULT_ACL)\n");
 	printf("  -b <bytes> Set the I/O block size hint.              (PARROT_BLOCK_SIZE)\n");
+	printf("  -C         Enable data channel authentication in GridFTP.\n");
 	printf("  -d <name>  Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n");
 	printf("  -D         Disable small file optimizations.\n");
 	printf("  -F         Enable file snapshot caching for all protocols.\n");
@@ -519,7 +521,7 @@ int main( int argc, char *argv[] )
 
 	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
 
-	while((c=getopt(argc,argv,"+hA:a:b:B:d:DE:FfG:HkKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
+	while((c=getopt(argc,argv,"+hA:a:b:B:Cd:DE:FfG:HkKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
 		switch(c) {
 		case 'a':
 			if(!auth_register_byname(optarg)) {
@@ -536,6 +538,9 @@ int main( int argc, char *argv[] )
 			break;
 		case 'B':
 			pfs_service_set_block_size(string_metric_parse(optarg));
+			break;
+		case 'C':
+			ftp_lite_data_channel_authentication = 1;
 			break;
 		case 'd':
 			if(!debug_flags_set(optarg)) show_use(argv[0]);

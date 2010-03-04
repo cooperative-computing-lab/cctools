@@ -18,6 +18,8 @@ typedef long long ftp_lite_size_t;
 #define FTP_LITE_GSS_DEFAULT_PORT 2811
 #define FTP_LITE_WHOLE_FILE ((ftp_lite_size_t)-1)
 
+extern int ftp_lite_data_channel_authentication;
+
 struct ftp_lite_server * ftp_lite_open_and_auth( const char *host, int port );
 
 struct ftp_lite_server * ftp_lite_open( const char *host, int port );

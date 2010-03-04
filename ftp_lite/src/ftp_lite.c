@@ -31,6 +31,8 @@ See the file COPYING for details.
 #include <signal.h>
 #include <sys/types.h>
 
+int ftp_lite_data_channel_authentication = 0;
+
 static int ftp_lite_send_command_gss( struct ftp_lite_server *s, const char *outbuffer );
 static int ftp_lite_get_response_gss( struct ftp_lite_server *s, char *outbuffer );
 static int ftp_lite_data_channel_auth( struct ftp_lite_server *s, FILE *stream );
@@ -476,9 +478,12 @@ static FILE * ftp_lite_xfer_setup( struct ftp_lite_server *s, char *command )
 		return 0;
 	}
 
-	ftp_lite_data_channel_auth(s,stream);
-
-	return stream;
+	if(ftp_lite_data_channel_auth(s,stream)) {
+		return stream;
+	} else {
+		fclose(stream);
+		return 0;
+	}
 }
 
 FILE * ftp_lite_get( struct ftp_lite_server *s, const char *path, ftp_lite_off_t offset )
@@ -999,7 +1004,7 @@ int ftp_lite_auth_globus( struct ftp_lite_server *s )
 	if(!network_address_remote(fileno(s->command),&addr,&port)) return 0;
 	if(!network_address_to_name(addr,&principal[4])) return 0;
 
-	major = globus_gss_assist_init_sec_context( &minor, s->credential, &s->context, principal, GSS_C_MUTUAL_FLAG|GSS_C_DELEG_FLAG, &flags, &token, ftp_lite_get_adat, s, ftp_lite_put_adat, s );
+	major = globus_gss_assist_init_sec_context( &minor, s->credential, &s->context, principal, GSS_C_MUTUAL_FLAG | GSS_C_DELEG_FLAG, &flags, &token, ftp_lite_get_adat, s, ftp_lite_put_adat, s );
 	if( major!=GSS_S_COMPLETE ) {
 		gss_release_cred( &major, &s->credential );
 		errno = EACCES;
@@ -1017,9 +1022,15 @@ int ftp_lite_auth_globus( struct ftp_lite_server *s )
 	}
 
 	if(ftp_lite_auth_userpass(s,":globus-mapping:","nothing")) {
-		ftp_lite_send_command(s,"DCAU A");
-		response = ftp_lite_get_response(s,0,buffer);
-		s->data_channel_authentication = (response==200);
+		if(ftp_lite_data_channel_authentication) {
+			ftp_lite_send_command(s,"DCAU A");
+			response = ftp_lite_get_response(s,0,buffer);
+			s->data_channel_authentication = (response==200);
+		} else {
+			ftp_lite_send_command(s,"DCAU N");
+			response = ftp_lite_get_response(s,0,buffer);
+			s->data_channel_authentication = 0;
+		}
 		return 1;
 	} else {
 		return 0;
