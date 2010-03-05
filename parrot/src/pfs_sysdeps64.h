@@ -38,17 +38,6 @@ the right include files.  So, we just define our own.
 #include <linux/net.h>
 
 /*
-We require a scratch area in each process' address
-space for storing internal data such as an adjusted
-argument to execve.  This need not be *free* space,
-as we will restore its contents afterwards.  It must
-simply be a valid memory address.
-*/
-
-#define PFS_SCRATCH_ADDR ((char*)(pfs_process_heap_address(p)))
-#define PFS_SCRATCH_SIZE 4096
-
-/*
 Sadly, it is necessary to prefix each of the structure
 tags with pfs (i.e. pfs_st_dev instead of st_dev) because
 the structure tags themselves are frequently the target

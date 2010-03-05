@@ -147,7 +147,6 @@ void pfs_table::collapse_path( const char *l, char *s, int remove_dotdot )
 	string_collapse_path(l,s,remove_dotdot);
 }
 
-
 /*
 If short_path is an absolute path, copy it to full path.
 Otherwise, tack the current directory on to the front

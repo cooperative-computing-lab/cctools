@@ -986,14 +986,18 @@ as the executable and fiddle around with the job's argv to
 indicate that.  Then, we do much the same as the first case.
 */
 
-void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *args ) {
+void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *args )
+{
+	char *scratch_addr  = (char*)pfs_process_scratch_address(p);
+	int   scratch_size  = PFS_SCRATCH_SIZE;
+	char *scratch_avail = scratch_addr;
+
 	if(args[0]==0) {
 		debug(D_PROCESS,"execve: %s executing ",p->name);
 		p->state = PFS_PROCESS_STATE_USER;
 	} else if(entering) {
 		char path[PFS_PATH_MAX];
 		char firstline[PFS_PATH_MAX];
-		char *start_of_available_scratch = PFS_SCRATCH_ADDR;
 
 		tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
 
@@ -1039,7 +1043,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 
 			interp = &firstline[2];
 			while(isspace(*interp)) interp++;
-			ext_interp = PFS_SCRATCH_ADDR;
+			ext_interp = scratch_addr;
 			
 			/* interparg points to the internal argument */
 			/* scriptarg points to the script itself */
@@ -1073,7 +1077,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			/* the physical name of the interp is next */
 			ext_physical_name = ext_scriptarg + strlen(scriptarg) + 1;
 			/* make sure redirect_ldso doesn't clobber arguments */
-			start_of_available_scratch = ext_physical_name;
+			scratch_avail = ext_physical_name;
 
 			/* the new argv goes in the scratch area next */
 			ext_argv = ext_physical_name + strlen(p->new_physical_name) + 1;
@@ -1083,7 +1087,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			for(argc=0;argv[argc] && argc<PFS_ARG_MAX;argc++) {}
 
 			/* save the scratch area */
-			tracer_copy_in(p->tracer,p->scratch_data,PFS_SCRATCH_ADDR,PFS_SCRATCH_SIZE);
+			tracer_copy_in(p->tracer,p->scratch_data,scratch_addr,scratch_size);
 
 			/* write out the new interp, arg, and physical name */
 			tracer_copy_out(p->tracer,interp,ext_interp,strlen(interp)+1);
@@ -1113,17 +1117,17 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			debug(D_PROCESS,"execve: %s is an ordinary executable",p->new_logical_name);
 
 			/* save all of the data we are going to clobber */
-			tracer_copy_in(p->tracer,p->scratch_data,PFS_SCRATCH_ADDR,PFS_SCRATCH_SIZE);
+			tracer_copy_in(p->tracer,p->scratch_data,scratch_addr,scratch_size);
 
 			/* store the new local path */
-			tracer_copy_out(p->tracer,p->new_physical_name,PFS_SCRATCH_ADDR,strlen(p->new_physical_name)+1);
+			tracer_copy_out(p->tracer,p->new_physical_name,scratch_addr,strlen(p->new_physical_name)+1);
 
 			/* set the new program name to the logical name */
-			args[0] = (PTRINT_T) PFS_SCRATCH_ADDR;
+			args[0] = (PTRINT_T) scratch_addr;
 			tracer_args_set(p->tracer,p->syscall,args,3); /* BUG? Why 3 ? */
 		}
 		if (pfs_ldso_path) {
-			redirect_ldso(p, pfs_ldso_path, args, start_of_available_scratch);
+			redirect_ldso(p, pfs_ldso_path, args, scratch_avail);
 		}
 		debug(D_PROCESS,"execve: %s attempting",p->new_logical_name);
 
@@ -1151,11 +1155,14 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			memset(p->signal_interruptible,0,sizeof(p->signal_interruptible));
 			/* and certain files in the file table are closed */
 			p->table->close_on_exec();
+			/* and our knowledge of the address space is gone. */
+			p->heap_address = 0;
+			p->break_address = 0;
 			debug(D_PSTREE,"%d exec %s",p->pid,p->new_logical_name);
 		} else if(p->new_logical_name[0]) {
 			debug(D_PROCESS,"execve: %s failed",p->new_logical_name);
 			debug(D_PROCESS,"execve: restoring scratch area");
-			tracer_copy_out(p->tracer,p->scratch_data,(void*)PFS_SCRATCH_ADDR,PFS_SCRATCH_SIZE);
+			tracer_copy_out(p->tracer,p->scratch_data,(void*)scratch_addr,scratch_size);
 		}
 	}
 }
@@ -2491,6 +2498,20 @@ void decode_syscall( struct pfs_process *p, int entering )
 			divert_to_dummy(p,0);
 			break;
 
+		/* Whenever the break address is udpated validly, save it. */
+		/* This is used as one way of computing a scratch space. */
+
+		case SYSCALL32_brk:
+			if(entering) {
+			} else {
+				if(p->syscall_result==0) {
+					if(p->syscall_args[0]!=0) {
+						p->break_address = p->syscall_args[0];
+					}
+				}
+			}
+			break;
+
 		/*
 		These things are not currently permitted.
 		*/
@@ -2539,7 +2560,6 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_afs_syscall:
 		case SYSCALL32_alarm:
 		case SYSCALL32_bdflush:
-		case SYSCALL32_brk:
 		case SYSCALL32_capget:
 		case SYSCALL32_capset:
 		case SYSCALL32_clock_settime:
@@ -2698,11 +2718,14 @@ void decode_syscall( struct pfs_process *p, int entering )
 	}
 
 	if(!entering && p->state==PFS_PROCESS_STATE_KERNEL) {
+
 		p->state = PFS_PROCESS_STATE_USER;
+
 		if(p->syscall_args_changed) {
 			tracer_args_set(p->tracer,p->syscall,p->syscall_args,TRACER_ARGS_MAX);
 			p->syscall_args_changed = 0;
 		}
+
 		if(p->syscall_dummy) {
 			tracer_result_set(p->tracer,p->syscall_result);
 			p->syscall_dummy = 0;

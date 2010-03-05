@@ -30,6 +30,7 @@ extern "C" {
 #define PFS_PROCESS_STATE_WAITWRITE 4
 #define PFS_PROCESS_STATE_DONE 5
 
+#define PFS_SCRATCH_SIZE 4096
 
 struct pfs_process {
 	char name[PFS_PATH_MAX];
@@ -47,6 +48,7 @@ struct pfs_process {
 
 	pfs_size_t io_channel_offset;
 	PTRINT_T heap_address;
+	PTRINT_T break_address;
 
 	INT64_T syscall;
 	INT64_T syscall_original;
@@ -90,6 +92,7 @@ extern "C" void pfs_process_kill();
 extern "C" void pfs_process_killall();
 
 PTRINT_T pfs_process_heap_address( struct pfs_process *p );
+PTRINT_T pfs_process_scratch_address( struct pfs_process *p );
 
 extern struct pfs_process *pfs_current;
 

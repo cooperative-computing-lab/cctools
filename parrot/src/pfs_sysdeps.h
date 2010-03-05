@@ -48,17 +48,6 @@ are not always defined in all kernels.
 #define PFS_CONVERT_FORK_TO_CLONE 1
 
 /*
-We require a scratch area in each process' address
-space for storing internal data such as an adjusted
-argument to execve.  This need not be *free* space,
-as we will restore its contents afterwards.  It must
-simply be a valid memory address.
-*/
-
-#define PFS_SCRATCH_ADDR ((char*)0x08048000)
-#define PFS_SCRATCH_SIZE 4096
-
-/*
 Sadly, it is necessary to prefix each of the structure
 tags with pfs (i.e. pfs_st_dev instead of st_dev) because
 the structure tags themselves are frequently the target

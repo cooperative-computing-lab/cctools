@@ -98,6 +98,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table,
 	child->did_stream_warning = 0;
 	child->nsyscalls = 0;
 	child->heap_address = 0;
+	child->break_address = 0;
 
 	parent = table[ppid];
 	if(parent) {
@@ -401,6 +402,15 @@ void pfs_process_killall()
 			debug(D_PROCESS,"killing pid %d",table[i]->pid);
 			kill(table[i]->pid,SIGKILL);
 		}
+	}
+}
+
+PTRINT_T pfs_process_scratch_address( struct pfs_process *p )
+{
+	if(p->break_address) {
+		return p->break_address - 4096;
+	} else {
+		return pfs_process_heap_address(p);
 	}
 }
 

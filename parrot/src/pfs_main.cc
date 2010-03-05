@@ -679,6 +679,9 @@ int main( int argc, char *argv[] )
 			tracer_prepare();
 			kill(getpid(),SIGSTOP);
 			getpid();
+			// This call is necessary to force the kernel to report the current heap
+			// size, so that Parrot can observe it in order to rewrite the following exec.
+			sbrk(4096);
 			execvp(argv[optind],&argv[optind]);
 			debug(D_NOTICE,"unable to execute %s: %s",argv[optind],strerror(errno));
 			_exit(1);
