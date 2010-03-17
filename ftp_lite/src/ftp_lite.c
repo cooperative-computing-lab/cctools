@@ -972,7 +972,8 @@ int ftp_lite_data_channel_auth( struct ftp_lite_server *s, FILE *data )
 int ftp_lite_auth_globus( struct ftp_lite_server *s )
 {
 	char buffer[FTP_LITE_LINE_MAX];
-	char principal[FTP_LITE_LINE_MAX];
+	char principal_buf[FTP_LITE_LINE_MAX];
+	char *principal;
 	OM_uint32 major, minor, flags=0;
 	network_address addr;
 	int token,port;
@@ -999,10 +1000,13 @@ int ftp_lite_auth_globus( struct ftp_lite_server *s )
 		return 0;
 	}
 
-	strcpy(principal,"ftp@");
-
-	if(!network_address_remote(fileno(s->command),&addr,&port)) return 0;
-	if(!network_address_to_name(addr,&principal[4])) return 0;
+	principal = getenv("FTP_LITE_PRINCIPAL");
+	if(!principal) {
+		strcpy(principal_buf,"ftp@");
+		if(!network_address_remote(fileno(s->command),&addr,&port)) return 0;
+		if(!network_address_to_name(addr,&principal_buf[4])) return 0;
+		principal = principal_buf;
+	}
 
 	major = globus_gss_assist_init_sec_context( &minor, s->credential, &s->context, principal, GSS_C_MUTUAL_FLAG | GSS_C_DELEG_FLAG, &flags, &token, ftp_lite_get_adat, s, ftp_lite_put_adat, s );
 	if( major!=GSS_S_COMPLETE ) {
