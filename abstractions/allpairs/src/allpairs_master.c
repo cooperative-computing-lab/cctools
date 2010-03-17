@@ -439,7 +439,7 @@ int main(int argc, char** argv) { // or other primary control function.
 	char cmdrun[256];
 	sprintf(cmdrun, "allpairs_multicore -f setA.set.list setB.set.list %s", compare_function);
 	if((tmpresult = fast_popen(cmdrun)) == NULL){
-		fprintf(stderr, "allpairs_workqueue: Cannot execute allpairs_multicore. : %s\n", strerror(errno));
+		fprintf(stderr, "allpairs_master: Cannot execute allpairs_multicore. : %s\n", strerror(errno));
 		exit(1);
 	}
 	fscanf(tmpresult, "%d", &function_flag);
@@ -453,7 +453,7 @@ int main(int argc, char** argv) { // or other primary control function.
 		debug(D_DEBUG, "Using outer function.\n");
 	} else {
 		// function_flag == NO_COMPARE_FUNCTION
-		fprintf(stderr, "allpairs_workqueue: no compare function is found, either internal or external.\n");
+		fprintf(stderr, "allpairs_master: no compare function is found, either internal or external.\n");
 		exit(1);
 	}
 
