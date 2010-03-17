@@ -7,7 +7,7 @@ error_state=0;
 
 # link to all the necessary pieces.
 echo "Getting compress_reads"
-ln -s ${SAND_HOME}/formatting/src/sand_compress_reads ./sand_compress_reads || { echo "Please build sand first or delete conflicting file ./compress_reads ."; error_state=1 ; }
+ln -s ${SAND_HOME}/src/sand_compress_reads ./sand_compress_reads || { echo "Please build sand first or delete conflicting file ./compress_reads ."; error_state=1 ; }
 if [ ! -f ./sand_compress_reads ]; then echo "Please build sand first."; error_state=1 ; fi
 
 echo "Getting worker"
@@ -15,19 +15,19 @@ ln -s ${CCTOOLS_HOME}/dttools/src/worker ./worker || { echo "Please build dttool
 if [ ! -f ./worker ]; then echo "Please build dttools first."; error_state=1 ; fi
 
 echo "Getting serial filter program"
-ln -s ${SAND_HOME}/filtering/src/sand_filter_mer_seq ./sand_filter_mer_seq || { echo "Please build sand first or delete conflicting file ./sand_filter_mer_seq ."; error_state=1 ; }
+ln -s ${SAND_HOME}/src/sand_filter_mer_seq ./sand_filter_mer_seq || { echo "Please build sand first or delete conflicting file ./sand_filter_mer_seq ."; error_state=1 ; }
 if [ ! -f ./sand_filter_mer_seq ]; then echo "Please build sand first."; error_state=1 ; fi
 
 echo "Getting filter master"
-ln -s ${SAND_HOME}/filtering/src/sand_filter_master ./sand_filter_master || { echo "Please build sand first or delete conflicting file ./sand_filter_master ."; error_state=1 ; }
+ln -s ${SAND_HOME}/src/sand_filter_master ./sand_filter_master || { echo "Please build sand first or delete conflicting file ./sand_filter_master ."; error_state=1 ; }
 if [ ! -f ./sand_filter_master ]; then echo "Please build sand first."; error_state=1 ; fi
 
 echo "Getting serial alignment program"
-ln -s ${SAND_HOME}/alignment/src/sand_sw_alignment ./sand_sw_alignment || { echo "Please build sand first or delete conflicting file ./sw_alignment ."; error_state=1 ; }
+ln -s ${SAND_HOME}/src/sand_sw_alignment ./sand_sw_alignment || { echo "Please build sand first or delete conflicting file ./sw_alignment ."; error_state=1 ; }
 if [ ! -f ./sand_sw_alignment ]; then echo "Please build sand first."; error_state=1 ; fi
 
 echo "Getting alignment master"
-ln -s ${SAND_HOME}/alignment/src/sand_align_master ./sand_align_master || { echo "Please build sand first or delete conflicting file ./sand_align_master ."; error_state=1 ; }
+ln -s ${SAND_HOME}/src/sand_align_master ./sand_align_master || { echo "Please build sand first or delete conflicting file ./sand_align_master ."; error_state=1 ; }
 if [ ! -f ./sand_align_master ]; then echo "Please build sand first."; error_state=1 ; fi
 
 if(($error_state)); then

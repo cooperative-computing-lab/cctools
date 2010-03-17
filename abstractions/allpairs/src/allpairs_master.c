@@ -31,9 +31,7 @@ See the file COPYING for details.
 
 #include "allpairs_util.h"
 
-#define EXAMPLE_LINE_MAX 4096
-#define MAX_FILENAME_LEN 1024
-#define DEFAULT_PORT 9068
+#define ALLPAIRS_LINE_MAX 4096
 #define USING_INNER_FUNCTION 0
 #define USING_OUTER_FUNCTION 1
 #define NO_COMPARE_FUNCTION 2
@@ -65,8 +63,8 @@ struct ragged_array read_in_set(const char *setdir)
 	int numset = 0;
 	char *setfile;
 	char *tmpstr;
-	char buffer[MAX_FILENAME_LEN];
-	char filepath[MAX_FILENAME_LEN];
+	char buffer[ALLPAIRS_LINE_MAX];
+	char filepath[ALLPAIRS_LINE_MAX];
 	int setarraysize;
 
 	struct ragged_array setarray;
@@ -95,7 +93,7 @@ struct ragged_array read_in_set(const char *setdir)
 	}
 
 	while(!feof(setfileID)) {
-		tmpstr = fgets(tmpstr, MAX_FILENAME_LEN, setfileID);
+		tmpstr = fgets(tmpstr, ALLPAIRS_LINE_MAX, setfileID);
 		if(tmpstr != NULL) {
 			size_t last = strlen(tmpstr) - 1;
 			if(tmpstr[last] == '\n')
@@ -222,9 +220,6 @@ int init_worklist(int n, int x1, int y1, int x2, int y2)
 	return total;
 }
 
-// TODO for measurement
-//FILE *tasklog;
-
 int work_accept(struct work_queue_task *task)
 {
 	if(task->return_status != 0)
@@ -232,12 +227,6 @@ int work_accept(struct work_queue_task *task)
 	fputs(task->output, stdout);
 	fflush(stdout);
 	total_done++;
-
-	/**
-	// for measurement only
-	// taskid, computation time(including transfer result back), bytes_transfered, transfer_time
-	fprintf(tasklog, "%d\t%.02lfs\t%lld\t%.02lfs\t%s\n", task->taskid, (task->finish_time-task->start_time)/1000000.0, task->total_bytes_transfered, task->total_transfer_time/1000000.0, task->command_line);
-*/
 
 	fprintf(stderr, "Completed task with command: %s\n", task->command_line);
 	fprintf(stderr, "%i tasks done so far.\n", total_done);
@@ -247,47 +236,29 @@ int work_accept(struct work_queue_task *task)
 void do_failure(struct work_queue_task *task)
 {
 	fprintf(stderr, "Task with command \"%s\" returned with return status: %i\n", task->command_line, task->return_status);
-	// other applications may resubmit task or take other action, if desired
 }
 
 struct work_queue_task *work_create(struct block *q, char *setAdir, char *setBdir)
 {
 	int i;
-	char input_file[EXAMPLE_LINE_MAX];
-	char cmd[EXAMPLE_LINE_MAX];
+	char input_file[ALLPAIRS_LINE_MAX];
+	char cmd[ALLPAIRS_LINE_MAX];
 
-	char *setAfile;
-	char *setBfile;
+	char setAfile[ALLPAIRS_LINE_MAX];
+	char setBfile[ALLPAIRS_LINE_MAX];
 
-	if(!q)
-		return 0;
-
-	// get location of set.list file
-	setAfile = (char *) malloc((strlen(setAdir) + 1 + strlen("set.list") + 1) * sizeof(char));
-	if(setAfile == NULL) {
-		fprintf(stderr, "Allocating set name failed!\n");
-		return 0;
-	}
 	sprintf(setAfile, "%s/set.list", setAdir);
-
-
-	// get location of set.list file
-	setBfile = (char *) malloc((strlen(setBdir) + 1 + strlen("set.list") + 1) * sizeof(char));
-	if(setBfile == NULL) {
-		fprintf(stderr, "Allocating set name failed!\n");
-		return 0;
-	}
 	sprintf(setBfile, "%s/set.list", setBdir);
 
-
-
 	sprintf(cmd, "./allpairs_multicore -i %d -j %d -k %d -l %d -X %d -Y %d -r setA.set.list setB.set.list %s", q->x1, q->y1, q->x2, q->y2, topLeftX, topLeftY, compare_function);
+
 	struct work_queue_task *t = work_queue_task_create(cmd);
 	fprintf(stderr, "Created task with command: %s\n", cmd);
 	work_queue_task_specify_input_file(t, allpairs_multicore, "allpairs_multicore");
 	if(usingInnerFunc != 1) {
 		work_queue_task_specify_input_file(t, compare_function, compare_function);
 	}
+
 	work_queue_task_specify_input_file(t, setAfile, "setA.set.list");
 	work_queue_task_specify_input_file(t, setBfile, "setB.set.list");
 
@@ -317,14 +288,10 @@ static void show_help(const char *cmd)
 {
 	printf("Usage: %s [options] <set A> <set B> <compare function>\n", cmd);
 	printf("The most common options are:\n");
+	printf(" -p <integer>	The port that the Master will be listening on.\n");
 	printf(" -d <string>	Enable debugging for this subsystem.\n");
 	printf(" -v         	Show program version.\n");
 	printf(" -h         	Display this message.\n");
-	printf(" -p <integer>	The port that the Master will be listening on.\n");
-	printf(" -i <integer>  	x coordinate of the start point of computation in the matrix. \n");
-	printf(" -j <integer>  	y coordinate of the start point of computation in the matrix. \n");
-	printf(" -k <integer>  	x coordinate of the end point of computation in the matrix. \n");
-	printf(" -l <integer>  	y coordinate of the end point of computation in the matrix. \n");
 	printf("\n");
 	printf("Less common options are:\n");
 	printf(" -x <integer>	Block width.  (default is chosen according to hardware conditions)\n");
@@ -332,40 +299,15 @@ static void show_help(const char *cmd)
 	printf(" -X <integer> 	x coordinate of starting point in a distributed context.\n");
 	printf(" -Y <integer>  	y coordinate of starting point in a distributed context.\n");
 	printf(" -c <integer>	Number of workers to be used.\n");
-	printf(" -f 			Indicate that workqueue uses an inner compare function embedded in allpairs_multicore.\n");
-}
-
-// Test function starts below
-
-void display_ragged_array(struct ragged_array *t)
-{
-	int i;
-
-	if(!t)
-		return;
-
-	printf("Array size: %d; Elements are as follow:\n", t->array_size);
-	for(i = 0; i < t->array_size; i++) {
-		printf("\t%s\n", t->arr[i]);
-	}
-	printf("\n");
-}
-
-void display_work_list()
-{
-	struct block *p;
-
-	p = pCurrentBlock;
-
-	while(p) {
-		debug(D_DEBUG, "[%d, %d]\t[%d, %d]\n", p->x1, p->y1, p->x2, p->y2);
-		p = p->next;
-	}
+	printf(" -i <integer>  	x coordinate of the start point of computation in the matrix. \n");
+	printf(" -j <integer>  	y coordinate of the start point of computation in the matrix. \n");
+	printf(" -k <integer>  	x coordinate of the end point of computation in the matrix. \n");
+	printf(" -l <integer>  	y coordinate of the end point of computation in the matrix. \n");
+	printf(" -f             Indicate that workqueue uses an inner compare function embedded in allpairs_multicore.\n");
 }
 
 int main(int argc, char **argv)
-{				// or other primary control function.
-	int i, sum = 0;
+{
 	int ret;
 	char c;
 	time_t short_timeout = 10;
@@ -374,13 +316,11 @@ int main(int argc, char **argv)
 
 	int setAindex, setBindex, funcindex;
 
-	char *setAfile;
-	char *setBfile;
 	int x1, y1, x2, y2;
 	int numOfStableElements;
 	int numOfMovingElements;
 	int numOfWorkers = 0;
-	int port = DEFAULT_PORT;
+	int port = WORK_QUEUE_DEFAULT_PORT;
 
 	x1 = y1 = x2 = y2 = -1;
 
@@ -431,12 +371,9 @@ int main(int argc, char **argv)
 	}
 
 	if((argc - optind) < 3) {
-		fprintf(stderr, "allpairs_multicore: after all options, you must have: setA setB function\n");
+		show_help(argv[0]);
 		exit(1);
 	}
-	// TODO measurement only
-	//tasklog = fopen("task_stats.log", "w");
-
 	setAindex = optind;
 	setBindex = optind + 1;
 	funcindex = optind + 2;
@@ -469,46 +406,28 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	char setAfile[ALLPAIRS_LINE_MAX];
+	char setBfile[ALLPAIRS_LINE_MAX];
 
-	// get location of set.list file
-	setAfile = (char *) malloc((strlen(argv[setAindex]) + 1 + strlen("set.list") + 1) * sizeof(char));
-	if(setAfile == NULL) {
-		fprintf(stderr, "Allocating set name failed!\n");
-		return -1;
-	}
 	sprintf(setAfile, "%s/set.list", argv[setBindex]);
-
-
-	// get location of set.list file
-	setBfile = (char *) malloc((strlen(argv[setBindex]) + 1 + strlen("set.list") + 1) * sizeof(char));
-	if(setBfile == NULL) {
-		fprintf(stderr, "Allocating set name failed!\n");
-		return -1;
-	}
 	sprintf(setBfile, "%s/set.list", argv[setBindex]);
-
 
 	validate_coordinates(setAfile, setBfile, &x1, &y1, &x2, &y2);
 	debug(D_DEBUG, "validated coords: [%d, %d]\t[%d, %d]\n", x1, y1, x2, y2);
 
-	free(setAfile);
-	free(setBfile);
-
 	ret = init_worklist(numOfWorkers, x1, y1, x2, y2);
 	debug(D_DEBUG, "Number of tasks: %d. They are:\n", ret);
-	//display_work_list();
 
-	q = work_queue_create(port, time(0) + 60);	// create a queue
-	if(!q) {		// if it could not be created
+	q = work_queue_create(port, time(0) + 60);
+	if(!q) {
 		fprintf(stderr, "Could not create queue.\n");
 		return 1;
 	}
-	//work_queue_activate_fast_abort(q, 2);
 
 	while(1) {
-		while(work_queue_hungry(q)) {	// while the work queue can support more tasks
+		while(work_queue_hungry(q)) {
 			task = work_create(pCurrentBlock, argv[setAindex], argv[setBindex]);
-			if(!task) {	// if we're out of work to do
+			if(!task) {
 				break;
 			} else {
 				work_queue_submit(q, task);
@@ -516,24 +435,20 @@ int main(int argc, char **argv)
 		}
 
 		if(!task && work_queue_empty(q)) {
-			break;	// we're out of work and there are no more tasks that the queue knows about that haven't been handled: we're done
+			break;
 		}
 
-		task = work_queue_wait(q, short_timeout);	//wait for a little while to see if there are any completed tasks
-		if(task) {	// if there were completed tasks, handle them.
+		task = work_queue_wait(q, short_timeout);
+		if(task) {
 			if(work_accept(task)) {
-				work_queue_task_delete(task);	// delete the task structure. We've completed its work.
+				work_queue_task_delete(task);
 			} else {
-				do_failure(task);	// handle the task's failure, perhaps by logging it or submitting a new task.
+				do_failure(task);
 			}
 		}
 	}
 
-	for(i = 0; i < 10; i++)
-		sum += work_queue_shut_down_workers(q, 0);
-	fprintf(stderr, "%i workers shut down.\n", sum);
 	work_queue_delete(q);
 
-	//fclose(tasklog);
 	return 0;
 }

@@ -52,8 +52,8 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 
 	Chris Moretti
 	University of Notre Dame
-	Contributed extensively to the implementation of Chirp
-	and abstractions for distributed computing.
+	Contributed extensively to the implementation of Chirp,
+	abstractions for distributed computing, and the SAND assembler.
 
 	Francesco Prelz
 	INFN Milan
@@ -75,6 +75,10 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 	Paul Madrid
 	University of Notre Dame
 	Implemented the reservation ACL feature.
+
+	Kevin Partington
+	University of Notre Dame
+	Contributed to features in Makeflow.
 
 	Alain Roy
 	University of Wisconsin

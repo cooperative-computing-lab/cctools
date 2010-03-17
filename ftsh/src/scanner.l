@@ -1,3 +1,6 @@
+
+%option nounput
+
 %{
 #include "parser.h"
 #include "parser.tab.h"

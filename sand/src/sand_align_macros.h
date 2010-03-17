@@ -1,4 +1,10 @@
 /*
+Copyright (C) 2009- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
+/*
 	A set of macros to determine what kind of alignment program to make. By default only COMPRESSION is activated.
 */
 

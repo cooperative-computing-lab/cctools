@@ -6,9 +6,9 @@ uname -a
 
 save_arguments $0 $@
 
-major=2
-minor=6
-micro=1
+major=3
+minor=0
+micro=0
 
 build_user=`whoami`
 build_host=`uname -n`
@@ -240,20 +240,6 @@ do
 		echo "package $p not found (that's ok)"
 	fi
 done
-
-#special check for sand, because it doesn't use the same hierarchy.
-p="sand"
-if [ -d $p ]
-    then
-    echo "package $p found (specific check)"
-    if [ -d `pwd`/$p/sandtools/src ]
-	then
-	internal_ccflags="${internal_ccflags} -I`pwd`/$p/sandtools/src"
-	internal_ldflags="${internal_ldflags} -L`pwd`/$p/sandtools/src"
-    fi
-else
-    echo "package $p not found (that's ok)"
-fi
 
 require_path ${ccompiler}
 require_path ${cxxcompiler}

@@ -1,13 +1,19 @@
+/*
+Copyright (C) 2009- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "sequence_alignment.h"
-#include "sequence_compression.h"
 
 int main(int argc, char ** argv)
 {
 	FILE * input;
 	seq s;
-	cseq c;
+	//cseq c;
 
 	if (argc == 2)
 	{
@@ -25,14 +31,18 @@ int main(int argc, char ** argv)
 
 	//s = get_next_sequence(input);
 
+	char tmp[500];
 	while (!feof(input))
 	{
 		s = get_next_sequence(input); 
 		if (!s.id) { fprintf(stdout, ">>\n"); continue; }
-		c = compress_seq(s);
+		//c = compress_seq(s);
+		strcpy(tmp, s.metadata);
+		sprintf(s.metadata, "%d %d %s", s.length, s.length, tmp);
+		print_sequence(stdout, s);
 		free_seq(s);
-		print_cseq(stdout, c);
-		free_cseq(c);
+		//print_cseq(stdout, c);
+		//free_cseq(c);
 	}
 
 	fclose(input);
