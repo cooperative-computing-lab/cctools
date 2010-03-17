@@ -44,7 +44,7 @@ the documentation.
 To build and install all of these packages in your
 home directory, simply type:
 
-	./configure --prefix ~/tools
+	./configure --prefix ~/cctools
 	make
 	make install
 
