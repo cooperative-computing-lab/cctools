@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2009- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "sequence_alignment.h"
