@@ -316,8 +316,6 @@ int main(int argc, char **argv)
 
 	int setAindex, setBindex, funcindex;
 
-	char *setAfile;
-	char *setBfile;
 	int x1, y1, x2, y2;
 	int numOfStableElements;
 	int numOfMovingElements;
