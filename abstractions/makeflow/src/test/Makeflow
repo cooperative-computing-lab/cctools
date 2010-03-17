@@ -49,6 +49,6 @@ utilities.js: $BASEDIR/utilities.js
 viewThread.php: $BASEDIR/viewThread.php
 	$CP $BASEDIR/viewThread.php viewThread.php
 
-total_word_count.txt: db_utilities.php forum.php game.php header.php index.htm login.php newgame.php newThread.php profile.php psychoGrid.css register.php rules.php submitPost.php submitThread.php utilities.js viewThread.php
-	LOCAL cat db_utilities.php forum.php game.php header.php index.htm login.php newgame.php newThread.php profile.php psychoGrid.css register.php rules.php submitPost.php submitThread.php utilities.js viewThread.php | wc -l > total_word_count.txt
+total_line_count.txt: db_utilities.php forum.php game.php header.php index.htm login.php newgame.php newThread.php profile.php psychoGrid.css register.php rules.php submitPost.php submitThread.php utilities.js viewThread.php
+	LOCAL cat db_utilities.php forum.php game.php header.php index.htm login.php newgame.php newThread.php profile.php psychoGrid.css register.php rules.php submitPost.php submitThread.php utilities.js viewThread.php | wc -l > total_line_count.txt
 

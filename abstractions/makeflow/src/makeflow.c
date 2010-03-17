@@ -1102,7 +1102,8 @@ int main( int argc, char *argv[] )
 		sprintf(batchlogfilename,"%s.condorlog",dagfile);
 	}
 
-	struct dag *d = dag_create(dagfile, clean_mode || syntax_check);
+	int no_symlinks = (clean_mode || syntax_check || display_mode);
+	struct dag *d = dag_create(dagfile, no_symlinks);
 	if(!d) {
 		fprintf(stderr,"makeflow: couldn't load %s: %s\n",dagfile,strerror(errno));
 		free(logfilename);
