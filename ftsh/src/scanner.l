@@ -10,8 +10,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define YY_NO_UNPUT
-
 static int grab( int type, int firstint );
 static int grab_int( int type );
 
