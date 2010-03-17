@@ -140,3 +140,17 @@ int ragged_array_delete_line(struct ragged_array* set, const int line_index) {
     set->row_count--;
     return 1;
 }
+
+void ragged_array_print( struct ragged_array *t )
+{
+	int i;
+
+	if(!t)
+		return;
+
+	printf("Array size: %d; Elements are as follow:\n", t->array_size);
+	for(i = 0; i < t->array_size; i++) {
+		printf("\t%s\n", t->arr[i]);
+	}
+	printf("\n");
+}
