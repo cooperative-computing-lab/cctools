@@ -24,5 +24,6 @@ clean:
 install: all
 	install -d ${CCTOOLS_INSTALL_DIR}/
 	install -d ${CCTOOLS_INSTALL_DIR}/bin
+	install wavefront ${CCTOOLS_INSTALL_DIR}/bin
 	install wavefront_master ${CCTOOLS_INSTALL_DIR}/bin
 
