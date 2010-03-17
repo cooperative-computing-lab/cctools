@@ -6,9 +6,9 @@ uname -a
 
 save_arguments $0 $@
 
-major=2
-minor=6
-micro=1
+major=3
+minor=0
+micro=0
 
 build_user=`whoami`
 build_host=`uname -n`
