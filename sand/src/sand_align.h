@@ -19,7 +19,7 @@ See the file COPYING for details.
 
 #include <sys/stat.h>
 
-#include "../../sandtools/src/sand_align_macros.h"
+#include "sand_align_macros.h"
 
 #include "debug.h"
 #include "work_queue.h"
