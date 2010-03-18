@@ -247,6 +247,8 @@ struct work_queue_task *work_create(struct block *q, char *setAdir, char *setBdi
 	char setAfile[ALLPAIRS_LINE_MAX];
 	char setBfile[ALLPAIRS_LINE_MAX];
 
+	if (!q) return 0;
+
 	sprintf(setAfile, "%s/set.list", setAdir);
 	sprintf(setBfile, "%s/set.list", setBdir);
 
@@ -273,8 +275,6 @@ struct work_queue_task *work_create(struct block *q, char *setAdir, char *setBdi
 		work_queue_task_specify_input_file(t, setB.arr[i], input_file);
 	}
 
-	free(setAfile);
-	free(setBfile);
 	pCurrentBlock = q->next;
 	return t;
 }
@@ -385,7 +385,7 @@ int main(int argc, char **argv)
 	// Check if the compare function exists. 
 	FILE *tmpresult;
 	int function_flag;
-	char cmdrun[256];
+	char cmdrun[ALLPAIRS_LINE_MAX];
 	sprintf(cmdrun, "allpairs_multicore -f setA.set.list setB.set.list %s", compare_function);
 	if((tmpresult = fast_popen(cmdrun)) == NULL) {
 		fprintf(stderr, "allpairs_master: Cannot execute allpairs_multicore. : %s\n", strerror(errno));
