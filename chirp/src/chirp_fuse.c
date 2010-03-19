@@ -295,17 +295,13 @@ static int chirp_fuse_utime(const char *path, struct utimbuf *buf)
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(path,newpath,host);
-	time_t actime, modtime;
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_utime( host, newpath, actime, modtime, time(0)+chirp_fuse_timeout );
+	result = chirp_global_utime( host, newpath, buf->actime, buf->modtime, time(0)+chirp_fuse_timeout );
 	pthread_mutex_unlock(&mutex);
 
 	if(result<0) return -errno;
 
-	buf->actime = actime;
-	buf->modtime = modtime;
-	
 	return 0;
 }
 
