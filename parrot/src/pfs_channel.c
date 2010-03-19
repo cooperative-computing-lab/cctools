@@ -69,7 +69,6 @@ static void entry_delete( struct entry *e )
 int pfs_channel_init( pfs_size_t size )
 {
 	char path[PATH_MAX];
-	int fd;
 
 	sprintf(path,"%s/pfs.tmp.XXXXXX",pfs_temp_dir);
 	channel_fd = mkstemp(path);
@@ -81,13 +80,13 @@ int pfs_channel_init( pfs_size_t size )
 
 	channel_base = (char*) mmap(0,size,PROT_READ|PROT_WRITE,MAP_SHARED,channel_fd,0);
 	if(channel_base==MAP_FAILED) {
-		close(fd);
+		close(channel_fd);
 		return 0;
 	}
 
 	head = entry_create(0,size,0,0);
 	if(!head) {
-		close(fd);
+		close(channel_fd);
 		munmap(channel_base,size);
 		return 0;
 	}
