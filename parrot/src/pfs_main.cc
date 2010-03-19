@@ -448,7 +448,7 @@ int main( int argc, char *argv[] )
 	pfs_uid = getuid();
 	pfs_gid = getgid();
 
-	putenv("PARROT_ENABLED=TRUE");
+	putenv((char *)"PARROT_ENABLED=TRUE");
 
 	s = getenv("PARROT_BLOCK_SIZE");
 	if(s) pfs_service_set_block_size(string_metric_parse(s));

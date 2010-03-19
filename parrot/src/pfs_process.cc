@@ -327,7 +327,7 @@ extern "C" char * pfs_process_name()
 	if(pfs_current) {
 		return pfs_current->name;
 	} else {
-		return "unknown";
+		return (char *)"unknown";
 	}
 }
 
