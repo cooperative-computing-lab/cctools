@@ -98,7 +98,7 @@ static void divert_to_dummy( struct pfs_process *p, int result )
 
 static int errno_in_progress( int e )
 {
-	return (e==EAGAIN || e==EALREADY | e==EINPROGRESS);
+	return (e==EAGAIN || e==EALREADY || e==EINPROGRESS);
 }
 
 /*
@@ -1281,7 +1281,7 @@ int decode_ioctl_siocgifconf( struct pfs_process *p, int fd, int cmd, void *uadd
 
 	tracer_copy_in(p->tracer,&uifc,uaddr,sizeof(uifc));
 	buffer = (char*) malloc(uifc.ifc_len);
-	tracer_copy_in(p->tracer,buffer,(void*)(PTRINT_T)uifc.ifc_buffer,uifc.ifc_len);
+	length = tracer_copy_in(p->tracer,buffer,(void*)(PTRINT_T)uifc.ifc_buffer,uifc.ifc_len);
 
 	ifc.ifc_buf = buffer;
 	ifc.ifc_len = length;
