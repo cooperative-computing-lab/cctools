@@ -40,6 +40,7 @@ See the file COPYING for details.
 #define USING_OUTER_FUNCTION 1
 #define NO_COMPARE_FUNCTION 2
 
+#define MILLION 1000000
 
 void get_absolute_path(char *local_path, char *path)
 {
@@ -171,4 +172,13 @@ int validate_coordinates(const char *setAfile, const char *setBfile, int *p, int
 	debug(D_DEBUG, "End point:  \t[%d, %d]\n", *r, *s);
 
 	return 0;
+}
+
+
+double elapsedtime(struct timeval *t_start, struct timeval *t_end) {
+	double elapsed;
+
+	elapsed = (MILLION * t_end->tv_sec + t_end->tv_usec) - (MILLION * t_start->tv_sec + t_start->tv_usec);
+
+	return elapsed/MILLION;
 }

@@ -292,13 +292,13 @@ static void show_help(const char *cmd)
 	printf(" -d <string>	Enable debugging for this subsystem.\n");
 	printf(" -v         	Show program version.\n");
 	printf(" -h         	Display this message.\n");
+	printf(" -c <integer>	Split factor. Number of subtasks = 2 ^ split factor\n");
 	printf("\n");
 	printf("Less common options are:\n");
 	printf(" -x <integer>	Block width.  (default is chosen according to hardware conditions)\n");
 	printf(" -y <integer>	Block height. (default is chosen according to hardware conditions)\n");
 	printf(" -X <integer> 	x coordinate of starting point in a distributed context.\n");
 	printf(" -Y <integer>  	y coordinate of starting point in a distributed context.\n");
-	printf(" -c <integer>	Number of workers to be used.\n");
 	printf(" -i <integer>  	x coordinate of the start point of computation in the matrix. \n");
 	printf(" -j <integer>  	y coordinate of the start point of computation in the matrix. \n");
 	printf(" -k <integer>  	x coordinate of the end point of computation in the matrix. \n");
@@ -415,8 +415,10 @@ int main(int argc, char **argv)
 	validate_coordinates(setAfile, setBfile, &x1, &y1, &x2, &y2);
 	debug(D_DEBUG, "validated coords: [%d, %d]\t[%d, %d]\n", x1, y1, x2, y2);
 
+	if(numOfWorkers <= 0)
+		numOfWorkers = 2;    // Default split factor
 	ret = init_worklist(numOfWorkers, x1, y1, x2, y2);
-	debug(D_DEBUG, "Number of tasks: %d. They are:\n", ret);
+	debug(D_DEBUG, "Number of tasks: %d\n", ret);
 
 	q = work_queue_create(port, time(0) + 60);
 	if(!q) {

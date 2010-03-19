@@ -44,3 +44,6 @@ int file_line_count(const char *filename);
 
 //
 int validate_coordinates(const char *setAfile, const char *setBfile, int *p, int *q, int *r, int *s);
+
+//
+double elapsedtime(struct timeval *t_start, struct timeval *t_end);
