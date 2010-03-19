@@ -1,0 +1,405 @@
+<html>
+
+<head>
+	<title>Allpairs User's Manual</title>
+</head>
+
+<body>
+
+<style type="text/css">
+pre {
+background: #ffffcc;
+font-family: monospace;
+font-size: 75%
+font-align: left;
+white-space: pre;
+border: solid 1px black;
+padding: 5px;
+margin: 20px;
+}
+
+ul.NoBullet {
+	list-style-type: none
+}
+</style>
+<h1>Allpairs User's Manual</h1>
+<b>Last Updated January 2010</b>
+<p>
+Allpairs is Copyright (C) 2009 The University of Notre Dame.
+This software is distributed under a BSD-style license.
+See the file COPYING for details.
+<p>
+<h2>Overview</h2>
+
+<table>
+<tr>
+	<td valign=middle>
+			<a href=/~ccl/software/allpairs/large.gif><img src=/~ccl/software/allpairs/small.gif align=right border=0></a>
+	</td>
+	<td valign=middle>
+		<div id=abstraction>
+All-Pairs( array A[i], array B[j], function F(x,y) )<br>
+returns matrix M where<br>
+M[i,j] = F( A[i], B[j] )<br>
+		</div>
+	</td>
+</tr>
+</table>
+<p>
+The All-Pairs abstraction computes the Cartesian product of two sets,
+generating a matrix where each cell M[i,j] contains the output of the function
+F on objects A[i] and B[j]. You provide two sets of data files (as in the above
+figure, one set is setA = {A0, A1, A2, A3} and the other set is setB = {B0, B1,
+B2, B3}) and a function F that computes on them (later in the text we refer to this fuction F as either <b>compare program</b> or <b>compare function</b>. You may optionally provide
+additional parameters to control the actual computation, such as computing only
+part of the matrix, using a specified number of CPU cores. The abstraction then
+runs each of the functions in parallel, automatically handling load balancing,
+data movement, fault tolerance and so on for you.
+
+<h2 id="preparation">The First Example</h2>
+<p>
+Before running All-Pairs, you should have:
+<ol> 
+	<li><b>Cooperative Computing Tools</b> installed - You can find the installation guide <a href=/~ccl/software/manuals/install.html>here</a> </li>
+	<li><b>Two data sets</b> -  Each data set is a directory containing all the data
+	files in the set. In the data set directory, there should also be a file
+	named <tt>set.list</tt>.  The <tt>set.list</tt> file contains the paths (absolute paths or
+	relative paths that are relative to the data set directory) to the
+	corresponding data files one at a line.</li> 
+	<li><b>A Compare Program/Function</b> - The compare program should accept
+	two files and return a <tt>double</tt> type value that would be placed in
+	the matrix cell. A compare function would make the computation faster
+	compared to the compare program. The details of how to use compare function
+	in allpairs can be found <a href=#cmp_func>here</a></li> 
+</ol>	
+	
+Now let's take a look at a real example!
+<p>
+We have two directories named <tt>setA</tt> and <tt>setB</tt>.<br>
+<ul class="NoBullet">
+<li><b><tt>setA</tt></b> contains 5 files. They are A1, A2 ... A5.<br></li>
+<li><b><tt>setB</tt></b> contains 5 files. They are B1, B2 ... B5.<br></li>
+</ul>
+We also have a compare program <b><tt>func.exe</tt></b> which accepts two files
+from command line arguments and return a <tt>double</tt> type value based on
+certain computations on those two files.
+<p>
+Our goal is to generate a matrix from <tt>setA</tt> and <tt>setB</tt> using
+<tt>func.exe</tt> as described in the following graph: 
+<div align=center>
+		<img src=allpairs.gif align=middle width=440 heigh=270 border=0>
+</div>
+To achieve this using allpairs abstraction, we first have to add the
+<b><tt>set.list</tt></b> files to the <tt>setA</tt> and <tt>setB</tt>
+directories.
+<p>
+The contents of the <tt>set.list</tt> file in setA are:
+<pre>
+A1
+A2
+...
+A5
+</pre> 
+As can be seen, each line of the <tt>set.list</tt> file is a relative path to a
+file that would be used in the matrix generation. The order of the paths in
+<tt>set.list</tt> decides the indices of the files during matrix creation. In
+this case, A1's index is 0 and A5's index is 4. Two indices together decide the
+coordinate of the value computed from the corresponding two files. In the above
+graph, the numbers in the yellow circles are the coordinates in the output
+matrix.  
+<p>
+Similarly, the contents of the <tt>set.list</tt> file in setB are: 
+<pre>
+B1
+B2
+...
+B5
+</pre>
+Now, we are ready to invoke the allpairs_multicore program to perform the
+matrix generation task. To do this is as simple as typing the following command
+at the command line: 
+<pre>
+allpairs_multicore setA setB func.exe
+</pre>
+In general, this is how you invoke <tt>allpairs_multicore</tt>:
+<pre>
+allpairs_multicore [options] &lt;set A&gt; &lt;set B&gt; &lt;compare function&gt;
+</pre>
+&lt;set A&gt; is the name of one set(a directory that has a <tt>set.list</tt>
+file), and &lt;set B&gt; is the name of the other set. In this example, they
+are <tt>setA</tt> and <tt>setB</tt> that we prepared in a earlier step.
+&lt;compare function&gt; is the function we wrote for each computation of a
+cell value. In this case it is <tt>func.exe</tt> 
+<p>
+The output of the execution looks like this:
+<pre>
+1	1	234
+2	3  	345
+0	0 	32
+...
+...
+4	4	987
+...
+3	2	184
+</pre>
+The output is what eventually matters. So let's spend a little time to understand what does the bunch of numbers mean. The format of the output is:
+<pre>
+x-axis	y-axis	value
+</pre>
+The <tt>x-axis</tt> and <tt>y-axis</tt> are the coordinates in the matrix.<br>
+The <tt>value</tt> is the value of the corresponding cell in the matrix.<br> 
+<p>
+Note that the program <tt>func.exe</tt> may be written in any language that you
+prefer. It's not restricted to just normal programming language, it can even be a script or anything as long as it can be invoked like this:
+<pre>
+./func.exe fileA fileB
+</pre>
+And of course, returns a <tt>double</tt> type value to the standard output.
+
+<h2 id="details">The Fine Details</h2>
+<h3>Compute only a submatrix</h3>
+The first example has no options, which by default computes the matrix using
+all the files listed in the two <tt>set.list</tt> files. Sometimes the matrix
+is very big or some parts of the matrix is already computed for some reason.
+Then you might just want to compute part of the matrix. You can do this by
+providing a few additional parameters: 
+<pre>
+allpairs_multicore -i 2 -j 2 -k 4 -l 3 setA setB func.exe
+</pre>
+The meaning of the options are:
+<ul class="NoBullet">
+<li><b>-i &lt;integer&gt;</b>: x coordinate of the start point of computation in the matrix.
+<li><b>-j &lt;integer&gt;</b>: y coordinate of the start point of computation in the matrix.
+<li><b>-k &lt;integer&gt;</b>: x coordinate of the end point of computation in the matrix.
+<li><b>-l &lt;integer&gt;</b>: y coordinate of the end point of computation in the matrix.
+</ul>
+In this example, the start point of computation is [2, 2] and the end point is [4, 3]. The output is thus just restricted to the cells in the submatrix encompassed by the red dotted line in the graph below:
+<div align=center>
+<img src=allpairs-submatrix.gif align=middle width=800 heigh=550 border=0>
+</div>
+
+<h3>The whole matrix is a submatrix of another</h3>
+The matrix created from setA and setB may be a submatrix of an another larger matrix.
+In this case, you can provide more parameters to inform the <tt>allpairs_multicore</tt> program where the matrix would be in the larger matrix:
+<pre>
+allpairs_multicore -X 10 -Y 5 setA setB func.exe
+</pre>
+The meaning of the options are:
+<ul class="NoBullet">
+<li><b>-X &lt;integer&gt;</b>: x coordinate of start point in a distributed context.</li>
+<li><b>-Y &lt;integer&gt;</b>: y coordinate of start point in a distributed context.</li>
+</ul>
+In this example, all the files listed in the two <tt>set.list</tt> files will be used to generate a matrix, and the output coordinates would reflect the new positions as if they were in a larger matrix.
+<div align=center>
+<img src=allpairs-distribute.gif align=middle width=800 heigh=550 border=0>
+</div>
+
+<h3>Can I do "a submatrix in a larger matrix context"?</h3>
+Of course, you can combine the functionalities of the above two examples:
+<pre>
+allpairs_multicore -i 2 -j 1 -k 3 -l 3 -X 78 - Y 534 setA setB func.exe
+</pre>
+This will compute the following:
+<div align=center>
+<img src=allpairs-combined.gif align=middle width=800 heigh=550 border=0>
+</div>
+<br>
+<!--
+<pre>
+	-x <integer>	Block width.  (default is chosen according to hardware conditions.)
+	-y <integer>	Block height. (default is chosen according to hardware conditions.)
+</pre>
+--> 
+For more options on <tt>allpairs_multicore</tt>, please type the following
+command and refer to the help message: 
+<pre>
+allpairs_multicore -h
+</pre>
+
+<h2 id=cmp_func>Work with a Compare Function to boost performance</h2>
+The main difference between a compare function and a compare program in
+allpairs is: a compare function is an internal function in the
+allpairs_multicore source code written in C language, and a compare program is
+an external standalone program that can be written in any language.
+<p>
+According to our reseach on allpair multicore abstraction, invoking a compare
+function is more than two orders of magnitude faster than invoking a compare
+program. This is especially important when a compare program could be finished
+in a very short time, say less than 1 or 2 seconds. If this is the case, the
+invocatio time of the compare program would take up a large portion of the
+total execution time. The situation could be even worse. To invoke an external
+program, <tt>allpairs_multicore</tt> will also invoke the user's shell along
+with their complex startup scripts, which can have unbounded execution time.
+Consider you may have to run the compare function thousands of times when the
+target matrix is large, then the program invocation overhead could hardly be
+neglected. 
+<p>
+Our solution to this problem is to allow the user to be able to plug a snippet
+of C code into the <tt>allpairs_multicore</tt> source code. To take advantage
+of this feature, you have to rebuild the <tt>allpairs_multicore</tt> program
+from source code. You can download the source code <a
+		href="http://www.cse.nd.edu/~ccl/software/download.shtml">here</a>.
+<p>
+There <b>3 steps</b> to plug in a customized compare function:
+<p>
+<b>1. Write the function and place it in <tt>allpairs_multicore.c</tt></b>
+<p>
+Your compare function should look like this:
+<pre>
+double function_name(const void *mmap1, size_t size1, const void *mmap2, size_t size2) {
+	The C code that implements the "comparison" algorithm...
+}
+</pre>
+<tt>mmap1</tt> and <tt>mmap2</tt> are pointers that returned by invoking
+POSIX-compliant Unix system call <tt>mmap</tt> on two files. <tt>size1</tt> and
+<tt>size2</tt> are sizes of the corresponding mapped memory areas. Your
+algorithm of "comparing" the two files should work on those two mapped memory
+areas and return a <tt>double</tt> type value as a result. <br>
+
+To plug the function code into the <tt>allpairs_multicore</tt> source code, first search for the string "To developers: ADD YOUR CUSTOMIZED COMPARE FUNCTION" and then copy the code to the area right below the "To developers" comment. That's it! Now , you are ready to move on to the next step.
+<p>
+<b>2. Register your compare function in <tt>allpairs_multicore.c</tt></b>
+<p>
+To register an inner compare function, first search for the string "To
+developers: REGISTER YOUR COMPARE FUNCTION" in <tt>allpairs_multicore.c</tt>.
+Then add code in the following format after the comment: 
+<pre>
+register_compare_function("YOUR_COMPARE_FUNCTION'S_NAME", YOUR_COMPARE_FUNCTION);
+</pre>
+Here YOUR_COMPARE_FUNCTION is the compare function you just added in the first
+step. 
+<p>
+Let's look at an example. Suppose the following function is the one you just
+added in the first step: 
+<pre>
+double my_function(const void *mmap1, size_t size1, const void *mmap2, size_t size2) {
+	Some C code ...
+}
+</pre>
+Then the line you should add below the comment would be:
+<pre>
+register_compare_function("my_function", my_function);
+</pre>
+<b>3. Rebuild</b>
+Type <tt>make</tt> under the directory where <tt>allpairs_multicore.c</tt>
+resides. No compile errors? Then HOORAY, you get a new
+<tt>allpairs_multicore</tt> with your own compare function embedded in.
+<p> 
+Now you are ready to use the new <tt>allpairs_multicore</tt> with all the
+options remaining the same. To use the added compare function, just replace the
+required argument - 'function name' with the newly added one. And, enjoy the
+boost.
+
+
+<h2>All-Pairs Work Queue</h2>
+So far, we have introduced how to use All-Pairs abstraction on a single
+machine.  But sometimes the All-Pairs problem is too big to allow a single
+machine to finish it in a reasonable amount of time, even if the single machine
+is multicore. So, we have built a <a
+		href=http://www.cse.nd.edu/~ccl/software/workqueue>Work Queue</a>
+version of the All-Pairs abstraction which allows the users to easily apply the
+All-Pairs abstraction on clusters, grids or clouds.
+
+<p> To use the All-Pairs Work Queue version, you will need to start a All-Pairs
+master program called <tt>allpairs_master</tt> and a bunch of workers.
+The workers will perform the tasks distributed by the master and return the
+results to the master. The individual tasks that the master program distributes
+are sub-matrix computation tasks and all the tasks would be performed by the
+<tt>allpairs_multicore</tt> program on the workers. For end users, the only
+extra step involved here is starting the workers. Starting the All-Pairs master
+program is almost identical to starting the All-Pairs multicore program except
+the program name and a few master program exclusive options.
+
+<h3>Starting the Master Program</h3>
+Before you start the master program, the <a href=#preparation>preparation</a>
+same as in the All-Pairs multicore needs to be done. Basically you will need to
+have CCTools installed, have two data sets in the proper form and have a
+compare function/program. Say you have already finished the preparation as in
+the <a href=#preparation>first example</a>. Now, for example, you can start the All-Pairs
+master program like this: 
+
+<pre> 
+allpairs_master -c 4 setA setB func.exe
+</pre> 
+
+As you might have noticed, allpairs program's name is changed from
+<tt>allpairs_multicore</tt> to <tt>allpairs_master</tt>. Also, there is an
+extra option '-c'. The '-c' option indicates the split factor. The number of
+subtasks that can be executed by workers simultaneously is 2 to the power of
+'split factor'. In the above example, the number of subtasks would be 16. With
+that being said, the number of subtasks you assigned through '-c' option had
+better be greater than the number of workers you would start. Otherwise some
+workers wouldn't get any tasks to do. A good news is that all the
+<tt>allpairs_multicore</tt>'s options remain the same in the
+<tt>allpairs_master</tt>. So, all the options you have learned in the <a
+		href=#details>Fine Details</a> section are still usable when you use
+the <tt>allpairs_master</tt> program.
+
+<h3>Starting the Workers</h3>
+<p>To begin, let's assume that you are logged into a machine named
+<tt>barney.nd.edu</tt>. In order to procure workers, you can use your
+batch system (such as those running running <a
+href=http://www.sun.com/software/sge>SGE</a>, or <a
+href=http://www.cs.wisc.edu/condor>Condor</a>), or you can execute the
+workers yourself. In order to make this a little easier, we have
+written some tools, provided in the CCTools, that submit workers to
+each of these two common batch systems.<br/>
+
+This is an example of submitting 10 worker processes to Condor:
+<pre>
+% condor_submit_workers barney.nd.edu 9123 10
+Submitting job(s)..........
+Logging submit event(s)..........
+10 job(s) submitted to cluster 298.
+</pre>
+
+Or, submitting 10 worker processes to SGE:
+<pre>
+% sge_submit_workers barney.nd.edu 9123 10
+</pre>
+
+In the above two examples, the first argument is the port number that the
+master process will be or is listening on and the second the argument is the
+number of workers to start. Note that <tt>9123</tt> is the default port
+number that the master process uses. If you use the '-p' option in the
+<tt>allpairs_master</tt> to change the listening port, you will need to
+modify the port argument in the starting worker command accordingly.  Or, you
+can start workers manually on any other machine you can log into, using the
+worker executable built in the CCTools:
+
+<pre>
+% worker barney.nd.edu 9123
+</pre>
+
+
+Once the workers begin running, the <tt>allpairs_master</tt> can dispatch tasks
+to each one very quickly.  If a worker should fail, Work Queue will retry the
+work elsewhere, so it is safe to submit many workers to an unreliable
+system.</p> 
+
+<p>When the All-Pairs master process completes, your workers will
+still be available, so you can either run another master with the same workers,
+remove them from the batch system, or wait for them to expire.  If you do
+nothing for 15 minutes, they will automatically exit by default. Of course, you
+can change this worker expiration time by setting the '<tt>-t</tt>' option.</p>
+<p>Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt> are
+simple shells scripts, so you can edit them directly if you would like to
+change batch options or other details.</p>
+
+<h3>The Result</h3>
+Now the workers are executing the task for you. All you need to do is waiting
+for the result to show up. The result will come out in the same form as in
+<tt>allpairs_multicore</tt>.  
+<p>
+For more options on <tt>allpairs_master</tt>, please type the following
+command and refer to the help message: 
+<pre>
+allpairs_master -h
+</pre>
+
+<h2>For More Information</h2>
+
+For the latest information about Allpairs, please visit our <a href=http://www.cse.nd.edu/~ccl/software/abstractions/allpairs>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software/help.shtml>mailing list</a>.
+
+</body>
+</html>
