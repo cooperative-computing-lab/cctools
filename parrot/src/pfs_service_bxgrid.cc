@@ -172,6 +172,23 @@ public:
 	virtual pfs_ssize_t read( void *data, pfs_size_t length, pfs_off_t offset ) {   
 		return chirp_global_pread(file,data,length,offset,time(0)+pfs_master_timeout);  
 	}
+
+	virtual int fstat( struct pfs_stat *buf ) {
+		int result;
+		struct chirp_stat cbuf;
+		result = chirp_global_fstat(file,&cbuf,time(0)+pfs_master_timeout);
+		if(result==0) COPY_CSTAT(cbuf,*buf);
+		return result;
+	}
+
+	virtual pfs_ssize_t get_size() {
+		struct pfs_stat buf;
+		if(this->fstat(&buf)==0) {
+			return buf.st_size;
+		} else {
+			return -1;
+		}
+	}
 };
 
 #define BXGRID_QUERY_AND_CHECK( res, cxn, reterr, ... ) \
