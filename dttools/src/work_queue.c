@@ -24,6 +24,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#include <dirent.h>
 #include <sys/wait.h>
 
 #define WORKER_STATE_INIT  0
@@ -344,6 +345,128 @@ static int build_poll_table( struct work_queue *q )
 	return n;
 }
 
+static int put_file(struct work_queue_file *, struct work_queue_worker *, int *);
+
+static int put_directory( const char *dirname, struct work_queue_worker *w, int *total_bytes )
+{
+	DIR *dir = opendir(dirname);
+	if (!dir) return 0;
+
+	struct dirent *file;
+	struct work_queue_file tf;
+
+	char buffer[WORK_QUEUE_LINE_MAX];
+
+	while ((file = readdir(dir)))
+	{
+		char *filename = file->d_name;
+		int len;
+
+		if (!strcmp(filename, ".") || !strcmp(filename, ".."))
+		{
+			continue;
+		}
+
+		*buffer = '\0';
+		len = sprintf(buffer, "%s/%s", dirname, filename);
+		
+		//TODO: Complete
+		tf.fname_or_literal = WORKER_FILE_NAME;
+		tf.cacheable = 1;
+		tf.length = len;
+		tf.payload = strdup(buffer);
+		tf.remote_name = strdup(buffer);
+
+		if (!put_file(&tf, w, total_bytes)) return 0;
+	}
+
+	closedir(dir);
+	return 1;
+}
+
+static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, int *total_bytes )
+{
+	struct stat local_info;
+	struct stat *remote_info;
+	char* hash_name;
+	time_t stoptime;
+	timestamp_t open_time=0;
+	timestamp_t close_time=0;
+	timestamp_t sum_time=0;
+	int actual=0;
+	int dir = 0;
+	
+	if(stat(tf->payload,&local_info)<0) return 0;
+
+	if (local_info.st_mode & S_IFDIR) dir = 1;
+	
+	/* normalize the mode so as not to set up invalid permissions */
+	if (dir)
+	{
+		local_info.st_mode |= 0700;
+	}
+	else
+	{
+		local_info.st_mode |= 0600;
+	}
+	local_info.st_mode &= 0777;
+
+	hash_name = (char*) malloc((strlen(tf->payload)+strlen(tf->remote_name)+2)*sizeof(char));
+	sprintf(hash_name,"%s-%s",(char*)tf->payload,tf->remote_name);
+	
+	remote_info = hash_table_lookup(w->current_files,hash_name);
+	
+	if(!remote_info || remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size ) {
+		if(remote_info) {
+			hash_table_remove(w->current_files,hash_name);
+			free(remote_info);
+		}
+		
+		debug(D_DEBUG,"%s (%s) needs file %s",w->hostname,w->addrport,tf->payload);
+		if (dir)
+		{
+			link_printf(w->link, "mkdir %s %o\n", tf->payload, local_info.st_mode);
+			char line[16];
+			link_readline(w->link, line, sizeof(line), time(0)+short_timeout);
+			if (sscanf(line, "%d", &actual) != 1) return 0;
+			if (actual != 0) return 0;
+			
+			if (!put_directory(tf->payload, w, total_bytes))
+				return 0;
+
+			return 1;
+		}
+		
+		int fd = open(tf->payload,O_RDONLY,0);
+		if(fd<0) return 0;
+		
+		stoptime = time(0) + MAX(1.0,local_info.st_size/1250000.0);
+		open_time = timestamp_get();
+
+		link_printf(w->link,"put %s %d 0%o\n",tf->remote_name,(int)local_info.st_size,local_info.st_mode);
+		
+		actual = link_stream_from_fd(w->link,fd,local_info.st_size,stoptime);
+		close(fd);
+		close_time = timestamp_get();
+		
+		if(actual!=local_info.st_size) return 0;
+		
+		if(tf->cacheable) {
+			remote_info = malloc(sizeof(*remote_info));
+			memcpy(remote_info,&local_info,sizeof(local_info));
+			hash_table_insert(w->current_files,hash_name,remote_info);
+		}
+		
+		*total_bytes+=actual;
+		
+		sum_time+=(close_time-open_time);
+	}
+	
+	free(hash_name);
+
+	return 1;
+}
+
 static int send_input_files( struct work_queue_task *t, struct work_queue_worker *w )
 {
 	struct work_queue_file* tf;
@@ -354,13 +477,10 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 	timestamp_t sum_time=0;
 	int fl;
 	time_t stoptime;
-	char* hash_name;
 	
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((tf=list_next_item(t->input_files))) {
-			struct stat local_info;
-			struct stat *remote_info;
 			if(tf->fname_or_literal == WORKER_FILE_LITERAL) {
 				debug(D_DEBUG,"%s (%s) needs literal as %s",w->hostname,w->addrport,tf->remote_name);
 				fl = tf->length;
@@ -374,41 +494,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 				total_bytes+=actual;
 				sum_time+=(close_time-open_time);
 			} else {
-				if(stat(tf->payload,&local_info)<0) goto failure;
-				
-				/* normalize the mode so as not to set up invalid permissions */
-				local_info.st_mode |= 0600;
-				local_info.st_mode &= 0777;
-
-				hash_name = (char*) malloc((strlen(tf->payload)+strlen(tf->remote_name)+2)*sizeof(char));
-				sprintf(hash_name,"%s-%s",(char*)tf->payload,tf->remote_name);
-				
-				remote_info = hash_table_lookup(w->current_files,hash_name);
-				if(!remote_info || remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size ) {
-					if(remote_info) {
-						hash_table_remove(w->current_files,hash_name);
-						free(remote_info);
-					}
-					
-					debug(D_DEBUG,"%s (%s) needs file %s",w->hostname,w->addrport,tf->payload);
-					int fd = open(tf->payload,O_RDONLY,0);
-					if(fd<0) goto failure;
-					stoptime = time(0) + MAX(1.0,local_info.st_size/1250000.0);
-					open_time = timestamp_get();
-					link_printf(w->link,"put %s %d 0%o\n",tf->remote_name,(int)local_info.st_size,local_info.st_mode);
-					actual = link_stream_from_fd(w->link,fd,local_info.st_size,stoptime);
-					close(fd);
-					close_time = timestamp_get();
-					if(actual!=local_info.st_size) goto failure;
-					if(tf->cacheable) {
-						remote_info = malloc(sizeof(*remote_info));
-						memcpy(remote_info,&local_info,sizeof(local_info));
-						hash_table_insert(w->current_files,hash_name,remote_info);
-					}
-					total_bytes+=actual;
-					sum_time+=(close_time-open_time);
-				}
-				free(hash_name);
+				if (!put_file(tf, w, &total_bytes)) goto failure;
 			}
 		}
 		t->total_bytes_transfered += total_bytes;

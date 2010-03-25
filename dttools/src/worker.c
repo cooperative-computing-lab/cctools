@@ -206,6 +206,13 @@ int main( int argc, char *argv[] )
 				close(fd);
 				if(actual!=length) goto recover;
 
+			} else if(sscanf(line, "mkdir %s %o", filename, &mode)==2) {
+				mode = mode | 0700;
+				result = mkdir(filename, mode);
+
+				sprintf(line, "%d\n", result);
+				link_write(master, line, strlen(line), time(0)+active_timeout);
+				
 			} else if(sscanf(line,"get %s",filename)==1) {
 				fd = open(filename,O_RDONLY,0);
 				if(fd>=0) {
