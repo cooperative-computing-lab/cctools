@@ -1,0 +1,59 @@
+#!/bin/sh
+
+show_help() 
+{
+	echo "Use: ssh_submit_workers [options] <servername> <port> <hostname1> <hostname2>..."
+	echo "options:"
+	echo "  -t <time> Abort after this amount of idle time. (default=900s)"
+	echo "  -h        Show this help message."
+	exit 1
+}
+
+timeout=900
+
+while getopts ht: opt 
+do
+	case "$opt" in
+		t)  timeout=$OPTARG ;;
+		h)  show_help;;
+		\?) show_help;;
+	esac
+done
+
+shift $(expr $OPTIND - 1)
+
+if [ X$3 = X ]
+then
+	show_help	
+fi
+
+worker=`which worker 2>/dev/null`
+if [ $? != 0 ]
+then
+	echo "$0: please add 'worker' to your PATH."
+	exit 1
+fi
+
+# TODO: need to clean up if KILLED
+
+cat > worker.sh<<EOF
+#!/bin/sh
+/tmp/${USER}-worker \$*
+rm -f /tmp/${USER}-worker /tmp/${USER}-worker.sh
+EOF
+
+chmod 755 worker.sh
+
+host=$1
+port=$2
+
+shift 2
+
+for remote in $@
+do
+	sftp $remote > /dev/null <<EOF
+put $worker /tmp/${USER}-worker
+put worker.sh /tmp/${USER}-worker.sh
+EOF
+	ssh $remote "/tmp/${USER}-worker.sh -t $timeout $host $port &" > /dev/null &
+done
