@@ -26,8 +26,8 @@ int result;
 
 const char *request = "GET / HTTP/1.0\n\n";
 
-result = domain_name_lookup_cache("www.google.com",addr);
-if(result!=0) fatal("could not lookup name");
+result = domain_name_cache_lookup("www.google.com",addr);
+if(!result) fatal("could not lookup name");
 
 link = link_connect(addr,80,stoptime);
 if(!link) fatal("could not connect");
