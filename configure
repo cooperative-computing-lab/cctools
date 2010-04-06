@@ -32,7 +32,7 @@ case "$build_cpu" in
 	;;
 esac
 
-potential_packages="dttools ftp_lite chirp ftsh abstractions sand"
+potential_packages="dttools ftp_lite chirp abstractions sand"
 
 if [ -d parrot -a $build_sys = LINUX ]
 then
@@ -245,8 +245,6 @@ require_path ${ccompiler}
 require_path ${cxxcompiler}
 require_path "install"
 require_gnu_make
-require_path flex
-require_path bison
 
 if [ $config_egee_path != no ] && check_file "${egee_path}/lcg/include/lcg_util.h"
 then
