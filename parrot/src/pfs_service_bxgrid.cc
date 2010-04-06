@@ -239,7 +239,7 @@ int bxgrid_bvf_stat( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, struct
 	return 0;
 }
 
-#define BXGRID_REPLICAID_QUERY "SELECT replicas.replicaid, replicas.host, replicas.path FROM replicas LEFT JOIN fileservers ON replicas.host = fileservers.name WHERE fileservers.state = 'ok' AND replicas.fileid = '%s' AND replicas.state = 'OK'"
+#define BXGRID_REPLICAID_QUERY "SELECT replicas.replicaid, replicas.host, replicas.path FROM replicas LEFT JOIN fileservers ON replicas.host = fileservers.name WHERE fileservers.state = 'ok' AND replicas.fileid = '%s' AND replicas.state = 'OK' ORDER BY r_priority"
 
 struct bxgrid_replica_list * bxgrid_lookup_replica_list( MYSQL *mysql_cxn, const char *fileid, int update = 0 )
 {
