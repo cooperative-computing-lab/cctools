@@ -477,8 +477,11 @@ INT64_T chirp_reli_whoareyou( const char *host, const char *rhost, char *buffer,
 
 INT64_T chirp_reli_getfile( const char *host, const char *path, FILE *stream, time_t stoptime )
 {
+	INT64_T pos = ftell(stream);
+	if (pos < 0) pos = 0;
+
 	RETRY_ATOMIC(\
-		fseek(stream,0,SEEK_SET);\
+		fseek(stream,pos,SEEK_SET);\
 		result = chirp_client_getfile(client,path,stream,stoptime);\
 		if(result<0 && ferror(stream)) { errno=EIO; return -1; }\
 	)
