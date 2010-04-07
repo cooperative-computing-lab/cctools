@@ -104,7 +104,7 @@ int work_queue_activate_fast_abort(struct work_queue* q, double multiplier);
 @param q A pointer to the queue to modify.
 @param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
 */
-int work_queue_specify_scheduler( struct work_queue* q, int alg);
+int work_queue_specify_algorithm( struct work_queue* q, int alg);
 
 /** Wait for tasks to complete.  This call will block until the timeout has elapsed.
 @param q The work queue to wait on.
@@ -141,7 +141,7 @@ void work_queue_task_specify_tag( struct work_queue_task *t, const char *tag );
 @param t The task to which to add parameters
 @param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
 */
-int work_queue_task_specify_scheduler( struct work_queue_task *t, int alg );
+int work_queue_task_specify_algorithm( struct work_queue_task *t, int alg );
 
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
 @param t The task to which to add parameters
