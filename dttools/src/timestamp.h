@@ -24,7 +24,7 @@ typedef UINT64_T timestamp_t;
 @return The current time, in microseconds since January 1st, 1970.
 */
 
-timestamp_t timestamp_get();
+timestamp_t timestamp_get(void);
 
 /** Sleep for a specified time.
 @param interval The number of microseconds to sleep for.
