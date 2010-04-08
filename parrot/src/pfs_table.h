@@ -105,8 +105,8 @@ public:
 
 	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );
 
-private:
 	int find_empty( int lowest );
+private:
 	int search_dup2( int ofd, int search );
 
 	int count_pointer_uses( pfs_pointer *p );

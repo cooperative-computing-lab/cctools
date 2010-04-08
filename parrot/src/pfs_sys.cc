@@ -454,27 +454,9 @@ int pfs_bind( int fd, const struct sockaddr *addr, int addrlen )
 
 int pfs_connect( int fd, const struct sockaddr *addr, int addrlen )
 {
-	struct sockaddr_un *paddr;
-
 	BEGIN
 	debug(D_LIBCALL,"connect %d 0x%x %d",fd,addr,addrlen);
-
-	paddr = (struct sockaddr_un *)addr;
-
-	/*
-	This hack is here to prevent the standard library from connecting to the name
-	service cache daemon.  This particular feature relies on the Linux SCM_RIGHTS
-	method of passing credentials through the file descriptor, which Parrot does not
-	correctly handle.  So, we reject the connection, which simply causes the standard
-	library to fall back to performing name resolution on its own.
-	*/
-
-	if(paddr->sun_family==AF_UNIX && !strcmp(paddr->sun_path,"/var/run/nscd/socket")) {
-		errno = ECONNREFUSED;
-		result = -1;
-	} else {
-		result = ::connect(pfs_current->table->get_real_fd(fd),addr,addrlen);
-	}
+	result = ::connect(pfs_current->table->get_real_fd(fd),addr,addrlen);
 	END
 }
 
@@ -530,7 +512,31 @@ int pfs_recvmsg( int fd,  struct msghdr *msg, int flags )
 {
 	BEGIN
 	debug(D_LIBCALL,"recvmsg %d 0x%x %d",fd,msg,flags);
+
 	result = ::recvmsg(pfs_current->table->get_real_fd(fd),msg,flags);
+
+	/*
+	One use of recvmsg is to pass file descriptors from one process
+	to another via the use of 'ancillary data'.  If this happens, then
+	Parrot will own the file descriptor, and must virtually attach it
+	to the process with an anonymous name.
+	*/
+
+	if(result>=0 && msg->msg_controllen>0) {
+		struct cmsghdr *cmsg = (struct cmsghdr *) msg->msg_control;
+		if(cmsg->cmsg_level==SOL_SOCKET && cmsg->cmsg_type==SCM_RIGHTS) {
+			int fd_count = (cmsg->cmsg_len-sizeof(struct cmsghdr)) / sizeof(int);
+			int *fds = (int*) CMSG_DATA(cmsg);
+			int i;
+			for(i=0;i<fd_count;i++) {
+				int lfd = pfs_current->table->find_empty(3);
+				pfs_current->table->attach(lfd,fds[i],O_RDWR,0700,"anonymous-socket-fd");
+				fds[i] = lfd;
+				debug(D_SYSCALL,"recvmsg got anonymous file descriptor %d",lfd);
+			}
+		}
+	}
+
 	END
 }
 
