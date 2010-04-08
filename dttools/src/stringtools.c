@@ -618,7 +618,7 @@ void string_collapse_path( const char *l, char *s, int remove_dotdot )
 			l++;
 		} else if( (*l)=='/' && (*(l+1))==0 ) {
 			l++;
-		} else if( remove_dotdot && !strncmp(l,"/..",3) ) {
+		} else if( remove_dotdot && !strncmp(l,"/..",3) && (l[3]==0 || l[3]=='/') ) {
 			if(s>start) s--;
 			while( s>start && ((*s) != '/') ) {
 				s--;
