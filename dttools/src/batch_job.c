@@ -60,6 +60,7 @@ static int batch_job_submit_condor( struct batch_queue *q, const char *cmd, cons
 	// to get stuck in a system hold if the files are not created.
 	fprintf(file,"should_transfer_files = yes\n");
 	fprintf(file,"when_to_transfer_output = on_exit\n");
+	fprintf(file,"notification = never\n");
 	fprintf(file,"copy_to_spool = true\n");
 	fprintf(file,"log = %s\n",q->logfile);
 	if(q->options_text) fprintf(file,"%s\n",q->options_text);
