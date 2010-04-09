@@ -649,7 +649,6 @@ int main(int argc, char ** argv)
 		fprintf(outfile, "%c\n", end_char);
 	fsync(fileno(outfile));
 	fclose(outfile);
-	work_queue_shut_down_workers(q, 0);
 	work_queue_delete(q);
 	delete_rectangles();
 	int rmdir_result = rmdir(outdirname);
