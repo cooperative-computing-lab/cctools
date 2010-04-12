@@ -164,7 +164,8 @@ delta prefix_suffix_align(const char * str1, const char * str2, int min_align)
 	}
 	//print_matrix(stdout, matrix, str1, length1, str2, length2);
 
-	int best_i, best_j;
+	int best_i=0;
+	int best_j=0;
 	choose_best(matrix, &best_i, &best_j, length1, length2, min_align);
 
 	//fprintf(stdout, "best: %d, %d\n", best_i, best_j);
@@ -843,7 +844,7 @@ void choose_best(cell ** matrix, int * best_i, int * best_j, int length1, int le
 	int i, j;
 	float quality;
 	float min_qual = (float) length1 + (float)length2;
-	
+
 
 	// Find the best in the last column
 	for (i=length1, j=min_align; j <= length2; j++)
