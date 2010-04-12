@@ -5,14 +5,27 @@ See the file COPYING for details.
 */
 
 #include <stdio.h>
-#include <sys/time.h>
-#include <math.h>
 #include <stdlib.h>
+#include <math.h>
+#include <ctype.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <sys/time.h>
 #include "sequence_alignment.h"
 #include "sequence_compression.h"
 #include "sand_align_macros.h"
 
-#define MIN_ALIGN 40
+#include "debug.h"
+
+//#define MIN_ALIGN 40
+int min_align = 40;  // default SWAT minimal score
 
 seq get_next_sequence_wrapper(FILE * input)
 {
@@ -23,18 +36,57 @@ seq get_next_sequence_wrapper(FILE * input)
 #endif
 }
 
+static void show_version(const char *cmd)
+{
+	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
+}
+
+static void show_help(const char *cmd)
+{
+	printf("Usage: %s [options] <file_name>\n", cmd);
+	printf("The most common options are:\n");
+	printf(" -m <integer>   SWAT minimal score.\n");
+	printf(" -d <flag>	Enable debugging for this subsystem.\n");
+	printf(" -v         	Show program version.\n");
+	printf(" -h         	Display this message.\n");
+}
+
 int main(int argc, char ** argv)
 {
 	FILE * input;
 	seq s1, s2;
 	char ori;
+	char c;		// holds command-line options
+	int fileindex;
 
-	if (argc == 2)
+	while((c = getopt(argc, argv, "d:m:vh")) != (char) -1) {
+		switch (c) {
+		case 'd':
+			debug_flags_set(optarg);
+			break;
+		case 'v':
+			show_version(argv[0]);
+			exit(0);
+			break;
+		case 'h':
+			show_help(argv[0]);
+			exit(0);
+			break;
+		case 'm':
+			min_align = atoi(optarg);
+			break;
+		}
+	}
+	debug(D_DEBUG, "SWAT minimal score: %d\n", min_align);
+
+	fileindex = optind;
+
+	if ((argc - optind) == 1)
 	{
-		input = fopen(argv[1], "r");
+		input = fopen(argv[fileindex], "r");
 		if (!input)
 		{
-			fprintf(stderr, "ERROR: Could not open file %s for reading.\n", argv[1]);
+			fprintf(stderr, "ERROR: Could not open file %s for reading.\n", argv[fileindex]);
 			exit(1);
 		}
 	}
@@ -68,15 +120,15 @@ int main(int argc, char ** argv)
 		//print_sequence(stdout, s2);
 		if (atoi(s2.metadata) == -1) { revcomp(&s2); ori = 'I'; }
 		else { ori = 'N'; }
-
-		delta tb = prefix_suffix_align(s1.seq, s2.seq, MIN_ALIGN);
+		
+		delta tb = prefix_suffix_align(s1.seq, s2.seq, min_align);
 		tb.ori = ori;
 		//fprintf(stderr, "score: %d\n", tb.score);
 	//print_alignment(stderr, s1.seq, s2.seq, tb, 80);
 
 		//tb.ori = 'N';
 		//revcomp(&s2);
-		//delta tb_r = prefix_suffix_align(s1.seq, s2.seq, MIN_ALIGN);
+		//delta tb_r = prefix_suffix_align(s1.seq, s2.seq, min_align);
 		//tb_r.ori = 'I';
 
 		// A lower score is better

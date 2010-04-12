@@ -32,6 +32,8 @@ int fast_fill = 50; // how many tasks to fast-submit on start.
 static int NUM_PAIRS_PER_FILE;
 static int LIMIT;
 
+char function_args[256];
+
 #define GET_CAND_LINE_RESULT_SUCCESS 0
 #define GET_CAND_LINE_RESULT_EOF 1
 #define GET_CAND_LINE_RESULT_WAIT 2
@@ -496,7 +498,7 @@ static int task_consider( void* taskfiledata, int size )
 	char cmd[2*MAX_FILENAME+4];
 	char job_filename[10];
 	string_cookie( job_filename, 10 );
-	sprintf(cmd,"./%s < %s",function,job_filename);
+	sprintf(cmd,"./%s %s < %s",function,function_args,job_filename);
 
 	struct work_queue_task* t;
 	
@@ -510,6 +512,8 @@ static int task_consider( void* taskfiledata, int size )
 	work_queue_task_specify_input_file( t, function, function);
 	work_queue_task_specify_input_buf( t, taskfiledata, size, job_filename);
 	work_queue_submit(queue,t);
+	//fprintf(stderr,"Task command:\"%s\"\n",cmd);
+	//work_queue_task_delete(t);
 	global_count++;
 
 	return 1;
@@ -722,6 +726,7 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 			memcpy(ins,s2->sequence_data,s2->num_bytes);
 			ins+=s2->num_bytes;
 
+		
 			pair_count++;
 	    }
 	    else {
@@ -814,8 +819,10 @@ int main( int argc, char *argv[] )
 	debug_config(progname);
 
 	int task_size_specified = 0;
+
+	strcpy(function_args, " ");
 	
-	while((c=getopt(argc,argv,"p:n:Pd:o:f:vh"))!=(char)-1) {
+	while((c=getopt(argc,argv,"e:p:n:Pd:o:f:vh"))!=(char)-1) {
 		switch(c) {
 		case 'p':
 			port = atoi(optarg);
@@ -825,6 +832,10 @@ int main( int argc, char *argv[] )
 			break;
 		case 'P':
 			priority_mode = 1;
+			break;
+		case 'e':
+			strcat(function_args, optarg);
+			strcat(function_args, " ");
 			break;
 		case 'd':
 			debug_flags_set(optarg);
