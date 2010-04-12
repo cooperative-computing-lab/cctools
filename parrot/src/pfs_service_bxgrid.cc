@@ -173,13 +173,7 @@ public:
 		return chirp_global_pread(file,data,length,offset,time(0)+pfs_master_timeout);  
 	}
 
-	virtual int fstat( struct pfs_stat *buf ) {
-		int result;
-		struct chirp_stat cbuf;
-		result = chirp_global_fstat(file,&cbuf,time(0)+pfs_master_timeout);
-		if(result==0) COPY_CSTAT(cbuf,*buf);
-		return result;
-	}
+	virtual int fstat( struct pfs_stat *buf );
 
 	virtual pfs_ssize_t get_size() {
 		struct pfs_stat buf;
@@ -748,6 +742,12 @@ public:
 
 static pfs_service_bxgrid pfs_service_bxgrid_instance;
 pfs_service *pfs_service_bxgrid = &pfs_service_bxgrid_instance;
+
+int pfs_file_bxgrid::fstat( struct pfs_stat *buf ) {
+	int result;
+	result = pfs_service_bxgrid->stat(&name, buf);
+	return result;
+}
 
 #endif
 
