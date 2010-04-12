@@ -78,6 +78,7 @@ size_t sprint_seq(char * buf, seq s);
 void free_seq(seq s);
 float benchmark(FILE * file, const char * message);
 seq get_next_sequence(FILE * file);
+seq get_next_sequence_clip(FILE * file); 
 int max_alignment_length(int length1, int length2, int start1, int start2);
 int sequence_count(FILE * file);
 

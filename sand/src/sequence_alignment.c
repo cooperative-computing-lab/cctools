@@ -1819,6 +1819,76 @@ seq get_next_sequence(FILE * file)
 	return sequence;
 }
 
+seq get_next_sequence_clip(FILE * file)
+{
+	static char line[MAX_STRING] = "";
+	static int count = 0;
+
+	seq sequence;
+
+	// Get the first line of the file, compile the regexp.
+	if (count == 0)
+	{
+		fgets(line, MAX_STRING, file);
+		count = 1;
+	}
+
+	sequence.seq = 0;
+	sequence.id = 0;
+	sequence.metadata = 0;
+	sequence.length = 0;
+
+	if (line[0] == '>' && line[1] == '>')
+	{
+
+		// Get the next line in the file for the next iteration to start with.
+		fgets(line, MAX_STRING, file);
+		return sequence;
+	}
+	else
+	{
+		sequence.seq = malloc(MAX_STRING*sizeof(char));
+		sequence.id = malloc(MAX_ID*sizeof(char));
+		sequence.metadata = malloc(MAX_METADATA*sizeof(char));
+		sequence.length = 0;
+	}
+
+	strcpy(sequence.metadata, "");
+
+	int bases;
+	int bytes;
+	//char celera_id[MAX_STRING];
+
+	//sscanf(line, ">%s,%s %d %d %[^\n]\n", sequence.id, celera_id, &bases, &bytes, sequence.metadata);
+	sscanf(line, ">%s %d %d %[^\n]\n", sequence.id,  &bases, &bytes, sequence.metadata);
+	
+	char *result = strtok(sequence.id, ","); 
+	sequence.id = result; 
+	
+
+
+
+	//int *index = strrchr(sequence.id, (int)",");
+	//char *id = malloc(MAX_ID*sizeof(char));
+	//strncat(id, sequence.id, *index); 
+	//strncpy(sequence.id, id, *index); 
+
+	
+
+	while (1)
+	{
+		fgets(line, MAX_STRING, file);
+		if (line[0] == '>') { break; }
+		if (feof(file)) { break; }
+		process_string(line);
+
+
+		seq_cat(&sequence, line);
+	}
+
+	return sequence;
+}
+
 int sequence_count(FILE * file)
 {
 	int count = 0;
