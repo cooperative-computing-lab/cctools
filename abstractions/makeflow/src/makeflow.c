@@ -1120,12 +1120,7 @@ int main( int argc, char *argv[] )
 	if(explicit_local_jobs_max) {
 		d->local_jobs_max = explicit_local_jobs_max;
 	} else {
-		char *s = getenv("MAKEFLOW_MAX_LOCAL_JOBS");
-		if(s) {
-			d->local_jobs_max = atoi(s);
-		} else {
-			d->local_jobs_max = load_average_get_cpus();
-		}
+		d->local_jobs_max = load_average_get_cpus();
 	}
 
 	if(explicit_remote_jobs_max) {
@@ -1137,6 +1132,20 @@ int main( int argc, char *argv[] )
 			d->remote_jobs_max = 1000;
 		} else {
 			d->remote_jobs_max = 100;
+		}
+	}
+
+	char *s = getenv("MAKEFLOW_MAX_REMOTE_JOBS");
+	if(s) {
+		d->remote_jobs_max = MIN(d->remote_jobs_max,atoi(s));
+	}
+
+	s = getenv("MAKEFLOW_MAX_LOCAL_JOBS");
+	if(s) {
+		int n = atoi(s);
+		d->local_jobs_max = MIN(d->local_jobs_max,n);
+		if(batch_queue_type==BATCH_QUEUE_TYPE_UNIX) {
+			d->remote_jobs_max = MIN(d->local_jobs_max,n);
 		}
 	}
 
