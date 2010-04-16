@@ -1120,7 +1120,12 @@ int main( int argc, char *argv[] )
 	if(explicit_local_jobs_max) {
 		d->local_jobs_max = explicit_local_jobs_max;
 	} else {
-		d->local_jobs_max = load_average_get_cpus();
+		char *s = getenv("MAKEFLOW_MAX_LOCAL_JOBS");
+		if(s) {
+			d->local_jobs_max = atoi(s);
+		} else {
+			d->local_jobs_max = load_average_get_cpus();
+		}
 	}
 
 	if(explicit_remote_jobs_max) {
