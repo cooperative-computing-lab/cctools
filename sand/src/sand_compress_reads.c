@@ -15,7 +15,8 @@ static void show_help(const char *cmd)
 {
         printf("Use: %s [options]  fasta_reads > compressed_reads\n", cmd);
         printf("where options are:\n");
-	printf(" -c             Remove Celera read_ids if file came from Celera's gatekeeper\n"); 
+	printf(" -c             Remove Celera read_ids if file came from Celera's gatekeeper\n");
+	printf(" -i		Remove read_ids but leave the Celera internal ids if the file came from Celera's gatekeeper\n"); 
 	printf(" -h             Show this help screen\n");
 }
 
@@ -28,12 +29,16 @@ int main(int argc, char ** argv)
 	cseq c;
 	char d;
 	char *clip = "";
+	char *internal = "";
 
-        while((d=getopt(argc,argv,"ch"))!=(char)-1) {
+        while((d=getopt(argc,argv,"chi"))!=(char)-1) {
                 switch(d) {
                 case 'c':
 			clip = "clip";
                         break;
+		case 'i':
+			internal = "internal";
+			break; 
                 case 'h':
                         show_help(progname);
                         exit(0);
@@ -41,7 +46,7 @@ int main(int argc, char ** argv)
                 }
         }
 
-	if (argc == 2 && clip == "")
+	if (argc == 2 && clip == "" && internal == "")
 	{
 		input = fopen(argv[1], "r");
 		if (!input)
@@ -72,14 +77,21 @@ int main(int argc, char ** argv)
 		if(clip != ""){
 			//fprintf(stderr, "clipping enabled"); 
 			s = get_next_sequence_clip(input); 
+		}
+		else if(internal != ""){
+			//fprintf(stderr, "internal reads enabled");
+			s = get_next_sequence_internal(input);
 		}	
 		else{
 			s = get_next_sequence(input); 
 		}
 		if (!s.id) { fprintf(stdout, ">>\n"); continue; }
+		//fprintf(stderr, "%s\n", s.id); 
 		c = compress_seq(s);
-		free_seq(s);
+		//fprintf(stderr, "freeing sequence"); 
+		//free_seq(s);
 		print_cseq(stdout, c);
+		//fprintf(stderr, "freeing compressed sequence"); 
 		free_cseq(c);
 	}
 
