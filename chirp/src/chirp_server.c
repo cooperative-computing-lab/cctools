@@ -64,6 +64,7 @@ static int errno_to_chirp( int e );
 static int port = CHIRP_PORT;
 static int idle_timeout = 60; /* one minute */
 static int stall_timeout = 3600; /* one hour */
+static int parent_check_timeout = 300; /* five minutes */
 static int advertise_timeout = 300; /* five minutes */
 static int advertise_alarm = 0;
 static int single_mode = 0;
@@ -124,6 +125,7 @@ static void show_help( const char *cmd )
 	printf(" -c <dir>    Challenge directory for filesystem authentication.\n");
 	printf(" -C          Do not create a core dump, even due to a crash.\n");
 	printf(" -E          Exit if parent process dies.\n");
+	printf(" -e <time>   Check for presence of parent at this interval. (default is %ds)\n",parent_check_timeout);
 	printf(" -F <size>   Leave this much space free in the filesystem.\n");
 	printf(" -G <url>    Base url for group lookups. (default: disabled)\n");
 	printf(" -I <addr>   Listen only on this network interface.\n");
@@ -298,7 +300,7 @@ int main( int argc, char *argv[] )
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c_input = getopt( argc,argv,"A:a:c:CEF:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:")) != -1 ) {
+	while((c_input = getopt( argc,argv,"A:a:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:")) != -1 ) {
 	        c = ( char ) c_input;
 		switch(c) {
 		case 'A':
@@ -317,6 +319,10 @@ int main( int argc, char *argv[] )
 			break;
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case 'e':
+			parent_check_timeout = string_time_parse(optarg);
+			exit_if_parent_fails = 1;
 			break;
 		case 'E':
 			exit_if_parent_fails = 1;
@@ -527,7 +533,7 @@ int main( int argc, char *argv[] )
 			}
 		}
 
-		l = link_accept(link,time(0)+advertise_timeout);
+		l = link_accept(link,time(0)+MIN(advertise_timeout,parent_check_timeout));
 		if(!l) continue;
 		link_address_remote(l,addr,&port);
 
