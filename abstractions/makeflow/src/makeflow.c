@@ -984,7 +984,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "Ap:cd:DCT:iB:S:Rr:l:L:j:J:o:vF:W:P")) != (char) -1) {
+	while((c = getopt(argc, argv, "Ap:cd:DCT:iB:S:Rr:l:L:j:J:o:vhF:W:P")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1036,6 +1036,9 @@ int main( int argc, char *argv[] )
 		case 'v':
 			show_version(argv[0]);
 			return 0;
+		case 'h':
+			show_help(argv[0]);
+			return 0;
 		case 'T':
 			batch_queue_type = batch_queue_type_from_string(optarg);
 			if(batch_queue_type==BATCH_QUEUE_TYPE_UNKNOWN) {
@@ -1061,7 +1064,6 @@ int main( int argc, char *argv[] )
 		case 'P':
 			preserve_symlinks = 1;
 			break;
-		case 'h':
 		default:
 			show_help(argv[0]);
 			return 1;
