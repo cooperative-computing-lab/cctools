@@ -445,6 +445,10 @@ static char *translate_command( struct dag *d, char *old_command )
 			strncat(new_command + current_length, " ", 1);
 			++current_length;
 		}
+		else
+		{
+			first = 0;
+		}
 
 		/* Append the shell metacharacter prefix, if there is one. */
 		if (prefix)
@@ -482,7 +486,6 @@ static char *translate_command( struct dag *d, char *old_command )
 			current_length += len;
 		}
 
-		first = 0;
 		token = strtok(NULL, " \t\n");
 	}
 
