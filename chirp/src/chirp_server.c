@@ -514,7 +514,7 @@ int main( int argc, char *argv[] )
 			}
 		}
 
-		if(time(0)>advertise_alarm) {
+		if(time(0)>=advertise_alarm) {
 			update_all_catalogs();
 			advertise_alarm = time(0)+advertise_timeout;
 		}
