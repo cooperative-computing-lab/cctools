@@ -189,8 +189,6 @@ static int chirp_multi_init( const char *volume, time_t stoptime)
 	int cpos,apos;
         char *c;
 
-	debug(D_MULTI,"init: /multi/%s",volume);
-	
 	cpos = strrpos(volume,':');
 	apos = strrpos(volume,'@');
 	if(cpos > apos) {

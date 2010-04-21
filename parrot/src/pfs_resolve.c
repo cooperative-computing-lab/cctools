@@ -229,6 +229,7 @@ void clean_up_path( char *path )
 					strcpy(prefix,"chirp/CONDOR");
 				}
 				sprintf(temp,"/%s/%s",prefix,path+plen+2);
+				debug(D_RESOLVE,"%s -> %s",path,temp);
 				strcpy(path,temp);
 			} else {
 				break;
