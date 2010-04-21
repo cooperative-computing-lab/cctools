@@ -186,11 +186,20 @@ struct chirp_server * chirp_volume_server_choose( struct chirp_volume *v )
 
 static int chirp_multi_init( const char *volume, time_t stoptime)
 {
-	char *c;
+	int cpos,apos;
+        char *c;
 
-	c = strrchr(volume,':');
-	if(c) *c = 0;
+	debug(D_MULTI,"init: /multi/%s",volume);
+	
+	cpos = strrpos(volume,':');
+	apos = strrpos(volume,'@');
+	if(cpos > apos) {
+		c = strrchr(volume,':');
+		if(c) *c = 0;
+	}
 
+	debug(D_MULTI,"init: /multi/%s",volume);
+    
 	if(current_volume && strcmp(current_volume->name,volume)) {
 		chirp_volume_close(current_volume);
 		current_volume = 0;
