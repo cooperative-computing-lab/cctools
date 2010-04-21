@@ -600,6 +600,33 @@ void string_split_path( const char *input, char *first, char *rest )
 	*rest = 0;
 }
 
+
+void string_split_multipath( const char *input, char *first, char *rest )
+{
+	/* skip any leading slashes */
+	while(*input=='/') {
+		input++;
+	}
+ 
+	/* copy the first element up to slash or @ or null */
+	while( *input && *input!='/' && *input!='@') {
+		*first++ = *input++;
+	}
+	*first=0;
+ 
+	/* make sure that rest starts with a slash or @ */
+	if( *input!='/' && *input!='@') {
+		*rest++ = '/';
+	}
+ 
+	/* copy the rest */
+	while( *input ) {
+		*rest++ = *input++;
+	}
+	*rest = 0;
+}
+
+
 /*
 Canonicalize a path name by removing duplicate
 slashes, dots, and so on.
@@ -700,7 +727,7 @@ void string_replace_backslash_codes( const char *a, char *b )
 	*b = 0;
 }
 
-int strpos(char *str, char c) {
+int strpos(const char *str, char c) {
 
     int i;
     if(str != NULL) {
@@ -713,7 +740,7 @@ int strpos(char *str, char c) {
 }
 
 
-int strrpos(char *str, char c) {
+int strrpos(const char *str, char c) {
 
     int i;
     if(str != NULL) {
