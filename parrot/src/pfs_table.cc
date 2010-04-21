@@ -247,7 +247,8 @@ int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_
 			strcpy(pname->rest,pname->path);
 			pname->is_local = 1;
 		} else {
-			string_split_path(tmp,pname->host,pname->rest);
+			string_split_multipath(tmp,pname->host,pname->rest);
+			debug(D_RESOLVE,"%s -> %s|%s",tmp,pname->host,pname->rest);
 			if(!pname->host[0]) {
 				pname->hostport[0] = 0;
 				pname->rest[0] = 0;
@@ -261,6 +262,12 @@ int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_
 				pname->port = pname->service->get_default_port();
 			}
 			sprintf(pname->hostport,"%s:%d",pname->host,pname->port);
+		
+			if(pname->rest != NULL && pname->rest[0]=='@') // if we're dealing with a multivolume, put the volume name back into hostport
+			{
+				strcpy(tmp,pname->rest);
+				string_split_path(tmp,&pname->hostport[strlen(pname->hostport)],pname->rest);
+			}
 			if(pname->service->tilde_is_special() && !strncmp(pname->rest,"/~",2)) {
 				memmove(pname->rest,&pname->rest[1],strlen(pname->rest));
 			}
