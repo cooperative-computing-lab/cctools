@@ -17,6 +17,7 @@ This simplifies the construction
 of parallel abstractions that need a simple form of parallel process execution.
 */
 
+
 /** An integer type indicating a unique batch job number.*/
 typedef int batch_job_id_t;
 
@@ -28,6 +29,16 @@ typedef enum {
 	BATCH_QUEUE_TYPE_SGE,	     /**< Batch jobs will be sent to Sun Grid Engine. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE  /**< Batch jobs will be send to the Work Queue. */
 } batch_queue_type_t;
+
+/** General batch queue structure. */
+struct batch_queue {
+	batch_queue_type_t type;
+	char *logfile;
+	char *options_text;
+	struct itable *job_table;
+	struct itable *output_table;
+	struct work_queue *work_queue;
+};
 
 /** Describes a batch job when it has completed. */
 struct batch_job_info {

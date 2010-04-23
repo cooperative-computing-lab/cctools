@@ -26,15 +26,6 @@ See the file COPYING for details.
 
 #define BATCH_JOB_LINE_MAX 1024
 
-struct batch_queue {
-	batch_queue_type_t type;
-	char *logfile;
-	char *options_text;
-	struct itable *job_table;
-	struct itable *output_table;
-	struct work_queue *work_queue;
-};
-
 static int batch_job_submit_condor( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
 {
 	FILE *file;
