@@ -1199,6 +1199,22 @@ int main( int argc, char *argv[] )
 	local_queue = batch_queue_create(BATCH_QUEUE_TYPE_UNIX);
 	remote_queue = batch_queue_create(batch_queue_type);
 
+	// When the batch queue type is Work Queue, check if the queue is successfully created.
+    if(batch_queue_type==BATCH_QUEUE_TYPE_WORK_QUEUE && remote_queue->work_queue == 0) {
+		// Makeflow uses "work_queue_create(0,time(0)+60)" to create the queue, which uses the env variable "WORK_QUEUE_PORT"
+		const char *portstring = getenv("WORK_QUEUE_PORT");
+		if(portstring) {
+			port = atoi(portstring);
+		} else {
+			port = WORK_QUEUE_DEFAULT_PORT;
+		}
+		fprintf(stderr,"makeflow: Sorry! Makeflow is not able to listen on port %d.\n", port);
+		fprintf(stderr,"makeflow: Please try a different port.\n");
+		free(logfilename);
+		free(batchlogfilename);
+		exit(1);
+   	}
+
 	if(batch_submit_options) {
 		batch_queue_set_options(remote_queue,batch_submit_options);
 	}
