@@ -30,16 +30,6 @@ typedef enum {
 	BATCH_QUEUE_TYPE_WORK_QUEUE  /**< Batch jobs will be send to the Work Queue. */
 } batch_queue_type_t;
 
-/** General batch queue structure. */
-struct batch_queue {
-	batch_queue_type_t type;
-	char *logfile;
-	char *options_text;
-	struct itable *job_table;
-	struct itable *output_table;
-	struct work_queue *work_queue;
-};
-
 /** Describes a batch job when it has completed. */
 struct batch_job_info {
 	time_t submitted;	/**< Time the job was submitted to the system. */

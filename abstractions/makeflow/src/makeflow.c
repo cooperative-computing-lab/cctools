@@ -1200,7 +1200,7 @@ int main( int argc, char *argv[] )
 	remote_queue = batch_queue_create(batch_queue_type);
 
 	// When the batch queue type is Work Queue, check if the queue is successfully created.
-    if(batch_queue_type==BATCH_QUEUE_TYPE_WORK_QUEUE && remote_queue->work_queue == 0) {
+    if(batch_queue_type==BATCH_QUEUE_TYPE_WORK_QUEUE && remote_queue == 0) {
 		// Makeflow uses "work_queue_create(0,time(0)+60)" to create the queue, which uses the env variable "WORK_QUEUE_PORT"
 		const char *portstring = getenv("WORK_QUEUE_PORT");
 		if(portstring) {
