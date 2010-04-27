@@ -49,6 +49,7 @@ int sort_dir( const char *dirname, char ***list, int (*sort) ( const char *a, co
 
 	failure:
 	if(*list) {
+		(*list)[used] = 0;
 		sort_dir_free(*list);
 		*list = 0;
 	} 
