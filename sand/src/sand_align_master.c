@@ -271,6 +271,7 @@ char* removeEnvelope(char* output) {
     char B_sequence_name[ASSEMBLY_LINE_MAX];
     
     int i = 0;
+	int obuf_len;
     int firstOVLRecord;
     
     char ori;
@@ -283,54 +284,58 @@ char* removeEnvelope(char* output) {
     int pct;
 
     char* obuf = strdup(output);
+	obuf_len = strlen(obuf);
     char* final_buf;
     firstOVLRecord=findFirstOVLRecord(obuf);     // find envelope opening.
     if(firstOVLRecord==-1) { // error
-	debug(D_DEBUG,"Unexpected output format parsing OVL envelope! Output:\n%s\n",obuf);
-	free(obuf);
-	return NULL;
+		debug(D_DEBUG,"Unexpected output format parsing OVL envelope! Output:\n%s\n",obuf);
+		free(obuf);
+		return NULL;
     }
     if(firstOVLRecord==0) { // blank task
-	free(obuf);
-	final_buf = malloc(1*sizeof(char));
-	final_buf[0]='\0';
-	return final_buf;
+		free(obuf);
+		final_buf = malloc(1*sizeof(char));
+		final_buf[0]='\0';
+		return final_buf;
     }
     //else, i is the first character of the first record.
     char* buf = &(obuf[firstOVLRecord]);
     char* rec = strtok(buf,"}");
     if(!rec) {
-	debug(D_DEBUG,"No } found! Output:\n%s\n",obuf);
-	buf=NULL;
-	free(obuf);
-	return NULL;
-    }
-    while(rec) {
-	if(sscanf(rec," {OVL afr:%s bfr:%s ori:%c olt:%c ahg:%i bhg:%i qua:%f mno:%i mxo:%i pct:%i ",A_sequence_name,B_sequence_name,&ori,&olt,&ahg,&bhg,&qua,&mno,&mxo,&pct) == 10) {
-	    i++;
-	    rec = strtok(0,"}");
-	}
-	else
-	{
-	    if(isValidClosing(rec)) { // all that's left is an envelope closing and whitespace
-		rec[0] = '\0'; // cut off closing envelope.
-		final_buf = (char*) malloc((strlen(buf)+3)*sizeof(char));
-		strcpy(final_buf,buf); // cut off starting envelope.
-		strcat(final_buf,"}\n"); // replace the '}' that we're using for our tokenizing
+		debug(D_DEBUG,"No } found! Output:\n%s\n",obuf);
 		buf=NULL;
 		free(obuf);
-		//debug(D_DEBUG,"Removed Envelope. Buffer:\n=====\n%s\n=====\n",final_buf);
-		return final_buf;
-	    }
-	    debug(D_DEBUG,"Confirm Output Error. Buffer:\n=====\n%s\n=====\n",buf);
-	    if(sscanf(rec," {OVL afr:%s bfr:%s ", A_sequence_name,B_sequence_name) == 2)
-		fprintf(stderr, "Unexpected output format for comparison of %s and %s. ", A_sequence_name,B_sequence_name);
-	    else
-		fprintf(stderr, "Unexpected output format. ");
-	    buf=NULL;
-	    free(obuf);
-	    return NULL;
-	}
+		return NULL;
+    }
+    while(rec) {
+		if(sscanf(rec," {OVL afr:%s bfr:%s ori:%c olt:%c ahg:%i bhg:%i qua:%f mno:%i mxo:%i pct:%i ",A_sequence_name,B_sequence_name,&ori,&olt,&ahg,&bhg,&qua,&mno,&mxo,&pct) == 10) {
+	    	i++;
+	    	rec = strtok(0,"}");
+		} else {
+	   		if(isValidClosing(rec)) { // all that's left is an envelope closing and whitespace
+				int diff = &(rec[0]) - buf;
+				final_buf = (char*) malloc((diff+1)*sizeof(char));
+	    		if(!final_buf) {
+					fprintf(stderr, "Cannot allocate memory to store the result sent back from the worker!\n");
+	    			buf=NULL;
+	    			free(obuf);
+					return NULL;
+				}
+				final_buf[diff] = '\0';
+				strncpy(final_buf, &(output[firstOVLRecord]),diff); // cut off starting envelope.
+				buf=NULL;
+				free(obuf);
+				return final_buf;
+	    	}
+	    	debug(D_DEBUG,"Confirm Output Error. Buffer:\n=====\n%s\n=====\n",buf);
+	    	if(sscanf(rec," {OVL afr:%s bfr:%s ", A_sequence_name,B_sequence_name) == 2)
+				fprintf(stderr, "Unexpected output format for comparison of %s and %s. ", A_sequence_name,B_sequence_name);
+	    	else
+				fprintf(stderr, "Unexpected output format. ");
+	    	buf=NULL;
+	    	free(obuf);
+	    	return NULL;
+		}
     }
     //if we got here, we didn't have a valid closing.
     debug(D_DEBUG,"Unexpected output format parsing OVL envelope! Output:\n%s\n",obuf);
