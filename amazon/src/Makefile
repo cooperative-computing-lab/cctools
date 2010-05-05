@@ -5,7 +5,7 @@ LIBRARY_SOURCES = s3client.c
 
 OBJECTS = ${LIBRARY_SOURCES:%.c=%.o}
 
-all: libs3client.a s3put s3get s3rm s3mkdir s3rmdir s3ls test s3stat s3getacl
+all: libs3client.a
 
 test: test.o s3client.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS} -lm -ldttools
