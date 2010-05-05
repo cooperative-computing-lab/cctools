@@ -274,6 +274,9 @@ pfs_service * pfs_service_lookup( const char *name )
 	} else if(!strcmp(name,"grow")) {
 		extern pfs_service *pfs_service_grow;
 		return pfs_service_grow;
+	} else if(!strcmp(name,"s3")) {
+		extern pfs_service *pfs_service_s3;
+		return pfs_service_s3;
 #ifdef HAS_GLOBUS_GSS
 	} else if(!strcmp(name,"gsiftp") || !strcmp(name,"gridftp") ) {
 		extern pfs_service *pfs_service_gsiftp;

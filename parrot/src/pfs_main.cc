@@ -19,6 +19,7 @@ extern "C" {
 #include "xmalloc.h"
 #include "create_dir.h"
 #include "file_cache.h"
+#include "password_cache.h"
 #include "debug.h"
 #include "getopt.h"
 #include "pfs_resolve.h"
@@ -45,6 +46,7 @@ pid_t trace_this_pid = -1;
 
 int pfs_master_timeout = 300;
 struct file_cache *pfs_file_cache = 0;
+struct password_cache *pfs_password_cache = 0;
 int pfs_trap_after_fork = 0;
 int pfs_force_stream = 0;
 int pfs_force_cache = 0;
@@ -245,6 +247,7 @@ static void show_use( const char *cmd )
 	if(pfs_service_lookup("irods"))		printf(" irods");
 	if(pfs_service_lookup("hdfs"))		printf(" hdfs");
 	if(pfs_service_lookup("bxgrid"))	printf(" bxgrid");
+	if(pfs_service_lookup("s3"))		printf(" s3");
 	printf("\n");
 	exit(1);
 }
@@ -517,6 +520,16 @@ int main( int argc, char *argv[] )
 			}
 		}
 		free(x);
+	}
+
+	s = getenv("PARROT_USER_PASS");
+	if(s) {
+		char *x = xstrdup(s);
+		int nargs;
+		char **args;
+		if(string_split(x,&nargs,&args)) {
+			pfs_password_cache = password_cache_init(args[0], args[1]);
+		}
 	}
 
 	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
