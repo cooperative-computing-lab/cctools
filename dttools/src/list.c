@@ -318,3 +318,39 @@ void *list_next_item( struct list *list )
 		return 0;
 	}
 }
+
+struct list* list_duplicate( struct list *list )
+{
+	struct list* list2;
+	struct list_node *node;
+	list2 = list_create();
+	node = list->head;
+	while(node) {
+		list_push_tail(list2, node->data);
+		if(list->iter == node) {
+			list2->iter = list2->tail;
+		}
+		node = node->next;
+	}
+	
+	return list2;
+}
+
+struct list* list_sort( struct list *list, int (*comparator) (const void *, const void *) )
+{
+	void **array;
+	int size, i=0;
+
+	size = list_size(list);
+	array = malloc(size*sizeof(*array));
+	while(list_size(list)) {
+		array[i] = list_pop_head(list);
+		i++;
+	}
+	qsort(array, size, sizeof(*array), comparator);
+	for(i = 0; i < size; i++) {
+		list_push_tail(list, array[i]);
+	}
+	free(array);
+	return list;
+}

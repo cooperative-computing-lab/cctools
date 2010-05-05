@@ -412,6 +412,15 @@ int sha1_file ( const char *filename, unsigned char digest[20] )
 	return 1;
 }
 
+void sha1_buffer( const char *buffer, int length, unsigned char digest[20] )
+{
+	sha1_context_t context;
+
+	sha1_init(&context);
+	sha1_update(&context,(const unsigned char*)buffer,length);
+	sha1_final(digest,&context);
+}
+
 const char * sha1_string( unsigned char digest[20] )
 {
 	static char str[41];

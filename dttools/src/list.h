@@ -60,6 +60,15 @@ typedef int (*list_op_t) ( void *item, const void *arg );
 
 struct list * list_create();
 
+/** Duplicate a linked list
+Returns a copy of the linked list.  Note that the 
+pointers in both lists point to the same places.
+@param list The list to be duplicated
+@return A pointer to the duplicate list
+*/
+
+struct list* list_duplicate( struct list *list );
+
 /** Delete a linked list.
 Note that this function only deletes the list itself,
 it does not delete the items referred to by the list.
@@ -199,5 +208,12 @@ Invokes op on every member of the list in reverse.
 @param arg An optional parameter to send to op.
 */
 int list_iterate_reverse( struct list *list, list_op_t op, const void *arg );
+
+/** Sort a list using a comparator function
+@param list The list to sort.
+@param comparator The comparison function used in the sort.  The function should take in pointers to two objects casted as void* and return an integer indicating whether the first is less than (negative), equal to (0), or greater than (positive) the second.
+@return A pointer to the list passed in.  Identical to the list parameter.
+*/
+struct list* list_sort( struct list *list, int (*comparator) (const void *, const void *));
 
 #endif

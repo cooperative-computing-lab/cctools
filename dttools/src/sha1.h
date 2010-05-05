@@ -27,6 +27,16 @@ void sha1_init( sha1_context_t *ctx );
 void sha1_update( sha1_context_t *ctx, const unsigned char *, unsigned int );
 void sha1_final( unsigned char digest[SHA1_DIGEST_LENGTH], sha1_context_t *ctx );
 
+/** Checksum a memory buffer.
+Note that this function produces a digest in binary form
+which  must be converted to a human readable form with @ref sha1_string.
+@param buffer Pointer to a memory buffer.
+@param length Length of the buffer in bytes.
+@param digest Pointer to a buffer to store the digest.
+*/
+
+void sha1_buffer( const char *buffer, int length, unsigned char digest[SHA1_DIGEST_LENGTH] );
+
 /** Checksum a local file.
 Note that this function produces a digest in binary form
 which  must be converted to a human readable form with @ref sha1_string.
