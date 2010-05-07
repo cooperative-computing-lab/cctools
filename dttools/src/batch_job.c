@@ -674,7 +674,7 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 	q->logfile = strdup("condor.logfile");
 
 	if(type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		q->work_queue = work_queue_create(0,time(0)+60);
+		q->work_queue = work_queue_create(0,time(0)+0);
 		if(q->work_queue == 0) {
 			free(q);
 			return 0;
