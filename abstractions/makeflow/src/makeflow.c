@@ -69,6 +69,7 @@ struct dag_file {
 };
 
 struct dag_node {
+	int only_my_children;
 	int linenum;
 	int nodeid;
 	int local_job;
@@ -82,6 +83,58 @@ struct dag_node {
 	batch_job_id_t jobid;
 	struct dag_node *next;
 };
+
+/*****************Li's code************************************************************/
+
+int dag_estimate_nodes_needed(struct dag *d, int actual_max)
+{
+	struct dag_node *n,*m,*tmp;
+	struct dag_file *f;
+	int nodeid;
+	int depends_on_single_node = 1;
+	int max=0;
+
+	for(n=d->nodes;n;n=n->next) {
+		nodeid = -1;
+		m = 0;
+		// for each source file, see if it is a target file of another node
+		for(f=n->source_files;f;f=f->next) {
+			// d->file_table contains all target files
+			// get the node (tmp) that outputs current source file
+			tmp = hash_table_lookup(d->file_table,f->filename);
+			// if a source file is also a target file 
+			if(tmp) {
+				debug(D_DEBUG, "%d depends on %d\n", n->nodeid, tmp->nodeid);
+				if(nodeid == -1) {
+					m = tmp;  // m holds the parent node
+					nodeid = m->nodeid;
+					continue;
+				} 
+			
+				// if current node depends on multiple nodes, continue to process next node
+				if(nodeid != tmp->nodeid) {
+					depends_on_single_node = 0;
+					break;
+				}
+			}
+		}
+
+		// m != 0 : current node depends on at least one exsisting node
+		if(m && depends_on_single_node && nodeid != -1) {
+				m->only_my_children++;
+				// return if maximum number of possible nodes is reached
+				if(m->only_my_children == actual_max) return actual_max;
+		}
+	}
+	
+	// find out the maximum number of direct children that a single parent node has
+	for(n=d->nodes;n;n=n->next) {
+		max = max < n->only_my_children ? n->only_my_children : max;
+	}
+
+	return max;
+}
+/*********^^^^^^^Li's code^^^^^^^^^*************************/
 
 void dag_print( struct dag *d )
 {
@@ -553,6 +606,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 
 	struct dag_node *n = malloc(sizeof(*n));
 	memset(n,0,sizeof(*n));
+	n->only_my_children = 0;
 	n->linenum = d->linenum;
 	n->state = DAG_NODE_STATE_WAITING;
 	n->nodeid = d->nodeid_counter++;
@@ -981,10 +1035,11 @@ int main( int argc, char *argv[] )
 	int skip_afs_check = 0;
 	int preserve_symlinks = 0;
 	const char *batch_submit_options = 0;
+	int auto_workers = 0;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "Ap:cd:DCT:iB:S:Rr:l:L:j:J:o:vhF:W:P")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAp:cd:DCT:iB:S:Rr:l:L:j:J:o:vhF:W:P")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1045,6 +1100,9 @@ int main( int argc, char *argv[] )
 				fprintf(stderr,"makeflow: unknown batch queue type: %s\n",optarg);
 				return 1;
 			}
+			break;
+		case 'a':
+			auto_workers = 1;
 			break;
 		case 'F':
 			wq_option_fast_abort_multiplier = atof(optarg);
@@ -1176,7 +1234,7 @@ int main( int argc, char *argv[] )
 		free(batchlogfilename);
 		return 1;
 	}
-
+	
 	if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
 		char cwd[DAG_LINE_MAX];
 		if(getcwd(cwd,sizeof(cwd))>=0) {
@@ -1200,7 +1258,8 @@ int main( int argc, char *argv[] )
 	remote_queue = batch_queue_create(batch_queue_type);
 
 	// When the batch queue type is Work Queue, check if the queue is successfully created.
-    if(batch_queue_type==BATCH_QUEUE_TYPE_WORK_QUEUE && remote_queue == 0) {
+    if(batch_queue_type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
+		// Figure out which port work queue master is listening on
 		// Makeflow uses "work_queue_create(0,time(0)+60)" to create the queue, which uses the env variable "WORK_QUEUE_PORT"
 		const char *portstring = getenv("WORK_QUEUE_PORT");
 		if(portstring) {
@@ -1208,11 +1267,44 @@ int main( int argc, char *argv[] )
 		} else {
 			port = WORK_QUEUE_DEFAULT_PORT;
 		}
-		fprintf(stderr,"makeflow: Sorry! Makeflow is not able to listen on port %d.\n", port);
-		fprintf(stderr,"makeflow: Please try a different port.\n");
-		free(logfilename);
-		free(batchlogfilename);
-		exit(1);
+
+		// Inital attempt to create a workqueue failed
+		if(remote_queue == 0) {
+			if(auto_workers == 0) {
+				fprintf(stderr,"makeflow: Sorry! Makeflow is not able to listen on port %d.\n", port);
+				fprintf(stderr,"makeflow: Please try a different port.\n");
+				free(logfilename);
+				free(batchlogfilename);
+				exit(1);
+			} else {
+				// Try another port until success 
+				if(port <= 0 || port >= 20000) port = WORK_QUEUE_DEFAULT_PORT;
+				srand(time(0));
+				port += 1 + rand()%1000;
+				while(1) {
+					char line[1024];
+					sprintf(line,"WORK_QUEUE_PORT=%d",port);
+					putenv(strdup(line));
+					remote_queue = batch_queue_create(batch_queue_type);
+					if(remote_queue) break;
+					port++;
+					// Dynamic and/or private ports: 49152–65535, should not be used
+					if(port >= 49152) port = WORK_QUEUE_DEFAULT_PORT + 1 + rand()%1000;
+				}
+			}
+		}
+
+		printf("Work Queue master is listening on port %d\n", port);
+
+		// Start workers
+		char start_worker_line[1024];
+		char hostname[1024];
+		int num_of_workers;
+		gethostname(hostname, 1024);
+		num_of_workers = dag_estimate_nodes_needed(d, 100); 
+		sprintf(start_worker_line, "condor_submit_workers %s %d %d", hostname, port, num_of_workers);
+		printf("Starting workers: %s\n", start_worker_line);
+		system(start_worker_line);
    	}
 
 	if(batch_submit_options) {
