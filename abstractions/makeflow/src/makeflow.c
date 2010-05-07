@@ -22,6 +22,7 @@ See the file COPYING for details.
 #include "load_average.h"
 #include "get_line.h"
 #include "int_sizes.h"
+#include "list.h"
 
 static int dag_abort_flag = 0;
 static int dag_failed_flag = 0;
@@ -82,6 +83,9 @@ struct dag_node {
 	int target_file_names_size;
 	batch_job_id_t jobid;
 	struct dag_node *next;
+	int children;
+	int children_left;
+	int level;
 };
 
 /*****************Li's code************************************************************/
@@ -135,6 +139,90 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 	return max;
 }
 /*********^^^^^^^Li's code^^^^^^^^^*************************/
+
+/* Code added by kparting to compute the width of the graph.
+   Original algorithm by pbui, with improvements by kparting */
+
+int dag_width( struct dag *d )
+{
+	struct dag_node *n, *tmp;
+	struct dag_file *f;
+	
+	/* 1. Find the number of immediate children for all nodes; also,
+	determine leaves by adding nodes with children==0 to list. */
+
+	for (n = d->nodes; n != NULL; n = n->next)
+	{
+		for (f = n->source_files; f != NULL; f = f->next)
+		{
+			tmp = (struct dag_node *)hash_table_lookup(d->file_table, f->filename);
+			if (!tmp) continue;
+			++tmp->children;
+		}
+	}
+
+	struct list *list = list_create();
+
+	for (n = d->nodes; n != NULL; n = n->next)
+	{
+		n->children_left = n->children;
+		if (n->children == 0) list_push_tail(list, n);
+	}
+
+	/* 2. Assign every node a "reverse depth" level. Normally by depth,
+	   I mean topologically sort and assign depth=0 to nodes with no
+	   parents. However, I'm thinking I need to reverse this, with depth=0
+	   corresponding to leaves. Also, we want to make sure that no node is
+	   added to the queue without all its children "looking at it" first
+	   (to determine its proper "depth level"). */
+
+	int max_level = 0;
+
+	while (list_size(list) > 0)
+	{
+		struct dag_node *n = (struct dag_node *)list_pop_head(list);
+		
+		for (f = n->source_files; f != NULL; f = f->next)
+		{
+			tmp = (struct dag_node *)hash_table_lookup(d->file_table, f->filename);
+			if (!tmp) continue;
+
+			if (tmp->level < n->level + 1)
+				tmp->level = n->level + 1;
+
+			if (tmp->level > max_level) max_level = tmp->level;
+			
+			--tmp->children_left;
+			if (tmp->children_left == 0) list_push_tail(list, tmp);
+		}
+	}
+
+	/* 3. Now that every node has a level, simply create an array and then
+	   go through the list once more to count the number of nodes in each
+	   level. */
+
+	int *level_count = malloc((max_level + 1) * sizeof(*level_count));
+	
+	int i;
+	for (i = 0; i <= max_level; ++i) /* yes, should be <=, no joke */
+	{
+		level_count[i] = 0;
+	}
+
+	for (n = d->nodes; n != NULL; n = n->next)
+	{
+		++level_count[n->level];
+	}
+
+	int max = 0;
+	for (i = 0; i <= max_level; ++i) /* yes, should still be <=, srsly */
+	{
+		if (max < level_count[i]) max = level_count[i];
+	}
+
+	return max;
+
+}
 
 void dag_print( struct dag *d )
 {
@@ -607,6 +695,9 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 	struct dag_node *n = malloc(sizeof(*n));
 	memset(n,0,sizeof(*n));
 	n->only_my_children = 0;
+	n->children = 0;
+	n->children_left = 0;
+	n->level = 0;
 	n->linenum = d->linenum;
 	n->state = DAG_NODE_STATE_WAITING;
 	n->nodeid = d->nodeid_counter++;
@@ -940,6 +1031,8 @@ int dag_check( struct dag *d )
 		}
 	}
 
+	printf("Width of graph: %d\n", dag_width(d));
+
 	return 1;			
 }
 
@@ -1269,14 +1362,17 @@ int main( int argc, char *argv[] )
 		}
 
 		// Inital attempt to create a workqueue failed
-		if(remote_queue == 0) {
-			if(auto_workers == 0) {
-				fprintf(stderr,"makeflow: Sorry! Makeflow is not able to listen on port %d.\n", port);
-				fprintf(stderr,"makeflow: Please try a different port.\n");
-				free(logfilename);
-				free(batchlogfilename);
-				exit(1);
-			} else {
+		if(remote_queue == 0 && !auto_workers) {
+			fprintf(stderr,"makeflow: Sorry! Makeflow is not able to listen on port %d.\n", port);
+			fprintf(stderr,"makeflow: Please try a different port.\n");
+			free(logfilename);
+			free(batchlogfilename);
+			exit(1);
+		}
+
+		/* Automatically figure out number of workers */
+		if(auto_workers == 1) {
+			if (remote_queue != 0) {
 				// Try another port until success 
 				if(port <= 0 || port >= 20000) port = WORK_QUEUE_DEFAULT_PORT;
 				srand(time(0));
@@ -1292,19 +1388,19 @@ int main( int argc, char *argv[] )
 					if(port >= 49152) port = WORK_QUEUE_DEFAULT_PORT + 1 + rand()%1000;
 				}
 			}
+
+			printf("Work Queue master is listening on port %d\n", port);
+	
+			// Start workers
+			char start_worker_line[1024];
+			char hostname[1024];
+			int num_of_workers;
+			gethostname(hostname, 1024);
+			num_of_workers = dag_estimate_nodes_needed(d, 100); 
+			sprintf(start_worker_line, "condor_submit_workers %s %d %d", hostname, port, num_of_workers);
+			printf("Starting workers: %s\n", start_worker_line);
+			system(start_worker_line);
 		}
-
-		printf("Work Queue master is listening on port %d\n", port);
-
-		// Start workers
-		char start_worker_line[1024];
-		char hostname[1024];
-		int num_of_workers;
-		gethostname(hostname, 1024);
-		num_of_workers = dag_estimate_nodes_needed(d, 100); 
-		sprintf(start_worker_line, "condor_submit_workers %s %d %d", hostname, port, num_of_workers);
-		printf("Starting workers: %s\n", start_worker_line);
-		system(start_worker_line);
    	}
 
 	if(batch_submit_options) {
