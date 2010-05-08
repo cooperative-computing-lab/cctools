@@ -36,6 +36,9 @@ static struct batch_queue *remote_queue = 0;
 
 #define DAG_LINE_MAX 1048576
 
+#define MAKEFLOW_AUTO_WIDTH 1
+#define MAKEFLOW_AUTO_GROUP 2
+
 typedef enum {
 	DAG_NODE_STATE_WAITING=0,
 	DAG_NODE_STATE_RUNNING=1,
@@ -1106,6 +1109,7 @@ static void show_help(const char *cmd)
 	printf(" -A             Disable the check for AFS.                  (experts only.)\n");;
 	printf(" -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	printf(" -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
+	printf(" -a <mode>      Auto Work Queue mode (DAG [width] or largest [group] of tasks)\n.");
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -P             Preserve (i.e., do not clean) intermediate symbolic links\n");
@@ -1132,7 +1136,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAp:cd:DCT:iB:S:Rr:l:L:j:J:o:vhF:W:P")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:Ap:cd:DCT:iB:S:Rr:l:L:j:J:o:vhF:W:P")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1195,7 +1199,18 @@ int main( int argc, char *argv[] )
 			}
 			break;
 		case 'a':
-			auto_workers = 1;
+			if (!strcmp(optarg, "width"))
+			{
+				auto_workers = MAKEFLOW_AUTO_WIDTH;
+			}
+			else if (!strcmp(optarg, "group"))
+			{
+				auto_workers = MAKEFLOW_AUTO_GROUP;
+			}
+			else
+			{
+				show_help(argv[0]);
+			}
 			break;
 		case 'F':
 			wq_option_fast_abort_multiplier = atof(optarg);
@@ -1371,7 +1386,7 @@ int main( int argc, char *argv[] )
 		}
 
 		/* Automatically figure out number of workers */
-		if(auto_workers == 1) {
+		if(auto_workers > 0) {
 			if (remote_queue != 0) {
 				// Try another port until success 
 				if(port <= 0 || port >= 20000) port = WORK_QUEUE_DEFAULT_PORT;
@@ -1396,10 +1411,26 @@ int main( int argc, char *argv[] )
 			char hostname[1024];
 			int num_of_workers;
 			gethostname(hostname, 1024);
-			num_of_workers = dag_estimate_nodes_needed(d, 100); 
+
+			if (auto_workers == MAKEFLOW_AUTO_GROUP)
+			{
+				num_of_workers = dag_estimate_nodes_needed(d, d->remote_jobs_max); 
+			}
+			else if (auto_workers == MAKEFLOW_AUTO_WIDTH)
+			{
+				num_of_workers = dag_width(d);
+				if (num_of_workers > d->remote_jobs_max)
+					num_of_workers = d->remote_jobs_max;
+			}
+
 			sprintf(start_worker_line, "condor_submit_workers %s %d %d", hostname, port, num_of_workers);
-			printf("Starting workers: %s\n", start_worker_line);
-			system(start_worker_line);
+			printf("Starting workers: `%s`\n", start_worker_line);
+			int rv = system(start_worker_line);
+			if (rv != 0)
+			{
+				fprintf(stderr, "condor_submit_workers failed. Terminating makeflow.\n");
+				exit(1);
+			}
 		}
    	}
 
