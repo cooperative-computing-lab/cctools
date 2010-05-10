@@ -200,9 +200,9 @@ int sign_message(struct s3_message* mesg, const char* user, const char * key) {
 	}
 
 	sprintf(sign_str, "%s\n/%s%s", sign_str, mesg->bucket, mesg->path);
-	if((result = hmac_sha1(sign_str, strlen(sign_str), key, strlen(key), digest))) return result;
+	if((result = hmac_sha1(sign_str, strlen(sign_str), key, strlen(key), (unsigned char*)digest))) return result;
 
-	hmac_sha1(sign_str, strlen(sign_str), key, strlen(key), digest);
+	//hmac_sha1(sign_str, strlen(sign_str), key, strlen(key), (unsigned char*)digest);
 	b64_encode(digest, SHA1_DIGEST_LENGTH, string, SHA1_DIGEST_LENGTH*2);
 
 	sprintf(mesg->authorization, "AWS %s:%s", user, string);
@@ -698,25 +698,52 @@ int s3_getacl(char* bucketname, char* filename, struct hash_table* acls, const c
 }
 
 // NOT IMPLEMENTED YET
-/*int s3_setacl(const char* bucketname, struct hash_table* acls, const char* access_key_id, const char* access_key) {
+int s3_setacl(char* bucketname, struct hash_table* acls, const char* access_key_id, const char* access_key) {
 	struct s3_message mesg;
 	struct link* server;
 	time_t stoptime = time(0)+s3_timeout;
 	char path[HEADER_LINE_MAX];
-	char response[HEADER_LINE_MAX];
+//	char response[HEADER_LINE_MAX];
 	char * text;
 	int length;
+	char *id;
+	struct s3_acl_object *acl;
  
 	if(!s3_endpoint) return -1;
-	if(filename) sprintf(path, "%s?acl", filename);
-	else sprintf(path, "/?acl");
+//	if(filename) sprintf(path, "%s?acl", filename);
+//	else
+	sprintf(path, "/?acl");
 
-	mesg.type = S3_MESG_GET;
+
+	mesg.content_length = 40;
+	hash_table_firstkey(acls);
+	while(hash_table_nextkey(acls, &id, (void**)&acl)) {
+		int glength;
+
+		switch(acl->acl_type) {
+			case S3_ACL_URI:
+				glength = 140+strlen(id);
+				break;
+			case S3_ACL_EMAIL:
+				glength = 135+strlen(id);
+				break;
+			default:
+				glength = 107+strlen(id);
+		}
+
+		if(acl->perm & S3_ACL_FULL_CONTROL)	mesg.content_length += 40 + glength + 12;
+		if(acl->perm & S3_ACL_READ)		mesg.content_length += 40 + glength + 4;
+		if(acl->perm & S3_ACL_WRITE)		mesg.content_length += 40 + glength + 5;
+		if(acl->perm & S3_ACL_READ_ACP)		mesg.content_length += 40 + glength + 8;
+		if(acl->perm & S3_ACL_WRITE_ACP)	mesg.content_length += 40 + glength + 9;
+	}
+	mesg.content_length += 44;
+
+	mesg.type = S3_MESG_PUT;
 	mesg.path = path;
 	mesg.bucket = bucketname;
 	mesg.content_type = NULL;
 	mesg.content_md5 = NULL;
-	mesg.content_length = ;
 	mesg.date = time(0);
 	mesg.expect = 0;
 	mesg.amz_headers = NULL;
@@ -729,7 +756,6 @@ int s3_getacl(char* bucketname, char* filename, struct hash_table* acls, const c
 
 
 	link_write(server, "<AccessControlPolicy><AccessControlList>", 40, stoptime);
-
 
 	hash_table_firstkey(acls);
 	while(hash_table_nextkey(acls, &id, (void**)&acl)) {
@@ -769,9 +795,11 @@ int s3_getacl(char* bucketname, char* filename, struct hash_table* acls, const c
 		}
 	}
 
+	link_write(server, "</AccessControlList></AccessControlPolicy>\r\n", 44, stoptime);
 
+	return 0;
 }
-*/
+
 
 
 int s3_put_file(const char* localname, char* remotename, char* bucketname, enum amz_base_perm perms, const char* access_key_id, const char* access_key) {

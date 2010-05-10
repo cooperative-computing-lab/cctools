@@ -6,8 +6,8 @@
 
 
 int main(int argc, char** argv) {
-	char md5_digest[MD5_DIGEST_LENGTH];
-	char sha1_digest[SHA1_DIGEST_LENGTH];
+	unsigned char md5_digest[MD5_DIGEST_LENGTH];
+	unsigned char sha1_digest[SHA1_DIGEST_LENGTH];
 	char md5_ref1[] = "9294727a3638bb1c13f48ef8158bfc9d";
 	char md5_ref2[] = "750c783e6ab0b503eaa86e310a5db738";
 	char md5_ref3[] = "56be34521d144c88dbb8c733f0e8b3f6";

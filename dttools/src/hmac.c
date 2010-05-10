@@ -8,8 +8,9 @@
 #define MD5_BLOCK_SIZE 64
 #define SHA1_BLOCK_SIZE 64
 
-int hmac( const unsigned char* text, int text_len, const unsigned char* in_key, int in_key_len, unsigned char *digest, int digest_len, int block_size, void (*hash_func)(const char*, int, unsigned char*)) {
-	unsigned char *key, *inner, *outer;
+int hmac( const char* text, int text_len, const char* in_key, int in_key_len, unsigned char *digest, int digest_len, int block_size, void (*hash_func)(const char*, int, unsigned char*)) {
+	unsigned char *key;
+	char *inner, *outer;
 	int i;
 
 	key = malloc(block_size);
@@ -52,11 +53,11 @@ int hmac( const unsigned char* text, int text_len, const unsigned char* in_key, 
 	return 0;
 }
 
-int hmac_md5(const unsigned char* text, int text_len, const unsigned char* in_key, int in_key_len, unsigned char *digest) {
+int hmac_md5(const char* text, int text_len, const char* in_key, int in_key_len, unsigned char *digest) {
 	return hmac(text, text_len, in_key, in_key_len, digest, MD5_DIGEST_LENGTH, MD5_BLOCK_SIZE, &md5_buffer);
 }
 
-int hmac_sha1(const unsigned char* text, int text_len, const unsigned char* in_key, int in_key_len, unsigned char *digest) {
+int hmac_sha1(const char* text, int text_len, const char* in_key, int in_key_len, unsigned char *digest) {
 	return hmac(text, text_len, in_key, in_key_len, digest, SHA1_DIGEST_LENGTH, SHA1_BLOCK_SIZE, &sha1_buffer);
 }
 
