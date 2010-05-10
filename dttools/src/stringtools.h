@@ -45,6 +45,7 @@ void   string_replace_backslash_codes( const char *instr, char *outstr );
 int strpos(const char *str, char c);
 int strrpos(const char *str, char c);
 int getDateString(char* str);
+int string_null_or_empty(const char *str);
 
 #ifndef CCTOOLS_OPSYS_LINUX
 char * strsep (char **stringp, const char *delim);

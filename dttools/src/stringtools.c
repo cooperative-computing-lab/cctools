@@ -752,6 +752,13 @@ int strrpos(const char *str, char c) {
     return -1;
 }
 
+int string_null_or_empty(const char *str)
+{
+	if (!str) return 1;
+	if (!strncmp(str, "", 1)) return 1;
+	return 0;
+}
+
 int getDateString(char* str) {
 
     int retval;
