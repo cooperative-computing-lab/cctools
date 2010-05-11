@@ -1109,7 +1109,7 @@ static void show_help(const char *cmd)
 	printf(" -A             Disable the check for AFS.                  (experts only.)\n");;
 	printf(" -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	printf(" -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
-	printf(" -a <mode>      Auto Work Queue mode (DAG [width] or largest [group] of tasks)\n.");
+	printf(" -a <mode>      Auto Work Queue mode. Mode is either 'width' or 'group' (DAG [width] or largest [group] of tasks).\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -P             Preserve (i.e., do not clean) intermediate symbolic links\n");
@@ -1387,7 +1387,7 @@ int main( int argc, char *argv[] )
 
 		/* Automatically figure out number of workers */
 		if(auto_workers > 0) {
-			if (remote_queue != 0) {
+			if (remote_queue == 0) {
 				// Try another port until success 
 				if(port <= 0 || port >= 20000) port = WORK_QUEUE_DEFAULT_PORT;
 				srand(time(0));

@@ -676,7 +676,7 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 	if(type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		q->work_queue = work_queue_create(0,time(0)+0);
 		if(q->work_queue == 0) {
-			free(q);
+			batch_queue_delete(q);
 			return 0;
 		}
 	} else {
