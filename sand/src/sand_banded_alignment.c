@@ -24,7 +24,9 @@ See the file COPYING for details.
 #include "debug.h"
 
 //#define MIN_ALIGN 40
-int min_align = 40;  // default SWAT minimal score
+int min_align = 40;  // default SWAT minimal aligment length
+int min_qual_score = 25;  // default SWAT minimal match quality score
+float min_qual = 0.04;
 
 seq get_next_sequence_wrapper(FILE * input)
 {
@@ -44,8 +46,10 @@ static void show_help(const char *cmd)
 {
 	printf("Usage: %s [options] <file_name>\n", cmd);
 	printf("The most common options are:\n");
-	printf(" -m <integer>   SWAT minimal score.\n");
+	printf(" -m <integer>	SWAT minimal aligment length (default is %d).\n", min_align);
+	printf(" -q <integer>	SWAT minimal match quality score (default is %d) -- [1/tb.quality].\n", min_qual_score);
 	printf(" -d <flag>	Enable debugging for this subsystem.\n");
+	printf(" -x         	Delete input file after completion.\n");
 	printf(" -v         	Show program version.\n");
 	printf(" -h         	Display this message.\n");
 }
@@ -55,11 +59,12 @@ int main(int argc, char ** argv)
 	FILE * input;
 	seq s1, s2;
 	char ori;
-	int dir, start1, start2, k;
+	int dir, start1, start2, k, max_alignment_l;
 	char c;		// holds command-line options
 	int fileindex;
+	int del_input=0;
 
-	while((c = getopt(argc, argv, "d:m:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "d:m:q:xvh")) != (char) -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);
@@ -75,9 +80,17 @@ int main(int argc, char ** argv)
 		case 'm':
 			min_align = atoi(optarg);
 			break;
+		case 'x':
+			del_input = 1;
+			break;
+		case 'q':
+			min_qual_score = atoi(optarg);
+			break;
 		}
 	}
-	debug(D_DEBUG, "SWAT minimal score: %d\n", min_align);
+	if(min_qual_score!=0)
+		min_qual = 1 / (float)min_qual_score;
+	debug(D_DEBUG, "SWAT minimal alignment length: %d, minimal alignment quality score: %d\n", min_align, min_qual_score);
 
 	fileindex = optind;
 
@@ -126,10 +139,13 @@ int main(int argc, char ** argv)
 		else { ori = 'N'; }
 
 		// Find the number of errors allowable (the width of the band)
-		// First, find the maximum length of the alignment, then get 4%
+		// First, find the maximum length of the alignment, then get 4% (min_qual)
 		// of that because it's the maximum amount of errors allowable.
-		k = ceil(0.04 * max_alignment_length(s1.length, s2.length, start1, start2)); 
-
+		max_alignment_l = max_alignment_length(s1.length, s2.length, start1, start2);
+		k = ceil(min_qual * max_alignment_l); 
+		if(k >= max_alignment_l) 
+			k = max_alignment_l - 1; //to avoid segmentation faults if q_score=1 or less :-)
+		if(k <= 0) k = 1; //to avoid segmentation faults if min_qual=0
 		delta tb = banded_prefix_suffix(s1.seq, s2.seq, start1, start2, k);
 		tb.ori = ori;
 		//fprintf(stderr, "score: %d\n", tb.score);
@@ -143,7 +159,7 @@ int main(int argc, char ** argv)
 		// A lower score is better
 		//if (tb.quality <= tb_r.quality)
 		//{
-		if (tb.quality <= 0.04)
+		if (tb.quality <= min_qual)
 		{
 			print_OVL_message(stdout, tb, s1.id, s2.id);
 		}
@@ -178,6 +194,11 @@ int main(int argc, char ** argv)
 	free_seq(s1);
 	fclose(input);
 	print_OVL_envelope_end(stdout);
+	//delete input file if told to do so
+	if ((argc - optind) == 1 && del_input == 1)
+	{
+		remove(argv[fileindex]);
+	}
 	return 0;
 }
 

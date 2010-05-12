@@ -503,7 +503,7 @@ static int task_consider( void* taskfiledata, int size )
 	char cmd[2*MAX_FILENAME+4];
 	char job_filename[10];
 	string_cookie( job_filename, 10 );
-	sprintf(cmd,"./%s %s < %s",function,function_args,job_filename);
+	sprintf(cmd,"./%s %s %s",function,function_args,job_filename);
 
 	struct work_queue_task* t;
 	
