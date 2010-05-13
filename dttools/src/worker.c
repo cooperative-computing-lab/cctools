@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "memory_info.h"
 #include "disk_info.h"
 #include "link.h"
+#include "list.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "load_average.h"
@@ -76,6 +77,8 @@ int main( int argc, char *argv[] )
 	char hostname[DOMAIN_NAME_MAX];
 	int w;
 
+	struct list *uncacheables;
+	
 	ncpus = load_average_get_cpus();
 	memory_info_get(&memory_avail,&memory_total);
 	disk_info_get(".",&disk_avail,&disk_total);
@@ -143,12 +146,15 @@ int main( int argc, char *argv[] )
 
 	time_t idle_stoptime = time(0) + idle_timeout;
 
+	uncacheables = list_create(); 
+
 	while(!abort_flag) {
 		char line[WORK_QUEUE_LINE_MAX];
-		int result, length, mode, fd;
+		int result, length, mode, cacheable, fd;
 		char filename[WORK_QUEUE_LINE_MAX];
 		char *buffer;
 		FILE *stream;
+		char *file_to_be_removed;
 
 		if(time(0)>idle_stoptime) {
 			if(master) {
@@ -195,7 +201,17 @@ int main( int argc, char *argv[] )
 				link_write(master,line,strlen(line),time(0)+active_timeout);
 				link_write(master,buffer,length,time(0)+active_timeout);
 				if(buffer) free(buffer);
-			} else if(sscanf(line,"put %s %d %o",filename,&length,&mode)==3) {
+
+				// remove uncacheable input files
+				file_to_be_removed = (char *)list_pop_head(uncacheables);
+				while(file_to_be_removed) {
+					char removecmd[WORK_QUEUE_LINE_MAX];
+					printf("worker: removing %s\n", file_to_be_removed);
+					sprintf(removecmd,"rm -rf %s", file_to_be_removed);
+					system(removecmd);
+					file_to_be_removed = (char *)list_pop_head(uncacheables);
+				}
+			} else if(sscanf(line,"put %s %d %o %d",filename,&length,&mode, &cacheable)==4) {
 
 				mode = mode | 0600;
 
@@ -204,6 +220,9 @@ int main( int argc, char *argv[] )
 
 				int actual = link_stream_to_fd(master,fd,length,time(0)+active_timeout);
 				close(fd);
+				if(cacheable == WORK_QUEUE_TASK_FILE_UNCACHEABLE) {
+					list_push_head(uncacheables, filename);
+				}
 				if(actual!=length) goto recover;
 
 			} else if(sscanf(line, "mkdir %s %o", filename, &mode)==2) {
@@ -248,6 +267,9 @@ int main( int argc, char *argv[] )
 	printf("worker: cleaning up %s\n",tempdir);
 	sprintf(deletecmd,"rm -rf %s",tempdir);
 	system(deletecmd);
+	
+	list_free(uncacheables);
+	list_delete(uncacheables);
 
 	return 0;
 }

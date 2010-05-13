@@ -186,6 +186,7 @@ void * list_pop_head( struct list *l )
 	struct list_node *node;
 	void *item;
 
+    if(!l) return 0;
 	if(!l->head) return 0;
 
 	node = l->head;
@@ -207,6 +208,7 @@ void * list_pop_tail( struct list *l )
 	struct list_node *node;
 	void *item;
 
+    if(!l) return 0;
 	if(!l->tail) return 0;
 
 	node = l->tail;

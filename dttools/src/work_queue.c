@@ -443,7 +443,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, in
 		stoptime = time(0) + MAX(1.0,local_info.st_size/1250000.0);
 		open_time = timestamp_get();
 
-		link_printf(w->link,"put %s %d 0%o\n",tf->remote_name,(int)local_info.st_size,local_info.st_mode);
+		link_printf(w->link,"put %s %d 0%o %d\n",tf->remote_name,(int)local_info.st_size,local_info.st_mode, tf->cacheable);
 		
 		actual = link_stream_from_fd(w->link,fd,local_info.st_size,stoptime);
 		close(fd);
@@ -486,7 +486,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 				fl = tf->length;
 				stoptime = time(0) + MAX(1.0,fl/1250000.0);
 				open_time = timestamp_get();
-				link_printf(w->link,"put %s %d %o\n",tf->remote_name,fl,0777);
+				link_printf(w->link,"put %s %d %o %d\n",tf->remote_name,fl,0777, tf->cacheable);
 				debug(D_DEBUG,"limit sending %i bytes to %.03lfs seconds (or 1 if <0)",fl,(fl)/1250000.0);
 				actual = link_write(w->link, tf->payload, fl,stoptime);
 				close_time = timestamp_get();
@@ -857,7 +857,7 @@ void work_queue_task_specify_output_file( struct work_queue_task* t, const char*
 {
 	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
 	tf->fname_or_literal = WORKER_FILE_NAME;
-	tf->cacheable = 0;
+	tf->cacheable = WORK_QUEUE_TASK_FILE_UNCACHEABLE;
 	tf->length = strlen(fname);
 	tf->payload = strdup(fname);
 	tf->remote_name = strdup(rname);
@@ -868,7 +868,7 @@ void work_queue_task_specify_input_buf( struct work_queue_task* t, const char* b
 {
 	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
 	tf->fname_or_literal = WORKER_FILE_LITERAL;
-	tf->cacheable = 0;
+	tf->cacheable = WORK_QUEUE_TASK_FILE_UNCACHEABLE;
 	tf->length = length;
 	tf->payload = malloc(length);
 	memcpy(tf->payload, buf, length);
@@ -880,7 +880,7 @@ void work_queue_task_specify_input_file( struct work_queue_task* t, const char* 
 {
 	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
 	tf->fname_or_literal = WORKER_FILE_NAME;
-	tf->cacheable = 1;
+	tf->cacheable = WORK_QUEUE_TASK_FILE_CACHEABLE;
 	tf->length = strlen(fname);
 	tf->payload = strdup(fname);
 	tf->remote_name = strdup(rname);

@@ -36,6 +36,9 @@ and port of the master.
 #define WORK_QUEUE_SCHEDULE_MAX 3
 #define WORK_QUEUE_SCHEDULE_DEFAULT 3 // default setting for queue.
 
+#define WORK_QUEUE_TASK_FILE_UNCACHEABLE 0
+#define WORK_QUEUE_TASK_FILE_CACHEABLE 1
+
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler; /**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
