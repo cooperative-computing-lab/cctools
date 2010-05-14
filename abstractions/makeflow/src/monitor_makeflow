@@ -1,0 +1,189 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2010- Peter Bui and the University of Notre Dame.
+# This software is distributed under a BSD-style license.
+# See the file LICENSE for details.
+
+""" Makeflow progress monitor """
+
+from collections import deque
+
+from time import sleep, time
+from time import ctime as time_ctime
+
+import curses
+import os
+import sys
+
+
+# Constants --------------------------------------------------------------------
+
+MF_STATES = [ 'waiting', 'running', 'complete', 'failed', 'aborted' ]
+
+MF_LOG_TIME	 = 0
+MF_LOG_NODE_ID	 = 1
+MF_LOG_NEW_STATE = 2
+MF_LOG_JOB_ID	 = 3
+MF_LOG_WAITING	 = 4
+MF_LOG_RUNNING	 = 5
+MF_LOG_COMPLETE	 = 6
+MF_LOG_FAILED	 = 7
+MF_LOG_ABORTED	 = 8
+MF_LOG_TOTAL	 = 9
+
+
+# Log Access Functions ---------------------------------------------------------
+
+def head(file_stream):
+    file_stream.seek(0)
+    return file_stream.readline()
+
+
+def tail(file_stream):
+    bytes = file_stream.tell()
+    line  = file_stream.readline()
+    if not line:
+        file_stream.seek(bytes)
+    return line
+
+
+# Formatting Functions ---------------------------------------------------------
+
+def time_format(seconds):
+    TDELTAS = (60, 60, 24, 365)
+    tlist   = []
+    ctime   = seconds
+
+    for d in TDELTAS:
+        if ctime >= d:
+            tlist.append(ctime % d)
+            ctime = ctime / d 
+        else:
+            tlist.append(ctime)
+            break
+
+    return ':'.join(reversed(map(lambda d: '%02d' % d, tlist)))
+
+# Makeflow Progress Monitor ----------------------------------------------------
+
+class MakeflowProgressMonitor(object):
+
+    def __init__(self, log_file = None, timeout = 1.0, 
+        field_width = 15, progress_width = 60):
+
+	self.log_file = log_file or 'Makeflow.makeflowlog'
+	self.timeout  = timeout
+
+        self.field_width      = field_width
+        self.progress_width   = progress_width
+        self.max_history_size = 100
+
+    def monitor(self, screen):
+        complete_history = deque(maxlen = self.max_history_size)
+
+	try:
+            log_stream = open(self.log_file, 'r')
+            while True:
+                line = head(log_stream)
+                if line:
+                    start_time = int(line.split()[MF_LOG_TIME])
+                    break
+
+            log_stream.seek(0, 2)
+                
+            curses.use_default_colors()
+            curses.curs_set(0)
+
+            slist = []
+
+	    while True:
+                screen.refresh()
+                
+                ctime = time_ctime()
+                screen.addstr(0, 0, 'Every %0.1fs: %s' % (self.timeout, self.log_file))
+                screen.addstr(0, curses.COLS - len(ctime), ctime)
+
+		status = tail(log_stream)
+                if not status:
+                    sleep(self.timeout)
+                else:
+                    slist = map(int, status.split())
+                
+                if not slist:
+                    continue
+
+                mlist = []
+                
+                ppct = float(slist[MF_LOG_COMPLETE]) / float(slist[MF_LOG_TOTAL])
+                bars = int(self.progress_width * ppct) - 1
+                pstr = str('=' * bars + '>').ljust(self.progress_width)
+
+                complete_history.append((slist[MF_LOG_COMPLETE], slist[MF_LOG_TIME]))
+
+                avg_tpm  = slist[MF_LOG_COMPLETE] / float(time() - start_time) * 60.0
+                try:
+                    if len(complete_history) >= self.max_history_size / 2:
+                        cur_tpm = float(complete_history[-1][0] - complete_history[0][0]) / \
+                                  float(complete_history[-1][1] - complete_history[0][1]) * 60.0
+                    else:
+                        cur_tpm = 0
+                except ZeroDivisionError:
+                    cur_tmp = 0
+
+                if cur_tpm:
+                    est_time = (slist[MF_LOG_TOTAL] - slist[MF_LOG_COMPLETE]) / cur_tpm * 60.0
+                else:
+                    est_time = (slist[MF_LOG_TOTAL] - slist[MF_LOG_COMPLETE]) / avg_tpm * 60.0
+
+                mlist.append(())
+                mlist.append(())
+                mlist.append(('start time',     time_ctime(start_time)))
+                mlist.append(('elapsed time',   time_format(time() - start_time)))
+                mlist.append(())
+                mlist.append(('progress', '[%s] %0.2f %%' % (pstr, ppct * 100.0)))
+                if cur_tpm:
+                    mlist.append(('current T/M', '%0.2f' % cur_tpm))
+                else:
+                    mlist.append(('current T/M', 'N/A'))
+                mlist.append(('average T/M', '%0.2f' % avg_tpm))
+                mlist.append(('time left', time_format(est_time)))
+                mlist.append(())
+                mlist.append(('last event', 'Task %d is %s' % \
+                    (slist[MF_LOG_NODE_ID], MF_STATES[slist[MF_LOG_NEW_STATE]])))
+                mlist.append(())
+                mlist.append(('waiting',  slist[MF_LOG_WAITING]))
+                mlist.append(('running',  slist[MF_LOG_RUNNING]))
+                mlist.append(('complete', slist[MF_LOG_COMPLETE]))
+                mlist.append(('failed',   slist[MF_LOG_FAILED]))
+                mlist.append(('aborted',  slist[MF_LOG_ABORTED]))
+                mlist.append(('total',    slist[MF_LOG_TOTAL]))
+                
+                for i, m in enumerate(mlist):
+                    if not m: continue
+
+                    field   = str(m[0].title() + ':').rjust(self.field_width)
+                    message = str(m[1])
+
+                    screen.addstr(i, 0, field)
+                    screen.addstr(i, len(field) + 1, message + ' '*5) 
+	except KeyboardInterrupt:
+	    log_stream.close()
+
+    def run(self):
+        if not os.path.exists(self.log_file):
+            print >>sys.stderr, 'usage: monitor_makeflow <makeflowlog>'
+            sys.exit(1)
+
+        curses.wrapper(lambda s: self.monitor(s))
+
+# Main Execution ---------------------------------------------------------------
+
+if __name__ == '__main__':
+    log_file = None
+    if len(sys.argv) == 2:
+        log_file = sys.argv[1]
+
+    mpm = MakeflowProgressMonitor(log_file)
+    mpm.run()
+
+# vim: sts=4 sw=4 ts=8 expandtab ft=python
