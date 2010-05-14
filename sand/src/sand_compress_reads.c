@@ -28,16 +28,16 @@ int main(int argc, char ** argv)
 	seq s;
 	cseq c;
 	char d;
-	char *clip = "";
-	char *internal = "";
+	int clip = 0; 
+	int internal = 0; 
 
         while((d=getopt(argc,argv,"chi"))!=(char)-1) {
                 switch(d) {
                 case 'c':
-			clip = "clip";
+			clip = 1;
                         break;
 		case 'i':
-			internal = "internal";
+			internal = 1;
 			break; 
                 case 'h':
                         show_help(progname);
@@ -46,7 +46,7 @@ int main(int argc, char ** argv)
                 }
         }
 
-	if (argc == 2 && clip == "" && internal == "")
+	if (argc == 2 && !clip && !internal) 
 	{
 		input = fopen(argv[1], "r");
 		if (!input)
@@ -74,11 +74,11 @@ int main(int argc, char ** argv)
 
 	while (!feof(input))
 	{
-		if(clip != ""){
+		if(clip) { 
 			//fprintf(stderr, "clipping enabled"); 
 			s = get_next_sequence_clip(input); 
 		}
-		else if(internal != ""){
+		else if(internal) {
 			//fprintf(stderr, "internal reads enabled");
 			s = get_next_sequence_internal(input);
 		}	
