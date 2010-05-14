@@ -459,6 +459,7 @@ static int handle_done_task(struct work_queue_task *t) {
 	    if(!strcmp(final_output,"") || confirm_output(final_output)) { // if we have a blank task or if we successfully confirm the output
 		debug(D_DEBUG,"Completed task!\n");
 		fputs(final_output,logfile);
+		fputs("\n",logfile);	// make sure the ovl record from the next done task starts at a new line
 		fflush(logfile);
 		tasks_done++;
 		tasks_runtime+=(t->finish_time-t->start_time);
@@ -639,44 +640,43 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
     }
     ins = buf;
 	char extra_data[ALIGNMENT_METADATA_MAX] = "";
+
+	// try to add the first sequence alignment pair
     while(pair_count == 0) {
-	//if(fscanf(fp,"%s %s %i",sequence_name1,sequence_name2, &alignment_flag ) == 3) {
-	//if ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, &start_pos_1, &start_pos_2)) == GET_CAND_LINE_RESULT_SUCCESS)
 	if ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, extra_data)) == GET_CAND_LINE_RESULT_SUCCESS)
-	{
+	{	// got a "seq_A seq_B ..." record
 	    sprintf(tmp,"%s-%s",sequence_name1,sequence_name2);
 	    if(!hash_table_lookup(t,tmp)) {
-		s1 = (struct sequence*) hash_table_lookup(h, sequence_name1);
-		s2 = (struct sequence*) hash_table_lookup(h, sequence_name2);
-		res = sprintf(ins,">%s %i %i\n",s1->sequence_name,s1->num_bases,s1->num_bytes);
-		ins+=res;
-		memcpy(ins,s1->sequence_data,s1->num_bytes);
-		ins+=s1->num_bytes;
-		res = sprintf(ins,"\n>%s %i %i %i%s\n",s2->sequence_name,s2->num_bases,s2->num_bytes,alignment_flag, extra_data);
-		ins+=res;
-		memcpy(ins,s2->sequence_data,s2->num_bytes);
-		ins+=s2->num_bytes;
+			s1 = (struct sequence*) hash_table_lookup(h, sequence_name1);
+			s2 = (struct sequence*) hash_table_lookup(h, sequence_name2);
+			res = sprintf(ins,">%s %i %i\n",s1->sequence_name,s1->num_bases,s1->num_bytes);
+			ins+=res;
+			memcpy(ins,s1->sequence_data,s1->num_bytes);
+			ins+=s1->num_bytes;
+			res = sprintf(ins,"\n>%s %i %i %i%s\n",s2->sequence_name,s2->num_bases,s2->num_bytes,alignment_flag, extra_data);
+			ins+=res;
+			memcpy(ins,s2->sequence_data,s2->num_bytes);
+			ins+=s2->num_bytes;
 		
-		pair_count++;
-	    }
-	    else {
-		already_done--;
-		if(already_done == 0) {
-		    /*cleanup t*/
-		    hash_table_firstkey(t);
-		    while(hash_table_nextkey(t,&key,&value)) {
-			hash_table_remove(t,key);
+			pair_count++;
+	    } else {
+			already_done--;
+			if(already_done == 0) {
+		   		/*cleanup t*/
+				hash_table_firstkey(t);
+				while(hash_table_nextkey(t,&key,&value)) {
+				hash_table_remove(t,key);
 		    }
 		    if(hash_table_size(t) != 0) {
-			fprintf(stderr,"Could not clear completed pairs hash table!\n");
+				fprintf(stderr,"Could not clear completed pairs hash table!\n");
 		    }
 		}
+
 		if(already_done % 10000 == 0)
 		    fprintf(stderr,"%i completed pairs left\n",already_done);
 	    }
 	
-	}
-	else {
+	} else { // did not get a "seq_A seq_B ..." record
 		if (get_line_result == GET_CAND_LINE_RESULT_EOF)
 		{
 			fprintf(stderr, "All candidate pairs in %s are already complete in provided output!\n", candidate_filename);
@@ -697,122 +697,99 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 			fprintf(stderr, "get_next_cand_line returned invalid result %d\n", get_line_result);
 			exit(1);
 		}
-		/*
-	    if(!feof(fp)) {
-		fprintf(stderr,"Badly formatted candidate file %s.\n",candidate_filename);
-		exit(1);
-	    }
-	    else {
-		fprintf(stderr,"All candidate pairs in %s are already complete in provided output!\n",candidate_filename);
-		exit(0);
-	    }
-		*/
-	}
-    }
+	}// if
+    }// while
     
-    //while(fscanf(fp,"%s %s %i",sequence_name1,sequence_name2, &alignment_flag) == 3)
-	//while ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, &start_pos_1, &start_pos_2)) != GET_CAND_LINE_RESULT_EOF)
+	
+	// Add more sequence alignment pairs
 	while ((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, extra_data)) != GET_CAND_LINE_RESULT_EOF)
     {
 	if(last_display_time < time(0)) display_progress(queue);
 	if (get_line_result == GET_CAND_LINE_RESULT_SUCCESS)
-	{
-	sprintf(tmp,"%s-%s",sequence_name1,sequence_name2);
-	if(!hash_table_lookup(t,tmp)) {
-	    if(!strcmp(sequence_name1,s1->sequence_name) && pair_count < NUM_PAIRS_PER_FILE) { // same first sequence, not exceeded max pairs.
-			s2 = (struct sequence*) hash_table_lookup(h, sequence_name2);
-			if(!s2)
-			{
-			    fprintf(stderr,"No such sequence: %s",sequence_name2);
-		    	exit(1);
-			}
-			res = sprintf(ins,"\n>%s %i %i %i%s\n",s2->sequence_name,s2->num_bases,s2->num_bytes,alignment_flag, extra_data);
-			ins+=res;
-			memcpy(ins,s2->sequence_data,s2->num_bytes);
-			ins+=s2->num_bytes;
-
+	{ // got a "seq_A seq_B ..." record
+		sprintf(tmp,"%s-%s",sequence_name1,sequence_name2);
+		if(!hash_table_lookup(t,tmp)) {
+	    	if(!strcmp(sequence_name1,s1->sequence_name) && pair_count < NUM_PAIRS_PER_FILE) { // same first sequence, not exceeded max pairs.
+				s2 = (struct sequence*) hash_table_lookup(h, sequence_name2);
+				if(!s2) {
+			   		fprintf(stderr,"No such sequence: %s",sequence_name2);
+		    		exit(1);
+				}
+				res = sprintf(ins,"\n>%s %i %i %i%s\n",s2->sequence_name,s2->num_bases,s2->num_bytes,alignment_flag, extra_data);
+				ins+=res;
+				memcpy(ins,s2->sequence_data,s2->num_bytes);
+				ins+=s2->num_bytes;
 		
-			pair_count++;
-	    }
-	    else {
-			if(!(pair_count < NUM_PAIRS_PER_FILE)){ // exceeded max pairs (may or may not be same first sequence, doesn't matter)
-		    	//printf("Count exceeded so doing new file with %s,%s\n",sequence_name1,sequence_name2);
-			    task_consider(buf,ins-buf);
-			    pair_count = 0;
-			    buf[0]='\0';
-		    	ins = buf;
-			}
-			else { //different first sequence
-			    //printf("%s!=%s so adding separator before %s,%s\n",sequence_name1,sequence_name0,sequence_name1,sequence_name2);
-		    	sprintf(ins,"\n>>\n");
-			    ins+=strlen(ins);
-			}
+				pair_count++;
+	    	} else {
+				if(!(pair_count < NUM_PAIRS_PER_FILE)){ // exceeded max pairs (may or may not be same first sequence, doesn't matter)
+		   		 	//printf("Count exceeded so doing new file with %s,%s\n",sequence_name1,sequence_name2);
+			   		task_consider(buf,ins-buf);
+			    	pair_count = 0;
+			    	buf[0]='\0';
+		    		ins = buf;
+				} else { //different first sequence, add separator ">>"
+		    		sprintf(ins,"\n>>\n");
+			    	ins+=strlen(ins);
+				}
 
-			//printf("PC:%i\n",pair_count);
-			s1 = (struct sequence*) hash_table_lookup(h, sequence_name1);
-			if(!s1)
-			{
-			    fprintf(stderr,"No such sequence: %s",sequence_name1);
-			    exit(1);
-			}
-			s2 = (struct sequence*) hash_table_lookup(h, sequence_name2);
-			if(!s2)
-			{
-		    	fprintf(stderr,"No such sequence: %s",sequence_name2);
-			    exit(1);
-			}
-			//printf("@%i:>%s %i %i\n",(int)(ins-buf),s1->sequence_name,s1->num_bases,s1->num_bytes);
-			res = sprintf(ins,">%s %i %i\n",s1->sequence_name,s1->num_bases,s1->num_bytes);
-			ins+=res;
-			memcpy(ins,s1->sequence_data,s1->num_bytes);
-			ins+=s1->num_bytes;
-			res = sprintf(ins,"\n>%s %i %i %i%s\n",s2->sequence_name,s2->num_bases,s2->num_bytes,alignment_flag, extra_data);
-			ins+=res;
-			memcpy(ins,s2->sequence_data,s2->num_bytes);
-			ins+=s2->num_bytes;
+				//printf("PC:%i\n",pair_count);
+				s1 = (struct sequence*) hash_table_lookup(h, sequence_name1);
+				if(!s1) {
+			    	fprintf(stderr,"No such sequence: %s",sequence_name1);
+			   		exit(1);
+				}
+				s2 = (struct sequence*) hash_table_lookup(h, sequence_name2);
+				if(!s2) {
+		    		fprintf(stderr,"No such sequence: %s",sequence_name2);
+			    	exit(1);
+				}
+				//printf("@%i:>%s %i %i\n",(int)(ins-buf),s1->sequence_name,s1->num_bases,s1->num_bytes);
+				res = sprintf(ins,">%s %i %i\n",s1->sequence_name,s1->num_bases,s1->num_bytes);
+				ins+=res;
+				memcpy(ins,s1->sequence_data,s1->num_bytes);
+				ins+=s1->num_bytes;
+				res = sprintf(ins,"\n>%s %i %i %i%s\n",s2->sequence_name,s2->num_bases,s2->num_bytes,alignment_flag, extra_data);
+				ins+=res;
+				memcpy(ins,s2->sequence_data,s2->num_bytes);
+				ins+=s2->num_bytes;
 
-			pair_count++;
-		}
-	} // if(!hash_table_lookup(t,tmp))
-	else {
-	    already_done--;
-	   	if(already_done == 0) {
-		/*cleanup t*/
-		hash_table_firstkey(t);
-		while(hash_table_nextkey(t,&key,&value)) {
-		    hash_table_remove(t,key);
-		}
-		if(hash_table_size(t) != 0) {
-		    fprintf(stderr,"Could not clear completed pairs hash table!\n");
-		}
-		if(already_done % 10000 == 0)
-		    fprintf(stderr,"%i completed pairs left\n",already_done);
-	    }
-	} // else
-	} // if (get_line_result == GET_CAND_LINE_RESULT_SUCCESS)
-	else if (get_line_result == GET_CAND_LINE_RESULT_BAD_FORMAT)
-	{
+				pair_count++;
+			}
+		} else {// if(!hash_table_lookup(t,tmp))
+	   		already_done--;
+	   		if(already_done == 0) {
+				/*cleanup t*/
+				hash_table_firstkey(t);
+				while(hash_table_nextkey(t,&key,&value)) {
+					hash_table_remove(t,key);
+				}
+				if(hash_table_size(t) != 0) {
+					fprintf(stderr,"Could not clear completed pairs hash table!\n");
+				}
+				if(already_done % 10000 == 0)
+					fprintf(stderr,"%i completed pairs left\n",already_done);
+			}
+		} // else
+	} else if (get_line_result == GET_CAND_LINE_RESULT_BAD_FORMAT) {// if (get_line_result == GET_CAND_LINE_RESULT_SUCCESS)
 		fprintf(stderr, "Badly formatted candidate file %s:\n", candidate_filename);
 		exit(1);
-	}
-	else if (get_line_result == GET_CAND_LINE_RESULT_WAIT)
-	{
+	} else if (get_line_result == GET_CAND_LINE_RESULT_WAIT) {
 		debug(D_DEBUG, "No candidates found, waiting (2).\n");
 		wait_for_cands(queue, 5);
-	}
-	else
-	{
+	} else {
 		fprintf(stderr, "get_next_cand_line returned invalid result %d\n", get_line_result);
 		exit(1);
 	}
     } // while
+
     if(buf[0] != '\0') {
-	task_consider(buf,ins-buf);
+		task_consider(buf,ins-buf);
     }
     
     free(buf);
+
     return 0;
-    
 }
 
 int main( int argc, char *argv[] )
@@ -928,7 +905,6 @@ int main( int argc, char *argv[] )
 	printf("%7s | %4s %4s %4s | %6s %4s %4s %4s | %6s %6s %6s %8s | %s\n","Time","WI","WR","WB","TS","TW","TR","TC","TD","AR","AF","WS","Speedup");
 		
 	struct work_queue_task *t;
-
 
 	while(1) {
 		if(last_display_time < time(0)) display_progress(queue);
