@@ -12,11 +12,10 @@ See the file COPYING for details.
 
 /** @file batch_job.h Batch job submission.
 This module implements batch job submission to multiple systems,
-including Condor, SGE, Work Queue, and local Unix processes.
+including Condor, SGE, Work Queue, Xgrid, and local Unix processes.
 This simplifies the construction
 of parallel abstractions that need a simple form of parallel process execution.
 */
-
 
 /** An integer type indicating a unique batch job number.*/
 typedef int batch_job_id_t;
@@ -27,7 +26,8 @@ typedef enum {
 	BATCH_QUEUE_TYPE_UNIX,	     /**< Batch jobs will run as local Unix processes. */
 	BATCH_QUEUE_TYPE_CONDOR,     /**< Batch jobs will be sent to Condor pool. */
 	BATCH_QUEUE_TYPE_SGE,	     /**< Batch jobs will be sent to Sun Grid Engine. */
-	BATCH_QUEUE_TYPE_WORK_QUEUE  /**< Batch jobs will be send to the Work Queue. */
+	BATCH_QUEUE_TYPE_WORK_QUEUE,  /**< Batch jobs will be send to the Work Queue. */
+	BATCH_QUEUE_TYPE_XGRID       /**< Batch jobs will be send to the Xgrid. */
 } batch_queue_type_t;
 
 /** Describes a batch job when it has completed. */
@@ -117,7 +117,7 @@ You must still call @ref batch_job_wait to wait for the removal to complete.
 int batch_job_remove( struct batch_queue *q, batch_job_id_t jobid );
 
 /** Converts a string into a batch queue type.
-@param str A string indicating the work queue type, which may be "unix", "condor", "sge", or "wq".
+@param str A string indicating the work queue type, which may be "unix", "condor", "sge", "wq", or "xgrid".
 @return The batch queue type corresponding to the string, or BATCH_QUEUE_TYPE_UNKNOWN if the string is invalid.
 */
 batch_queue_type_t batch_queue_type_from_string( const char *str );

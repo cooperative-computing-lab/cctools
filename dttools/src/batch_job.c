@@ -634,6 +634,113 @@ int batch_job_remove_unix( struct batch_queue *q, batch_job_id_t jobid )
 
 /***************************************************************************************/
 
+int batch_job_submit_simple_xgrid( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
+{
+	batch_job_id_t jobid;
+	char line[BATCH_JOB_LINE_MAX];
+	
+	fflush(0);
+	
+	jobid = fork();
+	if(jobid>0) {
+		debug(D_DEBUG,"started process %d: xgrid -job run %s",jobid,cmd);
+		struct batch_job_info *info = malloc(sizeof(*info));
+		memset(info,0,sizeof(*info));
+		info->submitted = time(0);
+		info->started = time(0);
+		itable_insert(q->job_table,jobid,info);
+		return jobid;
+	} else if(jobid<0) {
+		debug(D_DEBUG,"couldn't create new process: %s\n",strerror(errno));
+		return -1;
+	} else {
+		sprintf(line, "xgrid -h thirtytwo1.cse.nd.edu -p cse-xgrid -in . -job run %s", cmd);
+		int result = system(line);
+		if(WIFEXITED(result)) {
+			_exit(WEXITSTATUS(result));
+		} else {
+			_exit(1);
+		}
+	}
+	
+}
+
+int batch_job_submit_xgrid( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
+{
+	char line[BATCH_JOB_LINE_MAX];
+	
+	if(!cmd) return -1;
+	
+	if(!args)    args = "";
+	if(!infile)  infile = "/dev/null";
+	if(!outfile) outfile = "/dev/null";
+	if(!errfile) errfile = "/dev/null";
+	
+	sprintf(line,"%s %s <%s >%s 2>%s",cmd,args,infile,outfile,errfile);
+	
+	return batch_job_submit_simple_unix(q,line,extra_input_files,extra_output_files);
+}
+
+batch_job_id_t batch_job_wait_xgrid( struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime )
+{
+	while(1) {
+		int timeout;
+		
+		if(stoptime>0) {
+			timeout = MAX(0,stoptime-time(0));
+		} else {
+			timeout = 5;
+		}
+		
+		struct process_info *p = process_wait(timeout);
+		if(p) {
+			struct batch_job_info *info = itable_remove(q->job_table,p->pid);
+			if(!info) {
+				process_putback(p);
+				return -1;
+			}
+			
+			info->finished = time(0);
+			if(WIFEXITED(p->status)) {
+				info->exited_normally = 1;
+				info->exit_code = WEXITSTATUS(p->status);
+			} else {
+				info->exited_normally = 0;
+				info->exit_signal = WTERMSIG(p->status);
+			}
+			
+			memcpy(info_out,info,sizeof(*info));
+			
+			int jobid = p->pid;
+			free(p);
+			return jobid;
+			
+		} else if(errno==ESRCH || errno==ECHILD) {
+			return 0;
+		}
+		
+		if(stoptime!=0 && time(0)>=stoptime) return -1;
+	}
+}
+
+int batch_job_remove_xgrid( struct batch_queue *q, batch_job_id_t jobid )
+{
+	if(itable_lookup(q->job_table,jobid)) {
+		if(kill(jobid,SIGTERM)==0) {
+			debug(D_DEBUG,"signalled process %d",jobid);
+			return 1;
+		} else {
+			debug(D_DEBUG,"could not signal process %d: %s\n",jobid,strerror(errno));
+			return 0;
+		}
+	} else {
+		debug(D_DEBUG,"process %d is not under my control.\n",jobid);
+		return 0;
+	}
+}
+
+/***************************************************************************************/
+
 const char * batch_queue_type_string()
 {
 	return "unix, condor, sge, workqueue";
@@ -646,6 +753,7 @@ batch_queue_type_t batch_queue_type_from_string( const char *str )
 	if(!strcmp(str,"unix"))   return BATCH_QUEUE_TYPE_UNIX;
 	if(!strcmp(str,"wq"))     return BATCH_QUEUE_TYPE_WORK_QUEUE;
 	if(!strcmp(str,"workqueue")) return BATCH_QUEUE_TYPE_WORK_QUEUE;
+	if(!strcmp(str,"xgrid"))  return BATCH_QUEUE_TYPE_XGRID;
 	return BATCH_QUEUE_TYPE_UNKNOWN;
 }
 
@@ -656,6 +764,7 @@ const char * batch_queue_type_to_string( batch_queue_type_t t )
 		  case BATCH_QUEUE_TYPE_CONDOR:      return "condor";
 		  case BATCH_QUEUE_TYPE_SGE:         return "sge";
 		  case BATCH_QUEUE_TYPE_WORK_QUEUE:  return "wq";
+		  case BATCH_QUEUE_TYPE_XGRID:       return "xgrid";
 		  default: return "unknown";
 	}
 }
@@ -729,6 +838,8 @@ batch_job_id_t batch_job_submit( struct batch_queue *q, const char *cmd, const c
 		return batch_job_submit_sge(q,cmd,args,infile,outfile,errfile,extra_input_files,extra_output_files);
 	} else if(q->type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_submit_work_queue(q,cmd,args,infile,outfile,errfile,extra_input_files,extra_output_files);
+	} else if(q->type==BATCH_QUEUE_TYPE_XGRID) {
+		return batch_job_submit_xgrid(q,cmd,args,infile,outfile,errfile,extra_input_files,extra_output_files);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -747,6 +858,8 @@ batch_job_id_t batch_job_submit_simple( struct batch_queue *q, const char *cmd, 
 		return batch_job_submit_simple_sge(q,cmd,extra_input_files,extra_output_files);
 	} else if(q->type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_submit_simple_work_queue(q,cmd,extra_input_files,extra_output_files);
+	} else if(q->type==BATCH_QUEUE_TYPE_XGRID) {
+		return batch_job_submit_simple_xgrid(q,cmd,extra_input_files,extra_output_files);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -770,6 +883,8 @@ batch_job_id_t batch_job_wait_timeout( struct batch_queue *q, struct batch_job_i
 		return batch_job_wait_sge(q,info,stoptime);
 	} else if(q->type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_wait_work_queue(q,info,stoptime);
+	} else if(q->type==BATCH_QUEUE_TYPE_XGRID) {
+		return batch_job_wait_xgrid(q,info,stoptime);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -788,6 +903,8 @@ int batch_job_remove( struct batch_queue *q, batch_job_id_t jobid )
 		return batch_job_remove_sge(q,jobid);
 	} else if(q->type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_remove_work_queue(q,jobid);
+	} else if(q->type==BATCH_QUEUE_TYPE_XGRID) {
+		return batch_job_remove_xgrid(q,jobid);
 	} else {
 		errno = EINVAL;
 		return -1;
