@@ -623,19 +623,23 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
     int res;
     FILE* fp = fopen(candidate_filename,"r");
     if(!fp) {
-	fprintf(stderr,"Couldn't open file %s.\n",candidate_filename);
-	exit(1);
+		fprintf(stderr,"Couldn't open file %s.\n",candidate_filename);
+		exit(1);
     }
+	
+	const unsigned int max_one_candidate_pair_size = (SEQUENCE_ID_MAX+ASSEMBLY_LINE_MAX+3)*4;
+	unsigned int current_buffer_size = 4*1024*1024; // 4MB
+	unsigned int used_buffer_size;
 
     char* buf = NULL;
     char* ins = NULL;
     while(!buf) {
-	    buf = (char*) malloc(LIMIT*sizeof(char));
-	    if(!buf)
-	    {
-		fprintf(stderr,"Out of memory for buf! Waiting for a bit.\n");
-		if (last_display_time < time(0)) display_progress(queue);
-		handle_done_task(work_queue_wait(queue,WORK_QUEUE_WAITFORTASK));
+	    buf = (char*) malloc(current_buffer_size*sizeof(char));
+	    if(!buf) {
+			fprintf(stderr,"Out of memory for buf! Waiting for a bit.\n");
+			if(last_display_time < time(0)) 
+				display_progress(queue);
+			handle_done_task(work_queue_wait(queue,WORK_QUEUE_WAITFORTASK));
 	    }
     }
     ins = buf;
@@ -659,6 +663,25 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 			ins+=s2->num_bytes;
 		
 			pair_count++;
+
+			// If buffer is almost used up, realloc more memory for it
+			used_buffer_size = ins - buf;
+			while(current_buffer_size - used_buffer_size < max_one_candidate_pair_size) {
+				unsigned int new_buffer_size = current_buffer_size * 1.5;
+				buf = (char*)realloc(buf, new_buffer_size*sizeof(char));
+				if(buf) {
+					current_buffer_size = new_buffer_size;
+					ins = buf + used_buffer_size;
+					break;
+				} else {
+					fprintf(stderr,"Out of memory for buf! Waiting for a bit.\n");
+					if(last_display_time < time(0)) 
+						display_progress(queue);
+					handle_done_task(work_queue_wait(queue,WORK_QUEUE_WAITFORTASK));
+				}
+			}
+
+			
 	    } else {
 			already_done--;
 			if(already_done == 0) {
@@ -721,6 +744,24 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 				ins+=s2->num_bytes;
 		
 				pair_count++;
+
+				// If buffer is almost used up, realloc more memory for it
+				used_buffer_size = ins - buf;
+				while(current_buffer_size - used_buffer_size < max_one_candidate_pair_size) {
+					unsigned int new_buffer_size = current_buffer_size * 1.5;
+					buf = (char*)realloc(buf, new_buffer_size*sizeof(char));
+					if(buf) {
+						current_buffer_size = new_buffer_size;
+						ins = buf + used_buffer_size;
+						break;
+					} else {
+						fprintf(stderr,"Out of memory for buf! Waiting for a bit.\n");
+						if(last_display_time < time(0)) 
+							display_progress(queue);
+						handle_done_task(work_queue_wait(queue,WORK_QUEUE_WAITFORTASK));
+					}
+				}
+
 	    	} else {
 				if(!(pair_count < NUM_PAIRS_PER_FILE)){ // exceeded max pairs (may or may not be same first sequence, doesn't matter)
 		   		 	//printf("Count exceeded so doing new file with %s,%s\n",sequence_name1,sequence_name2);
@@ -755,6 +796,23 @@ static int build_jobs(const char* candidate_filename, struct hash_table* h, stru
 				ins+=s2->num_bytes;
 
 				pair_count++;
+
+				// If buffer is almost used up, realloc more memory for it
+				used_buffer_size = ins - buf;
+				while(current_buffer_size - used_buffer_size < max_one_candidate_pair_size) {
+					unsigned int new_buffer_size = current_buffer_size * 1.5;
+					buf = (char*)realloc(buf, new_buffer_size*sizeof(char));
+					if(buf) {
+						current_buffer_size = new_buffer_size;
+						ins = buf + used_buffer_size;
+						break;
+					} else {
+						fprintf(stderr,"Out of memory for buf! Waiting for a bit.\n");
+						if(last_display_time < time(0)) 
+							display_progress(queue);
+						handle_done_task(work_queue_wait(queue,WORK_QUEUE_WAITFORTASK));
+					}
+				}
 			}
 		} else {// if(!hash_table_lookup(t,tmp))
 	   		already_done--;
@@ -846,6 +904,7 @@ int main( int argc, char *argv[] )
 	else {
 		NUM_PAIRS_PER_FILE = 1000;
 	}
+
 	LIMIT = ((NUM_PAIRS_PER_FILE)*(SEQUENCE_ID_MAX+ASSEMBLY_LINE_MAX+3));
 		
 	sequential_run_time = NUM_PAIRS_PER_FILE*.04;

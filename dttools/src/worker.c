@@ -152,6 +152,7 @@ int main( int argc, char *argv[] )
 		char line[WORK_QUEUE_LINE_MAX];
 		int result, length, mode, cacheable, fd;
 		char filename[WORK_QUEUE_LINE_MAX];
+		char path[WORK_QUEUE_LINE_MAX];
 		char *buffer;
 		FILE *stream;
 		char *file_to_be_removed;
@@ -205,10 +206,9 @@ int main( int argc, char *argv[] )
 				// remove uncacheable input files
 				file_to_be_removed = (char *)list_pop_head(uncacheables);
 				while(file_to_be_removed) {
-					char removecmd[WORK_QUEUE_LINE_MAX];
-					printf("worker: removing %s\n", file_to_be_removed);
-					sprintf(removecmd,"rm -rf %s", file_to_be_removed);
-					system(removecmd);
+					printf("worker: removing uncacheable file - %s\n", file_to_be_removed);
+					remove(file_to_be_removed);
+					free(file_to_be_removed);
 					file_to_be_removed = (char *)list_pop_head(uncacheables);
 				}
 			} else if(sscanf(line,"put %s %d %o %d",filename,&length,&mode, &cacheable)==4) {
@@ -221,17 +221,21 @@ int main( int argc, char *argv[] )
 				int actual = link_stream_to_fd(master,fd,length,time(0)+active_timeout);
 				close(fd);
 				if(cacheable == WORK_QUEUE_TASK_FILE_UNCACHEABLE) {
-					list_push_head(uncacheables, filename);
+					list_push_head(uncacheables, strdup(filename));
 				}
 				if(actual!=length) goto recover;
-
+			} else if(sscanf(line, "rm %s", path) == 1) {
+				int status;
+				status = remove(path);
+			
+				sprintf(line, "%d\n", status); // 0 - succeeded; otherwise, failed
+				link_write(master, line, strlen(line), time(0)+active_timeout);
 			} else if(sscanf(line, "mkdir %s %o", filename, &mode)==2) {
 				mode = mode | 0700;
 				result = mkdir(filename, mode);
 
 				sprintf(line, "%d\n", result);
 				link_write(master, line, strlen(line), time(0)+active_timeout);
-				
 			} else if(sscanf(line,"get %s",filename)==1) {
 				fd = open(filename,O_RDONLY,0);
 				if(fd>=0) {
@@ -243,6 +247,7 @@ int main( int argc, char *argv[] )
 					int actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
 					close(fd);
 					if(actual!=length) goto recover;
+					remove(filename);
 				} else {
 					sprintf(line,"-1\n");
 					link_write(master,line,strlen(line),time(0)+active_timeout);

@@ -519,8 +519,6 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 	return 0;
 }
 
-
-
 int start_one_task( struct work_queue_task *t, struct work_queue_worker *w )
 {
 	if(!send_input_files(t,w)) return 0;
@@ -881,6 +879,17 @@ void work_queue_task_specify_input_file( struct work_queue_task* t, const char* 
 	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
 	tf->fname_or_literal = WORKER_FILE_NAME;
 	tf->cacheable = WORK_QUEUE_TASK_FILE_CACHEABLE;
+	tf->length = strlen(fname);
+	tf->payload = strdup(fname);
+	tf->remote_name = strdup(rname);
+	list_push_tail(t->input_files,tf);
+}
+
+void work_queue_task_specify_input_file_do_not_cache( struct work_queue_task* t, const char* fname, const char* rname)
+{
+	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
+	tf->fname_or_literal = WORKER_FILE_NAME;
+	tf->cacheable = WORK_QUEUE_TASK_FILE_UNCACHEABLE;
 	tf->length = strlen(fname);
 	tf->payload = strdup(fname);
 	tf->remote_name = strdup(rname);

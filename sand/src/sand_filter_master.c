@@ -59,6 +59,7 @@ static int window_size = 22;
 static int rectangle_size = 0;
 static char end_char = '\0';
 static int do_not_unlink = 0;
+static int do_not_cache = 0;
 
 static unsigned long int cand_count = 0;
 
@@ -113,6 +114,7 @@ static void show_help(const char *cmd)
 	printf("where options are:\n");
 	printf(" -p <port>      Port number for queue master to listen on.\n");
 	printf(" -s <size>      Size of \"rectangle\" for filtering.\n");
+	printf(" -x             If specified, input files would be cached on the workers.\n");
 	printf(" -r <file>      A meryl file of repeat mers to be filtered out.\n");
 	printf(" -k <number>    The k-mer size to use in candidate selection (default is 22).\n");
 	printf(" -w <number>    The minimizer window size to use in candidate selection (default");
@@ -294,6 +296,14 @@ static void checkpoint_task(struct work_queue_task * t)
 	fflush(checkpoint_file);
 }
 
+static void custom_work_queue_task_specify_input_file(struct work_queue_task* t, const char* fname, const char* rname) {
+	if(!do_not_cache) {
+		work_queue_task_specify_input_file(t, fname, rname);
+	} else {
+		work_queue_task_specify_input_file_do_not_cache(t, fname, rname);
+	}
+}
+	
 static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x, int curr_rect_y)
 {
 	struct work_queue_task * t;
@@ -345,24 +355,24 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 	work_queue_task_specify_tag(t, tag);
 
 	// Send the executable, if it's not already there.
-	work_queue_task_specify_input_file(t, filter_program_name, filter_program_name);
+	custom_work_queue_task_specify_input_file(t, filter_program_name, filter_program_name);
 
 	// Send the wrapper program to make sure it can execute.
-	if (wrapper_program_name) work_queue_task_specify_input_file(t, wrapper_program_name, wrapper_program_name);
+	if (wrapper_program_name) custom_work_queue_task_specify_input_file(t, wrapper_program_name, wrapper_program_name);
 
 	// Send the repeat file if we need it and it's not already there.
-	if (repeat_filename && !wrapper_program_name) work_queue_task_specify_input_file(t, repeat_filename, repeat_filename);
+	if (repeat_filename && !wrapper_program_name) custom_work_queue_task_specify_input_file(t, repeat_filename, repeat_filename);
 
 	// Add the rectangle. Add it as staged, so if the worker
 	// already has these sequences, there's no need to send them again.
 	//work_queue_task_specify_input_buf(t, rectangles[curr_rect_x], rectangle_sizes[curr_rect_x], rname_x);
 	//if (curr_rect_x != curr_rect_y) work_queue_task_specify_input_buf(t, rectangles[curr_rect_y], rectangle_sizes[curr_rect_y], rname_y);
 	sprintf(fname_x, "%s/%s", outdirname, rname_x);
-	work_queue_task_specify_input_file(t, fname_x, rname_x);
+	custom_work_queue_task_specify_input_file(t, fname_x, rname_x);
 	if (curr_rect_x != curr_rect_y)
 	{
 		sprintf(fname_y, "%s/%s", outdirname, rname_y);
-		work_queue_task_specify_input_file(t, fname_y, rname_y);
+		custom_work_queue_task_specify_input_file(t, fname_y, rname_y);
 	}
 
 	// Get the output file if it's in binary mode. If not in binary mode
@@ -668,7 +678,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 	char c;
 	char tmp[512];
 
-	while ((c = getopt(argc, argv, "p:n:d:s:r:k:w:bc:o:f:a:uvh")) != (char) -1)
+	while ((c = getopt(argc, argv, "p:n:d:s:r:k:w:bc:o:f:a:uxvh")) != (char) -1)
 	{
 		switch (c) {
 		case 'p':
@@ -708,6 +718,9 @@ static void get_options(int argc, char ** argv, const char * progname)
 			break;
 		case 'a':
 			wrapper_program_name = optarg;
+			break;
+		case 'x':
+			do_not_cache = 1;
 			break;
 		case 'o':
 			debug_config_file(optarg);

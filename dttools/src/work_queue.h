@@ -161,6 +161,13 @@ void work_queue_task_specify_input_buf( struct work_queue_task *t, const char *b
 */
 void work_queue_task_specify_input_file( struct work_queue_task *t, const char *fname, const char *rname);
 
+/** Further define a task specification. The file specified here won't be cached on the remote worker. Once completed, the task may be passed to @ref work_queue_submit. 
+@param t The task to which to add parameters
+@param fname The name of the data file to send to the worker to be available to the commands.
+@param rname The name of the file in which to store the buffer data on the worker
+*/
+void work_queue_task_specify_input_file_do_not_cache( struct work_queue_task *t, const char *fname, const char *rname);
+
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. If no file is defined, the program will have default (no) output files retrieved.
 @param t The task to which to add parameters
 @param rname The name of a file created by the program when it runs.
