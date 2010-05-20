@@ -278,7 +278,7 @@ batch_job_id_t batch_job_submit_simple_sge( struct batch_queue *q, const char *c
 			debug(D_DEBUG,"job %d submitted",jobid);
 			pclose(file);
 			info = malloc(sizeof(*info));
-			memset(info,0,sizeof(info));
+			memset(info,0,sizeof(*info));
 			info->submitted = time(0);
 			itable_insert(q->job_table,jobid,info);
 			return jobid;
