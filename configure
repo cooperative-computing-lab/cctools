@@ -438,7 +438,7 @@ else
 	krb5_include_path=${krb5_path}/include
 fi
 
-if [ $config_krb5_path != no ] && check_file ${krb5_include_path}/krb5.h
+if [ $config_krb5_path != no ] && check_file ${krb5_include_path}/krb5.h && library_search krb5 "${krb5_path}"
 then
 	if [ ${krb5_include_path} != /usr/include ]
 	then
@@ -447,7 +447,6 @@ then
 
 	ccflags="${ccflags} -DHAS_KRB5"
 	
-	library_search krb5        "${krb5_path}"
 	library_search k5crypto    "${krb5_path}"
 	library_search crypto      "${krb5_path}"
 	library_search com_err     "${krb5_path}"
