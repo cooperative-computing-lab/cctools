@@ -6,11 +6,18 @@ See the file COPYING for details.
 
 #include "work_queue.h"
 
+#include "catalog_query.h"
+#include "catalog_server.h"
+#include "datagram.h"
+#include "domain_name_cache.h"
+#include "nvpair.h"
 #include "copy_stream.h"
 #include "memory_info.h"
 #include "disk_info.h"
+#include "hash_cache.h"
 #include "link.h"
 #include "list.h"
+#include "xmalloc.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "load_average.h"
@@ -33,8 +40,131 @@ See the file COPYING for details.
 #include <sys/mman.h>
 #include <sys/signal.h>
 
+#define WQ_MASTER "wq_master"
+#define WQ_MASTER_ADDR_MAX 256
+#define WQ_MASTER_PROJ_MAX 256
+
+static int auto_worker = 0;
+static char *preference = NULL;
+static const int non_preference_priority_max = 100;
+
+struct wq_master {
+	char addr[WQ_MASTER_ADDR_MAX];
+	int port;
+	char proj[WQ_MASTER_PROJ_MAX];
+	int priority;
+};
+
+void debug_print_masters(struct list *ml) {
+	struct wq_master *m;
+	int count = 0;
+	
+	debug(D_DEBUG, "All available Masters:\n");
+	list_first_item(ml);
+	while((m = (struct wq_master *)list_next_item(ml)) != NULL) {
+		debug(D_DEBUG, "Master %d:\n", ++count);
+		debug(D_DEBUG, "addr:\t%s\n", m->addr);
+		debug(D_DEBUG, "port:\t%d\n", m->port);
+		debug(D_DEBUG, "project:\t%s\n", m->proj);
+		debug(D_DEBUG, "priority:\t%d\n", m->priority);
+		debug(D_DEBUG, "\n");
+	}
+}
+	
+
+struct wq_master * parse_wq_master_nvpair(struct nvpair *nv) {
+	struct wq_master *m;
+
+	m = xxmalloc(sizeof(struct wq_master));
+
+	strncpy(m->addr, nvpair_lookup_string(nv, "address"), WQ_MASTER_ADDR_MAX);
+	strncpy(m->proj, nvpair_lookup_string(nv, "project"), WQ_MASTER_PROJ_MAX);
+	m->port = nvpair_lookup_integer(nv, "port");
+	m->priority = nvpair_lookup_integer(nv, "priority");
+	if(m->priority < 0) m->priority = 0; 
+
+	return m;
+}
+
+struct list * get_work_queue_masters(const char * catalog_host, int catalog_port) {
+	struct catalog_query *q;
+	struct nvpair *nv;
+	struct list *ml;
+	struct wq_master *m;
+	time_t timeout=60, stoptime;
+	
+	stoptime = time(0) + timeout;
+
+	q = catalog_query_create(catalog_host, catalog_port, stoptime);
+	if(!q) {
+		fprintf(stderr,"couldn't query catalog: %s\n",strerror(errno));
+		return NULL;
+	}
+
+	ml = list_create();
+	if(!ml) return NULL;
+
+	while((nv = catalog_query_read(q, stoptime))){
+		if(strcmp(nvpair_lookup_string(nv, "type"), WQ_MASTER) == 0) {
+			m = parse_wq_master_nvpair(nv);	
+			if(preference) {
+				if(strncmp(m->proj, preference, WQ_MASTER_PROJ_MAX) == 0) {
+					m->priority += non_preference_priority_max; 
+				} else {
+					m->priority = non_preference_priority_max < m->priority ? non_preference_priority_max : m->priority;
+				}
+			}
+			list_push_priority(ml, m, m->priority);
+		}
+		nvpair_delete(nv);
+	}
+
+	return ml;
+}
+
+struct link * auto_link_connect(char *host, int *port, time_t idle_stoptime) {
+	struct link *master=0;
+	struct list *ml;
+	struct wq_master *m;
+
+	ml = get_work_queue_masters(NULL, 0);
+	debug_print_masters(ml);
+
+	list_first_item(ml);
+	while((m = (struct wq_master *)list_next_item(ml)) != NULL) {
+		master = link_connect(m->addr,m->port,idle_stoptime);
+		if(master) {
+			debug(D_DEBUG, "Talking to the Master at:\n");
+			debug(D_DEBUG, "addr:\t%s\n", m->addr);
+			debug(D_DEBUG, "port:\t%d\n", m->port);
+			debug(D_DEBUG, "project:\t%s\n", m->proj);
+			debug(D_DEBUG, "priority:\t%d\n", m->priority);
+			debug(D_DEBUG, "\n");
+
+			if(!domain_name_cache_lookup_reverse(m->addr, host)) {
+				strcpy(host, m->addr);
+			}
+
+			(*port) = m->port;
+
+			break;
+		}
+	}
+
+
+	list_free(ml);
+	list_delete(ml);
+
+	return master;
+}
+
+
+
 // Maximum time to wait before aborting if there is no connection to the master.
 static int idle_timeout=900;
+
+// Maximum time to wait before switching to another master.
+static int master_timeout=60;
 
 // Maximum time to wait when actively communicating with the master.
 static int active_timeout=3600;
@@ -68,6 +198,8 @@ int main( int argc, char *argv[] )
 {
 	const char *host;
 	int port;
+	char actual_host[DOMAIN_NAME_MAX];
+	int actual_port;
 	struct link *master=0;
 	char addr[LINK_ADDRESS_MAX];
 	UINT64_T memory_avail, memory_total;
@@ -85,8 +217,11 @@ int main( int argc, char *argv[] )
 	
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "d:t:o:w:vi")) != (char) -1) {
+	while((c = getopt(argc, argv, "ad:t:o:p:w:vi")) != (char) -1) {
 		switch (c) {
+		case 'a':
+			auto_worker = 1;	
+			break;
 		case 'd':
 			debug_flags_set(optarg);
 			break;
@@ -95,6 +230,9 @@ int main( int argc, char *argv[] )
 			break;
 		case 'o':
 			debug_config_file(optarg);
+			break;
+		case 'p':
+			preference = strdup(optarg);
 			break;
 		case 'v':
 			show_version(argv[0]);
@@ -110,13 +248,20 @@ int main( int argc, char *argv[] )
 		}
 	}
 
-	if((argc-optind)!=2) {
-		show_help(argv[0]);
-		return 1;
+	if(!auto_worker) {
+		if((argc-optind) != 2) {
+			show_help(argv[0]);
+			return 1;
+		}
+		host = argv[optind];
+		port = atoi(argv[optind+1]);
+
+		if(!domain_name_cache_lookup(host,addr)) {
+			printf("couldn't lookup address of host %s\n",host);
+			return 1;
+		}
 	}
 
-	host = argv[optind];
-	port = atoi(argv[optind+1]);
 
 	signal(SIGTERM,handle_abort);
 	signal(SIGQUIT,handle_abort);
@@ -137,14 +282,10 @@ int main( int argc, char *argv[] )
 	mkdir(tempdir,0700);
 	chdir(tempdir);
 
-	if(!domain_name_cache_lookup(host,addr)) {
-		printf("couldn't lookup address of host %s\n",host);
-		return 1;
-	}
-
 	domain_name_cache_guess(hostname);
 
 	time_t idle_stoptime = time(0) + idle_timeout;
+	time_t switch_master_time = time(0) + master_timeout;
 
 	uncacheables = list_create(); 
 
@@ -161,13 +302,21 @@ int main( int argc, char *argv[] )
 			if(master) {
 				printf("worker: gave up after waiting %ds to receive a task.\n",idle_timeout);
 			} else {
-				printf("worker: gave up after waiting %ds to connect to %s port %d.\n",idle_timeout,host,port);
+				if(auto_worker) {
+					printf("worker: gave up after waiting %ds to connect to all the available masters.\n",idle_timeout);
+				} else {
+					printf("worker: gave up after waiting %ds to connect to %s port %d.\n",idle_timeout,host,port);
+				}
 			}
 			break;
 		}
 
 		if(!master) {
-			master = link_connect(addr,port,idle_stoptime);
+			if(auto_worker) {
+				master = auto_link_connect(actual_host, &actual_port, idle_stoptime);
+			} else {
+				master = link_connect(addr,port,idle_stoptime);
+			}
 			if(!master) {
 				sleep(5);
 				continue;
@@ -259,6 +408,7 @@ int main( int argc, char *argv[] )
 			}
 
 			idle_stoptime = time(0) + idle_timeout;
+			switch_master_time = time(0) + master_timeout;
 
 		} else {
 			recover:

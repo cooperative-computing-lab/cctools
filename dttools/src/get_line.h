@@ -8,7 +8,7 @@ See the file COPYING for details.
 #ifndef __LINEREADER_H__
 #define __LINEREADER_H__
 
-#define LINE_MAX 1048576
+#define LARGE_LINE_MAX 1048576
 
 /** Read a line of any length from a file.
 @param fp A file pointer, pointing to the beginning of the next line to be read.

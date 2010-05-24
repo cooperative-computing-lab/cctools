@@ -14,7 +14,7 @@ See the file COPYING for details.
 char * get_line( FILE *fp )
 {
 	static char *other = NULL;
-	static char buffer[LINE_MAX];
+	static char buffer[LARGE_LINE_MAX];
 
 	/* Free the other buffer, if we have used it. */
 	if (other)
@@ -23,7 +23,7 @@ char * get_line( FILE *fp )
 		other = NULL;
 	}
 
-	if (!fgets(buffer, LINE_MAX, fp))
+	if (!fgets(buffer, LARGE_LINE_MAX, fp))
 	{
 		return NULL;
 	}
@@ -31,9 +31,9 @@ char * get_line( FILE *fp )
 	/* If the main buffer is completely filled and there is more
 	   to read... (second condition is for slackers who don't put newlines
 	   at the end of their text files) */
-	if (!strrchr(buffer, '\n') && strlen(buffer) == LINE_MAX - 1)
+	if (!strrchr(buffer, '\n') && strlen(buffer) == LARGE_LINE_MAX - 1)
 	{
-		int s = LINE_MAX;
+		int s = LARGE_LINE_MAX;
 
 		/* ...use the heap buffer ("other"), doubling its size
 		   repeatedly until it is filled. */
