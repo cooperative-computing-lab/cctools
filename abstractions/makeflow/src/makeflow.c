@@ -12,6 +12,11 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <signal.h>
 
+#include "catalog_query.h"
+#include "catalog_server.h"
+#include "datagram.h"
+#include "domain_name_cache.h"
+#include "link.h"
 #include "macros.h"
 #include "hash_table.h"
 #include "itable.h"
@@ -24,6 +29,13 @@ See the file COPYING for details.
 #include "int_sizes.h"
 #include "list.h"
 
+#define DAG_LINE_MAX 1048576
+#define MASTER_CATALOG_LINE_MAX 1024
+#define CATALOG_UPDATE_INTERVAL 300
+
+#define MAKEFLOW_AUTO_WIDTH 1
+#define MAKEFLOW_AUTO_GROUP 2
+
 static int dag_abort_flag = 0;
 static int dag_failed_flag = 0;
 static int dag_submit_timeout = 3600;
@@ -34,10 +46,10 @@ static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
-#define DAG_LINE_MAX 1048576
-
-#define MAKEFLOW_AUTO_WIDTH 1
-#define MAKEFLOW_AUTO_GROUP 2
+static struct datagram *outgoing_datagram = NULL;
+static char *project = NULL;
+static int priority = 0;
+static int port = 0;
 
 typedef enum {
 	DAG_NODE_STATE_WAITING=0,
@@ -92,6 +104,25 @@ struct dag_node {
 };
 
 /*****************Li's code************************************************************/
+
+static int master_send_catalog_update(const char *project, int port, int priority) {
+	char address[DATAGRAM_ADDRESS_MAX];
+	static char text[MASTER_CATALOG_LINE_MAX];
+
+	snprintf(text, MASTER_CATALOG_LINE_MAX,
+			"type wq_master\nproject %s\nport %d\npriority %d\n",
+			project,
+			port,
+			priority	
+	);
+
+	if(domain_name_cache_lookup(CATALOG_HOST, address)) {
+		debug(D_DEBUG, "sending master information to %s:%d", CATALOG_HOST, CATALOG_PORT);
+		datagram_send(outgoing_datagram, text, strlen(text), address, CATALOG_PORT);
+	}
+
+	return 1;
+}
 
 int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 {
@@ -1086,6 +1117,13 @@ static void handle_abort( int sig )
 	dag_abort_flag = 1;
 }
 
+static void handle_update_catalog () {
+	debug(D_DEBUG, "Catalog update: Master(project: %s, priority: %d) is listening on port %d\n", project, priority, port);
+	outgoing_datagram = datagram_create(0);
+	master_send_catalog_update(project, port, priority);
+	alarm(CATALOG_UPDATE_INTERVAL);
+}
+
 static void show_version(const char *cmd)
 {
 	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
@@ -1100,6 +1138,9 @@ static void show_help(const char *cmd)
 	printf(" -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	printf(" -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
 	printf(" -p <port>      Port number to use with work queue.         (default is %d)\n",WORK_QUEUE_DEFAULT_PORT);
+	printf(" -C             Syntax check.\n");
+	printf(" -N <project>   Report the master information to a catalog server with the project name - <project>\n");
+	printf(" -E <integer>   Priority. Higher the value, higher the priority.\n");
 	printf(" -D             Display the Makefile as a Dot graph.\n");
 	printf(" -B <options>   Add these options to all batch submit files.\n");
 	printf(" -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n",dag_submit_timeout);
@@ -1120,11 +1161,11 @@ static void show_help(const char *cmd)
 
 int main( int argc, char *argv[] )
 {
-	int port = 0;
 	char c;
 	char *logfilename = NULL;
 	char *batchlogfilename = NULL;
 	int clean_mode = 0;
+	int catalog_mode = 0;
 	int display_mode = 0;
 	int syntax_check = 0;
 	int explicit_remote_jobs_max = 0;
@@ -1136,7 +1177,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:Ap:cd:DCT:iB:S:Rr:l:L:j:J:o:vhF:W:P")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:Ap:cCd:E:DCT:iB:S:Rr:l:L:j:J:N:o:vhF:W:P")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1146,6 +1187,13 @@ int main( int argc, char *argv[] )
 			break;
 		case 'c':
 			clean_mode = 1;
+			break;
+		case 'N':
+			project = strdup(optarg);
+			catalog_mode = 1;
+			break;
+		case 'E':
+			priority = atoi(optarg);
 			break;
 		case 'l':
 			logfilename = strdup(optarg);
@@ -1377,7 +1425,7 @@ int main( int argc, char *argv[] )
 		}
 
 		// Inital attempt to create a workqueue failed
-		if(remote_queue == 0 && !auto_workers) {
+		if(remote_queue == 0 && !auto_workers && !catalog_mode) {
 			fprintf(stderr,"makeflow: Sorry! Makeflow is not able to listen on port %d.\n", port);
 			fprintf(stderr,"makeflow: Please try a different port.\n");
 			free(logfilename);
@@ -1386,7 +1434,7 @@ int main( int argc, char *argv[] )
 		}
 
 		/* Automatically figure out number of workers */
-		if(auto_workers > 0) {
+		if(auto_workers > 0 || catalog_mode) {
 			if (remote_queue == 0) {
 				// Try another port until success 
 				if(port <= 0 || port >= 20000) port = WORK_QUEUE_DEFAULT_PORT;
@@ -1405,7 +1453,9 @@ int main( int argc, char *argv[] )
 			}
 
 			printf("Work Queue master is listening on port %d\n", port);
+		}
 	
+		if(auto_workers > 0) {
 			// Start workers
 			char start_worker_line[1024];
 			char hostname[1024];
@@ -1432,6 +1482,13 @@ int main( int argc, char *argv[] )
 				exit(1);
 			}
 		}
+
+		if(catalog_mode) {
+			debug(D_DEBUG, "Catalog update: Master(project: %s, priority: %d) is listening on port %d\n", project, priority, port);
+			outgoing_datagram = datagram_create(0);
+			master_send_catalog_update(project, port, priority);
+			alarm(CATALOG_UPDATE_INTERVAL);
+		}
    	}
 
 	if(batch_submit_options) {
@@ -1447,6 +1504,7 @@ int main( int argc, char *argv[] )
 	signal(SIGINT,handle_abort);
 	signal(SIGQUIT,handle_abort);
 	signal(SIGTERM,handle_abort);
+	signal(SIGALRM, handle_update_catalog);
 
 	dag_run(d);
 
