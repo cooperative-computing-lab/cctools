@@ -1045,7 +1045,7 @@ int ftp_lite_auth_globus( struct ftp_lite_server *s )
 
 int ftp_lite_data_channel_auth( struct ftp_lite_server *s, FILE *data )
 {
-	return 0;
+	return 1;
 }
 
 static int ftp_lite_send_command_gss( struct ftp_lite_server *s, const char *buffer )
