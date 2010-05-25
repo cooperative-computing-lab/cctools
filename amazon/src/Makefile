@@ -1,11 +1,12 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-LIBRARY_SOURCES = s3client.c
+LIBRARY_SOURCES = s3client.c s3put.c s3get.c s3stat.c s3rm.c s3mkdir.c s3rmdir.c s3ls.c s3getacl.c s3setacl.c 
 
 OBJECTS = ${LIBRARY_SOURCES:%.c=%.o}
 
-all: libs3client.a
+all: libs3client.a s3put s3get s3stat s3rm s3mkdir s3rmdir s3ls
+#s3getacl s3setacl
 
 test: test.o s3client.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS} -lm -ldttools
@@ -25,6 +26,11 @@ s3ls: s3ls.o s3client.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS} -lm -ldttools
 s3getacl: s3getacl.o s3client.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS} -lm -ldttools
+s3setacl: s3setacl.o s3client.o
+	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS} -lm -ldttools
+
+s3passwd.h:
+	touch s3passwd.h
 
 libs3client.a: s3client.o
 	${CCTOOLS_AR} rv $@ $^

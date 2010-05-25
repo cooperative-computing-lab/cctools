@@ -19,7 +19,7 @@
 #define S3_ACL_READ		0x02
 #define S3_ACL_WRITE		0x04
 #define S3_ACL_READ_ACP		0x08
-#define S3_ACL_WRITE_ACP	0x0C
+#define S3_ACL_WRITE_ACP	0x10
 
 enum amz_header_type {
 	AMZ_CUSTOM_HEADER,
@@ -68,8 +68,8 @@ int s3_rm_bucket(char* bucketname, const char* access_key_id, const char* access
 int s3_ls_bucket(char* bucketname, struct list* dirent, const char* access_key_id, const char* access_key);
 
 
-int s3_getacl(char* bucketname, char* filename, struct hash_table* acls, const char* access_key_id, const char* access_key);
-// int s3_set_acls(const char* bucketname, struct list* acls, const char* access_key_id, const char* access_key);
+int s3_getacl(char* bucketname, char* filename, char *owner, struct hash_table* acls, const char* access_key_id, const char* access_key);
+int s3_setacl(char* bucketname, char* filename, const char* owner, struct hash_table* acls, const char* access_key_id, const char* access_key);
 
 
 int s3_put_file(const char* localname, char* remotename, char* bucketname, enum amz_base_perm perms, const char* access_key_id, const char* access_key);

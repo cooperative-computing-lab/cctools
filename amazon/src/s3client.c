@@ -202,7 +202,7 @@ int sign_message(struct s3_message* mesg, const char* user, const char * key) {
 	sprintf(sign_str, "%s\n/%s%s", sign_str, mesg->bucket, mesg->path);
 	if((result = hmac_sha1(sign_str, strlen(sign_str), key, strlen(key), (unsigned char*)digest))) return result;
 
-	//hmac_sha1(sign_str, strlen(sign_str), key, strlen(key), (unsigned char*)digest);
+	hmac_sha1(sign_str, strlen(sign_str), key, strlen(key), (unsigned char*)digest);
 	b64_encode(digest, SHA1_DIGEST_LENGTH, string, SHA1_DIGEST_LENGTH*2);
 
 	sprintf(mesg->authorization, "AWS %s:%s", user, string);
@@ -572,7 +572,7 @@ int s3_ls_bucket(char* bucketname, struct list* dirents, const char* access_key_
 	return 0;
 }
 
-int s3_getacl(char* bucketname, char* filename, struct hash_table* acls, const char* access_key_id, const char* access_key) {
+int s3_getacl(char* bucketname, char* filename, char* owner, struct hash_table* acls, const char* access_key_id, const char* access_key) {
 	struct s3_message mesg;
 	struct link* server;
 	time_t stoptime = time(0)+s3_timeout;
@@ -651,6 +651,7 @@ int s3_getacl(char* bucketname, char* filename, struct hash_table* acls, const c
 	}
 	link_close(server);
 
+	if(owner) sscanf(strstr(text, "<Owner>"), "<Owner><ID>%[^<]</ID>", owner);
 	temp = text;
 	while( (start = strstr(temp, "<Grant>")) ) {
 		char id[1024];
@@ -698,24 +699,24 @@ int s3_getacl(char* bucketname, char* filename, struct hash_table* acls, const c
 }
 
 // NOT IMPLEMENTED YET
-int s3_setacl(char* bucketname, struct hash_table* acls, const char* access_key_id, const char* access_key) {
+int s3_setacl(char* bucketname, char *filename, const char* owner, struct hash_table* acls, const char* access_key_id, const char* access_key) {
 	struct s3_message mesg;
 	struct link* server;
 	time_t stoptime = time(0)+s3_timeout;
 	char path[HEADER_LINE_MAX];
-//	char response[HEADER_LINE_MAX];
+	char response[HEADER_LINE_MAX];
 	char * text;
 	int length;
 	char *id;
 	struct s3_acl_object *acl;
  
 	if(!s3_endpoint) return -1;
-//	if(filename) sprintf(path, "%s?acl", filename);
-//	else
+	if(filename) sprintf(path, "%s?acl", filename);
+	else
 	sprintf(path, "/?acl");
+ 
 
-
-	mesg.content_length = 40;
+	mesg.content_length = 39 + 32 + strlen(owner) + 32;
 	hash_table_firstkey(acls);
 	while(hash_table_nextkey(acls, &id, (void**)&acl)) {
 		int glength;
@@ -737,7 +738,7 @@ int s3_setacl(char* bucketname, struct hash_table* acls, const char* access_key_
 		if(acl->perm & S3_ACL_READ_ACP)		mesg.content_length += 40 + glength + 8;
 		if(acl->perm & S3_ACL_WRITE_ACP)	mesg.content_length += 40 + glength + 9;
 	}
-	mesg.content_length += 44;
+	mesg.content_length += 43;
 
 	mesg.type = S3_MESG_PUT;
 	mesg.path = path;
@@ -754,8 +755,14 @@ int s3_setacl(char* bucketname, struct hash_table* acls, const char* access_key_
 	sign_message(&mesg, access_key_id, access_key);
 	length = s3_message_to_string(&mesg, &text);
 
+	fprintf(stderr, "Message:\n%s\n", text);
+	link_write(server, text, length, stoptime);
+	free(text);
 
-	link_write(server, "<AccessControlPolicy><AccessControlList>", 40, stoptime);
+	link_write(server, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", 39, stoptime);
+	link_write(server, "<AccessControlPolicy><Owner><ID>", 32, stoptime);
+	link_write(server, owner, strlen(owner), stoptime);
+	link_write(server, "</ID></Owner><AccessControlList>", 32, stoptime);
 
 	hash_table_firstkey(acls);
 	while(hash_table_nextkey(acls, &id, (void**)&acl)) {
@@ -795,7 +802,23 @@ int s3_setacl(char* bucketname, struct hash_table* acls, const char* access_key_
 		}
 	}
 
-	link_write(server, "</AccessControlList></AccessControlPolicy>\r\n", 44, stoptime);
+	link_write(server, "</AccessControlList></AccessControlPolicy>\n", 43, stoptime);
+
+	link_readline(server, response, HEADER_LINE_MAX, stoptime);
+	if(strcmp(response, "HTTP/1.1 200 OK")) {
+		// Error: transfer failed; close connection and return failure
+		fprintf(stderr, "Error: send file failed\nResponse: %s\n", response);
+		link_close(server);
+		return -1;
+	}
+
+//	fprintf(stderr, "Response:\n");
+	do {
+//		fprintf(stderr, "\t%s\n", response);
+		if(!strcmp(response, "Server: AmazonS3")) break;
+	} while(link_readline(server, response, HEADER_LINE_MAX, stoptime));
+
+	link_close(server);
 
 	return 0;
 }
@@ -1039,7 +1062,6 @@ int s3_stat_file(char* filename, char* bucketname, struct s3_dirent_object* dire
 
 	sign_message(&mesg, access_key_id, access_key);
 	length = s3_message_to_string(&mesg, &text);
-	//fprintf(stderr, "message: %s\n", text);
 
 	link_write(server, text, length, stoptime);
 	free(text);
@@ -1052,9 +1074,7 @@ int s3_stat_file(char* filename, char* bucketname, struct s3_dirent_object* dire
 		return -1;
 	}
 
-	//fprintf(stderr, "Response:\n");
 	do {
-	//	fprintf(stderr, "\t%s\n", response);
 		if(!strncmp(response, "Content-Length:", 14)) {
 			sscanf(response, "Content-Length: %d", &length);
 		} else if(dirent->metadata && !strncmp(response, "x-amz-meta-", 11)) {
