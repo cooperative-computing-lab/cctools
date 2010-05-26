@@ -11,6 +11,8 @@ See the file COPYING for details.
 #include <errno.h>
 #include <sys/stat.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "catalog_query.h"
 #include "catalog_server.h"
@@ -710,6 +712,17 @@ void dag_node_parse_filelist( struct dag *d, struct dag_node *n, char *filelist,
 					//TODO: Check for if symlink points to right place
 					fprintf(stderr, "makeflow: could not create symbolic link (%s)\n", strerror(errno));
 					exit(1);
+				}
+
+				if (access(filename, R_OK) < 0) {
+					int fd;
+
+					fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 0700);
+					if (fd < 0) {
+						fprintf(stderr, "makeflow: could not create symbolic link target (%s)\n", strerror(errno));
+						exit(1);
+					}
+					close(fd);
 				}
 			}
 			
