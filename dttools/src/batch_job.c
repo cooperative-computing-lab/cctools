@@ -381,10 +381,50 @@ int batch_job_remove_sge( struct batch_queue *q, batch_job_id_t jobid )
 
 /***************************************************************************************/
 
+void specify_work_queue_task_files( struct work_queue_task *t, const char *input_files, const char *output_files )
+{
+	char *f, *p, *files;
+	
+	if(input_files) {
+		files = strdup(input_files);
+		f = strtok(files," \t,");
+		while(f) {
+			p = strchr(f, '=');
+			if (p) {
+				*p = 0;
+				work_queue_task_specify_input_file(t,f,p+1);
+				debug(D_DEBUG, "local file %s is %s on remote system:", f, p+1);
+				*p = '=';
+			} else {
+				work_queue_task_specify_input_file(t,f,f);
+			}
+			f = strtok(0," \t,");
+		}
+		free(files);
+	}
+
+	if(output_files) {
+		files = strdup(output_files);
+		f = strtok(files," \t,");
+		while(f) {
+			p = strchr(f, '=');
+			if (p) {
+				*p = 0;
+				work_queue_task_specify_output_file(t,f,p+1);
+				debug(D_DEBUG, "remote file %s is %s on local system:", f, p+1);
+				*p = '=';
+			} else {
+				work_queue_task_specify_output_file(t,f,f);
+			}
+			f = strtok(0," \t,");
+		}
+		free(files);
+	}
+}
+
 int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
 {
 	struct work_queue_task *t;
-	char *f, *files;
 	char *full_command; 
 
 	full_command = (char*) malloc((strlen(cmd)+strlen(args)+2)*sizeof(char));
@@ -405,25 +445,7 @@ int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const c
 	if(infile) work_queue_task_specify_input_file(t,infile,infile);
 	if(cmd) work_queue_task_specify_input_file(t,cmd,cmd);
 	
-	if(extra_input_files) {
-		files = strdup(extra_input_files);
-		f = strtok(files," \t,");
-		while(f) {
-			 work_queue_task_specify_input_file(t,f,f);
-			 f = strtok(0," \t,");
-		}
-		free(files);
-	}
-
-	if(extra_output_files) {
-		files = strdup(extra_output_files);
-		f = strtok(files," \t,");
-		while(f) {
-			work_queue_task_specify_output_file(t,f,f);
-			f = strtok(0," \t,");
-		}
-		free(files);
-	}
+	specify_work_queue_task_files(t, extra_input_files, extra_output_files);
 
 	work_queue_submit(q->work_queue,t);
 
@@ -437,29 +459,9 @@ int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const c
 int batch_job_submit_simple_work_queue( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
 {
 	struct work_queue_task *t;
-	char *f, *files;
 	
 	t = work_queue_task_create(cmd);
-
-	if(extra_input_files) {
-		files = strdup(extra_input_files);
-		f = strtok(files," \t,");
-		while(f) {
-			 work_queue_task_specify_input_file(t,f,f);
-			 f = strtok(0," \t,");
-		}
-		free(files);
-	}
-
-	if(extra_output_files) {
-		files = strdup(extra_output_files);
-		f = strtok(files," \t,");
-		while(f) {
-			work_queue_task_specify_output_file(t,f,f);
-			f = strtok(0," \t,");
-		}
-		free(files);
-	}
+	specify_work_queue_task_files(t, extra_input_files, extra_output_files);
 
 	work_queue_submit(q->work_queue,t);
 
