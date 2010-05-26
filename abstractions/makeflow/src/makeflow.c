@@ -1082,7 +1082,7 @@ int dag_check( struct dag *d )
 		}
 	}
 
-	printf("Width of graph: %d\n", dag_width(d));
+	fprintf(stderr, "makeflow: Width of DAG: %d\n", dag_width(d));
 
 	return 1;			
 }
