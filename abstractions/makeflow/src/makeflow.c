@@ -712,11 +712,23 @@ void dag_node_parse_filelist( struct dag *d, struct dag_node *n, char *filelist,
 					exit(1);
 				}
 			}
-
+			
 			if (source) {
-				dag_node_add_source_file(n, newname);
+				if (batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
+					dag_node_add_source_file(n, newname);
+					n->source_file_names_size += strlen(filename)+1;
+				} else {
+					dag_node_add_source_file(n, filename);
+					n->source_file_names_size += strlen(filename)+strlen(newname)+2;
+				}
 			} else {
-				dag_node_add_target_file(n, newname);
+				if (batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
+					dag_node_add_target_file(n, newname);
+					n->target_file_names_size += strlen(filename)+1;
+				} else {
+					dag_node_add_target_file(n, filename);
+					n->target_file_names_size += strlen(filename)+strlen(newname)+2;
+				}
 			}
 			free(newname);
 		}
@@ -724,16 +736,13 @@ void dag_node_parse_filelist( struct dag *d, struct dag_node *n, char *filelist,
 		{
 			if (source) {
 				dag_node_add_source_file(n,filename);
+				n->source_file_names_size += strlen(filename)+1;
 			} else {
 				dag_node_add_target_file(n,filename);
+				n->target_file_names_size += strlen(filename)+1;
 			}
 		}
 
-		if (source) {
-			n->source_file_names_size += strlen(filename)+1;
-		} else {
-			n->target_file_names_size += strlen(filename)+1;
-		}
 		filename = strtok(0," \t\n");
 	}
 }
@@ -878,6 +887,7 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 {
 	char *input_files = NULL;
 	char *output_files = NULL;
+	char *filename = NULL;
 	struct dag_file *f;
 
 	struct batch_queue *thequeue;
@@ -894,12 +904,26 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 	input_files[0] = '\0';
 	for(f=n->source_files;f;f=f->next) {
 		strcat(input_files,f->filename);
+		if (batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+			filename = hash_table_lookup(d->filename_translation_fwd, f->filename);
+			if (filename) {
+				strcat(input_files,"=");
+				strcat(input_files,filename);
+			}
+		}
 		strcat(input_files,",");
 	}
 
 	output_files = malloc((n->target_file_names_size + 1) * sizeof(char));
 	output_files[0] = '\0';
 	for(f=n->target_files;f;f=f->next) {
+		if (batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+			filename = hash_table_lookup(d->filename_translation_fwd, f->filename);
+			if (filename) {
+				strcat(output_files,filename);
+				strcat(output_files,"=");
+			}
+		}
 		strcat(output_files,f->filename);
 		strcat(output_files,",");
 	}
