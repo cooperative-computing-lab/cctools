@@ -400,12 +400,12 @@ void dag_node_clean( struct dag *d, struct dag_node *n )
 
 void clean_symlinks( struct dag *d, int silent )
 {
-	/* Clean up all symlinks created by makeflow. */
-
-	hash_table_firstkey(d->filename_translation_rev);
-
 	char *key;
 	void *value;
+	
+	if (batch_queue_type != BATCH_QUEUE_TYPE_CONDOR) return;
+
+	hash_table_firstkey(d->filename_translation_rev);
 	while (hash_table_nextkey(d->filename_translation_rev, &key, &value))
 	{
 		file_clean(key, silent);
@@ -697,7 +697,7 @@ void dag_node_parse_filelist( struct dag *d, struct dag_node *n, char *filelist,
 
 	filename = strtok(filelist," \t\n");
 	while(filename) {
-		if(strchr(filename,'/'))
+		if(strchr(filename,'/') && (batch_queue_type == BATCH_QUEUE_TYPE_CONDOR || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE))
 		{
 			char *newname = NULL;
 			rv = translate_filename(d, filename, &newname);
@@ -1504,8 +1504,7 @@ int main( int argc, char *argv[] )
 	batch_queue_delete(local_queue);
 	batch_queue_delete(remote_queue);
 
-	if (!preserve_symlinks)
-	{
+	if (!preserve_symlinks && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
 		fprintf(stderr, "makeflow: cleaning up intermediate symlinks...\n");
 		clean_symlinks(d, 1);	/* Silently remove symlinks */
 	}
