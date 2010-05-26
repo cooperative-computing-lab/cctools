@@ -81,6 +81,7 @@ struct dag {
 
 struct dag_file {
 	const char *filename;
+	const char *alias;
 	struct dag_file *next;
 };
 
@@ -305,6 +306,7 @@ struct dag_file * dag_file_create( const char *filename, struct dag_file *next )
 {
 	struct dag_file *f = malloc(sizeof(*f));
 	f->filename = strdup(filename);
+	f->alias = NULL;
 	f->next = next;
 	return f;
 }
@@ -690,6 +692,54 @@ void dag_parse_assignment( struct dag *d, char *line )
 	setenv(name,value,1);
 }
 
+void dag_node_parse_filelist( struct dag *d, struct dag_node *n, char *filelist, int source, int clean_mode )
+{
+	char *filename;
+	int rv;
+
+	filename = strtok(filelist," \t\n");
+	while(filename) {
+		if(strchr(filename,'/'))
+		{
+			char *newname = NULL;
+			rv = translate_filename(d, filename, &newname);
+			if (rv && !clean_mode)
+			{
+				fprintf(stderr, "makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
+				rv = symlink(filename, newname);
+				if (rv < 0 && errno != EEXIST)
+				{
+					//TODO: Check for if symlink points to right place
+					fprintf(stderr, "makeflow: could not create symbolic link (%s)\n", strerror(errno));
+					exit(1);
+				}
+			}
+
+			if (source) {
+				dag_node_add_source_file(n, newname);
+			} else {
+				dag_node_add_target_file(n, newname);
+			}
+			free(newname);
+		}
+		else
+		{
+			if (source) {
+				dag_node_add_source_file(n,filename);
+			} else {
+				dag_node_add_target_file(n,filename);
+			}
+		}
+
+		if (source) {
+			n->source_file_names_size += strlen(filename)+1;
+		} else {
+			n->target_file_names_size += strlen(filename)+1;
+		}
+		filename = strtok(0," \t\n");
+	}
+}
+
 struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 {
 	char *line;
@@ -697,7 +747,6 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 	char *colon;
 	char *targetfiles;
 	char *sourcefiles;
-	char *filename;
 
 	while(1) {
 		line = dag_readline(d,file);
@@ -742,62 +791,8 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 	targetfiles = line;
 	sourcefiles = colon+1;
 
-	filename = strtok(targetfiles," \t\n");
-	int rv;
-	while(filename) {
-		if(strchr(filename,'/'))
-		{
-			char *newname = NULL;
-			rv = translate_filename(d, filename, &newname);
-			if (rv && !clean_mode)
-			{
-				fprintf(stderr, "makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
-				rv = symlink(filename, newname);
-				if (rv < 0 && errno != EEXIST)
-				{
-					//TODO: Check for if symlink points to right place
-					fprintf(stderr, "makeflow: could not create symbolic link (%s)\n", strerror(errno));
-					exit(1);
-				}
-			}
-			dag_node_add_target_file(n, newname);
-			free(newname);
-		}
-		else
-		{
-			dag_node_add_target_file(n,filename);
-		}
-		n->target_file_names_size += strlen(filename)+1;
-		filename = strtok(0," \t\n");
-	}
-
-	filename = strtok(sourcefiles," \t\n");
-	while(filename) {
-		if(strchr(filename,'/'))
-		{
-			char *newname = NULL;
-			rv = translate_filename(d, filename, &newname);
-			if (rv && !clean_mode)
-			{
-				fprintf(stderr, "makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
-				rv = symlink(filename, newname);
-				if (rv < 0 && errno != EEXIST)
-				{
-					//TODO: Check for if symlink points to right place
-					fprintf(stderr, "makeflow: could not create symbolic link (%s)\n", strerror(errno));
-					exit(1);
-				}
-				dag_node_add_source_file(n, newname);
-				free(newname);
-			}
-		}
-		else
-		{
-			dag_node_add_source_file(n,filename);
-		}
-		n->source_file_names_size += strlen(filename)+1;
-		filename = strtok(0," \t\n");
-	}
+	dag_node_parse_filelist(d, n, targetfiles, 0, clean_mode);
+	dag_node_parse_filelist(d, n, sourcefiles, 1, clean_mode);
 
 	free(line);
 
@@ -1533,4 +1528,6 @@ int main( int argc, char *argv[] )
 
 }
 
-
+/* 
+vim: sw=8 sts=8 ts=8 ft=c
+*/
