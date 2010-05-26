@@ -81,7 +81,6 @@ struct dag {
 
 struct dag_file {
 	const char *filename;
-	const char *alias;
 	struct dag_file *next;
 };
 
@@ -306,7 +305,6 @@ struct dag_file * dag_file_create( const char *filename, struct dag_file *next )
 {
 	struct dag_file *f = malloc(sizeof(*f));
 	f->filename = strdup(filename);
-	f->alias = NULL;
 	f->next = next;
 	return f;
 }
@@ -703,7 +701,7 @@ void dag_node_parse_filelist( struct dag *d, struct dag_node *n, char *filelist,
 		{
 			char *newname = NULL;
 			rv = translate_filename(d, filename, &newname);
-			if (rv && !clean_mode)
+			if (rv && !clean_mode && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR)
 			{
 				fprintf(stderr, "makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
 				rv = symlink(filename, newname);
