@@ -581,7 +581,7 @@ static int translate_filename( struct dag *d, const char *filename, char **newna
 
 static char *translate_command( struct dag *d, char *old_command )
 {
-	char *new_command = malloc( (strlen(old_command)+2) * sizeof(char));
+	char *new_command = malloc( (strlen(old_command)+3) * sizeof(char));
 	new_command[0] = '\0';
 
 	char *token = strtok(old_command, " \t\n");
