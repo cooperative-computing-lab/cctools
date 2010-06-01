@@ -32,6 +32,8 @@ See the file COPYING for details.
 #include "list.h"
 
 #define DAG_LINE_MAX 1048576
+#define SHOW_INPUT_FILES 2
+#define SHOW_OUTPUT_FILES 3
 #define MASTER_CATALOG_LINE_MAX 1024
 #define CATALOG_UPDATE_INTERVAL 300
 
@@ -174,6 +176,56 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 
 	return max;
 }
+
+
+void dag_show_input_files(struct dag *d)
+{
+	struct dag_node *n,*m,*tmp;
+	struct dag_file *f;
+	int nodeid;
+	struct list *il = list_create();
+	char *filename;
+
+	for(n=d->nodes;n;n=n->next) {
+		nodeid = -1;
+		m = 0;
+		// for each source file, see if it is a target file of another node
+		for(f=n->source_files;f;f=f->next) {
+			// d->file_table contains all target files
+			// get the node (tmp) that outputs current source file
+			tmp = hash_table_lookup(d->file_table,f->filename);
+			// if a source file is also a target file 
+			if(!tmp) {
+				debug(D_DEBUG, "Found independent input file: %s\n", f->filename);
+				list_push_tail(il, strdup(f->filename));
+			} 
+		}
+	}
+
+	filename = list_pop_head(il);
+	while(filename) {
+		printf("%s\n", (char *)filename);
+		filename = list_pop_head(il);
+	}
+
+	list_free(il);
+	list_delete(il);
+}
+
+
+
+void dag_show_output_files(struct dag *d)
+{
+	char *key;
+	void *value;
+
+	hash_table_firstkey(d->file_table);
+
+	while(hash_table_nextkey(d->file_table, &key,&value)) {
+			printf("%s\n", key);
+	}
+}
+
 /*********^^^^^^^Li's code^^^^^^^^^*************************/
 
 /* Code added by kparting to compute the width of the graph.
@@ -1171,6 +1223,8 @@ static void show_help(const char *cmd)
 	printf(" -C             Syntax check.\n");
 	printf(" -N <project>   Report the master information to a catalog server with the project name - <project>\n");
 	printf(" -E <integer>   Priority. Higher the value, higher the priority.\n");
+	printf(" -I             Show input files.\n");
+	printf(" -O             Show output files.\n");
 	printf(" -D             Display the Makefile as a Dot graph.\n");
 	printf(" -B <options>   Add these options to all batch submit files.\n");
 	printf(" -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n",dag_submit_timeout);
@@ -1207,7 +1261,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:Ap:cCd:E:DCT:iB:S:Rr:l:L:j:J:N:o:vhF:W:P")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:Ap:cCd:E:DCT:iIB:S:Rr:l:L:j:J:N:Oo:vhF:W:P")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1224,6 +1278,12 @@ int main( int argc, char *argv[] )
 			break;
 		case 'E':
 			priority = atoi(optarg);
+			break;
+		case 'I':
+			display_mode = SHOW_INPUT_FILES;
+			break;
+		case 'O':
+			display_mode = SHOW_OUTPUT_FILES;
 			break;
 		case 'l':
 			logfilename = strdup(optarg);
@@ -1364,6 +1424,16 @@ int main( int argc, char *argv[] )
 	{
 		printf("makeflow: %s: Syntax OK.\n", dagfile);
 		return 0;
+	}
+
+	// Check display mode
+	if(display_mode == SHOW_INPUT_FILES) {
+		dag_show_input_files(d);
+		exit(0);
+	}
+	if(display_mode == SHOW_OUTPUT_FILES) {
+		dag_show_output_files(d);
+		exit(0);
 	}
 
 	if(explicit_local_jobs_max) {
