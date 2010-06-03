@@ -32,21 +32,6 @@ MF_LOG_ABORTED	 = 8
 MF_LOG_TOTAL	 = 9
 
 
-# Log Access Functions ---------------------------------------------------------
-
-def head(file_stream):
-    file_stream.seek(0)
-    return file_stream.readline()
-
-
-def tail(file_stream):
-    bytes = file_stream.tell()
-    line  = file_stream.readline()
-    if not line:
-        file_stream.seek(bytes)
-    return line
-
-
 # Formatting Functions ---------------------------------------------------------
 
 def time_format(seconds):
@@ -82,18 +67,26 @@ class MakeflowProgressMonitor(object):
         complete_history = deque(maxlen = self.max_history_size)
 
 	try:
-            log_stream = open(self.log_file, 'r')
-            while True:
-                line = head(log_stream)
-                if line:
-                    start_time = int(line.split()[MF_LOG_TIME])
-                    break
-
-            log_stream.seek(0, 2)
-                
             curses.use_default_colors()
             curses.curs_set(0)
 
+            screen.addstr('waiting for log messages...')
+            screen.refresh()
+
+            log_stream = open(self.log_file, 'r')
+            for line in log_stream.readlines():
+                if line[0] != '#':
+                    log_stream.seek(-len(line), os.SEEK_END)
+                    break
+
+            start_time = 0
+            while not start_time:
+                line = log_stream.readline()
+                if line:
+                    start_time = int(line.split()[MF_LOG_TIME])
+
+            log_stream.seek(-len(line), os.SEEK_END)
+            
             slist = []
 
 	    while True:
@@ -103,12 +96,12 @@ class MakeflowProgressMonitor(object):
                 screen.addstr(0, 0, 'Every %0.1fs: %s' % (self.timeout, self.log_file))
                 screen.addstr(0, curses.COLS - len(ctime), ctime)
 
-		status = tail(log_stream)
+		status = log_stream.readline()
                 if not status:
                     sleep(self.timeout)
                 else:
                     slist = map(int, status.split())
-                
+
                 if not slist:
                     continue
 
@@ -120,7 +113,7 @@ class MakeflowProgressMonitor(object):
 
                 complete_history.append((slist[MF_LOG_COMPLETE], slist[MF_LOG_TIME]))
 
-                avg_tpm  = slist[MF_LOG_COMPLETE] / float(time() - start_time) * 60.0
+                avg_tpm = slist[MF_LOG_COMPLETE] / float(time() - start_time) * 60.0
                 try:
                     if len(complete_history) >= self.max_history_size / 2:
                         cur_tpm = float(complete_history[-1][0] - complete_history[0][0]) / \
@@ -130,10 +123,13 @@ class MakeflowProgressMonitor(object):
                 except ZeroDivisionError:
                     cur_tmp = 0
 
-                if cur_tpm:
-                    est_time = (slist[MF_LOG_TOTAL] - slist[MF_LOG_COMPLETE]) / cur_tpm * 60.0
-                else:
-                    est_time = (slist[MF_LOG_TOTAL] - slist[MF_LOG_COMPLETE]) / avg_tpm * 60.0
+                try:
+                    if cur_tpm:
+                        est_time = (slist[MF_LOG_TOTAL] - slist[MF_LOG_COMPLETE]) / cur_tpm * 60.0
+                    else:
+                        est_time = (slist[MF_LOG_TOTAL] - slist[MF_LOG_COMPLETE]) / avg_tpm * 60.0
+                except ZeroDivisionError:
+                    est_time = 0
 
                 mlist.append(())
                 mlist.append(())
@@ -165,7 +161,7 @@ class MakeflowProgressMonitor(object):
                     message = str(m[1])
 
                     screen.addstr(i, 0, field)
-                    screen.addstr(i, len(field) + 1, message + ' '*5) 
+                    screen.addstr(i, len(field) + 1, message + ' '*10)
 	except KeyboardInterrupt:
 	    log_stream.close()
 
