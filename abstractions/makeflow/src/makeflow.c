@@ -486,6 +486,8 @@ void dag_log_recover( struct dag *d, const char *filename )
 	if(d->logfile) {
 		while ((line = get_line(d->logfile))) {
 			linenum++;
+
+			if(line[0] == '#') continue;
 			if(sscanf(line,"%*u %d %d %d",&nodeid,&state,&jobid)==3) {
 				n = itable_lookup(d->node_table,nodeid);
 				if(n) {
