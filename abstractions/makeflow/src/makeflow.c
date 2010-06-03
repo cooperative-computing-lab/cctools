@@ -480,10 +480,13 @@ void dag_log_recover( struct dag *d, const char *filename )
 	int linenum = 0;
 	char *line;
 	int nodeid, state, jobid;
+	int first_run = 1;
 	struct dag_node *n;
 
 	d->logfile = fopen(filename,"r");
 	if(d->logfile) {
+		first_run = 0;
+
 		while ((line = get_line(d->logfile))) {
 			linenum++;
 
@@ -509,6 +512,20 @@ void dag_log_recover( struct dag *d, const char *filename )
 		fprintf(stderr,"makeflow: couldn't open logfile %s: %s\n",filename,strerror(errno));
 		clean_symlinks(d, 1);
 		exit(1);
+	}
+
+	if(first_run) {
+		struct dag_file *f;
+		struct dag_node *p;
+		for(n=d->nodes;n;n=n->next) {
+			fprintf(d->logfile, "# %d\t%s",n->nodeid,n->command);
+			for(f=n->source_files;f;f=f->next) {
+				p = hash_table_lookup(d->file_table,f->filename);
+				if (p)
+					fprintf(d->logfile, "\t%d",p->nodeid);
+			}
+			fputc('\n', d->logfile);
+		}
 	}
 
 	for(n=d->nodes;n;n=n->next) {
