@@ -770,7 +770,7 @@ static void chirp_handler( struct link *l, const char *subject )
 		char args[CHIRP_LINE_MAX];
 
 		if(chirp_alloc_flush_needed()) {
-			if(!link_usleep(l,100000,1,0)) {
+			if(!link_usleep(l,1000000,1,0)) {
 				chirp_alloc_flush();
 			}
 		}
