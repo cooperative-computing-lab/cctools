@@ -35,9 +35,9 @@ struct s3_message {
 	char authorization[55];
 };
 
-char s3_endpoint[] = "s3.amazonaws.com";
-char s3_address[] = "72.21.202.66";
-int s3_timeout = 60;
+static char *s3_endpoint = "s3.amazonaws.com";
+static char *s3_address  = "72.21.202.66";
+static int   s3_timeout  = 60;
 
 
 struct amz_header_object* amz_new_header(enum amz_header_type type, const char* custom_type, const char* value) {
