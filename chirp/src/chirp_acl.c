@@ -95,43 +95,45 @@ If the directory exists, but the subject has no rights, returns zero with errno=
 If the rights cannot be obtained, returns zero with errno set appropriately.
 */
 
-static int do_chirp_acl_get( const char *filename, const char *dirname, const char *subject )
+static int do_chirp_acl_get( const char *filename, const char *dirname, const char *subject, int *totalflags )
 {
 	FILE *aclfile;
 	char aclsubject[CHIRP_LINE_MAX];
 	int aclflags;
-	int totalflags;
 
 	errno = 0;
-	totalflags = 0;
+	*totalflags = 0;
   
 	aclfile = chirp_acl_open(dirname);
   	if(aclfile) {
 		while(chirp_acl_read(aclfile,aclsubject,&aclflags)) {
 			if(string_match(aclsubject,subject)) {
-				totalflags |= aclflags;
+				*totalflags |= aclflags;
 			} else if(!strncmp(aclsubject,"group:",6)) {
 				if(chirp_group_lookup(aclsubject,subject)) {
-					totalflags |= aclflags;
+					*totalflags |= aclflags;
 				}
 			}
 		}
 		chirp_acl_close(aclfile);
 	} else {
-		if(errno!=ENOENT) errno = EACCES;
+	  	return 0;
 	}
 
 	if(read_only_mode) {
-		totalflags &= CHIRP_ACL_READ|CHIRP_ACL_LIST;
+		*totalflags &= CHIRP_ACL_READ|CHIRP_ACL_LIST;
 	}
 
-	return totalflags;
+	return 1;
 }
 
 
 int chirp_acl_check_dir( const char *dirname, const char *subject, int flags )
 {
-	int myflags = do_chirp_acl_get(dirname,dirname,subject);
+	int myflags;
+	
+	if (!do_chirp_acl_get(dirname,dirname,subject,&myflags))
+	  return 0;
 
 	/* The superuser can implicitly list and admin */
 
@@ -407,6 +409,8 @@ FILE * chirp_acl_open( const char *dirname )
 			file = fopen(default_acl,"r");
 			return file;
 		}
+        else if (errno == ENOTDIR) /* component directory missing */
+          return NULL;
 		errno = ENOENT;
 		return 0;
 	} else {
@@ -592,10 +596,12 @@ int chirp_acl_init_reserve( const char *path, const char *subject )
 	char aclpath[CHIRP_PATH_MAX];
 	FILE *file;
 	int newflags = 0;
+	int aclflags;
 
 	string_dirname(path,dirname);
 
-	int aclflags = do_chirp_acl_get(dirname,dirname,subject);
+	if (!do_chirp_acl_get(dirname,dirname,subject,&aclflags))
+		return 0;
 
 	if(aclflags&CHIRP_ACL_RESERVE_READ)
 		newflags|=CHIRP_ACL_READ;
