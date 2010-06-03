@@ -263,7 +263,9 @@ void chirp_alloc_init( const char *rootpath, INT64_T size )
 	time_t start, stop;
 	INT64_T inuse, avail;
 
+#ifdef CCTOOLS_OPSYS_CYGWIN
 	fatal("sorry, CYGWIN cannot employ space allocation because it does not support file locking.");
+#endif
 
 	alloc_enabled = 1;
 	recovery_in_progress = 1;
