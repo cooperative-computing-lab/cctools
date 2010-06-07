@@ -100,7 +100,7 @@ public:
 	int	socketpair( int domain, int type, int protocol, int *fds );
 	int	accept( int fd, struct sockaddr *addr, int * addrlen );
 
-	void	follow_symlink( const char *cname, struct pfs_name *pname, int depth = 0 );
+	void	follow_symlink( struct pfs_name *pname, int depth = 0 );
 	int	resolve_name( const char *cname, pfs_name *pname, bool do_follow_symlink = true, int depth = 0 );
 
 	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );

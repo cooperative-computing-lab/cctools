@@ -164,38 +164,32 @@ void pfs_table::complete_path( const char *short_path, char *full_path )
         }
 }
 
-void pfs_table::follow_symlink( const char *cname, struct pfs_name *pname, int depth )
+void pfs_table::follow_symlink( struct pfs_name *pname, int depth )
 {
-	struct pfs_stat rstat;
+	char link_target[PFS_PATH_MAX];
+	char absolute_link_target[PFS_PATH_MAX];
+	char *name_to_resolve = link_target;
 	struct pfs_name new_pname = *pname;
 
-	int sres = new_pname.service->lstat(pname,&rstat);
-	if (sres >= 0 && S_ISLNK(rstat.st_mode)) {
-		char link_target[PFS_PATH_MAX];
-		char absolute_link_target[PFS_PATH_MAX];
-		const char *basename_start;
-		char *name_to_resolve = link_target;
-		int dirname_len;
-		int rlres;
-		rlres = new_pname.service->readlink(pname,link_target,PFS_PATH_MAX-1);
-		if (rlres > 0) {
-			/* readlink does not NULL-terminate */
-			link_target[rlres] = '\000';
-			/* Is link target relative ? */
-			if (link_target[0] != '/') {
-				 basename_start = string_basename(cname);
-				 if (basename_start) {
-					dirname_len = basename_start - cname;
-					snprintf(absolute_link_target,
-						PFS_PATH_MAX, "%*.*s%s",
-						dirname_len, dirname_len, cname, 
-						link_target);
-					name_to_resolve = absolute_link_target;
-				}
+	int rlres = new_pname.service->readlink(pname,link_target,PFS_PATH_MAX-1);
+	if (rlres > 0) {
+		/* readlink does not NULL-terminate */
+		link_target[rlres] = '\000';
+		/* Is link target relative ? */
+		if (link_target[0] != '/') {
+			 const char *basename_start = string_basename(pname->path);
+             //  debug(D_POLL, "BASENAME: %s; %s", cname, basename_start);
+			 if (basename_start) {
+				int dirname_len = basename_start - pname->path;
+				snprintf(absolute_link_target,
+					PFS_PATH_MAX, "%*.*s%s",
+					dirname_len, dirname_len, pname->path, 
+					link_target);
+				name_to_resolve = absolute_link_target;
 			}
-			if (resolve_name(name_to_resolve, &new_pname, true, depth + 1)) {
-				*pname = new_pname;
-			}
+		}
+		if (resolve_name(name_to_resolve, &new_pname, true, depth + 1)) {
+			*pname = new_pname;
 		}
 	}
 }
@@ -279,7 +273,7 @@ int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_
 
 		/* Enable cross service symlink resolution */
 		if (do_follow_symlink && pfs_follow_symlinks) {
-		    follow_symlink(cname, pname, depth + 1);
+		    follow_symlink(pname, depth + 1);
 		}
 		return 1;
 	}
