@@ -649,6 +649,37 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 
 		tracer_copy_in_string(p->tracer,path,(void*)args[0],sizeof(path));
 
+        /* debug arguments/environment */
+		{
+			int argc = 0, n = 0;
+			debug(D_SYSCALL,"execve(");
+			debug(D_SYSCALL,"\t%s,",path);
+			debug(D_SYSCALL,"\t[");
+			while (1) {
+				char arg[4096];
+				char *argp;
+				tracer_copy_in(p->tracer, &argp, ((char **)args[1])+argc, sizeof(argp));
+				if (argp == NULL) break;
+				tracer_copy_in_string(p->tracer, arg, argp, sizeof(arg));
+				arg[4096-1] = '\0';
+				debug(D_SYSCALL,"\t\"%s\",",arg);
+				argc++;
+			}
+			debug(D_SYSCALL,"\t],");
+			debug(D_SYSCALL,"\t[");
+			while (1) {
+				char var[4096];
+				char *varp;
+				tracer_copy_in(p->tracer, &varp, ((char **)args[2])+n, sizeof(varp));
+				if (varp == NULL) break;
+				tracer_copy_in_string(p->tracer, var, varp, sizeof(var));
+				var[4096-1] = '\0';
+				debug(D_SYSCALL,"\t\"%s\",",var);
+				n++;
+			}
+			debug(D_SYSCALL,"\t])");
+        }
+
 		p->new_logical_name[0] = 0;
 		p->new_physical_name[0] = 0;
 
