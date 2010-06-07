@@ -186,7 +186,9 @@ static void show_help(const char *cmd)
 {
 	printf("Use: %s <masterhost> <port>\n", cmd);
 	printf("where options are:\n");
-	printf(" -d <subsystem> Enable debugging for this subsystem\n");
+	printf(" -d <subsystem> Enable debugging for this subsystem.\n");
+	printf(" -a             Enable auto master selection mode.\n");
+	printf(" -N <name>      Preferred master name.\n");
 	printf(" -t <time>      Abort after this amount of idle time. (default=%ds)\n",idle_timeout);
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
@@ -217,7 +219,7 @@ int main( int argc, char *argv[] )
 	
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "ad:t:o:p:w:vi")) != (char) -1) {
+	while((c = getopt(argc, argv, "ad:t:o:N:w:vi")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;	
@@ -231,7 +233,7 @@ int main( int argc, char *argv[] )
 		case 'o':
 			debug_config_file(optarg);
 			break;
-		case 'p':
+		case 'N':
 			preference = strdup(optarg);
 			break;
 		case 'v':
