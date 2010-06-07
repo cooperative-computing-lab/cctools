@@ -129,9 +129,10 @@ const char * string_basename( const char *s )
 {
 	const char *b;
 
-	b=s;
+	b=s+strlen(s)-1; /* points to last character in path */
 
-	while(*b) b++;
+	while (*b == '/' && b > s) /* path has "redundant" final slash(es) */
+		b--;
 
 	while(b>=s) {
 		if(*b=='/') {
