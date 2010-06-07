@@ -178,7 +178,6 @@ void pfs_table::follow_symlink( struct pfs_name *pname, int depth )
 		/* Is link target relative ? */
 		if (link_target[0] != '/') {
 			 const char *basename_start = string_basename(pname->path);
-             //  debug(D_POLL, "BASENAME: %s; %s", cname, basename_start);
 			 if (basename_start) {
 				int dirname_len = basename_start - pname->path;
 				snprintf(absolute_link_target,
