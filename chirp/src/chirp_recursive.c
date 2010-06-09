@@ -238,18 +238,57 @@ static INT64_T do_put_one_file( const char *hostport, const char *source_file, c
 	}
 }
 
+static INT64_T do_put_one_fifo( const char *hostport, const char *source_file, const char *target_file, int mode, time_t stoptime )
+{
+	FILE *file;
+	int save_errno;
+	struct chirp_file *cf;
+	INT64_T offset = 0;
+
+	file = fopen64(source_file,"r");
+	if(!file) return -1;
+
+	cf = chirp_reli_open(hostport, target_file, O_WRONLY, 0600, stoptime);
+	if (cf) {
+		size_t n;
+		char buffer[65536];
+		while ((n = fread(buffer, sizeof(char), 65536, file))) {
+			if (chirp_reli_pwrite(cf, buffer, n, offset, stoptime) < 0)
+				return -1;
+			offset += n;
+		}
+		chirp_reli_close(cf, stoptime);
+	}
+
+    save_errno = errno;
+	fclose(file);
+    errno = save_errno;
+	return offset;
+}
+
 INT64_T chirp_recursive_put( const char *hostport, const char *source_file, const char *target_file, time_t stoptime )
 {
 	INT64_T result;
 	struct stat64 info;
+	struct stat64 linfo;
 
-	result = lstat64(source_file,&info);
+	result = lstat64(source_file,&linfo);
 	if(result>=0) {
-		if(S_ISLNK(info.st_mode)) {
+		if(S_ISLNK(linfo.st_mode) && (strncmp("/dev", source_file, 4) == 0 || strncmp("/proc", source_file, 5) == 0)) {
+			result = stat64(source_file,&info); /* for /dev/fd/n and similar */
+			if (result == -1)
+				return 0;
+		}
+        else
+            info = linfo;
+        mode_t mode = info.st_mode;
+		if(S_ISLNK(mode)) {
 			result = do_put_one_link(hostport,source_file,target_file,stoptime);
-		} else if(S_ISDIR(info.st_mode)) {
+		} else if(S_ISDIR(mode)) {
 			result = do_put_one_dir(hostport,source_file,target_file,0700,stoptime);
-		} else if(S_ISREG(info.st_mode)) {
+        } else if(S_ISBLK(mode) || S_ISCHR(mode) || S_ISFIFO(mode)) {
+			result = do_put_one_fifo(hostport,source_file,target_file,info.st_mode,stoptime);
+		} else if(S_ISREG(mode)) {
 			result = do_put_one_file(hostport,source_file,target_file,info.st_mode,info.st_size,stoptime);
 		} else {
 			result = 0;

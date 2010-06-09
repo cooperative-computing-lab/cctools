@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 
 #include "chirp_reli.h"
+#include "chirp_recursive.h"
 #include "chirp_stream.h"
 
 #include "debug.h"
@@ -57,7 +58,7 @@ int main( int argc, char *argv[] )
 {	
 	int did_explicit_auth = 0;
 	int follow_mode = 0;
-	int whole_file_mode = 0;
+	int whole_file_mode = 1;
 	const char *hostname, *source_file, *target_file;
 	time_t stoptime;
 	FILE *file;
@@ -108,10 +109,9 @@ int main( int argc, char *argv[] )
 	stoptime = time(0) + timeout;
 
 	if(!strcmp(source_file,"-")) {
-		whole_file_mode = 0;
 		file = stdin;
+        source_file = "/dev/stdin";
 	} else {
-		whole_file_mode = 1;
 		file = fopen(source_file,"r");
 		if(!file) {
 			fprintf(stderr,"couldn't open %s: %s\n",source_file,strerror(errno));
@@ -122,14 +122,7 @@ int main( int argc, char *argv[] )
 	if(follow_mode) whole_file_mode = 0;
 
 	if(whole_file_mode) {
-		struct stat64 info;
-		fstat64(fileno(file),&info);
-		if(chirp_reli_putfile(hostname,target_file,file,info.st_mode,info.st_size,stoptime)!=info.st_size) {
-			fprintf(stderr,"couldn't put %s: %s\n",target_file,strerror(errno));
-			return 1;
-		} else {
-			return 0;
-		}
+		return chirp_recursive_put(hostname,source_file,target_file,stoptime);
 	} else {
 		struct chirp_stream *stream;
 		char *buffer = xxmalloc(buffer_size);
