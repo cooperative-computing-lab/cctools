@@ -220,12 +220,6 @@ static INT64_T do_put_one_file( const char *hostport, const char *source_file, c
 	if(!file) return -1;
 
 	length = chirp_reli_putfile(hostport,target_file,file,mode,length,stoptime);
-	if(length<0) {
-		save_errno = errno;
-		fclose(file);
-		errno = save_errno;
-		return -1;
-	}
 
 	if(length>=0) {
 		fclose(file);
