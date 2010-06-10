@@ -1286,6 +1286,9 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
+	if (getenv("WORKQUEUE_PROJECT") != NULL)
+		project = strdup(getenv("WORKQUEUE_PROJECT"));
+
 	while((c = getopt(argc, argv, "a:Ap:cCd:E:DCT:iIB:S:Rr:l:L:j:J:N:Oo:vhF:W:P")) != (char) -1) {
 		switch (c) {
 		case 'A':
@@ -1298,8 +1301,10 @@ int main( int argc, char *argv[] )
 			clean_mode = 1;
 			break;
 		case 'N':
+			if (project) free(project);
 			project = strdup(optarg);
 			catalog_mode = 1;
+			setenv("WORKQUEUE_PROJECT", project, 1);
 			break;
 		case 'E':
 			priority = atoi(optarg);
