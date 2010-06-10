@@ -650,7 +650,7 @@ static int translate_filename( struct dag *d, const char *filename, char **newna
 	return 1;
 }
 
-static char *translate_command( struct dag *d, char *old_command )
+static char *translate_command( struct dag *d, char *old_command, int is_local )
 {
 	char *new_command = malloc( (strlen(old_command)+3) * sizeof(char));
 	new_command[0] = '\0';
@@ -685,8 +685,11 @@ static char *translate_command( struct dag *d, char *old_command )
 			wait = 1;
 		}
 
-		char *val = (char *)hash_table_lookup(d->filename_translation_fwd, token);
+		char *val = NULL;
 		int len;
+		
+		if (!is_local)
+			val = (char *)hash_table_lookup(d->filename_translation_fwd, token);
 
 		if (!first)
 		{
@@ -903,7 +906,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 		c+=6;
 	}
 
-	n->command = translate_command(d, c);
+	n->command = translate_command(d, c, n->local_job);
 
 	free(line);
 	return n;
