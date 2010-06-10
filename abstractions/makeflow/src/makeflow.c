@@ -796,25 +796,27 @@ void dag_node_parse_filelist( struct dag *d, struct dag_node *n, char *filelist,
 					close(fd);
 				}
 			}
-			
-			if (source) {
-				if (batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
-					dag_node_add_source_file(n, newname);
-					n->source_file_names_size += strlen(filename)+1;
+
+			if (newname) {
+				if (source) {
+					if (batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
+						dag_node_add_source_file(n, newname);
+						n->source_file_names_size += strlen(filename)+1;
+					} else {
+						dag_node_add_source_file(n, filename);
+						n->source_file_names_size += strlen(filename)+strlen(newname)+2;
+					}
 				} else {
-					dag_node_add_source_file(n, filename);
-					n->source_file_names_size += strlen(filename)+strlen(newname)+2;
+					if (batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
+						dag_node_add_target_file(n, newname);
+						n->target_file_names_size += strlen(filename)+1;
+					} else {
+						dag_node_add_target_file(n, filename);
+						n->target_file_names_size += strlen(filename)+strlen(newname)+2;
+					}
 				}
-			} else {
-				if (batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
-					dag_node_add_target_file(n, newname);
-					n->target_file_names_size += strlen(filename)+1;
-				} else {
-					dag_node_add_target_file(n, filename);
-					n->target_file_names_size += strlen(filename)+strlen(newname)+2;
-				}
+				free(newname);
 			}
-			free(newname);
 		}
 		else
 		{
