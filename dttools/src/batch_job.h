@@ -46,6 +46,14 @@ struct batch_job_info {
 */
 struct batch_queue * batch_queue_create( batch_queue_type_t type );
 
+/** Create a new batch queue. The info of the batch queue would be send to a catalog server.
+@param type The type of the queue.
+@param name The name of the queue.
+@param priority The priority of the queue.
+@return A new batch queue object on success, null on failure.
+*/
+struct batch_queue * batch_queue_create_with_name( batch_queue_type_t type, const char *name, int priority );
+
 /** Submit a simple batch job.
 @param q The queue to submit to.
 @param cmdline The command line to execute.  This line will be interpreted by the shell, so it may include output redirection, multiple commands, pipes, and so forth.

@@ -797,6 +797,32 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 	return q;
 }
 
+struct batch_queue * batch_queue_create_with_name(batch_queue_type_t type, const char *name, int priority)
+{
+	struct batch_queue *q;
+
+	if(type==BATCH_QUEUE_TYPE_UNKNOWN) return 0;
+
+	q = malloc(sizeof(*q));
+	q->type = type;
+	q->options_text = 0;
+	q->job_table = itable_create(0);
+	q->output_table = itable_create(0);
+	q->logfile = strdup("condor.logfile");
+
+	if(type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
+		q->work_queue = work_queue_create_with_name(name, priority);
+		if(q->work_queue == 0) {
+			batch_queue_delete(q);
+			return 0;
+		}
+	} else {
+		q->work_queue = 0;
+	}
+
+	return q;
+}
+
 void batch_queue_delete( struct batch_queue *q )
 {
 	if(q) {

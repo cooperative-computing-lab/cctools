@@ -85,6 +85,12 @@ struct work_queue_stats {
 */
 struct work_queue * work_queue_create( int port , time_t stoptime);
 
+/** Create a new work queue with a name. In this case, work queue port would be chosen automatically and the work queue information would be sent to a catalog server. A worker that runs with '-a' option could talk to such work queue masters.
+@param name The name of the work queue 
+@return A new work queue, or null if it could not be created.
+*/
+struct work_queue * work_queue_create_with_name( const char *name, int priority);
+
 /** Delete a work queue.
 @param q The work queue to delete.
 */

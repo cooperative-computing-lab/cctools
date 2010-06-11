@@ -50,7 +50,6 @@ static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
-static struct datagram *outgoing_datagram = NULL;
 static char *project = NULL;
 static int priority = 0;
 static int port = 0;
@@ -107,26 +106,12 @@ struct dag_node {
 	int level;
 };
 
+// Function declarations:
+int dag_width( struct dag *d );
+// End of function declarations.
+
 /*****************Li's code************************************************************/
 
-static int master_send_catalog_update(const char *project, int port, int priority) {
-	char address[DATAGRAM_ADDRESS_MAX];
-	static char text[MASTER_CATALOG_LINE_MAX];
-
-	snprintf(text, MASTER_CATALOG_LINE_MAX,
-			"type wq_master\nproject %s\nport %d\npriority %d\n",
-			project,
-			port,
-			priority	
-	);
-
-	if(domain_name_cache_lookup(CATALOG_HOST, address)) {
-		debug(D_DEBUG, "sending master information to %s:%d", CATALOG_HOST, CATALOG_PORT);
-		datagram_send(outgoing_datagram, text, strlen(text), address, CATALOG_PORT);
-	}
-
-	return 1;
-}
 
 int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 {
@@ -183,9 +168,11 @@ void dag_show_input_files(struct dag *d)
 	struct dag_node *n,*m,*tmp;
 	struct dag_file *f;
 	int nodeid;
-	struct list *il = list_create();
-	char *filename;
+	struct hash_table *ih;
+	char *key;
+	void *value;
 
+	ih = hash_table_create(0,0);
 	for(n=d->nodes;n;n=n->next) {
 		nodeid = -1;
 		m = 0;
@@ -197,19 +184,17 @@ void dag_show_input_files(struct dag *d)
 			// if a source file is also a target file 
 			if(!tmp) {
 				debug(D_DEBUG, "Found independent input file: %s\n", f->filename);
-				list_push_tail(il, strdup(f->filename));
+				hash_table_insert(ih, f->filename, (void *)NULL);
 			} 
 		}
 	}
 
-	filename = list_pop_head(il);
-	while(filename) {
-		printf("%s\n", (char *)filename);
-		filename = list_pop_head(il);
+	hash_table_firstkey(ih);
+	while(hash_table_nextkey(ih,&key,&value)) {
+		printf("%s\n",key);
 	}
 
-	list_free(il);
-	list_delete(il);
+	hash_table_delete(ih);
 }
 
 
@@ -223,6 +208,57 @@ void dag_show_output_files(struct dag *d)
 
 	while(hash_table_nextkey(d->file_table, &key,&value)) {
 			printf("%s\n", key);
+	}
+}
+
+void handle_auto_workers(struct dag *d, int auto_workers) {
+	char start_worker_line[1024];
+	char hostname[1024];
+	int num_of_workers;
+	int rv;
+
+	/* Force to create a workqueue on certain port since it's working under 'auto worker' or 'catalog server' mode. */
+	if (remote_queue == 0) {
+		// Try another port until success 
+		if(port <= 0 || port >= 20000) port = WORK_QUEUE_DEFAULT_PORT;
+		srand(time(0));
+		port += 1 + rand()%1000;
+		while(1) {
+			char line[1024];
+			sprintf(line,"WORK_QUEUE_PORT=%d",port);
+			putenv(strdup(line));
+			remote_queue = batch_queue_create(batch_queue_type);
+			if(remote_queue) break;
+			port++;
+			// Dynamic and/or private ports: 49152–65535, should not be used
+			if(port >= 49152) port = WORK_QUEUE_DEFAULT_PORT + 1 + rand()%1000;
+		}
+	}
+
+	printf("Work Queue master is listening on port %d\n", port);
+
+/* Automatically figure out number of workers and start those workers. */
+	// Start workers
+	gethostname(hostname, 1024);
+
+	if (auto_workers == MAKEFLOW_AUTO_GROUP)
+	{
+		num_of_workers = dag_estimate_nodes_needed(d, d->remote_jobs_max); 
+	}
+	else if (auto_workers == MAKEFLOW_AUTO_WIDTH)
+	{
+		num_of_workers = dag_width(d);
+		if (num_of_workers > d->remote_jobs_max)
+			num_of_workers = d->remote_jobs_max;
+	}
+
+	sprintf(start_worker_line, "condor_submit_workers %s %d %d", hostname, port, num_of_workers);
+	printf("Starting workers: `%s`\n", start_worker_line);
+	rv = system(start_worker_line);
+	if (rv != 0)
+	{
+		fprintf(stderr, "condor_submit_workers failed. Terminating makeflow.\n");
+		exit(1);
 	}
 }
 
@@ -1224,13 +1260,6 @@ static void handle_abort( int sig )
 	dag_abort_flag = 1;
 }
 
-static void handle_update_catalog () {
-	debug(D_DEBUG, "Catalog update: Master(project: %s, priority: %d) is listening on port %d\n", project, priority, port);
-	outgoing_datagram = datagram_create(0);
-	master_send_catalog_update(project, port, priority);
-	alarm(CATALOG_UPDATE_INTERVAL);
-}
-
 static void show_version(const char *cmd)
 {
 	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
@@ -1541,7 +1570,11 @@ int main( int argc, char *argv[] )
 	setlinebuf(stderr);
 
 	local_queue = batch_queue_create(BATCH_QUEUE_TYPE_UNIX);
-	remote_queue = batch_queue_create(batch_queue_type);
+	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE && catalog_mode) {
+		remote_queue = batch_queue_create_with_name(batch_queue_type, project, priority);
+	} else {
+		remote_queue = batch_queue_create(batch_queue_type);
+	}
 
 	// When the batch queue type is Work Queue, check if the queue is successfully created.
     if(batch_queue_type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
@@ -1555,69 +1588,25 @@ int main( int argc, char *argv[] )
 		}
 
 		// Inital attempt to create a workqueue failed
-		if(remote_queue == 0 && !auto_workers && !catalog_mode) {
-			fprintf(stderr,"makeflow: Sorry! Makeflow is not able to listen on port %d.\n", port);
-			fprintf(stderr,"makeflow: Please try a different port.\n");
-			free(logfilename);
-			free(batchlogfilename);
-			exit(1);
-		}
-
-		/* Automatically figure out number of workers */
-		if(auto_workers > 0 || catalog_mode) {
-			if (remote_queue == 0) {
-				// Try another port until success 
-				if(port <= 0 || port >= 20000) port = WORK_QUEUE_DEFAULT_PORT;
-				srand(time(0));
-				port += 1 + rand()%1000;
-				while(1) {
-					char line[1024];
-					sprintf(line,"WORK_QUEUE_PORT=%d",port);
-					putenv(strdup(line));
-					remote_queue = batch_queue_create(batch_queue_type);
-					if(remote_queue) break;
-					port++;
-					// Dynamic and/or private ports: 49152–65535, should not be used
-					if(port >= 49152) port = WORK_QUEUE_DEFAULT_PORT + 1 + rand()%1000;
-				}
+		if(remote_queue == 0 ) {
+			if(!auto_workers && !catalog_mode) {
+				fprintf(stderr,"makeflow: Sorry! Makeflow is not able to listen on port %d.\n", port);
+				fprintf(stderr,"makeflow: Please try a different port.\n");
+				free(logfilename);
+				free(batchlogfilename);
+				exit(1);
 			}
 
-			printf("Work Queue master is listening on port %d\n", port);
-		}
-	
-		if(auto_workers > 0) {
-			// Start workers
-			char start_worker_line[1024];
-			char hostname[1024];
-			int num_of_workers;
-			gethostname(hostname, 1024);
-
-			if (auto_workers == MAKEFLOW_AUTO_GROUP)
-			{
-				num_of_workers = dag_estimate_nodes_needed(d, d->remote_jobs_max); 
-			}
-			else if (auto_workers == MAKEFLOW_AUTO_WIDTH)
-			{
-				num_of_workers = dag_width(d);
-				if (num_of_workers > d->remote_jobs_max)
-					num_of_workers = d->remote_jobs_max;
-			}
-
-			sprintf(start_worker_line, "condor_submit_workers %s %d %d", hostname, port, num_of_workers);
-			printf("Starting workers: `%s`\n", start_worker_line);
-			int rv = system(start_worker_line);
-			if (rv != 0)
-			{
-				fprintf(stderr, "condor_submit_workers failed. Terminating makeflow.\n");
+			if(catalog_mode) {
+				fprintf(stderr,"makeflow: Sorry! Makeflow is not able to listen on any port.\n");
+				free(logfilename);
+				free(batchlogfilename);
 				exit(1);
 			}
 		}
 
-		if(catalog_mode) {
-			debug(D_DEBUG, "Catalog update: Master(project: %s, priority: %d) is listening on port %d\n", project, priority, port);
-			outgoing_datagram = datagram_create(0);
-			master_send_catalog_update(project, port, priority);
-			alarm(CATALOG_UPDATE_INTERVAL);
+		if(auto_workers > 0) {
+			handle_auto_workers(d, auto_workers);
 		}
    	}
 
@@ -1634,7 +1623,6 @@ int main( int argc, char *argv[] )
 	signal(SIGINT,handle_abort);
 	signal(SIGQUIT,handle_abort);
 	signal(SIGTERM,handle_abort);
-	signal(SIGALRM, handle_update_catalog);
 
 	dag_run(d);
 
@@ -1659,9 +1647,6 @@ int main( int argc, char *argv[] )
 		printf("makeflow: nothing left to do.\n");
 		return 0;
 	}
-
 }
 
-/* 
-vim: sw=8 sts=8 ts=8 ft=c
-*/
+
