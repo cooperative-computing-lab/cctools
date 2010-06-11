@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "macros.h"
 #include "process.h"
+#include "username.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -759,6 +760,7 @@ struct work_queue * work_queue_create_with_name(const char *name, int priority)
 	int	port;
 	time_t stoptime;
 	int timeout = CATALOG_UPDATE_INTERVAL;
+	char buffer[WORK_QUEUE_LINE_MAX];
 
 	srand(time(0));
 	port = 9000 + rand()%1000;
@@ -766,6 +768,13 @@ struct work_queue * work_queue_create_with_name(const char *name, int priority)
 	while(time(0) < stoptime) {
 		q=work_queue_create(port, time(0));	
 		if(q) {
+			if (name == NULL) name = getenv("WORK_QUEUE_NAME");
+			if (name == NULL) {
+				strcpy(buffer, "project-");
+				username_get(&buffer[strlen(buffer)]);
+				name = buffer;
+			}
+
 			debug(D_DEBUG,"Work Queue - \"%s\" is listening on port %d.\n", name, port);
 			wq_master_mode = MASTER_MODE_CATALOG;
 			outgoing_datagram = datagram_create(0);
@@ -775,6 +784,7 @@ struct work_queue * work_queue_create_with_name(const char *name, int priority)
 			q->priority = priority;
 			update_catalog(q->name, q->port, priority);
 			catalog_update_time = time(0);
+			setenv("WORK_QUEUE_NAME", name, 1);
 			return q;
 		}
 		port++;
