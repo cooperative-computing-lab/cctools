@@ -36,6 +36,10 @@ See the file COPYING for details.
 #define USING_OUTER_FUNCTION 1
 #define NO_COMPARE_FUNCTION 2
 
+static int catalog_mode = 0;
+static char *project = NULL;
+static int priority =  0;
+
 int total_done = 0;
 
 int topLeftX;
@@ -293,6 +297,8 @@ static void show_help(const char *cmd)
 	printf(" -v         	Show program version.\n");
 	printf(" -h         	Display this message.\n");
 	printf(" -c <integer>	Split factor. Number of subtasks = 2 ^ split factor\n");
+	printf(" -N <project>   Report the master information to a catalog server with the project name - <project>\n");
+	printf(" -E <integer>   Priority. Higher the value, higher the priority.\n");
 	printf("\n");
 	printf("Less common options are:\n");
 	printf(" -x <integer>	Block width.  (default is chosen according to hardware conditions)\n");
@@ -324,7 +330,7 @@ int main(int argc, char **argv)
 
 	x1 = y1 = x2 = y2 = -1;
 
-	while((c = getopt(argc, argv, "d:vhx:p:y:i:j:k:l:X:Y:c:")) != (char) -1) {
+	while((c = getopt(argc, argv, "d:E:vhx:p:y:i:j:k:l:N:X:Y:c:")) != (char) -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);
@@ -367,6 +373,18 @@ int main(int argc, char **argv)
 		case 'p':
 			port = atoi(optarg);
 			break;
+		case 'N':
+			if (project) free(project);
+			project = strdup(optarg);
+			catalog_mode = 1;
+			setenv("WORKQUEUE_PROJECT", project, 1);
+			break;
+		case 'E':
+			priority = atoi(optarg);
+			break;
+		default:
+			show_help(argv[0]);
+			return 1;
 		}
 	}
 
@@ -420,7 +438,11 @@ int main(int argc, char **argv)
 	ret = init_worklist(numOfWorkers, x1, y1, x2, y2);
 	debug(D_DEBUG, "Number of tasks: %d\n", ret);
 
-	q = work_queue_create(port, time(0) + 60);
+	if(catalog_mode) {
+		q = work_queue_create_with_name(project, priority);
+	} else {
+		q = work_queue_create(port, time(0) + 60);
+	}
 	if(!q) {
 		fprintf(stderr, "Could not create queue.\n");
 		return 1;
