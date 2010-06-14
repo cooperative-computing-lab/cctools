@@ -52,12 +52,11 @@ INT64_T chirp_local_truncate( const char *path, INT64_T length );
 INT64_T chirp_local_utime( const char *path, time_t actime, time_t modtime );
 INT64_T chirp_local_md5( const char *path, unsigned char digest[16] );
 
-INT64_T chirp_local_lsalloc( const char *path, char *alloc_path, INT64_T *total, INT64_T *inuse );
-INT64_T chirp_local_mkalloc( const char *path, INT64_T size, INT64_T mode );
-
 INT64_T chirp_local_file_size( const char *path );
 INT64_T chirp_local_fd_size( int fd );
 
 void chirp_local_bandwidth_limit_set( int bytes_per_second );
+
+extern struct chirp_filesystem chirp_local_fs;
 
 #endif

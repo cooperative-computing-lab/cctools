@@ -4,9 +4,11 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "chirp_filesystem.h"
 #include "chirp_local.h"
 #include "chirp_protocol.h"
 
+#include "create_dir.h"
 #include "hash_table.h"
 #include "xmalloc.h"
 #include "int_sizes.h"
@@ -395,6 +397,11 @@ INT64_T chirp_local_readlink( const char *path, char *buf, INT64_T length )
 	return readlink(path,buf,length);
 }
 
+INT64_T chirp_local_chdir( const char *path)
+{
+  return chdir(path);
+}
+
 INT64_T chirp_local_mkdir( const char *path, INT64_T mode )
 {
 	return mkdir(path,0700);
@@ -527,3 +534,60 @@ INT64_T chirp_local_md5( const char *path, unsigned char digest[16] )
 	return md5_file(path,digest);
 }
 
+INT64_T chirp_local_init (const char *path)
+{
+  return !create_dir(path, 0711);
+}
+
+INT64_T chirp_local_destroy (void)
+{
+  return 0;
+}
+
+struct chirp_filesystem chirp_local_fs = {
+	chirp_local_init,
+    chirp_local_destroy,
+
+	chirp_local_open,
+	chirp_local_close,
+	chirp_local_pread,
+	chirp_local_pwrite,
+	chirp_local_sread,
+	chirp_local_swrite,
+	chirp_local_fstat,
+	chirp_local_fstatfs,
+	chirp_local_fchown,
+	chirp_local_fchmod,
+	chirp_local_ftruncate,
+	chirp_local_fsync,
+
+	chirp_local_opendir,
+	chirp_local_readdir,
+	chirp_local_closedir,
+
+	chirp_local_getfile,
+	chirp_local_putfile,
+
+	chirp_local_mkfifo,
+	chirp_local_unlink,
+	chirp_local_rename,
+	chirp_local_link,
+	chirp_local_symlink,
+	chirp_local_readlink,
+	chirp_local_chdir,
+	chirp_local_mkdir,
+	chirp_local_rmdir,
+	chirp_local_stat,
+	chirp_local_lstat,
+	chirp_local_statfs,
+	chirp_local_access,
+	chirp_local_chmod,
+	chirp_local_chown,
+	chirp_local_lchown,
+	chirp_local_truncate,
+	chirp_local_utime,
+	chirp_local_md5,
+
+	chirp_local_file_size,
+	chirp_local_fd_size,
+};

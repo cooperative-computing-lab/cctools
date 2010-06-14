@@ -10,7 +10,10 @@ See the file COPYING for details.
 #include "chirp_reli.h"
 #include "chirp_group.h"
 #include "chirp_stats.h"
+#include "chirp_filesystem.h"
 #include "chirp_alloc.h"
+#include "chirp_local.h"
+#include "chirp_hdfs.h"
 #include "chirp_audit.h"
 #include "chirp_thirdput.h"
 #include "chirp_job.h"
@@ -25,9 +28,9 @@ See the file COPYING for details.
 #include "datagram.h"
 #include "username.h"
 #include "disk_info.h"
+#include "create_dir.h"
 #include "catalog_server.h"
 #include "domain_name_cache.h"
-#include "create_dir.h"
 #include "list.h"
 #include "xmalloc.h"
 #include "md5.h"
@@ -97,11 +100,14 @@ int        exit_if_parent_fails = 0;
 int        enable_identity_boxing = 1;
 const char *chirp_server_path = 0;
 const char *listen_on_interface = 0;
-char       chirp_root_path[CHIRP_PATH_MAX];
+char       chirp_root_path[CHIRP_PATH_MAX]; /* root on backend */
+char       *chirp_transient_path = "./"; /* local file system stuff */
 pid_t      chirp_master_pid = 0;
 const char *chirp_super_user = "";
 const char *chirp_group_base_url = 0;
 int         chirp_group_cache_time = 900;
+
+struct chirp_filesystem *cfs = &chirp_local_fs;
 
 static void show_version( const char *cmd )
 {
@@ -145,6 +151,9 @@ static void show_help( const char *cmd )
 	printf(" -w <name>   The name of this server's owner.  (default is username)\n");
 	printf(" -W <file>   Use alternate password file for unix authentication\n");
 	printf(" -X          Enable remote execution.\n");
+	printf(" -f <fs>     Type of filesystem on backend (default is local).\n");
+	printf(" -x <hostname:port> Hostname and port of remote backend filesystem.\n");
+	printf(" -y <dir>    Location of transient data (default is pwd).\n");
 	printf("\n");
 	printf("Where debug flags are: ");
 	debug_flags_print(stdout);
@@ -153,6 +162,7 @@ static void show_help( const char *cmd )
 
 void shutdown_clean( int sig )
 {
+	cfs->destroy(); /* disconnect from backend */
 	exit(0);
 }
 
@@ -202,8 +212,12 @@ static int space_available( INT64_T amount )
 	current = time(0);
 
 	if( (current-last_check) > check_interval) {
-		disk_info_get(chirp_root_path,&avail,&total);
-		last_check = current;
+        struct chirp_statfs buf;
+        if (cfs->statfs(chirp_root_path, &buf) == 0) {
+    		avail = buf.f_bsize*buf.f_bfree;
+    		total = buf.f_bsize*buf.f_blocks;
+			last_check = current;
+		}
 	}
 
 	if((avail-amount)>minimum_space_free) {
@@ -243,6 +257,7 @@ static void update_all_catalogs()
 	load_average_get(avg);
 	cpus = load_average_get_cpus();
 	chirp_alloc_statfs(chirp_root_path,&info);
+
 	memory_info_get(&memory_avail,&memory_total);
 	uptime = time(0)-starttime;
 
@@ -300,7 +315,7 @@ int main( int argc, char *argv[] )
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c_input = getopt( argc,argv,"A:a:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:")) != -1 ) {
+	while((c_input = getopt( argc,argv,"A:a:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:")) != -1 ) {
 	        c = ( char ) c_input;
 		switch(c) {
 		case 'A':
@@ -402,12 +417,43 @@ int main( int argc, char *argv[] )
 		case 'L':
 			extra_latency = atoi(optarg);
 			break;
+		case 'f':
+			if (strcmp(optarg, "local") == 0)
+              cfs = &chirp_local_fs;
+#ifdef HAS_HDFS
+			else if (strcmp(optarg, "hdfs") == 0)
+              cfs = &chirp_hdfs_fs;
+#endif /* HAS_HDFS */
+			else
+			  fatal("unknown filesystem: '%s'", optarg);
+			break;
+		case 'y':
+			chirp_transient_path = optarg;
+			break;
+		case 'x':
+#ifdef HAS_HDFS
+		{
+			char *delim;
+			chirp_hdfs_hostname = optarg;
+			if ((delim = strchr(chirp_hdfs_hostname, ':')) == NULL)
+			  fatal("hostname and port must be delimited by a ':'");
+			*delim = '\0'; /* terminate the hostname string */
+			if ((chirp_hdfs_port = (UINT16_T) strtol(delim+1, NULL, 10)) == 0)
+			  fatal("-x hostname:port -> port is not a positive integer");
+		}
+#else
+			fatal("-x not supported without hdfs installed");
+#endif
+			break;
 		case 'h':
 		default:
 			show_help(argv[0]);
 			return 1;
 		}
 	}
+
+	if (!create_dir(chirp_transient_path, 0711))
+		fatal("could not create transient data directory '%s'", chirp_transient_path);
 
 	if(dont_dump_core) {
 		struct rlimit rl;
@@ -418,12 +464,14 @@ int main( int argc, char *argv[] )
 	current = time(0);
 	debug(D_ALL,"*** %s starting at %s",argv[0],ctime(&current));
 
+    if (single_mode && cfs->init(startdir) != 0) /* done only once now */
+      fatal("could not initialize backend filesystem: %s", strerror(errno));
+
 	if(!list_size(catalog_host_list)) {
 		list_push_head(catalog_host_list,CATALOG_HOST);
 	}
 
 	if(getuid()==0) {
-		struct passwd *p;
 		if(!safe_username) {		
 			printf("Sorry, I refuse to run as root without certain safeguards.\n");
 			printf("Please give me a safe username with the -i <user> option.\n");
@@ -431,34 +479,24 @@ int main( int argc, char *argv[] )
 			printf("I will use the safe username to access data on disk.\n");
 			exit(1);
 		}
-		p = getpwnam(safe_username);
-		if(!p) fatal("unknown user: %s",safe_username);
-		safe_uid = p->pw_uid;
-		safe_gid = p->pw_gid;
-		chown(startdir,safe_uid,safe_gid);
-		chmod(startdir,0700);
-	} else {
-		if(safe_username) {
-			printf("Sorry, the -i option doesn't make sense\n");
-			printf("unless I am already running as root.\n");
-			exit(1);
-		}
+	} else if(safe_username) {
+		printf("Sorry, the -i option doesn't make sense\n");
+		printf("unless I am already running as root.\n");
+		exit(1);
 	}
 
-	if(!create_dir(startdir,0711))
-		fatal("couldn't create %s: %s\n",startdir,strerror(errno));
-
-	/* It's ok if this fails because there is a default permission check. */
-        /* Note that it might fail if we are exporting a read-only volume. */
-        chirp_acl_init_root(startdir);
 	chirp_stats_init();
-	chmod(startdir,0755);
 
-	if(root_quota>0)
-		chirp_alloc_init(startdir,root_quota);
-	if(chdir(startdir)!=0)
-		fatal("couldn't move to %s: %s\n",startdir,strerror(errno));
-	if(getcwd(chirp_root_path,sizeof(chirp_root_path))<0)
+	if(root_quota>0) {
+#ifdef HAS_HDFS
+		if (cfs == &chirp_hdfs_fs) /* using HDFS? Can't do quotas : / */
+			fatal("Cannot use quotas with HDFS\n");
+		else
+#endif
+			chirp_alloc_init(startdir,root_quota);
+	}
+	strncpy(chirp_root_path, startdir, sizeof(chirp_root_path));
+	if (strcmp(chirp_root_path, startdir) != 0)
 		fatal("couldn't get working dir: %s\n",strerror(errno));
 
 	link = link_serve_address(listen_on_interface,port);
@@ -541,12 +579,19 @@ int main( int argc, char *argv[] )
 
 		if(single_mode) {
 			chirp_receive(l);
+			if(!did_explicit_auth)
+				auth_register_all();
+			else
+				auth_register_byname(optarg);
 		} else {
 			pid = fork();
 			if(pid==0) {
 				change_process_title("chirp_server [authenticating]");
 				install_handler(SIGCHLD,ignore_signal);
+                if (cfs->init(startdir) != 0)
+      				fatal("could not initialize backend filesystem: %s", strerror(errno));
 				chirp_receive(l);
+				cfs->destroy(); /* disconnect from backend */
 				_exit(0);
 			} else if(pid>=0) {
 				total_child_procs++;
@@ -556,6 +601,7 @@ int main( int argc, char *argv[] )
 			}
 			link_close(l);
 		}
+
 	}
 }
 
@@ -576,6 +622,13 @@ static void chirp_receive( struct link *link )
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 
+	chmod(chirp_root_path, 0755);
+	if(cfs->chdir(chirp_root_path)!=0)
+		fatal("couldn't move to %s: %s\n",startdir,strerror(errno));
+	/* It's ok if this fails because there is a default permission check. */
+        /* Note that it might fail if we are exporting a read-only volume. */
+        chirp_acl_init_root(chirp_root_path);
+
 	link_address_remote(link,addr,&port);
 
 	if(extra_latency) millisleep(extra_latency*4);
@@ -588,6 +641,13 @@ static void chirp_receive( struct link *link )
 		debug(D_LOGIN,"%s from %s:%d",typesubject,addr,port);
 
 		if(safe_username) {
+			struct passwd *p;
+			p = getpwnam(safe_username);
+			if(!p) fatal("unknown user: %s",safe_username);
+			safe_uid = p->pw_uid;
+			safe_gid = p->pw_gid;
+			cfs->chown(startdir,safe_uid,safe_gid);
+			cfs->chmod(startdir,0700);
 			debug(D_AUTH,"changing to uid %d gid %d",safe_uid,safe_gid);
 			setgid(safe_gid);
 			setuid(safe_uid);
@@ -966,7 +1026,7 @@ static void chirp_handler( struct link *l, const char *subject )
 		} else if(sscanf(line,"getacl %s",path)==1) {
 			char aclsubject[CHIRP_LINE_MAX];
 			int aclflags;
-			FILE *aclfile;
+			CHIRP_FILE *aclfile;
 
 			if(!chirp_path_fix(path)) goto failure;
 
@@ -1068,6 +1128,9 @@ static void chirp_handler( struct link *l, const char *subject )
 			}
 		} else if(sscanf(line,"thirdput %s %s %s",path,hostname,newpath)==3) {
 			if(!chirp_path_fix(path)) goto failure;
+#ifdef HAS_HDFS
+			if(cfs == &chirp_hdfs_fs) goto failure;
+#endif
 
 			/* ACL check will occur inside of chirp_thirdput */
 

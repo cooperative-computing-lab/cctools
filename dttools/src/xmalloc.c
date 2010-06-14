@@ -38,3 +38,11 @@ char * xstrdup( const char *str )
 		return 0;
 	}
 }
+
+void * xxrealloc( void *ptr, size_t nsize )
+{
+	void *result = realloc(ptr, nsize);
+	if (nsize > 0 && result == NULL)
+	  fatal("out of memory");
+	return result;
+}

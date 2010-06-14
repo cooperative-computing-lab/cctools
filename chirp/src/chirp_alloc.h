@@ -7,7 +7,7 @@ See the file COPYING for details.
 #ifndef CHIRP_ALLOC_H
 #define CHIRP_ALLOC_H
 
-#include "chirp_client.h"
+#include "chirp_types.h"
 #include "link.h"
 
 #include <sys/types.h>

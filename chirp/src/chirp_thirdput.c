@@ -32,7 +32,7 @@ static INT64_T chirp_thirdput_recursive( const char *subject, const char *lpath,
 	if(result<0) return result;
 
 	if(S_ISDIR(info.cst_mode)) {
-		FILE *aclfile;
+		CHIRP_FILE *aclfile;
 		void *dir;
 		char *name;
 		char aclsubject[CHIRP_PATH_MAX];

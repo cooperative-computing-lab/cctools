@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "chirp_local.h"
+#include "chirp_filesystem.h"
 #include "chirp_audit.h"
 #include "chirp_protocol.h"
 
@@ -23,17 +23,21 @@ static int audit_count = 0;
 static int get_directory_owner( const char *path, char *owner )
 {
 	char aclpath[CHIRP_PATH_MAX];
-	FILE *file;
+	char tmp[CHIRP_LINE_MAX];
+	char *r;
+	CHIRP_FILE *file;
 	int result;
 
 	sprintf(aclpath,"%s/.__acl",path);
 
-	file = fopen(aclpath,"r");
+	file = cfs_fopen(aclpath,"r");
 	if(!file) return -1;
 
-	result = fscanf(file,"%[^ \t\n]",owner);
+	r = cfs_fgets(tmp, sizeof(tmp), file);
+	if(!r) return -1;
+	result = sscanf(tmp,"%[^ \t\n]",owner);
 
-	fclose(file);
+	cfs_fclose(file);
 
 	if(result==1) {
 		return 0;
@@ -65,13 +69,13 @@ static int chirp_audit_recursive( const char *path, struct hash_table *table )
 
 	entry->ndirs++;
 
-	dir = chirp_local_opendir(path);
+	dir = cfs->opendir(path);
 	if(!dir) {
 		debug(D_LOCAL,"audit: couldn't enter %s: %s",path,strerror(errno));
 		return -1;
 	}
 
-	while((name=chirp_local_readdir(dir))) {
+	while((name=cfs->readdir(dir))) {
 		if(!strcmp(name,".")) continue;
 		if(!strcmp(name,"..")) continue;
 		if(!strncmp(name,".__",3)) continue;
@@ -82,7 +86,7 @@ static int chirp_audit_recursive( const char *path, struct hash_table *table )
 
 		sprintf(subpath,"%s/%s",path,name);
 
-		result = chirp_local_lstat(subpath,&info);
+		result = cfs->lstat(subpath,&info);
 		if(result<0) continue;
 
 		if(S_ISDIR(info.cst_mode)) {
@@ -93,7 +97,7 @@ static int chirp_audit_recursive( const char *path, struct hash_table *table )
 		}
 	}
 
-	chirp_local_closedir(dir);
+	cfs->closedir(dir);
 
 	return 0;
 }

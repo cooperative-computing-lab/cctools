@@ -6,12 +6,12 @@ See the file COPYING for details.
 */
 
 #include "chirp_acl.h"
+#include "chirp_filesystem.h"
 #include "chirp_protocol.h"
 
 #include "username.h"
 #include "stringtools.h"
 #include "debug.h"
-#include "delete_dir.h"
 #include "chirp_group.h"
 
 #include <errno.h>
@@ -49,11 +49,11 @@ static const char *default_acl=0;
 
 extern const char *chirp_super_user;
 
-static int do_stat( const char *filename, struct stat *buf )
+static int do_stat( const char *filename, struct chirp_stat *buf )
 {
 	int result;
 	do {
-		result = stat(filename,buf);
+		result = cfs->stat(filename,buf);
 	} while( result==-1 && errno==EINTR );
 	return result;
 }
@@ -70,10 +70,10 @@ void chirp_acl_default( const char *d )
 
 static int is_a_directory( const char *filename )
 {
-	struct stat info;
+	struct chirp_stat info;
 
 	if(do_stat(filename,&info)==0) {
-		if(S_ISDIR(info.st_mode)) {
+		if(S_ISDIR(info.cst_mode)) {
 			return 1;
 		} else {
 			return 0;
@@ -97,7 +97,7 @@ If the rights cannot be obtained, returns zero with errno set appropriately.
 
 static int do_chirp_acl_get( const char *filename, const char *dirname, const char *subject, int *totalflags )
 {
-	FILE *aclfile;
+	CHIRP_FILE *aclfile;
 	char aclsubject[CHIRP_LINE_MAX];
 	int aclflags;
 
@@ -161,7 +161,7 @@ static int do_chirp_acl_check( const char *filename, const char *subject, int fl
 	*/
 
 	if(follow_links && flags!=CHIRP_ACL_DELETE) {
-		int length = readlink(filename,linkname,sizeof(linkname));
+		int length = cfs->readlink(filename,linkname,sizeof(linkname));
 		if(length>0) {
 			linkname[length] = 0;
 
@@ -217,49 +217,49 @@ int chirp_acl_check_link( const char *filename, const char *subject, int flags )
 
 static int add_mode_bits( const char *path, mode_t mode )
 {
-	struct stat64 info;
+	struct chirp_stat buf;
 	int result;
-	result = stat64(path,&info);
+	result = cfs->stat(path,&buf);
 	if(result<0) return result;
-	return chmod(path,info.st_mode|mode);
+	return cfs->chmod(path,buf.cst_mode|mode);
 }
 
 
 static int remove_mode_bits( const char *path, mode_t mode )
 {
-	struct stat64 info;
+	struct chirp_stat buf;
 	int result;
-	result = stat64(path,&info);
+	result = cfs->stat(path,&buf);
 	if(result<0) return result;
-	return chmod(path,info.st_mode&(~mode));
+	return cfs->chmod(path,buf.cst_mode&(~mode));
 }
 
 static int add_mode_bits_all( const char *path, mode_t mode )
 {
 	char subpath[CHIRP_PATH_MAX];
-	struct dirent *d;
-	DIR *dir;
-	struct stat64 info;
+	char *d;
+	void *dir;
+	struct chirp_stat buf;
 	int result;
 
-	dir = opendir(path);
+	dir = cfs->opendir(path);
 	if(!dir) return -1;
 
-	while((d=readdir(dir))) {
-		if(!strcmp(d->d_name,".")) continue;
-		if(!strcmp(d->d_name,"..")) continue;
+	while((d=cfs->readdir(dir))) {
+		if(!strcmp(d,".")) continue;
+		if(!strcmp(d,"..")) continue;
 
-		sprintf(subpath,"%s/%s",path,d->d_name);
+		sprintf(subpath,"%s/%s",path,d);
 
-		result = stat64(subpath,&info);
+		result = cfs->stat(subpath,&buf);
 		if(result<0) continue;
 
-		if(S_ISREG(info.st_mode)) {
-			chmod(subpath,info.st_mode|mode);
+		if(S_ISREG(buf.cst_mode)) {
+			cfs->chmod(subpath,buf.cst_mode|mode);
 		}
 	}
 
-	closedir(dir);
+	cfs->closedir(dir);
 
 	return 0;
 }
@@ -267,29 +267,29 @@ static int add_mode_bits_all( const char *path, mode_t mode )
 static int remove_mode_bits_all( const char *path, mode_t mode )
 {
 	char subpath[CHIRP_PATH_MAX];
-	struct dirent *d;
-	DIR *dir;
-	struct stat64 info;
+	char *d;
+	void *dir;
+	struct chirp_stat buf;
 	int result;
 
-	dir = opendir(path);
+	dir = cfs->opendir(path);
 	if(!dir) return -1;
 
-	while((d=readdir(dir))) {
-		if(!strcmp(d->d_name,".")) continue;
-		if(!strcmp(d->d_name,"..")) continue;
+	while((d=cfs->readdir(dir))) {
+		if(!strcmp(d,".")) continue;
+		if(!strcmp(d,"..")) continue;
 
-		sprintf(subpath,"%s/%s",path,d->d_name);
+		sprintf(subpath,"%s/%s",path,d);
 
-		result = stat64(subpath,&info);
+		result = cfs->stat(subpath,&buf);
 		if(result<0) continue;
 
-		if(S_ISREG(info.st_mode)) {
-			chmod(subpath,info.st_mode&(~mode));
+		if(S_ISREG(buf.cst_mode)) {
+			cfs->chmod(subpath,buf.cst_mode&(~mode));
 		}
 	}
 
-	closedir(dir);
+	cfs->closedir(dir);
 
 	return 0;
 }
@@ -300,7 +300,7 @@ int chirp_acl_set( const char *dirname, const char *subject, int flags, int rese
 	char newaclname[CHIRP_PATH_MAX];
 	char aclsubject[CHIRP_LINE_MAX];
 	int aclflags;
-	FILE *aclfile, *newaclfile;
+	CHIRP_FILE *aclfile, *newaclfile;
 	int result;
 	int replaced_acl_entry=0;
 
@@ -313,16 +313,16 @@ int chirp_acl_set( const char *dirname, const char *subject, int flags, int rese
 	sprintf(newaclname,"%s/%s.%d",dirname,CHIRP_ACL_BASE_NAME,(int)getpid());
 
 	if(reset_acl) {
-		aclfile = fopen("/dev/null","r");
+		aclfile = cfs_fopen("/dev/null","r");
 	} else {
-		aclfile = fopen(aclname,"r");
+		aclfile = cfs_fopen(aclname,"r");
 
 		/* If the acl never existed, then we can simply create it. */
 		if(!aclfile && errno==ENOENT) {
 			if(default_acl) {
-				aclfile = fopen(default_acl,"r");
+				aclfile = cfs_fopen(default_acl,"r");
 			} else {
-				aclfile = fopen("/dev/null","r");
+				aclfile = cfs_fopen("/dev/null","r"); /* use local... */
 			}
 		}
 	}
@@ -334,9 +334,9 @@ int chirp_acl_set( const char *dirname, const char *subject, int flags, int rese
 
 	replaced_acl_entry = 0;
 
-	newaclfile = fopen(newaclname,"w");
+	newaclfile = cfs_fopen(newaclname,"w");
 	if(!newaclfile) {
-		fclose(aclfile);
+		cfs_fclose(aclfile);
 		errno = EACCES;
 		return -1;
 	}
@@ -347,32 +347,32 @@ int chirp_acl_set( const char *dirname, const char *subject, int flags, int rese
 			replaced_acl_entry = 1;
 		}
 		if(aclflags!=0) {
-			fprintf(newaclfile,"%s %s\n",aclsubject,chirp_acl_flags_to_text(aclflags));
+			cfs_fprintf(newaclfile,"%s %s\n",aclsubject,chirp_acl_flags_to_text(aclflags));
 		}
 	}
 
 	if(!replaced_acl_entry) {
-		fprintf(newaclfile,"%s %s\n",subject,chirp_acl_flags_to_text(flags));
+		cfs_fprintf(newaclfile,"%s %s\n",subject,chirp_acl_flags_to_text(flags));
 	}
 
 	/* Need to force a write in order to get response from ferror */
 
-	fflush(newaclfile);
+	cfs_fflush(newaclfile);
 
-	if(ferror(newaclfile)) {
+	if(cfs_ferror(newaclfile)) {
 		errno = EACCES;
 		result = -1;
 	} else {
-		result = rename(newaclname,aclname);
+		result = cfs->rename(newaclname,aclname);
 		if(result<0) {
-			unlink(newaclname);
+			cfs->unlink(newaclname);
 			errno = EACCES;
 			result = -1;
 		}
 	}
 
-	fclose(aclfile);
-	fclose(newaclfile);
+	cfs_fclose(aclfile);
+	cfs_fclose(newaclfile);
 
 	if(!strcmp(subject,"system:localuser")) {
 		if(flags&CHIRP_ACL_READ) {
@@ -399,14 +399,14 @@ int chirp_acl_set( const char *dirname, const char *subject, int flags, int rese
 	return result;
 }
 
-FILE * chirp_acl_open( const char *dirname )
+CHIRP_FILE *chirp_acl_open( const char *dirname )
 {
 	char aclname[CHIRP_PATH_MAX];
-	FILE *file;
+	CHIRP_FILE *file;
 
 	if(!is_a_directory(dirname)) {
 		if (errno == ENOENT && default_acl) {
-			file = fopen(default_acl,"r");
+			file = cfs_fopen(default_acl, "r");
 			return file;
 		}
         else if (errno == ENOTDIR) /* component directory missing */
@@ -415,18 +415,18 @@ FILE * chirp_acl_open( const char *dirname )
 		return 0;
 	} else {
 		make_acl_name(dirname,0,aclname);
-		file = fopen(aclname,"r");
-		if(!file && default_acl) file = fopen(default_acl,"r");
+		file = cfs_fopen(aclname,"r");
+		if(!file && default_acl) file = cfs_fopen(default_acl, "r");
 		return file;
 	}
 }
 
-int chirp_acl_read( FILE *aclfile, char *subject, int *flags )
+int chirp_acl_read( CHIRP_FILE *aclfile, char *subject, int *flags )
 {
 	char acl[CHIRP_LINE_MAX];
 	char tmp[CHIRP_LINE_MAX];
 
-	while(fgets(acl,sizeof(acl),aclfile)) {
+	while(cfs_fgets(acl,sizeof(acl),aclfile)) {
 		if(sscanf(acl,"%[^ ] %[rwldpvax()]",subject,tmp)==2) {
 			*flags = chirp_acl_text_to_flags(tmp);
 			return 1;
@@ -438,9 +438,9 @@ int chirp_acl_read( FILE *aclfile, char *subject, int *flags )
 	return 0;
 }
 
-void chirp_acl_close( FILE *aclfile )
+void chirp_acl_close( CHIRP_FILE *aclfile )
 {
-	fclose(aclfile);
+	cfs_fclose(aclfile);
 }
 
 
@@ -540,7 +540,7 @@ int chirp_acl_init_root( const char *path )
 {
 	char aclpath[CHIRP_PATH_MAX];
 	char username[USERNAME_MAX];
-	FILE *file;
+	CHIRP_FILE *file;
 
 	file = chirp_acl_open(path);
 	if(file) {
@@ -551,10 +551,10 @@ int chirp_acl_init_root( const char *path )
 	username_get(username);
 
 	sprintf(aclpath,"%s/%s",path,CHIRP_ACL_BASE_NAME);
-	file = fopen(aclpath,"w");
+	file = cfs_fopen(aclpath,"w");
 	if(file) {
-		fprintf(file,"unix:%s %s\n",username,chirp_acl_flags_to_text(CHIRP_ACL_READ|CHIRP_ACL_WRITE|CHIRP_ACL_DELETE|CHIRP_ACL_LIST|CHIRP_ACL_ADMIN));
-		fclose(file);
+		cfs_fprintf(file,"unix:%s %s\n",username,chirp_acl_flags_to_text(CHIRP_ACL_READ|CHIRP_ACL_WRITE|CHIRP_ACL_DELETE|CHIRP_ACL_LIST|CHIRP_ACL_ADMIN));
+		cfs_fclose(file);
 		return 1;
 	} else {
 		return 0;
@@ -566,8 +566,8 @@ int chirp_acl_init_copy( const char *path )
 	char oldpath[CHIRP_LINE_MAX];
 	char newpath[CHIRP_LINE_MAX];
 	char subject[CHIRP_LINE_MAX];
-	FILE *oldfile;
-	FILE *newfile;
+	CHIRP_FILE *oldfile;
+	CHIRP_FILE *newfile;
 	int result = 0;
 	int flags;
 
@@ -576,12 +576,12 @@ int chirp_acl_init_copy( const char *path )
 
 	oldfile = chirp_acl_open(oldpath);
 	if(oldfile) {
-		newfile = fopen(newpath,"w");
+		newfile = cfs_fopen(newpath,"w");
 		if(newfile) {
 			while(chirp_acl_read(oldfile,subject,&flags)) {
-				fprintf(newfile,"%s %s\n",subject,chirp_acl_flags_to_text(flags));
+				cfs_fprintf(newfile,"%s %s\n",subject,chirp_acl_flags_to_text(flags));
 			}
-			fclose(newfile);
+			cfs_fclose(newfile);
 			result = 1;
 		}
 		chirp_acl_close(oldfile);
@@ -594,7 +594,7 @@ int chirp_acl_init_reserve( const char *path, const char *subject )
 {
 	char dirname[CHIRP_PATH_MAX];
 	char aclpath[CHIRP_PATH_MAX];
-	FILE *file;
+	CHIRP_FILE *file;
 	int newflags = 0;
 	int aclflags;
 
@@ -629,15 +629,40 @@ int chirp_acl_init_reserve( const char *path, const char *subject )
 	if(newflags==0) newflags = CHIRP_ACL_READ|CHIRP_ACL_WRITE|CHIRP_ACL_LIST|CHIRP_ACL_DELETE|CHIRP_ACL_ADMIN;
 
 	sprintf(aclpath,"%s/%s",path,CHIRP_ACL_BASE_NAME);
-	file = fopen(aclpath,"w");
+	file = cfs_fopen(aclpath,"w");
 	if(file) {
-		fprintf(file,"%s %s\n",subject,
-			chirp_acl_flags_to_text(newflags));
-		fclose(file);
+		cfs_fprintf(file,"%s %s\n",subject,chirp_acl_flags_to_text(newflags));
+		cfs_fclose(file);
 		return 1;
 	} else {
 		return 0;
 	}
+}
+
+static int delete_dir (const char *path)
+{
+  int result = 1;
+  const char *entry;
+  void *dir;
+
+  dir = cfs->opendir(path);
+  if (!dir) {
+    if (errno == ENOTDIR)
+      return cfs->unlink(path) == 0;
+    else
+      return errno == ENOENT;
+  }
+  while ((entry = cfs->readdir(dir))) {
+    char subdir[PATH_MAX];
+    if (!strcmp(entry, ".")) continue;
+    if (!strcmp(entry, "..")) continue;
+    sprintf(subdir,"%s/%s",path,entry);
+    if(!delete_dir(subdir)) {
+      result = 0;
+    }
+  }
+  cfs->closedir(dir);
+  return cfs->rmdir(path) == 0 ? result : 0;
 }
 
 /*
@@ -650,21 +675,21 @@ int chirp_acl_init_reserve( const char *path, const char *subject )
 
 int chirp_acl_rmdir( const char *path )
 {
-	DIR *dir;
-	struct dirent *d;
+	void *dir;
+	char *d;
 
-	dir = opendir(path);
+	dir = cfs->opendir(path);
 	if(dir) {
-		while((d=readdir(dir))) {
-			if(!strcmp(d->d_name,".")) continue;
-			if(!strcmp(d->d_name,"..")) continue;
-			if(!strcmp(d->d_name,CHIRP_ACL_BASE_NAME)) continue;
-			closedir(dir);
+		while((d=cfs->readdir(dir))) {
+			if(!strcmp(d,".")) continue;
+			if(!strcmp(d,"..")) continue;
+			if(!strcmp(d,CHIRP_ACL_BASE_NAME)) continue;
+			cfs->closedir(dir);
 			errno = ENOTEMPTY;
 			return -1;
 		}
-		closedir(dir);
-		delete_dir(path);
+		cfs->closedir(dir);
+		delete_dir(dir);
 		return 0;
 	} else {
 		errno = ENOENT;

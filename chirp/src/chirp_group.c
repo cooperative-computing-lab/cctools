@@ -17,8 +17,8 @@ See the file COPYING for details.
 #include <errno.h>
 #include <sys/stat.h>
 
-extern const char chirp_root_path[];
-extern const char * chirp_group_base_url;
+extern const char *chirp_transient_path;
+extern const char *chirp_group_base_url;
 extern int chirp_group_cache_time;
 
 /*
@@ -40,7 +40,7 @@ int chirp_group_lookup( const char *group, const char *subject )
 
 	int fetch_group = 1;
 
-	sprintf(cachedir,"%s/.__groups",chirp_root_path);
+	sprintf(cachedir,"%s/.__groups",chirp_transient_path);
 	sprintf(cachepath,"%s/%s",cachedir,&group[6]);
 
 	if(stat(cachepath,&info)==0) {

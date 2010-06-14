@@ -7,7 +7,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "chirp_alloc.h"
 #include "chirp_protocol.h"
-#include "chirp_local.h"
+#include "chirp_filesystem.h"
 
 #include "itable.h"
 #include "hash_table.h"
@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "delete_dir.h"
 #include "debug.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -74,6 +75,7 @@ static struct alloc_state * alloc_state_load( const char *path )
 
 	sprintf(statename,"%s/.__alloc",path);
 
+    /* WARNING chirp_alloc assumes we are using the local filesystem */
 	s->file = fopen(statename,"r+");
 	if(!s->file) {
 		free(s);
@@ -149,7 +151,7 @@ static char * alloc_state_root( const char *path )
 
 	while(1) {
 		sprintf(statename,"%s/.__alloc",dirname);
-		if(chirp_local_file_size(statename)>=0) {
+		if(cfs->file_size(statename)>=0) {
 			return xstrdup(dirname);
 		}
 		s = strrchr(dirname,'/');
@@ -228,17 +230,17 @@ static void recover( const char *path )
 	a = alloc_state_cache_exact(path);
 	if(!a) fatal("couldn't open alloc state in %s: %s",path,strerror(errno));
 
-	dir = chirp_local_opendir(path);
+	dir = cfs->opendir(path);
 	if(!dir) fatal("couldn't open %s: %s\n",path,strerror(errno));
 
-	while((d=chirp_local_readdir(dir))) {
+	while((d=cfs->readdir(dir))) {
 		if(!strcmp(d,".")) continue;
 		if(!strcmp(d,"..")) continue;
 		if(!strncmp(d,".__",3)) continue;
 
 		sprintf(newpath,"%s/%s",path,d);
 
-		result = chirp_local_lstat(newpath,&info);
+		result = cfs->lstat(newpath,&info);
 		if(result!=0) fatal("couldn't stat %s: %s\n",path,strerror(errno));
 
 		if(S_ISDIR(info.cst_mode)) {
@@ -252,7 +254,7 @@ static void recover( const char *path )
 		}
 	}
 
-	chirp_local_closedir(dir);
+	cfs->closedir(dir);
 
 	debug(D_ALLOC,"%s (%sB)",path,string_metric(a->inuse,-1,0));
 }
@@ -342,14 +344,14 @@ INT64_T chirp_alloc_open( const char *path, INT64_T flags, INT64_T mode )
 	struct alloc_state *a;
 	int fd = -1;
 
-	if(!alloc_enabled) return chirp_local_open(path,flags,mode);
+	if(!alloc_enabled) return cfs->open(path,flags,mode);
 
 	a = alloc_state_cache(path);
 	if(a) {
-		INT64_T filesize = chirp_local_file_size(path);
+		INT64_T filesize = cfs->file_size(path);
 		if(filesize<0) filesize = 0;
 
-		fd = chirp_local_open(path,flags,mode);
+		fd = cfs->open(path,flags,mode);
 		if(fd>=0) {
 			if(!fd_table) fd_table = itable_create(0);
 			itable_insert(fd_table,fd,xstrdup(path));
@@ -365,18 +367,18 @@ INT64_T chirp_alloc_open( const char *path, INT64_T flags, INT64_T mode )
 
 INT64_T chirp_alloc_close( int fd )
 {
-	if(!alloc_enabled) return chirp_local_close(fd);
+	if(!alloc_enabled) return cfs->close(fd);
 
 	if(!fd_table) fd_table = itable_create(0);
 	char *path = itable_remove(fd_table,fd);
 	if(path) free(path);
-	chirp_local_close(fd);
+	cfs->close(fd);
 	return 0;
 }
 
 INT64_T chirp_alloc_pread( int fd, void *buffer, INT64_T length, INT64_T offset )
 {
-	return chirp_local_pread(fd,buffer,length,offset);
+	return cfs->pread(fd,buffer,length,offset);
 }
 
 INT64_T chirp_alloc_pwrite( int fd, const void *data, INT64_T length, INT64_T offset )
@@ -384,18 +386,18 @@ INT64_T chirp_alloc_pwrite( int fd, const void *data, INT64_T length, INT64_T of
 	struct alloc_state *a;
 	int result;
 
-	if(!alloc_enabled) return chirp_local_pwrite(fd,data,length,offset);
+	if(!alloc_enabled) return cfs->pwrite(fd,data,length,offset);
 
 	if(!fd_table) fd_table = itable_create(0);
 
 	a  = alloc_state_cache(itable_lookup(fd_table,fd));
 	if(a) {
-		INT64_T filesize = chirp_local_fd_size(fd);
+		INT64_T filesize = cfs->fd_size(fd);
 		if(filesize>=0) {
 			INT64_T newfilesize = MAX(length+offset,filesize);
 			INT64_T alloc_change = space_consumed(newfilesize) - space_consumed(filesize);
 			if(a->avail>=alloc_change) {
-				result = chirp_local_pwrite(fd,data,length,offset);
+				result = cfs->pwrite(fd,data,length,offset);
 				if(result>0) alloc_state_update(a,alloc_change);
 			} else {
 				errno = ENOSPC;
@@ -412,17 +414,17 @@ INT64_T chirp_alloc_pwrite( int fd, const void *data, INT64_T length, INT64_T of
 
 INT64_T chirp_alloc_sread( int fd, void *buffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset )
 {
-	return chirp_local_sread(fd,buffer,length,stride_length,stride_skip,offset);
+	return cfs->sread(fd,buffer,length,stride_length,stride_skip,offset);
 }
 
 INT64_T chirp_alloc_swrite( int fd, const void *buffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset )
 {
-	return chirp_local_swrite(fd,buffer,length,stride_length,stride_skip,offset);
+	return cfs->swrite(fd,buffer,length,stride_length,stride_skip,offset);
 }
 
 INT64_T chirp_alloc_fstat( int fd, struct chirp_stat *buf )
 {
-	return chirp_local_fstat(fd,buf);
+	return cfs->fstat(fd,buf);
 }
 
 INT64_T chirp_alloc_fstatfs( int fd, struct chirp_statfs *info )
@@ -430,13 +432,13 @@ INT64_T chirp_alloc_fstatfs( int fd, struct chirp_statfs *info )
 	struct alloc_state *a;
 	int result;
 
-	if(!alloc_enabled) return chirp_local_fstatfs(fd,info);
+	if(!alloc_enabled) return cfs->fstatfs(fd,info);
 
 	if(!fd_table) fd_table = itable_create(0);
 
 	a = alloc_state_cache(itable_lookup(fd_table,fd));
 	if(a) {
-		result = chirp_local_fstatfs(fd,info);
+		result = cfs->fstatfs(fd,info);
 		if(result==0) {
 			info->f_blocks = a->size/info->f_bsize;
 			info->f_bfree = a->avail/info->f_bsize;
@@ -452,12 +454,12 @@ INT64_T chirp_alloc_fstatfs( int fd, struct chirp_statfs *info )
 
 INT64_T chirp_alloc_fchown( int fd, INT64_T uid, INT64_T gid )
 {
-	return chirp_local_fchown(fd,uid,gid);
+	return cfs->fchown(fd,uid,gid);
 }
 
 INT64_T chirp_alloc_fchmod( int fd, INT64_T mode )
 {
-	return chirp_local_fchmod(fd,mode);
+	return cfs->fchmod(fd,mode);
 }
 
 INT64_T chirp_alloc_ftruncate( int fd, INT64_T length )
@@ -465,17 +467,17 @@ INT64_T chirp_alloc_ftruncate( int fd, INT64_T length )
 	struct alloc_state *a;
 	int result;
 
-	if(!alloc_enabled) return chirp_local_ftruncate(fd,length);
+	if(!alloc_enabled) return cfs->ftruncate(fd,length);
 
 	if(!fd_table) fd_table = itable_create(0);
 
 	a = alloc_state_cache(itable_lookup(fd_table,fd));
 	if(a) {
-		INT64_T filesize = chirp_local_fd_size(fd);
+		INT64_T filesize = cfs->fd_size(fd);
 		if(filesize>=0) {
 			INT64_T alloc_change = space_consumed(length)-space_consumed(filesize);
 			if(a->avail>=alloc_change) {
-				result = chirp_local_ftruncate(fd,length);
+				result = cfs->ftruncate(fd,length);
 				if(result==0) alloc_state_update(a,alloc_change);
 			} else {
 				errno = ENOSPC;
@@ -492,27 +494,27 @@ INT64_T chirp_alloc_ftruncate( int fd, INT64_T length )
 
 INT64_T chirp_alloc_fsync( int fd )
 {
-	return chirp_local_fsync(fd);
+	return cfs->fsync(fd);
 }
 
 void *  chirp_alloc_opendir( const char *path )
 {
-	return chirp_local_opendir(path);
+	return cfs->opendir(path);
 }
 
 char *  chirp_alloc_readdir( void *dir )
 {
-	return chirp_local_readdir(dir);
+	return cfs->readdir(dir);
 }
 
 void    chirp_alloc_closedir( void *dir )
 {
-	return chirp_local_closedir(dir);
+	return cfs->closedir(dir);
 }
 
 INT64_T chirp_alloc_getfile( const char *path, struct link *link, time_t stoptime )
 {
-	return chirp_local_getfile(path,link,stoptime);
+	return cfs->getfile(path,link,stoptime);
 }
 
 INT64_T chirp_alloc_getstream( const char *path, struct link *l, time_t stoptime )
@@ -556,7 +558,7 @@ INT64_T chirp_alloc_putfile( const char *path, struct link *link, INT64_T length
 	struct alloc_state *a;
 	int result;
 
-	if(!alloc_enabled) return chirp_local_putfile(path,link,length,mode,stoptime);
+	if(!alloc_enabled) return cfs->putfile(path,link,length,mode,stoptime);
 
 	result = chirp_alloc_unlink(path);
 	if(result<0 && errno!=ENOENT) return result;
@@ -564,11 +566,11 @@ INT64_T chirp_alloc_putfile( const char *path, struct link *link, INT64_T length
 	a = alloc_state_cache(path);
 	if(a) {
 		if(a->avail>length) {
-			result = chirp_local_putfile(path,link,length,mode,stoptime);
+			result = cfs->putfile(path,link,length,mode,stoptime);
 			if(result>0) {
 				alloc_state_update(a,space_consumed(result));
 			} else {
-				chirp_local_unlink(path);
+				cfs->unlink(path);
 			}
 		} else {
 			errno = ENOSPC;
@@ -620,13 +622,13 @@ INT64_T chirp_alloc_unlink( const char *path )
 	struct alloc_state *a;
 	int result;
 
-	if(!alloc_enabled) return chirp_local_unlink(path);
+	if(!alloc_enabled) return cfs->unlink(path);
 
 	a = alloc_state_cache(path);
 	if(a) {
-		INT64_T filesize = chirp_local_file_size(path);
+		INT64_T filesize = cfs->file_size(path);
 		if(filesize>=0) {
-			result = chirp_local_unlink(path);
+			result = cfs->unlink(path);
 			if(result==0) alloc_state_update(a,-space_consumed(filesize));
 		} else {
 			result = -1;
@@ -642,7 +644,7 @@ INT64_T chirp_alloc_rename( const char *oldpath, const char *newpath )
 	struct alloc_state *a, *b;
 	int result = -1;
 
-	if(!alloc_enabled) return chirp_local_rename(oldpath,newpath);
+	if(!alloc_enabled) return cfs->rename(oldpath,newpath);
 
 	a = alloc_state_cache(oldpath);
 	if(a) {
@@ -651,10 +653,10 @@ INT64_T chirp_alloc_rename( const char *oldpath, const char *newpath )
 			if(a==b) {
 				result = rename(oldpath,newpath);
 			} else {
-				INT64_T filesize = chirp_local_file_size(oldpath);
+				INT64_T filesize = cfs->file_size(oldpath);
 				if(filesize>=0) {
 					if(b->avail>=filesize) {
-						result = chirp_local_rename(oldpath,newpath);
+						result = cfs->rename(oldpath,newpath);
 						if(result==0) {
 							alloc_state_update(a,-space_consumed(filesize));
 							alloc_state_update(b,space_consumed(filesize));
@@ -679,24 +681,24 @@ INT64_T chirp_alloc_rename( const char *oldpath, const char *newpath )
 
 INT64_T chirp_alloc_link( const char *path, const char *newpath )
 {
-	if(!alloc_enabled) return chirp_local_link(path,newpath);
+	if(!alloc_enabled) return cfs->link(path,newpath);
 	errno = EPERM;
 	return -1;
 }
 
 INT64_T chirp_alloc_symlink( const char *path, const char *newpath )
 {
-	return chirp_local_symlink(path,newpath);
+	return cfs->symlink(path,newpath);
 }
 
 INT64_T chirp_alloc_readlink( const char *path, char *buf, INT64_T length )
 {
-	return chirp_local_readlink(path,buf,length);
+	return cfs->readlink(path,buf,length);
 }
 
 INT64_T chirp_alloc_mkdir( const char *path, INT64_T mode )
 {
-	return chirp_local_mkdir(path,mode);
+	return cfs->mkdir(path,mode);
 }
 
 INT64_T chirp_alloc_rmall( const char *path )
@@ -742,13 +744,13 @@ INT64_T chirp_alloc_rmdir( const char *path )
 	struct alloc_state *a, *d;
 	int result=-1;
 
-	if(!alloc_enabled) return chirp_local_rmdir(path);
+	if(!alloc_enabled) return cfs->rmdir(path);
 
 	d = alloc_state_cache_exact(path);
 	if(d) {
 		a = alloc_state_cache(path);
 		if(a) {
-			if(chirp_local_rmdir(path)==0) {
+			if(cfs->rmdir(path)==0) {
 				if(d!=a) {
 					alloc_state_update(a,-d->size);
 					debug(D_ALLOC,"rmalloc %s %lld",path,d->size);
@@ -765,12 +767,12 @@ INT64_T chirp_alloc_rmdir( const char *path )
 
 INT64_T chirp_alloc_stat( const char *path, struct chirp_stat *buf )
 {
-	return chirp_local_stat(path,buf);
+	return cfs->stat(path,buf);
 }
 
 INT64_T chirp_alloc_lstat( const char *path, struct chirp_stat *buf )
 {
-	return chirp_local_lstat(path,buf);
+	return cfs->lstat(path,buf);
 }
 
 INT64_T chirp_alloc_statfs( const char *path, struct chirp_statfs *info )
@@ -778,11 +780,11 @@ INT64_T chirp_alloc_statfs( const char *path, struct chirp_statfs *info )
 	struct alloc_state *a;
 	int result;
 
-	if(!alloc_enabled) return chirp_local_statfs(path,info);
+	if(!alloc_enabled) return cfs->statfs(path,info);
 
 	a = alloc_state_cache(path);
 	if(a) {
-		result = chirp_local_statfs(path,info);
+		result = cfs->statfs(path,info);
 		if(result==0) {
 			info->f_blocks = a->size/info->f_bsize;
 			info->f_bavail = a->avail/info->f_bsize;
@@ -801,27 +803,27 @@ INT64_T chirp_alloc_statfs( const char *path, struct chirp_statfs *info )
 
 INT64_T chirp_alloc_mkfifo( const char *path )
 {
-        return chirp_local_mkfifo(path);
+        return cfs->mkfifo(path);
 }
 
 INT64_T chirp_alloc_access( const char *path, INT64_T mode )
 {
-	return chirp_local_access(path,mode);
+	return cfs->access(path,mode);
 }
 
 INT64_T chirp_alloc_chmod( const char *path, INT64_T mode )
 {
-	return chirp_local_chmod(path,mode);
+	return cfs->chmod(path,mode);
 }
 
 INT64_T chirp_alloc_chown( const char *path, INT64_T uid, INT64_T gid )
 {
-	return chirp_local_chown(path,uid,gid);
+	return cfs->chown(path,uid,gid);
 }
 
 INT64_T chirp_alloc_lchown( const char *path, INT64_T uid, INT64_T gid )
 {
-	return chirp_local_lchown(path,uid,gid);
+	return cfs->lchown(path,uid,gid);
 }
 
 INT64_T chirp_alloc_truncate( const char *path, INT64_T newsize )
@@ -829,15 +831,15 @@ INT64_T chirp_alloc_truncate( const char *path, INT64_T newsize )
 	struct alloc_state *a;
 	int result;
 
-	if(!alloc_enabled) return chirp_local_truncate(path,newsize);
+	if(!alloc_enabled) return cfs->truncate(path,newsize);
 
 	a = alloc_state_cache(path);
 	if(a) {
-		INT64_T filesize = chirp_local_file_size(path);
+		INT64_T filesize = cfs->file_size(path);
 		if(filesize>=0) {
 			INT64_T alloc_change = space_consumed(newsize)-space_consumed(filesize);
 			if(a->avail>=alloc_change) {
-				result = chirp_local_truncate(path,newsize);
+				result = cfs->truncate(path,newsize);
 				if(result==0) alloc_state_update(a,alloc_change);
 			} else {
 				errno = ENOSPC;
@@ -854,12 +856,12 @@ INT64_T chirp_alloc_truncate( const char *path, INT64_T newsize )
 
 INT64_T chirp_alloc_utime( const char *path, time_t actime, time_t modtime )
 {
-	return chirp_local_utime(path,actime,modtime);
+	return cfs->utime(path,actime,modtime);
 }
 
 INT64_T chirp_alloc_md5( const char *path, unsigned char digest[16] )
 {
-	return chirp_local_md5(path,digest);
+	return cfs->md5(path,digest);
 }
 
 INT64_T chirp_alloc_lsalloc( const char *path, char *alloc_path, INT64_T *total, INT64_T *inuse )
@@ -903,7 +905,7 @@ INT64_T chirp_alloc_mkalloc( const char *path, INT64_T size, INT64_T mode )
 	a = alloc_state_cache(path);
 	if(a) {
 		if(a->avail>size) {
-			result = chirp_local_mkdir(path,mode);
+			result = cfs->mkdir(path,mode);
 			if(result==0) {
 				if(alloc_state_create(path,size)) {
 					alloc_state_update(a,size);
@@ -926,10 +928,10 @@ INT64_T chirp_alloc_mkalloc( const char *path, INT64_T size, INT64_T mode )
 
 INT64_T chirp_alloc_file_size( const char *path )
 {
-	return chirp_local_file_size(path);
+	return cfs->file_size(path);
 }
 
 INT64_T chirp_alloc_fd_size( int fd )
 {
-	return chirp_local_fd_size(fd);
+	return cfs->fd_size(fd);
 }

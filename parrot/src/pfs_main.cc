@@ -23,6 +23,8 @@ extern "C" {
 #include "debug.h"
 #include "getopt.h"
 #include "pfs_resolve.h"
+#include "chirp_filesystem.h"
+#include "chirp_local.h"
 #include "chirp_acl.h"
 #include "chirp_global.h"
 #include "ftp_lite.h"
@@ -85,6 +87,9 @@ our own exit status
 static pid_t root_pid = -1;
 static int root_exitstatus = 0;
 static int channel_size = 10;
+
+struct chirp_filesystem *cfs = &chirp_local_fs;
+char *chirp_transient_path = "./";
 
 static void show_version( const char *cmd )
 {
@@ -650,6 +655,7 @@ int main( int argc, char *argv[] )
 			break;
 	}
 	}
+    cfs = &chirp_local_fs;
 
 	if(optind>=argc) show_use(argv[0]);
 

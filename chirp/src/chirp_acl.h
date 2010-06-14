@@ -7,6 +7,8 @@ See the file COPYING for details.
 #ifndef CHIRP_ACL_H
 #define CHIRP_ACL_H
 
+#include "chirp_filesystem.h"
+
 #include <stdio.h>
 
 #define CHIRP_ACL_BASE_NAME ".__acl"
@@ -36,9 +38,9 @@ int          chirp_acl_check_link( const char *linkname, const char *subject, in
 
 int          chirp_acl_set( const char *filename, const char *subject, int flags, int reset_acl );
 
-FILE *       chirp_acl_open( const char *filename );
-int          chirp_acl_read( FILE *aclfile, char *subject, int *flags );
-void         chirp_acl_close( FILE *aclfile);
+CHIRP_FILE *       chirp_acl_open( const char *filename );
+int          chirp_acl_read( CHIRP_FILE *aclfile, char *subject, int *flags );
+void         chirp_acl_close( CHIRP_FILE *aclfile);
 
 const char * chirp_acl_flags_to_text( int flags );
 int          chirp_acl_text_to_flags( const char *text );

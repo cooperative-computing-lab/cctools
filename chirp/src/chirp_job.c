@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "chirp_job.h"
 #include "chirp_protocol.h"
 #include "chirp_builtin.h"
+#include "chirp_filesystem.h"
 
 #include "stringtools.h"
 #include "debug.h"
@@ -26,7 +27,7 @@ See the file COPYING for details.
 
 extern int enable_identity_boxing;
 extern const char *chirp_server_path;
-extern const char chirp_root_path[];
+extern const char *chirp_transient_path;
 extern pid_t chirp_master_pid;
 extern const char *chirp_super_user;
 
@@ -62,7 +63,7 @@ INT64_T chirp_job_create_jobid()
 	int fd;
 	struct flock fl;
 
-	sprintf(path,"%s/.__jobs/.__jobid",chirp_root_path);
+	sprintf(path,"%s/.__jobs/.__jobid",chirp_transient_path);
 
 	fd = open(path,O_CREAT|O_RDWR,0700);
 	if(fd<0) return -1;
@@ -128,7 +129,7 @@ int chirp_job_info_load( INT64_T jobid, struct chirp_job_info *info )
 	FILE *file;
 	int result;
 
-	sprintf(path,"%s/.__jobs/%lld",chirp_root_path,jobid);
+	sprintf(path,"%s/.__jobs/%lld",chirp_transient_path,jobid);
 
 	file = fopen(path,"r");
 	if(!file) return 0;
@@ -150,7 +151,7 @@ int chirp_job_info_save( INT64_T jobid, struct chirp_job_info *info )
 	FILE *file;
 	int result;
 
-	sprintf(path,"%s/.__jobs/%lld",chirp_root_path,jobid);
+	sprintf(path,"%s/.__jobs/%lld",chirp_transient_path,jobid);
 
 	file = fopen(path,"w");
 	if(!file) return 0;
@@ -175,7 +176,7 @@ int chirp_job_info_save( INT64_T jobid, struct chirp_job_info *info )
 void chirp_job_info_delete( INT64_T jobid )
 {
 	char path[CHIRP_PATH_MAX];
-	sprintf(path,"%s/.__jobs/%lld",chirp_root_path,jobid);
+	sprintf(path,"%s/.__jobs/%lld",chirp_transient_path,jobid);
 	unlink(path);
 	debug(D_PROCESS,"jobid %lld: REMOVED",jobid);
 }
@@ -371,7 +372,7 @@ static INT64_T * chirp_job_scan()
 	
 	job_list = malloc(job_list_size*sizeof(INT64_T));
 
-	sprintf(path,"%s/.__jobs",chirp_root_path);
+	sprintf(path,"%s/.__jobs",chirp_transient_path);
 
 	dir = opendir(path);
 	if(!dir) return 0;
@@ -455,7 +456,7 @@ void chirp_job_starter()
 
 	signal(SIGCHLD,SIG_DFL);
 
-	sprintf(path,"%s/.__jobs",chirp_root_path);
+	sprintf(path,"%s/.__jobs",chirp_transient_path);
 	mkdir(path,0700);
 
 	while(1) {
