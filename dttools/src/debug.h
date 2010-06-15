@@ -71,7 +71,6 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_HDFS	   0x040000000  /**< Debug the HDFS module in Parrot. */
 #define D_WQ	   0x080000000  /**< Debug the Work Queue operations. */
 #define D_BXGRID   0x100000000LL  /**< Debug the BXGRID Module in Parrot. */
-#define D_SAMBA    0x100000000LL  /**< Debug the SAMBA Module in Parrot. */
 
 /** Debug all remote I/O operations. */
 #define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID)
