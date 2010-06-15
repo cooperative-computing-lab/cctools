@@ -12,7 +12,7 @@ LIBRARIES = libdttools.a
 PROGRAMS = catalog_server watchdog multirun worker worker_condor_submit start_workers
 TEST_PROGRAMS = work_queue_example microbench hmac_test chunk_test
 PROGRAM_SOURCES = ${PROGRAMS:%=%.c} ${TEST_PROGRAMS:%=%.c}
-SCRIPTS = condor_start_workerss sge_start_workerss
+SCRIPTS = condor_submit_workers sge_submit_workers
 CYGWINLIB = cygwin1.dll
 
 all: ${LIBRARIES} $(PROGRAMS) $(TEST_PROGRAMS)
