@@ -15,6 +15,8 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 static int find_executable(const char *exe_name, const char *env_path_var, char *exe_path)
@@ -40,6 +42,7 @@ static void show_help(const char *cmd)
 	printf("Use: %s [options] <hostname> <port> <count>\n", cmd);
 	printf("where start options are:\n");
 	printf("  -d <subsystem> Enable debugging for this subsystem.\n");
+	printf("  -S <scratch>   Scratch directory. (default is /tmp/${USER}-workers)\n");
 	printf("  -T <type>      Batch system type: unix, condor, sge, workqueue, xgrid. (default is unix)\n");
 	printf("  -W <path>      Path to worker executable.\n");
 	printf("  -h             Show this screen.\n");
@@ -55,6 +58,7 @@ int main(int argc, char *argv[])
 	int i, c;
 	int count = 0;
 	int port;
+	char scratch_dir[PATH_MAX] = "";
 	char worker_path[PATH_MAX] = "";
 	char worker_args[PATH_MAX] = "";
 	char *hostname;
@@ -105,7 +109,7 @@ int main(int argc, char *argv[])
 	count = strtol(argv[optind + 2], NULL, 10);
 
 	if (strlen(worker_path) > 0) {
-		if (!access(worker_path, R_OK | X_OK)) {
+		if (access(worker_path, R_OK | X_OK) < 0) {
 			fprintf(stderr, "inaccessible worker specified: %s\n", worker_path);
 			return EXIT_FAILURE;
 		}
@@ -115,8 +119,16 @@ int main(int argc, char *argv[])
 			return EXIT_FAILURE;
 		}
 	}
-
 	debug(D_DEBUG, "worker path: %s", worker_path);
+
+	if (strlen(scratch_dir) <= 0) {
+		snprintf(scratch_dir, PATH_MAX, "/tmp/%s-workers", getenv("USER"));
+	}
+	mkdir(scratch_dir, 0700);
+	if (chdir(scratch_dir) < 0) {
+		fprintf(stderr, "unable to cd into scratch directory %s: %s\n", scratch_dir, strerror(errno));
+	}
+	debug(D_DEBUG, "scratch dir: %s", scratch_dir);
 
 	q = batch_queue_create(batch_queue_type);
 	if (!q) fatal("unable to create batch_queue of type: %s", batch_queue_type_to_string(batch_queue_type));
