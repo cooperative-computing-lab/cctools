@@ -419,10 +419,12 @@ int main( int argc, char *argv[] )
 			break;
 		case 'f':
 			if (strcmp(optarg, "local") == 0)
-              cfs = &chirp_local_fs;
-#ifdef HAS_HDFS
+				cfs = &chirp_local_fs;
 			else if (strcmp(optarg, "hdfs") == 0)
-              cfs = &chirp_hdfs_fs;
+#ifdef HAS_HDFS
+				cfs = &chirp_hdfs_fs;
+#else
+				fatal("hdfs was not included; re-configure with hdfs");
 #endif /* HAS_HDFS */
 			else
 			  fatal("unknown filesystem: '%s'", optarg);
