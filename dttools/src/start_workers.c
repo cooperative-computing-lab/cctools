@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "batch_job.h"
+#include "copy_stream.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "xmalloc.h"
@@ -64,6 +65,7 @@ int main(int argc, char *argv[])
 	char *hostname;
 	int batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
 	struct batch_queue *q;
+	FILE *ifs, *ofs;
 
 	while ((c = getopt(argc, argv, "d:T:W:aN:t:h")) >= 0) {
 		switch (c) {
@@ -124,11 +126,27 @@ int main(int argc, char *argv[])
 	if (strlen(scratch_dir) <= 0) {
 		snprintf(scratch_dir, PATH_MAX, "/tmp/%s-workers", getenv("USER"));
 	}
-	mkdir(scratch_dir, 0700);
+	mkdir(scratch_dir, 0755);
 	if (chdir(scratch_dir) < 0) {
 		fprintf(stderr, "unable to cd into scratch directory %s: %s\n", scratch_dir, strerror(errno));
+		return EXIT_FAILURE;
 	}
 	debug(D_DEBUG, "scratch dir: %s", scratch_dir);
+
+	ifs = fopen(worker_path, "r");
+	if (!ifs) {
+		fprintf(stderr, "unable to open %s for reading: %s", worker_path, strerror(errno));
+		return EXIT_FAILURE;
+	}
+	ofs = fopen("worker", "w+");
+	if (!ofs) {
+		fprintf(stderr, "unable to open %s/worker for writing: %s", scratch_dir, strerror(errno));
+		return EXIT_FAILURE;
+	}
+	copy_stream_to_stream(ifs, ofs);
+	fclose(ifs);
+	fclose(ofs);
+	chmod("worker", 0777);
 
 	q = batch_queue_create(batch_queue_type);
 	if (!q) fatal("unable to create batch_queue of type: %s", batch_queue_type_to_string(batch_queue_type));
@@ -138,7 +156,7 @@ int main(int argc, char *argv[])
 
 		snprintf(command, PATH_MAX, "./%s %s %s %d", string_basename(worker_path), worker_args, hostname, port);
 		debug(D_DEBUG, "submitting worker %d: %s\n", i + 1, command);
-		batch_job_submit_simple(q, command, worker_path, NULL);
+		batch_job_submit_simple(q, command, string_basename(worker_path), NULL);
 	}
 
 	batch_queue_delete(q);
