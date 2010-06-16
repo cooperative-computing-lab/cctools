@@ -49,52 +49,52 @@ See the file COPYING for details.
 
 #define BUFFER_SIZE 32768
 
-static int do_open( 	int argc, char **argv );
-static int do_close( 	int argc, char **argv );
-static int do_get( 	int argc, char **argv );
-static int do_put( 	int argc, char **argv );
-static int do_cat(      int argc, char **argv );
-static int do_cd( 	int argc, char **argv );
-static int do_lcd( 	int argc, char **argv );
-static int do_pwd( 	int argc, char **argv );
-static int do_lpwd( 	int argc, char **argv );
-static int do_getacl( 	int argc, char **argv );
-static int do_setacl( 	int argc, char **argv );
-static int do_resetacl( int argc, char **argv );
-static int do_ls( 	int argc, char **argv );
-static int do_mv( 	int argc, char **argv );
-static int do_rm( 	int argc, char **argv );
-static int do_mkdir( 	int argc, char **argv );
-static int do_rmdir( 	int argc, char **argv );
-static int do_stat( 	int argc, char **argv );
-static int do_statfs( 	int argc, char **argv );
-static int do_timeout( 	int argc, char **argv );
-static int do_debug( 	int argc, char **argv );
-static int do_help( 	int argc, char **argv );
-static int do_quit( 	int argc, char **argv );
-static int do_whoami( 	 int argc, char **argv );
-static int do_whoareyou( int argc, char **argv );
-static int do_job_run( int argc, char **argv );
-static int do_job_start( int argc, char **argv );
-static int do_job_exec(  int argc, char **argv );
-static int do_job_wait(  int argc, char **argv );
-static int do_job_list(  int argc, char **argv );
-static int do_job_kill(  int argc, char **argv );
-static int do_job_remove(int argc, char **argv );
-static int do_md5( 	 int argc, char **argv );
-static int do_localpath(  int argc, char **argv );
-static int do_audit( 	 int argc, char **argv );
-static int do_thirdput(  int argc, char **argv );
-static int do_mkalloc(   int argc, char **argv );
-static int do_lsalloc(   int argc, char **argv );
-static int do_group_create(     int argc, char **argv );
-static int do_group_add(        int argc, char **argv);
-static int do_group_remove(     int argc, char **argv);
-static int do_group_list(       int argc, char** argv);
-static int do_group_policy( int argc, char** argv);
-static int do_matrix_create(    int argc, char **argv );
-static int do_matrix_list(      int argc, char **argv );
-static int do_matrix_delete(    int argc, char **argv );
+static INT64_T do_open( 	int argc, char **argv );
+static INT64_T do_close( 	int argc, char **argv );
+static INT64_T do_get( 	int argc, char **argv );
+static INT64_T do_put( 	int argc, char **argv );
+static INT64_T do_cat(      int argc, char **argv );
+static INT64_T do_cd( 	int argc, char **argv );
+static INT64_T do_lcd( 	int argc, char **argv );
+static INT64_T do_pwd( 	int argc, char **argv );
+static INT64_T do_lpwd( 	int argc, char **argv );
+static INT64_T do_getacl( 	int argc, char **argv );
+static INT64_T do_setacl( 	int argc, char **argv );
+static INT64_T do_resetacl( int argc, char **argv );
+static INT64_T do_ls( 	int argc, char **argv );
+static INT64_T do_mv( 	int argc, char **argv );
+static INT64_T do_rm( 	int argc, char **argv );
+static INT64_T do_mkdir( 	int argc, char **argv );
+static INT64_T do_rmdir( 	int argc, char **argv );
+static INT64_T do_stat( 	int argc, char **argv );
+static INT64_T do_statfs( 	int argc, char **argv );
+static INT64_T do_timeout( 	int argc, char **argv );
+static INT64_T do_debug( 	int argc, char **argv );
+static INT64_T do_help( 	int argc, char **argv );
+static INT64_T do_quit( 	int argc, char **argv );
+static INT64_T do_whoami( 	 int argc, char **argv );
+static INT64_T do_whoareyou( int argc, char **argv );
+static INT64_T do_job_run( int argc, char **argv );
+static INT64_T do_job_start( int argc, char **argv );
+static INT64_T do_job_exec(  int argc, char **argv );
+static INT64_T do_job_wait(  int argc, char **argv );
+static INT64_T do_job_list(  int argc, char **argv );
+static INT64_T do_job_kill(  int argc, char **argv );
+static INT64_T do_job_remove(int argc, char **argv );
+static INT64_T do_md5( 	 int argc, char **argv );
+static INT64_T do_localpath(  int argc, char **argv );
+static INT64_T do_audit( 	 int argc, char **argv );
+static INT64_T do_thirdput(  int argc, char **argv );
+static INT64_T do_mkalloc(   int argc, char **argv );
+static INT64_T do_lsalloc(   int argc, char **argv );
+static INT64_T do_group_create(     int argc, char **argv );
+static INT64_T do_group_add(        int argc, char **argv);
+static INT64_T do_group_remove(     int argc, char **argv);
+static INT64_T do_group_list(       int argc, char** argv);
+static INT64_T do_group_policy( int argc, char** argv);
+static INT64_T do_matrix_create(    int argc, char **argv );
+static INT64_T do_matrix_list(      int argc, char **argv );
+static INT64_T do_matrix_delete(    int argc, char **argv );
 
 static int process_command( int argc, char **argv );
 
@@ -112,7 +112,7 @@ struct command {
 	int must_be_open;
 	int minargs, maxargs;
 	char *help;
-	int (*handler) ( int argc, char **argv);
+	INT64_T (*handler) ( int argc, char **argv);
 };
 
 static struct command list[] =
@@ -317,7 +317,7 @@ static int process_command( int argc, char **argv )
 	return 0;
 }
 
-static int do_open( int argc, char **argv )
+static INT64_T do_open( int argc, char **argv )
 {
 	char subject[CHIRP_LINE_MAX];
 
@@ -333,7 +333,7 @@ static int do_open( int argc, char **argv )
 	}
 }
 
-static int do_close( int argc, char **argv )
+static INT64_T do_close( int argc, char **argv )
 {
 	current_host[0] = 0;
 	current_remote_dir[0] = 0;
@@ -362,7 +362,7 @@ static void complete_remote_path( const char *file, char *full_path )
 	string_collapse_path(temp,full_path,1);
 }
 
-static int do_cat( int argc, char **argv )
+static INT64_T do_cat( int argc, char **argv )
 {
 	INT64_T actual;
 	int i;
@@ -379,7 +379,7 @@ static int do_cat( int argc, char **argv )
 	return 0;
 }
 
-static int do_cd( int argc, char **argv )
+static INT64_T do_cd( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 	struct chirp_stat info;
@@ -397,7 +397,7 @@ static int do_cd( int argc, char **argv )
 	}
 }
 
-static int do_lcd( int argc, char **argv )
+static INT64_T do_lcd( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_local_path(argv[1],full_path);
@@ -409,19 +409,19 @@ static int do_lcd( int argc, char **argv )
 	}
 }
 
-static int do_pwd( int argc, char **argv )
+static INT64_T do_pwd( int argc, char **argv )
 {
 	printf("%s\n",current_remote_dir);
 	return 0;
 }
 
-static int do_lpwd( int argc, char **argv )
+static INT64_T do_lpwd( int argc, char **argv )
 {
 	printf("%s\n",current_local_dir);
 	return 0;
 }
 
-static int do_get( int argc, char **argv )
+static INT64_T do_get( int argc, char **argv )
 {
 	char target_full_path[CHIRP_PATH_MAX];
 	char source_full_path[CHIRP_PATH_MAX];
@@ -448,7 +448,7 @@ static int do_get( int argc, char **argv )
 	return result;
 }
 
-static int do_put( int argc, char **argv )
+static INT64_T do_put( int argc, char **argv )
 {
 	char target_full_path[CHIRP_PATH_MAX];
 	char source_full_path[CHIRP_PATH_MAX];
@@ -475,7 +475,7 @@ static int do_put( int argc, char **argv )
 	return result;
 }
 
-static int do_setacl( int argc, char **argv )
+static INT64_T do_setacl( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1],full_path);
@@ -489,7 +489,7 @@ static int do_setacl( int argc, char **argv )
 	return chirp_reli_setacl(current_host,full_path,argv[2],argv[3],stoptime);
 }
 
-static int do_resetacl( int argc, char **argv )
+static INT64_T do_resetacl( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1],full_path);
@@ -508,7 +508,7 @@ static void print_one_acl( const char *line, void *stream )
 	fprintf(stream,"%s\n",line);
 }
 
-static int do_getacl( int argc, char **argv )
+static INT64_T do_getacl( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 
@@ -560,7 +560,7 @@ static void ls_callback( const char *name, void *arg )
 	printf("%s\n",name);
 }
 
-static int do_ls( int argc, char **argv )
+static INT64_T do_ls( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 	int long_mode = 0;
@@ -617,21 +617,21 @@ static int do_ls( int argc, char **argv )
 	}
 }
 
-static int do_rm( int argc, char **argv )
+static INT64_T do_rm( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1],full_path);
 	return chirp_reli_rmall(current_host,full_path,stoptime);
 }
 
-static int do_rmdir( int argc, char **argv )
+static INT64_T do_rmdir( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1],full_path);
 	return chirp_reli_rmdir(current_host,full_path,stoptime);
 }
 
-static int do_mkdir( int argc, char **argv )
+static INT64_T do_mkdir( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 	int result;
@@ -644,7 +644,7 @@ static int do_mkdir( int argc, char **argv )
 	return result;
 }
 
-static int do_stat( int argc, char **argv )
+static INT64_T do_stat( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 	struct chirp_stat info;
@@ -675,7 +675,7 @@ static int do_stat( int argc, char **argv )
 	}
  }
 
-static int do_statfs( int argc, char **argv )
+static INT64_T do_statfs( int argc, char **argv )
 {
 	struct chirp_statfs info;
 	int metric_power = -1;
@@ -705,7 +705,7 @@ static int do_statfs( int argc, char **argv )
 	}
 }
 
-static int do_mv( int argc, char **argv )
+static INT64_T do_mv( int argc, char **argv )
 {
 	char old_full_path[CHIRP_PATH_MAX];
 	char new_full_path[CHIRP_PATH_MAX];
@@ -714,7 +714,7 @@ static int do_mv( int argc, char **argv )
 	return chirp_reli_rename(current_host,old_full_path,new_full_path,stoptime);
 }
 
-static int do_debug( int argc, char **argv )
+static INT64_T do_debug( int argc, char **argv )
 {
 	if(argv[1]) {
 		if(debug_flags_set(argv[1])) {
@@ -733,7 +733,7 @@ static int do_debug( int argc, char **argv )
 	
 }
 
-static int do_whoami( int argc, char **argv )
+static INT64_T do_whoami( int argc, char **argv )
 {
 	char name[CHIRP_LINE_MAX];
 	int result;
@@ -746,7 +746,7 @@ static int do_whoami( int argc, char **argv )
 	return result;
 }
 
-static int do_whoareyou( int argc, char **argv )
+static INT64_T do_whoareyou( int argc, char **argv )
 {
 	char name[CHIRP_LINE_MAX];
 	int result;
@@ -762,7 +762,7 @@ static int do_whoareyou( int argc, char **argv )
 
 static INT64_T last_job_started = 0;
 
-static int do_job_start( int argc, char **argv )
+static INT64_T do_job_start( int argc, char **argv )
 {
 	char infile[CHIRP_LINE_MAX];
 	char outfile[CHIRP_LINE_MAX];
@@ -819,7 +819,7 @@ static int do_job_start( int argc, char **argv )
 	return result;
 }
 
-static int do_job_wait_jobid( INT64_T jobid )
+static INT64_T do_job_wait_jobid( INT64_T jobid )
 {
 	struct chirp_job_state status;
 
@@ -853,12 +853,12 @@ static int do_job_wait_jobid( INT64_T jobid )
 	return 0;
 }
 
-static int do_job_wait( int argc, char **argv )
+static INT64_T do_job_wait( int argc, char **argv )
 {
 	return do_job_wait_jobid(atoll(argv[1]));
 }
 
-static int do_job_exec( int argc, char **argv )
+static INT64_T do_job_exec( int argc, char **argv )
 {
 	if(do_job_start(argc,argv)==0) {
 		do_job_wait_jobid(last_job_started);
@@ -866,12 +866,12 @@ static int do_job_exec( int argc, char **argv )
 	return 0;
 }
 
-static int do_job_kill( int argc, char **argv )
+static INT64_T do_job_kill( int argc, char **argv )
 {
 	return chirp_reli_job_kill(current_host,atoll(argv[1]),stoptime);
 }
 
-static int do_job_remove( int argc, char **argv )
+static INT64_T do_job_remove( int argc, char **argv )
 {
 	return chirp_reli_job_remove(current_host,atoll(argv[1]),stoptime);
 }
@@ -904,13 +904,13 @@ static void job_list_callback( struct chirp_job_state *state, void *arg )
 	printf("%-8lld %10s %8s %02d:%02d:%02d %-8s %3d %-16s %s\n",state->jobid,submit_date,submit_time,hours,minutes,seconds,chirp_job_state_string(state->state),state->exit_code,state->owner,state->command);
 }
 
-static int do_job_list( int argc, char ** argv )
+static INT64_T do_job_list( int argc, char ** argv )
 {
 	printf("JOBID    SUB_DATE   SUB_TIME RUNTIME  STATE   EXIT OWNER            COMMAND\n");
 	return chirp_reli_job_list(current_host,job_list_callback,stdout,stoptime);
 }
 
-static int do_job_run( int argc, char ** argv )
+static INT64_T do_job_run( int argc, char ** argv )
 {
 	char infile[CHIRP_LINE_MAX];
 	char outfile[CHIRP_LINE_MAX];
@@ -964,7 +964,7 @@ static int do_job_run( int argc, char ** argv )
 	return 0;
 }
 
-static int do_md5( int argc, char **argv )
+static INT64_T do_md5( int argc, char **argv )
 {
 	unsigned char digest[16];
 	char full_path[CHIRP_LINE_MAX];
@@ -977,7 +977,7 @@ static int do_md5( int argc, char **argv )
 	return result;
 }
 
-static int do_localpath( int argc, char **argv )
+static INT64_T do_localpath( int argc, char **argv )
 {
 	char localpath[CHIRP_LINE_MAX];
 	char full_path[CHIRP_LINE_MAX];
@@ -997,7 +997,7 @@ static int do_localpath( int argc, char **argv )
 	return result;
 }
 
-static int do_audit( int argc, char **argv )
+static INT64_T do_audit( int argc, char **argv )
 {
 	struct chirp_audit *list;
 	int result;
@@ -1029,20 +1029,20 @@ static int do_audit( int argc, char **argv )
 	return result;
 }
 
-static int do_timeout( int argc, char **argv )
+static INT64_T do_timeout( int argc, char **argv )
 {
 	timeout = atoi(argv[1]);
 	printf("Timeout is %d seconds.\n",timeout);
 	return 0;
 }
 
-static int do_quit( int argc, char **argv )
+static INT64_T do_quit( int argc, char **argv )
 {
 	exit(0);
 	return -1;
 }
 
-static int do_help( int argc, char **argv )
+static INT64_T do_help( int argc, char **argv )
 {
 	int i;
 	printf("Commands:\n");
@@ -1055,7 +1055,7 @@ static int do_help( int argc, char **argv )
 	return 0;
 }
 
-static int do_thirdput( int argc, char **argv )
+static INT64_T do_thirdput( int argc, char **argv )
 {
 	INT64_T result;
 	char full_path[CHIRP_PATH_MAX];
@@ -1079,14 +1079,14 @@ static int do_thirdput( int argc, char **argv )
 	return result;
 }
 
-static int do_mkalloc( int argc, char **argv )
+static INT64_T do_mkalloc( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1],full_path);	
 	return chirp_reli_mkalloc(current_host,full_path,string_metric_parse(argv[2]),0700,stoptime);
 }
 
-static int do_lsalloc( int argc, char **argv )
+static INT64_T do_lsalloc( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 	char alloc_path[CHIRP_PATH_MAX];
@@ -1108,7 +1108,7 @@ static int do_lsalloc( int argc, char **argv )
 	return result;
 }
 
-static int do_group_create(int argc, char** argv)
+static INT64_T do_group_create(int argc, char** argv)
 {
   char full_path[CHIRP_PATH_MAX];
   int result = 0;
@@ -1128,7 +1128,7 @@ static int do_group_create(int argc, char** argv)
   return result;
 }
 
-static int do_group_add( int argc, char** argv )
+static INT64_T do_group_add( int argc, char** argv )
 {
   char full_path[CHIRP_PATH_MAX];
   int result = 0;
@@ -1152,7 +1152,7 @@ static int do_group_add( int argc, char** argv )
   return result;
 }
 
-static int do_group_remove( int argc, char** argv )
+static INT64_T do_group_remove( int argc, char** argv )
 {
   char full_path[CHIRP_PATH_MAX];
   INT64_T result = 0;
@@ -1186,7 +1186,7 @@ static void show_one_user( const char *name, void *stream )
 	fprintf(stream,"%s\n",name);
 }
 
-static int do_group_list( int argc, char** argv )
+static INT64_T do_group_list( int argc, char** argv )
 {
 	static char full_path[CHIRP_PATH_MAX];
 
@@ -1195,7 +1195,7 @@ static int do_group_list( int argc, char** argv )
 	return chirp_reli_group_list(current_host,full_path,show_one_user,stdout,stoptime);
 }
 
-static int do_group_policy( int argc, char** argv )
+static INT64_T do_group_policy( int argc, char** argv )
 {
   static char full_path[CHIRP_PATH_MAX];
   int result;
@@ -1233,7 +1233,7 @@ static int do_group_policy( int argc, char** argv )
   return result;
 }
 
-static int do_matrix_create( int argc, char **argv )
+static INT64_T do_matrix_create( int argc, char **argv )
 {
 	char path[CHIRP_PATH_MAX];
 	struct chirp_matrix *m;
@@ -1249,7 +1249,7 @@ static int do_matrix_create( int argc, char **argv )
 	}
 }
 
-static int do_matrix_list( int argc, char **argv )
+static INT64_T do_matrix_list( int argc, char **argv )
 {
 	char path[CHIRP_PATH_MAX];
 	struct chirp_matrix *m;
@@ -1272,7 +1272,7 @@ static int do_matrix_list( int argc, char **argv )
 	}
 }
 
-static int do_matrix_delete( int argc, char **argv )
+static INT64_T do_matrix_delete( int argc, char **argv )
 {
 	char path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1],path);
