@@ -139,8 +139,8 @@ When it exceeds this size, it will be renamed to (file).old, and a new file will
 
 void debug_config_file_size( int size );
 
-void debug_config_fatal( void (*callback) () );
-void debug_config_getpid( pid_t (*getpidfunc)() );
+void debug_config_fatal( void (*callback)(void) );
+void debug_config_getpid( pid_t (*getpidfunc)(void) );
 
 /** Set debugging flags to enable output.
 Accepts a debug flag in ASCII form, and enables that subsystem.  For example: <tt>debug_flags_set("chirp");</tt>
@@ -165,7 +165,7 @@ Clear all currently set flags, so that no output will occur.
 @see debug_flags_set
 */
 
-int  debug_flags_clear();
+int  debug_flags_clear(void);
 
 /** Set name of flag combination
 * Sets the string value associated with flag.  This is normally used to set the
