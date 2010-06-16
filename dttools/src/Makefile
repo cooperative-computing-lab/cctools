@@ -9,7 +9,7 @@ EXTRA_HEADERS = int_sizes.h macros.h
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
 LIBRARIES = libdttools.a
-PROGRAMS = catalog_server watchdog multirun worker worker_condor_submit start_workers
+PROGRAMS = catalog_server watchdog multirun worker start_workers
 TEST_PROGRAMS = work_queue_example microbench hmac_test chunk_test
 PROGRAM_SOURCES = ${PROGRAMS:%=%.c} ${TEST_PROGRAMS:%=%.c}
 SCRIPTS = condor_submit_workers sge_submit_workers
@@ -33,9 +33,6 @@ multirun: multirun.o libdttools.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 worker: worker.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-worker_condor_submit: worker_condor_submit.o
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 work_queue_example: work_queue_example.c libdttools.a
