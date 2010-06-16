@@ -124,7 +124,11 @@ int main(int argc, char *argv[])
 	debug(D_DEBUG, "worker path: %s", worker_path);
 
 	if (strlen(scratch_dir) <= 0) {
-		snprintf(scratch_dir, PATH_MAX, "/tmp/%s-workers", getenv("USER"));
+		if (batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
+			snprintf(scratch_dir, PATH_MAX, "/tmp/%s-workers", getenv("USER"));
+		} else {
+			snprintf(scratch_dir, PATH_MAX, "%s-workers", getenv("USER"));
+		}
 	}
 	mkdir(scratch_dir, 0755);
 	if (chdir(scratch_dir) < 0) {
