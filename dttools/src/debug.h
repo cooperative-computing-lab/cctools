@@ -71,6 +71,7 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_HDFS	   0x040000000  /**< Debug the HDFS module in Parrot. */
 #define D_WQ	   0x080000000  /**< Debug the Work Queue operations. */
 #define D_BXGRID   0x100000000LL  /**< Debug the BXGRID Module in Parrot. */
+#define D_USER	   0x200000000LL  /**< Debug custom user application. */
 
 /** Debug all remote I/O operations. */
 #define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID)
@@ -97,6 +98,7 @@ transparently modify the linker namespace we are using.
 #define debug_flags_print      cctools_debug_flags_print
 #define debug_flags_clear      cctools_debug_flags_clear
 #define debug_flags_restore    cctools_debug_flags_restore
+#define debug_set_flag_name    cctools_debug_set_flag_name
 
 /** Emit a debugging message.
 Logs a debugging message, if the given flags are active.
@@ -164,6 +166,15 @@ Clear all currently set flags, so that no output will occur.
 */
 
 int  debug_flags_clear();
+
+/** Set name of flag combination
+* Sets the string value associated with flag.  This is normally used to set the
+* <tt>D_USER<tt> user flag as so: <tt>debug_set_flag_name(D_USER, "my-application");</tt>.
+@param flag Any of the standard debugging flags.
+@param name New name to associate with flag.
+*/
+
+void debug_set_flag_name( INT64_T flag, const char *name );
 
 #endif
 

@@ -74,6 +74,7 @@ static struct flag_info table[] = {
 	{ "login",    D_LOGIN },
 	{ "irods",    D_IRODS },
 	{ "wq",       D_WQ },
+	{ "user",     D_USER},
 	{ "all",      ~0 },
 	{ "time",     0 },	/* backwards compatibility */
 	{ "pid",     0 },	/* backwards compatibility */
@@ -108,6 +109,18 @@ void debug_flags_print( FILE *stream )
 
 	for(i=0;table[i].name;i++) {
 		fprintf(stream,"%s ",table[i].name);
+	}
+}
+
+void debug_set_flag_name( INT64_T flag, const char *name )
+{
+	struct flag_info *i;
+
+	for(i=table;i->name;i++) {
+		if (i->flag&flag) {
+			i->name = name;	
+			break;
+		}
 	}
 }
 
