@@ -41,7 +41,7 @@ static int find_executable(const char *exe_name, const char *env_path_var, char 
 static void show_help(const char *cmd)
 {
 	printf("Use: %s [options] <hostname> <port> <count>\n", cmd);
-	printf("where start options are:\n");
+	printf("where batch options are:\n");
 	printf("  -d <subsystem> Enable debugging for this subsystem.\n");
 	printf("  -S <scratch>   Scratch directory. (default is /tmp/${USER}-workers)\n");
 	printf("  -T <type>      Batch system type: unix, condor, sge, workqueue, xgrid. (default is unix)\n");
