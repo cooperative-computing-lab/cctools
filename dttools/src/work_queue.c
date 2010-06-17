@@ -836,10 +836,11 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 	time_t stoptime;
 	int result;
 	
-	if(timeout != WORK_QUEUE_WAITFORTASK)
-		stoptime = time(0) + timeout;
-	else
+	if(timeout==WORK_QUEUE_WAITFORTASK) {
 		stoptime = 0;
+	} else {
+		stoptime = time(0) + timeout;
+	}
 	
 	while(1) {
 		if(wq_master_mode ==  MASTER_MODE_CATALOG && time(0) - catalog_update_time >= CATALOG_UPDATE_INTERVAL) {	
@@ -855,12 +856,18 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		start_tasks(q);
 
 		int n = build_poll_table(q);
-		int msec = MAX(0,(time(0)-stoptime)*1000);
+		int msec;
+
+		if(stoptime) {
+			msec = MAX(0,(time(0)-stoptime)*1000);
+		} else {
+			msec = 5000;
+		}
 
 		result = link_poll(q->poll_table,n,msec);
 
 		// If time has expired, return without a task.
-		if(stoptime && time(0)>stoptime) return 0;
+		if(stoptime && time(0)>=stoptime) return 0;
 
 		// If a process is waiting to complete, return without a task.
 		if(process_pending()) return 0;
