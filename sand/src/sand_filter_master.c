@@ -581,7 +581,7 @@ int main(int argc, char ** argv)
 		exit(1);
 	}
 
-	q = work_queue_create(port, time(0)+300);
+	q = work_queue_create(port);
 	if (!q) {
 		fprintf(stderr, "Creation of queue on port %d timed out.\n", port);
 		exit(1);

@@ -35,7 +35,7 @@ See the file COPYING for details.
 #define SHOW_INPUT_FILES 2
 #define SHOW_OUTPUT_FILES 3
 #define MASTER_CATALOG_LINE_MAX 1024
-#define CATALOG_UPDATE_INTERVAL 300
+#define RANDOM_PORT_RETRY_TIME 300
 
 #define MAKEFLOW_AUTO_WIDTH 1
 #define MAKEFLOW_AUTO_GROUP 2
@@ -211,33 +211,38 @@ void dag_show_output_files(struct dag *d)
 	}
 }
 
-void handle_auto_workers(struct dag *d, int auto_workers) {
+static int handle_auto_workers(struct dag *d, int auto_workers) {
 	char start_worker_line[1024];
 	char hostname[1024];
 	int num_of_workers;
 	int rv;
+	time_t stoptime = time(0) + RANDOM_PORT_RETRY_TIME;
 
 	/* Force to create a workqueue on certain port since it's working under 'auto worker' or 'catalog server' mode. */
 	if (remote_queue == 0) {
 		// Try another port until success 
-		if(port <= 0 || port >= 20000) port = WORK_QUEUE_DEFAULT_PORT;
+		if(port < 9000 || port >= 10000) port = 9000;
 		srand(time(0));
-		port += 1 + rand()%1000;
-		while(1) {
+		port += rand()%1000;
+		while(time(0) < stoptime) {
 			char line[1024];
 			sprintf(line,"WORK_QUEUE_PORT=%d",port);
 			putenv(strdup(line));
 			remote_queue = batch_queue_create(batch_queue_type);
 			if(remote_queue) break;
 			port++;
-			// Dynamic and/or private ports: 49152–65535, should not be used
-			if(port >= 49152) port = WORK_QUEUE_DEFAULT_PORT + 1 + rand()%1000;
+			if(port > 10000) port = 9000 + rand()%1000;
 		}
+	}
+
+	if(!remote_queue) {
+		fprintf(stderr, "Couldn't create work queue on random ports in %d minutes.\nTerminating makeflow...\n", RANDOM_PORT_RETRY_TIME/60);
+		return 0;
 	}
 
 	printf("Work Queue master is listening on port %d\n", port);
 
-/* Automatically figure out number of workers and start those workers. */
+	/* Automatically figure out number of workers and start those workers. */
 	// Start workers
 	gethostname(hostname, 1024);
 
@@ -257,9 +262,11 @@ void handle_auto_workers(struct dag *d, int auto_workers) {
 	rv = system(start_worker_line);
 	if (rv != 0)
 	{
-		fprintf(stderr, "condor_submit_workers failed. Terminating makeflow.\n");
-		exit(1);
+		fprintf(stderr, "condor_submit_workers failed. \nTerminating makeflow...\n");
+		return 0;
 	}
+
+	return 1;
 }
 
 /*********^^^^^^^Li's code^^^^^^^^^*************************/
@@ -1312,6 +1319,7 @@ int main( int argc, char *argv[] )
 	int preserve_symlinks = 0;
 	const char *batch_submit_options = 0;
 	int auto_workers = 0;
+	char line[1024];
 
 	debug_config(argv[0]);
 
@@ -1329,10 +1337,14 @@ int main( int argc, char *argv[] )
 		case 'N':
 			if (project) free(project);
 			project = strdup(optarg);
+			sprintf(line,"WORK_QUEUE_NAME=%s",project);
+			putenv(strdup(line));
 			catalog_mode = 1;
 			break;
 		case 'E':
 			priority = atoi(optarg);
+			sprintf(line,"WORK_QUEUE_PRIORITY=%d",priority);
+			putenv(strdup(line));
 			break;
 		case 'I':
 			display_mode = SHOW_INPUT_FILES;
@@ -1566,11 +1578,7 @@ int main( int argc, char *argv[] )
 	setlinebuf(stderr);
 
 	local_queue = batch_queue_create(BATCH_QUEUE_TYPE_UNIX);
-	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE && catalog_mode) {
-		remote_queue = batch_queue_create_with_name(batch_queue_type, project, priority);
-	} else {
-		remote_queue = batch_queue_create(batch_queue_type);
-	}
+	remote_queue = batch_queue_create(batch_queue_type);
 
 	// When the batch queue type is Work Queue, check if the queue is successfully created.
     if(batch_queue_type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
@@ -1588,23 +1596,25 @@ int main( int argc, char *argv[] )
 			if(!auto_workers && !catalog_mode) {
 				fprintf(stderr,"makeflow: Sorry! Makeflow is not able to listen on port %d.\n", port);
 				fprintf(stderr,"makeflow: Please try a different port.\n");
-				free(logfilename);
-				free(batchlogfilename);
-				exit(1);
+				dag_failed_flag = 1;
+				goto cleanup;
 			}
 
 			if(catalog_mode) {
-				fprintf(stderr,"makeflow: Sorry! Makeflow is not able to listen on any port.\n");
-				free(logfilename);
-				free(batchlogfilename);
-				exit(1);
+				fprintf(stderr,"makeflow: Sorry! Makeflow is not able create a work queue on any port.\n");
+				dag_failed_flag = 1;
+				goto cleanup;
 			}
 		}
 
 		if(auto_workers > 0) {
-			handle_auto_workers(d, auto_workers);
+			if(handle_auto_workers(d, auto_workers) == 0) {
+				dag_failed_flag = 1;
+				goto cleanup;
+			}
 		}
    	}
+
 
 	if(batch_submit_options) {
 		batch_queue_set_options(remote_queue,batch_submit_options);
@@ -1622,6 +1632,7 @@ int main( int argc, char *argv[] )
 
 	dag_run(d);
 
+cleanup:
 	batch_queue_delete(local_queue);
 	batch_queue_delete(remote_queue);
 

@@ -45,6 +45,11 @@ See the file COPYING for details.
 #define MASTER_CATALOG_LINE_MAX 1024
 #define CATALOG_UPDATE_INTERVAL 180
 
+#define WORK_QUEUE_LOW_PORT 9000
+#define WORK_QUEUE_HIGH_PORT 10000
+#define WORK_QUEUE_DEFAULT_PRIORITY 10
+#define RANDOM_PORT_RETRY_TIME 300
+
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
 static int wq_master_mode = MASTER_MODE_STANDALONE;
@@ -53,7 +58,6 @@ static time_t catalog_update_time;
 
 struct work_queue {
 	char *name;
-	int port;
 	int priority;
 	struct link * master_link;
 	struct list * ready_list;
@@ -98,7 +102,7 @@ struct work_queue_file {
 };
 
 int start_one_task( struct work_queue_task *t, struct work_queue_worker *w );
-static int update_catalog(const char *project, int port, int priority);
+static int update_catalog(struct work_queue *q);
 
 static int short_timeout = 5;
 static int next_taskid = 1;
@@ -704,38 +708,72 @@ void abort_slow_workers( struct work_queue *q )
 			}
 		}
 	}
-
 }
 
-struct work_queue * work_queue_create( int port, time_t stoptime)
+int work_queue_port(struct work_queue *q) {
+	char addr[LINK_ADDRESS_MAX];
+	int port;
+	int ret;
+
+	if(!q) return 0;
+
+	ret = link_address_local(q->master_link, addr, &port);
+
+	if(ret) {
+		return port;
+	} else {
+		return 0;
+	}
+}
+
+struct work_queue * work_queue_create(int port)
 {
 	struct work_queue *q = malloc(sizeof(*q));
-	int waittime = 1;
-	
+	char *envstring;
+	int random_port_mode = 0;
+	time_t stoptime = time(0) + RANDOM_PORT_RETRY_TIME;
+
+	memset(q,0,sizeof(*q));
+
+	// Resolve port
 	if(port == 0) {
-		const char *portstring = getenv("WORK_QUEUE_PORT");
-		if(portstring) {
-			port = atoi(portstring);
+		envstring = getenv("WORK_QUEUE_PORT");
+		if(envstring) {
+			port = atoi(envstring);
 		} else {
 			port = WORK_QUEUE_DEFAULT_PORT;
 		}
 	}
 
-	memset(q,0,sizeof(*q));
-	
-	do {
-		q->master_link = link_serve(port);
-		if(!q->master_link) {
-			debug(D_NOTICE,"Could not create work_queue on port %i. Trying again in %i seconds.",port,waittime);
-			sleep(waittime);
-			waittime*=2;
-		}
-	} while(!q->master_link && time(0) < stoptime);
+	if(port == -1) {
+		random_port_mode = 1;
+		srand(time(0));
+		port = WORK_QUEUE_LOW_PORT + rand()%1000;
+	}
+		
+	// Dynamic and/or private ports: 49152~65535 (these ports should not be used)
+	if(port < 0 || port >= 49152) goto failure;
 
-	if(!q->master_link)
+	// Try to listen on a port	
+	if(!random_port_mode) {
+		q->master_link = link_serve(port);
+		if(!q->master_link) goto failure;
+	} else {
+		// In random port mode which tries to listen on a random port repeatedly until successfully listens on one
+		while(time(0) < stoptime) {
+			q->master_link = link_serve(port);
+			if(q) break;
+			port++;
+			if(port >= WORK_QUEUE_HIGH_PORT) port = WORK_QUEUE_LOW_PORT + rand()%1000;
+		}
+	}
+
+	if(!q->master_link) {
+		debug(D_NOTICE,"Could not create work_queue on random ports in %d minutes.", RANDOM_PORT_RETRY_TIME/60);
+		free(q);
 		return 0;
-	
-	q->port = port;	
+	}
+
 	q->ready_list = list_create();
 	q->complete_list = list_create();
 	q->worker_table = hash_table_create(0,0);
@@ -751,48 +789,41 @@ struct work_queue * work_queue_create( int port, time_t stoptime)
 	q->fast_abort_multiplier = wq_option_fast_abort_multiplier;
 	q->worker_selection_algorithm = wq_option_scheduler;
 
-	return q;
-}
 
-struct work_queue * work_queue_create_with_name(const char *name, int priority)
-{
-	struct work_queue *q = malloc(sizeof(*q));
-	int	port;
-	time_t stoptime;
-	int timeout = CATALOG_UPDATE_INTERVAL;
-	char buffer[WORK_QUEUE_LINE_MAX];
-
-	srand(time(0));
-	port = 9000 + rand()%1000;
-	stoptime = time(0) + timeout; 
-	while(time(0) < stoptime) {
-		q=work_queue_create(port, time(0));	
-		if(q) {
-			if (name == NULL) name = getenv("WORK_QUEUE_NAME");
-			if (name == NULL) {
-				strcpy(buffer, "project-");
-				username_get(&buffer[strlen(buffer)]);
-				name = buffer;
-			}
-
-			debug(D_DEBUG,"Work Queue - \"%s\" is listening on port %d.\n", name, port);
-			wq_master_mode = MASTER_MODE_CATALOG;
-			outgoing_datagram = datagram_create(0);
-			if(!outgoing_datagram)
-				fatal("Couldn't create outgoing udp port (thus work queue master info won't be sent to the catalog server)");
-			q->name = strdup(name);
-			q->priority = priority;
-			update_catalog(q->name, q->port, priority);
-			catalog_update_time = time(0);
-			setenv("WORK_QUEUE_NAME", name, 1);
-			return q;
-		}
-		port++;
-		// Dynamic and/or private ports: 49152~65535 (these should not be used)
-		if(port >= 49152) port = 9000 + rand()%1000;
+	// Reading the environment variables
+	envstring = getenv("WORK_QUEUE_NAME");
+	if(envstring) {
+		q->name = strdup(envstring);
+	} else {
+		q->name = 0;
 	}
-	debug(D_DEBUG,"Work Queue - \"%s\" couldn't listen on any port.\n", name);
-	return NULL;
+
+	envstring = getenv("WORK_QUEUE_PRIORITY");
+	if(envstring) {
+		q->priority = atoi(envstring);
+	} else {
+		q->priority = WORK_QUEUE_DEFAULT_PRIORITY;
+	}
+
+	// Update catalog server if WORK_QUEUE_NAME environment variable is set
+	if (q->name) {
+		debug(D_DEBUG,"Work Queue - \"%s\" is listening on port %d.", q->name, port);
+		wq_master_mode = MASTER_MODE_CATALOG;
+		outgoing_datagram = datagram_create(0);
+		if(!outgoing_datagram)
+			fatal("Couldn't create outgoing udp port (thus work queue master info won't be sent to the catalog server)");
+		update_catalog(q);
+		catalog_update_time = time(0);
+	} else {
+		debug(D_DEBUG,"Work Queue is listening on port %d.", port);
+	}
+
+	return q;
+
+	failure:
+	debug(D_NOTICE,"Could not create work_queue on port %i.",port);
+	free(q);
+	return 0;
 }
 
 void work_queue_delete( struct work_queue *q )
@@ -844,7 +875,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 	
 	while(1) {
 		if(wq_master_mode ==  MASTER_MODE_CATALOG && time(0) - catalog_update_time >= CATALOG_UPDATE_INTERVAL) {	
-			update_catalog(q->name, q->port, q->priority);
+			update_catalog(q);
 			catalog_update_time = time(0);
 		}
 
@@ -1009,15 +1040,18 @@ int work_queue_empty (struct work_queue* q)
 }
 
 
-static int update_catalog(const char *project, int port, int priority) {
+static int update_catalog(struct work_queue* q) {
 	char address[DATAGRAM_ADDRESS_MAX];
 	static char text[MASTER_CATALOG_LINE_MAX];
+	int port;
+
+	port = work_queue_port(q);
 
 	snprintf(text, MASTER_CATALOG_LINE_MAX,
-			"type wq_master\nproject %s\nport %d\npriority %d\n",
-			project,
-			port,
-			priority	
+			"type wq_master\nproject %s\npriority %d\nport %d\n",
+			q->name,
+			q->priority,
+			port
 	);
 
 	if(domain_name_cache_lookup(CATALOG_HOST, address)) {

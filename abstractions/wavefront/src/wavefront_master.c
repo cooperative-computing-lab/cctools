@@ -183,7 +183,7 @@ int main( int argc, char *argv[] )
 		return 1;
 	}
 
-	queue = work_queue_create(port,time(0)+long_wait);
+	queue = work_queue_create(port);
 
 	task_prime();
 

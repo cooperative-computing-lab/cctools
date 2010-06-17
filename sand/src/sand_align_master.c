@@ -936,10 +936,9 @@ int main( int argc, char *argv[] )
 	    return 1;
 	}
 
-	time_t loop_time = time(0);
-	queue = work_queue_create(port,loop_time+300);
+	queue = work_queue_create(port);
 	if(!queue) {
-	    fprintf(stderr,"couldn't create queue on port %i, timed out\n",port);
+	    fprintf(stderr,"Couldn't create queue on port %i.\n",port);
 	    return 1;
 	}
 	

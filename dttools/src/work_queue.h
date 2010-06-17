@@ -80,16 +80,9 @@ struct work_queue_stats {
 
 /** Create a new work queue.
 @param port The port number to listen on, or zero to choose a default.  The default port is 9123, but can be overridden by the environment variable WORK_QUEUE_PORT.
-@param stoptime The time at which to return null if not yet able to be created.
 @return A new work queue, or null if it could not be created.
 */
-struct work_queue * work_queue_create( int port , time_t stoptime);
-
-/** Create a new work queue with a name. In this case, work queue port would be chosen automatically and the work queue information would be sent to a catalog server. A worker that runs with '-a' option could talk to such work queue masters.
-@param name The name of the work queue 
-@return A new work queue, or null if it could not be created.
-*/
-struct work_queue * work_queue_create_with_name( const char *name, int priority);
+struct work_queue * work_queue_create( int port );
 
 /** Delete a work queue.
 @param q The work queue to delete.

@@ -326,7 +326,7 @@ int main(int argc, char **argv)
 	int numOfStableElements;
 	int numOfMovingElements;
 	int numOfWorkers = 0;
-	int port = WORK_QUEUE_DEFAULT_PORT;
+	int port = 0;
 
 	x1 = y1 = x2 = y2 = -1;
 
@@ -377,9 +377,10 @@ int main(int argc, char **argv)
 			if (project) free(project);
 			project = strdup(optarg);
 			catalog_mode = 1;
-			setenv("WORKQUEUE_PROJECT", project, 1);
+			setenv("WORK_QUEUE_NAME", project, 1);
 			break;
 		case 'E':
+			setenv("WORK_QUEUE_PRIORITY", optarg, 1);
 			priority = atoi(optarg);
 			break;
 		default:
@@ -438,10 +439,11 @@ int main(int argc, char **argv)
 	ret = init_worklist(numOfWorkers, x1, y1, x2, y2);
 	debug(D_DEBUG, "Number of tasks: %d\n", ret);
 
-	if(catalog_mode) {
-		q = work_queue_create_with_name(project, priority);
+	if(catalog_mode && !port) {
+		// Let work queue to choose a random port for the work queue master
+		q = work_queue_create(-1); 
 	} else {
-		q = work_queue_create(port, time(0) + 60);
+		q = work_queue_create(port);
 	}
 	if(!q) {
 		fprintf(stderr, "Could not create queue.\n");

@@ -31,7 +31,7 @@ int main( int argc, char *argv[] )
 		return 0;
 	}
 
-	q = work_queue_create(port,time(0)+5);
+	q = work_queue_create(port);
 	if(!q) {
 		printf("couldn't listen on port %d: %s\n",port,strerror(errno));
 		return 1;
