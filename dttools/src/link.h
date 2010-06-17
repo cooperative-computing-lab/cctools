@@ -200,24 +200,42 @@ INT64_T link_stream_from_file( struct link *link, FILE *file, INT64_T length, ti
 
 INT64_T link_soak( struct link *link, INT64_T length, time_t stoptime );
 
+/** Options for link performance tuning. */
 typedef enum {
-	LINK_TUNE_INTERACTIVE,
-	LINK_TUNE_BULK
+	LINK_TUNE_INTERACTIVE,  /**< Data is sent immediately to optimze interactive latency. */
+	LINK_TUNE_BULK          /**< Data may be buffered to improve throughput of large transfers. */
 } link_tune_t;
 
+/** Tune a link for interactive or bulk performance.  A link may be tuned at any point in its lifecycle.
+@ref LINK_TUNE_INTERACTIVE is best used for building latency-sensitive interactive or RPC applications.
+@ref LINK_TUNE_BULK is best used to large data transfers.
+@param link The link to be tuned.
+@param mode The desired tuning mode.
+*/
 int  link_tune( struct link *link, link_tune_t mode );
 
+/** Indicates a link is ready to read via @ref link_poll.*/
 #define LINK_READ 1
+
+/** Indicates a link is ready to write via @ref link_poll.*/
 #define LINK_WRITE 2
 
+/** Activity structure passed to @ref link_poll. */
 struct link_info {
-	struct link *link;
-	int events;
-	int revents;
+	struct link *link;  /**< The link to be polled. */
+	int events;         /**< The events to wait for (@ref LINK_READ or @ref LINK_WRITE) */
+	int revents;	    /**< The events returned (@ref LINK_READ or @ref LINK_WRITE) */
 };
 
-int  link_poll( struct link_info *array, int nlinks, int usec );
+/**
+Wait for a activity on a an array of links.
+@param array Pointer to an array of @ref link_info structures.  Each one should contain a pointer to a valid @ref link and have the events field set to the events (@ref LINK_READ or @ref LINK_WRITE) of interest.  Upon return, each one will have the revents field filled with the events that actually occurred.
+@param nlinks The length of the array.
+@param msec The number of milliseconds to wait for activity.  Zero indicates do not wait at all, while -1 indicates wait forever.
+@return The number of links available to read or write.
+*/
 
+int  link_poll( struct link_info *array, int nlinks, int msec );
 
 #endif
 
