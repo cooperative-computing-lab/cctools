@@ -537,15 +537,21 @@ INT64_T chirp_hdfs_swrite( int fd, const void *vbuffer, INT64_T length, INT64_T 
 INT64_T chirp_hdfs_fstatfs( int fd, struct chirp_statfs *buf )
 {
 	debug(D_HDFS, "fstatfs");
-    /* lie about capacity until can be fixed with hdfs upgrade */
-	tOffset capacity = 1000000000000;//hdfs_services.get_capacity(fs); SuperUser?
-	tOffset used = 0; // hdfs_services.get_used(fs); Requires SuperUser?
+
+	/* lie about capacity until can be fixed with hdfs upgrade */
+	// hdfs_services.get_capacity(fs); SuperUser?
+	// hdfs_services.get_used(fs); Requires SuperUser?
 	/* if (capacity == -1 || used == -1) return (errno = EIO, -1); */
 
+	/* Assume a 1TB filesystem with a 128MB block size */
+	UINT64_T capacity = 1LL*1024*1024*1024*1024;
+        UINT64_T used = 0;
+	int      blocksize = 128*1024*1024;
+
 	buf->f_type = 0; /* FIXME */
-	buf->f_bsize = CHIRP_LINE_MAX;
-	buf->f_blocks = capacity/CHIRP_LINE_MAX;
-	buf->f_bavail = buf->f_bfree = used/CHIRP_LINE_MAX;
+	buf->f_bsize = blocksize;
+	buf->f_blocks = capacity/blocksize;
+	buf->f_bavail = buf->f_bfree = used/blocksize;
 	buf->f_files = buf->f_ffree = 0;
 
 	return 0;
