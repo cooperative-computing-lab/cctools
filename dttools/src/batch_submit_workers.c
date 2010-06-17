@@ -64,6 +64,7 @@ int main(int argc, char *argv[])
 	char worker_args[PATH_MAX] = "";
 	char *hostname;
 	int batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
+	int auto_worker = 0;
 	struct batch_queue *q;
 	FILE *ifs, *ofs;
 
@@ -84,6 +85,7 @@ int main(int argc, char *argv[])
 				break;
 			case 'a':
 				strncat(worker_args, " -a ", PATH_MAX);
+				auto_worker = 1;
 				break;
 			case 'N':
 				strncat(worker_args, " -N ", PATH_MAX);
@@ -101,14 +103,22 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if ((argc - optind) != 3) {
-		fprintf(stderr, "invalid number of arguments\n");
-		show_help(argv[0]);
-	}
+	if (!auto_worker) {
+		if ((argc - optind) != 3) {
+			fprintf(stderr, "invalid number of arguments\n");
+			show_help(argv[0]);
+		}
 
-	hostname = argv[optind];
-	port = strtol(argv[optind + 1], NULL, 10);
-	count = strtol(argv[optind + 2], NULL, 10);
+		hostname = argv[optind];
+		port = strtol(argv[optind + 1], NULL, 10);
+		count = strtol(argv[optind + 2], NULL, 10);
+	} else {
+		if ((argc - optind) != 1) {
+			fprintf(stderr, "invalid number of arguments\n");
+			show_help(argv[0]);
+		}
+		count = strtol(argv[optind], NULL, 10);
+	}
 
 	if (strlen(worker_path) > 0) {
 		if (access(worker_path, R_OK | X_OK) < 0) {
@@ -158,7 +168,11 @@ int main(int argc, char *argv[])
 	for (i = 0; i < count; i++) {
 		char command[PATH_MAX];
 
-		snprintf(command, PATH_MAX, "./%s %s %s %d", string_basename(worker_path), worker_args, hostname, port);
+		if (!auto_worker) {
+			snprintf(command, PATH_MAX, "./%s %s %s %d", string_basename(worker_path), worker_args, hostname, port);
+		} else {
+			snprintf(command, PATH_MAX, "./%s %s", string_basename(worker_path), worker_args);
+		}
 		debug(D_DEBUG, "submitting worker %d: %s\n", i + 1, command);
 		batch_job_submit_simple(q, command, string_basename(worker_path), NULL);
 	}
