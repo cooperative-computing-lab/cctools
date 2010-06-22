@@ -39,16 +39,21 @@ CHIRP_FILE *cfs_fopen (const char *path, const char *mode)
 
   if (strcmp(path, "/dev/null") == 0) return &CHIRP_FILE_NULL;
 
-  if (strchr(mode, '+'))
-    return (errno = ENOTSUP, NULL);
+  if (strchr(mode, '+')) {
+    errno = ENOTSUP;
+    return 0;
+  }
+
   if (strchr(mode, 'r'))
     flags |= O_RDONLY;
   else if (strchr(mode, 'w'))
     flags |= O_WRONLY | O_CREAT | O_TRUNC;
   else if (strchr(mode, 'a'))
     flags |= O_APPEND | O_CREAT;
-  else
-    return (errno = EINVAL, NULL);
+  else {
+    errno = EINVAL;
+    return 0;
+  }
 
   fd = cfs->open(path, flags, 0600);
   if (fd == -1)
@@ -75,8 +80,10 @@ int cfs_fflush (CHIRP_FILE *file)
   while ((INT64_T) size > file->offset) /* finish all writes */
   {
     int w = cfs->pwrite(file->fd, content, size, file->offset);
-    if (w == -1)
-      return (file->error = EIO, EOF);
+    if (w == -1) {
+      file->error = EIO;
+      return EOF;
+    }
     file->offset += w;
   }
   return 0;
@@ -157,12 +164,14 @@ char *cfs_fgets (char *s, int n, CHIRP_FILE *file)
   file->read_n = 0;
 
   i = cfs->pread(file->fd, file->read, CHIRP_FILESYSTEM_BUFFER-1, file->offset);
-  if (i == -1)
-    return (file->error = errno, NULL);
-  else if (i == 0 && empty)
+  if (i == -1) {
+    file->error = errno;
+    return 0;
+  } else if (i == 0 && empty) {
     return NULL;
-  else if (i == 0)
+  } else if (i == 0) {
     return s;
+  }
 
   file->read_n += i;
   file->offset += i;
