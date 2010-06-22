@@ -454,8 +454,10 @@ int main( int argc, char *argv[] )
 		}
 	}
 
+#ifdef HAS_HDFS
 	if (cfs == &chirp_hdfs_fs && chirp_hdfs_hostname == NULL)
 		fatal("hostname and port must be specified, use -x option");
+#endif
 
 	if (!create_dir(chirp_transient_path, 0711))
 		fatal("could not create transient data directory '%s'", chirp_transient_path);
