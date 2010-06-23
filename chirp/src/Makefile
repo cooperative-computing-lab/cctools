@@ -1,7 +1,7 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-TARGETS = chirp_server chirp_get chirp_put libchirp.a chirp chirp_benchmark chirp_status chirp_fuse chirp_distribute chirp_md5sum chirp_stream_files
+TARGETS = chirp_server chirp_server_hdfs chirp_get chirp_put libchirp.a chirp chirp_benchmark chirp_status chirp_fuse chirp_distribute chirp_md5sum chirp_stream_files
 LOCAL_LDFLAGS = -ldttools -lchirp ${CCTOOLS_INTERNAL_LDFLAGS}
 
 LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_types.c chirp_acl.c chirp_local.c chirp_group.c chirp_hdfs.c chirp_filesystem.c
@@ -19,6 +19,10 @@ chirp: chirp_tool.o libchirp.a
 
 chirp_server: chirp_server.o chirp_stats.o chirp_job.o chirp_builtin.o chirp_thirdput.o chirp_alloc.o chirp_audit.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
+
+chirp_server_hdfs: ../../hdfs-setup.template
+	@cp $^ $@
+	@echo 'exec $$(dirname $$0)/chirp_server -f hdfs $$@' >> $@
 
 chirp_get: chirp_get.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}

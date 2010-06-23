@@ -1,7 +1,7 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-TARGETS = parrot libparrot.a libparrot_client.a parrot_helper.so parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp parrot_timeout
+TARGETS = parrot parrot_hdfs libparrot.a libparrot_client.a parrot_helper.so parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp parrot_timeout
 
 LOCAL_LDFLAGS=-lchirp -ls3client -ldttools -lftp_lite -ldl ${CCTOOLS_INTERNAL_LDFLAGS}
 
@@ -9,6 +9,10 @@ all: ${TARGETS}
 
 parrot: pfs_main.o pfs_poll.o tracer.o pfs_dispatch.o pfs_dispatch64.o pfs_process.o pfs_channel_cache.o pfs_channel.o libparrot.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
+
+parrot_hdfs: ../../hdfs-setup.template
+	@cp $^ $@
+	@echo 'exec $$(dirname $$0)/parrot $$@' >> $@
 
 parrot_helper.so: parrot_helper.c
 	gcc -shared -fPIC $< -o $@
