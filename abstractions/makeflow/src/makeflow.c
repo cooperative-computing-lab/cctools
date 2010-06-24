@@ -661,6 +661,11 @@ static int translate_filename( struct dag *d, const char *filename, char **newna
 	{
 		if (*c == '/') *c = '_';
 	}
+	
+	for (c = newname; *c == '.'; ++c)
+	{
+		*c = '_';
+	}
 
 	while (!hash_table_insert(d->filename_translation_rev, newname, strdup(filename)))
 	{
