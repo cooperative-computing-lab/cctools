@@ -393,6 +393,8 @@ else
 	fi
 fi
 
+# Create a blank file so Make does not fail if HDFS is not enabled.
+touch hdfs-setup.template
 if [ $config_hdfs_path != no ] && check_file "${hdfs_path}/src/c++/libhdfs/hdfs.h"
 then
 	if [ X$JAVA_HOME = X ]
