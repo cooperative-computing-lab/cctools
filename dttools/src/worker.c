@@ -122,7 +122,7 @@ struct list * get_work_queue_masters(const char * catalog_host, int catalog_port
 	return ml;
 }
 
-struct link * auto_link_connect(char *host, int *port, time_t idle_stoptime) {
+struct link * auto_link_connect(char *host, int *port, time_t master_stoptime) {
 	struct link *master=0;
 	struct list *ml;
 	struct wq_master *m;
@@ -132,7 +132,7 @@ struct link * auto_link_connect(char *host, int *port, time_t idle_stoptime) {
 
 	list_first_item(ml);
 	while((m = (struct wq_master *)list_next_item(ml)) != NULL) {
-		master = link_connect(m->addr,m->port,idle_stoptime);
+		master = link_connect(m->addr,m->port,master_stoptime);
 		if(master) {
 			debug(D_DEBUG, "Talking to the Master at:\n");
 			debug(D_DEBUG, "addr:\t%s\n", m->addr);
@@ -315,7 +315,7 @@ int main( int argc, char *argv[] )
 
 		if(!master) {
 			if(auto_worker) {
-				master = auto_link_connect(actual_host, &actual_port, idle_stoptime);
+				master = auto_link_connect(actual_host, &actual_port, switch_master_time);
 			} else {
 				master = link_connect(addr,port,idle_stoptime);
 			}
