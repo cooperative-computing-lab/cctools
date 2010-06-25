@@ -162,6 +162,7 @@ static void handle_updates(struct datagram *update_port)
 	char key[LINE_MAX];
 	int port;
 	int result;
+	int timeout;
 	struct nvpair *nv;
 
 	while(1) {
@@ -198,8 +199,12 @@ static void handle_updates(struct datagram *update_port)
 			nvpair_insert_string(nv,"name",addr);
 		}
 
+		timeout = nvpair_lookup_integer(nv,"lifetime");
+		if (!timeout)
+		    timeout = lifetime;
+
 		make_hash_key(nv, key);
-		hash_cache_insert(table, key, nv, lifetime);
+		hash_cache_insert(table, key, nv, timeout);
 
 		debug(D_DEBUG, "received udp update from %s", key);
 	}
