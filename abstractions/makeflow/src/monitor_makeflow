@@ -74,9 +74,10 @@ class MakeflowProgressMonitor(object):
             screen.refresh()
 
             log_stream = open(self.log_file, 'r')
-            for line in log_stream.readlines():
-                if line[0] != '#':
-                    log_stream.seek(-len(line), os.SEEK_END)
+            while True:
+                line = log_stream.readline()
+                if line and line[0] != '#':
+                    log_stream.seek(-len(line), os.SEEK_CUR)
                     break
 
             start_time = 0
@@ -86,7 +87,7 @@ class MakeflowProgressMonitor(object):
                     start_time = int(line.split()[MF_LOG_TIME])
 
             log_stream.seek(-len(line), os.SEEK_END)
-            
+
             slist = []
 
 	    while True:
