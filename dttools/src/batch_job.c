@@ -24,7 +24,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/signal.h>
 
-#define BATCH_JOB_LINE_MAX 1024
+#define BATCH_JOB_LINE_MAX 8192
 
 struct batch_queue {
 	batch_queue_type_t type;
