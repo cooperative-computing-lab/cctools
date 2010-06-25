@@ -101,7 +101,10 @@ class MakeflowProgressMonitor(object):
                 if not status:
                     sleep(self.timeout)
                 else:
-                    slist = map(int, status.split())
+                    try:
+                        slist = map(int, status.split())
+                    except ValueError:
+                        continue
 
                 if not slist:
                     continue
