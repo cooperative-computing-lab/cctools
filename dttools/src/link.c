@@ -341,7 +341,7 @@ struct link * link_connect( const char *addr, int port, time_t stoptime )
 		}
 	} while(link_sleep(link,stoptime,0,1));
 
-	debug(D_TCP,"connection to %s:%d failed",addr,port);
+	debug(D_TCP,"connection to %s:%d failed (%s)",addr,port,strerror(errno));
 
 	failure:
 	save_errno = errno;
