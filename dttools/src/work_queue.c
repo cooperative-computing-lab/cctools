@@ -267,7 +267,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 	return 1;
 
 	failure:
-	debug(D_DEBUG,"%s (%s) failed to return %s to %s",w->addrport,w->hostname,tf->remote_name,tf->payload);
+	debug(D_NOTICE,"%s (%s) failed to return %s to %s (%s)",w->addrport,w->hostname,tf->remote_name,tf->payload, strerror(errno));
 	return 0;
 }
 
