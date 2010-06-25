@@ -700,16 +700,23 @@ static int translate_filename( struct dag *d, const char *filename, char **newna
 
 static char *translate_command( struct dag *d, char *old_command, int is_local )
 {
-	char *new_command = malloc( (strlen(old_command)+3) * sizeof(char));
-	new_command[0] = '\0';
-
-	char *token = strtok(old_command, " \t\n");
+	char *new_command;
+	char *sp;
+	char *token;
 	int first = 1;
-	int cmd_done = 0;
 	int wait = 0; /* Wait for next token before prepending "./"? */
+	int padding = 3;
 	char prefix;
-
+	
 	UPTRINT_T current_length = (UPTRINT_T)0;
+
+	for (sp = old_command; *sp; sp++)
+	    if (isspace(*sp)) padding += 2;
+
+	new_command = malloc((strlen(old_command)+padding) * sizeof(char));
+	new_command[0] = '\0';
+	
+	token = strtok(old_command, " \t\n");
 
 	while (token)
 	{
@@ -760,18 +767,14 @@ static char *translate_command( struct dag *d, char *old_command, int is_local )
 		{
 			/* If the executable has a hashtable entry, then we
 			   need to prepend "./" to the symlink name */
-			if (!cmd_done)
+			if (wait)
 			{
-				if (wait)
-				{
-					wait = 0;
-				}
-				else
-				{
-					strncat(new_command + current_length, "./", 2);
-					current_length += 2;
-					cmd_done = 1;
-				}
+				wait = 0;
+			}
+			else
+			{
+				strncat(new_command + current_length, "./", 2);
+				current_length += 2;
 			}
 			
 			len = strlen(val);
