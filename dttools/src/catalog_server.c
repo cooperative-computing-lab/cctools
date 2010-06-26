@@ -202,6 +202,7 @@ static void handle_updates(struct datagram *update_port)
 		timeout = nvpair_lookup_integer(nv,"lifetime");
 		if (!timeout)
 		    timeout = lifetime;
+		timeout = MIN(timeout, lifetime);
 
 		make_hash_key(nv, key);
 		hash_cache_insert(table, key, nv, timeout);
