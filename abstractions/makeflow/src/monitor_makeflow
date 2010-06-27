@@ -106,7 +106,7 @@ class MakeflowProgressMonitor(object):
                     except ValueError:
                         continue
 
-                if not slist:
+                if not slist or len(slist) != (MF_LOG_TOTAL + 1):
                     continue
 
                 mlist = []
