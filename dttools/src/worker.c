@@ -45,6 +45,7 @@ See the file COPYING for details.
 #define WQ_MASTER_PROJ_MAX 256
 
 static int auto_worker = 0;
+static int exclusive_worker = 0;
 static char *preference = NULL;
 static const int non_preference_priority_max = 100;
 
@@ -111,6 +112,7 @@ struct list * get_work_queue_masters(const char * catalog_host, int catalog_port
 				if(strncmp(m->proj, preference, WQ_MASTER_PROJ_MAX) == 0) {
 					m->priority += non_preference_priority_max; 
 				} else {
+					if(exclusive_worker) continue;
 					m->priority = non_preference_priority_max < m->priority ? non_preference_priority_max : m->priority;
 				}
 			}
@@ -219,10 +221,13 @@ int main( int argc, char *argv[] )
 	
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "ad:t:o:N:w:vi")) != (char) -1) {
+	while((c = getopt(argc, argv, "aed:t:o:N:w:vi")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;	
+			break;
+		case 'e':
+			exclusive_worker = 1;	
 			break;
 		case 'd':
 			debug_flags_set(optarg);
