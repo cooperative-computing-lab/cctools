@@ -190,6 +190,7 @@ static void show_help(const char *cmd)
 	printf("where options are:\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.\n");
 	printf(" -a             Enable auto master selection mode.\n");
+	printf(" -e             Only select preferred master.\n");
 	printf(" -N <name>      Preferred master name.\n");
 	printf(" -t <time>      Abort after this amount of idle time. (default=%ds)\n",idle_timeout);
 	printf(" -o <file>      Send debugging to this file.\n");
@@ -221,7 +222,7 @@ int main( int argc, char *argv[] )
 	
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aed:t:o:N:w:vi")) != (char) -1) {
+	while((c = getopt(argc, argv, "aed:t:o:N:w:vih")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;	
