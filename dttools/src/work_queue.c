@@ -44,6 +44,7 @@ See the file COPYING for details.
 #define MASTER_MODE_CATALOG 1
 #define MASTER_CATALOG_LINE_MAX 1024
 #define CATALOG_UPDATE_INTERVAL 180
+#define	CATALOG_LIFETIME	300
 
 #define WORK_QUEUE_LOW_PORT 9000
 #define WORK_QUEUE_HIGH_PORT 10000
@@ -1048,10 +1049,15 @@ static int update_catalog(struct work_queue* q) {
 	port = work_queue_port(q);
 
 	snprintf(text, MASTER_CATALOG_LINE_MAX,
-			"type wq_master\nproject %s\npriority %d\nport %d\n",
+			"type wq_master\nproject %s\npriority %d\nport %d\nlifetime %d\ntasks_submitted %lld\ntasks_complete %lld\ntask_time %lld\nworkers %d\n",
 			q->name,
 			q->priority,
-			port
+			port,
+			CATALOG_LIFETIME,
+			q->total_tasks_submitted,
+			q->total_tasks_complete,
+			q->total_task_time,
+			hash_table_size(q->worker_table)
 	);
 
 	if(domain_name_cache_lookup(CATALOG_HOST, address)) {
