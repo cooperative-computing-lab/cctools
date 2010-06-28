@@ -50,6 +50,7 @@ static void show_help(const char *cmd)
 	printf("\n");
 	printf("where worker options are:\n");
 	printf("  -a             Enable auto master selection mode.\n");
+	printf("  -e             Only select preferred master.\n");
 	printf("  -N <name>      Preferred master name.\n");
 	printf("  -t <time>      Abort after this amount of idle time.\n");
 }
@@ -68,7 +69,7 @@ int main(int argc, char *argv[])
 	struct batch_queue *q;
 	FILE *ifs, *ofs;
 
-	while ((c = getopt(argc, argv, "d:T:W:aN:t:h")) >= 0) {
+	while ((c = getopt(argc, argv, "d:T:W:aeN:t:h")) >= 0) {
 		switch (c) {
 			case 'd':
 				debug_flags_set(optarg);
@@ -86,6 +87,9 @@ int main(int argc, char *argv[])
 			case 'a':
 				strncat(worker_args, " -a ", PATH_MAX);
 				auto_worker = 1;
+				break;
+			case 'e':
+				strncat(worker_args, " -e ", PATH_MAX);
 				break;
 			case 'N':
 				strncat(worker_args, " -N ", PATH_MAX);
