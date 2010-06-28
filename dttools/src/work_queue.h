@@ -100,13 +100,19 @@ void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s );
 @param multiplier The multiplier of the average task time at which point to abort; if negative (and by default) fast_abort is deactivated.
 @returns 0 if activated or deactivated with an appropriate multiplier, 1 if deactivated due to inappropriate multiplier.
 */
-int work_queue_activate_fast_abort(struct work_queue* q, double multiplier);
+int work_queue_activate_fast_abort(struct work_queue* q, double multiplier );
 
 /** Change the worker selection algorithm for a given queue.
 @param q A pointer to the queue to modify.
 @param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
 */
-int work_queue_specify_algorithm( struct work_queue* q, int alg);
+int work_queue_specify_algorithm( struct work_queue* q, int alg );
+
+/** Change the project name for a given queue.
+@param q A pointer to the queue to modify.
+@param name The new project name..
+*/
+int work_queue_specify_name( struct work_queue* q, const char *name );
 
 /** Wait for tasks to complete.  This call will block until the timeout has elapsed.
 @param q The work queue to wait on.

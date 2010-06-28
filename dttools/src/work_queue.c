@@ -793,11 +793,8 @@ struct work_queue * work_queue_create(int port)
 
 	// Reading the environment variables
 	envstring = getenv("WORK_QUEUE_NAME");
-	if(envstring) {
-		q->name = strdup(envstring);
-	} else {
-		q->name = 0;
-	}
+	if (envstring)
+		work_queue_specify_name(q, envstring);
 
 	envstring = getenv("WORK_QUEUE_PRIORITY");
 	if(envstring) {
@@ -824,6 +821,18 @@ struct work_queue * work_queue_create(int port)
 	failure:
 	debug(D_NOTICE,"Could not create work_queue on port %i.",port);
 	free(q);
+	return 0;
+}
+
+int work_queue_specify_name( struct work_queue *q, const char *name )
+{
+	if (q && name) {
+		if (q->name) free(q->name);
+		q->name = strdup(name);
+		setenv("WORK_QUEUE_NAME", q->name, 1);
+		return 1;
+	}
+
 	return 0;
 }
 
