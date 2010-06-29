@@ -53,7 +53,7 @@ def time_format(seconds):
 
 class MakeflowProgressMonitor(object):
 
-    def __init__(self, log_file = None, timeout = 1.0, 
+    def __init__(self, log_file = None, timeout = 1.0,
         field_width = 15, progress_width = 60):
 
 	self.log_file = log_file or 'Makeflow.makeflowlog'
@@ -99,7 +99,11 @@ class MakeflowProgressMonitor(object):
 
 		status = log_stream.readline()
                 if not status:
+                    curpos = log_stream.tell()
+                    log_stream.close()
                     sleep(self.timeout)
+                    log_stream = open(self.log_file, 'r')
+                    log_stream.seek(curpos, os.SEEK_SET)
                 else:
                     try:
                         slist = map(int, status.split())
