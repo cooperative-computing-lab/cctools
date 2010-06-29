@@ -1053,20 +1053,25 @@ int work_queue_empty (struct work_queue* q)
 static int update_catalog(struct work_queue* q) {
 	char address[DATAGRAM_ADDRESS_MAX];
 	static char text[MASTER_CATALOG_LINE_MAX];
+	struct work_queue_stats s;
 	int port;
 
 	port = work_queue_port(q);
+	work_queue_get_stats(q, &s);
 
 	snprintf(text, MASTER_CATALOG_LINE_MAX,
-			"type wq_master\nproject %s\npriority %d\nport %d\nlifetime %d\ntasks_submitted %lld\ntasks_complete %lld\ntask_time %lld\nworkers %d\n",
+			"type wq_master\nproject %s\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running%d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\n",
 			q->name,
 			q->priority,
 			port,
 			CATALOG_LIFETIME,
-			q->total_tasks_submitted,
-			q->total_tasks_complete,
-			q->total_task_time,
-			hash_table_size(q->worker_table)
+			s.tasks_waiting,
+			s.tasks_complete,
+			s.tasks_running,
+			s.total_tasks_dispatched,
+			s.workers_init,
+			s.workers_ready,
+			s.workers_busy
 	);
 
 	if(domain_name_cache_lookup(CATALOG_HOST, address)) {
