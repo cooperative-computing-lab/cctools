@@ -1060,7 +1060,7 @@ static int update_catalog(struct work_queue* q) {
 	work_queue_get_stats(q, &s);
 
 	snprintf(text, MASTER_CATALOG_LINE_MAX,
-			"type wq_master\nproject %s\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running%d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\n",
+			"type wq_master\nproject %s\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running%d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\n",
 			q->name,
 			q->priority,
 			port,
@@ -1071,7 +1071,8 @@ static int update_catalog(struct work_queue* q) {
 			s.total_tasks_dispatched,
 			s.workers_init,
 			s.workers_ready,
-			s.workers_busy
+			s.workers_busy,
+			s.workers_init + s.workers_ready + s.workers_busy
 	);
 
 	if(domain_name_cache_lookup(CATALOG_HOST, address)) {
