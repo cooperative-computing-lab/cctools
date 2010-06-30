@@ -12,6 +12,7 @@ parrot: pfs_main.o pfs_poll.o tracer.o pfs_dispatch.o pfs_dispatch64.o pfs_proce
 
 parrot_hdfs: ../../hdfs-setup.template
 	@cp $^ $@
+	@chmod 755 $@
 	@echo 'exec $$(dirname $$0)/parrot $$@' >> $@
 
 parrot_helper.so: parrot_helper.c
