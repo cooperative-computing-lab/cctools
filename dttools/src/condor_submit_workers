@@ -5,6 +5,7 @@ show_help()
 	echo "Use: condor_submit_workers [options] <servername> <port> <num-workers>"
 	echo "options:"
 	echo "  -a        Enable auto master selection mode."
+	echo "  -e        Only select preferred master."
 	echo "  -N <name> Preferred master name."
 	echo "  -t <time> Abort after this amount of idle time. (default=900s)"
 	echo "  -h        Show this help message."
@@ -12,11 +13,13 @@ show_help()
 }
 
 arguments=""
+use_auto=0
 
-while getopts aN:t:h opt 
+while getopts aeN:t:h opt 
 do
 	case "$opt" in
-		a)  arguments="$arguments -a";;
+		a)  arguments="$arguments -a"; use_auto=1;;
+		e)  arguments="$arguments -e";;
 		N)  arguments="$arguments -N $OPTARG";;
 		t)  arguments="$arguments -t $OPTARG";;
 		h)  show_help;;
@@ -26,12 +29,25 @@ done
 
 shift $(expr $OPTIND - 1)
 
-if [ X$3 = X ]
-then
+if [ $use_auto = 0 ]; then
+    if [ X$3 = X ]
+    then
 	show_help	
+    fi
+    host=$1
+    port=$2
+    count=$3
+else
+    if [ X$1 = X ]
+    then
+	show_help	
+    fi
+    host=
+    port=
+    count=$1
 fi
 
-worker=`which worker`
+worker=`which worker 2>/dev/null`
 if [ $? != 0 ]
 then
 	echo "$0: please add 'worker' to your PATH."
@@ -41,10 +57,6 @@ fi
 mkdir /tmp/${USER}-workers
 cd /tmp/${USER}-workers
 cp $worker .
-
-host=$1
-port=$2
-count=$3
 
 condor_submit << EOF
 universe = vanilla
