@@ -89,7 +89,7 @@ static int root_exitstatus = 0;
 static int channel_size = 10;
 
 struct chirp_filesystem *cfs = &chirp_local_fs;
-char *chirp_transient_path = "./";
+const char *chirp_transient_path = "./";
 
 static void show_version( const char *cmd )
 {
