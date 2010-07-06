@@ -703,6 +703,59 @@ same identity you used to authenticate to the Chirp server.
 Thus, it is not necessary for any special accounts to
 be created for visiting users.
 
+<h2>Advanced Topic: HDFS Backend Storage for Chirp</h2>
+
+<p>
+The Chirp server is able to bind to backend filesystems besides the local
+filesystem. In particular, it is able to act as a frontend for the Hadoop HDFS
+filesystem. When used on top of Hadoop, Chirp gives you the benefit of a robust
+system of ACLs, simple userspace access and POSIX semantics (with some
+limitations, discussed below). Perhaps best of all, client jobs will no
+longer have any Hadoop or Java (version) dependencies.
+
+<p>
+<tt>chirp_server</tt> takes two new options to support HDFS: <tt>-f hdfs</tt>
+to switch to an HDFS backend instead of local storage and <tt>-x host:port</tt>
+to set the Hadoop head node.
+
+<p>
+To run a Chirp server as a frontend to Hadoop use the
+<tt>chirp_server_hdfs</tt> command. It acts as a wrapper around the
+<tt>chirp_server</tt> command to setup environment variables for Hadoop on
+behalf of the user. <tt>chirp_server_hdfs</tt> also adds the <tt>-f hdfs</tt>
+for you when invoking <tt>chirp_server</tt>.
+<p>
+Just like when running Chirp on the local filesystem, you must pick a root
+storage directory for the server. The root for the server in this case will
+(naturally) be located in HDFS. For the <tt>chirp_server_hdfs</tt> command, you
+need only give the location of the HDFS head node. You run the server like so:
+<pre>
+% chirp_server_hdfs -x headnode.hadoop.domain.edu -r /mydata
+</pre>
+After setting up the environment variables, this command expands to:
+<pre>
+% chirp_server -f hdfs -x headnode.hadoop.domain.edu -r /mydata
+</pre>
+
+<h3>Temporary Local Storage</h3>
+<p>
+Chirp allows you to setup a location to place temporary files such as those
+used for Active Storage jobs. You can set this using the <tt>-y path</tt>
+option. This allows for faster access, POSIX semantics, and less load on HDFS.
+By default, Chirp assumes the current directory for temporary storage.
+
+<h3>Limitations</h3>
+<p>
+Chirp tries to preserve POSIX filesystem semantics where possible despite HDFS
+violating certain assumptions. For example, random writes are not possible for
+Chirp on HDFS. When the user requests to open a file for writing, Chirp assumes
+an implicit <tt>O_APPEND</tt> flag was added. In addition, HDFS does not
+maintain an execute permission bit for regular files. Chirp assumes all files
+have the execute bit set.
+<p>
+Chirp also does not allow using the thirdput command or user space management
+(<tt>-F</tt>) when using HDFS as a backend.
+
 <h2>Debugging Advice</h2>
 
 Debugging a distributed system can be quite difficult because of the
