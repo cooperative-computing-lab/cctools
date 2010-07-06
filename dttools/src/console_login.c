@@ -84,3 +84,8 @@ int console_login( const char *service, char *name, int namelen, char *pass, int
 	return do_getline(prompt,name,namelen,1) && do_getline("password: ",pass,passlen,0);
 	
 }
+
+int console_input( const char *prompt, char *buf, int buflen )
+{
+	return do_getline(prompt, buf, buflen, 0);
+}
