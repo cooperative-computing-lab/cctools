@@ -1,3 +1,8 @@
+/*
+Copyright (C) 2010- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 #include <list.h>
 #include <link.h>
 #include <stdlib.h>
@@ -8,11 +13,14 @@
 #include "s3c_file.h"
 #include "s3c_util.h"
 
+extern const char s3_endpoint[];
+extern const char s3_address[];
+extern int s3_timeout;
 
 int s3_mk_bucket(char* bucketname, enum amz_base_perm perms, const char* access_key_id, const char* access_key) {
 	struct link* server;
 	char path[] = "/";
-	struct amz_header_object *amz;
+	struct s3_header_object *head;
 	time_t stoptime = time(0)+s3_timeout;
 	struct s3_message mesg;
 	char * text;
@@ -31,16 +39,16 @@ int s3_mk_bucket(char* bucketname, enum amz_base_perm perms, const char* access_
 	mesg.expect = 0;
 
 	switch(perms) {
-		case AMZ_PERM_PRIVATE:      amz = amz_new_header(AMZ_HEADER_ACL, NULL, "private"); break;
-		case AMZ_PERM_PUBLIC_READ:  amz = amz_new_header(AMZ_HEADER_ACL, NULL, "public-read"); break;
-		case AMZ_PERM_PUBLIC_WRITE: amz = amz_new_header(AMZ_HEADER_ACL, NULL, "public-read-write"); break;
-		case AMZ_PERM_AUTH_READ:    amz = amz_new_header(AMZ_HEADER_ACL, NULL, "authenticated-read"); break;
-		case AMZ_PERM_BUCKET_READ:  amz = amz_new_header(AMZ_HEADER_ACL, NULL, "bucket-owner-read"); break;
-		case AMZ_PERM_BUCKET_FULL:  amz = amz_new_header(AMZ_HEADER_ACL, NULL, "bucket-owner-full-control"); break;
+		case AMZ_PERM_PRIVATE:      head = s3_new_header_object(S3_HEADER_AMZ_ACL, NULL, "private"); break;
+		case AMZ_PERM_PUBLIC_READ:  head = s3_new_header_object(S3_HEADER_AMZ_ACL, NULL, "public-read"); break;
+		case AMZ_PERM_PUBLIC_WRITE: head = s3_new_header_object(S3_HEADER_AMZ_ACL, NULL, "public-read-write"); break;
+		case AMZ_PERM_AUTH_READ:    head = s3_new_header_object(S3_HEADER_AMZ_ACL, NULL, "authenticated-read"); break;
+		case AMZ_PERM_BUCKET_READ:  head = s3_new_header_object(S3_HEADER_AMZ_ACL, NULL, "bucket-owner-read"); break;
+		case AMZ_PERM_BUCKET_FULL:  head = s3_new_header_object(S3_HEADER_AMZ_ACL, NULL, "bucket-owner-full-control"); break;
 		default: return -1;
 	}
 	mesg.amz_headers = list_create();
-	list_push_tail(mesg.amz_headers, amz);
+	list_push_tail(mesg.amz_headers, head);
 
 
 	sign_message(&mesg, access_key_id, access_key);
@@ -120,7 +128,7 @@ int s3_rm_bucket(char* bucketname, const char* access_key_id, const char* access
 	return 0;
 }
 
-int s3_ls_bucket(char* bucketname, struct list* headers, const char* access_key_id, const char* access_key) {
+int s3_ls_bucket(char* bucketname, struct list* dirents, const char* access_key_id, const char* access_key) {
 	struct s3_message mesg;
 	struct link* server;
 	time_t stoptime = time(0)+s3_timeout;
@@ -145,7 +153,6 @@ int s3_ls_bucket(char* bucketname, struct list* headers, const char* access_key_
 
 	server = link_connect(s3_address, 80, stoptime);
 	if(!server) return -1;
-
 
 	do {
 		char *buffer, *temp, *start, *end, *last;
@@ -205,23 +212,24 @@ int s3_ls_bucket(char* bucketname, struct list* headers, const char* access_key_
 		if(!strcmp(trunc, "false")) done = 1;
 		temp = buffer;
 		while( (start = strstr(temp, "<Contents>")) ) {
-			struct s3_header *head;
+			struct s3_dirent_object *dirent;
 			struct tm date;
 			char display_name[1024];
 			end = strstr(start, "</Contents>");
 			end[10] = '\0';
 			temp = end + 11;
-			head = malloc(sizeof(*d));
+			dirent = malloc(sizeof(*dirent));
 			date.tm_isdst = -1;
-			sscanf(strstr(start, "<Key>"), "<Key>%[^<]</Key>", head->key);
+			sscanf(strstr(start, "<Key>"), "<Key>%[^<]</Key>", dirent->key);
 			sscanf(strstr(start, "<LastModified>"), "<LastModified>%d-%d-%dT%d:%d:%d.%*dZ</LastModified>", &date.tm_year, &date.tm_mon, &date.tm_mday, &date.tm_hour, &date.tm_min, &date.tm_sec);
-			sscanf(strstr(start, "<ETag>"), "<ETag>&quot;%[^&]&quot;</ETag>", head->digest);
-			sscanf(strstr(start, "<Size>"), "<Size>%d</Size>", &head->size);
-			//sscanf(strstr(start, "<Owner>"), "<Owner><ID>%*[^<]</ID><DisplayName>%*[^<]</DisplayName></Owner>", 
+			sscanf(strstr(start, "<ETag>"), "<ETag>&quot;%[^&]&quot;</ETag>", dirent->digest);
+			sscanf(strstr(start, "<Size>"), "<Size>%d</Size>", &dirent->size);
+			sscanf(strstr(start, "<Owner>"), "<Owner><ID>%*[^<]</ID><DisplayName>%[^<]</DisplayName></Owner>", display_name);
+			if(strlen(display_name)) dirent->display_name = strdup(display_name);
 			date.tm_mon -= 1;
-			head->last_modified = mktime(&date);
-			list_push_tail(headers, head);
-			last = head->key;
+			dirent->last_modified = mktime(&date);
+			list_push_tail(dirents, dirent);
+			last = dirent->key;
 		}
 		free(buffer);
 

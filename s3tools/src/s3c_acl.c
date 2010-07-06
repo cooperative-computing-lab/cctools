@@ -1,3 +1,8 @@
+/*
+Copyright (C) 2010- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 #include <list.h>
 #include <hash_table.h>
 #include <link.h>
@@ -8,7 +13,13 @@
 #include <math.h>
 #include <b64_encode.h>
 #include <sys/stat.h>
-#include "s3client.h"
+
+#include "s3c_util.h"
+#include "s3c_acl.h"
+
+extern char *s3_endpoint;
+extern char *s3_address;
+extern int s3_timeout;
 
 int s3_getacl(char* bucketname, char* filename, char* owner, struct hash_table* acls, const char* access_key_id, const char* access_key) {
 	struct s3_message mesg;

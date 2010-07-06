@@ -1,10 +1,15 @@
-#include "s3client.h"
+/*
+Copyright (C) 2010- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stringtools.h>
 
-#include "s3passwd.h"
+#include "s3common.h"
+#include "s3c_acl.h"
 
 int main(int argc, char** argv) {
 	struct hash_table *acls;
@@ -13,8 +18,10 @@ int main(int argc, char** argv) {
 	char owner[1024];
 	char remotename[FILENAME_MAX];
 
+	s3_initialize(&argc, argv);
+
 	if(argc < 2) {
-		fprintf(stderr, "usage: s3mkdir <bucket>\n");
+		fprintf(stderr, "usage: s3getacl <bucket> [filename]\n");
 		return -1;
 	}
 
@@ -24,7 +31,7 @@ int main(int argc, char** argv) {
 	} else filename = NULL;
 
 	acls = hash_table_create(0, NULL);
-	s3_getacl(argv[1], filename, owner, acls, userid, key);
+	s3_getacl(argv[1], filename, owner, acls, s3_userid(), s3_key());
 
 	hash_table_firstkey(acls);
 	while(hash_table_nextkey(acls, &id, (void**)&acl)) {

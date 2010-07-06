@@ -1,7 +1,13 @@
+/*
+Copyright (C) 2010- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 
 #include <list.h>
 #include <hmac.h>
@@ -9,24 +15,25 @@
 
 #include "s3c_util.h"
 
-char s3_endpoint[] = "s3.amazonaws.com";
-char s3_address[] = "72.21.202.66";
+const char s3_endpoint[] = "s3.amazonaws.com";
+const char s3_address[] = "72.21.202.66";
 int s3_timeout = 60;
 
 
-struct s3_header_element* s3_new_header_element(enum s3_header_element_type type, const char* custom_type, const char* value) {
-	struct s3_header_element *obj;
+struct s3_header_object* s3_new_header_object(enum s3_header_type type, const char* custom_type, const char* value) {
+	struct s3_header_object *obj;
 	obj = malloc(sizeof(*obj));
 	obj->type = type;
-	if(type == S3_HEADER_AMZ_META ) {
+	if(type == S3_HEADER_CUSTOM ) {
 		obj->custom_type = strdup(custom_type);
 	} else obj->custom_type = NULL;
 
-	amz->value = strdup(value);
-	return amz;
+	obj->value = strdup(value);
+	return obj;
 }
 
-const char * s3_get_header_string(enum amz_header_type type, const char* custom_type) {
+
+const char * s3_get_header_string(enum s3_header_type type, const char* custom_type) {
 	static const char x_amz_acl[] = "x-amz-acl";
 	static const char x_amz_mfa[] = "x-amz-mfa";
 
@@ -40,12 +47,12 @@ const char * s3_get_header_string(enum amz_header_type type, const char* custom_
 	}
 }
 
-int s3_header_element_comp(const void *a, const void *b) {
-	const struct amz_header_object *one, *two;
+int s3_header_object_comp(const void *a, const void *b) {
+	const struct s3_header_object *one, *two;
 	const char *header1, *header2;
 	int result;
-	one = (struct amz_header_object *)a;
-	two = (struct amz_header_object *)b;
+	one = (struct s3_header_object *)a;
+	two = (struct s3_header_object *)b;
 
 	header1 = s3_get_header_string(one->type, one->custom_type);
 	header2 = s3_get_header_string(two->type, two->custom_type);
@@ -59,7 +66,7 @@ int sign_message(struct s3_message* mesg, const char* user, const char * key) {
 	int sign_str_len = 0;
 	char *sign_str;
 	char date[1024];
-	struct amz_header_object *amz;
+	struct s3_header_object *amz;
 	struct list *amz_headers;
 	char digest[SHA1_DIGEST_LENGTH];
 	char string[SHA1_DIGEST_LENGTH*2];
@@ -100,15 +107,15 @@ int sign_message(struct s3_message* mesg, const char* user, const char * key) {
 
 	if(mesg->amz_headers) {	
 		list_first_item(mesg->amz_headers);
-		while( (amz = (struct amz_header_object *)list_next_item(mesg->amz_headers)) ) {
-			if(amz->type < AMZ_CUSTOM_HEADER) continue;
+		while( (amz = (struct s3_header_object *)list_next_item(mesg->amz_headers)) ) {
+			if(amz->type < S3_HEADER_CUSTOM) continue;
 			switch(amz->type) {
-				case AMZ_CUSTOM_HEADER:
+				case S3_HEADER_CUSTOM:
 					if(!amz->custom_type) return -1;
 					sign_str_len += strlen(amz->custom_type) + 1;
 					break;
 				default:
-					sign_str_len += strlen(amz_get_header(amz->type, amz->custom_type)) + 1;
+					sign_str_len += strlen(s3_get_header_string(amz->type, amz->custom_type)) + 1;
 					break;
 			}
 			if(!amz->value) return -1;
@@ -152,18 +159,18 @@ int sign_message(struct s3_message* mesg, const char* user, const char * key) {
 	sprintf(sign_str, "%s%s", sign_str, date);
 
 	if(mesg->amz_headers) {
-		amz_headers = list_sort(list_duplicate(mesg->amz_headers), &amz_header_comp);
+		amz_headers = list_sort(list_duplicate(mesg->amz_headers), &s3_header_object_comp);
 		list_first_item(amz_headers);
 		{	int c_type = -1;
 			char* c_ctype = NULL;
-			while( (amz = (struct amz_header_object *)list_next_item(amz_headers)) ) {
-				if(amz->type < AMZ_CUSTOM_HEADER) continue;
+			while( (amz = (struct s3_header_object *)list_next_item(amz_headers)) ) {
+				if(amz->type < S3_HEADER_CUSTOM) continue;
 				if(c_type != amz->type) {
 					c_type = amz->type;
 					c_ctype = amz->custom_type;
-					sprintf(sign_str, "%s\n%s:%s", sign_str, amz_get_header(amz->type, amz->custom_type), amz->value);
+					sprintf(sign_str, "%s\n%s:%s", sign_str, s3_get_header_string(amz->type, amz->custom_type), amz->value);
 
-				} else if(c_type == AMZ_CUSTOM_HEADER && strcmp(c_ctype, amz->custom_type)) {
+				} else if(c_type == S3_HEADER_CUSTOM && strcmp(c_ctype, amz->custom_type)) {
 					c_ctype = amz->custom_type;
 					sprintf(sign_str, "%s\n%s:%s", sign_str, amz->custom_type, amz->value);
 				} else {
@@ -190,7 +197,7 @@ int s3_message_to_string(struct s3_message *mesg, char** text) {
 	int msg_str_len = 0;
 	char *msg_str = NULL;
 	char date[1024];
-	struct amz_header_object *amz;
+	struct s3_header_object *amz;
 
 	switch(mesg->type) {
 		case S3_MESG_GET: 
@@ -244,17 +251,17 @@ int s3_message_to_string(struct s3_message *mesg, char** text) {
 
 	if(mesg->amz_headers) {
 		list_first_item(mesg->amz_headers);
-		while( (amz = (struct amz_header_object *)list_next_item(mesg->amz_headers)) ) {
+		while( (amz = (struct s3_header_object *)list_next_item(mesg->amz_headers)) ) {
 			switch(amz->type) {
-				case AMZ_CUSTOM_HEADER:
+				case S3_HEADER_CUSTOM:
 					if(!amz->custom_type) {
-						fprintf(stderr, "no custom type defined for AMZ_CUSTOM_HEADER\n");
+						fprintf(stderr, "no custom type defined for S3_HEADER_CUSTOM\n");
 						return 0;
 					}
 					msg_str_len += strlen(amz->custom_type) + 2;
 					break;
 				default:
-					msg_str_len += strlen(amz_get_header(amz->type, amz->custom_type)) + 2;
+					msg_str_len += strlen(s3_get_header_string(amz->type, amz->custom_type)) + 2;
 					break;
 			}
 			if(!amz->value) {
@@ -306,13 +313,13 @@ int s3_message_to_string(struct s3_message *mesg, char** text) {
 
 	if(mesg->amz_headers) {
 		list_first_item(mesg->amz_headers);
-		while( (amz = (struct amz_header_object *)list_next_item(mesg->amz_headers)) ) {
+		while( (amz = (struct s3_header_object *)list_next_item(mesg->amz_headers)) ) {
 			switch(amz->type) {
-				case AMZ_CUSTOM_HEADER:
+				case S3_HEADER_CUSTOM:
 					sprintf(msg_str, "%s%s: %s\r\n", msg_str, amz->custom_type, amz->value);
 					break;
 				default:
-					sprintf(msg_str, "%s%s: %s\r\n", msg_str, amz_get_header(amz->type, amz->custom_type), amz->value);
+					sprintf(msg_str, "%s%s: %s\r\n", msg_str, s3_get_header_string(amz->type, amz->custom_type), amz->value);
 					break;
 			}
 		}

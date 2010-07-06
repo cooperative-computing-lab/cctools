@@ -1,3 +1,8 @@
+/*
+Copyright (C) 2010- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 #include <list.h>
 #include <link.h>
 #include <stdlib.h>
@@ -5,12 +10,17 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "s3c_file.h"
 #include "s3c_util.h"
+#include "s3c_file.h"
+
+extern char *s3_endpoint;
+extern char *s3_address;
+extern int s3_timeout;
+
 
 int s3_put_file(const char* localname, char* remotename, char* bucketname, enum amz_base_perm perms, const char* access_key_id, const char* access_key) {
 	struct link* server;
-	struct amz_header_object *amz;
+	struct s3_header_object *head;
 	time_t stoptime = time(0)+s3_timeout;
 	struct s3_message mesg;
 	struct stat st;
@@ -34,18 +44,18 @@ int s3_put_file(const char* localname, char* remotename, char* bucketname, enum 
 	mesg.amz_headers = NULL;
 
 	switch(perms) {
-		case AMZ_PERM_PRIVATE:      amz = amz_new_header(AMZ_HEADER_ACL, NULL, "private"); break;
-		case AMZ_PERM_PUBLIC_READ:  amz = amz_new_header(AMZ_HEADER_ACL, NULL, "public-read"); break;
-		case AMZ_PERM_PUBLIC_WRITE: amz = amz_new_header(AMZ_HEADER_ACL, NULL, "public-read-write"); break;
-		case AMZ_PERM_AUTH_READ:    amz = amz_new_header(AMZ_HEADER_ACL, NULL, "authenticated-read"); break;
-		case AMZ_PERM_BUCKET_READ:  amz = amz_new_header(AMZ_HEADER_ACL, NULL, "bucket-owner-read"); break;
-		case AMZ_PERM_BUCKET_FULL:  amz = amz_new_header(AMZ_HEADER_ACL, NULL, "bucket-owner-full-control"); break;
+		case AMZ_PERM_PRIVATE:      head = s3_new_header_object(S3_HEADER_AMZ_ACL, NULL, "private"); break;
+		case AMZ_PERM_PUBLIC_READ:  head = s3_new_header_object(S3_HEADER_AMZ_ACL, NULL, "public-read"); break;
+		case AMZ_PERM_PUBLIC_WRITE: head = s3_new_header_object(S3_HEADER_AMZ_ACL, NULL, "public-read-write"); break;
+		case AMZ_PERM_AUTH_READ:    head = s3_new_header_object(S3_HEADER_AMZ_ACL, NULL, "authenticated-read"); break;
+		case AMZ_PERM_BUCKET_READ:  head = s3_new_header_object(S3_HEADER_AMZ_ACL, NULL, "bucket-owner-read"); break;
+		case AMZ_PERM_BUCKET_FULL:  head = s3_new_header_object(S3_HEADER_AMZ_ACL, NULL, "bucket-owner-full-control"); break;
 		default: return -1;
 	}
 
 	mesg.amz_headers = list_create();
 	if(!mesg.amz_headers) return -1;
-	list_push_tail(mesg.amz_headers, amz);
+	list_push_tail(mesg.amz_headers, head);
 
 	sign_message(&mesg, access_key_id, access_key);
 	length = s3_message_to_string(&mesg, &text);
@@ -87,7 +97,7 @@ int s3_put_file(const char* localname, char* remotename, char* bucketname, enum 
 	return 0;
 }
 
-int s3_get_file(const char* localname, struct s3_header *head, char* remotename, char* bucketname, const char* access_key_id, const char* access_key) {
+int s3_get_file(const char* localname, struct s3_dirent_object *dirent, char* remotename, char* bucketname, const char* access_key_id, const char* access_key) {
 	struct s3_message mesg;
 	struct link* server;
 	time_t stoptime = time(0)+s3_timeout;
@@ -128,28 +138,28 @@ int s3_get_file(const char* localname, struct s3_header *head, char* remotename,
 	do {
 		if(!strncmp(response, "Content-Length:", 14)) {
 			sscanf(response, "Content-Length: %d", &length);
-		} else if(head && head->metadata && !strncmp(response, "x-amz-meta-", 11)) {
+		} else if(dirent && dirent->metadata && !strncmp(response, "x-amz-meta-", 11)) {
 			struct amz_metadata_object *obj;
 			obj = malloc(sizeof(*obj));
 			sscanf(response, "x-amz-meta-%[^:]: %s", obj->type, obj->value);
-			list_push_tail(st->metadata, obj);
-		} else if(head && !strncmp(response, "Last-Modified:", 14)) {
+			list_push_tail(dirent->metadata, obj);
+		} else if(dirent && !strncmp(response, "Last-Modified:", 14)) {
 			struct tm date;
 			char date_str[1024];
 			sscanf(response, "Last-Modified: %s", date_str);
 			strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z", &date);
 			date.tm_isdst = -1;
-			head->last_modified = mktime(&date);
-		} else if(head && !strncmp(response, "ETag:", 5)) {
-			sscanf(response, "ETag: \"%[^\"]\"", st->digest);
+			dirent->last_modified = mktime(&date);
+		} else if(dirent && !strncmp(response, "ETag:", 5)) {
+			sscanf(response, "ETag: \"%[^\"]\"", dirent->digest);
 		}
 
 		if(!strcmp(response, "Server: AmazonS3")) break;
 	} while(link_readline(server, response, HEADER_LINE_MAX, stoptime));
 
-	if(head) {
-		head->size = length;
-		sprintf(head->key, "%s", remotename);
+	if(dirent) {
+		dirent->size = length;
+		sprintf(dirent->key, "%s", remotename);
 	}
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -213,7 +223,7 @@ int s3_rm_file(char* filename, char* bucketname, const char* access_key_id, cons
 	return 0;
 }
 
-int s3_stat_file(char* filename, char* bucketname, struct s3_header* head, const char* access_key_id, const char* access_key) {
+int s3_stat_file(char* filename, char* bucketname, struct s3_dirent_object* dirent, const char* access_key_id, const char* access_key) {
 	struct s3_message mesg;
 	struct link* server;
 	time_t stoptime = time(0)+s3_timeout;
@@ -253,26 +263,26 @@ int s3_stat_file(char* filename, char* bucketname, struct s3_header* head, const
 	do {
 		if(!strncmp(response, "Content-Length:", 14)) {
 			sscanf(response, "Content-Length: %d", &length);
-		} else if(head->metadata && !strncmp(response, "x-amz-meta-", 11)) {
+		} else if(dirent->metadata && !strncmp(response, "x-amz-meta-", 11)) {
 			struct amz_metadata_object *obj;
 			obj = malloc(sizeof(*obj));
 			sscanf(response, "x-amz-meta-%[^:]: %s", obj->type, obj->value);
-			list_push_tail(head->metadata, obj);
+			list_push_tail(dirent->metadata, obj);
 		} else if(!strncmp(response, "Last-Modified:", 14)) {
 			struct tm date;
 			char date_str[1024];
 			sscanf(response, "Last-Modified: %s", date_str);
 			strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z", &date);
 			date.tm_isdst = -1;
-			head->last_modified = mktime(&date);
+			dirent->last_modified = mktime(&date);
 		} else if(!strncmp(response, "ETag:", 5)) {
-			sscanf(response, "ETag: \"%[^\"]\"", head->digest);
+			sscanf(response, "ETag: \"%[^\"]\"", dirent->digest);
 		}
 
 		if(!strcmp(response, "Server: AmazonS3")) break;
 	} while(link_readline(server, response, HEADER_LINE_MAX, stoptime));
-	head->size = length;
-	sprintf(head->key, "%s", filename);
+	dirent->size = length;
+	sprintf(dirent->key, "%s", filename);
 
 	link_close(server);
 	return 0;

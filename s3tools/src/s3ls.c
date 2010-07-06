@@ -1,4 +1,8 @@
-#include "s3client.h"
+/*
+Copyright (C) 2010- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,7 +10,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "s3passwd.h"
+#include "s3common.h"
+#include "s3c_bucket.h"
 
 int main(int argc, char** argv) {
 	struct list *dirents;
@@ -15,13 +20,16 @@ int main(int argc, char** argv) {
 	char c;
 	int i;
 
+	opterr = 0;
+	s3_initialize(&argc, argv);
+
 	while( (c = getopt(argc, argv, "l")) != -1 ) {
 		switch(c) {
 			case 'l':
 				long_list = 1;
 				break;
 			default:
-				fprintf(stderr, "Error: invalid option (-%c)\n", c);
+				fprintf(stderr, "Error: invalid option (-%c)\n", optopt);
 		}
 	}
 
@@ -34,7 +42,7 @@ int main(int argc, char** argv) {
 	for(i = optind; i < argc; i++) {
 		char date[1024];
 		if(argc-optind > 1) printf("%s:\n", argv[i]);
-		s3_ls_bucket(argv[i], dirents, userid, key);
+		s3_ls_bucket(argv[i], dirents, s3_userid(), s3_key());
 		while( (d = list_pop_head(dirents)) ) {
 			strftime(date, 1024, "%b %d %H:%M", localtime(&d->last_modified));
 			if(!long_list) printf("%s\n", d->key);
