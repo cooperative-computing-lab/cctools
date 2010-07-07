@@ -1275,6 +1275,31 @@ static void handle_abort( int sig )
 	dag_abort_flag = 1;
 }
 
+int parse_catalog_server_description(char* server_string) {
+	char *host;
+	int port;
+	char *colon;
+	char line[1024];
+
+	colon = strchr(server_string, ':');
+
+	if(!colon) return 0;
+
+	*colon = '\0';
+
+	host = strdup(server_string);
+	port = atoi(colon+1);
+
+	if(!port) return 0;
+		
+	sprintf(line,"CATALOG_HOST=%s",host);
+	putenv(strdup(line));
+	sprintf(line,"CATALOG_PORT=%d",port);
+	putenv(strdup(line));
+	
+	return 1;
+}
+	
 static void show_version(const char *cmd)
 {
 	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
@@ -1331,7 +1356,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:Ap:cCd:E:DCT:iIB:S:Rr:l:L:j:J:N:Oo:vhF:W:P")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:Ap:cCd:E:DCT:iIB:s:S:Rr:l:L:j:J:N:Oo:vhF:W:P")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1372,6 +1397,12 @@ int main( int argc, char *argv[] )
 			break;
 		case 'C':
 			syntax_check = 1;
+			break;
+		case 's':
+			if(!parse_catalog_server_description(optarg)) {
+				fprintf(stderr,"The provided catalog server is invalid. The format of the '-s' option should be '-s HOSTNAME:PORT'.\n");
+				exit(1);
+			}
 			break;
 		case 'S':
 			dag_submit_timeout = atoi(optarg);

@@ -41,16 +41,21 @@ See the file COPYING for details.
 #include <sys/signal.h>
 
 #define WQ_MASTER "wq_master"
-#define WQ_MASTER_ADDR_MAX 256
 #define WQ_MASTER_PROJ_MAX 256
 
 static int auto_worker = 0;
-static int exclusive_worker = 0;
+static int exclusive_worker = 1;
 static char *preference = NULL;
 static const int non_preference_priority_max = 100;
+static char *catalog_server_host = NULL;
+static int catalog_server_port = 0;
+static struct wq_master *actual_master = NULL;
+
+struct hash_cache *bad_masters = NULL;
+struct list *uncacheables = NULL;
 
 struct wq_master {
-	char addr[WQ_MASTER_ADDR_MAX];
+	char addr[LINK_ADDRESS_MAX];
 	int port;
 	char proj[WQ_MASTER_PROJ_MAX];
 	int priority;
@@ -71,14 +76,38 @@ void debug_print_masters(struct list *ml) {
 		debug(D_DEBUG, "\n");
 	}
 }
-	
 
+
+static void make_hash_key(const char *addr, int port, char *key)
+{
+	sprintf(key, "%s:%d", addr, port);
+}
+
+int parse_catalog_server_description(char* server_string, char **host, int *port) {
+	char *colon;
+
+	colon = strchr(server_string, ':');
+
+	if(!colon) {
+		*host = NULL;
+		*port = 0;
+		return 0;
+	}
+
+	*colon = '\0';
+
+	*host = strdup(server_string);
+	*port = atoi(colon+1);
+	
+	return *port;
+}
+	
 struct wq_master * parse_wq_master_nvpair(struct nvpair *nv) {
 	struct wq_master *m;
 
 	m = xxmalloc(sizeof(struct wq_master));
 
-	strncpy(m->addr, nvpair_lookup_string(nv, "address"), WQ_MASTER_ADDR_MAX);
+	strncpy(m->addr, nvpair_lookup_string(nv, "address"), LINK_ADDRESS_MAX);
 	strncpy(m->proj, nvpair_lookup_string(nv, "project"), WQ_MASTER_PROJ_MAX);
 	m->port = nvpair_lookup_integer(nv, "port");
 	m->priority = nvpair_lookup_integer(nv, "priority");
@@ -87,12 +116,42 @@ struct wq_master * parse_wq_master_nvpair(struct nvpair *nv) {
 	return m;
 }
 
+struct wq_master * duplicate_wq_master(struct wq_master *master) {
+	struct wq_master *m;
+
+	m = xxmalloc(sizeof(struct wq_master));
+	strncpy(m->addr, master->addr, LINK_ADDRESS_MAX);
+	strncpy(m->proj, master->proj, WQ_MASTER_PROJ_MAX);
+	m->port = master->port;
+	m->priority = master->priority;
+	if(m->priority < 0) m->priority = 0; 
+
+	return m;
+}
+
+/**
+ * Reasons for a master being bad:
+ * 1. The master does not need more workers right now;
+ * 2. The master is already shut down but its record is still in the catalog server.
+ */
+static void record_bad_master(struct wq_master *m) {
+	char key[LINK_ADDRESS_MAX + 10]; // addr:port
+	int lifetime = 10;
+
+	if(!m) return;
+
+	make_hash_key(m->addr, m->port, key);
+	hash_cache_insert(bad_masters, key, m, lifetime);
+	debug(D_DEBUG, "Master at %s:%d is not receiving more workers.\nWon't connect to this master in %d seconds.", m->addr, m->port, lifetime);
+}
+
 struct list * get_work_queue_masters(const char * catalog_host, int catalog_port) {
 	struct catalog_query *q;
 	struct nvpair *nv;
 	struct list *ml;
 	struct wq_master *m;
 	time_t timeout=60, stoptime;
+	char key[LINK_ADDRESS_MAX + 10]; // addr:port
 	
 	stoptime = time(0) + timeout;
 
@@ -116,7 +175,12 @@ struct list * get_work_queue_masters(const char * catalog_host, int catalog_port
 					m->priority = non_preference_priority_max < m->priority ? non_preference_priority_max : m->priority;
 				}
 			}
-			list_push_priority(ml, m, m->priority);
+			
+			// exclude 'bad' masters
+			make_hash_key(m->addr, m->port, key);
+			if(!hash_cache_lookup(bad_masters, key)) {
+				list_push_priority(ml, m, m->priority);
+			}
 		}
 		nvpair_delete(nv);
 	}
@@ -124,12 +188,12 @@ struct list * get_work_queue_masters(const char * catalog_host, int catalog_port
 	return ml;
 }
 
-struct link * auto_link_connect(char *host, int *port, time_t master_stoptime) {
+struct link * auto_link_connect(char *addr, int *port, time_t master_stoptime) {
 	struct link *master=0;
 	struct list *ml;
 	struct wq_master *m;
 
-	ml = get_work_queue_masters(NULL, 0);
+	ml = get_work_queue_masters(catalog_server_host, catalog_server_port);
 	debug_print_masters(ml);
 
 	list_first_item(ml);
@@ -143,16 +207,17 @@ struct link * auto_link_connect(char *host, int *port, time_t master_stoptime) {
 			debug(D_DEBUG, "priority:\t%d\n", m->priority);
 			debug(D_DEBUG, "\n");
 
-			if(!domain_name_cache_lookup_reverse(m->addr, host)) {
-				strcpy(host, m->addr);
-			}
-
+			strncpy(addr, m->addr, LINK_ADDRESS_MAX);
 			(*port) = m->port;
 
+			if(actual_master) free(actual_master);
+			actual_master = duplicate_wq_master(m);
+
 			break;
+		} else {
+			record_bad_master(duplicate_wq_master(m));
 		}
 	}
-
 
 	list_free(ml);
 	list_delete(ml);
@@ -165,7 +230,7 @@ struct link * auto_link_connect(char *host, int *port, time_t master_stoptime) {
 // Maximum time to wait before aborting if there is no connection to the master.
 static int idle_timeout=900;
 
-// Maximum time to wait before switching to another master.
+// Maxium time to wait before switching to another master.
 static int master_timeout=60;
 
 // Maximum time to wait when actively communicating with the master.
@@ -190,9 +255,9 @@ static void show_help(const char *cmd)
 	printf("where options are:\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.\n");
 	printf(" -a             Enable auto master selection mode.\n");
-	printf(" -e             Only select preferred master.\n");
 	printf(" -N <name>      Preferred master name.\n");
 	printf(" -t <time>      Abort after this amount of idle time. (default=%ds)\n",idle_timeout);
+	printf(" -S             Run as a shared worker. (Would work for non-preferred master when preferred master is not up.)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -w <size>      Set TCP window size.\n");
@@ -203,7 +268,7 @@ int main( int argc, char *argv[] )
 {
 	const char *host;
 	int port;
-	char actual_host[DOMAIN_NAME_MAX];
+	char actual_addr[LINK_ADDRESS_MAX];
 	int actual_port;
 	struct link *master=0;
 	char addr[LINK_ADDRESS_MAX];
@@ -214,21 +279,29 @@ int main( int argc, char *argv[] )
 	char hostname[DOMAIN_NAME_MAX];
 	int w;
 
-	struct list *uncacheables;
-	
 	ncpus = load_average_get_cpus();
 	memory_info_get(&memory_avail,&memory_total);
 	disk_info_get(".",&disk_avail,&disk_total);
 	
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aed:t:o:N:w:vih")) != (char) -1) {
+	while((c = getopt(argc, argv, "ac:d:t:o:N:s:Sw:vih")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;	
 			break;
-		case 'e':
-			exclusive_worker = 1;	
+		case 'c':
+			auto_worker = 1;	
+			break;
+		case 's':
+			port = parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port);
+			if(!port) {
+				fprintf(stderr,"The provided catalog server is invalid. The format of the '-s' option should be '-s HOSTNAME:PORT'.\n");
+				exit(1);
+			}
+			break;
+		case 'S':
+			exclusive_worker = 0;	
 			break;
 		case 'd':
 			debug_flags_set(optarg);
@@ -277,11 +350,14 @@ int main( int argc, char *argv[] )
 	
 	const char *workdir;
 
+	/**
 	if(getenv("_CONDOR_SCRATCH_DIR")) {
 		workdir = getenv("_CONDOR_SCRATCH_DIR");
 	} else {
 		workdir = "/tmp";
 	}
+	*/
+	workdir = "/tmp";
 
 	char tempdir[WORK_QUEUE_LINE_MAX];
 	sprintf(tempdir,"%s/worker-%d-%d",workdir,(int)getuid(),(int)getpid());
@@ -296,6 +372,7 @@ int main( int argc, char *argv[] )
 	time_t switch_master_time = time(0) + master_timeout;
 
 	uncacheables = list_create(); 
+	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t) free);
 
 	while(!abort_flag) {
 		char line[WORK_QUEUE_LINE_MAX];
@@ -321,7 +398,7 @@ int main( int argc, char *argv[] )
 
 		if(!master) {
 			if(auto_worker) {
-				master = auto_link_connect(actual_host, &actual_port, switch_master_time);
+				master = auto_link_connect(actual_addr, &actual_port, switch_master_time);
 			} else {
 				master = link_connect(addr,port,idle_stoptime);
 			}
@@ -422,7 +499,10 @@ int main( int argc, char *argv[] )
 			recover:
 			link_close(master);
 			master = 0;
-			sleep(5);
+			if(auto_worker) {
+				record_bad_master(duplicate_wq_master(actual_master));
+			}
+			sleep(3);
 		}
 	}
 

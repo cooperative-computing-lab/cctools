@@ -43,8 +43,8 @@ See the file COPYING for details.
 #define MASTER_MODE_STANDALONE 0
 #define MASTER_MODE_CATALOG 1
 #define MASTER_CATALOG_LINE_MAX 1024
-#define CATALOG_UPDATE_INTERVAL 180
-#define	CATALOG_LIFETIME	300
+#define CATALOG_UPDATE_INTERVAL 60
+#define	CATALOG_LIFETIME	180
 
 #define WORK_QUEUE_LOW_PORT 9000
 #define WORK_QUEUE_HIGH_PORT 10000
@@ -103,6 +103,7 @@ struct work_queue_file {
 };
 
 int start_one_task( struct work_queue_task *t, struct work_queue_worker *w );
+static int remove_unnecessary_workers (struct work_queue* q);
 static int update_catalog(struct work_queue *q);
 
 static int short_timeout = 5;
@@ -652,6 +653,7 @@ static void start_tasks( struct work_queue *q )
 {
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
+	int i;
 
 	while(list_size(q->ready_list)) {
 		
@@ -671,6 +673,11 @@ static void start_tasks( struct work_queue *q )
 			w->current_task = t;
 			remove_worker(q,w);
 		}
+	}
+
+	i = remove_unnecessary_workers(q);
+	if(i) {
+		debug(D_DEBUG,"%d workers are removed because there are no waiting tasks.", i);
 	}
 }
 
@@ -763,7 +770,7 @@ struct work_queue * work_queue_create(int port)
 		// In random port mode which tries to listen on a random port repeatedly until successfully listens on one
 		while(time(0) < stoptime) {
 			q->master_link = link_serve(port);
-			if(q) break;
+			if(q->master_link) break;
 			port++;
 			if(port >= WORK_QUEUE_HIGH_PORT) port = WORK_QUEUE_LOW_PORT + rand()%1000;
 		}
@@ -1049,6 +1056,27 @@ int work_queue_empty (struct work_queue* q)
 	return ((list_size(q->ready_list)+list_size(q->complete_list)+q->workers_in_state[WORKER_STATE_BUSY])==0);
 }
 
+
+
+static int remove_unnecessary_workers (struct work_queue* q)
+{
+	struct work_queue_worker *w;
+	char *key;
+	int i=0;
+
+	if(!q) return 0;
+	
+	// send worker exit.
+	hash_table_firstkey( q->worker_table);
+	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+		if(w->state != WORKER_STATE_BUSY) {
+			remove_worker(q,w);
+			i++;
+		}
+	}
+
+	return i;  
+}
 
 static int update_catalog(struct work_queue* q) {
 	char address[DATAGRAM_ADDRESS_MAX];
