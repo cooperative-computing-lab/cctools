@@ -634,7 +634,7 @@ struct work_queue_worker * find_best_worker( struct work_queue *q, struct work_q
 {
 	int a = t->worker_selection_algorithm;
 
-	if(a!=WORK_QUEUE_SCHEDULE_UNSET) {
+	if(a==WORK_QUEUE_SCHEDULE_UNSET) {
 		a = q->worker_selection_algorithm;
 	}
 
