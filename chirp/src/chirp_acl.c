@@ -215,85 +215,6 @@ int chirp_acl_check_link( const char *filename, const char *subject, int flags )
 	return do_chirp_acl_check(filename,subject,flags,0);
 }
 
-static int add_mode_bits( const char *path, mode_t mode )
-{
-	struct chirp_stat buf;
-	int result;
-	result = cfs->stat(path,&buf);
-	if(result<0) return result;
-	return cfs->chmod(path,buf.cst_mode|mode);
-}
-
-
-static int remove_mode_bits( const char *path, mode_t mode )
-{
-	struct chirp_stat buf;
-	int result;
-	result = cfs->stat(path,&buf);
-	if(result<0) return result;
-	return cfs->chmod(path,buf.cst_mode&(~mode));
-}
-
-static int add_mode_bits_all( const char *path, mode_t mode )
-{
-	char subpath[CHIRP_PATH_MAX];
-	char *d;
-	void *dir;
-	struct chirp_stat buf;
-	int result;
-
-	dir = cfs->opendir(path);
-	if(!dir) return -1;
-
-	while((d=cfs->readdir(dir))) {
-		if(!strcmp(d,".")) continue;
-		if(!strcmp(d,"..")) continue;
-
-		sprintf(subpath,"%s/%s",path,d);
-
-		result = cfs->stat(subpath,&buf);
-		if(result<0) continue;
-
-		if(S_ISREG(buf.cst_mode)) {
-			cfs->chmod(subpath,buf.cst_mode|mode);
-		}
-	}
-
-	cfs->closedir(dir);
-
-	return 0;
-}
-
-static int remove_mode_bits_all( const char *path, mode_t mode )
-{
-	char subpath[CHIRP_PATH_MAX];
-	char *d;
-	void *dir;
-	struct chirp_stat buf;
-	int result;
-
-	dir = cfs->opendir(path);
-	if(!dir) return -1;
-
-	while((d=cfs->readdir(dir))) {
-		if(!strcmp(d,".")) continue;
-		if(!strcmp(d,"..")) continue;
-
-		sprintf(subpath,"%s/%s",path,d);
-
-		result = cfs->stat(subpath,&buf);
-		if(result<0) continue;
-
-		if(S_ISREG(buf.cst_mode)) {
-			cfs->chmod(subpath,buf.cst_mode&(~mode));
-		}
-	}
-
-	cfs->closedir(dir);
-
-	return 0;
-}
-
 int chirp_acl_set( const char *dirname, const char *subject, int flags, int reset_acl )
 {
 	char aclname[CHIRP_PATH_MAX];
@@ -373,28 +294,6 @@ int chirp_acl_set( const char *dirname, const char *subject, int flags, int rese
 
 	cfs_fclose(aclfile);
 	cfs_fclose(newaclfile);
-
-	if(!strcmp(subject,"system:localuser")) {
-		if(flags&CHIRP_ACL_READ) {
-			add_mode_bits_all(dirname,0044);
-		} else {
-			remove_mode_bits_all(dirname,0044);
-		}
-
-		if(flags&CHIRP_ACL_LIST) {
-			add_mode_bits(dirname,0055);
-		} else {
-			remove_mode_bits(dirname,0055);
-		}
-
-		if(flags&CHIRP_ACL_WRITE) {
-			add_mode_bits(dirname,0022);
-			add_mode_bits_all(dirname,0022);
-		} else {
-			remove_mode_bits(dirname,0022);
-			remove_mode_bits_all(dirname,0022);
-		}
-	}
 
 	return result;
 }

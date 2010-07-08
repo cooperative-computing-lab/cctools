@@ -252,10 +252,11 @@ INT64_T chirp_local_fchown( int fd, INT64_T uid, INT64_T gid )
 
 INT64_T chirp_local_fchmod( int fd, INT64_T mode )
 {
-	// The owner may only add or remove the execute bit,
-	// because permissions are handled through the ACL model.
-	mode = 0600 | (mode&0100);
-	return fchmod(fd,(int)mode);
+	// A remote user can change some of the permissions bits,
+	// which only affect local users, but we don't let them
+	// take away the owner bits, which would affect the Chirp server.
+	mode = 0600 | (mode&0177);
+	return fchmod(fd,mode);
 }
 
 INT64_T chirp_local_ftruncate( int fd, INT64_T length )
@@ -496,9 +497,10 @@ INT64_T chirp_local_access( const char *path, INT64_T mode )
 
 INT64_T chirp_local_chmod( const char *path, INT64_T mode )
 {
-	// The owner may only add or remove the execute bit,
-	// because permissions are handled through the ACL model.
-	mode = 0600 | (mode&0100);
+	// A remote user can change some of the permissions bits,
+	// which only affect local users, but we don't let them
+	// take away the owner bits, which would affect the Chirp server.
+	mode = 0600 | (mode&0177);
 	return chmod(path,mode);
 }
 
