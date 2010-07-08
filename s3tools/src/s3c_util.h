@@ -7,6 +7,7 @@ See the file COPYING for details.
 #define S3C_UTIL_H_
 
 #include <md5.h>
+#include <time.h>
 
 #define ACCESS_KEY_ID_LENGTH 21
 #define ACCESS_KEY_LENGTH 41
