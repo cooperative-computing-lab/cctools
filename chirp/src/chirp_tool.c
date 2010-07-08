@@ -740,7 +740,7 @@ static INT64_T do_mv( int argc, char **argv )
 static INT64_T do_chmod( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
-	mode_t mode;
+	unsigned mode;
 	sscanf(argv[1],"%o",&mode);
 	complete_remote_path(argv[2],full_path);
 	return chirp_reli_chmod(current_host,full_path,mode,stoptime);
