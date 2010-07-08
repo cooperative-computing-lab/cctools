@@ -68,6 +68,7 @@ static INT64_T do_mkdir( 	int argc, char **argv );
 static INT64_T do_rmdir( 	int argc, char **argv );
 static INT64_T do_stat( 	int argc, char **argv );
 static INT64_T do_statfs( 	int argc, char **argv );
+static INT64_T do_chmod(	int argc, char **argv );
 static INT64_T do_timeout( 	int argc, char **argv );
 static INT64_T do_debug( 	int argc, char **argv );
 static INT64_T do_help( 	int argc, char **argv );
@@ -140,6 +141,7 @@ static struct command list[] =
 {"rmdir",   1, 1, 1, "<dir>",                    do_rmdir},
 {"stat",    1, 1, 1, "<file>",                   do_stat},
 {"df",      1, 0, 1, "[-k|-m|-g|-t]",         	 do_statfs},
+{"chmod",   1, 2, 2, "<mode> <path>",		 do_chmod},
 {"md5",     1, 1, 1,  "<path>",                  do_md5},
 {"localpath",  1, 0, 1, "[remotepath]",          do_localpath},
 {"audit",   1, 0, 1,  "[-r]",                    do_audit},
@@ -733,6 +735,15 @@ static INT64_T do_mv( int argc, char **argv )
 	complete_remote_path(argv[1],old_full_path);
 	complete_remote_path(argv[2],new_full_path);
 	return chirp_reli_rename(current_host,old_full_path,new_full_path,stoptime);
+}
+
+static INT64_T do_chmod( int argc, char **argv )
+{
+	char full_path[CHIRP_PATH_MAX];
+	mode_t mode;
+	sscanf(argv[1],"%o",&mode);
+	complete_remote_path(argv[2],full_path);
+	return chirp_reli_chmod(current_host,full_path,mode,stoptime);
 }
 
 static INT64_T do_debug( int argc, char **argv )
