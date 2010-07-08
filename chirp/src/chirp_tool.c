@@ -136,7 +136,7 @@ static struct command list[] =
 {"ls",      1, 0, 2, "[-la] [remotepath]",       do_ls},
 {"mv",      1, 2, 2, "<oldname> <newname>",      do_mv},
 {"rm",	    1, 1, 1, "<file>",                   do_rm},
-{"mkdir",   1, 1, 1, "<dir>",                    do_mkdir},
+{"mkdir",   1, 1, 2, "[-p] <dir>",               do_mkdir},
 {"rmdir",   1, 1, 1, "<dir>",                    do_rmdir},
 {"stat",    1, 1, 1, "<file>",                   do_stat},
 {"df",      1, 0, 1, "[-k|-m|-g|-t]",         	 do_statfs},
@@ -635,9 +635,16 @@ static INT64_T do_mkdir( int argc, char **argv )
 {
 	char full_path[CHIRP_PATH_MAX];
 	int result;
+	int create_parents = (argc == 3 && strcmp(argv[1], "-p") == 0);
 
-	complete_remote_path(argv[1],full_path);
-	result = chirp_reli_mkdir(current_host,full_path,0777,stoptime);
+	if (create_parents) {
+		complete_remote_path(argv[2],full_path);
+		result = chirp_reli_mkdir_recursive(current_host,full_path,0777,stoptime);
+	}
+	else {
+		complete_remote_path(argv[1],full_path);
+		result = chirp_reli_mkdir(current_host,full_path,0777,stoptime);
+	}
 
 	if(result<0 && errno==EEXIST) result = 0;
 
