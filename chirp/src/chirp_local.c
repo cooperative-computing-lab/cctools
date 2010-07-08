@@ -495,10 +495,23 @@ INT64_T chirp_local_access( const char *path, INT64_T mode )
 
 INT64_T chirp_local_chmod( const char *path, INT64_T mode )
 {
+	struct chirp_stat info;
+
+	int result = chirp_local_stat(path,&info);
+	if(result<0) return result;
+
 	// A remote user can change some of the permissions bits,
 	// which only affect local users, but we don't let them
 	// take away the owner bits, which would affect the Chirp server.
-	mode = 0600 | (mode&0177);
+
+	if(S_ISDIR(info.cst_mode)) {
+		// On a directory, the user cannot set the execute bit.
+		mode = 0700 | (mode&0077);
+	} else {
+		// On a file, the user can set the execute bit.
+		mode = 0600 | (mode&0177);
+	}
+
 	return chmod(path,mode);
 }
 
