@@ -1237,8 +1237,11 @@ static void chirp_handler( struct link *l, const char *subject )
 			result = chirp_alloc_access(path,flags);
 		} else if(sscanf(line,"chmod %s %lld",path,&mode)==2) {
 			if(!chirp_path_fix(path)) goto failure;
-			if(!chirp_acl_check(path,subject,CHIRP_ACL_WRITE)) goto failure;
-			result = chirp_alloc_chmod(path,mode);
+			if(chirp_acl_check_dir(path,subject,CHIRP_ACL_WRITE) || chirp_acl_check(path,subject,CHIRP_ACL_WRITE)) {
+				result = chirp_alloc_chmod(path,mode);
+			} else {
+				goto failure;
+			}
 		} else if(sscanf(line,"chown %s %lld %lld",path,&uid,&gid)==3) {
 			if(!chirp_path_fix(path)) goto failure;
 			if(!chirp_acl_check(path,subject,CHIRP_ACL_WRITE)) goto failure;
