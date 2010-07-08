@@ -11,6 +11,7 @@ Less used interfaces are not documented, but can still be browsed through this i
 If you are writing programs to access Chirp, start here:
 
 - @ref chirp_reli.h
+- @ref chirp_recursive.h
 - @ref chirp_stream.h
 
 If you are writing programs to submit jobs to Work Queue, Condor, or other systems, start here:
