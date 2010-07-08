@@ -229,7 +229,7 @@ struct link_info {
 
 /**
 Wait for a activity on a an array of links.
-@param array Pointer to an array of @ref link_info structures.  Each one should contain a pointer to a valid @ref link and have the events field set to the events (@ref LINK_READ or @ref LINK_WRITE) of interest.  Upon return, each one will have the revents field filled with the events that actually occurred.
+@param array Pointer to an array of @ref link_info structures.  Each one should contain a pointer to a valid link and have the events field set to the events (@ref LINK_READ or @ref LINK_WRITE) of interest.  Upon return, each one will have the revents field filled with the events that actually occurred.
 @param nlinks The length of the array.
 @param msec The number of milliseconds to wait for activity.  Zero indicates do not wait at all, while -1 indicates wait forever.
 @return The number of links available to read or write.

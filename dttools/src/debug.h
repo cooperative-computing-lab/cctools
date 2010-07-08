@@ -168,8 +168,7 @@ Clear all currently set flags, so that no output will occur.
 int  debug_flags_clear(void);
 
 /** Set name of flag combination
-* Sets the string value associated with flag.  This is normally used to set the
-* <tt>D_USER<tt> user flag as so: <tt>debug_set_flag_name(D_USER, "my-application");</tt>.
+Sets the string value associated with flag.  This is normally used to set the <tt>D_USER</tt> user flag as so: <tt>debug_set_flag_name(D_USER, "my-application");</tt>.
 @param flag Any of the standard debugging flags.
 @param name New name to associate with flag.
 */

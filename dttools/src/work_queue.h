@@ -84,43 +84,6 @@ struct work_queue_stats {
 */
 struct work_queue * work_queue_create( int port );
 
-/** Delete a work queue.
-@param q The work queue to delete.
-*/
-void work_queue_delete( struct work_queue *q );
-
-/** Get queue statistics.
-@param q The queue to query.
-@param s A pointer to a buffer that will be filed with statistics.
-*/
-void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s );
-
-/** Turn on or off fast abort functionality for a given queue.
-@param q A pointer to the queue to modify.
-@param multiplier The multiplier of the average task time at which point to abort; if negative (and by default) fast_abort is deactivated.
-@returns 0 if activated or deactivated with an appropriate multiplier, 1 if deactivated due to inappropriate multiplier.
-*/
-int work_queue_activate_fast_abort(struct work_queue* q, double multiplier );
-
-/** Change the worker selection algorithm for a given queue.
-@param q A pointer to the queue to modify.
-@param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
-*/
-int work_queue_specify_algorithm( struct work_queue* q, int alg );
-
-/** Change the project name for a given queue.
-@param q A pointer to the queue to modify.
-@param name The new project name..
-*/
-int work_queue_specify_name( struct work_queue* q, const char *name );
-
-/** Wait for tasks to complete.  This call will block until the timeout has elapsed.
-@param q The work queue to wait on.
-@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant WAITFORTASK to block until a task has completed.
-@returns A completed task description, or null if the queue is empty or the timeout was reached without a completed task.  The returned task must be deleted with @ref work_queue_task_delete or resubmitted with @ref work_queue_submit.
-*/
-struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout );
-
 /** Submit a job to a work queue.
 It is safe to re-submit a task returned by @ref work_queue_wait.
 @param q A work queue returned from @ref work_queue_create.
@@ -128,10 +91,12 @@ It is safe to re-submit a task returned by @ref work_queue_wait.
 */
 void work_queue_submit( struct work_queue *q, struct work_queue_task *t );
 
-/** Delete a task specification.  This may be called on tasks after they are returned from @ref work_queue_wait.
-@param t The task specification to delete.
+/** Wait for tasks to complete.  This call will block until the timeout has elapsed.
+@param q The work queue to wait on.
+@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant WAITFORTASK to block until a task has completed.
+@returns A completed task description, or null if the queue is empty or the timeout was reached without a completed task.  The returned task must be deleted with @ref work_queue_task_delete or resubmitted with @ref work_queue_submit.
 */
-void work_queue_task_delete( struct work_queue_task *t );
+struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout );
 
 /** Create a new task specification.  Once created, the task may be passed to @ref work_queue_submit.
 @param full_command The shell command line to be executed by the task.
@@ -180,6 +145,42 @@ void work_queue_task_specify_input_file_do_not_cache( struct work_queue_task *t,
 */
 void work_queue_task_specify_output_file( struct work_queue_task *t, const char *rname, const char *fname);
 
+/** Delete a task specification.  This may be called on tasks after they are returned from @ref work_queue_wait.
+@param t The task specification to delete.
+*/
+void work_queue_task_delete( struct work_queue_task *t );
+
+/** Get queue statistics.
+@param q The queue to query.
+@param s A pointer to a buffer that will be filed with statistics.
+*/
+void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s );
+
+/** Turn on or off fast abort functionality for a given queue.
+@param q A pointer to the queue to modify.
+@param multiplier The multiplier of the average task time at which point to abort; if negative (and by default) fast_abort is deactivated.
+@returns 0 if activated or deactivated with an appropriate multiplier, 1 if deactivated due to inappropriate multiplier.
+*/
+int work_queue_activate_fast_abort(struct work_queue* q, double multiplier );
+
+/** Change the worker selection algorithm for a given queue.
+@param q A pointer to the queue to modify.
+@param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
+*/
+int work_queue_specify_algorithm( struct work_queue* q, int alg );
+
+/** Change the project name for a given queue.
+@param q A pointer to the queue to modify.
+@param name The new project name..
+*/
+int work_queue_specify_name( struct work_queue* q, const char *name );
+
+/** Shut down workers connected to the work_queue system. Gives a best effort and then returns the number of workers given the shut down order.
+@param q A pointer to the queue to query.
+@param n The number to shut down. All workers if given "0".
+*/
+int work_queue_shut_down_workers (struct work_queue *q, int n);
+
 /** Determine whether the queue can support more tasks. Returns the number of additional tasks it can support if "hungry" and 0 if "sated".
 @param q A pointer to the queue to query.
 */
@@ -190,10 +191,9 @@ int work_queue_hungry (struct work_queue *q);
 */
 int work_queue_empty (struct work_queue *q);
 
-/** Shut down workers connected to the work_queue system. Gives a best effort and then returns the number of workers given the shut down order.
-@param q A pointer to the queue to query.
-@param n The number to shut down. All workers if given "0".
+/** Delete a work queue.
+@param q The work queue to delete.
 */
-int work_queue_shut_down_workers (struct work_queue *q, int n);
+void work_queue_delete( struct work_queue *q );
 
 #endif
