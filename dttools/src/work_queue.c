@@ -45,10 +45,7 @@ See the file COPYING for details.
 #define CATALOG_UPDATE_INTERVAL 60
 #define	CATALOG_LIFETIME	180
 
-#define WORK_QUEUE_LOW_PORT 9000
-#define WORK_QUEUE_HIGH_PORT 10000
 #define WORK_QUEUE_DEFAULT_PRIORITY 10
-#define RANDOM_PORT_RETRY_TIME 300
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
@@ -810,12 +807,9 @@ struct work_queue * work_queue_create(int port)
 {
 	struct work_queue *q = malloc(sizeof(*q));
 	char *envstring;
-	int random_port_mode = 0;
-	time_t stoptime = time(0) + RANDOM_PORT_RETRY_TIME;
 
 	memset(q,0,sizeof(*q));
 
-	// Resolve port
 	if(port == 0) {
 		envstring = getenv("WORK_QUEUE_PORT");
 		if(envstring) {
@@ -826,33 +820,24 @@ struct work_queue * work_queue_create(int port)
 	}
 
 	if(port == -1) {
-		random_port_mode = 1;
-		srand(time(0));
-		port = WORK_QUEUE_LOW_PORT + rand()%1000;
-	}
-		
-	// Dynamic and/or private ports: 49152~65535 (these ports should not be used)
-	if(port < 0 || port >= 49152) goto failure;
+		int lowport = 1024;
+		int highport = 32767;
 
-	// Try to listen on a port	
-	if(!random_port_mode) {
-		q->master_link = link_serve(port);
-		if(!q->master_link) goto failure;
-	} else {
-		// In random port mode which tries to listen on a random port repeatedly until successfully listens on one
-		while(time(0) < stoptime) {
+		envstring = getenv("WORK_QUEUE_LOW_PORT");
+		if(envstring) lowport = atoi(envstring);
+
+		envstring = getenv("WORK_QUEUE_HIGH_PORT");
+		if(envstring) highport = atoi(envstring);
+
+		for(port=lowport;port<highport;port++) {
 			q->master_link = link_serve(port);
 			if(q->master_link) break;
-			port++;
-			if(port >= WORK_QUEUE_HIGH_PORT) port = WORK_QUEUE_LOW_PORT + rand()%1000;
 		}
+	} else {
+		q->master_link = link_serve(port);
 	}
 
-	if(!q->master_link) {
-		debug(D_NOTICE,"Could not create work_queue on random ports in %d minutes.", RANDOM_PORT_RETRY_TIME/60);
-		free(q);
-		return 0;
-	}
+	if(!q->master_link) goto failure;
 
 	q->ready_list = list_create();
 	q->complete_list = list_create();
@@ -869,8 +854,6 @@ struct work_queue * work_queue_create(int port)
 	q->fast_abort_multiplier = wq_option_fast_abort_multiplier;
 	q->worker_selection_algorithm = wq_option_scheduler;
 
-
-	// Reading the environment variables
 	envstring = getenv("WORK_QUEUE_NAME");
 	if (envstring)
 		work_queue_specify_name(q, envstring);
