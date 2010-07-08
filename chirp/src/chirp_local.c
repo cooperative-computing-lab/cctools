@@ -453,7 +453,6 @@ INT64_T chirp_local_stat( const char *path, struct chirp_stat *buf )
 	int result;
 	result = stat64(path,&info);
 	if(result==0) COPY_CSTAT(info,*buf);
-	buf->cst_mode = buf->cst_mode & (~0077);
 	return result;
 }
 
@@ -463,7 +462,6 @@ INT64_T chirp_local_lstat( const char *path, struct chirp_stat *buf )
 	int result;
 	result = lstat64(path,&info);
 	if(result==0) COPY_CSTAT(info,*buf);
-	buf->cst_mode = buf->cst_mode & (~0077);
 	return result;
 }
 
