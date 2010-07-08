@@ -3,7 +3,6 @@ Copyright (C) 2008- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
-
 #include "work_queue.h"
 #include "int_sizes.h"
 #include "link.h"
@@ -242,7 +241,14 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 	int actual,fd;
 	int length;
 	time_t stoptime;
-	
+
+	// This may be where I can trigger output file cache
+	// Added by Anthony Canino
+	// Attempting to add output cacheing
+	struct stat local_info;
+	struct stat *remote_info;
+	char *hash_name;
+
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((tf=list_next_item(t->output_files))) {
@@ -259,6 +265,20 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 				actual = link_stream_to_fd(w->link,fd,length,stoptime);
 				close(fd);
 				if(actual!=length) { unlink(tf->payload); goto failure; }
+
+				////////////////////// Output cache stuff /////////////////////////
+				if(stat(tf->payload,&local_info)<0) return 0;
+
+				hash_name = (char*) malloc((strlen(tf->payload)+strlen(tf->remote_name)+2)*sizeof(char));
+				sprintf(hash_name,"%s-%s",(char*)tf->payload,tf->remote_name);
+
+				if(tf->cacheable) {
+					remote_info = malloc(sizeof(*remote_info));
+					memcpy(remote_info,&local_info,sizeof(local_info));
+					hash_table_insert(w->current_files,hash_name,remote_info);
+				}
+				//////////////////////////////////////////////////////////////////
+
 			} else {
 				debug(D_DEBUG,"%s (%s) did not create expected file %s",w->hostname,w->addrport,tf->remote_name);
 				if(t->result == WORK_QUEUE_RESULT_UNSET) t->result = WORK_QUEUE_RESULT_OUTPUT_FAIL;
@@ -474,9 +494,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, in
 	int dir = 0;
 	
 	if(stat(tf->payload,&local_info)<0) return 0;
-
-	if (local_info.st_mode & S_IFDIR) dir = 1;
-	
+if (local_info.st_mode & S_IFDIR) dir = 1; 
 	/* normalize the mode so as not to set up invalid permissions */
 	if (dir)
 	{
@@ -490,7 +508,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, in
 
 	hash_name = (char*) malloc((strlen(tf->payload)+strlen(tf->remote_name)+2)*sizeof(char));
 	sprintf(hash_name,"%s-%s",(char*)tf->payload,tf->remote_name);
-	
+
 	remote_info = hash_table_lookup(w->current_files,hash_name);
 	
 	if(!remote_info || remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size ) {
@@ -632,7 +650,7 @@ struct work_queue_worker * find_worker_by_files( struct work_queue *q , struct w
 					free(hash_name);
 				}
 			}
-			
+
 			if(!best_worker || task_cached_bytes>most_task_cached_bytes) {
 				best_worker = w;
 				most_task_cached_bytes = task_cached_bytes;
@@ -657,8 +675,7 @@ struct work_queue_worker * find_worker_by_fcfs( struct work_queue *q )
 	return best_worker;
 }
 
-struct work_queue_worker * find_worker_by_time( struct work_queue *q )
-{
+struct work_queue_worker * find_worker_by_time( struct work_queue *q ) {
 	char *key;
 	struct work_queue_worker *w;
 	struct work_queue_worker *best_worker = 0;
