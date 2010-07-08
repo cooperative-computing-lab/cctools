@@ -274,11 +274,25 @@ int main( int argc, char *argv[] )
 		add_history(line);
 #endif
 
-		if(user_argv) free(user_argv);
-		string_split(line,&user_argc,&user_argv);
-		if(user_argc==0) continue;
+		{
+			char *start = line, *last = strlen(line)+line;
+			while (*start != '\0') { /* process compound commands */
+				char *end = strchr(start, ';');
+				while (end != NULL && end != start && *(end-1) == '\\')
+					end = strchr(end+1, ';');
+				if (end == NULL) end = start+strlen(start);
+                *end = '\0';
 
-		result = process_command(user_argc,user_argv);
+				if(user_argv) free(user_argv);
+				string_split(start,&user_argc,&user_argv);
+				if(user_argc==0) {
+					start++;
+					continue;
+				}
+				result = process_command(user_argc,user_argv);
+				start = end == last ? last : end+1;
+			}
+		}
 		if(!interactive_mode && !result) break;
 	}
 
