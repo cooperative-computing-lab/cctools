@@ -962,7 +962,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		int msec;
 
 		if(stoptime) {
-			msec = MAX(0,(time(0)-stoptime)*1000);
+			msec = MAX(0,(stoptime-time(0))*1000);
 		} else {
 			msec = 5000;
 		}
