@@ -52,7 +52,6 @@ static int catalog_server_port = 0;
 static struct wq_master *actual_master = NULL;
 
 struct hash_cache *bad_masters = NULL;
-struct list *uncacheables = NULL;
 
 struct wq_master {
 	char addr[LINK_ADDRESS_MAX];
@@ -350,14 +349,11 @@ int main( int argc, char *argv[] )
 	
 	const char *workdir;
 
-	/**
 	if(getenv("_CONDOR_SCRATCH_DIR")) {
 		workdir = getenv("_CONDOR_SCRATCH_DIR");
 	} else {
 		workdir = "/tmp";
 	}
-	*/
-	workdir = "/tmp";
 
 	char tempdir[WORK_QUEUE_LINE_MAX];
 	sprintf(tempdir,"%s/worker-%d-%d",workdir,(int)getuid(),(int)getpid());
@@ -371,17 +367,15 @@ int main( int argc, char *argv[] )
 	time_t idle_stoptime = time(0) + idle_timeout;
 	time_t switch_master_time = time(0) + master_timeout;
 
-	uncacheables = list_create(); 
 	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t) free);
 
 	while(!abort_flag) {
 		char line[WORK_QUEUE_LINE_MAX];
-		int result, length, mode, cacheable, fd;
+		int result, length, mode, fd;
 		char filename[WORK_QUEUE_LINE_MAX];
 		char path[WORK_QUEUE_LINE_MAX];
 		char *buffer;
 		FILE *stream;
-		char *file_to_be_removed;
 
 		if(time(0)>idle_stoptime) {
 			if(master) {
@@ -436,38 +430,21 @@ int main( int argc, char *argv[] )
 				link_write(master,line,strlen(line),time(0)+active_timeout);
 				link_write(master,buffer,length,time(0)+active_timeout);
 				if(buffer) free(buffer);
-
-				// remove uncacheable input files
-				file_to_be_removed = (char *)list_pop_head(uncacheables);
-				while(file_to_be_removed) {
-					printf("worker: removing uncacheable file - %s\n", file_to_be_removed);
-					remove(file_to_be_removed);
-					free(file_to_be_removed);
-					file_to_be_removed = (char *)list_pop_head(uncacheables);
-				}
-			} else if(sscanf(line,"put %s %d %o %d",filename,&length,&mode, &cacheable)==4) {
-
+			} else if(sscanf(line,"put %s %d %o",filename,&length,&mode)==3) {
 				mode = mode | 0600;
-
 				fd = open(filename,O_WRONLY|O_CREAT|O_TRUNC,mode);
 				if(fd<0) goto recover;
-
 				int actual = link_stream_to_fd(master,fd,length,time(0)+active_timeout);
 				close(fd);
-				if(cacheable == WORK_QUEUE_TASK_FILE_UNCACHEABLE) {
-					list_push_head(uncacheables, strdup(filename));
-				}
 				if(actual!=length) goto recover;
-			} else if(sscanf(line, "rm %s", path) == 1) {
+			} else if(sscanf(line, "unlink %s", path) == 1) {
 				int status;
 				status = remove(path);
-			
 				sprintf(line, "%d\n", status); // 0 - succeeded; otherwise, failed
 				link_write(master, line, strlen(line), time(0)+active_timeout);
 			} else if(sscanf(line, "mkdir %s %o", filename, &mode)==2) {
 				mode = mode | 0700;
 				result = mkdir(filename, mode);
-
 				sprintf(line, "%d\n", result);
 				link_write(master, line, strlen(line), time(0)+active_timeout);
 			} else if(sscanf(line,"get %s",filename)==1) {
@@ -481,7 +458,6 @@ int main( int argc, char *argv[] )
 					int actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
 					close(fd);
 					if(actual!=length) goto recover;
-					remove(filename);
 				} else {
 					sprintf(line,"-1\n");
 					link_write(master,line,strlen(line),time(0)+active_timeout);
@@ -502,7 +478,7 @@ int main( int argc, char *argv[] )
 			if(auto_worker) {
 				record_bad_master(duplicate_wq_master(actual_master));
 			}
-			sleep(3);
+			sleep(5);
 		}
 	}
 
@@ -511,8 +487,5 @@ int main( int argc, char *argv[] )
 	sprintf(deletecmd,"rm -rf %s",tempdir);
 	system(deletecmd);
 	
-	list_free(uncacheables);
-	list_delete(uncacheables);
-
 	return 0;
 }

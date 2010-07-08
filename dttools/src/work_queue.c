@@ -273,6 +273,57 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 	return 0;
 }
 
+void delete_uncacheable_files(struct work_queue_task *t, struct work_queue_worker *w) {
+	char line[WORK_QUEUE_LINE_MAX];
+	struct work_queue_file* tf;
+	int ret;
+
+	if(t->input_files) {
+		list_first_item(t->input_files);
+		while((tf=list_next_item(t->input_files))) {
+			if(tf->cacheable == WORK_QUEUE_TASK_FILE_UNCACHEABLE) {
+				// Send 'unlink' command to the worker
+				debug(D_DEBUG,"Deleting input file '%s' on %s (%s) ...", tf->remote_name, w->hostname,w->addrport);
+				link_printf(w->link,"unlink %s\n",tf->remote_name);
+
+				// Check deletion status
+				link_readline(w->link, line, sizeof(line), time(0)+short_timeout);
+				if (sscanf(line, "%d", &ret) != 1) {
+					debug(D_NOTICE,"Input file '%s' on %s (%s) might not be deleted.",tf->remote_name, w->hostname, w->addrport);
+				}
+				if (ret != 0) {
+					debug(D_NOTICE,"Input file '%s' on %s (%s) might not be deleted.",tf->remote_name, w->hostname, w->addrport);
+				} else {
+					debug(D_DEBUG,"Input file '%s' on %s (%s) has been successfully deleted.", tf->remote_name, w->hostname,w->addrport);
+				}
+			}
+		}
+	}
+
+
+	if(t->output_files) {
+		list_first_item(t->output_files);
+		while((tf=list_next_item(t->output_files))) {
+			if(tf->cacheable == WORK_QUEUE_TASK_FILE_UNCACHEABLE) {
+				// Send 'unlink' command to the worker
+				debug(D_DEBUG,"Deleting output file '%s' on %s (%s) ...", tf->remote_name, w->hostname,w->addrport);
+				link_printf(w->link,"unlink %s\n",tf->remote_name);
+
+				// Check deletion status
+				link_readline(w->link, line, sizeof(line), time(0)+short_timeout);
+				if (sscanf(line, "%d", &ret) != 1) {
+					debug(D_NOTICE,"Output file '%s' on %s (%s) might not be deleted.",tf->remote_name, w->hostname, w->addrport);
+				}
+				if (ret != 0) {
+					debug(D_NOTICE,"Output file '%s' on %s (%s) might not be deleted.",tf->remote_name, w->hostname, w->addrport);
+				} else {
+					debug(D_DEBUG,"Output file '%s' on %s (%s) has been successfully deleted.", tf->remote_name, w->hostname,w->addrport);
+				}
+			}
+		}
+	}
+}
+
 static int handle_worker( struct work_queue *q, struct link *l )
 {
 	char line[WORK_QUEUE_LINE_MAX];
@@ -319,6 +370,10 @@ static int handle_worker( struct work_queue *q, struct link *l )
 				goto failure;
 			}
 
+			// Delete uncacheable files
+			delete_uncacheable_files(t, w);
+
+			// Record current task as completed and change worker's state
 			list_push_head(q->complete_list,w->current_task);
 			w->current_task = 0;
 			change_worker_state(q,w,WORKER_STATE_READY);
@@ -465,7 +520,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, in
 		stoptime = time(0) + MAX(1.0,local_info.st_size/1250000.0);
 		open_time = timestamp_get();
 
-		link_printf(w->link,"put %s %d 0%o %d\n",tf->remote_name,(int)local_info.st_size,local_info.st_mode, tf->cacheable);
+		link_printf(w->link,"put %s %d 0%o\n",tf->remote_name,(int)local_info.st_size,local_info.st_mode);
 		
 		actual = link_stream_from_fd(w->link,fd,local_info.st_size,stoptime);
 		close(fd);
@@ -508,7 +563,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 				fl = tf->length;
 				stoptime = time(0) + MAX(1.0,fl/1250000.0);
 				open_time = timestamp_get();
-				link_printf(w->link,"put %s %d %o %d\n",tf->remote_name,fl,0777, tf->cacheable);
+				link_printf(w->link,"put %s %d %o\n",tf->remote_name,fl,0777);
 				debug(D_DEBUG,"limit sending %i bytes to %.03lfs seconds (or 1 if <0)",fl,(fl)/1250000.0);
 				actual = link_write(w->link, tf->payload, fl,stoptime);
 				close_time = timestamp_get();
@@ -969,6 +1024,17 @@ void work_queue_task_specify_tag( struct work_queue_task *t, const char *tag )
 
 
 void work_queue_task_specify_output_file( struct work_queue_task* t, const char* rname, const char* fname)
+{
+	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
+	tf->fname_or_literal = WORKER_FILE_NAME;
+	tf->cacheable = WORK_QUEUE_TASK_FILE_CACHEABLE;
+	tf->length = strlen(fname);
+	tf->payload = strdup(fname);
+	tf->remote_name = strdup(rname);
+	list_push_tail(t->output_files,tf);
+}
+
+void work_queue_task_specify_output_file_do_not_cache( struct work_queue_task* t, const char* rname, const char* fname)
 {
 	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
 	tf->fname_or_literal = WORKER_FILE_NAME;
