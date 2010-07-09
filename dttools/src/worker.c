@@ -156,7 +156,7 @@ struct list * get_work_queue_masters(const char * catalog_host, int catalog_port
 
 	q = catalog_query_create(catalog_host, catalog_port, stoptime);
 	if(!q) {
-		fprintf(stderr,"couldn't query catalog: %s\n",strerror(errno));
+		fprintf(stderr,"Couldn't query catalog: %s\n",strerror(errno));
 		return NULL;
 	}
 
@@ -438,15 +438,18 @@ int main( int argc, char *argv[] )
 				close(fd);
 				if(actual!=length) goto recover;
 			} else if(sscanf(line, "unlink %s", path) == 1) {
-				int status;
-				status = remove(path);
-				sprintf(line, "%d\n", status); // 0 - succeeded; otherwise, failed
-				link_write(master, line, strlen(line), time(0)+active_timeout);
+				result = remove(path);
+				if(result != 0) { // 0 - succeeded; otherwise, failed
+					fprintf(stderr,"Could not remove file: %s.(%s)\n", path, strerror(errno));
+					goto recover;
+				}
 			} else if(sscanf(line, "mkdir %s %o", filename, &mode)==2) {
 				mode = mode | 0700;
 				result = mkdir(filename, mode);
-				sprintf(line, "%d\n", result);
-				link_write(master, line, strlen(line), time(0)+active_timeout);
+				if(result != 0) { // 0 - succeeded; otherwise, failed
+					fprintf(stderr,"Could not make directory: %s.(%s)\n",filename, strerror(errno));
+					goto recover;
+				}
 			} else if(sscanf(line,"get %s",filename)==1) {
 				fd = open(filename,O_RDONLY,0);
 				if(fd>=0) {

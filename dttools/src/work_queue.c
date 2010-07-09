@@ -291,9 +291,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 }
 
 void delete_uncacheable_files(struct work_queue_task *t, struct work_queue_worker *w) {
-	char line[WORK_QUEUE_LINE_MAX];
 	struct work_queue_file* tf;
-	int ret;
 
 	if(t->input_files) {
 		list_first_item(t->input_files);
@@ -302,17 +300,6 @@ void delete_uncacheable_files(struct work_queue_task *t, struct work_queue_worke
 				// Send 'unlink' command to the worker
 				debug(D_DEBUG,"Deleting input file '%s' on %s (%s) ...", tf->remote_name, w->hostname,w->addrport);
 				link_printf(w->link,"unlink %s\n",tf->remote_name);
-
-				// Check deletion status
-				link_readline(w->link, line, sizeof(line), time(0)+short_timeout);
-				if (sscanf(line, "%d", &ret) != 1) {
-					debug(D_NOTICE,"Input file '%s' on %s (%s) might not be deleted.",tf->remote_name, w->hostname, w->addrport);
-				}
-				if (ret != 0) {
-					debug(D_NOTICE,"Input file '%s' on %s (%s) might not be deleted.",tf->remote_name, w->hostname, w->addrport);
-				} else {
-					debug(D_DEBUG,"Input file '%s' on %s (%s) has been successfully deleted.", tf->remote_name, w->hostname,w->addrport);
-				}
 			}
 		}
 	}
@@ -325,17 +312,6 @@ void delete_uncacheable_files(struct work_queue_task *t, struct work_queue_worke
 				// Send 'unlink' command to the worker
 				debug(D_DEBUG,"Deleting output file '%s' on %s (%s) ...", tf->remote_name, w->hostname,w->addrport);
 				link_printf(w->link,"unlink %s\n",tf->remote_name);
-
-				// Check deletion status
-				link_readline(w->link, line, sizeof(line), time(0)+short_timeout);
-				if (sscanf(line, "%d", &ret) != 1) {
-					debug(D_NOTICE,"Output file '%s' on %s (%s) might not be deleted.",tf->remote_name, w->hostname, w->addrport);
-				}
-				if (ret != 0) {
-					debug(D_NOTICE,"Output file '%s' on %s (%s) might not be deleted.",tf->remote_name, w->hostname, w->addrport);
-				} else {
-					debug(D_DEBUG,"Output file '%s' on %s (%s) has been successfully deleted.", tf->remote_name, w->hostname,w->addrport);
-				}
 			}
 		}
 	}
@@ -491,7 +467,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, in
 	int dir = 0;
 	
 	if(stat(tf->payload,&local_info)<0) return 0;
-if (local_info.st_mode & S_IFDIR) dir = 1; 
+	if (local_info.st_mode & S_IFDIR) dir = 1; 
 	/* normalize the mode so as not to set up invalid permissions */
 	if (dir)
 	{
@@ -515,16 +491,14 @@ if (local_info.st_mode & S_IFDIR) dir = 1;
 		}
 		
 		debug(D_DEBUG,"%s (%s) needs file %s",w->hostname,w->addrport,tf->payload);
-		if (dir)
-		{
+		if (dir) {
+			// If mkdir fails, the future calls to 'put_file' function to place
+			// files in that directory won't suceed. Such failure would
+			// eventually be captured in 'start_tasks' function and in the
+			// 'start_tasks' function the corresponding worker would be removed.
 			link_printf(w->link, "mkdir %s %o\n", tf->payload, local_info.st_mode);
-			char line[16];
-			link_readline(w->link, line, sizeof(line), time(0)+short_timeout);
-			if (sscanf(line, "%d", &actual) != 1) return 0;
-			if (actual != 0) return 0;
 			
-			if (!put_directory(tf->payload, w, total_bytes))
-				return 0;
+			if (!put_directory(tf->payload, w, total_bytes)) return 0;
 
 			return 1;
 		}

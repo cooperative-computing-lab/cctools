@@ -145,6 +145,13 @@ void work_queue_task_specify_input_file_do_not_cache( struct work_queue_task *t,
 */
 void work_queue_task_specify_output_file( struct work_queue_task *t, const char *rname, const char *fname);
 
+/** Further define a task specification. The file specified here won't be cached on the remote worker. Once completed, the task may be passed to @ref work_queue_submit. If no file is defined, the program will have default (no) output files retrieved.
+@param t The task to which to add parameters
+@param rname The name of a file created by the program when it runs.
+@param fname The name of the file local target for copying rname back.
+*/
+void work_queue_task_specify_output_file_do_not_cache( struct work_queue_task* t, const char* rname, const char* fname);
+
 /** Delete a task specification.  This may be called on tasks after they are returned from @ref work_queue_wait.
 @param t The task specification to delete.
 */

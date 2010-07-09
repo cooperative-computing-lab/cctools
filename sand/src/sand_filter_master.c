@@ -377,8 +377,13 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 
 	// Get the output file if it's in binary mode. If not in binary mode
 	// it will just return a string into a buffer.
-	if (BINARY_OUTPUT)
-		work_queue_task_specify_output_file(t, output_rname, output_fname);
+	if (BINARY_OUTPUT) {
+		if(do_not_cache) {
+			work_queue_task_specify_output_file_do_not_cache(t, output_rname, output_fname);
+		} else {
+			work_queue_task_specify_output_file(t, output_rname, output_fname);
+		}
+	}
 
 	// Submit the task
 	work_queue_submit(q, t);
