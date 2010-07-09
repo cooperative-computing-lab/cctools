@@ -390,6 +390,7 @@ int main( int argc, char *argv[] )
 			break;
 		}
 
+		switch_master_time = time(0) + master_timeout;
 		if(!master) {
 			if(auto_worker) {
 				master = auto_link_connect(actual_addr, &actual_port, switch_master_time);
@@ -472,7 +473,6 @@ int main( int argc, char *argv[] )
 			}
 
 			idle_stoptime = time(0) + idle_timeout;
-			switch_master_time = time(0) + master_timeout;
 
 		} else {
 			recover:
