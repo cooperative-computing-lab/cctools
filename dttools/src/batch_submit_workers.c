@@ -50,7 +50,6 @@ static void show_help(const char *cmd)
 	printf("\n");
 	printf("where worker options are:\n");
 	printf("  -a             Enable auto master selection mode.\n");
-	printf("  -e             Only select preferred master.\n");
 	printf("  -S             Run as a shared worker.\n");
 	printf("  -N <name>      Preferred master name.\n");
 	printf("  -t <time>      Abort after this amount of idle time.\n");
