@@ -59,11 +59,11 @@ int hmac( const char* text, int text_len, const char* in_key, int in_key_len, un
 	return 0;
 }
 
-int hmac_md5(const char* text, int text_len, const char* in_key, int in_key_len, unsigned char *digest) {
+int hmac_md5(const char* text, int text_len, const char* in_key, int in_key_len, unsigned char digest[MD5_DIGEST_LENGTH]) {
 	return hmac(text, text_len, in_key, in_key_len, digest, MD5_DIGEST_LENGTH, MD5_BLOCK_SIZE, &md5_buffer);
 }
 
-int hmac_sha1(const char* text, int text_len, const char* in_key, int in_key_len, unsigned char *digest) {
+int hmac_sha1(const char* text, int text_len, const char* in_key, int in_key_len, unsigned char digest[SHA1_DIGEST_LENGTH]) {
 	return hmac(text, text_len, in_key, in_key_len, digest, SHA1_DIGEST_LENGTH, SHA1_BLOCK_SIZE, &sha1_buffer);
 }
 
