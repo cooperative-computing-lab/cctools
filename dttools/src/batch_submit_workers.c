@@ -114,6 +114,7 @@ int main(int argc, char *argv[])
 		if ((argc - optind) != 3) {
 			fprintf(stderr, "invalid number of arguments\n");
 			show_help(argv[0]);
+			return EXIT_FAILURE;
 		}
 
 		hostname = argv[optind];
@@ -123,6 +124,7 @@ int main(int argc, char *argv[])
 		if ((argc - optind) != 1) {
 			fprintf(stderr, "invalid number of arguments\n");
 			show_help(argv[0]);
+			return EXIT_FAILURE;
 		}
 		count = strtol(argv[optind], NULL, 10);
 	}
