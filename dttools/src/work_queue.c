@@ -263,13 +263,14 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 				close(fd);
 				if(actual!=length) { unlink(tf->payload); goto failure; }
 
-				////////////////////// Output cache stuff /////////////////////////
-				if(stat(tf->payload,&local_info)<0) return 0;
-
-				hash_name = (char*) malloc((strlen(tf->payload)+strlen(tf->remote_name)+2)*sizeof(char));
-				sprintf(hash_name,"%s-%s",(char*)tf->payload,tf->remote_name);
-
+				////////////////////// Output Cache /////////////////////////
+				// Add the output files to the hash table if its cacheable
 				if(tf->cacheable) {
+					if(stat(tf->payload,&local_info)<0) { unlink(tf->payload); goto failure; }
+
+					hash_name = (char*) malloc((strlen(tf->payload)+strlen(tf->remote_name)+2)*sizeof(char));
+					sprintf(hash_name,"%s-%s",(char*)tf->payload,tf->remote_name);
+
 					remote_info = malloc(sizeof(*remote_info));
 					memcpy(remote_info,&local_info,sizeof(local_info));
 					hash_table_insert(w->current_files,hash_name,remote_info);
