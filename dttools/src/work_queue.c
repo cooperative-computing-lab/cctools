@@ -99,7 +99,6 @@ struct work_queue_file {
 };
 
 int start_one_task( struct work_queue_task *t, struct work_queue_worker *w );
-static int remove_unnecessary_workers (struct work_queue* q);
 static int update_catalog(struct work_queue *q);
 
 static int short_timeout = 5;
@@ -263,7 +262,6 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 				close(fd);
 				if(actual!=length) { unlink(tf->payload); goto failure; }
 
-				////////////////////// Output Cache /////////////////////////
 				// Add the output files to the hash table if its cacheable
 				if(tf->cacheable) {
 					if(stat(tf->payload,&local_info)<0) { unlink(tf->payload); goto failure; }
@@ -275,7 +273,6 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 					memcpy(remote_info,&local_info,sizeof(local_info));
 					hash_table_insert(w->current_files,hash_name,remote_info);
 				}
-				//////////////////////////////////////////////////////////////////
 
 			} else {
 				debug(D_DEBUG,"%s (%s) did not create expected file %s",w->hostname,w->addrport,tf->remote_name);
@@ -697,7 +694,6 @@ static void start_tasks( struct work_queue *q )
 {
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
-	int i;
 
 	while(list_size(q->ready_list)) {
 		
@@ -719,10 +715,14 @@ static void start_tasks( struct work_queue *q )
 		}
 	}
 
-	i = remove_unnecessary_workers(q);
+	/*
+	This function is too aggressive, see below for why.
+
+	int i = remove_unnecessary_workers(q);
 	if(i) {
 		debug(D_DEBUG,"%d workers are removed because there are no waiting tasks.", i);
 	}
+	*/
 }
 
 int work_queue_activate_fast_abort(struct work_queue* q, double multiplier)
@@ -1099,6 +1099,14 @@ int work_queue_empty (struct work_queue* q)
 
 
 
+/*
+As written, this function removes every single worker that does not
+currently have a task, which is a little too aggressive.  If there
+is a brief dip in the available work, the worker and its cached
+data will be lost.  A slightly less aggressive algorithm is needed.
+*/
+
+/*
 static int remove_unnecessary_workers (struct work_queue* q)
 {
 	struct work_queue_worker *w;
@@ -1107,7 +1115,6 @@ static int remove_unnecessary_workers (struct work_queue* q)
 
 	if(!q) return 0;
 	
-	// send worker exit.
 	hash_table_firstkey( q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 		if(w->state != WORKER_STATE_BUSY) {
@@ -1118,6 +1125,7 @@ static int remove_unnecessary_workers (struct work_queue* q)
 
 	return i;  
 }
+*/
 
 static int update_catalog(struct work_queue* q) {
 	char address[DATAGRAM_ADDRESS_MAX];
