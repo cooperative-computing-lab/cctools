@@ -84,7 +84,10 @@ class MakeflowProgressMonitor(object):
             while not start_time:
                 line = log_stream.readline()
                 if line:
-                    start_time = int(line.split()[MF_LOG_TIME])
+                    try:
+                        start_time = int(line.split()[MF_LOG_TIME])
+                    except ValueError:
+                        start_time = 0
 
             log_stream.seek(-len(line), os.SEEK_END)
 
