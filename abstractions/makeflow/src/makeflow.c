@@ -74,6 +74,7 @@ struct dag {
 	struct hash_table *filename_translation_rev;
 	struct hash_table *filename_translation_fwd;
 	FILE * logfile;
+	int node_states[DAG_NODE_STATE_MAX];
 	int linenum;
 	int local_jobs_running;
 	int local_jobs_max;
@@ -416,30 +417,33 @@ void dag_node_add_target_file( struct dag_node *n, const char *filename )
 	n->target_files = dag_file_create(filename,n->target_files);
 }
 
-void dag_count_states( struct dag *d, int states[DAG_NODE_STATE_MAX] )
+void dag_count_states( struct dag *d )
 {
 	struct dag_node *n;
 	int i;
 
-	for(i=0;i<DAG_NODE_STATE_MAX;i++) {
-		states[i] = 0;
-	}
+	debug(D_NOTICE, "counting states");
 
+	for(i=0;i<DAG_NODE_STATE_MAX;i++) {
+		d->node_states[i] = 0;
+	}
+    
 	for(n=d->nodes;n;n=n->next) {
-		states[n->state]++;
-	}	
+		d->node_states[n->state]++;
+	}     
 }
 
 void dag_node_state_change( struct dag *d, struct dag_node *n, int newstate )
 {
-	int states[DAG_NODE_STATE_MAX];
-
 	debug(D_DEBUG,"node %d %s -> %s\n",n->nodeid,dag_node_state_name(n->state),dag_node_state_name(newstate));
 
+	if (d->node_states[n->state] > 0) {
+		d->node_states[n->state]--;
+	}
 	n->state = newstate;
-	dag_count_states(d,states);
+	d->node_states[n->state]++;
 
-	fprintf(d->logfile,"%u %d %d %d %d %d %d %d %d %d\n",(unsigned)time(0),n->nodeid,newstate,n->jobid,states[0],states[1],states[2],states[3],states[4],d->nodeid_counter);
+	fprintf(d->logfile,"%u %d %d %d %d %d %d %d %d %d\n",(unsigned)time(0),n->nodeid,newstate,n->jobid,d->node_states[0],d->node_states[1],d->node_states[2],d->node_states[3],d->node_states[4],d->nodeid_counter);
 	fflush(d->logfile);
 	fsync(fileno(d->logfile));
 }
@@ -570,6 +574,8 @@ void dag_log_recover( struct dag *d, const char *filename )
 			fputc('\n', d->logfile);
 		}
 	}
+
+	dag_count_states(d);
 
 	for(n=d->nodes;n;n=n->next) {
 		if(n->state==DAG_NODE_STATE_RUNNING && !n->local_job && batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
@@ -985,6 +991,8 @@ struct dag * dag_create( const char *filename, int clean_mode )
 	d->nodeid_counter = 0;
 	d->filename_translation_rev = hash_table_create(0,0);
 	d->filename_translation_fwd = hash_table_create(0,0);
+
+	memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
 
 	struct dag_node *n,*m;
 	struct dag_file *f;
