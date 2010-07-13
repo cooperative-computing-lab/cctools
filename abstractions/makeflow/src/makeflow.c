@@ -422,8 +422,6 @@ void dag_count_states( struct dag *d )
 	struct dag_node *n;
 	int i;
 
-	debug(D_NOTICE, "counting states");
-
 	for(i=0;i<DAG_NODE_STATE_MAX;i++) {
 		d->node_states[i] = 0;
 	}

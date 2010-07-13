@@ -153,7 +153,10 @@ class MakeflowProgressMonitor(object):
                 else:
                     mlist.append(('current T/M', 'N/A'))
                 mlist.append(('average T/M', '%0.2f' % avg_tpm))
-                mlist.append(('time left', time_format(est_time)))
+                if slist[MF_LOG_TOTAL] == sum(slist[MF_LOG_COMPLETE:MF_LOG_TOTAL]):
+                    mlist.append(('time left', 'Finished'))
+                else:
+                    mlist.append(('time left', time_format(est_time)))
                 mlist.append(())
                 mlist.append(('last event', 'Task %d is %s' % \
                     (slist[MF_LOG_NODE_ID], MF_STATES[slist[MF_LOG_NEW_STATE]])))
