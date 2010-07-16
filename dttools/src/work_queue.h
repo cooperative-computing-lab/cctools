@@ -39,6 +39,9 @@ and port of the master.
 #define WORK_QUEUE_TASK_FILE_UNCACHEABLE 0
 #define WORK_QUEUE_TASK_FILE_CACHEABLE 1
 
+#define WORK_QUEUE_TASK_INPUT_FILE  0
+#define WORK_QUEUE_TASK_OUTPUT_FILE 1
+
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler; /**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
@@ -139,14 +142,14 @@ void work_queue_task_specify_input_buf( struct work_queue_task *t, const char *b
 /** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
 @param t The task to which to add parameters
 @param fname The name of the data file to send to the worker to be available to the commands.
-@param rname The name of the file in which to store the buffer data on the worker
+@param rname The name of the file in which to store the buffer data on the worker.
 */
 void work_queue_task_specify_input_file( struct work_queue_task *t, const char *fname, const char *rname);
 
 /** Further define a task specification. The file specified here won't be cached on the remote worker. Once completed, the task may be passed to @ref work_queue_submit. 
 @param t The task to which to add parameters
 @param fname The name of the data file to send to the worker to be available to the commands.
-@param rname The name of the file in which to store the buffer data on the worker
+@param rname The name of the file in which to store the buffer data on the worker.
 */
 void work_queue_task_specify_input_file_do_not_cache( struct work_queue_task *t, const char *fname, const char *rname);
 
@@ -163,6 +166,16 @@ void work_queue_task_specify_output_file( struct work_queue_task *t, const char 
 @param fname The name of the file local target for copying rname back.
 */
 void work_queue_task_specify_output_file_do_not_cache( struct work_queue_task* t, const char* rname, const char* fname);
+
+/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
+@param t The task to which to add parameters
+@param fname The name of the local data file. 
+@param rname The name of the remote data file.
+@param type  The type of file specification.  This may either be @ref WORK_QUEUE_TASK_INPUT_FILE for an input specification or @ref WORK_QUEUE_TASK_OUTPUT_FILE for an output specification.
+@param cacheable Whether or not the file should be considered cacheable.
+*/
+void work_queue_task_specify_file( struct work_queue_task *t, const char *fname, const char *rname, int type, int cacheable);
+
 
 /** Delete a task specification.  This may be called on tasks after they are returned from @ref work_queue_wait.
 @param t The task specification to delete.

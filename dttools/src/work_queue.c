@@ -997,27 +997,31 @@ void work_queue_task_specify_tag( struct work_queue_task *t, const char *tag )
 	t->tag = strdup(tag);
 }
 
-
-void work_queue_task_specify_output_file( struct work_queue_task* t, const char* rname, const char* fname)
+void work_queue_task_specify_file( struct work_queue_task* t, const char* fname, const char* rname, int type, int cacheable )
 {
 	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
+
 	tf->fname_or_literal = WORKER_FILE_NAME;
-	tf->cacheable = WORK_QUEUE_TASK_FILE_CACHEABLE;
+	tf->cacheable = cacheable;
 	tf->length = strlen(fname);
 	tf->payload = strdup(fname);
 	tf->remote_name = strdup(rname);
-	list_push_tail(t->output_files,tf);
+
+	if (type == WORK_QUEUE_TASK_INPUT_FILE) {
+	    list_push_tail(t->input_files,tf);
+	} else {
+	    list_push_tail(t->output_files,tf);
+	}
+}
+
+void work_queue_task_specify_output_file( struct work_queue_task* t, const char* rname, const char* fname)
+{
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_TASK_OUTPUT_FILE, WORK_QUEUE_TASK_FILE_CACHEABLE);
 }
 
 void work_queue_task_specify_output_file_do_not_cache( struct work_queue_task* t, const char* rname, const char* fname)
 {
-	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
-	tf->fname_or_literal = WORKER_FILE_NAME;
-	tf->cacheable = WORK_QUEUE_TASK_FILE_UNCACHEABLE;
-	tf->length = strlen(fname);
-	tf->payload = strdup(fname);
-	tf->remote_name = strdup(rname);
-	list_push_tail(t->output_files,tf);
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_TASK_OUTPUT_FILE, WORK_QUEUE_TASK_FILE_UNCACHEABLE);
 }
 
 void work_queue_task_specify_input_buf( struct work_queue_task* t, const char* buf, int length, const char* rname)
@@ -1034,24 +1038,12 @@ void work_queue_task_specify_input_buf( struct work_queue_task* t, const char* b
 
 void work_queue_task_specify_input_file( struct work_queue_task* t, const char* fname, const char* rname)
 {
-	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
-	tf->fname_or_literal = WORKER_FILE_NAME;
-	tf->cacheable = WORK_QUEUE_TASK_FILE_CACHEABLE;
-	tf->length = strlen(fname);
-	tf->payload = strdup(fname);
-	tf->remote_name = strdup(rname);
-	list_push_tail(t->input_files,tf);
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_TASK_INPUT_FILE, WORK_QUEUE_TASK_FILE_CACHEABLE);
 }
 
 void work_queue_task_specify_input_file_do_not_cache( struct work_queue_task* t, const char* fname, const char* rname)
 {
-	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
-	tf->fname_or_literal = WORKER_FILE_NAME;
-	tf->cacheable = WORK_QUEUE_TASK_FILE_UNCACHEABLE;
-	tf->length = strlen(fname);
-	tf->payload = strdup(fname);
-	tf->remote_name = strdup(rname);
-	list_push_tail(t->input_files,tf);
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_TASK_INPUT_FILE, WORK_QUEUE_TASK_FILE_UNCACHEABLE);
 }
 
 int work_queue_task_specify_algorithm( struct work_queue_task* t, int alg ) {
