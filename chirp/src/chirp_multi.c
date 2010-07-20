@@ -130,7 +130,7 @@ struct chirp_volume * chirp_volume_open( const char *volume, time_t stoptime )
 
 	/* Get an upper bound on the servers by counting the whitespace */
 	int maxservers = 0;
-	for(c=buffer;*c;c++) if(isspace(*c)) maxservers++;
+	for(c=buffer;*c;c++) if(isspace((int)*c)) maxservers++;
 
 	/* Allocate space for an array of servers */
 	v->servers = malloc(sizeof(struct chirp_server *)*maxservers);

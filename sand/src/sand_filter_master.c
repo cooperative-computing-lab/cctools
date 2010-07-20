@@ -715,7 +715,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 			break;
 		case 'f':
 			end_char = optarg[0];
-			if (isalnum(end_char) || (end_char == '>') || (end_char < ' '))
+			if (isalnum((int)end_char) || (end_char == '>') || (end_char < ' '))
 			{
 				fprintf(stderr, "End character (-f %c (%d)) must not be alphanumeric, cannot be '>',\ncannot be whitespace, and cannot be printable. Please choose a punctuation\ncharacter besides '>'.\n", end_char, (int) end_char);
 				exit(1);  

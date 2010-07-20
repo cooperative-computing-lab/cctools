@@ -215,7 +215,7 @@ INT64_T string_metric_parse( const char *str )
 	fields = sscanf(str,INT64_FORMAT "%c",&result,&prefix);
 	if(fields==1) return result;
 
-	switch(toupper(prefix)) {
+	switch(toupper((int)prefix)) {
 		case 'K':
 			factor = 1024LL;
 			break;
@@ -442,7 +442,7 @@ char * string_subst( char *value, string_subst_lookup_t lookup, void *arg )
 		} else {
 			ldelim--;
 			rdelim = ldelim+1;
-			while(isalnum(*rdelim) || *rdelim == '_') rdelim++;
+			while(isalnum((int)*rdelim) || *rdelim == '_') rdelim++;
 		}
 
 		oldrdelim = *rdelim;
@@ -670,7 +670,7 @@ void string_collapse_path( const char *l, char *s, int remove_dotdot )
 void string_tolower( char *s )
 {
 	while(*s) {
-		*s = tolower((*s));
+		*s = tolower((int)(*s));
 		s++;
 	}
 }
@@ -678,7 +678,7 @@ void string_tolower( char *s )
 void string_toupper( char *s )
 {
 	while(*s) {
-		*s = toupper((*s));
+		*s = toupper((int)(*s));
 		s++;
 	}
 }
@@ -686,7 +686,7 @@ void string_toupper( char *s )
 int string_is_integer( const char *s )
 {
 	while(*s) {
-		if(!isdigit(*s)) return 0;
+		if(!isdigit((int)*s)) return 0;
 		s++;
 	}
 	return 1;
@@ -695,7 +695,7 @@ int string_is_integer( const char *s )
 int string_isspace( const char *s )
 {
 	while(*s) {
-		if(!isspace(*s)) return 0;
+		if(!isspace((int)*s)) return 0;
 		s++;
 	}
 

@@ -1856,7 +1856,7 @@ void process_string(char * str)
 	//int len = 0;
 	while (*str != '\0')
 	{
-		*str = toupper(*str);
+		*str = toupper((int)*str);
 		str++;
 		//len++;
 	}
@@ -1881,7 +1881,7 @@ void convert_to_upper(char * str)
 	
 	while (*str != '\0')
 	{
-		*str = toupper(*str);
+		*str = toupper((int)*str);
 		str++;
 	}
 }

@@ -303,6 +303,7 @@ void *thr_function_compare(void *arg)
 	}
 
 	pthread_exit(NULL);
+	return 0;
 }
 
 

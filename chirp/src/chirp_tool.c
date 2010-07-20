@@ -267,7 +267,7 @@ int main( int argc, char *argv[] )
 		if(!line[0]) continue;
 
         if (!interactive_mode && (temp = strchr(line, '#'))) { /* comment? */
-			for (temp--; temp > line && isspace(*temp); temp--)
+			for (temp--; temp > line && isspace((int)*temp); temp--)
               ; /* preceding space? */
 			if (temp <= line) continue; /* else not comment */
 		}

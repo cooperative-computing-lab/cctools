@@ -46,7 +46,7 @@ newlines, and other crazy stuff like that.
 static void auth_sanitize( char *s )
 {
 	while(*s) {
-		if(isspace(*s) || !isprint(*s)) {
+		if( isspace((int)(*s)) || !isprint((int)(*s)) ) {
 			*s = '_';
 		}
 		s++;

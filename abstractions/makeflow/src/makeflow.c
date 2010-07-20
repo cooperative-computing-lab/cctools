@@ -715,7 +715,7 @@ static char *translate_command( struct dag *d, char *old_command, int is_local )
 	UPTRINT_T current_length = (UPTRINT_T)0;
 
 	for (sp = old_command; *sp; sp++)
-	    if (isspace(*sp)) padding += 2;
+	    if (isspace((int)*sp)) padding += 2;
 
 	new_command = malloc((strlen(old_command)+padding) * sizeof(char));
 	new_command[0] = '\0';
@@ -805,13 +805,13 @@ void dag_parse_assignment( struct dag *d, char *line )
 	char *value=eq+1;
 
 	// advance value to the first non-whitespace
-	while(*value && isspace(*value)) value++;
+	while(*value && isspace((int)*value)) value++;
 
 	// set = and any preceding whitespace to null
 	do {
 		*eq=0;
 		if (eq > line) eq--;
-	} while(eq>line && isspace(*eq));
+	} while(eq>line && isspace((int)*eq));
 
 	if(eq==name) {
 		fprintf(stderr,"makeflow: error at %s:%d: variable assignment has no name!\n",d->filename,d->linenum);
@@ -955,7 +955,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 	}
 
 	char *c=line;
-	while(*c && isspace(*c)) c++;
+	while(*c && isspace((int)*c)) c++;
 	if(!strncmp(c,"LOCAL ",6)) {
 		n->local_job = 1;
 		c+=6;

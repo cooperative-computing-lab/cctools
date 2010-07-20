@@ -131,7 +131,7 @@ static int ftp_lite_get_response( struct ftp_lite_server *s, int accept_note, ch
 					c = fgetc(s->response);
 				} while(c==EOF && errno==EINTR);
 				ungetc(c,s->response);
-				if(!isdigit(c)) {
+				if(!isdigit((int)c)) {
 					result = 0;
 					errno = ECONNRESET;
 				} else if(c=='6') {
@@ -151,7 +151,7 @@ static int ftp_lite_get_response( struct ftp_lite_server *s, int accept_note, ch
 
 		debug(D_FTP,"%s %s\n",s->hostname,buffer);
 
-		if(!isdigit(buffer[0])) continue;
+		if(!isdigit((int)(buffer[0]))) continue;
 
 		fields = sscanf(buffer,"%d%c",&response,&dash);
 		if(fields!=2) {

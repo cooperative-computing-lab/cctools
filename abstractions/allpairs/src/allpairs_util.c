@@ -121,7 +121,7 @@ int file_line_count(const char *filename)
 
 	while(fgets(buffer, MAX_FILENAME_LEN, fp) != NULL) {
 		for(i = 0; i < strlen(buffer); i++) {
-			if(isspace(buffer[i]) != 1) {
+			if(isspace((int)buffer[i]) != 1) {
 				count++;
 				break;
 			}

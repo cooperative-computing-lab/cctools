@@ -163,7 +163,7 @@ static struct hash_table* build_completed_table(const char* filename, int* numDo
 int isAllWhitespace(char* s) {
     int i;
     for(i=0; i<strlen(s); i++)
-	if(!isspace(s[i]))
+	if(!isspace((int)s[i]))
 	   return 0;
     return 1;
 }
@@ -184,7 +184,7 @@ int isValidClosing(char* s) {
 	    }
 	}
 	else { //make sure nothing except close and whitespace 
-	    if(!isspace(s[i])) {
+	    if(!isspace((int)s[i])) {
 		return 0;
 	    }
 	}
@@ -218,7 +218,7 @@ int findFirstOVLRecord(char* s) {
 		}
 	    }
 	    else { //make sure nothing except an open and whitespace before first record
-		if(!isspace(s[i])) {
+		if(!isspace((int)s[i])) {
 		    fprintf(stderr, "Non-whitespace before first OVL Record in task!\n");
 		    return -1;
 		}
@@ -246,7 +246,7 @@ int findFirstOVLRecord(char* s) {
 		}
 	    }
 	    else { //make sure nothing except an open and whitespace before first record
-		if(!isspace(s[i])) {
+		if(!isspace((int)s[i])) {
 		    fprintf(stderr, "Non-whitespace before first OVL Record in task!\n");
 		    return -1;
 		}
