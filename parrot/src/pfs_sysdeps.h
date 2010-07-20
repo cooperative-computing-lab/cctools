@@ -265,7 +265,7 @@ of the null-terminated name, rounded up to 8-byte alignment.
 */
 
 #define DIRENT_SIZE( x ) \
-	ROUND_UP(((char*)&(x).d_name[0]-(char*)&(x)) + strlen((x).d_name) + 1)
+	ROUND_UP(((char*)&(x).d_name[0]-(char*)&(x)) + strlen((x).d_name) + 2)
 
 #define COPY_DIRENT( a, b ) \
 	memset(&(b),0,sizeof((b))); \
