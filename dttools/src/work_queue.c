@@ -856,7 +856,8 @@ int work_queue_specify_name( struct work_queue *q, const char *name )
 		q->name = strdup(name);
 		setenv("WORK_QUEUE_NAME", q->name, 1);
 		wq_master_mode = MASTER_MODE_CATALOG;
-		outgoing_datagram = datagram_create(0);
+		if(!outgoing_datagram)
+			outgoing_datagram = datagram_create(0);
 		if(!outgoing_datagram)
 			fatal("Couldn't create outgoing udp port (thus work queue master info won't be sent to the catalog server)");
 		update_catalog(q);
