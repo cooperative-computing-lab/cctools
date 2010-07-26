@@ -840,19 +840,7 @@ struct work_queue * work_queue_create(int port)
 		q->priority = WORK_QUEUE_DEFAULT_PRIORITY;
 	}
 
-	// Update catalog server if WORK_QUEUE_NAME environment variable is set
-	if (q->name) {
-		debug(D_DEBUG,"Work Queue - \"%s\" is listening on port %d.", q->name, port);
-		wq_master_mode = MASTER_MODE_CATALOG;
-		outgoing_datagram = datagram_create(0);
-		if(!outgoing_datagram)
-			fatal("Couldn't create outgoing udp port (thus work queue master info won't be sent to the catalog server)");
-		update_catalog(q);
-		catalog_update_time = time(0);
-	} else {
-		debug(D_DEBUG,"Work Queue is listening on port %d.", port);
-	}
-
+	debug(D_DEBUG,"Work Queue is listening on port %d.", port);
 	return q;
 
 	failure:
@@ -867,6 +855,12 @@ int work_queue_specify_name( struct work_queue *q, const char *name )
 		if (q->name) free(q->name);
 		q->name = strdup(name);
 		setenv("WORK_QUEUE_NAME", q->name, 1);
+		wq_master_mode = MASTER_MODE_CATALOG;
+		outgoing_datagram = datagram_create(0);
+		if(!outgoing_datagram)
+			fatal("Couldn't create outgoing udp port (thus work queue master info won't be sent to the catalog server)");
+		update_catalog(q);
+		catalog_update_time = time(0);
 		return 1;
 	}
 
