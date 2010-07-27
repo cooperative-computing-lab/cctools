@@ -4,9 +4,8 @@ show_help()
 {
 	echo "Use: condor_submit_workers [options] <servername> <port> <num-workers>"
 	echo "options:"
-	echo "  -a        Enable auto master selection mode."
-	echo "  -S        Run as a shared worker."
 	echo "  -N <name> Preferred master name."
+	echo "  -S        Run as a shared worker."
 	echo "  -t <time> Abort after this amount of idle time. (default=900s)"
 	echo "  -h        Show this help message."
 	exit 1
@@ -18,9 +17,8 @@ use_auto=0
 while getopts aSN:t:h opt 
 do
 	case "$opt" in
-		a)  arguments="$arguments -a"; use_auto=1;;
-		S)  arguments="$arguments -S";;
-		N)  arguments="$arguments -N $OPTARG";;
+		S)  arguments="$arguments -S"; use_auto=1;;
+		N)  arguments="$arguments -N $OPTARG"; use_auto=1;;
 		t)  arguments="$arguments -t $OPTARG";;
 		h)  show_help;;
 		\?) show_help;;
