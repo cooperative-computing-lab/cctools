@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include <ctype.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <signal.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -90,6 +91,7 @@ struct dag_file {
 
 struct dag_node {
 	int only_my_children;
+	time_t previous_completion;
 	int linenum;
 	int nodeid;
 	int local_job;
@@ -520,6 +522,82 @@ void dag_clean( struct dag *d )
 	clean_symlinks(d, 0);
 }
 
+void dag_node_set_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
+int dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n) {
+	struct stat filestat;
+	struct dag_file *f;
+	
+	if(itable_lookup(rerun_table, n->nodeid)) return 0;
+
+	// Below are a bunch of situations when a node has to be rerun.
+
+	// Input file has been updated since last execution
+	for(f=n->source_files;f;f=f->next) {
+		if(!stat(f->filename, &filestat)) {
+			if(difftime(filestat.st_mtime, n->previous_completion) > 0) {
+				return 1; // rerun this node
+			}
+		} else {
+			// Cannot stat input file. Fatal error.
+			if(!hash_table_lookup(d->file_table, f->filename)) {
+				fprintf(stderr, "Cannot access input file - %s.\nMakeflow terminating ...\n", f->filename);
+				exit(1);
+			} else {
+				return 1;
+			}
+		}
+	}
+
+	// Output file has been updated/deleted since last execution
+	for(f=n->target_files;f;f=f->next) {
+		if(!stat(f->filename, &filestat)) {
+			if(difftime(filestat.st_mtime, n->previous_completion) > 0) {
+				return 1;
+			}
+		} else {
+			return 1;
+		}
+	}
+
+	// Tasks failed or had not started in the previous execution
+	if(n->state != DAG_NODE_STATE_COMPLETE && n->state != DAG_NODE_STATE_RUNNING) {
+		return 1;
+	}
+
+	// Do not rerun this node
+	return 0; 
+}
+
+void dag_node_set_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n) {
+	struct dag_node *p;
+	struct dag_file *f1;
+	struct dag_file *f2;
+	int child_node_found;
+
+	if(!dag_node_decide_rerun(rerun_table, d, n)) return;
+
+	dag_node_clean(d,n);
+	dag_node_state_change(d,n,DAG_NODE_STATE_WAITING);
+
+	for(f1=n->target_files;f1;f1=f1->next) {
+		for(p=d->nodes;p;p=p->next) {
+			child_node_found = 0;
+			for(f2=p->source_files;f2;f2=f2->next) {
+				if(!strcmp(f1->filename, f2->filename)) {
+					child_node_found = 1;
+					break;
+				}
+			}
+			if(child_node_found) {
+				dag_node_set_rerun(rerun_table, d, p);
+			}
+		}
+	}
+
+	itable_insert(rerun_table,n->nodeid,n);
+}
+
+
 void dag_log_recover( struct dag *d, const char *filename )
 {
 	int linenum = 0;
@@ -527,6 +605,7 @@ void dag_log_recover( struct dag *d, const char *filename )
 	int nodeid, state, jobid;
 	int first_run = 1;
 	struct dag_node *n;
+	unsigned int previous_completion_time;
 
 	d->logfile = fopen(filename,"r");
 	if(d->logfile) {
@@ -536,11 +615,12 @@ void dag_log_recover( struct dag *d, const char *filename )
 			linenum++;
 
 			if(line[0] == '#') continue;
-			if(sscanf(line,"%*u %d %d %d",&nodeid,&state,&jobid)==3) {
+			if(sscanf(line,"%u %d %d %d", &previous_completion_time, &nodeid,&state,&jobid)==4) {
 				n = itable_lookup(d->node_table,nodeid);
 				if(n) {
 					n->state = state;
 					n->jobid = jobid;
+					n->previous_completion = (time_t)previous_completion_time;
 					continue;
 				}
 			}
@@ -585,6 +665,21 @@ void dag_log_recover( struct dag *d, const char *filename )
 			dag_node_clean(d,n);
 			dag_node_state_change(d,n,DAG_NODE_STATE_WAITING);
 		}
+	}
+
+
+
+	// rerun stuff
+	if(!first_run) {
+		struct itable *rerun_table = itable_create(0);
+		for(n=d->nodes;n;n=n->next) {
+			dag_node_set_rerun(rerun_table, d, n);
+		}
+	}
+
+	// test
+	for(n=d->nodes;n;n=n->next) {
+		printf("%d:\t%d\n", n->nodeid, n->state);
 	}
 }
 
