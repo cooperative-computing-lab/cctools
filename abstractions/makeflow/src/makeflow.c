@@ -669,17 +669,12 @@ void dag_log_recover( struct dag *d, const char *filename )
 
 
 
-	// rerun stuff
+	// Check file system status to decide rerun tasks 
 	if(!first_run) {
 		struct itable *rerun_table = itable_create(0);
 		for(n=d->nodes;n;n=n->next) {
 			dag_node_set_rerun(rerun_table, d, n);
 		}
-	}
-
-	// test
-	for(n=d->nodes;n;n=n->next) {
-		printf("%d:\t%d\n", n->nodeid, n->state);
 	}
 }
 
