@@ -376,7 +376,7 @@ int batch_job_remove_sge( struct batch_queue *q, batch_job_id_t jobid )
 	sprintf(line,"qdel %d",jobid);
 	system(line);
 
-	return 0;
+	return 1;
 }
 
 /***************************************************************************************/
@@ -526,7 +526,7 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 
 int batch_job_remove_work_queue( struct batch_queue *q, batch_job_id_t jobid )
 {
-	return -1;
+	return 0;
 }
 
 /***************************************************************************************/
