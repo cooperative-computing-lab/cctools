@@ -253,10 +253,9 @@ static void show_help(const char *cmd)
 	printf("Use: %s <masterhost> <port>\n", cmd);
 	printf("where options are:\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.\n");
-	printf(" -a             Enable auto master selection mode.\n");
-	printf(" -N <name>      Preferred master name.\n");
+	printf(" -N <name>      Enable auto master selection mode and use this preferred master name.\n");
+	printf(" -S             Enable auto master selection mode and run as a non-exclusive shared worker.\n");
 	printf(" -t <time>      Abort after this amount of idle time. (default=%ds)\n",idle_timeout);
-	printf(" -S             Run as a shared worker. (Would work for non-preferred master when preferred master is not up.)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -w <size>      Set TCP window size.\n");
@@ -284,14 +283,8 @@ int main( int argc, char *argv[] )
 	
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "ac:d:t:o:N:s:Sw:vih")) != (char) -1) {
+	while((c = getopt(argc, argv, "d:t:o:N:s:Sw:vih")) != (char) -1) {
 		switch (c) {
-		case 'a':
-			auto_worker = 1;	
-			break;
-		case 'c':
-			auto_worker = 1;	
-			break;
 		case 's':
 			port = parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port);
 			if(!port) {
@@ -300,6 +293,7 @@ int main( int argc, char *argv[] )
 			}
 			break;
 		case 'S':
+			auto_worker = 1;	
 			exclusive_worker = 0;	
 			break;
 		case 'd':
@@ -312,6 +306,7 @@ int main( int argc, char *argv[] )
 			debug_config_file(optarg);
 			break;
 		case 'N':
+			auto_worker = 1;	
 			preference = strdup(optarg);
 			break;
 		case 'v':
