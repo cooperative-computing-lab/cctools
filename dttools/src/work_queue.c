@@ -458,9 +458,9 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, in
 	struct stat *remote_info;
 	char* hash_name;
 	time_t stoptime;
-	timestamp_t open_time=0;
-	timestamp_t close_time=0;
-	timestamp_t sum_time=0;
+	//timestamp_t open_time=0;
+	//timestamp_t close_time=0;
+	//timestamp_t sum_time=0;
 	int actual=0;
 	int dir = 0;
 	
@@ -505,13 +505,13 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, in
 		if(fd<0) return 0;
 		
 		stoptime = time(0) + MAX(1.0,local_info.st_size/1250000.0);
-		open_time = timestamp_get();
+		//open_time = timestamp_get();
 
 		link_printf(w->link,"put %s %d 0%o\n",tf->remote_name,(int)local_info.st_size,local_info.st_mode);
 		
 		actual = link_stream_from_fd(w->link,fd,local_info.st_size,stoptime);
 		close(fd);
-		close_time = timestamp_get();
+		//close_time = timestamp_get();
 		
 		if(actual!=local_info.st_size) return 0;
 		
@@ -523,7 +523,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, in
 		
 		*total_bytes+=actual;
 		
-		sum_time+=(close_time-open_time);
+		//sum_time+=(close_time-open_time);
 	}
 	
 	free(hash_name);
@@ -558,7 +558,10 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 				total_bytes+=actual;
 				sum_time+=(close_time-open_time);
 			} else {
+				open_time = timestamp_get();
 				if (!put_file(tf, w, &total_bytes)) goto failure;
+				close_time = timestamp_get();
+				sum_time+=(close_time-open_time);
 			}
 		}
 		t->total_bytes_transfered += total_bytes;
