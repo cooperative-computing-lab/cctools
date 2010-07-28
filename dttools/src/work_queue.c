@@ -234,8 +234,8 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 {
 	char line[WORK_QUEUE_LINE_MAX];
 	struct work_queue_file* tf;
-	int actual,fd;
-	int length;
+	int fd;
+	INT64_T actual, length;
 	time_t stoptime;
 
 	// This may be where I can trigger output file cache
@@ -253,7 +253,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 
 			link_printf(w->link,"get %s\n",tf->remote_name);
 			if(!link_readline(w->link,line,sizeof(line),time(0)+short_timeout)) goto failure;
-			if(sscanf(line,"%d",&length)!=1) goto failure;
+			if(sscanf(line,"%lld",&length)!=1) goto failure;
 			if(length>=0) {
 				fd = open(tf->payload,O_WRONLY|O_TRUNC|O_CREAT,0700);
 				if(fd<0) goto failure;

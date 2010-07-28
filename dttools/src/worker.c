@@ -366,7 +366,8 @@ int main( int argc, char *argv[] )
 
 	while(!abort_flag) {
 		char line[WORK_QUEUE_LINE_MAX];
-		int result, length, mode, fd;
+		int result, mode, fd;
+		INT64_T length;
 		char filename[WORK_QUEUE_LINE_MAX];
 		char path[WORK_QUEUE_LINE_MAX];
 		char *buffer;
@@ -404,7 +405,7 @@ int main( int argc, char *argv[] )
 
 		if(link_readline(master,line,sizeof(line),time(0)+active_timeout)) {
 			debug(D_DEBUG,"%s",line);
-			if(sscanf(line,"work %d",&length)) {
+			if(sscanf(line,"work %lld",&length)) {
 				buffer = malloc(length+10);
 				link_read(master,buffer,length,time(0)+active_timeout);
 				buffer[length] = 0;
@@ -421,16 +422,16 @@ int main( int argc, char *argv[] )
 					result = -1;
 					buffer = 0;
 				}
-				sprintf(line,"result %d %d\n",result,length);
+				sprintf(line,"result %d %lld\n",result,length);
 				debug(D_DEBUG,"%s",line);
 				link_write(master,line,strlen(line),time(0)+active_timeout);
 				link_write(master,buffer,length,time(0)+active_timeout);
 				if(buffer) free(buffer);
-			} else if(sscanf(line,"put %s %d %o",filename,&length,&mode)==3) {
+			} else if(sscanf(line,"put %s %lld %o",filename,&length,&mode)==3) {
 				mode = mode | 0600;
 				fd = open(filename,O_WRONLY|O_CREAT|O_TRUNC,mode);
 				if(fd<0) goto recover;
-				int actual = link_stream_to_fd(master,fd,length,time(0)+active_timeout);
+				INT64_T actual = link_stream_to_fd(master,fd,length,time(0)+active_timeout);
 				close(fd);
 				if(actual!=length) goto recover;
 			} else if(sscanf(line, "unlink %s", path) == 1) {
@@ -452,11 +453,14 @@ int main( int argc, char *argv[] )
 					struct stat info;
 					fstat(fd,&info);
 					length = info.st_size;
-					sprintf(line,"%d\n",(int)length);
+					sprintf(line,"%lld\n",length);
 					link_write(master,line,strlen(line),time(0)+active_timeout);
-					int actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
+					INT64_T actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
 					close(fd);
-					if(actual!=length) goto recover;
+					if(actual!=length) {
+						debug(D_DEBUG,"Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, length, actual);
+						goto recover;
+					}
 				} else {
 					sprintf(line,"-1\n");
 					link_write(master,line,strlen(line),time(0)+active_timeout);
