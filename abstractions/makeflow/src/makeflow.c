@@ -459,12 +459,14 @@ void dag_abort_all( struct dag *d )
 	while(itable_nextkey(d->local_job_table,&jobid,(void**)&n)) {
 		printf("makeflow: aborting local job %llu\n",jobid);
 		batch_job_remove(local_queue,jobid);
+		dag_node_state_change(d,n,DAG_NODE_STATE_ABORTED);
 	}
 
 	itable_firstkey(d->remote_job_table);
 	while(itable_nextkey(d->remote_job_table,&jobid,(void**)&n)) {
 		printf("makeflow: aborting remote job %llu\n",jobid);
 		batch_job_remove(remote_queue,jobid);
+		dag_node_state_change(d,n,DAG_NODE_STATE_ABORTED);
 	}
 }
 
@@ -574,9 +576,26 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 	struct dag_file *f2;
 	int child_node_found;
 
+	// Remove running batch jobs
+	if(n->state==DAG_NODE_STATE_RUNNING) {
+		if(n->local_job) {
+			batch_job_remove(local_queue, n->jobid);
+			if(itable_remove(d->local_job_table, n->jobid)) {
+				d->local_jobs_running--;
+			}
+		} else {
+			batch_job_remove(remote_queue, n->jobid);
+			if(itable_remove(d->remote_job_table, n->jobid)) {
+				d->remote_jobs_running--;
+			}
+		}
+	}
+
+	// Clean up things associated with this node
 	dag_node_clean(d,n);
 	dag_node_state_change(d,n,DAG_NODE_STATE_WAITING);
 
+	// For each child node, rerun it
 	for(f1=n->target_files;f1;f1=f1->next) {
 		for(p=d->nodes;p;p=p->next) {
 			child_node_found = 0;
@@ -592,6 +611,7 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 		}
 	}
 
+	// Mark this node as having been rerun already
 	itable_insert(rerun_table,n->nodeid,n);
 }
 
