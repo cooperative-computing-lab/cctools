@@ -522,12 +522,14 @@ void dag_clean( struct dag *d )
 	clean_symlinks(d, 0);
 }
 
-void dag_node_set_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
-int dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n) {
+void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
+
+// Decide whether to rerun a node based on file system status
+void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n) {
 	struct stat filestat;
 	struct dag_file *f;
 	
-	if(itable_lookup(rerun_table, n->nodeid)) return 0;
+	if(itable_lookup(rerun_table, n->nodeid)) return;
 
 	// Below are a bunch of situations when a node has to be rerun.
 
@@ -535,7 +537,7 @@ int dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 	for(f=n->source_files;f;f=f->next) {
 		if(!stat(f->filename, &filestat)) {
 			if(difftime(filestat.st_mtime, n->previous_completion) > 0) {
-				return 1; // rerun this node
+				goto rerun; // rerun this node
 			}
 		} else {
 			// Cannot stat input file. Fatal error.
@@ -543,7 +545,7 @@ int dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 				fprintf(stderr, "Cannot access input file - %s.\nMakeflow terminating ...\n", f->filename);
 				exit(1);
 			} else {
-				return 1;
+				goto rerun;
 			}
 		}
 	}
@@ -552,29 +554,25 @@ int dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 	for(f=n->target_files;f;f=f->next) {
 		if(!stat(f->filename, &filestat)) {
 			if(difftime(filestat.st_mtime, n->previous_completion) > 0) {
-				return 1;
+				goto rerun;
 			}
 		} else {
-			return 1;
+			goto rerun;
 		}
 	}
 
-	// Tasks failed or had not started in the previous execution
-	if(n->state != DAG_NODE_STATE_COMPLETE && n->state != DAG_NODE_STATE_RUNNING) {
-		return 1;
-	}
-
 	// Do not rerun this node
-	return 0; 
+	return; 
+
+rerun:
+	dag_node_force_rerun(rerun_table, d, n);
 }
 
-void dag_node_set_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n) {
+void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n) {
 	struct dag_node *p;
 	struct dag_file *f1;
 	struct dag_file *f2;
 	int child_node_found;
-
-	if(!dag_node_decide_rerun(rerun_table, d, n)) return;
 
 	dag_node_clean(d,n);
 	dag_node_state_change(d,n,DAG_NODE_STATE_WAITING);
@@ -589,7 +587,7 @@ void dag_node_set_rerun(struct itable *rerun_table, struct dag *d, struct dag_no
 				}
 			}
 			if(child_node_found) {
-				dag_node_set_rerun(rerun_table, d, p);
+				dag_node_force_rerun(rerun_table, d, p);
 			}
 		}
 	}
@@ -660,7 +658,7 @@ void dag_log_recover( struct dag *d, const char *filename )
 			printf("makeflow: rule still running: %s\n",n->command);
 			itable_insert(d->remote_job_table,n->jobid,n);
 			d->remote_jobs_running++;
-		} else if(n->state==DAG_NODE_STATE_RUNNING || n->state==DAG_NODE_STATE_FAILED || n->state==DAG_NODE_STATE_FAILED) {
+		} else if(n->state==DAG_NODE_STATE_RUNNING || n->state==DAG_NODE_STATE_FAILED || n->state==DAG_NODE_STATE_ABORTED) {
 			printf("makeflow: will retry failed rule: %s\n",n->command);
 			dag_node_clean(d,n);
 			dag_node_state_change(d,n,DAG_NODE_STATE_WAITING);
@@ -673,7 +671,7 @@ void dag_log_recover( struct dag *d, const char *filename )
 	if(!first_run) {
 		struct itable *rerun_table = itable_create(0);
 		for(n=d->nodes;n;n=n->next) {
-			dag_node_set_rerun(rerun_table, d, n);
+			dag_node_decide_rerun(rerun_table, d, n);
 		}
 	}
 }
