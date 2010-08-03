@@ -17,26 +17,26 @@ LOCAL_LDFLAGS = -ls3client -lm -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
 all: ${LIBRARIES} ${PROGRAMS}
 
-s3put: s3put.o s3common.o 
+s3put: s3put.o libs3client.a 
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-s3get: s3get.o s3common.o 
+s3get: s3get.o libs3client.a 
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-s3stat: s3stat.o s3common.o 
+s3stat: s3stat.o libs3client.a 
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-s3rm: s3rm.o s3common.o 
+s3rm: s3rm.o libs3client.a 
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-s3mkdir: s3mkdir.o s3common.o 
+s3mkdir: s3mkdir.o libs3client.a 
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-s3rmdir: s3rmdir.o s3common.o 
+s3rmdir: s3rmdir.o libs3client.a 
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-s3ls: s3ls.o s3common.o
+s3ls: s3ls.o libs3client.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-s3getacl: s3getacl.o s3common.o 
+s3getacl: s3getacl.o libs3client.a 
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-s3setacl: s3setacl.o s3common.o 
+s3setacl: s3setacl.o libs3client.a 
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-libs3client.a: s3c_util.o s3c_file.o s3c_bucket.o s3c_acl.o
+libs3client.a: s3common.o s3c_util.o s3c_file.o s3c_bucket.o s3c_acl.o
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
 
