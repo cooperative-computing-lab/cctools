@@ -588,6 +588,7 @@ optional_file /usr/include/alloca.h HAS_ALLOCA_H
 
 linker="gcc"
 
+library_search crypto   /usr
 library_search selinux  /usr
 library_search sepol    /usr
 library_search keyutils-1.2 /
