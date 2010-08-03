@@ -537,14 +537,13 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 
 	// Input file has been updated since last execution
 	for(f=n->source_files;f;f=f->next) {
-		if(!stat(f->filename, &filestat)) {
+		if(stat(f->filename, &filestat)>=0) {
 			if(difftime(filestat.st_mtime, n->previous_completion) > 0) {
 				goto rerun; // rerun this node
 			}
 		} else {
-			// Cannot stat input file. Fatal error.
 			if(!hash_table_lookup(d->file_table, f->filename)) {
-				fprintf(stderr, "Cannot access input file - %s.\nMakeflow terminating ...\n", f->filename);
+				fprintf(stderr, "makeflow: input file %s does not exist and is not created by any rule.\n",f->filename);
 				exit(1);
 			} else {
 				goto rerun;
@@ -554,7 +553,7 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 
 	// Output file has been updated/deleted since last execution
 	for(f=n->target_files;f;f=f->next) {
-		if(!stat(f->filename, &filestat)) {
+		if(stat(f->filename, &filestat)>=0) {
 			if(difftime(filestat.st_mtime, n->previous_completion) > 0) {
 				goto rerun;
 			}
