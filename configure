@@ -486,6 +486,32 @@ else
 	echo "*** skipping readline..."
 fi
 
+if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysql
+then
+	if [ ${mysql_path} != /usr ]
+	then
+		ccflags="${ccflags} -I${mysql_path}/include"
+	fi
+
+	ccflags="${ccflags} -DHAS_MYSQL -DHAS_BXGRID"
+
+	library_search mystrings ${mysql_path} mysql
+	library_search mysys ${mysql_path} mysql
+	library_search ssl /usr
+	library_search crypto /usr
+
+	config_krb5_path=yes
+else
+	if [ $config_mysql_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find MySQL in $mysql_path"
+		echo "*** Check --with-mysql-path and try again."
+		exit 1
+	else
+		echo "*** skipping mysql support"
+	fi
+fi
+
 # Solaris places kerberos includes in a strange place.
 
 if [ -d ${krb5_path}/include/kerberosv5 ]
@@ -541,28 +567,6 @@ then
         fi
 else
 	echo "*** skipping fuse support"
-fi
-
-if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysql
-then
-	if [ ${mysql_path} != /usr ]
-	then
-		ccflags="${ccflags} -I${mysql_path}/include"
-	fi
-
-	ccflags="${ccflags} -DHAS_MYSQL -DHAS_BXGRID"
-
-	library_search mystrings ${mysql_path} mysql
-	library_search mysys ${mysql_path} mysql
-else
-	if [ $config_mysql_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find MySQL in $mysql_path"
-		echo "*** Check --with-mysql-path and try again."
-		exit 1
-	else
-		echo "*** skipping mysql support"
-	fi
 fi
 
 if [ $config_zlib_path != no ] && library_search z ${zlib_path}
