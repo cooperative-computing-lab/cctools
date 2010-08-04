@@ -62,6 +62,7 @@ static int batch_job_submit_condor( struct batch_queue *q, const char *cmd, cons
 	fprintf(file,"when_to_transfer_output = on_exit\n");
 	fprintf(file,"notification = never\n");
 	fprintf(file,"copy_to_spool = true\n");
+	fprintf(file,"transfer_executable = true\n");
 	fprintf(file,"log = %s\n",q->logfile);
 	if(q->options_text) fprintf(file,"%s\n",q->options_text);
 	fprintf(file,"queue\n");
@@ -88,22 +89,32 @@ static int batch_job_submit_condor( struct batch_queue *q, const char *cmd, cons
 	return -1;
 }
 
-static int batch_job_submit_simple_condor( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
+static int setup_condor_wrapper( const char *wrapperfile )
 {
 	FILE *file;
 
-	file = fopen("condor.sh","w");
-	if(!file) {
-		debug(D_DEBUG,"could not create condor.sh: %s",strerror(errno));
-		return -1;
-	}
+	if(access(wrapperfile,R_OK|X_OK)==0) return 0;
+
+	file = fopen(wrapperfile,"w");
+	if(!file) return -1;
 
 	fprintf(file,"#!/bin/sh\n");
-	fprintf(file,"%s\n",cmd);
+	fprintf(file,"eval \"$@\"\n");
 	fprintf(file,"exit $?\n");
 	fclose(file);
 
-	chmod("condor.sh",0755);
+	chmod(wrapperfile,0755);
+
+	return 0;
+}
+
+
+static int batch_job_submit_simple_condor( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
+{
+	if(setup_condor_wrapper("condor.sh")<0) {
+		debug(D_DEBUG,"could not create condor.sh: %s",strerror(errno));
+		return -1;
+	}
 
 	return batch_job_submit_condor(q,"condor.sh",cmd,0,0,0,extra_input_files,extra_output_files);
 }
