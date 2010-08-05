@@ -111,9 +111,6 @@ struct dag_node {
 
 int dag_width( struct dag *d );
 
-/*****************Li's code************************************************************/
-
-
 int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 {
 	struct dag_node *n,*m,*tmp;
@@ -209,66 +206,31 @@ void dag_show_output_files(struct dag *d)
 	}
 }
 
-static int handle_auto_workers(struct dag *d, int auto_workers) {
+static int handle_auto_workers(struct dag *d, int auto_workers)
+{
 	char start_worker_line[1024];
-	char hostname[1024];
+	char hostname[DOMAIN_NAME_MAX];
 	int num_of_workers;
-	int rv;
 
-	time_t stoptime = time(0) + RANDOM_PORT_RETRY_TIME;
+	domain_name_cache_guess(hostname);
 
-	/* Force to create a workqueue on certain port since it's working under 'auto worker' or 'catalog server' mode. */
-	if (remote_queue == 0) {
-		// Try another port until success 
-		if(port < 9000 || port >= 10000) port = 9000;
-		srand(time(0));
-		port += rand()%1000;
-		while(time(0) < stoptime) {
-			char line[1024];
-			sprintf(line,"WORK_QUEUE_PORT=%d",port);
-			putenv(strdup(line));
-			remote_queue = batch_queue_create(batch_queue_type);
-			if(remote_queue) break;
-			port++;
-			if(port > 10000) port = 9000 + rand()%1000;
-		}
-	}
-
-	if(!remote_queue) {
-		fprintf(stderr, "makeflow: couldn't create work queue on random ports in %d minutes.\nTerminating makeflow...\n", RANDOM_PORT_RETRY_TIME/60);
-		return 0;
-	}
-
-	printf("makeflow: listening on port %d\n", port);
-
-	/* Automatically figure out number of workers and start those workers. */
-	// Start workers
-	gethostname(hostname, 1024);
-
-	if (auto_workers == MAKEFLOW_AUTO_GROUP)
-	{
+	if (auto_workers == MAKEFLOW_AUTO_GROUP) {
 		num_of_workers = dag_estimate_nodes_needed(d, d->remote_jobs_max); 
-	}
-	else if (auto_workers == MAKEFLOW_AUTO_WIDTH)
-	{
+	} else if (auto_workers == MAKEFLOW_AUTO_WIDTH) {
 		num_of_workers = dag_width(d);
 		if (num_of_workers > d->remote_jobs_max)
 			num_of_workers = d->remote_jobs_max;
 	}
 
 	sprintf(start_worker_line, "condor_submit_workers %s %d %d", hostname, port, num_of_workers);
-	printf("makeflow: starting workers: `%s`\n", start_worker_line);
-	rv = system(start_worker_line);
-	if (rv != 0)
-	{
-		fprintf(stderr, "condor_submit_workers failed. \nTerminating makeflow...\n");
+	printf("makeflow: starting %d workers: `%s`\n",num_of_workers,start_worker_line);
+	if (system(start_worker_line)) {
+		fprintf(stderr, "makeflow: unable to start workers.\n");
 		return 0;
 	}
 
 	return 1;
 }
-
-/*********^^^^^^^Li's code^^^^^^^^^*************************/
 
 /* Code added by kparting to compute the width of the graph.
    Original algorithm by pbui, with improvements by kparting */
@@ -1413,7 +1375,7 @@ static void show_help(const char *cmd)
 	printf(" -T <type>      Batch system type: %s. (default is unix)\n",batch_queue_type_string());
 	printf(" -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	printf(" -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
-	printf(" -p <port>      Port number to use with work queue.         (default is %d)\n",WORK_QUEUE_DEFAULT_PORT);
+	printf(" -p <port>      Port number to use with work queue.         (default is %d, -1=random)\n",WORK_QUEUE_DEFAULT_PORT);
 	printf(" -C             Syntax check.\n");
 	printf(" -N <project>   Report the master information to a catalog server with the project name - <project>\n");
 	printf(" -E <integer>   Priority. Higher the value, higher the priority.\n");
@@ -1632,7 +1594,6 @@ int main( int argc, char *argv[] )
 		return 0;
 	}
 
-	// Check display mode
 	if(display_mode == SHOW_INPUT_FILES) {
 		dag_show_input_files(d);
 		exit(0);
@@ -1717,43 +1678,17 @@ int main( int argc, char *argv[] )
 	setlinebuf(stderr);
 
 	local_queue = batch_queue_create(BATCH_QUEUE_TYPE_UNIX);
+	if(!local_queue) {
+		fprintf(stderr,"makeflow: couldn't create local job queue.\n");
+		exit(1);
+	}
+
 	remote_queue = batch_queue_create(batch_queue_type);
-
-	// When the batch queue type is Work Queue, check if the queue is successfully created.
-	if(batch_queue_type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		// Figure out which port work queue master is listening on
-		// Makeflow uses "work_queue_create(0,time(0)+60)" to create the queue, which uses the env variable "WORK_QUEUE_PORT"
-		const char *portstring = getenv("WORK_QUEUE_PORT");
-		if(portstring) {
-			port = atoi(portstring);
-		} else {
-			port = WORK_QUEUE_DEFAULT_PORT;
-		}
-
-		// Inital attempt to create a workqueue failed
-		if(remote_queue == 0 ) {
-			if(!auto_workers && !catalog_mode) {
-				fprintf(stderr,"makeflow: Sorry! Makeflow is not able to listen on port %d.\n", port);
-				fprintf(stderr,"makeflow: Please try a different port.\n");
-				dag_failed_flag = 1;
-				goto cleanup;
-			}
-
-			if(catalog_mode) {
-				fprintf(stderr,"makeflow: Sorry! Makeflow is not able create a work queue on any port.\n");
-				dag_failed_flag = 1;
-				goto cleanup;
-			}
-		}
-
-		if(auto_workers > 0) {
-			if(handle_auto_workers(d, auto_workers) == 0) {
-				dag_failed_flag = 1;
-				goto cleanup;
-			}
-		}
-   	}
-
+	if(!remote_queue) {
+		fprintf(stderr,"makeflow: couldn't create batch queue.\n");
+		if(port!=0) fprintf(stderr,"makeflow: perhaps port %d is already in use?\n",port);
+		exit(1);
+	}
 
 	if(batch_submit_options) {
 		batch_queue_set_options(remote_queue,batch_submit_options);
@@ -1761,6 +1696,15 @@ int main( int argc, char *argv[] )
 
 	if(batchlogfilename) {
 		batch_queue_set_logfile(remote_queue,batchlogfilename);
+	}
+
+	port = batch_queue_port(remote_queue);
+	if(port>0) printf("makeflow: listening on port %d.\n",port);
+
+	if(auto_workers>0) {
+		if(!handle_auto_workers(d, auto_workers)) {
+			exit(1);
+		}
 	}
 
 	dag_log_recover(d,logfilename);
@@ -1771,7 +1715,6 @@ int main( int argc, char *argv[] )
 
 	dag_run(d);
 
-cleanup:
 	batch_queue_delete(local_queue);
 	batch_queue_delete(remote_queue);
 
