@@ -109,9 +109,7 @@ struct dag_node {
 	int level;
 };
 
-// Function declarations:
 int dag_width( struct dag *d );
-// End of function declarations.
 
 /*****************Li's code************************************************************/
 
@@ -165,7 +163,6 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 	return max;
 }
 
-
 void dag_show_input_files(struct dag *d)
 {
 	struct dag_node *n,*m,*tmp;
@@ -200,8 +197,6 @@ void dag_show_input_files(struct dag *d)
 	hash_table_delete(ih);
 }
 
-
-
 void dag_show_output_files(struct dag *d)
 {
 	char *key;
@@ -210,7 +205,7 @@ void dag_show_output_files(struct dag *d)
 	hash_table_firstkey(d->file_table);
 
 	while(hash_table_nextkey(d->file_table, &key,&value)) {
-			printf("%s\n", key);
+		printf("%s\n", key);
 	}
 }
 
@@ -219,6 +214,7 @@ static int handle_auto_workers(struct dag *d, int auto_workers) {
 	char hostname[1024];
 	int num_of_workers;
 	int rv;
+
 	time_t stoptime = time(0) + RANDOM_PORT_RETRY_TIME;
 
 	/* Force to create a workqueue on certain port since it's working under 'auto worker' or 'catalog server' mode. */
@@ -239,11 +235,11 @@ static int handle_auto_workers(struct dag *d, int auto_workers) {
 	}
 
 	if(!remote_queue) {
-		fprintf(stderr, "Couldn't create work queue on random ports in %d minutes.\nTerminating makeflow...\n", RANDOM_PORT_RETRY_TIME/60);
+		fprintf(stderr, "makeflow: couldn't create work queue on random ports in %d minutes.\nTerminating makeflow...\n", RANDOM_PORT_RETRY_TIME/60);
 		return 0;
 	}
 
-	printf("Work Queue master is listening on port %d\n", port);
+	printf("makeflow: listening on port %d\n", port);
 
 	/* Automatically figure out number of workers and start those workers. */
 	// Start workers
@@ -261,7 +257,7 @@ static int handle_auto_workers(struct dag *d, int auto_workers) {
 	}
 
 	sprintf(start_worker_line, "condor_submit_workers %s %d %d", hostname, port, num_of_workers);
-	printf("Starting workers: `%s`\n", start_worker_line);
+	printf("makeflow: starting workers: `%s`\n", start_worker_line);
 	rv = system(start_worker_line);
 	if (rv != 0)
 	{
@@ -714,7 +710,7 @@ char * dag_readline( struct dag *d, FILE *file )
 		{
 			debug(D_DEBUG, "read line %d\n", d->linenum);
 			if (d->linenum % 100000 == 0)
-				fprintf(stderr, "makeflow: reading line %d\n", d->linenum);
+				printf("makeflow: reading line %d\n", d->linenum);
 		}
 
 		string_chomp(rawline);
@@ -941,12 +937,12 @@ void dag_node_parse_filelist( struct dag *d, struct dag_node *n, char *filelist,
 			rv = translate_filename(d, filename, &newname);
 			if (rv && !clean_mode && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR)
 			{
-				fprintf(stderr, "makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
+				printf("makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
 				rv = symlink(filename, newname);
 				if (rv < 0 && errno != EEXIST)
 				{
 					//TODO: Check for if symlink points to right place
-					fprintf(stderr, "makeflow: could not create symbolic link (%s)\n", strerror(errno));
+					fprintf(stderr,"makeflow: could not create symbolic link (%s)\n", strerror(errno));
 					exit(1);
 				}
 
@@ -1111,7 +1107,6 @@ struct dag * dag_create( const char *filename, int clean_mode )
 	if (!clean_mode)
 	{
 		debug(D_DEBUG, "checking for duplicate targets...\n");
-		fprintf(stderr, "makeflow: checking for duplicate targets...\n");
 	}
 	
 	for(n=d->nodes;n;n=n->next) {
@@ -1126,12 +1121,6 @@ struct dag * dag_create( const char *filename, int clean_mode )
 		}
 	}
 
-	if (!clean_mode)
-	{
-		debug(D_DEBUG, "DAG created.\n");
-		fprintf(stderr, "makeflow: DAG created.\n");
-	}
-	
 	return d;
 }
 
@@ -1313,7 +1302,7 @@ int dag_check( struct dag *d )
 	struct dag_node *n;
 	struct dag_file *f;
 
-	fprintf(stderr, "makeflow: checking rules for consistency...\n");
+	printf("makeflow: checking rules for consistency...\n");
 
 	for(n=d->nodes;n;n=n->next) {
 		for(f=n->source_files;f;f=f->next) {
@@ -1335,8 +1324,6 @@ int dag_check( struct dag *d )
 			return 0;
 		}
 	}
-
-	fprintf(stderr, "makeflow: Width of DAG: %d\n", dag_width(d));
 
 	return 1;			
 }
@@ -1513,7 +1500,7 @@ int main( int argc, char *argv[] )
 			break;
 		case 's':
 			if(!parse_catalog_server_description(optarg)) {
-				fprintf(stderr,"The provided catalog server is invalid. The format of the '-s' option should be '-s HOSTNAME:PORT'.\n");
+				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
 			}
 			break;
@@ -1733,7 +1720,7 @@ int main( int argc, char *argv[] )
 	remote_queue = batch_queue_create(batch_queue_type);
 
 	// When the batch queue type is Work Queue, check if the queue is successfully created.
-    if(batch_queue_type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
+	if(batch_queue_type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		// Figure out which port work queue master is listening on
 		// Makeflow uses "work_queue_create(0,time(0)+60)" to create the queue, which uses the env variable "WORK_QUEUE_PORT"
 		const char *portstring = getenv("WORK_QUEUE_PORT");
@@ -1789,8 +1776,7 @@ cleanup:
 	batch_queue_delete(remote_queue);
 
 	if (!preserve_symlinks && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
-		fprintf(stderr, "makeflow: cleaning up intermediate symlinks...\n");
-		clean_symlinks(d, 1);	/* Silently remove symlinks */
+		clean_symlinks(d,0);
 	}
 
 	if (logfilename) free(logfilename);
