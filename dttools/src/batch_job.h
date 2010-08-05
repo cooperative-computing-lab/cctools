@@ -165,4 +165,11 @@ Useful for including in help-option outputs.
 
 const char * batch_queue_type_string();
 
+/** Returns the port number of the batch queue.
+Currently only relevant for the work queue implementation.
+@param q The batch queue of interest.
+@return The port number in use, or zero if not applicable.
+*/
+int batch_queue_port( struct batch_queue *q );
+
 #endif

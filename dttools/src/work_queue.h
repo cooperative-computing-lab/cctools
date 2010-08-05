@@ -223,6 +223,12 @@ int work_queue_hungry (struct work_queue *q);
 */
 int work_queue_empty (struct work_queue *q);
 
+/** Get the listening port of the queue.
+@param q The work queue of interest.
+@return The port the queue is listening on.
+*/
+int work_queue_port( struct work_queue *q );
+
 /** Delete a work queue.
 @param q The work queue to delete.
 */

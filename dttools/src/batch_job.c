@@ -785,8 +785,6 @@ const char * batch_queue_type_to_string( batch_queue_type_t t )
 struct batch_queue * batch_queue_create( batch_queue_type_t type )
 {
 	struct batch_queue *q;
-	char *envstring;
-	int port;
 
 	if(type==BATCH_QUEUE_TYPE_UNKNOWN) return 0;
 
@@ -798,21 +796,8 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 	q->logfile = strdup("condor.logfile");
 
 	if(type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		envstring = getenv("WORK_QUEUE_PORT");
-		if(envstring) {
-			port = atoi(envstring);
-			q->work_queue = work_queue_create(port);
-		} else {
-			envstring = getenv("WORK_QUEUE_NAME");
-			if(envstring) {
-				// Let work queue choose a random available port
-				q->work_queue = work_queue_create(-1);
-			} else {
-				// Let work queue use the default port
-				q->work_queue = work_queue_create(0);
-			}
-		}
-		if(q->work_queue == 0) {
+		q->work_queue = work_queue_create(0);
+		if(!q->work_queue) {
 			batch_queue_delete(q);
 			return 0;
 		}
@@ -936,6 +921,15 @@ int batch_job_remove( struct batch_queue *q, batch_job_id_t jobid )
 	} else {
 		errno = EINVAL;
 		return -1;
+	}
+}
+
+int batch_queue_port( struct batch_queue *q )
+{
+	if(q->type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
+		return work_queue_port(q->work_queue);
+	} else {
+		return 0;
 	}
 }
 

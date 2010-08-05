@@ -765,23 +765,21 @@ void abort_slow_workers( struct work_queue *q )
 	}
 }
 
-int work_queue_port(struct work_queue *q) {
+int work_queue_port(struct work_queue *q)
+{
 	char addr[LINK_ADDRESS_MAX];
 	int port;
-	int ret;
 
 	if(!q) return 0;
 
-	ret = link_address_local(q->master_link, addr, &port);
-
-	if(ret) {
+	if(link_address_local(q->master_link, addr, &port)) {
 		return port;
 	} else {
 		return 0;
 	}
 }
 
-struct work_queue * work_queue_create(int port)
+struct work_queue * work_queue_create( int port )
 {
 	struct work_queue *q = malloc(sizeof(*q));
 	char *envstring;
@@ -792,13 +790,15 @@ struct work_queue * work_queue_create(int port)
 		envstring = getenv("WORK_QUEUE_PORT");
 		if(envstring) {
 			port = atoi(envstring);
+		} else if(getenv("WORK_QUEUE_NAME")) {
+			port = -1;
 		} else {
 			port = WORK_QUEUE_DEFAULT_PORT;
 		}
 	}
 
 	if(port == -1) {
-		int lowport = 1024;
+		int lowport = 9000;
 		int highport = 32767;
 
 		envstring = getenv("WORK_QUEUE_LOW_PORT");
