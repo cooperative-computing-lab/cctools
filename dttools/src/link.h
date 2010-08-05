@@ -180,6 +180,7 @@ int  link_nonblocking( struct link *link, int onoff );
 @param link The link to examine.
 @param addr Pointer to a string of at least @ref LINK_ADDRESS_MAX bytes, which will be filled with a text representation of the local IP address.
 @param port Pointer to an integer, which will be filled with the TCP port number.
+@return Positive on success, zero on failure.
 */
 int  link_address_local( struct link *link, char *addr, int *port );
 
@@ -187,6 +188,7 @@ int  link_address_local( struct link *link, char *addr, int *port );
 @param link The link to examine.
 @param addr Pointer to a string of at least @ref LINK_ADDRESS_MAX bytes, which will be filled with a text representation of the remote IP address.
 @param port Pointer to an integer, which will be filled with the TCP port number.
+@return Positive on success, zero on failure.
 */
 int  link_address_remote( struct link *link, char *addr, int *port );
 
