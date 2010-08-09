@@ -75,6 +75,7 @@ struct s3_dirent_object {
 	struct list *metadata;
 };
 
+int s3_set_endpoint(const char *target);
 struct s3_header_object* s3_new_header_object(enum s3_header_type type, const char* custom_type, const char* value);
 const char * s3_get_header(enum s3_header_type type, const char* custom_type);
 int s3_header_comp(const void *a, const void *b);

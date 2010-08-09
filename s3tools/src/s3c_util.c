@@ -12,13 +12,29 @@ See the file COPYING for details.
 #include <list.h>
 #include <hmac.h>
 #include <b64_encode.h>
+#include <domain_name_cache.h>
 
 #include "s3c_util.h"
 
-const char s3_endpoint[] = "s3.amazonaws.com";
-const char s3_address[] = "72.21.202.66";
+char s3_default_endpoint[] = "s3.amazonaws.com";
+char s3_default_address[] = "72.21.202.66";
+
+char *s3_endpoint = s3_default_endpoint;
+char *s3_address = s3_default_address;
 int s3_timeout = 60;
 
+
+int s3_set_endpoint(const char *target) {
+	static char endpoint_address[DOMAIN_NAME_MAX];
+
+	if(!target) return 0;
+	if(!domain_name_cache_lookup(target, endpoint_address)) return 0;
+
+	if(s3_endpoint && s3_endpoint != s3_default_endpoint) free(s3_endpoint);
+	s3_endpoint = strdup(target);
+	s3_address = endpoint_address;
+	return 1;
+}
 
 struct s3_header_object* s3_new_header_object(enum s3_header_type type, const char* custom_type, const char* value) {
 	struct s3_header_object *obj;
