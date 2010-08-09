@@ -13,8 +13,8 @@ See the file COPYING for details.
 #include "s3c_file.h"
 #include "s3c_util.h"
 
-extern char s3_endpoint[];
-extern char s3_address[];
+extern char *s3_endpoint;
+extern char *s3_address;
 extern int s3_timeout;
 
 int s3_mk_bucket(char* bucketname, enum amz_base_perm perms, const char* access_key_id, const char* access_key) {
