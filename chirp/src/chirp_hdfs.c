@@ -577,7 +577,7 @@ INT64_T chirp_hdfs_fchmod( int fd, INT64_T mode )
 INT64_T chirp_hdfs_ftruncate( int fd, INT64_T length )
 {
 	debug(D_HDFS, "ftruncate %s %ld", open_files[fd].name, (long) length);
-    INT64_T size;
+    INT64_T size = length;
 	char *buffer = read_buffer(open_files[fd].name, 0, &size);
 	if (buffer == NULL) return -1;
 	/* simulate truncate */
