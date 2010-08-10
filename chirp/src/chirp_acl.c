@@ -271,6 +271,7 @@ int chirp_acl_set( const char *dirname, const char *subject, int flags, int rese
 			cfs_fprintf(newaclfile,"%s %s\n",aclsubject,chirp_acl_flags_to_text(aclflags));
 		}
 	}
+	cfs_fclose(aclfile);
 
 	if(!replaced_acl_entry) {
 		cfs_fprintf(newaclfile,"%s %s\n",subject,chirp_acl_flags_to_text(flags));
@@ -279,8 +280,10 @@ int chirp_acl_set( const char *dirname, const char *subject, int flags, int rese
 	/* Need to force a write in order to get response from ferror */
 
 	cfs_fflush(newaclfile);
+    result = cfs_ferror(newaclfile);
+	cfs_fclose(newaclfile);
 
-	if(cfs_ferror(newaclfile)) {
+	if(result) {
 		errno = EACCES;
 		result = -1;
 	} else {
@@ -291,9 +294,6 @@ int chirp_acl_set( const char *dirname, const char *subject, int flags, int rese
 			result = -1;
 		}
 	}
-
-	cfs_fclose(aclfile);
-	cfs_fclose(newaclfile);
 
 	return result;
 }
