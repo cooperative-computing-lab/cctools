@@ -717,6 +717,7 @@ INT64_T chirp_hdfs_unlink( const char *path )
 INT64_T chirp_hdfs_rename( const char *path, const char *newpath )
 {
 	debug(D_HDFS, "rename %s -> %s", path, newpath);
+	hdfs_services.unlink(fs, newpath);
 	return hdfs_services.rename(fs, path, newpath);
 }
 
