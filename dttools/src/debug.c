@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "xmalloc.h"
 #include "full_io.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -241,7 +242,16 @@ void debug_config_file( const char *f )
 	}
 
 	if(f) {
-		debug_file = strdup(f);
+		if (*f == '/')
+			debug_file = strdup(f);
+		else {
+			char path[8192];
+			if (getcwd(path, sizeof(path)) == NULL) assert(0);
+			assert(strlen(path) + strlen(f) + 1 < 8192);
+			strcat(path, "/");
+			strcat(path, f);
+			debug_file = strdup(path);
+		}
 		debug_fd = open(f,O_CREAT|O_APPEND|O_WRONLY,0777);
 		if(debug_fd<0) fatal("couldn't open %s: %s",f,strerror(errno));		
 	} else {
