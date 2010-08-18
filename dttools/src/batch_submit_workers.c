@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "batch_job.h"
 #include "copy_stream.h"
 #include "debug.h"
+#include "envtools.h"
 #include "stringtools.h"
 #include "xmalloc.h"
 
@@ -19,24 +20,6 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-static int find_executable(const char *exe_name, const char *env_path_var, char *exe_path)
-{
-	char *env_paths;
-	char *cur_path;
-
-	if (!getenv(env_path_var)) return 0;
-
-	env_paths = xstrdup(getenv(env_path_var));
-
-	for (cur_path = strtok(env_paths, ":"); cur_path; cur_path = strtok(NULL, ":")) {
-		sprintf(exe_path, "%s/%s", cur_path, exe_name);
-		if (access(exe_path, R_OK | X_OK) == 0) break;
-	}
-
-	free(env_paths);
-	return cur_path != NULL;
-}
 
 static void show_help(const char *cmd)
 {
@@ -132,7 +115,7 @@ int main(int argc, char *argv[])
 			return EXIT_FAILURE;
 		}
 	} else {
-		if (!find_executable("worker", "PATH", worker_path)) {
+		if (!find_executable("worker", "PATH", worker_path, PATH_MAX)) {
 			fprintf(stderr, "please add worker to your PATH or specify it explicitly.\n");
 			return EXIT_FAILURE;
 		}

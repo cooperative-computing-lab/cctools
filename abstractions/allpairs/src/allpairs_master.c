@@ -21,6 +21,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "work_queue.h"
+#include "envtools.h"
 #include "fast_popen.h"
 #include "text_array.h"
 #include "ragged_array.h"
@@ -46,7 +47,7 @@ int topLeftX;
 int topLeftY;
 int usingInnerFunc = 0;
 
-char *allpairs_multicore = "allpairs_multicore";
+char allpairs_multicore[PATH_MAX] = "allpairs_multicore";
 char *compare_function = NULL;
 
 struct block {
@@ -401,11 +402,16 @@ int main(int argc, char **argv)
 	setB = read_in_set(argv[setBindex]);
 	compare_function = argv[funcindex];
 
+	if (!find_executable("allpairs_multicore", "PATH", allpairs_multicore, PATH_MAX)) {
+	    fprintf(stderr, "allpairs_master: Cannot find allpairs_multicore\n");
+	    exit(1);
+	}
+
 	// Check if the compare function exists. 
 	FILE *tmpresult;
 	int function_flag;
 	char cmdrun[ALLPAIRS_LINE_MAX];
-	sprintf(cmdrun, "allpairs_multicore -f setA.set.list setB.set.list %s", compare_function);
+	sprintf(cmdrun, "%s -f setA.set.list setB.set.list %s", allpairs_multicore, compare_function);
 	if((tmpresult = fast_popen(cmdrun)) == NULL) {
 		fprintf(stderr, "allpairs_master: Cannot execute allpairs_multicore. : %s\n", strerror(errno));
 		exit(1);
