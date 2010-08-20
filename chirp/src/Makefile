@@ -75,6 +75,7 @@ install: all
 	install chirp_put ${CCTOOLS_INSTALL_DIR}/bin
 	if [ -f ${CCTOOLS_INSTALL_DIR}/bin/chirp_server ]; then mv ${CCTOOLS_INSTALL_DIR}/bin/chirp_server ${CCTOOLS_INSTALL_DIR}/bin/chirp_server.old; fi
 	install chirp_server ${CCTOOLS_INSTALL_DIR}/bin
+	install chirp_server_hdfs ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_status ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_benchmark ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_stream_files ${CCTOOLS_INSTALL_DIR}/bin
