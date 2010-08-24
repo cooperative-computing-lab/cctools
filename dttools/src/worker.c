@@ -24,6 +24,7 @@ See the file COPYING for details.
 #include "domain_name_cache.h"
 #include "getopt.h"
 #include "full_io.h"
+#include "create_dir.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -429,6 +430,45 @@ int main( int argc, char *argv[] )
 				if(buffer) free(buffer);
 			} else if(sscanf(line,"put %s %lld %o",filename,&length,&mode)==3) {
 				mode = mode | 0600;
+				char *cur_pos, *tmp_pos;
+				//struct stat info;
+				//int rv;
+
+				cur_pos = filename;
+				
+				if (!strncmp(cur_pos, "./", 2)){
+					cur_pos += 2;
+				}
+
+				tmp_pos = strrchr(cur_pos, '/');
+				if(tmp_pos) {
+					*tmp_pos = '\0';
+					if(!create_dir(cur_pos, mode | 0700)) {
+						debug(D_DEBUG,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
+						goto recover;
+					}
+					*tmp_pos = '/';
+				}
+
+				/**
+				for(tmp_pos = cur_pos; *tmp_pos; ++tmp_pos) {
+					if( *tmp_pos == '/') {
+						*tmp_pos = '\0';
+						// Create this directory if not exist
+						info.st_mode = 0;
+						rv = stat(cur_pos, &info);
+						if(rv != 0 || !S_ISDIR(info.st_mode)) {
+							debug(D_DEBUG,"Creating directory - %s ... \n", cur_pos);
+							if(mkdir(cur_pos, mode | 0700) != 0) {
+								debug(D_DEBUG,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
+								goto recover;
+							}
+						}
+						*tmp_pos = '/';
+					}
+				}
+				*/
+				
 				fd = open(filename,O_WRONLY|O_CREAT|O_TRUNC,mode);
 				if(fd<0) goto recover;
 				INT64_T actual = link_stream_to_fd(master,fd,length,time(0)+active_timeout);

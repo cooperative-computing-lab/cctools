@@ -889,20 +889,18 @@ void dag_parse_assignment( struct dag *d, char *line )
 void dag_node_parse_filelist( struct dag *d, struct dag_node *n, char *filelist, int source, int clean_mode )
 {
 	char *filename;
+	char *newname;
 	int rv;
 
 	filename = strtok(filelist," \t\n");
 	while(filename) {
-		if(strchr(filename,'/') && (batch_queue_type == BATCH_QUEUE_TYPE_CONDOR || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE))
-		{
-			char *newname = NULL;
+		if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && strchr(filename, '/')) {
+			newname = NULL;
 			rv = translate_filename(d, filename, &newname);
-			if (rv && !clean_mode && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR)
-			{
+			if (rv && !clean_mode) {
 				printf("makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
 				rv = symlink(filename, newname);
-				if (rv < 0 && errno != EEXIST)
-				{
+				if (rv < 0 && errno != EEXIST) {
 					//TODO: Check for if symlink points to right place
 					fprintf(stderr,"makeflow: could not create symbolic link (%s)\n", strerror(errno));
 					exit(1);
@@ -923,27 +921,29 @@ void dag_node_parse_filelist( struct dag *d, struct dag_node *n, char *filelist,
 			if (!newname) newname = filename;
 
 			if (source) {
-				if (batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
-					dag_node_add_source_file(n, newname);
-					n->source_file_names_size += strlen(filename)+1;
-				} else {
-					dag_node_add_source_file(n, filename);
-					n->source_file_names_size += strlen(filename)+strlen(newname)+2;
-				}
+				dag_node_add_source_file(n, newname);
+				n->source_file_names_size += strlen(filename)+1;
 			} else {
-				if (batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
-					dag_node_add_target_file(n, newname);
-					n->target_file_names_size += strlen(filename)+1;
-				} else {
-					dag_node_add_target_file(n, filename);
-					n->target_file_names_size += strlen(filename)+strlen(newname)+2;
-				}
+				dag_node_add_target_file(n, newname);
+				n->target_file_names_size += strlen(filename)+1;
 			}
 
 			if (newname != filename) free(newname);
-		}
-		else
-		{
+		} else if(filename[0] == '/' && batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+			// Translate only explicit absolute paths for work queue tasks.
+			newname = NULL;
+			rv = translate_filename(d, filename, &newname);
+
+			if (source) {
+				dag_node_add_source_file(n, filename);
+				n->source_file_names_size += strlen(filename)+strlen(newname)+2;
+			} else {
+				dag_node_add_target_file(n, filename);
+				n->target_file_names_size += strlen(filename)+strlen(newname)+2;
+			}
+
+			if (newname != filename) free(newname);
+		} else {
 			if (source) {
 				dag_node_add_source_file(n,filename);
 				n->source_file_names_size += strlen(filename)+1;

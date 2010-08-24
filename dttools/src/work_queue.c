@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "process.h"
 #include "username.h"
+#include "create_dir.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -244,6 +245,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 	struct stat local_info;
 	struct stat *remote_info;
 	char *hash_name;
+	char *cur_pos, *tmp_pos;
 
 	if(t->output_files) {
 		list_first_item(t->output_files);
@@ -255,6 +257,22 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 			if(!link_readline(w->link,line,sizeof(line),time(0)+short_timeout)) goto failure;
 			if(sscanf(line,"%lld",&length)!=1) goto failure;
 			if(length>=0) {
+				// create dirs if needed
+				cur_pos = tf->payload;
+				if (!strncmp(cur_pos, "./", 2)){
+					cur_pos += 2;
+				}
+
+				tmp_pos = strrchr(cur_pos, '/');
+				if(tmp_pos) {
+					*tmp_pos = '\0';
+					if(!create_dir(cur_pos, 0700)) {
+						debug(D_DEBUG,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
+						goto failure;
+					}
+					*tmp_pos = '/';
+				}
+
 				fd = open(tf->payload,O_WRONLY|O_TRUNC|O_CREAT,0700);
 				if(fd<0) goto failure;
 				stoptime = time(0) + MAX(1.0,(length)/1250000.0);
