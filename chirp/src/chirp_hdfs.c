@@ -47,7 +47,7 @@ UINT16_T chirp_hdfs_port = 0;
 	} while (0);
 
 static struct hdfs_services_ {
-	hdfsFS          (*connect)      (const char *, tPort);
+	hdfsFS          (*connect)      (const char *, tPort, const char *, const char *[], int);
 	int             (*disconnect)   (hdfsFS);
 	hdfsFileInfo*   (*listdir)      (hdfsFS, const char *, int *);
 	hdfsFile	(*open)		(hdfsFS, const char *, int, int, short, tSize);
@@ -64,6 +64,7 @@ static struct hdfs_services_ {
 	void		(*free_stat)	(hdfsFileInfo *, int);
 	char***		(*get_hosts)	(hdfsFS, const char *, tOffset, tOffset);
 	void		(*free_hosts)	(char ***);
+	tOffset		(*get_default_block_size) (hdfsFS);
 	tOffset		(*get_capacity) (hdfsFS);
 	tOffset		(*get_used) (hdfsFS);
 	int			(*chmod) (hdfsFS, const char *, short);
@@ -103,7 +104,7 @@ static int load_hdfs_services (struct hdfs_services_ *hdfs)
 		return -1;
 	}
 
-	HDFS_LOAD_FUNC(connect,    "hdfsConnect",       void*(*)(const char*, tPort))
+	HDFS_LOAD_FUNC(connect,    "hdfsConnectAsUser",       void*(*)(const char*, tPort, const char *, const char *[], int))
 	HDFS_LOAD_FUNC(disconnect, "hdfsDisconnect",    int(*)(void*)) 
 	HDFS_LOAD_FUNC(listdir,    "hdfsListDirectory", hdfsFileInfo *(*)(void*, const char*, int*))
 	HDFS_LOAD_FUNC(open,       "hdfsOpenFile",	hdfsFile(*)(hdfsFS, const char *, int, int, short, tSize))
@@ -120,6 +121,7 @@ static int load_hdfs_services (struct hdfs_services_ *hdfs)
 	HDFS_LOAD_FUNC(free_stat,  "hdfsFreeFileInfo",	void(*)(hdfsFileInfo *, int))
 	HDFS_LOAD_FUNC(get_hosts,  "hdfsGetHosts",	char ***(*)(hdfsFS, const char *, tOffset, tOffset))
 	HDFS_LOAD_FUNC(free_hosts, "hdfsFreeHosts",	void(*)(char ***))
+	HDFS_LOAD_FUNC(get_default_block_size, "hdfsGetDefaultBlockSize",	tOffset(*)(hdfsFS))
 	HDFS_LOAD_FUNC(get_capacity, "hdfsGetCapacity",	tOffset(*)(hdfsFS))
 	HDFS_LOAD_FUNC(get_used, "hdfsGetUsed",	tOffset(*)(hdfsFS))
 	HDFS_LOAD_FUNC(chmod, "hdfsChmod",	int(*)(hdfsFS, const char*, short))
@@ -144,10 +146,16 @@ static struct chirp_hdfs_file {
 
 INT64_T chirp_hdfs_init (const char *path)
 {
+  static const char *groups[] = {"supergroup"};
+
   int i;
+  char name[LOGIN_NAME_MAX+2];
+
+  i = getlogin_r(name, sizeof(name)); 
+  assert(i == 0);
 
   if (chirp_hdfs_hostname == NULL)
-	fatal("hostname and port must be specified, use -x option");
+    fatal("hostname and port must be specified, use -x option");
 
   debug(D_HDFS, "initializing", chirp_hdfs_hostname, chirp_hdfs_port);
 
@@ -158,8 +166,8 @@ INT64_T chirp_hdfs_init (const char *path)
 
   if (!hdfs_services_loaded && load_hdfs_services(&hdfs_services) == -1)
     return -1; /* errno is set */
-  debug(D_HDFS, "connecting to %s:%u\n", chirp_hdfs_hostname, chirp_hdfs_port);
-  fs = hdfs_services.connect(chirp_hdfs_hostname, chirp_hdfs_port);
+  debug(D_HDFS, "connecting to %s:%u as '%s'\n", chirp_hdfs_hostname, chirp_hdfs_port, name);
+  fs = hdfs_services.connect(chirp_hdfs_hostname, chirp_hdfs_port, name, groups, 1);
 
   if (fs == NULL)
 	return (errno = ENOSYS, -1);
@@ -534,29 +542,6 @@ INT64_T chirp_hdfs_swrite( int fd, const void *vbuffer, INT64_T length, INT64_T 
 	}
 }
 
-INT64_T chirp_hdfs_fstatfs( int fd, struct chirp_statfs *buf )
-{
-	debug(D_HDFS, "fstatfs");
-
-	/* lie about capacity until can be fixed with hdfs upgrade */
-	// hdfs_services.get_capacity(fs); SuperUser?
-	// hdfs_services.get_used(fs); Requires SuperUser?
-	/* if (capacity == -1 || used == -1) return (errno = EIO, -1); */
-
-	/* Assume a 1TB filesystem with a 128MB block size */
-	UINT64_T capacity = 1LL*1024*1024*1024*1024;
-        UINT64_T used = 0;
-	int      blocksize = 128*1024*1024;
-
-	buf->f_type = 0; /* FIXME */
-	buf->f_bsize = blocksize;
-	buf->f_blocks = capacity/blocksize;
-	buf->f_bavail = buf->f_bfree = used/blocksize;
-	buf->f_files = buf->f_ffree = 0;
-
-	return 0;
-}
-
 INT64_T chirp_hdfs_fchown( int fd, INT64_T uid, INT64_T gid )
 {
 	// Changing file ownership is silently ignored,
@@ -791,7 +776,28 @@ INT64_T chirp_hdfs_lstat( const char *path, struct chirp_stat *buf )
 INT64_T chirp_hdfs_statfs( const char *path, struct chirp_statfs *buf )
 {
 	debug(D_HDFS, "statfs %s", path);
-	return chirp_hdfs_fstatfs(0, buf); // doesn't use fd
+
+	INT64_T capacity = hdfs_services.get_capacity(fs);
+	INT64_T used = hdfs_services.get_used(fs);
+	INT64_T blocksize = hdfs_services.get_default_block_size(fs);
+
+	if (capacity == -1 || used == -1 || blocksize == -1)
+		return (errno = EIO, -1);
+
+	buf->f_type = 0; /* FIXME */
+	buf->f_bsize = blocksize;
+	buf->f_blocks = capacity/blocksize;
+	buf->f_bavail = buf->f_bfree = used/blocksize;
+	buf->f_files = buf->f_ffree = 0;
+
+	return 0;
+}
+
+INT64_T chirp_hdfs_fstatfs( int fd, struct chirp_statfs *buf )
+{
+	debug(D_HDFS, "fstatfs %d", fd);
+
+	return chirp_hdfs_statfs("/", buf);
 }
 
 INT64_T chirp_hdfs_access( const char *path, INT64_T mode )

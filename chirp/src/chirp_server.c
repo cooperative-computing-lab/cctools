@@ -39,6 +39,7 @@ See the file COPYING for details.
 #include "change_process_title.h"
 #include "url_encode.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -190,6 +191,52 @@ static void install_handler( int sig, void (*handler)(int sig))
 	sigaction(sig,&s,0);
 }
 
+static INT64_T safe_statfs (const char *path, struct chirp_statfs *buf)
+{
+	int fildes[2];
+
+   	if (single_mode) { /* chirp_server process can handle it */
+       	return cfs->statfs(chirp_root_path, buf);
+	}
+	else {
+		/* We need to fork a new process that does statfs because
+		 * we cannot be connected to Hadoop in the chirp_server process.
+		 */
+		if (pipe(fildes) == -1)
+			fatal("could not create pipe");
+		pid_t child = fork();
+		if (child == 0) { /* child */
+			close(fildes[0]);
+			if (cfs->init(chirp_root_path) != 0) {
+				kill(chirp_master_pid, SIGABRT);
+				raise(SIGABRT);
+				_exit(-1);
+			}
+       		if (cfs->statfs(chirp_root_path, buf) == 0) {
+				write(fildes[1], &buf->f_bsize, sizeof(buf->f_bsize));
+				write(fildes[1], &buf->f_bfree, sizeof(buf->f_bfree));
+				write(fildes[1], &buf->f_blocks, sizeof(buf->f_blocks));
+			}
+			close(fildes[1]);
+			_exit(0);
+		} else if (child == -1)
+			fatal("could not fork process for statfs");
+		close(fildes[1]);
+
+		ssize_t r;
+		r = read(fildes[0], &buf->f_bsize, sizeof(buf->f_bsize));
+		if (r != sizeof(buf->f_bsize)) assert(0);
+		r = read(fildes[0], &buf->f_bfree, sizeof(buf->f_bfree));
+		if (r != sizeof(buf->f_bfree)) assert(0);
+		buf->f_bavail = buf->f_bfree; /* copy */
+		r = read(fildes[0], &buf->f_blocks, sizeof(buf->f_blocks));
+		if (r != sizeof(buf->f_blocks)) assert(0);
+		close(fildes[0]);
+
+		return 0;
+	}
+}
+
 /*
 space_available() is a simple mechanism to ensure that
 a runaway client does not use up every last drop of disk
@@ -213,11 +260,10 @@ static int space_available( INT64_T amount )
 
 	if( (current-last_check) > check_interval) {
         struct chirp_statfs buf;
-        if (cfs->statfs(chirp_root_path, &buf) == 0) {
-    		avail = buf.f_bsize*buf.f_bfree;
-    		total = buf.f_bsize*buf.f_blocks;
-			last_check = current;
-		}
+		safe_statfs(chirp_root_path, &buf);
+		avail = buf.f_bsize*buf.f_bfree;
+		total = buf.f_bsize*buf.f_blocks;
+		last_check = current;
 	}
 
 	if((avail-amount)>minimum_space_free) {
@@ -256,7 +302,8 @@ static void update_all_catalogs()
 	string_tolower(name.release);
 	load_average_get(avg);
 	cpus = load_average_get_cpus();
-	chirp_alloc_statfs(chirp_root_path,&info);
+
+	safe_statfs(chirp_root_path, &info);
 
 	memory_info_get(&memory_avail,&memory_total);
 	uptime = time(0)-starttime;
