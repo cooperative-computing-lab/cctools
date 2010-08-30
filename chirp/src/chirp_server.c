@@ -108,6 +108,7 @@ const char *chirp_super_user = "";
 const char *chirp_group_base_url = 0;
 int         chirp_group_cache_time = 900;
 
+const char *chirp_backend_storage_type = "local";
 struct chirp_filesystem *cfs = &chirp_local_fs;
 
 static void show_version( const char *cmd )
@@ -310,7 +311,7 @@ static void update_all_catalogs()
 
 	length = sprintf(
 		text,
-		"type chirp\nversion %d.%d.%d\nurl chirp://%s:%d\nname %s\nowner %s\ntotal %llu\navail %llu\nuptime %u\nport %d\nbytes_written %lld\nbytes_read %lld\ntotal_ops %d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nminfree %llu\nmemory_total %llu\nmemory_avail %llu\ncpus %d\n",
+		"type chirp\nversion %d.%d.%d\nurl chirp://%s:%d\nname %s\nowner %s\ntotal %llu\navail %llu\nuptime %u\nport %d\nbytes_written %lld\nbytes_read %lld\ntotal_ops %d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nminfree %llu\nmemory_total %llu\nmemory_avail %llu\ncpus %d\nbackend %s\n",
 		CCTOOLS_VERSION_MAJOR,
 		CCTOOLS_VERSION_MINOR,
 		CCTOOLS_VERSION_MICRO,
@@ -334,7 +335,8 @@ static void update_all_catalogs()
 		minimum_space_free,
 		memory_total,
 		memory_avail,
-		cpus
+		cpus,
+		chirp_backend_storage_type
 		);
 
 	chirp_stats_summary(&text[length],DATAGRAM_PAYLOAD_MAX-length);
@@ -465,15 +467,17 @@ int main( int argc, char *argv[] )
 			extra_latency = atoi(optarg);
 			break;
 		case 'f':
-			if (strcmp(optarg, "local") == 0)
+			if (strcmp(optarg, "local") == 0) {
+				chirp_backend_storage_type = "local";
 				cfs = &chirp_local_fs;
-			else if (strcmp(optarg, "hdfs") == 0)
+            } else if (strcmp(optarg, "hdfs") == 0) {
 #ifdef HAS_HDFS
 				cfs = &chirp_hdfs_fs;
+				chirp_backend_storage_type = "hdfs";
 #else
 				fatal("hdfs was not included; re-configure with hdfs");
 #endif /* HAS_HDFS */
-			else
+            } else
 			  fatal("unknown filesystem: '%s'", optarg);
 			break;
 		case 'y':
