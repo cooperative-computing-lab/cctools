@@ -73,7 +73,6 @@ static int advertise_timeout = 300; /* five minutes */
 static int advertise_alarm = 0;
 static int single_mode = 0;
 static struct list *catalog_host_list;
-static char owner[USERNAME_MAX] = "";
 static time_t starttime;
 static struct datagram *catalog_port;
 static char hostname[DOMAIN_NAME_MAX];
@@ -107,6 +106,7 @@ pid_t      chirp_master_pid = 0;
 const char *chirp_super_user = "";
 const char *chirp_group_base_url = 0;
 int         chirp_group_cache_time = 900;
+char chirp_owner[USERNAME_MAX] = "";
 
 const char *chirp_backend_storage_type = "local";
 struct chirp_filesystem *cfs = &chirp_local_fs;
@@ -318,7 +318,7 @@ static void update_all_catalogs()
 		hostname,
 		port,
 		hostname,
-		owner,
+		chirp_owner,
 		info.f_blocks*info.f_bsize,
 		info.f_bavail*info.f_bsize,
 		uptime,
@@ -449,7 +449,7 @@ int main( int argc, char *argv[] )
 			show_version(argv[0]);
 			return 1;
 		case 'w':
-			strcpy(owner,optarg);
+			strcpy(chirp_owner,optarg);
 			break;
 		case 'W':
 			auth_unix_passwd_file(optarg);
@@ -579,9 +579,9 @@ int main( int argc, char *argv[] )
 	} else {
 		domain_name_cache_guess(hostname);
 	}
-	if(!owner[0]) {
-		if(!username_get(owner)) {
-			strcpy(owner,"unknown");
+	if(!chirp_owner[0]) {
+		if(!username_get(chirp_owner)) {
+			strcpy(chirp_owner,"unknown");
 		}
 	}
 

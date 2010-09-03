@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "debug.h"
 #include "md5.h"
+#include "username.h"
 
 #include "hdfs.h"
 
@@ -33,6 +34,8 @@ See the file COPYING for details.
 
 char *chirp_hdfs_hostname = NULL;
 UINT16_T chirp_hdfs_port = 0;
+
+extern char chirp_owner[USERNAME_MAX];
 
 #define HDFS_LOAD_FUNC(func, func_name, func_sig) \
 	do { \
@@ -149,10 +152,6 @@ INT64_T chirp_hdfs_init (const char *path)
   static const char *groups[] = {"supergroup"};
 
   int i;
-  char name[LOGIN_NAME_MAX+2];
-
-  i = getlogin_r(name, sizeof(name)); 
-  assert(i == 0);
 
   if (chirp_hdfs_hostname == NULL)
     fatal("hostname and port must be specified, use -x option");
@@ -166,8 +165,8 @@ INT64_T chirp_hdfs_init (const char *path)
 
   if (!hdfs_services_loaded && load_hdfs_services(&hdfs_services) == -1)
     return -1; /* errno is set */
-  debug(D_HDFS, "connecting to %s:%u as '%s'\n", chirp_hdfs_hostname, chirp_hdfs_port, name);
-  fs = hdfs_services.connect(chirp_hdfs_hostname, chirp_hdfs_port, name, groups, 1);
+  debug(D_HDFS, "connecting to %s:%u as '%s'\n", chirp_hdfs_hostname, chirp_hdfs_port, chirp_owner);
+  fs = hdfs_services.connect(chirp_hdfs_hostname, chirp_hdfs_port, chirp_owner, groups, 1);
 
   if (fs == NULL)
 	return (errno = ENOSYS, -1);
