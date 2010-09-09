@@ -133,6 +133,14 @@ batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_in
 	}
 
 	while(1) {
+		/*
+		Note: clearerr is necessary to clear any cached end-of-file condition,
+		otherwise some implementations of fgets (i.e. darwin) will read to end
+		of file once and then never look for any more data.
+		*/
+
+		clearerr(logfile);
+
 		while(fgets(line,sizeof(line),logfile)) {
 			int type, proc, subproc;
 			batch_job_id_t jobid;
@@ -155,6 +163,9 @@ batch_job_id_t batch_job_wait_condor( struct batch_queue *q, struct batch_job_in
 					memset(info,0,sizeof(*info));
 					itable_insert(q->job_table,jobid,info);
 				}
+
+	
+				debug(D_DEBUG,"line: %s",line);
 
 				if(type==0) {
 					info->submitted = current;
