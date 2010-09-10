@@ -207,6 +207,7 @@ static void add_worker( struct work_queue *q )
 			hash_table_insert(q->worker_table,w->hashkey,w);
 			change_worker_state(q,w,WORKER_STATE_INIT);
 			debug(D_DEBUG,"worker %s added",w->addrport);
+			debug(D_DEBUG,"%d workers are connected in total now", hash_table_size(q->worker_table));
 		} else {
 			link_close(link);
 		}			
@@ -229,6 +230,8 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 	change_worker_state(q,w,WORKER_STATE_NONE);
 	if(w->link) link_close(w->link);
 	free(w);
+
+	debug(D_DEBUG,"%d workers are connected in total now", hash_table_size(q->worker_table));
 }
 
 static int get_output_files( struct work_queue_task *t, struct work_queue_worker *w )
@@ -936,6 +939,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 	} else {
 		stoptime = time(0) + timeout;
 	}
+
 	
 	while(1) {
 		if(wq_master_mode ==  MASTER_MODE_CATALOG && time(0) - catalog_update_time >= CATALOG_UPDATE_INTERVAL) {	
@@ -949,6 +953,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		if(q->workers_in_state[WORKER_STATE_BUSY]==0 && list_size(q->ready_list)==0) break;
 
 		start_tasks(q);
+		debug(D_DEBUG, "Number of busy workers: %d", q->workers_in_state[WORKER_STATE_BUSY]);
 
 		int n = build_poll_table(q);
 		int msec;
