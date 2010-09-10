@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "process.h"
 #include "stringtools.h"
+#include "timestamp.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -492,7 +493,23 @@ int batch_job_submit_simple_work_queue( struct batch_queue *q, const char *cmd, 
 
 batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_job_info *info, time_t stoptime )
 {
+	static FILE* logfile = 0;
+	struct work_queue_stats s;
+
 	int timeout;
+
+	if(!logfile) {
+		logfile = fopen(q->logfile,"w+");
+		if(!logfile) {
+			debug(D_NOTICE,"couldn't open logfile %s: %s\n",q->logfile,strerror(errno));
+			return -1;
+		}
+	}
+	
+	work_queue_get_stats(q->work_queue, &s);
+	fprintf(logfile, "%02lf %d %d %d %d %d %d %d %d %d %d\n", timestamp_get()/1000000.0, s.workers_init, s.workers_ready, s.workers_busy, s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_removed);
+	fflush(logfile);
+	fsync(fileno(logfile));
 
 	if(stoptime==0) {
 		timeout = WORK_QUEUE_WAITFORTASK;
@@ -804,7 +821,13 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 	q->options_text = 0;
 	q->job_table = itable_create(0);
 	q->output_table = itable_create(0);
-	q->logfile = strdup("condor.logfile");
+
+	if(type==BATCH_QUEUE_TYPE_CONDOR)
+	    q->logfile = strdup("condor.logfile");
+	else if(type==BATCH_QUEUE_TYPE_WORK_QUEUE)
+	    q->logfile = strdup("wq.log");
+	else
+	    q->logfile = NULL;
 
 	if(type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		q->work_queue = work_queue_create(0);
@@ -833,7 +856,8 @@ void batch_queue_delete( struct batch_queue *q )
 
 void batch_queue_set_logfile( struct batch_queue *q, const char *logfile )
 {
-	free(q->logfile);
+	if (q->logfile)
+	    free(q->logfile);
 	q->logfile = strdup(logfile);
 }
 

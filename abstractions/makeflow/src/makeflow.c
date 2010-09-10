@@ -1576,7 +1576,17 @@ int main( int argc, char *argv[] )
 	if(!batchlogfilename)
 	{
 		batchlogfilename = malloc((dagfile_namesize+11)*sizeof(char));
-		sprintf(batchlogfilename,"%s.condorlog",dagfile);
+		switch (batch_queue_type) {
+		    case BATCH_QUEUE_TYPE_CONDOR:
+			sprintf(batchlogfilename,"%s.condorlog",dagfile);
+			break;
+		    case BATCH_QUEUE_TYPE_WORK_QUEUE:
+			sprintf(batchlogfilename,"%s.wqlog",dagfile);
+			break;
+		    default:
+			sprintf(batchlogfilename,"%s.batchlog",dagfile);
+			break;
+		}
 	}
 
 	int no_symlinks = (clean_mode || syntax_check || display_mode);
