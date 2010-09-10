@@ -65,15 +65,15 @@ void debug_print_masters(struct list *ml) {
 	struct wq_master *m;
 	int count = 0;
 	
-	debug(D_DEBUG, "All available Masters:\n");
+	debug(D_WQ, "All available Masters:\n");
 	list_first_item(ml);
 	while((m = (struct wq_master *)list_next_item(ml)) != NULL) {
-		debug(D_DEBUG, "Master %d:\n", ++count);
-		debug(D_DEBUG, "addr:\t%s\n", m->addr);
-		debug(D_DEBUG, "port:\t%d\n", m->port);
-		debug(D_DEBUG, "project:\t%s\n", m->proj);
-		debug(D_DEBUG, "priority:\t%d\n", m->priority);
-		debug(D_DEBUG, "\n");
+		debug(D_WQ, "Master %d:\n", ++count);
+		debug(D_WQ, "addr:\t%s\n", m->addr);
+		debug(D_WQ, "port:\t%d\n", m->port);
+		debug(D_WQ, "project:\t%s\n", m->proj);
+		debug(D_WQ, "priority:\t%d\n", m->priority);
+		debug(D_WQ, "\n");
 	}
 }
 
@@ -142,7 +142,7 @@ static void record_bad_master(struct wq_master *m) {
 
 	make_hash_key(m->addr, m->port, key);
 	hash_cache_insert(bad_masters, key, m, lifetime);
-	debug(D_DEBUG, "Master at %s:%d is not receiving more workers.\nWon't connect to this master in %d seconds.", m->addr, m->port, lifetime);
+	debug(D_WQ, "Master at %s:%d is not receiving more workers.\nWon't connect to this master in %d seconds.", m->addr, m->port, lifetime);
 }
 
 struct list * get_work_queue_masters(const char * catalog_host, int catalog_port) {
@@ -200,12 +200,12 @@ struct link * auto_link_connect(char *addr, int *port, time_t master_stoptime) {
 	while((m = (struct wq_master *)list_next_item(ml)) != NULL) {
 		master = link_connect(m->addr,m->port,master_stoptime);
 		if(master) {
-			debug(D_DEBUG, "Talking to the Master at:\n");
-			debug(D_DEBUG, "addr:\t%s\n", m->addr);
-			debug(D_DEBUG, "port:\t%d\n", m->port);
-			debug(D_DEBUG, "project:\t%s\n", m->proj);
-			debug(D_DEBUG, "priority:\t%d\n", m->priority);
-			debug(D_DEBUG, "\n");
+			debug(D_WQ, "Talking to the Master at:\n");
+			debug(D_WQ, "addr:\t%s\n", m->addr);
+			debug(D_WQ, "port:\t%d\n", m->port);
+			debug(D_WQ, "project:\t%s\n", m->proj);
+			debug(D_WQ, "priority:\t%d\n", m->priority);
+			debug(D_WQ, "\n");
 
 			strncpy(addr, m->addr, LINK_ADDRESS_MAX);
 			(*port) = m->port;
@@ -405,13 +405,13 @@ int main( int argc, char *argv[] )
 		}
 
 		if(link_readline(master,line,sizeof(line),time(0)+active_timeout)) {
-			debug(D_DEBUG,"%s",line);
+			debug(D_WQ,"%s",line);
 			if(sscanf(line,"work %lld",&length)) {
 				buffer = malloc(length+10);
 				link_read(master,buffer,length,time(0)+active_timeout);
 				buffer[length] = 0;
 				strcat(buffer," 2>&1");
-				debug(D_DEBUG,"%s",buffer);
+				debug(D_WQ,"%s",buffer);
 				stream = popen(buffer,"r");
 				free(buffer);
 				if(stream) {
@@ -424,7 +424,7 @@ int main( int argc, char *argv[] )
 					buffer = 0;
 				}
 				sprintf(line,"result %d %lld\n",result,length);
-				debug(D_DEBUG,"%s",line);
+				debug(D_WQ,"%s",line);
 				link_write(master,line,strlen(line),time(0)+active_timeout);
 				link_write(master,buffer,length,time(0)+active_timeout);
 				if(buffer) free(buffer);
@@ -444,7 +444,7 @@ int main( int argc, char *argv[] )
 				if(tmp_pos) {
 					*tmp_pos = '\0';
 					if(!create_dir(cur_pos, mode | 0700)) {
-						debug(D_DEBUG,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
+						debug(D_WQ,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
 						goto recover;
 					}
 					*tmp_pos = '/';
@@ -458,9 +458,9 @@ int main( int argc, char *argv[] )
 						info.st_mode = 0;
 						rv = stat(cur_pos, &info);
 						if(rv != 0 || !S_ISDIR(info.st_mode)) {
-							debug(D_DEBUG,"Creating directory - %s ... \n", cur_pos);
+							debug(D_WQ,"Creating directory - %s ... \n", cur_pos);
 							if(mkdir(cur_pos, mode | 0700) != 0) {
-								debug(D_DEBUG,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
+								debug(D_WQ,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
 								goto recover;
 							}
 						}
@@ -498,7 +498,7 @@ int main( int argc, char *argv[] )
 					INT64_T actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
 					close(fd);
 					if(actual!=length) {
-						debug(D_DEBUG,"Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, length, actual);
+						debug(D_WQ,"Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, length, actual);
 						goto recover;
 					}
 				} else {

@@ -206,8 +206,8 @@ static void add_worker( struct work_queue *q )
 			sprintf(w->addrport,"%s:%d",addr,port);
 			hash_table_insert(q->worker_table,w->hashkey,w);
 			change_worker_state(q,w,WORKER_STATE_INIT);
-			debug(D_DEBUG,"worker %s added",w->addrport);
-			debug(D_DEBUG,"%d workers are connected in total now", hash_table_size(q->worker_table));
+			debug(D_WQ,"worker %s added",w->addrport);
+			debug(D_WQ,"%d workers are connected in total now", hash_table_size(q->worker_table));
 		} else {
 			link_close(link);
 		}			
@@ -218,7 +218,7 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 {
 	char *key, *value;
 
-	debug(D_DEBUG,"worker %s removed",w->addrport);
+	debug(D_WQ,"worker %s removed",w->addrport);
 
 	hash_table_firstkey(w->current_files);
 	while(hash_table_nextkey(w->current_files,&key,(void**)&value)) {
@@ -231,7 +231,7 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 	if(w->link) link_close(w->link);
 	free(w);
 
-	debug(D_DEBUG,"%d workers are connected in total now", hash_table_size(q->worker_table));
+	debug(D_WQ,"%d workers are connected in total now", hash_table_size(q->worker_table));
 }
 
 static int get_output_files( struct work_queue_task *t, struct work_queue_worker *w )
@@ -254,7 +254,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 		list_first_item(t->output_files);
 		while((tf=list_next_item(t->output_files))) {
 
-			debug(D_DEBUG,"%s (%s) sending back %s to %s",w->hostname,w->addrport,tf->remote_name, tf->payload);
+			debug(D_WQ,"%s (%s) sending back %s to %s",w->hostname,w->addrport,tf->remote_name, tf->payload);
 
 			link_printf(w->link,"get %s\n",tf->remote_name);
 			if(!link_readline(w->link,line,sizeof(line),time(0)+short_timeout)) goto failure;
@@ -270,7 +270,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 				if(tmp_pos) {
 					*tmp_pos = '\0';
 					if(!create_dir(cur_pos, 0700)) {
-						debug(D_DEBUG,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
+						debug(D_WQ,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
 						goto failure;
 					}
 					*tmp_pos = '/';
@@ -296,7 +296,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 				}
 
 			} else {
-				debug(D_DEBUG,"%s (%s) did not create expected file %s",w->hostname,w->addrport,tf->remote_name);
+				debug(D_WQ,"%s (%s) did not create expected file %s",w->hostname,w->addrport,tf->remote_name);
 				if(t->result == WORK_QUEUE_RESULT_UNSET) t->result = WORK_QUEUE_RESULT_OUTPUT_FAIL;
 				t->return_status = 1;
 			}
@@ -317,7 +317,7 @@ void delete_uncacheable_files(struct work_queue_task *t, struct work_queue_worke
 		while((tf=list_next_item(t->input_files))) {
 			if(tf->cacheable == WORK_QUEUE_TASK_FILE_UNCACHEABLE) {
 				// Send 'unlink' command to the worker
-				debug(D_DEBUG,"Deleting input file '%s' on %s (%s) ...", tf->remote_name, w->hostname,w->addrport);
+				debug(D_WQ,"Deleting input file '%s' on %s (%s) ...", tf->remote_name, w->hostname,w->addrport);
 				link_printf(w->link,"unlink %s\n",tf->remote_name);
 			}
 		}
@@ -329,7 +329,7 @@ void delete_uncacheable_files(struct work_queue_task *t, struct work_queue_worke
 		while((tf=list_next_item(t->output_files))) {
 			if(tf->cacheable == WORK_QUEUE_TASK_FILE_UNCACHEABLE) {
 				// Send 'unlink' command to the worker
-				debug(D_DEBUG,"Deleting output file '%s' on %s (%s) ...", tf->remote_name, w->hostname,w->addrport);
+				debug(D_WQ,"Deleting output file '%s' on %s (%s) ...", tf->remote_name, w->hostname,w->addrport);
 				link_printf(w->link,"unlink %s\n",tf->remote_name);
 			}
 		}
@@ -351,7 +351,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
 		if(sscanf(line,"ready %s %d %lld %lld %lld %lld",w->hostname,&w->ncpus,&w->memory_avail,&w->memory_total,&w->disk_avail,&w->disk_total)==6) {
 			if(w->state==WORKER_STATE_INIT) {
 				change_worker_state(q,w,WORKER_STATE_READY);
-				debug(D_DEBUG,"%s (%s) ready",w->hostname,w->addrport);
+				debug(D_WQ,"%s (%s) ready",w->hostname,w->addrport);
 			}
 		} else if(sscanf(line,"result %d %d",&result,&output_length)) {
 			struct work_queue_task *t = w->current_task;
@@ -397,7 +397,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			q->total_task_time += (t->finish_time-t->start_time);
 			w->total_tasks_complete++;
 			w->total_task_time += (t->finish_time-t->start_time);
-			debug(D_DEBUG,"%s (%s) done in %.02lfs total tasks %d average %.02lfs",w->hostname,w->addrport,(t->finish_time-t->start_time)/1000000.0,w->total_tasks_complete,w->total_task_time/w->total_tasks_complete/1000000.0);
+			debug(D_WQ,"%s (%s) done in %.02lfs total tasks %d average %.02lfs",w->hostname,w->addrport,(t->finish_time-t->start_time)/1000000.0,w->total_tasks_complete,w->total_task_time/w->total_tasks_complete/1000000.0);
 		} else {
 			goto failure;
 		}
@@ -509,7 +509,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, in
 			free(remote_info);
 		}
 		
-		debug(D_DEBUG,"%s (%s) needs file %s",w->hostname,w->addrport,tf->payload);
+		debug(D_WQ,"%s (%s) needs file %s",w->hostname,w->addrport,tf->payload);
 		if (dir) {
 			// If mkdir fails, the future calls to 'put_file' function to place
 			// files in that directory won't suceed. Such failure would
@@ -567,12 +567,12 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 		list_first_item(t->input_files);
 		while((tf=list_next_item(t->input_files))) {
 			if(tf->fname_or_literal == WORKER_FILE_LITERAL) {
-				debug(D_DEBUG,"%s (%s) needs literal as %s",w->hostname,w->addrport,tf->remote_name);
+				debug(D_WQ,"%s (%s) needs literal as %s",w->hostname,w->addrport,tf->remote_name);
 				fl = tf->length;
 				stoptime = time(0) + MAX(1.0,fl/1250000.0);
 				open_time = timestamp_get();
 				link_printf(w->link,"put %s %d %o\n",tf->remote_name,fl,0777);
-				debug(D_DEBUG,"limit sending %i bytes to %.03lfs seconds (or 1 if <0)",fl,(fl)/1250000.0);
+				debug(D_WQ,"limit sending %i bytes to %.03lfs seconds (or 1 if <0)",fl,(fl)/1250000.0);
 				actual = link_write(w->link, tf->payload, fl,stoptime);
 				close_time = timestamp_get();
 				if(actual!=(fl)) goto failure;
@@ -590,7 +590,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 		w->total_bytes_transfered += total_bytes;
 		w->total_transfer_time += sum_time;
 		if(total_bytes>0) {
-			debug(D_DEBUG,"%s (%s) got %d bytes in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps",w->hostname,w->addrport,total_bytes,sum_time/1000000.0,((8.0*total_bytes)/sum_time),(8.0*w->total_bytes_transfered)/w->total_transfer_time);
+			debug(D_WQ,"%s (%s) got %d bytes in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps",w->hostname,w->addrport,total_bytes,sum_time/1000000.0,((8.0*total_bytes)/sum_time),(8.0*w->total_bytes_transfered)/w->total_transfer_time);
 		}
 	}
 	
@@ -599,9 +599,9 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 
 	failure:
 	if(tf->fname_or_literal == WORKER_FILE_NAME) 
-	    debug(D_DEBUG,"%s (%s) failed to send %s (%i bytes received).",w->hostname,w->addrport,tf->payload,actual);
+	    debug(D_WQ,"%s (%s) failed to send %s (%i bytes received).",w->hostname,w->addrport,tf->payload,actual);
 	else
-	    debug(D_DEBUG,"%s (%s) failed to send literal data (%i bytes received).",w->hostname,w->addrport,actual);
+	    debug(D_WQ,"%s (%s) failed to send literal data (%i bytes received).",w->hostname,w->addrport,actual);
 	t->return_status = 1;
 	t->result = WORK_QUEUE_RESULT_INPUT_FAIL;
 	return 0;
@@ -613,7 +613,7 @@ int start_one_task( struct work_queue_task *t, struct work_queue_worker *w )
 	t->start_time = timestamp_get();
 	link_printf(w->link,"work %d\n",strlen(t->command_line));
 	link_write(w->link,t->command_line,strlen(t->command_line),time(0)+short_timeout);
-	debug(D_DEBUG,"%s (%s) busy on '%s'",w->hostname,w->addrport,t->command_line);
+	debug(D_WQ,"%s (%s) busy on '%s'",w->hostname,w->addrport,t->command_line);
 	return 1;
 }
 
@@ -733,7 +733,7 @@ static void start_tasks( struct work_queue *q )
 			change_worker_state(q,w,WORKER_STATE_BUSY);
 			w->current_task = t;
 		} else {
-			debug(D_DEBUG,"%s (%s) removed because couldn't send task.",w->hostname,w->addrport);
+			debug(D_WQ,"%s (%s) removed because couldn't send task.",w->hostname,w->addrport);
 			w->current_task = t;
 			remove_worker(q,w);
 		}
@@ -744,7 +744,7 @@ static void start_tasks( struct work_queue *q )
 
 	int i = remove_unnecessary_workers(q);
 	if(i) {
-		debug(D_DEBUG,"%d workers are removed because there are no waiting tasks.", i);
+		debug(D_WQ,"%d workers are removed because there are no waiting tasks.", i);
 	}
 	*/
 }
@@ -864,7 +864,7 @@ struct work_queue * work_queue_create( int port )
 		q->priority = WORK_QUEUE_DEFAULT_PRIORITY;
 	}
 
-	debug(D_DEBUG,"Work Queue is listening on port %d.", port);
+	debug(D_WQ,"Work Queue is listening on port %d.", port);
 	return q;
 
 	failure:
@@ -953,7 +953,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		if(q->workers_in_state[WORKER_STATE_BUSY]==0 && list_size(q->ready_list)==0) break;
 
 		start_tasks(q);
-		debug(D_DEBUG, "Number of busy workers: %d", q->workers_in_state[WORKER_STATE_BUSY]);
+		debug(D_WQ, "Number of busy workers: %d", q->workers_in_state[WORKER_STATE_BUSY]);
 
 		int n = build_poll_table(q);
 		int msec;
@@ -1167,7 +1167,7 @@ static int update_catalog(struct work_queue* q) {
 	);
 
 	if(domain_name_cache_lookup(CATALOG_HOST, address)) {
-		debug(D_DEBUG, "sending master information to %s:%d", CATALOG_HOST, CATALOG_PORT);
+		debug(D_WQ, "sending master information to %s:%d", CATALOG_HOST, CATALOG_PORT);
 		datagram_send(outgoing_datagram, text, strlen(text), address, CATALOG_PORT);
 	}
 
