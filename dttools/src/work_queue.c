@@ -67,6 +67,8 @@ struct work_queue {
 	INT64_T total_tasks_submitted;
 	INT64_T total_tasks_complete;
 	INT64_T total_task_time;
+	INT64_T	total_workers_joined;
+	INT64_T	total_workers_removed;
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;           /**< How to choose worker to run the task. */
 };
@@ -181,9 +183,12 @@ void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s )
 	s->workers_ready  = q->workers_in_state[WORKER_STATE_READY];
 	s->workers_busy   = q->workers_in_state[WORKER_STATE_BUSY];
 	s->tasks_waiting  = list_size(q->ready_list);
-	s->tasks_complete = list_size(q->complete_list);
 	s->tasks_running  = q->workers_in_state[WORKER_STATE_BUSY];
+	s->tasks_complete = list_size(q->complete_list);
 	s->total_tasks_dispatched = q->total_tasks_submitted;
+	s->total_tasks_complete	  = q->total_tasks_complete;
+	s->total_workers_joined   = q->total_workers_joined;
+	s->total_workers_removed  = q->total_workers_removed;
 }
 
 static void add_worker( struct work_queue *q )
@@ -208,6 +213,7 @@ static void add_worker( struct work_queue *q )
 			change_worker_state(q,w,WORKER_STATE_INIT);
 			debug(D_WQ,"worker %s added",w->addrport);
 			debug(D_WQ,"%d workers are connected in total now", hash_table_size(q->worker_table));
+			q->total_workers_joined++;
 		} else {
 			link_close(link);
 		}			
@@ -219,6 +225,7 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 	char *key, *value;
 
 	debug(D_WQ,"worker %s removed",w->addrport);
+	q->total_workers_removed++;
 
 	hash_table_firstkey(w->current_files);
 	while(hash_table_nextkey(w->current_files,&key,(void**)&value)) {

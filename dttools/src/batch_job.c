@@ -499,7 +499,7 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 	int timeout;
 
 	if(!logfile) {
-		logfile = fopen(q->logfile,"w+");
+		logfile = fopen(q->logfile,"a");
 		if(!logfile) {
 			debug(D_NOTICE,"couldn't open logfile %s: %s\n",q->logfile,strerror(errno));
 			return -1;
