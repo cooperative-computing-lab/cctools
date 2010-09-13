@@ -37,12 +37,13 @@ See the file COPYING for details.
 #define WORKER_STATE_NONE  3
 #define WORKER_STATE_MAX   (WORKER_STATE_NONE+1)
 
-#define WORKER_FILE_NAME 0
-#define WORKER_FILE_LITERAL 1
+#define WORK_QUEUE_FILE 0
+#define WORK_QUEUE_BUFFER 1
 
 #define MASTER_MODE_STANDALONE 0
 #define MASTER_MODE_CATALOG 1
 #define MASTER_CATALOG_LINE_MAX 1024
+
 #define CATALOG_UPDATE_INTERVAL 60
 #define	CATALOG_LIFETIME	180
 
@@ -94,11 +95,11 @@ struct work_queue_worker {
 };
 
 struct work_queue_file {
-	short fname_or_literal; //0 or 1
-	short cacheable; // 0=no, 1=yes.
-	int length;
-	void* payload; // name on master machine or buffer of data.
-	char* remote_name; // name on remote machine.
+	int   type;        // WORK_QUEUE_FILE or WORK_QUEUE_BUFFER
+	int   flags;       // WORK_QUEUE_CACHE or others in the future.
+	int   length;      // length of payload
+	void *payload;     // name on master machine or buffer of data.
+	char *remote_name; // name on remote machine.
 };
 
 int start_one_task( struct work_queue_task *t, struct work_queue_worker *w );
@@ -291,7 +292,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 				if(actual!=length) { unlink(tf->payload); goto failure; }
 
 				// Add the output files to the hash table if its cacheable
-				if(tf->cacheable) {
+				if(tf->flags&WORK_QUEUE_CACHE) {
 					if(stat(tf->payload,&local_info)<0) { unlink(tf->payload); goto failure; }
 
 					hash_name = (char*) malloc((strlen(tf->payload)+strlen(tf->remote_name)+2)*sizeof(char));
@@ -316,26 +317,24 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 	return 0;
 }
 
-void delete_uncacheable_files(struct work_queue_task *t, struct work_queue_worker *w) {
+static void delete_uncacheable_files( struct work_queue_task *t, struct work_queue_worker *w )
+{
 	struct work_queue_file* tf;
 
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((tf=list_next_item(t->input_files))) {
-			if(tf->cacheable == WORK_QUEUE_TASK_FILE_UNCACHEABLE) {
-				// Send 'unlink' command to the worker
+			if(!(tf->flags&WORK_QUEUE_CACHE)) {
 				debug(D_WQ,"Deleting input file '%s' on %s (%s) ...", tf->remote_name, w->hostname,w->addrport);
 				link_printf(w->link,"unlink %s\n",tf->remote_name);
 			}
 		}
 	}
 
-
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((tf=list_next_item(t->output_files))) {
-			if(tf->cacheable == WORK_QUEUE_TASK_FILE_UNCACHEABLE) {
-				// Send 'unlink' command to the worker
+			if(!(tf->flags&WORK_QUEUE_CACHE)) {
 				debug(D_WQ,"Deleting output file '%s' on %s (%s) ...", tf->remote_name, w->hostname,w->addrport);
 				link_printf(w->link,"unlink %s\n",tf->remote_name);
 			}
@@ -389,7 +388,6 @@ static int handle_worker( struct work_queue *q, struct link *l )
 				goto failure;
 			}
 
-			// Delete uncacheable files
 			delete_uncacheable_files(t, w);
 
 			// Record current task as completed and change worker's state
@@ -466,9 +464,8 @@ static int put_directory( const char *dirname, struct work_queue_worker *w, int 
 		*buffer = '\0';
 		len = sprintf(buffer, "%s/%s", dirname, filename);
 		
-		//TODO: Complete
-		tf.fname_or_literal = WORKER_FILE_NAME;
-		tf.cacheable = 1;
+		tf.type = WORK_QUEUE_FILE;
+		tf.flags = WORK_QUEUE_CACHE;
 		tf.length = len;
 		tf.payload = strdup(buffer);
 		tf.remote_name = strdup(buffer);
@@ -543,7 +540,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, in
 		
 		if(actual!=local_info.st_size) return 0;
 		
-		if(tf->cacheable) {
+		if(tf->flags&WORK_QUEUE_CACHE) {
 			remote_info = malloc(sizeof(*remote_info));
 			memcpy(remote_info,&local_info,sizeof(local_info));
 			hash_table_insert(w->current_files,hash_name,remote_info);
@@ -573,7 +570,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((tf=list_next_item(t->input_files))) {
-			if(tf->fname_or_literal == WORKER_FILE_LITERAL) {
+			if(tf->type == WORK_QUEUE_BUFFER) {
 				debug(D_WQ,"%s (%s) needs literal as %s",w->hostname,w->addrport,tf->remote_name);
 				fl = tf->length;
 				stoptime = time(0) + MAX(1.0,fl/1250000.0);
@@ -605,7 +602,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 	return 1;
 
 	failure:
-	if(tf->fname_or_literal == WORKER_FILE_NAME) 
+	if(tf->type == WORK_QUEUE_FILE) 
 	    debug(D_WQ,"%s (%s) failed to send %s (%i bytes received).",w->hostname,w->addrport,tf->payload,actual);
 	else
 	    debug(D_WQ,"%s (%s) failed to send literal data (%i bytes received).",w->hostname,w->addrport,actual);
@@ -641,7 +638,7 @@ struct work_queue_worker * find_worker_by_files( struct work_queue *q , struct w
 			task_cached_bytes = 0;
 			list_first_item(t->input_files);
 			while((tf=list_next_item(t->input_files))) {
-				if(tf->fname_or_literal == WORKER_FILE_NAME && tf->cacheable) {
+				if(tf->type == WORK_QUEUE_FILE && (tf->flags&WORK_QUEUE_CACHE)) {
 					hash_name = malloc((strlen(tf->payload)+strlen(tf->remote_name)+2)*sizeof(char));
 					sprintf(hash_name,"%s-%s",(char*)tf->payload,tf->remote_name);
 					remote_info = hash_table_lookup(w->current_files,hash_name);
@@ -1026,53 +1023,58 @@ void work_queue_task_specify_tag( struct work_queue_task *t, const char *tag )
 	t->tag = strdup(tag);
 }
 
-void work_queue_task_specify_file( struct work_queue_task* t, const char* fname, const char* rname, int type, int cacheable )
+void work_queue_task_specify_file( struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags )
 {
 	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
 
-	tf->fname_or_literal = WORKER_FILE_NAME;
-	tf->cacheable = cacheable;
-	tf->length = strlen(fname);
-	tf->payload = strdup(fname);
-	tf->remote_name = strdup(rname);
+	tf->type = WORK_QUEUE_FILE;
+	tf->flags = flags;
+	tf->length = strlen(local_name);
+	tf->payload = strdup(remote_name);
+	tf->remote_name = strdup(remote_name);
 
-	if (type == WORK_QUEUE_TASK_INPUT_FILE) {
-	    list_push_tail(t->input_files,tf);
+	if (type == WORK_QUEUE_INPUT) {
+		list_push_tail(t->input_files,tf);
 	} else {
-	    list_push_tail(t->output_files,tf);
+		list_push_tail(t->output_files,tf);
 	}
+}
+
+void work_queue_task_specify_buffer( struct work_queue_task* t, const char *data, int length, const char *remote_name )
+{
+	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
+	tf->type = WORK_QUEUE_BUFFER;
+	tf->flags = 0;
+	tf->length = length;
+	tf->payload = malloc(length);
+	memcpy(tf->payload, data, length);
+	tf->remote_name = strdup(remote_name);
+	list_push_tail(t->input_files,tf);
 }
 
 void work_queue_task_specify_output_file( struct work_queue_task* t, const char* rname, const char* fname)
 {
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_TASK_OUTPUT_FILE, WORK_QUEUE_TASK_FILE_CACHEABLE);
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
 }
 
 void work_queue_task_specify_output_file_do_not_cache( struct work_queue_task* t, const char* rname, const char* fname)
 {
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_TASK_OUTPUT_FILE, WORK_QUEUE_TASK_FILE_UNCACHEABLE);
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 }
 
 void work_queue_task_specify_input_buf( struct work_queue_task* t, const char* buf, int length, const char* rname)
 {
-	struct work_queue_file* tf = malloc(sizeof(struct work_queue_file));
-	tf->fname_or_literal = WORKER_FILE_LITERAL;
-	tf->cacheable = WORK_QUEUE_TASK_FILE_UNCACHEABLE;
-	tf->length = length;
-	tf->payload = malloc(length);
-	memcpy(tf->payload, buf, length);
-	tf->remote_name = strdup(rname);
-	list_push_tail(t->input_files,tf);
+	return work_queue_task_specify_buffer(t,buf,length,rname);
 }
 
 void work_queue_task_specify_input_file( struct work_queue_task* t, const char* fname, const char* rname)
 {
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_TASK_INPUT_FILE, WORK_QUEUE_TASK_FILE_CACHEABLE);
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 }
 
 void work_queue_task_specify_input_file_do_not_cache( struct work_queue_task* t, const char* fname, const char* rname)
 {
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_TASK_INPUT_FILE, WORK_QUEUE_TASK_FILE_UNCACHEABLE);
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
 }
 
 int work_queue_task_specify_algorithm( struct work_queue_task* t, int alg ) {
@@ -1117,36 +1119,6 @@ int work_queue_empty (struct work_queue* q)
 {
 	return ((list_size(q->ready_list)+list_size(q->complete_list)+q->workers_in_state[WORKER_STATE_BUSY])==0);
 }
-
-
-
-/*
-As written, this function removes every single worker that does not
-currently have a task, which is a little too aggressive.  If there
-is a brief dip in the available work, the worker and its cached
-data will be lost.  A slightly less aggressive algorithm is needed.
-*/
-
-/*
-static int remove_unnecessary_workers (struct work_queue* q)
-{
-	struct work_queue_worker *w;
-	char *key;
-	int i=0;
-
-	if(!q) return 0;
-	
-	hash_table_firstkey( q->worker_table);
-	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-		if(w->state != WORKER_STATE_BUSY) {
-			remove_worker(q,w);
-			i++;
-		}
-	}
-
-	return i;  
-}
-*/
 
 static int update_catalog(struct work_queue* q) {
 	char address[DATAGRAM_ADDRESS_MAX];

@@ -36,12 +36,11 @@ and port of the master.
 #define WORK_QUEUE_SCHEDULE_MAX 3
 #define WORK_QUEUE_SCHEDULE_DEFAULT 3 // default setting for queue.
 
-#define WORK_QUEUE_TASK_FILE_UNCACHEABLE 0
-#define WORK_QUEUE_TASK_FILE_CACHEABLE 1
+#define WORK_QUEUE_INPUT  0
+#define WORK_QUEUE_OUTPUT 1
 
-#define WORK_QUEUE_TASK_INPUT_FILE  0
-#define WORK_QUEUE_TASK_OUTPUT_FILE 1
-
+#define WORK_QUEUE_NOCACHE 0
+#define WORK_QUEUE_CACHE 1
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler; /**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
@@ -81,6 +80,59 @@ struct work_queue_stats {
 	int total_workers_removed;	/**< Total number of times a worker was removed from the queue. */
 };
 
+/** @name Functions - Tasks */
+
+//@{
+
+/** Create a new task specification.  Once created, the task may be passed to @ref work_queue_submit.
+@param full_command The shell command line to be executed by the task.
+*/
+struct work_queue_task * work_queue_task_create( const char *full_command);
+
+/** Add a file to a task.
+@param t The task to which to add a file.
+@param local_name The name of the file on local disk.
+@param remote_name The name of the file at the execution site.
+@param type Must be one of the following values:
+- WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
+- WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
+@param flags May be zero to indicate no special handling, or any of the following or'd together:
+- WORK_QUEUE_CACHEABLE - The file may be cached at the execution site for later use.
+*/
+void work_queue_task_specify_file( struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags );
+
+/** Add an input buffer to a task.
+@param t The task to which to add a file.
+@param data The contents of the buffer to pass as input.
+@param length The length of the buffer, in bytes
+@param remote_name The name of the remote file to create.
+*/
+void work_queue_task_specify_buffer( struct work_queue_task *t, const char *data, int length, const char *remote_name );
+
+/** Attach a user defined logical name to the task.
+This field is not interpreted by the work queue, but simply maintained to help the user track tasks.
+@param t The task to which to add parameters
+@param tag The tag to attach to task t.
+*/
+void work_queue_task_specify_tag( struct work_queue_task *t, const char *tag );
+
+/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
+@param t The task to which to add parameters
+@param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
+*/
+int work_queue_task_specify_algorithm( struct work_queue_task *t, int alg );
+
+/** Delete a task specification.  This may be called on tasks after they are returned from @ref work_queue_wait.
+@param t The task specification to delete.
+*/
+void work_queue_task_delete( struct work_queue_task *t );
+
+//@}
+
+/** @name Functions - Queues */
+
+//@{
+
 /** Create a new work queue.
 Users may modify the behavior of @ref work_queue_create by setting the following environmental variables before calling the function:
 
@@ -113,74 +165,21 @@ void work_queue_submit( struct work_queue *q, struct work_queue_task *t );
 */
 struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout );
 
-/** Create a new task specification.  Once created, the task may be passed to @ref work_queue_submit.
-@param full_command The shell command line to be executed by the task.
+/** Determine whether the queue can support more tasks. Returns the number of additional tasks it can support if "hungry" and 0 if "sated".
+@param q A pointer to the queue to query.
 */
-struct work_queue_task * work_queue_task_create( const char *full_command);
+int work_queue_hungry (struct work_queue *q);
 
-/** Attach a user defined logical name to the task.
-This field is not interpreted by the work queue, but simply maintained to help the user track tasks.
-@param t The task to which to add parameters
-@param tag The tag to attach to task t.
+/** Determine whether there are any known tasks queued, running, or waiting to be collected. Returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
+@param q A pointer to the queue to query.
 */
-void work_queue_task_specify_tag( struct work_queue_task *t, const char *tag );
+int work_queue_empty (struct work_queue *q);
 
-/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
-@param t The task to which to add parameters
-@param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
+/** Get the listening port of the queue.
+@param q The work queue of interest.
+@return The port the queue is listening on.
 */
-int work_queue_task_specify_algorithm( struct work_queue_task *t, int alg );
-
-/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
-@param t The task to which to add parameters
-@param buf A pointer to the data buffer to send to the worker to be available to the commands.
-@param length The number of bytes of data in the buffer
-@param rname The name of the file in which to store the buffer data on the worker
-*/
-void work_queue_task_specify_input_buf( struct work_queue_task *t, const char *buf, int length, const char *rname);
-
-/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
-@param t The task to which to add parameters
-@param fname The name of the data file to send to the worker to be available to the commands.
-@param rname The name of the file in which to store the buffer data on the worker.
-*/
-void work_queue_task_specify_input_file( struct work_queue_task *t, const char *fname, const char *rname);
-
-/** Further define a task specification. The file specified here won't be cached on the remote worker. Once completed, the task may be passed to @ref work_queue_submit. 
-@param t The task to which to add parameters
-@param fname The name of the data file to send to the worker to be available to the commands.
-@param rname The name of the file in which to store the buffer data on the worker.
-*/
-void work_queue_task_specify_input_file_do_not_cache( struct work_queue_task *t, const char *fname, const char *rname);
-
-/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. If no file is defined, the program will have default (no) output files retrieved.
-@param t The task to which to add parameters
-@param rname The name of a file created by the program when it runs.
-@param fname The name of the file local target for copying rname back.
-*/
-void work_queue_task_specify_output_file( struct work_queue_task *t, const char *rname, const char *fname);
-
-/** Further define a task specification. The file specified here won't be cached on the remote worker. Once completed, the task may be passed to @ref work_queue_submit. If no file is defined, the program will have default (no) output files retrieved.
-@param t The task to which to add parameters
-@param rname The name of a file created by the program when it runs.
-@param fname The name of the file local target for copying rname back.
-*/
-void work_queue_task_specify_output_file_do_not_cache( struct work_queue_task* t, const char* rname, const char* fname);
-
-/** Further define a task specification.  Once completed, the task may be passed to @ref work_queue_submit. 
-@param t The task to which to add parameters
-@param fname The name of the local data file. 
-@param rname The name of the remote data file.
-@param type  The type of file specification.  This may either be @ref WORK_QUEUE_TASK_INPUT_FILE for an input specification or @ref WORK_QUEUE_TASK_OUTPUT_FILE for an output specification.
-@param cacheable Whether or not the file should be considered cacheable.
-*/
-void work_queue_task_specify_file( struct work_queue_task *t, const char *fname, const char *rname, int type, int cacheable);
-
-
-/** Delete a task specification.  This may be called on tasks after they are returned from @ref work_queue_wait.
-@param t The task specification to delete.
-*/
-void work_queue_task_delete( struct work_queue_task *t );
+int work_queue_port( struct work_queue *q );
 
 /** Get queue statistics.
 @param q The queue to query.
@@ -213,25 +212,58 @@ int work_queue_specify_name( struct work_queue* q, const char *name );
 */
 int work_queue_shut_down_workers (struct work_queue *q, int n);
 
-/** Determine whether the queue can support more tasks. Returns the number of additional tasks it can support if "hungry" and 0 if "sated".
-@param q A pointer to the queue to query.
-*/
-int work_queue_hungry (struct work_queue *q);
-
-/** Determine whether there are any known tasks queued, running, or waiting to be collected. Returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
-@param q A pointer to the queue to query.
-*/
-int work_queue_empty (struct work_queue *q);
-
-/** Get the listening port of the queue.
-@param q The work queue of interest.
-@return The port the queue is listening on.
-*/
-int work_queue_port( struct work_queue *q );
-
 /** Delete a work queue.
 @param q The work queue to delete.
 */
 void work_queue_delete( struct work_queue *q );
+
+//@}
+
+/** @name Functions - Deprecated */
+
+//@{
+
+/** Add an input buffer to a task.
+@param t The task to which to add parameters
+@param buf A pointer to the data buffer to send to the worker to be available to the commands.
+@param length The number of bytes of data in the buffer
+@param rname The name of the file in which to store the buffer data on the worker
+@deprecated Use @ref work_queue_task_specify_buffer instead.
+*/
+void work_queue_task_specify_input_buf( struct work_queue_task *t, const char *buf, int length, const char *rname);
+
+/** Add an input file to a task.
+@param t The task to which to add parameters
+@param fname The name of the data file to send to the worker to be available to the commands.
+@param rname The name of the file in which to store the buffer data on the worker.
+@deprecated See @ref work_queue_task_specify_file instead.
+*/
+void work_queue_task_specify_input_file( struct work_queue_task *t, const char *fname, const char *rname);
+
+/** Add an input file to a task, without caching.
+@param t The task to which to add parameters
+@param fname The name of the data file to send to the worker to be available to the commands.
+@param rname The name of the file in which to store the buffer data on the worker.
+@deprecated See @ref work_queue_task_specify_file instead.
+*/
+void work_queue_task_specify_input_file_do_not_cache( struct work_queue_task *t, const char *fname, const char *rname);
+
+/** Add an output file to a task.
+@param t The task to which to add parameters
+@param rname The name of a file created by the program when it runs.
+@param fname The name of the file local target for copying rname back.
+@deprecated See @ref work_queue_task_specify_file instead.
+*/
+void work_queue_task_specify_output_file( struct work_queue_task *t, const char *rname, const char *fname);
+
+/** Add an output file to a task without caching.
+@param t The task to which to add parameters
+@param rname The name of a file created by the program when it runs.
+@param fname The name of the file local target for copying rname back.
+@deprecated See @ref work_queue_task_specify_file instead.
+*/
+void work_queue_task_specify_output_file_do_not_cache( struct work_queue_task* t, const char* rname, const char* fname);
+
+//@}
 
 #endif
