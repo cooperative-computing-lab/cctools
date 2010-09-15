@@ -533,7 +533,7 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 		capturing errors from the program.
 		*/
 
-		if(t->output[0]) {
+		if(t->output && t->output[0]) {
 			if(t->output[1] || t->output[0]!='\n') {
 				string_chomp(t->output);
 				printf("%s\n",t->output);

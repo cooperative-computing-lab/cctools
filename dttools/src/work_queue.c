@@ -234,7 +234,14 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 		free(value);
 	}
 	hash_table_remove(q->worker_table,w->hashkey);
-	if(w->current_task) list_push_head(q->ready_list,w->current_task);
+	if(w->current_task) {
+		if (w->current_task->result == WORK_QUEUE_RESULT_OUTPUT_FAIL) {
+			list_push_head(q->complete_list,w->current_task);
+		} else {
+			list_push_head(q->ready_list,w->current_task);
+		}
+		w->current_task = 0;
+	}
 	change_worker_state(q,w,WORKER_STATE_NONE);
 	if(w->link) link_close(w->link);
 	free(w);
@@ -257,13 +264,13 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 	debug(D_WQ,"%s (%s) sending back %s to %s",w->hostname,w->addrport,remote_name,local_name);
 
 	link_printf(w->link, "get %s\n", remote_name);
-	if(!link_readline(w->link, line, sizeof(line), time(0)+short_timeout)) goto failure;
+	if(!link_readline(w->link, line, sizeof(line), time(0)+short_timeout)) goto link_failure;
 	
 	if(sscanf(line,"%lld",&length) != 1) {
 		if(strncmp(line,"dir", 3) == 0) {
 			debug(D_WQ,"%s (%s) sending back list of directory %s's contents",w->hostname,w->addrport,remote_name);
 			link_printf(w->link,"list %s\n", remote_name);
-			if(!link_readline(w->link, line, sizeof(line), time(0)+short_timeout)) goto failure;
+			if(!link_readline(w->link, line, sizeof(line), time(0)+short_timeout)) goto link_failure;
 			if(sscanf(line,"%ld",&list_len) != 1) goto failure;
 			if(length >= 0) {
 				list = (char *)malloc((list_len+1)*sizeof(char));
@@ -326,6 +333,9 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 
 	return 1;
 
+	link_failure:
+	w->current_task->result = WORK_QUEUE_RESULT_LINK_FAIL;
+
 	failure:
 	debug(D_NOTICE,"%s (%s) failed to return %s to %s (%s)",w->addrport,w->hostname,remote_name,local_name, strerror(errno));
 	return 0;
@@ -354,7 +364,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 			rv = get_output_item(tf->remote_name, (char *)tf->payload, w, received_files);
 			if(!rv) {
 				debug(D_WQ,"%s (%s) did not create expected file %s",w->hostname,w->addrport,tf->remote_name);
-				if(t->result == WORK_QUEUE_RESULT_UNSET) t->result = WORK_QUEUE_RESULT_OUTPUT_FAIL;
+				t->result = WORK_QUEUE_RESULT_OUTPUT_FAIL;
 				t->return_status = 1;
 				return 0;
 			}

@@ -28,6 +28,7 @@ and port of the master.
 #define WORK_QUEUE_RESULT_INPUT_FAIL 1
 #define WORK_QUEUE_RESULT_FUNCTION_FAIL 2
 #define WORK_QUEUE_RESULT_OUTPUT_FAIL 3
+#define WORK_QUEUE_RESULT_LINK_FAIL 4
 
 #define WORK_QUEUE_SCHEDULE_UNSET 0 // default setting for task.
 #define WORK_QUEUE_SCHEDULE_FCFS 1
