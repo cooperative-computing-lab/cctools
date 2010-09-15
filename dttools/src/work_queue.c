@@ -554,7 +554,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, in
 	//timestamp_t sum_time=0;
 	int actual=0;
 	int dir = 0;
-	
+
 	if(stat(tf->payload,&local_info)<0) return 0;
 	if (local_info.st_mode & S_IFDIR) dir = 1; 
 	/* normalize the mode so as not to set up invalid permissions */
@@ -1096,7 +1096,7 @@ void work_queue_task_specify_file( struct work_queue_task *t, const char *local_
 	tf->type = WORK_QUEUE_FILE;
 	tf->flags = flags;
 	tf->length = strlen(local_name);
-	tf->payload = strdup(remote_name);
+	tf->payload = strdup(local_name);
 	tf->remote_name = strdup(remote_name);
 
 	if (type == WORK_QUEUE_INPUT) {
