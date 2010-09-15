@@ -35,6 +35,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <math.h>
 #include <signal.h>
+#include <dirent.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -431,8 +432,6 @@ int main( int argc, char *argv[] )
 			} else if(sscanf(line,"put %s %lld %o",filename,&length,&mode)==3) {
 				mode = mode | 0600;
 				char *cur_pos, *tmp_pos;
-				//struct stat info;
-				//int rv;
 
 				cur_pos = filename;
 				
@@ -444,31 +443,12 @@ int main( int argc, char *argv[] )
 				if(tmp_pos) {
 					*tmp_pos = '\0';
 					if(!create_dir(cur_pos, mode | 0700)) {
-						debug(D_WQ,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
+						debug(D_WQ,"Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
 						goto recover;
 					}
 					*tmp_pos = '/';
 				}
 
-				/**
-				for(tmp_pos = cur_pos; *tmp_pos; ++tmp_pos) {
-					if( *tmp_pos == '/') {
-						*tmp_pos = '\0';
-						// Create this directory if not exist
-						info.st_mode = 0;
-						rv = stat(cur_pos, &info);
-						if(rv != 0 || !S_ISDIR(info.st_mode)) {
-							debug(D_WQ,"Creating directory - %s ... \n", cur_pos);
-							if(mkdir(cur_pos, mode | 0700) != 0) {
-								debug(D_WQ,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
-								goto recover;
-							}
-						}
-						*tmp_pos = '/';
-					}
-				}
-				*/
-				
 				fd = open(filename,O_WRONLY|O_CREAT|O_TRUNC,mode);
 				if(fd<0) goto recover;
 				INT64_T actual = link_stream_to_fd(master,fd,length,time(0)+active_timeout);
@@ -481,30 +461,89 @@ int main( int argc, char *argv[] )
 					goto recover;
 				}
 			} else if(sscanf(line, "mkdir %s %o", filename, &mode)==2) {
-				mode = mode | 0700;
-				result = mkdir(filename, mode);
-				if(result != 0) { // 0 - succeeded; otherwise, failed
-					fprintf(stderr,"Could not make directory: %s.(%s)\n",filename, strerror(errno));
+				if(!create_dir(filename, mode | 0700)) {
+					debug(D_WQ,"Could not create directory - %s (%s)\n", filename, strerror(errno));
 					goto recover;
 				}
-			} else if(sscanf(line,"get %s",filename)==1) {
-				fd = open(filename,O_RDONLY,0);
-				if(fd>=0) {
-					struct stat info;
-					fstat(fd,&info);
-					length = info.st_size;
-					sprintf(line,"%lld\n",length);
+			} else if(sscanf(line, "list %s", filename)==1) {
+				struct stat info;
+				if(stat(filename, &info) != 0) {
+					fprintf(stderr,"File/Directory %s was not created. (%s)\n",filename, strerror(errno));
+					sprintf(line,"-1\n");
 					link_write(master,line,strlen(line),time(0)+active_timeout);
-					INT64_T actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
-					close(fd);
-					if(actual!=length) {
-						debug(D_WQ,"Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, length, actual);
+					goto recover;
+				}
+
+				if(S_ISDIR(info.st_mode)) {
+					// send back a list of directory contents
+					DIR *dir;
+					struct dirent *dent;
+					char *list;
+					char dentline[1024];
+
+					dir = opendir(filename);
+					if(!dir) {
+						fprintf(stderr,"Cannot open directory %s. (%s)\n",filename, strerror(errno));
+						sprintf(line,"-1\n");
+						link_write(master,line,strlen(line),time(0)+active_timeout);
+						goto recover;
+					}
+
+					list = (char *)malloc(info.st_size);
+					memset(list, 0, info.st_size);
+
+					while((dent = readdir(dir))) {
+						if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, "..")) continue;
+						sprintf(dentline, "%s\n", dent->d_name);
+						strncat(list, dentline, strlen(dentline));
+					}
+
+					closedir(dir);
+
+					sprintf(line,"%ld\n",strlen(list));
+					link_write(master,line,strlen(line),time(0)+active_timeout);
+					INT64_T actual = link_write(master,list,strlen(list),time(0)+active_timeout);
+					if(actual!=strlen(list)) {
+						debug(D_WQ,"Sending list of contents of directory - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, strlen(list), actual);
 						goto recover;
 					}
 				} else {
+					fprintf(stderr,"%s is not a directory, so it can not be listed.\n",filename);
 					sprintf(line,"-1\n");
 					link_write(master,line,strlen(line),time(0)+active_timeout);
-				}					
+					goto recover;
+				}
+			} else if(sscanf(line, "get %s",filename)==1) {
+				struct stat info;
+				if(stat(filename, &info) != 0) {
+					fprintf(stderr,"File/Directory %s was not created. (%s)\n",filename, strerror(errno));
+					sprintf(line,"-1\n");
+					link_write(master,line,strlen(line),time(0)+active_timeout);
+					goto recover;
+				}
+
+				if(S_ISDIR(info.st_mode)) {
+					// inform the master that 'filename' points to a directory
+					sprintf(line,"dir\n");
+					link_write(master,line,strlen(line),time(0)+active_timeout);
+				} else {
+					// send back a single file
+					fd = open(filename,O_RDONLY,0);
+					if(fd>=0) {
+						length = info.st_size;
+						sprintf(line,"%lld\n",length);
+						link_write(master,line,strlen(line),time(0)+active_timeout);
+						INT64_T actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
+						close(fd);
+						if(actual!=length) {
+							debug(D_WQ,"Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, length, actual);
+							goto recover;
+						}
+					} else {
+						sprintf(line,"-1\n");
+						link_write(master,line,strlen(line),time(0)+active_timeout);
+					}					
+				}
 			} else if(!strcmp(line,"exit")) {
 				break;
 			} else {

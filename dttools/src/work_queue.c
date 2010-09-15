@@ -242,13 +242,99 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 	debug(D_WQ,"%d workers are connected in total now", hash_table_size(q->worker_table));
 }
 
-static int get_output_files( struct work_queue_task *t, struct work_queue_worker *w )
-{
+static int get_output_item(char *remote_name, char *local_name, struct work_queue_worker *w, struct hash_table *received_files) {
 	char line[WORK_QUEUE_LINE_MAX];
-	struct work_queue_file* tf;
 	int fd;
 	INT64_T actual, length;
+	long list_len;
 	time_t stoptime;
+	char *list, *token;
+	char *search = "\n";
+	char tmp_remote_name[WORK_QUEUE_LINE_MAX], tmp_local_name[WORK_QUEUE_LINE_MAX];
+
+	if(hash_table_lookup(received_files, remote_name)) return 1;
+
+	debug(D_WQ,"%s (%s) sending back %s to %s",w->hostname,w->addrport,remote_name,local_name);
+
+	link_printf(w->link, "get %s\n", remote_name);
+	if(!link_readline(w->link, line, sizeof(line), time(0)+short_timeout)) goto failure;
+	
+	if(sscanf(line,"%lld",&length) != 1) {
+		if(strncmp(line,"dir", 3) == 0) {
+			debug(D_WQ,"%s (%s) sending back list of directory %s's contents",w->hostname,w->addrport,remote_name);
+			link_printf(w->link,"list %s\n", remote_name);
+			if(!link_readline(w->link, line, sizeof(line), time(0)+short_timeout)) goto failure;
+			if(sscanf(line,"%ld",&list_len) != 1) goto failure;
+			if(length >= 0) {
+				list = (char *)malloc((list_len+1)*sizeof(char));
+				memset(list, 0, list_len+1);
+				actual = link_read(w->link,list,list_len,time(0)+short_timeout);
+
+				token = strtok(list, search);
+				while(token) {
+					if(string_isspace(token)) continue;
+
+					sprintf(tmp_remote_name, "%s/%s", remote_name, token);
+					sprintf(tmp_local_name, "%s/%s", local_name, token);
+					get_output_item(tmp_remote_name,tmp_local_name, w, received_files);
+
+					token = strtok(NULL, search);
+				}	
+				free(list);
+			} else {
+				goto failure;
+			}
+		} else {
+			goto failure;
+		}
+	} else {
+		if(length>=0) {
+			char *cur_pos, *tmp_pos;
+
+			// create dirs in the filename path if needed
+			cur_pos = local_name;
+			if (!strncmp(cur_pos, "./", 2)){
+				cur_pos += 2;
+			}
+
+			tmp_pos = strrchr(cur_pos, '/');
+			while(tmp_pos) {
+				*tmp_pos = '\0';
+				if(!create_dir(cur_pos, 0700)) {
+					debug(D_WQ,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
+					goto failure;
+				}
+				*tmp_pos = '/';
+
+				cur_pos = tmp_pos+1;
+				tmp_pos = strrchr(cur_pos, '/');
+			}
+
+			// get the remote file and place it
+			fd = open(local_name, O_WRONLY|O_TRUNC|O_CREAT,0700);
+			if(fd<0) goto failure;
+			stoptime = time(0) + MAX(1.0,(length)/1250000.0);
+			actual = link_stream_to_fd(w->link,fd,length,stoptime);
+			close(fd);
+			if(actual!=length) { unlink(local_name); goto failure; }
+
+			hash_table_insert(received_files, remote_name, strdup(remote_name));
+		} else {
+			goto failure;
+		}
+	}
+
+	return 1;
+
+	failure:
+	debug(D_NOTICE,"%s (%s) failed to return %s to %s (%s)",w->addrport,w->hostname,remote_name,local_name, strerror(errno));
+	return 0;
+}
+
+static int get_output_files( struct work_queue_task *t, struct work_queue_worker *w )
+{
+	struct work_queue_file* tf;
+	int rv;
 
 	// This may be where I can trigger output file cache
 	// Added by Anthony Canino
@@ -256,65 +342,45 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 	struct stat local_info;
 	struct stat *remote_info;
 	char *hash_name;
-	char *cur_pos, *tmp_pos;
+	char *key, *value;
+
+	struct hash_table *received_files;
+
+	received_files = hash_table_create(0,0);
 
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((tf=list_next_item(t->output_files))) {
-
-			debug(D_WQ,"%s (%s) sending back %s to %s",w->hostname,w->addrport,tf->remote_name, tf->payload);
-
-			link_printf(w->link,"get %s\n",tf->remote_name);
-			if(!link_readline(w->link,line,sizeof(line),time(0)+short_timeout)) goto failure;
-			if(sscanf(line,"%lld",&length)!=1) goto failure;
-			if(length>=0) {
-				// create dirs if needed
-				cur_pos = tf->payload;
-				if (!strncmp(cur_pos, "./", 2)){
-					cur_pos += 2;
-				}
-
-				tmp_pos = strrchr(cur_pos, '/');
-				if(tmp_pos) {
-					*tmp_pos = '\0';
-					if(!create_dir(cur_pos, 0700)) {
-						debug(D_WQ,"Cannot create directory - %s (%s)\n", cur_pos, strerror(errno));
-						goto failure;
-					}
-					*tmp_pos = '/';
-				}
-
-				fd = open(tf->payload,O_WRONLY|O_TRUNC|O_CREAT,0700);
-				if(fd<0) goto failure;
-				stoptime = time(0) + MAX(1.0,(length)/1250000.0);
-				actual = link_stream_to_fd(w->link,fd,length,stoptime);
-				close(fd);
-				if(actual!=length) { unlink(tf->payload); goto failure; }
-
-				// Add the output files to the hash table if its cacheable
-				if(tf->flags&WORK_QUEUE_CACHE) {
-					if(stat(tf->payload,&local_info)<0) { unlink(tf->payload); goto failure; }
-
-					hash_name = (char*) malloc((strlen(tf->payload)+strlen(tf->remote_name)+2)*sizeof(char));
-					sprintf(hash_name,"%s-%s",(char*)tf->payload,tf->remote_name);
-
-					remote_info = malloc(sizeof(*remote_info));
-					memcpy(remote_info,&local_info,sizeof(local_info));
-					hash_table_insert(w->current_files,hash_name,remote_info);
-				}
-
-			} else {
+			rv = get_output_item(tf->remote_name, (char *)tf->payload, w, received_files);
+			if(!rv) {
 				debug(D_WQ,"%s (%s) did not create expected file %s",w->hostname,w->addrport,tf->remote_name);
 				if(t->result == WORK_QUEUE_RESULT_UNSET) t->result = WORK_QUEUE_RESULT_OUTPUT_FAIL;
 				t->return_status = 1;
+				return 0;
+			}
+
+			// Add the output item to the hash table if its cacheable
+			if(tf->flags&WORK_QUEUE_CACHE) {
+				if(stat(tf->payload,&local_info)<0) { unlink(tf->payload); return 0; }
+
+				hash_name = (char*) malloc((strlen(tf->payload)+strlen(tf->remote_name)+2)*sizeof(char));
+				sprintf(hash_name,"%s-%s",(char*)tf->payload,tf->remote_name);
+
+				remote_info = malloc(sizeof(*remote_info));
+				memcpy(remote_info,&local_info,sizeof(local_info));
+				hash_table_insert(w->current_files,hash_name,remote_info);
 			}
 		}
 	}
-	return 1;
 
-	failure:
-	debug(D_NOTICE,"%s (%s) failed to return %s to %s (%s)",w->addrport,w->hostname,tf->remote_name,tf->payload, strerror(errno));
-	return 0;
+	// destroy received files hash table for this task
+	hash_table_firstkey(received_files);
+	while(hash_table_nextkey(received_files, &key,(void**)&value)) {
+		free(value);
+	}
+	hash_table_delete(received_files);
+
+	return 1;
 }
 
 static void delete_uncacheable_files( struct work_queue_task *t, struct work_queue_worker *w )

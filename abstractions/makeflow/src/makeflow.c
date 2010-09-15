@@ -26,6 +26,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "batch_job.h"
 #include "work_queue.h"
+#include "delete_dir.h"
 #include "stringtools.h"
 #include "load_average.h"
 #include "get_line.h"
@@ -433,10 +434,16 @@ void file_clean( const char *filename, int silent )
 	if (!filename) return;
 
 	if(unlink(filename)==0) {
-		if (!silent) printf("makeflow: deleted %s\n",filename);
+		if (!silent) printf("makeflow: deleted file %s\n",filename);
 	} else {
 		if(errno==ENOENT) {
 			// nothing
+		} else if (errno==EISDIR) {
+			if(!delete_dir(filename)) {
+				if (!silent) printf("makeflow: couldn't delete directory %s: %s\n",filename,strerror(errno));
+			} else {
+				if (!silent) printf("makeflow: deleted directory %s\n",filename);
+			}
 		} else {
 			if (!silent) printf("makeflow: couldn't delete %s: %s\n",filename,strerror(errno));
 		}
@@ -1578,14 +1585,24 @@ int main( int argc, char *argv[] )
 		batchlogfilename = malloc((dagfile_namesize+11)*sizeof(char));
 		switch (batch_queue_type) {
 		    case BATCH_QUEUE_TYPE_CONDOR:
-			sprintf(batchlogfilename,"%s.condorlog",dagfile);
-			break;
+				sprintf(batchlogfilename,"%s.condorlog",dagfile);
+				break;
 		    case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			sprintf(batchlogfilename,"%s.wqlog",dagfile);
-			break;
+				sprintf(batchlogfilename,"%s.wqlog",dagfile);
+				break;
 		    default:
+				sprintf(batchlogfilename,"%s.batchlog",dagfile);
+				break;
+		}
+
+		// In clean mode, delete all exsiting log files
+		if(clean_mode) {
+			sprintf(batchlogfilename,"%s.condorlog",dagfile);
+			file_clean(batchlogfilename, 0);
+			sprintf(batchlogfilename,"%s.wqlog",dagfile);
+			file_clean(batchlogfilename, 0);
 			sprintf(batchlogfilename,"%s.batchlog",dagfile);
-			break;
+			file_clean(batchlogfilename, 0);
 		}
 	}
 
