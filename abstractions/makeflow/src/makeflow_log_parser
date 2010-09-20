@@ -9,9 +9,16 @@ open(LOGFILE, "<", $log);
 open(SUMMARY, ">", $log.".summary");
 
 $line = <LOGFILE>;
+#ignore makeflow structure information at the top of the log file and only deal with actual log data
+while($line =~ /^#/){
+	$line = <LOGFILE>;
+}
+
+#get start time from the first line
 @fields = split(/ /, $line);
 $timestart = $fields[0];
 
+#get end time from the last line
 $lastline = `tail -n 1 $log`;
 @lastfields = split(/ /, $lastline);
 $timeend = $lastfields[0];
