@@ -151,6 +151,8 @@ INT64_T chirp_hdfs_init (const char *path)
 {
   static const char *groups[] = {"supergroup"};
 
+  (void) path;
+
   int i;
 
   if (chirp_hdfs_hostname == NULL)
@@ -169,9 +171,9 @@ INT64_T chirp_hdfs_init (const char *path)
   fs = hdfs_services.connect(chirp_hdfs_hostname, chirp_hdfs_port, chirp_owner, groups, 1);
 
   if (fs == NULL)
-	return (errno = ENOSYS, -1);
+    return (errno = ENOSYS, -1);
   else
-	return chirp_hdfs_chdir(path);
+    return 0;
 }
 
 INT64_T chirp_hdfs_destroy (void)

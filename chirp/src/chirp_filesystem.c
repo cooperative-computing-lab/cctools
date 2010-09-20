@@ -18,6 +18,10 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <string.h>
 
+#ifdef HAS_ALLOCA_H
+#include <alloca.h>
+#endif
+
 #define CHIRP_FILESYSTEM_BUFFER  65536
 
 struct CHIRP_FILE {
@@ -185,4 +189,56 @@ char *cfs_fgets (char *s, int n, CHIRP_FILE *file)
 int cfs_ferror (CHIRP_FILE *file)
 {
   return file->error;
+}
+
+/* copy pasta from dttools/src/create_dir.c */
+int cfs_create_dir (const char *path, int mode)
+{
+	char *temp;
+	char *delim;
+	char oldchar;
+	int result;
+
+	temp = alloca(strlen(path)+1);
+	strcpy(temp,path);
+
+	delim = temp;
+
+	while( (delim = strchr(delim,'/')) ) {
+
+		if(delim==temp) {
+			delim++;
+			continue;
+		}
+
+		oldchar = *delim;
+		*delim = 0;
+
+		result = cfs->mkdir(temp,mode);
+		if(result!=0) {
+			if(errno==EEXIST) {
+				/* no problem, keep going */
+			} else {
+				return 0;
+			}
+		} else {
+			/* ok, made it successfully */
+		}
+
+		*delim = oldchar;
+		delim++;
+	}
+
+	/* Now, last chance */
+
+	result = cfs->mkdir(temp,mode);
+	if(result!=0) {
+		if(errno==EEXIST) {
+			return 1;
+		} else {
+			return 0;
+		}
+	} else {
+		return 1;
+	}
 }

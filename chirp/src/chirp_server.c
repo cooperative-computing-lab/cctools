@@ -38,6 +38,7 @@ See the file COPYING for details.
 #include "memory_info.h"
 #include "change_process_title.h"
 #include "url_encode.h"
+#include "get_canonical_path.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -213,11 +214,13 @@ static INT64_T safe_statfs (const char *path, struct chirp_statfs *buf)
 				raise(SIGABRT);
 				_exit(-1);
 			}
+			cfs_create_dir(chirp_root_path, 0771);
        		if (cfs->statfs(chirp_root_path, buf) == 0) {
 				write(fildes[1], &buf->f_bsize, sizeof(buf->f_bsize));
 				write(fildes[1], &buf->f_bfree, sizeof(buf->f_bfree));
 				write(fildes[1], &buf->f_blocks, sizeof(buf->f_blocks));
 			}
+			cfs->destroy();
 			close(fildes[1]);
 			_exit(0);
 		} else if (child == -1)
@@ -522,8 +525,42 @@ int main( int argc, char *argv[] )
 	current = time(0);
 	debug(D_ALL,"*** %s starting at %s",argv[0],ctime(&current));
 
-    if (single_mode && cfs->init(startdir) != 0) /* done only once now */
-      fatal("could not initialize backend filesystem: %s", strerror(errno));
+	if(!chirp_owner[0]) {
+		if(!username_get(chirp_owner)) {
+			strcpy(chirp_owner,"unknown");
+		}
+	}
+
+	if (cfs == &chirp_local_fs) {
+		create_dir(startdir, 0771); /* must be there for get_canonical_path */
+		int result = get_canonical_path(startdir, chirp_root_path, sizeof(chirp_root_path));
+		if (result <= 0) fatal("cannot get canonical path");
+	} else {
+		strncpy(chirp_root_path, startdir, sizeof(chirp_root_path));
+		if (strcmp(chirp_root_path, startdir) != 0)
+			fatal("couldn't get working dir: %s\n",strerror(errno));
+	}
+
+    if (single_mode) {
+		if (cfs->init(chirp_root_path) == 0) {
+			cfs_create_dir(chirp_root_path, 0771);
+		} else {
+			fatal("could not initialize backend filesystem: %s", strerror(errno));
+		}
+	} else { /* fork and initialize (setup possibly new root directory) */
+		pid_t child = fork();
+		if (child == 0) { /* child */
+			if (cfs->init(chirp_root_path) != 0) {
+				kill(chirp_master_pid, SIGABRT);
+				raise(SIGABRT);
+				_exit(-1);
+			}
+			cfs_create_dir(chirp_root_path, 0771);
+			cfs->destroy();
+			_exit(0);
+		} else if (child == -1)
+			fatal("could not fork process for init");
+	}
 
 	if(!list_size(catalog_host_list)) {
 		list_push_head(catalog_host_list,CATALOG_HOST);
@@ -551,11 +588,8 @@ int main( int argc, char *argv[] )
 			fatal("Cannot use quotas with HDFS\n");
 		else
 #endif
-			chirp_alloc_init(startdir,root_quota);
+			chirp_alloc_init(chirp_root_path,root_quota);
 	}
-	strncpy(chirp_root_path, startdir, sizeof(chirp_root_path));
-	if (strcmp(chirp_root_path, startdir) != 0)
-		fatal("couldn't get working dir: %s\n",strerror(errno));
 
 	link = link_serve_address(listen_on_interface,port);
 	if(!link) {
@@ -578,11 +612,6 @@ int main( int argc, char *argv[] )
 		strcpy(hostname,manual_hostname);
 	} else {
 		domain_name_cache_guess(hostname);
-	}
-	if(!chirp_owner[0]) {
-		if(!username_get(chirp_owner)) {
-			strcpy(chirp_owner,"unknown");
-		}
 	}
 
 	install_handler(SIGPIPE,ignore_signal);
@@ -646,8 +675,9 @@ int main( int argc, char *argv[] )
 			if(pid==0) {
 				change_process_title("chirp_server [authenticating]");
 				install_handler(SIGCHLD,ignore_signal);
-                if (cfs->init(startdir) != 0)
+                if (cfs->init(chirp_root_path) != 0)
       				fatal("could not initialize backend filesystem: %s", strerror(errno));
+				cfs_create_dir(chirp_root_path, 0771);
 				chirp_receive(l);
 				cfs->destroy(); /* disconnect from backend */
 				_exit(0);
@@ -682,7 +712,7 @@ static void chirp_receive( struct link *link )
 
 	chmod(chirp_root_path, 0755);
 	if(cfs->chdir(chirp_root_path)!=0)
-		fatal("couldn't move to %s: %s\n",startdir,strerror(errno));
+		fatal("couldn't move to %s: %s\n",chirp_root_path,strerror(errno));
 	/* It's ok if this fails because there is a default permission check. */
         /* Note that it might fail if we are exporting a read-only volume. */
         chirp_acl_init_root(chirp_root_path);
@@ -704,8 +734,8 @@ static void chirp_receive( struct link *link )
 			if(!p) fatal("unknown user: %s",safe_username);
 			safe_uid = p->pw_uid;
 			safe_gid = p->pw_gid;
-			cfs->chown(startdir,safe_uid,safe_gid);
-			cfs->chmod(startdir,0700);
+			cfs->chown(chirp_root_path,safe_uid,safe_gid);
+			cfs->chmod(chirp_root_path,0700);
 			debug(D_AUTH,"changing to uid %d gid %d",safe_uid,safe_gid);
 			setgid(safe_gid);
 			setuid(safe_uid);

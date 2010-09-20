@@ -549,7 +549,7 @@ INT64_T chirp_local_md5( const char *path, unsigned char digest[16] )
 
 INT64_T chirp_local_init (const char *path)
 {
-  return !create_dir(path, 0711);
+  return 0;
 }
 
 INT64_T chirp_local_destroy (void)
