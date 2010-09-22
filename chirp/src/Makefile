@@ -23,7 +23,7 @@ chirp_server: chirp_server.o chirp_stats.o chirp_job.o chirp_builtin.o chirp_thi
 chirp_server_hdfs: ../../hdfs-setup.template
 	@cp $^ $@
 	@chmod 755 $@
-	@echo 'exec $$(dirname $$0)/chirp_server -f hdfs $$@' >> $@
+	@echo 'exec `dirname $$0`/chirp_server -f hdfs $$@' >> $@
 
 chirp_get: chirp_get.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
