@@ -12,9 +12,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include "sequence_filter.h"
 
-
-
-
 // This has to be prime
 #define MAX_MER_REPEAT 25
 
@@ -586,6 +583,7 @@ void find_minimizers(int seq_num, int verbose_level)
 	//if ((strcmp(SEQ_ID(seq_num), "1101751653708") == 0) || (strcmp(SEQ_ID(seq_num), "1101751885812") == 0))	debug = 1;
 	if (verbose_level >= 1) { fprintf(stderr, "Processing %s\n", all_seqs[seq_num].ext_id); seq s=uncompress_seq(all_seqs[seq_num]); print_sequence(stderr, s); }
 
+	memset(&abs_min,0,sizeof(abs_min));
 	abs_min.value = ULONG_MAX;
 	abs_min.dir = 0;
 

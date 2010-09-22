@@ -190,7 +190,7 @@ void band2matrix(int band_row, int band_col, int diag, int k, int * matrix_row, 
 int start_band_left(cell ** band, int k, const char * str1, int start1, const char * str2, int start2, int * matrix_row_ret, int * matrix_col_ret)
 {
 	int band_row = 0;
-	int matrix_row, first_full_row, band_first_col;
+	int matrix_row=0, first_full_row=0, band_first_col=0;
 	int width = (2*k)+1;
 
 	// In the first row, the first (and only) column populated
@@ -309,7 +309,7 @@ int get_last_simple_row(int diag, int k, int length1, int length2)
 void choose_best_banded(cell ** band, int * best_row_ret, int * best_col_ret, int length1, int length2, int k, int band_row, int cols_in_last_row, int rows_in_last_col)
 {
 	int band_col;
-	int best_row, best_col, best_score;
+	int best_row=0, best_col=0, best_score=0;
 	int i;
 
 	best_score = INT_MAX;
@@ -350,7 +350,7 @@ delta generate_traceback_banded(cell ** band, int best_row, int best_col, int le
 {
 	delta tb;
 	int band_row, band_col, curr_tb_type, count;
-	int count_since_last, last_gap_type;
+	int count_since_last=0, last_gap_type=0;
 	int temp_tb[MIN(length1, length2)];
 	int first = 1;
 	int i;
@@ -894,11 +894,13 @@ delta generate_traceback(cell ** matrix, int i, int j, int length1, int length2,
 	int total_bases = 0;
 
 
+
 	// The return array requires 4 pieces of info
 	// 1. Whether string 1 or string 2 is the string for which the alignment is a prefix.
 	// 2. Which position in the prefix string the alignment starts at
 	// 3. Which position in the suffix string the alignment ends at.
 	// 4. The positions of the gaps.
+	memset(&tb,0,sizeof(tb));
 	tb.end1 = i-1;
 	tb.end2 = j-1;
 	tb.mismatch_count = 0;
@@ -1379,11 +1381,11 @@ int print_band_left(FILE * file, cell ** band, int k, const char * str1, int sta
 {
 	int i;
 	int band_row = 0;
-	int matrix_row;
-	int first_full_row;
+	int matrix_row=0;
+	int first_full_row=0;
 	int width = (2*k)+1;
 	int band_col;
-	int band_first_col;
+	int band_first_col=0;
 
 	int diag = start1 - start2;
 
