@@ -1,3 +1,0 @@
-# specify everything (directories and files) in the target file section
-1.txt mydir mydir.txt mydir/1.txt mydir/2.txt mydir/1 mydir/1/a.txt mydir/1/b.txt mydir/1/haha/lala.txt mydir/1/haha/wawa.txt: input
-	echo top > 1.txt; echo level > mydir.txt; mkdir -p mydir; cp input/hello mydir/1.txt; cp input/hello mydir/2.txt; mkdir -p mydir/1;cp input/hello mydir/1/a.txt; cp input/hello mydir/1/b.txt; mkdir -p mydir/1/haha; echo hello > mydir/1/haha/lala.txt; echo world > mydir/1/haha/wawa.txt
