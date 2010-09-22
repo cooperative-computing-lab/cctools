@@ -1,3 +1,0 @@
-# target and source files are both directories
-mydir: input
-	mkdir -p mydir; cp input/hello mydir/1.txt; cp input/hello mydir/2.txt

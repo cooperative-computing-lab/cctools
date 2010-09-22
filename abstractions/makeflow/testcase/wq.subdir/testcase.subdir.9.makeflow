@@ -1,3 +1,0 @@
-# dir depth larger than 2. Target is the root directory
-mydir: input
-	mkdir -p mydir; mkdir -p mydir/mysubdir; cp input/hello mydir/mysubdir/1.txt

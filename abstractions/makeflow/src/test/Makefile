@@ -21,4 +21,6 @@ test: ${MAKEFLOW}
 	@${MAKEFLOW} -C long_line_test.makeflow
 	@# Check syntax for variable_issues.makeflow: FAILS.
 	@$(SHELL) -c 'if ${MAKEFLOW} -C variable_issues.makeflow ; then exit 1; else exit 0; fi'
+	@# Run Makeflow with Work Queue tests
+	@cd wq.subdir; ./run_testcases.sh; cd ..
 	# All tests have been completed successfully.

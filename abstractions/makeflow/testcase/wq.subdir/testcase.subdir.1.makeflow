@@ -1,3 +1,0 @@
-# a single directory as a target
-mydir: input/hello
-	mkdir -p mydir; cp input/hello mydir/1.txt; cp input/hello mydir/2.txt

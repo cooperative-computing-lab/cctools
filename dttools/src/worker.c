@@ -45,6 +45,19 @@ See the file COPYING for details.
 #define WQ_MASTER "wq_master"
 #define WQ_MASTER_PROJ_MAX 256
 
+// Maximum time to wait before aborting if there is no connection to the master.
+static int idle_timeout=900;
+
+// Maxium time to wait before switching to another master.
+static int master_timeout=60;
+
+// Maximum time to wait when actively communicating with the master.
+static int active_timeout=3600;
+
+// Flag gets set on receipt of a terminal signal.
+static int abort_flag = 0;
+
+// Catalog mode control variables
 static int auto_worker = 0;
 static int exclusive_worker = 1;
 static char *preference = NULL;
@@ -226,19 +239,94 @@ struct link * auto_link_connect(char *addr, int *port, time_t master_stoptime) {
 	return master;
 }
 
+/**
+ * Stream file/directory contents for the rget protocol.
+ * Format:
+ * 		for a directory: a new line in the format of "dir $DIR_NAME 0"
+ * 		for a file: a new line in the format of "file $FILE_NAME $FILE_LENGTH"
+ * 					then file contents.
+ * 		string "end" at the end of the stream (on a new line).
+ *
+ * Example:
+ * Assume we have the following directory structure:
+ * mydir
+ * 		-- 1.txt
+ * 		-- 2.txt
+ * 		-- mysubdir
+ * 			-- a.txt
+ * 			-- b.txt
+ * 		-- z.jpg
+ *
+ * The stream contents would be:
+ *
+ * dir mydir 0
+ * file 1.txt $file_len
+ * $$ FILE 1.txt's CONTENTS $$
+ * file 2.txt $file_len
+ * $$ FILE 2.txt's CONTENTS $$
+ * dir mysubdir 0
+ * file mysubdir/a.txt $file_len
+ * $$ FILE mysubdir/a.txt's CONTENTS $$
+ * file mysubdir/b.txt $file_len
+ * $$ FILE mysubdir/b.txt's CONTENTS $$
+ * file z.jpg $file_len
+ * $$ FILE z.jpg's CONTENTS $$
+ * end
+ *
+ */
+int stream_output_item(struct link *master, const char *filename) {
+	DIR *dir;
+	struct dirent *dent;
+	char dentline[WORK_QUEUE_LINE_MAX];
+	struct stat info;
+	char line[WORK_QUEUE_LINE_MAX];
+	INT64_T actual, length;
+	int fd;
 
+	if(stat(filename, &info) != 0) {
+		fprintf(stderr,"Output file/directory %s was not created. (%s)\n",filename, strerror(errno));
+		return 0;
+	}
 
-// Maximum time to wait before aborting if there is no connection to the master.
-static int idle_timeout=900;
+	if(S_ISDIR(info.st_mode)) {
+		// stream a directory
+		sprintf(line,"dir %s %lld\n", filename, (INT64_T)0);
+		link_write(master,line,strlen(line),time(0)+active_timeout);
 
-// Maxium time to wait before switching to another master.
-static int master_timeout=60;
+		dir = opendir(filename);
+		if(!dir) {
+			fprintf(stderr,"Could not open directory %s. (%s)\n",filename, strerror(errno));
+			return 0;
+		}
 
-// Maximum time to wait when actively communicating with the master.
-static int active_timeout=3600;
+		while((dent = readdir(dir))) {
+			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, "..")) continue;
+			sprintf(dentline, "%s/%s", filename, dent->d_name);
+			stream_output_item(master, dentline);
+		}
 
-// Flag gets set on receipt of a terminal signal.
-static int abort_flag = 0;
+		closedir(dir);
+	} else {
+		// stream a file
+		fd = open(filename,O_RDONLY,0);
+		if(fd>=0) {
+			length = (INT64_T)info.st_size;
+			sprintf(line,"file %s %lld\n", filename, length);
+			link_write(master,line,strlen(line),time(0)+active_timeout);
+			actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
+			close(fd);
+			if(actual!=length) {
+				debug(D_WQ,"Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, length, actual);
+				return 0;
+			}
+		} else {
+			fprintf(stderr,"Could not open output file %s. (%s)\n",filename, strerror(errno));
+			return 0;
+		}
+	}
+
+	return 1;
+}
 
 static void handle_abort( int sig )
 {
@@ -465,85 +553,36 @@ int main( int argc, char *argv[] )
 					debug(D_WQ,"Could not create directory - %s (%s)\n", filename, strerror(errno));
 					goto recover;
 				}
-			} else if(sscanf(line, "list %s", filename)==1) {
+			} else if(sscanf(line, "rget %s",filename)==1) {
+				if(!stream_output_item(master, filename)) {
+					fprintf(stderr,"Failed to stream output item %s back to the master.\n",filename);
+					goto recover;
+				}
+				sprintf(line,"end\n");
+				link_write(master,line,strlen(line),time(0)+active_timeout);
+			} else if(sscanf(line, "get %s",filename)==1) { // for backward compatibility
 				struct stat info;
 				if(stat(filename, &info) != 0) {
-					fprintf(stderr,"File/Directory %s was not created. (%s)\n",filename, strerror(errno));
-					sprintf(line,"-1\n");
-					link_write(master,line,strlen(line),time(0)+active_timeout);
+					fprintf(stderr,"Output file %s was not created. (%s)\n",filename, strerror(errno));
 					goto recover;
 				}
 
-				if(S_ISDIR(info.st_mode)) {
-					// send back a list of directory contents
-					DIR *dir;
-					struct dirent *dent;
-					char *list;
-					char dentline[1024];
-
-					dir = opendir(filename);
-					if(!dir) {
-						fprintf(stderr,"Cannot open directory %s. (%s)\n",filename, strerror(errno));
-						sprintf(line,"-1\n");
-						link_write(master,line,strlen(line),time(0)+active_timeout);
-						goto recover;
-					}
-
-					list = (char *)malloc(info.st_size);
-					memset(list, 0, info.st_size);
-
-					while((dent = readdir(dir))) {
-						if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, "..")) continue;
-						sprintf(dentline, "%s\n", dent->d_name);
-						strncat(list, dentline, strlen(dentline));
-					}
-
-					closedir(dir);
-
-					sprintf(line,"%ld\n",strlen(list));
+				// send back a single file
+				fd = open(filename,O_RDONLY,0);
+				if(fd>=0) {
+					length = (INT64_T)info.st_size;
+					sprintf(line,"%lld\n",length);
 					link_write(master,line,strlen(line),time(0)+active_timeout);
-					INT64_T actual = link_write(master,list,strlen(list),time(0)+active_timeout);
-					if(actual!=strlen(list)) {
-						debug(D_WQ,"Sending list of contents of directory - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, strlen(list), actual);
+					INT64_T actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
+					close(fd);
+					if(actual!=length) {
+						debug(D_WQ,"Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, length, actual);
 						goto recover;
 					}
 				} else {
-					fprintf(stderr,"%s is not a directory, so it can not be listed.\n",filename);
-					sprintf(line,"-1\n");
-					link_write(master,line,strlen(line),time(0)+active_timeout);
+					fprintf(stderr,"Could not open output file %s. (%s)\n",filename, strerror(errno));
 					goto recover;
-				}
-			} else if(sscanf(line, "get %s",filename)==1) {
-				struct stat info;
-				if(stat(filename, &info) != 0) {
-					fprintf(stderr,"File/Directory %s was not created. (%s)\n",filename, strerror(errno));
-					sprintf(line,"-1\n");
-					link_write(master,line,strlen(line),time(0)+active_timeout);
-					goto recover;
-				}
-
-				if(S_ISDIR(info.st_mode)) {
-					// inform the master that 'filename' points to a directory
-					sprintf(line,"dir\n");
-					link_write(master,line,strlen(line),time(0)+active_timeout);
-				} else {
-					// send back a single file
-					fd = open(filename,O_RDONLY,0);
-					if(fd>=0) {
-						length = info.st_size;
-						sprintf(line,"%lld\n",length);
-						link_write(master,line,strlen(line),time(0)+active_timeout);
-						INT64_T actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
-						close(fd);
-						if(actual!=length) {
-							debug(D_WQ,"Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, length, actual);
-							goto recover;
-						}
-					} else {
-						sprintf(line,"-1\n");
-						link_write(master,line,strlen(line),time(0)+active_timeout);
-					}					
-				}
+				}					
 			} else if(!strcmp(line,"exit")) {
 				break;
 			} else {
