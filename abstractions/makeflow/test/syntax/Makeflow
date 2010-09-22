@@ -1,5 +1,5 @@
 CP=/bin/cp
-BASEDIR=../
+BASEDIR=../../src/
 
 makeflow.c: $BASEDIR/makeflow.c
 	$CP $BASEDIR/makeflow.c makeflow.c

@@ -5,10 +5,10 @@ numOfTests=10
 
 # set up test environment
 rm -f worker 
-cp ~ccl/work/lyu2/cctools/dttools/src/worker . 
+ln -s ../../../../dttools/src/worker .
 
 rm -f makeflow 
-cp ~ccl/work/lyu2/cctools/abstractions/makeflow/src/makeflow . 
+ln -s ../../src/makeflow .
 
 rm -rf input 
 rm -rf mydir 
