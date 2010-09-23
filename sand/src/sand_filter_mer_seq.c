@@ -54,7 +54,7 @@ static void show_help(const char *cmd)
 	printf("                the size dynamically by passing in d rather than a number.\n");
 	printf(" -r <file>      A meryl file of repeat mers to be filtered out.\n");
 	printf(" -k <number>    The k-mer size to use in candidate selection (default is 22).\n");
-7	printf(" -w <number>    The minimizer window size to use in candidate selection (default is 22).\n");
+	printf(" -w <number>    The minimizer window size to use in candidate selection (default is 22).\n");
 	printf(" -o <filename>  The output file. Default is stdout.\n");
 	printf(" -b             Return output as binary (default is ASCII).\n");
 	printf(" -f <character> The character that will be printed at the end of the file.\n");
