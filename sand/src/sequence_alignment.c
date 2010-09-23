@@ -634,7 +634,10 @@ cell new_score(cell ** matrix, int i, int j, const char * str1, const char * str
 	cell min;
 	int incr;
 
-	min.score = 999999999;
+	memset(&min,0,sizeof(min));
+
+	min.score = INT_MAX;
+
 	incr = (str1[i-1] == str2[j-1]) ? 0 : 1;
 	if (matrix[j-1][i-1].score + incr < min.score)
 	{
@@ -663,7 +666,8 @@ cell new_score_gap_extensions(cell ** matrix, int i, int j, const char * str1, c
 	cell min;
 	int incr;
 
-	min.score = 999999999;
+	memset(&min,0,sizeof(min));
+	min.score = INT_MAX;
 
 	// If this is a gap extension, don't increase the score.
 	// If it's a gap open, increase the score.
@@ -717,7 +721,7 @@ cell new_score_maximize(cell ** matrix, int i, int j, const char * str1, const c
 	cell max;
 	int incr;
 
-	max.score = 0;
+	memset(&max,0,sizeof(max));
 
 	// If this is a gap extension, don't increase the score.
 	// If it's a gap open, increase the score.
@@ -772,8 +776,9 @@ cell new_score_banded(cell ** band, int band_row, int band_col, int matrix_row, 
 	cell min, recurrence;
 	int incr;
 
-	recurrence.score = 0;
-	recurrence.tb = 0;
+	memset(&min,0,sizeof(min));
+	memset(&recurrence,0,sizeof(recurrence));
+
 	min.score = INT_MAX;
 
 	// Check if it's a gap (up).
