@@ -17,11 +17,10 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "work_queue.h"
-#include "text_array.h"
-#include "hash_table.h"
-#include "stringtools.h"
-#include "xmalloc.h"
+#include "memory_info.h"
 #include "macros.h"
+#include "itable.h"
+
 #include "sequence_compression.h"
 #include "sequence_filter.h"
 

@@ -8,9 +8,7 @@ See the file COPYING for details.
 #include <sys/time.h>
 #include <math.h>
 
-#include "itable.h"
-#include "memory_info.h"
-
+#include "int_sizes.h"
 #include "sequence_alignment.h"
 #include "sequence_compression.h"
 
@@ -50,8 +48,8 @@ int output_candidates(FILE * file, int format);
 int output_candidate_list(FILE * file, candidate_t * list, int total_output, int format);
 void free_mer_table();
 void free_cand_table();
-void init_cand_table();
-void init_mer_table();
+void init_cand_table( int buckets );
+void init_mer_table(int buckets );
 int init_repeat_mer_table(FILE * repeats, unsigned long buckets, int max_mer_repeat);
 int load_seqs(FILE * input, int sequence_count);
 int load_seqs_two_files(FILE * f1, int count1, int * end1, FILE * f2, int count2, int * end2);
@@ -60,8 +58,6 @@ void test_mers();
 void print_mer_table(FILE * file);
 void set_k(int new_k);
 void set_window_size(int new_size);
-unsigned long get_mem_usage();
-unsigned long get_mem_avail();
 int get_next_minimizer(int seq_num, minimizer * next_minimizer, int verbose_level);
 void print_kmer(FILE * file, mer_t mer);
 void translate_kmer(mer_t mer, char * str, int length);

@@ -41,3 +41,42 @@ int memory_info_get( UINT64_T *avail, UINT64_T *total )
 }
 
 #endif
+
+#include <sys/resource.h>
+#include <stdio.h>
+#include <unistd.h>
+
+int memory_usage_get( UINT64_T *rssp, UINT64_T *totalp )
+{
+#ifdef CCTOOLS_OPSYS_LINUX
+	/*
+	Linux has getrusage, but it doesn't remote memory status,
+	so we must load it from the proc filesystem instead.
+	*/
+
+	unsigned long total, rss, shared, text, libs, data, dirty;
+
+	FILE *file = fopen("/proc/self/statm","r");
+	if(!file) return 0;
+
+	fscanf(file,"%lu %lu %lu %lu %lu %lu %lu",
+		&total,&rss,&shared,&text,&libs,&data,&dirty);
+
+	fclose(file);
+
+	*rssp = (UINT64_T)rss*getpagesize();
+	*totalp = (UINT64_T)total*getpagesize();
+
+	return 1;
+#else
+	struct rusage ru;
+	int result = getrusage(RUSAGE_SELF,&ru);
+	if(result>=0) {
+		*rssp = (UINT64_T)ru.ru_ixrss*getpagesize();
+		*totalp = (UINT64_T)ru.ru_ixrss*getpagesize();
+		return 1;
+	} else {
+		return 0;
+	}
+#endif
+}

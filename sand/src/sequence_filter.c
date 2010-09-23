@@ -10,7 +10,9 @@ See the file COPYING for details.
 #include <limits.h>
 #include <stdarg.h>
 #include <stdlib.h>
+
 #include "sequence_filter.h"
+#include "itable.h"
 
 #define EVEN_MASK 0xCCCCCCCCCCCCCCCCULL
 #define ODD_MASK  0x3333333333333333ULL
@@ -69,13 +71,13 @@ typedef struct cand_list_element_s cand_list_element;
 /* These are globals referenced directly by sand_filter_mer_seq. */
 /* This needs to be cleaned up. */
 
-int MER_TABLE_BUCKETS = 5000011; //20000003;
-int CAND_TABLE_BUCKETS= 5000011; //20000003;
 int curr_rect_x = 0;
 int curr_rect_y = 0;
 int rectangle_size = 1000;
 unsigned long total_cand = 0;
 
+static int MER_TABLE_BUCKETS = 5000011; //20000003;
+static int CAND_TABLE_BUCKETS= 5000011; //20000003;
 static cseq * all_seqs = 0;
 static cand_list_element ** candidates;
 static mer_hash_element ** mer_table;
@@ -116,9 +118,10 @@ mer_t rev_comp_mer(mer_t mer);
 
 void print_mhe(FILE * file, mer_hash_element * mhe);
 
-void init_cand_table()
+void init_cand_table( int buckets )
 {
 	int i;
+	CAND_TABLE_BUCKETS = buckets;
 	candidates = malloc(CAND_TABLE_BUCKETS * sizeof(cand_list_element *));
 	for (i=0; i < CAND_TABLE_BUCKETS; i++)
 	{
@@ -126,9 +129,10 @@ void init_cand_table()
 	}
 }
 
-void init_mer_table()
+void init_mer_table( int buckets )
 {
 	int i;
+	MER_TABLE_BUCKETS = buckets;
 	mer_table = malloc(MER_TABLE_BUCKETS * sizeof(mer_hash_element *));
 	for (i=0; i < MER_TABLE_BUCKETS; i++)
 	{
@@ -1144,11 +1148,9 @@ void add_candidate(int seq, int cand, char dir, mer_t min, short loc1, short loc
 	// Unless this is a diagonal, ones from the same block have already been compared.
 	// If I don't do this step, then ones from the same block on the same axis
 	// could get compared, because we don't really distinguish them.
-	int debug = 0; //if (min == 1073318718) { debug = 1; fprintf(stderr, "adding candidate %s %s %d\n",all_seqs[seq].ext_id, all_seqs[cand].ext_id, dir); }
 
 	if (!should_compare_cands(seq, cand)) return;
 
-	if (debug) fprintf(stderr, "OK\n");
 	int index = (seq*cand*499);
 	if (index < 0) { index *= -1; }
 	index = index % CAND_TABLE_BUCKETS;
@@ -1209,24 +1211,3 @@ void free_cand_list_element(cand_list_element * cle)
 	free_cand_list_element(n);
 }
 
-unsigned long get_mem_avail()
-{
-	UINT64_T total, avail;
-	memory_info_get(&total, &avail);
-	return (unsigned long) avail/1024;
-}
-
-unsigned long get_mem_usage()
-{
-	char cmd[512];
-	unsigned int rss;
-	int pid;
-	FILE *stat = fopen("/proc/self/stat", "r");
-	fscanf(stat, "%d", &pid);
-	fclose(stat);
-	sprintf(cmd, "ps -p %d -o rss | tail -1", pid);
-	FILE *fp = popen(cmd, "r");
-	fscanf(fp, "%d\n", &rss);
-	pclose(fp);
-	return rss;
-}

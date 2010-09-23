@@ -13,6 +13,8 @@ See the file COPYING for details.
 #include <ctype.h>
 #include <time.h>
 
+#include "memory_info.h"
+
 #include "sequence_alignment.h"
 #include "sequence_compression.h"
 #include "sequence_filter.h"
@@ -20,11 +22,9 @@ See the file COPYING for details.
 extern int rectangle_size;
 extern int curr_rect_x;
 extern int curr_rect_y;
-extern int MER_TABLE_BUCKETS;
-extern int CAND_TABLE_BUCKETS;
-int num_seqs;
 extern unsigned long total_cand;
 
+static int num_seqs;
 static int kmer_size = 22;
 static int window_size = 22;
 static int output_format = CANDIDATE_FORMAT_LINE;
@@ -41,6 +41,19 @@ static char * output_filename = 0;
 #define MEMORY_FOR_MERS(max_mem) (MIN((get_mem_avail()*0.95),(max_mem))-get_mem_usage())
 #define DYNAMIC_RECTANGLE_SIZE(max_mem) (MEMORY_FOR_MERS((max_mem))/KB_PER_SEQUENCE)
 
+static unsigned long get_mem_avail()
+{
+	UINT64_T total, avail;
+	memory_info_get(&total, &avail);
+	return (unsigned long) avail/1024;
+}
+
+static unsigned long get_mem_usage()
+{
+	UINT64_T rss,total;
+	memory_usage_get(&rss,&total);
+	return rss/1024;
+}
 static void show_version(const char *cmd)
 {
 	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
@@ -214,11 +227,8 @@ int main(int argc, char ** argv)
 	fclose(input);
 	if (verbose_level > -1) fprintf(stderr, "%6lds : Loaded %d sequences\n", TIME, num_seqs);
 
-	MER_TABLE_BUCKETS = num_seqs*5;
-	CAND_TABLE_BUCKETS = num_seqs*5;
-
-	init_cand_table();
-	init_mer_table();
+	init_cand_table(num_seqs*5);
+	init_mer_table(num_seqs*5);
 
 	if (repeats)
 	{
