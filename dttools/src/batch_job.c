@@ -507,7 +507,7 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 	}
 	
 	work_queue_get_stats(q->work_queue, &s);
-	fprintf(logfile, "%02lf %d %d %d %d %d %d %d %d %d %d\n", timestamp_get()/1000000.0, s.workers_init, s.workers_ready, s.workers_busy, s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_removed);
+	fprintf(logfile, "%02lf %d %d %d %d %d %d %d %d %d %d %lld %lld\n", timestamp_get()/1000000.0, s.workers_init, s.workers_ready, s.workers_busy, s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received);
 	fflush(logfile);
 	fsync(fileno(logfile));
 
@@ -552,6 +552,12 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 
 		int taskid = t->taskid;
 		work_queue_task_delete(t);
+
+		// Print to work queue log since status has been changed.
+		work_queue_get_stats(q->work_queue, &s);
+		fprintf(logfile, "%02lf %d %d %d %d %d %d %d %d %d %d %lld %lld\n", timestamp_get()/1000000.0, s.workers_init, s.workers_ready, s.workers_busy, s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received);
+		fflush(logfile);
+		fsync(fileno(logfile));
 
 		return taskid;
 	}

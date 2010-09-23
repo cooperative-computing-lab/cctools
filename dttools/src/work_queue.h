@@ -62,7 +62,7 @@ struct work_queue_task {
 	timestamp_t submit_time;	/**< The time the task was submitted. */
 	timestamp_t start_time;		/**< The time at which the task began. */
 	timestamp_t finish_time;	/**< The time at which it completed. */
-    	INT64_T total_bytes_transfered;
+    INT64_T total_bytes_transfered;
 	timestamp_t total_transfer_time;
 };
 
@@ -79,6 +79,8 @@ struct work_queue_stats {
 	int total_tasks_complete;	/**< Total number of tasks returned complete. */
 	int total_workers_joined;	/**< Total number of times a worker joined the queue. */
 	int total_workers_removed;	/**< Total number of times a worker was removed from the queue. */
+	INT64_T total_bytes_sent;	/**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
+	INT64_T total_bytes_received;	/**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
 };
 
 /** @name Functions - Tasks */
