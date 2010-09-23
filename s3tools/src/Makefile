@@ -51,3 +51,6 @@ install:
 
 clean:
 	rm -f core *~ *.o *.os *.so libs3client.a $(PROGRAMS)
+
+test:
+
