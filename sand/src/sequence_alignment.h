@@ -4,25 +4,17 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include <sys/time.h>
-#include <stdio.h>
-//#include <string.h>
-//#include <math.h>
-
 #ifndef __SEQUENCE_ALIGNMENT_H_
 #define __SEQUENCE_ALIGNMENT_H_
+
+#include <sys/time.h>
+#include <stdio.h>
+
+#include "macros.h"
 
 #define TB_STR_1_PREFIX 1
 #define TB_STR_2_PREFIX 2
 #define MAX_STRING 102048
-
-#ifndef MIN  // Don't conflict with another implementation of this (like in cctools macros.h)
-#define MIN(x,y) ( ((x) < (y)) ? (x) : (y) )
-#endif
-
-#ifndef MAX  // Don't conflict with another implementation of this (like in cctools macros.h)
-#define MAX(x,y) ( ((x) > (y)) ? (x) : (y) )
-#endif
 
 struct s_seq
 {
@@ -80,6 +72,7 @@ float benchmark(FILE * file, const char * message);
 seq get_next_sequence(FILE * file);
 int max_alignment_length(int length1, int length2, int start1, int start2);
 int sequence_count(FILE * file);
-
+int base_to_num( char base );
+char num_to_base( int num );
 
 #endif  // __SEQUENCE_ALIGNMENT_H_

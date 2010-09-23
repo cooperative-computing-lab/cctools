@@ -15,26 +15,21 @@ See the file COPYING for details.
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/mman.h>
-#include <sys/wait.h>
-#include <sys/time.h>
+
 #include "sequence_alignment.h"
 #include "sequence_compression.h"
-#include "sand_align_macros.h"
 
 #include "debug.h"
 
-//#define MIN_ALIGN 40
 int min_align = 40;  // default SWAT minimal aligment length
 int min_qual_score = 25;  // default SWAT minimal match quality score
 float min_qual = 0.04;
+
 seq get_next_sequence_wrapper(FILE * input)
 {
-#ifdef COMPRESSION
-	cseq c; c = get_next_cseq(input); return uncompress_seq(c);
-#else
-	return get_next_sequence(input);
-#endif
+	cseq c;
+	c = get_next_cseq(input);
+	return uncompress_seq(c);
 }
 
 static void show_version(const char *cmd)

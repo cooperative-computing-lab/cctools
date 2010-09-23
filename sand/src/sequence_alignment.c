@@ -7,11 +7,10 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-//#include <cstring.h>
 #include <ctype.h>
 #include <limits.h>
+
 #include "sequence_alignment.h"
-#include "sand_align_macros.h"
 
 #define TB_LEFT -1
 #define TB_UP 1
@@ -28,28 +27,23 @@ See the file COPYING for details.
 #define CHECK_DIAG 2
 #define CHECK_LEFT 4
 
-int score_mismatch = 1;
-int score_match_open = 0;
-int score_match_extend = 0;
-int score_gap_open = 1;
-int score_gap_extend = 1;
+static int score_mismatch = 1;
+static int score_match_open = 0;
+static int score_match_extend = 0;
+static int score_gap_open = 1;
+static int score_gap_extend = 1;
 
-void print_matrix(FILE* file, cell ** matrix, const char * str1, int length1, const char * str2, int length2);
-void print_banded_matrix(FILE * file, cell ** band, const char * str1, int length1, int start1, const char * str2, int length2, int start2, int k);
-cell new_score(cell ** matrix, int i, int j, const char * str1, const char * str2);
-cell new_score_gap_extensions(cell ** matrix, int i, int j, const char * str1, const char * str2);
-cell new_score_maximize(cell ** matrix, int i, int j, const char * str1, const char * str2);
-cell new_score_banded(cell ** band, int band_row, int band_col, int matrix_row, int matrix_col, const char * str1, const char * str2, int which);
-void choose_best(cell ** matrix, int * i, int * j, int length1, int length2, int min_align);
-delta generate_traceback(cell ** matrix, int i, int j, int length1, int length2, int min_score);
-void convert_to_upper(char * str);
-void chomp(char * str);
-void process_string(char * str);
-void seq_cat(seq * sequence, char * new_str);
-cell ** init_matrix(int length1, int length2, int type);
-void free_matrix(cell ** matrix, int length2);
-int get_last_simple_row(int diag, int k, int length1, int length2);
-
+static cell new_score(cell ** matrix, int i, int j, const char * str1, const char * str2);
+static cell new_score_gap_extensions(cell ** matrix, int i, int j, const char * str1, const char * str2);
+static cell new_score_maximize(cell ** matrix, int i, int j, const char * str1, const char * str2);
+static cell new_score_banded(cell ** band, int band_row, int band_col, int matrix_row, int matrix_col, const char * str1, const char * str2, int which);
+static void choose_best(cell ** matrix, int * i, int * j, int length1, int length2, int min_align);
+static delta generate_traceback(cell ** matrix, int i, int j, int length1, int length2, int min_score);
+static void process_string(char * str);
+static void seq_cat(seq * sequence, char * new_str);
+static cell ** init_matrix(int length1, int length2, int type);
+static void free_matrix(cell ** matrix, int length2);
+static int get_last_simple_row(int diag, int k, int length1, int length2);
 
 delta local_align(const char * str1, const char * str2)
 {
@@ -59,14 +53,8 @@ delta local_align(const char * str1, const char * str2)
 	delta tb;
 	int best_i, best_j, best_score;
 
-#ifdef TRUNCATE
-	length1 = length1/TRUNCATE;
-	length2 = length2/TRUNCATE;
-#endif
-
-	//fprintf(stderr, "init matrix\n");
 	cell ** matrix = init_matrix(length1, length2, INIT_PREFIX_SUFFIX);
-	//fprintf(stderr, "filling out matrix\n");
+
 	best_i = 0;
 	best_j = 0;
 	best_score = 0;
@@ -92,17 +80,11 @@ delta local_align(const char * str1, const char * str2)
 
 	tb = generate_traceback(matrix, best_i, best_j, length1, length2, 0);
 
-	//print_matrix(stdout, matrix, str1, length1, str2, length2);
-	//fprintf(stderr, "best row: %d, best column: %d\n", best_j, best_i);
-
 	fflush(stdout);
 	free_matrix(matrix, length2);
 
 	return tb;
-
-
 }
-
 
 delta sw_align(const char * str1, const char * str2)
 {
@@ -111,27 +93,17 @@ delta sw_align(const char * str1, const char * str2)
 	int i,j;
 	delta tb;
 
-#ifdef TRUNCATE
-	length1 = length1/TRUNCATE;
-	length2 = length2/TRUNCATE;
-#endif
-
-
 	cell ** matrix = init_matrix(length1, length2, INIT_SW);
 
 	for (i=1; i<=length1; i++)
 	{
 		for (j=1; j<=length2; j++)
 		{
-			//matrix[j][i] = new_score(matrix, i, j, str1, str2);
 			matrix[j][i] = new_score_gap_extensions(matrix, i, j, str1, str2);
 		}
 	}
 
 	tb = generate_traceback(matrix, length1, length2, length1, length2, INT_MIN);
-
-	//print_matrix(stdout, matrix, str1, length1, str2, length2);
-	//fprintf(stderr, "best row: %d, best column: %d\n", best_j, best_i);
 
 	fflush(stdout);
 	free_matrix(matrix, length2);
@@ -146,14 +118,7 @@ delta prefix_suffix_align(const char * str1, const char * str2, int min_align)
 	int i,j;
 	delta tb;
 
-#ifdef TRUNCATE
-	length1 = length1/TRUNCATE;
-	length2 = length2/TRUNCATE;
-#endif
-
-	//fprintf(stderr, "init matrix\n");
 	cell ** matrix = init_matrix(length1, length2, INIT_PREFIX_SUFFIX);
-	//fprintf(stderr, "filling out matrix\n");
 	for (i=1; i<=length1; i++)
 	{
 		for (j=1; j<=length2; j++)
@@ -162,32 +127,25 @@ delta prefix_suffix_align(const char * str1, const char * str2, int min_align)
 			//matrix[j][i] = new_score_gap_extensions(matrix, i, j, str1, str2);
 		}
 	}
-	//print_matrix(stdout, matrix, str1, length1, str2, length2);
 
 	int best_i=0;
 	int best_j=0;
 	choose_best(matrix, &best_i, &best_j, length1, length2, min_align);
 
-	//fprintf(stdout, "best: %d, %d\n", best_i, best_j);
-
 	tb = generate_traceback(matrix, best_i, best_j, length1, length2, INT_MIN);
 
-	//print_matrix(stdout, matrix, str1, length1, str2, length2);
-	//fprintf(stderr, "best row: %d, best column: %d\n", best_j, best_i);
-
-	//fflush(stdout);
 	free_matrix(matrix, length2);
 
 	return tb;
 }
 
-void band2matrix(int band_row, int band_col, int diag, int k, int * matrix_row, int * matrix_col)
+static void band2matrix(int band_row, int band_col, int diag, int k, int * matrix_row, int * matrix_col)
 {
 	*matrix_row = (diag < -k) ? ((band_row) + (-diag-k)) : band_row;
 	*matrix_col = (*matrix_row + diag) + (band_col - k);
 }
 
-int start_band_left(cell ** band, int k, const char * str1, int start1, const char * str2, int start2, int * matrix_row_ret, int * matrix_col_ret)
+static int start_band_left(cell ** band, int k, const char * str1, int start1, const char * str2, int start2, int * matrix_row_ret, int * matrix_col_ret)
 {
 	int band_row = 0;
 	int matrix_row=0, first_full_row=0, band_first_col=0;
@@ -238,7 +196,6 @@ int start_band_left(cell ** band, int k, const char * str1, int start1, const ch
 
 		// The first in each row is just 0 in this case,
 		// which is part of the initialization.
-		//fprintf(stderr, "Calculating band[%d][%d] (a)\n", band_row, band_col);
 		band[band_row][band_col].score = 0;
 		band[band_row][band_col].tb = TB_END;
 		matrix_col++;
@@ -253,7 +210,6 @@ int start_band_left(cell ** band, int k, const char * str1, int start1, const ch
 
 		// Now, for the last column, just look at left and diag, don't
 		// check up.
-		//fprintf(stderr, "Calculating band[%d][%d] (c)\n", band_row, band_col);
 		band[band_row][band_col] = new_score_banded(band, band_row, band_col, matrix_row, matrix_col, str1, str2, CHECK_LEFT | CHECK_DIAG);
 		matrix_col++;
 
@@ -274,7 +230,7 @@ int start_band_left(cell ** band, int k, const char * str1, int start1, const ch
 }
 
 // In this case, just initialize the first row.  No fuss, no muss.
-int start_band_upper(cell ** band, int k, const char * str1, int start1, const char * str2, int start2, int * matrix_row_ret, int * matrix_col_ret)
+static int start_band_upper(cell ** band, int k, const char * str1, int start1, const char * str2, int start2, int * matrix_row_ret, int * matrix_col_ret)
 {
 	int band_row = 0;
 	
@@ -292,7 +248,7 @@ int start_band_upper(cell ** band, int k, const char * str1, int start1, const c
 	return 1;
 }
 
-int get_last_simple_row(int diag, int k, int length1, int length2)
+static int get_last_simple_row(int diag, int k, int length1, int length2)
 {
 	// Figure out when the border of the band will hit the right
 	// side of the matrix:
@@ -306,19 +262,17 @@ int get_last_simple_row(int diag, int k, int length1, int length2)
 
 }
 
-void choose_best_banded(cell ** band, int * best_row_ret, int * best_col_ret, int length1, int length2, int k, int band_row, int cols_in_last_row, int rows_in_last_col)
+static void choose_best_banded(cell ** band, int * best_row_ret, int * best_col_ret, int length1, int length2, int k, int band_row, int cols_in_last_row, int rows_in_last_col)
 {
 	int band_col;
 	int best_row=0, best_col=0, best_score=0;
 	int i;
 
 	best_score = INT_MAX;
-	//fprintf(stderr, "cols_in_last_row: %d, rows_in_last_col: %d\n", cols_in_last_row, rows_in_last_col);
 
 	// Now check the last row.
 	for (band_col=cols_in_last_row; band_col>=0; band_col--)
 	{
-		//fprintf(stderr, "choose_best (last row): band_row: %d, band_col: %d, score: %d\n", band_row, band_col, band[band_row][band_col].score);
 		if (band[band_row][band_col].score < best_score)
 		{
 			best_score = band[band_row][band_col].score;
@@ -332,21 +286,19 @@ void choose_best_banded(cell ** band, int * best_row_ret, int * best_col_ret, in
 	{
 		band_col = cols_in_last_row+i+1;
 		band_row--;
-		//fprintf(stderr, "choose_best (last col): band_row: %d, band_col: %d, score: %d\n", band_row, band_col, band[band_row][band_col].score);
 		if (band[band_row][band_col].score < best_score)
 		{
 			best_score = band[band_row][band_col].score;
 			best_row = band_row;
 			best_col = band_col;
 		}
-		//band_col--;
 	}
 
 	*best_row_ret = best_row;
 	*best_col_ret = best_col;
 }
 
-delta generate_traceback_banded(cell ** band, int best_row, int best_col, int length1, int length2, int k, int diag)
+static delta generate_traceback_banded(cell ** band, int best_row, int best_col, int length1, int length2, int k, int diag)
 {
 	delta tb;
 	int band_row, band_col, curr_tb_type, count;
@@ -429,7 +381,7 @@ delta generate_traceback_banded(cell ** band, int best_row, int best_col, int le
 	// matrix_row = (diag < 0) ? ((-diag - k)+band_row) : band_row;
 	// matrix_col = (band_row + diag) + (band_col - k)
 	//   band_row + diag puts you in the middle of the band (position k)
-	//fprintf(stderr, "band_row: %d, band_col: %d\nbest_row: %d, best_col: %d\n", band_row, band_col, best_row, best_col);
+
 	band2matrix(band_row, band_col, diag, k, &tb.start2, &tb.start1);
 	band2matrix(best_row, best_col, diag, k, &tb.end2, &tb.end1);
 	tb.end2--;  // These are one too high because of the implied "X"
@@ -456,11 +408,6 @@ delta banded_prefix_suffix(const char * str1, const char * str2, int start1, int
 	int width = 2*k+1;
 	int last_simple_row, last_col;
 
-#ifdef TRUNCATE
-	length1 = length1/TRUNCATE;
-	length2 = length2/TRUNCATE;
-#endif
-
 	// Fix the start positions so that one is 0 and the other is positive.
 	// Because we're finding the diagonal, we can subtract the same amount
 	// from both.
@@ -475,10 +422,7 @@ delta banded_prefix_suffix(const char * str1, const char * str2, int start1, int
 		start2 = 0;
 	}
 
-	//fprintf(stderr, "init matrix\n");
 	cell ** band = init_matrix(width, lastrow, INIT_PREFIX_SUFFIX);
-	//fprintf(stderr, "filling out matrix\n");
-	//print_banded_matrix(stdout, band, str1, length1, start1, str2, length2, start2, k); return tb;
 
 	int diag = start1 - start2;
 	int last_col_which = CHECK_DIAG | CHECK_LEFT;
@@ -497,7 +441,6 @@ delta banded_prefix_suffix(const char * str1, const char * str2, int start1, int
 	while (matrix_row <= MIN(length2, last_simple_row+width-1))
 	{
 		// The first one checks only up and diag, not left
-		//fprintf(stderr, "calculating band[%d][%d] (a)\n", band_row, 0);
 		band[band_row][0] = new_score_banded(band, band_row, 0, matrix_row, matrix_col, str1, str2, CHECK_UP | CHECK_DIAG);
 		matrix_col++;
 
@@ -510,7 +453,6 @@ delta banded_prefix_suffix(const char * str1, const char * str2, int start1, int
 		}
 
 		// The last col only checks left and diag, not up.
-		//fprintf(stderr, "calculating band[%d][%d] (c)\n", band_row, band_col);
 		band[band_row][band_col] = new_score_banded(band, band_row, band_col, matrix_row, matrix_col, str1, str2, last_col_which);
 		
 		// Update all the values.
@@ -527,8 +469,6 @@ delta banded_prefix_suffix(const char * str1, const char * str2, int start1, int
 
 	int best_row, best_col;
 
-	//fprintf(stderr, "last_col: %d\n", last_col);
-
 	choose_best_banded(band, &best_row, &best_col, length1, length2, k, band_row-1, last_col, width-last_col-1 );
 	tb = generate_traceback_banded(band, best_row, best_col, length1, length2, k, diag);
 
@@ -539,9 +479,6 @@ delta banded_prefix_suffix(const char * str1, const char * str2, int start1, int
 		free(band[j]);
 	}
 	free(band);
-	//fprintf(stderr, "best_row: %d, best_col: %d\n", best_row, best_col);
-
-	//print_banded_matrix(stdout, band, str1, length1, start1, str2, length2, start2, k);
 
 	return tb;
 
@@ -555,24 +492,12 @@ cell ** init_matrix(int length1, int length2, int type)
 	// Create the list of rows, each itself an int *
 	// Add 1 to make sure it has enough room for the
 	// first row of 0's
-#ifdef STATIC_MATRIX_SIZE
-	static cell ** matrix = 0;
-	if (matrix == 0)
-	{
-		matrix = malloc(STATIC_MATRIX_SIZE*sizeof(cell *));
-		for(j=0; j<=MAX_LENGTH; j++)
-		{
-			matrix[j] = malloc(STATIC_MATRIX_SIZE*sizeof(cell));
-		}
-		
-	}
-#else
+
 	cell ** matrix = malloc((length2+1)*sizeof(cell *));
 	for(j=0; j<=length2; j++)
 	{
 		matrix[j] = malloc((length1+1)*sizeof(cell));
 	}
-#endif
 
 	if (type == INIT_PREFIX_SUFFIX)
 	{
@@ -588,9 +513,8 @@ cell ** init_matrix(int length1, int length2, int type)
 			matrix[j][0].score = 0;
 			matrix[j][0].tb = 0;
 		}
-	}
-	else if (type == INIT_SW)
-	{
+	} else if (type == INIT_SW) {
+
 		// Initialize the first row to all 0's
 		matrix[0][0].score = 0;
 		matrix[0][0].tb = 0;
@@ -617,7 +541,7 @@ cell ** init_matrix(int length1, int length2, int type)
 void free_matrix(cell ** matrix, int length2)
 {
 	int j;
-#ifndef STATIC_MATRIX_SIZE
+
 	// Free each row
 	for(j=0; j<=length2; j++)
 	{
@@ -626,7 +550,6 @@ void free_matrix(cell ** matrix, int length2)
 
 	// Free the list of rows.
 	free(matrix);
-#endif
 }
 
 cell new_score(cell ** matrix, int i, int j, const char * str1, const char * str2)
@@ -657,7 +580,6 @@ cell new_score(cell ** matrix, int i, int j, const char * str1, const char * str
 		min.tb = TB_LEFT;
 	}
 
-	//printf("(%d, %d) %c %c = %d (%d, %d)\n", i, j, str1[i-1], str2[j-1], incr, min.score, min.tb);
 	return min;
 }
 
@@ -708,7 +630,6 @@ cell new_score_gap_extensions(cell ** matrix, int i, int j, const char * str1, c
 		min.tb = TB_DIAG;
 	}
 
-	//printf("(%d, %d) %c %c = %d (%d, %d)\n", i, j, str1[i-1], str2[j-1], incr, min.score, min.tb);
 	return min;
 }
 
@@ -762,7 +683,6 @@ cell new_score_maximize(cell ** matrix, int i, int j, const char * str1, const c
 		max.tb = TB_DIAG;
 	}
 
-	//printf("(%d, %d) %c %c = %d (%d, %d)\n", i, j, str1[i-1], str2[j-1], incr, max.score, max.tb);
 	return max;
 }
 
@@ -785,7 +705,6 @@ cell new_score_banded(cell ** band, int band_row, int band_col, int matrix_row, 
 	if (which & CHECK_UP)
 	{
 		recurrence = band[band_row-1][band_col+1];
-		//fprintf(stderr, "  up score: %d\n", recurrence.score);
 		incr = (recurrence.tb == TB_UP) ? score_gap_extend : score_gap_open;
 		if (recurrence.score+incr < min.score)
 		{
@@ -798,7 +717,6 @@ cell new_score_banded(cell ** band, int band_row, int band_col, int matrix_row, 
 	if (which & CHECK_LEFT)
 	{
 		recurrence = band[band_row][band_col-1];
-		//fprintf(stderr, "  left score: %d\n", recurrence.score);
 		incr = (recurrence.tb == TB_LEFT) ? score_gap_extend : score_gap_open;
 		if (recurrence.score+incr < min.score)
 		{
@@ -811,7 +729,6 @@ cell new_score_banded(cell ** band, int band_row, int band_col, int matrix_row, 
 	if (which & CHECK_DIAG)
 	{
 		recurrence = band[band_row-1][band_col];
-		//fprintf(stderr, "  diag score: %d, matrix_col: %d, matrix_row: %d\n", recurrence.score, matrix_col, matrix_row);
 		if (str1[matrix_col-1] == str2[matrix_row-1])
 		{
 			if ((recurrence.tb == TB_DIAG) && (str1[matrix_col-2] == str2[matrix_row-2]))
@@ -827,7 +744,6 @@ cell new_score_banded(cell ** band, int band_row, int band_col, int matrix_row, 
 		{
 			incr = score_mismatch;
 		}
-		//fprintf(stderr, "  incr: %d\n", incr);
 		if (recurrence.score+incr < min.score)
 		{
 			min.score = recurrence.score+incr;
@@ -854,40 +770,26 @@ void choose_best(cell ** matrix, int * best_i, int * best_j, int length1, int le
 	// Find the best in the last column
 	for (i=length1, j=min_align; j <= length2; j++)
 	{
-		//fprintf(stdout, "%d, %d, %d, %d\n", i, j, matrix[j][i].score, matrix[j][i].score*2 - j);
-		//if (matrix[j][i].score*2 - j < min_score)
-		//{
-		//	min_score = matrix[j][i].score*2 - j;
 		quality = ((float) matrix[j][i].score) / (float)min(i, j);
-		//fprintf(stdout, "quality (%d, %d): %d / %d = %f\n", i, j, matrix[j][i].score, min(i, j), quality);
 		if (quality < min_qual)
 		{
-			//fprintf(stdout, "Setting min_qual (%d, %d): %d / %d = %f\n", i, j, matrix[j][i].score, min(i, j), quality);
 			min_qual = quality;
 			*best_i = i;
 			*best_j = j;
 		}
 	}
-	//fprintf(stdout, "quality (%d, %d): %d / %d = %f\n", *best_i, *best_j, matrix[*best_j][*best_i].score, min(*best_i, *best_j), quality);
 
 	// Find the best in the last row
 	for (i=min_align, j=length2; i <= length1; i++)
 	{
-		//fprintf(stdout, "%d, %d, %d, %d\n", i, j, matrix[j][i].score, matrix[j][i].score*2 - i);
-		//if (matrix[j][i].score*2 - i < min_score)
-		//{
-		//	min_score = matrix[j][i].score*2 - i;
 		quality = ((float) matrix[j][i].score) / (float)min(i, j);
-		//fprintf(stdout, "quality (%d, %d): %d / %d = %f\n", i, j, matrix[j][i].score, min(i, j), quality);
 		if (quality < min_qual)
 		{
-			//fprintf(stdout, "Setting min_qual (%d, %d): %d / %d = %f\n", i, j, matrix[j][i].score, min(i, j), quality);
 			min_qual = quality;
 			*best_i = i;
 			*best_j = j;
 		}
 	}
-	//fprintf(stdout, "best quality (%d, %d): %d / %d = %f\n", *best_i, *best_j, matrix[*best_j][*best_i].score, min(*best_i, *best_j), min_qual);
 }
 
 delta generate_traceback(cell ** matrix, int i, int j, int length1, int length2, int min_score)
@@ -897,8 +799,6 @@ delta generate_traceback(cell ** matrix, int i, int j, int length1, int length2,
 	int first = 1, last_gap_type=0, count_since_last = 0;
 	int temp_tb[MAX_STRING];
 	int total_bases = 0;
-
-
 
 	// The return array requires 4 pieces of info
 	// 1. Whether string 1 or string 2 is the string for which the alignment is a prefix.
@@ -1036,13 +936,11 @@ void print_OVL_message(FILE * file, delta tb, const char * id1, const char * id2
 	ahg = tb.start1 - tb.start2;
 	bhg = (tb.length2-1) - tb.end2;
 	if (bhg == 0) { bhg = tb.end1 - tb.length1; }
-	//fprintf(stderr, "tb.start1: %d, tb.end1: %d, tb.length1: %d\ntb.start2: %d, tb.end1: %d, tb.length2: %d\nahg: %d, bhg: %d\n", tb.start1, tb.end1, tb.length1, tb.start2, tb.end2, tb.length2, ahg, bhg);
 
 	// If ahg and bhg are of opposite signs, then it's a containment.
 	// If they are the same sign, it's a dovetail.
 	if (ahg*bhg < 0) { olt = 'C'; }
 	else { olt = 'D'; }
-	//fprintf(file, "olt:%c\n", olt);
 	fprintf(file, "olt:D\n");  // Always put D to mimic Celera more closely.
 
 	// How much each piece hangs off the end. Not sure what to do
@@ -1064,17 +962,6 @@ void print_OVL_message(FILE * file, delta tb, const char * id1, const char * id2
 	// Polymorphism count.
 	//fprintf(file, "pct:%d\n", tb.mismatch_count);
 	fprintf(file, "pct:0\n");  // Again, try to match Celera
-
-	/*
-	// My additions, need to remove eventually:
-	fprintf(file, "gap:%d\n", tb.gap_count);
-	fprintf(file, "sco:%d\n", tb.score);
-	fprintf(file, "tsc:%d\n", tb.total_score);
-	fprintf(file, "st1:%d\n", tb.start1);
-	fprintf(file, "en1:%d\n", tb.end1);
-	fprintf(file, "st2:%d\n", tb.start2);
-	fprintf(file, "en2:%d\n", tb.end2);
-	*/
 
 	fprintf(file, "}\n");
 }
@@ -1355,33 +1242,6 @@ char arrow(cell ** matrix, int i, int j)
 	return 'x';
 }
 
-void print_matrix(FILE * file, cell ** matrix, const char * str1, int length1, const char * str2, int length2)
-{
-	int i, j;
-	fprintf(file, "    |     X | ");
-	for(i=0; i<length1; i++)
-	{
-		fprintf(file, "    %c | ", str1[i]);
-	}
-	printf("\n  X | ");
-	for (i=0; i<=length1; i++)
-	{
-		fprintf(file, "  %3d | ", matrix[0][i].score);
-	}
-	fprintf(file,"\n");
-	for(j=1; j<=length2; j++)
-	{
-		fprintf(file, "  %c | ", str2[j-1]);
-		fprintf(file, "  %3d | ", matrix[j][0].score);
-		for(i=1; i<=length1; i++)
-		{
-			fprintf(file, "%c %3d | ", arrow(matrix, i, j), matrix[j][i].score);
-		}
-		fprintf(file, "\n");
-	}
-
-}
-
 int print_band_left(FILE * file, cell ** band, int k, const char * str1, int start1, const char * str2, int start2, int * matrix_row_ret, int * matrix_col_ret)
 {
 	int i;
@@ -1590,77 +1450,6 @@ int print_band_upper(FILE * file, cell ** band, int k, const char * str1, int st
 	*matrix_row_ret = 1;
 	*matrix_col_ret = start1 - k+1;
 	return 1;
-}
-
-void print_banded_matrix(FILE * file, cell ** band, const char * str1, int length1, int start1, const char * str2, int length2, int start2, int k)
-{
-	int i;
-	int diag = start1 - start2;
-	int band_row, matrix_row, matrix_col, last_simple_row, band_col;
-	int width = 2*k+1;
-	int last_col;
-
-	// Print the first row (str1)
-	fprintf(file, "    |     X | ");
-	for(i=0; i<length1; i++)
-	{
-		fprintf(file, "    %c | ", str1[i]);
-	}
-	fprintf(file, "\n");
-
-	if (diag <= -k)
-	{
-		//band_row = print_band_lower(file, band, k, str1, start1, str2, start2, &matrix_row, &matrix_col);
-		band_row = print_band_left(file, band, k, str1, start1, str2, start2, &matrix_row, &matrix_col);
-	}
-	else if (diag < 0)
-	{
-		//band_row = print_band_low_corner(file, band, k, str1, start1, str2, start2, &matrix_row, &matrix_col);
-		band_row = print_band_left(file, band, k, str1, start1, str2, start2, &matrix_row, &matrix_col);
-	}
-	else if (diag < k) // assert: diag >= 0
-	{
-		//band_row = print_band_high_corner(file, band, k, str1, start1, str2, start2, &matrix_row, &matrix_col);
-		band_row = print_band_left(file, band, k, str1, start1, str2, start2, &matrix_row, &matrix_col);
-	}
-	else // (diag >= k)
-	{
-		band_row = print_band_upper(file, band, k, str1, start1, str2, start2, &matrix_row, &matrix_col);
-	}
-
-	last_simple_row = get_last_simple_row(diag, k, length1, length2);
-	last_col = width;
-	fprintf(stderr, "last_simple_row: %d\n", last_simple_row);
-	while (matrix_row <= MIN(length2, last_simple_row+width-1))
-	{
-		// First, print the character for this row.
-		fprintf(file, "  %c | ", str2[matrix_row-1]);
-
-		// Then, print blank space in the matrix up until
-		// where the band starts.
-		for (i=0; i<matrix_col; i++)
-		{
-			fprintf(file, "        ");
-		}
-		for (band_col = 0; band_col < last_col; band_col++)
-		{
-			fprintf(file, "%c %3d | ", arrow(band, band_col, band_row), band[band_row][band_col].score);
-			//fprintf(file, "%2d %3d| ", band_row, band_col);
-		}
-		fprintf(file, " %d %d\n", band_row, matrix_row);
-
-		band_row++;
-		matrix_row++;
-		matrix_col++;
-
-		if (matrix_row > last_simple_row) last_col--;
-	}
-
-	// Print the rest of the rows, even if they're blank.
-	for (i=matrix_row-1; i<length2; i++)
-	{
-		fprintf(file, "  %c |\n", str2[i]);
-	}
 }
 
 static char comp(char c)

@@ -48,8 +48,6 @@ void print_cseq(FILE * file, cseq c);
 cseq get_next_cseq(FILE * file);
 void cseq_file_reset();
 void translate_to_str(int mer, char * str, int length);
-char num_to_base(int num);
-int base_to_num(char);
 size_t cseq_size(cseq c);
 size_t sprint_cseq(char * buf, cseq c);
 

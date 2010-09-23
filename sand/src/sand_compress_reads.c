@@ -11,7 +11,6 @@ See the file COPYING for details.
 #include <string.h>
 #include "sequence_alignment.h"
 #include "sequence_compression.h"
-#include "sand_align_macros.h"
 
 static void show_help(const char *cmd)
 {

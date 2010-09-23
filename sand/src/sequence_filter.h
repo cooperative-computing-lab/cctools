@@ -7,16 +7,14 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <sys/time.h>
 #include <math.h>
-#include "sequence_alignment.h"
-#include "sequence_compression.h"
-#include "sand_align_macros.h"
 
-//#include "int_hash.h"
 #include "itable.h"
 #include "memory_info.h"
 
+#include "sequence_alignment.h"
+#include "sequence_compression.h"
+
 #define TIME time(0) - start_time
-//#define NUM_SEQUENCES 1801182
 #define KB_PER_SEQUENCE 9  // Defined by running some tests, not very exact.
 
 #define CANDIDATE_FORMAT_OVL 1

@@ -15,9 +15,7 @@ See the file COPYING for details.
 
 #include "sequence_alignment.h"
 #include "sequence_compression.h"
-#include "sand_align_macros.h"
 #include "sequence_filter.h"
-
 
 extern int rectangle_size;
 extern int curr_rect_x;

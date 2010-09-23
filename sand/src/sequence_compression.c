@@ -6,8 +6,9 @@ See the file COPYING for details.
 
 #include <string.h>
 #include <stdlib.h>
+
 #include "sequence_compression.h"
-#include "sand_align_macros.h"
+#include "sand_align.h"
 
 #define MAX_ID SEQUENCE_ID_MAX
 #define MAX_METADATA SEQUENCE_METADATA_MAX 
@@ -15,6 +16,8 @@ See the file COPYING for details.
 static short mer_add_base(short mer, char base);
 static short translate_8mer(const char * str, int start);
 static int get_mercount(int length);
+int base_to_num(char base );
+char num_to_base( int num );
 
 cseq compress_seq(seq s)
 {
@@ -58,7 +61,7 @@ cseq compress_seq(seq s)
 	return m;
 }
 
-static int get_mercount(int length)
+int get_mercount(int length)
 {
 	int mercount = length/8;
 	if (length%8 > 0) { mercount++; }
@@ -66,7 +69,7 @@ static int get_mercount(int length)
 	return mercount;
 }
 
-static short translate_8mer(const char * str, int start)
+short translate_8mer(const char * str, int start)
 {
 	int i;
 	short mer = 0;
@@ -79,46 +82,10 @@ static short translate_8mer(const char * str, int start)
 	return mer;
 }
 
-static short mer_add_base(short mer, char base)
-{
-	return (mer << 2) + base_to_num(base);
-}
-#ifndef UMD_COMPRESSION
 int base_to_num(char base)
 {
 	switch(base)
 	{
-		case 'A':
-		case 'a':
-			return 0;
-		case 'C':
-		case 'c':
-			return 1;
-		case 'G':
-		case 'g':
-			return 2;
-		case 'T':
-		case 't':
-			return 3;
-	}
-	return -1;
-}
-char num_to_base(int num)
-{
-	switch(num)
-	{
-		case 0: return 'A';
-		case 1: return 'C';
-		case 2: return 'G';
-		case 3: return 'T';
-		default: return 'N';
-	}
-}
-#else
-static int base_to_num(char base)
-{
-	switch(base)
-	{
 		case 'C':
 		case 'c':
 			return 0;
@@ -130,9 +97,11 @@ static int base_to_num(char base)
 			return 2;
 		case 'G':
 		case 'g':
+		default:
 			return 3;
 	}
 }
+
 char num_to_base(int num)
 {
 	switch(num)
@@ -144,7 +113,11 @@ char num_to_base(int num)
 		default: return 'N';
 	}
 }
-#endif
+
+short mer_add_base(short mer, char base)
+{
+	return (mer << 2) + base_to_num(base);
+}
 
 seq uncompress_seq(cseq m)
 {
@@ -316,9 +289,6 @@ cseq get_next_cseq(FILE * file)
 	}
 	else if (line[0] == '>')
 	{
-		//sequence.ext_id = malloc(MAX_ID*sizeof(char));
-		//sequence.metadata = malloc(MAX_METADATA*sizeof(char));
-		//strcpy(sequence.metadata, "");
 		sequence.ext_id = 0;
 		sequence.metadata = 0;
 		sequence.length = 0;
@@ -331,9 +301,7 @@ cseq get_next_cseq(FILE * file)
 	}
 
 	int bytes;
-	//parse_header(&sequence, line);
-	//fprintf(stderr, "line: %s", line);
-	//sscanf(line, ">%s %d %d %[^\n]\n", sequence.ext_id, &sequence.length, &bytes,sequence.metadata);
+
 	tmp_metadata[0] = '\0';
 	sscanf(line, ">%s %d %d %[^\n]\n", tmp_id, &sequence.length, &bytes,tmp_metadata);
 	sequence.ext_id = strdup(tmp_id);
@@ -341,11 +309,8 @@ cseq get_next_cseq(FILE * file)
 	sequence.mercount = get_mercount(sequence.length);
 	sequence.mers = malloc(sequence.mercount*sizeof(short));
 
-	//fprintf(stderr, "ext_id: %s, length: %d, bytes: %d, metadata: %s\n", sequence.ext_id, sequence.length, bytes,sequence.metadata);
-
 	char last;
 	total = fread(sequence.mers, 1, bytes, file);
-	//print_hex_mers(stderr, sequence);
 	if (total != bytes)
 	{
 		fprintf(stderr, "ERROR: Did not read as much as was expected (expected %d, read %d, line: %s).\n", bytes, total, line);

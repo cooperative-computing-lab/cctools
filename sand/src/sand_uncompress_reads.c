@@ -33,7 +33,6 @@ int main(int argc, char ** argv)
 
 	while (!feof(input))
 	{
-		//c = get_next_cseq(input);
 		if (!c.ext_id)
 		{
 			fprintf(stdout, ">>\n");
@@ -42,8 +41,6 @@ int main(int argc, char ** argv)
 		}
 		s = uncompress_seq(c);
 		free_cseq(c);
-		//strcpy(tmp, s.metadata);
-		//sprintf(s.metadata, "%d %d %s", s.length, s.length, tmp);
 		print_sequence(stdout, s);
 		free_seq(s);
 		c = get_next_cseq(input);

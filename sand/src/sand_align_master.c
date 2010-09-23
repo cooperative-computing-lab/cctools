@@ -64,7 +64,7 @@ static void display_progress( struct work_queue *q )
 	time_t current = time(0);
 	work_queue_get_stats(q,&info);
 	if(current==start_time) current++;
-	//double speedup = (sequential_run_time*tasks_done)/(current-start_time);
+
 	double speedup = (((double)tasks_runtime/1000000.0)/ (time(0)-start_time));
 	printf("%6ds | %4d %4d %4d | %6d %4d %4d %4d | %6d %6.02lf %6.02lf %8.02lf | %.02lf\n",
 	   (int)(time(0)-start_time),
@@ -410,8 +410,6 @@ static struct hash_table* build_sequence_library(const char* filename)
 	fprintf(stderr,"Couldn't open file %s.\n",filename);
 	exit(1);
     }
-    //while(fscanf(infile," >%s %i %i%*1[ ]%*1[\n]",s.sequence_name,&s.num_bases,&s.num_bytes) == 3) {
-    //while((num_items = fscanf(infile,">%s %i %i%[^\n]%*1[\n]",s.sequence_name,&s.num_bases,&s.num_bytes, tmp)) == 4) {
 	while (fgets(line, SEQUENCE_FILE_LINE_MAX, infile))
 	{
 	if ((num_items = sscanf(line,">%s %i %i%[^\n]%*1[\n]",s.sequence_name,&s.num_bases,&s.num_bytes, tmp)) != 4)
@@ -437,7 +435,6 @@ static struct hash_table* build_sequence_library(const char* filename)
 	    exit(1);
 	}
 	verification = (struct sequence*)hash_table_lookup(h,s.sequence_name);
-	//printf("%s Added %i bytes from %c(%i) to %c(%i)\n",s.sequence_name,verification->num_bytes,verification->sequence_data[0],(int)verification->sequence_data[0],verification->sequence_data[verification->num_bytes - 1],(int)verification->sequence_data[verification->num_bytes - 1]);
 	free(s.sequence_data);
 	s.sequence_data = NULL; 
 	fgetc(infile); // Ignore the newline at the end.
@@ -484,21 +481,6 @@ static int handle_done_task(struct work_queue_task *t) {
     return 1;
 }
 
-/*
-static int get_task_ratio(  struct work_queue *q ) {
-    struct work_queue_stats info;
-    int i,j;
-    work_queue_get_stats(queue,&info);
-
-    //i = 2 * number of current workers
-    //j = # of queued tasks.
-    //i-j = # of tasks to queue to re-reach the status quo.
-    i = (2*(info.workers_init + info.workers_ready + info.workers_busy));
-    j = (info.tasks_waiting);
-    return i-j;
-}
-*/
-
 static int task_consider( void* taskfiledata, int size )
 {
 	char cmd[2*MAX_FILENAME+4];
@@ -525,7 +507,6 @@ static int task_consider( void* taskfiledata, int size )
 	return 1;
 }
 
-//static int get_next_cand_line(FILE * fp, char * sequence_name1, char * sequence_name2, int * alignment_flag, int * start_pos1, int * start_pos2)
 static int get_next_cand_line(FILE * fp, char * sequence_name1, char * sequence_name2, int * alignment_flag, char * extra_data)
 {
 	char line[CAND_FILE_LINE_MAX];
@@ -567,7 +548,6 @@ static int get_next_cand_line(FILE * fp, char * sequence_name1, char * sequence_
 
 	// Get the actual data out of the line.
 	int resulta = sscanf(line, "%s %s %i%[^\n]%*1[\n]", sequence_name1, sequence_name2, alignment_flag, extra_data);
-	//if (sscanf(line, "%s %s %i %i %i", sequence_name1, sequence_name2, alignment_flag, start_pos1, start_pos2) != 5)
 	if ((resulta != 4) && ( !( (resulta == 3) && !strcmp(extra_data, ""))))
 	{
 		fprintf(stderr, "Bad line: %s, alignment_flag: %d, extra_data: |%s|, %d, resulta = %d\n", line, *alignment_flag, extra_data, *extra_data, resulta);

@@ -48,8 +48,6 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 static int handle_done_task(struct work_queue_task * t);
 static int confirm_output(struct work_queue_task *t);
 static void display_progress();
-//static int rect_to_index(int x, int y);
-//static void index_to_rect(int index, int * x, int * y);
 static int convert_cand_binary_to_ascii(FILE * outfile, const char * fname);
 
 // GLOBALS
@@ -125,9 +123,7 @@ static void show_help(const char *cmd)
 	printf(" -c <file>      The file which contains checkpoint information. If it exists,\n");
 	printf("                it will be used, otherwise it will be created.\n");
 	printf("                will be converted to when the master finishes.\n");
-	printf(" -a <file>      The wrapper to be passed to sand_filter_mer_seq. Can technically\n");
-	printf("                be anything, but generally should be run_exe.pl, which\n");
-	printf("                replaces the repeat mer file with a chirp file.\n");
+	printf(" -a <file>      The wrapper to be passed to sand_filter_mer_seq.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	printf(" -f <character> The character that will be printed at the end of the file.\n");
 	printf("                output file to indicate it has ended (default is nothing)\n");
@@ -459,18 +455,7 @@ static int handle_done_task(struct work_queue_task * t)
 		}
 		else if (t->result == 2)
 		{
-			if (WEXITSTATUS(t->return_status) == FILTER_MASTER_TASK_RESULT_CHIRP_FAILED)
-			{
-				fprintf(stderr, "Worker was unable to find repeat file %s in chirp on host %s for rectangle %s.\n%s\n", repeat_filename, t->host, t->tag, t->output);
-			}
-			else if (WEXITSTATUS(t->return_status) == FILTER_MASTER_TASK_RESULT_CHIRP_NOT_FOUND)
-			{
-				fprintf(stderr, "Local file for repeat file %s in chirp did not exist on host %s for rectangle %s.\n%s\n", repeat_filename, t->host, t->tag, t->output);
-			}
-			else
-			{
-				fprintf(stderr, "Function returned non-zero exit status on host %s for rectangle %s (%d):\n%s", t->host, t->tag, WEXITSTATUS(t->return_status), t->output);
-			}
+			fprintf(stderr, "Function returned non-zero exit status on host %s for rectangle %s (%d):\n%s", t->host, t->tag, WEXITSTATUS(t->return_status), t->output);
 			return 0;
 			
 		}
@@ -537,17 +522,6 @@ static int convert_cand_binary_to_ascii(FILE * outputfile, const char * fname)
 	return 1;
 }
 
-/*
-static int rect_to_index(int x, int y)
-{
-	return ((x*num_rectangles) - ((x*(x+1))/2) + y);
-}
-
-static int index_to_rect(int index, int * x, int * y)
-{
-}
-*/
-
 static void display_progress()
 {
 	struct work_queue_stats info;
@@ -555,9 +529,6 @@ static void display_progress()
 
 	work_queue_get_stats(q, &info);
 
-	//if (current == start_time) current++;
-
-	//printf("%6ds | %4d %4d %4d | %6d %4d %4d %4d | %6d %6.02lf %6.02lf %8.02lf | %.02lf\n",
 	printf("%6ds | %4d %4d %4d | %6d %4d %4d %4d | %6d %6.02lf %6.02lf %10lu\n",
 		(int)(current - start_time),
 		info.workers_init, info.workers_ready, info.workers_busy, 
@@ -594,7 +565,6 @@ int main(int argc, char ** argv)
 
 	// Load sequences.
 	load_sequences(sequence_filename);
-	//load_rectangles(sequence_filename);
 	load_rectangles_to_files();
 	task_id_map = itable_create(4096);
 

@@ -1,7 +1,7 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-PROGRAMS = sand_align_master sand_filter_master sand_banded_alignment sand_sw_alignment sand_filter_mer_seq sand_ucopy sand_compress_reads sand_uncompress_reads
+PROGRAMS = sand_align_master sand_filter_master sand_banded_alignment sand_sw_alignment sand_filter_mer_seq sand_compress_reads sand_uncompress_reads
 SOURCES =  sequence_alignment.c sequence_compression.c sequence_filter.c
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = *.h
