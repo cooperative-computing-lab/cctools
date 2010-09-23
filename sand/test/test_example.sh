@@ -21,10 +21,18 @@ sand_filter_master -s 10 -p $port -b test_20.cfa test_20.cand -d all -o filter.l
 
 echo "Starting Smith-Waterman assembly..."
 ln -s `which sand_sw_alignment` .
-sand_align_master -n 1 -p $port sand_sw_alignment test_20.cand test_20.cfa test_20.ovl -d all -o sw.log || { echo "Error in alignment."; kill -9 $wpid; exit 1 ; }
+sand_align_master -n 1 -p $port sand_sw_alignment test_20.cand test_20.cfa test_20.sw.ovl -d all -o sw.log || { echo "Error in alignment."; kill -9 $wpid; exit 1 ; }
 
-echo "Checking assembly results"
-diff --brief test_20.ovl test_20.right && echo "Files test_20.ovl and test_20.right are the same" || { kill -9 $wpid ; exit 1 ; }
+echo "Checking Smith-Waterman results"
+diff --brief test_20.sw.ovl test_20.sw.right && echo "Files test_20.sw.ovl and test_20.sw.right are the same" || { kill -9 $wpid ; exit 1 ; }
+
+echo "Starting banded assembly..."
+ln -s `which sand_banded_alignment` .
+sand_align_master -n 1 -p $port sand_banded_alignment test_20.cand test_20.cfa test_20.banded.ovl -d all -o sw.log || { echo "Error in alignment."; kill -9 $wpid; exit 1 ; }
+
+echo "Checking banded results"
+diff --brief test_20.banded.ovl test_20.banded.right && echo "Files test_20.banded.ovl and test_20.banded.right are the same" || { kill -9 $wpid ; exit 1 ; }
+
 
 echo "Waiting for worker to exit"
 wait $wpid
