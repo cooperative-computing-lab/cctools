@@ -12,15 +12,11 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include "sequence_filter.h"
 
-// This has to be prime
-#define MAX_MER_REPEAT 25
-
 #define EVEN_MASK 0xCCCCCCCCCCCCCCCCULL
 #define ODD_MASK  0x3333333333333333ULL
 
 unsigned short short_masks[8] = { 65535, 16383, 4095, 1023, 255, 63, 15, 3 };
 
-//unsigned short short_masks[8] = { 0, 3, 15, 63, 255, 1023, 4095, 16383 };
 #define SHORT_MASK_8 65535
 #define SHORT_MASK_7 16383
 #define SHORT_MASK_6 4095
@@ -30,18 +26,14 @@ unsigned short short_masks[8] = { 65535, 16383, 4095, 1023, 255, 63, 15, 3 };
 #define SHORT_MASK_2 15
 #define SHORT_MASK_1 3
 
-#define TIME time(0) - start_time
-int start_time = 0;
-
-int k = 22;
-mer_t k_mask = 0;
-int WINDOW_SIZE = 22;
-mer_t repeat_mask = 0;
+static int k = 22;
+static mer_t k_mask = 0;
+static int WINDOW_SIZE = 22;
+static mer_t repeat_mask = 0;
 
 #define MER_VALUE(mer) ( (mer & (EVEN_MASK & k_mask)) | ((~mer) & (ODD_MASK & k_mask)) )
 
 #define SEQ_ID(seq_num) ( all_seqs[seq_num].ext_id )
-
 
 struct mer_list_elem_s
 {
@@ -74,22 +66,21 @@ struct cand_list_element_s
 };
 typedef struct cand_list_element_s cand_list_element;
 
-//cseq all_seqs[NUM_SEQUENCES];
-cseq * all_seqs = 0;
-//cand_list_element ** candidates_x;
-//cand_list_element ** candidates_y;
+/* These are globals referenced directly by sand_filter_mer_seq. */
+/* This needs to be cleaned up. */
+
 int MER_TABLE_BUCKETS = 5000011; //20000003;
 int CAND_TABLE_BUCKETS= 5000011; //20000003;
-//cand_list_element * candidates[CAND_TABLE_BUCKETS];
-//mer_hash_element * mer_table[MER_TABLE_BUCKETS];
-cand_list_element ** candidates;
-mer_hash_element ** mer_table;
-struct itable * repeat_mer_table = 0;
-int rectangle_size = 1000;
-int num_seqs = 0;
-
 int curr_rect_x = 0;
 int curr_rect_y = 0;
+int rectangle_size = 1000;
+unsigned long total_cand = 0;
+
+static cseq * all_seqs = 0;
+static cand_list_element ** candidates;
+static mer_hash_element ** mer_table;
+static struct itable * repeat_mer_table = 0;
+static int num_seqs = 0;
 
 static int start_x = 0;
 static int end_x = 0;
@@ -97,10 +88,6 @@ static int start_y = 0;
 static int end_y = 0;
 static int same_rect;
 
-unsigned long total_cand = 0;
-
-#define is_x(x) ( (x >= (curr_rect_x*rectangle_size)) && (x < ((curr_rect_x+1)*rectangle_size)) )
-#define is_y(y) ( (y >= (curr_rect_y*rectangle_size)) && (y < ((curr_rect_y+1)*rectangle_size)) )
 #define in_range(x, s, e) (  ((s) <= (x)) && ((x) < (e))   )
 
 void add_sequence_to_mer(mer_t mer, int i, char dir, short loc);
@@ -132,7 +119,6 @@ void print_mhe(FILE * file, mer_hash_element * mhe);
 void init_cand_table()
 {
 	int i;
-	//candidates = calloc(CAND_TABLE_BUCKETS, sizeof(cand_list_element *));
 	candidates = malloc(CAND_TABLE_BUCKETS * sizeof(cand_list_element *));
 	for (i=0; i < CAND_TABLE_BUCKETS; i++)
 	{
@@ -143,28 +129,11 @@ void init_cand_table()
 void init_mer_table()
 {
 	int i;
-	//mer_table = calloc(MER_TABLE_BUCKETS, sizeof(mer_hash_element *));
 	mer_table = malloc(MER_TABLE_BUCKETS * sizeof(mer_hash_element *));
 	for (i=0; i < MER_TABLE_BUCKETS; i++)
 	{
 		mer_table[i] = 0;
 	}
-}
-
-cseq * get_seq_array()
-{
-	return all_seqs;
-}
-
-int get_seq_count()
-{
-	return num_seqs;
-}
-
-void set_seq_array(cseq * array, int size)
-{
-	all_seqs = array;
-	num_seqs = size;
 }
 
 int load_seqs(FILE * input, int seq_count)
@@ -335,7 +304,6 @@ int output_candidates(FILE * file, int format)
 					curr_cand.loc2 = (cle->dir == 1) ? cle->loc2 : all_seqs[cle->cand2].length - cle->loc2 - k;
 					fwrite(&curr_cand, sizeof(struct candidate_s), 1, file);
 				}
-				//printf("%s\t%s\t%d\n", all_seqs[cle->cand1].ext_id, all_seqs[cle->cand2].ext_id, cle->dir);
 				total_output++;
 			}
 			cle = cle->next;
@@ -348,7 +316,6 @@ int output_candidates(FILE * file, int format)
 
 }
 
-
 int compare_cand(const void * pair1, const void * pair2)
 {
 
@@ -357,7 +324,6 @@ int compare_cand(const void * pair1, const void * pair2)
 	int diff = ((candidate_t *) pair1)->cand1 - ((candidate_t *) pair2)->cand1;
 	if (!diff) return ((candidate_t *) pair1)->cand2 - ((candidate_t *) pair2)->cand2;
 	return diff;
-	
 }
 
 int output_candidate_list(FILE * file, candidate_t * list, int total_output, int format)
@@ -439,9 +405,6 @@ void generate_candidates(int verbose_level)
 		{
 			//if (mhe->mer == 1073318718) { fprintf(stderr, "Processing mer %u with count %d:\n", mhe->mer, mhe->count); print_16mer(mhe->mer); }
 			mer_generate_cands(mhe, verbose_level);
-			//if (mhe->count <= MAX_MER_REPEAT) mer_generate_cands(mhe, verbose_level);
-			//else if (verbose_level >= 2) { fprintf(stderr, "Mer %ux was repeated %d times: ", mhe->mer, mhe->count); print_kmer(stderr, mhe->mer); }
-			//else { fprintf(stderr, "Mer %010llx was repeated %d times: ", mhe->mer, mhe->count); print_kmer(stderr, mhe->mer); }
 			old_mhe = mhe;
 			mhe = mhe->next;
 			free(old_mhe);
@@ -457,10 +420,6 @@ void mer_generate_cands(mer_hash_element * mhe, int verbose_level)
 	mer_list_element *head, *curr;
 
 	head = mhe->mle;
-
-	// int debug = 0; //if (mhe->mer == 1073318718) debug = 1;
-
-	//printf("%d sequences\n", mhe->count);
 
 	while (head)
 	{
@@ -524,7 +483,6 @@ mer_t rev_comp_mer(mer_t mer)
 {
 	mer_t new_mer = 0;
 	int i;
-	//if (mer == 0) { fprintf(stderr, "Rev comping (k=%d): ", k); print_kmer(stderr, mer); }
 	for (i = 0; i < k; i++)
 	{
 		// Build new_mer by basically popping off the LSB of mer (mer >> 2)
@@ -544,20 +502,10 @@ void find_all_kmers(int seq_num)
 	int i;
 	int end = all_seqs[seq_num].length - 15;
 
-
-	//seq s = uncompress_seq(all_seqs[seq_num]); printf("Processing sequence %d (%s):\n", seq_num, all_seqs[seq_num].ext_id); print_sequence(stdout, s);
 	for (i = 0; i<end; i+=8)
 	{
 		mer16 = get_kmer(all_seqs[seq_num], i);
-		//printf("Adding to mer (%u): ", mer16); print_16mer(mer16);
 		add_sequence_to_mer(mer16, seq_num, (char) 1, (short) i);
-		//add_sequence_to_mer(rev_comp_mer(mer16), seq_num, (char) -1);
-
-		// Debug stuff
-		//mer_hash_element * mhe = find_mer(mer16);
-		//if (!mhe) { printf("ERROR: found no mhe\n"); }
-		//else if (!mhe->mle) { printf("ERROR: found no mle\n"); }
-		//else { printf("Current sequence: %s, found sequence: %s\n", all_seqs[seq_num].ext_id, all_seqs[mhe->mle->seq_num].ext_id); }
 	}
 }
 
@@ -579,8 +527,6 @@ void find_minimizers(int seq_num, int verbose_level)
 	int index;
 	int j;
 
-	// int debug = 0;
-	//if ((strcmp(SEQ_ID(seq_num), "1101751653708") == 0) || (strcmp(SEQ_ID(seq_num), "1101751885812") == 0))	debug = 1;
 	if (verbose_level >= 1) { fprintf(stderr, "Processing %s\n", all_seqs[seq_num].ext_id); seq s=uncompress_seq(all_seqs[seq_num]); print_sequence(stderr, s); }
 
 	memset(&abs_min,0,sizeof(abs_min));
@@ -594,9 +540,6 @@ void find_minimizers(int seq_num, int verbose_level)
 		rev = rev_comp_mer(mer);
 		mer_val = MER_VALUE(mer);
 		rev_val = MER_VALUE(rev);
-
-		//if (debug) { fprintf(stderr, "Dealing with kmer (%13u): ", mer); print_kmer(stderr, mer); }
-		//if (debug) { fprintf(stderr, "Reverse           (%13u): ", rev); print_kmer(stderr, rev); }
 
 		if (mer_val < rev_val)
 		{
@@ -635,8 +578,6 @@ void find_minimizers(int seq_num, int verbose_level)
 		rev = rev_comp_mer(mer);
 		mer_val = MER_VALUE(mer);
 		rev_val = MER_VALUE(rev);
-		//if (debug) { fprintf(stderr, "Dealing with kmer (%13u): ", mer); print_kmer(stderr, mer); }
-		//if (debug) { fprintf(stderr, "Reverse           (%13u): ", rev); print_kmer(stderr, rev); }
 
 		if (mer_val < rev_val)
 		{
@@ -792,7 +733,6 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer, int verbose_leve
 		}
 
 		// Now, check if the new k-mer is better than the current absolute minimizer.
-		//if (window[index].value < abs_min.value)
 		if (window[index].value < abs_min.value)
 		{
 			// If so, set it as the new absolute minimizer and add this sequence to the mer table
@@ -833,58 +773,6 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer, int verbose_leve
 	// We made it to the end of the sequence without finding a new minimizer, so we are done.
 	return 0;
 }
-
-/*
-void find_minimizers(int seq_num)
-{
-	int i;
-	int end = all_seqs[seq_num].length - k + 1;
-	minimizer min;
-
-	int debug = 0;
-	if ((strcmp(SEQ_ID(seq_num), "1101671397550") == 0) || (strcmp(SEQ_ID(seq_num), "1101854204516") == 0))	debug = 1;
-	if (debug) fprintf(stderr, "Processing %s\n", all_seqs[seq_num].ext_id);
-
-	for (i = 0; i < end; i+= WINDOW_SIZE)
-	{
-		min = get_minimizer(seq_num, i);
-		if (debug) { fprintf(stderr, "Adding minimizer for window [%d, %d] (%u): ", i, i+WINDOW_SIZE-1, min.mer); print_16mer(min.mer); }
-		add_sequence_to_mer(min.mer, seq_num, min.dir);
-	}
-}
-
-minimizer get_minimizer(int seq_num, int window_start)
-{
-	int i;
-	mer_t curr_mer;
-	mer_t curr_mer_val;
-	mer_t min_mer = UINT_MAX;
-	mer_t min_mer_val = UINT_MAX;
-	minimizer min;
-
-
-	for (i = window_start; i < window_start + WINDOW_SIZE; i++)
-	{
-		curr_mer = get_kmer(all_seqs[seq_num], i);
-		curr_mer_val = MER_VALUE(curr_mer);
-		if (curr_mer_val < min_mer_val)
-		{
-			min_mer_val = curr_mer_val;
-			min.mer = curr_mer;
-			min.dir = 1;
-		}
-
-		curr_mer = rev_comp_mer(curr_mer);
-		if (curr_mer_val < min_mer_val)
-		{
-			min_mer_val = curr_mer_val;
-			min.mer = curr_mer;
-			min.dir = -1;
-		}
-	}
-	return min;
-}
-*/
 
 void test_mers()
 {
@@ -930,11 +818,6 @@ mer_t get_kmer(cseq c, int curr)
 			// Mask out everything before which_base
 			curr_mer = c.mers[which_mer] & short_masks[which_base];
 
-			//printf("(1)curr_mer: %hu, mask: %hu, mer : ", curr_mer, short_masks[which_base]); print_8mer(curr_mer);
-			//mer_t test = (((mer_t) curr_mer) & (mer_t) 65535) << 48;
-			//char str[9]; translate_kmer(test , str, 8);
-			//printf("%llu, bases_left: %d, which_base: %d, which_mer: %d, curr_mer: %s\n", test, bases_left, which_base, which_mer, str);
-
 			// Push mer so that there is enough space for curr_mer
 			mer = mer << ( (8-which_base)*2 );
 
@@ -960,11 +843,6 @@ mer_t get_kmer(cseq c, int curr)
 			if ((c.mercount-1) == which_mer) { curr_mer = curr_mer << ((8-(c.length - (8*which_mer)))*2); }
 			curr_mer = (curr_mer >> ((8 - (bases_left+which_base))*2 )) & short_masks[8-bases_left];
 
-			//printf("(2)curr_mer: %hu, mask: %hu, mer : ", curr_mer, short_masks[which_base]); print_8mer(curr_mer);
-			//mer_t test = (((mer_t) c.mers[which_mer]) & (mer_t) 65535) << 48;
-			//char str[9]; translate_kmer(test , str, 8);
-			//printf("%llu, bases_left: %d, which_base: %d, which_mer: %d, curr_mer: %s\n", test, bases_left, which_base, which_mer, str);
-
 			// Now add it on to mer.
 			mer = mer | curr_mer;
 
@@ -973,40 +851,7 @@ mer_t get_kmer(cseq c, int curr)
 			bases_left = 0;
 		}
 	}
-	//printf("DONE!\n");
 	return mer;
-	// NEED TO TEST THIS PART OF THE CODE, DON'T JUST TRY TO RUN THE WHOLE PROGRAM!!!
-/*
-	//fprintf(stdout, "curr: %d, which_mer: %d, which_base: %d\n", curr, which_mer, which_base);
-	unsigned short first_mer = c.mers[which_mer];
-	unsigned short second_mer = c.mers[which_mer+1];
-	unsigned short third_mer = 0;
-	if (which_base > 0)
-	{
-		third_mer = c.mers[which_mer+2];
-	}
-
-	// Move the first base to the MSB and put the MSB of the
-	// second mer in the LSB of the first mer.
-	//fprintf(stdout, "first_mer before: %d\n", first_mer);
-	first_mer = (first_mer << (which_base*2)) | (second_mer >> ((8-which_base)*2));
-	//fprintf(stdout, "first_mer after: %d\n", first_mer);
-
-	// Do the same with the second mer.
-	if (which_mer+2 < c.mercount-1)
-	{
-		//printf(", using method a\n");
-		second_mer = (second_mer << (which_base*2)) | (third_mer >> ((8-which_base)*2));
-	}
-	else
-	{
-		//printf(", using method b\n");
-		second_mer = (second_mer << (which_base*2)) | third_mer;
-	}
-
-	// Return the final value.
-	return ((mer_t)first_mer << 16) | (mer_t)second_mer;	
-*/
 }
 
 void print_8mer(unsigned short mer)
@@ -1016,7 +861,6 @@ void print_8mer(unsigned short mer)
 	for (i=0; i<8; i++)
 	{
 		str[i] = num_to_base((mer >> ((8-1)-i)*2) & 3);
-		//fprintf(stderr, "i:%d, mer >> %i & 3: %d\n", i, (length-1)-i, (mer >> (length-1)-i) & 3);
 	}
 	str[8] = '\0';
 
@@ -1056,7 +900,6 @@ void translate_kmer(mer_t mer, char * str, int length)
 	for (i=0; i<length; i++)
 	{
 		str[i] = num_to_base((mer >> ((length-1)-i)*2) & 3);
-		//fprintf(stderr, "i:%d, mer >> %i & 3: %d\n", i, (length-1)-i, (mer >> (length-1)-i) & 3);
 	}
 	str[length] = '\0';
 }
@@ -1064,29 +907,14 @@ void translate_kmer(mer_t mer, char * str, int length)
 
 void add_sequence_to_mer(mer_t mer, int seq_num, char dir, short loc)
 {
-
 	// Store the sequence and its reverse complement as the same key.
-	//mer_t mer_key;
-	//mer_t rev = rev_comp_mer(mer);
-	//printf("mer: %u, rev: %u, mer_key: %u, dir: %d\n", mer, rev, mer_key, dir);
-	//if (mer < rev) { mer_key = mer; dir = 1; }
-	//else { mer_key = rev; dir = -1; }
 
-	//printf("add_sequence_to_mer %u (%d): ", mer, (int) dir); print_16mer(mer);
-	if (repeat_mer_table && itable_lookup(repeat_mer_table, mer))
-	{
-		//fprintf(stderr, "Filtering out mer %010llx due to high count.\n");
-		return;
-	}
+	if (repeat_mer_table && itable_lookup(repeat_mer_table, mer)) return;
 
 	mer_list_element * mle, * new_mle;
 
 	// This will create it if it doesn't exist.
-	//mer_hash_element * mhe = get_mer_hash_element(mer_key);
 	mer_hash_element * mhe = get_mer_hash_element(mer);
-
-	// Don't deal with mers that are repeated more than MAX_MER_REPEAT times
-	//if (mhe->count > MAX_MER_REPEAT) return; 
 
 	// Check that the list exists.
 	if (!mhe->mle)
@@ -1095,7 +923,6 @@ void add_sequence_to_mer(mer_t mer, int seq_num, char dir, short loc)
 		new_mle = create_mer_list_element(seq_num, dir, loc);
 		mhe->mle = new_mle;
 		mhe->count++;
-		//printf("Just created this mhe, mer has %d sequences\n", mhe->count);
 		return;
 	}
 
@@ -1107,15 +934,10 @@ void add_sequence_to_mer(mer_t mer, int seq_num, char dir, short loc)
 	// if it has ever had this mer before, so we don't add it twice.
 	if (mle->seq_num == seq_num) return;
 
-	// Create a new list element
 	new_mle = create_mer_list_element(seq_num, dir, loc);
-	// Put the front of the list after the new one
 	new_mle->next = mle;
-	// Make the new one the front of the list.
 	mhe->mle = new_mle;
-	// Increment count.
 	mhe->count++;
-	//printf("this mer now has %d sequences\n", mhe->count);
 	
 }
 
@@ -1135,13 +957,10 @@ mer_hash_element * get_mer_hash_element(mer_t mer)
 	int bucket = mer % MER_TABLE_BUCKETS;
 	mer_hash_element * mhe;
 
-	//printf("Calling get_mer_hash_element for %u: ", mer); print_16mer(mer);
-
 	// If there are no hash elements in this bucket
 	// Add a new one.
 	if (!mer_table[bucket])
 	{
-	//printf("Nothing in the bucket, so creating one\n");
 		mhe = malloc(sizeof(*mhe));
 		mhe->mer = mer;
 		mhe->count = 0;
@@ -1154,9 +973,7 @@ mer_hash_element * get_mer_hash_element(mer_t mer)
 	mhe = find_mer(mer);
 
 	// If this bucket is not empty, but does not contain this mer, add it.
-	if (!mhe)
-	{
-		//printf("Found a bucket, but no match\n");
+	if (!mhe) {
 		mer_hash_element * new_mhe = malloc(sizeof(*new_mhe));
 		new_mhe->mer = mer;
 		new_mhe->count = 0;
@@ -1164,10 +981,7 @@ mer_hash_element * get_mer_hash_element(mer_t mer)
 		new_mhe->next = mer_table[bucket];
 		mer_table[bucket] = new_mhe;
 		return new_mhe;
-	}
-	else
-	{
-		//printf("Found a match\n");
+	} else {
 		return mhe;
 	}
 }
@@ -1180,7 +994,6 @@ mer_hash_element * find_mer(mer_t mer)
 
 	while (mhe)
 	{
-		//printf("find_mer: mhe->mer: %u\n", mhe->mer);
 		if (mhe->mer == mer) { return mhe; }
 		mhe = mhe->next;
 	}
@@ -1274,27 +1087,16 @@ void load_mer_table_subset(int verbose_level, int curr_col, int end_col, int cur
 	// on a given rectangle, defined by curr_rect_x, curr_rect_y and rectangle_size.
 	// Load the mers in each of these sequences, then we'll output any matches.
 
-	//printf("Set 1:\n");
 	for ( ;	curr_col < end_col; curr_col++ )
 	{
-		//printf(" %s\n", all_seqs[curr_col].ext_id);
-		//find_all_kmers(curr_col);
-		// Ignore any sequences named "dummyX". These are there to make the matrix square.
-		//if (strncmp(all_seqs[curr_col].ext_id, "dummy", 5) == 0) { continue; }
 		find_minimizers(curr_col, verbose_level);
 	}
 
-	// If we are on the diagonal, don't need to add both, because they are
-	// the same.
+	// If we are on the diagonal, don't need to add both, because they are the same.
 	if (is_same_rect) { return; }
 
-	//printf("Set 2\n");
 	for ( ;	curr_row < end_row; curr_row++ )
 	{
-		//printf(" %s\n", all_seqs[curr_col].ext_id);
-		//find_all_kmers(curr_row);
-		// Ignore any sequences named "dummyX". These are there to make the matrix square.
-		//if (strncmp(all_seqs[curr_row].ext_id, "dummy", 5) == 0) { continue; }
 		find_minimizers(curr_row, verbose_level);
 	}
 }
@@ -1339,15 +1141,12 @@ int should_compare_cands(int c1, int c2)
 
 void add_candidate(int seq, int cand, char dir, mer_t min, short loc1, short loc2)
 {
-	//printf("Adding cand %s %s %d\n%d: %d %d; %d: %d %d\n", all_seqs[seq].ext_id, all_seqs[cand].ext_id, dir, seq, is_x(seq), is_y(seq), cand, is_x(cand), is_y(cand));
 	// Unless this is a diagonal, ones from the same block have already been compared.
 	// If I don't do this step, then ones from the same block on the same axis
 	// could get compared, because we don't really distinguish them.
 	int debug = 0; //if (min == 1073318718) { debug = 1; fprintf(stderr, "adding candidate %s %s %d\n",all_seqs[seq].ext_id, all_seqs[cand].ext_id, dir); }
 
-	//if ( (curr_rect_x != curr_rect_y) && ( (is_x(seq) && is_x(cand)) || (is_y(seq) && is_y(cand)) ) ) { return; }
 	if (!should_compare_cands(seq, cand)) return;
-	//printf("Added it!\n");
 
 	if (debug) fprintf(stderr, "OK\n");
 	int index = (seq*cand*499);
@@ -1358,21 +1157,9 @@ void add_candidate(int seq, int cand, char dir, mer_t min, short loc1, short loc
 	// There are no candidate pairs in this bucket
 	if (!cle)
 	{
-		/*
-		cand_list_element * new_cle = malloc(sizeof(*new_cle));
-		new_cle->cand1 = seq;
-		new_cle->cand2 = cand;
-		new_cle->dir = dir;
-		new_cle->next = 0;
-		new_cle->count = 1;
-		new_cle->loc1 = loc1;
-		new_cle->loc2 = loc2;
-		*/
 		candidates[index] = create_new_cle(seq, cand, dir, loc1, loc2);
 
 		total_cand++;
-		//printf("{OVL\nafr:%s\nbfr:%s\nori:%c\nolt:D\nahg:0\nbhg:0\nqua:0.000000\nmno:0\nmxo:0\npct:0\n}\n", all_seqs[seq].ext_id, all_seqs[cand].ext_id, (dir == 1) ? 'N' : 'I');
-	//printf("%s\t%s\t%d\t", all_seqs[seq].ext_id, all_seqs[cand].ext_id, dir); print_16mer(min);
 		return;
 	}
 
@@ -1394,21 +1181,10 @@ void add_candidate(int seq, int cand, char dir, mer_t min, short loc1, short loc
 	}
 
 	// If we made it this far, we did not find this candidate pair, so add it.
-	/*
-	cand_list_element * new_cle = malloc(sizeof(*new_cle));
-	new_cle->cand1 = seq;
-	new_cle->cand2 = cand;
-	new_cle->dir = dir;
-	new_cle->count = 1;
-	new_cle->loc1 = loc1;
-	new_cle->loc2 = loc2;
-	*/
 	cand_list_element * new_cle = create_new_cle(seq, cand, dir, loc1, loc2);
 	new_cle->next = candidates[index];
 	candidates[index] = new_cle;
 	total_cand++;
-	//printf("{OVL\nafr:%s\nbfr:%s\nori:%c\nolt:D\nahg:0\nbhg:0\nqua:0.000000\nmno:0\nmxo:0\npct:0\n}\n", all_seqs[seq].ext_id, all_seqs[cand].ext_id, (dir == 1) ? 'N' : 'I');
-	//printf("%s\t%s\t%d\t", all_seqs[seq].ext_id, all_seqs[cand].ext_id, dir); print_16mer(min);
 	return;
 
 }
@@ -1449,14 +1225,8 @@ unsigned long get_mem_usage()
 	fscanf(stat, "%d", &pid);
 	fclose(stat);
 	sprintf(cmd, "ps -p %d -o rss | tail -1", pid);
-	//printf("cmd: %s\n", cmd);
 	FILE *fp = popen(cmd, "r");
-	//fgets(line, 512, fp);
-	//printf(line);
-	//fgets(line, 512, fp);
-	//printf(line);
 	fscanf(fp, "%d\n", &rss);
-	//printf("rss: %d\n", rss);
 	pclose(fp);
 	return rss;
 }

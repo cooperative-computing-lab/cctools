@@ -20,7 +20,6 @@ See the file COPYING for details.
 extern int rectangle_size;
 extern int curr_rect_x;
 extern int curr_rect_y;
-extern int start_time;
 extern int MER_TABLE_BUCKETS;
 extern int CAND_TABLE_BUCKETS;
 int num_seqs;
@@ -32,6 +31,7 @@ static int output_format = CANDIDATE_FORMAT_LINE;
 static int verbose_level = 0;
 static char end_char = 0;
 static unsigned long max_mem_kb = ULONG_MAX;
+static time_t start_time;
 
 static char * repeat_filename = 0;
 static char * sequence_filename = 0;
@@ -54,7 +54,7 @@ static void show_help(const char *cmd)
 	printf("                the size dynamically by passing in d rather than a number.\n");
 	printf(" -r <file>      A meryl file of repeat mers to be filtered out.\n");
 	printf(" -k <number>    The k-mer size to use in candidate selection (default is 22).\n");
-	printf(" -w <number>    The minimizer window size to use in candidate selection (default is 22).\n");
+7	printf(" -w <number>    The minimizer window size to use in candidate selection (default is 22).\n");
 	printf(" -o <filename>  The output file. Default is stdout.\n");
 	printf(" -b             Return output as binary (default is ASCII).\n");
 	printf(" -f <character> The character that will be printed at the end of the file.\n");
@@ -213,13 +213,13 @@ int main(int argc, char ** argv)
 	}
 	fclose(input);
 	if (verbose_level > -1) fprintf(stderr, "%6lds : Loaded %d sequences\n", TIME, num_seqs);
-	//printf("Hit enter to continue.\n"); scanf("%*c");
 
 	MER_TABLE_BUCKETS = num_seqs*5;
 	CAND_TABLE_BUCKETS = num_seqs*5;
+
 	init_cand_table();
 	init_mer_table();
-	//printf("Hit enter to continue.\n"); scanf("%*c");
+
 	if (repeats)
 	{
 		int repeat_count = init_repeat_mer_table(repeats, 2000000, 0);
@@ -234,30 +234,18 @@ int main(int argc, char ** argv)
 		if (verbose_level > -1) fprintf(stderr, "%6lds : Mem avail: %lu, rectangle size: %d\n", TIME, (unsigned long) MEMORY_FOR_MERS(max_mem_kb), rectangle_size);
 	}
 
-	// Testing out mer generation.
-	//test_mers();
-	//exit(0);
-
-	//curr_rect_x = 0;
-	//curr_rect_y = 1;
 	int curr_start_x = start_x;
 	int curr_start_y = start_y;
 
 	candidate_t * output_list = 0;
 	int num_in_list;
 
-	//while (curr_start_y < num_seqs)
-	//{
-	//	while (curr_start_x < num_seqs)
-	//	{
-	// MAIN LOOP
 	while (curr_start_y < end_y)
 	{
 		while (curr_start_x < end_x)
 		{
 			if ((start_x == start_y) && (verbose_level > -1)) fprintf(stderr, "%6lds : Loading mer table (%d,%d)\n", TIME, curr_rect_x, curr_rect_y);
 			else if (verbose_level > -1) fprintf(stderr, "%6lds : Loading mer table for [%d,%d) and [%d,%d)\n", TIME, curr_start_x, MIN(curr_start_x+rectangle_size, end_x), curr_start_y, MIN(curr_start_y+rectangle_size, end_y));
-			//load_mer_table(0);
 			start_mem = get_mem_usage();
 			load_mer_table_subset(verbose_level, curr_start_x, MIN(curr_start_x+rectangle_size, end_x), curr_start_y, MIN(curr_start_y+rectangle_size, end_y), (curr_start_x == curr_start_y));
 			table_mem = get_mem_usage();
@@ -268,9 +256,7 @@ int main(int argc, char ** argv)
 			if (verbose_level > -1) fprintf(stderr, "%6lds : Total candidates generated: %llu\n", TIME, (long long unsigned int) total_cand);
 			output_list = retrieve_candidates(&num_in_list);
 			output_candidate_list(output, output_list, num_in_list, output_format);
-			//if (verbose_level > -1) fprintf(stderr, "%6lds : Memory used: %lu\n", TIME, cand_mem - table_mem);
 			free(output_list);
-			//output_candidates(output, output_format);
 			fflush(output);
 			if (verbose_level > -1) fprintf(stderr, "%6lds : Now freeing\n", TIME);
 			free_cand_table();
