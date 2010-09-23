@@ -46,6 +46,7 @@ seq uncompress_seq(cseq m);
 void free_cseq(cseq m);
 void print_cseq(FILE * file, cseq c);
 cseq get_next_cseq(FILE * file);
+seq  get_next_seq(FILE *file);
 void cseq_file_reset();
 void translate_to_str(int mer, char * str, int length);
 size_t cseq_size(cseq c);

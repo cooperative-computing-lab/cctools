@@ -260,6 +260,12 @@ void print_hex_mers(FILE * file, cseq c)
 	fprintf(file, "\n");
 }
 
+seq get_next_seq(FILE * input)
+{
+	cseq c = get_next_cseq(input);
+	return uncompress_seq(c);
+}
+
 cseq get_next_cseq(FILE * file)
 {
 	int total;
