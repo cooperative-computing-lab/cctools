@@ -9,7 +9,7 @@ See the file COPYING for details.
 #include <math.h>
 
 #include "int_sizes.h"
-#include "sequence_alignment.h"
+#include "align.h"
 #include "sequence_compression.h"
 
 #define TIME time(0) - start_time

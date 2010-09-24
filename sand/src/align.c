@@ -10,15 +10,12 @@ See the file COPYING for details.
 #include <ctype.h>
 #include <limits.h>
 
-#include "sequence_alignment.h"
+#include "align.h"
 
 #define TB_LEFT -1
 #define TB_UP 1
 #define TB_DIAG 0
 #define TB_END 2
-
-#define MAX_ID 100
-#define MAX_METADATA 100
 
 #define INIT_PREFIX_SUFFIX 0
 #define INIT_SW 1
@@ -26,6 +23,14 @@ See the file COPYING for details.
 #define CHECK_UP   1
 #define CHECK_DIAG 2
 #define CHECK_LEFT 4
+
+struct s_cell
+{
+	int score;
+	int tb;
+};
+
+typedef struct s_cell cell;
 
 static int score_mismatch = 1;
 static int score_match_open = 0;
@@ -35,65 +40,23 @@ static int score_gap_extend = 1;
 
 static cell new_score(cell ** matrix, int i, int j, const char * str1, const char * str2);
 static cell new_score_gap_extensions(cell ** matrix, int i, int j, const char * str1, const char * str2);
-static cell new_score_maximize(cell ** matrix, int i, int j, const char * str1, const char * str2);
 static cell new_score_banded(cell ** band, int band_row, int band_col, int matrix_row, int matrix_col, const char * str1, const char * str2, int which);
 static void choose_best(cell ** matrix, int * i, int * j, int length1, int length2, int min_align);
-static delta generate_traceback(cell ** matrix, int i, int j, int length1, int length2, int min_score);
-static void process_string(char * str);
-static void seq_cat(seq * sequence, char * new_str);
-static cell ** init_matrix(int length1, int length2, int type);
-static void free_matrix(cell ** matrix, int length2);
+
+static delta align_traceback(cell ** matrix, int i, int j, int length1, int length2, int min_score);
+
+static cell ** matrix_init(int length1, int length2, int type);
+static void matrix_free(cell ** matrix, int length2);
 static int get_last_simple_row(int diag, int k, int length1, int length2);
 
-delta local_align(const char * str1, const char * str2)
-{
-	int length1 = strlen(str1);
-	int length2 = strlen(str2);
-	int i,j;
-	delta tb;
-	int best_i, best_j, best_score;
-
-	cell ** matrix = init_matrix(length1, length2, INIT_PREFIX_SUFFIX);
-
-	best_i = 0;
-	best_j = 0;
-	best_score = 0;
-	for (i=1; i<=length1; i++)
-	{
-		for (j=1; j<=length2; j++)
-		{
-			//matrix[j][i] = new_score(matrix, i, j, str1, str2);
-			matrix[j][i] = new_score_maximize(matrix, i, j, str1, str2);
-			if (matrix[j][i].score < 0)
-			{
-				matrix[j][i].score = 0;
-			}
-			if (matrix[j][i].score >= best_score)
-			{
-				best_score = matrix[j][i].score;
-				best_i = i;
-				best_j = j;
-			}
-		}
-	}
-
-
-	tb = generate_traceback(matrix, best_i, best_j, length1, length2, 0);
-
-	fflush(stdout);
-	free_matrix(matrix, length2);
-
-	return tb;
-}
-
-delta sw_align(const char * str1, const char * str2)
+delta align_smith_waterman( const char * str1, const char * str2 )
 {
 	int length1 = strlen(str1);
 	int length2 = strlen(str2);
 	int i,j;
 	delta tb;
 
-	cell ** matrix = init_matrix(length1, length2, INIT_SW);
+	cell ** matrix = matrix_init(length1, length2, INIT_SW);
 
 	for (i=1; i<=length1; i++)
 	{
@@ -103,28 +66,26 @@ delta sw_align(const char * str1, const char * str2)
 		}
 	}
 
-	tb = generate_traceback(matrix, length1, length2, length1, length2, INT_MIN);
+	tb = align_traceback(matrix, length1, length2, length1, length2, INT_MIN);
 
-	fflush(stdout);
-	free_matrix(matrix, length2);
+	matrix_free(matrix, length2);
 
 	return tb;
 }
 
-delta prefix_suffix_align(const char * str1, const char * str2, int min_align)
+delta align_prefix_suffix(const char * str1, const char * str2, int min_align)
 {
 	int length1 = strlen(str1);
 	int length2 = strlen(str2);
 	int i,j;
 	delta tb;
 
-	cell ** matrix = init_matrix(length1, length2, INIT_PREFIX_SUFFIX);
+	cell ** matrix = matrix_init(length1, length2, INIT_PREFIX_SUFFIX);
 	for (i=1; i<=length1; i++)
 	{
 		for (j=1; j<=length2; j++)
 		{
 			matrix[j][i] = new_score(matrix, i, j, str1, str2);
-			//matrix[j][i] = new_score_gap_extensions(matrix, i, j, str1, str2);
 		}
 	}
 
@@ -132,9 +93,9 @@ delta prefix_suffix_align(const char * str1, const char * str2, int min_align)
 	int best_j=0;
 	choose_best(matrix, &best_i, &best_j, length1, length2, min_align);
 
-	tb = generate_traceback(matrix, best_i, best_j, length1, length2, INT_MIN);
+	tb = align_traceback(matrix, best_i, best_j, length1, length2, INT_MIN);
 
-	free_matrix(matrix, length2);
+	matrix_free(matrix, length2);
 
 	return tb;
 }
@@ -182,7 +143,6 @@ static int start_band_left(cell ** band, int k, const char * str1, int start1, c
 	// than k+1 cells.
 	for (band_col = band_first_col; band_col < width; band_col++)
 	{
-		//fprintf(stderr, "Calculating band[%d][%d] (x)\n", band_row, band_col);
 		band[band_row][band_col].score = 0;
 		band[band_row][band_col].tb = TB_END;
 	}
@@ -203,7 +163,6 @@ static int start_band_left(cell ** band, int k, const char * str1, int start1, c
 		// For all but the last column, look at all three recursions.
 		for (band_col = band_first_col+1; band_col < (width-1); band_col++)
 		{
-			//fprintf(stderr, "Calculating band[%d][%d] (b)\n", band_row, band_col);
 			band[band_row][band_col] = new_score_banded(band, band_row, band_col, matrix_row, matrix_col, str1, str2, CHECK_UP | CHECK_LEFT | CHECK_DIAG);
 			matrix_col++;
 		}
@@ -257,9 +216,7 @@ static int get_last_simple_row(int diag, int k, int length1, int length2)
 	// If the right border of the band intersects with the right
 	// side of the matrix below the last row, then just stop
 	// at the last row. Otherwise stop where it intersects.
-	//fprintf(stderr, "right_side_intersect_row: %d, length2: %d\n", right_side_intersect_row, length2);
 	return MIN(right_side_intersect_row, length2);
-
 }
 
 static void choose_best_banded(cell ** band, int * best_row_ret, int * best_col_ret, int length1, int length2, int k, int band_row, int cols_in_last_row, int rows_in_last_col)
@@ -298,7 +255,7 @@ static void choose_best_banded(cell ** band, int * best_row_ret, int * best_col_
 	*best_col_ret = best_col;
 }
 
-static delta generate_traceback_banded(cell ** band, int best_row, int best_col, int length1, int length2, int k, int diag)
+static delta align_traceback_banded(cell ** band, int best_row, int best_col, int length1, int length2, int k, int diag)
 {
 	delta tb;
 	int band_row, band_col, curr_tb_type, count;
@@ -396,7 +353,7 @@ static delta generate_traceback_banded(cell ** band, int best_row, int best_col,
 	return tb;
 }
 
-delta banded_prefix_suffix(const char * str1, const char * str2, int start1, int start2, int k)
+delta align_banded(const char * str1, const char * str2, int start1, int start2, int k)
 {
 	int length1 = strlen(str1);
 	int length2 = strlen(str2);
@@ -422,7 +379,7 @@ delta banded_prefix_suffix(const char * str1, const char * str2, int start1, int
 		start2 = 0;
 	}
 
-	cell ** band = init_matrix(width, lastrow, INIT_PREFIX_SUFFIX);
+	cell ** band = matrix_init(width, lastrow, INIT_PREFIX_SUFFIX);
 
 	int diag = start1 - start2;
 	int last_col_which = CHECK_DIAG | CHECK_LEFT;
@@ -447,7 +404,6 @@ delta banded_prefix_suffix(const char * str1, const char * str2, int start1, int
 		// All but the last check all three recursions
 		for (band_col = 1; band_col < last_col-1; band_col++)
 		{
-			//fprintf(stderr, "calculating band[%d][%d] (b)\n", band_row, band_col);
 			band[band_row][band_col] = new_score_banded(band, band_row, band_col, matrix_row, matrix_col, str1, str2, CHECK_LEFT | CHECK_DIAG | CHECK_UP);
 			matrix_col++;
 		}
@@ -470,7 +426,7 @@ delta banded_prefix_suffix(const char * str1, const char * str2, int start1, int
 	int best_row, best_col;
 
 	choose_best_banded(band, &best_row, &best_col, length1, length2, k, band_row-1, last_col, width-last_col-1 );
-	tb = generate_traceback_banded(band, best_row, best_col, length1, length2, k, diag);
+	tb = align_traceback_banded(band, best_row, best_col, length1, length2, k, diag);
 
 	// Free the banded matrix.
 	int j;
@@ -485,7 +441,7 @@ delta banded_prefix_suffix(const char * str1, const char * str2, int start1, int
 }
 
 
-cell ** init_matrix(int length1, int length2, int type)
+cell ** matrix_init(int length1, int length2, int type)
 {
 	int i, j;
 
@@ -538,7 +494,7 @@ cell ** init_matrix(int length1, int length2, int type)
 }
 
 
-void free_matrix(cell ** matrix, int length2)
+void matrix_free(cell ** matrix, int length2)
 {
 	int j;
 
@@ -552,7 +508,7 @@ void free_matrix(cell ** matrix, int length2)
 	free(matrix);
 }
 
-cell new_score(cell ** matrix, int i, int j, const char * str1, const char * str2)
+static cell new_score(cell ** matrix, int i, int j, const char * str1, const char * str2)
 {
 	cell min;
 	int incr;
@@ -583,7 +539,7 @@ cell new_score(cell ** matrix, int i, int j, const char * str1, const char * str
 	return min;
 }
 
-cell new_score_gap_extensions(cell ** matrix, int i, int j, const char * str1, const char * str2)
+static cell new_score_gap_extensions(cell ** matrix, int i, int j, const char * str1, const char * str2)
 {
 	cell min;
 	int incr;
@@ -637,61 +593,7 @@ cell new_score_gap_extensions(cell ** matrix, int i, int j, const char * str1, c
 Assumes we are trying to maximize the score rather than
 minimize it.  Used for local alignment.
 */
-cell new_score_maximize(cell ** matrix, int i, int j, const char * str1, const char * str2)
-{
-	cell max;
-	int incr;
-
-	memset(&max,0,sizeof(max));
-
-	// If this is a gap extension, don't increase the score.
-	// If it's a gap open, increase the score.
-	incr = (matrix[j-1][i].tb == TB_UP) ? score_gap_extend : score_gap_open;
-	if (matrix[j-1][i].score+incr >= max.score)
-	{
-		max.score = matrix[j-1][i].score+incr;
-		max.tb = TB_UP;
-	}
-
-	// If this is a gap extension, don't increase the score.
-	// If it's a gap open, increase the score.
-	incr = (matrix[j][i-1].tb == TB_LEFT) ? score_gap_extend : score_gap_open;
-	if (matrix[j][i-1].score+incr >= max.score)
-	{
-		max.score = matrix[j][i-1].score+incr;
-		max.tb = TB_LEFT;
-	}
-
-	if (str1[i-1] == str2[j-1])
-	{
-		if ((matrix[j-1][i-1].tb == TB_DIAG) && (str1[i-1] == str2[j-1]))
-		{
-			incr = score_match_extend;
-		}
-		else
-		{
-			incr = score_match_open;
-		}
-	}
-	else
-	{
-		incr = score_mismatch;
-	}
-	if (matrix[j-1][i-1].score + incr >= max.score)
-	{
-		max.score = matrix[j-1][i-1].score + incr;
-		max.tb = TB_DIAG;
-	}
-
-	return max;
-}
-
-
-/*
-Assumes we are trying to maximize the score rather than
-minimize it.  Used for local alignment.
-*/
-cell new_score_banded(cell ** band, int band_row, int band_col, int matrix_row, int matrix_col, const char * str1, const char * str2, int which)
+static cell new_score_banded(cell ** band, int band_row, int band_col, int matrix_row, int matrix_col, const char * str1, const char * str2, int which)
 {
 	cell min, recurrence;
 	int incr;
@@ -754,13 +656,7 @@ cell new_score_banded(cell ** band, int band_row, int band_col, int matrix_row, 
 	return min;
 }
 
-int min(int i, int j)
-{
-	if (i < j) { return i; }
-	else { return j; }
-}
-
-void choose_best(cell ** matrix, int * best_i, int * best_j, int length1, int length2, int min_align)
+static void choose_best(cell ** matrix, int * best_i, int * best_j, int length1, int length2, int min_align)
 {
 	int i, j;
 	float quality;
@@ -770,7 +666,7 @@ void choose_best(cell ** matrix, int * best_i, int * best_j, int length1, int le
 	// Find the best in the last column
 	for (i=length1, j=min_align; j <= length2; j++)
 	{
-		quality = ((float) matrix[j][i].score) / (float)min(i, j);
+		quality = ((float) matrix[j][i].score) / (float)MIN(i, j);
 		if (quality < min_qual)
 		{
 			min_qual = quality;
@@ -782,7 +678,7 @@ void choose_best(cell ** matrix, int * best_i, int * best_j, int length1, int le
 	// Find the best in the last row
 	for (i=min_align, j=length2; i <= length1; i++)
 	{
-		quality = ((float) matrix[j][i].score) / (float)min(i, j);
+		quality = ((float) matrix[j][i].score) / (float)MIN(i, j);
 		if (quality < min_qual)
 		{
 			min_qual = quality;
@@ -792,7 +688,7 @@ void choose_best(cell ** matrix, int * best_i, int * best_j, int length1, int le
 	}
 }
 
-delta generate_traceback(cell ** matrix, int i, int j, int length1, int length2, int min_score)
+static delta align_traceback(cell ** matrix, int i, int j, int length1, int length2, int min_score)
 {
 	delta tb;
 	int curr_i, curr_j, curr_gap_type, count;
@@ -884,7 +780,7 @@ delta generate_traceback(cell ** matrix, int i, int j, int length1, int length2,
 	tb.length2 = length2;
 	tb.score = matrix[j][i].score;
 	tb.total_score = tb.score + (length1 - i) + curr_i + (length2 - j) + curr_j;
-	tb.quality = (float)(tb.gap_count + tb.mismatch_count) / (float) min(i, j);
+	tb.quality = (float)(tb.gap_count + tb.mismatch_count) / (float) MIN(i, j);
 	
 	return tb;
 }
@@ -892,93 +788,12 @@ delta generate_traceback(cell ** matrix, int i, int j, int length1, int length2,
 // Find the maximum alignment length given the lengths and the start
 // positions of the exact match. Assume the start position has already
 // been corrected for distance.
-int max_alignment_length(int length1, int length2, int start1, int start2)
+int align_max(int length1, int length2, int start1, int start2)
 {
 	return MIN(start1, start2) + MIN(length1 - start1, length2 - start2);
 }
 
-void print_delta(FILE * file, delta tb, const char * id1, const char * id2)
-{
-	int i, start2, end2;
-	if (tb.ori == 'N')
-	{
-		start2 = tb.start2;
-		end2 = tb.end2;
-	}
-	else
-	{
-		start2 = tb.end2;
-		end2 = tb.start2;
-	}
-	fprintf(file, ">%s %s %d %d\n%d %d %d %d %d %d %d %d\n", id1, id2, tb.length1, tb.length2, tb.start1, tb.end1, start2, end2, tb.mismatch_count, tb.gap_count, tb.score, tb.total_score);
-
-	for(i=0; i<tb.gap_count; i++)
-	{
-		fprintf(file, "%d\n", tb.tb[i]);
-	}
-	fprintf(file, "0\n");
-}
-
-void print_OVL_message(FILE * file, delta tb, const char * id1, const char * id2)
-{
-	int ahg, bhg;
-	char olt;
-
-	fprintf(file, "{OVL\n");
-
-	// IDs of overlapping fragments.
-	fprintf(file, "afr:%s\n", id1);
-	fprintf(file, "bfr:%s\n", id2);
-
-	// Orientation
-	fprintf(file, "ori:%c\n", tb.ori);
-
-	ahg = tb.start1 - tb.start2;
-	bhg = (tb.length2-1) - tb.end2;
-	if (bhg == 0) { bhg = tb.end1 - tb.length1; }
-
-	// If ahg and bhg are of opposite signs, then it's a containment.
-	// If they are the same sign, it's a dovetail.
-	if (ahg*bhg < 0) { olt = 'C'; }
-	else { olt = 'D'; }
-	fprintf(file, "olt:D\n");  // Always put D to mimic Celera more closely.
-
-	// How much each piece hangs off the end. Not sure what to do
-	// for containment overlaps, or really what this means at all.
-	fprintf(file, "ahg:%d\n", ahg);
-	fprintf(file, "bhg:%d\n", bhg);
-
-	// Again, need to do more work to see how quality is computed.
-	// For now just making something up.
-	// As far as I can tell, Celera defines the quality score as
-	// (gaps + mismatches) / min(end1, end2)
-	fprintf(file, "qua:%f\n", tb.quality);
-
-	// This seems to be pretty much meaningless in Celera, so leaving it as 0.
-	// Scratch that, set it to the length of the overlap.
-	fprintf(file, "mno:%d\n", min(tb.end1 - tb.start1, tb.end2 - tb.start2));
-	fprintf(file, "mxo:%d\n", tb.score);
-
-	// Polymorphism count.
-	//fprintf(file, "pct:%d\n", tb.mismatch_count);
-	fprintf(file, "pct:0\n");  // Again, try to match Celera
-
-	fprintf(file, "}\n");
-}
-
-void print_OVL_envelope_start(FILE * file)
-{
-    fprintf(file, "[\n");
-}
-
-void print_OVL_envelope_end(FILE * file)
-{
-    fprintf(file, "]\n");
-}
-
-int abs(int i) { return (i >= 0) ? i : -i; }
-
-void print_local(FILE * file, const char * str1, const char * str2, delta tb, int line_width)
+void delta_print_local(FILE * file, const char * str1, const char * str2, delta tb, int line_width)
 {
 	int curr1, curr2, curr, a_curr1, a_curr2;
 	char a_str1[MAX_STRING];
@@ -1046,7 +861,7 @@ void print_local(FILE * file, const char * str1, const char * str2, delta tb, in
 	int count_since_last_gap = 1, curr_gap = 0;
 	while (curr_gap < tb.gap_count)
 	{
-		if (count_since_last_gap < abs(tb.tb[curr_gap]))
+		if (count_since_last_gap < ABS(tb.tb[curr_gap]))
 		{
 			a_str1[curr] = str1[curr1++];
 			a_str2[curr] = str2[curr2++];
@@ -1129,7 +944,7 @@ void print_local(FILE * file, const char * str1, const char * str2, delta tb, in
 
 }
 
-void print_alignment(FILE * file, const char * str1, const char * str2, delta tb, int line_width)
+void delta_print_alignment( FILE * file, const char * str1, const char * str2, delta tb, int line_width )
 {
 	int curr1, curr2, curr, a_curr1, a_curr2;
 	char a_str1[MAX_STRING];
@@ -1170,7 +985,7 @@ void print_alignment(FILE * file, const char * str1, const char * str2, delta tb
 	int count_since_last_gap = 1, curr_gap = 0;
 	while (curr_gap < tb.gap_count)
 	{
-		if (count_since_last_gap < abs(tb.tb[curr_gap]))
+		if (count_since_last_gap < ABS(tb.tb[curr_gap]))
 		{
 			a_str1[curr] = str1[curr1++];
 			a_str2[curr] = str2[curr2++];
@@ -1231,457 +1046,9 @@ void print_alignment(FILE * file, const char * str1, const char * str2, delta tb
 			j=0;
 		}
 	}
-	//fprintf(file, "%s|\n%s|\n", a_str1, a_str2);
 }
 
-char arrow(cell ** matrix, int i, int j)
-{
-	if (matrix[j][i].tb == TB_LEFT) { return '-'; }
-	if (matrix[j][i].tb == TB_DIAG) { return '*'; }
-	if (matrix[j][i].tb == TB_UP) { return '^'; }
-	return 'x';
-}
-
-int print_band_left(FILE * file, cell ** band, int k, const char * str1, int start1, const char * str2, int start2, int * matrix_row_ret, int * matrix_col_ret)
-{
-	int i;
-	int band_row = 0;
-	int matrix_row=0;
-	int first_full_row=0;
-	int width = (2*k)+1;
-	int band_col;
-	int band_first_col=0;
-
-	int diag = start1 - start2;
-
-	if (diag <= -k) // left side, no corner
-	{
-		matrix_row = start2 - k;
-		first_full_row = (2*k)+1;
-		band_first_col = width-1;
-	} 
-	else if (diag < 0) // left side on the corner.
-	{
-		matrix_row = 0;
-		first_full_row = start2+k+1;
-		band_first_col = width - (k-start2+1);
-	}
-	else if (diag < k) // right side on the corner
-	{
-		matrix_row = 0;
-		first_full_row = k - start1+1;
-		band_first_col = width - (k+start1+1);
-	}
-
-	// Print any empty rows before the band actually starts.
-	for (i=0; i<matrix_row; i++)
-	{
-		if (i == 0)
-		{
-			fprintf(file, "  X | \n");
-		}
-		else
-		{
-			fprintf(file, "  %c | \n", str2[i-1]);
-		}
-	}
-	while (band_row < first_full_row)
-	{
-		if (matrix_row == 0)
-		{
-			fprintf(file, "  X | ");
-		}
-		else
-		{
-			fprintf(file, "  %c | ", str2[matrix_row-1]);
-		}
-
-		for (band_col = band_first_col; band_col < width; band_col++)
-		{
-			fprintf(file, "%c %3d | ", arrow(band, band_col, band_row), band[band_row][band_col].score);
-			//fprintf(file, "%2d %3d| ", band_col, matrix_col);
-			//fprintf(file, "%2d %3d| ", band_row, band_col);
-		}
-		fprintf(file, " %d %d\n", band_row, matrix_row);
-		// Now, increment everything
-		band_row++;
-		matrix_row++;
-		band_first_col--;
-	}
-
-	// We actually filled out the first full row, but don't tell
-	// the rest of the code that. The reason is so that the rest
-	// of the code doesn't have to care about making sure the
-	// first column is set to 0.
-	*matrix_row_ret = matrix_row;
-	*matrix_col_ret = 1;
-	return first_full_row;
-	
-}
-
-int print_band_lower(FILE * file, cell ** band, int k, const char * str1, int start1, const char * str2, int start2, int * matrix_row_ret, int * matrix_col_ret)
-{
-	int i;
-	int band_row = 0;
-	int matrix_row = start2 - k;
-	int first_full_row = (2*k)+1;
-	int width = (2*k)+1;
-
-	// In the first row, the first (and only) column populated
-	// is the last one, but this is actually the first column
-	// in the DP matrix.
-	int band_first_col = width-1;
-	int band_col;
-
-	for (i=0; i<matrix_row; i++)
-	{
-		if (i == 0)
-		{
-			fprintf(file, "  X | \n");
-		}
-		else
-		{
-			fprintf(file, "  %c | \n", str2[i-1]);
-		}
-	}
-	while (band_row < first_full_row)
-	{
-		if (matrix_row == 0)
-		{
-			fprintf(file, "  X | ");
-		}
-		else
-		{
-			fprintf(file, "  %c | ", str2[matrix_row-1]);
-		}
-
-		for (band_col = band_first_col; band_col < width; band_col++)
-		{
-			fprintf(file, "%c %3d | ", arrow(band, band_col, band_row), band[band_row][band_col].score);
-			//fprintf(file, "%2d %3d| ", band_col, matrix_col);
-			//fprintf(file, "%2d %3d| ", band_row, band_col);
-		}
-		fprintf(file, " %d %d\n", band_row, matrix_row);
-		// Now, increment everything
-		band_row++;
-		matrix_row++;
-		band_first_col--;
-	}
-
-	// We actually filled out the first full row, but don't tell
-	// the rest of the code that. The reason is so that the rest
-	// of the code doesn't have to care about making sure the
-	// first column is set to 0.
-	*matrix_row_ret = matrix_row;
-	*matrix_col_ret = 1;
-	return first_full_row;
-}
-
-int print_band_low_corner(FILE * file, cell ** band, int k, const char * str1, int start1, const char * str2, int start2, int * matrix_row_ret, int * matrix_col_ret)
-{
-	int band_row = 0;
-	int matrix_row = 0;
-	int first_full_row = start2+k+1;
-	int width = (2*k)+1;
-	int band_col;
-
-	int band_first_col = width - (k-start2+1);
-
-	while (band_row < first_full_row)
-	{
-		if (matrix_row == 0)
-		{
-			fprintf(file, "  X | ");
-		}
-		else
-		{
-			fprintf(file, "  %c | ", str2[matrix_row-1]);
-		}
-
-		// print out the row from 
-
-		for (band_col = band_first_col; band_col < width; band_col++)
-		{
-			fprintf(file, "%c %3d | ", arrow(band, band_col, band_row), band[band_row][band_col].score);
-			//fprintf(file, "%2d %3d| ", band_col, matrix_col);
-			//fprintf(file, "%2d %3d| ", band_row, band_col);
-		}
-		fprintf(file, " %d %d\n", band_row, matrix_row);
-		// Now, increment everything
-		band_row++;
-		matrix_row++;
-		band_first_col--;
-
-	}
-	*matrix_row_ret = matrix_row;
-	*matrix_col_ret = 1;
-	return first_full_row;
-
-}
-
-int print_band_high_corner(FILE * file, cell ** band, int k, const char * str1, int start1, const char * str2, int start2, int * matrix_row_ret, int * matrix_col_ret)
-{
-    return 0;
-}
-
-int print_band_upper(FILE * file, cell ** band, int k, const char * str1, int start1, const char * str2, int start2, int * matrix_row_ret, int * matrix_col_ret)
-{
-	int band_row = 0;
-	int band_col;
-	int i;
-	int width = (2*k)+1;
-
-	// Print everything before the row starts.
-	fprintf(file, "  X | ");
-	for (i=0; i < start1 - k; i++)
-	{
-		fprintf(file, "        ");
-	}
-
-	// Print the first row.
-	for (band_col=0; band_col < width; band_col++)
-	{
-			fprintf(file, "%c %3d | ", arrow(band, band_col, band_row), band[band_row][band_col].score);
-			//fprintf(file, "%2d %3d| ", band_col, start1-k+band_col);
-			//fprintf(file, "%2d %3d| ", band_row, band_col);
-	}
-	fprintf(file, "\n");
-
-	*matrix_row_ret = 1;
-	*matrix_col_ret = start1 - k+1;
-	return 1;
-}
-
-static char comp(char c)
-{
-	switch(c)
-	{
-		case 'A':
-		case 'a':
-			return 'T';
-		case 'T':
-		case 't':
-			return 'A';
-		case 'G':
-		case 'g':
-			return 'C';
-		case 'C':
-		case 'c':
-			return 'G';
-		default:
-			return 'N';
-	}
-}
-
-// Ooh, reverse complement in place with a single scan of the string.
-// No mallocing, copying and freeing for me!
-void revcomp(seq * s)
-{
-	char * str = s->seq;
-	int length;
-	char c_i, c_j;
-	int i, j;
-	length = strlen(str);
-
-	for(i=0, j=length-1; i <= j; i++, j--)
-	{
-		c_i = str[i];
-		c_j = str[j];
-		str[j] = comp(c_i);
-		str[i] = comp(c_j);
-	}
-}
-
-
-void free_delta(delta tb)
+void delta_free(delta tb)
 {
 	if (tb.tb) free(tb.tb);
 }
-
-void free_seq(seq s)
-{
-	if (s.id) { free(s.id); s.id = 0; }
-	if (s.seq) { free(s.seq); s.seq = 0; }
-	if (s.metadata) { free(s.metadata); s.metadata = 0; }
-}
-
-size_t sprint_seq(char * buf, seq s)
-{
-	int res = 0;
-	size_t size = 0;
-	char * ins = buf;
-	res = sprintf(ins, ">%s %d %d", s.id, s.length, s.length);
-	ins += res;
-	size += res;
-
-	if (strlen(s.metadata) > 0)
-	{
-		res = sprintf(ins, " ");
-		ins += res;
-		size += res;
-	}
-
-	res = sprintf(ins, "%s\n%s\n", s.metadata, s.seq);
-	ins += res;
-	size += res;
-
-	return size;
-}
-
-void print_sequence(FILE * file, seq s)
-{
-	fprintf(file, ">%s %d %d", s.id, s.length, s.length);
-	if (strlen(s.metadata) > 0) { fprintf(file, " "); }
-	fprintf(file, "%s\n%s\n", s.metadata, s.seq);
-}
-
-float benchmark(FILE * file, const char * message)
-{
-	static struct timeval prev_tv;
-	struct timeval curr_tv;
-	float time_diff;
-
-	gettimeofday(&curr_tv, NULL);
-
-	if (prev_tv.tv_sec == 0)
-	{
-		fprintf(file, "%s: First benchmark\n", message);
-		prev_tv = curr_tv;
-		return 0.0;
-	}
-	
-	time_diff = (curr_tv.tv_sec+ (curr_tv.tv_usec/1000000.0)) - (prev_tv.tv_sec+ (prev_tv.tv_usec/1000000.0));
-
-	fprintf(file, "%s: %f\n", message, time_diff);
-
-	prev_tv = curr_tv;
-
-	return time_diff;
-}
-
-
-
-seq get_next_sequence(FILE * file)
-{
-	static char line[MAX_STRING] = "";
-	static int count = 0;
-
-	seq sequence;
-
-	// Get the first line of the file, compile the regexp.
-	if (count == 0)
-	{
-		fgets(line, MAX_STRING, file);
-		count = 1;
-	}
-
-	sequence.seq = 0;
-	sequence.id = 0;
-	sequence.metadata = 0;
-	sequence.length = 0;
-
-	if (line[0] == '>' && line[1] == '>')
-	{
-
-		// Get the next line in the file for the next iteration to start with.
-		fgets(line, MAX_STRING, file);
-		return sequence;
-	}else{//we need to allocate memory properly 
-		sequence.seq = malloc(MAX_STRING*sizeof(char));
-		sequence.id = malloc(MAX_ID*sizeof(char));
-		sequence.metadata = malloc(MAX_METADATA*sizeof(char));
-		sequence.length = 0;
-	}
-
-	strcpy(sequence.metadata, "");
-
-	int bases;
-	int bytes;
-
-	sscanf(line, ">%s %d %d %[^\n]\n", sequence.id, &bases, &bytes, sequence.metadata);
-
-	while (1)
-	{
-		fgets(line, MAX_STRING, file);
-		if (line[0] == '>') { break; }
-		if (feof(file)) { break; }
-		process_string(line);
-
-
-		seq_cat(&sequence, line);
-	}
-
-	return sequence;
-}
-
-int sequence_count(FILE * file)
-{
-	int count = 0;
-	char line[MAX_STRING];
-	char id[MAX_STRING];
-	int length, bytes;
-	long int start_pos = ftell(file);
-
-	while (!feof(file))
-	{
-		if (fgets(line, MAX_STRING, file) == 0) break;
-		if ((line[0] == '>') && (line[1] != '>'))
-		{
-			count++;
-			sscanf(line, ">%s %d %d", id, &length, &bytes);
-			fseek(file, bytes+1, SEEK_CUR);
-		}
-	}
-	fseek(file, start_pos, SEEK_SET);
-	return count;
-}
-
-void seq_cat(seq * sequence, char * new_str)
-{
-	while (*new_str != '\0')
-	{
-		sequence->seq[sequence->length] = *new_str;
-		sequence->length++;
-		new_str++;
-	}
-	sequence->seq[sequence->length] = '\0';
-}
-
-void process_string(char * str)
-{
-	//int len = 0;
-	while (*str != '\0')
-	{
-		*str = toupper((int)*str);
-		str++;
-		//len++;
-	}
-	str--;
-	if (*str == '\n') { *str = '\0'; } //len--; }
-	//return len;
-}
-
-void chomp(char * str)
-{
-	while (*str != '\0')
-	{
-		str++;
-	}
-	// If the last character is a newline, replace it with a \0.
-	str--;
-	if (*str == '\n') { *str = '\0'; }
-}
-
-void convert_to_upper(char * str)
-{
-	
-	while (*str != '\0')
-	{
-		*str = toupper((int)*str);
-		str++;
-	}
-}
-
-
-
-

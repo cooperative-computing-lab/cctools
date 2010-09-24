@@ -6,7 +6,7 @@ See the file COPYING for details.
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "sequence_alignment.h"
+
 #include "sequence_compression.h"
 
 int main(int argc, char ** argv)
@@ -41,16 +41,16 @@ int main(int argc, char ** argv)
 		}
 		s = uncompress_seq(c);
 		free_cseq(c);
-		print_sequence(stdout, s);
-		free_seq(s);
+		seq_print(stdout, s);
+		seq_free(s);
 		c = get_next_cseq(input);
 	}
 	if (c.ext_id)
 	{
 		s = uncompress_seq(c);
 		free_cseq(c);
-		print_sequence(stdout, s);
-		free_seq(s);
+		seq_print(stdout, s);
+		seq_free(s);
 	}
 
 	fclose(input);

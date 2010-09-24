@@ -764,8 +764,8 @@ void test_mers()
 
 	c = all_seqs[0];
 	seq s = uncompress_seq(c);
-	revcomp(&s);
-	print_sequence(stdout, s);
+	seq_reverse_complement(&s);
+	seq_print(stdout, s);
 
 	int end = c.length - k + 1;
 	mer_t mer;

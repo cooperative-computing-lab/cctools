@@ -9,7 +9,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
-#include "sequence_alignment.h"
+
 #include "sequence_compression.h"
 
 static void show_help(const char *cmd)
@@ -75,7 +75,7 @@ int main(int argc, char ** argv)
 
 	while (!feof(input))
 	{
-		s = get_next_sequence(input); 
+		s = seq_read(input); 
 		if(clip != 0 || internal != 0){
 			strcpy(tmp_id, s.id);
 			strcpy(s.id, strtok(tmp_id,","));//ext_id
@@ -87,7 +87,7 @@ int main(int argc, char ** argv)
 		c = compress_seq(s);
 		print_cseq(stdout, c);
 		free_cseq(c);
-		free_seq(s);
+		seq_free(s);
 	}
 
 	fclose(input);
