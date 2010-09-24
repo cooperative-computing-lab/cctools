@@ -4,22 +4,25 @@ show_help()
 {
 	echo "Use: sge_submit_workers [options] <servername> <port> <num-workers>"
 	echo "options:"
-	echo "  -N <name> Preferred master name."
-	echo "  -S        Run as a shared worker."
-	echo "  -t <time> Abort after this amount of idle time. (default=900s)"
-	echo "  -h        Show this help message."
+	echo "  -N <name>        Preferred master name."
+	echo "  -S               Run as a shared worker."
+	echo "  -t <time>        Abort after this amount of idle time. (default=900s)"
+	echo "  -p <parameters>  SGE qsub parameters."
+	echo "  -h               Show this help message."
 	exit 1
 }
 
 arguments=""
 use_auto=0
+parameters=""
 
-while getopts aSN:t:h opt 
+while getopts aSN:t:p:h opt 
 do
 	case "$opt" in
 		S)  arguments="$arguments -S"; use_auto=1;;
 		N)  arguments="$arguments -N $OPTARG"; use_auto=1;;
 		t)  arguments="$arguments -t $OPTARG";;
+		p)  parameters="$parameters $OPTARG";;
 		h)  show_help;;
 		\?) show_help;;
 	esac
@@ -72,5 +75,5 @@ chmod 755 worker.sh
 
 for n in `seq 1 $count`
 do
-	qsub worker.sh
+	qsub $parameters worker.sh
 done
