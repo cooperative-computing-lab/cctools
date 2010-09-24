@@ -101,7 +101,7 @@ void free_cand_table();
 mer_list_element * create_mer_list_element(int seq_num, char dir, short loc);
 mer_hash_element * get_mer_hash_element(mer_t mer);
 void free_mer_list_element(mer_list_element * mle);
-void mer_generate_cands(mer_hash_element * mhe, int verbose_level);
+void mer_generate_cands(mer_hash_element * mhe);
 void print_8mer(unsigned short mer);
 void set_k_mask();
 mer_t make_mer(const char * str);
@@ -110,7 +110,7 @@ void add_candidate(int seq, int cand, char dir, mer_t mer, short loc1, short loc
 void free_cand_list_element(cand_list_element * cle);
 
 void find_all_kmers(int seq_num);
-void find_minimizers(int seq_num, int verbose_level);
+void find_minimizers(int seq_num);
 minimizer get_minimizer(int seq_num, int window_start);
 mer_t get_kmer(cseq c, int i);
 void print_16mer(mer_t mer16);
@@ -395,7 +395,7 @@ candidate_t * retrieve_candidates(int * total_cand_ret)
 
 }
 
-void generate_candidates(int verbose_level)
+void generate_candidates()
 {
 	int curr_bucket;
 
@@ -404,11 +404,9 @@ void generate_candidates(int verbose_level)
 	for(curr_bucket = 0; curr_bucket < MER_TABLE_BUCKETS; curr_bucket++)
 	{
 		mhe = mer_table[curr_bucket];
-		//printf("Bucket %d\n", curr_bucket);
 		while (mhe)
 		{
-			//if (mhe->mer == 1073318718) { fprintf(stderr, "Processing mer %u with count %d:\n", mhe->mer, mhe->count); print_16mer(mhe->mer); }
-			mer_generate_cands(mhe, verbose_level);
+			mer_generate_cands(mhe);
 			old_mhe = mhe;
 			mhe = mhe->next;
 			free(old_mhe);
@@ -417,7 +415,7 @@ void generate_candidates(int verbose_level)
 	}
 }
 
-void mer_generate_cands(mer_hash_element * mhe, int verbose_level)
+void mer_generate_cands(mer_hash_element * mhe)
 {
 	if (!mhe) return;
 
@@ -430,12 +428,6 @@ void mer_generate_cands(mer_hash_element * mhe, int verbose_level)
 		curr = head->next;
 		while (curr)
 		{
-			if (verbose_level >= 1)
-			{
-				char mer_str[k+1];
-				translate_kmer(mhe->mer, mer_str, k);
-				fprintf(stderr, "%s (%u): %s\t%s\t%d\t%d\t%d\n", mer_str, (unsigned) mhe->mer, all_seqs[head->seq_num].ext_id, all_seqs[curr->seq_num].ext_id, (int) (head->dir * curr->dir), head->loc, curr->loc);
-			}
 			add_candidate(head->seq_num, curr->seq_num, head->dir * curr->dir, mhe->mer, head->loc, curr->loc);
 			curr = curr->next;
 		}
@@ -519,7 +511,7 @@ void find_all_kmers(int seq_num)
 //    If so, set it as the new one.
 // 2. Is the current absolute minimizer now outside the window?
 //    If so, check the window to find a NEW absolute minimizer, and add it.
-void find_minimizers(int seq_num, int verbose_level)
+void find_minimizers(int seq_num)
 {
 	int i;
 	int end = all_seqs[seq_num].length - k + 1;
@@ -530,8 +522,6 @@ void find_minimizers(int seq_num, int verbose_level)
 	int abs_min_index = 0;
 	int index;
 	int j;
-
-	if (verbose_level >= 1) { fprintf(stderr, "Processing %s\n", all_seqs[seq_num].ext_id); seq s=uncompress_seq(all_seqs[seq_num]); print_sequence(stderr, s); }
 
 	memset(&abs_min,0,sizeof(abs_min));
 	abs_min.value = ULONG_MAX;
@@ -547,7 +537,6 @@ void find_minimizers(int seq_num, int verbose_level)
 
 		if (mer_val < rev_val)
 		{
-			if (verbose_level >= 2) { fprintf(stderr, "Adding forward kmer %2d (%010llx/%010llx): ", i, MER_VALUE(mer), MER_VALUE(rev)); print_kmer(stderr, mer); }
 			window[i].mer = mer;
 			window[i].value = mer_val;
 			window[i].dir = 1;
@@ -555,7 +544,6 @@ void find_minimizers(int seq_num, int verbose_level)
 		}
 		else
 		{
-			if (verbose_level >= 2) { fprintf(stderr, "Adding reverse kmer %2d (%010llx/%010llx): ", i, MER_VALUE(mer), MER_VALUE(rev)); print_kmer(stderr, rev); }
 			window[i].mer = rev;
 			window[i].value = rev_val;
 			window[i].dir = -1;
@@ -570,7 +558,6 @@ void find_minimizers(int seq_num, int verbose_level)
 
 	// Add the absolute minimizer for the first window.
 	add_sequence_to_mer(abs_min.mer, seq_num, abs_min.dir, abs_min.loc);
-	if (verbose_level >= 1) { fprintf(stderr, "Adding new minimizer (init) (%010llx, %d): ", MER_VALUE(abs_min.mer), abs_min.dir); print_kmer(stderr, abs_min.mer); }
 
 	for (i = WINDOW_SIZE; i < end; i++)
 	{
@@ -585,7 +572,6 @@ void find_minimizers(int seq_num, int verbose_level)
 
 		if (mer_val < rev_val)
 		{
-			if (verbose_level >= 2) { fprintf(stderr, "Adding forward kmer %2d (%010llx/%010llx): ", i, MER_VALUE(mer), MER_VALUE(rev)); print_kmer(stderr, mer); }
 			window[index].mer = mer;
 			window[index].value = mer_val;
 			window[index].dir = 1;
@@ -593,7 +579,6 @@ void find_minimizers(int seq_num, int verbose_level)
 		}
 		else
 		{
-			if (verbose_level >= 2) { fprintf(stderr, "Adding reverse kmer %2d (%010llx/%010llx): ", i, MER_VALUE(mer), MER_VALUE(rev)); print_kmer(stderr, rev); }
 			window[index].mer = rev;
 			window[index].value = rev_val;
 			window[index].dir = -1;
@@ -608,7 +593,6 @@ void find_minimizers(int seq_num, int verbose_level)
 			abs_min = window[index];
 			abs_min_index = index;
 			add_sequence_to_mer(abs_min.mer, seq_num, abs_min.dir, abs_min.loc);
-			if (verbose_level >= 1) { fprintf(stderr, "Adding new minimizer (better) (%010llx, %d): ", MER_VALUE(abs_min.mer), abs_min.dir); print_kmer(stderr, abs_min.mer); }
 		}
 		// Now, check if the current absolute minimizer is out of the window
 		// We just replaced index, so if abs_min_index == index, we just evicted
@@ -630,13 +614,12 @@ void find_minimizers(int seq_num, int verbose_level)
 			}
 			// Add the new current minimizer to the mer table.
 			add_sequence_to_mer(abs_min.mer, seq_num, abs_min.dir, abs_min.loc);
-			if (verbose_level >= 1) { fprintf(stderr, "Adding new minimizer (eviction) (%010llx, %d): ", MER_VALUE(abs_min.mer), abs_min.dir); print_kmer(stderr, abs_min.mer); }
 		}
 	}
 }
 
 // Gets the next minimizer for this sequence.  Returns 1 if it worked, 0 if we're at the end of the sequence.
-int get_next_minimizer(int seq_num, minimizer * next_minimizer, int verbose_level)
+int get_next_minimizer(int seq_num, minimizer * next_minimizer )
 {
 	static int i = 0;
 	static int index = 0;
@@ -679,7 +662,6 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer, int verbose_leve
 
 			if (mer_val < rev_val)
 			{
-				if (verbose_level >= 2) { fprintf(stderr, "Adding forward kmer %2d (%010llx/%010llx): ", i, MER_VALUE(mer), MER_VALUE(rev)); print_kmer(stderr, mer); }
 				window[index].mer = mer;
 				window[index].value = mer_val;
 				window[index].dir = 1;
@@ -687,7 +669,6 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer, int verbose_leve
 			}
 			else
 			{
-				if (verbose_level >= 2) { fprintf(stderr, "Adding reverse kmer %2d (%010llx/%010llx): ", i, MER_VALUE(mer), MER_VALUE(rev)); print_kmer(stderr, rev); }
 				window[index].mer = rev;
 				window[index].value = rev_val;
 				window[index].dir = -1;
@@ -702,7 +683,6 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer, int verbose_leve
 
 		// Now, return the minimizer we found (it will be the first minimizer for the list)
 		*next_minimizer = abs_min;
-		if (verbose_level >= 1) { fprintf(stderr, "Found minimizer (init) (%010llx, %d): ", MER_VALUE(abs_min.mer), abs_min.dir); print_kmer(stderr, abs_min.mer); }
 
 		return 1;
 	}
@@ -721,7 +701,6 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer, int verbose_leve
 
 		if (mer_val < rev_val)
 		{
-			if (verbose_level >= 2) { fprintf(stderr, "Adding forward kmer %2d (%010llx/%010llx): ", i, MER_VALUE(mer), MER_VALUE(rev)); print_kmer(stderr, mer); }
 			window[index].mer = mer;
 			window[index].value = mer_val;
 			window[index].dir = 1;
@@ -729,7 +708,6 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer, int verbose_leve
 		}
 		else
 		{
-			if (verbose_level >= 2) { fprintf(stderr, "Adding reverse kmer %2d (%010llx/%010llx): ", i, MER_VALUE(mer), MER_VALUE(rev)); print_kmer(stderr, rev); }
 			window[index].mer = rev;
 			window[index].value = rev_val;
 			window[index].dir = -1;
@@ -743,7 +721,6 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer, int verbose_leve
 			abs_min = window[index];
 			abs_min_index = index;
 			*next_minimizer = abs_min;
-			if (verbose_level >= 1) { fprintf(stderr, "Found new minimizer (better) (%010llx, %d): ", MER_VALUE(abs_min.mer), abs_min.dir); print_kmer(stderr, abs_min.mer); }
 			i++;  // Increment i so we won't process this k-mer again.
 			return 1;
 		}
@@ -768,7 +745,6 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer, int verbose_leve
 			}
 			// Add the new current minimizer to the mer table.
 			*next_minimizer = abs_min;
-			if (verbose_level >= 1) { fprintf(stderr, "Found new minimizer (eviction) (%010llx, %d): ", MER_VALUE(abs_min.mer), abs_min.dir); print_kmer(stderr, abs_min.mer); }
 			i++;   // Increment i so we won't process this k-mer again.
 			return 1;
 		}
@@ -1058,7 +1034,7 @@ void set_k_mask()
 	}
 }
 
-void load_mer_table(int verbose_level)
+void load_mer_table()
 {
 	int curr_col, end_col, curr_row, end_row;
 	curr_col = curr_rect_x*rectangle_size;
@@ -1069,10 +1045,10 @@ void load_mer_table(int verbose_level)
 	end_row = curr_row+rectangle_size;
 	if (end_row > num_seqs) { end_row = num_seqs; }
 
-	load_mer_table_subset(verbose_level, curr_col, end_col, curr_row, end_row, (curr_rect_x == curr_rect_y));
+	load_mer_table_subset(curr_col, end_col, curr_row, end_row, (curr_rect_x == curr_rect_y));
 }
 
-void load_mer_table_subset(int verbose_level, int curr_col, int end_col, int curr_row, int end_row, int is_same_rect)
+void load_mer_table_subset(int curr_col, int end_col, int curr_row, int end_row, int is_same_rect)
 {
 
 	mer_t repeat_mask_rev;
@@ -1093,7 +1069,7 @@ void load_mer_table_subset(int verbose_level, int curr_col, int end_col, int cur
 
 	for ( ;	curr_col < end_col; curr_col++ )
 	{
-		find_minimizers(curr_col, verbose_level);
+		find_minimizers(curr_col);
 	}
 
 	// If we are on the diagonal, don't need to add both, because they are the same.
@@ -1101,7 +1077,7 @@ void load_mer_table_subset(int verbose_level, int curr_col, int end_col, int cur
 
 	for ( ;	curr_row < end_row; curr_row++ )
 	{
-		find_minimizers(curr_row, verbose_level);
+		find_minimizers(curr_row);
 	}
 }
 

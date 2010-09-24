@@ -40,9 +40,9 @@ struct minimizer_s
 };
 typedef struct minimizer_s minimizer;
 
-void load_mer_table(int verbose_level);
-void load_mer_table_subset(int verbose_level, int start_x, int end_x, int start_y, int end_y, int is_same_rect);
-void generate_candidates(int verbose_level);
+void load_mer_table();
+void load_mer_table_subset(int start_x, int end_x, int start_y, int end_y, int is_same_rect);
+void generate_candidates();
 candidate_t * retrieve_candidates(int * total_cand);
 int output_candidates(FILE * file, int format);
 int output_candidate_list(FILE * file, candidate_t * list, int total_output, int format);
@@ -58,6 +58,12 @@ void test_mers();
 void print_mer_table(FILE * file);
 void set_k(int new_k);
 void set_window_size(int new_size);
-int get_next_minimizer(int seq_num, minimizer * next_minimizer, int verbose_level);
+int get_next_minimizer(int seq_num, minimizer * next_minimizer);
 void print_kmer(FILE * file, mer_t mer);
 void translate_kmer(mer_t mer, char * str, int length);
+
+extern int rectangle_size;
+extern int curr_rect_x;
+extern int curr_rect_y;
+extern unsigned long total_cand;
+

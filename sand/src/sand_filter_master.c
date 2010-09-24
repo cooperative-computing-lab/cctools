@@ -53,7 +53,6 @@ static int convert_cand_binary_to_ascii(FILE * outfile, const char * fname);
 static int port = 9090;
 static int kmer_size = 22;
 static int window_size = 22;
-static int rectangle_size = 0;
 static char end_char = '\0';
 static int do_not_unlink = 0;
 static int do_not_cache = 0;
