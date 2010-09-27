@@ -18,12 +18,12 @@ struct cseq
 {
 	char * name;
 	char * metadata;
-	short * mers;
-	int length;
-	int mercount;
+	short * data;
+	int num_bases;
+	int num_bytes;
 };
 
-struct cseq * cseq_create( const char *name, int num_bases, int mercount, short *mers, const char *metadata);
+struct cseq * cseq_create( const char *name, int num_bases, int num_bytes, short *data, const char *metadata);
 struct cseq * cseq_copy(struct cseq *s);
 struct cseq * seq_compress( seq s );
 seq           cseq_uncompress( struct cseq * c );
@@ -38,4 +38,4 @@ void translate_to_str(int mer, char * str, int length);
 int base_to_num(char base );
 char num_to_base( int num );
 
-#endif // __SEQUENCE_COMPRESSION_H_
+#endif

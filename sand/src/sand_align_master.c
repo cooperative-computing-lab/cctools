@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include "sand_align.h"
 #include "sequence.h"
+#include "sequence_compression.h"
 
 static struct work_queue *queue = 0;
 static int port = 9068;
@@ -370,10 +371,10 @@ static struct hash_table * build_sequence_library( const char *filename )
 	FILE *file = fopen(filename, "r");
 	if(!file) fatal("couldn't open %s: %s\n",filename,strerror(errno));
 
-	struct sequence *s;
+	struct cseq *c;
 
-	while((s = sequence_read_binary(file))) {
-		hash_table_insert(h,s->name,s);
+	while((c = cseq_read(file))) {
+		hash_table_insert(h,c->name,c);
 	}
 
 	fclose(file);
@@ -518,8 +519,8 @@ static int build_jobs(const char *candidate_filename, struct hash_table *h, stru
 	char sequence_name1[SEQUENCE_ID_MAX + 1];
 	char sequence_name2[SEQUENCE_ID_MAX + 1];
 
-	struct sequence *s1;
-	struct sequence *s2;
+	struct cseq *s1;
+	struct cseq *s2;
 
 	int alignment_flag;
 
@@ -561,8 +562,8 @@ static int build_jobs(const char *candidate_filename, struct hash_table *h, stru
 		if((get_line_result = get_next_cand_line(fp, sequence_name1, sequence_name2, &alignment_flag, extra_data)) == GET_CAND_LINE_RESULT_SUCCESS) {	// got a "seq_A seq_B ..." record
 			sprintf(tmp, "%s-%s", sequence_name1, sequence_name2);
 			if(!hash_table_lookup(t, tmp)) {
-				s1 = (struct sequence *) hash_table_lookup(h, sequence_name1);
-				s2 = (struct sequence *) hash_table_lookup(h, sequence_name2);
+				s1 = hash_table_lookup(h, sequence_name1);
+				s2 = hash_table_lookup(h, sequence_name2);
 				res = sprintf(ins, ">%s %i %i\n", s1->name, s1->num_bases, s1->num_bytes);
 				ins += res;
 				memcpy(ins, s1->data, s1->num_bytes);
@@ -635,7 +636,7 @@ static int build_jobs(const char *candidate_filename, struct hash_table *h, stru
 			sprintf(tmp, "%s-%s", sequence_name1, sequence_name2);
 			if(!hash_table_lookup(t, tmp)) {
 				if(!strcmp(sequence_name1, s1->name) && pair_count < NUM_PAIRS_PER_FILE) {	// same first sequence, not exceeded max pairs.
-					s2 = (struct sequence *) hash_table_lookup(h, sequence_name2);
+					s2 = hash_table_lookup(h, sequence_name2);
 					if(!s2) {
 						fprintf(stderr, "No such sequence: %s", sequence_name2);
 						exit(1);
@@ -676,12 +677,12 @@ static int build_jobs(const char *candidate_filename, struct hash_table *h, stru
 						ins += strlen(ins);
 					}
 
-					s1 = (struct sequence *) hash_table_lookup(h, sequence_name1);
+					s1 = hash_table_lookup(h, sequence_name1);
 					if(!s1) {
 						fprintf(stderr, "No such sequence: %s", sequence_name1);
 						exit(1);
 					}
-					s2 = (struct sequence *) hash_table_lookup(h, sequence_name2);
+					s2 = hash_table_lookup(h, sequence_name2);
 					if(!s2) {
 						fprintf(stderr, "No such sequence: %s", sequence_name2);
 						exit(1);

@@ -43,7 +43,6 @@ static void show_version(const char *cmd);
 static void show_help(const char *cmd);
 static void load_sequences(const char * file);
 static void load_rectangles_to_files();
-static void delete_rectangles();
 static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x, int curr_rect_y);
 static int handle_done_task(struct work_queue_task * t);
 static int confirm_output(struct work_queue_task *t);
@@ -186,21 +185,6 @@ void load_rectangles_to_files()
 	// We no longer need the sequences array, and it has
 	// all been freed anyway.
 	free(sequences);
-
-}
-
-void delete_rectangles()
-{
-	char tmpfilename[255];
-	int curr_rect;
-
-	if (do_not_unlink) return;
-
-	for (curr_rect = 0; curr_rect < num_rectangles; curr_rect++)
-	{
-		sprintf(tmpfilename, "%s/rect%03d.cfa", outdirname, curr_rect);
-		unlink(tmpfilename);
-	}
 
 }
 
@@ -486,21 +470,20 @@ int main(int argc, char ** argv)
 	}
 
 	display_progress();
+
 	printf("Candidate Selection Complete! Candidates generated: %lu\n",cand_count);
 	if (checkpoint_file)
 		fclose(checkpoint_file);
 	if (end_char)
 		fprintf(outfile, "%c\n", end_char);
+
 	fflush(outfile);
 	fsync(fileno(outfile));
 	fclose(outfile);
 
 	work_queue_delete(q);
 
-	if(!do_not_unlink) {
-		delete_rectangles();
-		delete_dir(outdirname);
-	}
+	if(!do_not_unlink) delete_dir(outdirname);
 
 	return 0;
 }

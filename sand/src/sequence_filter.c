@@ -270,7 +270,7 @@ int output_candidate_list( FILE * file, candidate_t * list, int total_output )
 	for (i=0; i<total_output; i++)
 	{
 		candidate_t pair = list[i];
-		fprintf(file, "%s\t%s\t%d\t%d\t%d\n", all_seqs[pair.cand1]->name, all_seqs[pair.cand2]->name, pair.dir, pair.loc1, (pair.dir == 1) ? pair.loc2 : all_seqs[pair.cand2]->length - pair.loc2 - k);
+		fprintf(file, "%s\t%s\t%d\t%d\t%d\n", all_seqs[pair.cand1]->name, all_seqs[pair.cand2]->name, pair.dir, pair.loc1, (pair.dir == 1) ? pair.loc2 : all_seqs[pair.cand2]->num_bases - pair.loc2 - k);
 		total_printed++;
 	}
 	return total_printed;
@@ -412,7 +412,7 @@ void find_all_kmers(int seq_num)
 {
 	mer_t mer16;
 	int i;
-	int end = all_seqs[seq_num]->length - 15;
+	int end = all_seqs[seq_num]->num_bases - 15;
 
 	for (i = 0; i<end; i+=8)
 	{
@@ -430,7 +430,7 @@ void find_all_kmers(int seq_num)
 void find_minimizers(int seq_num)
 {
 	int i;
-	int end = all_seqs[seq_num]->length - k + 1;
+	int end = all_seqs[seq_num]->num_bases - k + 1;
 	mer_t mer, rev, mer_val, rev_val;
 
 	minimizer window[WINDOW_SIZE];
@@ -558,7 +558,7 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer )
 		abs_min.dir = 0;
 		abs_min.loc = -1;
 		abs_min_index = 0;
-		end = all_seqs[seq_num]->length - k + 1;
+		end = all_seqs[seq_num]->num_bases - k + 1;
 		prev_seq_num = seq_num;
 	}
 
@@ -688,7 +688,7 @@ mer_t get_kmer(struct cseq *c, int curr)
 		if ((bases_left >= 8) || (bases_left > (8-which_base)))
 		{
 			// Mask out everything before which_base
-			curr_mer = c->mers[which_mer] & short_masks[which_base];
+			curr_mer = c->data[which_mer] & short_masks[which_base];
 
 			// Push mer so that there is enough space for curr_mer
 			mer = mer << ( (8-which_base)*2 );
@@ -711,8 +711,8 @@ mer_t get_kmer(struct cseq *c, int curr)
 			mer = mer << bases_left*2;
 
 			// Shift the curr mer to the end and mask it out.
-			curr_mer = c->mers[which_mer];
-			if ((c->mercount-1) == which_mer) { curr_mer = curr_mer << ((8-(c->length - (8*which_mer)))*2); }
+			curr_mer = c->data[which_mer];
+			if ((c->num_bytes-1) == which_mer) { curr_mer = curr_mer << ((8-(c->num_bases - (8*which_mer)))*2); }
 			curr_mer = (curr_mer >> ((8 - (bases_left+which_base))*2 )) & short_masks[8-bases_left];
 
 			// Now add it on to mer.

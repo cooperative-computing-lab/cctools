@@ -16,16 +16,16 @@ See the file COPYING for details.
 
 static short mer_add_base(short mer, char base);
 static short translate_8mer(const char * str, int start);
-static int get_mercount(int length);
+static int get_num_bytes(int num_bases);
 
-struct cseq * cseq_create( const char *name, int length, int mercount, short *mers, const char *metadata)
+struct cseq * cseq_create( const char *name, int num_bases, int num_bytes, short *mers, const char *metadata)
 {
 	struct cseq *c = malloc(sizeof(*c));
 	c->name = strdup(name);
-	c->length = length;
-	c->mercount = mercount;
-	c->mers = malloc(c->mercount);
-	memcpy(c->mers,mers,c->mercount);
+	c->num_bases = num_bases;
+	c->num_bytes = num_bytes;
+	c->data = malloc(c->num_bytes);
+	memcpy(c->data,mers,c->num_bytes);
 	c->metadata = strdup(metadata);
 	return c;
 	
@@ -33,22 +33,22 @@ struct cseq * cseq_create( const char *name, int length, int mercount, short *me
 
 struct cseq *cseq_copy( struct cseq *c )
 {
-	return cseq_create(c->name,c->length,c->mercount,c->mers,c->metadata);
+	return cseq_create(c->name,c->num_bases,c->num_bytes,c->data,c->metadata);
 }
 
 struct cseq * seq_compress(seq s)
 {
 	struct cseq  *c;
-	int len = s.length;
-	int mercount = get_mercount(len);
+	int num_bases = s.length;
+	int num_bytes = get_num_bytes(num_bases);
 	int curr_8mer;
 
 	c = malloc(sizeof(*c));
 	if(!c) return 0;
 
-	c->length = len;
-	c->mercount = mercount;
-	c->mers = malloc(mercount*sizeof(short));
+	c->num_bases = num_bases;
+	c->num_bytes = num_bytes;
+	c->data = malloc(num_bytes*sizeof(short));
 	c->name = 0;
 	c->metadata = 0;
 	
@@ -57,23 +57,23 @@ struct cseq * seq_compress(seq s)
 
 	if (s.seq != 0)
 	{
-		for (curr_8mer=0; curr_8mer < mercount; curr_8mer++)
+		for (curr_8mer=0; curr_8mer < num_bytes; curr_8mer++)
 		{
-			c->mers[curr_8mer] = translate_8mer(s.seq, curr_8mer*8);
+			c->data[curr_8mer] = translate_8mer(s.seq, curr_8mer*8);
 		}
 	} else {
-		c->mers = 0;
+		c->data = 0;
 	}
 
 	return c;
 }
 
-static int get_mercount(int length)
+static int get_num_bytes(int num_bases)
 {
-	int mercount = length/8;
-	if (length%8 > 0) { mercount++; }
+	int num_bytes = num_bases/8;
+	if (num_bases%8 > 0) { num_bytes++; }
 
-	return mercount;
+	return num_bytes;
 }
 
 static short translate_8mer(const char * str, int start)
@@ -135,25 +135,25 @@ seq cseq_uncompress( struct cseq *c )
 	if(c->name)   s.id = strdup(c->name);
 	if(c->metadata) s.metadata = strdup(c->metadata);
 
-	s.length = c->length;
+	s.length = c->num_bases;
 
-	int mercount = c->length/8;
+	int num_bytes = c->num_bases/8;
 
-	if (c->mers != 0)
+	if (c->data != 0)
 	{
-		s.seq = malloc((c->length+1)*sizeof(char));
+		s.seq = malloc((c->num_bases+1)*sizeof(char));
 		s.seq[0] = '\0';
 		int i;
 		char tempstr[9];
-		for (i=0; i<mercount; i++)
+		for (i=0; i<num_bytes; i++)
 		{
-			translate_to_str(c->mers[i], tempstr, 8);
+			translate_to_str(c->data[i], tempstr, 8);
 			strcat(s.seq, tempstr);
 		}
-		if (c->length % 8 > 0)
+		if (c->num_bases % 8 > 0)
 		{
 			// handle the overflow if it doesn't divide by 8 exactly.
-			translate_to_str(c->mers[i], tempstr, c->length%8);
+			translate_to_str(c->data[i], tempstr, c->num_bases%8);
 			strcat(s.seq, tempstr);
 		} 
 		s.seq[s.length] = '\0';
@@ -164,7 +164,7 @@ seq cseq_uncompress( struct cseq *c )
 	return s;
 }
 
-void translate_to_str(int mer, char * str, int length)
+void translate_to_str(int mer, char * str, int num_bases)
 {
 	int i;
 
@@ -175,18 +175,18 @@ void translate_to_str(int mer, char * str, int length)
 	// etc.
 	// We mask by 3 to make sure we only have the two numbers and nothing
 	// but 0's in the rest.
-	for (i=0; i<length; i++)
+	for (i=0; i<num_bases; i++)
 	{
-		str[i] = num_to_base((mer >> ((length-1)-i)*2) & 3);
+		str[i] = num_to_base((mer >> ((num_bases-1)-i)*2) & 3);
 	}
-	str[length] = '\0';
+	str[num_bases] = '\0';
 }
 
 
 void cseq_free( struct cseq *c )
 {
 	if(c) {
-		if (c->mers)     free(c->mers);
+		if (c->data)     free(c->data);
 		if (c->name)     free(c->name);
 		if (c->metadata) free(c->metadata);
 		free(c);
@@ -195,7 +195,7 @@ void cseq_free( struct cseq *c )
 
 size_t cseq_size( struct cseq *c)
 {
-	return c->mercount*sizeof(short) + 100;
+	return c->num_bytes*sizeof(short) + 100;
 }
 
 void cseq_print( FILE * file, struct cseq *c )
@@ -204,8 +204,8 @@ void cseq_print( FILE * file, struct cseq *c )
 		// special case: null pointer indicates the end of a list.
 		fprintf(file,">>\n");
 	} else {
-		fprintf(file, ">%s %d %d %s\n", c->name, c->length, (int)(c->mercount*sizeof(short)), c->metadata);
-		fwrite(c->mers, sizeof(short), c->mercount, file);
+		fprintf(file, ">%s %d %d %s\n", c->name, c->num_bases, (int)(c->num_bytes*sizeof(short)), c->metadata);
+		fwrite(c->data, sizeof(short), c->num_bytes, file);
 		fputc('\n',file);
 	}
 }

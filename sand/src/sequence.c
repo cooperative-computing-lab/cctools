@@ -11,59 +11,6 @@
 
 #define SEQUENCE_FILE_LINE_MAX 4096
 
-struct sequence * sequence_create( const char *name, int num_bases, int num_bytes, unsigned char *data, const char *metadata)
-{
-	struct sequence *s = malloc(sizeof(*s));
-	s->name = strdup(name);
-	s->num_bases = num_bases;
-	s->num_bytes = num_bytes;
-	s->data = malloc(s->num_bytes);
-	memcpy(s->data,data,s->num_bytes);
-	s->metadata = strdup(metadata);
-	return s;
-	
-}
-
-struct sequence *sequence_copy(struct sequence *s)
-{
-  return sequence_create(s->name,s->num_bases,s->num_bytes,s->data,s->metadata);
-}
-
-void sequence_delete( struct sequence *s )
-{
-	if(s) {
-		free(s->name);
-		free(s->data);
-		free(s->metadata);
-		free(s);
-	}
-}
-
-struct sequence * sequence_read_binary( FILE *file )
-{
-	char line[SEQUENCE_FILE_LINE_MAX];
-	char metadata[SEQUENCE_FILE_LINE_MAX];
-	char name[SEQUENCE_FILE_LINE_MAX];
-	int  nbases, nbytes;
-
-	if(!fgets(line,sizeof(line),file)) return 0;
-
-	int n = sscanf(line, ">%s %d %d %[^\n]",name,&nbases,&nbytes,metadata);
-	if(n<3) fatal("syntax error near %s\n",line);
-
-	unsigned char *data = malloc(nbytes);
-
-	n = full_fread(file,data,nbytes);
-	if(n!=nbytes) fatal("sequence file is corrupted.");
-
-	fgetc(file);
-
-	struct sequence *s = sequence_create(name,nbases,nbytes,data,metadata);
-
-	free(data);
-	return s;
-}
-
 static char base_complement(char c)
 {
 	switch(c)
