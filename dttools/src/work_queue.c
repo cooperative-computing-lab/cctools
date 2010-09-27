@@ -49,9 +49,6 @@ See the file COPYING for details.
 
 #define WORK_QUEUE_DEFAULT_PRIORITY 10
 
-static INT64_T master_total_bytes_sent = 0;
-static INT64_T master_total_bytes_received = 0;
-
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
 static int wq_master_mode = MASTER_MODE_STANDALONE;
@@ -73,6 +70,8 @@ struct work_queue {
 	INT64_T total_task_time;
 	INT64_T	total_workers_joined;
 	INT64_T	total_workers_removed;
+	INT64_T total_bytes_sent;
+	INT64_T total_bytes_received;
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;           /**< How to choose worker to run the task. */
 };
@@ -105,7 +104,7 @@ struct work_queue_file {
 	char *remote_name; // name on remote machine.
 };
 
-int start_one_task( struct work_queue_task *t, struct work_queue_worker *w );
+int start_one_task( struct work_queue_task *t, struct work_queue_worker *w, struct work_queue *q );
 static int update_catalog(struct work_queue *q);
 
 static int short_timeout = 5;
@@ -193,8 +192,8 @@ void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s )
 	s->total_tasks_complete	  = q->total_tasks_complete;
 	s->total_workers_joined   = q->total_workers_joined;
 	s->total_workers_removed  = q->total_workers_removed;
-	s->total_bytes_sent = master_total_bytes_sent;
-	s->total_bytes_received = master_total_bytes_received;
+	s->total_bytes_sent = q->total_bytes_sent;
+	s->total_bytes_received = q->total_bytes_received;
 }
 
 static void add_worker( struct work_queue *q )
@@ -367,7 +366,7 @@ int filename_comparator(const void *a, const void *b) {
 	return rv > 0 ? -1 : 1;
 }
 
-static int get_output_files( struct work_queue_task *t, struct work_queue_worker *w )
+static int get_output_files( struct work_queue_task *t, struct work_queue_worker *w, struct work_queue *q )
 {
 	struct work_queue_file* tf;
 	int rv;
@@ -396,7 +395,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 		list_first_item(t->output_files);
 		while((tf=list_next_item(t->output_files))) {
 			rv = get_output_item(tf->remote_name, (char *)tf->payload, w, received_items, &total_bytes);
-			master_total_bytes_received += total_bytes;
+			q->total_bytes_received += total_bytes;
 			if(!rv) {
 				debug(D_WQ,"%s (%s) did not create expected file %s",w->hostname,w->addrport,tf->remote_name);
 				t->result = WORK_QUEUE_RESULT_OUTPUT_FAIL;
@@ -493,7 +492,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			if(t->return_status != 0)
 				t->result = WORK_QUEUE_RESULT_FUNCTION_FAIL;
 			
-			if(!get_output_files(t,w)) {
+			if(!get_output_files(t,w,q)) {
 				free(t->output);
 				t->output = 0;
 				goto failure;
@@ -667,7 +666,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, IN
 	return 1;
 }
 
-static int send_input_files( struct work_queue_task *t, struct work_queue_worker *w )
+static int send_input_files( struct work_queue_task *t, struct work_queue_worker *w, struct work_queue *q)
 {
 	struct work_queue_file* tf;
 	int actual=0;
@@ -705,7 +704,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 		w->total_bytes_transfered += total_bytes;
 		w->total_transfer_time += sum_time;
 		if(total_bytes>0) {
-			master_total_bytes_sent += (INT64_T)total_bytes;
+			q->total_bytes_sent += (INT64_T)total_bytes;
 			debug(D_WQ,"%s (%s) got %d bytes in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps",w->hostname,w->addrport,total_bytes,sum_time/1000000.0,((8.0*total_bytes)/sum_time),(8.0*w->total_bytes_transfered)/w->total_transfer_time);
 		}
 	}
@@ -723,9 +722,9 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 	return 0;
 }
 
-int start_one_task( struct work_queue_task *t, struct work_queue_worker *w )
+int start_one_task( struct work_queue_task *t, struct work_queue_worker *w, struct work_queue *q )
 {
-	if(!send_input_files(t,w)) return 0;
+	if(!send_input_files(t,w,q)) return 0;
 	t->start_time = timestamp_get();
 	link_printf(w->link,"work %d\n",strlen(t->command_line));
 	link_write(w->link,t->command_line,strlen(t->command_line),time(0)+short_timeout);
@@ -845,7 +844,7 @@ static void start_tasks( struct work_queue *q )
 			return;
 		}
 		
-		if(start_one_task(t,w)) {
+		if(start_one_task(t,w,q)) {
 			change_worker_state(q,w,WORKER_STATE_BUSY);
 			w->current_task = t;
 		} else {
