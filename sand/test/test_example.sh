@@ -19,6 +19,9 @@ echo "Starting filter master"
 ln -s `which sand_filter_mer_seq` .
 sand_filter_master -s 10 -p $port -b test_20.cfa test_20.cand -d all -o filter.log || { echo "Error in filtering."; kill -9 $wpid; exit 1 ; }
 
+echo "Checking filtering results..."
+diff --brief test_20.cand test_20.cand.right && echo "Candidates match" || { kill -9 $wpid ; exit 1; }
+
 echo "Starting Smith-Waterman assembly..."
 ln -s `which sand_sw_alignment` .
 sand_align_master -n 1 -p $port sand_sw_alignment test_20.cand test_20.cfa test_20.sw.ovl -d all -o sw.log || { echo "Error in alignment."; kill -9 $wpid; exit 1 ; }
