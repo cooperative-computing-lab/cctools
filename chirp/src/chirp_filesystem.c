@@ -139,7 +139,7 @@ size_t cfs_fread (void *ptr, size_t size, size_t nitems, CHIRP_FILE *file)
   while (nitems_read < nitems)
   {
     INT64_T t = cfs->pread(file->fd, ptr, size, file->offset);
-    if (t == -1) return nitems_read;
+    if (t == -1 || t == 0) return nitems_read;
     file->offset += t;
     ptr += size;
     nitems_read++;
