@@ -48,8 +48,8 @@ struct sequence * sequence_read_binary( FILE *file )
 
 	if(!fgets(line,sizeof(line),file)) return 0;
 
-	int n = sscanf(line, ">%s %d %d%[^\n]%*1[\n]",name,&nbases,&nbytes,metadata);
-	if(n!=4) fatal("syntax error near %s\n",line);
+	int n = sscanf(line, ">%s %d %d %[^\n]",name,&nbases,&nbytes,metadata);
+	if(n<3) fatal("syntax error near %s\n",line);
 
 	unsigned char *data = malloc(nbytes);
 

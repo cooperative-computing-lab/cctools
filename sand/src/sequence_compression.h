@@ -14,7 +14,7 @@ See the file COPYING for details.
 #ifndef __SEQUENCE_COMPRESSION_H_
 #define __SEQUENCE_COMPRESSION_H_
 
-struct s_cseq
+struct cseq
 {
 	char * name;
 	char * metadata;
@@ -23,16 +23,16 @@ struct s_cseq
 	int mercount;
 };
 
-typedef struct s_cseq cseq;
-
-cseq seq_compress(seq s);
-seq  cseq_uncompress(cseq m);
-void cseq_free(cseq m);
-void cseq_print(FILE * file, cseq c);
-cseq cseq_read(FILE * file);
-void cseq_file_reset();
-size_t cseq_size(cseq c);
-size_t cseq_sprint(char * buf, cseq c);
+struct cseq * cseq_create( const char *name, int num_bases, int mercount, short *mers, const char *metadata);
+struct cseq * cseq_copy(struct cseq *s);
+struct cseq * seq_compress( seq s );
+seq           cseq_uncompress( struct cseq * c );
+void          cseq_free( struct cseq * c );
+void          cseq_print( FILE *file, struct cseq *c );
+struct cseq * cseq_read( FILE *file );
+void          cseq_file_reset();
+size_t        cseq_size( struct cseq *c );
+size_t        cseq_sprint( char * buf, struct cseq *c );
 
 void translate_to_str(int mer, char * str, int length);
 int base_to_num(char base );

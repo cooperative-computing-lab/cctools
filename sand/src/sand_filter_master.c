@@ -60,7 +60,7 @@ static int retry_max = 100;
 
 static unsigned long int cand_count = 0;
 
-static cseq * sequences = 0;
+static struct cseq ** sequences = 0;
 static int num_seqs = 0;
 static int num_rectangles = 0;
 static size_t * rectangle_sizes = 0;
@@ -137,14 +137,12 @@ void load_sequences(const char * filename)
 	int seq_count = 0;
 
 	seq_count = sequence_count(file);
-	sequences = malloc(seq_count*sizeof(cseq));
+	sequences = malloc(seq_count*sizeof(struct cseq *));
 
-	while (!feof(file))
-	{
-		cseq c = cseq_read(file);
-		if (!c.metadata) continue;
-		sequences[num_seqs] = c;
-		num_seqs++;
+	struct cseq *c;
+
+	while((c = cseq_read(file))) {
+		sequences[num_seqs++] = c;
 	}
 }
 
@@ -498,8 +496,11 @@ int main(int argc, char ** argv)
 	fclose(outfile);
 
 	work_queue_delete(q);
-	delete_rectangles();
-	delete_dir(outdirname);
+
+	if(!do_not_unlink) {
+		delete_rectangles();
+		delete_dir(outdirname);
+	}
 
 	return 0;
 }

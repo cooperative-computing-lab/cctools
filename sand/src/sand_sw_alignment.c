@@ -91,28 +91,22 @@ int main(int argc, char ** argv)
 		input = stdin;
 	}
 
-	cseq c1 = cseq_read(input);
-	s1 = cseq_uncompress(c1);
-	cseq_free(c1);
+	struct cseq *c1, *c2;
 
-	overlap_write_begin(stdout);
-	
-	while (!feof(input))
-	{
-		cseq c2 = cseq_read(input);
+	// outer loop: read first sequence in comparison list
+
+	while((c1=cseq_read(input))) {
+	  s1 = cseq_uncompress(c1);
+	  cseq_free(c1);
+
+	  overlap_write_begin(stdout);
+
+	  // inner loop: read sequences until null (indicating end of list)
+	  // then continue again with outer loop.  (two nulls to halt.)
+
+	  while((c2=cseq_read(input))) {
 		s2 = cseq_uncompress(c2);
 		cseq_free(c2);
-
-		// If the sequence is null, we reached an end of file, and need to work with a new one.
-		if (s2.seq == 0)
-		{
-			seq_free(s1);
-			seq_free(s2);
-			c1 = cseq_read(input);
-			s1 = cseq_uncompress(c1);
-			cseq_free(c1);
-			continue;
-		}
 
 		delta tb;
 
@@ -162,6 +156,7 @@ int main(int argc, char ** argv)
 
 		seq_free(s2);
 		delta_free(tb);
+	  }
 	}
 
 	seq_free(s1);

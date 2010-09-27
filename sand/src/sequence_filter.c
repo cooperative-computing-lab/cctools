@@ -35,8 +35,6 @@ static mer_t repeat_mask = 0;
 
 #define MER_VALUE(mer) ( (mer & (EVEN_MASK & k_mask)) | ((~mer) & (ODD_MASK & k_mask)) )
 
-#define SEQ_ID(seq_num) ( all_seqs[seq_num].name )
-
 struct mer_list_elem_s
 {
 	int seq_num;
@@ -78,7 +76,7 @@ unsigned long total_cand = 0;
 
 static int MER_TABLE_BUCKETS = 5000011; //20000003;
 static int CAND_TABLE_BUCKETS= 5000011; //20000003;
-static cseq * all_seqs = 0;
+static struct cseq ** all_seqs = 0;
 static cand_list_element ** candidates;
 static mer_hash_element ** mer_table;
 static struct itable * repeat_mer_table = 0;
@@ -112,7 +110,7 @@ void free_cand_list_element(cand_list_element * cle);
 void find_all_kmers(int seq_num);
 void find_minimizers(int seq_num);
 minimizer get_minimizer(int seq_num, int window_start);
-mer_t get_kmer(cseq c, int i);
+mer_t get_kmer(struct cseq *c, int i);
 void print_16mer(mer_t mer16);
 mer_t rev_comp_mer(mer_t mer);
 
@@ -140,66 +138,40 @@ void init_mer_table( int buckets )
 	}
 }
 
-int load_seqs(FILE * input, int seq_count)
+int load_seqs(FILE * input )
 {
-	if (seq_count <= 0)
-	{
-		seq_count = sequence_count(input);
-	}
-	all_seqs = malloc(seq_count*sizeof(cseq));
-	cseq c;
+	int seq_count = sequence_count(input);
 
-	while (!feof(input))
-	{
-		c = cseq_read(input);
-		if (!c.metadata) continue;
+	all_seqs = malloc(seq_count*sizeof(struct cseq *));
+	struct cseq *c;
 
-		all_seqs[num_seqs] = c;
-		
-		num_seqs++;
+	while ((c=cseq_read(input))) {
+		all_seqs[num_seqs++] = c;
 	}
 
 	return num_seqs;
 
 }
 
-int load_seqs_two_files(FILE * f1, int count1, int * end1, FILE * f2, int count2, int * end2)
+int load_seqs_two_files(FILE * f1, int * end1, FILE * f2, int * end2)
 {
 	num_seqs = 0;
-	if (count1 == 0)
-	{
-		count1 = sequence_count(f1);
-	}
-	if (count2 == 0)
-	{
-		count2 = sequence_count(f2);
-	}
-	all_seqs = malloc((count1+count2)*sizeof(cseq));
-	cseq c;
+	int count1 = sequence_count(f1);
+	int count2 = sequence_count(f2);
 
-	while (!feof(f1))
-	{
-		c = cseq_read(f1);
-		if (!c.metadata) continue;
+	all_seqs = malloc((count1+count2)*sizeof(struct cseq *));
+	struct cseq *c;
 
-		all_seqs[num_seqs] = c;
-		
-		num_seqs++;
+	while((c = cseq_read(f1))) {
+		all_seqs[num_seqs++] = c;
 	}
 
 	*end1 = num_seqs;
 
-	cseq_file_reset();
-
-	while (!feof(f2))
-	{
-		c = cseq_read(f2);
-		if (!c.metadata) continue;
-
-		all_seqs[num_seqs] = c;
-		
-		num_seqs++;
+	while((c = cseq_read(f2))) {
+		all_seqs[num_seqs++] = c;
 	}
+
 	*end2 = num_seqs;
 
 	return num_seqs;
@@ -260,8 +232,9 @@ void rearrange_seqs_for_dist_framework()
 {
 	int i;
 
-	cseq * top = malloc(rectangle_size*(sizeof(cseq)));
-	cseq * bottom = malloc(rectangle_size*(sizeof(cseq)));
+	struct cseq ** top = malloc(rectangle_size*(sizeof(struct cseq *)));
+	struct cseq ** bottom = malloc(rectangle_size*(sizeof(struct cseq*)));
+
 	for (i=0; i < num_seqs; i+=2)
 	{
 		top[i/2] = all_seqs[i];
@@ -272,42 +245,9 @@ void rearrange_seqs_for_dist_framework()
 		all_seqs[i] = top[i];
 		all_seqs[i+rectangle_size] = bottom[i];
 	}
+
 	free(top);
 	free(bottom);
-}
-
-int output_candidates(FILE * file, int format)
-{
-	int curr_index;
-	int total_output = 0;
-
-	cand_list_element * cle;
-
-	for (curr_index = 0; curr_index < CAND_TABLE_BUCKETS; curr_index++)
-	{
-		cle = candidates[curr_index];	
-		while (cle)
-		{
-			if (cle->count >= 1) 
-			{
-				if (format == CANDIDATE_FORMAT_OVL)
-				{
-					fprintf(file, "{OVL\nafr:%s\nbfr:%s\nori:%c\nolt:D\nahg:0\nbhg:0\nqua:0.000000\nmno:0\nmxo:0\npct:0\n}\n", all_seqs[cle->cand1].name, all_seqs[cle->cand2].name, (cle->dir == 1) ? 'N' : 'I');
-				}
-				else if (format == CANDIDATE_FORMAT_LINE)
-				{
-					fprintf(file, "%s\t%s\t%d\t%d\t%d\n", all_seqs[cle->cand1].name, all_seqs[cle->cand2].name, cle->dir, cle->loc1, (cle->dir == 1) ? cle->loc2 : all_seqs[cle->cand2].length - cle->loc2 - k);
-				}
-				total_output++;
-			}
-			cle = cle->next;
-		}
-		free_cand_list_element(candidates[curr_index]);
-		candidates[curr_index] = 0;
-	}
-
-	return total_output;
-
 }
 
 int compare_cand(const void * pair1, const void * pair2)
@@ -320,7 +260,7 @@ int compare_cand(const void * pair1, const void * pair2)
 	return diff;
 }
 
-int output_candidate_list(FILE * file, candidate_t * list, int total_output, int format)
+int output_candidate_list( FILE * file, candidate_t * list, int total_output )
 {
 	if (!list) return 0;
 
@@ -330,14 +270,7 @@ int output_candidate_list(FILE * file, candidate_t * list, int total_output, int
 	for (i=0; i<total_output; i++)
 	{
 		candidate_t pair = list[i];
-		if (format == CANDIDATE_FORMAT_OVL)
-		{
-			fprintf(file, "{OVL\nafr:%s\nbfr:%s\nori:%c\nolt:D\nahg:0\nbhg:0\nqua:0.000000\nmno:0\nmxo:0\npct:0\n}\n", all_seqs[pair.cand1].name, all_seqs[pair.cand2].name, (pair.dir == 1) ? 'N' : 'I');
-		}
-		else if (format == CANDIDATE_FORMAT_LINE)
-		{
-			fprintf(file, "%s\t%s\t%d\t%d\t%d\n", all_seqs[pair.cand1].name, all_seqs[pair.cand2].name, pair.dir, pair.loc1, (pair.dir == 1) ? pair.loc2 : all_seqs[pair.cand2].length - pair.loc2 - k);
-		}
+		fprintf(file, "%s\t%s\t%d\t%d\t%d\n", all_seqs[pair.cand1]->name, all_seqs[pair.cand2]->name, pair.dir, pair.loc1, (pair.dir == 1) ? pair.loc2 : all_seqs[pair.cand2]->length - pair.loc2 - k);
 		total_printed++;
 	}
 	return total_printed;
@@ -451,7 +384,7 @@ void print_mhe(FILE * file, mer_hash_element * mhe)
 		while (curr)
 		{
 			translate_kmer(mhe->mer, mer_str, k);
-			fprintf(file, "%s\t%d\t%s\t%s\t%d\n", mer_str, mhe->count, all_seqs[head->seq_num].name, all_seqs[curr->seq_num].name, (int) (head->dir * curr->dir));
+			fprintf(file, "%s\t%d\t%s\t%s\t%d\n", mer_str, mhe->count, all_seqs[head->seq_num]->name, all_seqs[curr->seq_num]->name, (int) (head->dir * curr->dir));
 			curr = curr->next;
 		}
 		head = head->next;
@@ -479,7 +412,7 @@ void find_all_kmers(int seq_num)
 {
 	mer_t mer16;
 	int i;
-	int end = all_seqs[seq_num].length - 15;
+	int end = all_seqs[seq_num]->length - 15;
 
 	for (i = 0; i<end; i+=8)
 	{
@@ -497,7 +430,7 @@ void find_all_kmers(int seq_num)
 void find_minimizers(int seq_num)
 {
 	int i;
-	int end = all_seqs[seq_num].length - k + 1;
+	int end = all_seqs[seq_num]->length - k + 1;
 	mer_t mer, rev, mer_val, rev_val;
 
 	minimizer window[WINDOW_SIZE];
@@ -625,7 +558,7 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer )
 		abs_min.dir = 0;
 		abs_min.loc = -1;
 		abs_min_index = 0;
-		end = all_seqs[seq_num].length - k + 1;
+		end = all_seqs[seq_num]->length - k + 1;
 		prev_seq_num = seq_num;
 	}
 
@@ -737,31 +670,7 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer )
 	return 0;
 }
 
-void test_mers()
-{
-	cseq c;
-
-	int i;
-
-	set_k_mask();
-
-	c = all_seqs[0];
-	seq s = cseq_uncompress(c);
-	seq_reverse_complement(&s);
-	seq_print(stdout, s);
-
-	int end = c.length - k + 1;
-	mer_t mer;
-
-	for (i = 0; i<end; i++)
-	{
-		mer = rev_comp_mer(get_kmer(c, i));
-		printf("%13llu: ", (long long unsigned int)mer);
-		print_kmer(stdout, mer);
-	}
-}
-
-mer_t get_kmer(cseq c, int curr)
+mer_t get_kmer(struct cseq *c, int curr)
 {
 
 	// Which mer does this kmer start in? 
@@ -779,7 +688,7 @@ mer_t get_kmer(cseq c, int curr)
 		if ((bases_left >= 8) || (bases_left > (8-which_base)))
 		{
 			// Mask out everything before which_base
-			curr_mer = c.mers[which_mer] & short_masks[which_base];
+			curr_mer = c->mers[which_mer] & short_masks[which_base];
 
 			// Push mer so that there is enough space for curr_mer
 			mer = mer << ( (8-which_base)*2 );
@@ -802,8 +711,8 @@ mer_t get_kmer(cseq c, int curr)
 			mer = mer << bases_left*2;
 
 			// Shift the curr mer to the end and mask it out.
-			curr_mer = c.mers[which_mer];
-			if ((c.mercount-1) == which_mer) { curr_mer = curr_mer << ((8-(c.length - (8*which_mer)))*2); }
+			curr_mer = c->mers[which_mer];
+			if ((c->mercount-1) == which_mer) { curr_mer = curr_mer << ((8-(c->length - (8*which_mer)))*2); }
 			curr_mer = (curr_mer >> ((8 - (bases_left+which_base))*2 )) & short_masks[8-bases_left];
 
 			// Now add it on to mer.

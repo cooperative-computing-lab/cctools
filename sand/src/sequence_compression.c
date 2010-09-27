@@ -8,7 +8,8 @@ See the file COPYING for details.
 #include <stdlib.h>
 
 #include "sequence_compression.h"
-#include "sand_align.h"
+#include "full_io.h"
+#include "debug.h"
 
 #define MAX_ID SEQUENCE_ID_MAX
 #define MAX_METADATA SEQUENCE_METADATA_MAX 
@@ -17,36 +18,57 @@ static short mer_add_base(short mer, char base);
 static short translate_8mer(const char * str, int start);
 static int get_mercount(int length);
 
-cseq seq_compress(seq s)
+struct cseq * cseq_create( const char *name, int length, int mercount, short *mers, const char *metadata)
 {
-	cseq m;
+	struct cseq *c = malloc(sizeof(*c));
+	c->name = strdup(name);
+	c->length = length;
+	c->mercount = mercount;
+	c->mers = malloc(c->mercount);
+	memcpy(c->mers,mers,c->mercount);
+	c->metadata = strdup(metadata);
+	return c;
+	
+}
+
+struct cseq *cseq_copy( struct cseq *c )
+{
+	return cseq_create(c->name,c->length,c->mercount,c->mers,c->metadata);
+}
+
+struct cseq * seq_compress(seq s)
+{
+	struct cseq  *c;
 	int len = s.length;
 	int mercount = get_mercount(len);
 	int curr_8mer;
 
-	m.length = len;
-	m.mercount = mercount;
-	m.mers = malloc(mercount*sizeof(short));
-	m.name = 0;
-	m.metadata = 0;
+	c = malloc(sizeof(*c));
+	if(!c) return 0;
+
+	c->length = len;
+	c->mercount = mercount;
+	c->mers = malloc(mercount*sizeof(short));
+	c->name = 0;
+	c->metadata = 0;
 	
-	if(s.id)       m.name = strdup(s.id);
-	if(s.metadata) m.metadata = strdup(s.metadata);
+	if(s.id)       c->name = strdup(s.id);
+	if(s.metadata) c->metadata = strdup(s.metadata);
 
 	if (s.seq != 0)
 	{
 		for (curr_8mer=0; curr_8mer < mercount; curr_8mer++)
 		{
-			m.mers[curr_8mer] = translate_8mer(s.seq, curr_8mer*8);
+			c->mers[curr_8mer] = translate_8mer(s.seq, curr_8mer*8);
 		}
 	} else {
-		m.mers = 0;
+		c->mers = 0;
 	}
 
-	return m;
+	return c;
 }
 
-int get_mercount(int length)
+static int get_mercount(int length)
 {
 	int mercount = length/8;
 	if (length%8 > 0) { mercount++; }
@@ -54,7 +76,7 @@ int get_mercount(int length)
 	return mercount;
 }
 
-short translate_8mer(const char * str, int start)
+static short translate_8mer(const char * str, int start)
 {
 	int i;
 	short mer = 0;
@@ -104,34 +126,34 @@ short mer_add_base(short mer, char base)
 	return (mer << 2) + base_to_num(base);
 }
 
-seq cseq_uncompress(cseq m)
+seq cseq_uncompress( struct cseq *c )
 {
 	seq s;
 
 	memset(&s,0,sizeof(s));
 
-	if(m.name)   s.id = strdup(m.name);
-	if(m.metadata) s.metadata = strdup(m.metadata);
+	if(c->name)   s.id = strdup(c->name);
+	if(c->metadata) s.metadata = strdup(c->metadata);
 
-	s.length = m.length;
+	s.length = c->length;
 
-	int mercount = m.length/8;
+	int mercount = c->length/8;
 
-	if (m.mers != 0)
+	if (c->mers != 0)
 	{
-		s.seq = malloc((m.length+1)*sizeof(char));
+		s.seq = malloc((c->length+1)*sizeof(char));
 		s.seq[0] = '\0';
 		int i;
 		char tempstr[9];
 		for (i=0; i<mercount; i++)
 		{
-			translate_to_str(m.mers[i], tempstr, 8);
+			translate_to_str(c->mers[i], tempstr, 8);
 			strcat(s.seq, tempstr);
 		}
-		if (m.length % 8 > 0)
+		if (c->length % 8 > 0)
 		{
 			// handle the overflow if it doesn't divide by 8 exactly.
-			translate_to_str(m.mers[i], tempstr, m.length%8);
+			translate_to_str(c->mers[i], tempstr, c->length%8);
 			strcat(s.seq, tempstr);
 		} 
 		s.seq[s.length] = '\0';
@@ -161,136 +183,63 @@ void translate_to_str(int mer, char * str, int length)
 }
 
 
-void cseq_free(cseq m)
+void cseq_free( struct cseq *c )
 {
-	if (m.mers) { free(m.mers); m.mers = 0; }
-	if (m.name) { free(m.name); m.name = 0; }
-	if (m.metadata) { free(m.metadata); m.metadata = 0; }
-}
-
-size_t cseq_size(cseq c)
-{
-	char tmp[255];
-	size_t size = 0;
-
-	// Get the size of the header line.
-	size += sprintf(tmp, ">%s %d %d %s\n", c.name, c.length, (int)(c.mercount*sizeof(short)), c.metadata);
-	/*
-	size += strlen(c.name);
-	size += floor(log(c.length)+1);
-	size += floor(log(c.mercount*sizeof(short)));
-	size += strlen(c.metadata);
-	size += 5;  // The '>', spaces and newline.
-	*/
-	// Add the number of mers (each a short)
-	size += c.mercount*sizeof(short);
-	// Add one more for the newline at the end.
-	size++;
-
-	return size;
-}
-
-size_t cseq_sprint(char * buf, cseq c)
-{
-	char * ins = buf;
-	int res;
-	size_t size = 0;
-	res = sprintf(ins, ">%s %d %d %s\n", c.name, c.length, (int)(c.mercount*sizeof(short)), c.metadata);
-	ins += res;
-	size += res;
-	memcpy(ins, c.mers, c.mercount*sizeof(short));
-	ins += c.mercount*sizeof(short);
-	size += c.mercount*sizeof(short);
-	sprintf(ins, "\n");
-	size++;
-
-	return size;
-}
-
-void cseq_print(FILE * file, cseq c)
-{
-	fprintf(file, ">%s %d %d %s\n", c.name, c.length, (int)(c.mercount*sizeof(short)), c.metadata);
-
-	fwrite(c.mers, sizeof(short), c.mercount, file);
-	fputc('\n',file);
-}
-
-static char line[MAX_STRING] = "";
-static int count = 0;
-
-void cseq_file_reset()
-{
-	count = 0;
-	strcpy(line, "");
-}
-
-cseq cseq_read(FILE * file)
-{
-	int total;
-	cseq sequence;
-	char tmp_id[MAX_ID];
-	char tmp_metadata[MAX_METADATA];
-
-	// Read the first line.
-	if (count == 0)
-	{
-		fgets(line, MAX_STRING, file);
-		count = 1;
+	if(c) {
+		if (c->mers)     free(c->mers);
+		if (c->name)     free(c->name);
+		if (c->metadata) free(c->metadata);
+		free(c);
 	}
-
-	if (line[0] == '>' && line[1] == '>')
-	{
-		sequence.mers = 0;
-		sequence.name = 0;
-		sequence.metadata = 0;
-		sequence.length = 0;
-
-		// Read ahead the next line.
-		fgets(line, MAX_STRING, file);
-
-		// Get the next line in the file for the next iteration to start with.
-		return sequence;
-	}
-	else if (line[0] == '>')
-	{
-		sequence.name = 0;
-		sequence.metadata = 0;
-		sequence.length = 0;
-		sequence.mercount = 0;
-	}
-	else
-	{
-		fprintf(stderr, "Error parsing compressed sequences. Expected '>' and received %c (ASCII %d)\n", line[0], (int) line[0]);
-		exit(1);
-	}
-
-	int bytes;
-
-	tmp_metadata[0] = '\0';
-	sscanf(line, ">%s %d %d %[^\n]\n", tmp_id, &sequence.length, &bytes,tmp_metadata);
-	sequence.name = strdup(tmp_id);
-	sequence.metadata = strdup(tmp_metadata);
-	sequence.mercount = get_mercount(sequence.length);
-	sequence.mers = malloc(sequence.mercount*sizeof(short));
-
-	char last;
-	total = fread(sequence.mers, 1, bytes, file);
-	if (total != bytes)
-	{
-		fprintf(stderr, "ERROR: Did not read as much as was expected (expected %d, read %d, line: %s).\n", bytes, total, line);
-		exit(1);
-	}
-	fread(&last, sizeof(char), 1, file);  // Get the newline at the end of each sequence.
-
-	// Read ahead the next line.
-	fgets(line, MAX_STRING, file);
-	count++;
-
-	return sequence;
 }
 
+size_t cseq_size( struct cseq *c)
+{
+	return c->mercount*sizeof(short) + 100;
+}
 
+void cseq_print( FILE * file, struct cseq *c )
+{
+	if(!c) {
+		// special case: null pointer indicates the end of a list.
+		fprintf(file,">>\n");
+	} else {
+		fprintf(file, ">%s %d %d %s\n", c->name, c->length, (int)(c->mercount*sizeof(short)), c->metadata);
+		fwrite(c->mers, sizeof(short), c->mercount, file);
+		fputc('\n',file);
+	}
+}
 
+#define SEQUENCE_FILE_LINE_MAX 1024
 
+struct cseq * cseq_read( FILE *file )
+{
+	char line[SEQUENCE_FILE_LINE_MAX];
+	char metadata[SEQUENCE_FILE_LINE_MAX];
+	char name[SEQUENCE_FILE_LINE_MAX];
+	int  nbases, nbytes;
 
+	if(!fgets(line,sizeof(line),file)) return 0;
+
+	// special case: two arrows indicates the end of a list,
+	// but not the end of a file.
+
+	if(line[0] == '>' && line[1] == '>') return 0;
+
+	int n = sscanf(line, ">%s %d %d %[^\n]",name,&nbases,&nbytes,metadata);
+	if(n<3) fatal("syntax error near %s\n",line);
+
+	short *data = malloc(nbytes);
+
+	n = full_fread(file,data,nbytes);
+	if(n!=nbytes) fatal("sequence file is corrupted.");
+
+	fgetc(file);
+
+	struct cseq *c = cseq_create(name,nbases,nbytes,data,metadata);
+
+	free(data);
+
+	return c;
+}
 

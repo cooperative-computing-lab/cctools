@@ -15,13 +15,17 @@ See the file COPYING for details.
 
 #include "debug.h"
 
+static void show_version(const char *cmd)
+{
+        printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
+}
+
 static void show_help(const char *cmd)
 {
         printf("Use: %s [options]  fasta_reads > compressed_reads\n", cmd);
         printf("where options are:\n");
-	printf(" -c             Remove Celera read_ids if file came from Celera's gatekeeper\n");
-	printf(" -i             Remove read_ids but leave the Celera internal ids if the file came from Celera's gatekeeper\n"); 
-	printf(" -h             Show this help screen\n");
+	printf(" -v  Show version string.\n");
+	printf(" -h  Show this help screen\n");
 }
 
 int main(int argc, char ** argv)
@@ -29,20 +33,15 @@ int main(int argc, char ** argv)
 	const char *progname = "sand_compress_reads";
 	FILE * input;
 	seq s;
-	cseq c;
+	struct cseq *c;
 	char d;
-	char clip = 0;
-	char internal = 0;
-	char tmp_id[128];
 
         while((d=getopt(argc,argv,"chi"))!=(char)-1) {
                 switch(d) {
-                case 'c':
-			clip = 1;
-                        break;
-		case 'i':
-			internal = 1;
-			break; 
+		case 'v':
+			show_version(progname);
+			exit(0);
+			break;
                 case 'h':
                         show_help(progname);
                         exit(0);
@@ -50,28 +49,16 @@ int main(int argc, char ** argv)
                 }
         }
 
-	if (argc == 2 && clip == 0 && internal == 0) {
-		input = fopen(argv[1], "r");
-		if (!input) fatal("couldn't open %s: %s\n",argv[1],strerror(errno));
-	} else if (argc == 3) {
-		input = fopen(argv[2], "r");
-		if (!input) fatal("couldn't open %s: %s\n",argv[2],strerror(errno));
+	if( optind<(argc-1) ) {
+		input = fopen(argv[optind], "r");
+		if (!input) fatal("couldn't open %s: %s\n",argv[optind],strerror(errno));
 	} else {
 		input = stdin;
 	}
 
-
 	while (!feof(input))
 	{
 		s = seq_read(input); 
-		if(clip != 0 || internal != 0){
-			strcpy(tmp_id, s.id);
-			strcpy(s.id, strtok(tmp_id,","));
-			if(internal != 0){
-				strcpy(s.id, strtok(NULL,","));
-			}
-		}
-		if (!s.id) { fprintf(stdout, ">>\n"); continue; }
 		c = seq_compress(s);
 		cseq_print(stdout, c);
 		cseq_free(c);

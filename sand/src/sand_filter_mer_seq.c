@@ -5,13 +5,13 @@ See the file COPYING for details.
 */
 
 #include <stdio.h>
-#include <sys/time.h>
 #include <math.h>
-#include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include <time.h>
+#include <string.h>
+#include <errno.h>
+#include <limits.h>
 
 #include "memory_info.h"
 #include "debug.h"
@@ -21,7 +21,6 @@ See the file COPYING for details.
 static int num_seqs;
 static int kmer_size = 22;
 static int window_size = 22;
-static int output_format = CANDIDATE_FORMAT_LINE;
 static char end_char = 0;
 static unsigned long max_mem_kb = ULONG_MAX;
 
@@ -146,17 +145,11 @@ int main(int argc, char **argv)
 	unsigned long start_mem, cand_mem, table_mem;
 
 	input = fopen(sequence_filename, "r");
-	if(!input) {
-		fprintf(stderr, "ERROR: Could not open file %s for reading.\n", sequence_filename);
-		exit(1);
-	}
+	if(!input) fatal("couldn't open %s: %s\n",sequence_filename,strerror(errno));
 
 	if(repeat_filename) {
 		repeats = fopen(repeat_filename, "r");
-		if(!repeats) {
-			fprintf(stderr, "ERROR: Could not open file %s for reading.\n", repeat_filename);
-			exit(1);
-		}
+		if(!repeats) fatal("couldn't open %s: %s\n",repeat_filename,strerror(errno));
 	}
 
 	if(output_filename) {
@@ -179,7 +172,7 @@ int main(int argc, char **argv)
 	// If we only give one file, do an all vs. all
 	// on them.
 	if(!second_sequence_filename) {
-		num_seqs = load_seqs(input, 0);
+		num_seqs = load_seqs(input);
 		start_x = 0;
 		end_x = num_seqs;
 		start_y = 0;
@@ -193,7 +186,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Could not open file %s for reading.\n", second_sequence_filename);
 			exit(1);
 		}
-		num_seqs = load_seqs_two_files(input, 0, &end_x, input2, 0, &end_y);
+		num_seqs = load_seqs_two_files(input, &end_x, input2, &end_y);
 		start_x = 0;
 		start_y = end_x;
 		debug(D_DEBUG,"First file contains %d sequences, stored from (%d,%d].\n", end_x, start_x, end_x);
@@ -247,7 +240,7 @@ int main(int argc, char **argv)
 			debug(D_DEBUG,"Total candidates generated: %llu\n", (long long unsigned int) total_cand);
 
 			output_list = retrieve_candidates(&num_in_list);
-			output_candidate_list(output, output_list, num_in_list, output_format);
+			output_candidate_list(output, output_list, num_in_list);
 			free(output_list);
 			fflush(output);
 
