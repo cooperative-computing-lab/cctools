@@ -56,6 +56,7 @@ static int window_size = 22;
 static char end_char = '\0';
 static int do_not_unlink = 0;
 static int do_not_cache = 0;
+static int retry_max = 100;
 
 static unsigned long int cand_count = 0;
 
@@ -91,9 +92,11 @@ static time_t last_display_time = 0;
 static time_t last_flush_time = 0;
 
 static int total_submitted = 0;
+static int total_retried = 0;
 static int total_processed = 0;
 static timestamp_t tasks_runtime = 0;
 static timestamp_t tasks_filetime = 0;
+
 
 static void show_version(const char *cmd)
 {
@@ -108,6 +111,7 @@ static void show_help(const char *cmd)
 	printf(" -s <size>      Size of \"rectangle\" for filtering.\n");
 	printf(" -x             If specified, input files would be cached on the workers.\n");
 	printf(" -r <file>      A meryl file of repeat mers to be filtered out.\n");
+	printf(" -R <n>         Automatically retry failed jobs up to n times.\n");
 	printf(" -k <number>    The k-mer size to use in candidate selection (default is 22).\n");
 	printf(" -w <number>    The minimizer window size to use in candidate selection (default");
 	printf("                is 22).\n");
@@ -367,6 +371,7 @@ static int handle_done_task(struct work_queue_task * t)
 		else if (t->result == 3)
 		{
 			fprintf(stderr, "Rectangle %s failed to receive output files from host %s.\n", t->tag, t->host);
+			return 0;
 		}
 	}
 
@@ -397,6 +402,8 @@ static void display_progress()
 int main(int argc, char ** argv)
 {
 	const char *progname = "sand_filter_master";
+	struct work_queue_task *t;
+	int rv;
 
 	debug_config(progname);
 
@@ -426,7 +433,6 @@ int main(int argc, char ** argv)
 	start_time = time(0);
 
 	int curr_start_x = 0, curr_start_y = 0, curr_rect_x = 0, curr_rect_y = 0;
-	struct work_queue_task * t;
 	
 	printf("%7s | %4s %4s %4s | %6s %4s %4s %4s | %6s %6s %6s %10s\n",
 			"Time",
@@ -461,8 +467,16 @@ int main(int argc, char ** argv)
 
 			if (curr_start_y >= num_seqs) break;
 		}
-		t = work_queue_wait(q, 1);
-		if(t) handle_done_task(t);
+		t = work_queue_wait(q,1);
+		if(t) {
+			rv = handle_done_task(work_queue_wait(q, 1));
+			if(!rv && retry_max) { // Task failed
+				// Retry the task
+				work_queue_submit(q, t);
+				total_retried++;
+				retry_max--;
+			}
+		}
 		if (time(0) != last_display_time) display_progress();
 	}
 
@@ -495,7 +509,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 	char c;
 	char tmp[512];
 
-	while ((c = getopt(argc, argv, "p:n:d:s:r:k:w:c:o:f:a:uxvh")) != (char) -1)
+	while ((c = getopt(argc, argv, "p:n:d:s:r:R:k:w:c:o:f:a:uxvh")) != (char) -1)
 	{
 		switch (c) {
 		case 'p':
@@ -503,6 +517,9 @@ static void get_options(int argc, char ** argv, const char * progname)
 			break;
 		case 'r':
 			repeat_filename = optarg;
+			break;
+		case 'R':
+			retry_max = atoi(optarg);
 			break;
 		case 's':
 			rectangle_size = atoi(optarg);
