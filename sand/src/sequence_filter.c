@@ -151,7 +151,7 @@ int load_seqs(FILE * input, int seq_count)
 
 	while (!feof(input))
 	{
-		c = get_next_cseq(input);
+		c = cseq_read(input);
 		if (!c.metadata) continue;
 
 		all_seqs[num_seqs] = c;
@@ -179,7 +179,7 @@ int load_seqs_two_files(FILE * f1, int count1, int * end1, FILE * f2, int count2
 
 	while (!feof(f1))
 	{
-		c = get_next_cseq(f1);
+		c = cseq_read(f1);
 		if (!c.metadata) continue;
 
 		all_seqs[num_seqs] = c;
@@ -193,7 +193,7 @@ int load_seqs_two_files(FILE * f1, int count1, int * end1, FILE * f2, int count2
 
 	while (!feof(f2))
 	{
-		c = get_next_cseq(f2);
+		c = cseq_read(f2);
 		if (!c.metadata) continue;
 
 		all_seqs[num_seqs] = c;
@@ -282,7 +282,6 @@ int output_candidates(FILE * file, int format)
 	int total_output = 0;
 
 	cand_list_element * cle;
-	candidate_t curr_cand;
 
 	for (curr_index = 0; curr_index < CAND_TABLE_BUCKETS; curr_index++)
 	{
@@ -298,15 +297,6 @@ int output_candidates(FILE * file, int format)
 				else if (format == CANDIDATE_FORMAT_LINE)
 				{
 					fprintf(file, "%s\t%s\t%d\t%d\t%d\n", all_seqs[cle->cand1].ext_id, all_seqs[cle->cand2].ext_id, cle->dir, cle->loc1, (cle->dir == 1) ? cle->loc2 : all_seqs[cle->cand2].length - cle->loc2 - k);
-				}
-				else if (format == CANDIDATE_FORMAT_BINARY)
-				{
-					curr_cand.cand1 = atoi(all_seqs[cle->cand1].ext_id);
-					curr_cand.cand2 = atoi(all_seqs[cle->cand2].ext_id);
-					curr_cand.dir = cle->dir;
-					curr_cand.loc1 = cle->loc1;
-					curr_cand.loc2 = (cle->dir == 1) ? cle->loc2 : all_seqs[cle->cand2].length - cle->loc2 - k;
-					fwrite(&curr_cand, sizeof(struct candidate_s), 1, file);
 				}
 				total_output++;
 			}
@@ -347,13 +337,6 @@ int output_candidate_list(FILE * file, candidate_t * list, int total_output, int
 		else if (format == CANDIDATE_FORMAT_LINE)
 		{
 			fprintf(file, "%s\t%s\t%d\t%d\t%d\n", all_seqs[pair.cand1].ext_id, all_seqs[pair.cand2].ext_id, pair.dir, pair.loc1, (pair.dir == 1) ? pair.loc2 : all_seqs[pair.cand2].length - pair.loc2 - k);
-		}
-		else if (format == CANDIDATE_FORMAT_BINARY)
-		{
-			pair.loc2 = (pair.dir == 1) ? pair.loc2 : all_seqs[pair.cand2].length - pair.loc2 - k;
-			pair.cand1 = atoi(all_seqs[pair.cand1].ext_id);
-			pair.cand2 = atoi(all_seqs[pair.cand2].ext_id);
-			fwrite(&pair, sizeof(struct candidate_s), 1, file);
 		}
 		total_printed++;
 	}
@@ -763,7 +746,7 @@ void test_mers()
 	set_k_mask();
 
 	c = all_seqs[0];
-	seq s = uncompress_seq(c);
+	seq s = cseq_uncompress(c);
 	seq_reverse_complement(&s);
 	seq_print(stdout, s);
 

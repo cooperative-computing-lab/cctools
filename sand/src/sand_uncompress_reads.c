@@ -6,8 +6,12 @@ See the file COPYING for details.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 
 #include "sequence_compression.h"
+
+#include "debug.h"
 
 int main(int argc, char ** argv)
 {
@@ -15,40 +19,34 @@ int main(int argc, char ** argv)
 	seq s;
 	cseq c;
 
-	if (argc == 2)
-	{
+	if (argc == 2) {
 		input = fopen(argv[1], "r");
-		if (!input)
-		{
-			fprintf(stderr, "ERROR: Could not open file %s for reading.\n", argv[1]);
-			exit(1);
-		}
-	}
-	else
-	{
+		if (!input) fatal("couldn't open %s: %s\n",argv[1],strerror(errno));
+	} else {
 		input = stdin;
 	}
 
-	c = get_next_cseq(input);
+	c = cseq_read(input);
 
 	while (!feof(input))
 	{
 		if (!c.ext_id)
 		{
 			fprintf(stdout, ">>\n");
-			c = get_next_cseq(input);
+			c = cseq_read(input);
 			continue;
 		}
-		s = uncompress_seq(c);
-		free_cseq(c);
+		s = cseq_uncompress(c);
+		cseq_free(c);
 		seq_print(stdout, s);
 		seq_free(s);
-		c = get_next_cseq(input);
+		c = cseq_read(input);
 	}
+
 	if (c.ext_id)
 	{
-		s = uncompress_seq(c);
-		free_cseq(c);
+		s = cseq_uncompress(c);
+		cseq_free(c);
 		seq_print(stdout, s);
 		seq_free(s);
 	}

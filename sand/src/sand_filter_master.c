@@ -47,7 +47,6 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 static int handle_done_task(struct work_queue_task * t);
 static int confirm_output(struct work_queue_task *t);
 static void display_progress();
-static int convert_cand_binary_to_ascii(FILE * outfile, const char * fname);
 
 // GLOBALS
 static int port = 9090;
@@ -62,9 +61,8 @@ static unsigned long int cand_count = 0;
 static cseq * sequences = 0;
 static int num_seqs = 0;
 static int num_rectangles = 0;
-static size_t * sizes = 0;
 static size_t * rectangle_sizes = 0;
-static char ** name_map = 0;
+
 struct task_id
 {
 	int x;
@@ -96,9 +94,6 @@ static int total_processed = 0;
 static timestamp_t tasks_runtime = 0;
 static timestamp_t tasks_filetime = 0;
 
-static int BINARY_OUTPUT = 0;
-
-
 static void show_version(const char *cmd)
 {
 	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
@@ -115,7 +110,6 @@ static void show_help(const char *cmd)
 	printf(" -k <number>    The k-mer size to use in candidate selection (default is 22).\n");
 	printf(" -w <number>    The minimizer window size to use in candidate selection (default");
 	printf("                is 22).\n");
-	printf(" -b             Return output as binary (default is ASCII). Output\n");
 	printf("                will be converted to ASCII and stored in <outputdata>\n");
 	printf(" -u             If set, do not unlink temporary binary output files.\n");
 	printf(" -c <file>      The file which contains checkpoint information. If it exists,\n");
@@ -130,35 +124,23 @@ static void show_help(const char *cmd)
 	printf(" -h             Show this help screen\n");
 }
 
-void load_sequences(const char * file)
+void load_sequences(const char * filename)
 {
+	FILE * file = fopen(filename, "r");
+	if(!file) fatal("couldn't open %s: %s\n",filename,strerror(errno));
 
-	FILE * input = fopen(file, "r");
 	int seq_count = 0;
-	char * new_name;
 
-	seq_count = sequence_count(input);
+	seq_count = sequence_count(file);
 	sequences = malloc(seq_count*sizeof(cseq));
-	sizes = malloc(seq_count*sizeof(size_t));
-	name_map = malloc(seq_count*sizeof(char *));
+
 	cseq c;
 
-	while (!feof(input))
+	while (!feof(file))
 	{
-		c = get_next_cseq(input);
+		c = cseq_read(file);
 		if (!c.metadata) continue;
-
-		// Keep track of the name of this sequence.
-		name_map[num_seqs] = c.ext_id;
-
-		// Give this a new name.
-		new_name = malloc(32*sizeof(char));
-		sprintf(new_name, "%d", num_seqs);
-		c.ext_id = new_name;
-
 		sequences[num_seqs] = c;
-		sizes[num_seqs] = cseq_size(c);
-
 		num_seqs++;
 	}
 
@@ -186,7 +168,7 @@ void load_rectangles_to_files()
 		// Get the size of this rectangle.
 		for (curr = start; curr < end; curr++)
 		{
-			size += sizes[curr];
+			size += cseq_size(sequences[curr]);
 		}
 
 		// Open a new file to which to print this rectangle.
@@ -197,10 +179,10 @@ void load_rectangles_to_files()
 		for (curr = start; curr < end; curr++)
 		{			
 			// Copy this sequence into the new file.
-			print_cseq(tmpfile, sequences[curr]);
+			cseq_print(tmpfile, sequences[curr]);
 
 			// Free this sequence, it is no longer needed.
-			free_cseq(sequences[curr]);
+			cseq_free(sequences[curr]);
 		}
 
 		fclose(tmpfile);
@@ -305,8 +287,6 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 	char rname_x[32];
 	char rname_y[32];
 	char cmd[255];
-	char output_fname[255];
-	char output_rname[255];
 	char fname_x[255];
 	char fname_y[255];
 	char wrapper[255] = "";
@@ -330,16 +310,8 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 	{
 		sprintf(rname_y, "%s","");
 	}
-	if (BINARY_OUTPUT)
-	{
-		sprintf(output_rname, "rect%03d-%03d.bcand", curr_rect_y, curr_rect_x);
-		sprintf(output_fname, "%s/%s", outdirname, output_rname);
-		sprintf(cmd, "%s./%s %s -b -o %s %s %s 2>&1", wrapper, filter_program_name, filter_program_args, output_rname, rname_x, rname_y);
-	}
-	else
-	{
-		sprintf(cmd, "%s./%s %s %s %s", wrapper, filter_program_name, filter_program_args, rname_x, rname_y);
-	}
+
+	sprintf(cmd, "%s./%s %s %s %s", wrapper, filter_program_name, filter_program_args, rname_x, rname_y);
 
 	// Create the task.
 	t = work_queue_task_create(cmd);
@@ -359,24 +331,12 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 
 	// Add the rectangle. Add it as staged, so if the worker
 	// already has these sequences, there's no need to send them again.
-	//work_queue_task_specify_input_buf(t, rectangles[curr_rect_x], rectangle_sizes[curr_rect_x], rname_x);
-	//if (curr_rect_x != curr_rect_y) work_queue_task_specify_input_buf(t, rectangles[curr_rect_y], rectangle_sizes[curr_rect_y], rname_y);
 	sprintf(fname_x, "%s/%s", outdirname, rname_x);
 	custom_work_queue_task_specify_input_file(t, fname_x, rname_x);
 	if (curr_rect_x != curr_rect_y)
 	{
 		sprintf(fname_y, "%s/%s", outdirname, rname_y);
 		custom_work_queue_task_specify_input_file(t, fname_y, rname_y);
-	}
-
-	// Get the output file if it's in binary mode. If not in binary mode
-	// it will just return a string into a buffer.
-	if (BINARY_OUTPUT) {
-		if(do_not_cache) {
-			work_queue_task_specify_output_file_do_not_cache(t, output_rname, output_fname);
-		} else {
-			work_queue_task_specify_output_file(t, output_rname, output_fname);
-		}
 	}
 
 	// Submit the task
@@ -400,52 +360,19 @@ static int handle_done_task(struct work_queue_task * t)
 
 	if (t->result == 0)
 	{
-		if (!BINARY_OUTPUT)
+		if (confirm_output(t))
 		{
-			if (confirm_output(t))
-			{
-				//debug(D_DEBUG, "Completed task!\n%s\n%s\n", t->command, t->output);
-				debug(D_DEBUG, "Completed rectangle %s: '%s'\n", t->tag, t->command_line);
-				fputs(t->output, outfile);
-				fflush(outfile);
-				total_processed++;
-				tasks_runtime += (t->finish_time - t->start_time);
-				tasks_filetime += t->total_transfer_time;
-				//printf("Total submitted: %6d, Total processed: %6d\n", total_submitted, total_processed);
-			}
-			else
-			{
-				fprintf(stderr, "Invalid output format from host %s on rectangle %s:\n%s", t->host, t->tag, t->output);
-				return 0;
-			}
-		}
-		else
-		{
-			char fname[255];
-			// Deal with validating binary input later.
-			debug(D_DEBUG, "Completed rectangle %s (binary output): '%s' Output: %s\n", t->tag, t->command_line, t->output);
-
-			sprintf(fname, "%s/rect%s.bcand", outdirname, t->tag);
-			unsigned long int start_line_in_outfile = cand_count;
-			if (convert_cand_binary_to_ascii(outfile, fname))
-			{
-				// If we successfully converted, delete the file.
-				if (!do_not_unlink)
-				{
-					if (unlink(fname) != 0)
-					{
-						debug(D_DEBUG, "File %s was successfully converted but could not be deleted.\n", fname);
-					}
-				}
-			}
-			debug(D_DEBUG, "Lines %lu - %lu", start_line_in_outfile, cand_count);
+			debug(D_DEBUG, "Completed rectangle %s: '%s'\n", t->tag, t->command_line);
+			fputs(t->output, outfile);
+			fflush(outfile);
 			total_processed++;
 			tasks_runtime += (t->finish_time - t->start_time);
 			tasks_filetime += t->total_transfer_time;
+		} else {
+			fprintf(stderr, "Invalid output format from host %s on rectangle %s:\n%s", t->host, t->tag, t->output);
+			return 0;
 		}
-	}
-	else
-	{
+	} else {
 		if (t->result == 1)
 		{
 			fprintf(stderr, "Rectangle %s failed while sending input to host %s\n", t->tag, t->host);
@@ -464,59 +391,6 @@ static int handle_done_task(struct work_queue_task * t)
 	}
 
 	work_queue_task_delete(t);
-	return 1;
-}
-
-static int convert_cand_binary_to_ascii(FILE * outputfile, const char * fname)
-{
-	FILE * infile;
-	long infile_size;
-	candidate_t * buffer;
-	long result;
-	int count;
-
-	infile = fopen(fname, "rb");
-	if (!infile)
-	{
-		fprintf(stderr, "Could not open bcand file %s\n", fname);
-		return 0;
-	}
-
-	// Obtain file size.
-	fseek(infile, 0, SEEK_END);
-	infile_size = ftell(infile);
-	count = infile_size / sizeof(candidate_t);
-	rewind(infile);
-
-	// Allocate memory to contain the whole file.
-	buffer = (candidate_t *) malloc(infile_size);
-	if (!buffer)
-	{
-		fprintf(stderr, "Could not allocate memory for bcand file %s\n", fname);
-		return 0;
-	}
-
-	// Copy the result into the buffer.
-	result = fread(buffer, sizeof(candidate_t), count, infile);
-	if (result*sizeof(candidate_t) != infile_size)
-	{
-		fprintf(stderr, "Read %ld bytes from the file, expected %ld\n", result, infile_size);
-		return 0;
-	}
-
-	fclose(infile);
-
-	int i;
-	for (i=0; i < count; i++)
-	{
-		fprintf(outputfile, "%s\t%s\t%d\t%d\t%d\n", name_map[buffer[i].cand1], name_map[buffer[i].cand2], buffer[i].dir, buffer[i].loc1, buffer[i].loc2);
-		cand_count++;
-	}
-	//fflush(outputfile);
-	fsync(fileno(outputfile));
-
-	free(buffer);
-
 	return 1;
 }
 
@@ -651,7 +525,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 	char c;
 	char tmp[512];
 
-	while ((c = getopt(argc, argv, "p:n:d:s:r:k:w:bc:o:f:a:uxvh")) != (char) -1)
+	while ((c = getopt(argc, argv, "p:n:d:s:r:k:w:c:o:f:a:uxvh")) != (char) -1)
 	{
 		switch (c) {
 		case 'p':
@@ -668,9 +542,6 @@ static void get_options(int argc, char ** argv, const char * progname)
 			break;
 		case 'w':
 			window_size = atoi(optarg);
-			break;
-		case 'b':
-			BINARY_OUTPUT = 1;
 			break;
 		case 'c':
 			checkpoint_filename = optarg;
@@ -701,6 +572,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 		case 'v':
 			show_version(progname);
 			exit(0);
+		default:
 		case 'h':
 			show_help(progname);
 			exit(0);

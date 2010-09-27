@@ -42,7 +42,6 @@ static cell new_score(cell ** matrix, int i, int j, const char * str1, const cha
 static cell new_score_gap_extensions(cell ** matrix, int i, int j, const char * str1, const char * str2);
 static cell new_score_banded(cell ** band, int band_row, int band_col, int matrix_row, int matrix_col, const char * str1, const char * str2, int which);
 static void choose_best(cell ** matrix, int * i, int * j, int length1, int length2, int min_align);
-
 static delta align_traceback(cell ** matrix, int i, int j, int length1, int length2, int min_score);
 
 static cell ** matrix_init(int length1, int length2, int type);
@@ -742,10 +741,6 @@ static delta align_traceback(cell ** matrix, int i, int j, int length1, int leng
 		else
 		{
 			// See if it's a mismatch.
-			/*if (matrix[curr_j][curr_i].score > matrix[curr_j-1][curr_i-1].score)
-			{
-				tb.mismatch_count++;
-			}*/
 			if ((matrix[curr_j][curr_i].score - matrix[curr_j-1][curr_i-1].score) == score_mismatch)
 			{
 				tb.mismatch_count++;

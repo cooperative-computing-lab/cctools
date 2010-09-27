@@ -101,9 +101,6 @@ static void get_options(int argc, char **argv, const char *progname)
 		case 'o':
 			output_filename = optarg;
 			break;
-		case 'b':
-			output_format = CANDIDATE_FORMAT_BINARY;
-			break;
 		case 'f':
 			end_char = optarg[0];
 			if(isalnum((int) end_char) || (end_char == '>') || (end_char < ' ')) {

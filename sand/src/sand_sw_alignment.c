@@ -11,9 +11,6 @@ See the file COPYING for details.
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
-#include <dirent.h>
-#include <time.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 
 #include "align.h"
@@ -94,20 +91,26 @@ int main(int argc, char ** argv)
 		input = stdin;
 	}
 
-	s1 = get_next_seq(input);
+	cseq c1 = cseq_read(input);
+	s1 = cseq_uncompress(c1);
+	cseq_free(c1);
 
 	overlap_write_begin(stdout);
 	
 	while (!feof(input))
 	{
-		s2 = get_next_seq(input);
+		cseq c2 = cseq_read(input);
+		s2 = cseq_uncompress(c2);
+		cseq_free(c2);
 
 		// If the sequence is null, we reached an end of file, and need to work with a new one.
 		if (s2.seq == 0)
 		{
 			seq_free(s1);
 			seq_free(s2);
-			s1 = get_next_seq(input);
+			c1 = cseq_read(input);
+			s1 = cseq_uncompress(c1);
+			cseq_free(c1);
 			continue;
 		}
 

@@ -9,8 +9,11 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
+#include <errno.h>
 
 #include "sequence_compression.h"
+
+#include "debug.h"
 
 static void show_help(const char *cmd)
 {
@@ -20,7 +23,6 @@ static void show_help(const char *cmd)
 	printf(" -i             Remove read_ids but leave the Celera internal ids if the file came from Celera's gatekeeper\n"); 
 	printf(" -h             Show this help screen\n");
 }
-
 
 int main(int argc, char ** argv)
 {
@@ -48,27 +50,13 @@ int main(int argc, char ** argv)
                 }
         }
 
-	if (argc == 2 && clip == 0 && internal == 0)
-	{
+	if (argc == 2 && clip == 0 && internal == 0) {
 		input = fopen(argv[1], "r");
-		if (!input)
-		{
-			fprintf(stderr, "ERROR: Could not open file %s for reading.\n", argv[1]);
-			exit(1);
-		}
-	}
-	else if (argc == 3)
-	{
+		if (!input) fatal("couldn't open %s: %s\n",argv[1],strerror(errno));
+	} else if (argc == 3) {
 		input = fopen(argv[2], "r");
-                if (!input)
-                {
-                        fprintf(stderr, "ERROR: Could not open file %s for reading.\n", argv[1]);
-                        exit(1);
-                }
-
-	}
-	else
-	{
+		if (!input) fatal("couldn't open %s: %s\n",argv[2],strerror(errno));
+	} else {
 		input = stdin;
 	}
 
@@ -84,9 +72,9 @@ int main(int argc, char ** argv)
 			}
 		}
 		if (!s.id) { fprintf(stdout, ">>\n"); continue; }
-		c = compress_seq(s);
-		print_cseq(stdout, c);
-		free_cseq(c);
+		c = seq_compress(s);
+		cseq_print(stdout, c);
+		cseq_free(c);
 		seq_free(s);
 	}
 

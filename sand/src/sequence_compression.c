@@ -16,10 +16,8 @@ See the file COPYING for details.
 static short mer_add_base(short mer, char base);
 static short translate_8mer(const char * str, int start);
 static int get_mercount(int length);
-int base_to_num(char base );
-char num_to_base( int num );
 
-cseq compress_seq(seq s)
+cseq seq_compress(seq s)
 {
 	static int id = 1;
 	cseq m;
@@ -31,20 +29,11 @@ cseq compress_seq(seq s)
 	m.mercount = mercount;
 	m.mers = malloc(mercount*sizeof(short));
 	m.id = id++;
+	m.ext_id = 0;
+	m.metadata = 0;
 	
-	if (s.id != 0)
-	{
-		m.ext_id = malloc((strlen(s.id)+1)*sizeof(char));
-		strcpy(m.ext_id, s.id);
-	}
-	else { m.ext_id = 0; }
-
-	if (s.metadata != 0)
-	{
-		m.metadata = malloc((strlen(s.metadata)+1)*sizeof(char));
-		strcpy(m.metadata, s.metadata);
-	}
-	else { m.metadata = 0; }
+	if(s.id)       m.ext_id = strdup(s.id);
+	if(s.metadata) m.metadata = strdup(s.metadata);
 
 	if (s.seq != 0)
 	{
@@ -52,9 +41,7 @@ cseq compress_seq(seq s)
 		{
 			m.mers[curr_8mer] = translate_8mer(s.seq, curr_8mer*8);
 		}
-	}
-	else
-	{
+	} else {
 		m.mers = 0;
 	}
 
@@ -119,23 +106,14 @@ short mer_add_base(short mer, char base)
 	return (mer << 2) + base_to_num(base);
 }
 
-seq uncompress_seq(cseq m)
+seq cseq_uncompress(cseq m)
 {
 	seq s;
 
-	if (m.ext_id != 0)
-	{
-		s.id = malloc((strlen(m.ext_id)+1)*sizeof(char));
-		strcpy(s.id, m.ext_id);
-	}
-	else { s.id = 0; }
+	memset(&s,0,sizeof(s));
 
-	if (m.metadata != 0)
-	{
-		s.metadata = malloc((strlen(m.metadata)+1)*sizeof(char));
-		strcpy(s.metadata, m.metadata);
-	}
-	else { s.metadata = 0; }
+	if(m.ext_id)   s.id = strdup(m.ext_id);
+	if(m.metadata) s.metadata = strdup(m.metadata);
 
 	s.length = m.length;
 
@@ -150,19 +128,18 @@ seq uncompress_seq(cseq m)
 		for (i=0; i<mercount; i++)
 		{
 			translate_to_str(m.mers[i], tempstr, 8);
-			//fprintf(stderr, "m.mers[%d]: %d, tempstr: %s\n", i, m.mers[i], tempstr);
 			strcat(s.seq, tempstr);
 		}
 		if (m.length % 8 > 0)
 		{
 			// handle the overflow if it doesn't divide by 8 exactly.
 			translate_to_str(m.mers[i], tempstr, m.length%8);
-			//fprintf(stderr, "m.mers[%d]: %d, tempstr: %s\n", i, m.mers[i], tempstr);
 			strcat(s.seq, tempstr);
 		} 
 		s.seq[s.length] = '\0';
+	} else {
+		s.seq = 0;
 	}
-	else { s.seq = 0; }
 
 	return s;
 }
@@ -181,13 +158,12 @@ void translate_to_str(int mer, char * str, int length)
 	for (i=0; i<length; i++)
 	{
 		str[i] = num_to_base((mer >> ((length-1)-i)*2) & 3);
-		//fprintf(stderr, "i:%d, mer >> %i & 3: %d\n", i, (length-1)-i, (mer >> (length-1)-i) & 3);
 	}
 	str[length] = '\0';
 }
 
 
-void free_cseq(cseq m)
+void cseq_free(cseq m)
 {
 	if (m.mers) { free(m.mers); m.mers = 0; }
 	if (m.ext_id) { free(m.ext_id); m.ext_id = 0; }
@@ -216,7 +192,7 @@ size_t cseq_size(cseq c)
 	return size;
 }
 
-size_t sprint_cseq(char * buf, cseq c)
+size_t cseq_sprint(char * buf, cseq c)
 {
 	char * ins = buf;
 	int res;
@@ -233,7 +209,7 @@ size_t sprint_cseq(char * buf, cseq c)
 	return size;
 }
 
-void print_cseq(FILE * file, cseq c)
+void cseq_print(FILE * file, cseq c)
 {
 	fprintf(file, ">%s %d %d %s\n", c.ext_id, c.length, (int)(c.mercount*sizeof(short)), c.metadata);
 
@@ -243,30 +219,14 @@ void print_cseq(FILE * file, cseq c)
 
 static char line[MAX_STRING] = "";
 static int count = 0;
+
 void cseq_file_reset()
 {
 	count = 0;
 	strcpy(line, "");
 }
 
-void print_hex_mers(FILE * file, cseq c)
-{
-	int i;
-	for (i=0; i < c.mercount; i++)
-	{
-		fprintf(file, "%04x ", (unsigned short) c.mers[i]);
-		if (((i+1) % 8) == 0) fprintf(file, "\n");
-	}
-	fprintf(file, "\n");
-}
-
-seq get_next_seq(FILE * input)
-{
-	cseq c = get_next_cseq(input);
-	return uncompress_seq(c);
-}
-
-cseq get_next_cseq(FILE * file)
+cseq cseq_read(FILE * file)
 {
 	int total;
 	cseq sequence;

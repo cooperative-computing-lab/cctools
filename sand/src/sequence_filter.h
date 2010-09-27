@@ -17,7 +17,6 @@ See the file COPYING for details.
 
 #define CANDIDATE_FORMAT_OVL 1
 #define CANDIDATE_FORMAT_LINE 2
-#define CANDIDATE_FORMAT_BINARY 3
 
 typedef UINT64_T mer_t;
 
