@@ -296,7 +296,8 @@ batch_job_id_t batch_job_submit_simple_sge( struct batch_queue *q, const char *c
 		return -1;
 	}
 
-	if(fgets(line,sizeof(line),file)) {
+	line[0] = 0;
+	while(fgets(line,sizeof(line),file)) {
 		if(sscanf(line,"Your job %d",&jobid)==1) {
 			debug(D_DEBUG,"job %d submitted",jobid);
 			pclose(file);
@@ -305,16 +306,16 @@ batch_job_id_t batch_job_submit_simple_sge( struct batch_queue *q, const char *c
 			info->submitted = time(0);
 			itable_insert(q->job_table,jobid,info);
 			return jobid;
-		} else {
-			debug(D_DEBUG,"job submission failed: %s",line);
-			pclose(file);
-			return -1;
 		}
-	} else {
-		debug(D_DEBUG,"job submission failed: no output");
-		pclose(file);
-		return -1;
 	}
+	
+	if (strlen(line)) {
+		debug(D_NOTICE,"job submission failed: %s",line);
+	} else {
+		debug(D_NOTICE,"job submission failed: no output from qsub");
+	}
+	pclose(file);
+	return -1;
 }
 
 batch_job_id_t batch_job_submit_sge( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
