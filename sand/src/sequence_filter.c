@@ -35,7 +35,7 @@ static mer_t repeat_mask = 0;
 
 #define MER_VALUE(mer) ( (mer & (EVEN_MASK & k_mask)) | ((~mer) & (ODD_MASK & k_mask)) )
 
-#define SEQ_ID(seq_num) ( all_seqs[seq_num].ext_id )
+#define SEQ_ID(seq_num) ( all_seqs[seq_num].name )
 
 struct mer_list_elem_s
 {
@@ -292,11 +292,11 @@ int output_candidates(FILE * file, int format)
 			{
 				if (format == CANDIDATE_FORMAT_OVL)
 				{
-					fprintf(file, "{OVL\nafr:%s\nbfr:%s\nori:%c\nolt:D\nahg:0\nbhg:0\nqua:0.000000\nmno:0\nmxo:0\npct:0\n}\n", all_seqs[cle->cand1].ext_id, all_seqs[cle->cand2].ext_id, (cle->dir == 1) ? 'N' : 'I');
+					fprintf(file, "{OVL\nafr:%s\nbfr:%s\nori:%c\nolt:D\nahg:0\nbhg:0\nqua:0.000000\nmno:0\nmxo:0\npct:0\n}\n", all_seqs[cle->cand1].name, all_seqs[cle->cand2].name, (cle->dir == 1) ? 'N' : 'I');
 				}
 				else if (format == CANDIDATE_FORMAT_LINE)
 				{
-					fprintf(file, "%s\t%s\t%d\t%d\t%d\n", all_seqs[cle->cand1].ext_id, all_seqs[cle->cand2].ext_id, cle->dir, cle->loc1, (cle->dir == 1) ? cle->loc2 : all_seqs[cle->cand2].length - cle->loc2 - k);
+					fprintf(file, "%s\t%s\t%d\t%d\t%d\n", all_seqs[cle->cand1].name, all_seqs[cle->cand2].name, cle->dir, cle->loc1, (cle->dir == 1) ? cle->loc2 : all_seqs[cle->cand2].length - cle->loc2 - k);
 				}
 				total_output++;
 			}
@@ -332,11 +332,11 @@ int output_candidate_list(FILE * file, candidate_t * list, int total_output, int
 		candidate_t pair = list[i];
 		if (format == CANDIDATE_FORMAT_OVL)
 		{
-			fprintf(file, "{OVL\nafr:%s\nbfr:%s\nori:%c\nolt:D\nahg:0\nbhg:0\nqua:0.000000\nmno:0\nmxo:0\npct:0\n}\n", all_seqs[pair.cand1].ext_id, all_seqs[pair.cand2].ext_id, (pair.dir == 1) ? 'N' : 'I');
+			fprintf(file, "{OVL\nafr:%s\nbfr:%s\nori:%c\nolt:D\nahg:0\nbhg:0\nqua:0.000000\nmno:0\nmxo:0\npct:0\n}\n", all_seqs[pair.cand1].name, all_seqs[pair.cand2].name, (pair.dir == 1) ? 'N' : 'I');
 		}
 		else if (format == CANDIDATE_FORMAT_LINE)
 		{
-			fprintf(file, "%s\t%s\t%d\t%d\t%d\n", all_seqs[pair.cand1].ext_id, all_seqs[pair.cand2].ext_id, pair.dir, pair.loc1, (pair.dir == 1) ? pair.loc2 : all_seqs[pair.cand2].length - pair.loc2 - k);
+			fprintf(file, "%s\t%s\t%d\t%d\t%d\n", all_seqs[pair.cand1].name, all_seqs[pair.cand2].name, pair.dir, pair.loc1, (pair.dir == 1) ? pair.loc2 : all_seqs[pair.cand2].length - pair.loc2 - k);
 		}
 		total_printed++;
 	}
@@ -451,7 +451,7 @@ void print_mhe(FILE * file, mer_hash_element * mhe)
 		while (curr)
 		{
 			translate_kmer(mhe->mer, mer_str, k);
-			fprintf(file, "%s\t%d\t%s\t%s\t%d\n", mer_str, mhe->count, all_seqs[head->seq_num].ext_id, all_seqs[curr->seq_num].ext_id, (int) (head->dir * curr->dir));
+			fprintf(file, "%s\t%d\t%s\t%s\t%d\n", mer_str, mhe->count, all_seqs[head->seq_num].name, all_seqs[curr->seq_num].name, (int) (head->dir * curr->dir));
 			curr = curr->next;
 		}
 		head = head->next;

@@ -30,7 +30,7 @@ int main(int argc, char ** argv)
 
 	while (!feof(input))
 	{
-		if (!c.ext_id)
+		if (!c.name)
 		{
 			fprintf(stdout, ">>\n");
 			c = cseq_read(input);
@@ -43,7 +43,7 @@ int main(int argc, char ** argv)
 		c = cseq_read(input);
 	}
 
-	if (c.ext_id)
+	if (c.name)
 	{
 		s = cseq_uncompress(c);
 		cseq_free(c);

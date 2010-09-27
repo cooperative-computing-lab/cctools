@@ -19,7 +19,6 @@ static int get_mercount(int length);
 
 cseq seq_compress(seq s)
 {
-	static int id = 1;
 	cseq m;
 	int len = s.length;
 	int mercount = get_mercount(len);
@@ -28,11 +27,10 @@ cseq seq_compress(seq s)
 	m.length = len;
 	m.mercount = mercount;
 	m.mers = malloc(mercount*sizeof(short));
-	m.id = id++;
-	m.ext_id = 0;
+	m.name = 0;
 	m.metadata = 0;
 	
-	if(s.id)       m.ext_id = strdup(s.id);
+	if(s.id)       m.name = strdup(s.id);
 	if(s.metadata) m.metadata = strdup(s.metadata);
 
 	if (s.seq != 0)
@@ -112,7 +110,7 @@ seq cseq_uncompress(cseq m)
 
 	memset(&s,0,sizeof(s));
 
-	if(m.ext_id)   s.id = strdup(m.ext_id);
+	if(m.name)   s.id = strdup(m.name);
 	if(m.metadata) s.metadata = strdup(m.metadata);
 
 	s.length = m.length;
@@ -166,7 +164,7 @@ void translate_to_str(int mer, char * str, int length)
 void cseq_free(cseq m)
 {
 	if (m.mers) { free(m.mers); m.mers = 0; }
-	if (m.ext_id) { free(m.ext_id); m.ext_id = 0; }
+	if (m.name) { free(m.name); m.name = 0; }
 	if (m.metadata) { free(m.metadata); m.metadata = 0; }
 }
 
@@ -176,9 +174,9 @@ size_t cseq_size(cseq c)
 	size_t size = 0;
 
 	// Get the size of the header line.
-	size += sprintf(tmp, ">%s %d %d %s\n", c.ext_id, c.length, (int)(c.mercount*sizeof(short)), c.metadata);
+	size += sprintf(tmp, ">%s %d %d %s\n", c.name, c.length, (int)(c.mercount*sizeof(short)), c.metadata);
 	/*
-	size += strlen(c.ext_id);
+	size += strlen(c.name);
 	size += floor(log(c.length)+1);
 	size += floor(log(c.mercount*sizeof(short)));
 	size += strlen(c.metadata);
@@ -197,7 +195,7 @@ size_t cseq_sprint(char * buf, cseq c)
 	char * ins = buf;
 	int res;
 	size_t size = 0;
-	res = sprintf(ins, ">%s %d %d %s\n", c.ext_id, c.length, (int)(c.mercount*sizeof(short)), c.metadata);
+	res = sprintf(ins, ">%s %d %d %s\n", c.name, c.length, (int)(c.mercount*sizeof(short)), c.metadata);
 	ins += res;
 	size += res;
 	memcpy(ins, c.mers, c.mercount*sizeof(short));
@@ -211,7 +209,7 @@ size_t cseq_sprint(char * buf, cseq c)
 
 void cseq_print(FILE * file, cseq c)
 {
-	fprintf(file, ">%s %d %d %s\n", c.ext_id, c.length, (int)(c.mercount*sizeof(short)), c.metadata);
+	fprintf(file, ">%s %d %d %s\n", c.name, c.length, (int)(c.mercount*sizeof(short)), c.metadata);
 
 	fwrite(c.mers, sizeof(short), c.mercount, file);
 	fputc('\n',file);
@@ -243,7 +241,7 @@ cseq cseq_read(FILE * file)
 	if (line[0] == '>' && line[1] == '>')
 	{
 		sequence.mers = 0;
-		sequence.ext_id = 0;
+		sequence.name = 0;
 		sequence.metadata = 0;
 		sequence.length = 0;
 
@@ -255,7 +253,7 @@ cseq cseq_read(FILE * file)
 	}
 	else if (line[0] == '>')
 	{
-		sequence.ext_id = 0;
+		sequence.name = 0;
 		sequence.metadata = 0;
 		sequence.length = 0;
 		sequence.mercount = 0;
@@ -270,7 +268,7 @@ cseq cseq_read(FILE * file)
 
 	tmp_metadata[0] = '\0';
 	sscanf(line, ">%s %d %d %[^\n]\n", tmp_id, &sequence.length, &bytes,tmp_metadata);
-	sequence.ext_id = strdup(tmp_id);
+	sequence.name = strdup(tmp_id);
 	sequence.metadata = strdup(tmp_metadata);
 	sequence.mercount = get_mercount(sequence.length);
 	sequence.mers = malloc(sequence.mercount*sizeof(short));

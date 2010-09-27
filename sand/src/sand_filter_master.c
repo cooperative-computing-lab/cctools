@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "memory_info.h"
 #include "macros.h"
 #include "itable.h"
+#include "delete_dir.h"
 
 #include "sequence_compression.h"
 #include "sequence_filter.h"
@@ -134,16 +135,13 @@ void load_sequences(const char * filename)
 	seq_count = sequence_count(file);
 	sequences = malloc(seq_count*sizeof(cseq));
 
-	cseq c;
-
 	while (!feof(file))
 	{
-		c = cseq_read(file);
+		cseq c = cseq_read(file);
 		if (!c.metadata) continue;
 		sequences[num_seqs] = c;
 		num_seqs++;
 	}
-
 }
 
 void load_rectangles_to_files()
@@ -165,23 +163,17 @@ void load_rectangles_to_files()
 		end = MIN(start+rectangle_size, num_seqs);
 		size = 0;
 
-		// Get the size of this rectangle.
 		for (curr = start; curr < end; curr++)
 		{
 			size += cseq_size(sequences[curr]);
 		}
 
-		// Open a new file to which to print this rectangle.
 		sprintf(tmpfilename, "%s/rect%03d.cfa", outdirname, curr_rect);
 		tmpfile = fopen(tmpfilename, "w");
 
-		// Copy the sequences into this rectangle.
 		for (curr = start; curr < end; curr++)
 		{			
-			// Copy this sequence into the new file.
 			cseq_print(tmpfile, sequences[curr]);
-
-			// Free this sequence, it is no longer needed.
 			cseq_free(sequences[curr]);
 		}
 
@@ -215,41 +207,29 @@ static void init_checkpoint()
 	int row;
 	int x, y, status;
 
-	// Initialize the checkpoint matrix.
-	// Using calloc because it actually initializes to 0
 	checkpoint = calloc(num_rectangles, sizeof(short *));
 	for (row = 0; row < num_rectangles; row++)
 	{
 		checkpoint[row] = calloc(num_rectangles, sizeof(short));
 	}
 
-	// Open the file in a+ mode. This will allow us to read
-	// and to write to the end, allowing for maximum robustness.
 	if (checkpoint_filename)
 	{
 		checkpoint_file = fopen(checkpoint_filename, "a+");
 		if (!checkpoint_file)
 		{
-			// If it can't be opened in append mode (because it doesn't exist)
-			// open it in write mode so it will be created.
 			checkpoint_file = fopen(checkpoint_filename, "w");
-			if (!checkpoint_file)
-			{
-				printf("WARNING: Could not open checkpoint file %s for appending or writing. Checkpoint data will not be stored.\n", checkpoint_filename);
-			}
-			// No need to load it if it already exists, so quit here.
+			if (!checkpoint_file) fatal("couldn't create %s: %s",checkpoint_filename,strerror(errno));
 			return;
 		}
 	}
 
-	// Now, if the file exists, read in the existing checkpoints.
 	if (checkpoint_file)
 	{
 		while (fscanf(checkpoint_file, "%d %d %d\n", &y, &x, &status) == 3)
 		{
 			checkpoint[y][x] = status;
 		}
-
 	}
 }
 
@@ -455,6 +435,7 @@ int main(int argc, char ** argv)
 			"TD","AR","AF",
 			"Candidates");
 	// MAIN LOOP
+
 	while (curr_start_y < num_seqs)
 	{
 		while (work_queue_hungry(q))
@@ -480,21 +461,15 @@ int main(int argc, char ** argv)
 
 			if (curr_start_y >= num_seqs) break;
 		}
-		handle_done_task(work_queue_wait(q, 1));
+		t = work_queue_wait(q, 1);
+		if(t) handle_done_task(t);
 		if (time(0) != last_display_time) display_progress();
 	}
 
-	// Once all tasks have been submitted, just wait
-	// for them all to finish.
-	
-	// There's a "bug" with the workqueue that workers are
-	// only added when work_queue_wait is called. This means
-	// that until as many workers are busy as there are tasks,
-	// we need to take shorter breaks.
 	while (!work_queue_empty(q))
 	{
 		t = work_queue_wait(q, 1);
-		handle_done_task(t);
+		if(t) handle_done_task(t);
 		if (time(0) != last_display_time) display_progress();
 	}
 
@@ -504,19 +479,14 @@ int main(int argc, char ** argv)
 		fclose(checkpoint_file);
 	if (end_char)
 		fprintf(outfile, "%c\n", end_char);
+	fflush(outfile);
 	fsync(fileno(outfile));
 	fclose(outfile);
+
 	work_queue_delete(q);
 	delete_rectangles();
-	int rmdir_result = rmdir(outdirname);
-	if (rmdir_result == ENOTEMPTY)
-	{
-		fprintf(stderr, "Directory %s is not empty, please check results.\n", outdirname);
-	}
-	else if (rmdir_result != 0)
-	{
-		fprintf(stderr, "Deletion of directory %s failed.\n", outdirname);
-	}
+	delete_dir(outdirname);
+
 	return 0;
 }
 
@@ -599,17 +569,15 @@ static void get_options(int argc, char ** argv, const char * progname)
 			fprintf(stderr, "Unable to create directory %s\n", outdirname);
 			exit(1);
 		}
-	}
-	else
-	{
+	} else {
 		fprintf(stderr, "WARNING: Output directory %s/ already exists, you may want to delete or rename before running.\n", outdirname);
 	}
 
 	sprintf(filter_program_args, "-k %d -w %d -s d -d -1", kmer_size, window_size);
+
 	if (repeat_filename)
 	{
 		sprintf(tmp, " -r %s", repeat_filename);
 		strcat(filter_program_args, tmp);
 	}
-
 }

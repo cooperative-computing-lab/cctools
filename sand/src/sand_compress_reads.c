@@ -66,9 +66,9 @@ int main(int argc, char ** argv)
 		s = seq_read(input); 
 		if(clip != 0 || internal != 0){
 			strcpy(tmp_id, s.id);
-			strcpy(s.id, strtok(tmp_id,","));//ext_id
+			strcpy(s.id, strtok(tmp_id,","));
 			if(internal != 0){
-				strcpy(s.id, strtok(NULL,","));//int_id
+				strcpy(s.id, strtok(NULL,","));
 			}
 		}
 		if (!s.id) { fprintf(stdout, ">>\n"); continue; }

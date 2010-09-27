@@ -16,8 +16,7 @@ See the file COPYING for details.
 
 struct s_cseq
 {
-	char * ext_id;
-	int id;
+	char * name;
 	char * metadata;
 	short * mers;
 	int length;
