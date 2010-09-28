@@ -36,33 +36,23 @@ struct cseq *cseq_copy( struct cseq *c )
 	return cseq_create(c->name,c->num_bases,c->num_bytes,c->data,c->metadata);
 }
 
-struct cseq * seq_compress(seq s)
+struct cseq * seq_compress( struct seq *s )
 {
 	struct cseq  *c;
-	int num_bases = s.length;
-	int num_bytes = get_num_bytes(num_bases);
 	int curr_8mer;
 
 	c = malloc(sizeof(*c));
 	if(!c) return 0;
 
-	c->num_bases = num_bases;
-	c->num_bytes = num_bytes;
-	c->data = malloc(num_bytes*sizeof(short));
-	c->name = 0;
-	c->metadata = 0;
-	
-	if(s.id)       c->name = strdup(s.id);
-	if(s.metadata) c->metadata = strdup(s.metadata);
+	c->num_bases = s->num_bases;
+	c->num_bytes = get_num_bytes(s->num_bases);
+	c->data = malloc(c->num_bytes*sizeof(short));
+	c->name = strdup(s->name);
+	c->metadata = strdup(s->metadata);
 
-	if (s.seq != 0)
+	for (curr_8mer=0; curr_8mer < c->num_bytes; curr_8mer++)
 	{
-		for (curr_8mer=0; curr_8mer < num_bytes; curr_8mer++)
-		{
-			c->data[curr_8mer] = translate_8mer(s.seq, curr_8mer*8);
-		}
-	} else {
-		c->data = 0;
+		c->data[curr_8mer] = translate_8mer(s->data, curr_8mer*8);
 	}
 
 	return c;
@@ -126,40 +116,28 @@ short mer_add_base(short mer, char base)
 	return (mer << 2) + base_to_num(base);
 }
 
-seq cseq_uncompress( struct cseq *c )
+struct seq * cseq_uncompress( struct cseq *c )
 {
-	seq s;
+	struct seq *s = malloc(sizeof(*s));
 
-	memset(&s,0,sizeof(s));
-
-	if(c->name)   s.id = strdup(c->name);
-	if(c->metadata) s.metadata = strdup(c->metadata);
-
-	s.length = c->num_bases;
+	s->name = strdup(c->name);
+	s->metadata = strdup(c->metadata);
+	s->data = malloc(c->num_bases+1);
+	s->num_bases = c->num_bases;
 
 	int num_bytes = c->num_bases/8;
+	int i;
 
-	if (c->data != 0)
+	for (i=0; i<num_bytes; i++)
 	{
-		s.seq = malloc((c->num_bases+1)*sizeof(char));
-		s.seq[0] = '\0';
-		int i;
-		char tempstr[9];
-		for (i=0; i<num_bytes; i++)
-		{
-			translate_to_str(c->data[i], tempstr, 8);
-			strcat(s.seq, tempstr);
-		}
-		if (c->num_bases % 8 > 0)
-		{
-			// handle the overflow if it doesn't divide by 8 exactly.
-			translate_to_str(c->data[i], tempstr, c->num_bases%8);
-			strcat(s.seq, tempstr);
-		} 
-		s.seq[s.length] = '\0';
-	} else {
-		s.seq = 0;
+		translate_to_str(c->data[i],&s->data[i*8], 8);
 	}
+	if (c->num_bases % 8 > 0)
+	{
+		// handle the overflow if it doesn't divide by 8 exactly.
+		translate_to_str(c->data[i],&s->data[i*8], c->num_bases%8);
+	} 
+	s->data[s->num_bases] = 0;
 
 	return s;
 }

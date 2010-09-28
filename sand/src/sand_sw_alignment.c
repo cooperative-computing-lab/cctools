@@ -43,7 +43,7 @@ static void show_help(const char *cmd)
 int main(int argc, char ** argv)
 {
 	FILE * input;
-	seq s1, s2;
+	struct seq *s1=0, *s2=0;
 	char ori;
 	char c;
 	int fileindex;
@@ -113,14 +113,14 @@ int main(int argc, char ** argv)
 		#ifdef DO_BANDED_ALIGNMENT
 			int dir, start1, start2;
 
-			if (sscanf(s2.metadata, "%d %d %d", &dir, &start1, &start2) != 3)
+			if (sscanf(s2->metadata, "%d %d %d", &dir, &start1, &start2) != 3)
 			{
-				fprintf(stderr, "ERROR: Sequence %s (%s) did not provide enough information (direction and band start location)\n", s2.id, s2.metadata);
+				fprintf(stderr, "ERROR: Sequence %s (%s) did not provide enough information (direction and band start location)\n", s2->name, s2->metadata);
 				exit(1);
 			}
 	
 			if (dir == -1) {
-				seq_reverse_complement(&s2);
+				seq_reverse_complement(s2);
 				ori = 'I';
 			} else {
 				ori = 'N';
@@ -130,28 +130,28 @@ int main(int argc, char ** argv)
 			// First, find the maximum length of the alignment, then get 4% (min_qual)
 			// of that because it's the maximum amount of errors allowable.
 
-			int max_alignment_l = align_max(s1.length, s2.length, start1, start2);
+			int max_alignment_l = align_max(s1->num_bases, s2->num_bases, start1, start2);
 			int k = ceil(min_qual * max_alignment_l); 
 			if(k >= max_alignment_l) k = max_alignment_l - 1;
 			if(k <= 0) k = 1;
 
-			tb = align_banded(s1.seq, s2.seq, start1, start2, k);
+			tb = align_banded(s1->data, s2->data, start1, start2, k);
 		#else
-			if(atoi(s2.metadata) == -1) {
-				seq_reverse_complement(&s2);
+			if(atoi(s2->metadata) == -1) {
+				seq_reverse_complement(s2);
 				ori = 'I';
 			} else {
 				ori = 'N';
 			}
 
-			tb = align_prefix_suffix(s1.seq, s2.seq, min_align);
+			tb = align_prefix_suffix(s1->data,s2->data, min_align);
 		#endif
 
 		tb.ori = ori;
 
 		if (tb.quality <= min_qual)
 		{
-			overlap_write(stdout, tb, s1.id, s2.id);
+			overlap_write(stdout, tb, s1->name, s2->name);
 		}
 
 		seq_free(s2);
@@ -159,7 +159,6 @@ int main(int argc, char ** argv)
 	  }
 	}
 
-	seq_free(s1);
 	fclose(input);
 	overlap_write_end(stdout);
 

@@ -54,7 +54,7 @@ int main(int argc, char ** argv)
 	}
 
 	while((c=cseq_read(input))) {
-		seq s = cseq_uncompress(c);
+		struct seq *s = cseq_uncompress(c);
 		seq_print(stdout,s);
 		seq_free(s);
 		cseq_free(c);

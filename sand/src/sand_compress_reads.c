@@ -32,7 +32,7 @@ int main(int argc, char ** argv)
 {
 	const char *progname = "sand_compress_reads";
 	FILE * input;
-	seq s;
+	struct seq *s;
 	struct cseq *c;
 	char d;
 

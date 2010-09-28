@@ -3,21 +3,21 @@
 
 #include <stdio.h>
 
-struct s_seq
+struct seq
 {
-	char * id;
-	char * seq;
-	char * metadata;
-	int length;
+	char *name;
+	char *data;
+	char *metadata;
+	int   num_bases;
 };
 
-typedef struct s_seq seq;
+struct seq * seq_create( const char *name, const char *data, const char *metadata );
+struct seq * seq_read( FILE *file );
+void         seq_print( FILE * file, struct seq *s );
+int          seq_sprint( char *buf, struct seq *s );
+void         seq_reverse_complement( struct seq *s );
+void         seq_free( struct seq *s );
 
-void   seq_reverse_complement( seq * s);
-void   seq_print( FILE * file, seq s);
-seq    seq_read( FILE * file );
-void   seq_free( seq s);
-size_t seq_sprint( char * buf, seq s);
-int    sequence_count( FILE * file);
+int    sequence_count( FILE *file );
 
 #endif
