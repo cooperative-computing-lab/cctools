@@ -102,7 +102,7 @@ struct seq * seq_read( FILE *file )
 	int num_bases = 0;
 
 	while(1) {
-		int c = fgetc_unlocked(file);
+		int c = getc_unlocked(file);
 		if(isspace(c)) continue;
 		if(c==EOF) break;
 		if(c=='>') {
