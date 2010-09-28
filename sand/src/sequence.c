@@ -72,7 +72,7 @@ void seq_free( struct seq *s )
 
 int seq_sprint(char * buf, struct seq *s )
 {
-	return sprintf(buf,">%s %s\n%s\n",s->name,s->num_bases,s->num_bases,s->metadata,s->data);
+	return sprintf(buf,">%s %s\n%s\n",s->name,s->metadata,s->data);
 }
 
 void seq_print( FILE *file, struct seq *s )
