@@ -457,6 +457,7 @@ int main(int argc, char ** argv)
 				work_queue_submit(q, t);
 				total_retried++;
 				retry_max--;
+				debug(D_DEBUG, "Number of tasks retried: %d\n", total_retried);
 			}
 		}
 		if (time(0) != last_display_time) display_progress();
@@ -465,7 +466,16 @@ int main(int argc, char ** argv)
 	while (!work_queue_empty(q))
 	{
 		t = work_queue_wait(q, 1);
-		if(t) handle_done_task(t);
+		if(t) {
+			rv = handle_done_task(work_queue_wait(q, 1));
+			if(!rv && retry_max) { // Task failed
+				// Retry the task
+				work_queue_submit(q, t);
+				total_retried++;
+				retry_max--;
+				debug(D_DEBUG, "Number of tasks retried: %d\n", total_retried);
+			}
+		}
 		if (time(0) != last_display_time) display_progress();
 	}
 
