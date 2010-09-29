@@ -15,6 +15,7 @@ See the file COPYING for details.
 
 #include "memory_info.h"
 #include "debug.h"
+#include "macros.h"
 
 #include "sequence_filter.h"
 

@@ -9,8 +9,12 @@ See the file COPYING for details.
 #include <string.h>
 #include <ctype.h>
 #include <limits.h>
+#include <sys/time.h>
 
 #include "align.h"
+#include "macros.h"
+
+#define MAX_STRING 102048
 
 #define TB_LEFT -1
 #define TB_UP 1
@@ -266,8 +270,7 @@ static delta align_traceback_banded(cell ** band, int best_row, int best_col, in
 
 	// Need to figure out start and end positions in terms of the matrix,
 	// not of the band.
-
-	tb.mismatch_count = 0;
+	memset(&tb,0,sizeof(tb));
 
 	band_row = best_row;
 	band_col = best_col;
@@ -307,6 +310,7 @@ static delta align_traceback_banded(cell ** band, int best_row, int best_col, in
 		}
 		else
 		{
+		  // SEGFAULT here when band_row = 0
 			// It was TB_DIAG, so see if it's a mismatch.
 			if (band[band_row][band_col].score - band[band_row-1][band_col].score == score_mismatch)
 			{

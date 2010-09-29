@@ -4,15 +4,14 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#ifndef COMPRESSED_SEQUENCE_H
+#define COMPRESSED_SEQUENCE_H
+
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
 
-#include "align.h"
 #include "sequence.h"
-
-#ifndef __SEQUENCE_COMPRESSION_H_
-#define __SEQUENCE_COMPRESSION_H_
 
 struct cseq
 {

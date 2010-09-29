@@ -11,9 +11,6 @@ See the file COPYING for details.
 #include "full_io.h"
 #include "debug.h"
 
-#define MAX_ID SEQUENCE_ID_MAX
-#define MAX_METADATA SEQUENCE_METADATA_MAX 
-
 static short mer_add_base(short mer, char base);
 static short translate_8mer(const char * str, int start);
 static int get_num_bytes(int num_bases);
@@ -222,8 +219,6 @@ int cseq_sprint( char *buf, struct cseq *c, const char *extra_data )
 
 	return total;
 }
-
-#define SEQUENCE_FILE_LINE_MAX 1024
 
 struct cseq * cseq_read( FILE *file )
 {

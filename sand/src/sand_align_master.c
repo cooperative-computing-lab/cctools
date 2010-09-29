@@ -5,14 +5,29 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "sand_align.h"
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <string.h>
+#include <time.h>
+#include <ctype.h>
+#include <sys/stat.h>
+
+#include "debug.h"
+#include "work_queue.h"
+#include "hash_table.h"
+#include "stringtools.h"
+#include "macros.h"
+
 #include "sequence.h"
 #include "compressed_sequence.h"
 
 static struct work_queue *queue = 0;
 static int port = 9068;
-static const char *function = 0;
-static const char *function_args = "";
+static const char *align_prog = 0;
+static const char *align_prog_args = "";
 static const char *candidate_file_name;
 static const char *sequence_file_name;
 static const char *output_file_name;
@@ -35,6 +50,8 @@ static int max_pairs_per_task = 10000;
 #define CANDIDATE_EOF 1
 #define CANDIDATE_WAIT 2
 
+#define CAND_FILE_LINE_MAX 1024
+
 static void show_version(const char *cmd)
 {
 	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
@@ -42,10 +59,11 @@ static void show_version(const char *cmd)
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s [options] <command> <candidate pairs file> <sequences file> <outputdata>\n", cmd);
+	printf("Use: %s [options] <align-program> <candidate-pairs> <sequences> <output-overlaps>\n", cmd);
 	printf("where options are:\n");
 	printf(" -p <port>      Port number for queue master to listen on.\n");
 	printf(" -n <number>    Maximum number of candidates per task. (default is %d)\n",max_pairs_per_task);
+	printf(" -e <args>      Extra arguments to pass to the alignment program.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
@@ -219,29 +237,27 @@ static void buffer_ensure( char **buffer, int *buffer_size, int buffer_used, int
 	}
 }
 
-#define NAME_MAX 256
-
 static struct work_queue_task * task_create( struct hash_table *sequence_table )
 {
-	char aname1[NAME_MAX];
-	char aname2[NAME_MAX];
-	char aextra[NAME_MAX];
+	char aname1[CAND_FILE_LINE_MAX];
+	char aname2[CAND_FILE_LINE_MAX];
+	char aextra[CAND_FILE_LINE_MAX];
 
-	char bname1[NAME_MAX];
-	char bname2[NAME_MAX];
-	char bextra[NAME_MAX];
+	char bname1[CAND_FILE_LINE_MAX];
+	char bname2[CAND_FILE_LINE_MAX];
+	char bextra[CAND_FILE_LINE_MAX];
 
 	struct cseq *s1, *s2;
-
-	static int buffer_size = 1024;
-	char *buffer = malloc(buffer_size);
-	int buffer_pos = 0;
 
 	int result = candidate_read(candidate_file,aname1,aname2,aextra);
 	if(result!=CANDIDATE_SUCCESS) return 0;
 
 	s1 = sequence_lookup(sequence_table,aname1);
 	s2 = sequence_lookup(sequence_table,aname2);
+
+	static int buffer_size = 1024;
+	char *buffer = malloc(buffer_size);
+	int buffer_pos = 0;
 
 	buffer_ensure(&buffer,&buffer_size,buffer_pos,cseq_size(s1)+cseq_size(s2)+10);
 
@@ -273,13 +289,15 @@ static struct work_queue_task * task_create( struct hash_table *sequence_table )
 
 	} while( npairs < max_pairs_per_task );
 
-	char cmd[strlen(function)+strlen(function_args)+100];
+	char cmd[strlen(align_prog)+strlen(align_prog_args)+100];
 
-	sprintf(cmd, "./%s %s aligndata", function, function_args);
+	sprintf(cmd, "./%s %s aligndata", align_prog, align_prog_args);
 
 	struct work_queue_task *t = work_queue_task_create(cmd);
-	work_queue_task_specify_input_file(t, function, function);
+	work_queue_task_specify_input_file(t, align_prog, align_prog);
 	work_queue_task_specify_input_buf(t, buffer, buffer_pos, "aligndata");
+
+	free(buffer);
 
 	return t;
 }
@@ -301,7 +319,7 @@ int main(int argc, char *argv[])
 			max_pairs_per_task = atoi(optarg);
 			break;
 		case 'e':
-			function_args = strdup(optarg);
+			align_prog_args = strdup(optarg);
 			break;
 		case 'd':
 			debug_flags_set(optarg);
@@ -326,7 +344,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	function = argv[optind];
+	align_prog = argv[optind];
 	candidate_file_name = argv[optind + 1];
 	sequence_file_name = argv[optind + 2];
 	output_file_name = argv[optind + 3];
@@ -386,7 +404,13 @@ int main(int argc, char *argv[])
 
 	printf("%7s | %4s %4s %4s | %6s %4s %4s %4s | %6s %6s %6s %8s | %s\n", "Time", "WI", "WR", "WB", "TS", "TW", "TR", "TC", "TD", "AR", "AF", "WS", "Speedup");
 	display_progress(queue);
-	work_queue_delete(queue);
+
 	printf("Completed %i tasks in %i seconds\n", tasks_done, (int) (time(0) - start_time));
+
+	fclose(output_file);
+	fclose(candidate_file);
+
+	work_queue_delete(queue);
+
 	return 0;
 }

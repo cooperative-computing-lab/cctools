@@ -20,4 +20,6 @@ void         seq_free( struct seq *s );
 
 int    sequence_count( FILE *file );
 
+#define SEQUENCE_FILE_LINE_MAX 1024
+
 #endif

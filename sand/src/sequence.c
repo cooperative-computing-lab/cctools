@@ -9,8 +9,6 @@
 
 #include "sequence.h"
 
-#define SEQUENCE_FILE_LINE_MAX 4096
-
 struct seq * seq_create( const char *name, const char *data, const char *metadata )
 {
 	struct seq *s = malloc(sizeof(*s));
