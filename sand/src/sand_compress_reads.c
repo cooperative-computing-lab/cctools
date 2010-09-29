@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
-#include "sequence_compression.h"
+#include "compressed_sequence.h"
 
 #include "debug.h"
 
@@ -22,8 +22,9 @@ static void show_version(const char *cmd)
 
 static void show_help(const char *cmd)
 {
-        printf("Use: %s [options]  fasta_reads > compressed_reads\n", cmd);
+        printf("Use: %s [options] [infile] [outfile]\n", cmd);
         printf("where options are:\n");
+	printf(" -q  Quiet mode: suppress summary line.\n");
 	printf(" -v  Show version string.\n");
 	printf(" -h  Show this help screen\n");
 }
@@ -31,13 +32,18 @@ static void show_help(const char *cmd)
 int main(int argc, char ** argv)
 {
 	const char *progname = "sand_compress_reads";
-	FILE * input;
+	FILE * infile;
+	FILE * outfile;
+	int quiet_mode = 0;
 	struct seq *s;
 	struct cseq *c;
 	char d;
 
-        while((d=getopt(argc,argv,"chi"))!=(char)-1) {
+        while((d=getopt(argc,argv,"qhi"))!=(char)-1) {
                 switch(d) {
+		case 'q':
+			quiet_mode = 1;
+			break;
 		case 'v':
 			show_version(progname);
 			exit(0);
@@ -49,22 +55,45 @@ int main(int argc, char ** argv)
                 }
         }
 
-	if( optind<(argc-1) ) {
-		input = fopen(argv[optind], "r");
-		if (!input) fatal("couldn't open %s: %s\n",argv[optind],strerror(errno));
+	if( optind<argc ) {
+		infile = fopen(argv[optind], "r");
+		if(!infile) {
+			fprintf(stderr,"%s: couldn't open %s: %s\n",progname,argv[optind],strerror(errno));
+			return 1;
+		}
+		optind++;
 	} else {
-		input = stdin;
+		infile = stdin;
 	}
 
-	while (!feof(input))
+	if( optind<argc ) {
+		outfile = fopen(argv[optind],"w");
+		if(!outfile) {
+			fprintf(stderr,"%s: couldn't open %s: %s\n",progname,argv[optind],strerror(errno));
+			return 1;
+		}
+		optind++;
+	} else {
+		outfile = stdout;
+	}
+
+	while (!feof(infile))
 	{
-		s = seq_read(input); 
+		s = seq_read(infile); 
 		c = seq_compress(s);
-		cseq_print(stdout, c);
+		cseq_write(outfile,c);
 		cseq_free(c);
 		seq_free(s);
 	}
 
-	fclose(input);
+/*
+	if(!quiet_mode) {
+		fprintf(stderr,"%d sequences: %lu bytes read %lu bytes written.\n",count,ftell(infile),ftell(outfile));
+	}
+*/
+
+	fclose(infile);
+	fclose(outfile);
+
 	return 0;
 }

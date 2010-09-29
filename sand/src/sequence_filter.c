@@ -712,7 +712,11 @@ mer_t get_kmer(struct cseq *c, int curr)
 
 			// Shift the curr mer to the end and mask it out.
 			curr_mer = c->data[which_mer];
-			if ((c->num_bytes-1) == which_mer) { curr_mer = curr_mer << ((8-(c->num_bases - (8*which_mer)))*2); }
+
+			int mercount = c->num_bases/8;
+			if (c->num_bases%8 > 0) { mercount++; }
+
+			if ((mercount-1) == which_mer) { curr_mer = curr_mer << ((8-(c->num_bases - (8*which_mer)))*2); }
 			curr_mer = (curr_mer >> ((8 - (bases_left+which_base))*2 )) & short_masks[8-bases_left];
 
 			// Now add it on to mer.

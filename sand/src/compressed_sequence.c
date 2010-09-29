@@ -7,7 +7,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <stdlib.h>
 
-#include "sequence_compression.h"
+#include "compressed_sequence.h"
 #include "full_io.h"
 #include "debug.h"
 
@@ -17,15 +17,16 @@ See the file COPYING for details.
 static short mer_add_base(short mer, char base);
 static short translate_8mer(const char * str, int start);
 static int get_num_bytes(int num_bases);
+static int get_num_mers(int num_bases);
 
-struct cseq * cseq_create( const char *name, int num_bases, int num_bytes, short *mers, const char *metadata)
+struct cseq * cseq_create( const char *name, int num_bases, short *mers, const char *metadata)
 {
 	struct cseq *c = malloc(sizeof(*c));
 	c->name = strdup(name);
 	c->num_bases = num_bases;
-	c->num_bytes = num_bytes;
-	c->data = malloc(c->num_bytes);
-	memcpy(c->data,mers,c->num_bytes);
+	int num_bytes = get_num_bytes(c->num_bases);
+	c->data = malloc(num_bytes);
+	memcpy(c->data,mers,num_bytes);
 	c->metadata = strdup(metadata);
 	return c;
 	
@@ -33,7 +34,7 @@ struct cseq * cseq_create( const char *name, int num_bases, int num_bytes, short
 
 struct cseq *cseq_copy( struct cseq *c )
 {
-	return cseq_create(c->name,c->num_bases,c->num_bytes,c->data,c->metadata);
+	return cseq_create(c->name,c->num_bases,c->data,c->metadata);
 }
 
 struct cseq * seq_compress( struct seq *s )
@@ -45,12 +46,14 @@ struct cseq * seq_compress( struct seq *s )
 	if(!c) return 0;
 
 	c->num_bases = s->num_bases;
-	c->num_bytes = get_num_bytes(s->num_bases);
-	c->data = malloc(c->num_bytes*sizeof(short));
+	int num_bytes = get_num_bytes(s->num_bases);
+	c->data = malloc(num_bytes);
 	c->name = strdup(s->name);
 	c->metadata = strdup(s->metadata);
 
-	for (curr_8mer=0; curr_8mer < c->num_bytes; curr_8mer++)
+	int num_mers = get_num_mers(s->num_bases);
+
+	for (curr_8mer=0; curr_8mer < num_mers; curr_8mer++)
 	{
 		c->data[curr_8mer] = translate_8mer(s->data, curr_8mer*8);
 	}
@@ -58,11 +61,17 @@ struct cseq * seq_compress( struct seq *s )
 	return c;
 }
 
-static int get_num_bytes(int num_bases)
+static int get_num_mers( int num_bases )
 {
-	int num_bytes = num_bases/8;
-	if (num_bases%8 > 0) { num_bytes++; }
+	int num_mers = num_bases/8;
+	if(num_bases%8) num_mers++;
+	return num_mers;
+}
 
+static int get_num_bytes( int num_bases )
+{
+	int num_bytes = num_bases/4;
+	if (num_bases%4 > 0) { num_bytes++; }
 	return num_bytes;
 }
 
@@ -173,19 +182,45 @@ void cseq_free( struct cseq *c )
 
 size_t cseq_size( struct cseq *c)
 {
-	return c->num_bytes*sizeof(short) + 100;
+	return get_num_bytes(c->num_bases) + 100;
 }
 
-void cseq_print( FILE * file, struct cseq *c )
+void cseq_write( FILE * file, struct cseq *c )
 {
 	if(!c) {
 		// special case: null pointer indicates the end of a list.
 		fprintf(file,">>\n");
 	} else {
-		fprintf(file, ">%s %d %d %s\n", c->name, c->num_bases, (int)(c->num_bytes*sizeof(short)), c->metadata);
-		fwrite(c->data, sizeof(short), c->num_bytes, file);
+		int num_bytes = get_num_bytes(c->num_bases);
+		fprintf(file, ">%s %d %d %s\n", c->name, c->num_bases, num_bytes, c->metadata);
+		fwrite(c->data,1,num_bytes,file);
 		fputc('\n',file);
 	}
+}
+
+int cseq_sprint( char *buf, struct cseq *c, const char *extra_data )
+{
+	int total = 0;
+
+	if(!c) {
+		// special case: null pointer indicates the end of a list.
+		total += sprintf(buf,">>\n");
+	} else {
+		int num_bytes = get_num_bytes(c->num_bases);
+
+		total += sprintf(buf, ">%s %d %d %s %s\n", c->name, c->num_bases, num_bytes, c->metadata, extra_data);
+		buf += total;
+
+		memcpy(buf,c->data,num_bytes);
+		buf += num_bytes;
+		total += num_bytes;
+
+		strcpy(buf,"\n");
+		buf += 1;
+		total += 1;
+	}
+
+	return total;
 }
 
 #define SEQUENCE_FILE_LINE_MAX 1024
@@ -214,7 +249,7 @@ struct cseq * cseq_read( FILE *file )
 
 	fgetc(file);
 
-	struct cseq *c = cseq_create(name,nbases,nbytes,data,metadata);
+	struct cseq *c = cseq_create(name,nbases,data,metadata);
 
 	free(data);
 

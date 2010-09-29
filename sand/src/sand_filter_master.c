@@ -22,7 +22,7 @@ See the file COPYING for details.
 #include "itable.h"
 #include "delete_dir.h"
 
-#include "sequence_compression.h"
+#include "compressed_sequence.h"
 #include "sequence_filter.h"
 
 #include <sys/resource.h>
@@ -52,7 +52,6 @@ static void display_progress();
 static int port = 9090;
 static int kmer_size = 22;
 static int window_size = 22;
-static char end_char = '\0';
 static int do_not_unlink = 0;
 static int do_not_cache = 0;
 static int retry_max = 100;
@@ -174,7 +173,7 @@ void load_rectangles_to_files()
 
 		for (curr = start; curr < end; curr++)
 		{			
-			cseq_print(tmpfile, sequences[curr]);
+			cseq_write(tmpfile, sequences[curr]);
 			cseq_free(sequences[curr]);
 		}
 
@@ -482,10 +481,11 @@ int main(int argc, char ** argv)
 	display_progress();
 
 	printf("Candidate Selection Complete! Candidates generated: %lu\n",cand_count);
+
 	if (checkpoint_file)
 		fclose(checkpoint_file);
-	if (end_char)
-		fprintf(outfile, "%c\n", end_char);
+
+	fprintf(outfile,"EOF\n");
 
 	fflush(outfile);
 	fsync(fileno(outfile));
@@ -503,7 +503,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 	char c;
 	char tmp[512];
 
-	while ((c = getopt(argc, argv, "p:n:d:s:r:R:k:w:c:o:f:a:uxvh")) != (char) -1)
+	while ((c = getopt(argc, argv, "p:n:d:s:r:R:k:w:c:o:a:uxvh")) != (char) -1)
 	{
 		switch (c) {
 		case 'p':
@@ -532,14 +532,6 @@ static void get_options(int argc, char ** argv, const char * progname)
 			break;
 		case 'u':
 			do_not_unlink = 1;
-			break;
-		case 'f':
-			end_char = optarg[0];
-			if (isalnum((int)end_char) || (end_char == '>') || (end_char < ' '))
-			{
-				fprintf(stderr, "End character (-f %c (%d)) must not be alphanumeric, cannot be '>',\ncannot be whitespace, and cannot be printable. Please choose a punctuation\ncharacter besides '>'.\n", end_char, (int) end_char);
-				exit(1);  
-			}
 			break;
 		case 'a':
 			wrapper_program_name = optarg;

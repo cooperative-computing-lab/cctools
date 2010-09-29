@@ -14,7 +14,7 @@ See the file COPYING for details.
 #include <sys/types.h>
 
 #include "align.h"
-#include "sequence_compression.h"
+#include "compressed_sequence.h"
 #include "overlap.h"
 
 #include "debug.h"
@@ -93,13 +93,13 @@ int main(int argc, char ** argv)
 
 	struct cseq *c1, *c2;
 
+	overlap_write_begin(stdout);
+
 	// outer loop: read first sequence in comparison list
 
 	while((c1=cseq_read(input))) {
 	  s1 = cseq_uncompress(c1);
 	  cseq_free(c1);
-
-	  overlap_write_begin(stdout);
 
 	  // inner loop: read sequences until null (indicating end of list)
 	  // then continue again with outer loop.  (two nulls to halt.)

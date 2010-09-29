@@ -10,7 +10,8 @@ See the file COPYING for details.
 
 #include "int_sizes.h"
 #include "align.h"
-#include "sequence_compression.h"
+
+#include "compressed_sequence.h"
 
 #define TIME time(0) - start_time
 #define KB_PER_SEQUENCE 9  // Defined by running some tests, not very exact.

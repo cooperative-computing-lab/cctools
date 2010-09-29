@@ -9,7 +9,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
-#include "sequence_compression.h"
+#include "compressed_sequence.h"
 
 #include "debug.h"
 
@@ -46,7 +46,7 @@ int main(int argc, char ** argv)
                 }
         }
 
-	if (optind<(argc-1)) {
+	if (optind<argc) {
 		input = fopen(argv[optind], "r");
 		if (!input) fatal("couldn't open %s: %s\n",argv[optind],strerror(errno));
 	} else {
