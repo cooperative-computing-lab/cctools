@@ -157,6 +157,7 @@ int main(int argc, char ** argv)
 		seq_free(s2);
 		delta_free(tb);
 	  }
+	  seq_free(s1);
 	}
 
 	fclose(input);
