@@ -16,17 +16,31 @@ static short translate_8mer(const char * str, int start);
 static int get_num_bytes(int num_bases);
 static int get_num_mers(int num_bases);
 
+/*
+This module has a lot of manifest constants that are related to the size
+of the integer type (short) used for binary encoding the data.  It's not
+clear to me that short is a good choice here, but to change it, we first
+must track down all of the constants that are connected to it.
+*/
+
+/*
+Special Note: num_bytes refers to the number of bytes used to store
+the compressed representation on disk.  When allocating memory, we
+must round that number up to the nearest integer-aligned size, in
+order to avoid running off the end while doing arithmetic.  Hence,
+you see malloc( num_bytes + num_bytes % sizeof(i) );
+*/
+
 struct cseq * cseq_create( const char *name, int num_bases, short *mers, const char *metadata)
 {
 	struct cseq *c = malloc(sizeof(*c));
 	c->name = strdup(name);
 	c->num_bases = num_bases;
 	int num_bytes = get_num_bytes(c->num_bases);
-	c->data = malloc(num_bytes);
+	c->data = malloc(num_bytes + num_bytes%sizeof(*c->data));
 	memcpy(c->data,mers,num_bytes);
 	c->metadata = strdup(metadata);
 	return c;
-	
 }
 
 struct cseq *cseq_copy( struct cseq *c )
@@ -37,7 +51,6 @@ struct cseq *cseq_copy( struct cseq *c )
 struct cseq * seq_compress( struct seq *s )
 {
 	struct cseq  *c;
-	int curr_8mer;
 
 	c = malloc(sizeof(*c));
 	if(!c) return 0;
@@ -49,10 +62,11 @@ struct cseq * seq_compress( struct seq *s )
 	c->metadata = strdup(s->metadata);
 
 	int num_mers = get_num_mers(s->num_bases);
+	int i;
 
-	for (curr_8mer=0; curr_8mer < num_mers; curr_8mer++)
+	for (i=0; i < num_mers; i++)
 	{
-		c->data[curr_8mer] = translate_8mer(s->data, curr_8mer*8);
+		c->data[i] = translate_8mer(s->data,i*8);
 	}
 
 	return c;
@@ -131,41 +145,22 @@ struct seq * cseq_uncompress( struct cseq *c )
 	s->data = malloc(c->num_bases+1);
 	s->num_bases = c->num_bases;
 
-	int num_bytes = c->num_bases/8;
-	int i;
+	int i=0, j=0, shift=0;
 
-	for (i=0; i<num_bytes; i++)
-	{
-		translate_to_str(c->data[i],&s->data[i*8], 8);
+	while(i<s->num_bases) {
+		s->data[i] = num_to_base( (c->data[j] >> shift) & 3);
+		i++;
+		shift+=2;
+		if(shift==16) {
+			shift=0;
+			j++;
+		}
 	}
-	if (c->num_bases % 8 > 0)
-	{
-		// handle the overflow if it doesn't divide by 8 exactly.
-		translate_to_str(c->data[i],&s->data[i*8], c->num_bases%8);
-	} 
+
 	s->data[s->num_bases] = 0;
 
 	return s;
 }
-
-void translate_to_str(int mer, char * str, int num_bases)
-{
-	int i;
-
-	// 2 bits represent each base. So, to get the first base, we the
-	// two most significant bits. To get the second base, the two second
-	// most significant bits, etc. In other, we need to bit shift all but
-	// 2 (aka bitshift 14 to the right) when i = 0, bitshift 12 when i=1,
-	// etc.
-	// We mask by 3 to make sure we only have the two numbers and nothing
-	// but 0's in the rest.
-	for (i=0; i<num_bases; i++)
-	{
-		str[i] = num_to_base((mer >> ((num_bases-1)-i)*2) & 3);
-	}
-	str[num_bases] = '\0';
-}
-
 
 void cseq_free( struct cseq *c )
 {
@@ -239,7 +234,8 @@ struct cseq * cseq_read( FILE *file )
 	int n = sscanf(line, ">%s %d %d %[^\n]",name,&nbases,&nbytes,metadata);
 	if(n<3) fatal("syntax error near %s\n",line);
 
-	short *data = malloc(nbytes);
+	// round up the allocation to the alignment size of the data.
+	short *data = malloc(nbytes + nbytes%sizeof(*data));
 
 	n = full_fread(file,data,nbytes);
 	if(n!=nbytes) fatal("sequence file is corrupted.");
