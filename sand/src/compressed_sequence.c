@@ -239,6 +239,8 @@ struct cseq * cseq_read( FILE *file )
 
 	if(line[0] == '>' && line[1] == '>') return 0;
 
+	metadata[0] = 0;
+
 	int n = sscanf(line, ">%s %d %d %[^\n]",name,&nbases,&nbytes,metadata);
 	if(n<3) fatal("syntax error near %s\n",line);
 

@@ -245,8 +245,8 @@ static struct work_queue_task * task_create( struct hash_table *sequence_table )
 
 	buffer_ensure(&buffer,&buffer_size,buffer_pos,cseq_size(s1)+cseq_size(s2)+10);
 
-	buffer_pos += cseq_sprint(&buffer[buffer_pos],s1,aextra);
-	buffer_pos += cseq_sprint(&buffer[buffer_pos],s2,"");
+	buffer_pos += cseq_sprint(&buffer[buffer_pos],s1,"");
+	buffer_pos += cseq_sprint(&buffer[buffer_pos],s2,aextra);
 
 	int npairs = 1;
 
@@ -260,14 +260,14 @@ static struct work_queue_task * task_create( struct hash_table *sequence_table )
 		if(strcmp(aname1,bname1)!=0) {
 			buffer_ensure(&buffer,&buffer_size,buffer_pos,cseq_size(s1)+cseq_size(s2)+10);
 			buffer_pos += cseq_sprint(&buffer[buffer_pos],0,"");
-			buffer_pos += cseq_sprint(&buffer[buffer_pos],s1,bextra);
+			buffer_pos += cseq_sprint(&buffer[buffer_pos],s1,"");
 			strcpy(aname1,bname1);
 			strcpy(aname2,bname2);
 			strcpy(aextra,bextra);
 		}
 
 		buffer_ensure(&buffer,&buffer_size,buffer_pos,cseq_size(s2)+10);
-		buffer_pos += cseq_sprint(&buffer[buffer_pos],s2,"");
+		buffer_pos += cseq_sprint(&buffer[buffer_pos],s2,bextra);
 
 		npairs++;
 

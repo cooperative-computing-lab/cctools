@@ -94,6 +94,8 @@ struct seq * seq_read( FILE *file )
 	// special case: >> indicates the end of a list
 	if(line[0]=='>' && line[1]=='>') return 0;
 
+	metadata[0] = 0;
+
 	int n = sscanf(line, ">%s %[^\n]\n",name,metadata);
 	if(n<1) fatal("syntax error near: %s\n",line);
 
