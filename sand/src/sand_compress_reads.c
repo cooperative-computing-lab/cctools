@@ -38,6 +38,7 @@ int main(int argc, char ** argv)
 	struct seq *s;
 	struct cseq *c;
 	char d;
+	int count = 0;
 
         while((d=getopt(argc,argv,"qhi"))!=(char)-1) {
                 switch(d) {
@@ -49,6 +50,7 @@ int main(int argc, char ** argv)
 			exit(0);
 			break;
                 case 'h':
+		default:
                         show_help(progname);
                         exit(0);
                         break;
@@ -77,20 +79,17 @@ int main(int argc, char ** argv)
 		outfile = stdout;
 	}
 
-	while (!feof(infile))
-	{
-		s = seq_read(infile); 
+	while((s = seq_read(infile))) {
 		c = seq_compress(s);
 		cseq_write(outfile,c);
 		cseq_free(c);
 		seq_free(s);
+		count++;
 	}
 
-/*
 	if(!quiet_mode) {
-		fprintf(stderr,"%d sequences: %lu bytes read %lu bytes written.\n",count,ftell(infile),ftell(outfile));
+		fprintf(stderr,"%d sequences compressed.\n",count);
 	}
-*/
 
 	fclose(infile);
 	fclose(outfile);

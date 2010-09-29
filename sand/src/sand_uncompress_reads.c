@@ -22,6 +22,7 @@ static void show_help(const char *cmd)
 {
         printf("Use: %s [options]  compressed_reads > fasta_reads\n", cmd);
         printf("where options are:\n");
+	printf(" -q  Quiet mode: suppress summary line.\n");
 	printf(" -v  Show version string.\n");
 	printf(" -h  Show this help screen\n");
 }
@@ -29,37 +30,66 @@ static void show_help(const char *cmd)
 int main(int argc, char ** argv)
 {
 	const char *progname = "sand_uncompress_reads";
-	FILE * input;
+	FILE * infile;
+	FILE * outfile;
 	struct cseq *c;
 	char d;
+	int quiet_mode = 0;
+	int count = 0;
 
-        while((d=getopt(argc,argv,"chi"))!=(char)-1) {
+        while((d=getopt(argc,argv,"qhi"))!=(char)-1) {
                 switch(d) {
+		case 'q':
+			quiet_mode = 1;
+			break;
 		case 'v':
 			show_version(progname);
 			exit(0);
 			break;
                 case 'h':
+		default:
                         show_help(progname);
                         exit(0);
                         break;
                 }
         }
 
-	if (optind<argc) {
-		input = fopen(argv[optind], "r");
-		if (!input) fatal("couldn't open %s: %s\n",argv[optind],strerror(errno));
+	if( optind<argc ) {
+		infile = fopen(argv[optind], "r");
+		if(!infile) {
+			fprintf(stderr,"%s: couldn't open %s: %s\n",progname,argv[optind],strerror(errno));
+			return 1;
+		}
+		optind++;
 	} else {
-		input = stdin;
+		infile = stdin;
 	}
 
-	while((c=cseq_read(input))) {
+	if( optind<argc ) {
+		outfile = fopen(argv[optind],"w");
+		if(!outfile) {
+			fprintf(stderr,"%s: couldn't open %s: %s\n",progname,argv[optind],strerror(errno));
+			return 1;
+		}
+		optind++;
+	} else {
+		outfile = stdout;
+	}
+
+	while((c=cseq_read(infile))) {
 		struct seq *s = cseq_uncompress(c);
-		seq_print(stdout,s);
+		seq_print(outfile,s);
 		seq_free(s);
 		cseq_free(c);
+		count++;
 	}
 
-	fclose(input);
+	if(!quiet_mode) {
+		fprintf(stderr,"%d sequences uncompressed.\n",count);
+	}
+
+	fclose(infile);
+	fclose(outfile);
+
 	return 0;
 }
