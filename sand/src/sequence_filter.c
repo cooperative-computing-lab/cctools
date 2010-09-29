@@ -696,8 +696,6 @@ mer_t get_kmer(struct cseq *c, int curr)
 			// Add curr_mer onto mer.
 			mer = mer | (mer_t) curr_mer;
 
-			//printf("%llu: ", mer);
-			//print_kmer(stdout, mer);
 			bases_left -= (8 - which_base);
 			which_mer++;
 			which_base = 0;
@@ -722,8 +720,6 @@ mer_t get_kmer(struct cseq *c, int curr)
 			// Now add it on to mer.
 			mer = mer | curr_mer;
 
-			//printf("%llu: ", mer);
-			//print_kmer(stdout, mer);
 			bases_left = 0;
 		}
 	}
@@ -741,22 +737,6 @@ void print_8mer(unsigned short mer)
 	str[8] = '\0';
 
 	printf("%s\n", str);
-}
-
-void print_16mer(mer_t mer16)
-{
-	char str[17];
-
-	translate_to_str(mer16, str, 16);
-	fprintf(stderr, "%s\n", str);
-}
-
-void print_kmer(FILE * file, mer_t mer)
-{
-	char str[k+1];
-
-	translate_kmer(mer, str, k);
-	fprintf(file, "%s\n", str);
 }
 
 void translate_kmer(mer_t mer, char * str, int length)
