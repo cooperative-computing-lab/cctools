@@ -237,6 +237,8 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 		hash_table_remove(w->current_files,key);
 		free(value);
 	}
+	hash_table_delete(w->current_files);
+
 	hash_table_remove(q->worker_table,w->hashkey);
 	if(w->current_task) {
 		if (w->current_task->result == WORK_QUEUE_RESULT_OUTPUT_FAIL) {
@@ -1011,6 +1013,13 @@ int work_queue_specify_name( struct work_queue *q, const char *name )
 void work_queue_delete( struct work_queue *q )
 {
 	if(q) {
+		struct work_queue_worker *w;
+		char *key;
+
+		hash_table_firstkey(q->worker_table);
+		while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+			remove_worker(q,w);
+		}
 		hash_table_delete(q->worker_table);
 		list_delete(q->ready_list);
 		list_delete(q->complete_list);
