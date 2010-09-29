@@ -450,7 +450,7 @@ int main(int argc, char ** argv)
 		}
 		t = work_queue_wait(q,1);
 		if(t) {
-			rv = handle_done_task(work_queue_wait(q, 1));
+			rv = handle_done_task(t);
 			if(!rv && retry_max) { // Task failed
 				// Retry the task
 				work_queue_submit(q, t);
@@ -466,7 +466,7 @@ int main(int argc, char ** argv)
 	{
 		t = work_queue_wait(q, 1);
 		if(t) {
-			rv = handle_done_task(work_queue_wait(q, 1));
+			rv = handle_done_task(t);
 			if(!rv && retry_max) { // Task failed
 				// Retry the task
 				work_queue_submit(q, t);
