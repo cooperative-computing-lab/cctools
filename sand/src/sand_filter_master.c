@@ -576,7 +576,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 		fprintf(stderr, "WARNING: Output directory %s/ already exists, you may want to delete or rename before running.\n", outdirname);
 	}
 
-	sprintf(filter_program_args, "-k %d -w %d -s d -d -1", kmer_size, window_size);
+	sprintf(filter_program_args, "-k %d -w %d -s d", kmer_size, window_size);
 
 	if (repeat_filename)
 	{
