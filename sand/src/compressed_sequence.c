@@ -11,10 +11,7 @@ See the file COPYING for details.
 #include "full_io.h"
 #include "debug.h"
 
-static short mer_add_base(short mer, char base);
-static short translate_8mer(const char * str, int start);
 static int get_num_bytes(int num_bases);
-static int get_num_mers(int num_bases);
 
 /*
 This module has a lot of manifest constants that are related to the size
@@ -61,22 +58,21 @@ struct cseq * seq_compress( struct seq *s )
 	c->name = strdup(s->name);
 	c->metadata = strdup(s->metadata);
 
-	int num_mers = get_num_mers(s->num_bases);
-	int i;
+	memset(c->data,0,num_bytes);
 
-	for (i=0; i < num_mers; i++)
-	{
-		c->data[i] = translate_8mer(s->data,i*8);
+	int i=0, j=0, shift=0;
+
+	while(i<s->num_bases) {
+		c->data[j] |= (base_to_num(s->data[i]) << shift);
+		i++;
+		shift+=2;
+		if(shift==16) {
+			shift=0;
+			j++;
+		}
 	}
 
 	return c;
-}
-
-static int get_num_mers( int num_bases )
-{
-	int num_mers = num_bases/8;
-	if(num_bases%8) num_mers++;
-	return num_mers;
 }
 
 static int get_num_bytes( int num_bases )
@@ -84,19 +80,6 @@ static int get_num_bytes( int num_bases )
 	int num_bytes = num_bases/4;
 	if (num_bases%4 > 0) { num_bytes++; }
 	return num_bytes;
-}
-
-static short translate_8mer(const char * str, int start)
-{
-	int i;
-	short mer = 0;
-
-	for(i=start; i<start+8; i++)
-	{
-		if (str[i] == '\0') { return mer; }
-		mer = mer_add_base(mer, str[i]);
-	}
-	return mer;
 }
 
 int base_to_num(char base)
@@ -129,11 +112,6 @@ char num_to_base(int num)
 		case 3: return 'G';
 		default: return 'N';
 	}
-}
-
-short mer_add_base(short mer, char base)
-{
-	return (mer << 2) + base_to_num(base);
 }
 
 struct seq * cseq_uncompress( struct cseq *c )
