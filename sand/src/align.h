@@ -9,32 +9,31 @@ See the file COPYING for details.
 
 #include <stdio.h>
 
-struct s_delta
-{
+#include "matrix.h"
+
+struct alignment {
 	int start1;
 	int end1;
 	int length1;
 	int start2;
 	int end2;
 	int length2;
-	int * tb;
+	char * tb;
 	int gap_count;
 	int mismatch_count;
 	int score;
 	int total_score;
-	float quality;
+	double quality;
 	char ori;
 };
 
-typedef struct s_delta delta;
+struct alignment * align_prefix_suffix( struct matrix *m, const char *a, const char *b, int min_align );
+struct alignment * align_smith_waterman( struct matrix *m, const char *a, const char *b );
+struct alignment * align_banded( struct matrix *m, const char *a, const char *b, int astart, int bstart, int k );
 
-delta align_prefix_suffix(const char * str1, const char * str2, int min_align);
-delta align_smith_waterman(const char * str1, const char * str2);
-delta align_banded(const char * str1, const char * str2, int start1, int start2, int k);
-int   align_max(int length1, int length2, int start1, int start2);
+void alignment_print( FILE * file, const char * str1, const char * str2, struct alignment *a, int line_width );
+void alignment_delete( struct alignment *a );
 
-void delta_print_alignment(FILE * file, const char * str1, const char * str2, delta tb, int line_width);
-void delta_print_local(FILE * file, const char * str1, const char * str2, delta tb, int line_width);
-void delta_free(delta tb);
+int   align_max( int length1, int length2, int start1, int start2 );
 
 #endif

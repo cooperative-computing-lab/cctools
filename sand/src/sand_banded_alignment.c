@@ -12,5 +12,5 @@ A better solution would be to just pass in a command line argument,
 but the rest of the framework isn't set up for that yet.
 */
 
-#define DO_BANDED_ALIGNMENT
+#define DEFAULT_ALIGNMENT_TYPE "banded"
 #include "sand_sw_alignment.c"

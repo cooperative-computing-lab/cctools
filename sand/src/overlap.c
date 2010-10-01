@@ -6,7 +6,7 @@
 #include "overlap.h"
 #include "macros.h"
 
-void overlap_write(FILE * file, delta tb, const char * id1, const char * id2)
+void overlap_write(FILE * file, struct alignment *aln, const char * id1, const char * id2)
 {
 	int ahg, bhg;
 	char olt;
@@ -18,11 +18,11 @@ void overlap_write(FILE * file, delta tb, const char * id1, const char * id2)
 	fprintf(file, "bfr:%s\n", id2);
 
 	// Orientation
-	fprintf(file, "ori:%c\n", tb.ori);
+	fprintf(file, "ori:%c\n", aln->ori);
 
-	ahg = tb.start1 - tb.start2;
-	bhg = (tb.length2-1) - tb.end2;
-	if (bhg == 0) { bhg = tb.end1 - tb.length1; }
+	ahg = aln->start1 - aln->start2;
+	bhg = (aln->length2-1) - aln->end2;
+	if (bhg == 0) { bhg = aln->end1 - aln->length1; }
 
 	// If ahg and bhg are of opposite signs, then it's a containment.
 	// If they are the same sign, it's a dovetail.
@@ -39,14 +39,14 @@ void overlap_write(FILE * file, delta tb, const char * id1, const char * id2)
 	// For now just making something up.
 	// As far as I can tell, Celera defines the quality score as
 	// (gaps + mismatches) / MIN(end1, end2)
-	fprintf(file, "qua:%f\n", tb.quality);
+	fprintf(file, "qua:%f\n", aln->quality);
 
 	// This is the length of the overlap
-	fprintf(file, "mno:%d\n", MIN(tb.end1 - tb.start1, tb.end2 - tb.start2));
-	fprintf(file, "mxo:%d\n", tb.score);
+	fprintf(file, "mno:%d\n", MIN(aln->end1 - aln->start1, aln->end2 - aln->start2));
+	fprintf(file, "mxo:%d\n", aln->score);
 
 	// Polymorphism count.
-	//fprintf(file, "pct:%d\n", tb.mismatch_count);
+	//fprintf(file, "pct:%d\n", aln->mismatch_count);
 	fprintf(file, "pct:0\n");  // Again, try to match Celera
 
 	fprintf(file, "}\n");

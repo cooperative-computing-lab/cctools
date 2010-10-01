@@ -2,7 +2,7 @@ include ../../Makefile.config
 include ../../Makefile.rules
 
 PROGRAMS = sand_align_master sand_filter_master sand_banded_alignment sand_sw_alignment sand_filter_mer_seq sand_compress_reads sand_uncompress_reads
-SOURCES =  compressed_sequence.o sequence_filter.c sequence.c overlap.c align.c
+SOURCES =  compressed_sequence.o sequence_filter.c sequence.c matrix.c overlap.c align.c
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = *.h
 
@@ -16,7 +16,7 @@ libsandtools.a: $(OBJECTS)
 	ranlib libsandtools.a
 
 %.o: %.c
-	${CCTOOLS_CC} ${CCTOOLS_INTERNAL_CCFLAGS} -c $< -o $@ -O2
+	${CCTOOLS_CC} ${CCTOOLS_INTERNAL_CCFLAGS} -c $< -o $@
 
 clean:
 	rm -f core *~ *.o *.os *.so $(PROGRAMS) libsandtools.a

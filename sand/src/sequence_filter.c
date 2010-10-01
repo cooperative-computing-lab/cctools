@@ -672,7 +672,6 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer )
 
 mer_t get_kmer(struct cseq *c, int curr)
 {
-
 	// Which mer does this kmer start in? 
 	int which_mer = curr/8;
 	int which_base = curr%8;
