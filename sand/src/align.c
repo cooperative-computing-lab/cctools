@@ -74,8 +74,8 @@ static inline cell score_cell( struct matrix *m, int i, int j, const char *a, co
 
 struct alignment * align_smith_waterman( struct matrix *m, const char * a, const char * b )
 {
-	int alength = strlen(a);
-	int blength = strlen(b);
+	int alength = m->width;
+	int blength = m->height;
 	int i,j;
 
 	int best_i = 0;
@@ -116,8 +116,8 @@ struct alignment * align_smith_waterman( struct matrix *m, const char * a, const
 
 struct alignment * align_prefix_suffix( struct matrix *m, const char * a, const char * b, int min_align )
 {
-	int alength = strlen(a);
-	int blength = strlen(b);
+	int alength = m->width;
+	int blength = m->height;
 	int i,j;
 	int best_i = 0;
 	int best_j = 0;
@@ -150,8 +150,8 @@ struct alignment * align_prefix_suffix( struct matrix *m, const char * a, const 
 
 struct alignment * align_banded( struct matrix *m, const char *a, const char *b, int astart, int bstart, int k )
 {
-	int alength = strlen(a);
-	int blength = strlen(b);
+	int alength = m->width;
+	int blength = m->height;
 	int i,j;
 	int best_i = 0;
 	int best_j = 0;
@@ -190,7 +190,7 @@ struct alignment * align_banded( struct matrix *m, const char *a, const char *b,
 	#define BRACKET( a, x, b ) MIN(MAX((a),(x)),(b))
 
 	// For each row, sweep out the valid range of columns.
-	for(j=1;j<=blength;j++) {
+	for(j=1;j<=MIN(blength,alength-offset+k);j++) {
 
 		int istart = BRACKET(1,offset+j-k,alength);
 		int istop  = BRACKET(1,offset+j+k,alength);
@@ -221,23 +221,32 @@ static void choose_best(struct matrix *m, int * best_i, int * best_j, int istart
 	// QUESTION: In Celera, is a good score high or low?
 
 	// Find the best in the last column
-	for (i=m->width, j=jstart; j <= jend; j++) {
-		quality = ((double) m->data[j][i].score) / (double)MIN(i, j);
-		if (quality < best_qual) {
-			best_qual = quality;
-			*best_i = i;
-			*best_j = j;
+	if(jstart!=jend) {
+		for (i=m->width, j=jstart; j <= jend; j++) {
+			quality = ((double) m->data[j][i].score) / (double)MIN(i, j);
+			if (quality < best_qual) {
+				best_qual = quality;
+				*best_i = i;
+				*best_j = j;
+			}	
 		}
 	}
 
 	// Find the best in the last row
-	for (i=istart, j=m->height; i <= iend; i++) {
-		quality = ((double) m->data[j][i].score) / (double)MIN(i, j);
-		if (quality < best_qual) {
-			best_qual = quality;
-			*best_i = i;
-			*best_j = j;
+	if(istart!=iend) {
+		for (i=istart, j=m->height; i <= iend; i++) {
+			quality = ((double) m->data[j][i].score) / (double)MIN(i, j);
+			if (quality < best_qual) {
+				best_qual = quality;
+				*best_i = i;
+				*best_j = j;
+			}
 		}
+	}
+
+	if(jstart==jend && istart==iend) {
+		fprintf(stderr,"choose_best: no range available to choose from!\n");
+		exit(1);
 	}
 }
 
