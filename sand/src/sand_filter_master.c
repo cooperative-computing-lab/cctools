@@ -95,7 +95,6 @@ static int total_processed = 0;
 static timestamp_t tasks_runtime = 0;
 static timestamp_t tasks_filetime = 0;
 
-
 static void show_version(const char *cmd)
 {
 	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
@@ -111,9 +110,7 @@ static void show_help(const char *cmd)
 	printf(" -r <file>      A meryl file of repeat mers to be filtered out.\n");
 	printf(" -R <n>         Automatically retry failed jobs up to n times.\n");
 	printf(" -k <number>    The k-mer size to use in candidate selection (default is 22).\n");
-	printf(" -w <number>    The minimizer window size to use in candidate selection (default");
-	printf("                is 22).\n");
-	printf("                will be converted to ASCII and stored in <outputdata>\n");
+	printf(" -w <number>    The minimizer window size. (default is 22).\n");
 	printf(" -u             If set, do not unlink temporary binary output files.\n");
 	printf(" -c <file>      The file which contains checkpoint information. If it exists,\n");
 	printf("                it will be used, otherwise it will be created.\n");
@@ -146,7 +143,6 @@ void load_sequences(const char * filename)
 
 void load_rectangles_to_files()
 {
-
 	int curr_rect;
 	num_rectangles = ceil((float)num_seqs / (float)rectangle_size);
 
