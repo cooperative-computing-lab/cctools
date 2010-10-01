@@ -22,7 +22,6 @@ See the file COPYING for details.
 static int num_seqs;
 static int kmer_size = 22;
 static int window_size = 22;
-static char end_char = 0;
 static unsigned long max_mem_kb = ULONG_MAX;
 
 static char *repeat_filename = 0;
@@ -62,8 +61,6 @@ static void show_help(const char *cmd)
 	printf(" -k <number>    The k-mer size to use in candidate selection (default is 22).\n");
 	printf(" -w <number>    The minimizer window size to use in candidate selection (default is 22).\n");
 	printf(" -o <filename>  The output file. Default is stdout.\n");
-	printf(" -b             Return output as binary (default is ASCII).\n");
-	printf(" -f <character> The character that will be printed at the end of the file.\n");
 	printf("                output file to indicate it has ended (default is nothing)\n");
 	printf(" -d <subsys>    Enable debug messages for this subsystem.  Try 'd -all' to start .\n");
 	printf(" -v             Show version string\n");
@@ -74,7 +71,7 @@ static void get_options(int argc, char **argv, const char *progname)
 {
 	char c;
 
-	while((c = getopt(argc, argv, "d:r:s:bk:w:f:o:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "d:r:s:k:w:f:o:vh")) != (char) -1) {
 		switch (c) {
 		case 'r':
 			repeat_filename = optarg;
@@ -100,13 +97,6 @@ static void get_options(int argc, char **argv, const char *progname)
 			break;
 		case 'o':
 			output_filename = optarg;
-			break;
-		case 'f':
-			end_char = optarg[0];
-			if(isalnum((int) end_char) || (end_char == '>') || (end_char < ' ')) {
-				fprintf(stderr, "End character (-f %c (%d)) must not be alphanumeric, cannot be '>',\ncannot be whitespace, and cannot be printable. Please choose a punctuation\ncharacter besides '>'.\n", end_char, (int) end_char);
-				exit(1);
-			}
 			break;
 		case 'd':
 			debug_flags_set(optarg);
@@ -263,10 +253,6 @@ int main(int argc, char **argv)
 		} else {
 			curr_start_x = start_x;
 		}
-	}
-
-	if(end_char > 0) {
-		fprintf(output, "%c\n", end_char);
 	}
 
 	fclose(output);
