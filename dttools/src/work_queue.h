@@ -109,8 +109,9 @@ void work_queue_task_specify_file( struct work_queue_task *t, const char *local_
 @param data The contents of the buffer to pass as input.
 @param length The length of the buffer, in bytes
 @param remote_name The name of the remote file to create.
+@param flags May take the same values as in @ref work_queue_specify_file.
 */
-void work_queue_task_specify_buffer( struct work_queue_task *t, const char *data, int length, const char *remote_name );
+void work_queue_task_specify_buffer( struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags );
 
 /** Attach a user defined logical name to the task.
 This field is not interpreted by the work queue, but simply maintained to help the user track tasks.
