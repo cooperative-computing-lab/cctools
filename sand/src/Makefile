@@ -16,7 +16,7 @@ libsandtools.a: $(OBJECTS)
 	ranlib libsandtools.a
 
 %.o: %.c
-	${CCTOOLS_CC} ${CCTOOLS_INTERNAL_CCFLAGS} -c $< -o $@
+	${CCTOOLS_CC} ${CCTOOLS_INTERNAL_CCFLAGS} -c $< -o $@ -O4
 
 clean:
 	rm -f core *~ *.o *.os *.so $(PROGRAMS) libsandtools.a
