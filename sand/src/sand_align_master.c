@@ -25,6 +25,7 @@ See the file COPYING for details.
 #include "compressed_sequence.h"
 
 static struct work_queue *queue = 0;
+static struct hash_table *sequence_table = 0;
 static int port = 9068;
 static const char *align_prog = 0;
 static const char *align_prog_args = "";
@@ -32,6 +33,7 @@ static const char *candidate_file_name;
 static const char *sequence_file_name;
 static const char *output_file_name;
 
+static FILE *sequence_file;
 static FILE *candidate_file;
 static FILE *output_file;
 
@@ -43,6 +45,8 @@ static int tasks_submitted = 0;
 static int tasks_done = 0;
 static timestamp_t tasks_runtime = 0;
 static timestamp_t tasks_filetime = 0;
+static int candidates_loaded = 0;
+static int sequences_loaded = 0;
 
 static int max_pairs_per_task = 10000;
 
@@ -78,27 +82,24 @@ static void display_progress(struct work_queue *q)
 
 	work_queue_get_stats(q, &info);
 
-	double speedup = (((double) tasks_runtime / 1000000.0) / (time(0) - start_time));
-
 	if(row_count==0) {
-		printf("%7s | %4s %4s %4s | %6s %4s %4s %6s | %6s %6s %8s | %s\n",
-			"Time", "WI", "WR", "WB", "TS", "TW", "TR", "TD", "AR", "AF", "WS", "Speedup");
+		printf(" Total | Workers   | Tasks                          | K-Cand K-Seqs | Total\n");
+		printf("  Time | Idle Busy | Submit Idle  Run   Done    Avg | Loaded Loaded | Speedup\n");
 		row_count = row_limit;
 	}
 
-	printf("%6ds | %4d %4d %4d | %6d %4d %4d %6d | %6.02lf %6.02lf %8.02lf | %.02lf\n",
+	printf("%6d | %4d %4d | %6d %4d %4d %6d %6.2lf | %6d %6d | %5.2lf\n",
 		(int) (time(0) - start_time),
-		info.workers_init,
-		info.workers_ready,
+		info.workers_init + info.workers_ready,
 		info.workers_busy,
 		tasks_submitted,
 		info.tasks_waiting,
 		info.tasks_running,
 		tasks_done,
-		(tasks_runtime / 1000000.0) / tasks_done,
-		(tasks_filetime / 1000000.0) / tasks_done,
-		(tasks_runtime / 1000000.0) / (tasks_filetime / 1000000.0),
-		speedup);
+		tasks_done ? tasks_runtime / (double) tasks_done / 1000000.0 : 0,
+		candidates_loaded / 1000,
+		sequences_loaded / 1000,
+		(time(0)>start_time) ? (tasks_runtime/1000000.0) / (time(0)-start_time) : 0);
 
 	row_count--;
 
@@ -148,25 +149,6 @@ static char * confirm_output( char *output )
 	return result;
 }
 
-static struct hash_table * build_sequence_library( const char *filename )
-{
-	struct hash_table *h = hash_table_create(20000001, 0);
-	if(!h) fatal("couldn't create hash table\n");
-
-	FILE *file = fopen(filename, "r");
-	if(!file) fatal("couldn't open %s: %s\n",filename,strerror(errno));
-
-	struct cseq *c;
-
-	while((c = cseq_read(file))) {
-		hash_table_insert(h,c->name,c);
-	}
-
-	fclose(file);
-
-	return h;
-}
-
 static void task_complete( struct work_queue_task *t )
 {
 	if(t->return_status!=0) {
@@ -214,14 +196,31 @@ static int candidate_read(FILE * fp, char *name1, char *name2, char *extra_data)
 	int n = sscanf(line, "%s %s %[^\n]", name1, name2, extra_data);
 	if(n!=3) fatal("candidate file is corrupted: %s\n",line);
 
+	candidates_loaded++;
+
 	return CANDIDATE_SUCCESS;
 }
 
 struct cseq * sequence_lookup( struct hash_table *h, const char *name )
 {
 	struct cseq *c = hash_table_lookup(h,name);
-	if(!c) fatal("candidate file contains invalid sequence name: %s\n",name);
-	return c;
+	if(c) return c;
+
+	while(1) {
+		c = cseq_read(sequence_file);
+		if(!c) break;
+
+		sequences_loaded++;
+
+		hash_table_insert(h,c->name,c);
+		if(!strcmp(name,c->name)) return c;
+
+		int size = hash_table_size(h);
+		if(size%100000 ==0 )debug(D_DEBUG,"loaded %d sequences",size);
+	}
+
+	fatal("candidate file contains invalid sequence name: %s\n",name);
+	return 0;
 }
 
 static void buffer_ensure( char **buffer, int *buffer_size, int buffer_used, int buffer_delta )
@@ -265,6 +264,7 @@ static struct work_queue_task * task_create( struct hash_table *sequence_table )
 	buffer_pos += cseq_sprint(&buffer[buffer_pos],s2,aextra);
 
 	int npairs = 1;
+	int nseqs = 2;
 
 	do {
 		result = candidate_read(candidate_file,bname1,bname2,bextra);
@@ -280,14 +280,18 @@ static struct work_queue_task * task_create( struct hash_table *sequence_table )
 			strcpy(aname1,bname1);
 			strcpy(aname2,bname2);
 			strcpy(aextra,bextra);
+			nseqs++;
 		}
 
 		buffer_ensure(&buffer,&buffer_size,buffer_pos,cseq_size(s2)+10);
 		buffer_pos += cseq_sprint(&buffer[buffer_pos],s2,bextra);
 
+		nseqs++;
 		npairs++;
 
 	} while( npairs < max_pairs_per_task );
+
+	debug(D_DEBUG,"created task of %d sequences and %d comparisons\n",nseqs,npairs);
 
 	char cmd[strlen(align_prog)+strlen(align_prog_args)+100];
 
@@ -349,6 +353,12 @@ int main(int argc, char *argv[])
 	sequence_file_name = argv[optind + 2];
 	output_file_name = argv[optind + 3];
 
+	sequence_file = fopen(sequence_file_name,"r");
+	if(!sequence_file) {
+		fprintf(stderr, "couldn't open sequence file %s: %s\n", sequence_file_name, strerror(errno));
+		return 1;
+	}
+
 	candidate_file = fopen(candidate_file_name,"r");
 	if(!candidate_file) {
 		fprintf(stderr, "couldn't open candidate file %s: %s\n", candidate_file_name, strerror(errno));
@@ -367,13 +377,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	start_time = time(0);
-	last_display_time = 0;
+	sequence_table = hash_table_create(20000001,0);
 
-	printf("Loading sequences...\n");
-	time_t temp_time = time(0);
-	struct hash_table *sequence_table = build_sequence_library(sequence_file_name);
-	printf("%i sequences loaded in %6ds\n", hash_table_size(sequence_table), (int) (time(0) - temp_time));
+	start_time = time(0);
 
 	struct work_queue_task *t;
 
@@ -393,16 +399,17 @@ int main(int argc, char *argv[])
 		}
 
 		if(work_queue_empty(queue)) {
-			if(more_candidates) {
-				sleep(5);
-			}
+			if(more_candidates) sleep(5);
 		} else {
-			t = work_queue_wait(queue,5);
+			if(work_queue_hungry(queue)) {
+				t = work_queue_wait(queue,0);
+			} else {
+				t = work_queue_wait(queue,5);
+			}
 			if(t) task_complete(t);
 		}
 	}
 
-	printf("%7s | %4s %4s %4s | %6s %4s %4s %4s | %6s %6s %6s %8s | %s\n", "Time", "WI", "WR", "WB", "TS", "TW", "TR", "TC", "TD", "AR", "AF", "WS", "Speedup");
 	display_progress(queue);
 
 	printf("Completed %i tasks in %i seconds\n", tasks_done, (int) (time(0) - start_time));
