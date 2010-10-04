@@ -198,7 +198,7 @@ int main(int argc, char ** argv)
 			matrix_print(m,s1->data,s2->data);
 		} else if(!strcmp(output_format,"align")) {
 			printf("*** %s alignment of sequences %s and %s (quality %lf):\n\n",align_type,s1->name,s2->name,aln->quality);
-			alignment_print(stdout,s1->data,s2->data,aln,80);
+			alignment_print(stdout,s1->data,s2->data,aln);
 		} else {
 			printf("unknown output formt '%s'\n",output_format);
 			exit(1);

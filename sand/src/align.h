@@ -18,7 +18,7 @@ struct alignment {
 	int start2;
 	int end2;
 	int length2;
-	char * tb;
+	char * traceback;
 	int gap_count;
 	int mismatch_count;
 	int score;
@@ -31,7 +31,7 @@ struct alignment * align_prefix_suffix( struct matrix *m, const char *a, const c
 struct alignment * align_smith_waterman( struct matrix *m, const char *a, const char *b );
 struct alignment * align_banded( struct matrix *m, const char *a, const char *b, int astart, int bstart, int k );
 
-void alignment_print( FILE * file, const char * str1, const char * str2, struct alignment *a, int line_width );
+void alignment_print( FILE * file, const char * str1, const char * str2, struct alignment *a );
 void alignment_delete( struct alignment *a );
 
 int   align_max( int length1, int length2, int start1, int start2 );

@@ -16,21 +16,13 @@ struct matrix * matrix_create( int width, int height )
 
 	m->width = width;
 	m->height = height;
-	m->data = malloc(sizeof(cell*)*(height+1));
-
-	int j;
-
-	for(j=0;j<=m->height;j++) {
-		m->data[j] = malloc(sizeof(cell)*(width+1));
-	}
+	m->data = malloc(sizeof(struct cell) * (m->width+1) * (height+1) );
 
 	return m;
 }
 
 void matrix_delete( struct matrix *m )
 {
-	int j;
-	for(j=0; j<=m->height; j++) free(m->data[j]);
 	free(m->data);
 	free(m);
 }
@@ -55,9 +47,9 @@ void matrix_print( struct matrix *m, const char *a, const char *b )
 		}
 
 		for(i=0;i<=m->width;i++) {
-			char t = m->data[j][i].tb;
+			char t = matrix(m,i,j).traceback;
 			if(t==0) t=' ';
-			printf("%3d%c ",m->data[j][i].score,t);
+			printf("%3d%c ",matrix(m,i,j).score,t);
 		}
 		printf("\n");
 	}

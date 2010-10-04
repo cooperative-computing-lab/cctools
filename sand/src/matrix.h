@@ -7,23 +7,23 @@ See the file COPYING for details.
 #ifndef MATRIX_H
 #define MATRIX_H
 
-struct s_cell
+struct cell
 {
-	int score;
-	char tb;
+	short score;
+	short traceback;
 };
-
-typedef struct s_cell cell;
 
 struct matrix {
 	int width;
 	int height;
-	cell **data;
+	struct cell *data;
 };
 
 struct matrix * matrix_create( int width, int height );
 void            matrix_delete( struct matrix *m );
 void            matrix_print( struct matrix *m, const char *a, const char *b );
+
+#define matrix(m,i,j) ( (m)->data[(m->width*(j) + i)] )
 
 #endif
 
