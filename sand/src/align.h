@@ -22,7 +22,6 @@ struct alignment {
 	int gap_count;
 	int mismatch_count;
 	int score;
-	int total_score;
 	double quality;
 	char ori;
 };
