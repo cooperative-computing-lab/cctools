@@ -18,6 +18,7 @@ test: ${MAKEFLOW}
 	@$(SHELL) -c 'if ${MAKEFLOW} typo.makeflow ; then exit 1; else exit 0; fi'
 	@# Check syntax for long_line_test.makeflow: syntax OK, but there's no
 	@# way the makeflow would actually run.
+	@./long_line_test.pl > long_line_test.makeflow
 	@${MAKEFLOW} -C long_line_test.makeflow
 	@# Check syntax for variable_issues.makeflow: FAILS.
 	@$(SHELL) -c 'if ${MAKEFLOW} -C variable_issues.makeflow ; then exit 1; else exit 0; fi'
