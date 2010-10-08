@@ -54,7 +54,7 @@ static int max_pairs_per_task = 10000;
 #define CANDIDATE_EOF 1
 #define CANDIDATE_WAIT 2
 
-#define CAND_FILE_LINE_MAX 1024
+#define CAND_FILE_LINE_MAX 4096
 
 static void show_version(const char *cmd)
 {
@@ -74,6 +74,27 @@ static void show_help(const char *cmd)
 	printf(" -h             Show this help screen\n");
 }
 
+static char * find_in_path( const char *cmd )
+{
+	char tmp[CAND_FILE_LINE_MAX];
+
+	if(access(cmd,X_OK)==0) return strdup(cmd);
+
+	char * path = strdup(getenv("PATH"));
+	char * p = strtok(path,":");
+	while(p) {
+		sprintf(tmp,"%s/%s",p,cmd);
+		if(access(tmp,X_OK)==0) {
+			free(path);
+			return strdup(tmp);
+		}
+		p = strtok(0,":");
+	}
+
+	free(path);
+	return 0;
+}
+
 static void display_progress(struct work_queue *q)
 {
 	struct work_queue_stats info;
@@ -83,8 +104,8 @@ static void display_progress(struct work_queue *q)
 	work_queue_get_stats(q, &info);
 
 	if(row_count==0) {
-		printf(" Total | Workers   | Tasks                          | K-Cand K-Seqs | Total\n");
-		printf("  Time | Idle Busy | Submit Idle  Run   Done    Avg | Loaded Loaded | Speedup\n");
+		printf(" Total | Workers   | Tasks                      Avg | K-Cand K-Seqs | Total\n");
+		printf("  Time | Idle Busy | Submit Idle  Run   Done   Time | Loaded Loaded | Speedup\n");
 		row_count = row_limit;
 	}
 
@@ -348,32 +369,39 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	align_prog = argv[optind];
+	align_prog = find_in_path(argv[optind]);
+
+	if(!align_prog) {
+		fprintf(stderr, "%s: couldn't find alignment program %s: is it in your path?\n",progname,argv[optind]);
+		return 1;
+	}
+			
+
 	candidate_file_name = argv[optind + 1];
 	sequence_file_name = argv[optind + 2];
 	output_file_name = argv[optind + 3];
 
 	sequence_file = fopen(sequence_file_name,"r");
 	if(!sequence_file) {
-		fprintf(stderr, "couldn't open sequence file %s: %s\n", sequence_file_name, strerror(errno));
+		fprintf(stderr, "%s: couldn't open sequence file %s: %s\n", progname, sequence_file_name, strerror(errno));
 		return 1;
 	}
 
 	candidate_file = fopen(candidate_file_name,"r");
 	if(!candidate_file) {
-		fprintf(stderr, "couldn't open candidate file %s: %s\n", candidate_file_name, strerror(errno));
+		fprintf(stderr, "%s: couldn't open candidate file %s: %s\n", progname,candidate_file_name, strerror(errno));
 		return 1;
 	}
 
 	output_file = fopen(output_file_name, "a");
 	if(!output_file) {
-		fprintf(stderr, "couldn't open output file %s: %s\n", output_file_name, strerror(errno));
+		fprintf(stderr, "%s: couldn't open output file %s: %s\n", progname,output_file_name, strerror(errno));
 		return 1;
 	}
 
 	queue = work_queue_create(port);
 	if(!queue) {
-		fprintf(stderr, "couldn't listen on port %d: %s\n",port,strerror(errno));
+		fprintf(stderr, "%s: couldn't listen on port %d: %s\n",progname,port,strerror(errno));
 		return 1;
 	}
 

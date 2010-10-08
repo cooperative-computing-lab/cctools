@@ -20,17 +20,12 @@ See the file COPYING for details.
 
 #include "debug.h"
 
-#ifndef DEFAULT_ALIGNMENT_TYPE
-#define DEFAULT_ALIGNMENT_TYPE "ps"
-#endif
-
 static int band_width = 0;
-static int min_align = 40;  // default SWAT minimal aligment length
-static int min_qual_score = 25;  // default SWAT minimal match quality score
-static float min_qual = 0.04;
+static int min_align = 0;
+static double min_qual = 0;
 
 static const char *output_format = "ovl";
-static const char *align_type = DEFAULT_ALIGNMENT_TYPE;
+static const char *align_type = "ps";
 
 static void show_version(const char *cmd)
 {
@@ -44,8 +39,8 @@ static void show_help(const char *cmd)
 	printf(" -a <type>      Alignment type: sw, ps, or banded. (default: %s)\n",align_type);
 	printf(" -o <format>    Output format: ovl, align, or matrix. (default: %s)\n",output_format);
 	printf(" -k <integer>   Width of band for banded alignment (default is 4%% of maximum alignment.).\n");
-	printf(" -m <integer>	SWAT minimal aligment length (default: %d).\n", min_align);
-	printf(" -q <integer>	SWAT minimal match quality score (default: %d) -- [1/tb.quality].\n", min_qual_score);
+	printf(" -m <integer>	Minimum aligment length (default: %d).\n", min_align);
+	printf(" -q <integer>	Minimum Celera match quality (default: %lf)\n",min_qual);
 	printf(" -x         	Delete input file after completion.\n");
 	printf(" -d <flag>	Enable debugging for this subsystem.\n");
 	printf(" -v         	Show program version.\n");
@@ -76,7 +71,7 @@ int main(int argc, char ** argv)
 			min_align = atoi(optarg);
 			break;
 		case 'q':
-			min_qual_score = atoi(optarg);
+			min_qual = atof(optarg);
 			break;
 		case 'x':
 			del_input = 1;
@@ -96,17 +91,11 @@ int main(int argc, char ** argv)
 		}
 	}
 
-	if(min_qual_score!=0) {
-		min_qual = 1 / (float)min_qual_score;
-	}
-
 	fileindex = optind;
-	if ((argc - optind) == 1)
-	{
+	if ((argc - optind) == 1) {
 		input = fopen(argv[fileindex], "r");
-		if (!input)
-		{
-			fprintf(stderr, "ERROR: Could not open file %s for reading.\n", argv[fileindex]);
+		if (!input) {
+			fprintf(stderr, "sand_align_kernel: couldn't open %s: %s\n",argv[fileindex],strerror(errno));
 			exit(1);
 		}
 	} else {
@@ -135,12 +124,7 @@ int main(int argc, char ** argv)
 		int dir, start1, start2;
 		int metadata_valid = sscanf(s2->metadata, "%d %d %d", &dir, &start1, &start2);
 
-		if(metadata_valid<1) {
-			fprintf(stderr,"sequence %s did not indicate alignment direction.\n",s2->name);
-			exit(1);
-		}
-	
-		if (dir == -1) {
+		if(metadata_valid>=1 && dir==-1) {
 			seq_reverse_complement(s2);
 			ori = 'I';
 		} else {
@@ -149,7 +133,7 @@ int main(int argc, char ** argv)
 
 		struct matrix *m = matrix_create(s1->num_bases,s2->num_bases);
 		if(!m) {
-			fprintf(stderr,"sand_align: out of memory when creating alignment matrix.\n");
+			fprintf(stderr,"sand_align_kernel: out of memory when creating alignment matrix.\n");
 			exit(1);
 		}
 
@@ -165,7 +149,7 @@ int main(int argc, char ** argv)
 
 		} else if(!strcmp(align_type,"banded")) {
 			if(metadata_valid<3) {
-				fprintf(stderr,"sequence %s did not indicate start positions for the banded alignment.\n",s2->name);
+				fprintf(stderr,"sand_align_kernel: sequence %s did not indicate start positions for the banded alignment.\n",s2->name);
 				exit(1);
 			}
 
@@ -177,7 +161,7 @@ int main(int argc, char ** argv)
 				 int max_alignment_l = align_max(s1->num_bases, s2->num_bases, start1, start2);
 				 band_width = ceil(min_qual * max_alignment_l); 
 				 if(band_width >= max_alignment_l) band_width = max_alignment_l - 1;
-				 if(band_width <= 0) band_width = 1;
+				 if(band_width <= 5) band_width = 5;
 			}
 
 			aln = align_banded(m,s1->data, s2->data, start1, start2, band_width);
@@ -188,20 +172,19 @@ int main(int argc, char ** argv)
 
 		aln->ori = ori;
 
-		if(!strcmp(output_format,"ovl")) {
-			if (aln->quality <= min_qual)
-			{
+		if(min_qual==0 || aln->quality <= min_qual) {
+			if(!strcmp(output_format,"ovl")) {
 				overlap_write(stdout, aln, s1->name, s2->name);
+			} else if(!strcmp(output_format,"matrix")) {
+				printf("*** %s alignment of sequences %s and %s (quality %lf):\n\n",align_type,s1->name,s2->name,aln->quality);
+				matrix_print(m,s1->data,s2->data);
+			} else if(!strcmp(output_format,"align")) {
+				printf("*** %s alignment of sequences %s and %s (quality %lf):\n\n",align_type,s1->name,s2->name,aln->quality);
+				alignment_print(stdout,s1->data,s2->data,aln);
+			} else {
+				printf("unknown output format '%s'\n",output_format);
+				exit(1);
 			}
-		} else if(!strcmp(output_format,"matrix")) {
-			printf("*** %s alignment of sequences %s and %s (quality %lf):\n\n",align_type,s1->name,s2->name,aln->quality);
-			matrix_print(m,s1->data,s2->data);
-		} else if(!strcmp(output_format,"align")) {
-			printf("*** %s alignment of sequences %s and %s (quality %lf):\n\n",align_type,s1->name,s2->name,aln->quality);
-			alignment_print(stdout,s1->data,s2->data,aln);
-		} else {
-			printf("unknown output formt '%s'\n",output_format);
-			exit(1);
 		}
 		
 		matrix_delete(m);

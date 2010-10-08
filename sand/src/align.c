@@ -122,6 +122,8 @@ struct alignment * align_prefix_suffix( struct matrix *m, const char * a, const 
 	int best_i = 0;
 	int best_j = 0;
 
+	min_align = MIN(min_align,MIN(width,height));
+
 	// Zero out the top row.
 	for(i=0; i<=width; i++) {
 		matrix(m,i,0).score = 0;
@@ -170,19 +172,17 @@ struct alignment * align_banded( struct matrix *m, const char *a, const char *b,
 		matrix(m,0,j).traceback = TRACEBACK_UP;
 	}
 
-	// QUESTION: what happens if the alignment wanders off the diagonals?
-	// ANSWER: all cells outside of band should be set to -infinity -- need to implement I believe
-
-	// Zero out the diagonals.
+	// Set the diagonals to a large small number so that the
+	// traceback never wanders off the band.
 	for(j=0;j<=height;j++) {
 		i = offset + k + j + 1;
 		if(i>=0 && i<=width) {
-			matrix(m,i,j).score = 0;
+			matrix(m,i,j).score = SHRT_MIN;
 			matrix(m,i,j).traceback = TRACEBACK_LEFT;
 		}
 		i = offset - k + j - 1;
 		if(i>=0 && i<=width) {
-			matrix(m,i,j).score = 0;
+			matrix(m,i,j).score = SHRT_MIN;
 			matrix(m,i,j).traceback = TRACEBACK_UP;
 		}
 	}
@@ -216,48 +216,34 @@ static void choose_best(struct matrix *m, int * best_i, int * best_j, int istart
 	int i, j;
 	double best_score = 0;
 
+	// QUESTION: do we want to use % identity like Celera? May require changing the score parameters.
 
-	// QUESTION: do we want to use % identity like Celera? May require changing the score parameters 
-
-	// QUESTION there are a couple of odd boundary cases where the limits
+	// There are a couple of odd boundary cases where the limits
 	// are a single cell in either row.  To avoid that, we initialize the
 	// best to the first element in each dimension.
 
 	*best_i = istart;
 	*best_j = jstart;
 
-	// QUESTION: do we want maximum score, or Celera quality score here?
-	// QUESTION: In Celera, is a good score high or low?
-
 	// Find the best in the last column
 	if(jstart!=jend) {
-		
-	  for (i=m->width, j=jstart; j <= jend; j++) {
-			
-	    if ( matrix(m,i,j).score > best_score) {
-		    
-	      best_score =  matrix(m,i,j).score;
-	      *best_i = i;
-	      *best_j = j;
-		  
-	    }	
-		
-	  }
-
+		for (i=m->width, j=jstart; j <= jend; j++) {
+			if ( matrix(m,i,j).score > best_score) {
+	      			best_score =  matrix(m,i,j).score;
+	      			*best_i = i;
+	      			*best_j = j;
+			}
+		}
 	}
 
 	// Find the best in the last row
 	if(istart!=iend) {
 		for (i=istart, j=m->height; i <= iend; i++) {
-
-		  if ( matrix(m,i,j).score > best_score) {
-			
-		    best_score =  matrix(m,i,j).score;
-		    *best_i = i;
-		    *best_j = j;
-		  
-		  }
-
+			if ( matrix(m,i,j).score > best_score) {
+				best_score =  matrix(m,i,j).score;
+				*best_i = i;
+				*best_j = j;
+			}
 		}
 	}
 }
@@ -324,7 +310,7 @@ static struct alignment * alignment_traceback(struct matrix *m, int istart, int 
 	aln->length1 = m->width;
 	aln->length2 = m->height;
 	aln->score = matrix(m,istart,jstart).score;
-	aln->quality = (double)(aln->gap_count + aln->mismatch_count) / (double) MIN(i, j); 
+	aln->quality = (double)(aln->gap_count + aln->mismatch_count) / MIN(aln->end1-aln->start1,aln->end2-aln->start2);
 	
 	return aln;
 }
