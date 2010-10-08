@@ -171,7 +171,7 @@ struct alignment * align_banded( struct matrix *m, const char *a, const char *b,
 	}
 
 	// QUESTION: what happens if the alignment wanders off the diagonals?
-	// ANSWER: shouldn't happen, but scott will check.
+	// ANSWER: all cells outside of band should be set to -infinity -- need to implement I believe
 
 	// Zero out the diagonals.
 	for(j=0;j<=height;j++) {
@@ -214,8 +214,10 @@ struct alignment * align_banded( struct matrix *m, const char *a, const char *b,
 static void choose_best(struct matrix *m, int * best_i, int * best_j, int istart, int iend, int jstart, int jend )
 {
 	int i, j;
-	double quality;
-	double best_qual = 1000000.0;
+	double best_score = 0;
+
+
+	// QUESTION: do we want to use % identity like Celera? May require changing the score parameters 
 
 	// QUESTION there are a couple of odd boundary cases where the limits
 	// are a single cell in either row.  To avoid that, we initialize the
@@ -229,25 +231,33 @@ static void choose_best(struct matrix *m, int * best_i, int * best_j, int istart
 
 	// Find the best in the last column
 	if(jstart!=jend) {
-		for (i=m->width, j=jstart; j <= jend; j++) {
-			quality = ((double) matrix(m,i,j).score) / (double)MIN(i, j);
-			if (quality < best_qual) {
-				best_qual = quality;
-				*best_i = i;
-				*best_j = j;
-			}	
-		}
+		
+	  for (i=m->width, j=jstart; j <= jend; j++) {
+			
+	    if ( matrix(m,i,j).score > best_score) {
+		    
+	      best_score =  matrix(m,i,j).score;
+	      *best_i = i;
+	      *best_j = j;
+		  
+	    }	
+		
+	  }
+
 	}
 
 	// Find the best in the last row
 	if(istart!=iend) {
 		for (i=istart, j=m->height; i <= iend; i++) {
-			quality = ((double) matrix(m,i,j).score) / (double)MIN(i, j);
-			if (quality < best_qual) {
-				best_qual = quality;
-				*best_i = i;
-				*best_j = j;
-			}
+
+		  if ( matrix(m,i,j).score > best_score) {
+			
+		    best_score =  matrix(m,i,j).score;
+		    *best_i = i;
+		    *best_j = j;
+		  
+		  }
+
 		}
 	}
 }
@@ -278,8 +288,10 @@ static struct alignment * alignment_traceback(struct matrix *m, int istart, int 
 			j--;
 		} else if(dir==TRACEBACK_LEFT) {
 			i--;
+			aln->gap_count++;
 		} else if(dir==TRACEBACK_UP) {
 			j--;
+			aln->gap_count++;
 		} else if(dir==TRACEBACK_END) {
 			length--;
 			break;
@@ -302,19 +314,17 @@ static struct alignment * alignment_traceback(struct matrix *m, int istart, int 
 	free(aln->traceback);
 	aln->traceback = n;
 
-	// QUESTION: Where are the Celera OVL records defined?  I don't trust this...
-	// scott will look up the semantics of these.
+	// NOTE: These parameters are what are needed for OVL records.  Other values are
+        // calculated on runtime in the overlap output code
 
 	aln->start1 = i;
 	aln->start2 = j;
 	aln->end1 = istart-1;
 	aln->end2 = jstart-1;
-	aln->gap_count = length; // QUESTION: I don't think this is right: length is the number of steps in the traceback.
 	aln->length1 = m->width;
 	aln->length2 = m->height;
 	aln->score = matrix(m,istart,jstart).score;
-	aln->total_score = aln->score + (aln->length1 - istart) + i + (aln->length2 - jstart) + j; // CHECK
-	aln->quality = (double)(aln->gap_count + aln->mismatch_count) / (double) MIN(i, j); // CHECK
+	aln->quality = (double)(aln->gap_count + aln->mismatch_count) / (double) MIN(i, j); 
 	
 	return aln;
 }
