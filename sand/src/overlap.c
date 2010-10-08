@@ -9,7 +9,7 @@
 void overlap_write(FILE * file, struct alignment *aln, const char * id1, const char * id2)
 {
 	int ahg, bhg;
-	char olt;
+	int arh, brh;
 
 	fprintf(file, "{OVL\n");
 
@@ -20,25 +20,44 @@ void overlap_write(FILE * file, struct alignment *aln, const char * id1, const c
 	// Orientation
 	fprintf(file, "ori:%c\n", aln->ori);
 
-	ahg = aln->start1 - aln->start2;
+	arh = aln->length1 - aln->end1;      // determine the right portions of sequences that 
+	brh = aln->length2 - aln->end2;      // are not in the alignment
+
+	// calculate overhangs assuming A is on the left
+	ahg = aln->start1 + aln->start2;
 	bhg = (aln->length2-1) - aln->end2;
 	if (bhg == 0) { bhg = aln->end1 - aln->length1; }
 
-	// If ahg and bhg are of opposite signs, then it's a containment.
-	// If they are the same sign, it's a dovetail.
-	if (ahg*bhg < 0) { olt = 'C'; }
-	else { olt = 'D'; }
-	fprintf(file, "olt:D\n");  // Always put D to mimic Celera more closely.
+	if (aln->start2 <= aln->start1 && aln->end2 <= aln->end1) {  // A is on left or B is inside A
 
-	// How much each piece hangs off the end. Not sure what to do
-	// for containment overlaps, or really what this means at all.
+	  if (arh >= brh)
+	   fprintf(file, "olt:C\n");      // b is contained in A (or the same as A)
+	  else
+	    fprintf(file, "olt:D\n");      // dovetail - suffix/prefix alignment
+
+	} 
+	else if (aln->start1 <= aln->start2 && aln->end1 <= aln->end2)  { // B is on left or A is inside B
+
+	  // recalculate overhangs given that B is on right.  Main difference is these should be negative
+	  ahg = (aln->start2 + aln->start1) * -1;
+	  bhg = ((aln->length1-1) - aln->end1) * -1;
+	  if (bhg == 0) { bhg = aln->end1 - aln->length1; }
+	  
+	  if (brh >= arh)
+	   fprintf(file, "olt:C\n");      // a is contained in B 
+	  else
+	    fprintf(file, "olt:D\n");      // dovetail - suffix/prefix alignment
+
+	}
+	else               
+	  fprintf(file, "olt:D\n");  // Default to D to mimic Celera.
+
+	// How much each piece hangs off the end. If A is on left (or B is contained), these are positive
+	// If B is on the left, these are negative.
 	fprintf(file, "ahg:%d\n", ahg);
 	fprintf(file, "bhg:%d\n", bhg);
 
-	// Again, need to do more work to see how quality is computed.
-	// For now just making something up.
-	// As far as I can tell, Celera defines the quality score as
-	// (gaps + mismatches) / MIN(end1, end2)
+	// Celera defines the quality score as (gaps + mismatches) / MIN(end1, end2)
 	fprintf(file, "qua:%f\n", aln->quality);
 
 	// This is the length of the overlap
@@ -46,8 +65,7 @@ void overlap_write(FILE * file, struct alignment *aln, const char * id1, const c
 	fprintf(file, "mxo:%d\n", aln->score);
 
 	// Polymorphism count.
-	//fprintf(file, "pct:%d\n", aln->mismatch_count);
-	fprintf(file, "pct:0\n");  // Again, try to match Celera
+	fprintf(file, "pct:0\n");  // Again, try to match Celera, where this is set to 0 and unchanged later
 
 	fprintf(file, "}\n");
 }
