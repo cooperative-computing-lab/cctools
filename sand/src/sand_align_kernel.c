@@ -18,11 +18,11 @@ See the file COPYING for details.
 #include "overlap.h"
 #include "matrix.h"
 
+#include "macros.h"
 #include "debug.h"
 
-static int band_width = 0;
 static int min_align = 0;
-static double min_qual = 0;
+static double min_qual = 1.0;
 
 static const char *output_format = "ovl";
 static const char *align_type = "ps";
@@ -38,9 +38,8 @@ static void show_help(const char *cmd)
 	printf("The most common options are:\n");
 	printf(" -a <type>      Alignment type: sw, ps, or banded. (default: %s)\n",align_type);
 	printf(" -o <format>    Output format: ovl, align, or matrix. (default: %s)\n",output_format);
-	printf(" -k <integer>   Width of band for banded alignment (default is 4%% of maximum alignment.).\n");
 	printf(" -m <integer>	Minimum aligment length (default: %d).\n", min_align);
-	printf(" -q <integer>	Minimum Celera match quality (default: %lf)\n",min_qual);
+	printf(" -q <integer>	Minimum match quality (default: %.2lf)\n",min_qual);
 	printf(" -x         	Delete input file after completion.\n");
 	printf(" -d <flag>	Enable debugging for this subsystem.\n");
 	printf(" -v         	Show program version.\n");
@@ -63,9 +62,6 @@ int main(int argc, char ** argv)
 			break;
 		case 'o':
 			output_format = optarg;
-			break;
-		case 'k':
-			band_width = atoi(optarg);
 			break;
 		case 'm':
 			min_align = atoi(optarg);
@@ -153,18 +149,12 @@ int main(int argc, char ** argv)
 				exit(1);
 			}
 
-			if(band_width==0) {
-				 // Find the number of errors allowable (the width of the band)
-				 // First, find the maximum length of the alignment, then get 4% (min_qual)
-				 // of that because it's the maximum amount of errors allowable.
+			/* The width of the band is proportional to the desired quality of the match. */
 
-				 int max_alignment_l = align_max(s1->num_bases, s2->num_bases, start1, start2);
-				 band_width = ceil(min_qual * max_alignment_l); 
-				 if(band_width >= max_alignment_l) band_width = max_alignment_l - 1;
-				 if(band_width <= 5) band_width = 5;
-			}
+			int k = 2 + min_qual * MIN(s1->num_bases,s2->num_bases) / 2.0;
+			if(k<5) k = 5;
 
-			aln = align_banded(m,s1->data, s2->data, start1, start2, band_width);
+			aln = align_banded(m,s1->data, s2->data, start1, start2, k);
 		} else {
 			fprintf(stderr,"unknown alignment type: %s\n",align_type);
 			exit(1);
@@ -172,7 +162,7 @@ int main(int argc, char ** argv)
 
 		aln->ori = ori;
 
-		if(min_qual==0 || aln->quality <= min_qual) {
+		if(aln->quality <= min_qual) {
 			if(!strcmp(output_format,"ovl")) {
 				overlap_write(stdout, aln, s1->name, s2->name);
 			} else if(!strcmp(output_format,"matrix")) {
