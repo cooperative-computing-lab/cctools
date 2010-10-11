@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "stringtools.h"
 #include "macros.h"
+#include "find_in_path.h"
 
 #include "sequence.h"
 #include "compressed_sequence.h"
@@ -72,27 +73,6 @@ static void show_help(const char *cmd)
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
-}
-
-static char * find_in_path( const char *cmd )
-{
-	char tmp[CAND_FILE_LINE_MAX];
-
-	if(access(cmd,X_OK)==0) return strdup(cmd);
-
-	char * path = strdup(getenv("PATH"));
-	char * p = strtok(path,":");
-	while(p) {
-		sprintf(tmp,"%s/%s",p,cmd);
-		if(access(tmp,X_OK)==0) {
-			free(path);
-			return strdup(tmp);
-		}
-		p = strtok(0,":");
-	}
-
-	free(path);
-	return 0;
 }
 
 static void display_progress(struct work_queue *q)
