@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include <fcntl.h>
 #include <time.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <pthread.h>
 
 #include "allpairs_compare.h"
