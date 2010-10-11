@@ -5,14 +5,14 @@ include ${CCTOOLS_HOME}/Makefile.rules
 
 TARGETS = allpairs_multicore allpairs_master
 
-LOCAL_LDFLAGS=-lchirp -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+LOCAL_LDFLAGS=../../../sand/src/libsandtools.a -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
 all: ${TARGETS}
 
-allpairs_multicore: allpairs_multicore.o allpairs_util.o ${CCTOOLS_HOME}/chirp/src/libchirp.a
+allpairs_multicore: allpairs_multicore.o allpairs_compare.o
 	${CCTOOLS_LD} -o $@ $^ -lpthread ${LOCAL_LDFLAGS}
 
-allpairs_master: allpairs_master.o allpairs_util.o
+allpairs_master: allpairs_master.o allpairs_compare.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 test:
