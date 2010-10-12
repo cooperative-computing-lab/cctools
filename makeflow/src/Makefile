@@ -15,6 +15,8 @@ makeflow: makeflow.o
 clean:
 	rm -f core *~ *.o *.a ${TARGETS} 
 
+test: all
+
 install: all
 	install -d ${CCTOOLS_INSTALL_DIR}/
 	install -d ${CCTOOLS_INSTALL_DIR}/bin

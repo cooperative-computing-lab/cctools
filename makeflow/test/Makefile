@@ -6,8 +6,8 @@ include ${CCTOOLS_HOME}/Makefile.rules
 all:
 
 test:
-	cd syntax; make test; cd ..
-	cd dirs; make test; cd ..
+	@echo running makeflow tests
+	@${CCTOOLS_HOME}/dttools/src/test_runner.sh TR_*.sh
 
 clean:
 

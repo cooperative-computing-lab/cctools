@@ -62,7 +62,7 @@ int_sizes.h: make_int_sizes
 make_int_sizes: make_int_sizes.o
 	${CCTOOLS_LD} $^ -o $@ ${CCTOOLS_INTERNAL_LDFLAGS}
 
-test:
+test: all
 
 clean:
 	rm -f core *~ *.o *.os *.so libdttools.a make_int_sizes int_sizes.h large_chunk.txt $(PROGRAMS)
