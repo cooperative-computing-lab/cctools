@@ -12,6 +12,8 @@ all: ${TARGETS}
 makeflow: makeflow.o
 	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
 
+test:
+
 clean:
 	rm -f core *~ *.o *.a ${TARGETS} 
 
