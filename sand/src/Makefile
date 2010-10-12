@@ -8,6 +8,8 @@ HEADERS = *.h
 
 all: ${PROGRAMS}
 
+test:
+
 ${PROGRAMS}: %: %.o libsandtools.a
 	${CCTOOLS_LD} -o $@ $< -L. -lsandtools -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
