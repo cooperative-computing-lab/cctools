@@ -18,7 +18,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xmalloc.h"
 #include "macros.h"
-#include "find_in_path.h"
+#include "envtools.h"
 
 #include "allpairs_compare.h"
 
@@ -26,7 +26,7 @@ See the file COPYING for details.
 
 static const char *progname = "allpairs_master";
 static const char *allpairs_multicore_program = "allpairs_multicore";
-static const char *allpairs_compare_program = 0;
+static char allpairs_compare_program[ALLPAIRS_LINE_MAX];
 
 static int use_external_program = 0;
 
@@ -191,17 +191,17 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	allpairs_compare_program = argv[optind+2];
-
-	if(allpairs_compare_function_get(allpairs_compare_program)) {
+	if(allpairs_compare_function_get(argv[optind+2])) {
+		strcpy(allpairs_compare_program,argv[optind+2]);
+		debug(D_DEBUG,"using internal function %s",allpairs_compare_program);
 		use_external_program = 0;
 	} else {
-		allpairs_compare_program = find_in_path(argv[optind+2]);
-		if(!allpairs_compare_program) {
+		if(!find_executable(argv[optind+2],"PATH",allpairs_compare_program,sizeof(allpairs_compare_program))) {
 			fprintf(stderr,"%s: %s is neither an executable nor an internal comparison function.\n",progname,allpairs_compare_program);
 			return 1;
 		}
 		debug(D_DEBUG,"using comparison executable %s",allpairs_compare_program);
+		use_external_program = 1;
 	}
 
 	q = work_queue_create(port);

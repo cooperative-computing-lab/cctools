@@ -19,6 +19,11 @@ int find_executable(const char *exe_name, const char *env_path_var, char *exe_pa
     char *env_paths;
     char *cur_path;
 
+    if(access(exe_name,R_OK|X_OK)==0) {
+        snprintf(exe_path,max_length,"%s",exe_name);
+	return 1;
+    }
+
     if (!getenv(env_path_var)) return 0;
 
     env_paths = xstrdup(getenv(env_path_var));
@@ -28,10 +33,6 @@ int find_executable(const char *exe_name, const char *env_path_var, char *exe_pa
 	if (access(exe_path, R_OK | X_OK) == 0) 
 	    goto fe_cleanup;
     }
-    
-    snprintf(exe_path, max_length, "./%s", exe_name);
-    if (access(exe_path, R_OK | X_OK) != 0) 
-	cur_path = NULL;
 
 fe_cleanup:
     free(env_paths);

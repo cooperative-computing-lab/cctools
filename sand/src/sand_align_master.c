@@ -20,7 +20,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "stringtools.h"
 #include "macros.h"
-#include "find_in_path.h"
+#include "envtools.h"
 
 #include "sequence.h"
 #include "compressed_sequence.h"
@@ -28,7 +28,7 @@ See the file COPYING for details.
 static struct work_queue *queue = 0;
 static struct hash_table *sequence_table = 0;
 static int port = 9068;
-static const char *align_prog = 0;
+static char align_prog[1024];
 static const char *align_prog_args = "";
 static const char *candidate_file_name;
 static const char *sequence_file_name;
@@ -349,9 +349,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	align_prog = find_in_path(argv[optind]);
-
-	if(!align_prog) {
+	if(!find_executable(argv[optind],"PATH",align_prog,sizeof(align_prog))) {
 		fprintf(stderr, "%s: couldn't find alignment program %s: is it in your path?\n",progname,argv[optind]);
 		return 1;
 	}
