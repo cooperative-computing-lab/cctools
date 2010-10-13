@@ -8,7 +8,7 @@ save_arguments $0 $@
 
 major=3
 minor=1
-micro=0
+micro=1
 
 build_user=`whoami`
 build_host=`uname -n`
