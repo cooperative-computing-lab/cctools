@@ -10,7 +10,7 @@ prepare()
 
 run()
 {
-    exec ../src/hmac_test
+    exec ../src/hmac_test -v
 }
 
 clean()

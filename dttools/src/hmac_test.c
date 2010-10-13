@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
 	char data[51];
 	const char *string;
 	int verbose = 0;
-
+		
 	if(argc > 1 && !strcmp(argv[1], "-v")) verbose = 1;
 
 	if(verbose) printf("MD5 Tests\n===========\n");
@@ -35,7 +35,6 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-
 	hmac_md5("what do ya want for nothing?", 28, "Jefe", 4, md5_digest);
 	string = md5_string(md5_digest);
 	if(verbose) {
@@ -49,7 +48,7 @@ int main(int argc, char** argv) {
 	}
 
 	memset(data, '\xDD', 50);
-	data[51] = 0;
+	data[50] = 0;
 	hmac_md5(data, 50, "\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA", 16, md5_digest);
 	string = md5_string(md5_digest);
 	if(verbose) {
@@ -76,7 +75,6 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-
 	hmac_sha1("what do ya want for nothing?", 28, "Jefe", 4, sha1_digest);
 	string = sha1_string(sha1_digest);
 	if(verbose) {
@@ -90,7 +88,7 @@ int main(int argc, char** argv) {
 	}
 
 	memset(data, '\xDD', 50);
-	data[51] = 0;
+	data[50] = 0;
 	hmac_sha1(data, 50, "\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA", 20, sha1_digest);
 	string = sha1_string(sha1_digest);
 	if(verbose) {
