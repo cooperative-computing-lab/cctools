@@ -102,10 +102,8 @@ same OVL record format as used by the Celera assembler.</p>
 
 <h2>Example execution</h2>
 
-<p>Given a a set of sequences in fasta format <em>my_sequences.fa</em>
-and alignment executable <em>align.exe</em> that implements an
-arbitrary alignment algorithm based on the data formats described
-above, this section will walk through the process of creating the
+<p>Given a a set of sequences in fasta format <em>my_sequences.fa</em>,
+this section will walk through the process of creating the
 compressed fasta-like format, completing the candidate filtering, and
 computing the alignments. This walk-through is nearly identical to the
 example provided within the SAND distribution, which includes 20
@@ -165,13 +163,13 @@ like to change batch options or other details.</p>
 
 <h4>Candidate Filtering</h4>
 
-<p>The candidate filtering master takes the newly-created <em>my_sequences.cfa</em> as its only input requirement. Its only output requirement is the candidate list to be created, which this document will refer to as <em>my_candidates.cand</em>. A custom filtering executable is optional (without it, the standard one provided with the module, <tt>sand_filter_mer_seq</tt>, will be used). The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), the number of subsets to split the workload tasks into, and the -b option because we are using the binary cfa format. The filtering executable must be in the same directory as the filtering master.
+The candidate filtering master takes the newly-created <em>my_sequences.cfa</em> as its only input requirement. Its only output requirement is the candidate list to be created, which this document will refer to as <em>my_candidates.cand</em>:
 <pre>
-% sand_filter_master -p 9123 -s 10000 -b my_sequences.cfa my_candidates.cand
+% sand_filter_master my_sequences.cfa my_candidates.cand
 </pre>
 Note that a progress table will be printed to standard out, while more detailed performance information is printed to standard error. We strongly suggest redirecting at least standard error, if not both, to a file while executing.</p>
 
-<p>For many large datasets, preprocessing must be done before candidate filtering in order to discard subsequences that are repeated so often that they will not be useful. Failing to do so does not change the correctness of the filtering, but will increase its runtime significantly. Given the original list of (uncompressed) sequences, we can create a list (called repeats.meryl) of short sequences of length <em>k</em> that are repeated <em>n</em> times with the following commands. In this case <em>k</em> is 24 and <em>n</em> is 100.
+>For many large datasets, preprocessing must be done before candidate filtering in order to discard subsequences that are repeated so often that they will not be useful. Failing to do so does not change the correctness of the filtering, but will increase its runtime significantly. Given the original list of (uncompressed) sequences, we can create a list (called repeats.meryl) of short sequences of length <em>k</em> that are repeated <em>n</em> times with the following commands. In this case <em>k</em> is 24 and <em>n</em> is 100.
 <pre>
 % meryl -B -m 24 -C -L 100 -v -o output.meryl -s my_sequences.fa
 % meryl -Dt -s output.meryl -n 100 > repeats.meryl
@@ -179,29 +177,52 @@ Note that a progress table will be printed to standard out, while more detailed 
 
 <h4>Alignment</h4>
 
-<p>The alignment master takes the sequence file <em>my_sequences.cfa</em> and the newly created <em>my_candidates.cand</em> as its input data requirements. It also requires a serial alignment executable, which we proposed above as <em>align.exe</em> (examples of serial alignment executables provided with the SAND modules are <tt>sand_sw_alignment</tt> (a standard Smith-Waterman alignment algorithm) and <tt>sand_banded_alignment</tt> (a simple banding heuristic). The only output argument is the set of alignment computations, <em>my_results.ovl</em>. The most basic set of optional arguments to the master indicate the port on which it should listen for workers (9123 in our Work Queue example above), and the number of individual alignments per Work Queue task.
+<p>The program <tt>sand_align_master</tt> accepts an alignment program <tt>sand_align_kernel</tt> with some options for alignment,
+the newly created <em>my_candidates.cand</em>, and the sequences file <tt>my_sequences.cfa</tt>.  it divides the work up among
+multiple workers, and produces <tt>my_overlaps.ovl</tt>, which indicates which sequences overlap significantly, in the Celera OVL format.
+The options <tt>-q 0.25 -m 40</tt> passed to <tt>sand_align_kernel</tt> indicate a minimum alignment quality of 0.04 and a minimum
+alignment length of 40 bases.
 <pre>
-% sand_align_master  -p 9090 -n 1000 align.exe my_candidates.cand my_sequences.cfa  my_results.ovl
+% sand_align_master sand_align_kernel -e "-q 0.04 -m 40" my_candidates.cand my_sequences.cfa  my_results.ovl
 </pre>
-Again, a progress table will be printed to standard out, while more detailed performance information is printed to standard error. We strongly suggest redirecting at least standard error, if not both, to a file while executing. The progress table is formatted as:
+Again, a progress table will be printed to standard out:
 <pre>
-   Time |   WI   WR   WB |     TS   TW   TR   TC |     TD     AR     AF       WS | Speedup
-    90s |    0    0    0 |      0    0    0    0 |      0    nan    nan      nan | 0.00
-    96s |   30    0    6 |    100   94    6    0 |      0    nan    nan      nan | 0.00
-   101s |   34    1    5 |    100   93    5    0 |      2   7.96   0.28    28.00 | 0.16
-   103s |   35    2   12 |    100   84   12    0 |      4   8.12   0.21    38.02 | 0.32
+ Total | Workers   | Tasks                      Avg | K-Cand K-Seqs | Total
+  Time | Idle Busy | Submit Idle  Run   Done   Time | Loaded Loaded | Speedup
+     0 |    0    0 |      0    0    0      0   0.00 |      0      0 |  0.00
+     8 |    0   48 |    100   52   48      0   0.00 |   1000    284 |  0.00
+    10 |    0   86 |    100   13   86      1   7.07 |   1000    284 |  0.71
+    36 |    1   83 |    181   14   83      2  19.47 |   1810    413 |  1.08
+   179 |    1   83 |    259   92   83      3  22.51 |   2590   1499 |  0.38
+   180 |    1   83 |    259   92   83     18  28.19 |   2590   1499 |  2.82
+   186 |    2   80 |    259   15   80     85  28.54 |   2590   1499 | 13.04
+   199 |    2   80 |    334   90   80     86  29.96 |   3340   1499 | 12.95
+   200 |    2   80 |    334   90   80    114  59.43 |   3340   1499 | 33.88
+   202 |    2   81 |    334    9   81    165  86.08 |   3340   1499 | 70.32
 </pre>
-where:
-<ul>
- <li>"Time" is the elapsed time the master has been running</li>
- <li>"WI", "WR", and "WB" are the number of workers who have connected and are in the "initializing", "ready", and "busy" states, respectively.</li>
- <li>"TS", "TW", "TR", and "TC" are the total number of tasks submitted, number of tasks waiting, number of tasks running, and the number that have completed and are waiting to be post-processed, respectively.</li>
- <li>"TD" is the number of tasks that are finished.</li>
- <li>"AR" and "AF" are the average runtime and average file-transfer time for the tasks that are finished.  
- <li>"WS" is an approximate number of workers supportable based on the average runtimes and file-transfer times. Note that many systems are limited to approximately 1024 workers supportable based on available file descriptors open per process.</li>
- <li>"Speedup" is a calculated speedup-factor for the workload compared with a serial calculation. Note that because serial completion time may not be known and because there are heterogeneous workers this is calculated based on the average task runtime for all finished tasks.</li>
-</ul>
-</p>
+
+The columns of the output are as follows:
+<dir>
+<li> Total Time is the elapsed time the master has been running.
+<li> Workers Idle is the number of workers that are connected, but do not have a task to run.
+<li> Workers Busy is the number of workers that are currently running a task.
+<li> Tasks Submitted is the cumulative number of tasks created by the master.
+<li> Tasks Idle is the number of tasks waiting for a worker.
+<li> Tasks Running is the number of tasks currently running on a worker.
+<li> Tasks Done is the cumulative number of tasks compelted.
+<li> Avg Time is the average time a task takes to run.  An average time of 60 seconds is a good goal.
+<li> K-Cand Loaded indicates the number of candidates loaded into memory (in thousands).
+<li> K-Seqs Loaded indicates the number of sequences loaded into memory (in thousands).
+<li> Speedup is the approximate speed of the distributed framework, relative to one processor.
+</dir>
+
+<h2>Tuning Suggestions</h2>
+
+<dir>
+<li> As a rule of thumb, a single task should take a minute or two.  If tasks are much longer than that, it becomes more difficult to measure progress and recover from failures.  If tasks are much shorter than that, the overhead of managing the tasks becomes excessive.  Use the <tt>-n</tt> parameter to increase or decrease the size of tasks.
+<li> When using banded alignment (the default), the <tt>-q</tt> match quality parameter has a significant effect on speed.  A higher quality threshhold will consider more alignments, but take longer and produce more output.
+</dir>
+
 
 <h2>For More Information</h2>
 
