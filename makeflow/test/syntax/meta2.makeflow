@@ -9,8 +9,6 @@
 # Copyright 2010 The University of Notre Dame. All rights reserved. See file
 # COPYING for details.
 
-SED=/bin/sed
-
-correct.makeflow: typo.makeflow $SED
-	LOCAL <typo.makeflow >correct.makeflow $SED "s!capital!capitol!g"
+correct.makeflow: typo.makeflow
+	LOCAL <typo.makeflow >correct.makeflow sed "s!capital!capitol!g"
 
