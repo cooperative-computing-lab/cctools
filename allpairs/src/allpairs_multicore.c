@@ -26,7 +26,8 @@ See the file COPYING for details.
 #include "macros.h"
 #include "full_io.h"
 
-const char *progname = "allpairs_multicore";
+static const char *progname = "allpairs_multicore";
+static const char *extra_arguments = "";
 static int block_size = 0;
 static int num_cores = 0;
 
@@ -37,10 +38,11 @@ static void show_version(const char *cmd)
 
 static void show_help(const char *cmd)
 {
-	printf("Usage: %s [options] <set A> <set B> <compare function>\n", cmd);
+	printf("Usage: %s [options] <set A> <set B> <compare program>\n", cmd);
 	printf("where options are:\n");
-	printf(" -b <integer>	Block size: number of items to hold in memory at once. (default: 50%% of RAM\n");
-	printf(" -c <integer>	Number of cores to be used. (default: # of cores in machine)\n");
+	printf(" -b <items>     Block size: number of items to hold in memory at once. (default: 50%% of RAM\n");
+	printf(" -c <cores>     Number of cores to be used. (default: # of cores in machine)\n");
+	printf(" -e <args>      Extra arguments to pass to the comparison program.\n");
 	printf(" -d <flag>	Enable debugging for this subsystem.\n");
 	printf(" -v         	Show program version.\n");
 	printf(" -h         	Display this message.\n");
@@ -228,8 +230,10 @@ static int main_loop_program( const char *funcpath, struct text_list *seta, stru
 	char line[1024];
 	FILE *proc[num_cores];
 
+	int xstop = text_list_size(seta);
+
 	/* for each block sized vertical stripe... */
-	for(x=0;x<text_list_size(seta);x+=block_size) {
+	for(x=0;x<xstop;x+=block_size) {
 
 		/* for each row in the stripe ... */
 		for(j=0;j<text_list_size(setb);j++) {
@@ -237,11 +241,15 @@ static int main_loop_program( const char *funcpath, struct text_list *seta, stru
 			/* for each group of num_cores in the stripe... */
 			for(i=x;i<(x+block_size);i+=num_cores) {
 
-				int n = MIN(num_cores,block_size-i);
+				/* make sure we don't run past the block width */
+				int n = MIN(num_cores,x+block_size-i);
+
+				/* make sure we don't run off the width of the array */
+				n = MIN(n,xstop-i);
 
 				/* start one process for each core */
 				for(c=0;c<n;c++) {
-					sprintf(line,"%s %s %s\n",funcpath,text_list_get(seta,i+c),text_list_get(setb,j));
+					sprintf(line,"%s %s %s %s\n",funcpath,extra_arguments,text_list_get(seta,i+c),text_list_get(setb,j));
 					proc[c] = fast_popen(line);
 					if(!proc[c]) {
 						fprintf(stderr,"%s: couldn't execute %s: %s\n",progname,line,strerror(errno));
@@ -272,13 +280,16 @@ int main(int argc, char *argv[])
 
 	debug_config(progname);
 
-	while((c = getopt(argc, argv, "b:c:dvh"))!=-1) {
+	while((c = getopt(argc, argv, "b:c:e:dvh"))!=-1) {
 		switch (c) {
 		case 'b':
 			block_size = atoi(optarg);
 			break;
 		case 'c':
 			num_cores = atoi(optarg);
+			break;
+		case 'e':
+			extra_arguments = optarg;
 			break;
 		case 'd':
 			debug_flags_set(optarg);
