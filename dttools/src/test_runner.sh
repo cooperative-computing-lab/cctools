@@ -22,7 +22,7 @@ run_tests()
     do
     	success=0
 	    
-	echo "+++ testing $test_script" >> $log_file
+	echo "--- testing $test_script" >> $log_file
 
 	if [ $verbose = 0 ]
 	then
@@ -43,10 +43,10 @@ run_tests()
 	if [ $success = 1 ]
 	then
 	    [ $verbose = 0 ] && echo "ok"
-	    echo "+++ tested  $test_script: ok" >> $log_file
+	    echo "=== tested  $test_script: ok" >> $log_file
 	else
 	    [ $verbose = 0 ] && echo "fail"
-	    echo "+++ tested  $test_script: fail" >> $log_file
+	    echo "=== tested  $test_script: fail" >> $log_file
 	fi
 
 	run_and_test clean "$test_script clean"
@@ -57,7 +57,7 @@ show_help()
 {
     echo "Use: test_runner.sh [options] test_case.sh ..."
     echo "options:"
-    echo "  -l <log_file> Set log file."
+    echo "  -l <log_file> Set log file (default is $$CCTOOLS_TEST_LOG)."
     echo "  -v            Enable verbose output."
     echo "  -h            Show this help message."
 
