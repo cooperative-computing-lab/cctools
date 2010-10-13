@@ -25,7 +25,7 @@ static int min_align = 0;
 static double min_qual = 1.0;
 
 static const char *output_format = "ovl";
-static const char *align_type = "ps";
+static const char *align_type = "banded";
 
 static void show_version(const char *cmd)
 {
