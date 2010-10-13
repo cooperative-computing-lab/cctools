@@ -127,7 +127,7 @@ struct seq * cseq_uncompress( struct cseq *c )
 
 	while(i<s->num_bases) {
 		s->data[i] = num_to_base( (c->data[j] >> shift) & 3);
-		i--;
+		i++;
 		shift-=2;
 		if(shift<0) {
 			shift=14;
