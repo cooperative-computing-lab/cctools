@@ -60,14 +60,14 @@ struct cseq * seq_compress( struct seq *s )
 
 	memset(c->data,0,num_bytes);
 
-	int i=0, j=0, shift=0;
+	int i=0, j=0, shift=14;
 
 	while(i<s->num_bases) {
 		c->data[j] |= (base_to_num(s->data[i]) << shift);
 		i++;
-		shift+=2;
-		if(shift==16) {
-			shift=0;
+		shift-=2;
+		if(shift<0) {
+			shift=14;
 			j++;
 		}
 	}
@@ -123,14 +123,14 @@ struct seq * cseq_uncompress( struct cseq *c )
 	s->data = malloc(c->num_bases+1);
 	s->num_bases = c->num_bases;
 
-	int i=0, j=0, shift=0;
+	int i=0, j=0, shift=14;
 
 	while(i<s->num_bases) {
 		s->data[i] = num_to_base( (c->data[j] >> shift) & 3);
-		i++;
-		shift+=2;
-		if(shift==16) {
-			shift=0;
+		i--;
+		shift-=2;
+		if(shift<0) {
+			shift=14;
 			j++;
 		}
 	}
