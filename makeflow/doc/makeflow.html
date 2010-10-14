@@ -57,14 +57,13 @@ It examines all of the rules and determines which rules must run before
 others.  Where possible, it runs commands in parallel to reduce the
 execution time.
 <p>
-Here is a real Makeflow that does something more complex:
-it downloads an image from the web, creates four variations
+Here is a Makeflow that uses the <tt>convert</tt> utility to make an animation.
+It downloads an image from the web, creates four variations
 of the image, and then combines them back together into an animation.
 The first and the last task are marked as LOCAL to force them to
 run on the controlling machine.
 
 <pre>
-# This is a more complex example of Makeflow.
 CURL=/usr/bin/curl
 CONVERT=/usr/bin/convert
 URL=http://www.cse.nd.edu/~ccl/images/capitol.jpg
@@ -72,19 +71,19 @@ URL=http://www.cse.nd.edu/~ccl/images/capitol.jpg
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
         LOCAL $CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
 
-capitol.90.jpg: capitol.jpg
+capitol.90.jpg: capitol.jpg $CONVERT
         $CONVERT -swirl 90 capitol.jpg capitol.90.jpg
 
-capitol.180.jpg: capitol.jpg
+capitol.180.jpg: capitol.jpg $CONVERT
         $CONVERT -swirl 180 capitol.jpg capitol.180.jpg
 
-capitol.270.jpg: capitol.jpg
+capitol.270.jpg: capitol.jpg $CONVERT
         $CONVERT -swirl 270 capitol.jpg capitol.270.jpg
 
-capitol.360.jpg: capitol.jpg
+capitol.360.jpg: capitol.jpg $CONVERT
         $CONVERT -swirl 360 capitol.jpg capitol.360.jpg
 
-capitol.jpg:
+capitol.jpg: $CURL
         LOCAL $CURL -o capitol.jpg $URL
 </pre>
 
@@ -176,7 +175,7 @@ remove them from the batch system, or wait for them to expire.
 If you do nothing for 15 minutes, they will automatically exit.
 <p>
 Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>
-are simple shells scripts, so you can edit them directly if you would
+are simple shell scripts, so you can edit them directly if you would
 like to change batch options or other details.
 
 <h2>The Fine Details</h2>
@@ -221,9 +220,16 @@ Certain jobs don't make much sense to distribute.  For example, if you have a ve
 
 <h3>Batch Job Refinement</h3>
 
-When executing jobs, Makeflow simply uses the default settings in your batch system.  If you need to pass additional options, use the <tt>BATCH_OPTIONS</tt> variable or the <tt>-B</tt> option to Makeflow.  If you are using Condor, this string will be added to each submit file.  For example, if you want to add <tt>Requirements</tt> and <tt>Rank</tt> lines to your Condor submit files, add this to your Makeflow:
+When executing jobs, Makeflow simply uses the default settings in your batch system.  If you need to pass additional options, use the <tt>BATCH_OPTIONS</tt> variable or the <tt>-B</tt> option to Makeflow.
+<p>
+When using Condor, this string will be added to each submit file.  For example, if you want to add <tt>Requirements</tt> and <tt>Rank</tt> lines to your Condor submit files, add this to your Makeflow:
 <pre>
-BATCH_OPTIONS=Requirements = (Memory>1024)\nRank = Mips
+BATCH_OPTIONS = Requirements = (Memory>1024)
+</pre>
+<p>
+When using SGE, the string will be added to the qsub options.  For example, to specify that jobs should be submitted to the <tt>devel</tt> queue:
+<pre>
+BATCH_OPTIONS = -q devel
 </pre>
 
 <h3>Displaying a Makeflow</h3>
