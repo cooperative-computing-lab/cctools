@@ -181,7 +181,7 @@ int main(int argc, char **argv)
 		start_x = 0;
 		start_y = end_x;
 		debug(D_DEBUG,"First file contains %d sequences, stored from (%d,%d].\n", end_x, start_x, end_x);
-		debug(D_DEBUG,"Second file contains %d sequences, stored from (%d,%d].\n", end_y, start_y, end_y);
+		debug(D_DEBUG,"Second file contains %d sequences, stored from (%d,%d].\n", end_y-end_x, start_y, end_y);
 	}
 	fclose(input);
 
