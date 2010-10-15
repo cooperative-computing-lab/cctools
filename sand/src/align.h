@@ -33,6 +33,4 @@ struct alignment * align_banded( struct matrix *m, const char *a, const char *b,
 void alignment_print( FILE * file, const char * str1, const char * str2, struct alignment *a );
 void alignment_delete( struct alignment *a );
 
-int   align_max( int length1, int length2, int start1, int start2 );
-
 #endif

@@ -315,14 +315,6 @@ static struct alignment * alignment_traceback(struct matrix *m, int istart, int 
 	return aln;
 }
 
-// Find the maximum alignment length given the lengths and the start
-// positions of the exact match. Assume the start position has already
-// been corrected for distance.
-int align_max(int width, int height, int start1, int start2)
-{
-	return MIN(start1, start2) + MIN(width - start1, height - start2);
-}
-
 #define LINE_WIDTH 80
 
 static void print_rows( FILE * file, char a, char b )
