@@ -66,7 +66,7 @@ static void show_help(const char *cmd)
 {
 	printf("Use: %s [options] <align-program> <candidate-pairs> <sequences> <output-overlaps>\n", cmd);
 	printf("where options are:\n");
-	printf(" -p <port>      Port number for queue master to listen on.\n");
+	printf(" -p <port>      Port number for work queue master to listen on. (default: %d)\n",port);
 	printf(" -n <number>    Maximum number of candidates per task. (default is %d)\n",max_pairs_per_task);
 	printf(" -e <args>      Extra arguments to pass to the alignment program.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
