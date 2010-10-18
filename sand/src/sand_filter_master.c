@@ -19,8 +19,8 @@ See the file COPYING for details.
 #include "work_queue.h"
 #include "memory_info.h"
 #include "macros.h"
-#include "itable.h"
 #include "delete_dir.h"
+#include "envtools.h"
 
 #include "compressed_sequence.h"
 #include "sequence_filter.h"
@@ -45,7 +45,6 @@ static void load_sequences(const char * file);
 static void load_rectangles_to_files();
 static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x, int curr_rect_y);
 static int handle_done_task(struct work_queue_task * t);
-static int confirm_output(struct work_queue_task *t);
 static void display_progress();
 
 // GLOBALS
@@ -63,21 +62,15 @@ static int num_seqs = 0;
 static int num_rectangles = 0;
 static size_t * rectangle_sizes = 0;
 
-struct task_id
-{
-	int x;
-	int y;
-};
-static struct itable * task_id_map = 0;
-
 static struct work_queue * q = 0;
 
+static const char *progname = "sand_filter_master";
 static const char * sequence_filename;
 static const char * repeat_filename = 0;
-static const char * filter_program_name = "sand_filter_mer_seq";
-static const char * wrapper_program_name = 0;
 static const char * checkpoint_filename = 0;
+static const char * filter_program_name = "sand_filter_kernel";
 static char filter_program_args[255];
+static char filter_program_path[255];
 static const char * outfilename;
 static char * outdirname = 0;
 static FILE * outfile;
@@ -115,10 +108,7 @@ static void show_help(const char *cmd)
 	printf(" -c <file>      The file which contains checkpoint information. If it exists,\n");
 	printf("                it will be used, otherwise it will be created.\n");
 	printf("                will be converted to when the master finishes.\n");
-	printf(" -a <file>      The wrapper to be passed to sand_filter_mer_seq.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
-	printf(" -f <character> The character that will be printed at the end of the file.\n");
-	printf("                output file to indicate it has ended (default is nothing)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -250,13 +240,7 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 	char cmd[255];
 	char fname_x[255];
 	char fname_y[255];
-	char wrapper[255] = "";
 	char tag[32];
-
-	if (wrapper_program_name)
-	{
-		sprintf(wrapper, "./%s ", wrapper_program_name);
-	}
 
 	sprintf(tag, "%03d-%03d", curr_rect_y, curr_rect_x);
 
@@ -272,7 +256,7 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 		sprintf(rname_y, "%s","");
 	}
 
-	sprintf(cmd, "%s./%s %s %s %s", wrapper, filter_program_name, filter_program_args, rname_x, rname_y);
+	sprintf(cmd, "./%s %s %s %s", filter_program_name, filter_program_args, rname_x, rname_y);
 
 	// Create the task.
 	t = work_queue_task_create(cmd);
@@ -282,13 +266,10 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 	work_queue_task_specify_tag(t, tag);
 
 	// Send the executable, if it's not already there.
-	custom_work_queue_task_specify_input_file(t, filter_program_name, filter_program_name);
-
-	// Send the wrapper program to make sure it can execute.
-	if (wrapper_program_name) custom_work_queue_task_specify_input_file(t, wrapper_program_name, wrapper_program_name);
+	custom_work_queue_task_specify_input_file(t, filter_program_path, filter_program_name);
 
 	// Send the repeat file if we need it and it's not already there.
-	if (repeat_filename && !wrapper_program_name) custom_work_queue_task_specify_input_file(t, repeat_filename, repeat_filename);
+	if (repeat_filename) custom_work_queue_task_specify_input_file(t, repeat_filename, repeat_filename);
 
 	// Add the rectangle. Add it as staged, so if the worker
 	// already has these sequences, there's no need to send them again.
@@ -308,52 +289,32 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 	return 1;
 }
 
-static int confirm_output(struct work_queue_task *t)
-{
-	return 1;
-}
-
 static int handle_done_task(struct work_queue_task * t)
 {
 	if (!t) return 0;
 
 	checkpoint_task(t);
 
-	if (t->result == 0)
-	{
-		if (confirm_output(t))
-		{
-			debug(D_DEBUG, "Completed rectangle %s: '%s'\n", t->tag, t->command_line);
-			fputs(t->output, outfile);
-			fflush(outfile);
-			total_processed++;
-			tasks_runtime += (t->finish_time - t->start_time);
-			tasks_filetime += t->total_transfer_time;
-		} else {
-			fprintf(stderr, "Invalid output format from host %s on rectangle %s:\n%s", t->host, t->tag, t->output);
-			return 0;
-		}
+	if (t->result == 0) {
+		debug(D_DEBUG, "Completed rectangle %s: '%s'\n", t->tag, t->command_line);
+		fputs(t->output, outfile);
+		fflush(outfile);
+		total_processed++;
+		tasks_runtime += (t->finish_time - t->start_time);
+		tasks_filetime += t->total_transfer_time;
+		work_queue_task_delete(t);
+		return 1;
 	} else {
-		if (t->result == 1)
-		{
-			fprintf(stderr, "Rectangle %s failed while sending input to host %s\n", t->tag, t->host);
-			return 0;
-		}
-		else if (t->result == 2)
-		{
-			fprintf(stderr, "Function returned non-zero exit status on host %s for rectangle %s (%d):\n%s", t->host, t->tag, WEXITSTATUS(t->return_status), t->output);
-			return 0;
+		if (t->result == 1) {
+			fprintf(stderr,"%s: Rectangle %s failed while sending input to host %s\n", progname, t->tag, t->host);
+		} else if (t->result == 2) {
+			fprintf(stderr, "%s: %s returned non-zero exit status on host %s for rectangle %s (%d):\n%s", progname, filter_program_name, t->host, t->tag, WEXITSTATUS(t->return_status), t->output);
 			
+		} else if (t->result == 3) {
+			fprintf(stderr, "%s: Rectangle %s failed to receive output files from host %s.\n", progname, t->tag, t->host);
 		}
-		else if (t->result == 3)
-		{
-			fprintf(stderr, "Rectangle %s failed to receive output files from host %s.\n", t->tag, t->host);
-			return 0;
-		}
+		return 0;
 	}
-
-	work_queue_task_delete(t);
-	return 1;
 }
 
 static void display_progress()
@@ -378,7 +339,6 @@ static void display_progress()
 
 int main(int argc, char ** argv)
 {
-	const char *progname = "sand_filter_master";
 	struct work_queue_task *t;
 	int rv;
 
@@ -387,22 +347,25 @@ int main(int argc, char ** argv)
 	get_options(argc, argv, progname);
 
 	outfile = fopen(outfilename, "a+");
-	if (!outfile)
-	{
-		fprintf(stderr, "Unable to open output file %s for writing\n", outfilename);
+	if (!outfile) {
+		fprintf(stderr,"%s: couldn't open %s: %s\n",progname,outfilename,strerror(errno));
 		exit(1);
+	}
+
+	if(!find_executable(filter_program_name,"PATH",filter_program_path,sizeof(filter_program_path))) {
+		fprintf(stderr,"%s: couldn't find %s in your PATH.\n",progname,filter_program_path);
+		exit(1);	
 	}
 
 	q = work_queue_create(port);
 	if (!q) {
-		fprintf(stderr, "Creation of queue on port %d timed out.\n", port);
+		fprintf(stderr, "%s: couldn't listen on port %d: %s\n",progname,port,strerror(errno));
 		exit(1);
 	}
 
 	// Load sequences.
 	load_sequences(sequence_filename);
 	load_rectangles_to_files();
-	task_id_map = itable_create(4096);
 
 	// Load checkpointing info
 	init_checkpoint();
@@ -499,7 +462,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 	char c;
 	char tmp[512];
 
-	while ((c = getopt(argc, argv, "p:n:d:s:r:R:k:w:c:o:a:uxvh")) != (char) -1)
+	while ((c = getopt(argc, argv, "p:n:d:s:r:R:k:w:c:o:uxvh")) != (char) -1)
 	{
 		switch (c) {
 		case 'p':
@@ -529,9 +492,6 @@ static void get_options(int argc, char ** argv, const char * progname)
 		case 'u':
 			do_not_unlink = 1;
 			break;
-		case 'a':
-			wrapper_program_name = optarg;
-			break;
 		case 'x':
 			do_not_cache = 1;
 			break;
@@ -551,7 +511,6 @@ static void get_options(int argc, char ** argv, const char * progname)
 	if (argc - optind != 2)
 	{
 		show_help(progname);
-		fprintf(stderr, "Wrong number of arguments, expected 2, got %d\n", argc - optind);
 		exit(1);
 	}
 
@@ -565,11 +524,11 @@ static void get_options(int argc, char ** argv, const char * progname)
 	{
 		if (mkdir(outdirname, S_IRWXU) != 0)
 		{
-			fprintf(stderr, "Unable to create directory %s\n", outdirname);
+			fprintf(stderr, "%s: couldn't create %s: %s\n",progname,outdirname,strerror(errno));
 			exit(1);
 		}
 	} else {
-		fprintf(stderr, "WARNING: Output directory %s/ already exists, you may want to delete or rename before running.\n", outdirname);
+		fprintf(stderr, "%s: directory %s already exists, you may want to delete or rename before running.\n",progname,outdirname);
 	}
 
 	sprintf(filter_program_args, "-k %d -w %d -s d", kmer_size, window_size);

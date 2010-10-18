@@ -131,7 +131,7 @@ int main(int argc, char **argv)
 
 	int start_x, end_x, start_y, end_y;
 
-	get_options(argc, argv, "sand_filter_mer_seq");
+	get_options(argc, argv, "sand_filter_kernel");
 
 	unsigned long start_mem, cand_mem, table_mem;
 
