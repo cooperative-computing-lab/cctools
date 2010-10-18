@@ -43,8 +43,8 @@ static void show_version(const char *cmd);
 static void show_help(const char *cmd);
 static void load_sequences(const char * file);
 static void load_rectangles_to_files();
-static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x, int curr_rect_y);
-static int handle_done_task(struct work_queue_task * t);
+static void task_submit(struct work_queue * q, int curr_rect_x, int curr_rect_y);
+static void task_complete(struct work_queue_task * t);
 static void display_progress();
 
 // GLOBALS
@@ -79,9 +79,6 @@ static FILE * checkpoint_file = 0;
 static short ** checkpoint = 0;
 
 static time_t start_time = 0;
-static time_t last_display_time = 0;
-static time_t last_flush_time = 0;
-
 static int total_submitted = 0;
 static int total_retried = 0;
 static int total_processed = 0;
@@ -119,14 +116,17 @@ void load_sequences(const char * filename)
 	FILE * file = fopen(filename, "r");
 	if(!file) fatal("couldn't open %s: %s\n",filename,strerror(errno));
 
-	int seq_count = 0;
+	int alloc_size = 128;
 
-	seq_count = sequence_count(file);
-	sequences = malloc(seq_count*sizeof(struct cseq *));
+	sequences = malloc(alloc_size*sizeof(struct cseq *));
 
 	struct cseq *c;
 
 	while((c = cseq_read(file))) {
+		if(num_seqs>=alloc_size) {
+			alloc_size *= 2;
+			sequences = realloc(sequences,alloc_size * sizeof(struct cseq*));
+		}
 		sequences[num_seqs++] = c;
 	}
 }
@@ -223,15 +223,7 @@ static void checkpoint_task(struct work_queue_task * t)
 	fflush(checkpoint_file);
 }
 
-static void custom_work_queue_task_specify_input_file(struct work_queue_task* t, const char* fname, const char* rname) {
-	if(!do_not_cache) {
-		work_queue_task_specify_input_file(t, fname, rname);
-	} else {
-		work_queue_task_specify_input_file_do_not_cache(t, fname, rname);
-	}
-}
-	
-static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x, int curr_rect_y)
+static void task_submit(struct work_queue * q, int curr_rect_x, int curr_rect_y)
 {
 	struct work_queue_task * t;
 	
@@ -244,19 +236,17 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 
 	sprintf(tag, "%03d-%03d", curr_rect_y, curr_rect_x);
 
-	// Create new arguments for the file by passing the two
-	// filenames.
 	sprintf(rname_x, "rect%03d.cfa", curr_rect_x);
-	if (curr_rect_x != curr_rect_y)
-	{
+
+	if (curr_rect_x != curr_rect_y) {
 		sprintf(rname_y, "rect%03d.cfa", curr_rect_y);
-	}
-	else
-	{
+	} else {
 		sprintf(rname_y, "%s","");
 	}
 
 	sprintf(cmd, "./%s %s %s %s", filter_program_name, filter_program_args, rname_x, rname_y);
+
+	int cache_flag = do_not_cache ? WORK_QUEUE_NOCACHE : WORK_QUEUE_CACHE;
 
 	// Create the task.
 	t = work_queue_task_create(cmd);
@@ -266,61 +256,60 @@ static int create_and_submit_task_cached(struct work_queue * q, int curr_rect_x,
 	work_queue_task_specify_tag(t, tag);
 
 	// Send the executable, if it's not already there.
-	custom_work_queue_task_specify_input_file(t, filter_program_path, filter_program_name);
+	work_queue_task_specify_file(t, filter_program_path, filter_program_name, WORK_QUEUE_INPUT, cache_flag);
 
 	// Send the repeat file if we need it and it's not already there.
-	if (repeat_filename) custom_work_queue_task_specify_input_file(t, repeat_filename, repeat_filename);
+	if (repeat_filename) work_queue_task_specify_file(t, repeat_filename, repeat_filename, WORK_QUEUE_INPUT, cache_flag);
 
 	// Add the rectangle. Add it as staged, so if the worker
 	// already has these sequences, there's no need to send them again.
 	sprintf(fname_x, "%s/%s", outdirname, rname_x);
-	custom_work_queue_task_specify_input_file(t, fname_x, rname_x);
+	work_queue_task_specify_file( t, fname_x, rname_x, WORK_QUEUE_INPUT,cache_flag );
 	if (curr_rect_x != curr_rect_y)
 	{
 		sprintf(fname_y, "%s/%s", outdirname, rname_y);
-		custom_work_queue_task_specify_input_file(t, fname_y, rname_y);
+		work_queue_task_specify_file( t, fname_y, rname_y, WORK_QUEUE_INPUT, cache_flag );
 	}
 
-	// Submit the task
 	work_queue_submit(q, t);
 	total_submitted++;
 	debug(D_DEBUG, "Submitted task for rectangle (%d, %d)\n", curr_rect_y, curr_rect_x);
-
-	return 1;
 }
 
-static int handle_done_task(struct work_queue_task * t)
+static void task_complete( struct work_queue_task * t )
 {
-	if (!t) return 0;
-
 	checkpoint_task(t);
 
 	if (t->result == 0) {
-		debug(D_DEBUG, "Completed rectangle %s: '%s'\n", t->tag, t->command_line);
+		debug(D_DEBUG, "task complete: %s: %s", t->tag, t->command_line);
+
 		fputs(t->output, outfile);
 		fflush(outfile);
 		total_processed++;
 		tasks_runtime += (t->finish_time - t->start_time);
 		tasks_filetime += t->total_transfer_time;
 		work_queue_task_delete(t);
-		return 1;
 	} else {
-		if (t->result == 1) {
-			fprintf(stderr,"%s: Rectangle %s failed while sending input to host %s\n", progname, t->tag, t->host);
-		} else if (t->result == 2) {
-			fprintf(stderr, "%s: %s returned non-zero exit status on host %s for rectangle %s (%d):\n%s", progname, filter_program_name, t->host, t->tag, WEXITSTATUS(t->return_status), t->output);
-			
-		} else if (t->result == 3) {
-			fprintf(stderr, "%s: Rectangle %s failed to receive output files from host %s.\n", progname, t->tag, t->host);
+		debug(D_DEBUG, "task failed: %s: %s",t->tag,t->command_line);
+
+		if(retry_max>total_retried) {
+			debug(D_DEBUG,"retrying task %d/%d",total_retried,retry_max);
+			total_retried++;
+			work_queue_submit(q, t);
+		} else {
+			fprintf(stderr,"%s: giving up after retrying %d tasks.\n",progname,retry_max);
+			exit(1);
 		}
-		return 0;
 	}
 }
 
 static void display_progress()
 {
+	static time_t last_display_time = 0;
 	struct work_queue_stats info;
 	time_t current = time(0);
+
+	if( (last_display_time-current) < 5 ) return;
 
 	work_queue_get_stats(q, &info);
 
@@ -329,19 +318,14 @@ static void display_progress()
 		info.workers_init, info.workers_ready, info.workers_busy, 
 		total_submitted, info.tasks_waiting, info.tasks_running, info.tasks_complete,
 		total_processed, (tasks_runtime/1000000.0)/total_processed, (tasks_filetime/1000000.0)/total_processed, cand_count);
+
+	fflush(stdout);
+
 	last_display_time = current;
-	if (current - last_flush_time >= 5) 
-	{
-		fflush(stdout);
-		last_flush_time = current;
-	}
 }
 
 int main(int argc, char ** argv)
 {
-	struct work_queue_task *t;
-	int rv;
-
 	debug_config(progname);
 
 	get_options(argc, argv, progname);
@@ -363,11 +347,9 @@ int main(int argc, char ** argv)
 		exit(1);
 	}
 
-	// Load sequences.
 	load_sequences(sequence_filename);
 	load_rectangles_to_files();
 
-	// Load checkpointing info
 	init_checkpoint();
 
 	start_time = time(0);
@@ -380,16 +362,15 @@ int main(int argc, char ** argv)
 			"TS","TW","TR","TC",
 			"TD","AR","AF",
 			"Candidates");
-	// MAIN LOOP
 
-	while (curr_start_y < num_seqs)
-	{
-		while (work_queue_hungry(q))
-		{
+	while (1) {
+		while (work_queue_hungry(q)) {
+			if (curr_start_y >= num_seqs) break;
+
+			display_progress();
+
 			if (checkpoint[curr_rect_y][curr_rect_x] != CHECKPOINT_STATUS_SUCCESS)
-				create_and_submit_task_cached(q, curr_rect_x, curr_rect_y);
-
-			if (time(0) != last_display_time) display_progress();
+				task_submit(q, curr_rect_x, curr_rect_y);
 
 			// Increment the x rectangle
 			curr_rect_x++;
@@ -404,50 +385,23 @@ int main(int argc, char ** argv)
 				curr_rect_x = curr_rect_y;
 				curr_start_x = curr_rect_x * rectangle_size;
 			}
+		}
 
-			if (curr_start_y >= num_seqs) break;
-		}
-		t = work_queue_wait(q,1);
-		if(t) {
-			rv = handle_done_task(t);
-			if(!rv && retry_max) { // Task failed
-				// Retry the task
-				work_queue_submit(q, t);
-				total_retried++;
-				retry_max--;
-				debug(D_DEBUG, "Number of tasks retried: %d\n", total_retried);
-			}
-		}
-		if (time(0) != last_display_time) display_progress();
+		if(work_queue_empty(q) && curr_start_y >= num_seqs) break;
+
+		struct work_queue_task *t = work_queue_wait(q,5);
+		if(t) task_complete(t);
+
+		display_progress();
 	}
 
-	while (!work_queue_empty(q))
-	{
-		t = work_queue_wait(q, 1);
-		if(t) {
-			rv = handle_done_task(t);
-			if(!rv && retry_max) { // Task failed
-				// Retry the task
-				work_queue_submit(q, t);
-				total_retried++;
-				retry_max--;
-				debug(D_DEBUG, "Number of tasks retried: %d\n", total_retried);
-			}
-		}
-		if (time(0) != last_display_time) display_progress();
-	}
+	printf("%s: candidates generated: %lu\n",progname,cand_count);
 
-	display_progress();
-
-	printf("Candidate Selection Complete! Candidates generated: %lu\n",cand_count);
-
-	if (checkpoint_file)
+	if (checkpoint_file) {
 		fclose(checkpoint_file);
+	}
 
 	fprintf(outfile,"EOF\n");
-
-	fflush(outfile);
-	fsync(fileno(outfile));
 	fclose(outfile);
 
 	work_queue_delete(q);
@@ -519,22 +473,19 @@ static void get_options(int argc, char ** argv, const char * progname)
 
 	outdirname = malloc(strlen(outfilename)+8);
 	sprintf(outdirname, "%s.output", outfilename);
-	struct stat st;
-	if (stat(outdirname, &st) != 0)
-	{
-		if (mkdir(outdirname, S_IRWXU) != 0)
-		{
+
+	if (mkdir(outdirname, S_IRWXU) != 0) {
+		if(errno==EEXIST) {
+			fprintf(stderr, "%s: directory %s already exists, you may want to delete or rename before running.\n",progname,outdirname);
+		} else {
 			fprintf(stderr, "%s: couldn't create %s: %s\n",progname,outdirname,strerror(errno));
 			exit(1);
 		}
-	} else {
-		fprintf(stderr, "%s: directory %s already exists, you may want to delete or rename before running.\n",progname,outdirname);
 	}
 
 	sprintf(filter_program_args, "-k %d -w %d -s d", kmer_size, window_size);
 
-	if (repeat_filename)
-	{
+	if (repeat_filename) {
 		sprintf(tmp, " -r %s", repeat_filename);
 		strcat(filter_program_args, tmp);
 	}
