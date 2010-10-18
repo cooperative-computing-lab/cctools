@@ -51,7 +51,7 @@ int text_list_append( struct text_list *t, const char *str )
 {
 	if(t->used_length==t->alloc_length) {
 		t->alloc_length *= 2;
-		t->items = realloc(t->items,t->alloc_length);
+		t->items = realloc(t->items, sizeof(*t->items)*t->alloc_length);
 	}
 
 	t->items[t->used_length] = strdup(str);
