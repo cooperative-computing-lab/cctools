@@ -27,7 +27,7 @@ See the file COPYING for details.
 #define ALLPAIRS_LINE_MAX 4096
 
 static const char *progname = "allpairs_master";
-static const char *allpairs_multicore_program = "allpairs_multicore";
+static char allpairs_multicore_program[ALLPAIRS_LINE_MAX] = "allpairs_multicore";
 static char allpairs_compare_program[ALLPAIRS_LINE_MAX];
 
 static double compare_program_time = 0.0;
@@ -192,7 +192,7 @@ struct work_queue_task * task_create( struct text_list *seta, struct text_list *
 	if(ycurrent>=ystop) return 0;
 
 	char cmd[ALLPAIRS_LINE_MAX];
-	sprintf(cmd,"./%s -e \"%s\" A B %s%s",allpairs_multicore_program,extra_arguments,use_external_program ? "./" : "",string_basename(allpairs_compare_program));
+	sprintf(cmd,"%s -e \"%s\" A B %s%s",allpairs_multicore_program,extra_arguments,use_external_program ? "./" : "",string_basename(allpairs_compare_program));
 	struct work_queue_task *task = work_queue_task_create(cmd);
 
 	if(use_external_program) {
@@ -306,11 +306,16 @@ int main(int argc, char **argv)
 
 	struct text_list *setb = text_list_load(argv[optind+1]);
 	if(!setb) {
-		fprintf(stderr,"%s: couldn't open %s: %s\n",progname,argv[optind+2],strerror(errno));
+		fprintf(stderr,"%s: couldn't open %s: %s\n",progname,argv[optind+1],strerror(errno));
 		return 1;
 	}
 
 	printf("%s: %s has %d elements\n",progname,argv[optind+1],text_list_size(setb));
+
+	if (!find_executable("allpairs_multicore", "PATH", allpairs_multicore_program, ALLPAIRS_LINE_MAX)) {
+		fprintf(stderr,"%s: couldn't find allpairs_multicore in path\n",progname);
+		return 1;
+	}
 
 	if(allpairs_compare_function_get(argv[optind+2])) {
 		strcpy(allpairs_compare_program,argv[optind+2]);

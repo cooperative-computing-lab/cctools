@@ -1,0 +1,3 @@
+../src/allpairs_compare.c
+../src/allpairs_master.c
+../src/allpairs_multicore.c
