@@ -30,7 +30,7 @@ static void allpairs_compare_CUSTOM( const char *name1, const char *data1, int s
 	int result = 5;
 
 	pthread_mutex_lock(&mutex);
-	printf("%s %s %d\n",name1,name2,result);
+	printf("%s\t%s\t%d\n",name1,name2,result);
 	pthread_mutex_unlock(&mutex);
 }
 
@@ -54,7 +54,7 @@ static void allpairs_compare_BITWISE( const char *name1, const char *data1, int 
 	}
 
 	pthread_mutex_lock(&mutex);
-	printf("%s %s %d\n",name1,name2,count);
+	printf("%s\t%s\t%d\n",name1,name2,count);
 	pthread_mutex_unlock(&mutex);
 }
 
@@ -196,7 +196,7 @@ static void allpairs_compare_IRIS( const char *name1, const char *data1, int siz
 	}
 
 	pthread_mutex_lock(&mutex);
-	printf("%s %s %lf\n",name1,name2,distance/(double)total);
+	printf("%s\t%s\t%lf\n",name1,name2,distance/(double)total);
 	pthread_mutex_unlock(&mutex);
 }
 
