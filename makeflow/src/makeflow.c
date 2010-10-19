@@ -657,6 +657,7 @@ void dag_log_recover( struct dag *d, const char *filename )
 		for(n=d->nodes;n;n=n->next) {
 			dag_node_decide_rerun(rerun_table, d, n);
 		}
+		itable_delete(rerun_table);
 	}
 }
 
@@ -1174,6 +1175,9 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 		dag_node_state_change(d,n,DAG_NODE_STATE_FAILED);
 		dag_failed_flag = 1;
 	}
+
+	free(input_files);
+	free(output_files);
 }
 
 int dag_node_ready( struct dag *d, struct dag_node *n )
