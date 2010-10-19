@@ -601,8 +601,7 @@ then
 	then
 	    echo "*** Sorry, you have ${python_version}, we require Python >= 2.6.x"
 	else
-	    echo "including python, because this system has" ${python_version}
-	    potential_packages="${potential_packages} python"
+	    packages="${packages} python"
 	fi
     else
 	if [ $config_python_path = yes ]
