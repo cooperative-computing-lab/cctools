@@ -210,7 +210,7 @@ def error(s):
 def find_files(files, env_var):
     paths = ['.']
     if env_var in os.environ:
-        path.extend(os.environ[env_var].split(':'))
+        paths.extend(os.environ[env_var].split(':'))
 
     for file in files:
         for path in paths:
