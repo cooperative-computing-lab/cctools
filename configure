@@ -595,13 +595,13 @@ then
     if check_file ${python_path}/bin/python2
     then
 	python=${python_path}/bin/python2
-	python_version=`python -V`
+	python_version="$(${python} -V 2>&1)"
 
-	if [ `python -V | awk '{print $1}'` -lt "2.6" ]
+	if [ $(echo ${python_version} | awk '{print $2}' | cut -d . -f 2) -lt 6 ]
 	then
-	    echo "*** Sorry, you have $python_version, we require Python >= 2.6.x"
+	    echo "*** Sorry, you have ${python_version}, we require Python >= 2.6.x"
 	else
-	    echo "including python, because this system has $python_version"
+	    echo "including python, because this system has" ${python_version}
 	    potential_packages="${potential_packages} python"
 	fi
     else
