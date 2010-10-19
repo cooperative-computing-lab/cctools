@@ -10,7 +10,7 @@ Dependencies
 ------------
 
 Required:
-    - `Python <http://www.python.org>`_ (2.4, 2.6)
+    - `Python <http://www.python.org>`_ (2.6, 2.7)
     - `CCTools <http://cse.nd.edu/~ccl/software/download.shtml>`_ 
 
 Although other versions of Python may work, python-workqueue has only been

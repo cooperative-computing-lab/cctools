@@ -32,7 +32,7 @@ case "$build_cpu" in
 	;;
 esac
 
-potential_packages="dttools sand allpairs wavefront makeflow ftp_lite s3tools chirp python"
+potential_packages="dttools sand allpairs wavefront makeflow ftp_lite s3tools chirp"
 
 if [ -d parrot -a $build_sys = LINUX ]
 then
@@ -595,6 +595,15 @@ then
     if check_file ${python_path}/bin/python2
     then
 	python=${python_path}/bin/python2
+	python_version=`python -V`
+
+	if [ `python -V | awk '{print $1}'` -lt "2.6" ]
+	then
+	    echo "*** Sorry, you have $python_version, we require Python >= 2.6.x"
+	else
+	    echo "including python, because this system has $python_version"
+	    potential_packages="${potential_packages} python"
+	fi
     else
 	if [ $config_python_path = yes ]
 	then
