@@ -32,7 +32,7 @@ case "$build_cpu" in
 	;;
 esac
 
-potential_packages="dttools sand allpairs wavefront makeflow ftp_lite s3tools chirp"
+potential_packages="dttools sand allpairs wavefront makeflow ftp_lite s3tools chirp python"
 
 if [ -d parrot -a $build_sys = LINUX ]
 then
@@ -71,6 +71,7 @@ irods_path="/usr"
 hdfs_path="/usr"
 zlib_path="/usr"
 mysql_path="/usr"
+python_path="/usr"
 
 globus_flavor=auto
 has_egee=no
@@ -96,6 +97,7 @@ config_irods_path=no
 config_hdfs_path=no
 config_zlib_path=yes
 config_mysql_path=auto
+config_python_path=auto
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
 then
@@ -176,6 +178,11 @@ do
 			mysql_path=$1
 			config_mysql_path=yes
 			;;
+		--with-python-path)
+			shift
+			python_path=$1
+			config_python_path=yes
+			;;
 		--with-*-path)
 			echo "ignoring unknown package $1"
 			shift
@@ -202,6 +209,7 @@ Where PACKAGE may be:
     hdfs
     zlib
     mysql
+    python
 EOF
 			exit 1
 			;;
@@ -582,6 +590,23 @@ else
 	exit 1
 fi
 
+if [ $config_python_path != no ]
+then
+    if check_file ${python_path}/bin/python2
+    then
+	python=${python_path}/bin/python2
+    else
+	if [ $config_python_path = yes ]
+	then
+	    echo "*** Sorry, I couldn't find Python in $python_path"
+	    echo "*** Check --with-python-path and try again."
+	    exit 1
+	else
+	    echo "*** skipping python support"
+	fi
+    fi
+fi
+
 optional_function strsignal /usr/include/string.h HAS_STRSIGNAL
 optional_function pread /usr/include/unistd.h HAS_PREAD
 optional_function pwrite /usr/include/unistd.h HAS_PWRITE
@@ -654,6 +679,7 @@ CCTOOLS_YACC=bison
 CCTOOLS_LEX=flex
 CCTOOLS_DOXYGEN=${doxygen}
 
+CCTOOLS_PYTHON=${python}
 EOF
 
 echo ""
