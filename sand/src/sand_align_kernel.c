@@ -117,8 +117,22 @@ int main(int argc, char ** argv)
 		s2 = cseq_uncompress(c2);
 		cseq_free(c2);
 
-		int dir, start1, start2;
-		int metadata_valid = sscanf(s2->metadata, "%d %d %d", &dir, &start1, &start2);
+		int dir = 0;
+		int start1 = 0;
+		int start2 = 0;
+		char* tmp = strdup(s2->metadata);
+		int metadata_valid = 0;
+		
+		char* token = strtok(tmp, "	 ");
+		start2 = atoi(token);
+		metadata_valid++;
+		while((token = strtok(NULL, "	 "))) 
+		{
+			dir = start1;
+			start1 = start2;
+			start2 = atoi(token);
+			metadata_valid++;
+		}
 
 		if(metadata_valid>=1 && dir==-1) {
 			seq_reverse_complement(s2);
