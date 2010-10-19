@@ -39,17 +39,19 @@ run_tests()
 	    	break
 	    fi
 	done
+
+	_success=$success
+	
+	run_and_test clean "$test_script clean"
 	    
-	if [ $success = 1 ]
+	if [ $_success = 1 ]
 	then
 	    [ $verbose = 0 ] && echo "ok"
-	    echo "=== tested  $test_script: ok" >> $log_file
+	    echo "=== tested $test_script: ok" >> $log_file
 	else
 	    [ $verbose = 0 ] && echo "fail"
-	    echo "=== tested  $test_script: fail" >> $log_file
+	    echo "=== tested $test_script: fail" >> $log_file
 	fi
-
-	run_and_test clean "$test_script clean"
     done
 }
 
