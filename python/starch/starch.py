@@ -208,7 +208,9 @@ def error(s):
 # Find file utilities ----------------------------------------------------------
 
 def find_files(files, env_var):
-    paths = ['.'] + os.environ[env_var].split(':')
+    paths = ['.']
+    if env_var in os.environ:
+        path.extend(os.environ[env_var].split(':'))
 
     for file in files:
         for path in paths:
