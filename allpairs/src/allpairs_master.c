@@ -76,7 +76,7 @@ double estimate_run_time( struct text_list *seta, struct text_list *setb )
 	int loops=0;
 	time_t starttime, stoptime;
 
-	printf("%s: sampling execution time of %s...\n",progname,allpairs_compare_program);
+	fprintf(stderr, "%s: sampling execution time of %s...\n",progname,allpairs_compare_program);
 
 	sprintf(line,"./%s %s %s %s",
 		string_basename(allpairs_compare_program),
@@ -95,7 +95,7 @@ double estimate_run_time( struct text_list *seta, struct text_list *setb )
 		}
 
 		while(fgets(line,sizeof(line),file)) {
-			printf("%s\n",line);
+			fprintf(stderr,"%s",line);
 		}
 
 		fast_pclose(file);
@@ -126,7 +126,7 @@ void estimate_block_size( struct text_list *seta, struct text_list *setb, int *x
 		}
 	}
 
-	printf("%s: %s estimated at %.02lfs per comparison\n",progname,allpairs_compare_program,compare_program_time);
+	fprintf(stderr, "%s: %s estimated at %.02lfs per comparison\n",progname,allpairs_compare_program,compare_program_time);
 
 	int block_limit = 60;
 	double block_time;
@@ -235,6 +235,7 @@ struct work_queue_task * task_create( struct text_list *seta, struct text_list *
 
 void task_complete( struct work_queue_task *t )
 {
+	string_chomp(t->output);
 	printf("%s\n",t->output);
 	work_queue_task_delete(t);
 }
@@ -302,7 +303,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	printf("%s: %s has %d elements\n",progname,argv[optind],text_list_size(seta));
+	fprintf(stderr, "%s: %s has %d elements\n",progname,argv[optind],text_list_size(seta));
 
 	struct text_list *setb = text_list_load(argv[optind+1]);
 	if(!setb) {
@@ -310,13 +311,15 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	printf("%s: %s has %d elements\n",progname,argv[optind+1],text_list_size(setb));
+	fprintf(stderr, "%s: %s has %d elements\n",progname,argv[optind+1],text_list_size(setb));
 
-	if (!find_executable("allpairs_multicore", "PATH", allpairs_multicore_program, ALLPAIRS_LINE_MAX)) {
+	if (!find_executable("allpairs_multicore","PATH",allpairs_multicore_program,sizeof(allpairs_multicore_program))) {
 		fprintf(stderr,"%s: couldn't find allpairs_multicore in path\n",progname);
 		return 1;
 	}
 
+	debug(D_DEBUG,"using multicore executable %s",allpairs_multicore_program);
+	
 	if(allpairs_compare_function_get(argv[optind+2])) {
 		strcpy(allpairs_compare_program,argv[optind+2]);
 		debug(D_DEBUG,"using internal function %s",allpairs_compare_program);
@@ -334,7 +337,7 @@ int main(int argc, char **argv)
 		estimate_block_size(seta,setb,&xblock,&yblock);
 	}
 
-	printf("%s: using block size of %dx%d\n",progname,xblock,yblock);
+	fprintf(stderr, "%s: using block size of %dx%d\n",progname,xblock,yblock);
 
 	q = work_queue_create(port);
 	if(!q) {
@@ -342,7 +345,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	printf("%s: listening for workers on port %d...\n",progname,work_queue_port(q));
+	fprintf(stderr, "%s: listening for workers on port %d...\n",progname,work_queue_port(q));
 
 	if(!xstop) xstop = text_list_size(seta);
 	if(!ystop) ystop = text_list_size(setb);

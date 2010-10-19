@@ -261,6 +261,7 @@ static int main_loop_program( const char *funcpath, struct text_list *seta, stru
 				for(c=0;c<n;c++) {
 					printf("%s\t%s\t",text_list_get(seta,i+c),text_list_get(setb,j));
 					while(fgets(line,sizeof(line),proc[c])) {
+						string_chomp(line);
 						printf("%s",line);
 					}
 					printf("\n");
