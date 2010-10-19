@@ -309,7 +309,7 @@ static void display_progress()
 	struct work_queue_stats info;
 	time_t current = time(0);
 
-	if( (last_display_time-current) < 5 ) return;
+	if( (current - last_display_time) < 5 ) return;
 
 	work_queue_get_stats(q, &info);
 
