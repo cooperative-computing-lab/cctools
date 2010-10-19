@@ -7,7 +7,7 @@ all: setup.cfg
 
 test: workqueue.so 
 	@echo running python-workqueue tests
-	@${CCTOOLS_HOME}/dttools/src/test_runner.sh TR_*.sh
+	@env CCTOOLS_PYTHON=${CCTOOLS_PYTHON} ${CCTOOLS_HOME}/dttools/src/test_runner.sh TR_*.sh
 
 clean:
 	rm -fr build workqueue.so
