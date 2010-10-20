@@ -245,6 +245,7 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 		if (w->current_task->result == WORK_QUEUE_RESULT_OUTPUT_FAIL) {
 			list_push_head(q->complete_list,w->current_task);
 		} else {
+			w->current_task->result = WORK_QUEUE_RESULT_UNSET;
 			list_push_head(q->ready_list,w->current_task);
 		}
 		w->current_task = 0;
