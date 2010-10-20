@@ -472,7 +472,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
 				change_worker_state(q,w,WORKER_STATE_READY);
 				debug(D_WQ,"%s (%s) ready",w->hostname,w->addrport);
 			}
-		} else if(sscanf(line,"result %d %d",&result,&output_length)) {
+		} else if(sscanf(line,"result %d %d",&result,&output_length)==2) {
 			struct work_queue_task *t = w->current_task;
 			int actual;
 
