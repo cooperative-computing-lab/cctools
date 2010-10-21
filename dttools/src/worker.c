@@ -284,9 +284,9 @@ int stream_output_item(struct link *master, const char *filename) {
 	int fd;
 
 	if(stat(filename, &info) != 0) {
-		fprintf(stderr,"Output item %s was not created (%s).\n",filename, strerror(errno));
-		sprintf(line,"errno %s %lld\n", filename, (INT64_T)-1);
+		sprintf(line,"error %s %d\n", filename, errno);
 		link_write(master,line,strlen(line),time(0)+active_timeout);
+		fprintf(stderr,"Output item %s was not created (%s).\n",filename, strerror(errno));
 		return 0;
 	}
 
