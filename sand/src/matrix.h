@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 struct cell
 {
-	int score;
+	short score;
 	short traceback;
 };
 

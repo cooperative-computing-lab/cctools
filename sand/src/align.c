@@ -177,12 +177,12 @@ struct alignment * align_banded( struct matrix *m, const char *a, const char *b,
 	for(j=0;j<=height;j++) {
 		i = offset + k + j + 1;
 		if(i>=0 && i<=width) {
-			matrix(m,i,j).score = SHRT_MIN;
+			matrix(m,i,j).score = SHRT_MIN + 100;
 			matrix(m,i,j).traceback = TRACEBACK_LEFT;
 		}
 		i = offset - k + j - 1;
 		if(i>=0 && i<=width) {
-			matrix(m,i,j).score = SHRT_MIN;
+			matrix(m,i,j).score = SHRT_MIN + 100;
 			matrix(m,i,j).traceback = TRACEBACK_UP;
 		}
 	}
