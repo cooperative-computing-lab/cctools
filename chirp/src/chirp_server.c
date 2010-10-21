@@ -774,11 +774,11 @@ int chirp_path_fix( char *path )
 	// Remove the percent-hex encoding
 	url_decode(path,decodepath,sizeof(decodepath));
 
-	// Collapse dots, double dots, and the like:
-	string_collapse_path(decodepath,safepath,1);
-
 	// Add the Chirp root and copy it back out.
-	sprintf(path,"%s/%s",chirp_root_path,safepath);
+	sprintf(safepath,"%s/%s",chirp_root_path,decodepath);
+
+	// Collapse dots, double dots, and the like:
+	string_collapse_path(safepath,path,1);
 
 	return 1;
 }
