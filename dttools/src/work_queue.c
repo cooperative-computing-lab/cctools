@@ -291,13 +291,6 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 			tmp_local_name[local_name_len] = '\0';
 			strcat(tmp_local_name, &(tmp_remote_name[remote_name_len]));
 
-			if(length < 0) { // when length < 0, it's treated as an errorno
-				if (length == -1) {
-					debug(D_NOTICE,"%s was not created on %s (%s)", remote_name, w->addrport,w->hostname);
-				}
-				goto failure;
-			}
-
 			if (strncmp(type,"dir", 3) == 0) {
 				debug(D_WQ,"%s (%s) dir %s",w->hostname,w->addrport,tmp_local_name);
 				if(!create_dir(tmp_local_name, 0700)) {
@@ -307,37 +300,48 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 				hash_table_insert(received_items, tmp_local_name, strdup(tmp_local_name));
 			} else if (strncmp(type, "file", 4) == 0) {
 				// actually place the file
-				// create dirs in the filename path if needed
-				cur_pos = tmp_local_name;
-				if (!strncmp(cur_pos, "./", 2)){
-					cur_pos += 2;
-				}
-
-				tmp_pos = strrchr(cur_pos, '/');
-				while(tmp_pos) {
-					*tmp_pos = '\0';
-					if(!create_dir(cur_pos, 0700)) {
-						debug(D_WQ,"Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
-						goto failure;
+				if(length >= 0) {
+					// create dirs in the filename path if needed
+					cur_pos = tmp_local_name;
+					if (!strncmp(cur_pos, "./", 2)){
+						cur_pos += 2;
 					}
-					*tmp_pos = '/';
 
-					cur_pos = tmp_pos+1;
 					tmp_pos = strrchr(cur_pos, '/');
+					while(tmp_pos) {
+						*tmp_pos = '\0';
+						if(!create_dir(cur_pos, 0700)) {
+							debug(D_WQ,"Could not create directory - %s (%s)", cur_pos, strerror(errno));
+							goto failure;
+						}
+						*tmp_pos = '/';
+
+						cur_pos = tmp_pos+1;
+						tmp_pos = strrchr(cur_pos, '/');
+					}
+
+					// get the remote file and place it
+					debug(D_WQ,"%s (%s) file %s (%lld bytes)...",w->hostname,w->addrport,tmp_local_name,length);
+					fd = open(tmp_local_name, O_WRONLY|O_TRUNC|O_CREAT,0700);
+					if(fd<0) goto failure;
+					stoptime = time(0) + MAX(1.0,(length)/1250000.0);
+					actual = link_stream_to_fd(w->link,fd,length,stoptime);
+					close(fd);
+					if(actual!=length) { unlink(local_name); goto failure; }
+					*total_bytes += length;
+
+					hash_table_insert(received_items, tmp_local_name, strdup(tmp_local_name));
+				} else {
+					debug(D_NOTICE,"%s on %s (%s) has invalid length: %lld", remote_name, w->addrport,w->hostname, length);
+					goto failure;
 				}
-
-				// get the remote file and place it
-				debug(D_WQ,"%s (%s) file %s (%lld bytes)...",w->hostname,w->addrport,tmp_local_name,length);
-				fd = open(tmp_local_name, O_WRONLY|O_TRUNC|O_CREAT,0700);
-				if(fd<0) goto failure;
-				stoptime = time(0) + MAX(1.0,(length)/1250000.0);
-				actual = link_stream_to_fd(w->link,fd,length,stoptime);
-				close(fd);
-				if(actual!=length) { unlink(local_name); goto failure; }
-				*total_bytes += length;
-
-				hash_table_insert(received_items, tmp_local_name, strdup(tmp_local_name));
-			} else {
+			} else if (strncmp(type, "error", 5) == 0) {
+				// now length is treated as errno
+				if (length == -1) {
+					debug(D_NOTICE,"%s was not created on %s (%s)", remote_name, w->addrport,w->hostname);
+				}
+				goto failure;
+			}else {
 				debug(D_WQ,"Invalid item type - %s\n", type);
 				goto failure;
 			}
