@@ -296,10 +296,10 @@ static struct work_queue_task * task_create( struct hash_table *sequence_table )
 
 	char cmd[strlen(align_prog)+strlen(align_prog_args)+100];
 
-	sprintf(cmd, "./%s %s aligndata", align_prog, align_prog_args);
+	sprintf(cmd, "./%s %s aligndata", "align", align_prog_args);
 
 	struct work_queue_task *t = work_queue_task_create(cmd);
-	work_queue_task_specify_input_file(t, align_prog, align_prog);
+	work_queue_task_specify_input_file(t, align_prog, "align");
 	work_queue_task_specify_input_buf(t, buffer, buffer_pos, "aligndata");
 
 	free(buffer);
