@@ -811,7 +811,7 @@ static int chirp_is_directory( const char *path )
 			return 0;
 		}
 	} else {
-		return 1;
+		return 0;
 	}
 }
 
