@@ -335,7 +335,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					debug(D_NOTICE,"%s on %s (%s) has invalid length: %lld", remote_name, w->addrport,w->hostname, length);
 					goto failure;
 				}
-			} else if (strncmp(type, "error", 5) == 0) {
+			} else if (strncmp(type, "errno", 5) == 0) {
 				// now length is treated as errno
 				if (length == -1) {
 					debug(D_NOTICE,"%s was not created on %s (%s)", remote_name, w->addrport,w->hostname);
