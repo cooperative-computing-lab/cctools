@@ -303,6 +303,9 @@ def parse_command_line_options():
     STARCH_AUTODETECT = options.autodetect
 
     if options.config:
+        if not os.path.exists(options.config):
+            error('config file \'%s\' does not exist' % options.config)
+
         config = StarchConfigParser()
         config.read(options.config)
 
