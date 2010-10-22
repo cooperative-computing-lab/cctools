@@ -21,12 +21,16 @@ from ConfigParser import ConfigParser, NoSectionError, NoOptionError
 import os
 import sys
 
+# Todo -------------------------------------------------------------------------
+
+"""
+1. Keep track of files added to avoid duplication (efficiency).
+"""
 
 # Global variables -------------------------------------------------------------
 
 STARCH_AUTODETECT = True
 STARCH_VERBOSE    = False
-
 
 # Shell scripts ----------------------------------------------------------------
 
@@ -114,7 +118,6 @@ fi
 %s
 '''
 
-
 # Create SFX --------------------------------------------------------------------
 
 def create_sfx(sfx_path, executables, libraries, data, environments, command):
@@ -153,12 +156,9 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
         archive.addfile(lib_info, open(real_path))
     
     debug('adding data...')
-    for data_path, real_path in map(lambda s: s.split(','), data):
-        data_info = archive.gettarinfo(real_path, data_path)
+    for data_path, real_path in map(lambda s: s.split(':'), data):
+        add_data_to_archive(archive, data_path, real_path)
 
-        debug('    adding data: ' + data_path)
-        archive.addfile(data_info, open(real_path))
-    
     debug('adding environment scripts...')
     for env_path, real_path in find_files(environments, 'PWD'):
         env_name = basename(env_path)
@@ -190,6 +190,17 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
     os.chmod(sfx_path, 0755)
     os.unlink(arc_path)
 
+def add_data_to_archive(archive, data_path, real_path):
+    if os.path.isdir(real_path):
+        for root, dirs, files in os.walk(real_path):
+            for n in files + dirs:
+                dp = os.path.join(root.replace(real_path, data_path), n)
+                rp = os.path.join(root, n)
+                add_data_to_archive(archive, dp, rp)
+    else:
+        data_info = archive.gettarinfo(realpath(real_path), data_path)
+        debug('    adding data: ' + data_path)
+        archive.addfile(data_info, open(real_path))
 
 # Print utilities --------------------------------------------------------------
 
@@ -203,7 +214,6 @@ def warn(s):
 def error(s):
     print >>sys.stderr, '[E]', s
     sys.exit(1)
-
 
 # Find file utilities ----------------------------------------------------------
 
@@ -247,7 +257,6 @@ def find_libraries(libraries, executables):
 
     return libs
 
-
 # Configuration Parser ---------------------------------------------------------
 
 class StarchConfigParser(ConfigParser):
@@ -256,7 +265,6 @@ class StarchConfigParser(ConfigParser):
             return ConfigParser.get(self, section, name)
         except (NoSectionError, NoOptionError), e:
             return default
-
 
 # Parse commandline options ----------------------------------------------------
 
@@ -273,7 +281,7 @@ def parse_command_line_options():
     parser.add_option('-l', dest = 'libraries', action = 'append',
         help = 'add library', metavar = 'lib', default = [])
     parser.add_option('-d', dest = 'data', action = 'append',
-        help = 'add data (new path, old path)', metavar = 'npath,opath', default = [])
+        help = 'add data (new path:old path)', metavar = 'npath:opath', default = [])
     parser.add_option('-e', dest = 'environments', action = 'append',
         help = 'add environment script', metavar = 'env', default = [])
     parser.add_option('-C', dest = 'config', action = 'store',
@@ -314,7 +322,6 @@ def parse_command_line_options():
 
     return args[0], options.executables, options.libraries, \
                     options.data, options.environments, options.command
-
 
 # Main execution ---------------------------------------------------------------
 

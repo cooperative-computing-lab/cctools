@@ -27,26 +27,30 @@ class TestCommand(Command):
 
     def initialize_options(self):
         self.cwd = os.getcwd()
+        if not os.path.exists(os.path.join(self.cwd, 'build')):
+            os.makedirs(os.path.join(self.cwd, 'build'))
 
     def finalize_options(self):
         pass
 
     def run(self):
-        sfxs = [('date.sfx', '-x date')]
+        sfxs = [('date.sfx', '-x date'),
+                ('example.sfx', '-C example.cfg')]
 
         for sfx_name, sfx_args in sfxs:
             logfile  = open(os.path.join(self.cwd, 'build', sfx_name + '.log'), 'a')
             sfx_path = os.path.join(self.cwd, 'build', sfx_name)
+            command  = './starch.py %s %s' % (sfx_args, sfx_path)
             try:
                 sys.stdout.write('Starching %s ... ' % sfx_name)
                 sys.stdout.flush()
-                check_call(['./starch.py', sfx_args, sfx_path], stderr = logfile, stdout = logfile)
+                check_call(command.split(), stderr = logfile, stdout = logfile)
                 check_call([sfx_path], stderr = logfile, stdout = logfile)
                 check_call(['env', 'SFX_KEEP=1', sfx_path], stderr = logfile, stdout = logfile)
                 check_call(['env', 'SFX_KEEP=0', sfx_path], stderr = logfile, stdout = logfile)
                 check_call(['env', 'SFX_UNIQUE=1', sfx_path], stderr = logfile, stdout = logfile)
             except Exception as e:
-                sys.stdout.write('failure: %s\n' % str(e))
+                sys.stdout.write('failure\n%s\n\n' % str(e))
                 continue
             finally:
                 logfile.close()

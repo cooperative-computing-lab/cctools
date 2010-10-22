@@ -29,7 +29,7 @@ Usage
         -c cmd          command to execute
         -x exe          add executable
         -l lib          add library
-        -d npath,opath  add data (new path, old path)
+        -d npath:opath  add data (new path:old path)
         -e env          add environment script
         -C cfg          configuration file
         -a              automatically detect library dependencies (default: True)
@@ -43,9 +43,19 @@ Instead of specifying the command, executables, libraries, data, and
 environment options on the command line, users may specify the settings in a
 simple INI-style configuration file and pass that to starch.  A simple example
 configuration file looks like so::
-
+    
     [starch]
-    executables = date
+    executables = echo date hostname
+    libraries   = libz.so
+    data	= hosts.txt:/etc/hosts localtime:/etc/localtime images:/usr/share/pixmaps
+    command	= echo $(hostname) $(date $@)
+
+In this example, we specify three executables: ``echo``, ``date``, and
+``hostname``.  We include the ``libz.so`` library and a collection of data
+files.  In this case, we copy ``/etc/hosts`` to ``hosts.txt``,
+``/etc/localtime`` to ``localtime``, and we recursively copy the
+``/usr/share/pixmaps`` directory to ``images``.  Finally, we set our command to
+simply print out the hostname and date.
 
 Environmental Variables
 -----------------------
