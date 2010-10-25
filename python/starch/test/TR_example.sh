@@ -2,8 +2,8 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-sfxfile=example.sfx
-cfgfile=example.cfg
+sfxfile=test/example.sfx
+cfgfile=test/example.cfg
 
 prepare()
 {
