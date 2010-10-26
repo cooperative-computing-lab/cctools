@@ -499,6 +499,16 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	if(itable_lookup(rerun_table, n->nodeid)) return;
 
 	// Below are a bunch of situations when a node has to be rerun.
+	
+	if(n->state==DAG_NODE_STATE_RUNNING && !n->local_job && batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
+		// Reconnect the Condor jobs
+		printf("makeflow: rule still running: %s\n",n->command);
+		itable_insert(d->remote_job_table,n->jobid,n);
+		d->remote_jobs_running++;
+	} else if(n->state==DAG_NODE_STATE_RUNNING || n->state==DAG_NODE_STATE_FAILED || n->state==DAG_NODE_STATE_ABORTED) {
+		printf("makeflow: will retry failed rule: %s\n",n->command);
+		goto rerun;
+	}
 
 	// Input file has been updated since last execution
 	for(f=n->source_files;f;f=f->next) {
@@ -539,6 +549,8 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 	struct dag_file *f1;
 	struct dag_file *f2;
 	int child_node_found;
+
+	if(itable_lookup(rerun_table, n->nodeid)) return;
 
 	// Remove running batch jobs
 	if(n->state==DAG_NODE_STATE_RUNNING) {
@@ -637,21 +649,7 @@ void dag_log_recover( struct dag *d, const char *filename )
 
 	dag_count_states(d);
 
-	for(n=d->nodes;n;n=n->next) {
-		if(n->state==DAG_NODE_STATE_RUNNING && !n->local_job && batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
-			printf("makeflow: rule still running: %s\n",n->command);
-			itable_insert(d->remote_job_table,n->jobid,n);
-			d->remote_jobs_running++;
-		} else if(n->state==DAG_NODE_STATE_RUNNING || n->state==DAG_NODE_STATE_FAILED || n->state==DAG_NODE_STATE_ABORTED) {
-			printf("makeflow: will retry failed rule: %s\n",n->command);
-			dag_node_clean(d,n);
-			dag_node_state_change(d,n,DAG_NODE_STATE_WAITING);
-		}
-	}
-
-
-
-	// Check file system status to decide rerun tasks 
+	// Decide rerun tasks 
 	if(!first_run) {
 		struct itable *rerun_table = itable_create(0);
 		for(n=d->nodes;n;n=n->next) {
