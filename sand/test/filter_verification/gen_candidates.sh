@@ -6,7 +6,7 @@
 
 port=9091
 
-PATH=../src:../../dttools/src:$PATH
+PATH=../../src:../../../dttools/src:$PATH
 export PATH
 
 error_state=0;
