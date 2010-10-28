@@ -577,7 +577,7 @@ int batch_job_remove_work_queue( struct batch_queue *q, batch_job_id_t jobid )
 
 /***************************************************************************************/
 
-int batch_job_submit_simple_unix( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
+int batch_job_submit_simple_local( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
 {
 	batch_job_id_t jobid;
 
@@ -606,7 +606,7 @@ int batch_job_submit_simple_unix( struct batch_queue *q, const char *cmd, const 
 	
 }
 
-int batch_job_submit_unix( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
+int batch_job_submit_local( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
 {
 	char line[BATCH_JOB_LINE_MAX];
 
@@ -619,10 +619,10 @@ int batch_job_submit_unix( struct batch_queue *q, const char *cmd, const char *a
 
 	sprintf(line,"%s %s <%s >%s 2>%s",cmd,args,infile,outfile,errfile);
 
-	return batch_job_submit_simple_unix(q,line,extra_input_files,extra_output_files);
+	return batch_job_submit_simple_local(q,line,extra_input_files,extra_output_files);
 }
 
-batch_job_id_t batch_job_wait_unix( struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime )
+batch_job_id_t batch_job_wait_local( struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime )
 {
 	while(1) {
 		int timeout;
@@ -664,7 +664,7 @@ batch_job_id_t batch_job_wait_unix( struct batch_queue *q, struct batch_job_info
 	}
 }
 
-int batch_job_remove_unix( struct batch_queue *q, batch_job_id_t jobid )
+int batch_job_remove_local( struct batch_queue *q, batch_job_id_t jobid )
 {
 	if(itable_lookup(q->job_table,jobid)) {
 		if(kill(jobid,SIGTERM)==0) {
@@ -726,7 +726,7 @@ int batch_job_submit_xgrid( struct batch_queue *q, const char *cmd, const char *
 	
 	sprintf(line,"%s %s <%s >%s 2>%s",cmd,args,infile,outfile,errfile);
 	
-	return batch_job_submit_simple_unix(q,line,extra_input_files,extra_output_files);
+	return batch_job_submit_simple_local(q,line,extra_input_files,extra_output_files);
 }
 
 batch_job_id_t batch_job_wait_xgrid( struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime )
@@ -791,14 +791,15 @@ int batch_job_remove_xgrid( struct batch_queue *q, batch_job_id_t jobid )
 
 const char * batch_queue_type_string()
 {
-	return "unix, condor, sge, workqueue, xgrid";
+	return "local, condor, sge, workqueue, xgrid";
 }
 
 batch_queue_type_t batch_queue_type_from_string( const char *str )
 {
 	if(!strcmp(str,"condor")) return BATCH_QUEUE_TYPE_CONDOR;
 	if(!strcmp(str,"sge"))    return BATCH_QUEUE_TYPE_SGE;
-	if(!strcmp(str,"unix"))   return BATCH_QUEUE_TYPE_UNIX;
+	if(!strcmp(str,"local"))   return BATCH_QUEUE_TYPE_LOCAL;
+	if(!strcmp(str,"unix"))   return BATCH_QUEUE_TYPE_LOCAL;
 	if(!strcmp(str,"wq"))     return BATCH_QUEUE_TYPE_WORK_QUEUE;
 	if(!strcmp(str,"workqueue")) return BATCH_QUEUE_TYPE_WORK_QUEUE;
 	if(!strcmp(str,"xgrid"))  return BATCH_QUEUE_TYPE_XGRID;
@@ -808,7 +809,7 @@ batch_queue_type_t batch_queue_type_from_string( const char *str )
 const char * batch_queue_type_to_string( batch_queue_type_t t )
 {
 	switch(t) {
-		  case BATCH_QUEUE_TYPE_UNIX:        return "unix";
+		  case BATCH_QUEUE_TYPE_LOCAL:       return "local";
 		  case BATCH_QUEUE_TYPE_CONDOR:      return "condor";
 		  case BATCH_QUEUE_TYPE_SGE:         return "sge";
 		  case BATCH_QUEUE_TYPE_WORK_QUEUE:  return "wq";
@@ -885,8 +886,8 @@ batch_job_id_t batch_job_submit( struct batch_queue *q, const char *cmd, const c
 {
 	if(!q->job_table) q->job_table = itable_create(0);
 
-	if(q->type==BATCH_QUEUE_TYPE_UNIX) {
-		return batch_job_submit_unix(q,cmd,args,infile,outfile,errfile,extra_input_files,extra_output_files);
+	if(q->type==BATCH_QUEUE_TYPE_LOCAL) {
+		return batch_job_submit_local(q,cmd,args,infile,outfile,errfile,extra_input_files,extra_output_files);
 	} else if(q->type==BATCH_QUEUE_TYPE_CONDOR) {
 		return batch_job_submit_condor(q,cmd,args,infile,outfile,errfile,extra_input_files,extra_output_files);
 	} else if(q->type==BATCH_QUEUE_TYPE_SGE) {
@@ -905,8 +906,8 @@ batch_job_id_t batch_job_submit_simple( struct batch_queue *q, const char *cmd, 
 {
 	if(!q->job_table) q->job_table = itable_create(0);
 
-	if(q->type==BATCH_QUEUE_TYPE_UNIX) {
-		return batch_job_submit_simple_unix(q,cmd,extra_input_files,extra_output_files);
+	if(q->type==BATCH_QUEUE_TYPE_LOCAL) {
+		return batch_job_submit_simple_local(q,cmd,extra_input_files,extra_output_files);
 	} else if(q->type==BATCH_QUEUE_TYPE_CONDOR) {
 		return batch_job_submit_simple_condor(q,cmd,extra_input_files,extra_output_files);
 	} else if(q->type==BATCH_QUEUE_TYPE_SGE) {
@@ -930,8 +931,8 @@ batch_job_id_t batch_job_wait_timeout( struct batch_queue *q, struct batch_job_i
 {
 	if(!q->job_table) q->job_table = itable_create(0);
 
-	if(q->type==BATCH_QUEUE_TYPE_UNIX) {
-		return batch_job_wait_unix(q,info,stoptime);
+	if(q->type==BATCH_QUEUE_TYPE_LOCAL) {
+		return batch_job_wait_local(q,info,stoptime);
 	} else if(q->type==BATCH_QUEUE_TYPE_CONDOR) {
 		return batch_job_wait_condor(q,info,stoptime);
 	} else if(q->type==BATCH_QUEUE_TYPE_SGE) {
@@ -950,8 +951,8 @@ int batch_job_remove( struct batch_queue *q, batch_job_id_t jobid )
 {
 	if(!q->job_table) q->job_table = itable_create(0);
 
-	if(q->type==BATCH_QUEUE_TYPE_UNIX) {
-		return batch_job_remove_unix(q,jobid);
+	if(q->type==BATCH_QUEUE_TYPE_LOCAL) {
+		return batch_job_remove_local(q,jobid);
 	} else if(q->type==BATCH_QUEUE_TYPE_CONDOR) {
 		return batch_job_remove_condor(q,jobid);
 	} else if(q->type==BATCH_QUEUE_TYPE_SGE) {

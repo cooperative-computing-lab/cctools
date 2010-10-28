@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
 	char worker_path[PATH_MAX] = "";
 	char worker_args[PATH_MAX] = "";
 	char *hostname;
-	int batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
+	int batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 	int auto_worker = 0;
 	struct batch_queue *q;
 	FILE *ifs, *ofs;

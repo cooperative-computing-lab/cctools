@@ -23,7 +23,7 @@ typedef int batch_job_id_t;
 /** Indicates which type of batch submission to use. */
 typedef enum {
 	BATCH_QUEUE_TYPE_UNKNOWN=-1, /**< An invalid batch queue type. */
-	BATCH_QUEUE_TYPE_UNIX,	     /**< Batch jobs will run as local Unix processes. */
+	BATCH_QUEUE_TYPE_LOCAL,	     /**< Batch jobs will run as local processes. */
 	BATCH_QUEUE_TYPE_CONDOR,     /**< Batch jobs will be sent to Condor pool. */
 	BATCH_QUEUE_TYPE_SGE,	     /**< Batch jobs will be sent to Sun Grid Engine. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE,  /**< Batch jobs will be send to the Work Queue. */

@@ -320,7 +320,7 @@ static double measure_task_time()
 	batch_job_id_t jobid;
 	int test_jobs_complete = 0;
 
-	batch_q = batch_queue_create(BATCH_QUEUE_TYPE_UNIX);
+	batch_q = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL);
 
 	timestamp_t start = timestamp_get();
 	timestamp_t stop;
@@ -498,7 +498,7 @@ int main( int argc, char *argv[] )
 	}
 
 	if(wavefront_mode==WAVEFRONT_MODE_MULTICORE) {
-		batch_system_type = BATCH_QUEUE_TYPE_UNIX;
+		batch_system_type = BATCH_QUEUE_TYPE_LOCAL;
 		max_jobs_running = ncpus;
 	} else {
 		max_jobs_running = 1000;

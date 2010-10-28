@@ -48,7 +48,7 @@ static int dag_submit_timeout = 3600;
 static int dag_retry_flag = 0;
 static int dag_retry_max = 100;
 
-static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNIX;
+static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
@@ -1381,7 +1381,7 @@ static void show_help(const char *cmd)
 	printf("Use: %s [options] <dagfile>\n", cmd);
 	printf("where options are:\n");
 	printf(" -c             Clean up: remove logfile and all targets.\n");
-	printf(" -T <type>      Batch system type: %s. (default is unix)\n",batch_queue_type_string());
+	printf(" -T <type>      Batch system type: %s. (default is local)\n",batch_queue_type_string());
 	printf(" -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	printf(" -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
 	printf(" -p <port>      Port number to use with work queue.         (default is %d, -1=random)\n",WORK_QUEUE_DEFAULT_PORT);
@@ -1641,7 +1641,7 @@ int main( int argc, char *argv[] )
 	if(explicit_remote_jobs_max) {
 		d->remote_jobs_max = explicit_remote_jobs_max;
 	} else {
-		if(batch_queue_type==BATCH_QUEUE_TYPE_UNIX) {
+		if(batch_queue_type==BATCH_QUEUE_TYPE_LOCAL) {
 			d->remote_jobs_max = load_average_get_cpus();
 		} else if(batch_queue_type==BATCH_QUEUE_TYPE_WORK_QUEUE) {
 			d->remote_jobs_max = 1000;
@@ -1659,7 +1659,7 @@ int main( int argc, char *argv[] )
 	if(s) {
 		int n = atoi(s);
 		d->local_jobs_max = MIN(d->local_jobs_max,n);
-		if(batch_queue_type==BATCH_QUEUE_TYPE_UNIX) {
+		if(batch_queue_type==BATCH_QUEUE_TYPE_LOCAL) {
 			d->remote_jobs_max = MIN(d->local_jobs_max,n);
 		}
 	}
@@ -1706,7 +1706,7 @@ int main( int argc, char *argv[] )
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	local_queue = batch_queue_create(BATCH_QUEUE_TYPE_UNIX);
+	local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL);
 	if(!local_queue) {
 		fprintf(stderr,"makeflow: couldn't create local job queue.\n");
 		exit(1);
