@@ -197,10 +197,11 @@ static int do_chirp_acl_check( const char *filename, const char *subject, int fl
 
 	/* Now get the name of the directory containing the file */
 
-    if(!is_a_directory(filename))
-		string_dirname(filename, dirname);
+	string_collapse_path(filename,temp,1);
+	if(!is_a_directory(temp))
+		string_dirname(temp,dirname);
 	else
-		strcpy(dirname, filename);
+		strcpy(dirname,temp);
 
 	/* Perform the permissions check on that directory. */
 
