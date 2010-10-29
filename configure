@@ -595,15 +595,11 @@ then
     if check_file ${python_path}/bin/python2
     then
 	python=${python_path}/bin/python2
-	python_version="$(${python} -V 2>&1)"
-
-	if [ $(echo ${python_version} | awk '{print $2}' | cut -d . -f 2) -lt 6 ]
-	then
-	    echo "*** Sorry, you have ${python_version}, we require Python >= 2.6.x"
-	else
-	    packages="${packages} python"
-	fi
+    elif check_file ${python_path}/bin/python
+    then
+	python=${python_path}/bin/python
     else
+    	python=0
 	if [ $config_python_path = yes ]
 	then
 	    echo "*** Sorry, I couldn't find Python in $python_path"
@@ -611,6 +607,18 @@ then
 	    exit 1
 	else
 	    echo "*** skipping python support"
+	fi
+    fi
+
+    if [ $python != 0 ]
+    then
+	python_version="$(${python} -V 2>&1)"
+
+	if [ $(echo ${python_version} | awk '{print $2}' | cut -d . -f 2) -lt 6 ]
+	then
+	    echo "*** Sorry, you have ${python_version}, we require Python >= 2.6.x"
+	else
+	    packages="${packages} python"
 	fi
     fi
 fi
