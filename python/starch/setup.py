@@ -82,7 +82,7 @@ class InstallScripts(install_scripts.install_scripts):
 
 setup(
     name	 = 'Starch',
-    version	 = '0.0.1',
+    version	 = '0.0.2',
     description	 = 'STandalone application ARCHiver',
     author	 = 'Peter Bui',
     author_email = 'pbui@cse.nd.edu',

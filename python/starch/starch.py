@@ -7,8 +7,6 @@
 """ Starch """
 
 from cStringIO  import StringIO
-from os.path    import basename, realpath
-from os.path    import join as path_join
 from optparse   import OptionParser
 from subprocess import Popen, PIPE
 from tarfile    import REGTYPE, TarInfo, open as Tar
@@ -31,6 +29,7 @@ import sys
 
 STARCH_AUTODETECT = True
 STARCH_VERBOSE    = False
+STARCH_PLATFORM   = 'Linux'
 
 # Shell scripts ----------------------------------------------------------------
 
@@ -47,6 +46,8 @@ if [ -z $SFX_DIR ]; then
         SFX_DIR=$CONDOR_SCRATCH_DIR/$SFX_DIR
     elif [ ! -z $_CONDOR_SCRATCH_DIR ]; then
         SFX_DIR=$_CONDOR_SCRATCH_DIR/$SFX_DIR
+    elif [ ! -z $XGRID_AGENT_NAME ]; then
+        SFX_DIR=$(pwd)/$SFX_DIR
     else
         SFX_DIR=/tmp/$SFX_DIR
     fi
@@ -139,8 +140,8 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
     debug('adding executables...')
     executables = find_executables(executables)
     for exe_path, real_path in executables:
-        exe_name = basename(exe_path)
-        exe_info = archive.gettarinfo(real_path, path_join('bin', exe_name))
+        exe_name = os.path.basename(exe_path)
+        exe_info = archive.gettarinfo(real_path, os.path.join('bin', exe_name))
         exe_info.mode = 0755
 
         debug('    adding executable: ' + exe_name)
@@ -149,8 +150,8 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
     debug('adding libraries...')
     libraries = find_libraries(libraries, executables)
     for lib_path, real_path in libraries:
-        lib_name = basename(lib_path)
-        lib_info = archive.gettarinfo(real_path, path_join('lib', lib_name))
+        lib_name = os.path.basename(lib_path)
+        lib_info = archive.gettarinfo(real_path, os.path.join('lib', lib_name))
 
         debug('    adding library: ' + lib_name)
         archive.addfile(lib_info, open(real_path))
@@ -161,8 +162,8 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
 
     debug('adding environment scripts...')
     for env_path, real_path in find_files(environments, 'PWD'):
-        env_name = basename(env_path)
-        env_info = archive.gettarinfo(real_path, path_join('env', env_name))
+        env_name = os.path.basename(env_path)
+        env_info = archive.gettarinfo(real_path, os.path.join('env', env_name))
 
         debug('    adding environment script: ' + env_path)
         archive.addfile(env_info, open(real_path))
@@ -198,7 +199,7 @@ def add_data_to_archive(archive, data_path, real_path):
                 rp = os.path.join(root, n)
                 add_data_to_archive(archive, dp, rp)
     else:
-        data_info = archive.gettarinfo(realpath(real_path), data_path)
+        data_info = archive.gettarinfo(os.path.realpath(real_path), data_path)
         debug('    adding data: ' + data_path)
         archive.addfile(data_info, open(real_path))
 
@@ -224,9 +225,9 @@ def find_files(files, env_var):
 
     for file in files:
         for path in paths:
-            file_path = path_join(path, file)
+            file_path = os.path.join(path, file)
             if os.path.exists(file_path):
-                yield file_path, realpath(file_path)
+                yield file_path, os.path.realpath(file_path)
                 continue
     raise StopIteration
 
@@ -246,16 +247,49 @@ def find_libraries(libraries, executables):
 
     if STARCH_AUTODETECT:
         for exe_path, real_path in executables:
-            p = Popen(['ldd', exe_path], stdout = PIPE)
-            for line in p.communicate()[0].split('\n'):
-                try:
-                    lib_path = line.split('=>')[-1].strip().split()[0]
-                    if os.path.exists(lib_path):
-                        libs.append((lib_path, realpath(lib_path)))
-                except:
-                    pass
+            if STARCH_PLATFORM == 'Darwin':
+                libs.extend(autodetect_libraries_darwin(exe_path))
+            else:
+                libs.extend(autodetect_libraries_linux(exe_path))
 
     return libs
+
+
+def autodetect_libraries_linux(executable):
+    libs = []
+
+    try:
+        p = Popen(['ldd', executable], stdout = PIPE)
+        for line in p.communicate()[0].split('\n'):
+            try:
+                lib_path = line.split('=>')[-1].strip().split()[0]
+                if os.path.exists(lib_path):
+                    libs.append((lib_path, os.path.realpath(lib_path)))
+            except Exception as e:
+                pass
+    except Exception as e:
+        error('could not execute ldd on %s: %s' % (executable, str(e)))
+
+    return libs
+
+
+def autodetect_libraries_darwin(executable):
+    libs = []
+
+    try:
+        p = Popen(['otool', '-L', executable], stdout = PIPE)
+        for line in p.communicate()[0].split('\n'):
+            try:
+                lib_path = line.split('(')[0].strip()
+                if os.path.exists(lib_path):
+                    libs.append((lib_path, os.path.realpath(lib_path)))
+            except Exception as e:
+                pass
+    except Exception as e:
+        error('could not execute otool on %s: %s' % (executable, str(e)))
+
+    return libs
+
 
 # Configuration Parser ---------------------------------------------------------
 
@@ -271,6 +305,7 @@ class StarchConfigParser(ConfigParser):
 def parse_command_line_options():
     global STARCH_VERBOSE
     global STARCH_AUTODETECT
+    global STARCH_PLATFORM
 
     parser = OptionParser('%prog [options] <sfx_path>')
 
@@ -301,6 +336,7 @@ def parse_command_line_options():
 
     STARCH_VERBOSE    = options.verbose
     STARCH_AUTODETECT = options.autodetect
+    STARCH_PLATFORM   = os.uname()[0]
 
     if options.config:
         if not os.path.exists(options.config):
