@@ -299,7 +299,6 @@ static void task_complete( struct work_queue_task * t )
 			free(out);
 			free(cand1);	
 			free(cand2);
-			free(line);
 		}
 		fputs(t->output, outfile);
 		fflush(outfile);
