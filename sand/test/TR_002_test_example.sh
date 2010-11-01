@@ -6,8 +6,8 @@ prepare()
 {
     cd ../src/; make
     cd ../test/filter_verification
-    ./gen_random_sequence.pl
-    ./gen_random_reads.pl
+    ./gen_random_sequence.pl 100000
+    ./gen_random_reads.pl 100000
     exec ./gen_candidates.sh
 }
 
