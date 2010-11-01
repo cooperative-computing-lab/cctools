@@ -518,7 +518,7 @@ void find_minimizers(int seq_num)
 			// Find the new minimizer
 			// If runtime starts to suffer I can implement something better than a linear search,
 			// but because WINDOW_SIZE is a small constant (around 20) it should be OK.
-			abs_min.value = ULONG_MAX;
+			abs_min.value = ULLONG_MAX;
 			abs_min.dir = 0;
 			for (j = 0; j < WINDOW_SIZE; j++)
 			{
