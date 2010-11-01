@@ -14,6 +14,14 @@ my $random_number;
 my $char;
 my $i;
 
+
+# Check sequence_length argument
+my $numArgs;
+$numArgs = $#ARGV+1;
+if ($numArgs == 1) {
+	$sequence_length = $ARGV[0];
+}
+
 # Generate a random sequence and write it to file
 open MYFILE, ">$filename" or die $!;
 for($i = 0; $i < $sequence_length; $i++) {

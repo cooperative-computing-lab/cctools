@@ -22,6 +22,13 @@ my $seq_revcom;
 my $kmer;
 my $num_of_reads;
 
+# Check sequence_length argument
+my $numArgs;
+$numArgs = $#ARGV+1;
+if ($numArgs == 1) {
+	$sequence_length = $ARGV[0];
+}
+
 open SEQFILE, "$seq_file" or die $!;
 $seq = <SEQFILE>;
 print length($seq) . " bases are read from $seq_file.\n";
