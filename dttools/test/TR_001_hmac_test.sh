@@ -4,7 +4,6 @@
 
 prepare()
 {
-    cd ../src/; make
     exit 0
 }
 

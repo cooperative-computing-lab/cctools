@@ -16,7 +16,7 @@ prepare()
 
 run()
 {
-    exec chirp localhost:9095 df -g 
+    exec ../src/chirp localhost:9095 df -g 
 }
 
 clean()

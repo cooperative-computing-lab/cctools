@@ -26,7 +26,7 @@ wpid=$!
 echo "Worker is process $wpid"
 
 echo "Starting filter master ..."
-sand_filter_master -s 100 -k 22 -p $port random.cfa random.cand -d all -o filter.log || { echo "Error in filtering."; kill -9 $wpid; exit 1 ; }
+sand_filter_master -s 100 -k 22 -p $port -d all -o filter.log random.cfa random.cand || { echo "Error in filtering."; kill -9 $wpid; exit 1 ; }
 
 echo "Waiting for worker to exit"
 wait $wpid
