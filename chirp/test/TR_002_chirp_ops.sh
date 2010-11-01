@@ -7,6 +7,7 @@ PID_FILE=chirp_server.pid
 
 prepare()
 {
+	ln -s ..//.//.///src/
     ../src/chirp_server -p 9095 &
     pid=$!
     
@@ -19,6 +20,7 @@ run()
     exec ../src/chirp localhost:9095 <<EOF
 help
 df -g
+ls src
 audit -r
 whoami
 whoareyou localhost:9095
@@ -42,6 +44,7 @@ clean()
     rm -f $PID_FILE
     rm -f .__acl
     rm -fr _test
+    rm -f src
     exit 0
 }
 
