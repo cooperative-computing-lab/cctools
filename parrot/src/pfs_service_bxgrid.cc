@@ -99,7 +99,7 @@ static struct bxgrid_virtual_folder BXGRID_VIRTUAL_FOLDERS[] = {
 	},
 	{ "/fileid",
 	  "SELECT fileid FROM files",
-	  "SELECT size, UNIX_TIMESTAMP(lastcheck) FROM files WHERE fileid = '%s'",
+	  "SELECT size, UNIX_TIMESTAMP(files.lastcheck) FROM files LEFT JOIN replicas USING(fileid) WHERE fileid = '%s' AND replicas.state = 'OK' LIMIT 1",
 	  BXGRID_FILE_QUERY
 	},
 	{ "/replicaid",
@@ -187,11 +187,11 @@ public:
 
 #define BXGRID_QUERY_AND_CHECK( res, cxn, reterr, ... ) \
 	(res) = bxgrid_db_query(cxn, __VA_ARGS__); \
-	if ((res) == NULL) { debug(D_BXGRID|D_NOTICE, "%s", mysql_error(mysql_cxn)); return (reterr); }
+	if ((res) == NULL) { debug(D_BXGRID|D_NOTICE, "query returned no results: %s", mysql_error(mysql_cxn)); return (reterr); }
 
 #define BXGRID_FETCH_AND_CHECK( row, res, reterr ) \
 	(row) = mysql_fetch_row(res); \
-	if ((row) == NULL) { debug(D_BXGRID|D_NOTICE, "%s", mysql_error(mysql_cxn)); mysql_free_result(res); return (reterr); }
+	if ((row) == NULL) { debug(D_BXGRID|D_NOTICE, "failed to fetch row: %s", mysql_error(mysql_cxn)); mysql_free_result(res); return (reterr); }
 
 int bxgrid_bvf_stat( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, struct pfs_name *name, struct pfs_stat *buf )
 {
