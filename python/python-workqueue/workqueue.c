@@ -162,7 +162,10 @@ Task_set_algorithm(Task *self, PyObject *value, void *closure)
 static PyObject *
 Task_get_command(Task *self, void *closure)
 {
-    return PyString_FromString(self->tp->command_line);
+    if (self->tp->command_line)
+	return PyString_FromString(self->tp->command_line);
+
+    Py_RETURN_NONE;
 }
 
 static int
@@ -184,7 +187,10 @@ Task_set_command(Task *self, PyObject *value, void *closure)
 static PyObject *
 Task_get_tag(Task *self, void *closure)
 {
-    return PyString_FromString(self->tp->tag);
+    if (self->tp->tag)
+	return PyString_FromString(self->tp->tag);
+
+    Py_RETURN_NONE;
 }
 
 static int
@@ -203,7 +209,10 @@ Task_set_tag(Task *self, PyObject *value, void *closure)
 static PyObject *
 Task_get_output(Task *self, void *closure)
 {
-    return PyString_FromString(self->tp->output);
+    if (self->tp->output) 
+	return PyString_FromString(self->tp->output);
+
+    Py_RETURN_NONE;
 }
 
 static PyObject *
@@ -227,7 +236,10 @@ Task_get_result(Task *self, void *closure)
 static PyObject *
 Task_get_host(Task *self, void *closure)
 {
-    return PyString_FromString(self->tp->host);
+    if (self->tp->host)
+	return PyString_FromString(self->tp->host);
+
+    Py_RETURN_NONE;
 }
 
 static PyObject *
