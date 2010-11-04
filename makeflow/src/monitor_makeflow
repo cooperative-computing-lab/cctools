@@ -133,10 +133,10 @@ EMITTER_TABLE = {
 
 # Monitor makeflows ------------------------------------------------------------
 
-def monitor_makeflows(log_paths, emitter = emit_text, parse_dag = False, hide_finished = False, min_tasks = float('+infinity'), timeout = 1.0):
+def monitor_makeflows(log_paths, options): 
     makeflows = []
     for lp in log_paths:
-        makeflows.append({'log_path': lp, 'timeout': timeout})
+        makeflows.append({'log_path': lp}) 
 
     while True:
         os.system('clear')
@@ -144,17 +144,21 @@ def monitor_makeflows(log_paths, emitter = emit_text, parse_dag = False, hide_fi
         next_makeflows = []
         for makeflow in makeflows:
             with open(makeflow['log_path'], 'r') as log_stream:
-                parse_makeflow_stream(log_stream, parse_dag, makeflow)
+                parse_makeflow_stream(log_stream, options.parse_dag, makeflow)
 
-            if (hide_finished and makeflow['finished']) or \
-                float(makeflow['total']) < min_tasks:
+            if (options.hide_finished and makeflow['finished']) or \
+                float(makeflow['total']) < options.min_tasks:
                 continue
             else:
-                emitter(makeflow)
+                options.emitter(makeflow)
                 next_makeflows.append(makeflow)
-
+        
         makeflows = next_makeflows
-        sleep(timeout)
+        
+        if options.sort:
+            makeflows = sorted(makeflows, key = lambda mf: mf['percent_complete'])
+
+        sleep(options.timeout)
 
 # Parse command line options ---------------------------------------------------
 
@@ -169,6 +173,8 @@ def parse_command_line_options():
     parser.add_option('-m', dest = 'min_tasks', action = 'store',
         help = 'mininum number of tasks', metavar = 'minimum',
         type = 'float', default = float('+infinity'))
+    parser.add_option('-S', dest = 'sort', action = 'store_true',
+        help = 'sort logs by progress', default = False)
     parser.add_option('-P', dest = 'parse_dag', action = 'store_true',
         help = 'parse dag for node information', default = False)
     parser.add_option('-H', dest = 'hide_finished', action = 'store_true',
@@ -183,7 +189,9 @@ def parse_command_line_options():
     if options.format not in EMITTER_TABLE:
         print >>sys.stderr, 'invalid format specified:', options.format
 
-    return args, EMITTER_TABLE[options.format], options.parse_dag, options.hide_finished, options.min_tasks, options.timeout
+    options.emitter = EMITTER_TABLE[options.format]
+
+    return args, options 
 
 # Formatting Functions ---------------------------------------------------------
 
