@@ -187,11 +187,11 @@ public:
 
 #define BXGRID_QUERY_AND_CHECK( res, cxn, reterr, ... ) \
 	(res) = bxgrid_db_query(cxn, __VA_ARGS__); \
-	if ((res) == NULL) { debug(D_BXGRID|D_NOTICE, "query returned no results: %s", mysql_error(mysql_cxn)); return (reterr); }
+	if ((res) == NULL) { debug(D_BXGRID, "query returned no results: %s", mysql_error(mysql_cxn)); return (reterr); }
 
 #define BXGRID_FETCH_AND_CHECK( row, res, reterr ) \
 	(row) = mysql_fetch_row(res); \
-	if ((row) == NULL) { debug(D_BXGRID|D_NOTICE, "failed to fetch row: %s", mysql_error(mysql_cxn)); mysql_free_result(res); return (reterr); }
+	if ((row) == NULL) { debug(D_BXGRID, "failed to fetch row: %s", mysql_error(mysql_cxn)); mysql_free_result(res); return (reterr); }
 
 int bxgrid_bvf_stat( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, struct pfs_name *name, struct pfs_stat *buf )
 {
@@ -686,6 +686,26 @@ public:
 				result = -1;
 			}
 		}
+		BXGRID_END
+	}
+
+	virtual int access( pfs_name *name, mode_t mode ) {
+		int result = -1;
+		struct pfs_stat buf;
+		MYSQL *mysql_cxn = (MYSQL *)pfs_service_connect_cache(name);
+		
+		debug(D_BXGRID, "access %s", name->rest);
+		if (this->_stat(mysql_cxn, name, &buf) >= 0) {
+			if (mode&X_OK || mode&W_OK) {
+				errno = EACCES;
+			} else {
+				result = 0;
+			}
+		} else {
+			errno = ENOENT;
+		}
+
+		pfs_service_disconnect_cache(name, (void *)mysql_cxn, 0);
 		BXGRID_END
 	}
 
