@@ -114,7 +114,19 @@ if [ -d $SFX_DIR/bin ]; then
 fi
 
 if [ -d $SFX_DIR/lib ]; then
-    export LD_LIBRARY_PATH=$SFX_DIR/lib:$LD_LIBRARY_PATH
+    if [ "$(uname -s)" == "Darwin" ]; then
+        if [ -z $DYLD_LIBRARY_PATH ]; then
+            export DYLD_LIBRARY_PATH=$SFX_DIR/lib
+        else
+            export DYLD_LIBRARY_PATH=$SFX_DIR/lib:$DYLD_LIBRARY_PATH
+        fi
+    else
+        if [ -z $LD_LIBRARY_PATH ]; then
+            export LD_LIBRARY_PATH=$SFX_DIR/lib
+        else
+            export LD_LIBRARY_PATH=$SFX_DIR/lib:$LD_LIBRARY_PATH
+        fi
+    fi
 fi
 %s
 '''
@@ -144,7 +156,7 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
         exe_info = archive.gettarinfo(real_path, os.path.join('bin', exe_name))
         exe_info.mode = 0755
 
-        debug('    adding executable: ' + exe_name)
+        debug('    adding executable: %s (%s)' % (exe_name, real_path))
         archive.addfile(exe_info, open(real_path))
 
     debug('adding libraries...')
@@ -153,7 +165,7 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
         lib_name = os.path.basename(lib_path)
         lib_info = archive.gettarinfo(real_path, os.path.join('lib', lib_name))
 
-        debug('    adding library: ' + lib_name)
+        debug('    adding library: %s (%s)' % (lib_name, real_path))
         archive.addfile(lib_info, open(real_path))
     
     debug('adding data...')
@@ -165,7 +177,7 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
         env_name = os.path.basename(env_path)
         env_info = archive.gettarinfo(real_path, os.path.join('env', env_name))
 
-        debug('    adding environment script: ' + env_path)
+        debug('    adding environment script: %s (%s)' % (env_name, real_path))
         archive.addfile(env_info, open(real_path))
 
     run_info = TarInfo('run.sh')
@@ -200,7 +212,7 @@ def add_data_to_archive(archive, data_path, real_path):
                 add_data_to_archive(archive, dp, rp)
     else:
         data_info = archive.gettarinfo(os.path.realpath(real_path), data_path)
-        debug('    adding data: ' + data_path)
+        debug('    adding data: %s (%s)' % (data_path, real_path))
         archive.addfile(data_info, open(real_path))
 
 # Print utilities --------------------------------------------------------------
@@ -228,7 +240,7 @@ def find_files(files, env_var):
             file_path = os.path.join(path, file)
             if os.path.exists(file_path):
                 yield file_path, os.path.realpath(file_path)
-                continue
+                break
     raise StopIteration
 
 
