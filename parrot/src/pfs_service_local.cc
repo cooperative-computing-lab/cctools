@@ -285,10 +285,11 @@ process to sleep and wait for actual input to become ready.
 		result = ::poll(&pfd,1,0);
 		if(result>0) {
 			if(pfd.revents&POLLIN) flags |= PFS_POLL_READ;
-			if(pfd.revents&POLLPRI) flags |= PFS_POLL_READ;
 			if(pfd.revents&POLLHUP) flags |= PFS_POLL_READ;
 			if(pfd.revents&POLLOUT) flags |= PFS_POLL_WRITE;
-			if(pfd.revents&POLLERR) flags |= PFS_POLL_EXCEPT;
+			if(pfd.revents&POLLERR) flags |= PFS_POLL_READ;
+			if(pfd.revents&POLLERR) flags |= PFS_POLL_WRITE;
+			if(pfd.revents&POLLPRI) flags |= PFS_POLL_EXCEPT;
 		}
 		return flags;
 	}
