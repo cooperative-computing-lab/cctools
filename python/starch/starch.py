@@ -230,17 +230,26 @@ def error(s):
 
 # Find file utilities ----------------------------------------------------------
 
-def find_files(files, env_var):
-    paths = ['.']
+def find_files(files, env_var, default_paths = None):
+    if default_paths:
+        paths = default_paths
+    else:
+        paths = [os.curdir]
+
     if env_var in os.environ:
         paths.extend(os.environ[env_var].split(':'))
 
     for file in files:
+        is_found = False
         for path in paths:
             file_path = os.path.join(path, file)
+            print file_path
             if os.path.exists(file_path):
+                is_found = True
                 yield file_path, os.path.realpath(file_path)
                 break
+        if not is_found:
+            error('could not find file: %s' % file)
     raise StopIteration
 
 
@@ -254,7 +263,7 @@ def find_executables(executables):
 def find_libraries(libraries, executables):
     libs = []
 
-    for lp, rp in find_files(libraries, 'LD_LIBRARY_PATH'):
+    for lp, rp in find_files(libraries, 'LD_LIBRARY_PATH', ['/lib', '/lib64', '/usr/lib', '/usr/lib64']):
         libs.append((lp, rp))
 
     if STARCH_AUTODETECT:
