@@ -655,7 +655,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, IN
 		stoptime = time(0) + MAX(1.0,local_info.st_size/1250000.0);
 		//open_time = timestamp_get();
 
-		link_printf(w->link,"put %s %d 0%o\n",tf->remote_name,(int)local_info.st_size,local_info.st_mode);
+		link_printf(w->link,"put %s %lld 0%o\n",tf->remote_name,(INT64_T)local_info.st_size,local_info.st_mode);
 		
 		actual = link_stream_from_fd(w->link,fd,local_info.st_size,stoptime);
 		close(fd);
@@ -698,7 +698,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 				fl = tf->length;
 				stoptime = time(0) + MAX(1.0,fl/1250000.0);
 				open_time = timestamp_get();
-				link_printf(w->link,"put %s %d %o\n",tf->remote_name,fl,0777);
+				link_printf(w->link,"put %s %lld %o\n",tf->remote_name,(INT64_T)fl,0777);
 				debug(D_WQ,"%s (%s) will try up to %.03lfs seconds",w->hostname,w->addrport,(fl)/1250000.0);
 				actual = link_write(w->link, tf->payload, fl,stoptime);
 				close_time = timestamp_get();
