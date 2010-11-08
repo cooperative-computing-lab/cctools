@@ -170,7 +170,7 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
     
     debug('adding data...')
     for data_path, real_path in map(lambda s: s.split(':'), data):
-        add_data_to_archive(archive, data_path, real_path)
+        add_data_to_archive(archive, os.path.normpath(data_path), os.path.normpath(real_path))
 
     debug('adding environment scripts...')
     for env_path, real_path in find_files(environments, 'PWD'):
@@ -243,7 +243,6 @@ def find_files(files, env_var, default_paths = None):
         is_found = False
         for path in paths:
             file_path = os.path.join(path, file)
-            print file_path
             if os.path.exists(file_path):
                 is_found = True
                 yield file_path, os.path.realpath(file_path)
