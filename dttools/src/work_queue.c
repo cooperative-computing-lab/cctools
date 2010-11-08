@@ -173,6 +173,7 @@ static void change_worker_state( struct work_queue *q, struct work_queue_worker 
 	q->workers_in_state[w->state]--;
 	w->state = state;
 	q->workers_in_state[state]++;
+	debug(D_WQ, "Number of workers in state 'busy': %d;  'ready': %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_READY]);
 }
 
 static void link_to_hash_key( struct link *link, char *key )
@@ -1085,7 +1086,6 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		if(q->workers_in_state[WORKER_STATE_BUSY]==0 && list_size(q->ready_list)==0) break;
 
 		start_tasks(q);
-		debug(D_WQ, "Number of busy workers: %d", q->workers_in_state[WORKER_STATE_BUSY]);
 
 		int n = build_poll_table(q);
 		int msec;
