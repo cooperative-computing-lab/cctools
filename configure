@@ -613,8 +613,7 @@ then
     if [ $python != 0 ]
     then
 	python_version="$(${python} -V 2>&1)"
-
-	if [ $(echo ${python_version} | awk '{print $2}' | cut -d . -f 2) -lt 6 ]
+	if [ `echo ${python_version} | awk '{print $2}' | cut -d . -f 2` -lt 6 ]
 	then
 	    echo "*** Sorry, you have ${python_version}, we require Python >= 2.6.x"
 	else
