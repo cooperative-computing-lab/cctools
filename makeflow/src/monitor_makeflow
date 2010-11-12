@@ -145,7 +145,7 @@ EMITTER_TABLE = {
 def monitor_makeflows(log_paths, options): 
     makeflows = []
     for lp in log_paths:
-        makeflows.append({'log_path': lp, 'finished': False}) 
+        makeflows.append({'log_path': lp, 'finished': False})
 
     while makeflows:
         os.system('clear')
@@ -165,8 +165,12 @@ def monitor_makeflows(log_paths, options):
             if (options.hide_finished and makeflow['finished']) or \
                 float(makeflow['total']) < options.min_tasks:
                 continue
-            else:
+            
+            try:
                 options.emitter(makeflow)
+            except KeyError as e:
+                print >>sys.stderr, 'unable to emit %s: missing %s' % (makeflow['log_path'], str(e))
+            finally:
                 next_makeflows.append(makeflow)
         
         makeflows = next_makeflows
