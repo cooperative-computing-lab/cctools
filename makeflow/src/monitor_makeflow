@@ -147,13 +147,20 @@ def monitor_makeflows(log_paths, options):
     for lp in log_paths:
         makeflows.append({'log_path': lp, 'finished': False}) 
 
-    while True:
+    while makeflows:
         os.system('clear')
 
         next_makeflows = []
         for makeflow in makeflows:
-            with open(makeflow['log_path'], 'r') as log_stream:
-                parse_makeflow_stream(log_stream, options.parse_dag, makeflow)
+            try:
+                with open(makeflow['log_path'], 'r') as log_stream:
+                    parse_makeflow_stream(log_stream, options.parse_dag, makeflow)
+            except IOError as e:
+                print >>sys.stderr, 'unable to open %s: %s' % (makeflow['log_path'], str(e))
+                continue
+            except ValueError as e:
+                print >>sys.stderr, 'unable to parse %s: %s' % (makeflow['log_path'], str(e))
+                continue
 
             if (options.hide_finished and makeflow['finished']) or \
                 float(makeflow['total']) < options.min_tasks:
@@ -168,6 +175,8 @@ def monitor_makeflows(log_paths, options):
             makeflows = sorted(makeflows, key = lambda mf: mf['percent_complete'])
 
         sleep(options.timeout)
+
+    print >>sys.stderr, 'No makeflowlogs to monitor...'
 
 # Parse command line options ---------------------------------------------------
 
