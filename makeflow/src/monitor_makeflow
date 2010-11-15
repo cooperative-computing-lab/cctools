@@ -85,7 +85,10 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
 
     makeflow['prev_stream_pos'] = log_stream.tell()
     makeflow['history']  = history
-    makeflow['finished'] = sum(int(makeflow[s]) for s in MF_STATES[2:]) >= int(makeflow['total'])
+    try:
+        makeflow['finished'] = sum(int(makeflow[s]) for s in MF_STATES[2:]) >= int(makeflow['total'])
+    except KeyError:
+        makeflow['finished'] = False
     return makeflow
 
 def parse_makeflowlog(log_path, parse_dag = False):
@@ -145,7 +148,7 @@ EMITTER_TABLE = {
 def monitor_makeflows(log_paths, options): 
     makeflows = []
     for lp in log_paths:
-        makeflows.append({'log_path': lp, 'finished': False})
+        makeflows.append({'log_path': lp, 'finished': False, 'percent_complete': 0.0, 'total': float('+infinity')})
 
     while makeflows:
         os.system('clear')
