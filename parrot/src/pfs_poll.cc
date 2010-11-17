@@ -180,7 +180,20 @@ void pfs_poll_sleep()
 				}
 			}
 		}
+	} else if(errno==EBADF) {
+		// select returned an error, which should NEVER happen,
+		// unless we accidentally passed in bad data.
+
+		debug(D_NOTICE,"POLL TABLE CORRUPT: WAKING EVERYONE");
+
+		p = &poll_table[i];
+		if(p->pid>=0) {
+			pid_t pid = p->pid;
+			pfs_poll_clear(pid);
+			pfs_process_wake(pid);
+		}
 	}
+
 }
 
 void pfs_poll_wakeon( int fd, int flags )
