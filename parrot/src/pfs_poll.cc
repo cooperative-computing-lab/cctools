@@ -174,21 +174,20 @@ void pfs_poll_sleep()
 			if(s->pid>=0) {
 				if(timercmp(&curtime,&s->stoptime,>)) {
 					pid_t pid = s->pid;
-					debug(D_POLL,"waking pid %d because time expired");
+					debug(D_POLL,"waking pid %d because time expired",pid);
 					pfs_poll_clear(pid);
 					pfs_process_wake(pid);
 				}
 			}
 		}
 	} else if(errno==EBADF) {
-		// select returned an error, which should NEVER happen,
-		// unless we accidentally passed in bad data.
-
-		debug(D_NOTICE,"POLL TABLE CORRUPT: WAKING EVERYONE");
+		debug(D_POLL,"select returned EBADF, which really shouldn't happen.");
+		debug(D_POLL,"waking up all processes to clean up and try again.");
 
 		p = &poll_table[i];
 		if(p->pid>=0) {
 			pid_t pid = p->pid;
+			debug(D_POLL,"waking pid %d",pid);
 			pfs_poll_clear(pid);
 			pfs_process_wake(pid);
 		}
