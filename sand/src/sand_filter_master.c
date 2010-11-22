@@ -42,7 +42,7 @@ static void get_options(int argc, char ** argv, const char * progname);
 static void show_version(const char *cmd);
 static void show_help(const char *cmd);
 static void load_sequences(const char * file);
-static void load_rectangles_to_files();
+static size_t load_rectangle_to_file(int rect_id, struct cseq ** sequences, int cseq_count);
 static void task_submit(struct work_queue * q, int curr_rect_x, int curr_rect_y);
 static void task_complete(struct work_queue_task * t);
 static void display_progress();
@@ -113,64 +113,82 @@ static void show_help(const char *cmd)
 
 void load_sequences(const char * filename)
 {
-	FILE * file = fopen(filename, "r");
+	FILE * file;
+	int i, count, rect_id, rectangle_count;
+	struct cseq *c;
+	size_t size;
+
+
+	rectangle_count = 256;
+	rectangle_sizes = malloc(rectangle_count*sizeof(size_t));
+
+	file = fopen(filename, "r");
 	if(!file) fatal("couldn't open %s: %s\n",filename,strerror(errno));
 
-	int alloc_size = 128;
+	debug(D_DEBUG, "rectangle size: %d\n", rectangle_size);
+	sequences = malloc(rectangle_size*sizeof(struct cseq *));
+	if(!sequences) fatal("No enough memory to hold %d sequences. (%s) \n", rectangle_size, strerror(errno));
 
-	sequences = malloc(alloc_size*sizeof(struct cseq *));
 
-	struct cseq *c;
+	count=0;
+	rect_id=0;
+	while(1) {
+		c = cseq_read(file);
+		if(!c) {
+			if(count != rectangle_size) { // write the last rectangle to file
+				size = load_rectangle_to_file(rect_id, sequences, count);
+				if(!size) fatal("Failed to write rectangle %d to file. (%s)\n", rect_id, strerror(errno));
+				rectangle_sizes[rect_id] = size;
+				rect_id++;
+				for(i = 0; i < count; i++) cseq_free(sequences[i]);
+				debug(D_DEBUG, "Rectangle %d has been created.\n", rect_id);
+			}
 
-	while((c = cseq_read(file))) {
-		if(num_seqs>=alloc_size) {
-			alloc_size *= 2;
-			sequences = realloc(sequences,alloc_size * sizeof(struct cseq*));
+			num_rectangles = rect_id;
+			break;
 		}
-		sequences[num_seqs++] = c;
+		sequences[count] = c;
+		count++;
+		num_seqs++;
+
+		if(count == rectangle_size) {
+			size = load_rectangle_to_file(rect_id, sequences, count);
+			if(!size) fatal("Failed to write rectangle %d to file. (%s)\n", rect_id, strerror(errno));
+			rectangle_sizes[rect_id] = size;
+			rect_id++;
+			if(rect_id == rectangle_count) {
+				rectangle_count = rectangle_count*2;
+				rectangle_sizes = realloc(rectangle_sizes, rectangle_count*sizeof(size_t));
+				if(!rectangle_sizes) fatal("Failed to allocate memory for holding rectangle sizes. Number of rectangles: %d. (%s)\n", rectangle_count, strerror(errno));
+			}
+			for(i = 0; i < count; i++) cseq_free(sequences[i]);
+			count = 0;
+			debug(D_DEBUG, "Rectangle %d has been created.\n", rect_id);
+		}
 	}
+
+	fclose(file);
+	free(sequences);
 }
 
-void load_rectangles_to_files()
-{
-	int curr_rect;
-	num_rectangles = ceil((float)num_seqs / (float)rectangle_size);
-
-	rectangle_sizes = malloc(num_rectangles*sizeof(size_t));
-	
-	int start, end, curr;
+size_t load_rectangle_to_file(int rect_id, struct cseq ** sequences, int cseq_count) {
+	int i;
 	size_t size;
 	char tmpfilename[255];
 	FILE * tmpfile;
 
-	for (curr_rect = 0; curr_rect < num_rectangles; curr_rect++)
-	{
-		start = curr_rect * rectangle_size;
-		end = MIN(start+rectangle_size, num_seqs);
-		size = 0;
+	size = 0;
+	sprintf(tmpfilename, "%s/rect%03d.cfa", outdirname, rect_id);
+	tmpfile = fopen(tmpfilename, "w");
+	if(!tmpfile) return 0;
 
-		for (curr = start; curr < end; curr++)
-		{
-			size += cseq_size(sequences[curr]);
-		}
-
-		sprintf(tmpfilename, "%s/rect%03d.cfa", outdirname, curr_rect);
-		tmpfile = fopen(tmpfilename, "w");
-
-		for (curr = start; curr < end; curr++)
-		{			
-			cseq_write(tmpfile, sequences[curr]);
-			cseq_free(sequences[curr]);
-		}
-
-		fclose(tmpfile);
-		rectangle_sizes[curr_rect] = size;
+	for (i = 0; i < cseq_count; i++) {			
+		cseq_write(tmpfile, sequences[i]);
+		size += cseq_size(sequences[i]);
 	}
+	fclose(tmpfile);
 
-	// We no longer need the sequences array, and it has
-	// all been freed anyway.
-	free(sequences);
-
+	return size;
 }
 
 static void init_checkpoint()
@@ -365,7 +383,7 @@ int main(int argc, char ** argv)
 	}
 
 	load_sequences(sequence_filename);
-	load_rectangles_to_files();
+	debug(D_DEBUG, "Sequence loaded.\n", curr_rect_y, curr_rect_x);
 
 	init_checkpoint();
 
