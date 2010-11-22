@@ -173,6 +173,10 @@ static void change_worker_state( struct work_queue *q, struct work_queue_worker 
 	q->workers_in_state[w->state]--;
 	w->state = state;
 	q->workers_in_state[state]++;
+	if(wq_master_mode ==  MASTER_MODE_CATALOG) {	
+		update_catalog(q);
+		catalog_update_time = time(0);
+	}
 	debug(D_WQ, "Number of workers in state 'busy': %d;  'ready': %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_READY]);
 }
 
