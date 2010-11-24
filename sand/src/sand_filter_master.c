@@ -106,6 +106,7 @@ static void show_help(const char *cmd)
 	printf("                it will be used, otherwise it will be created.\n");
 	printf("                will be converted to when the master finishes.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
+	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 3.)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -363,6 +364,10 @@ int main(int argc, char ** argv)
 {
 	debug_config(progname);
 
+	// By default, turn on fast abort option since we know each job is of very similar size (in terms of runtime).
+	// One can also set the fast_abort_multiplier by the '-f' option.
+	wq_option_fast_abort_multiplier = 3;
+
 	get_options(argc, argv, progname);
 
 	outfile = fopen(outfilename, "a+");
@@ -451,7 +456,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 	char c;
 	char tmp[512];
 
-	while ((c = getopt(argc, argv, "p:n:d:s:r:R:k:w:c:o:uxvh")) != (char) -1)
+	while ((c = getopt(argc, argv, "p:n:d:F:s:r:R:k:w:c:o:uxvh")) != (char) -1)
 	{
 		switch (c) {
 		case 'p':
@@ -477,6 +482,9 @@ static void get_options(int argc, char ** argv, const char * progname)
 			break;
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case 'F':
+			wq_option_fast_abort_multiplier = atof(optarg);
 			break;
 		case 'u':
 			do_not_unlink = 1;

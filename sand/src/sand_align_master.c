@@ -70,6 +70,7 @@ static void show_help(const char *cmd)
 	printf(" -n <number>    Maximum number of candidates per task. (default is %d)\n",max_pairs_per_task);
 	printf(" -e <args>      Extra arguments to pass to the alignment program.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
+	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 3.)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -315,7 +316,11 @@ int main(int argc, char *argv[])
 
 	debug_config(progname);
 
-	while((c = getopt(argc, argv, "e:p:n:d:o:vh")) != (char) -1) {
+	// By default, turn on fast abort option since we know each job is of very similar size (in terms of runtime).
+	// One can also set the fast_abort_multiplier by the '-f' option.
+	wq_option_fast_abort_multiplier = 3;
+
+	while((c = getopt(argc, argv, "e:F:p:n:d:o:vh")) != (char) -1) {
 		switch (c) {
 		case 'p':
 			port = atoi(optarg);
@@ -328,6 +333,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case 'F':
+			wq_option_fast_abort_multiplier = atof(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
