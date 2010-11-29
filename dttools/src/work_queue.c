@@ -972,7 +972,7 @@ struct work_queue * work_queue_create( int port )
 	q->complete_list = list_create();
 	q->worker_table = hash_table_create(0,0);
 	
-	q->poll_table_size = 1024;
+	q->poll_table_size = 4096;
 	q->poll_table = malloc(sizeof(*q->poll_table)*q->poll_table_size);
 	
 	int i;
