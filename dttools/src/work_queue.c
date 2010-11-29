@@ -1092,8 +1092,9 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		start_tasks(q);
 
 		int n = build_poll_table(q);
-		int msec;
 
+		// Wait no longer than the caller's patience.
+		int msec;
 		if(stoptime) {
 			msec = MAX(0,(stoptime-time(0))*1000);
 		} else {
@@ -1114,18 +1115,24 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			}
 		}
 
+		// If the master link was awake, then accept as many workers as possible.
 		if(q->poll_table[0].revents) {
-			add_worker(q);
+			do {
+				add_worker(q);
+			} while (link_usleep(q->master_link,0,1,0));
 		}
 
+		// Then consider all existing active workers and dispatch tasks.
 		for(i=1;i<n;i++) {
 			if(q->poll_table[i].revents) {
 				handle_worker(q,q->poll_table[i].link);
 			}
 		}
 
-		if(q->fast_abort_multiplier > 0) // fast abort is turned on. 
+		// If fast abort is enabled, kill off slow workers.
+		if(q->fast_abort_multiplier > 0) {
 			abort_slow_workers(q);
+		}
 	}
 
 	return 0;
