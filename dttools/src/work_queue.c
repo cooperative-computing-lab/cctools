@@ -551,12 +551,22 @@ static int build_poll_table( struct work_queue *q )
 	char *key;
 	struct work_queue_worker *w;
 
+	if(!q->poll_table) {
+		q->poll_table = malloc(sizeof(*q->poll_table)*q->poll_table_size);
+	}
+
 	q->poll_table[0].link = q->master_link;
 	q->poll_table[0].events = LINK_READ;
 	q->poll_table[0].revents = 0;
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+
+		if(n>=q->poll_table_size) {
+			q->poll_table_size *= 2;
+			q->poll_table = realloc(q->poll_table,sizeof(*q->poll_table)*q->poll_table_size);
+		}
+
 		q->poll_table[n].link = w->link;
 		q->poll_table[n].events = LINK_READ;
 		q->poll_table[n].revents = 0;
@@ -972,8 +982,10 @@ struct work_queue * work_queue_create( int port )
 	q->complete_list = list_create();
 	q->worker_table = hash_table_create(0,0);
 	
-	q->poll_table_size = 4096;
-	q->poll_table = malloc(sizeof(*q->poll_table)*q->poll_table_size);
+	// The poll table is initially null, and will be created
+	// (and resized) as needed by build_poll_table.
+	q->poll_table_size = 8;
+	q->poll_table = 0;
 	
 	int i;
 	for(i=0;i<WORKER_STATE_MAX;i++) {
