@@ -27,7 +27,7 @@ See the file COPYING for details.
 
 static struct work_queue *queue = 0;
 static struct hash_table *sequence_table = 0;
-static int port = 9068;
+static int port = WORK_QUEUE_DEFAULT_PORT;
 static char align_prog[1024];
 static const char *align_prog_args = "";
 static const char *candidate_file_name;

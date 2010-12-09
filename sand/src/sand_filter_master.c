@@ -48,12 +48,10 @@ static void task_submit(struct work_queue * q, int curr_rect_x, int curr_rect_y)
 static void task_complete(struct work_queue_task * t);
 static void display_progress();
 
-// GLOBALS
-static int port = 9090;
+static int port = WORK_QUEUE_DEFAULT_PORT;
 static int kmer_size = 22;
 static int window_size = 22;
 static int do_not_unlink = 0;
-static int do_not_cache = 0;
 static int retry_max = 100;
 
 static unsigned long int cand_count = 0;
@@ -95,17 +93,14 @@ static void show_help(const char *cmd)
 {
 	printf("Use: %s [options] <sequences file> <outputdata>\n", cmd);
 	printf("where options are:\n");
-	printf(" -p <port>      Port number for queue master to listen on.\n");
-	printf(" -s <size>      Size of \"rectangle\" for filtering.\n");
-	printf(" -x             If specified, input files would be cached on the workers.\n");
+	printf(" -p <port>      Port number for queue master to listen on. (default: %d)\n",port);
+	printf(" -s <size>      Number of sequences in each filtering task. (default: %d)\n",rectangle_size);
 	printf(" -r <file>      A meryl file of repeat mers to be filtered out.\n");
-	printf(" -R <n>         Automatically retry failed jobs up to n times.\n");
-	printf(" -k <number>    The k-mer size to use in candidate selection (default is 22).\n");
-	printf(" -w <number>    The minimizer window size. (default is 22).\n");
+	printf(" -R <n>         Automatically retry failed jobs up to n times. (default: %d)\n",retry_max);
+	printf(" -k <number>    The k-mer size to use in candidate selection (default is %d).\n",kmer_size);
+	printf(" -w <number>    The minimizer window size. (default is %d).\n",window_size);
 	printf(" -u             If set, do not unlink temporary binary output files.\n");
-	printf(" -c <file>      The file which contains checkpoint information. If it exists,\n");
-	printf("                it will be used, otherwise it will be created.\n");
-	printf("                will be converted to when the master finishes.\n");
+	printf(" -c <file>      Checkpoint filename; will be created if necessary.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 3.)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
@@ -119,7 +114,6 @@ void load_sequences(const char * filename)
 	int i, count, rect_id, rectangle_count;
 	struct cseq *c;
 	size_t size;
-
 
 	rectangle_count = 256;
 	rectangle_sizes = malloc(rectangle_count*sizeof(size_t));
@@ -266,8 +260,6 @@ static void task_submit(struct work_queue * q, int curr_rect_x, int curr_rect_y)
 
 	sprintf(cmd, "./%s %s %s %s", filter_program_name, filter_program_args, rname_x, rname_y);
 
-	int cache_flag = do_not_cache ? WORK_QUEUE_NOCACHE : WORK_QUEUE_CACHE;
-
 	// Create the task.
 	t = work_queue_task_create(cmd);
 
@@ -276,19 +268,19 @@ static void task_submit(struct work_queue * q, int curr_rect_x, int curr_rect_y)
 	work_queue_task_specify_tag(t, tag);
 
 	// Send the executable, if it's not already there.
-	work_queue_task_specify_file(t, filter_program_path, filter_program_name, WORK_QUEUE_INPUT, cache_flag);
+	work_queue_task_specify_file(t, filter_program_path, filter_program_name, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 
 	// Send the repeat file if we need it and it's not already there.
-	if (repeat_filename) work_queue_task_specify_file(t, repeat_filename, string_basename(repeat_filename), WORK_QUEUE_INPUT, cache_flag);
+	if (repeat_filename) work_queue_task_specify_file(t, repeat_filename, string_basename(repeat_filename), WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 
 	// Add the rectangle. Add it as staged, so if the worker
 	// already has these sequences, there's no need to send them again.
 	sprintf(fname_x, "%s/%s", outdirname, rname_x);
-	work_queue_task_specify_file( t, fname_x, rname_x, WORK_QUEUE_INPUT,cache_flag );
+	work_queue_task_specify_file( t, fname_x, rname_x, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE );
 	if (curr_rect_x != curr_rect_y)
 	{
 		sprintf(fname_y, "%s/%s", outdirname, rname_y);
-		work_queue_task_specify_file( t, fname_y, rname_y, WORK_QUEUE_INPUT, cache_flag );
+		work_queue_task_specify_file( t, fname_y, rname_y, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE );
 	}
 
 	work_queue_submit(q, t);
@@ -490,9 +482,6 @@ static void get_options(int argc, char ** argv, const char * progname)
 		case 'u':
 			do_not_unlink = 1;
 			break;
-		case 'x':
-			do_not_cache = 1;
-			break;
 		case 'o':
 			debug_config_file(optarg);
 			break;
@@ -515,8 +504,8 @@ static void get_options(int argc, char ** argv, const char * progname)
 	sequence_filename = argv[optind++];
 	outfilename = argv[optind++];
 
-	outdirname = malloc(strlen(outfilename)+8);
-	sprintf(outdirname, "%s.output", outfilename);
+	outdirname = malloc(strlen(outfilename)+15);
+	sprintf(outdirname, "%s.filter.tmp", outfilename);
 
 	if (mkdir(outdirname, S_IRWXU) != 0) {
 		if(errno==EEXIST) {
