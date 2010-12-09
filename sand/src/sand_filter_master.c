@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "delete_dir.h"
 #include "envtools.h"
+#include "stringtools.h"
 
 #include "compressed_sequence.h"
 #include "sequence_filter.h"
@@ -278,7 +279,7 @@ static void task_submit(struct work_queue * q, int curr_rect_x, int curr_rect_y)
 	work_queue_task_specify_file(t, filter_program_path, filter_program_name, WORK_QUEUE_INPUT, cache_flag);
 
 	// Send the repeat file if we need it and it's not already there.
-	if (repeat_filename) work_queue_task_specify_file(t, repeat_filename, repeat_filename, WORK_QUEUE_INPUT, cache_flag);
+	if (repeat_filename) work_queue_task_specify_file(t, repeat_filename, string_basename(repeat_filename), WORK_QUEUE_INPUT, cache_flag);
 
 	// Add the rectangle. Add it as staged, so if the worker
 	// already has these sequences, there's no need to send them again.
@@ -529,7 +530,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 	sprintf(filter_program_args, "-k %d -w %d -s d", kmer_size, window_size);
 
 	if (repeat_filename) {
-		sprintf(tmp, " -r %s", repeat_filename);
+		sprintf(tmp, " -r %s", string_basename(repeat_filename));
 		strcat(filter_program_args, tmp);
 	}
 }
