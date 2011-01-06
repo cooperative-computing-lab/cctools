@@ -260,9 +260,10 @@ static int setup_sge_wrapper( const char *wrapperfile )
 	fprintf(file,"start $starttime\n");
 	fprintf(file,"EOF\n\n");
 	fprintf(file,"eval \"$@\"\n\n");
+	fprintf(file,"status=$?\n");
 	fprintf(file,"stoptime=`date +%%s`\n");
 	fprintf(file,"cat >> $logfile <<EOF\n");
-	fprintf(file,"stop $? $stoptime\n");
+	fprintf(file,"stop $status $stoptime\n");
 	fprintf(file,"EOF\n");
 	fclose(file);
 
