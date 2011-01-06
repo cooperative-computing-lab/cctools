@@ -45,146 +45,110 @@ href=http://www.cse.nd.edu/~ccl/software/download>this web page</a>,
 follow the <a href=install.html>installation instructions</a>, and you
 are ready to go.</p>
 
-<h2>The SAND modules</h2>
+<h2>Data Preparation</h2>
 
-<p>The two SAND modules are very similar to the combined Overlapper
-module in Celera, except that they facilitate easy and flexible
-parallelization on distributed resources.</p>
+We assume that your sequencing device will produce a file of reads in FASTA format.  Before using SAND, you must first generate repeats and compress the data.  (If you don't have data handy, download <tt>small.cfa</tt> and  <tt>small.repeats</tt> data from the <a href=http://www.nd.edu/~ccl/software/sand>SAND Webpage</a> and skip to the next section on Starting Workers.)
 
-<p>SAND requires data in formats that differ slightly from other
-bioinformatics applications. Included in the SAND package is a set of
-tools that allow users to convert data into the formats required by
-SAND. The primary difference is that sequences data is used in a compressed fasta-like format, which by convention we call .cfa. The details of this format are discussed in the next paragraph, and conversion to this format is dicussed in the <b>Example Execution</b> section.
-</p>
-
-
-<p>The candidate filtering module produces a set of promising pairs of
-sequences to align.  By default, the module uses <em>k</em>-mer
-filtering, which selects a pair of sequences for alignment if it has a
-perfect match on a short alignment. The filtering is done by a serial
-program that is included with the SAND candidate filtering module, but
-alternate candidate selection routines can be specified in its
-place. The candidate filtering module requires a list of sequences in
-compressed fasta-like format, which encodes the actual sequence data {A,C,T,G} into a 2-bit format, but retains human-readable metadata:
+To generate repeats, use the <tt>meryl</tt> tool from the Celera Assembler:
 <pre>
->sequence_1_name number_of_bases number_of_bytes\n
-Sequence encoded into 2-bit Format, with a trailing newline\n
->sequence_2_name number_of_bases number_of_bytes\n
-Sequence encoded into 2-bit Format, with a trailing newline\n
->sequence_3_name number_of_bases number_of_bytes\n
-...
+% meryl -B -m 24 -C -L 100 -v -o small.meryl -s small.fa
+% meryl -Dt -s small.meryl -n 100 > small.repeats
 </pre>
-</p>
 
-<p>The alignment module computes sequence alignments using a
-user-supplied alignment algorithm. It requires a list of sequences in
-the same compressed fasta-like format as the candidate filtering
-module, a list of candidate pairs, and an alignment executable. The
-list of candidate pairs, which may be either pre-chosen or selected
-concurrently in a production pipeline as candidates are selected, is a
-file in the format:
+Then use <tt>sand_compress_data</tt> to compress the sequence data into a compressed FASTA (.cfa) file:
 <pre>
-sequence_1_name sequence_2_name alignment_flag extra_data
-sequence_1_name sequence_3_name alignment_flag extra_data
-sequence_2_name sequence_3_name alignment_flag extra_data
-sequence_3_name sequence_4_name alignment_flag extra_data
-...
+% sand_compress_reads small.fa small.cfa
 </pre>
-The alignment flag is the direction of alignment, signified by either
-"1" (forward, left to right) or "-1" (backward, right to left). The
-extra data is a free-form field of up to 128 ASCII characters that may
-be used as additional information to the alignment algorithm.  In the
-case of the algorithms bundled with the SAND modules, it is used only
-for metadata about the candidate. The algorithms bundled with the SAND
-alignment module are simple implementations of a Smith-Waterman
-alignment, and a basic banded alignment heuristic. The modules use the
-same OVL record format as used by the Celera assembler.</p>
 
-<h2>Example execution</h2>
+<h2>Starting Workers</h2>
 
-<p>Given a a set of sequences in fasta format <em>my_sequences.fa</em>,
-this section will walk through the process of creating the
-compressed fasta-like format, completing the candidate filtering, and
-computing the alignments. This walk-through is nearly identical to the
-example provided within the SAND distribution, which includes 20
-sequences (in actuality, 10 duplicated to ensure that there are viable
-candidates), and a correct final set of alignment records to compare
-against.</p>
+The following steps in SAND will require that you start a number of <tt>worker</tt> processes.
+Each worker that you start will connect back to the master process <tt>sand_filter_master</tt>
+or <tt>sand_align_master</tt> and perform small pieces of the work at a time.
+In general, the more machines that you can harness, the faster the work will go.
+<p>
+For testing SAND, just open a new console window and start a single worker,
+specifying the hostname where the master runs and the port number it is listening on.
+(Port 9123 is the default, but this can be changed with the -p option to the master.)
+For example:
 
-<h4>Data Conversion</h4> 
-<p>The primary data conversion tool is <tt>sand_compress_reads</tt>, which
-converts fasta files into the compressed fasta-like format used with
-our modules.  
-<pre> % sand_compress_reads < my_sequences.fa > my_sequences.cfa </pre> 
-The compressed file <em>my_sequences.cfa</em> is then used to filter
-out a list of candidates. This is the first step in the pipeline that
-uses the Work Queue, so let us discuss that here.</p>
-
-<h4>Procuring Resources</h4>
-<p>To begin, let's assume that you are logged into a machine named
-<tt>barney.nd.edu</tt>. In order to procure workers, you can use your
-batch system (such as those running running <a
-href=http://www.sun.com/software/sge>SGE</a>, or <a
-href=http://www.cs.wisc.edu/condor>Condor</a>), or you can execute the
-workers yourself. In order to make this a little easier, we have
-written some tools, provided in the CCTools, that submit workers to
-each of these two common batch systems.<br/>
-
-This is an example of submitting 10 worker processes to Condor:
 <pre>
-% condor_submit_workers barney.nd.edu 9123 10
+% worker master.somewhere.edu 9123
+</pre>
+
+Then, just leave the worker running while you try out the sections below.
+<p>
+However, to run a really large assembly at scale, you will need to
+run as many workers as possible.  A simple (but tiresome) way of doing
+so is to <tt>ssh</tt> into lots of machines and manually run <tt>worker</tt>
+as above.  But, if you have access to a batch system like
+<a href=http://www.cs.wisc.edu/condor>Condor</a> or
+<a href=http://www.sun.com/software/sge>SGE</a>, you can use them
+to start many workers with a single submit command.
+<p>
+We have provided some simple scripts to make this easy.
+For example, to submit 10 workers to your local Condor pool:
+<pre>
+% condor_submit_workers master.somewhere.edu 9123 10
 Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 </pre>
 
-Or, submitting 10 worker processes to SGE:
+Or, to submit 10 worker processes to your SGE cluster:
 <pre>
 % sge_submit_workers barney.nd.edu 9123 10
+Your job 1054781 ("worker.sh") has been submitted
+Your job 1054782 ("worker.sh") has been submitted
+Your job 1054783 ("worker.sh") has been submitted
+...
 </pre>
 
-Or, you can start workers manually on any other machine you can log into, using the worker executable built in the CCTools:
-<pre>
-% worker barney.nd.edu 9123
-</pre>
-
+Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>
+are simple shell scripts, so you can edit them directly if you would
+like to change batch options or other details.
+<p>
 Once the workers begin running, the SAND modules can dispatch tasks to
-each one very quickly.  If a worker should fail, Work Queue will retry
-the work elsewhere, so it is safe to submit many workers to an
-unreliable system.</p>
-<p>When the SAND module's master process completes, your workers will
+each one very quickly.  It's ok if a machine running a worker crashes
+or is turned off; the work will be silently sent elsewhere to run.
+<p>
+When the SAND module's master process completes, your workers will
 still be available, so you can either run another master with the
 same workers, remove them from the batch system, or wait for them to
-expire.  If you do nothing for 15 minutes, they will automatically
-exit.</p>
-<p>Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>
-are simple shells scripts, so you can edit them directly if you would
-like to change batch options or other details.</p>
+expire.  If you do nothing for 15 minutes, they will automatically exit.
 
-<h4>Candidate Filtering</h4>
+<h2>Sequence Filtering</h2>
 
-The candidate filtering master takes the newly-created <em>my_sequences.cfa</em> as its only input requirement. Its only output requirement is the candidate list to be created, which this document will refer to as <em>my_candidates.cand</em>:
+The filtering step will read in the compressed sequence data (<tt>small.cfa</tt>) and quickly produce a list of candidate sequences (<tt>small.cand</tt>) for the following step to consider in detail.  Start the filtering step as follows:
 <pre>
-% sand_filter_master my_sequences.cfa my_candidates.cand
-</pre>
-Note that a progress table will be printed to standard out, while more detailed performance information is printed to standard error. We strongly suggest redirecting at least standard error, if not both, to a file while executing.</p>
-
->For many large datasets, preprocessing must be done before candidate filtering in order to discard subsequences that are repeated so often that they will not be useful. Failing to do so does not change the correctness of the filtering, but will increase its runtime significantly. Given the original list of (uncompressed) sequences, we can create a list (called repeats.meryl) of short sequences of length <em>k</em> that are repeated <em>n</em> times with the following commands. In this case <em>k</em> is 24 and <em>n</em> is 100.
-<pre>
-% meryl -B -m 24 -C -L 100 -v -o output.meryl -s my_sequences.fa
-% meryl -Dt -s output.meryl -n 100 > repeats.meryl
+% sand_filter_master -r small.repeat small.cfa small.cand
 </pre>
 
-<h4>Alignment</h4>
+While the filtering step runs, it will print some statistics to the
+console, showing the number of workers available, tasks running, and so forth:
 
-<p>The program <tt>sand_align_master</tt> accepts an alignment program <tt>sand_align_kernel</tt> with some options for alignment,
-the newly created <em>my_candidates.cand</em>, and the sequences file <tt>my_sequences.cfa</tt>.  it divides the work up among
-multiple workers, and produces <tt>my_overlaps.ovl</tt>, which indicates which sequences overlap significantly, in the Celera OVL format.
-The options <tt>-q 0.25 -m 40</tt> passed to <tt>sand_align_kernel</tt> indicate a minimum alignment quality of 0.04 and a minimum
-alignment length of 40 bases.
 <pre>
-% sand_align_master sand_align_kernel -e "-q 0.04 -m 40" my_candidates.cand my_sequences.cfa  my_results.ovl
+ Total | Workers   | Tasks                      Avg | Candidates
+  Time | Idle Busy | Submit Idle  Run   Done   Time | Found
+     0 |    0    0 |      0    0    0      0    nan | 0
+     5 |    0   14 |    158   14   14    130   0.39 | 16452
+    10 |    0   15 |    356   15   15    326   0.38 | 42382
+    15 |    0   15 |    549   15   15    519   0.38 | 69055
+    20 |    0   15 |    744   15   15    714   0.38 | 96298
+    25 |    0   15 |    942   15   15    912   0.38 | 124284
 </pre>
+
+<h2>Sequence Alignment</h2>
+
+The alignment step will take the list of candidates generated in the previous step (<tt>small.cand</tt>),
+the compressed sequences (<tt>small.cfa</tt>) and produce a listing of how and where the sequences
+overlap (<tt>small.ovl</tt>).  For example:
+
+<pre>
+% sand_align_master sand_align_kernel -e "-q 0.04 -m 40" small.cand small.cfa small.ovl
+</pre>
+
+The options <tt>-q 0.04 -m 40</tt> passed to <tt>sand_align_kernel</tt> indicate a minimum alignment quality of 0.04 and a minimum alignment length of 40 bases.
 Again, a progress table will be printed to standard out:
 <pre>
  Total | Workers   | Tasks                      Avg | K-Cand K-Seqs | Total
@@ -194,13 +158,31 @@ Again, a progress table will be printed to standard out:
     10 |    0   86 |    100   13   86      1   7.07 |   1000    284 |  0.71
     36 |    1   83 |    181   14   83      2  19.47 |   1810    413 |  1.08
    179 |    1   83 |    259   92   83      3  22.51 |   2590   1499 |  0.38
-   180 |    1   83 |    259   92   83     18  28.19 |   2590   1499 |  2.82
    186 |    2   80 |    259   15   80     85  28.54 |   2590   1499 | 13.04
    199 |    2   80 |    334   90   80     86  29.96 |   3340   1499 | 12.95
    200 |    2   80 |    334   90   80    114  59.43 |   3340   1499 | 33.88
    202 |    2   81 |    334    9   81    165  86.08 |   3340   1499 | 70.32
 </pre>
 
+<h2>What's Next?</h2>
+
+After the sequence alignment step completes, you will have an overlap (<tt>.ovl</tt>)
+file that can be fed into the final stages of your assembler to complete the consensus step.
+<p>
+If you are using the Celera Assembler, you may find the scripts <a href=http://www.nd.edu/~ccl/software/sand/data/runCA_5.4_sand>runCA_5.4_sand</a>
+and <a href=http://www.nd.edu/~ccl/software/sand/data/sand_submit>sand_submit</a> useful for running the entire Celera pipeline together with SAND.
+<p>
+For example:
+<pre>
+% runCA_5.4_sand ...
+</pre>
+
+<h2>Tuning Suggestions</h2>
+
+<dir>
+<li> As a rule of thumb, a single task should take a minute or two.  If tasks are much longer than that, it becomes more difficult to measure progress and recover from failures.  If tasks are much shorter than that, the overhead of managing the tasks becomes excessive.  Use the <tt>-n</tt> parameter to increase or decrease the size of tasks.
+<li> When using banded alignment (the default), the <tt>-q</tt> match quality parameter has a significant effect on speed.  A higher quality threshhold will consider more alignments, but take longer and produce more output.
+<li>
 The columns of the output are as follows:
 <dir>
 <li> Total Time is the elapsed time the master has been running.
@@ -209,20 +191,14 @@ The columns of the output are as follows:
 <li> Tasks Submitted is the cumulative number of tasks created by the master.
 <li> Tasks Idle is the number of tasks waiting for a worker.
 <li> Tasks Running is the number of tasks currently running on a worker.
-<li> Tasks Done is the cumulative number of tasks compelted.
+<li> Tasks Done is the cumulative number of tasks completed.
 <li> Avg Time is the average time a task takes to run.  An average time of 60 seconds is a good goal.
 <li> K-Cand Loaded indicates the number of candidates loaded into memory (in thousands).
 <li> K-Seqs Loaded indicates the number of sequences loaded into memory (in thousands).
 <li> Speedup is the approximate speed of the distributed framework, relative to one processor.
 </dir>
 
-<h2>Tuning Suggestions</h2>
-
-<dir>
-<li> As a rule of thumb, a single task should take a minute or two.  If tasks are much longer than that, it becomes more difficult to measure progress and recover from failures.  If tasks are much shorter than that, the overhead of managing the tasks becomes excessive.  Use the <tt>-n</tt> parameter to increase or decrease the size of tasks.
-<li> When using banded alignment (the default), the <tt>-q</tt> match quality parameter has a significant effect on speed.  A higher quality threshhold will consider more alignments, but take longer and produce more output.
 </dir>
-
 
 <h2>For More Information</h2>
 
