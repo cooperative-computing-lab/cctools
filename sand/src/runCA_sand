@@ -61,6 +61,8 @@ sub getBinDirectory () {
     my $installDir = join '/', @t;  #  path to the assembler
     #  CODE DUPLICATION!!!
 
+	$installDir = "/afs/crc.nd.edu/user/a/athrash1/celera";
+
     #  Guess what platform we are currently running on.
 
     my $syst = `uname -s`;    chomp $syst;  #  OS implementation
@@ -352,6 +354,12 @@ sub setDefaults () {
     $global{"umdOverlapperFlags"}          = "-use-uncleaned-reads -trim-error-rate 0.03 -max-minimizer-cutoff 150";
     $synops{"umdOverlapperFlags"}          = "Options for the UMD overlapper";
 
+    $global{"sandFilterFlags"}             = "-p 9123 ";
+    $synops{"sandFilterFlags"}             = "Options to be passed to sand_filter_master.";
+
+    $global{"sandAlignFlags"}              = "-p 9123 -n 10000 sand_align_kernel -e \"-q 0.04 -m 40\"";
+    $synops{"sandAlignFlags"}              = "Options to be passed to sand_align_master.";
+
     #####  Mers
 
     $global{"merylMemory"}                 = 800;
@@ -627,11 +635,11 @@ sub setParameters () {
     fixCase("consensus");
     fixCase("cleanup");
 
-    if ((getGlobal("obtOverlapper") ne "mer") && (getGlobal("obtOverlapper") ne "ovl")) {
-        caFailure("invalid obtOverlapper specified (" . getGlobal("obtOverlapper") . "); must be 'mer' or 'ovl'", undef);
+    if ((getGlobal("obtOverlapper") ne "mer") && (getGlobal("obtOverlapper") ne "ovl") && (getGlobal("obtOverlapper") ne "umd") && (getGlobal("obtOverlapper") ne "sand")) {
+        caFailure("invalid obtOverlapper specified (" . getGlobal("obtOverlapper") . "); must be 'mer' or 'ovl' or 'umd' or 'sand'", undef);
     }
-    if ((getGlobal("ovlOverlapper") ne "mer") && (getGlobal("ovlOverlapper") ne "ovl")) {
-        caFailure("invalid ovlOverlapper specified (" . getGlobal("ovlOverlapper") . "); must be 'mer' or 'ovl'", undef);
+    if ((getGlobal("ovlOverlapper") ne "mer") && (getGlobal("ovlOverlapper") ne "ovl") && (getGlobal("ovlOverlapper") ne "umd") && (getGlobal("ovlOverlapper") ne "sand")) {
+        caFailure("invalid ovlOverlapper specified (" . getGlobal("ovlOverlapper") . "); must be 'mer' or 'ovl' or 'umd' or 'sand'", undef);
     }
     if ((getGlobal("unitigger") ne "utg") && (getGlobal("unitigger") ne "bog")) {
         caFailure("invalid unitigger specified (" . getGlobal("unitigger") . "); must be 'utg' or 'bog'", undef);
@@ -1192,21 +1200,25 @@ sub checkOverlap {
     if ($isTrim eq "trim") {
         return if (-d "$wrk/$asm.obtStore");
         if      (getGlobal("obtOverlapper") eq "ovl") {
-            checkOverlapper($isTrim);
+            #checkOverlapper($isTrim);
         } elsif (getGlobal("obtOverlapper") eq "mer") {
-            checkMerOverlapper($isTrim);
+            #checkMerOverlapper($isTrim);
         } elsif (getGlobal("obtOverlapper") eq "umd") {
             caError("checkOverlap() wanted to check umd overlapper for obt?\n");
+ 	} elsif (getGlobal("obtOverlapper") eq "sand") {
+            caError("checkOverlap() wanted to check sand overlapper for obt?\n");
         } else {
             caError("checkOverlap() unknown obt overlapper?\n");
         }
     } else {
         return if (-d "$wrk/$asm.ovlStore");
         if      (getGlobal("ovlOverlapper") eq "ovl") {
-            checkOverlapper($isTrim);
+            #checkOverlapper($isTrim);
         } elsif (getGlobal("ovlOverlapper") eq "mer") {
-            checkMerOverlapper($isTrim);
+            #checkMerOverlapper($isTrim);
         } elsif (getGlobal("ovlOverlapper") eq "umd") {
+            #  Nop.
+        } elsif (getGlobal("ovlOverlapper") eq "sand") {
             #  Nop.
         } else {
             caError("checkOverlap() unknown ovl overlapper?\n");
@@ -1810,6 +1822,16 @@ sub createOverlapJobs($) {
         #  OBT is smart enough to disable itself if umd is enabled.
         #
         UMDoverlapper();
+        return;
+    }
+
+    #  sand overlapper here
+    #
+    if (getGlobal("ovlOverlapper") eq "sand") {
+        #  SANDoverlapper() needs to dump the gkpstore, run SAND, build
+        #  the ovlStore.
+        #  OBT is smart enough to disable itself if sand is enabled.
+        SANDoverlapper();
         return;
     }
 
@@ -2461,6 +2483,11 @@ sub meryl {
         caFailure("meryl attempted to compute mer counts for the umd overlapper", undef);
     }
 
+    if (getGlobal("ovlOverlapper") eq "sand") {
+        caFailure("meryl attempted to compute mer counts for the sand overlapper", undef);
+    }
+
+
     my $ovlc = 0;  #  No compression, unless we're the mer overlapper
     my $obtc = 0;
 
@@ -2860,7 +2887,8 @@ sub overlapTrim {
         #  all overlaps for a fragment A are localized.
 
         if (runCommand("$wrk/0-overlaptrim",
-                       "find $wrk/0-overlaptrim-overlap -follow -name \\*ovb.gz -print > $wrk/$asm.obtStore.list")) {
+                       #"find $wrk/0-overlaptrim-overlap -follow -name \\*ovb.gz -print > $wrk/$asm.obtStore.list")) {
+		       "find $wrk/1-overlapper -follow -name \\*.ovb.gz -print > $wrk/$asm.obtStore.list")) {
             caFailure("failed to generate a list of all the overlap files", undef);
         }
 
@@ -4638,6 +4666,56 @@ sub UMDoverlapper () {
     rmrf("$asm.vec.frg");
 
     touch("$wrk/$outDir/$jobID/$jobID.success");
+    stopAfter("overlapper");
+
+  alldone:
+}
+
+sub SANDoverlapper () {
+    my $sandwrk = "$wrk/1-overlapper";
+    mkdir($sandwrk);
+
+    goto alldone if (-f "$sandwrk/$asm.ovb.gz");
+    goto alldone if (getGlobal("ovlOverlapper") ne "sand");
+
+    my $bin = getBinDirectory();
+
+    my $vecopt = "";
+    if(defined(getGlobal("vectorIntersect"))) {
+	$vecopt = "-clear VEC";
+    }
+
+    if(runCommand($wrk, "$bin/gatekeeper $vecopt -dumpfastaseq $wrk/$asm.gkpStore 2> $sandwrk/gatekeeper.err | grep -v 'No source' > $sandwrk/$asm.fa")) {
+          caFailure("failed to dump gatekeeper store for SAND overlapper", "$sandwrk/gatekeeper.err");
+    }
+
+    if(runCommand($sandwrk, "sand_compress_reads $asm.fa $asm.cfa 2>compress.err")) {
+	  caFailure("failed to compress reads for SAND overlapper", "$sandwrk/compress.err");
+    }
+
+    # PROBLEM:
+    # The meryl program distributed with Celera does not work with these arguments,
+    # it appears to be a completely different program.  What's going on here?
+
+    # if(runCommand($sandwrk, "$bin/meryl -B -m 22 -C -L 25 -v -o $asm.meryl -s $asm.fa && $bin/meryl -Dt -s $asm.meryl -n 25 $asm.repeats 2>repeats.err")) {
+    #   caFailure("failed to generate repeats for SAND overlapper", "$sandwrk/repeats.err");
+    # }
+
+    # PROBLEM:
+    # Once repeats are generated correctly, they need to be passed to the sand filter master.
+    if(runCommand("$sandwrk","sand_filter_master ".getGlobal("sandFilterFlags")." $asm.cfa $asm.cand 2>filter.err")) {
+	caFailure("failed to run sand_filter_master", "$sandwrk/filter.err");
+    }
+
+    if(runCommand("$sandwrk","sand_align_master ".getGlobal("sandAlignFlags")." $asm.cand $asm.cfa $asm.ovl 2>align.err")) {
+	caFailure("failed to run sand_align_master", "$sandwrk/align.err");
+    }
+	
+    if (runCommand("$sandwrk","< $asm.ovl $bin/convertOverlap -b -ovl | gzip > $asm.ovb.gz")) {
+	caFailure("failed to create overlaps", undef);
+    }
+
+    touch("$sandwrk/$asm.success");
     stopAfter("overlapper");
 
   alldone:
