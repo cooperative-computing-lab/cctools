@@ -91,7 +91,7 @@ static void show_version(const char *cmd)
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s [options] <sequences file> <outputdata>\n", cmd);
+	printf("Use: %s [options] <sequences.cfa> <candidates.cand>\n", cmd);
 	printf("where options are:\n");
 	printf(" -p <port>      Port number for queue master to listen on. (default: %d)\n",port);
 	printf(" -s <size>      Number of sequences in each filtering task. (default: %d)\n",rectangle_size);
@@ -102,7 +102,7 @@ static void show_help(const char *cmd)
 	printf(" -u             If set, do not unlink temporary binary output files.\n");
 	printf(" -c <file>      Checkpoint filename; will be created if necessary.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
-	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 3.)\n");
+	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 10.)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -334,6 +334,8 @@ static void task_complete( struct work_queue_task * t )
 
 static void display_progress()
 {
+	static int row_limit = 25;
+	static int row_count = 0;
 	static time_t last_display_time = 0;
 	struct work_queue_stats info;
 	time_t current = time(0);
@@ -342,13 +344,21 @@ static void display_progress()
 
 	work_queue_get_stats(q, &info);
 
-	printf("%6ds | %4d %4d %4d | %6d %4d %4d %4d | %6d %6.02lf %6.02lf %10lu\n",
+	if(row_count==0) {
+		printf(" Total | Workers   | Tasks                      Avg | Candidates\n");
+		printf("  Time | Idle Busy | Submit Idle  Run   Done   Time | Found\n");
+		row_count = row_limit;
+	}
+
+	printf("%6d | %4d %4d | %6d %4d %4d %6d %6.02lf | %lu\n",
 		(int)(current - start_time),
-		info.workers_init, info.workers_ready, info.workers_busy, 
-		total_submitted, info.tasks_waiting, info.tasks_running, info.tasks_complete,
-		total_processed, (tasks_runtime/1000000.0)/total_processed, (tasks_filetime/1000000.0)/total_processed, cand_count);
+		info.workers_init + info.workers_ready, info.workers_busy, 
+		total_submitted, info.tasks_waiting, info.tasks_running, total_processed,
+		(tasks_runtime/1000000.0)/total_processed,
+		cand_count);
 
 	fflush(stdout);
+	row_count--;
 
 	last_display_time = current;
 }
@@ -359,7 +369,7 @@ int main(int argc, char ** argv)
 
 	// By default, turn on fast abort option since we know each job is of very similar size (in terms of runtime).
 	// One can also set the fast_abort_multiplier by the '-f' option.
-	wq_option_fast_abort_multiplier = 3;
+	wq_option_fast_abort_multiplier = 10;
 
 	get_options(argc, argv, progname);
 
@@ -389,13 +399,6 @@ int main(int argc, char ** argv)
 
 	int curr_start_x = 0, curr_start_y = 0, curr_rect_x = 0, curr_rect_y = 0;
 	
-	printf("%7s | %4s %4s %4s | %6s %4s %4s %4s | %6s %6s %6s %10s\n",
-			"Time",
-			"WI","WR","WB",
-			"TS","TW","TR","TC",
-			"TD","AR","AF",
-			"Candidates");
-
 	while (1) {
 		while (work_queue_hungry(q)) {
 			if (curr_start_y >= num_seqs) break;
