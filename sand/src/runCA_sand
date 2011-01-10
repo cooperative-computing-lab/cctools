@@ -4703,16 +4703,25 @@ sub SANDoverlapper () {
 
     # PROBLEM:
     # Once repeats are generated correctly, they need to be passed to the sand filter master.
-    if(runCommand("$sandwrk","sand_filter_master ".getGlobal("sandFilterFlags")." $asm.cfa $asm.cand 2>filter.err")) {
-	caFailure("failed to run sand_filter_master", "$sandwrk/filter.err");
+    unless(-f "$sandwrk/$asm.cand"){
+      if(runCommand("$sandwrk","sand_filter_master ".getGlobal("sandFilterFlags")." $asm.cfa $asm.cand 2>filter.err")) {
+  	caFailure("failed to run sand_filter_master", "$sandwrk/filter.err");
+      }
     }
-
-    if(runCommand("$sandwrk","sand_align_master ".getGlobal("sandAlignFlags")." $asm.cand $asm.cfa $asm.ovl 2>align.err")) {
-	caFailure("failed to run sand_align_master", "$sandwrk/align.err");
+    unless(-f "$sandwrk/$asm.ovl.work"){
+      if(runCommand("$sandwrk","sand_align_master ".getGlobal("sandAlignFlags")." $asm.cand $asm.cfa $asm.ovl.work 2>align.err")) {
+  	caFailure("failed to run sand_align_master", "$sandwrk/align.err");
+      }
     }
-	
-    if (runCommand("$sandwrk","< $asm.ovl $bin/convertOverlap -b -ovl | gzip > $asm.ovb.gz")) {
-	caFailure("failed to create overlaps", undef);
+    unless(-f "$sandwrk/$asm.ovl"){
+      if(runCommand("$sandwrk", "mapOverlaps.pl $asm.ovl.work > $asm.ovl")){
+        caFailure("failed to convert external to internal IDs", "");
+      }
+    }    
+    unless(-f "$sandwrk/$asm.ovb.gz"){	
+      if (runCommand("$sandwrk","< $asm.ovl $bin/convertOverlap -b -ovl | gzip > $asm.ovb.gz")) {
+        caFailure("failed to create overlaps", undef);
+      }
     }
 
     touch("$sandwrk/$asm.success");
