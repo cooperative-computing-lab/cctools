@@ -4689,7 +4689,7 @@ sub SANDoverlapper () {
           caFailure("failed to dump gatekeeper store for SAND overlapper", "$sandwrk/gatekeeper.err");
     }
 
-    if(runCommand($sandwrk, "sand_compress_reads $asm.fa $asm.cfa 2>compress.err")) {
+    if(runCommand($sandwrk, "sand_compress_reads -i $asm.fa $asm.cfa 2>compress.err")) {
 	  caFailure("failed to compress reads for SAND overlapper", "$sandwrk/compress.err");
     }
 
@@ -4708,16 +4708,11 @@ sub SANDoverlapper () {
   	caFailure("failed to run sand_filter_master", "$sandwrk/filter.err");
       }
     }
-    unless(-f "$sandwrk/$asm.ovl.work"){
-      if(runCommand("$sandwrk","sand_align_master ".getGlobal("sandAlignFlags")." $asm.cand $asm.cfa $asm.ovl.work 2>align.err")) {
+    unless(-f "$sandwrk/$asm.ovl"){
+      if(runCommand("$sandwrk","sand_align_master ".getGlobal("sandAlignFlags")." $asm.cand $asm.cfa $asm.ovl 2>align.err")) {
   	caFailure("failed to run sand_align_master", "$sandwrk/align.err");
       }
     }
-    unless(-f "$sandwrk/$asm.ovl"){
-      if(runCommand("$sandwrk", "mapOverlaps.pl $asm.ovl.work > $asm.ovl")){
-        caFailure("failed to convert external to internal IDs", "");
-      }
-    }    
     unless(-f "$sandwrk/$asm.ovb.gz"){	
       if (runCommand("$sandwrk","< $asm.ovl $bin/convertOverlap -b -ovl | gzip > $asm.ovb.gz")) {
         caFailure("failed to create overlaps", undef);
