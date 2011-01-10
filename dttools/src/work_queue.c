@@ -551,17 +551,21 @@ static int build_poll_table( struct work_queue *q )
 	char *key;
 	struct work_queue_worker *w;
 
+	// Allocate a small table, if it hasn't been done yet.
 	if(!q->poll_table) {
 		q->poll_table = malloc(sizeof(*q->poll_table)*q->poll_table_size);
 	}
 
+	// The first item in the poll table is the master link, which accepts new connections.
 	q->poll_table[0].link = q->master_link;
 	q->poll_table[0].events = LINK_READ;
 	q->poll_table[0].revents = 0;
 
+	// For every worker in the hash table, add an item to the poll table
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 
+		// If poll table is not large enough, reallocate it
 		if(n>=q->poll_table_size) {
 			q->poll_table_size *= 2;
 			q->poll_table = realloc(q->poll_table,sizeof(*q->poll_table)*q->poll_table_size);
