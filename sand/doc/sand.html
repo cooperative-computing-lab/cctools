@@ -19,7 +19,7 @@ margin: 20px;
 }
 </style>
 <h1>SAND User's Manual</h1>
-<b>Last Updated February 2010</b>
+<b>Last Updated January 2011</b>
 <p>
 SAND is Copyright (C) 2010- The University of Notre Dame.
 This software is distributed under the GNU General Public License.
@@ -80,13 +80,14 @@ For example:
 % worker master.somewhere.edu 9123
 </pre>
 
-With one worker, you will see some change in the output, perhaps like this:
+With one worker, you will see some change in the output, like this:
 <pre>
-   Time |   WI   WR   WB |     TS   TW   TR   TC |     TD     AR     AF Candidates
-     0s |    0    0    0 |      0    0    0    0 |      0    nan    nan          0
-     5s |    0    0    1 |    100   83    1    0 |     16   0.32   0.00       1858
-    10s |    0    0    1 |    100   69    1    0 |     30   0.33   0.00       3649
-    15s |    0    0    1 |    100   55    1    0 |     44   0.34   0.00       5464
+ Total | Workers   | Tasks                      Avg | Candidates
+  Time | Idle Busy | Submit Idle  Run   Done   Time | Found
+     0 |    0    0 |      0    0    0      0    nan | 0
+     5 |    0    1 |    100   83    1     16   0.32 | 1858
+    10 |    0    1 |    100   69    1     30   0.33 | 3649
+    15 |    0    1 |    100   55    1     44   0.34 | 5464
 </pre>
 
 For a very small assembly, a single worker might be sufficient.
@@ -109,7 +110,7 @@ Logging submit event(s)..........
 
 Or, to submit 10 worker processes to your SGE cluster:
 <pre>
-% sge_submit_workers barney.nd.edu 9123 10
+% sge_submit_workers master.somewhere.edu 9123 10
 Your job 1054781 ("worker.sh") has been submitted
 Your job 1054782 ("worker.sh") has been submitted
 Your job 1054783 ("worker.sh") has been submitted
@@ -142,14 +143,14 @@ To generate repeats from a FASTA file, use the <tt>meryl</tt> tool from the Cele
 % meryl -Dt -s small.meryl -n 100 > small.repeats
 </pre>
 
-Then use <tt>sand_compress_data</tt> to compress the sequence data into a compressed FASTA (.cfa) file:
+Then use <tt>sand_compress_reads</tt> to compress the sequence data into a compressed FASTA (.cfa) file:
 <pre>
 % sand_compress_reads small.fa small.cfa
 </pre>
 
 The filtering step will read in the compressed sequence data (<tt>small.cfa</tt>) and quickly produce a list of candidate sequences (<tt>small.cand</tt>) for the following step to consider in detail.  Start the filtering step as follows:
 <pre>
-% sand_filter_master -r small.repeat small.cfa small.cand
+% sand_filter_master -r small.repeats small.cfa small.cand
 </pre>
 
 While the filtering step runs, it will print some statistics to the
