@@ -21,22 +21,19 @@ margin: 20px;
 <h1>SAND User's Manual</h1>
 <b>Last Updated February 2010</b>
 <p>
-SAND is Copyright (C) 2010 The University of Notre Dame.
+SAND is Copyright (C) 2010- The University of Notre Dame.
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 <p>
 <h2>Overview</h2>
 
-<p>SAND is a set of modules for genome assembly that are built atop
-the <a href="http://www.cse.nd.edu/~ccl/software/workqueue/">Work
-Queue</a> platform for large-scale distributed computation on
-clusters, clouds, grids, or assorted collections of machines. SAND was
-designed as a modular replacement for the conventional overlapper in
-the Celera assembler, separated into two distinct steps: candidate
-selection and alignment. Given a set of sequences, the modules can
-produce a set of candidate pairs of sequences and compute the
-alignments on those pairs, storing the alignment results in OVL format
-for use farther down the Celera pipeline.</p>
+<p>SAND is a set of modules for accelerating genome assembly and other
+bioinformatics tasks.
+Using the  <a href="http://www.cse.nd.edu/~ccl/software/workqueue/">Work Queue</a>
+framework, SAND can distribute computational tasks to hundreds of nodes harnessed
+from clusters, clouds, grids, or just the idle machines you have in your office.
+SAND can be used as a drop-in replacement for the conventional overlapper in
+the Celera Assembler, or can be used as a standalone tool by advanced users.
 
 <p>SAND is part of the <a
 href=http://www.cse.nd.edu/~ccl/software>Cooperating Computing
@@ -45,39 +42,54 @@ href=http://www.cse.nd.edu/~ccl/software/download>this web page</a>,
 follow the <a href=install.html>installation instructions</a>, and you
 are ready to go.</p>
 
-<h2>Data Preparation</h2>
+<h2>Using SAND with the Celera Assembler</h2>
 
-We assume that your sequencing device will produce a file of reads in FASTA format.  Before using SAND, you must first generate repeats and compress the data.  (If you don't have data handy, download <tt>small.cfa</tt> and  <tt>small.repeats</tt> data from the <a href=http://www.nd.edu/~ccl/software/sand>SAND Webpage</a> and skip to the next section on Starting Workers.)
+If you are already using the Celera Assembler version 5.4, you can easily switch to using SAND
+to accelerate assemblies by using our modified <tt>runCA</tt> script.  We assume that you have
+installed SAND according to the instructions above and addeed it to your <tt>PATH</tt>.
 
-To generate repeats, use the <tt>meryl</tt> tool from the Celera Assembler:
+<ol>
+<li> Copy the script <tt>sand_runCA</tt> into the same directory where you have the normal <tt>runCA</tt> installed.
+<li> Set <tt>ovlOverlapper=sand</tt> to your <tt>spec</tt> file.
+<li> Run <tt>sand_runCA</tt> just like you normally use <tt>runCA</tt>
+</ol>
+
+You will see the assembly start as normal.  When the overlapping stage begins, you will see output like this:
+
 <pre>
-% meryl -B -m 24 -C -L 100 -v -o small.meryl -s small.fa
-% meryl -Dt -s small.meryl -n 100 > small.repeats
+ Total | Workers   | Tasks                      Avg | Candidates
+  Time | Idle Busy | Submit Idle  Run   Done   Time | Found
+     0 |    0    0 |      0    0    0      0    nan | 0
+     5 |    0    0 |      0    0    0      0    nan | 0
+    10 |    0    0 |      0    0    0      0    nan | 0
+    15 |    0    0 |      0    0    0      0    nan | 0
+...
 </pre>
 
-Then use <tt>sand_compress_data</tt> to compress the sequence data into a compressed FASTA (.cfa) file:
-<pre>
-% sand_compress_reads small.fa small.cfa
-</pre>
-
-<h2>Starting Workers</h2>
-
-The following steps in SAND will require that you start a number of <tt>worker</tt> processes.
-Each worker that you start will connect back to the master process <tt>sand_filter_master</tt>
-or <tt>sand_align_master</tt> and perform small pieces of the work at a time.
+SAND is now waiting for you to start <tt>worker</tt> processes.
+Each worker that you start will connect back to the master process
+nd perform small pieces of the work at a time.
 In general, the more machines that you can harness, the faster the work will go.
 <p>
 For testing SAND, just open a new console window and start a single worker,
 specifying the hostname where the master runs and the port number it is listening on.
-(Port 9123 is the default, but this can be changed with the -p option to the master.)
+(This can be changed with the sandPort option in the CA spec file.)
 For example:
 
 <pre>
 % worker master.somewhere.edu 9123
 </pre>
 
-Then, just leave the worker running while you try out the sections below.
-<p>
+With one worker, you will see some change in the output, perhaps like this:
+<pre>
+   Time |   WI   WR   WB |     TS   TW   TR   TC |     TD     AR     AF Candidates
+     0s |    0    0    0 |      0    0    0    0 |      0    nan    nan          0
+     5s |    0    0    1 |    100   83    1    0 |     16   0.32   0.00       1858
+    10s |    0    0    1 |    100   69    1    0 |     30   0.33   0.00       3649
+    15s |    0    0    1 |    100   55    1    0 |     44   0.34   0.00       5464
+</pre>
+
+For a very small assembly, a single worker might be sufficient.
 However, to run a really large assembly at scale, you will need to
 run as many workers as possible.  A simple (but tiresome) way of doing
 so is to <tt>ssh</tt> into lots of machines and manually run <tt>worker</tt>
@@ -117,7 +129,23 @@ still be available, so you can either run another master with the
 same workers, remove them from the batch system, or wait for them to
 expire.  If you do nothing for 15 minutes, they will automatically exit.
 
-<h2>Sequence Filtering</h2>
+<h2>SAND in More Detail</h2>
+
+This section explains the two SAND modules in more detail,
+if you would like to tune the performance or use them independently
+of Celera.  We assume that you begin with a file of reads in FASTA format.
+To use the SAND modules, you must first generate repeats and compress the data.  (If you don't have data handy, download <tt>small.cfa</tt> and  <tt>small.repeats</tt> data from the <a href=http://www.nd.edu/~ccl/software/sand>SAND Webpage</a>.)
+
+To generate repeats from a FASTA file, use the <tt>meryl</tt> tool from the Celera Assembler:
+<pre>
+% meryl -B -m 24 -C -L 100 -v -o small.meryl -s small.fa
+% meryl -Dt -s small.meryl -n 100 > small.repeats
+</pre>
+
+Then use <tt>sand_compress_data</tt> to compress the sequence data into a compressed FASTA (.cfa) file:
+<pre>
+% sand_compress_reads small.fa small.cfa
+</pre>
 
 The filtering step will read in the compressed sequence data (<tt>small.cfa</tt>) and quickly produce a list of candidate sequences (<tt>small.cand</tt>) for the following step to consider in detail.  Start the filtering step as follows:
 <pre>
@@ -137,8 +165,6 @@ console, showing the number of workers available, tasks running, and so forth:
     20 |    0   15 |    744   15   15    714   0.38 | 96298
     25 |    0   15 |    942   15   15    912   0.38 | 124284
 </pre>
-
-<h2>Sequence Alignment</h2>
 
 The alignment step will take the list of candidates generated in the previous step (<tt>small.cand</tt>),
 the compressed sequences (<tt>small.cfa</tt>) and produce a listing of how and where the sequences
@@ -164,18 +190,8 @@ Again, a progress table will be printed to standard out:
    202 |    2   81 |    334    9   81    165  86.08 |   3340   1499 | 70.32
 </pre>
 
-<h2>What's Next?</h2>
-
 After the sequence alignment step completes, you will have an overlap (<tt>.ovl</tt>)
 file that can be fed into the final stages of your assembler to complete the consensus step.
-<p>
-If you are using the Celera Assembler, you may find the scripts <a href=http://www.nd.edu/~ccl/software/sand/data/runCA_5.4_sand>runCA_5.4_sand</a>
-and <a href=http://www.nd.edu/~ccl/software/sand/data/sand_submit>sand_submit</a> useful for running the entire Celera pipeline together with SAND.
-<p>
-For example:
-<pre>
-% runCA_5.4_sand ...
-</pre>
 
 <h2>Tuning Suggestions</h2>
 

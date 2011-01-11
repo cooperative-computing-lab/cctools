@@ -1,5 +1,16 @@
 #!/usr/bin/env perl
 
+# This file is a modified version of the runCA script distributed
+# with the Whole Genome Shotgun Assembler (wgs-assembler), which is
+# licensed under the GNU General Public License.
+# More information is available here:
+# http://sourceforge.net/projects/wgs-assembler/files/
+
+# This program has been modified to work with the Scalable Assembler
+# at Notre Dame (SAND), which is also licensed under the GNU General
+# Public License.  More information is available here:
+# http://www.nd.edu/~ccl/software/sand
+
 use strict;
 use Config;  #  for @signame
 use FindBin;
@@ -60,8 +71,6 @@ sub getBinDirectory () {
     pop @t;                      #  arch, e.g., FreeBSD-amd64
     my $installDir = join '/', @t;  #  path to the assembler
     #  CODE DUPLICATION!!!
-
-	$installDir = "/afs/crc.nd.edu/user/a/athrash1/celera";
 
     #  Guess what platform we are currently running on.
 
@@ -354,11 +363,14 @@ sub setDefaults () {
     $global{"umdOverlapperFlags"}          = "-use-uncleaned-reads -trim-error-rate 0.03 -max-minimizer-cutoff 150";
     $synops{"umdOverlapperFlags"}          = "Options for the UMD overlapper";
 
-    $global{"sandFilterFlags"}             = "-p 9123 ";
+    $global{"sandFilterFlags"}             = "";
     $synops{"sandFilterFlags"}             = "Options to be passed to sand_filter_master.";
 
-    $global{"sandAlignFlags"}              = "-p 9123 -n 10000 sand_align_kernel -e \"-q 0.04 -m 40\"";
+    $global{"sandAlignFlags"}              = "-n 10000 sand_align_kernel -e \"-q 0.04 -m 40\"";
     $synops{"sandAlignFlags"}              = "Options to be passed to sand_align_master.";
+
+    $global{"sandPort"}			   = "9123";
+    $synops{"sandPort"}			   = "Port number for workers to connect to SAND.\n";
 
     #####  Mers
 
@@ -4675,7 +4687,6 @@ sub SANDoverlapper () {
     my $sandwrk = "$wrk/1-overlapper";
     mkdir($sandwrk);
 
-    goto alldone if (-f "$sandwrk/$asm.ovb.gz");
     goto alldone if (getGlobal("ovlOverlapper") ne "sand");
 
     my $bin = getBinDirectory();
@@ -4685,34 +4696,36 @@ sub SANDoverlapper () {
 	$vecopt = "-clear VEC";
     }
 
-    if(runCommand($wrk, "$bin/gatekeeper $vecopt -dumpfastaseq $wrk/$asm.gkpStore 2> $sandwrk/gatekeeper.err | grep -v 'No source' > $sandwrk/$asm.fa")) {
+    unless(-f "$sandwrk/$asm.fa") {
+      if(runCommand($wrk, "$bin/gatekeeper $vecopt -dumpfastaseq $wrk/$asm.gkpStore 2> $sandwrk/gatekeeper.err | grep -v 'No source' > $sandwrk/$asm.fa")) {
           caFailure("failed to dump gatekeeper store for SAND overlapper", "$sandwrk/gatekeeper.err");
+      }
     }
 
-    if(runCommand($sandwrk, "sand_compress_reads -i $asm.fa $asm.cfa 2>compress.err")) {
+    unless(-f "$sandwrk/$asm.cfa") {
+      if(runCommand($sandwrk, "sand_compress_reads -i $asm.fa $asm.cfa 2>compress.err")) {
 	  caFailure("failed to compress reads for SAND overlapper", "$sandwrk/compress.err");
+      }
     }
 
-    # PROBLEM:
-    # The meryl program distributed with Celera does not work with these arguments,
-    # it appears to be a completely different program.  What's going on here?
+    unless(-f "$sandwrk/$asm.repeats") {
+	if(runCommand($sandwrk, "$bin/meryl -B -m 22 -C -L 25 -v -o $asm.meryl -s $asm.fa && $bin/meryl -Dt -s $asm.meryl -n 25 >$asm.repeats 2>repeats.err")) {
+          caFailure("failed to generate repeats for SAND overlapper", "$sandwrk/repeats.err");
+      }
+    }
 
-    # if(runCommand($sandwrk, "$bin/meryl -B -m 22 -C -L 25 -v -o $asm.meryl -s $asm.fa && $bin/meryl -Dt -s $asm.meryl -n 25 $asm.repeats 2>repeats.err")) {
-    #   caFailure("failed to generate repeats for SAND overlapper", "$sandwrk/repeats.err");
-    # }
-
-    # PROBLEM:
-    # Once repeats are generated correctly, they need to be passed to the sand filter master.
     unless(-f "$sandwrk/$asm.cand"){
-      if(runCommand("$sandwrk","sand_filter_master ".getGlobal("sandFilterFlags")." $asm.cfa $asm.cand 2>filter.err")) {
+      if(runCommand("$sandwrk","sand_filter_master -p ".getGlobal("sandPort")." ".getGlobal("sandFilterFlags")." -r $asm.repeats $asm.cfa $asm.cand 2>filter.err")) {
   	caFailure("failed to run sand_filter_master", "$sandwrk/filter.err");
       }
     }
+
     unless(-f "$sandwrk/$asm.ovl"){
-      if(runCommand("$sandwrk","sand_align_master ".getGlobal("sandAlignFlags")." $asm.cand $asm.cfa $asm.ovl 2>align.err")) {
+      if(runCommand("$sandwrk","sand_align_master -p ".getGlobal("sandPort")." ".getGlobal("sandAlignFlags")." $asm.cand $asm.cfa $asm.ovl 2>align.err")) {
   	caFailure("failed to run sand_align_master", "$sandwrk/align.err");
       }
     }
+
     unless(-f "$sandwrk/$asm.ovb.gz"){	
       if (runCommand("$sandwrk","< $asm.ovl $bin/convertOverlap -b -ovl | gzip > $asm.ovb.gz")) {
         caFailure("failed to create overlaps", undef);
