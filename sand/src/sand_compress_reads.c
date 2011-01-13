@@ -26,6 +26,8 @@ static void show_help(const char *cmd)
         printf("where options are:\n");
 	printf(" -q  Quiet mode: suppress summary line.\n");
 	printf(" -v  Show version string.\n");
+	printf(" -c  Remove Celera read_ids if file came from Celera's gatekeeper\n");
+	printf(" -i  Remove read_ids but leave the Celera internal ids if the file came from Celera's gatekeeper\n"); 
 	printf(" -h  Show this help screen\n");
 }
 
@@ -38,10 +40,19 @@ int main(int argc, char ** argv)
 	struct seq *s;
 	struct cseq *c;
 	char d;
+	int clip = 0;
+	int internal = 0; 
+	char tmp_id[128];
 	int count = 0;
 
-        while((d=getopt(argc,argv,"qhi"))!=(char)-1) {
+        while((d=getopt(argc,argv,"cvqhi"))!=(char)-1) {
                 switch(d) {
+		case 'c':
+			clip = 1;
+			break;
+		case 'i':
+			internal = 1;
+			break; 
 		case 'q':
 			quiet_mode = 1;
 			break;
@@ -80,6 +91,14 @@ int main(int argc, char ** argv)
 	}
 
 	while((s = seq_read(infile))) {
+		if(clip != 0 || internal != 0){
+			strcpy(tmp_id, s->name);
+			strcpy(s->name, strtok(tmp_id,","));
+			if(internal != 0){
+				strcpy(s->name, strtok(NULL,","));
+			}
+		}
+
 		c = seq_compress(s);
 		cseq_write(outfile,c);
 		cseq_free(c);

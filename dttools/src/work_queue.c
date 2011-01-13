@@ -173,6 +173,10 @@ static void change_worker_state( struct work_queue *q, struct work_queue_worker 
 	q->workers_in_state[w->state]--;
 	w->state = state;
 	q->workers_in_state[state]++;
+	if(wq_master_mode ==  MASTER_MODE_CATALOG) {	
+		update_catalog(q);
+		catalog_update_time = time(0);
+	}
 	debug(D_WQ, "Number of workers in state 'busy': %d;  'ready': %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_READY]);
 }
 
@@ -547,12 +551,26 @@ static int build_poll_table( struct work_queue *q )
 	char *key;
 	struct work_queue_worker *w;
 
+	// Allocate a small table, if it hasn't been done yet.
+	if(!q->poll_table) {
+		q->poll_table = malloc(sizeof(*q->poll_table)*q->poll_table_size);
+	}
+
+	// The first item in the poll table is the master link, which accepts new connections.
 	q->poll_table[0].link = q->master_link;
 	q->poll_table[0].events = LINK_READ;
 	q->poll_table[0].revents = 0;
 
+	// For every worker in the hash table, add an item to the poll table
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+
+		// If poll table is not large enough, reallocate it
+		if(n>=q->poll_table_size) {
+			q->poll_table_size *= 2;
+			q->poll_table = realloc(q->poll_table,sizeof(*q->poll_table)*q->poll_table_size);
+		}
+
 		q->poll_table[n].link = w->link;
 		q->poll_table[n].events = LINK_READ;
 		q->poll_table[n].revents = 0;
@@ -968,8 +986,10 @@ struct work_queue * work_queue_create( int port )
 	q->complete_list = list_create();
 	q->worker_table = hash_table_create(0,0);
 	
-	q->poll_table_size = 1024;
-	q->poll_table = malloc(sizeof(*q->poll_table)*q->poll_table_size);
+	// The poll table is initially null, and will be created
+	// (and resized) as needed by build_poll_table.
+	q->poll_table_size = 8;
+	q->poll_table = 0;
 	
 	int i;
 	for(i=0;i<WORKER_STATE_MAX;i++) {
@@ -1088,8 +1108,9 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		start_tasks(q);
 
 		int n = build_poll_table(q);
-		int msec;
 
+		// Wait no longer than the caller's patience.
+		int msec;
 		if(stoptime) {
 			msec = MAX(0,(stoptime-time(0))*1000);
 		} else {
@@ -1110,18 +1131,24 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			}
 		}
 
+		// If the master link was awake, then accept as many workers as possible.
 		if(q->poll_table[0].revents) {
-			add_worker(q);
+			do {
+				add_worker(q);
+			} while (link_usleep(q->master_link,0,1,0));
 		}
 
+		// Then consider all existing active workers and dispatch tasks.
 		for(i=1;i<n;i++) {
 			if(q->poll_table[i].revents) {
 				handle_worker(q,q->poll_table[i].link);
 			}
 		}
 
-		if(q->fast_abort_multiplier > 0) // fast abort is turned on. 
+		// If fast abort is enabled, kill off slow workers.
+		if(q->fast_abort_multiplier > 0) {
 			abort_slow_workers(q);
+		}
 	}
 
 	return 0;

@@ -519,6 +519,34 @@ int main( int argc, char *argv[] )
 				link_write(master,line,strlen(line),time(0)+active_timeout);
 				link_write(master,buffer,length,time(0)+active_timeout);
 				if(buffer) free(buffer);
+			} else if(sscanf(line,"stat %s",filename)==1) {
+				struct stat st;
+				if(!stat(filename, &st)) {
+					sprintf(line,"result 1 %lu %lu\n",(unsigned long int)st.st_size,(unsigned long int)st.st_mtime);
+				} else {
+					sprintf(line,"result 0 0 0\n");
+				}
+				debug(D_WQ,"%s",line);
+				link_write(master,line,strlen(line),time(0)+active_timeout);
+			} else if(sscanf(line,"symlink %s %s",path,filename)==2) {
+				char *cur_pos, *tmp_pos;
+
+				cur_pos = filename;
+				
+				if (!strncmp(cur_pos, "./", 2)){
+					cur_pos += 2;
+				}
+
+				tmp_pos = strrchr(cur_pos, '/');
+				if(tmp_pos) {
+					*tmp_pos = '\0';
+					if(!create_dir(cur_pos, mode | 0700)) {
+						debug(D_WQ,"Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
+						goto recover;
+					}
+					*tmp_pos = '/';
+				}
+				symlink(path, filename);
 			} else if(sscanf(line,"put %s %lld %o",filename,&length,&mode)==3) {
 				mode = mode | 0600;
 				char *cur_pos, *tmp_pos;

@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2010- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #ifndef SEQUENCE_H
 #define SEQUENCE_H
 

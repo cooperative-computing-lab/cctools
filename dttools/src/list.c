@@ -248,6 +248,7 @@ void * list_remove( struct list *l, const void *value )
 	struct list_node *n;
 	void *data;
 
+	if(!value) return 0;
 	for(n=l->head;n;n=n->next) {
 		if( value==n->data ) {
 			data = n->data;

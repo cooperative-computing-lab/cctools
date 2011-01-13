@@ -8,6 +8,10 @@ This package is developed primarily by:
 
 Many thanks go a host of contributors and colleagues, in alphabetical order.
 
+	Michael Albrecht
+	University of Notre Dame
+	Created the Parrot-S3 module and contributed to Work Queue and Makeflow.
+
 	John Bent
 	University of Wisconsin
 	Debugged early versions of parrot on many applications with NeST.
@@ -17,17 +21,20 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 	Developed new support for Parrot to work with the EGEE software and bioinformatics applications.
 
 	Hoang Bui
-	Notre Dame
+	University of Notre Dame
 	Created the chirp_distribute and chirp_matrix modules.
 
 	Peter Bui
-	Notre Dame
-	Contributed the Parrot-HDFS module and an implementation
-	of Map-Reduce
+	University of Notre Dame
+	Created the Parrot-HDFS module and many improvements to Makeflow and Work Queue.
 
 	Benjamin Couturier
 	CERN
 	Provided patches to work with the CASTOR name space.
+
+	Patrick Donnelly
+	University of Notre Dame
+	Created the chirp_filesystem backend and the Chirp-HDFS module.
 	
 	Michael Ernst, Patrick Fuhrmann, and Tigran Mkrtchyan
 	Fermi National Labs and DESY
@@ -55,6 +62,10 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 	Contributed extensively to the implementation of Chirp,
 	abstractions for distributed computing, and the SAND assembler.
 
+	Kevin Partington
+	University of Notre Dame
+	COntributed features to Makeflow and Work Queue.
+
 	Francesco Prelz
 	INFN Milan
 	Contributed numerous bug fixes and performance improvements to Parrot.
@@ -62,10 +73,6 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 	Sander Klous
 	NIKHEF
 	Tested and deployed parrot with BaBar and Objectivity.
-
-	Igor Sfiligoi, Aureliano Rama, Simone Pagan Griso, Donatella Lucchesi
-	INFN Padova and Fermi National Laboratory
-	Contributed to the Design and implementation of the GROW filesystem.
 
 	Peter Kunszt
 	CERN
@@ -75,6 +82,10 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 	Paul Madrid
 	University of Notre Dame
 	Implemented the reservation ACL feature.
+
+	Michael Olson
+	University of Notre Dame
+	Contributed to the design and implementation of SAND.
 
 	Kevin Partington
 	University of Notre Dame
@@ -86,14 +97,22 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 
 	Hugh Sasse
 	De Montfort University, U.K.
-	Contributed to the Fault TOlerant Shell
+	Contributed to the Fault Tolerant Shell
 
 	Ulrich Schwickerath	
 	FZH Hamburg
 	Contributed RFIO driver and Infiniband support for Parrot.
 
+	Igor Sfiligoi, Aureliano Rama, Simone Pagan Griso, Donatella Lucchesi
+	INFN Padova and Fermi National Laboratory
+	Contributed to the Design and implementation of the GROW filesystem.
+
+	Andrew Thrasher
+	University of Notre Dame
+	Contributed to the design and implementation of SAND
+
 	Li Yu
 	Notre Dame
-	Contributed to the multicore all-pairs implementation.
+	Contributed to work queue, makeflow, all-pairs, and SAND.
 
 Thanks to one and all!

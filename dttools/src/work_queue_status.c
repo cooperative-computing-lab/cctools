@@ -22,11 +22,14 @@ static int Work_Queue_Status_Mode    = MODE_TABLE;
 static int Work_Queue_Status_Timeout = 30;
 
 static struct nvpair_header headers[] = {
-    { "project",	NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT,   20},
-    { "name",           NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT,   25},
-    { "port",		NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,   8},
-    { "workers",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,   8},
-    { "lastheardfrom",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,  13},
+    { "project",		NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT,		20},
+    { "name",       	NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT,		25},
+	{ "port",			NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,   	8},
+	{ "tasks_waiting",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,	15},
+	{ "tasks_complete",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,	15},
+    { "workers",		NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,  	10},
+    { "workers_busy",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,	15},
+    { "lastheardfrom",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,	15},
     { NULL, }
 };
 

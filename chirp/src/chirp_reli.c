@@ -66,7 +66,7 @@ static struct chirp_client * connect_to_host( const char *host, time_t stoptime 
 	c = hash_table_lookup(table,host);
 	if(c) return c;
 	
-	if(!strcmp(host,"CONDOR")) {
+	if(!strncmp(host,"CONDOR",6)) {
 		c = chirp_client_connect_condor(stoptime);
 	} else {
 		c = chirp_client_connect(host,1,stoptime);

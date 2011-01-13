@@ -44,6 +44,7 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
     if 'prev_stream_pos' in makeflow:
         log_stream.seek(makeflow['prev_stream_pos'], os.SEEK_SET)
 
+    slist = None
     for line in log_stream:
         if line.startswith('#'):
             continue
@@ -61,9 +62,12 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
         makeflow['total'] = slist[MF_LOG_TOTAL]
         makeflow['last_event'] = slist
 
-    if 'start_time' in makeflow:
-        start_time   = makeflow['start_time']
-        current_time = time()
+    if 'start_time' in makeflow and not makeflow['finished']:
+        start_time = makeflow['start_time']
+        if slist is None:
+            current_time = time()
+        else:
+            current_time = slist[MF_LOG_TIME]
 
         makeflow['elapsed_time']      = current_time - start_time
         makeflow['percent_complete']  = float(makeflow['complete']) / float(makeflow['total'])
@@ -81,7 +85,10 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
 
     makeflow['prev_stream_pos'] = log_stream.tell()
     makeflow['history']  = history
-    makeflow['finished'] = sum(int(makeflow[s]) for s in MF_STATES[2:]) >= int(makeflow['total'])
+    try:
+        makeflow['finished'] = sum(int(makeflow[s]) for s in MF_STATES[2:]) >= int(makeflow['total'])
+    except KeyError:
+        makeflow['finished'] = False
     return makeflow
 
 def parse_makeflowlog(log_path, parse_dag = False):
@@ -101,6 +108,11 @@ def emit_text(makeflow, field_width = 15, progress_width = 60):
         tlist.append(('status', 'waiting for events...'))
     elif makeflow['finished']:
         tlist.append(('status', 'finished'))
+        tlist.append(('time',
+                      ', '.join(['start: '   + time_ctime(makeflow['start_time']),
+                                 'elapsed: ' + time_format(makeflow['elapsed_time'])])))
+        tlist.append(('tasks/minute', 
+                      'average: %0.2f' % (makeflow['average_task_rate'] * 60.0)))
     else:
         progress_bars = int(progress_width * makeflow['percent_complete']) - 1
         progress_text = str('=' * progress_bars + '>').ljust(progress_width)
@@ -136,21 +148,32 @@ EMITTER_TABLE = {
 def monitor_makeflows(log_paths, options): 
     makeflows = []
     for lp in log_paths:
-        makeflows.append({'log_path': lp}) 
+        makeflows.append({'log_path': lp, 'finished': False, 'percent_complete': 0.0, 'total': float('+infinity')})
 
-    while True:
+    while makeflows:
         os.system('clear')
 
         next_makeflows = []
         for makeflow in makeflows:
-            with open(makeflow['log_path'], 'r') as log_stream:
-                parse_makeflow_stream(log_stream, options.parse_dag, makeflow)
+            try:
+                with open(makeflow['log_path'], 'r') as log_stream:
+                    parse_makeflow_stream(log_stream, options.parse_dag, makeflow)
+            except IOError as e:
+                print >>sys.stderr, 'unable to open %s: %s' % (makeflow['log_path'], str(e))
+                continue
+            except ValueError as e:
+                print >>sys.stderr, 'unable to parse %s: %s' % (makeflow['log_path'], str(e))
+                continue
 
             if (options.hide_finished and makeflow['finished']) or \
                 float(makeflow['total']) < options.min_tasks:
                 continue
-            else:
+            
+            try:
                 options.emitter(makeflow)
+            except KeyError as e:
+                print >>sys.stderr, 'unable to emit %s: missing %s' % (makeflow['log_path'], str(e))
+            finally:
                 next_makeflows.append(makeflow)
         
         makeflows = next_makeflows
@@ -159,6 +182,8 @@ def monitor_makeflows(log_paths, options):
             makeflows = sorted(makeflows, key = lambda mf: mf['percent_complete'])
 
         sleep(options.timeout)
+
+    print >>sys.stderr, 'No makeflowlogs to monitor...'
 
 # Parse command line options ---------------------------------------------------
 
@@ -172,7 +197,7 @@ def parse_command_line_options():
         type = 'float', default = 1.0)
     parser.add_option('-m', dest = 'min_tasks', action = 'store',
         help = 'mininum number of tasks', metavar = 'minimum',
-        type = 'float', default = float('+infinity'))
+        type = 'float', default = 0)
     parser.add_option('-S', dest = 'sort', action = 'store_true',
         help = 'sort logs by progress', default = False)
     parser.add_option('-P', dest = 'parse_dag', action = 'store_true',

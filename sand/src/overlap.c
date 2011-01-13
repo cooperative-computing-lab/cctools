@@ -1,3 +1,8 @@
+/*
+Copyright (C) 2009- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,7 +31,7 @@ void overlap_write(FILE * file, struct alignment *aln, const char * id1, const c
 	// calculate overhangs assuming A is on the left
 	ahg = aln->start1 + aln->start2;
 	bhg = (aln->length2-1) - aln->end2;
-	if (bhg == 0) { bhg = aln->end1 - aln->length1; }
+	if (bhg == 0) { bhg = aln->end1 - (aln->length1-1); }
 
 	if (aln->start2 <= aln->start1 && aln->end2 <= aln->end1) {  // A is on left or B is inside A
 
@@ -41,7 +46,7 @@ void overlap_write(FILE * file, struct alignment *aln, const char * id1, const c
 	  // recalculate overhangs given that B is on right.  Main difference is these should be negative
 	  ahg = (aln->start2 + aln->start1) * -1;
 	  bhg = ((aln->length1-1) - aln->end1) * -1;
-	  if (bhg == 0) { bhg = aln->end1 - aln->length1; }
+	  if (bhg == 0) { bhg = (aln->end1 - (aln->length1-1)) * -1; }
 	  
 	  if (brh >= arh)
 	   fprintf(file, "olt:C\n");      // a is contained in B 

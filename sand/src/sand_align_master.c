@@ -27,7 +27,7 @@ See the file COPYING for details.
 
 static struct work_queue *queue = 0;
 static struct hash_table *sequence_table = 0;
-static int port = 9068;
+static int port = WORK_QUEUE_DEFAULT_PORT;
 static char align_prog[1024];
 static const char *align_prog_args = "";
 static const char *candidate_file_name;
@@ -64,12 +64,13 @@ static void show_version(const char *cmd)
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s [options] <align-program> <candidate-pairs> <sequences> <output-overlaps>\n", cmd);
+	printf("Use: %s [options] <sand_align_kernel> <candidates.cand> <sequences.cfa> <overlaps.ovl>\n", cmd);
 	printf("where options are:\n");
 	printf(" -p <port>      Port number for work queue master to listen on. (default: %d)\n",port);
 	printf(" -n <number>    Maximum number of candidates per task. (default is %d)\n",max_pairs_per_task);
 	printf(" -e <args>      Extra arguments to pass to the alignment program.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
+	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 10.)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -315,7 +316,11 @@ int main(int argc, char *argv[])
 
 	debug_config(progname);
 
-	while((c = getopt(argc, argv, "e:p:n:d:o:vh")) != (char) -1) {
+	// By default, turn on fast abort option since we know each job is of very similar size (in terms of runtime).
+	// One can also set the fast_abort_multiplier by the '-f' option.
+	wq_option_fast_abort_multiplier = 10;
+
+	while((c = getopt(argc, argv, "e:F:p:n:d:o:vh")) != (char) -1) {
 		switch (c) {
 		case 'p':
 			port = atoi(optarg);
@@ -328,6 +333,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case 'F':
+			wq_option_fast_abort_multiplier = atof(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);

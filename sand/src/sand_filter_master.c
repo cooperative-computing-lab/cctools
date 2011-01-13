@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "delete_dir.h"
 #include "envtools.h"
+#include "stringtools.h"
 
 #include "compressed_sequence.h"
 #include "sequence_filter.h"
@@ -42,17 +43,15 @@ static void get_options(int argc, char ** argv, const char * progname);
 static void show_version(const char *cmd);
 static void show_help(const char *cmd);
 static void load_sequences(const char * file);
-static void load_rectangles_to_files();
+static size_t load_rectangle_to_file(int rect_id, struct cseq ** sequences, int cseq_count);
 static void task_submit(struct work_queue * q, int curr_rect_x, int curr_rect_y);
 static void task_complete(struct work_queue_task * t);
 static void display_progress();
 
-// GLOBALS
-static int port = 9090;
+static int port = WORK_QUEUE_DEFAULT_PORT;
 static int kmer_size = 22;
 static int window_size = 22;
 static int do_not_unlink = 0;
-static int do_not_cache = 0;
 static int retry_max = 100;
 
 static unsigned long int cand_count = 0;
@@ -92,20 +91,18 @@ static void show_version(const char *cmd)
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s [options] <sequences file> <outputdata>\n", cmd);
+	printf("Use: %s [options] <sequences.cfa> <candidates.cand>\n", cmd);
 	printf("where options are:\n");
-	printf(" -p <port>      Port number for queue master to listen on.\n");
-	printf(" -s <size>      Size of \"rectangle\" for filtering.\n");
-	printf(" -x             If specified, input files would be cached on the workers.\n");
+	printf(" -p <port>      Port number for queue master to listen on. (default: %d)\n",port);
+	printf(" -s <size>      Number of sequences in each filtering task. (default: %d)\n",rectangle_size);
 	printf(" -r <file>      A meryl file of repeat mers to be filtered out.\n");
-	printf(" -R <n>         Automatically retry failed jobs up to n times.\n");
-	printf(" -k <number>    The k-mer size to use in candidate selection (default is 22).\n");
-	printf(" -w <number>    The minimizer window size. (default is 22).\n");
+	printf(" -R <n>         Automatically retry failed jobs up to n times. (default: %d)\n",retry_max);
+	printf(" -k <number>    The k-mer size to use in candidate selection (default is %d).\n",kmer_size);
+	printf(" -w <number>    The minimizer window size. (default is %d).\n",window_size);
 	printf(" -u             If set, do not unlink temporary binary output files.\n");
-	printf(" -c <file>      The file which contains checkpoint information. If it exists,\n");
-	printf("                it will be used, otherwise it will be created.\n");
-	printf("                will be converted to when the master finishes.\n");
+	printf(" -c <file>      Checkpoint filename; will be created if necessary.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
+	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 10.)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -113,64 +110,81 @@ static void show_help(const char *cmd)
 
 void load_sequences(const char * filename)
 {
-	FILE * file = fopen(filename, "r");
+	FILE * file;
+	int i, count, rect_id, rectangle_count;
+	struct cseq *c;
+	size_t size;
+
+	rectangle_count = 256;
+	rectangle_sizes = malloc(rectangle_count*sizeof(size_t));
+
+	file = fopen(filename, "r");
 	if(!file) fatal("couldn't open %s: %s\n",filename,strerror(errno));
 
-	int alloc_size = 128;
+	debug(D_DEBUG, "rectangle size: %d\n", rectangle_size);
+	sequences = malloc(rectangle_size*sizeof(struct cseq *));
+	if(!sequences) fatal("No enough memory to hold %d sequences. (%s) \n", rectangle_size, strerror(errno));
 
-	sequences = malloc(alloc_size*sizeof(struct cseq *));
 
-	struct cseq *c;
+	count=0;
+	rect_id=0;
+	while(1) {
+		c = cseq_read(file);
+		if(!c) {
+			if(count != rectangle_size) { // write the last rectangle to file
+				size = load_rectangle_to_file(rect_id, sequences, count);
+				if(!size) fatal("Failed to write rectangle %d to file. (%s)\n", rect_id, strerror(errno));
+				rectangle_sizes[rect_id] = size;
+				rect_id++;
+				for(i = 0; i < count; i++) cseq_free(sequences[i]);
+				debug(D_DEBUG, "Rectangle %d has been created.\n", rect_id);
+			}
 
-	while((c = cseq_read(file))) {
-		if(num_seqs>=alloc_size) {
-			alloc_size *= 2;
-			sequences = realloc(sequences,alloc_size * sizeof(struct cseq*));
+			num_rectangles = rect_id;
+			break;
 		}
-		sequences[num_seqs++] = c;
+		sequences[count] = c;
+		count++;
+		num_seqs++;
+
+		if(count == rectangle_size) {
+			size = load_rectangle_to_file(rect_id, sequences, count);
+			if(!size) fatal("Failed to write rectangle %d to file. (%s)\n", rect_id, strerror(errno));
+			rectangle_sizes[rect_id] = size;
+			rect_id++;
+			if(rect_id == rectangle_count) {
+				rectangle_count = rectangle_count*2;
+				rectangle_sizes = realloc(rectangle_sizes, rectangle_count*sizeof(size_t));
+				if(!rectangle_sizes) fatal("Failed to allocate memory for holding rectangle sizes. Number of rectangles: %d. (%s)\n", rectangle_count, strerror(errno));
+			}
+			for(i = 0; i < count; i++) cseq_free(sequences[i]);
+			count = 0;
+			debug(D_DEBUG, "Rectangle %d has been created.\n", rect_id);
+		}
 	}
+
+	fclose(file);
+	free(sequences);
 }
 
-void load_rectangles_to_files()
-{
-	int curr_rect;
-	num_rectangles = ceil((float)num_seqs / (float)rectangle_size);
-
-	rectangle_sizes = malloc(num_rectangles*sizeof(size_t));
-	
-	int start, end, curr;
+size_t load_rectangle_to_file(int rect_id, struct cseq ** sequences, int cseq_count) {
+	int i;
 	size_t size;
 	char tmpfilename[255];
 	FILE * tmpfile;
 
-	for (curr_rect = 0; curr_rect < num_rectangles; curr_rect++)
-	{
-		start = curr_rect * rectangle_size;
-		end = MIN(start+rectangle_size, num_seqs);
-		size = 0;
+	size = 0;
+	sprintf(tmpfilename, "%s/rect%03d.cfa", outdirname, rect_id);
+	tmpfile = fopen(tmpfilename, "w");
+	if(!tmpfile) return 0;
 
-		for (curr = start; curr < end; curr++)
-		{
-			size += cseq_size(sequences[curr]);
-		}
-
-		sprintf(tmpfilename, "%s/rect%03d.cfa", outdirname, curr_rect);
-		tmpfile = fopen(tmpfilename, "w");
-
-		for (curr = start; curr < end; curr++)
-		{			
-			cseq_write(tmpfile, sequences[curr]);
-			cseq_free(sequences[curr]);
-		}
-
-		fclose(tmpfile);
-		rectangle_sizes[curr_rect] = size;
+	for (i = 0; i < cseq_count; i++) {			
+		cseq_write(tmpfile, sequences[i]);
+		size += cseq_size(sequences[i]);
 	}
+	fclose(tmpfile);
 
-	// We no longer need the sequences array, and it has
-	// all been freed anyway.
-	free(sequences);
-
+	return size;
 }
 
 static void init_checkpoint()
@@ -246,8 +260,6 @@ static void task_submit(struct work_queue * q, int curr_rect_x, int curr_rect_y)
 
 	sprintf(cmd, "./%s %s %s %s", filter_program_name, filter_program_args, rname_x, rname_y);
 
-	int cache_flag = do_not_cache ? WORK_QUEUE_NOCACHE : WORK_QUEUE_CACHE;
-
 	// Create the task.
 	t = work_queue_task_create(cmd);
 
@@ -256,19 +268,19 @@ static void task_submit(struct work_queue * q, int curr_rect_x, int curr_rect_y)
 	work_queue_task_specify_tag(t, tag);
 
 	// Send the executable, if it's not already there.
-	work_queue_task_specify_file(t, filter_program_path, filter_program_name, WORK_QUEUE_INPUT, cache_flag);
+	work_queue_task_specify_file(t, filter_program_path, filter_program_name, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 
 	// Send the repeat file if we need it and it's not already there.
-	if (repeat_filename) work_queue_task_specify_file(t, repeat_filename, repeat_filename, WORK_QUEUE_INPUT, cache_flag);
+	if (repeat_filename) work_queue_task_specify_file(t, repeat_filename, string_basename(repeat_filename), WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 
 	// Add the rectangle. Add it as staged, so if the worker
 	// already has these sequences, there's no need to send them again.
 	sprintf(fname_x, "%s/%s", outdirname, rname_x);
-	work_queue_task_specify_file( t, fname_x, rname_x, WORK_QUEUE_INPUT,cache_flag );
+	work_queue_task_specify_file( t, fname_x, rname_x, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE );
 	if (curr_rect_x != curr_rect_y)
 	{
 		sprintf(fname_y, "%s/%s", outdirname, rname_y);
-		work_queue_task_specify_file( t, fname_y, rname_y, WORK_QUEUE_INPUT, cache_flag );
+		work_queue_task_specify_file( t, fname_y, rname_y, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE );
 	}
 
 	work_queue_submit(q, t);
@@ -322,6 +334,8 @@ static void task_complete( struct work_queue_task * t )
 
 static void display_progress()
 {
+	static int row_limit = 25;
+	static int row_count = 0;
 	static time_t last_display_time = 0;
 	struct work_queue_stats info;
 	time_t current = time(0);
@@ -330,13 +344,21 @@ static void display_progress()
 
 	work_queue_get_stats(q, &info);
 
-	printf("%6ds | %4d %4d %4d | %6d %4d %4d %4d | %6d %6.02lf %6.02lf %10lu\n",
+	if(row_count==0) {
+		printf(" Total | Workers   | Tasks                      Avg | Candidates\n");
+		printf("  Time | Idle Busy | Submit Idle  Run   Done   Time | Found\n");
+		row_count = row_limit;
+	}
+
+	printf("%6d | %4d %4d | %6d %4d %4d %6d %6.02lf | %lu\n",
 		(int)(current - start_time),
-		info.workers_init, info.workers_ready, info.workers_busy, 
-		total_submitted, info.tasks_waiting, info.tasks_running, info.tasks_complete,
-		total_processed, (tasks_runtime/1000000.0)/total_processed, (tasks_filetime/1000000.0)/total_processed, cand_count);
+		info.workers_init + info.workers_ready, info.workers_busy, 
+		total_submitted, info.tasks_waiting, info.tasks_running, total_processed,
+		(tasks_runtime/1000000.0)/total_processed,
+		cand_count);
 
 	fflush(stdout);
+	row_count--;
 
 	last_display_time = current;
 }
@@ -344,6 +366,10 @@ static void display_progress()
 int main(int argc, char ** argv)
 {
 	debug_config(progname);
+
+	// By default, turn on fast abort option since we know each job is of very similar size (in terms of runtime).
+	// One can also set the fast_abort_multiplier by the '-f' option.
+	wq_option_fast_abort_multiplier = 10;
 
 	get_options(argc, argv, progname);
 
@@ -365,7 +391,7 @@ int main(int argc, char ** argv)
 	}
 
 	load_sequences(sequence_filename);
-	load_rectangles_to_files();
+	debug(D_DEBUG, "Sequence loaded.\n", curr_rect_y, curr_rect_x);
 
 	init_checkpoint();
 
@@ -373,13 +399,6 @@ int main(int argc, char ** argv)
 
 	int curr_start_x = 0, curr_start_y = 0, curr_rect_x = 0, curr_rect_y = 0;
 	
-	printf("%7s | %4s %4s %4s | %6s %4s %4s %4s | %6s %6s %6s %10s\n",
-			"Time",
-			"WI","WR","WB",
-			"TS","TW","TR","TC",
-			"TD","AR","AF",
-			"Candidates");
-
 	while (1) {
 		while (work_queue_hungry(q)) {
 			if (curr_start_y >= num_seqs) break;
@@ -433,7 +452,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 	char c;
 	char tmp[512];
 
-	while ((c = getopt(argc, argv, "p:n:d:s:r:R:k:w:c:o:uxvh")) != (char) -1)
+	while ((c = getopt(argc, argv, "p:n:d:F:s:r:R:k:w:c:o:uxvh")) != (char) -1)
 	{
 		switch (c) {
 		case 'p':
@@ -460,11 +479,11 @@ static void get_options(int argc, char ** argv, const char * progname)
 		case 'd':
 			debug_flags_set(optarg);
 			break;
+		case 'F':
+			wq_option_fast_abort_multiplier = atof(optarg);
+			break;
 		case 'u':
 			do_not_unlink = 1;
-			break;
-		case 'x':
-			do_not_cache = 1;
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -488,8 +507,8 @@ static void get_options(int argc, char ** argv, const char * progname)
 	sequence_filename = argv[optind++];
 	outfilename = argv[optind++];
 
-	outdirname = malloc(strlen(outfilename)+8);
-	sprintf(outdirname, "%s.output", outfilename);
+	outdirname = malloc(strlen(outfilename)+15);
+	sprintf(outdirname, "%s.filter.tmp", outfilename);
 
 	if (mkdir(outdirname, S_IRWXU) != 0) {
 		if(errno==EEXIST) {
@@ -503,7 +522,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 	sprintf(filter_program_args, "-k %d -w %d -s d", kmer_size, window_size);
 
 	if (repeat_filename) {
-		sprintf(tmp, " -r %s", repeat_filename);
+		sprintf(tmp, " -r %s", string_basename(repeat_filename));
 		strcat(filter_program_args, tmp);
 	}
 }
