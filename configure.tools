@@ -135,9 +135,11 @@ library_search()
 		return 0
 	elif check_file $libdir/lib$1.$dynamic_suffix
 	then
-		if [ $2 != / -a $2 != /usr ]
+		# If this is not a standard library directory, add it to the library search path.
+		# (Adding standard directories to the path has unintended effects.)
+		if [ $libdir != /lib -a $libdir != /lib64 -a $libdir != /usr/lib -a $libdir != /usr/lib64 ]
 		then
-			ldflags="${ldflags} -L$libdir -R$libdir"
+			ldflags="${ldflags} -L$libdir"
 		fi
 		ldflags="${ldflags} -l$1"
 		return 0
