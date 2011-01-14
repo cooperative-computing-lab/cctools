@@ -69,9 +69,12 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
         else:
             current_time = slist[MF_LOG_TIME]
 
-        makeflow['elapsed_time']      = current_time - start_time
-        makeflow['percent_complete']  = float(makeflow['complete']) / float(makeflow['total'])
-        makeflow['average_task_rate'] = float(makeflow['complete']) / float(makeflow['elapsed_time'])
+        makeflow['elapsed_time']     = current_time - start_time
+        makeflow['percent_complete'] = float(makeflow['complete']) / float(makeflow['total'])
+        try:
+            makeflow['average_task_rate'] = float(makeflow['complete']) / float(makeflow['elapsed_time'])
+        except ZeroDivisionError:
+            makeflow['average_task_rate'] = 0
 
         try:
             if len(history) >= MF_MAX_HISTORY_LENGTH / 2:
