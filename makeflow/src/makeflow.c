@@ -32,6 +32,7 @@ See the file COPYING for details.
 #include "get_line.h"
 #include "int_sizes.h"
 #include "list.h"
+#include "timestamp.h"
 
 #define DAG_LINE_MAX 1048576
 #define SHOW_INPUT_FILES 2
@@ -637,7 +638,7 @@ void dag_log_recover( struct dag *d, const char *filename )
 		struct dag_file *f;
 		struct dag_node *p;
 		for(n=d->nodes;n;n=n->next) {
-			fprintf(d->logfile, "# %d\t%s",n->nodeid,n->command);
+			fprintf(d->logfile, "# NODE\t%d\t%s",n->nodeid,n->command);
 			for(f=n->source_files;f;f=f->next) {
 				p = hash_table_lookup(d->file_table,f->filename);
 				if (p)
@@ -1742,6 +1743,7 @@ int main( int argc, char *argv[] )
 	signal(SIGQUIT,handle_abort);
 	signal(SIGTERM,handle_abort);
 
+	fprintf(d->logfile, "# STARTED\t%llu\n", timestamp_get());
 	dag_run(d);
 
 	batch_queue_delete(local_queue);
@@ -1755,12 +1757,15 @@ int main( int argc, char *argv[] )
 	if (batchlogfilename) free(batchlogfilename);
 
 	if(dag_abort_flag) {
+		fprintf(d->logfile, "# ABORTED\t%llu\n", timestamp_get());
 		fprintf(stderr,"makeflow: workflow was aborted.\n");
 		return 1;
 	} else if(dag_failed_flag) {
+		fprintf(d->logfile, "# FAILED\t%llu\n", timestamp_get());
 		fprintf(stderr,"makeflow: workflow failed.\n");
 		return 1;
 	} else {
+		fprintf(d->logfile, "# COMPLETED\t%llu\n", timestamp_get());
 		printf("makeflow: nothing left to do.\n");
 		return 0;
 	}
