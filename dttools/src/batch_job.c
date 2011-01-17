@@ -546,7 +546,7 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 			}
 			free(outfile);			
 		}
-		fprintf(logfile, "TASK %d %d %d %d %llu %llu %llu %llu %llu %s \"%s\" \"%s\"\n", t->taskid, t->result, t->return_status, t->worker_selection_algorithm, t->submit_time, t->start_time, t->finish_time, t->total_bytes_transfered, t->total_transfer_time, t->host, t->tag ? t->tag : "", t->command_line);
+		fprintf(logfile, "TASK %llu %d %d %d %d %llu %llu %llu %llu %llu %s \"%s\" \"%s\"\n", timestamp_get(), t->taskid, t->result, t->return_status, t->worker_selection_algorithm, t->submit_time, t->start_time, t->finish_time, t->total_bytes_transfered, t->total_transfer_time, t->host, t->tag ? t->tag : "", t->command_line);
 
 		taskid = t->taskid;
 		work_queue_task_delete(t);
