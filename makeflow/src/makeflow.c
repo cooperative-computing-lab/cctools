@@ -600,7 +600,7 @@ void dag_log_recover( struct dag *d, const char *filename )
 	int nodeid, state, jobid;
 	int first_run = 1;
 	struct dag_node *n;
-	unsigned int previous_completion_time;
+	timestamp_t previous_completion_time;
 
 	d->logfile = fopen(filename,"r");
 	if(d->logfile) {
@@ -610,12 +610,13 @@ void dag_log_recover( struct dag *d, const char *filename )
 			linenum++;
 
 			if(line[0] == '#') continue;
-			if(sscanf(line,"%u %d %d %d", &previous_completion_time, &nodeid,&state,&jobid)==4) {
+			if(sscanf(line,"%llu %d %d %d", &previous_completion_time, &nodeid,&state,&jobid)==4) {
 				n = itable_lookup(d->node_table,nodeid);
 				if(n) {
 					n->state = state;
 					n->jobid = jobid;
-					n->previous_completion = (time_t)previous_completion_time;
+					/* Log timestamp is in microseconds, we need seconds for diff. */
+					n->previous_completion = (time_t)(previous_completion_time / 1000000);
 					continue;
 				}
 			}
@@ -638,11 +639,29 @@ void dag_log_recover( struct dag *d, const char *filename )
 		struct dag_file *f;
 		struct dag_node *p;
 		for(n=d->nodes;n;n=n->next) {
-			fprintf(d->logfile, "# NODE\t%d\t%s",n->nodeid,n->command);
+			/* Record node information to log */
+			fprintf(d->logfile, "# NODE\t%d\t%s\n",n->nodeid,n->command);
+
+			/* Record node parents to log */
+			fprintf(d->logfile, "# PARENTS\t%d",n->nodeid);
 			for(f=n->source_files;f;f=f->next) {
 				p = hash_table_lookup(d->file_table,f->filename);
 				if (p)
 					fprintf(d->logfile, "\t%d",p->nodeid);
+			}
+			fputc('\n', d->logfile);
+			
+			/* Record node inputs to log */
+			fprintf(d->logfile, "# SOURCES\t%d",n->nodeid);
+			for(f=n->source_files;f;f=f->next) {
+				fprintf(d->logfile, "\t%s",f->filename);
+			}
+			fputc('\n', d->logfile);
+
+			/* Record node outputsto log */
+			fprintf(d->logfile, "# TARGETS\t%d",n->nodeid);
+			for(f=n->target_files;f;f=f->next) {
+				fprintf(d->logfile, "\t%s",f->filename);
 			}
 			fputc('\n', d->logfile);
 		}
