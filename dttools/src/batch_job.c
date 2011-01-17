@@ -498,7 +498,7 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 	static FILE* logfile = 0;
 	struct work_queue_stats s;
 
-	int timeout;
+	int timeout, taskid = -1;
 
 	if(!logfile) {
 		logfile = fopen(q->logfile,"a");
@@ -508,11 +508,6 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 		}
 	}
 	
-	work_queue_get_stats(q->work_queue, &s);
-	fprintf(logfile, "%02lf %d %d %d %d %d %d %d %d %d %d %lld %lld\n", timestamp_get()/1000000.0, s.workers_init, s.workers_ready, s.workers_busy, s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received);
-	fflush(logfile);
-	fsync(fileno(logfile));
-
 	if(stoptime==0) {
 		timeout = WORK_QUEUE_WAITFORTASK;
 	} else {
@@ -551,16 +546,19 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 			}
 			free(outfile);			
 		}
+		fprintf(logfile, "TASK %d %d %d %d %llu %llu %llu %llu %llu %s \"%s\" \"%s\"\n", t->taskid, t->result, t->return_status, t->worker_selection_algorithm, t->submit_time, t->start_time, t->finish_time, t->total_bytes_transfered, t->total_transfer_time, t->host, t->tag ? t->tag : "", t->command_line);
 
-		int taskid = t->taskid;
+		taskid = t->taskid;
 		work_queue_task_delete(t);
+	}
 
-		// Print to work queue log since status has been changed.
-		work_queue_get_stats(q->work_queue, &s);
-		fprintf(logfile, "%02lf %d %d %d %d %d %d %d %d %d %d %lld %lld\n", timestamp_get()/1000000.0, s.workers_init, s.workers_ready, s.workers_busy, s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received);
-		fflush(logfile);
-		fsync(fileno(logfile));
+	// Print to work queue log since status has been changed.
+	work_queue_get_stats(q->work_queue, &s);
+	fprintf(logfile, "QUEUE %llu %d %d %d %d %d %d %d %d %d %d %lld %lld\n", timestamp_get(), s.workers_init, s.workers_ready, s.workers_busy, s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received);
+	fflush(logfile);
+	fsync(fileno(logfile));
 
+	if(taskid >= 0) {
 		return taskid;
 	}
 
