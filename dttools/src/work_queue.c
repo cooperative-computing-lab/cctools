@@ -131,7 +131,7 @@ struct work_queue_task * work_queue_task_create( const char *command_line)
 	t->output = NULL;
 	t->input_files = list_create();
 	t->output_files = list_create();
-	t->return_status = 0;
+	t->return_status = WORK_QUEUE_RETURN_STATUS_UNSET;
 	t->result = WORK_QUEUE_RESULT_UNSET;
 	t->taskid = next_taskid++;
 
@@ -326,13 +326,16 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					}
 
 					// get the remote file and place it
-					debug(D_WQ,"%s (%s) file %s (%lld bytes)...",w->hostname,w->addrport,tmp_local_name,length);
+					debug(D_WQ,"Receiving file %s (size: %lld bytes) from %s (%s) ...",tmp_local_name, length, w->addrport, w->hostname);
 					fd = open(tmp_local_name, O_WRONLY|O_TRUNC|O_CREAT,0700);
 					if(fd<0) goto failure;
 					stoptime = time(0) + MAX(1.0,(length)/1250000.0);
 					actual = link_stream_to_fd(w->link,fd,length,stoptime);
 					close(fd);
-					if(actual!=length) { unlink(local_name); goto failure; }
+					if(actual!=length) { 
+					    debug(D_WQ,"Received data size (%lld) does not match the expected size - %lld bytes.", actual, length);
+                        unlink(local_name); goto failure; 
+                    }
 					*total_bytes += length;
 
 					hash_table_insert(received_items, tmp_local_name, strdup(tmp_local_name));
@@ -364,10 +367,12 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 	return 1;
 
 	link_failure:
+    debug(D_WQ,"Link to %s (%s) failed.\n", w->addrport, w->hostname);
 	w->current_task->result = WORK_QUEUE_RESULT_LINK_FAIL;
 
 	failure:
 	debug(D_NOTICE,"%s (%s) failed to return %s to %s",w->addrport,w->hostname,remote_name,local_name);
+	w->current_task->result = WORK_QUEUE_RESULT_OUTPUT_FAIL;
 	return 0;
 }
 
@@ -412,9 +417,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 			rv = get_output_item(tf->remote_name, (char *)tf->payload, w, received_items, &total_bytes);
 			q->total_bytes_received += total_bytes;
 			if(!rv) {
-				debug(D_WQ,"%s (%s) did not create expected file %s",w->hostname,w->addrport,tf->remote_name);
-				t->result = WORK_QUEUE_RESULT_OUTPUT_FAIL;
-				t->return_status = 1;
+				debug(D_WQ,"Failed to fetch %s from %s (%s).", tf->remote_name, w->addrport, w->hostname);
 				return 0;
 			}
 
@@ -748,7 +751,6 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 	    debug(D_WQ,"%s (%s) failed to send %s (%i bytes received).",w->hostname,w->addrport,tf->payload,actual);
 	else
 	    debug(D_WQ,"%s (%s) failed to send literal data (%i bytes received).",w->hostname,w->addrport,actual);
-	t->return_status = 1;
 	t->result = WORK_QUEUE_RESULT_INPUT_FAIL;
 	return 0;
 }
