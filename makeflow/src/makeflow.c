@@ -1405,11 +1405,12 @@ static void show_help(const char *cmd)
 	printf(" -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	printf(" -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
 	printf(" -p <port>      Port number to use with work queue.         (default is %d, -1=random)\n",WORK_QUEUE_DEFAULT_PORT);
-	printf(" -C             Syntax check.\n");
-	printf(" -G             Advertise the master information to a catalog server.\n");
 	printf(" -N <project>   Set the project name to <project>\n");
-	printf(" -E <integer>   Priority. Higher the value, higher the priority.\n");
-	printf(" -e             Only accept workers that prefer this project.\n");
+	printf(" -P <integer>   Priority. Higher the value, higher the priority.\n");
+	printf(" -a             Advertise the master information to a catalog server.\n");
+	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
+	printf(" -s             Accept shared workers (workers with no project preferences). By default the master would only accept workers that prefer this project.\n");
+	printf(" -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	printf(" -I             Show input files.\n");
 	printf(" -O             Show output files.\n");
 	printf(" -D             Display the Makefile as a Dot graph.\n");
@@ -1419,12 +1420,12 @@ static void show_help(const char *cmd)
 	printf(" -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
 	printf(" -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
 	printf(" -A             Disable the check for AFS.                  (experts only.)\n");;
-	printf(" -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
+	printf(" -k             Syntax check.\n");
+	printf(" -w <mode>      Auto Work Queue mode. Mode is either 'width' or 'group' (DAG [width] or largest [group] of tasks).\n");
 	printf(" -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
-	printf(" -a <mode>      Auto Work Queue mode. Mode is either 'width' or 'group' (DAG [width] or largest [group] of tasks).\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
 	printf(" -o <file>      Send debugging to this file.\n");
-	printf(" -P             Preserve (i.e., do not clean) intermediate symbolic links\n");
+	printf(" -K             Preserve (i.e., do not clean) intermediate symbolic links\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
 	
@@ -1446,11 +1447,11 @@ int main( int argc, char *argv[] )
 	int auto_workers = 0;
 	char line[1024];
     int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
-    int work_queue_worker_mode = WORK_QUEUE_USE_SHARED_WORKERS;
+    int work_queue_worker_mode = WORK_QUEUE_USE_EXCLUSIVE_WORKERS;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:AB:cCd:DeE:F:GhiIj:J:l:L:N:o:Op:Pr:Rs:S:T:vW:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cCd:DF:GhiIj:J:kKl:L:N:o:Op:P:r:RsS:T:vw:W:")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1461,28 +1462,29 @@ int main( int argc, char *argv[] )
 		case 'c':
 			clean_mode = 1;
 			break;
-        case 'e':
-            work_queue_worker_mode = WORK_QUEUE_USE_EXCLUSIVE_WORKERS;
-            break;
 		case 'N':
 			if (project) free(project);
 			project = strdup(optarg);
 			sprintf(line,"WORK_QUEUE_NAME=%s",project);
 			putenv(strdup(line));
 			break;
-		case 'E':
+		case 'P':
 			priority = atoi(optarg);
 			sprintf(line,"WORK_QUEUE_PRIORITY=%d",priority);
 			putenv(strdup(line));
 			break;
-        case 'G':
+        case 'a':
             work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
-		case 's':
+        case 's':
+            work_queue_worker_mode = WORK_QUEUE_USE_SHARED_WORKERS;
+            break;
+		case 'C':
 			if(!parse_catalog_server_description(optarg)) {
 				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
 			}
+            work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
 		case 'I':
 			display_mode = SHOW_INPUT_FILES;
@@ -1500,7 +1502,7 @@ int main( int argc, char *argv[] )
 		case 'D':
 			display_mode = 1;
 			break;
-		case 'C':
+		case 'k':
 			syntax_check = 1;
 			break;
 		case 'S':
@@ -1541,18 +1543,14 @@ int main( int argc, char *argv[] )
 				return 1;
 			}
 			break;
-		case 'a':
-			if (!strcmp(optarg, "width"))
-			{
+		case 'w':
+			if (!strcmp(optarg, "width")) {
 				auto_workers = MAKEFLOW_AUTO_WIDTH;
-			}
-			else if (!strcmp(optarg, "group"))
-			{
+			} else if (!strcmp(optarg, "group")) {
 				auto_workers = MAKEFLOW_AUTO_GROUP;
-			}
-			else
-			{
+			} else {
 				show_help(argv[0]);
+                exit(1);
 			}
 			break;
 		case 'F':
@@ -1570,7 +1568,7 @@ int main( int argc, char *argv[] )
 				return 1;
 			}
 			break;
-		case 'P':
+		case 'K':
 			preserve_symlinks = 1;
 			break;
 		default:

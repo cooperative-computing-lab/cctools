@@ -353,9 +353,10 @@ static void show_help(const char *cmd) {
 	printf("Use: %s <masterhost> <port>\n", cmd);
 	printf("where options are:\n");
 	printf(" -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
+	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.\n");
-	printf(" -N <name>      Name of a preferred master. A worker can have multiple preferred masters.\n");
-	printf(" -S             This option allows the worker to work for non-preferred masters.\n");
+	printf(" -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
+	printf(" -s             Run as a shared worker. By default the worker would only work on preferred projects.\n");
 	printf(" -t <time>      Abort after this amount of idle time. (default=%ds)\n",idle_timeout);
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
@@ -392,19 +393,20 @@ int main( int argc, char *argv[] ) {
 	
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "ad:ihN:o:s:St:w:v")) != (char) -1) {
+	while((c = getopt(argc, argv, "aC:d:ihN:o:st:w:v")) != (char) -1) {
 		switch (c) {
         case 'a':
             auto_worker = 1;
             break;
-		case 's':
+		case 'C':
 			port = parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port);
 			if(!port) {
 				fprintf(stderr,"The provided catalog server is invalid. The format of the '-s' option should be '-s HOSTNAME:PORT'.\n");
 				exit(1);
 			}
+            auto_worker = 1;
 			break;
-		case 'S':
+		case 's':
             auto_worker = 1;
             // This is a shared worker
 			exclusive_worker = 0;	
