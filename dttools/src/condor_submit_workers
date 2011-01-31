@@ -4,6 +4,7 @@ show_help()
 {
 	echo "Use: condor_submit_workers [options] <servername> <port> <num-workers>"
 	echo "options:"
+	echo "  -a                 Enable auto mode."
 	echo "  -N <name>          Preferred master name."
 	echo "  -S                 Run as a shared worker."
 	echo "  -t <time>          Abort after this amount of idle time. (default=900s)"
@@ -19,8 +20,9 @@ use_auto=0
 while getopts aSN:t:r:h opt 
 do
 	case "$opt" in
-		S)  arguments="$arguments -S"; use_auto=1;;
-		N)  arguments="$arguments -N $OPTARG"; use_auto=1;;
+		a)  arguments="$arguments -a"; use_auto=1;;
+		S)  arguments="$arguments -S";;
+		N)  arguments="$arguments -N $OPTARG";;
 		t)  arguments="$arguments -t $OPTARG";;
 		r)  requirements="$requirments $OPTARG";;
 		h)  show_help;;
