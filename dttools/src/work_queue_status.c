@@ -90,7 +90,7 @@ main(int argc, char *argv[])
     if (Work_Queue_Status_Mode == MODE_TABLE) nvpair_print_table_header(stdout, headers);
 
     while ((nv = catalog_query_read(cq, time(0) + Work_Queue_Status_Timeout))) {
-	if (strcmp(nvpair_lookup_string(nv, "type"), "wq_master") == 0) {
+	if (strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0) {
 	    if (Work_Queue_Status_Mode == MODE_TABLE)
 		nvpair_print_table(nv, stdout, headers);
 	    else

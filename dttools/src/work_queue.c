@@ -1327,7 +1327,7 @@ static int update_catalog(struct work_queue* q)
 			port,
 			WORK_QUEUE_CATALOG_LIFETIME,
 			s.tasks_waiting,
-			s.tasks_complete,
+			s.total_tasks_complete,
 			s.tasks_running,
 			s.total_tasks_dispatched,
 			s.workers_init,
