@@ -45,6 +45,17 @@ and port of the master.
 #define WORK_QUEUE_NOCACHE 0
 #define WORK_QUEUE_CACHE 1
 
+
+#define WORK_QUEUE_MASTER_MODE_STANDALONE 0
+#define WORK_QUEUE_MASTER_MODE_CATALOG 1
+#define WORK_QUEUE_NAME_MAX 256
+#define WORK_QUEUE_DEFAULT_PRIORITY 10
+#define WORK_QUEUE_USE_EXCLUSIVE_WORKERS 1
+#define WORK_QUEUE_USE_SHARED_WORKERS 0
+#define WORK_QUEUE_CATALOG_LINE_MAX 1024
+#define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 60
+#define	WORK_QUEUE_CATALOG_LIFETIME	180
+
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler; /**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
 

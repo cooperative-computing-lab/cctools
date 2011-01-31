@@ -1406,8 +1406,10 @@ static void show_help(const char *cmd)
 	printf(" -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
 	printf(" -p <port>      Port number to use with work queue.         (default is %d, -1=random)\n",WORK_QUEUE_DEFAULT_PORT);
 	printf(" -C             Syntax check.\n");
-	printf(" -N <project>   Report the master information to a catalog server with the project name - <project>\n");
+	printf(" -G             Advertise the master information to a catalog server.\n");
+	printf(" -N <project>   Set the project name to <project>\n");
 	printf(" -E <integer>   Priority. Higher the value, higher the priority.\n");
+	printf(" -e             Only accept workers that prefer this project.\n");
 	printf(" -I             Show input files.\n");
 	printf(" -O             Show output files.\n");
 	printf(" -D             Display the Makefile as a Dot graph.\n");
@@ -1434,7 +1436,6 @@ int main( int argc, char *argv[] )
 	char *logfilename = NULL;
 	char *batchlogfilename = NULL;
 	int clean_mode = 0;
-	int catalog_mode = 0;
 	int display_mode = 0;
 	int syntax_check = 0;
 	int explicit_remote_jobs_max = 0;
@@ -1444,10 +1445,12 @@ int main( int argc, char *argv[] )
 	const char *batch_submit_options = 0;
 	int auto_workers = 0;
 	char line[1024];
+    int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+    int work_queue_worker_mode = WORK_QUEUE_USE_SHARED_WORKERS;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:Ap:cCd:E:DCT:iIB:s:S:Rr:l:L:j:J:N:Oo:vhF:W:P")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:AB:cCd:DeE:F:GhiIj:J:l:L:N:o:Op:Pr:Rs:S:T:vW:")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1458,17 +1461,28 @@ int main( int argc, char *argv[] )
 		case 'c':
 			clean_mode = 1;
 			break;
+        case 'e':
+            work_queue_worker_mode = WORK_QUEUE_USE_EXCLUSIVE_WORKERS;
+            break;
 		case 'N':
 			if (project) free(project);
 			project = strdup(optarg);
 			sprintf(line,"WORK_QUEUE_NAME=%s",project);
 			putenv(strdup(line));
-			catalog_mode = 1;
 			break;
 		case 'E':
 			priority = atoi(optarg);
 			sprintf(line,"WORK_QUEUE_PRIORITY=%d",priority);
 			putenv(strdup(line));
+			break;
+        case 'G':
+            work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+			break;
+		case 's':
+			if(!parse_catalog_server_description(optarg)) {
+				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
+				exit(1);
+			}
 			break;
 		case 'I':
 			display_mode = SHOW_INPUT_FILES;
@@ -1488,12 +1502,6 @@ int main( int argc, char *argv[] )
 			break;
 		case 'C':
 			syntax_check = 1;
-			break;
-		case 's':
-			if(!parse_catalog_server_description(optarg)) {
-				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
-				exit(1);
-			}
 			break;
 		case 'S':
 			dag_submit_timeout = atoi(optarg);
@@ -1588,6 +1596,13 @@ int main( int argc, char *argv[] )
 	{
 		dagfile = argv[optind];
 	}
+
+    sprintf(line, "WORK_QUEUE_USE_EXCLUSIVE_WORKERS=%d", work_queue_worker_mode);
+    putenv(strdup(line));
+
+    sprintf(line, "WORK_QUEUE_MASTER_MODE=%d", work_queue_master_mode);
+    putenv(strdup(line));
+
 
 	if(port!=0) {
 		char line[1024];

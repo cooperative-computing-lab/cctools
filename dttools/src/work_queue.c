@@ -40,23 +40,14 @@ See the file COPYING for details.
 #define WORK_QUEUE_FILE 0
 #define WORK_QUEUE_BUFFER 1
 
-#define MASTER_MODE_STANDALONE 0
-#define MASTER_MODE_CATALOG 1
-#define MASTER_CATALOG_LINE_MAX 1024
-
-#define CATALOG_UPDATE_INTERVAL 60
-#define	CATALOG_LIFETIME	180
-
-#define WORK_QUEUE_DEFAULT_PRIORITY 10
-
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
-static int wq_master_mode = MASTER_MODE_STANDALONE;
 static struct datagram *outgoing_datagram = NULL;
 static time_t catalog_update_time;
 
 struct work_queue {
 	char *name;
+    int mode;
 	int priority;
 	struct link * master_link;
 	struct list * ready_list;
@@ -74,6 +65,7 @@ struct work_queue {
 	INT64_T total_bytes_received;
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;           /**< How to choose worker to run the task. */
+    int use_exclusive_workers;
 };
 
 
@@ -113,7 +105,7 @@ static int next_taskid = 1;
 
 static int link_printf( struct link *l, const char *fmt, ... )
 {
-	char line[WORK_QUEUE_LINE_MAX];
+	char line[WORK_QUEUE_CATALOG_LINE_MAX];
 	va_list args;
 	va_start(args,fmt);
 	vsnprintf(line,sizeof(line),fmt,args);
@@ -173,7 +165,7 @@ static void change_worker_state( struct work_queue *q, struct work_queue_worker 
 	q->workers_in_state[w->state]--;
 	w->state = state;
 	q->workers_in_state[state]++;
-	if(wq_master_mode ==  MASTER_MODE_CATALOG) {	
+	if(q->mode ==  WORK_QUEUE_MASTER_MODE_CATALOG) {	
 		update_catalog(q);
 		catalog_update_time = time(0);
 	}
@@ -268,12 +260,12 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
  * to the stream_output_item function in worker.c
  */
 static int get_output_item(char *remote_name, char *local_name, struct work_queue_worker *w, struct hash_table *received_items, INT64_T *total_bytes) {
-	char line[WORK_QUEUE_LINE_MAX];
+	char line[WORK_QUEUE_CATALOG_LINE_MAX];
 	int fd;
 	INT64_T actual, length;
 	time_t stoptime;
 	char type[256];
-	char tmp_remote_name[WORK_QUEUE_LINE_MAX], tmp_local_name[WORK_QUEUE_LINE_MAX];
+	char tmp_remote_name[WORK_QUEUE_CATALOG_LINE_MAX], tmp_local_name[WORK_QUEUE_CATALOG_LINE_MAX];
 	char *cur_pos, *tmp_pos;
 	int remote_name_len;
 	int local_name_len;
@@ -328,7 +320,10 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					// get the remote file and place it
 					debug(D_WQ,"Receiving file %s (size: %lld bytes) from %s (%s) ...",tmp_local_name, length, w->addrport, w->hostname);
 					fd = open(tmp_local_name, O_WRONLY|O_TRUNC|O_CREAT,0700);
-					if(fd<0) goto failure;
+					if(fd<0) {
+					    debug(D_NOTICE,"Cannot open file %s for writing: %s", tmp_local_name, strerror(errno));
+                        goto failure;
+                    }
 					stoptime = time(0) + MAX(1.0,(length)/1250000.0);
 					actual = link_stream_to_fd(w->link,fd,length,stoptime);
 					close(fd);
@@ -472,17 +467,30 @@ static void delete_uncacheable_files( struct work_queue_task *t, struct work_que
 
 static int handle_worker( struct work_queue *q, struct link *l )
 {
-	char line[WORK_QUEUE_LINE_MAX];
-	char key[WORK_QUEUE_LINE_MAX];
+	char line[WORK_QUEUE_CATALOG_LINE_MAX];
+	char key[WORK_QUEUE_CATALOG_LINE_MAX];
 	struct work_queue_worker *w;
 	int result, output_length;
 	time_t stoptime;
+
+    char project_names[WORK_QUEUE_LINE_MAX];
 	
 	link_to_hash_key(l,key);
 	w = hash_table_lookup(q->worker_table,key);
 
 	if(link_readline(l,line,sizeof(line),time(0)+short_timeout)) {
 		if(sscanf(line,"ready %s %d %lld %lld %lld %lld",w->hostname,&w->ncpus,&w->memory_avail,&w->memory_total,&w->disk_avail,&w->disk_total)==6) {
+            if(q->use_exclusive_workers && q->name) {
+                // For backward compatibility, we scan the line AGAIN to see if it contains extra fields
+		        if(sscanf(line,"ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"",project_names)==1) {
+                    if(!string_contains_word(project_names, q->name)) {
+                        goto reject;
+                    }
+                } else {
+                    // No extra fields, so this is a shared worker
+                    goto reject;
+                }
+            }
 			if(w->state==WORKER_STATE_INIT) {
 				change_worker_state(q,w,WORKER_STATE_READY);
 				debug(D_WQ,"%s (%s) ready",w->hostname,w->addrport);
@@ -542,6 +550,12 @@ static int handle_worker( struct work_queue *q, struct link *l )
 
 	return 1;
 
+    reject:
+	debug(D_WQ,"Preferred masters of %s (%s): %s",w->hostname,w->addrport, project_names);
+	debug(D_NOTICE,"%s (%s) is rejected and removed.",w->hostname,w->addrport);
+	remove_worker(q,w);
+    return 0;
+
 	failure:
 	debug(D_NOTICE,"%s (%s) failed and removed.",w->hostname,w->addrport);
 	remove_worker(q,w);
@@ -593,7 +607,7 @@ static int put_directory( const char *dirname, struct work_queue_worker *w, INT6
 	struct dirent *file;
 	struct work_queue_file tf;
 
-	char buffer[WORK_QUEUE_LINE_MAX];
+	char buffer[WORK_QUEUE_CATALOG_LINE_MAX];
 
 	while ((file = readdir(dir)))
 	{
@@ -1005,12 +1019,34 @@ struct work_queue * work_queue_create( int port )
 	if (envstring)
 		work_queue_specify_name(q, envstring);
 
+	envstring = getenv("WORK_QUEUE_MASTER_MODE");
+	if(envstring) {
+		q->mode = atoi(envstring);
+	} else {
+		q->mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+	}
+
 	envstring = getenv("WORK_QUEUE_PRIORITY");
 	if(envstring) {
 		q->priority = atoi(envstring);
 	} else {
 		q->priority = WORK_QUEUE_DEFAULT_PRIORITY;
 	}
+
+	envstring = getenv("WORK_QUEUE_USE_EXCLUSIVE_WORKERS");
+	if(envstring) {
+		q->use_exclusive_workers = atoi(envstring);
+	} else {
+		q->use_exclusive_workers = WORK_QUEUE_USE_SHARED_WORKERS;
+	}
+
+    if (q->mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
+        if(update_catalog(q)) {
+            catalog_update_time = time(0);
+        } else {
+            fprintf(stderr, "Reporting master info to catalog server failed!");
+        }
+    }
 
 	debug(D_WQ,"Work Queue is listening on port %d.", port);
 	return q;
@@ -1027,15 +1063,6 @@ int work_queue_specify_name( struct work_queue *q, const char *name )
 		if (q->name) free(q->name);
 		q->name = strdup(name);
 		setenv("WORK_QUEUE_NAME", q->name, 1);
-		wq_master_mode = MASTER_MODE_CATALOG;
-		if(!outgoing_datagram) {
-			outgoing_datagram = datagram_create(0);
-			if(!outgoing_datagram)
-				fatal("Couldn't create outgoing udp port (thus work queue master info won't be sent to the catalog server)");
-		}
-		update_catalog(q);
-		catalog_update_time = time(0);
-		return 1;
 	}
 
 	return 0;
@@ -1097,7 +1124,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 
 	
 	while(1) {
-		if(wq_master_mode ==  MASTER_MODE_CATALOG && time(0) - catalog_update_time >= CATALOG_UPDATE_INTERVAL) {	
+		if(q->mode ==  WORK_QUEUE_MASTER_MODE_CATALOG && time(0) - catalog_update_time >= WORK_QUEUE_CATALOG_UPDATE_INTERVAL) {	
 			update_catalog(q);
 			catalog_update_time = time(0);
 		}
@@ -1279,19 +1306,26 @@ int work_queue_empty (struct work_queue* q)
 static int update_catalog(struct work_queue* q)
 {
 	char address[DATAGRAM_ADDRESS_MAX];
-	static char text[MASTER_CATALOG_LINE_MAX];
+	static char text[WORK_QUEUE_CATALOG_LINE_MAX];
 	struct work_queue_stats s;
 	int port;
+
+    if(!outgoing_datagram) {
+        outgoing_datagram = datagram_create(0);
+        if(!outgoing_datagram)
+            fprintf(stderr, "Couldn't create outgoing udp port, thus work queue master info won't be sent to the catalog server!");
+            return 0;
+    }
 
 	port = work_queue_port(q);
 	work_queue_get_stats(q, &s);
 
-	snprintf(text, MASTER_CATALOG_LINE_MAX,
+	snprintf(text, WORK_QUEUE_CATALOG_LINE_MAX,
 			"type wq_master\nproject %s\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running%d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\n",
 			q->name,
 			q->priority,
 			port,
-			CATALOG_LIFETIME,
+			WORK_QUEUE_CATALOG_LIFETIME,
 			s.tasks_waiting,
 			s.tasks_complete,
 			s.tasks_running,

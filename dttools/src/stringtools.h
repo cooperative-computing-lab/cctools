@@ -16,6 +16,7 @@ void   string_from_ip_address( const unsigned char *ip_addr_bytes, char *str );
 int    string_to_ip_address( const char * str, unsigned char *ip_addr_bytes );
 int    string_ip_subnet( const char *addr, char *subnet );
 void   string_chomp( char *str );
+int    string_contains_word(char *, char *);
 int    string_match( const char *pattern, const char *text );
 char * string_front( const char *str, int max );
 const char * string_back( const char *str, int max );

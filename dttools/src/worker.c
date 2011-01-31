@@ -42,8 +42,6 @@ See the file COPYING for details.
 #include <sys/mman.h>
 #include <sys/signal.h>
 
-#define WQ_MASTER "wq_master"
-#define WQ_MASTER_PROJ_MAX 256
 
 // Maximum time to wait before aborting if there is no connection to the master.
 static int idle_timeout=900;
@@ -60,18 +58,18 @@ static int abort_flag = 0;
 // Catalog mode control variables
 static int auto_worker = 0;
 static int exclusive_worker = 1;
-static char *preference = NULL;
 static const int non_preference_priority_max = 100;
 static char *catalog_server_host = NULL;
 static int catalog_server_port = 0;
 static struct wq_master *actual_master = NULL;
 
-struct hash_cache *bad_masters = NULL;
+static struct list *preferred_masters = NULL;
+static struct hash_cache *bad_masters = NULL;
 
 struct wq_master {
 	char addr[LINK_ADDRESS_MAX];
 	int port;
-	char proj[WQ_MASTER_PROJ_MAX];
+	char proj[WORK_QUEUE_NAME_MAX];
 	int priority;
 };
 
@@ -81,7 +79,7 @@ void debug_print_masters(struct list *ml) {
 	
 	debug(D_WQ, "All available Masters:\n");
 	list_first_item(ml);
-	while((m = (struct wq_master *)list_next_item(ml)) != NULL) {
+	while((m = (struct wq_master *)list_next_item(ml))) {
 		debug(D_WQ, "Master %d:\n", ++count);
 		debug(D_WQ, "addr:\t%s\n", m->addr);
 		debug(D_WQ, "port:\t%d\n", m->port);
@@ -122,7 +120,7 @@ struct wq_master * parse_wq_master_nvpair(struct nvpair *nv) {
 	m = xxmalloc(sizeof(struct wq_master));
 
 	strncpy(m->addr, nvpair_lookup_string(nv, "address"), LINK_ADDRESS_MAX);
-	strncpy(m->proj, nvpair_lookup_string(nv, "project"), WQ_MASTER_PROJ_MAX);
+	strncpy(m->proj, nvpair_lookup_string(nv, "project"), WORK_QUEUE_NAME_MAX);
 	m->port = nvpair_lookup_integer(nv, "port");
 	m->priority = nvpair_lookup_integer(nv, "priority");
 	if(m->priority < 0) m->priority = 0; 
@@ -135,7 +133,7 @@ struct wq_master * duplicate_wq_master(struct wq_master *master) {
 
 	m = xxmalloc(sizeof(struct wq_master));
 	strncpy(m->addr, master->addr, LINK_ADDRESS_MAX);
-	strncpy(m->proj, master->proj, WQ_MASTER_PROJ_MAX);
+	strncpy(m->proj, master->proj, WORK_QUEUE_NAME_MAX);
 	m->port = master->port;
 	m->priority = master->priority;
 	if(m->priority < 0) m->priority = 0; 
@@ -164,6 +162,7 @@ struct list * get_work_queue_masters(const char * catalog_host, int catalog_port
 	struct nvpair *nv;
 	struct list *ml;
 	struct wq_master *m;
+    char *pm;
 	time_t timeout=60, stoptime;
 	char key[LINK_ADDRESS_MAX + 10]; // addr:port
 	
@@ -179,16 +178,28 @@ struct list * get_work_queue_masters(const char * catalog_host, int catalog_port
 	if(!ml) return NULL;
 
 	while((nv = catalog_query_read(q, stoptime))){
-		if(strcmp(nvpair_lookup_string(nv, "type"), WQ_MASTER) == 0) {
+		if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0) {
 			m = parse_wq_master_nvpair(nv);	
-			if(preference) {
-				if(strncmp(m->proj, preference, WQ_MASTER_PROJ_MAX) == 0) {
-					m->priority += non_preference_priority_max; 
-				} else {
-					if(exclusive_worker) continue;
-					m->priority = non_preference_priority_max < m->priority ? non_preference_priority_max : m->priority;
-				}
+
+            list_first_item(preferred_masters);
+            while((pm = (char *)list_next_item(preferred_masters))) {
+				if(strncmp(m->proj, pm, WORK_QUEUE_NAME_MAX) == 0) {
+                    // preferred master found
+                    break;
+                }
 			}
+
+            if(pm) {
+                // This is a preferred master
+				m->priority += non_preference_priority_max; 
+            } else {
+                // Master name does not match any preferred master names
+                if(exclusive_worker) { 
+                    continue;
+                } else {
+				    m->priority = non_preference_priority_max < m->priority ? non_preference_priority_max : m->priority;
+                }
+            }
 			
 			// exclude 'bad' masters
 			make_hash_key(m->addr, m->port, key);
@@ -211,7 +222,7 @@ struct link * auto_link_connect(char *addr, int *port, time_t master_stoptime) {
 	debug_print_masters(ml);
 
 	list_first_item(ml);
-	while((m = (struct wq_master *)list_next_item(ml)) != NULL) {
+	while((m = (struct wq_master *)list_next_item(ml))) {
 		master = link_connect(m->addr,m->port,master_stoptime);
 		if(master) {
 			debug(D_WQ, "Talking to the Master at:\n");
@@ -330,23 +341,21 @@ int stream_output_item(struct link *master, const char *filename) {
 	return 1;
 }
 
-static void handle_abort( int sig )
-{
+static void handle_abort( int sig ) {
 	abort_flag = 1;
 }
 
-static void show_version(const char *cmd)
-{
+static void show_version(const char *cmd) {
 	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
 }
 
-static void show_help(const char *cmd)
-{
+static void show_help(const char *cmd) {
 	printf("Use: %s <masterhost> <port>\n", cmd);
 	printf("where options are:\n");
+	printf(" -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.\n");
-	printf(" -N <name>      Enable auto master selection mode and use this preferred master name.\n");
-	printf(" -S             Enable auto master selection mode and run as a non-exclusive shared worker.\n");
+	printf(" -N <name>      Name of a preferred master. A worker can have multiple preferred masters.\n");
+	printf(" -S             This option allows the worker to work for non-preferred masters.\n");
 	printf(" -t <time>      Abort after this amount of idle time. (default=%ds)\n",idle_timeout);
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
@@ -354,9 +363,9 @@ static void show_help(const char *cmd)
 	printf(" -h             Show this help screen\n");
 }
 
-int main( int argc, char *argv[] )
-{
+int main( int argc, char *argv[] ) {
 	const char *host;
+    char *pm;
 	int port;
 	char actual_addr[LINK_ADDRESS_MAX];
 	int actual_port;
@@ -368,15 +377,26 @@ int main( int argc, char *argv[] )
 	char c;
 	char hostname[DOMAIN_NAME_MAX];
 	int w;
+    char preferred_master_names[WORK_QUEUE_LINE_MAX]; 
 
 	ncpus = load_average_get_cpus();
 	memory_info_get(&memory_avail,&memory_total);
 	disk_info_get(".",&disk_avail,&disk_total);
+
+    preferred_masters = list_create();
+    if(!preferred_masters) {
+		fprintf(stderr,"Cannot allocate memory to store preferred work queue masters names.\n");
+        exit(1);
+    }
+
 	
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "d:t:o:N:s:Sw:vih")) != (char) -1) {
+	while((c = getopt(argc, argv, "ad:ihN:o:s:St:w:v")) != (char) -1) {
 		switch (c) {
+        case 'a':
+            auto_worker = 1;
+            break;
 		case 's':
 			port = parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port);
 			if(!port) {
@@ -385,7 +405,8 @@ int main( int argc, char *argv[] )
 			}
 			break;
 		case 'S':
-			auto_worker = 1;	
+            auto_worker = 1;
+            // This is a shared worker
 			exclusive_worker = 0;	
 			break;
 		case 'd':
@@ -398,8 +419,7 @@ int main( int argc, char *argv[] )
 			debug_config_file(optarg);
 			break;
 		case 'N':
-			auto_worker = 1;	
-			preference = strdup(optarg);
+			list_push_tail(preferred_masters, strdup(optarg));
 			break;
 		case 'v':
 			show_version(argv[0]);
@@ -418,16 +438,29 @@ int main( int argc, char *argv[] )
 	if(!auto_worker) {
 		if((argc-optind) != 2) {
 			show_help(argv[0]);
-			return 1;
+			exit(1);
 		}
 		host = argv[optind];
 		port = atoi(argv[optind+1]);
 
 		if(!domain_name_cache_lookup(host,addr)) {
-			printf("couldn't lookup address of host %s\n",host);
-			return 1;
+			fprintf(stderr, "couldn't lookup address of host %s\n",host);
+			exit(1);
 		}
 	}
+
+
+    preferred_master_names[0] = 0;
+    list_first_item(preferred_masters);
+    while((pm = (char *)list_next_item(preferred_masters))) {
+        sprintf(&(preferred_master_names[strlen(preferred_master_names)]), "%s ", pm);
+    }
+
+    if(auto_worker && exclusive_worker && !list_size(preferred_masters)) {
+        fprintf(stderr, "Worker is running under exclusive mode. But no preferred master is specified.\n");
+        fprintf(stderr, "Please specify the preferred master names with -N option or add -S option to allow the worker work for any available masters.\n");
+        exit(1);
+    }
 
 
 	signal(SIGTERM,handle_abort);
@@ -491,7 +524,13 @@ int main( int argc, char *argv[] )
 			}
 
 			link_tune(master,LINK_TUNE_INTERACTIVE);
-			sprintf(line,"ready %s %d %llu %llu %llu %llu\n",hostname,ncpus,memory_avail,memory_total,disk_avail,disk_total);
+          
+
+            if(exclusive_worker) {
+			    sprintf(line,"ready %s %d %llu %llu %llu %llu \"%s\"\n",hostname,ncpus,memory_avail,memory_total,disk_avail,disk_total, preferred_master_names);
+            } else {
+			    sprintf(line,"ready %s %d %llu %llu %llu %llu\n",hostname,ncpus,memory_avail,memory_total,disk_avail,disk_total);
+            }
 			link_write(master,line,strlen(line),time(0)+active_timeout);
 		}
 

@@ -84,6 +84,33 @@ void string_chomp( char *start )
 	}
 }
 
+int string_contains_word(char *str, char *word) {
+    char *start;
+    char tmp;
+    int ret;
+
+	while(*str) {
+		while(isspace((int)*str)) {
+			str++;
+		}
+		start = str;
+		while(*str && !isspace((int)*str)) {
+			str++;
+		}
+		if(*str) {
+            tmp = *str;
+			*str = 0;
+            ret = strncmp(start, word, strlen(start));
+            *str = tmp;
+            if(!ret) {
+                return 1;
+            }
+			str++;       
+		}
+    }
+    return 0;
+}
+
 int string_match( const char *pattern, const char *text )
 {
         char *w;
