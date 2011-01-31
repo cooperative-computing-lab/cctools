@@ -4,12 +4,13 @@ show_help()
 {
 	echo "Use: condor_submit_workers [options] <servername> <port> <num-workers>"
 	echo "options:"
-	echo "  -a                 Enable auto mode."
-	echo "  -N <name>          Preferred master name."
-	echo "  -S                 Run as a shared worker."
-	echo "  -t <time>          Abort after this amount of idle time. (default=900s)"
-	echo "  -r <requirements>  Condor requirements ClassAd."
-	echo "  -h                 Show this help message."
+	echo "  -a              Enable auto mode."
+	echo "  -s              Run as a shared worker."
+	echo "  -N <name>       Preferred master name."
+	echo "  -C <catalog>    Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
+	echo "  -t <time>       Abort after this amount of idle time. (default=900s)"
+	echo "  -r <requirements>   Condor requirements ClassAd."
+	echo "  -h              Show this help message."
 	exit 1
 }
 
@@ -21,8 +22,9 @@ while getopts aSN:t:r:h opt
 do
 	case "$opt" in
 		a)  arguments="$arguments -a"; use_auto=1;;
-		S)  arguments="$arguments -S";;
+		s)  arguments="$arguments -s";;
 		N)  arguments="$arguments -N $OPTARG";;
+		C)  arguments="$arguments -C $OPTARG";;
 		t)  arguments="$arguments -t $OPTARG";;
 		r)  requirements="$requirments $OPTARG";;
 		h)  show_help;;

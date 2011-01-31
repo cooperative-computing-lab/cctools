@@ -5,8 +5,9 @@ show_help()
 	echo "Use: sge_submit_workers [options] <servername> <port> <num-workers>"
 	echo "options:"
 	echo "  -a               Enable auto mode."
+	echo "  -s               Run as a shared worker."
 	echo "  -N <name>        Preferred master name."
-	echo "  -S               Run as a shared worker."
+	echo "  -C <catalog>     Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
 	echo "  -t <time>        Abort after this amount of idle time. (default=900s)"
 	echo "  -p <parameters>  SGE qsub parameters."
 	echo "  -h               Show this help message."
@@ -17,12 +18,13 @@ arguments=""
 use_auto=0
 parameters=""
 
-while getopts aSN:t:p:h opt 
+while getopts asN:t:p:h opt 
 do
 	case "$opt" in
 		a)  arguments="$arguments -a"; use_auto=1;;
-		S)  arguments="$arguments -S";;
+		s)  arguments="$arguments -s";;
 		N)  arguments="$arguments -N $OPTARG";;
+		C)  arguments="$arguments -C $OPTARG";;
 		t)  arguments="$arguments -t $OPTARG";;
 		p)  parameters="$parameters $OPTARG";;
 		h)  show_help;;
