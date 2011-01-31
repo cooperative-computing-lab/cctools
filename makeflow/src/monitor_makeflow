@@ -52,9 +52,9 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
             slist = map(int, line.split())
 
         if 'start_time' not in makeflow:
-            makeflow['start_time'] = slist[MF_LOG_TIME]
+            makeflow['start_time'] = slist[MF_LOG_TIME]/1000000.0
 
-        history.append((slist[MF_LOG_COMPLETE], slist[MF_LOG_TIME]))
+        history.append((slist[MF_LOG_COMPLETE], slist[MF_LOG_TIME]/1000000.0))
 
         for s, i in zip(MF_STATES, range(MF_LOG_WAITING, MF_LOG_TOTAL)):
             makeflow[s] = slist[i]
@@ -67,7 +67,7 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
         if slist is None:
             current_time = time()
         else:
-            current_time = slist[MF_LOG_TIME]
+            current_time = slist[MF_LOG_TIME]/1000000.0
 
         makeflow['elapsed_time']     = current_time - start_time
         makeflow['percent_complete'] = float(makeflow['complete']) / float(makeflow['total'])
