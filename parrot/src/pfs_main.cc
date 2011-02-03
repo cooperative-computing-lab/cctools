@@ -58,6 +58,8 @@ int pfs_session_cache = 0;
 int pfs_use_helper = 1;
 int pfs_checksum_files = 1;
 int pfs_auto_gzip = 0;
+int pfs_write_rval = 0;
+const char *pfs_write_rval_file = "parrot.rval";
 int pfs_enable_small_file_optimizations = 1;
 char pfs_temp_dir[PFS_PATH_MAX];
 
@@ -201,6 +203,7 @@ static void show_use( const char *cmd )
 	printf("  -a <list>  Use these Chirp authentication methods.   (PARROT_CHIRP_AUTH)\n");
 	printf("  -A <file>  Use this file as a default ACL.          (PARROT_DEFAULT_ACL)\n");
 	printf("  -b <bytes> Set the I/O block size hint.              (PARROT_BLOCK_SIZE)\n");
+	printf("  -c <file>  Print exit status information to <file>.\n");
 	printf("  -C         Enable data channel authentication in GridFTP.\n");
 	printf("  -d <name>  Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n");
 	printf("  -D         Disable small file optimizations.\n");
@@ -406,6 +409,15 @@ static void handle_sigio( int sig )
 	pfs_process_sigio();
 }
 
+void write_rval(char* message, int status) {
+	FILE *file = fopen(pfs_write_rval_file, "w+");
+	if(file) {
+		fprintf(file, "%s\n%d\n", message, status);
+		fclose(file);
+	}
+
+}
+
 int main( int argc, char *argv[] )
 {
 	pid_t pid=0;
@@ -539,7 +551,7 @@ int main( int argc, char *argv[] )
 
 	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
 
-	while((c=getopt(argc,argv,"+hA:a:b:B:Cd:DE:FfG:HkKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
+	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DE:FfG:HkKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
 		switch(c) {
 		case 'a':
 			if(!auth_register_byname(optarg)) {
@@ -556,6 +568,10 @@ int main( int argc, char *argv[] )
 			break;
 		case 'B':
 			pfs_service_set_block_size(string_metric_parse(optarg));
+			break;
+		case 'c':
+			pfs_write_rval = 1;
+			pfs_write_rval_file = optarg;
 			break;
 		case 'C':
 			ftp_lite_data_channel_authentication = 1;
@@ -703,9 +719,15 @@ int main( int argc, char *argv[] )
 			sbrk(4096);
 			execvp(argv[optind],&argv[optind]);
 			debug(D_NOTICE,"unable to execute %s: %s",argv[optind],strerror(errno));
+			if(pfs_write_rval) {
+				write_rval("noexec", 0);
+			}
 			_exit(1);
 		} else {
 			debug(D_NOTICE,"unable to fork %s: %s",argv[optind],strerror(errno));
+			if(pfs_write_rval) {
+				write_rval("nofork", 0);
+			}
 			exit(1);
 		}
 	}
@@ -716,6 +738,9 @@ int main( int argc, char *argv[] )
 	debug(D_PROCESS,"attaching to pid %d",pid);
 	p = pfs_process_create(pid,getpid(),0,SIGCHLD);
 	if(!p) {
+		if(pfs_write_rval) {
+			write_rval("noattach", 0);
+		}
 		kill(pid,SIGKILL);
 		fatal("unable to attach to pid %d: %s",pid,strerror(errno));
 	}
@@ -770,10 +795,16 @@ int main( int argc, char *argv[] )
 	if(WIFEXITED(root_exitstatus)) {
 		status = WEXITSTATUS(root_exitstatus);
 		debug(D_PROCESS,"%s exited normally with status %d",argv[optind],status);
+		if(pfs_write_rval) {
+			write_rval("normal", status);
+		}
 		return status;
 	} else {
 		signum = WTERMSIG(root_exitstatus);
 		debug(D_PROCESS,"%s exited abnormally with signal %d (%s)",argv[optind],signum,string_signal(signum));
+		if(pfs_write_rval) {
+			write_rval("abnormal", signum);
+		}
 		return 1;
 	}
 }
