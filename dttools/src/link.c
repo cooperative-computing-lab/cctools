@@ -387,6 +387,8 @@ int link_read( struct link *link, char *data, int count, time_t stoptime )
 	ssize_t total=0;
 	ssize_t chunk=0;
 
+    if(count == 0) return 0;
+    
 	/* If this is a small read, attempt to fill the buffer */
 	if(count<BUFFER_SIZE) {
 		chunk = fill_buffer(link,stoptime);

@@ -69,14 +69,19 @@ struct work_queue_task {
 	struct list * input_files;      /**< The files to transfer to the worker and place in the executing directory. */
 	struct list * output_files;	/**< The output files (other than the standard output stream) created by the program expected to be retrieved from the task. */
 	int taskid;			/**< A unique task id number. */
+    int status;         /**< Current status of the task. */
 	int return_status;		/**< The exit code of the command line. */
 	int result;			/**< The result of the task (successful, failed return_status, missing input file, missing output file). */
 	char* host;			/**< The name of the host on which it ran. */
 	timestamp_t submit_time;	/**< The time the task was submitted. */
 	timestamp_t start_time;		/**< The time at which the task began. */
 	timestamp_t finish_time;	/**< The time at which it completed. */
+	timestamp_t transfer_start_time;	/**< The time at which it started to transfer input files. */
+    timestamp_t computation_time;
     INT64_T total_bytes_transfered;
 	timestamp_t total_transfer_time;
+    INT64_T total_input_size;
+    INT64_T total_output_size;
 };
 
 /** Statistics describing a work queue. */
@@ -94,6 +99,8 @@ struct work_queue_stats {
 	int total_workers_removed;	/**< Total number of times a worker was removed from the queue. */
 	INT64_T total_bytes_sent;	/**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
 	INT64_T total_bytes_received;	/**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
+    timestamp_t total_send_time;  /**<Total time in microseconds spent in sending data to workers. */
+    timestamp_t total_receive_time;  /**<Total time in microseconds spent in receiving data from workers. */
 };
 
 /** @name Functions - Tasks */
@@ -280,6 +287,11 @@ void work_queue_task_specify_output_file( struct work_queue_task *t, const char 
 @deprecated See @ref work_queue_task_specify_file instead.
 */
 void work_queue_task_specify_output_file_do_not_cache( struct work_queue_task* t, const char* rname, const char* fname);
+
+/** Get the size of an item (either a file or directory)
+@param path Path to the item on the local file system 
+*/
+INT64_T work_queue_get_item_size(char *path);
 
 //@}
 

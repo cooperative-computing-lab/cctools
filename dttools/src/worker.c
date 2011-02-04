@@ -250,6 +250,58 @@ struct link * auto_link_connect(char *addr, int *port, time_t master_stoptime) {
 	return master;
 }
 
+int do_rstat(struct link *master, INT64_T length) {
+    struct stat st;
+    char *token;
+    char *search = " ";
+    char line[WORK_QUEUE_LINE_MAX];
+    char *problem_items;
+    char *items;
+    INT64_T actual;
+    INT64_T total_length = 0;
+
+    line[0] = '\0';
+
+    if(!(items = (char *)malloc((length+1)*sizeof(char))) || !(problem_items=(char *)malloc((length+1)*sizeof(char)))) {
+        fprintf(stderr, "Cannot allocate ram in do_rstat!\n");
+        return 0;
+    }
+    actual = link_read(master, items, length, time(0)+active_timeout);
+    if(actual != length) {
+        free(items);
+        items = NULL;
+        return 0;
+    }
+    items[length] = '\0';
+
+    problem_items[0] = '\0';
+    token = strtok(items, search);
+    while(token) {
+        if(stat(token, &st) != 0) {
+            //something wrong
+            strcat(problem_items, token);
+            strcat(problem_items, " ");
+        } else {
+            total_length += work_queue_get_item_size(token);
+        }
+        token = strtok(NULL, search);
+    }
+    free(items);
+
+    sprintf(line,"rstat_result %lld %lu\n", total_length, strlen(problem_items));
+    debug(D_WQ, "%s", line);
+    link_write(master,line,strlen(line),time(0)+active_timeout);
+    if(strlen(problem_items)) {
+        debug(D_WQ, "Problem items: %s", problem_items);
+        link_write(master, problem_items, strlen(problem_items), time(0)+active_timeout);
+        free(problem_items);
+        return 0;
+    } else {
+        free(problem_items);
+        return 1;
+    }
+}
+
 /**
  * Stream file/directory contents for the rget protocol.
  * Format:
@@ -537,8 +589,8 @@ int main( int argc, char *argv[] ) {
 		}
 
 		if(link_readline(master,line,sizeof(line),time(0)+active_timeout)) {
-			debug(D_WQ,"%s",line);
-			if(sscanf(line,"work %lld",&length)) {
+			debug(D_WQ, "%s", line);
+			if(sscanf(line, "work %lld", &length)) {
 				buffer = malloc(length+10);
 				link_read(master,buffer,length,time(0)+active_timeout);
 				buffer[length] = 0;
@@ -555,12 +607,12 @@ int main( int argc, char *argv[] ) {
 					result = -1;
 					buffer = 0;
 				}
-				sprintf(line,"result %d %lld\n",result,length);
+				sprintf(line, "result %d %lld\n", result, length);
 				debug(D_WQ,"%s",line);
 				link_write(master,line,strlen(line),time(0)+active_timeout);
 				link_write(master,buffer,length,time(0)+active_timeout);
 				if(buffer) free(buffer);
-			} else if(sscanf(line,"stat %s",filename)==1) {
+			} else if(sscanf(line,"stat %s", filename)==1) {
 				struct stat st;
 				if(!stat(filename, &st)) {
 					sprintf(line,"result 1 %lu %lu\n",(unsigned long int)st.st_size,(unsigned long int)st.st_mtime);
@@ -569,7 +621,9 @@ int main( int argc, char *argv[] ) {
 				}
 				debug(D_WQ,"%s",line);
 				link_write(master,line,strlen(line),time(0)+active_timeout);
-			} else if(sscanf(line,"symlink %s %s",path,filename)==2) {
+            } else if(sscanf(line, "rstat %lld", &length) == 1) {
+				do_rstat(master, length);
+			} else if(sscanf(line, "symlink %s %s", path, filename)==2) {
 				char *cur_pos, *tmp_pos;
 
 				cur_pos = filename;

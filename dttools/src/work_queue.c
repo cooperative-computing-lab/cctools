@@ -40,10 +40,17 @@ See the file COPYING for details.
 #define WORK_QUEUE_FILE 0
 #define WORK_QUEUE_BUFFER 1
 
+#define TASK_STATUS_INITIALIZING 0
+#define TASK_STATUS_SENDING_INPUT 1
+#define TASK_STATUS_EXECUTING 2
+#define TASK_STATUS_RECEIVING_OUTPUT 3
+
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
 static struct datagram *outgoing_datagram = NULL;
 static time_t catalog_update_time;
+int wq_tolerable_transfer_time_multiplier = 10;
+int wq_minimum_transfer_timeout = 3;
 
 struct work_queue {
 	char *name;
@@ -63,6 +70,8 @@ struct work_queue {
 	INT64_T	total_workers_removed;
 	INT64_T total_bytes_sent;
 	INT64_T total_bytes_received;
+    timestamp_t total_send_time;
+    timestamp_t total_receive_time;
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;           /**< How to choose worker to run the task. */
     int use_exclusive_workers;
@@ -99,6 +108,7 @@ struct work_queue_file {
 static int start_one_task( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t );
 static int start_task_on_worker( struct work_queue *q, struct work_queue_worker *w );
 static int update_catalog(struct work_queue *q);
+static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, INT64_T length);
 
 static int short_timeout = 5;
 static int next_taskid = 1;
@@ -127,8 +137,10 @@ struct work_queue_task * work_queue_task_create( const char *command_line)
 	t->result = WORK_QUEUE_RESULT_UNSET;
 	t->taskid = next_taskid++;
 
-	t->submit_time = t->start_time = t->finish_time = t->total_bytes_transfered = t->total_transfer_time = 0;
+	t->submit_time = t->start_time = t->finish_time = t->transfer_start_time = t->total_transfer_time = t->computation_time = 0;
 	
+    t->total_input_size = t->total_output_size = t->total_bytes_transfered = 0;
+    t->status = TASK_STATUS_INITIALIZING;
 	return t;
 }
 
@@ -192,6 +204,8 @@ void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s )
 	s->total_workers_removed  = q->total_workers_removed;
 	s->total_bytes_sent = q->total_bytes_sent;
 	s->total_bytes_received = q->total_bytes_received;
+    s->total_send_time = q->total_send_time;
+    s->total_receive_time = q->total_receive_time;
 }
 
 static void add_worker( struct work_queue *q )
@@ -243,6 +257,8 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
 			list_push_head(q->complete_list,w->current_task);
 		} else {
 			w->current_task->result = WORK_QUEUE_RESULT_UNSET;
+            w->current_task->total_bytes_transfered = 0;
+            w->current_task->total_transfer_time = 0;
 			list_push_head(q->ready_list,w->current_task);
 		}
 		w->current_task = 0;
@@ -259,7 +275,7 @@ static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
  * It reads a streamed item from a worker. For the stream format, please refer
  * to the stream_output_item function in worker.c
  */
-static int get_output_item(char *remote_name, char *local_name, struct work_queue_worker *w, struct hash_table *received_items, INT64_T *total_bytes) {
+static int get_output_item(char *remote_name, char *local_name, struct work_queue *q, struct work_queue_worker *w, struct hash_table *received_items, INT64_T *total_bytes) {
 	char line[WORK_QUEUE_CATALOG_LINE_MAX];
 	int fd;
 	INT64_T actual, length;
@@ -324,7 +340,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					    debug(D_NOTICE,"Cannot open file %s for writing: %s", tmp_local_name, strerror(errno));
                         goto failure;
                     }
-					stoptime = time(0) + MAX(1.0,(length)/1250000.0);
+					stoptime = time(0) + get_transfer_wait_time(q, w, length);
 					actual = link_stream_to_fd(w->link,fd,length,stoptime);
 					close(fd);
 					if(actual!=length) { 
@@ -342,7 +358,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 				// now length holds the errno
 				debug(D_NOTICE,"Error while retrieving %s from %s (%s): %s", remote_name, w->addrport,w->hostname,strerror(length));
 				goto failure;
-			}else {
+			} else {
 				debug(D_WQ,"Invalid item type - %s\n", type);
 				goto failure;
 			}
@@ -381,6 +397,74 @@ int filename_comparator(const void *a, const void *b) {
 	return rv > 0 ? -1 : 1;
 }
 
+static int do_rstat(struct work_queue_worker *w, INT64_T *length, char **problem_items) {
+
+    struct work_queue_task *t;
+    struct work_queue_file *tf;
+    char line[WORK_QUEUE_LINE_MAX];
+    char *list = NULL;
+    INT64_T actual;
+    INT64_T list_len = 0;
+
+    *length =  0;
+    *problem_items = NULL;
+
+    t = w->current_task;
+    if(!(t->output_files)) return 1;
+    list_first_item(t->output_files);
+    while((tf=list_next_item(t->output_files))) {
+        list_len += strlen(tf->remote_name) + 1;
+    }
+    list_len += 1;
+
+    list = (char *)malloc(list_len * sizeof(char));
+    if(!list) {
+        debug(D_NOTICE, "Failed to allocate memory for rstat command.\n");
+        return 0;
+    }
+    list[0] = '\0';
+    list_first_item(t->output_files);
+    while((tf=list_next_item(t->output_files))) {
+        strcat(list, tf->remote_name);
+        strcat(list, " ");
+    }
+
+    debug(D_WQ, "Confirming output file existence via rstat ...\n");
+	link_printf(w->link,"rstat %lu\n", strlen(list));
+    link_write(w->link, list, strlen(list), time(0)+short_timeout);
+
+    line[0]='\0';
+	if(link_readline(w->link,line,sizeof(line),time(0)+short_timeout)) {
+		if(sscanf(line,"rstat_result %lld %lld", length, &list_len)==2) {
+            if(!list_len) {
+                free(list);
+                return 1; // no problem items
+            }
+
+            actual = link_read(w->link, list, list_len, time(0)+short_timeout);
+            if(actual != list_len) {
+                debug(D_WQ, "rstat problem items lengths do not match!\n");
+                goto rstat_fail;
+            }
+            list[list_len] = '\0';
+
+            *problem_items = list;
+            return 0; // there are problem items
+        } else {
+            debug(D_WQ, "Wrong rstat_result format: %s!\n", line);
+            goto rstat_fail;
+        }
+    } else {
+        debug(D_WQ, "Readng rstat_result failed!\n");
+        goto rstat_fail;
+    }
+
+    rstat_fail:
+    free(list);
+    debug(D_NOTICE, "Function do_rstat failed due to program error!!\n");
+    return -1;
+}
+
 static int get_output_files( struct work_queue_task *t, struct work_queue_worker *w, struct work_queue *q )
 {
 	struct work_queue_file* tf;
@@ -396,6 +480,20 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 	struct hash_table *received_items;
 	INT64_T total_bytes=0;
 
+	timestamp_t open_time=0;
+	timestamp_t close_time=0;
+	timestamp_t sum_time;
+
+    // TODO: Check existence of all output items
+    char *problem_items;
+    if(!do_rstat(w, &(t->total_output_size), &problem_items)) {
+        debug(D_WQ, "Expected output files not found on worker: %s\n", problem_items);
+        free(problem_items);
+        return 0;
+    }
+
+    // Start transfer ...
+    t->status = TASK_STATUS_RECEIVING_OUTPUT;
 	received_items = hash_table_create(0,0);
 
 	//  Sorting list will make sure that upper level dirs sit before their
@@ -409,12 +507,22 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((tf=list_next_item(t->output_files))) {
-			rv = get_output_item(tf->remote_name, (char *)tf->payload, w, received_items, &total_bytes);
-			q->total_bytes_received += total_bytes;
+		    open_time = timestamp_get();
+			rv = get_output_item(tf->remote_name, (char *)tf->payload, q, w, received_items, &total_bytes);
+		    close_time = timestamp_get();
 			if(!rv) {
 				debug(D_WQ,"Failed to fetch %s from %s (%s).", tf->remote_name, w->addrport, w->hostname);
 				return 0;
 			}
+            sum_time = close_time - open_time;
+            q->total_bytes_received += total_bytes;
+            q->total_receive_time += sum_time;
+		    t->total_bytes_transfered += total_bytes;
+		    t->total_transfer_time += sum_time;
+		    w->total_bytes_transfered += total_bytes;
+		    w->total_transfer_time += sum_time;
+            total_bytes =  0;
+
 
 			// Add the output item to the hash table if its cacheable
 			if(tf->flags&WORK_QUEUE_CACHE) {
@@ -427,7 +535,9 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
 				memcpy(remote_info,&local_info,sizeof(local_info));
 				hash_table_insert(w->current_files,hash_name,remote_info);
 			}
+
 		}
+
 	}
 
 	// destroy received files hash table for this task
@@ -499,10 +609,12 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			struct work_queue_task *t = w->current_task;
 			int actual;
 
+            t->computation_time = timestamp_get() - t->start_time;
 			t->output = malloc(output_length+1);
 
 			if(output_length>0) {
-				stoptime = time(0) + MAX(1.0,output_length/1250000.0);
+				//stoptime = time(0) + MAX(1.0,output_length/1250000.0);
+				stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T)output_length);
 				actual = link_read(l,t->output,output_length,stoptime);
 				if(actual!=output_length) {
 					free(t->output);
@@ -512,8 +624,8 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			} else {
 				actual = 0;
 			}
-
 			t->output[actual] = 0;
+
 			t->return_status = result;
 			if(t->return_status != 0)
 				t->result = WORK_QUEUE_RESULT_FUNCTION_FAIL;
@@ -538,7 +650,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			q->total_task_time += (t->finish_time-t->start_time);
 			w->total_tasks_complete++;
 			w->total_task_time += (t->finish_time-t->start_time);
-			debug(D_WQ,"%s (%s) done in %.02lfs total tasks %d average %.02lfs",w->hostname,w->addrport,(t->finish_time-t->start_time)/1000000.0,w->total_tasks_complete,w->total_task_time/w->total_tasks_complete/1000000.0);
+			debug(D_WQ,"%s (%s) done in %.02lfs total tasks %d average %.02lfs",w->hostname,w->addrport,(t->finish_time-t->transfer_start_time)/1000000.0,w->total_tasks_complete,w->total_task_time/w->total_tasks_complete/1000000.0);
 
 			start_task_on_worker(q,w);
 		} else {
@@ -597,9 +709,9 @@ static int build_poll_table( struct work_queue *q )
 	return n;
 }
 
-static int put_file(struct work_queue_file *, struct work_queue_worker *, INT64_T *);
+static int put_file(struct work_queue_file *, struct work_queue *, struct work_queue_worker *, INT64_T *);
 
-static int put_directory( const char *dirname, struct work_queue_worker *w, INT64_T *total_bytes )
+static int put_directory( const char *dirname, struct work_queue *q, struct work_queue_worker *w, INT64_T *total_bytes )
 {
 	DIR *dir = opendir(dirname);
 	if (!dir) return 0;
@@ -628,34 +740,27 @@ static int put_directory( const char *dirname, struct work_queue_worker *w, INT6
 		tf.payload = strdup(buffer);
 		tf.remote_name = strdup(buffer);
 
-		if (!put_file(&tf, w, total_bytes)) return 0;
+		if (!put_file(&tf, q, w, total_bytes)) return 0;
 	}
 
 	closedir(dir);
 	return 1;
 }
 
-static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, INT64_T *total_bytes )
-{
+static int put_file( struct work_queue_file *tf, struct work_queue *q, struct work_queue_worker *w, INT64_T *total_bytes ) {
 	struct stat local_info;
 	struct stat *remote_info;
 	char* hash_name;
 	time_t stoptime;
-	//timestamp_t open_time=0;
-	//timestamp_t close_time=0;
-	//timestamp_t sum_time=0;
 	INT64_T actual=0;
 	int dir = 0;
 
 	if(stat(tf->payload,&local_info)<0) return 0;
 	if (local_info.st_mode & S_IFDIR) dir = 1; 
 	/* normalize the mode so as not to set up invalid permissions */
-	if (dir)
-	{
+	if (dir) {
 		local_info.st_mode |= 0700;
-	}
-	else
-	{
+	} else {
 		local_info.st_mode |= 0600;
 	}
 	local_info.st_mode &= 0777;
@@ -679,7 +784,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, IN
 			// 'start_tasks' function the corresponding worker would be removed.
 			link_printf(w->link, "mkdir %s %o\n", tf->payload, local_info.st_mode);
 			
-			if (!put_directory(tf->payload, w, total_bytes)) return 0;
+			if (!put_directory(tf->payload, q, w, total_bytes)) return 0;
 
 			return 1;
 		}
@@ -687,14 +792,10 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, IN
 		int fd = open(tf->payload,O_RDONLY,0);
 		if(fd<0) return 0;
 		
-		stoptime = time(0) + MAX(1.0,local_info.st_size/1250000.0);
-		//open_time = timestamp_get();
-
+		stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T)local_info.st_size);
 		link_printf(w->link,"put %s %lld 0%o\n",tf->remote_name,(INT64_T)local_info.st_size,local_info.st_mode);
-		
 		actual = link_stream_from_fd(w->link,fd,local_info.st_size,stoptime);
 		close(fd);
-		//close_time = timestamp_get();
 		
 		if(actual!=local_info.st_size) return 0;
 		
@@ -705,12 +806,9 @@ static int put_file( struct work_queue_file *tf, struct work_queue_worker *w, IN
 		}
 		
 		*total_bytes+=actual;
-		
-		//sum_time+=(close_time-open_time);
 	}
 	
 	free(hash_name);
-
 	return 1;
 }
 
@@ -724,6 +822,27 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 	timestamp_t sum_time=0;
 	int fl;
 	time_t stoptime;
+    struct stat s;
+
+    t->status = TASK_STATUS_SENDING_INPUT;
+    t->total_input_size = 0;
+	if(t->input_files) {
+		list_first_item(t->input_files);
+		while((tf=list_next_item(t->input_files))) {
+            if(tf->type == WORK_QUEUE_FILE) {
+                if(stat(tf->payload, &s) != 0) {
+                    // Input does not exist
+                    debug(D_WQ, "Cannot stat %s (%s).", tf->payload, strerror(errno));
+                    goto failure;
+                } else {
+                    t->total_input_size += work_queue_get_item_size(tf->payload);
+                }
+            } else {
+                // Input item is a buffer
+                t->total_input_size += tf->length;
+            }
+        }
+    }
 	
 	if(t->input_files) {
 		list_first_item(t->input_files);
@@ -731,10 +850,10 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 			if(tf->type == WORK_QUEUE_BUFFER) {
 				debug(D_WQ,"%s (%s) needs literal as %s",w->hostname,w->addrport,tf->remote_name);
 				fl = tf->length;
-				stoptime = time(0) + MAX(1.0,fl/1250000.0);
+
+				stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T)fl);
 				open_time = timestamp_get();
 				link_printf(w->link,"put %s %lld %o\n",tf->remote_name,(INT64_T)fl,0777);
-				debug(D_WQ,"%s (%s) will try up to %.03lfs seconds",w->hostname,w->addrport,(fl)/1250000.0);
 				actual = link_write(w->link, tf->payload, fl,stoptime);
 				close_time = timestamp_get();
 				if(actual!=(fl)) goto failure;
@@ -742,7 +861,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 				sum_time+=(close_time-open_time);
 			} else {
 				open_time = timestamp_get();
-				if (!put_file(tf, w, &total_bytes)) goto failure;
+				if (!put_file(tf, q, w, &total_bytes)) goto failure;
 				close_time = timestamp_get();
 				sum_time+=(close_time-open_time);
 			}
@@ -753,6 +872,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 		w->total_transfer_time += sum_time;
 		if(total_bytes>0) {
 			q->total_bytes_sent += (INT64_T)total_bytes;
+            q->total_send_time += sum_time;
 			debug(D_WQ,"%s (%s) got %d bytes in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps",w->hostname,w->addrport,total_bytes,sum_time/1000000.0,((8.0*total_bytes)/sum_time),(8.0*w->total_bytes_transfered)/w->total_transfer_time);
 		}
 	}
@@ -771,10 +891,12 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 
 int start_one_task( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
+	t->transfer_start_time = timestamp_get();
 	if(!send_input_files(t,w,q)) return 0;
 	t->start_time = timestamp_get();
 	link_printf(w->link,"work %d\n",strlen(t->command_line));
 	link_write(w->link,t->command_line,strlen(t->command_line),time(0)+short_timeout);
+    t->status = TASK_STATUS_EXECUTING;
 	debug(D_WQ,"%s (%s) busy on '%s'",w->hostname,w->addrport,t->command_line);
 	return 1;
 }
@@ -937,7 +1059,7 @@ void abort_slow_workers( struct work_queue *q )
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 		if(w->state==WORKER_STATE_BUSY) {
-			timestamp_t runtime = current - w->current_task->start_time;
+			timestamp_t runtime = current - w->current_task->transfer_start_time;
 			if(runtime>(average_task_time*multiplier)) {
 				debug(D_NOTICE,"%s (%s) has run too long: %.02lf s (average is %.02lf s)",w->hostname,w->addrport,runtime/1000000.0,average_task_time/1000000.0);
 				remove_worker(q,w);
@@ -1186,17 +1308,17 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 
 int work_queue_hungry(struct work_queue* q)
 {
-	struct work_queue_stats info;
+	struct work_queue_stats qs;
 	int i,j;
-	work_queue_get_stats(q,&info);
+	work_queue_get_stats(q,&qs);
 
-	if(info.total_tasks_dispatched<100) return (100-info.total_tasks_dispatched);
+	if(qs.total_tasks_dispatched<100) return (100-qs.total_tasks_dispatched);
 
-        //i = 1.1 * number of current workers
-	//j = # of queued tasks.
-	//i-j = # of tasks to queue to re-reach the status quo.
-	i = (1.1*(info.workers_init + info.workers_ready + info.workers_busy));
-	j = (info.tasks_waiting);
+    //i = 1.1 * number of current workers
+    //j = # of queued tasks.
+    //i-j = # of tasks to queue to re-reach the status quo.
+	i = (1.1*(qs.workers_init + qs.workers_ready + qs.workers_busy));
+	j = (qs.tasks_waiting);
 	return MAX(i-j,0);
 }
 
@@ -1303,6 +1425,57 @@ int work_queue_empty (struct work_queue* q)
 	return ((list_size(q->ready_list)+list_size(q->complete_list)+q->workers_in_state[WORKER_STATE_BUSY])==0);
 }
 
+int tolerable_transfer_rate_denominator = 10;
+long double minimum_allowed_transfer_rate = 100000; // 100 KB/s
+static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, INT64_T length) {
+    timestamp_t timeout;
+    struct work_queue_task *t;
+    long double avg_transfer_rate, avg_worker_transfer_rate, retry_transfer_rate, tolerable_transfer_rate;
+	struct work_queue_stats qs;
+    INT64_T remaining_bytes, total_bytes;
+
+
+
+	work_queue_get_stats(q,&qs);
+    t = w->current_task;
+
+    if(w->total_transfer_time) {
+        avg_worker_transfer_rate = (long double)w->total_bytes_transfered / w->total_transfer_time * 1000000;
+    } else {
+        avg_worker_transfer_rate = 0;
+    }
+
+    retry_transfer_rate = 0;
+    if(qs.total_tasks_complete > qs.tasks_running && qs.workers_init+qs.workers_ready > qs.tasks_waiting) {
+        // The master has already tried most of the workers connected and has free workers for retrying slow workers
+        avg_transfer_rate = (long double)(qs.total_bytes_sent + qs.total_bytes_received) / (qs.total_send_time + qs.total_receive_time) * 1000000;
+        //printf("avg_transfer_rate: %Lf B/s\n", avg_transfer_rate);
+        if(t->status == TASK_STATUS_SENDING_INPUT) {
+            remaining_bytes = t->total_input_size - t->total_bytes_transfered - length;
+            retry_transfer_rate = (long double)remaining_bytes / t->total_input_size * avg_transfer_rate;
+            //printf("total input: %lld\ntotal transfered: %lld\nlength: %lld \n", t->total_input_size, t->total_bytes_transfered, length);
+        } else if (t->status == TASK_STATUS_RECEIVING_OUTPUT) {
+            total_bytes = t->total_input_size + t->total_output_size;
+            remaining_bytes = total_bytes - t->total_bytes_transfered - length;
+            retry_transfer_rate = remaining_bytes /(total_bytes/avg_transfer_rate + t->computation_time);
+        } else {
+            // wrong task status
+            retry_transfer_rate = 0;
+        }
+    } 
+    //printf("avg_worker_transfer_rate: %Lf B/s\n", avg_worker_transfer_rate);
+    //printf("retry_transfer_rate: %Lf B/s\n", retry_transfer_rate);
+
+    tolerable_transfer_rate = MAX(avg_worker_transfer_rate/tolerable_transfer_rate_denominator, retry_transfer_rate);
+    tolerable_transfer_rate = MAX(minimum_allowed_transfer_rate, tolerable_transfer_rate);
+
+    //printf("tolerable_worker_transfer_rate: %Lf B/s\n", tolerable_transfer_rate);
+    timeout = MAX(2, length / tolerable_transfer_rate); // try at least 2 seconds
+
+	debug(D_WQ,"%s (%s) will try up to %lld seconds for transferring this %.3Lf MB file.",w->hostname,w->addrport,timeout,(long double)length/1000000);
+    return timeout;
+}
+
 static int update_catalog(struct work_queue* q)
 {
 	char address[DATAGRAM_ADDRESS_MAX];
@@ -1343,3 +1516,36 @@ static int update_catalog(struct work_queue* q)
 
 	return 1;
 }
+
+INT64_T work_queue_get_item_size(char *path) {
+    INT64_T length;
+    DIR *dir;
+    struct dirent *dent;
+    struct stat st;
+    char newpath[WORK_QUEUE_LINE_MAX];
+
+    length = 0;
+    if(stat(path, &st) != 0) {
+        fprintf(stderr,"Could not stat %s. (%s)\n", path, strerror(errno));
+        return -1;
+    }
+	if(S_ISDIR(st.st_mode)) {
+		dir = opendir(path);
+		if(!dir) {
+			fprintf(stderr,"Could not open directory %s. (%s)\n", path, strerror(errno));
+			return -1;
+		}
+
+		while((dent = readdir(dir))) {
+			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, "..")) continue;
+			sprintf(newpath, "%s/%s", path, dent->d_name);
+			length += work_queue_get_item_size(newpath);
+		}
+
+		closedir(dir);
+        return length;
+    } else {
+        return (INT64_T)st.st_size;
+    }
+}
+
