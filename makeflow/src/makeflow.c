@@ -500,18 +500,21 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	if(itable_lookup(rerun_table, n->nodeid)) return;
 
 	// Below are a bunch of situations when a node has to be rerun.
-	
+
+	// If a job was submitted to Condor, then just reconnect to it.	
 	if(n->state==DAG_NODE_STATE_RUNNING && !n->local_job && batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
 		// Reconnect the Condor jobs
 		printf("makeflow: rule still running: %s\n",n->command);
 		itable_insert(d->remote_job_table,n->jobid,n);
 		d->remote_jobs_running++;
+
+	// Otherwise, we cannot reconnect to the job, so rerun it
 	} else if(n->state==DAG_NODE_STATE_RUNNING || n->state==DAG_NODE_STATE_FAILED || n->state==DAG_NODE_STATE_ABORTED) {
 		printf("makeflow: will retry failed rule: %s\n",n->command);
 		goto rerun;
 	}
 
-	// Input file has been updated since last execution
+	// Rerun if an input file has been updated since the last execution.
 	for(f=n->source_files;f;f=f->next) {
 		if(stat(f->filename, &filestat)>=0) {
 			if(difftime(filestat.st_mtime, n->previous_completion) > 0) {
@@ -527,13 +530,9 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 		}
 	}
 
-	// Output file has been updated/deleted since last execution
+	// Rerun if an output file is missing.
 	for(f=n->target_files;f;f=f->next) {
-		if(stat(f->filename, &filestat)>=0) {
-			if(difftime(filestat.st_mtime, n->previous_completion) > 0) {
-				goto rerun;
-			}
-		} else {
+		if(stat(f->filename, &filestat)<0) {
 			goto rerun;
 		}
 	}
