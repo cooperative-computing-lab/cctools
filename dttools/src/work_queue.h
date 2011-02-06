@@ -28,9 +28,11 @@ and port of the master.
 
 #define WORK_QUEUE_RESULT_UNSET 0
 #define WORK_QUEUE_RESULT_INPUT_FAIL 1
-#define WORK_QUEUE_RESULT_FUNCTION_FAIL 2
-#define WORK_QUEUE_RESULT_OUTPUT_FAIL 3
-#define WORK_QUEUE_RESULT_LINK_FAIL 4
+#define WORK_QUEUE_RESULT_INPUT_MISSING 2
+#define WORK_QUEUE_RESULT_FUNCTION_FAIL 4
+#define WORK_QUEUE_RESULT_OUTPUT_FAIL 8
+#define WORK_QUEUE_RESULT_OUTPUT_MISSING 16
+#define WORK_QUEUE_RESULT_LINK_FAIL 32
 
 #define WORK_QUEUE_SCHEDULE_UNSET 0 // default setting for task.
 #define WORK_QUEUE_SCHEDULE_FCFS 1
@@ -77,11 +79,9 @@ struct work_queue_task {
 	timestamp_t start_time;		/**< The time at which the task began. */
 	timestamp_t finish_time;	/**< The time at which it completed. */
 	timestamp_t transfer_start_time;	/**< The time at which it started to transfer input files. */
-    timestamp_t computation_time;
-    INT64_T total_bytes_transfered;
-	timestamp_t total_transfer_time;
-    INT64_T total_input_size;
-    INT64_T total_output_size;
+    timestamp_t computation_time;       /**< The time of executing the command. */
+    INT64_T total_bytes_transferred;    /**< Number of bytes transferred since task has last started transferring input data. */
+	timestamp_t total_transfer_time;    /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
 };
 
 /** Statistics describing a work queue. */
@@ -97,10 +97,10 @@ struct work_queue_stats {
 	int total_tasks_complete;	/**< Total number of tasks returned complete. */
 	int total_workers_joined;	/**< Total number of times a worker joined the queue. */
 	int total_workers_removed;	/**< Total number of times a worker was removed from the queue. */
-	INT64_T total_bytes_sent;	/**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
-	INT64_T total_bytes_received;	/**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
-    timestamp_t total_send_time;  /**<Total time in microseconds spent in sending data to workers. */
-    timestamp_t total_receive_time;  /**<Total time in microseconds spent in receiving data from workers. */
+	INT64_T total_bytes_sent;   /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
+	INT64_T total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
+    timestamp_t total_send_time;    /**<Total time in microseconds spent in sending data to workers. */
+    timestamp_t total_receive_time; /**<Total time in microseconds spent in receiving data from workers. */
 };
 
 /** @name Functions - Tasks */
@@ -287,11 +287,6 @@ void work_queue_task_specify_output_file( struct work_queue_task *t, const char 
 @deprecated See @ref work_queue_task_specify_file instead.
 */
 void work_queue_task_specify_output_file_do_not_cache( struct work_queue_task* t, const char* rname, const char* fname);
-
-/** Get the size of an item (either a file or directory)
-@param path Path to the item on the local file system 
-*/
-INT64_T work_queue_get_item_size(char *path);
 
 //@}
 

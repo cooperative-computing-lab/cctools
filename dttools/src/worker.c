@@ -250,58 +250,6 @@ struct link * auto_link_connect(char *addr, int *port, time_t master_stoptime) {
 	return master;
 }
 
-int do_rstat(struct link *master, INT64_T length) {
-    struct stat st;
-    char *token;
-    char *search = " ";
-    char line[WORK_QUEUE_LINE_MAX];
-    char *problem_items;
-    char *items;
-    INT64_T actual;
-    INT64_T total_length = 0;
-
-    line[0] = '\0';
-
-    if(!(items = (char *)malloc((length+1)*sizeof(char))) || !(problem_items=(char *)malloc((length+1)*sizeof(char)))) {
-        fprintf(stderr, "Cannot allocate ram in do_rstat!\n");
-        return 0;
-    }
-    actual = link_read(master, items, length, time(0)+active_timeout);
-    if(actual != length) {
-        free(items);
-        items = NULL;
-        return 0;
-    }
-    items[length] = '\0';
-
-    problem_items[0] = '\0';
-    token = strtok(items, search);
-    while(token) {
-        if(stat(token, &st) != 0) {
-            //something wrong
-            strcat(problem_items, token);
-            strcat(problem_items, " ");
-        } else {
-            total_length += work_queue_get_item_size(token);
-        }
-        token = strtok(NULL, search);
-    }
-    free(items);
-
-    sprintf(line,"rstat_result %lld %lu\n", total_length, strlen(problem_items));
-    debug(D_WQ, "%s", line);
-    link_write(master,line,strlen(line),time(0)+active_timeout);
-    if(strlen(problem_items)) {
-        debug(D_WQ, "Problem items: %s", problem_items);
-        link_write(master, problem_items, strlen(problem_items), time(0)+active_timeout);
-        free(problem_items);
-        return 0;
-    } else {
-        free(problem_items);
-        return 1;
-    }
-}
-
 /**
  * Stream file/directory contents for the rget protocol.
  * Format:
@@ -347,22 +295,17 @@ int stream_output_item(struct link *master, const char *filename) {
 	int fd;
 
 	if(stat(filename, &info) != 0) {
-		sprintf(line,"error %s %d\n", filename, errno);
-		link_write(master,line,strlen(line),time(0)+active_timeout);
-		fprintf(stderr,"Output item %s was not created (%s).\n",filename, strerror(errno));
-		return 0;
+        goto failure;
 	}
 
 	if(S_ISDIR(info.st_mode)) {
 		// stream a directory
-		sprintf(line,"dir %s %lld\n", filename, (INT64_T)0);
-		link_write(master,line,strlen(line),time(0)+active_timeout);
-
 		dir = opendir(filename);
 		if(!dir) {
-			fprintf(stderr,"Could not open directory %s. (%s)\n",filename, strerror(errno));
-			return 0;
+            goto failure;
 		}
+		sprintf(line,"dir %s %lld\n", filename, (INT64_T)0);
+		link_write(master,line,strlen(line),time(0)+active_timeout);
 
 		while((dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, "..")) continue;
@@ -381,16 +324,21 @@ int stream_output_item(struct link *master, const char *filename) {
 			actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
 			close(fd);
 			if(actual!=length) {
-				debug(D_WQ,"Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, length, actual);
+				debug(D_WQ,"Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.", filename, length, actual);
 				return 0;
 			}
 		} else {
-			fprintf(stderr,"Could not open output file %s. (%s)\n",filename, strerror(errno));
-			return 0;
+            goto failure;
 		}
 	}
 
 	return 1;
+
+    failure:
+	fprintf(stderr,"Failed to transfer ouput item - %s. (%s)\n",filename, strerror(errno));
+    sprintf(line,"missing %s %d\n", filename, errno);
+    link_write(master,line,strlen(line),time(0)+active_timeout);
+	return 0;
 }
 
 static void handle_abort( int sig ) {
@@ -621,8 +569,6 @@ int main( int argc, char *argv[] ) {
 				}
 				debug(D_WQ,"%s",line);
 				link_write(master,line,strlen(line),time(0)+active_timeout);
-            } else if(sscanf(line, "rstat %lld", &length) == 1) {
-				do_rstat(master, length);
 			} else if(sscanf(line, "symlink %s %s", path, filename)==2) {
 				char *cur_pos, *tmp_pos;
 
@@ -679,10 +625,7 @@ int main( int argc, char *argv[] ) {
 					goto recover;
 				}
 			} else if(sscanf(line, "rget %s",filename)==1) {
-				if(!stream_output_item(master, filename)) {
-					fprintf(stderr,"Failed to stream output item %s back to the master.\n",filename);
-					goto recover;
-				}
+				stream_output_item(master, filename);
 				sprintf(line,"end\n");
 				link_write(master,line,strlen(line),time(0)+active_timeout);
 			} else if(sscanf(line, "get %s",filename)==1) { // for backward compatibility
