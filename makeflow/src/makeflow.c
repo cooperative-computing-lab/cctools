@@ -1594,6 +1594,13 @@ int main( int argc, char *argv[] )
 		dagfile = argv[optind];
 	}
 
+
+    if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
+        fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
+        fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
+        return 1;
+    }
+
     sprintf(line, "WORK_QUEUE_USE_EXCLUSIVE_WORKERS=%d", work_queue_worker_mode);
     putenv(strdup(line));
 

@@ -170,7 +170,7 @@ struct list * get_work_queue_masters(const char * catalog_host, int catalog_port
 
 	q = catalog_query_create(catalog_host, catalog_port, stoptime);
 	if(!q) {
-		fprintf(stderr,"Couldn't query catalog: %s\n",strerror(errno));
+		fprintf(stderr,"Failed to query catalog server at %s:%d\n", catalog_host, catalog_port);
 		return NULL;
 	}
 
@@ -219,6 +219,7 @@ struct link * auto_link_connect(char *addr, int *port, time_t master_stoptime) {
 	struct wq_master *m;
 
 	ml = get_work_queue_masters(catalog_server_host, catalog_server_port);
+    if(!ml) return NULL;
 	debug_print_masters(ml);
 
 	list_first_item(ml);
@@ -460,7 +461,7 @@ int main( int argc, char *argv[] ) {
 
     if(auto_worker && exclusive_worker && !list_size(preferred_masters)) {
         fprintf(stderr, "Worker is running under exclusive mode. But no preferred master is specified.\n");
-        fprintf(stderr, "Please specify the preferred master names with -N option or add -S option to allow the worker work for any available masters.\n");
+        fprintf(stderr, "Please specify the preferred master names with -N option or add -s option to allow the worker to work for any available masters.\n");
         exit(1);
     }
 
