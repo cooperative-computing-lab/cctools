@@ -452,7 +452,11 @@ int batch_job_submit_work_queue( struct batch_queue *q, const char *cmd, const c
 	struct work_queue_task *t;
 	char *full_command; 
 
-	full_command = (char*) malloc((strlen(cmd)+strlen(args)+2)*sizeof(char));
+	if(infile)
+		full_command = (char*) malloc((strlen(cmd)+strlen(args)+strlen(infile)+5)*sizeof(char));
+	else
+		full_command = (char*) malloc((strlen(cmd)+strlen(args)+2)*sizeof(char));
+
 	if(!full_command) {
 	    debug(D_DEBUG,"couldn't create new work_queue task: out of memory\n");
 	    return -1;
