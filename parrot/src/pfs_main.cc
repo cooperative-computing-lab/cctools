@@ -409,7 +409,7 @@ static void handle_sigio( int sig )
 	pfs_process_sigio();
 }
 
-void write_rval(char* message, int status) {
+void write_rval(const char* message, int status) {
 	FILE *file = fopen(pfs_write_rval_file, "w+");
 	if(file) {
 		fprintf(file, "%s\n%d\n", message, status);

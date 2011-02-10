@@ -109,7 +109,6 @@ static int start_one_task( struct work_queue *q, struct work_queue_worker *w, st
 static int start_task_on_worker( struct work_queue *q, struct work_queue_worker *w );
 static int update_catalog(struct work_queue *q);
 static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, INT64_T length);
-static INT64_T get_item_size(char *path);
 
 static int short_timeout = 5;
 static int next_taskid = 1;
@@ -1430,36 +1429,3 @@ static int update_catalog(struct work_queue* q)
 
 	return 1;
 }
-
-static INT64_T get_item_size(char *path) {
-    INT64_T length;
-    DIR *dir;
-    struct dirent *dent;
-    struct stat st;
-    char newpath[WORK_QUEUE_LINE_MAX];
-
-    length = 0;
-    if(stat(path, &st) != 0) {
-        fprintf(stderr,"Could not stat %s. (%s)\n", path, strerror(errno));
-        return -1;
-    }
-	if(S_ISDIR(st.st_mode)) {
-		dir = opendir(path);
-		if(!dir) {
-			fprintf(stderr,"Could not open directory %s. (%s)\n", path, strerror(errno));
-			return -1;
-		}
-
-		while((dent = readdir(dir))) {
-			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, "..")) continue;
-			sprintf(newpath, "%s/%s", path, dent->d_name);
-			length += get_item_size(newpath);
-		}
-
-		closedir(dir);
-        return length;
-    } else {
-        return (INT64_T)st.st_size;
-    }
-}
-
