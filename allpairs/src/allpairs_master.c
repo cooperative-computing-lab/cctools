@@ -192,7 +192,7 @@ struct work_queue_task * task_create( struct text_list *seta, struct text_list *
 	if(ycurrent>=ystop) return 0;
 
 	char cmd[ALLPAIRS_LINE_MAX];
-	sprintf(cmd,"%s -e \"%s\" A B %s%s",allpairs_multicore_program,extra_arguments,use_external_program ? "./" : "",string_basename(allpairs_compare_program));
+	sprintf(cmd,"%s -e \"%s\" A B %s%s",string_basename(allpairs_multicore_program),extra_arguments,use_external_program ? "./" : "",string_basename(allpairs_compare_program));
 	struct work_queue_task *task = work_queue_task_create(cmd);
 
 	if(use_external_program) {
