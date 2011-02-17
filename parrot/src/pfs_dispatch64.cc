@@ -925,7 +925,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 {
 	INT64_T *args;
 	void *x;
-	INT64_T length;
 
 	char path[PFS_PATH_MAX];
 	char path2[PFS_PATH_MAX];
@@ -1194,8 +1193,8 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 		case SYSCALL64_accept:
 			if(entering) {
+				int length;
 				if(args[1]) {
-					int length;
 					tracer_copy_in(p->tracer,&length,(void*)args[2],sizeof(length));
 					x = xxmalloc(length);
 					p->syscall_result = pfs_accept(args[0],(struct sockaddr*)x,&length);
