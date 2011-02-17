@@ -140,6 +140,8 @@ static char *find_in_path( const char *cmd )
 	debug(D_DEBUG,"looking for %s in PATH",cmd);
 
 	path = xstrdup(getenv("PATH"));
+	if(!path) return 0;
+
 	p = strtok(path,":");
 	while(p) {
 		char tmp[PFS_PATH_MAX];
