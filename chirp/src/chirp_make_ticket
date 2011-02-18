@@ -1,7 +1,7 @@
 #!/bin/sh
 
 function usage () {
-  echo "Usage: $0 <hostname:port> [-s[ubject] <subject/user>] [-d[uration] <duration>] [-b[its] <bits>] [[<directory> <acl>] ...]"
+  echo "Usage: $0 <hostname:port> [-o[utput] <ticket filename>] [-s[ubject] <subject/user>] [-d[uration] <duration>] [-b[its] <bits>] [[<directory> <acl>] ...]"
   exit 1
 }
 
@@ -11,6 +11,7 @@ CHIRP_HOSTNAME="$1"
 CHIRP_DURATION="86400" # 60 * 60 * 24 (seconds in a day)
 CHIRP_BITS="1024"
 CHIRP_SUBJECT=""
+CHIRP_TICKET=""
 shift 1
 
 while [ $# -gt 0 ]; do
@@ -27,6 +28,9 @@ while [ $# -gt 0 ]; do
       CHIRP_BITS="$2"
       shift 2
       ;;
+    -o|-output)
+      CHIRP_TICKET="$2"
+      shift 2
     -*)
       usage
       ;;
@@ -40,19 +44,19 @@ T=`mktemp`
 P=`mktemp`
 MD5=`mktemp`
 
-openssl genrsa -out $T $CHIRP_BITS > /dev/null 2> /dev/null
-openssl rsa -in $T -pubout -out $P > /dev/null 2> /dev/null
+openssl genrsa -out "$T" "$CHIRP_BITS" > /dev/null 2> /dev/null
+openssl rsa -in "$T" -pubout -out "$P" > /dev/null 2> /dev/null
 
-openssl md5 < $P > $MD5 2> /dev/null
-FILENAME=ticket.`cat $MD5`
-SUBJECT=ticket:`cat $MD5`
+openssl md5 < "$P" > "$MD5" 2> /dev/null
+if [ -z "$CHIRP_TICKET" ]; then
+  CHIRP_TICKET="ticket.`cat $MD5`"
+fi
+SUBJECT="ticket:`cat $MD5`"
 
-cat > $FILENAME < $T
-rm -f $T $P $MD5
+cat > "$CHIRP_TICKET" < "$T"
+rm -f "$T" "$P" "$MD5"
 
-echo "Generated ticket $FILENAME."
-
-CHIRP_TICKET="$FILENAME"
+echo "Generated ticket $CHIRP_TICKET."
 
 # chirp <hostname:port> ticket ticket.md5 <duration> <subject/user>
 if test -z "$CHIRP_SUBJECT"; then
