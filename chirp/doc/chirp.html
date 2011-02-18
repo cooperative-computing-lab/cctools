@@ -703,6 +703,116 @@ same identity you used to authenticate to the Chirp server.
 Thus, it is not necessary for any special accounts to
 be created for visiting users.
 
+<h2>Advanced Topic: Ticket Authentication</h2>
+
+<p>
+  Often a user will want to access a Chirp server storing files for cluster
+  computing jobs but will have difficulty accessing it securely without
+  transferring their credentials with the jobs dispatched to the cluster. Users
+  typically solve this by giving hostname masks rights on the Chirp server
+  even if this level of access is inappropriate. Conversely, some users cannot
+  use hostname masks because the data being accessed is of sensitive nature
+  and must be protected. These users are forced to use difficult authentication
+  methods such as Globus or Kerberos for running the Chirp server. These
+  authentication modes are difficult to use so Chirp offers its own ticket
+  based authentication system that is both easy and convenient.
+</p>
+
+<p>
+  Users may create a ticket for authentication using:
+</p>
+
+<code>chirp_make_ticket &lt;host:port&gt; -subject unix:user -bits 1024 -duration 86400 / rl /foo rwl</code>
+
+<p>
+  This command performs multiple tasks in three stages:
+</p>
+
+<p>
+  First, it creates a ticket which is composed of an RSA Private Key with a key
+  (modulus) size of 1024 bits. When we refer to the ticket, we are speaking of
+  this Private Key. By default, the ticket file generated is named
+  <strong>ticket.MD5SUM</strong> where <strong>MD5SUM</strong> is the MD5
+  digest of the Public Key of the ticket.
+</p>
+  
+<p>
+  Once the ticket is created, it is registered with the Chirp server with a
+  validity period in seconds defined by the duration option (86400).
+  The <code>-subject unix:user</code> switch allows the user to set the ticket
+  for another user; however, only the <strong>chirp_server</strong> superuser (-P)
+  may set tickets for any subject. For regular users, the -subject option is
+  unnecessary as it is by default the subject you possess when registering the
+  ticket. Users who authenticate using this ticket in the future will become
+  the this subject with certain masked rights.
+</p>
+  
+<p>
+  Once the ticket is created and registered, we give the ticket a set of
+  <em>ACL masks</em> that mask the rights of the ticket authenticated user with
+  the rights of the subject that registered the ticket. For example, if a user
+  named <em>foo</em> (subject is <code>unix:foo</code>) has rights
+  <strong>rwl</strong> in the root directory of the Chirp server and if a
+  ticket is registered for <em>foo</em> with the ACL mask <code>/ rl</code>,
+  the effective rights of the ticket authenticated user is <strong>rl</strong>
+  in the root directory.
+</p>
+
+<p>
+  ACL masks are also inherited from parent directories. So, in the above
+  example, the root directory has the ACL mask <strong>rl</strong> while the
+  foo directory has the ACL mask <strong>rwl</strong>. Other nested directories
+  within the root directory also inherit the <strong>rl</strong> mask.
+  Similarly, nested directories of the foo directory inherit the
+  <strong>rwl</strong> mask. We emphasize that the ACL mask does not give
+  rights but limits them. If the user that registers a ticket has no rights in
+  a directory, then neither will the ticket authenticated user.
+</p>
+
+<h3>Authenticating with a ticket</h3>
+
+<p>
+  To authenticate using a ticket, it can be as simple as including the ticket
+  file with your job. Tickets that follow the <strong>ticket.MD5SUM</strong>
+  template are automatically added to the list of tickets to try when
+  authenticating. You can also give specific tickets to authenticate with
+  using the comma-delimited list of ticket filenames in either the
+  <strong>CHIRP_CLIENT_TICKETS</strong> environment variable or via the
+  <strong>-k <tickets></strong> option. Tickets are tried in the order
+  they are specified.
+</p>
+
+<code>chirp &lt;host:port&gt;</code>
+
+<p>
+  The above command will try ticket authentication as a last result but will
+  use tickets it finds in the current directory following the template.
+</p>
+
+<code>chirp -a ticket -k file.ticket &lt;host:port&gt;</code>
+
+<p>
+  The above command forces ticket authentication and uses the
+  <strong>file.ticket</strong> ticket to authenticate.
+<p>
+
+<p>
+  Authenticating is this simple. It is important to note that tickets are
+  obviously not protected in any way from theft when you distribute the ticket
+  with jobs in a distributed computing environment (no ticket system can give
+  this guarantee).  Users may want to protect their tickets in basic ways
+  by setting a restrictive file mode and by giving tickets a limited duration
+  on the server.
+</p>
+
+<p>
+  Finally, users should be careful to experiment with small key sizes for a
+  balance of quick authentication and security. Smaller key sizes may be
+  rejected outright by openssl when given a 64 byte challenge to sign. Chirp
+  will not authenticate or use smaller challenge sizes if openssl rejects the
+  ticket.
+</p>
+
 <h2>Advanced Topic: HDFS Backend Storage for Chirp</h2>
 
 <p>

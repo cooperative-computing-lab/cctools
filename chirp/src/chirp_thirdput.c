@@ -19,6 +19,8 @@ See the file COPYING for details.
 #include <errno.h>
 #include <sys/stat.h>
 
+extern char *chirp_root_path;
+
 static INT64_T chirp_thirdput_recursive( const char *subject, const char *lpath, const char *hostname, const char *rpath, const char *hostsubject, time_t stoptime )
 {
 	struct chirp_stat info;
@@ -38,7 +40,7 @@ static INT64_T chirp_thirdput_recursive( const char *subject, const char *lpath,
 		char aclsubject[CHIRP_PATH_MAX];
 		int aclflags;
 
-		if(!chirp_acl_check_dir(lpath,subject,CHIRP_ACL_LIST)) return -1;
+		if(!chirp_acl_check_dir(chirp_root_path,lpath,subject,CHIRP_ACL_LIST)) return -1;
 
 		// create the directory, but do not fail if it already exists
 		result = chirp_reli_mkdir(hostname,rpath,0700,stoptime);
@@ -102,12 +104,12 @@ static INT64_T chirp_thirdput_recursive( const char *subject, const char *lpath,
 		}
 
 	} else if(S_ISLNK(info.cst_mode)) {
-		if(!chirp_acl_check(lpath,subject,CHIRP_ACL_READ)) return -1;
+		if(!chirp_acl_check(chirp_root_path,lpath,subject,CHIRP_ACL_READ)) return -1;
 		result = chirp_alloc_readlink(lpath,newlpath,sizeof(newlpath));
 		if(result<0) return -1;
 		return chirp_reli_symlink(hostname,newlpath,rpath,stoptime);
 	} else if(S_ISREG(info.cst_mode)) {
-		if(!chirp_acl_check(lpath,subject,CHIRP_ACL_READ)) return -1;
+		if(!chirp_acl_check(chirp_root_path,lpath,subject,CHIRP_ACL_READ)) return -1;
 		int fd = chirp_alloc_open(lpath,O_RDONLY,0);
 		if(fd>=0) {
 			FILE *stream = fdopen(fd,"r");

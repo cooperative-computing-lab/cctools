@@ -1,0 +1,82 @@
+#!/bin/sh
+
+function usage () {
+  echo "Usage: $0 <hostname:port> [-s[ubject] <subject/user>] [-d[uration] <duration>] [-b[its] <bits>] [[<directory> <acl>] ...]"
+  exit 1
+}
+
+if [ $# -lt 1 ]; then usage; fi
+
+CHIRP_HOSTNAME="$1"
+CHIRP_DURATION="86400" # 60 * 60 * 24 (seconds in a day)
+CHIRP_BITS="1024"
+CHIRP_SUBJECT=""
+shift 1
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -s|-subject)
+      CHIRP_SUBJECT="$2"
+      shift 2
+      ;;
+    -d|-duration)
+      CHIRP_DURATION="$2"
+      shift 2
+      ;;
+    -b|-bits)
+      CHIRP_BITS="$2"
+      shift 2
+      ;;
+    -*)
+      usage
+      ;;
+    *)
+      break;
+      ;;
+  esac
+done
+
+T=`mktemp`
+P=`mktemp`
+MD5=`mktemp`
+
+openssl genrsa -out $T $CHIRP_BITS > /dev/null 2> /dev/null
+openssl rsa -in $T -pubout -out $P > /dev/null 2> /dev/null
+
+openssl md5 < $P > $MD5 2> /dev/null
+FILENAME=ticket.`cat $MD5`
+SUBJECT=ticket:`cat $MD5`
+
+cat > $FILENAME < $T
+rm -f $T $P $MD5
+
+echo "Generated ticket $FILENAME."
+
+CHIRP_TICKET="$FILENAME"
+
+# chirp <hostname:port> ticket ticket.md5 <duration> <subject/user>
+if test -z "$CHIRP_SUBJECT"; then
+  "`dirname $0`/chirp" "$CHIRP_HOSTNAME" ticket "$CHIRP_TICKET" "$CHIRP_DURATION"
+else
+  "`dirname $0`/chirp" "$CHIRP_HOSTNAME" ticket "$CHIRP_TICKET" "$CHIRP_DURATION" "$CHIRP_SUBJECT"
+fi
+
+if [ $? -ne 0 ]; then
+  echo "Registering ticket failed."
+  exit 2
+fi
+
+echo "Successfully registered ticket $CHIRP_TICKET."
+
+# Now do the masks... [[<directory> <acl>] ...]
+# chirp <hostname:port> ticketacl ticket.md5 <path> <aclmask>
+while [ $# -gt 0 ]; do
+  if [ $# -lt 2 ]; then usage; fi
+  "`dirname $0`/chirp" "$CHIRP_HOSTNAME" ticketacl "$CHIRP_TICKET" "$1" "$2"
+  if [ $? -ne 0 ]; then
+    echo "Setting mask for ticket $CHIRP_TICKET on directory '$1' to '$2' failed!"
+    exit 3
+  fi
+  echo "Set mask for '$1' to '$2'."
+  shift 2
+done

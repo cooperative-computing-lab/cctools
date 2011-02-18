@@ -521,6 +521,16 @@ INT64_T chirp_reli_getacl( const char *host, const char *path, chirp_dir_t callb
 	RETRY_ATOMIC( result = chirp_client_getacl(client,path,callback,arg,stoptime); )
 }
 
+INT64_T chirp_reli_ticket( const char *host, const char *ticket, const char *duration, const char *subject, time_t stoptime )
+{
+	RETRY_ATOMIC( result = chirp_client_ticket(client,ticket,duration,subject,stoptime); )
+}
+
+INT64_T chirp_reli_ticketacl( const char *host, const char *ticket, const char *path, const char *aclmask, time_t stoptime )
+{
+	RETRY_ATOMIC( result = chirp_client_ticketacl(client,ticket,path,aclmask,stoptime); )
+}
+
 INT64_T chirp_reli_setacl( const char *host, const char *path, const char *subject, const char *rights, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_setacl(client,path,subject,rights,stoptime); )

@@ -17,11 +17,14 @@ See the file COPYING for details.
 #include "domain_name_cache.h"
 #include "full_io.h"
 #include "macros.h"
+#include "md5.h"
 #include "debug.h"
 #include "copy_stream.h"
 #include "list.h"
 #include "url_encode.h"
+#include "xmalloc.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -122,18 +125,49 @@ struct chirp_client * chirp_client_connect( const char *hostport, int negotiate_
 
 	c = malloc(sizeof(*c));
 	if(c) {
-	        c->link = link_connect(addr,port,stoptime);
+		c->link = link_connect(addr,port,stoptime);
 		c->broken = 0;
 		c->serial = global_serial++;
 		if(c->link) {
-		        link_tune(c->link,LINK_TUNE_INTERACTIVE);
+	        link_tune(c->link,LINK_TUNE_INTERACTIVE);
 			if(negotiate_auth) {
 				char *type, *subject;
-				if(auth_assert(c->link,&type,&subject,stoptime)) {
+				struct hash_table *t = hash_table_create(0, 0);
+                size_t ntickets = 0;
+                char **tickets = (char **) xxrealloc(NULL, sizeof(char *)*(ntickets+1));
+				tickets[ntickets] = NULL;
+
+				/* populate the table with tickets */
+				const char *TICKETS = getenv(CHIRP_CLIENT_TICKETS);
+				const char *start, *end;
+				for (start = end = TICKETS; TICKETS && start < TICKETS+strlen(TICKETS); start = ++end)
+				{
+					while (*end != '\0' && *end != ',') end++;
+                    if (start == end) continue;
+					char *value = xxmalloc(end-start+1);
+                    memset(value, 0, end-start+1);
+					strncpy(value, start, end-start);
+					debug(D_CHIRP, "adding %s", value);
+					tickets[ntickets] = value;
+					tickets = xxrealloc(tickets, sizeof(char *)*((++ntickets)+1));
+					tickets[ntickets] = NULL;
+				}
+
+				int result = hash_table_insert(t, "ticket", tickets);
+
+				result = auth_assert(c->link,&type,&subject,t,stoptime);
+
+				{
+					size_t i;
+					for (i = 0; tickets[i]; i++) free(tickets[i]);
+					free(tickets);
+					hash_table_delete(t);
+				}
+
+				if(result) {
 					free(type);
 					free(subject);
 					strcpy(c->hostport,hostport);
-
 					return c;
 				} else {
 					chirp_client_disconnect(c);
@@ -285,6 +319,86 @@ const char * chirp_client_readacl( struct chirp_client *c, time_t stoptime )
 		return 0;
 	}
 
+}
+
+/* MD5_DIGEST_LENGTH is binary length, hex is MD5_DIGEST_LENGTH*2 */
+#define MD5_DIGEST_LENGTH_HEX  (MD5_DIGEST_LENGTH<<1)
+
+static int ticket_translate( const char *ticket_filename, char *ticket_subject )
+{   
+	char command[PATH_MAX*2+4096];
+	char digest[MD5_DIGEST_LENGTH_HEX];
+
+	/* load the digest */
+	sprintf(command, "openssl rsa -in '%s' -pubout 2> /dev/null | openssl md5", ticket_filename);
+	FILE *digestf = popen(command, "r");
+	if (fread(digest, sizeof(char), MD5_DIGEST_LENGTH_HEX, digestf) < MD5_DIGEST_LENGTH_HEX) {
+	  pclose(digestf);
+	  return 0;
+	}
+	pclose(digestf);
+
+	sprintf(ticket_subject, "ticket:%.*s", MD5_DIGEST_LENGTH_HEX, digest);
+	return 1;
+}
+
+INT64_T chirp_client_ticket( struct chirp_client *c, const char *ticket_filename, const char *subject, const char *duration, time_t stoptime )
+{
+	char command[PATH_MAX*2+4096];
+	char ticket_subject[CHIRP_PATH_MAX];
+	FILE *shell;
+	int status;
+
+	ticket_translate(ticket_filename, ticket_subject);
+
+	/* BEWARE: we don't bother to escape the filename, a user could
+	 * provide a malicious filename that makes us execute code we don't want to.
+	 */
+	sprintf(command,"if [ -r '%s' ]; then sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null; exit 0; else exit 1; fi",ticket_filename,ticket_filename);
+	shell = popen(command,"r");
+	if (!shell) return -1;
+
+	/* read the ticket file (public key) */
+	char *ticket = xxrealloc(NULL, 4096);
+	size_t read, length = 0;
+	while((read = fread(ticket+length, 1, 4096, shell)) > 0) {
+		length += read;
+		ticket = xxrealloc(ticket, length+4096);
+	}
+	if(ferror(shell)) {
+		status = pclose(shell);
+		errno = ferror(shell);
+		return -1;
+	}
+	assert(feof(shell));
+	status = pclose(shell);
+	if(status) {
+		return -1;
+	}
+	
+	int result = send_command(c,stoptime,"ticket %s %s %zu\n",subject,duration,length);
+	if(result<0) {
+		free(ticket);
+		return result;
+	}
+	result = link_write(c->link,ticket,length,stoptime);
+	free(ticket);
+	if (result!=length) {
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+
+	return get_result(c,stoptime);
+}
+
+INT64_T chirp_client_ticketacl( struct chirp_client *c, const char *ticket_filename, const char *path, const char *acl, time_t stoptime )
+{
+	char ticket_subject[CHIRP_PATH_MAX];
+	char safepath[CHIRP_LINE_MAX];
+	ticket_translate(ticket_filename, ticket_subject);
+	url_encode(path, safepath, sizeof(safepath));
+	return simple_command(c, stoptime, "ticketacl %s %s %s\n", ticket_subject, safepath, acl);
 }
 
 INT64_T chirp_client_setacl( struct chirp_client *c, const char *path, const char *user, const char *acl, time_t stoptime )

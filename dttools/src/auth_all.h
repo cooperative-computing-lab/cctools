@@ -25,6 +25,7 @@ the <tt>-a</tt> command line option.
 #include "auth_globus.h"
 #include "auth_hostname.h"
 #include "auth_address.h"
+#include "auth_ticket.h"
 
 /** Enables a specific authentication mode.
 If called multiple times, the methods will be

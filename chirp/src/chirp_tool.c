@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include <fcntl.h>
 #include <ctype.h>
 
+#include "chirp_client.h"
 #include "chirp_reli.h"
 #include "chirp_recursive.h"
 #include "chirp_protocol.h"
@@ -31,6 +32,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "domain_name_cache.h"
 #include "md5.h"
+#include "sort_dir.h"
 
 #ifdef HAS_LIBREADLINE
 #include "readline/readline.h"
@@ -59,6 +61,8 @@ static INT64_T do_lcd( 	int argc, char **argv );
 static INT64_T do_pwd( 	int argc, char **argv );
 static INT64_T do_lpwd( 	int argc, char **argv );
 static INT64_T do_getacl( 	int argc, char **argv );
+static INT64_T do_ticket(	int argc, char **argv );
+static INT64_T do_ticketacl(	int argc, char **argv );
 static INT64_T do_setacl( 	int argc, char **argv );
 static INT64_T do_resetacl( int argc, char **argv );
 static INT64_T do_ls( 	int argc, char **argv );
@@ -104,6 +108,8 @@ static time_t stoptime=0;
 static char current_host[CHIRP_PATH_MAX] = {0};
 static char current_local_dir[CHIRP_PATH_MAX];
 static char current_remote_dir[CHIRP_PATH_MAX];
+static char current_subject[CHIRP_LINE_MAX];
+
 int interactive_mode=0;
 
 static int long_information = 0;
@@ -132,6 +138,8 @@ static struct command list[] =
 {"thirdput",1, 3, 3, "<file> <3rdhost> <3rdfile>",do_thirdput},
 {"getacl",  1, 0, 1, "[remotepath]",             do_getacl},
 {"listacl", 1, 0, 1, "[remotepath]",             do_getacl},
+{"ticket",  1, 2, 3, "<ticket> <duration> [<user>]",do_ticket},
+{"ticketacl",  1, 3, 3, "<ticket> <path> <aclmask>",do_ticketacl},
 {"setacl",  1, 3, 3, "<remotepath> <user> <rwldax>",do_setacl},
 {"resetacl",1, 2, 2, "<remotepath> <rwldax>",do_resetacl},
 {"ls",      1, 0, 2, "[-la] [remotepath]",       do_ls},
@@ -180,6 +188,7 @@ static void show_help( const char *cmd )
 	printf("use: %s [options] [hostname] [command]\n",cmd);
 	printf("where options are:\n");
 	printf(" -a <flag>  Require this authentication mode.\n");
+	printf(" -k <files> Comma-delimited list of tickets to use for authentication.\n");
 	printf(" -d <flag>  Enable debugging for this subsystem.\n");
 	printf(" -q         Quiet mode; supress messages and table headers.\n");
 	printf(" -t <time>  Set remote operation timeout.\n");
@@ -193,6 +202,7 @@ int main( int argc, char *argv[] )
 {	
 	char *temp;
 	int did_explicit_auth = 0;
+	int did_ticket = 0;
 	char prompt[CHIRP_LINE_MAX];
 	char line[CHIRP_LINE_MAX];
 	char **user_argv=0;
@@ -202,7 +212,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c=getopt(argc,argv,"+a:d:vhlt:"))!=(char)-1) {
+	while((c=getopt(argc,argv,"+a:d:vhlt:k:"))!=(char)-1) {
 		switch(c) {
 			case 'a':
 				auth_register_byname(optarg);
@@ -222,14 +232,39 @@ int main( int argc, char *argv[] )
 				show_help(argv[0]);
 				exit(0);
 				break;
-		        case 'l':
-			        long_information = 1;
+	        case 'l':
+		        long_information = 1;
 				break;
-
+			case 'k':
+	 			if (setenv(CHIRP_CLIENT_TICKETS, optarg, 1) != 0) {
+					fprintf(stderr, "couldn't setenv\n");
+					return 1;
+				}
+				did_ticket = 1;
+				break;
 		}
 	}
  
 	if(!did_explicit_auth) auth_register_all();
+	if(!did_ticket && getenv(CHIRP_CLIENT_TICKETS) == NULL) {
+		/* populate a list with tickets in the current directory */
+		int i;
+		char **list;
+		char *tickets = xstrdup("");
+		sort_dir(".", &list, strcmp);
+		for (i = 0; list[i]; i++) {
+			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 && (strlen(list[i]) == (strlen("ticket.")+(MD5_DIGEST_LENGTH<<1)))) {
+				debug(D_CHIRP, "adding ticket %s", list[i]);
+				tickets = xxrealloc(tickets, strlen(tickets)+1+strlen(list[i])+1);
+                if (*tickets != '\0') /* non-empty? */
+					strcat(tickets, ",");
+				strcat(tickets, list[i]);
+			}
+		}
+		setenv(CHIRP_CLIENT_TICKETS, tickets, 1);
+		free(tickets);
+		sort_dir_free(list);
+	}
 	getcwd(current_local_dir,CHIRP_PATH_MAX);
 
 	interactive_mode = isatty(0);
@@ -335,14 +370,12 @@ static int process_command( int argc, char **argv )
 
 static INT64_T do_open( int argc, char **argv )
 {
-	char subject[CHIRP_LINE_MAX];
-
 	do_close(0,0);
 
-	if(chirp_reli_whoami(argv[1],subject,sizeof(subject),stoptime)>=0) {
+	if(chirp_reli_whoami(argv[1],current_subject,sizeof(current_subject),stoptime)>=0) {
 		strcpy(current_host,argv[1]);
 		strcpy(current_remote_dir,"/");
-		if(interactive_mode) printf("connected to %s as %s\n",current_host,subject);
+		if(interactive_mode) printf("connected to %s as %s\n",current_host,current_subject);
 		return 0;
 	} else {
 		return -1;
@@ -489,6 +522,30 @@ static INT64_T do_put( int argc, char **argv )
 	}
 
 	return result;
+}
+
+static INT64_T do_ticket( int argc, char **argv )
+{
+	const char *subject;
+	if (argc == 4) /* are there 3 arguments to ticket? (note +1) */
+		subject = argv[3];
+	else
+		subject = current_subject;
+	return chirp_reli_ticket(current_host,argv[1],argv[2],subject,stoptime);
+}
+
+static INT64_T do_ticketacl( int argc, char **argv )
+{
+	char full_path[CHIRP_PATH_MAX];
+	complete_remote_path(argv[2], full_path);
+
+	if(!strcmp(argv[3],"read")) argv[3] = "rl";
+	if(!strcmp(argv[3],"write")) argv[3] = "rwld";
+	if(!strcmp(argv[3],"admin")) argv[3] = "rwldva";
+	if(!strcmp(argv[3],"reserve")) argv[3] = "lv";
+	if(!strcmp(argv[3],"none")) argv[3] = ".";
+
+	return chirp_reli_ticketacl(current_host,argv[1],full_path,argv[3],stoptime);
 }
 
 static INT64_T do_setacl( int argc, char **argv )

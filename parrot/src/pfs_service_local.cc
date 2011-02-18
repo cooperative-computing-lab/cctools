@@ -67,14 +67,14 @@ static int check_implicit_acl( const char *path, int checkflags )
 static int pfs_acl_check( pfs_name *name, int flags )
 {
 	if(!pfs_username) return 1;
-	if(chirp_acl_check(name->rest,pfs_username,flags)) return 1;
+	if(chirp_acl_check(chirp_root_path,name->rest,pfs_username,flags)) return 1;
 	return check_implicit_acl(name->rest,flags);
 }
 
 static int pfs_acl_check_dir( pfs_name *name, int flags )
 {
 	if(!pfs_username) return 1;
-	if(chirp_acl_check_dir(name->rest,pfs_username,flags)) return 1;
+	if(chirp_acl_check_dir(chirp_root_path,name->rest,pfs_username,flags)) return 1;
 	return check_implicit_acl(name->rest,flags);
 }
 

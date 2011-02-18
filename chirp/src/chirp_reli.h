@@ -361,6 +361,12 @@ INT64_T chirp_reli_getacl( const char *host, const char *path, chirp_dir_t callb
 
 INT64_T chirp_reli_setacl( const char *host, const char *path, const char *subject, const char *rights, time_t stoptime );
 
+/* FIXME document */
+INT64_T chirp_reli_ticket( const char *host, const char *ticket, const char *duration, const char *subject, time_t stoptime );
+
+/* FIXME document */
+INT64_T chirp_reli_ticketacl( const char *host, const char *ticket, const char *path, const char *aclmask, time_t stoptime );
+
 /** Reset an access control list.  This call will remove all entries from the access control list and grant to the calling user only those rights stated here.
 @param host The name and port of the Chirp server to access.
 @param path The pathname of the directory to access.

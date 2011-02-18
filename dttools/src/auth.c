@@ -54,7 +54,7 @@ static void auth_sanitize( char *s )
 
 }
 
-int auth_assert( struct link *link, char **type, char **subject, time_t stoptime )
+int auth_assert( struct link *link, char **type, char **subject, struct hash_table *t, time_t stoptime )
 {
 	char line[AUTH_LINE_MAX];
 	struct auth_ops *a;
@@ -69,7 +69,7 @@ int auth_assert( struct link *link, char **type, char **subject, time_t stoptime
 		if(!link_readline(link,line,AUTH_LINE_MAX,stoptime)) break;
 		if(!strcmp(line,"yes")) {
 			debug(D_AUTH,"server agrees to try '%s'",a->type);
-			if(a->assert(link,stoptime)) {
+			if(a->assert(link,t,stoptime)) {
 				debug(D_AUTH,"successfully authenticated");
 				if(!link_readline(link,line,AUTH_LINE_MAX,stoptime)) break;
 				if(!strcmp(line,"yes")) {
@@ -102,7 +102,7 @@ int auth_assert( struct link *link, char **type, char **subject, time_t stoptime
 	return 0;
 }
 
-int auth_accept( struct link *link, char **typeout, char **subject, time_t stoptime )
+int auth_accept( struct link *link, char **typeout, char **subject, struct hash_table *t, time_t stoptime )
 {
 	struct auth_ops *a;
 	char type[AUTH_TYPE_MAX];
@@ -130,7 +130,7 @@ int auth_accept( struct link *link, char **typeout, char **subject, time_t stopt
 			continue;
 		}
 
-		if(a->accept(link,subject,stoptime)) {
+		if(a->accept(link,subject,t,stoptime)) {
 			auth_sanitize(*subject);
 			debug(D_AUTH,"'%s' authentication succeeded",type);
 			debug(D_AUTH,"%s:%d is %s:%s\n",addr,port,type,*subject);

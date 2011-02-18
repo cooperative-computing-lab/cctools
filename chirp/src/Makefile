@@ -70,6 +70,7 @@ install: all
 	install -d ${CCTOOLS_INSTALL_DIR}/include
 	install -d ${CCTOOLS_INSTALL_DIR}/lib
 	install chirp ${CCTOOLS_INSTALL_DIR}/bin
+	install chirp_make_ticket ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_get ${CCTOOLS_INSTALL_DIR}/bin
 	install chirp_put ${CCTOOLS_INSTALL_DIR}/bin
 	if [ -f ${CCTOOLS_INSTALL_DIR}/bin/chirp_server ]; then mv ${CCTOOLS_INSTALL_DIR}/bin/chirp_server ${CCTOOLS_INSTALL_DIR}/bin/chirp_server.old; fi

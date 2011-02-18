@@ -18,6 +18,9 @@ See the file COPYING for details.
 #include <time.h>
 #include <time.h>
 
+/* Authentication Environment Variable */
+#define CHIRP_CLIENT_TICKETS  "CHIRP_CLIENT_TICKETS"
+
 struct chirp_client * chirp_client_connect( const char *host, int negotiate_auth, time_t stoptime );
 struct chirp_client * chirp_client_connect_condor( time_t stoptime );
 
@@ -57,6 +60,8 @@ const char * chirp_client_readdir( struct chirp_client *c, time_t stoptime );
 INT64_T chirp_client_getacl( struct chirp_client *c, const char *path, chirp_dir_t callback, void *arg, time_t stoptime );
 INT64_T chirp_client_openacl( struct chirp_client *c, const char *path, time_t stoptime );
 const char * chirp_client_readacl( struct chirp_client *c, time_t stoptime );
+INT64_T chirp_client_ticket( struct chirp_client *c, const char *ticket_filename, const char *subject, const char *duration, time_t stoptime );
+INT64_T chirp_client_ticketacl( struct chirp_client *c, const char *ticket_filename, const char *path, const char *acl, time_t stoptime );
 INT64_T chirp_client_setacl( struct chirp_client *c, const char *path, const char *user, const char *acl, time_t stoptime );
 INT64_T chirp_client_resetacl( struct chirp_client *c, const char *path, const char *acl, time_t stoptime );
 INT64_T chirp_client_locate( struct chirp_client *c, const char *path, chirp_loc_t callback, void *arg, time_t stoptime );
