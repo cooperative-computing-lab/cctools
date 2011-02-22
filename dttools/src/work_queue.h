@@ -51,9 +51,10 @@ and port of the master.
 #define WORK_QUEUE_MASTER_MODE_STANDALONE 0
 #define WORK_QUEUE_MASTER_MODE_CATALOG 1
 #define WORK_QUEUE_NAME_MAX 256
-#define WORK_QUEUE_DEFAULT_PRIORITY 10
-#define WORK_QUEUE_USE_EXCLUSIVE_WORKERS 1
-#define WORK_QUEUE_USE_SHARED_WORKERS 0
+#define WORK_QUEUE_MASTER_PRIORITY_MAX 100
+#define WORK_QUEUE_MASTER_PRIORITY_DEFAULT 10
+#define WORK_QUEUE_WORKER_MODE_SHARED 0
+#define WORK_QUEUE_WORKER_MODE_EXCLUSIVE 1
 #define WORK_QUEUE_CATALOG_LINE_MAX 1024
 #define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 60
 #define	WORK_QUEUE_CATALOG_LIFETIME	180
@@ -229,6 +230,31 @@ int work_queue_specify_algorithm( struct work_queue* q, int alg );
 @param name The new project name..
 */
 int work_queue_specify_name( struct work_queue* q, const char *name );
+
+/** Change the priority for a given queue.
+@param q A pointer to the queue to modify.
+@param priority An integer that presents the priorty of this work queue master. The higher the value, the higher the priority.
+@return The priority that has been set.
+*/
+int work_queue_specify_priority( struct work_queue* q, int priority );
+
+/** Specify the master mode for a given queue. 
+@param q A pointer to the queue to modify.
+@param mode 
+<b>mode == 0</b>: standalone mode. In this mode the master would not report its information to a catalog server; 
+<b>mode == 1</b>: catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
+@return The mode that has been set.
+*/
+int work_queue_specify_master_mode(struct work_queue* q, int mode);
+
+/** Specify the worker mode for a given queue. 
+@param q A pointer to the queue to modify.
+@param mode 
+<b>mode == 0</b>: shared mode. In this mode the master would not accept connections from shared workers;
+<b>mode == 1</b>: exclusive mode. In this mode the master would only accept workers that have specified a preference on it, which are the workers started with "-N name" where name is the name of the queue. 
+@return The mode that has been set.
+*/
+int work_queue_specify_worker_mode(struct work_queue* q, int mode);
 
 /** Shut down workers connected to the work_queue system. Gives a best effort and then returns the number of workers given the shut down order.
 @param q A pointer to the queue to query.

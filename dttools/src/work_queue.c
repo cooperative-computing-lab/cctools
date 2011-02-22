@@ -54,7 +54,8 @@ int wq_minimum_transfer_timeout = 3;
 
 struct work_queue {
 	char *name;
-    int mode;
+    int master_mode;
+    int worker_mode;
 	int priority;
 	struct link * master_link;
 	struct list * ready_list;
@@ -74,7 +75,6 @@ struct work_queue {
     timestamp_t total_receive_time;
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;           /**< How to choose worker to run the task. */
-    int use_exclusive_workers;
 };
 
 
@@ -177,7 +177,7 @@ static void change_worker_state( struct work_queue *q, struct work_queue_worker 
 	q->workers_in_state[w->state]--;
 	w->state = state;
 	q->workers_in_state[state]++;
-	if(q->mode ==  WORK_QUEUE_MASTER_MODE_CATALOG) {	
+	if(q->master_mode ==  WORK_QUEUE_MASTER_MODE_CATALOG) {	
 		update_catalog(q);
 		catalog_update_time = time(0);
 	}
@@ -528,7 +528,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
                 goto reject;
             }
 
-            if(q->use_exclusive_workers && q->name) {
+            if(q->worker_mode == WORK_QUEUE_WORKER_MODE_EXCLUSIVE && q->name) {
                 // For backward compatibility, we scan the line AGAIN to see if it contains extra fields
 		        if(sscanf(line,"ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"",project_names)==1) {
                     if(!string_contains_word(project_names, q->name)) {
@@ -1078,26 +1078,26 @@ struct work_queue * work_queue_create( int port )
 
 	envstring = getenv("WORK_QUEUE_MASTER_MODE");
 	if(envstring) {
-		q->mode = atoi(envstring);
+		work_queue_specify_master_mode(q, atoi(envstring));
 	} else {
-		q->mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+		q->master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	}
 
 	envstring = getenv("WORK_QUEUE_PRIORITY");
 	if(envstring) {
-		q->priority = atoi(envstring);
+        work_queue_specify_priority(q, atoi(envstring));
 	} else {
-		q->priority = WORK_QUEUE_DEFAULT_PRIORITY;
+		q->priority = WORK_QUEUE_MASTER_PRIORITY_DEFAULT;
 	}
 
-	envstring = getenv("WORK_QUEUE_USE_EXCLUSIVE_WORKERS");
+	envstring = getenv("WORK_QUEUE_WORKER_MODE");
 	if(envstring) {
-		q->use_exclusive_workers = atoi(envstring);
+		work_queue_specify_worker_mode(q, atoi(envstring));
 	} else {
-		q->use_exclusive_workers = WORK_QUEUE_USE_SHARED_WORKERS;
+		q->worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
 	}
 
-    if (q->mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
+    if (q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
         if(update_catalog(q)) {
             catalog_update_time = time(0);
         } else {
@@ -1114,8 +1114,7 @@ struct work_queue * work_queue_create( int port )
 	return 0;
 }
 
-int work_queue_specify_name( struct work_queue *q, const char *name )
-{
+int work_queue_specify_name( struct work_queue *q, const char *name ) {
 	if (q && name) {
 		if (q->name) free(q->name);
 		q->name = strdup(name);
@@ -1123,6 +1122,40 @@ int work_queue_specify_name( struct work_queue *q, const char *name )
 	}
 
 	return 0;
+}
+
+int work_queue_specify_priority(struct work_queue *q, int priority) {
+    if(priority > 0 && priority <= WORK_QUEUE_MASTER_PRIORITY_MAX) {
+       q->priority = priority;
+    } else {
+        q->priority = WORK_QUEUE_MASTER_PRIORITY_DEFAULT;
+    }
+    return q->priority;
+}
+
+int work_queue_specify_master_mode(struct work_queue *q, int mode) {
+    switch(mode) {
+        case WORK_QUEUE_MASTER_MODE_CATALOG:
+        case WORK_QUEUE_MASTER_MODE_STANDALONE:
+            q->master_mode = mode;
+            break;
+        default:
+            q->master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+    }
+
+    return q->master_mode;
+}
+
+int work_queue_specify_worker_mode(struct work_queue *q, int mode) {
+    switch(mode) {
+        case WORK_QUEUE_WORKER_MODE_EXCLUSIVE:
+        case WORK_QUEUE_WORKER_MODE_SHARED:
+            q->worker_mode = mode;
+            break;
+        default:
+            q->worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
+    }
+	return q->worker_mode;
 }
 
 void work_queue_delete( struct work_queue *q )
@@ -1181,7 +1214,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 
 	
 	while(1) {
-		if(q->mode ==  WORK_QUEUE_MASTER_MODE_CATALOG && time(0) - catalog_update_time >= WORK_QUEUE_CATALOG_UPDATE_INTERVAL) {	
+		if(q->master_mode ==  WORK_QUEUE_MASTER_MODE_CATALOG && time(0) - catalog_update_time >= WORK_QUEUE_CATALOG_UPDATE_INTERVAL) {	
 			update_catalog(q);
 			catalog_update_time = time(0);
 		}

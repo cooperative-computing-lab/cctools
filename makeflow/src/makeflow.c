@@ -1445,7 +1445,7 @@ int main( int argc, char *argv[] )
 	int auto_workers = 0;
 	char line[1024];
     int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
-    int work_queue_worker_mode = WORK_QUEUE_USE_EXCLUSIVE_WORKERS;
+    int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
 
 	debug_config(argv[0]);
 
@@ -1475,7 +1475,7 @@ int main( int argc, char *argv[] )
             work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
         case 's':
-            work_queue_worker_mode = WORK_QUEUE_USE_SHARED_WORKERS;
+            work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
             break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg)) {
@@ -1601,7 +1601,7 @@ int main( int argc, char *argv[] )
         return 1;
     }
 
-    sprintf(line, "WORK_QUEUE_USE_EXCLUSIVE_WORKERS=%d", work_queue_worker_mode);
+    sprintf(line, "WORK_QUEUE_WORKER_MODE=%d", work_queue_worker_mode);
     putenv(strdup(line));
 
     sprintf(line, "WORK_QUEUE_MASTER_MODE=%d", work_queue_master_mode);
