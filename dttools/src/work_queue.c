@@ -520,14 +520,24 @@ static int handle_worker( struct work_queue *q, struct link *l )
 
 	if(link_readline(l,line,sizeof(line),time(0)+short_timeout)) {
 		if(sscanf(line,"ready %s %d %lld %lld %lld %lld",w->hostname,&w->ncpus,&w->memory_avail,&w->memory_total,&w->disk_avail,&w->disk_total)==6) {
+            // More workers than needed are connected
+            int workers_connected = hash_table_size(q->worker_table);
+            int jobs_not_completed = list_size(q->ready_list) + q->workers_in_state[WORKER_STATE_BUSY];
+            if(workers_connected > jobs_not_completed) {
+	            debug(D_WQ,"Jobs waiting + running: %d; Workers connected now: %d", jobs_not_completed, workers_connected);
+                goto reject;
+            }
+
             if(q->use_exclusive_workers && q->name) {
                 // For backward compatibility, we scan the line AGAIN to see if it contains extra fields
 		        if(sscanf(line,"ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"",project_names)==1) {
                     if(!string_contains_word(project_names, q->name)) {
+	                    debug(D_WQ,"Preferred masters of %s (%s): %s",w->hostname,w->addrport, project_names);
                         goto reject;
                     }
                 } else {
                     // No extra fields, so this is a shared worker
+	                debug(D_WQ,"%s (%s) is a shared worker. But the master does not allow shared workers.",w->hostname,w->addrport);
                     goto reject;
                 }
             }
@@ -593,7 +603,6 @@ static int handle_worker( struct work_queue *q, struct link *l )
 	return 1;
 
     reject:
-	debug(D_WQ,"Preferred masters of %s (%s): %s",w->hostname,w->addrport, project_names);
 	debug(D_NOTICE,"%s (%s) is rejected and removed.",w->hostname,w->addrport);
 	remove_worker(q,w);
     return 0;

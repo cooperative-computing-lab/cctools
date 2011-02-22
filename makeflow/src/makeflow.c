@@ -122,7 +122,8 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 	int max=0;
 
 	for(n=d->nodes;n;n=n->next) {
-		nodeid = -1;
+        depends_on_single_node = 1;
+        nodeid = -1;
 		m = 0;
 		// for each source file, see if it is a target file of another node
 		for(f=n->source_files;f;f=f->next) {
@@ -137,7 +138,6 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 					nodeid = m->nodeid;
 					continue;
 				} 
-			
 				// if current node depends on multiple nodes, continue to process next node
 				if(nodeid != tmp->nodeid) {
 					depends_on_single_node = 0;
@@ -145,7 +145,6 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 				}
 			}
 		}
-
 		// m != 0 : current node depends on at least one exsisting node
 		if(m && depends_on_single_node && nodeid != -1) {
 				m->only_my_children++;
@@ -1593,6 +1592,7 @@ int main( int argc, char *argv[] )
 	{
 		dagfile = argv[optind];
 	}
+
 
 
     if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {

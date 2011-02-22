@@ -210,6 +210,8 @@ struct list * get_work_queue_masters(const char * catalog_host, int catalog_port
 		nvpair_delete(nv);
 	}
 
+    // Must delete the query otherwise it would occupy 1 tcp connection forever!
+    catalog_query_delete(q);
 	return ml;
 }
 
