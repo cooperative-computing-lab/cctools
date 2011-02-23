@@ -131,13 +131,13 @@ void load_sequences(const char * filename)
 	while(1) {
 		c = cseq_read(file);
 		if(!c) {
-			if(count != rectangle_size) { // write the last rectangle to file
+			if(count != rectangle_size && count > 0) { // write the last rectangle to file
 				size = load_rectangle_to_file(rect_id, sequences, count);
 				if(!size) fatal("Failed to write rectangle %d to file. (%s)\n", rect_id, strerror(errno));
 				rectangle_sizes[rect_id] = size;
 				rect_id++;
 				for(i = 0; i < count; i++) cseq_free(sequences[i]);
-				debug(D_DEBUG, "Rectangle %d has been created.\n", rect_id);
+				debug(D_DEBUG, "Rectangle %d has been created.\n", rect_id-1);
 			}
 
 			num_rectangles = rect_id;
@@ -159,7 +159,7 @@ void load_sequences(const char * filename)
 			}
 			for(i = 0; i < count; i++) cseq_free(sequences[i]);
 			count = 0;
-			debug(D_DEBUG, "Rectangle %d has been created.\n", rect_id);
+			debug(D_DEBUG, "Rectangle %d has been created.\n", rect_id-1);
 		}
 	}
 
@@ -177,7 +177,7 @@ size_t load_rectangle_to_file(int rect_id, struct cseq ** sequences, int cseq_co
 	sprintf(tmpfilename, "%s/rect%03d.cfa", outdirname, rect_id);
 	tmpfile = fopen(tmpfilename, "w");
 	if(!tmpfile) return 0;
-
+	
 	for (i = 0; i < cseq_count; i++) {			
 		cseq_write(tmpfile, sequences[i]);
 		size += cseq_size(sequences[i]);
