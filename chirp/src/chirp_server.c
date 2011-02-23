@@ -1412,13 +1412,14 @@ static void chirp_handler( struct link *l, const char *subject )
 			if(!chirp_path_fix(path)) goto failure;
 			if(!chirp_acl_check_dir(chirp_root_path,path,subject,CHIRP_ACL_ADMIN)) goto failure;
 			result = chirp_acl_set(path,subject,chirp_acl_text_to_flags(newacl)|CHIRP_ACL_ADMIN,1);
-		} else if(sscanf(line,"ticket %s %s %lld",duration,newsubject,&length)==3) {
+		} else if(sscanf(line,"ticket_register %s %s %lld",newsubject,duration,&length)==3) {
 			char *ticket;
 			ticket = malloc(length+1); /* room for NUL terminator */
 			if(ticket) {
 				actual = link_read(l,ticket,length,stalltime);
 				if(actual!=length) break;
 				*(ticket+length) = '\0'; /* NUL terminator... */
+				if(strcmp(newsubject,"self") == 0) strcpy(newsubject,esubject);
 				if(strcmp(esubject,newsubject) != 0 && strcmp(esubject,chirp_super_user) != 0) { /* must be superuser to create a ticket for someone else */
 					free(ticket);
 					errno = EACCES;
@@ -1432,9 +1433,8 @@ static void chirp_handler( struct link *l, const char *subject )
 				errno = ENOMEM;
 				break;
 			}
-		} else if(sscanf(line,"ticketacl %s %s %s",newsubject,path,newacl)==3) {
+		} else if(sscanf(line,"ticket_mask %s %s %s",newsubject,path,newacl)==3) {
 			/* newsubject is the ticket_subject (e.g. "ticket:MD5") */
-          debug(D_CHIRP, "%s", line);
 			if(!chirp_path_fix(path)) goto failure;
 			result = chirp_acl_ticketacl(chirp_root_path,subject,newsubject,path,chirp_acl_text_to_flags(newacl),strcmp(esubject,chirp_super_user) == 0);
 		} else if(sscanf(line,"mkdir %s %lld",path,&mode)==2) {

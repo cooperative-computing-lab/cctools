@@ -5,6 +5,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include <assert.h>
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -61,8 +62,11 @@ static INT64_T do_lcd( 	int argc, char **argv );
 static INT64_T do_pwd( 	int argc, char **argv );
 static INT64_T do_lpwd( 	int argc, char **argv );
 static INT64_T do_getacl( 	int argc, char **argv );
-static INT64_T do_ticket(	int argc, char **argv );
-static INT64_T do_ticketacl(	int argc, char **argv );
+static INT64_T do_ticket_create(	int argc, char **argv );
+static INT64_T do_ticket_register(	int argc, char **argv );
+static INT64_T do_ticket_delete(	int argc, char **argv );
+static INT64_T do_ticket_list(	int argc, char **argv );
+static INT64_T do_ticket_mask(	int argc, char **argv );
 static INT64_T do_setacl( 	int argc, char **argv );
 static INT64_T do_resetacl( int argc, char **argv );
 static INT64_T do_ls( 	int argc, char **argv );
@@ -138,8 +142,11 @@ static struct command list[] =
 {"thirdput",1, 3, 3, "<file> <3rdhost> <3rdfile>",do_thirdput},
 {"getacl",  1, 0, 1, "[remotepath]",             do_getacl},
 {"listacl", 1, 0, 1, "[remotepath]",             do_getacl},
-{"ticket",  1, 2, 3, "<ticket> <duration> [<user>]",do_ticket},
-{"ticketacl",  1, 3, 3, "<ticket> <path> <aclmask>",do_ticketacl},
+{"ticket_create", 1, 0, 100, "[-o[utput] <ticket filename>] [-s[ubject] <subject/user>] [-d[uration] <duration>] [-b[its] <bits>] [[<directory> <acl>] ...]",do_ticket_create},
+{"ticket_register", 1, 2, 3, "<name> [<subject>] <duration>", do_ticket_register},
+{"ticket_delete", 1, 1, 1, "<name>", do_ticket_delete},
+{"ticket_list", 1, 1, 1, "<name>", do_ticket_list},
+{"ticket_mask", 1, 3, 3, "<name> <directory> <aclmask>", do_ticket_mask},
 {"setacl",  1, 3, 3, "<remotepath> <user> <rwldax>",do_setacl},
 {"resetacl",1, 2, 2, "<remotepath> <rwldax>",do_resetacl},
 {"ls",      1, 0, 2, "[-la] [remotepath]",       do_ls},
@@ -368,6 +375,15 @@ static int process_command( int argc, char **argv )
 	return 0;
 }
 
+static void acl_simple (char **acl)
+{
+	if(!strcmp(*acl,"read")) *acl = "rl";
+	if(!strcmp(*acl,"write")) *acl = "rwld";
+	if(!strcmp(*acl,"admin")) *acl = "rwldva";
+	if(!strcmp(*acl,"reserve")) *acl = "lv";
+	if(!strcmp(*acl,"none")) *acl = ".";
+}
+
 static INT64_T do_open( int argc, char **argv )
 {
 	do_close(0,0);
@@ -524,28 +540,115 @@ static INT64_T do_put( int argc, char **argv )
 	return result;
 }
 
-static INT64_T do_ticket( int argc, char **argv )
+static INT64_T do_ticket_create( int argc, char **argv )
 {
-	const char *subject;
-	if (argc == 4) /* are there 3 arguments to ticket? (note +1) */
-		subject = argv[3];
-	else
-		subject = current_subject;
-	return chirp_reli_ticket(current_host,argv[1],argv[2],subject,stoptime);
+//{"ticket_create", 1, 0, 100, "[-o[utput] <ticket filename>] [-s[ubject] <subject/user>] [-d[uration] <duration>] [-b[its] <bits>] [[<directory> <acl>] ...]",do_ticket_create},
+	char name[CHIRP_PATH_MAX] = "";
+	const char *subject = NULL;
+	time_t duration = 86400; /* one day */
+	unsigned bits = 1024;
+
+	int i;
+
+    /* fix split bug */
+    if (argv[1] == NULL) argc = 0;
+
+	for (i = 1; i < argc; i++) {
+		if (*argv[i] == '-') {
+			if (i == argc) { /* is the argument option beyond the argv array? */
+				fprintf(stderr, "missing option argument to create: %s\n", argv[i]);
+				return -1;
+			}
+			if (strcmp(argv[i],"-o") == 0 || strcmp(argv[i],"-output") == 0) {
+				strncpy(name, argv[++i], CHIRP_PATH_MAX);
+                name[CHIRP_PATH_MAX-1] = '\0';
+			} else if (strcmp(argv[i],"-s") == 0 || strcmp(argv[i],"-subject") == 0) {
+				subject = argv[++i];
+			} else if (strcmp(argv[i],"-d") == 0 || strcmp(argv[i],"-duration") == 0) {
+				duration = (time_t) strtoull(argv[++i], NULL, 10);
+				if (duration == 0) {
+					fprintf(stderr, "invalid ticket duration: %s\n", argv[i]);
+					return -1;
+				}
+			} else if (strcmp(argv[i],"-b") == 0 || strcmp(argv[i],"-bits") == 0) {
+				bits = strtoull(argv[++i], NULL, 10);
+				if (bits == 0) {
+					fprintf(stderr, "invalid number of bits: %s\n", argv[i]);
+					return -1;
+				}
+			} else {
+				fprintf(stderr, "invalid option to create: %s\n", argv[i]);
+				return -1;
+			}
+		} else
+			break;
+	}
+
+	INT64_T result = chirp_reli_ticket_create(current_host,name,bits,stoptime);	
+	if (result < 0) {
+		fprintf(stderr, "could not create ticket\n");
+		return result;
+	}
+	fprintf(stderr, "ticket '%s': successfully created with %d bits.\n", name, bits);
+
+	result = chirp_reli_ticket_register(current_host,name,subject,duration,stoptime);
+	if (result < 0) {
+		fprintf(stderr, "could not register ticket\n");
+		return result;
+	}
+	fprintf(stderr, "ticket '%s': successfully registered.\n", name);
+
+	for (; i < argc; i+=2) {
+		if (i == argc-1) {
+			fprintf(stderr, "ticket '%s': directory '%s' requires an aclmask.\n", name, argv[i]);
+            errno = EINVAL;
+			return -1;
+		}
+		char *path = argv[i];
+		char *aclmask = argv[i+1];
+		acl_simple(&aclmask);
+        fprintf(stderr, "ticket '%s': directory '%s' aclmask = '%s'.\n", name, path, aclmask);
+		result = chirp_reli_ticket_mask(current_host,name,path,aclmask,stoptime);
+		if (result < 0) {
+			fprintf(stderr, "ticket '%s': could not set acl mask '%s' for directory '%s'\n", name, argv[i+1], argv[i]);
+			return -1;
+		}
+	}
+	return 0;
 }
 
-static INT64_T do_ticketacl( int argc, char **argv )
+static INT64_T do_ticket_register( int argc, char **argv )
 {
+//{"ticket_register", 1, 2, 1, "<name> [<subject>] <duration>", do_ticket_register},
+	assert(argc == 2 || argc == 3);
+	if (argc == 2) {
+		return chirp_reli_ticket_register(current_host,argv[1],NULL,(time_t)strtoull(argv[2],NULL,10),stoptime);
+	} else {
+		return chirp_reli_ticket_register(current_host,argv[1],argv[2],(time_t)strtoull(argv[3],NULL,10),stoptime);
+	}
+}
+
+static INT64_T do_ticket_delete( int argc, char **argv )
+{
+//{"ticket_delete", 1, 2, 1, "<name>", do_ticket_delete},
+	return chirp_reli_ticket_delete(current_host,argv[1],stoptime);
+}
+
+static INT64_T do_ticket_list( int argc, char **argv )
+{
+//{"ticket_list", 1, 2, 1, "<name>", do_ticket_list},
+	return chirp_reli_ticket_list(current_host,argv[1],stoptime);
+}
+
+static INT64_T do_ticket_mask( int argc, char **argv )
+{
+//{"ticket_mask", 1, 2, 1, "<name> <directory> <aclmask>", do_ticket_mask},
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[2], full_path);
 
-	if(!strcmp(argv[3],"read")) argv[3] = "rl";
-	if(!strcmp(argv[3],"write")) argv[3] = "rwld";
-	if(!strcmp(argv[3],"admin")) argv[3] = "rwldva";
-	if(!strcmp(argv[3],"reserve")) argv[3] = "lv";
-	if(!strcmp(argv[3],"none")) argv[3] = ".";
+	acl_simple(&argv[3]);
 
-	return chirp_reli_ticketacl(current_host,argv[1],full_path,argv[3],stoptime);
+	return chirp_reli_ticket_mask(current_host,argv[1],full_path,argv[3],stoptime);
 }
 
 static INT64_T do_setacl( int argc, char **argv )
@@ -553,11 +656,7 @@ static INT64_T do_setacl( int argc, char **argv )
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1],full_path);
 
-	if(!strcmp(argv[3],"read")) argv[3] = "rl";
-	if(!strcmp(argv[3],"write")) argv[3] = "rwld";
-	if(!strcmp(argv[3],"admin")) argv[3] = "rwldva";
-	if(!strcmp(argv[3],"reserve")) argv[3] = "lv";
-	if(!strcmp(argv[3],"none")) argv[3] = ".";
+	acl_simple(&argv[3]);
 
 	return chirp_reli_setacl(current_host,full_path,argv[2],argv[3],stoptime);
 }
@@ -567,11 +666,7 @@ static INT64_T do_resetacl( int argc, char **argv )
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1],full_path);
 
-	if(!strcmp(argv[2],"read")) argv[2] = "rl";
-	if(!strcmp(argv[2],"write")) argv[2] = "rwld";
-	if(!strcmp(argv[2],"admin")) argv[2] = "rwldva";
-	if(!strcmp(argv[2],"reserve")) argv[2] = "lv";
-	if(!strcmp(argv[2],"none")) argv[2] = ".";
+	acl_simple(&argv[3]);
 
 	return chirp_reli_resetacl(current_host,full_path,argv[2],stoptime);
 }

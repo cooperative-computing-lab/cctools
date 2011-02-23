@@ -324,13 +324,13 @@ const char * chirp_client_readacl( struct chirp_client *c, time_t stoptime )
 /* MD5_DIGEST_LENGTH is binary length, hex is MD5_DIGEST_LENGTH*2 */
 #define MD5_DIGEST_LENGTH_HEX  (MD5_DIGEST_LENGTH<<1)
 
-static int ticket_translate( const char *ticket_filename, char *ticket_subject )
+static int ticket_translate( const char *name, char *ticket_subject )
 {   
 	char command[PATH_MAX*2+4096];
 	char digest[MD5_DIGEST_LENGTH_HEX];
 
 	/* load the digest */
-	sprintf(command, "openssl rsa -in '%s' -pubout 2> /dev/null | openssl md5", ticket_filename);
+	sprintf(command, "sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null | openssl md5 2> /dev/null", name);
 	FILE *digestf = popen(command, "r");
 	if (fread(digest, sizeof(char), MD5_DIGEST_LENGTH_HEX, digestf) < MD5_DIGEST_LENGTH_HEX) {
 	  pclose(digestf);
@@ -342,19 +342,19 @@ static int ticket_translate( const char *ticket_filename, char *ticket_subject )
 	return 1;
 }
 
-INT64_T chirp_client_ticket( struct chirp_client *c, const char *ticket_filename, const char *subject, const char *duration, time_t stoptime )
+INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, const char *subject, time_t duration, time_t stoptime )
 {
 	char command[PATH_MAX*2+4096];
 	char ticket_subject[CHIRP_PATH_MAX];
 	FILE *shell;
 	int status;
 
-	ticket_translate(ticket_filename, ticket_subject);
+	ticket_translate(name, ticket_subject);
 
 	/* BEWARE: we don't bother to escape the filename, a user could
 	 * provide a malicious filename that makes us execute code we don't want to.
 	 */
-	sprintf(command,"if [ -r '%s' ]; then sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null; exit 0; else exit 1; fi",ticket_filename,ticket_filename);
+	sprintf(command,"if [ -r '%s' ]; then sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null; exit 0; else exit 1; fi",name,name);
 	shell = popen(command,"r");
 	if (!shell) return -1;
 
@@ -375,8 +375,8 @@ INT64_T chirp_client_ticket( struct chirp_client *c, const char *ticket_filename
 	if(status) {
 		return -1;
 	}
-	
-	int result = send_command(c,stoptime,"ticket %s %s %zu\n",subject,duration,length);
+
+	int result = send_command(c,stoptime,"ticket_register %s %llu %zu\n",subject == NULL ? "self" : subject,(unsigned long long)duration,length);
 	if(result<0) {
 		free(ticket);
 		return result;
@@ -389,16 +389,83 @@ INT64_T chirp_client_ticket( struct chirp_client *c, const char *ticket_filename
 		return -1;
 	}
 
-	return get_result(c,stoptime);
+	result = get_result(c,stoptime);
+
+	if (result == 0) {
+		/* FIXME: comments in ticket */
+	}
+	return result;
 }
 
-INT64_T chirp_client_ticketacl( struct chirp_client *c, const char *ticket_filename, const char *path, const char *acl, time_t stoptime )
+INT64_T chirp_client_ticket_create (struct chirp_client *c, char name[CHIRP_PATH_MAX], unsigned bits, time_t stoptime)
+{
+	static const char command[] =
+		"T=`mktemp`\n"
+		"P=`mktemp`\n"
+		"MD5=`mktemp`\n"
+
+		"echo \"# Chirp Ticket\" > \"$T\"\n"
+		"echo \"# Created: `date`\" >> \"$T\"\n"
+		"openssl genrsa \"$CHIRP_BITS\" >> \"$T\" 2> /dev/null\n"
+		"sed '/^\\s*#/d' < \"$T\" | openssl rsa -pubout > \"$P\" 2> /dev/null\n"
+
+		"openssl md5 < \"$P\" > \"$MD5\" 2> /dev/null\n"
+		"if [ -z \"$CHIRP_TICKET\" ]; then\n"
+		"  CHIRP_TICKET=\"ticket.`cat $MD5`\"\n"
+		"fi\n"
+
+		"cat > \"$CHIRP_TICKET\" < \"$T\"\n"
+		"rm -f \"$T\" \"$P\" \"$MD5\"\n"
+
+		"echo \"Generated ticket $CHIRP_TICKET.\" 1>&2\n"
+		"echo -n \"$CHIRP_TICKET\"\n";
+
+	int result;
+
+	if (strlen(name) == 0)
+		result = unsetenv("CHIRP_TICKET");
+	else
+		result = setenv("CHIRP_TICKET", name, 1);
+	if (result == -1) return -1;
+
+	char bits_s[32];
+	sprintf(bits_s, "%u", bits);
+	result = setenv("CHIRP_BITS", bits_s, 1);
+	if (result == -1) return -1;
+
+	memset(name, 0, CHIRP_PATH_MAX);
+	FILE *shell = popen(command, "r");
+	if (shell == NULL) return -1;
+	ssize_t read;
+	char *buffer = name;
+	while ((read = full_fread(shell, buffer, sizeof(name)-1-(name-buffer))) > 0)
+		buffer += read;
+	pclose(shell);
+	if ((buffer - name) <= 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	return 0;
+}
+
+INT64_T chirp_client_ticket_delete (struct chirp_client *c, const char *name, time_t stoptime)
+{
+	return chirp_client_ticket_register(c, name, NULL, 0, stoptime) == 0 ? unlink(name) : -1;
+}
+
+INT64_T chirp_client_ticket_list (struct chirp_client *c, const char *name, time_t stoptime)
+{
+	return 0;
+}
+
+INT64_T chirp_client_ticket_mask (struct chirp_client *c, const char *name, const char *path, const char *aclmask, time_t stoptime)
 {
 	char ticket_subject[CHIRP_PATH_MAX];
 	char safepath[CHIRP_LINE_MAX];
-	ticket_translate(ticket_filename, ticket_subject);
+	ticket_translate(name, ticket_subject);
 	url_encode(path, safepath, sizeof(safepath));
-	return simple_command(c, stoptime, "ticketacl %s %s %s\n", ticket_subject, safepath, acl);
+	return simple_command(c, stoptime, "ticket_mask %s %s %s\n", ticket_subject, safepath, aclmask);
 }
 
 INT64_T chirp_client_setacl( struct chirp_client *c, const char *path, const char *user, const char *acl, time_t stoptime )
