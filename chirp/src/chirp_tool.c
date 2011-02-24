@@ -195,13 +195,13 @@ static void show_help( const char *cmd )
 	printf("use: %s [options] [hostname] [command]\n",cmd);
 	printf("where options are:\n");
 	printf(" -a <flag>  Require this authentication mode.\n");
-	printf(" -k <files> Comma-delimited list of tickets to use for authentication.\n");
 	printf(" -d <flag>  Enable debugging for this subsystem.\n");
+	printf(" -h         This message.\n");
+	printf(" -k <files> Comma-delimited list of tickets to use for authentication.\n");
+	printf(" -l         Long transfer information.\n");
 	printf(" -q         Quiet mode; supress messages and table headers.\n");
 	printf(" -t <time>  Set remote operation timeout.\n");
 	printf(" -v         Show program version.\n");
-	printf(" -h         This message.\n");
-	printf(" -l         Long transfer information.\n");
 }
  
 
