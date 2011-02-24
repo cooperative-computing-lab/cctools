@@ -19,6 +19,8 @@ extern "C" {
 #include "xmalloc.h"
 #include "create_dir.h"
 #include "file_cache.h"
+#include "md5.h"
+#include "sort_dir.h"
 #include "password_cache.h"
 #include "debug.h"
 #include "getopt.h"
@@ -215,6 +217,7 @@ static void show_use( const char *cmd )
 	printf("  -G <num>   Fake this gid; Real gid stays the same.          (PARROT_GID)\n");
 	printf("  -H         Disable use of helper library.\n");
 	printf("  -h         Show this screen.\n");
+	printf("  -i <files> Comma-delimited list of tickets to use for authentication.\n");
 	printf("  -K         Checksum files where available.\n");
 	printf("  -k         Do not checksum files.\n");
 	printf("  -l <path>  Path to ld.so to use.                      (PARROT_LDSO_PATH)\n");
@@ -431,6 +434,7 @@ int main( int argc, char *argv[] )
 	int chose_auth=0;
 	struct rusage usage;
 	char c;
+	int did_ticket=0;
 
 	srand(time(0)*(getpid()+getuid()));
 
@@ -553,7 +557,7 @@ int main( int argc, char *argv[] )
 
 	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
 
-	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DE:FfG:HkKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
+	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DE:FfG:Hi:kKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
 		switch(c) {
 		case 'a':
 			if(!auth_register_byname(optarg)) {
@@ -598,6 +602,10 @@ int main( int argc, char *argv[] )
 			break;
 		case 'H':
 			pfs_use_helper = 0;
+			break;
+		case 'i':
+			setenv(CHIRP_CLIENT_TICKETS, optarg, 1);
+			did_ticket = 1;
 			break;
 		case 'k':
 			pfs_checksum_files = 0;
@@ -682,6 +690,26 @@ int main( int argc, char *argv[] )
 	pfs_file_cache = file_cache_init(pfs_temp_dir);
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
 	file_cache_cleanup(pfs_file_cache);
+
+	if(!did_ticket && getenv(CHIRP_CLIENT_TICKETS) == NULL) {
+		/* populate a list with tickets in the current directory */
+		int i;
+		char **list;
+		char *tickets = xstrdup("");
+		sort_dir(".", &list, strcmp);
+		for (i = 0; list[i]; i++) {
+			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 && (strlen(list[i]) == (strlen("ticket.")+(MD5_DIGEST_LENGTH<<1)))) {
+				debug(D_CHIRP, "adding ticket %s", list[i]);
+				tickets = (char *) xxrealloc(tickets, strlen(tickets)+1+strlen(list[i])+1);
+                if (*tickets != '\0') /* non-empty? */
+					strcat(tickets, ",");
+				strcat(tickets, list[i]);
+			}
+		}
+		setenv(CHIRP_CLIENT_TICKETS, tickets, 1);
+		free(tickets);
+		sort_dir_free(list);
+	}
 
 	if(!chose_auth) auth_register_all();
 
