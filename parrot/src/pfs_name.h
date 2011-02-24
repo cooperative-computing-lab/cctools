@@ -15,7 +15,7 @@ class pfs_service;
 struct pfs_name {
 	pfs_service *service;
 	char logical_name[PFS_PATH_MAX];
-        char service_name[PFS_PATH_MAX];
+	char service_name[PFS_PATH_MAX];
 	char path[PFS_PATH_MAX];
 	char host[PFS_PATH_MAX];
 	char hostport[PFS_PATH_MAX];
