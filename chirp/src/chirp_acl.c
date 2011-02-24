@@ -509,6 +509,12 @@ int chirp_acl_ticket ( const char *root, const char *subject, const char *newsub
 	now = mktime(gmtime(&now)); /* convert to UTC */
     sprintf(expiration, "%lu", (unsigned long) (now+offset));
 
+    /* Note about tickets making tickets:
+     * A ticket created by a ticket authenticated user has the same effective
+     * subject (see the ticket_register RPC in chirp_server.c). Also, the
+     * expiration time is less than or equal to the expiration time of the
+     * ticket used to authenticate.
+     */
 	if (isticket(subject,&digest)) {
 		struct chirp_ticket ct;
 		sprintf(ticket_file,"%s/%s%s",root,TICKET_PREFIX,subject);
@@ -558,6 +564,11 @@ int chirp_acl_ticketacl ( const char *root, const char *subject, const char *tic
 		errno = EINVAL;
 		return -1;
 	}
+    /* Note about tickets making tickets:
+     * We check whether the ticket has the rights associated with the mask in
+     * the next line. So, a ticket can only make a ticket with rights it
+     * already has.
+     */
     if (!chirp_acl_check_dir(root,path,subject,flags)) return -1; /* you don't have the rights for the mask */
     if (!chirp_acl_whoami(subject, &esubject)) return -1;
 
