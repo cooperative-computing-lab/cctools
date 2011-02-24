@@ -467,12 +467,13 @@ typedef struct {
 static int
 WorkQueue_init(WorkQueue *self, PyObject *args, PyObject *kwds)
 {
-    char *kwlist[]  = { "port", "catalog", "exclusive", NULL };
+    char *kwlist[]  = { "port", "name", "catalog", "exclusive", NULL };
+    PyObject *name  = NULL;
     int   port      = WORK_QUEUE_DEFAULT_PORT;
     int   catalog   = TRUE;
     int   exclusive = TRUE;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|iii", kwlist, &port, &catalog, &exclusive))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|iO!ii", kwlist, &port, &PyString_Type, &name, &catalog, &exclusive))
 	return -1;
 
     self->wqp = work_queue_create(port);
@@ -491,6 +492,10 @@ WorkQueue_init(WorkQueue *self, PyObject *args, PyObject *kwds)
     if (!self->stats) {
 	PyErr_Format(PyExc_Exception, "could not create stats member");
 	return -1;
+    }
+
+    if (name) {
+    	work_queue_specify_name(self->wqp, PyString_AsString(name));
     }
 
     work_queue_specify_master_mode(self->wqp, catalog);
