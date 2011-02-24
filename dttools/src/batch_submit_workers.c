@@ -43,8 +43,7 @@ static void show_help(const char *cmd)
 	printf("  -h             Show this screen.\n");
 	printf("\n");
 	printf("where worker options are:\n");
-	printf("  -N <name>      Preferred master name.\n");
-	printf("  -S             Run as a shared worker.\n");
+	printf("  -a <args>      The arguments that get passed to the worker program.\n");
 	printf("  -t <time>      Abort after this amount of idle time.\n");
 }
 
