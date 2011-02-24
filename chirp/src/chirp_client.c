@@ -376,7 +376,8 @@ INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, 
 		return -1;
 	}
 
-	int result = send_command(c,stoptime,"ticket_register %s %llu %zu\n",subject == NULL ? "self" : subject,(unsigned long long)duration,length);
+	if (subject == NULL) subject = "self";
+	int result = send_command(c,stoptime,"ticket_register %s %llu %zu\n",subject,(unsigned long long)duration,length);
 	if(result<0) {
 		free(ticket);
 		return result;
@@ -392,7 +393,22 @@ INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, 
 	result = get_result(c,stoptime);
 
 	if (result == 0) {
-		/* FIXME: comments in ticket */
+		time_t t;
+		struct tm tm;
+		char now[1024];
+		char expiration[1024];
+
+		time(&t);
+		localtime_r(&t, &tm);
+		strftime(now, sizeof(now)/sizeof(char), "%c", &tm);
+		t += duration;
+		localtime_r(&t, &tm);
+		strftime(expiration, sizeof(expiration)/sizeof(char), "%c", &tm);
+
+		FILE *file = fopen(name, "a");
+		if (file == NULL) return -1;
+		fprintf(file,"# %s: Registered with %s as \"%s\". Expires on %s\n",now,c->hostport,subject,now);
+		fclose(file);
 	}
 	return result;
 }
@@ -405,7 +421,7 @@ INT64_T chirp_client_ticket_create (struct chirp_client *c, char name[CHIRP_PATH
 		"MD5=`mktemp`\n"
 
 		"echo \"# Chirp Ticket\" > \"$T\"\n"
-		"echo \"# Created: `date`\" >> \"$T\"\n"
+		"echo \"# `date`: Ticket Created.\" >> \"$T\"\n"
 		"openssl genrsa \"$CHIRP_BITS\" >> \"$T\" 2> /dev/null\n"
 		"sed '/^\\s*#/d' < \"$T\" | openssl rsa -pubout > \"$P\" 2> /dev/null\n"
 
@@ -465,7 +481,22 @@ INT64_T chirp_client_ticket_mask (struct chirp_client *c, const char *name, cons
 	char safepath[CHIRP_LINE_MAX];
 	ticket_translate(name, ticket_subject);
 	url_encode(path, safepath, sizeof(safepath));
-	return simple_command(c, stoptime, "ticket_mask %s %s %s\n", ticket_subject, safepath, aclmask);
+	INT64_T result = simple_command(c, stoptime, "ticket_mask %s %s %s\n", ticket_subject, safepath, aclmask);
+	if (result == 0) {
+		time_t t;
+		struct tm tm;
+		char now[1024];
+
+		time(&t);
+		localtime_r(&t, &tm);
+		strftime(now, sizeof(now)/sizeof(char), "%c", &tm);
+
+		FILE *file = fopen(name, "a");
+		if (file == NULL) return -1;
+		fprintf(file,"# %s: Set ACL Mask on %s directory = '%s' mask = '%s'.\n",now,c->hostport,path,aclmask);
+		fclose(file);
+	}
+	return result;
 }
 
 INT64_T chirp_client_setacl( struct chirp_client *c, const char *path, const char *user, const char *acl, time_t stoptime )
