@@ -233,7 +233,7 @@ int main( int argc, char *argv[] )
 				exit(0);
 				break;
 			case 'i':
-	 			if (setenv(CHIRP_CLIENT_TICKETS, optarg, 1) != 0) {
+				if (setenv(CHIRP_CLIENT_TICKETS, optarg, 1) != 0) {
 					fprintf(stderr, "couldn't setenv\n");
 					return 1;
 				}
