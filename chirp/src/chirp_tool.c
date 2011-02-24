@@ -219,7 +219,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c=getopt(argc,argv,"+a:d:vhlt:k:"))!=(char)-1) {
+	while((c=getopt(argc,argv,"+a:d:hi:lt:v"))!=(char)-1) {
 		switch(c) {
 			case 'a':
 				auth_register_byname(optarg);
