@@ -197,7 +197,7 @@ static void show_help( const char *cmd )
 	printf(" -a <flag>  Require this authentication mode.\n");
 	printf(" -d <flag>  Enable debugging for this subsystem.\n");
 	printf(" -h         This message.\n");
-	printf(" -k <files> Comma-delimited list of tickets to use for authentication.\n");
+	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
 	printf(" -l         Long transfer information.\n");
 	printf(" -q         Quiet mode; supress messages and table headers.\n");
 	printf(" -t <time>  Set remote operation timeout.\n");
@@ -232,7 +232,7 @@ int main( int argc, char *argv[] )
 				show_help(argv[0]);
 				exit(0);
 				break;
-			case 'k':
+			case 'i':
 	 			if (setenv(CHIRP_CLIENT_TICKETS, optarg, 1) != 0) {
 					fprintf(stderr, "couldn't setenv\n");
 					return 1;
