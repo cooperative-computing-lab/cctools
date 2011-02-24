@@ -228,19 +228,9 @@ int main( int argc, char *argv[] )
 			case 'd':
 				debug_flags_set(optarg);
 				break;
-			case 't':
-				timeout = string_time_parse(optarg);
-				break;
-			case 'v':
-				show_version(argv[0]);
-				exit(0);
-				break;
 			case 'h':
 				show_help(argv[0]);
 				exit(0);
-				break;
-	        case 'l':
-		        long_information = 1;
 				break;
 			case 'k':
 	 			if (setenv(CHIRP_CLIENT_TICKETS, optarg, 1) != 0) {
@@ -248,6 +238,16 @@ int main( int argc, char *argv[] )
 					return 1;
 				}
 				did_ticket = 1;
+				break;
+			case 'l':
+				long_information = 1;
+				break;
+			case 't':
+				timeout = string_time_parse(optarg);
+				break;
+			case 'v':
+				show_version(argv[0]);
+				exit(0);
 				break;
 		}
 	}
