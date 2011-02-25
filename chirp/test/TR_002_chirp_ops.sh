@@ -8,7 +8,7 @@ PID_FILE=chirp_server.pid
 prepare()
 {
     mkdir foo
-    ln -s ..//.//./..///foo/ foo
+    ln -s ..//.//./..///foo/ foo/foo
     ../src/chirp_server -r $PWD/foo -p 9095 &
     echo "$!" > $PID_FILE
     exit 0
