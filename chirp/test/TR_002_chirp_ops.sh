@@ -41,7 +41,7 @@ EOF
 clean()
 {
     kill -9 `cat $PID_FILE`
-    rm -rf _test .__acl $PID_FILE $TEST_FILE
+    rm -rf foo _test .__acl $PID_FILE $TEST_FILE
     exit 0
 }
 
