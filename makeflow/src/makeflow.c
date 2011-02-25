@@ -1407,7 +1407,7 @@ static void show_help(const char *cmd)
 	printf(" -P <integer>   Priority. Higher the value, higher the priority.\n");
 	printf(" -a             Advertise the master information to a catalog server.\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	printf(" -s             Accept shared workers (workers with no project preferences). By default the master would only accept workers that prefer this project.\n");
+	printf(" -e             Set the work queue master to only accept workers that have the same -N <project> option.\n");
 	printf(" -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	printf(" -I             Show input files.\n");
 	printf(" -O             Show output files.\n");
@@ -1445,11 +1445,11 @@ int main( int argc, char *argv[] )
 	int auto_workers = 0;
 	char line[1024];
     int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
-    int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
+    int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAB:cCd:DF:GhiIj:J:kKl:L:N:o:Op:P:r:RsS:T:vw:W:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cCd:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:T:vw:W:")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1474,8 +1474,8 @@ int main( int argc, char *argv[] )
         case 'a':
             work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
-        case 's':
-            work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
+        case 'e':
+            work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
             break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg)) {

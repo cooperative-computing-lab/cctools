@@ -1094,7 +1094,7 @@ struct work_queue * work_queue_create( int port )
 	if(envstring) {
 		work_queue_specify_worker_mode(q, atoi(envstring));
 	} else {
-		q->worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
+		q->worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 	}
 
     if (q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
@@ -1153,7 +1153,7 @@ int work_queue_specify_worker_mode(struct work_queue *q, int mode) {
             q->worker_mode = mode;
             break;
         default:
-            q->worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
+            q->worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
     }
 	return q->worker_mode;
 }
