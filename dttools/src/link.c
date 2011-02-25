@@ -42,8 +42,8 @@ struct link {
 	int written;
 	time_t last_used;
 	char buffer[BUFFER_SIZE];
-	int buffer_start;
-	int buffer_length;
+	size_t buffer_start;
+	size_t buffer_length;
 	char raddr[LINK_ADDRESS_MAX];
 	int rport;
 };
@@ -382,7 +382,7 @@ static int fill_buffer( struct link *link, time_t stoptime )
 
 /* link_read blocks until all the requested data is available */
 
-int link_read( struct link *link, char *data, int count, time_t stoptime )
+int link_read( struct link *link, char *data, size_t count, time_t stoptime )
 {
 	ssize_t total=0;
 	ssize_t chunk=0;
@@ -443,7 +443,7 @@ int link_read( struct link *link, char *data, int count, time_t stoptime )
 
 /* link_read_avail returns whatever is available, blocking only if nothing is */
 
-int link_read_avail( struct link *link, char *data, int count, time_t stoptime )
+int link_read_avail( struct link *link, char *data, size_t count, time_t stoptime )
 {
 	ssize_t total=0;
 	ssize_t chunk=0;
@@ -495,7 +495,7 @@ int link_read_avail( struct link *link, char *data, int count, time_t stoptime )
 	}		
 }
 
-int link_readline( struct link *link, char *line, int length, time_t stoptime )
+int link_readline( struct link *link, char *line, size_t length, time_t stoptime )
 {
 	while(1) {
 		while(length>0 && link->buffer_length>0) {
@@ -512,14 +512,14 @@ int link_readline( struct link *link, char *line, int length, time_t stoptime )
 				length--;
 			}
 		}
-		if(length<=0) break;
+		if(length==0) break;
 		if(fill_buffer(link,stoptime)<=0) break;
 	}
 
 	return 0;
 }
 
-int link_write( struct link *link, const char *data, int count, time_t stoptime )
+int link_write( struct link *link, const char *data, size_t count, time_t stoptime )
 {
 	ssize_t total=0;
 	ssize_t chunk=0;

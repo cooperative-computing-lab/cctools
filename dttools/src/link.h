@@ -98,7 +98,7 @@ or the connection is dropped.
 @param stoptime The time at which to abort.
 @return The number of bytes actually read, or zero if the connection is closed, or less than zero on error.
 */
-int  link_read( struct link *link, char *data, int length, time_t stoptime );
+int  link_read( struct link *link, char *data, size_t length, time_t stoptime );
 
 /** Read available data from a connection.
 This call will read whatever data is immediately available, and then
@@ -109,7 +109,7 @@ return without blocking.
 @param stoptime The time at which to abort.
 @return The number of bytes actually read, or zero if the connection is closed, or less than zero on error.
 */
-int  link_read_avail( struct link *link, char *data, int length, time_t stoptime );
+int  link_read_avail( struct link *link, char *data, size_t length, time_t stoptime );
 
 /** Write data to a connection.
 @param link The link to write.
@@ -118,7 +118,7 @@ int  link_read_avail( struct link *link, char *data, int length, time_t stoptime
 @param stoptime The time at which to abort.
 @return The number of bytes actually written, or less than zero on error.
 */
-int  link_write( struct link *link, const char *data, int length, time_t stoptime );
+int  link_write( struct link *link, const char *data, size_t length, time_t stoptime );
 
 /** Block until a link is readable or writable.
 @param link The link to wait on.
@@ -166,7 +166,7 @@ readline can usually complete with zero or one system calls.
 @param stoptime The absolute time at which to abort.
 @return If greater than zero, a line was read, and the return value indicates the length in bytes.  If equal to zero, end of stream was reached.  If less than zero, an error occurred.
 */
-int  link_readline( struct link *link, char *line, int length, time_t stoptime );
+int  link_readline( struct link *link, char *line, size_t length, time_t stoptime );
 
 /** Get the underlying file descriptor of a link.
 @param link The link to examine.
