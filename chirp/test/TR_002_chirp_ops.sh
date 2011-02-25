@@ -7,11 +7,10 @@ PID_FILE=chirp_server.pid
 
 prepare()
 {
-	ln -s ..//.//.///src/
-    ../src/chirp_server -p 9095 &
-    pid=$!
-    
-    echo $pid > $PID_FILE
+    mkdir foo
+    ln -s ..//.//./..///foo/ foo
+    ../src/chirp_server -r $PWD/foo -p 9095 &
+    echo "$!" > $PID_FILE
     exit 0
 }
 
@@ -20,7 +19,9 @@ run()
     exec ../src/chirp localhost:9095 <<EOF
 help
 df -g
-ls src
+mkdir bar
+mv foo bar/foo
+ls bar/foo
 audit -r
 whoami
 whoareyou localhost:9095
@@ -39,12 +40,8 @@ EOF
 
 clean()
 {
-    kill -9 $(cat $PID_FILE)
-    rm -f $TEST_FILE
-    rm -f $PID_FILE
-    rm -f .__acl
-    rm -fr _test
-    rm -f src
+    kill -9 `cat $PID_FILE`
+    rm -rf _test .__acl $PID_FILE $TEST_FILE
     exit 0
 }
 
