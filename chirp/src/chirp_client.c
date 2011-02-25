@@ -407,7 +407,7 @@ INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, 
 
 		FILE *file = fopen(name, "a");
 		if (file == NULL) return -1;
-		fprintf(file,"# %s: Registered with %s as \"%s\". Expires on %s\n",now,c->hostport,subject,now);
+		fprintf(file,"# %s: Registered with %s as \"%s\". Expires on %s\n",now,c->hostport,subject,expiration);
 		fclose(file);
 	}
 	return result;
