@@ -46,7 +46,6 @@ static int read_token(void *link, void **bufp, size_t *sizep)
 
 static int write_token(void *link, void *buf, size_t size)
 {
-	char line[AUTH_LINE_MAX];
 	time_t stoptime = time(0)+3600;
 
 	link_putfstring(link,"%zu\n",stoptime,size);
