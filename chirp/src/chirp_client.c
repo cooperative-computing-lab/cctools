@@ -560,7 +560,7 @@ INT64_T chirp_client_pwrite_begin( struct chirp_client *c, INT64_T fd, const voi
 	result = send_command(c,stoptime,"pwrite %lld %lld %lld\n",fd,length,offset);
 	if(result<0) return result;
 
-	result = link_write(c->link,buffer,length,stoptime);
+	result = link_putlstring(c->link,buffer,length,stoptime);
 	if(result!=length) {
 		c->broken = 1;
 		errno = ECONNRESET;
@@ -592,7 +592,7 @@ INT64_T chirp_client_swrite_begin( struct chirp_client *c, INT64_T fd, const voi
 	result = send_command(c,stoptime,"swrite %lld %lld %lld %lld %lld\n",fd,length,stride_length,stride_skip,offset);
 	if(result<0) return result;
 
-	result = link_write(c->link,buffer,length,stoptime);
+	result = link_putlstring(c->link,buffer,length,stoptime);
 	if(result!=length) {
 		c->broken = 1;
 		errno = ECONNRESET;
@@ -644,7 +644,7 @@ INT64_T chirp_client_putfile_buffer( struct chirp_client *c, const char *path, c
 	result = simple_command(c,stoptime,"putfile %s %lld %lld\n",safepath,mode,length);
 	if(result<0) return result;
 
-	result = link_write(c->link,buffer,length,stoptime);
+	result = link_putlstring(c->link,buffer,length,stoptime);
 	if(result!=length) {
 		c->broken = 1;
 		errno = ECONNRESET;
@@ -676,7 +676,7 @@ INT64_T chirp_client_putstream( struct chirp_client *c, const char *path, time_t
 
 INT64_T chirp_client_putstream_write( struct chirp_client *c, const char *data, INT64_T length, time_t stoptime )
 {
-	return link_write(c->link,data,length,stoptime);
+	return link_putlstring(c->link,data,length,stoptime);
 }
 
 INT64_T chirp_client_thirdput( struct chirp_client *c, const char *path, const char *hostname, const char *newpath, time_t stoptime ) {
@@ -1107,8 +1107,7 @@ INT64_T chirp_client_group_policy_get( struct chirp_client *c, const char *group
 	char line[CHIRP_LINE_MAX];
 	INT64_T result;
 
-	sprintf(line, "group_policy_get %s\n", group);
-	result = link_write(c->link,line,strlen(line),stoptime);
+	result = link_putfstring(c->link,"group_policy_get %s\n",stoptime,group);
 	debug(D_CHIRP,"= %lld",result);
  
 	link_readline(c->link,line,CHIRP_LINE_MAX,stoptime);
@@ -1298,7 +1297,7 @@ static INT64_T send_command_varargs( struct chirp_client *c, time_t stoptime, ch
 
 	debug(D_CHIRP,"%s: %s",c->hostport,command);
 
-	result = link_write(c->link,command,strlen(command),stoptime);
+	result = link_putstring(c->link,command,stoptime);
 	if(result < 0) {
 		c->broken = 1;
 		errno = ECONNRESET;

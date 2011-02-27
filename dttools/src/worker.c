@@ -293,7 +293,6 @@ int stream_output_item(struct link *master, const char *filename) {
 	struct dirent *dent;
 	char dentline[WORK_QUEUE_LINE_MAX];
 	struct stat info;
-	char line[WORK_QUEUE_LINE_MAX];
 	INT64_T actual, length;
 	int fd;
 
@@ -307,8 +306,7 @@ int stream_output_item(struct link *master, const char *filename) {
 		if(!dir) {
             goto failure;
 		}
-		sprintf(line,"dir %s %lld\n", filename, (INT64_T)0);
-		link_write(master,line,strlen(line),time(0)+active_timeout);
+		link_putfstring(master,"dir %s %lld\n",time(0)+active_timeout,filename,(INT64_T)0);
 
 		while((dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, "..")) continue;
@@ -322,8 +320,7 @@ int stream_output_item(struct link *master, const char *filename) {
 		fd = open(filename,O_RDONLY,0);
 		if(fd>=0) {
 			length = (INT64_T)info.st_size;
-			sprintf(line,"file %s %lld\n", filename, length);
-			link_write(master,line,strlen(line),time(0)+active_timeout);
+			link_putfstring(master,"file %s %lld\n",time(0)+active_timeout,filename,length);
 			actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
 			close(fd);
 			if(actual!=length) {
@@ -339,8 +336,7 @@ int stream_output_item(struct link *master, const char *filename) {
 
     failure:
 	fprintf(stderr,"Failed to transfer ouput item - %s. (%s)\n",filename, strerror(errno));
-    sprintf(line,"missing %s %d\n", filename, errno);
-    link_write(master,line,strlen(line),time(0)+active_timeout);
+    link_putfstring(master,"missing %s %d\n",time(0)+active_timeout,filename,errno);
 	return 0;
 }
 
@@ -532,11 +528,10 @@ int main( int argc, char *argv[] ) {
           
 
             if(exclusive_worker) {
-			    sprintf(line,"ready %s %d %llu %llu %llu %llu \"%s\"\n",hostname,ncpus,memory_avail,memory_total,disk_avail,disk_total, preferred_master_names);
+			    link_putfstring(master,"ready %s %d %llu %llu %llu %llu \"%s\"\n",time(0)+active_timeout,hostname,ncpus,memory_avail,memory_total,disk_avail,disk_total,preferred_master_names);
             } else {
-			    sprintf(line,"ready %s %d %llu %llu %llu %llu\n",hostname,ncpus,memory_avail,memory_total,disk_avail,disk_total);
+			    link_putfstring(master,"ready %s %d %llu %llu %llu %llu\n",time(0)+active_timeout,hostname,ncpus,memory_avail,memory_total,disk_avail,disk_total);
             }
-			link_write(master,line,strlen(line),time(0)+active_timeout);
 		}
 
 		if(link_readline(master,line,sizeof(line),time(0)+active_timeout)) {
@@ -558,20 +553,19 @@ int main( int argc, char *argv[] ) {
 					result = -1;
 					buffer = 0;
 				}
-				sprintf(line, "result %d %lld\n", result, length);
-				debug(D_WQ,"%s",line);
-				link_write(master,line,strlen(line),time(0)+active_timeout);
-				link_write(master,buffer,length,time(0)+active_timeout);
+				debug(D_WQ,"result %d %lld",result,length);
+				link_putfstring(master,"result %d %lld\n",time(0)+active_timeout,result,length);
+				link_putlstring(master,buffer,length,time(0)+active_timeout);
 				if(buffer) free(buffer);
 			} else if(sscanf(line,"stat %s", filename)==1) {
 				struct stat st;
 				if(!stat(filename, &st)) {
-					sprintf(line,"result 1 %lu %lu\n",(unsigned long int)st.st_size,(unsigned long int)st.st_mtime);
+					debug(D_WQ,"result 1 %lu %lu",(unsigned long int)st.st_size,(unsigned long int)st.st_mtime);
+					link_putfstring(master,"result 1 %lu %lu\n",time(0)+active_timeout,(unsigned long int)st.st_size,(unsigned long int)st.st_mtime);
 				} else {
-					sprintf(line,"result 0 0 0\n");
+					debug(D_WQ,"result 0 0 0");
+					link_putliteral(master,"result 0 0 0\n",time(0)+active_timeout);
 				}
-				debug(D_WQ,"%s",line);
-				link_write(master,line,strlen(line),time(0)+active_timeout);
 			} else if(sscanf(line, "symlink %s %s", path, filename)==2) {
 				char *cur_pos, *tmp_pos;
 
@@ -629,8 +623,7 @@ int main( int argc, char *argv[] ) {
 				}
 			} else if(sscanf(line, "rget %s",filename)==1) {
 				stream_output_item(master, filename);
-				sprintf(line,"end\n");
-				link_write(master,line,strlen(line),time(0)+active_timeout);
+				link_putliteral(master,"end\n",time(0)+active_timeout);
 			} else if(sscanf(line, "get %s",filename)==1) { // for backward compatibility
 				struct stat info;
 				if(stat(filename, &info) != 0) {
@@ -642,8 +635,7 @@ int main( int argc, char *argv[] ) {
 				fd = open(filename,O_RDONLY,0);
 				if(fd>=0) {
 					length = (INT64_T)info.st_size;
-					sprintf(line,"%lld\n",length);
-					link_write(master,line,strlen(line),time(0)+active_timeout);
+					link_putfstring(master,"%lld\n",time(0)+active_timeout,length);
 					INT64_T actual = link_stream_from_fd(master,fd,length,time(0)+active_timeout);
 					close(fd);
 					if(actual!=length) {
@@ -657,7 +649,7 @@ int main( int argc, char *argv[] ) {
 			} else if(!strcmp(line,"exit")) {
 				break;
 			} else {
-				link_write(master,"error\n",6,time(0)+active_timeout);
+				link_putliteral(master,"error\n",time(0)+active_timeout);
 			}
 
 			idle_stoptime = time(0) + idle_timeout;

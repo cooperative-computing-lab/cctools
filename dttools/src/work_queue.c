@@ -113,16 +113,6 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 static int short_timeout = 5;
 static int next_taskid = 1;
 
-static int link_printf( struct link *l, const char *fmt, ... )
-{
-	char line[WORK_QUEUE_CATALOG_LINE_MAX];
-	va_list args;
-	va_start(args,fmt);
-	vsnprintf(line,sizeof(line),fmt,args);
-	va_end(args);
-	return link_write(l,line,strlen(line),time(0)+short_timeout);
-}
-
 struct work_queue_task * work_queue_task_create( const char *command_line)
 {
 	struct work_queue_task *t = malloc(sizeof(*t));
@@ -291,7 +281,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 	if(hash_table_lookup(received_items, local_name)) return 1;
 
 	debug(D_WQ,"%s (%s) sending back %s to %s",w->hostname,w->addrport,remote_name,local_name);
-	link_printf(w->link, "rget %s\n", remote_name);
+	link_putfstring(w->link, "rget %s\n", time(0)+short_timeout, remote_name);
 
 	strcpy(tmp_local_name, local_name);
 	remote_name_len = strlen(remote_name);
@@ -489,7 +479,7 @@ static void delete_uncacheable_files( struct work_queue_task *t, struct work_que
 		while((tf=list_next_item(t->input_files))) {
 			if(!(tf->flags&WORK_QUEUE_CACHE)) {
 				debug(D_WQ,"%s (%s) unlink %s",w->hostname,w->addrport,tf->remote_name);
-				link_printf(w->link,"unlink %s\n",tf->remote_name);
+				link_putfstring(w->link,"unlink %s\n",time(0)+short_timeout,tf->remote_name);
 			}
 		}
 	}
@@ -499,7 +489,7 @@ static void delete_uncacheable_files( struct work_queue_task *t, struct work_que
 		while((tf=list_next_item(t->output_files))) {
 			if(!(tf->flags&WORK_QUEUE_CACHE)) {
 				debug(D_WQ,"%s (%s) unlink %s",w->hostname,w->addrport,tf->remote_name);
-				link_printf(w->link,"unlink %s\n",tf->remote_name);
+				link_putfstring(w->link,"unlink %s\n",time(0)+short_timeout,tf->remote_name);
 			}
 		}
 	}
@@ -721,7 +711,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue *q, struct wo
 			// files in that directory won't suceed. Such failure would
 			// eventually be captured in 'start_tasks' function and in the
 			// 'start_tasks' function the corresponding worker would be removed.
-			link_printf(w->link, "mkdir %s %o\n", tf->payload, local_info.st_mode);
+			link_putfstring(w->link, "mkdir %s %o\n", time(0)+short_timeout, tf->payload, local_info.st_mode);
 			
 			if (!put_directory(tf->payload, q, w, total_bytes)) return 0;
 
@@ -732,7 +722,7 @@ static int put_file( struct work_queue_file *tf, struct work_queue *q, struct wo
 		if(fd<0) return 0;
 		
 		stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T)local_info.st_size);
-		link_printf(w->link,"put %s %lld 0%o\n",tf->remote_name,(INT64_T)local_info.st_size,local_info.st_mode);
+		link_putfstring(w->link,"put %s %lld 0%o\n",time(0)+short_timeout,tf->remote_name,(INT64_T)local_info.st_size,local_info.st_mode);
 		actual = link_stream_from_fd(w->link,fd,local_info.st_size,stoptime);
 		close(fd);
 		
@@ -788,8 +778,8 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 
 				stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T)fl);
 				open_time = timestamp_get();
-				link_printf(w->link,"put %s %lld %o\n",tf->remote_name,(INT64_T)fl,0777);
-				actual = link_write(w->link, tf->payload, fl,stoptime);
+				link_putfstring(w->link,"put %s %lld %o\n",time(0)+short_timeout,tf->remote_name,(INT64_T)fl,0777);
+				actual = link_putlstring(w->link, tf->payload, fl, stoptime);
 				close_time = timestamp_get();
 				if(actual!=(fl)) goto failure;
 				total_bytes+=actual;
@@ -829,8 +819,7 @@ int start_one_task( struct work_queue *q, struct work_queue_worker *w, struct wo
 	t->transfer_start_time = timestamp_get();
 	if(!send_input_files(t,w,q)) return 0;
 	t->start_time = timestamp_get();
-	link_printf(w->link,"work %d\n",strlen(t->command_line));
-	link_write(w->link,t->command_line,strlen(t->command_line),time(0)+short_timeout);
+	link_putfstring(w->link,"work %zu\n%s",time(0)+short_timeout,strlen(t->command_line),t->command_line);
     t->status = TASK_STATUS_EXECUTING;
 	debug(D_WQ,"%s (%s) busy on '%s'",w->hostname,w->addrport,t->command_line);
 	return 1;
@@ -1380,7 +1369,7 @@ int work_queue_shut_down_workers (struct work_queue* q, int n)
 	// send worker exit.
 	hash_table_firstkey( q->worker_table);
 	while((n==0 || i<n) && hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-		link_printf(w->link,"exit\n");
+		link_putliteral(w->link,"exit\n",time(0)+short_timeout);
 		remove_worker(q,w);
 		i++;
 	}

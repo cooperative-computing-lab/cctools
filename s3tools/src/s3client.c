@@ -394,7 +394,7 @@ int s3_mk_bucket(char* bucketname, enum amz_base_perm perms, const char* access_
 	server = link_connect(s3_address, 80, stoptime);
 	if(!server) return -1;
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -442,7 +442,7 @@ int s3_rm_bucket(char* bucketname, const char* access_key_id, const char* access
 	sign_message(&mesg, access_key_id, access_key);
 	length = s3_message_to_string(&mesg, &text);
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -497,7 +497,7 @@ int s3_ls_bucket(char* bucketname, struct list* dirents, const char* access_key_
 		sign_message(&mesg, access_key_id, access_key);
 		length = s3_message_to_string(&mesg, &text);
 	//	fprintf(stderr, "Request:\n%s\n", text);
-		link_write(server, text, length, stoptime);
+		link_putlstring(server, text, length, stoptime);
 		free(text);
 
 		link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -603,7 +603,7 @@ int s3_getacl(char* bucketname, char* filename, char* owner, struct hash_table* 
 	sign_message(&mesg, access_key_id, access_key);
 	length = s3_message_to_string(&mesg, &text);
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -756,13 +756,13 @@ int s3_setacl(char* bucketname, char *filename, const char* owner, struct hash_t
 	length = s3_message_to_string(&mesg, &text);
 
 	fprintf(stderr, "Message:\n%s\n", text);
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
-	link_write(server, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", 39, stoptime);
-	link_write(server, "<AccessControlPolicy><Owner><ID>", 32, stoptime);
-	link_write(server, owner, strlen(owner), stoptime);
-	link_write(server, "</ID></Owner><AccessControlList>", 32, stoptime);
+	link_putliteral(server, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", stoptime);
+	link_putliteral(server, "<AccessControlPolicy><Owner><ID>", stoptime);
+	link_putlstring(server, owner, strlen(owner), stoptime);
+	link_putliteral(server, "</ID></Owner><AccessControlList>", stoptime);
 
 	hash_table_firstkey(acls);
 	while(hash_table_nextkey(acls, &id, (void**)&acl)) {
@@ -781,28 +781,23 @@ int s3_setacl(char* bucketname, char *filename, const char* owner, struct hash_t
 		}
 
 		if(acl->perm & S3_ACL_FULL_CONTROL) {
-			sprintf(grant, "<Grant>%s<Permission>FULL_CONTROL</Permission></Grant>", grantee);
-			link_write(server, grant, strlen(grant), stoptime);
+			link_putfstring(server, grant, "<Grant>%s<Permission>FULL_CONTROL</Permission></Grant>", stoptime, grantee);
 		}
 		if(acl->perm & S3_ACL_READ) {
-			sprintf(grant, "<Grant>%s<Permission>READ</Permission></Grant>", grantee);
-			link_write(server, grant, strlen(grant), stoptime);
+			link_putfstring(server, grant, "<Grant>%s<Permission>READ</Permission></Grant>", stoptime, grantee);
 		}
 		if(acl->perm & S3_ACL_WRITE) {
-			sprintf(grant, "<Grant>%s<Permission>WRITE</Permission></Grant>", grantee);
-			link_write(server, grant, strlen(grant), stoptime);
+			link_putfstring(server, grant, "<Grant>%s<Permission>WRITE</Permission></Grant>", stoptime, grantee);
 		}
 		if(acl->perm & S3_ACL_READ_ACP) {
-			sprintf(grant, "<Grant>%s<Permission>READ_ACP</Permission></Grant>", grantee);
-			link_write(server, grant, strlen(grant), stoptime);
+			link_putfstring(server, grant, "<Grant>%s<Permission>READ_ACP</Permission></Grant>", stoptime, grantee);
 		}
 		if(acl->perm & S3_ACL_WRITE_ACP) {
-			sprintf(grant, "<Grant>%s<Permission>WRITE_ACP</Permission></Grant>", grantee);
-			link_write(server, grant, strlen(grant), stoptime);
+			link_putfstring(server, grant, "<Grant>%s<Permission>WRITE_ACP</Permission></Grant>", stoptime, grantee);
 		}
 	}
 
-	link_write(server, "</AccessControlList></AccessControlPolicy>\n", 43, stoptime);
+	link_putliteral(server, "</AccessControlList></AccessControlPolicy>\n", stoptime);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
 	if(strcmp(response, "HTTP/1.1 200 OK")) {
@@ -872,7 +867,7 @@ int s3_put_file(const char* localname, char* remotename, char* bucketname, enum 
 	server = link_connect(s3_address, 80, stoptime);
 	if(!server) return -1;
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -886,7 +881,7 @@ int s3_put_file(const char* localname, char* remotename, char* bucketname, enum 
 	infile = fopen(localname, "r");
 	link_stream_from_file(server, infile, mesg.content_length, stoptime);
 	fclose(infile);
-	//link_write(server, "\r\n\r\n", 2, stoptime);
+	//link_putliteral(server, "\r\n\r\n", stoptime);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
 	if(strcmp(response, "HTTP/1.1 200 OK")) {
@@ -935,7 +930,7 @@ int s3_get_file(const char* localname, struct s3_dirent_object *dirent, char* re
 	length = s3_message_to_string(&mesg, &text);
 	//fprintf(stderr, "message: %s\n", text);
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -1016,7 +1011,7 @@ int s3_rm_file(char* filename, char* bucketname, const char* access_key_id, cons
 	sign_message(&mesg, access_key_id, access_key);
 	length = s3_message_to_string(&mesg, &text);
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -1063,7 +1058,7 @@ int s3_stat_file(char* filename, char* bucketname, struct s3_dirent_object* dire
 	sign_message(&mesg, access_key_id, access_key);
 	length = s3_message_to_string(&mesg, &text);
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);

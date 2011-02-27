@@ -59,7 +59,7 @@ int s3_mk_bucket(char* bucketname, enum amz_base_perm perms, const char* access_
 	server = link_connect(s3_address, 80, stoptime);
 	if(!server) return -1;
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -107,7 +107,7 @@ int s3_rm_bucket(char* bucketname, const char* access_key_id, const char* access
 	sign_message(&mesg, access_key_id, access_key);
 	length = s3_message_to_string(&mesg, &text);
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -160,7 +160,7 @@ int s3_ls_bucket(char* bucketname, struct list* dirents, const char* access_key_
 		int keys;
 		sign_message(&mesg, access_key_id, access_key);
 		length = s3_message_to_string(&mesg, &text);
-		link_write(server, text, length, stoptime);
+		link_putlstring(server, text, length, stoptime);
 		free(text);
 
 		link_readline(server, response, HEADER_LINE_MAX, stoptime);

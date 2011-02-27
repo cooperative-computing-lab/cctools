@@ -53,7 +53,7 @@ static int auth_unix_assert( struct link *link, time_t stoptime )
 			}
 		} else {
 			debug(D_AUTH,"unix: could not meet challenge: %s",strerror(errno));
-			link_write(link,"no\n",3,stoptime);
+			link_putliteral(link,"no\n",stoptime);
 		}
 		unlink(line);
 	} else {
@@ -154,8 +154,7 @@ static int auth_unix_accept( struct link *link, char **subject, time_t stoptime 
 
 	debug(D_AUTH,"unix: generating challenge");
 	make_challenge_path(path);
-	link_write(link,path,strlen(path),stoptime);
-	link_write(link,"\n",1,stoptime);
+	link_putfstring(link,"%s\n",stoptime,path);
 	
 	debug(D_AUTH,"unix: waiting for response");
 	if(link_readline(link,line,sizeof(line),stoptime)) {
@@ -166,16 +165,16 @@ static int auth_unix_accept( struct link *link, char **subject, time_t stoptime 
 				p = auth_get_passwd_from_uid(buf.st_uid);
 				if(p) {
 					debug(D_AUTH,"unix: client is subject %s",p->pw_name);
-					link_write(link,"yes\n",4,stoptime);
+					link_putliteral(link,"yes\n",stoptime);
 					*subject = xstrdup(p->pw_name);
 					success = 1;
 				} else {
 					debug(D_AUTH,"unix: there is no user corresponding to uid %d",buf.st_uid);
-					link_write(link,"no\n",3,stoptime);
+					link_putliteral(link,"no\n",stoptime);
 				}
 			} else {
 				debug(D_AUTH,"unix: client failed the challenge: %s",strerror(errno));
-				link_write(link,"no\n",3,stoptime);
+				link_putliteral(link,"no\n",stoptime);
 			}
 		} else {
 			debug(D_AUTH,"unix: client declined the challenge");

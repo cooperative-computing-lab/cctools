@@ -54,11 +54,11 @@ static int auth_address_accept( struct link *link, char **subject, time_t stopti
 		goto reject;
 	}
 
-	link_write(link,"yes\n",4,stoptime);
+	link_putliteral(link,"yes\n",stoptime);
 	return 1;
 
 	reject:
-	link_write(link,"no\n",3,stoptime);
+	link_putliteral(link,"no\n",stoptime);
 	return 0;
 }
 

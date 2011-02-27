@@ -63,8 +63,7 @@ int auth_assert( struct link *link, char **type, char **subject, time_t stoptime
 
 		debug(D_AUTH,"requesting '%s' authentication",a->type);
 
-		sprintf(line,"%s\n",a->type);
-		link_write(link,line,strlen(line),stoptime);
+		link_putfstring(link,"%s\n",stoptime,a->type);
 
 		if(!link_readline(link,line,AUTH_LINE_MAX,stoptime)) break;
 		if(!strcmp(line,"yes")) {
@@ -106,7 +105,6 @@ int auth_accept( struct link *link, char **typeout, char **subject, time_t stopt
 {
 	struct auth_ops *a;
 	char type[AUTH_TYPE_MAX];
-	char line[AUTH_LINE_MAX];
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 
@@ -123,10 +121,10 @@ int auth_accept( struct link *link, char **typeout, char **subject, time_t stopt
 		a = type_lookup( type );
 		if(a) {
 			debug(D_AUTH,"I agree to try '%s' ",type);
-			link_write(link,"yes\n",4,stoptime);
+			link_putliteral(link,"yes\n",stoptime);
 		} else {
 			debug(D_AUTH,"I do not agree to '%s' ",type);
-			link_write(link,"no\n",3,stoptime);
+			link_putliteral(link,"no\n",stoptime);
 			continue;
 		}
 
@@ -134,12 +132,7 @@ int auth_accept( struct link *link, char **typeout, char **subject, time_t stopt
 			auth_sanitize(*subject);
 			debug(D_AUTH,"'%s' authentication succeeded",type);
 			debug(D_AUTH,"%s:%d is %s:%s\n",addr,port,type,*subject);
-			sprintf(line,"yes\n");
-			link_write(link,line,strlen(line),stoptime);
-			sprintf(line,"%s\n",type);
-			link_write(link,line,strlen(line),stoptime);
-			sprintf(line,"%s\n",*subject);
-			link_write(link,line,strlen(line),stoptime);
+			link_putfstring(link,"yes\n%s\n%s\n",stoptime,type,*subject);
 			*typeout = xstrdup(type);
 			return 1;
 		} else {
@@ -158,7 +151,7 @@ int auth_barrier( struct link *link, const char *response, time_t stoptime )
 {
 	char line[AUTH_LINE_MAX];
 
-	link_write(link,response,strlen(response),stoptime);
+	link_putstring(link,response,stoptime);
 
 	if(link_readline(link,line,sizeof(line),stoptime)) {
 		if(!strcmp(line,"yes")) {

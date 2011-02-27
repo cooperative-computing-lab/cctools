@@ -120,6 +120,54 @@ int  link_read_avail( struct link *link, char *data, size_t length, time_t stopt
 */
 int  link_write( struct link *link, const char *data, size_t length, time_t stoptime );
 
+/* Write a string of length len to a connection. All data is written until
+ * finished or an error is encountered.
+@param link The link to write.
+@param str A pointer to the string.
+@param len Length of the string.
+@param stoptime The time at which to abort.
+@return The number of bytes actually written, or less than zero on error.
+*/
+int  link_putlstring( struct link *link, const char *str, size_t len, time_t stoptime);
+
+/* Write a C string to a connection. All data is written until finished or an
+   error is encountered. It is defined as a macro.
+@param link The link to write.
+@param str A pointer to the string.
+@param stoptime The time at which to abort.
+@return The number of bytes actually written, or less than zero on error.
+*/
+#define link_putstring(l,s,t)  (link_putlstring(l,s,strlen(s),t))
+
+/* Write a C literal string to a connection. All data is written until finished
+   or an error is encountered. It is defined as a macro.
+@param link The link to write.
+@param str A pointer to the string.
+@param stoptime The time at which to abort.
+@return The number of bytes actually written, or less than zero on error.
+*/
+#define link_putliteral(l,s,t)  (link_putlstring(l,s "",((sizeof(s))-1),t))
+
+/** Write formatted data to a connection. All data is written until finished
+  * or an error is encountered.
+@param link The link to write.
+@param data A pointer to the data.
+@param stoptime The time at which to abort.
+@param ... Format arguments.
+@return The number of bytes actually written, or less than zero on error.
+*/
+int  link_putfstring( struct link *link, const char *fmt, time_t stoptime, ... );
+
+/** Write formatted data to a connection. All data is written until finished
+  * or an error is encountered.
+@param link The link to write.
+@param data A pointer to the data.
+@param stoptime The time at which to abort.
+@param va Format arguments.
+@return The number of bytes actually written, or less than zero on error.
+*/
+int  link_putvfstring( struct link *link, const char *fmt, time_t stoptime, va_list va );
+
 /** Block until a link is readable or writable.
 @param link The link to wait on.
 @param usec The maximum number of microseconds to wait.

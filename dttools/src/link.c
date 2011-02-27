@@ -28,6 +28,8 @@ See the file COPYING for details.
 #include <netdb.h>
 #include <errno.h>
 
+#include <assert.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -555,6 +557,60 @@ int link_write( struct link *link, const char *data, size_t count, time_t stopti
 			return -1;
 		}
 	}		
+}
+
+int link_putlstring( struct link *link, const char *data, size_t count, time_t stoptime )
+{
+	size_t total = 0;
+	ssize_t written;
+
+	while (count > 0 && (written = link_write(link, data, count, stoptime)) > 0) {
+		count -= written;
+		total += written;
+		data += written;
+	}
+	return written < 0 ? written : total;
+}
+
+int link_putvfstring( struct link *link, const char *fmt, time_t stoptime, va_list va )
+{
+	va_list va2;
+	size_t size = 65536;
+	char buffer[size];
+	char *b = buffer;
+
+	va_copy(va2, va);
+	int n = vsnprintf(NULL, 0, fmt, va2);
+	va_end(va2);
+
+	if (n < 0) return -1;
+	if (n > size-1) {
+		b = (char *) malloc(n+1);
+		if (b == NULL) return -1;
+		size = n+1;
+	}
+
+	va_copy(va2, va);
+	n = vsnprintf(b, size, fmt, va2);
+	assert(n >= 0);
+	va_end(va2);
+
+	int r = link_putlstring(link, b, (size_t) n, stoptime);
+
+	if (b != buffer) free(b);
+
+	return r;
+}
+
+int link_putfstring( struct link *link, const char *fmt, time_t stoptime, ... )
+{
+	va_list va;
+
+	va_start(va, stoptime);
+	int result = link_putvfstring(link, fmt, stoptime, va);
+	va_end(va);
+
+	return result;
 }
 
 void link_close( struct link *link )

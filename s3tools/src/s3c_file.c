@@ -65,7 +65,7 @@ int s3_put_file(const char* localname, char* remotename, char* bucketname, enum 
 	server = link_connect(s3_address, 80, stoptime);
 	if(!server) return -1;
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -124,7 +124,7 @@ int s3_get_file(const char* localname, struct s3_dirent_object *dirent, char* re
 	sign_message(&mesg, access_key_id, access_key);
 	length = s3_message_to_string(&mesg, &text);
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -202,7 +202,7 @@ int s3_rm_file(char* filename, char* bucketname, const char* access_key_id, cons
 	sign_message(&mesg, access_key_id, access_key);
 	length = s3_message_to_string(&mesg, &text);
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -249,7 +249,7 @@ int s3_stat_file(char* filename, char* bucketname, struct s3_dirent_object* dire
 	sign_message(&mesg, access_key_id, access_key);
 	length = s3_message_to_string(&mesg, &text);
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
