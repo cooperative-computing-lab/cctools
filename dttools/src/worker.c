@@ -364,7 +364,7 @@ static void show_help(const char *cmd) {
 }
 
 int main( int argc, char *argv[] ) {
-	const char *host;
+	const char *host = NULL;
     char *pm;
 	int port;
 	char actual_addr[LINK_ADDRESS_MAX];
