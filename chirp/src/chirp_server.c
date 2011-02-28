@@ -1334,7 +1334,7 @@ static void chirp_handler( struct link *l, const char *subject )
 		} else if(sscanf(line,"rename %s %s",path,newpath)==2) {
 			if(!chirp_path_fix(path)) goto failure;
 			if(!chirp_path_fix(newpath)) goto failure;
-			if(!chirp_acl_check(path,subject,CHIRP_ACL_DELETE)) goto failure;
+			if(!chirp_acl_check_link(path,subject,CHIRP_ACL_DELETE|CHIRP_ACL_READ)) goto failure;
 			if(!chirp_acl_check(newpath,subject,CHIRP_ACL_WRITE)) goto failure;
 			result = chirp_alloc_rename(path,newpath);
 		} else if(sscanf(line,"link %s %s",path,newpath)==2) {
