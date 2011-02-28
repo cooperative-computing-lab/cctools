@@ -497,6 +497,29 @@ static void delete_uncacheable_files( struct work_queue_task *t, struct work_que
 	}
 }
 
+static int match_project_names(struct work_queue *q, const char *project_names) {
+    char *str;
+    char *token=NULL;
+    char *delims = " \t";
+
+    if(!q || !project_names) return 0;
+
+    str = strndup(project_names, strlen(project_names));
+    token = strtok(str, delims);
+	while(token) {
+        // token holds the preferred master name pattern
+	    debug(D_WQ,"Matching %s against %s", q->name, project_names);
+        if(whole_string_match_regex(q->name, token)) {
+            free(str);
+            return 1;
+        }
+
+        token = strtok(NULL, delims);
+    }
+    free(str);
+    return 0;
+}
+
 static int handle_worker( struct work_queue *q, struct link *l )
 {
 	char line[WORK_QUEUE_CATALOG_LINE_MAX];
@@ -523,7 +546,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
             if(q->worker_mode == WORK_QUEUE_WORKER_MODE_EXCLUSIVE && q->name) {
                 // For backward compatibility, we scan the line AGAIN to see if it contains extra fields
 		        if(sscanf(line,"ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"",project_names)==1) {
-                    if(!string_contains_word(project_names, q->name)) {
+                    if(!match_project_names(q, project_names)) {
 	                    debug(D_WQ,"Preferred masters of %s (%s): %s",w->hostname,w->addrport, project_names);
                         goto reject;
                     }
