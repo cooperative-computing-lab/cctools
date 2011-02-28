@@ -20,16 +20,18 @@ See the file COPYING for details.
 #include "username.h"
 #include "create_dir.h"
 
+#include <unistd.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+
+#include <errno.h>
+#include <math.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <stdarg.h>
-#include <dirent.h>
-#include <sys/wait.h>
 
 #define WORKER_STATE_INIT  0
 #define WORKER_STATE_READY 1
@@ -880,7 +882,7 @@ struct work_queue_worker * find_worker_by_time( struct work_queue *q ) {
 	char *key;
 	struct work_queue_worker *w;
 	struct work_queue_worker *best_worker = 0;
-	double best_time;
+	double best_time = HUGE_VAL;
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
