@@ -156,7 +156,7 @@ public:
 
 		char *local_name;
 		char local_exists;
-		FILE *local_file;
+		FILE *local_file = NULL;
 
 		char *username, *password;
 		username = pfs_password_cache->username;

@@ -69,8 +69,8 @@ public:
 
 	virtual void *connect( pfs_name *name ) {
 
-		struct ftp_lite_server *server;
-		int result;
+		struct ftp_lite_server *server = NULL;
+		int result = 0;
 		int save_errno;
 
 		debug(D_FTP,"connecting to %s:%d",name->host,name->port);

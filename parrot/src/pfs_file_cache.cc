@@ -175,7 +175,7 @@ pfs_file * pfs_cache_open( pfs_name *name, int flags, mode_t mode )
 	struct pfs_stat buf;
 	char txn[PFS_PATH_MAX];
 	int fd, ok_to_fail;
-	struct pfs_file *rfile, *result;
+	struct pfs_file *rfile, *result = NULL;
 	struct utimbuf ut;
 	int sleep_time = 1;
 
