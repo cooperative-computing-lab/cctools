@@ -761,7 +761,7 @@ int s3_setacl(char* bucketname, char *filename, const char* owner, struct hash_t
 
 	link_putliteral(server, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", stoptime);
 	link_putliteral(server, "<AccessControlPolicy><Owner><ID>", stoptime);
-	link_putlstring(server, owner, strlen(owner), stoptime);
+	link_putstring(server, owner, stoptime);
 	link_putliteral(server, "</ID></Owner><AccessControlList>", stoptime);
 
 	hash_table_firstkey(acls);
