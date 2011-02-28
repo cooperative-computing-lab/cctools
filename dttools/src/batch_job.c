@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <fcntl.h>
 
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -33,6 +34,7 @@ struct batch_queue {
 	char *options_text;
 	struct itable *job_table;
 	struct itable *output_table;
+	struct itable *hadoop_jobs;
 	struct work_queue *work_queue;
 };
 
@@ -580,6 +582,256 @@ int batch_job_remove_work_queue( struct batch_queue *q, batch_job_id_t jobid )
 
 /***************************************************************************************/
 
+struct batch_job_hadoop_job {
+	char jobname[BATCH_JOB_LINE_MAX];
+	int jobid;
+};
+
+struct batch_job_hadoop_job * batch_job_hadoop_job_create(char *jname)
+{
+	static int jobid = 1;
+	struct batch_job_hadoop_job *job;
+	job = malloc(sizeof(*job));
+	if(!job) return NULL;
+	snprintf(job->jobname, BATCH_JOB_LINE_MAX, "%s", jname);
+	job->jobid = jobid++;
+	return job;
+}
+
+static int setup_hadoop_wrapper( const char *wrapperfile, const char *cmd )
+{
+	FILE *file;
+
+	if(access(wrapperfile,R_OK|X_OK)==0) return 0;
+
+	file = fopen(wrapperfile,"w");
+	if(!file) return -1;
+
+	fprintf(file,"#!/usr/bin/perl\n");
+	if(cmd) fprintf(file,"system('/afs/nd.edu/user37/ccl/software/cctools/bin/parrot_hdfs %s');\n\n", cmd);
+	fprintf(file, "exit;\n\n");
+	fclose(file);
+
+	chmod(wrapperfile,0755);
+
+	return 0;
+}
+
+static char * get_hadoop_target_file( const char *input_files )
+{
+	static char result[BATCH_JOB_LINE_MAX];
+	static char match_string[BATCH_JOB_LINE_MAX];
+	char * hdfs_root = getenv("HDFS_ROOT_DIR");
+	sprintf(match_string, "%s%%[^,]", hdfs_root);
+	sscanf(input_files, match_string, result);
+	return result;
+}
+
+int batch_job_fork_hadoop( struct batch_queue *q, const char *cmd )
+{
+	int fd_pipe[2];
+	int childpid;
+
+	if(pipe(fd_pipe) < 0) return -1;
+
+	debug(D_HDFS, "forking hadoop_status_wrapper\n");
+	if( (childpid = fork()) < 0 ){
+		return -1;
+	} else if(!childpid) {
+	// CHILD
+		char line[BATCH_JOB_LINE_MAX];
+		char outname[BATCH_JOB_LINE_MAX];
+		FILE *cmd_pipe, *parent;
+		struct flock lock; {
+			lock.l_whence = SEEK_SET;
+			lock.l_start = lock.l_len = 0;
+			lock.l_pid = getpid();
+		}
+
+		close(fd_pipe[0]);
+		parent = fdopen(fd_pipe[1], "w");
+		setvbuf(parent, NULL, _IOLBF, 0);
+
+		cmd_pipe = popen(cmd, "r");
+		if(!cmd_pipe) {
+			debug(D_DEBUG,"hadoop_status_wrapper: couldn't submit job: %s",strerror(errno));
+			fclose(parent);
+			exit(-1);
+		}
+
+		outname[0] = 0;
+		while(fgets(line,sizeof(line),cmd_pipe)) {
+			char jobname[BATCH_JOB_LINE_MAX];
+			int mapdone, reddone;
+			if(!strlen(outname) && sscanf(line,"%*s %*s INFO streaming.StreamJob: Running job: %s",jobname)==1) {
+				fprintf(parent, "%s\n", jobname);
+				fclose(parent);
+				sprintf(outname, "%s.status", jobname);
+			} else if(strlen(outname) && sscanf(line,"%*s %*s INFO streaming.StreamJob:\tmap %d%%\treduce %d%%", &mapdone, &reddone) == 2) {
+				FILE  *output = NULL;
+				sprintf(line, "%ld\tM%03d\tR%03d\n", (long int)time(0), mapdone, reddone);
+
+				output = fopen(outname, "w");
+				lock.l_type = F_WRLCK;
+				fcntl(fileno(output), F_SETLKW, &lock);
+				fprintf(output, "%s", line);
+				lock.l_type = F_UNLCK;
+				fcntl(fileno(output), F_SETLKW, &lock);
+				fclose(output);
+
+				debug(D_HDFS, "hadoop_status_wrapper: %s", line);
+
+			}
+		}
+		exit(0);
+
+	} else {
+	//PARENT
+		char line[BATCH_JOB_LINE_MAX];
+		char jobname[BATCH_JOB_LINE_MAX];
+		FILE *child;
+		struct batch_job_info *info;
+		struct batch_job_hadoop_job *hadoop_job;
+
+		close(fd_pipe[1]);
+		child = fdopen(fd_pipe[0], "r");
+		setvbuf(child, NULL, _IOLBF, 0);
+
+		jobname[0] = 0;
+		while(fgets(line,sizeof(line),child)) {
+			if(sscanf(line,"%s",jobname) == 1) {
+				break;
+			}
+		}
+
+		fclose(child);
+		if(!strlen(jobname)) return -1;
+
+		debug(D_HDFS, "jobname received: %s\n", jobname);
+		hadoop_job = batch_job_hadoop_job_create(jobname);
+		
+		info = malloc(sizeof(*info));
+		memset(info,0,sizeof(*info));
+		info->submitted = time(0);
+		itable_insert(q->job_table,hadoop_job->jobid,info);
+		itable_insert(q->hadoop_jobs,hadoop_job->jobid,hadoop_job);
+		debug(D_DEBUG,"job %d (%s) submitted",hadoop_job->jobid, jobname);
+		return (hadoop_job->jobid);
+	}
+
+
+}
+
+
+int batch_job_submit_simple_hadoop( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
+{
+	char line[BATCH_JOB_LINE_MAX];
+	char *target_file;
+
+	target_file = get_hadoop_target_file(extra_input_files);
+	if(!target_file) {
+		debug(D_DEBUG,"couldn't create new hadoop task: no input file specified\n");
+		return -1;
+	} else debug(D_HDFS,"input file %s specified\n",target_file);
+
+	setup_hadoop_wrapper("hadoop.wrapper", cmd);
+
+	sprintf(line, "$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-*-streaming.jar -D mapred.min.split.size=100000000 -input %s -mapper \"perl hadoop.wrapper\" -file hadoop.wrapper -numReduceTasks 0 -output /malbrec2/tmp/makeflow/job-%010d 2>&1", target_file, (int)time(0));
+
+	debug(D_HDFS,"%s\n", line);
+
+	return batch_job_fork_hadoop(q, line);
+
+}
+
+int batch_job_submit_hadoop( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
+{
+	char command[BATCH_JOB_LINE_MAX];
+
+	sprintf(command,"%s %s",cmd,args);
+
+	if(infile) sprintf(&command[strlen(command)]," <%s",infile);
+	if(outfile) sprintf(&command[strlen(command)]," >%s",outfile);
+	if(errfile) sprintf(&command[strlen(command)]," 2>%s",errfile);
+	
+	return batch_job_submit_simple_hadoop(q,command,extra_input_files,extra_output_files);
+}
+
+
+batch_job_id_t batch_job_wait_hadoop( struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime )
+{
+	struct batch_job_info *info;
+	batch_job_id_t jobid;
+	char line[BATCH_JOB_LINE_MAX];
+	char statusfile[BATCH_JOB_LINE_MAX];
+	struct batch_job_hadoop_job *hadoop_job;
+
+	while(1) {
+		UINT64_T ujobid;
+		itable_firstkey(q->job_table);
+		while(itable_nextkey(q->job_table,&ujobid,(void**)&info)) {
+			FILE *status;
+			struct flock lock; {
+				lock.l_whence = SEEK_SET;
+				lock.l_start = lock.l_len = 0;
+				lock.l_pid = getpid();
+			}
+			jobid = ujobid;
+			hadoop_job = (struct batch_job_hadoop_job *)itable_lookup(q->hadoop_jobs, jobid);
+
+			sprintf(statusfile,"%s.status",hadoop_job->jobname);
+			status = fopen(statusfile,"r");
+			
+			if(status) {
+				int map, red;
+				time_t logtime;
+
+				lock.l_type = F_RDLCK;
+				fcntl(fileno(status), F_SETLKW, &lock);
+				fgets(line,sizeof(line),status);
+				lock.l_type = F_UNLCK;
+				fcntl(fileno(status), F_SETLKW, &lock);
+				fclose(status);
+
+				if(sscanf(line,"%ld\tM%d\tR%d", &logtime, &map, &red) == 3) {
+					if(map && !info->started) info->started = logtime;
+					if(red == 100) {
+						debug(D_DEBUG,"job %d complete",jobid);
+						info->finished = logtime;
+						info->exited_normally = 1;
+					}
+				}
+
+				if(info->finished!=0) {
+					info = itable_remove(q->job_table,jobid);
+					*info_out = *info;
+					free(info);
+					unlink(statusfile);
+					return jobid;
+				}
+			}
+		}
+
+		if(itable_size(q->job_table)<=0) return 0;
+
+		if(stoptime!=0 && time(0)>=stoptime) return -1;
+
+		if(process_pending()) return -1;
+
+		sleep(1);
+	}
+
+	return -1;
+}
+
+
+int batch_job_remove_hadoop( struct batch_queue *q, batch_job_id_t jobid )
+{
+	return 0;
+}
+
+/***************************************************************************************/
+
 int batch_job_submit_simple_local( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
 {
 	batch_job_id_t jobid;
@@ -806,6 +1058,7 @@ batch_queue_type_t batch_queue_type_from_string( const char *str )
 	if(!strcmp(str,"wq"))     return BATCH_QUEUE_TYPE_WORK_QUEUE;
 	if(!strcmp(str,"workqueue")) return BATCH_QUEUE_TYPE_WORK_QUEUE;
 	if(!strcmp(str,"xgrid"))  return BATCH_QUEUE_TYPE_XGRID;
+	if(!strcmp(str,"hadoop")) return BATCH_QUEUE_TYPE_HADOOP;
 	return BATCH_QUEUE_TYPE_UNKNOWN;
 }
 
@@ -817,6 +1070,7 @@ const char * batch_queue_type_to_string( batch_queue_type_t t )
 		  case BATCH_QUEUE_TYPE_SGE:         return "sge";
 		  case BATCH_QUEUE_TYPE_WORK_QUEUE:  return "wq";
 		  case BATCH_QUEUE_TYPE_XGRID:       return "xgrid";
+		  case BATCH_QUEUE_TYPE_HADOOP:      return "hadoop";
 		  default: return "unknown";
 	}
 }
@@ -850,6 +1104,30 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 		q->work_queue = 0;
 	}
 
+	if(type==BATCH_QUEUE_TYPE_HADOOP) {
+		int fail = 0;
+/*		if(!getenv("JAVA_HOME")) {
+			debug(D_NOTICE, "error: environment variable JAVA_HOME not set\n");
+			fail = 1;
+		}
+*/		if(!getenv("HADOOP_HOME")) {
+			debug(D_NOTICE, "error: environment variable HADOOP_HOME not set\n");
+			fail = 1;
+		}
+		if(!getenv("HDFS_ROOT_DIR")) {
+			debug(D_NOTICE, "error: environment variable HDFS_ROOT_DIR not set\n");
+			fail = 1;
+		}
+		if(fail) {
+			batch_queue_delete(q);
+			return 0;
+		}
+
+		q->hadoop_jobs = itable_create(0);
+	} else {
+		q->hadoop_jobs = NULL;
+	}
+
 	return q;
 }
 
@@ -861,6 +1139,7 @@ void batch_queue_delete( struct batch_queue *q )
 	      if(q->output_table) itable_delete(q->output_table);
 	      if(q->logfile)      free(q->logfile);
 	      if(q->work_queue)   work_queue_delete(q->work_queue);
+	      if(q->hadoop_jobs)  itable_delete(q->hadoop_jobs);
 	      free(q);
 	}
 }
@@ -899,6 +1178,8 @@ batch_job_id_t batch_job_submit( struct batch_queue *q, const char *cmd, const c
 		return batch_job_submit_work_queue(q,cmd,args,infile,outfile,errfile,extra_input_files,extra_output_files);
 	} else if(q->type==BATCH_QUEUE_TYPE_XGRID) {
 		return batch_job_submit_xgrid(q,cmd,args,infile,outfile,errfile,extra_input_files,extra_output_files);
+	} else if(q->type==BATCH_QUEUE_TYPE_HADOOP) {
+		return batch_job_submit_hadoop(q,cmd,args,infile,outfile,errfile,extra_input_files,extra_output_files);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -919,6 +1200,8 @@ batch_job_id_t batch_job_submit_simple( struct batch_queue *q, const char *cmd, 
 		return batch_job_submit_simple_work_queue(q,cmd,extra_input_files,extra_output_files);
 	} else if(q->type==BATCH_QUEUE_TYPE_XGRID) {
 		return batch_job_submit_simple_xgrid(q,cmd,extra_input_files,extra_output_files);
+	} else if(q->type==BATCH_QUEUE_TYPE_HADOOP) {
+		return batch_job_submit_simple_hadoop(q,cmd,extra_input_files,extra_output_files);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -944,6 +1227,8 @@ batch_job_id_t batch_job_wait_timeout( struct batch_queue *q, struct batch_job_i
 		return batch_job_wait_work_queue(q,info,stoptime);
 	} else if(q->type==BATCH_QUEUE_TYPE_XGRID) {
 		return batch_job_wait_xgrid(q,info,stoptime);
+	} else if(q->type==BATCH_QUEUE_TYPE_HADOOP) {
+		return batch_job_wait_hadoop(q,info,stoptime);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -964,6 +1249,8 @@ int batch_job_remove( struct batch_queue *q, batch_job_id_t jobid )
 		return batch_job_remove_work_queue(q,jobid);
 	} else if(q->type==BATCH_QUEUE_TYPE_XGRID) {
 		return batch_job_remove_xgrid(q,jobid);
+	} else if(q->type==BATCH_QUEUE_TYPE_HADOOP) {
+		return batch_job_remove_hadoop(q,jobid);
 	} else {
 		errno = EINVAL;
 		return -1;
