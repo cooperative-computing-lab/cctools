@@ -217,7 +217,7 @@ static int handle_auto_workers(struct dag *d, int auto_workers)
 
 	if (auto_workers == MAKEFLOW_AUTO_GROUP) {
 		num_of_workers = dag_estimate_nodes_needed(d, d->remote_jobs_max); 
-	} else if (auto_workers == MAKEFLOW_AUTO_WIDTH) {
+	} else /* if (auto_workers == MAKEFLOW_AUTO_WIDTH) ALWAYS TRUE */ {
 		num_of_workers = dag_width(d);
 		if (num_of_workers > d->remote_jobs_max)
 			num_of_workers = d->remote_jobs_max;
