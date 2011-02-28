@@ -736,7 +736,7 @@ int batch_job_submit_simple_hadoop( struct batch_queue *q, const char *cmd, cons
 
 	setup_hadoop_wrapper("hadoop.wrapper", cmd);
 
-	sprintf(line, "$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-*-streaming.jar -D mapred.min.split.size=100000000 -input %s -mapper \"perl hadoop.wrapper\" -file hadoop.wrapper -numReduceTasks 0 -output /malbrec2/tmp/makeflow/job-%010d 2>&1", target_file, (int)time(0));
+	sprintf(line, "$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-*-streaming.jar -D mapred.min.split.size=100000000 -input %s -mapper \"perl hadoop.wrapper\" -file hadoop.wrapper -numReduceTasks 0 -output /makeflow_tmp/job-%010d 2>&1", target_file, (int)time(0));
 
 	debug(D_HDFS,"%s\n", line);
 
