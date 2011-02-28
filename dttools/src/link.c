@@ -562,7 +562,7 @@ int link_write( struct link *link, const char *data, size_t count, time_t stopti
 int link_putlstring( struct link *link, const char *data, size_t count, time_t stoptime )
 {
 	size_t total = 0;
-	ssize_t written;
+	ssize_t written = 0;
 
 	while (count > 0 && (written = link_write(link, data, count, stoptime)) > 0) {
 		count -= written;
