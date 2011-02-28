@@ -198,7 +198,7 @@ int main( int argc, char *argv[] )
 	char **user_argv=0;
 	int user_argc;
 	char c;
-	int result;
+	int result = 0;
 
 	debug_config(argv[0]);
 
