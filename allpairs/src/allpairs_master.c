@@ -244,7 +244,6 @@ int main(int argc, char **argv)
 {
 	char c;
 	struct work_queue *q;
-	struct work_queue_task *task;
 	int port = WORK_QUEUE_DEFAULT_PORT;
 
 	extra_files_list = list_create();
@@ -351,6 +350,7 @@ int main(int argc, char **argv)
 	if(!ystop) ystop = text_list_size(setb);
 
 	while(1) {
+		struct work_queue_task *task = NULL;
 		while(work_queue_hungry(q)) {
 			task = task_create(seta,setb);
 			if(task) {
