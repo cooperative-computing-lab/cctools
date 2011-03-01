@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include "process.h"
 #include "username.h"
 #include "create_dir.h"
+#include "xmalloc.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -504,7 +505,7 @@ static int match_project_names(struct work_queue *q, const char *project_names) 
 
     if(!q || !project_names) return 0;
 
-    str = strndup(project_names, strlen(project_names));
+    str = xstrdup(project_names);
     token = strtok(str, delims);
 	while(token) {
         // token holds the preferred master name pattern
