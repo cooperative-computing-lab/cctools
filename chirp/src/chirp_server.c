@@ -197,6 +197,10 @@ static INT64_T safe_statfs (const char *path, struct chirp_statfs *buf)
 {
 	int fildes[2];
 
+	buf->f_bsize = 4096;
+	buf->f_bfree = 1;
+	buf->f_blocks = 1;
+
    	if (single_mode) { /* chirp_server process can handle it */
        	return cfs->statfs(chirp_root_path, buf);
 	}
@@ -229,12 +233,14 @@ static INT64_T safe_statfs (const char *path, struct chirp_statfs *buf)
 
 		ssize_t r;
 		r = read(fildes[0], &buf->f_bsize, sizeof(buf->f_bsize));
-		if (r != sizeof(buf->f_bsize)) assert(0);
+		if (r != sizeof(buf->f_bsize)) goto finish;
 		r = read(fildes[0], &buf->f_bfree, sizeof(buf->f_bfree));
-		if (r != sizeof(buf->f_bfree)) assert(0);
+		if (r != sizeof(buf->f_bfree)) goto finish;
 		buf->f_bavail = buf->f_bfree; /* copy */
 		r = read(fildes[0], &buf->f_blocks, sizeof(buf->f_blocks));
-		if (r != sizeof(buf->f_blocks)) assert(0);
+		if (r != sizeof(buf->f_blocks)) goto finish;
+
+finish:
 		close(fildes[0]);
 
 		return 0;
