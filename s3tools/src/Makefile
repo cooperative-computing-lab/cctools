@@ -41,13 +41,6 @@ libs3client.a: s3common.o s3c_util.o s3c_file.o s3c_bucket.o s3c_acl.o
 	ranlib $@
 
 install:
-	install -d ${CCTOOLS_INSTALL_DIR}
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install -d ${CCTOOLS_INSTALL_DIR}/lib
-	install -d ${CCTOOLS_INSTALL_DIR}/include
-	for file in ${LIBRARIES} ; do install $$file ${CCTOOLS_INSTALL_DIR}/lib/$$file ; done
-	for file in ${HEADERS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/include/$$file ; done
-	for file in ${PROGRAMS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; done
 
 clean:
 	rm -f core *~ *.o *.os *.so libs3client.a $(PROGRAMS)

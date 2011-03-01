@@ -47,7 +47,8 @@ else
 	echo "skipping parrot, because this system is ${build_sys}, not LINUX"
 fi
 
-install_path="/usr/local"
+install_path="$HOME/cctools"
+
 grep Fedora /etc/issue > /dev/null 2>&1
 if [ $? -eq 0 ]
 then
@@ -55,15 +56,18 @@ then
 else
 	globus_path="/usr/local"
 fi
+
 krb5_path="/usr"
 gcb_path="/usr/local"
 readline_path="/usr"
+
 if [ ${build_sys} = DARWIN -o ${build_sys} = FREEBSD ]
 then
 	fuse_path="/usr/local"
 else
 	fuse_path="/usr"
 fi
+
 egee_path="/opt"
 rfio_path="/usr"
 dcap_path="/usr"
@@ -96,7 +100,7 @@ config_dcap_path=no
 config_irods_path=no
 config_hdfs_path=no
 config_zlib_path=yes
-config_mysql_path=auto
+config_mysql_path=no
 config_python_path=auto
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
@@ -670,12 +674,12 @@ CCTOOLS_PACKAGES=${packages}
 CCTOOLS_CC=@echo COMPILE \$@; ${ccompiler}
 CCTOOLS_BASE_CCFLAGS=${ccflags}
 CCTOOLS_INTERNAL_CCFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CCFLAGS}
-CCTOOLS_CCFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include \${CCTOOLS_BASE_CCFLAGS}
+CCTOOLS_CCFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CCFLAGS}
 
 CCTOOLS_CXX=@echo COMPILE \$@; ${cxxcompiler}
 CCTOOLS_BASE_CXXFLAGS=${ccflags}
 CCTOOLS_INTERNAL_CXXFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CXXFLAGS}
-CCTOOLS_CXXFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include \${CCTOOLS_BASE_CXXFLAGS}
+CCTOOLS_CXXFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CXXFLAGS}
 
 CCTOOLS_LD=@echo LINK \$@; ${linker}
 CCTOOLS_BASE_LDFLAGS=${ldflags}
