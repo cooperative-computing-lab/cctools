@@ -24,4 +24,4 @@ install: all
 	chmod 755 condor_submit_makeflow
 	install condor_submit_makeflow ${CCTOOLS_INSTALL_DIR}/bin
 	install makeflow_log_parser ${CCTOOLS_INSTALL_DIR}/bin
-	install monitor_makeflow ${CCTOOLS_INSTALL_DIR}/bin
+	install makeflow_monitor ${CCTOOLS_INSTALL_DIR}/bin
