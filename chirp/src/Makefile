@@ -7,7 +7,7 @@ LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c ch
 PROGRAMS=chirp chirp_get chirp_put chirp_server chirp_server_hdfs chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute chirp_md5sum
 SCRIPTS=chirp_audit_cluster
 LIBRARIES=libchirp.a
-HEADERS=chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h
+HEADERS=chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h
 
 TARGETS = ${PROGRAMS} ${LIBRARIES}
 OBJECTS = ${LIBRARY_SOURCES:%.c=%.o}
