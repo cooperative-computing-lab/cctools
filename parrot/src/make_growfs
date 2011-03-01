@@ -10,7 +10,7 @@
 # 
 # Example use:
 #    make_growfs /home/fred/www
-#    parrot tcsh
+#    parrot_run tcsh
 #    cd /growfs/my.web.server/~fred
 #    ls -la
 

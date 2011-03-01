@@ -28,7 +28,7 @@ For license conditions see the license file or http://eu-egee.org/license.html
 Parrot is a tool for attaching old programs to new storage systems.  Parrot makes a remote storage system appear as a file system to a legacy application.  Parrot does not require any special privileges, any recompiling, or any change whatsoever to existing programs.  It can be used by normal users doing normal tasks.  For example, an anonymous FTP service is made available to <code>vi</code> like so:
 <dir>
 <pre>
-% parrot vi /anonftp/ftp.cs.wisc.edu/RoadMap
+% parrot_run vi /anonftp/ftp.cs.wisc.edu/RoadMap
 </pre>
 </dir>
 <p>
@@ -75,13 +75,13 @@ To install, please read the <a href=install.html>cctools installation instructio
 To use Parrot, you simply use the <code>parrot</code> command followed by any other Unix program.  For example, to run a Parrot-enabled <code>vi</code>, execute this command:
 <dir>
 <pre>
-% parrot vi /anonftp/ftp.cs.wisc.edu/RoadMap
+% parrot_run vi /anonftp/ftp.cs.wisc.edu/RoadMap
 </pre>
 </dir>
 Of course, it can be clumsy to put <code>parrot</code> before every command you run, so try starting a shell with Parrot already loaded:
 <dir>
 <pre>
-% parrot tcsh
+% parrot_run tcsh
 </pre>
 </dir>
 Now, you should be able to run any standard command using Parrot filenames.  Here are some examples to get you thinking:
@@ -150,7 +150,7 @@ If you attempt to perform a directory listing on an HTTP
 server, Parrot will attempt to keep <code>ls</code> happy
 by producing a bogus directory entry:
 <pre>
-    % parrot ls -la /http/www.yahoo.com/
+    % parrot_run ls -la /http/www.yahoo.com/
     -r--r--r--    1 thain    thain           0 Jul 16 11:50 /http/www.yahoo.com
 </pre>
 
@@ -159,7 +159,7 @@ to perform a directory listing of an FTP server, Parrot
 fills in the available information -- the file names and
 their sizes -- but again inserts bogus information to fill the rest out:
 <pre>
-    % parrot ls -la /anonftp/ftp.cs.wisc.edu
+    % parrot_run ls -la /anonftp/ftp.cs.wisc.edu
     total 0
     -rwxrwxrwx    1 thain    thain        2629 Jul 16 11:53 RoadMap
     -rwxrwxrwx    1 thain    thain     1622222 Jul 16 11:53 ls-lR
@@ -173,7 +173,7 @@ which will display all of the remote I/O operations that it performs
 on a program's behalf:
 
 <pre>
-    % parrot -d remote ls -la /anonftp/ftp.cs.wisc.edu
+    % parrot_run -d remote ls -la /anonftp/ftp.cs.wisc.edu
     ...
     ftp.cs.wisc.edu <-- TYPE I
     ftp.cs.wisc.edu --> 200 Type set to I.
@@ -211,7 +211,7 @@ Suppose the Chirp server is running on <tt>bird.cs.wisc.edu</tt>.
 Using Parrot, you may access all of the Unix features of
 that host from elsewhere:
 <pre>
-    % parrot tcsh
+    % parrot_run tcsh
     % cd /chirp/bird.cs.wisc.edu
     % ls -la
     % ...
@@ -249,14 +249,14 @@ filesystem under <tt>/dbase</tt> with a mount list like this:
 </pre>
 Instruct Parrot to use the mountlist as follows:
 <pre>
-    % parrot -m mountfile tcsh
+    % parrot_run -m mountfile tcsh
     % cd /dbase
     % ls -la
 </pre>
 A single mount entry may be given on the command line
 with the <b>-M</b> option as follows:
 <pre>
-    % parrot -M /dbase=/anonftp/ftp.cs.wisc.edu/db tcsh
+    % parrot_run -M /dbase=/anonftp/ftp.cs.wisc.edu/db tcsh
 </pre>
 A more sophisticated way to perform name binding is with
 an <i>external resolver</i>.  This is a program executed
@@ -277,7 +277,7 @@ To connect the program <tt>locate_file</tt> to Parrot,
 simply give a mount string that specifies the program
 as a resolver:
 <pre>
-    % parrot -M /dbase=resolver:/path/to/locate_file tcsh
+    % parrot_run -M /dbase=resolver:/path/to/locate_file tcsh
 </pre>
 
 Now, if you attempt to access files under /dbase,
@@ -300,7 +300,7 @@ To use <tt>parrot_cp</tt>, simply use your shell to alias calls
 to <tt>cp</tt> with calls to <tt>parrot_cp</tt>:
 <p>
 <pre>
-% parrot tcsh
+% parrot_run tcsh
 % alias cp parrot_cp
 % cp /tmp/mydata /chirp/server.nd.edu/joe/data
 % cp -rR /chirp/server.nd.edu/joe /tmp/joe
@@ -354,7 +354,7 @@ In this case, you should run the following command:
 Now, others may perceive the web server as a file server under the /grow
 hierarchy.  For example:
 <pre>
-    % parrot tcsh
+    % parrot_run tcsh
     % cd /grow/my.server.com/~fred
     % ls -la
 </pre>
@@ -386,11 +386,11 @@ The EGEE project is a European-wide grid computing project.
 The EGEE software stack, GLite, can be downloaded <a href=http://glite.web.cern.ch/glite/packages/R3.0/R20060502/default.asp>here</a>.  (Warning: it's big.)
 Parrot can be connected to several different but related components of EGEE.
 <p>
-The simplest way to use Parrot with EGEE is through the Grid File Access Library (GFAL).  This library is attached to parrot under the paths <tt>/lfn</tt>, <tt>/guid</tt>, <tt>/srm</tt>, <tt>/rfio</tt>, <tt>/dcap</tt>, and <tt>/gfal</tt>.  This manual does not document all of the details of GFAL itself, you should read <a href=http://wiki.nesc.ac.uk/read/egee-na3-etf?action=browse&diff=1&id=InductionNotesGFAL>that manual</a> for more information.
+The simplest way to use Parrot with EGEE is through the Grid File Access Library (GFAL).  This library is attached to Parrot under the paths <tt>/lfn</tt>, <tt>/guid</tt>, <tt>/srm</tt>, <tt>/rfio</tt>, <tt>/dcap</tt>, and <tt>/gfal</tt>.  This manual does not document all of the details of GFAL itself, you should read <a href=http://wiki.nesc.ac.uk/read/egee-na3-etf?action=browse&diff=1&id=InductionNotesGFAL>that manual</a> for more information.
 <p>
 For example, suppose that you have an RFIO server running on <tt>server.somewhere.edu</tt>.  To access this server, try the following:
 <pre>
-    % parrot tcsh
+    % parrot_run tcsh
     % cd /rfio/server.somewhere.edu/
     % ls -la
 </pre>
@@ -398,7 +398,7 @@ For example, suppose that you have an RFIO server running on <tt>server.somewher
 Or, to access a file by logical name or by GUID, note that you can either use
 a pathname-like syntax, or specify a URL with colons.  Both ways are acceptable:
 <pre>
-    % parrot tcsh
+    % parrot_run tcsh
 
     % cat /lfn/baud/testgfal15 
     % cat lfn:baud/testgfal15 
@@ -414,7 +414,7 @@ are attempting to harness some new GFAL capability that Parrot is not aware of.
 For example:
 
 <pre>
-    % parrot tcsh
+    % parrot_run tcsh
     % cd /gfal/rfio://server.somewhere.edu//
     % ls -la
 </pre>
@@ -440,7 +440,7 @@ library search path:
 </pre>
 
 Use of the GFAL involves many complex interacting pieces
-of software.  It is recommended that you run parrot with the <tt>-d remote</tt>
+of software.  It is recommended that you run Parrot with the <tt>-d remote</tt>
 flag in order to debug problems using GFAL.
 
 <h3>EGEE Data Catalog: LFC</h3>
@@ -449,7 +449,7 @@ In addition to using GFAL, Parrot can access an LHC file catalog (LFC) directly
 under the path <tt>/lfc</tt>.  For example:
 
 <pre>
-    % parrot cat /lfc/my/logical/name
+    % parrot_run cat /lfc/my/logical/name
 </pre>
 
 In this case, Parrot itself performs the lookup against the LFC,
@@ -458,7 +458,7 @@ This can be useful when Parrot supports a protocol (such as GSIFTP)
 that is not directly supported by the GFAL library itself.
 <p>
 Use of the LFC involves many complex interacting pieces
-of software.  It is recommended that you run parrot with the <tt>-d remote</tt>
+of software.  It is recommended that you run Parrot with the <tt>-d remote</tt>
 flag in order to debug problems using LFC.
 
 <h3>Hadoop Distributed File System (HDFS)</h3>
@@ -584,18 +584,18 @@ Parrot has several command line options and corresponding environment variables.
 </table>
 </dir>
 <p>
-This list is probably out of date, so you should run <tt>parrot -h</tt> to see
+This list is probably out of date, so you should run <tt>parrot_run -h</tt> to see
 the most up-to-date list.
 <p>
 The flexible debugging flags can be a great help in both debugging and understanding Parrot.
 To turn on multiple debugging flags, you may either issue multiple -d options:
 <pre>
-    % parrot -d ftp -d chirp tcsh
+    % parrot_run -d ftp -d chirp tcsh
 </pre>
 Or, you may give a space separated list in the corresponding environment variable:
 <pre>
     % setenv PARROT_DEBUG_FLAGS "ftp chirp"
-    % parrot tcsh
+    % parrot_run tcsh
 </pre>
 Here is the meaning of each of the debug flags.
 <p>

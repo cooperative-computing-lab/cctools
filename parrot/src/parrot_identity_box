@@ -3,7 +3,7 @@
 vid="$1"
 shift
 command="$@"
-parrot=`which parrot`
+parrot=`which parrot_run`
 
 if [ "X$vid" = X ]
 then
