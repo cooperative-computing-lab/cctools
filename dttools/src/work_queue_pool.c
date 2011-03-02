@@ -43,7 +43,7 @@ static void show_help(const char *cmd)
 	printf("  -h             Show this screen.\n");
 	printf("\n");
 	printf("where worker options are:\n");
-	printf(" -a              Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
+	printf("  -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
 	printf("  -t <time>      Abort after this amount of idle time.\n");
 	printf("  -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	printf("  -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
