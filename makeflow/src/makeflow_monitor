@@ -15,7 +15,7 @@ import sys
 
 # Constants
 
-MF_STATES = [ 'waiting', 'running', 'complete', 'failed', 'aborted' ]
+MF_STATES = ['waiting', 'running', 'complete', 'failed', 'aborted']
 
 MF_LOG_TIME	 = 0
 MF_LOG_NODE_ID	 = 1
