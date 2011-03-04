@@ -11,7 +11,7 @@ run()
 {
     cd syntax
     
-    if ../../src/makeflow -C variable_issues.makeflow
+    if ../../src/makeflow -k variable_issues.makeflow
     then
     	exit 1
     else

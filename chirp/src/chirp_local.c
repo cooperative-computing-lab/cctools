@@ -294,7 +294,6 @@ INT64_T chirp_local_getfile( const char *path, struct link *link, time_t stoptim
 {
 	int fd;
 	INT64_T result;
-	char line[CHIRP_LINE_MAX];
 	struct chirp_stat info;
 	
 	result = chirp_local_stat(path,&info);
@@ -313,8 +312,7 @@ INT64_T chirp_local_getfile( const char *path, struct link *link, time_t stoptim
 	fd = chirp_local_open(path,O_RDONLY,0);
 	if(fd>=0) {
 		INT64_T length = info.cst_size;
-		sprintf(line,"%lld\n",length);
-		link_write(link,line,strlen(line),stoptime);
+		link_putfstring(link,"%lld\n",stoptime,length);
 		result = link_stream_from_fd(link,fd,length,stoptime);
 		chirp_local_close(fd);
 	} else {
@@ -328,14 +326,12 @@ INT64_T chirp_local_putfile( const char *path, struct link *link, INT64_T length
 {
 	int fd;
 	INT64_T result;
-	char line[CHIRP_LINE_MAX];
 
 	mode = 0600 | (mode&0100);
 
 	fd = chirp_local_open(path,O_WRONLY|O_CREAT|O_TRUNC,(int)mode);
 	if(fd>=0) {
-		sprintf(line,"0\n");
-		link_write(link,line,strlen(line),stoptime);
+		link_putliteral(link,"0\n",stoptime);
 		result = link_stream_to_fd(link,fd,length,stoptime);
 		if(result!=length) {
 			if(result>=0) link_soak(link,length-result,stoptime);

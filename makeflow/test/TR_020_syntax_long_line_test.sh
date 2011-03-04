@@ -10,7 +10,7 @@ prepare()
 
 run()
 {
-    cd syntax; ../../src/makeflow -C long_line_test.makeflow && exit 0 
+    cd syntax; ../../src/makeflow -k long_line_test.makeflow && exit 0 
     exit 1
 }
 

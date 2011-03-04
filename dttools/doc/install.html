@@ -5,7 +5,7 @@
 </head>
 
 <h1>Installing the Cooperative Computing Tools</h1>
-<b>November 2009</b>
+<b>March 2011</b>
 <p>
 
 The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain
@@ -24,6 +24,7 @@ fault-prone distributed systems.  The components of the cctools are:
 <li> <a href=chirp.html>Chirp</a> - A distributed file and storage system.
 <li> <a href=makeflow.html>Makeflow</a> - A workflow engine similar to Make.
 <li> <a href=workqueue.html>Work Queue</a> - A flexible master-worker library. 
+<li> <a href=sand.html</a> - A scalable genome assembly framework.
 <li> <a href=allpairs.html>All-Pairs</a> - A computational abstraction.
 <li> <a href=wavefront.html>Wavefront</a> - A computational abstraction.
 <li> <a href=watchdog.html>Watchdog</a> - A reliable process manager.
@@ -44,18 +45,6 @@ chirp version 1.0.1 built by dthain@hedwig on Sep 12 2004 at 20:04:51
 then the cctools are installed, and you are ready to go.
 <p>
 Otherwise, you must install the cctools yourself.
-
-<h3>Installing at Notre Dame</h3>
-
-If you are on the Notre Dame campus,
-you may find a recent version of the cctools in AFS.
-Simply set up your path as follows:
-
-<dir>
-<pre>
-% setenv PATH /afs/nd.edu/user37/ccl/software/cctools/bin:$PATH
-</pre>
-</dir>
 
 <h3>Installation From a Binary Package</h3>
 
@@ -82,13 +71,13 @@ Just download a source package:
 <li> <a href=http://www.cse.nd.edu/~ccl/software/download.shtml>CCTools Download</a> (Required)
 </ol>
 
-And follow this recipe:
+And follow this recipe while logged in as any ordinary user:
 <dir>
 <pre>
 % gunzip cctools-xxx-src.tar.gz
 % tar xvf cctools-xxx-src.tar
 % cd cctools-xxx-src
-% ./configure --prefix ${HOME}/cctools
+% ./configure
 % make
 % make install
 % setenv PATH ${HOME}/cctools/bin:$PATH
@@ -116,9 +105,27 @@ installations.  Then, make and install.  For example:
 % gunzip cctools-xxx.tar.gz
 % tar xvf cctools-xxx.tar
 % cd cctools-xxx
-% ./configure --prefix $HOME/cctools --with-krb5-path /usr/kerberos --with-globus-path /usr/local/globus ...
+% ./configure --with-krb5-path /usr/kerberos --with-globus-path /usr/local/globus ...
 % make
 % make install
 % setenv PATH ${HOME}/cctools/bin:$PATH
 </pre>
 </dir>
+
+<h3>Installation From a Binary Package</h3>
+
+To install from a binary package for your specific system,
+download a package from the <a href=http://www.cse.nd.edu/~ccl/software/download.shtml>cctools web page</a>.
+Simply unpack the tarball in any directory that you like,
+and then add the <code>bin</code> directory to your path.
+For example, to install in $HOME/cctools:
+
+<dir>
+<pre>
+% cd $HOME
+% gunzip cctools-xxx-yyy.tar.gz
+% tar xvf cctools-xxx-yyy.tar
+% setenv PATH $HOME/cctools/bin:$PATH
+</pre>
+</dir>
+

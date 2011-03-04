@@ -122,7 +122,8 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 	int max=0;
 
 	for(n=d->nodes;n;n=n->next) {
-		nodeid = -1;
+        depends_on_single_node = 1;
+        nodeid = -1;
 		m = 0;
 		// for each source file, see if it is a target file of another node
 		for(f=n->source_files;f;f=f->next) {
@@ -137,7 +138,6 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 					nodeid = m->nodeid;
 					continue;
 				} 
-			
 				// if current node depends on multiple nodes, continue to process next node
 				if(nodeid != tmp->nodeid) {
 					depends_on_single_node = 0;
@@ -145,7 +145,6 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 				}
 			}
 		}
-
 		// m != 0 : current node depends on at least one exsisting node
 		if(m && depends_on_single_node && nodeid != -1) {
 				m->only_my_children++;
@@ -218,7 +217,7 @@ static int handle_auto_workers(struct dag *d, int auto_workers)
 
 	if (auto_workers == MAKEFLOW_AUTO_GROUP) {
 		num_of_workers = dag_estimate_nodes_needed(d, d->remote_jobs_max); 
-	} else if (auto_workers == MAKEFLOW_AUTO_WIDTH) {
+	} else /* if (auto_workers == MAKEFLOW_AUTO_WIDTH) ALWAYS TRUE */ {
 		num_of_workers = dag_width(d);
 		if (num_of_workers > d->remote_jobs_max)
 			num_of_workers = d->remote_jobs_max;
@@ -1408,7 +1407,7 @@ static void show_help(const char *cmd)
 	printf(" -P <integer>   Priority. Higher the value, higher the priority.\n");
 	printf(" -a             Advertise the master information to a catalog server.\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	printf(" -s             Accept shared workers (workers with no project preferences). By default the master would only accept workers that prefer this project.\n");
+	printf(" -e             Set the work queue master to only accept workers that have the same -N <project> option.\n");
 	printf(" -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	printf(" -I             Show input files.\n");
 	printf(" -O             Show output files.\n");
@@ -1446,11 +1445,11 @@ int main( int argc, char *argv[] )
 	int auto_workers = 0;
 	char line[1024];
     int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
-    int work_queue_worker_mode = WORK_QUEUE_USE_EXCLUSIVE_WORKERS;
+    int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAB:cCd:DF:GhiIj:J:kKl:L:N:o:Op:P:r:RsS:T:vw:W:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cCd:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:T:vw:W:")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1475,8 +1474,8 @@ int main( int argc, char *argv[] )
         case 'a':
             work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
-        case 's':
-            work_queue_worker_mode = WORK_QUEUE_USE_SHARED_WORKERS;
+        case 'e':
+            work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
             break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg)) {
@@ -1595,13 +1594,14 @@ int main( int argc, char *argv[] )
 	}
 
 
+
     if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
         fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
         fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
         return 1;
     }
 
-    sprintf(line, "WORK_QUEUE_USE_EXCLUSIVE_WORKERS=%d", work_queue_worker_mode);
+    sprintf(line, "WORK_QUEUE_WORKER_MODE=%d", work_queue_worker_mode);
     putenv(strdup(line));
 
     sprintf(line, "WORK_QUEUE_MASTER_MODE=%d", work_queue_master_mode);

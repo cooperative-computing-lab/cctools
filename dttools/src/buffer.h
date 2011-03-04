@@ -29,35 +29,24 @@ buffer_t *buffer_create (void);
   */
 void buffer_delete (buffer_t *b);
 
-/** Determine the space needed to fill a buffer. This function is to be used
-    in conjunction with buffer_vprintf. This procedure does not call any of
-    the va_(start|end) macros. The integer size returned is to be passed
-    to buffer_vprintf. This procedure does not actually change the buffer.
-    @param b The buffer to fill.
-    @param format The format string.
-    @param ap The variable argument list for the format string.
-    @return The number of bytes needed to save the buffer.
-  */
-int buffer_vprep (buffer_t *b, const char *format, va_list ap);
-
 /** Print the formatted output to the buffer. The format string follows the
-    same semantics as the UNIX vprintf function. The size argument is given
-    by the buffer_vprep function. Neither buffer_vprep nor buffer_vprintf
-    call the variable argument macros va_(start|end).
+    same semantics as the UNIX vprintf function. buffer_vprintf does not call
+    the variable argument macros va_(start|end) on ap.
     @param b The buffer to fill.
     @param format The format string.
-    @param size The integer size determined by buffer_vprep.
     @param ap The variable argument list for the format string.
+    @return Negative value on error.
   */
-void buffer_vprintf (buffer_t *b, const char *format, int size, va_list ap);
+int buffer_vprintf (buffer_t *b, const char *format, va_list ap);
 
 /** Print the formatted output to the buffer. The format string follows the
     same semantics as the UNIX vprintf function.
     @param b The buffer to fill.
     @param format The format string.
     @param ... The variable arguments for the format string.
+    @return Negative value on error.
   */
-void buffer_printf (buffer_t *b, const char *format, ...);
+int buffer_printf (buffer_t *b, const char *format, ...);
 
 /** Returns the buffer as a string. The string is no longer valid after
     deleting the buffer. A final ASCII NUL character is guaranteed to terminate

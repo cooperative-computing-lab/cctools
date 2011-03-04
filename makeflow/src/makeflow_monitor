@@ -13,9 +13,9 @@ from time import sleep, time, ctime as time_ctime
 import os
 import sys
 
-# Constants --------------------------------------------------------------------
+# Constants
 
-MF_STATES = [ 'waiting', 'running', 'complete', 'failed', 'aborted' ]
+MF_STATES = ['waiting', 'running', 'complete', 'failed', 'aborted']
 
 MF_LOG_TIME	 = 0
 MF_LOG_NODE_ID	 = 1
@@ -30,7 +30,7 @@ MF_LOG_TOTAL	 = 9
 
 MF_MAX_HISTORY_LENGTH = 250
 
-# MakeflowLog Parser -----------------------------------------------------------
+# MakeflowLog Parser
 
 def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
     if makeflow is None:
@@ -48,8 +48,12 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
     for line in log_stream:
         if line.startswith('#'):
             slist = line.split()
-            if slist[1] in ['FAILED', 'ABORTED', 'COMPLETED']:
+            if slist[1] in ['STARTED']:
+                makeflow['start_time'] = int(slist[2])/1000000.0
+            elif slist[1] in ['FAILED', 'ABORTED', 'COMPLETED']:
                 makeflow['finished'] = True
+                makeflow['elapsed_time'] = makeflow['start_time'] = int(slist[2])/1000000.0
+                makeflow['average_task_rate'] = makeflow['total'] / makeflow['elapsed_time']
             continue
         else:
             slist = map(int, line.split())
@@ -99,7 +103,7 @@ def parse_makeflowlog(log_path, parse_dag = False):
         makeflow = parse_makeflow_stream(log_stream, parse_dag)
     return makeflow
 
-# Emit text output -------------------------------------------------------------
+# Emit text output
 
 def emit_text(makeflow, field_width = 15, progress_width = 60):
     tlist = [()]
@@ -131,7 +135,7 @@ def emit_text(makeflow, field_width = 15, progress_width = 60):
         tlist.append(('tasks',
                       ', '.join(['%s: %d' % (s, makeflow[s]) for s in MF_STATES + ['total']])))
 
-    for i, m in enumerate(tlist):
+    for m in tlist:
         if m:
             field   = str(m[0].title() + ':').rjust(field_width)
             message = str(m[1])
@@ -139,13 +143,13 @@ def emit_text(makeflow, field_width = 15, progress_width = 60):
         else:
             print
 
-# Emitter table ----------------------------------------------------------------
+# Emitter table
 
 EMITTER_TABLE = {
     'text' : emit_text,
 }
 
-# Monitor makeflows ------------------------------------------------------------
+# Monitor makeflows
 
 def monitor_makeflows(log_paths, options): 
     makeflows = []
@@ -187,7 +191,7 @@ def monitor_makeflows(log_paths, options):
 
     print >>sys.stderr, 'No makeflowlogs to monitor...'
 
-# Parse command line options ---------------------------------------------------
+# Parse command line options
 
 def parse_command_line_options():
     parser = OptionParser('%prog [options] <makeflowlog> ...')
@@ -220,7 +224,7 @@ def parse_command_line_options():
 
     return args, options 
 
-# Formatting Functions ---------------------------------------------------------
+# Formatting Functions
 
 def time_format(seconds):
     TDELTAS = (60, 60, 24, 365)
@@ -240,7 +244,7 @@ def time_format(seconds):
 
     return ':'.join(reversed(map(lambda d: '%02d' % d, tlist)))
 
-# Main Execution ---------------------------------------------------------------
+# Main Execution
 
 if __name__ == '__main__':
     try:

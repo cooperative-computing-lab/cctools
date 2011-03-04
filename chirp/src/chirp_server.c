@@ -199,6 +199,10 @@ static INT64_T safe_statfs (const char *path, struct chirp_statfs *buf)
 {
 	int fildes[2];
 
+	buf->f_bsize = 4096;
+	buf->f_bfree = 1;
+	buf->f_blocks = 1;
+
    	if (single_mode) { /* chirp_server process can handle it */
        	return cfs->statfs(chirp_root_path, buf);
 	}
@@ -231,12 +235,14 @@ static INT64_T safe_statfs (const char *path, struct chirp_statfs *buf)
 
 		ssize_t r;
 		r = read(fildes[0], &buf->f_bsize, sizeof(buf->f_bsize));
-		if (r != sizeof(buf->f_bsize)) assert(0);
+		if (r != sizeof(buf->f_bsize)) goto finish;
 		r = read(fildes[0], &buf->f_bfree, sizeof(buf->f_bfree));
-		if (r != sizeof(buf->f_bfree)) assert(0);
+		if (r != sizeof(buf->f_bfree)) goto finish;
 		buf->f_bavail = buf->f_bfree; /* copy */
 		r = read(fildes[0], &buf->f_blocks, sizeof(buf->f_blocks));
-		if (r != sizeof(buf->f_blocks)) assert(0);
+		if (r != sizeof(buf->f_blocks)) goto finish;
+
+finish:
 		close(fildes[0]);
 
 		return 0;
@@ -1126,15 +1132,13 @@ static void chirp_handler( struct link *l, const char *subject )
 
 			dir = chirp_alloc_opendir(path);
 			if(dir) {
-				link_write(l,"0\n",2,stalltime);
+				link_putliteral(l,"0\n",stalltime);
 				while((d=chirp_alloc_readdir(dir))) {
 					if(!strncmp(d,".__",3)) continue;
-					sprintf(line,"%s\n",d);
-					link_write(l,line,strlen(line),stalltime);
+					link_putfstring(l,"%s\n",stalltime,d);
 					sprintf(subpath,"%s/%s",path,d);
 					chirp_alloc_lstat(subpath,&statbuf);
-					sprintf(line,"%s\n",chirp_stat_string(&statbuf));
-					link_write(l,line,strlen(line),stalltime);					
+					link_putfstring(l,"%s\n",stalltime,chirp_stat_string(&statbuf));
 				}
 				chirp_alloc_closedir(dir);
 				do_getdir_result = 1;
@@ -1151,11 +1155,10 @@ static void chirp_handler( struct link *l, const char *subject )
 
 			dir = chirp_alloc_opendir(path);
 			if(dir) {
-				link_write(l,"0\n",2,stalltime);
+				link_putliteral(l,"0\n",stalltime);
 				while((d=chirp_alloc_readdir(dir))) {
 					if(!strncmp(d,".__",3)) continue;
-					sprintf(line,"%s\n",d);
-					link_write(l,line,strlen(line),stalltime);
+					link_putfstring(l,"%s\n",stalltime,d);
 				}
 				chirp_alloc_closedir(dir);
 				do_getdir_result = 1;
@@ -1178,10 +1181,9 @@ static void chirp_handler( struct link *l, const char *subject )
 
 			aclfile = chirp_acl_open(path);
 			if(aclfile) {
-				link_write(l,"0\n",2,stalltime);
+				link_putliteral(l,"0\n",stalltime);
 				while(chirp_acl_read(aclfile,aclsubject,&aclflags)) {
-					sprintf(line,"%s %s\n",aclsubject,chirp_acl_flags_to_text(aclflags));
-					link_write(l,line,strlen(line),stalltime);
+					link_putfstring(l,"%s %s\n",stalltime,aclsubject,chirp_acl_flags_to_text(aclflags));
 				}
 				chirp_acl_close(aclfile);
 				do_getdir_result = 1;
@@ -1390,7 +1392,7 @@ static void chirp_handler( struct link *l, const char *subject )
 		} else if(sscanf(line,"rename %s %s",path,newpath)==2) {
 			if(!chirp_path_fix(path)) goto failure;
 			if(!chirp_path_fix(newpath)) goto failure;
-			if(!chirp_acl_check(chirp_root_path,path,subject,CHIRP_ACL_READ|CHIRP_ACL_DELETE)) goto failure;
+			if(!chirp_acl_check_link(chirp_root_path,path,subject,CHIRP_ACL_READ|CHIRP_ACL_DELETE)) goto failure;
 			if(!chirp_acl_check(chirp_root_path,newpath,subject,CHIRP_ACL_WRITE)) goto failure;
 			result = chirp_alloc_rename(path,newpath);
 		} else if(sscanf(line,"link %s %s",path,newpath)==2) {
@@ -1524,8 +1526,7 @@ static void chirp_handler( struct link *l, const char *subject )
 			if(!chirp_acl_check_link(chirp_root_path,path,subject,CHIRP_ACL_LIST)) goto failure;
 			result = chirp_alloc_lsalloc(path,newpath,&size,&inuse);
 			if(result>=0) {
-				sprintf(line,"0\n%s %lld %lld\n",&newpath[strlen(chirp_root_path)+1],size,inuse);
-				link_write(l,line,strlen(line),stalltime);
+				link_putfstring(l,"0\n%s %lld %lld\n",stalltime,&newpath[strlen(chirp_root_path)+1],size,inuse);
 				do_no_result = 1;
 			}
 		} else if(sscanf(line,"mkalloc %s %lld %lld",path,&size,&mode)==3) {
@@ -1561,9 +1562,7 @@ static void chirp_handler( struct link *l, const char *subject )
 			if(!chirp_acl_check(chirp_root_path,path,subject,CHIRP_ACL_LIST) && !chirp_acl_check(chirp_root_path,path,"system:localuser",CHIRP_ACL_LIST)) goto failure;
 			result = chirp_alloc_stat(path,&info);
 			if(result>=0) {
-				sprintf(line,"%d\n",(int)strlen(path));
-				link_write(l,line,strlen(line),stalltime);
-				link_write(l,path,strlen(path),stalltime);
+				link_putfstring(l,"%zu\n%s",stalltime,strlen(path),path);
 				do_no_result = 1;
 			} else {
 				result = -1;
@@ -1578,12 +1577,10 @@ static void chirp_handler( struct link *l, const char *subject )
 
 			table = chirp_audit(path);
 			if(table) {
-				sprintf(line,"%d\n",hash_table_size(table));
-				link_write(l,line,strlen(line),stalltime);
+				link_putfstring(l,"%d\n",stalltime,hash_table_size(table));
 				hash_table_firstkey(table);
 				while(hash_table_nextkey(table,&key,(void*)&entry)) {
-					sprintf(line,"%s %lld %lld %lld\n",key,entry->nfiles,entry->ndirs,entry->nbytes);
-					link_write(l,line,strlen(line),stalltime);
+					link_putfstring(l,"%s %lld %lld %lld\n",stalltime,key,entry->nfiles,entry->ndirs,entry->nbytes);
 				}
 				chirp_audit_delete(table);
 				result = 0;
@@ -1629,7 +1626,7 @@ static void chirp_handler( struct link *l, const char *subject )
 		} else if(sscanf(line,"job_wait %lld %d",&jobid,&wait_timeout)==2) {
 			result = chirp_job_wait(subject,jobid,&jobstate,time(0)+MIN(wait_timeout,max_job_wait_timeout));
 			if(result>=0) {
-				sprintf(line,"0\n%lld %s %s %u %d %lu %lu %lu %d\n",
+				link_putfstring(l,"0\n%lld %s %s %u %d %lu %lu %lu %d\n",stalltime,
 					jobstate.jobid,
 					jobstate.command,
 					jobstate.owner,
@@ -1639,7 +1636,6 @@ static void chirp_handler( struct link *l, const char *subject )
 					jobstate.start_time,
 					jobstate.stop_time,
 					jobstate.pid);
-				link_write(l,line,strlen(line),stalltime);
 				do_no_result = 1;
 			}
 		} else if(sscanf(line,"job_commit %lld",&jobid)==1) {
@@ -1653,10 +1649,10 @@ static void chirp_handler( struct link *l, const char *subject )
 			void * list = chirp_job_list_open();
 			if(!list) goto failure;
 
-			link_write(l,"0\n",2,stalltime);
+			link_putliteral(l,"0\n",stalltime);
 
 			while((job=chirp_job_list_next(list))) {
-				sprintf(line,"%lld %s %s %u %d %lu %lu %lu %d\n",
+				link_putfstring(l,"%lld %s %s %u %d %lu %lu %lu %d\n",stalltime,
 					job->jobid,
 					job->command,
 					job->owner,
@@ -1666,10 +1662,9 @@ static void chirp_handler( struct link *l, const char *subject )
 					job->start_time,
 					job->stop_time,
 					job->pid);
-				link_write(l,line,strlen(line),stalltime);
 			}
 
-			link_write(l,"\n",1,stalltime);
+			link_putliteral(l,"\n",stalltime);
 			chirp_job_list_close(list);
 			do_no_result = 1;
 
@@ -1706,12 +1701,13 @@ static void chirp_handler( struct link *l, const char *subject )
 		debug(D_CHIRP,"= %s",line);
 		if(!do_no_result) {
 			length = strlen(line);
-			actual = link_write(l,line,length,stalltime);
+			actual = link_putlstring(l,line,length,stalltime);
+
 			if(actual!=length) break;
 		}
 
 		if(dataout) {
-			actual = link_write(l,dataout,dataoutlength,stalltime);
+			actual = link_putlstring(l,dataout,dataoutlength,stalltime);
 			if(actual!=dataoutlength) break;
 			free(dataout);
 			dataout = 0;

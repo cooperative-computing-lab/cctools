@@ -924,7 +924,7 @@ static INT64_T decode_ioctl_siocgifconf( struct pfs_process *p, INT64_T fd, INT6
 static void decode_syscall( struct pfs_process *p, INT64_T entering )
 {
 	INT64_T *args;
-	void *x;
+	void *x = NULL;
 
 	char path[PFS_PATH_MAX];
 	char path2[PFS_PATH_MAX];
@@ -1275,7 +1275,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			break;
 
 		case SYSCALL64_sendto: {
-			INT64_T t4;
+			INT64_T t4 = 0;
 			if(args[4]) {
 				x = xxmalloc(args[5]);
 				tracer_copy_in(p->tracer,x,(void*)args[4],args[5]);
@@ -1292,7 +1292,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 		case SYSCALL64_recvfrom:
 			if(entering) {
-				INT64_T t4, t5;
+				INT64_T t4 = 0, t5 = 0;
 				int length;
 				if(args[4]) {
 					tracer_copy_in(p->tracer,&length,(void*)args[5],sizeof(length));
@@ -1356,7 +1356,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_recvmsg:
 			if(entering) {
 				struct msghdr umsg;
-				struct pfs_kernel_iovec *uvec;
+				struct pfs_kernel_iovec *uvec = NULL;
 				struct msghdr msg;
 				struct iovec vec;
 
@@ -1528,7 +1528,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				void *uaddr = (void*) args[2];
 				char buffer[65536];
 				char tbuffer[65536];
-				INT64_T length;
+				INT64_T length = 0;
 
 
 				if(cmd==SIOCGIFCONF) {

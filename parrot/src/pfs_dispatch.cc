@@ -503,10 +503,10 @@ void decode_socketcall( struct pfs_process *p, int entering, int syscall, INT64_
 	int length;
 	int savelength;
 	int fds[2];
-	void *x;
+	void *x = NULL;
 	int r;
-	int t4;
-	int t5;
+	int t4 = 0;
+	int t5 = 0;
 
 	struct sockaddr_un *paddr;
 	struct sockaddr_un addr;
@@ -722,7 +722,7 @@ void decode_socketcall( struct pfs_process *p, int entering, int syscall, INT64_
 		case SYS_RECVMSG:
 			{
 			struct pfs_kernel_msghdr umsg;
-			struct pfs_kernel_iovec *uvec;
+			struct pfs_kernel_iovec *uvec = NULL;
 			struct msghdr msg;
 			struct iovec vec;
 
@@ -1668,7 +1668,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 				void *uaddr = POINTER(args[2]);
 				char buffer[65536];
 				char tbuffer[65536];
-				int length;
+				int length = 0;
 
 
 				if(cmd==SIOCGIFCONF) {

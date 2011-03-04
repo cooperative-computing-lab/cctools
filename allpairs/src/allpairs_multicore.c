@@ -68,7 +68,7 @@ int block_size_estimate( struct text_list *seta )
 {
 	int count = MIN(100,text_list_size(seta));
 	int i;
-	UINT64_T total_data,free_mem,total_mem;
+	UINT64_T total_data = 0,free_mem,total_mem;
 	int block_size;
 
 	memory_info_get(&free_mem, &total_mem);

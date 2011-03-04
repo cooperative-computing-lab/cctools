@@ -268,7 +268,9 @@ static int is_a_directory( const char *filename )
 
 static void make_acl_name( const char *filename, int get_parent, char *aclname )
 {
-	sprintf(aclname,"%s/%s",filename,CHIRP_ACL_BASE_NAME);
+	char tmp[CHIRP_PATH_MAX];
+	sprintf(tmp,"%s/%s",filename,CHIRP_ACL_BASE_NAME);
+	string_collapse_path(tmp,aclname,1);
 }
 
 /*

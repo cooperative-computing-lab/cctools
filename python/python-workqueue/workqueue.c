@@ -39,6 +39,14 @@ See the file LICENSE for details.
 #  define Py_TYPE(o) ((o)->ob_type)
 #endif
 
+#ifndef TRUE
+#define TRUE 1
+#endif
+
+#ifndef FALSE
+#define FALSE 0
+#endif
+
 /* Task ------------------------------------------------------------------ */
 
 typedef struct {
@@ -103,42 +111,57 @@ Task_specify_tag(Task *self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-Task_specify_input_buf(Task *self, PyObject *args, PyObject *kwds)
+Task_specify_input_buffer(Task *self, PyObject *args, PyObject *kwds)
 {
+    char *kwlist[]  = { "buffer", "remote_name", "cache", NULL };
     PyObject *buffer;
     PyObject *rname;
+    int cache = TRUE;
+    int flags = 0;
 
-    if (!PyArg_ParseTuple(args, "O!O!", &PyString_Type, &buffer, &PyString_Type, &rname))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|i", kwlist, &PyString_Type, &buffer, &PyString_Type, &rname, &cache))
+	return NULL;
+    
+    if (cache)
+    	flags = WORK_QUEUE_CACHE;
+    else
+    	flags = WORK_QUEUE_NOCACHE;
+
+    work_queue_task_specify_buffer(self->tp, PyString_AsString(buffer), PyString_Size(buffer), PyString_AsString(rname), flags);
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+Task_specify_file(Task *self, PyObject *args, PyObject *kwds, int type)
+{
+    char *kwlist[]  = { "local_name", "remote_name", "cache", NULL };
+    PyObject *rname;
+    PyObject *lname;
+    int cache = TRUE;
+    int flags = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|i", kwlist, &PyString_Type, &lname, &PyString_Type, &rname, &cache))
 	return NULL;
 
-    work_queue_task_specify_input_buf(self->tp, PyString_AsString(buffer), PyString_Size(buffer), PyString_AsString(rname));
+    if (cache)
+    	flags = WORK_QUEUE_CACHE;
+    else
+    	flags = WORK_QUEUE_NOCACHE;
+
+    work_queue_task_specify_file(self->tp, PyString_AsString(lname), PyString_AsString(rname), type, flags);
     Py_RETURN_NONE;
 }
 
 static PyObject *
 Task_specify_input_file(Task *self, PyObject *args, PyObject *kwds)
 {
-    PyObject *rname;
-    PyObject *fname;
-
-    if (!PyArg_ParseTuple(args, "O!O!", &PyString_Type, &fname, &PyString_Type, &rname))
-	return NULL;
-
-    work_queue_task_specify_input_file(self->tp, PyString_AsString(fname), PyString_AsString(rname));
-    Py_RETURN_NONE;
+    return Task_specify_file(self, args, kwds, WORK_QUEUE_INPUT);
 }
 
 static PyObject *
 Task_specify_output_file(Task *self, PyObject *args, PyObject *kwds)
 {
-    PyObject *rname;
-    PyObject *fname;
-
-    if (!PyArg_ParseTuple(args, "O!O!", &PyString_Type, &rname, &PyString_Type, &fname))
-	return NULL;
-
-    work_queue_task_specify_output_file(self->tp, PyString_AsString(rname), PyString_AsString(fname));
-    Py_RETURN_NONE;
+    return Task_specify_file(self, args, kwds, WORK_QUEUE_OUTPUT);
 }
 
 static PyObject *
@@ -266,7 +289,7 @@ static PyMemberDef TaskMembers[] = {
 
 static PyMethodDef TaskMethods[] = {
     TASK_METHOD(specify_algorithm),
-    TASK_METHOD(specify_input_buf),
+    TASK_METHOD(specify_input_buffer),
     TASK_METHOD(specify_input_file),
     TASK_METHOD(specify_output_file),
     TASK_METHOD(specify_tag),
@@ -444,10 +467,13 @@ typedef struct {
 static int
 WorkQueue_init(WorkQueue *self, PyObject *args, PyObject *kwds)
 {
-    char  *kwlist[] = { "port", NULL };
-    int    port     = WORK_QUEUE_DEFAULT_PORT;
+    char *kwlist[]  = { "port", "name", "catalog", "exclusive", NULL };
+    PyObject *name  = NULL;
+    int   port      = WORK_QUEUE_DEFAULT_PORT;
+    int   catalog   = TRUE;
+    int   exclusive = TRUE;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|i", kwlist, &port))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|iO!ii", kwlist, &port, &PyString_Type, &name, &catalog, &exclusive))
 	return -1;
 
     self->wqp = work_queue_create(port);
@@ -467,6 +493,13 @@ WorkQueue_init(WorkQueue *self, PyObject *args, PyObject *kwds)
 	PyErr_Format(PyExc_Exception, "could not create stats member");
 	return -1;
     }
+
+    if (name) {
+    	work_queue_specify_name(self->wqp, PyString_AsString(name));
+    }
+
+    work_queue_specify_master_mode(self->wqp, catalog);
+    work_queue_specify_worker_mode(self->wqp, exclusive);
 
     return 0;
 }
@@ -556,6 +589,31 @@ WorkQueue_specify_name(WorkQueue *self, PyObject *args, PyObject *kwds)
     Py_RETURN_NONE;
 }
 
+static PyObject *
+WorkQueue_specify_master_mode(WorkQueue *self, PyObject *args, PyObject *kwds)
+{
+    int master_mode;
+
+    if (!PyArg_ParseTuple(args, "i", &master_mode))
+	return NULL;
+
+    work_queue_specify_master_mode(self->wqp, master_mode);
+
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+WorkQueue_specify_worker_mode(WorkQueue *self, PyObject *args, PyObject *kwds)
+{
+    int worker_mode;
+
+    if (!PyArg_ParseTuple(args, "i", &worker_mode))
+	return NULL;
+
+    work_queue_specify_worker_mode(self->wqp, worker_mode);
+
+    Py_RETURN_NONE;
+}
 
 static PyObject *
 WorkQueue_submit(WorkQueue *self, PyObject *args, PyObject *kwds)
@@ -628,6 +686,8 @@ static PyMethodDef WorkQueueMethods[] = {
     WORKQUEUE_METHOD(shutdown_workers),
     WORKQUEUE_METHOD(specify_algorithm),
     WORKQUEUE_METHOD(specify_name),
+    WORKQUEUE_METHOD(specify_master_mode),
+    WORKQUEUE_METHOD(specify_worker_mode),
     WORKQUEUE_METHOD(submit),
     WORKQUEUE_METHOD(wait),
     { NULL }
@@ -734,6 +794,26 @@ initworkqueue(void)
     PyModule_AddIntConstant(m, "WORK_QUEUE_SCHEDULE_FILES",   WORK_QUEUE_SCHEDULE_FILES);
     PyModule_AddIntConstant(m, "WORK_QUEUE_SCHEDULE_TIME",    WORK_QUEUE_SCHEDULE_TIME);
     PyModule_AddIntConstant(m, "WORK_QUEUE_SCHEDULE_DEFAULT", WORK_QUEUE_SCHEDULE_DEFAULT);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_SCHEDULE_DEFAULT", WORK_QUEUE_SCHEDULE_DEFAULT);
+    
+    PyModule_AddIntConstant(m, "WORK_QUEUE_RESULT_UNSET",	   WORK_QUEUE_RESULT_UNSET);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_RESULT_INPUT_FAIL",	   WORK_QUEUE_RESULT_INPUT_FAIL);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_RESULT_INPUT_MISSING",  WORK_QUEUE_RESULT_INPUT_MISSING);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_RESULT_FUNCTION_FAIL",  WORK_QUEUE_RESULT_FUNCTION_FAIL);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_RESULT_OUTPUT_FAIL",	   WORK_QUEUE_RESULT_OUTPUT_FAIL);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_RESULT_OUTPUT_MISSING", WORK_QUEUE_RESULT_OUTPUT_MISSING);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_RESULT_LINK_FAIL",	   WORK_QUEUE_RESULT_LINK_FAIL);
+
+    PyModule_AddIntConstant(m, "WORK_QUEUE_INPUT",   WORK_QUEUE_INPUT);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_OUTPUT",  WORK_QUEUE_OUTPUT);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_NOCACHE", WORK_QUEUE_NOCACHE);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_CACHE",   WORK_QUEUE_CACHE);
+    
+    PyModule_AddIntConstant(m, "WORK_QUEUE_MASTER_MODE_STANDALONE", WORK_QUEUE_MASTER_MODE_STANDALONE);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_MASTER_MODE_CATALOG",    WORK_QUEUE_MASTER_MODE_CATALOG);
+
+    PyModule_AddIntConstant(m, "WORK_QUEUE_WORKER_MODE_SHARED",     WORK_QUEUE_WORKER_MODE_SHARED);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_WORKER_MODE_EXCLUSIVE",  WORK_QUEUE_WORKER_MODE_EXCLUSIVE);
 
     if (PyErr_Occurred())
 	Py_FatalError("can't initialize module " MODULE_NAME);

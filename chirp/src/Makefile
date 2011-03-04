@@ -1,11 +1,15 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-TARGETS = chirp_server chirp_server_hdfs chirp_get chirp_put libchirp.a chirp chirp_benchmark chirp_status chirp_fuse chirp_distribute chirp_md5sum chirp_stream_files
 LOCAL_LDFLAGS = -ldttools -lchirp ${CCTOOLS_INTERNAL_LDFLAGS}
 
 LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_types.c chirp_acl.c chirp_local.c chirp_group.c chirp_hdfs.c chirp_filesystem.c
+PROGRAMS=chirp chirp_get chirp_put chirp_server chirp_server_hdfs chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute chirp_md5sum
+SCRIPTS=chirp_audit_cluster
+LIBRARIES=libchirp.a
+HEADERS=chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h
 
+TARGETS = ${PROGRAMS} ${LIBRARIES}
 OBJECTS = ${LIBRARY_SOURCES:%.c=%.o}
 
 all: ${TARGETS}
@@ -66,27 +70,11 @@ clean:
 install: all
 	install -d ${CCTOOLS_INSTALL_DIR}
 	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install -d ${CCTOOLS_INSTALL_DIR}/etc
-	install -d ${CCTOOLS_INSTALL_DIR}/include
 	install -d ${CCTOOLS_INSTALL_DIR}/lib
-	install chirp ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_get ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_put ${CCTOOLS_INSTALL_DIR}/bin
+	install -d ${CCTOOLS_INSTALL_DIR}/include
+	install -d ${CCTOOLS_INSTALL_DIR}/include/cctools
 	if [ -f ${CCTOOLS_INSTALL_DIR}/bin/chirp_server ]; then mv ${CCTOOLS_INSTALL_DIR}/bin/chirp_server ${CCTOOLS_INSTALL_DIR}/bin/chirp_server.old; fi
-	install chirp_server ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_server_hdfs ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_status ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_benchmark ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_stream_files ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_fuse ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_audit_cluster ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_distribute ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_md5sum ${CCTOOLS_INSTALL_DIR}/bin
-	install libchirp.a ${CCTOOLS_INSTALL_DIR}/lib
-	install chirp_global.h ${CCTOOLS_INSTALL_DIR}/include
-	install chirp_multi.h ${CCTOOLS_INSTALL_DIR}/include
-	install chirp_reli.h ${CCTOOLS_INSTALL_DIR}/include
-	install chirp_client.h ${CCTOOLS_INSTALL_DIR}/include
-	install chirp_protocol.h ${CCTOOLS_INSTALL_DIR}/include
-	install chirp_matrix.h ${CCTOOLS_INSTALL_DIR}/include
-	install chirp_types.h ${CCTOOLS_INSTALL_DIR}/include
+	for file in ${PROGRAMS} ${SCRIPTS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; done
+	for file in ${LIBRARIES} ; do install $$file ${CCTOOLS_INSTALL_DIR}/lib/$$file ; done
+	for file in ${HEADERS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/include/cctools/$$file ; done
+

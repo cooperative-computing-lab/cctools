@@ -586,7 +586,6 @@ INT64_T chirp_hdfs_getfile( const char *path, struct link *link, time_t stoptime
 {
 	int fd;
 	INT64_T result;
-	char line[CHIRP_LINE_MAX];
 	struct chirp_stat info;
 
 	debug(D_HDFS, "getfile %s", path);
@@ -606,8 +605,7 @@ INT64_T chirp_hdfs_getfile( const char *path, struct link *link, time_t stoptime
 		INT64_T ractual, wactual;
 		INT64_T length = info.cst_size;
 
-		sprintf(line,"%lld\n",length);
-		link_write(link,line,strlen(line),stoptime);
+		link_putfstring(link,"%lld\n",stoptime,length);
 
 		// Copy Pasta from link.c
 		
@@ -617,7 +615,7 @@ INT64_T chirp_hdfs_getfile( const char *path, struct link *link, time_t stoptime
 		  ractual = hdfs_services.read(fs, open_files[fd].file, buffer, chunk);
 		  if(ractual<=0) break;
 		  
-		  wactual = link_write(link,buffer,ractual,stoptime);
+		  wactual = link_putlstring(link,buffer,ractual,stoptime);
 		  if(wactual!=ractual) {
 			total = -1;
 			break;
@@ -639,7 +637,6 @@ INT64_T chirp_hdfs_putfile( const char *path, struct link *link, INT64_T length,
 {
 	int fd;
 	INT64_T result;
-	char line[CHIRP_LINE_MAX];
 
 	debug(D_HDFS, "putfile %s", path);
 
@@ -650,8 +647,7 @@ INT64_T chirp_hdfs_putfile( const char *path, struct link *link, INT64_T length,
 		char buffer[65536];
 		INT64_T total=0;
 
-		sprintf(line,"0\n");
-		link_write(link,line,strlen(line),stoptime);
+		link_putliteral(link,"0\n",stoptime);
 
 		// Copy Pasta from link.c
 		

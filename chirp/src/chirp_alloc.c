@@ -526,7 +526,7 @@ INT64_T chirp_alloc_getstream( const char *path, struct link *l, time_t stoptime
 	fd = chirp_alloc_open(path,O_RDONLY,0700);
 	if(fd<0) return fd;
 
-	link_write(l,"0\n",2,stoptime);
+	link_putliteral(l,"0\n",stoptime);
 
 	buffer = malloc(buffer_size);
 
@@ -534,7 +534,7 @@ INT64_T chirp_alloc_getstream( const char *path, struct link *l, time_t stoptime
 		result = chirp_alloc_pread(fd,buffer,buffer_size,total);
 		if(result<=0) break;
 
-		actual = link_write(l,buffer,result,stoptime);
+		actual = link_putlstring(l,buffer,result,stoptime);
 		if(actual!=result) break;
 
 		total += actual;
@@ -596,7 +596,7 @@ INT64_T chirp_alloc_putstream( const char *path, struct link *l, time_t stoptime
 	fd = chirp_alloc_open(path,O_CREAT|O_TRUNC|O_WRONLY,0700);
 	if(fd<0) return fd;
 
-	link_write(l,"0\n",2,stoptime);
+	link_putliteral(l,"0\n",stoptime);
 
 	buffer = malloc(buffer_size);
 

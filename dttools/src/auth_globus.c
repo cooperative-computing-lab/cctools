@@ -46,12 +46,10 @@ static int read_token(void *link, void **bufp, size_t *sizep)
 
 static int write_token(void *link, void *buf, size_t size)
 {
-	char line[AUTH_LINE_MAX];
 	time_t stoptime = time(0)+3600;
 
-	sprintf(line,"%d\n",(int)size);
-	link_write(link,line,strlen(line),stoptime);
-	if(link_write(link,buf,size,stoptime)==size) {
+	link_putfstring(link,"%zu\n",stoptime,size);
+	if(link_putlstring(link,buf,size,stoptime)==size) {
 		return GLOBUS_SUCCESS;
 	} else {
 		return GLOBUS_GSS_ASSIST_TOKEN_EOF;

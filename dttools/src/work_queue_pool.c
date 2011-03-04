@@ -36,16 +36,19 @@ static void show_help(const char *cmd)
 	printf("Use: %s [options] <count>\n", cmd);
 	printf("where batch options are:\n");
 	printf("  -d <subsystem> Enable debugging for this subsystem.\n");
-	printf("  -s <scratch>   Scratch directory. (default is /tmp/${USER}-workers)\n");
+	printf("  -S <scratch>   Scratch directory. (default is /tmp/${USER}-workers)\n");
 	printf("  -T <type>      Batch system type: unix, condor, sge, workqueue, xgrid. (default is unix)\n");
 	printf("  -r <count>     Number of attemps to retry if failed to submit a worker.\n");
 	printf("  -W <path>      Path to worker executable.\n");
 	printf("  -h             Show this screen.\n");
 	printf("\n");
 	printf("where worker options are:\n");
-	printf("  -N <name>      Preferred master name.\n");
-	printf("  -S             Run as a shared worker.\n");
+	printf("  -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
 	printf("  -t <time>      Abort after this amount of idle time.\n");
+	printf("  -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
+	printf("  -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
+	printf("  -s             Run as a shared worker. By default the worker would only work on preferred projects.\n");
+	printf("  -o <file>      Send debugging to this file.\n");
 }
 
 int main(int argc, char *argv[])
@@ -62,11 +65,29 @@ int main(int argc, char *argv[])
 	struct batch_queue *q;
 	FILE *ifs, *ofs;
 	struct itable *remote_job_table;
+        int auto_worker = 0;
 
-	while ((c = getopt(argc, argv, "a:d:hT:s:W:")) >= 0) {
+	while ((c = getopt(argc, argv, "aC:d:hN:t:T:sS:W:")) >= 0) {
 		switch (c) {
                         case 'a':
-				strncpy(worker_args, optarg, PATH_MAX);
+                                strcat(worker_args, " -a");
+                                auto_worker = 1;
+                                break;
+                        case 'C':
+                                strcat(worker_args, " -C ");
+                                strcat(worker_args, optarg);
+                                break;
+                        case 'N':
+                                strcat(worker_args, " -N ");
+                                strcat(worker_args, optarg);
+                                break;
+                        case 's':
+                                strcat(worker_args, " -s");
+                                break;
+                        case 't':
+                                strcat(worker_args, " -t ");
+                                strcat(worker_args, optarg);
+                                break;
 			case 'd':
 				debug_flags_set(optarg);
 				break;
@@ -80,7 +101,7 @@ int main(int argc, char *argv[])
 			case 'W':
 				strncpy(worker_path, optarg, PATH_MAX);
 				break;
-			case 's':
+			case 'S':
 				strncpy(scratch_dir, optarg, PATH_MAX);
 				break;
 			case 'r':
@@ -94,12 +115,28 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if ((argc - optind) != 1) {
-                fprintf(stderr, "invalid number of arguments\n");
-                show_help(argv[0]);
-                return EXIT_FAILURE;
+        if(!auto_worker) {
+                if ((argc - optind) != 3) {
+                        fprintf(stderr, "invalid number of arguments\n");
+                        show_help(argv[0]);
+                        return EXIT_FAILURE;
+                }
+                // Add host name
+                strcat(worker_args, " ");
+                strcat(worker_args, argv[optind]);
+                // Add port
+                strcat(worker_args, " ");
+                strcat(worker_args, argv[optind+1]);
+                // Number of workers to submit
+                count = strtol(argv[optind+2], NULL, 10);
+        } else {
+                if ((argc - optind) != 1) {
+                        fprintf(stderr, "invalid number of arguments\n");
+                        show_help(argv[0]);
+                        return EXIT_FAILURE;
+                }
+                count = strtol(argv[optind], NULL, 10);
         }
-	count = strtol(argv[optind], NULL, 10);
 
 	signal(SIGINT,handle_abort);
 	signal(SIGQUIT,handle_abort);

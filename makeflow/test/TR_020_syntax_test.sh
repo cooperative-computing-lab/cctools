@@ -9,7 +9,7 @@ prepare()
 
 run()
 {
-    ../src/makeflow -C syntax/test.makeflow && exit 0
+    ../src/makeflow -k syntax/test.makeflow && exit 0
     exit 1
 }
 

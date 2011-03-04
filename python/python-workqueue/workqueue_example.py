@@ -8,6 +8,7 @@
 
 from workqueue import Task, WorkQueue, set_debug_flag
 from workqueue import WORK_QUEUE_SCHEDULE_FCFS, WORK_QUEUE_SCHEDULE_FILES
+#from workqueue import WORK_QUEUE_MASTER_MODE_STANDALONE, WORK_QUEUE_WORKER_MODE_SHARED
 
 import os
 import sys
@@ -16,10 +17,12 @@ import time
 set_debug_flag('debug')
 set_debug_flag('wq')
 
-wq = WorkQueue()
+wq = WorkQueue(9999, name='workqueue_example', catalog=False, exclusive=False)
 
 wq.specify_algorithm(WORK_QUEUE_SCHEDULE_FCFS)
-wq.specify_name('work_queue_example')
+#wq.specify_name('workqueue_example')
+#wq.specify_master_mode(WORK_QUEUE_MASTER_MODE_STANDALONE)
+#wq.specify_worker_mode(WORK_QUEUE_WORKER_MODE_SHARED)
 
 if wq.empty():
     print 'work queue is empty'
@@ -40,7 +43,7 @@ for i in range(5):
     task.algorithm = WORK_QUEUE_SCHEDULE_FILES
     print task.command, task.algorithm
 
-    task.specify_input_buf('hello from %d' % i, ifile)
+    task.specify_input_buffer('hello from %d' % i, ifile, cache=False)
     task.specify_output_file(ofile, ofile)
 
     outputs.append(ofile)
@@ -70,7 +73,7 @@ if wq.hungry():
 wq.activate_fast_abort(1.5)
 
 while not wq.empty():
-    t = wq.wait(10)
+    t = wq.wait(1)
     if t:
 	print t.taskid, t.return_status, t.result, t.host
 	print t.submit_time, t.start_time, t.finish_time

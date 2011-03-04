@@ -28,6 +28,8 @@ See the file COPYING for details.
 #include <netdb.h>
 #include <errno.h>
 
+#include <assert.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -42,8 +44,8 @@ struct link {
 	int written;
 	time_t last_used;
 	char buffer[BUFFER_SIZE];
-	int buffer_start;
-	int buffer_length;
+	size_t buffer_start;
+	size_t buffer_length;
 	char raddr[LINK_ADDRESS_MAX];
 	int rport;
 };
@@ -382,7 +384,7 @@ static int fill_buffer( struct link *link, time_t stoptime )
 
 /* link_read blocks until all the requested data is available */
 
-int link_read( struct link *link, char *data, int count, time_t stoptime )
+int link_read( struct link *link, char *data, size_t count, time_t stoptime )
 {
 	ssize_t total=0;
 	ssize_t chunk=0;
@@ -443,7 +445,7 @@ int link_read( struct link *link, char *data, int count, time_t stoptime )
 
 /* link_read_avail returns whatever is available, blocking only if nothing is */
 
-int link_read_avail( struct link *link, char *data, int count, time_t stoptime )
+int link_read_avail( struct link *link, char *data, size_t count, time_t stoptime )
 {
 	ssize_t total=0;
 	ssize_t chunk=0;
@@ -495,7 +497,7 @@ int link_read_avail( struct link *link, char *data, int count, time_t stoptime )
 	}		
 }
 
-int link_readline( struct link *link, char *line, int length, time_t stoptime )
+int link_readline( struct link *link, char *line, size_t length, time_t stoptime )
 {
 	while(1) {
 		while(length>0 && link->buffer_length>0) {
@@ -512,14 +514,14 @@ int link_readline( struct link *link, char *line, int length, time_t stoptime )
 				length--;
 			}
 		}
-		if(length<=0) break;
+		if(length==0) break;
 		if(fill_buffer(link,stoptime)<=0) break;
 	}
 
 	return 0;
 }
 
-int link_write( struct link *link, const char *data, int count, time_t stoptime )
+int link_write( struct link *link, const char *data, size_t count, time_t stoptime )
 {
 	ssize_t total=0;
 	ssize_t chunk=0;
@@ -555,6 +557,60 @@ int link_write( struct link *link, const char *data, int count, time_t stoptime 
 			return -1;
 		}
 	}		
+}
+
+int link_putlstring( struct link *link, const char *data, size_t count, time_t stoptime )
+{
+	size_t total = 0;
+	ssize_t written = 0;
+
+	while (count > 0 && (written = link_write(link, data, count, stoptime)) > 0) {
+		count -= written;
+		total += written;
+		data += written;
+	}
+	return written < 0 ? written : total;
+}
+
+int link_putvfstring( struct link *link, const char *fmt, time_t stoptime, va_list va )
+{
+	va_list va2;
+	size_t size = 65536;
+	char buffer[size];
+	char *b = buffer;
+
+	va_copy(va2, va);
+	int n = vsnprintf(NULL, 0, fmt, va2);
+	va_end(va2);
+
+	if (n < 0) return -1;
+	if (n > size-1) {
+		b = (char *) malloc(n+1);
+		if (b == NULL) return -1;
+		size = n+1;
+	}
+
+	va_copy(va2, va);
+	n = vsnprintf(b, size, fmt, va2);
+	assert(n >= 0);
+	va_end(va2);
+
+	int r = link_putlstring(link, b, (size_t) n, stoptime);
+
+	if (b != buffer) free(b);
+
+	return r;
+}
+
+int link_putfstring( struct link *link, const char *fmt, time_t stoptime, ... )
+{
+	va_list va;
+
+	va_start(va, stoptime);
+	int result = link_putvfstring(link, fmt, stoptime, va);
+	va_end(va);
+
+	return result;
 }
 
 void link_close( struct link *link )

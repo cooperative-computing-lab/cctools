@@ -9,8 +9,8 @@ EXTRA_HEADERS = int_sizes.h macros.h
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
 LIBRARIES = libdttools.a
-PROGRAMS = catalog_server watchdog multirun worker batch_submit_workers work_queue_status
-TEST_PROGRAMS = work_queue_example microbench hmac_test chunk_test
+PROGRAMS = catalog_server worker work_queue_pool work_queue_status watchdog
+TEST_PROGRAMS = work_queue_example microbench hmac_test chunk_test multirun
 PROGRAM_SOURCES = ${PROGRAMS:%=%.c} ${TEST_PROGRAMS:%=%.c}
 SCRIPTS = condor_submit_workers sge_submit_workers
 CYGWINLIB = cygwin1.dll
@@ -47,7 +47,7 @@ hmac_test: hmac_test.o libdttools.a
 chunk_test: chunk_test.o libdttools.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-batch_submit_workers: batch_submit_workers.o libdttools.a
+work_queue_pool: work_queue_pool.o libdttools.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 libdttools.a: ${OBJECTS}
@@ -72,8 +72,9 @@ install: all
 	install -d ${CCTOOLS_INSTALL_DIR}/bin
 	install -d ${CCTOOLS_INSTALL_DIR}/lib
 	install -d ${CCTOOLS_INSTALL_DIR}/include
+	install -d ${CCTOOLS_INSTALL_DIR}/include/cctools
 	for file in ${LIBRARIES} ; do install $$file ${CCTOOLS_INSTALL_DIR}/lib/$$file ; done
-	for file in ${HEADERS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/include/$$file ; done
+	for file in ${HEADERS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/include/cctools/$$file ; done
 	for file in ${PROGRAMS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; done
 	for file in ${SCRIPTS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; chmod 755 ${CCTOOLS_INSTALL_DIR}/bin/$$file; done
 	if [ -f /bin/${CYGWINLIB} ] ; then install /bin/${CYGWINLIB} ${CCTOOLS_INSTALL_DIR}/bin/${CYGWINLIB} ; fi

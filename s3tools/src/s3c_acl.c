@@ -52,7 +52,7 @@ int s3_getacl(char* bucketname, char* filename, char* owner, struct hash_table* 
 	sign_message(&mesg, access_key_id, access_key);
 	length = s3_message_to_string(&mesg, &text);
 
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
@@ -205,18 +205,17 @@ int s3_setacl(char* bucketname, char *filename, const char* owner, struct hash_t
 	length = s3_message_to_string(&mesg, &text);
 
 	fprintf(stderr, "Message:\n%s\n", text);
-	link_write(server, text, length, stoptime);
+	link_putlstring(server, text, length, stoptime);
 	free(text);
 
-	link_write(server, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", 39, stoptime);
-	link_write(server, "<AccessControlPolicy><Owner><ID>", 32, stoptime);
-	link_write(server, owner, strlen(owner), stoptime);
-	link_write(server, "</ID></Owner><AccessControlList>", 32, stoptime);
+	link_putliteral(server, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", stoptime);
+	link_putliteral(server, "<AccessControlPolicy><Owner><ID>", stoptime);
+	link_putstring(server, owner, stoptime);
+	link_putliteral(server, "</ID></Owner><AccessControlList>", stoptime);
 
 	hash_table_firstkey(acls);
 	while(hash_table_nextkey(acls, &id, (void**)&acl)) {
 		char grantee[HEADER_LINE_MAX];
-		char grant[HEADER_LINE_MAX];
 
 		switch(acl->acl_type) {
 			case S3_ACL_URI:
@@ -230,28 +229,23 @@ int s3_setacl(char* bucketname, char *filename, const char* owner, struct hash_t
 		}
 
 		if(acl->perm & S3_ACL_FULL_CONTROL) {
-			sprintf(grant, "<Grant>%s<Permission>FULL_CONTROL</Permission></Grant>", grantee);
-			link_write(server, grant, strlen(grant), stoptime);
+			link_putfstring(server, "<Grant>%s<Permission>FULL_CONTROL</Permission></Grant>", stoptime, grantee);
 		}
 		if(acl->perm & S3_ACL_READ) {
-			sprintf(grant, "<Grant>%s<Permission>READ</Permission></Grant>", grantee);
-			link_write(server, grant, strlen(grant), stoptime);
+			link_putfstring(server, "<Grant>%s<Permission>READ</Permission></Grant>", stoptime, grantee);
 		}
 		if(acl->perm & S3_ACL_WRITE) {
-			sprintf(grant, "<Grant>%s<Permission>WRITE</Permission></Grant>", grantee);
-			link_write(server, grant, strlen(grant), stoptime);
+			link_putfstring(server, "<Grant>%s<Permission>WRITE</Permission></Grant>", stoptime, grantee);
 		}
 		if(acl->perm & S3_ACL_READ_ACP) {
-			sprintf(grant, "<Grant>%s<Permission>READ_ACP</Permission></Grant>", grantee);
-			link_write(server, grant, strlen(grant), stoptime);
+			link_putfstring(server, "<Grant>%s<Permission>READ_ACP</Permission></Grant>", stoptime, grantee);
 		}
 		if(acl->perm & S3_ACL_WRITE_ACP) {
-			sprintf(grant, "<Grant>%s<Permission>WRITE_ACP</Permission></Grant>", grantee);
-			link_write(server, grant, strlen(grant), stoptime);
+			link_putfstring(server, "<Grant>%s<Permission>WRITE_ACP</Permission></Grant>", stoptime, grantee);
 		}
 	}
 
-	link_write(server, "</AccessControlList></AccessControlPolicy>\n", 43, stoptime);
+	link_putliteral(server, "</AccessControlList></AccessControlPolicy>\n", stoptime);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
 	if(strcmp(response, "HTTP/1.1 200 OK")) {

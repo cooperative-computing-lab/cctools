@@ -259,15 +259,17 @@ not available on your system. You can change the default port via the '-p
 <h3>Set Project Name</h3>
 The hostname:port is the default way for workers to identify masters.  Anyone
 can start a worker and connect to your master at the hostname:port.  Sometimes
-you don't want other people's workers to work on your project.  Setting project
-name for both your master and workers can <strong>avoid anonymous worker
-    connections</strong>. To set a name for your master, use the '-N' option: 
+you don't want other people's workers to work on your project.  To
+<strong>avoid anonymous worker connections</strong>, you will need to set a
+project name with the '-N' option for both your master and workers and enable
+the exclusive worker mode on your work queue master with the "-e" option: 
 <pre>
-% makeflow -T wq -N proj1 example.makeflow
+% makeflow -T wq -N proj1 -e example.makeflow
 </pre>
-This would inform the master to allow connections from workers who have a
-preference on "proj1".  To add a project preference for the worker, add the
-'-N' option to the worker as well:
+This would inform the master to only allow connections from workers who have a
+preference on "proj1".  If the '-e' option is not specified, the master would
+accept shared workers submitted by anyone. To add a project preference for the
+worker, add the '-N' option to the worker as well:
 <pre>
 % worker -N proj1 barney.nd.edu 9123
 </pre>

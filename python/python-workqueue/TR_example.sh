@@ -6,7 +6,7 @@ pidfile=worker.pid
 
 prepare()
 {
-    ../../dttools/src/worker -d all localhost 9123 &
+    ../../dttools/src/worker -d all localhost 9999 &
     workerpid=$!
     echo $workerpid > $pidfile
     exit 0

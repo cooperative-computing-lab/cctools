@@ -132,7 +132,7 @@ static void get_linux_version()
 		}
 	}
 
-	debug(D_NOTICE,"parrot %d.%d.%d has not been tested on %s %s yet, this may not work",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,name.sysname,name.release);
+	debug(D_NOTICE,"parrot_run %d.%d.%d has not been tested on %s %s yet, this may not work",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,name.sysname,name.release);
 }
 
 static char *find_in_path( const char *cmd )
@@ -442,7 +442,7 @@ int main( int argc, char *argv[] )
 	debug_config_file_size(0);
 
 	if(getenv("PARROT_ENABLED")) {
-		fprintf(stderr,"sorry, parrot cannot be run inside of itself.\n");
+		fprintf(stderr,"sorry, parrot_run cannot be run inside of itself.\n");
 		exit(1);
 	}
 

@@ -258,7 +258,7 @@ acceptable.  Do NOT use for cryptographic purposes.
 */
 
 static ub4 jenkins_hash( k, length, initval)
-register ub1 *k;        /* the key */
+const register ub1 *k;        /* the key */
 register ub4  length;   /* the length of the key */
 register ub4  initval;  /* the previous hash, or an arbitrary value */
 {
@@ -298,6 +298,6 @@ register ub4  initval;  /* the previous hash, or an arbitrary value */
 
 unsigned hash_string( const char *s )
 {
-	return jenkins_hash(s,strlen(s),0);
+	return jenkins_hash((const ub1 *) s,strlen(s),0);
 }
 

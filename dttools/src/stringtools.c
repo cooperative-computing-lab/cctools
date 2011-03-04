@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include <ctype.h>
 #include <stdarg.h>
 #include <signal.h>
+#include <regex.h>
 
 #define STRINGTOOLS_BUFFER_SIZE 256
 #define METRIC_POWER_COUNT 6
@@ -84,30 +85,34 @@ void string_chomp( char *start )
 	}
 }
 
-int string_contains_word(char *str, char *word) {
-    char *start;
-    char tmp;
-    int ret;
+int whole_string_match_regex(const char *text, char *pattern) {
+    char *new_pattern;
 
-	while(*str) {
-		while(isspace((int)*str)) {
-			str++;
-		}
-		start = str;
-		while(*str && !isspace((int)*str)) {
-			str++;
-		}
-		if(*str) {
-            tmp = *str;
-			*str = 0;
-            ret = strncmp(start, word, strlen(start));
-            *str = tmp;
-            if(!ret) {
-                return 1;
-            }
-			str++;       
-		}
+    if(!pattern || !text) return 0;
+
+    new_pattern = (char *)malloc(sizeof(char) * (strlen(pattern)+2));
+    if(!new_pattern) return 0;
+
+    new_pattern[0] = '\0';
+    if(*pattern != '^') strncat(new_pattern, "^", 1);
+    strncat(new_pattern, pattern, strlen(pattern));
+    if(text[strlen(pattern)-1] != '$') strncat(new_pattern, "$", 1);
+
+    return string_match_regex(text, new_pattern);
+}
+
+
+int string_match_regex(const char *text, char *pattern) {
+    int ret = 0;
+    regex_t re;
+
+    if(!pattern || !text) return 0;
+    if(regcomp(&re, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
+        return 0;
     }
+    ret = regexec(&re, text, (size_t)0, NULL, 0);
+    regfree(&re);
+    if(!ret) return 1;
     return 0;
 }
 

@@ -23,4 +23,4 @@ install:
 	install -d ${CCTOOLS_INSTALL_DIR}/lib
 	install -d ${CCTOOLS_INSTALL_DIR}/include
 	install libftp_lite.a ${CCTOOLS_INSTALL_DIR}/lib
-	install ftp_lite.h ${CCTOOLS_INSTALL_DIR}/include
+	install ftp_lite.h ${CCTOOLS_INSTALL_DIR}/include/cctools

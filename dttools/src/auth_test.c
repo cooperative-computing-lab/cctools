@@ -106,8 +106,7 @@ int main( int argc, char *argv[] )
 
 			if(auth_accept(link,&type,&subject,stoptime)) {
 				time_t t = time(0);
-				sprintf(line,"Hello %s:%s, it is now %s",type,subject,ctime(&t));
-				link_write(link,line,strlen(line),stoptime);
+				link_putfstring(link,"Hello %s:%s, it is now %s",stoptime,type,subject,ctime(&t)); /* ctime ends with newline */
 			} else {
 				printf("couldn't auth accept\n");
 			} 

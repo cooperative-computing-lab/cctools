@@ -111,13 +111,9 @@ int cfs_fclose (CHIRP_FILE *file)
 void cfs_fprintf( CHIRP_FILE *file, const char *format, ... )
 {
   va_list va;
-  int size;
   if (file == &CHIRP_FILE_NULL) return;
   va_start(va, format);
-  size = buffer_vprep(file->b, format, va);
-  va_end(va);
-  va_start(va, format);
-  buffer_vprintf(file->b, format, size, va);
+  buffer_vprintf(file->b, format, va);
   va_end(va);
 }
 

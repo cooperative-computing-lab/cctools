@@ -11,7 +11,7 @@ run()
 {
     cd syntax; 
 
-    if ! ../../src/makeflow -C typo.makeflow 
+    if ! ../../src/makeflow -k typo.makeflow 
     then
     	exit 1
     fi
