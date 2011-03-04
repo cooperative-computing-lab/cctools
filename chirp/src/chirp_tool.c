@@ -66,7 +66,7 @@ static INT64_T do_ticket_create(	int argc, char **argv );
 static INT64_T do_ticket_register(	int argc, char **argv );
 static INT64_T do_ticket_delete(	int argc, char **argv );
 static INT64_T do_ticket_list(	int argc, char **argv );
-static INT64_T do_ticket_mask(	int argc, char **argv );
+static INT64_T do_ticket_modify(	int argc, char **argv );
 static INT64_T do_setacl( 	int argc, char **argv );
 static INT64_T do_resetacl( int argc, char **argv );
 static INT64_T do_ls( 	int argc, char **argv );
@@ -146,7 +146,7 @@ static struct command list[] =
 {"ticket_register", 1, 2, 3, "<name> [<subject>] <duration>", do_ticket_register},
 {"ticket_delete", 1, 1, 1, "<name>", do_ticket_delete},
 {"ticket_list", 1, 1, 1, "<name>", do_ticket_list},
-{"ticket_mask", 1, 3, 3, "<name> <directory> <aclmask>", do_ticket_mask},
+{"ticket_modify", 1, 3, 3, "<name> <directory> <aclmask>", do_ticket_modify},
 {"setacl",  1, 3, 3, "<remotepath> <user> <rwldax>",do_setacl},
 {"resetacl",1, 2, 2, "<remotepath> <rwldax>",do_resetacl},
 {"ls",      1, 0, 2, "[-la] [remotepath]",       do_ls},
@@ -608,7 +608,7 @@ static INT64_T do_ticket_create( int argc, char **argv )
 		char *aclmask = argv[i+1];
 		acl_simple(&aclmask);
         fprintf(stderr, "ticket '%s': directory '%s' aclmask = '%s'.\n", name, path, aclmask);
-		result = chirp_reli_ticket_mask(current_host,name,path,aclmask,stoptime);
+		result = chirp_reli_ticket_modify(current_host,name,path,aclmask,stoptime);
 		if (result < 0) {
 			fprintf(stderr, "ticket '%s': could not set acl mask '%s' for directory '%s'\n", name, argv[i+1], argv[i]);
 			return -1;
@@ -637,18 +637,18 @@ static INT64_T do_ticket_delete( int argc, char **argv )
 static INT64_T do_ticket_list( int argc, char **argv )
 {
 //{"ticket_list", 1, 2, 1, "<name>", do_ticket_list},
-	return chirp_reli_ticket_list(current_host,argv[1],stoptime);
+	return chirp_reli_ticket_list(current_host,argv[1],0,stoptime);
 }
 
-static INT64_T do_ticket_mask( int argc, char **argv )
+static INT64_T do_ticket_modify( int argc, char **argv )
 {
-//{"ticket_mask", 1, 2, 1, "<name> <directory> <aclmask>", do_ticket_mask},
+//{"ticket_modify", 1, 2, 1, "<name> <directory> <aclmask>", do_ticket_modify},
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[2], full_path);
 
 	acl_simple(&argv[3]);
 
-	return chirp_reli_ticket_mask(current_host,argv[1],full_path,argv[3],stoptime);
+	return chirp_reli_ticket_modify(current_host,argv[1],full_path,argv[3],stoptime);
 }
 
 static INT64_T do_setacl( int argc, char **argv )

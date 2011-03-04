@@ -343,8 +343,8 @@ void chirp_reli_closedir( struct chirp_dir *dir );
 INT64_T chirp_reli_ticket_create( const char *host, char name[CHIRP_PATH_MAX], unsigned bits, time_t stoptime );
 INT64_T chirp_reli_ticket_register( const char *host, const char *name, const char *subject, time_t duration, time_t stoptime );
 INT64_T chirp_reli_ticket_delete( const char *host, const char *name, time_t stoptime );
-INT64_T chirp_reli_ticket_list( const char *host, const char *name, time_t stoptime );
-INT64_T chirp_reli_ticket_mask( const char *host, const char *name, const char *path, const char *aclmask, time_t stoptime );
+INT64_T chirp_reli_ticket_list( const char *host, const char *name, int everyone, time_t stoptime );
+INT64_T chirp_reli_ticket_modify( const char *host, const char *name, const char *path, const char *aclmask, time_t stoptime );
 
 /** Get an access control list.
 @param host The name and port of the Chirp server to access.

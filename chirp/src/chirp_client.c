@@ -470,18 +470,23 @@ INT64_T chirp_client_ticket_delete (struct chirp_client *c, const char *name, ti
 	return chirp_client_ticket_register(c, name, NULL, 0, stoptime) == 0 ? unlink(name) : -1;
 }
 
-INT64_T chirp_client_ticket_list (struct chirp_client *c, const char *name, time_t stoptime)
+INT64_T chirp_client_ticket_get (struct chirp_client *c, const char *name, char **duration, time_t stoptime)
 {
 	return 0;
 }
 
-INT64_T chirp_client_ticket_mask (struct chirp_client *c, const char *name, const char *path, const char *aclmask, time_t stoptime)
+INT64_T chirp_client_ticket_list (struct chirp_client *c, const char *name, int everyone, time_t stoptime)
+{
+	return 0;
+}
+
+INT64_T chirp_client_ticket_modify (struct chirp_client *c, const char *name, const char *path, const char *aclmask, time_t stoptime)
 {
 	char ticket_subject[CHIRP_PATH_MAX];
 	char safepath[CHIRP_LINE_MAX];
 	ticket_translate(name, ticket_subject);
 	url_encode(path, safepath, sizeof(safepath));
-	INT64_T result = simple_command(c, stoptime, "ticket_mask %s %s %s\n", ticket_subject, safepath, aclmask);
+	INT64_T result = simple_command(c, stoptime, "ticket_modify %s %s %s\n", ticket_subject, safepath, aclmask);
 	if (result == 0) {
 		time_t t;
 		struct tm tm;

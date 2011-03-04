@@ -944,6 +944,8 @@ static void chirp_handler( struct link *l, const char *subject )
 		char path[CHIRP_PATH_MAX];
 		char newpath[CHIRP_PATH_MAX];
 		char newsubject[CHIRP_LINE_MAX];
+		int everyone;
+		char ticket_subject[CHIRP_LINE_MAX];
 		char duration[CHIRP_LINE_MAX];
 		char newacl[CHIRP_LINE_MAX];
 		char hostname[CHIRP_LINE_MAX];
@@ -1425,7 +1427,7 @@ static void chirp_handler( struct link *l, const char *subject )
 					errno = EACCES;
 					goto failure;
 				}
-				result = chirp_acl_ticket(chirp_root_path,subject,newsubject,ticket,duration);
+				result = chirp_acl_ticket_create(chirp_root_path,subject,newsubject,ticket,duration);
 				free(ticket);
 			} else {
 				link_soak(l,length,stalltime);
@@ -1433,10 +1435,20 @@ static void chirp_handler( struct link *l, const char *subject )
 				errno = ENOMEM;
 				break;
 			}
-		} else if(sscanf(line,"ticket_mask %s %s %s",newsubject,path,newacl)==3) {
-			/* newsubject is the ticket_subject (e.g. "ticket:MD5") */
+		} else if(sscanf(line,"ticket_modify %s %s %s",ticket_subject,path,newacl)==3) {
 			if(!chirp_path_fix(path)) goto failure;
-			result = chirp_acl_ticketacl(chirp_root_path,subject,newsubject,path,chirp_acl_text_to_flags(newacl),strcmp(esubject,chirp_super_user) == 0);
+			result = chirp_acl_ticket_modify(chirp_root_path,subject,ticket_subject,path,chirp_acl_text_to_flags(newacl),strcmp(esubject,chirp_super_user) == 0);
+		} else if(sscanf(line,"ticket_get %s",ticket_subject)==1) {
+			char *ticket_esubject;
+			char *ticket;
+			time_t expiration;
+			char **ticket_rights;
+			if(!chirp_path_fix(path)) goto failure;
+			result = chirp_acl_ticket_get(chirp_root_path,subject,ticket_subject,&ticket_esubject,&ticket,&expiration,&ticket_rights);
+			if (result == 0) {
+				
+			}
+		} else if(sscanf(line,"ticket_list %s %d",ticket_subject,&everyone)==1) {
 		} else if(sscanf(line,"mkdir %s %lld",path,&mode)==2) {
 			if(!chirp_path_fix(path)) goto failure;
 			if(chirp_acl_check(chirp_root_path,path,subject,CHIRP_ACL_RESERVE)) {

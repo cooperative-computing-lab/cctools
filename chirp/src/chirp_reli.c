@@ -536,14 +536,14 @@ INT64_T chirp_reli_ticket_delete( const char *host, const char *name, time_t sto
 	RETRY_ATOMIC( result = chirp_client_ticket_delete(client,name,stoptime); )
 }
 
-INT64_T chirp_reli_ticket_list( const char *host, const char *name, time_t stoptime )
+INT64_T chirp_reli_ticket_list( const char *host, const char *name, int everyone, time_t stoptime )
 {
-	RETRY_ATOMIC( result = chirp_client_ticket_list(client,name,stoptime); )
+	RETRY_ATOMIC( result = chirp_client_ticket_list(client,name,everyone,stoptime); )
 }
 
-INT64_T chirp_reli_ticket_mask( const char *host, const char *name, const char *path, const char *aclmask, time_t stoptime )
+INT64_T chirp_reli_ticket_modify( const char *host, const char *name, const char *path, const char *aclmask, time_t stoptime )
 {
-	RETRY_ATOMIC( result = chirp_client_ticket_mask(client,name,path,aclmask,stoptime); )
+	RETRY_ATOMIC( result = chirp_client_ticket_modify(client,name,path,aclmask,stoptime); )
 }
 
 INT64_T chirp_reli_setacl( const char *host, const char *path, const char *subject, const char *rights, time_t stoptime )
