@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 	struct itable *remote_job_table;
         int auto_worker = 0;
 
-	while ((c = getopt(argc, argv, "aC:d:hN:t:T:sS:W:")) >= 0) {
+	while ((c = getopt(argc, argv, "aC:d:hN:r:sS:t:T:W:")) >= 0) {
 		switch (c) {
                         case 'a':
                                 strcat(worker_args, " -a");
@@ -234,7 +234,7 @@ int main(int argc, char *argv[])
         UINT64_T key;
 	itable_firstkey(remote_job_table);
 	while(itable_nextkey(remote_job_table, &key, &x)) {
-		printf("batch_submit_workers: aborting remote job %llu\n", key);
+		printf("work_queue_pool: aborting remote job %llu\n", key);
 		batch_job_remove(q, key);
 	}
 
