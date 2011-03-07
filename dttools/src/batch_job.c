@@ -1086,6 +1086,7 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 	q->options_text = 0;
 	q->job_table = itable_create(0);
 	q->output_table = itable_create(0);
+	q->hadoop_jobs = NULL;
 
 	if(type==BATCH_QUEUE_TYPE_CONDOR)
 	    q->logfile = strdup("condor.logfile");

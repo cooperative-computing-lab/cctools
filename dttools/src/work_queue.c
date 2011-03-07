@@ -1067,11 +1067,10 @@ struct work_queue * work_queue_create( int port )
 		envstring = getenv("WORK_QUEUE_PORT");
 		if(envstring) {
 			port = atoi(envstring);
-		} else if(getenv("WORK_QUEUE_NAME")) {
-			port = -1;
 		} else {
-			port = WORK_QUEUE_DEFAULT_PORT;
-		}
+            // indicate using a random available port
+			port = -1;
+		} 
 	}
 
 	if(port == -1) {

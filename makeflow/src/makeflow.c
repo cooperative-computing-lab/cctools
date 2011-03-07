@@ -1609,9 +1609,16 @@ int main( int argc, char *argv[] )
 
 
 	if(port!=0) {
-		char line[1024];
 		sprintf(line,"WORK_QUEUE_PORT=%d",port);
 		putenv(strdup(line));
+	} else {
+        // Use work queue default port in standalone mode when port in not
+        // specified with -p option. In work queue catalog mode, work queue
+        // would choose a random port when port is not explicitly specified.
+        if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE){
+            sprintf(line,"WORK_QUEUE_PORT=%d",WORK_QUEUE_DEFAULT_PORT);
+            putenv(strdup(line));
+        }
 	}
 
 	int dagfile_namesize = strlen(dagfile);
