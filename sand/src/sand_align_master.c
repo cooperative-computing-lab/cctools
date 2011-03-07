@@ -169,7 +169,7 @@ static void task_complete( struct work_queue_task *t )
 	fflush(output_file);
 
 	tasks_done++;
-	tasks_runtime += (t->finish_time - t->start_time);
+	tasks_runtime += (t->time_receive_output_finish - t->time_send_input_start);
 	tasks_filetime += t->total_transfer_time;
 
 	work_queue_task_delete(t);
