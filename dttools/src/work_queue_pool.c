@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 	struct itable *remote_job_table;
         int auto_worker = 0;
 
-	while ((c = getopt(argc, argv, "aC:d:hN:t:T:sS:W:")) >= 0) {
+	while ((c = getopt(argc, argv, "aC:d:hN:r:sS:t:T:W:")) >= 0) {
 		switch (c) {
                         case 'a':
                                 strcat(worker_args, " -a");
