@@ -76,11 +76,16 @@ struct work_queue_task {
 	int return_status;		/**< The exit code of the command line. */
 	int result;			/**< The result of the task (successful, failed return_status, missing input file, missing output file). */
 	char* host;			/**< The name of the host on which it ran. */
-	timestamp_t submit_time;	/**< The time the task was submitted. */
-	timestamp_t start_time;		/**< The time at which the task began. */
-	timestamp_t finish_time;	/**< The time at which it completed. */
-	timestamp_t transfer_start_time;	/**< The time at which it started to transfer input files. */
-    timestamp_t computation_time;       /**< The time of executing the command. */
+
+	timestamp_t time_task_submit;	/**< The time at which this task was submitted */
+	timestamp_t time_task_finish;	/**< The time at which this task was finished */
+	timestamp_t time_send_input_start;	/**< The time at which it started to transfer input files. */
+	timestamp_t time_send_input_finish;	/**< The time at which it finished transferring input files. */
+	timestamp_t time_execute_cmd_start;		    /**< The time at which the task began. */
+	timestamp_t time_execute_cmd_finish;		/**< The time at which the task finished (discovered by the master). */
+	timestamp_t time_receive_output_start;	/**< The time at which it started to transfer output files. */
+	timestamp_t time_receive_output_finish;	/**< The time at which it finished transferring output files. */
+
     INT64_T total_bytes_transferred;    /**< Number of bytes transferred since task has last started transferring input data. */
 	timestamp_t total_transfer_time;    /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
 };

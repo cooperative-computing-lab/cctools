@@ -522,9 +522,9 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 
 	struct work_queue_task *t = work_queue_wait(q->work_queue,timeout);
 	if(t) {
-		info->submitted = t->submit_time/1000000;
-		info->started = t->start_time/1000000;
-		info->finished = t->finish_time/1000000;
+		info->submitted = t->time_task_submit/1000000;
+		info->started = t->time_send_input_start/1000000;
+		info->finished = t->time_receive_output_finish/1000000;
 		info->exited_normally = 1;
 		info->exit_code = t->return_status;
 		info->exit_signal = 0;
@@ -552,7 +552,7 @@ batch_job_id_t batch_job_wait_work_queue( struct batch_queue *q, struct batch_jo
 			}
 			free(outfile);			
 		}
-		fprintf(logfile, "TASK %llu %d %d %d %d %llu %llu %llu %llu %llu %s \"%s\" \"%s\"\n", timestamp_get(), t->taskid, t->result, t->return_status, t->worker_selection_algorithm, t->submit_time, t->transfer_start_time, t->finish_time, t->total_bytes_transferred, t->total_transfer_time, t->host, t->tag ? t->tag : "", t->command_line);
+		fprintf(logfile, "TASK %llu %d %d %d %d %llu %llu %llu %llu %llu %s \"%s\" \"%s\"\n", timestamp_get(), t->taskid, t->result, t->return_status, t->worker_selection_algorithm, t->time_task_submit, t->time_send_input_start, t->time_receive_output_finish, t->total_bytes_transferred, t->total_transfer_time, t->host, t->tag ? t->tag : "", t->command_line);
 
 		taskid = t->taskid;
 		work_queue_task_delete(t);

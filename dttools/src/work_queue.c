@@ -130,7 +130,10 @@ struct work_queue_task * work_queue_task_create( const char *command_line)
 	t->result = WORK_QUEUE_RESULT_UNSET;
 	t->taskid = next_taskid++;
 
-	t->submit_time = t->start_time = t->finish_time = t->transfer_start_time = t->total_transfer_time = t->computation_time = 0;
+    t->time_task_submit = t->time_task_finish = 0;
+	t->time_send_input_start = t->time_send_input_finish = 0;
+	t->time_execute_cmd_start = t->time_execute_cmd_finish = 0;
+	t->time_receive_output_start = t->time_receive_output_finish = 0;
 	
     t->total_bytes_transferred = 0;
     t->status = TASK_STATUS_INITIALIZING;
@@ -565,7 +568,6 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			struct work_queue_task *t = w->current_task;
 			int actual;
 
-            t->computation_time = timestamp_get() - t->start_time;
 			t->output = malloc(output_length+1);
 
 			if(output_length>0) {
@@ -585,6 +587,8 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			t->return_status = result;
 			if(t->return_status != 0)
 				t->result |= WORK_QUEUE_RESULT_FUNCTION_FAIL;
+
+            t->time_execute_cmd_finish = timestamp_get();
 			
 			if(!get_output_files(t,w,q)) {
 				free(t->output);
@@ -599,14 +603,14 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			w->current_task = 0;
 			change_worker_state(q,w,WORKER_STATE_READY);
 
-			t->finish_time = timestamp_get();
+	        t->time_task_finish = timestamp_get();
 
 			t->host = strdup(w->addrport);
 			q->total_tasks_complete++;
-			q->total_task_time += (t->finish_time-t->start_time);
+			q->total_task_time += (t->time_receive_output_finish - t->time_send_input_start);
 			w->total_tasks_complete++;
-			w->total_task_time += (t->finish_time-t->start_time);
-			debug(D_WQ,"%s (%s) done in %.02lfs total tasks %d average %.02lfs",w->hostname,w->addrport,(t->finish_time-t->transfer_start_time)/1000000.0,w->total_tasks_complete,w->total_task_time/w->total_tasks_complete/1000000.0);
+			w->total_task_time += (t->time_receive_output_finish - t->time_send_input_start);
+			debug(D_WQ,"%s (%s) done in %.02lfs total tasks %d average %.02lfs",w->hostname,w->addrport,(t->time_receive_output_finish - t->time_send_input_start)/1000000.0,w->total_tasks_complete,w->total_task_time/w->total_tasks_complete/1000000.0);
 
 			start_task_on_worker(q,w);
 		} else {
@@ -780,6 +784,7 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
     struct stat s;
 
     t->status = TASK_STATUS_SENDING_INPUT;
+	t->time_send_input_start = timestamp_get();
 
     // Check input existence
 	if(t->input_files) {
@@ -829,9 +834,11 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 	}
 	
 
+	t->time_send_input_finish = timestamp_get();
 	return 1;
 
 	failure:
+	t->time_send_input_finish = timestamp_get();
 	if(tf->type == WORK_QUEUE_FILE) 
 	    debug(D_WQ,"%s (%s) failed to send %s (%i bytes received).",w->hostname,w->addrport,tf->payload,actual);
 	else
@@ -842,9 +849,8 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 
 int start_one_task( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
-	t->transfer_start_time = timestamp_get();
 	if(!send_input_files(t,w,q)) return 0;
-	t->start_time = timestamp_get();
+	t->time_execute_cmd_start = timestamp_get();
 	link_putfstring(w->link,"work %zu\n%s",time(0)+short_timeout,strlen(t->command_line),t->command_line);
     t->status = TASK_STATUS_EXECUTING;
 	debug(D_WQ,"%s (%s) busy on '%s'",w->hostname,w->addrport,t->command_line);
@@ -1009,7 +1015,7 @@ void abort_slow_workers( struct work_queue *q )
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 		if(w->state==WORKER_STATE_BUSY) {
-			timestamp_t runtime = current - w->current_task->transfer_start_time;
+			timestamp_t runtime = current - w->current_task->time_send_input_start;
 			if(runtime>(average_task_time*multiplier)) {
 				debug(D_NOTICE,"%s (%s) has run too long: %.02lf s (average is %.02lf s)",w->hostname,w->addrport,runtime/1000000.0,average_task_time/1000000.0);
 				remove_worker(q,w);
@@ -1210,7 +1216,7 @@ void work_queue_submit( struct work_queue *q, struct work_queue_task *t )
 	/* Then, add it to the ready list and mark it as submitted. */
 
 	list_push_tail(q->ready_list,t);
-	t->submit_time = timestamp_get();
+	t->time_task_submit = timestamp_get();
 	q->total_tasks_submitted++;
 }
 
