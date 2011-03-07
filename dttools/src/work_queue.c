@@ -46,7 +46,9 @@ See the file COPYING for details.
 #define TASK_STATUS_INITIALIZING 0
 #define TASK_STATUS_SENDING_INPUT 1
 #define TASK_STATUS_EXECUTING 2
-#define TASK_STATUS_RECEIVING_OUTPUT 3
+#define TASK_STATUS_WAITING_FOR_OUTPUT 3
+#define TASK_STATUS_RECEIVING_OUTPUT 4
+#define TASK_STATUS_COMPLETE 4
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
@@ -63,6 +65,7 @@ struct work_queue {
 	struct link * master_link;
 	struct list * ready_list;
 	struct list * complete_list;
+	struct list * receive_output_waiting_list;
 	struct hash_table * worker_table;
 	struct link_info * poll_table;
 	int poll_table_size;
@@ -589,30 +592,8 @@ static int handle_worker( struct work_queue *q, struct link *l )
 				t->result |= WORK_QUEUE_RESULT_FUNCTION_FAIL;
 
             t->time_execute_cmd_finish = timestamp_get();
-			
-			if(!get_output_files(t,w,q)) {
-				free(t->output);
-				t->output = 0;
-				goto failure;
-			}
-
-			delete_uncacheable_files(t, w);
-
-			// Record current task as completed and change worker's state
-			list_push_head(q->complete_list,w->current_task);
-			w->current_task = 0;
-			change_worker_state(q,w,WORKER_STATE_READY);
-
-	        t->time_task_finish = timestamp_get();
-
-			t->host = strdup(w->addrport);
-			q->total_tasks_complete++;
-			q->total_task_time += (t->time_receive_output_finish - t->time_send_input_start);
-			w->total_tasks_complete++;
-			w->total_task_time += (t->time_receive_output_finish - t->time_send_input_start);
-			debug(D_WQ,"%s (%s) done in %.02lfs total tasks %d average %.02lfs",w->hostname,w->addrport,(t->time_receive_output_finish - t->time_send_input_start)/1000000.0,w->total_tasks_complete,w->total_task_time/w->total_tasks_complete/1000000.0);
-
-			start_task_on_worker(q,w);
+            t->status = TASK_STATUS_WAITING_FOR_OUTPUT;
+            list_push_head(q->receive_output_waiting_list, w);
 		} else {
 			goto failure;
 		}
@@ -626,6 +607,44 @@ static int handle_worker( struct work_queue *q, struct link *l )
 	debug(D_NOTICE,"%s (%s) is rejected and removed.",w->hostname,w->addrport);
 	remove_worker(q,w);
     return 0;
+
+	failure:
+	debug(D_NOTICE,"%s (%s) failed and removed.",w->hostname,w->addrport);
+	remove_worker(q,w);
+	return 0;
+}
+
+
+static int receive_output_from_worker( struct work_queue *q, struct work_queue_worker *w )
+{
+	struct work_queue_task *t;
+	
+    t = w->current_task;
+
+    t->time_receive_output_start = timestamp_get();
+    if(!get_output_files(t,w,q)) {
+        free(t->output);
+        t->output = 0;
+        goto failure;
+    }
+    t->time_receive_output_finish = timestamp_get();
+
+    delete_uncacheable_files(t, w);
+
+    // Record current task as completed and change worker's state
+    list_push_head(q->complete_list,w->current_task);
+    w->current_task = 0;
+    change_worker_state(q,w,WORKER_STATE_READY);
+
+    t->time_task_finish = timestamp_get();
+
+    t->host = strdup(w->addrport);
+    q->total_tasks_complete++;
+    q->total_task_time += (t->time_receive_output_finish - t->time_send_input_start);
+    w->total_tasks_complete++;
+    w->total_task_time += (t->time_receive_output_finish - t->time_send_input_start);
+    debug(D_WQ,"%s (%s) done in %.02lfs total tasks %d average %.02lfs",w->hostname,w->addrport,(t->time_receive_output_finish - t->time_send_input_start)/1000000.0,w->total_tasks_complete,w->total_task_time/w->total_tasks_complete/1000000.0);
+    return 1;
 
 	failure:
 	debug(D_NOTICE,"%s (%s) failed and removed.",w->hostname,w->addrport);
@@ -784,7 +803,6 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
     struct stat s;
 
     t->status = TASK_STATUS_SENDING_INPUT;
-	t->time_send_input_start = timestamp_get();
 
     // Check input existence
 	if(t->input_files) {
@@ -833,12 +851,9 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 		}
 	}
 	
-
-	t->time_send_input_finish = timestamp_get();
 	return 1;
 
 	failure:
-	t->time_send_input_finish = timestamp_get();
 	if(tf->type == WORK_QUEUE_FILE) 
 	    debug(D_WQ,"%s (%s) failed to send %s (%i bytes received).",w->hostname,w->addrport,tf->payload,actual);
 	else
@@ -849,7 +864,10 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 
 int start_one_task( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
+
+	t->time_send_input_start = timestamp_get();
 	if(!send_input_files(t,w,q)) return 0;
+	t->time_send_input_finish = timestamp_get();
 	t->time_execute_cmd_start = timestamp_get();
 	link_putfstring(w->link,"work %zu\n%s",time(0)+short_timeout,strlen(t->command_line),t->command_line);
     t->status = TASK_STATUS_EXECUTING;
@@ -1078,6 +1096,7 @@ struct work_queue * work_queue_create( int port )
 
 	q->ready_list = list_create();
 	q->complete_list = list_create();
+	q->receive_output_waiting_list = list_create();
 	q->worker_table = hash_table_create(0,0);
 	
 	// The poll table is initially null, and will be created
@@ -1223,6 +1242,7 @@ void work_queue_submit( struct work_queue *q, struct work_queue_task *t )
 struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 {
 	struct work_queue_task *t;
+	struct work_queue_worker *w;
 	int i;
 	time_t stoptime;
 	int result;
@@ -1284,6 +1304,11 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 				handle_worker(q,q->poll_table[i].link);
 			}
 		}
+
+        // Transfer output
+        while((w=list_pop_head(q->receive_output_waiting_list))) {
+            receive_output_from_worker(q, w);
+        }
 
 		// If fast abort is enabled, kill off slow workers.
 		if(q->fast_abort_multiplier > 0) {
