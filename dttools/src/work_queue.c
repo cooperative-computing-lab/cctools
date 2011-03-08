@@ -1454,9 +1454,10 @@ static int update_catalog(struct work_queue* q)
 
     if(!outgoing_datagram) {
         outgoing_datagram = datagram_create(0);
-        if(!outgoing_datagram)
+        if(!outgoing_datagram) {
             fprintf(stderr, "Couldn't create outgoing udp port, thus work queue master info won't be sent to the catalog server!");
             return 0;
+        }
     }
 
 	port = work_queue_port(q);
