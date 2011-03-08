@@ -517,12 +517,7 @@ int chirp_acl_ticket_get (const char *root, const char *subject, const char *tic
 int chirp_acl_ticket_list (const char *root, const char *subject, int everyone, char ***ticket_subjects)
 {
 	size_t n = 0;
-	ticket_subjects = NULL;
-
-	if (everyone && strcmp(subject, chirp_super_user) != 0) {
-		errno = EACCES;
-		return -1;
-	}
+	*ticket_subjects = NULL;
 
 	const char *entry;
 	void *dir;
@@ -537,10 +532,12 @@ int chirp_acl_ticket_list (const char *root, const char *subject, int everyone, 
 		if (strncmp(entry, TICKET_PREFIX, TICKET_PREFIX_LENGTH) == 0 && isticket(entry+TICKET_PREFIX_LENGTH, &digest)) {
 			struct chirp_ticket ct;
 			if (!ticket_read(path, &ct)) continue; /* expired? */
-			n = n+1;
-			ticket_subjects = (char ***) xxrealloc(ticket_subjects, (n+1)*sizeof(char *));
-			(*ticket_subjects)[n-1] = xstrdup(entry+TICKET_PREFIX_LENGTH);
-			(*ticket_subjects)[n] = NULL;
+			if (strcmp(subject, ct.subject) == 0 || everyone) {
+			    n = n+1;
+				*ticket_subjects = (char **) xxrealloc(ticket_subjects, (n+1)*sizeof(char *));
+				(*ticket_subjects)[n-1] = xstrdup(entry+TICKET_PREFIX_LENGTH);
+				(*ticket_subjects)[n] = NULL;
+			}
 			ticket_free(&ct);
 		}
 	}

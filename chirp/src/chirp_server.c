@@ -1445,12 +1445,39 @@ static void chirp_handler( struct link *l, const char *subject )
 			char *ticket;
 			time_t expiration;
 			char **ticket_rights;
-			if(!chirp_path_fix(path)) goto failure;
 			result = chirp_acl_ticket_get(chirp_root_path,subject,ticket_subject,&ticket_esubject,&ticket,&expiration,&ticket_rights);
 			if (result == 0) {
-				
+				link_putliteral(l, "0\n", stalltime);
+				link_putfstring(l, "%zu\n%s%zu\n%s%llu\n", stalltime, strlen(ticket_subject), ticket_subject, strlen(ticket), ticket, (unsigned long long) expiration);
+				free(ticket_esubject);
+				free(ticket);
+				char **tr;
+				for (; tr[0] && tr[1]; tr += 2) {
+					link_putfstring(l, "%s %s\n", stalltime, tr[0], tr[1]);
+					free(tr[0]);
+					free(tr[1]);
+				}
+				free(ticket_rights);
+				do_getdir_result = 1; /* outputs final new line */
 			}
 		} else if(sscanf(line,"ticket_list %s %d",ticket_subject,&everyone)==1) {
+			char **ticket_subjects;
+			int super = strcmp(subject, chirp_super_user) == 0; /* note subject instead of esubject; super user must be authenticated as himself */
+			if (!super && (strcmp(ticket_subject, esubject) != 0 || everyone)) {
+				errno = EACCES;
+				goto failure;
+			}
+			result = chirp_acl_ticket_list(chirp_root_path,ticket_subject,everyone,&ticket_subjects);
+			if (result == 0) {
+				link_putliteral(l, "0\n", stalltime);
+				char **ts = ticket_subjects;
+				for (; ts[0]; ts++) {
+					link_putfstring(l, "%s\n", stalltime, ts[0]);
+					free(ts[0]);
+				}
+				free(ticket_subjects);
+				do_getdir_result = 1; /* outputs final new line */
+			}
 		} else if(sscanf(line,"mkdir %s %lld",path,&mode)==2) {
 			if(!chirp_path_fix(path)) goto failure;
 			if(chirp_acl_check(chirp_root_path,path,subject,CHIRP_ACL_RESERVE)) {
