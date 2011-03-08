@@ -345,7 +345,7 @@ static int ticket_translate( const char *name, char *ticket_subject )
 INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, const char *subject, time_t duration, time_t stoptime )
 {
 	char command[PATH_MAX*2+4096];
-	char ticket_subject[CHIRP_PATH_MAX];
+	char ticket_subject[CHIRP_LINE_MAX];
 	FILE *shell;
 	int status;
 
@@ -470,9 +470,76 @@ INT64_T chirp_client_ticket_delete (struct chirp_client *c, const char *name, ti
 	return chirp_client_ticket_register(c, name, NULL, 0, stoptime) == 0 ? unlink(name) : -1;
 }
 
-INT64_T chirp_client_ticket_get (struct chirp_client *c, const char *name, char **duration, time_t stoptime)
+INT64_T chirp_client_ticket_get (struct chirp_client *c, const char *name, char **subject, char **ticket, time_t *duration, char ***rights, time_t stoptime)
 {
-	return 0;
+	INT64_T result;
+	char ticket_subject[CHIRP_LINE_MAX];
+
+	*subject = *ticket = NULL;
+	*rights = NULL;
+
+	ticket_translate(name, ticket_subject);
+
+	result = simple_command(c, stoptime, "ticket_get %s\n", ticket_subject);
+
+	if (result == 0) {
+		char line[CHIRP_LINE_MAX];
+		size_t length;
+		size_t nrights = 0;
+
+		if (!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) goto failure;
+		if (sscanf(line, "%zu", &length) != 1) goto failure;
+		*subject = malloc((length+1)*sizeof(char));
+		if (!link_read(c->link, *subject, length, stoptime)) goto failure;
+		(*subject)[length] = '\0';
+
+		if (!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) goto failure;
+		if (sscanf(line, "%zu", &length) != 1) goto failure;
+		*ticket = malloc((length+1)*sizeof(char));
+		if (!link_read(c->link, *ticket, length, stoptime)) goto failure;
+		(*ticket)[length] = '\0';
+
+		if (!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) goto failure;
+		unsigned long long tmp;
+		if (sscanf(line, "%llu", &tmp) != 1) goto failure;
+		*duration = (time_t) tmp;
+
+		while (1) {
+			char path[CHIRP_PATH_MAX];
+			char acl[CHIRP_LINE_MAX];
+			if (!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) goto failure;
+			if (sscanf(line, "%s %s", path, acl) == 2) {
+				*rights = xxrealloc(*rights, sizeof(char *)*2*(nrights+2));
+				(*rights)[nrights*2+0] = xstrdup(path);
+				(*rights)[nrights*2+1] = xstrdup(acl);
+				(*rights)[nrights*2+2] = NULL;
+				(*rights)[nrights*2+3] = NULL;
+				nrights++;
+			} else if (sscanf(line, "%lld", &result) == 1 && result == 0) {
+				break;
+			} else
+				goto failure;
+		}
+
+		return 0;
+failure:
+		free(*subject);
+		free(*ticket);
+		if (*rights != NULL) {
+			char **tmp = *rights;
+			while (tmp[0] && tmp[1]) {
+				free(tmp[0]);
+				free(tmp[1]);
+			}
+			free(*rights);
+		}
+		*subject = *ticket = NULL;
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+
+	return result;
 }
 
 INT64_T chirp_client_ticket_list (struct chirp_client *c, const char *name, int everyone, time_t stoptime)
@@ -482,7 +549,7 @@ INT64_T chirp_client_ticket_list (struct chirp_client *c, const char *name, int 
 
 INT64_T chirp_client_ticket_modify (struct chirp_client *c, const char *name, const char *path, const char *aclmask, time_t stoptime)
 {
-	char ticket_subject[CHIRP_PATH_MAX];
+	char ticket_subject[CHIRP_LINE_MAX];
 	char safepath[CHIRP_LINE_MAX];
 	ticket_translate(name, ticket_subject);
 	url_encode(path, safepath, sizeof(safepath));

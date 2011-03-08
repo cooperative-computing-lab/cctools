@@ -64,6 +64,7 @@ INT64_T chirp_client_ticket_create( struct chirp_client *c, char name[CHIRP_PATH
 INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, const char *subject, time_t duration, time_t stoptime );
 INT64_T chirp_client_ticket_delete( struct chirp_client *c, const char *name, time_t stoptime );
 INT64_T chirp_client_ticket_list (struct chirp_client *c, const char *name, int everyone, time_t stoptime);
+INT64_T chirp_client_ticket_get (struct chirp_client *c, const char *name, char **subject, char **ticket, time_t *duration, char ***rights, time_t stoptime);
 INT64_T chirp_client_ticket_modify( struct chirp_client *c, const char *name, const char *path, const char *aclmask, time_t stoptime );
 INT64_T chirp_client_setacl( struct chirp_client *c, const char *path, const char *user, const char *acl, time_t stoptime );
 INT64_T chirp_client_resetacl( struct chirp_client *c, const char *path, const char *acl, time_t stoptime );

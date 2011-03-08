@@ -497,11 +497,11 @@ int chirp_acl_ticket_get (const char *root, const char *subject, const char *tic
 		size_t n;
 		*ticket_rights = (char **) xxmalloc(sizeof(char *)*2*(ct.nrights+1));
 		for (n = 0; n < ct.nrights; n++) {
-			*((*ticket_rights)+n*2+0) = xstrdup(ct.rights[n].directory);
-			*((*ticket_rights)+n*2+1) = xstrdup(chirp_acl_flags_to_text(ct.rights[n].acl));
+			(*ticket_rights)[n*2+0] = xstrdup(ct.rights[n].directory);
+			(*ticket_rights)[n*2+1] = xstrdup(chirp_acl_flags_to_text(ct.rights[n].acl));
 		}
-		*(*ticket_rights+n*2+0) = NULL;
-		*(*ticket_rights+n*2+1) = NULL;
+		(*ticket_rights)[n*2+0] = NULL;
+		(*ticket_rights)[n*2+1] = NULL;
 		
 		ticket_free(&ct);
 		free(esubject);

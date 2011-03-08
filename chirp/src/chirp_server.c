@@ -1441,6 +1441,7 @@ static void chirp_handler( struct link *l, const char *subject )
 			if(!chirp_path_fix(path)) goto failure;
 			result = chirp_acl_ticket_modify(chirp_root_path,subject,ticket_subject,path,chirp_acl_text_to_flags(newacl),strcmp(esubject,chirp_super_user) == 0);
 		} else if(sscanf(line,"ticket_get %s",ticket_subject)==1) {
+			/* ticket_subject is ticket:MD5SUM */
 			char *ticket_esubject;
 			char *ticket;
 			time_t expiration;
@@ -1448,19 +1449,19 @@ static void chirp_handler( struct link *l, const char *subject )
 			result = chirp_acl_ticket_get(chirp_root_path,subject,ticket_subject,&ticket_esubject,&ticket,&expiration,&ticket_rights);
 			if (result == 0) {
 				link_putliteral(l, "0\n", stalltime);
-				link_putfstring(l, "%zu\n%s%zu\n%s%llu\n", stalltime, strlen(ticket_subject), ticket_subject, strlen(ticket), ticket, (unsigned long long) expiration);
+				link_putfstring(l, "%zu\n%s%zu\n%s%llu\n", stalltime, strlen(ticket_esubject), ticket_esubject, strlen(ticket), ticket, (unsigned long long) expiration);
 				free(ticket_esubject);
 				free(ticket);
-				char **tr;
+				char **tr = ticket_rights;
 				for (; tr[0] && tr[1]; tr += 2) {
 					link_putfstring(l, "%s %s\n", stalltime, tr[0], tr[1]);
 					free(tr[0]);
 					free(tr[1]);
 				}
 				free(ticket_rights);
-				do_getdir_result = 1; /* outputs final new line */
 			}
 		} else if(sscanf(line,"ticket_list %s %d",ticket_subject,&everyone)==1) {
+			/* ticket_subject is the owner of the ticket, not ticket:MD5SUM */
 			char **ticket_subjects;
 			int super = strcmp(subject, chirp_super_user) == 0; /* note subject instead of esubject; super user must be authenticated as himself */
 			if (!super && (strcmp(ticket_subject, esubject) != 0 || everyone)) {
@@ -1476,7 +1477,6 @@ static void chirp_handler( struct link *l, const char *subject )
 					free(ts[0]);
 				}
 				free(ticket_subjects);
-				do_getdir_result = 1; /* outputs final new line */
 			}
 		} else if(sscanf(line,"mkdir %s %lld",path,&mode)==2) {
 			if(!chirp_path_fix(path)) goto failure;

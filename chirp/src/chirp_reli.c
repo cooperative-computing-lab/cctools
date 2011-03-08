@@ -541,6 +541,11 @@ INT64_T chirp_reli_ticket_list( const char *host, const char *name, int everyone
 	RETRY_ATOMIC( result = chirp_client_ticket_list(client,name,everyone,stoptime); )
 }
 
+INT64_T chirp_reli_ticket_get( const char *host, const char *name, char **subject, char **ticket, time_t *duration, char ***rights, time_t stoptime )
+{
+	RETRY_ATOMIC( result = chirp_client_ticket_get(client,name,subject,ticket,duration,rights,stoptime); )
+}
+
 INT64_T chirp_reli_ticket_modify( const char *host, const char *name, const char *path, const char *aclmask, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_ticket_modify(client,name,path,aclmask,stoptime); )

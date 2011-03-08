@@ -66,6 +66,7 @@ static INT64_T do_ticket_create(	int argc, char **argv );
 static INT64_T do_ticket_register(	int argc, char **argv );
 static INT64_T do_ticket_delete(	int argc, char **argv );
 static INT64_T do_ticket_list(	int argc, char **argv );
+static INT64_T do_ticket_get(	int argc, char **argv );
 static INT64_T do_ticket_modify(	int argc, char **argv );
 static INT64_T do_setacl( 	int argc, char **argv );
 static INT64_T do_resetacl( int argc, char **argv );
@@ -146,6 +147,7 @@ static struct command list[] =
 {"ticket_register", 1, 2, 3, "<name> [<subject>] <duration>", do_ticket_register},
 {"ticket_delete", 1, 1, 1, "<name>", do_ticket_delete},
 {"ticket_list", 1, 1, 1, "<name>", do_ticket_list},
+{"ticket_get", 1, 1, 1, "<name>", do_ticket_get},
 {"ticket_modify", 1, 3, 3, "<name> <directory> <aclmask>", do_ticket_modify},
 {"setacl",  1, 3, 3, "<remotepath> <user> <rwldax>",do_setacl},
 {"resetacl",1, 2, 2, "<remotepath> <rwldax>",do_resetacl},
@@ -638,6 +640,31 @@ static INT64_T do_ticket_list( int argc, char **argv )
 {
 //{"ticket_list", 1, 2, 1, "<name>", do_ticket_list},
 	return chirp_reli_ticket_list(current_host,argv[1],0,stoptime);
+}
+
+static INT64_T do_ticket_get( int argc, char **argv )
+{
+//{"ticket_get", 1, 2, 1, "<name>", do_ticket_list},
+	char *subject;
+	char *ticket;
+	time_t duration;
+	char **rights;
+	INT64_T result = chirp_reli_ticket_get(current_host,argv[1],&subject,&ticket,&duration,&rights,stoptime);
+	if (result == 0) {
+		printf("%s\n", subject);
+		free(subject);
+		printf("%s\n", ticket);
+		free(ticket);
+		printf("%llu\n", (unsigned long long) duration);
+		char **tmp = rights;
+		for (; tmp && tmp[0] && tmp[1]; tmp += 2) {
+			printf("%s %s\n", tmp[0], tmp[1]);
+			free(tmp[0]);
+			free(tmp[1]);
+		}
+		free(rights);
+	}
+	return result;
 }
 
 static INT64_T do_ticket_modify( int argc, char **argv )
