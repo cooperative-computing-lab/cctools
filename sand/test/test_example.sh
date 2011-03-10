@@ -28,7 +28,7 @@ echo "Checking Smith-Waterman results"
 diff --brief test_20.sw.ovl test_20.sw.right && echo "Files test_20.sw.ovl and test_20.sw.right are the same" || { kill -9 $wpid ; exit 1 ; }
 
 echo "Starting banded assembly..."
-sand_align_master -p $port sand_align_kernel -e "a banded" test_20.cand test_20.cfa test_20.banded.ovl -d all -o banded.log || { echo "Error in alignment."; kill -9 $wpid; exit 1 ; }
+sand_align_master -p $port sand_align_kernel -e "-a banded" test_20.cand test_20.cfa test_20.banded.ovl -d all -o banded.log || { echo "Error in alignment."; kill -9 $wpid; exit 1 ; }
 
 echo "Checking banded results"
 diff --brief test_20.banded.ovl test_20.banded.right && echo "Files test_20.banded.ovl and test_20.banded.right are the same" || { kill -9 $wpid ; exit 1 ; }
