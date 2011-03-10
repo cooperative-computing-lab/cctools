@@ -19,7 +19,7 @@ libchirp.a: ${OBJECTS}
 	ranlib $@
 
 chirp: chirp_tool.o libchirp.a
-	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
+	${CCTOOLS_LD} -o $@ $^ ${CCTOOLS_READLINE_LDFLAGS} ${LOCAL_LDFLAGS}
 
 chirp_server: chirp_server.o chirp_stats.o chirp_job.o chirp_builtin.o chirp_thirdput.o chirp_alloc.o chirp_audit.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
@@ -28,6 +28,9 @@ chirp_server_hdfs: ../../hdfs-setup.template
 	@cp $^ $@
 	@chmod 755 $@
 	@echo 'exec `dirname $$0`/chirp_server -f hdfs $$@' >> $@
+
+chirp_client_package.o: chirp_global.o chirp_stream.o chirp_recursive.o chirp_matrix.o
+	${CCTOOLS_LD} -r -o $@ $^ ${LOCAL_LDFLAGS}
 
 chirp_get: chirp_get.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
