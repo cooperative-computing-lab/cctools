@@ -492,7 +492,11 @@ int chirp_acl_ticket_get (const char *root, const char *subject, const char *tic
 	if (strcmp(ct.subject, subject) == 0 || strcmp(subject, chirp_super_user) == 0) {
 		*ticket_esubject = xstrdup(ct.subject);
 		*ticket = xstrdup(ct.ticket);
-		*ticket_expiration = ct.expiration; /* FIXME should be seconds from now */
+
+		time_t now;
+		time(&now);
+		now = mktime(gmtime(&now)); /* convert to UTC */
+		*ticket_expiration = ct.expiration-now;
 
 		size_t n;
 		*ticket_rights = (char **) xxmalloc(sizeof(char *)*2*(ct.nrights+1));
