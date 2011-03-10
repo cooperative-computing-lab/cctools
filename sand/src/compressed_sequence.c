@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "debug.h"
 
 static int get_num_bytes(int num_bases);
+static int get_malloc_bytes(int num_bases);
 
 /*
 This module has a lot of manifest constants that are related to the size
@@ -25,7 +26,7 @@ Special Note: num_bytes refers to the number of bytes used to store
 the compressed representation on disk.  When allocating memory, we
 must round that number up to the nearest integer-aligned size, in
 order to avoid running off the end while doing arithmetic.  Hence,
-you see malloc( num_bytes + num_bytes % sizeof(i) );
+you see get_mallc_bytes used to round it up.
 */
 
 struct cseq * cseq_create( const char *name, int num_bases, short *mers, const char *metadata)
@@ -33,9 +34,9 @@ struct cseq * cseq_create( const char *name, int num_bases, short *mers, const c
 	struct cseq *c = malloc(sizeof(*c));
 	c->name = strdup(name);
 	c->num_bases = num_bases;
-	int num_bytes = get_num_bytes(c->num_bases);
-	c->data = malloc(num_bytes + num_bytes%sizeof(*c->data));
-	memcpy(c->data,mers,num_bytes);
+	int malloc_bytes = get_malloc_bytes(c->num_bases);
+	c->data = malloc(malloc_bytes);
+	memcpy(c->data,mers,malloc_bytes);
 	c->metadata = strdup(metadata);
 	return c;
 }
@@ -53,12 +54,12 @@ struct cseq * seq_compress( struct seq *s )
 	if(!c) return 0;
 
 	c->num_bases = s->num_bases;
-	int num_bytes = get_num_bytes(s->num_bases);
-	c->data = malloc(num_bytes);
+	int malloc_bytes = get_malloc_bytes(s->num_bases);
+	c->data = malloc(malloc_bytes);
 	c->name = strdup(s->name);
 	c->metadata = strdup(s->metadata);
 
-	memset(c->data,0,num_bytes);
+	memset(c->data,0,malloc_bytes);
 
 	int i=0, j=0, shift=14;
 
@@ -79,6 +80,16 @@ static int get_num_bytes( int num_bases )
 {
 	int num_bytes = num_bases/4;
 	if (num_bases%4 > 0) { num_bytes++; }
+	return num_bytes;
+}
+
+static int get_malloc_bytes( int num_bases )
+{
+	int num_bytes = get_num_bytes(num_bases);
+	int remainder = num_bytes % sizeof(short);
+	if(remainder!=0) {
+		num_bytes += sizeof(short) - remainder;
+	}
 	return num_bytes;
 }
 
@@ -212,8 +223,12 @@ struct cseq * cseq_read( FILE *file )
 	int n = sscanf(line, ">%s %d %d %[^\n]",name,&nbases,&nbytes,metadata);
 	if(n<3) fatal("syntax error near %s\n",line);
 
-	// round up the allocation to the alignment size of the data.
-	short *data = malloc(nbytes + nbytes%sizeof(*data));
+	// allocate memory, rounding up to the next word size
+	int malloc_bytes = get_malloc_bytes(nbases);
+	short *data = malloc(malloc_bytes);
+
+	// set the last full word to zero, to avoid uninitialized data.
+	data[(malloc_bytes/sizeof(short))-1] = 0;
 
 	n = full_fread(file,data,nbytes);
 	if(n!=nbytes) fatal("sequence file is corrupted.");
