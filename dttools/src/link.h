@@ -162,7 +162,7 @@ int  link_putfstring( struct link *link, const char *fmt, time_t stoptime, ... )
 /** Write formatted data to a connection. All data is written until finished
   * or an error is encountered.
 @param link The link to write.
-@param fmr A pointer to the data.
+@param fmt A pointer to the data.
 @param stoptime The time at which to abort.
 @param va Format arguments.
 @return The number of bytes actually written, or less than zero on error.
