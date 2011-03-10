@@ -4,7 +4,9 @@
 # in file "random.cand". The format of each line in the .cand file is: 
 # read1_name   read2_name   direction   start_position_in_read1   start_position_in_read2
 
-port=9091
+. ../../../dttools/src/test_runner.common.sh
+
+port=`find_free_port`
 
 PATH=../../src:../../../dttools/src:$PATH
 export PATH
