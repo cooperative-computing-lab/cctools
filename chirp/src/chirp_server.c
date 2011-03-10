@@ -950,7 +950,6 @@ static void chirp_handler( struct link *l, const char *subject )
 		char path[CHIRP_PATH_MAX];
 		char newpath[CHIRP_PATH_MAX];
 		char newsubject[CHIRP_LINE_MAX];
-		int everyone;
 		char ticket_subject[CHIRP_LINE_MAX];
 		char duration[CHIRP_LINE_MAX];
 		char newacl[CHIRP_LINE_MAX];
@@ -1460,20 +1459,20 @@ static void chirp_handler( struct link *l, const char *subject )
 				}
 				free(ticket_rights);
 			}
-		} else if(sscanf(line,"ticket_list %s %d",ticket_subject,&everyone)==1) {
+		} else if(sscanf(line,"ticket_list %s",ticket_subject)==1) {
 			/* ticket_subject is the owner of the ticket, not ticket:MD5SUM */
 			char **ticket_subjects;
 			int super = strcmp(subject, chirp_super_user) == 0; /* note subject instead of esubject; super user must be authenticated as himself */
-			if (!super && (strcmp(ticket_subject, esubject) != 0 || everyone)) {
+			if (!super && strcmp(ticket_subject, esubject) != 0) {
 				errno = EACCES;
 				goto failure;
 			}
-			result = chirp_acl_ticket_list(chirp_root_path,ticket_subject,everyone,&ticket_subjects);
+			result = chirp_acl_ticket_list(chirp_root_path,ticket_subject,&ticket_subjects);
 			if (result == 0) {
 				link_putliteral(l, "0\n", stalltime);
 				char **ts = ticket_subjects;
 				for (; ts[0]; ts++) {
-					link_putfstring(l, "%s\n", stalltime, ts[0]);
+					link_putfstring(l, "%zu\n%s", stalltime, strlen(ts[0]), ts[0]);
 					free(ts[0]);
 				}
 				free(ticket_subjects);

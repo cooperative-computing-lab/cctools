@@ -489,13 +489,13 @@ INT64_T chirp_client_ticket_get (struct chirp_client *c, const char *name, char 
 
 		if (!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) goto failure;
 		if (sscanf(line, "%zu", &length) != 1) goto failure;
-		*subject = malloc((length+1)*sizeof(char));
+		*subject = xxmalloc((length+1)*sizeof(char));
 		if (!link_read(c->link, *subject, length, stoptime)) goto failure;
 		(*subject)[length] = '\0';
 
 		if (!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) goto failure;
 		if (sscanf(line, "%zu", &length) != 1) goto failure;
-		*ticket = malloc((length+1)*sizeof(char));
+		*ticket = xxmalloc((length+1)*sizeof(char));
 		if (!link_read(c->link, *ticket, length, stoptime)) goto failure;
 		(*ticket)[length] = '\0';
 
@@ -542,9 +542,48 @@ failure:
 	return result;
 }
 
-INT64_T chirp_client_ticket_list (struct chirp_client *c, const char *name, int everyone, time_t stoptime)
+INT64_T chirp_client_ticket_list (struct chirp_client *c, const char *subject, char ***list, time_t stoptime)
 {
-	return 0;
+	INT64_T result;
+
+	size_t size = 0;
+	*list = NULL;
+
+	result = simple_command(c, stoptime, "ticket_list %s\n", subject);
+
+	if (result == 0) {
+
+		while (1) {
+			char line[CHIRP_LINE_MAX];
+			size_t length;
+
+			if (!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) goto failure;
+			if (sscanf(line, "%zu", &length) != 1) goto failure;
+			if (length == 0) break;
+
+			size++;
+			*list = xxrealloc(*list, sizeof(char *)*(size+1));
+			(*list)[size-1] = xxmalloc(sizeof(char)*(length+1));
+			if (!link_read(c->link, (*list)[size-1], length, stoptime)) goto failure;
+			(*list)[size-1][length] = '\0';
+			(*list)[size] = NULL;
+		}
+
+		return 0;
+failure:
+		if (*list != NULL) {
+			char **tmp = *list;
+			while (tmp[0]) {
+				free(tmp[0]);
+			}
+			free(*list);
+		}
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+
+	return result;
 }
 
 INT64_T chirp_client_ticket_modify (struct chirp_client *c, const char *name, const char *path, const char *aclmask, time_t stoptime)

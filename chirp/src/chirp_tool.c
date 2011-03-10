@@ -639,7 +639,19 @@ static INT64_T do_ticket_delete( int argc, char **argv )
 static INT64_T do_ticket_list( int argc, char **argv )
 {
 //{"ticket_list", 1, 2, 1, "<name>", do_ticket_list},
-	return chirp_reli_ticket_list(current_host,argv[1],0,stoptime);
+	char **list;
+
+	INT64_T result = chirp_reli_ticket_list(current_host,argv[1],&list,stoptime);
+
+	if (result == 0) {
+		char **tmp = list;
+		for (; tmp && tmp[0]; tmp++) {
+			printf("%s\n", tmp[0]);
+			free(tmp[0]);
+		}
+		free(list);
+	}
+	return result;
 }
 
 static INT64_T do_ticket_get( int argc, char **argv )
