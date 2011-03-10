@@ -14,7 +14,7 @@ echo "Compressing reads"
 sand_compress_reads < test_20.fa > test_20.cfa
 
 echo "Starting worker for filtering"
-worker -t 5s -d all -o worker.log localhost $port &
+worker -t 60s -d all -o worker.log localhost $port &
 wpid=$!
 echo "Worker is process $wpid"
 
@@ -36,8 +36,8 @@ sand_align_master -d all -o banded.log -p $port -e "-a banded" sand_align_kernel
 echo "Checking banded results"
 diff --brief test_20.banded.ovl test_20.banded.right && echo "Files test_20.banded.ovl and test_20.banded.right are the same" || { kill -9 $wpid ; exit 1 ; }
 
-
-echo "Waiting for worker to exit"
+echo "Stopping the worker..."
+kill -9 $wpid
 wait $wpid
 
 exit 0;
