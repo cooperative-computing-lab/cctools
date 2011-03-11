@@ -342,6 +342,12 @@ static int ticket_translate( const char *name, char *ticket_subject )
 	return 1;
 }
 
+static int isticketsubject (const char *subject)
+{
+	return strncmp(subject, "ticket:", strlen("ticket:")) == 0;
+}
+
+
 INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, const char *subject, time_t duration, time_t stoptime )
 {
 	char command[PATH_MAX*2+4096];
@@ -478,7 +484,10 @@ INT64_T chirp_client_ticket_get (struct chirp_client *c, const char *name, char 
 	*subject = *ticket = NULL;
 	*rights = NULL;
 
-	ticket_translate(name, ticket_subject);
+	if (isticketsubject(name))
+		strcpy(ticket_subject, name);
+	else
+		ticket_translate(name, ticket_subject);
 
 	result = simple_command(c, stoptime, "ticket_get %s\n", ticket_subject);
 
