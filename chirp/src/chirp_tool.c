@@ -666,11 +666,11 @@ static INT64_T do_ticket_get( int argc, char **argv )
 	if (result == 0) {
 		printf("%s\n", subject);
 		free(subject);
-        /* base64 encode the ticket so it fits on one line */
-        char *bticket = xxmalloc(sizeof(char)*strlen(ticket)*2+10); /* double is more than 4/3 needed */
-        b64_encode(ticket, strlen(ticket), bticket, strlen(ticket)*2+10);
+		/* base64 encode the ticket so it fits on one line */
+		char *bticket = xxmalloc(sizeof(char)*strlen(ticket)*2+10); /* double is more than 4/3 needed */
+		b64_encode(ticket, strlen(ticket), bticket, strlen(ticket)*2+10);
 		printf("%s\n", bticket);
-        free(bticket);
+		free(bticket);
 		free(ticket);
 		printf("%llu\n", (unsigned long long) duration);
 		char **tmp = rights;
