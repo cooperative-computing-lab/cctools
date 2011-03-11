@@ -2,13 +2,8 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-pidfile=worker.pid
-
 prepare()
 {
-    ../../dttools/src/worker -d all localhost 9999 &
-    workerpid=$!
-    echo $workerpid > $pidfile
     exit 0
 }
 
@@ -19,8 +14,6 @@ run()
 
 clean()
 {
-    kill -9 $(cat $pidfile)
-    rm -f $pidfile
     exit 0
 }
 
