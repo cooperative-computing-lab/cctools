@@ -25,6 +25,7 @@ See the file COPYING for details.
 #include "chirp_group.h"
 #include "chirp_matrix.h"
 
+#include "b64_encode.h"
 #include "timestamp.h"
 #include "debug.h"
 #include "auth_all.h"
@@ -665,7 +666,11 @@ static INT64_T do_ticket_get( int argc, char **argv )
 	if (result == 0) {
 		printf("%s\n", subject);
 		free(subject);
-		printf("%s\n", ticket);
+        /* base64 encode the ticket so it fits on one line */
+        char *bticket = xxmalloc(sizeof(char)*strlen(ticket)*2+10); /* double is more than 4/3 needed */
+        b64_encode(ticket, strlen(ticket), bticket, strlen(ticket)*2+10);
+		printf("%s\n", bticket);
+        free(bticket);
 		free(ticket);
 		printf("%llu\n", (unsigned long long) duration);
 		char **tmp = rights;
