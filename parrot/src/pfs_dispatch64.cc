@@ -2408,6 +2408,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_query_module:
 		case SYSCALL64_quotactl:
 		case SYSCALL64_reboot:
+		case SYSCALL64_restart_syscall:
 		case SYSCALL64_rt_sigpending:
 		case SYSCALL64_rt_sigprocmask:
 		case SYSCALL64_rt_sigqueueinfo:
