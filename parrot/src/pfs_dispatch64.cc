@@ -698,8 +698,10 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 		/* remove any newlines or spaces at the end */
 
 		char *c = firstline;
+
 		while(*c) c++;
-		c--;
+		if(c>firstline) c--;
+
 		while( *c=='\n' || *c==' ' ) {
 			*c = 0;
 			c--;
