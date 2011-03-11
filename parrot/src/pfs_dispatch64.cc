@@ -698,8 +698,10 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 		/* remove any newlines or spaces at the end */
 
 		char *c = firstline;
+
 		while(*c) c++;
-		c--;
+		if(c>firstline) c--;
+
 		while( *c=='\n' || *c==' ' ) {
 			*c = 0;
 			c--;
@@ -924,8 +926,7 @@ static INT64_T decode_ioctl_siocgifconf( struct pfs_process *p, INT64_T fd, INT6
 static void decode_syscall( struct pfs_process *p, INT64_T entering )
 {
 	INT64_T *args;
-	void *x;
-	INT64_T length;
+	void *x = NULL;
 
 	char path[PFS_PATH_MAX];
 	char path2[PFS_PATH_MAX];
@@ -996,8 +997,15 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						child_signal = args[0]&0xff;
 						clone_files = args[0]&CLONE_FILES;
 					}
+                                        pid_t parent;
+                                        if(args[0]&(CLONE_PARENT|CLONE_THREAD)) {
+                                                parent = p->ppid;
+                                        } else {
+                                                parent = p->pid;
+                                        }
 					child = pfs_process_create(childpid,p->pid,clone_files,child_signal);
 					child->syscall_result = 0;
+					if(args[0]&CLONE_THREAD) child->tgid = p->tgid;
 					if(p->syscall_original==SYSCALL64_fork) {
 						memcpy(child->syscall_args,p->syscall_args,sizeof(p->syscall_args));
 						child->syscall_args_changed = 1;
@@ -1045,8 +1053,11 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		in the main loop.
 		*/
 
-		case SYSCALL64_exit:
 		case SYSCALL64_exit_group:
+			if(entering) pfs_process_exit_group(p);
+			break;
+	
+		case SYSCALL64_exit:
 			break;
 
 		/*
@@ -1194,8 +1205,8 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 		case SYSCALL64_accept:
 			if(entering) {
+				int length;
 				if(args[1]) {
-					int length;
 					tracer_copy_in(p->tracer,&length,(void*)args[2],sizeof(length));
 					x = xxmalloc(length);
 					p->syscall_result = pfs_accept(args[0],(struct sockaddr*)x,&length);
@@ -1276,7 +1287,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			break;
 
 		case SYSCALL64_sendto: {
-			INT64_T t4;
+			INT64_T t4 = 0;
 			if(args[4]) {
 				x = xxmalloc(args[5]);
 				tracer_copy_in(p->tracer,x,(void*)args[4],args[5]);
@@ -1293,7 +1304,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 		case SYSCALL64_recvfrom:
 			if(entering) {
-				INT64_T t4, t5;
+				INT64_T t4 = 0, t5 = 0;
 				int length;
 				if(args[4]) {
 					tracer_copy_in(p->tracer,&length,(void*)args[5],sizeof(length));
@@ -1357,7 +1368,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_recvmsg:
 			if(entering) {
 				struct msghdr umsg;
-				struct pfs_kernel_iovec *uvec;
+				struct pfs_kernel_iovec *uvec = NULL;
 				struct msghdr msg;
 				struct iovec vec;
 
@@ -1529,7 +1540,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				void *uaddr = (void*) args[2];
 				char buffer[65536];
 				char tbuffer[65536];
-				INT64_T length;
+				INT64_T length = 0;
 
 
 				if(cmd==SIOCGIFCONF) {
@@ -2166,13 +2177,16 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 		case SYSCALL64_rt_sigaction:
 			if(entering) {
-				INT64_T sig = args[0];
-				struct pfs_kernel_sigaction act;
-				tracer_copy_in(p->tracer,&act,(void*)args[1],sizeof(act));
-				if(act.pfs_sa_flags&SA_RESTART) {
-					pfs_current->signal_interruptible[sig] = 0;
-				} else {
-					pfs_current->signal_interruptible[sig] = 1;
+				if(args[1]) {
+					INT64_T sig = args[0];
+					struct pfs_kernel_sigaction act;
+					int r = tracer_copy_in(p->tracer,&act,(void*)args[1],sizeof(act));
+                                	if(r!=sizeof(act)) debug(D_NOTICE,"rt_sigaction: %d",r);
+					if(act.pfs_sa_flags&SA_RESTART) {
+						pfs_current->signal_interruptible[sig] = 0;
+					} else {
+						pfs_current->signal_interruptible[sig] = 1;
+					}
 				}
 			}
 			break;
@@ -2409,6 +2423,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_query_module:
 		case SYSCALL64_quotactl:
 		case SYSCALL64_reboot:
+		case SYSCALL64_restart_syscall:
 		case SYSCALL64_rt_sigpending:
 		case SYSCALL64_rt_sigprocmask:
 		case SYSCALL64_rt_sigqueueinfo:
