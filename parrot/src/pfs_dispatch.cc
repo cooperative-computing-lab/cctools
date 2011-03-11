@@ -1403,8 +1403,15 @@ void decode_syscall( struct pfs_process *p, int entering )
 						child_signal = args[0]&0xff;
 						clone_files = args[0]&CLONE_FILES;
 					}
-					child = pfs_process_create(childpid,p->pid,clone_files,child_signal);
+					pid_t parent;
+					if(args[0]&(CLONE_PARENT|CLONE_THREAD)) {
+						parent = p->ppid;
+					} else {
+						parent = p->pid;
+					}
+					child = pfs_process_create(childpid,parent,clone_files,child_signal);
 					child->syscall_result = 0;
+					if(args[0]&CLONE_THREAD) child->tgid = p->tgid;
 					if(p->syscall_original==SYSCALL32_fork) {
 						memcpy(child->syscall_args,p->syscall_args,sizeof(p->syscall_args));
 						child->syscall_args_changed = 1;
@@ -2354,13 +2361,15 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_sigaction:
 		case SYSCALL32_rt_sigaction:
 			if(entering) {
-				int sig = args[0];
-				struct pfs_kernel_sigaction act;
-				tracer_copy_in(p->tracer,&act,POINTER(args[1]),sizeof(act));
-				if(act.pfs_sa_flags&SA_RESTART) {
-					pfs_current->signal_interruptible[sig] = 0;
-				} else {
-					pfs_current->signal_interruptible[sig] = 1;
+				if(args[1]) {
+					int sig = args[0];
+					struct pfs_kernel_sigaction act;
+					tracer_copy_in(p->tracer,&act,POINTER(args[1]),sizeof(act));
+					if(act.pfs_sa_flags&SA_RESTART) {
+						pfs_current->signal_interruptible[sig] = 0;
+					} else {
+						pfs_current->signal_interruptible[sig] = 1;
+					}
 				}
 			}
 			break;
@@ -2819,6 +2828,8 @@ void pfs_dispatch32( struct pfs_process *p, INT64_T signum )
 
 void pfs_dispatch( struct pfs_process *p, INT64_T signum )
 {
+	if(p->state==PFS_PROCESS_STATE_DONE) return;
+
 	if(tracer_is_64bit(p->tracer)) {
 		pfs_dispatch64(p,signum);
 	} else {

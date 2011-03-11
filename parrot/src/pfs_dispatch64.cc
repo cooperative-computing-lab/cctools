@@ -997,8 +997,15 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						child_signal = args[0]&0xff;
 						clone_files = args[0]&CLONE_FILES;
 					}
+                                        pid_t parent;
+                                        if(args[0]&(CLONE_PARENT|CLONE_THREAD)) {
+                                                parent = p->ppid;
+                                        } else {
+                                                parent = p->pid;
+                                        }
 					child = pfs_process_create(childpid,p->pid,clone_files,child_signal);
 					child->syscall_result = 0;
+					if(args[0]&CLONE_THREAD) child->tgid = p->tgid;
 					if(p->syscall_original==SYSCALL64_fork) {
 						memcpy(child->syscall_args,p->syscall_args,sizeof(p->syscall_args));
 						child->syscall_args_changed = 1;
@@ -1046,8 +1053,11 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		in the main loop.
 		*/
 
-		case SYSCALL64_exit:
 		case SYSCALL64_exit_group:
+			if(entering) pfs_process_exit_group(p);
+			break;
+	
+		case SYSCALL64_exit:
 			break;
 
 		/*
@@ -2167,13 +2177,16 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 		case SYSCALL64_rt_sigaction:
 			if(entering) {
-				INT64_T sig = args[0];
-				struct pfs_kernel_sigaction act;
-				tracer_copy_in(p->tracer,&act,(void*)args[1],sizeof(act));
-				if(act.pfs_sa_flags&SA_RESTART) {
-					pfs_current->signal_interruptible[sig] = 0;
-				} else {
-					pfs_current->signal_interruptible[sig] = 1;
+				if(args[1]) {
+					INT64_T sig = args[0];
+					struct pfs_kernel_sigaction act;
+					int r = tracer_copy_in(p->tracer,&act,(void*)args[1],sizeof(act));
+                                	if(r!=sizeof(act)) debug(D_NOTICE,"rt_sigaction: %d",r);
+					if(act.pfs_sa_flags&SA_RESTART) {
+						pfs_current->signal_interruptible[sig] = 0;
+					} else {
+						pfs_current->signal_interruptible[sig] = 1;
+					}
 				}
 			}
 			break;
