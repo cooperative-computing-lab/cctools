@@ -625,9 +625,9 @@ static INT64_T do_ticket_register( int argc, char **argv )
 //{"ticket_register", 1, 2, 1, "<name> [<subject>] <duration>", do_ticket_register},
 	assert(argc == 2 || argc == 3);
 	if (argc == 2) {
-		return chirp_reli_ticket_register(current_host,argv[1],NULL,(time_t)strtoull(argv[2],NULL,10),stoptime);
+		return chirp_reli_ticket_register(current_host,argv[1],NULL,(time_t)strtoull(argv[3],NULL,10),stoptime);
 	} else {
-		return chirp_reli_ticket_register(current_host,argv[1],argv[2],(time_t)strtoull(argv[3],NULL,10),stoptime);
+		return chirp_reli_ticket_register(current_host,argv[1],argv[2],(time_t)strtoull(argv[2],NULL,10),stoptime);
 	}
 }
 
