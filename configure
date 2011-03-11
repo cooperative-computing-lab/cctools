@@ -314,6 +314,9 @@ else
 			do
 				library_search ${library}_${globus_flavor} ${globus_path}
 			done
+
+			cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${globus_path}/lib -lglobus_gss_assist_${globus_flavor}"
+
 		elif check_file ${globus_path}/include/globus/globus_common.h
 		then
 			ccflags="${ccflags} -I${globus_path}/lib/globus/include -I${globus_path}/include/globus -DHAS_GLOBUS_GSS"
@@ -322,6 +325,9 @@ else
 			do
 				library_search $library ${globus_path}
 			done
+
+                        cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${globus_path}/lib -lglobus_gss_assist"
+
 		else
 			if [ $config_globus_path = yes ]
 			then
@@ -514,6 +520,8 @@ then
 		ccflags="${ccflags} -I${krb5_include_path}"
 	fi
 
+	cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${krb5_path}/lib -lkrb5"
+
 	ccflags="${ccflags} -DHAS_KRB5"
 else
 	if [ $config_krb5_path = yes ]
@@ -575,6 +583,15 @@ fi
 
 ldflags="${ldflags} -ldl -lpthread -lz -lc -lm"
 
+if [ $build_sys = DARWIN ]
+then
+	cctools_dynamic_suffix=dylib
+	cctools_dynamic_flag=-dynamiclib
+else
+	cctools_dynamic_suffix=so
+	cctools_dynamic_flag=-shared
+fi
+
 optional_function strsignal /usr/include/string.h HAS_STRSIGNAL
 optional_function pread /usr/include/unistd.h HAS_PREAD
 optional_function pwrite /usr/include/unistd.h HAS_PWRITE
@@ -616,6 +633,10 @@ CCTOOLS_INTERNAL_LDFLAGS= ${internal_ldflags} \${CCTOOLS_BASE_LDFLAGS}
 CCTOOLS_LDFLAGS=-L\${CCTOOLS_INSTALL_DIR}/lib \${CCTOOLS_BASE_LDFLAGS}
 
 CCTOOLS_READLINE_LDFLAGS=${cctools_readline_ldflags}
+
+CCTOOLS_DYNAMIC_SUFFIX=${cctools_dynamic_suffix}
+CCTOOLS_DYNAMIC_FLAG=${cctools_dynamic_flag}
+CCTOOLS_DYNAMIC_AUTH_LIBS=${cctools_dynamic_auth_libs}
 
 CC=\$(CCTOOLS_CC)
 CCFLAGS=\$(CCTOOLS_CCFLAGS)

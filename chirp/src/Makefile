@@ -3,34 +3,51 @@ include ../../Makefile.rules
 
 LOCAL_LDFLAGS = -ldttools -lchirp ${CCTOOLS_INTERNAL_LDFLAGS}
 
-LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_types.c chirp_acl.c chirp_local.c chirp_group.c chirp_hdfs.c chirp_filesystem.c
+LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_types.c
+SERVER_SOURCES = chirp_stats.c chirp_job.c chirp_builtin.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chirp_acl.c chirp_group.c chirp_filesystem.c chirp_hdfs.c chirp_local.c
+
 PROGRAMS=chirp chirp_get chirp_put chirp_server chirp_server_hdfs chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute chirp_md5sum
 SCRIPTS=chirp_audit_cluster
-LIBRARIES=libchirp.a
+LIBRARIES=libchirp.a libchirp_client.${CCTOOLS_DYNAMIC_SUFFIX}
 HEADERS=chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h
 
 TARGETS = ${PROGRAMS} ${LIBRARIES}
-OBJECTS = ${LIBRARY_SOURCES:%.c=%.o}
+LIBRARY_OBJECTS = ${LIBRARY_SOURCES:%.c=%.o}
+SERVER_OBJECTS = ${SERVER_SOURCES:%.c=%.o}
 
 all: ${TARGETS}
 
-libchirp.a: ${OBJECTS}
+# This is the library intended to be used by clients of the system.
+
+libchirp.a: ${LIBRARY_OBJECTS}
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
+
+# This library contains only sources used by the server, and the
+# parts of the server needed by Parrot to implement identity boxing.
+
+libchirp_server.a: ${SERVER_OBJECTS}
+	${CCTOOLS_AR} rv $@ $^
+	ranlib $@
+
+# This object exists primarily to get a linkable object for use
+# by ROOT and other systems that want to load Chirp dynamically.
+# Note that we explicitly include auth_all.o and ${CCTOOLS_DYNAMIC_AUTH_LIBS}
+# to force the inclusion of the various authentication infrastructures.
+
+libchirp_client.${CCTOOLS_DYNAMIC_SUFFIX}: ${LIBRARY_OBJECTS} ../../dttools/src/auth_all.o
+	${CCTOOLS_LD} ${CCTOOLS_DYNAMIC_FLAG} -o $@ $^ ../../dttools/src/libdttools.a ${CCTOOLS_DYNAMIC_AUTH_LIBS}
 
 chirp: chirp_tool.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${CCTOOLS_READLINE_LDFLAGS} ${LOCAL_LDFLAGS}
 
-chirp_server: chirp_server.o chirp_stats.o chirp_job.o chirp_builtin.o chirp_thirdput.o chirp_alloc.o chirp_audit.o libchirp.a
+chirp_server: chirp_server.o libchirp.a libchirp_server.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 chirp_server_hdfs: ../../hdfs-setup.template
 	@cp $^ $@
 	@chmod 755 $@
 	@echo 'exec `dirname $$0`/chirp_server -f hdfs $$@' >> $@
-
-chirp_client_package.o: chirp_global.o chirp_stream.o chirp_recursive.o chirp_matrix.o
-	${CCTOOLS_LD} -r -o $@ $^ ${LOCAL_LDFLAGS}
 
 chirp_get: chirp_get.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
@@ -68,7 +85,7 @@ chirp_stream_files: chirp_stream_files.o libchirp.a
 test:	all
 
 clean:
-	rm -f core *~ *.o *.os *.a *.so ${TARGETS}
+	rm -f core *~ *.o *.os *.a *.${CCTOOLS_DYNAMIC_SUFFIX} ${TARGETS}
 
 install: all
 	install -d ${CCTOOLS_INSTALL_DIR}
