@@ -1436,9 +1436,11 @@ static void chirp_handler( struct link *l, const char *subject )
 				errno = ENOMEM;
 				break;
 			}
+		} else if(sscanf(line,"ticket_delete %s",ticket_subject)==1) {
+			result = chirp_acl_ticket_delete(chirp_root_path,subject,ticket_subject);
 		} else if(sscanf(line,"ticket_modify %s %s %s",ticket_subject,path,newacl)==3) {
 			if(!chirp_path_fix(path)) goto failure;
-			result = chirp_acl_ticket_modify(chirp_root_path,subject,ticket_subject,path,chirp_acl_text_to_flags(newacl),strcmp(esubject,chirp_super_user) == 0);
+			result = chirp_acl_ticket_modify(chirp_root_path,subject,ticket_subject,path,chirp_acl_text_to_flags(newacl));
 		} else if(sscanf(line,"ticket_get %s",ticket_subject)==1) {
 			/* ticket_subject is ticket:MD5SUM */
 			char *ticket_esubject;
@@ -1471,7 +1473,7 @@ static void chirp_handler( struct link *l, const char *subject )
 			if (result == 0) {
 				link_putliteral(l, "0\n", stalltime);
 				char **ts = ticket_subjects;
-				for (; ts[0]; ts++) {
+				for (; ts && ts[0]; ts++) {
 					link_putfstring(l, "%zu\n%s", stalltime, strlen(ts[0]), ts[0]);
 					free(ts[0]);
 				}

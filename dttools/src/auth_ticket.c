@@ -16,9 +16,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* MD5_DIGEST_LENGTH is binary length, hex is MD5_DIGEST_LENGTH*2 */
-#define MD5_DIGEST_LENGTH_HEX  (MD5_DIGEST_LENGTH<<1)
-
 #define DIGEST_LENGTH  (MD5_DIGEST_LENGTH_HEX)
 #define CHALLENGE_LENGTH  (64)
 #define CHALLENGE_LENGTH_STR  "64"

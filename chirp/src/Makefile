@@ -3,7 +3,7 @@ include ../../Makefile.rules
 
 LOCAL_LDFLAGS = -ldttools -lchirp ${CCTOOLS_INTERNAL_LDFLAGS}
 
-LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_types.c chirp_acl.c chirp_local.c chirp_group.c chirp_hdfs.c chirp_filesystem.c
+LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_types.c chirp_acl.c chirp_local.c chirp_group.c chirp_hdfs.c chirp_filesystem.c chirp_ticket.c
 PROGRAMS=chirp chirp_get chirp_put chirp_server chirp_server_hdfs chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute chirp_md5sum
 SCRIPTS=chirp_audit_cluster
 LIBRARIES=libchirp.a

@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "chirp_filesystem.h"
 #include "chirp_group.h"
 #include "chirp_protocol.h"
+#include "chirp_ticket.h"
 
 #include "debug.h"
 #include "hash_table.h"
@@ -216,29 +217,16 @@ static int ticket_read (const char *fname, struct chirp_ticket *ct)
 	return status && !ct->expired;
 }
 
-#define TICKET_PREFIX  ".__"
-#define TICKET_PREFIX_LENGTH  strlen(TICKET_PREFIX)
-
 static void chirp_acl_ticket_name ( const char *root, const char *ticket, char *name, char *fname )
 {
-  unsigned char digest[MD5_DIGEST_LENGTH];
+  unsigned char digest[CHIRP_TICKET_DIGEST_LENGTH];
   md5_context_t context;
   md5_init(&context);
   md5_update(&context, (const unsigned char *) ticket, strlen(ticket));
   md5_final(digest, &context);
   strcpy(name, "ticket:");
   strcat(name, md5_string(digest));
-  sprintf(fname,"%s/%s%s",root,TICKET_PREFIX,name);
-}
-
-static int isticket (const char *subject, const char **digest)
-{
-	if (strncmp(subject, "ticket:", strlen("ticket:")) == 0) {
-		*digest = subject+strlen("ticket:");
-		return 1;
-	} else {
-		return 0;
-	}
+  sprintf(fname,"%s/%s%s",root,CHIRP_TICKET_PREFIX,name);
 }
 
 void chirp_acl_force_readonly()
@@ -293,11 +281,11 @@ static int do_chirp_acl_get( const char *root, const char *dirname, const char *
 	 * directory along with the rights of the subject in that directory
 	 */
 	const char *digest;
-    if (isticket(subject, &digest)) {
+    if (chirp_ticket_isticketsubject(subject, &digest)) {
 		/* open the ticket file, read the public key */
 		char ticketfilename[CHIRP_PATH_MAX];
 		struct chirp_ticket ct;
-		strcpy(ticketfilename, TICKET_PREFIX);
+		strcpy(ticketfilename, CHIRP_TICKET_PREFIX);
 		strcat(ticketfilename, subject);
 		if (!ticket_read(ticketfilename, &ct)) return 0;
 		if (!do_chirp_acl_get(root, dirname, ct.subject, totalflags)) {
@@ -457,7 +445,7 @@ int chirp_acl_gettickets (const char *dirname, struct hash_table *ticket)
 		if (!strcmp(entry, "..")) continue;
 		sprintf(path,"%s/%s", dirname, entry);
 		const char *digest;
-		if (strncmp(entry, TICKET_PREFIX, TICKET_PREFIX_LENGTH) == 0 && isticket(entry+TICKET_PREFIX_LENGTH, &digest)) {
+		if (strncmp(entry, CHIRP_TICKET_PREFIX, CHIRP_TICKET_PREFIX_LENGTH) == 0 && chirp_ticket_isticketsubject(entry+CHIRP_TICKET_PREFIX_LENGTH, &digest)) {
 			/* open the ticket file, read the public key */
 			struct chirp_ticket ct;
 			if (!ticket_read(path, &ct)) continue;
@@ -470,20 +458,52 @@ int chirp_acl_gettickets (const char *dirname, struct hash_table *ticket)
 	return 0;
 }
 
+int chirp_acl_ticket_delete( const char *root, const char *subject, const char *ticket_subject )
+{
+	char ticket_file[CHIRP_PATH_MAX];
+    const char *digest;
+    char *esubject;
+    struct chirp_ticket ct;
+	int status = 0;
+
+	if (!chirp_ticket_isticketsubject(ticket_subject,&digest)) {
+		errno = EINVAL;
+		return -1;
+	}
+    if (!chirp_acl_whoami(subject, &esubject)) return -1;
+
+	sprintf(ticket_file,"%s/%s%s",root,CHIRP_TICKET_PREFIX,ticket_subject);
+
+	if (!ticket_read(ticket_file, &ct)) {
+		free(esubject);
+		return -1;
+	}
+
+	if (strcmp(esubject,ct.subject) == 0 || strcmp(chirp_super_user, subject) == 0) {
+		status = cfs->unlink(ticket_file);
+	} else {
+		errno = EACCES;
+		status = -1;
+	}
+	ticket_free(&ct);
+	free(esubject);
+	return status;
+}
+
 int chirp_acl_ticket_get (const char *root, const char *subject, const char *ticket_subject, char **ticket_esubject, char **ticket, time_t *ticket_expiration, char ***ticket_rights)
 {
 	char *esubject;
     if (!chirp_acl_whoami(subject, &esubject)) return -1;
 
     const char *digest;
-	if (!isticket(ticket_subject,&digest)) {
+	if (!chirp_ticket_isticketsubject(ticket_subject,&digest)) {
 		errno = EINVAL;
 		return -1;
 	}
 
 	struct chirp_ticket ct;
 	char ticket_file[CHIRP_PATH_MAX];
-	sprintf(ticket_file,"%s/%s%s",root,TICKET_PREFIX,ticket_subject);
+	sprintf(ticket_file,"%s/%s%s",root,CHIRP_TICKET_PREFIX,ticket_subject);
 	if (!ticket_read(ticket_file, &ct)) {
 		free(esubject);
 		errno = EINVAL;
@@ -533,13 +553,13 @@ int chirp_acl_ticket_list (const char *root, const char *subject, char ***ticket
 		char path[CHIRP_PATH_MAX];
 		sprintf(path,"%s/%s", root, entry);
 		const char *digest;
-		if (strncmp(entry, TICKET_PREFIX, TICKET_PREFIX_LENGTH) == 0 && isticket(entry+TICKET_PREFIX_LENGTH, &digest)) {
+		if (strncmp(entry, CHIRP_TICKET_PREFIX, CHIRP_TICKET_PREFIX_LENGTH) == 0 && chirp_ticket_isticketsubject(entry+CHIRP_TICKET_PREFIX_LENGTH, &digest)) {
 			struct chirp_ticket ct;
 			if (!ticket_read(path, &ct)) continue; /* expired? */
 			if (strcmp(subject, ct.subject) == 0 || strcmp(subject, "all") == 0) {
 			    n = n+1;
 				*ticket_subjects = (char **) xxrealloc(*ticket_subjects, (n+1)*sizeof(char *));
-				(*ticket_subjects)[n-1] = xstrdup(entry+TICKET_PREFIX_LENGTH);
+				(*ticket_subjects)[n-1] = xstrdup(entry+CHIRP_TICKET_PREFIX_LENGTH);
 				(*ticket_subjects)[n] = NULL;
 			}
 			ticket_free(&ct);
@@ -561,7 +581,7 @@ int chirp_acl_gctickets (const char *root)
 	}
 	while ((entry = cfs->readdir(dir))) {
 		const char *digest;
-		if (strncmp(entry, TICKET_PREFIX, TICKET_PREFIX_LENGTH) == 0 && isticket(entry+TICKET_PREFIX_LENGTH, &digest)) {
+		if (strncmp(entry, CHIRP_TICKET_PREFIX, CHIRP_TICKET_PREFIX_LENGTH) == 0 && chirp_ticket_isticketsubject(entry+CHIRP_TICKET_PREFIX_LENGTH, &digest)) {
 			/* open the ticket file, read the public key */
 			struct chirp_ticket ct;
 			char path[CHIRP_PATH_MAX];
@@ -597,9 +617,9 @@ int chirp_acl_ticket_create ( const char *root, const char *subject, const char 
      * expiration time is less than or equal to the expiration time of the
      * ticket used to authenticate.
      */
-	if (isticket(subject,&digest)) {
+	if (chirp_ticket_isticketsubject(subject,&digest)) {
 		struct chirp_ticket ct;
-		sprintf(ticket_file,"%s/%s%s",root,TICKET_PREFIX,subject);
+		sprintf(ticket_file,"%s/%s%s",root,CHIRP_TICKET_PREFIX,subject);
 		if (!ticket_read(ticket_file, &ct)) return -1;
 		if (ct.expiration < now+offset) {
     		sprintf(expiration, "%lu", (unsigned long) ct.expiration);
@@ -634,7 +654,7 @@ int chirp_acl_ticket_create ( const char *root, const char *subject, const char 
     return 0;
 }
 
-int chirp_acl_ticket_modify ( const char *root, const char *subject, const char *ticket_subject, const char *path, int flags, int super )
+int chirp_acl_ticket_modify ( const char *root, const char *subject, const char *ticket_subject, const char *path, int flags )
 {
 	char ticket_file[CHIRP_PATH_MAX];
     const char *digest;
@@ -642,7 +662,7 @@ int chirp_acl_ticket_modify ( const char *root, const char *subject, const char 
     struct chirp_ticket ct;
 	int status = 0;
 
-	if (!isticket(ticket_subject,&digest)) {
+	if (!chirp_ticket_isticketsubject(ticket_subject,&digest)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -654,14 +674,14 @@ int chirp_acl_ticket_modify ( const char *root, const char *subject, const char 
     if (!chirp_acl_check_dir(root,path,subject,flags)) return -1; /* you don't have the rights for the mask */
     if (!chirp_acl_whoami(subject, &esubject)) return -1;
 
-	sprintf(ticket_file,"%s/%s%s",root,TICKET_PREFIX,ticket_subject);
+	sprintf(ticket_file,"%s/%s%s",root,CHIRP_TICKET_PREFIX,ticket_subject);
 
 	if (!ticket_read(ticket_file, &ct)) {
 		free(esubject);
 		return -1;
 	}
 
-	if (strcmp(esubject,ct.subject) == 0 || super) {
+	if (strcmp(esubject,ct.subject) == 0 || strcmp(chirp_super_user, subject) == 0) {
 		size_t n;
 		int replaced = 0;
 		for (n = 0; n < ct.nrights; n++) {
@@ -698,11 +718,11 @@ int chirp_acl_ticket_modify ( const char *root, const char *subject, const char 
 int chirp_acl_whoami( const char *subject, char **esubject )
 {
 	const char *digest;
-	if (isticket(subject, &digest)) {
+	if (chirp_ticket_isticketsubject(subject, &digest)) {
 		/* open the ticket file */
 		struct chirp_ticket ct;
 		char ticketfilename[CHIRP_PATH_MAX];
-		strcpy(ticketfilename, TICKET_PREFIX);
+		strcpy(ticketfilename, CHIRP_TICKET_PREFIX);
 		strcat(ticketfilename, subject);
 		if (!ticket_read(ticketfilename, &ct)) return 0;
 		*esubject = xstrdup(ct.subject);

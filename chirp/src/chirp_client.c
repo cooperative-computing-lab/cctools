@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "chirp_protocol.h"
 #include "chirp_client.h"
 #include "chirp_group.h"
+#include "chirp_ticket.h"
 
 #include "sleeptools.h"
 
@@ -321,32 +322,29 @@ const char * chirp_client_readacl( struct chirp_client *c, time_t stoptime )
 
 }
 
-/* MD5_DIGEST_LENGTH is binary length, hex is MD5_DIGEST_LENGTH*2 */
-#define MD5_DIGEST_LENGTH_HEX  (MD5_DIGEST_LENGTH<<1)
-
 static int ticket_translate( const char *name, char *ticket_subject )
 {   
 	char command[PATH_MAX*2+4096];
-	char digest[MD5_DIGEST_LENGTH_HEX];
+	char digest[CHIRP_TICKET_DIGEST_LENGTH];
+	const char *dummy;
+
+	if (chirp_ticket_isticketsubject(name, &dummy)) {
+		strcpy(ticket_subject, name);
+		return 1;
+	}
 
 	/* load the digest */
 	sprintf(command, "sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null | openssl md5 2> /dev/null", name);
 	FILE *digestf = popen(command, "r");
-	if (fread(digest, sizeof(char), MD5_DIGEST_LENGTH_HEX, digestf) < MD5_DIGEST_LENGTH_HEX) {
+	if (fread(digest, sizeof(char), CHIRP_TICKET_DIGEST_LENGTH, digestf) < CHIRP_TICKET_DIGEST_LENGTH) {
 	  pclose(digestf);
 	  return 0;
 	}
 	pclose(digestf);
 
-	sprintf(ticket_subject, "ticket:%.*s", MD5_DIGEST_LENGTH_HEX, digest);
+	sprintf(ticket_subject, "ticket:%.*s", CHIRP_TICKET_DIGEST_LENGTH, digest);
 	return 1;
 }
-
-static int isticketsubject (const char *subject)
-{
-	return strncmp(subject, "ticket:", strlen("ticket:")) == 0;
-}
-
 
 INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, const char *subject, time_t duration, time_t stoptime )
 {
@@ -354,6 +352,8 @@ INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, 
 	char ticket_subject[CHIRP_LINE_MAX];
 	FILE *shell;
 	int status;
+
+    if (access(name, R_OK) != 0) return -1; /* the 'name' argument must be a client ticket filename */
 
 	ticket_translate(name, ticket_subject);
 
@@ -379,11 +379,12 @@ INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, 
 	assert(feof(shell));
 	status = pclose(shell);
 	if(status) {
+		errno = EINVAL;
 		return -1;
 	}
 
 	if (subject == NULL) subject = "self";
-	int result = send_command(c,stoptime,"ticket_register %s %llu %zu\n",subject,(unsigned long long)duration,length);
+	INT64_T result = send_command(c,stoptime,"ticket_register %s %llu %zu\n",subject,(unsigned long long)duration,length);
 	if(result<0) {
 		free(ticket);
 		return result;
@@ -473,7 +474,16 @@ INT64_T chirp_client_ticket_create (struct chirp_client *c, char name[CHIRP_PATH
 
 INT64_T chirp_client_ticket_delete (struct chirp_client *c, const char *name, time_t stoptime)
 {
-	return chirp_client_ticket_register(c, name, NULL, 0, stoptime) == 0 ? unlink(name) : -1;
+    char ticket_subject[CHIRP_LINE_MAX];
+
+	ticket_translate(name, ticket_subject);
+
+	INT64_T result = simple_command(c, stoptime, "ticket_delete %s\n", ticket_subject);
+
+	if (result == 0) {
+		unlink(name);
+	}
+	return result;
 }
 
 INT64_T chirp_client_ticket_get (struct chirp_client *c, const char *name, char **subject, char **ticket, time_t *duration, char ***rights, time_t stoptime)
@@ -484,10 +494,7 @@ INT64_T chirp_client_ticket_get (struct chirp_client *c, const char *name, char 
 	*subject = *ticket = NULL;
 	*rights = NULL;
 
-	if (isticketsubject(name))
-		strcpy(ticket_subject, name);
-	else
-		ticket_translate(name, ticket_subject);
+	ticket_translate(name, ticket_subject);
 
 	result = simple_command(c, stoptime, "ticket_get %s\n", ticket_subject);
 
