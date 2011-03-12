@@ -14,6 +14,7 @@ Routines for computing MD5 checksums.
 #include "int_sizes.h"
 
 #define MD5_DIGEST_LENGTH 16
+#define MD5_DIGEST_LENGTH_HEX (MD5_DIGEST_LENGTH<<1)
 
 typedef struct {
 	UINT32_T state[4];

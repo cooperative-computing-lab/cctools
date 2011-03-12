@@ -521,6 +521,36 @@ INT64_T chirp_reli_getacl( const char *host, const char *path, chirp_dir_t callb
 	RETRY_ATOMIC( result = chirp_client_getacl(client,path,callback,arg,stoptime); )
 }
 
+INT64_T chirp_reli_ticket_create( const char *host, char name[CHIRP_PATH_MAX], unsigned bits, time_t stoptime )
+{
+	RETRY_ATOMIC( result = chirp_client_ticket_create(client,name,bits,stoptime); )
+}
+
+INT64_T chirp_reli_ticket_register( const char *host, const char *name, const char *subject, time_t duration, time_t stoptime )
+{
+	RETRY_ATOMIC( result = chirp_client_ticket_register(client,name,subject,duration,stoptime); )
+}
+
+INT64_T chirp_reli_ticket_delete( const char *host, const char *name, time_t stoptime )
+{
+	RETRY_ATOMIC( result = chirp_client_ticket_delete(client,name,stoptime); )
+}
+
+INT64_T chirp_reli_ticket_list( const char *host, const char *subject, char ***list, time_t stoptime )
+{
+	RETRY_ATOMIC( result = chirp_client_ticket_list(client,subject,list,stoptime); )
+}
+
+INT64_T chirp_reli_ticket_get( const char *host, const char *name, char **subject, char **ticket, time_t *duration, char ***rights, time_t stoptime )
+{
+	RETRY_ATOMIC( result = chirp_client_ticket_get(client,name,subject,ticket,duration,rights,stoptime); )
+}
+
+INT64_T chirp_reli_ticket_modify( const char *host, const char *name, const char *path, const char *aclmask, time_t stoptime )
+{
+	RETRY_ATOMIC( result = chirp_client_ticket_modify(client,name,path,aclmask,stoptime); )
+}
+
 INT64_T chirp_reli_setacl( const char *host, const char *path, const char *subject, const char *rights, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_setacl(client,path,subject,rights,stoptime); )

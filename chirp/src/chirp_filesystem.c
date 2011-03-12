@@ -238,3 +238,20 @@ int cfs_create_dir (const char *path, int mode)
 		return 1;
 	}
 }
+
+int cfs_freadall (CHIRP_FILE *f, char **s, size_t *l)
+{
+  char *buffer = xxrealloc(NULL, 4096);
+  size_t n;
+  *l = 0;
+  *s = buffer;
+  while ((n = cfs_fread(buffer+(*l), sizeof(char), 4096, f)) > 0) {
+    *l += n;
+    buffer = xxrealloc(buffer, (*l)+4096);
+    *(buffer+(*l)) = '\0'; /* NUL terminator... */
+  }
+  if (n < 0)
+    return 0;
+  else
+    return 1;
+}

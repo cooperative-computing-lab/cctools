@@ -31,7 +31,7 @@ void auth_unix_passwd_file( const char *path )
 	strcpy(alternate_passwd_file,path);
 }
 
-static int auth_unix_assert( struct link *link, time_t stoptime )
+static int auth_unix_assert( struct link *link, struct hash_table *t, time_t stoptime )
 {
 	int success=0;
 	FILE *file;
@@ -144,7 +144,7 @@ static struct passwd * auth_get_passwd_from_uid( uid_t uid )
 	}
 }
 
-static int auth_unix_accept( struct link *link, char **subject, time_t stoptime )
+static int auth_unix_accept( struct link *link, char **subject, struct hash_table *t, time_t stoptime )
 {
 	char path[AUTH_LINE_MAX];
 	char line[AUTH_LINE_MAX];

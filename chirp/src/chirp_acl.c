@@ -7,13 +7,19 @@ See the file COPYING for details.
 
 #include "chirp_acl.h"
 #include "chirp_filesystem.h"
-#include "chirp_protocol.h"
-
-#include "username.h"
-#include "stringtools.h"
-#include "debug.h"
 #include "chirp_group.h"
+#include "chirp_protocol.h"
+#include "chirp_ticket.h"
 
+#include "debug.h"
+#include "hash_table.h"
+#include "md5.h"
+#include "stringtools.h"
+#include "username.h"
+#include "xmalloc.h"
+
+#include <assert.h>
+#include <ctype.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -58,6 +64,171 @@ static int do_stat( const char *filename, struct chirp_stat *buf )
 	return result;
 }
 
+struct chirp_ticket {
+  char *subject;
+  char *ticket;
+  time_t expiration;
+  short expired;
+  size_t nrights;
+  struct chirp_ticket_rights {
+    char *directory;
+	int acl;
+  } *rights;
+};
+
+static int readquote (const char **buffer, const char **s, size_t *l)
+{
+  while (isspace(**buffer)) (*buffer)++;
+  if (**buffer != '"') return 0;
+  (*buffer)++;
+  *l = 0;
+  *s = *buffer;
+  while (**buffer != '"' && **buffer != '\0') {
+    (*buffer)++;
+    (*l)++;
+  }
+  if (**buffer != '"') return 0;
+  (*buffer)++;
+  return 1;
+}
+
+static void ticket_free (struct chirp_ticket *ct)
+{
+  size_t n = 0;
+  free(ct->subject);
+  free(ct->ticket);
+  while (n < ct->nrights) {
+    free(ct->rights[n].directory);
+    n++;
+  }
+  free(ct->rights);
+}
+
+static int ticket_write (const char *fname, struct chirp_ticket *ct)
+{
+	size_t n;
+	CHIRP_FILE *ticketfile = cfs_fopen(fname, "w");
+    if (!ticketfile) return 0;
+
+	cfs_fprintf(ticketfile,"subject \"%s\"\n",ct->subject);
+	cfs_fprintf(ticketfile,"ticket \"%s\"\n",ct->ticket);
+	cfs_fprintf(ticketfile,"expiration \"%lu\"\n",(unsigned long) ct->expiration);
+	for (n = 0; n < ct->nrights; n++) {
+		cfs_fprintf(ticketfile,"rights \"%s\" \"%s\"\n",ct->rights[n].directory,chirp_acl_flags_to_text(ct->rights[n].acl));
+	}
+
+	cfs_fflush(ticketfile);
+	int result = cfs_ferror(ticketfile);
+	if (result) {
+		errno = EACCES;
+		return -1;
+	}
+	cfs_fclose(ticketfile);
+	return 0;
+}
+
+static int ticket_read (const char *fname, struct chirp_ticket *ct)
+{
+	int status = 0;
+
+	char *b;
+	size_t l;
+	CHIRP_FILE *ticketfile = cfs_fopen(fname, "r");
+    if (!ticketfile) return 0;
+    if (!cfs_freadall(ticketfile, &b, &l)) {
+		cfs_fclose(ticketfile);
+		return 0;
+	}
+	cfs_fclose(ticketfile);
+
+	/* Ticket format (quoted strings may span multiple lines):
+	 * subject "<subject>"
+	 * ticket "<ticket>"
+	 * expiration "<UTC seconds since Epoch>"
+	 * rights "<directory>" "<acl>"
+	 * rights "<directory>" "<acl>"
+	 * ...
+	 */
+	size_t n;
+	const char *s;
+	const char *buffer = b;
+	time_t now = time(NULL);
+	now = mktime(gmtime(&now)); /* convert to UTC */
+	ct->subject = NULL;
+	ct->ticket = NULL;
+	ct->expiration = now; /* default expire now... */
+	ct->expired = 1; /* default is expired */
+	ct->nrights = 0;
+	ct->rights = NULL;
+	while (1) {
+		while (isspace(*buffer)) buffer++;
+		if (strncmp(buffer, "subject", strlen("subject")) == 0) {
+			buffer += strlen("subject");
+			if (!readquote(&buffer, &s, &n)) break;
+			ct->subject = xxrealloc(ct->subject, n+1);
+			memcpy(ct->subject, s, n);
+			ct->subject[n] = '\0';
+		} else if (strncmp(buffer, "ticket", strlen("ticket")) == 0) {
+			buffer += strlen("ticket");
+			if (!readquote(&buffer, &s, &n)) break;
+			ct->ticket = xxrealloc(ct->ticket, n+1);
+			memcpy(ct->ticket, s, n);
+			ct->ticket[n] = '\0';
+		} else if (strncmp(buffer, "expiration", strlen("expiration")) == 0) {
+			buffer += strlen("expiration");
+			if (!readquote(&buffer, &s, &n)) break;
+			char *stime = xxmalloc(n+1);
+			memcpy(stime, s, n);
+			stime[n] = '\0';
+			ct->expiration = (time_t) strtoul(stime, NULL, 10);
+			ct->expired = (ct->expiration <= now);
+			free(stime);
+		} else if (strncmp(buffer, "rights", strlen("rights")) == 0) {
+			buffer += strlen("rights");
+			if (!readquote(&buffer, &s, &n)) break;
+			ct->rights = xxrealloc(ct->rights, sizeof(*ct->rights)*(++ct->nrights)+1);
+			ct->rights[ct->nrights-1].directory = xxmalloc(n+1);
+			memcpy(ct->rights[ct->nrights-1].directory, s, n);
+			ct->rights[ct->nrights-1].directory[n] = '\0';
+			if (!readquote(&buffer, &s, &n)) break;
+			char *acl = xxmalloc(n+1);
+			memcpy(acl, s, n);
+			acl[n] = '\0';
+			ct->rights[ct->nrights-1].acl = chirp_acl_text_to_flags(acl);
+			free(acl);
+		} else if (*buffer == '\0') {
+			if (ct->subject && ct->ticket && ct->nrights > 0) {
+				status = 1;
+			}
+			break;
+		} else {
+			break;
+		}
+	}
+	if (ct->rights == NULL) {
+		assert(ct->nrights == 0);
+		ct->rights = xxrealloc(ct->rights, sizeof(*ct->rights)*(++ct->nrights)+1);
+		ct->rights[ct->nrights-1].directory = xstrdup("/");
+		ct->rights[ct->nrights-1].acl = CHIRP_ACL_ALL;
+		ct->nrights = 1;
+	}
+	free(b);
+	/* fprintf(stderr, "TICKET:\n\tsubject = %s\n\texpiration = %lu %lu %d\n\tticket = %s\n\trights[0] = %s %s\n", ct->subject, now, ct->expiration, ct->expired, ct->ticket, ct->rights[0].directory, chirp_acl_flags_to_text(ct->rights[0].acl)); */
+	return status && !ct->expired;
+}
+
+static void chirp_acl_ticket_name ( const char *root, const char *ticket, char *name, char *fname )
+{
+  unsigned char digest[CHIRP_TICKET_DIGEST_LENGTH];
+  md5_context_t context;
+  md5_init(&context);
+  md5_update(&context, (const unsigned char *) ticket, strlen(ticket));
+  md5_final(digest, &context);
+  strcpy(name, "ticket:");
+  strcat(name, md5_string(digest));
+  sprintf(fname,"%s/%s%s",root,CHIRP_TICKET_PREFIX,name);
+}
+
 void chirp_acl_force_readonly()
 {
 	read_only_mode = 1;
@@ -97,7 +268,7 @@ If the directory exists, but the subject has no rights, returns zero with errno=
 If the rights cannot be obtained, returns zero with errno set appropriately.
 */
 
-static int do_chirp_acl_get( const char *filename, const char *dirname, const char *subject, int *totalflags )
+static int do_chirp_acl_get( const char *root, const char *dirname, const char *subject, int *totalflags )
 {
 	CHIRP_FILE *aclfile;
 	char aclsubject[CHIRP_LINE_MAX];
@@ -105,21 +276,55 @@ static int do_chirp_acl_get( const char *filename, const char *dirname, const ch
 
 	errno = 0;
 	*totalflags = 0;
-  
-	aclfile = chirp_acl_open(dirname);
-  	if(aclfile) {
-		while(chirp_acl_read(aclfile,aclsubject,&aclflags)) {
-			if(string_match(aclsubject,subject)) {
-				*totalflags |= aclflags;
-			} else if(!strncmp(aclsubject,"group:",6)) {
-				if(chirp_group_lookup(aclsubject,subject)) {
-					*totalflags |= aclflags;
+
+	/* if the subject is a ticket, then we need the rights we have for the
+	 * directory along with the rights of the subject in that directory
+	 */
+	const char *digest;
+    if (chirp_ticket_isticketsubject(subject, &digest)) {
+		/* open the ticket file, read the public key */
+		char ticketfilename[CHIRP_PATH_MAX];
+		struct chirp_ticket ct;
+		strcpy(ticketfilename, CHIRP_TICKET_PREFIX);
+		strcat(ticketfilename, subject);
+		if (!ticket_read(ticketfilename, &ct)) return 0;
+		if (!do_chirp_acl_get(root, dirname, ct.subject, totalflags)) {
+			ticket_free(&ct);
+			return 0;
+		}
+		size_t i;
+		size_t longest = 0;
+		int mask = 0;
+		for (i = 0; i < ct.nrights; i++) {
+			char safewhere[CHIRP_PATH_MAX];
+			char where[CHIRP_PATH_MAX];
+			sprintf(safewhere, "%s/%s", root, ct.rights[i].directory);
+			string_collapse_path(safewhere, where, 1);
+
+			if (strncmp(dirname, where, strlen(where)) == 0) {
+				if (strlen(where) > longest) {
+					longest = strlen(where);
+					mask = ct.rights[i].acl;
 				}
 			}
 		}
-		chirp_acl_close(aclfile);
-	} else {
-	  	return 0;
+		*totalflags &= mask;
+    } else {
+		aclfile = chirp_acl_open(dirname);
+  		if(aclfile) {
+			while(chirp_acl_read(aclfile,aclsubject,&aclflags)) {
+				if(string_match(aclsubject,subject)) {
+					*totalflags |= aclflags;
+				} else if(!strncmp(aclsubject,"group:",6)) {
+					if(chirp_group_lookup(aclsubject,subject)) {
+						*totalflags |= aclflags;
+					}
+				}
+			}
+			chirp_acl_close(aclfile);
+		} else {
+		  	return 0;
+		}
 	}
 
 	if(read_only_mode) {
@@ -130,11 +335,11 @@ static int do_chirp_acl_get( const char *filename, const char *dirname, const ch
 }
 
 
-int chirp_acl_check_dir( const char *dirname, const char *subject, int flags )
+int chirp_acl_check_dir( const char *root, const char *dirname, const char *subject, int flags )
 {
 	int myflags;
 	
-	if (!do_chirp_acl_get(dirname,dirname,subject,&myflags))
+	if (!do_chirp_acl_get(root,dirname,subject,&myflags))
 	  return 0;
 
 	/* The superuser can implicitly list and admin */
@@ -151,7 +356,7 @@ int chirp_acl_check_dir( const char *dirname, const char *subject, int flags )
 	}
 }
 
-static int do_chirp_acl_check( const char *filename, const char *subject, int flags, int follow_links )
+static int do_chirp_acl_check( const char *root, const char *filename, const char *subject, int flags, int follow_links )
 {
 	char linkname[CHIRP_PATH_MAX];
 	char temp[CHIRP_PATH_MAX];
@@ -207,17 +412,326 @@ static int do_chirp_acl_check( const char *filename, const char *subject, int fl
 
 	/* Perform the permissions check on that directory. */
 
-	return chirp_acl_check_dir(dirname,subject,flags);
+	return chirp_acl_check_dir(root,dirname,subject,flags);
 }
 
-int chirp_acl_check( const char *filename, const char *subject, int flags )
+int chirp_acl_check( const char *root, const char *filename, const char *subject, int flags )
 {
-	return do_chirp_acl_check(filename,subject,flags,1);
+	return do_chirp_acl_check(root,filename,subject,flags,1);
 }
 
-int chirp_acl_check_link( const char *filename, const char *subject, int flags )
+int chirp_acl_check_link( const char *root, const char *filename, const char *subject, int flags )
 {
-	return do_chirp_acl_check(filename,subject,flags,0);
+	return do_chirp_acl_check(root,filename,subject,flags,0);
+}
+
+int chirp_acl_gettickets (const char *dirname, struct hash_table *ticket)
+{
+	if (!is_a_directory(dirname)) {
+		errno = ENOTDIR;
+		return -1;
+	}
+
+	const char *entry;
+	void *dir;
+
+	dir = cfs->opendir(dirname);
+	if (!dir) {
+		return -1;
+	}
+	while ((entry = cfs->readdir(dir))) {
+		char path[CHIRP_PATH_MAX];
+		if (!strcmp(entry, ".")) continue;
+		if (!strcmp(entry, "..")) continue;
+		sprintf(path,"%s/%s", dirname, entry);
+		const char *digest;
+		if (strncmp(entry, CHIRP_TICKET_PREFIX, CHIRP_TICKET_PREFIX_LENGTH) == 0 && chirp_ticket_isticketsubject(entry+CHIRP_TICKET_PREFIX_LENGTH, &digest)) {
+			/* open the ticket file, read the public key */
+			struct chirp_ticket ct;
+			if (!ticket_read(path, &ct)) continue;
+			debug(D_CHIRP, "adding %s to known tickets", digest);
+			hash_table_insert(ticket, digest, xstrdup(ct.ticket));
+			ticket_free(&ct);
+		}
+	}
+	cfs->closedir(dir);
+	return 0;
+}
+
+int chirp_acl_ticket_delete( const char *root, const char *subject, const char *ticket_subject )
+{
+	char ticket_file[CHIRP_PATH_MAX];
+    const char *digest;
+    char *esubject;
+    struct chirp_ticket ct;
+	int status = 0;
+
+	if (!chirp_ticket_isticketsubject(ticket_subject,&digest)) {
+		errno = EINVAL;
+		return -1;
+	}
+    if (!chirp_acl_whoami(subject, &esubject)) return -1;
+
+	sprintf(ticket_file,"%s/%s%s",root,CHIRP_TICKET_PREFIX,ticket_subject);
+
+	if (!ticket_read(ticket_file, &ct)) {
+		free(esubject);
+		return -1;
+	}
+
+	if (strcmp(esubject,ct.subject) == 0 || strcmp(chirp_super_user, subject) == 0) {
+		status = cfs->unlink(ticket_file);
+	} else {
+		errno = EACCES;
+		status = -1;
+	}
+	ticket_free(&ct);
+	free(esubject);
+	return status;
+}
+
+int chirp_acl_ticket_get (const char *root, const char *subject, const char *ticket_subject, char **ticket_esubject, char **ticket, time_t *ticket_expiration, char ***ticket_rights)
+{
+	char *esubject;
+    if (!chirp_acl_whoami(subject, &esubject)) return -1;
+
+    const char *digest;
+	if (!chirp_ticket_isticketsubject(ticket_subject,&digest)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	struct chirp_ticket ct;
+	char ticket_file[CHIRP_PATH_MAX];
+	sprintf(ticket_file,"%s/%s%s",root,CHIRP_TICKET_PREFIX,ticket_subject);
+	if (!ticket_read(ticket_file, &ct)) {
+		free(esubject);
+		errno = EINVAL;
+		return -1;
+	}
+	if (strcmp(ct.subject, subject) == 0 || strcmp(subject, chirp_super_user) == 0) {
+		*ticket_esubject = xstrdup(ct.subject);
+		*ticket = xstrdup(ct.ticket);
+
+		time_t now;
+		time(&now);
+		now = mktime(gmtime(&now)); /* convert to UTC */
+		*ticket_expiration = ct.expiration-now;
+
+		size_t n;
+		*ticket_rights = (char **) xxmalloc(sizeof(char *)*2*(ct.nrights+1));
+		for (n = 0; n < ct.nrights; n++) {
+			(*ticket_rights)[n*2+0] = xstrdup(ct.rights[n].directory);
+			(*ticket_rights)[n*2+1] = xstrdup(chirp_acl_flags_to_text(ct.rights[n].acl));
+		}
+		(*ticket_rights)[n*2+0] = NULL;
+		(*ticket_rights)[n*2+1] = NULL;
+		
+		ticket_free(&ct);
+		free(esubject);
+		return 0;
+	} else {
+		ticket_free(&ct);
+		free(esubject);
+		errno = EACCES;
+		return -1;
+	}
+}
+
+int chirp_acl_ticket_list (const char *root, const char *subject, char ***ticket_subjects)
+{
+	size_t n = 0;
+	*ticket_subjects = NULL;
+
+	const char *entry;
+	void *dir;
+	dir = cfs->opendir(root);
+	if (dir == NULL) return -1;
+
+	while ((entry = cfs->readdir(dir))) {
+		if (strcmp(entry, ".") == 0 || strcmp(entry, "..") == 0) continue;
+		char path[CHIRP_PATH_MAX];
+		sprintf(path,"%s/%s", root, entry);
+		const char *digest;
+		if (strncmp(entry, CHIRP_TICKET_PREFIX, CHIRP_TICKET_PREFIX_LENGTH) == 0 && chirp_ticket_isticketsubject(entry+CHIRP_TICKET_PREFIX_LENGTH, &digest)) {
+			struct chirp_ticket ct;
+			if (!ticket_read(path, &ct)) continue; /* expired? */
+			if (strcmp(subject, ct.subject) == 0 || strcmp(subject, "all") == 0) {
+			    n = n+1;
+				*ticket_subjects = (char **) xxrealloc(*ticket_subjects, (n+1)*sizeof(char *));
+				(*ticket_subjects)[n-1] = xstrdup(entry+CHIRP_TICKET_PREFIX_LENGTH);
+				(*ticket_subjects)[n] = NULL;
+			}
+			ticket_free(&ct);
+		}
+	}
+	cfs->closedir(dir);
+
+	return 0;
+}
+
+int chirp_acl_gctickets (const char *root)
+{
+	void *dir;
+	const char *entry;
+
+	dir = cfs->opendir(root);
+	if (!dir) {
+		return -1;
+	}
+	while ((entry = cfs->readdir(dir))) {
+		const char *digest;
+		if (strncmp(entry, CHIRP_TICKET_PREFIX, CHIRP_TICKET_PREFIX_LENGTH) == 0 && chirp_ticket_isticketsubject(entry+CHIRP_TICKET_PREFIX_LENGTH, &digest)) {
+			/* open the ticket file, read the public key */
+			struct chirp_ticket ct;
+			char path[CHIRP_PATH_MAX];
+			sprintf(path, "%s/%s", root, entry);
+			if (ticket_read(path, &ct)) {
+				ticket_free(&ct);
+				continue;
+            }
+			debug(D_CHIRP, "ticket %s expired (or corrupt), garbage collecting", digest);
+			cfs->unlink(path);
+		}
+	}
+	cfs->closedir(dir);
+	return 0;
+}
+
+int chirp_acl_ticket_create ( const char *root, const char *subject, const char *newsubject, const char *ticket, const char *duration)
+{
+    time_t now; /*, delta; */
+	time_t offset = (time_t) strtoul(duration, NULL, 10);
+	const char *digest;
+	char ticket_name[CHIRP_PATH_MAX];
+	char ticket_file[CHIRP_PATH_MAX];
+    char expiration[128];
+
+	now = time(NULL);
+	now = mktime(gmtime(&now)); /* convert to UTC */
+    sprintf(expiration, "%lu", (unsigned long) (now+offset));
+
+    /* Note about tickets making tickets:
+     * A ticket created by a ticket authenticated user has the same effective
+     * subject (see the ticket_register RPC in chirp_server.c). Also, the
+     * expiration time is less than or equal to the expiration time of the
+     * ticket used to authenticate.
+     */
+	if (chirp_ticket_isticketsubject(subject,&digest)) {
+		struct chirp_ticket ct;
+		sprintf(ticket_file,"%s/%s%s",root,CHIRP_TICKET_PREFIX,subject);
+		if (!ticket_read(ticket_file, &ct)) return -1;
+		if (ct.expiration < now+offset) {
+    		sprintf(expiration, "%lu", (unsigned long) ct.expiration);
+		}
+		ticket_free(&ct);
+    }
+
+	if(!is_a_directory(root)) {
+		errno = ENOTDIR;
+		return -1;
+	}
+
+	chirp_acl_ticket_name(root,ticket,ticket_name,ticket_file);
+
+	CHIRP_FILE *f = cfs_fopen(ticket_file,"w");
+	if (!f) {
+		errno = EACCES;
+		return -1;
+	}
+	cfs_fprintf(f,"subject \"%s\"\n",newsubject);
+	cfs_fprintf(f,"expiration \"%s\"\n",expiration);
+	cfs_fprintf(f,"ticket \"%s\"\n",ticket);
+    cfs_fprintf(f,"rights \"/\" \"\"\n");
+
+	cfs_fflush(f);
+	int result = cfs_ferror(f);
+	if (result) {
+		errno = EACCES;
+		return -1;
+	}
+	cfs_fclose(f);
+    return 0;
+}
+
+int chirp_acl_ticket_modify ( const char *root, const char *subject, const char *ticket_subject, const char *path, int flags )
+{
+	char ticket_file[CHIRP_PATH_MAX];
+    const char *digest;
+    char *esubject;
+    struct chirp_ticket ct;
+	int status = 0;
+
+	if (!chirp_ticket_isticketsubject(ticket_subject,&digest)) {
+		errno = EINVAL;
+		return -1;
+	}
+    /* Note about tickets making tickets:
+     * We check whether the ticket has the rights associated with the mask in
+     * the next line. So, a ticket can only make a ticket with rights it
+     * already has.
+     */
+    if (!chirp_acl_check_dir(root,path,subject,flags)) return -1; /* you don't have the rights for the mask */
+    if (!chirp_acl_whoami(subject, &esubject)) return -1;
+
+	sprintf(ticket_file,"%s/%s%s",root,CHIRP_TICKET_PREFIX,ticket_subject);
+
+	if (!ticket_read(ticket_file, &ct)) {
+		free(esubject);
+		return -1;
+	}
+
+	if (strcmp(esubject,ct.subject) == 0 || strcmp(chirp_super_user, subject) == 0) {
+		size_t n;
+		int replaced = 0;
+		for (n = 0; n < ct.nrights; n++) {
+			char safewhere[CHIRP_PATH_MAX];
+			char where[CHIRP_PATH_MAX];
+			sprintf(safewhere, "%s/%s", root, ct.rights[n].directory);
+			string_collapse_path(safewhere, where, 1);
+
+			if (strcmp(where, path) == 0) {
+				ct.rights[n].acl = flags; /* replace old acl mask */
+				replaced = 1;
+			}
+		}
+		if (!replaced) {
+			assert(strlen(path) >= strlen(root));
+			ct.rights = xxrealloc(ct.rights, sizeof(*ct.rights)*(++ct.nrights)+1);
+			char directory[CHIRP_PATH_MAX];
+			char collapsed_directory[CHIRP_PATH_MAX];
+			sprintf(directory, "/%s", path+strlen(root));
+			string_collapse_path(directory, collapsed_directory, 1);
+			ct.rights[ct.nrights-1].directory = xstrdup(collapsed_directory);
+			ct.rights[ct.nrights-1].acl = flags;
+		}
+		status = ticket_write(ticket_file, &ct);
+	} else {
+		errno = EACCES;
+		status = -1;
+	}
+	ticket_free(&ct);
+	free(esubject);
+	return status;
+}
+
+int chirp_acl_whoami( const char *subject, char **esubject )
+{
+	const char *digest;
+	if (chirp_ticket_isticketsubject(subject, &digest)) {
+		/* open the ticket file */
+		struct chirp_ticket ct;
+		char ticketfilename[CHIRP_PATH_MAX];
+		strcpy(ticketfilename, CHIRP_TICKET_PREFIX);
+		strcat(ticketfilename, subject);
+		if (!ticket_read(ticketfilename, &ct)) return 0;
+		*esubject = xstrdup(ct.subject);
+		ticket_free(&ct);
+		return 1;
+	} else {
+		*esubject = xstrdup(subject);
+		return 1;
+	}
 }
 
 int chirp_acl_set( const char *dirname, const char *subject, int flags, int reset_acl )
@@ -314,7 +828,7 @@ CHIRP_FILE *chirp_acl_open( const char *dirname )
 			return file;
 		}
         else if (errno == ENOTDIR) /* component directory missing */
-          return NULL;
+			return NULL;
 		errno = ENOENT;
 		return 0;
 	} else {
@@ -494,7 +1008,7 @@ int chirp_acl_init_copy( const char *path )
 	return result;
 }
 
-int chirp_acl_init_reserve( const char *path, const char *subject )
+int chirp_acl_init_reserve( const char *root, const char *path, const char *subject )
 {
 	char dirname[CHIRP_PATH_MAX];
 	char aclpath[CHIRP_PATH_MAX];
@@ -504,7 +1018,7 @@ int chirp_acl_init_reserve( const char *path, const char *subject )
 
 	string_dirname(path,dirname);
 
-	if (!do_chirp_acl_get(dirname,dirname,subject,&aclflags))
+	if (!do_chirp_acl_get(root,dirname,subject,&aclflags))
 		return 0;
 
 	if(aclflags&CHIRP_ACL_RESERVE_READ)

@@ -22,7 +22,7 @@ See the file COPYING for details.
 #define SERVICE "host"
 #define VERSION "dttools_auth_protocol_1"
 
-int auth_kerberos_assert( struct link *link, time_t stoptime )
+int auth_kerberos_assert( struct link *link, struct hash_table *t, time_t stoptime )
 {
 	krb5_context context;
 	krb5_ccache ccdef;
@@ -112,7 +112,7 @@ int auth_kerberos_assert( struct link *link, time_t stoptime )
 	return success;
 }
 
-int auth_kerberos_accept( struct link *link, char **subject, time_t stoptime )
+int auth_kerberos_accept( struct link *link, char **subject, struct hash_table *t, time_t stoptime )
 {
 	krb5_context context;
 	krb5_auth_context auth_context = NULL;

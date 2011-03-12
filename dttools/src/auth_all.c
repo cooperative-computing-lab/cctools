@@ -16,6 +16,7 @@ int auth_register_byname( const char *name )
 	if(!strcmp(name,"unix")) return auth_unix_register();
 	if(!strcmp(name,"hostname")) return auth_hostname_register();
 	if(!strcmp(name,"address")) return auth_address_register();
+    if(!strcmp(name,"ticket")) return auth_ticket_register();
 	return 0;
 }
 
@@ -25,6 +26,7 @@ int auth_register_all()
 		auth_kerberos_register() +
 		auth_globus_register() +
 		auth_unix_register() +
+        auth_ticket_register() +
 		auth_hostname_register() +
 		auth_address_register();
 }

@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "chirp_protocol.h"
 #include "chirp_client.h"
 #include "chirp_group.h"
+#include "chirp_ticket.h"
 
 #include "sleeptools.h"
 
@@ -17,11 +18,14 @@ See the file COPYING for details.
 #include "domain_name_cache.h"
 #include "full_io.h"
 #include "macros.h"
+#include "md5.h"
 #include "debug.h"
 #include "copy_stream.h"
 #include "list.h"
 #include "url_encode.h"
+#include "xmalloc.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -122,18 +126,49 @@ struct chirp_client * chirp_client_connect( const char *hostport, int negotiate_
 
 	c = malloc(sizeof(*c));
 	if(c) {
-	        c->link = link_connect(addr,port,stoptime);
+		c->link = link_connect(addr,port,stoptime);
 		c->broken = 0;
 		c->serial = global_serial++;
 		if(c->link) {
-		        link_tune(c->link,LINK_TUNE_INTERACTIVE);
+	        link_tune(c->link,LINK_TUNE_INTERACTIVE);
 			if(negotiate_auth) {
 				char *type, *subject;
-				if(auth_assert(c->link,&type,&subject,stoptime)) {
+				struct hash_table *t = hash_table_create(0, 0);
+                size_t ntickets = 0;
+                char **tickets = (char **) xxrealloc(NULL, sizeof(char *)*(ntickets+1));
+				tickets[ntickets] = NULL;
+
+				/* populate the table with tickets */
+				const char *TICKETS = getenv(CHIRP_CLIENT_TICKETS);
+				const char *start, *end;
+				for (start = end = TICKETS; TICKETS && start < TICKETS+strlen(TICKETS); start = ++end)
+				{
+					while (*end != '\0' && *end != ',') end++;
+                    if (start == end) continue;
+					char *value = xxmalloc(end-start+1);
+                    memset(value, 0, end-start+1);
+					strncpy(value, start, end-start);
+					debug(D_CHIRP, "adding %s", value);
+					tickets[ntickets] = value;
+					tickets = xxrealloc(tickets, sizeof(char *)*((++ntickets)+1));
+					tickets[ntickets] = NULL;
+				}
+
+				int result = hash_table_insert(t, "ticket", tickets);
+
+				result = auth_assert(c->link,&type,&subject,t,stoptime);
+
+				{
+					size_t i;
+					for (i = 0; tickets[i]; i++) free(tickets[i]);
+					free(tickets);
+					hash_table_delete(t);
+				}
+
+				if(result) {
 					free(type);
 					free(subject);
 					strcpy(c->hostport,hostport);
-
 					return c;
 				} else {
 					chirp_client_disconnect(c);
@@ -285,6 +320,310 @@ const char * chirp_client_readacl( struct chirp_client *c, time_t stoptime )
 		return 0;
 	}
 
+}
+
+static int ticket_translate( const char *name, char *ticket_subject )
+{   
+	char command[PATH_MAX*2+4096];
+	char digest[CHIRP_TICKET_DIGEST_LENGTH];
+	const char *dummy;
+
+	if (chirp_ticket_isticketsubject(name, &dummy)) {
+		strcpy(ticket_subject, name);
+		return 1;
+	}
+
+	/* load the digest */
+	sprintf(command, "sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null | openssl md5 2> /dev/null", name);
+	FILE *digestf = popen(command, "r");
+	if (fread(digest, sizeof(char), CHIRP_TICKET_DIGEST_LENGTH, digestf) < CHIRP_TICKET_DIGEST_LENGTH) {
+	  pclose(digestf);
+	  return 0;
+	}
+	pclose(digestf);
+
+	sprintf(ticket_subject, "ticket:%.*s", CHIRP_TICKET_DIGEST_LENGTH, digest);
+	return 1;
+}
+
+INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, const char *subject, time_t duration, time_t stoptime )
+{
+	char command[PATH_MAX*2+4096];
+	char ticket_subject[CHIRP_LINE_MAX];
+	FILE *shell;
+	int status;
+
+    if (access(name, R_OK) != 0) return -1; /* the 'name' argument must be a client ticket filename */
+
+	ticket_translate(name, ticket_subject);
+
+	/* BEWARE: we don't bother to escape the filename, a user could
+	 * provide a malicious filename that makes us execute code we don't want to.
+	 */
+	sprintf(command,"if [ -r '%s' ]; then sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null; exit 0; else exit 1; fi",name,name);
+	shell = popen(command,"r");
+	if (!shell) return -1;
+
+	/* read the ticket file (public key) */
+	char *ticket = xxrealloc(NULL, 4096);
+	size_t read, length = 0;
+	while((read = fread(ticket+length, 1, 4096, shell)) > 0) {
+		length += read;
+		ticket = xxrealloc(ticket, length+4096);
+	}
+	if(ferror(shell)) {
+		status = pclose(shell);
+		errno = ferror(shell);
+		return -1;
+	}
+	assert(feof(shell));
+	status = pclose(shell);
+	if(status) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (subject == NULL) subject = "self";
+	INT64_T result = send_command(c,stoptime,"ticket_register %s %llu %zu\n",subject,(unsigned long long)duration,length);
+	if(result<0) {
+		free(ticket);
+		return result;
+	}
+	result = link_write(c->link,ticket,length,stoptime);
+	free(ticket);
+	if (result!=length) {
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+
+	result = get_result(c,stoptime);
+
+	if (result == 0) {
+		time_t t;
+		struct tm tm;
+		char now[1024];
+		char expiration[1024];
+
+		time(&t);
+		localtime_r(&t, &tm);
+		strftime(now, sizeof(now)/sizeof(char), "%c", &tm);
+		t += duration;
+		localtime_r(&t, &tm);
+		strftime(expiration, sizeof(expiration)/sizeof(char), "%c", &tm);
+
+		FILE *file = fopen(name, "a");
+		if (file == NULL) return -1;
+		fprintf(file,"# %s: Registered with %s as \"%s\". Expires on %s\n",now,c->hostport,subject,expiration);
+		fclose(file);
+	}
+	return result;
+}
+
+INT64_T chirp_client_ticket_create (struct chirp_client *c, char name[CHIRP_PATH_MAX], unsigned bits, time_t stoptime)
+{
+	static const char command[] =
+		"T=`mktemp`\n"
+		"P=`mktemp`\n"
+		"MD5=`mktemp`\n"
+
+		"echo \"# Chirp Ticket\" > \"$T\"\n"
+		"echo \"# `date`: Ticket Created.\" >> \"$T\"\n"
+		"openssl genrsa \"$CHIRP_BITS\" >> \"$T\" 2> /dev/null\n"
+		"sed '/^\\s*#/d' < \"$T\" | openssl rsa -pubout > \"$P\" 2> /dev/null\n"
+
+		"openssl md5 < \"$P\" > \"$MD5\" 2> /dev/null\n"
+		"if [ -z \"$CHIRP_TICKET\" ]; then\n"
+		"  CHIRP_TICKET=\"ticket.`cat $MD5`\"\n"
+		"fi\n"
+
+		"cat > \"$CHIRP_TICKET\" < \"$T\"\n"
+		"rm -f \"$T\" \"$P\" \"$MD5\"\n"
+
+		"echo \"Generated ticket $CHIRP_TICKET.\" 1>&2\n"
+		"echo -n \"$CHIRP_TICKET\"\n";
+
+	int result;
+
+	if (strlen(name) == 0)
+		result = unsetenv("CHIRP_TICKET");
+	else
+		result = setenv("CHIRP_TICKET", name, 1);
+	if (result == -1) return -1;
+
+	char bits_s[32];
+	sprintf(bits_s, "%u", bits);
+	result = setenv("CHIRP_BITS", bits_s, 1);
+	if (result == -1) return -1;
+
+	memset(name, 0, CHIRP_PATH_MAX);
+	FILE *shell = popen(command, "r");
+	if (shell == NULL) return -1;
+	ssize_t read;
+	char *buffer = name;
+	while ((read = full_fread(shell, buffer, sizeof(name)-1-(name-buffer))) > 0)
+		buffer += read;
+	pclose(shell);
+	if ((buffer - name) <= 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	return 0;
+}
+
+INT64_T chirp_client_ticket_delete (struct chirp_client *c, const char *name, time_t stoptime)
+{
+    char ticket_subject[CHIRP_LINE_MAX];
+
+	ticket_translate(name, ticket_subject);
+
+	INT64_T result = simple_command(c, stoptime, "ticket_delete %s\n", ticket_subject);
+
+	if (result == 0) {
+		unlink(name);
+	}
+	return result;
+}
+
+INT64_T chirp_client_ticket_get (struct chirp_client *c, const char *name, char **subject, char **ticket, time_t *duration, char ***rights, time_t stoptime)
+{
+	INT64_T result;
+	char ticket_subject[CHIRP_LINE_MAX];
+
+	*subject = *ticket = NULL;
+	*rights = NULL;
+
+	ticket_translate(name, ticket_subject);
+
+	result = simple_command(c, stoptime, "ticket_get %s\n", ticket_subject);
+
+	if (result == 0) {
+		char line[CHIRP_LINE_MAX];
+		size_t length;
+		size_t nrights = 0;
+
+		if (!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) goto failure;
+		if (sscanf(line, "%zu", &length) != 1) goto failure;
+		*subject = xxmalloc((length+1)*sizeof(char));
+		if (!link_read(c->link, *subject, length, stoptime)) goto failure;
+		(*subject)[length] = '\0';
+
+		if (!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) goto failure;
+		if (sscanf(line, "%zu", &length) != 1) goto failure;
+		*ticket = xxmalloc((length+1)*sizeof(char));
+		if (!link_read(c->link, *ticket, length, stoptime)) goto failure;
+		(*ticket)[length] = '\0';
+
+		if (!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) goto failure;
+		unsigned long long tmp;
+		if (sscanf(line, "%llu", &tmp) != 1) goto failure;
+		*duration = (time_t) tmp;
+
+		while (1) {
+			char path[CHIRP_PATH_MAX];
+			char acl[CHIRP_LINE_MAX];
+			if (!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) goto failure;
+			if (sscanf(line, "%s %s", path, acl) == 2) {
+				*rights = xxrealloc(*rights, sizeof(char *)*2*(nrights+2));
+				(*rights)[nrights*2+0] = xstrdup(path);
+				(*rights)[nrights*2+1] = xstrdup(acl);
+				(*rights)[nrights*2+2] = NULL;
+				(*rights)[nrights*2+3] = NULL;
+				nrights++;
+			} else if (sscanf(line, "%lld", &result) == 1 && result == 0) {
+				break;
+			} else
+				goto failure;
+		}
+
+		return 0;
+failure:
+		free(*subject);
+		free(*ticket);
+		if (*rights != NULL) {
+			char **tmp = *rights;
+			while (tmp[0] && tmp[1]) {
+				free(tmp[0]);
+				free(tmp[1]);
+			}
+			free(*rights);
+		}
+		*subject = *ticket = NULL;
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+
+	return result;
+}
+
+INT64_T chirp_client_ticket_list (struct chirp_client *c, const char *subject, char ***list, time_t stoptime)
+{
+	INT64_T result;
+
+	size_t size = 0;
+	*list = NULL;
+
+	result = simple_command(c, stoptime, "ticket_list %s\n", subject);
+
+	if (result == 0) {
+
+		while (1) {
+			char line[CHIRP_LINE_MAX];
+			size_t length;
+
+			if (!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) goto failure;
+			if (sscanf(line, "%zu", &length) != 1) goto failure;
+			if (length == 0) break;
+
+			size++;
+			*list = xxrealloc(*list, sizeof(char *)*(size+1));
+			(*list)[size-1] = xxmalloc(sizeof(char)*(length+1));
+			if (!link_read(c->link, (*list)[size-1], length, stoptime)) goto failure;
+			(*list)[size-1][length] = '\0';
+			(*list)[size] = NULL;
+		}
+
+		return 0;
+failure:
+		if (*list != NULL) {
+			char **tmp = *list;
+			while (tmp[0]) {
+				free(tmp[0]);
+			}
+			free(*list);
+		}
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+
+	return result;
+}
+
+INT64_T chirp_client_ticket_modify (struct chirp_client *c, const char *name, const char *path, const char *aclmask, time_t stoptime)
+{
+	char ticket_subject[CHIRP_LINE_MAX];
+	char safepath[CHIRP_LINE_MAX];
+	ticket_translate(name, ticket_subject);
+	url_encode(path, safepath, sizeof(safepath));
+	INT64_T result = simple_command(c, stoptime, "ticket_modify %s %s %s\n", ticket_subject, safepath, aclmask);
+	if (result == 0) {
+		time_t t;
+		struct tm tm;
+		char now[1024];
+
+		time(&t);
+		localtime_r(&t, &tm);
+		strftime(now, sizeof(now)/sizeof(char), "%c", &tm);
+
+		FILE *file = fopen(name, "a");
+		if (file == NULL) return -1;
+		fprintf(file,"# %s: Set ACL Mask on %s directory = '%s' mask = '%s'.\n",now,c->hostport,path,aclmask);
+		fclose(file);
+	}
+	return result;
 }
 
 INT64_T chirp_client_setacl( struct chirp_client *c, const char *path, const char *user, const char *acl, time_t stoptime )

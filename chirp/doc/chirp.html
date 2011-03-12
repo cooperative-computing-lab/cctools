@@ -703,6 +703,233 @@ same identity you used to authenticate to the Chirp server.
 Thus, it is not necessary for any special accounts to
 be created for visiting users.
 
+<h2>Advanced Topic: Ticket Authentication</h2>
+
+<p>
+  Often a user will want to access a Chirp server storing files for cluster
+  computing jobs but will have difficulty accessing it securely without
+  transferring their credentials with the jobs dispatched to the cluster. To
+  facilitate ease-of-use, users typically solve this by giving rights to a
+  hostname mask (e.g. <em>*.cse.nd.edu</em>) on the Chirp server.  However,
+  this level of access can be innappropriate due to sensitive data.  Instead,
+  these users are forced to use difficult authentication methods such as Globus
+  or Kerberos for running the Chirp server. They may also use a virtual network
+  solution but users typically lack this amount of control on clusters.  To
+  provide an easy solution to this problem, Chirp offers its own ticket based
+  authentication system which is convenient and simple to setup.
+</p>
+
+<p>
+  To start, users may create a ticket for authentication using:
+</p>
+
+<code>chirp &lt;host:port&gt; ticket_create -output myticket.ticket -subject unix:user -bits 1024 -duration 86400 / rl /foo rwl</code>
+
+<p>
+  This command performs multiple tasks in three stages:
+</p>
+
+<p>
+  First, it creates a ticket which is composed of an RSA Private Key with a key
+  (modulus) size of 1024 bits. When we refer to the ticket, we are speaking of
+  this Private Key. By default, the ticket file generated is named
+  <strong>ticket.MD5SUM</strong> where <strong>MD5SUM</strong> is the MD5
+  digest of the Public Key of the ticket.
+</p>
+  
+<p>
+  Once the ticket is created, it is registered with the Chirp server with a
+  validity period in seconds defined by the duration option (86400, or a day).
+  The <code>-subject unix:user</code> switch allows the user to set the ticket
+  for another user; however, only the <strong>chirp_server</strong> superuser
+  (-P) may set tickets for any subject. For regular users, the -subject option
+  is unnecessary as it is by default the subject you possess when registering
+  the ticket. Users who authenticate using this ticket in the future will
+  become this subject with certain masked rights.
+</p>
+  
+<p>
+  Once the ticket is created and registered, we give the ticket a set of
+  <em>ACL masks</em>. The ACL mask will mask the rights of the
+  ticket-authenticated user with the rights of the subject that registered the
+  ticket. For example, if a user named <em>foo</em> (subject is
+  <code>unix:foo</code>) has rights <strong>rwl</strong> in the root
+  directory of the Chirp server and if a ticket is registered for <em>foo</em>
+  with the ACL mask <code>/ rlx</code>, the effective rights of the
+  ticket-authenticated user is <strong>rl</strong> in the root directory.
+</p>
+
+<p>
+  ACL masks are also inherited from parent directories. So, in the above
+  example, the root directory has the ACL mask <strong>rl</strong> while the
+  foo directory has the ACL mask <strong>rwl</strong>. Other nested directories
+  within the root directory also inherit the <strong>rl</strong> mask.
+  Similarly, nested directories of the foo directory inherit the
+  <strong>rwl</strong> mask. We emphasize that the ACL mask does not give
+  rights but limits them. If the user that registers a ticket has no rights in
+  a directory, then neither will the ticket authenticated user.
+</p>
+
+<h3>Authenticating with a ticket</h3>
+
+<p>
+  To authenticate using a ticket, it can be as simple as including the ticket
+  file with your job. Tickets that follow the <strong>ticket.MD5SUM</strong>
+  template are automatically added to the list of tickets to try when
+  authenticating. You can also give specific tickets to authenticate with
+  using a comma-delimited list of ticket filenames in either the
+  <strong>CHIRP_CLIENT_TICKETS</strong> environment variable or via the
+  <strong>-k <tickets></strong> option. Tickets are tried in the order
+  they are specified.
+</p>
+
+<code>chirp &lt;host:port&gt;</code>
+
+<p>
+  The above command will try ticket authentication as a last resort but will
+  use tickets it finds in the current directory following the template.
+</p>
+
+<code>chirp -a ticket -k file.ticket &lt;host:port&gt;</code>
+
+<p>
+  The above command forces ticket authentication and only uses the
+  <strong>file.ticket</strong> ticket to authenticate.
+<p>
+
+<p>
+  Authenticating is this simple. It is important to note that tickets are
+  obviously not protected in any way from theft when you distribute the ticket
+  with jobs in a distributed computing environment (no ticket system can give
+  this guarantee).  Users may want to protect their tickets in basic ways
+  by setting a restrictive file mode and by giving tickets a limited duration
+  on the server.
+</p>
+
+<p>
+  Finally, users should be careful to experiment with small key sizes for a
+  balance of quick authentication and security. Smaller key sizes may be
+  rejected outright by openssl when given a 64 byte challenge to sign. Chirp
+  will not authenticate or use smaller challenge sizes if openssl rejects the
+  ticket.
+</p>
+
+<h3>Manually Registering a Ticket</h3>
+
+<p>
+  A ticket is only useful when registered with a server. The ticket_create
+  command does this for you automatically but you may also wish to register the
+  ticket with multiple servers. To do this, you can manually register a ticket
+  that is already created by using the <code>ticket_register</code> command:
+</p>
+
+<code>chirp &lt;host:port&gt; ticket_register myticket.ticket unix:user 86400</code>
+
+<p>
+  The first argument to <code>ticket_register</code> is the name of the ticket,
+  followed by the subject, and finally the ticket duration.  The second option
+  (the subject) is optional. As described earlier, specifying the subject
+  allows you to register a ticket with a user other than yourself. This is only
+  possible if you are authenticated with the server as the super user.
+</p>
+
+<h3>Modifying the Rights of a Ticket</h3>
+
+<p>
+  You may use the <code>ticket_modify</code> command to change the rights
+  a ticket has in a directory. You are restricted to giving rights to a 
+  ticket you already possess. Recall, however, that the rights are actually
+  a mask that are logically ANDed with the rights the user has at the time.
+<p>
+
+<code>chirp &lt;host:port&gt; ticket_modify myticket.ticket / rl</code>
+
+<p>
+  The above command changes the ACL mask of <code>myticket.ticket</code>
+  to <code>rl</code> in the root directory.
+</p>
+
+<p>
+  A ticket identifier as returned by <code>ticket_list</code> may also
+  be used instead of a ticket filename.
+</p>
+
+<h3>Deleting a Ticket</h3>
+
+<p>
+  Deleting a ticket unregisters the ticket with the server. Additionally,
+  the ticket on the client is deleted.
+</p>
+
+<code>chirp &lt;host:port&gt; ticket_delete myticket.ticket</code>
+
+<p>
+  A ticket identifier as returned by <code>ticket_list</code> may also
+  be used instead of a ticket filename.
+</p>
+
+<h3>Listing the Registered Tickets on the Server</h3>
+
+<p>
+  To list the tickets registered on a server, use the <code>ticket_list</code>
+  command:
+</p>
+
+<code>chirp &lt;host:port&gt; ticket_list unix:user</code>
+
+<p>
+  The subject argument instructs the command to fetch all the tickets belonging
+  to the user. You may also use <code>ticket_list all</code> to list all the
+  tickets of all users on the server. The latter command is only executable by
+  the Chirp super user. The output is a list of tickets identifiers. You can
+  query information about a ticket using these identifiers with the
+  <code>ticket_get</code> command.
+</p>
+
+<h3>Getting a Registered Ticket's Information from the Server</h3>
+
+<p>
+  To check the status of a ticket on a server, you may use the
+  <code>ticket_get</code> command:
+</p>
+
+<code>chirp &lt;host:port&gt; ticket_get myticket.ticket</code>
+
+<p>
+  So long as you own the ticket or are authenticated as the super user, the
+  server will return to you information associated with the ticket.  The ticket
+  must also exist and must also not have expired.  <code>ticket_get</code>
+  takes a client side ticket filename as an argument or a ticket identifier as
+  returned by the <code>ticket_list</code> command.
+</p>
+
+<p>
+  <code>ticket_get</code> prints the subject that owns the ticket,
+  the base64 encoded public key of the ticket, the time left
+  until the ticket expires in seconds, and a variable number of
+  directory and ACL masks. For example, we might have the following
+  output:
+</p>
+
+<pre>
+$ chirp host:port ticket_get myticket.ticket
+unix:pdonnel3
+LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlHZk1BMEdDU3FHU0liM0RRRUJBUVVBQTRHTkFEQ0Jp
+UUtCZ1FEZVoyZWxKYXdlcHBHK0J4SFlaMmlmWFIzNAovU3RhUElta0lmeit4TDZxN21wS2lnMDJQZ2Z5
+emdKRWFjMk50NzJrUlBpOEJWYWdkOHdvSGhWc25YZ1YvNjFPCjVkaG13STNLYWRlYjNUbkZXUUo3bFhh
+anhmVTZZR1hXb2VNY1BsdjVQUWloWm8yWmFXTUUvQVA4WUtnVVphdXcKelI2RkdZWGd6N2RGZzR6Yk9R
+SURBUUFCCi0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=
+5993
+/ rl
+/foo rwl
+</pre>
+
+<p>
+  Note that the base64 encoded public key above is wrapped to fit an 80
+  character width.  All of the information is new-line-delimited.
+</p>
+
+
 <h2>Advanced Topic: HDFS Backend Storage for Chirp</h2>
 
 <p>

@@ -23,6 +23,7 @@ ssize_t full_read( int fd, void *buf, size_t count )
 	ssize_t chunk=0;
 
 	while( count>0 ) {
+
 		chunk = read(fd,buf,count);
 		if(chunk<0) {
 			if(errno==EINTR) {

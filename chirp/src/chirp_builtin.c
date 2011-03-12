@@ -25,6 +25,8 @@ Note that thirdput does not need to check ACLs, because thirdput already
 does so recursively.  All of the rest of the builtin calls must check ACLs.
 */
 
+extern char *chirp_root_path;
+
 extern int chirp_path_fix( char *path );
 
 static int chirp_builtin_path_fix( const char *path, char *newpath )
@@ -48,7 +50,7 @@ static INT64_T chirp_builtin_rmall( const char *subject, const char *path )
 
 	if(!chirp_builtin_path_fix(path,newpath)) return -1;
 
-	if(chirp_acl_check(newpath,subject,CHIRP_ACL_DELETE) || chirp_acl_check_dir(newpath,subject,CHIRP_ACL_DELETE)) {
+	if(chirp_acl_check(chirp_root_path,newpath,subject,CHIRP_ACL_DELETE) || chirp_acl_check_dir(chirp_root_path,newpath,subject,CHIRP_ACL_DELETE)) {
 		return chirp_alloc_rmall(newpath);
 	} else {
 		return -1;
@@ -120,7 +122,7 @@ static INT64_T chirp_builtin_checksum( const char *subject, const char *path )
 
 	if(!chirp_builtin_path_fix(path,newpath)) return -1;
 
-	if(chirp_acl_check(newpath,subject,CHIRP_ACL_READ|CHIRP_ACL_LIST) || chirp_acl_check_dir(newpath,subject,CHIRP_ACL_READ|CHIRP_ACL_LIST)) {
+	if(chirp_acl_check(chirp_root_path,newpath,subject,CHIRP_ACL_READ|CHIRP_ACL_LIST) || chirp_acl_check_dir(chirp_root_path,newpath,subject,CHIRP_ACL_READ|CHIRP_ACL_LIST)) {
 		/* ok to proceed */
 	} else {
 		return -1;
@@ -144,7 +146,7 @@ static INT64_T chirp_builtin_measure( const char *subject, const char *path )
 
 	if(!chirp_builtin_path_fix(path,newpath)) return -1;
 
-	if(chirp_acl_check(newpath,subject,CHIRP_ACL_LIST) || chirp_acl_check_dir(newpath,subject,CHIRP_ACL_LIST)) {
+	if(chirp_acl_check(chirp_root_path,newpath,subject,CHIRP_ACL_LIST) || chirp_acl_check_dir(chirp_root_path,newpath,subject,CHIRP_ACL_LIST)) {
 		/* ok to proceed */
 	} else {
 		return -1;
@@ -172,7 +174,7 @@ static INT64_T chirp_builtin_setacl_recursive( const char *subject, const char *
 	if(result<0) return -1;
 
 	if(S_ISDIR(info.cst_mode)) {
-		if(!chirp_acl_check(path,subject,CHIRP_ACL_ADMIN)) return -1;
+		if(!chirp_acl_check(chirp_root_path,path,subject,CHIRP_ACL_ADMIN)) return -1;
 		if(chirp_acl_set(path,aclsubject,aclflags,0)<0) return -1;
 
 		dir = chirp_alloc_opendir(path);

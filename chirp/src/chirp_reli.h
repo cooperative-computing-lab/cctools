@@ -339,6 +339,14 @@ Note that this function has no timeoutbecause it operates solely on memory struc
 
 void chirp_reli_closedir( struct chirp_dir *dir );
 
+/* FIXME document */
+INT64_T chirp_reli_ticket_create( const char *host, char name[CHIRP_PATH_MAX], unsigned bits, time_t stoptime );
+INT64_T chirp_reli_ticket_register( const char *host, const char *name, const char *subject, time_t duration, time_t stoptime );
+INT64_T chirp_reli_ticket_delete( const char *host, const char *name, time_t stoptime );
+INT64_T chirp_reli_ticket_list( const char *host, const char *subject, char ***list, time_t stoptime );
+INT64_T chirp_reli_ticket_get( const char *host, const char *name, char **subject, char **ticket, time_t *duration, char ***rights, time_t stoptime );
+INT64_T chirp_reli_ticket_modify( const char *host, const char *name, const char *path, const char *aclmask, time_t stoptime );
+
 /** Get an access control list.
 @param host The name and port of the Chirp server to access.
 @param path The pathname of the directory to access.
