@@ -446,7 +446,7 @@ INT64_T chirp_client_ticket_create (struct chirp_client *c, char name[CHIRP_PATH
 	int result;
 
 	if (strlen(name) == 0)
-		result = unsetenv("CHIRP_TICKET");
+		unsetenv("CHIRP_TICKET");
 	else
 		result = setenv("CHIRP_TICKET", name, 1);
 	if (result == -1) return -1;
