@@ -443,7 +443,7 @@ INT64_T chirp_client_ticket_create (struct chirp_client *c, char name[CHIRP_PATH
 		"echo \"Generated ticket $CHIRP_TICKET.\" 1>&2\n"
 		"echo -n \"$CHIRP_TICKET\"\n";
 
-	int result;
+	int result = 0;
 
 	if (strlen(name) == 0)
 		unsetenv("CHIRP_TICKET");
