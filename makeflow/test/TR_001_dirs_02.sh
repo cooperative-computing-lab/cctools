@@ -9,7 +9,7 @@ prepare()
 
 run()
 {
-    exec ../src/makeflow -d all -T wq -p 9091 dirs/testcase.subdir.${i}.makeflow
+    exec ../src/makeflow -d all -T wq -p `cat worker.port` dirs/testcase.subdir.${i}.makeflow
 }
 
 clean()

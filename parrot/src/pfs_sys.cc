@@ -431,7 +431,7 @@ int pfs_socket( int domain, int type, int protocol )
 int pfs_socketpair( int domain, int type, int proto, int *fds)
 {
 	BEGIN
-	debug(D_LIBCALL,"socketpair %d %d",fds[0],fds[1]);
+	debug(D_LIBCALL,"socketpair %d %d %d",domain,type,proto);
 	result = pfs_current->table->socketpair(domain,type,proto,fds);
 	END
 }

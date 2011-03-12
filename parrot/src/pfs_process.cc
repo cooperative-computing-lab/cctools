@@ -82,6 +82,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table,
 	child->new_physical_name[0] = 0;
 	child->pid = pid;
 	child->ppid = ppid;
+	child->tgid = pid;
 	child->state = PFS_PROCESS_STATE_KERNEL;
 	child->flags = PFS_PROCESS_FLAGS_STARTUP;
 	child->seltime.tv_sec = 0;
@@ -214,6 +215,23 @@ static int pfs_process_may_wake( struct pfs_process *parent, struct pfs_process 
 	}
 }
 
+void pfs_process_exit_group( struct pfs_process *child )
+{
+	struct pfs_process *p;
+	int i;
+
+	struct rusage usage;
+	memset(&usage,0,sizeof(usage));
+
+	for(i=0;i<PFS_PID_MAX;i++) {
+		p = table[i];
+		if(p && p!=child && p->tgid == child->tgid) {
+			debug(D_PROCESS,"exiting process %d",p->pid);
+			pfs_process_stop(p,0,usage);
+		}
+	}
+}
+
 /*
 The given process has stopped or completed with this status and rusage.
 If this process has a parent, attempt to inform it, otherwise
@@ -224,6 +242,8 @@ parent ourselves, then cause it to be rescheduled.
 void pfs_process_stop( struct pfs_process *child, int status, struct rusage usage )
 {
 	struct pfs_process *parent;
+
+	if(child->state==PFS_PROCESS_STATE_DONE) return;
 
 	if(WIFEXITED(status) || WIFSIGNALED(status) ) {
 		if(WIFEXITED(status)) {

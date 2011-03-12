@@ -183,7 +183,7 @@ struct list * get_work_queue_masters(const char * catalog_host, int catalog_port
 
             list_first_item(preferred_masters);
             while((pm = (char *)list_next_item(preferred_masters))) {
-				if(strncmp(m->proj, pm, WORK_QUEUE_NAME_MAX) == 0) {
+                if(whole_string_match_regex(m->proj, pm)) {
                     // preferred master found
                     break;
                 }

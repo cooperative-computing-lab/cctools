@@ -52,7 +52,7 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
                 makeflow['start_time'] = int(slist[2])/1000000.0
             elif slist[1] in ['FAILED', 'ABORTED', 'COMPLETED']:
                 makeflow['finished'] = True
-                makeflow['elapsed_time'] = makeflow['start_time'] = int(slist[2])/1000000.0
+                makeflow['elapsed_time'] = int(slist[2])/1000000.0 - makeflow['start_time'] 
                 makeflow['average_task_rate'] = makeflow['total'] / makeflow['elapsed_time']
             continue
         else:
@@ -105,7 +105,7 @@ def parse_makeflowlog(log_path, parse_dag = False):
 
 # Emit text output
 
-def emit_text(makeflow, field_width = 15, progress_width = 60):
+def emit_text(makeflow, field_width=13, progress_width=55):
     tlist = [()]
 
     tlist.append(('makeflow', makeflow['log_path']))

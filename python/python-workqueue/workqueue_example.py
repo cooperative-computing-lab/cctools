@@ -17,7 +17,13 @@ import time
 set_debug_flag('debug')
 set_debug_flag('wq')
 
-wq = WorkQueue(9999, name='workqueue_example', catalog=False, exclusive=False)
+for port in range(9000, 9999):
+    try:
+	wq = WorkQueue(port, name='workqueue_example', catalog=False, exclusive=False)
+	os.system('../../dttools/src/worker -d all localhost %d &' % port)
+	break
+    except Exception:
+    	continue
 
 wq.specify_algorithm(WORK_QUEUE_SCHEDULE_FCFS)
 #wq.specify_name('workqueue_example')

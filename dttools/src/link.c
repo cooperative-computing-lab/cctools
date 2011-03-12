@@ -234,7 +234,7 @@ struct link * link_serve_address( const char *addr, int port )
 	link = link_create();
 	if(!link) goto failure;
 
-	link->fd = socket( PF_INET, SOCK_STREAM, 0 );
+	link->fd = socket( AF_INET, SOCK_STREAM, 0 );
 	if(link->fd<0) goto failure;
 
 	value = 1;
@@ -243,8 +243,14 @@ struct link * link_serve_address( const char *addr, int port )
 	link_window_configure(link);
 
 	if(addr!=0 || port!=LINK_PORT_ANY) {
+
+		memset(&address,0,sizeof(address));
+#if !defined(CCTOOLS_OPSYS_LINUX)
+		address.sin_len = sizeof(address);
+#endif
 		address.sin_family = AF_INET;
 		address.sin_port = htons( port );
+
 		if(addr) {
 			string_to_ip_address(addr,(unsigned char*)&address.sin_addr.s_addr);
 		} else {
@@ -306,6 +312,10 @@ struct link * link_connect( const char *addr, int port, time_t stoptime )
 
 	link_squelch();
 
+	memset(&address,0,sizeof(address));
+#if !defined(CCTOOLS_OPSYS_LINUX)
+	address.sin_len = sizeof(address);
+#endif
 	address.sin_family = AF_INET;
 	address.sin_port = htons(port);
 
@@ -326,12 +336,17 @@ struct link * link_connect( const char *addr, int port, time_t stoptime )
 	debug(D_TCP,"connecting to %s:%d",addr,port);
 
 	do {
-		result = connect( link->fd, (struct sockaddr *) &address, sizeof(address) );
+	        result = connect( link->fd, (struct sockaddr *) &address, sizeof(address) );
 
 		/* On some platforms, errno is not set correctly. */
 		/* If the remote address can be found, then we are really connected. */
+		/* Also, on bsd-derived systems, failure to connect is indicated by a second connect returning EINVAL. */
 
-		if( result<0 && !errno_is_temporary(errno) ) break;
+		if( result<0 && !errno_is_temporary(errno) ) {
+			if(errno==EINVAL) errno = ECONNREFUSED;
+			break;
+		}
+
 		if(link_address_remote(link,link->raddr,&link->rport)) {
 
 			debug(D_TCP,"made connection to %s:%d",link->raddr,link->rport);

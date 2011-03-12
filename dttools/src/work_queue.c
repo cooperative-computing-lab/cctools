@@ -1043,11 +1043,10 @@ struct work_queue * work_queue_create( int port )
 		envstring = getenv("WORK_QUEUE_PORT");
 		if(envstring) {
 			port = atoi(envstring);
-		} else if(getenv("WORK_QUEUE_NAME")) {
-			port = -1;
 		} else {
-			port = WORK_QUEUE_DEFAULT_PORT;
-		}
+            // indicate using a random available port
+			port = -1;
+		} 
 	}
 
 	if(port == -1) {
@@ -1455,9 +1454,10 @@ static int update_catalog(struct work_queue* q)
 
     if(!outgoing_datagram) {
         outgoing_datagram = datagram_create(0);
-        if(!outgoing_datagram)
+        if(!outgoing_datagram) {
             fprintf(stderr, "Couldn't create outgoing udp port, thus work queue master info won't be sent to the catalog server!");
             return 0;
+        }
     }
 
 	port = work_queue_port(q);

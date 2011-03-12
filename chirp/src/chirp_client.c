@@ -1608,8 +1608,8 @@ static INT64_T get_result( struct chirp_client *c, time_t stoptime )
 	fields = sscanf(line,"%lld",&result);
 	if(fields!=1) {
 		errno = ECONNRESET;
-		return -1;
 		c->broken = 1;
+		return -1;
 	}
 
 	result = convert_result(result);
