@@ -25,7 +25,7 @@ static int auth_ticket_assert (struct link *link, struct hash_table *t, time_t s
   /* FIXME need to save errno ? */
   char line[AUTH_LINE_MAX];
 
-  char **tickets;
+  char **tickets=0;
   
   if (t)
 	tickets = (char **) hash_table_lookup(t, "ticket");
