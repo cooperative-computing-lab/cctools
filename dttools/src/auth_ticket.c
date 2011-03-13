@@ -18,7 +18,6 @@
 
 #define DIGEST_LENGTH  (MD5_DIGEST_LENGTH_HEX)
 #define CHALLENGE_LENGTH  (64)
-#define CHALLENGE_LENGTH_STR  "64"
 
 static int auth_ticket_assert (struct link *link, struct hash_table *t, time_t stoptime)
 {
@@ -46,8 +45,8 @@ static int auth_ticket_assert (struct link *link, struct hash_table *t, time_t s
       }
       pclose(digestf);
       debug(D_AUTH, "trying ticket %.*s", DIGEST_LENGTH, digest);
-      if (link_write(link, digest, DIGEST_LENGTH, stoptime) <= 0) return 0;
-      if (link_write(link, "\n", 1, stoptime) <= 0) return 0;
+      if (link_putlstring(link, digest, DIGEST_LENGTH, stoptime) <= 0) return 0;
+      if (link_putliteral(link, "\n", stoptime) <= 0) return 0;
 
       if (link_readline(link, line, sizeof(line), stoptime) <= 0) return 0;
       if (strcmp(line, "declined") == 0) continue;
@@ -104,8 +103,7 @@ static int auth_ticket_assert (struct link *link, struct hash_table *t, time_t s
       }
     }
   }
-  const char *done = "==\n";
-  link_write(link, done, strlen(done), stoptime);
+  link_putliteral(link, "==\n", stoptime);
 
   return 0;
 }
@@ -161,7 +159,7 @@ static int auth_ticket_accept (struct link *link, char **subject, struct hash_ta
             free(command);
             if (pid == 0) break;
 
-            if (!link_write(link, CHALLENGE_LENGTH_STR "\n", strlen(CHALLENGE_LENGTH_STR)+1, stoptime)) break;
+            if (!link_putfstring(link, "%zu\n", stoptime, CHALLENGE_LENGTH)) break;
             if (!link_stream_from_file(link, out, CHALLENGE_LENGTH, stoptime)) break;
 
             if (link_readline(link, line, sizeof(line), stoptime) <= 0) break;
@@ -173,25 +171,21 @@ static int auth_ticket_accept (struct link *link, char **subject, struct hash_ta
 
             if (result == 0) {
               debug(D_AUTH, "succeeded challenge for %s\n", ticket_digest);
-              static const char success[] = "success\n";
-              link_write(link, success, strlen(success), stoptime);
+              link_putliteral(link, "success\n", stoptime);
               status = 1;
               break;
             } else {
               debug(D_AUTH, "failed challenge for %s\n", ticket_digest);
-              static const char *failure = "failure\n";
-              link_write(link, failure, strlen(failure), stoptime);
+              link_putliteral(link, "failure\n", stoptime);
               break;
             }
           } else {
-            const char *declined = "declined\n";
             debug(D_AUTH, "declining key %s", ticket_digest);
-            link_write(link, declined, strlen(declined), stoptime);
+            link_putliteral(link, "declined\n", stoptime);
           }
         } else {
-          const char *declined = "declined\n";
           debug(D_AUTH, "declining key %s", ticket_digest);
-          link_write(link, declined, strlen(declined), stoptime);
+          link_putliteral(link, "declined\n", stoptime);
         }
       } else {
         debug(D_AUTH, "ticket: bad response");
