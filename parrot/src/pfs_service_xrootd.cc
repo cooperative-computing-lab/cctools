@@ -17,6 +17,8 @@ sensitive to this setting.
 
 #define _FILE_OFFSET_BITS 64
 
+#ifdef HAS_XROOTD
+
 #include "pfs_service.h"
 
 extern "C" {
@@ -150,3 +152,4 @@ public:
 static pfs_service_xrootd pfs_service_xrootd_instance;
 pfs_service *pfs_service_xrootd = &pfs_service_xrootd_instance;
 
+#endif
