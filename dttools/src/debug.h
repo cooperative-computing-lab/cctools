@@ -72,9 +72,10 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_WQ	   0x080000000  /**< Debug the Work Queue operations. */
 #define D_BXGRID   0x100000000LL  /**< Debug the BXGRID Module in Parrot. */
 #define D_USER	   0x200000000LL  /**< Debug custom user application. */
+#define D_XROOTD   0x400000000LL  /**< Debug Xrootd module in Parrot */
 
 /** Debug all remote I/O operations. */
-#define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID)
+#define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID|D_XROOTD)
 
 /** Show all debugging info. */
 #define D_ALL      0xfffffffffLL

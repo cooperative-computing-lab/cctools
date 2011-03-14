@@ -76,6 +76,7 @@ static struct flag_info table[] = {
 	{ "irods",    D_IRODS },
 	{ "wq",       D_WQ },
 	{ "user",     D_USER},
+	{ "xrootd",   D_XROOTD},
 	{ "all",      ~0 },
 	{ "time",     0 },	/* backwards compatibility */
 	{ "pid",     0 },	/* backwards compatibility */

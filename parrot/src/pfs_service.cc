@@ -320,6 +320,12 @@ pfs_service * pfs_service_lookup( const char *name )
                 extern pfs_service *pfs_service_bxgrid;
 		return pfs_service_bxgrid;
 #endif
+#ifdef HAS_XROOTD
+        } else if(!strcmp(name,"xrootd")) {
+                extern pfs_service *pfs_service_xrootd;
+        return pfs_service_xrootd;
+
+#endif
 	} else {
 		return 0;
 	}

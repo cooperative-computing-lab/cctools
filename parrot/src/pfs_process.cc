@@ -24,7 +24,7 @@ extern "C" {
 #include <unistd.h>
 #include <string.h>
 
-#define PFS_PID_MAX 65536
+#define PFS_PID_MAX 2100000
 
 static struct pfs_process * table[PFS_PID_MAX] = {0};
 struct pfs_process *pfs_current=0;
