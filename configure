@@ -7,8 +7,8 @@ uname -a
 save_arguments $0 $@
 
 major=3
-minor=3
-micro=0
+minor=2
+micro=2
 
 build_user=`whoami`
 build_host=`uname -n`
