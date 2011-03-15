@@ -7,8 +7,8 @@ uname -a
 save_arguments $0 $@
 
 major=3
-minor=2
-micro=2
+minor=3
+micro=0
 
 build_user=`whoami`
 build_host=`uname -n`
@@ -47,29 +47,17 @@ else
 	echo "skipping parrot, because this system is ${build_sys}, not LINUX"
 fi
 
-install_path="/usr/local"
-grep Fedora /etc/issue > /dev/null 2>&1
-if [ $? -eq 0 ]
-then
-	globus_path="/usr"
-else
-	globus_path="/usr/local"
-fi
+install_path="$HOME/cctools"
+
 krb5_path="/usr"
-gcb_path="/usr/local"
 readline_path="/usr"
-if [ ${build_sys} = DARWIN -o ${build_sys} = FREEBSD ]
-then
-	fuse_path="/usr/local"
-else
-	fuse_path="/usr"
-fi
+globus_path="/usr"
+fuse_path="/usr"
 egee_path="/opt"
 rfio_path="/usr"
 dcap_path="/usr"
 irods_path="/usr"
 hdfs_path="/usr"
-zlib_path="/usr"
 mysql_path="/usr"
 python_path="/usr"
 
@@ -87,17 +75,16 @@ fi
 
 config_readline_path=auto
 config_globus_path=auto
-config_krb5_path=auto
-config_gcb_path=no
 config_fuse_path=auto
+config_mysql_path=auto
+config_python_path=auto
+
+config_krb5_path=no
 config_egee_path=no
 config_rfio_path=no
 config_dcap_path=no
 config_irods_path=no
 config_hdfs_path=no
-config_zlib_path=yes
-config_mysql_path=auto
-config_python_path=auto
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
 then
@@ -127,11 +114,6 @@ do
 			shift
 			krb5_path=$1
 			config_krb5_path=yes
-			;;
-		--with-gcb-path)
-			shift
-			gcb_path=$1
-			config_gcb_path=yes
 			;;
 		--with-readline-path)
 			shift
@@ -168,11 +150,6 @@ do
 			hdfs_path=$1
 			config_hdfs_path=yes
 			;;
-		--with-zlib-path)
-			shift
-			zlib_path=$1
-			config_zlib_path=yes
-			;;
 		--with-mysql-path)
 			shift
 			mysql_path=$1
@@ -200,14 +177,12 @@ Where PACKAGE may be:
     readline
     egee
     krb5
-    gdb
     fuse
     rfio
     dcap
     globus
     irods
     hdfs
-    zlib
     mysql
     python
 EOF
@@ -226,7 +201,7 @@ export IFS
 
 if [ $build_sys = LINUX ]
 then
-	ldflags="-Xlinker -Bstatic -Xlinker --as-needed -lstdc++ -static-libgcc -Xlinker -Bdynamic"
+	ldflags="-Xlinker -Bstatic -Xlinker -lstdc++ -static-libgcc -Xlinker -Bdynamic -Xlinker --as-needed "
 else
 	ldflags="-lstdc++ -static-libgcc"
 fi
@@ -254,6 +229,12 @@ require_path ${cxxcompiler}
 require_path "install"
 require_gnu_make
 
+##########################################################################
+# SWITCH TO STATIC LINKING FOR UNCOMMON THIRD-PARTY PACKAGES
+##########################################################################
+library_search_mode=prefer_static
+##########################################################################
+
 if [ $config_egee_path != no ] && check_file "${egee_path}/lcg/include/lcg_util.h"
 then
 	has_egee=yes
@@ -270,21 +251,6 @@ else
 		exit 1
 	else
 		echo "*** skipping egee support"
-	fi
-fi
-
-if [ $config_gcb_path != no ] && check_file "${gcb_path}/include/GCB.h"
-then
-	ccflags="${ccflags} -DHAS_GCB -I${gcb_path}/include"
-	ldflags="${ldflags} -Wl,--wrap,socket -Wl,--wrap,bind -Wl,--wrap,listen -Wl,--wrap,connect -Wl,--wrap,accept -Wl,--wrap,select -Wl,--wrap,recv -Wl,--wrap,read -Wl,--wrap,recvfrom -Wl,--wrap,send -Wl,--wrap,sendto -Wl,--wrap,write -Wl,--wrap,close -Wl,--wrap,dup -Wl,--wrap,dup2 -Wl,--wrap,getsockname -Wl,--wrap,getsockaddr -Wl,--wrap,getsockopt -Wl,--wrap,execve -L${gcb_path}/lib -lGCB"
-else
-	if [ $config_gcb_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find GCB in $gcb_path"
-		echo "*** Check --with-gcb-path and try again."
-		exit 1
-	else
-		echo "*** skipping gcb support"
 	fi
 fi
 
@@ -345,37 +311,21 @@ else
 			ldflags="${ldflags} -L${globus_path}/lib"
 			for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
 			do
-				libpath="${globus_path}/lib/lib${library}_${globus_flavor}.a"
-				require_file $libpath
-				ldflags="${ldflags} $libpath"
+				library_search ${library}_${globus_flavor} ${globus_path}
 			done
 
-			library_search ssl /usr
-			library_search crypto /usr
-			library_search gssapi_krb5 /usr
-			config_krb5_path=yes
+			cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${globus_path}/lib -lglobus_gss_assist_${globus_flavor}"
 
 		elif check_file ${globus_path}/include/globus/globus_common.h
 		then
-			# Notes about Globus on Fedora...
-			#  o libraries are in /usr/lib/
-			#  o headers are in /usr/include/globus/
-			#  o there is no flavor
-			#  o there are no static libraries
-			#  o globus_config.h is in /usr/lib/globus/include
 			ccflags="${ccflags} -I${globus_path}/lib/globus/include -I${globus_path}/include/globus -DHAS_GLOBUS_GSS"
 			ldflags="${ldflags} -L${globus_path}/lib"
 			for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
 			do
-				libpath="${globus_path}/lib/lib${library}.so"
-				require_file $libpath
-				ldflags="${ldflags} -l${library}"
+				library_search $library ${globus_path}
 			done
 
-			library_search ssl /usr
-			library_search crypto /usr
-			library_search gssapi_krb5 /usr
-			config_krb5_path=yes
+                        cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${globus_path}/lib -lglobus_gss_assist"
 
 		else
 			if [ $config_globus_path = yes ]
@@ -479,21 +429,6 @@ else
 	fi
 fi
 
-if [ $config_readline_path != no ] && library_search readline ${readline_path}
-then
-	if [ ${readline_path} != /usr ]
-	then
-		ccflags="${ccflags} -I${readline_path}/include"
-	fi
-	
-	ccflags="${ccflags} -DHAS_LIBREADLINE"
-
-	library_search ncurses ${readline_path}
-	library_search history ${readline_path}
-else
-	echo "*** skipping readline..."
-fi
-
 if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysql
 then
 	if [ ${mysql_path} != /usr ]
@@ -502,13 +437,6 @@ then
 	fi
 
 	ccflags="${ccflags} -DHAS_MYSQL -DHAS_BXGRID"
-
-	library_search mystrings ${mysql_path} mysql
-	library_search mysys ${mysql_path} mysql
-	library_search ssl /usr
-	library_search crypto /usr
-
-	config_krb5_path=yes
 else
 	if [ $config_mysql_path = yes ]
 	then
@@ -520,37 +448,35 @@ else
 	fi
 fi
 
-# Solaris places kerberos includes in a strange place.
+##########################################################################
+# SWITCH BACK TO DYNAMIC LINKING FOR COMMON SYSTEM LIBRARIES
+##########################################################################
+library_search_mode=prefer_dynamic
+##########################################################################
 
-if [ -d ${krb5_path}/include/kerberosv5 ]
+if [ $config_readline_path != no ] && library_search readline ${readline_path}
 then
-	krb5_include_path=${krb5_path}/include/kerberosv5
-else
-	krb5_include_path=${krb5_path}/include
-fi
-
-if [ $config_krb5_path != no ] && check_file ${krb5_include_path}/krb5.h && library_search krb5 "${krb5_path}"
-then
-	if [ ${krb5_include_path} != /usr/include ]
+	if [ ${readline_path} != /usr ]
 	then
-		ccflags="${ccflags} -I${krb5_include_path}"
+		ccflags="${ccflags} -I${readline_path}/include"
 	fi
-
-	ccflags="${ccflags} -DHAS_KRB5"
 	
-	library_search k5crypto    "${krb5_path}"
-	library_search crypto      "${krb5_path}"
-	library_search com_err     "${krb5_path}"
-	library_search krb5support "${krb5_path}"
-else
-	if [ $config_krb5_path = yes ]
+	ccflags="${ccflags} -DHAS_LIBREADLINE"
+
+	# We rely on the --as-needed flag to figure out what dynamic
+	# libraries are actually used by each executable.
+	# However, libreadline doesn't properly specify a dependency
+	# on ncurses and history, so we must force them to link.
+
+	if [ $build_sys = LINUX ]
 	then
-		echo "*** Sorry, I couldn't find Kerberos in $krb5_path"
-		echo "*** Check --with-krb5-path and try again."
-		exit 1
+		cctools_readline_ldflags="-Xlinker --no-as-needed -lncurses -lhistory -Xlinker --as-needed"
 	else
-		echo "*** skipping krb5 support"
+		library_search ncurses ${readline_path}
+		library_search history ${readline_path}
 	fi
+else
+	echo "*** skipping readline..."
 fi
 
 if [ $config_fuse_path != no ]
@@ -577,17 +503,37 @@ else
 	echo "*** skipping fuse support"
 fi
 
-if [ $config_zlib_path != no ] && library_search z ${zlib_path}
+# Solaris places kerberos includes in a strange place.
+
+if [ -d ${krb5_path}/include/kerberosv5 ]
 then
-	if [ ${zlib_path} != /usr ]
-	then	
-        	ccflags="${ccflags} -I${zlib_path}/include"
+	krb5_include_path=${krb5_path}/include/kerberosv5
+else
+	krb5_include_path=${krb5_path}/include
+fi
+
+library_search ssl    /usr
+library_search crypto /usr
+
+if [ $config_krb5_path != no ] && check_file ${krb5_include_path}/krb5.h && library_search krb5 "${krb5_path}"
+then
+	if [ ${krb5_include_path} != /usr/include ]
+	then
+		ccflags="${ccflags} -I${krb5_include_path}"
 	fi
 
-	ccflags="${ccflags} -DHAS_ZLIB"
+	cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${krb5_path}/lib -lkrb5"
+
+	ccflags="${ccflags} -DHAS_KRB5"
 else
-	echo "*** Sorry, you must have zlib to build this package."
-	exit 1
+	if [ $config_krb5_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find Kerberos in $krb5_path"
+		echo "*** Check --with-krb5-path and try again."
+		exit 1
+	else
+		echo "*** skipping krb5 support"
+	fi
 fi
 
 if [ $config_python_path != no ]
@@ -622,6 +568,32 @@ then
     fi
 fi
 
+linker="gcc"
+
+library_search ssl	/usr
+library_search crypto	/usr
+library_search resolv   /usr
+library_search socket   /usr
+library_search nsl      /usr
+
+# Finally, add in standard system libraries found everywhere
+
+if [ $build_sys != DARWIN ]
+then
+	ldflags="${ldflags} -lrt"
+fi
+
+ldflags="${ldflags} -ldl -lpthread -lz -lc -lm"
+
+if [ $build_sys = DARWIN ]
+then
+	cctools_dynamic_suffix=dylib
+	cctools_dynamic_flag=-dynamiclib
+else
+	cctools_dynamic_suffix=so
+	cctools_dynamic_flag=-shared
+fi
+
 optional_function strsignal /usr/include/string.h HAS_STRSIGNAL
 optional_function pread /usr/include/unistd.h HAS_PREAD
 optional_function pwrite /usr/include/unistd.h HAS_PWRITE
@@ -629,26 +601,6 @@ optional_function pwrite /usr/include/unistd.h HAS_PWRITE
 optional_file /usr/include/sys/statfs.h HAS_SYS_STATFS_H
 optional_file /usr/include/sys/statvfs.h HAS_SYS_STATVFS_H
 optional_file /usr/include/alloca.h HAS_ALLOCA_H
-
-linker="gcc"
-
-library_search crypto   /usr
-library_search selinux  /usr
-library_search sepol    /usr
-library_search keyutils-1.2 /
-library_search resolv   /usr
-library_search socket   /usr
-library_search nsl      /usr
-library_search iconv    /usr
-
-# Finally, add in standard system libraries that are better off being dynamically linked.
-
-if [ $build_sys != DARWIN ]
-then
-	ldflags="${ldflags} -lrt"
-fi
-
-ldflags="${ldflags} -ldl -lpthread -lm -lc"
 
 if check_path doxygen
 then
@@ -670,17 +622,23 @@ CCTOOLS_PACKAGES=${packages}
 CCTOOLS_CC=@echo COMPILE \$@; ${ccompiler}
 CCTOOLS_BASE_CCFLAGS=${ccflags}
 CCTOOLS_INTERNAL_CCFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CCFLAGS}
-CCTOOLS_CCFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include \${CCTOOLS_BASE_CCFLAGS}
+CCTOOLS_CCFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CCFLAGS}
 
 CCTOOLS_CXX=@echo COMPILE \$@; ${cxxcompiler}
 CCTOOLS_BASE_CXXFLAGS=${ccflags}
 CCTOOLS_INTERNAL_CXXFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CXXFLAGS}
-CCTOOLS_CXXFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include \${CCTOOLS_BASE_CXXFLAGS}
+CCTOOLS_CXXFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CXXFLAGS}
 
 CCTOOLS_LD=@echo LINK \$@; ${linker}
 CCTOOLS_BASE_LDFLAGS=${ldflags}
 CCTOOLS_INTERNAL_LDFLAGS= ${internal_ldflags} \${CCTOOLS_BASE_LDFLAGS}
 CCTOOLS_LDFLAGS=-L\${CCTOOLS_INSTALL_DIR}/lib \${CCTOOLS_BASE_LDFLAGS}
+
+CCTOOLS_READLINE_LDFLAGS=${cctools_readline_ldflags}
+
+CCTOOLS_DYNAMIC_SUFFIX=${cctools_dynamic_suffix}
+CCTOOLS_DYNAMIC_FLAG=${cctools_dynamic_flag}
+CCTOOLS_DYNAMIC_AUTH_LIBS=${cctools_dynamic_auth_libs}
 
 CC=\$(CCTOOLS_CC)
 CCFLAGS=\$(CCTOOLS_CCFLAGS)

@@ -3,7 +3,7 @@ include ../../Makefile.rules
 
 TARGETS = parrot parrot_hdfs libparrot.a libparrot_client.a parrot_helper.so parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp parrot_timeout
 
-LOCAL_LDFLAGS=-lchirp -ls3client -ldttools -lftp_lite -ldl ${CCTOOLS_INTERNAL_LDFLAGS}
+LOCAL_LDFLAGS=-lchirp -lchirp_server -ls3client -ldttools -lftp_lite -ldl ${CCTOOLS_INTERNAL_LDFLAGS}
 
 all: ${TARGETS}
 

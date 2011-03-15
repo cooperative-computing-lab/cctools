@@ -19,6 +19,8 @@ extern "C" {
 #include "xmalloc.h"
 #include "create_dir.h"
 #include "file_cache.h"
+#include "md5.h"
+#include "sort_dir.h"
 #include "password_cache.h"
 #include "debug.h"
 #include "getopt.h"
@@ -258,6 +260,7 @@ static void show_use( const char *cmd )
 	if(pfs_service_lookup("hdfs"))		printf(" hdfs");
 	if(pfs_service_lookup("bxgrid"))	printf(" bxgrid");
 	if(pfs_service_lookup("s3"))		printf(" s3");
+	if(pfs_service_lookup("xrootd"))        printf(" xrootd");
 	printf("\n");
 	exit(1);
 }
@@ -553,7 +556,7 @@ int main( int argc, char *argv[] )
 
 	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
 
-	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DE:FfG:HkKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
+	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DE:FfG:Hi:kKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
 		switch(c) {
 		case 'a':
 			if(!auth_register_byname(optarg)) {

@@ -1,23 +1,47 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-TARGETS = chirp_server chirp_server_hdfs chirp_get chirp_put libchirp.a chirp chirp_benchmark chirp_status chirp_fuse chirp_distribute chirp_md5sum chirp_stream_files
 LOCAL_LDFLAGS = -ldttools -lchirp ${CCTOOLS_INTERNAL_LDFLAGS}
 
-LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_types.c chirp_acl.c chirp_local.c chirp_group.c chirp_hdfs.c chirp_filesystem.c
+LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_types.c
+SERVER_SOURCES = chirp_stats.c chirp_job.c chirp_builtin.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chirp_acl.c chirp_group.c chirp_filesystem.c chirp_hdfs.c chirp_local.c
 
-OBJECTS = ${LIBRARY_SOURCES:%.c=%.o}
+PROGRAMS=chirp chirp_get chirp_put chirp_server chirp_server_hdfs chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute chirp_md5sum
+SCRIPTS=chirp_audit_cluster
+LIBRARIES=libchirp.a libchirp_client.${CCTOOLS_DYNAMIC_SUFFIX}
+HEADERS=chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h
+
+TARGETS = ${PROGRAMS} ${LIBRARIES}
+LIBRARY_OBJECTS = ${LIBRARY_SOURCES:%.c=%.o}
+SERVER_OBJECTS = ${SERVER_SOURCES:%.c=%.o}
 
 all: ${TARGETS}
 
-libchirp.a: ${OBJECTS}
+# This is the library intended to be used by clients of the system.
+
+libchirp.a: ${LIBRARY_OBJECTS}
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
 
-chirp: chirp_tool.o libchirp.a
-	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
+# This library contains only sources used by the server, and the
+# parts of the server needed by Parrot to implement identity boxing.
 
-chirp_server: chirp_server.o chirp_stats.o chirp_job.o chirp_builtin.o chirp_thirdput.o chirp_alloc.o chirp_audit.o libchirp.a
+libchirp_server.a: ${SERVER_OBJECTS}
+	${CCTOOLS_AR} rv $@ $^
+	ranlib $@
+
+# This object exists primarily to get a linkable object for use
+# by ROOT and other systems that want to load Chirp dynamically.
+# Note that we explicitly include auth_all.o and ${CCTOOLS_DYNAMIC_AUTH_LIBS}
+# to force the inclusion of the various authentication infrastructures.
+
+libchirp_client.${CCTOOLS_DYNAMIC_SUFFIX}: ${LIBRARY_OBJECTS} ../../dttools/src/auth_all.o
+	${CCTOOLS_LD} ${CCTOOLS_DYNAMIC_FLAG} -o $@ $^ ../../dttools/src/libdttools.a ${CCTOOLS_DYNAMIC_AUTH_LIBS}
+
+chirp: chirp_tool.o libchirp.a
+	${CCTOOLS_LD} -o $@ $^ ${CCTOOLS_READLINE_LDFLAGS} ${LOCAL_LDFLAGS}
+
+chirp_server: chirp_server.o libchirp.a libchirp_server.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 chirp_server_hdfs: ../../hdfs-setup.template
@@ -61,32 +85,16 @@ chirp_stream_files: chirp_stream_files.o libchirp.a
 test:	all
 
 clean:
-	rm -f core *~ *.o *.os *.a *.so ${TARGETS}
+	rm -f core *~ *.o *.os *.a *.${CCTOOLS_DYNAMIC_SUFFIX} ${TARGETS}
 
 install: all
 	install -d ${CCTOOLS_INSTALL_DIR}
 	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install -d ${CCTOOLS_INSTALL_DIR}/etc
-	install -d ${CCTOOLS_INSTALL_DIR}/include
 	install -d ${CCTOOLS_INSTALL_DIR}/lib
-	install chirp ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_get ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_put ${CCTOOLS_INSTALL_DIR}/bin
+	install -d ${CCTOOLS_INSTALL_DIR}/include
+	install -d ${CCTOOLS_INSTALL_DIR}/include/cctools
 	if [ -f ${CCTOOLS_INSTALL_DIR}/bin/chirp_server ]; then mv ${CCTOOLS_INSTALL_DIR}/bin/chirp_server ${CCTOOLS_INSTALL_DIR}/bin/chirp_server.old; fi
-	install chirp_server ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_server_hdfs ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_status ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_benchmark ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_stream_files ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_fuse ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_audit_cluster ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_distribute ${CCTOOLS_INSTALL_DIR}/bin
-	install chirp_md5sum ${CCTOOLS_INSTALL_DIR}/bin
-	install libchirp.a ${CCTOOLS_INSTALL_DIR}/lib
-	install chirp_global.h ${CCTOOLS_INSTALL_DIR}/include
-	install chirp_multi.h ${CCTOOLS_INSTALL_DIR}/include
-	install chirp_reli.h ${CCTOOLS_INSTALL_DIR}/include
-	install chirp_client.h ${CCTOOLS_INSTALL_DIR}/include
-	install chirp_protocol.h ${CCTOOLS_INSTALL_DIR}/include
-	install chirp_matrix.h ${CCTOOLS_INSTALL_DIR}/include
-	install chirp_types.h ${CCTOOLS_INSTALL_DIR}/include
+	for file in ${PROGRAMS} ${SCRIPTS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; done
+	for file in ${LIBRARIES} ; do install $$file ${CCTOOLS_INSTALL_DIR}/lib/$$file ; done
+	for file in ${HEADERS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/include/cctools/$$file ; done
+
