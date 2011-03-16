@@ -366,6 +366,6 @@ const char * md5_string( unsigned char digest[16] )
 	for(i=0;i<16;i++) {
 		sprintf(&str[i*2],"%02x",(unsigned)digest[i]);
 	}
-	str[33] = 0;
+	str[32] = 0;
 	return str;
 }
