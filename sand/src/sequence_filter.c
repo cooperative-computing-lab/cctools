@@ -440,7 +440,7 @@ void find_minimizers(int seq_num)
 	int j;
 
 	memset(&abs_min,0,sizeof(abs_min));
-	abs_min.value = ULLONG_MAX;
+	abs_min.value = MINIMIZER_MAX;
 	abs_min.dir = 0;
 
 	// First, just populate the first window and get the first minimizer.
