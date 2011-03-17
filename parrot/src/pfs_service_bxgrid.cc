@@ -600,7 +600,7 @@ public:
 	}
 
 	virtual int lstat( pfs_name *name, struct pfs_stat *buf ) {
-		int result;
+		int result = -1;
 		MYSQL *mysql_cxn = (MYSQL *)pfs_service_connect_cache(name);
 
 		debug(D_BXGRID, "lstat %s", name->rest);

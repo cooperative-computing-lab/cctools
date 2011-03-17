@@ -366,7 +366,7 @@ static void show_help(const char *cmd) {
 int main( int argc, char *argv[] ) {
 	const char *host = NULL;
     char *pm;
-	int port;
+	int port = WORK_QUEUE_DEFAULT_PORT;
 	char actual_addr[LINK_ADDRESS_MAX];
 	int actual_port;
 	struct link *master=0;

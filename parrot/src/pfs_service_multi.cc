@@ -187,12 +187,10 @@ public:
 
 	virtual int chdir( pfs_name *name, char *newname ) {
 		int result=-1;
-		char tmp[PFS_PATH_MAX];
 		struct pfs_stat statbuf;
 		if(this->stat(name,&statbuf)>=0) {
 			if(S_ISDIR(statbuf.st_mode)) {
-				tmp[result] = 0;
-				sprintf(newname,"/%s/%s:%d%s",name->service_name,name->hostport,name->port,tmp);
+				sprintf(newname,"/%s/%s:%d%s",name->service_name,name->hostport,name->port,name->rest);
 				result = 0;
 			} else {
 				errno = ENOTDIR;
