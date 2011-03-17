@@ -88,7 +88,7 @@ version of the All-Pairs abstraction which allows the users to easily apply the
 All-Pairs abstraction on clusters, grids or clouds.
 <p>
 To use the All-Pairs Work Queue version, you will need to start a All-Pairs
-master program called <tt>allpairs_master</tt> and a bunch of workers.
+master program called <tt>allpairs_master</tt> and a number of workers.
 The workers will perform the tasks distributed by the master and return the
 results to the master. The individual tasks that the master program distributes
 are sub-matrix computation tasks and all the tasks would be performed by the
@@ -106,7 +106,7 @@ Let's suppose the master is running on a machine named <tt>barney.nd.edu</tt>.
 If you have access to login to other machines, you could simply start
 worker processes by hand on each one, like this:
 <pre>
-% worker barney.nd.edu 9123
+% work_queue_worker barney.nd.edu 9123
 </pre>
 If you have access to a batch system like <a href=http://www.cs.wisc.edu/condor>Condor</a>, you can submit multiple workers at once:
 <pre>
@@ -128,7 +128,7 @@ number that the master process uses. If you use the '-p' option in the
 <tt>allpairs_master</tt> to change the listening port, you will need to
 modify the port argument in the starting worker command accordingly.
 
-<p>Once the workers begin running, the <tt>allpairs_master</tt> can dispatch tasks
+<p>Once the workers are running, the <tt>allpairs_master</tt> can dispatch tasks
 to each one very quickly.  If a worker should fail, Work Queue will retry the
 work elsewhere, so it is safe to submit many workers to an unreliable
 system.</p>

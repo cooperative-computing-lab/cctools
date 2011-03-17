@@ -39,15 +39,15 @@ static void show_help(const char *cmd)
 	printf("  -S <scratch>   Scratch directory. (default is /tmp/${USER}-workers)\n");
 	printf("  -T <type>      Batch system type: unix, condor, sge, workqueue, xgrid. (default is unix)\n");
 	printf("  -r <count>     Number of attemps to retry if failed to submit a worker.\n");
-	printf("  -W <path>      Path to worker executable.\n");
+	printf("  -W <path>      Path to the work_queue_worker executable.\n");
 	printf("  -h             Show this screen.\n");
 	printf("\n");
 	printf("where worker options are:\n");
-	printf("  -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
+	printf("  -a             Enable auto mode. In this mode the workers would ask a catalog server for available masters.\n");
 	printf("  -t <time>      Abort after this amount of idle time.\n");
 	printf("  -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	printf("  -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
-	printf("  -s             Run as a shared worker. By default the worker would only work on preferred projects.\n");
+	printf("  -s             Run as a shared worker. By default the workers would only work for preferred projects.\n");
 	printf("  -o <file>      Send debugging to this file.\n");
 }
 
@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
         // Locate the worker program
 	if (strlen(worker_path) > 0) {
 		if (access(worker_path, R_OK | X_OK) < 0) {
-			fprintf(stderr, "Inaccessible worker specified: %s\n", worker_path);
+			fprintf(stderr, "Inaccessible work_queue_worker specified: %s\n", worker_path);
 			return EXIT_FAILURE;
 		}
 	} else {
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
 			return EXIT_FAILURE;
 		}
 	}
-	debug(D_DEBUG, "worker path: %s", worker_path);
+	debug(D_DEBUG, "work_queue_worker path: %s", worker_path);
 
         // Create a tmp directory to hold all workers' runtime information
 	if (strlen(scratch_dir) <= 0) {

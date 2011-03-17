@@ -55,7 +55,7 @@ fi
 worker=`which work_queue_worker 2>/dev/null`
 if [ $? != 0 ]
 then
-	echo "$0: please add 'worker' to your PATH."
+	echo "$0: please add 'work_queue_worker' to your PATH."
 	exit 1
 fi
 

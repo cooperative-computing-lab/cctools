@@ -46,7 +46,7 @@ To start your Makeflow with Work Queue on port 9123:
 
 Then, start as many workers as you like on whatever machines you
 have available.  You can ssh to another machine and run:
-    worker servername 9123
+    work_queue_worker servername 9123
 
 Or, you can submit 100 workers to Condor like this:
     condor_submit_workers servername 9123 100

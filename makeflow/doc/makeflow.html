@@ -161,7 +161,7 @@ Or, submit 10 worker processes to SGE like this:
 
 Or, you can start workers manually on any other machine you can log into:
 <pre>
-% worker barney.nd.edu 9123
+% work_queue_worker barney.nd.edu 9123
 </pre>
 
 Once the workers begin running, Makeflow will dispatch multiple
@@ -271,7 +271,7 @@ preference on "proj1".  If the '-e' option is not specified, the master would
 accept shared workers submitted by anyone. To add a project preference for the
 worker, add the '-N' option to the worker as well:
 <pre>
-% worker -N proj1 barney.nd.edu 9123
+% work_queue_worker -N proj1 barney.nd.edu 9123
 </pre>
 You can even assign mulitple preferred project names to a single worker. The
 worker would only work for the master whose name is contained in the list of
@@ -301,7 +301,7 @@ masters and workers contact this catalog server, add the '-C hostname:port'
 option to both the master and worker programs: 
 <pre>
 % makeflow -T wq -C barney.nd.edu:9097 -N proj1 example.makeflow
-% worker -C barney.nd.edu:9097 -s
+% work_queue_worker -C barney.nd.edu:9097 -s
 </pre>
 The '-C' option turns on the catalog mode. Note that the '-s' option in the
 above worker command tells the worker to run in a shared worker mode, as
@@ -316,7 +316,7 @@ catalog mode in this case you will use the '-a' option, again on both the
 master and worker programs.
 <pre>
 % makeflow -T wq -a -N proj1 example.makeflow
-% worker -a -N proj1 -N proj2 -N proj3
+% work_queue_worker -a -N proj1 -N proj2 -N proj3
 </pre>
 Note that this time the worker is not run with the '-s' option. Instead, it
 has three preferred projects. The worker would ask the catalog server for
