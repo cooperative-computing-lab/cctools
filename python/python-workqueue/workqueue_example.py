@@ -20,7 +20,7 @@ set_debug_flag('wq')
 for port in range(9000, 9999):
     try:
 	wq = WorkQueue(port, name='workqueue_example', catalog=False, exclusive=False)
-	os.system('../../dttools/src/worker -d all localhost %d &' % port)
+	os.system('../../dttools/src/work_queue_worker -d all localhost %d &' % port)
 	break
     except Exception:
     	continue

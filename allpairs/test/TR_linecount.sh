@@ -8,7 +8,7 @@ portfile=worker.port
 prepare()
 {
     workerport=`find_free_port`
-    ../../dttools/src/worker -d all localhost $workerport &
+    ../../dttools/src/work_queue_worker -d all localhost $workerport &
     workerpid=$!
     echo $workerpid > $pidfile
     echo $workerport > $portfile

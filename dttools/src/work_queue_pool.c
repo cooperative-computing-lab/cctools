@@ -149,8 +149,8 @@ int main(int argc, char *argv[])
 			return EXIT_FAILURE;
 		}
 	} else {
-		if (!find_executable("worker", "PATH", worker_path, PATH_MAX)) {
-			fprintf(stderr, "Please add worker to your PATH or specify it explicitly.\n");
+		if (!find_executable("work_queue_worker", "PATH", worker_path, PATH_MAX)) {
+			fprintf(stderr, "Please add work_queue_worker to your PATH or specify it explicitly.\n");
 			return EXIT_FAILURE;
 		}
 	}
@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
         // filesystem (other than afs, etc.) because condor might not be able
         // to access your shared file system
         char new_worker_path[PATH_MAX];
-        snprintf(new_worker_path, PATH_MAX, "%s/worker", scratch_dir);
+        snprintf(new_worker_path, PATH_MAX, "%s/work_queue_worker", scratch_dir);
 	ifs = fopen(worker_path, "r");
 	if (!ifs) {
 		fprintf(stderr, "Unable to open %s for reading: %s\n", worker_path, strerror(errno));
@@ -180,7 +180,7 @@ int main(int argc, char *argv[])
 	}
 	ofs = fopen(new_worker_path, "w+");
 	if (!ofs) {
-		fprintf(stderr, "Unable to open %s/worker for writing: %s", scratch_dir, strerror(errno));
+		fprintf(stderr, "Unable to open %s/work_queue_worker for writing: %s", scratch_dir, strerror(errno));
 		return EXIT_FAILURE;
 	}
 	copy_stream_to_stream(ifs, ofs);

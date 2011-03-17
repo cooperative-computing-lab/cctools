@@ -14,7 +14,7 @@ prepare()
 
     # start a worker
     workerport=`find_free_port`
-    ../../dttools/src/worker localhost $workerport &
+    ../../dttools/src/work_queue_worker localhost $workerport &
     workerpid=$!
 
     echo $workerpid  > worker.pid
