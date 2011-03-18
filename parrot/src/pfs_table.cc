@@ -552,12 +552,14 @@ int pfs_table::poll( struct pollfd *ufds, unsigned int nfds, int timeout )
 	for(i=0;i<nfds;i++) {
 		int fd = ufds[i].fd;
 		if(fd<0 || fd>=pointer_count || pointers[fd]==0) {
+			debug(D_POLL,"index %d fd %d is invalid",i,fd);
 			continue;
 			/* will fill in POLLNVAL later */
 		} else {
 			if(ufds[i].events&POLLIN)  FD_SET(fd,&rfds);
 			if(ufds[i].events&POLLOUT) FD_SET(fd,&wfds);
 			if(ufds[i].events&POLLERR) FD_SET(fd,&efds);
+			debug(D_POLL,"index %d fd %d has events %d",i,fd,ufds[i].events);
 		}
 		maxfd = MAX(maxfd,fd+1);
 	}
