@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#if !defined(CHIRP_HDFS_H) && HAS_HDFS
+#ifndef CHIRP_HDFS_H
 #define CHIRP_HDFS_H
 
 #include "chirp_client.h"

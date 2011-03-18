@@ -310,11 +310,9 @@ pfs_service * pfs_service_lookup( const char *name )
                 extern pfs_service *pfs_service_irods;
 		return pfs_service_irods;
 #endif
-#ifdef HAS_HDFS
         } else if(!strcmp(name,"hdfs")) {
                 extern pfs_service *pfs_service_hdfs;
 		return pfs_service_hdfs;
-#endif
 #ifdef HAS_BXGRID
         } else if(!strcmp(name,"bxgrid")) {
                 extern pfs_service *pfs_service_bxgrid;

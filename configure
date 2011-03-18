@@ -57,7 +57,6 @@ egee_path="/opt"
 rfio_path="/usr"
 dcap_path="/usr"
 irods_path="/usr"
-hdfs_path="/usr"
 mysql_path="/usr"
 python_path="/usr"
 xrootd_path="/usr"
@@ -86,7 +85,6 @@ config_egee_path=no
 config_rfio_path=no
 config_dcap_path=no
 config_irods_path=no
-config_hdfs_path=no
 config_xrootd_path=no
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
@@ -148,11 +146,6 @@ do
 			irods_path=$1
 			config_irods_path=yes
 			;;
-		--with-hdfs-path)
-			shift
-			hdfs_path=$1
-			config_hdfs_path=yes
-			;;
 		--with-mysql-path)
 			shift
 			mysql_path=$1
@@ -195,7 +188,6 @@ Where PACKAGE may be:
     dcap
     globus
     irods
-    hdfs
     mysql
     python
     xrootd
@@ -367,79 +359,6 @@ else
 		exit 1
 	else
 		echo "*** skipping irods support"
-	fi
-fi
-
-# Create a blank file so Make does not fail if HDFS is not enabled.
-touch hdfs-setup.template
-if [ $config_hdfs_path != no ] && check_file "${hdfs_path}/src/c++/libhdfs/hdfs.h"
-then
-	if [ X$JAVA_HOME = X ]
-	then
-		echo "*** Please set JAVA_HOME to the Java installation that you use with Hadoop."
-		exit 1
-	fi
-
-	# Make a HDFS Environment Setup Script Template
-	# Automatically sets JAVA_HOME and HADOOP_HOME for the user if absent.
-	HDFS_TEMPLATE='#!/bin/sh
-
-if [ -z "$JAVA_HOME" ]; then
-  JAVA_HOME="'"$JAVA_HOME"'"
-fi
-export JAVA_HOME
-
-if [ -z "$HADOOP_HOME" ]; then
-  HADOOP_HOME="'"$hdfs_path"'"
-fi
-export HADOOP_HOME
-
-if [ -z $CLASSPATH ]; then
-  CLASSPATH=${JAVA_HOME}/jdk/jre/lib
-else
-  CLASSPATH=${CLASSPATH}:${JAVA_HOME}/jdk/jre/lib
-fi
-CLASSPATH=${CLASSPATH}:`ls ${HADOOP_HOME}/hadoop-*-core.jar | head -n 1`
-CLASSPATH=${CLASSPATH}:${HADOOP_HOME}/conf
-for f in ${HADOOP_HOME}/lib/*.jar; do
-  CLASSPATH=${CLASSPATH}:$f
-done
-export CLASSPATH
-
-if [ -z $LIBJVM_PATH ]; then
-  LIBJVM_PATH=`find $JAVA_HOME -follow -name libjvm.so | head -1l`
-  if [ -z $LIBJVM_PATH ]; then
-    echo 2>&1 "Sorry but could not find libjvm.so anywhere under JAVA_HOME"
-    exit 1
-  fi
-fi
-export LIBJVM_PATH
-
-if [ -z $LIBHDFS_PATH ]; then
-  if [ `uname -m` = x86_64 ]; then
-    LIBHDFS_PATH="$HADOOP_HOME/c++/`uname`-amd64-64/lib/libhdfs.so"
-  else
-    LIBHDFS_PATH="$HADOOP_HOME/c++/`uname`-i386-32/lib/libhdfs.so"
-  fi
-  if [ ! -e $LIBHDFS_PATH ]; then
-    echo 2>&1 "Sorry but could not find libhdfs.so anywhere under HADOOP_HOME"
-    exit 1
-  fi
-fi
-export LIBHDFS_PATH
-
-'
-	echo -n "$HDFS_TEMPLATE" > hdfs-setup.template
-	ccflags="${ccflags} -I ${hdfs_path}/src/c++/libhdfs -DHAS_HDFS"
-	ccflags="${ccflags} -I ${JAVA_HOME}/include -I ${JAVA_HOME}/include/`echo $build_sys | tr \[A-Z\] \[a-z\]`"
-else
-	if [ $config_hdfs_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find HDFS in $hdfs_path"
-		echo "*** Check --with-hdfs-path and try again."
-		exit 1
-	else
-		echo "*** skipping hdfs support"
 	fi
 fi
 

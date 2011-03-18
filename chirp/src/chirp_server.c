@@ -507,12 +507,8 @@ int main( int argc, char *argv[] )
 				chirp_backend_storage_type = "local";
 				cfs = &chirp_local_fs;
             } else if (strcmp(optarg, "hdfs") == 0) {
-#ifdef HAS_HDFS
 				cfs = &chirp_hdfs_fs;
 				chirp_backend_storage_type = "hdfs";
-#else
-				fatal("hdfs was not included; re-configure with hdfs");
-#endif /* HAS_HDFS */
             } else
 			  fatal("unknown filesystem: '%s'", optarg);
 			break;
@@ -520,7 +516,6 @@ int main( int argc, char *argv[] )
 			chirp_transient_path = optarg;
 			break;
 		case 'x':
-#ifdef HAS_HDFS
 		{
 			char *delim;
 			chirp_hdfs_hostname = optarg;
@@ -530,9 +525,6 @@ int main( int argc, char *argv[] )
 			if ((chirp_hdfs_port = (UINT16_T) strtol(delim+1, NULL, 10)) == 0)
 			  fatal("-x hostname:port -> port is not a positive integer");
 		}
-#else
-			fatal("-x not supported without hdfs installed");
-#endif
 			break;
 		case 'h':
 		default:
@@ -541,10 +533,8 @@ int main( int argc, char *argv[] )
 		}
 	}
 
-#ifdef HAS_HDFS
 	if (cfs == &chirp_hdfs_fs && chirp_hdfs_hostname == NULL)
 		fatal("hostname and port must be specified, use -x option");
-#endif
 
 	if (!create_dir(chirp_transient_path, 0711))
 		fatal("could not create transient data directory '%s'", chirp_transient_path);
@@ -616,11 +606,9 @@ int main( int argc, char *argv[] )
 	chirp_stats_init();
 
 	if(root_quota>0) {
-#ifdef HAS_HDFS
 		if (cfs == &chirp_hdfs_fs) /* using HDFS? Can't do quotas : / */
 			fatal("Cannot use quotas with HDFS\n");
 		else
-#endif
 			chirp_alloc_init(chirp_root_path,root_quota);
 	}
 
@@ -1269,9 +1257,7 @@ static void chirp_handler( struct link *l, const char *subject )
 			}
 		} else if(sscanf(line,"thirdput %s %s %s",path,hostname,newpath)==3) {
 			if(!chirp_path_fix(path)) goto failure;
-#ifdef HAS_HDFS
 			if(cfs == &chirp_hdfs_fs) goto failure;
-#endif
 
 			/* ACL check will occur inside of chirp_thirdput */
 

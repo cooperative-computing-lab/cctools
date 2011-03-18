@@ -5,8 +5,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifdef HAS_HDFS
-
 #include "pfs_dircache.h"
 #include "pfs_table.h"
 #include "pfs_service.h"
@@ -14,9 +12,8 @@ See the file COPYING for details.
 extern "C" {
 #include "debug.h"
 #include "hash_table.h"
+#include "hdfs_library.h"
 }
-
-#include "hdfs.h"
 
 #include <string.h>
 #include <unistd.h>
@@ -41,96 +38,16 @@ extern int pfs_enable_small_file_optimizations;
 
 #define HDFS_END debug(D_HDFS,"= %d %s",(int)result,((result>=0) ? "" : strerror(errno))); return result;
 
-#define HDFS_LOAD_FUNC(func, func_name, func_sig) \
-	do { \
-		char *errmsg = dlerror(); \
-		debug(D_HDFS, "loading function %s", func_name); \
-		hdfs->func = (func_sig)dlsym(handle, func_name); \
-		if ((errmsg = dlerror()) != NULL) { \
-			debug(D_HDFS, "= %s", errmsg); \
-			return -1; \
-		} \
-		debug(D_HDFS, "= %lld", hdfs->func); \
-	} while (0);
-
-struct hdfs_services {
-	hdfsFS          (*connect)      (const char *, tPort);
-	int             (*disconnect)   (hdfsFS);
-	hdfsFileInfo*   (*listdir)      (hdfsFS, const char *, int *);
-	hdfsFile	(*open)		(hdfsFS, const char *, int, int, short, tSize);
-	int		(*close)	(hdfsFS, hdfsFile);
-	int		(*flush)	(hdfsFS, hdfsFile);
-	tSize		(*read)		(hdfsFS, hdfsFile, tOffset, void *, tSize);
-	tSize		(*write)	(hdfsFS, hdfsFile, const void *, tSize);
-	int		(*exists)	(hdfsFS, const char *);
-	int		(*mkdir)	(hdfsFS, const char *);
-	int		(*unlink)	(hdfsFS, const char *);
-	int		(*rename)	(hdfsFS, const char *, const char *);
-	hdfsFileInfo*	(*stat)		(hdfsFS, const char *);
-	void		(*free_stat)	(hdfsFileInfo *, int);
-	char***		(*get_hosts)	(hdfsFS, const char *, tOffset, tOffset);
-	void		(*free_hosts)	(char ***);
-};
-
-/* TODO: Clean up handles? */
-static int load_hdfs_services(struct hdfs_services *hdfs)
-{
-	void *handle;
-
-	if(!getenv("JAVA_HOME") || !getenv("HADOOP_HOME") || !getenv("CLASSPATH") || !getenv("LIBHDFS_PATH") || !getenv("LIBJVM_PATH")) {
-		static int did_hdfs_warning=0;
-		if(!did_hdfs_warning) {
-			fprintf(stderr,"Sorry, to use Parrot with HDFS, you need to set up Java and Hadoop first.\n");
-			fprintf(stderr,"Set JAVA_HOME, HADOOP_HOME, CLASSPATH, LIBHDFS_PATH, and LIBJVM_PATH appropriately.\n");
-			fprintf(stderr,"Or just run parrot_hdfs, which sets up everything for you.\n");
-			did_hdfs_warning = 1;
-		}
-		errno = ENOSYS;		
-		return -1;
-	}
-	
-	handle = dlopen(getenv("LIBJVM_PATH"), RTLD_LAZY);
-	if (!handle) {
-		debug(D_NOTICE|D_HDFS, "%s", dlerror());
-		return -1;
-	}
-
-	handle = dlopen(getenv("LIBHDFS_PATH"), RTLD_LAZY);
-	if (!handle) {
-		debug(D_NOTICE|D_HDFS, "%s", dlerror());
-		return -1;
-	}
-
-	HDFS_LOAD_FUNC(connect,    "hdfsConnect",       void*(*)(const char*, tPort))
-	HDFS_LOAD_FUNC(disconnect, "hdfsDisconnect",    int(*)(void*)) 
-	HDFS_LOAD_FUNC(listdir,    "hdfsListDirectory", hdfsFileInfo *(*)(void*, const char*, int*))
-	HDFS_LOAD_FUNC(open,       "hdfsOpenFile",	hdfsFile(*)(hdfsFS, const char *, int, int, short, tSize))
-	HDFS_LOAD_FUNC(close,      "hdfsCloseFile",	int(*)(hdfsFS, hdfsFile))
-	HDFS_LOAD_FUNC(flush,      "hdfsFlush",		int(*)(hdfsFS, hdfsFile))
-	HDFS_LOAD_FUNC(read,       "hdfsPread",		tSize(*)(hdfsFS, hdfsFile, tOffset, void *, tSize))
-	HDFS_LOAD_FUNC(write,      "hdfsWrite",		tSize(*)(hdfsFS, hdfsFile, const void *, tSize))
-	HDFS_LOAD_FUNC(exists,     "hdfsExists",	int(*)(hdfsFS, const char *))
-	HDFS_LOAD_FUNC(mkdir,      "hdfsCreateDirectory", int(*)(hdfsFS, const char *))
-	HDFS_LOAD_FUNC(unlink,     "hdfsDelete",	int(*)(hdfsFS, const char *))
-	HDFS_LOAD_FUNC(rename,     "hdfsRename",	int(*)(hdfsFS, const char *, const char *))
-	HDFS_LOAD_FUNC(stat,	   "hdfsGetPathInfo",	hdfsFileInfo *(*)(hdfsFS, const char *))
-	HDFS_LOAD_FUNC(free_stat,  "hdfsFreeFileInfo",	void(*)(hdfsFileInfo *, int))
-	HDFS_LOAD_FUNC(get_hosts,  "hdfsGetHosts",	char ***(*)(hdfsFS, const char *, tOffset, tOffset))
-	HDFS_LOAD_FUNC(free_hosts, "hdfsFreeHosts",	void(*)(char ***))
-
-	return 0;
-}
-
 static pfs_dircache hdfs_dircache;
 
 class pfs_file_hdfs : public pfs_file
 {
 private:
-	struct hdfs_services *hdfs;
+	struct hdfs_library *hdfs;
 	hdfsFS fs;
 	hdfsFile handle;
 public:
-	pfs_file_hdfs( pfs_name *n, struct hdfs_services *hs, hdfsFS f, hdfsFile h ) : pfs_file(n) {
+	pfs_file_hdfs( pfs_name *n, struct hdfs_library *hs, hdfsFS f, hdfsFile h ) : pfs_file(n) {
 		hdfs = hs;
 		fs = f;
 		handle = h;
@@ -158,7 +75,7 @@ public:
 		pfs_ssize_t result;
 
 		debug(D_HDFS, "reading from file %s", name.rest);
-		result = hdfs->read(fs, handle, offset, data, length);
+		result = hdfs->pread(fs, handle, offset, data, length);
 		HDFS_END
 	}
 	
@@ -176,7 +93,7 @@ public:
 
 class pfs_service_hdfs : public pfs_service {
 private:
-	struct hdfs_services hdfs;
+	struct hdfs_library *hdfs;
 	struct hash_table *uid_table;
 	struct hash_table *gid_table;
 
@@ -197,7 +114,8 @@ public:
 		int result;
 
 		debug(D_HDFS, "loading dynamically shared libraries");
-		if (load_hdfs_services(&hdfs) < 0) {
+		hdfs = hdfs_library_open();
+		if(!hdfs){
 			is_initialized = false;
 			result = -1;
 		} else {
@@ -277,12 +195,11 @@ public:
 
 	virtual void * connect( pfs_name *name ) {
 		hdfsFS fs;
-		
 		HDFS_CHECK_INIT(0)
 
 		debug(D_HDFS, "connecting to %s:%d", name->host, name->port);
-		fs = hdfs.connect(name->host, name->port);
-		if (errno == EINTERNAL) {
+		fs = hdfs->connect(name->host, name->port);
+		if (errno == HDFS_EINTERNAL) {
 			errno = ECONNRESET;
 		}
 
@@ -292,7 +209,7 @@ public:
 
 	virtual void disconnect( pfs_name *name, void *fs) {
 		debug(D_HDFS, "disconnecting from %s:%d", name->host, name->port);
-		hdfs.disconnect((hdfsFS)fs);
+		hdfs->disconnect((hdfsFS)fs);
 	}
 
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
@@ -309,7 +226,7 @@ public:
 			case O_RDONLY:
 				debug(D_HDFS, "opening file %s for reading", name->rest);
 				flags = O_RDONLY;
-				if (hdfs.exists(fs, name->rest) < 0) {
+				if (hdfs->exists(fs, name->rest) < 0) {
 					debug(D_HDFS, "file %s does not exist", name->rest);
 					errno = ENOENT;
 					return 0;
@@ -331,9 +248,9 @@ public:
 			return 0;
 		}
 
-		handle = hdfs.open(fs, name->rest, flags, 0, 0, 0);
+		handle = hdfs->open(fs, name->rest, flags, 0, 0, 0);
 		if (handle != NULL) {
-			file = new pfs_file_hdfs(name, &hdfs, fs, handle);
+			file = new pfs_file_hdfs(name, hdfs, fs, handle);
 			if (!file) {
 				errno = ENOENT;
 			}
@@ -342,7 +259,7 @@ public:
 			file = 0;
 		}
 
-		pfs_service_disconnect_cache(name, fs, (errno == EINTERNAL));
+		pfs_service_disconnect_cache(name, fs, (errno == HDFS_EINTERNAL));
 
 		debug(D_HDFS, "= %ld", file);
 		return file;
@@ -363,14 +280,14 @@ public:
 		}
 
 		debug(D_HDFS, "checking if directory %s exists", name->rest);
-		if (hdfs.exists(fs, name->rest) < 0) {
+		if (hdfs->exists(fs, name->rest) < 0) {
 			errno = EINVAL;
 			delete dir;
 			return 0;
 		}
 
 		debug(D_HDFS, "getting directory of %s", name->rest);
-		file_list = hdfs.listdir(fs, name->rest, &num_entries);
+		file_list = hdfs->listdir(fs, name->rest, &num_entries);
 		struct pfs_stat buf;
 		if (file_list != NULL) {
 			for (int i = 0; i < num_entries; i++) {
@@ -382,10 +299,10 @@ public:
 				}
 			}
 			
-			hdfs.free_stat(file_list, num_entries);
+			hdfs->free_stat(file_list, num_entries);
 		}
 		
-		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		return dir;
 	}
 	
@@ -398,7 +315,7 @@ public:
 		
 		debug(D_HDFS, "stat %s", name->rest);
 		result = this->_stat(fs, name, buf);
-		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 
 		HDFS_END
 	}
@@ -412,7 +329,7 @@ public:
 		
 		debug(D_HDFS, "lstat %s", name->rest);
 		result = this->_stat(fs, name, buf);
-		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 
 		HDFS_END
 	}
@@ -424,11 +341,11 @@ public:
 		if (hdfs_dircache.lookup(name->rest, buf)) {
 			result = 0;
 		} else {
-			file_info = hdfs.stat(fs, name->rest);
+			file_info = hdfs->stat(fs, name->rest);
 
 			if (file_info != NULL) {
 				hdfs_copy_fileinfo(name, file_info, buf);
-				hdfs.free_stat(file_info, 1);
+				hdfs->free_stat(file_info, 1);
 				result = 0;
 			} else {
 				errno = ENOENT;
@@ -447,9 +364,9 @@ public:
 		HDFS_CHECK_FS(-1)
 
 		debug(D_HDFS, "access %s", name->rest);
-		result = hdfs.exists(fs, name->rest);
+		result = hdfs->exists(fs, name->rest);
 		
-		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		HDFS_END
 	}
 
@@ -472,7 +389,7 @@ public:
 			}
 		}
 
-		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		HDFS_END
 	}
 
@@ -486,9 +403,9 @@ public:
 		hdfs_dircache.invalidate();
 		
 		debug(D_HDFS, "mkdir %s", name->rest);
-		result = hdfs.mkdir(fs, name->rest);
+		result = hdfs->mkdir(fs, name->rest);
 
-		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		HDFS_END
 	}
 	
@@ -502,9 +419,9 @@ public:
 		hdfs_dircache.invalidate();
 		
 		debug(D_HDFS, "rmdir %s", name->rest);
-		result = hdfs.unlink(fs, name->rest);
+		result = hdfs->unlink(fs, name->rest);
 
-		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		HDFS_END
 	}
 	
@@ -518,9 +435,9 @@ public:
 		hdfs_dircache.invalidate();
 		
 		debug(D_HDFS, "unlink %s", name->rest);
-		result = hdfs.unlink(fs, name->rest);
+		result = hdfs->unlink(fs, name->rest);
 
-		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		HDFS_END
 	}
 
@@ -534,9 +451,9 @@ public:
 		hdfs_dircache.invalidate();
 		
 		debug(D_HDFS, "rename %s to %s", name->rest, newname->rest);
-		result = hdfs.rename(fs, name->rest, newname->rest);
+		result = hdfs->rename(fs, name->rest, newname->rest);
 
-		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		HDFS_END
 	}
 
@@ -557,19 +474,19 @@ public:
 			if (S_ISDIR(buf.st_mode)) {
 				errno = ENOTSUP;
 			} else {
-				hosts = hdfs.get_hosts(fs, name->rest, 0, buf.st_blksize);
+				hosts = hdfs->get_hosts(fs, name->rest, 0, buf.st_blksize);
 				if (hosts) {
 					loc = new pfs_location();
 					for (int i = 0; hosts[i]; i++)
 						for (int j = 0; hosts[i][j]; j++)
 							loc->append(hosts[i][j]);
-					hdfs.free_hosts(hosts);
+					hdfs->free_hosts(hosts);
 				}
 			}
 
 		}
 
-		pfs_service_disconnect_cache(name, (void*)fs, (errno == EINTERNAL));
+		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		return loc;
 	}
 
@@ -584,7 +501,5 @@ public:
 
 static pfs_service_hdfs pfs_service_hdfs_instance;
 pfs_service *pfs_service_hdfs = &pfs_service_hdfs_instance;
-
-#endif
 
 // vim: sw=8 sts=8 ts=8 ft=cpp 
