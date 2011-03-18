@@ -28,7 +28,7 @@ See the file COPYING for details.
 #include <dlfcn.h>
 #include <pwd.h>
 #include <grp.h>
-#include <sys/statfs.h>
+#include <sys/stat.h>
 
 // HDFS gets upset if a path begins with two slashes.
 // This macro simply skips over the first slash if needed.

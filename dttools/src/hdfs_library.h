@@ -9,6 +9,7 @@ See the file COPYING for details.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "int_sizes.h"
 
