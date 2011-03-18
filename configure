@@ -401,16 +401,9 @@ then
 
 	echo "using an xrootd arch of '$xrootd_arch' (if this is wrong, use the --xrootd-arch argument)"
 
-	if [ ! -d ${xrootd_path}/lib/${xrootd_arch} ]
-	then
-		echo "*** Sorry, couldn't find the xrootd arch directory $xrootd_arch"
-		echo "*** Please set --xrootd-arch to an installed architecture (look in ${xrootd_path}/lib)"
-		exit 1
-	fi
-
-
 	ccflags="${ccflags} -I${xrootd_path}/include/xrootd -DHAS_XROOTD"
 
+	#for library in XrdPosix
 	for library in XrdPosix XrdOuc XrdClient XrdSys XrdSec XrdSecgsi Xrd Xrd XrdCrypto XrdSut XrdNet XrdNetUtil XrdCryptossl XrdCryptoLite XrdSecunix XrdSecsss XrdPss XrdBwm
 	do
 		if ! library_search $library ${xrootd_path} ${xrootd_arch}

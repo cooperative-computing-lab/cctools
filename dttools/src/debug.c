@@ -70,13 +70,13 @@ static struct flag_info table[] = {
 	{ "poll",     D_POLL },
 	{ "hdfs",     D_HDFS },
 	{ "bxgrid",   D_BXGRID },
-	{ "remote",   D_REMOTE },
 	{ "debug",    D_DEBUG },
 	{ "login",    D_LOGIN },
 	{ "irods",    D_IRODS },
 	{ "wq",       D_WQ },
 	{ "user",     D_USER},
 	{ "xrootd",   D_XROOTD},
+	{ "remote",   D_REMOTE },
 	{ "all",      ~0 },
 	{ "time",     0 },	/* backwards compatibility */
 	{ "pid",     0 },	/* backwards compatibility */
