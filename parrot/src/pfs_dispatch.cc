@@ -1403,13 +1403,13 @@ void decode_syscall( struct pfs_process *p, int entering )
 						child_signal = args[0]&0xff;
 						clone_files = args[0]&CLONE_FILES;
 					}
-					pid_t parent;
+					pid_t notify_parent;
 					if(args[0]&(CLONE_PARENT|CLONE_THREAD)) {
-						parent = p->ppid;
+						notify_parent = p->ppid;
 					} else {
-						parent = p->pid;
+						notify_parent = p->pid;
 					}
-					child = pfs_process_create(childpid,parent,clone_files,child_signal);
+					child = pfs_process_create(childpid,p->pid,notify_parent,clone_files,child_signal);
 					child->syscall_result = 0;
 					if(args[0]&CLONE_THREAD) child->tgid = p->tgid;
 					if(p->syscall_original==SYSCALL32_fork) {

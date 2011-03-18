@@ -767,7 +767,7 @@ int main( int argc, char *argv[] )
 
 	root_pid = pid;
 	debug(D_PROCESS,"attaching to pid %d",pid);
-	p = pfs_process_create(pid,getpid(),0,SIGCHLD);
+	p = pfs_process_create(pid,getpid(),getpid(),0,SIGCHLD);
 	if(!p) {
 		if(pfs_write_rval) {
 			write_rval("noattach", 0);

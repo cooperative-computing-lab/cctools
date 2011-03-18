@@ -74,7 +74,7 @@ struct pfs_process {
 	int            nsyscalls;
 };
 
-struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table, int exit_signal );
+struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t notify_ppid, int share_table, int exit_signal );
 struct pfs_process * pfs_process_lookup( pid_t pid );
 void pfs_process_delete( struct pfs_process *p );
 
