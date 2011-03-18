@@ -196,6 +196,7 @@ int main(int argc, char *argv[])
 	q = batch_queue_create(batch_queue_type);
 	if (!q) fatal("Unable to create batch_queue of type: %s", batch_queue_type_to_string(batch_queue_type));
 
+	batch_queue_set_options(q,getenv("BATCH_OPTIONS"));
 
 	remote_job_table = itable_create(0);
         snprintf(command, PATH_MAX, "./%s %s", string_basename(worker_path), worker_args);
