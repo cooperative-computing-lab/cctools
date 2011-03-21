@@ -78,7 +78,7 @@ config_readline_path=auto
 config_globus_path=auto
 config_fuse_path=auto
 config_mysql_path=auto
-config_python_path=auto
+config_python_path=no
 
 config_krb5_path=no
 config_egee_path=no
@@ -403,7 +403,6 @@ then
 
 	ccflags="${ccflags} -I${xrootd_path}/include/xrootd -DHAS_XROOTD"
 
-	#for library in XrdPosix
 	for library in XrdPosix XrdOuc XrdClient XrdSys XrdSec XrdSecgsi Xrd Xrd XrdCrypto XrdSut XrdNet XrdNetUtil XrdCryptossl XrdCryptoLite XrdSecunix XrdSecsss XrdPss XrdBwm
 	do
 		if ! library_search $library ${xrootd_path} ${xrootd_arch}
@@ -436,16 +435,17 @@ then
 	# We rely on the --as-needed flag to figure out what dynamic
 	# libraries are actually used by each executable.
 	# However, libreadline doesn't properly specify a dependency
-	# on ncurses and history, so we must force them to link.
+	# on ncurses, termcap, and history, so we must force them to link.
 
 	if [ $build_sys = LINUX ]
 	then
-		cctools_readline_ldflags="-Xlinker --no-as-needed -lncurses -lhistory -Xlinker --as-needed"
-	else
+		cctools_readline_ldflags="-Xlinker --no-as-needed -lncurses -ltermcap -lhistory -Xlinker --as-needed"
+	else 
 		library_search ncurses ${readline_path}
+		library_search termcap ${readline_path}
 		library_search history ${readline_path}
 	fi
-else
+else	
 	echo "*** skipping readline..."
 fi
 
