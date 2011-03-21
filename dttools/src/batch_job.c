@@ -608,7 +608,7 @@ static int setup_hadoop_wrapper( const char *wrapperfile, const char *cmd )
 	if(!file) return -1;
 
 	fprintf(file,"#!/usr/bin/perl\n");
-	if(cmd) fprintf(file,"system('/afs/nd.edu/user37/ccl/software/cctools/bin/parrot_hdfs %s');\n\n", cmd);
+	if(cmd) fprintf(file,"system('/afs/nd.edu/user37/ccl/software/cctools/bin/parrot_run_hdfs %s');\n\n", cmd);
 	fprintf(file, "exit;\n\n");
 	fclose(file);
 
