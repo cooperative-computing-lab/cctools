@@ -516,6 +516,7 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	// Rerun if an input file has been updated since the last execution.
 	for(f=n->source_files;f;f=f->next) {
 		if(stat(f->filename, &filestat)>=0) {
+			if(S_ISDIR(filestat.st_mode)) continue;
 			if(difftime(filestat.st_mtime, n->previous_completion) > 0) {
 				goto rerun; // rerun this node
 			}
