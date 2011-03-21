@@ -289,7 +289,7 @@ struct link * link_accept( struct link * master, time_t stoptime )
 
 	if(!link_nonblocking(link,1)) goto failure;
 	if(!link_address_remote(link,link->raddr,&link->rport)) goto failure;
-	link_squelch(link);
+	link_squelch();
 
 	debug(D_TCP,"got connection from %s:%d",link->raddr,link->rport);
 
