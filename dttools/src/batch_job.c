@@ -1046,7 +1046,7 @@ int batch_job_remove_xgrid( struct batch_queue *q, batch_job_id_t jobid )
 
 const char * batch_queue_type_string()
 {
-	return "local, condor, sge, workqueue, xgrid";
+	return "local, condor, sge, wq, hadoop";
 }
 
 batch_queue_type_t batch_queue_type_from_string( const char *str )
