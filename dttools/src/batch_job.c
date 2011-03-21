@@ -602,14 +602,13 @@ static int setup_hadoop_wrapper( const char *wrapperfile, const char *cmd )
 {
 	FILE *file;
 
-	if(access(wrapperfile,R_OK|X_OK)==0) return 0;
+	//if(access(wrapperfile,R_OK|X_OK)==0) return 0;
 
 	file = fopen(wrapperfile,"w");
 	if(!file) return -1;
 
-	fprintf(file,"#!/usr/bin/perl\n");
-	if(cmd) fprintf(file,"system('/afs/nd.edu/user37/ccl/software/cctools/bin/parrot_run_hdfs %s');\n\n", cmd);
-	fprintf(file, "exit;\n\n");
+	fprintf(file,"#!/bin/sh\n");
+	if(cmd) fprintf(file,"exec %s\n\n", cmd);
 	fclose(file);
 
 	chmod(wrapperfile,0755);
@@ -736,7 +735,7 @@ int batch_job_submit_simple_hadoop( struct batch_queue *q, const char *cmd, cons
 
 	setup_hadoop_wrapper("hadoop.wrapper", cmd);
 
-	sprintf(line, "$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-*-streaming.jar -D mapred.min.split.size=100000000 -input %s -mapper \"perl hadoop.wrapper\" -file hadoop.wrapper -numReduceTasks 0 -output /makeflow_tmp/job-%010d 2>&1", target_file, (int)time(0));
+	sprintf(line, "$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-*-streaming.jar -D mapred.min.split.size=100000000 -input %s -mapper \"$PARROT_HOME/bin/parrot_run_hdfs ./hadoop.wrapper\" -file hadoop.wrapper -numReduceTasks 0 -output /makeflow_tmp/job-%010d 2>&1", target_file, (int)time(0));
 
 	debug(D_HDFS,"%s\n", line);
 
@@ -1117,6 +1116,10 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type )
 		}
 		if(!getenv("HDFS_ROOT_DIR")) {
 			debug(D_NOTICE, "error: environment variable HDFS_ROOT_DIR not set\n");
+			fail = 1;
+		}
+		if(!getenv("PARROT_HOME")) {
+			debug(D_NOTICE, "error: environment variable PARROT_HOME not set\n");
 			fail = 1;
 		}
 		if(fail) {
