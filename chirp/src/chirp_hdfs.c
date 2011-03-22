@@ -162,8 +162,11 @@ void *chirp_hdfs_opendir(const char *path)
 	d->i = 0;
 	d->path = xstrdup(path);
 
-	if(d->info == NULL)
-		return (free(d), errno = ENOENT, NULL);
+	if(d->info == NULL) {
+		free(d);
+		errno = ENOENT;
+		return 0;
+	}
 
 	return d;
 }

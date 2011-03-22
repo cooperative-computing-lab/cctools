@@ -7,6 +7,8 @@
 #include <limits.h>
 #include <signal.h>
 
+extern char **environ;
+
 pid_t dpopen (const char *command, FILE **in, FILE **out)
 {
   pid_t pid;
@@ -61,7 +63,7 @@ pid_t dpopen (const char *command, FILE **in, FILE **out)
     for (i = STDERR_FILENO+1; i < _POSIX_OPEN_MAX; i++)
       close(i);
 
-    return execl("/bin/sh", "sh", "-c", command, NULL);
+    return execl("/bin/sh", "sh", "-c", command, (char*)0);
   } else {
     close(stdin_fd[0]);
     close(stdin_fd[1]);

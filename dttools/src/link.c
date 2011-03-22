@@ -245,7 +245,7 @@ struct link * link_serve_address( const char *addr, int port )
 	if(addr!=0 || port!=LINK_PORT_ANY) {
 
 		memset(&address,0,sizeof(address));
-#if !defined(CCTOOLS_OPSYS_LINUX)
+#if defined(CCTOOLS_OPSYS_DARWIN)
 		address.sin_len = sizeof(address);
 #endif
 		address.sin_family = AF_INET;
@@ -313,7 +313,7 @@ struct link * link_connect( const char *addr, int port, time_t stoptime )
 	link_squelch();
 
 	memset(&address,0,sizeof(address));
-#if !defined(CCTOOLS_OPSYS_LINUX)
+#if defined(CCTOOLS_OPSYS_DARWIN)
 	address.sin_len = sizeof(address);
 #endif
 	address.sin_family = AF_INET;
