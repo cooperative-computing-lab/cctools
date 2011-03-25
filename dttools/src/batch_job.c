@@ -788,6 +788,7 @@ batch_job_id_t batch_job_wait_hadoop( struct batch_queue *q, struct batch_job_in
 				lock.l_type = F_RDLCK;
 				fcntl(fileno(status), F_SETLKW, &lock);
 				char *result = fgets(line,sizeof(line),status);
+				(void)result;
 				lock.l_type = F_UNLCK;
 				fcntl(fileno(status), F_SETLKW, &lock);
 				fclose(status);
