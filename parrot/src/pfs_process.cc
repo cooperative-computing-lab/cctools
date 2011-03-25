@@ -470,10 +470,11 @@ PTRINT_T pfs_process_heap_address( struct pfs_process *p )
 	}
 
 	while(fgets(line,sizeof(line),file)) {
+		debug(D_PROCESS,"line: %s",line);
 		fields = sscanf(line,PTR_FORMAT "-" PTR_FORMAT " %s " PTR_FORMAT "%d:%d %d",
 			&start,&end,flagstring,&offset,&major,&minor,&inode);
 
-		if(fields==7 && !strcmp(flagstring,"rw-p") && inode==0) {
+		if(fields==7 && inode==0 && flagstring[0]=='r' && flagstring[1]=='w' && flagstring[3]=='p') {
 			fclose(file);
 			p->heap_address = start;
 			debug(D_PROCESS,"heap address is 0x%x",start);
