@@ -261,6 +261,7 @@ static void show_use( const char *cmd )
 	if(pfs_service_lookup("hdfs"))		printf(" hdfs");
 	if(pfs_service_lookup("bxgrid"))	printf(" bxgrid");
 	if(pfs_service_lookup("s3"))		printf(" s3");
+	if(pfs_service_lookup("root"))          printf(" root");
 	if(pfs_service_lookup("xrootd"))        printf(" xrootd");
 	printf("\n");
 	exit(1);
