@@ -761,7 +761,7 @@ batch_job_id_t batch_job_wait_hadoop( struct batch_queue *q, struct batch_job_in
 {
 	struct batch_job_info *info;
 	batch_job_id_t jobid;
-	char line[BATCH_JOB_LINE_MAX];
+	char line[BATCH_JOB_LINE_MAX] = "";
 	char statusfile[BATCH_JOB_LINE_MAX];
 	struct batch_job_hadoop_job *hadoop_job;
 
@@ -787,7 +787,7 @@ batch_job_id_t batch_job_wait_hadoop( struct batch_queue *q, struct batch_job_in
 
 				lock.l_type = F_RDLCK;
 				fcntl(fileno(status), F_SETLKW, &lock);
-				fgets(line,sizeof(line),status);
+				char *result = fgets(line,sizeof(line),status);
 				lock.l_type = F_UNLCK;
 				fcntl(fileno(status), F_SETLKW, &lock);
 				fclose(status);
