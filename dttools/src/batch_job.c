@@ -830,11 +830,11 @@ batch_job_id_t batch_job_wait_hadoop( struct batch_queue *q, struct batch_job_in
 
 				if(!strncmp(result, "SUCCESS", 7)) {
 					debug(D_DEBUG,"job %d success",jobid);
-					if(!info->finished) info->finished = logtime;
+					info->finished = logtime;
 					info->exited_normally = 1;
 				} else if(!strncmp(result, "FAILURE", 7)) {
 					debug(D_DEBUG,"hadoop execution failed: %s",message);
-					if(!info->finished) info->finished = logtime;
+					info->finished = logtime;
 					info->exited_normally = 0;
 				}
 
@@ -848,10 +848,7 @@ batch_job_id_t batch_job_wait_hadoop( struct batch_queue *q, struct batch_job_in
 
 				if(sscanf(line,"%ld\tM%d\tR%d", &logtime, &map, &red) == 3) {
 					if(map && !info->started) info->started = logtime;
-					if(red == 100) {
-						debug(D_DEBUG,"job %d end execution",jobid);
-						info->finished = logtime;
-					}
+					if(red == 100) debug(D_DEBUG,"job %d end execution",jobid);
 				}
 
 			}
