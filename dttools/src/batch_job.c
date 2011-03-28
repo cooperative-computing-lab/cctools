@@ -661,6 +661,7 @@ int batch_job_fork_hadoop( struct batch_queue *q, const char *cmd )
 		outname[0] = 0;
 		while(fgets(line,sizeof(line),cmd_pipe)) {
 			char jobname[BATCH_JOB_LINE_MAX];
+			char error_string[BATCH_JOB_LINE_MAX];
 			int mapdone, reddone;
 			if(!strlen(outname) && sscanf(line,"%*s %*s INFO streaming.StreamJob: Running job: %s",jobname)==1) {
 				fprintf(parent, "%s\n", jobname);
@@ -680,6 +681,34 @@ int batch_job_fork_hadoop( struct batch_queue *q, const char *cmd )
 
 				debug(D_HDFS, "hadoop_status_wrapper: %s", line);
 
+			} else if(strlen(outname) && sscanf(line,"%*s %*s INFO streaming.StreamJob: Job complete: %s",jobname)==1) {
+				FILE  *output = NULL;
+				sprintf(line, "%ld\tSUCCESS\t%s\n", (long int)time(0), jobname);
+
+				output = fopen(outname, "w");
+				lock.l_type = F_WRLCK;
+				fcntl(fileno(output), F_SETLKW, &lock);
+				fprintf(output, "%s", line);
+				lock.l_type = F_UNLCK;
+				fcntl(fileno(output), F_SETLKW, &lock);
+				fclose(output);
+
+				debug(D_HDFS, "hadoop_status_wrapper: %s", line);
+				exit(0);
+			} else if(strlen(outname) && sscanf(line,"%*s %*s ERROR streaming.StreamJob: %s",error_string)==1) {
+				FILE  *output = NULL;
+				sprintf(line, "%ld\tFAILURE\t%s\n", (long int)time(0), error_string);
+
+				output = fopen(outname, "w");
+				lock.l_type = F_WRLCK;
+				fcntl(fileno(output), F_SETLKW, &lock);
+				fprintf(output, "%s", line);
+				lock.l_type = F_UNLCK;
+				fcntl(fileno(output), F_SETLKW, &lock);
+				fclose(output);
+
+				debug(D_HDFS, "hadoop_status_wrapper: %s", line);
+				exit(0);
 			}
 		}
 		exit(0);
@@ -761,7 +790,7 @@ batch_job_id_t batch_job_wait_hadoop( struct batch_queue *q, struct batch_job_in
 {
 	struct batch_job_info *info;
 	batch_job_id_t jobid;
-	char line[BATCH_JOB_LINE_MAX] = "";
+	char line[BATCH_JOB_LINE_MAX];
 	char statusfile[BATCH_JOB_LINE_MAX];
 	struct batch_job_hadoop_job *hadoop_job;
 
@@ -784,22 +813,28 @@ batch_job_id_t batch_job_wait_hadoop( struct batch_queue *q, struct batch_job_in
 			if(status) {
 				int map, red;
 				time_t logtime;
+				char result[BATCH_JOB_LINE_MAX];
+				char message[BATCH_JOB_LINE_MAX];
 
+				line[0] = 0;
 				lock.l_type = F_RDLCK;
 				fcntl(fileno(status), F_SETLKW, &lock);
-				char *result = fgets(line,sizeof(line),status);
-				(void)result;
+				fgets(line,sizeof(line),status);
 				lock.l_type = F_UNLCK;
 				fcntl(fileno(status), F_SETLKW, &lock);
 				fclose(status);
 
-				if(sscanf(line,"%ld\tM%d\tR%d", &logtime, &map, &red) == 3) {
-					if(map && !info->started) info->started = logtime;
-					if(red == 100) {
-						debug(D_DEBUG,"job %d complete",jobid);
-						info->finished = logtime;
-						info->exited_normally = 1;
-					}
+				result[0] = message[0] = 0;
+				sscanf(line,"%ld\t%s\t%s",&logtime,result,message);
+
+				if(!strncmp(result, "SUCCESS", 7)) {
+					debug(D_DEBUG,"job %d success",jobid);
+					if(!info->finished) info->finished = logtime;
+					info->exited_normally = 1;
+				} else if(!strncmp(result, "FAILURE", 7)) {
+					debug(D_DEBUG,"hadoop execution failed: %s",message);
+					if(!info->finished) info->finished = logtime;
+					info->exited_normally = 0;
 				}
 
 				if(info->finished!=0) {
@@ -809,6 +844,15 @@ batch_job_id_t batch_job_wait_hadoop( struct batch_queue *q, struct batch_job_in
 					unlink(statusfile);
 					return jobid;
 				}
+
+				if(sscanf(line,"%ld\tM%d\tR%d", &logtime, &map, &red) == 3) {
+					if(map && !info->started) info->started = logtime;
+					if(red == 100) {
+						debug(D_DEBUG,"job %d end execution",jobid);
+						info->finished = logtime;
+					}
+				}
+
 			}
 		}
 

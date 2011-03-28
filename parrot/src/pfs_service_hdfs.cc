@@ -315,6 +315,7 @@ public:
 		
 		debug(D_HDFS, "stat %s", name->rest);
 		result = this->_stat(fs, name, buf);
+		buf->st_mode |= (S_IXUSR | S_IXGRP);
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 
 		HDFS_END
@@ -329,6 +330,7 @@ public:
 		
 		debug(D_HDFS, "lstat %s", name->rest);
 		result = this->_stat(fs, name, buf);
+		buf->st_mode |= (S_IXUSR | S_IXGRP);
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 
 		HDFS_END
