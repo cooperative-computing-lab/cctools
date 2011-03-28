@@ -633,6 +633,7 @@ int batch_job_fork_hadoop( struct batch_queue *q, const char *cmd )
 
 	if(pipe(fd_pipe) < 0) return -1;
 
+	fflush(NULL);
 	debug(D_HDFS, "forking hadoop_status_wrapper\n");
 	if( (childpid = fork()) < 0 ){
 		return -1;
@@ -655,7 +656,7 @@ int batch_job_fork_hadoop( struct batch_queue *q, const char *cmd )
 		if(!cmd_pipe) {
 			debug(D_DEBUG,"hadoop_status_wrapper: couldn't submit job: %s",strerror(errno));
 			fclose(parent);
-			exit(-1);
+			_exit(-1);
 		}
 
 		outname[0] = 0;
@@ -694,7 +695,7 @@ int batch_job_fork_hadoop( struct batch_queue *q, const char *cmd )
 				fclose(output);
 
 				debug(D_HDFS, "hadoop_status_wrapper: %s", line);
-				exit(0);
+				_exit(0);
 			} else if(strlen(outname) && sscanf(line,"%*s %*s ERROR streaming.StreamJob: %s",error_string)==1) {
 				FILE  *output = NULL;
 				sprintf(line, "%ld\tFAILURE\t%s\n", (long int)time(0), error_string);
@@ -708,10 +709,10 @@ int batch_job_fork_hadoop( struct batch_queue *q, const char *cmd )
 				fclose(output);
 
 				debug(D_HDFS, "hadoop_status_wrapper: %s", line);
-				exit(0);
+				_exit(0);
 			}
 		}
-		exit(0);
+		_exit(0);
 
 	} else {
 	//PARENT
@@ -880,8 +881,7 @@ int batch_job_submit_simple_local( struct batch_queue *q, const char *cmd, const
 {
 	batch_job_id_t jobid;
 
-	fflush(0);
-
+	fflush(NULL);
 	jobid = fork();
 	if(jobid>0) {
 		debug(D_DEBUG,"started process %d: %s",jobid,cmd);
@@ -986,8 +986,7 @@ int batch_job_submit_simple_xgrid( struct batch_queue *q, const char *cmd, const
 	batch_job_id_t jobid;
 	char line[BATCH_JOB_LINE_MAX];
 	
-	fflush(0);
-	
+	fflush(NULL);
 	jobid = fork();
 	if(jobid>0) {
 		debug(D_DEBUG,"started process %d: xgrid -job run %s",jobid,cmd);
