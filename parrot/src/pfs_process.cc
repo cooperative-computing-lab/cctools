@@ -85,6 +85,7 @@ Note that a new process really has two kinds of parents:
 struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t notify_ppid, int share_table, int exit_signal )
 {  
 	struct pfs_process *actual_parent;
+	struct pfs_process *notify_parent;
 	struct pfs_process *child;
 
 	if(!pfs_process_table) pfs_process_table = itable_create(0);
@@ -141,6 +142,11 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 		child->umask = 000;
 		strcpy(child->tty,"/dev/tty");
 		memset(child->signal_interruptible,0,sizeof(child->signal_interruptible));
+	}
+
+	notify_parent = pfs_process_lookup(notify_ppid);
+	if (!notify_parent) {
+		child->ppid = actual_ppid;
 	}
 
 	itable_insert(pfs_process_table,pid,child);
@@ -281,6 +287,7 @@ void pfs_process_stop( struct pfs_process *child, int status, struct rusage usag
 	child->exit_rusage = usage;
 
 	parent = pfs_process_lookup(child->ppid);
+	debug(D_PSTREE, "process %d parent is %d", child->pid, child->ppid);
 
 	if(parent) {
 		int send_signal = 0;
@@ -301,6 +308,8 @@ void pfs_process_stop( struct pfs_process *child, int status, struct rusage usag
 		} else if(send_signal!=0) {
 			pfs_process_raise(parent->pid,send_signal,1);
 		}
+	} else {
+		debug(D_PSTREE, "process %d parent %d not in process table", child->pid, child->ppid);
 	}
 }
 
