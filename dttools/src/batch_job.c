@@ -950,6 +950,7 @@ batch_job_id_t batch_job_wait_local( struct batch_queue *q, struct batch_job_inf
 
 			int jobid = p->pid;
 			free(p);
+			free(info);
 			return jobid;
 
 		} else if(errno==ESRCH || errno==ECHILD) {
