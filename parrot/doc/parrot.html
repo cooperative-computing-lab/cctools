@@ -5,7 +5,7 @@
 </head>
 
 <h1>Parrot User's Manual</h1>
-<b>18 May 2007</b>
+<b>March 2011</b>
 <p>
 
 Parrot is Copyright (C) 2003-2004 Douglas Thain and
@@ -140,6 +140,7 @@ then the file name.  Here are all the currently supported services:
 <tr><td>/gfal/protocol://host//path<td>Grid File Access Library<td><a href=http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html>more info</a>
 <tr><td>/irods/host:port/zone/home/user/path<td>iRODS<td><a href=http://irods.sdsc.edu>more info</a>
 <tr><td>/hdfs/namenode:port/path<td>Hadoop Distributed File System (HDFS)<td><a href=http://hadoop.apache.org/common/docs/current/hdfs_user_guide.html>more info</a>
+<tr><td>/xrootd/host:port/path<td>XRootD/Scalla Distributed Storage System (xrootd)<td><a href=http://project-arda-dev.web.cern.ch/project-arda-dev/xrootd/site/index.html>more info</a>
 </table>
 <hr>
 
@@ -380,6 +381,39 @@ If necessary, checksums can be disabled by giving the <tt>-k</tt> option
 to either Parrot or <tt>make_growfs</tt>.
 </dir>
 
+<h3>Hadoop Distributed File System (HDFS)</h3>
+
+HDFS is the primary distributed filesystem used in the <a
+    href="http://hadoop.apache.org">Hadoop</a> project.  Parrot supports read
+and write access to HDFS systems using the <tt>parrot_run_hdfs</tt> wrapper.  This
+script checks that the appropriate environmental variables are defined and
+calls <tt>parrot</tt>.
+<p>
+In particular, you must ensure that you define the following environmental
+variables:
+
+<pre>
+JAVA_HOME     Location of your Java installation.
+HADOOP_HOME   Location of your Hadoop installation.
+</pre>
+
+Based on these environmental variables, <tt>parrot_run_hdfs</tt> will attempt to
+find the appropriate paths for <tt>libjvm.so</tt> and <tt>libhdfs.so</tt>.
+These paths are stored in the environmental variables <tt>LIBJVM_PATH</tt> and
+<tt>LIBHDFS_PATH</tt>, which are used by the HDFS Parrot module to load the
+necessary shared libraries at run-time.  To avoid the startup overhead of
+searching for these libraries, you may set the paths manually in your
+environment before calling <tt>parrot_run_hdfs</tt>, or you may edit the script
+directly.
+
+<p>
+
+Note that while Parrot supports read access to HDFS, it only provides
+write-once support on HDFS.  This is because the current implementations of
+HDFS do not provide reliable append operations.  Likewise, files can only be
+opened in either read (<tt>O_RDONLY</tt>) or write mode (<tt>O_WRONLY</tt>),
+and not both (<tt>O_RDWR</tt>).
+
 <h3>EGEE Data Access: GFAL, LFN, GUID, SRM, RFIO, DCAP, and LFC</h3>
 
 The EGEE project is a European-wide grid computing project.
@@ -460,39 +494,6 @@ that is not directly supported by the GFAL library itself.
 Use of the LFC involves many complex interacting pieces
 of software.  It is recommended that you run Parrot with the <tt>-d remote</tt>
 flag in order to debug problems using LFC.
-
-<h3>Hadoop Distributed File System (HDFS)</h3>
-
-HDFS is the primary distributed filesystem used in the <a
-    href="http://hadoop.apache.org">Hadoop</a> project.  Parrot supports read
-and write access to HDFS systems using the <tt>parrot_run_hdfs</tt> wrapper.  This
-script checks that the appropriate environmental variables are defined and
-calls <tt>parrot</tt>.
-<p>
-In particular, you must ensure that you define the following environmental
-variables:
-
-<pre>
-JAVA_HOME     Location of your Java installation.
-HADOOP_HOME   Location of your Hadoop installation.
-</pre>
-
-Based on these environmental variables, <tt>parrot_hdfs</tt> will attempt to
-find the appropriate paths for <tt>libjvm.so</tt> and <tt>libhdfs.so</tt>.
-These paths are stored in the environmental variables <tt>LIBJVM_PATH</tt> and
-<tt>LIBHDFS_PATH</tt>, which are used by the HDFS Parrot module to load the
-necessary shared libraries at run-time.  To avoid the startup overhead of
-searching for these libraries, you may set the paths manually in your
-environment before calling <tt>parrot_hdfs</tt>, or you may edit the script
-directly.
-
-<p>
-
-Note that while Parrot supports read access to HDFS, it only provides
-write-once support on HDFS.  This is because the current implementations of
-HDFS do not provide reliable append operations.  Likewise, files can only be
-opened in either read (<tt>O_RDONLY</tt>) or write mode (<tt>O_WRONLY</tt>),
-and not both (<tt>O_RDWR</tt>).
 
 <h2>Identity Boxing</h2>
 
