@@ -73,6 +73,6 @@ struct hdfs_library {
 };
 
 struct hdfs_library *hdfs_library_open();
-void hdfs_library_close();
+void hdfs_library_close( struct hdfs_library *hs );
 
 #endif
