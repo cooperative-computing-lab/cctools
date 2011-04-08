@@ -346,6 +346,14 @@ static int ticket_translate( const char *name, char *ticket_subject )
 	return 1;
 }
 
+/* Some versions of gcc emit a silly error about the use of %c.  This suppresses that error. */
+
+static size_t my_strftime( char *str, int len, const char *fmt, struct tm *t )
+{
+	return strftime(str,len,fmt,t);
+}
+
+
 INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, const char *subject, time_t duration, time_t stoptime )
 {
 	char command[PATH_MAX*2+4096];
@@ -407,10 +415,10 @@ INT64_T chirp_client_ticket_register( struct chirp_client *c, const char *name, 
 
 		time(&t);
 		localtime_r(&t, &tm);
-		strftime(now, sizeof(now)/sizeof(char), "%c", &tm);
+		my_strftime(now, sizeof(now)/sizeof(char), "%c", &tm);
 		t += duration;
 		localtime_r(&t, &tm);
-		strftime(expiration, sizeof(expiration)/sizeof(char), "%c", &tm);
+		my_strftime(expiration, sizeof(expiration)/sizeof(char), "%c", &tm);
 
 		FILE *file = fopen(name, "a");
 		if (file == NULL) return -1;
@@ -616,7 +624,7 @@ INT64_T chirp_client_ticket_modify (struct chirp_client *c, const char *name, co
 
 		time(&t);
 		localtime_r(&t, &tm);
-		strftime(now, sizeof(now)/sizeof(char), "%c", &tm);
+		my_strftime(now, sizeof(now)/sizeof(char), "%c", &tm);
 
 		FILE *file = fopen(name, "a");
 		if (file == NULL) return -1;
