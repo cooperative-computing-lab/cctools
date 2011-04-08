@@ -114,7 +114,7 @@ int main( int argc, char *argv[] )
 	} else {
 		file = fopen(source_file,"r");
 		if(!file) {
-			fprintf(stderr,"couldn't open %s: %s\n",source_file,strerror(errno));
+			fprintf(stderr,"chirp_put: couldn't open %s: %s\n",source_file,strerror(errno));
 			return 1;
 		}
 	}
@@ -122,7 +122,13 @@ int main( int argc, char *argv[] )
 	if(follow_mode) whole_file_mode = 0;
 
 	if(whole_file_mode) {
-		return chirp_recursive_put(hostname,source_file,target_file,stoptime);
+		int result = chirp_recursive_put(hostname,source_file,target_file,stoptime);
+		if(result<0) {
+			fprintf(stderr,"chirp_put: couldn't put %s to host %s: %s\n",source_file,hostname,strerror(errno));
+			return 1;
+		} else {
+			return 0;
+		}
 	} else {
 		struct chirp_stream *stream;
 		char *buffer = xxmalloc(buffer_size);
@@ -130,7 +136,7 @@ int main( int argc, char *argv[] )
 
 		stream = chirp_stream_open(hostname,target_file,CHIRP_STREAM_WRITE,stoptime);
 		if(!stream) {
-			fprintf(stderr,"couldn't open %s for writing: %s\n",target_file,strerror(errno));
+			fprintf(stderr,"chirp_put: couldn't open %s for writing: %s\n",target_file,strerror(errno));
 			return 1;
 		}
 
@@ -147,7 +153,7 @@ int main( int argc, char *argv[] )
 			}
 			wactual = chirp_stream_write(stream,buffer,ractual,stoptime);
 			if(wactual!=ractual) {
-				fprintf(stderr,"couldn't write to %s: %s\n",target_file,strerror(errno));
+				fprintf(stderr,"chirp_put: couldn't write to %s: %s\n",target_file,strerror(errno));
 				return 1;
 			}
 		}
