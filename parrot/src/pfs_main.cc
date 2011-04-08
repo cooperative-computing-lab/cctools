@@ -135,60 +135,21 @@ static void get_linux_version()
 	debug(D_NOTICE,"parrot_run %d.%d.%d has not been tested on %s %s yet, this may not work",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,name.sysname,name.release);
 }
 
-static char *find_in_path( const char *cmd )
-{
-	char *p, *path;
-
-	debug(D_DEBUG,"looking for %s in PATH",cmd);
-
-	path = xstrdup(getenv("PATH"));
-	if(!path) return 0;
-
-	p = strtok(path,":");
-	while(p) {
-		char tmp[PFS_PATH_MAX];
-		sprintf(tmp,"%s/%s",p,cmd);
-		debug(D_DEBUG,"checking %s",tmp);
-		if(access(tmp,X_OK)==0) {
-			debug(D_DEBUG,"%s located in %s",cmd,tmp);
-			free(path);
-			return xstrdup(tmp);
-		}
-		p = strtok(0,":");
-	}
-
-	free(path);
-	return 0;
-}
-
 static void pfs_helper_init( const char *argv0 ) 
 {
 	char helper_path[PFS_PATH_MAX];
-	char t1[PFS_PATH_MAX];
-	char t2[PFS_PATH_MAX];
 
 	debug(D_DEBUG,"locating helper library...");
-	
-	if(argv0[0]=='/') {
-		debug(D_DEBUG,"%s is an explicit path",argv0);
-	} else if(strchr(argv0,'/')) {
-		debug(D_DEBUG,"%s is a relative path",argv0);
-		getcwd(t1,sizeof(t1));
-		sprintf(t2,"%s/%s",t1,argv0);
-		argv0 = t2;
+
+	sprintf(helper_path,"%s/lib/libparrot_helper.so",INSTALL_PATH);
+
+	char * s = getenv("PARROT_HELPER");
+	if(s) {
+		debug(D_DEBUG,"PARROT_HELPER=%s",s);
+		strcpy(helper_path,s);
 	} else {
-		debug(D_DEBUG,"%s is an implicit path",argv0);
-		argv0 = find_in_path(argv0);
+		debug(D_DEBUG,"PARROT_HELPER is not set");
 	}
-
-
-	if(argv0) {
-		sprintf(helper_path,"%s_helper.so",argv0);
-	} else {
-		sprintf(helper_path,"%s/bin/parrot_helper.so",INSTALL_PATH);
-	}
-
-	debug(D_DEBUG,"looking for helper in %s",helper_path);
 
 	if(access(helper_path,R_OK)==0) {
 		debug(D_DEBUG,"found helper in %s",helper_path);
