@@ -46,6 +46,8 @@ See the file COPYING for details.
 #define fstatfs64 fstatfs
 #endif
 
+#define unsigned_isspace(c) isspace((unsigned char) c)
+
 #if CCTOOLS_OPSYS_DARWIN
 #define lchown chown
 #endif
@@ -78,7 +80,7 @@ struct chirp_ticket {
 
 static int readquote (const char **buffer, const char **s, size_t *l)
 {
-  while (isspace(**buffer)) (*buffer)++;
+  while (unsigned_isspace(**buffer)) (*buffer)++;
   if (**buffer != '"') return 0;
   (*buffer)++;
   *l = 0;
@@ -161,7 +163,7 @@ static int ticket_read (const char *fname, struct chirp_ticket *ct)
 	ct->nrights = 0;
 	ct->rights = NULL;
 	while (1) {
-		while (isspace(*buffer)) buffer++;
+		while (unsigned_isspace(*buffer)) buffer++;
 		if (strncmp(buffer, "subject", strlen("subject")) == 0) {
 			buffer += strlen("subject");
 			if (!readquote(&buffer, &s, &n)) break;
