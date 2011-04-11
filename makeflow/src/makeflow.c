@@ -631,6 +631,11 @@ void dag_log_recover( struct dag *d, const char *filename )
 		clean_symlinks(d, 1);
 		exit(1);
 	}
+	if(setvbuf(d->logfile, NULL, _IOLBF, 0) != 0) {
+		fprintf(stderr,"makeflow: couldn't set line buffer on logfile %s: %s\n",filename,strerror(errno));
+		clean_symlinks(d, 1);
+		exit(1);
+	}
 
 	if(first_run) {
 		struct dag_file *f;
