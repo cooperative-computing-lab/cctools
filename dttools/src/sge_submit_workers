@@ -72,7 +72,7 @@ cp $worker .
 
 cat >worker.sh <<EOF
 #!/bin/sh
-./worker $arguments $host $port
+./work_queue_worker $arguments $host $port
 EOF
 
 chmod 755 worker.sh
