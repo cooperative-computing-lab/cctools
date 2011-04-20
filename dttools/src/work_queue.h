@@ -107,6 +107,8 @@ struct work_queue_stats {
 	INT64_T total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
     timestamp_t total_send_time;    /**<Total time in microseconds spent in sending data to workers. */
     timestamp_t total_receive_time; /**<Total time in microseconds spent in receiving data from workers. */
+	double efficiency;
+	double range_efficiency;
 };
 
 /** @name Functions - Tasks */

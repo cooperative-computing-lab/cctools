@@ -537,11 +537,13 @@ int main( int argc, char *argv[] ) {
 		if(link_readline(master,line,sizeof(line),time(0)+active_timeout)) {
 			debug(D_WQ, "%s", line);
 			if(sscanf(line, "work %lld", &length)) {
+				timestamp_t execution_start, execution_end;
 				buffer = malloc(length+10);
 				link_read(master,buffer,length,time(0)+active_timeout);
 				buffer[length] = 0;
 				strcat(buffer," 2>&1");
 				debug(D_WQ,"%s",buffer);
+				execution_start = timestamp_get();
 				stream = popen(buffer,"r");
 				free(buffer);
 				if(stream) {
@@ -553,8 +555,9 @@ int main( int argc, char *argv[] ) {
 					result = -1;
 					buffer = 0;
 				}
-				debug(D_WQ,"result %d %lld",result,length);
-				link_putfstring(master,"result %d %lld\n",time(0)+active_timeout,result,length);
+				execution_end = timestamp_get();
+				debug(D_WQ,"result %d %lld %llu",result,length, execution_end-execution_start);
+				link_putfstring(master,"result %d %lld %llu\n",time(0)+active_timeout,result,length, execution_end-execution_start);
 				link_putlstring(master,buffer,length,time(0)+active_timeout);
 				if(buffer) free(buffer);
 			} else if(sscanf(line,"stat %s", filename)==1) {
