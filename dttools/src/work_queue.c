@@ -908,11 +908,13 @@ int start_one_task( struct work_queue *q, struct work_queue_worker *w, struct wo
 	struct time_slot *ts;
 
 	ts = (struct time_slot *)malloc(sizeof(struct time_slot));
-	if(ts && w->time_last_task_complete != 0) {
-		ts->start = w->time_last_task_complete;
-		ts->duration = timestamp_get() - ts->start;
-		ts->status = TIME_SLOT_WAIT_ON_INPUT;
-		add_time_slot_to_worker(q, w, ts); 
+	if(ts) { 
+		if(w->time_last_task_complete != 0) {
+			ts->start = w->time_last_task_complete;
+			ts->duration = timestamp_get() - ts->start;
+			ts->status = TIME_SLOT_WAIT_ON_INPUT;
+			add_time_slot_to_worker(q, w, ts); 
+		}
 	} else {
 		debug(D_NOTICE,"Failed to record send input time for worker %s (%s)",w->hostname,w->addrport);
 	}
@@ -1351,24 +1353,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		t = list_pop_head(q->complete_list);
 		if(t) return t;
 
-        // Transfer output
-        while((w=list_pop_head(q->receive_output_waiting_list))) {
-            if(receive_output_from_worker(q, w)) {
-				start_task_on_worker(q,w);
-			}
-			add_more_workers(q);
-			/**
-		    t = list_pop_head(q->complete_list);
-		    if(t) {
-			    start_task_on_worker(q,w);
-                return t;
-            }
-			*/
-        }
-
 		if(q->workers_in_state[WORKER_STATE_BUSY]==0 && list_size(q->ready_list)==0) break;
-
-		start_tasks(q);
 
 		add_more_workers(q);
 
@@ -1396,8 +1381,6 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			}
 		}
 
-
-
 		// Then consider all existing active workers and dispatch tasks.
 		for(i=1;i<n;i++) {
 			if(q->poll_table[i].revents) {
@@ -1405,12 +1388,19 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			}
 		}
 
-
 		if(time(0) - efficiency_update_time >= EFFICIENCY_UPDATE_INTERVAL) {
 			update_work_queue_efficiency(q);
 		}
 
 		start_tasks(q);
+
+        // Transfer output
+        if((w=list_pop_head(q->receive_output_waiting_list))) {
+            if(receive_output_from_worker(q, w)) {
+				start_task_on_worker(q,w);
+				add_more_workers(q);
+			}
+        }
 
         // Transfer output
 		/**
@@ -1439,9 +1429,10 @@ void update_work_queue_efficiency(struct work_queue *q){
 	struct work_queue_worker *w;
 	char *key;
 	int count = 0;
+	timestamp_t extra_wait_time;
 
 	timestamp_t range_end = timestamp_get();
-	timestamp_t total_wait_time;
+	long double total_wait_time;
 
 	total_wait_time = 0;
 	// For every worker in the hash table, add an item to the poll table
@@ -1449,26 +1440,27 @@ void update_work_queue_efficiency(struct work_queue *q){
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 		if(w->time_last_task_complete == 0) continue;
 
+		trim_wait_times_on_worker(w);
 		total_wait_time += w->range_wait_time;
 
-		trim_wait_times_on_worker(w);
-
 		// add latest wait times 
+		extra_wait_time = 0;
 		if(w->state == WORKER_STATE_READY) {
-			total_wait_time += range_end - w->time_last_task_complete;
+			extra_wait_time = range_end - w->time_last_task_complete;
 		}
 
-		if(w->state == WORKER_STATE_BUSY) {
-			if(w->current_task->status  == TASK_STATUS_WAITING_FOR_OUTPUT) {
-				total_wait_time += range_end - w->current_task->time_execute_cmd_finish;
-			}
+		if(w->state == WORKER_STATE_BUSY && w->current_task->status  == TASK_STATUS_WAITING_FOR_OUTPUT) {
+			extra_wait_time = range_end - w->current_task->time_execute_cmd_finish;
 		}
+
+		if(extra_wait_time > EFFICIENCY_TIME_RANGE) extra_wait_time = EFFICIENCY_TIME_RANGE;
+		total_wait_time += extra_wait_time;
 
 		count++;
 	}
 
 	if(count) {
-		q->range_efficiency = (double)(EFFICIENCY_TIME_RANGE - total_wait_time / count) / EFFICIENCY_TIME_RANGE; 
+		q->range_efficiency = (double)(EFFICIENCY_TIME_RANGE - (total_wait_time / count)) / EFFICIENCY_TIME_RANGE; 
 	} else {
 	    q->range_efficiency = 1;
 	}
@@ -1492,14 +1484,14 @@ void trim_wait_times_on_worker(struct work_queue_worker *w) {
 	while(1) {
 		ts = (struct time_slot *)list_peek_head(w->wait_times);
 		if(!ts) break;
-		if(ts->start + ts->duration < range_start) {
+		if(ts->start + ts->duration <= range_start) {
 			ts = list_pop_head(w->wait_times);
 			w->range_wait_time -= ts->duration;
 			free(ts);
 		} else {
 			if(ts->start < range_start) {
 				w->range_wait_time -= range_start - ts->start;
-				ts->duration = ts->duration - (range_start - ts->start);
+				ts->duration -= range_start - ts->start;
 				ts->start = range_start;
 			}
 			break;
