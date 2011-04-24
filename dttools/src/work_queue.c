@@ -649,6 +649,7 @@ static int receive_output_from_worker( struct work_queue *q, struct work_queue_w
 	struct time_slot *ts;
 	
     t = w->current_task;
+	if(!t) goto failure;
     t->time_receive_output_start = timestamp_get();
 
 	ts = (struct time_slot *)malloc(sizeof(struct time_slot));
