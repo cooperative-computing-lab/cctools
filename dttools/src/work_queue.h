@@ -38,14 +38,17 @@ and port of the master.
 #define WORK_QUEUE_SCHEDULE_FCFS 1
 #define WORK_QUEUE_SCHEDULE_FILES 2
 #define WORK_QUEUE_SCHEDULE_TIME 3
-#define WORK_QUEUE_SCHEDULE_MAX 3
 #define WORK_QUEUE_SCHEDULE_DEFAULT 3 // default setting for queue.
+#define WORK_QUEUE_SCHEDULE_PREFERRED_HOSTS 4
+#define WORK_QUEUE_SCHEDULE_MAX 4
 
 #define WORK_QUEUE_INPUT  0
 #define WORK_QUEUE_OUTPUT 1
 
 #define WORK_QUEUE_NOCACHE 0
 #define WORK_QUEUE_CACHE 1
+#define WORK_QUEUE_SYMLINK 2
+#define WORK_QUEUE_PREEXIST 4
 
 
 #define WORK_QUEUE_MASTER_MODE_STANDALONE 0
@@ -59,6 +62,11 @@ and port of the master.
 #define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 60
 #define	WORK_QUEUE_CATALOG_LIFETIME	180
 
+#define WORK_QUEUE_FS_CMD 1
+#define WORK_QUEUE_FS_PATH 2
+#define WORK_QUEUE_FS_SYMLINK 3
+
+
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler; /**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
 
@@ -71,6 +79,7 @@ struct work_queue_task {
 	char *output;			/**< The standard output of the task. */
 	struct list * input_files;      /**< The files to transfer to the worker and place in the executing directory. */
 	struct list * output_files;	/**< The output files (other than the standard output stream) created by the program expected to be retrieved from the task. */
+	char *preferred_host;		/**< The hostname where the task should preferrentially be run. */
 	int taskid;			/**< A unique task id number. */
     int status;         /**< Current status of the task. */
 	int return_status;		/**< The exit code of the command line. */
@@ -134,6 +143,31 @@ void work_queue_task_specify_file( struct work_queue_task *t, const char *local_
 */
 void work_queue_task_specify_buffer( struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags );
 
+/** Add a file stored in a shared filesystem to a task.
+@param t The task to which to add a file.
+@param remote_name The name of the file at the execution site.
+@param shared_path The path of the file stored on the shared filesystem.
+@param type Must be one of the following values:
+- WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
+- WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
+@param flags May be zero to indicate no special handling, or any of the following or'd together:
+- WORK_QUEUE_CACHEABLE - The file may be cached at the execution site for later use.
+- WORK_QUEUE_SYMLINK - If possible symlink to the file rather than copying the whole thing.
+*/
+void work_queue_task_specify_shared_file(struct work_queue_task *t, const char *remote_name, const char *shared_path, int type, int flags);
+
+/** Add a file stored on a remote, non-mounted filesystem to a task.
+@param t The task to which to add a file.
+@param remote_name The name of the file at the execution site.
+@param cmd The command to run on the remote node to retrieve or store the file.
+@param type Must be one of the following values:
+- WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
+- WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
+@param flags May be zero to indicate no special handling, or any of the following or'd together:
+- WORK_QUEUE_CACHEABLE - The file may be cached at the execution site for later use.
+*/
+void work_queue_task_specify_remote_file(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags);
+
 /** Attach a user defined logical name to the task.
 This field is not interpreted by the work queue, but simply maintained to help the user track tasks.
 @param t The task to which to add parameters
@@ -146,6 +180,12 @@ void work_queue_task_specify_tag( struct work_queue_task *t, const char *tag );
 @param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
 */
 int work_queue_task_specify_algorithm( struct work_queue_task *t, int alg );
+
+/** Indicate that the task would be optimally run on a given host.
+@param t The task to which to add parameters
+@param hostname The hostname to which this task would optimally be sent.
+*/
+void work_queue_task_specify_preferred_host( struct work_queue_task *t, const char *hostname );
 
 /** Delete a task specification.  This may be called on tasks after they are returned from @ref work_queue_wait.
 @param t The task specification to delete.

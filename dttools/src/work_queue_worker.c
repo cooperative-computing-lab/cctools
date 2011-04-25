@@ -668,6 +668,85 @@ int main(int argc, char *argv[])
 					fprintf(stderr, "Could not open output file %s. (%s)\n", filename, strerror(errno));
 					goto recover;
 				}
+			} else if(sscanf(line, "thirdget %d %s %[^\n]", &mode, filename, path)) {
+				char cmd[WORK_QUEUE_LINE_MAX];
+				char *cur_pos, *tmp_pos;
+
+				if(mode != WORK_QUEUE_FS_CMD) {
+					struct stat info;
+					if(stat(path, &info) != 0) {
+						debug(D_WQ, "Path %s not accessible. (%s)\n", path, strerror(errno));
+						goto recover;
+					}
+					if(!strcmp(filename, path)) {
+						debug(D_WQ, "thirdget aborted: filename (%s) and path (%s) are the same\n", filename, path);
+						continue;
+					}
+				}
+
+				cur_pos = filename;
+				if(!strncmp(cur_pos, "./", 2)) {
+					cur_pos += 2;
+				}
+
+				tmp_pos = strrchr(cur_pos, '/');
+				if(tmp_pos) {
+					*tmp_pos = '\0';
+					if(!create_dir(cur_pos, mode | 0700)) {
+						debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
+						goto recover;
+					}
+					*tmp_pos = '/';
+				}
+
+				switch(mode) {
+					case WORK_QUEUE_FS_SYMLINK:
+						if(symlink(path, filename) != 0) {
+							debug(D_WQ, "Could not thirdget %s, symlink (%s) failed. (%s)\n", filename, path, strerror(errno));
+							goto recover;
+						}
+					case WORK_QUEUE_FS_PATH:
+						sprintf(cmd, "/bin/cp %s %s", path, filename);
+						if(system(cmd) != 0) {
+							debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
+							goto recover;
+						}
+						break;
+					case WORK_QUEUE_FS_CMD:
+						if(system(path) != 0) {
+							debug(D_WQ, "Could not thirdget %s, command (%s) failed. (%s)\n", filename, path, strerror(errno));
+							goto recover;
+						}
+						break;
+				}
+			} else if(sscanf(line, "thirdput %d %s %[^\n]", &mode, filename, path)) {
+				struct stat info;
+				char cmd[WORK_QUEUE_LINE_MAX];
+
+				switch(mode) {
+					case WORK_QUEUE_FS_SYMLINK:
+					case WORK_QUEUE_FS_PATH:
+						if(stat(filename, &info) != 0) {
+							debug(D_WQ, "File %s not accessible. (%s)\n", filename, strerror(errno));
+							goto recover;
+						}
+						if(!strcmp(filename, path)) {
+							debug(D_WQ, "thirdput aborted: filename (%s) and path (%s) are the same\n", filename, path);
+							continue;
+						}
+						sprintf(cmd, "/bin/cp %s %s", filename, path);
+						if(system(cmd) != 0) {
+							debug(D_WQ, "Could not thirdput %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
+							goto recover;
+						}
+						break;
+					case WORK_QUEUE_FS_CMD:
+						if(system(path) != 0) {
+							debug(D_WQ, "Could not thirdput %s, command (%s) failed. (%s)\n", filename, path, strerror(errno));
+							goto recover;
+						}
+						break;
+				}
 			} else if(!strcmp(line, "exit")) {
 				break;
 			} else {
