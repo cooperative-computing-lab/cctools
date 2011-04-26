@@ -4,6 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 #include "work_queue.h"
+#include "get_canonical_path.h"
 #include "int_sizes.h"
 #include "link.h"
 #include "debug.h"
@@ -855,14 +856,20 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 				sum_time += (close_time - open_time);
 			} else if(tf->type == WORK_QUEUE_SHARED) {
 				debug(D_WQ, "%s (%s) needs %s from shared filesystem as %s", w->hostname, w->addrport, tf->payload, tf->remote_name);
-				if(!strcmp(tf->remote_name, tf->payload)) {
+				char remote_path[WORK_QUEUE_LINE_MAX];
+				if(tf->remote_name[0] != '/') {
+					get_canonical_path(tf->remote_name, remote_path, WORK_QUEUE_LINE_MAX);
+				} else {
+					strcpy(remote_path, tf->remote_name);
+				}
+				if(!strcmp(remote_path, tf->payload)) {
 					tf->flags |= WORK_QUEUE_PREEXIST;
 				} else {
 					open_time = timestamp_get();
 					if(tf->flags & WORK_QUEUE_SYMLINK) {
-						link_putfstring(w->link, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_SYMLINK, tf->remote_name, tf->payload);
+						link_putfstring(w->link, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_SYMLINK, remote_path, tf->payload);
 					} else {
-						link_putfstring(w->link, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, tf->remote_name, tf->payload);
+						link_putfstring(w->link, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, remote_path, tf->payload);
 					}
 					close_time = timestamp_get();
 					sum_time += (close_time - open_time);
