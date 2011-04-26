@@ -708,7 +708,7 @@ int main(int argc, char *argv[])
 					case WORK_QUEUE_FS_PATH:
 						sprintf(cmd, "/bin/cp %s %s", path, filename);
 						if(system(cmd) != 0) {
-							debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
+							debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (/bin/cp %s)\n", filename, path, filename, strerror(errno));
 							goto recover;
 						}
 						break;
@@ -747,6 +747,7 @@ int main(int argc, char *argv[])
 						}
 						break;
 				}
+				link_putliteral(master, "thirdput complete\n", time(0) + active_timeout);
 			} else if(!strcmp(line, "exit")) {
 				break;
 			} else {
