@@ -60,7 +60,7 @@ double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
 static struct datagram *outgoing_datagram = NULL;
 static time_t catalog_update_time = 0;
-static time_t efficiency_update_time = 0;
+//static time_t efficiency_update_time = 0;
 int wq_tolerable_transfer_time_multiplier = 10;
 int wq_minimum_transfer_timeout = 3;
 
@@ -85,8 +85,10 @@ struct work_queue {
 	INT64_T	total_workers_removed;
 	INT64_T total_bytes_sent;
 	INT64_T total_bytes_received;
+    timestamp_t start_time;
     timestamp_t total_send_time;
     timestamp_t total_receive_time;
+    timestamp_t total_execute_time;
 	double range_efficiency;
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;           /**< How to choose worker to run the task. */
@@ -120,7 +122,7 @@ struct time_slot {
 	timestamp_t duration;
 	int status;
 };
-	
+
 
 struct work_queue_file {
 	int   type;        // WORK_QUEUE_FILE or WORK_QUEUE_BUFFER
@@ -135,7 +137,7 @@ static int start_task_on_worker( struct work_queue *q, struct work_queue_worker 
 static int update_catalog(struct work_queue *q);
 static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, INT64_T length);
 void add_time_slot_to_worker(struct work_queue *q, struct work_queue_worker *w, struct time_slot *ts_to_add);
-void update_work_queue_efficiency(struct work_queue *q);
+void update_work_queue_range_efficiency(struct work_queue *q);
 
 static int short_timeout = 5;
 static int next_taskid = 1;
@@ -211,6 +213,9 @@ static void link_to_hash_key( struct link *link, char *key )
 
 void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s )
 {
+	INT64_T effective_workers;
+    timestamp_t wall_clock_time;
+
 	memset(s,0,sizeof(*s));
 	s->workers_init   = q->workers_in_state[WORKER_STATE_INIT];
 	s->workers_ready  = q->workers_in_state[WORKER_STATE_READY];
@@ -226,7 +231,9 @@ void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s )
 	s->total_bytes_received = q->total_bytes_received;
     s->total_send_time = q->total_send_time;
     s->total_receive_time = q->total_receive_time;
-	s->efficiency = (long double)(q->total_task_time)/(q->total_task_time + q->total_wait_time);
+	effective_workers = q->workers_in_state[WORKER_STATE_READY] + q->workers_in_state[WORKER_STATE_BUSY];
+	wall_clock_time = timestamp_get() - q->start_time;
+	s->efficiency = (long double)(q->total_execute_time) / (wall_clock_time * effective_workers);
 	s->range_efficiency = q->range_efficiency;
 }
 
@@ -246,9 +253,9 @@ static void add_worker( struct work_queue *q )
 			w->state = WORKER_STATE_NONE;
 			w->link = link;
 			w->current_files = hash_table_create(0,0);
-			w->wait_times = list_create();
+			//w->wait_times = list_create();
 			w->time_last_task_complete = 0;
-			w->range_wait_time = 0;
+			//w->range_wait_time = 0;
 			link_to_hash_key(link,w->hashkey);
 			sprintf(w->addrport,"%s:%d",addr,port);
 			hash_table_insert(q->worker_table,w->hashkey,w);
@@ -620,8 +627,9 @@ static int handle_worker( struct work_queue *q, struct link *l )
 				t->result |= WORK_QUEUE_RESULT_FUNCTION_FAIL;
 
             t->time_execute_cmd_finish = t->time_execute_cmd_start + execution_time;
+			q->total_execute_time += execution_time;
             t->status = TASK_STATUS_WAITING_FOR_OUTPUT;
-            list_push_head(q->receive_output_waiting_list, w);
+            list_push_head(q->receive_output_waiting_list, l);
 		} else {
 			goto failure;
 		}
@@ -646,12 +654,13 @@ static int handle_worker( struct work_queue *q, struct link *l )
 static int receive_output_from_worker( struct work_queue *q, struct work_queue_worker *w )
 {
 	struct work_queue_task *t;
-	struct time_slot *ts;
+	//struct time_slot *ts;
 	
     t = w->current_task;
 	if(!t) goto failure;
     t->time_receive_output_start = timestamp_get();
 
+	/**
 	ts = (struct time_slot *)malloc(sizeof(struct time_slot));
 	if(ts) {
 		ts->start = t->time_execute_cmd_finish;
@@ -661,6 +670,8 @@ static int receive_output_from_worker( struct work_queue *q, struct work_queue_w
 	} else {
 		debug(D_NOTICE,"Failed to record wait to output time for worker %s (%s)",w->hostname,w->addrport);
 	}
+	*/
+
 
     if(!get_output_files(t,w,q)) {
         free(t->output);
@@ -674,8 +685,8 @@ static int receive_output_from_worker( struct work_queue *q, struct work_queue_w
     // Record current task as completed and change worker's state
     list_push_head(q->complete_list,w->current_task);
     w->current_task = 0;
-	w->time_last_task_complete = timestamp_get(); 
-    t->time_task_finish = w->time_last_task_complete; 
+    t->time_task_finish = timestamp_get(); 
+	//w->time_last_task_complete = t->time_task_finish; 
 
     change_worker_state(q,w,WORKER_STATE_READY);
 
@@ -906,8 +917,8 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 
 int start_one_task( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
+	/**
 	struct time_slot *ts;
-
 	ts = (struct time_slot *)malloc(sizeof(struct time_slot));
 	if(ts) { 
 		if(w->time_last_task_complete != 0) {
@@ -919,6 +930,7 @@ int start_one_task( struct work_queue *q, struct work_queue_worker *w, struct wo
 	} else {
 		debug(D_NOTICE,"Failed to record send input time for worker %s (%s)",w->hostname,w->addrport);
 	}
+	*/
 
 	t->time_send_input_start = timestamp_get();
 	if(!send_input_files(t,w,q)) return 0;
@@ -1202,6 +1214,10 @@ struct work_queue * work_queue_create( int port )
     }
 
 	q->range_efficiency = 1;
+	q->total_send_time = 0;
+	q->total_execute_time = 0;
+	q->total_receive_time = 0;
+	q->start_time = timestamp_get();
 
 	debug(D_WQ,"Work Queue is listening on port %d.", port);
 	return q;
@@ -1330,6 +1346,8 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 {
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
+	struct link *l;
+	char key[WORK_QUEUE_CATALOG_LINE_MAX];
 	int i;
 	time_t stoptime;
 	int result;
@@ -1347,9 +1365,11 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			catalog_update_time = time(0);
 		}
 
+		/**
 		if(time(0) - efficiency_update_time >= EFFICIENCY_UPDATE_INTERVAL) {
-			update_work_queue_efficiency(q);
+			update_work_queue_range_efficiency(q);
 		}
+		*/
 
 		t = list_pop_head(q->complete_list);
 		if(t) return t;
@@ -1389,31 +1409,24 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			}
 		}
 
+		/**
 		if(time(0) - efficiency_update_time >= EFFICIENCY_UPDATE_INTERVAL) {
-			update_work_queue_efficiency(q);
+			update_work_queue_range_efficiency(q);
 		}
+		*/
 
 		start_tasks(q);
 
         // Transfer output
-        if((w=list_pop_head(q->receive_output_waiting_list))) {
-            if(receive_output_from_worker(q, w)) {
-				start_task_on_worker(q,w);
-				add_more_workers(q);
+        if((l=list_pop_head(q->receive_output_waiting_list))) {
+			link_to_hash_key(l,key);
+			if((w=hash_table_lookup(q->worker_table,key))) {
+				if(receive_output_from_worker(q, w)) {
+					start_task_on_worker(q,w);
+					add_more_workers(q);
+				}
 			}
         }
-
-        // Transfer output
-		/**
-        while((w=list_pop_head(q->receive_output_waiting_list))) {
-            receive_output_from_worker(q, w);
-		    t = list_pop_head(q->complete_list);
-		    if(t) {
-			    start_task_on_worker(q,w);
-                return t;
-            }
-        }
-		*/
 
 		// If fast abort is enabled, kill off slow workers.
 		if(q->fast_abort_multiplier > 0) {
@@ -1426,7 +1439,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 
 void trim_wait_times_on_worker(struct work_queue_worker *w);
 
-void update_work_queue_efficiency(struct work_queue *q){
+void update_work_queue_range_efficiency(struct work_queue *q){
 	struct work_queue_worker *w;
 	char *key;
 	int count = 0;
