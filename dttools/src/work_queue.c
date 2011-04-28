@@ -582,7 +582,9 @@ static int handle_worker( struct work_queue *q, struct link *l )
             int jobs_not_completed = list_size(q->ready_list) + q->workers_in_state[WORKER_STATE_BUSY];
             if(workers_connected > jobs_not_completed) {
 	            debug(D_WQ,"Jobs waiting + running: %d; Workers connected now: %d", jobs_not_completed, workers_connected);
-                goto reject;
+				if(q->workers_in_state[WORKER_STATE_READY] >= list_size(q->ready_list)) {
+                	goto reject;
+				}
             }
 
             if(q->worker_mode == WORK_QUEUE_WORKER_MODE_EXCLUSIVE && q->name) {
@@ -707,7 +709,8 @@ static int receive_output_from_worker( struct work_queue *q, struct work_queue_w
 
 static int build_poll_table( struct work_queue *q )
 {
-	int n=1;
+	//int n=1;
+	int n=0;
 	char *key;
 	struct work_queue_worker *w;
 
@@ -716,10 +719,12 @@ static int build_poll_table( struct work_queue *q )
 		q->poll_table = malloc(sizeof(*q->poll_table)*q->poll_table_size);
 	}
 
+	/**
 	// The first item in the poll table is the master link, which accepts new connections.
 	q->poll_table[0].link = q->master_link;
 	q->poll_table[0].events = LINK_READ;
 	q->poll_table[0].revents = 0;
+	*/
 
 	// For every worker in the hash table, add an item to the poll table
 	hash_table_firstkey(q->worker_table);
@@ -1314,9 +1319,10 @@ void work_queue_submit( struct work_queue *q, struct work_queue_task *t )
 }
 
 void add_more_workers (struct work_queue *q) {
-	int msec;
-	int result;
+	time_t stoptime;
+	//int result;
 
+	/**
 	// Allocate a small table, if it hasn't been done yet.
 	if(!q->poll_table) {
 		q->poll_table = malloc(sizeof(*q->poll_table)*q->poll_table_size);
@@ -1332,13 +1338,15 @@ void add_more_workers (struct work_queue *q) {
 	msec = 3000;
 
 	result = link_poll(q->poll_table,1,msec);
+	*/
 
 	// If the master link was awake, then accept as many workers as possible.
-	if(result) {
-		do {
-			add_worker(q);
-		} while (link_usleep(q->master_link,0,1,0));
-	}
+	//if(result) {
+	stoptime = time(0) + 2;
+	do {
+		add_worker(q);
+	} while (link_usleep(q->master_link,0,1,0) && stoptime > time(0));
+	//}
 }
 
 
@@ -1398,6 +1406,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			if(stoptime && time(0)>=stoptime) {
 				return 0;
 			} else {
+				
 				continue;
 			}
 		}
@@ -1415,6 +1424,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		}
 		*/
 
+		// This is after polling because new added workers must be in READY state in order to receive tasks.
 		start_tasks(q);
 
         // Transfer output
@@ -1423,7 +1433,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			if((w=hash_table_lookup(q->worker_table,key))) {
 				if(receive_output_from_worker(q, w)) {
 					start_task_on_worker(q,w);
-					add_more_workers(q);
+					//add_more_workers(q);
 				}
 			}
         }
