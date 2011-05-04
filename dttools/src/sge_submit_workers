@@ -79,5 +79,5 @@ chmod 755 worker.sh
 
 for n in `seq 1 $count`
 do
-	qsub $parameters worker.sh
+	qsub -cwd $parameters worker.sh
 done

@@ -289,7 +289,7 @@ batch_job_id_t batch_job_submit_simple_sge( struct batch_queue *q, const char *c
 	char *s = strchr(name,' ');
 	if(s) *s = 0;
 
-	sprintf(line,"qsub -o /dev/null -j y -N '%s' %s sge.wrapper \"%s\"",string_basename(name),q->options_text ? q->options_text : "",cmd);
+	sprintf(line,"qsub -cwd -o /dev/null -j y -N '%s' %s sge.wrapper \"%s\"",string_basename(name),q->options_text ? q->options_text : "",cmd);
 
 	debug(D_DEBUG,"%s",line);
 
