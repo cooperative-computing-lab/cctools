@@ -16,12 +16,12 @@ else
 	CLASSPATH=${CLASSPATH}:${JAVA_HOME}/jdk/jre/lib
 fi
 
-CLASSPATH=${CLASSPATH}:`ls ${HADOOP_HOME}/hadoop-*-core.jar | head -n 1`
-CLASSPATH=${CLASSPATH}:${HADOOP_HOME}/conf
-
-for f in ${HADOOP_HOME}/lib/*.jar; do
-	CLASSPATH=${CLASSPATH}:$f
+for file in ${HADOOP_HOME}/*.jar ${HADOOP_HOME}/lib/*.jar
+do
+	CLASSPATH=${CLASSPATH}:$file
 done
+
+CLASSPATH=${CLASSPATH}:${HADOOP_HOME}/conf
 export CLASSPATH
 
 if [ -z $LIBJVM_PATH ]; then
