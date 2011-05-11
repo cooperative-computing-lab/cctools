@@ -611,7 +611,7 @@ INT64_T chirp_hdfs_unlink(const char *path)
 INT64_T chirp_hdfs_rename(const char *path, const char *newpath)
 {
 	path = FIXPATH(path);
-	newpath = FIXPATH(path);
+	newpath = FIXPATH(newpath);
 	debug(D_HDFS, "rename %s -> %s", path, newpath);
 	hdfs_services->unlink(fs, newpath);
 	return hdfs_services->rename(fs, path, newpath);
@@ -620,7 +620,7 @@ INT64_T chirp_hdfs_rename(const char *path, const char *newpath)
 INT64_T chirp_hdfs_link(const char *path, const char *newpath)
 {
 	path = FIXPATH(path);
-	newpath = FIXPATH(path);
+	newpath = FIXPATH(newpath);
 	debug(D_HDFS, "link %s -> %s", path, newpath);
 	return (errno = ENOTSUP, -1);
 }
@@ -628,7 +628,7 @@ INT64_T chirp_hdfs_link(const char *path, const char *newpath)
 INT64_T chirp_hdfs_symlink(const char *path, const char *newpath)
 {
 	path = FIXPATH(path);
-	newpath = FIXPATH(path);
+	newpath = FIXPATH(newpath);
 	debug(D_HDFS, "symlink %s -> %s", path, newpath);
 	return (errno = ENOTSUP, -1);
 }
