@@ -3,11 +3,13 @@
 if [ -z "$JAVA_HOME" ]
 then
 	echo 2>&1 "$0: Sorry, you must set JAVA_HOME to point to your Java installation."
+	exit 1
 fi
 
 if [ -z "$HADOOP_HOME" ]
 then
 	echo 2>&1 "$0: Sorry, you must set HADOOP_HOME to point to your Hadoop installation."
+	exit 1
 fi
 
 if [ -z $CLASSPATH ]; then
