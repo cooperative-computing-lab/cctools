@@ -70,6 +70,7 @@ struct hdfs_library {
 	int	(*chmod) (hdfsFS, const char *, short);
 	int	(*utime) (hdfsFS, const char *, tTime, tTime);
 	int	(*chdir) (hdfsFS, const char *);
+	tOffset (*tell) (hdfsFS, hdfsFile);
 };
 
 struct hdfs_library *hdfs_library_open();
