@@ -201,10 +201,9 @@ static INT64_T do_put_one_link( const char *hostport, const char *source_file, c
 
 	result = readlink(source_file,linkdata,sizeof(linkdata));
 	if(result>0) {
-		char linkdatafull[CHIRP_PATH_MAX];
 		linkdata[result] = 0;
 		chirp_reli_unlink(hostport,target_file,stoptime);
-       		result = chirp_reli_symlink(hostport,linkdatafull,target_file,stoptime);
+       		result = chirp_reli_symlink(hostport,linkdata,target_file,stoptime);
 		if(result>=0) result = 0;
 	}
 
