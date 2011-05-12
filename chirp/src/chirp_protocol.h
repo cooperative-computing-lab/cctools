@@ -91,6 +91,9 @@ used by both the client and server implementations of the protocol.
 /** Error: A attempted operation does not apply to a pipe. */
 #define CHIRP_ERROR_IS_A_PIPE -22
 
+/** Error: This operation is not supported by this server. */
+#define CHIRP_ERROR_NOT_SUPPORTED -23
+
 /** Error: An unknown error occurred. */
 #define CHIRP_ERROR_UNKNOWN -127
 
