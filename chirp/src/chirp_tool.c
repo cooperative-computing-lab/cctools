@@ -710,7 +710,7 @@ static INT64_T do_resetacl( int argc, char **argv )
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1],full_path);
 
-	acl_simple(&argv[3]);
+	acl_simple(&argv[2]);
 
 	return chirp_reli_resetacl(current_host,full_path,argv[2],stoptime);
 }
