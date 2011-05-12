@@ -331,9 +331,40 @@ INT64_T chirp_hdfs_pread(int fd, void *buffer, INT64_T length, INT64_T offset)
 
 INT64_T chirp_hdfs_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
 {
-	/* Strided write won't work on HDFS because it is a variation on random write. */
-	errno = ENOTSUP;
-	return -1;
+	INT64_T total = 0;
+	INT64_T actual = 0;
+	char *buffer = vbuffer;
+
+	if(stride_length < 0 || stride_skip < 0 || offset < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	while(length >= stride_length) {
+		actual = chirp_hdfs_pread(fd, &buffer[total], stride_length, offset);
+		if(actual > 0) {
+			length -= actual;
+			total += actual;
+			offset += stride_skip;
+			if(actual == stride_length) {
+				continue;
+			} else {
+				break;
+			}
+		} else {
+			break;
+		}
+	}
+
+	if(total > 0) {
+		return total;
+	} else {
+		if(actual < 0) {
+			return -1;
+		} else {
+			return 0;
+		}
+	}
 }
 
 void chirp_hdfs_write_zeroes( int fd, INT64_T length )
@@ -657,7 +688,7 @@ INT64_T chirp_hdfs_statfs(const char *path, struct chirp_statfs * buf)
 	INT64_T used = hdfs_services->get_used(fs);
 	INT64_T blocksize = hdfs_services->get_default_block_size(fs);
 
-	if(capacity == -1 || used == -1 || blocksize == -1)
+	if(capacity<0 || used<0 || blocksize<0)
 		return (errno = EIO, -1);
 
 	buf->f_type = 0;

@@ -196,8 +196,8 @@ static void install_handler( int sig, void (*handler)(int sig))
 }
 
 /*
-This wrapper functin is needed because statfs is called in both
-the parent and chile processes, but it is not safe to use 
+This wrapper function is needed because statfs is called in both
+the parent and child processes, but it is not safe to use 
 a chirp_filesystem_hdfs within the parent process.
 Where needed, we fork first and then pass the result back.
 */
@@ -215,17 +215,17 @@ static INT64_T safe_statfs (const char *path, struct chirp_statfs *buf)
 	pid_t pid = fork();
 	if(pid == 0) { /* child */
 		close(fildes[0]);
-		if(!cfs->init(chirp_root_path)) {
-			_exit(1);
-		}
+		if(cfs->init(chirp_root_path)) _exit(1);
 		cfs_create_dir(chirp_root_path, 0771);
 		if (cfs->statfs(chirp_root_path, buf) == 0) {
 			write(fildes[1],buf, sizeof(*buf));
 		}
 		_exit(0);
 	} else if(pid>0) { /* parent */
+		total_child_procs++;
+		// corresponding wait takes place in reap_child()
 		close(fildes[1]);
-		int r = read(fildes[0],buf,sizeof(*buf));
+		int r = full_read(fildes[0],buf,sizeof(*buf));
 		close(fildes[0]);
 		if(r==sizeof(*buf)) {
 			return 0;
@@ -302,7 +302,9 @@ static void update_all_catalogs()
 	load_average_get(avg);
 	cpus = load_average_get_cpus();
 
-	safe_statfs(chirp_root_path, &info);
+	if(safe_statfs(chirp_root_path, &info)<0) {
+		memset(&info,0,sizeof(info));
+	}
 
 	memory_info_get(&memory_avail,&memory_total);
 	uptime = time(0)-starttime;
@@ -345,25 +347,21 @@ static void update_all_catalogs()
 static void gc_tickets()
 {
    	if (single_mode) { /* chirp_server process can handle it */
-       	chirp_acl_gctickets(chirp_root_path);
-	}
-	else {
-		/* We need to fork a new process that does statfs because
-		 * we cannot be connected to Hadoop in the chirp_server process.
-		 */
+		chirp_acl_gctickets(chirp_root_path);
+	} else {
 		pid_t child = fork();
 		if (child == 0) { /* child */
-			if (cfs->init(chirp_root_path) != 0) {
-				kill(chirp_master_pid, SIGABRT);
-				raise(SIGABRT);
-				_exit(-1);
-			}
+			if (cfs->init(chirp_root_path)) _exit(1);
 			cfs_create_dir(chirp_root_path, 0771);
 			chirp_acl_gctickets(chirp_root_path);
 			cfs->destroy();
 			_exit(0);
-		} else if (child == -1)
-			fatal("could not fork process for statfs");
+		} else if(child>0) { /* parent */
+		       total_child_procs++;
+		       // corresponding wait() occurs in reap_child()
+		} else {
+		       debug(D_NOTICE,"couldn't fork process to garbage collect auth tickets");
+		}
 	}
 }
 
@@ -551,7 +549,7 @@ int main( int argc, char *argv[] )
 			fatal("couldn't get working dir: %s\n",strerror(errno));
 	}
 
-    if (single_mode) {
+	if (single_mode) {
 		if (cfs->init(chirp_root_path) == 0) {
 			cfs_create_dir(chirp_root_path, 0771);
 		} else {
@@ -560,16 +558,16 @@ int main( int argc, char *argv[] )
 	} else { /* fork and initialize (setup possibly new root directory) */
 		pid_t child = fork();
 		if (child == 0) { /* child */
-			if (cfs->init(chirp_root_path) != 0) {
-				kill(chirp_master_pid, SIGABRT);
-				raise(SIGABRT);
-				_exit(-1);
-			}
+			if(cfs->init(chirp_root_path)) _exit(1);
 			cfs_create_dir(chirp_root_path, 0771);
 			cfs->destroy();
 			_exit(0);
-		} else if (child == -1)
-			fatal("could not fork process for init");
+		} else if(child>0) {
+			int status;
+			wait(&status);
+		} else {
+			fatal("could not fork process to initialize backend filesystem: %s",strerror(errno));
+		}
 	}
 
 	if(!list_size(catalog_host_list)) {
@@ -666,6 +664,7 @@ int main( int argc, char *argv[] )
 
 		if(max_child_procs>0) {
 			if(total_child_procs>=max_child_procs) {
+				debug(D_PROCESS,"max of %d child processes reached, waiting for one to finish...");
 				// Note that this will be interrupted by SIGCHILD
 				sleep(5);
 				continue;
@@ -689,8 +688,8 @@ int main( int argc, char *argv[] )
 			if(pid==0) {
 				change_process_title("chirp_server [authenticating]");
 				install_handler(SIGCHLD,ignore_signal);
-                if (cfs->init(chirp_root_path) != 0)
-      				fatal("could not initialize backend filesystem: %s", strerror(errno));
+				if(cfs->init(chirp_root_path))
+					fatal("could not initialize backend filesystem: %s", strerror(errno));
 				cfs_create_dir(chirp_root_path, 0771);
 				chirp_receive(l);
 				cfs->destroy(); /* disconnect from backend */
