@@ -2309,6 +2309,10 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 				p->syscall_result = pfs_copyfile(source,target);
 
+				if(p->syscall_result<0) {
+					p->syscall_result = -errno;
+				}
+
 				divert_to_dummy(p,p->syscall_result);
 			}
 			break;
@@ -2320,7 +2324,10 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				p->syscall_result = pfs_md5(path,(unsigned char*)digest);
 				if(p->syscall_result>=0) {
 					tracer_copy_out(p->tracer,digest,(void*)args[1],sizeof(digest));
+				} else {
+					p->syscall_result = -errno;
 				}
+
 				divert_to_dummy(p,p->syscall_result);
 			}
 			break;
