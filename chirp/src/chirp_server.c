@@ -195,60 +195,47 @@ static void install_handler( int sig, void (*handler)(int sig))
 	sigaction(sig,&s,0);
 }
 
+/*
+This wrapper functin is needed because statfs is called in both
+the parent and chile processes, but it is not safe to use 
+a chirp_filesystem_hdfs within the parent process.
+Where needed, we fork first and then pass the result back.
+*/
+
 static INT64_T safe_statfs (const char *path, struct chirp_statfs *buf)
 {
+	if(single_mode || getpid()!=chirp_master_pid) {
+		return cfs->statfs(path,buf);
+	}
+
 	int fildes[2];
 
-	buf->f_bsize = 4096;
-	buf->f_bfree = 1;
-	buf->f_blocks = 1;
+	if(pipe(fildes)<0) return -1;
 
-   	if (single_mode) { /* chirp_server process can handle it */
-       	return cfs->statfs(chirp_root_path, buf);
-	}
-	else {
-		/* We need to fork a new process that does statfs because
-		 * we cannot be connected to Hadoop in the chirp_server process.
-		 */
-		if (pipe(fildes) == -1)
-			fatal("could not create pipe");
-		pid_t child = fork();
-		if (child == 0) { /* child */
-			close(fildes[0]);
-			if (cfs->init(chirp_root_path) != 0) {
-				kill(chirp_master_pid, SIGABRT);
-				raise(SIGABRT);
-				_exit(-1);
-			}
-			cfs_create_dir(chirp_root_path, 0771);
-       		if (cfs->statfs(chirp_root_path, buf) == 0) {
-				write(fildes[1], &buf->f_bsize, sizeof(buf->f_bsize));
-				write(fildes[1], &buf->f_bfree, sizeof(buf->f_bfree));
-				write(fildes[1], &buf->f_blocks, sizeof(buf->f_blocks));
-			}
-			cfs->destroy();
-			close(fildes[1]);
-			_exit(0);
-		} else if (child == -1)
-			fatal("could not fork process for statfs");
-		close(fildes[1]);
-
-		ssize_t r;
-		r = read(fildes[0], &buf->f_bsize, sizeof(buf->f_bsize));
-		if (r != sizeof(buf->f_bsize)) goto finish;
-		r = read(fildes[0], &buf->f_bfree, sizeof(buf->f_bfree));
-		if (r != sizeof(buf->f_bfree)) goto finish;
-		buf->f_bavail = buf->f_bfree; /* copy */
-		r = read(fildes[0], &buf->f_blocks, sizeof(buf->f_blocks));
-		if (r != sizeof(buf->f_blocks)) goto finish;
-
-finish:
+	pid_t pid = fork();
+	if(pid == 0) { /* child */
 		close(fildes[0]);
-
-		return 0;
+		if(!cfs->init(chirp_root_path)) {
+			_exit(1);
+		}
+		cfs_create_dir(chirp_root_path, 0771);
+		if (cfs->statfs(chirp_root_path, buf) == 0) {
+			write(fildes[1],buf, sizeof(*buf));
+		}
+		_exit(0);
+	} else if(pid>0) { /* parent */
+		close(fildes[1]);
+		int r = read(fildes[0],buf,sizeof(*buf));
+		close(fildes[0]);
+		if(r==sizeof(*buf)) {
+			return 0;
+		} else {
+			return -1;
+		}
+	} else {
+		return -1;
 	}
 }
-
 /*
 space_available() is a simple mechanism to ensure that
 a runaway client does not use up every last drop of disk
@@ -271,8 +258,8 @@ static int space_available( INT64_T amount )
 	current = time(0);
 
 	if( (current-last_check) > check_interval) {
-        struct chirp_statfs buf;
-		safe_statfs(chirp_root_path, &buf);
+		struct chirp_statfs buf;
+		if(safe_statfs(chirp_root_path, &buf)<0) return 0;
 		avail = buf.f_bsize*buf.f_bfree;
 		total = buf.f_bsize*buf.f_blocks;
 		last_check = current;
@@ -1775,6 +1762,8 @@ static int errno_to_chirp( int e )
 		return CHIRP_ERROR_NO_SUCH_PROCESS;
 	case ESPIPE:
 		return CHIRP_ERROR_IS_A_PIPE;
+	case ENOTSUP:
+		return CHIRP_ERROR_NOT_SUPPORTED;
 	default:
 		debug(D_CHIRP,"zoiks, I don't know how to transform error %d (%s)\n",errno,strerror(errno));
 		return CHIRP_ERROR_UNKNOWN;
