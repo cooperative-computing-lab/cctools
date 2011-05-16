@@ -60,7 +60,6 @@ See the file COPYING for details.
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
 static struct datagram *outgoing_datagram = NULL;
-static time_t catalog_update_time = 0;
 //static time_t efficiency_update_time = 0;
 int wq_tolerable_transfer_time_multiplier = 10;
 int wq_minimum_transfer_timeout = 3;
@@ -213,7 +212,6 @@ static void change_worker_state( struct work_queue *q, struct work_queue_worker 
 	q->workers_in_state[state]++;
 	if(q->master_mode ==  WORK_QUEUE_MASTER_MODE_CATALOG) {	
 		update_catalog(q);
-		catalog_update_time = time(0);
 	}
 	debug(D_WQ, "Number of workers in state 'busy': %d;  'ready': %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_READY]);
 }
@@ -1276,9 +1274,7 @@ struct work_queue * work_queue_create( int port )
 	}
 
     if (q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
-        if(update_catalog(q)) {
-            catalog_update_time = time(0);
-        } else {
+        if(update_catalog(q) == -1) {
             fprintf(stderr, "Reporting master info to catalog server failed!");
         }
     }
@@ -1438,9 +1434,8 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 
 	
 	while(1) {
-		if(q->master_mode ==  WORK_QUEUE_MASTER_MODE_CATALOG && time(0) - catalog_update_time >= WORK_QUEUE_CATALOG_UPDATE_INTERVAL) {	
+		if(q->master_mode ==  WORK_QUEUE_MASTER_MODE_CATALOG) {	
 			update_catalog(q);
-			catalog_update_time = time(0);
 		}
 
 		/**
@@ -1774,14 +1769,17 @@ static int update_catalog(struct work_queue* q)
 {
 	char address[DATAGRAM_ADDRESS_MAX];
 	static char text[WORK_QUEUE_CATALOG_LINE_MAX];
+	static time_t last_update_time = 0;
 	struct work_queue_stats s;
 	int port;
+
+	if(time(0) - last_update_time < WORK_QUEUE_CATALOG_UPDATE_INTERVAL) return 0;
 
     if(!outgoing_datagram) {
         outgoing_datagram = datagram_create(0);
         if(!outgoing_datagram)
             fprintf(stderr, "Couldn't create outgoing udp port, thus work queue master info won't be sent to the catalog server!");
-            return 0;
+            return -1;
     }
 
 	port = work_queue_port(q);
@@ -1808,5 +1806,6 @@ static int update_catalog(struct work_queue* q)
 		datagram_send(outgoing_datagram, text, strlen(text), address, CATALOG_PORT);
 	}
 
+	last_update_time = time(0);
 	return 1;
 }
