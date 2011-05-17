@@ -1,0 +1,81 @@
+#!/bin/sh
+
+max_num_of_workers=100
+
+show_help() 
+{
+	echo "Use: sge_submit_workers [options] <project-name> <makeflow-script>"
+	echo "Note, this script has only been tested in the Notre Dame SGE environment. Also, it requires a catalog server to work properly."
+	echo "options:"
+	echo "  -p <parameters>  SGE qsub parameters."
+	echo "  -w <number>      Submit <number> workers."
+	echo "  -h               Show this help message."
+	exit 1
+}
+
+parameters=""
+num_of_workers=0
+
+while getopts p:w:h opt 
+do
+	case "$opt" in
+		p)  parameters="$parameters $OPTARG";;
+		w)  num_of_workers=$OPTARG;;
+		h)  show_help;;
+		\?) show_help;;
+	esac
+done
+
+shift $(expr $OPTIND - 1)
+
+if [ $# = 2 ]; then
+	project_name=$1
+	makeflow_script=$2
+else
+	show_help	
+fi
+
+
+makeflow=`which makeflow 2>/dev/null`
+if [ $? != 0 ]; then
+	echo "$0: please add 'makeflow' to your PATH."
+	exit 1
+fi
+
+qsub=`which qsub 2>/dev/null`
+if [ $? != 0 ]; then
+	echo "$0: please add 'qsub' to your PATH."
+	exit 1
+fi
+
+if [ ! -e $makeflow_script ]; then
+	echo "Makeflow script - $makeflow_script does not exist."
+	exit 1
+fi
+
+if [ $num_of_workers -ne 0 ]; then
+	sge_submit_workers=`which sge_submit_workers 2>/dev/null`
+	if [ $? != 0 ]; then
+		echo "$0: please add 'sge_submit_workers' to your PATH."
+		exit 1
+	else 
+		if [ $num_of_workers -gt $max_num_of_workers ]; then
+			$num_of_workers = $max_num_of_workers
+		fi
+		sge_submit_workers -a -N $project_name $num_of_workers	
+	fi
+fi
+
+echo $num_of_workers workers have been submitted to SGE.		
+
+cp $makeflow .
+
+cat >sge_submit.sh <<EOF
+#!/bin/sh
+./makeflow -T wq -a -e -N $project_name $makeflow_ops $makeflow_script
+EOF
+
+chmod 755 sge_submit.sh
+
+qsub $parameters sge_submit.sh
+
