@@ -4,8 +4,10 @@
 #include "debug.h"
 #include "dpopen.h"
 #include "full_io.h"
+#include "hash_table.h"
 #include "link.h"
 #include "md5.h"
+#include "sort_dir.h"
 #include "xmalloc.h"
 
 #include <sys/stat.h>
@@ -19,21 +21,19 @@
 #define DIGEST_LENGTH  (MD5_DIGEST_LENGTH_HEX)
 #define CHALLENGE_LENGTH  (64)
 
-static int auth_ticket_assert (struct link *link, struct hash_table *t, time_t stoptime)
+static struct hash_table *server_tickets = NULL;
+static char **client_tickets = NULL;
+
+static int auth_ticket_assert (struct link *link, time_t stoptime)
 {
   /* FIXME need to save errno ? */
   char line[AUTH_LINE_MAX];
-
-  char **tickets=0;
   
-  if (t)
-	tickets = (char **) hash_table_lookup(t, "ticket");
-
-  if (tickets) {
+  if (client_tickets) {
 	char *ticket;
     char digest[DIGEST_LENGTH];
 
-	while ((ticket = *(tickets++)) != NULL) {
+	while ((ticket = *(client_tickets++)) != NULL) {
   	  char command[PATH_MAX*2+4096];
 
 	  /* load the digest */
@@ -108,19 +108,15 @@ static int auth_ticket_assert (struct link *link, struct hash_table *t, time_t s
   return 0;
 }
 
-static int auth_ticket_accept (struct link *link, char **subject, struct hash_table *t, time_t stoptime)
+static int auth_ticket_accept (struct link *link, char **subject, time_t stoptime)
 {
   int serrno = errno;
   int status = 0;
   char line[AUTH_LINE_MAX];
   char ticket_subject[AUTH_LINE_MAX];
-  struct hash_table *TICKETS = NULL;
 
   errno = 0;
   
-  if (t)
-    TICKETS = (struct hash_table *) hash_table_lookup(t, "ticket");
-
   debug(D_AUTH, "ticket: waiting for tickets");
 
   while (1) {
@@ -133,8 +129,8 @@ static int auth_ticket_accept (struct link *link, char **subject, struct hash_ta
         strcpy(ticket_digest, line);
         strcpy(ticket_subject, line);
         debug(D_AUTH, "ticket: read ticket digest: %s", ticket_digest);
-        if (TICKETS) {
-          char *ticket = hash_table_lookup(TICKETS, ticket_digest);
+        if (server_tickets) {
+          char *ticket = hash_table_lookup(server_tickets, ticket_digest);
           if (ticket) {
             static const char command_template[] = 
                 "T1=`mktemp`\n" /* The RSA Public Key */
@@ -204,8 +200,68 @@ static int auth_ticket_accept (struct link *link, char **subject, struct hash_ta
   return status;
 }
 
-int auth_ticket_register()
+int auth_ticket_register( void )
 {
+	if (!server_tickets) server_tickets = hash_table_create(0, 0);
+	if (!server_tickets) return 0;
+	if (!client_tickets) {
+		client_tickets = xxrealloc(NULL, sizeof(char *));
+		client_tickets[0] = NULL;
+	}
 	debug(D_AUTH,"ticket: registered");
 	return auth_register("ticket",auth_ticket_assert,auth_ticket_accept);
+}
+
+void auth_ticket_clear( void )
+{
+	if (server_tickets) {
+		char *digest, *ticket;
+		hash_table_firstkey(server_tickets);
+		while (hash_table_nextkey(server_tickets, &digest, (void **) &ticket))
+			free(ticket);
+		hash_table_delete(server_tickets);
+		server_tickets = hash_table_create(0, 0);
+	}
+}
+
+void auth_ticket_add( const char *digest, const char *ticket )
+{
+	hash_table_insert(server_tickets, digest, strdup(ticket));
+}
+
+void auth_ticket_load( const char *tickets )
+{
+	size_t n = 0;
+	client_tickets = xxrealloc(client_tickets, sizeof(char *));
+	client_tickets[n] = NULL;
+
+	if (tickets) {
+		const char *start, *end;
+		for (start = end = tickets; start < tickets+strlen(tickets); start = ++end)
+		{   
+			while (*end != '\0' && *end != ',') end++;
+			if (start == end) continue;
+			char *value = xxmalloc(end-start+1);
+			memset(value, 0, end-start+1);
+			strncpy(value, start, end-start);
+			debug(D_CHIRP, "adding %s", value);
+			client_tickets = xxrealloc(client_tickets, sizeof(char *)*((++n)+1));
+			client_tickets[n-1] = value;
+			client_tickets[n] = NULL;
+		}
+	} else {
+		/* populate a list with tickets in the current directory */
+		int i;
+		char **list;
+		sort_dir(".", &list, strcmp);
+		for (i = 0; list[i]; i++) {
+			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 && (strlen(list[i]) == (strlen("ticket.")+(MD5_DIGEST_LENGTH<<1)))) {
+				debug(D_CHIRP, "adding ticket %s", list[i]);
+				client_tickets = xxrealloc(client_tickets, sizeof(char *)*((++n)+1));
+				client_tickets[n-1] = strdup(list[i]);
+				client_tickets[n] = NULL;
+			}
+		}
+		sort_dir_free(list);
+	}
 }

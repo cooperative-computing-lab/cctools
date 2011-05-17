@@ -133,37 +133,8 @@ struct chirp_client * chirp_client_connect( const char *hostport, int negotiate_
 	        link_tune(c->link,LINK_TUNE_INTERACTIVE);
 			if(negotiate_auth) {
 				char *type, *subject;
-				struct hash_table *t = hash_table_create(0, 0);
-                size_t ntickets = 0;
-                char **tickets = (char **) xxrealloc(NULL, sizeof(char *)*(ntickets+1));
-				tickets[ntickets] = NULL;
 
-				/* populate the table with tickets */
-				const char *TICKETS = getenv(CHIRP_CLIENT_TICKETS);
-				const char *start, *end;
-				for (start = end = TICKETS; TICKETS && start < TICKETS+strlen(TICKETS); start = ++end)
-				{
-					while (*end != '\0' && *end != ',') end++;
-                    if (start == end) continue;
-					char *value = xxmalloc(end-start+1);
-                    memset(value, 0, end-start+1);
-					strncpy(value, start, end-start);
-					debug(D_CHIRP, "adding %s", value);
-					tickets[ntickets] = value;
-					tickets = xxrealloc(tickets, sizeof(char *)*((++ntickets)+1));
-					tickets[ntickets] = NULL;
-				}
-
-				int result = hash_table_insert(t, "ticket", tickets);
-
-				result = auth_assert(c->link,&type,&subject,t,stoptime);
-
-				{
-					size_t i;
-					for (i = 0; tickets[i]; i++) free(tickets[i]);
-					free(tickets);
-					hash_table_delete(t);
-				}
+				int result = auth_assert(c->link,&type,&subject,stoptime);
 
 				if(result) {
 					free(type);

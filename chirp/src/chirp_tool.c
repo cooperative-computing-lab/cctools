@@ -29,6 +29,7 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "debug.h"
 #include "auth_all.h"
+#include "auth_ticket.h"
 #include "stringtools.h"
 #include "xmalloc.h"
 #include "list.h"
@@ -212,7 +213,7 @@ int main( int argc, char *argv[] )
 {	
 	char *temp;
 	int did_explicit_auth = 0;
-	int did_ticket = 0;
+    char *tickets = NULL;
 	char prompt[CHIRP_LINE_MAX];
 	char line[CHIRP_LINE_MAX];
 	char **user_argv=0;
@@ -236,11 +237,7 @@ int main( int argc, char *argv[] )
 				exit(0);
 				break;
 			case 'i':
-				if (setenv(CHIRP_CLIENT_TICKETS, optarg, 1) != 0) {
-					fprintf(stderr, "couldn't setenv\n");
-					return 1;
-				}
-				did_ticket = 1;
+				tickets = strdup(optarg);
 				break;
 			case 'l':
 				long_information = 1;
@@ -256,25 +253,15 @@ int main( int argc, char *argv[] )
 	}
  
 	if(!did_explicit_auth) auth_register_all();
-	if(!did_ticket && getenv(CHIRP_CLIENT_TICKETS) == NULL) {
-		/* populate a list with tickets in the current directory */
-		int i;
-		char **list;
-		char *tickets = xstrdup("");
-		sort_dir(".", &list, strcmp);
-		for (i = 0; list[i]; i++) {
-			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 && (strlen(list[i]) == (strlen("ticket.")+(MD5_DIGEST_LENGTH<<1)))) {
-				debug(D_CHIRP, "adding ticket %s", list[i]);
-				tickets = xxrealloc(tickets, strlen(tickets)+1+strlen(list[i])+1);
-                if (*tickets != '\0') /* non-empty? */
-					strcat(tickets, ",");
-				strcat(tickets, list[i]);
-			}
-		}
-		setenv(CHIRP_CLIENT_TICKETS, tickets, 1);
+	if(tickets) {
+		auth_ticket_load(tickets);
 		free(tickets);
-		sort_dir_free(list);
-	}
+	} else if (getenv(CHIRP_CLIENT_TICKETS)) {
+		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
+	} else {
+        auth_ticket_load(NULL);
+    }
+
 	getcwd(current_local_dir,CHIRP_PATH_MAX);
 
 	interactive_mode = isatty(0);

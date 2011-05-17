@@ -734,11 +734,19 @@ static void chirp_receive( struct link *link )
 
 	if(extra_latency) millisleep(extra_latency*4);
 
-    struct hash_table *t = hash_table_create(0, 0);
-    struct hash_table *ticket = hash_table_create(0, 0);
-    hash_table_insert(t, "ticket", ticket);
+	auth_ticket_clear();
+	struct hash_table *tickets = hash_table_create(0, 0);
+	if (chirp_acl_gettickets(".", tickets) == 0) {
+		char *key, *value;
+		hash_table_firstkey(tickets);
+		while (hash_table_nextkey(tickets, &key, (void **) &value)) {
+			auth_ticket_add(key, value);
+			free(value);
+		}
+	}
+	hash_table_delete(tickets);
 
-    if (chirp_acl_gettickets(".", ticket) == -1 || auth_accept(link,&atype,&asubject,t,time(0)+idle_timeout)) {
+    if (auth_accept(link,&atype,&asubject,time(0)+idle_timeout)) {
 		sprintf(typesubject,"%s:%s",atype,asubject);
 		free(atype);
 		free(asubject);
@@ -774,15 +782,6 @@ static void chirp_receive( struct link *link )
 		debug(D_LOGIN,"authentication failed from %s:%d",addr,port);
 	}
 
-    hash_table_delete(t);
-    {   
-        char *key, *entry;
-        hash_table_firstkey(ticket);
-        while (hash_table_nextkey(ticket, &key, (void **) &entry))
-            free(entry);
-    }
-    hash_table_delete(ticket);
-    
     link_close(link);
 	chirp_stats_local_end(local_stats);
 	chirp_stats_sync();

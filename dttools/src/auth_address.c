@@ -21,7 +21,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <errno.h>
 
-static int auth_address_assert( struct link *link, struct hash_table *t, time_t stoptime )
+static int auth_address_assert( struct link *link, time_t stoptime )
 {
 	char line[AUTH_LINE_MAX];
 
@@ -38,7 +38,7 @@ static int auth_address_assert( struct link *link, struct hash_table *t, time_t 
 	return 0;
 }
 
-static int auth_address_accept( struct link *link, char **subject, struct hash_table *t, time_t stoptime )
+static int auth_address_accept( struct link *link, char **subject, time_t stoptime )
 {
 	char addr[LINK_ADDRESS_MAX];
 	int port;

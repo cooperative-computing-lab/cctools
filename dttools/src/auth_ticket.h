@@ -4,16 +4,15 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "hash_table.h"
-
 int auth_ticket_register(void);
 
-/* Generates a hash table full of <public key digest, private key>
- * pairs to be stored in the auth hash table (with key "ticket").
- *
- * The tickets argument is a comma separated list of (private key)
- * ticket files. Whitespace is not ignored.
- *
- * All value strings normally must be freed when authentication finishes.
+/* Clear all tickets stored for server authentication. */
+void auth_ticket_clear (void);
+
+/* Add a digest/ticket pair for server authentication. */
+void auth_ticket_add (const char *digest, const char *ticket);
+
+/* Add tickets to client side tickets to try or, if NULL, load
+ * tickets from current working directory.
  */
-//struct *hash_table auth_ticket_gather (const char *tickets);
+void auth_ticket_load (const char *tickets);

@@ -56,7 +56,7 @@ static int write_token(void *link, void *buf, size_t size)
 	}
 }
 
-static int auth_globus_assert( struct link *link, struct hash_table *h, time_t stoptime )
+static int auth_globus_assert( struct link *link, time_t stoptime )
 {
 	gss_cred_id_t credential = GSS_C_NO_CREDENTIAL;
 	gss_ctx_id_t context = GSS_C_NO_CONTEXT;
@@ -107,7 +107,7 @@ static int auth_globus_assert( struct link *link, struct hash_table *h, time_t s
 	return success;
 }
 
-static int auth_globus_accept( struct link *link, char **subject, struct hash_table *h, time_t stoptime )
+static int auth_globus_accept( struct link *link, char **subject, time_t stoptime )
 {
 	gss_cred_id_t credential = GSS_C_NO_CREDENTIAL;
 	gss_ctx_id_t context = GSS_C_NO_CONTEXT;
