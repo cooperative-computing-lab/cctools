@@ -4,7 +4,7 @@ max_num_of_workers=100
 
 show_help() 
 {
-	echo "Use: sge_submit_workers [options] <project-name> <makeflow-script>"
+	echo "Use: sge_submit_makeflow [options] <project-name> <makeflow-script>"
 	echo "Note, this script has only been tested in the Notre Dame SGE environment. Also, it requires a catalog server to work properly."
 	echo "options:"
 	echo "  -p <parameters>  SGE qsub parameters."
