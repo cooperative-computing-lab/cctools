@@ -248,7 +248,7 @@ void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s )
 	s->idle_percentage = (long double)(q->accumulated_idle_time + q->idle_time) / (timestamp_get() - q->accumulated_idle_start);
 }
 
-static void add_worker( struct work_queue *q )
+static int add_worker( struct work_queue *q )
 {
 	struct link *link;
 	struct work_queue_worker *w;
@@ -275,10 +275,14 @@ static void add_worker( struct work_queue *q )
 			debug(D_WQ,"worker %s added",w->addrport);
 			debug(D_WQ,"%d workers are connected in total now", hash_table_size(q->worker_table));
 			q->total_workers_joined++;
+
+			return 1;
 		} else {
 			link_close(link);
 		}			
 	}
+
+	return 0;
 }
 
 static void remove_worker( struct work_queue *q, struct work_queue_worker *w )
@@ -653,6 +657,7 @@ static int handle_worker( struct work_queue *q, struct link *l )
 			p->start = timestamp_get();
 			p->link = l;
             list_push_head(q->receive_output_waiting_list, p);
+			debug(D_WQ,"%s (%s) has finished its task. Output transfer is postponed.",w->hostname,w->addrport);
 		} else {
 	        debug(D_WQ,"Invalid message from worker %s (%s): %s",w->hostname,w->addrport,line);
 			goto failure;
@@ -1131,7 +1136,7 @@ static void start_tasks( struct work_queue *q )
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
-	while(list_size(q->ready_list)) {
+	while(list_size(q->ready_list) && q->workers_in_state[WORKER_STATE_READY]) {
 		t = list_peek_head(q->ready_list);
 		w = find_best_worker(q,t);
 		if(w) {
@@ -1384,8 +1389,8 @@ void work_queue_submit( struct work_queue *q, struct work_queue_task *t )
 	q->total_tasks_submitted++;
 }
 
-void add_more_workers (struct work_queue *q) {
-	time_t stoptime;
+static int add_more_workers (struct work_queue *q, int msec) {
+	timestamp_t stoptime;
 	//int result;
 
 	/**
@@ -1408,15 +1413,17 @@ void add_more_workers (struct work_queue *q) {
 
 	// If the master link was awake, then accept as many workers as possible.
 	//if(result) {
-	stoptime = time(0) + 2;
+	int count = 0;
+	stoptime = timestamp_get() + msec * 1000;
 	do {
-		add_worker(q);
-	} while (link_usleep(q->master_link,0,1,0) && stoptime > time(0));
+		if(add_worker(q)) count++;
+	} while (link_usleep(q->master_link,0,1,0) && stoptime > timestamp_get());
 	//}
+	return count;
 }
 
 
-void receive_output_of_one_task(struct work_queue *q);
+void receive_pending_output_of_one_task(struct work_queue *q, struct pending_output *p);
 
 struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 {
@@ -1424,7 +1431,10 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 	int i;
 	time_t stoptime;
 	int result;
+	int msec;
 	timestamp_t idle_start;
+	int added_workers;
+	struct pending_output *po;
 	
 	if(timeout==WORK_QUEUE_WAITFORTASK) {
 		stoptime = 0;
@@ -1449,26 +1459,50 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 
 		if(q->workers_in_state[WORKER_STATE_BUSY]==0 && list_size(q->ready_list)==0) break;
 
+		// Upper level application may have just submitted some new tasks. Try to dispatch them to ready workers.
+		start_tasks(q);
+
+		added_workers = 0;
 		if(q->workers_in_state[WORKER_STATE_READY] < list_size(q->ready_list)) {
-			add_more_workers(q);
+			// Wait no longer than the caller's patience.
+			if(stoptime) {
+				msec = MAX(0,(stoptime-time(0))*1000);
+			} else {
+				msec = 2000;
+			}
+			idle_start = timestamp_get();
+			added_workers = add_more_workers(q, msec);
+			int add_worker_time =  timestamp_get() - idle_start;
+			printf("added %d workers in %d microsec\n", added_workers, add_worker_time);
+		}
+
+		if(added_workers == 0) {
+			if((po=list_pop_head(q->receive_output_waiting_list))) {
+				receive_pending_output_of_one_task(q, po);
+				free(po);
+				continue;
+			}
 		}
 
 		int n = build_poll_table(q);
 
 		// Wait no longer than the caller's patience.
-		int msec;
 		if(stoptime) {
 			msec = MAX(0,(stoptime-time(0))*1000);
 		} else {
 			msec = 5000;
 		}
 
+		/**
 		if(list_size(q->receive_output_waiting_list)){
 			msec = 10;
-		}
+		}*/
 
+		printf("plan to poll for %d millisec.\n", msec);
 		idle_start = timestamp_get();
 		result = link_poll(q->poll_table,n,msec);
+		int tmp_idle = timestamp_get() - idle_start;
+		printf("poll idle time: %d microsec; poll result: %d\n", tmp_idle, result);
 		q->idle_time += timestamp_get() - idle_start;
 	
 		// If a process is waiting to complete, return without a task.
@@ -1476,7 +1510,8 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 
 		// If nothing was awake, restart the loop or return without a task.
 		if(result<=0) {
-			receive_output_of_one_task(q);
+			// TODO what to do here?
+			//receive_pending_output_of_one_task(q, po);
 			if(stoptime && time(0)>=stoptime) {
 				return 0;
 			} else {
@@ -1510,12 +1545,10 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 	return 0;
 }
 
-void receive_output_of_one_task(struct work_queue *q) {
-	struct pending_output *p;
+void receive_pending_output_of_one_task(struct work_queue *q, struct pending_output *p) {
 	struct work_queue_worker *w;
 	char key[WORK_QUEUE_CATALOG_LINE_MAX];
 
-	p=list_pop_head(q->receive_output_waiting_list);
 	if(!p) return;
 
 	link_to_hash_key(p->link,key);
