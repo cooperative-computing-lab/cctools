@@ -20,7 +20,7 @@ See the file COPYING for details.
 
 static int audit_count = 0;
 
-static int get_directory_owner( const char *path, char *owner )
+static int get_directory_owner(const char *path, char *owner)
 {
 	char aclpath[CHIRP_PATH_MAX];
 	char tmp[CHIRP_LINE_MAX];
@@ -28,25 +28,27 @@ static int get_directory_owner( const char *path, char *owner )
 	CHIRP_FILE *file;
 	int result;
 
-	sprintf(aclpath,"%s/.__acl",path);
+	sprintf(aclpath, "%s/.__acl", path);
 
-	file = cfs_fopen(aclpath,"r");
-	if(!file) return -1;
+	file = cfs_fopen(aclpath, "r");
+	if(!file)
+		return -1;
 
 	r = cfs_fgets(tmp, sizeof(tmp), file);
-	if(!r) return -1;
-	result = sscanf(tmp,"%[^ \t\n]",owner);
+	if(!r)
+		return -1;
+	result = sscanf(tmp, "%[^ \t\n]", owner);
 
 	cfs_fclose(file);
 
-	if(result==1) {
+	if(result == 1) {
 		return 0;
 	} else {
 		return -1;
 	}
 }
 
-static int chirp_audit_recursive( const char *path, struct hash_table *table )
+static int chirp_audit_recursive(const char *path, struct hash_table *table)
 {
 	void *dir;
 	char *name;
@@ -56,41 +58,48 @@ static int chirp_audit_recursive( const char *path, struct hash_table *table )
 	struct chirp_stat info;
 	int result;
 
-	result = get_directory_owner(path,owner);
-	if(result<0) strcpy(owner,"unknown");
+	result = get_directory_owner(path, owner);
+	if(result < 0)
+		strcpy(owner, "unknown");
 
-	entry = hash_table_lookup(table,owner);
+	entry = hash_table_lookup(table, owner);
 	if(!entry) {
 		entry = malloc(sizeof(*entry));
-		memset(entry,0,sizeof(*entry));
-		strcpy(entry->name,owner);
-		hash_table_insert(table,owner,entry);
+		memset(entry, 0, sizeof(*entry));
+		strcpy(entry->name, owner);
+		hash_table_insert(table, owner, entry);
 	}
 
 	entry->ndirs++;
 
 	dir = cfs->opendir(path);
 	if(!dir) {
-		debug(D_LOCAL,"audit: couldn't enter %s: %s",path,strerror(errno));
+		debug(D_LOCAL, "audit: couldn't enter %s: %s", path, strerror(errno));
 		return -1;
 	}
 
-	while((name=cfs->readdir(dir))) {
-		if(!strcmp(name,".")) continue;
-		if(!strcmp(name,"..")) continue;
-		if(!strncmp(name,".__",3)) continue;
-		if(!strncmp(name,".__",3)) continue;
+	while((name = cfs->readdir(dir))) {
+		if(!strcmp(name, "."))
+			continue;
+		if(!strcmp(name, ".."))
+			continue;
+		if(!strncmp(name, ".__", 3))
+			continue;
+		if(!strncmp(name, ".__", 3))
+			continue;
 
 		audit_count++;
-		if((audit_count%10000)==0) debug(D_LOCAL,"audit: %d items",audit_count);
+		if((audit_count % 10000) == 0)
+			debug(D_LOCAL, "audit: %d items", audit_count);
 
-		sprintf(subpath,"%s/%s",path,name);
+		sprintf(subpath, "%s/%s", path, name);
 
-		result = cfs->lstat(subpath,&info);
-		if(result<0) continue;
+		result = cfs->lstat(subpath, &info);
+		if(result < 0)
+			continue;
 
 		if(S_ISDIR(info.cst_mode)) {
-			chirp_audit_recursive(subpath,table);
+			chirp_audit_recursive(subpath, table);
 		} else {
 			entry->nfiles++;
 			entry->nbytes += info.cst_size;
@@ -102,33 +111,35 @@ static int chirp_audit_recursive( const char *path, struct hash_table *table )
 	return 0;
 }
 
-struct hash_table * chirp_audit( const char *path )
+struct hash_table *chirp_audit(const char *path)
 {
 	struct hash_table *table;
 	time_t stop, start;
 	int result;
 
 	/*
-	An audit can be time consuming and resource intensive,
-	so run the audit at a low priority so as not to hurt
-	anyone else.
-	*/
+	   An audit can be time consuming and resource intensive,
+	   so run the audit at a low priority so as not to hurt
+	   anyone else.
+	 */
 
 	nice(10);
 
-	table = hash_table_create(0,0);
-	if(!table) return 0;
+	table = hash_table_create(0, 0);
+	if(!table)
+		return 0;
 
 	audit_count = 0;
 
 	start = time(0);
-	debug(D_LOCAL,"audit: starting");
-	result = chirp_audit_recursive(path,table);
+	debug(D_LOCAL, "audit: starting");
+	result = chirp_audit_recursive(path, table);
 	stop = time(0);
-	if(stop==start) stop++;
-	debug(D_LOCAL,"audit: completed %d items in %d seconds (%d items/sec)",audit_count,(int)(stop-start),audit_count/(stop-start));
+	if(stop == start)
+		stop++;
+	debug(D_LOCAL, "audit: completed %d items in %d seconds (%d items/sec)", audit_count, (int) (stop - start), audit_count / (stop - start));
 
-	if(result<0) {
+	if(result < 0) {
 		chirp_audit_delete(table);
 		return 0;
 	} else {
@@ -136,16 +147,15 @@ struct hash_table * chirp_audit( const char *path )
 	}
 }
 
-void chirp_audit_delete( struct hash_table *table )
+void chirp_audit_delete(struct hash_table *table)
 {
 	char *key;
 	struct chirp_audit *entry;
 
 	hash_table_firstkey(table);
-	while(hash_table_nextkey(table,&key,(void*)&entry)) {
-		free(hash_table_remove(table,key));
+	while(hash_table_nextkey(table, &key, (void *) &entry)) {
+		free(hash_table_remove(table, key));
 	}
 
 	hash_table_delete(table);
 }
-

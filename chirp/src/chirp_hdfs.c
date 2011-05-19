@@ -94,7 +94,8 @@ INT64_T chirp_hdfs_init(const char *path)
 
 	if(!hdfs_services) {
 		hdfs_services = hdfs_library_open();
-		if(!hdfs_services) return -1;
+		if(!hdfs_services)
+			return -1;
 	}
 
 	debug(D_HDFS, "connecting to hdfs://%s:%u as '%s'\n", chirp_hdfs_hostname, chirp_hdfs_port, chirp_owner);
@@ -121,12 +122,12 @@ INT64_T chirp_hdfs_destroy(void)
 	return 0;
 }
 
-static void copystat(struct chirp_stat *cs, hdfsFileInfo * hs, const char *path )
+static void copystat(struct chirp_stat *cs, hdfsFileInfo * hs, const char *path)
 {
-	memset(cs,0,sizeof(*cs));
+	memset(cs, 0, sizeof(*cs));
 	cs->cst_dev = -1;
 	cs->cst_rdev = -2;
-        cs->cst_ino = hash_string(path);
+	cs->cst_ino = hash_string(path);
 	cs->cst_mode = hs->mKind == kObjectKindDirectory ? S_IFDIR : S_IFREG;
 
 	/* HDFS does not have execute bit, lie and set it for all files */
@@ -138,8 +139,9 @@ static void copystat(struct chirp_stat *cs, hdfsFileInfo * hs, const char *path 
 	cs->cst_blksize = hs->mBlockSize;
 
 	/* If the blocksize is not set, assume 64MB chunksize */
-	if(cs->cst_blksize<1) cs->cst_blksize = 64*1024*1024;
-	cs->cst_blocks = MAX(1,cs->cst_size/cs->cst_blksize);
+	if(cs->cst_blksize < 1)
+		cs->cst_blksize = 64 * 1024 * 1024;
+	cs->cst_blocks = MAX(1, cs->cst_size / cs->cst_blksize);
 
 	/* Note that hs->mLastAccess is typically zero. */
 	cs->cst_atime = cs->cst_mtime = cs->cst_ctime = hs->mLastMod;
@@ -158,7 +160,7 @@ INT64_T chirp_hdfs_stat(const char *path, struct chirp_stat * buf)
 
 	debug(D_HDFS, "stat %s", path);
 
-	file_info = hdfs_services->stat(fs,path);
+	file_info = hdfs_services->stat(fs, path);
 	if(file_info == NULL)
 		return (errno = ENOENT, -1);
 	copystat(buf, file_info, path);
@@ -183,7 +185,7 @@ void *chirp_hdfs_opendir(const char *path)
 	debug(D_HDFS, "listdir %s", path);
 
 	d = xxmalloc(sizeof(struct chirp_hdfs_dir));
-	d->info = hdfs_services->listdir(fs,path, &d->n);
+	d->info = hdfs_services->listdir(fs, path, &d->n);
 	d->i = 0;
 	d->path = xstrdup(path);
 
@@ -259,16 +261,16 @@ INT64_T chirp_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 
 	path = FIXPATH(path);
 
-	int result = chirp_hdfs_stat(path,&info);
+	int result = chirp_hdfs_stat(path, &info);
 
-	int file_exists = (result==0);
+	int file_exists = (result == 0);
 
 	fd = get_fd();
 	if(fd == -1)
 		return -1;
 
 	mode = 0600 | (mode & 0100);
-	
+
 	switch (flags & O_ACCMODE) {
 	case O_RDONLY:
 		debug(D_HDFS, "opening file %s (flags: %o) for reading; mode: %o", path, flags, mode);
@@ -279,9 +281,9 @@ INT64_T chirp_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 		break;
 	case O_WRONLY:
 		// You may truncate the file by deleting it.
-		if(flags&O_TRUNC) {
+		if(flags & O_TRUNC) {
 			if(file_exists) {
-				hdfs_services->unlink(fs,path);
+				hdfs_services->unlink(fs, path);
 				file_exists = 0;
 			}
 		} else {
@@ -292,7 +294,7 @@ INT64_T chirp_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 		}
 
 		// You cannot append to an existing file.
-		if(flags&O_APPEND) {
+		if(flags & O_APPEND) {
 			if(file_exists) {
 				errno = EACCES;
 				return -1;
@@ -300,14 +302,14 @@ INT64_T chirp_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 		}
 		break;
 	default:
-		debug(D_HDFS,"file %s must be opened O_RDONLY or O_WRONLY but not O_RDWR",path);
+		debug(D_HDFS, "file %s must be opened O_RDONLY or O_WRONLY but not O_RDWR", path);
 		errno = EACCES;
 		return -1;
 	}
 
 	open_files[fd].file = hdfs_services->open(fs, path, flags, 0, 0, 0);
 	if(open_files[fd].file == NULL) {
-		debug(D_HDFS, "open %s failed: %s",path,strerror(errno));
+		debug(D_HDFS, "open %s failed: %s", path, strerror(errno));
 		return -1;
 	} else {
 		open_files[fd].name = xstrdup(path);
@@ -317,7 +319,7 @@ INT64_T chirp_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 
 INT64_T chirp_hdfs_close(int fd)
 {
-	debug(D_HDFS, "close %s",open_files[fd].name);
+	debug(D_HDFS, "close %s", open_files[fd].name);
 	free(open_files[fd].name);
 	open_files[fd].name = NULL;
 	return hdfs_services->close(fs, open_files[fd].file);
@@ -325,7 +327,7 @@ INT64_T chirp_hdfs_close(int fd)
 
 INT64_T chirp_hdfs_pread(int fd, void *buffer, INT64_T length, INT64_T offset)
 {
-	debug(D_HDFS, "pread %d %lld %lld",fd,length,offset);
+	debug(D_HDFS, "pread %d %lld %lld", fd, length, offset);
 	return hdfs_services->pread(fs, open_files[fd].file, offset, buffer, length);
 }
 
@@ -367,17 +369,17 @@ INT64_T chirp_hdfs_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_l
 	}
 }
 
-void chirp_hdfs_write_zeroes( int fd, INT64_T length )
+void chirp_hdfs_write_zeroes(int fd, INT64_T length)
 {
 	int zero_size = 65536;
 	char *zero = malloc(zero_size);
-	memset(zero,0,zero_size);
+	memset(zero, 0, zero_size);
 
-	debug(D_HDFS, "zero %d %d",fd,length);
+	debug(D_HDFS, "zero %d %d", fd, length);
 
-	while(length>0) {
-		int chunksize = MIN(zero_size,length);
-		hdfs_services->write(fs,open_files[fd].file,zero,chunksize);
+	while(length > 0) {
+		int chunksize = MIN(zero_size, length);
+		hdfs_services->write(fs, open_files[fd].file, zero, chunksize);
 		length -= chunksize;
 	}
 
@@ -386,27 +388,27 @@ void chirp_hdfs_write_zeroes( int fd, INT64_T length )
 
 INT64_T chirp_hdfs_pwrite(int fd, const void *buffer, INT64_T length, INT64_T offset)
 {
-	INT64_T current = hdfs_services->tell(fs,open_files[fd].file);
+	INT64_T current = hdfs_services->tell(fs, open_files[fd].file);
 
 	/* We cannot seek backwards while writing */
-	if(offset<current) {
-		debug(D_HDFS,"pwrite: seeking backwards on a write is not supported by HDFS.");
+	if(offset < current) {
+		debug(D_HDFS, "pwrite: seeking backwards on a write is not supported by HDFS.");
 		errno = EACCES;
 		return -1;
 	}
 
 
 	/*
-	But, if the write is after the end of the file,
-	it can be simulated by writing a sufficent number of zeros.
-	This is commonly done by cp, which re-creates sparse files.
-	*/
+	   But, if the write is after the end of the file,
+	   it can be simulated by writing a sufficent number of zeros.
+	   This is commonly done by cp, which re-creates sparse files.
+	 */
 
-	if(offset>current) {
-		chirp_hdfs_write_zeroes(fd,offset-current);
+	if(offset > current) {
+		chirp_hdfs_write_zeroes(fd, offset - current);
 	}
 
-	debug(D_HDFS, "write %d %lld",fd,length);
+	debug(D_HDFS, "write %d %lld", fd, length);
 	return hdfs_services->write(fs, open_files[fd].file, buffer, length);
 }
 
@@ -436,17 +438,17 @@ INT64_T chirp_hdfs_fchmod(int fd, INT64_T mode)
 
 INT64_T chirp_hdfs_ftruncate(int fd, INT64_T length)
 {
-	debug(D_HDFS,"ftruncate %d %lld",fd,length);
+	debug(D_HDFS, "ftruncate %d %lld", fd, length);
 
-	tOffset current = hdfs_services->tell(fs,open_files[fd].file);
+	tOffset current = hdfs_services->tell(fs, open_files[fd].file);
 
-	if(length < current ) {
+	if(length < current) {
 		errno = EACCES;
 		return -1;
-	} else if(length==current) {
+	} else if(length == current) {
 		return 0;
 	} else {
-		chirp_hdfs_write_zeroes(fd,length-current);
+		chirp_hdfs_write_zeroes(fd, length - current);
 		return 0;
 	}
 }
@@ -576,8 +578,8 @@ INT64_T chirp_hdfs_unlink(const char *path)
 	debug(D_HDFS, "unlink %s", path);
 	/* FIXME unlink does not set errno properly on failure! */
 	int ret = hdfs_services->unlink(fs, path);
-	if(ret<0) {
-		errno = EACCES; /* FIXME bad fix to above problem */
+	if(ret < 0) {
+		errno = EACCES;	/* FIXME bad fix to above problem */
 		return -1;
 	}
 	return 0;
@@ -611,7 +613,7 @@ INT64_T chirp_hdfs_symlink(const char *path, const char *newpath)
 INT64_T chirp_hdfs_readlink(const char *path, char *buf, INT64_T length)
 {
 	path = FIXPATH(path);
-	debug(D_HDFS, "readlink %s %lld", path,length);
+	debug(D_HDFS, "readlink %s %lld", path, length);
 	return (errno = EINVAL, -1);
 }
 
@@ -621,13 +623,13 @@ INT64_T chirp_hdfs_mkdir(const char *path, INT64_T mode)
 
 	/* hdfs mkdir incorrectly returns EPERM if it already exists. */
 	struct chirp_stat info;
-	int result = chirp_hdfs_stat(path,&info);
-	if(result==0 && S_ISDIR(info.cst_mode)) {
+	int result = chirp_hdfs_stat(path, &info);
+	if(result == 0 && S_ISDIR(info.cst_mode)) {
 		errno = EEXIST;
 		return -1;
 	}
 
-	debug(D_HDFS, "mkdir %s %lld", path,mode);
+	debug(D_HDFS, "mkdir %s %lld", path, mode);
 	return hdfs_services->mkdir(fs, path);
 }
 
@@ -688,13 +690,13 @@ INT64_T chirp_hdfs_statfs(const char *path, struct chirp_statfs * buf)
 	INT64_T used = hdfs_services->get_used(fs);
 	INT64_T blocksize = hdfs_services->get_default_block_size(fs);
 
-	if(capacity<0 || used<0 || blocksize<0)
+	if(capacity < 0 || used < 0 || blocksize < 0)
 		return (errno = EIO, -1);
 
 	buf->f_type = 0;
 	buf->f_bsize = blocksize;
 	buf->f_blocks = capacity / blocksize;
-	buf->f_bavail = buf->f_bfree = (capacity-used) / blocksize;
+	buf->f_bavail = buf->f_bfree = (capacity - used) / blocksize;
 	buf->f_files = buf->f_ffree = 0;
 
 	return 0;
@@ -745,7 +747,7 @@ INT64_T chirp_hdfs_lchown(const char *path, INT64_T uid, INT64_T gid)
 
 INT64_T chirp_hdfs_truncate(const char *path, INT64_T length)
 {
-	debug(D_HDFS,"truncate %s %lld (unsupported)",path,length);
+	debug(D_HDFS, "truncate %s %lld (unsupported)", path, length);
 	errno = EACCES;
 	return -1;
 }

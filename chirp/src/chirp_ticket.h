@@ -17,6 +17,6 @@ See the file COPYING for details.
 #define CHIRP_TICKET_FORMAT  "ticket:%n%32[0123456789abcdefABCDEF]%n"
 #define CHIRP_TICKET_DIGEST_LENGTH  (MD5_DIGEST_LENGTH_HEX)
 
-int chirp_ticket_isticketsubject( const char *subject, const char **digest );
+int chirp_ticket_isticketsubject(const char *subject, const char **digest);
 
 #endif

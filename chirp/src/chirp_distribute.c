@@ -52,77 +52,78 @@ static double *bw_matrix = 0;
 static int bw_matrix_size = 400;
 
 
-static void bw_matrix_init( int n )
+static void bw_matrix_init(int n)
 {
-	bw_matrix = malloc(sizeof(double)*n*n);
-	memset(bw_matrix,0,sizeof(double)*n*n);
+	bw_matrix = malloc(sizeof(double) * n * n);
+	memset(bw_matrix, 0, sizeof(double) * n * n);
 	bw_matrix_size = n;
 }
 
-static void bw_matrix_set( int s, int t, double c )
+static void bw_matrix_set(int s, int t, double c)
 {
-	bw_matrix[s*bw_matrix_size+t] = c;
+	bw_matrix[s * bw_matrix_size + t] = c;
 }
 
-static double bw_matrix_get( int s, int t )
+static double bw_matrix_get(int s, int t)
 {
-	return bw_matrix[s*bw_matrix_size+t];
+	return bw_matrix[s * bw_matrix_size + t];
 }
 
 static double bw_find_max(int s)
 {
-	int max=0, i;
-	for(i = 0;i<bw_matrix_size;i++)
-	{
-		if(max<bw_matrix_get(s,i))
-			max = bw_matrix_get(s,i);
+	int max = 0, i;
+	for(i = 0; i < bw_matrix_size; i++) {
+		if(max < bw_matrix_get(s, i))
+			max = bw_matrix_get(s, i);
 	}
 	return max;
 }
 
 
 
-static int compute_stoptime() 
+static int compute_stoptime()
 {
-	return MIN(time(0)+timeout,overall_stoptime);
+	return MIN(time(0) + timeout, overall_stoptime);
 }
 
 #define FAILURE_MARK_NONE    ' '
 #define FAILURE_MARK_FAILED  '#'
 #define FAILURE_MARK_SUCCESS '+'
 
-static void failure_matrix_init( int n )
+static void failure_matrix_init(int n)
 {
-	failure_matrix = malloc(sizeof(char)*n*n);
-	memset(failure_matrix,FAILURE_MARK_NONE,sizeof(char)*n*n);
+	failure_matrix = malloc(sizeof(char) * n * n);
+	memset(failure_matrix, FAILURE_MARK_NONE, sizeof(char) * n * n);
 	failure_matrix_size = n;
 }
 
-static void failure_matrix_set( int s, int t, char c )
+static void failure_matrix_set(int s, int t, char c)
 {
-	failure_matrix[s*failure_matrix_size+t] = c;
+	failure_matrix[s * failure_matrix_size + t] = c;
 }
 
-static char failure_matrix_get( int s, int t )
+static char failure_matrix_get(int s, int t)
 {
-	return failure_matrix[s*failure_matrix_size+t];
+	return failure_matrix[s * failure_matrix_size + t];
 }
 
 static void failure_matrix_print()
 {
 	FILE *file;
-	int i,j;
+	int i, j;
 
-	if(!failure_matrix_filename) return;
+	if(!failure_matrix_filename)
+		return;
 
-	file = fopen(failure_matrix_filename,"w");
-	if(!file) return;
+	file = fopen(failure_matrix_filename, "w");
+	if(!file)
+		return;
 
-	for(i=0;i<failure_matrix_size;i++) {
-		for(j=0;j<failure_matrix_size;j++) {
-			fputc(failure_matrix_get(i,j),file);
+	for(i = 0; i < failure_matrix_size; i++) {
+		for(j = 0; j < failure_matrix_size; j++) {
+			fputc(failure_matrix_get(i, j), file);
 		}
-		fputc('\n',file);
+		fputc('\n', file);
 	}
 
 	fclose(file);
@@ -138,8 +139,7 @@ typedef enum {
 
 
 
-struct m_server_info
-{
+struct m_server_info {
 	char *name;
 	int cid;
 	int index;
@@ -147,8 +147,7 @@ struct m_server_info
 	int status;
 };
 
-struct server_info
-{
+struct server_info {
 	char *name;
 	int cid;
 };
@@ -160,9 +159,9 @@ struct target_info {
 	int cid;
 };
 
-static void show_version( const char *cmd )
+static void show_version(const char *cmd)
 {
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n",cmd,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,BUILD_USER,BUILD_HOST,__DATE__,__TIME__);
+	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
 }
 
 static void show_use()
@@ -173,11 +172,11 @@ static void show_use()
 	printf(" -D         Show detailed location, time, and performance of each transfer.\n");
 	printf(" -Y         Show confirmation of successful placements.\n");
 	printf(" -F <file>  Write matrix of failures to this file.\n");
-	printf(" -T <time>  Overall timeout for entire distribution. (default is %d)\n",overall_timeout);
+	printf(" -T <time>  Overall timeout for entire distribution. (default is %d)\n", overall_timeout);
 	printf(" -R         Randomize order of target hosts given on command line.\n");
 	printf(" -N <num>   Stop after this number of successful copies.\n");
-	printf(" -t <time>  Timeout for for each copy. (default is %ds)\n",timeout);
-	printf(" -p <num>   Maximum number of processes to run at once (default=%d)\n",maxprocs);
+	printf(" -t <time>  Timeout for for each copy. (default is %ds)\n", timeout);
+	printf(" -p <num>   Maximum number of processes to run at once (default=%d)\n", maxprocs);
 	printf(" -a <flag>  Require this authentication mode.\n");
 	printf(" -d <flag>  Enable debugging for this subsystem.\n");
 	printf(" -v         Show program version.\n");
@@ -188,7 +187,7 @@ static void show_use()
 	printf("is printed on stdout.  The -X option deletes all but one copy.\n\n");
 }
 
-int main( int argc, char *argv[] )
+int main(int argc, char *argv[])
 {
 	INT64_T result;
 	char c;
@@ -196,24 +195,24 @@ int main( int argc, char *argv[] )
 	struct target_info *targets;
 	struct server_info *servers;
 	int ntargets;
-	int i,j;
+	int i, j;
 	pid_t pid;
-	int nprocs=0;
+	int nprocs = 0;
 
-	int start_time,end_time,length;
-	int server_count=0;
-	int cluster_count=0;
+	int start_time, end_time, length;
+	int server_count = 0;
+	int cluster_count = 0;
 
 	srand(time(0));
 
 	debug_config(argv[0]);
-	
+
 	debug(D_CHIRP, "HELLO");
 
 	start_time = time(0);
 
-	while(((c=getopt(argc,argv,"RXYDF:N:T:p:d:vt:a:h"))!=(char)-1)) {
-		switch(c) {
+	while(((c = getopt(argc, argv, "RXYDF:N:T:p:d:vt:a:h")) != (char) -1)) {
+		switch (c) {
 		case 'R':
 			randomize_mode = 1;
 			break;
@@ -222,7 +221,7 @@ int main( int argc, char *argv[] )
 			break;
 		case 'Y':
 			confirm_mode = 1;
-			break;	
+			break;
 		case 'D':
 			detail_mode = 1;
 			break;
@@ -255,43 +254,43 @@ int main( int argc, char *argv[] )
 		default:
 		case 'h':
 			show_use();
-		return 1;
+			return 1;
 		}
 	}
-	
-	if(!did_explicit_auth) auth_register_all();
 
-	if((argc-optind)<2) {
+	if(!did_explicit_auth)
+		auth_register_all();
+
+	if((argc - optind) < 2) {
 		show_use();
 		return 1;
 	}
 
 
 	sourcehost = argv[optind];
-	sourcepath = argv[optind+1];
-	ntargets = argc-optind-1;
-	
-	
+	sourcepath = argv[optind + 1];
+	ntargets = argc - optind - 1;
+
+
 
 	struct chirp_stat buf;
-	
-	char home_dir[50];
-	sprintf(home_dir,"%s/.chirp",getenv("HOME"));
-	mkdir(home_dir,0777);		
 
-	result = chirp_reli_stat(sourcehost,sourcepath,&buf,time(0)+20);
-	if(result<0)
-	{
-		printf("%s %s %lld %i %s chirp stat failed\n",sourcehost,sourcepath,result,errno,strerror(errno));
+	char home_dir[50];
+	sprintf(home_dir, "%s/.chirp", getenv("HOME"));
+	mkdir(home_dir, 0777);
+
+	result = chirp_reli_stat(sourcehost, sourcepath, &buf, time(0) + 20);
+	if(result < 0) {
+		printf("%s %s %lld %i %s chirp stat failed\n", sourcehost, sourcepath, result, errno, strerror(errno));
 		if(errno == 2)
-		return 0;
+			return 0;
 	}
-	
+
 
 	if(randomize_mode) {
-		for(i=0;i<ntargets*10;i++) {
-			int a = optind+2+rand()%(ntargets-1);
-			int b = optind+2+rand()%(ntargets-1);
+		for(i = 0; i < ntargets * 10; i++) {
+			int a = optind + 2 + rand() % (ntargets - 1);
+			int b = optind + 2 + rand() % (ntargets - 1);
 			char *t;
 
 			t = argv[a];
@@ -304,101 +303,95 @@ int main( int argc, char *argv[] )
 
 	failure_matrix_init(ntargets);
 
-	if(destroy_mode) {	
+	if(destroy_mode) {
 		INT64_T result;
 		int status;
 
-		for(i=0;i<(ntargets-1);i++) {
-			if(nprocs<maxprocs) {
+		for(i = 0; i < (ntargets - 1); i++) {
+			if(nprocs < maxprocs) {
 				//printf("%s\n",argv[optind+2+i]);
 				nprocs++;
 				fflush(0);
 				pid = fork();
-				if(pid>0) {
+				if(pid > 0) {
 					/* keep going */
-				} else if(pid==0) {
-					result = chirp_reli_rmall(argv[optind+2+i],sourcepath,compute_stoptime());
-					if(result==0) {
-						printf("destroyed %s\n",argv[optind+2+i]);
+				} else if(pid == 0) {
+					result = chirp_reli_rmall(argv[optind + 2 + i], sourcepath, compute_stoptime());
+					if(result == 0) {
+						printf("destroyed %s\n", argv[optind + 2 + i]);
 						exit(0);
 					} else {
-						printf("couldn't destroy %s: %s\n",argv[optind+2+i],strerror(errno));
+						printf("couldn't destroy %s: %s\n", argv[optind + 2 + i], strerror(errno));
 						exit(1);
 					}
 				} else {
-					printf("couldn't fork: %s\n",strerror(errno));
+					printf("couldn't fork: %s\n", strerror(errno));
 					sleep(1);
 					i--;
 				}
 			} else {
 				pid = wait(&status);
-				if(pid>0) nprocs--;
+				if(pid > 0)
+					nprocs--;
 				i--;
 			}
 		}
 
 		while(1) {
 			pid = wait(&status);
-			if(pid<0 && errno==ECHILD) break;
+			if(pid < 0 && errno == ECHILD)
+				break;
 		}
 
 		return 0;
 	}
-
 	//open output file to create cluster file
 	char outRe[50];
-	sprintf(outRe,"%s/out.txt",home_dir);
+	sprintf(outRe, "%s/out.txt", home_dir);
 	char clusterFile[50];
-	sprintf(clusterFile,"%s/cluster.txt",home_dir);
-	
-	
-	FILE *out = fopen(clusterFile,"w");
+	sprintf(clusterFile, "%s/cluster.txt", home_dir);
+
+
+	FILE *out = fopen(clusterFile, "w");
 	float d;
 	char ar1[100];
 	char ar2[100];
 	int c_count = 0;
 	struct m_server_info temp_sever;
-	struct m_server_info *m_servers = malloc(sizeof(struct m_server_info)*400);
+	struct m_server_info *m_servers = malloc(sizeof(struct m_server_info) * 400);
 	bw_matrix_init(400);
-	FILE *fp = fopen(outRe,"r");
+	FILE *fp = fopen(outRe, "r");
 	//process output file
-	if(fp!=NULL)
-		while(fscanf(fp,"%s %s %f",ar1,ar2,&d)!=EOF)
-		{
-			int s=0,t=0;
+	if(fp != NULL)
+		while(fscanf(fp, "%s %s %f", ar1, ar2, &d) != EOF) {
+			int s = 0, t = 0;
 			int test = 0;
 			int length;
-			for(i=0;i<100;i++)
-			{
-				if(ar1[i]=='\0')
+			for(i = 0; i < 100; i++) {
+				if(ar1[i] == '\0')
 					break;
 			}
-			temp_sever.name = malloc(sizeof(char)*(i+1));
-			for(j=0;j<=i;j++)
-			{
+			temp_sever.name = malloc(sizeof(char) * (i + 1));
+			for(j = 0; j <= i; j++) {
 				temp_sever.name[j] = ar1[j];
 			}
 
-			for(j = 0;j<c_count;j++)
-			{
-				if(strlen(m_servers[j].name)>strlen(temp_sever.name))
+			for(j = 0; j < c_count; j++) {
+				if(strlen(m_servers[j].name) > strlen(temp_sever.name))
 					length = strlen(temp_sever.name);
 				else
 					length = strlen(m_servers[j].name);
-			
-				if(!strncmp(temp_sever.name,m_servers[j].name,length))
-				{
+
+				if(!strncmp(temp_sever.name, m_servers[j].name, length)) {
 					test = 1;
 					s = j;
 					break;
 				}
 			}
-			if (test==0)
-			{
-				m_servers[c_count].name = malloc(sizeof(char)*(i+1));
-				for(j=0;j<=i;j++)
-				{
-					m_servers[c_count].name[j]=temp_sever.name[j];
+			if(test == 0) {
+				m_servers[c_count].name = malloc(sizeof(char) * (i + 1));
+				for(j = 0; j <= i; j++) {
+					m_servers[c_count].name[j] = temp_sever.name[j];
 				}
 				m_servers[c_count].cid = 0;
 				m_servers[c_count].index = c_count;
@@ -406,37 +399,31 @@ int main( int argc, char *argv[] )
 				c_count++;
 			}
 
-			for(i=0;i<100;i++)
-			{
-				if(ar2[i]=='\0')
+			for(i = 0; i < 100; i++) {
+				if(ar2[i] == '\0')
 					break;
 			}
-			temp_sever.name = malloc(sizeof(char)*(i+1));
-			for(j=0;j<=i;j++)
-			{
+			temp_sever.name = malloc(sizeof(char) * (i + 1));
+			for(j = 0; j <= i; j++) {
 				temp_sever.name[j] = ar2[j];
 			}
 
-			for(j = 0;j<c_count;j++)
-			{
-				if(strlen(m_servers[j].name)>strlen(temp_sever.name))
+			for(j = 0; j < c_count; j++) {
+				if(strlen(m_servers[j].name) > strlen(temp_sever.name))
 					length = strlen(temp_sever.name);
 				else
 					length = strlen(m_servers[j].name);
-			
-				if(!strncmp(temp_sever.name,m_servers[j].name,length))
-				{
+
+				if(!strncmp(temp_sever.name, m_servers[j].name, length)) {
 					test = 1;
 					t = j;
 					break;
 				}
 			}
-			if (test==0)
-			{
-				m_servers[c_count].name = malloc(sizeof(char)*(i+1));
-				for(j=0;j<=i;j++)
-				{
-					m_servers[c_count].name[j]=temp_sever.name[j];
+			if(test == 0) {
+				m_servers[c_count].name = malloc(sizeof(char) * (i + 1));
+				for(j = 0; j <= i; j++) {
+					m_servers[c_count].name[j] = temp_sever.name[j];
 				}
 				m_servers[c_count].index = c_count;
 				m_servers[c_count].cid = 0;
@@ -445,140 +432,121 @@ int main( int argc, char *argv[] )
 			}
 			//printf("%d %d\n",s,t);
 
-			if(bw_matrix_get(s,t)<d)
-			{
-				bw_matrix_set(s,t,d);
-				bw_matrix_set(t,s,d);
+			if(bw_matrix_get(s, t) < d) {
+				bw_matrix_set(s, t, d);
+				bw_matrix_set(t, s, d);
 			}
 		}
-		
-		if(fp!=NULL)
-			fclose(fp);
+
+	if(fp != NULL)
+		fclose(fp);
 	int stack[1000];
 	int bottom = -1;
 	int count = 0;
-	
-	int save_i = 0;		
-	double max =0;
+
+	int save_i = 0;
+	double max = 0;
 	int test = 1;
 	//create cluster file
-	while(test)
-	{
+	while(test) {
 		max = 0;
-		 bottom = -1;
-		for(i=0;i<c_count;i++)
-		{
-			if(max<bw_find_max(i))
-			{
+		bottom = -1;
+		for(i = 0; i < c_count; i++) {
+			if(max < bw_find_max(i)) {
 				max = bw_find_max(i);
 				save_i = i;
 			}
 		}
-		if(max == 0)
-		{
+		if(max == 0) {
 			test = 0;
 			break;
 		}
-		
+
 		count++;
-		fprintf(out,"Cluster %d bw %2.1f : ",count,max);
-		fprintf(out,"%s_XXX",m_servers[save_i].name);
-		for(i=0;i<c_count;i++)
-		{
-			if(bw_matrix_get( save_i,i)>threshold*max)
-			{
+		fprintf(out, "Cluster %d bw %2.1f : ", count, max);
+		fprintf(out, "%s_XXX", m_servers[save_i].name);
+		for(i = 0; i < c_count; i++) {
+			if(bw_matrix_get(save_i, i) > threshold * max) {
 				m_servers[save_i].cid = count;
 				m_servers[i].cid = count;
 				bottom++;
-				stack[bottom]=i;
+				stack[bottom] = i;
 			}
 		}
-		
-		for(j=0;j<c_count;j++)
-		{
-			bw_matrix_set(save_i,j,0);
-			bw_matrix_set(j,save_i,0);
+
+		for(j = 0; j < c_count; j++) {
+			bw_matrix_set(save_i, j, 0);
+			bw_matrix_set(j, save_i, 0);
 		}
-		
-		while(bottom>=0)
-		{
+
+		while(bottom >= 0) {
 			i = stack[bottom];
-			fprintf(out,",%s_XXX",m_servers[i].name);
+			fprintf(out, ",%s_XXX", m_servers[i].name);
 			bottom--;
-			for(j = 0;j<c_count; j++)
-			{
-				if(bw_matrix_get(i,j)>threshold*max)
-				{
+			for(j = 0; j < c_count; j++) {
+				if(bw_matrix_get(i, j) > threshold * max) {
 					m_servers[j].cid = count;
 					bottom++;
-					stack[bottom]=j;
+					stack[bottom] = j;
 				}
 			}
-			for(j=0;j<c_count;j++)
-			{
-				bw_matrix_set(i,j,0);
-				bw_matrix_set(j,i,0);
+			for(j = 0; j < c_count; j++) {
+				bw_matrix_set(i, j, 0);
+				bw_matrix_set(j, i, 0);
 			}
 		}
-		fprintf(out,"\n\n");
-	}	
-	
-	
-	if(out!=NULL)
+		fprintf(out, "\n\n");
+	}
+
+
+	if(out != NULL)
 		fclose(out);
 
 
 
 
-	targets = malloc(sizeof(struct target_info)*ntargets);
-	servers = malloc(sizeof(struct server_info)*400);
+	targets = malloc(sizeof(struct target_info) * ntargets);
+	servers = malloc(sizeof(struct server_info) * 400);
 
 	/***read in chirp server with cluster information***/
 	char temp[4000];
 	char t_name[40];
-	int name_count=0;
+	int name_count = 0;
 
 	test = 0;
-	out = fopen(outRe,"a");
+	out = fopen(outRe, "a");
 
 	/*
-	char outR[15];
-	sprintf(outR, "%i", start_time);
-	FILE *outResult = fopen(outR,"w");
-	*/
+	   char outR[15];
+	   sprintf(outR, "%i", start_time);
+	   FILE *outResult = fopen(outR,"w");
+	 */
 
-	fp = fopen(clusterFile,"r");
-	if(fp!=NULL)
-	{
-	   while(fgets(temp,4000,fp)!=NULL)
-		{
+	fp = fopen(clusterFile, "r");
+	if(fp != NULL) {
+		while(fgets(temp, 4000, fp) != NULL) {
 			name_count = 0;
-			
-			if(strlen(temp)>10)
-			cluster_count = cluster_count+1;
-			for(i=0;i<strlen(temp);i++)
-			{
-				if((test!=0)&&(temp[i]!='_')&&(temp[i]!=' '))
-				{
-					t_name[name_count] =temp[i];
+
+			if(strlen(temp) > 10)
+				cluster_count = cluster_count + 1;
+			for(i = 0; i < strlen(temp); i++) {
+				if((test != 0) && (temp[i] != '_') && (temp[i] != ' ')) {
+					t_name[name_count] = temp[i];
 					name_count++;
 				}
 
-				if(temp[i]==':')
+				if(temp[i] == ':')
 					test = 1;
-				if(temp[i]=='_')
-				{
+				if(temp[i] == '_') {
 					test = 0;
-					t_name[name_count] ='\0';
+					t_name[name_count] = '\0';
 					name_count++;
 				}
-				if(temp[i]==',')
-				{
+				if(temp[i] == ',') {
 					test = 1;
-					servers[server_count].name = malloc(sizeof(char)*(name_count));
-					
-					for(j = 0;j<name_count;j++)
-					{
+					servers[server_count].name = malloc(sizeof(char) * (name_count));
+
+					for(j = 0; j < name_count; j++) {
 						servers[server_count].name[j] = t_name[j];
 					}
 					servers[server_count].cid = cluster_count;
@@ -588,198 +556,192 @@ int main( int argc, char *argv[] )
 			}
 		}
 	}
-	
 	//set inital cluster state
 	int c_State[cluster_count];
-	for(i=0;i<cluster_count;i++)
-	{
-		c_State[i] = -1;//-1: cluster does not have files, does not need files
+	for(i = 0; i < cluster_count; i++) {
+		c_State[i] = -1;	//-1: cluster does not have files, does not need files
 	}
-	
-	
+
+
 	targets[0].name = sourcehost;
 	targets[0].state = TARGET_STATE_IDLE;
-	
+
 	test = 0;
-	for(j = 0;j<server_count;j++)
-	{
-		if(strlen(servers[j].name)>strlen(targets[0].name))
+	for(j = 0; j < server_count; j++) {
+		if(strlen(servers[j].name) > strlen(targets[0].name))
 			length = strlen(targets[0].name);
 		else
 			length = strlen(servers[j].name);
-			
-		if(!strncmp(targets[0].name,servers[j].name,length))
-		{
+
+		if(!strncmp(targets[0].name, servers[j].name, length)) {
 			targets[0].cid = servers[j].cid;
 			c_State[targets[0].cid] = 1;
 			test = 1;
 			break;
 		}
 	}
-	if(test==0)
-	{
-		targets[0].cid = 0;//unknow servers will be considered in cluster #0
+	if(test == 0) {
+		targets[0].cid = 0;	//unknow servers will be considered in cluster #0
 		c_State[targets[0].cid] = 1;
 	}
 
-	for(i=1;i<ntargets;i++) {
-		if(i!=0){
-			targets[i].name = argv[optind+1+i];
+	for(i = 1; i < ntargets; i++) {
+		if(i != 0) {
+			targets[i].name = argv[optind + 1 + i];
 			targets[i].state = TARGET_STATE_FRESH;
 		}
 
 		test = 0;
-		for(j = 0;j<server_count;j++)
-		{
-			if(strlen(servers[j].name)>strlen(targets[i].name))
+		for(j = 0; j < server_count; j++) {
+			if(strlen(servers[j].name) > strlen(targets[i].name))
 				length = strlen(targets[i].name);
 			else
 				length = strlen(servers[j].name);
-				
-			if(!strncmp(targets[i].name,servers[j].name,length))
-			{
+
+			if(!strncmp(targets[i].name, servers[j].name, length)) {
 				targets[i].cid = servers[j].cid;
-				if(c_State[targets[i].cid]==-1)
-					c_State[targets[i].cid] = 0;//0 does not have files, need files
+				if(c_State[targets[i].cid] == -1)
+					c_State[targets[i].cid] = 0;	//0 does not have files, need files
 				test = 1;
 				break;
 			}
 		}
-		if(test==0)
-			targets[i].cid = 0;//unknow servers will be considered in cluster #0
+		if(test == 0)
+			targets[i].cid = 0;	//unknow servers will be considered in cluster #0
 	}
 
 	if(detail_mode) {
-		printf("%u   start -> %s    0 secs, 0 MB/sec\n",(unsigned)time(0),sourcehost);
+		printf("%u   start -> %s    0 secs, 0 MB/sec\n", (unsigned) time(0), sourcehost);
 	}
 
 
-	while(time(0)<overall_stoptime) {
+	while(time(0) < overall_stoptime) {
 		int source = -1;
 		int target = -1;
 
-		if(transfers_needed!=0 && transfers_complete>=transfers_needed) {
-			for(i=1;i<ntargets;i++) {
-				if(targets[i].state==TARGET_STATE_SENDING) {
-					kill(targets[i].pid,SIGKILL);
+		if(transfers_needed != 0 && transfers_complete >= transfers_needed) {
+			for(i = 1; i < ntargets; i++) {
+				if(targets[i].state == TARGET_STATE_SENDING) {
+					kill(targets[i].pid, SIGKILL);
 				}
 			}
 			break;
 		}
 
-		for(i=0;i<=ntargets-1;i++) {//(i=(ntargets-1);i>=0;i--) {
-			if(targets[i].state==TARGET_STATE_IDLE) {
+		for(i = 0; i <= ntargets - 1; i++) {	//(i=(ntargets-1);i>=0;i--) {
+			if(targets[i].state == TARGET_STATE_IDLE) {
 				source = i;
 				break;
 			}
 		}
 
-		if(source!=-1) {
+		if(source != -1) {
 			int freshtargets = 0;
 			target = -1;
-			for(i=1;i<ntargets;i++) {
-				if(targets[i].state==TARGET_STATE_FRESH) {
+			for(i = 1; i < ntargets; i++) {
+				if(targets[i].state == TARGET_STATE_FRESH) {
 					freshtargets++;
-					if(c_State[targets[i].cid]==0){//cluster does not have files
-						if(failure_matrix_get(source,i)!=FAILURE_MARK_FAILED) {
-							c_State[targets[i].cid]=2;//cluster is receving files
+					if(c_State[targets[i].cid] == 0) {	//cluster does not have files
+						if(failure_matrix_get(source, i) != FAILURE_MARK_FAILED) {
+							c_State[targets[i].cid] = 2;	//cluster is receving files
 							target = i;
-							
-							if(!strncmp(targets[target].name,sourcehost,strlen(sourcehost)))
-								printf("New cluster %s, %s, %s \n",targets[source].name, sourcehost,targets[target].name);
-							break;
-						}
-					}
-				}
-			}
-					if(target==-1)
-					for(i=1;i<ntargets;i++) {
-				if(targets[i].state==TARGET_STATE_FRESH) {
-					if(targets[i].cid==targets[source].cid){//target and source are in the same cluster
-						if(failure_matrix_get(source,i)!=FAILURE_MARK_FAILED) {
-							target = i;
-							break;
-						}
-					}
-				}
-			}
-			if(target==-1)
-			for(i=1;i<ntargets;i++) {
-				if(targets[i].state==TARGET_STATE_FRESH) {
-						if(failure_matrix_get(source,i)!=FAILURE_MARK_FAILED) {
-							target = i;
-							break;
-					}
-				}
-			}
-			
 
-			if(target==-1 && freshtargets>0) {
+							if(!strncmp(targets[target].name, sourcehost, strlen(sourcehost)))
+								printf("New cluster %s, %s, %s \n", targets[source].name, sourcehost, targets[target].name);
+							break;
+						}
+					}
+				}
+			}
+			if(target == -1)
+				for(i = 1; i < ntargets; i++) {
+					if(targets[i].state == TARGET_STATE_FRESH) {
+						if(targets[i].cid == targets[source].cid) {	//target and source are in the same cluster
+							if(failure_matrix_get(source, i) != FAILURE_MARK_FAILED) {
+								target = i;
+								break;
+							}
+						}
+					}
+				}
+			if(target == -1)
+				for(i = 1; i < ntargets; i++) {
+					if(targets[i].state == TARGET_STATE_FRESH) {
+						if(failure_matrix_get(source, i) != FAILURE_MARK_FAILED) {
+							target = i;
+							break;
+						}
+					}
+				}
+
+
+			if(target == -1 && freshtargets > 0) {
 				/* nothing left for this one to do */
 				targets[source].state = TARGET_STATE_FAILED;
 				continue;
 			}
 		}
 
-		if(nprocs<maxprocs && target!=-1 && source!=-1) {
-			if(target == 0)
-			{
-				printf("%s, %s, %s %d \n",targets[source].name, sourcehost,targets[target].name,target );
+		if(nprocs < maxprocs && target != -1 && source != -1) {
+			if(target == 0) {
+				printf("%s, %s, %s %d \n", targets[source].name, sourcehost, targets[target].name, target);
 				exit(0);
 			}
 			fflush(0);
 			pid = fork();
-			if(pid>0) {
+			if(pid > 0) {
 				nprocs++;
 				targets[source].state = TARGET_STATE_SENDING;
 				targets[source].pid = pid;
 				targets[target].state = TARGET_STATE_RECEIVING;
 				targets[target].pid = pid;
-			} else if(pid==0) {
-				timestamp_t start,stop;
+			} else if(pid == 0) {
+				timestamp_t start, stop;
 				start = timestamp_get();
-				
-				result = 	chirp_reli_thirdput(targets[source].name,sourcepath,targets[target].name,sourcepath,compute_stoptime());
+
+				result = chirp_reli_thirdput(targets[source].name, sourcepath, targets[target].name, sourcepath, compute_stoptime());
 				stop = timestamp_get();
-				if(start==stop) stop++;
-				if(result>=0) {
-					c_State[targets[target].cid]=1;//mark cluster to "have files"
+				if(start == stop)
+					stop++;
+				if(result >= 0) {
+					c_State[targets[target].cid] = 1;	//mark cluster to "have files"
 					//targets[target].state = TARGET_STATE_IDLE;
 					if(detail_mode) {
-						printf("%u   %s (%d) -> %s (%d)   %.2lf secs, %.1lf MB/sec\n",(unsigned)time(0),targets[source].name, targets[source].cid, targets[target].name,targets[target].cid, (stop-start)/1000000.0,result/(double)(stop-start));
-						fprintf(out,"%s %s %.1lf\n",targets[source].name, targets[target].name,result/(double)(stop-start));
+						printf("%u   %s (%d) -> %s (%d)   %.2lf secs, %.1lf MB/sec\n", (unsigned) time(0), targets[source].name, targets[source].cid, targets[target].name, targets[target].cid, (stop - start) / 1000000.0,
+						       result / (double) (stop - start));
+						fprintf(out, "%s %s %.1lf\n", targets[source].name, targets[target].name, result / (double) (stop - start));
 						end_time = time(0);
 						//fprintf(outResult,"%d\n",end_time-start_time);
-						
+
 					} else {
-							end_time = time(0);
-							//fprintf(outResult,"%d\n",end_time-start_time);
+						end_time = time(0);
+						//fprintf(outResult,"%d\n",end_time-start_time);
 					}
 					if(confirm_mode) {
-					    printf("YES %s\n",targets[target].name);
+						printf("YES %s\n", targets[target].name);
 					}
 					fflush(0);
 					exit(0);
 				} else {
-					if(c_State[targets[target].cid]==2)
-						c_State[targets[target].cid]=0;//cluster did not get files
+					if(c_State[targets[target].cid] == 2)
+						c_State[targets[target].cid] = 0;	//cluster did not get files
 					int save_errno = errno;
 					if(detail_mode) {
-						printf("%u   %s(%d) -> %s(%d)    failed: %s\n",(unsigned)time(0),targets[source].name,targets[source].cid, targets[target].name,targets[target].cid,strerror(errno));
+						printf("%u   %s(%d) -> %s(%d)    failed: %s\n", (unsigned) time(0), targets[source].name, targets[source].cid, targets[target].name, targets[target].cid, strerror(errno));
 					}
-					
+
 					fflush(0);
-					chirp_reli_rmall(targets[target].name,sourcepath,compute_stoptime());
+					chirp_reli_rmall(targets[target].name, sourcepath, compute_stoptime());
 					exit(save_errno);
 				}
 			} else {
-				fprintf(stderr,"chirp_distribute: %s\n",strerror(errno));
+				fprintf(stderr, "chirp_distribute: %s\n", strerror(errno));
 				sleep(1);
 			}
 		} else {
 			int status;
 			pid = wait(&status);
-			if(pid>0) {
+			if(pid > 0) {
 				int transfer_ok;
 				int error_code;
 
@@ -787,8 +749,8 @@ int main( int argc, char *argv[] )
 
 				if(WIFEXITED(status)) {
 					error_code = WEXITSTATUS(status);
-					transfer_ok = (error_code==0);
-					if(transfer_ok){
+					transfer_ok = (error_code == 0);
+					if(transfer_ok) {
 						transfers_complete++;
 						end_time = time(0);
 					}
@@ -797,42 +759,42 @@ int main( int argc, char *argv[] )
 					error_code = 0;
 				}
 
-				for(i=0;i<ntargets;i++) {
-					if( targets[i].pid==pid ) {
-						if(targets[i].state==TARGET_STATE_RECEIVING) {
+				for(i = 0; i < ntargets; i++) {
+					if(targets[i].pid == pid) {
+						if(targets[i].state == TARGET_STATE_RECEIVING) {
 							target = i;
 							if(transfer_ok) {
 								targets[i].state = TARGET_STATE_IDLE;
-							} else if(error_code==ECONNRESET) {
+							} else if(error_code == ECONNRESET) {
 								targets[i].state = TARGET_STATE_FAILED;
 							} else {
 								targets[i].state = TARGET_STATE_FRESH;
 							}
-						} else if(targets[i].state==TARGET_STATE_SENDING) {
+						} else if(targets[i].state == TARGET_STATE_SENDING) {
 							source = i;
 							targets[i].state = TARGET_STATE_IDLE;
 						}
 					}
 				}
 				if(transfer_ok) {
-					failure_matrix_set(source,target,FAILURE_MARK_SUCCESS);
+					failure_matrix_set(source, target, FAILURE_MARK_SUCCESS);
 				} else {
-					failure_matrix_set(source,target,FAILURE_MARK_FAILED);
+					failure_matrix_set(source, target, FAILURE_MARK_FAILED);
 				}
-			} else if(errno==ECHILD) {
+			} else if(errno == ECHILD) {
 				break;
 			} else {
-				fprintf(stderr,"chirp_distribute: wait: %s\n",strerror(errno));
+				fprintf(stderr, "chirp_distribute: wait: %s\n", strerror(errno));
 				sleep(1);
 			}
 		}
 	}
-	if(out!=NULL)
+	if(out != NULL)
 		fclose(out);
-	if(fp!=NULL)
+	if(fp != NULL)
 		fclose(fp);
 	/*if(outResult!=NULL)
-		fclose(outResult);*/
+	   fclose(outResult); */
 
 
 

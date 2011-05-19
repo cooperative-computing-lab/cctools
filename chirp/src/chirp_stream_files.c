@@ -17,7 +17,7 @@ See the file COPYING for details.
 #include "auth_all.h"
 #include "stringtools.h"
 
-#define MODE_SPLIT 0 
+#define MODE_SPLIT 0
 #define MODE_COPY  1
 #define MODE_JOIN  2
 
@@ -25,29 +25,29 @@ static int timeout = 3600;
 static int buffer_size = 1048576;
 static int stream_mode = MODE_SPLIT;
 
-static void show_version (const char *cmd)
+static void show_version(const char *cmd)
 {
-	printf ("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
+	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
 }
 
-static void show_help (const char *cmd)
+static void show_help(const char *cmd)
 {
-	printf ("use: %s [options] [copy|split|join] <local-file> { <hostname[:port]> <remote-file> }\n", cmd);
-	printf ("where options are:\n");
-	printf (" -a <flag>  Require this authentication mode.\n");
-	printf (" -b <size>  Set transfer buffer size. (default is %d bytes)\n", buffer_size);
-	printf (" -d <flag>  Enable debugging for this subsystem.\n");
-	printf (" -t <time>  Timeout for failure. (default is %ds)\n", timeout);
-	printf (" -v         Show program version.\n");
-	printf (" -h         This message.\n");
-	printf ("\nThis tool is used to move data between a single local file and multiple remote files.\n");
-	printf ("'chirp_stream_files copy'  duplicates a single file to multiple hsots.\n");
-	printf ("'chirp_stream_files split' sends the lines of a file to multiple hosts, round robin.\n");
-	printf ("'chirp_stream_files join'  performs the opposite of split, joining multiple files to one.\n");
-	printf ("A local file of '-' will use stdin for splitting or copying and stdout for joining.\n");
+	printf("use: %s [options] [copy|split|join] <local-file> { <hostname[:port]> <remote-file> }\n", cmd);
+	printf("where options are:\n");
+	printf(" -a <flag>  Require this authentication mode.\n");
+	printf(" -b <size>  Set transfer buffer size. (default is %d bytes)\n", buffer_size);
+	printf(" -d <flag>  Enable debugging for this subsystem.\n");
+	printf(" -t <time>  Timeout for failure. (default is %ds)\n", timeout);
+	printf(" -v         Show program version.\n");
+	printf(" -h         This message.\n");
+	printf("\nThis tool is used to move data between a single local file and multiple remote files.\n");
+	printf("'chirp_stream_files copy'  duplicates a single file to multiple hsots.\n");
+	printf("'chirp_stream_files split' sends the lines of a file to multiple hosts, round robin.\n");
+	printf("'chirp_stream_files join'  performs the opposite of split, joining multiple files to one.\n");
+	printf("A local file of '-' will use stdin for splitting or copying and stdout for joining.\n");
 }
 
-int main (int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	int did_explicit_auth = 0;
 	time_t stoptime;
@@ -58,106 +58,107 @@ int main (int argc, char *argv[])
 	const char *localmode;
 	int remotemode;
 
-	debug_config (argv[0]);
+	debug_config(argv[0]);
 
-	while ((c = getopt (argc, argv, "a:b:d:t:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:b:d:t:vh")) != (char) -1) {
 		switch (c) {
 		case 'a':
-			auth_register_byname (optarg);
+			auth_register_byname(optarg);
 			did_explicit_auth = 1;
 			break;
 		case 'b':
-			buffer_size = atoi (optarg);
+			buffer_size = atoi(optarg);
 			break;
 		case 'd':
-			debug_flags_set (optarg);
+			debug_flags_set(optarg);
 			break;
 		case 't':
-			timeout = string_time_parse (optarg);
+			timeout = string_time_parse(optarg);
 			break;
 		case 'v':
-			show_version (argv[0]);
-			exit (0);
+			show_version(argv[0]);
+			exit(0);
 			break;
 		case 'h':
-			show_help (argv[0]);
-			exit (0);
+			show_help(argv[0]);
+			exit(0);
 			break;
 
 		}
 	}
 
-	if(!did_explicit_auth) auth_register_all ();
+	if(!did_explicit_auth)
+		auth_register_all();
 
-	if ((argc - optind) < 4) {
-		show_help (argv[0]);
+	if((argc - optind) < 4) {
+		show_help(argv[0]);
 		return 1;
 	}
 
-	if(!strcmp(argv[optind],"split")) {
+	if(!strcmp(argv[optind], "split")) {
 		stream_mode = MODE_SPLIT;
 		localmode = "r";
 		remotemode = CHIRP_STREAM_WRITE;
-	} else if(!strcmp(argv[optind],"copy")) {
+	} else if(!strcmp(argv[optind], "copy")) {
 		stream_mode = MODE_COPY;
 		localmode = "r";
 		remotemode = CHIRP_STREAM_WRITE;
-	} else if(!strcmp(argv[optind],"join")) {
+	} else if(!strcmp(argv[optind], "join")) {
 		stream_mode = MODE_JOIN;
 		localmode = "w";
 		remotemode = CHIRP_STREAM_READ;
 	} else {
-		fprintf(stderr,"unknown operation: %s\n",argv[0]);
+		fprintf(stderr, "unknown operation: %s\n", argv[0]);
 		show_help(argv[0]);
 		return 1;
 	}
 
 	char *buffer = malloc(buffer_size);
 
-	srcindex = optind+1;
+	srcindex = optind + 1;
 	nstreams = (argc - optind - 2) / 2;
-	stoptime = time (0) + timeout;
+	stoptime = time(0) + timeout;
 
-	localfile = fopen(argv[srcindex],localmode);
+	localfile = fopen(argv[srcindex], localmode);
 	if(!localfile) {
-		fprintf (stderr, "couldn't open %s: %s\n", argv[srcindex], strerror (errno));
+		fprintf(stderr, "couldn't open %s: %s\n", argv[srcindex], strerror(errno));
 		return 1;
 	}
 
-	char **hostname = malloc(sizeof(*hostname)*nstreams);
-	char **filename = malloc(sizeof(*filename)*nstreams);
+	char **hostname = malloc(sizeof(*hostname) * nstreams);
+	char **filename = malloc(sizeof(*filename) * nstreams);
 
-	for (i = 0; i < nstreams; i++) {
-		hostname[i] = argv[srcindex+(2*i)+1];
-		filename[i] = argv[srcindex+(2*i)+2];
+	for(i = 0; i < nstreams; i++) {
+		hostname[i] = argv[srcindex + (2 * i) + 1];
+		filename[i] = argv[srcindex + (2 * i) + 2];
 
-		stream[i] = chirp_stream_open(hostname[i],filename[i],remotemode,stoptime);
-		if (!stream[i]) {
-			fprintf (stderr, "couldn't open %s:%s: %s\n",hostname[i],filename[i],strerror(errno));
+		stream[i] = chirp_stream_open(hostname[i], filename[i], remotemode, stoptime);
+		if(!stream[i]) {
+			fprintf(stderr, "couldn't open %s:%s: %s\n", hostname[i], filename[i], strerror(errno));
 			return 1;
 		}
 	}
 
 
-	if(stream_mode==MODE_SPLIT) {
-		i=0;
-		while (fgets(buffer,buffer_size,localfile)) {
+	if(stream_mode == MODE_SPLIT) {
+		i = 0;
+		while(fgets(buffer, buffer_size, localfile)) {
 			int length = strlen(buffer);
-			int actual = chirp_stream_write (stream[i], buffer, length, stoptime);
-			if (actual != length) {
-				fprintf(stderr,"couldn't write to %s:%s: %s\n",hostname[i],filename[i],strerror(errno));
+			int actual = chirp_stream_write(stream[i], buffer, length, stoptime);
+			if(actual != length) {
+				fprintf(stderr, "couldn't write to %s:%s: %s\n", hostname[i], filename[i], strerror(errno));
 				return 1;
 			}
 			i = (i + 1) % nstreams;
 		}
-	} else if(stream_mode==MODE_COPY) {
+	} else if(stream_mode == MODE_COPY) {
 
-		while (fgets(buffer,buffer_size,localfile)) {
+		while(fgets(buffer, buffer_size, localfile)) {
 			int length = strlen(buffer);
-			for(i=0;i<nstreams;i++) {
-				int actual = chirp_stream_write (stream[i], buffer, length, stoptime);
-				if (actual != length) {
-					fprintf(stderr,"couldn't write to %s:%s: %s\n",hostname[i],filename[i],strerror(errno));
+			for(i = 0; i < nstreams; i++) {
+				int actual = chirp_stream_write(stream[i], buffer, length, stoptime);
+				if(actual != length) {
+					fprintf(stderr, "couldn't write to %s:%s: %s\n", hostname[i], filename[i], strerror(errno));
 					return 1;
 				}
 			}
@@ -165,13 +166,14 @@ int main (int argc, char *argv[])
 
 	} else {
 		int streams_left = nstreams;
-		while(streams_left>0) {
-			for(i=0;i<nstreams;i++) {
-				if(!stream[i]) continue;
-				int length = chirp_stream_readline(stream[i],buffer,buffer_size,stoptime);
-				if(length>0) {
+		while(streams_left > 0) {
+			for(i = 0; i < nstreams; i++) {
+				if(!stream[i])
+					continue;
+				int length = chirp_stream_readline(stream[i], buffer, buffer_size, stoptime);
+				if(length > 0) {
 					length = strlen(buffer);
-					fprintf(localfile,"%s\n",buffer);
+					fprintf(localfile, "%s\n", buffer);
 				} else {
 					streams_left--;
 				}
@@ -179,9 +181,9 @@ int main (int argc, char *argv[])
 		}
 	}
 
-	for (i = 0; i < nstreams; i++) {
-		chirp_stream_flush (stream[i], stoptime);
-		chirp_stream_close (stream[i], stoptime);
+	for(i = 0; i < nstreams; i++) {
+		chirp_stream_flush(stream[i], stoptime);
+		chirp_stream_close(stream[i], stoptime);
 	}
 
 	return 0;

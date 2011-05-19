@@ -14,25 +14,24 @@ See the file COPYING for details.
 #include <errno.h>
 #include "md5.h"
 
-int main( int argc, char *argv[] )
+int main(int argc, char *argv[])
 {
-	if(argc!=3)
-	{
-		printf ("use: chirp_md5sum <hostname[:port]> <remote-file>\n");
+	if(argc != 3) {
+		printf("use: chirp_md5sum <hostname[:port]> <remote-file>\n");
 		return 0;
 	}
-	
-   auth_register_all();
+
+	auth_register_all();
 	const char *host = argv[1];
 	char *path = argv[2];
 	INT64_T result;
 	unsigned char digest[16];
 
-	result = chirp_reli_md5(host,path,digest,time(0)+30);
-	if(result>=0) {
-		printf("%s\n",md5_string(digest));
+	result = chirp_reli_md5(host, path, digest, time(0) + 30);
+	if(result >= 0) {
+		printf("%s\n", md5_string(digest));
 	} else {
-		printf("error: %s\n",strerror(errno));
+		printf("error: %s\n", strerror(errno));
 	}
 
 	return 0;

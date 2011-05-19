@@ -39,29 +39,29 @@ static struct itable *file_table = 0;
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static void parsepath( const char *path, char *newpath, char *host )
+static void parsepath(const char *path, char *newpath, char *host)
 {
 	memset(newpath, 0, CHIRP_PATH_MAX);
 	memset(host, 0, CHIRP_PATH_MAX);
-	
+
 	if(!strcmp(path, "/")) {
-	// path is the root directory
+		// path is the root directory
 		strcpy(host, "/");
 		strcpy(newpath, "/");
-	} else if (*path == '/') {
-	// path is absolute
+	} else if(*path == '/') {
+		// path is absolute
 		sscanf(path, "/%[^/]%s", host, newpath);
 	} else {
-	// path is relative
+		// path is relative
 		strcpy(host, "/");
 		strcpy(newpath, path);
 	}
 
 }
 
-static void chirp_stat_to_fuse_stat( struct chirp_stat *c, struct stat *f )
+static void chirp_stat_to_fuse_stat(struct chirp_stat *c, struct stat *f)
 {
-	memset(f,0,sizeof(*f));
+	memset(f, 0, sizeof(*f));
 	f->st_dev = c->cst_dev;
 	f->st_ino = c->cst_ino;
 	f->st_mode = c->cst_mode;
@@ -84,14 +84,15 @@ static int chirp_fuse_getattr(const char *path, struct stat *info)
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 
-	parsepath(path,newpath,host);
+	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_lstat(host, newpath, &cinfo, time(0)+chirp_fuse_timeout );
+	result = chirp_global_lstat(host, newpath, &cinfo, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
-	chirp_stat_to_fuse_stat(&cinfo,info);
+	if(result < 0)
+		return -errno;
+	chirp_stat_to_fuse_stat(&cinfo, info);
 	return 0;
 }
 
@@ -100,46 +101,48 @@ static int chirp_fuse_readlink(const char *path, char *buf, size_t size)
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	parsepath(path,newpath,host);
+	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_readlink(host, newpath, buf, size, time(0)+chirp_fuse_timeout );
+	result = chirp_global_readlink(host, newpath, buf, size, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 	buf[result] = 0;
 
 	return 0;
 }
 
 static fuse_fill_dir_t longdir_filler;
-static void * longdir_buf;
+static void *longdir_buf;
 
-static void longdir_callback( const char *name, struct chirp_stat *cinfo, void *arg )
+static void longdir_callback(const char *name, struct chirp_stat *cinfo, void *arg)
 {
 	struct stat info;
-	chirp_stat_to_fuse_stat(cinfo,&info);
-	longdir_filler(longdir_buf,name,&info,0);
+	chirp_stat_to_fuse_stat(cinfo, &info);
+	longdir_filler(longdir_buf, name, &info, 0);
 }
 
-static int chirp_fuse_readdir( const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi )
+static int chirp_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
- 	char newpath[CHIRP_PATH_MAX];
+	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	int result;
 
-	parsepath(path,newpath,host);
+	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
 
 	longdir_buf = buf;
 	longdir_filler = filler;
 
-	result = chirp_global_getlongdir(host,newpath,longdir_callback,0,time(0)+chirp_fuse_timeout);
+	result = chirp_global_getlongdir(host, newpath, longdir_callback, 0, time(0) + chirp_fuse_timeout);
 
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 	return 0;
 
 	return 0;
@@ -150,13 +153,14 @@ static int chirp_fuse_mkdir(const char *path, mode_t mode)
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	parsepath(path,newpath,host);
+	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
 	result = chirp_global_mkdir(host, newpath, mode, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 	return 0;
 }
 
@@ -165,13 +169,14 @@ static int chirp_fuse_unlink(const char *path)
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	parsepath(path,newpath,host);
+	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_unlink(host, newpath, time(0) + chirp_fuse_timeout );
+	result = chirp_global_unlink(host, newpath, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 	return 0;
 }
 
@@ -180,13 +185,14 @@ static int chirp_fuse_rmdir(const char *path)
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	parsepath(path,newpath,host); 
+	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_rmdir(host, newpath, time(0) + chirp_fuse_timeout );
+	result = chirp_global_rmdir(host, newpath, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 	return 0;
 }
 
@@ -198,15 +204,16 @@ static int chirp_fuse_symlink(const char *source, const char *target)
 	INT64_T result;
 	char dest_path[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	
-	parsepath(target,dest_path,host);
+
+	parsepath(target, dest_path, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_symlink( host, source, dest_path, time(0)+ chirp_fuse_timeout );
+	result = chirp_global_symlink(host, source, dest_path, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 	return 0;
 }
 
@@ -215,14 +222,15 @@ static int chirp_fuse_rename(const char *from, const char *to)
 	INT64_T result;
 	char frompath[CHIRP_PATH_MAX], topath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	parsepath(from,frompath,host); 
-	parsepath(to,topath,host);
+	parsepath(from, frompath, host);
+	parsepath(to, topath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_rename( host, frompath, topath, time(0)+ chirp_fuse_timeout );
+	result = chirp_global_rename(host, frompath, topath, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 	return 0;
 }
 
@@ -231,14 +239,15 @@ static int chirp_fuse_link(const char *from, const char *to)
 	INT64_T result;
 	char frompath[CHIRP_PATH_MAX], topath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	parsepath(from,frompath,host); 
-	parsepath(to,topath,host);
+	parsepath(from, frompath, host);
+	parsepath(to, topath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_link( host, frompath, topath, time(0)+ chirp_fuse_timeout );
+	result = chirp_global_link(host, frompath, topath, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 	return 0;
 }
 
@@ -247,13 +256,14 @@ static int chirp_fuse_chmod(const char *path, mode_t mode)
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	parsepath(path,newpath,host);
+	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_chmod( host, newpath, mode, time(0)+chirp_fuse_timeout );
+	result = chirp_global_chmod(host, newpath, mode, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 
 	return 0;
 }
@@ -263,13 +273,14 @@ static int chirp_fuse_chown(const char *path, uid_t uid, gid_t gid)
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	parsepath(path,newpath,host);
+	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_chown( host, newpath, uid, gid, time(0)+chirp_fuse_timeout );
+	result = chirp_global_chown(host, newpath, uid, gid, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 
 	return 0;
 }
@@ -279,13 +290,14 @@ static int chirp_fuse_truncate(const char *path, off_t size)
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	parsepath(path,newpath,host);
+	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_truncate( host, newpath, size, time(0)+chirp_fuse_timeout );
+	result = chirp_global_truncate(host, newpath, size, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 	return 0;
 }
 
@@ -294,56 +306,58 @@ static int chirp_fuse_utime(const char *path, struct utimbuf *buf)
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	parsepath(path,newpath,host);
+	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_utime( host, newpath, buf->actime, buf->modtime, time(0)+chirp_fuse_timeout );
+	result = chirp_global_utime(host, newpath, buf->actime, buf->modtime, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 
 	return 0;
 }
 
 
-static int chirp_fuse_open( const char *path, struct fuse_file_info *fi )
+static int chirp_fuse_open(const char *path, struct fuse_file_info *fi)
 {
-	static int file_number_counter=1;
+	static int file_number_counter = 1;
 	struct chirp_file *file;
 	int mode = 0;
 
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 
-	parsepath(path,newpath,host); 
+	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	file =  chirp_global_open( host, newpath, fi->flags, mode, time(0)+chirp_fuse_timeout);
+	file = chirp_global_open(host, newpath, fi->flags, mode, time(0) + chirp_fuse_timeout);
 	if(file) {
 		int file_number = file_number_counter++;
-		itable_insert(file_table,file_number,file);
+		itable_insert(file_table, file_number, file);
 		fi->fh = file_number;
 	}
 
 	pthread_mutex_unlock(&mutex);
 
-	if(!file) return -errno;
+	if(!file)
+		return -errno;
 
 	return 0;
 
 }
 
-static int chirp_fuse_release( const char *path, struct fuse_file_info *fi )
+static int chirp_fuse_release(const char *path, struct fuse_file_info *fi)
 {
 	struct chirp_file *file;
 	int result;
 
 	pthread_mutex_lock(&mutex);
 
-	file = itable_lookup(file_table,fi->fh);
+	file = itable_lookup(file_table, fi->fh);
 	if(file) {
-		chirp_global_close(file,time(0)+chirp_fuse_timeout);
-		itable_remove(file_table,fi->fh);
+		chirp_global_close(file, time(0) + chirp_fuse_timeout);
+		itable_remove(file_table, fi->fh);
 		fi->fh = 0;
 		result = 0;
 	} else {
@@ -362,9 +376,9 @@ static int chirp_fuse_read(const char *path, char *buf, size_t size, off_t offse
 
 	pthread_mutex_lock(&mutex);
 
-	file = itable_lookup(file_table,fi->fh);
+	file = itable_lookup(file_table, fi->fh);
 	if(file) {
-		result = chirp_global_pread( file, buf, size, offset, time(0)+chirp_fuse_timeout );
+		result = chirp_global_pread(file, buf, size, offset, time(0) + chirp_fuse_timeout);
 	} else {
 		result = -1;
 		errno = EBADF;
@@ -372,7 +386,8 @@ static int chirp_fuse_read(const char *path, char *buf, size_t size, off_t offse
 
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 
 	return result;
 }
@@ -384,9 +399,9 @@ static int chirp_fuse_write(const char *path, const char *buf, size_t size, off_
 
 	pthread_mutex_lock(&mutex);
 
-	file = itable_lookup(file_table,fi->fh);
+	file = itable_lookup(file_table, fi->fh);
 	if(file) {
-		result = chirp_global_pwrite( file, buf, size, offset, time(0)+chirp_fuse_timeout );
+		result = chirp_global_pwrite(file, buf, size, offset, time(0) + chirp_fuse_timeout);
 	} else {
 		result = -1;
 		errno = EBADF;
@@ -394,7 +409,8 @@ static int chirp_fuse_write(const char *path, const char *buf, size_t size, off_
 
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 
 	return result;
 }
@@ -405,16 +421,17 @@ static int chirp_fuse_mknod(const char *path, mode_t mode, dev_t rdev)
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 
-	parsepath(path,newpath,host);
+	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	file =  chirp_global_open( host, newpath, O_CREAT, mode, time(0)+chirp_fuse_timeout);
+	file = chirp_global_open(host, newpath, O_CREAT, mode, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(!file) return -errno;
+	if(!file)
+		return -errno;
 
 	pthread_mutex_lock(&mutex);
-	chirp_global_close(file,time(0)+chirp_fuse_timeout);
+	chirp_global_close(file, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
 	return 0;
@@ -430,16 +447,17 @@ static int chirp_fuse_statfs(const char *path, struct statvfs *info)
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
-	parsepath(path,newpath,host);
+	parsepath(path, newpath, host);
 	struct chirp_statfs cinfo;
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_statfs( host, newpath, &cinfo, time(0)+chirp_fuse_timeout );
+	result = chirp_global_statfs(host, newpath, &cinfo, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
-	if(result<0) return -errno;
+	if(result < 0)
+		return -errno;
 
-	memset(info,0,sizeof(*info));
+	memset(info, 0, sizeof(*info));
 
 #if FUSE_USE_VERSION==22
 	info->f_type = cinfo.f_type;
@@ -455,52 +473,52 @@ static int chirp_fuse_statfs(const char *path, struct statvfs *info)
 }
 
 static struct fuse_operations chirp_fuse_operations = {
-	.getattr	= chirp_fuse_getattr,
-	.readlink	= chirp_fuse_readlink,
-	.readdir	= chirp_fuse_readdir,
-	.mknod		= chirp_fuse_mknod,
-	.mkdir		= chirp_fuse_mkdir,
-	.symlink	= chirp_fuse_symlink,
-	.unlink		= chirp_fuse_unlink,
-	.rmdir		= chirp_fuse_rmdir,
-	.rename		= chirp_fuse_rename,
-	.link		= chirp_fuse_link,
-	.chmod		= chirp_fuse_chmod,
-	.chown		= chirp_fuse_chown,
-	.truncate	= chirp_fuse_truncate,
-	.utime		= chirp_fuse_utime,
-	.open		= chirp_fuse_open,
-	.read		= chirp_fuse_read,
-	.write		= chirp_fuse_write,
-	.statfs		= chirp_fuse_statfs,
-	.release	= chirp_fuse_release
+	.getattr = chirp_fuse_getattr,
+	.readlink = chirp_fuse_readlink,
+	.readdir = chirp_fuse_readdir,
+	.mknod = chirp_fuse_mknod,
+	.mkdir = chirp_fuse_mkdir,
+	.symlink = chirp_fuse_symlink,
+	.unlink = chirp_fuse_unlink,
+	.rmdir = chirp_fuse_rmdir,
+	.rename = chirp_fuse_rename,
+	.link = chirp_fuse_link,
+	.chmod = chirp_fuse_chmod,
+	.chown = chirp_fuse_chown,
+	.truncate = chirp_fuse_truncate,
+	.utime = chirp_fuse_utime,
+	.open = chirp_fuse_open,
+	.read = chirp_fuse_read,
+	.write = chirp_fuse_write,
+	.statfs = chirp_fuse_statfs,
+	.release = chirp_fuse_release
 };
 
-static struct fuse *fuse_instance=0;
-static struct fuse_chan *fuse_chan=0;
+static struct fuse *fuse_instance = 0;
+static struct fuse_chan *fuse_chan = 0;
 static char *fuse_mountpoint;
 
-static void exit_handler( int sig )
+static void exit_handler(int sig)
 {
 	if(fuse_instance) {
 		fuse_exit(fuse_instance);
-		fuse_unmount(fuse_mountpoint,fuse_chan);
+		fuse_unmount(fuse_mountpoint, fuse_chan);
 		fuse_destroy(fuse_instance);
 	}
 	_exit(0);
 }
 
-static void show_version( const char *cmd )
+static void show_version(const char *cmd)
 {
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n",cmd,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,BUILD_USER,BUILD_HOST,__DATE__,__TIME__);
+	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
 }
 
-static void show_help( const char *cmd )
+static void show_help(const char *cmd)
 {
-	printf("use: %s <mountpath>\n",cmd);
+	printf("use: %s <mountpath>\n", cmd);
 	printf("where options are:\n");
-	printf(" -t <timeout> Timeout for network operations. (default is %ds)\n",chirp_fuse_timeout);
-	printf(" -b <bytes>   Block size for network I/O. (default is %ds)\n",(int)chirp_reli_blocksize_get());
+	printf(" -t <timeout> Timeout for network operations. (default is %ds)\n", chirp_fuse_timeout);
+	printf(" -b <bytes>   Block size for network I/O. (default is %ds)\n", (int) chirp_reli_blocksize_get());
 	printf(" -a <flag>    Require this authentication mode.\n");
 	printf(" -d <flag>    Enable debugging for this subsystem.\n");
 	printf(" -o <file>    Send debugging output to this file.\n");
@@ -508,7 +526,7 @@ static void show_help( const char *cmd )
 	printf(" -v           Show program version.\n");
 	printf(" -h           This message.\n");
 }
- 
+
 int main(int argc, char *argv[])
 {
 	char c;
@@ -516,81 +534,83 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c=getopt(argc,argv,"d:b:o:a:t:fhv")) != -1 ) {
-		switch(c) {
-			case 'd':
-				debug_flags_set(optarg);
-				break;
-			case 'b':
-				chirp_reli_blocksize_set(atoi(optarg));
-				break;
-			case 'o':
-				debug_config_file(optarg);
-				break;
-			case 'a':
-				auth_register_byname(optarg);
-				did_explicit_auth = 1;
-				break;
-			case 't':
-				chirp_fuse_timeout = string_time_parse(optarg);
-				break;
-			case 'f':
-				run_in_foreground = 1;
-				break;
-			case 'v':
-				show_version(argv[0]);
-				return 0;
-				break;
-			case 'h':
-			default:
-				show_help(argv[0]);
-				return 1;
-				break;
+	while((c = getopt(argc, argv, "d:b:o:a:t:fhv")) != -1) {
+		switch (c) {
+		case 'd':
+			debug_flags_set(optarg);
+			break;
+		case 'b':
+			chirp_reli_blocksize_set(atoi(optarg));
+			break;
+		case 'o':
+			debug_config_file(optarg);
+			break;
+		case 'a':
+			auth_register_byname(optarg);
+			did_explicit_auth = 1;
+			break;
+		case 't':
+			chirp_fuse_timeout = string_time_parse(optarg);
+			break;
+		case 'f':
+			run_in_foreground = 1;
+			break;
+		case 'v':
+			show_version(argv[0]);
+			return 0;
+			break;
+		case 'h':
+		default:
+			show_help(argv[0]);
+			return 1;
+			break;
 		}
 	}
 
-	if((argc-optind)!=1) {
+	if((argc - optind) != 1) {
 		show_help(argv[0]);
 		return 1;
 	}
 
 	fuse_mountpoint = argv[optind];
 
-	if(!did_explicit_auth) auth_register_all();
+	if(!did_explicit_auth)
+		auth_register_all();
 
 	file_table = itable_create(0);
 
-	signal(SIGHUP,exit_handler);
-	signal(SIGINT,exit_handler);
-	signal(SIGTERM,exit_handler);
+	signal(SIGHUP, exit_handler);
+	signal(SIGINT, exit_handler);
+	signal(SIGTERM, exit_handler);
 
-	fuse_chan = fuse_mount(fuse_mountpoint,0);
+	fuse_chan = fuse_mount(fuse_mountpoint, 0);
 	if(!fuse_chan) {
-		fprintf(stderr,"chirp_fuse: couldn't access %s\n",fuse_mountpoint);
+		fprintf(stderr, "chirp_fuse: couldn't access %s\n", fuse_mountpoint);
 		return 1;
 	}
 
-	fuse_instance = fuse_new(fuse_chan,0,&chirp_fuse_operations,sizeof(chirp_fuse_operations),0);
+	fuse_instance = fuse_new(fuse_chan, 0, &chirp_fuse_operations, sizeof(chirp_fuse_operations), 0);
 	if(!fuse_instance) {
-		fuse_unmount(fuse_mountpoint,fuse_chan);
-		fprintf(stderr,"chirp_fuse: couldn't access %s\n",fuse_mountpoint);
+		fuse_unmount(fuse_mountpoint, fuse_chan);
+		fprintf(stderr, "chirp_fuse: couldn't access %s\n", fuse_mountpoint);
 		return 1;
 	}
 
-	printf("chirp_fuse: mounted chirp on %s\n",fuse_mountpoint);
+	printf("chirp_fuse: mounted chirp on %s\n", fuse_mountpoint);
 #ifdef CCTOOLS_OPSYS_DARWIN
-	printf("chirp_fuse: to unmount: umount %s\n",fuse_mountpoint);
+	printf("chirp_fuse: to unmount: umount %s\n", fuse_mountpoint);
 #else
-	printf("chirp_fuse: to unmount: fusermount -u %s\n",fuse_mountpoint);
+	printf("chirp_fuse: to unmount: fusermount -u %s\n", fuse_mountpoint);
 #endif
 
 	fflush(0);
 
-	if(!run_in_foreground) daemon(0,0);
+	if(!run_in_foreground)
+		daemon(0, 0);
 
 	fuse_loop(fuse_instance);
 
-	fuse_unmount(fuse_mountpoint,fuse_chan);
+	fuse_unmount(fuse_mountpoint, fuse_chan);
 	fuse_destroy(fuse_instance);
 
 	return 0;
@@ -600,9 +620,9 @@ int main(int argc, char *argv[])
 
 #include <stdio.h>
 
-int main( int argc, char *argv[] )
+int main(int argc, char *argv[])
 {
-	printf("%s: sorry, fuse support was not built in\n",argv[0]);
+	printf("%s: sorry, fuse support was not built in\n", argv[0]);
 	return 1;
 }
 
