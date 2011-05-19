@@ -7,12 +7,12 @@ See the file COPYING for details.
 int auth_ticket_register(void);
 
 /* Clear all tickets stored for server authentication. */
-void auth_ticket_clear (void);
+void auth_ticket_clear(void);
 
 /* Add a digest/ticket pair for server authentication. */
-void auth_ticket_add (const char *digest, const char *ticket);
+void auth_ticket_add(const char *digest, const char *ticket);
 
 /* Add tickets to client side tickets to try or, if NULL, load
  * tickets from current working directory.
  */
-void auth_ticket_load (const char *tickets);
+void auth_ticket_load(const char *tickets);

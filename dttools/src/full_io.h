@@ -28,7 +28,7 @@ fail for more permanent reasons such as end of file or disk full.
 @param count The number of bytes to read.
 @return The number of bytes actually read, or less than zero indicating error.
 */
-ssize_t full_read( int fd, void *buf, size_t count );
+ssize_t full_read(int fd, void *buf, size_t count);
 
 /** Write the next bytes to a file descriptor.
 @param fd File descriptor.
@@ -36,7 +36,7 @@ ssize_t full_read( int fd, void *buf, size_t count );
 @param count The number of bytes to write.
 @return The number of bytes actually written, or less than zero indicating error.
 */
-ssize_t full_write( int fd, const void *buf, size_t count );
+ssize_t full_write(int fd, const void *buf, size_t count);
 
 /** Read arbitrary bytes from a file descriptor.
 @param fd File descriptor.
@@ -45,7 +45,7 @@ ssize_t full_write( int fd, const void *buf, size_t count );
 @param offset The offset in the file to begin from.
 @return The number of bytes actually read, or less than zero indicating error.
 */
-ssize_t full_pread( int fd, void *buf, size_t count, off_t offset );
+ssize_t full_pread(int fd, void *buf, size_t count, off_t offset);
 
 /** Write arbitrary bytes to a file descriptor.
 @param fd File descriptor.
@@ -54,7 +54,7 @@ ssize_t full_pread( int fd, void *buf, size_t count, off_t offset );
 @param offset The offset in the file to begin from.
 @return The number of bytes actually written, or less than zero indicating error.
 */
-ssize_t full_pwrite( int fd, const void *buf, size_t count, off_t offset );
+ssize_t full_pwrite(int fd, const void *buf, size_t count, off_t offset);
 
 /** Read arbitrary bytes from a file descriptor. (64 bit)
 @param fd File descriptor.
@@ -63,7 +63,7 @@ ssize_t full_pwrite( int fd, const void *buf, size_t count, off_t offset );
 @param offset The offset in the file to begin from.
 @return The number of bytes actually read, or less than zero indicating error.
 */
-INT64_T full_pread64( int fd, void *buf, INT64_T count, INT64_T offset );
+INT64_T full_pread64(int fd, void *buf, INT64_T count, INT64_T offset);
 
 /** Write arbitrary bytes to a file descriptor.  (64 bit)
 @param fd File descriptor.
@@ -72,7 +72,7 @@ INT64_T full_pread64( int fd, void *buf, INT64_T count, INT64_T offset );
 @param offset The offset in the file to begin from.
 @return The number of bytes actually written, or less than zero indicating error.
 */
-INT64_T full_pwrite64( int fd, const void *buf, INT64_T count, INT64_T offset );
+INT64_T full_pwrite64(int fd, const void *buf, INT64_T count, INT64_T offset);
 
 /** Read the next bytes from a file stream.
 @param file Standard file stream.
@@ -80,7 +80,7 @@ INT64_T full_pwrite64( int fd, const void *buf, INT64_T count, INT64_T offset );
 @param count The number of bytes to read.
 @return The number of bytes actually read, or less than zero indicating error.
 */
-ssize_t full_fread( FILE *file, void *buf, size_t count );
+ssize_t full_fread(FILE * file, void *buf, size_t count);
 
 /** Write the next bytes to a file stream.
 @param file Standard file stream.
@@ -88,6 +88,6 @@ ssize_t full_fread( FILE *file, void *buf, size_t count );
 @param count The number of bytes to write.
 @return The number of bytes actually written, or less than zero indicating error.
 */
-ssize_t full_fwrite( FILE *file, const void *buf, size_t count );
+ssize_t full_fwrite(FILE * file, const void *buf, size_t count);
 
 #endif

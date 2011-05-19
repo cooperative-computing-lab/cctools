@@ -14,6 +14,6 @@ See the file COPYING for details.
 @param fp A file pointer, pointing to the beginning of the next line to be read.
 @return A pointer to the line read. This should be used instead of the original buffer pointer once the function returns.
  **/
-char * get_line( FILE *fp );
+char *get_line(FILE * fp);
 
 #endif

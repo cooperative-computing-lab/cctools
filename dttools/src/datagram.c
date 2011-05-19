@@ -29,63 +29,63 @@ See the file COPYING for details.
 #include <string.h>
 
 struct datagram {
-       int fd;
+	int fd;
 };
 
-struct datagram * datagram_create( int port )
+struct datagram *datagram_create(int port)
 {
-	struct datagram *d=0;
+	struct datagram *d = 0;
 	struct sockaddr_in address;
 	int success;
-	int on =1;
+	int on = 1;
 
 	d = malloc(sizeof(*d));
-	if(!d) goto failure;
+	if(!d)
+		goto failure;
 
-	d->fd = socket( PF_INET, SOCK_DGRAM, 0 );
-	if(d->fd<0) goto failure;
+	d->fd = socket(PF_INET, SOCK_DGRAM, 0);
+	if(d->fd < 0)
+		goto failure;
 
-	setsockopt( d->fd, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on) );
+	setsockopt(d->fd, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on));
 
-	if(port!=DATAGRAM_PORT_ANY) {
+	if(port != DATAGRAM_PORT_ANY) {
 		address.sin_family = AF_INET;
 		address.sin_port = htons(port);
 		address.sin_addr.s_addr = htonl(INADDR_ANY);
 
-		success = bind( d->fd, (struct sockaddr *) &address, sizeof(address) );
-		if(success<0) goto failure;
+		success = bind(d->fd, (struct sockaddr *) &address, sizeof(address));
+		if(success < 0)
+			goto failure;
 	}
 
 	return d;
 
-	failure:
+      failure:
 	datagram_delete(d);
 	return 0;
 }
 
-void datagram_delete( struct datagram *d )
+void datagram_delete(struct datagram *d)
 {
 	if(d) {
-		if(d->fd>=0) close(d->fd);
+		if(d->fd >= 0)
+			close(d->fd);
 		free(d);
 	}
 }
 
-static void addr_to_string( struct in_addr *addr, char *str )
+static void addr_to_string(struct in_addr *addr, char *str)
 {
 	unsigned char *bytes;
-	bytes = (unsigned char*) addr;
+	bytes = (unsigned char *) addr;
 
-	sprintf(str,"%u.%u.%u.%u",
-		(unsigned)bytes[0],
-		(unsigned)bytes[1],
-		(unsigned)bytes[2],
-		(unsigned)bytes[3]);
+	sprintf(str, "%u.%u.%u.%u", (unsigned) bytes[0], (unsigned) bytes[1], (unsigned) bytes[2], (unsigned) bytes[3]);
 }
 
-static int errno_is_temporary( int e )
+static int errno_is_temporary(int e)
 {
-	if( e==EINTR || e==EWOULDBLOCK || e==EAGAIN || e==EINPROGRESS || e==EALREADY || e==EISCONN ) {
+	if(e == EINTR || e == EWOULDBLOCK || e == EAGAIN || e == EINPROGRESS || e == EALREADY || e == EISCONN) {
 		return 1;
 	} else {
 		return 0;
@@ -93,12 +93,12 @@ static int errno_is_temporary( int e )
 }
 
 #if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN)
-	#define SOCKLEN_T socklen_t
+#define SOCKLEN_T socklen_t
 #else
-	#define SOCKLEN_T int
+#define SOCKLEN_T int
 #endif
 
-int datagram_recv( struct datagram *d, char *data, int length, char *addr, int *port, int timeout )
+int datagram_recv(struct datagram *d, char *data, int length, char *addr, int *port, int timeout)
 {
 	int result;
 	struct sockaddr_in iaddr;
@@ -108,16 +108,17 @@ int datagram_recv( struct datagram *d, char *data, int length, char *addr, int *
 
 	while(1) {
 
-		tm.tv_sec = timeout/1000000;
-		tm.tv_usec = timeout%1000000;
+		tm.tv_sec = timeout / 1000000;
+		tm.tv_usec = timeout % 1000000;
 
 		FD_ZERO(&fds);
-		FD_SET(d->fd,&fds);
+		FD_SET(d->fd, &fds);
 
-		result = select(d->fd+1,&fds,0,0,&tm);
-		if(result>0) {
-			if(FD_ISSET(d->fd,&fds)) break;
-		} else if( result<0 && errno_is_temporary(errno) ) {
+		result = select(d->fd + 1, &fds, 0, 0, &tm);
+		if(result > 0) {
+			if(FD_ISSET(d->fd, &fds))
+				break;
+		} else if(result < 0 && errno_is_temporary(errno)) {
 			continue;
 		} else {
 			return -1;
@@ -126,16 +127,17 @@ int datagram_recv( struct datagram *d, char *data, int length, char *addr, int *
 
 	iaddr_length = sizeof(iaddr);
 
-	result = recvfrom( d->fd, data, length, 0, (struct sockaddr *) &iaddr, &iaddr_length );
-	if(result<0) return result;
+	result = recvfrom(d->fd, data, length, 0, (struct sockaddr *) &iaddr, &iaddr_length);
+	if(result < 0)
+		return result;
 
-	addr_to_string( &iaddr.sin_addr, addr );
-	*port = ntohs( iaddr.sin_port );
+	addr_to_string(&iaddr.sin_addr, addr);
+	*port = ntohs(iaddr.sin_port);
 
 	return result;
 }
 
-int datagram_send( struct datagram *d, const char *data, int length, const char *addr, int port )
+int datagram_send(struct datagram *d, const char *data, int length, const char *addr, int port)
 {
 	int result;
 	struct sockaddr_in iaddr;
@@ -145,17 +147,17 @@ int datagram_send( struct datagram *d, const char *data, int length, const char 
 
 	iaddr.sin_family = AF_INET;
 	iaddr.sin_port = htons(port);
-	if(!string_to_ip_address( addr, (unsigned char *)&iaddr.sin_addr )) return -1;
-	
-	result = sendto( d->fd, data, length, 0, (const struct sockaddr *) &iaddr, iaddr_length );
-	if(result<0) return result;
+	if(!string_to_ip_address(addr, (unsigned char *) &iaddr.sin_addr))
+		return -1;
+
+	result = sendto(d->fd, data, length, 0, (const struct sockaddr *) &iaddr, iaddr_length);
+	if(result < 0)
+		return result;
 
 	return result;
 }
 
-int datagram_fd ( struct datagram *d )
+int datagram_fd(struct datagram *d)
 {
 	return d->fd;
 }
-
-

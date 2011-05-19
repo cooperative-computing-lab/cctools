@@ -25,20 +25,24 @@ struct nvpair_database {
 	UINT64_T nextkey;
 };
 
-static void nvpair_database_error( struct nvpair_database *db )
+static void nvpair_database_error(struct nvpair_database *db)
 {
-	fatal("unable to access %s: %s",db->filename,strerror(errno));
+	fatal("unable to access %s: %s", db->filename, strerror(errno));
 }
 
-static void nvpair_database_sync( struct nvpair_database *db )
+static void nvpair_database_sync(struct nvpair_database *db)
 {
-	if(ferror(db->logfile))			nvpair_database_error(db);
-	if(fflush(db->logfile)!=0)		nvpair_database_error(db);
-	if(ferror(db->logfile))			nvpair_database_error(db);
-	if(fsync(fileno(db->logfile))!=0)	nvpair_database_error(db);
+	if(ferror(db->logfile))
+		nvpair_database_error(db);
+	if(fflush(db->logfile) != 0)
+		nvpair_database_error(db);
+	if(ferror(db->logfile))
+		nvpair_database_error(db);
+	if(fsync(fileno(db->logfile)) != 0)
+		nvpair_database_error(db);
 }
 
-struct nvpair_database * nvpair_database_open( const char *filename )
+struct nvpair_database *nvpair_database_open(const char *filename)
 {
 	struct nvpair_database *db;
 	struct nvpair *nv;
@@ -53,25 +57,27 @@ struct nvpair_database * nvpair_database_open( const char *filename )
 	db->filename = strdup(filename);
 	db->nextkey = 1;
 
-	db->logfile = fopen(filename,"r");
+	db->logfile = fopen(filename, "r");
 	if(db->logfile) {
-		while(fgets(line,sizeof(line),db->logfile)) {
+		while(fgets(line, sizeof(line), db->logfile)) {
 			db->logsize++;
-			if(sscanf(line,"I %lld",&key)) {
+			if(sscanf(line, "I %lld", &key)) {
 				nv = nvpair_create();
-				if(nvpair_parse_stream(nv,db->logfile)) {
-					itable_insert(db->table,key,nv);
+				if(nvpair_parse_stream(nv, db->logfile)) {
+					itable_insert(db->table, key, nv);
 				} else {
 					nvpair_database_error(db);
 				}
-				db->nextkey = key+1;
-			} else if(sscanf(line,"R %lld",&key)) {
-				nv = itable_remove(db->table,key);
-				if(nv) nvpair_delete(nv);
- 			} else if(sscanf(line,"U %lld %s %s",&key,name,value)) {
-				nv = itable_lookup(db->table,key);
-				if(nv) nvpair_insert_string(nv,name,value);
-			} else if(sscanf(line,"N %lld",&key)) {
+				db->nextkey = key + 1;
+			} else if(sscanf(line, "R %lld", &key)) {
+				nv = itable_remove(db->table, key);
+				if(nv)
+					nvpair_delete(nv);
+			} else if(sscanf(line, "U %lld %s %s", &key, name, value)) {
+				nv = itable_lookup(db->table, key);
+				if(nv)
+					nvpair_insert_string(nv, name, value);
+			} else if(sscanf(line, "N %lld", &key)) {
 				db->nextkey = key;
 			} else {
 				nvpair_database_error(db);
@@ -80,7 +86,7 @@ struct nvpair_database * nvpair_database_open( const char *filename )
 		fclose(db->logfile);
 	}
 
-	db->logfile = fopen(filename,"a");
+	db->logfile = fopen(filename, "a");
 	if(!db->logfile) {
 		nvpair_database_close(db);
 		return 0;
@@ -89,28 +95,30 @@ struct nvpair_database * nvpair_database_open( const char *filename )
 	return db;
 }
 
-void nvpair_database_compress( struct nvpair_database *db )
+void nvpair_database_compress(struct nvpair_database *db)
 {
 	char newfilename[DB_LINE_MAX];
 	FILE *file;
 	UINT64_T key;
 	struct nvpair *nv;
 
-	if(db->logsize < itable_size(db->table)*3 ) return;
+	if(db->logsize < itable_size(db->table) * 3)
+		return;
 
-	sprintf(newfilename,"%s.new",db->filename);
+	sprintf(newfilename, "%s.new", db->filename);
 
-	file = fopen(newfilename,"w");
-	if(!file) nvpair_database_error(db);
+	file = fopen(newfilename, "w");
+	if(!file)
+		nvpair_database_error(db);
 
 	itable_firstkey(db->table);
-	while(itable_nextkey(db->table,&key,(void**)&nv)) {
-		fprintf(file,"I %llu\n",key);
-		nvpair_print_text(nv,file);
+	while(itable_nextkey(db->table, &key, (void **) &nv)) {
+		fprintf(file, "I %llu\n", key);
+		nvpair_print_text(nv, file);
 	}
-	fprintf(file,"N %lld\n",db->nextkey);
+	fprintf(file, "N %lld\n", db->nextkey);
 
-	if(fflush(file)!=0 || ferror(file) || fsync(fileno(file))!=0 || rename(newfilename,db->filename)!=0) {
+	if(fflush(file) != 0 || ferror(file) || fsync(fileno(file)) != 0 || rename(newfilename, db->filename) != 0) {
 		nvpair_database_error(db);
 	}
 
@@ -120,7 +128,7 @@ void nvpair_database_compress( struct nvpair_database *db )
 	db->logsize = itable_size(db->table);
 }
 
-void nvpair_database_close( struct nvpair_database *db )
+void nvpair_database_close(struct nvpair_database *db)
 {
 	if(db) {
 		if(db->logfile) {
@@ -131,7 +139,7 @@ void nvpair_database_close( struct nvpair_database *db )
 			UINT64_T key;
 			struct nvpair *nv;
 			itable_firstkey(db->table);
-			while(itable_nextkey(db->table,&key,(void**)&nv)) {
+			while(itable_nextkey(db->table, &key, (void **) &nv)) {
 				nvpair_delete(nv);
 			}
 			itable_delete(db->table);
@@ -145,47 +153,48 @@ void nvpair_database_close( struct nvpair_database *db )
 	}
 }
 
-int nvpair_database_insert( struct nvpair_database *db, UINT64_T *key, struct nvpair *nv )
+int nvpair_database_insert(struct nvpair_database *db, UINT64_T * key, struct nvpair *nv)
 {
 	*key = db->nextkey++;
 
-	nvpair_insert_integer(nv,"key",*key);
-	itable_insert(db->table,*key,nv);
-	fprintf(db->logfile,"I %lld\n",*key);
-	nvpair_print_text(nv,db->logfile);
+	nvpair_insert_integer(nv, "key", *key);
+	itable_insert(db->table, *key, nv);
+	fprintf(db->logfile, "I %lld\n", *key);
+	nvpair_print_text(nv, db->logfile);
 	nvpair_database_sync(db);
 	nvpair_database_compress(db);
 
 	return 1;
 }
 
-struct nvpair * nvpair_database_remove( struct nvpair_database *db, UINT64_T key )
+struct nvpair *nvpair_database_remove(struct nvpair_database *db, UINT64_T key)
 {
 	struct nvpair *nv;
 
-	nv = itable_remove(db->table,key);
-	if(!nv) return 0;
+	nv = itable_remove(db->table, key);
+	if(!nv)
+		return 0;
 
-	fprintf(db->logfile,"R %lld\n",key);
+	fprintf(db->logfile, "R %lld\n", key);
 	nvpair_database_sync(db);
 	nvpair_database_compress(db);
 
 	return nv;
 }
 
-struct nvpair * nvpair_database_lookup( struct nvpair_database *db, UINT64_T key )
+struct nvpair *nvpair_database_lookup(struct nvpair_database *db, UINT64_T key)
 {
-	return itable_lookup(db->table,key);
+	return itable_lookup(db->table, key);
 }
 
-int nvpair_database_update_string( struct nvpair_database *db, UINT64_T key, const char *name, const char *value )
+int nvpair_database_update_string(struct nvpair_database *db, UINT64_T key, const char *name, const char *value)
 {
 	struct nvpair *nv;
 
-	nv = itable_lookup(db->table,key);
+	nv = itable_lookup(db->table, key);
 	if(nv) {
-		nvpair_insert_string(nv,name,value);
-		fprintf(db->logfile,"U %lld %s %s\n",key,name,value);
+		nvpair_insert_string(nv, name, value);
+		fprintf(db->logfile, "U %lld %s %s\n", key, name, value);
 		nvpair_database_sync(db);
 		nvpair_database_compress(db);
 		return 1;
@@ -194,14 +203,14 @@ int nvpair_database_update_string( struct nvpair_database *db, UINT64_T key, con
 	}
 }
 
-int nvpair_database_update_integer( struct nvpair_database *db, UINT64_T key, const char *name, INT64_T value )
+int nvpair_database_update_integer(struct nvpair_database *db, UINT64_T key, const char *name, INT64_T value)
 {
 	struct nvpair *nv;
 
-	nv = itable_lookup(db->table,key);
+	nv = itable_lookup(db->table, key);
 	if(nv) {
-		nvpair_insert_integer(nv,name,value);
-		fprintf(db->logfile,"U %lld %s %lld\n",key,name,value);
+		nvpair_insert_integer(nv, name, value);
+		fprintf(db->logfile, "U %lld %s %lld\n", key, name, value);
 		nvpair_database_sync(db);
 		nvpair_database_compress(db);
 		return 1;
@@ -210,36 +219,36 @@ int nvpair_database_update_integer( struct nvpair_database *db, UINT64_T key, co
 	}
 }
 
-const char * nvpair_database_lookup_string( struct nvpair_database *db, UINT64_T key, const char *name )
+const char *nvpair_database_lookup_string(struct nvpair_database *db, UINT64_T key, const char *name)
 {
 	struct nvpair *nv;
 
-	nv = itable_lookup(db->table,key);
+	nv = itable_lookup(db->table, key);
 	if(nv) {
-		return nvpair_lookup_string(nv,name);
+		return nvpair_lookup_string(nv, name);
 	} else {
 		return 0;
 	}
 }
 
-INT64_T nvpair_database_lookup_integer( struct nvpair_database *db, UINT64_T key, const char *name )
+INT64_T nvpair_database_lookup_integer(struct nvpair_database * db, UINT64_T key, const char *name)
 {
 	struct nvpair *nv;
 
-	nv = itable_lookup(db->table,key);
+	nv = itable_lookup(db->table, key);
 	if(nv) {
-		return nvpair_lookup_integer(nv,name);
+		return nvpair_lookup_integer(nv, name);
 	} else {
 		return 0;
 	}
 }
 
-void nvpair_database_firstkey( struct nvpair_database *db )
+void nvpair_database_firstkey(struct nvpair_database *db)
 {
 	itable_firstkey(db->table);
 }
 
-int nvpair_database_nextkey( struct nvpair_database *db, UINT64_T *key, struct nvpair **nv )
+int nvpair_database_nextkey(struct nvpair_database *db, UINT64_T * key, struct nvpair **nv)
 {
-	return itable_nextkey(db->table,key,(void**)nv);
+	return itable_nextkey(db->table, key, (void **) nv);
 }

@@ -17,21 +17,21 @@ See the file COPYING for details.
 
 #include "debug.h"
 
-int create_dir( const char *path, int mode )
+int create_dir(const char *path, int mode)
 {
 	char *temp;
 	char *delim;
 	char oldchar;
 	int result;
 
-	temp = alloca(strlen(path)+1);
-	strcpy(temp,path);
+	temp = alloca(strlen(path) + 1);
+	strcpy(temp, path);
 
 	delim = temp;
 
-	while( (delim = strchr(delim,'/')) ) {
+	while((delim = strchr(delim, '/'))) {
 
-		if(delim==temp) {
+		if(delim == temp) {
 			delim++;
 			continue;
 		}
@@ -39,9 +39,9 @@ int create_dir( const char *path, int mode )
 		oldchar = *delim;
 		*delim = 0;
 
-		result = mkdir(temp,mode);
-		if(result!=0) {
-			if(errno==EEXIST) {
+		result = mkdir(temp, mode);
+		if(result != 0) {
+			if(errno == EEXIST) {
 				/* no problem, keep going */
 			} else {
 				return 0;
@@ -56,9 +56,9 @@ int create_dir( const char *path, int mode )
 
 	/* Now, last chance */
 
-	result = mkdir(temp,mode);
-	if(result!=0) {
-		if(errno==EEXIST) {
+	result = mkdir(temp, mode);
+	if(result != 0) {
+		if(errno == EEXIST) {
 			return 1;
 		} else {
 			return 0;
@@ -67,4 +67,3 @@ int create_dir( const char *path, int mode )
 		return 1;
 	}
 }
-

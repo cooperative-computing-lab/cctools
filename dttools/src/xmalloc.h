@@ -22,15 +22,15 @@ caller of these routines need not continually check for a null pointer return.
 @param nbytes The amount of memory to allocate.
 @return On success, returns a valid pointer.  On failure, aborts by calling @ref fatal.
 */
-void * xxmalloc( size_t nbytes );
+void *xxmalloc(size_t nbytes);
 
-void * xxrealloc( void *ptr, size_t nbytes );
+void *xxrealloc(void *ptr, size_t nbytes);
 
 /** Duplicate string, or abort on failure.
 @param str The string to duplicate.
 @return On success, returns a valid pointer.  On failure, aborts by calling @ref fatal.
 */
 
-char * xstrdup( const char *str );
+char *xstrdup(const char *str);
 
 #endif

@@ -17,7 +17,7 @@ the Stevens Unix book.  So a to avoid conflicts with packages
 such as readline, we use xxmalloc, but it means the same thing.
 */
 
-void * xxmalloc( size_t nbytes )
+void *xxmalloc(size_t nbytes)
 {
 	void *result = malloc(nbytes);
 	if(result) {
@@ -28,7 +28,7 @@ void * xxmalloc( size_t nbytes )
 	}
 }
 
-char * xstrdup( const char *str )
+char *xstrdup(const char *str)
 {
 	void *result = strdup(str);
 	if(result) {
@@ -39,10 +39,10 @@ char * xstrdup( const char *str )
 	}
 }
 
-void * xxrealloc( void *ptr, size_t nsize )
+void *xxrealloc(void *ptr, size_t nsize)
 {
 	void *result = realloc(ptr, nsize);
-	if (nsize > 0 && result == NULL)
-	  fatal("out of memory");
+	if(nsize > 0 && result == NULL)
+		fatal("out of memory");
 	return result;
 }

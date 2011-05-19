@@ -29,46 +29,46 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <string.h>
 
-int domain_name_lookup_reverse( const char *addr, char *name )
+int domain_name_lookup_reverse(const char *addr, char *name)
 {
 	struct hostent *h;
 	struct in_addr iaddr;
 
-	debug(D_DNS,"looking up addr %s",addr);
+	debug(D_DNS, "looking up addr %s", addr);
 
-	if(!string_to_ip_address(addr,(unsigned char*)&iaddr)) {
-		debug(D_DNS,"%s is not a valid addr");
+	if(!string_to_ip_address(addr, (unsigned char *) &iaddr)) {
+		debug(D_DNS, "%s is not a valid addr");
 		return 0;
 	}
 
-	h = gethostbyaddr( (char*)&iaddr, sizeof(iaddr), AF_INET );
-	if(h) strcpy(name,h->h_name);
+	h = gethostbyaddr((char *) &iaddr, sizeof(iaddr), AF_INET);
+	if(h)
+		strcpy(name, h->h_name);
 
 	if(h) {
-		debug(D_DNS,"%s is %s",addr,name);
+		debug(D_DNS, "%s is %s", addr, name);
 		return 1;
 	} else {
-		debug(D_DNS,"couldn't lookup %s: %s",addr,strerror(errno));
+		debug(D_DNS, "couldn't lookup %s: %s", addr, strerror(errno));
 		return 0;
 	}
 }
 
-int domain_name_lookup( const char *name, char *addr )
+int domain_name_lookup(const char *name, char *addr)
 {
 	struct hostent *h;
 
-	debug(D_DNS,"looking up name %s",name);
+	debug(D_DNS, "looking up name %s", name);
 
-	h = gethostbyname( name );
-	if(h) string_from_ip_address((const unsigned char*)h->h_addr,addr);
+	h = gethostbyname(name);
+	if(h)
+		string_from_ip_address((const unsigned char *) h->h_addr, addr);
 
 	if(h) {
-		debug(D_DNS,"%s is %s",name,addr);
+		debug(D_DNS, "%s is %s", name, addr);
 		return 1;
 	} else {
-		debug(D_DNS,"couldn't look up %s: %s",name,strerror(errno));
+		debug(D_DNS, "couldn't look up %s: %s", name, strerror(errno));
 		return 0;
 	}
 }
-
-

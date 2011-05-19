@@ -13,11 +13,9 @@ See the file COPYING for details.
 #define CATALOG_HOST_DEFAULT "chirp.cse.nd.edu"
 #define CATALOG_PORT_DEFAULT 9097
 
-#define CATALOG_HOST (getenv("CATALOG_HOST") ? getenv("CATALOG_HOST") : CATALOG_HOST_DEFAULT ) 
-#define CATALOG_PORT (getenv("CATALOG_PORT") ? atoi(getenv("CATALOG_PORT")) : CATALOG_PORT_DEFAULT ) 
+#define CATALOG_HOST (getenv("CATALOG_HOST") ? getenv("CATALOG_HOST") : CATALOG_HOST_DEFAULT )
+#define CATALOG_PORT (getenv("CATALOG_PORT") ? atoi(getenv("CATALOG_PORT")) : CATALOG_PORT_DEFAULT )
 
 #define CATALOG_TYPE_WORK_QUEUE_MASTER "wq_master"
 
 #endif
-
-

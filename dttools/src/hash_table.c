@@ -29,45 +29,48 @@ struct hash_table {
 	struct entry *ientry;
 };
 
-struct hash_table * hash_table_create( int bucket_count, hash_func_t func )
+struct hash_table *hash_table_create(int bucket_count, hash_func_t func)
 {
 	struct hash_table *h;
 	int i;
 
-	h = (struct hash_table*) malloc(sizeof(struct hash_table));
-	if(!h) return 0;
+	h = (struct hash_table *) malloc(sizeof(struct hash_table));
+	if(!h)
+		return 0;
 
-	if(bucket_count<1) bucket_count = DEFAULT_SIZE;
-	if(!func) func = DEFAULT_FUNC;
+	if(bucket_count < 1)
+		bucket_count = DEFAULT_SIZE;
+	if(!func)
+		func = DEFAULT_FUNC;
 
 	h->size = 0;
 	h->hash_func = func;
 	h->bucket_count = bucket_count;
-	h->buckets = (struct entry**) malloc( sizeof(struct entry*)*bucket_count );
+	h->buckets = (struct entry **) malloc(sizeof(struct entry *) * bucket_count);
 	if(!h->buckets) {
 		free(h);
 		return 0;
 	}
 
-	for( i=0; i<bucket_count; i++ ) {
+	for(i = 0; i < bucket_count; i++) {
 		h->buckets[i] = 0;
 	}
 
 	return h;
 }
 
-void hash_table_delete( struct hash_table *h )
+void hash_table_delete(struct hash_table *h)
 {
 	struct entry *e, *f;
 	int i;
 
-	for( i=0; i<h->bucket_count; i++ ) {
+	for(i = 0; i < h->bucket_count; i++) {
 		e = h->buckets[i];
 		while(e) {
-			f=e->next;
+			f = e->next;
 			free(e->key);
 			free(e);
-			e=f;
+			e = f;
 		}
 	}
 
@@ -75,7 +78,7 @@ void hash_table_delete( struct hash_table *h )
 	free(h);
 }
 
-void * hash_table_lookup( struct hash_table *h, const char *key )
+void *hash_table_lookup(struct hash_table *h, const char *key)
 {
 	struct entry *e;
 	unsigned hash, index;
@@ -85,21 +88,21 @@ void * hash_table_lookup( struct hash_table *h, const char *key )
 	e = h->buckets[index];
 
 	while(e) {
-		if(hash==e->hash && !strcmp(key,e->key)) {
+		if(hash == e->hash && !strcmp(key, e->key)) {
 			return e->value;
 		}
-		e=e->next;
+		e = e->next;
 	}
 
 	return 0;
 }
 
-int hash_table_size( struct hash_table *h )
+int hash_table_size(struct hash_table *h)
 {
 	return h->size;
 }
 
-int hash_table_insert( struct hash_table *h, const char *key, const void *value )
+int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 {
 	struct entry *e;
 	unsigned hash, index;
@@ -109,12 +112,14 @@ int hash_table_insert( struct hash_table *h, const char *key, const void *value 
 	e = h->buckets[index];
 
 	while(e) {
-		if(hash==e->hash && !strcmp(key,e->key)) return 0;
-		e=e->next;
+		if(hash == e->hash && !strcmp(key, e->key))
+			return 0;
+		e = e->next;
 	}
 
-	e = (struct entry*) malloc(sizeof(struct entry));
-	if(!e) return 0;
+	e = (struct entry *) malloc(sizeof(struct entry));
+	if(!e)
+		return 0;
 
 	e->key = strdup(key);
 	if(!e->key) {
@@ -122,7 +127,7 @@ int hash_table_insert( struct hash_table *h, const char *key, const void *value 
 		return 0;
 	}
 
-	e->value = (void*) value;
+	e->value = (void *) value;
 	e->hash = hash;
 	e->next = h->buckets[index];
 	h->buckets[index] = e;
@@ -131,9 +136,9 @@ int hash_table_insert( struct hash_table *h, const char *key, const void *value 
 	return 1;
 }
 
-void * hash_table_remove( struct hash_table *h, const char *key )
+void *hash_table_remove(struct hash_table *h, const char *key)
 {
-	struct entry *e,*f;
+	struct entry *e, *f;
 	void *value;
 	unsigned hash, index;
 
@@ -143,7 +148,7 @@ void * hash_table_remove( struct hash_table *h, const char *key )
 	f = 0;
 
 	while(e) {
-		if(hash==e->hash && !strcmp(key,e->key)) {
+		if(hash == e->hash && !strcmp(key, e->key)) {
 			if(f) {
 				f->next = e->next;
 			} else {
@@ -162,16 +167,17 @@ void * hash_table_remove( struct hash_table *h, const char *key )
 	return 0;
 }
 
-void hash_table_firstkey( struct hash_table *h )
+void hash_table_firstkey(struct hash_table *h)
 {
 	h->ientry = 0;
-	for(h->ibucket=0;h->ibucket<h->bucket_count;h->ibucket++) {
+	for(h->ibucket = 0; h->ibucket < h->bucket_count; h->ibucket++) {
 		h->ientry = h->buckets[h->ibucket];
-		if(h->ientry) break;
+		if(h->ientry)
+			break;
 	}
 }
 
-int hash_table_nextkey( struct hash_table *h, char **key, void **value )
+int hash_table_nextkey(struct hash_table *h, char **key, void **value)
 {
 	if(h->ientry) {
 		*key = h->ientry->key;
@@ -180,9 +186,10 @@ int hash_table_nextkey( struct hash_table *h, char **key, void **value )
 		h->ientry = h->ientry->next;
 		if(!h->ientry) {
 			h->ibucket++;
-			for(;h->ibucket<h->bucket_count;h->ibucket++) {
+			for(; h->ibucket < h->bucket_count; h->ibucket++) {
 				h->ientry = h->buckets[h->ibucket];
-				if(h->ientry) break;
+				if(h->ientry)
+					break;
 			}
 		}
 		return 1;
@@ -191,8 +198,8 @@ int hash_table_nextkey( struct hash_table *h, char **key, void **value )
 	}
 }
 
-typedef  unsigned long  int  ub4;   /* unsigned 4-byte quantities */
-typedef  unsigned       char ub1;   /* unsigned 1-byte quantities */
+typedef unsigned long int ub4;	/* unsigned 4-byte quantities */
+typedef unsigned char ub1;	/* unsigned 1-byte quantities */
 
 #define hashsize(n) ((ub4)1<<(n))
 #define hashmask(n) (hashsize(n)-1)
@@ -257,47 +264,57 @@ acceptable.  Do NOT use for cryptographic purposes.
 --------------------------------------------------------------------
 */
 
-static ub4 jenkins_hash( k, length, initval)
-const register ub1 *k;        /* the key */
-register ub4  length;   /* the length of the key */
-register ub4  initval;  /* the previous hash, or an arbitrary value */
+static ub4 jenkins_hash(k, length, initval)
+     const register ub1 *k;	/* the key */
+     register ub4 length;	/* the length of the key */
+     register ub4 initval;	/* the previous hash, or an arbitrary value */
 {
-   register ub4 a,b,c,len;    /* Set up the internal state */
-   len = length;
-   a = b = 0x9e3779b9;  /* the golden ratio; an arbitrary value */
-   c = initval;         /* the previous hash value */    /*---------------------------------------- handle most of the key */
-   while (len >= 12)
-   {
-      a += (k[0] +((ub4)k[1]<<8) +((ub4)k[2]<<16) +((ub4)k[3]<<24));
-      b += (k[4] +((ub4)k[5]<<8) +((ub4)k[6]<<16) +((ub4)k[7]<<24));
-      c += (k[8] +((ub4)k[9]<<8) +((ub4)k[10]<<16)+((ub4)k[11]<<24));
-      mix(a,b,c);
-      k += 12; len -= 12;
-   }    /*------------------------------------- handle the last 11 bytes */
-   c += length;
-   switch(len)              /* all the case statements fall through */
-   {
-   case 11: c+=((ub4)k[10]<<24);
-   case 10: c+=((ub4)k[9]<<16);
-   case 9 : c+=((ub4)k[8]<<8);
-      /* the first byte of c is reserved for the length */
-   case 8 : b+=((ub4)k[7]<<24);
-   case 7 : b+=((ub4)k[6]<<16);
-   case 6 : b+=((ub4)k[5]<<8);
-   case 5 : b+=k[4];
-   case 4 : a+=((ub4)k[3]<<24);
-   case 3 : a+=((ub4)k[2]<<16);
-   case 2 : a+=((ub4)k[1]<<8);
-   case 1 : a+=k[0];
-     /* case 0: nothing left to add */
-   }
-   mix(a,b,c);
+	register ub4 a, b, c, len;	/* Set up the internal state */
+	len = length;
+	a = b = 0x9e3779b9;	/* the golden ratio; an arbitrary value */
+	c = initval;					 /* the previous hash value *//*---------------------------------------- handle most of the key */
+	while(len >= 12) {
+		a += (k[0] + ((ub4) k[1] << 8) + ((ub4) k[2] << 16) + ((ub4) k[3] << 24));
+		b += (k[4] + ((ub4) k[5] << 8) + ((ub4) k[6] << 16) + ((ub4) k[7] << 24));
+		c += (k[8] + ((ub4) k[9] << 8) + ((ub4) k[10] << 16) + ((ub4) k[11] << 24));
+		mix(a, b, c);
+		k += 12;
+		len -= 12;
+	}
+	/*------------------------------------- handle the last 11 bytes */
+	c += length;
+	switch (len) {		/* all the case statements fall through */
+	case 11:
+		c += ((ub4) k[10] << 24);
+	case 10:
+		c += ((ub4) k[9] << 16);
+	case 9:
+		c += ((ub4) k[8] << 8);
+		/* the first byte of c is reserved for the length */
+	case 8:
+		b += ((ub4) k[7] << 24);
+	case 7:
+		b += ((ub4) k[6] << 16);
+	case 6:
+		b += ((ub4) k[5] << 8);
+	case 5:
+		b += k[4];
+	case 4:
+		a += ((ub4) k[3] << 24);
+	case 3:
+		a += ((ub4) k[2] << 16);
+	case 2:
+		a += ((ub4) k[1] << 8);
+	case 1:
+		a += k[0];
+		/* case 0: nothing left to add */
+	}
+	mix(a, b, c);
    /*-------------------------------------------- report the result */
-   return c;
+	return c;
 }
 
-unsigned hash_string( const char *s )
+unsigned hash_string(const char *s)
 {
-	return jenkins_hash((const ub1 *) s,strlen(s),0);
+	return jenkins_hash((const ub1 *) s, strlen(s), 0);
 }
-

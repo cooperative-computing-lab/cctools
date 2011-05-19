@@ -22,8 +22,8 @@ not include quotes, variables, or other features of the shell.
 @param command The command string to execute.
 @return A pointer to a file stream which must be closed with @ref fast_pclose.
 */
-pid_t dpopen (const char *command, FILE **in, FILE **out);
+pid_t dpopen(const char *command, FILE ** in, FILE ** out);
 
-int dpclose (FILE *in, FILE *out, pid_t pid);
+int dpclose(FILE * in, FILE * out, pid_t pid);
 
 #endif

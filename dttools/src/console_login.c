@@ -16,76 +16,80 @@ See the file COPYING for details.
 #include <termios.h>
 #include <alloca.h>
 
-static int setecho( int fd, int onoff )
+static int setecho(int fd, int onoff)
 {
 	struct termios term;
-	if(tcgetattr(fd,&term)<0) return 0;
+	if(tcgetattr(fd, &term) < 0)
+		return 0;
 	if(onoff) {
 		term.c_lflag |= ECHO;
 	} else {
 		term.c_lflag &= ~(ECHO);
 	}
-	if(tcsetattr(fd,TCSANOW,&term)<0) return 0;
+	if(tcsetattr(fd, TCSANOW, &term) < 0)
+		return 0;
 	return 1;
 }
 
-static int do_getline( const char *prompt, char *buffer, int length, int echo )
+static int do_getline(const char *prompt, char *buffer, int length, int echo)
 {
 	int fd;
-	char * result;
-	FILE * stream;
+	char *result;
+	FILE *stream;
 
-	fd = open("/dev/tty",O_RDWR);
-	if(fd<0) return 0;
+	fd = open("/dev/tty", O_RDWR);
+	if(fd < 0)
+		return 0;
 
 	if(!echo) {
-		if(!setecho(fd,0)) {
+		if(!setecho(fd, 0)) {
 			close(fd);
 			return 0;
 		}
 	}
 
-	stream = fdopen(fd,"r+");
+	stream = fdopen(fd, "r+");
 	if(!stream) {
 		if(!echo) {
-			setecho(fd,1);
+			setecho(fd, 1);
 		}
 		close(fd);
 		return 0;
 	}
 
-	fprintf(stream,"%s",prompt);
+	fprintf(stream, "%s", prompt);
 	fflush(stream);
 
-	result = fgets(buffer,length,stream);
+	result = fgets(buffer, length, stream);
 
 	string_chomp(buffer);
 
 	if(!echo) {
-		fprintf(stream,"\n");
+		fprintf(stream, "\n");
 		fflush(stream);
-		setecho(fd,1);
+		setecho(fd, 1);
 	}
 
 	fclose(stream);
 
-	return result!=0;
+	return result != 0;
 }
 
-int console_login( const char *service, char *name, int namelen, char *pass, int passlen )
+int console_login(const char *service, char *name, int namelen, char *pass, int passlen)
 {
 	char *prompt;
 
-	prompt = alloca(strlen(service)+10);
-	if(!prompt) return 0;
+	prompt = alloca(strlen(service) + 10);
+	if(!prompt)
+		return 0;
 
-	sprintf(prompt,"%s login: ",service);
+	sprintf(prompt, "%s login: ", service);
 
-	return do_getline(prompt,name,namelen,1) && do_getline("password: ",pass,passlen,0);
-	
+	return do_getline(prompt, name, namelen, 1) && do_getline("password: ", pass, passlen, 0);
+
 }
 
-int console_input( const char *prompt, char *buf, int buflen )
+int console_input(const char *prompt, char *buf, int buflen)
 {
 	return do_getline(prompt, buf, buflen, 0);
 }

@@ -19,17 +19,19 @@ struct catalog_query {
 	struct link *link;
 };
 
-struct catalog_query * catalog_query_create( const char *host, int port, time_t stoptime )
+struct catalog_query *catalog_query_create(const char *host, int port, time_t stoptime)
 {
 	struct catalog_query *q = xxmalloc(sizeof(*q));
 	char url[1024];
 
-	if(!host) host = CATALOG_HOST;
-	if(!port) port = CATALOG_PORT;
+	if(!host)
+		host = CATALOG_HOST;
+	if(!port)
+		port = CATALOG_PORT;
 
-	sprintf(url,"http://%s:%d/query.text",host,port);
+	sprintf(url, "http://%s:%d/query.text", host, port);
 
-	q->link = http_query(url,"GET",stoptime);
+	q->link = http_query(url, "GET", stoptime);
 	if(!q->link) {
 		free(q);
 		return 0;
@@ -38,16 +40,17 @@ struct catalog_query * catalog_query_create( const char *host, int port, time_t 
 	return q;
 }
 
-struct nvpair * catalog_query_read( struct catalog_query *q, time_t stoptime )
+struct nvpair *catalog_query_read(struct catalog_query *q, time_t stoptime)
 {
 	struct nvpair *nv = nvpair_create();
 	char line[65536];
 	int lines = 0;
 
-	while(link_readline(q->link,line,sizeof(line),stoptime)) {
+	while(link_readline(q->link, line, sizeof(line), stoptime)) {
 		string_chomp(line);
-		if(!line[0]) break;
-		nvpair_parse(nv,line);
+		if(!line[0])
+			break;
+		nvpair_parse(nv, line);
 		lines++;
 	}
 
@@ -59,9 +62,8 @@ struct nvpair * catalog_query_read( struct catalog_query *q, time_t stoptime )
 	}
 }
 
-void catalog_query_delete( struct catalog_query *q )
+void catalog_query_delete(struct catalog_query *q)
 {
 	link_close(q->link);
 	free(q);
 }
-

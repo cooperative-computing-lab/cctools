@@ -26,8 +26,8 @@ Each element of this structure is the same as returned by Unix wait4().
 */
 
 struct process_info {
-	pid_t         pid;    /**< The process ID of a complete process. */
-	int           status; /**< The exit status of the process. */
+	pid_t pid;	      /**< The process ID of a complete process. */
+	int status;	      /**< The exit status of the process. */
 	struct rusage rusage; /**< The resource usage of the process. */
 };
 
@@ -41,7 +41,7 @@ or may return it via @ref process_putback in order to allow another caller to re
 process completed in the available time.
 */
 
-struct process_info * process_wait( int timeout );
+struct process_info *process_wait(int timeout);
 
 /** Detect if a child process has completed.
 If so, its status may be obtained without delay by calling @ref process_wait .
@@ -54,7 +54,7 @@ int process_pending();
 @param p A @ref process_info structure returned by @ref process_wait.
 */
 
-void process_putback( struct process_info *p );
+void process_putback(struct process_info *p);
 
 
 

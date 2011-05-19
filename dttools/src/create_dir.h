@@ -16,6 +16,6 @@ See the file COPYING for details.
 @return One on success, zero on failure.
 */
 
-int create_dir( const char *path, int mode );
+int create_dir(const char *path, int mode);
 
 #endif

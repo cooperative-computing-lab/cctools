@@ -21,11 +21,10 @@ int main(int argc, char **argv)
 	files[1] = malloc(8 * sizeof(*files[0]));
 	strcpy(files[1], "chunk.h");
 
-	if (!chunk_concat("large_chunk.txt", (char **)files, 2, "> ", NULL))
-	{
+	if(!chunk_concat("large_chunk.txt", (char **) files, 2, "> ", NULL)) {
 		fprintf(stderr, "chunk_test: chunk_concat failed\n");
 		exit(1);
 	}
-	
+
 	return 0;
 }

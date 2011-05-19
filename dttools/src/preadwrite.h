@@ -10,7 +10,7 @@ See the file COPYING for details.
 
 #include <unistd.h>
 
-ssize_t pread(int fd, void *data, size_t length, off_t offset );
-ssize_t pwrite(int fd, const void *data, size_t length, off_t offset );
+ssize_t pread(int fd, void *data, size_t length, off_t offset);
+ssize_t pwrite(int fd, const void *data, size_t length, off_t offset);
 
 #endif

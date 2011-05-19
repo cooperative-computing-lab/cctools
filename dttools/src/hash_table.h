@@ -39,7 +39,7 @@ while(hash_table_nextkey(h,&key,&value)) {
 
 /** The type signature for a hash function given to @ref hash_table_create */
 
-typedef unsigned (*hash_func_t) ( const char *key );
+typedef unsigned (*hash_func_t) (const char *key);
 
 /** Create a new hash table.
 @param buckets The number of buckets in the table.  If zero, a default value will be used.
@@ -47,21 +47,21 @@ typedef unsigned (*hash_func_t) ( const char *key );
 @return A pointer to a new hash table.
 */
 
-struct hash_table * hash_table_create( int buckets, hash_func_t func );
+struct hash_table *hash_table_create(int buckets, hash_func_t func);
 
 /** Delete a hash table.
 Note that this function will not delete all of the objects contained within the hash table.
 @param h The hash table to delete.
 */
 
-void                hash_table_delete( struct hash_table *h );
+void hash_table_delete(struct hash_table *h);
 
 /** Count the entries in a hash table.
 @return The number of entries in the table.
 @param h A pointer to a hash table.
 */
 
-int    hash_table_size  ( struct hash_table *h );
+int hash_table_size(struct hash_table *h);
 
 /** Insert a key and value.
 This call will fail if the table already contains the same key.
@@ -73,7 +73,7 @@ Also note that you cannot insert a null value into the table.
 @return One if the insert succeeded, failure otherwise
 */
 
-int    hash_table_insert( struct hash_table *h, const char *key, const void *value );
+int hash_table_insert(struct hash_table *h, const char *key, const void *value);
 
 /** Look up a value by key.
 @param h A pointer to a hash table.
@@ -81,7 +81,7 @@ int    hash_table_insert( struct hash_table *h, const char *key, const void *val
 @return If found, the pointer associated with the key, otherwise null.
 */
 
-void * hash_table_lookup( struct hash_table *h, const char *key );
+void *hash_table_lookup(struct hash_table *h, const char *key);
 
 /** Remove a value by key.
 @param h A pointer to a hash table.
@@ -89,7 +89,7 @@ void * hash_table_lookup( struct hash_table *h, const char *key );
 @return If found, the pointer associated with the key, otherwise null.
 */
 
-void * hash_table_remove( struct hash_table *h, const char *key );
+void *hash_table_remove(struct hash_table *h, const char *key);
 
 /** Begin iteration over all keys.
 This function begins a new iteration over a hash table,
@@ -98,7 +98,7 @@ Next, invoke @ref hash_table_nextkey to retrieve each value in order.
 @param h A pointer to a hash table.
 */
 
-void   hash_table_firstkey( struct hash_table *h );
+void hash_table_firstkey(struct hash_table *h);
 
 /** Continue iteration over all keys.
 This function returns the next key and value in the iteration.
@@ -108,13 +108,13 @@ This function returns the next key and value in the iteration.
 @return Zero if there are no more elements to visit, one otherwise.
 */
 
-int    hash_table_nextkey( struct hash_table *h, char **key, void **value );
+int hash_table_nextkey(struct hash_table *h, char **key, void **value);
 
 /** A default hash function.
 @param s A string to hash.
 @return An integer hash of the string.
 */
 
-unsigned hash_string( const char *s );
+unsigned hash_string(const char *s);
 
 #endif

@@ -5,7 +5,8 @@
 #include "md5.h"
 
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
 	unsigned char md5_digest[MD5_DIGEST_LENGTH];
 	unsigned char sha1_digest[SHA1_DIGEST_LENGTH];
 	char md5_ref1[] = "9294727a3638bb1c13f48ef8158bfc9d";
@@ -18,10 +19,12 @@ int main(int argc, char** argv) {
 	char data[51];
 	const char *string;
 	int verbose = 0;
-		
-	if(argc > 1 && !strcmp(argv[1], "-v")) verbose = 1;
 
-	if(verbose) printf("MD5 Tests\n===========\n");
+	if(argc > 1 && !strcmp(argv[1], "-v"))
+		verbose = 1;
+
+	if(verbose)
+		printf("MD5 Tests\n===========\n");
 
 	// Test Str 1
 	hmac_md5("Hi There", 8, "\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b", 16, md5_digest);
@@ -31,7 +34,8 @@ int main(int argc, char** argv) {
 		printf("MD5 Test 1 digest:\t0x%s\n", string);
 	}
 	if(strcmp(md5_ref1, string)) {
-		if(verbose) printf("MD5 Test 1 Failed\n");
+		if(verbose)
+			printf("MD5 Test 1 Failed\n");
 		return -1;
 	}
 
@@ -43,7 +47,8 @@ int main(int argc, char** argv) {
 		printf("MD5 Test 2 digest:\t0x%s\n", string);
 	}
 	if(strcmp(md5_ref2, string)) {
-		if(verbose) printf("MD5 Test 2 Failed\n");
+		if(verbose)
+			printf("MD5 Test 2 Failed\n");
 		return -1;
 	}
 
@@ -57,11 +62,13 @@ int main(int argc, char** argv) {
 		printf("MD5 Test 3 digest:\t0x%s\n", string);
 	}
 	if(strcmp(md5_ref3, string)) {
-		if(verbose) printf("MD5 Test 3 Failed\n");
+		if(verbose)
+			printf("MD5 Test 3 Failed\n");
 		return -1;
 	}
-	
-	if(verbose) printf("\n\nSHA1 Tests\n===========\n");
+
+	if(verbose)
+		printf("\n\nSHA1 Tests\n===========\n");
 
 	// Test Str 1
 	hmac_sha1("Hi There", 8, "\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b", 20, sha1_digest);
@@ -71,7 +78,8 @@ int main(int argc, char** argv) {
 		printf("SHA1 Test 1 digest:\t0x%s\n", string);
 	}
 	if(strcmp(sha1_ref1, string)) {
-		if(verbose) printf("SHA1 Test 1 Failed\n");
+		if(verbose)
+			printf("SHA1 Test 1 Failed\n");
 		return -1;
 	}
 
@@ -83,7 +91,8 @@ int main(int argc, char** argv) {
 		printf("SHA1 Test 2 digest:\t0x%s\n", string);
 	}
 	if(strcmp(sha1_ref2, string)) {
-		if(verbose) printf("SHA1 Test 2 Failed\n");
+		if(verbose)
+			printf("SHA1 Test 2 Failed\n");
 		return -1;
 	}
 
@@ -97,10 +106,10 @@ int main(int argc, char** argv) {
 		printf("SHA1 Test 3 digest:\t0x%s\n", string);
 	}
 	if(strcmp(sha1_ref3, string)) {
-		if(verbose) printf("SHA1 Test 3 Failed\n");
+		if(verbose)
+			printf("SHA1 Test 3 Failed\n");
 		return -1;
 	}
-	 
+
 	return 0;
 }
-

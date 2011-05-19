@@ -11,11 +11,11 @@ See the file COPYING for details.
 #include "link.h"
 #include "int_sizes.h"
 
-struct link * http_query( const char *url, const char *action, time_t stoptime );
-struct link * http_query_no_cache( const char *url, const char *action, time_t stoptime);
-struct link * http_query_size( const char *url, const char *action, INT64_T *size, time_t stoptime, int cache_reload );
-struct link * http_query_size_via_proxy( const char *proxy, const char *url, const char *action, INT64_T *size, time_t stoptime, int cache_reload );
+struct link *http_query(const char *url, const char *action, time_t stoptime);
+struct link *http_query_no_cache(const char *url, const char *action, time_t stoptime);
+struct link *http_query_size(const char *url, const char *action, INT64_T * size, time_t stoptime, int cache_reload);
+struct link *http_query_size_via_proxy(const char *proxy, const char *url, const char *action, INT64_T * size, time_t stoptime, int cache_reload);
 
-INT64_T http_fetch_to_file( const char *url, const char *filename, time_t stoptime );
+INT64_T http_fetch_to_file(const char *url, const char *filename, time_t stoptime);
 
 #endif

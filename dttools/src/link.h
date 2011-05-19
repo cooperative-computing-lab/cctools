@@ -63,8 +63,8 @@ link_close(link);
 @param port Port of server.
 @param stoptime Absolute time at which to abort.
 @return On success, returns a pointer to a link object.  On failure, returns a null pointer with errno set appropriately.
-*/ 
-struct link * link_connect( const char *addr, int port, time_t stoptime );
+*/
+struct link *link_connect(const char *addr, int port, time_t stoptime);
 
 /** Prepare to accept connections.
 @ref link_serve will accept connections on any network interface,
@@ -72,7 +72,7 @@ which is usually what you want.
 @param port The port number to listen on.
 @return link A server endpoint that can be passed to @ref link_accept, or null on failure.
 */
-struct link * link_serve( int port );
+struct link *link_serve(int port);
 
 /** Prepare to accept connections on one network interface.
 Functions like @ref link_serve, except that the server will
@@ -81,14 +81,14 @@ only be visible on the given network interface.
 @param port The port number to listen on.
 @return link A server endpoint that can be passed to @ref link_accept, or null on failure.
 */
-struct link * link_serve_address( const char *addr, int port );
+struct link *link_serve_address(const char *addr, int port);
 
 /** Accept one connection.
 @param master A link returned from @ref link_serve or @ref link_serve_address.
 @param stoptime The time at which to abort.
 @return link A connection to a client, or null on failure.
 */
-struct link * link_accept( struct link *master, time_t stoptime );
+struct link *link_accept(struct link *master, time_t stoptime);
 
 /** Read data from a connection.
 This call will block until the given number of bytes have been read,
@@ -99,7 +99,7 @@ or the connection is dropped.
 @param stoptime The time at which to abort.
 @return The number of bytes actually read, or zero if the connection is closed, or less than zero on error.
 */
-int  link_read( struct link *link, char *data, size_t length, time_t stoptime );
+int link_read(struct link *link, char *data, size_t length, time_t stoptime);
 
 /** Read available data from a connection.
 This call will read whatever data is immediately available, and then
@@ -110,7 +110,7 @@ return without blocking.
 @param stoptime The time at which to abort.
 @return The number of bytes actually read, or zero if the connection is closed, or less than zero on error.
 */
-int  link_read_avail( struct link *link, char *data, size_t length, time_t stoptime );
+int link_read_avail(struct link *link, char *data, size_t length, time_t stoptime);
 
 /** Write data to a connection.
 @param link The link to write.
@@ -119,7 +119,7 @@ int  link_read_avail( struct link *link, char *data, size_t length, time_t stopt
 @param stoptime The time at which to abort.
 @return The number of bytes actually written, or less than zero on error.
 */
-int  link_write( struct link *link, const char *data, size_t length, time_t stoptime );
+int link_write(struct link *link, const char *data, size_t length, time_t stoptime);
 
 /* Write a string of length len to a connection. All data is written until
  * finished or an error is encountered.
@@ -129,7 +129,7 @@ int  link_write( struct link *link, const char *data, size_t length, time_t stop
 @param stoptime The time at which to abort.
 @return The number of bytes actually written, or less than zero on error.
 */
-int  link_putlstring( struct link *link, const char *str, size_t len, time_t stoptime);
+int link_putlstring(struct link *link, const char *str, size_t len, time_t stoptime);
 
 /* Write a C string to a connection. All data is written until finished or an
    error is encountered. It is defined as a macro.
@@ -157,7 +157,7 @@ int  link_putlstring( struct link *link, const char *str, size_t len, time_t sto
 @param ... Format arguments.
 @return The number of bytes actually written, or less than zero on error.
 */
-int  link_putfstring( struct link *link, const char *fmt, time_t stoptime, ... );
+int link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...);
 
 /** Write formatted data to a connection. All data is written until finished
   * or an error is encountered.
@@ -167,7 +167,7 @@ int  link_putfstring( struct link *link, const char *fmt, time_t stoptime, ... )
 @param va Format arguments.
 @return The number of bytes actually written, or less than zero on error.
 */
-int  link_putvfstring( struct link *link, const char *fmt, time_t stoptime, va_list va );
+int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va);
 
 /** Block until a link is readable or writable.
 @param link The link to wait on.
@@ -176,12 +176,12 @@ int  link_putvfstring( struct link *link, const char *fmt, time_t stoptime, va_l
 @param writing Wait for the link to become writable.
 @return One if the link becomes readable or writable before the timeout expires, zero otherwise.
 */
-int  link_usleep( struct link *link, int usec, int reading, int writing );
+int link_usleep(struct link *link, int usec, int reading, int writing);
 
 /** Close a connection.
 @param link The connection to close.
 */
-void link_close( struct link *link );
+void link_close(struct link *link);
 
 /** Set the TCP window size to be used for all links.
 Takes effect on future calls to @ref link_connect or @ref link_accept.
@@ -194,7 +194,7 @@ the buffer actually allocated for a given link.
 @param recv_window The size of the recv window, in bytes.
 */
 
-void link_window_set( int send_window, int recv_window );
+void link_window_set(int send_window, int recv_window);
 
 /** Get the TCP window size actually allocated for this link.
 @param link The link to examine.
@@ -202,7 +202,7 @@ void link_window_set( int send_window, int recv_window );
 @param recv_window A pointer where to store the receive window.
 */
 
-void link_window_get( struct link *link, int *send_window, int *recv_window );
+void link_window_get(struct link *link, int *send_window, int *recv_window);
 
 /** Read a line of text from a link.
 Reads a line of text, up to and including a newline, interpreted as either LF
@@ -215,15 +215,15 @@ readline can usually complete with zero or one system calls.
 @param stoptime The absolute time at which to abort.
 @return If greater than zero, a line was read, and the return value indicates the length in bytes.  If equal to zero, end of stream was reached.  If less than zero, an error occurred.
 */
-int  link_readline( struct link *link, char *line, size_t length, time_t stoptime );
+int link_readline(struct link *link, char *line, size_t length, time_t stoptime);
 
 /** Get the underlying file descriptor of a link.
 @param link The link to examine.
 @return The integer file descriptor of the link.
 */
-int  link_fd( struct link *link );
+int link_fd(struct link *link);
 
-int  link_nonblocking( struct link *link, int onoff );
+int link_nonblocking(struct link *link, int onoff);
 
 /** Return the local address of the link in text format.
 @param link The link to examine.
@@ -231,7 +231,7 @@ int  link_nonblocking( struct link *link, int onoff );
 @param port Pointer to an integer, which will be filled with the TCP port number.
 @return Positive on success, zero on failure.
 */
-int  link_address_local( struct link *link, char *addr, int *port );
+int link_address_local(struct link *link, char *addr, int *port);
 
 /** Return the remote address of the link in text format.
 @param link The link to examine.
@@ -239,22 +239,22 @@ int  link_address_local( struct link *link, char *addr, int *port );
 @param port Pointer to an integer, which will be filled with the TCP port number.
 @return Positive on success, zero on failure.
 */
-int  link_address_remote( struct link *link, char *addr, int *port );
+int link_address_remote(struct link *link, char *addr, int *port);
 
-INT64_T link_stream_to_buffer( struct link *link, char **buffer, time_t stoptime );
+INT64_T link_stream_to_buffer(struct link *link, char **buffer, time_t stoptime);
 
-INT64_T link_stream_to_fd( struct link *link, int fd, INT64_T length, time_t stoptime );
-INT64_T link_stream_to_file( struct link *link, FILE *file, INT64_T length, time_t stoptime );
+INT64_T link_stream_to_fd(struct link *link, int fd, INT64_T length, time_t stoptime);
+INT64_T link_stream_to_file(struct link *link, FILE * file, INT64_T length, time_t stoptime);
 
-INT64_T link_stream_from_fd( struct link *link, int fd, INT64_T length, time_t stoptime );
-INT64_T link_stream_from_file( struct link *link, FILE *file, INT64_T length, time_t stoptime );
+INT64_T link_stream_from_fd(struct link *link, int fd, INT64_T length, time_t stoptime);
+INT64_T link_stream_from_file(struct link *link, FILE * file, INT64_T length, time_t stoptime);
 
-INT64_T link_soak( struct link *link, INT64_T length, time_t stoptime );
+INT64_T link_soak(struct link *link, INT64_T length, time_t stoptime);
 
 /** Options for link performance tuning. */
 typedef enum {
-	LINK_TUNE_INTERACTIVE,  /**< Data is sent immediately to optimze interactive latency. */
-	LINK_TUNE_BULK          /**< Data may be buffered to improve throughput of large transfers. */
+	LINK_TUNE_INTERACTIVE,	/**< Data is sent immediately to optimze interactive latency. */
+	LINK_TUNE_BULK		/**< Data may be buffered to improve throughput of large transfers. */
 } link_tune_t;
 
 /** Tune a link for interactive or bulk performance.  A link may be tuned at any point in its lifecycle.
@@ -263,7 +263,7 @@ typedef enum {
 @param link The link to be tuned.
 @param mode The desired tuning mode.
 */
-int  link_tune( struct link *link, link_tune_t mode );
+int link_tune(struct link *link, link_tune_t mode);
 
 /** Indicates a link is ready to read via @ref link_poll.*/
 #define LINK_READ 1
@@ -274,7 +274,7 @@ int  link_tune( struct link *link, link_tune_t mode );
 /** Activity structure passed to @ref link_poll. */
 struct link_info {
 	struct link *link;  /**< The link to be polled. */
-	int events;         /**< The events to wait for (@ref LINK_READ or @ref LINK_WRITE) */
+	int events;	    /**< The events to wait for (@ref LINK_READ or @ref LINK_WRITE) */
 	int revents;	    /**< The events returned (@ref LINK_READ or @ref LINK_WRITE) */
 };
 
@@ -286,19 +286,6 @@ Wait for a activity on a an array of links.
 @return The number of links available to read or write.
 */
 
-int  link_poll( struct link_info *array, int nlinks, int msec );
+int link_poll(struct link_info *array, int nlinks, int msec);
 
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-

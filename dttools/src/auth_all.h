@@ -39,7 +39,7 @@ attempted in the order chosen.
 @see auth_register_all
 */
 
-int auth_register_byname( const char *name );
+int auth_register_byname(const char *name);
 
 /** Enable all authentication modes.
 Enables all authentication modes, in a default order.

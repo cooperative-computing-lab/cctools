@@ -22,14 +22,15 @@ typedef int batch_job_id_t;
 
 /** Indicates which type of batch submission to use. */
 typedef enum {
-	BATCH_QUEUE_TYPE_UNKNOWN=-1, /**< An invalid batch queue type. */
+	BATCH_QUEUE_TYPE_UNKNOWN = -1,
+				     /**< An invalid batch queue type. */
 	BATCH_QUEUE_TYPE_LOCAL,	     /**< Batch jobs will run as local processes. */
 	BATCH_QUEUE_TYPE_CONDOR,     /**< Batch jobs will be sent to Condor pool. */
 	BATCH_QUEUE_TYPE_SGE,	     /**< Batch jobs will be sent to Sun Grid Engine. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE,  /**< Batch jobs will be sent to the Work Queue. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS, /**< Batch jobs will be sent to the Work Queue, all files are stored on a shared filesystem. */
-	BATCH_QUEUE_TYPE_XGRID,       /**< Batch jobs will be sent to the Xgrid. */
-	BATCH_QUEUE_TYPE_HADOOP       /**< Batch jobs will be sent to Hadoop. */
+	BATCH_QUEUE_TYPE_XGRID,	      /**< Batch jobs will be sent to the Xgrid. */
+	BATCH_QUEUE_TYPE_HADOOP	      /**< Batch jobs will be sent to Hadoop. */
 } batch_queue_type_t;
 
 /** Describes a batch job when it has completed. */
@@ -46,7 +47,7 @@ struct batch_job_info {
 @param type The type of the queue.
 @return A new batch queue object on success, null on failure.
 */
-struct batch_queue * batch_queue_create( batch_queue_type_t type );
+struct batch_queue *batch_queue_create(batch_queue_type_t type);
 
 /** Submit a simple batch job.
 @param q The queue to submit to.
@@ -56,11 +57,7 @@ struct batch_queue * batch_queue_create( batch_queue_type_t type );
 @return On success, returns a unique identifier for the batch job.  On failure, returns a negative number.
 */
 
-batch_job_id_t batch_job_submit_simple(
-	struct batch_queue *q,
-	const char *cmdline,
-	const char *input_files,
-	const char *output_files );
+batch_job_id_t batch_job_submit_simple(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files);
 
 /** Submit a batch job.
 @param q The queue to submit to.
@@ -74,15 +71,7 @@ batch_job_id_t batch_job_submit_simple(
 @return On success, returns a unique positive jobid.  Zero or a negative number indicates a failure to submit this job.
 */
 
-batch_job_id_t batch_job_submit(
-	struct batch_queue *q,
-	const char *cmd,
-	const char *args,
-	const char *infile,
-	const char *outfile,
-	const char *errfile,
-	const char *extra_input_files,
-	const char *extra_output_files );
+batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files);
 
 /** Wait for any batch job to complete.
 Blocks until a batch job completes.
@@ -93,7 +82,7 @@ If equal to zero, there were no more jobs to wait for.
 If less than zero, the operation was interrupted by a system event, but may be tried again.
 */
 
-batch_job_id_t batch_job_wait( struct batch_queue *q, struct batch_job_info *info );
+batch_job_id_t batch_job_wait(struct batch_queue *q, struct batch_job_info *info);
 
 /** Wait for any batch job to complete, with a timeout.
 Blocks until a batch job completes or the current time exceeds stoptime.
@@ -106,7 +95,7 @@ If equal to zero, there were no more jobs to wait for.
 If less than zero, the operation timed out or was interrupted by a system event, but may be tried again.
 */
 
-batch_job_id_t batch_job_wait_timeout( struct batch_queue *q, struct batch_job_info *info, time_t stoptime );
+batch_job_id_t batch_job_wait_timeout(struct batch_queue *q, struct batch_job_info *info, time_t stoptime);
 
 /** Remove a batch job.
 This call will start the removal process.
@@ -116,19 +105,19 @@ You must still call @ref batch_job_wait to wait for the removal to complete.
 @return Greater than zero if the job exists and was removed, zero otherwise.
 */
 
-int batch_job_remove( struct batch_queue *q, batch_job_id_t jobid );
+int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid);
 
 /** Converts a string into a batch queue type.
 @param str A string indicating the work queue type, which may be "unix", "condor", "sge", "wq", or "xgrid".
 @return The batch queue type corresponding to the string, or BATCH_QUEUE_TYPE_UNKNOWN if the string is invalid.
 */
-batch_queue_type_t batch_queue_type_from_string( const char *str );
+batch_queue_type_t batch_queue_type_from_string(const char *str);
 
 /** Converts a batch queue type to a string.
 @param t A @ref batch_queue_type_t.
 @return A string corresponding to the batch queue type.
 */
-const char * batch_queue_type_to_string( batch_queue_type_t t );
+const char *batch_queue_type_to_string(batch_queue_type_t t);
 
 /** Set the log file used by the batch queue.
 This is an optional call that will only affect batch queue types
@@ -136,7 +125,7 @@ that use an internal logfile; currently only Condor.
 @param q The batch queue to adjust.
 @param logfile Name of the logfile to use.
 */
-void batch_queue_set_logfile( struct batch_queue *q, const char *logfile );
+void batch_queue_set_logfile(struct batch_queue *q, const char *logfile);
 
 /** Add extra options to pass to the underlying batch system.
 This call specifies additional options to be passed to the batch system each
@@ -149,7 +138,7 @@ the <tt>qsub</tt> command.  This call has no effect on other queue types.
 @param q The batch queue to adjust.
 @param options The options to pass to the batch system.
 */
-void batch_queue_set_options( struct batch_queue *q, const char *options );
+void batch_queue_set_options(struct batch_queue *q, const char *options);
 
 /** Delete a batch queue.
 Note that this function just destroys the internal data structures,
@@ -158,20 +147,20 @@ you must call @ref batch_job_wait until it returns zero, or
 call @ref batch_job_remove on all runnings jobs.
 @param q The queue to delete.
 */
-void batch_queue_delete( struct batch_queue *q );
+void batch_queue_delete(struct batch_queue *q);
 
 /** Returns the list of queue types supported by this module.
 Useful for including in help-option outputs.
 @return A static string listing the types of queues supported.
 */
 
-const char * batch_queue_type_string();
+const char *batch_queue_type_string();
 
 /** Returns the port number of the batch queue.
 Currently only relevant for the work queue implementation.
 @param q The batch queue of interest.
 @return The port number in use, or zero if not applicable.
 */
-int batch_queue_port( struct batch_queue *q );
+int batch_queue_port(struct batch_queue *q);
 
 #endif

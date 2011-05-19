@@ -12,7 +12,7 @@ See the file COPYING for details.
 @return A pointer to a set of file chunks, on which @ref chunk_read may be called.
 */
 
-struct chunk_set *chunk_parse_file( char *file_name, char *ln_prefix, char *fc_prefix );
+struct chunk_set *chunk_parse_file(char *file_name, char *ln_prefix, char *fc_prefix);
 
 /** Get a large chunk of data corresponding to the entire content of a logical file (within a larger physical file that has already been parsed into chunks with @ref chunk_parse_file.
 @param chunk_set A chunk_set created via @ref chunk_parse_file.
@@ -21,7 +21,7 @@ struct chunk_set *chunk_parse_file( char *file_name, char *ln_prefix, char *fc_p
 @return A pointer to the content of the logical file.
 */
 
-char *chunk_read( struct chunk_set *chunk_set, const char *file_name, int *size );
+char *chunk_read(struct chunk_set *chunk_set, const char *file_name, int *size);
 
 /** Read a number of physical files and concatenate them into a single physical file with many logical files within. After this function returns, @ref chunk_parse_file may be called.
 @param new_name The name of the new physical file name to be created.
@@ -29,5 +29,4 @@ char *chunk_read( struct chunk_set *chunk_set, const char *file_name, int *size 
 @param num_files The number of file names in the filenames array.
 */
 
-int chunk_concat( const char *new_name, char **filenames, int num_files, char *ln_prefix, char *fc_prefix );
-
+int chunk_concat(const char *new_name, char **filenames, int num_files, char *ln_prefix, char *fc_prefix);

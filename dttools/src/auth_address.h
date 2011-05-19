@@ -6,4 +6,3 @@ See the file COPYING for details.
 */
 
 int auth_address_register();
-

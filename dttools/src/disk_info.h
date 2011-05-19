@@ -20,6 +20,6 @@ Query disk space properties.
 @param total A pointer to an integer that will be filled with the total space in bytes.
 @return Greater than or equal to zero on success, less than zero otherwise.
 */
-int disk_info_get( const char *path, UINT64_T *avail, UINT64_T *total );
+int disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total);
 
 #endif

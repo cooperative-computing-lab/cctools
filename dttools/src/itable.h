@@ -44,21 +44,21 @@ while(itable_nextkey(h,&key,&value)) {
 @return A pointer to a new integer table.
 */
 
-struct itable * itable_create( int buckets );
+struct itable *itable_create(int buckets);
 
 /** Delete an integer table.
 Note that this function will not delete all of the objects contained within the integer table.
 @param h The integer table to delete.
 */
 
-void itable_delete( struct itable *h );
+void itable_delete(struct itable *h);
 
 /** Count the entries in an integer table.
 @return The number of entries in the table.
 @param h A pointer to an integer table.
 */
 
-int itable_size  ( struct itable *h );
+int itable_size(struct itable *h);
 
 /** Insert a key and value.
 This call will fail if the table already contains the same key.
@@ -70,7 +70,7 @@ Also note that you cannot insert a null value into the table.
 @return One if the insert succeeded, failure otherwise
 */
 
-int itable_insert( struct itable *h, UINT64_T key, const void *value );
+int itable_insert(struct itable *h, UINT64_T key, const void *value);
 
 /** Look up a value by key.
 @param h A pointer to an integer table.
@@ -78,7 +78,7 @@ int itable_insert( struct itable *h, UINT64_T key, const void *value );
 @return If found, the pointer associated with the key, otherwise null.
 */
 
-void * itable_lookup( struct itable *h, UINT64_T key );
+void *itable_lookup(struct itable *h, UINT64_T key);
 
 /** Remove a value by key.
 @param h A pointer to an integer table.
@@ -86,7 +86,7 @@ void * itable_lookup( struct itable *h, UINT64_T key );
 @return If found, the pointer associated with the key, otherwise null.
 */
 
-void * itable_remove( struct itable *h, UINT64_T key );
+void *itable_remove(struct itable *h, UINT64_T key);
 
 /** Begin iteration over all keys.
 This function begins a new iteration over an integer table,
@@ -95,7 +95,7 @@ Next, invoke @ref itable_nextkey to retrieve each value in order.
 @param h A pointer to an integer table.
 */
 
-void   itable_firstkey( struct itable *h );
+void itable_firstkey(struct itable *h);
 
 /** Continue iteration over all keys.
 This function returns the next key and value in the iteration.
@@ -105,6 +105,6 @@ This function returns the next key and value in the iteration.
 @return Zero if there are no more elements to visit, one otherwise.
 */
 
-int    itable_nextkey( struct itable *h, UINT64_T *key, void **value );
+int itable_nextkey(struct itable *h, UINT64_T * key, void **value);
 
 #endif

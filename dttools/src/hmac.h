@@ -25,7 +25,7 @@ Routines for computing Hash-based Message Authentication Codes.
 @param block_size The size of the block used by the hash function in bytes.
 @param hash_func A function pointer to the hash function to be used.
 */
-int hmac( const char* buffer, int buffer_length, const char* key, int key_length, unsigned char *digest, int digest_len, int block_size, void (*hash_func)(const char*, int, unsigned char*));
+int hmac(const char *buffer, int buffer_length, const char *key, int key_length, unsigned char *digest, int digest_len, int block_size, void (*hash_func) (const char *, int, unsigned char *));
 
 /** Generate HMAC using md5 hash function
 Note that this function produces a digest in binary form which must be converted to a human readable form with md5_string.
@@ -35,7 +35,7 @@ Note that this function produces a digest in binary form which must be converted
 @param key_length The length of the key in bytes.
 @param digest Pointer to a buffer of size MD5_DIGEST_LENGTH to store the digest.
 */
-int hmac_md5( const char* buffer, int buffer_length, const char* key, int key_length, unsigned char digest[MD5_DIGEST_LENGTH]);
+int hmac_md5(const char *buffer, int buffer_length, const char *key, int key_length, unsigned char digest[MD5_DIGEST_LENGTH]);
 
 /** Generate HMAC using sha1 hash function
 Note that this function produces a digest in binary form which must be converted to a human readable form with sha1_string.
@@ -45,8 +45,7 @@ Note that this function produces a digest in binary form which must be converted
 @param key_length The length of the key in bytes.
 @param digest Pointer to a buffer of size SHA1_DIGEST_LENGTH to store the digest.
 */
-int hmac_sha1( const char* buffer, int buffer_length, const char* key, int key_length, unsigned char digest[SHA1_DIGEST_LENGTH]);
+int hmac_sha1(const char *buffer, int buffer_length, const char *key, int key_length, unsigned char digest[SHA1_DIGEST_LENGTH]);
 
 
 #endif
-

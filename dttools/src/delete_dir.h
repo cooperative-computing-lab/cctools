@@ -15,6 +15,6 @@ See the file COPYING for details.
 @return One on success, zero on failure.
 */
 
-int delete_dir( const char *dir );
+int delete_dir(const char *dir);
 
 #endif

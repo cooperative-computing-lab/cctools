@@ -38,38 +38,38 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 
 #include "int_sizes.h"
 
-#define D_SYSCALL  0x000000001  /**< Debug system calls in Parrot. */
-#define D_CHANNEL  0x000000002  /**< Debug the I/O channel in Parrot. */
-#define D_PROCESS  0x000000004  /**< Debug jobs and process. */
-#define D_NOTICE   0x000000008  /**< Indicates a message that is always shown. */
-#define D_RESOLVE  0x000000010  /**< Debug the file name resolver in Parrot. */
-#define D_LIBCALL  0x000000020  /**< Debug I/O library calls in Parrot. */
-#define D_LOCAL    0x000000040  /**< Debug the local I/O module in Parrot. */
-#define D_DNS      0x000000080  /**< Debug domain name lookups. */
-#define D_TCP      0x000000100  /**< Debug TCP connections and disconnections. */
-#define D_AUTH     0x000000200  /**< Debug authentication and authorization actions. */
-#define D_IRODS    0x000000400  /**< Debug the iRODS module in Parrot. */
-#define D_LANDLORD 0x000000800  /**< Debug Landlord operations. */
-#define D_HTTP     0x000001000  /**< Debug HTTP queries. */
-#define D_FTP      0x000002000  /**< Debug FTP operations. */
-#define D_NEST     0x000004000  /**< Debug the NEST module in Parrot. */
-#define D_GROW     0x000008000  /**< Debug the GROW filesystem in Parrot. */
-#define D_CHIRP    0x000010000  /**< Debug Chirp protocol operations. */
-#define D_DCAP     0x000020000  /**< Debug the DCAP module in Parrot. */
-#define D_RFIO     0x000040000  /**< Debug the RFIO module in Parrot. */
-#define D_GLITE    0x000080000  /**< Debug the gLite module in Parrot. */
-#define D_MULTI    0x000100000  /**< Debug Chirp Multi filesystems. */
-#define D_PSTREE   0x000200000  /**< Debug process trees in Parrot. */
-#define D_ALLOC    0x000400000  /**< Debug space allocations in the Chirp server. */
-#define D_LFC	   0x000800000  /**< Debug LFC file lookups in Parrot. */
-#define D_GFAL	   0x001000000  /**< Debug the GFAL module in Parrot. */
-#define D_SUMMARY  0x002000000  /**< Show I/O summary stats in Parrot. */
-#define D_DEBUG    0x004000000  /**< Show general debugging messages. */
-#define D_LOGIN    0x008000000  /**< Debug logins on the Chirp server. */
-#define D_CACHE    0x010000000  /**< Debug cache operations in Parrot. */
-#define D_POLL     0x020000000  /**< Debug FD polling in Parrot. */
-#define D_HDFS	   0x040000000  /**< Debug the HDFS module in Parrot. */
-#define D_WQ	   0x080000000  /**< Debug the Work Queue operations. */
+#define D_SYSCALL  0x000000001	/**< Debug system calls in Parrot. */
+#define D_CHANNEL  0x000000002	/**< Debug the I/O channel in Parrot. */
+#define D_PROCESS  0x000000004	/**< Debug jobs and process. */
+#define D_NOTICE   0x000000008	/**< Indicates a message that is always shown. */
+#define D_RESOLVE  0x000000010	/**< Debug the file name resolver in Parrot. */
+#define D_LIBCALL  0x000000020	/**< Debug I/O library calls in Parrot. */
+#define D_LOCAL    0x000000040	/**< Debug the local I/O module in Parrot. */
+#define D_DNS      0x000000080	/**< Debug domain name lookups. */
+#define D_TCP      0x000000100	/**< Debug TCP connections and disconnections. */
+#define D_AUTH     0x000000200	/**< Debug authentication and authorization actions. */
+#define D_IRODS    0x000000400	/**< Debug the iRODS module in Parrot. */
+#define D_LANDLORD 0x000000800	/**< Debug Landlord operations. */
+#define D_HTTP     0x000001000	/**< Debug HTTP queries. */
+#define D_FTP      0x000002000	/**< Debug FTP operations. */
+#define D_NEST     0x000004000	/**< Debug the NEST module in Parrot. */
+#define D_GROW     0x000008000	/**< Debug the GROW filesystem in Parrot. */
+#define D_CHIRP    0x000010000	/**< Debug Chirp protocol operations. */
+#define D_DCAP     0x000020000	/**< Debug the DCAP module in Parrot. */
+#define D_RFIO     0x000040000	/**< Debug the RFIO module in Parrot. */
+#define D_GLITE    0x000080000	/**< Debug the gLite module in Parrot. */
+#define D_MULTI    0x000100000	/**< Debug Chirp Multi filesystems. */
+#define D_PSTREE   0x000200000	/**< Debug process trees in Parrot. */
+#define D_ALLOC    0x000400000	/**< Debug space allocations in the Chirp server. */
+#define D_LFC	   0x000800000	/**< Debug LFC file lookups in Parrot. */
+#define D_GFAL	   0x001000000	/**< Debug the GFAL module in Parrot. */
+#define D_SUMMARY  0x002000000	/**< Show I/O summary stats in Parrot. */
+#define D_DEBUG    0x004000000	/**< Show general debugging messages. */
+#define D_LOGIN    0x008000000	/**< Debug logins on the Chirp server. */
+#define D_CACHE    0x010000000	/**< Debug cache operations in Parrot. */
+#define D_POLL     0x020000000	/**< Debug FD polling in Parrot. */
+#define D_HDFS	   0x040000000	/**< Debug the HDFS module in Parrot. */
+#define D_WQ	   0x080000000	/**< Debug the Work Queue operations. */
 #define D_BXGRID   0x100000000LL  /**< Debug the BXGRID Module in Parrot. */
 #define D_USER	   0x200000000LL  /**< Debug custom user application. */
 #define D_XROOTD   0x400000000LL  /**< Debug Xrootd module in Parrot */
@@ -107,21 +107,21 @@ Logs a debugging message, if the given flags are active.
 @param fmt A printf-style formatting string, followed by the necessary arguments.
 */
 
-void debug( INT64_T flags, const char *fmt, ... );
+void debug(INT64_T flags, const char *fmt, ...);
 
 /** Emit a fatal debugging message and exit.
 Displays a printf-style message, and then forcibly exits the program.
 @param fmt A printf-style formatting string, followed by the necessary arguments.
 */
 
-void fatal( const char *fmt, ... );
+void fatal(const char *fmt, ...);
 
 /** Initialize the debugging system.
 Must be called before any other calls take place.
 @param name The name of the program to use in debug output.
 */
 
-void debug_config( const char *name );
+void debug_config(const char *name);
 
 /** Direct debug output to a file.
 All enabled debugging statements will be sent to this file.
@@ -129,7 +129,7 @@ All enabled debugging statements will be sent to this file.
 @see debug_config_file_size
 */
 
-void debug_config_file( const char *file );
+void debug_config_file(const char *file);
 
 /** Set the maximum debug file size.
 Debugging files can very quickly become large and fill up your available disk space.
@@ -138,10 +138,10 @@ When it exceeds this size, it will be renamed to (file).old, and a new file will
 @param size Maximum size in bytes of the debugging file.
 */
 
-void debug_config_file_size( int size );
+void debug_config_file_size(int size);
 
-void debug_config_fatal( void (*callback)(void) );
-void debug_config_getpid( pid_t (*getpidfunc)(void) );
+void debug_config_fatal(void (*callback) (void));
+void debug_config_getpid(pid_t(*getpidfunc) (void));
 
 /** Set debugging flags to enable output.
 Accepts a debug flag in ASCII form, and enables that subsystem.  For example: <tt>debug_flags_set("chirp");</tt>
@@ -151,7 +151,7 @@ Typically used in command-line processing in <tt>main</tt>.
 @see debug_flags_print, debug_flags_clear
 */
 
-int  debug_flags_set( const char *flagname );
+int debug_flags_set(const char *flagname);
 
 /** Display the available debug flags.
 Prints on the standard output all possible debug flag names that
@@ -159,14 +159,14 @@ can be passed to @ref debug_flags_set.  Useful for constructing a program help t
 @param stream Standard I/O stream on which to print the output.
 */
 
-void debug_flags_print( FILE *stream );
+void debug_flags_print(FILE * stream);
 
 /** Clear all debugging flags.
 Clear all currently set flags, so that no output will occur.
 @see debug_flags_set
 */
 
-int  debug_flags_clear(void);
+int debug_flags_clear(void);
 
 /** Set name of flag combination
 Sets the string value associated with flag.  This is normally used to set the <tt>D_USER</tt> user flag as so: <tt>debug_set_flag_name(D_USER, "my-application");</tt>.
@@ -174,7 +174,6 @@ Sets the string value associated with flag.  This is normally used to set the <t
 @param name New name to associate with flag.
 */
 
-void debug_set_flag_name( INT64_T flag, const char *name );
+void debug_set_flag_name(INT64_T flag, const char *name);
 
 #endif
-

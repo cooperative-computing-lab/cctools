@@ -22,7 +22,7 @@ carefully read a name and password, and then set the mode back.
 @param passlen The size of the name buffer in bytes.
 @return True if the name and password were successfully read, false otherwise.
 */
-int console_login( const char *service, char *name, int namelen, char *pass, int passlen );
+int console_login(const char *service, char *name, int namelen, char *pass, int passlen);
 
 /** Read a string from the console.
 This routine will set the console to no-echo mode,
@@ -32,6 +32,6 @@ carefully read a generic string, and then set the mode back.
 @param buflen The size of the buffer in bytes.
 @return True if the string was successfully read, false otherwise.
 */
-int console_input( const char *prompt, char *buf, int buflen );
+int console_input(const char *prompt, char *buf, int buflen);
 
 #endif

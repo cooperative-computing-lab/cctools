@@ -8,8 +8,7 @@ See the file COPYING for details.
 #define URL_ENCODE_H
 
 
-int b64_encode(const char* input, int len, char* output, int buf_len);
+int b64_encode(const char *input, int len, char *output, int buf_len);
 
 
 #endif
-

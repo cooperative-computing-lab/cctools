@@ -45,9 +45,9 @@ typedef unsigned char *POINTER;
 #define TRUE	( !FALSE )
 #endif
 
-void endianTest (int *endianness);
+void endianTest(int *endianness);
 
-static void SHAtoByte (UINT8_T * output, UINT32_T * input, unsigned int len);
+static void SHAtoByte(UINT8_T * output, UINT32_T * input, unsigned int len);
 
 /* The SHS block size and message digest sizes, in bytes */
 
@@ -123,9 +123,9 @@ static void SHAtoByte (UINT8_T * output, UINT32_T * input, unsigned int len);
 
 /* Initialize the SHS values */
 
-void sha1_init (sha1_context_t * shsInfo)
+void sha1_init(sha1_context_t * shsInfo)
 {
-	endianTest (&shsInfo->Endianness);
+	endianTest(&shsInfo->Endianness);
 	/* Set the h-vars to their initial values */
 	shsInfo->digest[0] = h0init;
 	shsInfo->digest[1] = h1init;
@@ -145,7 +145,7 @@ void sha1_init (sha1_context_t * shsInfo)
 
    Note that this corrupts the shsInfo->data area */
 
-static void SHSTransform (digest, data)
+static void SHSTransform(digest, data)
      UINT32_T *digest, *data;
 {
 	UINT32_T A, B, C, D, E;	/* Local vars */
@@ -157,92 +157,92 @@ static void SHSTransform (digest, data)
 	C = digest[2];
 	D = digest[3];
 	E = digest[4];
-	memcpy ((POINTER) eData, (POINTER) data, SHS_DATASIZE);
+	memcpy((POINTER) eData, (POINTER) data, SHS_DATASIZE);
 
 	/* Heavy mangling, in 4 sub-rounds of 20 interations each. */
-	subRound (A, B, C, D, E, f1, K1, eData[0]);
-	subRound (E, A, B, C, D, f1, K1, eData[1]);
-	subRound (D, E, A, B, C, f1, K1, eData[2]);
-	subRound (C, D, E, A, B, f1, K1, eData[3]);
-	subRound (B, C, D, E, A, f1, K1, eData[4]);
-	subRound (A, B, C, D, E, f1, K1, eData[5]);
-	subRound (E, A, B, C, D, f1, K1, eData[6]);
-	subRound (D, E, A, B, C, f1, K1, eData[7]);
-	subRound (C, D, E, A, B, f1, K1, eData[8]);
-	subRound (B, C, D, E, A, f1, K1, eData[9]);
-	subRound (A, B, C, D, E, f1, K1, eData[10]);
-	subRound (E, A, B, C, D, f1, K1, eData[11]);
-	subRound (D, E, A, B, C, f1, K1, eData[12]);
-	subRound (C, D, E, A, B, f1, K1, eData[13]);
-	subRound (B, C, D, E, A, f1, K1, eData[14]);
-	subRound (A, B, C, D, E, f1, K1, eData[15]);
-	subRound (E, A, B, C, D, f1, K1, expand (eData, 16));
-	subRound (D, E, A, B, C, f1, K1, expand (eData, 17));
-	subRound (C, D, E, A, B, f1, K1, expand (eData, 18));
-	subRound (B, C, D, E, A, f1, K1, expand (eData, 19));
+	subRound(A, B, C, D, E, f1, K1, eData[0]);
+	subRound(E, A, B, C, D, f1, K1, eData[1]);
+	subRound(D, E, A, B, C, f1, K1, eData[2]);
+	subRound(C, D, E, A, B, f1, K1, eData[3]);
+	subRound(B, C, D, E, A, f1, K1, eData[4]);
+	subRound(A, B, C, D, E, f1, K1, eData[5]);
+	subRound(E, A, B, C, D, f1, K1, eData[6]);
+	subRound(D, E, A, B, C, f1, K1, eData[7]);
+	subRound(C, D, E, A, B, f1, K1, eData[8]);
+	subRound(B, C, D, E, A, f1, K1, eData[9]);
+	subRound(A, B, C, D, E, f1, K1, eData[10]);
+	subRound(E, A, B, C, D, f1, K1, eData[11]);
+	subRound(D, E, A, B, C, f1, K1, eData[12]);
+	subRound(C, D, E, A, B, f1, K1, eData[13]);
+	subRound(B, C, D, E, A, f1, K1, eData[14]);
+	subRound(A, B, C, D, E, f1, K1, eData[15]);
+	subRound(E, A, B, C, D, f1, K1, expand(eData, 16));
+	subRound(D, E, A, B, C, f1, K1, expand(eData, 17));
+	subRound(C, D, E, A, B, f1, K1, expand(eData, 18));
+	subRound(B, C, D, E, A, f1, K1, expand(eData, 19));
 
-	subRound (A, B, C, D, E, f2, K2, expand (eData, 20));
-	subRound (E, A, B, C, D, f2, K2, expand (eData, 21));
-	subRound (D, E, A, B, C, f2, K2, expand (eData, 22));
-	subRound (C, D, E, A, B, f2, K2, expand (eData, 23));
-	subRound (B, C, D, E, A, f2, K2, expand (eData, 24));
-	subRound (A, B, C, D, E, f2, K2, expand (eData, 25));
-	subRound (E, A, B, C, D, f2, K2, expand (eData, 26));
-	subRound (D, E, A, B, C, f2, K2, expand (eData, 27));
-	subRound (C, D, E, A, B, f2, K2, expand (eData, 28));
-	subRound (B, C, D, E, A, f2, K2, expand (eData, 29));
-	subRound (A, B, C, D, E, f2, K2, expand (eData, 30));
-	subRound (E, A, B, C, D, f2, K2, expand (eData, 31));
-	subRound (D, E, A, B, C, f2, K2, expand (eData, 32));
-	subRound (C, D, E, A, B, f2, K2, expand (eData, 33));
-	subRound (B, C, D, E, A, f2, K2, expand (eData, 34));
-	subRound (A, B, C, D, E, f2, K2, expand (eData, 35));
-	subRound (E, A, B, C, D, f2, K2, expand (eData, 36));
-	subRound (D, E, A, B, C, f2, K2, expand (eData, 37));
-	subRound (C, D, E, A, B, f2, K2, expand (eData, 38));
-	subRound (B, C, D, E, A, f2, K2, expand (eData, 39));
+	subRound(A, B, C, D, E, f2, K2, expand(eData, 20));
+	subRound(E, A, B, C, D, f2, K2, expand(eData, 21));
+	subRound(D, E, A, B, C, f2, K2, expand(eData, 22));
+	subRound(C, D, E, A, B, f2, K2, expand(eData, 23));
+	subRound(B, C, D, E, A, f2, K2, expand(eData, 24));
+	subRound(A, B, C, D, E, f2, K2, expand(eData, 25));
+	subRound(E, A, B, C, D, f2, K2, expand(eData, 26));
+	subRound(D, E, A, B, C, f2, K2, expand(eData, 27));
+	subRound(C, D, E, A, B, f2, K2, expand(eData, 28));
+	subRound(B, C, D, E, A, f2, K2, expand(eData, 29));
+	subRound(A, B, C, D, E, f2, K2, expand(eData, 30));
+	subRound(E, A, B, C, D, f2, K2, expand(eData, 31));
+	subRound(D, E, A, B, C, f2, K2, expand(eData, 32));
+	subRound(C, D, E, A, B, f2, K2, expand(eData, 33));
+	subRound(B, C, D, E, A, f2, K2, expand(eData, 34));
+	subRound(A, B, C, D, E, f2, K2, expand(eData, 35));
+	subRound(E, A, B, C, D, f2, K2, expand(eData, 36));
+	subRound(D, E, A, B, C, f2, K2, expand(eData, 37));
+	subRound(C, D, E, A, B, f2, K2, expand(eData, 38));
+	subRound(B, C, D, E, A, f2, K2, expand(eData, 39));
 
-	subRound (A, B, C, D, E, f3, K3, expand (eData, 40));
-	subRound (E, A, B, C, D, f3, K3, expand (eData, 41));
-	subRound (D, E, A, B, C, f3, K3, expand (eData, 42));
-	subRound (C, D, E, A, B, f3, K3, expand (eData, 43));
-	subRound (B, C, D, E, A, f3, K3, expand (eData, 44));
-	subRound (A, B, C, D, E, f3, K3, expand (eData, 45));
-	subRound (E, A, B, C, D, f3, K3, expand (eData, 46));
-	subRound (D, E, A, B, C, f3, K3, expand (eData, 47));
-	subRound (C, D, E, A, B, f3, K3, expand (eData, 48));
-	subRound (B, C, D, E, A, f3, K3, expand (eData, 49));
-	subRound (A, B, C, D, E, f3, K3, expand (eData, 50));
-	subRound (E, A, B, C, D, f3, K3, expand (eData, 51));
-	subRound (D, E, A, B, C, f3, K3, expand (eData, 52));
-	subRound (C, D, E, A, B, f3, K3, expand (eData, 53));
-	subRound (B, C, D, E, A, f3, K3, expand (eData, 54));
-	subRound (A, B, C, D, E, f3, K3, expand (eData, 55));
-	subRound (E, A, B, C, D, f3, K3, expand (eData, 56));
-	subRound (D, E, A, B, C, f3, K3, expand (eData, 57));
-	subRound (C, D, E, A, B, f3, K3, expand (eData, 58));
-	subRound (B, C, D, E, A, f3, K3, expand (eData, 59));
+	subRound(A, B, C, D, E, f3, K3, expand(eData, 40));
+	subRound(E, A, B, C, D, f3, K3, expand(eData, 41));
+	subRound(D, E, A, B, C, f3, K3, expand(eData, 42));
+	subRound(C, D, E, A, B, f3, K3, expand(eData, 43));
+	subRound(B, C, D, E, A, f3, K3, expand(eData, 44));
+	subRound(A, B, C, D, E, f3, K3, expand(eData, 45));
+	subRound(E, A, B, C, D, f3, K3, expand(eData, 46));
+	subRound(D, E, A, B, C, f3, K3, expand(eData, 47));
+	subRound(C, D, E, A, B, f3, K3, expand(eData, 48));
+	subRound(B, C, D, E, A, f3, K3, expand(eData, 49));
+	subRound(A, B, C, D, E, f3, K3, expand(eData, 50));
+	subRound(E, A, B, C, D, f3, K3, expand(eData, 51));
+	subRound(D, E, A, B, C, f3, K3, expand(eData, 52));
+	subRound(C, D, E, A, B, f3, K3, expand(eData, 53));
+	subRound(B, C, D, E, A, f3, K3, expand(eData, 54));
+	subRound(A, B, C, D, E, f3, K3, expand(eData, 55));
+	subRound(E, A, B, C, D, f3, K3, expand(eData, 56));
+	subRound(D, E, A, B, C, f3, K3, expand(eData, 57));
+	subRound(C, D, E, A, B, f3, K3, expand(eData, 58));
+	subRound(B, C, D, E, A, f3, K3, expand(eData, 59));
 
-	subRound (A, B, C, D, E, f4, K4, expand (eData, 60));
-	subRound (E, A, B, C, D, f4, K4, expand (eData, 61));
-	subRound (D, E, A, B, C, f4, K4, expand (eData, 62));
-	subRound (C, D, E, A, B, f4, K4, expand (eData, 63));
-	subRound (B, C, D, E, A, f4, K4, expand (eData, 64));
-	subRound (A, B, C, D, E, f4, K4, expand (eData, 65));
-	subRound (E, A, B, C, D, f4, K4, expand (eData, 66));
-	subRound (D, E, A, B, C, f4, K4, expand (eData, 67));
-	subRound (C, D, E, A, B, f4, K4, expand (eData, 68));
-	subRound (B, C, D, E, A, f4, K4, expand (eData, 69));
-	subRound (A, B, C, D, E, f4, K4, expand (eData, 70));
-	subRound (E, A, B, C, D, f4, K4, expand (eData, 71));
-	subRound (D, E, A, B, C, f4, K4, expand (eData, 72));
-	subRound (C, D, E, A, B, f4, K4, expand (eData, 73));
-	subRound (B, C, D, E, A, f4, K4, expand (eData, 74));
-	subRound (A, B, C, D, E, f4, K4, expand (eData, 75));
-	subRound (E, A, B, C, D, f4, K4, expand (eData, 76));
-	subRound (D, E, A, B, C, f4, K4, expand (eData, 77));
-	subRound (C, D, E, A, B, f4, K4, expand (eData, 78));
-	subRound (B, C, D, E, A, f4, K4, expand (eData, 79));
+	subRound(A, B, C, D, E, f4, K4, expand(eData, 60));
+	subRound(E, A, B, C, D, f4, K4, expand(eData, 61));
+	subRound(D, E, A, B, C, f4, K4, expand(eData, 62));
+	subRound(C, D, E, A, B, f4, K4, expand(eData, 63));
+	subRound(B, C, D, E, A, f4, K4, expand(eData, 64));
+	subRound(A, B, C, D, E, f4, K4, expand(eData, 65));
+	subRound(E, A, B, C, D, f4, K4, expand(eData, 66));
+	subRound(D, E, A, B, C, f4, K4, expand(eData, 67));
+	subRound(C, D, E, A, B, f4, K4, expand(eData, 68));
+	subRound(B, C, D, E, A, f4, K4, expand(eData, 69));
+	subRound(A, B, C, D, E, f4, K4, expand(eData, 70));
+	subRound(E, A, B, C, D, f4, K4, expand(eData, 71));
+	subRound(D, E, A, B, C, f4, K4, expand(eData, 72));
+	subRound(C, D, E, A, B, f4, K4, expand(eData, 73));
+	subRound(B, C, D, E, A, f4, K4, expand(eData, 74));
+	subRound(A, B, C, D, E, f4, K4, expand(eData, 75));
+	subRound(E, A, B, C, D, f4, K4, expand(eData, 76));
+	subRound(D, E, A, B, C, f4, K4, expand(eData, 77));
+	subRound(C, D, E, A, B, f4, K4, expand(eData, 78));
+	subRound(B, C, D, E, A, f4, K4, expand(eData, 79));
 
 	/* Build message digest */
 	digest[0] += A;
@@ -255,14 +255,14 @@ static void SHSTransform (digest, data)
 /* When run on a little-endian CPU we need to perform byte reversal on an
    array of long words. */
 
-static void longReverse (UINT32_T * buffer, int byteCount, int Endianness)
+static void longReverse(UINT32_T * buffer, int byteCount, int Endianness)
 {
 	UINT32_T value;
 
-	if (Endianness == TRUE)
+	if(Endianness == TRUE)
 		return;
-	byteCount /= sizeof (UINT32_T);
-	while (byteCount--) {
+	byteCount /= sizeof(UINT32_T);
+	while(byteCount--) {
 		value = *buffer;
 		value = ((value & 0xFF00FF00L) >> 8) | ((value & 0x00FF00FFL) << 8);
 		*buffer++ = (value << 16) | (value >> 16);
@@ -271,14 +271,14 @@ static void longReverse (UINT32_T * buffer, int byteCount, int Endianness)
 
 /* Update SHS for a block of data */
 
-void sha1_update (sha1_context_t * shsInfo, const unsigned char *buffer, unsigned int count)
+void sha1_update(sha1_context_t * shsInfo, const unsigned char *buffer, unsigned int count)
 {
 	UINT32_T tmp;
 	int dataCount;
 
 	/* Update bitcount */
 	tmp = shsInfo->countLo;
-	if ((shsInfo->countLo = tmp + ((UINT32_T) count << 3)) < tmp)
+	if((shsInfo->countLo = tmp + ((UINT32_T) count << 3)) < tmp)
 		shsInfo->countHi++;	/* Carry from low to high */
 	shsInfo->countHi += count >> 29;
 
@@ -286,32 +286,32 @@ void sha1_update (sha1_context_t * shsInfo, const unsigned char *buffer, unsigne
 	dataCount = (int) (tmp >> 3) & 0x3F;
 
 	/* Handle any leading odd-sized chunks */
-	if (dataCount) {
+	if(dataCount) {
 		UINT8_T *p = (UINT8_T *) shsInfo->data + dataCount;
 
 		dataCount = SHS_DATASIZE - dataCount;
-		if (count < dataCount) {
-			memcpy (p, buffer, count);
+		if(count < dataCount) {
+			memcpy(p, buffer, count);
 			return;
 		}
-		memcpy (p, buffer, dataCount);
-		longReverse (shsInfo->data, SHS_DATASIZE, shsInfo->Endianness);
-		SHSTransform (shsInfo->digest, shsInfo->data);
+		memcpy(p, buffer, dataCount);
+		longReverse(shsInfo->data, SHS_DATASIZE, shsInfo->Endianness);
+		SHSTransform(shsInfo->digest, shsInfo->data);
 		buffer += dataCount;
 		count -= dataCount;
 	}
 
 	/* Process data in SHS_DATASIZE chunks */
-	while (count >= SHS_DATASIZE) {
-		memcpy ((POINTER) shsInfo->data, (POINTER) buffer, SHS_DATASIZE);
-		longReverse (shsInfo->data, SHS_DATASIZE, shsInfo->Endianness);
-		SHSTransform (shsInfo->digest, shsInfo->data);
+	while(count >= SHS_DATASIZE) {
+		memcpy((POINTER) shsInfo->data, (POINTER) buffer, SHS_DATASIZE);
+		longReverse(shsInfo->data, SHS_DATASIZE, shsInfo->Endianness);
+		SHSTransform(shsInfo->digest, shsInfo->data);
 		buffer += SHS_DATASIZE;
 		count -= SHS_DATASIZE;
 	}
 
 	/* Handle any remaining bytes of data. */
-	memcpy ((POINTER) shsInfo->data, (POINTER) buffer, count);
+	memcpy((POINTER) shsInfo->data, (POINTER) buffer, count);
 }
 
 /* Final wrapup - pad to SHS_DATASIZE-byte boundary with the bit pattern
@@ -335,38 +335,37 @@ void sha1_final(unsigned char output[2], sha1_context_t * shsInfo)
 	count = SHS_DATASIZE - 1 - count;
 
 	/* Pad out to 56 mod 64 */
-	if (count < 8) {
+	if(count < 8) {
 		/* Two lots of padding:  Pad the first block to 64 bytes */
-		memset (dataPtr, 0, count);
-		longReverse (shsInfo->data, SHS_DATASIZE, shsInfo->Endianness);
-		SHSTransform (shsInfo->digest, shsInfo->data);
+		memset(dataPtr, 0, count);
+		longReverse(shsInfo->data, SHS_DATASIZE, shsInfo->Endianness);
+		SHSTransform(shsInfo->digest, shsInfo->data);
 
 		/* Now fill the next block with 56 bytes */
-		memset ((POINTER) shsInfo->data, 0, SHS_DATASIZE - 8);
-	}
-	else
+		memset((POINTER) shsInfo->data, 0, SHS_DATASIZE - 8);
+	} else
 		/* Pad block to 56 bytes */
-		memset (dataPtr, 0, count - 8);
+		memset(dataPtr, 0, count - 8);
 
 	/* Append length in bits and transform */
 	shsInfo->data[14] = shsInfo->countHi;
 	shsInfo->data[15] = shsInfo->countLo;
 
-	longReverse (shsInfo->data, SHS_DATASIZE - 8, shsInfo->Endianness);
-	SHSTransform (shsInfo->digest, shsInfo->data);
+	longReverse(shsInfo->data, SHS_DATASIZE - 8, shsInfo->Endianness);
+	SHSTransform(shsInfo->digest, shsInfo->data);
 
 	/* Output to an array of bytes */
-	SHAtoByte (output, shsInfo->digest, SHS_DIGESTSIZE);
+	SHAtoByte(output, shsInfo->digest, SHS_DIGESTSIZE);
 
 	/* Zeroise sensitive stuff */
-	memset ((POINTER) shsInfo, 0, sizeof (shsInfo));
+	memset((POINTER) shsInfo, 0, sizeof(shsInfo));
 }
 
-static void SHAtoByte (UINT8_T * output, UINT32_T * input, unsigned int len)
+static void SHAtoByte(UINT8_T * output, UINT32_T * input, unsigned int len)
 {				/* Output SHA digest in byte array */
 	unsigned int i, j;
 
-	for (i = 0, j = 0; j < len; i++, j += 4) {
+	for(i = 0, j = 0; j < len; i++, j += 4) {
 		output[j + 3] = (UINT8_T) (input[i] & 0xff);
 		output[j + 2] = (UINT8_T) ((input[i] >> 8) & 0xff);
 		output[j + 1] = (UINT8_T) ((input[i] >> 16) & 0xff);
@@ -374,13 +373,12 @@ static void SHAtoByte (UINT8_T * output, UINT32_T * input, unsigned int len)
 	}
 }
 
-void endianTest (int *endian_ness)
+void endianTest(int *endian_ness)
 {
-	if ((*(unsigned short *) ("#S") >> 8) == '#') {
+	if((*(unsigned short *) ("#S") >> 8) == '#') {
 		/* printf("Big endian = no change\n"); */
 		*endian_ness = !(0);
-	}
-	else {
+	} else {
 		/* printf("Little endian = swap\n"); */
 		*endian_ness = 0;
 	}
@@ -388,23 +386,24 @@ void endianTest (int *endian_ness)
 
 #define BUFFER_SIZE 1048576
 
-int sha1_file ( const char *filename, unsigned char digest[20] )
+int sha1_file(const char *filename, unsigned char digest[20])
 {
 	FILE *file;
 	sha1_context_t context;
 	int actual;
 	unsigned char *buffer;
 
-	file = fopen(filename,"rb");
-	if(!file) return 0;
+	file = fopen(filename, "rb");
+	if(!file)
+		return 0;
 
 	buffer = xxmalloc(BUFFER_SIZE);
 
 	sha1_init(&context);
-	while((actual=fread(buffer,1,BUFFER_SIZE,file))) {
-		sha1_update(&context,buffer,actual);
+	while((actual = fread(buffer, 1, BUFFER_SIZE, file))) {
+		sha1_update(&context, buffer, actual);
 	}
-	sha1_final (digest, &context);
+	sha1_final(digest, &context);
 
 	free(buffer);
 	fclose(file);
@@ -412,21 +411,21 @@ int sha1_file ( const char *filename, unsigned char digest[20] )
 	return 1;
 }
 
-void sha1_buffer( const char *buffer, int length, unsigned char digest[20] )
+void sha1_buffer(const char *buffer, int length, unsigned char digest[20])
 {
 	sha1_context_t context;
 
 	sha1_init(&context);
-	sha1_update(&context,(const unsigned char*)buffer,length);
-	sha1_final(digest,&context);
+	sha1_update(&context, (const unsigned char *) buffer, length);
+	sha1_final(digest, &context);
 }
 
-const char * sha1_string( unsigned char digest[20] )
+const char *sha1_string(unsigned char digest[20])
 {
 	static char str[41];
 	int i;
-	for(i=0;i<20;i++) {
-		sprintf(&str[i*2],"%02x",(unsigned)digest[i]);
+	for(i = 0; i < 20; i++) {
+		sprintf(&str[i * 2], "%02x", (unsigned) digest[i]);
 	}
 	str[40] = 0;
 	return str;

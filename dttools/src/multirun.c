@@ -26,34 +26,35 @@ Example use:
 #include <errno.h>
 #include <sys/wait.h>
 
-static int debug=0;
+static int debug = 0;
 static char *name;
 static const char *fileprefix = 0;
 static pid_t child_pid = 0;
 
 #define BUFFER_SIZE 65536
 
-FILE * fopen_process( const char *cmd )
+FILE *fopen_process(const char *cmd)
 {
 	int result;
 	int fds[2];
 
 	result = pipe(fds);
-	if(result<0) return 0;
+	if(result < 0)
+		return 0;
 
 	child_pid = fork();
-	if(child_pid<0) {
+	if(child_pid < 0) {
 		close(fds[0]);
 		close(fds[1]);
 		return 0;
 	}
 
-	if(child_pid>0) {
+	if(child_pid > 0) {
 		close(fds[1]);
-		return fdopen(fds[0],"r");
+		return fdopen(fds[0], "r");
 	} else {
-		dup2(fds[1],1);
-		dup2(fds[1],2);
+		dup2(fds[1], 1);
+		dup2(fds[1], 2);
 		close(fds[0]);
 		close(fds[1]);
 		exit(system(cmd));
@@ -61,45 +62,46 @@ FILE * fopen_process( const char *cmd )
 	}
 }
 
-int agent( char *param, char *format, int timeout )
+int agent(char *param, char *format, int timeout)
 {
-	char buffer[BUFFER_SIZE+1];
+	char buffer[BUFFER_SIZE + 1];
 	FILE *child;
 	char filename[1024];
 	FILE *outfile;
 
 	/* If a fileprefix has been given, write to that file */
 	if(fileprefix) {
-		sprintf(filename,"%s.%s",fileprefix,param);
-		outfile = fopen(filename,"w");
+		sprintf(filename, "%s.%s", fileprefix, param);
+		outfile = fopen(filename, "w");
 		if(!outfile) {
-			fprintf(stderr,"%s: Couldn't open %s: %s\n",param,filename,strerror(errno));
+			fprintf(stderr, "%s: Couldn't open %s: %s\n", param, filename, strerror(errno));
 			return 1;
 		}
 	} else {
 		outfile = stdout;
 	}
 
-	sprintf(buffer,format,param);
+	sprintf(buffer, format, param);
 
 	child = fopen_process(buffer);
 	if(!child) {
-		fprintf(stderr,"%s: Unable to execute %s\n",param,buffer);
+		fprintf(stderr, "%s: Unable to execute %s\n", param, buffer);
 		return 0;
 	}
 
 	name = param;
 
-	if(timeout>0) alarm(timeout);
+	if(timeout > 0)
+		alarm(timeout);
 
-	while(fgets(buffer,BUFFER_SIZE,child)) {
+	while(fgets(buffer, BUFFER_SIZE, child)) {
 		if(fileprefix) {
-			fprintf(outfile,"%s",buffer);
+			fprintf(outfile, "%s", buffer);
 		} else {
-			fprintf(outfile,"%s: %s",param,buffer);
+			fprintf(outfile, "%s: %s", param, buffer);
 		}
 	}
-	
+
 	fclose(child);
 
 	exit(0);
@@ -107,27 +109,27 @@ int agent( char *param, char *format, int timeout )
 
 void shutdown_handler()
 {
-	if(child_pid>0) {
-		kill(child_pid,SIGTERM);
+	if(child_pid > 0) {
+		kill(child_pid, SIGTERM);
 		sleep(1);
-		kill(child_pid,SIGKILL);
+		kill(child_pid, SIGKILL);
 	}
-	exit(0);	
+	exit(0);
 }
 
 void alarm_handler()
 {
-	fprintf(stderr,"%s: timeout\n",name);
+	fprintf(stderr, "%s: timeout\n", name);
 	shutdown_handler();
 }
 
 void sigterm_handler()
 {
-	fprintf(stderr,"%s: aborting\n",name);
+	fprintf(stderr, "%s: aborting\n", name);
 	shutdown_handler();
 }
 
-static void ignore_signal( int sig )
+static void ignore_signal(int sig)
 {
 }
 
@@ -138,88 +140,92 @@ static void show_version(const char *cmd)
 
 static void use(char *program)
 {
-	fprintf(stderr,"Use: %s [options] <command> [params]\n",program);
-	fprintf(stderr,"Options are:\n");
-	fprintf(stderr,"\t-t <seconds>   Set timeout for each child process. (default is none)\n");
-	fprintf(stderr,"\t-p <processes> Set the maximum number of concurrent jobs (default 5)\n");
-	fprintf(stderr,"\t-f <prefix>    Send each output to file named prefix.param\n");
-	fprintf(stderr,"\t-d             Debug mode\n");
-	fprintf(stderr,"\t-v             Show version\n");
+	fprintf(stderr, "Use: %s [options] <command> [params]\n", program);
+	fprintf(stderr, "Options are:\n");
+	fprintf(stderr, "\t-t <seconds>   Set timeout for each child process. (default is none)\n");
+	fprintf(stderr, "\t-p <processes> Set the maximum number of concurrent jobs (default 5)\n");
+	fprintf(stderr, "\t-f <prefix>    Send each output to file named prefix.param\n");
+	fprintf(stderr, "\t-d             Debug mode\n");
+	fprintf(stderr, "\t-v             Show version\n");
 	exit(0);
 }
 
 int main(int argc, char *argv[])
 {
-	char	*command=0;
-	char	*param=0;
-	int	started=0,running=0,done=0;
-	int	timeout=0;
-	int	limit=5;
-	int	i=0;
-	int	result;
+	char *command = 0;
+	char *param = 0;
+	int started = 0, running = 0, done = 0;
+	int timeout = 0;
+	int limit = 5;
+	int i = 0;
+	int result;
 
-	if(argc<2) use(argv[0]);
+	if(argc < 2)
+		use(argv[0]);
 
-	for(i=1; i<argc; i++) {
-		if(argv[i][0]=='-') {
-			switch(argv[i][1]) {
-				case 't':
-				if(++i==argc) use(argv[0]);
-				timeout=atoi(argv[i]);
+	for(i = 1; i < argc; i++) {
+		if(argv[i][0] == '-') {
+			switch (argv[i][1]) {
+			case 't':
+				if(++i == argc)
+					use(argv[0]);
+				timeout = atoi(argv[i]);
 				break;
 
-				case 'p':
-				if(++i==argc) use(argv[0]);
-				limit=atoi(argv[i]);
+			case 'p':
+				if(++i == argc)
+					use(argv[0]);
+				limit = atoi(argv[i]);
 				break;
 
-				case 'f':
-				if(++i==argc) use(argv[0]);
+			case 'f':
+				if(++i == argc)
+					use(argv[0]);
 				fileprefix = argv[i];
 				break;
 
-				case 'd':
+			case 'd':
 				debug = 1;
 				break;
 
-				case 'v':
+			case 'v':
 				show_version(argv[0]);
 				exit(0);
 				break;
 
-				default:
+			default:
 				use(argv[0]);
 				break;
 			}
-		} else if(command==0) {
+		} else if(command == 0) {
 			command = argv[i++];
 			break;
 		}
 	}
 
-	if(command==0) {
-		fprintf(stderr,"No command specified.\n");
+	if(command == 0) {
+		fprintf(stderr, "No command specified.\n");
 		return -1;
 	}
 
-	signal(SIGPIPE,ignore_signal);
-	signal(SIGCHLD,ignore_signal);
-	signal(SIGALRM,alarm_handler);
-	signal(SIGTERM,sigterm_handler);
-	signal(SIGQUIT,sigterm_handler);
-	signal(SIGABRT,sigterm_handler);
-	signal(SIGINT,sigterm_handler);
+	signal(SIGPIPE, ignore_signal);
+	signal(SIGCHLD, ignore_signal);
+	signal(SIGALRM, alarm_handler);
+	signal(SIGTERM, sigterm_handler);
+	signal(SIGQUIT, sigterm_handler);
+	signal(SIGABRT, sigterm_handler);
+	signal(SIGINT, sigterm_handler);
 
 	while(1) {
-       		if(i<argc) {
+		if(i < argc) {
 			param = argv[i++];
 
 			result = fork();
-			if(result<0) {
-				fprintf(stderr,"Unable to fork: %s\n",strerror(errno));
+			if(result < 0) {
+				fprintf(stderr, "Unable to fork: %s\n", strerror(errno));
 				return -1;
-			} else if(result==0) {
-				agent(param,command,timeout);
+			} else if(result == 0) {
+				agent(param, command, timeout);
 				exit(0);
 			} else {
 				started++;
@@ -227,20 +233,20 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		if(debug) fprintf(stderr,"multirun: %d started, %d running, %d done        \r",started,running,done);
-       	       	fflush(stdout);
+		if(debug)
+			fprintf(stderr, "multirun: %d started, %d running, %d done        \r", started, running, done);
+		fflush(stdout);
 
-		if(running==0)  {
-			if(debug) fprintf(stderr,"\nmultirun: done\n");
+		if(running == 0) {
+			if(debug)
+				fprintf(stderr, "\nmultirun: done\n");
 			return 0;
 		}
 
-		if( running>=limit || i>=argc) {
+		if(running >= limit || i >= argc) {
 			wait(0);
 			running--;
 			done++;
 		}
 	}
 }
-
-

@@ -9,16 +9,16 @@ See the file COPYING for details.
 #include <sys/loadavg.h>
 #include <unistd.h>
 
-void load_average_get( double *avg )
+void load_average_get(double *avg)
 {
 	avg[0] = avg[1] = avg[2] = 0;
-	getloadavg(avg,3);
+	getloadavg(avg, 3);
 }
 
 int load_average_get_cpus()
 {
 	long n = sysconf(_SC_NPROCESSORS_ONLN);
-	if(n>=1) {
+	if(n >= 1) {
 		return n;
 	} else {
 		return 1;
@@ -32,17 +32,17 @@ int load_average_get_cpus()
 #include <sys/sysctl.h>
 #include <sys/types.h>
 
-void load_average_get( double *avg )
+void load_average_get(double *avg)
 {
 	avg[0] = avg[1] = avg[2] = 0;
-	getloadavg(avg,3);
+	getloadavg(avg, 3);
 }
 
 int load_average_get_cpus()
 {
 	int n;
 	size_t size = sizeof(n);
-	if(sysctlbyname("hw.ncpu",&n,&size,0,0)==0) {
+	if(sysctlbyname("hw.ncpu", &n, &size, 0, 0) == 0) {
 		return n;
 	} else {
 		return 1;
@@ -53,13 +53,13 @@ int load_average_get_cpus()
 
 #include <stdio.h>
 
-void load_average_get( double *avg )
+void load_average_get(double *avg)
 {
 	FILE *f;
 	avg[0] = avg[1] = avg[2] = 0;
-	f = fopen("/proc/loadavg","r");
+	f = fopen("/proc/loadavg", "r");
 	if(f) {
-		fscanf(f,"%lf %lf %lf",&avg[0],&avg[1],&avg[2]);
+		fscanf(f, "%lf %lf %lf", &avg[0], &avg[1], &avg[2]);
 		fclose(f);
 	}
 }
@@ -68,15 +68,15 @@ int load_average_get_cpus()
 {
 	FILE *f;
 
-	f = fopen("/proc/cpuinfo","r");
+	f = fopen("/proc/cpuinfo", "r");
 	if(f) {
 		char line[1024];
 		int ncpus = 0;
-		while(fgets(line,sizeof(line),f)) {
-			sscanf(line,"processor : %d",&ncpus);
+		while(fgets(line, sizeof(line), f)) {
+			sscanf(line, "processor : %d", &ncpus);
 		}
 		fclose(f);
-		return ncpus+1;
+		return ncpus + 1;
 	} else {
 		return 1;
 	}
@@ -84,7 +84,7 @@ int load_average_get_cpus()
 
 #else
 
-void load_average_get( double *avg )
+void load_average_get(double *avg)
 {
 	avg[0] = avg[1] = avg[2] = 0;
 }

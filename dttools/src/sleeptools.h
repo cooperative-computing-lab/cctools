@@ -19,11 +19,11 @@ These routines will retry sleep() until the desired condition is reached.
 /** Sleep until a specific time.
 @param stoptime The absolute time to wait for.
 */
-void sleep_until( time_t stoptime );
+void sleep_until(time_t stoptime);
 
 /** Sleep for a specific interval of time.
 @param interval The number of seconds to wait.
 */
-void sleep_for( time_t interval );
+void sleep_for(time_t interval);
 
 #endif

@@ -699,53 +699,53 @@ int main(int argc, char *argv[])
 					*tmp_pos = '/';
 				}
 
-				switch(mode) {
-					case WORK_QUEUE_FS_SYMLINK:
-						if(symlink(path, filename) != 0) {
-							debug(D_WQ, "Could not thirdget %s, symlink (%s) failed. (%s)\n", filename, path, strerror(errno));
-							goto recover;
-						}
-					case WORK_QUEUE_FS_PATH:
-						sprintf(cmd, "/bin/cp %s %s", path, filename);
-						if(system(cmd) != 0) {
-							debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (/bin/cp %s)\n", filename, path, filename, strerror(errno));
-							goto recover;
-						}
-						break;
-					case WORK_QUEUE_FS_CMD:
-						if(system(path) != 0) {
-							debug(D_WQ, "Could not thirdget %s, command (%s) failed. (%s)\n", filename, path, strerror(errno));
-							goto recover;
-						}
-						break;
+				switch (mode) {
+				case WORK_QUEUE_FS_SYMLINK:
+					if(symlink(path, filename) != 0) {
+						debug(D_WQ, "Could not thirdget %s, symlink (%s) failed. (%s)\n", filename, path, strerror(errno));
+						goto recover;
+					}
+				case WORK_QUEUE_FS_PATH:
+					sprintf(cmd, "/bin/cp %s %s", path, filename);
+					if(system(cmd) != 0) {
+						debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (/bin/cp %s)\n", filename, path, filename, strerror(errno));
+						goto recover;
+					}
+					break;
+				case WORK_QUEUE_FS_CMD:
+					if(system(path) != 0) {
+						debug(D_WQ, "Could not thirdget %s, command (%s) failed. (%s)\n", filename, path, strerror(errno));
+						goto recover;
+					}
+					break;
 				}
 			} else if(sscanf(line, "thirdput %d %s %[^\n]", &mode, filename, path)) {
 				struct stat info;
 				char cmd[WORK_QUEUE_LINE_MAX];
 
-				switch(mode) {
-					case WORK_QUEUE_FS_SYMLINK:
-					case WORK_QUEUE_FS_PATH:
-						if(stat(filename, &info) != 0) {
-							debug(D_WQ, "File %s not accessible. (%s)\n", filename, strerror(errno));
-							goto recover;
-						}
-						if(!strcmp(filename, path)) {
-							debug(D_WQ, "thirdput aborted: filename (%s) and path (%s) are the same\n", filename, path);
-							continue;
-						}
-						sprintf(cmd, "/bin/cp %s %s", filename, path);
-						if(system(cmd) != 0) {
-							debug(D_WQ, "Could not thirdput %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
-							goto recover;
-						}
-						break;
-					case WORK_QUEUE_FS_CMD:
-						if(system(path) != 0) {
-							debug(D_WQ, "Could not thirdput %s, command (%s) failed. (%s)\n", filename, path, strerror(errno));
-							goto recover;
-						}
-						break;
+				switch (mode) {
+				case WORK_QUEUE_FS_SYMLINK:
+				case WORK_QUEUE_FS_PATH:
+					if(stat(filename, &info) != 0) {
+						debug(D_WQ, "File %s not accessible. (%s)\n", filename, strerror(errno));
+						goto recover;
+					}
+					if(!strcmp(filename, path)) {
+						debug(D_WQ, "thirdput aborted: filename (%s) and path (%s) are the same\n", filename, path);
+						continue;
+					}
+					sprintf(cmd, "/bin/cp %s %s", filename, path);
+					if(system(cmd) != 0) {
+						debug(D_WQ, "Could not thirdput %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
+						goto recover;
+					}
+					break;
+				case WORK_QUEUE_FS_CMD:
+					if(system(path) != 0) {
+						debug(D_WQ, "Could not thirdput %s, command (%s) failed. (%s)\n", filename, path, strerror(errno));
+						goto recover;
+					}
+					break;
 				}
 				link_putliteral(master, "thirdput complete\n", time(0) + active_timeout);
 			} else if(!strcmp(line, "exit")) {

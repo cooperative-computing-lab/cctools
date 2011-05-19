@@ -20,14 +20,13 @@ not include quotes, variables, or other features of the shell.
 @param command The command string to execute.
 @return A pointer to a file stream which must be closed with @ref fast_pclose.
 */
-FILE * fast_popen( const char *command );
+FILE *fast_popen(const char *command);
 
 /** Conclude a fast process stream.
 @param file A file pointer returned from @ref fast_popen.
 @return The exit status of the process.
 */
 
-int fast_pclose( FILE * file );
+int fast_pclose(FILE * file);
 
 #endif
-
