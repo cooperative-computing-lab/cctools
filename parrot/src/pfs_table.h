@@ -106,6 +106,7 @@ public:
 	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );
 
 	int find_empty( int lowest );
+	void complete_at_path( int dirfd, const char *short_path, char *long_path );
 private:
 	int search_dup2( int ofd, int search );
 

@@ -164,6 +164,25 @@ void pfs_table::complete_path( const char *short_path, char *full_path )
         }
 }
 
+/*
+Complete a path, starting with this fd assumed to be a directory.
+*/
+
+void pfs_table::complete_at_path( int dirfd, const char *path, char *full_path )
+{
+	if(path[0]=='/') {
+		strcpy(full_path,path);
+	} else {
+		if(dirfd==AT_FDCWD) {
+			sprintf(full_path,"%s/%s",working_dir,path);
+		} else {
+			get_full_name(dirfd,full_path);
+			strcat(full_path,"/");
+			strcat(full_path,path);
+		}
+	}
+}
+
 void pfs_table::follow_symlink( struct pfs_name *pname, int depth )
 {
 	char link_target[PFS_PATH_MAX];
