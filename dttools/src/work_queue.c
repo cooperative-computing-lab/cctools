@@ -97,6 +97,9 @@ struct work_queue {
 	timestamp_t accumulated_idle_start;
 	timestamp_t accumulated_idle_time;
 	struct list * idle_times;
+	int capacity;
+	timestamp_t avg_task_transfer_time;
+	timestamp_t avg_task_execute_time;
 };
 
 
@@ -246,6 +249,7 @@ void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s )
 	s->efficiency = (long double)(q->total_execute_time) / (wall_clock_time * effective_workers);
 	s->range_efficiency = q->range_efficiency;
 	s->idle_percentage = (long double)(q->accumulated_idle_time + q->idle_time) / (timestamp_get() - q->accumulated_idle_start);
+	s->capacity = q->capacity;
 }
 
 static int add_worker( struct work_queue *q )
@@ -718,6 +722,14 @@ static int receive_output_from_worker( struct work_queue *q, struct work_queue_w
     w->current_task = 0;
     t->time_task_finish = timestamp_get(); 
 	//w->time_last_task_complete = t->time_task_finish; 
+	//
+	double fraction = (double)q->total_tasks_complete / (q->total_tasks_complete + 1);
+	timestamp_t new_avg_task_execute_time = q->avg_task_execute_time * fraction + (long double)(t->time_execute_cmd_finish - t->time_execute_cmd_start) / (q->total_tasks_complete + 1); 
+	timestamp_t new_avg_task_transfer_time = q->avg_task_transfer_time * fraction + (long double)(t->total_transfer_time) / (q->total_tasks_complete + 1); 
+	printf("fraction: %.2f; avg execute: %lld; avg transfer: %lld\n", fraction, new_avg_task_execute_time, new_avg_task_transfer_time);
+	q->capacity = new_avg_task_execute_time / new_avg_task_transfer_time + 1;
+	q->avg_task_execute_time = new_avg_task_execute_time;
+	q->avg_task_transfer_time = new_avg_task_transfer_time;
 
     change_worker_state(q,w,WORKER_STATE_READY);
 
@@ -984,20 +996,18 @@ int start_one_task( struct work_queue *q, struct work_queue_worker *w, struct wo
 void add_master_idle_time_slot(struct work_queue *q) {
 	struct time_slot *ts;
 
-	if(q->idle_time != 0) {
-		ts = (struct time_slot *)malloc(sizeof(struct time_slot));
-		if(ts) { 
-			ts->start = q->time_last_task_start;
-			ts->duration = q->idle_time;
-			ts->status = TIME_SLOT_MASTER_IDLE;
-			q->accumulated_idle_time += ts->duration;
-			list_push_tail(q->idle_times, ts);
-			q->time_last_task_start = timestamp_get();
-		} else {
-			debug(D_NOTICE,"Failed to record master idle time.");
-		}
-		q->idle_time = 0;
+	ts = (struct time_slot *)malloc(sizeof(struct time_slot));
+	if(ts) { 
+		ts->start = q->time_last_task_start;
+		ts->duration = q->idle_time;
+		ts->status = TIME_SLOT_MASTER_IDLE;
+		q->accumulated_idle_time += ts->duration;
+		list_push_tail(q->idle_times, ts);
+		q->time_last_task_start = timestamp_get();
+	} else {
+		debug(D_NOTICE,"Failed to record master idle time.");
 	}
+	q->idle_time = 0;
 
 	// trim q->idle_times
 	int effective_workers = q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_READY];
@@ -1294,6 +1304,7 @@ struct work_queue * work_queue_create( int port )
 	q->accumulated_idle_time = 0;
 	q->idle_time = 0;
 	q->idle_times = list_create();
+	q->capacity = 0;
 
 	debug(D_WQ,"Work Queue is listening on port %d.", port);
 	return q;
@@ -1389,36 +1400,20 @@ void work_queue_submit( struct work_queue *q, struct work_queue_task *t )
 	q->total_tasks_submitted++;
 }
 
-static int add_more_workers (struct work_queue *q, int msec) {
-	timestamp_t stoptime;
-	//int result;
-
-	/**
-	// Allocate a small table, if it hasn't been done yet.
-	if(!q->poll_table) {
-		q->poll_table = malloc(sizeof(*q->poll_table)*q->poll_table_size);
-	}
-
-	// The first item in the poll table is the master link, which accepts new connections.
-	q->poll_table[0].link = q->master_link;
-	q->poll_table[0].events = LINK_READ;
-	q->poll_table[0].revents = 0;
+static int add_more_workers (struct work_queue *q, time_t stoptime) {
+	int count;
+	int result;
 
 
-	// Wait no longer than the caller's patience.
-	msec = 3000;
+	if(q->workers_in_state[WORKER_STATE_BUSY] ==  0) {
+		result = link_sleep(q->master_link,stoptime,1,0);
+		if(result <=0) return 0;
+	} 
 
-	result = link_poll(q->poll_table,1,msec);
-	*/
-
-	// If the master link was awake, then accept as many workers as possible.
-	//if(result) {
-	int count = 0;
-	stoptime = timestamp_get() + msec * 1000;
-	do {
+	count = 0;
+	while (link_usleep(q->master_link,0,1,0) && stoptime > time(0)) {
 		if(add_worker(q)) count++;
-	} while (link_usleep(q->master_link,0,1,0) && stoptime > timestamp_get());
-	//}
+	}
 	return count;
 }
 
@@ -1464,14 +1459,11 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 
 		added_workers = 0;
 		if(q->workers_in_state[WORKER_STATE_READY] < list_size(q->ready_list)) {
-			// Wait no longer than the caller's patience.
-			if(stoptime) {
-				msec = MAX(0,(stoptime-time(0))*1000);
-			} else {
-				msec = 2000;
+			if(stoptime && time(0)>=stoptime) {
+				return 0;
 			}
 			idle_start = timestamp_get();
-			added_workers = add_more_workers(q, msec);
+			added_workers = add_more_workers(q, stoptime);
 			int add_worker_time =  timestamp_get() - idle_start;
 			printf("added %d workers in %d microsec\n", added_workers, add_worker_time);
 		}
@@ -1480,6 +1472,10 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			if((po=list_pop_head(q->receive_output_waiting_list))) {
 				receive_pending_output_of_one_task(q, po);
 				free(po);
+				continue;
+			}
+
+			if(q->workers_in_state[WORKER_STATE_BUSY] == 0) {
 				continue;
 			}
 		}
@@ -1491,6 +1487,9 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			msec = MAX(0,(stoptime-time(0))*1000);
 		} else {
 			msec = 5000;
+		}
+		if(q->workers_in_state[WORKER_STATE_READY] < list_size(q->ready_list)) {
+			msec = 1000;
 		}
 
 		/**
@@ -1510,8 +1509,6 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 
 		// If nothing was awake, restart the loop or return without a task.
 		if(result<=0) {
-			// TODO what to do here?
-			//receive_pending_output_of_one_task(q, po);
 			if(stoptime && time(0)>=stoptime) {
 				return 0;
 			} else {

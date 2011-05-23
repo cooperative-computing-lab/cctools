@@ -110,6 +110,7 @@ struct work_queue_stats {
 	double efficiency;
 	double range_efficiency;
 	double idle_percentage;
+	int capacity;
 };
 
 /** @name Functions - Tasks */
