@@ -93,6 +93,7 @@ struct work_queue {
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;           /**< How to choose worker to run the task. */
 	timestamp_t time_last_task_start;
+	timestamp_t time_last_task_finish;
 	timestamp_t idle_time;
 	timestamp_t accumulated_idle_start;
 	timestamp_t accumulated_idle_time;
@@ -498,6 +499,7 @@ static int get_output_files( struct work_queue_task *t, struct work_queue_worker
                 t->total_transfer_time += sum_time;
                 w->total_bytes_transferred += total_bytes;
                 w->total_transfer_time += sum_time;
+				debug(D_WQ,"Got %d bytes from %s (%s) in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps",total_bytes,w->hostname,w->addrport,sum_time/1000000.0,((8.0*total_bytes)/sum_time),(8.0*w->total_bytes_transferred)/w->total_transfer_time);
             }
             total_bytes =  0;
 
@@ -1430,6 +1432,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 	timestamp_t idle_start;
 	int added_workers;
 	struct pending_output *po;
+	int tmp_idle;
 	
 	if(timeout==WORK_QUEUE_WAITFORTASK) {
 		stoptime = 0;
@@ -1455,7 +1458,12 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		if(q->workers_in_state[WORKER_STATE_BUSY]==0 && list_size(q->ready_list)==0) break;
 
 		// Upper level application may have just submitted some new tasks. Try to dispatch them to ready workers.
+
+		idle_start = timestamp_get();
+		printf("next task start in between time: %lld us\n", idle_start-q->time_last_task_finish);
 		start_tasks(q);
+		tmp_idle = timestamp_get() - idle_start;
+		printf("start tasks time: %d us\n", tmp_idle);
 
 		added_workers = 0;
 		if(q->workers_in_state[WORKER_STATE_READY] < list_size(q->ready_list)) {
@@ -1469,9 +1477,13 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		}
 
 		if(added_workers == 0) {
+			idle_start = timestamp_get();
 			if((po=list_pop_head(q->receive_output_waiting_list))) {
 				receive_pending_output_of_one_task(q, po);
 				free(po);
+		tmp_idle = timestamp_get() - idle_start;
+				q->time_last_task_finish = timestamp_get();
+		printf("receive one output time: %d us\n", tmp_idle);
 				continue;
 			}
 
@@ -1500,7 +1512,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		printf("plan to poll for %d millisec.\n", msec);
 		idle_start = timestamp_get();
 		result = link_poll(q->poll_table,n,msec);
-		int tmp_idle = timestamp_get() - idle_start;
+		tmp_idle = timestamp_get() - idle_start;
 		printf("poll idle time: %d microsec; poll result: %d\n", tmp_idle, result);
 		q->idle_time += timestamp_get() - idle_start;
 	
@@ -1516,12 +1528,15 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			}
 		}
 
+		idle_start = timestamp_get();
 		// Then consider all existing active workers and dispatch tasks.
 		for(i=0;i<n;i++) {
 			if(q->poll_table[i].revents) {
 				handle_worker(q,q->poll_table[i].link);
 			}
 		}
+		tmp_idle = timestamp_get() - idle_start;
+		printf("handle %d workers time: %d us\n", result, tmp_idle);
 
 		/**
 		if(time(0) - efficiency_update_time >= EFFICIENCY_UPDATE_INTERVAL) {
@@ -1530,7 +1545,10 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		*/
 
 		// This is after polling because new added workers must be in READY state in order to receive tasks.
+		idle_start = timestamp_get();
 		start_tasks(q);
+		tmp_idle = timestamp_get() - idle_start;
+		printf("start tasks time: %d us\n", tmp_idle);
 
 
 		// If fast abort is enabled, kill off slow workers.
