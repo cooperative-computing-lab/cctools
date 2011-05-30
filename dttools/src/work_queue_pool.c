@@ -194,7 +194,7 @@ static int fix_running_job_number_condor(int goal) {
 	int goal_achieved = 0;
 	int count, extra;
 
-	extra = MAX(10, goal*0.20);
+	extra = MAX(15, goal*0.20);
 	count = submit_workers(extra);
 	printf("%d extra workers are submitted successfully.\n", count);
 

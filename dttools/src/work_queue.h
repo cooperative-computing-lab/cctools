@@ -108,7 +108,6 @@ struct work_queue_stats {
     timestamp_t total_send_time;    /**<Total time in microseconds spent in sending data to workers. */
     timestamp_t total_receive_time; /**<Total time in microseconds spent in receiving data from workers. */
 	double efficiency;
-	double range_efficiency;
 	double idle_percentage;
 	int capacity;
 };
