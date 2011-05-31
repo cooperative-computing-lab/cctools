@@ -150,7 +150,7 @@ static int start_one_task( struct work_queue *q, struct work_queue_worker *w, st
 static int start_task_on_worker( struct work_queue *q, struct work_queue_worker *w );
 static int update_catalog(struct work_queue *q);
 static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, INT64_T length);
-static void add_time_slot(struct work_queue *q, timestamp_t duration, int type, timestamp_t *accumulated_time, struct list *time_list);
+static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t duration, int type, timestamp_t *accumulated_time, struct list *time_list);
 
 static int short_timeout = 5;
 static int next_taskid = 1;
@@ -253,7 +253,10 @@ void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s )
 	ts = (struct time_slot *)list_peek_head(q->idle_times);
 	if(ts) {
 		accumulated_idle_start = ts->start;
+	} else {
+		accumulated_idle_start = q->start_time;
 	}
+	printf("accumulated idle time: %lld, tmp idle time: %lld, now to start: %lld\n", q->accumulated_idle_time, q->idle_time, timestamp_get() - accumulated_idle_start);
 	s->idle_percentage = (long double)(q->accumulated_idle_time + q->idle_time) / (timestamp_get() - accumulated_idle_start);
 
 	// Estimate master capacity, i.e. how many workers can this master handle
@@ -717,12 +720,12 @@ static int receive_output_from_worker( struct work_queue *q, struct work_queue_w
 
 	
 	// Update estimated capacity
-	add_time_slot(q, t->total_transfer_time, TIME_SLOT_TASK_TRANSFER, &(q->accumulated_transfer_time), q->transfer_times);
+	add_time_slot(q, 0, t->total_transfer_time, TIME_SLOT_TASK_TRANSFER, &(q->accumulated_transfer_time), q->transfer_times);
 
 	timestamp_t task_execute_time = t->time_execute_cmd_finish - t->time_execute_cmd_start;
-	add_time_slot(q, task_execute_time, TIME_SLOT_TASK_EXECUTE, &(q->accumulated_execute_time), q->execute_times);
+	add_time_slot(q, 0, task_execute_time, TIME_SLOT_TASK_EXECUTE, &(q->accumulated_execute_time), q->execute_times);
 
-	timestamp_t avg_app_time = list_size(q->app_times)? q->accumulated_app_time / list_size(q->app_times) : 0;
+	timestamp_t avg_app_time = list_size(q->app_times)? q->accumulated_app_time / list_size(q->app_times) : q->app_time;
 	timestamp_t avg_task_transfer_time = q->accumulated_transfer_time / list_size(q->transfer_times);
 	timestamp_t avg_task_execute_time = q->accumulated_execute_time / list_size(q->execute_times); 
 	printf("avg execute: %lld; avg transfer: %lld; avg app time: %lld\n", avg_task_execute_time, avg_task_transfer_time, avg_app_time);
@@ -954,13 +957,13 @@ static int send_input_files( struct work_queue_task *t, struct work_queue_worker
 
 int start_one_task( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
-	add_time_slot(q, q->idle_time, TIME_SLOT_MASTER_IDLE, &(q->accumulated_idle_time), q->idle_times);
+	add_time_slot(q, q->time_last_task_start, q->idle_time, TIME_SLOT_MASTER_IDLE, &(q->accumulated_idle_time), q->idle_times);
 	q->idle_time=0;
 
-	add_time_slot(q, q->app_time, TIME_SLOT_APPLICATION, &(q->accumulated_app_time), q->app_times);
+	add_time_slot(q, q->time_last_task_start, q->app_time, TIME_SLOT_APPLICATION, &(q->accumulated_app_time), q->app_times);
 	q->app_time=0;
 
-	t->time_send_input_start = timestamp_get();
+	t->time_send_input_start = q->time_last_task_start = timestamp_get();
 	if(!send_input_files(t,w,q)) return 0;
 	t->time_send_input_finish = timestamp_get();
 
@@ -972,7 +975,7 @@ int start_one_task( struct work_queue *q, struct work_queue_worker *w, struct wo
 	return 1;
 }
 
-static void add_time_slot(struct work_queue *q, timestamp_t duration, int type, timestamp_t *accumulated_time, struct list *time_list) {
+static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t duration, int type, timestamp_t *accumulated_time, struct list *time_list) {
 	struct time_slot *ts;
 	int count, effective_workers;
 
@@ -980,12 +983,11 @@ static void add_time_slot(struct work_queue *q, timestamp_t duration, int type, 
 
 	ts = (struct time_slot *)malloc(sizeof(struct time_slot));
 	if(ts) { 
-		ts->start = q->time_last_task_start;
+		ts->start = start;
 		ts->duration = duration;
 		ts->type = type;
 		*accumulated_time += ts->duration;
 		list_push_tail(time_list, ts);
-		q->time_last_task_start = timestamp_get();
 	} else {
 		debug(D_NOTICE,"Failed to record time slot of type %d.", type);
 	}
