@@ -752,7 +752,7 @@ static int receive_output_from_worker( struct work_queue *q, struct work_queue_w
 
 static int build_poll_table( struct work_queue *q )
 {
-	int n=0;
+	int n;
 	char *key;
 	struct work_queue_worker *w;
 
@@ -760,6 +760,12 @@ static int build_poll_table( struct work_queue *q )
 	if(!q->poll_table) {
 		q->poll_table = malloc(sizeof(*q->poll_table)*q->poll_table_size);
 	}
+
+	// The first item in the poll table is the master link, which accepts new connections.
+	q->poll_table[0].link = q->master_link;
+	q->poll_table[0].events = LINK_READ;
+	q->poll_table[0].revents = 0;
+	n=1;
 
 	// For every worker in the hash table, add an item to the poll table
 	hash_table_firstkey(q->worker_table);
@@ -1380,18 +1386,19 @@ void work_queue_submit( struct work_queue *q, struct work_queue_task *t )
 
 static int add_more_workers (struct work_queue *q, time_t stoptime) {
 	int count;
-	int result;
+	//int result;
 
-
+	/**
 	if(q->workers_in_state[WORKER_STATE_BUSY] ==  0) {
 		result = link_sleep(q->master_link,stoptime,1,0);
 		if(result <=0) return 0;
 	} 
+	*/
 
 	count = 0;
-	while (link_usleep(q->master_link,0,1,0) && stoptime > time(0)) {
+	do {
 		if(add_worker(q)) count++;
-	}
+	} while (link_usleep(q->master_link,0,1,0) && stoptime > time(0));
 	return count;
 }
 
@@ -1401,13 +1408,13 @@ void receive_pending_output_of_one_task(struct work_queue *q, struct pending_out
 struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 {
 	struct work_queue_task *t;
+	struct pending_output *po;
 	int i;
 	time_t stoptime;
 	int result;
 	int msec;
 	timestamp_t idle_start;
-	int added_workers;
-	struct pending_output *po;
+	static int added_workers = 0;
 	static timestamp_t last_leave = 0;
 	
 	if(last_leave) {
@@ -1436,26 +1443,15 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 		// Upper level application may have just submitted some new tasks. Try to dispatch them to ready workers.
 		start_tasks(q);
 
-		added_workers = 0;
-		if(q->workers_in_state[WORKER_STATE_READY] < list_size(q->ready_list)) {
-			if(stoptime && time(0)>=stoptime) {
-				goto leave;
-			}
-			added_workers = add_more_workers(q, stoptime);
-		}
-
 		if(added_workers == 0) {
 			if((po=list_pop_head(q->receive_output_waiting_list))) {
 				receive_pending_output_of_one_task(q, po);
 				free(po);
 				q->time_last_task_finish = timestamp_get();
-				continue;
-			}
-
-			if(q->workers_in_state[WORKER_STATE_BUSY] == 0) {
-				continue;
+				//continue;
 			}
 		}
+		added_workers = 0;
 
 		int n = build_poll_table(q);
 
@@ -1466,8 +1462,9 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			msec = 5000;
 		}
 
-		if(q->workers_in_state[WORKER_STATE_READY] < list_size(q->ready_list)) {
-			msec = 1000;
+		// There are output waiting for being tranferred back. So, do not waste time on polling.
+		if(list_size(q->receive_output_waiting_list) != 0) {
+			msec = 0;
 		}
 
 		idle_start = timestamp_get();
@@ -1488,8 +1485,13 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 			}
 		}
 
+		// If the master link was awake, then accept as many workers as possible.
+		if(q->poll_table[0].revents) {
+			added_workers = add_more_workers(q, stoptime);
+		}
+
 		// Then consider all existing active workers and dispatch tasks.
-		for(i=0;i<n;i++) {
+		for(i=1;i<n;i++) {
 			if(q->poll_table[i].revents) {
 				handle_worker(q,q->poll_table[i].link);
 			}
