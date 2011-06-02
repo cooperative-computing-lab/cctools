@@ -1241,6 +1241,8 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 {
 	struct dag_file *f;
 	int job_failed = 0;
+	FILE *fd;
+	long f_len;
 
 	if(n->state!=DAG_NODE_STATE_RUNNING) return;
 
@@ -1249,13 +1251,22 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 	} else {
 		d->remote_jobs_running--;
 	}
-
+	
 	if(info->exited_normally && info->exit_code==0) {
 		for(f=n->target_files;f;f=f->next) {
 			if(access(f->filename,R_OK)!=0) {
 				fprintf(stderr,"makeflow: %s did not create file %s\n",n->command,f->filename);
 				job_failed=1;
 			}
+			else {
+				fd = fopen(f->filename, "r");
+				fseek(fd,0L,SEEK_END);
+				f_len = ftell(fd);
+				if(f_len == 0){
+					fprintf(stderr,"makeflow: %s created a file of length %ld\n",n->command,f_len);
+	                                job_failed=1;
+				}
+			}	
 		}
 	} else {
 		if(info->exited_normally) {
