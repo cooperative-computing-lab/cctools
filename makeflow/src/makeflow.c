@@ -56,6 +56,7 @@ static struct batch_queue *remote_queue = 0;
 static char *project = NULL;
 static int priority = 0;
 static int port = 0;
+static int output_len_check = 0;
 
 typedef enum {
 	DAG_NODE_STATE_WAITING=0,
@@ -1241,8 +1242,8 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 {
 	struct dag_file *f;
 	int job_failed = 0;
-	FILE *fd;
-	long f_len;
+
+	struct stat stat_info;
 
 	if(n->state!=DAG_NODE_STATE_RUNNING) return;
 
@@ -1257,14 +1258,14 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 			if(access(f->filename,R_OK)!=0) {
 				fprintf(stderr,"makeflow: %s did not create file %s\n",n->command,f->filename);
 				job_failed=1;
-			}
-			else {
-				fd = fopen(f->filename, "r");
-				fseek(fd,0L,SEEK_END);
-				f_len = ftell(fd);
-				if(f_len == 0){
-					fprintf(stderr,"makeflow: %s created a file of length %ld\n",n->command,f_len);
-	                                job_failed=1;
+			} else {
+				if (output_len_check){
+					if (stat(f->filename,&stat_info)==0){
+						if (stat_info.st_size<=0){
+							fprintf(stderr,"makeflow: %s created a file of length %ld\n",n->command,stat_info.st_size);
+		                                	job_failed=1;
+						}
+					}
 				}
 			}	
 		}
@@ -1439,6 +1440,7 @@ static void show_help(const char *cmd)
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -K             Preserve (i.e., do not clean) intermediate symbolic links\n");
+	printf(" -z             Force failure on zero-length output files \n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
 	
@@ -1464,7 +1466,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAB:cCd:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:T:vw:W:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cCd:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:T:vw:W:z")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1583,6 +1585,9 @@ int main( int argc, char *argv[] )
 			break;
 		case 'K':
 			preserve_symlinks = 1;
+			break;
+		case 'z':
+			output_len_check = 1;
 			break;
 		default:
 			show_help(argv[0]);
