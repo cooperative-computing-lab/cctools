@@ -199,7 +199,7 @@ static void show_use( const char *cmd )
 	printf("  -v         Display version number.\n");
 	printf("  -w         Initial working directory.\n");
 	printf("  -W         Display table of system calls trapped.\n");
-	printf("  -Y         Force sYnchronous disk writes.            (PARROT_FORCE_SYNC)\n");
+	printf("  -Y         Force synchronous disk writes.            (PARROT_FORCE_SYNC)\n");
 	printf("  -Z         Enable automatic decompression on .gz files.\n");
 	printf("\n");
 	printf("Known debugging sub-systems are: ");
