@@ -574,12 +574,22 @@ INT64_T chirp_hdfs_mkfifo(const char *path)
 
 INT64_T chirp_hdfs_unlink(const char *path)
 {
+	struct chirp_stat info;
 	path = FIXPATH(path);
 	debug(D_HDFS, "unlink %s", path);
-	/* FIXME unlink does not set errno properly on failure! */
+
+	/* HDFS doesn't set errno properly */
+	int result = chirp_hdfs_stat(path, &info);
+	if(result == 0 && S_ISDIR(info.cst_mode)) {
+		errno = EPERM;
+		return -1;
+	} else if (result == -1) {
+		return -1;
+	}
+
 	int ret = hdfs_services->unlink(fs, path);
 	if(ret < 0) {
-		errno = EACCES;	/* FIXME bad fix to above problem */
+		errno = EACCES;	/* catch all for any errors we couldn't detect before hdfs unlink */
 		return -1;
 	}
 	return 0;
