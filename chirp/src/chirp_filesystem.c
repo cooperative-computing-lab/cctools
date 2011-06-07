@@ -248,14 +248,18 @@ int cfs_freadall(CHIRP_FILE * f, char **s, size_t * l)
 	char *buffer = xxrealloc(NULL, 4096);
 	size_t n;
 	*l = 0;
-	*s = buffer;
 	while((n = cfs_fread(buffer + (*l), sizeof(char), 4096, f)) > 0) {
 		*l += n;
 		buffer = xxrealloc(buffer, (*l) + 4096);
 		*(buffer + (*l)) = '\0';	/* NUL terminator... */
 	}
-	if(n < 0)
+	if(n < 0) {
+		free(buffer);
+		*s = NULL;
+		*l = 0;
 		return 0;
-	else
+	} else {
+		*s = buffer;
 		return 1;
+	}
 }

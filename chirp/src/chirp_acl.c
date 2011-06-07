@@ -168,8 +168,10 @@ static int ticket_read(const char *fname, struct chirp_ticket *ct)
 	ct->nrights = 0;
 	ct->rights = NULL;
 	while(1) {
+		assert(buffer >= b && b+l >= buffer);
 		while(unsigned_isspace(*buffer))
 			buffer++;
+		assert(buffer >= b && b+l >= buffer);
 		if(strncmp(buffer, "subject", strlen("subject")) == 0) {
 			buffer += strlen("subject");
 			if(!readquote(&buffer, &s, &n))
@@ -226,7 +228,6 @@ static int ticket_read(const char *fname, struct chirp_ticket *ct)
 		ct->nrights = 1;
 	}
 	free(b);
-	/* fprintf(stderr, "TICKET:\n\tsubject = %s\n\texpiration = %lu %lu %d\n\tticket = %s\n\trights[0] = %s %s\n", ct->subject, now, ct->expiration, ct->expired, ct->ticket, ct->rights[0].directory, chirp_acl_flags_to_text(ct->rights[0].acl)); */
 	return status && !ct->expired;
 }
 
