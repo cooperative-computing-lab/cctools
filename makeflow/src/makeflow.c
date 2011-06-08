@@ -1262,7 +1262,7 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 				if (output_len_check){
 					if (stat(f->filename,&stat_info)==0){
 						if (stat_info.st_size<=0){
-							fprintf(stderr,"makeflow: %s created a file of length %ld\n",n->command,stat_info.st_size);
+							fprintf(stderr,"makeflow: %s created a file of length %ld\n",n->command,(long)stat_info.st_size);
 		                                	job_failed=1;
 						}
 					}
