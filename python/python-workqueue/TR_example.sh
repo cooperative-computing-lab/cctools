@@ -9,6 +9,7 @@ prepare()
 
 run()
 {
+    export PATH=../../dttools/src:$PATH
     exec ${CCTOOLS_PYTHON} ./workqueue_example.py
 }
 
