@@ -478,7 +478,7 @@ WorkQueue_init(WorkQueue *self, PyObject *args, PyObject *kwds)
 
     self->wqp = work_queue_create(port);
     if (!self->wqp) {
-	PyErr_Format(PyExc_Exception, "could not create workqueue on port %d: %s", port, strerror(errno));
+	PyErr_Format(PyExc_ValueError, "could not create workqueue on port %d: %s", port, strerror(errno));
 	return -1;
     }
 
@@ -667,6 +667,12 @@ WorkQueue_wait(WorkQueue *self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
+WorkQueue_get_port(WorkQueue *self, void *closure)
+{
+    return PyInt_FromLong(work_queue_port(self->wqp));
+}
+
+static PyObject *
 WorkQueue_get_stats(WorkQueue *self, void *closure)
 {
     work_queue_get_stats(self->wqp, &(self->stats->stats));
@@ -695,6 +701,7 @@ static PyMethodDef WorkQueueMethods[] = {
 
 
 static PyGetSetDef WorkQueueGetSetters[] = {
+    WORKQUEUE_GETTER(port),
     WORKQUEUE_GETTER(stats),
     {NULL}
 };
@@ -789,6 +796,8 @@ initworkqueue(void)
     PyModule_AddObject(m, "Stats", (PyObject*)&StatsType);
 
     PyModule_AddIntConstant(m, "WORK_QUEUE_DEFAULT_PORT",     WORK_QUEUE_DEFAULT_PORT);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_RANDOM_PORT",      -1);
+
     PyModule_AddIntConstant(m, "WORK_QUEUE_SCHEDULE_UNSET",   WORK_QUEUE_SCHEDULE_UNSET);
     PyModule_AddIntConstant(m, "WORK_QUEUE_SCHEDULE_FCFS",    WORK_QUEUE_SCHEDULE_FCFS);
     PyModule_AddIntConstant(m, "WORK_QUEUE_SCHEDULE_FILES",   WORK_QUEUE_SCHEDULE_FILES);

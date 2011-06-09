@@ -8,6 +8,7 @@
 
 from workqueue import Task, WorkQueue, set_debug_flag
 from workqueue import WORK_QUEUE_SCHEDULE_FCFS, WORK_QUEUE_SCHEDULE_FILES
+from workqueue import WORK_QUEUE_RANDOM_PORT
 #from workqueue import WORK_QUEUE_MASTER_MODE_STANDALONE, WORK_QUEUE_WORKER_MODE_SHARED
 
 import os
@@ -17,13 +18,8 @@ import time
 set_debug_flag('debug')
 set_debug_flag('wq')
 
-for port in range(9000, 9999):
-    try:
-	wq = WorkQueue(port, name='workqueue_example', catalog=False, exclusive=False)
-	os.system('../../dttools/src/work_queue_worker -d all localhost %d &' % port)
-	break
-    except Exception:
-    	continue
+wq = WorkQueue(WORK_QUEUE_RANDOM_PORT, name='workqueue_example', catalog=False, exclusive=False)
+os.system('work_queue_worker -d all localhost %d &' % wq.port)
 
 wq.specify_algorithm(WORK_QUEUE_SCHEDULE_FCFS)
 #wq.specify_name('workqueue_example')
