@@ -1586,10 +1586,10 @@ int pfs_table::locate( const char *n, char *buf, int length )
 }
 
 
-int pfs_table::copyfile( const char *source, const char *target )
+pfs_ssize_t pfs_table::copyfile( const char *source, const char *target )
 {
 	pfs_name psource, ptarget;
-	int result;
+	pfs_ssize_t result;
 
 	if(!pfs_enable_small_file_optimizations) {
 		errno = ENOSYS;
@@ -1618,12 +1618,12 @@ int pfs_table::copyfile( const char *source, const char *target )
 	return result;
 }
 
-int pfs_table::copyfile_slow( const char *source, const char *target )
+pfs_ssize_t pfs_table::copyfile_slow( const char *source, const char *target )
 {
 	pfs_file *sourcefile;
 	pfs_file *targetfile;
 	pfs_stat info;
-	pfs_off_t total, ractual, wactual;
+	pfs_ssize_t total, ractual, wactual;
 	void *buffer;
 	int buffer_size = pfs_service_get_block_size();
 	int result;

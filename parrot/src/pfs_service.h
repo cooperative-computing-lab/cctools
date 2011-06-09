@@ -54,9 +54,9 @@ public:
 	virtual int setacl( pfs_name *name, const char *subject, const char *rights );
 	virtual pfs_location* locate( pfs_name *name );
 
-	virtual int putfile( pfs_name *source, pfs_name *target );
-	virtual int getfile( pfs_name *source, pfs_name *target );
-	virtual int thirdput( pfs_name *source, pfs_name *target );
+	virtual pfs_ssize_t putfile( pfs_name *source, pfs_name *target );
+	virtual pfs_ssize_t getfile( pfs_name *source, pfs_name *target );
+	virtual pfs_ssize_t thirdput( pfs_name *source, pfs_name *target );
 	virtual int md5( pfs_name *source, unsigned char *digest );
 };
 

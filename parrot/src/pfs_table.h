@@ -90,8 +90,8 @@ public:
 	int	getacl( const char *path, char *buf, int size );
 	int	setacl( const char *path, const char *subject, const char *rights );
 	int	locate( const char *path, char *buf, int size );
-	int	copyfile( const char *source, const char *target );
-	int	copyfile_slow( const char *source, const char *target );
+	pfs_ssize_t copyfile( const char *source, const char *target );
+	pfs_ssize_t copyfile_slow( const char *source, const char *target );
 	int	md5( const char *path, unsigned char *digest );
 	int	md5_slow( const char *path, unsigned char *digest );
 	
