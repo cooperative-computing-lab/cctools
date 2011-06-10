@@ -34,6 +34,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define WORKER_STATE_INIT  0
 #define WORKER_STATE_READY 1
@@ -1004,6 +1005,39 @@ struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q)
 	return best_worker;
 }
 
+struct work_queue_worker *find_worker_by_random( struct work_queue *q )
+{
+        char *key;
+        struct work_queue_worker *w;
+        struct work_queue_worker *best_worker = 0;
+	struct work_queue_stats qs;
+	int num_workers_ready;
+	int random_ready_worker, ready_worker_count = 1;
+
+	srand(time(0));
+        
+	work_queue_get_stats(q, &qs);
+	num_workers_ready = qs.workers_ready;
+
+	if (num_workers_ready > 0) {
+		random_ready_worker = (rand() % num_workers_ready) + 1;
+	} else { 	
+  		random_ready_worker = 0;
+        }     
+
+        hash_table_firstkey(q->worker_table);
+        while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+                if(w->state==WORKER_STATE_READY && ready_worker_count==random_ready_worker) {
+			return w;
+		}
+		if (w->state==WORKER_STATE_READY){
+			ready_worker_count++;
+		}
+	}
+
+        return best_worker;
+}
+
 struct work_queue_worker *find_worker_by_time(struct work_queue *q)
 {
 	char *key;
@@ -1045,6 +1079,8 @@ struct work_queue_worker *find_best_worker(struct work_queue *q, struct work_que
 		return find_worker_by_files(q, t);
 	case WORK_QUEUE_SCHEDULE_TIME:
 		return find_worker_by_time(q);
+	case WORK_QUEUE_SCHEDULE_RAND:
+		return find_worker_by_random(q);
 	case WORK_QUEUE_SCHEDULE_FCFS:
 	default:
 		return find_worker_by_fcfs(q);

@@ -40,7 +40,8 @@ and port of the master.
 #define WORK_QUEUE_SCHEDULE_TIME 3
 #define WORK_QUEUE_SCHEDULE_DEFAULT 3	// default setting for queue.
 #define WORK_QUEUE_SCHEDULE_PREFERRED_HOSTS 4
-#define WORK_QUEUE_SCHEDULE_MAX 4
+#define WORK_QUEUE_SCHEDULE_RAND 5
+#define WORK_QUEUE_SCHEDULE_MAX 5
 
 #define WORK_QUEUE_INPUT  0
 #define WORK_QUEUE_OUTPUT 1
