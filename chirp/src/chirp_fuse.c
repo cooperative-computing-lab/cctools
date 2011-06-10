@@ -424,7 +424,7 @@ static int chirp_fuse_mknod(const char *path, mode_t mode, dev_t rdev)
 	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	file = chirp_global_open(host, newpath, O_CREAT, mode, time(0) + chirp_fuse_timeout);
+	file = chirp_global_open(host, newpath, O_CREAT|O_WRONLY, mode, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
 	if(!file)
