@@ -873,7 +873,7 @@ static void chirp_handler(struct link *l, const char *subject)
 	char line[CHIRP_LINE_MAX];
 	char *esubject;
 
-	if(!chirp_acl_whoami(subject, &esubject))
+	if(!chirp_acl_whoami(chirp_root_path, subject, &esubject))
 		return;
 
 	link_tune(l, LINK_TUNE_INTERACTIVE);
@@ -1466,6 +1466,8 @@ static void chirp_handler(struct link *l, const char *subject)
 		} else if(sscanf(line, "ticket_list %s", ticket_subject) == 1) {
 			/* ticket_subject is the owner of the ticket, not ticket:MD5SUM */
 			char **ticket_subjects;
+			if(strcmp(ticket_subject, "self") == 0)
+				strcpy(ticket_subject, esubject);
 			int super = strcmp(subject, chirp_super_user) == 0;	/* note subject instead of esubject; super user must be authenticated as himself */
 			if(!super && strcmp(ticket_subject, esubject) != 0) {
 				errno = EACCES;

@@ -64,6 +64,6 @@ void chirp_acl_default(const char *aclpath);
 int chirp_acl_init_root(const char *path);
 int chirp_acl_init_copy(const char *path);
 int chirp_acl_init_reserve(const char *root, const char *path, const char *subject);
-int chirp_acl_whoami(const char *subject, char **esubject);
+int chirp_acl_whoami(const char *root, const char *subject, char **esubject);
 
 #endif

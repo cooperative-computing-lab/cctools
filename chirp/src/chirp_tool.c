@@ -147,7 +147,7 @@ static struct command list[] = {
 	{"ticket_create", 1, 0, 100, "[-o[utput] <ticket filename>] [-s[ubject] <subject/user>] [-d[uration] <duration>] [-b[its] <bits>] [[<directory> <acl>] ...]", do_ticket_create},
 	{"ticket_register", 1, 2, 3, "<name> [<subject>] <duration>", do_ticket_register},
 	{"ticket_delete", 1, 1, 1, "<name>", do_ticket_delete},
-	{"ticket_list", 1, 1, 1, "<name>", do_ticket_list},
+	{"ticket_list", 1, 0, 1, "<name>", do_ticket_list},
 	{"ticket_get", 1, 1, 1, "<name>", do_ticket_get},
 	{"ticket_modify", 1, 3, 3, "<name> <directory> <aclmask>", do_ticket_modify},
 	{"setacl", 1, 3, 3, "<remotepath> <user> <rwldax>", do_setacl},
@@ -545,7 +545,6 @@ static INT64_T do_put(int argc, char **argv)
 
 static INT64_T do_ticket_create(int argc, char **argv)
 {
-//{"ticket_create", 1, 0, 100, "[-o[utput] <ticket filename>] [-s[ubject] <subject/user>] [-d[uration] <duration>] [-b[its] <bits>] [[<directory> <acl>] ...]",do_ticket_create},
 	char name[CHIRP_PATH_MAX] = "";
 	const char *subject = NULL;
 	time_t duration = 86400;	/* one day */
@@ -623,7 +622,6 @@ static INT64_T do_ticket_create(int argc, char **argv)
 
 static INT64_T do_ticket_register(int argc, char **argv)
 {
-//{"ticket_register", 1, 2, 1, "<name> [<subject>] <duration>", do_ticket_register},
 	assert(argc == 2 || argc == 3);
 	if(argc == 2) {
 		return chirp_reli_ticket_register(current_host, argv[1], NULL, (time_t) strtoull(argv[3], NULL, 10), stoptime);
@@ -634,16 +632,18 @@ static INT64_T do_ticket_register(int argc, char **argv)
 
 static INT64_T do_ticket_delete(int argc, char **argv)
 {
-//{"ticket_delete", 1, 2, 1, "<name>", do_ticket_delete},
 	return chirp_reli_ticket_delete(current_host, argv[1], stoptime);
 }
 
 static INT64_T do_ticket_list(int argc, char **argv)
 {
-//{"ticket_list", 1, 2, 1, "<name>", do_ticket_list},
 	char **list;
 
-	INT64_T result = chirp_reli_ticket_list(current_host, argv[1], &list, stoptime);
+	INT64_T result;
+	if (argc == 1)
+		result = chirp_reli_ticket_list(current_host, "self", &list, stoptime);
+	else
+		result = chirp_reli_ticket_list(current_host, argv[1], &list, stoptime);
 
 	if(result == 0) {
 		char **tmp = list;
@@ -658,7 +658,6 @@ static INT64_T do_ticket_list(int argc, char **argv)
 
 static INT64_T do_ticket_get(int argc, char **argv)
 {
-//{"ticket_get", 1, 2, 1, "<name>", do_ticket_list},
 	char *subject;
 	char *ticket;
 	time_t duration;
@@ -687,7 +686,6 @@ static INT64_T do_ticket_get(int argc, char **argv)
 
 static INT64_T do_ticket_modify(int argc, char **argv)
 {
-//{"ticket_modify", 1, 2, 1, "<name> <directory> <aclmask>", do_ticket_modify},
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[2], full_path);
 

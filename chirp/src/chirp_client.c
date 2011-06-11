@@ -300,7 +300,6 @@ const char *chirp_client_readacl(struct chirp_client *c, time_t stoptime)
 static int ticket_translate(const char *name, char *ticket_subject)
 {
 	char command[PATH_MAX * 2 + 4096];
-	char digest[CHIRP_TICKET_DIGEST_LENGTH];
 	const char *dummy;
 
 	if(chirp_ticket_isticketsubject(name, &dummy)) {
@@ -308,16 +307,19 @@ static int ticket_translate(const char *name, char *ticket_subject)
 		return 1;
 	}
 
-	/* load the digest */
-	sprintf(command, "sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null | openssl md5 2> /dev/null", name);
-	FILE *digestf = popen(command, "r");
-	if(fread(digest, sizeof(char), CHIRP_TICKET_DIGEST_LENGTH, digestf) < CHIRP_TICKET_DIGEST_LENGTH) {
-		pclose(digestf);
+	char *pk = xxmalloc(65536); /* max size of public key */
+	sprintf(command, "sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null", name);
+	FILE *pkf = popen(command, "r");
+	if(fread(pk, sizeof(char), 65536, pkf) <= 0) {
+		pclose(pkf);
 		return 0;
 	}
-	pclose(digestf);
+	pclose(pkf);
 
-	sprintf(ticket_subject, "ticket:%.*s", CHIRP_TICKET_DIGEST_LENGTH, digest);
+	/* load the digest */
+	const char *digest = chirp_ticket_digest(pk);
+
+	sprintf(ticket_subject, "ticket:%s", digest);
 	return 1;
 }
 
