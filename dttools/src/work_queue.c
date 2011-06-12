@@ -34,6 +34,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+
 #define WORKER_STATE_INIT  0
 #define WORKER_STATE_READY 1
 #define WORKER_STATE_BUSY  2
@@ -103,6 +104,7 @@ struct work_queue {
 	timestamp_t accumulated_execute_time;
 	struct list * execute_times;
 	int capacity;
+	int work_queue_wait_routine;
 };
 
 
@@ -151,6 +153,7 @@ static int start_task_on_worker( struct work_queue *q, struct work_queue_worker 
 static int update_catalog(struct work_queue *q);
 static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, INT64_T length);
 static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t duration, int type, timestamp_t *accumulated_time, struct list *time_list);
+static int receive_output_from_worker( struct work_queue *q, struct work_queue_worker *w );
 
 static int short_timeout = 5;
 static int next_taskid = 1;
@@ -660,17 +663,27 @@ static int handle_worker( struct work_queue *q, struct link *l )
             t->time_execute_cmd_finish = t->time_execute_cmd_start + execution_time;
 			q->total_execute_time += execution_time;
             t->status = TASK_STATUS_WAITING_FOR_OUTPUT;
-			struct pending_output *p;
-			p = (struct pending_output *)malloc(sizeof(struct pending_output));
-			if(!p) {
-				free(t->output);
-				t->output = 0;
-				goto failure;
+
+
+			if(q->work_queue_wait_routine == WORK_QUEUE_WAIT_FAST_DISPATCH) {
+				// Output delayed
+				struct pending_output *p;
+				p = (struct pending_output *)malloc(sizeof(struct pending_output));
+				if(!p) {
+					free(t->output);
+					t->output = 0;
+					goto failure;
+				}
+				p->start = timestamp_get();
+				p->link = l;
+				list_push_head(q->receive_output_waiting_list, p);
+				debug(D_WQ,"%s (%s) has finished its task. Output transfer is postponed.",w->hostname,w->addrport);
+			} else {
+				// Receive output immediately and start a new task on the current work if possible
+				if(receive_output_from_worker(q, w)) {
+					start_task_on_worker(q,w);
+				}
 			}
-			p->start = timestamp_get();
-			p->link = l;
-            list_push_head(q->receive_output_waiting_list, p);
-			debug(D_WQ,"%s (%s) has finished its task. Output transfer is postponed.",w->hostname,w->addrport);
 		} else {
 	        debug(D_WQ,"Invalid message from worker %s (%s): %s",w->hostname,w->addrport,line);
 			goto failure;
@@ -706,7 +719,6 @@ static int receive_output_from_worker( struct work_queue *q, struct work_queue_w
     if(!get_output_files(t,w,q)) {
         free(t->output);
         t->output = 0;
-		printf("get_output_files failed!\n");
         goto failure;
     }
     t->time_receive_output_finish = timestamp_get();
@@ -1189,6 +1201,8 @@ int work_queue_port(struct work_queue *q)
 	}
 }
 
+int work_queue_specify_wait_routine(struct work_queue *q, int routine);
+
 struct work_queue * work_queue_create( int port )
 {
 	struct work_queue *q = malloc(sizeof(*q));
@@ -1275,6 +1289,15 @@ struct work_queue * work_queue_create( int port )
         }
     }
 
+	envstring = getenv("WORK_QUEUE_WAIT_ROUTINE");
+	if(envstring) {
+		work_queue_specify_wait_routine(q, atoi(envstring));
+	} else {
+		q->work_queue_wait_routine = WORK_QUEUE_WAIT_FAST_DISPATCH;
+	}
+
+
+
 	q->total_send_time = 0;
 	q->total_execute_time = 0;
 	q->total_receive_time = 0;
@@ -1345,6 +1368,18 @@ int work_queue_specify_worker_mode(struct work_queue *q, int mode) {
 	return q->worker_mode;
 }
 
+int work_queue_specify_wait_routine(struct work_queue *q, int routine) {
+    switch(routine) {
+        case WORK_QUEUE_WAIT_FCFS:
+        case WORK_QUEUE_WAIT_FAST_DISPATCH:
+            q->work_queue_wait_routine = routine;
+            break;
+        default:
+            q->work_queue_wait_routine = WORK_QUEUE_WAIT_FAST_DISPATCH;
+    }
+	return q->work_queue_wait_routine;
+}
+
 void work_queue_delete( struct work_queue *q )
 {
 	if(q) {
@@ -1403,9 +1438,97 @@ static int add_more_workers (struct work_queue *q, time_t stoptime) {
 }
 
 
-void receive_pending_output_of_one_task(struct work_queue *q, struct pending_output *p);
+void receive_pending_output(struct work_queue *q, struct pending_output *p);
 
-struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
+struct work_queue_task *work_queue_wait_fcfs(struct work_queue *q, int timeout)
+{
+	struct work_queue_task *t;
+	int i;
+	time_t stoptime;
+	int result;
+	timestamp_t idle_start;
+	static timestamp_t last_leave = 0;
+
+
+	if(last_leave) {
+		q->app_time += timestamp_get() - last_leave;
+	} 
+
+	if(timeout==WORK_QUEUE_WAITFORTASK) {
+		stoptime = 0;
+	} else {
+		stoptime = time(0) + timeout;
+	}
+	
+	while(1) {
+		if(q->master_mode ==  WORK_QUEUE_MASTER_MODE_CATALOG) {	
+			update_catalog(q);
+		}
+
+		t = list_pop_head(q->complete_list);
+		if(t) {
+			last_leave = timestamp_get();
+			return t;
+		}
+
+		if(q->workers_in_state[WORKER_STATE_BUSY]==0 && list_size(q->ready_list)==0) break;
+
+		start_tasks(q);
+
+		int n = build_poll_table(q);
+
+		// Wait no longer than the caller's patience.
+		int msec;
+		if(stoptime) {
+			msec = MAX(0, (stoptime - time(0)) * 1000);
+		} else {
+			msec = 5000;
+		}
+
+		idle_start = timestamp_get();
+		result = link_poll(q->poll_table,n,msec);
+		q->idle_time += timestamp_get() - idle_start;
+
+		// If a process is waiting to complete, return without a task.
+		if(process_pending()) {
+			goto leave;
+		}
+
+		// If nothing was awake, restart the loop or return without a task.
+		if(result <= 0) {
+			if(stoptime && time(0) >= stoptime) {
+				goto leave;
+			} else {
+				continue;
+			}
+		}
+		// If the master link was awake, then accept as many workers as possible.
+		if(q->poll_table[0].revents) {
+			do {
+				add_worker(q);
+			} while(link_usleep(q->master_link, 0, 1, 0));
+		}
+		// Then consider all existing active workers and dispatch tasks.
+		for(i = 1; i < n; i++) {
+			if(q->poll_table[i].revents) {
+				handle_worker(q, q->poll_table[i].link);
+			}
+		}
+
+		// If fast abort is enabled, kill off slow workers.
+		if(q->fast_abort_multiplier > 0) {
+			abort_slow_workers(q);
+		}
+	}
+
+leave:
+	last_leave = timestamp_get();
+	return 0;
+}
+
+
+
+struct work_queue_task * work_queue_wait_fast_dispatch( struct work_queue *q, int timeout )
 {
 	struct work_queue_task *t;
 	struct pending_output *po;
@@ -1445,7 +1568,7 @@ struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout )
 
 		if(added_workers == 0) {
 			if((po=list_pop_head(q->receive_output_waiting_list))) {
-				receive_pending_output_of_one_task(q, po);
+				receive_pending_output(q, po);
 				free(po);
 				q->time_last_task_finish = timestamp_get();
 				//continue;
@@ -1510,8 +1633,17 @@ leave:
 	last_leave = timestamp_get();
 	return 0;
 }
+struct work_queue_task * work_queue_wait( struct work_queue *q, int timeout ) {
+	if(q->work_queue_wait_routine == WORK_QUEUE_WAIT_FCFS) {
+		return work_queue_wait_fcfs(q, timeout);
+	} else if(q->work_queue_wait_routine == WORK_QUEUE_WAIT_FAST_DISPATCH) {
+		return work_queue_wait_fast_dispatch(q, timeout);
+	} else {
+		return work_queue_wait_fast_dispatch(q, timeout);
+	}
+}
 
-void receive_pending_output_of_one_task(struct work_queue *q, struct pending_output *p) {
+void receive_pending_output(struct work_queue *q, struct pending_output *p) {
 	struct work_queue_worker *w;
 	char key[WORK_QUEUE_CATALOG_LINE_MAX];
 

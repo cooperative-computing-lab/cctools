@@ -59,6 +59,9 @@ and port of the master.
 #define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 30
 #define	WORK_QUEUE_CATALOG_LIFETIME	60
 
+#define WORK_QUEUE_WAIT_FCFS 0
+#define WORK_QUEUE_WAIT_FAST_DISPATCH 1
+
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler; /**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
 
