@@ -301,6 +301,23 @@ static int chirp_fuse_truncate(const char *path, off_t size)
 	return 0;
 }
 
+static int chirp_fuse_access(const char *path, int flags)
+{
+	INT64_T result;
+	char newpath[CHIRP_PATH_MAX];
+	char host[CHIRP_PATH_MAX];
+	parsepath(path, newpath, host);
+
+	pthread_mutex_lock(&mutex);
+	result = chirp_global_access(host, newpath, flags, time(0) + chirp_fuse_timeout);
+	pthread_mutex_unlock(&mutex);
+
+	if(result < 0)
+		return -errno;
+	return 0;
+}
+
+
 static int chirp_fuse_utime(const char *path, struct utimbuf *buf)
 {
 	INT64_T result;
@@ -473,6 +490,7 @@ static int chirp_fuse_statfs(const char *path, struct statvfs *info)
 }
 
 static struct fuse_operations chirp_fuse_operations = {
+	.access = chirp_fuse_access,
 	.getattr = chirp_fuse_getattr,
 	.readlink = chirp_fuse_readlink,
 	.readdir = chirp_fuse_readdir,
