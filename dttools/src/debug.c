@@ -44,7 +44,7 @@ struct debug_settings {
 	size_t output_size;
 	INT64_T flags;
 	char program_name[1024];
-} *D;
+} *debug_settings;
 
 struct fatal_callback {
 	void (*callback) ();
@@ -116,15 +116,15 @@ int debug_flags_set(const char *flagname)
 {
 	struct flag_info *i;
 
-	pthread_mutex_lock(&D->mutex);
+	pthread_mutex_lock(&debug_settings->mutex);
 	for(i = table; i->name; i++) {
 		if(!strcmp(flagname, i->name)) {
-			D->flags |= i->flag;
-			pthread_mutex_unlock(&D->mutex);
+			debug_settings->flags |= i->flag;
+			pthread_mutex_unlock(&debug_settings->mutex);
 			return 1;
 		}
 	}
-	pthread_mutex_unlock(&D->mutex);
+	pthread_mutex_unlock(&debug_settings->mutex);
 
 	return 0;
 }
@@ -133,25 +133,25 @@ void debug_flags_print(FILE * stream)
 {
 	int i;
 
-	pthread_mutex_lock(&D->mutex);
+	pthread_mutex_lock(&debug_settings->mutex);
 	for(i = 0; table[i].name; i++) {
 		fprintf(stream, "%s ", table[i].name);
 	}
-	pthread_mutex_unlock(&D->mutex);
+	pthread_mutex_unlock(&debug_settings->mutex);
 }
 
 void debug_set_flag_name(INT64_T flag, const char *name)
 {
 	struct flag_info *i;
 
-	pthread_mutex_lock(&D->mutex);
+	pthread_mutex_lock(&debug_settings->mutex);
 	for(i = table; i->name; i++) {
 		if(i->flag & flag) {
 			i->name = name;
 			break;
 		}
 	}
-	pthread_mutex_unlock(&D->mutex);
+	pthread_mutex_unlock(&debug_settings->mutex);
 }
 
 static void do_debug(int is_fatal, INT64_T flags, const char *fmt, va_list args)
@@ -166,37 +166,37 @@ static void do_debug(int is_fatal, INT64_T flags, const char *fmt, va_list args)
 	gettimeofday(&tv, 0);
 	tm = localtime(&tv.tv_sec);
 
-	sprintf(newfmt, "%04d/%02d/%02d %02d:%02d:%02d.%02ld [%d] %s: %s: %s", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (long) tv.tv_usec / 10000, (int) debug_getpid(), D->program_name, is_fatal ? "fatal " : flag_to_name(flags), fmt);
+	sprintf(newfmt, "%04d/%02d/%02d %02d:%02d:%02d.%02ld [%d] %s: %s: %s", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (long) tv.tv_usec / 10000, (int) debug_getpid(), debug_settings->program_name, is_fatal ? "fatal " : flag_to_name(flags), fmt);
 
 	vsprintf(buffer, newfmt, args);
 	string_chomp(buffer);
 	strcat(buffer, "\n");
 	length = strlen(buffer);
 
-	if(strcmp(D->output, "") != 0) {
+	if(strcmp(debug_settings->output, "") != 0) {
 		struct stat info;
 
-		fstat(D->fd, &info);
-		if(S_ISREG(info.st_mode) && info.st_size >= D->output_size && D->output_size != 0) {
-			close(D->fd);
+		fstat(debug_settings->fd, &info);
+		if(S_ISREG(info.st_mode) && info.st_size >= debug_settings->output_size && debug_settings->output_size != 0) {
+			close(debug_settings->fd);
 
-			if(stat(D->output, &info) == 0) {
-				if(info.st_size >= D->output_size) {
-					char *newname = alloca(strlen(D->output) + 5);
-					sprintf(newname, "%s.old", D->output);
-					rename(D->output, newname);
+			if(stat(debug_settings->output, &info) == 0) {
+				if(info.st_size >= debug_settings->output_size) {
+					char *newname = alloca(strlen(debug_settings->output) + 5);
+					sprintf(newname, "%s.old", debug_settings->output);
+					rename(debug_settings->output, newname);
 				}
 			}
 
-			D->fd = open(D->output, O_CREAT | O_TRUNC | O_WRONLY, 0777);
-			if(D->fd < 0) {
-				pthread_mutex_unlock(&D->mutex);
-				fatal("couldn't open %s: %s", D->output, strerror(errno));
+			debug_settings->fd = open(debug_settings->output, O_CREAT | O_TRUNC | O_WRONLY, 0777);
+			if(debug_settings->fd < 0) {
+				pthread_mutex_unlock(&debug_settings->mutex);
+				fatal("couldn't open %s: %s", debug_settings->output, strerror(errno));
             }
 		}
 	}
 
-	full_write(D->fd, buffer, length);
+	full_write(debug_settings->fd, buffer, length);
 }
 
 void debug(INT64_T flags, const char *fmt, ...)
@@ -204,13 +204,13 @@ void debug(INT64_T flags, const char *fmt, ...)
 	va_list args;
 	va_start(args, fmt);
 
-	pthread_mutex_lock(&D->mutex);
-	if(flags & D->flags) {
+	pthread_mutex_lock(&debug_settings->mutex);
+	if(flags & debug_settings->flags) {
 		int save_errno = errno;
 		do_debug(0, flags, fmt, args);
 		errno = save_errno;
 	}
-	pthread_mutex_unlock(&D->mutex);
+	pthread_mutex_unlock(&debug_settings->mutex);
 
 	va_end(args);
 }
@@ -221,9 +221,9 @@ void fatal(const char *fmt, ...)
 	va_list args;
 	va_start(args, fmt);
 
-	pthread_mutex_lock(&D->mutex);
+	pthread_mutex_lock(&debug_settings->mutex);
 	do_debug(1, 0, fmt, args);
-	pthread_mutex_unlock(&D->mutex);
+	pthread_mutex_unlock(&debug_settings->mutex);
 
 	for(f = fatal_callback_list; f; f = f->next) {
 		f->callback();
@@ -248,10 +248,10 @@ void debug_config_fatal(void (*callback) ())
 
 void debug_config_file(const char *f)
 {
-	pthread_mutex_lock(&D->mutex);
+	pthread_mutex_lock(&debug_settings->mutex);
 	if(f) {
 		if(*f == '/')
-			strcpy(D->output, f);
+			strcpy(debug_settings->output, f);
 		else {
 			char path[8192];
 			if(getcwd(path, sizeof(path)) == NULL)
@@ -259,24 +259,24 @@ void debug_config_file(const char *f)
 			assert(strlen(path) + strlen(f) + 1 < 8192);
 			strcat(path, "/");
 			strcat(path, f);
-			strcpy(D->output, path);
+			strcpy(debug_settings->output, path);
 		}
-		D->fd = open(f, O_CREAT | O_APPEND | O_WRONLY, 0777);
-		if(D->fd < 0) {
-            pthread_mutex_unlock(&D->mutex);
+		debug_settings->fd = open(f, O_CREAT | O_APPEND | O_WRONLY, 0777);
+		if(debug_settings->fd < 0) {
+            pthread_mutex_unlock(&debug_settings->mutex);
 			fatal("couldn't open %s: %s", f, strerror(errno));
         }
 	} else {
-		D->fd = STDERR_FILENO;
+		debug_settings->fd = STDERR_FILENO;
 	}
-	pthread_mutex_unlock(&D->mutex);
+	pthread_mutex_unlock(&debug_settings->mutex);
 }
 
 void debug_config_file_size(size_t size)
 {
-	pthread_mutex_lock(&D->mutex);
-	D->output_size = size;
-	pthread_mutex_unlock(&D->mutex);
+	pthread_mutex_lock(&debug_settings->mutex);
+	debug_settings->output_size = size;
+	pthread_mutex_unlock(&debug_settings->mutex);
 }
 
 void debug_config_getpid(pid_t(*getpidfunc) ())
@@ -287,18 +287,18 @@ void debug_config_getpid(pid_t(*getpidfunc) ())
 INT64_T debug_flags_clear()
 {
 	INT64_T result;
-	pthread_mutex_lock(&D->mutex);
-	result = D->flags;
-	D->flags = 0;
-	pthread_mutex_unlock(&D->mutex);
+	pthread_mutex_lock(&debug_settings->mutex);
+	result = debug_settings->flags;
+	debug_settings->flags = 0;
+	pthread_mutex_unlock(&debug_settings->mutex);
 	return result;
 }
 
 void debug_flags_restore(INT64_T fl)
 {
-	pthread_mutex_lock(&D->mutex);
-	D->flags = fl;
-	pthread_mutex_unlock(&D->mutex);
+	pthread_mutex_lock(&debug_settings->mutex);
+	debug_settings->flags = fl;
+	pthread_mutex_unlock(&debug_settings->mutex);
 }
 
 void debug_config(const char *name)
@@ -308,17 +308,17 @@ void debug_config(const char *name)
 		fprintf(stderr, "couldn't open /dev/zero: %s\n", strerror(errno));
 		_exit(1);
 	}
-	D = (struct debug_settings *) mmap(NULL, sizeof(struct debug_settings), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	debug_settings = (struct debug_settings *) mmap(NULL, sizeof(struct debug_settings), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     close(fd);
-	if(D == MAP_FAILED) {
+	if(debug_settings == MAP_FAILED) {
 		fprintf(stderr, "could not allocate shared memory page: %s\n", strerror(errno));
 		_exit(1);
 	}
 
-	D->fd = STDERR_FILENO;
-	memset(D->output, 0, PATH_MAX);
-	D->output_size = 10485760;
-	D->flags = D_NOTICE;
+	debug_settings->fd = STDERR_FILENO;
+	memset(debug_settings->output, 0, PATH_MAX);
+	debug_settings->output_size = 10485760;
+	debug_settings->flags = D_NOTICE;
 
 	if(strlen(name) >= 1024) {
 		fprintf(stderr, "program name is too long\n");
@@ -326,9 +326,9 @@ void debug_config(const char *name)
 	}
 	const char *end = strrchr(name, '/');
 	if(end) {
-		strcpy(D->program_name, end+1);
+		strcpy(debug_settings->program_name, end+1);
 	} else {
-		strcpy(D->program_name, name);
+		strcpy(debug_settings->program_name, name);
 	}
 
 	pthread_mutexattr_t attr;
@@ -342,7 +342,7 @@ void debug_config(const char *name)
 		fprintf(stderr, "pthread_mutexattr_setpshared failed: %s\n", strerror(result));
 		_exit(1);
 	}
-	result = pthread_mutex_init(&D->mutex, &attr);
+	result = pthread_mutex_init(&debug_settings->mutex, &attr);
 	if (result != 0) {
 		fprintf(stderr, "pthread_mutex_init failed: %s\n", strerror(result));
 		_exit(1);
