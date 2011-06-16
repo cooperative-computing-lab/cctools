@@ -2232,6 +2232,119 @@ void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 
+		case SYSCALL32_openat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_openat(args[0],path,args[2],args[3]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_mkdirat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_mkdirat(args[0],path,args[2]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_mknodat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_mknodat(args[0],path,args[2],args[3]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_fchownat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_fchownat(args[0],path,args[2],args[3],args[4]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_futimesat:
+			if(entering) {
+				struct timeval times[2];
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				if(args[2]) {
+					tracer_copy_in(p->tracer,times,(void*)args[2],sizeof(times));
+				} else {
+					gettimeofday(&times[0],0);
+					times[1] = times[0];
+				}
+				p->syscall_result = pfs_futimesat(args[0],path,times);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_unlinkat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_unlinkat(args[0],path,args[2]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_renameat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				tracer_copy_in_string(p->tracer,path2,(void*)args[3],sizeof(path2));
+				p->syscall_result = pfs_renameat(args[0],path,args[2],path2);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+
+			break;
+		case SYSCALL32_linkat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				tracer_copy_in_string(p->tracer,path2,(void*)args[3],sizeof(path2));
+				p->syscall_result = pfs_linkat(args[0],path,args[2],path2,args[4]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_symlinkat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[0],sizeof(path));
+				tracer_copy_in_string(p->tracer,path2,(void*)args[2],sizeof(path2));
+				p->syscall_result = pfs_symlinkat(path,args[1],path2);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_readlinkat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_readlinkat(args[0],path,path2,sizeof(path2));
+				if(p->syscall_result<0) {
+					p->syscall_result = -errno;
+				} else {
+					tracer_copy_out(p->tracer,path2,(void*)args[2],p->syscall_result);
+				}
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_fchmodat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_fchmodat(args[0],path,args[2],args[3]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
 		/*
 		Note that we call pfs_process_raise here so that the process data
 		structures are made aware of the signal propagation, possibly kicking
