@@ -1732,7 +1732,7 @@ static void chirp_handler(struct link *l, const char *subject)
 				errno = EPERM;
 				goto failure;
 			}
-            result = 0;
+			result = 0;
 			if(strcmp(debug_file, "*") != 0)
 				debug_config_file(debug_file);
 			if(strcmp(debug_file_size, "*") != 0)
