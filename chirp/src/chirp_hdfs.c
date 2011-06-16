@@ -265,6 +265,12 @@ INT64_T chirp_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 
 	int file_exists = (result == 0);
 
+    /* HDFS doesn't handle the errnos for this properly */
+	if (file_exists && S_ISDIR(info.cst_mode)) {
+		errno = EISDIR;
+		return -1;
+	}
+
 	fd = get_fd();
 	if(fd == -1)
 		return -1;
@@ -281,11 +287,17 @@ INT64_T chirp_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 		break;
 	case O_WRONLY:
 		// You may truncate the file by deleting it.
+		debug(D_HDFS, "opening file %s (flags: %o) for writing; mode: %o", path, flags, mode);
 		if(flags & O_TRUNC) {
 			if(file_exists) {
 				hdfs_services->unlink(fs, path);
 				file_exists = 0;
+				flags ^= O_TRUNC;
 			}
+		} else if(file_exists && info.cst_size == 0) {
+			/* file is empty, just delete it as if O_TRUNC (useful for FUSE with some UNIX utils, like mv) */
+			hdfs_services->unlink(fs, path);
+			file_exists = 0;
 		} else {
 			if(file_exists) {
 				errno = EACCES;
@@ -757,9 +769,25 @@ INT64_T chirp_hdfs_lchown(const char *path, INT64_T uid, INT64_T gid)
 
 INT64_T chirp_hdfs_truncate(const char *path, INT64_T length)
 {
-	debug(D_HDFS, "truncate %s %lld (unsupported)", path, length);
-	errno = EACCES;
-	return -1;
+	struct chirp_stat info;
+	path = FIXPATH(path);
+	debug(D_HDFS, "truncate %s %lld", path, length);
+	int result = chirp_hdfs_stat(path, &info);
+	if(result < 0)
+		return -1; /* probably doesn't exist, return ENOENT... */
+	else if (length == 0) {
+		/* FUSE is particularly obnoxious about changing open with O_TRUNC to
+		* truncate(path);
+		* open(path, ...);
+		*/
+		hdfs_services->unlink(fs, path);
+		hdfsFile file = hdfs_services->open(fs, path, O_WRONLY|O_CREAT, 0, 0, 0);
+		hdfs_services->close(fs, file);
+		return 0;
+	} else {
+		errno = EACCES;
+		return -1;
+	}
 }
 
 INT64_T chirp_hdfs_utime(const char *path, time_t actime, time_t modtime)
