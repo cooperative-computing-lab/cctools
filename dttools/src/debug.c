@@ -303,7 +303,12 @@ void debug_flags_restore(INT64_T fl)
 
 void debug_config(const char *name)
 {
-	D = (struct debug_settings *) mmap(NULL, sizeof(struct debug_settings), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+	int fd = open("/dev/zero", O_RDWR);
+	if(fd == -1) {
+		fprintf(stderr, "couldn't open /dev/zero: %s\n", strerror(errno));
+		_exit(1);
+	}
+	D = (struct debug_settings *) mmap(NULL, sizeof(struct debug_settings), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if(D == MAP_FAILED) {
 		fprintf(stderr, "could not allocate shared memory page: %s\n", strerror(errno));
 		_exit(1);

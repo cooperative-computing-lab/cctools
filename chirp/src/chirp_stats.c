@@ -8,23 +8,25 @@ See the file COPYING for details.
 #include "debug.h"
 #include "xmalloc.h"
 
-#include <time.h>
-#include <errno.h>
-#include <string.h>
+#include <fcntl.h>
 #include <sys/mman.h>
+
+#include <errno.h>
+#include <time.h>
+#include <string.h>
 
 #define SHARED_SEGMENT_SIZE 4096
 #define TOTAL_ENTRIES (SHARED_SEGMENT_SIZE/sizeof(struct chirp_stats))
-
-#ifndef MAP_ANONYMOUS
-#define MAP_ANONYMOUS MAP_ANON
-#endif
 
 static struct chirp_stats *table = 0;
 
 void chirp_stats_init()
 {
-	void *pa = mmap(0, SHARED_SEGMENT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	int fd = open("/dev/zero", O_RDWR);
+	if(fd == -1)
+		fatal("couldn't open /dev/zero: %s\n", strerror(errno));
+	void *pa = mmap(0, SHARED_SEGMENT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	close(fd);
 	if(pa == MAP_FAILED)
 		fatal("couldn't allocate shared page: %s\n", strerror(errno));
 	table = (struct chirp_stats *) pa;
