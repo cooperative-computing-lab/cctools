@@ -24,9 +24,10 @@ static struct chirp_stats *table = 0;
 
 void chirp_stats_init()
 {
-	table = (void *) mmap(0, SHARED_SEGMENT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	if(table == (void *) -1)
+	void *pa = mmap(0, SHARED_SEGMENT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	if(pa == MAP_FAILED)
 		fatal("couldn't allocate shared page: %s\n", strerror(errno));
+	table = (struct chirp_stats *) pa;
 
 	memset(table, 0, SHARED_SEGMENT_SIZE);
 }
