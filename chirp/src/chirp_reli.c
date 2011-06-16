@@ -674,6 +674,11 @@ INT64_T chirp_reli_md5( const char *host, const char *path, unsigned char digest
 	RETRY_ATOMIC( result = chirp_client_md5(client,path,digest,stoptime); )
 }
 
+INT64_T chirp_reli_remote_debug( const char *host, const char *path, const char *size, const char *flag, time_t stoptime )
+{
+	RETRY_ATOMIC( result = chirp_client_remote_debug(client,path,size,flag,stoptime); )
+}
+
 INT64_T chirp_reli_localpath( const char *host, const char *path, char *localpath, int length, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_localpath(client,path,localpath,length,stoptime); )
@@ -954,5 +959,3 @@ void chirp_reli_cleanup_before_fork()
 		invalidate_host(host);
 	}		
 }
-
-

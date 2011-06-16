@@ -896,6 +896,10 @@ static void chirp_handler(struct link *l, const char *subject)
 		char newacl[CHIRP_LINE_MAX];
 		char hostname[CHIRP_LINE_MAX];
 
+		char debug_file[CHIRP_LINE_MAX];
+		char debug_flag[CHIRP_LINE_MAX];
+		char debug_file_size[CHIRP_LINE_MAX];
+
 		char jobcwd[CHIRP_PATH_MAX];
 		char infile[CHIRP_PATH_MAX];
 		char outfile[CHIRP_PATH_MAX];
@@ -1722,6 +1726,21 @@ static void chirp_handler(struct link *l, const char *subject)
 				result = dataoutlength = 16;
 			} else {
 				result = errno_to_chirp(errno);
+			}
+		} else if(sscanf(line, "debug %s %s %s", debug_file, debug_file_size, debug_flag) == 3) {
+			if(strcmp(esubject, chirp_super_user) != 0) {
+				errno = EPERM;
+				goto failure;
+			}
+            result = 0;
+			if(strcmp(debug_file, "*") != 0)
+				debug_config_file(debug_file);
+			if(strcmp(debug_file_size, "*") != 0)
+				debug_config_file_size(string_metric_parse(debug_file_size));
+			if(strcmp(debug_flag, "clear") == 0)
+				debug_flags_clear();
+			else if(strcmp(debug_flag, "*") != 0) {
+				debug_flags_set(debug_flag);
 			}
 		} else {
 			result = -1;

@@ -138,7 +138,7 @@ When it exceeds this size, it will be renamed to (file).old, and a new file will
 @param size Maximum size in bytes of the debugging file.
 */
 
-void debug_config_file_size(int size);
+void debug_config_file_size(size_t size);
 
 void debug_config_fatal(void (*callback) (void));
 void debug_config_getpid(pid_t(*getpidfunc) (void));
@@ -166,7 +166,7 @@ Clear all currently set flags, so that no output will occur.
 @see debug_flags_set
 */
 
-int debug_flags_clear(void);
+INT64_T debug_flags_clear(void);
 
 /** Set name of flag combination
 Sets the string value associated with flag.  This is normally used to set the <tt>D_USER</tt> user flag as so: <tt>debug_set_flag_name(D_USER, "my-application");</tt>.
@@ -175,5 +175,10 @@ Sets the string value associated with flag.  This is normally used to set the <t
 */
 
 void debug_set_flag_name(INT64_T flag, const char *name);
+
+/** Restore debug flags.
+@param flags flags to set
+*/
+void debug_flags_restore(INT64_T flags);
 
 #endif
