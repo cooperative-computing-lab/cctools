@@ -309,6 +309,7 @@ void debug_config(const char *name)
 		_exit(1);
 	}
 	D = (struct debug_settings *) mmap(NULL, sizeof(struct debug_settings), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
 	if(D == MAP_FAILED) {
 		fprintf(stderr, "could not allocate shared memory page: %s\n", strerror(errno));
 		_exit(1);
