@@ -164,17 +164,14 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 
 void dag_show_input_files(struct dag *d)
 {
-	struct dag_node *n,*m,*tmp;
+	struct dag_node *n,*tmp;
 	struct dag_file *f;
-	int nodeid;
 	struct hash_table *ih;
 	char *key;
 	void *value;
 
 	ih = hash_table_create(0,0);
 	for(n=d->nodes;n;n=n->next) {
-		nodeid = -1;
-		m = 0;
 		// for each source file, see if it is a target file of another node
 		for(f=n->source_files;f;f=f->next) {
 			// d->file_table contains all target files

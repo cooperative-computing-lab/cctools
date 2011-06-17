@@ -252,7 +252,7 @@ it more than once per second.
 
 static int space_available(INT64_T amount)
 {
-	static UINT64_T total, avail;
+	static UINT64_T avail;
 	static time_t last_check = 0;
 	int check_interval = 1;
 	time_t current;
@@ -267,7 +267,6 @@ static int space_available(INT64_T amount)
 		if(safe_statfs(chirp_root_path, &buf) < 0)
 			return 0;
 		avail = buf.f_bsize * buf.f_bfree;
-		total = buf.f_bsize * buf.f_blocks;
 		last_check = current;
 	}
 

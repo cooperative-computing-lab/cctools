@@ -155,7 +155,7 @@ int s3_ls_bucket(char* bucketname, struct list* dirents, const char* access_key_
 	if(!server) return -1;
 
 	do {
-		char *buffer, *temp, *start, *end, *last;
+		char *buffer, *temp, *start, *end;
 		char trunc[25];
 		int keys;
 		sign_message(&mesg, access_key_id, access_key);
@@ -229,7 +229,6 @@ int s3_ls_bucket(char* bucketname, struct list* dirents, const char* access_key_
 			date.tm_mon -= 1;
 			dirent->last_modified = mktime(&date);
 			list_push_tail(dirents, dirent);
-			last = dirent->key;
 		}
 		free(buffer);
 

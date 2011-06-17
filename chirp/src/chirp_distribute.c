@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
 	pid_t pid;
 	int nprocs = 0;
 
-	int start_time, end_time, length;
+	int length;//, start_time, end_time;
 	int server_count = 0;
 	int cluster_count = 0;
 
@@ -209,7 +209,7 @@ int main(int argc, char *argv[])
 
 	debug(D_CHIRP, "HELLO");
 
-	start_time = time(0);
+	//start_time = time(0);
 
 	while(((c = getopt(argc, argv, "RXYDF:N:T:p:d:vt:a:h")) != (char) -1)) {
 		switch (c) {
@@ -710,11 +710,11 @@ int main(int argc, char *argv[])
 						printf("%u   %s (%d) -> %s (%d)   %.2lf secs, %.1lf MB/sec\n", (unsigned) time(0), targets[source].name, targets[source].cid, targets[target].name, targets[target].cid, (stop - start) / 1000000.0,
 						       result / (double) (stop - start));
 						fprintf(out, "%s %s %.1lf\n", targets[source].name, targets[target].name, result / (double) (stop - start));
-						end_time = time(0);
+						//end_time = time(0);
 						//fprintf(outResult,"%d\n",end_time-start_time);
 
 					} else {
-						end_time = time(0);
+						//end_time = time(0);
 						//fprintf(outResult,"%d\n",end_time-start_time);
 					}
 					if(confirm_mode) {
@@ -752,7 +752,7 @@ int main(int argc, char *argv[])
 					transfer_ok = (error_code == 0);
 					if(transfer_ok) {
 						transfers_complete++;
-						end_time = time(0);
+						//end_time = time(0);
 					}
 				} else {
 					transfer_ok = 0;
@@ -800,7 +800,7 @@ int main(int argc, char *argv[])
 
 
 	failure_matrix_print();
-	end_time = time(0);
+	//end_time = time(0);
 
 	return 0;
 }

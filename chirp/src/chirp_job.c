@@ -418,7 +418,6 @@ static void chirp_job_cleanup()
 {
 	struct chirp_job_info info;
 	INT64_T *job_list, jobid;
-	int result;
 	int i;
 
 	job_list = chirp_job_scan();
@@ -430,7 +429,7 @@ static void chirp_job_cleanup()
 
 		if(chirp_job_info_load(jobid, &info)) {
 			if(info.state == CHIRP_JOB_STATE_RUNNING) {
-				result = kill(-info.pid, SIGKILL);
+				kill(-info.pid, SIGKILL);
 				sleep(1);
 				info.state = CHIRP_JOB_STATE_IDLE;
 				info.pid = 0;

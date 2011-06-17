@@ -35,8 +35,10 @@ static int process_work(int timeout)
 	struct process_info p;
 
 	p.pid = wait4(-1, &p.status, flags, &p.rusage);
-	if(p.pid <= 0)
+	if(p.pid <= 0) {
+		signal(SIGALRM, old_handler);
 		return 0;
+	}
 
 	struct process_info *i = malloc(sizeof(*i));
 	*i = p;
