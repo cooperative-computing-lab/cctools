@@ -37,7 +37,7 @@ See the file COPYING for details.
 
 static pid_t(*debug_getpid) () = getpid;
 
-struct debug_settings {
+static struct debug_settings {
 	pthread_mutex_t mutex;
 	int fd;
 	char output[PATH_MAX];
