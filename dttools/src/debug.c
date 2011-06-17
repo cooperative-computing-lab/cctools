@@ -119,9 +119,50 @@ static const char *flag_to_name(INT64_T flag)
 	return "debug";
 }
 
+static void initialize(void)
+{
+	debug_settings = (struct debug_settings *) mmap(NULL, sizeof(struct debug_settings), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+	if(debug_settings == MAP_FAILED) {
+		fprintf(stderr, "could not allocate shared memory page: %s\n", strerror(errno));
+		_exit(1);
+	}
+
+	debug_settings->fd = STDERR_FILENO;
+	memset(debug_settings->output, 0, PATH_MAX);
+	debug_settings->output_size = 10485760;
+	debug_settings->flags = D_NOTICE;
+	strcpy(debug_settings->program_name, "(undefined)");
+	
+	pthread_mutexattr_t attr;
+	int result = pthread_mutexattr_init(&attr);
+	if (result != 0) {
+		fprintf(stderr, "pthread_mutexattr_init failed: %s\n", strerror(result));
+		_exit(1);
+	}
+	result = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+	if (result != 0) {
+		fprintf(stderr, "pthread_mutexattr_setpshared failed: %s\n", strerror(result));
+		_exit(1);
+	}
+	result = pthread_mutex_init(&debug_settings->mutex, &attr);
+	if (result != 0) {
+		fprintf(stderr, "pthread_mutex_init failed: %s\n", strerror(result));
+		_exit(1);
+	}
+	pthread_mutexattr_destroy(&attr);
+}
+
+static void begin(void)
+{
+	if (debug_settings == NULL)
+		initialize();
+}
+
 int debug_flags_set(const char *flagname)
 {
 	struct flag_info *i;
+
+	begin();
 
 	pthread_mutex_lock(&debug_settings->mutex);
 	for(i = table; i->name; i++) {
@@ -140,6 +181,8 @@ void debug_flags_print(FILE * stream)
 {
 	int i;
 
+	begin();
+
 	pthread_mutex_lock(&debug_settings->mutex);
 	for(i = 0; table[i].name; i++) {
 		fprintf(stream, "%s ", table[i].name);
@@ -150,6 +193,8 @@ void debug_flags_print(FILE * stream)
 void debug_set_flag_name(INT64_T flag, const char *name)
 {
 	struct flag_info *i;
+
+	begin();
 
 	pthread_mutex_lock(&debug_settings->mutex);
 	for(i = table; i->name; i++) {
@@ -211,6 +256,8 @@ void debug(INT64_T flags, const char *fmt, ...)
 	va_list args;
 	va_start(args, fmt);
 
+	begin();
+
 	pthread_mutex_lock(&debug_settings->mutex);
 	if(flags & debug_settings->flags) {
 		int save_errno = errno;
@@ -227,6 +274,8 @@ void fatal(const char *fmt, ...)
 	struct fatal_callback *f;
 	va_list args;
 	va_start(args, fmt);
+
+	begin();
 
 	pthread_mutex_lock(&debug_settings->mutex);
 	do_debug(1, 0, fmt, args);
@@ -255,6 +304,7 @@ void debug_config_fatal(void (*callback) ())
 
 void debug_config_file(const char *f)
 {
+	begin();
 	pthread_mutex_lock(&debug_settings->mutex);
 	if(f) {
 		if(*f == '/')
@@ -281,6 +331,7 @@ void debug_config_file(const char *f)
 
 void debug_config_file_size(size_t size)
 {
+	begin();
 	pthread_mutex_lock(&debug_settings->mutex);
 	debug_settings->output_size = size;
 	pthread_mutex_unlock(&debug_settings->mutex);
@@ -294,6 +345,7 @@ void debug_config_getpid(pid_t(*getpidfunc) ())
 INT64_T debug_flags_clear()
 {
 	INT64_T result;
+	begin();
 	pthread_mutex_lock(&debug_settings->mutex);
 	result = debug_settings->flags;
 	debug_settings->flags = 0;
@@ -303,6 +355,7 @@ INT64_T debug_flags_clear()
 
 void debug_flags_restore(INT64_T fl)
 {
+	begin();
 	pthread_mutex_lock(&debug_settings->mutex);
 	debug_settings->flags = fl;
 	pthread_mutex_unlock(&debug_settings->mutex);
@@ -310,17 +363,7 @@ void debug_flags_restore(INT64_T fl)
 
 void debug_config(const char *name)
 {
-	debug_settings = (struct debug_settings *) mmap(NULL, sizeof(struct debug_settings), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
-	if(debug_settings == MAP_FAILED) {
-		fprintf(stderr, "could not allocate shared memory page: %s\n", strerror(errno));
-		_exit(1);
-	}
-
-	debug_settings->fd = STDERR_FILENO;
-	memset(debug_settings->output, 0, PATH_MAX);
-	debug_settings->output_size = 10485760;
-	debug_settings->flags = D_NOTICE;
-
+	begin();
 	if(strlen(name) >= 1024) {
 		fprintf(stderr, "program name is too long\n");
 		_exit(1);
@@ -331,22 +374,4 @@ void debug_config(const char *name)
 	} else {
 		strcpy(debug_settings->program_name, name);
 	}
-
-	pthread_mutexattr_t attr;
-	int result = pthread_mutexattr_init(&attr);
-	if (result != 0) {
-		fprintf(stderr, "pthread_mutexattr_init failed: %s\n", strerror(result));
-		_exit(1);
-	}
-	result = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
-	if (result != 0) {
-		fprintf(stderr, "pthread_mutexattr_setpshared failed: %s\n", strerror(result));
-		_exit(1);
-	}
-	result = pthread_mutex_init(&debug_settings->mutex, &attr);
-	if (result != 0) {
-		fprintf(stderr, "pthread_mutex_init failed: %s\n", strerror(result));
-		_exit(1);
-	}
-	pthread_mutexattr_destroy(&attr);
 }
