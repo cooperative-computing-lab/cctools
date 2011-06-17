@@ -31,6 +31,13 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
+/* Darwin doesn't support mmap of /dev/zero. We have to use non-standard
+ * anonymous mapping. Darwin uses MAP_ANON.
+ */
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+
 #ifdef HAS_ALLOCA_H
 #include <alloca.h>
 #endif
@@ -303,13 +310,7 @@ void debug_flags_restore(INT64_T fl)
 
 void debug_config(const char *name)
 {
-	int fd = open("/dev/zero", O_RDWR);
-	if(fd == -1) {
-		fprintf(stderr, "couldn't open /dev/zero: %s\n", strerror(errno));
-		_exit(1);
-	}
-	debug_settings = (struct debug_settings *) mmap(NULL, sizeof(struct debug_settings), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    close(fd);
+	debug_settings = (struct debug_settings *) mmap(NULL, sizeof(struct debug_settings), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
 	if(debug_settings == MAP_FAILED) {
 		fprintf(stderr, "could not allocate shared memory page: %s\n", strerror(errno));
 		_exit(1);

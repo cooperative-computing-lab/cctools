@@ -15,6 +15,13 @@ See the file COPYING for details.
 #include <time.h>
 #include <string.h>
 
+/* Darwin doesn't support mmap of /dev/zero. We have to use non-standard
+ * anonymous mapping. Darwin uses MAP_ANON.
+ */
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+
 #define SHARED_SEGMENT_SIZE 4096
 #define TOTAL_ENTRIES (SHARED_SEGMENT_SIZE/sizeof(struct chirp_stats))
 
@@ -22,11 +29,7 @@ static struct chirp_stats *table = 0;
 
 void chirp_stats_init()
 {
-	int fd = open("/dev/zero", O_RDWR);
-	if(fd == -1)
-		fatal("couldn't open /dev/zero: %s\n", strerror(errno));
-	void *pa = mmap(0, SHARED_SEGMENT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	close(fd);
+	void *pa = mmap(0, SHARED_SEGMENT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	if(pa == MAP_FAILED)
 		fatal("couldn't allocate shared page: %s\n", strerror(errno));
 	table = (struct chirp_stats *) pa;
