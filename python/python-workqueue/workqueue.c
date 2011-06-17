@@ -824,6 +824,9 @@ initworkqueue(void)
     PyModule_AddIntConstant(m, "WORK_QUEUE_WORKER_MODE_SHARED",     WORK_QUEUE_WORKER_MODE_SHARED);
     PyModule_AddIntConstant(m, "WORK_QUEUE_WORKER_MODE_EXCLUSIVE",  WORK_QUEUE_WORKER_MODE_EXCLUSIVE);
 
+    /* hackity hack hack */
+    debug_config("python-workqueue");
+
     if (PyErr_Occurred())
 	Py_FatalError("can't initialize module " MODULE_NAME);
 }

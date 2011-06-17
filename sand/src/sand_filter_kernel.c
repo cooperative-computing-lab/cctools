@@ -19,6 +19,7 @@ See the file COPYING for details.
 
 #include "sequence_filter.h"
 
+static char *progname = "sand_filter_kernel";
 static int num_seqs;
 static int kmer_size = 22;
 static int window_size = 22;
@@ -131,7 +132,8 @@ int main(int argc, char **argv)
 
 	int start_x, end_x, start_y, end_y;
 
-	get_options(argc, argv, "sand_filter_kernel");
+	debug_config(progname);
+	get_options(argc, argv, progname);
 
 	unsigned long start_mem, cand_mem, table_mem;
 
