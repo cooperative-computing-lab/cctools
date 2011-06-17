@@ -668,7 +668,7 @@ int main(int argc, char *argv[])
 					fprintf(stderr, "Could not open output file %s. (%s)\n", filename, strerror(errno));
 					goto recover;
 				}
-			} else if(sscanf(line, "thirdget %d %s %[^\n]", &mode, filename, path)) {
+			} else if(sscanf(line, "thirdget %d %s %[^\n]", &mode, filename, path) == 3) {
 				char cmd[WORK_QUEUE_LINE_MAX];
 				char *cur_pos, *tmp_pos;
 
@@ -719,7 +719,7 @@ int main(int argc, char *argv[])
 					}
 					break;
 				}
-			} else if(sscanf(line, "thirdput %d %s %[^\n]", &mode, filename, path)) {
+			} else if(sscanf(line, "thirdput %d %s %[^\n]", &mode, filename, path) == 3) {
 				struct stat info;
 				char cmd[WORK_QUEUE_LINE_MAX];
 

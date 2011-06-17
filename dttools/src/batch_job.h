@@ -22,15 +22,16 @@ typedef int batch_job_id_t;
 
 /** Indicates which type of batch submission to use. */
 typedef enum {
-	BATCH_QUEUE_TYPE_UNKNOWN = -1,
-				     /**< An invalid batch queue type. */
-	BATCH_QUEUE_TYPE_LOCAL,	     /**< Batch jobs will run as local processes. */
-	BATCH_QUEUE_TYPE_CONDOR,     /**< Batch jobs will be sent to Condor pool. */
-	BATCH_QUEUE_TYPE_SGE,	     /**< Batch jobs will be sent to Sun Grid Engine. */
-	BATCH_QUEUE_TYPE_WORK_QUEUE,  /**< Batch jobs will be sent to the Work Queue. */
+	BATCH_QUEUE_TYPE_UNKNOWN = -1,        /**< An invalid batch queue type. */
+	BATCH_QUEUE_TYPE_LOCAL,	              /**< Batch jobs will run as local processes. */
+	BATCH_QUEUE_TYPE_CONDOR,              /**< Batch jobs will be sent to Condor pool. */
+	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine. */
+	BATCH_QUEUE_TYPE_MOAB,                /**< Batch jobs will be sent to the Moab Workload Manager. */
+	BATCH_QUEUE_TYPE_WORK_QUEUE,          /**< Batch jobs will be sent to the Work Queue. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS, /**< Batch jobs will be sent to the Work Queue, all files are stored on a shared filesystem. */
-	BATCH_QUEUE_TYPE_XGRID,	      /**< Batch jobs will be sent to the Xgrid. */
-	BATCH_QUEUE_TYPE_HADOOP	      /**< Batch jobs will be sent to Hadoop. */
+	BATCH_QUEUE_TYPE_XGRID,	              /**< Batch jobs will be sent to the Xgrid. */
+	BATCH_QUEUE_TYPE_HADOOP,              /**< Batch jobs will be sent to Hadoop. */
+	BATCH_QUEUE_TYPE_MPI_QUEUE            /**< Batch jobs will be sent to the MPI Queue. */
 } batch_queue_type_t;
 
 /** Describes a batch job when it has completed. */

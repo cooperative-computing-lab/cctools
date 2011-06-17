@@ -34,14 +34,23 @@ esac
 
 potential_packages="dttools sand allpairs wavefront makeflow ftp_lite s3tools chirp"
 
+include_package_sand="sand"
+include_package_allpairs="allpairs"
+include_package_wavefront="wavefront"
+include_package_makeflow="makeflow"
+include_package_ftplite="ftp_lite"
+include_package_s3tools="s3tools"
+include_package_chirp="chirp"
+
 if [ -d parrot -a $build_sys = LINUX ]
 then
 	if [ $build_cpu = I386 -o $build_cpu = X86_64 ]
 	then
 		echo "including parrot, because this system is $build_sys and $build_cpu"
-		potential_packages="${potential_packages} parrot"
+		include_package_parrot="parrot"
 	else
 		echo "skipping parrot, because this cpu is ${build_cpu}, not I386"
+		include_package_parrot=""
 	fi
 else
 	echo "skipping parrot, because this system is ${build_sys}, not LINUX"
@@ -60,6 +69,7 @@ irods_path="/usr"
 mysql_path="/usr"
 python_path="/usr"
 xrootd_path="/usr"
+mpi_path="/usr/local"
 
 xrootd_arch=auto
 globus_flavor=auto
@@ -67,6 +77,7 @@ has_egee=no
 
 ccompiler=gcc
 cxxcompiler=g++
+mpicompiler=mpicc
 ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Werror -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
 
 if [ ${build_sys} != CYGWIN ]
@@ -74,10 +85,12 @@ then
 	ccflags="${ccflags} -fPIC"
 fi
 
+
 config_readline_path=auto
 config_globus_path=auto
 config_fuse_path=auto
 config_mysql_path=auto
+config_mpi_path=auto
 config_python_path=auto
 
 config_krb5_path=no
@@ -161,9 +174,43 @@ do
 			xrootd_path=$1
 			config_xrootd_path=yes
 			;;
+		--with-mpi-path)
+			shift
+			mpi_path=$1
+			config_mpi_path=yes
+			;;
+		--without-system-sand)
+			include_package_sand=""
+			if [ $include_package_allpairs != "" ]
+			then
+				echo "*** skipping system 'allpairs' because of dependencies"
+				include_package_allpairs=""
+			fi
+			;;
+		--without-system-allpairs)
+			include_package_allpairs=""
+			;;
+		--without-system-wavefront)
+			include_package_wavefront=""
+			;;
+		--without-system-makeflow)
+			include_package_makeflow=""
+			;;
+		--without-system-ftp-lite)
+			include_package_ftplite=""
+			;;
+		--without-system-s3tools)
+			include_package_s3tools=""
+			;;
+		--without-system-chirp)
+			include_package_chirp=""
+			;;
+		--without-system-parrot)
+			include_package_parrot=""
+			;;
 		--xrootd-arch)
-		        shift
-			xrootd_arch=1
+			shift
+			xrootd_arch=$1
 			;;
 		--with-*-path)
 			echo "ignoring unknown package $1"
@@ -178,6 +225,7 @@ Where options are:
   --globus-flavor      <flavor>
   --xrootd-arch        <arch>
   --with-PACKAGE-path  <path>
+  --without-system-SYSTEM
 
 Where PACKAGE may be:
     readline
@@ -191,6 +239,17 @@ Where PACKAGE may be:
     mysql
     python
     xrootd
+    mpi
+
+And SYSTEM may be:
+    sand
+    allpairs
+    wavefront
+    makeflow
+    ftp-lite
+    s3tools
+    chirp
+    parrot
 EOF
 			exit 1
 			;;
@@ -204,6 +263,8 @@ done
 
 IFS=" "
 export IFS
+
+potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot}"
 
 if [ $build_sys = LINUX ]
 then
@@ -379,6 +440,23 @@ else
 	else
 		echo "*** skipping mysql support"
 	fi
+fi
+
+if [ $config_mpi_path != no ] && check_file ${mpi_path}/lib/libmpi.so && check_file ${mpi_path}/bin/mpicc && check_file ${mpi_path}/include/mpi.h
+then
+        mpilinker=${mpi_path}/bin/mpicc
+        usempi="true"
+        ccflags="${ccflags} -DHAS_MPI"
+else
+    usempi="false"
+    if [ $config_mpi_path = yes ]
+    then
+        echo "*** Sorry, I couldn't find mpicc in $mpi_path"
+        echo "*** Check --with-mpi-path and try again."
+        exit 1
+    else
+        echo "*** skipping mpi support"
+    fi
 fi
 
 ##########################################################################
@@ -601,6 +679,9 @@ CCTOOLS_BASE_LDFLAGS=${ldflags}
 CCTOOLS_INTERNAL_LDFLAGS= ${internal_ldflags} \${CCTOOLS_BASE_LDFLAGS}
 CCTOOLS_LDFLAGS=-L\${CCTOOLS_INSTALL_DIR}/lib \${CCTOOLS_BASE_LDFLAGS}
 
+CCTOOLS_MPI_LD=@echo MPI_LINK \$@; ${mpilinker}
+CCTOOLS_USE_MPI=$usempi
+
 CCTOOLS_READLINE_LDFLAGS=${cctools_readline_ldflags}
 
 CCTOOLS_DYNAMIC_SUFFIX=${cctools_dynamic_suffix}
@@ -613,6 +694,7 @@ LD=\$(CCTOOLS_LD)
 LDFLAGS=\$(CCTOOLS_LDFLAGS)
 CXX=\$(CCTOOLS_CXX)
 CXXFLAGS=\$(CCTOOLS_CXXFLAGS)
+MPILD=\$(CCTOOLS_MPI_LD)
 
 CCTOOLS_AR=ar
 CCTOOLS_YACC=bison

@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "itable.h"
 #include "debug.h"
 #include "macros.h"
+#include "mpi_queue.h"
 #include "process.h"
 #include "stringtools.h"
 #include "timestamp.h"
@@ -36,7 +37,10 @@ struct batch_queue {
 	struct itable *output_table;
 	struct itable *hadoop_jobs;
 	struct work_queue *work_queue;
+	struct mpi_queue *mpi_queue;
 };
+
+/***************************************************************************************/
 
 static int batch_job_submit_condor(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
@@ -257,7 +261,9 @@ int batch_job_remove_condor(struct batch_queue *q, batch_job_id_t jobid)
 	}
 }
 
-static int setup_sge_wrapper(const char *wrapperfile)
+/***************************************************************************************/
+
+static int setup_batch_wrapper(const char *sysname, const char *wrapperfile)
 {
 	FILE *file;
 
@@ -269,7 +275,7 @@ static int setup_sge_wrapper(const char *wrapperfile)
 		return -1;
 
 	fprintf(file, "#!/bin/sh\n");
-	fprintf(file, "logfile=sge.status.${JOB_ID}\n");
+	fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
 	fprintf(file, "starttime=`date +%%s`\n");
 	fprintf(file, "cat > $logfile <<EOF\n");
 	fprintf(file, "start $starttime\n");
@@ -296,7 +302,7 @@ batch_job_id_t batch_job_submit_simple_sge(struct batch_queue * q, const char *c
 
 	FILE *file;
 
-	if(setup_sge_wrapper("sge.wrapper") < 0)
+	if(setup_batch_wrapper("sge", "sge.wrapper") < 0)
 		return -1;
 
 	strcpy(name, cmd);
@@ -432,6 +438,317 @@ int batch_job_remove_sge(struct batch_queue *q, batch_job_id_t jobid)
 
 /***************************************************************************************/
 
+batch_job_id_t batch_job_submit_simple_moab( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
+{
+	char line[BATCH_JOB_LINE_MAX];
+	char name[BATCH_JOB_LINE_MAX];
+	batch_job_id_t jobid;
+	struct batch_job_info *info;
+
+	FILE *file;
+
+	if(setup_batch_wrapper("moab", "moab.wrapper")<0) return -1;
+
+	strcpy(name,cmd);
+	char *s = strchr(name,' ');
+	if(s) *s = 0;
+
+	sprintf(line,"msub -d $CWD -o /dev/null -j oe -N '%s' %s moab.wrapper \"%s\"",string_basename(name),q->options_text ? q->options_text : "",cmd);
+
+	debug(D_DEBUG,"%s",line);
+
+	file = popen(line,"r");
+	if(!file) {
+		debug(D_DEBUG,"couldn't submit job: %s",strerror(errno));
+		return -1;
+	}
+
+	line[0] = 0;
+	while(fgets(line,sizeof(line),file)) {
+		if(sscanf(line,"Your job %d",&jobid)==1) {
+			debug(D_DEBUG,"job %d submitted",jobid);
+			pclose(file);
+			info = malloc(sizeof(*info));
+			memset(info,0,sizeof(*info));
+			info->submitted = time(0);
+			itable_insert(q->job_table,jobid,info);
+			return jobid;
+		}
+	}
+	
+	if (strlen(line)) {
+		debug(D_NOTICE,"job submission failed: %s",line);
+	} else {
+		debug(D_NOTICE,"job submission failed: no output from msub");
+	}
+	pclose(file);
+	return -1;
+}
+
+batch_job_id_t batch_job_submit_moab( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
+{
+	char command[BATCH_JOB_LINE_MAX];
+
+	sprintf(command,"%s %s",cmd,args);
+
+	if(infile) sprintf(&command[strlen(command)]," <%s",infile);
+	if(outfile) sprintf(&command[strlen(command)]," >%s",outfile);
+	if(errfile) sprintf(&command[strlen(command)]," 2>%s",errfile);
+	
+	return batch_job_submit_simple_sge(q,command,extra_input_files,extra_output_files);
+}
+
+batch_job_id_t batch_job_wait_moab( struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime )
+{
+	struct batch_job_info *info;
+	batch_job_id_t jobid;
+	FILE *file;
+	char statusfile[BATCH_JOB_LINE_MAX];
+	char line[BATCH_JOB_LINE_MAX];
+	int t,c;
+
+	while(1) {
+		UINT64_T ujobid;
+		itable_firstkey(q->job_table);
+		while(itable_nextkey(q->job_table,&ujobid,(void**)&info)) {
+			jobid = ujobid;
+			sprintf(statusfile,"moab.status.%d",jobid);
+			file = fopen(statusfile,"r");
+			if(file) {
+				while(fgets(line,sizeof(line),file)) {
+					if(sscanf(line,"start %d",&t)) {
+						info->started = t;
+					} else if(sscanf(line,"stop %d %d",&c,&t)==2) {
+						debug(D_DEBUG,"job %d complete",jobid);
+						if(!info->started) info->started = t;
+						info->finished = t;
+						info->exited_normally = 1;
+						info->exit_code = c;
+					}
+				}
+				fclose(file);
+
+				if(info->finished!=0) {
+					unlink(statusfile);
+					info = itable_remove(q->job_table,jobid);
+					*info_out = *info;
+					free(info);
+					return jobid;
+				}
+			}
+		}
+
+		if(itable_size(q->job_table)<=0) return 0;
+
+		if(stoptime!=0 && time(0)>=stoptime) return -1;
+
+		if(process_pending()) return -1;
+
+		sleep(1);
+	}
+
+	return -1;
+}
+
+int batch_job_remove_moab( struct batch_queue *q, batch_job_id_t jobid )
+{
+	char line[BATCH_JOB_LINE_MAX];
+	struct batch_job_info *info;
+
+	info = itable_lookup(q->job_table,jobid);
+	if(!info) return 0;
+
+	if(!info->started) info->started = time(0);
+
+	info->finished = time(0);
+	info->exited_normally = 0;
+	info->exit_signal = 1;
+
+	sprintf(line,"mdel %d",jobid);
+	system(line);
+
+	return 1;
+}
+
+
+
+/***************************************************************************************/
+
+void specify_mpi_queue_task_files(struct mpi_queue_task *t, const char *input_files, const char *output_files)
+{
+	char *f, *p, *files;
+
+	if(input_files) {
+		files = strdup(input_files);
+		f = strtok(files, " \t,");
+		while(f) {
+			p = strchr(f, '=');
+			if(p) {
+				*p = 0;
+				mpi_queue_task_specify_file(t, f, MPI_QUEUE_INPUT);
+				*p = '=';
+			} else {
+				mpi_queue_task_specify_file(t, f, MPI_QUEUE_INPUT);
+			}
+			f = strtok(0, " \t,");
+		}
+		free(files);
+	}
+
+	if(output_files) {
+		files = strdup(output_files);
+		f = strtok(files, " \t,");
+		while(f) {
+			p = strchr(f, '=');
+			if(p) {
+				*p = 0;
+				mpi_queue_task_specify_file(t, f, MPI_QUEUE_OUTPUT);
+				*p = '=';
+			} else {
+				mpi_queue_task_specify_file(t, f, MPI_QUEUE_OUTPUT);
+			}
+			f = strtok(0, " \t,");
+		}
+		free(files);
+	}
+}
+
+batch_job_id_t batch_job_submit_simple_mpi_queue( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
+{
+	struct mpi_queue_task *t;
+
+	t = mpi_queue_task_create(cmd);
+
+	specify_mpi_queue_task_files(t, extra_input_files, extra_output_files);
+
+	mpi_queue_submit(q->mpi_queue, t);
+
+	return t->taskid;
+}
+
+batch_job_id_t batch_job_submit_mpi_queue( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
+{
+	struct mpi_queue_task *t;
+	char *full_command;
+
+	if(infile)
+		full_command = (char *) malloc((strlen(cmd) + strlen(args) + strlen(infile) + 5) * sizeof(char));
+	else
+		full_command = (char *) malloc((strlen(cmd) + strlen(args) + 2) * sizeof(char));
+
+	if(!full_command) {
+		debug(D_DEBUG, "couldn't create new work_queue task: out of memory\n");
+		return -1;
+	}
+
+	if(infile)
+		sprintf(full_command, "%s %s < %s", cmd, args, infile);
+	else
+		sprintf(full_command, "%s %s", cmd, args);
+
+	t = mpi_queue_task_create(full_command);
+
+	free(full_command);
+
+	if(infile)
+		mpi_queue_task_specify_file(t, infile, MPI_QUEUE_INPUT);
+	if(cmd)
+		mpi_queue_task_specify_file(t, cmd, MPI_QUEUE_INPUT);
+
+	specify_mpi_queue_task_files(t, extra_input_files, extra_output_files);
+
+	mpi_queue_submit(q->mpi_queue, t);
+
+	if(outfile) {
+		itable_insert(q->output_table, t->taskid, strdup(outfile));
+	}
+
+	return t->taskid;
+}
+
+batch_job_id_t batch_job_wait_mpi_queue( struct batch_queue *q, struct batch_job_info *info, time_t stoptime )
+{
+	static FILE *logfile = 0;
+//	struct work_queue_stats s;
+
+	int timeout, taskid = -1;
+
+	if(!logfile) {
+		logfile = fopen(q->logfile, "a");
+		if(!logfile) {
+			debug(D_NOTICE, "couldn't open logfile %s: %s\n", q->logfile, strerror(errno));
+			return -1;
+		}
+	}
+
+	if(stoptime == 0) {
+		timeout = MPI_QUEUE_WAITFORTASK;
+	} else {
+		timeout = MAX(0, stoptime - time(0));
+	}
+
+	struct mpi_queue_task *t = mpi_queue_wait(q->mpi_queue, timeout);
+	if(t) {
+		info->submitted = t->submit_time / 1000000;
+		info->started = t->start_time / 1000000;
+		info->finished = t->finish_time / 1000000;
+		info->exited_normally = 1;
+		info->exit_code = t->return_status;
+		info->exit_signal = 0;
+
+		/*
+		   If the standard ouput of the job is not empty,
+		   then print it, because this is analogous to a Unix
+		   job, and would otherwise be lost.  Important for
+		   capturing errors from the program.
+		 */
+
+		if(t->output && t->output[0]) {
+			if(t->output[1] || t->output[0] != '\n') {
+				string_chomp(t->output);
+				printf("%s\n", t->output);
+			}
+		}
+
+		char *outfile = itable_remove(q->output_table, t->taskid);
+		if(outfile) {
+			FILE *file = fopen(outfile, "w");
+			if(file) {
+				fwrite(t->output, strlen(t->output), 1, file);
+				fclose(file);
+			}
+			free(outfile);
+		}
+		fprintf(logfile, "TASK %llu %d %d %d %llu %llu \"%s\" \"%s\"\n", timestamp_get(), t->taskid, t->result, t->return_status, t->submit_time, t->finish_time, t->tag ? t->tag : "", t->command_line);
+
+		taskid = t->taskid;
+		mpi_queue_task_delete(t);
+	}
+	// Print to work queue log since status has been changed.
+//	mpi_queue_get_stats(q->mpi_queue, &s);
+//	fprintf(logfile, "QUEUE %llu %d %d %d %d %d\n", timestamp_get(), s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete);
+//	fflush(logfile);
+//	fsync(fileno(logfile));
+
+	if(taskid >= 0) {
+		return taskid;
+	}
+
+	if(mpi_queue_empty(q->mpi_queue)) {
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
+int batch_job_remove_mpi_queue(struct batch_queue *q, batch_job_id_t jobid)
+{
+	return 0;
+}
+
+
+/***************************************************************************************/
+
 void specify_work_queue_task_files(struct work_queue_task *t, const char *input_files, const char *output_files)
 {
 	char *f, *p, *files;
@@ -481,14 +798,28 @@ void specify_work_queue_task_shared_files(struct work_queue_task *t, const char 
 		files = strdup(input_files);
 		f = strtok(files, " \t,");
 		while(f) {
+			char fname[WORK_QUEUE_LINE_MAX];
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-				work_queue_task_specify_shared_file(t, f, p + 1, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
-				debug(D_DEBUG, "local file %s is %s on remote system:", f, p + 1);
+			}
+
+			if(f[0] != '/') {
+				char tmp[WORK_QUEUE_LINE_MAX];
+				getcwd(tmp, WORK_QUEUE_LINE_MAX);
+				strcat(tmp, "/");
+				strcat(tmp, f);
+				string_collapse_path(tmp, fname, 1);
+			} else {
+				strcpy(fname, f);
+			}
+
+			if(p) {	
+				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE|WORK_QUEUE_THIRDGET);
+				debug(D_DEBUG, "shared file %s is %s on remote system:", f, p + 1);
 				*p = '=';
 			} else {
-				work_queue_task_specify_shared_file(t, f, f, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+				work_queue_task_specify_file(t, fname, fname, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE|WORK_QUEUE_THIRDGET);
 			}
 			f = strtok(0, " \t,");
 		}
@@ -499,14 +830,28 @@ void specify_work_queue_task_shared_files(struct work_queue_task *t, const char 
 		files = strdup(output_files);
 		f = strtok(files, " \t,");
 		while(f) {
+			char fname[WORK_QUEUE_LINE_MAX];
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-				work_queue_task_specify_shared_file(t, f, p + 1, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
-				debug(D_DEBUG, "remote file %s is %s on local system:", f, p + 1);
+			}
+
+			if(f[0] != '/') {
+				char tmp[WORK_QUEUE_LINE_MAX];
+				getcwd(tmp, WORK_QUEUE_LINE_MAX);
+				strcat(tmp, "/");
+				strcat(tmp, f);
+				string_collapse_path(tmp, fname, 1);
+			} else {
+				strcpy(fname, f);
+			}
+
+			if(p) {	
+				work_queue_task_specify_file(t, fname, p + 1, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
+				debug(D_DEBUG, "shared file %s is %s on remote system:", f, p + 1);
 				*p = '=';
 			} else {
-				work_queue_task_specify_shared_file(t, f, f, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+				work_queue_task_specify_file(t, fname, fname, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
 			}
 			f = strtok(0, " \t,");
 		}
@@ -540,9 +885,9 @@ int batch_job_submit_work_queue(struct batch_queue *q, const char *cmd, const ch
 
 	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		if(infile)
-			work_queue_task_specify_shared_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+			work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE|WORK_QUEUE_THIRDGET);
 		if(cmd)
-			work_queue_task_specify_shared_file(t, cmd, cmd, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+			work_queue_task_specify_file(t, cmd, cmd, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE|WORK_QUEUE_THIRDGET);
 
 		specify_work_queue_task_shared_files(t, extra_input_files, extra_output_files);
 	} else {
@@ -854,7 +1199,7 @@ int batch_job_submit_simple_hadoop(struct batch_queue *q, const char *cmd, const
 	setup_hadoop_wrapper("hadoop.wrapper", cmd);
 
 	sprintf(line,
-		"$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-*-streaming.jar -D mapred.min.split.size=100000000 -input %s -mapper \"$PARROT_HOME/bin/parrot_run_hdfs ./hadoop.wrapper\" -file hadoop.wrapper -numReduceTasks 0 -output /makeflow_tmp/job-%010d 2>&1",
+		"$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-*-streaming.jar -D mapred.min.split.size=100000000 -input %s -mapper \"$HADOOP_PARROT_PATH ./hadoop.wrapper\" -file hadoop.wrapper -numReduceTasks 0 -output /makeflow_tmp/job-%010d 2>&1",
 		target_file, (int) time(0));
 
 	debug(D_HDFS, "%s\n", line);
@@ -1197,7 +1542,7 @@ int batch_job_remove_xgrid(struct batch_queue *q, batch_job_id_t jobid)
 
 const char *batch_queue_type_string()
 {
-	return "local, condor, sge, wq, hadoop";
+	return "local, condor, sge, wq, hadoop, mpi-queue";
 }
 
 batch_queue_type_t batch_queue_type_from_string(const char *str)
@@ -1222,6 +1567,10 @@ batch_queue_type_t batch_queue_type_from_string(const char *str)
 		return BATCH_QUEUE_TYPE_XGRID;
 	if(!strcmp(str, "hadoop"))
 		return BATCH_QUEUE_TYPE_HADOOP;
+	if(!strcmp(str, "mpi"))
+		return BATCH_QUEUE_TYPE_MPI_QUEUE;
+	if(!strcmp(str, "mpi-queue"))
+		return BATCH_QUEUE_TYPE_MPI_QUEUE;
 	return BATCH_QUEUE_TYPE_UNKNOWN;
 }
 
@@ -1242,6 +1591,8 @@ const char *batch_queue_type_to_string(batch_queue_type_t t)
 		return "xgrid";
 	case BATCH_QUEUE_TYPE_HADOOP:
 		return "hadoop";
+	case BATCH_QUEUE_TYPE_MPI_QUEUE:
+		return "mpi-queue";
 	default:
 		return "unknown";
 	}
@@ -1277,25 +1628,34 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	} else {
 		q->work_queue = 0;
 	}
+	
+	if(type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
+		q->mpi_queue = mpi_queue_create(0);
+		if(!q->mpi_queue) {
+			batch_queue_delete(q);
+			return 0;
+		}
+	} else {
+		q->mpi_queue = 0;
+	}
 
 	if(type == BATCH_QUEUE_TYPE_HADOOP) {
 		int fail = 0;
-/*		if(!getenv("JAVA_HOME")) {
-			debug(D_NOTICE, "error: environment variable JAVA_HOME not set\n");
-			fail = 1;
-		}
-*/ if(!getenv("HADOOP_HOME")) {
-			debug(D_NOTICE, "error: environment variable HADOOP_HOME not set\n");
-			fail = 1;
-		}
+
+	   if(!getenv("HADOOP_HOME")) {
+				debug(D_NOTICE, "error: environment variable HADOOP_HOME not set\n");
+				fail = 1;
+			}
 		if(!getenv("HDFS_ROOT_DIR")) {
-			debug(D_NOTICE, "error: environment variable HDFS_ROOT_DIR not set\n");
+				debug(D_NOTICE, "error: environment variable HDFS_ROOT_DIR not set\n");
+				fail = 1;
+		}
+		if(!getenv("HADOOP_PARROT_PATH")) {
+			/* Note: HADOOP_PARROT_PATH is the path to Parrot on the remote node, not on the local machine. */
+			debug(D_NOTICE, "error: environment variable HADOOP_PARROT_PATH not set\n");
 			fail = 1;
 		}
-		if(!getenv("PARROT_HOME")) {
-			debug(D_NOTICE, "error: environment variable PARROT_HOME not set\n");
-			fail = 1;
-		}
+	
 		if(fail) {
 			batch_queue_delete(q);
 			return 0;
@@ -1359,6 +1719,8 @@ batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const ch
 		return batch_job_submit_condor(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
 		return batch_job_submit_sge(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
+	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+		return batch_job_submit_moab(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_submit_work_queue(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
@@ -1367,6 +1729,8 @@ batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const ch
 		return batch_job_submit_xgrid(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_HADOOP) {
 		return batch_job_submit_hadoop(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
+	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
+		return batch_job_submit_mpi_queue(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -1384,6 +1748,8 @@ batch_job_id_t batch_job_submit_simple(struct batch_queue * q, const char *cmd, 
 		return batch_job_submit_simple_condor(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
 		return batch_job_submit_simple_sge(q, cmd, extra_input_files, extra_output_files);
+	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+		return batch_job_submit_simple_moab(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_submit_simple_work_queue(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
@@ -1392,6 +1758,8 @@ batch_job_id_t batch_job_submit_simple(struct batch_queue * q, const char *cmd, 
 		return batch_job_submit_simple_xgrid(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_HADOOP) {
 		return batch_job_submit_simple_hadoop(q, cmd, extra_input_files, extra_output_files);
+	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
+		return batch_job_submit_simple_mpi_queue(q, cmd, extra_input_files, extra_output_files);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -1414,6 +1782,8 @@ batch_job_id_t batch_job_wait_timeout(struct batch_queue * q, struct batch_job_i
 		return batch_job_wait_condor(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
 		return batch_job_wait_sge(q, info, stoptime);
+	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+		return batch_job_wait_moab(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_wait_work_queue(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
@@ -1422,6 +1792,8 @@ batch_job_id_t batch_job_wait_timeout(struct batch_queue * q, struct batch_job_i
 		return batch_job_wait_xgrid(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_HADOOP) {
 		return batch_job_wait_hadoop(q, info, stoptime);
+	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
+		return batch_job_wait_mpi_queue(q, info, stoptime);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -1439,6 +1811,8 @@ int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid)
 		return batch_job_remove_condor(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
 		return batch_job_remove_sge(q, jobid);
+	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+		return batch_job_remove_moab(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_remove_work_queue(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
@@ -1447,6 +1821,8 @@ int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid)
 		return batch_job_remove_xgrid(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_HADOOP) {
 		return batch_job_remove_hadoop(q, jobid);
+	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
+		return batch_job_remove_mpi_queue(q, jobid);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -1457,6 +1833,8 @@ int batch_queue_port(struct batch_queue *q)
 {
 	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return work_queue_port(q->work_queue);
+	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
+		return mpi_queue_port(q->mpi_queue);
 	} else {
 		return 0;
 	}
