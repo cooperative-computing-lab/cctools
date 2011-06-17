@@ -44,8 +44,7 @@ See the file COPYING for details.
 
 #define WORK_QUEUE_FILE 0
 #define WORK_QUEUE_BUFFER 1
-#define WORK_QUEUE_SHARED 2
-#define WORK_QUEUE_REMOTEFS 3
+#define WORK_QUEUE_REMOTECMD 2
 
 #define TASK_STATUS_INITIALIZING 0
 #define TASK_STATUS_SENDING_INPUT 1
@@ -442,35 +441,23 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((tf = list_next_item(t->output_files))) {
-			if(tf->type == WORK_QUEUE_SHARED) {
-				//Hax to make benchmarks work properly
-				char remote_path[WORK_QUEUE_LINE_MAX];
-				if(tf->remote_name[0] != '/') {
-					char tmp[WORK_QUEUE_LINE_MAX];
-					getcwd(tmp, WORK_QUEUE_LINE_MAX);
-					strcat(tmp, "/");
-					strcat(tmp, tf->payload);
-					string_collapse_path(tmp, remote_path, 1);
-					tf->flags |= WORK_QUEUE_PREEXIST;
-				} else {
-					strcpy(remote_path, tf->payload);
-				}
-				debug(D_WQ, "thirdputting %s as %s", tf->remote_name, remote_path);
-				//end Hax
+			if(tf->flags & WORK_QUEUE_THIRDPUT) {
 
-				if(!strcmp(tf->remote_name, remote_path)) {
+				debug(D_WQ, "thirdputting %s as %s", tf->remote_name, tf->payload);
+
+				if(!strcmp(tf->remote_name, tf->payload)) {
 					debug(D_WQ, "output file %s already on shared filesystem", tf->remote_name);
 					tf->flags |= WORK_QUEUE_PREEXIST;
 				} else {
 					char thirdput_result[WORK_QUEUE_LINE_MAX];
-					debug(D_WQ, "putting %s from %s (%s) to shared filesystem from %s", tf->remote_name, w->hostname, w->addrport, remote_path);
+					debug(D_WQ, "putting %s from %s (%s) to shared filesystem from %s", tf->remote_name, w->hostname, w->addrport, tf->payload);
 					open_time = timestamp_get();
-					link_putfstring(w->link, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, tf->remote_name, remote_path);
+					link_putfstring(w->link, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, tf->remote_name, tf->payload);
 					link_readline(w->link, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
 					close_time = timestamp_get();
 					sum_time += (close_time - open_time);
 				}
-			} else if(tf->type == WORK_QUEUE_REMOTEFS) {
+			} else if(tf->type == WORK_QUEUE_REMOTECMD) {
 				char thirdput_result[WORK_QUEUE_LINE_MAX];
 				debug(D_WQ, "putting %s from %s (%s) to remote filesystem using %s", tf->remote_name, w->hostname, w->addrport, tf->payload);
 				open_time = timestamp_get();
@@ -874,47 +861,35 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 					goto failure;
 				total_bytes += actual;
 				sum_time += (close_time - open_time);
-			} else if(tf->type == WORK_QUEUE_SHARED) {
-				debug(D_WQ, "%s (%s) needs %s from shared filesystem as %s", w->hostname, w->addrport, tf->payload, tf->remote_name);
-
-				//Hax to make benchmarks work properly
-				char remote_path[WORK_QUEUE_LINE_MAX];
-				if(tf->remote_name[0] != '/') {
-					char tmp[WORK_QUEUE_LINE_MAX];
-					getcwd(tmp, WORK_QUEUE_LINE_MAX);
-					strcat(tmp, "/");
-					strcat(tmp, tf->payload);
-					string_collapse_path(tmp, remote_path, 1);
-				} else {
-					strcpy(remote_path, tf->payload);
-				}
-				debug(D_WQ, "thirdgetting %s as %s", tf->remote_name, remote_path);
-				//end Hax
-
-				if(!strcmp(remote_path, tf->payload)) {
-					tf->flags |= WORK_QUEUE_PREEXIST;
-				} else {
-					open_time = timestamp_get();
-					if(tf->flags & WORK_QUEUE_SYMLINK) {
-						link_putfstring(w->link, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_SYMLINK, tf->remote_name, remote_path);
-					} else {
-						link_putfstring(w->link, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, tf->remote_name, remote_path);
-					}
-					close_time = timestamp_get();
-					sum_time += (close_time - open_time);
-				}
-			} else if(tf->type == WORK_QUEUE_REMOTEFS) {
+			} else if(tf->type == WORK_QUEUE_REMOTECMD) {
 				debug(D_WQ, "%s (%s) needs %s from remote filesystem using %s", w->hostname, w->addrport, tf->remote_name, tf->payload);
 				open_time = timestamp_get();
 				link_putfstring(w->link, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, tf->remote_name, tf->payload);
 				close_time = timestamp_get();
 				sum_time += (close_time - open_time);
 			} else {
-				open_time = timestamp_get();
-				if(!put_file(tf, q, w, &total_bytes))
-					goto failure;
-				close_time = timestamp_get();
-				sum_time += (close_time - open_time);
+				if(tf->flags & WORK_QUEUE_THIRDGET) {
+					debug(D_WQ, "%s (%s) needs %s from shared filesystem as %s", w->hostname, w->addrport, tf->payload, tf->remote_name);
+
+					if(!strcmp(tf->remote_name, tf->payload)) {
+						tf->flags |= WORK_QUEUE_PREEXIST;
+					} else {
+						open_time = timestamp_get();
+						if(tf->flags & WORK_QUEUE_SYMLINK) {
+							link_putfstring(w->link, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_SYMLINK, tf->remote_name, tf->payload);
+						} else {
+							link_putfstring(w->link, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, tf->remote_name, tf->payload);
+						}
+						close_time = timestamp_get();
+						sum_time += (close_time - open_time);
+					}
+				} else {				
+					open_time = timestamp_get();
+					if(!put_file(tf, q, w, &total_bytes))
+						goto failure;
+					close_time = timestamp_get();
+					sum_time += (close_time - open_time);
+				}
 			}
 		}
 		t->total_bytes_transferred += total_bytes;
@@ -1494,26 +1469,10 @@ void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data,
 	list_push_tail(t->input_files, tf);
 }
 
-void work_queue_task_specify_shared_file(struct work_queue_task *t, const char *remote_name, const char *shared_path, int type, int flags)
+void work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags)
 {
 	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
-	tf->type = WORK_QUEUE_SHARED;
-	tf->flags = flags;
-	tf->length = strlen(shared_path);
-	tf->payload = strdup(shared_path);
-	tf->remote_name = strdup(remote_name);
-
-	if(type == WORK_QUEUE_INPUT) {
-		list_push_tail(t->input_files, tf);
-	} else {
-		list_push_tail(t->output_files, tf);
-	}
-}
-
-void work_queue_task_specify_remote_file(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags)
-{
-	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
-	tf->type = WORK_QUEUE_REMOTEFS;
+	tf->type = WORK_QUEUE_REMOTECMD;
 	tf->flags = flags;
 	tf->length = strlen(cmd);
 	tf->payload = strdup(cmd);

@@ -50,7 +50,8 @@ and port of the master.
 #define WORK_QUEUE_CACHE 1
 #define WORK_QUEUE_SYMLINK 2
 #define WORK_QUEUE_PREEXIST 4
-
+#define WORK_QUEUE_THIRDGET 8
+#define WORK_QUEUE_THIRDPUT 8	// THIRDPUT/THIRDGET identical flags, including both for readability
 
 #define WORK_QUEUE_MASTER_MODE_STANDALONE 0
 #define WORK_QUEUE_MASTER_MODE_CATALOG 1
@@ -126,13 +127,16 @@ struct work_queue_task *work_queue_task_create(const char *full_command);
 
 /** Add a file to a task.
 @param t The task to which to add a file.
-@param local_name The name of the file on local disk.
+@param local_name The name of the file on local disk or shared filesystem.
 @param remote_name The name of the file at the execution site.
 @param type Must be one of the following values:
 - WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
 - WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
 @param flags May be zero to indicate no special handling, or any of the following or'd together:
 - WORK_QUEUE_CACHEABLE - The file may be cached at the execution site for later use.
+- WORK_QUEUE_SYMLINK - Create a symlink to the file rather than copying it, if possible.
+- WORK_QUEUE_THIRDGET - Access the file on the client from a shared filesystem.
+- WORK_QUEUE_THIRDPUT - Access the file on the client from a shared filesystem (included for readability).
 */
 void work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags);
 
@@ -145,30 +149,17 @@ void work_queue_task_specify_file(struct work_queue_task *t, const char *local_n
 */
 void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags);
 
-/** Add a file stored in a shared filesystem to a task.
-@param t The task to which to add a file.
-@param remote_name The name of the file at the execution site.
-@param shared_path The path of the file stored on the shared filesystem.
-@param type Must be one of the following values:
-- WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
-- WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
-@param flags May be zero to indicate no special handling, or any of the following or'd together:
-- WORK_QUEUE_CACHEABLE - The file may be cached at the execution site for later use.
-- WORK_QUEUE_SYMLINK - If possible symlink to the file rather than copying the whole thing.
-*/
-void work_queue_task_specify_shared_file(struct work_queue_task *t, const char *remote_name, const char *shared_path, int type, int flags);
-
-/** Add a file stored on a remote, non-mounted filesystem to a task.
+/** Add a file created or handled by an arbitrary command to a task (eg: wget, ftp, chirp_get|put).
 @param t The task to which to add a file.
 @param remote_name The name of the file at the execution site.
 @param cmd The command to run on the remote node to retrieve or store the file.
 @param type Must be one of the following values:
-- WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
-- WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
+- WORK_QUEUE_INPUT to indicate this creates an input file to be consumed by the task
+- WORK_QUEUE_OUTPUT to indicate this handles an output file to be produced by the task
 @param flags May be zero to indicate no special handling, or any of the following or'd together:
 - WORK_QUEUE_CACHEABLE - The file may be cached at the execution site for later use.
 */
-void work_queue_task_specify_remote_file(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags);
+void work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags);
 
 /** Attach a user defined logical name to the task.
 This field is not interpreted by the work queue, but simply maintained to help the user track tasks.

@@ -436,6 +436,7 @@ int batch_job_remove_sge(struct batch_queue *q, batch_job_id_t jobid)
 	return 1;
 }
 
+
 /***************************************************************************************/
 
 batch_job_id_t batch_job_submit_simple_moab( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
