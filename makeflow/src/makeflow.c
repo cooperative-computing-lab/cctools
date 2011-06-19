@@ -1463,7 +1463,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAB:cCd:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:T:vw:W:z")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:T:vw:W:z")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
