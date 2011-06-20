@@ -357,14 +357,13 @@ void mer_generate_cands(mer_hash_element * mhe)
 void print_mer_table(FILE * file)
 {
 	int curr_bucket;
-	mer_hash_element * mhe, *old_mhe;
+	mer_hash_element * mhe;
 	for (curr_bucket = 0; curr_bucket < MER_TABLE_BUCKETS; curr_bucket++)
 	{
 		mhe = mer_table[curr_bucket];
 		while (mhe)
 		{
 			print_mhe(file, mhe);
-			old_mhe = mhe;
 			mhe = mhe->next;
 		}
 	}

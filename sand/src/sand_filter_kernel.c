@@ -231,6 +231,7 @@ int main(int argc, char **argv)
 			cand_mem = get_mem_usage();
 
 			debug(D_DEBUG,"Total candidates generated: %llu\n", (long long unsigned int) total_cand);
+			debug(D_DEBUG,"Candidate memory used: %lu\n", cand_mem - table_mem);
 
 			output_list = retrieve_candidates(&num_in_list);
 			output_candidate_list(output, output_list, num_in_list);
