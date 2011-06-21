@@ -636,14 +636,12 @@ INT64_T chirp_reli_md5(const char *host, const char *path, unsigned char digest[
 
 /** Set the debug options on the remote server.
 @param host The name and port of the Chirp server to access.
-@param path The new filename for debug output. Pass NULL to not change.
-@param size The new file size limit of the debug output file. Pass NULL to not change.
 @param flag A debug flag to set on the server. Pass NULL to not change. Pass "clear" to clear.
 @param stoptime The absolute time at which to abort.
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_remote_debug(const char *host, const char *path, const char *size, const char *flag, time_t stoptime);
+INT64_T chirp_reli_remote_debug(const char *host, const char *flag, time_t stoptime);
 
 /** Return the local path of a file.
 This function allows the caller to find out the local path where a file is stored,

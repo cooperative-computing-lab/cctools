@@ -183,7 +183,7 @@ static struct command list[] = {
 	{"matrix_delete", 1, 1, 1, "<path>", do_matrix_delete},
 	{"timeout", 0, 1, 1, "<seconds>", do_timeout},
 	{"debug", 0, 0, 1, "[subsystem]", do_debug},
-	{"remote_debug", 1, 1, 3, "[output_file, output_file_size,] [subsystem]", do_remote_debug},
+	{"remote_debug", 1, 1, 1, "[subsystem]", do_remote_debug},
 	{"help", 0, 0, 0, "", do_help},
 	{"exit", 0, 0, 0, "", do_quit},
 	{"quit", 0, 0, 0, "", do_quit},
@@ -956,17 +956,7 @@ static INT64_T do_debug(int argc, char **argv)
 
 static INT64_T do_remote_debug(int argc, char **argv)
 {
-	if(argc == 2) {
-		/* set the flag */
-		return chirp_reli_remote_debug(current_host, NULL, NULL, argv[1], stoptime);
-	} else if (argc == 3) {
-		/* remote_debug output_file output_file_size */
-		return chirp_reli_remote_debug(current_host, argv[1], argv[2], NULL, stoptime);
-	} else if (argc == 4) {
-		/* remote_debug output_file output_file_size output_flag */
-		return chirp_reli_remote_debug(current_host, argv[1], argv[2], argv[3], stoptime);
-	} else
-	  assert(0);
+	return chirp_reli_remote_debug(current_host, argv[1], stoptime);
 }
 
 static INT64_T do_whoami(int argc, char **argv)

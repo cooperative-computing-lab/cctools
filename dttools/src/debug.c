@@ -43,6 +43,7 @@ See the file COPYING for details.
 #endif
 
 static pid_t(*debug_getpid) () = getpid;
+static int synchronize = 1;
 
 static struct debug_settings {
 	pthread_mutex_t mutex;
@@ -52,6 +53,9 @@ static struct debug_settings {
 	INT64_T flags;
 	char program_name[1024];
 } *debug_settings;
+
+#define LOCK  if (synchronize) pthread_mutex_lock(&debug_settings->mutex);
+#define UNLOCK  if (synchronize) pthread_mutex_unlock(&debug_settings->mutex);
 
 struct fatal_callback {
 	void (*callback) ();
@@ -141,8 +145,12 @@ static void initialize(void)
 	}
 	result = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
 	if (result != 0) {
-		fprintf(stderr, "pthread_mutexattr_setpshared failed: %s\n", strerror(result));
-		_exit(1);
+		/* If we can't use mutexes, then we're probably using Darwin.
+		   We just don't synchronize memory and hope for the best.
+		 */
+		synchronize = 0;
+		pthread_mutexattr_destroy(&attr);
+		return;
 	}
 	result = pthread_mutex_init(&debug_settings->mutex, &attr);
 	if (result != 0) {
@@ -164,15 +172,15 @@ int debug_flags_set(const char *flagname)
 
 	begin();
 
-	pthread_mutex_lock(&debug_settings->mutex);
+	LOCK
 	for(i = table; i->name; i++) {
 		if(!strcmp(flagname, i->name)) {
 			debug_settings->flags |= i->flag;
-			pthread_mutex_unlock(&debug_settings->mutex);
+			UNLOCK
 			return 1;
 		}
 	}
-	pthread_mutex_unlock(&debug_settings->mutex);
+	UNLOCK
 
 	return 0;
 }
@@ -183,11 +191,11 @@ void debug_flags_print(FILE * stream)
 
 	begin();
 
-	pthread_mutex_lock(&debug_settings->mutex);
+	LOCK
 	for(i = 0; table[i].name; i++) {
 		fprintf(stream, "%s ", table[i].name);
 	}
-	pthread_mutex_unlock(&debug_settings->mutex);
+	UNLOCK
 }
 
 void debug_set_flag_name(INT64_T flag, const char *name)
@@ -196,14 +204,14 @@ void debug_set_flag_name(INT64_T flag, const char *name)
 
 	begin();
 
-	pthread_mutex_lock(&debug_settings->mutex);
+	LOCK
 	for(i = table; i->name; i++) {
 		if(i->flag & flag) {
 			i->name = name;
 			break;
 		}
 	}
-	pthread_mutex_unlock(&debug_settings->mutex);
+	UNLOCK
 }
 
 static void do_debug(int is_fatal, INT64_T flags, const char *fmt, va_list args)
@@ -242,7 +250,7 @@ static void do_debug(int is_fatal, INT64_T flags, const char *fmt, va_list args)
 
 			debug_settings->fd = open(debug_settings->output, O_CREAT | O_TRUNC | O_WRONLY, 0777);
 			if(debug_settings->fd < 0) {
-				pthread_mutex_unlock(&debug_settings->mutex);
+				UNLOCK 
 				fatal("couldn't open %s: %s", debug_settings->output, strerror(errno));
             }
 		}
@@ -258,13 +266,13 @@ void debug(INT64_T flags, const char *fmt, ...)
 
 	begin();
 
-	pthread_mutex_lock(&debug_settings->mutex);
+	LOCK
 	if(flags & debug_settings->flags) {
 		int save_errno = errno;
 		do_debug(0, flags, fmt, args);
 		errno = save_errno;
 	}
-	pthread_mutex_unlock(&debug_settings->mutex);
+	UNLOCK
 
 	va_end(args);
 }
@@ -277,9 +285,9 @@ void fatal(const char *fmt, ...)
 
 	begin();
 
-	pthread_mutex_lock(&debug_settings->mutex);
+	LOCK
 	do_debug(1, 0, fmt, args);
-	pthread_mutex_unlock(&debug_settings->mutex);
+	UNLOCK
 
 	for(f = fatal_callback_list; f; f = f->next) {
 		f->callback();
@@ -305,7 +313,7 @@ void debug_config_fatal(void (*callback) ())
 void debug_config_file(const char *f)
 {
 	begin();
-	pthread_mutex_lock(&debug_settings->mutex);
+	LOCK
 	if(f) {
 		if(*f == '/')
 			strcpy(debug_settings->output, f);
@@ -320,21 +328,21 @@ void debug_config_file(const char *f)
 		}
 		debug_settings->fd = open(f, O_CREAT | O_APPEND | O_WRONLY, 0777);
 		if(debug_settings->fd < 0) {
-            pthread_mutex_unlock(&debug_settings->mutex);
+			UNLOCK
 			fatal("couldn't open %s: %s", f, strerror(errno));
         }
 	} else {
 		debug_settings->fd = STDERR_FILENO;
 	}
-	pthread_mutex_unlock(&debug_settings->mutex);
+	UNLOCK
 }
 
 void debug_config_file_size(size_t size)
 {
 	begin();
-	pthread_mutex_lock(&debug_settings->mutex);
+	LOCK
 	debug_settings->output_size = size;
-	pthread_mutex_unlock(&debug_settings->mutex);
+	UNLOCK
 }
 
 void debug_config_getpid(pid_t(*getpidfunc) ())
@@ -346,19 +354,19 @@ INT64_T debug_flags_clear()
 {
 	INT64_T result;
 	begin();
-	pthread_mutex_lock(&debug_settings->mutex);
+	LOCK
 	result = debug_settings->flags;
 	debug_settings->flags = 0;
-	pthread_mutex_unlock(&debug_settings->mutex);
+	UNLOCK
 	return result;
 }
 
 void debug_flags_restore(INT64_T fl)
 {
 	begin();
-	pthread_mutex_lock(&debug_settings->mutex);
+	LOCK
 	debug_settings->flags = fl;
-	pthread_mutex_unlock(&debug_settings->mutex);
+	UNLOCK
 }
 
 void debug_config(const char *name)

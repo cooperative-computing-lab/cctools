@@ -1328,12 +1328,10 @@ INT64_T chirp_client_md5(struct chirp_client * c, const char *path, unsigned cha
 	return result;
 }
 
-INT64_T chirp_client_remote_debug(struct chirp_client * c, const char *path, const char *size, const char *flag, time_t stoptime)
+INT64_T chirp_client_remote_debug(struct chirp_client * c, const char *flag, time_t stoptime)
 {
-	if(path == NULL) path = "*";
-	if(size == NULL) size = "*";
 	if(flag == NULL) flag = "*";
-	return simple_command(c, stoptime, "debug %s %s %s\n", path, size, flag);
+	return simple_command(c, stoptime, "debug %s\n", flag);
 }
 
 INT64_T chirp_client_audit(struct chirp_client * c, const char *path, struct chirp_audit ** list, time_t stoptime)
