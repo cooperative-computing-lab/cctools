@@ -286,6 +286,14 @@ static int do_chirp_acl_check(const char *root, const char *filename, const char
 	else
 		strcpy(dirname, temp);
 
+	/* If filename is a directory, then we change execute flags to list flags.
+	* This is significant for the access system call (on FUSE).
+	*/
+	if(is_a_directory(filename) && (flags & CHIRP_ACL_EXECUTE)) {
+		flags ^= CHIRP_ACL_EXECUTE;
+		flags |= CHIRP_ACL_LIST;
+	}
+
 	/* Perform the permissions check on that directory. */
 
 	return chirp_acl_check_dir(root, dirname, subject, flags);
