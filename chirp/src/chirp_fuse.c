@@ -51,6 +51,9 @@ static void parsepath(const char *path, char *newpath, char *host)
 	} else if(*path == '/') {
 		// path is absolute
 		sscanf(path, "/%[^/]%s", host, newpath);
+		if(strcmp(newpath, "") == 0) {
+			strcpy(newpath, "/"); /* path = "/host[:port]" ; no final slash */
+		}
 	} else {
 		// path is relative
 		strcpy(host, "/");
