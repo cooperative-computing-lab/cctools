@@ -125,5 +125,6 @@ INT64_T chirp_client_fsync_begin(struct chirp_client *c, INT64_T fd, time_t stop
 INT64_T chirp_client_fsync_finish(struct chirp_client *c, INT64_T fd, time_t stoptime);
 INT64_T chirp_client_fstat_begin(struct chirp_client *c, INT64_T fd, struct chirp_stat *buf, time_t stoptime);
 INT64_T chirp_client_fstat_finish(struct chirp_client *c, INT64_T fd, struct chirp_stat *buf, time_t stoptime);
+INT64_T chirp_client_search(struct chirp_client *c, const char *pattern, const char *dir, char **list, time_t stoptime);
 
 #endif

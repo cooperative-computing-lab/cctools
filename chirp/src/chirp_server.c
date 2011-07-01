@@ -897,6 +897,10 @@ static void chirp_handler(struct link *l, const char *subject)
 
 		char debug_flag[CHIRP_LINE_MAX];
 
+		char search_pattern[CHIRP_LINE_MAX];
+		char search_dir[CHIRP_LINE_MAX];
+		int limit;	
+
 		char jobcwd[CHIRP_PATH_MAX];
 		char infile[CHIRP_PATH_MAX];
 		char outfile[CHIRP_PATH_MAX];
@@ -1734,7 +1738,14 @@ static void chirp_handler(struct link *l, const char *subject)
 				debug_flags_clear();
 			else if(strcmp(debug_flag, "*") != 0) {
 				debug_flags_set(debug_flag);
-			}
+		} else if (sscanf(line, "search %s %s %d", search_pattern, search_dir, &limit)==2)  {
+			char** to_search = malloc((strlen(search_dir)+10)*sizeof(char));
+			*(to_search)=search_dir;
+			*(to_search+1)=NULL;
+			link_write(l, "0\n", 2, stalltime);	
+			chirp_alloc_search(to_search, search_pattern, l, stalltime);
+			link_write(l, "/\n", 1, stalltime);
+			link_write(l, "\n", 1, stalltime);
 		} else {
 			result = -1;
 			errno = ENOSYS;

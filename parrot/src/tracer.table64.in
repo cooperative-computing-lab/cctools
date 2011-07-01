@@ -307,3 +307,4 @@ parrot_copyfile 305
 parrot_md5      306
 parrot_locate   307
 parrot_timeout  308
+parrot_search   309

@@ -35,6 +35,7 @@ extern "C" {
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <fnmatch.h>
 #include <ctype.h>
 #include <math.h>
 #include <signal.h>
@@ -1528,6 +1529,90 @@ int pfs_table::whoami( const char *n, char *buf, int length )
 	}
 
 	return result;
+}
+
+/*
+        The search system call looks through directories for files matching a given pattern.
+
+        char **dirlist          : NULL-terminated list of directories to recursively search
+        char *pattern           : glob pattern for file names to match
+        char buffer[][NAME_MAX] : the buffer onto which the matching names are written
+        struct stat *stats      : the stat structs buffer onto which file metadata is written
+        size_t size             : the number of rows of the buffer. No more than size results can be returned
+        int return              : the number of results. If the buffer is too small, -1 will be returned
+*/
+
+int pfs_table::search( char **dirlist, char *pattern, char buffer[][NAME_MAX], struct stat *stats, size_t size )
+{
+        int i=0, writ=0;
+        const char *name;
+
+        while((name=*(dirlist+i))!=NULL && writ!=-1) {
+
+                i++;
+                DIR *dirp;
+                struct stat st;
+
+                 if ((dirp=opendir(name))!=NULL) {
+
+                        struct dirent *entry;
+
+                        while ((entry=readdir(dirp)) && writ!=-1) {
+
+                                if (strcmp(entry->d_name, ".")!=0 && strcmp(entry->d_name, "..")!=0) {
+
+                                        char *fullpath_st = (char*) malloc(sizeof(char)*(strlen(entry->d_name)+strlen(name)+2));
+                                        char *fullpath = (char*) malloc(sizeof(char)*(strlen(entry->d_name)+strlen(name)+2));
+                                        char *file_name = (char*) malloc(sizeof(char)*(strlen(entry->d_name)+1));
+                                        strcpy(fullpath_st, name);
+                                        strcpy(file_name, entry->d_name);
+                                        strcat(fullpath_st, "/");
+                                        strcat(fullpath_st, file_name);
+                                        strcpy(fullpath, fullpath_st);
+                                        int statmode = ::stat(fullpath_st, &st);
+                                        char *pat = NULL;
+                                        char *sep = (char*) "/";
+                                        char *pats_tok = (char*) malloc(sizeof(char)*(strlen(pattern)+1));
+                                        strcpy(pats_tok, pattern);
+                                        pat = strtok(pats_tok, sep);
+
+                                        while (pat!=NULL) {
+
+                                                if (!fnmatch(pat, entry->d_name, 0) && writ!=-1) {
+
+                                                        unsigned int uwrit = (unsigned int) writ;
+
+                                                        if (uwrit==size) {
+
+                                                                writ=-1;
+                                                                break;
+                                                        }
+                                                        else {
+
+                                                                strcpy(buffer[writ], fullpath);
+                                                                *(stats+writ) = st;
+                                                                writ++;
+                                                        }
+                                                }
+
+                                                pat = strtok(NULL, sep);
+                                        }
+
+                                        if (!statmode && S_ISDIR(st.st_mode)) {
+
+                                                char **tmp_dirlist = (char**) malloc((strlen(fullpath)+1)*sizeof(char));
+                                                *(tmp_dirlist) = fullpath;
+                                                *(tmp_dirlist+1) = NULL;
+                                                int new_writ = search(tmp_dirlist, pattern, buffer+writ, stats+writ, size-writ);
+                                                writ = (writ==-1 || new_writ==-1) ? -1 : writ+new_writ;
+                                        }
+                                }
+                        }
+                }
+                closedir(dirp);
+        }
+
+        return writ;
 }
 
 int pfs_table::getacl( const char *n, char *buf, int length )

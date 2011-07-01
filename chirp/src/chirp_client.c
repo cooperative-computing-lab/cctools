@@ -1395,6 +1395,25 @@ INT64_T chirp_client_lsalloc(struct chirp_client * c, char const *path, char *al
 	return result;
 }
 
+INT64_T chirp_client_search(struct chirp_client *c, const char *pattern, const char *dir, char **list, time_t stoptime)
+{
+	simple_command(c, stoptime, "search %s %s\n", pattern, dir);
+	char line[CHIRP_LINE_MAX];
+	int i = 0;
+	char* items = malloc(sizeof(char)*CHIRP_LINE_MAX);
+
+	while (link_readline(c->link, line, sizeof(line), stoptime)) {
+		if (strcmp(line, "/")==0) break;
+		if (strcmp(line, "0")!=0) {
+			strcpy(items+i*CHIRP_LINE_MAX, line);
+			items = realloc(items, (++i+1)*CHIRP_LINE_MAX);	
+		}
+	}
+
+	*list = items;	
+	return i;
+}
+
 INT64_T chirp_client_group_create(struct chirp_client * c, char *group, time_t stoptime)
 {
 	return simple_command(c, stoptime, "group_create %s\n", group);

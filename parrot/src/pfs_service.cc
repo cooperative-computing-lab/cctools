@@ -212,6 +212,12 @@ int pfs_service::whoami( pfs_name *name, char *buf, int size )
 	return -1;
 }
 
+int pfs_service::search ( char **dirlist, char *pattern, char buffer[][NAME_MAX], struct stat *stats, size_t size )
+{
+        errno = ENOSYS;
+        return -1;
+}
+
 int pfs_service::getacl( pfs_name *name, char *buf, int size )
 {
 	errno = ENOSYS;

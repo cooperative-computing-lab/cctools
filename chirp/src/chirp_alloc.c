@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "chirp_alloc.h"
 #include "chirp_protocol.h"
 #include "chirp_filesystem.h"
+#include "chirp_acl.h"
 
 #include "itable.h"
 #include "hash_table.h"
@@ -18,13 +19,17 @@ See the file COPYING for details.
 #include "delete_dir.h"
 #include "debug.h"
 
-#include <assert.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+
+#include <fnmatch.h>
+#include <dirent.h>
+
+#include <assert.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 static struct hash_table *alloc_table = 0;
 static struct hash_table *root_table = 0;
@@ -359,6 +364,62 @@ int chirp_alloc_flush_needed()
 time_t chirp_alloc_last_flush_time()
 {
 	return last_flush_time;
+}
+
+INT64_T chirp_alloc_search(char **dirlist, char *pattern, struct link *l, time_t stalltime)
+{
+	char line[CHIRP_LINE_MAX];
+	int i=0, writ=0;
+	const char *name;
+
+	while((name=*(dirlist+i))!=NULL && writ!=-1) {
+		i++;
+		void *dirp;
+
+		if ((dirp=chirp_alloc_opendir(name))!=NULL) {
+			const char *d;
+
+			while ((d=chirp_alloc_readdir(dirp)) && writ!=-1) {	
+				if (strcmp(d, ".")!=0 && strcmp(d, "..")!=0) {
+					char *fullpath_st = (char*) xxmalloc(sizeof(char)*(strlen(d)+strlen(name)+2));
+					char *fullpath = (char*) xxmalloc(sizeof(char)*(strlen(d)+strlen(name)+2));
+					char *file_name = (char*) xxmalloc(sizeof(char)*(strlen(d)+1));
+					strcpy(fullpath_st, name);
+					strcpy(file_name, d);
+					strcat(fullpath_st, "/");
+					strcat(fullpath_st, file_name);
+					strcpy(fullpath, fullpath_st); 
+					char *pat = NULL;
+					char *sep = (char*) "/";
+					char *pats_tok = (char*) xxmalloc(sizeof(char)*(strlen(pattern)+1));
+					strcpy(pats_tok, pattern);
+					pat = strtok(pats_tok, sep);	
+
+					while (pat!=NULL) {
+						if (!fnmatch(pat, d, 0) && writ!=-1) {
+							sprintf(line, "%s\n", fullpath);
+							link_write(l, line, strlen(line), stalltime);
+							writ++;
+						}
+
+						pat = strtok(NULL, sep);
+					}
+
+					if (is_a_directory(fullpath)) {
+						char **tmp_dirlist = (char**) xxmalloc((strlen(fullpath)+1)*sizeof(char));
+						*(tmp_dirlist) = fullpath;
+						*(tmp_dirlist+1) = NULL;
+						int new_writ = chirp_alloc_search(tmp_dirlist, pattern, l, stalltime);
+						writ = (writ==-1 || new_writ==-1) ? -1 : writ+new_writ;
+					}
+				}
+			}
+		}
+
+		chirp_alloc_closedir(dirp);
+	}
+
+	return writ;
 }
 
 INT64_T chirp_alloc_open(const char *path, INT64_T flags, INT64_T mode)

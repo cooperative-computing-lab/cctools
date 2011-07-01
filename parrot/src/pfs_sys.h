@@ -120,6 +120,7 @@ int		pfs_get_full_name( int fd, char *name );
 int		pfs_get_local_name( const char *rpath, char *lpath, char *firstline, int length );
 int		pfs_is_nonblocking( int fd );
 int		pfs_resolve_name( const char *path, struct pfs_name *pname );
+int pfs_search( char **dirlist, char *pattern, char buffer[][NAME_MAX], struct stat *stats, size_t size );
  
 #ifdef __cplusplus
 }

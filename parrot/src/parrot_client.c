@@ -47,6 +47,16 @@ int parrot_setacl( const char *path, const char *subject, const char *rights )
 #endif
 }
 
+int parrot_search( char **dirlist, char *pattern, char buffer[][NAME_MAX], struct stat *stats, size_t size )
+{
+
+#ifdef CCTOOLS_CPU_I386
+        return syscall(SYSCALL32_parrot_search,dirlist,pattern,buffer,stats,size);
+#else
+        return syscall(SYSCALL64_parrot_search,dirlist,pattern,buffer,stats,size);
+#endif
+}
+
 int parrot_md5( const char *filename, unsigned char *digest )
 {
 #ifdef CCTOOLS_CPU_I386

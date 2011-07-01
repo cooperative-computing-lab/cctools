@@ -73,7 +73,7 @@ void chirp_acl_default(const char *d)
 	default_acl = d;
 }
 
-static int is_a_directory(const char *filename)
+int is_a_directory(const char *filename)
 {
 	struct chirp_stat info;
 
