@@ -200,7 +200,12 @@ static void handle_updates(struct datagram *update_port)
 		char name[DOMAIN_NAME_MAX];
 		if(domain_name_cache_lookup_reverse(addr, name)) {
 			nvpair_insert_string(nv, "name", name);
-		} else {
+		} else if (nvpair_lookup_string(nv, "name") == NULL) {
+			/* If rDNS is unsuccessful, then we use the name reported if given.
+			 * This allows for hostnames that are only valid in the subnet of
+			 * the reporting server.  Here we set the "name" field to the IP
+			 * Address, addr, because it was not set by the reporting server.
+			 */
 			nvpair_insert_string(nv, "name", addr);
 		}
 
