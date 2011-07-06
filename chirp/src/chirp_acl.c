@@ -54,15 +54,6 @@ static const char *default_acl = 0;
 
 extern const char *chirp_super_user;
 
-static int do_stat(const char *filename, struct chirp_stat *buf)
-{
-	int result;
-	do {
-		result = cfs->stat(filename, buf);
-	} while(result == -1 && errno == EINTR);
-	return result;
-}
-
 void chirp_acl_force_readonly()
 {
 	read_only_mode = 1;
@@ -71,21 +62,6 @@ void chirp_acl_force_readonly()
 void chirp_acl_default(const char *d)
 {
 	default_acl = d;
-}
-
-static int is_a_directory(const char *filename)
-{
-	struct chirp_stat info;
-
-	if(do_stat(filename, &info) == 0) {
-		if(S_ISDIR(info.cst_mode)) {
-			return 1;
-		} else {
-			return 0;
-		}
-	} else {
-		return 0;
-	}
 }
 
 static void make_acl_name(const char *filename, int get_parent, char *aclname)
@@ -281,18 +257,10 @@ static int do_chirp_acl_check(const char *root, const char *filename, const char
 	/* Now get the name of the directory containing the file */
 
 	string_collapse_path(filename, temp, 1);
-	if(!is_a_directory(temp))
+	if(!cfs_isdir(temp))
 		string_dirname(temp, dirname);
 	else
 		strcpy(dirname, temp);
-
-	/* If filename is a directory, then we change execute flags to list flags.
-	* This is significant for the access system call (on FUSE).
-	*/
-	if(is_a_directory(filename) && (flags & CHIRP_ACL_EXECUTE)) {
-		flags ^= CHIRP_ACL_EXECUTE;
-		flags |= CHIRP_ACL_LIST;
-	}
 
 	/* Perform the permissions check on that directory. */
 
@@ -311,7 +279,7 @@ int chirp_acl_check_link(const char *root, const char *filename, const char *sub
 
 int chirp_acl_gettickets(const char *dirname, struct hash_table *ticket)
 {
-	if(!is_a_directory(dirname)) {
+	if(!cfs_isdir(dirname)) {
 		errno = ENOTDIR;
 		return -1;
 	}
@@ -522,7 +490,7 @@ int chirp_acl_ticket_create(const char *root, const char *subject, const char *n
 		chirp_ticket_free(&ct);
 	}
 
-	if(!is_a_directory(root)) {
+	if(!cfs_isdir(root)) {
 		errno = ENOTDIR;
 		return -1;
 	}
@@ -643,7 +611,7 @@ int chirp_acl_set(const char *dirname, const char *subject, int flags, int reset
 	int result;
 	int replaced_acl_entry = 0;
 
-	if(!is_a_directory(dirname)) {
+	if(!cfs_isdir(dirname)) {
 		errno = ENOTDIR;
 		return -1;
 	}
@@ -721,7 +689,7 @@ CHIRP_FILE *chirp_acl_open(const char *dirname)
 	char aclname[CHIRP_PATH_MAX];
 	CHIRP_FILE *file;
 
-	if(!is_a_directory(dirname)) {
+	if(!cfs_isdir(dirname)) {
 		if(errno == ENOENT && default_acl) {
 			file = cfs_fopen(default_acl, "r");
 			return file;

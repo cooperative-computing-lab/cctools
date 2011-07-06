@@ -263,3 +263,27 @@ int cfs_freadall(CHIRP_FILE * f, char **s, size_t * l)
 		return 1;
 	}
 }
+
+static int do_stat(const char *filename, struct chirp_stat *buf)
+{
+	int result;
+	do {
+		result = cfs->stat(filename, buf);
+	} while(result == -1 && errno == EINTR);
+	return result;
+}
+
+int cfs_isdir(const char *filename)
+{
+	struct chirp_stat info;
+
+	if(do_stat(filename, &info) == 0) {
+		if(S_ISDIR(info.cst_mode)) {
+			return 1;
+		} else {
+			return 0;
+		}  
+	} else {
+		return 0;
+	}
+}

@@ -24,6 +24,7 @@ size_t cfs_fwrite(const void *ptr, size_t size, size_t nitems, CHIRP_FILE * f);
 size_t cfs_fread(void *ptr, size_t size, size_t nitems, CHIRP_FILE * f);
 int cfs_ferror(CHIRP_FILE * file);
 int cfs_freadall(CHIRP_FILE * file, char **s, size_t * l);
+int cfs_isdir(const char *filename);
 
 int cfs_create_dir(const char *path, int mode);
 
