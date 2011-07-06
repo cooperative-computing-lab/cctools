@@ -32,7 +32,7 @@ See the file COPYING for details.
 
 const char *batch_queue_type_string()
 {
-	return "local, condor, sge, wq, hadoop, mpi-queue";
+	return "local, condor, sge, moab, wq, hadoop, mpi-queue";
 }
 
 batch_queue_type_t batch_queue_type_from_string(const char *str)
