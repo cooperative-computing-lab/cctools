@@ -193,8 +193,8 @@ static void handle_updates(struct datagram *update_port)
 			INT64_T avail = nvpair_lookup_integer(nv, "avail");
 
 			if(total > max_server_size || avail > max_server_size) {
-				nvpair_insert_integer(nv, "total", 0);
-				nvpair_insert_integer(nv, "avail", 0);
+				nvpair_insert_integer(nv, "total", max_server_size);
+				nvpair_insert_integer(nv, "avail", max_server_size);
 			}
 		}
 
