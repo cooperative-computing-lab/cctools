@@ -227,7 +227,9 @@ void auth_ticket_clear(void)
 
 void auth_ticket_add(const char *digest, const char *ticket)
 {
-	hash_table_insert(server_tickets, digest, strdup(ticket));
+	if(server_tickets) {
+		hash_table_insert(server_tickets, digest, strdup(ticket));
+	}
 }
 
 void auth_ticket_load(const char *tickets)
