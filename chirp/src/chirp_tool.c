@@ -624,11 +624,11 @@ static INT64_T do_ticket_create(int argc, char **argv)
 
 static INT64_T do_ticket_register(int argc, char **argv)
 {
-	assert(argc == 2 || argc == 3);
-	if(argc == 2) {
-		return chirp_reli_ticket_register(current_host, argv[1], NULL, (time_t) strtoull(argv[3], NULL, 10), stoptime);
+	assert(argc == 3 || argc == 4);
+	if(argc == 3) {
+		return chirp_reli_ticket_register(current_host, argv[1], NULL, (time_t) strtoull(argv[2], NULL, 10), stoptime);
 	} else {
-		return chirp_reli_ticket_register(current_host, argv[1], argv[2], (time_t) strtoull(argv[2], NULL, 10), stoptime);
+		return chirp_reli_ticket_register(current_host, argv[1], argv[2], (time_t) strtoull(argv[3], NULL, 10), stoptime);
 	}
 }
 
