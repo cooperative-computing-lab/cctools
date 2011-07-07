@@ -25,6 +25,7 @@ extern "C" {
 #include "debug.h"
 #include "getopt.h"
 #include "pfs_resolve.h"
+#include "chirp_client.h"
 #include "chirp_filesystem.h"
 #include "chirp_local.h"
 #include "chirp_acl.h"
@@ -397,7 +398,7 @@ int main( int argc, char *argv[] )
 	int chose_auth=0;
 	struct rusage usage;
 	char c;
-	int did_ticket=0;
+	char *tickets = NULL;
 
 	srand(time(0)*(getpid()+getuid()));
 
@@ -567,8 +568,7 @@ int main( int argc, char *argv[] )
 			pfs_use_helper = 0;
 			break;
 		case 'i':
-			setenv(CHIRP_CLIENT_TICKETS, optarg, 1);
-			did_ticket = 1;
+			tickets = strdup(optarg);
 			break;
 		case 'k':
 			pfs_checksum_files = 0;
@@ -654,27 +654,17 @@ int main( int argc, char *argv[] )
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
 	file_cache_cleanup(pfs_file_cache);
 
-	if(!did_ticket && getenv(CHIRP_CLIENT_TICKETS) == NULL) {
-		/* populate a list with tickets in the current directory */
-		int i;
-		char **list;
-		char *tickets = xstrdup("");
-		sort_dir(".", &list, strcmp);
-		for (i = 0; list[i]; i++) {
-			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 && (strlen(list[i]) == (strlen("ticket.")+(MD5_DIGEST_LENGTH<<1)))) {
-				debug(D_CHIRP, "adding ticket %s", list[i]);
-				tickets = (char *) xxrealloc(tickets, strlen(tickets)+1+strlen(list[i])+1);
-                if (*tickets != '\0') /* non-empty? */
-					strcat(tickets, ",");
-				strcat(tickets, list[i]);
-			}
-		}
-		setenv(CHIRP_CLIENT_TICKETS, tickets, 1);
+	if(!chose_auth) auth_register_all();
+
+	if(tickets) {
+		auth_ticket_load(tickets);
 		free(tickets);
-		sort_dir_free(list);
+	} else if(getenv(CHIRP_CLIENT_TICKETS)) {
+		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
+	} else {
+		auth_ticket_load(NULL);
 	}
 
-	if(!chose_auth) auth_register_all();
 
 	if(!pfs_channel_init(channel_size*1024*1024)) fatal("couldn't establish I/O channel");	
 
