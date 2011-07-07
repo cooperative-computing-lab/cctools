@@ -133,10 +133,11 @@ static void show_help(const char *cmd)
 	printf("\nLess common options are:\n");
 	printf(" -A <file>   Use this file as the default ACL.\n");
 	printf(" -a <method> Enable this authentication method.\n");
-	printf(" -c <dir>    Challenge directory for filesystem authentication.\n");
+	printf(" -c <dir>    Challenge directory for unix filesystem authentication.\n");
 	printf(" -C          Do not create a core dump, even due to a crash.\n");
 	printf(" -E          Exit if parent process dies.\n");
 	printf(" -e <time>   Check for presence of parent at this interval. (default is %ds)\n", parent_check_timeout);
+	printf(" -f <fs>     Type of filesystem on backend (default is local).\n");
 	printf(" -F <size>   Leave this much space free in the filesystem.\n");
 	printf(" -G <url>    Base url for group lookups. (default: disabled)\n");
 	printf(" -I <addr>   Listen only on this network interface.\n");
@@ -156,9 +157,9 @@ static void show_help(const char *cmd)
 	printf(" -w <name>   The name of this server's owner.  (default is username)\n");
 	printf(" -W <file>   Use alternate password file for unix authentication\n");
 	printf(" -X          Enable remote execution.\n");
-	printf(" -f <fs>     Type of filesystem on backend (default is local).\n");
 	printf(" -x <hostname:port> Hostname and port of remote backend filesystem.\n");
 	printf(" -y <dir>    Location of transient data (default is pwd).\n");
+	printf(" -z <time>   Set max timeout for unix filesystem authentication. (default is 5s)\n");
 	printf("\n");
 	printf("Where debug flags are: ");
 	debug_flags_print(stdout);
@@ -366,7 +367,7 @@ int main(int argc, char *argv[])
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c_input = getopt(argc, argv, "A:a:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:")) != -1) {
+	while((c_input = getopt(argc, argv, "A:a:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:")) != -1) {
 		c = (char) c_input;
 		switch (c) {
 		case 'A':
@@ -491,6 +492,9 @@ int main(int argc, char *argv[])
 				if((chirp_hdfs_port = (UINT16_T) strtol(delim + 1, NULL, 10)) == 0)
 					fatal("-x hostname:port -> port is not a positive integer");
 			}
+			break;
+		case 'z':
+			auth_unix_timeout_set(atoi(optarg));
 			break;
 		case 'h':
 		default:
