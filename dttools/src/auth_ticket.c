@@ -28,12 +28,13 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 {
 	/* FIXME need to save errno ? */
 	char line[AUTH_LINE_MAX];
+	char **tickets = client_tickets;
 
-	if(client_tickets) {
+	if(tickets) {
 		char *ticket;
 		char digest[DIGEST_LENGTH];
 
-		while((ticket = *(client_tickets++)) != NULL) {
+		for (ticket = *tickets; ticket; ticket = *(++tickets)) {
 			char command[PATH_MAX * 2 + 4096];
 
 			/* load the digest */
