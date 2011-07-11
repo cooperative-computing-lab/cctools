@@ -70,6 +70,7 @@ mysql_path="/usr"
 python_path="/usr"
 xrootd_path="/usr"
 mpi_path="/usr/local"
+zlib_path="/usr"
 
 xrootd_arch=auto
 globus_flavor=auto
@@ -99,6 +100,7 @@ config_rfio_path=no
 config_dcap_path=no
 config_irods_path=no
 config_xrootd_path=no
+config_zlib_path=yes
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
 then
@@ -174,6 +176,11 @@ do
 			xrootd_path=$1
 			config_xrootd_path=yes
 			;;
+		--with-zlib-path)
+			shift
+			zlib_path=$1
+			config_zlib_path=yes
+			;;
 		--with-mpi-path)
 			shift
 			mpi_path=$1
@@ -240,6 +247,7 @@ Where PACKAGE may be:
     python
     xrootd
     mpi
+    zlib
 
 And SYSTEM may be:
     sand
@@ -549,6 +557,19 @@ then
         fi
 else
 	echo "*** skipping fuse support"
+fi
+
+if library_search z ${zlib_path}
+then
+	if [ X${zlib_path} != X/usr ]
+	then
+		ccflags="${ccflags} -I${zlib_path}/include"
+		ldflags="${ldflags} -L${zlib_path}/lib"
+	fi
+else
+	echo "*** Sorry, I couldn't find zlib in $zlib_path"
+	echo "*** Check --with-zlib-path and try again."
+	exit 1
 fi
 
 # Solaris places kerberos includes in a strange place.
