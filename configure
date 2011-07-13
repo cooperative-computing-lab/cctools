@@ -276,9 +276,9 @@ potential_packages="dttools ${include_package_sand} ${include_package_allpairs} 
 
 if [ $build_sys = LINUX ]
 then
-	ldflags="-Xlinker -Bstatic -Xlinker -lstdc++ -static-libgcc -Xlinker -Bdynamic -Xlinker --as-needed "
+	ldflags="-Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic -Xlinker --as-needed "
 else
-	ldflags="-lstdc++ -static-libgcc"
+	ldflags="-static-libgcc"
 fi
 
 rm -f Makefile.config
@@ -467,12 +467,6 @@ else
     fi
 fi
 
-##########################################################################
-# SWITCH BACK TO DYNAMIC LINKING FOR COMMON SYSTEM LIBRARIES
-##########################################################################
-library_search_mode=prefer_dynamic
-##########################################################################
-
 if [ $config_xrootd_path != no ] && check_file ${xrootd_path}/include/xrootd/XrdVersion.hh
 then
 	if [ x$xrootd_arch = xauto ]
@@ -489,7 +483,7 @@ then
 
 	ccflags="${ccflags} -I${xrootd_path}/include/xrootd -DHAS_XROOTD"
 
-	for library in XrdPosix XrdOuc XrdClient XrdSys XrdSec XrdSecgsi Xrd Xrd XrdCrypto XrdSut XrdNet XrdNetUtil XrdCryptossl XrdCryptoLite XrdSecunix XrdSecsss XrdPss XrdBwm
+	for library in XrdPosix XrdClient XrdSys XrdNet XrdNetUtil XrdOuc
 	do
 		if ! library_search $library ${xrootd_path} ${xrootd_arch}
 		then
@@ -508,6 +502,12 @@ else
 		echo "*** skipping xrootd support"
 	fi
 fi
+
+##########################################################################
+# SWITCH BACK TO DYNAMIC LINKING FOR COMMON SYSTEM LIBRARIES
+##########################################################################
+library_search_mode=prefer_dynamic
+##########################################################################
 
 if [ $config_readline_path != no ] && library_search readline ${readline_path}
 then
@@ -661,7 +661,7 @@ then
 	ldflags="${ldflags} -lrt"
 fi
 
-ldflags="${ldflags} -ldl -lpthread -lz -lc -lm"
+ldflags="${ldflags} -lstdc++ -ldl -lpthread -lz -lc -lm"
 
 if [ $build_sys = DARWIN ]
 then
