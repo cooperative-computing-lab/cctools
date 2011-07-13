@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <signal.h>
 
 batch_job_id_t batch_job_submit_simple_local(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
