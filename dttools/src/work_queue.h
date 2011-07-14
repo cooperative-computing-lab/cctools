@@ -56,11 +56,13 @@ and port of the master.
 #define WORK_QUEUE_WORKER_MODE_SHARED 0
 #define WORK_QUEUE_WORKER_MODE_EXCLUSIVE 1
 #define WORK_QUEUE_CATALOG_LINE_MAX 1024
-#define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 30
+//#define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 30
+#define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 10
 #define	WORK_QUEUE_CATALOG_LIFETIME	60
 
 #define WORK_QUEUE_WAIT_FCFS 0
 #define WORK_QUEUE_WAIT_FAST_DISPATCH 1
+#define WORK_QUEUE_WAIT_ADAPTIVE 2
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler; /**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
@@ -82,6 +84,7 @@ struct work_queue_task {
 
 	timestamp_t time_task_submit;	/**< The time at which this task was submitted */
 	timestamp_t time_task_finish;	/**< The time at which this task was finished */
+	timestamp_t time_app_delay;	 /**< time spent in upper-level application (outside of work_queue_wait)>*/
 	timestamp_t time_send_input_start;	/**< The time at which it started to transfer input files. */
 	timestamp_t time_send_input_finish;	/**< The time at which it finished transferring input files. */
 	timestamp_t time_execute_cmd_start;		    /**< The time at which the task began. */
@@ -113,6 +116,7 @@ struct work_queue_stats {
 	double efficiency;
 	double idle_percentage;
 	int capacity;
+	int current_capacity;
 };
 
 /** @name Functions - Tasks */

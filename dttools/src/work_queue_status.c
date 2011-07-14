@@ -20,6 +20,8 @@ enum {
 
 static int Work_Queue_Status_Mode    = MODE_TABLE;
 static int Work_Queue_Status_Timeout = 30;
+char *catalog_host = NULL;
+int catalog_port = 0;
 
 static struct nvpair_header headers[] = {
     { "project",		NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT,		20},
@@ -29,6 +31,7 @@ static struct nvpair_header headers[] = {
 	{ "tasks_complete",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,	15},
     { "workers",		NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,  	10},
     { "workers_busy",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,	15},
+    { "capacity",		NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,  	10},
     { "lastheardfrom",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT,	15},
     { NULL, }
 };
@@ -44,13 +47,38 @@ work_queue_status_show_help(const char *progname)
     printf(" -h          This message.\n");
 }
 
+int parse_catalog_server_description(char* server_string, char **host, int *port) {
+	char *colon;
+
+	colon = strchr(server_string, ':');
+
+	if(!colon) {
+		*host = NULL;
+		*port = 0;
+		return 0;
+	}
+
+	*colon = '\0';
+
+	*host = strdup(server_string);
+	*port = atoi(colon+1);
+	
+	return *port;
+}
+
 static void
 work_queue_status_parse_command_line_arguments(int argc, char *argv[])
 {
     int c;
 
-    while ((c = getopt(argc, argv, "d:lt:h")) != -1) {
+    while ((c = getopt(argc, argv, "C:d:lt:h")) != -1) {
 	switch (c) {
+		case 'C':
+		if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
+			fprintf(stderr, "Cannot parse catalog description: %s. \n", optarg);
+			exit(EXIT_FAILURE);
+		}
+			break;
 	    case 'd': 
 		debug_flags_set(optarg); 
 		break;
@@ -72,6 +100,7 @@ work_queue_status_parse_command_line_arguments(int argc, char *argv[])
     }
 }
 
+
 int
 main(int argc, char *argv[])
 {
@@ -81,20 +110,29 @@ main(int argc, char *argv[])
     work_queue_status_parse_command_line_arguments(argc, argv);
 
     if(optind > argc) {
-	work_queue_status_show_help("work_queue_status");
-	exit(EXIT_FAILURE);
+		work_queue_status_show_help("work_queue_status");
+		exit(EXIT_FAILURE);
     }
 
-    cq = catalog_query_create(CATALOG_HOST, CATALOG_PORT, time(0) + Work_Queue_Status_Timeout);
+	if(!catalog_host) {
+		catalog_host = strdup(CATALOG_HOST);
+		catalog_port = CATALOG_PORT;
+	}
+
+    cq = catalog_query_create(catalog_host, catalog_port, time(0) + Work_Queue_Status_Timeout);
+	if(!cq) {
+		fprintf(stderr, "Failed to query catalog server at %s:%d. \n", catalog_host, catalog_port);
+		exit(EXIT_FAILURE);
+	}
 
     if (Work_Queue_Status_Mode == MODE_TABLE) nvpair_print_table_header(stdout, headers);
 
     while ((nv = catalog_query_read(cq, time(0) + Work_Queue_Status_Timeout))) {
 	if (strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0) {
 	    if (Work_Queue_Status_Mode == MODE_TABLE)
-		nvpair_print_table(nv, stdout, headers);
+			nvpair_print_table(nv, stdout, headers);
 	    else
-		nvpair_print_text(nv, stdout);
+			nvpair_print_text(nv, stdout);
 	}
 	nvpair_delete(nv);
     }

@@ -15,6 +15,8 @@ See the file COPYING for details.
 #include "create_dir.h"
 #include "delete_dir.h"
 #include "macros.h"
+#include "catalog_query.h"
+#include "catalog_server.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -35,14 +37,45 @@ static struct batch_queue *q;
 static struct itable *remote_job_table = NULL;
 static int retry_count = 20;
 
-static void handle_abort( int sig ) {
-	abort_flag = 1;
-}
 
 struct worker_status {
 	int batch_job_id;
 	char status;
 };
+
+static void handle_abort( int sig ) {
+	abort_flag = 1;
+}
+
+int get_master_capacity(const char * catalog_host, int catalog_port, const char *proj) {
+	struct catalog_query *q;
+	struct nvpair *nv;
+	time_t stoptime;
+	int capacity = 0;
+	
+	stoptime = time(0) + 5;
+
+	q = catalog_query_create(catalog_host, catalog_port, stoptime);
+	if(!q) {
+		fprintf(stderr,"Failed to query catalog server at %s:%d\n", catalog_host, catalog_port);
+		return 0;
+	}
+
+	while((nv = catalog_query_read(q, stoptime))){
+		if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0 ) {
+			if(strcmp(nvpair_lookup_string(nv, proj), proj) == 0) {
+				capacity = nvpair_lookup_integer(nv, "capacity");
+				nvpair_delete(nv);
+				break;
+			}
+		}
+		nvpair_delete(nv);
+	}
+
+    // Must delete the query otherwise it would occupy 1 tcp connection forever!
+    catalog_query_delete(q);
+	return capacity;
+}
 	
 static int submit_workers(int count){
 	int i;
