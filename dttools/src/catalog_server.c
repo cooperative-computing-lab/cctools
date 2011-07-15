@@ -452,7 +452,7 @@ int main(int argc, char *argv[])
 			lifetime = string_time_parse(optarg);
 			break;
 		case 'L':
-			logfile = fopen(optarg,"w");
+			logfile = fopen(optarg,"a");
 			if(!logfile) fatal("couldn't open %s: %s\n",optarg,strerror(errno));
 			break;
 		case 'S':
