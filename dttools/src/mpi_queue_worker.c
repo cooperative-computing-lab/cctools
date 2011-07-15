@@ -577,6 +577,11 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if ((argc - optind) != 2) {
+	    show_help(argv[0]);
+	    return 1;
+	}
+
 	host = argv[optind];
 	port = atoi(argv[optind + 1]);
 
