@@ -91,8 +91,8 @@ config_readline_path=auto
 config_globus_path=auto
 config_fuse_path=auto
 config_mysql_path=auto
-config_mpi_path=auto
 config_python_path=auto
+config_zlib_path=yes
 
 config_krb5_path=no
 config_egee_path=no
@@ -100,7 +100,7 @@ config_rfio_path=no
 config_dcap_path=no
 config_irods_path=no
 config_xrootd_path=no
-config_zlib_path=yes
+config_mpi_path=no
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
 then
@@ -246,7 +246,6 @@ Where PACKAGE may be:
     mysql
     python
     xrootd
-    mpi
     zlib
 
 And SYSTEM may be:
