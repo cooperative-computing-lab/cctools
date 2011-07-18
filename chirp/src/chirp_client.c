@@ -310,10 +310,12 @@ static int ticket_translate(const char *name, char *ticket_subject)
 	char *pk = xxmalloc(65536); /* max size of public key */
 	sprintf(command, "sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null", name);
 	FILE *pkf = popen(command, "r");
-	if(fread(pk, sizeof(char), 65536, pkf) <= 0) {
+	int length = fread(pk, sizeof(char), 65536, pkf);
+	if(length <= 0) {
 		pclose(pkf);
 		return 0;
 	}
+	pk[length] = 0;
 	pclose(pkf);
 
 	/* load the digest */
