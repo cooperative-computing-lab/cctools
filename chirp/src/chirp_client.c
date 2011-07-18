@@ -422,7 +422,7 @@ INT64_T chirp_client_ticket_create(struct chirp_client * c, char name[CHIRP_PATH
 		/* WARNING: openssl is *very* bad at giving sensible output. Use the last
 		 * 32 non-space characters as the MD5 sum.
 		 */
-		"openssl md5 < \"$P\" 2> /dev/null | tr -d '[:space:] | tail -c 32 > \"$MD5\"\n"
+		"openssl md5 < \"$P\" 2> /dev/null | tr -d '[:space:]' | tail -c 32 > \"$MD5\"\n"
 		"if [ -z \"$CHIRP_TICKET\" ]; then\n"
 		"  CHIRP_TICKET=\"ticket.`cat $MD5`\"\n"
 		"fi\n"
