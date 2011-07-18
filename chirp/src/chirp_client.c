@@ -412,9 +412,24 @@ INT64_T chirp_client_ticket_register(struct chirp_client * c, const char *name, 
 INT64_T chirp_client_ticket_create(struct chirp_client * c, char name[CHIRP_PATH_MAX], unsigned bits, time_t stoptime)
 {
 	static const char command[] =
-		"T=`mktemp`\n" "P=`mktemp`\n" "MD5=`mktemp`\n" "echo \"# Chirp Ticket\" > \"$T\"\n" "echo \"# `date`: Ticket Created.\" >> \"$T\"\n" "openssl genrsa \"$CHIRP_BITS\" >> \"$T\" 2> /dev/null\n"
-		"sed '/^\\s*#/d' < \"$T\" | openssl rsa -pubout > \"$P\" 2> /dev/null\n" "openssl md5 < \"$P\" > \"$MD5\" 2> /dev/null\n" "if [ -z \"$CHIRP_TICKET\" ]; then\n" "  CHIRP_TICKET=\"ticket.`cat $MD5`\"\n" "fi\n"
-		"cat > \"$CHIRP_TICKET\" < \"$T\"\n" "rm -f \"$T\" \"$P\" \"$MD5\"\n" "echo \"Generated ticket $CHIRP_TICKET.\" 1>&2\n" "echo -n \"$CHIRP_TICKET\"\n";
+		"T=`mktemp`\n"
+		"P=`mktemp`\n"
+		"MD5=`mktemp`\n"
+		"echo \"# Chirp Ticket\" > \"$T\"\n"
+		"echo \"# `date`: Ticket Created.\" >> \"$T\"\n"
+		"openssl genrsa \"$CHIRP_BITS\" >> \"$T\" 2> /dev/null\n"
+		"sed '/^\\s*#/d' < \"$T\" | openssl rsa -pubout > \"$P\" 2> /dev/null\n"
+		/* WARNING: openssl is *very* bad at giving sensible output. Use the last
+		 * 32 non-space characters as the MD5 sum.
+		 */
+		"openssl md5 < \"$P\" 2> /dev/null | tr -d '[:space:] | tail -c 32 > \"$MD5\"\n"
+		"if [ -z \"$CHIRP_TICKET\" ]; then\n"
+		"  CHIRP_TICKET=\"ticket.`cat $MD5`\"\n"
+		"fi\n"
+		"cat > \"$CHIRP_TICKET\" < \"$T\"\n"
+		"rm -f \"$T\" \"$P\" \"$MD5\"\n"
+		"echo \"Generated ticket $CHIRP_TICKET.\" 1>&2\n"
+		"echo -n \"$CHIRP_TICKET\"\n";
 
 	int result = 0;
 
