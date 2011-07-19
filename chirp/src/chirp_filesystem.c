@@ -248,9 +248,10 @@ int cfs_create_dir(const char *path, int mode)
 int cfs_freadall(CHIRP_FILE * f, char **s, size_t * l)
 {
 	char *buffer = xxrealloc(NULL, 4096);
-	size_t n;
+	INT64_T n;
 	*l = 0;
-	while((n = cfs_fread(buffer + (*l), sizeof(char), 4096, f)) > 0) {
+	while((n = cfs->pread(f->fd, buffer + (*l), sizeof(char)*4096, f->offset)) > 0) {
+		f->offset += n;
 		*l += n;
 		buffer = xxrealloc(buffer, (*l) + 4096);
 		*(buffer + (*l)) = '\0';	/* NUL terminator... */
