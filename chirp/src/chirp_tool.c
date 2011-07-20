@@ -1504,13 +1504,16 @@ static INT64_T do_matrix_delete(int argc, char **argv)
 
 static INT64_T do_search(int argc, char **argv)
 {
-	char *list;
-	int result = chirp_reli_search(current_host, argv[1], argv[2], &list, stoptime);
-	int i;
+    char **array;
+	INT64_T result = chirp_reli_search(current_host, argv[1], argv[2], &array, stoptime);
 
-	for (i=0; i<result; i++) {
-		printf("%s\n", list+i*CHIRP_LINE_MAX);
+	if (result == 0) {
+		int i;
+		for (i = 0; array[i]; i++)
+			printf("%s\n", array[i]);
+		free(array);
+		return 0;
 	}
-
-	return result;
+	else
+		return 1;
 }

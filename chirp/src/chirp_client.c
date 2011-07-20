@@ -22,6 +22,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "copy_stream.h"
 #include "list.h"
+#include "string_array.h"
 #include "url_encode.h"
 #include "xmalloc.h"
 
@@ -1395,23 +1396,20 @@ INT64_T chirp_client_lsalloc(struct chirp_client * c, char const *path, char *al
 	return result;
 }
 
-INT64_T chirp_client_search(struct chirp_client *c, const char *pattern, const char *dir, char **list, time_t stoptime)
+INT64_T chirp_client_search(struct chirp_client *c, const char *pattern, const char *dir, char ***array, time_t stoptime)
 {
-	simple_command(c, stoptime, "search %s %s\n", pattern, dir);
-	char line[CHIRP_LINE_MAX];
-	int i = 0;
-	char* items = malloc(sizeof(char)*CHIRP_LINE_MAX);
+	INT64_T result = simple_command(c, stoptime, "search %s %s\n", pattern, dir);
+	*array = string_array_new();
 
-	while (link_readline(c->link, line, sizeof(line), stoptime)) {
-		if (strcmp(line, "/")==0) break;
-		if (strcmp(line, "0")!=0) {
-			strcpy(items+i*CHIRP_LINE_MAX, line);
-			items = realloc(items, (++i+1)*CHIRP_LINE_MAX);	
+	if (result == 0) {
+		char path[CHIRP_PATH_MAX];
+		while (link_readline(c->link, path, sizeof(path), stoptime)) {
+			if (strcmp(path, "") == 0) break;
+			*array = string_array_append(*array, path);
 		}
 	}
 
-	*list = items;	
-	return i;
+	return 0;
 }
 
 INT64_T chirp_client_group_create(struct chirp_client * c, char *group, time_t stoptime)

@@ -38,8 +38,6 @@ The caller may invoke <tt>strerror(errno)</tt> to generate a human-readable stri
 #include <stdio.h>
 #include <dirent.h>
 
-INT64_T chirp_reli_search( const char *host, const char *pattern, const char *dir, char **list, time_t stoptime );
-
 /** Creates or opens a file in preparation for I/O.
 @param host The name and port of the Chirp server to access.
 @param path The pathname of the file to access.
@@ -897,5 +895,7 @@ After forking, each process will maintain its own connection to each Chirp serve
 */
 
 void chirp_reli_cleanup_before_fork();
+
+INT64_T chirp_reli_search( const char *host, const char *pattern, const char *dir, char ***array, time_t stoptime );
 
 #endif

@@ -896,10 +896,8 @@ static void chirp_handler(struct link *l, const char *subject)
 		char hostname[CHIRP_LINE_MAX];
 
 		char debug_flag[CHIRP_LINE_MAX];
+		char pattern[CHIRP_LINE_MAX];
 
-		char search_pattern[CHIRP_LINE_MAX];
-		char search_dir[CHIRP_LINE_MAX];
-		int limit;	
 
 		char jobcwd[CHIRP_PATH_MAX];
 		char infile[CHIRP_PATH_MAX];
@@ -1716,7 +1714,6 @@ static void chirp_handler(struct link *l, const char *subject)
 			link_putliteral(l, "\n", stalltime);
 			chirp_job_list_close(list);
 			do_no_result = 1;
-
 		} else if(sscanf(line, "md5 %s", path) == 1) {
 			dataout = xxmalloc(16);
 			if(!chirp_path_fix(path))
@@ -1738,14 +1735,16 @@ static void chirp_handler(struct link *l, const char *subject)
 				debug_flags_clear();
 			else if(strcmp(debug_flag, "*") != 0) {
 				debug_flags_set(debug_flag);
-		} else if (sscanf(line, "search %s %s %d", search_pattern, search_dir, &limit)==2)  {
-			char** to_search = malloc((strlen(search_dir)+10)*sizeof(char));
-			*(to_search)=search_dir;
-			*(to_search+1)=NULL;
-			link_write(l, "0\n", 2, stalltime);	
-			chirp_alloc_search(to_search, search_pattern, l, stalltime);
-			link_write(l, "/\n", 1, stalltime);
-			link_write(l, "\n", 1, stalltime);
+            }
+		} else if (sscanf(line, "search %s %s", pattern, path)==2)  {
+			if(!chirp_path_fix(path))
+				goto failure;
+			if(!chirp_acl_check_dir(chirp_root_path, path, subject, CHIRP_ACL_LIST))
+				goto failure;
+			link_putliteral(l, "0\n", stalltime);	
+			chirp_alloc_search(subject, path, pattern, l, stalltime);
+			link_putliteral(l, "\n", stalltime);
+			result = 0;
 		} else {
 			result = -1;
 			errno = ENOSYS;

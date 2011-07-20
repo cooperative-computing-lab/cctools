@@ -4,20 +4,20 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "macros.h"
-#include "chirp_alloc.h"
-#include "chirp_protocol.h"
-#include "chirp_filesystem.h"
 #include "chirp_acl.h"
+#include "chirp_alloc.h"
+#include "chirp_filesystem.h"
+#include "chirp_protocol.h"
 
-#include "itable.h"
-#include "hash_table.h"
-#include "xmalloc.h"
-#include "int_sizes.h"
-#include "stringtools.h"
-#include "full_io.h"
-#include "delete_dir.h"
 #include "debug.h"
+#include "delete_dir.h"
+#include "full_io.h"
+#include "hash_table.h"
+#include "int_sizes.h"
+#include "itable.h"
+#include "macros.h"
+#include "stringtools.h"
+#include "xmalloc.h"
 
 #include <unistd.h>
 #include <sys/stat.h>
@@ -36,6 +36,8 @@ static struct hash_table *root_table = 0;
 static struct itable *fd_table = 0;
 static int recovery_in_progress = 0;
 static int alloc_enabled = 0;
+
+extern char *chirp_root_path;
 
 struct alloc_state {
 	FILE *file;
@@ -366,60 +368,49 @@ time_t chirp_alloc_last_flush_time()
 	return last_flush_time;
 }
 
-INT64_T chirp_alloc_search(char **dirlist, char *pattern, struct link *l, time_t stalltime)
+static void search_directory (const char *subject, unsigned level, const char *base, char *dir, const char *pattern, struct link *l, time_t stoptime)
 {
-	char line[CHIRP_LINE_MAX];
-	int i=0, writ=0;
-	const char *name;
+	if (level == 0)
+		return;
 
-	while((name=*(dirlist+i))!=NULL && writ!=-1) {
-		i++;
-		void *dirp;
+	void *dirp = chirp_alloc_opendir(dir);
+	char *current = dir+strlen(dir); /* point to end to current directory */
 
-		if ((dirp=chirp_alloc_opendir(name))!=NULL) {
-			const char *d;
+	if (dirp) {
+		const char *entry;
+		while ((entry = chirp_alloc_readdir(dirp))) {
+			if (strcmp(entry, ".") == 0 || strcmp(entry, "..") == 0 || strncmp(entry, ".__", 3) == 0) continue;
 
-			while ((d=chirp_alloc_readdir(dirp)) && writ!=-1) {	
-				if (strcmp(d, ".")!=0 && strcmp(d, "..")!=0) {
-					char *fullpath_st = (char*) xxmalloc(sizeof(char)*(strlen(d)+strlen(name)+2));
-					char *fullpath = (char*) xxmalloc(sizeof(char)*(strlen(d)+strlen(name)+2));
-					char *file_name = (char*) xxmalloc(sizeof(char)*(strlen(d)+1));
-					strcpy(fullpath_st, name);
-					strcpy(file_name, d);
-					strcat(fullpath_st, "/");
-					strcat(fullpath_st, file_name);
-					strcpy(fullpath, fullpath_st); 
-					char *pat = NULL;
-					char *sep = (char*) "/";
-					char *pats_tok = (char*) xxmalloc(sizeof(char)*(strlen(pattern)+1));
-					strcpy(pats_tok, pattern);
-					pat = strtok(pats_tok, sep);	
-
-					while (pat!=NULL) {
-						if (!fnmatch(pat, d, 0) && writ!=-1) {
-							sprintf(line, "%s\n", fullpath);
-							link_write(l, line, strlen(line), stalltime);
-							writ++;
-						}
-
-						pat = strtok(NULL, sep);
-					}
-
-					if (is_a_directory(fullpath)) {
-						char **tmp_dirlist = (char**) xxmalloc((strlen(fullpath)+1)*sizeof(char));
-						*(tmp_dirlist) = fullpath;
-						*(tmp_dirlist+1) = NULL;
-						int new_writ = chirp_alloc_search(tmp_dirlist, pattern, l, stalltime);
-						writ = (writ==-1 || new_writ==-1) ? -1 : writ+new_writ;
-					}
-				}
+			sprintf(current, "/%s", entry);
+			if (fnmatch(pattern, base, FNM_PATHNAME) == 0) {
+				link_putfstring(l, "%s\n", stoptime, dir);
 			}
+			if (is_a_directory(dir) && chirp_acl_check_dir(chirp_root_path, dir, subject, CHIRP_ACL_LIST)) {
+				search_directory(subject, level-1, base, dir, pattern, l, stoptime);
+			}
+			*current = '\0'; /* clear current entry */
 		}
-
 		chirp_alloc_closedir(dirp);
 	}
+}
 
-	return writ;
+/* Note we need the subject because we must check the ACL for any nested directories. */
+INT64_T chirp_alloc_search(const char *subject, const char *dir, const char *patt, struct link *l, time_t stoptime)
+{
+	unsigned level = 1;
+	const char *s;
+	char directory[CHIRP_PATH_MAX];
+	char pattern[CHIRP_PATH_MAX];
+
+	string_collapse_path(dir, directory, 0);
+
+	for (s = patt; *s == '/'; s++) ; /* remove leading slashes from pattern */
+	sprintf(pattern, "/%s", s); /* add leading slash for base directory */
+	for (s = strchr(pattern, '/'); s; s = strchr(s+1, '/')) level++; /* count the number of nested directories to descend at maximum */
+
+	search_directory(subject, level, directory+strlen(directory), directory, pattern, l, stoptime);
+
+	return 0;
 }
 
 INT64_T chirp_alloc_open(const char *path, INT64_T flags, INT64_T mode)
