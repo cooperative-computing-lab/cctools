@@ -38,7 +38,7 @@ char **string_array_append (char **oarray, char *str)
 	ptrdiff_t offset = ((void *)narray)-((void *)oarray)+sizeof(char *); /* difference including extra pointer */
 	for (tmp = narray; *tmp; tmp++)
 		*tmp = ((void *)*tmp)+offset; /* correct the address */
-	*tmp = (char *) narray+olength+sizeof(char *); /* set to new string location */
+	*tmp = (char *) (((void *)narray)+olength+sizeof(char *)); /* set to new string location */
 	strcpy(*tmp, str);
 	tmp++; /* now points to the old data length */
     memmove(((void *)tmp)+sizeof(char *), tmp, olength-(((void *)tmp)-((void *)narray))); /* careful with pointer arithmetic */
