@@ -43,9 +43,7 @@ extern struct chirp_filesystem chirp_fs_chirp;
 
 struct chirp_filesystem * cfs_lookup( const char *url )
 {
-	// XXX handle a non-url as a local path.
-
-	if(!strncmp(url,"local:",6) || !strncmp(url,"file:",5)) {
+	if(!strchr(url,':') || !strncmp(url,"local:",6) || !strncmp(url,"file:",5)) {
 		return &chirp_fs_local;
 	} else if(!strncmp(url,"hdfs:",5)) {
 		return &chirp_fs_hdfs;
@@ -263,6 +261,34 @@ int cfs_create_dir(const char *path, int mode)
 	} else {
 		return 1;
 	}
+}
+
+int cfs_delete_dir(const char *path)
+{
+	int result = 1;
+	const char *entry;
+	void *dir;
+
+	dir = cfs->opendir(path);
+	if(!dir) {
+		if(errno == ENOTDIR)
+			return cfs->unlink(path) == 0;
+		else
+			return errno == ENOENT;
+	}
+	while((entry = cfs->readdir(dir))) {
+		char subdir[PATH_MAX];
+		if(!strcmp(entry, "."))
+			continue;
+		if(!strcmp(entry, ".."))
+			continue;
+		sprintf(subdir, "%s/%s", path, entry);
+		if(!cfs_delete_dir(subdir)) {
+			result = 0;
+		}
+	}
+	cfs->closedir(dir);
+	return cfs->rmdir(path) == 0 ? result : 0;
 }
 
 int cfs_freadall(CHIRP_FILE * f, char **s, size_t * l)

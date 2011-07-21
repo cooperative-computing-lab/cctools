@@ -946,34 +946,6 @@ int chirp_acl_init_reserve(const char *root, const char *path, const char *subje
 	}
 }
 
-static int delete_dir(const char *path)
-{
-	int result = 1;
-	const char *entry;
-	void *dir;
-
-	dir = cfs->opendir(path);
-	if(!dir) {
-		if(errno == ENOTDIR)
-			return cfs->unlink(path) == 0;
-		else
-			return errno == ENOENT;
-	}
-	while((entry = cfs->readdir(dir))) {
-		char subdir[PATH_MAX];
-		if(!strcmp(entry, "."))
-			continue;
-		if(!strcmp(entry, ".."))
-			continue;
-		sprintf(subdir, "%s/%s", path, entry);
-		if(!delete_dir(subdir)) {
-			result = 0;
-		}
-	}
-	cfs->closedir(dir);
-	return cfs->rmdir(path) == 0 ? result : 0;
-}
-
 /*
   Because each directory now contains an ACL,
   a simple rmdir will not work on a (perceived) empty directory.
@@ -1001,7 +973,7 @@ int chirp_acl_rmdir(const char *path)
 			return -1;
 		}
 		cfs->closedir(dir);
-		delete_dir(dir);
+		cfs_delete_dir(dir);
 		return 0;
 	} else {
 		errno = ENOENT;

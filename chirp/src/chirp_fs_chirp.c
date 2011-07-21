@@ -54,17 +54,9 @@ const char * chirp_fs_chirp_init( const char *url )
 	p = strchr(chirp_fs_chirp_hostport,'/');
 	if(p) *p = 0;
 
-	debug(D_CHIRP,"url:      %s",url);
-	debug(D_CHIRP,"hostport: %s",chirp_fs_chirp_hostport);
-	debug(D_CHIRP,"root:     %s",path);
+	debug(D_CHIRP,"url: %s",url);
 
 	return path;
-}
-
-void chirp_fs_chirp_destroy(void)
-{
-	// XXX close all open files	
-	chirp_reli_cleanup_before_fork();
 }
 
 INT64_T chirp_fs_chirp_open(const char *path, INT64_T flags, INT64_T mode)
@@ -301,7 +293,6 @@ INT64_T chirp_fs_chirp_fd_size(int fd)
 
 struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_init,
-	chirp_fs_chirp_destroy,
 
 	chirp_fs_chirp_open,
 	chirp_fs_chirp_close,

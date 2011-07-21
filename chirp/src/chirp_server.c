@@ -84,7 +84,6 @@ static char address[LINK_ADDRESS_MAX];
 static const char *safe_username = 0;
 static uid_t safe_uid = 0;
 static gid_t safe_gid = 0;
-static int did_acl_default = 0;
 static int dont_dump_core = 0;
 static INT64_T minimum_space_free = 0;
 static INT64_T root_quota = 0;
@@ -119,7 +118,7 @@ static void show_help(const char *cmd)
 {
 	printf("use: %s [options]\n", cmd);
 	printf("The most common options are:\n");
-	printf(" -r <dir>    Root of storage directory. (default is current dir)\n");
+	printf(" -r <url>    URL of storage directory, like  file://path or hdfs://host:port/path\n");
 	printf(" -d <flag>   Enable debugging for this sybsystem\n");
 	printf(" -o <file>   Send debugging output to this file.\n");
 	printf(" -u <host>   Send status updates to this host. (default is %s)\n", CATALOG_HOST);
@@ -133,7 +132,6 @@ static void show_help(const char *cmd)
 	printf(" -C          Do not create a core dump, even due to a crash.\n");
 	printf(" -E          Exit if parent process dies.\n");
 	printf(" -e <time>   Check for presence of parent at this interval. (default is %ds)\n", parent_check_timeout);
-	printf(" -f <fs>     Type of filesystem on backend (default is local).\n");
 	printf(" -F <size>   Leave this much space free in the filesystem.\n");
 	printf(" -G <url>    Base url for group lookups. (default: disabled)\n");
 	printf(" -I <addr>   Listen only on this network interface.\n");
@@ -150,7 +148,6 @@ static void show_help(const char *cmd)
 	printf(" -U <time>   Send status updates at this interval. (default is 5m)\n");
 	printf(" -w <name>   The name of this server's owner.  (default is username)\n");
 	printf(" -W <file>   Use alternate password file for unix authentication\n");
-	printf(" -x <hostname:port> Hostname and port of remote backend filesystem.\n");
 	printf(" -y <dir>    Location of transient data (default is pwd).\n");
 	printf(" -z <time>   Set max timeout for unix filesystem authentication. (default is 5s)\n");
 	printf("\n");
@@ -161,7 +158,6 @@ static void show_help(const char *cmd)
 
 void shutdown_clean(int sig)
 {
-	cfs->destroy();		/* disconnect from backend */
 	exit(0);
 }
 
@@ -169,18 +165,11 @@ void ignore_signal(int sig)
 {
 }
 
-void reap_child(int sig)
-{/*
-	pid_t pid;
-	int status;
-
-	// XXX this conflicts with waitpid in run_in_child_process
-
-	do {
-		pid = waitpid(-1, &status, WNOHANG);
-		if(pid > 0)
-			total_child_procs--;
-	} while(pid > 0);
+void handle_child(int sig)
+{
+/*
+Do nothing in this function, it only exists to catch a signal
+so that we are forced to break out of sleep(5) on a SIGCHLD below.
 */
 }
 
@@ -311,7 +300,7 @@ static int gc_tickets( const char *url )
 
 static int run_in_child_process( int (*func) ( const char *a ), const char *args, const char *name )
 {
-	debug(D_PROCESS,"creating process for %s",name);
+	debug(D_PROCESS,"*** %s starting ***",name);
 
 	pid_t pid = fork();
 	if(pid==0) {
@@ -319,13 +308,14 @@ static int run_in_child_process( int (*func) ( const char *a ), const char *args
 	} else if(pid>0) {
 		int status;
 		while(waitpid(pid,&status,0)!=pid) { }
+		debug(D_PROCESS,"*** %s complete ***",name);
 		if(WIFEXITED(status)) {
 			return WEXITSTATUS(status);
 		} else {
 			return -1;
 		}
 	} else {
-		debug(D_PROCESS,"couldn't create process for %s: %s",name,strerror(errno));
+		debug(D_PROCESS,"couldn't fork: %s",strerror(errno));
 		return -1;
 	}		
 }
@@ -354,7 +344,6 @@ int main(int argc, char *argv[])
 		switch (c) {
 		case 'A':
 			chirp_acl_default(optarg);
-			did_acl_default = 1;
 			break;
 		case 'a':
 			auth_register_byname(optarg);
@@ -496,7 +485,7 @@ int main(int argc, char *argv[])
 
 	cfs = cfs_lookup(chirp_root_url);
 
-	if(run_in_child_process(backend_setup,chirp_root_url,"storage setup")!=0) {
+	if(run_in_child_process(backend_setup,chirp_root_url,"backend setup")!=0) {
 		fatal("couldn't setup %s",chirp_root_url);
 	}
 
@@ -520,6 +509,7 @@ int main(int argc, char *argv[])
 
 	chirp_stats_init();
 
+	// XXX move allocation handling to the side.
 	if(root_quota > 0) {
 		if(cfs == &chirp_fs_hdfs)	/* using HDFS? Can't do quotas : / */
 			fatal("Cannot use quotas with HDFS\n");
@@ -548,7 +538,7 @@ int main(int argc, char *argv[])
 
 	install_handler(SIGPIPE, ignore_signal);
 	install_handler(SIGHUP, ignore_signal);
-	install_handler(SIGCHLD, reap_child);
+	install_handler(SIGCHLD, handle_child);
 	install_handler(SIGINT, shutdown_clean);
 	install_handler(SIGTERM, shutdown_clean);
 	install_handler(SIGQUIT, shutdown_clean);
@@ -569,13 +559,18 @@ int main(int argc, char *argv[])
 			}
 		}
 
+		while((pid = waitpid(-1,0,WNOHANG))>0) {
+			debug(D_PROCESS,"pid %d completed (%d total child procs)",pid,total_child_procs);
+			total_child_procs--;
+		}
+
 		if(time(0) >= advertise_alarm) {
-			run_in_child_process(update_all_catalogs,chirp_root_url,"send catalog updates");
+			run_in_child_process(update_all_catalogs,chirp_root_url,"catalog update");
 			advertise_alarm = time(0) + advertise_timeout;
 		}
 
 		if(time(0) >= gc_alarm) {
-			run_in_child_process(gc_tickets,chirp_root_url,"ticket garbage collection");
+			run_in_child_process(gc_tickets,chirp_root_url,"ticket cleanup");
 			gc_alarm = time(0) + gc_timeout;
 		}
 
@@ -589,23 +584,21 @@ int main(int argc, char *argv[])
 		}
 
 		l = link_accept(link, time(0) + MIN(advertise_timeout, parent_check_timeout));
-		if(!l)
-			continue;
+		if(!l) continue;
+
 		link_address_remote(l, addr, &port);
 
 		local_stats = chirp_stats_local_begin(addr);
 
 		pid = fork();
 		if(pid == 0) {
-			change_process_title("chirp_server [authenticating]");
-			install_handler(SIGCHLD, ignore_signal);
 			chirp_receive(l);
 			_exit(0);
 		} else if(pid >= 0) {
 			total_child_procs++;
-			debug(D_CHIRP, "created pid %d (%d total child procs)", pid, total_child_procs);
+			debug(D_PROCESS, "created pid %d (%d total child procs)", pid, total_child_procs);
 		} else {
-			debug(D_CHIRP, "couldn't fork: %s", strerror(errno));
+			debug(D_PROCESS, "couldn't fork: %s", strerror(errno));
 		}
 		link_close(l);
 	}
@@ -617,6 +610,8 @@ static void chirp_receive(struct link *link)
 	char typesubject[AUTH_TYPE_MAX + AUTH_SUBJECT_MAX];
 	char addr[LINK_ADDRESS_MAX];
 	int port;
+
+	change_process_title("chirp_server [authenticating]");
 
 	chirp_root_path = cfs->init(chirp_root_url);
         if(!chirp_root_path)

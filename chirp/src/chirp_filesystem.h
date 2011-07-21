@@ -29,10 +29,10 @@ int    cfs_freadall(CHIRP_FILE * file, char **s, size_t * l);
 int    cfs_isdir(const char *filename);
 
 int cfs_create_dir(const char *path, int mode);
+int cfs_delete_dir(const char *path);
 
 struct chirp_filesystem {
 	const char *  (*init)      ( const char *url );
-	void    (*destroy)   ( void );
 
 	INT64_T (*open)      ( const char *path, INT64_T flags, INT64_T mode );
 	INT64_T (*close)     ( int fd );

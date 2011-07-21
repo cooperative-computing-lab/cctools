@@ -85,18 +85,19 @@ See the file COPYING for details.
 
 INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat * buf);
 
+/*
+The provided url could have any of the following forms:
+local:/path, file:/path, or just /path.
+*/
+
 const char * chirp_fs_local_init( const char *url )
 {
 	char *c = strchr(url,':');
-	if(!c) return 0;
-
-	return strdup(c+1);
-}
-
-void chirp_fs_local_destroy(void)
-{
-	// XXX close all open files	
-	return;
+	if(c) {
+		return strdup(c+1);
+	} else {
+		return strdup(url);
+	}
 }
 
 INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode)
@@ -567,7 +568,6 @@ INT64_T chirp_fs_local_fd_size(int fd)
 
 struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_init,
-	chirp_fs_local_destroy,
 
 	chirp_fs_local_open,
 	chirp_fs_local_close,

@@ -110,11 +110,6 @@ const char* chirp_fs_hdfs_init( const char *url )
 	p = strchr(chirp_fs_hdfs_hostname,':');
 	if(p) *p = 0;
 
-	debug(D_HDFS,"url:      %s",url);
-	debug(D_HDFS,"hostname: %s",chirp_fs_hdfs_hostname);
-	debug(D_HDFS,"port:     %d",chirp_fs_hdfs_port);
-	debug(D_HDFS,"root:     %s",path);
-
 	int i;
 
 	assert(fs == NULL);
@@ -128,24 +123,13 @@ const char* chirp_fs_hdfs_init( const char *url )
 			return 0;
 	}
 
-	debug(D_HDFS, "connecting to hdfs://%s:%u as '%s'\n", chirp_fs_hdfs_hostname, chirp_fs_hdfs_port, chirp_owner);
+	debug(D_HDFS, "connecting to hdfs://%s:%u%s as '%s'\n", chirp_fs_hdfs_hostname, chirp_fs_hdfs_port, path, chirp_owner);
 	fs = hdfs_services->connect_as_user(chirp_fs_hdfs_hostname, chirp_fs_hdfs_port, chirp_owner, groups, 1);
 
 	if(fs == NULL) 
 		return 0;
 	else
 		return strdup(path);
-}
-
-void chirp_fs_hdfs_destroy(void)
-{
-	if(fs == NULL) return;
-	debug(D_HDFS, "disconnecting from hdfs://%s:%u", chirp_fs_hdfs_hostname, chirp_fs_hdfs_port);
-	hdfs_services->disconnect(fs);
-	fs = NULL;
-	hdfs_library_close(hdfs_services);
-	hdfs_services = 0;
-	return;
 }
 
 static void copystat(struct chirp_stat *cs, hdfsFileInfo * hs, const char *path)
@@ -876,7 +860,6 @@ INT64_T chirp_fs_hdfs_chdir(const char *path)
 
 struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_init,
-	chirp_fs_hdfs_destroy,
 
 	chirp_fs_hdfs_open,
 	chirp_fs_hdfs_close,
