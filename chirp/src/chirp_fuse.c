@@ -312,7 +312,22 @@ static int chirp_fuse_access(const char *path, int flags)
 	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_access(host, newpath, flags, time(0) + chirp_fuse_timeout);
+	if (flags & X_OK) {
+		struct chirp_stat buf;
+		/* FUSE calls access(dir, X_OK) for chdir calls. For compatibility with older chirp servers, we
+		 * check for list access rights on a directory by calling stat.
+		 */
+		if ((chirp_global_stat(host, newpath, &buf, time(0)+chirp_fuse_timeout) == 0) && S_ISDIR(buf.cst_mode)) {
+			/* we've confirmed X_OK rights, now check others if they exist... */
+			flags ^= X_OK;
+			flags |= F_OK; /* make sure we have *some* flags; on GNU/Linux 0 is a valid value for flags (it is F_OK actually), others it may not be */
+			result = chirp_global_access(host, newpath, flags, time(0) + chirp_fuse_timeout);
+		} else {
+			result = chirp_global_access(host, newpath, flags, time(0) + chirp_fuse_timeout);
+		}
+	} else {
+		result = chirp_global_access(host, newpath, flags, time(0) + chirp_fuse_timeout);
+	}
 	pthread_mutex_unlock(&mutex);
 
 	if(result < 0)
