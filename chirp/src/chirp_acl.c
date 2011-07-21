@@ -29,26 +29,6 @@ See the file COPYING for details.
 #include <fcntl.h>
 #include <dirent.h>
 
-/* Cygwin does not have 64-bit I/O, while Darwin has it by default. */
-
-#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD
-#define fopen64 fopen
-#define open64 open
-#define lseek64 lseek
-#define stat64 stat
-#define fstat64 fstat
-#define lstat64 lstat
-#define fseeko64 fseeko
-#define ftruncate64 ftruncate
-#define truncate64 truncate
-#define statfs64 statfs
-#define fstatfs64 fstatfs
-#endif
-
-#if CCTOOLS_OPSYS_DARWIN
-#define lchown chown
-#endif
-
 static int read_only_mode = 0;
 static const char *default_acl = 0;
 

@@ -19,7 +19,9 @@ See the file COPYING for details.
 #include <errno.h>
 #include <sys/stat.h>
 
-extern char *chirp_root_path;
+// XXX convert this to a proper argument.
+
+extern const char * chirp_root_path;
 
 static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, const char *hostname, const char *rpath, const char *hostsubject, time_t stoptime)
 {
@@ -41,7 +43,7 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 		char aclsubject[CHIRP_PATH_MAX];
 		int aclflags;
 
-		if(!chirp_acl_check_dir(chirp_root_path, lpath, subject, CHIRP_ACL_LIST))
+		if(!chirp_acl_check_dir(chirp_root_path,lpath, subject, CHIRP_ACL_LIST))
 			return -1;
 
 		// create the directory, but do not fail if it already exists

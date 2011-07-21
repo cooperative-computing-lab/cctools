@@ -5,7 +5,7 @@
 </head>
 
 <h1>Chirp User's Manual</h1>
-<b>February 2007</b>
+<b>July 2011</b>
 <pre>
 Chirp is Copyright (C) 2003-2004 Douglas Thain and
 Copyright (C) 2005- The University of Notre Dame.
@@ -36,7 +36,7 @@ streaming point-to-point data transfer over the Internet.  However, Chirp
 also provides fine-grained Unix-like data access suitable for direct
 access by ordinary programs.
 <p>
-Chirp also includes advanced features for space allocation and active storage.
+Chirp also includes several advanced features for authentication tickets, space allocation, and more.
 However, each of these features must be explicitly enabled, so you don't
 have to worry about them if all you want is simple storage access.
 Read on below for more details.
@@ -627,81 +627,6 @@ the same effect.
 To examine an allocation, use the <tt>lsalloc</tt> command.
 <p>
 To destroy an allocation, simply delete the corresponding directory.
-
-<h2>Advanced Topic: Active Storage</h2>
-
-Using Parrot and Chirp, it is easy to run programs
-that access data remotely over the network.  In essence,
-the data mvoes to wherever the program is executed.
-However, when the program to the run is smaller than
-the data to be processed, it makes more sense to send
-the program to the data. This concept is called <em>active storage</em>.
-<p>
-By default, a Chirp server allows only for data storage.
-Active storage must be manually enabled through two
-distinct steps:
-<dir>
-<li> The server must be started with the -X option.  Programs cannot be executed without the overall permission of the server owner.
-<li> The X right must be set in the directory containing the program to be run.  Programs cannot be executed unless a user is able to also gain the X right.
-</dir>
-<p>
-To execute a program remotely, create a fresh directory,
-ensure that you have the X right on the directory, and
-transfer in a program.  Use the <tt>job_run</tt> command from
-the Chirp tool to run that program.  By default, Chirp
-will store the outputs in <tt>stdout.txt</tt> and <tt>stderr.txt</tt>
-in the current working directory, and then fetch them when
-the job completes.
-<p>
-As a very simple example, suppose that you want to sort
-some data stored in <tt>/chirp/server.nd.edu/data/records.txt</tt>.
-Using the Chirp tool, set the X right, send the <tt>sort</tt>
-binary, and then execute it:
-<pre>
-% chirp server.nd.edu
-connected to server.nd.edu:9094 as unix:fred
-chirp:server.nd.edu> setacl . unix:fred rwlax
-chirp:server.nd.edu> put /bin/sort
-chirp:server.nd.edu> job_run sort -n records.txt >sorted.txt
-jobid 33 created
-jobid 33 submitted.
-jobid 33 completed with exit code 1
-jobid 33 removed.
-</pre>
-Now, the sorted records are found in sorted.txt.
-You could extract the data for further manipulation,
-or you could simply dispatch further programs
-like <tt>grep</tt> to sort it:
-<pre>
-chirp:server.nd.edu> put /bin/grep
-chirp:server.nd.edu> job_run grep needle sorted.txt
-</pre>
-If you have long-running jobs, you may disconnect from the Chirp
-server, and use the <tt>job_list</tt> command to see the current
-state of the job.  Using the unique job number created when it
-was submitted, you may use <tt>job_wait</tt> to wait for completion,
-or <tt>job_kill</tt> to stop a long running job.  <tt>job_remove</tt>
-should be used to remove the record of a completed or killed job.
-<p>
-The Chirp security model allows for many flexible policies
-on what programs may be run.  The owner of a server can
-allow a user to run and execute arbitrary code on a server
-by granting the W and X rights on a directory.  If the owner
-wants to restrict the runnable programs, he/she may provide
-a directory of programs with only the R and X bits set.
-This allows users to execute only those programs provided.
-By constructing ACLs appropriately, various classes of users
-may be given different policies.
-<p>
-Note that the same security model is used for both
-data access as remote execution.  Internally, Chirp uses
-Parrot to run the program in an <i>identity box</i> that
-ensures it can only access files according to the ACLs
-as described above.  If you were to dispatch the program
-<tt>whoami</tt> to the remote node, you would see the
-same identity you used to authenticate to the Chirp server.
-Thus, it is not necessary for any special accounts to
-be created for visiting users.
 
 <h2>Advanced Topic: Ticket Authentication</h2>
 

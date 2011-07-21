@@ -10,13 +10,13 @@ See the file COPYING for details.
 #include "chirp_reli.h"
 #include "chirp_group.h"
 #include "chirp_stats.h"
-#include "chirp_filesystem.h"
 #include "chirp_alloc.h"
-#include "chirp_local.h"
-#include "chirp_hdfs.h"
+#include "chirp_filesystem.h"
+#include "chirp_fs_local.h"
+#include "chirp_fs_hdfs.h"
+#include "chirp_fs_chirp.h"
 #include "chirp_audit.h"
 #include "chirp_thirdput.h"
-#include "chirp_job.h"
 
 #include "macros.h"
 #include "debug.h"
@@ -58,6 +58,7 @@ See the file COPYING for details.
 #include <sys/resource.h>
 #include <sys/utsname.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
@@ -74,24 +75,19 @@ static int advertise_timeout = 300;	/* five minutes */
 static int gc_timeout = 86400;
 static time_t advertise_alarm = 0;
 static time_t gc_alarm = 0;
-static int single_mode = 0;
 static struct list *catalog_host_list;
 static time_t starttime;
 static struct datagram *catalog_port;
 static char hostname[DOMAIN_NAME_MAX];
 static const char *manual_hostname = 0;
 static char address[LINK_ADDRESS_MAX];
-static const char *startdir = ".";
 static const char *safe_username = 0;
 static uid_t safe_uid = 0;
 static gid_t safe_gid = 0;
-static int allow_execute = 0;
 static int did_acl_default = 0;
 static int dont_dump_core = 0;
 static INT64_T minimum_space_free = 0;
 static INT64_T root_quota = 0;
-static int extra_latency = 0;
-static int max_job_wait_timeout = 300;
 static int did_explicit_auth = 0;
 static int max_child_procs = 0;
 static int total_child_procs = 0;
@@ -99,11 +95,12 @@ static int total_child_procs = 0;
 struct chirp_stats *global_stats = 0;
 struct chirp_stats *local_stats = 0;
 
+// XXX see if these can be made static
+
 int exit_if_parent_fails = 0;
-int enable_identity_boxing = 1;
-const char *chirp_server_path = 0;
 const char *listen_on_interface = 0;
-char chirp_root_path[CHIRP_PATH_MAX];	/* root on backend */
+const char *chirp_root_url = 0;
+const char *chirp_root_path;	/* root on backend */
 char *chirp_transient_path = "./";	/* local file system stuff */
 pid_t chirp_master_pid = 0;
 const char *chirp_super_user = "";
@@ -111,8 +108,7 @@ const char *chirp_group_base_url = 0;
 int chirp_group_cache_time = 900;
 char chirp_owner[USERNAME_MAX] = "";
 
-const char *chirp_backend_storage_type = "local";
-struct chirp_filesystem *cfs = &chirp_local_fs;
+struct chirp_filesystem *cfs = 0;
 
 static void show_version(const char *cmd)
 {
@@ -144,19 +140,16 @@ static void show_help(const char *cmd)
 	printf(" -O <bytes>  Rotate debug file once it reaches this size.\n");
 	printf(" -n <name>   Use this name when reporting to the catalog.\n");
 	printf(" -M <count>  Set the maximum number of clients to accept at once. (default unlimited)\n");
-	printf(" -N          Disable identity boxing for execution.  (discouraged)\n");
 	printf(" -p <port>   Listen on this port (default is %d)\n", port);
 	printf(" -P <user>   Superuser for all directories. (default is none)\n");
 	printf(" -Q <size>   Enforce this root quota in software.\n");
 	printf(" -R          Read-only / read-everything mode.\n");
 	printf(" -s <time>   Abort stalled operations after this long. (default is %ds)\n", stall_timeout);
-	printf(" -S          Single process mode, do not fork.\n");
 	printf(" -t <time>   Disconnect idle clients after this time. (default is %ds)\n", idle_timeout);
 	printf(" -T <time>   Maximum time to cache group information. (default is %ds)\n", chirp_group_cache_time);
 	printf(" -U <time>   Send status updates at this interval. (default is 5m)\n");
 	printf(" -w <name>   The name of this server's owner.  (default is username)\n");
 	printf(" -W <file>   Use alternate password file for unix authentication\n");
-	printf(" -X          Enable remote execution.\n");
 	printf(" -x <hostname:port> Hostname and port of remote backend filesystem.\n");
 	printf(" -y <dir>    Location of transient data (default is pwd).\n");
 	printf(" -z <time>   Set max timeout for unix filesystem authentication. (default is 5s)\n");
@@ -177,15 +170,18 @@ void ignore_signal(int sig)
 }
 
 void reap_child(int sig)
-{
+{/*
 	pid_t pid;
 	int status;
+
+	// XXX this conflicts with waitpid in run_in_child_process
 
 	do {
 		pid = waitpid(-1, &status, WNOHANG);
 		if(pid > 0)
 			total_child_procs--;
 	} while(pid > 0);
+*/
 }
 
 static void install_handler(int sig, void (*handler) (int sig))
@@ -195,50 +191,6 @@ static void install_handler(int sig, void (*handler) (int sig))
 	sigfillset(&s.sa_mask);
 	s.sa_flags = 0;
 	sigaction(sig, &s, 0);
-}
-
-/*
-This wrapper function is needed because statfs is called in both
-the parent and child processes, but it is not safe to use 
-a chirp_filesystem_hdfs within the parent process.
-Where needed, we fork first and then pass the result back.
-*/
-
-static INT64_T safe_statfs(const char *path, struct chirp_statfs *buf)
-{
-	if(single_mode || getpid() != chirp_master_pid) {
-		return cfs->statfs(path, buf);
-	}
-
-	int fildes[2];
-
-	if(pipe(fildes) < 0)
-		return -1;
-
-	pid_t pid = fork();
-	if(pid == 0) {		/* child */
-		close(fildes[0]);
-		if(cfs->init(chirp_root_path))
-			_exit(1);
-		cfs_create_dir(chirp_root_path, 0771);
-		if(cfs->statfs(chirp_root_path, buf) == 0) {
-			write(fildes[1], buf, sizeof(*buf));
-		}
-		_exit(0);
-	} else if(pid > 0) {	/* parent */
-		total_child_procs++;
-		// corresponding wait takes place in reap_child()
-		close(fildes[1]);
-		int r = full_read(fildes[0], buf, sizeof(*buf));
-		close(fildes[0]);
-		if(r == sizeof(*buf)) {
-			return 0;
-		} else {
-			return -1;
-		}
-	} else {
-		return -1;
-	}
 }
 
 /*
@@ -265,7 +217,7 @@ static int space_available(INT64_T amount)
 
 	if((current - last_check) > check_interval) {
 		struct chirp_statfs buf;
-		if(safe_statfs(chirp_root_path, &buf) < 0)
+		if(cfs->statfs(chirp_root_path, &buf) < 0)
 			return 0;
 		avail = buf.f_bsize * buf.f_bfree;
 		last_check = current;
@@ -290,7 +242,7 @@ int update_one_catalog(void *catalog_host, const void *text)
 	return 1;
 }
 
-static void update_all_catalogs()
+static int update_all_catalogs( const char *url )
 {
 	struct chirp_statfs info;
 	struct utsname name;
@@ -308,7 +260,9 @@ static void update_all_catalogs()
 	load_average_get(avg);
 	cpus = load_average_get_cpus();
 
-	if(safe_statfs(chirp_root_path, &info) < 0) {
+	const char *path = cfs->init(url);
+
+	if(cfs->statfs(path, &info) < 0) {
 		memset(&info, 0, sizeof(info));
 	}
 
@@ -318,33 +272,62 @@ static void update_all_catalogs()
 	length = sprintf(text,
 			 "type chirp\nversion %d.%d.%d\nurl chirp://%s:%d\nname %s\nowner %s\ntotal %llu\navail %llu\nuptime %u\nport %d\nbytes_written %lld\nbytes_read %lld\ntotal_ops %d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nminfree %llu\nmemory_total %llu\nmemory_avail %llu\ncpus %d\nbackend %s\n",
 			 CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, chirp_owner, info.f_blocks * info.f_bsize, info.f_bavail * info.f_bsize, uptime, port, global_stats->bytes_written,
-			 global_stats->bytes_read, global_stats->total_ops, name.machine, name.sysname, name.release, avg[0], avg[1], avg[2], minimum_space_free, memory_total, memory_avail, cpus, chirp_backend_storage_type);
+			 global_stats->bytes_read, global_stats->total_ops, name.machine, name.sysname, name.release, avg[0], avg[1], avg[2], minimum_space_free, memory_total, memory_avail, cpus, url);
 
 	chirp_stats_summary(&text[length], DATAGRAM_PAYLOAD_MAX - length);
 	chirp_stats_cleanup();
 	list_iterate(catalog_host_list, update_one_catalog, text);
+
+	return 0;
 }
 
-static void gc_tickets()
+static int backend_setup( const char *url )
 {
-	if(single_mode) {	/* chirp_server process can handle it */
-		chirp_acl_gctickets(chirp_root_path);
-	} else {
-		pid_t child = fork();
-		if(child == 0) {	/* child */
-			if(cfs->init(chirp_root_path))
-				_exit(1);
-			cfs_create_dir(chirp_root_path, 0771);
-			chirp_acl_gctickets(chirp_root_path);
-			cfs->destroy();
-			_exit(0);
-		} else if(child > 0) {	/* parent */
-			total_child_procs++;
-			// corresponding wait() occurs in reap_child()
+	const char *root_path;
+
+	root_path = cfs->init(url);
+	if(!root_path) fatal("couldn't initialize %s",url);
+
+	int result = cfs_create_dir(root_path,0711);
+	if(!result) fatal("couldn't create root directory %s: %s",root_path,strerror(errno));
+
+	chirp_acl_init_root(root_path);
+
+	result = cfs->chdir(root_path);
+	if(result<0) fatal("couldn't move to %s: %s",root_path,strerror(errno));
+
+	return 0;
+}
+
+static int gc_tickets( const char *url )
+{
+	const char * path = cfs->init(url);
+	if(!path) fatal("couldn't initialize %s",url);
+
+	chirp_acl_gctickets(path);
+
+	return 0;
+}
+
+static int run_in_child_process( int (*func) ( const char *a ), const char *args, const char *name )
+{
+	debug(D_PROCESS,"creating process for %s",name);
+
+	pid_t pid = fork();
+	if(pid==0) {
+		_exit(func(args));
+	} else if(pid>0) {
+		int status;
+		while(waitpid(pid,&status,0)!=pid) { }
+		if(WIFEXITED(status)) {
+			return WEXITSTATUS(status);
 		} else {
-			debug(D_NOTICE, "couldn't fork process to garbage collect auth tickets");
+			return -1;
 		}
-	}
+	} else {
+		debug(D_PROCESS,"couldn't create process for %s: %s",name,strerror(errno));
+		return -1;
+	}		
 }
 
 int main(int argc, char *argv[])
@@ -357,7 +340,6 @@ int main(int argc, char *argv[])
 	change_process_title_init(argv);
 	change_process_title("chirp_server");
 
-	chirp_server_path = argv[0];
 	chirp_master_pid = getpid();
 
 	catalog_host_list = list_create();
@@ -428,10 +410,10 @@ int main(int argc, char *argv[])
 			stall_timeout = string_time_parse(optarg);
 			break;
 		case 'S':
-			single_mode = 1;
+			/* deprecated */
 			break;
 		case 'r':
-			startdir = optarg;
+			chirp_root_url = optarg;
 			break;
 		case 'R':
 			chirp_acl_force_readonly();
@@ -458,40 +440,25 @@ int main(int argc, char *argv[])
 			auth_unix_passwd_file(optarg);
 			break;
 		case 'X':
-			allow_execute = 1;
+			/* deprecated */
 			break;
 		case 'N':
-			enable_identity_boxing = 0;
+			/* deprecated */
 			break;
 		case 'I':
 			listen_on_interface = optarg;
 			break;
 		case 'L':
-			extra_latency = atoi(optarg);
+			/* deprecated */
 			break;
 		case 'f':
-			if(strcmp(optarg, "local") == 0) {
-				chirp_backend_storage_type = "local";
-				cfs = &chirp_local_fs;
-			} else if(strcmp(optarg, "hdfs") == 0) {
-				cfs = &chirp_hdfs_fs;
-				chirp_backend_storage_type = "hdfs";
-			} else
-				fatal("unknown filesystem: '%s'", optarg);
+			fprintf(stderr,"chirp_server: option -f is deprecated, use -r with a URL instead.");
 			break;
 		case 'y':
 			chirp_transient_path = optarg;
 			break;
 		case 'x':
-			{
-				char *delim;
-				chirp_hdfs_hostname = optarg;
-				if((delim = strchr(chirp_hdfs_hostname, ':')) == NULL)
-					fatal("hostname and port must be delimited by a ':'");
-				*delim = '\0';	/* terminate the hostname string */
-				if((chirp_hdfs_port = (UINT16_T) strtol(delim + 1, NULL, 10)) == 0)
-					fatal("-x hostname:port -> port is not a positive integer");
-			}
+			fprintf(stderr,"chirp_server: option -x is deprecated, use -r with a URL instead.");
 			break;
 		case 'z':
 			auth_unix_timeout_set(atoi(optarg));
@@ -502,9 +469,6 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
-
-	if(cfs == &chirp_hdfs_fs && chirp_hdfs_hostname == NULL)
-		fatal("hostname and port must be specified, use -x option");
 
 	if(!create_dir(chirp_transient_path, 0711))
 		fatal("could not create transient data directory '%s'", chirp_transient_path);
@@ -524,37 +488,16 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(cfs == &chirp_local_fs) {
-		create_dir(startdir, 0771);	/* must be there for get_canonical_path */
-		int result = get_canonical_path(startdir, chirp_root_path, sizeof(chirp_root_path));
-		if(result <= 0)
-			fatal("cannot get canonical path");
-	} else {
-		strncpy(chirp_root_path, startdir, sizeof(chirp_root_path));
-		if(strcmp(chirp_root_path, startdir) != 0)
-			fatal("couldn't get working dir: %s\n", strerror(errno));
+	if(!did_explicit_auth) {
+		auth_register_all();
 	}
 
-	if(single_mode) {
-		if(cfs->init(chirp_root_path) == 0) {
-			cfs_create_dir(chirp_root_path, 0771);
-		} else {
-			fatal("could not initialize backend filesystem: %s", strerror(errno));
-		}
-	} else {		/* fork and initialize (setup possibly new root directory) */
-		pid_t child = fork();
-		if(child == 0) {	/* child */
-			if(cfs->init(chirp_root_path))
-				_exit(1);
-			cfs_create_dir(chirp_root_path, 0771);
-			cfs->destroy();
-			_exit(0);
-		} else if(child > 0) {
-			int status;
-			wait(&status);
-		} else {
-			fatal("could not fork process to initialize backend filesystem: %s", strerror(errno));
-		}
+	if(!chirp_root_url) fatal("please give me a storage url with the -r option.");
+
+	cfs = cfs_lookup(chirp_root_url);
+
+	if(run_in_child_process(backend_setup,chirp_root_url,"storage setup")!=0) {
+		fatal("couldn't setup %s",chirp_root_url);
 	}
 
 	if(!list_size(catalog_host_list)) {
@@ -578,7 +521,7 @@ int main(int argc, char *argv[])
 	chirp_stats_init();
 
 	if(root_quota > 0) {
-		if(cfs == &chirp_hdfs_fs)	/* using HDFS? Can't do quotas : / */
+		if(cfs == &chirp_fs_hdfs)	/* using HDFS? Can't do quotas : / */
 			fatal("Cannot use quotas with HDFS\n");
 		else
 			chirp_alloc_init(chirp_root_path, root_quota);
@@ -594,10 +537,6 @@ int main(int argc, char *argv[])
 	}
 
 	link_address_local(link, address, &port);
-
-	if(!did_explicit_auth) {
-		auth_register_all();
-	}
 
 	starttime = time(0);
 	catalog_port = datagram_create(0);
@@ -615,14 +554,6 @@ int main(int argc, char *argv[])
 	install_handler(SIGQUIT, shutdown_clean);
 	install_handler(SIGXFSZ, ignore_signal);
 
-	if(allow_execute) {
-		if(fork() == 0) {
-			link_close(link);
-			chirp_job_starter();
-			_exit(0);
-		}
-	}
-
 	global_stats = chirp_stats_global();
 
 	while(1) {
@@ -639,13 +570,12 @@ int main(int argc, char *argv[])
 		}
 
 		if(time(0) >= advertise_alarm) {
-			update_all_catalogs();
+			run_in_child_process(update_all_catalogs,chirp_root_url,"send catalog updates");
 			advertise_alarm = time(0) + advertise_timeout;
 		}
 
 		if(time(0) >= gc_alarm) {
-			debug(D_CHIRP, "garbage collecting tickets");
-			gc_tickets();
+			run_in_child_process(gc_tickets,chirp_root_url,"ticket garbage collection");
 			gc_alarm = time(0) + gc_timeout;
 		}
 
@@ -665,43 +595,19 @@ int main(int argc, char *argv[])
 
 		local_stats = chirp_stats_local_begin(addr);
 
-		if(single_mode) {
+		pid = fork();
+		if(pid == 0) {
+			change_process_title("chirp_server [authenticating]");
+			install_handler(SIGCHLD, ignore_signal);
 			chirp_receive(l);
-			if(!did_explicit_auth)
-				auth_register_all();
-			else
-				auth_register_byname(optarg);
+			_exit(0);
+		} else if(pid >= 0) {
+			total_child_procs++;
+			debug(D_CHIRP, "created pid %d (%d total child procs)", pid, total_child_procs);
 		} else {
-			pid = fork();
-			if(pid == 0) {
-				change_process_title("chirp_server [authenticating]");
-				install_handler(SIGCHLD, ignore_signal);
-				if(cfs->init(chirp_root_path))
-					fatal("could not initialize backend filesystem: %s", strerror(errno));
-				cfs_create_dir(chirp_root_path, 0771);
-				chirp_receive(l);
-				cfs->destroy();	/* disconnect from backend */
-				_exit(0);
-			} else if(pid >= 0) {
-				total_child_procs++;
-				debug(D_CHIRP, "created pid %d (%d total child procs)", pid, total_child_procs);
-			} else {
-				debug(D_CHIRP, "couldn't fork: %s", strerror(errno));
-			}
-			link_close(l);
+			debug(D_CHIRP, "couldn't fork: %s", strerror(errno));
 		}
-
-	}
-}
-
-void millisleep(int n)
-{
-	if(n == 1) {
-		int i;
-		for(i = 0; i < 1000000; i++) {
-		}
-	} else {
-		usleep(n * 1000);
+		link_close(l);
 	}
 }
 
@@ -712,17 +618,14 @@ static void chirp_receive(struct link *link)
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 
-	chmod(chirp_root_path, 0755);
+	chirp_root_path = cfs->init(chirp_root_url);
+        if(!chirp_root_path)
+		fatal("could not initialize backend filesystem: %s", strerror(errno));
+
 	if(cfs->chdir(chirp_root_path) != 0)
 		fatal("couldn't move to %s: %s\n", chirp_root_path, strerror(errno));
-	/* It's ok if this fails because there is a default permission check. */
-	/* Note that it might fail if we are exporting a read-only volume. */
-	chirp_acl_init_root(chirp_root_path);
 
 	link_address_remote(link, addr, &port);
-
-	if(extra_latency)
-		millisleep(extra_latency * 4);
 
 	auth_ticket_clear();
 	struct hash_table *tickets = hash_table_create(0, 0);
@@ -780,6 +683,7 @@ static void chirp_receive(struct link *link)
 
 /*
   Force a path to fall within the simulated root directory.
+  XXX for safety, shouldn't we do collapse_path before prepending the root?
 */
 
 int chirp_path_fix(char *path)
@@ -901,14 +805,6 @@ static void chirp_handler(struct link *l, const char *subject)
 
 		char debug_flag[CHIRP_LINE_MAX];
 
-		char jobcwd[CHIRP_PATH_MAX];
-		char infile[CHIRP_PATH_MAX];
-		char outfile[CHIRP_PATH_MAX];
-		char errfile[CHIRP_PATH_MAX];
-		INT64_T jobid;
-		struct chirp_job_state jobstate;
-		int wait_timeout;
-
 		INT64_T fd, length, flags, offset, actual;
 		INT64_T uid, gid, mode;
 		INT64_T size, inuse;
@@ -918,7 +814,7 @@ static void chirp_handler(struct link *l, const char *subject)
 		INT64_T actime, modtime;
 		time_t idletime = time(0) + idle_timeout;
 		time_t stalltime = time(0) + stall_timeout;
-		char args[CHIRP_LINE_MAX];
+
 
 		if(chirp_alloc_flush_needed()) {
 			if(!link_usleep(l, 1000000, 1, 0)) {
@@ -930,9 +826,6 @@ static void chirp_handler(struct link *l, const char *subject)
 			debug(D_CHIRP, "timeout: client idle too long\n");
 			break;
 		}
-
-		if(extra_latency)
-			millisleep(extra_latency);
 
 		string_chomp(line);
 		if(strlen(line) < 1)
@@ -1243,7 +1136,7 @@ static void chirp_handler(struct link *l, const char *subject)
 		} else if(sscanf(line, "thirdput %s %s %s", path, hostname, newpath) == 3) {
 			if(!chirp_path_fix(path))
 				goto failure;
-			if(cfs == &chirp_hdfs_fs)
+			if(cfs == &chirp_fs_hdfs)
 				goto failure;
 
 			/* ACL check will occur inside of chirp_thirdput */
@@ -1340,12 +1233,6 @@ static void chirp_handler(struct link *l, const char *subject)
 			} else {
 				goto failure;
 			}
-		} else if(sscanf(line, "mkfifo %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
-			if(!chirp_acl_check(chirp_root_path, path, subject, CHIRP_ACL_WRITE))
-				goto failure;
-			result = chirp_alloc_mkfifo(path);
 		} else if(sscanf(line, "access %s %lld", path, &flags) == 2) {
 			if(!chirp_path_fix(path))
 				goto failure;
@@ -1649,80 +1536,6 @@ static void chirp_handler(struct link *l, const char *subject)
 			} else {
 				result = -1;
 			}
-		} else if(sscanf(line, "job_begin %s %s %s %s %s %[^\n]", jobcwd, infile, outfile, errfile, path, args) >= 5) {
-			if(!allow_execute) {
-				errno = EPERM;
-				goto failure;
-			}
-
-			if(!chirp_path_fix(jobcwd))
-				goto failure;
-			if(!chirp_acl_check(chirp_root_path, jobcwd, subject, CHIRP_ACL_LIST))
-				goto failure;
-
-			if(!strcmp(infile, "-")) {
-				strcpy(infile, "/dev/null");
-			} else {
-				if(!chirp_path_fix(infile))
-					goto failure;
-				if(!chirp_acl_check(chirp_root_path, infile, subject, CHIRP_ACL_READ))
-					goto failure;
-			}
-			if(!strcmp(outfile, "-")) {
-				strcpy(outfile, "/dev/null");
-			} else {
-				if(!chirp_path_fix(outfile))
-					goto failure;
-				if(!chirp_acl_check(chirp_root_path, outfile, subject, CHIRP_ACL_WRITE))
-					goto failure;
-			}
-			if(!strcmp(errfile, "-")) {
-				strcpy(errfile, "/dev/null");
-			} else {
-				if(!chirp_path_fix(errfile))
-					goto failure;
-				if(!chirp_acl_check(chirp_root_path, errfile, subject, CHIRP_ACL_WRITE))
-					goto failure;
-			}
-
-			if(path[0] != '@') {
-				if(!chirp_path_fix(path))
-					goto failure;
-				if(!chirp_acl_check(chirp_root_path, path, subject, CHIRP_ACL_EXECUTE))
-					goto failure;
-			}
-
-			result = chirp_job_begin(subject, jobcwd, infile, outfile, errfile, path, args);
-
-		} else if(sscanf(line, "job_wait %lld %d", &jobid, &wait_timeout) == 2) {
-			result = chirp_job_wait(subject, jobid, &jobstate, time(0) + MIN(wait_timeout, max_job_wait_timeout));
-			if(result >= 0) {
-				link_putfstring(l, "0\n%lld %s %s %u %d %lu %lu %lu %d\n", stalltime, jobstate.jobid, jobstate.command, jobstate.owner, jobstate.state, jobstate.exit_code, jobstate.submit_time, jobstate.start_time, jobstate.stop_time,
-						jobstate.pid);
-				do_no_result = 1;
-			}
-		} else if(sscanf(line, "job_commit %lld", &jobid) == 1) {
-			result = chirp_job_commit(subject, jobid);
-		} else if(sscanf(line, "job_kill %lld", &jobid) == 1) {
-			result = chirp_job_kill(subject, jobid);
-		} else if(sscanf(line, "job_remove %lld", &jobid) == 1) {
-			result = chirp_job_remove(subject, jobid);
-		} else if(!strcmp(line, "job_list")) {
-			struct chirp_job_state *job;
-			void *list = chirp_job_list_open();
-			if(!list)
-				goto failure;
-
-			link_putliteral(l, "0\n", stalltime);
-
-			while((job = chirp_job_list_next(list))) {
-				link_putfstring(l, "%lld %s %s %u %d %lu %lu %lu %d\n", stalltime, job->jobid, job->command, job->owner, job->state, job->exit_code, job->submit_time, job->start_time, job->stop_time, job->pid);
-			}
-
-			link_putliteral(l, "\n", stalltime);
-			chirp_job_list_close(list);
-			do_no_result = 1;
-
 		} else if(sscanf(line, "md5 %s", path) == 1) {
 			dataout = xxmalloc(16);
 			if(!chirp_path_fix(path))

@@ -41,7 +41,6 @@ INT64_T chirp_alloc_putfile(const char *path, struct link *link, INT64_T length,
 INT64_T chirp_alloc_getstream(const char *path, struct link *link, time_t stoptime);
 INT64_T chirp_alloc_putstream(const char *path, struct link *link, time_t stoptime);
 
-INT64_T chirp_alloc_mkfifo(const char *path);
 INT64_T chirp_alloc_unlink(const char *path);
 INT64_T chirp_alloc_rename(const char *path, const char *newpath);
 INT64_T chirp_alloc_link(const char *path, const char *newpath);

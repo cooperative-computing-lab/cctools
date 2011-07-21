@@ -24,8 +24,8 @@ See the file COPYING for details.
 
 void hdfs_library_close(struct hdfs_library *hs)
 {
-	dlclose(hs->libjvm_handle);
 	dlclose(hs->libhdfs_handle);
+	dlclose(hs->libjvm_handle);
 	free(hs);
 }
 

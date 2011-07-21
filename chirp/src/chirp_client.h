@@ -97,22 +97,6 @@ INT64_T chirp_client_audit(struct chirp_client *c, const char *path, struct chir
 INT64_T chirp_client_mkalloc(struct chirp_client *c, char const *path, INT64_T size, INT64_T mode, time_t stoptime);
 INT64_T chirp_client_lsalloc(struct chirp_client *c, char const *path, char *allocpath, INT64_T * total, INT64_T * inuse, time_t stoptime);
 
-INT64_T chirp_client_group_create(struct chirp_client *c, char *group, time_t stoptime);
-INT64_T chirp_client_group_list(struct chirp_client *c, const char *group, chirp_dir_t callback, void *arg, time_t stoptime);
-INT64_T chirp_client_group_add(struct chirp_client *c, char *group, char *user, time_t stoptime);
-INT64_T chirp_client_group_remove(struct chirp_client *c, char *group, char *user, time_t stoptime);
-INT64_T chirp_client_group_lookup(struct chirp_client *c, const char *group, const char *user, time_t stoptime);
-INT64_T chirp_client_group_cache_update(struct chirp_client *c, const char *group, time_t mod_time, time_t stoptime);
-INT64_T chirp_client_group_policy_set(struct chirp_client *c, char *group, unsigned long int file_duration, unsigned long int dec_duration, time_t stoptime);
-INT64_T chirp_client_group_policy_get(struct chirp_client *c, const char *group, int *policy, int *file_duration, int *dec_duration, time_t stoptime);
-
-INT64_T chirp_client_job_begin(struct chirp_client *c, const char *cwd, const char *input, const char *output, const char *error, const char *cmdline, time_t stoptime);
-INT64_T chirp_client_job_commit(struct chirp_client *c, INT64_T jobid, time_t stoptime);
-INT64_T chirp_client_job_wait(struct chirp_client *c, INT64_T jobid, struct chirp_job_state *state, int wait_time, time_t stoptime);
-INT64_T chirp_client_job_kill(struct chirp_client *c, INT64_T jobid, time_t stoptime);
-INT64_T chirp_client_job_remove(struct chirp_client *c, INT64_T jobid, time_t stoptime);
-INT64_T chirp_client_job_list(struct chirp_client *c, chirp_joblist_t callback, void *arg, time_t stoptime);
-
 INT64_T chirp_client_pread_begin(struct chirp_client *c, INT64_T fd, void *buffer, INT64_T length, INT64_T offset, time_t stoptime);
 INT64_T chirp_client_pread_finish(struct chirp_client *c, INT64_T fd, void *buffer, INT64_T length, INT64_T offset, time_t stoptime);
 INT64_T chirp_client_sread_begin(struct chirp_client *c, INT64_T fd, void *buffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset, time_t stoptime);

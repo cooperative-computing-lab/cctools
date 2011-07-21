@@ -37,6 +37,26 @@ struct CHIRP_FILE {
 
 static CHIRP_FILE CHIRP_FILE_NULL;
 
+extern struct chirp_filesystem chirp_fs_local;
+extern struct chirp_filesystem chirp_fs_hdfs;
+extern struct chirp_filesystem chirp_fs_chirp;
+
+struct chirp_filesystem * cfs_lookup( const char *url )
+{
+	// XXX handle a non-url as a local path.
+
+	if(!strncmp(url,"local:",6) || !strncmp(url,"file:",5)) {
+		return &chirp_fs_local;
+	} else if(!strncmp(url,"hdfs:",5)) {
+		return &chirp_fs_hdfs;
+	} else if(!strncmp(url,"chirp:",6)) {
+		return &chirp_fs_chirp;
+	} else {
+		return 0;
+	}	
+}
+
+
 CHIRP_FILE *cfs_fopen(const char *path, const char *mode)
 {
 	CHIRP_FILE *file;
@@ -290,3 +310,4 @@ int cfs_isdir(const char *filename)
 		return 0;
 	}
 }
+

@@ -694,46 +694,6 @@ INT64_T chirp_reli_thirdput( const char *host, const char *path, const char *thi
 	RETRY_ATOMIC( result = chirp_client_thirdput( client, path, thirdhost, thirdpath, stoptime ); )
 }
 
-INT64_T chirp_reli_group_create( const char *host, char *group, time_t stoptime )
-{
-	RETRY_ATOMIC ( result = chirp_client_group_create(client,group,stoptime); )
-}
-
-INT64_T chirp_reli_group_list( const char *host, const char *group, chirp_dir_t callback, void *arg, time_t stoptime )
-{
-	RETRY_ATOMIC ( result = chirp_client_group_list(client,group,callback,arg,stoptime); )
-}
-
-INT64_T chirp_reli_group_add( const char *host, char *group, char *user, time_t stoptime )
-{
-	RETRY_ATOMIC ( result = chirp_client_group_add(client,group,user,stoptime); )
-}
-
-INT64_T chirp_reli_group_remove( const char *host, char *group, char *user, time_t stoptime )
-{
-	RETRY_ATOMIC ( result = chirp_client_group_remove(client,group,user,stoptime); )
-}
-
-INT64_T chirp_reli_group_lookup(const char* host, const char* group, const char* user, time_t stoptime)
-{
-        RETRY_ATOMIC( result = chirp_client_group_lookup( client, group, user, stoptime ); )
-}
-
-INT64_T chirp_reli_group_policy_set( const char *host, char *group, unsigned long int file_duration, unsigned long int dec_duration, time_t stoptime )
-{
-	RETRY_ATOMIC ( result = chirp_client_group_policy_set(client,group,file_duration,dec_duration,stoptime); )
-}
-
-INT64_T chirp_reli_group_cache_update( const char* host, const char* group, time_t mod_time, time_t stoptime )
-{
-        RETRY_ATOMIC( result = chirp_client_group_cache_update( client, group, mod_time, stoptime ); )
-} 
-
-INT64_T chirp_reli_group_policy_get(const char* host, const char* group, int* policy, int* file_duration, int* dec_duration, time_t stoptime)
-{
-        RETRY_ATOMIC( result = chirp_client_group_policy_get( client, group, policy, file_duration, dec_duration, stoptime ); )
-}
-
 INT64_T chirp_reli_mkalloc( const char *host, const char *path, INT64_T size, INT64_T mode, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_mkalloc(client,path,size,mode,stoptime); )
@@ -742,36 +702,6 @@ INT64_T chirp_reli_mkalloc( const char *host, const char *path, INT64_T size, IN
 INT64_T chirp_reli_lsalloc( const char *host, const char *path, char *allocpath, INT64_T *total, INT64_T *inuse, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_lsalloc(client,path,allocpath,total,inuse,stoptime); )
-}
-
-INT64_T chirp_reli_job_begin( const char *host, const char *cwd, const char *input, const char *output, const char *error, const char *cmdline, time_t stoptime )
-{
-	RETRY_ATOMIC( result = chirp_client_job_begin(client,cwd,input,output,error,cmdline,stoptime); )
-}
-
-INT64_T chirp_reli_job_commit( const char *host, INT64_T jobid, time_t stoptime )
-{
-	RETRY_ATOMIC( result = chirp_client_job_commit(client,jobid,stoptime); );
-}
-
-INT64_T chirp_reli_job_wait( const char *host, INT64_T jobid, struct chirp_job_state *state, int wait_time, time_t stoptime )
-{
-	RETRY_ATOMIC( result = chirp_client_job_wait(client,jobid,state,wait_time,stoptime); );
-}
-
-INT64_T chirp_reli_job_kill( const char *host, INT64_T jobid, time_t stoptime )
-{
-	RETRY_ATOMIC( result = chirp_client_job_kill(client,jobid,stoptime); );
-}
-
-INT64_T chirp_reli_job_remove( const char *host, INT64_T jobid, time_t stoptime )
-{
-	RETRY_ATOMIC( result = chirp_client_job_remove(client,jobid,stoptime); );
-}
-
-INT64_T chirp_reli_job_list( const char *host, chirp_joblist_t callback, void *arg, time_t stoptime )
-{
-	RETRY_ATOMIC( result = chirp_client_job_list(client,callback,arg,stoptime); );
 }
 
 struct chirp_dir {

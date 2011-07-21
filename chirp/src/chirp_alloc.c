@@ -856,11 +856,6 @@ INT64_T chirp_alloc_statfs(const char *path, struct chirp_statfs * info)
 	return result;
 }
 
-INT64_T chirp_alloc_mkfifo(const char *path)
-{
-	return cfs->mkfifo(path);
-}
-
 INT64_T chirp_alloc_access(const char *path, INT64_T mode)
 {
 	return cfs->access(path, mode);
