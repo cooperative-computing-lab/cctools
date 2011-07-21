@@ -291,6 +291,11 @@ INT64_T chirp_fs_chirp_fd_size(int fd)
 	}
 }
 
+int chirp_fs_chirp_do_acl_check()
+{
+	return 0;
+}
+
 struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_init,
 
@@ -335,4 +340,5 @@ struct chirp_filesystem chirp_fs_chirp = {
 
 	chirp_fs_chirp_file_size,
 	chirp_fs_chirp_fd_size,
+	chirp_fs_chirp_do_acl_check
 };

@@ -75,6 +75,8 @@ struct chirp_filesystem {
 
 	INT64_T (*file_size) (const char *path );
 	INT64_T (*fd_size) (int fd );
+
+	int (*do_acl_check) ();
 };
 
 extern struct chirp_filesystem *cfs;

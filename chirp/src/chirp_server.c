@@ -616,7 +616,9 @@ static void chirp_receive(struct link *link)
 
 	change_process_title("chirp_server [authenticating]");
 
+	printf("%s\n",chirp_root_url);
 	chirp_root_path = cfs->init(chirp_root_url);
+	printf("%s\n",chirp_root_path);
 	chirp_ticket_path = chirp_root_path;
 
         if(!chirp_root_path)

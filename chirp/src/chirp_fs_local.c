@@ -566,6 +566,11 @@ INT64_T chirp_fs_local_fd_size(int fd)
 	}
 }
 
+int chirp_fs_do_acl_check()
+{
+	return 1;
+}
+
 struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_init,
 
@@ -610,4 +615,5 @@ struct chirp_filesystem chirp_fs_local = {
 
 	chirp_fs_local_file_size,
 	chirp_fs_local_fd_size,
+	chirp_fs_do_acl_check,
 };

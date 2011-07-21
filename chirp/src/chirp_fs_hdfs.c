@@ -858,6 +858,11 @@ INT64_T chirp_fs_hdfs_chdir(const char *path)
 	return hdfs_services->chdir(fs, path);
 }
 
+int chirp_fs_hdfs_do_acl_check()
+{
+	return 1;
+}
+
 struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_init,
 
@@ -902,4 +907,6 @@ struct chirp_filesystem chirp_fs_hdfs = {
 
 	chirp_fs_hdfs_file_size,
 	chirp_fs_hdfs_fd_size,
+
+	chirp_fs_hdfs_do_acl_check,
 };
