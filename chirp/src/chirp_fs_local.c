@@ -15,7 +15,6 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "full_io.h"
 #include "delete_dir.h"
-#include "md5.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -122,44 +121,6 @@ INT64_T chirp_fs_local_pread(int fd, void *buffer, INT64_T length, INT64_T offse
 	return result;
 }
 
-INT64_T chirp_fs_local_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
-{
-	INT64_T total = 0;
-	INT64_T actual = 0;
-	char *buffer = vbuffer;
-
-	if(stride_length < 0 || stride_skip < 0 || offset < 0) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	while(length >= stride_length) {
-		actual = chirp_fs_local_pread(fd, &buffer[total], stride_length, offset);
-		if(actual > 0) {
-			length -= actual;
-			total += actual;
-			offset += stride_skip;
-			if(actual == stride_length) {
-				continue;
-			} else {
-				break;
-			}
-		} else {
-			break;
-		}
-	}
-
-	if(total > 0) {
-		return total;
-	} else {
-		if(actual < 0) {
-			return -1;
-		} else {
-			return 0;
-		}
-	}
-}
-
 INT64_T chirp_fs_local_pwrite(int fd, const void *buffer, INT64_T length, INT64_T offset)
 {
 	INT64_T result;
@@ -169,44 +130,6 @@ INT64_T chirp_fs_local_pwrite(int fd, const void *buffer, INT64_T length, INT64_
 		result = full_write(fd, buffer, length);
 	}
 	return result;
-}
-
-INT64_T chirp_fs_local_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
-{
-	INT64_T total = 0;
-	INT64_T actual = 0;
-	const char *buffer = vbuffer;
-
-	if(stride_length < 0 || stride_skip < 0 || offset < 0) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	while(length >= stride_length) {
-		actual = chirp_fs_local_pwrite(fd, &buffer[total], stride_length, offset);
-		if(actual > 0) {
-			length -= actual;
-			total += actual;
-			offset += stride_skip;
-			if(actual == stride_length) {
-				continue;
-			} else {
-				break;
-			}
-		} else {
-			break;
-		}
-	}
-
-	if(total > 0) {
-		return total;
-	} else {
-		if(actual < 0) {
-			return -1;
-		} else {
-			return 0;
-		}
-	}
 }
 
 INT64_T chirp_fs_local_fstat(int fd, struct chirp_stat * buf)
@@ -288,62 +211,6 @@ char *chirp_fs_local_readdir(void *dir)
 void chirp_fs_local_closedir(void *dir)
 {
 	closedir(dir);
-}
-
-INT64_T chirp_fs_local_getfile(const char *path, struct link *link, time_t stoptime)
-{
-	int fd;
-	INT64_T result;
-	struct chirp_stat info;
-
-	result = chirp_fs_local_stat(path, &info);
-	if(result < 0)
-		return result;
-
-	if(S_ISDIR(info.cst_mode)) {
-		errno = EISDIR;
-		return -1;
-	}
-
-	if(S_ISFIFO(info.cst_mode)) {
-		errno = ESPIPE;
-		return -1;
-	}
-
-	fd = chirp_fs_local_open(path, O_RDONLY, 0);
-	if(fd >= 0) {
-		INT64_T length = info.cst_size;
-		link_putfstring(link, "%lld\n", stoptime, length);
-		result = link_stream_from_fd(link, fd, length, stoptime);
-		chirp_fs_local_close(fd);
-	} else {
-		result = -1;
-	}
-
-	return result;
-}
-
-INT64_T chirp_fs_local_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime)
-{
-	int fd;
-	INT64_T result;
-
-	mode = 0600 | (mode & 0100);
-
-	fd = chirp_fs_local_open(path, O_WRONLY | O_CREAT | O_TRUNC, (int) mode);
-	if(fd >= 0) {
-		link_putliteral(link, "0\n", stoptime);
-		result = link_stream_to_fd(link, fd, length, stoptime);
-		if(result != length) {
-			if(result >= 0)
-				link_soak(link, length - result, stoptime);
-			result = -1;
-		}
-		chirp_fs_local_close(fd);
-	} else {
-		result = -1;
-	}
-	return result;
 }
 
 INT64_T chirp_fs_local_unlink(const char *path)
@@ -541,11 +408,6 @@ INT64_T chirp_fs_local_utime(const char *path, time_t actime, time_t modtime)
 	return utime(path, &ut);
 }
 
-INT64_T chirp_fs_local_md5(const char *path, unsigned char digest[16])
-{
-	return md5_file(path, digest);
-}
-
 INT64_T chirp_fs_local_file_size(const char *path)
 {
 	struct chirp_stat info;
@@ -578,8 +440,8 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_close,
 	chirp_fs_local_pread,
 	chirp_fs_local_pwrite,
-	chirp_fs_local_sread,
-	chirp_fs_local_swrite,
+	cfs_basic_sread,
+	cfs_basic_swrite,
 	chirp_fs_local_fstat,
 	chirp_fs_local_fstatfs,
 	chirp_fs_local_fchown,
@@ -591,8 +453,8 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_readdir,
 	chirp_fs_local_closedir,
 
-	chirp_fs_local_getfile,
-	chirp_fs_local_putfile,
+	cfs_basic_getfile,
+	cfs_basic_putfile,
 
 	chirp_fs_local_unlink,
 	chirp_fs_local_rename,
@@ -611,7 +473,7 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_lchown,
 	chirp_fs_local_truncate,
 	chirp_fs_local_utime,
-	chirp_fs_local_md5,
+	cfs_basic_md5,
 
 	chirp_fs_local_file_size,
 	chirp_fs_local_fd_size,

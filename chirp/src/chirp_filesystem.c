@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "buffer.h"
 #include "xmalloc.h"
+#include "md5.h"
 
 #include <sys/stat.h>
 
@@ -336,4 +337,222 @@ int cfs_isdir(const char *filename)
 		return 0;
 	}
 }
+
+INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime)
+{
+	int fd;
+	INT64_T result;
+
+	mode = 0600 | (mode & 0100);
+
+	fd = cfs->open(path, O_WRONLY | O_CREAT | O_TRUNC, (int) mode);
+	if(fd >= 0) {
+		char buffer[65536];
+		INT64_T total = 0;
+
+		link_putliteral(link, "0\n", stoptime);
+
+		while(length > 0) {
+			INT64_T ractual, wactual;
+			INT64_T chunk = MIN(sizeof(buffer), length);
+
+			ractual = link_read(link, buffer, chunk, stoptime);
+			if(ractual <= 0)
+				break;
+
+			wactual = cfs->pwrite(fd,buffer,ractual,total);
+			if(wactual != ractual) {
+				total = -1;
+				break;
+			}
+
+			total += ractual;
+			length -= ractual;
+		}
+
+		result = total;
+
+		if(length != 0) {
+			if(result >= 0)
+				link_soak(link, length - result, stoptime);
+			result = -1;
+		}
+		cfs->close(fd);
+	} else {
+		result = -1;
+	}
+	return result;
+}
+
+
+INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
+{
+	int fd;
+	INT64_T result;
+	struct chirp_stat info;
+
+	result = cfs->stat(path, &info);
+	if(result<0) return result;
+
+	if(S_ISDIR(info.cst_mode)) {
+		errno = EISDIR;
+		return -1;
+	}
+
+	fd = cfs->open(path, O_RDONLY, 0);
+	if(fd >= 0) {
+		char buffer[65536];
+		INT64_T total = 0;
+		INT64_T ractual, wactual;
+		INT64_T length = info.cst_size;
+
+		link_putfstring(link, "%lld\n", stoptime, length);
+
+		while(length > 0) {
+			INT64_T chunk = MIN(sizeof(buffer), length);
+
+			ractual = cfs->pread(fd,buffer,chunk,total);
+			if(ractual <= 0)
+				break;
+
+			wactual = link_putlstring(link, buffer, ractual, stoptime);
+			if(wactual != ractual) {
+				total = -1;
+				break;
+			}
+
+			total += ractual;
+			length -= ractual;
+		}
+		result = total;
+		cfs->close(fd);
+	} else {
+		result = -1;
+	}
+
+	return result;
+}
+
+INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
+{
+	int fd;
+	INT64_T result;
+	struct chirp_stat info;
+
+	result = cfs->stat(path, &info);
+	if(result < 0)
+		return result;
+
+	if(S_ISDIR(info.cst_mode)) {
+		errno = EISDIR;
+		return -1;
+	}
+
+	fd = cfs->open(path, O_RDONLY, 0);
+	if(fd >= 0) {
+		char buffer[65536];
+		INT64_T ractual;
+		INT64_T total=0;
+		INT64_T length = info.cst_size;
+		md5_context_t ctx;
+
+		md5_init(&ctx);
+
+		while(length > 0) {
+			INT64_T chunk = MIN(sizeof(buffer), length);
+
+			ractual = cfs->pread(fd,buffer,chunk,total);
+			if(ractual <= 0) break;
+
+			md5_update(&ctx, (unsigned char *) buffer, ractual);
+
+			length -= ractual;
+			total += ractual;
+		}
+		result = 0;
+		cfs->close(fd);
+		md5_final(digest, &ctx);
+	} else {
+		result = -1;
+	}
+
+	return result;
+}
+
+INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
+{
+	INT64_T total = 0;
+	INT64_T actual = 0;
+	char *buffer = vbuffer;
+
+	if(stride_length < 0 || stride_skip < 0 || offset < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	while(length >= stride_length) {
+		actual = cfs->pread(fd, &buffer[total], stride_length, offset);
+		if(actual > 0) {
+			length -= actual;
+			total += actual;
+			offset += stride_skip;
+			if(actual == stride_length) {
+				continue;
+			} else {
+				break;
+			}
+		} else {
+			break;
+		}
+	}
+
+	if(total > 0) {
+		return total;
+	} else {
+		if(actual < 0) {
+			return -1;
+		} else {
+			return 0;
+		}
+	}
+}
+
+INT64_T cfs_basic_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
+{
+	INT64_T total = 0;
+	INT64_T actual = 0;
+	const char *buffer = vbuffer;
+
+	if(stride_length < 0 || stride_skip < 0 || offset < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	while(length >= stride_length) {
+		actual = cfs->pwrite(fd, &buffer[total], stride_length, offset);
+		if(actual > 0) {
+			length -= actual;
+			total += actual;
+			offset += stride_skip;
+			if(actual == stride_length) {
+				continue;
+			} else {
+				break;
+			}
+		} else {
+			break;
+		}
+	}
+
+	if(total > 0) {
+		return total;
+	} else {
+		if(actual < 0) {
+			return -1;
+		} else {
+			return 0;
+		}
+	}
+}
+
 

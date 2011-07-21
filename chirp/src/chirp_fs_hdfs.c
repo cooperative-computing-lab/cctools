@@ -12,7 +12,6 @@ See the file COPYING for details.
 #include "xmalloc.h"
 #include "hash_table.h"
 #include "debug.h"
-#include "md5.h"
 #include "username.h"
 
 #include "hdfs_library.h"
@@ -29,8 +28,6 @@ See the file COPYING for details.
 #include <pwd.h>
 #include <grp.h>
 #include <sys/stat.h>
-
-// XXX show return values in all methods.
 
 /*
 This file must take into account several oddities of HDFS:
@@ -483,110 +480,13 @@ INT64_T chirp_fs_hdfs_fsync(int fd)
 
 INT64_T chirp_fs_hdfs_getfile(const char *path, struct link * link, time_t stoptime)
 {
-	int fd;
-	INT64_T result;
-	struct chirp_stat info;
-
-	path = FIXPATH(path);
-	debug(D_HDFS, "getfile %s", path);
-
-	result = chirp_fs_hdfs_stat(path, &info);
-	if(result < 0)
-		return result;
-
-	if(S_ISDIR(info.cst_mode)) {
-		errno = EISDIR;
-		return -1;
-	}
-
-	fd = chirp_fs_hdfs_open(path, O_RDONLY, 0);
-	if(fd >= 0) {
-		char buffer[65536];
-		INT64_T total = 0;
-		INT64_T ractual, wactual;
-		INT64_T length = info.cst_size;
-
-		link_putfstring(link, "%lld\n", stoptime, length);
-
-		// Copy Pasta from link.c
-
-		while(length > 0) {
-			INT64_T chunk = MIN(sizeof(buffer), length);
-
-			ractual = hdfs_services->read(fs, open_files[fd].file, buffer, chunk);
-			if(ractual <= 0)
-				break;
-
-			wactual = link_putlstring(link, buffer, ractual, stoptime);
-			if(wactual != ractual) {
-				total = -1;
-				break;
-			}
-
-			total += ractual;
-			length -= ractual;
-		}
-		result = total;
-		chirp_fs_hdfs_close(fd);
-	} else {
-		result = -1;
-	}
-
-	return result;
+	return cfs_basic_getfile(FIXPATH(path),link,stoptime);
 }
 
 INT64_T chirp_fs_hdfs_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime)
 {
-	int fd;
-	INT64_T result;
-
-	path = FIXPATH(path);
-
-	debug(D_HDFS, "putfile %s", path);
-
-	mode = 0600 | (mode & 0100);
-
-	fd = chirp_fs_hdfs_open(path, O_WRONLY | O_CREAT | O_TRUNC, (int) mode);
-	if(fd >= 0) {
-		char buffer[65536];
-		INT64_T total = 0;
-
-		link_putliteral(link, "0\n", stoptime);
-
-		// Copy Pasta from link.c
-
-		while(length > 0) {
-			INT64_T ractual, wactual;
-			INT64_T chunk = MIN(sizeof(buffer), length);
-
-			ractual = link_read(link, buffer, chunk, stoptime);
-			if(ractual <= 0)
-				break;
-
-			wactual = hdfs_services->write(fs, open_files[fd].file, buffer, ractual);
-			if(wactual != ractual) {
-				total = -1;
-				break;
-			}
-
-			total += ractual;
-			length -= ractual;
-		}
-
-		result = total;
-
-		if(length != 0) {
-			if(result >= 0)
-				link_soak(link, length - result, stoptime);
-			result = -1;
-		}
-		chirp_fs_hdfs_close(fd);
-	} else {
-		result = -1;
-	}
-	return result;
+	return cfs_basic_putfile(FIXPATH(path),link,length,mode,stoptime);
 }
-
 
 INT64_T chirp_fs_hdfs_unlink(const char *path)
 {
@@ -803,53 +703,7 @@ INT64_T chirp_fs_hdfs_utime(const char *path, time_t actime, time_t modtime)
 
 INT64_T chirp_fs_hdfs_md5(const char *path, unsigned char digest[16])
 {
-	int fd;
-	INT64_T result;
-	struct chirp_stat info;
-
-	path = FIXPATH(path);
-
-	debug(D_HDFS, "md5sum %s", path);
-
-	result = chirp_fs_hdfs_stat(path, &info);
-	if(result < 0)
-		return result;
-
-	if(S_ISDIR(info.cst_mode)) {
-		errno = EISDIR;
-		return -1;
-	}
-
-	fd = chirp_fs_hdfs_open(path, O_RDONLY, 0);
-	if(fd >= 0) {
-		char buffer[65536];
-		//INT64_T total=0;
-		INT64_T ractual;
-		INT64_T length = info.cst_size;
-		md5_context_t ctx;
-
-		md5_init(&ctx);
-
-		while(length > 0) {
-			INT64_T chunk = MIN(sizeof(buffer), length);
-
-			ractual = hdfs_services->read(fs, open_files[fd].file, buffer, chunk);
-			if(ractual <= 0)
-				break;
-
-			md5_update(&ctx, (unsigned char *) buffer, ractual);
-
-			//total += ractual;
-			length -= ractual;
-		}
-		result = 0;
-		chirp_fs_hdfs_close(fd);
-		md5_final(digest, &ctx);
-	} else {
-		result = -1;
-	}
-
-	return result;
+	return cfs_basic_md5(FIXPATH(path),digest);
 }
 
 INT64_T chirp_fs_hdfs_chdir(const char *path)
