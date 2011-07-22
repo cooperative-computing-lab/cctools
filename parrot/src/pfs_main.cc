@@ -26,10 +26,8 @@ extern "C" {
 #include "getopt.h"
 #include "pfs_resolve.h"
 #include "chirp_client.h"
-#include "chirp_filesystem.h"
-#include "chirp_local.h"
-#include "chirp_acl.h"
 #include "chirp_global.h"
+#include "chirp_ticket.h"
 #include "ftp_lite.h"
 }
 
@@ -92,9 +90,6 @@ our own exit status
 static pid_t root_pid = -1;
 static int root_exitstatus = 0;
 static int channel_size = 10;
-
-struct chirp_filesystem *cfs = &chirp_local_fs;
-const char *chirp_transient_path = "./";
 
 static void show_version( const char *cmd )
 {
@@ -167,7 +162,6 @@ static void show_use( const char *cmd )
 	printf("Use: %s [options] <command> ...\n",cmd);
 	printf("Where options and environment variables are:\n");
 	printf("  -a <list>  Use these Chirp authentication methods.   (PARROT_CHIRP_AUTH)\n");
-	printf("  -A <file>  Use this file as a default ACL.          (PARROT_DEFAULT_ACL)\n");
 	printf("  -b <bytes> Set the I/O block size hint.              (PARROT_BLOCK_SIZE)\n");
 	printf("  -c <file>  Print exit status information to <file>.\n");
 	printf("  -C         Enable data channel authentication in GridFTP.\n");
@@ -530,9 +524,6 @@ int main( int argc, char *argv[] )
 			}
 			chose_auth = 1;
 			break;
-		case 'A':
-			chirp_acl_default(optarg);
-			break;
 		case 'b':
 			pfs_service_set_block_size(string_metric_parse(optarg));
 			break;
@@ -644,7 +635,6 @@ int main( int argc, char *argv[] )
 			break;
 	}
 	}
-    cfs = &chirp_local_fs;
 
 	if(optind>=argc) show_use(argv[0]);
 
