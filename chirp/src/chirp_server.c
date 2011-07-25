@@ -65,7 +65,7 @@ See the file COPYING for details.
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
 static void chirp_receive(struct link *l);
-static void chirp_handler(struct link *l, const char *subject);
+static void chirp_handler(struct link *l, const char *addr, const char *subject);
 static int errno_to_chirp(int e);
 
 static int port = CHIRP_PORT;
@@ -92,9 +92,6 @@ static int did_explicit_auth = 0;
 static int max_child_procs = 0;
 static int total_child_procs = 0;
 static int config_pipe[2];
-
-struct chirp_stats *global_stats = 0;
-struct chirp_stats *local_stats = 0;
 
 // XXX see if these can be made static
 
@@ -262,12 +259,10 @@ static int update_all_catalogs( const char *url )
 	uptime = time(0) - starttime;
 
 	length = sprintf(text,
-			 "type chirp\nversion %d.%d.%d\nurl chirp://%s:%d\nname %s\nowner %s\ntotal %llu\navail %llu\nuptime %u\nport %d\nbytes_written %lld\nbytes_read %lld\ntotal_ops %d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nminfree %llu\nmemory_total %llu\nmemory_avail %llu\ncpus %d\nbackend %s\n",
-			 CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, chirp_owner, info.f_blocks * info.f_bsize, info.f_bavail * info.f_bsize, uptime, port, global_stats->bytes_written,
-			 global_stats->bytes_read, global_stats->total_ops, name.machine, name.sysname, name.release, avg[0], avg[1], avg[2], minimum_space_free, memory_total, memory_avail, cpus, url);
+			 "type chirp\nversion %d.%d.%d\nurl chirp://%s:%d\nname %s\nowner %s\ntotal %llu\navail %llu\nuptime %u\nport %d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nminfree %llu\nmemory_total %llu\nmemory_avail %llu\ncpus %d\nbackend %s\n",
+			 CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, chirp_owner, info.f_blocks * info.f_bsize, info.f_bavail * info.f_bsize, uptime, port, name.machine, name.sysname, name.release, avg[0], avg[1], avg[2], minimum_space_free, memory_total, memory_avail, cpus, url);
 
 	chirp_stats_summary(&text[length], DATAGRAM_PAYLOAD_MAX - length);
-	chirp_stats_cleanup();
 	list_iterate(catalog_host_list, update_one_catalog, text);
 
 	return 0;
@@ -339,6 +334,9 @@ static void config_pipe_handler( int fd )
 {
 	char line[PIPE_BUF];
 	char flag[PIPE_BUF];
+	char subject[PIPE_BUF];
+	char address[PIPE_BUF];
+	UINT64_T ops, bytes_read, bytes_written;
 
 	while(1) {
 		fcntl(fd,F_SETFL,O_NONBLOCK);
@@ -358,6 +356,8 @@ static void config_pipe_handler( int fd )
 				} else {
 					debug_flags_set(flag);
 				}
+			} else if(sscanf(msg,"stats %s %s %llu %llu %llu",address,subject,&ops,&bytes_read,&bytes_written)==5) {
+				chirp_stats_collect(address,subject,ops,bytes_read,bytes_written);
 			} else {
 				debug(D_NOTICE,"bad config message: %s\n",msg);
 			}
@@ -557,8 +557,6 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	chirp_stats_init();
-
 	// XXX move allocation handling to the side.
 	if(root_quota > 0) {
 		if(cfs == &chirp_fs_hdfs)	/* using HDFS? Can't do quotas : / */
@@ -594,8 +592,6 @@ int main(int argc, char *argv[])
 	install_handler(SIGQUIT, shutdown_clean);
 	install_handler(SIGXFSZ, ignore_signal);
 
-	global_stats = chirp_stats_global();
-
 	while(1) {
 		char addr[LINK_ADDRESS_MAX];
 		int port;
@@ -617,6 +613,7 @@ int main(int argc, char *argv[])
 		if(time(0) >= advertise_alarm) {
 			run_in_child_process(update_all_catalogs,chirp_root_url,"catalog update");
 			advertise_alarm = time(0) + advertise_timeout;
+			chirp_stats_cleanup();
 		}
 
 		if(time(0) >= gc_alarm) {
@@ -656,8 +653,6 @@ int main(int argc, char *argv[])
 			if(!l) continue;
 
 			link_address_remote(l, addr, &port);
-
-			local_stats = chirp_stats_local_begin(addr);
 
 			pid = fork();
 			if(pid == 0) {
@@ -721,6 +716,8 @@ static void chirp_receive(struct link *link)
 
 		debug(D_LOGIN, "%s from %s:%d", typesubject, addr, port);
 
+		// XXX move getpwnam to main
+
 		if(safe_username) {
 			struct passwd *p;
 			p = getpwnam(safe_username);
@@ -742,9 +739,12 @@ static void chirp_receive(struct link *link)
 		}
 		auth_hostname_register();
 		auth_address_register();
+
 		change_process_title("chirp_server [%s:%d] [%s]", addr, port, typesubject);
-		chirp_handler(link, typesubject);
+
+		chirp_handler(link, addr, typesubject);
 		chirp_alloc_flush();
+		chirp_stats_report(config_pipe[1],addr,typesubject,0);
 
 		debug(D_LOGIN, "disconnected");
 	} else {
@@ -752,8 +752,6 @@ static void chirp_receive(struct link *link)
 	}
 
 	link_close(link);
-	chirp_stats_local_end(local_stats);
-	chirp_stats_sync();
 }
 
 /*
@@ -850,7 +848,7 @@ char *chirp_statfs_string(struct chirp_statfs *info)
   does from there is out of our hands.
 */
 
-static void chirp_handler(struct link *l, const char *subject)
+static void chirp_handler(struct link *l, const char *addr, const char *subject)
 {
 	char line[CHIRP_LINE_MAX];
 	char *esubject;
@@ -890,7 +888,6 @@ static void chirp_handler(struct link *l, const char *subject)
 		time_t idletime = time(0) + idle_timeout;
 		time_t stalltime = time(0) + stall_timeout;
 
-
 		if(chirp_alloc_flush_needed()) {
 			if(!link_usleep(l, 1000000, 1, 0)) {
 				chirp_alloc_flush();
@@ -908,8 +905,9 @@ static void chirp_handler(struct link *l, const char *subject)
 		if(line[0] == 4)
 			break;
 
-		global_stats->total_ops++;
-		local_stats->total_ops++;
+		chirp_stats_report(config_pipe[1],addr,subject,advertise_alarm);
+
+		chirp_stats_update(1,0,0);
 
 		debug(D_CHIRP, "%s", line);
 
@@ -920,8 +918,7 @@ static void chirp_handler(struct link *l, const char *subject)
 				result = chirp_alloc_pread(fd, dataout, length, offset);
 				if(result >= 0) {
 					dataoutlength = result;
-					global_stats->bytes_read += result;
-					local_stats->bytes_read += result;
+					chirp_stats_update(0,result,0);
 				} else {
 					free(dataout);
 					dataout = 0;
@@ -936,8 +933,7 @@ static void chirp_handler(struct link *l, const char *subject)
 				result = chirp_alloc_sread(fd, dataout, length, stride_length, stride_skip, offset);
 				if(result >= 0) {
 					dataoutlength = result;
-					global_stats->bytes_read += result;
-					local_stats->bytes_read += result;
+					chirp_stats_update(0,result,0);
 				} else {
 					free(dataout);
 					dataout = 0;
@@ -963,8 +959,7 @@ static void chirp_handler(struct link *l, const char *subject)
 				link_soak(l, (orig_length - length), stalltime);
 				free(data);
 				if(result > 0) {
-					global_stats->bytes_written += result;
-					local_stats->bytes_written += result;
+					chirp_stats_update(0,0,result);
 				}
 			} else {
 				link_soak(l, orig_length, stalltime);
@@ -990,8 +985,7 @@ static void chirp_handler(struct link *l, const char *subject)
 				link_soak(l, (orig_length - length), stalltime);
 				free(data);
 				if(result > 0) {
-					global_stats->bytes_written += result;
-					local_stats->bytes_written += result;
+					chirp_stats_update(0,0,result);
 				}
 			} else {
 				link_soak(l, orig_length, stalltime);
@@ -1132,8 +1126,7 @@ static void chirp_handler(struct link *l, const char *subject)
 
 			if(result >= 0) {
 				do_no_result = 1;
-				global_stats->bytes_read += length;
-				local_stats->bytes_read += length;
+				chirp_stats_update(0,length,0);
 			}
 		} else if(sscanf(line, "putfile %s %lld %lld", path, &mode, &length) == 3) {
 			if(!chirp_path_fix(path))
@@ -1160,8 +1153,7 @@ static void chirp_handler(struct link *l, const char *subject)
 
 			result = chirp_alloc_putfile(path, l, length, mode, stalltime);
 			if(result >= 0) {
-				global_stats->bytes_written += length;
-				local_stats->bytes_written += length;
+				chirp_stats_update(0,0,length);
 			}
 		} else if(sscanf(line, "getstream %s", path) == 1) {
 			if(!chirp_path_fix(path))
@@ -1173,8 +1165,7 @@ static void chirp_handler(struct link *l, const char *subject)
 
 			result = chirp_alloc_getstream(path, l, stalltime);
 			if(result >= 0) {
-				global_stats->bytes_read += length;
-				local_stats->bytes_read += length;
+				chirp_stats_update(0,length,0);
 				debug(D_CHIRP, "= %lld bytes streamed\n", result);
 				/* getstream indicates end by closing the connection */
 				break;
@@ -1202,8 +1193,7 @@ static void chirp_handler(struct link *l, const char *subject)
 
 			result = chirp_alloc_putstream(path, l, stalltime);
 			if(result >= 0) {
-				global_stats->bytes_written += length;
-				local_stats->bytes_written += length;
+				chirp_stats_update(0,0,length);
 				debug(D_CHIRP, "= %lld bytes streamed\n", result);
 				/* putstream getstream indicates end by closing the connection */
 				break;

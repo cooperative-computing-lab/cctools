@@ -5,129 +5,117 @@ See the file COPYING for details.
 */
 
 #include "chirp_stats.h"
+
 #include "debug.h"
 #include "xmalloc.h"
+#include "hash_table.h"
+#include "link.h"
 
-#include <fcntl.h>
-#include <sys/mman.h>
-
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include <errno.h>
 #include <time.h>
-#include <string.h>
 
-/* Darwin doesn't support mmap of /dev/zero. We have to use non-standard
- * anonymous mapping. Darwin uses MAP_ANON.
- */
-#ifndef MAP_ANONYMOUS
-#define MAP_ANONYMOUS MAP_ANON
-#endif
+static struct hash_table *stats_table = 0;
 
-#define SHARED_SEGMENT_SIZE 4096
-#define TOTAL_ENTRIES (SHARED_SEGMENT_SIZE/sizeof(struct chirp_stats))
+static UINT64_T total_ops = 0;
+static UINT64_T total_bytes_read = 0;
+static UINT64_T total_bytes_written = 0;
 
-static struct chirp_stats *table = 0;
+struct chirp_stats {
+	char addr[LINK_ADDRESS_MAX];
+	UINT64_T ops;
+	UINT64_T bytes_read;
+	UINT64_T bytes_written;
+};
 
-void chirp_stats_init()
+void chirp_stats_collect( const char *addr, const char *subject, UINT64_T ops, UINT64_T bytes_read, UINT64_T bytes_written )
 {
-	void *pa = mmap(0, SHARED_SEGMENT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	if(pa == MAP_FAILED)
-		fatal("couldn't allocate shared page: %s\n", strerror(errno));
-	table = (struct chirp_stats *) pa;
-
-	memset(table, 0, SHARED_SEGMENT_SIZE);
-}
-
-void chirp_stats_sync()
-{
-	msync((void *) table, SHARED_SEGMENT_SIZE, MS_SYNC | MS_INVALIDATE);
-}
-
-
-struct chirp_stats *chirp_stats_global()
-{
-	return &table[0];
-}
-
-struct chirp_stats *chirp_stats_local_begin(const char *addr)
-{
-	int i;
 	struct chirp_stats *s;
 
-	for(i = 1; i < TOTAL_ENTRIES; i++) {
-		if(!strcmp(table[i].addr, addr)) {
-			table[i].active_clients++;
-			table[i].total_connections++;
-			return &table[i];
-		}
+	if(!stats_table) stats_table = hash_table_create(0,0);
+
+	s = hash_table_lookup(stats_table,addr);
+	if(!s) {
+		s = malloc(sizeof(*s));
+		memset(s,0,sizeof(*s));
+		strcpy(s->addr,addr);
+		hash_table_insert(stats_table,addr,s);
 	}
 
-	for(i = 1; i < TOTAL_ENTRIES; i++) {
-		if(!table[i].addr[0]) {
-			memset(&table[i], 0, sizeof(struct chirp_stats));
-			strcpy(table[i].addr, addr);
-			table[i].active_clients++;
-			table[i].total_connections++;
-			return &table[i];
-		}
-	}
+	s->ops += ops;
+	s->bytes_read += bytes_read;
+	s->bytes_written += bytes_written;
 
-	/*
-	   If we have so many clients that we run out of space
-	   in the shared memory area, then just return a non-shared
-	   memory chunk.  It won't be reported in the stats, but
-	   it will simplify the caller, who doesn't have to check
-	   for a null pointer.
-	 */
-
-	s = xxmalloc(sizeof(*s));
-	memset(s, 0, sizeof(*s));
-	return s;
+	total_ops += ops;
+	total_bytes_read += bytes_read;
+	total_bytes_written += bytes_written;
 }
-
-void chirp_stats_local_end(struct chirp_stats *s)
-{
-	s->active_clients--;
-}
-
-void chirp_stats_cleanup()
-{
-	int i;
-	for(i = 1; i < TOTAL_ENTRIES; i++) {
-		struct chirp_stats *s = &table[i];
-		if(s->active_clients == 0) {
-			memset(s, 0, sizeof(*s));
-		} else {
-			s->total_connections = 0;
-			s->total_ops = 0;
-			s->bytes_read = 0;
-			s->bytes_written = 0;
-		}
-	}
-}
-
 
 void chirp_stats_summary(char *buf, int length)
 {
-	int i;
 	int chunk;
+	char *addr;
 	struct chirp_stats *s;
+
+	if(!stats_table) stats_table = hash_table_create(0,0);
+
+	chunk = snprintf(buf,length,"bytes_written %llu\nbytes_read %llu\ntotal_ops %llu\n",total_bytes_written,total_bytes_read,total_ops);
+	length -= chunk;
+	buf += chunk;
 
 	chunk = snprintf(buf, length, "clients ");
 
 	length -= chunk;
 	buf += chunk;
 
-	for(i = 1; i < TOTAL_ENTRIES; i++) {
-		s = &table[i];
-
-		if(!s->addr[0]) {
-			continue;
-		}
-
-		chunk = snprintf(buf, length, "%s,%d,%d,%d,%llu,%llu; ", s->addr, s->active_clients, s->total_connections, s->total_ops, s->bytes_read, s->bytes_written);
+	hash_table_firstkey(stats_table);
+	while(hash_table_nextkey(stats_table,&addr,(void**)&s)) {
+		chunk = snprintf(buf, length, "%s,1,1,%llu,%llu,%llu; ", s->addr, s->ops, s->bytes_read, s->bytes_written);
 		buf += chunk;
 		length -= chunk;
 	}
 
 	snprintf(buf, length, "\n");
 }
+
+void chirp_stats_cleanup()
+{
+	char *addr;
+	struct chirp_stats *s;
+
+	if(!stats_table) stats_table = hash_table_create(0,0);
+
+	hash_table_firstkey(stats_table);
+	while(hash_table_nextkey(stats_table,&addr,(void**)&s)) {
+		hash_table_remove(stats_table,addr);
+		free(s);
+	}
+}
+
+static UINT64_T child_ops = 0;
+static UINT64_T child_bytes_read = 0;
+static UINT64_T child_bytes_written = 0;
+static time_t  child_report_time = 0;
+
+void chirp_stats_update( UINT64_T ops, UINT64_T bytes_read, UINT64_T bytes_written )
+{
+	child_ops += ops;
+	child_bytes_read += bytes_read;
+	child_bytes_written += bytes_written;
+}
+
+void chirp_stats_report( int pipefd, const char *addr, const char *subject, int interval )
+{
+	char line[PIPE_BUF];
+
+	if(time(0)-child_report_time > interval) {
+		snprintf(line,PIPE_BUF,"stats %s %s %lld %lld %lld\n",addr,subject,child_ops,child_bytes_read,child_bytes_written);
+		write(pipefd,line,strlen(line));
+		debug(D_DEBUG,"sending stats: %s",line);
+		child_ops = child_bytes_read = child_bytes_written = 0;
+		child_report_time = time(0);
+	}
+}
+
