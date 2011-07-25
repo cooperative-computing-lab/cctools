@@ -97,7 +97,7 @@ static int config_pipe[2];
 
 int exit_if_parent_fails = 0;
 const char *listen_on_interface = 0;
-const char *chirp_root_url = 0;
+const char *chirp_root_url = ".";
 const char *chirp_root_path = 0;
 const char *chirp_ticket_path = 0;
 char *chirp_transient_path = "./";	/* local file system stuff */
@@ -530,8 +530,6 @@ int main(int argc, char *argv[])
 	if(!did_explicit_auth) {
 		auth_register_all();
 	}
-
-	if(!chirp_root_url) fatal("please give me a storage url with the -r option.");
 
 	cfs = cfs_lookup(chirp_root_url);
 
