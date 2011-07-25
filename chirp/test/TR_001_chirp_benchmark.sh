@@ -8,11 +8,10 @@ PORT_FILE=chirp_server.port
 
 prepare()
 {
-    port=`find_free_port`
-    ../src/chirp_server -p $port &
+    ../src/chirp_server -Z $PORT_FILE &
     pid=$!
-    
-    echo $port> $PORT_FILE
+    # give the server a moment to generate the port file
+    sleep 5
     echo $pid > $PID_FILE
     exit 0
 }

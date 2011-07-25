@@ -69,6 +69,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 static int errno_to_chirp(int e);
 
 static int port = CHIRP_PORT;
+static const char *port_file = 0;
 static int idle_timeout = 60;	/* one minute */
 static int stall_timeout = 3600;	/* one hour */
 static int parent_check_timeout = 300;	/* five minutes */
@@ -150,6 +151,7 @@ static void show_help(const char *cmd)
 	printf(" -W <file>   Use alternate password file for unix authentication\n");
 	printf(" -y <dir>    Location of transient data (default is pwd).\n");
 	printf(" -z <time>   Set max timeout for unix filesystem authentication. (default is 5s)\n");
+	printf(" -Z <file>   Select port at random and write to this file.  (default is disabled)\n");
 	printf("\n");
 	printf("Where debug flags are: ");
 	debug_flags_print(stdout);
@@ -386,7 +388,7 @@ int main(int argc, char *argv[])
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c_input = getopt(argc, argv, "A:a:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:")) != -1) {
+	while((c_input = getopt(argc, argv, "A:a:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:Z:")) != -1) {
 		c = (char) c_input;
 		switch (c) {
 		case 'A':
@@ -499,6 +501,10 @@ int main(int argc, char *argv[])
 		case 'z':
 			auth_unix_timeout_set(atoi(optarg));
 			break;
+	        case 'Z':
+			port_file = optarg;
+			port = 0;
+			break;
 		case 'h':
 		default:
 			show_help(argv[0]);
@@ -573,6 +579,15 @@ int main(int argc, char *argv[])
 	}
 
 	link_address_local(link, address, &port);
+
+	debug(D_DEBUG,"now listening port on port %d\n",port);
+
+	if(port_file) {
+		FILE *file = fopen(port_file,"w");
+		if(!file) fatal("couldn't write to %s: %s\n",port_file,strerror(errno));
+		fprintf(file,"%d\n",port);
+		fclose(file);
+	}
 
 	starttime = time(0);
 	catalog_port = datagram_create(0);

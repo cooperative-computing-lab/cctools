@@ -10,10 +10,10 @@ prepare()
 {
     mkdir foo
     ln -s ..//.//./..///foo/ foo/foo
-    port=`find_free_port`
-    ../src/chirp_server -r $PWD/foo -p $port &
+    ../src/chirp_server -r $PWD/foo -Z $PORT_FILE &
+    # give the server a little time to write the port file
+    sleep 5
     echo $! > $PID_FILE
-    echo $port > $PORT_FILE
     exit 0
 }
 
