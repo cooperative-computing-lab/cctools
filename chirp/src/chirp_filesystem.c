@@ -360,6 +360,29 @@ int cfs_isnotdir(const char *filename)
 	}
 }
 
+INT64_T cfs_file_size( const char *path )
+{
+	struct chirp_stat info;
+
+	if(cfs->stat(path,&info)>=0) {
+		return info.cst_size;
+	} else {
+		return -1;
+	}
+}
+
+INT64_T cfs_fd_size( int fd )
+{
+	struct chirp_stat info;
+
+	if(cfs->fstat(fd,&info)>=0) {
+		return info.cst_size;
+	} else {
+		return -1;
+	}
+}
+
+
 INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime)
 {
 	int fd;

@@ -271,26 +271,6 @@ INT64_T chirp_fs_chirp_md5(const char *path, unsigned char digest[16])
 	return chirp_reli_md5(chirp_fs_chirp_hostport,path,digest,STOPTIME);
 }
 
-INT64_T chirp_fs_chirp_file_size(const char *path)
-{
-	struct chirp_stat info;
-	if(chirp_fs_chirp_stat(path, &info) == 0) {
-		return info.cst_size;
-	} else {
-		return -1;
-	}
-}
-
-INT64_T chirp_fs_chirp_fd_size(int fd)
-{
-	struct chirp_stat info;
-	if(chirp_fs_chirp_fstat(fd, &info) == 0) {
-		return info.cst_size;
-	} else {
-		return -1;
-	}
-}
-
 int chirp_fs_chirp_do_acl_check()
 {
 	return 0;
@@ -338,7 +318,5 @@ struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_utime,
 	chirp_fs_chirp_md5,
 
-	chirp_fs_chirp_file_size,
-	chirp_fs_chirp_fd_size,
 	chirp_fs_chirp_do_acl_check
 };

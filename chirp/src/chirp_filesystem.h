@@ -32,6 +32,9 @@ int    cfs_isnotdir(const char *filename);
 int    cfs_create_dir(const char *path, int mode);
 int    cfs_delete_dir(const char *path);
 
+INT64_T cfs_file_size( const char *path );
+INT64_T cfs_fd_size( int fd );
+
 INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset);
 INT64_T cfs_basic_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset);
 INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime);
@@ -79,9 +82,6 @@ struct chirp_filesystem {
 	INT64_T (*truncate)  ( const char *path, INT64_T length );
 	INT64_T (*utime)     ( const char *path, time_t atime, time_t mtime  );
 	INT64_T (*md5)       ( const char *path, unsigned char digest[16] );
-
-	INT64_T (*file_size) (const char *path );
-	INT64_T (*fd_size) (int fd );
 
 	int (*do_acl_check) ();
 };

@@ -153,7 +153,7 @@ static char *alloc_state_root(const char *path)
 
 	while(1) {
 		sprintf(statename, "%s/.__alloc", dirname);
-		if(cfs->file_size(statename) >= 0) {
+		if(cfs_file_size(statename) >= 0) {
 			return xstrdup(dirname);
 		}
 		s = strrchr(dirname, '/');
@@ -371,7 +371,7 @@ INT64_T chirp_alloc_open(const char *path, INT64_T flags, INT64_T mode)
 
 	a = alloc_state_cache(path);
 	if(a) {
-		INT64_T filesize = cfs->file_size(path);
+		INT64_T filesize = cfs_file_size(path);
 		if(filesize < 0)
 			filesize = 0;
 
@@ -422,7 +422,7 @@ INT64_T chirp_alloc_pwrite(int fd, const void *data, INT64_T length, INT64_T off
 
 	a = alloc_state_cache(itable_lookup(fd_table, fd));
 	if(a) {
-		INT64_T filesize = cfs->fd_size(fd);
+		INT64_T filesize = cfs_fd_size(fd);
 		if(filesize >= 0) {
 			INT64_T newfilesize = MAX(length + offset, filesize);
 			INT64_T alloc_change = space_consumed(newfilesize) - space_consumed(filesize);
@@ -508,7 +508,7 @@ INT64_T chirp_alloc_ftruncate(int fd, INT64_T length)
 
 	a = alloc_state_cache(itable_lookup(fd_table, fd));
 	if(a) {
-		INT64_T filesize = cfs->fd_size(fd);
+		INT64_T filesize = cfs_fd_size(fd);
 		if(filesize >= 0) {
 			INT64_T alloc_change = space_consumed(length) - space_consumed(filesize);
 			if(a->avail >= alloc_change) {
@@ -671,7 +671,7 @@ INT64_T chirp_alloc_unlink(const char *path)
 
 	a = alloc_state_cache(path);
 	if(a) {
-		INT64_T filesize = cfs->file_size(path);
+		INT64_T filesize = cfs_file_size(path);
 		if(filesize >= 0) {
 			result = cfs->unlink(path);
 			if(result == 0)
@@ -700,7 +700,7 @@ INT64_T chirp_alloc_rename(const char *oldpath, const char *newpath)
 			if(a == b) {
 				result = rename(oldpath, newpath);
 			} else {
-				INT64_T filesize = cfs->file_size(oldpath);
+				INT64_T filesize = cfs_file_size(oldpath);
 				if(filesize >= 0) {
 					if(b->avail >= filesize) {
 						result = cfs->rename(oldpath, newpath);
@@ -886,7 +886,7 @@ INT64_T chirp_alloc_truncate(const char *path, INT64_T newsize)
 
 	a = alloc_state_cache(path);
 	if(a) {
-		INT64_T filesize = cfs->file_size(path);
+		INT64_T filesize = cfs_file_size(path);
 		if(filesize >= 0) {
 			INT64_T alloc_change = space_consumed(newsize) - space_consumed(filesize);
 			if(a->avail >= alloc_change) {
@@ -976,14 +976,4 @@ INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode)
 	}
 
 	return result;
-}
-
-INT64_T chirp_alloc_file_size(const char *path)
-{
-	return cfs->file_size(path);
-}
-
-INT64_T chirp_alloc_fd_size(int fd)
-{
-	return cfs->fd_size(fd);
 }

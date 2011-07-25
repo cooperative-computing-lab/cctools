@@ -408,26 +408,6 @@ INT64_T chirp_fs_local_utime(const char *path, time_t actime, time_t modtime)
 	return utime(path, &ut);
 }
 
-INT64_T chirp_fs_local_file_size(const char *path)
-{
-	struct chirp_stat info;
-	if(chirp_fs_local_stat(path, &info) == 0) {
-		return info.cst_size;
-	} else {
-		return -1;
-	}
-}
-
-INT64_T chirp_fs_local_fd_size(int fd)
-{
-	struct chirp_stat info;
-	if(chirp_fs_local_fstat(fd, &info) == 0) {
-		return info.cst_size;
-	} else {
-		return -1;
-	}
-}
-
 int chirp_fs_do_acl_check()
 {
 	return 1;
@@ -475,7 +455,5 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_utime,
 	cfs_basic_md5,
 
-	chirp_fs_local_file_size,
-	chirp_fs_local_fd_size,
 	chirp_fs_do_acl_check,
 };

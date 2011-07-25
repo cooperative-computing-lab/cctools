@@ -228,27 +228,6 @@ void chirp_fs_hdfs_closedir(void *dir)
 	free(d);
 }
 
-INT64_T chirp_fs_hdfs_file_size(const char *path)
-{
-	struct chirp_stat info;
-	path = FIXPATH(path);
-	if(chirp_fs_hdfs_stat(path, &info) == 0) {
-		return info.cst_size;
-	} else {
-		return -1;
-	}
-}
-
-INT64_T chirp_fs_hdfs_fd_size(int fd)
-{
-	struct chirp_stat info;
-	if(chirp_fs_hdfs_fstat(fd, &info) == 0) {
-		return info.cst_size;
-	} else {
-		return -1;
-	}
-}
-
 static INT64_T get_fd(void)
 {
 	INT64_T fd;
@@ -758,9 +737,6 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_truncate,
 	chirp_fs_hdfs_utime,
 	chirp_fs_hdfs_md5,
-
-	chirp_fs_hdfs_file_size,
-	chirp_fs_hdfs_fd_size,
 
 	chirp_fs_hdfs_do_acl_check,
 };
