@@ -31,7 +31,7 @@ if(!fd) { errno = EBADF; return -1;}
 
 const char * chirp_fs_chirp_init( const char *url )
 {
-	char *h, *p, *t;
+	char *h, *p;
 	const char *path;
 
 	/* find the first slash after chirp: */
@@ -42,7 +42,7 @@ const char * chirp_fs_chirp_init( const char *url )
 	if(!h) return 0;
 
 	/* now find the slash following the hostname */
-	p = strchr(t,'/');
+	p = strchr(h,'/');
 	if(p) {
 		path = strdup(p);
 	} else {
