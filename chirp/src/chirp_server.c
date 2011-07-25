@@ -59,6 +59,7 @@ See the file COPYING for details.
 #include <sys/utsname.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/select.h>
 
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
@@ -90,6 +91,7 @@ static INT64_T root_quota = 0;
 static int did_explicit_auth = 0;
 static int max_child_procs = 0;
 static int total_child_procs = 0;
+static int config_pipe[2];
 
 struct chirp_stats *global_stats = 0;
 struct chirp_stats *local_stats = 0;
@@ -323,6 +325,48 @@ static int run_in_child_process( int (*func) ( const char *a ), const char *args
 	}		
 }
 
+/*
+The parent Chirp server process maintains a pipe connected to
+all child processes.  When the child must update the global
+state, it is done by sending a message to the config pipe,
+which the parent reads and processes.  This code relies
+on the guarantee that all writes of less than PIPE_BUF size
+are atomic, so here we expect a read to return one or
+more complete messages, each delimited by a newline.
+*/
+
+static void config_pipe_handler( int fd )
+{
+	char line[PIPE_BUF];
+	char flag[PIPE_BUF];
+
+	while(1) {
+		fcntl(fd,F_SETFL,O_NONBLOCK);
+
+		int length = read(fd,line,PIPE_BUF);
+		if(length<=0) return;
+
+		line[length] = 0;
+
+		const char *msg = strtok(line,"\n");
+		while(msg) {
+			debug(D_DEBUG,"config message: %s",msg);
+
+			if(sscanf(msg,"debug %s",flag)==1) {
+				if(!strcmp(flag,"clear")) {
+					debug_flags_clear();
+				} else {
+					debug_flags_set(flag);
+				}
+			} else {
+				debug(D_NOTICE,"bad config message: %s\n",msg);
+			}
+			msg = strtok(0,"\n");
+		}
+	}
+}
+
+
 int main(int argc, char *argv[])
 {
 	struct link *link;
@@ -462,6 +506,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if(pipe(config_pipe)<0)
+		fatal("could not create internal pipe: %s",strerror(errno));
+
 	if(!create_dir(chirp_transient_path, 0711))
 		fatal("could not create transient data directory '%s'", chirp_transient_path);
 
@@ -577,33 +624,59 @@ int main(int argc, char *argv[])
 			gc_alarm = time(0) + gc_timeout;
 		}
 
-		if(max_child_procs > 0) {
-			if(total_child_procs >= max_child_procs) {
-				debug(D_PROCESS, "max of %d child processes reached, waiting for one to finish...");
-				// Note that this will be interrupted by SIGCHILD
-				sleep(5);
-				continue;
+		/* Wait for action on one of two ports: the master TCP port, or the internal pipe. */
+		/* If the limit of child procs has been reached, don't watch the TCP port. */
+
+		fd_set rfds;
+		FD_ZERO(&rfds);
+		FD_SET(config_pipe[0],&rfds);
+		if(max_child_procs==0 || total_child_procs < max_child_procs) {
+			FD_SET(link_fd(link),&rfds);
+		}
+		int maxfd = MAX(link_fd(link),config_pipe[0]) + 1;
+
+		/* Sleep for the minimum of any periodic timers, but don't go negative. */
+
+		struct timeval timeout;
+		time_t current = time(0);
+		timeout.tv_usec = 0;
+		timeout.tv_sec = advertise_alarm-current;
+		timeout.tv_sec = MIN(timeout.tv_sec,gc_alarm-current);
+		timeout.tv_sec = MIN(timeout.tv_sec,parent_check_timeout);
+		timeout.tv_sec = MAX(0,timeout.tv_sec);
+
+		/* Wait for activity on the listening port or the config pipe */
+
+		if(select(maxfd,&rfds,0,0,&timeout)<0) continue;
+
+		/* If the network port is active, accept the connection and fork the handler. */
+
+		if(FD_ISSET(link_fd(link),&rfds)) {
+			l = link_accept(link, time(0) + 5 );
+			if(!l) continue;
+
+			link_address_remote(l, addr, &port);
+
+			local_stats = chirp_stats_local_begin(addr);
+
+			pid = fork();
+			if(pid == 0) {
+				chirp_receive(l);
+				_exit(0);
+			} else if(pid > 0) {
+				total_child_procs++;
+				debug(D_PROCESS, "created pid %d (%d total child procs)", pid, total_child_procs);
+			} else {
+				debug(D_PROCESS, "couldn't fork: %s", strerror(errno));
 			}
+			link_close(l);
 		}
 
-		l = link_accept(link, time(0) + MIN(advertise_timeout, parent_check_timeout));
-		if(!l) continue;
+		/* If the config pipe is active, read and process those messages. */
 
-		link_address_remote(l, addr, &port);
-
-		local_stats = chirp_stats_local_begin(addr);
-
-		pid = fork();
-		if(pid == 0) {
-			chirp_receive(l);
-			_exit(0);
-		} else if(pid >= 0) {
-			total_child_procs++;
-			debug(D_PROCESS, "created pid %d (%d total child procs)", pid, total_child_procs);
-		} else {
-			debug(D_PROCESS, "couldn't fork: %s", strerror(errno));
+		if(FD_ISSET(config_pipe[0],&rfds)) {
+			config_pipe_handler(config_pipe[0]);
 		}
-		link_close(l);
 	}
 }
 
@@ -1555,11 +1628,9 @@ static void chirp_handler(struct link *l, const char *subject)
 				goto failure;
 			}
 			result = 0;
-			if(strcmp(debug_flag, "clear") == 0)
-				debug_flags_clear();
-			else if(strcmp(debug_flag, "*") != 0) {
-				debug_flags_set(debug_flag);
-			}
+			// send this message to the parent for processing.
+			strcat(line,"\n");
+			write(config_pipe[1],line,strlen(line));
 		} else {
 			result = -1;
 			errno = ENOSYS;
