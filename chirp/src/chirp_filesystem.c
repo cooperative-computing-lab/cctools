@@ -324,8 +324,8 @@ static int do_stat(const char *filename, struct chirp_stat *buf)
 }
 
 /*
-Note that cfs_isdir() is not quite the same as !cfs_isnotdir().
-If there is an error accessing the path, both return failure.
+Note that cfs_isdir() is not quite the same as !cfs_isnotdir(),
+note the slight difference in errno for the client.
 */
 
 int cfs_isdir(const char *filename)
@@ -356,7 +356,7 @@ int cfs_isnotdir(const char *filename)
 			return 1;
 		}  
 	} else {
-		return 0;
+		return 1;
 	}
 }
 
