@@ -684,9 +684,7 @@ static void chirp_receive(struct link *link)
 
 	change_process_title("chirp_server [authenticating]");
 
-	printf("%s\n",chirp_root_url);
 	chirp_root_path = cfs->init(chirp_root_url);
-	printf("%s\n",chirp_root_path);
 	chirp_ticket_path = chirp_root_path;
 
         if(!chirp_root_path)
@@ -774,38 +772,6 @@ int chirp_path_fix(char *path)
 	string_collapse_path(safepath, path, 1);
 
 	return 1;
-}
-
-static int chirp_not_directory(const char *path)
-{
-	struct chirp_stat statbuf;
-
-	if(chirp_alloc_stat(path, &statbuf) == 0) {
-		if(S_ISDIR(statbuf.cst_mode)) {
-			errno = EISDIR;
-			return 0;
-		} else {
-			return 1;
-		}
-	} else {
-		return 1;
-	}
-}
-
-static int chirp_is_directory(const char *path)
-{
-	struct chirp_stat statbuf;
-
-	if(chirp_alloc_stat(path, &statbuf) == 0) {
-		if(S_ISDIR(statbuf.cst_mode)) {
-			return 1;
-		} else {
-			errno = ENOTDIR;
-			return 0;
-		}
-	} else {
-		return 0;
-	}
 }
 
 static int chirp_file_exists(const char *path)
@@ -1117,7 +1083,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "getfile %s", path) == 1) {
 			if(!chirp_path_fix(path))
 				goto failure;
-			if(!chirp_not_directory(path))
+			if(!cfs_isnotdir(path))
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
@@ -1131,7 +1097,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "putfile %s %lld %lld", path, &mode, &length) == 3) {
 			if(!chirp_path_fix(path))
 				goto failure;
-			if(!chirp_not_directory(path))
+			if(!cfs_isnotdir(path))
 				goto failure;
 
 			if(chirp_acl_check(path, subject, CHIRP_ACL_WRITE)) {
@@ -1158,7 +1124,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "getstream %s", path) == 1) {
 			if(!chirp_path_fix(path))
 				goto failure;
-			if(!chirp_not_directory(path))
+			if(!cfs_isnotdir(path))
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
@@ -1174,7 +1140,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "putstream %s", path) == 1) {
 			if(!chirp_path_fix(path))
 				goto failure;
-			if(!chirp_not_directory(path))
+			if(!cfs_isnotdir(path))
 				goto failure;
 
 			if(chirp_acl_check(path, subject, CHIRP_ACL_WRITE)) {
@@ -1246,7 +1212,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			   with EISDIR.
 			 */
 
-			if(chirp_not_directory(path)) {
+			if(cfs_isnotdir(path)) {
 				if(chirp_acl_check(path, subject, chirp_acl_from_open_flags(flags))) {
 					/* ok to proceed */
 				} else if(chirp_acl_check(path, subject, CHIRP_ACL_PUT)) {
@@ -1471,7 +1437,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 						goto failure;
 					}
 				}
-			} else if(chirp_is_directory(path)) {
+			} else if(cfs_isdir(path)) {
 				errno = EEXIST;
 				goto failure;
 			} else {

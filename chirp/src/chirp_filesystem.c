@@ -323,6 +323,11 @@ static int do_stat(const char *filename, struct chirp_stat *buf)
 	return result;
 }
 
+/*
+Note that cfs_isdir() is not quite the same as !cfs_isnotdir().
+If there is an error accessing the path, both return failure.
+*/
+
 int cfs_isdir(const char *filename)
 {
 	struct chirp_stat info;
@@ -331,7 +336,24 @@ int cfs_isdir(const char *filename)
 		if(S_ISDIR(info.cst_mode)) {
 			return 1;
 		} else {
+			errno = ENOTDIR;
 			return 0;
+		}  
+	} else {
+		return 0;
+	}
+}
+
+int cfs_isnotdir(const char *filename)
+{
+	struct chirp_stat info;
+
+	if(do_stat(filename, &info) == 0) {
+		if(S_ISDIR(info.cst_mode)) {
+			errno = EISDIR;
+			return 0;
+		} else {
+			return 1;
 		}  
 	} else {
 		return 0;
