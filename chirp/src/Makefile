@@ -23,13 +23,6 @@ libchirp.a: ${LIBRARY_OBJECTS}
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
 
-# This library contains only sources used by the server, and the
-# parts of the server needed by Parrot to implement identity boxing.
-
-libchirp_server.a: ${SERVER_OBJECTS}
-	${CCTOOLS_AR} rv $@ $^
-	ranlib $@
-
 # This object exists primarily to get a linkable object for use
 # by ROOT and other systems that want to load Chirp dynamically.
 # Note that we explicitly include auth_all.o and ${CCTOOLS_DYNAMIC_AUTH_LIBS}
@@ -41,7 +34,7 @@ libchirp_client.${CCTOOLS_DYNAMIC_SUFFIX}: ${LIBRARY_OBJECTS} ../../dttools/src/
 chirp: chirp_tool.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${CCTOOLS_READLINE_LDFLAGS} ${LOCAL_LDFLAGS}
 
-chirp_server: chirp_server.o libchirp.a libchirp_server.a
+chirp_server: chirp_server.o ${SERVER_OBJECTS} libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 chirp_get: chirp_get.o libchirp.a
