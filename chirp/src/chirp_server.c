@@ -764,22 +764,21 @@ static void chirp_receive(struct link *link)
 
 /*
   Force a path to fall within the simulated root directory.
-  XXX for safety, shouldn't we do collapse_path before prepending the root?
 */
 
 int chirp_path_fix(char *path)
 {
 	char decodepath[CHIRP_PATH_MAX];
-	char safepath[CHIRP_PATH_MAX];
+	char shortpath[CHIRP_PATH_MAX];
 
 	// Remove the percent-hex encoding
 	url_decode(path, decodepath, sizeof(decodepath));
 
-	// Add the Chirp root and copy it back out.
-	sprintf(safepath, "%s/%s", chirp_root_path, decodepath);
-
 	// Collapse dots, double dots, and the like:
-	string_collapse_path(safepath, path, 1);
+	string_collapse_path(decodepath,shortpath,1);
+
+	// Add the Chirp root and copy it back out.
+	sprintf(path, "%s/%s", chirp_root_path, shortpath);
 
 	return 1;
 }
