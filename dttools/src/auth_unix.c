@@ -172,6 +172,13 @@ static int auth_unix_accept(struct link *link, char **subject, time_t stoptime)
 			int i=0;
 
 			for(i=0;i<challenge_timeout;i++) {
+				/*
+				This is an odd hack, but invoking ls -la appears to help to force
+				some NFS clients to refresh cached metadata.
+				*/
+
+				system("ls -la > /dev/null");
+
 				if(stat(path,&buf)==0) {
 					file_exists = 1;
 					break;
