@@ -554,6 +554,11 @@ int main(int argc, char *argv[])
 			printf("After using root access to authenticate users,\n");
 			printf("I will use the safe username to access data on disk.\n");
 			exit(1);
+		} else {
+			struct passwd *p = getpwnam(safe_username);
+			if(!p) fatal("unknown user: %s", safe_username);
+			safe_uid = p->pw_uid;
+			safe_gid = p->pw_gid;
 		}
 	} else if(safe_username) {
 		printf("Sorry, the -i option doesn't make sense\n");
@@ -727,15 +732,7 @@ static void chirp_receive(struct link *link)
 
 		debug(D_LOGIN, "%s from %s:%d", typesubject, addr, port);
 
-		// XXX move getpwnam to main
-
 		if(safe_username) {
-			struct passwd *p;
-			p = getpwnam(safe_username);
-			if(!p)
-				fatal("unknown user: %s", safe_username);
-			safe_uid = p->pw_uid;
-			safe_gid = p->pw_gid;
 			cfs->chown(chirp_root_path, safe_uid, safe_gid);
 			cfs->chmod(chirp_root_path, 0700);
 			debug(D_AUTH, "changing to uid %d gid %d", safe_uid, safe_gid);
