@@ -382,6 +382,16 @@ INT64_T cfs_fd_size( int fd )
 	}
 }
 
+int cfs_exists(const char *path)
+{
+	struct chirp_stat statbuf;
+	if(cfs->lstat(path, &statbuf) == 0) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 
 INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime)
 {

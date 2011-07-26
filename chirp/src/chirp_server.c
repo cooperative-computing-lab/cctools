@@ -783,17 +783,6 @@ int chirp_path_fix(char *path)
 	return 1;
 }
 
-static int chirp_file_exists(const char *path)
-{
-	struct chirp_stat statbuf;
-	if(chirp_alloc_lstat(path, &statbuf) == 0) {
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-
 char *chirp_stat_string(struct chirp_stat *info)
 {
 	static char line[CHIRP_LINE_MAX];
@@ -1112,7 +1101,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if(chirp_acl_check(path, subject, CHIRP_ACL_WRITE)) {
 				/* writable, ok to proceed */
 			} else if(chirp_acl_check(path, subject, CHIRP_ACL_PUT)) {
-				if(chirp_file_exists(path)) {
+				if(cfs_exists(path)) {
 					errno = EEXIST;
 					goto failure;
 				} else {
@@ -1155,7 +1144,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if(chirp_acl_check(path, subject, CHIRP_ACL_WRITE)) {
 				/* writable, ok to proceed */
 			} else if(chirp_acl_check(path, subject, CHIRP_ACL_PUT)) {
-				if(chirp_file_exists(path)) {
+				if(cfs_exists(path)) {
 					errno = EEXIST;
 					goto failure;
 				} else {
@@ -1226,7 +1215,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					/* ok to proceed */
 				} else if(chirp_acl_check(path, subject, CHIRP_ACL_PUT)) {
 					if(flags & O_CREAT) {
-						if(chirp_file_exists(path)) {
+						if(cfs_exists(path)) {
 							errno = EEXIST;
 							goto failure;
 						} else {

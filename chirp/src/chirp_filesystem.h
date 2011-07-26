@@ -28,6 +28,7 @@ int    cfs_ferror(CHIRP_FILE * file);
 int    cfs_freadall(CHIRP_FILE * file, char **s, size_t * l);
 int    cfs_isdir(const char *filename);
 int    cfs_isnotdir(const char *filename);
+int    cfs_exists( const char *path );
 
 int    cfs_create_dir(const char *path, int mode);
 int    cfs_delete_dir(const char *path);
