@@ -1256,13 +1256,13 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "access %s %lld", path, &flags) == 2) {
 			if(!chirp_path_fix(path))
 				goto failure;
-			flags = chirp_acl_from_access_flags(flags);
+			int chirp_flags = chirp_acl_from_access_flags(flags);
 			/* If filename is a directory, then we change execute flags to list flags. */
-			if(cfs_isdir(path) && (flags & CHIRP_ACL_EXECUTE)) {
-				flags ^= CHIRP_ACL_EXECUTE; /* remove execute flag */
-				flags |= CHIRP_ACL_LIST; /* change to list */
+			if(cfs_isdir(path) && (chirp_flags & CHIRP_ACL_EXECUTE)) {
+				chirp_flags ^= CHIRP_ACL_EXECUTE; /* remove execute flag */
+				chirp_flags |= CHIRP_ACL_LIST; /* change to list */
 			}
-			if(!chirp_acl_check(path, subject, flags))
+			if(!chirp_acl_check(path, subject, chirp_flags))
 				goto failure;
 			result = chirp_alloc_access(path, flags);
 		} else if(sscanf(line, "chmod %s %lld", path, &mode) == 2) {
