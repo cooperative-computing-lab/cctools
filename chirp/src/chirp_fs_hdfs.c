@@ -240,6 +240,8 @@ static INT64_T get_fd(void)
 	return -1;
 }
 
+INT64_T chirp_fs_hdfs_unlink( const char *path );
+
 INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 {
 	INT64_T fd;
@@ -276,13 +278,13 @@ INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 		debug(D_HDFS, "opening file %s (flags: %o) for writing; mode: %o", path, flags, mode);
 		if(flags & O_TRUNC) {
 			if(file_exists) {
-				hdfs_services->unlink(fs, path);
+				chirp_fs_hdfs_unlink(path);
 				file_exists = 0;
 				flags ^= O_TRUNC;
 			}
 		} else if(file_exists && info.cst_size == 0) {
 			/* file is empty, just delete it as if O_TRUNC (useful for FUSE with some UNIX utils, like mv) */
-			hdfs_services->unlink(fs, path);
+			chirp_fs_hdfs_unlink(path);
 			file_exists = 0;
 		} else {
 			if(file_exists) {
@@ -469,33 +471,21 @@ INT64_T chirp_fs_hdfs_putfile(const char *path, struct link * link, INT64_T leng
 
 INT64_T chirp_fs_hdfs_unlink(const char *path)
 {
-	struct chirp_stat info;
 	path = FIXPATH(path);
-	debug(D_HDFS, "unlink %s", path);
-
-	/* HDFS doesn't set errno properly */
-	int result = chirp_fs_hdfs_stat(path, &info);
-	if(result == 0 && S_ISDIR(info.cst_mode)) {
-		errno = EPERM;
-		return -1;
-	} else if (result == -1) {
-		return -1;
-	}
-
-	int ret = hdfs_services->unlink(fs, path);
-	if(ret < 0) {
-		errno = EACCES;	/* catch all for any errors we couldn't detect before hdfs unlink */
-		return -1;
-	}
-	return 0;
+	debug(D_HDFS, "delete %s", path);
+	/*
+	hdfsDelete has odd behavior when the recursive argument is zero,
+	so just always call it recursively, which is also much faster than traversing the tree.
+	*/
+	return hdfs_services->delete(fs, path,1);
 }
 
 INT64_T chirp_fs_hdfs_rename(const char *path, const char *newpath)
 {
 	path = FIXPATH(path);
 	newpath = FIXPATH(newpath);
+	chirp_fs_hdfs_unlink(path);
 	debug(D_HDFS, "rename %s %s", path, newpath);
-	hdfs_services->unlink(fs, newpath);
 	return hdfs_services->rename(fs, path, newpath);
 }
 
@@ -538,45 +528,11 @@ INT64_T chirp_fs_hdfs_mkdir(const char *path, INT64_T mode)
 	return hdfs_services->mkdir(fs, path);
 }
 
-/*
-rmdir is a little unusual.
-An 'empty' directory may contain some administrative
-files such as an ACL and an allocation state.
-Only delete the directory if it contains only those files.
-*/
-
 INT64_T chirp_fs_hdfs_rmdir(const char *path)
 {
-	void *dir;
-	char *d;
-	int empty = 1;
-
 	path = FIXPATH(path);
-	debug(D_HDFS, "rmdir %s", path);
-
-	dir = chirp_fs_hdfs_opendir(path);
-	if(dir) {
-		while((d = chirp_fs_hdfs_readdir(dir))) {
-			if(!strcmp(d, "."))
-				continue;
-			if(!strcmp(d, ".."))
-				continue;
-			if(!strncmp(d, ".__", 3))
-				continue;
-			empty = 0;
-			break;
-		}
-		chirp_fs_hdfs_closedir(dir);
-
-		if(empty) {
-			return hdfs_services->unlink(fs, path);
-		} else {
-			errno = ENOTEMPTY;
-			return -1;
-		}
-	} else {
-		return -1;
-	}
+	debug(D_HDFS,"delete %s", path);
+	return hdfs_services->delete(fs,path,1);
 }
 
 INT64_T chirp_fs_hdfs_lstat(const char *path, struct chirp_stat * buf)
@@ -663,7 +619,7 @@ INT64_T chirp_fs_hdfs_truncate(const char *path, INT64_T length)
 		* truncate(path);
 		* open(path, ...);
 		*/
-		hdfs_services->unlink(fs, path);
+		hdfs_services->delete(fs, path,0);
 		hdfsFile file = hdfs_services->open(fs, path, O_WRONLY|O_CREAT, 0, 0, 0);
 		hdfs_services->close(fs, file);
 		return 0;

@@ -421,7 +421,7 @@ public:
 		hdfs_dircache.invalidate();
 		
 		debug(D_HDFS, "rmdir %s", name->rest);
-		result = hdfs->unlink(fs, name->rest);
+		result = hdfs->delete(fs, name->rest,1);
 
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		HDFS_END
@@ -437,7 +437,7 @@ public:
 		hdfs_dircache.invalidate();
 		
 		debug(D_HDFS, "unlink %s", name->rest);
-		result = hdfs->unlink(fs, name->rest);
+		result = hdfs->delete(fs, name->rest,0);
 
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		HDFS_END
