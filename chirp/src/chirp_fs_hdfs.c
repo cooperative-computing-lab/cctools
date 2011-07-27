@@ -476,11 +476,34 @@ INT64_T chirp_fs_hdfs_putfile(const char *path, struct link * link, INT64_T leng
 	return cfs_basic_putfile(FIXPATH(path),link,length,mode,stoptime);
 }
 
+/*
+HDFS is known to return bogus errnos from unlink,
+so check for directories beforehand, and set the errno
+properly afterwards if needed.
+*/
+
 INT64_T chirp_fs_hdfs_unlink(const char *path)
 {
 	path = FIXPATH(path);
+
+	struct chirp_stat info;
+
+	if(chirp_fs_hdfs_stat(path,&info)<0) return -1;
+
+	if(S_ISDIR(info.cst_mode)) {
+		errno = EISDIR;
+		return -1;
+	}
+
 	debug(D_HDFS, "unlink %s", path);
-	return hdfs_services->unlink(fs,path,1);
+
+	int result = hdfs_services->unlink(fs,path,0);
+	if(result<0) {
+		errno = EACCES;
+		return -1;
+	}
+
+	return 0;
 }
 
 INT64_T chirp_fs_hdfs_rmall(const char *path)
