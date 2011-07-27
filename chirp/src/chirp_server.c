@@ -93,16 +93,13 @@ static int did_explicit_auth = 0;
 static int max_child_procs = 0;
 static int total_child_procs = 0;
 static int config_pipe[2];
+static int exit_if_parent_fails = 0;
+static const char *listen_on_interface = 0;
+static const char *chirp_root_url = ".";
+static const char *chirp_root_path = 0;
 
-// XXX see if these can be made static
-
-int exit_if_parent_fails = 0;
-const char *listen_on_interface = 0;
-const char *chirp_root_url = ".";
-const char *chirp_root_path = 0;
-const char *chirp_ticket_path = 0;
 char *chirp_transient_path = "./";	/* local file system stuff */
-pid_t chirp_master_pid = 0;
+const char *chirp_ticket_path = 0;
 const char *chirp_super_user = "";
 const char *chirp_group_base_url = 0;
 int chirp_group_cache_time = 900;
@@ -378,8 +375,6 @@ int main(int argc, char *argv[])
 
 	change_process_title_init(argv);
 	change_process_title("chirp_server");
-
-	chirp_master_pid = getpid();
 
 	catalog_host_list = list_create();
 
