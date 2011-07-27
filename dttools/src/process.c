@@ -36,7 +36,8 @@ static int process_work(int timeout)
 
 	p.pid = wait4(-1, &p.status, flags, &p.rusage);
 
-	if(old_handler) {
+	if(timeout != 0) {
+		alarm(0);
 		signal(SIGALRM, old_handler);
 	}
 
