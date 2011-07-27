@@ -36,6 +36,7 @@ This module written by James Fitzgerald, B.S. 2006.
 static int chirp_fuse_timeout = 60;
 static int run_in_foreground = 0;
 static struct itable *file_table = 0;
+static int enable_small_file_optimizations = 1;
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -175,7 +176,11 @@ static int chirp_fuse_unlink(const char *path)
 	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_unlink(host, newpath, time(0) + chirp_fuse_timeout);
+	if(enable_small_file_optimizations) {
+		result = chirp_global_rmall(host, newpath, time(0) + chirp_fuse_timeout);
+	} else {
+		result = chirp_global_unlink(host, newpath, time(0) + chirp_fuse_timeout);
+	}
 	pthread_mutex_unlock(&mutex);
 
 	if(result < 0)
@@ -191,7 +196,11 @@ static int chirp_fuse_rmdir(const char *path)
 	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_rmdir(host, newpath, time(0) + chirp_fuse_timeout);
+	if(enable_small_file_optimizations) {
+		result = chirp_global_rmall(host, newpath, time(0) + chirp_fuse_timeout);
+	} else {
+		result = chirp_global_rmdir(host, newpath, time(0) + chirp_fuse_timeout);
+	}
 	pthread_mutex_unlock(&mutex);
 
 	if(result < 0)
@@ -213,7 +222,6 @@ static int chirp_fuse_symlink(const char *source, const char *target)
 	pthread_mutex_lock(&mutex);
 	result = chirp_global_symlink(host, source, dest_path, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
-
 
 	if(result < 0)
 		return -errno;
@@ -558,6 +566,7 @@ static void show_help(const char *cmd)
 	printf(" -a <flag>    Require this authentication mode.\n");
 	printf(" -d <flag>    Enable debugging for this subsystem.\n");
 	printf(" -o <file>    Send debugging output to this file.\n");
+	printf(" -D           Disable small file optimizations such as recursive delete.\n");
 	printf(" -f           Run in foreground for debugging.\n");
 	printf(" -v           Show program version.\n");
 	printf(" -h           This message.\n");
@@ -570,10 +579,13 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "d:b:o:a:t:fhv")) != -1) {
+	while((c = getopt(argc, argv, "d:Db:o:a:t:fhv")) != -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case 'D':
+			enable_small_file_optimizations = 0;
 			break;
 		case 'b':
 			chirp_reli_blocksize_set(atoi(optarg));
