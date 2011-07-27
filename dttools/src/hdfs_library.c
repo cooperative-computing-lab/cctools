@@ -77,7 +77,7 @@ struct hdfs_library *hdfs_library_open()
 	HDFS_LOAD_FUNC(write, "hdfsWrite");
 	HDFS_LOAD_FUNC(exists, "hdfsExists");
 	HDFS_LOAD_FUNC(mkdir, "hdfsCreateDirectory");
-	HDFS_LOAD_FUNC(delete, "hdfsDelete");
+	HDFS_LOAD_FUNC(unlink, "hdfsDelete");
 	HDFS_LOAD_FUNC(rename, "hdfsRename");
 	HDFS_LOAD_FUNC(stat, "hdfsGetPathInfo");
 	HDFS_LOAD_FUNC(free_stat, "hdfsFreeFileInfo");

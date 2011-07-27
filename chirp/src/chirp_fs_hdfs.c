@@ -472,12 +472,12 @@ INT64_T chirp_fs_hdfs_putfile(const char *path, struct link * link, INT64_T leng
 INT64_T chirp_fs_hdfs_unlink(const char *path)
 {
 	path = FIXPATH(path);
-	debug(D_HDFS, "delete %s", path);
+	debug(D_HDFS, "unlink %s", path);
 	/*
 	hdfsDelete has odd behavior when the recursive argument is zero,
 	so just always call it recursively, which is also much faster than traversing the tree.
 	*/
-	return hdfs_services->delete(fs, path,1);
+	return hdfs_services->unlink(fs, path,1);
 }
 
 INT64_T chirp_fs_hdfs_rename(const char *path, const char *newpath)
@@ -531,8 +531,8 @@ INT64_T chirp_fs_hdfs_mkdir(const char *path, INT64_T mode)
 INT64_T chirp_fs_hdfs_rmdir(const char *path)
 {
 	path = FIXPATH(path);
-	debug(D_HDFS,"delete %s", path);
-	return hdfs_services->delete(fs,path,1);
+	debug(D_HDFS,"unlink %s", path);
+	return hdfs_services->unlink(fs,path,1);
 }
 
 INT64_T chirp_fs_hdfs_lstat(const char *path, struct chirp_stat * buf)
@@ -619,7 +619,7 @@ INT64_T chirp_fs_hdfs_truncate(const char *path, INT64_T length)
 		* truncate(path);
 		* open(path, ...);
 		*/
-		hdfs_services->delete(fs, path,0);
+		hdfs_services->unlink(fs, path,0);
 		hdfsFile file = hdfs_services->open(fs, path, O_WRONLY|O_CREAT, 0, 0, 0);
 		hdfs_services->close(fs, file);
 		return 0;
