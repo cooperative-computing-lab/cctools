@@ -866,27 +866,12 @@ limitations, discussed below). Perhaps best of all, client jobs will no
 longer have any Hadoop or Java (version) dependencies.
 
 <p>
-<tt>chirp_server</tt> takes two new options to support HDFS: <tt>-f hdfs</tt>
-to switch to an HDFS backend instead of local storage and <tt>-x host:port</tt>
-to set the Hadoop head node.
-
-<p>
 To run a Chirp server as a frontend to Hadoop use the
-<tt>chirp_server_hdfs</tt> command. It acts as a wrapper around the
-<tt>chirp_server</tt> command to setup environment variables for Hadoop on
-behalf of the user. <tt>chirp_server_hdfs</tt> also adds the <tt>-f hdfs</tt>
-for you when invoking <tt>chirp_server</tt>.
-<p>
-Just like when running Chirp on the local filesystem, you must pick a root
-storage directory for the server. The root for the server in this case will
-(naturally) be located in HDFS. For the <tt>chirp_server_hdfs</tt> command, you
-need only give the location of the HDFS head node. You run the server like so:
+<tt>chirp_server_hdfs</tt> command, which will set up a number of needed
+environment variables and then run <tt>chirp_server</tt> with the usual arguments.
+Give the location of the root storage directory in HDFS with <tt>-r</tt> and a URL like so:
 <pre>
-% chirp_server_hdfs -x headnode.hadoop.domain.edu -r /mydata
-</pre>
-After setting up the environment variables, this command expands to:
-<pre>
-% chirp_server -f hdfs -x headnode.hadoop.domain.edu -r /mydata
+% chirp_server_hdfs -r hdfs://headnode.hadoop.domain.edu/mydata
 </pre>
 
 <h3>Temporary Local Storage</h3>
