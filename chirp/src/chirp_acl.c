@@ -875,7 +875,7 @@ int chirp_acl_init_copy(const char *path)
 	int result = 0;
 	int flags;
 
-	if(!cfs->do_acl_check()) return 0;
+	if(!cfs->do_acl_check()) return 1;
 
 	sprintf(oldpath, "%s/..", path);
 	sprintf(newpath, "%s/%s", path, CHIRP_ACL_BASE_NAME);
@@ -904,7 +904,7 @@ int chirp_acl_init_reserve(const char *path, const char *subject)
 	int newflags = 0;
 	int aclflags;
 
-	if(!cfs->do_acl_check()) return 0;
+	if(!cfs->do_acl_check()) return 1;
 
 	string_dirname(path, dirname);
 
