@@ -674,21 +674,11 @@ CHIRP_FILE *chirp_acl_open(const char *dirname)
 	char aclname[CHIRP_PATH_MAX];
 	CHIRP_FILE *file;
 
-	if(!cfs_isdir(dirname)) {
-		if(errno == ENOENT && default_acl) {
-			file = cfs_fopen(default_acl, "r");
-			return file;
-		} else if(errno == ENOTDIR)	/* component directory missing */
-			return NULL;
-		errno = ENOENT;
-		return 0;
-	} else {
-		make_acl_name(dirname, 0, aclname);
-		file = cfs_fopen(aclname, "r");
-		if(!file && default_acl)
-			file = cfs_fopen(default_acl, "r");
-		return file;
-	}
+	make_acl_name(dirname, 0, aclname);
+	file = cfs_fopen(aclname, "r");
+	if(!file && default_acl)
+		file = cfs_fopen(default_acl, "r");
+	return file;
 }
 
 int chirp_acl_read(CHIRP_FILE * aclfile, char *subject, int *flags)
