@@ -91,7 +91,8 @@ const char* chirp_fs_hdfs_init( const char *url )
 
 	/* find the port following a colon */
 	p = strchr(h,':');
-	if(!p) return 0;
+	if(!p) fatal("couldn't find a port number in %s",url);
+
 	chirp_fs_hdfs_port = atoi(p+1);
 	
 	/* now find the slash following the hostname */
