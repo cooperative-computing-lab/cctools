@@ -83,6 +83,7 @@ See the file COPYING for details.
 #endif
 
 INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat * buf);
+INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat * buf);
 
 /*
 The provided url could have any of the following forms:
@@ -192,25 +193,44 @@ INT64_T chirp_fs_local_fsync(int fd)
 	return fsync(fd);
 }
 
-void *chirp_fs_local_opendir(const char *path)
-{
-	return opendir(path);
-}
+struct chirp_dir {
+	char *path;
+	DIR *dir;
+};
 
-char *chirp_fs_local_readdir(void *dir)
+struct chirp_dir * chirp_fs_local_opendir( const char *path )
 {
-	struct dirent *d;
-	d = readdir(dir);
-	if(d) {
-		return d->d_name;
+	DIR *dir = opendir(path);
+	if(dir) {
+		struct chirp_dir *cdir = malloc(sizeof(*cdir));
+		cdir->dir = dir;
+		cdir->path = strdup(path);
+		return cdir;
 	} else {
 		return 0;
 	}
 }
 
-void chirp_fs_local_closedir(void *dir)
+struct chirp_dirent * chirp_fs_local_readdir( struct chirp_dir *dir )
 {
-	closedir(dir);
+	struct dirent *d = readdir(dir->dir);
+	if(d) {
+		static struct chirp_dirent cd;
+		char subpath[CHIRP_PATH_MAX];
+		cd.name = d->d_name;
+		sprintf(subpath,"%s/%s",dir->path,cd.name);
+	       	chirp_fs_local_lstat(subpath,&cd.info);
+		return &cd;
+	} else {
+		return 0;
+	}
+}
+
+void chirp_fs_local_closedir( struct chirp_dir *dir )
+{
+	free(dir->path);
+	closedir(dir->dir);
+	free(dir);
 }
 
 INT64_T chirp_fs_local_unlink(const char *path)
@@ -236,6 +256,11 @@ INT64_T chirp_fs_local_unlink(const char *path)
 	}
 
 	return result;
+}
+
+INT64_T chirp_fs_local_rmall(const char *path)
+{
+	return cfs_delete_dir(path);
 }
 
 INT64_T chirp_fs_local_rename(const char *path, const char *newpath)
@@ -277,18 +302,18 @@ Only delete the directory if it contains only those files.
 
 INT64_T chirp_fs_local_rmdir(const char *path)
 {
-	void *dir;
-	char *d;
+	struct chirp_dir *dir;
+	struct chirp_dirent *d;
 	int empty = 1;
 
 	dir = chirp_fs_local_opendir(path);
 	if(dir) {
 		while((d = chirp_fs_local_readdir(dir))) {
-			if(!strcmp(d, "."))
+			if(!strcmp(d->name, "."))
 				continue;
-			if(!strcmp(d, ".."))
+			if(!strcmp(d->name, ".."))
 				continue;
-			if(!strncmp(d, ".__", 3))
+			if(!strncmp(d->name, ".__", 3))
 				continue;
 			empty = 0;
 			break;
@@ -437,6 +462,7 @@ struct chirp_filesystem chirp_fs_local = {
 	cfs_basic_putfile,
 
 	chirp_fs_local_unlink,
+	chirp_fs_local_rmall,
 	chirp_fs_local_rename,
 	chirp_fs_local_link,
 	chirp_fs_local_symlink,

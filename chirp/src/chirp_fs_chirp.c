@@ -146,23 +146,17 @@ INT64_T chirp_fs_chirp_fsync(int fd)
 	return chirp_reli_fsync(file,STOPTIME);
 }
 
-void *chirp_fs_chirp_opendir(const char *path)
+struct chirp_dir * chirp_fs_chirp_opendir(const char *path)
 {
 	return chirp_reli_opendir(chirp_fs_chirp_hostport,path,STOPTIME);
 }
 
-char *chirp_fs_chirp_readdir(void *dir)
+struct chirp_dirent * chirp_fs_chirp_readdir( struct chirp_dir *dir )
 {	
-	struct chirp_dirent *d;
-	d = chirp_reli_readdir(dir);
-	if(d) {
-		return d->name;
-	} else {
-		return 0;
-	}
+	return chirp_reli_readdir(dir);
 }
 
-void chirp_fs_chirp_closedir(void *dir)
+void chirp_fs_chirp_closedir( struct chirp_dir *dir )
 {
 	chirp_reli_closedir(dir);
 }
@@ -184,6 +178,11 @@ INT64_T chirp_fs_chirp_putfile(const char *path, struct link * link, INT64_T len
 INT64_T chirp_fs_chirp_unlink(const char *path)
 {
 	return chirp_reli_unlink(chirp_fs_chirp_hostport,path,STOPTIME);
+}
+
+INT64_T chirp_fs_chirp_rmall(const char *path)
+{
+	return chirp_reli_rmall(chirp_fs_chirp_hostport,path,STOPTIME);
 }
 
 INT64_T chirp_fs_chirp_rename(const char *path, const char *newpath)
@@ -300,6 +299,7 @@ struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_putfile,
 
 	chirp_fs_chirp_unlink,
+	chirp_fs_chirp_rmall,
 	chirp_fs_chirp_rename,
 	chirp_fs_chirp_link,
 	chirp_fs_chirp_symlink,

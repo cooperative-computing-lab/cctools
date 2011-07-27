@@ -34,8 +34,8 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 
 	if(S_ISDIR(info.cst_mode)) {
 		CHIRP_FILE *aclfile;
-		void *dir;
-		char *name;
+		struct chirp_dir *dir;
+		struct chirp_dirent *d;
 		char aclsubject[CHIRP_PATH_MAX];
 		int aclflags;
 
@@ -54,15 +54,15 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 
 		// transfer each of the directory contents recurisvely
 		dir = chirp_alloc_opendir(lpath);
-		while((name = chirp_alloc_readdir(dir))) {
-			if(!strcmp(name, "."))
+		while((d = chirp_alloc_readdir(dir))) {
+			if(!strcmp(d->name, "."))
 				continue;
-			if(!strcmp(name, ".."))
+			if(!strcmp(d->name, ".."))
 				continue;
-			if(!strncmp(name, ".__", 3))
+			if(!strncmp(d->name, ".__", 3))
 				continue;
-			sprintf(newlpath, "%s/%s", lpath, name);
-			sprintf(newrpath, "%s/%s", rpath, name);
+			sprintf(newlpath, "%s/%s", lpath, d->name);
+			sprintf(newrpath, "%s/%s", rpath, d->name);
 			result = chirp_thirdput_recursive(subject, newlpath, hostname, newrpath, hostsubject, stoptime);
 			if(result >= 0) {
 				size += result;

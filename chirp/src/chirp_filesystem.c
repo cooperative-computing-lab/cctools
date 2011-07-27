@@ -267,8 +267,8 @@ int cfs_create_dir(const char *path, int mode)
 int cfs_delete_dir(const char *path)
 {
 	int result = 1;
-	const char *entry;
-	void *dir;
+	struct chirp_dir *dir;
+	struct chirp_dirent *d;
 
 	dir = cfs->opendir(path);
 	if(!dir) {
@@ -277,13 +277,13 @@ int cfs_delete_dir(const char *path)
 		else
 			return errno == ENOENT;
 	}
-	while((entry = cfs->readdir(dir))) {
+	while((d = cfs->readdir(dir))) {
 		char subdir[PATH_MAX];
-		if(!strcmp(entry, "."))
+		if(!strcmp(d->name, "."))
 			continue;
-		if(!strcmp(entry, ".."))
+		if(!strcmp(d->name, ".."))
 			continue;
-		sprintf(subdir, "%s/%s", path, entry);
+		sprintf(subdir, "%s/%s", path, d->name);
 		if(!cfs_delete_dir(subdir)) {
 			result = 0;
 		}

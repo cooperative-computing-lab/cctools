@@ -31,9 +31,9 @@ INT64_T chirp_alloc_fchmod(int fd, INT64_T mode);
 INT64_T chirp_alloc_ftruncate(int fd, INT64_T length);
 INT64_T chirp_alloc_fsync(int fd);
 
-void *chirp_alloc_opendir(const char *path);
-char *chirp_alloc_readdir(void *dir);
-void chirp_alloc_closedir(void *dir);
+struct chirp_dir *    chirp_alloc_opendir( const char *path );
+struct chirp_dirent * chirp_alloc_readdir( struct chirp_dir *dir );
+void                  chirp_alloc_closedir( struct chirp_dir *dir );
 
 INT64_T chirp_alloc_getfile(const char *path, struct link *link, time_t stoptime);
 INT64_T chirp_alloc_putfile(const char *path, struct link *link, INT64_T length, INT64_T mode, time_t stoptime);

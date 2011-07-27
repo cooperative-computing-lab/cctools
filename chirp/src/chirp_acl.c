@@ -269,22 +269,22 @@ int chirp_acl_gettickets(const char *ticket_dir, struct hash_table *ticket)
 		return -1;
 	}
 
-	const char *entry;
-	void *dir;
+	struct chirp_dir *dir;
+	struct chirp_dirent *d;
 
 	dir = cfs->opendir(ticket_dir);
 	if(!dir) {
 		return -1;
 	}
-	while((entry = cfs->readdir(dir))) {
+	while((d = cfs->readdir(dir))) {
 		char path[CHIRP_PATH_MAX];
-		if(!strcmp(entry, "."))
+		if(!strcmp(d->name, "."))
 			continue;
-		if(!strcmp(entry, ".."))
+		if(!strcmp(d->name, ".."))
 			continue;
-		sprintf(path, "%s/%s", ticket_dir, entry);
+		sprintf(path, "%s/%s", ticket_dir, d->name);
 		const char *digest;
-		if(chirp_ticket_isticketfilename(entry, &digest)) {
+		if(chirp_ticket_isticketfilename(d->name, &digest)) {
 			/* open the ticket file, read the public key */
 			struct chirp_ticket ct;
 			if(!ticket_read(path, &ct))
@@ -385,19 +385,20 @@ int chirp_acl_ticket_list(const char *ticket_dir, const char *subject, char ***t
 	size_t n = 0;
 	*ticket_subjects = NULL;
 
-	const char *entry;
-	void *dir;
+	struct chirp_dirent *d;
+	struct chirp_dir *dir;
+
 	dir = cfs->opendir(ticket_dir);
 	if(dir == NULL)
 		return -1;
 
-	while((entry = cfs->readdir(dir))) {
-		if(strcmp(entry, ".") == 0 || strcmp(entry, "..") == 0)
+	while((d = cfs->readdir(dir))) {
+		if(strcmp(d->name, ".") == 0 || strcmp(d->name, "..") == 0)
 			continue;
 		char path[CHIRP_PATH_MAX];
-		sprintf(path, "%s/%s", ticket_dir, entry);
+		sprintf(path, "%s/%s", ticket_dir, d->name);
 		const char *digest;
-		if(chirp_ticket_isticketfilename(entry, &digest)) {
+		if(chirp_ticket_isticketfilename(d->name, &digest)) {
 			struct chirp_ticket ct;
 			if(!ticket_read(path, &ct))
 				continue;	/* expired? */
@@ -405,7 +406,7 @@ int chirp_acl_ticket_list(const char *ticket_dir, const char *subject, char ***t
 				char ticket_subject[CHIRP_PATH_MAX];
 				n = n + 1;
 				*ticket_subjects = (char **) xxrealloc(*ticket_subjects, (n + 1) * sizeof(char *));
-				chirp_ticket_subject(ticket_subject, entry);
+				chirp_ticket_subject(ticket_subject, d->name);
 				(*ticket_subjects)[n - 1] = xstrdup(ticket_subject);
 				(*ticket_subjects)[n] = NULL;
 			}
@@ -419,20 +420,20 @@ int chirp_acl_ticket_list(const char *ticket_dir, const char *subject, char ***t
 
 int chirp_acl_gctickets(const char *ticket_dir)
 {
-	void *dir;
-	const char *entry;
+	struct chirp_dir *dir;
+	struct chirp_dirent *d;
 
 	dir = cfs->opendir(ticket_dir);
 	if(!dir) {
 		return -1;
 	}
-	while((entry = cfs->readdir(dir))) {
+	while((d = cfs->readdir(dir))) {
 		const char *digest;
-		if(chirp_ticket_isticketfilename(entry, &digest)) {
+		if(chirp_ticket_isticketfilename(d->name, &digest)) {
 			/* open the ticket file, read the public key */
 			struct chirp_ticket ct;
 			char path[CHIRP_PATH_MAX];
-			sprintf(path, "%s/%s", ticket_dir, entry);
+			sprintf(path, "%s/%s", ticket_dir, d->name);
 			if(ticket_read(path, &ct)) {
 				chirp_ticket_free(&ct);
 				continue;
@@ -957,24 +958,24 @@ int chirp_acl_init_reserve(const char *path, const char *subject)
 
 int chirp_acl_rmdir(const char *path)
 {
-	void *dir;
-	char *d;
+	struct chirp_dir *dir;
+	struct chirp_dirent *d;
 
 	dir = cfs->opendir(path);
 	if(dir) {
 		while((d = cfs->readdir(dir))) {
-			if(!strcmp(d, "."))
+			if(!strcmp(d->name, "."))
 				continue;
-			if(!strcmp(d, ".."))
+			if(!strcmp(d->name, ".."))
 				continue;
-			if(!strcmp(d, CHIRP_ACL_BASE_NAME))
+			if(!strcmp(d->name, CHIRP_ACL_BASE_NAME))
 				continue;
 			cfs->closedir(dir);
 			errno = ENOTEMPTY;
 			return -1;
 		}
 		cfs->closedir(dir);
-		cfs_delete_dir(dir);
+		cfs_delete_dir(path);
 		return 0;
 	} else {
 		errno = ENOENT;

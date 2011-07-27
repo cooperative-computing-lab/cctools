@@ -43,7 +43,7 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime 
 INT64_T cfs_basic_md5(const char *path, unsigned char digest[16]);
 
 struct chirp_filesystem {
-	const char *  (*init)      ( const char *url );
+	const char * (*init) ( const char *url );
 
 	INT64_T (*open)      ( const char *path, INT64_T flags, INT64_T mode );
 	INT64_T (*close)     ( int fd );
@@ -58,14 +58,15 @@ struct chirp_filesystem {
 	INT64_T (*ftruncate) ( int fd, INT64_T length );
 	INT64_T (*fsync)     ( int fd );
 
-	void *  (*opendir)   ( const char *path );
-	char *  (*readdir)   ( void *dirp );
-	void    (*closedir)  ( void *dirp );
+	struct chirp_dir    * (*opendir)   ( const char *path );
+	struct chirp_dirent * (*readdir)   ( struct chirp_dir *dir );
+	void                  (*closedir)  ( struct chirp_dir *dir );
 
 	INT64_T (*getfile)   ( const char *path, struct link *l, time_t stoptime );
 	INT64_T (*putfile)   ( const char *path, struct link *l, INT64_T mode, INT64_T length, time_t stoptime );
 
 	INT64_T (*unlink)    ( const char *path );
+	INT64_T (*rmall)     ( const char *path );
 	INT64_T (*rename)    ( const char *path, const char *newpath );
 	INT64_T (*link)      ( const char *path, const char *newpath );
 	INT64_T (*symlink)   ( const char *path, const char *newpath );

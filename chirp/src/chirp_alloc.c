@@ -231,11 +231,9 @@ static struct alloc_state *alloc_state_cache(const char *path)
 static void recover(const char *path)
 {
 	char newpath[CHIRP_PATH_MAX];
-	struct chirp_stat info;
 	struct alloc_state *a, *b;
-	int result;
-	void *dir;
-	char *d;
+	struct chirp_dir *dir;
+	struct chirp_dirent *d;
 
 	a = alloc_state_cache_exact(path);
 	if(!a)
@@ -246,26 +244,22 @@ static void recover(const char *path)
 		fatal("couldn't open %s: %s\n", path, strerror(errno));
 
 	while((d = cfs->readdir(dir))) {
-		if(!strcmp(d, "."))
+		if(!strcmp(d->name, "."))
 			continue;
-		if(!strcmp(d, ".."))
+		if(!strcmp(d->name, ".."))
 			continue;
-		if(!strncmp(d, ".__", 3))
+		if(!strncmp(d->name, ".__", 3))
 			continue;
 
-		sprintf(newpath, "%s/%s", path, d);
+		sprintf(newpath, "%s/%s", path, d->name);
 
-		result = cfs->lstat(newpath, &info);
-		if(result != 0)
-			fatal("couldn't stat %s: %s\n", path, strerror(errno));
-
-		if(S_ISDIR(info.cst_mode)) {
+		if(S_ISDIR(d->info.cst_mode)) {
 			recover(newpath);
 			b = alloc_state_cache_exact(newpath);
 			if(a != b)
 				alloc_state_update(a, b->size);
-		} else if(S_ISREG(info.cst_mode)) {
-			alloc_state_update(a, space_consumed(info.cst_size));
+		} else if(S_ISREG(d->info.cst_mode)) {
+			alloc_state_update(a, space_consumed(d->info.cst_size));
 		} else {
 			debug(D_ALLOC, "warning: unknown file type: %s\n", newpath);
 		}
@@ -533,17 +527,17 @@ INT64_T chirp_alloc_fsync(int fd)
 	return cfs->fsync(fd);
 }
 
-void *chirp_alloc_opendir(const char *path)
+struct chirp_dir * chirp_alloc_opendir( const char *path )
 {
 	return cfs->opendir(path);
 }
 
-char *chirp_alloc_readdir(void *dir)
+struct chirp_dirent * chirp_alloc_readdir( struct chirp_dir *dir )
 {
 	return cfs->readdir(dir);
 }
 
-void chirp_alloc_closedir(void *dir)
+void chirp_alloc_closedir( struct chirp_dir *dir )
 {
 	return cfs->closedir(dir);
 }
@@ -751,16 +745,16 @@ INT64_T chirp_alloc_mkdir(const char *path, INT64_T mode)
 
 INT64_T chirp_alloc_rmall(const char *path)
 {
-	int result;
+	if(!alloc_enabled) return cfs->rmall(path);
 
-	result = chirp_alloc_unlink(path);
+	int result = chirp_alloc_unlink(path);
 	if(result == 0) {
 		return 0;
 	} else if(errno != EISDIR) {
 		return -1;
 	} else {
-		void *dir;
-		char *d;
+		struct chirp_dir *dir;
+		struct chirp_dirent *d;
 		char subpath[CHIRP_PATH_MAX];
 
 		dir = chirp_alloc_opendir(path);
@@ -770,13 +764,13 @@ INT64_T chirp_alloc_rmall(const char *path)
 		result = 0;
 
 		while((d = chirp_alloc_readdir(dir))) {
-			if(!strcmp(d, "."))
+			if(!strcmp(d->name, "."))
 				continue;
-			if(!strcmp(d, ".."))
+			if(!strcmp(d->name, ".."))
 				continue;
-			if(!strncmp(d, ".__	", 3))
+			if(!strncmp(d->name, ".__	", 3))
 				continue;
-			sprintf(subpath, "%s/%s", path, d);
+			sprintf(subpath, "%s/%s", path, d->name);
 			result = chirp_alloc_rmall(subpath);
 			if(result != 0)
 				break;

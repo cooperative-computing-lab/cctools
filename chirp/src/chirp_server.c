@@ -998,9 +998,8 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				result = -1;
 			}
 		} else if(sscanf(line, "getlongdir %s", path) == 1) {
-			void *dir;
-			const char *d;
-			char subpath[CHIRP_PATH_MAX];
+			struct chirp_dir *dir;
+			struct chirp_dirent *d;
 
 			if(!chirp_path_fix(path))
 				goto failure;
@@ -1011,12 +1010,9 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if(dir) {
 				link_putliteral(l, "0\n", stalltime);
 				while((d = chirp_alloc_readdir(dir))) {
-					if(!strncmp(d, ".__", 3))
+					if(!strncmp(d->name, ".__", 3))
 						continue;
-					link_putfstring(l, "%s\n", stalltime, d);
-					sprintf(subpath, "%s/%s", path, d);
-					chirp_alloc_lstat(subpath, &statbuf);
-					link_putfstring(l, "%s\n", stalltime, chirp_stat_string(&statbuf));
+					link_putfstring(l, "%s\n%s\n", stalltime, d->name, chirp_stat_string(&d->info) );
 				}
 				chirp_alloc_closedir(dir);
 				do_getdir_result = 1;
@@ -1025,8 +1021,8 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				result = -1;
 			}
 		} else if(sscanf(line, "getdir %s", path) == 1) {
-			void *dir;
-			const char *d;
+			struct chirp_dir *dir;
+			struct chirp_dirent *d;
 
 			if(!chirp_path_fix(path))
 				goto failure;
@@ -1037,9 +1033,9 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if(dir) {
 				link_putliteral(l, "0\n", stalltime);
 				while((d = chirp_alloc_readdir(dir))) {
-					if(!strncmp(d, ".__", 3))
+					if(!strncmp(d->name, ".__", 3))
 						continue;
-					link_putfstring(l, "%s\n", stalltime, d);
+					link_putfstring(l, "%s\n", stalltime, d->name);
 				}
 				chirp_alloc_closedir(dir);
 				do_getdir_result = 1;
