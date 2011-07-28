@@ -1364,7 +1364,7 @@ static void handle_abort( int sig )
 	dag_abort_flag = 1;
 }
 
-int parse_catalog_server_description(char* server_string) {
+int parse_catalog_server_description(char *server_string) {
 	char *host;
 	int port;
 	char *colon;
@@ -1450,7 +1450,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAB:cCd:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:T:vw:W:z:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:T:vw:W:z:")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1575,6 +1575,8 @@ int main( int argc, char *argv[] )
 				work_queue_wait_routine = WORK_QUEUE_WAIT_FCFS;
 			} else if (!strcmp(optarg, "fd")) {
 				work_queue_wait_routine = WORK_QUEUE_WAIT_FAST_DISPATCH;
+			} else if (!strcmp(optarg, "adaptive")) {
+				work_queue_wait_routine = WORK_QUEUE_WAIT_ADAPTIVE;
 			} else {
 				work_queue_wait_routine = WORK_QUEUE_WAIT_FAST_DISPATCH;
 			}
