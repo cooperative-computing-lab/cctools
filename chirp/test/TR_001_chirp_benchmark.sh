@@ -29,7 +29,7 @@ run()
 
 clean()
 {
-    kill -9 $(cat $PID_FILE)
+    kill -9 `cat $PID_FILE`
     rm -f $TEST_FILE
     rm -f $PID_FILE
     rm -f $PORT_FILE
