@@ -117,6 +117,8 @@ struct work_queue_stats {
 	double idle_percentage;
 	int capacity;
 	int current_capacity;
+	int total_workers_connected;
+	int excessive_workers_removed;
 };
 
 /** @name Functions - Tasks */

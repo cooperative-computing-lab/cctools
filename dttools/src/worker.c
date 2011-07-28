@@ -649,7 +649,7 @@ int main( int argc, char *argv[] ) {
 					fprintf(stderr,"Could not open output file %s. (%s)\n",filename, strerror(errno));
 					goto recover;
 				}					
-			} else if(!strcmp(line,"exit")) {
+			} else if(!strncmp(line,"exit", 4)) {
 				break;
 			} else {
 				link_putliteral(master,"error\n",time(0)+active_timeout);
