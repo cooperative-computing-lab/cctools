@@ -7,12 +7,12 @@ ulimit -c 400000000
 # project name returned by work_queue_status would be $user-$proj-$worker.
 # $user is the unix login username and $worker is the number of workers are
 # provided for the corresponding run.
-proj="test"
+proj="lyu2test"
 
 # Workload format: "input_size:execution_time:output_size:num_of_tasks". Note
 # that the execution time is in seconds. And the unit for input/output files
 # can be set by the "unit" global variable below.
-workload="5:5:5:400"
+workload="50:10:5:800"
 unit="M"
 
 # The directory to store input files
@@ -21,19 +21,20 @@ dir_input="input"
 # If yes, all the tasks would share the same input, otherwise every task has
 # its independing input. This parameter can be used to test the worker caching
 # behavior.
-shared_input="no"
+shared_input="yes"
 
 # Additional arguments added to makeflow.  Format: "symbolic_name:real
 # arguments". All results related to one "real argument" would be stored under
 # the directory that contains the correspoinding symbolic name
-makeflow_args=( "fcfs:-z fcfs"
-				"fd:-z fd" )
+#makeflow_args=( "fcfs:-z fcfs"
+#				"fd:-z fd" )
+makeflow_args=( "ad:-z adaptive" )
 
 # Max retry times when makeflow jobs fail
 retry_max=30
 
 # Number of workers for each run
-workers=(20 50 100)
+workers=( 20 40 80 100 )
 
 # yrange max in the work queue log plot
 yrange_max=$((`echo ${workers[@]} | tr ' ' '\n' | sort -nr | head -1 ` + 50))
@@ -109,7 +110,10 @@ gen_wqlog_gnuplot () {
 		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):6 title \"task running\" with lines lt 2 lw 3, \\
 		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):(\$15 * 100) title \"calculated efficiency\" with lines lt 3 lw 3, \\
 		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):(\$16 * 100) title \"idle percentage\" with lines lt 4 lw 3, \\
-		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):17 title \"estimated capacity\" with lines lt 5 lw 3
+		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):17 title \"estimated capacity\" with lines lt 5 lw 3, \\
+		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):18 title \"reliable capacity\" with lines lt 6 lw 3, \\
+		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):19 title \"workers joined\" with lines lt 7 lw 3, \\
+		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):20 title \"workers removed\" with lines lt 8 lw 3
 	" > $wqloggnuplot
 }
 
@@ -164,6 +168,8 @@ run_experiments () {
 
 		for i in "${workers[@]}"; do
 			name=lyu2-$proj-$i
+			#work_queue_pool -T condor -f -a -C cclweb01.cse.nd.edu:9097 -N $name $i
+			#makeflow -T wq -d all -a -e -C cclweb01.cse.nd.edu:9097 -N $name -r $retry_max $arg $makeflow &> $makeflow.stdout.stderr
 			work_queue_pool -T condor -f -a -N $name $i
 			makeflow -T wq -d all -a -e -N $name -r $retry_max $arg $makeflow &> $makeflow.stdout.stderr
 
