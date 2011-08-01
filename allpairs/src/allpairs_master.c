@@ -9,7 +9,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/time.h>
 
 #include "debug.h"
 #include "work_queue.h"
@@ -22,6 +21,7 @@ See the file COPYING for details.
 #include "envtools.h"
 #include "fast_popen.h"
 #include "list.h"
+#include "timestamp.h"
 
 #include "allpairs_compare.h"
 
@@ -74,14 +74,12 @@ No very accurate for embedded functions.
 double estimate_run_time( struct text_list *seta, struct text_list *setb )
 {
 	char line[ALLPAIRS_LINE_MAX];
-	struct timeval tv;
-	long long starttime, stoptime;
+	timestamp_t starttime, stoptime;
 	int x,y;
 
 	fprintf(stderr, "%s: sampling execution time of %s...\n",progname,allpairs_compare_program);
 
-	gettimeofday(&tv,NULL);
-	starttime = tv.tv_sec*1000000+tv.tv_usec;
+	starttime = timestamp_get();
 
 	for(x=0;x<xstop;x++) {
 		for(y=0;y<ystop;y++) {
@@ -104,8 +102,7 @@ double estimate_run_time( struct text_list *seta, struct text_list *setb )
 
 			fast_pclose(file);
 
-			gettimeofday(&tv,NULL);
-			stoptime = tv.tv_sec*1000000+tv.tv_usec;
+			stoptime = timestamp_get();
 		
 			if(stoptime-starttime>5000000) break;
 		}
