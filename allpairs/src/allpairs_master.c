@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/time.h>
 
 #include "debug.h"
 #include "work_queue.h"
@@ -73,42 +74,49 @@ No very accurate for embedded functions.
 double estimate_run_time( struct text_list *seta, struct text_list *setb )
 {
 	char line[ALLPAIRS_LINE_MAX];
-	int loops=0;
-	time_t starttime, stoptime;
+	struct timeval tv;
+	long long starttime, stoptime;
+	int x,y;
 
 	fprintf(stderr, "%s: sampling execution time of %s...\n",progname,allpairs_compare_program);
 
-	sprintf(line,"./%s %s %s %s",
-		string_basename(allpairs_compare_program),
-		extra_arguments,
-		text_list_get(seta,0),
-		text_list_get(setb,0)
-		);
+	gettimeofday(&tv,NULL);
+	starttime = tv.tv_sec*1000000+tv.tv_usec;
 
-	starttime = time(0);
+	for(x=0;x<xstop;x++) {
+		for(y=0;y<ystop;y++) {
+			sprintf(line,"./%s %s %s %s",
+				string_basename(allpairs_compare_program),
+				extra_arguments,
+				text_list_get(seta,x),
+				text_list_get(setb,y)
+				);
 
-	do {
-		FILE *file = fast_popen(line);
-		if(!file) {
-			fprintf(stderr,"%s: couldn't execute %s: %s\n",progname,line,strerror(errno));
-			exit(1);
+			FILE *file = fast_popen(line);
+			if(!file) {
+				fprintf(stderr,"%s: couldn't execute %s: %s\n",progname,line,strerror(errno));
+				exit(1);
+			}
+
+			while(fgets(line,sizeof(line),file)) {
+				fprintf(stderr,"%s",line);
+			}
+
+			fast_pclose(file);
+
+			gettimeofday(&tv,NULL);
+			stoptime = tv.tv_sec*1000000+tv.tv_usec;
+		
+			if(stoptime-starttime>5000000) break;
 		}
+		if(stoptime-starttime>5000000) break;
+	}
 
-		while(fgets(line,sizeof(line),file)) {
-			fprintf(stderr,"%s",line);
-		}
-
-		fast_pclose(file);
-
-		stoptime = time(0);
-		loops++;
-	} while( (stoptime-starttime) < 5 );
-
-	double t = (stoptime - starttime) / loops;
+	double t = (double)(stoptime - starttime) / (x * ystop + y + 1) / 1000000;
 
 	if(t<0.01) t = 0.01;
 
-	return  t;  
+	return t;
 }
 
 /*
@@ -319,6 +327,9 @@ int main(int argc, char **argv)
 
 	debug(D_DEBUG,"using multicore executable %s",allpairs_multicore_program);
 	
+	xstop = text_list_size(seta);
+	ystop = text_list_size(setb);
+
 	if(allpairs_compare_function_get(argv[optind+2])) {
 		strcpy(allpairs_compare_program,argv[optind+2]);
 		debug(D_DEBUG,"using internal function %s",allpairs_compare_program);
@@ -345,9 +356,6 @@ int main(int argc, char **argv)
 	}
 
 	fprintf(stderr, "%s: listening for workers on port %d...\n",progname,work_queue_port(q));
-
-	if(!xstop) xstop = text_list_size(seta);
-	if(!ystop) ystop = text_list_size(setb);
 
 	while(1) {
 		struct work_queue_task *task = NULL;
