@@ -378,6 +378,7 @@ static void show_help(const char *cmd)
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -w <size>      Set TCP window size.\n");
+	printf(" -z <size>      Set available disk space threshold (in MB) before aborting. By default no checks on available space are performed.\n");
 	printf(" -h             Show this help screen\n");
 }
 
@@ -396,6 +397,7 @@ int main(int argc, char *argv[])
 	char c;
 	char hostname[DOMAIN_NAME_MAX];
 	int w;
+	UINT64_T avail_space_threshold = 0;
 	char preferred_master_names[WORK_QUEUE_LINE_MAX];
 	char deletecmd[WORK_QUEUE_LINE_MAX];
 
@@ -412,7 +414,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aC:d:ihN:o:st:w:v")) != (char) -1) {
+	while((c = getopt(argc, argv, "aC:d:ihN:o:st:w:z:v")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
@@ -448,6 +450,9 @@ int main(int argc, char *argv[])
 		case 'w':
 			w = string_metric_parse(optarg);
 			link_window_set(w, w);
+			break;
+		case 'z':
+			avail_space_threshold = string_metric_parse(optarg) * 1024 * 1024;
 			break;
 		case 'h':
 		default:
@@ -518,6 +523,13 @@ int main(int argc, char *argv[])
 		char path[WORK_QUEUE_LINE_MAX];
 		char *buffer;
 		FILE *stream;
+
+		if (avail_space_threshold > 0) {
+			if (disk_avail < avail_space_threshold) {
+                        	printf("worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
+	                        break;
+                       	}	
+                }	
 
 		if(time(0) > idle_stoptime) {
 			if(master) {
@@ -608,6 +620,13 @@ int main(int argc, char *argv[])
 				}
 				symlink(path, filename);
 			} else if(sscanf(line, "put %s %lld %o", filename, &length, &mode) == 3) {
+				if (avail_space_threshold > 0){
+		                        if (disk_avail < avail_space_threshold) {
+                	                	debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
+	                        	        goto recover;
+                        		}	
+                		}	
+
 				mode = mode | 0600;
 				char *cur_pos, *tmp_pos;
 
