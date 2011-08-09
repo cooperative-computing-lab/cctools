@@ -378,6 +378,7 @@ int main( int argc, char *argv[] ) {
 	char hostname[DOMAIN_NAME_MAX];
 	int w;
     char preferred_master_names[WORK_QUEUE_LINE_MAX]; 
+	char deletecmd[WORK_QUEUE_LINE_MAX];
 
 	ncpus = load_average_get_cpus();
 	memory_info_get(&memory_avail,&memory_total);
@@ -664,11 +665,12 @@ int main( int argc, char *argv[] ) {
 			if(auto_worker) {
 				record_bad_master(duplicate_wq_master(actual_master));
 			}
+			sprintf(deletecmd, "rm -rf %s/*", tempdir);
+			system(deletecmd);
 			sleep(5);
 		}
 	}
 
-	char deletecmd[WORK_QUEUE_LINE_MAX];
 	printf("worker: cleaning up %s\n",tempdir);
 	sprintf(deletecmd,"rm -rf %s",tempdir);
 	system(deletecmd);

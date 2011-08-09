@@ -59,8 +59,6 @@ See the file COPYING for details.
 #define TIME_SLOT_MASTER_IDLE 2
 #define TIME_SLOT_APPLICATION 3
 
-#define CAPACITY_TOLERANCE 10
-
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
 static struct datagram *outgoing_datagram = NULL;
@@ -107,6 +105,7 @@ struct work_queue {
 	INT64_T total_workers_connected;
 	INT64_T excessive_workers_removed;
 	int busy_workers_to_remove;
+	int capacity_tolerance;
 };
 
 
@@ -143,15 +142,16 @@ struct time_slot {
 
 struct task_statistics {
 	struct list *reports;
-	timestamp_t total_time_app_delay;
+	//timestamp_t total_time_app_delay;
 	timestamp_t total_time_transfer_data;
 	timestamp_t total_time_execute_cmd;
-	timestamp_t total_capacity;
+	INT64_T total_capacity;
 	INT64_T total_busy_workers;
+	
 };
 
 struct task_report {
-	timestamp_t time_app_delay;	 /**< time spent in upper-level application (outside of work_queue_wait)>*/
+	//timestamp_t time_app_delay;	 /**< time spent in upper-level application (outside of work_queue_wait)>*/
 	timestamp_t time_transfer_data;
 	timestamp_t time_execute_cmd;	
 	int busy_workers;
@@ -178,6 +178,7 @@ static struct task_statistics *task_statistics_init();
 static void add_task_report(struct work_queue *q, struct task_report *entry);
 static double get_idle_percentage(struct work_queue *q);
 int work_queue_shut_down_workers (struct work_queue* q, int n);
+int work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance);
 
 static int short_timeout = 5;
 static int next_taskid = 1;
@@ -715,13 +716,31 @@ static int handle_worker( struct work_queue *q, struct link *l )
 				if(receive_output_from_worker(q, w)) {
 					start_task_on_worker(q,w);
 				}
-			} else { // work_queue_wait_adaptive
+			} else if(q->work_queue_wait_routine == WORK_QUEUE_WAIT_ADAPTIVE) { 
+				// Output delayed
+				struct pending_output *p;
+				p = (struct pending_output *)malloc(sizeof(struct pending_output));
+				if(!p) {
+					free(t->output);
+					t->output = 0;
+					goto failure;
+				}
+				p->start = timestamp_get();
+				p->link = l;
+				list_push_head(q->receive_output_waiting_list, p);
+				debug(D_WQ,"%s (%s) has finished its task. Output transfer is postponed.",w->hostname,w->addrport);
+				/**
 				if(receive_output_from_worker(q, w)) {
 					if(q->busy_workers_to_remove > 0) {
 						q->busy_workers_to_remove--;
 					} else {
 						start_task_on_worker(q,w);
 					}
+				}
+				*/
+			} else { // default
+				if(receive_output_from_worker(q, w)) {
+					start_task_on_worker(q,w);
 				}
 			}
 		} else {
@@ -770,6 +789,8 @@ static int receive_output_from_worker( struct work_queue *q, struct work_queue_w
     w->current_task = 0;
     t->time_task_finish = timestamp_get(); 
 
+	// update master idle percentage
+	q->idle_percentage = get_idle_percentage(q);
 	
 	// Record task statistics for master capacity estimation.
 	struct task_report *entry;
@@ -777,15 +798,13 @@ static int receive_output_from_worker( struct work_queue *q, struct work_queue_w
 	if(!entry) {
 		fprintf(stderr, "Failed to allocate memory for task performance accounting.\n");
 	} else {
-		entry->time_app_delay = t->time_app_delay;
+		//entry->time_app_delay = t->time_app_delay;
 		entry->time_transfer_data = t->total_transfer_time;
 		entry->time_execute_cmd = t->time_execute_cmd_finish - t->time_execute_cmd_start;
 		entry->busy_workers = q->workers_in_state[WORKER_STATE_BUSY];
 
 		add_task_report(q, entry);
 	}
-	// update master idle percentage
-	q->idle_percentage = get_idle_percentage(q);
 
 	/**
 	// Update estimated capacity
@@ -1044,8 +1063,8 @@ int start_one_task( struct work_queue *q, struct work_queue_worker *w, struct wo
 	q->idle_time=0;
 
 	//add_time_slot(q, q->time_last_task_start, q->app_time, TIME_SLOT_APPLICATION, &(q->accumulated_app_time), q->app_times);
-	t->time_app_delay = q->app_time;
-	q->app_time=0;
+	//t->time_app_delay = q->app_time;
+	//q->app_time=0;
 
 	t->time_send_input_start = q->time_last_task_start = timestamp_get();
 	if(!send_input_files(t,w,q)) return 0;
@@ -1122,7 +1141,7 @@ static void add_task_report(struct work_queue *q, struct task_report *entry) {
 		ts->reports = reports;
 	}
 
-	ts->total_time_app_delay += entry->time_app_delay;
+	//ts->total_time_app_delay += entry->time_app_delay; // on all tasks
 	ts->total_time_transfer_data += entry->time_transfer_data;
 	ts->total_time_execute_cmd += entry->time_execute_cmd;
 	ts->total_busy_workers += entry->busy_workers;
@@ -1132,7 +1151,7 @@ static void add_task_report(struct work_queue *q, struct task_report *entry) {
 	count = MAX(MIN_TIME_LIST_SIZE, effective_workers);
 	while(list_size(reports) >= count) {
 		tr = (struct task_report *)list_pop_head(reports);
-		ts->total_time_app_delay -= tr->time_app_delay;
+		//ts->total_time_app_delay -= tr->time_app_delay;
 		ts->total_time_transfer_data -= tr->time_transfer_data;
 		ts->total_time_execute_cmd -= tr->time_execute_cmd;
 		ts->total_busy_workers -= tr->busy_workers;
@@ -1144,74 +1163,83 @@ static void add_task_report(struct work_queue *q, struct task_report *entry) {
 	count = list_size(reports) + 1; //
 	timestamp_t avg_task_execution_time = ts->total_time_execute_cmd / count;
 	timestamp_t avg_task_transfer_time = ts->total_time_transfer_data / count;
-	timestamp_t avg_task_app_delay = ts->total_time_app_delay / count;
+	//timestamp_t avg_task_app_delay = ts->total_time_app_delay / count;
+	timestamp_t avg_task_app_delay = q->app_time / (q->total_tasks_complete + 1);
 	int avg_busy_workers = ts->total_busy_workers / count;
 
 	q->current_capacity = entry->capacity = avg_task_execution_time / (avg_task_transfer_time + avg_task_app_delay) + 1;
 	ts->total_capacity += entry->capacity;
 
-	list_push_tail(reports, entry);
-
 	// calculate standard deviations
 	double avg_capacity = ts->total_capacity / (double)count;
-/**
-	double stddev = 0;
+	q->capacity = avg_capacity;
+
+	printf("avg exe: %lld; avg tranfer: %lld; avg app: %lld; current capacity: %d; avg capacity: %.2f\n", avg_task_execution_time, avg_task_transfer_time, avg_task_app_delay, entry->capacity, avg_capacity);
+
+	list_push_tail(reports, entry);
+
+	if(q->capacity_tolerance < 0) return; // do no remove workers
+
+	// remove workers, if necessary
+	int idle_percentage = q->idle_percentage * 100;
+	printf("idle percentage: %d \n", idle_percentage);
+	if(idle_percentage > 0 || count < MIN_TIME_LIST_SIZE) return; 
+
+	double capacity_stddev = 0;
 	list_first_item(reports);
 	while((tr=(struct task_report*)list_next_item(reports))) {
-		stddev += (double)(tr->capacity - avg_capacity) * (tr->capacity - avg_capacity);
+		capacity_stddev += (double)(tr->capacity - avg_capacity) * (tr->capacity - avg_capacity);
 	}
-	stddev = sqrt(stddev/(count-1)); // sample standard deviation
-
-	printf("avg exe: %lld; avg tranfer: %lld; avg app: %lld; current capacity: %d; avg capacity: %.2f; stddev: %.2f\n", avg_task_execution_time, avg_task_transfer_time, avg_task_app_delay, entry->capacity, avg_capacity, stddev);
-*/
+	capacity_stddev = sqrt(capacity_stddev/(count-1)); // sample standard deviation
+	
 	int connected_workers = hash_table_size(q->worker_table);
 	int busy_workers = entry->busy_workers;
-	if(count < MIN_TIME_LIST_SIZE) {
-		q->capacity = 0;
-	} else {
-		//if(stddev < 1 && abs(avg_capacity - q->capacity) > CAPACITY_TOLERANCE ) {
-		if(abs(avg_capacity - q->capacity) > CAPACITY_TOLERANCE ) {
-			if(q->work_queue_wait_routine == WORK_QUEUE_WAIT_ADAPTIVE) {
-				int threshold;
-				if(busy_workers == connected_workers) {
-					threshold = MIN(busy_workers, q->current_capacity);
-				} else {
-					threshold = busy_workers; 
-				}
-				if(q->total_tasks_complete >= 2*threshold) {
-					q->capacity = avg_capacity + 1;
-				}
+	//if(stddev < 1 && abs(avg_capacity - q->capacity) > CAPACITY_TOLERANCE ) {
+	//
+	/**
+	int threshold;
+	if(abs(avg_capacity - q->capacity) > CAPACITY_TOLERANCE ) {
+		if(q->work_queue_wait_routine == WORK_QUEUE_WAIT_ADAPTIVE) {
+			if(busy_workers == connected_workers) {
+				threshold = MIN(busy_workers, q->current_capacity);
 			} else {
-				q->capacity = avg_capacity + 1;
+				threshold = busy_workers; 
 			}
+			if(q->total_tasks_complete >= 2*threshold) {
+				q->capacity = q->current_capacity + 1;
+			}
+		} else {
+			q->capacity = q->current_capacity + 1;
 		}
 	}
-
-	// removing workers, if necessary
-	int percentage = q->idle_percentage * 100;
-	if(percentage > 0 || q->capacity == 0) return;
-
-	double stddev = 0;
+	*/
+	
+	double busy_stddev = 0;
 	list_first_item(reports);
 	while((tr=(struct task_report*)list_next_item(reports))) {
-		stddev += (double)(tr->busy_workers - avg_busy_workers) * (tr->busy_workers - avg_busy_workers);
+		busy_stddev += (double)(tr->busy_workers - avg_busy_workers) * (tr->busy_workers - avg_busy_workers);
 	}
-	stddev = sqrt(stddev/(count-1)); // sample standard deviation
+	busy_stddev = sqrt(busy_stddev/(count-1)); // sample standard deviation
 	
-	printf("avg busy workers: %d; stddev: %.2f\n", avg_busy_workers, stddev);
+	//printf("avg busy workers: %d; stddev: %.2f\n", avg_busy_workers, busy_stddev);
 
 
 	int excessive_workers;
-	if(stddev < 1) {
-		if(connected_workers == busy_workers && connected_workers > q->capacity) {
-			excessive_workers = (connected_workers - q->capacity) /2 + 1; // "+ 1" act as the C math library's ceil function
-		} else if(connected_workers > busy_workers) {
-			excessive_workers = (connected_workers - busy_workers) / 2 + 1;
+	if(busy_stddev < 1) {
+		if(connected_workers == busy_workers && connected_workers > q->current_capacity + q->capacity_tolerance) {
+			if(capacity_stddev < 1) {
+				excessive_workers = busy_workers - (q->current_capacity + q->capacity_tolerance); //) /2 + 1; // "+ 1" act as the C math library's ceil function
+			} else {
+				excessive_workers = busy_workers - (q->current_capacity + capacity_stddev*(double)(q->capacity_tolerance) + 1); //) /2 + 1; // "+ 1" act as the C math library's ceil function
+			}
+			q->busy_workers_to_remove = MAX(0, excessive_workers);
+		} else if(connected_workers > busy_workers ) {
+			excessive_workers = connected_workers - MAX(busy_workers, (q->current_capacity + q->capacity_tolerance)); // ) / 2 + 1;
+			int ret = work_queue_shut_down_workers(q, excessive_workers);
+			q->excessive_workers_removed += ret;
+			//q->busy_workers_to_remove = excessive_workers - ret;
 		}
-		int ret = work_queue_shut_down_workers(q, excessive_workers);
-		q->excessive_workers_removed += ret;
-		q->busy_workers_to_remove = excessive_workers - ret;
-		printf("Planned to shut down %d workers ...\n%d workers have been shut down!\n", excessive_workers, ret);
+		//printf("Planned to shut down %d workers ...\n%d workers have been shut down!\n", excessive_workers, ret);
 	}
 
 }
@@ -1516,7 +1544,12 @@ struct work_queue * work_queue_create( int port )
 		q->work_queue_wait_routine = WORK_QUEUE_WAIT_FAST_DISPATCH;
 	}
 
-
+	envstring = getenv("WORK_QUEUE_CAPACITY_TOLERANCE");
+	if(envstring) {
+        work_queue_specify_capacity_tolerance(q, atoi(envstring));
+	} else {
+        q->capacity_tolerance = WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT;
+	}
 
 	q->total_send_time = 0;
 	q->total_execute_time = 0;
@@ -1540,6 +1573,15 @@ struct work_queue * work_queue_create( int port )
 	debug(D_NOTICE,"Could not create work_queue on port %i.",port);
 	free(q);
 	return 0;
+}
+
+int work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance) {
+    if(tolerance > 0 && tolerance <= WORK_QUEUE_CAPACITY_TOLERANCE_MAX) {
+       q->capacity_tolerance = tolerance;
+    } else {
+        q->capacity_tolerance = WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT;
+    }
+    return q->capacity_tolerance;
 }
 
 int work_queue_specify_name( struct work_queue *q, const char *name ) {
@@ -1758,8 +1800,9 @@ struct work_queue_task * work_queue_wait_fast_dispatch( struct work_queue *q, in
 	timestamp_t idle_start;
 	static int added_workers = 0;
 	static timestamp_t last_leave = 0;
+	static int last_leave_status = 0;
 	
-	if(last_leave) {
+	if(last_leave && last_leave_status == 1) {
 		q->app_time += timestamp_get() - last_leave;
 	} 
 
@@ -1777,6 +1820,7 @@ struct work_queue_task * work_queue_wait_fast_dispatch( struct work_queue *q, in
 		t = list_pop_head(q->complete_list);
 		if(t) {
 			last_leave = timestamp_get();
+			last_leave_status = 1;
 			return t;
 		}
 
@@ -1848,21 +1892,35 @@ struct work_queue_task * work_queue_wait_fast_dispatch( struct work_queue *q, in
 
 leave:
 	last_leave = timestamp_get();
+	last_leave_status = 0;
 	return 0;
 }
 
 // make a smarter decision on whether to start new task on a new worker or an old worker.
 struct work_queue_task * work_queue_wait_adaptive( struct work_queue *q, int timeout ) {
 	struct work_queue_task *t;
+	struct pending_output *po;
 	int i;
 	time_t stoptime;
 	int result;
 	int msec;
 	timestamp_t idle_start;
 	static timestamp_t last_leave = 0;
+	static int last_leave_status = 0;  // 0 -- no task done; 1 -- task done
 	
-	if(last_leave) {
-		q->app_time += timestamp_get() - last_leave;
+	if(last_leave && last_leave_status == 1) {
+		//q->app_time += timestamp_get() - last_leave;
+		if(q->total_tasks_complete > MIN_TIME_LIST_SIZE ) {
+			timestamp_t tmp_time = timestamp_get() - last_leave;
+			if(tmp_time > 10*(q->app_time/q->total_tasks_complete)) {
+				//skip
+			} else {
+				printf("task app time: %lld\n", tmp_time);
+				q->app_time += tmp_time;
+			}
+		} else {
+			q->app_time += timestamp_get() - last_leave;
+		}
 	} 
 
 	if(timeout==WORK_QUEUE_WAITFORTASK) {
@@ -1883,6 +1941,11 @@ struct work_queue_task * work_queue_wait_adaptive( struct work_queue *q, int tim
 
 		if(q->workers_in_state[WORKER_STATE_BUSY]==0 && list_size(q->ready_list)==0) break;
 
+		if((po=list_pop_head(q->receive_output_waiting_list))) {
+			receive_pending_output(q, po);
+			free(po);
+			continue;
+		}
 
 		int percentage = q->idle_percentage * 100;
 		int ready_workers = q->workers_in_state[WORKER_STATE_READY];
@@ -1890,6 +1953,8 @@ struct work_queue_task * work_queue_wait_adaptive( struct work_queue *q, int tim
 			// start new tasks conservatively, one at a time, otherwise we might use too many workers than we actually need
 			start_n_tasks(q, 1);
 		}
+
+		
 
 		int n = build_poll_table(q);
 
@@ -1924,6 +1989,11 @@ struct work_queue_task * work_queue_wait_adaptive( struct work_queue *q, int tim
 			if(stoptime && time(0)>=stoptime) {
 		   		goto leave;
 			} else {
+				/**
+				if(list_size(q->ready_list) && q->workers_in_state[WORKER_STATE_READY]) {
+					start_n_tasks(q, 1);
+				}
+				*/
 				continue;
 			}
 		}
@@ -1953,8 +2023,10 @@ leave:
 	last_leave = timestamp_get();
 	t = list_pop_head(q->complete_list);
 	if(t) {
+		last_leave_status = 1;
 		return t;
 	} else {
+		last_leave_status = 0;
 		return 0;
 	}
 }
@@ -1984,7 +2056,15 @@ void receive_pending_output(struct work_queue *q, struct pending_output *p) {
 		// make sure it's not a new worker (orginal worker might be disconnected and replaced)
 		if(p->start > w->start_time) {
 			if(receive_output_from_worker(q, w)) {
-				start_task_on_worker(q,w);
+				if(q->work_queue_wait_routine == WORK_QUEUE_WAIT_ADAPTIVE) {
+					if(q->busy_workers_to_remove > 0) {
+						q->busy_workers_to_remove--;
+					} else {
+						start_task_on_worker(q,w);
+					}
+				} else {
+					start_task_on_worker(q,w);
+				}
 			}
 		}	
 	}

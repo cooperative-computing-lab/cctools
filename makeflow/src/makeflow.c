@@ -1447,10 +1447,11 @@ int main( int argc, char *argv[] )
     int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
     int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
     int work_queue_wait_routine = WORK_QUEUE_WAIT_FAST_DISPATCH;
+	int capacity_tolerance = 0;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAB:cC:d:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:T:vw:W:z:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:t:T:vw:W:z:")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1580,6 +1581,11 @@ int main( int argc, char *argv[] )
 			} else {
 				work_queue_wait_routine = WORK_QUEUE_WAIT_FAST_DISPATCH;
 			}
+			break;
+		case 't':
+			capacity_tolerance = atoi(optarg);
+			sprintf(line,"WORK_QUEUE_CAPACITY_TOLERANCE=%d", capacity_tolerance);
+			putenv(strdup(line));
 			break;
 		default:
 			show_help(argv[0]);
