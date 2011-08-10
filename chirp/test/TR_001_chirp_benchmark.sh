@@ -8,9 +8,11 @@ PORT_FILE=chirp_server.port
 
 prepare()
 {
-    port=`find_free_port`
-    ../src/chirp_server -p $port &
+    ../src/chirp_server -Z $PORT_FILE &
     pid=$!
+
+    # give the server a moment to generate the port file
+    sleep 5
 
     if ps ux | awk '{print $2}' | grep "^$pid$"; then
 	echo $port> $PORT_FILE

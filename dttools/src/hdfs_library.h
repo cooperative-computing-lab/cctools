@@ -58,7 +58,7 @@ struct hdfs_library {
 	  tSize(*write) (hdfsFS, hdfsFile, const void *, tSize);
 	int (*exists) (hdfsFS, const char *);
 	int (*mkdir) (hdfsFS, const char *);
-	int (*unlink) (hdfsFS, const char *);
+	int (*unlink) (hdfsFS, const char *, int recursive );
 	int (*rename) (hdfsFS, const char *, const char *);
 	hdfsFileInfo *(*stat) (hdfsFS, const char *);
 	void (*free_stat) (hdfsFileInfo *, int);

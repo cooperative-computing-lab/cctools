@@ -19,8 +19,6 @@ See the file COPYING for details.
 #include <errno.h>
 #include <sys/stat.h>
 
-extern char *chirp_root_path;
-
 static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, const char *hostname, const char *rpath, const char *hostsubject, time_t stoptime)
 {
 	struct chirp_stat info;
@@ -36,12 +34,12 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 
 	if(S_ISDIR(info.cst_mode)) {
 		CHIRP_FILE *aclfile;
-		void *dir;
-		char *name;
+		struct chirp_dir *dir;
+		struct chirp_dirent *d;
 		char aclsubject[CHIRP_PATH_MAX];
 		int aclflags;
 
-		if(!chirp_acl_check_dir(chirp_root_path, lpath, subject, CHIRP_ACL_LIST))
+		if(!chirp_acl_check_dir(lpath, subject, CHIRP_ACL_LIST))
 			return -1;
 
 		// create the directory, but do not fail if it already exists
@@ -56,15 +54,15 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 
 		// transfer each of the directory contents recurisvely
 		dir = chirp_alloc_opendir(lpath);
-		while((name = chirp_alloc_readdir(dir))) {
-			if(!strcmp(name, "."))
+		while((d = chirp_alloc_readdir(dir))) {
+			if(!strcmp(d->name, "."))
 				continue;
-			if(!strcmp(name, ".."))
+			if(!strcmp(d->name, ".."))
 				continue;
-			if(!strncmp(name, ".__", 3))
+			if(!strncmp(d->name, ".__", 3))
 				continue;
-			sprintf(newlpath, "%s/%s", lpath, name);
-			sprintf(newrpath, "%s/%s", rpath, name);
+			sprintf(newlpath, "%s/%s", lpath, d->name);
+			sprintf(newrpath, "%s/%s", rpath, d->name);
 			result = chirp_thirdput_recursive(subject, newlpath, hostname, newrpath, hostsubject, stoptime);
 			if(result >= 0) {
 				size += result;
@@ -111,14 +109,14 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 		}
 
 	} else if(S_ISLNK(info.cst_mode)) {
-		if(!chirp_acl_check(chirp_root_path, lpath, subject, CHIRP_ACL_READ))
+		if(!chirp_acl_check(lpath, subject, CHIRP_ACL_READ))
 			return -1;
 		result = chirp_alloc_readlink(lpath, newlpath, sizeof(newlpath));
 		if(result < 0)
 			return -1;
 		return chirp_reli_symlink(hostname, newlpath, rpath, stoptime);
 	} else if(S_ISREG(info.cst_mode)) {
-		if(!chirp_acl_check(chirp_root_path, lpath, subject, CHIRP_ACL_READ))
+		if(!chirp_acl_check(lpath, subject, CHIRP_ACL_READ))
 			return -1;
 		int fd = chirp_alloc_open(lpath, O_RDONLY, 0);
 		if(fd >= 0) {

@@ -34,18 +34,19 @@ See the file COPYING for details.
 #define CHIRP_ACL_RESERVE         (1<<15)
 #define CHIRP_ACL_ALL             (~0)
 
-int chirp_acl_check(const char *root, const char *filename, const char *subject, int flags);
-int chirp_acl_check_dir(const char *root, const char *dirname, const char *subject, int flags);
-int chirp_acl_check_link(const char *root, const char *linkname, const char *subject, int flags);
+int chirp_acl_check(const char *filename, const char *subject, int flags);
+int chirp_acl_check_dir(const char *dirname, const char *subject, int flags);
+int chirp_acl_check_link(const char *linkname, const char *subject, int flags);
 
 int chirp_acl_set(const char *filename, const char *subject, int flags, int reset_acl);
-int chirp_acl_ticket_create(const char *root, const char *subject, const char *newsubject, const char *ticket, const char *duration);
-int chirp_acl_ticket_modify(const char *root, const char *subject, const char *ticket_subject, const char *path, int flags);
-int chirp_acl_gettickets(const char *dirname, struct hash_table *ticket);
-int chirp_acl_gctickets(const char *root);
-int chirp_acl_ticket_delete(const char *root, const char *subject, const char *ticket_subject);
-int chirp_acl_ticket_get(const char *root, const char *subject, const char *ticket_subject, char **ticket_esubject, char **ticket, time_t * ticket_expiration, char ***ticket_rights);
-int chirp_acl_ticket_list(const char *root, const char *subject, char **ticket_subjects[]);
+
+int chirp_acl_ticket_create(const char *ticketdir, const char *subject, const char *newsubject, const char *ticket, const char *duration);
+int chirp_acl_ticket_modify(const char *ticketdir, const char *subject, const char *ticket_subject, const char *path, int flags);
+int chirp_acl_gettickets(const char *ticketdir, struct hash_table *ticket);
+int chirp_acl_gctickets(const char *ticketdir);
+int chirp_acl_ticket_delete(const char *ticketdir, const char *subject, const char *ticket_subject);
+int chirp_acl_ticket_get(const char *ticketdir, const char *subject, const char *ticket_subject, char **ticket_esubject, char **ticket, time_t * ticket_expiration, char ***ticket_rights);
+int chirp_acl_ticket_list(const char *ticketdir, const char *subject, char **ticket_subjects[]);
 
 CHIRP_FILE *chirp_acl_open(const char *filename);
 int chirp_acl_read(CHIRP_FILE * aclfile, char *subject, int *flags);
@@ -63,7 +64,7 @@ void chirp_acl_default(const char *aclpath);
 
 int chirp_acl_init_root(const char *path);
 int chirp_acl_init_copy(const char *path);
-int chirp_acl_init_reserve(const char *root, const char *path, const char *subject);
-int chirp_acl_whoami(const char *root, const char *subject, char **esubject);
+int chirp_acl_init_reserve(const char *path, const char *subject);
+int chirp_acl_whoami(const char *subject, char **esubject);
 
 #endif

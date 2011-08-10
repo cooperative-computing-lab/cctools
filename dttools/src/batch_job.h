@@ -110,7 +110,7 @@ You must still call @ref batch_job_wait to wait for the removal to complete.
 int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid);
 
 /** Converts a string into a batch queue type.
-@param str A string indicating the work queue type, which may be "unix", "condor", "sge", "wq", or "xgrid".
+@param str A string listing all of the known batch queue types (which changes over time.)
 @return The batch queue type corresponding to the string, or BATCH_QUEUE_TYPE_UNKNOWN if the string is invalid.
 */
 batch_queue_type_t batch_queue_type_from_string(const char *str);
