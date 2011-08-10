@@ -33,6 +33,7 @@ See the file COPYING for details.
 #include "int_sizes.h"
 #include "list.h"
 #include "timestamp.h"
+#include "xmalloc.h"
 
 #define DAG_LINE_MAX 1048576
 #define SHOW_INPUT_FILES 2
@@ -101,6 +102,7 @@ struct dag_node {
 	int failure_count;
 	dag_node_state_t state;
 	const char *command;
+	const char *original_command;
 	struct dag_file *source_files;
 	struct dag_file *target_files;
 	int source_file_names_size;
@@ -640,7 +642,7 @@ void dag_log_recover( struct dag *d, const char *filename )
 		struct dag_node *p;
 		for(n=d->nodes;n;n=n->next) {
 			/* Record node information to log */
-			fprintf(d->logfile, "# NODE\t%d\t%s\n",n->nodeid,n->command);
+			fprintf(d->logfile, "# NODE\t%d\t%s\n",n->nodeid,n->original_command);
 
 			/* Record node parents to log */
 			fprintf(d->logfile, "# PARENTS\t%d",n->nodeid);
@@ -658,12 +660,15 @@ void dag_log_recover( struct dag *d, const char *filename )
 			}
 			fputc('\n', d->logfile);
 
-			/* Record node outputsto log */
+			/* Record node outputs to log */
 			fprintf(d->logfile, "# TARGETS\t%d",n->nodeid);
 			for(f=n->target_files;f;f=f->next) {
 				fprintf(d->logfile, "\t%s",f->filename);
 			}
 			fputc('\n', d->logfile);
+			
+			/* Record translated command to log */
+			fprintf(d->logfile, "# COMMAND\t%d\t%s\n",n->nodeid,n->command);
 		}
 	}
 
@@ -1052,6 +1057,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 		c+=6;
 	}
 
+	n->original_command = xstrdup(c);
 	n->command = translate_command(d, c, n->local_job);
 
 	free(line);
