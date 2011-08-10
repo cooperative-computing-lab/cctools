@@ -761,7 +761,7 @@ static void chirp_receive(struct link *link)
   Force a path to fall within the simulated root directory.
 */
 
-int chirp_path_fix(char *path)
+static int chirp_path_fix(char *path)
 {
 	char decodepath[CHIRP_PATH_MAX];
 	char shortpath[CHIRP_PATH_MAX];
@@ -778,7 +778,7 @@ int chirp_path_fix(char *path)
 	return 1;
 }
 
-char *chirp_stat_string(struct chirp_stat *info)
+static char *chirp_stat_string(struct chirp_stat *info)
 {
 	static char line[CHIRP_LINE_MAX];
 
@@ -788,7 +788,7 @@ char *chirp_stat_string(struct chirp_stat *info)
 	return line;
 }
 
-char *chirp_statfs_string(struct chirp_statfs *info)
+static char *chirp_statfs_string(struct chirp_statfs *info)
 {
 	static char line[CHIRP_LINE_MAX];
 

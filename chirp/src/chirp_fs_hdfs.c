@@ -75,7 +75,7 @@ static struct chirp_fs_hdfs_file {
 	hdfsFile file;
 } open_files[BASE_SIZE];	// = NULL;
 
-const char* chirp_fs_hdfs_init( const char *url )
+static const char* chirp_fs_hdfs_init( const char *url )
 {
 	static const char *groups[] = { "supergroup" };
 	const char *path;
@@ -155,7 +155,7 @@ static void copystat(struct chirp_stat *cs, hdfsFileInfo * hs, const char *path)
 	cs->cst_atime = cs->cst_mtime = cs->cst_ctime = hs->mLastMod;
 }
 
-INT64_T chirp_fs_hdfs_stat(const char *path, struct chirp_stat * buf)
+static INT64_T chirp_fs_hdfs_stat(const char *path, struct chirp_stat * buf)
 {
 	hdfsFileInfo *file_info;
 
@@ -172,7 +172,7 @@ INT64_T chirp_fs_hdfs_stat(const char *path, struct chirp_stat * buf)
 	return 0;
 }
 
-INT64_T chirp_fs_hdfs_fstat(int fd, struct chirp_stat *buf)
+static INT64_T chirp_fs_hdfs_fstat(int fd, struct chirp_stat *buf)
 {
 	return chirp_fs_hdfs_stat(open_files[fd].name, buf);
 }
@@ -184,7 +184,7 @@ struct chirp_dir {
 	char *path;
 };
 
-struct chirp_dir * chirp_fs_hdfs_opendir( const char *path )
+static struct chirp_dir * chirp_fs_hdfs_opendir( const char *path )
 {
 	struct chirp_dir *dir;
 
@@ -207,7 +207,7 @@ struct chirp_dir * chirp_fs_hdfs_opendir( const char *path )
 	return dir;
 }
 
-struct chirp_dirent * chirp_fs_hdfs_readdir( struct chirp_dir *dir )
+static struct chirp_dirent * chirp_fs_hdfs_readdir( struct chirp_dir *dir )
 {
 	static struct chirp_dirent d;
 
@@ -227,7 +227,7 @@ struct chirp_dirent * chirp_fs_hdfs_readdir( struct chirp_dir *dir )
 	}
 }
 
-void chirp_fs_hdfs_closedir( struct chirp_dir *dir )
+static void chirp_fs_hdfs_closedir( struct chirp_dir *dir )
 {
 	debug(D_HDFS, "closedir %s", dir->path);
 	hdfs_services->free_stat(dir->info, dir->n);
@@ -247,9 +247,9 @@ static INT64_T get_fd(void)
 	return -1;
 }
 
-INT64_T chirp_fs_hdfs_unlink( const char *path );
+static INT64_T chirp_fs_hdfs_unlink( const char *path );
 
-INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
+static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 {
 	INT64_T fd;
 	struct chirp_stat info;
@@ -324,7 +324,7 @@ INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 	}
 }
 
-INT64_T chirp_fs_hdfs_close(int fd)
+static INT64_T chirp_fs_hdfs_close(int fd)
 {
 	debug(D_HDFS, "close %s", open_files[fd].name);
 	free(open_files[fd].name);
@@ -332,13 +332,13 @@ INT64_T chirp_fs_hdfs_close(int fd)
 	return hdfs_services->close(fs, open_files[fd].file);
 }
 
-INT64_T chirp_fs_hdfs_pread(int fd, void *buffer, INT64_T length, INT64_T offset)
+static INT64_T chirp_fs_hdfs_pread(int fd, void *buffer, INT64_T length, INT64_T offset)
 {
 	debug(D_HDFS, "pread %d %lld %lld", fd, length, offset);
 	return hdfs_services->pread(fs, open_files[fd].file, offset, buffer, length);
 }
 
-INT64_T chirp_fs_hdfs_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
+static INT64_T chirp_fs_hdfs_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
 {
 	INT64_T total = 0;
 	INT64_T actual = 0;
@@ -376,7 +376,7 @@ INT64_T chirp_fs_hdfs_sread(int fd, void *vbuffer, INT64_T length, INT64_T strid
 	}
 }
 
-void chirp_fs_hdfs_write_zeroes(int fd, INT64_T length)
+static void chirp_fs_hdfs_write_zeroes(int fd, INT64_T length)
 {
 	int zero_size = 65536;
 	char *zero = malloc(zero_size);
@@ -393,7 +393,7 @@ void chirp_fs_hdfs_write_zeroes(int fd, INT64_T length)
 	free(zero);
 }
 
-INT64_T chirp_fs_hdfs_pwrite(int fd, const void *buffer, INT64_T length, INT64_T offset)
+static INT64_T chirp_fs_hdfs_pwrite(int fd, const void *buffer, INT64_T length, INT64_T offset)
 {
 	INT64_T current = hdfs_services->tell(fs, open_files[fd].file);
 
@@ -419,14 +419,14 @@ INT64_T chirp_fs_hdfs_pwrite(int fd, const void *buffer, INT64_T length, INT64_T
 	return hdfs_services->write(fs, open_files[fd].file, buffer, length);
 }
 
-INT64_T chirp_fs_hdfs_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
+static INT64_T chirp_fs_hdfs_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
 {
 	/* Strided write won't work on HDFS because it is a variation on random write. */
 	errno = ENOTSUP;
 	return -1;
 }
 
-INT64_T chirp_fs_hdfs_fchown(int fd, INT64_T uid, INT64_T gid)
+static INT64_T chirp_fs_hdfs_fchown(int fd, INT64_T uid, INT64_T gid)
 {
 	// Changing file ownership is silently ignored,
 	// because permissions are handled through the ACL model.
@@ -434,7 +434,7 @@ INT64_T chirp_fs_hdfs_fchown(int fd, INT64_T uid, INT64_T gid)
 	return 0;
 }
 
-INT64_T chirp_fs_hdfs_fchmod(int fd, INT64_T mode)
+static INT64_T chirp_fs_hdfs_fchmod(int fd, INT64_T mode)
 {
 	// The owner may only add or remove the execute bit,
 	// because permissions are handled through the ACL model.
@@ -443,7 +443,7 @@ INT64_T chirp_fs_hdfs_fchmod(int fd, INT64_T mode)
 	return hdfs_services->chmod(fs, open_files[fd].name, mode);
 }
 
-INT64_T chirp_fs_hdfs_ftruncate(int fd, INT64_T length)
+static INT64_T chirp_fs_hdfs_ftruncate(int fd, INT64_T length)
 {
 	debug(D_HDFS, "ftruncate %d %lld", fd, length);
 
@@ -460,18 +460,18 @@ INT64_T chirp_fs_hdfs_ftruncate(int fd, INT64_T length)
 	}
 }
 
-INT64_T chirp_fs_hdfs_fsync(int fd)
+static INT64_T chirp_fs_hdfs_fsync(int fd)
 {
 	debug(D_HDFS, "fsync %s", open_files[fd].name);
 	return hdfs_services->flush(fs, open_files[fd].file);
 }
 
-INT64_T chirp_fs_hdfs_getfile(const char *path, struct link * link, time_t stoptime)
+static INT64_T chirp_fs_hdfs_getfile(const char *path, struct link * link, time_t stoptime)
 {
 	return cfs_basic_getfile(FIXPATH(path),link,stoptime);
 }
 
-INT64_T chirp_fs_hdfs_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime)
+static INT64_T chirp_fs_hdfs_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime)
 {
 	return cfs_basic_putfile(FIXPATH(path),link,length,mode,stoptime);
 }
@@ -482,7 +482,7 @@ so check for directories beforehand, and set the errno
 properly afterwards if needed.
 */
 
-INT64_T chirp_fs_hdfs_unlink(const char *path)
+static INT64_T chirp_fs_hdfs_unlink(const char *path)
 {
 	path = FIXPATH(path);
 
@@ -506,14 +506,14 @@ INT64_T chirp_fs_hdfs_unlink(const char *path)
 	return 0;
 }
 
-INT64_T chirp_fs_hdfs_rmall(const char *path)
+static INT64_T chirp_fs_hdfs_rmall(const char *path)
 {
 	path = FIXPATH(path);
 	debug(D_HDFS, "rmall %s", path);
 	return hdfs_services->unlink(fs, path,1);
 }
 
-INT64_T chirp_fs_hdfs_rename(const char *path, const char *newpath)
+static INT64_T chirp_fs_hdfs_rename(const char *path, const char *newpath)
 {
 	path = FIXPATH(path);
 	newpath = FIXPATH(newpath);
@@ -522,7 +522,7 @@ INT64_T chirp_fs_hdfs_rename(const char *path, const char *newpath)
 	return hdfs_services->rename(fs, path, newpath);
 }
 
-INT64_T chirp_fs_hdfs_link(const char *path, const char *newpath)
+static INT64_T chirp_fs_hdfs_link(const char *path, const char *newpath)
 {
 	path = FIXPATH(path);
 	newpath = FIXPATH(newpath);
@@ -530,7 +530,7 @@ INT64_T chirp_fs_hdfs_link(const char *path, const char *newpath)
 	return (errno = ENOTSUP, -1);
 }
 
-INT64_T chirp_fs_hdfs_symlink(const char *path, const char *newpath)
+static INT64_T chirp_fs_hdfs_symlink(const char *path, const char *newpath)
 {
 	path = FIXPATH(path);
 	newpath = FIXPATH(newpath);
@@ -538,14 +538,14 @@ INT64_T chirp_fs_hdfs_symlink(const char *path, const char *newpath)
 	return (errno = ENOTSUP, -1);
 }
 
-INT64_T chirp_fs_hdfs_readlink(const char *path, char *buf, INT64_T length)
+static INT64_T chirp_fs_hdfs_readlink(const char *path, char *buf, INT64_T length)
 {
 	path = FIXPATH(path);
 	debug(D_HDFS, "readlink %s %lld", path, length);
 	return (errno = EINVAL, -1);
 }
 
-INT64_T chirp_fs_hdfs_mkdir(const char *path, INT64_T mode)
+static INT64_T chirp_fs_hdfs_mkdir(const char *path, INT64_T mode)
 {
 	path = FIXPATH(path);
 
@@ -561,21 +561,21 @@ INT64_T chirp_fs_hdfs_mkdir(const char *path, INT64_T mode)
 	return hdfs_services->mkdir(fs, path);
 }
 
-INT64_T chirp_fs_hdfs_rmdir(const char *path)
+static INT64_T chirp_fs_hdfs_rmdir(const char *path)
 {
 	path = FIXPATH(path);
 	debug(D_HDFS,"rmdir %s", path);
 	return hdfs_services->unlink(fs,path,1);
 }
 
-INT64_T chirp_fs_hdfs_lstat(const char *path, struct chirp_stat * buf)
+static INT64_T chirp_fs_hdfs_lstat(const char *path, struct chirp_stat * buf)
 {
 	path = FIXPATH(path);
 	debug(D_HDFS, "lstat %s", path);
 	return chirp_fs_hdfs_stat(path, buf);
 }
 
-INT64_T chirp_fs_hdfs_statfs(const char *path, struct chirp_statfs * buf)
+static INT64_T chirp_fs_hdfs_statfs(const char *path, struct chirp_statfs * buf)
 {
 	path = FIXPATH(path);
 	debug(D_HDFS, "statfs %s", path);
@@ -596,12 +596,12 @@ INT64_T chirp_fs_hdfs_statfs(const char *path, struct chirp_statfs * buf)
 	return 0;
 }
 
-INT64_T chirp_fs_hdfs_fstatfs(int fd, struct chirp_statfs * buf)
+static INT64_T chirp_fs_hdfs_fstatfs(int fd, struct chirp_statfs * buf)
 {
 	return chirp_fs_hdfs_statfs(open_files[fd].name, buf);
 }
 
-INT64_T chirp_fs_hdfs_access(const char *path, INT64_T mode)
+static INT64_T chirp_fs_hdfs_access(const char *path, INT64_T mode)
 {
 	/* W_OK is ok to delete, not to write, but we can't distinguish intent */
 	/* Chirp ACL will check that we can access the file the way we want, so
@@ -611,7 +611,7 @@ INT64_T chirp_fs_hdfs_access(const char *path, INT64_T mode)
 	return hdfs_services->exists(fs, path);
 }
 
-INT64_T chirp_fs_hdfs_chmod(const char *path, INT64_T mode)
+static INT64_T chirp_fs_hdfs_chmod(const char *path, INT64_T mode)
 {
 	// The owner may only add or remove the execute bit,
 	// because permissions are handled through the ACL model.
@@ -621,7 +621,7 @@ INT64_T chirp_fs_hdfs_chmod(const char *path, INT64_T mode)
 	return hdfs_services->chmod(fs, path, mode);
 }
 
-INT64_T chirp_fs_hdfs_chown(const char *path, INT64_T uid, INT64_T gid)
+static INT64_T chirp_fs_hdfs_chown(const char *path, INT64_T uid, INT64_T gid)
 {
 	// Changing file ownership is silently ignored,
 	// because permissions are handled through the ACL model.
@@ -630,7 +630,7 @@ INT64_T chirp_fs_hdfs_chown(const char *path, INT64_T uid, INT64_T gid)
 	return 0;
 }
 
-INT64_T chirp_fs_hdfs_lchown(const char *path, INT64_T uid, INT64_T gid)
+static INT64_T chirp_fs_hdfs_lchown(const char *path, INT64_T uid, INT64_T gid)
 {
 	// Changing file ownership is silently ignored,
 	// because permissions are handled through the ACL model.
@@ -639,7 +639,7 @@ INT64_T chirp_fs_hdfs_lchown(const char *path, INT64_T uid, INT64_T gid)
 	return 0;
 }
 
-INT64_T chirp_fs_hdfs_truncate(const char *path, INT64_T length)
+static INT64_T chirp_fs_hdfs_truncate(const char *path, INT64_T length)
 {
 	struct chirp_stat info;
 	path = FIXPATH(path);
@@ -662,25 +662,25 @@ INT64_T chirp_fs_hdfs_truncate(const char *path, INT64_T length)
 	}
 }
 
-INT64_T chirp_fs_hdfs_utime(const char *path, time_t actime, time_t modtime)
+static INT64_T chirp_fs_hdfs_utime(const char *path, time_t actime, time_t modtime)
 {
 	path = FIXPATH(path);
 	debug(D_HDFS, "utime %s %ld %ld", path, (long) actime, (long) modtime);
 	return hdfs_services->utime(fs, path, modtime, actime);
 }
 
-INT64_T chirp_fs_hdfs_md5(const char *path, unsigned char digest[16])
+static INT64_T chirp_fs_hdfs_md5(const char *path, unsigned char digest[16])
 {
 	return cfs_basic_md5(FIXPATH(path),digest);
 }
 
-INT64_T chirp_fs_hdfs_chdir(const char *path)
+static INT64_T chirp_fs_hdfs_chdir(const char *path)
 {
 	debug(D_HDFS, "chdir %s", path);
 	return hdfs_services->chdir(fs, path);
 }
 
-int chirp_fs_hdfs_do_acl_check()
+static int chirp_fs_hdfs_do_acl_check()
 {
 	return 1;
 }
