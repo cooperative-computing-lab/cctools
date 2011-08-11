@@ -617,12 +617,12 @@ int pfs_whoami( const char *path, char *buf, int size )
 	END
 }
 
-int pfs_search( char **dirlist, char *pattern, char buffer[][NAME_MAX], struct stat *stats, size_t size )
+int pfs_search( const char *path, const char *pattern, char buffer[][PFS_PATH_MAX+1], struct stat *stats, size_t size )
 {
-        BEGIN
-        debug(D_LIBCALL,"search %x %x %x %x %x",dirlist, pattern, buffer, stats, size );
-        result = pfs_current->table->search(dirlist,pattern,buffer,stats,size);
-        END
+    BEGIN
+    debug(D_LIBCALL,"search %x %x %x %x %x",path,pattern,buffer,stats,size);
+    result = pfs_current->table->search(path,pattern,buffer,stats,size);
+    END
 }
 
 int pfs_getacl( const char *path, char *buf, int size )

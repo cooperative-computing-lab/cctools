@@ -2340,47 +2340,32 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			}
 			break;
 
-                case SYSCALL64_parrot_search:
-                        if (entering) {
-                                size_t size = (size_t) args[4];
-                                struct stat *stats = (struct stat*) calloc(size, sizeof(struct stat));
-                                char *pattern = (char*) calloc(NAME_MAX, sizeof(char));
-                                char **to_search = (char**) calloc(NAME_MAX*size, sizeof(char));
-                                char buffer[size][NAME_MAX];
-                                tracer_copy_in(p->tracer,stats,(void*)args[3],size*sizeof(struct stat));
-                                tracer_copy_in_string(p->tracer,pattern,(void*)args[1],NAME_MAX*sizeof(char));
-                                tracer_copy_in(p->tracer,&buffer,(char*)args[2],sizeof(buffer));
-                                int i = 0;
+		case SYSCALL64_parrot_search:
+			if (entering) {
+				/* parrot_search(path, pattern, buffer[][PFS_PATH_MAX+1], struct stat *stats, size_t size) */
+				char path[PFS_PATH_MAX+1];
+				char pattern[PFS_PATH_MAX+1];
+				pfs_size_t size;
 
-                                for (;;) {
+				tracer_copy_in_string(p->tracer, path, POINTER(args[0]), sizeof(path));
+				tracer_copy_in_string(p->tracer, pattern, POINTER(args[1]), sizeof(pattern));
+				char *buffer;
+				struct stat *stats = NULL;
+				size = (pfs_size_t) args[4];
 
-                                        char* holder;
-                                        char* dir = (char*) calloc(NAME_MAX, sizeof(char));
-                                        tracer_copy_in(p->tracer, &holder, ((char **)args[0])+i, sizeof(holder));
-
-                                        if (holder==NULL) {
-
-                                                break;
-                                        }
-
-                                        tracer_copy_in_string(p->tracer, dir, (char*)holder, (NAME_MAX-1)*sizeof(char));
-                                        *(dir+NAME_MAX-1) = '\0';
-                                        *(to_search+i)=dir;
-                                        i++;
-                                }
-
-                                *(to_search+i) = NULL;
-                                p->syscall_result = pfs_search(to_search, pattern, buffer, stats, size);
-
-                                for (i=0; i<(p->syscall_result); i++) {
-
-                                        tracer_copy_out(p->tracer,buffer[i],((char*)args[2])+(i*NAME_MAX), NAME_MAX*sizeof(char));
-                                }
-
-                                tracer_copy_out(p->tracer,stats,(struct stat*)args[3], size*sizeof(struct stat));
-                                divert_to_dummy(p,p->syscall_result);
-                        }
-                        break;
+				buffer = malloc(sizeof(char)*(PFS_PATH_MAX+1)*size);
+				memset(buffer, 0, sizeof(char)*(PFS_PATH_MAX+1)*size);
+				if (!buffer) {
+					p->syscall_result = -errno;
+				} else {
+					size_t i;
+					p->syscall_result = pfs_search(path, pattern, (char [][PFS_PATH_MAX+1])buffer, stats, size);
+					for (i = 0; i < (size_t) p->syscall_result; i++)
+						tracer_copy_out(p->tracer, buffer[i], POINTER(args[2])+(i*(PFS_PATH_MAX+1)), PFS_PATH_MAX*sizeof(char));
+				}
+				divert_to_dummy(p, p->syscall_result);
+			}
+			break;
 
 		case SYSCALL64_parrot_setacl:
 			if(entering) {

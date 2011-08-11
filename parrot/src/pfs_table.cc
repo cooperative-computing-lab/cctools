@@ -1531,88 +1531,66 @@ int pfs_table::whoami( const char *n, char *buf, int length )
 	return result;
 }
 
-/*
-        The search system call looks through directories for files matching a given pattern.
-
-        char **dirlist          : NULL-terminated list of directories to recursively search
-        char *pattern           : glob pattern for file names to match
-        char buffer[][NAME_MAX] : the buffer onto which the matching names are written
-        struct stat *stats      : the stat structs buffer onto which file metadata is written
-        size_t size             : the number of rows of the buffer. No more than size results can be returned
-        int return              : the number of results. If the buffer is too small, -1 will be returned
-*/
-
-int pfs_table::search( char **dirlist, char *pattern, char buffer[][NAME_MAX], struct stat *stats, size_t size )
+static int search_directory (unsigned level, const char *base, char *dir, const char *pattern, char buffer[][PFS_PATH_MAX+1], size_t *i, size_t size)
 {
-        int i=0, writ=0;
-        const char *name;
+	if (level == 0)
+		return 0;
 
-        while((name=*(dirlist+i))!=NULL && writ!=-1) {
+	DIR *dirp = opendir(dir);
+	char *current = dir+strlen(dir); /* point to end to current directory */
 
-                i++;
-                DIR *dirp;
-                struct stat st;
+	if (dirp) {
+		const char *entry;
+		while ((entry = readdir(dirp))) {
+			int r;
+			struct pfs_stat buf;
 
-                 if ((dirp=opendir(name))!=NULL) {
+			if (strcmp(entry, ".") == 0 || strcmp(entry, "..") == 0) continue;
 
-                        struct dirent *entry;
+			sprintf(current, "/%s", entry);
+			if (fnmatch(pattern, base, FNM_PATHNAME) == 0) {
+				if (strlen(dir) >= PFS_PATH_MAX+1) {
+					errno = ERANGE;
+					return -1;
+				} else if (size == *i) {
+					errno = ENOMEM;
+					return -1;
+				} else {
+					strcpy(buffer[*i], dir);
+					*i += 1;
+				}
+			}
 
-                        while ((entry=readdir(dirp)) && writ!=-1) {
+			r = this->stat(base, &buf);
+			if (f == 0 && S_ISDIR(buf.st_mode))
+				if (search_directory(level-1, base, dir, pattern, buffer, i, size) == -1)
+					return -1;
+			}
+			*current = '\0'; /* clear current entry */
+		}
+		closedir(dirp);
+	}
 
-                                if (strcmp(entry->d_name, ".")!=0 && strcmp(entry->d_name, "..")!=0) {
+	return 0;
+}
 
-                                        char *fullpath_st = (char*) malloc(sizeof(char)*(strlen(entry->d_name)+strlen(name)+2));
-                                        char *fullpath = (char*) malloc(sizeof(char)*(strlen(entry->d_name)+strlen(name)+2));
-                                        char *file_name = (char*) malloc(sizeof(char)*(strlen(entry->d_name)+1));
-                                        strcpy(fullpath_st, name);
-                                        strcpy(file_name, entry->d_name);
-                                        strcat(fullpath_st, "/");
-                                        strcat(fullpath_st, file_name);
-                                        strcpy(fullpath, fullpath_st);
-                                        int statmode = ::stat(fullpath_st, &st);
-                                        char *pat = NULL;
-                                        char *sep = (char*) "/";
-                                        char *pats_tok = (char*) malloc(sizeof(char)*(strlen(pattern)+1));
-                                        strcpy(pats_tok, pattern);
-                                        pat = strtok(pats_tok, sep);
+int pfs_table::search( const char *path, const char *pattern, char buffer[][PFS_PATH_MAX+1], struct stat *stats, size_t size )
+{
+	unsigned level = 1;
+	const char *s;
+	char directory[PFS_PATH_MAX+1];
+	char pattern[PFS_PATH_MAX+1];
+	size_t i = 0;
 
-                                        while (pat!=NULL) {
+	string_collapse_path(path, directory, 0);
 
-                                                if (!fnmatch(pat, entry->d_name, 0) && writ!=-1) {
+	for (s = patt; *s == '/'; s++) ; /* remove leading slashes from pattern */
+	sprintf(pattern, "/%s", s); /* add leading slash for base directory */
+	for (s = strchr(pattern, '/'); s; s = strchr(s+1, '/')) level++; /* count the number of nested directories to descend at maximum */
 
-                                                        unsigned int uwrit = (unsigned int) writ;
+	search_directory(level, directory+strlen(directory), directory, pattern, buffer, &i, size);
 
-                                                        if (uwrit==size) {
-
-                                                                writ=-1;
-                                                                break;
-                                                        }
-                                                        else {
-
-                                                                strcpy(buffer[writ], fullpath);
-                                                                *(stats+writ) = st;
-                                                                writ++;
-                                                        }
-                                                }
-
-                                                pat = strtok(NULL, sep);
-                                        }
-
-                                        if (!statmode && S_ISDIR(st.st_mode)) {
-
-                                                char **tmp_dirlist = (char**) malloc((strlen(fullpath)+1)*sizeof(char));
-                                                *(tmp_dirlist) = fullpath;
-                                                *(tmp_dirlist+1) = NULL;
-                                                int new_writ = search(tmp_dirlist, pattern, buffer+writ, stats+writ, size-writ);
-                                                writ = (writ==-1 || new_writ==-1) ? -1 : writ+new_writ;
-                                        }
-                                }
-                        }
-                }
-                closedir(dirp);
-        }
-
-        return writ;
+    return (int) i;
 }
 
 int pfs_table::getacl( const char *n, char *buf, int length )
