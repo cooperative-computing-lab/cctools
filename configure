@@ -280,6 +280,8 @@ else
 	ldflags="-static-libgcc"
 fi
 
+check_multiarch
+
 rm -f Makefile.config
 echo "checking for all the things I know how to build..."
 for p in $potential_packages

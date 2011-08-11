@@ -89,6 +89,30 @@ library_search_mode=prefer_dynamic
 
 library_search()
 {
+	if library_search_normal $@;
+	then
+		return 0
+	fi
+	if [ X$HOST_MULTIARCH != X ] && library_search_multiarch $@;
+	then
+		return 0
+	fi
+
+	return 1
+}
+
+library_search_multiarch()
+{
+	if [ X$3 = X ];
+	then
+		library_search_normal $1 $2 $HOST_MULTIARCH
+	else
+		library_search_normal $1 $2 $HOST_MULTIARCH/$3
+	fi
+}
+
+library_search_normal()
+{
 	# If the second argument is root, and we are not careful,
 	# we will end up with a path that has two slashes, which
 	# means something unintended in Windows
@@ -163,8 +187,7 @@ library_search()
 			return 0
 		fi
 	fi
-
-
+	
 	return 1
 }
 
@@ -417,5 +440,17 @@ check_for_globus()
 
 		echo "no"
 		return 1
+	fi
+}
+
+check_multiarch()
+{
+	echo -n "checking for multiarch environment..." 
+	if [ -r /etc/debian_version ]; then
+		HOST_MULTIARCH=`dpkg-architecture -qDEB_HOST_MULTIARCH 2> /dev/null`
+		echo "$HOST_MULTIARCH"
+	else
+		HOST_MULTIARCH=
+		echo "no"
 	fi
 }
