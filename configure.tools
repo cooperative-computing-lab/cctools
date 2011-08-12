@@ -193,13 +193,19 @@ library_search_normal()
 
 optional_function()
 {
+	multiarch_include=`echo $2 | sed "s|include/|include/$HOST_MULTIARCH/|"`
+
 	if check_function $1 $2
 	then
 		ccflags="${ccflags} -D$3"
 		return 0
-	else
-		return 1
+	elif [ X$HOST_MULTIARCH != X ] && check_function $1 $multiarch_include;
+	then
+		ccflags="${ccflags} -D$3"
+		return 0
 	fi
+		
+	return 1
 }
 
 optional_file()
@@ -211,6 +217,21 @@ optional_file()
 	else
 		return 1
 	fi
+}
+
+optional_include()
+{
+	multiarch_include=`echo $1 | sed "s|include/|include/$HOST_MULTIARCH/|"`
+
+	if optional_file $1 $2;
+	then
+		return 0
+	elif [ X$HOST_MULTIARCH != X ] && optional_file $multiarch_include $2;
+	then
+		return 0
+	fi
+
+	return 1
 }
 
 optional_pfs_service()
