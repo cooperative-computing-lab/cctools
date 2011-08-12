@@ -350,11 +350,7 @@ static void config_pipe_handler( int fd )
 			debug(D_DEBUG,"config message: %s",msg);
 
 			if(sscanf(msg,"debug %s",flag)==1) {
-				if(!strcmp(flag,"clear")) {
-					debug_flags_clear();
-				} else {
-					debug_flags_set(flag);
-				}
+				debug_flags_set(flag);
 			} else if(sscanf(msg,"stats %s %s %llu %llu %llu",address,subject,&ops,&bytes_read,&bytes_written)==5) {
 				chirp_stats_collect(address,subject,ops,bytes_read,bytes_written);
 			} else {
@@ -1583,6 +1579,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			// send this message to the parent for processing.
 			strcat(line,"\n");
 			write(config_pipe[1],line,strlen(line));
+			debug_flags_set(debug_flag);
 		} else {
 			result = -1;
 			errno = ENOSYS;

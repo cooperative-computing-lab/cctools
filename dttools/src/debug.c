@@ -95,6 +95,11 @@ int debug_flags_set(const char *flagname)
 {
 	struct flag_info *i;
 
+	if(!strcmp(flagname,"clear")) {
+		debug_flags_clear();
+		return 1;
+	}
+
 	for(i = table; i->name; i++) {
 		if(!strcmp(flagname, i->name)) {
 			debug_flags |= i->flag;
