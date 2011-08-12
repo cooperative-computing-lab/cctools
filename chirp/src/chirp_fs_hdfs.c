@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "debug.h"
 #include "username.h"
+#include "stringtools.h"
 
 #include "hdfs_library.h"
 
@@ -62,6 +63,7 @@ This macro simply skips over the first slash if needed.
 
 static char *chirp_fs_hdfs_hostname = NULL;
 static int chirp_fs_hdfs_port = 0;
+static int chirp_fs_hdfs_nreps = 0;
 
 static struct hdfs_library *hdfs_services = 0;
 static hdfsFS fs = NULL;
@@ -314,7 +316,7 @@ static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 		return -1;
 	}
 
-	open_files[fd].file = hdfs_services->open(fs, path, flags, 0, 0, 0);
+	open_files[fd].file = hdfs_services->open(fs, path, flags, 0, chirp_fs_hdfs_nreps, 0);
 	if(open_files[fd].file == NULL) {
 		debug(D_HDFS, "open %s failed: %s", path, strerror(errno));
 		return -1;
@@ -680,6 +682,25 @@ static INT64_T chirp_fs_hdfs_chdir(const char *path)
 	return hdfs_services->chdir(fs, path);
 }
 
+static INT64_T chirp_fs_hdfs_setrep( const char *path, int nreps )
+{
+	debug(D_HDFS,"setrep %s %d",path,nreps);
+
+	/* If the path is @@@, then it sets the replication factor for all newly created files in this session. Zero is valid and indicates the default value selected by HDFS. */
+
+	if(!strcmp(string_back(path,3),"@@@")) {
+		if(nreps>=0) {
+			chirp_fs_hdfs_nreps = nreps;
+			return 0;
+		} else {
+			errno = EINVAL;
+			return -1;
+		}
+	} else {
+		return hdfs_services->setrep(fs,path,nreps);
+	}
+}
+
 static int chirp_fs_hdfs_do_acl_check()
 {
 	return 1;
@@ -727,6 +748,7 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_truncate,
 	chirp_fs_hdfs_utime,
 	chirp_fs_hdfs_md5,
+	chirp_fs_hdfs_setrep,
 
 	chirp_fs_hdfs_do_acl_check,
 };

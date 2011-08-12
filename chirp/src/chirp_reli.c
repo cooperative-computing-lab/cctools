@@ -43,6 +43,7 @@ struct chirp_file {
 
 struct hash_table *table = 0;
 static int chirp_reli_blocksize = 65536;
+static int chirp_reli_default_nreps = 0;
 
 INT64_T chirp_reli_blocksize_get()
 {
@@ -73,6 +74,13 @@ static struct chirp_client * connect_to_host( const char *host, time_t stoptime 
 	}
 
 	if(c) {
+		/*
+		If a default replication factor was set earlier, then
+		it must be re-applied when re-connecting after a failure.
+		*/
+		if(chirp_reli_default_nreps>0) {
+			chirp_client_setrep(c,"@@@",chirp_reli_default_nreps,stoptime);
+		}
 		hash_table_insert(table,host,c);
 		return c;
 	} else {
@@ -672,6 +680,17 @@ INT64_T chirp_reli_utime( const char *host, const char *path, time_t actime, tim
 INT64_T chirp_reli_md5( const char *host, const char *path, unsigned char digest[16], time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_md5(client,path,digest,stoptime); )
+}
+
+INT64_T chirp_reli_setrep(const char *host, const char *path, int nreps, time_t stoptime )
+{
+	/*
+	If setting a default replication factor for the session,
+	then save it in a global so that it can be re-applied on a re-connection.
+	*/
+
+	if(!strcmp(path,"@@@")) chirp_reli_default_nreps = nreps;
+	RETRY_ATOMIC( result = chirp_client_setrep(client,path,nreps,stoptime); )
 }
 
 INT64_T chirp_reli_remote_debug( const char *host, const char *flag, time_t stoptime )

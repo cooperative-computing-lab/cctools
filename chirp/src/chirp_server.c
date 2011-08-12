@@ -841,6 +841,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		INT64_T uid, gid, mode;
 		INT64_T size, inuse;
 		INT64_T stride_length, stride_skip;
+		int nreps;
 		struct chirp_stat statbuf;
 		struct chirp_statfs statfsbuf;
 		INT64_T actime, modtime;
@@ -1567,6 +1568,12 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			} else {
 				result = errno_to_chirp(errno);
 			}
+		} else if(sscanf(line, "setrep %s %d", path, &nreps)==2) {
+			if(!chirp_path_fix(path))
+				goto failure;
+			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
+				goto failure;
+			result = chirp_alloc_setrep(path,nreps);
 		} else if(sscanf(line, "debug %s", debug_flag) == 1) {
 			if(strcmp(esubject, chirp_super_user) != 0) {
 				errno = EPERM;

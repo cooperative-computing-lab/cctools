@@ -873,12 +873,17 @@ Give the location of the root storage directory in HDFS with <tt>-r</tt> and a U
 <pre>
 % chirp_server_hdfs -r hdfs://headnode.hadoop.domain.edu/mydata
 </pre>
+<p>
+By default, chirp will use whatever default replication factor is
+defined by HDFS (typically 3).  To change the replication factor of
+a single file, use the <tt>chirp setrep</tt> or <tt>parrot_setrep</tt> commands.  A path of <tt>&amp;&amp;&amp;</tt> will set the replication factor for all new files created in that session.
 
 <h3>Temporary Local Storage</h3>
 <p>
 Chirp allows you to setup a location to place temporary files such as those
-used for Active Storage jobs. You can set this using the <tt>-y path</tt>
-option. This allows for faster access, POSIX semantics, and less load on HDFS.
+for caching groups, and other items.
+You can set this using the <tt>-y path</tt>.
+This allows for faster access, POSIX semantics, and less load on HDFS.
 By default, Chirp assumes the current directory for temporary storage.
 
 <h3>Limitations</h3>

@@ -433,6 +433,12 @@ static INT64_T chirp_fs_local_utime(const char *path, time_t actime, time_t modt
 	return utime(path, &ut);
 }
 
+static INT64_T chirp_fs_local_setrep( const char *path, int nreps )
+{
+	errno = EINVAL;
+	return -1;
+}
+
 static int chirp_fs_do_acl_check()
 {
 	return 1;
@@ -480,6 +486,7 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_truncate,
 	chirp_fs_local_utime,
 	cfs_basic_md5,
+	chirp_fs_local_setrep,
 
 	chirp_fs_do_acl_check,
 };

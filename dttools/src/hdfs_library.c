@@ -90,6 +90,7 @@ struct hdfs_library *hdfs_library_open()
 	HDFS_LOAD_FUNC(utime, "hdfsUtime");
 	HDFS_LOAD_FUNC(chdir, "hdfsSetWorkingDirectory");
 	HDFS_LOAD_FUNC(tell, "hdfsTell");
+	HDFS_LOAD_FUNC(setrep, "hdfsSetReplication");
 
 	return hs;
 

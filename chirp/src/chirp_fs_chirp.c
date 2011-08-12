@@ -270,6 +270,11 @@ static INT64_T chirp_fs_chirp_md5(const char *path, unsigned char digest[16])
 	return chirp_reli_md5(chirp_fs_chirp_hostport,path,digest,STOPTIME);
 }
 
+static INT64_T chirp_fs_chirp_setrep( const char *path, int nreps )
+{
+	return chirp_reli_setrep(chirp_fs_chirp_hostport,path,nreps,STOPTIME);
+}
+
 static int chirp_fs_chirp_do_acl_check()
 {
 	return 0;
@@ -317,6 +322,7 @@ struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_truncate,
 	chirp_fs_chirp_utime,
 	chirp_fs_chirp_md5,
+	chirp_fs_chirp_setrep,
 
 	chirp_fs_chirp_do_acl_check
 };

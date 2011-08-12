@@ -87,6 +87,7 @@ static INT64_T do_quit(int argc, char **argv);
 static INT64_T do_whoami(int argc, char **argv);
 static INT64_T do_whoareyou(int argc, char **argv);
 static INT64_T do_md5(int argc, char **argv);
+static INT64_T do_setrep(int argc, char **argv);
 static INT64_T do_localpath(int argc, char **argv);
 static INT64_T do_audit(int argc, char **argv);
 static INT64_T do_thirdput(int argc, char **argv);
@@ -150,6 +151,7 @@ static struct command list[] = {
 	{"df", 1, 0, 1, "[-k|-m|-g|-t]", do_statfs},
 	{"chmod", 1, 2, 2, "<mode> <path>", do_chmod},
 	{"md5", 1, 1, 1, "<path>", do_md5},
+	{"setrep", 1, 2, 2, "<path> <nreps>", do_setrep},
 	{"localpath", 1, 0, 1, "[remotepath]", do_localpath},
 	{"audit", 1, 0, 1, "[-r]", do_audit},
 	{"lsalloc", 1, 0, 1, "[path]", do_lsalloc},
@@ -973,6 +975,16 @@ static INT64_T do_md5(int argc, char **argv)
 	if(result > 0)
 		printf("%s %s\n", md5_string(digest), full_path);
 	return result;
+}
+
+static INT64_T do_setrep(int argc, char **argv)
+{
+	char full_path[CHIRP_LINE_MAX];
+
+	complete_remote_path(argv[1], full_path);
+	int nreps = atoi(argv[2]);
+
+	return chirp_reli_setrep(current_host, full_path, nreps, stoptime );
 }
 
 static INT64_T do_localpath(int argc, char **argv)

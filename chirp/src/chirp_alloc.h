@@ -59,6 +59,7 @@ INT64_T chirp_alloc_lchown(const char *path, INT64_T uid, INT64_T gid);
 INT64_T chirp_alloc_truncate(const char *path, INT64_T length);
 INT64_T chirp_alloc_utime(const char *path, time_t actime, time_t modtime);
 INT64_T chirp_alloc_md5(const char *path, unsigned char digest[16]);
+INT64_T chirp_alloc_setrep(const char *path, int nreps);
 
 INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total, INT64_T * inuse);
 INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode);

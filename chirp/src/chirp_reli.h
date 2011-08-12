@@ -634,6 +634,18 @@ digest into a human readable form.
 
 INT64_T chirp_reli_md5(const char *host, const char *path, unsigned char digest[16], time_t stoptime);
 
+/** Set replication factor.
+Sets the number of replicas desired for the indicated file or for all newly created files.
+This only has an effect if the server backend supports replication, currently only with HDFS.
+@param host The name and port of the Chirp server to access.
+@param path The pathname of the file to modify.  If the pathname is <tt>"@@@"</tt>, then this call sets the replication factor for all files created by this process.
+@param nreps The number of replicas desired.  Zero indicates the server should use the default replication value. 
+@param stoptime The absolute time at which to abort.
+@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
+*/
+
+INT64_T chirp_reli_setrep(const char *host, const char *path, int nreps, time_t stoptime );
+
 /** Set the debug options on the remote server.
 @param host The name and port of the Chirp server to access.
 @param flag A debug flag to set on the server. Pass NULL to not change. Pass "clear" to clear.

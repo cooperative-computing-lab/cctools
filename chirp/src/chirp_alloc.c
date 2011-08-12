@@ -910,6 +910,11 @@ INT64_T chirp_alloc_md5(const char *path, unsigned char digest[16])
 	return cfs->md5(path, digest);
 }
 
+INT64_T chirp_alloc_setrep(const char *path, int nreps)
+{
+	return cfs->setrep(path,nreps);
+}
+
 INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total, INT64_T * inuse)
 {
 	char *name;

@@ -90,6 +90,7 @@ INT64_T chirp_client_lchown(struct chirp_client *c, const char *path, INT64_T ui
 INT64_T chirp_client_truncate(struct chirp_client *c, const char *path, INT64_T length, time_t stoptime);
 INT64_T chirp_client_utime(struct chirp_client *c, const char *path, time_t actime, time_t modtime, time_t stoptime);
 INT64_T chirp_client_md5(struct chirp_client *c, const char *path, unsigned char digest[16], time_t stoptime);
+INT64_T chirp_client_setrep(struct chirp_client *c, const char *path, int nreps, time_t stoptime);
 INT64_T chirp_client_remote_debug(struct chirp_client *c, const char *flag, time_t stoptime);
 INT64_T chirp_client_localpath(struct chirp_client *c, const char *path, char *localpath, int length, time_t stoptime);
 INT64_T chirp_client_audit(struct chirp_client *c, const char *path, struct chirp_audit **list, time_t stoptime);

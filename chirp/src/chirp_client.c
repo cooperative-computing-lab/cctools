@@ -1277,6 +1277,13 @@ INT64_T chirp_client_md5(struct chirp_client * c, const char *path, unsigned cha
 	return result;
 }
 
+INT64_T chirp_client_setrep(struct chirp_client * c, char const *path, int nreps, time_t stoptime)
+{
+	char safepath[CHIRP_LINE_MAX];
+	url_encode(path, safepath, sizeof(safepath));
+	return simple_command(c, stoptime, "setrep %s %d\n", safepath, nreps);
+}
+
 INT64_T chirp_client_remote_debug(struct chirp_client * c, const char *flag, time_t stoptime)
 {
 	if(flag == NULL) flag = "*";

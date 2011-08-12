@@ -84,6 +84,7 @@ struct chirp_filesystem {
 	INT64_T (*truncate)  ( const char *path, INT64_T length );
 	INT64_T (*utime)     ( const char *path, time_t atime, time_t mtime  );
 	INT64_T (*md5)       ( const char *path, unsigned char digest[16] );
+	INT64_T (*setrep)    ( const char *path, int nreps );
 
 	int (*do_acl_check) ();
 };
