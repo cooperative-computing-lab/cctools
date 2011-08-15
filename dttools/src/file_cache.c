@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "md5.h"
 #include "domain_name_cache.h"
+#include "copy_stream.h"
 
 #include <string.h>
 #include <errno.h>
@@ -240,6 +241,27 @@ int file_cache_open(struct file_cache *c, const char *path, char *lpath, INT64_T
 		debug(D_CACHE, "miss %s %s", path, lpath);
 		return -1;
 	}
+}
+
+int file_cache_insert(struct file_cache *c, const char *path, char *lpath)
+{
+	struct stat64 info;
+	FILE *src, *dest;
+	int result;
+	
+	if(file_cache_stat(c, path, lpath, &info) == 0) {
+		return -1;
+	}
+
+	src = fopen(path, "rb");
+	dest = fopen(lpath, "wb");
+	result = copy_stream_to_stream(src, dest);
+	fclose(src);
+	fclose(dest);
+	if(result < 0) {
+		unlink(lpath);
+	}
+	return result;
 }
 
 int file_cache_delete(struct file_cache *f, const char *path)

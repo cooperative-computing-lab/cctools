@@ -26,4 +26,22 @@ pid_t dpopen(const char *command, FILE ** in, FILE ** out);
 
 int dpclose(FILE * in, FILE * out, pid_t pid);
 
+/** Multi-pipe process invocation.
+  * @ref multi_popen opens a process for execution, providing input, output and
+  error streams as requested.
+@param command The command string to execute.
+@param in a reference to a FILE pointer to store the input stream.  A NULL value will
+cause the input stream to be ignored.
+@param out a reference to a FILE pointer to store the output stream.  A NULL value will
+cause the output stream to be ignored.
+@param err a reference to a FILE pointer to store the error stream.  A NULL value will
+cause the error stream to be ignored.  If @ref in and @ref out are the same, the output
+and error streams will be combined.
+@return The pid of the child process.
+*/
+
+pid_t multi_popen(const char *command, FILE ** in, FILE ** out, FILE ** err);
+
+int multi_pclose(FILE * in, FILE * out, FILE * err, pid_t pid);
+
 #endif

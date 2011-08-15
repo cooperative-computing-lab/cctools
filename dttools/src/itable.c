@@ -139,6 +139,19 @@ void *itable_remove(struct itable *h, UINT64_T key)
 			} else {
 				h->buckets[index] = e->next;
 			}
+			
+			if(e == h->ientry) {
+				h->ientry = h->ientry->next;
+				if(!h->ientry) {
+					h->ibucket++;
+					for(; h->ibucket < h->bucket_count; h->ibucket++) {
+						h->ientry = h->buckets[h->ibucket];
+						if(h->ientry)
+							break;
+					}
+				}
+			}
+			
 			value = e->value;
 			free(e);
 			h->size--;
