@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "pfs_process.h"
 #include "pfs_dispatch.h"
 #include "pfs_poll.h"
+#include "pfs_channel.h"
 
 extern "C" {
 #include "debug.h"
@@ -136,9 +137,31 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 		memcpy(child->signal_interruptible,actual_parent->signal_interruptible,sizeof(child->signal_interruptible));
 	} else {
 		child->table = new pfs_table;
-		child->table->attach(0,dup(0),O_RDONLY,0666,"stdin");
-		child->table->attach(1,dup(1),O_WRONLY,0666,"stdout");
-		child->table->attach(2,dup(2),O_WRONLY,0666,"stderr");
+
+		/* The first child process must inherit file descriptors */
+
+		int count = sysconf(_SC_OPEN_MAX);
+		int *flags = (int*)malloc(sizeof(int)*count);
+		int i;
+
+		/* Scan through the known file descriptors */
+
+		for(int i=0;i<count;i++) {
+			flags[i] = fcntl(i,F_GETFL);
+		}
+
+		/* If valid, duplicate and attach them to the child process. */
+
+		for(i=0;i<count;i++) {
+			if(i==pfs_channel_fd()) continue;
+			if(flags[i]>=0) {
+				child->table->attach(i,dup(i),flags[i],0666,"fd");
+				debug(D_PROCESS,"attaching to inherited fd %d with flags %d",i,flags);
+			} 
+		}
+
+		free(flags);
+
 		child->umask = 000;
 		strcpy(child->tty,"/dev/tty");
 		memset(child->signal_interruptible,0,sizeof(child->signal_interruptible));

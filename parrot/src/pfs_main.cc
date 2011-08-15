@@ -680,9 +680,6 @@ int main( int argc, char *argv[] )
 		if(pid>0) {
 			debug(D_PROCESS,"pid %d started",pid);
 		} else if(pid==0) {
-			for(i=0;i<sysconf(_SC_OPEN_MAX);i++) {
-				if(i!=pfs_channel_fd()) close(i);
-			}
 			setpgrp();
 			tracer_prepare();
 			kill(getpid(),SIGSTOP);
