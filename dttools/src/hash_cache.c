@@ -101,7 +101,7 @@ void *hash_cache_lookup(struct hash_cache *cache, const char *key)
 		result = e->value;
 		if(e->expires < time(0)) {
 			result = hash_cache_remove(cache, key);
-			cache->cleanup(result);
+			if(result) cache->cleanup(result);
 			result = 0;
 		}
 	} else {
