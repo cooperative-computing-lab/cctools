@@ -3,8 +3,9 @@ Copyright (C) 2008- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
+
 #include "work_queue.h"
-#include "get_canonical_path.h"
+
 #include "int_sizes.h"
 #include "link.h"
 #include "debug.h"
@@ -1597,6 +1598,7 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 static int update_catalog(struct work_queue *q)
 {
 	char address[DATAGRAM_ADDRESS_MAX];
+	char owner[USERNAME_MAX];
 	static char text[WORK_QUEUE_CATALOG_LINE_MAX];
 	struct work_queue_stats s;
 	int port;
@@ -1612,9 +1614,13 @@ static int update_catalog(struct work_queue *q)
 	port = work_queue_port(q);
 	work_queue_get_stats(q, &s);
 
+	if(!username_get(owner)) {
+		strcpy(owner,"unknown");
+	}
+
 	snprintf(text, WORK_QUEUE_CATALOG_LINE_MAX,
-		 "type wq_master\nproject %s\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running%d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\n", q->name, q->priority, port,
-		 WORK_QUEUE_CATALOG_LIFETIME, s.tasks_waiting, s.total_tasks_complete, s.tasks_running, s.total_tasks_dispatched, s.workers_init, s.workers_ready, s.workers_busy, s.workers_init + s.workers_ready + s.workers_busy);
+		 "type wq_master\nproject %s\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running%d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nversion %d.%d.%d\nowner %s", q->name, q->priority, port,
+		 WORK_QUEUE_CATALOG_LIFETIME, s.tasks_waiting, s.total_tasks_complete, s.tasks_running, s.total_tasks_dispatched, s.workers_init, s.workers_ready, s.workers_busy, s.workers_init + s.workers_ready + s.workers_busy, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
 
 	if(domain_name_cache_lookup(CATALOG_HOST, address)) {
 		debug(D_WQ, "sending master information to %s:%d", CATALOG_HOST, CATALOG_PORT);
