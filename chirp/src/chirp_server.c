@@ -99,7 +99,7 @@ static const char *chirp_root_url = ".";
 static const char *chirp_root_path = 0;
 
 char *chirp_transient_path = "./";	/* local file system stuff */
-const char *chirp_ticket_path = 0;
+extern const char *chirp_ticket_path;
 const char *chirp_super_user = "";
 const char *chirp_group_base_url = 0;
 int chirp_group_cache_time = 900;
@@ -704,17 +704,7 @@ static void chirp_receive(struct link *link)
 
 	link_address_remote(link, addr, &port);
 
-	auth_ticket_clear();
-	struct hash_table *tickets = hash_table_create(0, 0);
-	if(chirp_acl_gettickets(".", tickets) == 0) {
-		char *key, *value;
-		hash_table_firstkey(tickets);
-		while(hash_table_nextkey(tickets, &key, (void **) &value)) {
-			auth_ticket_add(key, value);
-			free(value);
-		}
-	}
-	hash_table_delete(tickets);
+	auth_ticket_server_callback(chirp_acl_ticket_callback);
 
 	if(auth_accept(link, &atype, &asubject, time(0) + idle_timeout)) {
 		sprintf(typesubject, "%s:%s", atype, asubject);

@@ -42,7 +42,7 @@ int chirp_acl_set(const char *filename, const char *subject, int flags, int rese
 
 int chirp_acl_ticket_create(const char *ticketdir, const char *subject, const char *newsubject, const char *ticket, const char *duration);
 int chirp_acl_ticket_modify(const char *ticketdir, const char *subject, const char *ticket_subject, const char *path, int flags);
-int chirp_acl_gettickets(const char *ticketdir, struct hash_table *ticket);
+char *chirp_acl_ticket_callback(const char *digest);
 int chirp_acl_gctickets(const char *ticketdir);
 int chirp_acl_ticket_delete(const char *ticketdir, const char *subject, const char *ticket_subject);
 int chirp_acl_ticket_get(const char *ticketdir, const char *subject, const char *ticket_subject, char **ticket_esubject, char **ticket, time_t * ticket_expiration, char ***ticket_rights);
