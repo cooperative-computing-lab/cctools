@@ -14,7 +14,7 @@ the linked lists defined in @ref list.h.
 
 #include "list.h"
 
-typedef int (*cmp_op_t) (void *, void *);
+typedef int (*cmp_op_t) (const void *, const void *);
 
 /** Sort linked list using MergeSort.
 This allows for a custom comparator that takes two data pointers and returns a
