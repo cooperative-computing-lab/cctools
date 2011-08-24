@@ -1,3 +1,4 @@
+#include "copy_stream.h"
 #include "debug.h"
 #include "itable.h"
 #include "list.h"
@@ -46,7 +47,7 @@ struct list * worker_comm_accept_connections(int interface, struct link *master_
 				MPI_Status mpi_stat;
 			 
 				if(mpi_current_request == MPI_REQUEST_NULL) {
-					MPI_Irecv(&mpi_worker_id, 1, MPI_INT, MPI_ANY_SOURCE, WORKER_COMM_TAG_ROLE, &mpi_current_request);
+					MPI_Irecv(&mpi_worker_id, 1, MPI_INT, MPI_ANY_SOURCE, WORKER_COMM_TAG_ROLE, MPI_COMM_WORLD, &mpi_current_request);
 				}
 		
 				MPI_Test(&mpi_current_request, &complete, &mpi_stat);
@@ -76,10 +77,10 @@ struct list * worker_comm_accept_connections(int interface, struct link *master_
 					
 					comm->lnk = link_accept(master_link, stoptime);
 					if(comm->lnk) {
-						char line[WQ_LINE_MAX];
+						char line[WORK_QUEUE_LINE_MAX];
 						int result;
 						link_tune(comm->lnk, LINK_TUNE_INTERACTIVE);
-						result = link_readline(comm->lnk, line, WQ_LINE_MAX, stoptime);
+						result = link_readline(comm->lnk, line, WORK_QUEUE_LINE_MAX, stoptime);
 						
 						comm->type = WORKER_COMM_TCP;
 						comm->mpi_rank = -1;
@@ -101,7 +102,7 @@ struct list * worker_comm_accept_connections(int interface, struct link *master_
 	}
 	if(list_size(new_comms)) {
 		return new_comms;
-	} else
+	} else {
 		list_delete(new_comms);
 		return NULL;
 	}
@@ -255,7 +256,7 @@ int worker_comm_send_array(struct worker_comm *comm, int datatype, void* buf, in
 int worker_comm_recv_array(struct worker_comm *comm, int datatype, void* buf, int length)
 {
 	int i, mpi_init, stoptime;
-	char line[WQ_LINE_MAX];
+	char line[WORK_QUEUE_LINE_MAX];
 	char *tokens, *token;
 	
 	switch(comm->type) {
@@ -268,7 +269,7 @@ int worker_comm_recv_array(struct worker_comm *comm, int datatype, void* buf, in
 			if(!comm->lnk)
 				return -1;
 			stoptime = time(0) + comm->active_timeout;
-			link_readline(comm->lnk, line, WQ_LINE_MAX, stoptime);
+			link_readline(comm->lnk, line, WORK_QUEUE_LINE_MAX, stoptime);
 			break;
 	}
 	
@@ -278,12 +279,12 @@ int worker_comm_recv_array(struct worker_comm *comm, int datatype, void* buf, in
 				MPI_Recv(buf, length, MPI_INT, comm->mpi_rank, 0, MPI_COMM_WORLD, &comm->mpi_stat);
 			}
 			if(comm->type == WORKER_COMM_TCP) {
-				token = strtok_r(line, " ", tokens);
+				token = strtok_r(line, " ", &tokens);
 				i = 0;
 				do{
 					sscanf(token, "%d", ((int*)buf)+i);
 					i++;
-				}while((token = strtok_r(NULL, " ", tokens)));
+				}while((token = strtok_r(NULL, " ", &tokens)));
 			}
 			break;
 
@@ -301,12 +302,12 @@ int worker_comm_recv_array(struct worker_comm *comm, int datatype, void* buf, in
 				MPI_Recv(buf, length, MPI_FLOAT, comm->mpi_rank, 0, MPI_COMM_WORLD, &comm->mpi_stat);
 			}
 			if(comm->type == WORKER_COMM_TCP) {
-				token = strtok_r(line, " ", tokens);
+				token = strtok_r(line, " ", &tokens);
 				i = 0;
 				do{
 					sscanf(token, "%f", ((float*)buf)+i);
 					i++;
-				}while((token = strtok_r(NULL, " ", tokens)));
+				}while((token = strtok_r(NULL, " ", &tokens)));
 			}
 			break;
 
@@ -315,19 +316,19 @@ int worker_comm_recv_array(struct worker_comm *comm, int datatype, void* buf, in
 				MPI_Recv(buf, length, MPI_DOUBLE, comm->mpi_rank, 0, MPI_COMM_WORLD, &comm->mpi_stat);
 			}
 			if(comm->type == WORKER_COMM_TCP) {
-				token = strtok_r(line, " ", tokens);
+				token = strtok_r(line, " ", &tokens);
 				i = 0;
 				do{
-					sscanf(token, "%f", ((double*)buf)+i);
+					sscanf(token, "%lf", ((double*)buf)+i);
 					i++;
-				}while((token = strtok_r(NULL, " ", tokens)));
+				}while((token = strtok_r(NULL, " ", &tokens)));
 			}
 			break;
 	}
 	return 0;
 }
 
-int worker_comm_send_buffer(struct worker_comm *comm, const char *buffer, int length, char header)
+int worker_comm_send_buffer(struct worker_comm *comm, char *buffer, int length, char header)
 {
 	int mpi_init, stoptime;
 	switch(comm->type) {
@@ -338,7 +339,7 @@ int worker_comm_send_buffer(struct worker_comm *comm, const char *buffer, int le
 			if(header)
 				MPI_Send(&length, 1, MPI_INT, comm->mpi_rank, 0, MPI_COMM_WORLD);
 			if(length > 0)
-				MPI_Send(buffer, length, MPI_BYTES, comm->mpi_rank, 0, MPI_COMM_WORLD);
+				MPI_Send(buffer, length, MPI_BYTE, comm->mpi_rank, 0, MPI_COMM_WORLD);
 			break;
 		case WORKER_COMM_TCP:
 			stoptime = time(0) + comm->active_timeout;
@@ -388,8 +389,9 @@ int worker_comm_send_file(struct worker_comm *comm, const char *filename, int le
 				if(header) {
 					MPI_Send(&length, 1, MPI_INT, comm->mpi_rank, 0, MPI_COMM_WORLD);
 				}
-				MPI_Send(buffer, length, MPI_BYTES, comm->mpi_rank, 0, MPI_COMM_WORLD);
+				MPI_Send(buffer, length, MPI_BYTE, comm->mpi_rank, 0, MPI_COMM_WORLD);
 				free(buffer);
+			}
 			break;
 		case WORKER_COMM_TCP:
 			if(!comm->lnk)
@@ -408,7 +410,7 @@ int worker_comm_send_file(struct worker_comm *comm, const char *filename, int le
 int worker_comm_recv_buffer(struct worker_comm *comm, char **buffer, int *bufferlength, char header)
 {
 	int mpi_init, stoptime;
-	char line[WQ_LINE_MAX];
+	char line[WORK_QUEUE_LINE_MAX];
 	
 	switch(comm->type) {
 		case WORKER_COMM_MPI:
@@ -416,11 +418,11 @@ int worker_comm_recv_buffer(struct worker_comm *comm, char **buffer, int *buffer
 			if(!mpi_init)
 				return -1;
 			if(header)
-				MPI_Recv(bufferlength, 1, MPI_INT, comm->mpi_rank, 0, MPI_COMM_WORLD, comm->mpi_stat);
+				MPI_Recv(bufferlength, 1, MPI_INT, comm->mpi_rank, 0, MPI_COMM_WORLD, &comm->mpi_stat);
 			if(*bufferlength > 0) {
 				*buffer = malloc(*bufferlength);
 				memset(*buffer, *bufferlength, 0);
-				MPI_Recv(*buffer, *bufferlength, MPI_BYTES, comm->mpi_rank, 0, MPI_COMM_WORLD, comm->mpi_stat);
+				MPI_Recv(*buffer, *bufferlength, MPI_BYTE, comm->mpi_rank, 0, MPI_COMM_WORLD, &comm->mpi_stat);
 			} else {
 				*buffer = NULL;
 			}
@@ -430,7 +432,7 @@ int worker_comm_recv_buffer(struct worker_comm *comm, char **buffer, int *buffer
 				return -1;
 			stoptime = time(0)+comm->active_timeout;
 			if(header) {
-				link_readline(comm->lnk, line, WQ_LINE_MAX, stoptime);
+				link_readline(comm->lnk, line, WORK_QUEUE_LINE_MAX, stoptime);
 				sscanf(line, "%d\n", bufferlength);
 			}
 			if(*bufferlength > 0) {
@@ -453,9 +455,9 @@ int worker_comm_send_op(struct worker_comm *comm, struct worker_op *op)
 			MPI_Initialized(&mpi_init);
 			if(!mpi_init)
 				return -1;
-			MPI_Send(op, sizeof(*op), MPI_BYTES, comm->mpi_rank, 0, MPI_COMM_WORLD);
+			MPI_Send(op, sizeof(*op), MPI_BYTE, comm->mpi_rank, 0, MPI_COMM_WORLD);
 			if(op->payload)
-				MPI_Send(op->payload, op->payloadsize, MPI_BYTES, comm->mpi_rank, 0, MPI_COMM_WORLD);
+				MPI_Send(op->payload, op->payloadsize, MPI_BYTE, comm->mpi_rank, 0, MPI_COMM_WORLD);
 			break;
 		case WORKER_COMM_TCP:
 			stoptime = time(0)+comm->active_timeout;
@@ -472,7 +474,7 @@ int worker_comm_send_op(struct worker_comm *comm, struct worker_op *op)
 int worker_comm_receive_op(struct worker_comm *comm, struct worker_op *op)
 {
 	int mpi_init, complete, stoptime;
-	char line[WQ_LINE_MAX];
+	char line[WORK_QUEUE_LINE_MAX];
 	stoptime = time(0)+comm->active_timeout;
 	
 	switch(comm->type) {
@@ -481,7 +483,7 @@ int worker_comm_receive_op(struct worker_comm *comm, struct worker_op *op)
 			if(!mpi_init)
 				return -1;
 			if(comm->mpi_req == MPI_REQUEST_NULL) {
-				MPI_Irecv(op, sizeof(*op), MPI_BYTES, comm->mpi_rank, 0, MPI_COMM_WORLD, &comm->mpi_req);
+				MPI_Irecv(op, sizeof(*op), MPI_BYTE, comm->mpi_rank, 0, MPI_COMM_WORLD, &comm->mpi_req);
 			}
 			while(time(0) < stoptime && !complete) {
 				MPI_Test(&comm->mpi_req, &complete, &comm->mpi_stat);
@@ -491,7 +493,7 @@ int worker_comm_receive_op(struct worker_comm *comm, struct worker_op *op)
 				if(op->payloadsize) {
 					op->payload = malloc(op->payloadsize);
 					memset(op->payload, 0, op->payloadsize);
-					MPI_Recv(op->payload, op->payloadsize, MPI_BYTES, comm->mpi_rank, 0, MPI_COMM_WORLD, &comm->mpi_stat);
+					MPI_Recv(op->payload, op->payloadsize, MPI_BYTE, comm->mpi_rank, 0, MPI_COMM_WORLD, &comm->mpi_stat);
 				} else {
 					op->payload = NULL;
 				}
@@ -500,7 +502,7 @@ int worker_comm_receive_op(struct worker_comm *comm, struct worker_op *op)
 		case WORKER_COMM_TCP:
 			if(!comm->lnk)
 				return -1;
-			complete = link_readline(comm->lnk, line, WQ_LINE_MAX, stoptime);
+			complete = link_readline(comm->lnk, line, WORK_QUEUE_LINE_MAX, stoptime);
 			
 			if(complete) {
 				sscanf(line, "%d %d %d %d %d %d %s", &op->type, &op->jobid, &op->id, &op->options, &op->flags, &op->payloadsize, op->name);
@@ -523,7 +525,7 @@ int worker_comm_receive_op(struct worker_comm *comm, struct worker_op *op)
 int worker_comm_test_results(struct worker_comm *comm)
 {
 	int stoptime, complete = 0;
-	char line[WQ_LINE_MAX];
+	char line[WORK_QUEUE_LINE_MAX];
 	stoptime = time(0) + comm->active_timeout;
 	
 	switch(comm->type) {
@@ -536,7 +538,7 @@ int worker_comm_test_results(struct worker_comm *comm)
 			}
 			break;
 		case WORKER_COMM_TCP:
-			complete = work_queue_readline(comm->lnk, line, WQ_LINE_MAX, stoptime);
+			complete = link_readline(comm->lnk, line, WORK_QUEUE_LINE_MAX, stoptime);
 			if(complete) {
 				complete = sscanf(line, "%d", &comm->results);
 			}

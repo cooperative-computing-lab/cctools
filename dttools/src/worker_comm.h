@@ -4,6 +4,8 @@
 #include <mpi.h>
 
 
+#define WORK_QUEUE_LINE_MAX 1024
+
 struct worker_comm {
 	int type;
 	int mpi_rank;
@@ -24,7 +26,7 @@ struct worker_op {
 	int flags;
 	int payloadsize;
 	
-	char name[WQ_FILENAME_MAX];
+	char name[WORK_QUEUE_LINE_MAX];
 	char *payload;
 };
 
@@ -37,7 +39,7 @@ struct worker_op {
 #define WORKER_COMM_ARRAY_DOUBLE	4
 
 
-int worker_comm_accept_connections(int interface, struct link *master_link, struct list *active_workers, int active_timeout, int short_timeout);
+struct list * worker_comm_accept_connections(int interface, struct link *master_link, int active_timeout, int short_timeout);
 
 struct worker_comm * worker_comm_connect(struct worker_comm *comm, int interface, const char *hostname, int port_id, int active_timeout, int short_timeout);
 
@@ -51,7 +53,7 @@ int worker_comm_send_array(struct worker_comm *comm, int datatype, void* buf, in
 
 int worker_comm_recv_array(struct worker_comm *comm, int datatype, void* buf, int length);
 
-int worker_comm_send_buffer(struct worker_comm *comm, const char *buffer, int length, char header);
+int worker_comm_send_buffer(struct worker_comm *comm, char *buffer, int length, char header);
 
 int worker_comm_send_file(struct worker_comm *comm, const char *filename, int length, char header);
 
