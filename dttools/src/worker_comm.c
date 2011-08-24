@@ -1,49 +1,48 @@
+#include "debug.h"
+#include "itable.h"
+#include "list.h"
+#include "link.h"
+#include "worker_comm.h"
 
+#include <mpi.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 
-struct worker * worker_comm_accept_connection(int type, int port, MPI_Comm communicator, int timeout, int stoptime)
+#include <sys/stat.h>
+
+#define WORKER_COMM_TAG_OP	0x00
+#define WORKER_COMM_TAG_ROLE	0x01
+
+int worker_comm_accept_connections(int interface, struct link *master_link, struct list *active_workers, int active_timeout, int short_timeout)
 {
-	static struct list *available_workers = NULL;
-	static struct link *master_link = NULL;
-	static int master_port = -1;
-	
-	static MPI_Request mpi_current_request = MPI_REQUEST_NULL;
-	static MPI_Comm mpi_communicator = MPI_COMM_WORLD;
-	static int mpi_num_workers = -1;
-
 	static struct worker *worker_info = NULL;
 	struct worker_comm *comm;
-	int mpi_init = 0, sleeptime;
+	int sleeptime, stoptime, mpi_init = 0;
 
-	switch(type) {
+	stoptime = time(0) + short_timeout;
+	switch(interface) {
 		case WORKER_COMM_MPI:
 			MPI_Initialized(&mpi_init);
 			if(!mpi_init)
-				return NULL;
+				return -1;
 			break;
 		case WORKER_COMM_TCP:
-			if(!comm->lnk)
+			if(!master_link)
 				return -1;
 			break;
 	}
 
-
-	if(!available_workers) {
-		available_workers = list_create();
-	}
-	if(list_size(available_workers)) {
-		return list_pop_head(available_workers);
-	}
-	if(mpi_init && num_mpi_workers < 0) {
-		MPI_Comm_size(mpi_communicator, &mpi_num_workers);
-	}
-
-	switch(type) {
-		case WORKER_COMM_MPI: {
-			
+	switch(interface) {
+		case WORKER_COMM_MPI:
 			while(time(0) < stoptime) {
+				static struct worker *mpi_worker_info = NULL;
+				static MPI_Request mpi_current_request = MPI_REQUEST_NULL;
+				
 				int complete = 0;
 				MPI_Status mpi_stat;
-				static struct worker *mpi_worker_info = NULL;
 			 
 				if(!mpi_worker_info) {
 					mpi_worker_info = malloc(sizeof(*mpi_worker_info));
@@ -61,7 +60,8 @@ struct worker * worker_comm_accept_connection(int type, int port, MPI_Comm commu
 					comm = malloc(sizeof(*comm));
 					comm->type = WORKER_COMM_MPI;
 					comm->mpi_rank = mpi_stat.MPI_SOURCE;
-					comm->timeout = timeout;
+					comm->active_timeout = active_timeout;
+					comm->short_timeout = short_timeout;
 					comm->results = 0;
 					comm->hostname = NULL;
 					comm->lnk = NULL;
@@ -73,22 +73,9 @@ struct worker * worker_comm_accept_connection(int type, int port, MPI_Comm commu
 					comm = NULL;
 				}
 			}
-		}
 		break;
 		
 		case WORKER_COMM_TCP:
-			if(port != master_port) {
-				link_close(master_link);
-				master_link = NULL;
-			}
-			
-			if(!master_link) {
-				if(!port || port < 0)
-					return NULL;
-				master_port = port;
-				master_link = link_serve(port);
-			}
-			
 			// If the master link was awake, then accept as many workers as possible.
 			sleeptime = (stoptime - time(0)) * 1000000;
 			if(link_usleep(master_link, sleeptime, 1, 0)) {
@@ -98,54 +85,75 @@ struct worker * worker_comm_accept_connection(int type, int port, MPI_Comm commu
 					
 					comm->lnk = link_accept(master_link, stoptime);
 					if(comm->lnk) {
+						char line[WQ_LINE_MAX];
+						int result;
 						link_tune(comm->lnk, LINK_TUNE_INTERACTIVE);
+						result = link_readline(comm->lnk, line, WQ_LINE_MAX, stoptime);
+
+						comm->type = WORKER_COMM_TCP;
+						comm->mpi_rank = -1;
+						comm->active_timeout = active_timeout;
+						comm->short_timeout = short_timeout;
+						comm->results = 0;
+						comm->mpi_req = MPI_REQUEST_NULL;
 						
-						/* Recieve worker description */
-					} else {
-						free(worker_info);
-						free(comm);
-						return NULL;
+						if(result > 0) {
+							sscanf(line, "%s %d %d %d\n", &worker_info->hostname, &worker_info->cores, &worker_info->ram, &worker_info->disk);
+							comm->hostname = strdup(worker_info->hostname);
+							worker_info->comm = comm;
+							list_push_tail(available_workers, worker_info);
+							continue;
+						}
+						
 					}
-					
-					list_push_tail(available_workers, worker_info);
+					free(worker_info);
+					free(comm);
+					return -1;
+				
 				} while(link_usleep(master_link, 0, 1, 0));
 			}
 		break;
 	}
 	
-	if(list_size(available_workers)) {
-		return list_pop_head(available_workers);
-	} else {
-		return NULL;
-	}
-
+	return 0;
 }
 
-int worker_comm_connect(struct worker_comm *comm, struct worker_op *op, int timeout)
+struct worker_comm * worker_comm_connect(struct worker_comm *comm, int interface, const char *hostname, int port_id, int active_timeout, int short_timeout)
 {
-	int mpi_init = 0;
+	int comm_create = 0, mpi_init = 0;
 	
-	MPI_Initialized(&mpi_initi);
-	if(op->payloadsize <= 0 && !mpi_init)
-		return -1;
-	
-	comm->timeout = timeout;
+	MPI_Initialized(&mpi_init);
+	if(interface == WORKER_COMM_MPI && !mpi_init)
+		return NULL;
 
-	if(op->payloadsize <= 0) {
-		// Use MPI
-		comm->type = WORKER_COMM_MPI;
-		comm->mpi_rank = op->id;
-		comm->lnk = NULL;
-	} else {
-		// Use LINK
-		comm->type = WORKER_COMM_TCP;
-		comm->mpi_rank = -1;
-		comm->lnk = link_connect(op->payload, op->id, timeout);
-		if(!comm->lnk)
-			return -1;
+	if(!comm) {
+		comm = malloc(sizeof(*comm));
+		memset(comm, 0, sizeof(*comm));
+		comm_create = 1;
+	}
+	comm->active_timeout = active_timeout;
+	comm->short_timeout = short_timeout;
+
+	switch(interface) {
+		case WORKER_COMM_MPI:
+			comm->type = WORKER_COMM_MPI;
+			comm->mpi_rank = port_id;
+			comm->lnk = NULL;
+		break;
+		
+		case WORKER_COMM_TCP:
+			comm->type = WORKER_COMM_TCP;
+			comm->mpi_rank = -1;
+			comm->lnk = link_connect(hostname, port_id, active_timeout);
+			if(!comm->lnk) {
+				if(comm_create)
+					free(comm);
+				return NULL;
+			}
+		break;
 	}
 	
-	return 0;
+	return comm;
 }
 
 void worker_comm_disconnect(struct worker_comm *comm)
@@ -171,7 +179,7 @@ void worker_comm_delete(struct worker_comm *comm)
 	free(comm);
 }
 
-int worker_comm_send_worker(struct worker_comm *comm, struct worker *worker)
+int worker_comm_send_worker(struct worker_comm *comm, struct worker *workerdata)
 {
 	int mpi_init, stoptime;
 	switch(comm->type) {
@@ -179,14 +187,13 @@ int worker_comm_send_worker(struct worker_comm *comm, struct worker *worker)
 			MPI_Initialized(&mpi_init);
 			if(!mpi_init)
 				return -1;
-			MPI_Send(worker, sizeof(*worker), MPI_BYTES, comm->mpi_rank, 0, MPI_COMM_WORLD);
+			MPI_Send(workerdata, sizeof(*workerdata), MPI_BYTES, comm->mpi_rank, 0, MPI_COMM_WORLD);
 			break;
 		case WORKER_COMM_TCP:
 			if(!comm->lnk)
 				return -1;
-			stoptime = time(0) + comm->timeout;
-			link_putfstring(comm->lnk, "%s %d %d %d\n", stoptime, worker->hostname, worker->cores, worker->ram, worker->disk);
-			
+			stoptime = time(0) + comm->active_timeout;
+			link_putfstring(comm->lnk, "%s %d %d %d\n", stoptime, workerdata->hostname, workerdata->cores, workerdata->ram, workerdata->disk);
 			break;
 	}
 	return 0;
@@ -203,79 +210,7 @@ int worker_comm_send_array(struct worker_comm *comm, int datatype, void* buf, in
 				return -1;
 			break;
 		case WORKER_COMM_TCP:	
-			if(!comm->lnk)
-				return -1;
-			stoptime = time(0) + comm->timeout;
-			break;
-	}
-	
-	switch(datatype) {
-		case WORKER_COMM_ARRAY_INT:
-			if(comm->type == WORKER_COMM_MPI) {
-				MPI_Send(&length, 1, MPI_INT, comm->mpi_rank, 0, MPI_COMM_WORLD);
-				MPI_Send(buf, length, MPI_INT, comm->mpi_rank, 0, MPI_COMM_WORLD);
-			}
-			if(comm->type == WORKER_COMM_TCP) {
-				link_putfstring(comm->lnk, "%d\n", stoptime, length);
-				for(i = 0; i < length; i++)
-					link_putfstring(comm->lnk, "%d ", stoptime, ((int*)buf)[i]);
-				link_putfstring(comm->lnk, "\n", stoptime);
-			}
-			break;
-
-		case WORKER_COMM_ARRAY_CHAR:
-			if(comm->type == WORKER_COMM_MPI) {
-				MPI_Send(&length, 1, MPI_INT, comm->mpi_rank, 0, MPI_COMM_WORLD);
-				MPI_Send(buf, length, MPI_CHAR, comm->mpi_rank, 0, MPI_COMM_WORLD);
-			}
-			if(comm->type == WORKER_COMM_TCP) {
-				link_putfstring(comm->lnk, "%d\n", stoptime, length);
-				link_write(comm->lnk, (char *)buf, sizeof(char)*length, stoptime);
-			}
-			break;
-
-		case WORKER_COMM_ARRAY_FLOAT:
-			if(comm->type == WORKER_COMM_MPI) {
-				MPI_Send(&length, 1, MPI_INT, comm->mpi_rank, 0, MPI_COMM_WORLD);
-				MPI_Send(buf, length, MPI_FLOAT, comm->mpi_rank, 0, MPI_COMM_WORLD);
-			}
-			if(comm->type == WORKER_COMM_TCP) {
-				link_putfstring(comm->lnk, "%d\n", stoptime, length);
-				for(i = 0; i < length; i++)
-					link_putfstring(comm->lnk, "%f ", stoptime, ((float*)buf)[i]);
-				link_putfstring(comm->lnk, "\n", stoptime);
-			}
-			break;
-
-		case WORKER_COMM_ARRAY_DOUBLE:
-			if(comm->type == WORKER_COMM_MPI) {
-				MPI_Send(&length, 1, MPI_INT, comm->mpi_rank, 0, MPI_COMM_WORLD);
-				MPI_Send(buf, length, MPI_DOUBLE, comm->mpi_rank, 0, MPI_COMM_WORLD);
-			}
-			if(comm->type == WORKER_COMM_TCP) {
-				link_putfstring(comm->lnk, "%d\n", stoptime, length);
-				for(i = 0; i < length; i++)
-					link_putfstring(comm->lnk, "%f ", stoptime, ((double*)buf)[i]);
-				link_putfstring(comm->lnk, "\n", stoptime);
-			}
-			break;
-	}
-	
-	return 0;
-}
-
-int worker_comm_send_array(struct worker_comm *comm, int datatype, void* buf, int length)
-{
-	int i, mpi_init, stoptime;
-	
-	switch(comm->type) {
-		case WORKER_COMM_MPI:
-			MPI_Initialized(&mpi_init);
-			if(!mpi_init)
-				return -1;
-			break;
-		case WORKER_COMM_TCP:	
-			stoptime = time(0) + comm->timeout;
+			stoptime = time(0) + comm->active_timeout;
 			if(!comm->lnk)
 				return -1;
 			break;
@@ -343,7 +278,7 @@ int worker_comm_recv_array(struct worker_comm *comm, int datatype, void* buf, in
 		case WORKER_COMM_TCP:	
 			if(!comm->lnk)
 				return -1;
-			stoptime = time(0) + comm->timeout;
+			stoptime = time(0) + comm->active_timeout;
 			link_readline(comm->lnk, line, WQ_LINE_MAX, stoptime);
 			break;
 	}
@@ -417,7 +352,7 @@ int worker_comm_send_buffer(struct worker_comm *comm, const char *buffer, int le
 				MPI_Send(buffer, length, MPI_BYTES, comm->mpi_rank, 0, MPI_COMM_WORLD);
 			break;
 		case WORKER_COMM_TCP:
-			stoptime = time(0) + comm->timeout;
+			stoptime = time(0) + comm->active_timeout;
 			if(!comm->lnk)
 				return -1;
 			if(header)
@@ -429,7 +364,8 @@ int worker_comm_send_buffer(struct worker_comm *comm, const char *buffer, int le
 	return 0;
 }
 
-int worker_comm_send_file(struct worker_comm *comm, const char *filename, int length, char header) {
+int worker_comm_send_file(struct worker_comm *comm, const char *filename, int length, char header)
+{
 	int mpi_init, result, stoptime;
 	FILE *source;
 	
@@ -469,7 +405,7 @@ int worker_comm_send_file(struct worker_comm *comm, const char *filename, int le
 		case WORKER_COMM_TCP:
 			if(!comm->lnk)
 				return -1;
-			stoptime = time(0)+comm->timeout;
+			stoptime = time(0)+comm->active_timeout;
 			if(header)
 				link_putfstring(comm->lnk, "%d\n", stoptime, length);
 			if(length > 0)
@@ -503,7 +439,7 @@ int worker_comm_recv_buffer(struct worker_comm *comm, char **buffer, int *buffer
 		case WORKER_COMM_TCP:
 			if(!comm->lnk)
 				return -1;
-			stoptime = time(0)+comm->timeout;
+			stoptime = time(0)+comm->active_timeout;
 			if(header) {
 				link_readline(comm->lnk, line, WQ_LINE_MAX, stoptime);
 				sscanf(line, "%d\n", bufferlength);
@@ -520,7 +456,6 @@ int worker_comm_recv_buffer(struct worker_comm *comm, char **buffer, int *buffer
 	return 0;
 }
 
-
 int worker_comm_send_op(struct worker_comm *comm, struct worker_op *op)
 {
 	int mpi_init, stoptime;
@@ -534,7 +469,7 @@ int worker_comm_send_op(struct worker_comm *comm, struct worker_op *op)
 				MPI_Send(op->payload, op->payloadsize, MPI_BYTES, comm->mpi_rank, 0, MPI_COMM_WORLD);
 			break;
 		case WORKER_COMM_TCP:
-			stoptime = time(0)+comm->timeout;
+			stoptime = time(0)+comm->active_timeout;
 			if(!comm->lnk)
 				return -1;
 			link_putfstring(comm->lnk, "%d %d %d %d %d %d %s\n", stoptime, op->type, op->jobid, op->id, op->options, op->flags, op->payloadsize, op->name);
@@ -549,7 +484,7 @@ int worker_comm_receive_op(struct worker_comm *comm, struct worker_op *op)
 {
 	int mpi_init, complete, stoptime;
 	char line[WQ_LINE_MAX];
-	stoptime = time(0)+comm->timeout;
+	stoptime = time(0)+comm->active_timeout;
 	
 	switch(comm->type) {
 		case WORKER_COMM_MPI:
@@ -596,11 +531,11 @@ int worker_comm_receive_op(struct worker_comm *comm, struct worker_op *op)
 		return -1;
 }
 
-
 int worker_comm_test_results(struct worker_comm *comm)
 {
 	int stoptime, complete = 0;
 	char line[WQ_LINE_MAX];
+	stoptime = time(0) + comm->active_timeout;
 	
 	switch(comm->type) {
 		case WORKER_COMM_MPI:
@@ -612,7 +547,6 @@ int worker_comm_test_results(struct worker_comm *comm)
 			}
 			break;
 		case WORKER_COMM_TCP:
-			stoptime = time(0) + comm->timeout;
 			complete = work_queue_readline(comm->lnk, line, WQ_LINE_MAX, stoptime);
 			if(complete) {
 				complete = sscanf(line, "%d", &comm->results);
@@ -627,122 +561,4 @@ int worker_comm_test_results(struct worker_comm *comm)
 	return comm->results;
 }
 
-int worker_comm_send_result(struct worker_comm *comm, struct worker_job *job)
-{
-	int results[3];
-	
-	results[0] = job->id;
-	results[1] = job->status;
-	results[2] = job->result;
-	worker_comm_send_array(comm, WORK_COMM_ARRAY_INT, results, 3);
-	worker_comm_send_buffer(comm, job->stdout_buffer, job->stdout_buffersize, 1);
-	worker_comm_send_buffer(comm, job->stderr_buffer, job->stderr_buffersize, 1);
-	return 0;
-}
-
-void worker_comm_receive_result(struct worker_comm *comm, int* results_buffer, char **stdout_buf, int *stdout_bufsize, char **stderr_buf, int *stderr_bufsize)
-{
-	worker_comm_recv_array(comm, WORKER_COMM_ARRAY_INT, results_buffer, 3);
-	worker_comm_recv_buffer(comm, stdout_buf, stdout_bufsize, 1);
-	worker_comm_recv_buffer(comm, stderr_buf, stderr_bufsize, 1);
-}
-
-int worker_comm_handle_files(struct worker_comm *comm, struct list *files, int direction)
-{
-	struct worker_file *file;
-	struct worker_op op;
-	struct stat st;
-
-	list_first_item(files);
-	while((fileptr = list_next_item(files))) {
-
-		int file_status[3];
-		char cachename[WQ_FILENAME_MAX];
-		char *buffer;
-		int buffersize;
-		
-		memset(&op, 0, sizeof(op));
-		op.type = WORKER_OP_FILE_CHECK;
-		op.id = fileptr->id;
-		worker_comm_send_op(comm, &op);
-		worker_comm_recv_array(comm, WORKER_COMM_ARRAY_INT, file_status, 3);
-		
-		if(fileptr->type == WORKER_FILE_NORMAL) {
-			file_cache_contains(file_store, fileptr->label, cachename);
-		} else if(fileptr->type == WORKER_FILE_REMOTE) {
-			sprintf(cachename, "%s", fileptr->payload);
-		}
-		if(stat(cachename, &st))
-			return -1;
-
-		switch(direction) {
-			case WORKER_FILES_INPUT:
-				
-				if(file_status[0] < 0) {
-					memset(&op, 0, sizeof(op));
-					op.type = WORKER_OP_FILE;
-					op.id = fileptr->id;
-					op.options = fileptr->options;
-					sprintf(op.name, "%s", fileptr->filename);
-					op.payload = fileptr->payload;
-					worker_comm_send_op(comm, &op);
-					
-					if(fileptr->type == WORKER_FILE_REMOTE) {
-						memset(&op, 0, sizeof(op));
-						op.type = WORKER_OP_FILE_CHECK;
-						op.id = fileptr->id;
-						worker_comm_send_op(comm, &op);
-						worker_comm_recv_array(comm, WORKER_COMM_ARRAY_INT, file_status, 3);
-					}
-				}
-				
-				
-				if(file_status[0] != st.st_size || file_status[2] <= st.st_mtime) {
-					memset(&op, 0, sizeof(op));
-					op.type = WORKER_OP_FILE_PUT;
-					op.id = fileptr->id;
-					if(file_status[0] <= 0)
-						op.type = WORKER_FILE_NORMAL;
-					else
-						op.type = fileptr->type;
-					
-					op.payloadsize = st.st_size;
-					op.payload = NULL;
-					worker_comm_send_op(comm, &op);
-					worker_comm_send_file(comm, cachename, st.st_size, 0);
-				}
-			break;
-			
-			case WORKER_FILES_OUTPUT:
-			
-				if(fileptr->flags & WORKER_FILE_IGNORE)
-					continue;
-				if(file_status[0] <= 0) {
-					if(!fileptr->flags & WORKER_FILE_OPTIONAL)
-						return -1;
-				}
-				if(file_status[2] <= st.st_mtime && file_status[0] == st.st_size)
-					continue;
-				memset(&op, 0, sizeof(op));
-				op.type = WORKER_OP_FILE_GET;
-				op.id = fileptr->id;
-				worker_comm_send_op(comm, &op);
-				worker_comm_recv_buffer(comm, &buffer, &buffersize, 1);
-				if(buffersize) {
-					FILE *outfile;
-					outfile = fopen(cachename, "w");
-					if(!outfile) {
-						free(buffer);
-						return -1;
-					}
-					full_fwrite(outfile, buffer, buffersize);
-					fclose(outfile);
-					free(buffer);
-				} else {
-					return -1;
-				}
-			break;
-		}
-	}
-}
 
