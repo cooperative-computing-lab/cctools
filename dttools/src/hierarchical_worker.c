@@ -24,9 +24,6 @@
 
 #define FILE_CACHE_DEFAULT_PATH "/tmp/wqh_fc"
 
-#define WORKER_ROLE_WORKER	0x01
-#define WORKER_ROLE_FOREMAN	0x02
-
 struct worker_file {
 	int id;
 	int type;
@@ -96,12 +93,15 @@ enum worker_op_type {
 	WORKER_OP_JOB_CANCEL
 };
 
-WORKER_FILES_INPUT
-WORKER_FILES_OUTPUT
+#define WORKER_ROLE_WORKER			0x01
+#define WORKER_ROLE_FOREMAN			0x02
 
-WORKER_FILE_INCOMPLETE
-WORKER_FILE_NORMAL
-WORKER_FILE_REMOTE
+#define WORKER_FILES_INPUT			0x01
+#define WORKER_FILES_OUTPUT			0x01
+
+#define WORKER_FILE_INCOMPLETE			0x01
+#define WORKER_FILE_NORMAL			0x02
+#define WORKER_FILE_REMOTE			0x03
 
 #define WORKER_FILE_FLAG_NOCLOBBER		0x01
 #define WORKER_FILE_FLAG_REMOTEFS		0x02
@@ -405,12 +405,17 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 
 	switch(op->type) {
 		case WORKER_OP_ROLE:
+		{	int stats[3];
 			worker_comm_disconnect(super_comm);
 			worker_comm_connect(super_comm, comm_interface, op->payload, op->id, active_timeout, short_timeout);
 			workerdata->role = op->flags;
-			worker_comm_send_worker(super_comm, workerdata);
+			worker_comm_send_id(super_comm, workerdata->id, workerdata->hostname);
+			stats[0] = workerdata->cores;
+			stats[1] = workerdata->ram;
+			stats[2] = workerdata->disk;
+			worker_comm_send_array(super_comm, WORKER_COMM_ARRAY_INT, stats, 3);
 			return;
-	
+		}
 		case WORKER_OP_WORKDIR:
 			if(stat(op->name, &st)) {
 				debug(D_WQ, "Working directory (%s) does not exist\n", op->name);
@@ -615,10 +620,12 @@ void foreman_main()
 {
 	static struct list *checked_workers = NULL;
 	struct list        *tmp_workers = NULL;
+	struct list        *new_comms = NULL;
 	struct worker      *current_worker = NULL;
 	struct worker_job  *job = NULL;
 	struct worker_file *fileptr = NULL;
 	struct worker_op    results_request;
+	struct worker_comm *comm;
 	static struct link *listen_link = NULL;
 	static int          listen_port = -1;
 	
@@ -635,7 +642,21 @@ void foreman_main()
 		link_serve(comm_port);
 		listen_port = comm_port;
 	}
-	worker_comm_accept_connections(comm_interface, listen_link, active_workers, active_timeout, short_timeout);
+	new_comms = worker_comm_accept_connections(comm_interface, listen_link, active_timeout, short_timeout);
+	while((comm = list_pop_head(new_comms))) {
+		int stats[3];
+		current_worker = malloc(sizeof(*current_worker));
+		memset(current_worker, 0, sizeof(*current_worker));
+		current_worker->comm = comm;
+		worker_comm_recv_array(comm, WORKER_COMM_ARRAY_INT, stats, 3);
+		current_worker->cores = stats[0];
+		current_worker->ram = stats[1];
+		current_worker->disk = stats[2];
+		current_worker->workerid = comm->id;
+		if(comm->hostname) {
+			sprintf(current_worker->hostname, "%s", comm->hostname);
+		}
+	}
 
 	/* Service each worker */
 	num_waiting_jobs = list_size(waiting_jobs);

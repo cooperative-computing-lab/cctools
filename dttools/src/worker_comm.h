@@ -45,7 +45,7 @@ void worker_comm_disconnect(struct worker_comm *comm);
 
 void worker_comm_delete(struct worker_comm *comm);
 
-int worker_comm_send_worker(struct worker_comm *comm, struct worker *workerdata);
+int worker_comm_send_id(struct worker_comm *comm, int id, const char *hostname);
 
 int worker_comm_send_array(struct worker_comm *comm, int datatype, void* buf, int length);
 

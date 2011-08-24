@@ -16,10 +16,10 @@
 #define WORKER_COMM_TAG_OP	0x00
 #define WORKER_COMM_TAG_ROLE	0x01
 
-int worker_comm_accept_connections(int interface, struct link *master_link, struct list *active_workers, int active_timeout, int short_timeout)
+struct list * worker_comm_accept_connections(int interface, struct link *master_link, int active_timeout, int short_timeout)
 {
-	static struct worker *worker_info = NULL;
 	struct worker_comm *comm;
+	struct list *new_comms;
 	int sleeptime, stoptime, mpi_init = 0;
 
 	stoptime = time(0) + short_timeout;
@@ -27,39 +27,33 @@ int worker_comm_accept_connections(int interface, struct link *master_link, stru
 		case WORKER_COMM_MPI:
 			MPI_Initialized(&mpi_init);
 			if(!mpi_init)
-				return -1;
+				return NULL;
 			break;
 		case WORKER_COMM_TCP:
 			if(!master_link)
-				return -1;
+				return NULL;
 			break;
 	}
 
+	new_comms = list_create();
 	switch(interface) {
 		case WORKER_COMM_MPI:
 			while(time(0) < stoptime) {
-				static struct worker *mpi_worker_info = NULL;
+				static int mpi_worker_id;
 				static MPI_Request mpi_current_request = MPI_REQUEST_NULL;
 				
 				int complete = 0;
 				MPI_Status mpi_stat;
 			 
-				if(!mpi_worker_info) {
-					mpi_worker_info = malloc(sizeof(*mpi_worker_info));
-					memset(worker_info, 0, sizeof(*mpi_worker_info));
-				}
 				if(mpi_current_request == MPI_REQUEST_NULL) {
-					MPI_Irecv(mpi_worker_info, sizeof(*mpi_worker_info), MPI_BYTE, MPI_ANY_SOURCE, WORKER_COMM_TAG_ROLE, &mpi_current_request);
+					MPI_Irecv(&mpi_worker_id, 1, MPI_INT, MPI_ANY_SOURCE, WORKER_COMM_TAG_ROLE, &mpi_current_request);
 				}
 		
 				MPI_Test(&mpi_current_request, &complete, &mpi_stat);
 				if(complete) {
-					worker_info = mpi_worker_info;
-					mpi_worker_info = NULL;
-					
 					comm = malloc(sizeof(*comm));
 					comm->type = WORKER_COMM_MPI;
-					comm->mpi_rank = mpi_stat.MPI_SOURCE;
+					comm->mpi_rank = mpi_worker_id;
 					comm->active_timeout = active_timeout;
 					comm->short_timeout = short_timeout;
 					comm->results = 0;
@@ -67,9 +61,7 @@ int worker_comm_accept_connections(int interface, struct link *master_link, stru
 					comm->lnk = NULL;
 					comm->mpi_req = MPI_REQUEST_NULL;
 					
-					worker_info->comm = comm;
-					list_push_tail(available_workers, worker_info);
-					worker_info = NULL;
+					list_push_tail(new_comms, comm);
 					comm = NULL;
 				}
 			}
@@ -80,7 +72,6 @@ int worker_comm_accept_connections(int interface, struct link *master_link, stru
 			sleeptime = (stoptime - time(0)) * 1000000;
 			if(link_usleep(master_link, sleeptime, 1, 0)) {
 				do {
-					worker_info = malloc(sizeof(*worker_info));
 					comm = malloc(sizeof(*comm));
 					
 					comm->lnk = link_accept(master_link, stoptime);
@@ -89,7 +80,7 @@ int worker_comm_accept_connections(int interface, struct link *master_link, stru
 						int result;
 						link_tune(comm->lnk, LINK_TUNE_INTERACTIVE);
 						result = link_readline(comm->lnk, line, WQ_LINE_MAX, stoptime);
-
+						
 						comm->type = WORKER_COMM_TCP;
 						comm->mpi_rank = -1;
 						comm->active_timeout = active_timeout;
@@ -98,24 +89,22 @@ int worker_comm_accept_connections(int interface, struct link *master_link, stru
 						comm->mpi_req = MPI_REQUEST_NULL;
 						
 						if(result > 0) {
-							sscanf(line, "%s %d %d %d\n", &worker_info->hostname, &worker_info->cores, &worker_info->ram, &worker_info->disk);
-							comm->hostname = strdup(worker_info->hostname);
-							worker_info->comm = comm;
-							list_push_tail(available_workers, worker_info);
+							comm->hostname = strdup(line);
+							list_push_tail(new_comms, comm);
 							continue;
 						}
-						
 					}
-					free(worker_info);
 					free(comm);
-					return -1;
-				
 				} while(link_usleep(master_link, 0, 1, 0));
 			}
 		break;
 	}
-	
-	return 0;
+	if(list_size(new_comms)) {
+		return new_comms;
+	} else
+		list_delete(new_comms);
+		return NULL;
+	}
 }
 
 struct worker_comm * worker_comm_connect(struct worker_comm *comm, int interface, const char *hostname, int port_id, int active_timeout, int short_timeout)
@@ -179,7 +168,7 @@ void worker_comm_delete(struct worker_comm *comm)
 	free(comm);
 }
 
-int worker_comm_send_worker(struct worker_comm *comm, struct worker *workerdata)
+int worker_comm_send_id(struct worker_comm *comm, int id, const char *hostname)
 {
 	int mpi_init, stoptime;
 	switch(comm->type) {
@@ -187,13 +176,13 @@ int worker_comm_send_worker(struct worker_comm *comm, struct worker *workerdata)
 			MPI_Initialized(&mpi_init);
 			if(!mpi_init)
 				return -1;
-			MPI_Send(workerdata, sizeof(*workerdata), MPI_BYTES, comm->mpi_rank, 0, MPI_COMM_WORLD);
+			MPI_Send(&id, 1, MPI_INT, comm->mpi_rank, WORKER_COMM_TAG_ROLE, MPI_COMM_WORLD);
 			break;
 		case WORKER_COMM_TCP:
 			if(!comm->lnk)
 				return -1;
 			stoptime = time(0) + comm->active_timeout;
-			link_putfstring(comm->lnk, "%s %d %d %d\n", stoptime, workerdata->hostname, workerdata->cores, workerdata->ram, workerdata->disk);
+			link_putfstring(comm->lnk, "%s\n", stoptime, hostname);
 			break;
 	}
 	return 0;
