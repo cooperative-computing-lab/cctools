@@ -2493,26 +2493,42 @@ void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_parrot_search:
 			if (entering) {
-				/* parrot_search(path, pattern, buffer[][PFS_PATH_MAX+1], struct stat *stats, size_t size) */
 				char path[PFS_PATH_MAX+1];
 				char pattern[PFS_PATH_MAX+1];
-				pfs_size_t size;
 
 				tracer_copy_in_string(p->tracer, path, POINTER(args[0]), sizeof(path));
 				tracer_copy_in_string(p->tracer, pattern, POINTER(args[1]), sizeof(pattern));
-				void *buffer;
-				struct stat *stats = NULL;
-				size = (pfs_size_t) args[4];
+				char *buffer;
+				pfs_size_t len1 = (pfs_size_t) args[3];
+				struct stat *stats;
+				pfs_size_t len2 = (pfs_size_t) args[5];
 
-				buffer = malloc(sizeof(char)*(PFS_PATH_MAX+1)*size);
-				memset(buffer, 0, sizeof(char)*(PFS_PATH_MAX+1)*size);
-				if (!buffer) {
-					p->syscall_result = -errno;
+				buffer = (char *) malloc(sizeof(char)*len1);
+				stats = (struct stat *) malloc(sizeof(struct stat)*len2);
+				if (!buffer || !stats) {
+					free(buffer);
+					free(stats);
+					p->syscall_result = -ENOMEM;
 				} else {
-					size_t i;
-					p->syscall_result = pfs_search(path, pattern, (char [][PFS_PATH_MAX+1])buffer, stats, size);
-					for (i = 0; i < (size_t) p->syscall_result; i++)
-						tracer_copy_out(p->tracer, buffer+(i*(PFS_PATH_MAX+1)), POINTER(args[2])+(i*(PFS_PATH_MAX+1)), (PFS_PATH_MAX+1)*sizeof(char));
+					memset(buffer, 0, sizeof(char)*len1);
+					memset(stats, 0, sizeof(struct stat)*len2);
+					p->syscall_result = pfs_search(path, pattern, buffer, len1, stats, len2);
+					if (p->syscall_result > 0) {
+						pfs_size_t length = 0;
+						while (buffer[length] != '\0') {
+							if (buffer[length+1] == '\0') {
+								length += 1;
+								break;
+							} else {
+								length += strlen(&buffer[length])+1;
+							}
+						}
+						tracer_copy_out(p->tracer, buffer, POINTER(args[2]), sizeof(char)*length);
+						if (p->syscall_result <= len2) /* entirely fits in stats array */
+							tracer_copy_out(p->tracer, stats, POINTER(args[4]), sizeof(struct stat)*p->syscall_result);
+						else
+							tracer_copy_out(p->tracer, stats, POINTER(args[4]), sizeof(struct stat)*len2);
+					}
 				}
 				divert_to_dummy(p, p->syscall_result);
 			}

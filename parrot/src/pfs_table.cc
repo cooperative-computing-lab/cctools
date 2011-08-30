@@ -1531,56 +1531,68 @@ int pfs_table::whoami( const char *n, char *buf, int length )
 	return result;
 }
 
-static int search_directory (unsigned level, const char *base, char *dir, const char *pattern, char buffer[][PFS_PATH_MAX+1], size_t *i, size_t size)
+static int search_directory (pfs_table *t, unsigned level, const char *base, char *dir, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, size_t *i, size_t *j)
 {
 	if (level == 0)
 		return 0;
 
-	DIR *dirp = opendir(dir);
+	int found = 0;
 	char *current = dir+strlen(dir); /* point to end to current directory */
-
-	if (dirp) {
-		const char *entry;
-		while ((entry = readdir(dirp))) {
+	int fd;
+	if ((fd = t->open(dir, O_RDONLY, 0, 0))) {
+		struct dirent *entry;
+		while ((entry = t->fdreaddir(fd))) {
+			const char *name = entry->d_name;
 			int r;
 			struct pfs_stat buf;
 
-			if (strcmp(entry, ".") == 0 || strcmp(entry, "..") == 0) continue;
+			if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
 
-			sprintf(current, "/%s", entry);
+			sprintf(current, "/%s", name);
+			r = t->stat(base, &buf);
 			if (fnmatch(pattern, base, FNM_PATHNAME) == 0) {
-				if (strlen(dir) >= PFS_PATH_MAX+1) {
-					errno = ERANGE;
-					return -1;
-				} else if (size == *i) {
+				size_t l = strlen(dir);
+				if (l+*i+2 >= len1) { /* +2 for terminating 2 NUL bytes */
 					errno = ENOMEM;
 					return -1;
 				} else {
-					strcpy(buffer[*i], dir);
-					*i += 1;
+					strcpy(buffer+*i, dir);
+					*i += l+1;
+					buffer[*i] = '\0'; /* second terminating NUL byte */
 				}
+
+				if (*j == len2) {
+					errno = ENOMEM;
+					return -1;
+				} else {
+					COPY_STAT(buf, stats[*j]);
+					*j += 1;
+				}
+				found += 1;
 			}
 
-			r = this->stat(base, &buf);
-			if (f == 0 && S_ISDIR(buf.st_mode))
-				if (search_directory(level-1, base, dir, pattern, buffer, i, size) == -1)
+			if (r == 0 && S_ISDIR(buf.st_mode)) {
+				int result = search_directory(t, level-1, base, dir, pattern, buffer, len1, stats, len2, i, j);
+				if (result == -1)
 					return -1;
+				else
+					found += result;
 			}
 			*current = '\0'; /* clear current entry */
 		}
-		closedir(dirp);
+		t->close(fd);
 	}
 
-	return 0;
+	return found;
 }
 
-int pfs_table::search( const char *path, const char *pattern, char buffer[][PFS_PATH_MAX+1], struct stat *stats, size_t size )
+int pfs_table::search( const char *path, const char *patt, char *buffer, size_t len1, struct stat *stats, size_t len2 )
 {
 	unsigned level = 1;
 	const char *s;
 	char directory[PFS_PATH_MAX+1];
 	char pattern[PFS_PATH_MAX+1];
-	size_t i = 0;
+	size_t i = 0, j = 0;
 
 	string_collapse_path(path, directory, 0);
 
@@ -1588,9 +1600,7 @@ int pfs_table::search( const char *path, const char *pattern, char buffer[][PFS_
 	sprintf(pattern, "/%s", s); /* add leading slash for base directory */
 	for (s = strchr(pattern, '/'); s; s = strchr(s+1, '/')) level++; /* count the number of nested directories to descend at maximum */
 
-	search_directory(level, directory+strlen(directory), directory, pattern, buffer, &i, size);
-
-    return (int) i;
+	return search_directory(this, level, directory+strlen(directory), directory, pattern, buffer, len1, stats, len2, &i, &j);
 }
 
 int pfs_table::getacl( const char *n, char *buf, int length )

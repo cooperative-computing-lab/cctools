@@ -4,6 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "parrot_client.h"
+
 #include "tracer.table.h"
 #include "tracer.table64.h"
 #include "int_sizes.h"
@@ -47,12 +49,11 @@ int parrot_setacl( const char *path, const char *subject, const char *rights )
 #endif
 }
 
-int parrot_search( const char *path, const char *pattern, char buffer[][PFS_PATH_MAX+1], struct stat *stats, size_t size )
-{
+int parrot_search( const char *path, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2 ) {
 #ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_search,path,pattern,buffer,stats,size);
+	return syscall(SYSCALL32_parrot_search,path,pattern,buffer,len1,stats,len2);
 #else
-	return syscall(SYSCALL64_parrot_search,path,pattern,buffer,stats,size);
+	return syscall(SYSCALL64_parrot_search,path,pattern,buffer,len1,stats,len2);
 #endif
 }
 
