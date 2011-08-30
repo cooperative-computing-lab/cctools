@@ -1574,7 +1574,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if (sscanf(line, "search %s %s", pattern, path)==2)  {
 			if(!chirp_path_fix(path))
 				goto failure;
-			if(!chirp_acl_check_dir(chirp_root_path, path, subject, CHIRP_ACL_LIST))
+			if(!chirp_acl_check_dir(path, subject, CHIRP_ACL_LIST))
 				goto failure;
 			link_putliteral(l, "0\n", stalltime);	
 			chirp_alloc_search(subject, path, pattern, l, stalltime);
