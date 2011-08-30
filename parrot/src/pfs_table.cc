@@ -1539,7 +1539,7 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 	int found = 0;
 	char *current = dir+strlen(dir); /* point to end to current directory */
 	int fd;
-	if ((fd = t->open(dir, O_RDONLY, 0, 0))) {
+	if ((fd = t->open(dir, O_DIRECTORY|O_RDONLY, 0, 0))) {
 		struct dirent *entry;
 		while ((entry = t->fdreaddir(fd))) {
 			const char *name = entry->d_name;
@@ -1553,7 +1553,7 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 			if (fnmatch(pattern, base, FNM_PATHNAME) == 0) {
 				size_t l = strlen(dir);
 				if (l+*i+2 >= len1) { /* +2 for terminating 2 NUL bytes */
-					errno = ENOMEM;
+					errno = ERANGE;
 					return -1;
 				} else {
 					strcpy(buffer+*i, dir);
@@ -1562,7 +1562,7 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 				}
 
 				if (*j == len2) {
-					errno = ENOMEM;
+					errno = ERANGE;
 					return -1;
 				} else {
 					COPY_STAT(buf, stats[*j]);
@@ -1593,6 +1593,7 @@ int pfs_table::search( const char *path, const char *patt, char *buffer, size_t 
 	char directory[PFS_PATH_MAX+1];
 	char pattern[PFS_PATH_MAX+1];
 	size_t i = 0, j = 0;
+
 
 	string_collapse_path(path, directory, 0);
 
