@@ -103,42 +103,6 @@ struct chirp_audit {
 	INT64_T nbytes;			/**< The total bytes consumed by that user. */
 };
 
-/** Describes the progress of an active storage job through its lifetime.
-@see chirp_job_state, chirp_reli_job_wait, chirp_reli_job_list
-*/
-
-typedef enum {
-	CHIRP_JOB_STATE_BEGIN = 0,	/**< The job has been created, but not yet committed */
-	CHIRP_JOB_STATE_IDLE = 1,	/**< The job has been committed, and is free to run. */
-	CHIRP_JOB_STATE_RUNNING = 2,	/**< The job is currently running. */
-	CHIRP_JOB_STATE_SUSPENDED = 3,	/**< The job has been temporarily suspended. */
-	CHIRP_JOB_STATE_COMPLETE = 4,	/**< The job ran all the way to completion. */
-	CHIRP_JOB_STATE_FAILED = 5,	/**< The job could not be run at all. */
-	CHIRP_JOB_STATE_KILLED = 6,	/**< The job was forcibly killed by the owner or administrator. */
-} chirp_job_state_t;
-
-/** Gives a readable string corresponding to a job state.
-@return A constant string corresponding to the job state, e.g. "BEGIN".
-*/
-
-const char *chirp_job_state_string(chirp_job_state_t state);
-
-/** Describes the current state of an active storage job on a Chirp server.
-@see chirp_reli_job_wait, chirp_reli_job_list
-*/
-
-struct chirp_job_state {
-	INT64_T jobid;				/**< The unique job identifier */
-	char command[CHIRP_PATH_MAX];		/**< The actual command to be run */
-	char owner[CHIRP_PATH_MAX];		/**< The owner of the job */
-	chirp_job_state_t state;		/**< The current state of the job. */
-	int exit_code;				/**< If completed, the exit code of the job. */
-	time_t submit_time;			/**< The time at which @ref chirp_reli_job_begin was invoked */
-	time_t start_time;			/**< The time at which the job most recently began executing */
-	time_t stop_time;			/**< The time at which the job completed or was aborted. */
-	int pid;				/**< If running, the local process ID of the job. */
-};
-
 /** A callback function typedef used to display a directory or access control list.
 A function matching this type is called by @ref chirp_reli_getdir
 to display or otherwise act upon each line in a directory or access control list.
@@ -159,16 +123,6 @@ to display or otherwise act upon each line in a directory listing.
 */
 
 typedef void (*chirp_longdir_t) (const char *path, struct chirp_stat * info, void *arg);
-
-/** A callback function typedef used to display a job state.
-A function matching this type is called by @ref chirp_reli_job_list
-to display or otherwise act upon all active storage jobs in a server.
-@param state The name and detailed state of one job.
-@param arg  A convenience pointer corresponding to the <tt>arg</tt> passed from @ref chirp_reli_job_list
-@see chirp_reli_job_list
-*/
-
-typedef void (*chirp_joblist_t) (struct chirp_job_state * state, void *arg);
 
 /** A callback function typedef used to display a file's location(s).
 A function matching this type is called by @ref chirp_reli_locate

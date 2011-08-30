@@ -184,12 +184,14 @@ void pfs_poll_sleep()
 		debug(D_POLL,"select returned EBADF, which really shouldn't happen.");
 		debug(D_POLL,"waking up all processes to clean up and try again.");
 
-		p = &poll_table[i];
-		if(p->pid>=0) {
-			pid_t pid = p->pid;
-			debug(D_POLL,"waking pid %d",pid);
-			pfs_poll_clear(pid);
-			pfs_process_wake(pid);
+		for(i=0;i<poll_table_size;i++) {
+			p = &poll_table[i];
+			if(p->pid>=0) {
+				pid_t pid = p->pid;
+				debug(D_POLL,"waking pid %d",pid);
+				pfs_poll_clear(pid);
+				pfs_process_wake(pid);
+			}
 		}
 	}
 

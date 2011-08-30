@@ -7,62 +7,34 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "domain_name_cache.h"
-#include "full_io.h"
 #include "macros.h"
 #include "stringtools.h"
+#include "full_io.h"
 #include "xmalloc.h"
-
-#include <unistd.h>
-
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-
-#include <pthread.h>
+#include "full_io.h"
 
 #include <assert.h>
-#include <errno.h>
-#include <limits.h>
-#include <signal.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
+#include <signal.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <time.h>
-
-/* Darwin doesn't support mmap of /dev/zero. We have to use non-standard
- * anonymous mapping. Darwin uses MAP_ANON.
- */
-#ifndef MAP_ANONYMOUS
-#define MAP_ANONYMOUS MAP_ANON
-#endif
-
 #ifdef HAS_ALLOCA_H
 #include <alloca.h>
 #endif
 
+static int debug_fd = 2;
+static char *debug_file = 0;
+static int debug_file_size = 10485760;
+static const char *program_name = "";
+static INT64_T debug_flags = D_NOTICE;
 static pid_t(*debug_getpid) () = getpid;
-static int synchronize = 1;
-
-static struct debug_settings {
-	pthread_mutex_t mutex;
-	int fd;
-	char output[PATH_MAX];
-	size_t output_size;
-	INT64_T flags;
-	char program_name[1024];
-} *debug_settings;
-
-#define LOCK  if (synchronize) pthread_mutex_lock(&debug_settings->mutex);
-#define UNLOCK  if (synchronize) pthread_mutex_unlock(&debug_settings->mutex);
-
-struct fatal_callback {
-	void (*callback) ();
-	struct fatal_callback *next;
-};
-
-struct fatal_callback *fatal_callback_list = 0;
 
 struct flag_info {
 	const char *name;
@@ -111,6 +83,54 @@ static struct flag_info table[] = {
 	{0, 0}
 };
 
+struct fatal_callback {
+	void (*callback) ();
+	struct fatal_callback *next;
+};
+
+struct fatal_callback *fatal_callback_list = 0;
+
+
+int debug_flags_set(const char *flagname)
+{
+	struct flag_info *i;
+
+	if(!strcmp(flagname,"clear")) {
+		debug_flags_clear();
+		return 1;
+	}
+
+	for(i = table; i->name; i++) {
+		if(!strcmp(flagname, i->name)) {
+			debug_flags |= i->flag;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+void debug_flags_print(FILE * stream)
+{
+	int i;
+
+	for(i = 0; table[i].name; i++) {
+		fprintf(stream, "%s ", table[i].name);
+	}
+}
+
+void debug_set_flag_name(INT64_T flag, const char *name)
+{
+	struct flag_info *i;
+
+	for(i = table; i->name; i++) {
+		if(i->flag & flag) {
+			i->name = name;
+			break;
+		}
+	}
+}
+
 static const char *flag_to_name(INT64_T flag)
 {
 	struct flag_info *i;
@@ -121,97 +141,6 @@ static const char *flag_to_name(INT64_T flag)
 	}
 
 	return "debug";
-}
-
-static void initialize(void)
-{
-	debug_settings = (struct debug_settings *) mmap(NULL, sizeof(struct debug_settings), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
-	if(debug_settings == MAP_FAILED) {
-		fprintf(stderr, "could not allocate shared memory page: %s\n", strerror(errno));
-		_exit(1);
-	}
-
-	debug_settings->fd = STDERR_FILENO;
-	memset(debug_settings->output, 0, PATH_MAX);
-	debug_settings->output_size = 10485760;
-	debug_settings->flags = D_NOTICE;
-	strcpy(debug_settings->program_name, "(undefined)");
-	
-	pthread_mutexattr_t attr;
-	int result = pthread_mutexattr_init(&attr);
-	if (result != 0) {
-		fprintf(stderr, "pthread_mutexattr_init failed: %s\n", strerror(result));
-		_exit(1);
-	}
-	result = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
-	if (result != 0) {
-		/* If we can't use mutexes, then we're probably using Darwin.
-		   We just don't synchronize memory and hope for the best.
-		 */
-		synchronize = 0;
-		pthread_mutexattr_destroy(&attr);
-		return;
-	}
-	result = pthread_mutex_init(&debug_settings->mutex, &attr);
-	if (result != 0) {
-		fprintf(stderr, "pthread_mutex_init failed: %s\n", strerror(result));
-		_exit(1);
-	}
-	pthread_mutexattr_destroy(&attr);
-}
-
-static void begin(void)
-{
-	if (debug_settings == NULL)
-		initialize();
-}
-
-int debug_flags_set(const char *flagname)
-{
-	struct flag_info *i;
-
-	begin();
-
-	LOCK
-	for(i = table; i->name; i++) {
-		if(!strcmp(flagname, i->name)) {
-			debug_settings->flags |= i->flag;
-			UNLOCK
-			return 1;
-		}
-	}
-	UNLOCK
-
-	return 0;
-}
-
-void debug_flags_print(FILE * stream)
-{
-	int i;
-
-	begin();
-
-	LOCK
-	for(i = 0; table[i].name; i++) {
-		fprintf(stream, "%s ", table[i].name);
-	}
-	UNLOCK
-}
-
-void debug_set_flag_name(INT64_T flag, const char *name)
-{
-	struct flag_info *i;
-
-	begin();
-
-	LOCK
-	for(i = table; i->name; i++) {
-		if(i->flag & flag) {
-			i->name = name;
-			break;
-		}
-	}
-	UNLOCK
 }
 
 static void do_debug(int is_fatal, INT64_T flags, const char *fmt, va_list args)
@@ -226,37 +155,36 @@ static void do_debug(int is_fatal, INT64_T flags, const char *fmt, va_list args)
 	gettimeofday(&tv, 0);
 	tm = localtime(&tv.tv_sec);
 
-	sprintf(newfmt, "%04d/%02d/%02d %02d:%02d:%02d.%02ld [%d] %s: %s: %s", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (long) tv.tv_usec / 10000, (int) debug_getpid(), debug_settings->program_name, is_fatal ? "fatal " : flag_to_name(flags), fmt);
+	sprintf(newfmt, "%04d/%02d/%02d %02d:%02d:%02d.%02ld [%d] %s: %s: %s", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (long) tv.tv_usec / 10000, (int) debug_getpid(), program_name,
+		is_fatal ? "fatal " : flag_to_name(flags), fmt);
 
 	vsprintf(buffer, newfmt, args);
 	string_chomp(buffer);
 	strcat(buffer, "\n");
 	length = strlen(buffer);
 
-	if(strcmp(debug_settings->output, "") != 0) {
+	if(debug_file) {
 		struct stat info;
 
-		fstat(debug_settings->fd, &info);
-		if(S_ISREG(info.st_mode) && info.st_size >= debug_settings->output_size && debug_settings->output_size != 0) {
-			close(debug_settings->fd);
+		fstat(debug_fd, &info);
+		if(info.st_size >= debug_file_size && debug_file_size != 0) {
+			close(debug_fd);
 
-			if(stat(debug_settings->output, &info) == 0) {
-				if(info.st_size >= debug_settings->output_size) {
-					char *newname = alloca(strlen(debug_settings->output) + 5);
-					sprintf(newname, "%s.old", debug_settings->output);
-					rename(debug_settings->output, newname);
+			if(stat(debug_file, &info) == 0) {
+				if(info.st_size >= debug_file_size) {
+					char *newname = alloca(strlen(debug_file) + 5);
+					sprintf(newname, "%s.old", debug_file);
+					rename(debug_file, newname);
 				}
 			}
 
-			debug_settings->fd = open(debug_settings->output, O_CREAT | O_TRUNC | O_WRONLY, 0777);
-			if(debug_settings->fd < 0) {
-				UNLOCK 
-				fatal("couldn't open %s: %s", debug_settings->output, strerror(errno));
-            }
+			debug_fd = open(debug_file, O_CREAT | O_TRUNC | O_WRONLY, 0777);
+			if(debug_fd < 0)
+				fatal("couldn't open %s: %s", debug_file, strerror(errno));
 		}
 	}
 
-	full_write(debug_settings->fd, buffer, length);
+	full_write(debug_fd, buffer, length);
 }
 
 void debug(INT64_T flags, const char *fmt, ...)
@@ -264,15 +192,11 @@ void debug(INT64_T flags, const char *fmt, ...)
 	va_list args;
 	va_start(args, fmt);
 
-	begin();
-
-	LOCK
-	if(flags & debug_settings->flags) {
+	if(flags & debug_flags) {
 		int save_errno = errno;
 		do_debug(0, flags, fmt, args);
 		errno = save_errno;
 	}
-	UNLOCK
 
 	va_end(args);
 }
@@ -283,11 +207,7 @@ void fatal(const char *fmt, ...)
 	va_list args;
 	va_start(args, fmt);
 
-	begin();
-
-	LOCK
 	do_debug(1, 0, fmt, args);
-	UNLOCK
 
 	for(f = fatal_callback_list; f; f = f->next) {
 		f->callback();
@@ -310,13 +230,28 @@ void debug_config_fatal(void (*callback) ())
 	fatal_callback_list = f;
 }
 
+void debug_config(const char *name)
+{
+	const char *n = strdup(name);
+
+	program_name = strrchr(n, '/');
+	if(program_name) {
+		program_name++;
+	} else {
+		program_name = n;
+	}
+}
+
 void debug_config_file(const char *f)
 {
-	begin();
-	LOCK
+	if(debug_file) {
+		free(debug_file);
+		debug_file = 0;
+	}
+
 	if(f) {
 		if(*f == '/')
-			strcpy(debug_settings->output, f);
+			debug_file = strdup(f);
 		else {
 			char path[8192];
 			if(getcwd(path, sizeof(path)) == NULL)
@@ -324,25 +259,19 @@ void debug_config_file(const char *f)
 			assert(strlen(path) + strlen(f) + 1 < 8192);
 			strcat(path, "/");
 			strcat(path, f);
-			strcpy(debug_settings->output, path);
+			debug_file = strdup(path);
 		}
-		debug_settings->fd = open(f, O_CREAT | O_APPEND | O_WRONLY, 0777);
-		if(debug_settings->fd < 0) {
-			UNLOCK
+		debug_fd = open(f, O_CREAT | O_APPEND | O_WRONLY, 0777);
+		if(debug_fd < 0)
 			fatal("couldn't open %s: %s", f, strerror(errno));
-        }
 	} else {
-		debug_settings->fd = STDERR_FILENO;
+		debug_fd = 2;
 	}
-	UNLOCK
 }
 
-void debug_config_file_size(size_t size)
+void debug_config_file_size( size_t size )
 {
-	begin();
-	LOCK
-	debug_settings->output_size = size;
-	UNLOCK
+	debug_file_size = size;
 }
 
 void debug_config_getpid(pid_t(*getpidfunc) ())
@@ -352,34 +281,12 @@ void debug_config_getpid(pid_t(*getpidfunc) ())
 
 INT64_T debug_flags_clear()
 {
-	INT64_T result;
-	begin();
-	LOCK
-	result = debug_settings->flags;
-	debug_settings->flags = 0;
-	UNLOCK
+	INT64_T result = debug_flags;
+	debug_flags = 0;
 	return result;
 }
 
 void debug_flags_restore(INT64_T fl)
 {
-	begin();
-	LOCK
-	debug_settings->flags = fl;
-	UNLOCK
-}
-
-void debug_config(const char *name)
-{
-	begin();
-	if(strlen(name) >= 1024) {
-		fprintf(stderr, "program name is too long\n");
-		_exit(1);
-	}
-	const char *end = strrchr(name, '/');
-	if(end) {
-		strcpy(debug_settings->program_name, end+1);
-	} else {
-		strcpy(debug_settings->program_name, name);
-	}
+	debug_flags = fl;
 }

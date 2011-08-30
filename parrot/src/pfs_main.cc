@@ -25,10 +25,9 @@ extern "C" {
 #include "debug.h"
 #include "getopt.h"
 #include "pfs_resolve.h"
-#include "chirp_filesystem.h"
-#include "chirp_local.h"
-#include "chirp_acl.h"
+#include "chirp_client.h"
 #include "chirp_global.h"
+#include "chirp_ticket.h"
 #include "ftp_lite.h"
 }
 
@@ -91,9 +90,6 @@ our own exit status
 static pid_t root_pid = -1;
 static int root_exitstatus = 0;
 static int channel_size = 10;
-
-struct chirp_filesystem *cfs = &chirp_local_fs;
-const char *chirp_transient_path = "./";
 
 static void show_version( const char *cmd )
 {
@@ -166,7 +162,6 @@ static void show_use( const char *cmd )
 	printf("Use: %s [options] <command> ...\n",cmd);
 	printf("Where options and environment variables are:\n");
 	printf("  -a <list>  Use these Chirp authentication methods.   (PARROT_CHIRP_AUTH)\n");
-	printf("  -A <file>  Use this file as a default ACL.          (PARROT_DEFAULT_ACL)\n");
 	printf("  -b <bytes> Set the I/O block size hint.              (PARROT_BLOCK_SIZE)\n");
 	printf("  -c <file>  Print exit status information to <file>.\n");
 	printf("  -C         Enable data channel authentication in GridFTP.\n");
@@ -397,7 +392,7 @@ int main( int argc, char *argv[] )
 	int chose_auth=0;
 	struct rusage usage;
 	char c;
-	int did_ticket=0;
+	char *tickets = NULL;
 
 	srand(time(0)*(getpid()+getuid()));
 
@@ -529,9 +524,6 @@ int main( int argc, char *argv[] )
 			}
 			chose_auth = 1;
 			break;
-		case 'A':
-			chirp_acl_default(optarg);
-			break;
 		case 'b':
 			pfs_service_set_block_size(string_metric_parse(optarg));
 			break;
@@ -567,8 +559,7 @@ int main( int argc, char *argv[] )
 			pfs_use_helper = 0;
 			break;
 		case 'i':
-			setenv(CHIRP_CLIENT_TICKETS, optarg, 1);
-			did_ticket = 1;
+			tickets = strdup(optarg);
 			break;
 		case 'k':
 			pfs_checksum_files = 0;
@@ -644,7 +635,6 @@ int main( int argc, char *argv[] )
 			break;
 	}
 	}
-    cfs = &chirp_local_fs;
 
 	if(optind>=argc) show_use(argv[0]);
 
@@ -654,27 +644,17 @@ int main( int argc, char *argv[] )
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
 	file_cache_cleanup(pfs_file_cache);
 
-	if(!did_ticket && getenv(CHIRP_CLIENT_TICKETS) == NULL) {
-		/* populate a list with tickets in the current directory */
-		int i;
-		char **list;
-		char *tickets = xstrdup("");
-		sort_dir(".", &list, strcmp);
-		for (i = 0; list[i]; i++) {
-			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 && (strlen(list[i]) == (strlen("ticket.")+(MD5_DIGEST_LENGTH<<1)))) {
-				debug(D_CHIRP, "adding ticket %s", list[i]);
-				tickets = (char *) xxrealloc(tickets, strlen(tickets)+1+strlen(list[i])+1);
-                if (*tickets != '\0') /* non-empty? */
-					strcat(tickets, ",");
-				strcat(tickets, list[i]);
-			}
-		}
-		setenv(CHIRP_CLIENT_TICKETS, tickets, 1);
+	if(!chose_auth) auth_register_all();
+
+	if(tickets) {
+		auth_ticket_load(tickets);
 		free(tickets);
-		sort_dir_free(list);
+	} else if(getenv(CHIRP_CLIENT_TICKETS)) {
+		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
+	} else {
+		auth_ticket_load(NULL);
 	}
 
-	if(!chose_auth) auth_register_all();
 
 	if(!pfs_channel_init(channel_size*1024*1024)) fatal("couldn't establish I/O channel");	
 
@@ -700,9 +680,6 @@ int main( int argc, char *argv[] )
 		if(pid>0) {
 			debug(D_PROCESS,"pid %d started",pid);
 		} else if(pid==0) {
-			for(i=0;i<sysconf(_SC_OPEN_MAX);i++) {
-				if(i!=pfs_channel_fd()) close(i);
-			}
 			setpgrp();
 			tracer_prepare();
 			kill(getpid(),SIGSTOP);

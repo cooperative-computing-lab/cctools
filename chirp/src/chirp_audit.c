@@ -50,12 +50,11 @@ static int get_directory_owner(const char *path, char *owner)
 
 static int chirp_audit_recursive(const char *path, struct hash_table *table)
 {
-	void *dir;
-	char *name;
+	struct chirp_dir *dir;
+	struct chirp_dirent *d;
 	char subpath[CHIRP_PATH_MAX];
 	char owner[CHIRP_PATH_MAX];
 	struct chirp_audit *entry;
-	struct chirp_stat info;
 	int result;
 
 	result = get_directory_owner(path, owner);
@@ -78,31 +77,27 @@ static int chirp_audit_recursive(const char *path, struct hash_table *table)
 		return -1;
 	}
 
-	while((name = cfs->readdir(dir))) {
-		if(!strcmp(name, "."))
+	while((d = cfs->readdir(dir))) {
+		if(!strcmp(d->name, "."))
 			continue;
-		if(!strcmp(name, ".."))
+		if(!strcmp(d->name, ".."))
 			continue;
-		if(!strncmp(name, ".__", 3))
+		if(!strncmp(d->name, ".__", 3))
 			continue;
-		if(!strncmp(name, ".__", 3))
+		if(!strncmp(d->name, ".__", 3))
 			continue;
 
 		audit_count++;
 		if((audit_count % 10000) == 0)
 			debug(D_LOCAL, "audit: %d items", audit_count);
 
-		sprintf(subpath, "%s/%s", path, name);
+		sprintf(subpath, "%s/%s", path, d->name);
 
-		result = cfs->lstat(subpath, &info);
-		if(result < 0)
-			continue;
-
-		if(S_ISDIR(info.cst_mode)) {
+		if(S_ISDIR(d->info.cst_mode)) {
 			chirp_audit_recursive(subpath, table);
 		} else {
 			entry->nfiles++;
-			entry->nbytes += info.cst_size;
+			entry->nbytes += d->info.cst_size;
 		}
 	}
 

@@ -8,13 +8,19 @@ PORT_FILE=chirp_server.port
 
 prepare()
 {
-    port=`find_free_port`
-    ../src/chirp_server -p $port &
+    ../src/chirp_server -Z $PORT_FILE &
     pid=$!
-    
-    echo $port> $PORT_FILE
-    echo $pid > $PID_FILE
-    exit 0
+
+    # give the server a moment to generate the port file
+    sleep 5
+
+    if ps ux | awk '{print $2}' | grep "^$pid$"; then
+	echo $port> $PORT_FILE
+	echo $pid > $PID_FILE
+	exit 0
+    else
+    	exit 1
+    fi
 }
 
 run()
@@ -25,7 +31,7 @@ run()
 
 clean()
 {
-    kill -9 $(cat $PID_FILE)
+    kill -9 `cat $PID_FILE`
     rm -f $TEST_FILE
     rm -f $PID_FILE
     rm -f $PORT_FILE

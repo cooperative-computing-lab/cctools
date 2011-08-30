@@ -32,7 +32,7 @@ See the file COPYING for details.
 
 const char *batch_queue_type_string()
 {
-	return "local, condor, sge, wq, hadoop, mpi-queue";
+	return "local, condor, sge, moab, wq, hadoop, mpi-queue";
 }
 
 batch_queue_type_t batch_queue_type_from_string(const char *str)
@@ -57,8 +57,6 @@ batch_queue_type_t batch_queue_type_from_string(const char *str)
 		return BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS;
 	if(!strcmp(str, "workqueue-sharedfs"))
 		return BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS;
-	if(!strcmp(str, "xgrid"))
-		return BATCH_QUEUE_TYPE_XGRID;
 	if(!strcmp(str, "hadoop"))
 		return BATCH_QUEUE_TYPE_HADOOP;
 	if(!strcmp(str, "mpi"))
@@ -85,8 +83,6 @@ const char *batch_queue_type_to_string(batch_queue_type_t t)
 		return "wq";
 	case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 		return "wq-sharedfs";
-	case BATCH_QUEUE_TYPE_XGRID:
-		return "xgrid";
 	case BATCH_QUEUE_TYPE_HADOOP:
 		return "hadoop";
 	case BATCH_QUEUE_TYPE_MPI_QUEUE:
@@ -227,8 +223,6 @@ batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const ch
 		return batch_job_submit_work_queue(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		return batch_job_submit_work_queue(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_XGRID) {
-		return batch_job_submit_xgrid(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_HADOOP) {
 		return batch_job_submit_hadoop(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
@@ -256,8 +250,6 @@ batch_job_id_t batch_job_submit_simple(struct batch_queue * q, const char *cmd, 
 		return batch_job_submit_simple_work_queue(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		return batch_job_submit_simple_work_queue(q, cmd, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_XGRID) {
-		return batch_job_submit_simple_xgrid(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_HADOOP) {
 		return batch_job_submit_simple_hadoop(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
@@ -290,8 +282,6 @@ batch_job_id_t batch_job_wait_timeout(struct batch_queue * q, struct batch_job_i
 		return batch_job_wait_work_queue(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		return batch_job_wait_work_queue(q, info, stoptime);
-	} else if(q->type == BATCH_QUEUE_TYPE_XGRID) {
-		return batch_job_wait_xgrid(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_HADOOP) {
 		return batch_job_wait_hadoop(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
@@ -319,8 +309,6 @@ int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid)
 		return batch_job_remove_work_queue(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		return batch_job_remove_work_queue(q, jobid);
-	} else if(q->type == BATCH_QUEUE_TYPE_XGRID) {
-		return batch_job_remove_xgrid(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_HADOOP) {
 		return batch_job_remove_hadoop(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {

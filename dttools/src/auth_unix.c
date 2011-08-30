@@ -20,6 +20,7 @@ See the file COPYING for details.
 
 static char challenge_dir[AUTH_LINE_MAX] = "/tmp";
 static char alternate_passwd_file[AUTH_LINE_MAX] = "\0";
+static int  challenge_timeout = 5;
 
 void auth_unix_challenge_dir(const char *path)
 {
@@ -30,6 +31,12 @@ void auth_unix_passwd_file(const char *path)
 {
 	strcpy(alternate_passwd_file, path);
 }
+
+void auth_unix_timeout_set( int secs )
+{
+	challenge_timeout = secs;
+}
+
 
 static int auth_unix_assert(struct link *link, time_t stoptime)
 {
@@ -161,7 +168,27 @@ static int auth_unix_accept(struct link *link, char **subject, time_t stoptime)
 	debug(D_AUTH, "unix: waiting for response");
 	if(link_readline(link, line, sizeof(line), stoptime)) {
 		if(!strcmp(line, "yes")) {
-			if(stat(path, &buf) == 0) {
+			int file_exists = 0;
+			int i=0;
+
+			for(i=0;i<challenge_timeout;i++) {
+				/*
+				This is an odd hack, but invoking ls -la appears to help to force
+				some NFS clients to refresh cached metadata.
+				*/
+
+				system("ls -la > /dev/null");
+
+				if(stat(path,&buf)==0) {
+					file_exists = 1;
+					break;
+				} else {
+					debug(D_AUTH,"unix: client claims success, but I don't see it yet...");
+					sleep(1);
+				}
+			}
+
+			if(file_exists) {
 				debug(D_AUTH, "unix: got response");
 				debug(D_AUTH, "unix: client is uid %d", buf.st_uid);
 				p = auth_get_passwd_from_uid(buf.st_uid);

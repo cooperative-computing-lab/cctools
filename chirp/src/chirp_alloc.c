@@ -160,7 +160,7 @@ static char *alloc_state_root(const char *path)
 
 	while(1) {
 		sprintf(statename, "%s/.__alloc", dirname);
-		if(cfs->file_size(statename) >= 0) {
+		if(cfs_file_size(statename) >= 0) {
 			return xstrdup(dirname);
 		}
 		s = strrchr(dirname, '/');
@@ -238,11 +238,9 @@ static struct alloc_state *alloc_state_cache(const char *path)
 static void recover(const char *path)
 {
 	char newpath[CHIRP_PATH_MAX];
-	struct chirp_stat info;
 	struct alloc_state *a, *b;
-	int result;
-	void *dir;
-	char *d;
+	struct chirp_dir *dir;
+	struct chirp_dirent *d;
 
 	a = alloc_state_cache_exact(path);
 	if(!a)
@@ -253,26 +251,22 @@ static void recover(const char *path)
 		fatal("couldn't open %s: %s\n", path, strerror(errno));
 
 	while((d = cfs->readdir(dir))) {
-		if(!strcmp(d, "."))
+		if(!strcmp(d->name, "."))
 			continue;
-		if(!strcmp(d, ".."))
+		if(!strcmp(d->name, ".."))
 			continue;
-		if(!strncmp(d, ".__", 3))
+		if(!strncmp(d->name, ".__", 3))
 			continue;
 
-		sprintf(newpath, "%s/%s", path, d);
+		sprintf(newpath, "%s/%s", path, d->name);
 
-		result = cfs->lstat(newpath, &info);
-		if(result != 0)
-			fatal("couldn't stat %s: %s\n", path, strerror(errno));
-
-		if(S_ISDIR(info.cst_mode)) {
+		if(S_ISDIR(d->info.cst_mode)) {
 			recover(newpath);
 			b = alloc_state_cache_exact(newpath);
 			if(a != b)
 				alloc_state_update(a, b->size);
-		} else if(S_ISREG(info.cst_mode)) {
-			alloc_state_update(a, space_consumed(info.cst_size));
+		} else if(S_ISREG(d->info.cst_mode)) {
+			alloc_state_update(a, space_consumed(d->info.cst_size));
 		} else {
 			debug(D_ALLOC, "warning: unknown file type: %s\n", newpath);
 		}
@@ -423,7 +417,7 @@ INT64_T chirp_alloc_open(const char *path, INT64_T flags, INT64_T mode)
 
 	a = alloc_state_cache(path);
 	if(a) {
-		INT64_T filesize = cfs->file_size(path);
+		INT64_T filesize = cfs_file_size(path);
 		if(filesize < 0)
 			filesize = 0;
 
@@ -474,7 +468,7 @@ INT64_T chirp_alloc_pwrite(int fd, const void *data, INT64_T length, INT64_T off
 
 	a = alloc_state_cache(itable_lookup(fd_table, fd));
 	if(a) {
-		INT64_T filesize = cfs->fd_size(fd);
+		INT64_T filesize = cfs_fd_size(fd);
 		if(filesize >= 0) {
 			INT64_T newfilesize = MAX(length + offset, filesize);
 			INT64_T alloc_change = space_consumed(newfilesize) - space_consumed(filesize);
@@ -560,7 +554,7 @@ INT64_T chirp_alloc_ftruncate(int fd, INT64_T length)
 
 	a = alloc_state_cache(itable_lookup(fd_table, fd));
 	if(a) {
-		INT64_T filesize = cfs->fd_size(fd);
+		INT64_T filesize = cfs_fd_size(fd);
 		if(filesize >= 0) {
 			INT64_T alloc_change = space_consumed(length) - space_consumed(filesize);
 			if(a->avail >= alloc_change) {
@@ -585,17 +579,17 @@ INT64_T chirp_alloc_fsync(int fd)
 	return cfs->fsync(fd);
 }
 
-void *chirp_alloc_opendir(const char *path)
+struct chirp_dir * chirp_alloc_opendir( const char *path )
 {
 	return cfs->opendir(path);
 }
 
-char *chirp_alloc_readdir(void *dir)
+struct chirp_dirent * chirp_alloc_readdir( struct chirp_dir *dir )
 {
 	return cfs->readdir(dir);
 }
 
-void chirp_alloc_closedir(void *dir)
+void chirp_alloc_closedir( struct chirp_dir *dir )
 {
 	return cfs->closedir(dir);
 }
@@ -723,7 +717,7 @@ INT64_T chirp_alloc_unlink(const char *path)
 
 	a = alloc_state_cache(path);
 	if(a) {
-		INT64_T filesize = cfs->file_size(path);
+		INT64_T filesize = cfs_file_size(path);
 		if(filesize >= 0) {
 			result = cfs->unlink(path);
 			if(result == 0)
@@ -752,7 +746,7 @@ INT64_T chirp_alloc_rename(const char *oldpath, const char *newpath)
 			if(a == b) {
 				result = rename(oldpath, newpath);
 			} else {
-				INT64_T filesize = cfs->file_size(oldpath);
+				INT64_T filesize = cfs_file_size(oldpath);
 				if(filesize >= 0) {
 					if(b->avail >= filesize) {
 						result = cfs->rename(oldpath, newpath);
@@ -803,16 +797,16 @@ INT64_T chirp_alloc_mkdir(const char *path, INT64_T mode)
 
 INT64_T chirp_alloc_rmall(const char *path)
 {
-	int result;
+	if(!alloc_enabled) return cfs->rmall(path);
 
-	result = chirp_alloc_unlink(path);
+	int result = chirp_alloc_unlink(path);
 	if(result == 0) {
 		return 0;
 	} else if(errno != EISDIR) {
 		return -1;
 	} else {
-		void *dir;
-		char *d;
+		struct chirp_dir *dir;
+		struct chirp_dirent *d;
 		char subpath[CHIRP_PATH_MAX];
 
 		dir = chirp_alloc_opendir(path);
@@ -822,13 +816,13 @@ INT64_T chirp_alloc_rmall(const char *path)
 		result = 0;
 
 		while((d = chirp_alloc_readdir(dir))) {
-			if(!strcmp(d, "."))
+			if(!strcmp(d->name, "."))
 				continue;
-			if(!strcmp(d, ".."))
+			if(!strcmp(d->name, ".."))
 				continue;
-			if(!strncmp(d, ".__	", 3))
+			if(!strncmp(d->name, ".__	", 3))
 				continue;
-			sprintf(subpath, "%s/%s", path, d);
+			sprintf(subpath, "%s/%s", path, d->name);
 			result = chirp_alloc_rmall(subpath);
 			if(result != 0)
 				break;
@@ -908,11 +902,6 @@ INT64_T chirp_alloc_statfs(const char *path, struct chirp_statfs * info)
 	return result;
 }
 
-INT64_T chirp_alloc_mkfifo(const char *path)
-{
-	return cfs->mkfifo(path);
-}
-
 INT64_T chirp_alloc_access(const char *path, INT64_T mode)
 {
 	return cfs->access(path, mode);
@@ -943,7 +932,7 @@ INT64_T chirp_alloc_truncate(const char *path, INT64_T newsize)
 
 	a = alloc_state_cache(path);
 	if(a) {
-		INT64_T filesize = cfs->file_size(path);
+		INT64_T filesize = cfs_file_size(path);
 		if(filesize >= 0) {
 			INT64_T alloc_change = space_consumed(newsize) - space_consumed(filesize);
 			if(a->avail >= alloc_change) {
@@ -971,6 +960,11 @@ INT64_T chirp_alloc_utime(const char *path, time_t actime, time_t modtime)
 INT64_T chirp_alloc_md5(const char *path, unsigned char digest[16])
 {
 	return cfs->md5(path, digest);
+}
+
+INT64_T chirp_alloc_setrep(const char *path, int nreps)
+{
+	return cfs->setrep(path,nreps);
 }
 
 INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total, INT64_T * inuse)
@@ -1033,14 +1027,4 @@ INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode)
 	}
 
 	return result;
-}
-
-INT64_T chirp_alloc_file_size(const char *path)
-{
-	return cfs->file_size(path);
-}
-
-INT64_T chirp_alloc_fd_size(int fd)
-{
-	return cfs->fd_size(fd);
 }

@@ -64,6 +64,9 @@ static int fork_mode = 1;
 /* The maximum size of a server that will actually be believed. */
 static INT64_T max_server_size = 0;
 
+/* Logfile for new updates. */
+static FILE *logfile = 0;
+
 /* Settings for the master catalog that we will report *to* */
 static int outgoing_alarm = 0;
 static int outgoing_timeout = 300;
@@ -190,8 +193,8 @@ static void handle_updates(struct datagram *update_port)
 			INT64_T avail = nvpair_lookup_integer(nv, "avail");
 
 			if(total > max_server_size || avail > max_server_size) {
-				nvpair_insert_integer(nv, "total", 0);
-				nvpair_insert_integer(nv, "avail", 0);
+				nvpair_insert_integer(nv, "total", max_server_size);
+				nvpair_insert_integer(nv, "avail", max_server_size);
 			}
 		}
 
@@ -200,7 +203,12 @@ static void handle_updates(struct datagram *update_port)
 		char name[DOMAIN_NAME_MAX];
 		if(domain_name_cache_lookup_reverse(addr, name)) {
 			nvpair_insert_string(nv, "name", name);
-		} else {
+		} else if (nvpair_lookup_string(nv, "name") == NULL) {
+			/* If rDNS is unsuccessful, then we use the name reported if given.
+			 * This allows for hostnames that are only valid in the subnet of
+			 * the reporting server.  Here we set the "name" field to the IP
+			 * Address, addr, because it was not set by the reporting server.
+			 */
 			nvpair_insert_string(nv, "name", addr);
 		}
 
@@ -210,6 +218,14 @@ static void handle_updates(struct datagram *update_port)
 		timeout = MIN(timeout, lifetime);
 
 		make_hash_key(nv, key);
+
+		if(logfile) {
+			if(!hash_cache_lookup(table,key)) {
+				nvpair_print_text(nv,logfile);
+				fflush(logfile);
+			}
+		}
+
 		hash_cache_insert(table, key, nv, timeout);
 
 		debug(D_DEBUG, "received udp update from %s", key);
@@ -393,6 +409,7 @@ static void show_help(const char *cmd)
 	printf(" -u <host>      Send status updates to this host. (default is %s)\n", CATALOG_HOST_DEFAULT);
 	printf(" -M <size>      Maximum size of a server to be believed.  (default is any)\n");
 	printf(" -U <time>      Send status updates at this interval. (default is 5m)\n");
+	printf(" -L <file>      Log new updates to this file.\n");
 	printf(" -S             Single process mode; do not work on queries.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -408,7 +425,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "p:l:M:d:o:O:u:U:Shv")) != (char) -1) {
+	while((ch = getopt(argc, argv, "p:l:L:M:d:o:O:u:U:Shv")) != (char) -1) {
 		switch (ch) {
 		case 'd':
 			debug_flags_set(optarg);
@@ -433,6 +450,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'l':
 			lifetime = string_time_parse(optarg);
+			break;
+		case 'L':
+			logfile = fopen(optarg,"a");
+			if(!logfile) fatal("couldn't open %s: %s\n",optarg,strerror(errno));
 			break;
 		case 'S':
 			fork_mode = 0;

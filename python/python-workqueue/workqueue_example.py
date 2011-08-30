@@ -78,8 +78,11 @@ while not wq.empty():
     t = wq.wait(1)
     if t:
 	print t.taskid, t.return_status, t.result, t.host
+	print t.preferred_host, t.status
 	print t.submit_time, t.start_time, t.finish_time
-	print t.output,
+	print t.transfer_start_time, t.computation_time
+	print t.total_bytes_transferred, t.total_transfer_time
+	print t.output
     
     print wq.stats.workers_init, wq.stats.workers_ready, wq.stats.workers_busy, \
 	  wq.stats.tasks_running, wq.stats.tasks_waiting, wq.stats.tasks_complete

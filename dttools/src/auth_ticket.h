@@ -4,15 +4,19 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#ifndef AUTH_TICKET_H
+#define AUTH_TICKET_H
+
+typedef char * (*auth_ticket_server_callback_t)(const char *);
+
 int auth_ticket_register(void);
 
-/* Clear all tickets stored for server authentication. */
-void auth_ticket_clear(void);
-
-/* Add a digest/ticket pair for server authentication. */
-void auth_ticket_add(const char *digest, const char *ticket);
+/* Callback to lookup a ticket. Returns free()able char * to ticket public key */
+void auth_ticket_server_callback(auth_ticket_server_callback_t sc);
 
 /* Add tickets to client side tickets to try or, if NULL, load
  * tickets from current working directory.
  */
 void auth_ticket_load(const char *tickets);
+
+#endif

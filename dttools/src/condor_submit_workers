@@ -14,8 +14,13 @@ show_help()
 	exit 1
 }
 
+# This dummy requirement inhibits Condor from adding its own Memory expression,
+# which causes long-running workers to eventually sit idle in the queue.
+# The user can still add their own expression via the -r option.
+
+requirements="(Memory>0)"
+
 arguments=""
-requirements=""
 use_auto=0
 
 while getopts aSN:t:r:h opt 

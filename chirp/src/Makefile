@@ -3,10 +3,10 @@ include ../../Makefile.rules
 
 LOCAL_LDFLAGS = -ldttools -lchirp ${CCTOOLS_INTERNAL_LDFLAGS}
 
-LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_types.c chirp_ticket.c
-SERVER_SOURCES = chirp_stats.c chirp_job.c chirp_builtin.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chirp_acl.c chirp_group.c chirp_filesystem.c chirp_hdfs.c chirp_local.c chirp_ticket.c
+LIBRARY_SOURCES = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_ticket.c
+SERVER_SOURCES = chirp_stats.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chirp_acl.c chirp_group.c chirp_filesystem.c chirp_fs_hdfs.c chirp_fs_local.c chirp_fs_chirp.c chirp_ticket.c
 
-PROGRAMS=chirp chirp_get chirp_put chirp_server chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute chirp_md5sum
+PROGRAMS=chirp chirp_get chirp_put chirp_server chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute
 SCRIPTS=chirp_audit_cluster chirp_server_hdfs
 LIBRARIES=libchirp.a libchirp_client.${CCTOOLS_DYNAMIC_SUFFIX}
 HEADERS=chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h
@@ -23,13 +23,6 @@ libchirp.a: ${LIBRARY_OBJECTS}
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
 
-# This library contains only sources used by the server, and the
-# parts of the server needed by Parrot to implement identity boxing.
-
-libchirp_server.a: ${SERVER_OBJECTS}
-	${CCTOOLS_AR} rv $@ $^
-	ranlib $@
-
 # This object exists primarily to get a linkable object for use
 # by ROOT and other systems that want to load Chirp dynamically.
 # Note that we explicitly include auth_all.o and ${CCTOOLS_DYNAMIC_AUTH_LIBS}
@@ -41,7 +34,7 @@ libchirp_client.${CCTOOLS_DYNAMIC_SUFFIX}: ${LIBRARY_OBJECTS} ../../dttools/src/
 chirp: chirp_tool.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${CCTOOLS_READLINE_LDFLAGS} ${LOCAL_LDFLAGS}
 
-chirp_server: chirp_server.o libchirp.a libchirp_server.a
+chirp_server: chirp_server.o ${SERVER_OBJECTS} libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 chirp_get: chirp_get.o libchirp.a
@@ -69,9 +62,6 @@ chirp_matrix_roc: chirp_matrix_roc.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 chirp_matrix_verify: chirp_matrix_verify.o libchirp.a
-	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-
-chirp_md5sum: chirp_md5sum.o libchirp.a
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 chirp_stream_files: chirp_stream_files.o libchirp.a

@@ -10,11 +10,18 @@ prepare()
 {
     mkdir foo
     ln -s ..//.//./..///foo/ foo/foo
-    port=`find_free_port`
-    ../src/chirp_server -r $PWD/foo -p $port &
-    echo $! > $PID_FILE
-    echo $port > $PORT_FILE
-    exit 0
+    ../src/chirp_server -r $PWD/foo -Z $PORT_FILE &
+    # give the server a little time to write the port file
+    sleep 5
+    pid=$!
+
+    if ps ux | awk '{print $2}' | grep "^$pid$"; then
+	echo $port> $PORT_FILE
+	echo $pid > $PID_FILE
+	exit 0
+    else
+    	exit 1
+    fi
 }
 
 run()

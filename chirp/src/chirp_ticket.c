@@ -28,6 +28,8 @@ See the file COPYING for details.
 
 #define unsigned_isspace(c) isspace((unsigned char) c)
 
+const char *chirp_ticket_path = ".";
+
 static int readquote(const char **buffer, const char **s, size_t * l)
 {
 	while(unsigned_isspace(**buffer))
@@ -175,7 +177,7 @@ int chirp_ticket_read(const char *ticket, struct chirp_ticket *ct)
 	return status && !ct->expired;
 }
 
-void chirp_ticket_name(const char *root, const char *pk, char *ticket_subject, char *ticket_filename)
+void chirp_ticket_name(const char *pk, char *ticket_subject, char *ticket_filename)
 {
 	unsigned char digest[TICKET_DIGEST_LENGTH];
 	md5_context_t context;
@@ -183,15 +185,17 @@ void chirp_ticket_name(const char *root, const char *pk, char *ticket_subject, c
 	md5_update(&context, (const unsigned char *) pk, strlen(pk));
 	md5_final(digest, &context);
 	sprintf(ticket_subject, TICKET_SUBJECT_FORMAT, md5_string(digest));
-	sprintf(ticket_filename, "%s/"TICKET_FILENAME_FORMAT, root, md5_string(digest));
+	sprintf(ticket_filename, "%s/"TICKET_FILENAME_FORMAT, chirp_ticket_path, md5_string(digest));
 }
 
-void chirp_ticket_filename(char *ticket_filename, const char *root, const char *ticket_subject)
+void chirp_ticket_filename(char *ticket_filename, const char *ticket_subject, const char *digest)
 {
-	const char *digest;
-	int result = chirp_ticket_isticketsubject(ticket_subject, &digest);
-	assert(result);
-	sprintf(ticket_filename, "%s/"TICKET_FILENAME_FORMAT, root, digest);
+	if (digest == NULL) {
+		assert(ticket_subject);
+		int result = chirp_ticket_isticketsubject(ticket_subject, &digest);
+		assert(result);
+	}
+	sprintf(ticket_filename, "%s/"TICKET_FILENAME_FORMAT, chirp_ticket_path, digest);
 }
 
 void chirp_ticket_subject(char *ticket_subject, const char *ticket_filename)

@@ -199,11 +199,10 @@ Task_set_command(Task *self, PyObject *value, void *closure)
 	return -1;
     }
 
-    if (self->tp->command_line) {
+    if (self->tp->command_line)
 	free(self->tp->command_line);
-	self->tp->command_line = strdup(PyString_AsString(value));
-    }
 
+    self->tp->command_line = strdup(PyString_AsString(value));
     return 0;
 }
 
@@ -239,9 +238,39 @@ Task_get_output(Task *self, void *closure)
 }
 
 static PyObject *
+Task_get_preferred_host(Task *self, void *closure)
+{
+    if (self->tp->preferred_host)
+	return PyString_FromString(self->tp->preferred_host);
+
+    Py_RETURN_NONE;
+}
+
+static int
+Task_set_preferred_host(Task *self, PyObject *value, void *closure)
+{
+    if (!PyString_Check(value)) {
+	PyErr_Format(PyExc_Exception, "preferred_host must be a string");
+	return -1;
+    }
+
+    if (self->tp->preferred_host)
+	free(self->tp->preferred_host);
+
+    self->tp->preferred_host = strdup(PyString_AsString(value));
+    return 0;
+}
+
+static PyObject *
 Task_get_taskid(Task *self, void *closure)
 {
     return PyInt_FromLong(self->tp->taskid);
+}
+
+static PyObject *
+Task_get_status(Task *self, void *closure)
+{
+    return PyInt_FromLong(self->tp->status);
 }
 
 static PyObject *
@@ -283,6 +312,30 @@ Task_get_finish_time(Task *self, void *closure)
     return PyLong_FromLong(self->tp->finish_time);
 }
 
+static PyObject *
+Task_get_transfer_start_time(Task *self, void *closure)
+{
+    return PyLong_FromLong(self->tp->transfer_start_time);
+}
+
+static PyObject *
+Task_get_computation_time(Task *self, void *closure)
+{
+    return PyLong_FromLong(self->tp->computation_time);
+}
+
+static PyObject *
+Task_get_total_bytes_transferred(Task *self, void *closure)
+{
+    return PyLong_FromLong(self->tp->total_bytes_transferred);
+}
+
+static PyObject *
+Task_get_total_transfer_time(Task *self, void *closure)
+{
+    return PyLong_FromLong(self->tp->total_transfer_time);
+}
+
 static PyMemberDef TaskMembers[] = {
     { NULL }
 };
@@ -301,13 +354,19 @@ static PyGetSetDef TaskGetSetters[] = {
     TASK_GETSETTER(command),
     TASK_GETSETTER(tag),
     TASK_GETTER(output),
+    TASK_GETSETTER(preferred_host),
     TASK_GETTER(taskid),
+    TASK_GETTER(status),
     TASK_GETTER(return_status),
     TASK_GETTER(result),
     TASK_GETTER(host),
     TASK_GETTER(submit_time),
     TASK_GETTER(start_time),
     TASK_GETTER(finish_time),
+    TASK_GETTER(transfer_start_time),
+    TASK_GETTER(computation_time),
+    TASK_GETTER(total_bytes_transferred),
+    TASK_GETTER(total_transfer_time),
     {NULL}
 };
 

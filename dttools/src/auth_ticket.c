@@ -21,23 +21,27 @@
 #define DIGEST_LENGTH  (MD5_DIGEST_LENGTH_HEX)
 #define CHALLENGE_LENGTH  (64)
 
-static struct hash_table *server_tickets = NULL;
+static auth_ticket_server_callback_t server_callback = NULL;
 static char **client_tickets = NULL;
 
 static int auth_ticket_assert(struct link *link, time_t stoptime)
 {
 	/* FIXME need to save errno ? */
 	char line[AUTH_LINE_MAX];
+	char **tickets = client_tickets;
 
-	if(client_tickets) {
+	if(tickets) {
 		char *ticket;
 		char digest[DIGEST_LENGTH];
 
-		while((ticket = *(client_tickets++)) != NULL) {
+		for (ticket = *tickets; ticket; ticket = *(++tickets)) {
 			char command[PATH_MAX * 2 + 4096];
 
 			/* load the digest */
-			sprintf(command, "openssl rsa -in '%s' -pubout 2> /dev/null | openssl md5", ticket);
+			/* WARNING: openssl is *very* bad at giving sensible output. Use the last
+			 * 32 non-space characters as the MD5 sum.
+			 */
+			sprintf(command, "openssl rsa -in '%s' -pubout 2> /dev/null | openssl md5 2> /dev/null | tr -d '[:space:]' | tail -c 32", ticket);
 			FILE *digestf = popen(command, "r");
 			if(full_fread(digestf, digest, DIGEST_LENGTH) < DIGEST_LENGTH) {
 				pclose(digestf);
@@ -112,6 +116,7 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 	int status = 0;
 	char line[AUTH_LINE_MAX];
 	char ticket_subject[AUTH_LINE_MAX];
+	char *ticket = NULL;
 
 	errno = 0;
 
@@ -127,8 +132,9 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 				strcpy(ticket_digest, line);
 				strcpy(ticket_subject, line);
 				debug(D_AUTH, "ticket: read ticket digest: %s", ticket_digest);
-				if(server_tickets) {
-					char *ticket = hash_table_lookup(server_tickets, ticket_digest);
+				if(server_callback) {
+					free(ticket); /* free previously allocated ticket string or NULL (noop) */
+					ticket = server_callback(ticket_digest);
 					if(ticket) {
 						static const char command_template[] = "T1=`mktemp`\n"	/* The RSA Public Key */
 							"T2=`mktemp`\n"	/* The Challenge */
@@ -194,16 +200,13 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 		*subject = xxmalloc(AUTH_LINE_MAX);
 		strcpy(*subject, ticket_subject);
 	}
+	free(ticket); /* free previously allocated ticket string or NULL (noop) */
 	errno = serrno;
 	return status;
 }
 
 int auth_ticket_register(void)
 {
-	if(!server_tickets)
-		server_tickets = hash_table_create(0, 0);
-	if(!server_tickets)
-		return 0;
 	if(!client_tickets) {
 		client_tickets = xxrealloc(NULL, sizeof(char *));
 		client_tickets[0] = NULL;
@@ -212,21 +215,9 @@ int auth_ticket_register(void)
 	return auth_register("ticket", auth_ticket_assert, auth_ticket_accept);
 }
 
-void auth_ticket_clear(void)
+void auth_ticket_server_callback (auth_ticket_server_callback_t sc)
 {
-	if(server_tickets) {
-		char *digest, *ticket;
-		hash_table_firstkey(server_tickets);
-		while(hash_table_nextkey(server_tickets, &digest, (void **) &ticket))
-			free(ticket);
-		hash_table_delete(server_tickets);
-		server_tickets = hash_table_create(0, 0);
-	}
-}
-
-void auth_ticket_add(const char *digest, const char *ticket)
-{
-	hash_table_insert(server_tickets, digest, strdup(ticket));
+	server_callback = sc;
 }
 
 void auth_ticket_load(const char *tickets)
