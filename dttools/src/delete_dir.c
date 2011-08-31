@@ -16,7 +16,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <errno.h>
 
-int delete_dir( const char *dirname )
+int delete_dir(const char *dirname)
 {
 	char subdir[PATH_MAX];
 	int result;
@@ -25,14 +25,14 @@ int delete_dir( const char *dirname )
 
 	dir = opendir(dirname);
 	if(!dir) {
-		if(errno==ENOTDIR) {
+		if(errno == ENOTDIR) {
 			result = unlink(dirname);
-			if(result==0) {
+			if(result == 0) {
 				return 1;
 			} else {
 				return 0;
 			}
-		} else if(errno==ENOENT) {
+		} else if(errno == ENOENT) {
 			return 1;
 		} else {
 			return 0;
@@ -41,10 +41,12 @@ int delete_dir( const char *dirname )
 
 	result = 1;
 
-	while((d=readdir(dir))) {
-		if(!strcmp(d->d_name,".")) continue;
-		if(!strcmp(d->d_name,"..")) continue;
-		sprintf(subdir,"%s/%s",dirname,d->d_name);
+	while((d = readdir(dir))) {
+		if(!strcmp(d->d_name, "."))
+			continue;
+		if(!strcmp(d->d_name, ".."))
+			continue;
+		sprintf(subdir, "%s/%s", dirname, d->d_name);
 		if(!delete_dir(subdir)) {
 			result = 0;
 		}
@@ -52,7 +54,7 @@ int delete_dir( const char *dirname )
 
 	closedir(dir);
 
-	if(rmdir(dirname)!=0) {
+	if(rmdir(dirname) != 0) {
 		result = 0;
 	}
 

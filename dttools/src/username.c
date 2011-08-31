@@ -17,33 +17,33 @@ int username_is_super()
 	return !getuid();
 }
 
-int username_get( char *name )
+int username_get(char *name)
 {
 	struct passwd *p;
 
 	p = getpwuid(getuid());
 	if(p) {
-		strcpy(name,p->pw_name);
+		strcpy(name, p->pw_name);
 		return 1;
 	} else {
 		return 0;
 	}
 }
 
-int username_home( char *dir )
+int username_home(char *dir)
 {
 	struct passwd *p;
 
 	p = getpwuid(getuid());
 	if(p) {
-		strcpy(dir,p->pw_dir);
+		strcpy(dir, p->pw_dir);
 		return 1;
 	} else {
 		return 0;
 	}
 }
 
-int username_set( const char *name )
+int username_set(const char *name)
 {
 	struct passwd *p;
 	int result;
@@ -58,10 +58,12 @@ int username_set( const char *name )
 	uid = p->pw_uid;
 	gid = p->pw_gid;
 
-	if(geteuid()==uid) return 1;
+	if(geteuid() == uid)
+		return 1;
 
 	result = seteuid(0);
-	if(result<0) return 0;
+	if(result < 0)
+		return 0;
 
 	setuid(uid);
 	setgid(gid);

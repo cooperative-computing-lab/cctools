@@ -8,7 +8,6 @@ See the file COPYING for details.
 #ifndef CHIRP_GROUP_H
 #define CHIRP_GROUP_H
 
-int chirp_group_lookup( const char *group, const char *subject );
+int chirp_group_lookup(const char *group, const char *subject);
 
 #endif
-

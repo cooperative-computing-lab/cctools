@@ -19,28 +19,30 @@ See the file COPYING for details.
 #include <sys/statvfs.h>
 #endif
 
-int disk_info_get( const char *path, UINT64_T *avail, UINT64_T *total )
+int disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total)
 {
 #ifdef CCTOOLS_OPSYS_SUNOS
 	int result;
 	struct statvfs s;
 
-	result = statvfs(path,&s);
-	if(result<0) return result;
+	result = statvfs(path, &s);
+	if(result < 0)
+		return result;
 
-	*total = ((UINT64_T)s.f_bsize)*s.f_blocks;
-	*avail = ((UINT64_T)s.f_bsize)*s.f_bfree;
+	*total = ((UINT64_T) s.f_bsize) * s.f_blocks;
+	*avail = ((UINT64_T) s.f_bsize) * s.f_bfree;
 
 	return 0;
 #else
 	int result;
 	struct statfs s;
 
-	result = statfs(path,&s);
-	if(result<0) return result;
+	result = statfs(path, &s);
+	if(result < 0)
+		return result;
 
-	*total = ((UINT64_T)s.f_bsize)*s.f_blocks;
-	*avail = ((UINT64_T)s.f_bsize)*s.f_bavail;
+	*total = ((UINT64_T) s.f_bsize) * s.f_blocks;
+	*avail = ((UINT64_T) s.f_bsize) * s.f_bavail;
 
 	return 0;
 #endif

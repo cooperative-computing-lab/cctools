@@ -1001,37 +1001,6 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 
 		tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
 
-        /* debug arguments/environment */
-		{
-			int argc = 0, n = 0;
-			debug(D_SYSCALL,"execve(");
-			debug(D_SYSCALL,"\t%s,",path);
-			debug(D_SYSCALL,"\t[");
-			while (1) {
-				char arg[4096];
-				char *argp;
-				tracer_copy_in(p->tracer, &argp, ((char **)args[1])+argc, sizeof(argp));
-				if (argp == NULL) break;
-				tracer_copy_in_string(p->tracer, arg, argp, sizeof(arg));
-				arg[4096-1] = '\0';
-				debug(D_SYSCALL,"\t\"%s\",",arg);
-				argc++;
-			}
-			debug(D_SYSCALL,"\t],");
-			debug(D_SYSCALL,"\t[");
-			while (1) {
-				char var[4096];
-				char *varp;
-				tracer_copy_in(p->tracer, &varp, ((char **)args[2])+n, sizeof(varp));
-				if (varp == NULL) break;
-				tracer_copy_in_string(p->tracer, var, varp, sizeof(var));
-				var[4096-1] = '\0';
-				debug(D_SYSCALL,"\t\"%s\",",var);
-				n++;
-			}
-			debug(D_SYSCALL,"\t])");
-        }
-
 		p->new_logical_name[0] = 0;
 		p->new_physical_name[0] = 0;
 
@@ -1403,8 +1372,15 @@ void decode_syscall( struct pfs_process *p, int entering )
 						child_signal = args[0]&0xff;
 						clone_files = args[0]&CLONE_FILES;
 					}
-					child = pfs_process_create(childpid,p->pid,clone_files,child_signal);
+					pid_t notify_parent;
+					if(args[0]&(CLONE_PARENT|CLONE_THREAD)) {
+						notify_parent = p->ppid;
+					} else {
+						notify_parent = p->pid;
+					}
+					child = pfs_process_create(childpid,p->pid,notify_parent,clone_files,child_signal);
 					child->syscall_result = 0;
+					if(args[0]&CLONE_THREAD) child->tgid = p->tgid;
 					if(p->syscall_original==SYSCALL32_fork) {
 						memcpy(child->syscall_args,p->syscall_args,sizeof(p->syscall_args));
 						child->syscall_args_changed = 1;
@@ -2256,6 +2232,119 @@ void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 
+		case SYSCALL32_openat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_openat(args[0],path,args[2],args[3]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_mkdirat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_mkdirat(args[0],path,args[2]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_mknodat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_mknodat(args[0],path,args[2],args[3]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_fchownat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_fchownat(args[0],path,args[2],args[3],args[4]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_futimesat:
+			if(entering) {
+				struct timeval times[2];
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				if(args[2]) {
+					tracer_copy_in(p->tracer,times,(void*)args[2],sizeof(times));
+				} else {
+					gettimeofday(&times[0],0);
+					times[1] = times[0];
+				}
+				p->syscall_result = pfs_futimesat(args[0],path,times);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_unlinkat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_unlinkat(args[0],path,args[2]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_renameat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				tracer_copy_in_string(p->tracer,path2,(void*)args[3],sizeof(path2));
+				p->syscall_result = pfs_renameat(args[0],path,args[2],path2);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+
+			break;
+		case SYSCALL32_linkat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				tracer_copy_in_string(p->tracer,path2,(void*)args[3],sizeof(path2));
+				p->syscall_result = pfs_linkat(args[0],path,args[2],path2,args[4]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_symlinkat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[0],sizeof(path));
+				tracer_copy_in_string(p->tracer,path2,(void*)args[2],sizeof(path2));
+				p->syscall_result = pfs_symlinkat(path,args[1],path2);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_readlinkat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_readlinkat(args[0],path,path2,sizeof(path2));
+				if(p->syscall_result<0) {
+					p->syscall_result = -errno;
+				} else {
+					tracer_copy_out(p->tracer,path2,(void*)args[2],p->syscall_result);
+				}
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_fchmodat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
+				p->syscall_result = pfs_fchmodat(args[0],path,args[2],args[3]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
 		/*
 		Note that we call pfs_process_raise here so that the process data
 		structures are made aware of the signal propagation, possibly kicking
@@ -2354,13 +2443,15 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_sigaction:
 		case SYSCALL32_rt_sigaction:
 			if(entering) {
-				int sig = args[0];
-				struct pfs_kernel_sigaction act;
-				tracer_copy_in(p->tracer,&act,POINTER(args[1]),sizeof(act));
-				if(act.pfs_sa_flags&SA_RESTART) {
-					pfs_current->signal_interruptible[sig] = 0;
-				} else {
-					pfs_current->signal_interruptible[sig] = 1;
+				if(args[1]) {
+					int sig = args[0];
+					struct pfs_kernel_sigaction act;
+					tracer_copy_in(p->tracer,&act,POINTER(args[1]),sizeof(act));
+					if(act.pfs_sa_flags&SA_RESTART) {
+						pfs_current->signal_interruptible[sig] = 0;
+					} else {
+						pfs_current->signal_interruptible[sig] = 1;
+					}
 				}
 			}
 			break;
@@ -2819,6 +2910,8 @@ void pfs_dispatch32( struct pfs_process *p, INT64_T signum )
 
 void pfs_dispatch( struct pfs_process *p, INT64_T signum )
 {
+	if(p->state==PFS_PROCESS_STATE_DONE) return;
+
 	if(tracer_is_64bit(p->tracer)) {
 		pfs_dispatch64(p,signum);
 	} else {

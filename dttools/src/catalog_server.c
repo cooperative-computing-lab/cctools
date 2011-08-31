@@ -62,7 +62,10 @@ static time_t starttime;
 static int fork_mode = 1;
 
 /* The maximum size of a server that will actually be believed. */
-static INT64_T max_server_size=0;
+static INT64_T max_server_size = 0;
+
+/* Logfile for new updates. */
+static FILE *logfile = 0;
 
 /* Settings for the master catalog that we will report *to* */
 static int outgoing_alarm = 0;
@@ -100,18 +103,20 @@ static void install_handler(int sig, void (*handler) (int sig))
 	sigaction(sig, &s, 0);
 }
 
-int compare_nvpair( const void *a, const void *b )
+int compare_nvpair(const void *a, const void *b)
 {
-	struct nvpair **pa = (struct nvpair **)a;
-	struct nvpair **pb = (struct nvpair **)b;
+	struct nvpair **pa = (struct nvpair **) a;
+	struct nvpair **pb = (struct nvpair **) b;
 
-	const char *sa = nvpair_lookup_string(*pa,"name");
-	const char *sb = nvpair_lookup_string(*pb,"name");
+	const char *sa = nvpair_lookup_string(*pa, "name");
+	const char *sb = nvpair_lookup_string(*pb, "name");
 
-	if(!sa) sa = "unknown";
-	if(!sb) sb = "unknown";
+	if(!sa)
+		sa = "unknown";
+	if(!sb)
+		sb = "unknown";
 
-	return strcasecmp(sa,sb);
+	return strcasecmp(sa, sb);
 }
 
 int update_one_catalog(void *outgoing_host, const void *text)
@@ -133,6 +138,9 @@ static void update_all_catalogs(struct datagram *outgoing_dgram)
 	uptime = time(0) - starttime;
 
 	length = sprintf(text, "type catalog\nversion %d.%d.%d\nurl http://%s:%d\nname %s\nowner %s\nuptime %u\nport %d\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, owner, uptime, port);
+
+	if(!length)
+		return;
 
 	list_iterate(outgoing_host_list, update_one_catalog, text);
 }
@@ -180,31 +188,44 @@ static void handle_updates(struct datagram *update_port)
 
 		/* If the server reports unbelievable numbers, simply reset them */
 
-		if(max_server_size>0) {
-			INT64_T total = nvpair_lookup_integer(nv,"total");
-			INT64_T avail = nvpair_lookup_integer(nv,"avail");
+		if(max_server_size > 0) {
+			INT64_T total = nvpair_lookup_integer(nv, "total");
+			INT64_T avail = nvpair_lookup_integer(nv, "avail");
 
-			if( total>max_server_size || avail>max_server_size ) {
-				nvpair_insert_integer(nv,"total",0);
-				nvpair_insert_integer(nv,"avail",0);
+			if(total > max_server_size || avail > max_server_size) {
+				nvpair_insert_integer(nv, "total", max_server_size);
+				nvpair_insert_integer(nv, "avail", max_server_size);
 			}
 		}
 
 		/* Do not believe the server's reported name, just resolve it backwards. */
 
 		char name[DOMAIN_NAME_MAX];
-		if(domain_name_cache_lookup_reverse(addr,name)) {
-			nvpair_insert_string(nv,"name",name);
-		} else {
-			nvpair_insert_string(nv,"name",addr);
+		if(domain_name_cache_lookup_reverse(addr, name)) {
+			nvpair_insert_string(nv, "name", name);
+		} else if (nvpair_lookup_string(nv, "name") == NULL) {
+			/* If rDNS is unsuccessful, then we use the name reported if given.
+			 * This allows for hostnames that are only valid in the subnet of
+			 * the reporting server.  Here we set the "name" field to the IP
+			 * Address, addr, because it was not set by the reporting server.
+			 */
+			nvpair_insert_string(nv, "name", addr);
 		}
 
-		timeout = nvpair_lookup_integer(nv,"lifetime");
-		if (!timeout)
-		    timeout = lifetime;
+		timeout = nvpair_lookup_integer(nv, "lifetime");
+		if(!timeout)
+			timeout = lifetime;
 		timeout = MIN(timeout, lifetime);
 
 		make_hash_key(nv, key);
+
+		if(logfile) {
+			if(!hash_cache_lookup(table,key)) {
+				nvpair_print_text(nv,logfile);
+				fflush(logfile);
+			}
+		}
+
 		hash_cache_insert(table, key, nv, timeout);
 
 		debug(D_DEBUG, "received udp update from %s", key);
@@ -239,7 +260,7 @@ static void handle_query(struct link *query_link)
 
 	char *hkey;
 	struct nvpair *nv;
-	int i,n;
+	int i, n;
 
 	link_address_remote(query_link, addr, &port);
 
@@ -247,11 +268,14 @@ static void handle_query(struct link *query_link)
 
 	link_nonblocking(query_link, 0);
 	stream = fdopen(link_fd(query_link), "r+");
-	if(!stream) return;
+	if(!stream)
+		return;
 
-	if(!fgets(line, sizeof(line), stream)) return;
+	if(!fgets(line, sizeof(line), stream))
+		return;
 	string_chomp(line);
-	if(sscanf(line, "%s %s %s", action, url, version) != 3) return;
+	if(sscanf(line, "%s %s %s", action, url, version) != 3)
+		return;
 
 	while(1) {
 		if(!fgets(line, sizeof(line), stream))
@@ -274,7 +298,7 @@ static void handle_query(struct link *query_link)
 
 	/* load the hash table entries into one big array */
 
-	n=0;
+	n = 0;
 	hash_cache_firstkey(table);
 	while(hash_cache_nextkey(table, &hkey, (void **) &nv)) {
 		array[n] = nv;
@@ -283,26 +307,30 @@ static void handle_query(struct link *query_link)
 
 	/* sort the array by name before displaying */
 
-	qsort(array,n,sizeof(struct nvpair *),compare_nvpair);
+	qsort(array, n, sizeof(struct nvpair *), compare_nvpair);
 
 	if(!strcmp(path, "/query.text")) {
-		fprintf(stream,"Content-type: text/plain\n\n");
-		for(i=0;i<n;i++) nvpair_print_text(array[i], stream);
+		fprintf(stream, "Content-type: text/plain\n\n");
+		for(i = 0; i < n; i++)
+			nvpair_print_text(array[i], stream);
 	} else if(!strcmp(path, "/query.oldclassads")) {
-		fprintf(stream,"Content-type: text/plain\n\n");
-		for(i=0;i<n;i++) nvpair_print_old_classads(array[i], stream);
+		fprintf(stream, "Content-type: text/plain\n\n");
+		for(i = 0; i < n; i++)
+			nvpair_print_old_classads(array[i], stream);
 	} else if(!strcmp(path, "/query.newclassads")) {
-		fprintf(stream,"Content-type: text/plain\n\n");
-		for(i=0;i<n;i++) nvpair_print_new_classads(array[i], stream);
+		fprintf(stream, "Content-type: text/plain\n\n");
+		for(i = 0; i < n; i++)
+			nvpair_print_new_classads(array[i], stream);
 	} else if(!strcmp(path, "/query.xml")) {
-		fprintf(stream,"Content-type: text/xml\n\n");
+		fprintf(stream, "Content-type: text/xml\n\n");
 		fprintf(stream, "<?xml version=\"1.0\" standalone=\"yes\"?>\n");
 		fprintf(stream, "<catalog>\n");
-		for(i=0;i<n;i++) nvpair_print_xml(array[i], stream);
+		for(i = 0; i < n; i++)
+			nvpair_print_xml(array[i], stream);
 		fprintf(stream, "</catalog>\n");
 	} else if(sscanf(path, "/detail/%s", key) == 1) {
 		struct nvpair *nv;
-		fprintf(stream,"Content-type: text/html\n\n");
+		fprintf(stream, "Content-type: text/html\n\n");
 		nv = hash_cache_lookup(table, key);
 		if(nv) {
 			const char *name = nvpair_lookup_string(nv, "name");
@@ -340,7 +368,7 @@ static void handle_query(struct link *query_link)
 		fprintf(stream, "<a href=/query.newclassads>newclassads</a>");
 		fprintf(stream, "<p>\n");
 
-		for(i=0;i<n;i++) {
+		for(i = 0; i < n; i++) {
 			nv = array[i];
 			sum_total += nvpair_lookup_integer(nv, "total");
 			sum_avail += nvpair_lookup_integer(nv, "avail");
@@ -352,7 +380,7 @@ static void handle_query(struct link *query_link)
 		fprintf(stream, "<b>%sB available out of %sB on %d devices</b><p>\n", avail_line, total_line, (int) sum_devices);
 
 		nvpair_print_html_header(stream, html_headers);
-		for(i=0;i<n;i++) {
+		for(i = 0; i < n; i++) {
 			nv = array[i];
 			make_hash_key(nv, key);
 			sprintf(url, "/detail/%s", key);
@@ -381,6 +409,7 @@ static void show_help(const char *cmd)
 	printf(" -u <host>      Send status updates to this host. (default is %s)\n", CATALOG_HOST_DEFAULT);
 	printf(" -M <size>      Maximum size of a server to be believed.  (default is any)\n");
 	printf(" -U <time>      Send status updates at this interval. (default is 5m)\n");
+	printf(" -L <file>      Log new updates to this file.\n");
 	printf(" -S             Single process mode; do not work on queries.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -396,7 +425,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "p:l:M:d:o:O:u:U:Shv")) != (char) -1) {
+	while((ch = getopt(argc, argv, "p:l:L:M:d:o:O:u:U:Shv")) != (char) -1) {
 		switch (ch) {
 		case 'd':
 			debug_flags_set(optarg);
@@ -421,6 +450,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'l':
 			lifetime = string_time_parse(optarg);
+			break;
+		case 'L':
+			logfile = fopen(optarg,"a");
+			if(!logfile) fatal("couldn't open %s: %s\n",optarg,strerror(errno));
 			break;
 		case 'S':
 			fork_mode = 0;
@@ -482,21 +515,22 @@ int main(int argc, char *argv[])
 		}
 
 		FD_ZERO(&rfds);
-		FD_SET(ufd,&rfds);
-		FD_SET(lfd,&rfds);
-		maxfd = MAX(ufd,lfd)+1;
+		FD_SET(ufd, &rfds);
+		FD_SET(lfd, &rfds);
+		maxfd = MAX(ufd, lfd) + 1;
 
 		timeout.tv_sec = 5;
 		timeout.tv_usec = 0;
 
-		result = select(maxfd,&rfds,0,0,&timeout);
-		if(result<=0) continue;
+		result = select(maxfd, &rfds, 0, 0, &timeout);
+		if(result <= 0)
+			continue;
 
-		if(FD_ISSET(ufd,&rfds)) {
+		if(FD_ISSET(ufd, &rfds)) {
 			handle_updates(update_dgram);
 		}
 
-		if(FD_ISSET(lfd,&rfds)) {
+		if(FD_ISSET(lfd, &rfds)) {
 			link = link_accept(list_port, time(0) + 5);
 			if(link) {
 				if(fork_mode) {

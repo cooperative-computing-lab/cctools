@@ -55,7 +55,7 @@ are <tt>0700</tt> for an executable, and <tt>0600</tt> for a data file.  (Note t
 @see chirp_reli_pread, chirp_reli_pwrite, chirp_reli_sread, chirp_reli_swrite, chirp_reli_fstat, chirp_reli_fstatfs chirp_reli_fchmod, chirp_reli_fchown, chirp_reli_ftruncate, chirp_reli_flush, chirp_reli_close
 */
 
-struct chirp_file * chirp_reli_open( const char *host, const char *path, INT64_T flags, INT64_T mode, time_t stoptime );
+struct chirp_file *chirp_reli_open(const char *host, const char *path, INT64_T flags, INT64_T mode, time_t stoptime);
 
 /** Closes an open file.  Note that a close may need to write buffered data to disk before completing, so <b>chirp_reli_close can fail</b>.
 If chirp_reli_close indicates failures, the <tt>struct chirp_file</tt> is deallocated and can no longer be used, but the caller
@@ -65,7 +65,7 @@ must assume some previously written data was lost.
 @see chirp_file_open
 */
 
-INT64_T chirp_reli_close( struct chirp_file *file, time_t stoptime );
+INT64_T chirp_reli_close(struct chirp_file *file, time_t stoptime);
 
 /** Read data from a file.  Small reads may be buffered into large reads for efficiency.
 @param file A chirp_file handle returned by chirp_reli_open.
@@ -77,7 +77,7 @@ INT64_T chirp_reli_close( struct chirp_file *file, time_t stoptime );
 @see chirp_reli_open, chirp_reli_pread_unbuffered, chirp_reli_sread
 */
 
-INT64_T chirp_reli_pread( struct chirp_file *file, void *buffer, INT64_T length, INT64_T offset, time_t stoptime );
+INT64_T chirp_reli_pread(struct chirp_file *file, void *buffer, INT64_T length, INT64_T offset, time_t stoptime);
 
 /** Write data to a file.  Small writes may be buffered together into large writes for efficiency.
 @param file A chirp_file handle returned by chirp_reli_open.
@@ -90,7 +90,7 @@ INT64_T chirp_reli_pread( struct chirp_file *file, void *buffer, INT64_T length,
 @see chirp_reli_open, chirp_reli_swrite
 */
 
-INT64_T chirp_reli_pwrite( struct chirp_file *file, const void *buffer, INT64_T length, INT64_T offset, time_t stoptime );
+INT64_T chirp_reli_pwrite(struct chirp_file *file, const void *buffer, INT64_T length, INT64_T offset, time_t stoptime);
 
 /** Read data from a file without buffering.
 @param file A chirp_file handle returned by chirp_reli_open.
@@ -102,7 +102,7 @@ INT64_T chirp_reli_pwrite( struct chirp_file *file, const void *buffer, INT64_T 
 @see chirp_reli_open, chirp_reli_pread, chirp_reli_sread
 */
 
-INT64_T chirp_reli_pread_unbuffered( struct chirp_file *file, void *buffer, INT64_T length, INT64_T offset, time_t stoptime );
+INT64_T chirp_reli_pread_unbuffered(struct chirp_file *file, void *buffer, INT64_T length, INT64_T offset, time_t stoptime);
 
 /** Write data to a file without buffering.
 @param file A chirp_file handle returned by chirp_reli_open.
@@ -114,7 +114,7 @@ INT64_T chirp_reli_pread_unbuffered( struct chirp_file *file, void *buffer, INT6
 @see chirp_reli_open, chirp_reli_pwrite, chirp_reli_swrite
 */
 
-INT64_T chirp_reli_pwrite_unbuffered( struct chirp_file *file, const void *buffer, INT64_T length, INT64_T offset, time_t stoptime );
+INT64_T chirp_reli_pwrite_unbuffered(struct chirp_file *file, const void *buffer, INT64_T length, INT64_T offset, time_t stoptime);
 
 /** Strided read from a file.  Reads <tt>stride_length</tt> bytes every <tt>stride_skip</tt> bytes, starting from <tt>offset</tt>
 up to a maximum of <tt>length</tt> bytes read.
@@ -130,7 +130,7 @@ up to a maximum of <tt>length</tt> bytes read.
 @see chirp_reli_open, chirp_reli_pread, chirp_reli_pwrite, chirp_reli_sread, chirp_reli_swrite
 */
 
-INT64_T chirp_reli_sread( struct chirp_file *file, void *buffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset, time_t stoptime );
+INT64_T chirp_reli_sread(struct chirp_file *file, void *buffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset, time_t stoptime);
 
 /** Strided write to a file.  Writes <tt>stride_length</tt> bytes every <tt>stride_skip</tt> bytes, starting from <tt>offset</tt>
 up to a maximum of <tt>length</tt> bytes written.
@@ -146,7 +146,7 @@ up to a maximum of <tt>length</tt> bytes written.
 @see chirp_reli_open, chirp_reli_pread, chirp_reli_pwrite, chirp_reli_sread, chirp_reli_swrite
 */
 
-INT64_T chirp_reli_swrite( struct chirp_file *file, const void *buffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset, time_t stoptime );
+INT64_T chirp_reli_swrite(struct chirp_file *file, const void *buffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset, time_t stoptime);
 
 /** Get file status.
 @param file A chirp_file handle returned by chirp_reli_open.
@@ -156,7 +156,7 @@ INT64_T chirp_reli_swrite( struct chirp_file *file, const void *buffer, INT64_T 
 @see chirp_reli_open, chirp_stat
 */
 
-INT64_T chirp_reli_fstat( struct chirp_file *file, struct chirp_stat *info, time_t stoptime );
+INT64_T chirp_reli_fstat(struct chirp_file *file, struct chirp_stat *info, time_t stoptime);
 
 /** Get file system status.
 @param file A chirp_file handle returned by chirp_reli_open.
@@ -166,7 +166,7 @@ INT64_T chirp_reli_fstat( struct chirp_file *file, struct chirp_stat *info, time
 @see chirp_reli_open, chirp_reli_statfs
 */
 
-INT64_T chirp_reli_fstatfs( struct chirp_file *file, struct chirp_statfs *info, time_t stoptime );
+INT64_T chirp_reli_fstatfs(struct chirp_file *file, struct chirp_statfs *info, time_t stoptime);
 
 /** Change the ownership of a file.
 @deprecated Note that the current Chirp file server does not make use of the Unix owner field, see @ref chirp_reli_setacl instead.
@@ -177,7 +177,7 @@ INT64_T chirp_reli_fstatfs( struct chirp_file *file, struct chirp_statfs *info, 
 @see chirp_reli_chown, chirp_reli_setacl, chirp_reli_getacl
 */
 
-INT64_T chirp_reli_fchown( struct chirp_file *file, INT64_T uid, INT64_T gid, time_t stoptime );
+INT64_T chirp_reli_fchown(struct chirp_file *file, INT64_T uid, INT64_T gid, time_t stoptime);
 
 /** Change the mode bits of a file.
 Note that the current Chirp file server ignores the mode bits,
@@ -188,7 +188,7 @@ except to determine whether a program is executable.  See @ref chirp_reli_setacl
 @see chirp_reli_chmod, chirp_reli_setacl, chirp_reli_getacl
 */
 
-INT64_T chirp_reli_fchmod( struct chirp_file *file, INT64_T mode, time_t stoptime );
+INT64_T chirp_reli_fchmod(struct chirp_file *file, INT64_T mode, time_t stoptime);
 
 /** Truncate an open file.
 @param file A chirp_file handle returned by chirp_reli_open.
@@ -197,7 +197,7 @@ INT64_T chirp_reli_fchmod( struct chirp_file *file, INT64_T mode, time_t stoptim
 @see chirp_reli_open, chirp_reli_truncate
 */
 
-INT64_T chirp_reli_ftruncate( struct chirp_file *file, INT64_T length, time_t stoptime );
+INT64_T chirp_reli_ftruncate(struct chirp_file *file, INT64_T length, time_t stoptime);
 
 /** Flush any pending changes to a file.
 To improve performance, Chirp buffers small writes to files.
@@ -208,9 +208,9 @@ To force any buffered writes to disk, call this function.
 @see chirp_reli_close
 */
 
-INT64_T chirp_reli_flush( struct chirp_file *file, time_t stoptime );
+INT64_T chirp_reli_flush(struct chirp_file *file, time_t stoptime);
 
-INT64_T chirp_reli_fsync( struct chirp_file *file, time_t stoptime );
+INT64_T chirp_reli_fsync(struct chirp_file *file, time_t stoptime);
 
 /** Get an entire file efficiently.
 Reads an entire remote file, and write the contents to a standard FILE stream.
@@ -224,7 +224,7 @@ To get an entire directory tree, see @ref chirp_recursive_get instead.
 @see chirp_reli_open
 */
 
-INT64_T chirp_reli_getfile( const char *host, const char *path, FILE *stream, time_t stoptime );
+INT64_T chirp_reli_getfile(const char *host, const char *path, FILE * stream, time_t stoptime);
 
 /** Get an entire file efficiently to memory.
 Reads an entire remote file into newly allocated memory.
@@ -237,7 +237,7 @@ On success, this pointer will point to newly allocated memory containing the fil
 @return The size of the file in bytes, or less than zero on error.
 */
 
-INT64_T chirp_reli_getfile_buffer( const char *host, const char *path, char **buffer, time_t stoptime );
+INT64_T chirp_reli_getfile_buffer(const char *host, const char *path, char **buffer, time_t stoptime);
 
 /** Put an entire file efficiently.
 Reads data out of a standard I/O stream and writes it to a remote file.
@@ -252,7 +252,7 @@ To put an entire directory tree, see @ref chirp_recursive_put instead.
 @return The size of the file in bytes, or less than zero on error.
 */
 
-INT64_T chirp_reli_putfile( const char *host, const char *path, FILE *stream, INT64_T mode, INT64_T length, time_t stoptime );
+INT64_T chirp_reli_putfile(const char *host, const char *path, FILE * stream, INT64_T mode, INT64_T length, time_t stoptime);
 
 /** Put an entire file efficiently from memory.
 Reads data out of memory and writes it to a remote file.
@@ -266,7 +266,7 @@ To put an entire directory tree, see @ref chirp_recursive_put instead.
 @return The size of the file in bytes, or less than zero on error.
 */
 
-INT64_T chirp_reli_putfile_buffer( const char *host, const char *path, const char *buffer, INT64_T mode, INT64_T length, time_t stoptime );
+INT64_T chirp_reli_putfile_buffer(const char *host, const char *path, const char *buffer, INT64_T mode, INT64_T length, time_t stoptime);
 
 /** Get a detailed directory listing.
 Gets a detailed directory listing from a Chirp server, and then calls the callback once for each element in the directory.
@@ -278,7 +278,7 @@ Gets a detailed directory listing from a Chirp server, and then calls the callba
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_getlongdir( const char *host, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime );
+INT64_T chirp_reli_getlongdir(const char *host, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime);
 
 /** Get a simple directory listing.
 Gets a simple directory listing from a Chirp server, and then calls the callback once for each element in the directory.  This is a low-level function, you may find @ref chirp_reli_opendir easier to use.
@@ -291,7 +291,7 @@ Gets a simple directory listing from a Chirp server, and then calls the callback
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_getdir( const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime );
+INT64_T chirp_reli_getdir(const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime);
 
 /** Get an access control list.
 Gets an access control list from a Chirp server, and then calls the callback once for each element in the list.
@@ -315,7 +315,7 @@ You may then call @ref chirp_reli_readdir to read directory elements one by one.
 @see chirp_reli_opendir chirp_reli_readdir, chirp_reli_closedir
 */
 
-struct chirp_dir * chirp_reli_opendir( const char *host, const char *path, time_t stoptime );
+struct chirp_dir *chirp_reli_opendir(const char *host, const char *path, time_t stoptime);
 
 /**
 Read one item from a directory.  Accepts a pointer to a directory opened by @ref chirp_reli_opendir
@@ -327,7 +327,7 @@ Note that this function has no timeout because it operates solely on memory stru
 @see chirp_reli_opendir chirp_reli_readdir, chirp_reli_closedir
 */
 
-struct chirp_dirent * chirp_reli_readdir( struct chirp_dir *dir );
+struct chirp_dirent *chirp_reli_readdir(struct chirp_dir *dir);
 
 /**
 Close a directory.  This function releases the chirp_dir object returned by @ref chirp_reli_opendir.
@@ -337,7 +337,15 @@ Note that this function has no timeoutbecause it operates solely on memory struc
 @see chirp_reli_opendir chirp_reli_readdir, chirp_reli_closedir
 */
 
-void chirp_reli_closedir( struct chirp_dir *dir );
+void chirp_reli_closedir(struct chirp_dir *dir);
+
+/* FIXME document */
+INT64_T chirp_reli_ticket_create(const char *host, char name[CHIRP_PATH_MAX], unsigned bits, time_t stoptime);
+INT64_T chirp_reli_ticket_register(const char *host, const char *name, const char *subject, time_t duration, time_t stoptime);
+INT64_T chirp_reli_ticket_delete(const char *host, const char *name, time_t stoptime);
+INT64_T chirp_reli_ticket_list(const char *host, const char *subject, char ***list, time_t stoptime);
+INT64_T chirp_reli_ticket_get(const char *host, const char *name, char **subject, char **ticket, time_t * duration, char ***rights, time_t stoptime);
+INT64_T chirp_reli_ticket_modify(const char *host, const char *name, const char *path, const char *aclmask, time_t stoptime);
 
 /** Get an access control list.
 @param host The name and port of the Chirp server to access.
@@ -348,7 +356,7 @@ void chirp_reli_closedir( struct chirp_dir *dir );
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_getacl( const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime );
+INT64_T chirp_reli_getacl(const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime);
 
 /** Modify an access control list.
 @param host The name and port of the Chirp server to access.
@@ -359,7 +367,7 @@ INT64_T chirp_reli_getacl( const char *host, const char *path, chirp_dir_t callb
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_setacl( const char *host, const char *path, const char *subject, const char *rights, time_t stoptime );
+INT64_T chirp_reli_setacl(const char *host, const char *path, const char *subject, const char *rights, time_t stoptime);
 
 /** Reset an access control list.  This call will remove all entries from the access control list and grant to the calling user only those rights stated here.
 @param host The name and port of the Chirp server to access.
@@ -369,7 +377,7 @@ INT64_T chirp_reli_setacl( const char *host, const char *path, const char *subje
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_resetacl( const char *host, const char *path, const char *rights, time_t stoptime );
+INT64_T chirp_reli_resetacl(const char *host, const char *path, const char *rights, time_t stoptime);
 
 /** Identify the true location of a path. 
 @param host The name and port of the Chirp server to access.
@@ -379,7 +387,7 @@ INT64_T chirp_reli_resetacl( const char *host, const char *path, const char *rig
 @param stoptime The absolute time at which to abort.
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
-INT64_T chirp_reli_locate( const char *host, const char *path, chirp_loc_t callback, void *arg, time_t stoptime );
+INT64_T chirp_reli_locate(const char *host, const char *path, chirp_loc_t callback, void *arg, time_t stoptime);
 
 /** Return the caller's identity.
 @param host The name and port of the Chirp server to access.
@@ -389,7 +397,7 @@ INT64_T chirp_reli_locate( const char *host, const char *path, chirp_loc_t callb
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_whoami( const char *host, char *subject, INT64_T length, time_t stoptime );
+INT64_T chirp_reli_whoami(const char *host, char *subject, INT64_T length, time_t stoptime);
 
 /** Return the server's identity against another server.
 This causes the server to call <b>another</b> Chirp server and invoke @ref chirp_reli_whoami.
@@ -401,7 +409,7 @@ This causes the server to call <b>another</b> Chirp server and invoke @ref chirp
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_whoareyou( const char *host, const char *rhost, char *subject, INT64_T length, time_t stoptime  );
+INT64_T chirp_reli_whoareyou(const char *host, const char *rhost, char *subject, INT64_T length, time_t stoptime);
 
 /** Create a named pipe (FIFO).
 A named pipe (FIFO) is a rendezvous that appears as a file.
@@ -412,7 +420,7 @@ Programs that read from the named pipe will block until another program connects
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_mkfifo( const char *host, const char *path, time_t stoptime );
+INT64_T chirp_reli_mkfifo(const char *host, const char *path, time_t stoptime);
 
 /** Delete a file.
 @param host The name and port of the Chirp server to access.
@@ -421,7 +429,7 @@ INT64_T chirp_reli_mkfifo( const char *host, const char *path, time_t stoptime )
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_unlink( const char *host, const char *path, time_t stoptime );
+INT64_T chirp_reli_unlink(const char *host, const char *path, time_t stoptime);
 
 /** Rename a file or directory.
 @param host The name and port of the Chirp server to access.
@@ -431,7 +439,7 @@ INT64_T chirp_reli_unlink( const char *host, const char *path, time_t stoptime )
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_rename( const char *host, const char *path, const char *newpath, time_t stoptime );
+INT64_T chirp_reli_rename(const char *host, const char *path, const char *newpath, time_t stoptime);
 
 /** Create a hard link.
 @param host The name and port of the Chirp server to access.
@@ -441,7 +449,7 @@ INT64_T chirp_reli_rename( const char *host, const char *path, const char *newpa
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_link( const char *host, const char *path, const char *newpath, time_t stoptime );
+INT64_T chirp_reli_link(const char *host, const char *path, const char *newpath, time_t stoptime);
 
 /** Create a symbolic link.
 @param host The name and port of the Chirp server to access.
@@ -451,7 +459,7 @@ INT64_T chirp_reli_link( const char *host, const char *path, const char *newpath
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_symlink( const char *host, const char *path, const char *newpath, time_t stoptime );
+INT64_T chirp_reli_symlink(const char *host, const char *path, const char *newpath, time_t stoptime);
 
 /** Examine a symbolic link.
 @param host The name and port of the Chirp server to access.
@@ -462,7 +470,7 @@ INT64_T chirp_reli_symlink( const char *host, const char *path, const char *newp
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_readlink( const char *host, const char *path, char *buf, INT64_T length, time_t stoptime );
+INT64_T chirp_reli_readlink(const char *host, const char *path, char *buf, INT64_T length, time_t stoptime);
 
 
 /** Create a new directory.
@@ -473,7 +481,7 @@ INT64_T chirp_reli_readlink( const char *host, const char *path, char *buf, INT6
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_mkdir( const char *host, const char *path, INT64_T mode, time_t stoptime );
+INT64_T chirp_reli_mkdir(const char *host, const char *path, INT64_T mode, time_t stoptime);
 
 /** Create a new directory recursively.
 @param host The name and port of the Chirp server to access.
@@ -483,7 +491,7 @@ INT64_T chirp_reli_mkdir( const char *host, const char *path, INT64_T mode, time
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_mkdir_recursive( const char *host, const char *path, INT64_T mode, time_t stoptime );
+INT64_T chirp_reli_mkdir_recursive(const char *host, const char *path, INT64_T mode, time_t stoptime);
 
 /** Delete a directory if it is empty.
 @param host The name and port of the Chirp server to access.
@@ -493,7 +501,7 @@ INT64_T chirp_reli_mkdir_recursive( const char *host, const char *path, INT64_T 
 @see chirp_reli_rmall.
 */
 
-INT64_T chirp_reli_rmdir( const char *host, const char *path, time_t stoptime );
+INT64_T chirp_reli_rmdir(const char *host, const char *path, time_t stoptime);
 
 /** Delete a directory recursively.
 Deletes a directory recursively, even if it is not empty.
@@ -505,7 +513,7 @@ The recursion is performed on the file server, so this call is efficient to perf
 @
 */
 
-INT64_T chirp_reli_rmall( const char *host, const char *path, time_t stoptime );
+INT64_T chirp_reli_rmall(const char *host, const char *path, time_t stoptime);
 
 /** Get file status.
 If called on a symbolic link, @ref chirp_reli_stat will follow that link and obtain the status of the underlying file.
@@ -516,7 +524,7 @@ If called on a symbolic link, @ref chirp_reli_stat will follow that link and obt
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_stat( const char *host, const char *path, struct chirp_stat *info, time_t stoptime );
+INT64_T chirp_reli_stat(const char *host, const char *path, struct chirp_stat *info, time_t stoptime);
 
 /** Get file or link status.
 If called on a symbolic link, @ref chirp_reli_lstat will return the status of the link itself.
@@ -528,7 +536,7 @@ If called on a symbolic link, @ref chirp_reli_lstat will return the status of th
 @see chirp_reli_lstat, chirp_reli_fstat, chirp_reli_statfs
 */
 
-INT64_T chirp_reli_lstat( const char *host, const char *path, struct chirp_stat *info, time_t stoptime );
+INT64_T chirp_reli_lstat(const char *host, const char *path, struct chirp_stat *info, time_t stoptime);
 
 /** Get filesystem status.
 @param host The name and port of the Chirp server to access.
@@ -538,7 +546,7 @@ INT64_T chirp_reli_lstat( const char *host, const char *path, struct chirp_stat 
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_statfs( const char *host, const char *path, struct chirp_statfs *info, time_t stoptime );
+INT64_T chirp_reli_statfs(const char *host, const char *path, struct chirp_statfs *info, time_t stoptime);
 
 /** Check access permissions.
 @param host The name and port of the Chirp server to access.
@@ -551,7 +559,7 @@ INT64_T chirp_reli_statfs( const char *host, const char *path, struct chirp_stat
 @return If access will be granted, returns greater than or equal to zero.  On failure, returns less than zero and sets errno.
 */
 
-INT64_T chirp_reli_access( const char *host, const char *path, INT64_T flags, time_t stoptime );
+INT64_T chirp_reli_access(const char *host, const char *path, INT64_T flags, time_t stoptime);
 
 /** Change mode bits.
 Note that the current Chirp file server ignores the mode bits,
@@ -564,7 +572,7 @@ except to determine whether a program is executable.  See @ref chirp_reli_setacl
 @see chirp_reli_fchmod, chirp_reli_setacl
 */
 
-INT64_T chirp_reli_chmod( const char *host, const char *path, INT64_T mode, time_t stoptime );
+INT64_T chirp_reli_chmod(const char *host, const char *path, INT64_T mode, time_t stoptime);
 
 /** Change the ownership of a file.
 @deprecated Note that the current Chirp file server does not make use of the Unix owner field, see @ref chirp_reli_setacl instead.
@@ -576,7 +584,7 @@ INT64_T chirp_reli_chmod( const char *host, const char *path, INT64_T mode, time
 @see chirp_reli_fchown, chirp_reli_setacl, chirp_reli_getacl
 */
 
-INT64_T chirp_reli_chown( const char *host, const char *path, INT64_T uid, INT64_T gid, time_t stoptime );
+INT64_T chirp_reli_chown(const char *host, const char *path, INT64_T uid, INT64_T gid, time_t stoptime);
 
 /** Change the ownership of a file or link.
 @deprecated Note that the current Chirp file server does not make use of the Unix owner field, see @ref chirp_reli_setacl instead.
@@ -588,7 +596,7 @@ INT64_T chirp_reli_chown( const char *host, const char *path, INT64_T uid, INT64
 @see chirp_reli_fchown, chirp_reli_setacl, chirp_reli_getacl
 */
 
-INT64_T chirp_reli_lchown( const char *host, const char *path, INT64_T uid, INT64_T gid, time_t stoptime );
+INT64_T chirp_reli_lchown(const char *host, const char *path, INT64_T uid, INT64_T gid, time_t stoptime);
 
 /** Truncate a file.
 @param host The name and port of the Chirp server to access.
@@ -598,7 +606,7 @@ INT64_T chirp_reli_lchown( const char *host, const char *path, INT64_T uid, INT6
 @see chirp_reli_ftruncate
 */
 
-INT64_T chirp_reli_truncate( const char *host, const char *path, INT64_T length, time_t stoptime );
+INT64_T chirp_reli_truncate(const char *host, const char *path, INT64_T length, time_t stoptime);
 
 /** Change the modification times of a file.
 @param host The name and port of the Chirp server to access.
@@ -609,7 +617,7 @@ INT64_T chirp_reli_truncate( const char *host, const char *path, INT64_T length,
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_utime( const char *host, const char *path, time_t actime, time_t modtime, time_t stoptime );
+INT64_T chirp_reli_utime(const char *host, const char *path, time_t actime, time_t modtime, time_t stoptime);
 
 /** Checksum a remote file.
 This MD5 checksum is performed remotely by the file server, so it is much more
@@ -624,7 +632,28 @@ digest into a human readable form.
 @see md5_string
 */
 
-INT64_T chirp_reli_md5( const char *host, const char *path, unsigned char digest[16], time_t stoptime );
+INT64_T chirp_reli_md5(const char *host, const char *path, unsigned char digest[16], time_t stoptime);
+
+/** Set replication factor.
+Sets the number of replicas desired for the indicated file or for all newly created files.
+This only has an effect if the server backend supports replication, currently only with HDFS.
+@param host The name and port of the Chirp server to access.
+@param path The pathname of the file to modify.  If the pathname is <tt>"@@@"</tt>, then this call sets the replication factor for all files created by this process.
+@param nreps The number of replicas desired.  Zero indicates the server should use the default replication value. 
+@param stoptime The absolute time at which to abort.
+@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
+*/
+
+INT64_T chirp_reli_setrep(const char *host, const char *path, int nreps, time_t stoptime );
+
+/** Set the debug options on the remote server.
+@param host The name and port of the Chirp server to access.
+@param flag A debug flag to set on the server. Pass NULL to not change. Pass "clear" to clear.
+@param stoptime The absolute time at which to abort.
+@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
+*/
+
+INT64_T chirp_reli_remote_debug(const char *host, const char *flag, time_t stoptime);
 
 /** Return the local path of a file.
 This function allows the caller to find out the local path where a file is stored,
@@ -639,7 +668,7 @@ has been readable to the user <tt>system:localuser</tt> using @ref chirp_reli_se
 @return On success, greater than or equal to zero.  On failure, returns less than zero and sets errno.
 */
 
-INT64_T chirp_reli_localpath( const char *host, const char *path, char *localpath, int length, time_t stoptime  );
+INT64_T chirp_reli_localpath(const char *host, const char *path, char *localpath, int length, time_t stoptime);
 
 /** Measure remote space consumption.
 This routine causes the server to internally measure the space consumed by each user of the system.
@@ -652,7 +681,7 @@ describing the current space usage.  The caller is responsible for free()ing the
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_audit( const char *host, const char *path, struct chirp_audit **list, time_t stoptime );
+INT64_T chirp_reli_audit(const char *host, const char *path, struct chirp_audit **list, time_t stoptime);
 
 /** Third party transfer.
 Directs the server to transfer a file or directory to another (third-party) server.
@@ -666,7 +695,7 @@ preserve the access controls present in the source directory.
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_thirdput( const char *host, const char *path, const char *thirdhost, const char *thirdpath, time_t stoptime );
+INT64_T chirp_reli_thirdput(const char *host, const char *path, const char *thirdhost, const char *thirdpath, time_t stoptime);
 
 /** Create a space allocation.
 Creates a new directory with a firm guarantee that the user will be able to store a specific amount of data there.
@@ -679,7 +708,7 @@ Creates a new directory with a firm guarantee that the user will be able to stor
 @see chirp_reli_lsalloc
 */
 
-INT64_T chirp_reli_mkalloc( const char *host, const char *path, INT64_T size, INT64_T mode, time_t stoptime );
+INT64_T chirp_reli_mkalloc(const char *host, const char *path, INT64_T size, INT64_T mode, time_t stoptime);
 
 /** List a space allocation.
 @param host The name and port of the Chirp server to access.
@@ -692,7 +721,7 @@ INT64_T chirp_reli_mkalloc( const char *host, const char *path, INT64_T size, IN
 @see chirp_reli_mkalloc
 */
 
-INT64_T chirp_reli_lsalloc( const char *host, const char *path, char *allocpath, INT64_T *total, INT64_T *inuse, time_t stoptime );
+INT64_T chirp_reli_lsalloc(const char *host, const char *path, char *allocpath, INT64_T * total, INT64_T * inuse, time_t stoptime);
 
 /** Create a new access control group.
 Note that group is deleted by calling @ref chirp_reli_unlink on the group name.
@@ -702,154 +731,7 @@ Note that group is deleted by calling @ref chirp_reli_unlink on the group name.
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_group_create( const char *host, char *group, time_t stoptime );
-
-/** List members of an access control group.
-@param host The name and port of the server hosting the group.
-@param group The group name, which is simple a path on the server.
-@param callback A function to call for each member of the group.
-@param arg An optional convenience pointer to pass to the callback.
-@param stoptime The absolute time at which to abort.
-@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
-*/
-
-INT64_T chirp_reli_group_list( const char *host, const char *group, chirp_dir_t callback, void *arg, time_t stoptime );
-
-/** Add a user to a group.
-@param host The name and port of the server hosting the group.
-@param group The group name, which is simple a path on the server.
-@param user The subject name to add to the group.
-@param stoptime The absolute time at which to abort.
-@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
-*/
-
-INT64_T chirp_reli_group_add( const char *host, char *group, char *user, time_t stoptime );
-
-/** Remove a user from a group.
-@param host The name and port of the server hosting the group.
-@param group The group name, which is simple a path on the server.
-@param user The subject name to remove from the group.
-@param stoptime The absolute time at which to abort.
-@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
-*/
-
-INT64_T chirp_reli_group_remove( const char *host, char *group, char *user, time_t stoptime );
-
-/** Test membership in a group.
-@param host The name and port of the server hosting the group.
-@param group The group name, which is simple a path on the server.
-@param user The subject name to remove from the group.
-@param stoptime The absolute time at which to abort.
-@return Greater than zero if the user is a member of the group, zero is the user is not a member of a group, less than zero if there is a failure to access the group.
-*/
-
-INT64_T chirp_reli_group_lookup( const char *host, const char *group, const char *user, time_t stoptime );
-
-/* Note that these functions are not documented because they are only used for inter-server communications. */
-INT64_T chirp_reli_group_cache_update( const char *host, const char *group, time_t mod_time, time_t stoptime );
-INT64_T chirp_reli_group_policy_set( const char *host, char *group, unsigned long int file_duration, unsigned long int dec_duration, time_t stoptime );
-INT64_T chirp_reli_group_policy_get( const char *host, const char *group, int *policy, int *file_duration, int *dec_duration, time_t stoptime );
-
-/** Create a new active storage job.
-This function creates a new job with a given command line and the explicitly names the current working directory and standard I/O files.
-A unique job identifier will be returned, which must be given to @ref chirp_reli_job_commit, which will permit the job to run.
-@param host The name and port of the Chirp server to access.
-@param cwd The initial working directory of the job.
-@param input A file to use as the standard input stream, or "-" for none.
-@param output A file to use as the standard output stream, or "-" for none.
-@param error A file to use as the standard error stream, or "-" for none.
-@param cmdline The command line to execute, beginning with the path of the executable.
-@param stoptime The absolute time at which to abort.
-@return On success, returns a unique job identifier.  On failure, returns less than zero and sets errno.
-@see chirp_reli_job_begin, chirp_reli_job_commit, chirp_reli_job_wait, chirp_reli_job_list, chirp_reli_job_kill, chirp_reli_job_remove
-*/
-
-INT64_T chirp_reli_job_begin( const char *host, const char *cwd, const char *input, const char *output, const char *error, const char *cmdline, time_t stoptime );
-
-/** Commit an active storage job.
-A job created by @ref chirp_reli_job_begin is not allowed to run until it is committed by calling @ref chirp_reli_job_commit.
-This is called a <i>two phase commit</i> and is necessary to prevent runaway jobs of which the caller does not know the job ID.
-After this function is called, the job is free to run within the constraints of the local scheduler.
-@param host The name and port of the Chirp server to access.
-@param jobid The job identifier.
-@param stoptime The absolute time at which to abort.
-@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
-@see chirp_reli_job_begin, chirp_reli_job_commit, chirp_reli_job_wait, chirp_reli_job_list, chirp_reli_job_kill, chirp_reli_job_remove
-*/
-
-INT64_T chirp_reli_job_commit( const char *host, INT64_T jobid, time_t stoptime );
-
-/** Get status of an active storage job.
-This function will obtain the detailed status of an active storage job, optionally waiting until it is complete.
-If wait_time is zero, then the job's status will be immediately returned.
-If wait_time is greater than zero, then this function will wait until the job reaches a completed state,
-or the wait_time expires.
-<b>Note that stoptime must be greater than waittime, otherwise you will never receive a response.</b>
-@param host The name and port of the Chirp server to access.
-@param jobid The job identifier.
-@param state A pointer to a buffer to be filled with the job's current states.
-@param wait_time The maximum time to wait for the job to complete.
-@param stoptime The absolute time at which to abort.
-@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
-@see chirp_reli_job_begin, chirp_reli_job_commit, chirp_reli_job_wait, chirp_reli_job_list, chirp_reli_job_kill, chirp_reli_job_remove
-*/
-
-INT64_T chirp_reli_job_wait( const char *host, INT64_T jobid, struct chirp_job_state *state, int wait_time, time_t stoptime );
-
-/** Kill an active storage job.
-Forces the named job into the @ref CHIRP_JOB_STATE_KILLED state.
-The job record must still be removed by calling @ref chirp_reli_job_remove.
-The caller must be the owner of this job.
-@param host The name and port of the Chirp server to access.
-@param jobid The job identifier.
-@param stoptime The absolute time at which to abort.
-@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
-@see chirp_reli_job_begin, chirp_reli_job_commit, chirp_reli_job_wait, chirp_reli_job_list, chirp_reli_job_kill, chirp_reli_job_remove
-*/
-
-INT64_T chirp_reli_job_kill( const char *host, INT64_T jobid, time_t stoptime );
-
-/** Remove an active storage job.
-Deletes the record and all other state associated with an active storage job.
-If the job is not yet complete, it will be killed first.
-The caller must be the owner of this job.
-@param host The name and port of the Chirp server to access.
-@param jobid The job identifier.
-@param stoptime The absolute time at which to abort.
-@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
-@see chirp_reli_job_begin, chirp_reli_job_commit, chirp_reli_job_wait, chirp_reli_job_list, chirp_reli_job_kill, chirp_reli_job_remove
-*/
-
-INT64_T chirp_reli_job_remove( const char *host, INT64_T jobid, time_t stoptime );
-
-/** List all active storage jobs.
-Returns status about all known jobs on a server, regardless of their owner or state.
-@param host The name and port of the Chirp server to access.
-@param callback The function to be called for each job in the listing.
-@param arg An optional convenience pointer passed to the callback.
-@param stoptime The absolute time at which to abort.
-@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
-@see chirp_reli_job_begin, chirp_reli_job_commit, chirp_reli_job_wait, chirp_reli_job_list, chirp_reli_job_kill, chirp_reli_job_remove
-*/
-
-INT64_T chirp_reli_job_list( const char *host, chirp_joblist_t callback, void *arg, time_t stoptime );
-
-/** Perform multiple I/O operations simultaneously.
-This call invokes any number of I/O operations simultaneously,
-using pipelining and parallelism to complete quickly.
-Multiple operations may affect a single host, multiple hosts,
-or a mix of the two.  The list of operations is given by
-an array of @ref chirp_bulkio structures, each of which specifies
-an individual operation from @ref chirp_reli.h.  Note that only
-a select few operations are available through this interface.
-Future versions of the API may be more complete.
-@param list The list of operations to be performed.
-@param count The number of entries in list.
-@param stoptime The absolute time at which to abort.
-@returns On success, returns greater than or equal to zero.  On failure, returns less than zero and sets errno appropriately.  Note that "success" means all the operations were successfully dispatched.  Each individual operation will have it success or failure and errno recorded in the corresponding @ref chirp_bulkio structure.
-*/
-
-INT64_T chirp_reli_bulkio( struct chirp_bulkio *list, int count, time_t stoptime );
+INT64_T chirp_reli_bulkio(struct chirp_bulkio *list, int count, time_t stoptime);
 
 /** Return the current buffer block size.
 This module performs input and output buffering to improve the performance of small I/O operations.
@@ -867,7 +749,7 @@ aggregated together.  This function sets the current buffer size.
 @param bs The new buffer block size.
 */
 
-void    chirp_reli_blocksize_set( INT64_T bs );
+void chirp_reli_blocksize_set(INT64_T bs);
 
 /** Prepare to fork in a parallel program.
 The Chirp library is not thread-safe, but it can be used in a program

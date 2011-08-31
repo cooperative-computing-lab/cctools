@@ -30,14 +30,13 @@ timestamp_t timestamp_get(void);
 @param interval The number of microseconds to sleep for.
 */
 
-void timestamp_sleep( timestamp_t interval );
+void timestamp_sleep(timestamp_t interval);
 
 /** Get the last modified time of a file.
 @param file The path of the file to examine.
 @return The modification time, in seconds since January 1st, 1970.
 */
 
-time_t timestamp_file( const char *file );
+time_t timestamp_file(const char *file);
 
 #endif
-

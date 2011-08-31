@@ -19,6 +19,7 @@ See the file COPYING for details.
 
 #include "sequence_filter.h"
 
+static char *progname = "sand_filter_kernel";
 static int num_seqs;
 static int kmer_size = 22;
 static int window_size = 22;
@@ -131,7 +132,8 @@ int main(int argc, char **argv)
 
 	int start_x, end_x, start_y, end_y;
 
-	get_options(argc, argv, "sand_filter_kernel");
+	debug_config(progname);
+	get_options(argc, argv, progname);
 
 	unsigned long start_mem, cand_mem, table_mem;
 
@@ -229,6 +231,7 @@ int main(int argc, char **argv)
 			cand_mem = get_mem_usage();
 
 			debug(D_DEBUG,"Total candidates generated: %llu\n", (long long unsigned int) total_cand);
+			debug(D_DEBUG,"Candidate memory used: %lu\n", cand_mem - table_mem);
 
 			output_list = retrieve_candidates(&num_in_list);
 			output_candidate_list(output, output_list, num_in_list);

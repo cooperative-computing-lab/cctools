@@ -73,12 +73,12 @@ if(length>0) {
 @param port The UDP port number to bind to.  On most versions of Unix, an ordinary user can only bind to ports greater than 1024.
 @return A new object for sending or receiving datagrams.  On failure, returns null and sets errno appropriately.  A very common error is EADDRINUSE, which indicates another process is already bound to that port.
 */
-struct datagram * datagram_create( int port );
+struct datagram *datagram_create(int port);
 
 /** Destroy a datagram port.
 @param d The datagram object to destroy.
 */
-void datagram_delete( struct datagram *d );
+void datagram_delete(struct datagram *d);
 
 /** Receive a datagram.
 @param d The datagram object.
@@ -89,7 +89,7 @@ void datagram_delete( struct datagram *d );
 @param timeout Maximum time to wait, in microseconds.
 @return On success, returns the number of bytes received.  On failure, returns less than zero and sets errno appropriately.
 */
-int datagram_recv( struct datagram *d, char *data, int length, char *addr, int *port, int timeout );
+int datagram_recv(struct datagram *d, char *data, int length, char *addr, int *port, int timeout);
 
 /** Send a datagram.
 @param d The datagram object.
@@ -99,12 +99,12 @@ int datagram_recv( struct datagram *d, char *data, int length, char *addr, int *
 @param port The port of the recipient.
 @return On success, returns the number of bytes sent.  On failure, returns less than zero and sets errno appropriately.
 */
-int datagram_send( struct datagram *d, const char *data, int length, const char *addr, int port );
+int datagram_send(struct datagram *d, const char *data, int length, const char *addr, int port);
 
 /** Obtain the file descriptor of a datagram object.
 @param d The datagram object.
 @return The file descriptor associated with the underlying socket.
 */
-int datagram_fd( struct datagram *d );
+int datagram_fd(struct datagram *d);
 
 #endif

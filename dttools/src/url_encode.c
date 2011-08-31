@@ -9,14 +9,14 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <string.h>
 
-void url_encode( const char *s, char *t, int length )
+void url_encode(const char *s, char *t, int length)
 {
-	while(*s && length>1 ) {
-		if( *s<=32 || *s=='%' || *s=='\\' || *s=='<' || *s== '>' || *s=='\'' || *s=='\"' || *s>122 ) {
-			if(length>3) {
-				snprintf(t,length,"%%%2X",*s);
-				t+=3;
-				length-=3;
+	while(*s && length > 1) {
+		if(*s <= 32 || *s == '%' || *s == '\\' || *s == '<' || *s == '>' || *s == '\'' || *s == '\"' || *s > 122) {
+			if(length > 3) {
+				snprintf(t, length, "%%%2X", *s);
+				t += 3;
+				length -= 3;
 				s++;
 			} else {
 				break;
@@ -29,14 +29,14 @@ void url_encode( const char *s, char *t, int length )
 	*t = 0;
 }
 
-void url_decode( const char *s, char *t, int length )
+void url_decode(const char *s, char *t, int length)
 {
-	while(*s && length>1 ) {
-		if( *s=='%') {
+	while(*s && length > 1) {
+		if(*s == '%') {
 			int x;
-			sscanf(s+1,"%2x",&x);
+			sscanf(s + 1, "%2x", &x);
 			*t++ = x;
-			s+=3;
+			s += 3;
 		} else {
 			*t++ = *s++;
 		}

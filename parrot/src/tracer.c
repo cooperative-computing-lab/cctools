@@ -24,7 +24,7 @@ See the file COPYING for details.
 #include <sys/wait.h>
 #include <sys/ptrace.h>
 
-#define FATAL fatal("tracer: %s",strerror(errno));
+#define FATAL fatal("tracer: %d %s",t->pid,strerror(errno));
 
 /*
 Note that we would normally get such register definitions

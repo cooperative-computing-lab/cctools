@@ -5,7 +5,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-int  auth_globus_register();
-int  auth_globus_has_delegated_credential();
-void auth_globus_use_delegated_credential( int yesno );
-
+int auth_globus_register();
+int auth_globus_has_delegated_credential();
+void auth_globus_use_delegated_credential(int yesno);

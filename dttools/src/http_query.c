@@ -22,67 +22,68 @@ See the file COPYING for details.
 #define HTTP_LINE_MAX 4096
 #define HTTP_PORT 80
 
-static int http_response_to_errno( int response ) 
+static int http_response_to_errno(int response)
 {
-	if(response<=299) {
+	if(response <= 299) {
 		return 0;
-	} else if(response<=399) {
+	} else if(response <= 399) {
 		return EBUSY;
-	} else if(response==400) {
+	} else if(response == 400) {
 		return EINVAL;
-	} else if(response<=403) {
+	} else if(response <= 403) {
 		return EACCES;
-	} else if(response==404) {
+	} else if(response == 404) {
 		return ENOENT;
-	} else if(response<=406) {
+	} else if(response <= 406) {
 		return EINVAL;
-	} else if(response==407) {
+	} else if(response == 407) {
 		return EACCES;
-	} else if(response==408) {
+	} else if(response == 408) {
 		return ETIMEDOUT;
-	} else if(response<=410) {
+	} else if(response <= 410) {
 		return ENOENT;
-	} else if(errno<=499) {
+	} else if(errno <= 499) {
 		return EINVAL;
 	} else {
 		return EIO;
 	}
 }
 
-struct link * http_query_no_cache( const char *url, const char *action, time_t stoptime)
+struct link *http_query_no_cache(const char *url, const char *action, time_t stoptime)
 {
 	INT64_T size;
-	return http_query_size(url,action,&size,stoptime, 1);
+	return http_query_size(url, action, &size, stoptime, 1);
 }
 
-struct link * http_query( const char *url, const char *action, time_t stoptime)
+struct link *http_query(const char *url, const char *action, time_t stoptime)
 {
 	INT64_T size;
-	return http_query_size(url,action,&size,stoptime, 0);
+	return http_query_size(url, action, &size, stoptime, 0);
 }
 
-struct link * http_query_size( const char *url, const char *action, INT64_T *size, time_t stoptime, int cache_reload )
+struct link *http_query_size(const char *url, const char *action, INT64_T * size, time_t stoptime, int cache_reload)
 {
 	if(!getenv("HTTP_PROXY")) {
-		return http_query_size_via_proxy(0,url,action,size,stoptime, cache_reload);
+		return http_query_size_via_proxy(0, url, action, size, stoptime, cache_reload);
 	} else {
 		char proxies[HTTP_LINE_MAX];
 		char *proxy;
 
-		strcpy(proxies,getenv("HTTP_PROXY"));
-		proxy = strtok(proxies,";");
+		strcpy(proxies, getenv("HTTP_PROXY"));
+		proxy = strtok(proxies, ";");
 
 		while(proxy) {
 			struct link *result;
-			result = http_query_size_via_proxy(proxy,url,action,size,stoptime, cache_reload);
-			if(result) return result;
-			proxy = strtok(0,";");
+			result = http_query_size_via_proxy(proxy, url, action, size, stoptime, cache_reload);
+			if(result)
+				return result;
+			proxy = strtok(0, ";");
 		}
 		return 0;
 	}
 }
 
-struct link * http_query_size_via_proxy( const char *proxy, const char *urlin, const char *action, INT64_T *size, time_t stoptime, int cache_reload )
+struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, const char *action, INT64_T * size, time_t stoptime, int cache_reload)
 {
 	char url[HTTP_LINE_MAX];
 	char newurl[HTTP_LINE_MAX];
@@ -95,100 +96,102 @@ struct link * http_query_size_via_proxy( const char *proxy, const char *urlin, c
 	int actual_port;
 	*size = 0;
 
-	url_encode(urlin,url,sizeof(url));
+	url_encode(urlin, url, sizeof(url));
 
-	if(proxy && !strcmp(proxy,"DIRECT")) proxy = 0;
+	if(proxy && !strcmp(proxy, "DIRECT"))
+		proxy = 0;
 
 	if(proxy) {
-		int fields = sscanf(proxy,"http://%[^:]:%d",actual_host,&actual_port);
-		if(fields==2) {
+		int fields = sscanf(proxy, "http://%[^:]:%d", actual_host, &actual_port);
+		if(fields == 2) {
 			/* host and port are good */
-		} else if(fields==1) {
+		} else if(fields == 1) {
 			actual_port = HTTP_PORT;
 		} else {
-			debug(D_HTTP,"invalid proxy syntax: %s",proxy);
+			debug(D_HTTP, "invalid proxy syntax: %s", proxy);
 			return 0;
 		}
 	} else {
-		int fields = sscanf(url,"http://%[^:]:%d",actual_host,&actual_port);
-		if(fields!=2) {
-			fields = sscanf(url,"http://%[^/]",actual_host);
-			if(fields==1) {
+		int fields = sscanf(url, "http://%[^:]:%d", actual_host, &actual_port);
+		if(fields != 2) {
+			fields = sscanf(url, "http://%[^/]", actual_host);
+			if(fields == 1) {
 				actual_port = HTTP_PORT;
 			} else {
-				debug(D_HTTP,"malformed url: %s",url);
+				debug(D_HTTP, "malformed url: %s", url);
 				return 0;
 			}
 		}
 	}
 
-	debug(D_HTTP,"connect %s port %d",actual_host,actual_port);
-	if(!domain_name_lookup(actual_host,addr)) return 0;
+	debug(D_HTTP, "connect %s port %d", actual_host, actual_port);
+	if(!domain_name_lookup(actual_host, addr))
+		return 0;
 
-	link = link_connect(addr,actual_port,stoptime);
+	link = link_connect(addr, actual_port, stoptime);
 	if(!link) {
 		errno = ECONNRESET;
 		return 0;
 	}
 
-	if (cache_reload == 0) {
-		debug(D_HTTP,"%s %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n",action,url,actual_host);
-		link_putfstring(link,"%s %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n",stoptime,action,url,actual_host);
+	if(cache_reload == 0) {
+		debug(D_HTTP, "%s %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n", action, url, actual_host);
+		link_putfstring(link, "%s %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host);
 	} else {
 		//  force refresh of cache end-to-end (RFC 2616)
-		debug(D_HTTP,"%s %s HTTP/1.1\r\nHost: %s\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n",action,url,actual_host);
-		link_putfstring(link,"%s %s HTTP/1.1\r\nHost: %s\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n",stoptime,action,url,actual_host);
+		debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", action, url, actual_host);
+		link_putfstring(link, "%s %s HTTP/1.1\r\nHost: %s\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host);
 	}
 
-	if(link_readline(link,line,HTTP_LINE_MAX,stoptime)) {
+	if(link_readline(link, line, HTTP_LINE_MAX, stoptime)) {
 		string_chomp(line);
-		debug(D_HTTP,"%s",line);	
-		if(sscanf(line,"HTTP/%*d.%*d %d",&response)==1) {
+		debug(D_HTTP, "%s", line);
+		if(sscanf(line, "HTTP/%*d.%*d %d", &response) == 1) {
 			newurl[0] = 0;
-			while(link_readline(link,line,HTTP_LINE_MAX,stoptime)) {
+			while(link_readline(link, line, HTTP_LINE_MAX, stoptime)) {
 				string_chomp(line);
-				debug(D_HTTP,"%s",line);
-				sscanf(line,"Location: %s",newurl);
-				sscanf(line,"Content-Length: %lld",size);
-				if(strlen(line)<=2) {
+				debug(D_HTTP, "%s", line);
+				sscanf(line, "Location: %s", newurl);
+				sscanf(line, "Content-Length: %lld", size);
+				if(strlen(line) <= 2) {
 					break;
 				}
 			}
 
-			switch(response) {
-				case 200:
-					return link;
-					break;
-				case 301:
-				case 302:
-				case 303:
-				case 307:
-					link_close(link);
-					if(newurl[0]) {
-						if(!strcmp(url,newurl)) {
-							debug(D_HTTP,"error: server gave %d redirect from %s back to the same url!",response,url);
-							errno = EIO;
-							return 0;
-						} else {
-							return http_query(newurl,action,stoptime);
-						}
-					} else {
-						errno = ENOENT;
+			switch (response) {
+			case 200:
+				return link;
+				break;
+			case 301:
+			case 302:
+			case 303:
+			case 307:
+				link_close(link);
+				if(newurl[0]) {
+					if(!strcmp(url, newurl)) {
+						debug(D_HTTP, "error: server gave %d redirect from %s back to the same url!", response, url);
+						errno = EIO;
 						return 0;
+					} else {
+						return http_query(newurl, action, stoptime);
 					}
-					break;
-				default:
-					link_close(link);
-					errno = http_response_to_errno(response);
+				} else {
+					errno = ENOENT;
 					return 0;
-					break;
+				}
+				break;
+			default:
+				link_close(link);
+				errno = http_response_to_errno(response);
+				return 0;
+				break;
 			}
 		} else {
-			debug(D_HTTP,"malformed response");
+			debug(D_HTTP, "malformed response");
 			save_errno = ECONNRESET;
 		}
 	} else {
-		debug(D_HTTP,"malformed response");
+		debug(D_HTTP, "malformed response");
 		save_errno = ECONNRESET;
 	}
 
@@ -197,21 +200,21 @@ struct link * http_query_size_via_proxy( const char *proxy, const char *urlin, c
 	return 0;
 }
 
-INT64_T http_fetch_to_file( const char *url, const char *filename, time_t stoptime )
+INT64_T http_fetch_to_file(const char *url, const char *filename, time_t stoptime)
 {
 	FILE *file;
 	INT64_T size;
 	INT64_T actual;
 	struct link *link;
 
-	file = fopen(filename,"w");
+	file = fopen(filename, "w");
 	if(file) {
-		link = http_query_size(url,"GET",&size,stoptime,1);
+		link = http_query_size(url, "GET", &size, stoptime, 1);
 		if(link) {
-			actual = link_stream_to_file(link,file,size,stoptime);
+			actual = link_stream_to_file(link, file, size, stoptime);
 			link_close(link);
 			fclose(file);
-			if(actual==size) {
+			if(actual == size) {
 				return actual;
 			} else {
 				unlink(filename);

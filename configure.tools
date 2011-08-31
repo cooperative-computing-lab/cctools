@@ -85,7 +85,33 @@ require_function ()
 	fi
 }
 
+library_search_mode=prefer_dynamic
+
 library_search()
+{
+	if library_search_normal $@;
+	then
+		return 0
+	fi
+	if [ X$HOST_MULTIARCH != X ] && library_search_multiarch $@;
+	then
+		return 0
+	fi
+
+	return 1
+}
+
+library_search_multiarch()
+{
+	if [ X$3 = X ];
+	then
+		library_search_normal $1 $2 $HOST_MULTIARCH
+	else
+		library_search_normal $1 $2 $HOST_MULTIARCH/$3
+	fi
+}
+
+library_search_normal()
 {
 	# If the second argument is root, and we are not careful,
 	# we will end up with a path that has two slashes, which
@@ -129,34 +155,57 @@ library_search()
 	# Now check for the library file in all of the known places,
 	# and add it to the link line as appropriate for the type and platform.
 
-	if check_file $libdir/lib$1.a
+	if [ $library_search_mode = prefer_static -o $library_search_mode = require_static ]
 	then
-		ldflags="${ldflags} $libdir/lib$1.a"
-		return 0
-	elif check_file $libdir/lib$1.$dynamic_suffix
-	then
-		# If this is not a standard library directory, add it to the library search path.
-		# (Adding standard directories to the path has unintended effects.)
-		if [ $libdir != /lib -a $libdir != /lib64 -a $libdir != /usr/lib -a $libdir != /usr/lib64 ]
+		if check_file $libdir/lib$1.a
 		then
-			ldflags="${ldflags} -L$libdir"
+			ldflags="${ldflags} $libdir/lib$1.a"
+			return 0
 		fi
-		ldflags="${ldflags} -l$1"
-		return 0
 	fi
 
+	if [ $library_search_mode != require_static ]
+	then
+		if check_file $libdir/lib$1.$dynamic_suffix
+		then
+			# If this is not a standard library directory, add it to the library search path.
+			# (Adding standard directories to the path has unintended effects.)
+			if [ $libdir != /lib -a $libdir != /lib64 -a $libdir != /usr/lib -a $libdir != /usr/lib64 ]
+			then
+				ldflags="${ldflags} -L$libdir"
+			fi
+			ldflags="${ldflags} -l$1"
+			return 0
+		fi
+	fi
+
+	if [ $library_search_mode = prefer_dynamic ]
+	then
+		if check_file $libdir/lib$1.a
+		then
+			ldflags="${ldflags} $libdir/lib$1.a"
+			return 0
+		fi
+	fi
+	
 	return 1
 }
 
 optional_function()
 {
+	multiarch_include=`echo $2 | sed "s|include/|include/$HOST_MULTIARCH/|"`
+
 	if check_function $1 $2
 	then
 		ccflags="${ccflags} -D$3"
 		return 0
-	else
-		return 1
+	elif [ X$HOST_MULTIARCH != X ] && check_function $1 $multiarch_include;
+	then
+		ccflags="${ccflags} -D$3"
+		return 0
 	fi
+		
+	return 1
 }
 
 optional_file()
@@ -168,6 +217,21 @@ optional_file()
 	else
 		return 1
 	fi
+}
+
+optional_include()
+{
+	multiarch_include=`echo $1 | sed "s|include/|include/$HOST_MULTIARCH/|"`
+
+	if optional_file $1 $2;
+	then
+		return 0
+	elif [ X$HOST_MULTIARCH != X ] && optional_file $multiarch_include $2;
+	then
+		return 0
+	fi
+
+	return 1
 }
 
 optional_pfs_service()
@@ -397,5 +461,17 @@ check_for_globus()
 
 		echo "no"
 		return 1
+	fi
+}
+
+check_multiarch()
+{
+	echo -n "checking for multiarch environment..." 
+	if [ -r /etc/debian_version ]; then
+		HOST_MULTIARCH=`dpkg-architecture -qDEB_HOST_MULTIARCH 2> /dev/null`
+		echo "$HOST_MULTIARCH"
+	else
+		HOST_MULTIARCH=
+		echo "no"
 	fi
 }

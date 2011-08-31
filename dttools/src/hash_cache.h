@@ -19,17 +19,16 @@ will not see it again.
 */
 
 
-typedef void (*hash_cache_cleanup_t) ( void *value );
+typedef void (*hash_cache_cleanup_t) (void *value);
 
-struct hash_cache * hash_cache_create( int size, hash_func_t func, hash_cache_cleanup_t cleanup );
-void                hash_cache_delete( struct hash_cache *cache );
+struct hash_cache *hash_cache_create(int size, hash_func_t func, hash_cache_cleanup_t cleanup);
+void hash_cache_delete(struct hash_cache *cache);
 
-int    hash_cache_insert( struct hash_cache *cache, const char *key, void *value, int lifetime );
-void * hash_cache_remove( struct hash_cache *cache, const char *key );
-void * hash_cache_lookup( struct hash_cache *cache, const char *key );
+int hash_cache_insert(struct hash_cache *cache, const char *key, void *value, int lifetime);
+void *hash_cache_remove(struct hash_cache *cache, const char *key);
+void *hash_cache_lookup(struct hash_cache *cache, const char *key);
 
-void   hash_cache_firstkey( struct hash_cache *cache );
-int    hash_cache_nextkey( struct hash_cache *cache, char **key, void **item );
+void hash_cache_firstkey(struct hash_cache *cache);
+int hash_cache_nextkey(struct hash_cache *cache, char **key, void **item);
 
 #endif
-

@@ -14,8 +14,13 @@ show_help()
 	exit 1
 }
 
+# This dummy requirement inhibits Condor from adding its own Memory expression,
+# which causes long-running workers to eventually sit idle in the queue.
+# The user can still add their own expression via the -r option.
+
+requirements="(Memory>0)"
+
 arguments=""
-requirements=""
 use_auto=0
 
 while getopts aSN:t:r:h opt 
@@ -52,10 +57,10 @@ else
     count=$1
 fi
 
-worker=`which worker 2>/dev/null`
+worker=`which work_queue_worker 2>/dev/null`
 if [ $? != 0 ]
 then
-	echo "$0: please add 'worker' to your PATH."
+	echo "$0: please add 'work_queue_worker' to your PATH."
 	exit 1
 fi
 
@@ -65,9 +70,9 @@ cp $worker .
 
 condor_submit << EOF
 universe = vanilla
-executable = worker
+executable = work_queue_worker
 arguments = $arguments $host $port
-transfer_input_files = worker
+transfer_input_files = work_queue_worker
 should_transfer_files = yes
 when_to_transfer_output = on_exit
 output = worker.\$(PROCESS).output

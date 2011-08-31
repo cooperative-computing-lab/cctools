@@ -92,7 +92,7 @@ int pfs_file::flock( int op )
 	return -1;
 }
 
-void * pfs_file::mmap( void *start, pfs_size_t length, int prot, int flags, off_t offset )
+void * pfs_file::mmap( void *start, pfs_size_t length, int prot, int flags, pfs_off_t offset )
 {
 	errno = EINVAL;
 	return MAP_FAILED;

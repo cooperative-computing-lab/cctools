@@ -17,10 +17,10 @@ struct password_cache {
 	char *password;
 };
 
-struct password_cache * password_cache_init( const char *uname, const char *pwd );
-void password_cache_delete( struct password_cache *c );
-void password_cache_cleanup( struct password_cache *c );
-int password_cache_register( struct password_cache *p, const char *uname, const char *pwd );
-int password_cache_full( struct password_cache *c);
+struct password_cache *password_cache_init(const char *uname, const char *pwd);
+void password_cache_delete(struct password_cache *c);
+void password_cache_cleanup(struct password_cache *c);
+int password_cache_register(struct password_cache *p, const char *uname, const char *pwd);
+int password_cache_full(struct password_cache *c);
 
 #endif

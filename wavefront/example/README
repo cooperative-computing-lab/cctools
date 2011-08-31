@@ -27,7 +27,7 @@ and where to place the output data:
 Then, start one or more worker processes, and tell them to contact
 the master process using host name and port number:
 
-% worker mymachine.somewhere.edu 9068
+% work_queue_worker mymachine.somewhere.edu 9068
 
 The master process will then output a series of lines detailing the
 progress of the entire computation.  If the master fails or is killed,

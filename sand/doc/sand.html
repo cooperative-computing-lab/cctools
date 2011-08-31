@@ -66,7 +66,7 @@ You will see the assembly start as normal.  When the overlapping stage begins, y
 ...
 </pre>
 
-SAND is now waiting for you to start <tt>worker</tt> processes.
+SAND is now waiting for you to start <tt>work_queue_worker</tt> processes.
 Each worker that you start will connect back to the master process
 nd perform small pieces of the work at a time.
 In general, the more machines that you can harness, the faster the work will go.
@@ -77,7 +77,7 @@ specifying the hostname where the master runs and the port number it is listenin
 For example:
 
 <pre>
-% worker master.somewhere.edu 9123
+% work_queue_worker master.somewhere.edu 9123
 </pre>
 
 With one worker, you will see some change in the output, like this:
@@ -93,7 +93,7 @@ With one worker, you will see some change in the output, like this:
 For a very small assembly, a single worker might be sufficient.
 However, to run a really large assembly at scale, you will need to
 run as many workers as possible.  A simple (but tiresome) way of doing
-so is to <tt>ssh</tt> into lots of machines and manually run <tt>worker</tt>
+so is to <tt>ssh</tt> into lots of machines and manually run <tt>work_queue_worker</tt>
 as above.  But, if you have access to a batch system like
 <a href=http://www.cs.wisc.edu/condor>Condor</a> or
 <a href=http://www.sun.com/software/sge>SGE</a>, you can use them

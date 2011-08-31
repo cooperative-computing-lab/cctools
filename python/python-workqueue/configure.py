@@ -16,7 +16,12 @@ import sys
 # Constants --------------------------------------------------------------------
 
 INCLUDE_DIRS  = ['/usr/include', '/usr/local/include']
+if 'INCLUDE' in os.environ:
+    INCLUDE_DIRS += list(set(os.environ['INCLUDE'].split(':')))
+
 LIBRARY_DIRS  = ['/usr/lib', '/usr/local/lib']
+if 'LIBRARY_PATH' in os.environ:
+    LIBRARY_DIRS += list(set(os.environ['LIBRARY_PATH'].split(':')))
 
 if os.uname()[-1] == 'x86_64':
     LIBRARY_DIRS  = LIBRARY_DIRS + map(lambda s: s + '64', LIBRARY_DIRS)

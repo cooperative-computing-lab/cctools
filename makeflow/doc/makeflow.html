@@ -161,7 +161,7 @@ Or, submit 10 worker processes to SGE like this:
 
 Or, you can start workers manually on any other machine you can log into:
 <pre>
-% worker barney.nd.edu 9123
+% work_queue_worker barney.nd.edu 9123
 </pre>
 
 Once the workers begin running, Makeflow will dispatch multiple
@@ -184,7 +184,7 @@ The Makeflow language is very similar to Make, but it does have a few important 
 
 <h3>Get the Dependencies Right</h3>
 
-You must be careful to accurately specify <b>all of the files that a rule requires and creates</b>, including any custom executables.  This is because Makeflow uses this information to construct the environment for a remote job.  For example, suppose that you have written a simulation program called <tt>mysim.exe</tt> that reads <tt>calib.data</tt> and then produces and output file.  The following rule won't work, because it doesn't inform Makeflow what files are neded to execute the simulation:
+You must be careful to accurately specify <b>all of the files that a rule requires and creates</b>, including any custom executables.  This is because Makeflow requires all these information to construct the environment for a remote job.  For example, suppose that you have written a simulation program called <tt>mysim.exe</tt> that reads <tt>calib.data</tt> and then produces and output file.  The following rule won't work, because it doesn't inform Makeflow what files are neded to execute the simulation:
 <pre>
 # This is an incorrect rule.
 
@@ -201,6 +201,7 @@ construct a batch job that consists of <tt>mysim.exe</tt> and <tt>calib.data</tt
 output.txt: mysim.exe calib.data
         ./mysim.exe -c calib.data -o output.txt
 </pre>
+When a regular file is specified as an input file, it means the command relies on the contents of that file. When a directory is specified as an input file, however, it could mean one of two things. First, the command depends on the contents inside the directory. Second, the command relies on the existence of the directory (for example, you just want to add more things into the directory later, it does not matter what's already in it). <b>Makeflow assumes that an input directory indicates that the command relies on the directory's existence</b>.
 
 <h3>No Phony Rules</h3>
 
@@ -271,7 +272,7 @@ preference on "proj1".  If the '-e' option is not specified, the master would
 accept shared workers submitted by anyone. To add a project preference for the
 worker, add the '-N' option to the worker as well:
 <pre>
-% worker -N proj1 barney.nd.edu 9123
+% work_queue_worker -N proj1 barney.nd.edu 9123
 </pre>
 You can even assign mulitple preferred project names to a single worker. The
 worker would only work for the master whose name is contained in the list of
@@ -301,7 +302,7 @@ masters and workers contact this catalog server, add the '-C hostname:port'
 option to both the master and worker programs: 
 <pre>
 % makeflow -T wq -C barney.nd.edu:9097 -N proj1 example.makeflow
-% worker -C barney.nd.edu:9097 -s
+% work_queue_worker -C barney.nd.edu:9097 -s
 </pre>
 The '-C' option turns on the catalog mode. Note that the '-s' option in the
 above worker command tells the worker to run in a shared worker mode, as
@@ -316,7 +317,7 @@ catalog mode in this case you will use the '-a' option, again on both the
 master and worker programs.
 <pre>
 % makeflow -T wq -a -N proj1 example.makeflow
-% worker -a -N proj1 -N proj2 -N proj3
+% work_queue_worker -a -N proj1 -N proj2 -N proj3
 </pre>
 Note that this time the worker is not run with the '-s' option. Instead, it
 has three preferred projects. The worker would ask the catalog server for

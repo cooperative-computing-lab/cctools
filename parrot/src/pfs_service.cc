@@ -230,19 +230,19 @@ pfs_location* pfs_service::locate( pfs_name *name )
 	return 0;
 }
 
-int pfs_service::putfile( pfs_name *source, pfs_name *target )
+pfs_ssize_t pfs_service::putfile( pfs_name *source, pfs_name *target )
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-int pfs_service::getfile( pfs_name *source, pfs_name *target )
+pfs_ssize_t pfs_service::getfile( pfs_name *source, pfs_name *target )
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-int pfs_service::thirdput( pfs_name *source, pfs_name *target )
+pfs_ssize_t pfs_service::thirdput( pfs_name *source, pfs_name *target )
 {
 	errno = ENOSYS;
 	return -1;
@@ -310,15 +310,18 @@ pfs_service * pfs_service_lookup( const char *name )
                 extern pfs_service *pfs_service_irods;
 		return pfs_service_irods;
 #endif
-#ifdef HAS_HDFS
         } else if(!strcmp(name,"hdfs")) {
                 extern pfs_service *pfs_service_hdfs;
 		return pfs_service_hdfs;
-#endif
 #ifdef HAS_BXGRID
         } else if(!strcmp(name,"bxgrid")) {
                 extern pfs_service *pfs_service_bxgrid;
 		return pfs_service_bxgrid;
+#endif
+#ifdef HAS_XROOTD
+        } else if(!strcmp(name,"xrootd") || !strcmp(name,"root") ) {
+                extern pfs_service *pfs_service_xrootd;
+        	return pfs_service_xrootd;
 #endif
 	} else {
 		return 0;

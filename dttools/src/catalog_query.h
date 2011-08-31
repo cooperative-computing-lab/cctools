@@ -24,7 +24,7 @@ If neither is set, the system will contact chirp.cse.nd.edu on port 9097.
 @param stoptime The absolute time at which to abort.
 @return A catalog query object on success, or null on failure.
 */
-struct catalog_query * catalog_query_create( const char *host, int port, time_t stoptime );
+struct catalog_query *catalog_query_create(const char *host, int port, time_t stoptime);
 
 /** Read the next object from a query.
 Returns the next @ref nvpair.h object from the issued query.
@@ -34,11 +34,11 @@ and then must call @ref nvpair_delete when done.
 @param stoptime The absolute time at which to abort.
 @return An @ref nvpair.h object representing the next result, or null if the end of stream has been reached.
 */
-struct nvpair * catalog_query_read( struct catalog_query *q, time_t stoptime );
+struct nvpair *catalog_query_read(struct catalog_query *q, time_t stoptime);
 
 /** Delete a completed query object.
 @param q The query to delete.
 */
-void catalog_query_delete( struct catalog_query *q );
+void catalog_query_delete(struct catalog_query *q);
 
 #endif

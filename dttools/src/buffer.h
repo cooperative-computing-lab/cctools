@@ -22,12 +22,12 @@ typedef struct buffer_t buffer_t;
 /** Create a new buffer.
     @return A new empty buffer object. Returns NULL when out of memory.
   */
-buffer_t *buffer_create (void);
+buffer_t *buffer_create(void);
 
 /** Delete a buffer.
     @param b The buffer to free.
   */
-void buffer_delete (buffer_t *b);
+void buffer_delete(buffer_t * b);
 
 /** Print the formatted output to the buffer. The format string follows the
     same semantics as the UNIX vprintf function. buffer_vprintf does not call
@@ -37,7 +37,7 @@ void buffer_delete (buffer_t *b);
     @param ap The variable argument list for the format string.
     @return Negative value on error.
   */
-int buffer_vprintf (buffer_t *b, const char *format, va_list ap);
+int buffer_vprintf(buffer_t * b, const char *format, va_list ap);
 
 /** Print the formatted output to the buffer. The format string follows the
     same semantics as the UNIX vprintf function.
@@ -46,7 +46,7 @@ int buffer_vprintf (buffer_t *b, const char *format, va_list ap);
     @param ... The variable arguments for the format string.
     @return Negative value on error.
   */
-int buffer_printf (buffer_t *b, const char *format, ...);
+int buffer_printf(buffer_t * b, const char *format, ...);
 
 /** Returns the buffer as a string. The string is no longer valid after
     deleting the buffer. A final ASCII NUL character is guaranteed to terminate
@@ -55,6 +55,6 @@ int buffer_printf (buffer_t *b, const char *format, ...);
     @param size The size of the string is placed in this variable.
     @return The buffer as a string with a NUL terminator.
   */
-const char *buffer_tostring (buffer_t *b, size_t *size);
+const char *buffer_tostring(buffer_t * b, size_t * size);
 
 #endif /* BUFFER_H */

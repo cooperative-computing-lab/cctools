@@ -15,27 +15,27 @@ See the file COPYING for details.
 #include <sys/time.h>
 
 int NumberOfTimers = 0;
-const char** TimerStrings = NULL;
+const char **TimerStrings = NULL;
 
-struct timeval* StartTime = NULL;
-struct timeval* EndTime   = NULL;
+struct timeval *StartTime = NULL;
+struct timeval *EndTime = NULL;
 
-double* ElapsedTime = NULL;
-int*    TimedRuns   = NULL;
+double *ElapsedTime = NULL;
+int *TimedRuns = NULL;
 
-void timer_init(int timers, const char* timer_strings[])
+void timer_init(int timers, const char *timer_strings[])
 {
-	StartTime = malloc(sizeof(struct timeval)*timers);
-	EndTime   = malloc(sizeof(struct timeval)*timers);
+	StartTime = malloc(sizeof(struct timeval) * timers);
+	EndTime = malloc(sizeof(struct timeval) * timers);
 
-	ElapsedTime = malloc(sizeof(double)*timers);
-	TimedRuns   = malloc(sizeof(int)*timers);
+	ElapsedTime = malloc(sizeof(double) * timers);
+	TimedRuns = malloc(sizeof(int) * timers);
 
-	memset(ElapsedTime, 0, sizeof(double)*timers);
-	memset(TimedRuns, 0, sizeof(int)*timers);
+	memset(ElapsedTime, 0, sizeof(double) * timers);
+	memset(TimedRuns, 0, sizeof(int) * timers);
 
 	NumberOfTimers = timers;
-	TimerStrings   = timer_strings;
+	TimerStrings = timer_strings;
 }
 
 #define FREE_AND_NULL(s) if (s) { free (s); (s) = NULL; }
@@ -57,15 +57,14 @@ void timer_stop(int i)
 {
 	gettimeofday(&EndTime[i], NULL);
 
-	ElapsedTime[i] += (double)(EndTime[i].tv_sec - StartTime[i].tv_sec) + 
-			  (double)(EndTime[i].tv_usec - StartTime[i].tv_usec)/1000000.0;
+	ElapsedTime[i] += (double) (EndTime[i].tv_sec - StartTime[i].tv_sec) + (double) (EndTime[i].tv_usec - StartTime[i].tv_usec) / 1000000.0;
 	TimedRuns[i]++;
 }
 
 void timer_reset(int i)
 {
 	ElapsedTime[i] = 0.0;
-	TimedRuns[i]   = 0;
+	TimedRuns[i] = 0;
 }
 
 double timer_elapsed_time(int i)
@@ -75,19 +74,15 @@ double timer_elapsed_time(int i)
 
 double timer_average_time(int i)
 {
-	return (ElapsedTime[i]/TimedRuns[i]);
+	return (ElapsedTime[i] / TimedRuns[i]);
 }
 
 void timer_print_summary(int print_all)
 {
 	int i;
-	for (i = 0; i < NumberOfTimers; i++) 
-		if (TimedRuns[i] > 0 || print_all) 
-			printf("%s = average(%2.6lf), total(%2.6lf), runs(%d)\n", 
-				TimerStrings[i], 
-				timer_average_time(i),
-				ElapsedTime[i],
-				TimedRuns[i]);
+	for(i = 0; i < NumberOfTimers; i++)
+		if(TimedRuns[i] > 0 || print_all)
+			printf("%s = average(%2.6lf), total(%2.6lf), runs(%d)\n", TimerStrings[i], timer_average_time(i), ElapsedTime[i], TimedRuns[i]);
 }
 
 /*

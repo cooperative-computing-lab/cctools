@@ -4,11 +4,11 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef BUILTIN_H
-#define BUILTIN_H
+#ifndef CHIRP_FS_CHIRP_H
+#define CHIRP_FS_CHIRP_H
 
-#include "int_sizes.h"
+#include "chirp_filesystem.h"
 
-INT64_T chirp_builtin( const char *subject, int argc, char *argv[] );
+extern struct chirp_filesystem chirp_fs_chirp;
 
 #endif

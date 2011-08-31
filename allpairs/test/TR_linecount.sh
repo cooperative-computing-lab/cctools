@@ -3,25 +3,28 @@
 . ../../dttools/src/test_runner.common.sh
 
 pidfile=worker.pid
+portfile=worker.port
 
 prepare()
 {
-    ../../dttools/src/worker -d all localhost 9098 &
+    workerport=`find_free_port`
+    ../../dttools/src/work_queue_worker -d all localhost $workerport &
     workerpid=$!
     echo $workerpid > $pidfile
+    echo $workerport > $portfile
     ln -s ../src/allpairs_multicore .
     exit 0
 }
 
 run()
 {
-    exec ../src/allpairs_master -d all -p 9098 set.list set.list ./lc_compare.sh
+    exec ../src/allpairs_master -d all -p `cat $portfile` set.list set.list ./lc_compare.sh
 }
 
 clean()
 {
-    kill -9 $(cat $pidfile)
-    rm -f $pidfile
+    kill -9 `cat $pidfile`
+    rm -f $pidfile $portfile
     rm -f allpairs_multicore
     exit 0
 }

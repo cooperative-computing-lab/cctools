@@ -25,6 +25,7 @@ the <tt>-a</tt> command line option.
 #include "auth_globus.h"
 #include "auth_hostname.h"
 #include "auth_address.h"
+#include "auth_ticket.h"
 
 /** Enables a specific authentication mode.
 If called multiple times, the methods will be
@@ -38,7 +39,7 @@ attempted in the order chosen.
 @see auth_register_all
 */
 
-int auth_register_byname( const char *name );
+int auth_register_byname(const char *name);
 
 /** Enable all authentication modes.
 Enables all authentication modes, in a default order.

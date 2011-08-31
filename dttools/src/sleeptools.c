@@ -9,21 +9,21 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <sys/time.h>
 
-void sleep_until( time_t stoptime )
+void sleep_until(time_t stoptime)
 {
 	struct timeval tv;
 
 	while(1) {
 		time_t current = time(0);
-		if(current>=stoptime) break;
-		tv.tv_sec = stoptime-current;
+		if(current >= stoptime)
+			break;
+		tv.tv_sec = stoptime - current;
 		tv.tv_usec = 0;
-		select(0,0,0,0,&tv);
+		select(0, 0, 0, 0, &tv);
 	}
 }
 
-void sleep_for( time_t interval )
+void sleep_for(time_t interval)
 {
-	return sleep_until(time(0)+interval);
+	return sleep_until(time(0) + interval);
 }
-

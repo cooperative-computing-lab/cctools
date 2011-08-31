@@ -25,6 +25,7 @@ extern "C" {
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/un.h>
+#include <time.h>
 
 extern struct file_cache *pfs_file_cache;
 extern int pfs_force_cache;
@@ -431,7 +432,7 @@ int pfs_socket( int domain, int type, int protocol )
 int pfs_socketpair( int domain, int type, int proto, int *fds)
 {
 	BEGIN
-	debug(D_LIBCALL,"socketpair %d %d",fds[0],fds[1]);
+	debug(D_LIBCALL,"socketpair %d %d %d",domain,type,proto);
 	result = pfs_current->table->socketpair(domain,type,proto,fds);
 	END
 }
@@ -719,6 +720,128 @@ int pfs_resolve_name( const char *path, struct pfs_name *pname )
 	return pfs_current->table->resolve_name(path,pname);
 }
 
+/*
+A proposed POSIX standard includes a number of new system calls
+ending in -at, corresponding to traditional system calls.
+Each one takes a directory fd and resolves relative paths in
+relation to that fd.  This avoids some race-conditions (good idea)
+and allows for per-thread working directories (bad idea).
+Instead of propagating these new calls all the way down through Parrot,
+we reduce them to traditional calls at this interface.
+*/
+
+int pfs_openat( int dirfd, const char *path, int flags, mode_t mode )
+{
+	char newpath[PFS_PATH_MAX];
+	pfs_current->table->complete_at_path(dirfd,path,newpath);
+	return pfs_open(newpath,flags,mode);
+}
+
+int pfs_mkdirat( int dirfd, const char *path, mode_t mode)
+{
+	char newpath[PFS_PATH_MAX];
+	pfs_current->table->complete_at_path(dirfd,path,newpath);
+	return pfs_mkdir(newpath,mode);
+}
+
+int pfs_mknodat( int dirfd, const char *path, mode_t mode, dev_t dev )
+{
+	char newpath[PFS_PATH_MAX];
+	pfs_current->table->complete_at_path(dirfd,path,newpath);
+	return pfs_mknod(newpath,mode,dev);
+}
+
+int pfs_fchownat( int dirfd, const char *path, uid_t owner, gid_t group, int flags )
+{
+	char newpath[PFS_PATH_MAX];
+	pfs_current->table->complete_at_path(dirfd,path,newpath);
+	if(flags&AT_SYMLINK_NOFOLLOW) {
+		return pfs_lchown(newpath,owner,group);
+	} else {
+		return pfs_chown(newpath,owner,group);
+	}
+}
+
+int pfs_futimesat( int dirfd, const char *path, const struct timeval times[2] )
+{
+	char newpath[PFS_PATH_MAX];
+	pfs_current->table->complete_at_path(dirfd,path,newpath);
+
+	struct utimbuf ut;
+	if(times) {
+		ut.actime = times[0].tv_sec;
+		ut.modtime = times[1].tv_sec;
+	} else {
+		ut.actime = ut.modtime = time(0);
+	}
+	return pfs_utime(newpath,&ut);
+}
+
+int pfs_fstatat( int dirfd, const char *path, struct pfs_stat *buf, int flags )
+{
+	char newpath[PFS_PATH_MAX];
+	pfs_current->table->complete_at_path(dirfd,path,newpath);
+	if(flags&AT_SYMLINK_NOFOLLOW) {
+		return pfs_lstat(newpath,buf);
+	} else {
+		return pfs_stat(newpath,buf);
+	}
+}
+
+int pfs_unlinkat( int dirfd, const char *path, int flags )
+{
+	char newpath[PFS_PATH_MAX];
+	pfs_current->table->complete_at_path(dirfd,path,newpath);
+	if(flags&AT_REMOVEDIR) {
+		return pfs_rmdir(newpath);
+	} else {
+		return pfs_unlink(newpath);
+	}
+}
+
+int pfs_renameat( int olddirfd, const char *oldpath, int newdirfd, const char *newpath )
+{
+	char newoldpath[PFS_PATH_MAX];
+	char newnewpath[PFS_PATH_MAX];
+
+	pfs_current->table->complete_at_path(olddirfd,oldpath,newoldpath);
+	pfs_current->table->complete_at_path(newdirfd,newpath,newnewpath);
+
+	return pfs_rename(newoldpath,newnewpath);
+}
+
+int pfs_linkat( int olddirfd, const char *oldpath, int newdirfd, const char *newpath, int flags )
+{
+	char newoldpath[PFS_PATH_MAX];
+	char newnewpath[PFS_PATH_MAX];
+
+	pfs_current->table->complete_at_path(olddirfd,oldpath,newoldpath);
+	pfs_current->table->complete_at_path(newdirfd,newpath,newnewpath);
+
+	return pfs_link(newoldpath,newnewpath);
+}
+
+
+int pfs_symlinkat( const char *oldpath, int newdirfd, const char *newpath )
+{
+	char newnewpath[PFS_PATH_MAX];
+	pfs_current->table->complete_at_path(newdirfd,newpath,newnewpath);
+	return pfs_symlink(oldpath,newnewpath);
+}
+
+int pfs_readlinkat( int dirfd, const char *path, char *buf, size_t bufsiz )
+{
+	char newpath[PFS_PATH_MAX];
+	pfs_current->table->complete_at_path(dirfd,path,newpath);
+	return pfs_readlink(newpath,buf,bufsiz);
+}
+
+int pfs_fchmodat( int dirfd, const char *path, mode_t mode, int flags )
+{
+	char newpath[PFS_PATH_MAX];
+	pfs_current->table->complete_at_path(dirfd,path,newpath);
+	return pfs_chmod(newpath,mode);
+}
 
 
 

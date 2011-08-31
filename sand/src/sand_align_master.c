@@ -57,6 +57,8 @@ static int max_pairs_per_task = 10000;
 
 #define CAND_FILE_LINE_MAX 4096
 
+#define unsigned_isspace(c) isspace((unsigned char) c)
+
 static void show_version(const char *cmd)
 {
 	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
@@ -122,7 +124,7 @@ static char * confirm_output( char *output )
 	char *s = output;
 	char *result = 0;
 
-	while(isspace(*s)) s++;
+	while(unsigned_isspace(*s)) s++;
 
 	if(*s!='[') {
 		debug(D_NOTICE,"aligment output did not begin with [:\n%s\n",output);
@@ -131,7 +133,7 @@ static char * confirm_output( char *output )
 
 	s++;
 
-	while(isspace(*s)) s++;
+	while(unsigned_isspace(*s)) s++;
 
 	result = s;
 
@@ -139,7 +141,7 @@ static char * confirm_output( char *output )
 
 	s--;
 
-	while(isspace(*s)) s--;
+	while(unsigned_isspace(*s)) s--;
 
 	if(*s!=']') {
 		debug(D_NOTICE,"aligment output did not end with ]:\n%s\n",output);

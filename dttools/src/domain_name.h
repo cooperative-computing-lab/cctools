@@ -23,7 +23,7 @@ which uses an internal cache to perform lookups quickly.
 @return One on success, zero on failure.
 */
 
-int domain_name_lookup( const char *name, char *addr );
+int domain_name_lookup(const char *name, char *addr);
 
 /** Resolve an IP address to a domain name with caching.
 @param addr A string containing an IP address like "202.5.129.1"
@@ -31,6 +31,6 @@ int domain_name_lookup( const char *name, char *addr );
 @return One on success, zero on failure.
 */
 
-int domain_name_lookup_reverse( const char *addr, char *name );
+int domain_name_lookup_reverse(const char *addr, char *name);
 
 #endif

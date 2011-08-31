@@ -33,6 +33,7 @@ See the file COPYING for details.
 #include "int_sizes.h"
 #include "list.h"
 #include "timestamp.h"
+#include "xmalloc.h"
 
 #define DAG_LINE_MAX 1048576
 #define SHOW_INPUT_FILES 2
@@ -56,6 +57,7 @@ static struct batch_queue *remote_queue = 0;
 static char *project = NULL;
 static int priority = 0;
 static int port = 0;
+static int output_len_check = 0;
 
 typedef enum {
 	DAG_NODE_STATE_WAITING=0,
@@ -100,6 +102,7 @@ struct dag_node {
 	int failure_count;
 	dag_node_state_t state;
 	const char *command;
+	const char *original_command;
 	struct dag_file *source_files;
 	struct dag_file *target_files;
 	int source_file_names_size;
@@ -163,17 +166,14 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 
 void dag_show_input_files(struct dag *d)
 {
-	struct dag_node *n,*m,*tmp;
+	struct dag_node *n,*tmp;
 	struct dag_file *f;
-	int nodeid;
 	struct hash_table *ih;
 	char *key;
 	void *value;
 
 	ih = hash_table_create(0,0);
 	for(n=d->nodes;n;n=n->next) {
-		nodeid = -1;
-		m = 0;
 		// for each source file, see if it is a target file of another node
 		for(f=n->source_files;f;f=f->next) {
 			// d->file_table contains all target files
@@ -403,8 +403,6 @@ void dag_node_state_change( struct dag *d, struct dag_node *n, int newstate )
 	d->node_states[n->state]++;
 
 	fprintf(d->logfile,"%llu %d %d %d %d %d %d %d %d %d\n",timestamp_get(),n->nodeid,newstate,n->jobid,d->node_states[0],d->node_states[1],d->node_states[2],d->node_states[3],d->node_states[4],d->nodeid_counter);
-	fflush(d->logfile);
-	fsync(fileno(d->logfile));
 }
 
 void dag_abort_all( struct dag *d )
@@ -516,6 +514,7 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	// Rerun if an input file has been updated since the last execution.
 	for(f=n->source_files;f;f=f->next) {
 		if(stat(f->filename, &filestat)>=0) {
+			if(S_ISDIR(filestat.st_mode)) continue;
 			if(difftime(filestat.st_mtime, n->previous_completion) > 0) {
 				goto rerun; // rerun this node
 			}
@@ -632,13 +631,18 @@ void dag_log_recover( struct dag *d, const char *filename )
 		clean_symlinks(d, 1);
 		exit(1);
 	}
+	if(setvbuf(d->logfile, NULL, _IOLBF, BUFSIZ) != 0) {
+		fprintf(stderr,"makeflow: couldn't set line buffer on logfile %s: %s\n",filename,strerror(errno));
+		clean_symlinks(d, 1);
+		exit(1);
+	}
 
 	if(first_run) {
 		struct dag_file *f;
 		struct dag_node *p;
 		for(n=d->nodes;n;n=n->next) {
 			/* Record node information to log */
-			fprintf(d->logfile, "# NODE\t%d\t%s\n",n->nodeid,n->command);
+			fprintf(d->logfile, "# NODE\t%d\t%s\n",n->nodeid,n->original_command);
 
 			/* Record node parents to log */
 			fprintf(d->logfile, "# PARENTS\t%d",n->nodeid);
@@ -656,12 +660,15 @@ void dag_log_recover( struct dag *d, const char *filename )
 			}
 			fputc('\n', d->logfile);
 
-			/* Record node outputsto log */
+			/* Record node outputs to log */
 			fprintf(d->logfile, "# TARGETS\t%d",n->nodeid);
 			for(f=n->target_files;f;f=f->next) {
 				fprintf(d->logfile, "\t%s",f->filename);
 			}
 			fputc('\n', d->logfile);
+			
+			/* Record translated command to log */
+			fprintf(d->logfile, "# COMMAND\t%d\t%s\n",n->nodeid,n->command);
 		}
 	}
 
@@ -1050,6 +1057,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 		c+=6;
 	}
 
+	n->original_command = xstrdup(c);
 	n->command = translate_command(d, c, n->local_job);
 
 	free(line);
@@ -1238,6 +1246,8 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 	struct dag_file *f;
 	int job_failed = 0;
 
+	struct stat stat_info;
+
 	if(n->state!=DAG_NODE_STATE_RUNNING) return;
 
 	if(n->local_job) {
@@ -1245,13 +1255,22 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 	} else {
 		d->remote_jobs_running--;
 	}
-
+	
 	if(info->exited_normally && info->exit_code==0) {
 		for(f=n->target_files;f;f=f->next) {
 			if(access(f->filename,R_OK)!=0) {
 				fprintf(stderr,"makeflow: %s did not create file %s\n",n->command,f->filename);
 				job_failed=1;
-			}
+			} else {
+				if (output_len_check){
+					if (stat(f->filename,&stat_info)==0){
+						if (stat_info.st_size<=0){
+							fprintf(stderr,"makeflow: %s created a file of length %ld\n",n->command,(long)stat_info.st_size);
+		                                	job_failed=1;
+						}
+					}
+				}
+			}	
 		}
 	} else {
 		if(info->exited_normally) {
@@ -1424,6 +1443,7 @@ static void show_help(const char *cmd)
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -K             Preserve (i.e., do not clean) intermediate symbolic links\n");
+	printf(" -z             Force failure on zero-length output files \n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
 	
@@ -1451,7 +1471,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAB:cC:d:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:t:T:vw:W:z:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:t:T:vw:W:z:Z:")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1571,7 +1591,7 @@ int main( int argc, char *argv[] )
 		case 'K':
 			preserve_symlinks = 1;
 			break;
-		case 'z':
+		case 'Z':
 			if (!strcmp(optarg, "fcfs")) {
 				work_queue_wait_routine = WORK_QUEUE_WAIT_FCFS;
 			} else if (!strcmp(optarg, "fd")) {
@@ -1586,6 +1606,9 @@ int main( int argc, char *argv[] )
 			capacity_tolerance = atoi(optarg);
 			sprintf(line,"WORK_QUEUE_CAPACITY_TOLERANCE=%d", capacity_tolerance);
 			putenv(strdup(line));
+			break;
+		case 'z':
+			output_len_check = 1;
 			break;
 		default:
 			show_help(argv[0]);

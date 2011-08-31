@@ -30,7 +30,7 @@ int ftp_lite_radix_encode( const unsigned char * inbuf, unsigned char * outbuf, 
 {
 	int i;
 	int j;
-	unsigned char c;
+	unsigned char c=0;
 	
 	for (i=0,j=0; i < *length; i++)
 	{

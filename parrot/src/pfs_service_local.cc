@@ -11,8 +11,7 @@ extern "C" {
 #include "debug.h"
 #include "get_canonical_path.h"
 #include "username.h"
-#include "chirp_acl.h"
-#include "chirp_local.h"
+#include "ibox_acl.h"
 }
 
 #include <stdlib.h>
@@ -38,19 +37,14 @@ extern "C" ssize_t pwrite(int  fd,  const  void  *buf, size_t count, off_t offse
 
 extern const char * pfs_username;
 
-const char * chirp_super_user = 0;
-const char * chirp_group_base_url = 0;
-int chirp_group_cache_time = 0;
-char chirp_root_path[CHIRP_PATH_MAX]="/";
-
 static int check_implicit_acl( const char *path, int checkflags )
 {
 	int flags=0;
 	struct stat64 info;
 
 	if(stat64(path,&info)==0) {
-		if(info.st_mode&S_IROTH) flags |= CHIRP_ACL_READ|CHIRP_ACL_LIST;
-		if(info.st_mode&S_IXOTH) flags |= CHIRP_ACL_EXECUTE;
+		if(info.st_mode&S_IROTH) flags |= IBOX_ACL_READ|IBOX_ACL_LIST;
+		if(info.st_mode&S_IXOTH) flags |= IBOX_ACL_EXECUTE;
 		if((flags&checkflags)==checkflags) {
 			return 1;
 		} else {
@@ -67,14 +61,14 @@ static int check_implicit_acl( const char *path, int checkflags )
 static int pfs_acl_check( pfs_name *name, int flags )
 {
 	if(!pfs_username) return 1;
-	if(chirp_acl_check(name->rest,pfs_username,flags)) return 1;
+	if(ibox_acl_check(name->rest,pfs_username,flags)) return 1;
 	return check_implicit_acl(name->rest,flags);
 }
 
 static int pfs_acl_check_dir( pfs_name *name, int flags )
 {
 	if(!pfs_username) return 1;
-	if(chirp_acl_check_dir(name->rest,pfs_username,flags)) return 1;
+	if(ibox_acl_check_dir(name->rest,pfs_username,flags)) return 1;
 	return check_implicit_acl(name->rest,flags);
 }
 
@@ -300,7 +294,7 @@ public:
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
 		pfs_file *result;
 
-		if(!pfs_acl_check(name,chirp_acl_from_open_flags(flags))) return 0;
+		if(!pfs_acl_check(name,ibox_acl_from_open_flags(flags))) return 0;
 
 		flags |= O_NONBLOCK;
 		debug(D_LOCAL,"open %s %d %d",name->rest,flags,(flags&O_CREAT) ? mode : 0);
@@ -319,14 +313,14 @@ public:
 		DIR *dir;
 		pfs_dir *result = 0;
 
-		if(!pfs_acl_check_dir(name,CHIRP_ACL_LIST)) return 0;
+		if(!pfs_acl_check_dir(name,IBOX_ACL_LIST)) return 0;
 
 		debug(D_LOCAL,"getdir %s",name->rest);
 		dir = ::opendir(name->rest);
 		if(dir) {
 			result = new pfs_dir(name);
 			while((d=::readdir(dir))) {
-				if(!strcmp(d->d_name,CHIRP_ACL_BASE_NAME)) continue;
+				if(!strcmp(d->d_name,IBOX_ACL_BASE_NAME)) continue;
 				result->append(d->d_name);
 			}
 			if(!strcmp(name->rest,"/")) {
@@ -343,7 +337,7 @@ public:
 	virtual int stat( pfs_name *name, struct pfs_stat *buf ) {
 		int result;
 		struct stat64 lbuf;
-		if(!pfs_acl_check(name,CHIRP_ACL_LIST)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		debug(D_LOCAL,"stat %s 0x%x",name->rest,buf);
 		result = ::stat64(name->rest,&lbuf);
 		if(result>=0) COPY_STAT(lbuf,*buf);
@@ -352,7 +346,7 @@ public:
 	virtual int statfs( pfs_name *name, struct pfs_statfs *buf ) {
 		int result;
 		struct statfs64 lbuf;
-		if(!pfs_acl_check(name,CHIRP_ACL_LIST)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		debug(D_LOCAL,"statfs %s 0x%x",name->rest,buf);
 		result = ::statfs64(name->rest,&lbuf);
 		if(result>=0) COPY_STATFS(lbuf,*buf);
@@ -361,7 +355,7 @@ public:
 	virtual int lstat( pfs_name *name, struct pfs_stat *buf ) {
 		int result;
 		struct stat64 lbuf;
-		if(!pfs_acl_check(name,CHIRP_ACL_LIST)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		debug(D_LOCAL,"lstat %s 0x%x",name->rest,buf);
 		result = ::lstat64(name->rest,&lbuf);
 		if(result>=0) COPY_STAT(lbuf,*buf);
@@ -369,58 +363,58 @@ public:
 	}
 	virtual int access( pfs_name *name, mode_t mode ) {
 		int result;
-		if(!pfs_acl_check(name,chirp_acl_from_access_flags(mode))) return -1;
+		if(!pfs_acl_check(name,ibox_acl_from_access_flags(mode))) return -1;
 		debug(D_LOCAL,"access %s %d",name->rest,mode);
 		result = ::access(name->rest,mode);
 		END
 	}
 	virtual int chmod( pfs_name *name, mode_t mode ) {
 		int result;
-		if(!pfs_acl_check(name,CHIRP_ACL_WRITE)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"chmod %s %d",name->rest,mode);
 		result = ::chmod(name->rest,mode);
 		END
 	}
 	virtual int chown( pfs_name *name, uid_t uid, gid_t gid ) {
 		int result;
-		if(!pfs_acl_check(name,CHIRP_ACL_WRITE)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"chown %s %d %d",name->rest,uid,gid);
 		result = ::chown(name->rest,uid,gid);
 		END
 	}
 	virtual int lchown( pfs_name *name, uid_t uid, gid_t gid ) {
 		int result;
-		if(!pfs_acl_check(name,CHIRP_ACL_WRITE)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"lchown %s %d %d",name->rest,uid,gid);
 		result = ::lchown(name->rest,uid,gid);
 		END
 	}
 	virtual int truncate( pfs_name *name, pfs_off_t length ) {
 		int result;
-		if(!pfs_acl_check(name,CHIRP_ACL_WRITE)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"truncate %s %lld",name->rest,length);
 		result = ::truncate64(name->rest,length);
 		END
 	}
 	virtual int utime( pfs_name *name, struct utimbuf *buf ) {
 		int result;
-		if(!pfs_acl_check(name,CHIRP_ACL_WRITE)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"utime %s 0x%x",name->rest,buf);
 		result = ::utime(name->rest,buf);
 		END
 	}
 	virtual int unlink( pfs_name *name ) {
 		int result;
-		if(!pfs_acl_check(name,CHIRP_ACL_WRITE)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"unlink %s",name->rest);
 		result = ::unlink(name->rest);
 		END
 	}
 	virtual int rename( pfs_name *oldname, pfs_name *newname ) {
 		int result;
-		if(!pfs_acl_check(oldname,CHIRP_ACL_READ)) return -1;
-		if(!pfs_acl_check(newname,CHIRP_ACL_WRITE)) return -1;
-		if(!pfs_acl_check(newname,CHIRP_ACL_WRITE)) return -1;
+		if(!pfs_acl_check(oldname,IBOX_ACL_READ)) return -1;
+		if(!pfs_acl_check(newname,IBOX_ACL_WRITE)) return -1;
+		if(!pfs_acl_check(newname,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"rename %s %s",oldname->rest,newname->rest);
 		result = ::rename(oldname->rest,newname->rest);
 		END
@@ -437,7 +431,7 @@ public:
 	*/
 	virtual int chdir( pfs_name *name, char *newpath ) {
 		int result;
-		if(!pfs_acl_check(name,CHIRP_ACL_READ)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"canonicalize %s",name->rest);
 		result = ::get_canonical_path(name->rest,newpath,PFS_PATH_MAX);
 		END
@@ -445,49 +439,45 @@ public:
 
 	virtual int link( pfs_name *oldname, pfs_name *newname ) {
 		int result;
-		if(!pfs_acl_check(oldname,CHIRP_ACL_WRITE)) return -1;
+		if(!pfs_acl_check(oldname,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"link %s %s",oldname->rest,newname->rest);
 		result = ::link(oldname->rest,newname->rest);
 		END
 	}
 	virtual int symlink( const char *linkname, pfs_name *newname ) {
 		int result;
-		if(!pfs_acl_check(newname,CHIRP_ACL_WRITE)) return -1;
+		if(!pfs_acl_check(newname,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"symlink %s %s",linkname,newname->rest);
 		result = ::symlink(linkname,newname->rest);
 		END
 	}
 	virtual int readlink( pfs_name *name, char *buf, pfs_size_t size ) {
 		int result;
-		if(!pfs_acl_check(name,CHIRP_ACL_READ)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"readlink %s 0x%x %d",name->rest,buf,size);
 		result = ::readlink(name->rest,buf,size);
 		END
 	}
 	virtual int mknod( pfs_name *name, mode_t mode, dev_t dev ) {
 		int result;
-		if(!pfs_acl_check(name,CHIRP_ACL_WRITE)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"mknod %s %d %d",name->rest,mode,dev);
 		result = ::mknod(name->rest,mode,dev);
 		END
 	}
 	virtual int mkdir( pfs_name *name, mode_t mode ) {
 		int result;
-		if(!pfs_acl_check(name,CHIRP_ACL_WRITE)) return -1;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"mkdir %s %d",name->rest,mode);
 		result = ::mkdir(name->rest,mode);
-		if(result==0 && pfs_username) chirp_acl_init_copy(name->rest);
+		if(result==0 && pfs_username) ibox_acl_init_copy(name->rest);
 		END
 	}
 	virtual int rmdir( pfs_name *name ) {
 		int result;
-		if(!pfs_acl_check_dir(name,CHIRP_ACL_WRITE)) return -1;
+		if(!pfs_acl_check_dir(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"rmdir %s",name->rest);
-		if(pfs_username) {
-			result = ::chirp_local_rmdir(name->rest);
-		} else {
-			result = ::rmdir(name->rest);
-		}
+		result = ::rmdir(name->rest);
 		END
 	}
 
@@ -509,7 +499,7 @@ public:
 		struct pfs_stat buf;
 		char path[PFS_PATH_MAX];
 		pfs_location *loc;
-		if(!pfs_acl_check_dir(name,CHIRP_ACL_LIST)) return 0;
+		if(!pfs_acl_check_dir(name,IBOX_ACL_LIST)) return 0;
 		debug(D_LOCAL,"locate %s",name->rest);
 		result = stat(name, &buf);
 		if(result < 0) return 0;

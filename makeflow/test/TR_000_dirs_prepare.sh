@@ -13,10 +13,12 @@ prepare()
     echo world > input/hello
 
     # start a worker
-    ../../dttools/src/worker localhost 9091 &
+    workerport=`find_free_port`
+    ../../dttools/src/work_queue_worker localhost $workerport &
     workerpid=$!
 
-    echo $workerpid >| worker.pid
+    echo $workerpid  > worker.pid
+    echo $workerport > worker.port
     exit 0
 }
 

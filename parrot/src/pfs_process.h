@@ -40,7 +40,7 @@ struct pfs_process {
 	char tty[PFS_PATH_MAX];
 
 	mode_t umask;
-	pid_t  pid, ppid;
+	pid_t  pid, ppid, tgid;
 	int    flags, state;
 	pfs_table *table;
 	struct tracer *tracer;
@@ -74,11 +74,12 @@ struct pfs_process {
 	int            nsyscalls;
 };
 
-struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table, int exit_signal );
+struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t notify_ppid, int share_table, int exit_signal );
 struct pfs_process * pfs_process_lookup( pid_t pid );
 void pfs_process_delete( struct pfs_process *p );
 
 void pfs_process_stop( struct pfs_process *p, int status, struct rusage usage );
+void pfs_process_exit_group( struct pfs_process *p );
 int pfs_process_waitpid( struct pfs_process *p, pid_t wait_pid, int *wait_ustatus, int wait_options, struct rusage *wait_urusage );
 
 void pfs_process_sigio();

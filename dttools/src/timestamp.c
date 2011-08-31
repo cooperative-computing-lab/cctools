@@ -12,10 +12,10 @@ See the file COPYING for details.
 #include <sys/select.h>
 #include <sys/stat.h>
 
-time_t timestamp_file( const char *filename )
+time_t timestamp_file(const char *filename)
 {
 	struct stat buf;
-	if(stat(filename,&buf)==0) {
+	if(stat(filename, &buf) == 0) {
 		return buf.st_mtime;
 	} else {
 		return 0;
@@ -27,18 +27,18 @@ timestamp_t timestamp_get()
 	struct timeval current;
 	timestamp_t stamp;
 
-	gettimeofday(&current,0);
-	stamp = ((timestamp_t)current.tv_sec)*1000000 + current.tv_usec;
+	gettimeofday(&current, 0);
+	stamp = ((timestamp_t) current.tv_sec) * 1000000 + current.tv_usec;
 
 	return stamp;
 }
 
-void timestamp_sleep( timestamp_t interval )
+void timestamp_sleep(timestamp_t interval)
 {
 	struct timeval t;
 
 	t.tv_sec = interval / 1000000;
 	t.tv_usec = interval % 1000000;
 
-	select(0,0,0,0,&t);
+	select(0, 0, 0, 0, &t);
 }

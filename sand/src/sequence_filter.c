@@ -357,14 +357,13 @@ void mer_generate_cands(mer_hash_element * mhe)
 void print_mer_table(FILE * file)
 {
 	int curr_bucket;
-	mer_hash_element * mhe, *old_mhe;
+	mer_hash_element * mhe;
 	for (curr_bucket = 0; curr_bucket < MER_TABLE_BUCKETS; curr_bucket++)
 	{
 		mhe = mer_table[curr_bucket];
 		while (mhe)
 		{
 			print_mhe(file, mhe);
-			old_mhe = mhe;
 			mhe = mhe->next;
 		}
 	}
@@ -440,7 +439,7 @@ void find_minimizers(int seq_num)
 	int j;
 
 	memset(&abs_min,0,sizeof(abs_min));
-	abs_min.value = ULLONG_MAX;
+	abs_min.value = MINIMIZER_MAX;
 	abs_min.dir = 0;
 
 	// First, just populate the first window and get the first minimizer.
@@ -518,7 +517,7 @@ void find_minimizers(int seq_num)
 			// Find the new minimizer
 			// If runtime starts to suffer I can implement something better than a linear search,
 			// but because WINDOW_SIZE is a small constant (around 20) it should be OK.
-			abs_min.value = ULLONG_MAX;
+			abs_min.value = MINIMIZER_MAX;
 			abs_min.dir = 0;
 			for (j = 0; j < WINDOW_SIZE; j++)
 			{

@@ -1,0 +1,19 @@
+Required packages:
+
+    * build-essential
+    * zlib1g-dev
+
+Optional packages:
+
+    * doxygen (documentation)
+    * libfuse-dev (fuse chirp module)
+    * libglobus-common-dev (globus support)
+    * libglobus-gss-assist-dev (gssapi support)
+    * libkrb5-dev (kerberos support)
+    * libmysqlclient-dev (mysql support)
+    * libreadline-dev (readline support)
+    * python-dev (python package)
+
+Debian Package page:
+
+    * http://packages/debian.org/source/sid/cctools

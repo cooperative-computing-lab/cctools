@@ -22,7 +22,7 @@ Typically used to encode URLs and Chirp file names.
 @see url_decode
  */
 
-void url_encode( const char *source, char *target, int length );
+void url_encode(const char *source, char *target, int length);
 
 /** Decodes an RFC 2396 string into plain ASCII.
 For example, the string <tt>Let%27s%20go</tt> becomes <tt>Let's go</tt>.
@@ -33,6 +33,6 @@ Typically used to decode URLs and Chirp file names.
 @see url_encode
  */
 
-void url_decode( const char *source, char *target, int length );
+void url_decode(const char *source, char *target, int length);
 
 #endif

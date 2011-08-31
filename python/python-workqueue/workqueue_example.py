@@ -8,6 +8,7 @@
 
 from workqueue import Task, WorkQueue, set_debug_flag
 from workqueue import WORK_QUEUE_SCHEDULE_FCFS, WORK_QUEUE_SCHEDULE_FILES
+from workqueue import WORK_QUEUE_RANDOM_PORT
 #from workqueue import WORK_QUEUE_MASTER_MODE_STANDALONE, WORK_QUEUE_WORKER_MODE_SHARED
 
 import os
@@ -17,7 +18,8 @@ import time
 set_debug_flag('debug')
 set_debug_flag('wq')
 
-wq = WorkQueue(9999, name='workqueue_example', catalog=False, exclusive=False)
+wq = WorkQueue(WORK_QUEUE_RANDOM_PORT, name='workqueue_example', catalog=False, exclusive=False)
+os.system('work_queue_worker -d all localhost %d &' % wq.port)
 
 wq.specify_algorithm(WORK_QUEUE_SCHEDULE_FCFS)
 #wq.specify_name('workqueue_example')
@@ -76,8 +78,11 @@ while not wq.empty():
     t = wq.wait(1)
     if t:
 	print t.taskid, t.return_status, t.result, t.host
+	print t.preferred_host, t.status
 	print t.submit_time, t.start_time, t.finish_time
-	print t.output,
+	print t.transfer_start_time, t.computation_time
+	print t.total_bytes_transferred, t.total_transfer_time
+	print t.output
     
     print wq.stats.workers_init, wq.stats.workers_ready, wq.stats.workers_busy, \
 	  wq.stats.tasks_running, wq.stats.tasks_waiting, wq.stats.tasks_complete

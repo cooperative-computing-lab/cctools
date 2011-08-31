@@ -8,6 +8,6 @@ See the file COPYING for details.
 #ifndef GET_CANONICAL_PATH_H
 #define GET_CANONICAL_PATH_H
 
-int get_canonical_path( const char *path, char *canonical, int maxlength );
+int get_canonical_path(const char *path, char *canonical, int maxlength);
 
 #endif

@@ -32,7 +32,7 @@ public:
 	virtual int fchmod( mode_t mode );
 	virtual int fchown( uid_t uid, gid_t gid );
 	virtual int flock( int op );
-	virtual void * mmap( void *start, pfs_size_t length, int prot, int flags, off_t offset );
+	virtual void * mmap( void *start, pfs_size_t length, int prot, int flags, pfs_off_t offset );
 	virtual struct dirent * fdreaddir( pfs_off_t offset, pfs_off_t *next_offset );
 
 	virtual pfs_ssize_t get_size();

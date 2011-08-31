@@ -372,11 +372,11 @@ public:
 		return chirp_global_lsalloc(name->hostport,name->rest,alloc_name,size,inuse,time(0)+pfs_master_timeout);
 	}
 
-	virtual int putfile( pfs_name *source, pfs_name *target )
+	virtual pfs_ssize_t putfile( pfs_name *source, pfs_name *target )
 	{
 		struct stat64 info;
 		FILE *sourcefile;
-		INT64_T result;
+		pfs_ssize_t result;
 
 		chirp_dircache_invalidate();
 
@@ -397,10 +397,10 @@ public:
 		return result;		
 	}
 
-	virtual int getfile( pfs_name *source, pfs_name *target )
+	virtual pfs_ssize_t getfile( pfs_name *source, pfs_name *target )
 	{
 		FILE *targetfile;
-		INT64_T result;
+		pfs_ssize_t result;
 		int save_errno;
 
 		chirp_dircache_invalidate();
@@ -418,9 +418,9 @@ public:
 		return result;		
 	}
 
-	virtual int thirdput( pfs_name *source, pfs_name *target )
+	virtual pfs_ssize_t thirdput( pfs_name *source, pfs_name *target )
 	{
-		INT64_T result;
+		pfs_ssize_t result;
 
 		chirp_dircache_invalidate();
 

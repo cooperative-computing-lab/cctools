@@ -20,56 +20,56 @@ struct nvpair {
 	struct hash_table *table;
 };
 
-struct nvpair * nvpair_create()
+struct nvpair *nvpair_create()
 {
 	struct nvpair *n;
 	n = xxmalloc(sizeof(*n));
-	n->table = hash_table_create(7,hash_string);
+	n->table = hash_table_create(7, hash_string);
 	return n;
 }
 
-void nvpair_delete( struct nvpair *n )
+void nvpair_delete(struct nvpair *n)
 {
 	char *key;
 	void *value;
 
 	hash_table_firstkey(n->table);
-	while(hash_table_nextkey(n->table,&key,&value)) {
-		hash_table_remove(n->table,key);
+	while(hash_table_nextkey(n->table, &key, &value)) {
+		hash_table_remove(n->table, key);
 		free(value);
 	}
 	hash_table_delete(n->table);
 	free(n);
 }
 
-void nvpair_parse( struct nvpair *n, const char *data )
+void nvpair_parse(struct nvpair *n, const char *data)
 {
 	char *text = xstrdup(data);
 	char *name, *value;
 
-	name = strtok(text," ");
+	name = strtok(text, " ");
 	while(name) {
-		value = strtok(0,"\n");
+		value = strtok(0, "\n");
 		if(value) {
-			nvpair_insert_string(n,name,value);
+			nvpair_insert_string(n, name, value);
 		} else {
 			break;
 		}
-		name = strtok(0," ");
+		name = strtok(0, " ");
 	}
 
 	free(text);
 }
 
-int nvpair_parse_stream( struct nvpair *n, FILE *stream )
+int nvpair_parse_stream(struct nvpair *n, FILE * stream)
 {
 	int got_something = 0;
 	char line[NVPAIR_LINE_MAX];
 	char name[NVPAIR_LINE_MAX];
 	char value[NVPAIR_LINE_MAX];
 
-	while(fgets(line,sizeof(line),stream)) {
-		if(line[0]=='\n') {
+	while(fgets(line, sizeof(line), stream)) {
+		if(line[0] == '\n') {
 			if(got_something) {
 				return 1;
 			} else {
@@ -77,8 +77,8 @@ int nvpair_parse_stream( struct nvpair *n, FILE *stream )
 			}
 		}
 
-		if(sscanf(line,"%s %[^\r\n]",name,value)==2) {
-			nvpair_insert_string(n,name,value);
+		if(sscanf(line, "%s %[^\r\n]", name, value) == 2) {
+			nvpair_insert_string(n, name, value);
 			got_something = 1;
 		} else {
 			return 0;
@@ -89,17 +89,17 @@ int nvpair_parse_stream( struct nvpair *n, FILE *stream )
 	return 0;
 }
 
-int nvpair_print( struct nvpair *n, char *text, int length )
+int nvpair_print(struct nvpair *n, char *text, int length)
 {
 	char *key;
 	void *value;
 
 	int actual;
-	int total=0;
+	int total = 0;
 
 	hash_table_firstkey(n->table);
-	while(hash_table_nextkey(n->table,&key,&value)) {
-		actual = snprintf(text,length,"%s %s\n",key,(char*)value);
+	while(hash_table_nextkey(n->table, &key, &value)) {
+		actual = snprintf(text, length, "%s %s\n", key, (char *) value);
 		total += actual;
 		text += actual;
 		length -= actual;
@@ -108,49 +108,52 @@ int nvpair_print( struct nvpair *n, char *text, int length )
 	return total;
 }
 
-int nvpair_print_alloc( struct nvpair *n, char **text )
+int nvpair_print_alloc(struct nvpair *n, char **text)
 {
 	int length = 1024;
 	int needed;
 
 	*text = malloc(length);
-	if(!*text) return 0;
+	if(!*text)
+		return 0;
 
-	needed = nvpair_print(n,*text,length);
-	if(needed>=length) {
+	needed = nvpair_print(n, *text, length);
+	if(needed >= length) {
 		free(*text);
-		*text = malloc(needed+1);
-		if(!*text) return 0;
-		nvpair_print(n,*text,needed+1);
+		*text = malloc(needed + 1);
+		if(!*text)
+			return 0;
+		nvpair_print(n, *text, needed + 1);
 	}
 
 	return 1;
 }
 
-void nvpair_insert_string( struct nvpair *n, const char *name, const char *value )
+void nvpair_insert_string(struct nvpair *n, const char *name, const char *value)
 {
 	void *old;
-	old = hash_table_remove(n->table,name);
-	if(old) free(old);
-	hash_table_insert(n->table,name,xstrdup(value));
+	old = hash_table_remove(n->table, name);
+	if(old)
+		free(old);
+	hash_table_insert(n->table, name, xstrdup(value));
 }
 
-void nvpair_insert_integer( struct nvpair *n, const char *name, INT64_T ivalue )
+void nvpair_insert_integer(struct nvpair *n, const char *name, INT64_T ivalue)
 {
 	char value[256];
-	sprintf(value,INT64_FORMAT,ivalue);
-	nvpair_insert_string(n,name,(char*)value);
+	sprintf(value, INT64_FORMAT, ivalue);
+	nvpair_insert_string(n, name, (char *) value);
 }
 
-const char * nvpair_lookup_string( struct nvpair *n, const char *name )
+const char *nvpair_lookup_string(struct nvpair *n, const char *name)
 {
-	return hash_table_lookup(n->table,name);
+	return hash_table_lookup(n->table, name);
 }
 
-INT64_T nvpair_lookup_integer( struct nvpair *n, const char *name )
+INT64_T nvpair_lookup_integer(struct nvpair * n, const char *name)
 {
 	const char *value;
-	value = hash_table_lookup(n->table,name);
+	value = hash_table_lookup(n->table, name);
 	if(value) {
 		return atoll(value);
 	} else {
@@ -158,155 +161,156 @@ INT64_T nvpair_lookup_integer( struct nvpair *n, const char *name )
 	}
 }
 
-void nvpair_print_text( struct nvpair *n, FILE *s )
+void nvpair_print_text(struct nvpair *n, FILE * s)
 {
 	char *key;
 	void *value;
 
 	hash_table_firstkey(n->table);
-	while(hash_table_nextkey(n->table,&key,&value)) {
-		fprintf(s,"%s %s\n",key,(char*)value);
+	while(hash_table_nextkey(n->table, &key, &value)) {
+		fprintf(s, "%s %s\n", key, (char *) value);
 	}
-	fprintf(s,"\n");
+	fprintf(s, "\n");
 }
 
-void nvpair_print_xml( struct nvpair *n, FILE *s )
+void nvpair_print_xml(struct nvpair *n, FILE * s)
 {
 	char *key;
 	void *value;
 
-	fprintf(s,"<item>\n");
+	fprintf(s, "<item>\n");
 	hash_table_firstkey(n->table);
-	while(hash_table_nextkey(n->table,&key,&value)) {
-		fprintf(s,"<%s>%s</%s>\n",key,(char*)value,key);
+	while(hash_table_nextkey(n->table, &key, &value)) {
+		fprintf(s, "<%s>%s</%s>\n", key, (char *) value, key);
 	}
-	fprintf(s,"</item>\n\n");
+	fprintf(s, "</item>\n\n");
 }
 
-void nvpair_print_old_classads( struct nvpair *n, FILE *s )
+void nvpair_print_old_classads(struct nvpair *n, FILE * s)
 {
 	char *key;
 	void *value;
 
 	hash_table_firstkey(n->table);
-	while(hash_table_nextkey(n->table,&key,&value)) {
-		fprintf(s,"%s = \"%s\"\n",key,(char*)value);
+	while(hash_table_nextkey(n->table, &key, &value)) {
+		fprintf(s, "%s = \"%s\"\n", key, (char *) value);
 	}
-	fprintf(s,"\n");
+	fprintf(s, "\n");
 }
 
-void nvpair_print_new_classads( struct nvpair *n, FILE *s )
+void nvpair_print_new_classads(struct nvpair *n, FILE * s)
 {
 	char *key;
 	void *value;
 
-	fprintf(s,"[\n");
+	fprintf(s, "[\n");
 	hash_table_firstkey(n->table);
-	while(hash_table_nextkey(n->table,&key,&value)) {
-		fprintf(s,"%s = \"%s\";\n",key,(char*)value);
+	while(hash_table_nextkey(n->table, &key, &value)) {
+		fprintf(s, "%s = \"%s\";\n", key, (char *) value);
 	}
-	fprintf(s,"]\n");
+	fprintf(s, "]\n");
 }
 
 #define COLOR_ONE "#aaaaff"
 #define COLOR_TWO "#bbbbbb"
 
-static int color_counter=0;
+static int color_counter = 0;
 
-static const char *align_string( struct nvpair_header *h )
+static const char *align_string(struct nvpair_header *h)
 {
-	if(h->align==NVPAIR_ALIGN_RIGHT) {
+	if(h->align == NVPAIR_ALIGN_RIGHT) {
 		return "right";
 	} else {
 		return "left";
 	}
 }
 
-void nvpair_print_html_solo( struct nvpair *n, FILE *stream )
+void nvpair_print_html_solo(struct nvpair *n, FILE * stream)
 {
 	char *key;
 	void *value;
 
-	fprintf(stream,"<table bgcolor=%s>\n",COLOR_TWO);
-	fprintf(stream,"<tr bgcolor=%s>\n",COLOR_ONE);
+	fprintf(stream, "<table bgcolor=%s>\n", COLOR_TWO);
+	fprintf(stream, "<tr bgcolor=%s>\n", COLOR_ONE);
 
 	color_counter = 0;
 
 	hash_table_firstkey(n->table);
-	while(hash_table_nextkey(n->table,&key,&value)) {
-		fprintf(stream,"<tr bgcolor=%s>\n",color_counter%2 ? COLOR_ONE : COLOR_TWO );
+	while(hash_table_nextkey(n->table, &key, &value)) {
+		fprintf(stream, "<tr bgcolor=%s>\n", color_counter % 2 ? COLOR_ONE : COLOR_TWO);
 		color_counter++;
-		fprintf(stream,"<td align=left><b>%s</b>\n",key);
-		if(!strcmp(key,"url")) {
-			fprintf(stream,"<td align=left><a href=%s>%s</a>\n",(char*)value,(char*)value);
+		fprintf(stream, "<td align=left><b>%s</b>\n", key);
+		if(!strcmp(key, "url")) {
+			fprintf(stream, "<td align=left><a href=%s>%s</a>\n", (char *) value, (char *) value);
 		} else {
-			fprintf(stream,"<td align=left>%s\n",(char*)value);
+			fprintf(stream, "<td align=left>%s\n", (char *) value);
 		}
 	}
-	fprintf(stream,"</table>\n");
+	fprintf(stream, "</table>\n");
 }
- 
-void nvpair_print_html_header( FILE *s, struct nvpair_header *h )
+
+void nvpair_print_html_header(FILE * s, struct nvpair_header *h)
 {
-	fprintf(s,"<table bgcolor=%s>\n",COLOR_TWO);
-	fprintf(s,"<tr bgcolor=%s>\n",COLOR_ONE);
+	fprintf(s, "<table bgcolor=%s>\n", COLOR_TWO);
+	fprintf(s, "<tr bgcolor=%s>\n", COLOR_ONE);
 	while(h->name) {
-		fprintf(s,"<td align=%s><b>%s</b>\n",align_string(h),h->name);
+		fprintf(s, "<td align=%s><b>%s</b>\n", align_string(h), h->name);
 		h++;
 	}
 	color_counter = 0;
 }
 
-void nvpair_print_html( struct nvpair *n, FILE *s, struct nvpair_header *h )
+void nvpair_print_html(struct nvpair *n, FILE * s, struct nvpair_header *h)
 {
-	return nvpair_print_html_with_link(n,s,h,0,0);
+	return nvpair_print_html_with_link(n, s, h, 0, 0);
 }
 
-void nvpair_print_html_with_link( struct nvpair *n, FILE *s, struct nvpair_header *h, const char *linkname, const char *linktext )
+void nvpair_print_html_with_link(struct nvpair *n, FILE * s, struct nvpair_header *h, const char *linkname, const char *linktext)
 {
-	fprintf(s,"<tr bgcolor=%s>\n",color_counter%2 ? COLOR_ONE : COLOR_TWO );
+	fprintf(s, "<tr bgcolor=%s>\n", color_counter % 2 ? COLOR_ONE : COLOR_TWO);
 	color_counter++;
 	while(h->name) {
-		const char *text = nvpair_lookup_string(n,h->name);
-		if(!text) text = "???";
-		fprintf(s,"<td align=%s>",align_string(h));
-		if(h->mode==NVPAIR_MODE_URL) {
-			fprintf(s,"<a href=%s>%s</a>\n",text,text);
-		} else if(h->mode==NVPAIR_MODE_METRIC) {
+		const char *text = nvpair_lookup_string(n, h->name);
+		if(!text)
+			text = "???";
+		fprintf(s, "<td align=%s>", align_string(h));
+		if(h->mode == NVPAIR_MODE_URL) {
+			fprintf(s, "<a href=%s>%s</a>\n", text, text);
+		} else if(h->mode == NVPAIR_MODE_METRIC) {
 			char line[1024];
-			string_metric(atof(text),-1,line);
-			fprintf(s,"%sB\n",line);
+			string_metric(atof(text), -1, line);
+			fprintf(s, "%sB\n", line);
 		} else {
-			if(linkname && !strcmp(linkname,h->name)) {
-				fprintf(s,"<a href=%s>%s</a>\n",linktext,text);
+			if(linkname && !strcmp(linkname, h->name)) {
+				fprintf(s, "<a href=%s>%s</a>\n", linktext, text);
 			} else {
-				fprintf(s,"%s\n",text);
+				fprintf(s, "%s\n", text);
 			}
 		}
 		h++;
 	}
 }
 
-void nvpair_print_html_footer( FILE *s, struct nvpair_header *h )
+void nvpair_print_html_footer(FILE * s, struct nvpair_header *h)
 {
-	fprintf(s,"</table>\n");
+	fprintf(s, "</table>\n");
 }
- 
-static void fill_string( const char *str, char *buf, int buflen, nvpair_align_t align )
+
+static void fill_string(const char *str, char *buf, int buflen, nvpair_align_t align)
 {
 	int stlen = strlen(str);
-	memset(buf,' ',buflen);
+	memset(buf, ' ', buflen);
 	buf[buflen] = 0;
-	if(align==NVPAIR_ALIGN_LEFT) {
-		while(stlen>0 && buflen>0) {
+	if(align == NVPAIR_ALIGN_LEFT) {
+		while(stlen > 0 && buflen > 0) {
 			*buf++ = *str++;
 			stlen--;
 			buflen--;
 		}
 	} else {
-		str = str+stlen-1;
-		buf = buf+buflen-1;
-		while(stlen>0 && buflen>0) {
+		str = str + stlen - 1;
+		buf = buf + buflen - 1;
+		while(stlen > 0 && buflen > 0) {
 			*buf-- = *str--;
 			stlen--;
 			buflen--;
@@ -314,37 +318,37 @@ static void fill_string( const char *str, char *buf, int buflen, nvpair_align_t 
 	}
 }
 
-void nvpair_print_table_header( FILE *s, struct nvpair_header *h )
+void nvpair_print_table_header(FILE * s, struct nvpair_header *h)
 {
 	while(h->name) {
-		char *n = xxmalloc(h->width+1);
-		fill_string(h->name,n,h->width,h->align);
+		char *n = xxmalloc(h->width + 1);
+		fill_string(h->name, n, h->width, h->align);
 		string_toupper(n);
-		printf("%s ",n);
+		printf("%s ", n);
 		free(n);
 		h++;
 	}
 	printf("\n");
 }
 
-void nvpair_print_table( struct nvpair *n, FILE *s, struct nvpair_header *h )
+void nvpair_print_table(struct nvpair *n, FILE * s, struct nvpair_header *h)
 {
 	while(h->name) {
-		const char *text = nvpair_lookup_string(n,h->name);
-		char *aligned = xxmalloc(h->width+1);
+		const char *text = nvpair_lookup_string(n, h->name);
+		char *aligned = xxmalloc(h->width + 1);
 		char *line;
 		if(!text) {
 			line = xstrdup("???");
-		} else if(h->mode==NVPAIR_MODE_METRIC) {
+		} else if(h->mode == NVPAIR_MODE_METRIC) {
 			line = xxmalloc(10);
-			string_metric(atof(text),-1,line);
-			strcat(line,"B");
+			string_metric(atof(text), -1, line);
+			strcat(line, "B");
 		} else {
-			line = xxmalloc(strlen(text)+1);
-			strcpy(line,text);
+			line = xxmalloc(strlen(text) + 1);
+			strcpy(line, text);
 		}
-		fill_string(line,aligned,h->width,h->align);
-		printf("%s ",aligned);
+		fill_string(line, aligned, h->width, h->align);
+		printf("%s ", aligned);
 		free(line);
 		free(aligned);
 		h++;
@@ -352,6 +356,6 @@ void nvpair_print_table( struct nvpair *n, FILE *s, struct nvpair_header *h )
 	printf("\n");
 }
 
-void nvpair_print_table_footer( FILE *s, struct nvpair_header *h )
+void nvpair_print_table_footer(FILE * s, struct nvpair_header *h)
 {
 }

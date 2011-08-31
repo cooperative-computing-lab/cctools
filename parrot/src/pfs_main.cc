@@ -19,14 +19,15 @@ extern "C" {
 #include "xmalloc.h"
 #include "create_dir.h"
 #include "file_cache.h"
+#include "md5.h"
+#include "sort_dir.h"
 #include "password_cache.h"
 #include "debug.h"
 #include "getopt.h"
 #include "pfs_resolve.h"
-#include "chirp_filesystem.h"
-#include "chirp_local.h"
-#include "chirp_acl.h"
+#include "chirp_client.h"
 #include "chirp_global.h"
+#include "chirp_ticket.h"
 #include "ftp_lite.h"
 }
 
@@ -90,9 +91,6 @@ static pid_t root_pid = -1;
 static int root_exitstatus = 0;
 static int channel_size = 10;
 
-struct chirp_filesystem *cfs = &chirp_local_fs;
-const char *chirp_transient_path = "./";
-
 static void show_version( const char *cmd )
 {
 	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n",cmd,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,BUILD_USER,BUILD_HOST,__DATE__,__TIME__);
@@ -133,60 +131,21 @@ static void get_linux_version()
 	debug(D_NOTICE,"parrot_run %d.%d.%d has not been tested on %s %s yet, this may not work",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,name.sysname,name.release);
 }
 
-static char *find_in_path( const char *cmd )
-{
-	char *p, *path;
-
-	debug(D_DEBUG,"looking for %s in PATH",cmd);
-
-	path = xstrdup(getenv("PATH"));
-	if(!path) return 0;
-
-	p = strtok(path,":");
-	while(p) {
-		char tmp[PFS_PATH_MAX];
-		sprintf(tmp,"%s/%s",p,cmd);
-		debug(D_DEBUG,"checking %s",tmp);
-		if(access(tmp,X_OK)==0) {
-			debug(D_DEBUG,"%s located in %s",cmd,tmp);
-			free(path);
-			return xstrdup(tmp);
-		}
-		p = strtok(0,":");
-	}
-
-	free(path);
-	return 0;
-}
-
 static void pfs_helper_init( const char *argv0 ) 
 {
 	char helper_path[PFS_PATH_MAX];
-	char t1[PFS_PATH_MAX];
-	char t2[PFS_PATH_MAX];
 
 	debug(D_DEBUG,"locating helper library...");
-	
-	if(argv0[0]=='/') {
-		debug(D_DEBUG,"%s is an explicit path",argv0);
-	} else if(strchr(argv0,'/')) {
-		debug(D_DEBUG,"%s is a relative path",argv0);
-		getcwd(t1,sizeof(t1));
-		sprintf(t2,"%s/%s",t1,argv0);
-		argv0 = t2;
+
+	sprintf(helper_path,"%s/lib/libparrot_helper.so",INSTALL_PATH);
+
+	char * s = getenv("PARROT_HELPER");
+	if(s) {
+		debug(D_DEBUG,"PARROT_HELPER=%s",s);
+		strcpy(helper_path,s);
 	} else {
-		debug(D_DEBUG,"%s is an implicit path",argv0);
-		argv0 = find_in_path(argv0);
+		debug(D_DEBUG,"PARROT_HELPER is not set");
 	}
-
-
-	if(argv0) {
-		sprintf(helper_path,"%s_helper.so",argv0);
-	} else {
-		sprintf(helper_path,"%s/bin/parrot_helper.so",INSTALL_PATH);
-	}
-
-	debug(D_DEBUG,"looking for helper in %s",helper_path);
 
 	if(access(helper_path,R_OK)==0) {
 		debug(D_DEBUG,"found helper in %s",helper_path);
@@ -203,7 +162,6 @@ static void show_use( const char *cmd )
 	printf("Use: %s [options] <command> ...\n",cmd);
 	printf("Where options and environment variables are:\n");
 	printf("  -a <list>  Use these Chirp authentication methods.   (PARROT_CHIRP_AUTH)\n");
-	printf("  -A <file>  Use this file as a default ACL.          (PARROT_DEFAULT_ACL)\n");
 	printf("  -b <bytes> Set the I/O block size hint.              (PARROT_BLOCK_SIZE)\n");
 	printf("  -c <file>  Print exit status information to <file>.\n");
 	printf("  -C         Enable data channel authentication in GridFTP.\n");
@@ -215,6 +173,7 @@ static void show_use( const char *cmd )
 	printf("  -G <num>   Fake this gid; Real gid stays the same.          (PARROT_GID)\n");
 	printf("  -H         Disable use of helper library.\n");
 	printf("  -h         Show this screen.\n");
+	printf("  -i <files> Comma-delimited list of tickets to use for authentication.\n");
 	printf("  -K         Checksum files where available.\n");
 	printf("  -k         Do not checksum files.\n");
 	printf("  -l <path>  Path to ld.so to use.                      (PARROT_LDSO_PATH)\n");
@@ -235,7 +194,7 @@ static void show_use( const char *cmd )
 	printf("  -v         Display version number.\n");
 	printf("  -w         Initial working directory.\n");
 	printf("  -W         Display table of system calls trapped.\n");
-	printf("  -Y         Force sYnchronous disk writes.            (PARROT_FORCE_SYNC)\n");
+	printf("  -Y         Force synchronous disk writes.            (PARROT_FORCE_SYNC)\n");
 	printf("  -Z         Enable automatic decompression on .gz files.\n");
 	printf("\n");
 	printf("Known debugging sub-systems are: ");
@@ -258,6 +217,8 @@ static void show_use( const char *cmd )
 	if(pfs_service_lookup("hdfs"))		printf(" hdfs");
 	if(pfs_service_lookup("bxgrid"))	printf(" bxgrid");
 	if(pfs_service_lookup("s3"))		printf(" s3");
+	if(pfs_service_lookup("root"))          printf(" root");
+	if(pfs_service_lookup("xrootd"))        printf(" xrootd");
 	printf("\n");
 	exit(1);
 }
@@ -431,6 +392,7 @@ int main( int argc, char *argv[] )
 	int chose_auth=0;
 	struct rusage usage;
 	char c;
+	char *tickets = NULL;
 
 	srand(time(0)*(getpid()+getuid()));
 
@@ -553,7 +515,7 @@ int main( int argc, char *argv[] )
 
 	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
 
-	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DE:FfG:HkKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
+	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DE:FfG:Hi:kKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
 		switch(c) {
 		case 'a':
 			if(!auth_register_byname(optarg)) {
@@ -561,9 +523,6 @@ int main( int argc, char *argv[] )
 				return 1;
 			}
 			chose_auth = 1;
-			break;
-		case 'A':
-			chirp_acl_default(optarg);
 			break;
 		case 'b':
 			pfs_service_set_block_size(string_metric_parse(optarg));
@@ -598,6 +557,9 @@ int main( int argc, char *argv[] )
 			break;
 		case 'H':
 			pfs_use_helper = 0;
+			break;
+		case 'i':
+			tickets = strdup(optarg);
 			break;
 		case 'k':
 			pfs_checksum_files = 0;
@@ -673,7 +635,6 @@ int main( int argc, char *argv[] )
 			break;
 	}
 	}
-    cfs = &chirp_local_fs;
 
 	if(optind>=argc) show_use(argv[0]);
 
@@ -684,6 +645,16 @@ int main( int argc, char *argv[] )
 	file_cache_cleanup(pfs_file_cache);
 
 	if(!chose_auth) auth_register_all();
+
+	if(tickets) {
+		auth_ticket_load(tickets);
+		free(tickets);
+	} else if(getenv(CHIRP_CLIENT_TICKETS)) {
+		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
+	} else {
+		auth_ticket_load(NULL);
+	}
+
 
 	if(!pfs_channel_init(channel_size*1024*1024)) fatal("couldn't establish I/O channel");	
 
@@ -709,9 +680,6 @@ int main( int argc, char *argv[] )
 		if(pid>0) {
 			debug(D_PROCESS,"pid %d started",pid);
 		} else if(pid==0) {
-			for(i=0;i<sysconf(_SC_OPEN_MAX);i++) {
-				if(i!=pfs_channel_fd()) close(i);
-			}
 			setpgrp();
 			tracer_prepare();
 			kill(getpid(),SIGSTOP);
@@ -738,7 +706,7 @@ int main( int argc, char *argv[] )
 
 	root_pid = pid;
 	debug(D_PROCESS,"attaching to pid %d",pid);
-	p = pfs_process_create(pid,getpid(),0,SIGCHLD);
+	p = pfs_process_create(pid,getpid(),getpid(),0,SIGCHLD);
 	if(!p) {
 		if(pfs_write_rval) {
 			write_rval("noattach", 0);

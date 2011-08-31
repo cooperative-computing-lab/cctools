@@ -72,6 +72,20 @@ int		pfs_mkdir( const char *path, mode_t mode );
 int		pfs_rmdir( const char *path );
 struct dirent *	pfs_fdreaddir( int fd );
 
+int		pfs_openat( int dirfd, const char *path, int flags, mode_t mode );
+int		pfs_mkdirat( int dirfd, const char *path, mode_t mode);
+int		pfs_mknodat( int dirfd, const char *path, mode_t mode, dev_t dev );
+int		pfs_fchownat( int dirfd, const char *path, uid_t owner, gid_t group, int flags );
+int		pfs_futimesat( int dirfd, const char *path, const struct timeval times[2] );
+int		pfs_fstatat( int dirfd, const char *path, struct pfs_stat *buf, int flags );
+int		pfs_unlinkat( int dirfd, const char *path, int flags );
+int		pfs_renameat( int olddirfd, const char *oldpath, int newdirfd, const char *newpath );
+int		pfs_linkat( int olddirfd, const char *oldpath, int newdirfd, const char *newpath, int flags );
+int		pfs_symlinkat( const char *oldpath, int newdirfd, const char *newpath );
+int		pfs_readlinkat( int dirfd, const char *path, char *buf, size_t bufsiz );
+int		pfs_fchmodat( int dirfd, const char *path, mode_t mode, int flags );
+
+
 int		pfs_socket( int domain, int type, int protocol );
 int		pfs_socketpair( int domain, int type, int protocol, int *fds );
 int		pfs_accept( int fd, struct sockaddr *addr, int * addrlen );

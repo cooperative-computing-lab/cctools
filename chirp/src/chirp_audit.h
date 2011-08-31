@@ -20,7 +20,7 @@ send the hash table back to chirp_audit_delete.
 #include "hash_table.h"
 #include "chirp_client.h"
 
-struct hash_table * chirp_audit( const char *path );
-void chirp_audit_delete( struct hash_table *table );
+struct hash_table *chirp_audit(const char *path);
+void chirp_audit_delete(struct hash_table *table);
 
 #endif

@@ -19,13 +19,13 @@ the physical amount of memory installed, and the amount currently available.
 @param total Will be filled in with the memory physically installed, measured in bytes.
 @return One on success, zero on failure. 
 */
-int memory_info_get( UINT64_T *avail, UINT64_T *total );
+int memory_info_get(UINT64_T * avail, UINT64_T * total);
 
 /** Get current memory usage by this process.
 @param rss Will be filled in with the current resident memory usage of this process, in bytes.
 @param total Will be filled in with the total virtual memory size of this process, in bytes.
 */
 
-int memory_usage_get( UINT64_T *rss, UINT64_T *total );
+int memory_usage_get(UINT64_T * rss, UINT64_T * total);
 
 #endif

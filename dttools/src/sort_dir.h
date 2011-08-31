@@ -31,12 +31,12 @@ The final item will be null.  This list must be freed with @ref sort_dir_free.
 @param sort A pointer to a function to compare two strings, which must have the same semantics as <tt>strcmp</tt>
 @return True on success, false on failure, setting errno appropriately.
 */
-int sort_dir( const char *dirname, char ***list, int (*sort) ( const char *a, const char *b ) );
+int sort_dir(const char *dirname, char ***list, int (*sort) (const char *a, const char *b));
 
 /** Free a sorted directory listing.
 @param list The list to be freed.
 */
 
-void sort_dir_free( char **list );
+void sort_dir_free(char **list);
 
 #endif

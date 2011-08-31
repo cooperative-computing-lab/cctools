@@ -16,51 +16,54 @@ See the file COPYING for details.
 
 #define COPY_BUFFER_SIZE 65536
 
-int copy_stream_to_stream( FILE *input, FILE *output )
+int copy_stream_to_stream(FILE * input, FILE * output)
 {
 	char buffer[COPY_BUFFER_SIZE];
-	int actual_read=0, actual_write=0;
-	int total=0;
+	int actual_read = 0, actual_write = 0;
+	int total = 0;
 
 	while(1) {
-		actual_read = full_fread(input,buffer,COPY_BUFFER_SIZE);
-		if(actual_read<=0) break;
+		actual_read = full_fread(input, buffer, COPY_BUFFER_SIZE);
+		if(actual_read <= 0)
+			break;
 
-		actual_write = full_fwrite(output,buffer,actual_read);
-		if(actual_write!=actual_read) {
+		actual_write = full_fwrite(output, buffer, actual_read);
+		if(actual_write != actual_read) {
 			total = -1;
 			break;
 		}
 
-		total+=actual_write;
+		total += actual_write;
 	}
 
-	if( ( (actual_read<0) || (actual_write<0) ) && total==0 ) {
+	if(((actual_read < 0) || (actual_write < 0)) && total == 0) {
 		return -1;
 	} else {
 		return total;
 	}
 }
 
-int copy_stream_to_buffer( FILE *input, char **buffer )
+int copy_stream_to_buffer(FILE * input, char **buffer)
 {
 	int buffer_size = 8192;
-	int total=0;
+	int total = 0;
 	int actual;
 	char *newbuffer;
 
 	*buffer = malloc(buffer_size);
-	if(!*buffer) return -1;
+	if(!*buffer)
+		return -1;
 
 	while(1) {
-		actual = full_fread(input,&(*buffer)[total],buffer_size-total);
-		if(actual<=0) break;
+		actual = full_fread(input, &(*buffer)[total], buffer_size - total);
+		if(actual <= 0)
+			break;
 
 		total += actual;
 
-		if( (buffer_size-total)<1 ) {
+		if((buffer_size - total) < 1) {
 			buffer_size *= 2;
-			newbuffer = realloc(*buffer,buffer_size);
+			newbuffer = realloc(*buffer, buffer_size);
 			if(!newbuffer) {
 				free(*buffer);
 				return -1;
@@ -74,52 +77,54 @@ int copy_stream_to_buffer( FILE *input, char **buffer )
 	return total;
 }
 
-int copy_stream_to_fd( FILE *input, int fd )
+int copy_stream_to_fd(FILE * input, int fd)
 {
 	char buffer[COPY_BUFFER_SIZE];
-	int actual_read=0, actual_write=0;
-	int total=0;
+	int actual_read = 0, actual_write = 0;
+	int total = 0;
 
 	while(1) {
-		actual_read = full_fread(input,buffer,COPY_BUFFER_SIZE);
-		if(actual_read<=0) break;
+		actual_read = full_fread(input, buffer, COPY_BUFFER_SIZE);
+		if(actual_read <= 0)
+			break;
 
-		actual_write = full_write(fd,buffer,actual_read);
-		if(actual_write!=actual_read) {
+		actual_write = full_write(fd, buffer, actual_read);
+		if(actual_write != actual_read) {
 			total = -1;
 			break;
 		}
 
-		total+=actual_write;
+		total += actual_write;
 	}
 
-	if( ( (actual_read<0) || (actual_write<0) ) && total==0 ) {
+	if(((actual_read < 0) || (actual_write < 0)) && total == 0) {
 		return -1;
 	} else {
 		return total;
 	}
 }
 
-int copy_fd_to_stream( int fd, FILE *output )
+int copy_fd_to_stream(int fd, FILE * output)
 {
 	char buffer[COPY_BUFFER_SIZE];
-	int actual_read=0, actual_write=0;
-	int total=0;
+	int actual_read = 0, actual_write = 0;
+	int total = 0;
 
 	while(1) {
-		actual_read = full_read(fd,buffer,COPY_BUFFER_SIZE);
-		if(actual_read<=0) break;
+		actual_read = full_read(fd, buffer, COPY_BUFFER_SIZE);
+		if(actual_read <= 0)
+			break;
 
-		actual_write = full_fwrite(output,buffer,actual_read);
-		if(actual_write!=actual_read) {
+		actual_write = full_fwrite(output, buffer, actual_read);
+		if(actual_write != actual_read) {
 			total = -1;
 			break;
 		}
 
-		total+=actual_write;
+		total += actual_write;
 	}
 
-	if( ( (actual_read<0) || (actual_write<0) ) && total==0 ) {
+	if(((actual_read < 0) || (actual_write < 0)) && total == 0) {
 		return -1;
 	} else {
 		return total;
@@ -128,62 +133,63 @@ int copy_fd_to_stream( int fd, FILE *output )
 
 static int keepgoing = 0;
 
-static void stop_working( int sig )
+static void stop_working(int sig)
 {
 	keepgoing = 0;
 }
 
-static void * install_handler( int sig, void (*handler)(int sig))
+static void *install_handler(int sig, void (*handler) (int sig))
 {
-	struct sigaction s,olds;
+	struct sigaction s, olds;
 	s.sa_handler = handler;
 	sigfillset(&s.sa_mask);
-	s.sa_flags = 0; 
-	sigaction(sig,&s,&olds);
+	s.sa_flags = 0;
+	sigaction(sig, &s, &olds);
 	return olds.sa_handler;
 }
 
-void copy_fd_pair( int leftin, int leftout, int rightin, int rightout )
+void copy_fd_pair(int leftin, int leftout, int rightin, int rightout)
 {
 	char buffer[COPY_BUFFER_SIZE];
 	int actual, result;
 	pid_t pid;
-	void (*old_sigchld)(int);
-	void (*old_sigterm)(int);
+	void (*old_sigchld) (int);
+	void (*old_sigterm) (int);
 
 	keepgoing = 1;
 
-	old_sigchld = install_handler(SIGCHLD,stop_working);
-	old_sigterm = install_handler(SIGTERM,stop_working);
+	old_sigchld = install_handler(SIGCHLD, stop_working);
+	old_sigterm = install_handler(SIGTERM, stop_working);
 
 	pid = fork();
-	if(pid==0) {
+	if(pid == 0) {
 		while(keepgoing) {
-			result = read(leftin,buffer,sizeof(buffer));
-			if(result>0) {
-				actual = full_write(rightout,buffer,result);
-				if(actual!=result) break;
-			} else if(result==0) {
-				break;				
+			result = read(leftin, buffer, sizeof(buffer));
+			if(result > 0) {
+				actual = full_write(rightout, buffer, result);
+				if(actual != result)
+					break;
+			} else if(result == 0) {
+				break;
 			}
 		}
-		kill(getppid(),SIGTERM);
+		kill(getppid(), SIGTERM);
 		_exit(0);
 	} else {
 		while(keepgoing) {
-			result = read(rightin,buffer,sizeof(buffer));
-			if(result>0) {
-				actual = full_write(leftout,buffer,result);
-				if(actual!=result) break;
-			} else if(result==0) {
-				break;				
+			result = read(rightin, buffer, sizeof(buffer));
+			if(result > 0) {
+				actual = full_write(leftout, buffer, result);
+				if(actual != result)
+					break;
+			} else if(result == 0) {
+				break;
 			}
 		}
-		kill(pid,SIGTERM);
+		kill(pid, SIGTERM);
 	}
 
 
-	install_handler(SIGTERM,old_sigterm);
-	install_handler(SIGTERM,old_sigchld);
+	install_handler(SIGTERM, old_sigterm);
+	install_handler(SIGTERM, old_sigchld);
 }
-

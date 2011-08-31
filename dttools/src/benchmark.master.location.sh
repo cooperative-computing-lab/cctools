@@ -172,6 +172,7 @@ start_workers () {
 	for ((j=1;j<=$workloads_max;j++)); do
 		projname=lyu2.$j
 		./work_queue_pool -T condor -f -a -N $projname -t 86400 $num_of_workers 
+		sleep 5
 	done
 	echo $((workloads_max * num_of_workers)) are started successfully.
 

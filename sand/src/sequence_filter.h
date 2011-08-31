@@ -15,6 +15,7 @@ See the file COPYING for details.
 
 #define TIME time(0) - start_time
 #define KB_PER_SEQUENCE 9  // Defined by running some tests, not very exact.
+#define MINIMIZER_MAX 0xffffffffffffffffLL
 
 typedef UINT64_T mer_t;
 

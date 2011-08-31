@@ -15,6 +15,6 @@ See the file COPYING for details.
 @param delete_pattern The pattern of filenames to match and delete.
 */
 
-int clean_dir( const char *dir, const char *delete_pattern );
+int clean_dir(const char *dir, const char *delete_pattern);
 
 #endif

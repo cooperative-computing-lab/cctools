@@ -52,10 +52,10 @@ else
     count=$1
 fi
 
-worker=`which worker 2>/dev/null`
+worker=`which work_queue_worker 2>/dev/null`
 if [ $? != 0 ]
 then
-	echo "$0: please add 'worker' to your PATH."
+	echo "$0: please add 'work_queue_worker' to your PATH."
 	exit 1
 fi
 
@@ -72,12 +72,12 @@ cp $worker .
 
 cat >worker.sh <<EOF
 #!/bin/sh
-./worker $arguments $host $port
+./work_queue_worker $arguments $host $port
 EOF
 
 chmod 755 worker.sh
 
 for n in `seq 1 $count`
 do
-	qsub $parameters worker.sh
+	qsub -cwd $parameters worker.sh
 done

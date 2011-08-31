@@ -25,7 +25,7 @@ set to @ref D_DNS to observe exactly who th ename was determined.
 @returns One on success, zero on failure.
 */
 
-int domain_name_cache_guess( char *name );
+int domain_name_cache_guess(char *name);
 
 /** Determine the caller's local machine name.
 This function uses the built in facility to determine the
@@ -36,7 +36,7 @@ only the first segment of the name will be returned.
 @returns One on success, zero on failure.
 */
 
-int domain_name_cache_guess_short( char *name );
+int domain_name_cache_guess_short(char *name);
 
 /** Resolve a domain name to an IP address with caching.
 @param name A string containing a domain name like "www.google.com".
@@ -44,7 +44,7 @@ int domain_name_cache_guess_short( char *name );
 @return One on success, zero on failure.
 */
 
-int domain_name_cache_lookup( const char *name, char *addr );
+int domain_name_cache_lookup(const char *name, char *addr);
 
 /** Resolve an IP address to a domain name with caching.
 @param addr A string containing an IP address like "202.5.129.1"
@@ -52,7 +52,7 @@ int domain_name_cache_lookup( const char *name, char *addr );
 @return One on success, zero on failure.
 */
 
-int domain_name_cache_lookup_reverse( const char *addr, char *name );
+int domain_name_cache_lookup_reverse(const char *addr, char *name);
 
 /** Find the canonical name of a host.
 @param name_or_addr A string containing a domain name or ip address.
@@ -60,6 +60,6 @@ int domain_name_cache_lookup_reverse( const char *addr, char *name );
 @return One on success, zero on failure.
 */
 
-int domain_name_cache_canonical( const char *name_or_addr, char *cname );
+int domain_name_cache_canonical(const char *name_or_addr, char *cname);
 
 #endif

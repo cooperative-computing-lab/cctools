@@ -115,7 +115,6 @@ int network_connect( const char *host, int port )
 	struct sockaddr_in address;
 	int success;
 	int fd;
-	int on;
 
 	signal(SIGPIPE,signal_swallow);
 
@@ -134,8 +133,6 @@ int network_connect( const char *host, int port )
 		return -1;
 	}
 
-	on=1;   
-        
 	return fd;
 }
 

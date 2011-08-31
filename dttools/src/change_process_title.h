@@ -1,8 +1,8 @@
-#/*
-Copyright (C) 2008- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
+#				/*
+				   Copyright (C) 2008- The University of Notre Dame
+				   This software is distributed under the GNU General Public License.
+				   See the file COPYING for details.
+				 */
 
 #ifndef CHANGE_PROCESS_TITLE_H
 #define CHANGE_PROCESS_TITLE_H
@@ -19,13 +19,13 @@ Intialize the ability to change the process title.
 @param argv The argument vector passed to the main() function.
 */
 
-void change_process_title_init( char **argv );
+void change_process_title_init(char **argv);
 
 /**
 Change the process title.
 @param fmt A printf-style formatting string.
 */
 
-void change_process_title( const char *fmt, ... );
+void change_process_title(const char *fmt, ...);
 
 #endif

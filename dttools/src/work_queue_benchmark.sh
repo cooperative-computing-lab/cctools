@@ -28,7 +28,7 @@ shared_input="no"
 # the directory that contains the correspoinding symbolic name
 #makeflow_args=( "fcfs:-z fcfs"
 #				"fd:-z fd" )
-makeflow_args=( "ad:-z adaptive" )
+makeflow_args=( "ad:-Z adaptive" )
 
 # Max retry times when makeflow jobs fail
 retry_max=30

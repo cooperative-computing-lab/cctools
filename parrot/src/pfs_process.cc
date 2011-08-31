@@ -8,12 +8,14 @@ See the file COPYING for details.
 #include "pfs_process.h"
 #include "pfs_dispatch.h"
 #include "pfs_poll.h"
+#include "pfs_channel.h"
 
 extern "C" {
 #include "debug.h"
 #include "xmalloc.h"
 #include "stringtools.h"
 #include "macros.h"
+#include "itable.h"
 }
 
 #include <sys/wait.h>
@@ -24,11 +26,15 @@ extern "C" {
 #include <unistd.h>
 #include <string.h>
 
-#define PFS_PID_MAX 65536
-
-static struct pfs_process * table[PFS_PID_MAX] = {0};
 struct pfs_process *pfs_current=0;
+
+static struct itable * pfs_process_table = 0;
 static int nprocs = 0;
+
+struct pfs_process * pfs_process_lookup( pid_t pid )
+{
+	return (struct pfs_process *) itable_lookup(pfs_process_table,pid);
+}
 
 /*
 For every process interested in asynchronous events,
@@ -41,9 +47,13 @@ everybody.
 
 void pfs_process_sigio()
 {
+	UINT64_T pid;
+	struct pfs_process *p;
+
 	debug(D_PROCESS,"SIGIO received");
-	for(int i=0;i<PFS_PID_MAX;i++) {
-		struct pfs_process *p = table[i];
+
+	itable_firstkey(pfs_process_table);
+	while(itable_nextkey(pfs_process_table,&pid,(void**)&p)) {
 		if(p && p->flags&PFS_PROCESS_FLAGS_ASYNC) {
 			switch(p->state) {
 				case PFS_PROCESS_STATE_DONE:
@@ -59,17 +69,27 @@ void pfs_process_sigio()
 
 void pfs_process_wake( pid_t pid )
 {
-	struct pfs_process *p = table[pid];
+	struct pfs_process *p = pfs_process_lookup(pid);
 	if(p && (p->state==PFS_PROCESS_STATE_WAITREAD || p->state==PFS_PROCESS_STATE_WAITWRITE) ) {
 		debug(D_PROCESS,"pid %d woken from wait state",p->pid);
 		pfs_dispatch(p,0);
 	}
 }
 
-struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table, int exit_signal )
+/*
+Note that a new process really has two kinds of parents:
+- The 'actual parent' process is the process that called fork or clone to create the child process.  From this parent, the child inherits the file table and other properties.
+- If 'notify parent' is the parent process that should be notified when the process exits.  This is different than the actual parent if the child was created with the CLONE_PARENT flag to clone.
+*/
+
+
+struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t notify_ppid, int share_table, int exit_signal )
 {  
-	struct pfs_process *parent;
+	struct pfs_process *actual_parent;
+	struct pfs_process *notify_parent;
 	struct pfs_process *child;
+
+	if(!pfs_process_table) pfs_process_table = itable_create(0);
 
 	child = (struct pfs_process *) xxmalloc(sizeof(*child));
 	child->tracer = tracer_attach(pid);
@@ -81,7 +101,8 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table,
 	child->new_logical_name[0] = 0;
 	child->new_physical_name[0] = 0;
 	child->pid = pid;
-	child->ppid = ppid;
+	child->ppid = notify_ppid;
+	child->tgid = pid;
 	child->state = PFS_PROCESS_STATE_KERNEL;
 	child->flags = PFS_PROCESS_FLAGS_STARTUP;
 	child->seltime.tv_sec = 0;
@@ -100,47 +121,70 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table,
 	child->heap_address = 0;
 	child->break_address = 0;
 
-	parent = table[ppid];
-	if(parent) {
-		child->flags |= parent->flags;
+	actual_parent = pfs_process_lookup(actual_ppid);
+
+	if(actual_parent) {
+		child->flags |= actual_parent->flags;
 		if(share_table) {
-			child->table = parent->table;
+			child->table = actual_parent->table;
 			child->table->addref();
 		} else {
-			child->table = parent->table->fork();
+			child->table = actual_parent->table->fork();
 		}
-		strcpy(child->name,parent->name);
-		child->umask = parent->umask;
-		strcpy(child->tty,parent->tty);
-		memcpy(child->signal_interruptible,parent->signal_interruptible,sizeof(child->signal_interruptible));
+		strcpy(child->name,actual_parent->name);
+		child->umask = actual_parent->umask;
+		strcpy(child->tty,actual_parent->tty);
+		memcpy(child->signal_interruptible,actual_parent->signal_interruptible,sizeof(child->signal_interruptible));
 	} else {
 		child->table = new pfs_table;
-		child->table->attach(0,dup(0),O_RDONLY,0666,"stdin");
-		child->table->attach(1,dup(1),O_WRONLY,0666,"stdout");
-		child->table->attach(2,dup(2),O_WRONLY,0666,"stderr");
+
+		/* The first child process must inherit file descriptors */
+
+		int count = sysconf(_SC_OPEN_MAX);
+		int *flags = (int*)malloc(sizeof(int)*count);
+		int i;
+
+		/* Scan through the known file descriptors */
+
+		for(int i=0;i<count;i++) {
+			flags[i] = fcntl(i,F_GETFL);
+		}
+
+		/* If valid, duplicate and attach them to the child process. */
+
+		for(i=0;i<count;i++) {
+			if(i==pfs_channel_fd()) continue;
+			if(flags[i]>=0) {
+				child->table->attach(i,dup(i),flags[i],0666,"fd");
+				debug(D_PROCESS,"attaching to inherited fd %d with flags %d",i,flags);
+			} 
+		}
+
+		free(flags);
+
 		child->umask = 000;
 		strcpy(child->tty,"/dev/tty");
 		memset(child->signal_interruptible,0,sizeof(child->signal_interruptible));
 	}
-		
-	table[pid] = child;
+
+	notify_parent = pfs_process_lookup(notify_ppid);
+	if (!notify_parent) {
+		child->ppid = actual_ppid;
+	}
+
+	itable_insert(pfs_process_table,pid,child);
 
 	nprocs++;
 
-	debug(D_PSTREE,"%d %s %d",ppid,share_table ? "newthread" : "fork", pid);
+	debug(D_PSTREE,"%d %s %d",actual_ppid,share_table ? "newthread" : "fork", pid);
 	
 	return child;
 }
 
-struct pfs_process * pfs_process_lookup( pid_t pid )
-{
-	return table[pid];
-}
-
 void pfs_process_delete( struct pfs_process *p )
 {
-	/* The table was deleted in pfs_process_stop */
-	table[p->pid] = 0;
+	/* The file table was deleted in pfs_process_stop */
+	itable_remove(pfs_process_table,p->pid);
 	tracer_detach(p->tracer);
 	free(p);
 }
@@ -214,6 +258,23 @@ static int pfs_process_may_wake( struct pfs_process *parent, struct pfs_process 
 	}
 }
 
+void pfs_process_exit_group( struct pfs_process *child )
+{
+	struct pfs_process *p;
+	UINT64_T pid;
+
+	struct rusage usage;
+	memset(&usage,0,sizeof(usage));
+
+	itable_firstkey(pfs_process_table);
+	while(itable_nextkey(pfs_process_table,&pid,(void**)&p)) {
+		if(p && p!=child && p->tgid == child->tgid) {
+			debug(D_PROCESS,"exiting process %d",p->pid);
+			pfs_process_stop(p,0,usage);
+		}
+	}
+}
+
 /*
 The given process has stopped or completed with this status and rusage.
 If this process has a parent, attempt to inform it, otherwise
@@ -224,6 +285,8 @@ parent ourselves, then cause it to be rescheduled.
 void pfs_process_stop( struct pfs_process *child, int status, struct rusage usage )
 {
 	struct pfs_process *parent;
+
+	if(child->state==PFS_PROCESS_STATE_DONE) return;
 
 	if(WIFEXITED(status) || WIFSIGNALED(status) ) {
 		if(WIFEXITED(status)) {
@@ -246,7 +309,9 @@ void pfs_process_stop( struct pfs_process *child, int status, struct rusage usag
 	child->exit_status = status;
 	child->exit_rusage = usage;
 
-	parent = table[child->ppid];
+	parent = pfs_process_lookup(child->ppid);
+	debug(D_PSTREE, "process %d parent is %d", child->pid, child->ppid);
+
 	if(parent) {
 		int send_signal = 0;
 		if(child->state==PFS_PROCESS_STATE_DONE) {
@@ -266,6 +331,8 @@ void pfs_process_stop( struct pfs_process *child, int status, struct rusage usag
 		} else if(send_signal!=0) {
 			pfs_process_raise(parent->pid,send_signal,1);
 		}
+	} else {
+		debug(D_PSTREE, "process %d parent %d not in process table", child->pid, child->ppid);
 	}
 }
 
@@ -278,9 +345,9 @@ from the kernel.
 
 int pfs_process_waitpid( struct pfs_process *p, pid_t wait_pid, int *wait_ustatus, int wait_options, struct rusage *wait_urusage )
 {
+	UINT64_T childpid;
 	struct pfs_process *child;
 	int nchildren = 0;
-	int i;
 
 	p->state = PFS_PROCESS_STATE_WAITPID;
 	p->wait_pid = wait_pid;
@@ -289,8 +356,8 @@ int pfs_process_waitpid( struct pfs_process *p, pid_t wait_pid, int *wait_ustatu
 	p->wait_urusage = wait_urusage;
 	p->syscall_result = -EINTR;
 
-	for(i=0;i<PFS_PID_MAX;i++) {
-		child = table[i];
+	itable_firstkey(pfs_process_table);
+	while(itable_nextkey(pfs_process_table,&childpid,(void**)&child)) {
 		if(child && child->ppid==p->pid) {
 			nchildren++;
 			if(pfs_process_may_wake(p,child)) return 1;
@@ -342,7 +409,7 @@ int  pfs_process_raise( pid_t pid, int sig, int really_sendit )
 
 	pid = ABS(pid);
 
-	p = table[pid];
+	p = pfs_process_lookup(pid);
 	if(!p) {
 		if(pfs_username) {
 			result = -1;
@@ -396,12 +463,13 @@ void pfs_process_kill()
 
 void pfs_process_killall()
 {
-	int i;
-	for(i=0;i<PFS_PID_MAX;i++) {
-		if(table[i]) {
-			debug(D_PROCESS,"killing pid %d",table[i]->pid);
-			kill(table[i]->pid,SIGKILL);
-		}
+	UINT64_T pid;
+	struct pfs_process *p;
+
+	itable_firstkey(pfs_process_table);
+	while(itable_nextkey(pfs_process_table,&pid,(void**)&p)) {
+		debug(D_PROCESS,"killing pid %d",p->pid);
+		kill(p->pid,SIGKILL);
 	}
 }
 
@@ -434,10 +502,11 @@ PTRINT_T pfs_process_heap_address( struct pfs_process *p )
 	}
 
 	while(fgets(line,sizeof(line),file)) {
+		debug(D_PROCESS,"line: %s",line);
 		fields = sscanf(line,PTR_FORMAT "-" PTR_FORMAT " %s " PTR_FORMAT "%d:%d %d",
 			&start,&end,flagstring,&offset,&major,&minor,&inode);
 
-		if(fields==7 && !strcmp(flagstring,"rw-p") && inode==0) {
+		if(fields==7 && inode==0 && flagstring[0]=='r' && flagstring[1]=='w' && flagstring[3]=='p') {
 			fclose(file);
 			p->heap_address = start;
 			debug(D_PROCESS,"heap address is 0x%x",start);

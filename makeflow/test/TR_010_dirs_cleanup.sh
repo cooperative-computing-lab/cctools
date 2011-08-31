@@ -16,6 +16,7 @@ clean()
 {
     kill -9 $(cat worker.pid)
     rm -f worker.pid
+    rm -f worker.port
     rm -rf input
     exit 0
 }

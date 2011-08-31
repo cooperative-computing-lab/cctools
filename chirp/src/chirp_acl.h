@@ -9,6 +9,8 @@ See the file COPYING for details.
 
 #include "chirp_filesystem.h"
 
+#include "hash_table.h"
+
 #include <stdio.h>
 
 #define CHIRP_ACL_BASE_NAME ".__acl"
@@ -32,28 +34,37 @@ See the file COPYING for details.
 #define CHIRP_ACL_RESERVE         (1<<15)
 #define CHIRP_ACL_ALL             (~0)
 
-int          chirp_acl_check( const char *filename, const char *subject, int flags );
-int          chirp_acl_check_dir( const char *dirname, const char *subject, int flags );
-int          chirp_acl_check_link( const char *linkname, const char *subject, int flags );
+int chirp_acl_check(const char *filename, const char *subject, int flags);
+int chirp_acl_check_dir(const char *dirname, const char *subject, int flags);
+int chirp_acl_check_link(const char *linkname, const char *subject, int flags);
 
-int          chirp_acl_set( const char *filename, const char *subject, int flags, int reset_acl );
+int chirp_acl_set(const char *filename, const char *subject, int flags, int reset_acl);
 
-CHIRP_FILE *       chirp_acl_open( const char *filename );
-int          chirp_acl_read( CHIRP_FILE *aclfile, char *subject, int *flags );
-void         chirp_acl_close( CHIRP_FILE *aclfile);
+int chirp_acl_ticket_create(const char *ticketdir, const char *subject, const char *newsubject, const char *ticket, const char *duration);
+int chirp_acl_ticket_modify(const char *ticketdir, const char *subject, const char *ticket_subject, const char *path, int flags);
+char *chirp_acl_ticket_callback(const char *digest);
+int chirp_acl_gctickets(const char *ticketdir);
+int chirp_acl_ticket_delete(const char *ticketdir, const char *subject, const char *ticket_subject);
+int chirp_acl_ticket_get(const char *ticketdir, const char *subject, const char *ticket_subject, char **ticket_esubject, char **ticket, time_t * ticket_expiration, char ***ticket_rights);
+int chirp_acl_ticket_list(const char *ticketdir, const char *subject, char **ticket_subjects[]);
 
-const char * chirp_acl_flags_to_text( int flags );
-int          chirp_acl_text_to_flags( const char *text );
-int          chirp_acl_from_access_flags( int flags );
-int          chirp_acl_from_open_flags( int flags );
+CHIRP_FILE *chirp_acl_open(const char *filename);
+int chirp_acl_read(CHIRP_FILE * aclfile, char *subject, int *flags);
+void chirp_acl_close(CHIRP_FILE * aclfile);
 
-void         chirp_acl_force_readonly();
-void         chirp_acl_timeout_set( int t );
-int          chirp_acl_timeout_get();
-void	     chirp_acl_default( const char *aclpath );
+const char *chirp_acl_flags_to_text(int flags);
+int chirp_acl_text_to_flags(const char *text);
+int chirp_acl_from_access_flags(int flags);
+int chirp_acl_from_open_flags(int flags);
 
-int          chirp_acl_init_root( const char *path );
-int	     chirp_acl_init_copy( const char *path );
-int	     chirp_acl_init_reserve( const char *path, const char *subject );
+void chirp_acl_force_readonly();
+void chirp_acl_timeout_set(int t);
+int chirp_acl_timeout_get();
+void chirp_acl_default(const char *aclpath);
+
+int chirp_acl_init_root(const char *path);
+int chirp_acl_init_copy(const char *path);
+int chirp_acl_init_reserve(const char *path, const char *subject);
+int chirp_acl_whoami(const char *subject, char **esubject);
 
 #endif
