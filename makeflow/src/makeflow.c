@@ -1165,6 +1165,11 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 		strcat(output_files,",");
 	}
 
+	const char *batch_submit_options = getenv("BATCH_OPTIONS");
+	if (batch_submit_options) {
+		batch_queue_set_options(thequeue, batch_submit_options);
+	}
+
 	time_t stoptime = time(0) + dag_submit_timeout;
 	int waittime = 1;
 
