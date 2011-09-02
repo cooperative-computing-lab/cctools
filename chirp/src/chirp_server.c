@@ -751,6 +751,7 @@ static int chirp_path_fix(char *path)
 {
 	char decodepath[CHIRP_PATH_MAX];
 	char shortpath[CHIRP_PATH_MAX];
+	char rootpath[CHIRP_PATH_MAX];
 
 	// Remove the percent-hex encoding
 	url_decode(path, decodepath, sizeof(decodepath));
@@ -759,7 +760,10 @@ static int chirp_path_fix(char *path)
 	string_collapse_path(decodepath,shortpath,1);
 
 	// Add the Chirp root and copy it back out.
-	sprintf(path, "%s/%s", chirp_root_path, shortpath);
+	sprintf(rootpath, "%s/%s", chirp_root_path, shortpath);
+
+	// Collapse again...
+	string_collapse_path(rootpath, path, 1);
 
 	return 1;
 }
