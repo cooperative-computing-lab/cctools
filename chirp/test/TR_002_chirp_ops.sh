@@ -16,7 +16,6 @@ prepare()
     pid=$!
 
     if ps ux | awk '{print $2}' | grep "^$pid$"; then
-	echo $port> $PORT_FILE
 	echo $pid > $PID_FILE
 	exit 0
     else
@@ -43,6 +42,7 @@ cd _test
 ls
 put /etc/hosts hosts.txt
 cat hosts.txt
+md5 hosts.txt
 getacl
 localpath hosts.txt
 exit
