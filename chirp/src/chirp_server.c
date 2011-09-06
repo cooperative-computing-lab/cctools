@@ -761,11 +761,9 @@ static int chirp_path_fix(char *path)
 
 	// Add the Chirp root and copy it back out.
 	sprintf(rootpath, "%s/%s", chirp_root_path, shortpath);
-	debug(D_DEBUG, "root path = %s", rootpath);
 
 	// Collapse again...
 	string_collapse_path(rootpath, path, 1);
-	debug(D_DEBUG, "path = %s", path);
 
 	return 1;
 }
