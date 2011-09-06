@@ -761,9 +761,11 @@ static int chirp_path_fix(char *path)
 
 	// Add the Chirp root and copy it back out.
 	sprintf(rootpath, "%s/%s", chirp_root_path, shortpath);
+	debug(D_DEBUG, "root path = %s", rootpath);
 
 	// Collapse again...
 	string_collapse_path(rootpath, path, 1);
+	debug(D_DEBUG, "path = %s", path);
 
 	return 1;
 }
@@ -1553,7 +1555,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
-			if(chirp_alloc_md5(path, (unsigned char *) dataout)) {
+			if(chirp_alloc_md5(path, (unsigned char *) dataout) >= 0) {
 				result = dataoutlength = 16;
 			} else {
 				result = errno_to_chirp(errno);
