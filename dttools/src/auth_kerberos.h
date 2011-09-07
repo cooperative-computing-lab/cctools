@@ -4,5 +4,10 @@ Copyright (C) 2005- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
- int auth_kerberos_register();
 
+#ifndef AUTH_KERBEROS_H
+#define AUTH_KERBEROS_H
+
+int auth_kerberos_register(void);
+
+#endif

@@ -26,7 +26,7 @@ int auth_register_byname(const char *name)
 	return 0;
 }
 
-int auth_register_all()
+int auth_register_all(void)
 {
 	return auth_kerberos_register() + auth_globus_register() + auth_unix_register() + auth_ticket_register() + auth_hostname_register() + auth_address_register();
 }

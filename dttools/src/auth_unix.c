@@ -215,7 +215,7 @@ static int auth_unix_accept(struct link *link, char **subject, time_t stoptime)
 	return success;
 }
 
-int auth_unix_register()
+int auth_unix_register(void)
 {
 	debug(D_AUTH, "unix: registered");
 	return auth_register("unix", auth_unix_assert, auth_unix_accept);

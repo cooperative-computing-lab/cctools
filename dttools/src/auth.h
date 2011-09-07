@@ -23,6 +23,6 @@ int auth_accept(struct link *l, char **type, char **subject, time_t stoptime);
 int auth_barrier(struct link *l, const char *response, time_t stoptime);
 int auth_register(char *type, auth_assert_t assert, auth_accept_t accept);
 
-void auth_clear();
+void auth_clear(void);
 
 #endif

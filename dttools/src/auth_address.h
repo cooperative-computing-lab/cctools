@@ -5,4 +5,9 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-int auth_address_register();
+#ifndef AUTH_ADDRESS_H
+#define AUTH_ADDRESS_H
+
+int auth_address_register(void);
+
+#endif

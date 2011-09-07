@@ -46,6 +46,6 @@ Enables all authentication modes, in a default order.
 @see auth_register_byname
 */
 
-int auth_register_all();
+int auth_register_all(void);
 
 #endif
