@@ -5,7 +5,7 @@ include ../../Makefile.config
 all: setup.cfg
 	@${CCTOOLS_PYTHON} ./setup.py build_ext --inplace
 
-test: workqueue.so 
+test: all
 	@echo running python-workqueue tests
 	@env CCTOOLS_PYTHON=${CCTOOLS_PYTHON} ${CCTOOLS_HOME}/dttools/src/test_runner.sh TR_*.sh
 
