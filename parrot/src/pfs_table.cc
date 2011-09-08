@@ -498,6 +498,7 @@ int pfs_table::select( int n, fd_set *r, fd_set *w, fd_set *e, struct timeval *t
 		}
 	}
 
+
 	if(result>0) {
 		if(r) FD_ZERO(r);
 		if(w) FD_ZERO(w);
@@ -536,7 +537,22 @@ int pfs_table::select( int n, fd_set *r, fd_set *w, fd_set *e, struct timeval *t
 			errno = EAGAIN;
 		}
 
-		if(result!=0) {
+		/*
+		If result is zero, then we timed out. Clear all the output bits and return.
+		Clearing is not strictly mandated by the standard, but many programs seem
+		to depend on it.
+
+		If result is not zero, then we need to register all of the fds of interest
+		with the master pfs_poll mechanism, and then return EAGAIN, which will put
+		this process to sleep.  When it wakes up, it will call pfs_table::select
+		again and start over.
+		*/
+
+		if(result==0) {
+			if(r) FD_ZERO(r);
+			if(w) FD_ZERO(w);
+			if(e) FD_ZERO(e);
+		} else {
 			for(i=0;i<n;i++) {
 				if(!pointers[i]) continue;
 				int flags=0;
