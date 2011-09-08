@@ -100,7 +100,7 @@ config_rfio_path=no
 config_dcap_path=no
 config_irods_path=no
 config_xrootd_path=no
-config_mpi_path=no
+config_mpi_path=auto
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
 then
@@ -454,6 +454,8 @@ fi
 if [ $config_mpi_path != no ] && check_file ${mpi_path}/bin/mpicc && check_file ${mpi_path}/include/mpi.h
 then
         mpilinker=${mpi_path}/bin/mpicc
+        linker=${mpi_path}/bin/mpicc
+        ccompiler=${mpi_path}/bin/mpicc
         usempi="true"
         ccflags="${ccflags} -I${mpi_path}/include -DHAS_MPI"
 else

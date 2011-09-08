@@ -32,7 +32,7 @@ See the file COPYING for details.
 
 const char *batch_queue_type_string()
 {
-	return "local, condor, sge, moab, wq, hadoop, mpi-queue";
+	return "local, condor, sge, moab, wq, hadoop, mpi-queue, wqh";
 }
 
 batch_queue_type_t batch_queue_type_from_string(const char *str)
@@ -49,6 +49,8 @@ batch_queue_type_t batch_queue_type_from_string(const char *str)
 		return BATCH_QUEUE_TYPE_LOCAL;
 	if(!strcmp(str, "unix"))
 		return BATCH_QUEUE_TYPE_LOCAL;
+	if(!strcmp(str, "wqh"))
+		return BATCH_QUEUE_TYPE_HIERARCHICAL_WORK_QUEUE;
 	if(!strcmp(str, "wq"))
 		return BATCH_QUEUE_TYPE_WORK_QUEUE;
 	if(!strcmp(str, "workqueue"))
@@ -87,6 +89,8 @@ const char *batch_queue_type_to_string(batch_queue_type_t t)
 		return "hadoop";
 	case BATCH_QUEUE_TYPE_MPI_QUEUE:
 		return "mpi-queue";
+	case BATCH_QUEUE_TYPE_HIERARCHICAL_WORK_QUEUE:
+		return "wqh";
 	default:
 		return "unknown";
 	}
@@ -163,6 +167,19 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	} else {
 		q->hadoop_jobs = NULL;
 	}
+	
+	if(type == BATCH_QUEUE_TYPE_HIERARCHICAL_WORK_QUEUE) {
+		char *wqh_mode;
+		int mode;
+		wqh_mode = getenv("WQH_FILE_CACHE");
+
+		if(wqh_mode && !strcmp(wqh_mode, "mpi"))
+			mode = WORKER_COMM_TCP;
+		else
+			mode = WORKER_COMM_TCP;
+		
+		q->hierarchical_work_queue = hierarchical_work_queue_create(mode, -1, "/tmp/wqh");
+	}
 
 	return q;
 }
@@ -227,6 +244,8 @@ batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const ch
 		return batch_job_submit_hadoop(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
 		return batch_job_submit_mpi_queue(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
+	} else if(q->type == BATCH_QUEUE_TYPE_HIERARCHICAL_WORK_QUEUE) {
+		return batch_job_submit_hierarchical_work_queue(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -254,6 +273,8 @@ batch_job_id_t batch_job_submit_simple(struct batch_queue * q, const char *cmd, 
 		return batch_job_submit_simple_hadoop(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
 		return batch_job_submit_simple_mpi_queue(q, cmd, extra_input_files, extra_output_files);
+	} else if(q->type == BATCH_QUEUE_TYPE_HIERARCHICAL_WORK_QUEUE) {
+		return batch_job_submit_simple_hierarchical_work_queue(q, cmd, extra_input_files, extra_output_files);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -286,6 +307,8 @@ batch_job_id_t batch_job_wait_timeout(struct batch_queue * q, struct batch_job_i
 		return batch_job_wait_hadoop(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
 		return batch_job_wait_mpi_queue(q, info, stoptime);
+	} else if(q->type == BATCH_QUEUE_TYPE_HIERARCHICAL_WORK_QUEUE) {
+		return batch_job_wait_hierarchical_work_queue(q, info, stoptime);
 	} else {
 		errno = EINVAL;
 		return -1;
@@ -313,6 +336,8 @@ int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid)
 		return batch_job_remove_hadoop(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
 		return batch_job_remove_mpi_queue(q, jobid);
+	} else if(q->type == BATCH_QUEUE_TYPE_HIERARCHICAL_WORK_QUEUE) {
+		return batch_job_remove_hierarchical_work_queue(q, jobid);
 	} else {
 		errno = EINVAL;
 		return -1;

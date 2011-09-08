@@ -2,7 +2,7 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-SOURCES = auth.c auth_all.c auth_unix.c auth_globus.c auth_kerberos.c auth_hostname.c auth_address.c auth_ticket.c b64_encode.c batch_job.c batch_job_condor.c batch_job_hadoop.c batch_job_local.c batch_job_mpi_queue.c batch_job_grid.c batch_job_work_queue.c bitmap.c buffer.c catalog_query.c change_process_title.c chunk.c console_login.c clean_dir.c copy_stream.c create_dir.c datagram.c debug.c delete_dir.c disk_info.c domain_name.c domain_name_cache.c dpopen.c envtools.c fast_popen.c full_io.c file_cache.c get_canonical_path.c get_line.c hdfs_library.c hash_cache.c hash_table.c hmac.c http_query.c itable.c link.c list.c load_average.c memory_info.c mergesort.c md5.c mpi_queue.c nvpair.c nvpair_database.c password_cache.c preadwrite.c process.c sha1.c sleeptools.c sort_dir.c stringtools.c text_array.c text_list.c timestamp.c timer.c url_encode.c username.c work_queue.c worker_comm.c xmalloc.c
+SOURCES = auth.c auth_all.c auth_unix.c auth_globus.c auth_kerberos.c auth_hostname.c auth_address.c auth_ticket.c b64_encode.c batch_job.c batch_job_condor.c batch_job_hadoop.c batch_job_hierarchical_work_queue.c batch_job_local.c batch_job_mpi_queue.c batch_job_grid.c batch_job_work_queue.c bitmap.c buffer.c catalog_query.c change_process_title.c chunk.c console_login.c clean_dir.c copy_stream.c create_dir.c datagram.c debug.c delete_dir.c disk_info.c domain_name.c domain_name_cache.c dpopen.c envtools.c fast_popen.c full_io.c file_cache.c get_canonical_path.c get_line.c hdfs_library.c hash_cache.c hash_table.c hierarchical_work_queue.c hmac.c http_query.c itable.c link.c list.c load_average.c memory_info.c mergesort.c md5.c mpi_queue.c nvpair.c nvpair_database.c password_cache.c preadwrite.c process.c sha1.c sleeptools.c sort_dir.c stringtools.c text_array.c text_list.c timestamp.c timer.c url_encode.c username.c work_queue.c worker_comm.c xmalloc.c
 
 EXTRA_HEADERS = int_sizes.h macros.h batch_job_internal.h
 
@@ -12,7 +12,7 @@ LIBRARIES = libdttools.a
 PROGRAMS = catalog_server work_queue_worker work_queue_pool work_queue_status watchdog
 
 ifeq (${CCTOOLS_USE_MPI},true)
-	PROGRAMS += mpi_queue_worker
+	PROGRAMS += mpi_queue_worker hierarchical_worker
 endif
 
 TEST_PROGRAMS = work_queue_example microbench hmac_test chunk_test multirun
@@ -43,6 +43,9 @@ work_queue_worker: work_queue_worker.o libdttools.a
 mpi_queue_worker: mpi_queue_worker.o libdttools.a
 	${CCTOOLS_MPI_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
+hierarchical_worker: hierarchical_worker.o libdttools.a
+	${CCTOOLS_MPI_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
+
 work_queue_example: work_queue_example.c libdttools.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
@@ -56,7 +59,7 @@ chunk_test: chunk_test.o libdttools.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 work_queue_pool: work_queue_pool.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
+	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -lmpi -o $@
 
 libdttools.a: ${OBJECTS}
 	${CCTOOLS_AR} rv $@ $^

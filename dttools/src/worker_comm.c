@@ -110,12 +110,14 @@ struct list * worker_comm_accept_connections(int interface, struct link *master_
 
 struct worker_comm * worker_comm_connect(struct worker_comm *comm, int interface, const char *hostname, int port_id, int active_timeout, int short_timeout)
 {
-	int comm_create = 0, mpi_init = 0;
+	int comm_create = 0, mpi_init = 0, stoptime;
 	
 	MPI_Initialized(&mpi_init);
 	if(interface == WORKER_COMM_MPI && !mpi_init)
 		return NULL;
 
+
+	debug(D_WQ, "establishing comm connection\n");
 	if(!comm) {
 		comm = malloc(sizeof(*comm));
 		memset(comm, 0, sizeof(*comm));
@@ -132,10 +134,14 @@ struct worker_comm * worker_comm_connect(struct worker_comm *comm, int interface
 		break;
 		
 		case WORKER_COMM_TCP:
+			debug(D_WQ, "connecting via TCP\n");
 			comm->type = WORKER_COMM_TCP;
 			comm->mpi_rank = -1;
-			comm->lnk = link_connect(hostname, port_id, active_timeout);
+			debug(D_WQ, "link_connect(%s, %d, %d+%d)\n", hostname, port_id, time(0), active_timeout);
+			stoptime = time(0) + active_timeout;
+			comm->lnk = link_connect(hostname, port_id, stoptime);
 			if(!comm->lnk) {
+				debug(D_WQ, "link_connect failed\n");
 				if(comm_create)
 					free(comm);
 				return NULL;
@@ -356,7 +362,7 @@ int worker_comm_send_buffer(struct worker_comm *comm, char *buffer, int length, 
 
 int worker_comm_send_file(struct worker_comm *comm, const char *filename, int length, char header)
 {
-	int mpi_init, result, stoptime;
+	int mpi_init, result = 0, stoptime;
 	FILE *source;
 	
 	if(length <= 0) {

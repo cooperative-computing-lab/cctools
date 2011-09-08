@@ -5,6 +5,7 @@
 #include "itable.h"
 #include "mpi_queue.h"
 #include "work_queue.h"
+#include "hierarchical_work_queue.h"
 
 #define BATCH_JOB_LINE_MAX 8192
 
@@ -17,6 +18,7 @@ struct batch_queue {
 	struct itable *hadoop_jobs;
 	struct work_queue *work_queue;
 	struct mpi_queue *mpi_queue;
+	struct hierarchical_work_queue *hierarchical_work_queue;
 };
 
 batch_job_id_t batch_job_submit_simple_local(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files);
@@ -59,6 +61,12 @@ batch_job_id_t batch_job_submit_simple_xgrid(struct batch_queue * q, const char 
 batch_job_id_t batch_job_submit_xgrid(struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files);
 batch_job_id_t batch_job_wait_xgrid(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime);
 int batch_job_remove_xgrid(struct batch_queue *q, batch_job_id_t jobid);
+
+batch_job_id_t batch_job_submit_simple_hierarchical_work_queue(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files);
+batch_job_id_t batch_job_submit_hierarchical_work_queue(struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files);
+batch_job_id_t batch_job_wait_hierarchical_work_queue(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime);
+int batch_job_remove_hierarchical_work_queue(struct batch_queue *q, batch_job_id_t jobid);
+
 
 #endif
 

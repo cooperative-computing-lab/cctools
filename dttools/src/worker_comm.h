@@ -1,8 +1,10 @@
+#ifndef WORKER_COMM_H_
+#define WORKER_COMM_H_
+
 #include "link.h"
 #include "list.h"
 
 #include <mpi.h>
-
 
 #define WORK_QUEUE_LINE_MAX 1024
 
@@ -30,8 +32,8 @@ struct worker_op {
 	char *payload;
 };
 
-#define WORKER_COMM_TCP 1
-#define WORKER_COMM_MPI 2
+#define WORKER_COMM_TCP	1
+#define WORKER_COMM_MPI	2
 
 #define WORKER_COMM_ARRAY_CHAR		1
 #define WORKER_COMM_ARRAY_INT		2
@@ -65,4 +67,5 @@ int worker_comm_receive_op(struct worker_comm *comm, struct worker_op *op);
 
 int worker_comm_test_results(struct worker_comm *comm);
 
+#endif
 
