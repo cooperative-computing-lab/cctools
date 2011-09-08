@@ -24,6 +24,7 @@ extern "C" {
 #include "debug.h"
 }
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -2515,14 +2516,11 @@ void decode_syscall( struct pfs_process *p, int entering )
 					p->syscall_result = pfs_search(path, pattern, buffer, len1, stats, len2);
 					if (p->syscall_result > 0) {
 						pfs_size_t length = 0;
-						while (buffer[length] != '\0') {
-							if (buffer[length+1] == '\0') {
-								length += 1;
-								break;
-							} else {
-								length += strlen(&buffer[length])+1;
-							}
+						while (buffer[length]) {
+							length += strlen(&buffer[length])+1;
 						}
+						assert(buffer[length+1] == '\0');
+						length += 1;
 						tracer_copy_out(p->tracer, buffer, POINTER(args[2]), sizeof(char)*length);
 						if (p->syscall_result <= len2) /* entirely fits in stats array */
 							tracer_copy_out(p->tracer, stats, POINTER(args[4]), sizeof(struct stat)*p->syscall_result);
