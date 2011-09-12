@@ -1549,7 +1549,7 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 			if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
 
 			sprintf(current, "/%s", name);
-			r = t->stat(base, &buf);
+			r = t->stat(dir, &buf);
 			if (fnmatch(pattern, base, FNM_PATHNAME) == 0) {
 				size_t l = strlen(dir);
 				if (l+*i+2 >= len1) { /* +2 for terminating 2 NUL bytes */
