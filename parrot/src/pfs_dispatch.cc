@@ -2526,6 +2526,8 @@ void decode_syscall( struct pfs_process *p, int entering )
 							tracer_copy_out(p->tracer, stats, POINTER(args[4]), sizeof(struct stat)*p->syscall_result);
 						else
 							tracer_copy_out(p->tracer, stats, POINTER(args[4]), sizeof(struct stat)*len2);
+					} else {
+						p->syscall_result = -errno
 					}
 				}
 				divert_to_dummy(p, p->syscall_result);
