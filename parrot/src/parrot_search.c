@@ -56,7 +56,7 @@ int main( int argc, char *argv[] )
 		}
 		assert(n == result);
 	} else {
-		fprintf(stderr, "%s: %s", argv[0], strerror(errno));
+		fprintf(stderr, "%s: %s\n", argv[0], strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
