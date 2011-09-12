@@ -393,11 +393,11 @@ int main(int argc, char *argv[])
 	char addr[LINK_ADDRESS_MAX];
 	UINT64_T memory_avail, memory_total;
 	UINT64_T disk_avail, disk_total;
+	UINT64_T avail_space_threshold = 0;
 	int ncpus;
 	char c;
 	char hostname[DOMAIN_NAME_MAX];
 	int w;
-	UINT64_T avail_space_threshold = 0;
 	char preferred_master_names[WORK_QUEUE_LINE_MAX];
 	char deletecmd[WORK_QUEUE_LINE_MAX];
 
@@ -507,6 +507,14 @@ int main(int argc, char *argv[])
 	printf("worker: working in %s\n", tempdir);
 	mkdir(tempdir, 0700);
 	chdir(tempdir);
+	
+	if (avail_space_threshold > 0) {
+		disk_info_get(".", &disk_avail, &disk_total);
+		if (disk_avail < avail_space_threshold) {
+                       	printf("worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
+	                goto abort;
+                }	
+        }	
 
 	domain_name_cache_guess(hostname);
 
@@ -514,7 +522,7 @@ int main(int argc, char *argv[])
 	time_t switch_master_time = time(0) + master_timeout;
 
 	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t) free);
-
+		
 	while(!abort_flag) {
 		char line[WORK_QUEUE_LINE_MAX];
 		int result, mode, fd;
@@ -523,13 +531,6 @@ int main(int argc, char *argv[])
 		char path[WORK_QUEUE_LINE_MAX];
 		char *buffer;
 		FILE *stream;
-
-		if (avail_space_threshold > 0) {
-			if (disk_avail < avail_space_threshold) {
-                        	printf("worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
-	                        break;
-                       	}	
-                }	
 
 		if(time(0) > idle_stoptime) {
 			if(master) {
@@ -621,6 +622,7 @@ int main(int argc, char *argv[])
 				symlink(path, filename);
 			} else if(sscanf(line, "put %s %lld %o", filename, &length, &mode) == 3) {
 				if (avail_space_threshold > 0){
+					disk_info_get(".", &disk_avail, &disk_total);
 		                        if (disk_avail < avail_space_threshold) {
                 	                	debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
 	                        	        goto recover;
@@ -789,6 +791,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
+      abort:	
 	printf("worker: cleaning up %s\n", tempdir);
 	sprintf(deletecmd, "rm -rf %s", tempdir);
 	system(deletecmd);
