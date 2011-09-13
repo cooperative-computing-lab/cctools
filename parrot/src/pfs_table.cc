@@ -1588,7 +1588,7 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 
 int pfs_table::search( const char *path, const char *patt, char *buffer, size_t len1, struct stat *stats, size_t len2 )
 {
-	unsigned level = 1;
+	unsigned level = 0;
 	const char *s;
 	char directory[PFS_PATH_MAX+1];
 	char pattern[PFS_PATH_MAX+1];
