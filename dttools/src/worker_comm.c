@@ -1,8 +1,10 @@
 #include "copy_stream.h"
 #include "debug.h"
+#include "domain_name_cache.h"
 #include "itable.h"
 #include "list.h"
 #include "link.h"
+#include "macros.h"
 #include "worker_comm.h"
 
 #include <mpi.h>
@@ -17,13 +19,20 @@
 #define WORKER_COMM_TAG_OP	0x00
 #define WORKER_COMM_TAG_ROLE	0x01
 
+// Amount of time spent waiting for new connections by default
+// After not finding a connection the wait time is halved, min 1 sec.
+// When a new connection is found the wait time returns to the default.
+#define NEW_CONNECTION_WAIT_TIME 8;
+
 struct list * worker_comm_accept_connections(int interface, struct link *master_link, int active_timeout, int short_timeout)
 {
+	static int wait_time = NEW_CONNECTION_WAIT_TIME;
 	struct worker_comm *comm;
 	struct list *new_comms;
-	int sleeptime, stoptime, mpi_init = 0;
+	int stoptime, mpi_init = 0;
+	UINT64_T sleeptime;
 
-	stoptime = time(0) + short_timeout;
+	stoptime = time(0) + wait_time;
 	switch(interface) {
 		case WORKER_COMM_MPI:
 			MPI_Initialized(&mpi_init);
@@ -31,8 +40,10 @@ struct list * worker_comm_accept_connections(int interface, struct link *master_
 				return NULL;
 			break;
 		case WORKER_COMM_TCP:
-			if(!master_link)
+			if(!master_link) {
+				debug(D_WQ, "no master link detected, returning\n");
 				return NULL;
+			}
 			break;
 	}
 
@@ -90,6 +101,7 @@ struct list * worker_comm_accept_connections(int interface, struct link *master_
 						comm->mpi_req = MPI_REQUEST_NULL;
 						
 						if(result > 0) {
+							debug(D_WQ, "id info received: %s\n", line);
 							comm->hostname = strdup(line);
 							list_push_tail(new_comms, comm);
 							continue;
@@ -101,8 +113,10 @@ struct list * worker_comm_accept_connections(int interface, struct link *master_
 		break;
 	}
 	if(list_size(new_comms)) {
+		wait_time = NEW_CONNECTION_WAIT_TIME;
 		return new_comms;
 	} else {
+		wait_time = MAX(1, wait_time/2);
 		list_delete(new_comms);
 		return NULL;
 	}
@@ -110,7 +124,8 @@ struct list * worker_comm_accept_connections(int interface, struct link *master_
 
 struct worker_comm * worker_comm_connect(struct worker_comm *comm, int interface, const char *hostname, int port_id, int active_timeout, int short_timeout)
 {
-	int comm_create = 0, mpi_init = 0, stoptime;
+	int comm_create = 0, mpi_init = 0, stoptime, sleeptime = 1;
+	char addr[LINK_ADDRESS_MAX];
 	
 	MPI_Initialized(&mpi_init);
 	if(interface == WORKER_COMM_MPI && !mpi_init)
@@ -135,11 +150,27 @@ struct worker_comm * worker_comm_connect(struct worker_comm *comm, int interface
 		
 		case WORKER_COMM_TCP:
 			debug(D_WQ, "connecting via TCP\n");
+
+			if(!domain_name_cache_lookup(hostname, addr)) {
+				fprintf(stderr, "couldn't lookup address of host %s\n", hostname);
+				if(comm_create)
+					free(comm);
+				return NULL;
+			}
+
 			comm->type = WORKER_COMM_TCP;
 			comm->mpi_rank = -1;
-			debug(D_WQ, "link_connect(%s, %d, %d+%d)\n", hostname, port_id, time(0), active_timeout);
+			debug(D_WQ, "link_connect(%s, %d, %d+%d)\n", addr, port_id, time(0), active_timeout);
 			stoptime = time(0) + active_timeout;
-			comm->lnk = link_connect(hostname, port_id, stoptime);
+			while(!comm->lnk && time(0) < stoptime) {
+				comm->lnk = link_connect(addr, port_id, stoptime);
+				if(!comm->lnk) {
+					sleep(sleeptime);
+					if(sleeptime < 64)
+						sleeptime *= 2;
+				}
+			}
+			
 			if(!comm->lnk) {
 				debug(D_WQ, "link_connect failed\n");
 				if(comm_create)
@@ -372,7 +403,7 @@ int worker_comm_send_file(struct worker_comm *comm, const char *filename, int le
 	}
 	if(result < 0 || length <= 0)
 		return -1;
-	source = fopen(filename, "r");
+	source = fopen(filename, "rb");
 	if(!source)
 		return -1;
 	
@@ -382,7 +413,7 @@ int worker_comm_send_file(struct worker_comm *comm, const char *filename, int le
 			if(!mpi_init)
 				return -1;
 			if(length > 0) {
-				char *buffer;
+				char *buffer = NULL;
 				int bufferlength;
 				bufferlength = copy_stream_to_buffer(source, &buffer);
 				fclose(source);
@@ -400,14 +431,28 @@ int worker_comm_send_file(struct worker_comm *comm, const char *filename, int le
 			}
 			break;
 		case WORKER_COMM_TCP:
-			if(!comm->lnk)
+			if(!comm->lnk) {
+				fclose(source);
 				return -1;
+			}
 			stoptime = time(0)+comm->active_timeout;
-			if(header)
-				link_putfstring(comm->lnk, "%d\n", stoptime, length);
-			if(length > 0)
-				link_stream_from_file(comm->lnk, source, length, stoptime);
-			fclose(source);
+			if(length > 0) {
+				char *buffer = NULL;
+				int bufferlength;
+				if(header)
+					link_putfstring(comm->lnk, "%d\n", stoptime, length);
+	
+				bufferlength = copy_stream_to_buffer(source, &buffer);
+				if(bufferlength < length) {
+					length = bufferlength;
+				}
+				fclose(source);
+				
+				link_write(comm->lnk, buffer, length, stoptime);
+	//			if(length > 0)
+	//				link_stream_from_file(comm->lnk, source, length, stoptime);
+			}
+//			fclose(source);
 			break;
 	}
 	return 0;
@@ -497,8 +542,8 @@ int worker_comm_receive_op(struct worker_comm *comm, struct worker_op *op)
 			
 			if(complete) {
 				if(op->payloadsize) {
-					op->payload = malloc(op->payloadsize);
-					memset(op->payload, 0, op->payloadsize);
+					op->payload = malloc(op->payloadsize+1);
+					memset(op->payload, 0, op->payloadsize+1);
 					MPI_Recv(op->payload, op->payloadsize, MPI_BYTE, comm->mpi_rank, 0, MPI_COMM_WORLD, &comm->mpi_stat);
 				} else {
 					op->payload = NULL;
@@ -513,8 +558,8 @@ int worker_comm_receive_op(struct worker_comm *comm, struct worker_op *op)
 			if(complete) {
 				sscanf(line, "%d %d %d %d %d %d %s", &op->type, &op->jobid, &op->id, &op->options, &op->flags, &op->payloadsize, op->name);
 				if(op->payloadsize) {
-					op->payload = malloc(op->payloadsize);
-					memset(op->payload, 0, op->payloadsize);
+					op->payload = malloc(op->payloadsize+1);
+					memset(op->payload, 0, op->payloadsize+1);
 					link_read(comm->lnk, op->payload, op->payloadsize, stoptime);
 				} else {
 					op->payload = NULL;

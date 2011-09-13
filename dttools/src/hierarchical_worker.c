@@ -35,6 +35,7 @@
 
 
 
+#define FILE_CACHE_DEFAULT_PATH	"/tmp/wqh_cache"
 
 
 
@@ -82,7 +83,6 @@ struct worker_job * worker_job_lookup_insert(struct itable *jobs, int jobid)
 }
 
 
-
 void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 {
 	struct stat st;
@@ -90,10 +90,11 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 	struct worker_file *fileptr = NULL;
 	struct worker_job *job = NULL;
 	
-
+	debug(D_WQ, "Handling op type %d\n", op->type);
 	switch(op->type) {
 		case WORKER_OP_ROLE:
 		{	int stats[3];
+			debug(D_WQ, "op: ROLE\n");
 			worker_comm_disconnect(super_comm);
 			worker_comm_connect(super_comm, comm_interface, op->payload, op->id, active_timeout, short_timeout);
 			workerdata->role = op->flags;
@@ -105,6 +106,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 			return;
 		}
 		case WORKER_OP_WORKDIR:
+			debug(D_WQ, "op: WORKDIR (%s)\n", op->name);
 			if(stat(op->name, &st)) {
 				debug(D_WQ, "Working directory (%s) does not exist\n", op->name);
 				exit(1);
@@ -113,6 +115,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 			break;
 	
 		case WORKER_OP_CLEAR_CACHE:
+			debug(D_WQ, "op: CLEAR CACHE\n");
 			file_cache_cleanup(file_store);
 			itable_firstkey(file_table);
 			while(itable_nextkey(file_table, &index, (void **)&fileptr)) {
@@ -121,6 +124,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 			}
 			break;
 		case WORKER_OP_COMM_INTERFACE:
+			debug(D_WQ, "op: SET INTERFACE\n");
 			comm_interface = op->id;
 			if(op->flags > 0)
 				comm_port = op->flags;
@@ -128,6 +132,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 				comm_port = comm_default_port;
 			break;
 		case WORKER_OP_FILE:
+			debug(D_WQ, "op: CREATE FILE id:%d (%s)\n", op->id, op->name);
 			fileptr = itable_remove(file_table, op->id);
 			if(fileptr && op->options & WORKER_FILE_FLAG_NOCLOBBER)
 				break;
@@ -161,6 +166,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 		case WORKER_OP_FILE_CHECK:
 		{	int stats[4];
 
+			debug(D_WQ, "op: CHECK FILE %d\n", op->id);
 			memset(stats, 0, sizeof(stats));
 			stats[0] = -1;
 		
@@ -171,7 +177,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 				struct stat64 st;
 
 				stats[1] = fileptr->flags;
-		
+				
 				if(fileptr->type == WORKER_FILE_REMOTE) {
 					stats[1] |= WORKER_FILE_FLAG_REMOTEFS;
 					sprintf(cachename, "%s", fileptr->payload);
@@ -185,8 +191,9 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 					stats[2] = st.st_mtime;
 					stats[3] = st.st_mode;
 				}
-			
+				debug(D_WQ, "\tfile %d (%s:%s) exists: %d %d %d %d\n", op->id, fileptr->label, fileptr->payload?fileptr->payload:"", stats[0], stats[1], stats[2], stats[3]);
 			} else {
+				debug(D_WQ, "\tfile %d missing\n", op->id);
 				stats[1] = WORKER_FILE_FLAG_MISSING;
 			}
 			
@@ -195,11 +202,12 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 		}	break;
 	
 		case WORKER_OP_FILE_PUT:
+			debug(D_WQ, "op: PUT FILE %d\n", op->id);
 			fileptr = itable_lookup(file_table, op->id);
 			if(fileptr) {
 				char cachename[WORK_QUEUE_LINE_MAX];
 				int fd;
-			
+				fileptr->type = op->options;
 				if(fileptr->type == WORKER_FILE_NORMAL) {
 					file_cache_contains(file_store, fileptr->label, cachename);
 				} else if(fileptr->type == WORKER_FILE_REMOTE) {
@@ -208,10 +216,12 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 				fd = open64(cachename, O_WRONLY | O_CREAT | O_SYNC | O_TRUNC, op->flags);
 				full_write(fd, op->payload, op->payloadsize);
 				close(fd);
+				debug(D_WQ, "\tdone putting file %d\n", op->id);
 			}
 			break;
 	
 		case WORKER_OP_FILE_GET:
+			debug(D_WQ, "op: RETRIEVE FILE %d\n", op->id);
 			fileptr = itable_lookup(file_table, op->id);
 			if(fileptr) {
 				char cachename[WORK_QUEUE_LINE_MAX];
@@ -235,6 +245,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 	
 		case WORKER_OP_RESULTS:
 		{	int num_results = list_size(complete_jobs);
+			debug(D_WQ, "op: GET RESULTS\n");
 			worker_comm_send_array(super_comm, WORKER_COMM_ARRAY_INT, &num_results, 1);
 
 			while(list_size(complete_jobs)) {
@@ -246,6 +257,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 		}	break;
 
 		case WORKER_OP_JOB_DIRMAP:
+			debug(D_WQ, "op: set JOB %d DIRMAP\n", op->jobid);
 			job = worker_job_lookup_insert(unfinished_jobs, op->jobid);
 			job->dirmap = malloc(op->payloadsize);
 			job->dirmaplength = op->payloadsize;
@@ -253,6 +265,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 			break;
 	
 		case WORKER_OP_JOB_REQUIRES:
+			debug(D_WQ, "op: set JOB %d REQUIRES file %d\n", op->jobid, op->id);
 			job = worker_job_lookup_insert(unfinished_jobs, op->jobid);
 			fileptr = itable_lookup(file_table, op->id);
 			if(!fileptr) {
@@ -266,6 +279,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 			break;
 		
 		case WORKER_OP_JOB_GENERATES:
+			debug(D_WQ, "op: set JOB %d GENERATES file %d\n", op->jobid, op->id);
 			job = worker_job_lookup_insert(unfinished_jobs, op->jobid);
 			fileptr = itable_lookup(file_table, op->id);
 			if(!fileptr) {
@@ -279,6 +293,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 			break;
 		
 		case WORKER_OP_JOB_CMD:
+			debug(D_WQ, "op: set JOB %d COMMAND %s\n", op->jobid, op->payload);
 			job = worker_job_lookup_insert(unfinished_jobs, op->jobid);
 			if(job->command)
 				free(job->command);
@@ -288,6 +303,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 			break;
 	
 		case WORKER_OP_JOB_CLOSE:
+			debug(D_WQ, "op: CLOSE JOB %d\n", op->jobid);
 			job = itable_remove(unfinished_jobs, op->jobid);
 			if(job) {
 				job->status = WORKER_JOB_STATUS_READY;
@@ -295,7 +311,7 @@ void handle_op(struct worker_comm *super_comm, struct worker_op *op)
 			}
 			break;
 	}
-
+	debug(D_WQ, "Finished handling op\n");
 }
 
 void foreman_main()
@@ -356,7 +372,7 @@ void foreman_main()
 				current_worker->open_cores += num_results;
 				for(i = 0; i < num_results; i++) {
 					job = worker_job_receive_result(current_worker->comm, active_jobs);
-					worker_job_handle_files(current_worker->comm, job->output_files, file_store, WORKER_FILES_OUTPUT);
+					worker_job_fetch_files(current_worker->comm, job->output_files, file_store);
 					list_push_tail(complete_jobs, job);
 				}
 			}
@@ -370,7 +386,7 @@ void foreman_main()
 			/* May want to implement a more complicated (read: cache-aware) job selection algorithm */
 			job = list_pop_head(waiting_jobs);
 			num_waiting_jobs--;
-			worker_job_handle_files(current_worker->comm, job->input_files, file_store, WORKER_FILES_INPUT);
+			worker_job_send_files(current_worker->comm, job->input_files, job->output_files, file_store);
 			if(job->dirmap) {
 				memset(&op, 0, sizeof(op));
 				op.type = WORKER_OP_JOB_DIRMAP;
@@ -440,24 +456,33 @@ void worker_main()
 	short_timeout_st.tv_usec = 0;
 	
 	
-	/* run through the list of active jobs, figure out which ones have output available */
+	/* If there are active jobs, run through the list and figure out which ones have output available */
 
-	FD_ZERO(&worker_fds);
-	itable_firstkey(active_jobs);
-	while(itable_nextkey(active_jobs, &jobid, (void **)&job)) {
-		if(job->output_streams & WORKER_JOB_OUTPUT_STDOUT) {
-			FD_SET(job->out_fd, &worker_fds);
-			maxfd = MAX(job->out_fd, maxfd);
+	if(itable_size(active_jobs)) {
+		debug(D_WQ, "Waiting on %d jobs\n", itable_size(active_jobs));
+		FD_ZERO(&worker_fds);
+		itable_firstkey(active_jobs);
+		while(itable_nextkey(active_jobs, &jobid, (void **)&job)) {
+			debug(D_WQ, "Checking status of job %d\n", jobid);
+			if(job->output_streams & WORKER_JOB_OUTPUT_STDOUT) {
+				debug(D_WQ, "\tchecking stdout\n");
+				FD_SET(job->out_fd, &worker_fds);
+				maxfd = MAX(job->out_fd+1, maxfd);
+			}
+			if(job->output_streams & WORKER_JOB_OUTPUT_STDERR) {
+				debug(D_WQ, "\tchecking stderr\n");
+				FD_SET(job->err_fd, &worker_fds);
+				maxfd = MAX(job->err_fd+1, maxfd);
+			}
 		}
-		if(job->output_streams & WORKER_JOB_OUTPUT_STDERR) {
-			FD_SET(job->err_fd, &worker_fds);
-			maxfd = MAX(job->err_fd, maxfd);
-		}
+		num_ready_procs = select(maxfd, &worker_fds, NULL, NULL, &short_timeout_st);
+	} else {
+		num_ready_procs = 0;
 	}
-	num_ready_procs = select(maxfd, &worker_fds, NULL, NULL, &short_timeout_st);
 
 
 	/* for each process with any output, copy the output into the job's stdout or stderr buffer, and check for end of file */
+	debug(D_WQ, "%d processes have output\n", num_ready_procs);
 	if(num_ready_procs > 0) {
 		itable_firstkey(active_jobs);
 		while(itable_nextkey(active_jobs, &jobid, (void**)&job)) {
@@ -480,16 +505,19 @@ void worker_main()
 			if( (!job->err || feof(job->err)) && (!job->out || feof(job->out)) ) {
 				job = itable_remove(active_jobs, jobid);
 				job->exit_code = multi_pclose(NULL, job->out, job->err, job->pid);
+				job->out = job->err = NULL;
 				job->status = WORKER_JOB_STATUS_COMPLETE;
 				worker_job_check_files(job, file_store, WORKER_FILES_OUTPUT);
 				job->finish_time = timestamp_get();
 				list_push_tail(complete_jobs, job);
 				workerdata->open_cores++;
+				debug(D_WQ, "Job %d finished\n", job->id);
 			}
 		}
 	}
 	
 	/* If cores are open, start running new jobs */
+	debug(D_WQ, "worker has %d open cores and %d waiting jobs\n", workerdata->open_cores, list_size(waiting_jobs));
 	while(workerdata->open_cores && list_size(waiting_jobs)) {
 		job = list_pop_head(waiting_jobs);
 		if(job) {
@@ -524,6 +552,8 @@ void worker_main()
 			if(job->err)
 				job->err_fd = fileno(job->err);
 			workerdata->open_cores--;
+			itable_insert(active_jobs, job->id, job);
+			debug(D_WQ, "started running job %d (pid %d)\n", job->id, job->pid);
 		}
 	}
 }
@@ -553,11 +583,13 @@ static void show_help(const char *cmd)
 int main(int argc, char *argv[])
 {
 	int super_port = WORK_QUEUE_DEFAULT_PORT;
+	int stats[3];
 	char* super_host;
 	char c;
 	UINT64_T memory_avail, disk_total;
 	struct worker_comm *super_comm;
 	struct worker_op op;
+	abort_flag = 0;
 
 	workerdata = malloc(sizeof(*workerdata));
 
@@ -620,8 +652,6 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	
-
 	if(comm_interface == WORKER_COMM_MPI) {
 		super_port = atoi(argv[optind]);
 		MPI_Init(&argc, &argv);
@@ -641,7 +671,15 @@ int main(int argc, char *argv[])
 	workerdata->cores = workerdata->open_cores = load_average_get_cpus();
 	disk_info_get(file_cache_path, &workerdata->disk, &disk_total);
 	memory_info_get(&memory_avail, &workerdata->ram);
-	domain_name_cache_guess(workerdata->hostname);
+	domain_name_cache_guess_short(workerdata->hostname);
+
+	debug(D_WQ, "Sending worker info (%d, %s, %d, %d, %d)", workerdata->workerid, workerdata->hostname, workerdata->cores, workerdata->ram, workerdata->disk);
+	worker_comm_send_id(super_comm, workerdata->workerid, workerdata->hostname);
+	stats[0] = workerdata->cores;
+	stats[1] = workerdata->ram;
+	stats[2] = workerdata->disk;
+	worker_comm_send_array(super_comm, WORKER_COMM_ARRAY_INT, stats, 3);
+
 
 	unfinished_jobs = itable_create(0);
 	waiting_jobs = list_create();
@@ -651,12 +689,14 @@ int main(int argc, char *argv[])
 	file_table = itable_create(0);
 	file_store = file_cache_init(file_cache_path);
 
-	while(1) {
+	while(!abort_flag) {
 		int result;
 
 		//wait for a new op from current supervisor and handle it if there is one
 		memset(&op, 0, sizeof(op));
+//		debug(D_WQ, "started waiting for next op\n");
 		result = worker_comm_receive_op(super_comm, &op);
+//		debug(D_WQ, "finished waiting for next op\n");
 		if(result >= 0)
 			handle_op(super_comm, &op);
 
@@ -665,7 +705,11 @@ int main(int argc, char *argv[])
 			foreman_main();
 		else
 			worker_main();
+		if(result < 0 && !itable_size(active_jobs) && !list_size(waiting_jobs))
+			sleep(5);
 	}
 	
+	return 0;
 }
+
 

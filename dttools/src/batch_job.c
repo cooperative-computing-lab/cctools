@@ -169,16 +169,18 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	}
 	
 	if(type == BATCH_QUEUE_TYPE_HIERARCHICAL_WORK_QUEUE) {
-		char *wqh_mode;
+		char *wqh_mode, *wqh_file_cache;
 		int mode;
-		wqh_mode = getenv("WQH_FILE_CACHE");
+		wqh_mode = getenv("WQH_COMMUNICATION_MODE");
+		wqh_file_cache = getenv("WQH_FILE_CACHE");
 
-		if(wqh_mode && !strcmp(wqh_mode, "mpi"))
+		if(wqh_mode && !strcmp(wqh_mode, "mpi")) {
+			mode = WORKER_COMM_MPI;
+		} else {
 			mode = WORKER_COMM_TCP;
-		else
-			mode = WORKER_COMM_TCP;
+		}
 		
-		q->hierarchical_work_queue = hierarchical_work_queue_create(mode, -1, "/tmp/wqh");
+		q->hierarchical_work_queue = hierarchical_work_queue_create(mode, -1, wqh_file_cache?wqh_file_cache:"/tmp/makeflow_wqh_cache", 3600);
 	}
 
 	return q;
@@ -199,6 +201,8 @@ void batch_queue_delete(struct batch_queue *q)
 			work_queue_delete(q->work_queue);
 		if(q->hadoop_jobs)
 			itable_delete(q->hadoop_jobs);
+		if(q->hierarchical_work_queue)
+			hierarchical_work_queue_delete(q->hierarchical_work_queue);
 		free(q);
 	}
 }

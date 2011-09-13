@@ -156,9 +156,12 @@ static void add_workers(struct hierarchical_work_queue *q)
 	struct worker *w;
 	struct list *new_comms;
 	struct worker_comm *comm;
+	
+	debug(D_WQ, "Waiting for new connections\n");
 	new_comms = worker_comm_accept_connections(q->interface_mode, q->master_link, q->active_timeout, q->short_timeout);
 	
-	while((comm = list_pop_head(new_comms))) {
+	debug(D_WQ, "Found %d new connections\n", new_comms?list_size(new_comms):0);
+	while(new_comms && (comm = list_pop_head(new_comms))) {
 		int stats[3];
 		w = malloc(sizeof(*w));
 		memset(w, 0, sizeof(*w));
@@ -170,9 +173,31 @@ static void add_workers(struct hierarchical_work_queue *q)
 		w->workerid = comm->mpi_rank;
 		if(comm->hostname) {
 			sprintf(w->hostname, "%s", comm->hostname);
+			debug(D_WQ, "adding worker %s\n", w->hostname);
+		} else {
+			debug(D_WQ, "adding worker %d\n", w->workerid);
 		}
+		w->jobids = itable_create(0);
+
+		list_push_head(q->active_workers, w);
 	}
 	list_delete(new_comms);
+}
+
+void remove_worker(struct hierarchical_work_queue *q, struct worker *w) {
+	UINT64_T jobid;
+	struct worker_job *j;
+	
+	itable_firstkey(w->jobids);
+	while(itable_nextkey(w->jobids, &jobid, (void**)&j)) {
+		itable_remove(q->active_list, jobid);
+		list_push_head(q->ready_list, j);
+	}
+	itable_delete(w->jobids);
+	if(w->comm) {
+		worker_comm_delete(w->comm);
+	}
+	free(w);
 }
 
 
@@ -249,7 +274,7 @@ int work_queue_port(struct work_queue *q)
 }
 */
 
-struct hierarchical_work_queue *hierarchical_work_queue_create(int mode, int port, const char *file_cache_path)
+struct hierarchical_work_queue *hierarchical_work_queue_create(int mode, int port, const char *file_cache_path, int timeout)
 {
 	struct hierarchical_work_queue *q = malloc(sizeof(*q));
 	char *envstring;
@@ -266,6 +291,9 @@ struct hierarchical_work_queue *hierarchical_work_queue_create(int mode, int por
 		}
 	}
 
+	q->interface_mode = mode;
+	q->active_timeout = timeout;
+	q->short_timeout = 60;
 	
 	switch(mode) {
 		case WORKER_COMM_TCP:
@@ -294,6 +322,7 @@ struct hierarchical_work_queue *hierarchical_work_queue_create(int mode, int por
 			if(!q->master_link)
 				goto failure;
 
+			debug(D_WQ, "master link successfully created: listening on port %d\n", port);
 			break;
 		case WORKER_COMM_MPI:
 			q->master_link = NULL;
@@ -390,6 +419,8 @@ struct worker_job *hierarchical_work_queue_wait(struct hierarchical_work_queue *
 	if(!checked_workers)
 		checked_workers = list_create();
 
+	results_request.type = WORKER_OP_RESULTS;
+	
 	while(1) {
 		struct list *tmp_workers;
 		struct worker_file *fileptr;
@@ -408,8 +439,10 @@ struct worker_job *hierarchical_work_queue_wait(struct hierarchical_work_queue *
 		/* Service each worker */
 		num_waiting_jobs = list_size(q->ready_list);
 		while((current_worker = list_pop_head(q->active_workers))) {
-			/* If the worker is full, see if has anything done */
-			if(!current_worker->open_cores) {
+			debug(D_WQ, "checking worker %s %d\n", current_worker->hostname, current_worker->workerid);
+			debug(D_WQ, "\tworker has %d open cores to handle %d waiting jobs\n", current_worker->open_cores, num_waiting_jobs);
+			/* If the worker is full or there are no jobs left to submit and the worker has active jobs remaining, see if it has anything done */
+			if(!current_worker->open_cores || (!num_waiting_jobs && itable_size(current_worker->jobids))) {
 				int num_results;
 				num_results = worker_comm_test_results(current_worker->comm);
 				/* If it has available results, fetch them */
@@ -419,7 +452,8 @@ struct worker_job *hierarchical_work_queue_wait(struct hierarchical_work_queue *
 					current_worker->open_cores += num_results;
 					for(i = 0; i < num_results; i++) {
 						j = worker_job_receive_result(current_worker->comm, q->active_list);
-						worker_job_handle_files(current_worker->comm, j->output_files, q->file_store, WORKER_FILES_OUTPUT);
+						worker_job_fetch_files(current_worker->comm, j->output_files, q->file_store);
+						itable_remove(current_worker->jobids, j->id);
 						list_push_tail(q->complete_list, j);
 					}
 				}
@@ -432,8 +466,10 @@ struct worker_job *hierarchical_work_queue_wait(struct hierarchical_work_queue *
 			if(num_waiting_jobs && current_worker->open_cores) {
 				/* May want to implement a more complicated (read: cache-aware) job selection algorithm */
 				j = list_pop_head(q->ready_list);
+				debug(D_WQ, "\tgiving worker %d:%s job number %d\n", current_worker->workerid, current_worker->hostname, j->id);
 				num_waiting_jobs--;
-				worker_job_handle_files(current_worker->comm, j->input_files, q->file_store, WORKER_FILES_INPUT);
+				worker_job_send_files(current_worker->comm, j->input_files, j->output_files, q->file_store);
+				debug(D_WQ, "\tjob %d input files handled\n", j->id);
 				if(j->dirmap) {
 					memset(&op, 0, sizeof(op));
 					op.type = WORKER_OP_JOB_DIRMAP;
@@ -442,6 +478,7 @@ struct worker_job *hierarchical_work_queue_wait(struct hierarchical_work_queue *
 					op.payload = j->dirmap;
 					worker_comm_send_op(current_worker->comm, &op);
 				}
+				debug(D_WQ, "\tbuilding job (assigning input files)\n");
 				list_first_item(j->input_files);
 				memset(&op, 0, sizeof(op));
 				while((fileptr = list_next_item(j->input_files))) {
@@ -450,7 +487,7 @@ struct worker_job *hierarchical_work_queue_wait(struct hierarchical_work_queue *
 					op.id = fileptr->id;
 					worker_comm_send_op(current_worker->comm, &op);
 				}
-				
+				debug(D_WQ, "\tbuilding job (assigning output files)\n");
 				list_first_item(j->output_files);
 				memset(&op, 0, sizeof(op));
 				while((fileptr = list_next_item(j->output_files))) {
@@ -459,6 +496,7 @@ struct worker_job *hierarchical_work_queue_wait(struct hierarchical_work_queue *
 					op.id = fileptr->id;
 					worker_comm_send_op(current_worker->comm, &op);
 				}
+				debug(D_WQ, "\tbuilding job (sending command)\n");
 				memset(&op, 0, sizeof(op));
 				op.type = WORKER_OP_JOB_CMD;
 				op.jobid = j->id;
@@ -471,11 +509,14 @@ struct worker_job *hierarchical_work_queue_wait(struct hierarchical_work_queue *
 				op.type = WORKER_OP_JOB_CLOSE;
 				op.jobid = j->id;
 				worker_comm_send_op(current_worker->comm, &op);
+				debug(D_WQ, "\tdone building job\n");
 				
+				itable_insert(current_worker->jobids, j->id, j);
 				itable_insert(q->active_list, j->id, j);
 
 				current_worker->open_cores--;
-				if((num_waiting_jobs && current_worker->open_cores))
+				/* If there are no more jobs currently available, or the current worker is full, request its results */
+				if((!num_waiting_jobs || !current_worker->open_cores))
 					worker_comm_send_op(current_worker->comm, &results_request);
 			}
 			/* If the worker still has open cores, and there are any jobs available, send it to the end of the queue */
@@ -619,7 +660,7 @@ void worker_job_check_files(struct worker_job *job, struct file_cache *file_stor
 		}
 		
 		
-		if(fileptr->type == WORKER_FILES_INPUT) {
+		if(filetype == WORKER_FILES_INPUT) {
 			if(!strcmp(fileptr->filename, filename)) {
 				continue;
 			}
@@ -640,7 +681,7 @@ void worker_job_check_files(struct worker_job *job, struct file_cache *file_stor
 				int cache_fd;
 				file_cache_contains(file_store, fileptr->label, filename);
 				reg = fopen(fileptr->filename, "r");
-				cache_fd = open64(filename, O_WRONLY | O_CREAT | O_SYNC | O_TRUNC, fileptr->flags);
+				cache_fd = open64(filename, O_WRONLY | O_CREAT | O_SYNC | O_TRUNC, st.st_mode & S_IRWXU);
 				copy_stream_to_fd(reg, cache_fd);
 				fclose(reg);
 				close(cache_fd);
@@ -691,7 +732,121 @@ struct worker_job * worker_job_receive_result(struct worker_comm *comm, struct i
 	return job;
 }
 
-int worker_job_handle_files(struct worker_comm *comm, struct list *files, struct file_cache *file_store, int direction)
+int worker_job_send_files(struct worker_comm *comm, struct list *input_files, struct list *output_files, struct file_cache *file_store)
+{
+	struct worker_file *fileptr;
+	struct worker_op op;
+	struct stat st;
+
+	list_first_item(input_files);
+	while((fileptr = list_next_item(input_files))) {
+
+		int file_status[3];
+		char cachename[WORK_QUEUE_LINE_MAX];
+
+		memset(&op, 0, sizeof(op));
+		op.type = WORKER_OP_FILE_CHECK;
+		op.id = fileptr->id;
+		worker_comm_send_op(comm, &op);
+		worker_comm_recv_array(comm, WORKER_COMM_ARRAY_INT, file_status, 3);
+		
+		if(fileptr->type == WORKER_FILE_NORMAL) {
+			file_cache_contains(file_store, fileptr->label, cachename);
+		} else if(fileptr->type == WORKER_FILE_REMOTE) {
+			sprintf(cachename, "%s", fileptr->payload);
+		} else if(fileptr->type == WORKER_FILE_INCOMPLETE) {
+			return -1;
+		}
+		
+		debug(D_WQ, "checking file %s (%s) for input\n", fileptr->label, cachename);
+
+		if(stat(cachename, &st))
+			return -1;
+		
+		if(file_status[0] < 0) {
+			debug(D_WQ, "\tworker doesn't know of file, sending file info\n");
+			memset(&op, 0, sizeof(op));
+			op.type = WORKER_OP_FILE;
+			op.id = fileptr->id;
+			op.options = fileptr->flags;
+			if(fileptr->type == WORKER_FILE_REMOTE) {
+				op.options = op.options & WORKER_FILE_FLAG_REMOTEFS;
+			}
+			sprintf(op.name, "%s", fileptr->filename);
+			op.payload = fileptr->payload;
+			worker_comm_send_op(comm, &op);
+			
+			if(fileptr->type == WORKER_FILE_REMOTE) {
+				debug(D_WQ, "\tfile is remote, checking for availability\n");
+				memset(&op, 0, sizeof(op));
+				op.type = WORKER_OP_FILE_CHECK;
+				op.id = fileptr->id;
+				worker_comm_send_op(comm, &op);
+				debug(D_WQ, "\twaiting for response\n");
+				worker_comm_recv_array(comm, WORKER_COMM_ARRAY_INT, file_status, 3);
+			}
+		}
+		
+		
+		if(file_status[0] != st.st_size || file_status[2] <= st.st_mtime) {
+			debug(D_WQ, "\tfile not available on worker, sending file info\n");
+			memset(&op, 0, sizeof(op));
+			op.type = WORKER_OP_FILE_PUT;
+			op.id = fileptr->id;
+			if(file_status[0] <= 0)
+				op.options = WORKER_FILE_NORMAL;
+			else
+				op.options = fileptr->type;
+			
+			op.payloadsize = st.st_size;
+			op.payload = NULL;
+			op.flags = st.st_mode & S_IRWXU;
+			worker_comm_send_op(comm, &op);
+			worker_comm_send_file(comm, cachename, st.st_size, 0);
+		}
+	}
+	
+	list_first_item(output_files);
+	while((fileptr = list_next_item(output_files))) {
+
+		int file_status[3];
+		char cachename[WORK_QUEUE_LINE_MAX];
+		
+		memset(&op, 0, sizeof(op));
+		op.type = WORKER_OP_FILE_CHECK;
+		op.id = fileptr->id;
+		worker_comm_send_op(comm, &op);
+		worker_comm_recv_array(comm, WORKER_COMM_ARRAY_INT, file_status, 3);
+		
+		debug(D_WQ, "checking file %s (%s) for generation\n", fileptr->label, cachename);
+
+		if(fileptr->type == WORKER_FILE_NORMAL) {
+			file_cache_contains(file_store, fileptr->label, cachename);
+		} else if(fileptr->type == WORKER_FILE_REMOTE) {
+			sprintf(cachename, "%s", fileptr->payload);
+		} else if(fileptr->type == WORKER_FILE_INCOMPLETE) {
+			return -1;
+		}
+	
+		if(file_status[0] < 0) {
+			debug(D_WQ, "\tworker doesn't know of file, sending file info\n");
+			memset(&op, 0, sizeof(op));
+			op.type = WORKER_OP_FILE;
+			op.id = fileptr->id;
+			op.options = fileptr->flags;
+			if(fileptr->type == WORKER_FILE_REMOTE) {
+				op.options = op.options & WORKER_FILE_FLAG_REMOTEFS;
+			}
+			sprintf(op.name, "%s", fileptr->filename);
+			op.payload = fileptr->payload;
+			worker_comm_send_op(comm, &op);
+		}
+	}
+	
+	return 0;
+}
+
+int worker_job_fetch_files(struct worker_comm *comm, struct list *files, struct file_cache *file_store)
 {
 	struct worker_file *fileptr;
 	struct worker_op op;
@@ -718,79 +873,34 @@ int worker_job_handle_files(struct worker_comm *comm, struct list *files, struct
 		} else if(fileptr->type == WORKER_FILE_INCOMPLETE) {
 			return -1;
 		}
-		if(stat(cachename, &st))
+		
+		if(fileptr->flags & WORKER_FILE_FLAG_IGNORE)
+			continue;
+		if(file_status[0] <= 0) {
+			if(!(fileptr->flags & WORKER_FILE_FLAG_OPTIONAL))
+				return -1;
+		}
+		if(file_status[2] <= st.st_mtime && file_status[0] == st.st_size)
+			continue;
+		memset(&op, 0, sizeof(op));
+		op.type = WORKER_OP_FILE_GET;
+		op.id = fileptr->id;
+		worker_comm_send_op(comm, &op);
+		worker_comm_recv_buffer(comm, &buffer, &buffersize, 1);
+		if(buffersize) {
+			FILE *outfile;
+			outfile = fopen(cachename, "w");
+			if(!outfile) {
+				free(buffer);
+				return -1;
+			}
+			full_fwrite(outfile, buffer, buffersize);
+			fclose(outfile);
+			free(buffer);
+		} else {
 			return -1;
-
-		switch(direction) {
-			case WORKER_FILES_INPUT:
-				
-				if(file_status[0] < 0) {
-					memset(&op, 0, sizeof(op));
-					op.type = WORKER_OP_FILE;
-					op.id = fileptr->id;
-					op.options = fileptr->flags;
-					sprintf(op.name, "%s", fileptr->filename);
-					op.payload = fileptr->payload;
-					worker_comm_send_op(comm, &op);
-					
-					if(fileptr->type == WORKER_FILE_REMOTE) {
-						memset(&op, 0, sizeof(op));
-						op.type = WORKER_OP_FILE_CHECK;
-						op.id = fileptr->id;
-						worker_comm_send_op(comm, &op);
-						worker_comm_recv_array(comm, WORKER_COMM_ARRAY_INT, file_status, 3);
-					}
-				}
-				
-				
-				if(file_status[0] != st.st_size || file_status[2] <= st.st_mtime) {
-					memset(&op, 0, sizeof(op));
-					op.type = WORKER_OP_FILE_PUT;
-					op.id = fileptr->id;
-					if(file_status[0] <= 0)
-						op.type = WORKER_FILE_NORMAL;
-					else
-						op.type = fileptr->type;
-					
-					op.payloadsize = st.st_size;
-					op.payload = NULL;
-					worker_comm_send_op(comm, &op);
-					worker_comm_send_file(comm, cachename, st.st_size, 0);
-				}
-			break;
-			
-			case WORKER_FILES_OUTPUT:
-			
-				if(fileptr->flags & WORKER_FILE_FLAG_IGNORE)
-					continue;
-				if(file_status[0] <= 0) {
-					if(!(fileptr->flags & WORKER_FILE_FLAG_OPTIONAL))
-						return -1;
-				}
-				if(file_status[2] <= st.st_mtime && file_status[0] == st.st_size)
-					continue;
-				memset(&op, 0, sizeof(op));
-				op.type = WORKER_OP_FILE_GET;
-				op.id = fileptr->id;
-				worker_comm_send_op(comm, &op);
-				worker_comm_recv_buffer(comm, &buffer, &buffersize, 1);
-				if(buffersize) {
-					FILE *outfile;
-					outfile = fopen(cachename, "w");
-					if(!outfile) {
-						free(buffer);
-						return -1;
-					}
-					full_fwrite(outfile, buffer, buffersize);
-					fclose(outfile);
-					free(buffer);
-				} else {
-					return -1;
-				}
-			break;
 		}
 	}
 	return 0;
 }
-
 

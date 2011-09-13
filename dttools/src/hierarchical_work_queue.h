@@ -40,6 +40,7 @@ and port of the master.
 #define WORK_QUEUE_RESULT_LINK_FAIL 32
 
 
+/*
 enum worker_op_type {
 	WORKER_OP_ROLE,
 	WORKER_OP_WORKDIR,
@@ -59,6 +60,25 @@ enum worker_op_type {
 	WORKER_OP_JOB_CLOSE,
 	WORKER_OP_JOB_CANCEL
 };
+*/
+
+#define WORKER_OP_ROLE			 1
+#define WORKER_OP_WORKDIR		 2
+#define WORKER_OP_CLEAR_CACHE		 3
+#define WORKER_OP_COMM_INTERFACE	 4
+#define WORKER_OP_RESULTS		 5
+
+#define WORKER_OP_FILE			 6
+#define WORKER_OP_FILE_CHECK		 7
+#define WORKER_OP_FILE_PUT		 8
+#define WORKER_OP_FILE_GET		 9
+
+#define WORKER_OP_JOB_DIRMAP		10
+#define WORKER_OP_JOB_REQUIRES		11
+#define WORKER_OP_JOB_GENERATES	12
+#define WORKER_OP_JOB_CMD		13
+#define WORKER_OP_JOB_CLOSE		14
+#define WORKER_OP_JOB_CANCEL		15
 
 #define WORKER_ROLE_WORKER			0x01
 #define WORKER_ROLE_FOREMAN			0x02
@@ -91,7 +111,6 @@ enum worker_op_type {
 #define WORKER_STATE_BUSY			0x02
 #define WORKER_STATE_UNRESPONSNIVE		0x03
 
-#define FILE_CACHE_DEFAULT_PATH	"/tmp/wqh_cache"
 
 
 struct worker_file {
@@ -149,7 +168,7 @@ struct worker {
 	
 	int state;
 	int role;
-	int *jobids;
+	struct itable *jobids;
 	struct worker_comm *comm;
 };
 
@@ -220,7 +239,7 @@ the <b>CATALOG_HOST</b> and <b>CATALOG_PORT</b> environmental variables as descr
 @param port The port number to listen on.  If zero is specified, then the default is chosen, and if -1 is specified, a random port is chosen.  
 @return A new work queue, or null if it could not be created.
 */
-struct hierarchical_work_queue *hierarchical_work_queue_create(int mode, int port, const char *file_cache_path);
+struct hierarchical_work_queue *hierarchical_work_queue_create(int mode, int port, const char *file_cache_path, int timeout);
 
 /** Submit a job to a work queue.
 It is safe to re-submit a task returned by @ref work_queue_wait.
@@ -275,7 +294,8 @@ void hierarchical_work_queue_delete(struct hierarchical_work_queue *q);
 void worker_job_check_files(struct worker_job *job, struct file_cache *file_store, int filetype);
 void worker_job_send_result(struct worker_comm *comm, struct worker_job *job);
 struct worker_job * worker_job_receive_result(struct worker_comm *comm, struct itable *jobs);
-int worker_job_handle_files(struct worker_comm *comm, struct list *files, struct file_cache *file_store, int direction);
+int worker_job_send_files(struct worker_comm *comm, struct list *input_files, struct list *output_files, struct file_cache *file_store);
+int worker_job_fetch_files(struct worker_comm *comm, struct list *files, struct file_cache *file_store);
 
 
 #endif
