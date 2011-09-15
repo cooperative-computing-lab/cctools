@@ -68,26 +68,6 @@ struct hierarchical_work_queue {
 	int short_timeout;
 };
 
-
-struct work_queue_worker {
-	int state;
-	char hostname[DOMAIN_NAME_MAX];
-	char addrport[32];
-	char hashkey[32];
-	int ncpus;
-	INT64_T memory_avail;
-	INT64_T memory_total;
-	INT64_T disk_avail;
-	INT64_T disk_total;
-	struct hash_table *current_files;
-	struct link *link;
-	struct work_queue_task *current_task;
-	INT64_T total_tasks_complete;
-	timestamp_t total_task_time;
-	INT64_T total_bytes_transferred;
-	timestamp_t total_transfer_time;
-};
-
 struct work_queue_file {
 	int type;		// WORK_QUEUE_FILE or WORK_QUEUE_BUFFER
 	int flags;		// WORK_QUEUE_CACHE or others in the future.

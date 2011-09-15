@@ -40,7 +40,6 @@
 
 
 //**********************************************************************
-	static int comm_interface = WORKER_COMM_TCP;
 	static int default_comm_interface = WORKER_COMM_TCP;
 	static int comm_port = WORK_QUEUE_DEFAULT_PORT;
 	static int comm_default_port = WORK_QUEUE_DEFAULT_PORT;
@@ -49,21 +48,30 @@
 
 	// Overall time to wait for communications before exiting 
 	static int idle_timeout = 900;
-	// Time to wait for expected communications
-	static int active_timeout = 3600;
-	// Time to wait for optional communications
-	static int short_timeout = 60;
 
 	static struct worker *workerdata      = NULL;
+	static struct itable *unfinished_jobs = NULL;
+
+
+
+	
+	static int comm_interface = WORKER_COMM_TCP;
+
 	static struct list   *active_workers  = NULL;
 
-	static struct itable *unfinished_jobs = NULL;
 	static struct list   *waiting_jobs    = NULL;
 	static struct itable *active_jobs     = NULL;
 	static struct list   *complete_jobs   = NULL;
 
 	static struct itable     *file_table  = NULL;
 	static struct file_cache *file_store  = NULL;
+
+	// Time to wait for expected communications
+	static int active_timeout = 3600;
+	// Time to wait for optional communications
+	static int short_timeout = 60;
+
+	
 //**********************************************************************
 
 struct worker_job * worker_job_lookup_insert(struct itable *jobs, int jobid)
@@ -589,6 +597,7 @@ int main(int argc, char *argv[])
 	UINT64_T memory_avail, disk_total;
 	struct worker_comm *super_comm;
 	struct worker_op op;
+	int stoptime;
 	abort_flag = 0;
 
 	workerdata = malloc(sizeof(*workerdata));
@@ -660,7 +669,12 @@ int main(int argc, char *argv[])
 		super_host = argv[optind];
 		super_port = atoi(argv[optind + 1]);
 		fprintf(stderr, "Attempting to connect via TCP: %s:%d (%d/%d)\n", super_host, super_port, active_timeout, short_timeout);
-		super_comm = worker_comm_connect(NULL, WORKER_COMM_TCP, super_host, super_port, active_timeout, short_timeout);
+		stoptime = time(0) + idle_timeout;
+		while(time(0) < stoptime && !abort_flag) {
+			super_comm = worker_comm_connect(NULL, WORKER_COMM_TCP, super_host, super_port, active_timeout, short_timeout);
+			if(!super_comm)
+				sleep(5);
+		}
 	}
 	if(!super_comm) {
 		fprintf(stderr, "Unable to establish connection.\n");
@@ -705,8 +719,15 @@ int main(int argc, char *argv[])
 			foreman_main();
 		else
 			worker_main();
-		if(result < 0 && !itable_size(active_jobs) && !list_size(waiting_jobs))
-			sleep(5);
+		if(result < 0 && !itable_size(active_jobs) && !list_size(waiting_jobs)) {
+			if(time(0) > stoptime)
+				abort_flag = 1;
+			else
+				sleep(5);
+		} else {
+			stoptime = time(0) + idle_timeout;
+		}
+
 	}
 	
 	return 0;
