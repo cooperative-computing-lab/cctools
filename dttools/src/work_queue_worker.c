@@ -8,6 +8,7 @@ See the file COPYING for details.
 
 #include "catalog_query.h"
 #include "catalog_server.h"
+#include "work_queue_catalog.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
 #include "nvpair.h"
@@ -61,34 +62,10 @@ static int exclusive_worker = 1;
 static const int non_preference_priority_max = 100;
 static char *catalog_server_host = NULL;
 static int catalog_server_port = 0;
-static struct wq_master *actual_master = NULL;
+static struct work_queue_master *actual_master = NULL;
 
 static struct list *preferred_masters = NULL;
 static struct hash_cache *bad_masters = NULL;
-
-struct wq_master {
-	char addr[LINK_ADDRESS_MAX];
-	int port;
-	char proj[WORK_QUEUE_NAME_MAX];
-	int priority;
-};
-
-void debug_print_masters(struct list *ml)
-{
-	struct wq_master *m;
-	int count = 0;
-
-	debug(D_WQ, "All available Masters:\n");
-	list_first_item(ml);
-	while((m = (struct wq_master *) list_next_item(ml))) {
-		debug(D_WQ, "Master %d:\n", ++count);
-		debug(D_WQ, "addr:\t%s\n", m->addr);
-		debug(D_WQ, "port:\t%d\n", m->port);
-		debug(D_WQ, "project:\t%s\n", m->proj);
-		debug(D_WQ, "priority:\t%d\n", m->priority);
-		debug(D_WQ, "\n");
-	}
-}
 
 
 static void make_hash_key(const char *addr, int port, char *key)
@@ -96,63 +73,12 @@ static void make_hash_key(const char *addr, int port, char *key)
 	sprintf(key, "%s:%d", addr, port);
 }
 
-int parse_catalog_server_description(char *server_string, char **host, int *port)
-{
-	char *colon;
-
-	colon = strchr(server_string, ':');
-
-	if(!colon) {
-		*host = NULL;
-		*port = 0;
-		return 0;
-	}
-
-	*colon = '\0';
-
-	*host = strdup(server_string);
-	*port = atoi(colon + 1);
-
-	return *port;
-}
-
-struct wq_master *parse_wq_master_nvpair(struct nvpair *nv)
-{
-	struct wq_master *m;
-
-	m = xxmalloc(sizeof(struct wq_master));
-
-	strncpy(m->addr, nvpair_lookup_string(nv, "address"), LINK_ADDRESS_MAX);
-	strncpy(m->proj, nvpair_lookup_string(nv, "project"), WORK_QUEUE_NAME_MAX);
-	m->port = nvpair_lookup_integer(nv, "port");
-	m->priority = nvpair_lookup_integer(nv, "priority");
-	if(m->priority < 0)
-		m->priority = 0;
-
-	return m;
-}
-
-struct wq_master *duplicate_wq_master(struct wq_master *master)
-{
-	struct wq_master *m;
-
-	m = xxmalloc(sizeof(struct wq_master));
-	strncpy(m->addr, master->addr, LINK_ADDRESS_MAX);
-	strncpy(m->proj, master->proj, WORK_QUEUE_NAME_MAX);
-	m->port = master->port;
-	m->priority = master->priority;
-	if(m->priority < 0)
-		m->priority = 0;
-
-	return m;
-}
-
 /**
  * Reasons for a master being bad:
  * 1. The master does not need more workers right now;
  * 2. The master is already shut down but its record is still in the catalog server.
  */
-static void record_bad_master(struct wq_master *m)
+static void record_bad_master(struct work_queue_master *m)
 {
 	char key[LINK_ADDRESS_MAX + 10];	// addr:port
 	int lifetime = 10;
@@ -170,7 +96,7 @@ struct list *get_work_queue_masters(const char *catalog_host, int catalog_port)
 	struct catalog_query *q;
 	struct nvpair *nv;
 	struct list *ml;
-	struct wq_master *m;
+	struct work_queue_master *m;
 	char *pm;
 	time_t timeout = 60, stoptime;
 	char key[LINK_ADDRESS_MAX + 10];	// addr:port
@@ -189,7 +115,7 @@ struct list *get_work_queue_masters(const char *catalog_host, int catalog_port)
 
 	while((nv = catalog_query_read(q, stoptime))) {
 		if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0) {
-			m = parse_wq_master_nvpair(nv);
+			m = parse_work_queue_master_nvpair(nv);
 
 			list_first_item(preferred_masters);
 			while((pm = (char *) list_next_item(preferred_masters))) {
@@ -229,7 +155,7 @@ struct link *auto_link_connect(char *addr, int *port, time_t master_stoptime)
 {
 	struct link *master = 0;
 	struct list *ml;
-	struct wq_master *m;
+	struct work_queue_master *m;
 
 	ml = get_work_queue_masters(catalog_server_host, catalog_server_port);
 	if(!ml)
@@ -237,7 +163,7 @@ struct link *auto_link_connect(char *addr, int *port, time_t master_stoptime)
 	debug_print_masters(ml);
 
 	list_first_item(ml);
-	while((m = (struct wq_master *) list_next_item(ml))) {
+	while((m = (struct work_queue_master *) list_next_item(ml))) {
 		master = link_connect(m->addr, m->port, master_stoptime);
 		if(master) {
 			debug(D_WQ, "Talking to the Master at:\n");
@@ -252,11 +178,11 @@ struct link *auto_link_connect(char *addr, int *port, time_t master_stoptime)
 
 			if(actual_master)
 				free(actual_master);
-			actual_master = duplicate_wq_master(m);
+			actual_master = duplicate_work_queue_master(m);
 
 			break;
 		} else {
-			record_bad_master(duplicate_wq_master(m));
+			record_bad_master(duplicate_work_queue_master(m));
 		}
 	}
 
@@ -784,7 +710,7 @@ int main(int argc, char *argv[])
 			link_close(master);
 			master = 0;
 			if(auto_worker) {
-				record_bad_master(duplicate_wq_master(actual_master));
+				record_bad_master(duplicate_work_queue_master(actual_master));
 			}
 			sprintf(deletecmd, "rm -rf %s/*", tempdir);
 			system(deletecmd);

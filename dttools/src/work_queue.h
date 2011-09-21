@@ -60,10 +60,6 @@ and port of the master.
 #define WORK_QUEUE_MASTER_PRIORITY_DEFAULT 10
 #define WORK_QUEUE_WORKER_MODE_SHARED 0
 #define WORK_QUEUE_WORKER_MODE_EXCLUSIVE 1
-#define WORK_QUEUE_CATALOG_LINE_MAX 1024
-//#define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 30
-#define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 10
-#define	WORK_QUEUE_CATALOG_LIFETIME	60
 
 #define WORK_QUEUE_WAIT_FCFS 0
 #define WORK_QUEUE_WAIT_FAST_DISPATCH 1
@@ -71,6 +67,8 @@ and port of the master.
 
 #define WORK_QUEUE_CAPACITY_TOLERANCE_MAX 1000
 #define WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT -1
+
+#define WORK_QUEUE_WORKERS_NO_LIMIT -1
 
 #define WORK_QUEUE_FS_CMD 1
 #define WORK_QUEUE_FS_PATH 2
@@ -112,6 +110,8 @@ struct work_queue_task {
 /** Statistics describing a work queue. */
 
 struct work_queue_stats {
+	int port;
+	int priority;
 	int workers_init;		/**< Number of workers initializing. */
 	int workers_ready;		/**< Number of workers ready for tasks. */
 	int workers_busy;		/**< Number of workers running tasks. */

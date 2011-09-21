@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "catalog_query.h"
 #include "catalog_server.h"
+#include "work_queue_catalog.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
 #include "hash_table.h"
@@ -65,12 +66,12 @@ See the file COPYING for details.
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
-static struct datagram *outgoing_datagram = NULL;
 int wq_tolerable_transfer_time_multiplier = 10;
 int wq_minimum_transfer_timeout = 3;
 
 struct work_queue {
 	char *name;
+	int port;
 	int master_mode;
 	int worker_mode;
 	int priority;
@@ -110,6 +111,9 @@ struct work_queue {
 	INT64_T excessive_workers_removed;
 	int busy_workers_to_remove;
 	int capacity_tolerance;
+	int maximum_workers;
+	char catalog_host[DOMAIN_NAME_MAX];
+	int catalog_port;
 };
 
 
@@ -173,7 +177,6 @@ struct work_queue_file {
 static int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
 static int start_n_tasks( struct work_queue *q, int n );
-static int update_catalog(struct work_queue *q);
 static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, INT64_T length);
 static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t duration, int type, timestamp_t *accumulated_time, struct list *time_list);
 static int receive_output_from_worker( struct work_queue *q, struct work_queue_worker *w );
@@ -183,6 +186,8 @@ static void add_task_report(struct work_queue *q, struct task_report *entry);
 static double get_idle_percentage(struct work_queue *q);
 int work_queue_shut_down_workers (struct work_queue* q, int n);
 int work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance);
+int work_queue_specify_maximum_workers(struct work_queue *q, int max);
+static void update_catalog(struct work_queue *q);
 
 static int short_timeout = 5;
 static int next_taskid = 1;
@@ -281,6 +286,8 @@ void work_queue_get_stats( struct work_queue *q, struct work_queue_stats *s )
     timestamp_t wall_clock_time;
 
 	memset(s,0,sizeof(*s));
+	s->port = q->port;
+	s->priority = q->priority;
 	s->workers_init   = q->workers_in_state[WORKER_STATE_INIT];
 	s->workers_ready  = q->workers_in_state[WORKER_STATE_READY];
 	s->workers_busy   = q->workers_in_state[WORKER_STATE_BUSY];
@@ -1591,15 +1598,19 @@ struct work_queue * work_queue_create( int port )
 
 		for(port = lowport; port < highport; port++) {
 			q->master_link = link_serve(port);
-			if(q->master_link)
+			if(q->master_link) {
 				break;
+			}
 		}
 	} else {
 		q->master_link = link_serve(port);
 	}
 
-	if(!q->master_link)
+	if(!q->master_link) {
 		goto failure;
+	} else {
+		q->port = port;
+	}
 
 	q->ready_list = list_create();
 	q->complete_list = list_create();
@@ -1646,9 +1657,9 @@ struct work_queue * work_queue_create( int port )
 	}
 
     if (q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
-        if(update_catalog(q) == -1) {
-            fprintf(stderr, "Reporting master info to catalog server failed!");
-        }
+		strncpy(q->catalog_host, CATALOG_HOST, DOMAIN_NAME_MAX);
+		q->catalog_port = CATALOG_PORT;
+        update_catalog(q);
     }
 
 	envstring = getenv("WORK_QUEUE_WAIT_ROUTINE");
@@ -1663,6 +1674,13 @@ struct work_queue * work_queue_create( int port )
         work_queue_specify_capacity_tolerance(q, atoi(envstring));
 	} else {
         q->capacity_tolerance = WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT;
+	}
+
+	envstring = getenv("WORK_QUEUE_MAXIMUM_WORKERS");
+	if(envstring) {
+        work_queue_specify_maximum_workers(q, atoi(envstring));
+	} else {
+        q->maximum_workers = WORK_QUEUE_WORKERS_NO_LIMIT;
 	}
 
 	q->total_send_time = 0;
@@ -1687,6 +1705,15 @@ struct work_queue * work_queue_create( int port )
 	debug(D_NOTICE, "Could not create work_queue on port %i.", port);
 	free(q);
 	return 0;
+}
+
+int work_queue_specify_maximum_workers(struct work_queue *q, int max) {
+	if(max > 0) {
+    	q->maximum_workers = max;
+    } else {
+        q->maximum_workers = WORK_QUEUE_WORKERS_NO_LIMIT;
+    }
+    return q->maximum_workers;
 }
 
 int work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance) {
@@ -2373,40 +2400,11 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 	return timeout;
 }
 
-static int update_catalog(struct work_queue *q)
+static void update_catalog(struct work_queue *q)
 {
-	char address[DATAGRAM_ADDRESS_MAX];
-	char owner[USERNAME_MAX];
-	static char text[WORK_QUEUE_CATALOG_LINE_MAX];
-	static time_t last_update_time = 0;
 	struct work_queue_stats s;
-	int port;
-
-	if(time(0) - last_update_time < WORK_QUEUE_CATALOG_UPDATE_INTERVAL) return 0;
-
-    if(!outgoing_datagram) {
-        outgoing_datagram = datagram_create(0);
-        if(!outgoing_datagram)
-            fprintf(stderr, "Couldn't create outgoing udp port, thus work queue master info won't be sent to the catalog server!");
-            return -1;
-    }
-
-	port = work_queue_port(q);
 	work_queue_get_stats(q, &s);
-
-	if(!username_get(owner)) {
-		strcpy(owner,"unknown");
+	if(!advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s)) {
+    	fprintf(stderr, "Reporting master info to the catalog server failed!\n");
 	}
-
-	snprintf(text, WORK_QUEUE_CATALOG_LINE_MAX,
-		 "type wq_master\nproject %s\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running%d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\ncapacity %d\nversion %d.%d.%d\nowner %s", q->name, q->priority, port,
-		 WORK_QUEUE_CATALOG_LIFETIME, s.tasks_waiting, s.total_tasks_complete, s.tasks_running, s.total_tasks_dispatched, s.workers_init, s.workers_ready, s.workers_busy, s.workers_init + s.workers_ready + s.workers_busy, s.capacity, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
-
-	if(domain_name_cache_lookup(CATALOG_HOST, address)) {
-		debug(D_WQ, "sending master information to %s:%d", CATALOG_HOST, CATALOG_PORT);
-		datagram_send(outgoing_datagram, text, strlen(text), address, CATALOG_PORT);
-	}
-
-	last_update_time = time(0);
-	return 1;
 }

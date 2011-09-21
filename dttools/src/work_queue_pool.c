@@ -17,6 +17,8 @@ See the file COPYING for details.
 #include "macros.h"
 #include "catalog_query.h"
 #include "catalog_server.h"
+#include "work_queue_catalog.h"
+#include "list.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -35,16 +37,114 @@ static char worker_path[PATH_MAX] = "";
 static char worker_args[PATH_MAX] = "";
 static struct batch_queue *q;
 static struct itable *remote_job_table = NULL;
+static struct hash_table *processed_masters;
 static int retry_count = 20;
+
+struct list *get_matching_masters(const char *catalog_host, int catalog_port, struct list *regex_list);
+void process_matching_masters(struct list* matching_masters);
+int submit_workers_for_master(struct work_queue_master *master, int count);
 
 struct worker_status {
 	int batch_job_id;
 	char status;
 };
 
+
 static void handle_abort( int sig ) {
 	abort_flag = 1;
 }
+
+void start_serving_masters(const char *catalog_host, int catalog_port, struct list *regex_list) {
+	struct list *matching_masters;
+
+	while(!abort_flag) {
+		matching_masters = get_matching_masters(catalog_host, catalog_port, regex_list);
+		//printf("Matching masters:\n");
+		//debug_print_masters(matching_masters);
+		process_matching_masters(matching_masters);
+		sleep(6);
+	}
+}
+
+struct list *get_matching_masters(const char *catalog_host, int catalog_port, struct list *regex_list) {
+	struct list *all_masters;
+	struct list *matching_list;
+	struct work_queue_master *m;
+	char *regex;
+
+	all_masters = get_masters_from_catalog(catalog_host, catalog_port);
+	if(!all_masters) return NULL;
+	//printf("All masters:\n");
+	//debug_print_masters(all_masters);
+
+	matching_list = list_create();
+	if(!matching_list) {
+		fprintf(stderr, "Cannot allocate memory to store matching masters.\n");
+		return NULL;
+	}
+
+	list_first_item(all_masters);
+	while((m = (struct work_queue_master *)list_next_item(all_masters))) {
+		list_first_item(regex_list);
+		while((regex = (char *)list_next_item(regex_list))) {
+			//printf("***matching %s against %s\n", m->proj, regex);
+			if(whole_string_match_regex(m->proj, regex)) {
+				printf("Master matched: %s -> %s\n", regex, m->proj);
+				list_push_tail(matching_list, duplicate_work_queue_master(m));
+			}
+		}
+	}
+
+	list_free(all_masters);
+	list_delete(all_masters);
+
+	return matching_list;
+}
+
+void process_matching_masters(struct list* matching_masters) {
+	struct work_queue_master *m;
+
+	if(!matching_masters) return;
+
+	list_first_item(matching_masters);
+	while((m = (struct work_queue_master *)list_next_item(matching_masters))) {
+		if(!hash_table_lookup(processed_masters, m->proj)) {
+			printf("submit 15 workers for master: %s\n", m->proj);
+			submit_workers_for_master(m, 15);
+			hash_table_insert(processed_masters, m->proj, duplicate_work_queue_master(m));
+		} else {
+			//TODO
+		}
+	}
+}
+
+int submit_workers_for_master(struct work_queue_master *master, int count){
+	int i;
+	batch_job_id_t jobid;
+	char cmd[PATH_MAX] = "";
+	snprintf(cmd, PATH_MAX, "./%s -a -N %s", string_basename(worker_path), master->proj);
+
+	for (i = 0; i < count; i++) {
+		debug(D_DEBUG, "Submitting worker %d: %s\n", i + 1, cmd);
+		jobid = batch_job_submit_simple(q, cmd, string_basename(worker_path), NULL);
+		if(jobid >= 0) {
+			itable_insert(remote_job_table, jobid, NULL);
+        } else {
+			retry_count--;
+			if(!retry_count) {
+				fprintf(stderr, "Retry max reached. Stop submitting more workers..\n");
+				break;
+			}
+		    fprintf(stderr, "Failed to submit the %dth job: %s. Will retry it.\n", i+1, cmd);
+			i--;
+        }
+	}
+
+	return i;
+}
+
+
+
 
 int get_master_capacity(const char * catalog_host, int catalog_port, const char *proj) {
 	struct catalog_query *q;
@@ -305,8 +405,19 @@ int main(int argc, char *argv[])
 	FILE *ifs, *ofs;
 	int auto_worker = 0;
 	int fix_worker_number = 0;
+	int auto_worker_pool = 0;
+	char *catalog_host;
+	int catalog_port;
 
-	while ((c = getopt(argc, argv, "aC:d:fhN:r:sS:t:T:W:")) >= 0) {
+	struct list *regex_list;
+
+	regex_list = list_create();
+	if(!regex_list) {
+		fprintf(stderr, "cannot allocate memory for regex list!\n");
+		exit(1);
+	}
+
+	while ((c = getopt(argc, argv, "aAC:d:fhN:r:sS:t:T:W:")) >= 0) {
 		switch (c) {
 			case 'a':
 				strcat(worker_args, " -a");
@@ -319,6 +430,7 @@ int main(int argc, char *argv[])
 			case 'N':
 				strcat(worker_args, " -N ");
 				strcat(worker_args, optarg);
+				list_push_tail(regex_list, strdup(optarg));
 				break;
 			case 's':
 				strcat(worker_args, " -s");
@@ -332,6 +444,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'f':
 				fix_worker_number = 1;
+				break;
+			case 'A':
+				auto_worker_pool = 1;
 				break;
 			case 'T':
 				batch_queue_type = batch_queue_type_from_string(optarg);
@@ -355,29 +470,30 @@ int main(int argc, char *argv[])
 				return EXIT_FAILURE;
 		}
 	}
-
-	if(!auto_worker) {
-		if ((argc - optind) != 3) {
-			fprintf(stderr, "invalid number of arguments\n");
-			show_help(argv[0]);
-			return EXIT_FAILURE;
+    if(!auto_worker_pool) {
+		if(!auto_worker) {
+			if ((argc - optind) != 3) {
+				fprintf(stderr, "invalid number of arguments\n");
+				show_help(argv[0]);
+				return EXIT_FAILURE;
+			}
+			// Add host name
+			strcat(worker_args, " ");
+			strcat(worker_args, argv[optind]);
+			// Add port
+			strcat(worker_args, " ");
+			strcat(worker_args, argv[optind+1]);
+			// Number of workers to submit
+			goal = strtol(argv[optind+2], NULL, 10);
+		} else {
+			if ((argc - optind) != 1) {
+				fprintf(stderr, "invalid number of arguments\n");
+				show_help(argv[0]);
+				return EXIT_FAILURE;
+			}
+			goal = strtol(argv[optind], NULL, 10);
 		}
-		// Add host name
-		strcat(worker_args, " ");
-		strcat(worker_args, argv[optind]);
-		// Add port
-		strcat(worker_args, " ");
-		strcat(worker_args, argv[optind+1]);
-		// Number of workers to submit
-		goal = strtol(argv[optind+2], NULL, 10);
-	} else {
-		if ((argc - optind) != 1) {
-			fprintf(stderr, "invalid number of arguments\n");
-			show_help(argv[0]);
-			return EXIT_FAILURE;
-		}
-        goal = strtol(argv[optind], NULL, 10);
-    }
+	}
 
 	signal(SIGINT, handle_abort);
 	signal(SIGQUIT, handle_abort);
@@ -452,6 +568,15 @@ int main(int argc, char *argv[])
 			fix_running_job_number_condor(goal);
 			delete_dir(scratch_dir);
 			exit(0);
+		}
+	}
+
+	if(auto_worker_pool) {
+		catalog_host = CATALOG_HOST;
+		catalog_port = CATALOG_PORT;
+		processed_masters = hash_table_create(0,0);
+		while(!abort_flag){
+			start_serving_masters(catalog_host, catalog_port, regex_list);
 		}
 	}
 

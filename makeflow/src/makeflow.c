@@ -17,6 +17,7 @@ See the file COPYING for details.
 
 #include "catalog_query.h"
 #include "catalog_server.h"
+#include "work_queue_catalog.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
 #include "link.h"
@@ -1382,31 +1383,6 @@ static void handle_abort( int sig )
 {
 	dag_abort_flag = 1;
 }
-
-int parse_catalog_server_description(char *server_string) {
-	char *host;
-	int port;
-	char *colon;
-	char line[1024];
-
-	colon = strchr(server_string, ':');
-
-	if(!colon) return 0;
-
-	*colon = '\0';
-
-	host = strdup(server_string);
-	port = atoi(colon+1);
-
-	if(!port) return 0;
-		
-	sprintf(line,"CATALOG_HOST=%s",host);
-	putenv(strdup(line));
-	sprintf(line,"CATALOG_PORT=%d",port);
-	putenv(strdup(line));
-	
-	return 1;
-}
 	
 static void show_version(const char *cmd)
 {
@@ -1468,6 +1444,8 @@ int main( int argc, char *argv[] )
     int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
     int work_queue_wait_routine = WORK_QUEUE_WAIT_FAST_DISPATCH;
 	int capacity_tolerance = 0;
+	char *catalog_host;
+	int catalog_port;
 
 	debug_config(argv[0]);
 
@@ -1500,10 +1478,14 @@ int main( int argc, char *argv[] )
             work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
             break;
 		case 'C':
-			if(!parse_catalog_server_description(optarg)) {
+			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
 				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
-			}
+			} 
+			sprintf(line,"CATALOG_HOST=%s", catalog_host);
+			putenv(strdup(line));
+			sprintf(line,"CATALOG_PORT=%d", catalog_port);
+			putenv(strdup(line));
             work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
 		case 'I':
