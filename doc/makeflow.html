@@ -1,0 +1,332 @@
+<html>
+
+<head>
+<title>Makeflow User's Manual</title>
+</head>
+
+<body>
+
+<style type="text/css">
+pre {
+background: #ffffcc;
+font-family: monospace;
+font-size: 75%
+font-align: left;
+white-space: pre;
+border: solid 1px black;
+padding: 5px;
+margin: 20px;
+}
+</style>
+<h1>Makeflow User's Manual</h1>
+<b>Last Updated Febuary 2011</b>
+<p>
+Makeflow is Copyright (C) 2009 The University of Notre Dame.
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+<p>
+<h2>Overview</h2>
+
+Makeflow is a <b>workflow engine</b> for distributed computing.
+It accepts a specification of a large amount of work to be
+performed, and runs it on remote machines in parallel where possible.
+In addition, Makeflow is fault-tolerant, so you can use it to coordinate
+very large tasks that may run for days or weeks in the face of failures.
+Makeflow is designed to be similar to <b>Make</b>, so if you can write
+a Makefile, then you can write a Makeflow.
+<p>
+You can run a Makeflow on your local machine to test it out.
+If you have a multi-core machine, then you can run multiple tasks simultaneously.
+If you have a Condor pool or a Sun Grid Engine batch system, then you can send
+your jobs there to run.  If you don't already have a batch system, Makeflow comes with a
+system called Work Queue that will let you distribute the load across any collection
+of machines, large or small.
+<p>
+Makeflow is part of the <a href=http://www.cse.nd.edu/~ccl/software>Cooperating Computing Tools</a>.  You can download the CCTools from <a href=http://www.cse.nd.edu/~ccl/software/download>this web page</a>, follow the <a href=install.html>installation instructions</a>, and you are ready to go.
+
+<h2>The Makeflow Language</h2>
+
+The Makeflow language is very similar to Make.
+A Makeflow script consists of a set of rules.
+Each rule specifies a set of <i>target files</i> to create,
+a set of <i>source files</i> needed to create them,
+and a <i>command</i> that generates the target files from the source files.
+<p>
+Makeflow attempts to generate all of the target files in a script.
+It examines all of the rules and determines which rules must run before
+others.  Where possible, it runs commands in parallel to reduce the
+execution time.
+<p>
+Here is a Makeflow that uses the <tt>convert</tt> utility to make an animation.
+It downloads an image from the web, creates four variations
+of the image, and then combines them back together into an animation.
+The first and the last task are marked as LOCAL to force them to
+run on the controlling machine.
+
+<pre>
+CURL=/usr/bin/curl
+CONVERT=/usr/bin/convert
+URL=http://www.cse.nd.edu/~ccl/images/capitol.jpg
+
+capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
+        LOCAL $CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
+
+capitol.90.jpg: capitol.jpg $CONVERT
+        $CONVERT -swirl 90 capitol.jpg capitol.90.jpg
+
+capitol.180.jpg: capitol.jpg $CONVERT
+        $CONVERT -swirl 180 capitol.jpg capitol.180.jpg
+
+capitol.270.jpg: capitol.jpg $CONVERT
+        $CONVERT -swirl 270 capitol.jpg capitol.270.jpg
+
+capitol.360.jpg: capitol.jpg $CONVERT
+        $CONVERT -swirl 360 capitol.jpg capitol.360.jpg
+
+capitol.jpg: $CURL
+        LOCAL $CURL -o capitol.jpg $URL
+</pre>
+
+Note that Makeflow differs from Make in a few important ways.
+Read section 4 below to get all of the details.
+
+<h2>Running Makeflow</h2>
+
+To try out the example above, copy and paste it into a file named <tt>example.makeflow</tt>.
+To run it on your local machine:
+
+<pre>
+% makeflow example.makeflow
+</pre>
+
+Note that if you run it a second time, nothing will happen, because all of the files are built:
+
+<pre>
+% makeflow example.makeflow
+makeflow: nothing left to do
+</pre>
+
+Use the <tt>-c</tt> option to clean everything up before trying it again:
+
+<pre>
+% makeflow -c example.makeflow
+</pre>
+
+If you have access to a batch system running <a href=http://www.sun.com/software/sge>SGE</a>,
+then you can direct Makeflow to run your jobs there:
+
+<pre>
+% makeflow -T sge example.makeflow
+</pre>
+
+Or, if you have a <a href=http://www.cs.wisc.edu/condor>Condor Pool</a>,
+then you can direct Makeflow to run your jobs there:
+
+<pre>
+% makeflow -T condor example.makeflow
+</pre>
+
+To submit Makeflow as a Condor job that submits more Condor jobs:
+
+<pre>
+% condor_submit_makeflow example.makeflow
+</pre>
+
+You will notice that a workflow can run very slowly if you submit
+each batch job to SGE or Condor, because it typically
+takes 30 seconds or so to start each batch job running.  To get
+around this limitation, we provide the Work Queue system.
+This allows Makeflow to function as a master process that 
+quickly dispatches work to remote worker processes.
+<p>
+To begin, let's assume that you are logged into a machine
+named <tt>barney.nd.edu</tt>. start your Makeflow like this:
+<pre>
+% makeflow -T wq example.makeflow
+</pre>
+
+Then, submit 10 worker processes to Condor like this:
+
+<pre>
+% condor_submit_workers barney.nd.edu 9123 10
+Submitting job(s)..........
+Logging submit event(s)..........
+10 job(s) submitted to cluster 298.
+</pre>
+
+Or, submit 10 worker processes to SGE like this:
+<pre>
+% sge_submit_workers barney.nd.edu 9123 10
+</pre>
+
+Or, you can start workers manually on any other machine you can log into:
+<pre>
+% work_queue_worker barney.nd.edu 9123
+</pre>
+
+Once the workers begin running, Makeflow will dispatch multiple
+tasks to each one very quickly.  If a worker should fail, Makeflow
+will retry the work elsewhere, so it is safe to submit many
+workers to an unreliable system.
+<p>
+When the Makeflow completes, your workers will still be available,
+so you can either run another Makeflow with the same workers,
+remove them from the batch system, or wait for them to expire.
+If you do nothing for 15 minutes, they will automatically exit.
+<p>
+Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>
+are simple shell scripts, so you can edit them directly if you would
+like to change batch options or other details.
+
+<h2>The Fine Details</h2>
+
+The Makeflow language is very similar to Make, but it does have a few important differences that you should be aware of.
+
+<h3>Get the Dependencies Right</h3>
+
+You must be careful to accurately specify <b>all of the files that a rule requires and creates</b>, including any custom executables.  This is because Makeflow requires all these information to construct the environment for a remote job.  For example, suppose that you have written a simulation program called <tt>mysim.exe</tt> that reads <tt>calib.data</tt> and then produces and output file.  The following rule won't work, because it doesn't inform Makeflow what files are neded to execute the simulation:
+<pre>
+# This is an incorrect rule.
+
+output.txt:
+        ./mysim.exe -c calib.data -o output.txt
+</pre>
+
+However, the following is correct, because the rule states all of the files needed to run the simulation.  Makeflow will use this information to
+construct a batch job that consists of <tt>mysim.exe</tt> and <tt>calib.data</tt> and uses it to produce <tt>output.txt</tt>:
+
+<pre>
+# This is a correct rule.
+
+output.txt: mysim.exe calib.data
+        ./mysim.exe -c calib.data -o output.txt
+</pre>
+When a regular file is specified as an input file, it means the command relies on the contents of that file. When a directory is specified as an input file, however, it could mean one of two things. First, the command depends on the contents inside the directory. Second, the command relies on the existence of the directory (for example, you just want to add more things into the directory later, it does not matter what's already in it). <b>Makeflow assumes that an input directory indicates that the command relies on the directory's existence</b>.
+
+<h3>No Phony Rules</h3>
+
+For a similar reason, you cannot have "phony" rules that don't actually
+create the specified files.  For example, it is common practice to define
+a <tt>clean</tt> rule in Make that deletes all derived files.  This doesn't
+make sense in Makeflow, because such a rule does not actually create 
+a file named <tt>clean</tt>.  Instead use the <tt>-c</tt> option as shown above.
+
+<h3>Just Plain Rules</h3>
+
+Makeflow does not support all of the syntax that you find in various versions of Make.  Each rule must have exactly one command to execute.  If you have multiple commands, simply join them together with semicolons.  Makeflow allows you to define and use variables, but it does not support  pattern rules, wildcards, or special variables like <tt>$&lt;</tt> or <tt>$@</tt>.  You simply have to write out the rules longhand, or write a script in your favorite language to generate a large Makeflow.
+
+<h3>Local Job Execution</h3>
+
+Certain jobs don't make much sense to distribute.  For example, if you have a very fast running job that consumes a large amount of data, then it should simply run on the same machine as Makeflow.  To force this, simply add the word <tt>LOCAL</tt> to the beginning of the command line in the rule.
+
+<h3>Batch Job Refinement</h3>
+
+When executing jobs, Makeflow simply uses the default settings in your batch system.  If you need to pass additional options, use the <tt>BATCH_OPTIONS</tt> variable or the <tt>-B</tt> option to Makeflow.
+<p>
+When using Condor, this string will be added to each submit file.  For example, if you want to add <tt>Requirements</tt> and <tt>Rank</tt> lines to your Condor submit files, add this to your Makeflow:
+<pre>
+BATCH_OPTIONS = Requirements = (Memory>1024)
+</pre>
+<p>
+When using SGE, the string will be added to the qsub options.  For example, to specify that jobs should be submitted to the <tt>devel</tt> queue:
+<pre>
+BATCH_OPTIONS = -q devel
+</pre>
+
+<h3>Displaying a Makeflow</h3>
+
+When run with the <tt>-D</tt> option, Makeflow will emit a diagram of the Makeflow in the
+<a href=http://www.graphviz.org>Graphviz DOT</a> format.  If you have <tt>dot</tt> installed,
+then you can generate an image of your workload like this:
+
+<pre>
+% makeflow -D example.makeflow | dot -T gif > example.gif
+</pre>
+
+<h2>Running Makeflow with Work Queue</h2>
+With the '-T wq' option, Makeflow runs as a master process that dispatches
+tasks to remote worker processes. 
+
+<h3>Change master port</h3>
+The master process listens on a port which the remote workers would connect to.
+The default port number is 9123.  Sometimes, however, the port number might be
+not available on your system. You can change the default port via the '-p
+&lt;port number&gt;' option. For example, if you want the master to listen on port
+9567 by default, you can run the following command: 
+<pre>
+% makeflow -T wq -p 9567 exmaple.makeflow
+</pre>
+
+<h3>Set Project Name</h3>
+The hostname:port is the default way for workers to identify masters.  Anyone
+can start a worker and connect to your master at the hostname:port.  Sometimes
+you don't want other people's workers to work on your project.  To
+<strong>avoid anonymous worker connections</strong>, you will need to set a
+project name with the '-N' option for both your master and workers and enable
+the exclusive worker mode on your work queue master with the "-e" option: 
+<pre>
+% makeflow -T wq -N proj1 -e example.makeflow
+</pre>
+This would inform the master to only allow connections from workers who have a
+preference on "proj1".  If the '-e' option is not specified, the master would
+accept shared workers submitted by anyone. To add a project preference for the
+worker, add the '-N' option to the worker as well:
+<pre>
+% work_queue_worker -N proj1 barney.nd.edu 9123
+</pre>
+You can even assign mulitple preferred project names to a single worker. The
+worker would only work for the master whose name is contained in the list of
+the worker's preferred project names.
+
+<h3>Enable Catalog Mode</h3>
+In the catalog mode, the master would advertise its information, such as
+project name, running status, and hostname and port number, to a catalog
+server. The workers (with proper options turned on) would contact the catalog
+server to ask for available masters and then work for them. The catalog mode
+allows a set of workers to work for different masters without stopping them
+and telling them a new master's hostname:port for each master. It also allows
+different users to share their computing resources. So your workers could work
+for other's projects when they are idle and other's workers could also work
+for yours.
+<p>
+To make use of the catalog mode, you will have to have a catalog server to
+pass information between potential masters and workers. Say you want to run
+your catalog server on a machine named barney.nd.edu (the default port that
+the catalog server will be listening on is 9097, you can change it via the
+'-p' option), do:
+<pre>
+barney% catalog_server
+</pre>
+Now you have a catalog server listening at barney.nd.edu:9097. To make your
+masters and workers contact this catalog server, add the '-C hostname:port'
+option to both the master and worker programs: 
+<pre>
+% makeflow -T wq -C barney.nd.edu:9097 -N proj1 example.makeflow
+% work_queue_worker -C barney.nd.edu:9097 -s
+</pre>
+The '-C' option turns on the catalog mode. Note that the '-s' option in the
+above worker command tells the worker to run in a shared worker mode, as
+opposed to the default exlusive mode which would let the worker only work for
+masters that it prefers (set by the -N option).
+<p>
+At Notre Dame, we have already had a catalog server runing 24/7. The work
+queue master and worker program would contact the Notre Dame catalog server by
+default. Thus, you don't have to specify the catalog server explicitly with
+the '-C' option unless you have your own catalog server. To turn on the
+catalog mode in this case you will use the '-a' option, again on both the
+master and worker programs.
+<pre>
+% makeflow -T wq -a -N proj1 example.makeflow
+% work_queue_worker -a -N proj1 -N proj2 -N proj3
+</pre>
+Note that this time the worker is not run with the '-s' option. Instead, it
+has three preferred projects. The worker would ask the catalog server for
+available masters and only work for a master if its project name matches one
+of the worker's preferences.
+
+<h2>For More Information</h2>
+
+For the latest information about Makeflow, please visit our <a href=http://www.cse.nd.edu/~ccl/software/makeflow>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
+
+</body>
+</html>
