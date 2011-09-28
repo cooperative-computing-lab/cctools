@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(makeflow) - workflow engine for executing distributed workflows
 
 SECTION(SYNOPSIS)
-CODE(BOLD(makeflow [options] dagfile))
+CODE(BOLD(makeflow [options] PARAM(dagfile)))
 
 SECTION(DESCRIPTION)
 
