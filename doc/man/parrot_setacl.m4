@@ -11,7 +11,7 @@ SECTION(DESCRIPTION)
 CODE(parrot_setacl) utilizes BOLD(Parrot) system calls to set the access
 control list (ACL) information for the directory specified by PARAM(path).  The
 PARAM(subject) argument refers to the entity to authorize, while the
-PARAM(rights) is one of the following: read, write, admin, none.
+PARAM(rights) argument is one of the following: read, write, admin, none.
 PARA
 Note, this program only works if it is executed under BOLD(Parrot) and if the
 underlying filesystem supports ACLs.
