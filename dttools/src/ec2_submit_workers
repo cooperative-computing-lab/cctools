@@ -1,0 +1,110 @@
+#!/bin/sh
+
+show_help() 
+{
+        echo "Use: ec2_submit_workers [options] <hostname> <port> <ec2-keypair-name> <num-workers>"
+        echo "options:"
+        echo "  -a               	Enable auto mode."
+        echo "  -s               	Run as a shared worker."
+        echo "  -N <name>        	Preferred master name."
+        echo "  -C <catalog>     	Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
+        echo "  -t <time> 	        Abort after this amount of idle time. (default=900s)."
+        echo "  -i <image_id>      	EC2 OS image ID. Default = ami-fa01f193 (Ubuntu 10.04 x86_64)."
+        echo "  -z <instance_size>  	EC2 instance size. Default = m1.large."
+        echo "  -p <parameters>	    	ec2-run-instances parameters."
+	echo "  -h   	            	Show this help message."
+        exit 1
+}
+
+arguments=""
+use_auto=0
+image=ami-fa01f193
+instance_size=m1.large
+parameters=""
+
+while getopts asN:t:i:z:p:h opt 
+do
+        case "$opt" in
+                a)  arguments="$arguments -a"; use_auto=1;;
+                s)  arguments="$arguments -s";;
+                N)  arguments="$arguments -N $OPTARG";;
+                C)  arguments="$arguments -C $OPTARG";;
+                t)  arguments="$arguments -t $OPTARG";;
+                i)  image="$OPTARG";;
+                z)  instance_size="$OPTARG";;
+		p)  parameters="$parameters $OPTARG";;
+                h)  show_help;;
+                \?) show_help;;
+        esac
+done
+
+shift $(expr $OPTIND - 1)
+
+if [ $use_auto = 0 ]; then
+    if [ X$4 = X ]
+    then
+        show_help
+    fi
+    host=$1
+    port=$2
+    key=$3
+    count=$4
+else
+    if [ X$2 = X ]
+    then
+        show_help
+    fi
+    host=
+    port=
+    key=$1
+    count=$2
+fi
+
+worker=`which work_queue_worker 2>/dev/null`
+if [ $? != 0 ]
+then
+        echo "$0: please add 'work_queue_worker' to your PATH."
+        exit 1
+fi
+
+ec2run=`which ec2-run-instances 2>/dev/null`
+if [ $? != 0 ]
+then
+        echo "$0: please add 'ec2-run-instances' to your PATH."
+        exit 1
+fi
+
+cp $worker .
+
+cat >worker.sh <<EOF
+#!/bin/sh
+PATH=".:"$PATH
+export PATH
+
+./work_queue_worker $arguments $host $port 
+EOF
+
+chmod 755 worker.sh
+
+#Start EC2 instances of the required count.
+ec2-run-instances $image --instance-type $instance_size -k $key -n $count
+sleep 60
+
+#Wait until all of the requested instances come on-board..
+running_instances=0
+while [ $running_instances -lt $count ]
+do
+	sleep 20
+	running_instances=$(ec2-describe-instances | grep $image | grep running | wc -l)
+done
+
+inst_count=1
+while [ $inst_count -le $count ]
+do
+	instance=$(ec2-describe-instances | grep running | awk 'NR==var{print $4 }' var="${inst_count}")
+	echo "------------------------------------------------"
+	echo "Starting worker #$inst_count on $instance"
+	scp -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $key $worker worker.sh ubuntu@$instance:.
+	ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $key ubuntu@$instance './worker.sh 1>worker.log 2>&1 &'
+	let inst_count++
+done
