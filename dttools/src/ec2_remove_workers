@@ -1,0 +1,64 @@
+#!/bin/sh
+
+show_help() 
+{
+        echo "Use: ec2_remove_workers [options] <num_workers>"
+        echo "options:"
+        echo "  -a                      Remove all running workers (EC2 instances)."
+	echo "  -i <image_id>           EC2 OS image ID of running workers. Default = ami-fa01f193."
+        echo "  -h                      Show this help message."
+        exit 1
+}
+
+remove_all=0
+image=ami-fa01f193
+
+while getopts i:ah opt 
+do
+        case "$opt" in
+                a)  remove_all=1;;
+                i)  image="$OPTARG";;
+		h)  show_help;;
+                \?) show_help;;
+        esac
+done
+
+shift $(expr $OPTIND - 1)
+
+if [ $remove_all = 0 ]; then
+    if [ X$1 = X ]
+    then
+        show_help
+    fi
+    count=$1
+fi
+
+ec2remove=`which ec2kill 2>/dev/null`
+if [ $? != 0 ]
+then
+        echo "$0: please add 'ec2kill' to your PATH."
+        exit 1
+fi
+
+running_instances=$(ec2-describe-instances | grep $image | grep running | wc -l)
+if [ ! -n "$running_instances" ];
+then
+	echo "No workers to remove."
+	exit 1
+fi
+
+if [ $remove_all = 1 ]; 
+then
+	num_remove_instances=$running_instances
+else
+	num_remove_instances=$count
+fi
+
+for (( i=1; i<=$num_remove_instances; i++ ))
+do
+	instance=$(ec2-describe-instances | grep $image | grep running | awk 'NR==1{print $2}')
+	if [ -n "$instance" ]; 
+	then
+        	$ec2remove $instance
+	fi
+done
