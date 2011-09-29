@@ -1,4 +1,4 @@
-define(HEADER,.TH "$1" 1 "Cooperative Computing Tools")dnl
+define(HEADER,.TH "$1" 1 "October 2011" "CCL" "Cooperative Computing Tools")dnl
 define(SECTION,.SH $1
 .LP)dnl
 define(SUBSECTION,.SS $1
