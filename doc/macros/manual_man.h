@@ -8,6 +8,7 @@ define(BOLD,\fB$1\fP)dnl
 define(ITALIC,\fI$1\fP)dnl
 define(CODE,\FC$1\FT)dnl
 define(LINK,$1 (BOLD($2)))dnl
+define(MANPAGE,BOLD($1($2)))dnl
 define(LIST_BEGIN)dnl
 define(LIST_ITEM,`.IP \(bu 4'
 .

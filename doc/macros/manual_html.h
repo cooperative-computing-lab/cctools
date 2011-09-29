@@ -4,7 +4,7 @@ define(SUBSECTION,<h3>$1</h3>)dnl
 define(SUBSUBSECTION,<h4>$1</h4>)dnl
 define(PARA,<p>)dnl
 define(LINK,<a href=$2>$1</a>)dnl
-define(MANPAGE,LINK($1,man/$1.html))dnl
+define(MANPAGE,LINK($1($2),$1.html))dnl
 define(BOLD,<b>$1</b>)dnl
 define(CODE,<tt>$1</tt>)dnl
 
