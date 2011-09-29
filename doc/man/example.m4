@@ -21,7 +21,7 @@ List all options here in alphabetical order.
 It's ok to copy and paste from the program help text or the manual.
 
 OPTIONS_BEGIN
-OPTION_ITEM(-d flag) Enable debugging for this sub-system.
+OPTION_PAIR(-d,flag) Enable debugging for this sub-system.
 OPTION_ITEM(-h) Display version information.
 OPTION_ITEM(-v) Show help text.
 OPTIONS_END
@@ -60,4 +60,6 @@ SECTION(SEE ALSO)
 LIST_BEGIN
 LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
 LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
+LIST_ITEM MANPAGE(parrot_run,1)
+LIST_ITEM MANPAGE(makeflow,1)
 LIST_END
