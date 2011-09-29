@@ -1,8 +1,9 @@
+include ../Makefile.config
 
 SOURCES=${shell ls man/*.m4}
 
 HTMLFILES = ${SOURCES:%.m4=%.html}
-TXTFILES = ${SOURCES:%.m4=%.txt}
+TXTFILES = ${SOURCES:%.m4=%.1}
 PDFFILES = ${SOURCES:%.m4=%.pdf}
 MANFILES = ${SOURCES:%.m4=%.man}
 
@@ -14,7 +15,7 @@ all: ${HTMLFILES} ${TXTFILES} ${PDFFILES}
 %.man: %.m4
 	m4 -DMAN -Imacros $< > $@
 
-%.txt: %.man
+%.1: %.man
 	nroff -man $< > $@
 
 %.ps: %.man
@@ -25,11 +26,11 @@ all: ${HTMLFILES} ${TXTFILES} ${PDFFILES}
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	cp *.html $(INSTALL_DIR)/doc
+	cp *.html $(CCTOOLS_INSTALL_DIR)/doc
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/man
-	cp man/*.html $(INSTALL_DIR)/doc/man
+	cp man/*.html $(CCTOOLS_INSTALL_DIR)/doc/man
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/man/man1
-	cp man/*.txt $(INSTALL_DIR)/share/man/man1
+	cp man/*.1 $(CCTOOLS_INSTALL_DIR)/share/man/man1
 
 test:
 
