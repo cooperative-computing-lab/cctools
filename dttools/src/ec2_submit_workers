@@ -87,7 +87,7 @@ EOF
 chmod 755 worker.sh
 
 #Start EC2 instances of the required count.
-ec2-run-instances $image --instance-type $instance_size -k $key -n $count
+ec2-run-instances $image --instance-type $instance_size -k $key $parameters -n $count
 sleep 60
 
 #Wait until all of the requested instances come on-board..
