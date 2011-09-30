@@ -2,8 +2,8 @@
 
 show_help() 
 {
-        echo "Use: ec2_submit_workers [options] <hostname> <port> <ec2-keypair-name> <num-workers>"
-        echo "options:"
+        echo "Use: ec2_submit_workers [options] <port> <ec2-keypair-name> <num-workers>"
+        echo "where options are:"
         echo "  -a               	Enable auto mode."
         echo "  -s               	Run as a shared worker."
         echo "  -N <name>        	Preferred master name."
@@ -106,5 +106,8 @@ do
 	echo "Starting worker #$inst_count on $instance"
 	scp -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $key $worker worker.sh ubuntu@$instance:.
 	ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $key ubuntu@$instance './worker.sh 1>worker.log 2>&1 &'
+	return_status=$?
 	let inst_count++
 done
+
+exit $return_status

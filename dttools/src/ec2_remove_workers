@@ -3,7 +3,7 @@
 show_help() 
 {
         echo "Use: ec2_remove_workers [options] <num_workers>"
-        echo "options:"
+        echo "where options are:"
         echo "  -a                      Remove all running workers (EC2 instances)."
 	echo "  -i <image_id>           EC2 OS image ID of running workers. Default = ami-fa01f193."
         echo "  -h                      Show this help message."
@@ -60,5 +60,8 @@ do
 	if [ -n "$instance" ]; 
 	then
         	$ec2remove $instance
+		return_status=$?
 	fi
 done
+
+exit $return_status
