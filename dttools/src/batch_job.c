@@ -32,7 +32,7 @@ See the file COPYING for details.
 
 const char *batch_queue_type_string()
 {
-	return "local, condor, sge, moab, wq, hadoop, mpi-queue";
+	return "local, condor, sge, moab, cluster, wq, hadoop, mpi-queue";
 }
 
 batch_queue_type_t batch_queue_type_from_string(const char *str)
@@ -43,7 +43,7 @@ batch_queue_type_t batch_queue_type_from_string(const char *str)
 		return BATCH_QUEUE_TYPE_SGE;
 	if(!strcmp(str, "moab"))
 		return BATCH_QUEUE_TYPE_MOAB;
-	if(!strcmp(str, "grid"))
+	if(!strcmp(str, "cluster"))
 		return BATCH_QUEUE_TYPE_CLUSTER;
 	if(!strcmp(str, "local"))
 		return BATCH_QUEUE_TYPE_LOCAL;
@@ -78,7 +78,7 @@ const char *batch_queue_type_to_string(batch_queue_type_t t)
 	case BATCH_QUEUE_TYPE_MOAB:
 		return "moab";
 	case BATCH_QUEUE_TYPE_CLUSTER:
-		return "grid";
+		return "cluster";
 	case BATCH_QUEUE_TYPE_WORK_QUEUE:
 		return "wq";
 	case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
