@@ -40,7 +40,7 @@ OPTION_ITEM(-v)Display verbose messages (default: False).
 OPTIONS_END
 Once a CODE(SFX) is generated, you can use it as a normal executable.
 
-SECTION(Configuration File)
+SECTION(CONFIGURATION FILE)
 The command line options may be stored in a configuration file and passed to
 starch using the CODE(-C) option.  The format of the configuration file is as
 follows:
