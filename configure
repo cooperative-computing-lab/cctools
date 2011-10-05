@@ -619,9 +619,9 @@ then
 	then
 		python_version="$(${python} -V 2>&1)"
 		echo "python version is ${python_version}"
-		if [ `echo ${python_version} | awk '{print $2}' | cut -d . -f 2` -ge 6 ]
+		if [ `echo ${python_version} | awk '{print $2}' | cut -d . -f 2` -ge 4 ]
 		then
-			if check_file ${python_path}/include/python2.[6-7]/Python.h
+			if check_file ${python_path}/include/python2.[4-7]/Python.h
 			then
 				echo "found python development libraries"
 				packages="${packages} python"
@@ -629,7 +629,7 @@ then
 				python=0
 			fi
 		else
-			echo "*** Sorry, we require Python >= 2.6.0"
+			echo "*** Sorry, we require Python >= 2.4"
 			python=0
 		fi
 	fi

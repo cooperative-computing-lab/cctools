@@ -143,7 +143,7 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
         run.sh      Script that contains command
     """
 
-    tmp_file = NamedTemporaryFile(delete = False)
+    tmp_file = NamedTemporaryFile()
     tmp_file.close()
 
     arc_path = tmp_file.name
@@ -285,9 +285,9 @@ def autodetect_libraries_linux(executable):
                 lib_path = line.split('=>')[-1].strip().split()[0]
                 if os.path.exists(lib_path):
                     libs.append((lib_path, os.path.realpath(lib_path)))
-            except Exception as e:
+            except Exception, e:
                 pass
-    except Exception as e:
+    except Exception, e:
         error('could not execute ldd on %s: %s' % (executable, str(e)))
 
     return libs
@@ -303,9 +303,9 @@ def autodetect_libraries_darwin(executable):
                 lib_path = line.split('(')[0].strip()
                 if os.path.exists(lib_path):
                     libs.append((lib_path, os.path.realpath(lib_path)))
-            except Exception as e:
+            except Exception, e:
                 pass
-    except Exception as e:
+    except Exception, e:
         error('could not execute otool on %s: %s' % (executable, str(e)))
 
     return libs
