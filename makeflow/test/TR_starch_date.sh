@@ -11,7 +11,7 @@ prepare()
 
 run()
 {
-    ${CCTOOLS_PYTHON} ./starch.py -x date $sfxfile
+    ../src/starch -x date $sfxfile
     exec $sfxfile
 }
 

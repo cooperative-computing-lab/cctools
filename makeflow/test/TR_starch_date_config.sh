@@ -15,7 +15,7 @@ EOF
 
 run()
 {
-    ${CCTOOLS_PYTHON} ./starch.py -C $cfgfile $sfxfile
+    ../src/starch -C $cfgfile $sfxfile
     exec $sfxfile
 }
 

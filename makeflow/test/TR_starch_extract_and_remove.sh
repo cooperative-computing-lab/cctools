@@ -7,13 +7,13 @@ tarfile=starch.tar.gz
 
 prepare()
 {
-    cd ..; tar czvf $tarfile starch; cd -; mv ../$tarfile .
+    cd ..; tar czvf $tarfile src; cd -; mv ../$tarfile .
     exit 0
 }
 
 run()
 {
-    ${CCTOOLS_PYTHON} ./starch.py -v -x tar -x rm -c 'for f in $@; do if ! tar xvf $f; then exit 1; fi ; done; rm $@' $sfxfile
+    ../src/starch -v -x tar -x rm -c 'for f in $@; do if ! tar xvf $f; then exit 1; fi ; done; rm $@' $sfxfile
     exec $sfxfile $tarfile
 }
 

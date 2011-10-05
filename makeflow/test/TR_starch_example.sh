@@ -2,8 +2,8 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-sfxfile=test/example.sfx
-cfgfile=test/example.cfg
+sfxfile=example.sfx
+cfgfile=example.cfg
 
 prepare()
 {
@@ -12,7 +12,7 @@ prepare()
 
 run()
 {
-    ${CCTOOLS_PYTHON} ./starch.py -C $cfgfile $sfxfile
+    ../src/starch -C $cfgfile $sfxfile
     exec $sfxfile
 }
 

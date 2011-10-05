@@ -25,3 +25,4 @@ install: all
 	install condor_submit_makeflow ${CCTOOLS_INSTALL_DIR}/bin
 	install makeflow_log_parser ${CCTOOLS_INSTALL_DIR}/bin
 	install makeflow_monitor ${CCTOOLS_INSTALL_DIR}/bin
+	install starch ${CCTOOLS_INSTALL_DIR}/bin
