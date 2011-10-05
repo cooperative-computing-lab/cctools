@@ -329,24 +329,22 @@ def parse_command_line_options():
 
     parser = OptionParser('%prog [options] <sfx_path>')
 
-    parser.add_option('-c', dest = 'command', action = 'store',
-        help = 'command to execute', metavar = 'cmd', default = '')
-    parser.add_option('-x', dest = 'executables', action = 'append',
-        help = 'add executable', metavar = 'exe', default = [])
-    parser.add_option('-l', dest = 'libraries', action = 'append',
-        help = 'add library', metavar = 'lib', default = [])
-    parser.add_option('-d', dest = 'data', action = 'append',
-        help = 'add data (new path:old path)', metavar = 'npath:opath', default = [])
-    parser.add_option('-e', dest = 'environments', action = 'append',
-        help = 'add environment script', metavar = 'env', default = [])
-    parser.add_option('-C', dest = 'config', action = 'store',
-        help = 'configuration file', metavar = 'cfg', default = None) 
-    parser.add_option('-a', dest = 'autodetect', action = 'store_true',
-        help = 'automatically detect library dependencies (default: True)', default = True)
     parser.add_option('-A', dest = 'autodetect', action = 'store_false',
-        help = 'do not automatically detect library dependencies')
+        help = 'Do not automatically detect library dependencies (default: enabled).', default=True)
+    parser.add_option('-C', dest = 'config', action = 'store',
+        help = 'Use configuration file.', metavar = 'cfg', default = None) 
+    parser.add_option('-c', dest = 'command', action = 'store',
+        help = 'Specify command to execute.', metavar = 'cmd', default = '')
+    parser.add_option('-d', dest = 'data', action = 'append',
+        help = 'Add data (new path:old path).', metavar = 'npath:opath', default = [])
+    parser.add_option('-e', dest = 'environments', action = 'append',
+        help = 'Add environment script.', metavar = 'env', default = [])
+    parser.add_option('-l', dest = 'libraries', action = 'append',
+        help = 'Add library.', metavar = 'lib', default = [])
+    parser.add_option('-x', dest = 'executables', action = 'append',
+        help = 'Add executable.', metavar = 'exe', default = [])
     parser.add_option('-v', dest = 'verbose', action = 'store_true',
-        help = 'display verbose messages (default: False)', default = False)
+        help = 'Display verbose messages.', default = False)
 
     (options, args) = parser.parse_args()
 
