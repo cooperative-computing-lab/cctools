@@ -2,7 +2,7 @@
 
 show_help() 
 {
-        echo "Use: ec2_submit_workers [options] <port> <ec2-keypair-name> <num-workers>"
+        echo "Use: ec2_submit_workers [options] <servername> <port> <ec2-key-name> <ec2-key-file> <num-workers>"
         echo "where options are:"
         echo "  -a               	Enable auto mode."
         echo "  -s               	Run as a shared worker."
@@ -41,23 +41,25 @@ done
 shift $(expr $OPTIND - 1)
 
 if [ $use_auto = 0 ]; then
-    if [ X$4 = X ]
+    if [ X$5 = X ]
     then
         show_help
     fi
     host=$1
     port=$2
-    key=$3
-    count=$4
+    keyname=$3
+    keyfile=$4
+    count=$5
 else
-    if [ X$2 = X ]
+    if [ X$3 = X ]
     then
         show_help
     fi
     host=
     port=
-    key=$1
-    count=$2
+    keyname=$1
+    keyfile=$2
+    count=$3
 fi
 
 worker=`which work_queue_worker 2>/dev/null`
@@ -87,7 +89,7 @@ EOF
 chmod 755 worker.sh
 
 #Start EC2 instances of the required count.
-ec2-run-instances $image --instance-type $instance_size -k $key $parameters -n $count
+ec2-run-instances $image --instance-type $instance_size -k $keyname $parameters -n $count
 sleep 60
 
 #Wait until all of the requested instances come on-board..
@@ -104,8 +106,8 @@ do
 	instance=$(ec2-describe-instances | grep running | awk 'NR==var{print $4 }' var="${inst_count}")
 	echo "------------------------------------------------"
 	echo "Starting worker #$inst_count on $instance"
-	scp -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $key $worker worker.sh ubuntu@$instance:.
-	ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $key ubuntu@$instance './worker.sh 1>worker.log 2>&1 &'
+	scp -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $keyfile $worker worker.sh ubuntu@$instance:.
+	ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $keyfile ubuntu@$instance './worker.sh 1>worker.log 2>&1 &'
 	return_status=$?
 	let inst_count++
 done
