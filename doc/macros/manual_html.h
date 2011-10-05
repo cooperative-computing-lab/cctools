@@ -12,11 +12,13 @@ define(LIST_BEGIN,<dir>)
 define(LIST_ITEM,<li>)
 define(LIST_END,</dir>)
 
-define(TAB,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)
+define(SPACE,&nbsp;)
+define(HALFTAB,SPACE()SPACE()SPACE()SPACE())
+define(TAB,HALFTAB()HALFTAB())
 define(PARAM,<i>&lt;$1&gt;</i>)
 
 define(OPTIONS_BEGIN,<dir>)
-define(OPTION_ITEM,<li> BOLD(CODE($1))TAB())
+define(OPTION_ITEM,<li> BOLD(CODE($1))TAB()HALFTAB())
 define(OPTION_PAIR,<li> BOLD(CODE($1)) PARAM($2)<br/>TAB()TAB())
 define(OPTIONS_END,</dir>)
 
