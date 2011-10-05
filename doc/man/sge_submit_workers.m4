@@ -13,9 +13,9 @@ on the SUN Grid Engine (SGE) through its job submission interface, qsub.
 The number of BOLD(work_queue_worker) scheduled and run is given by the BOLD(num-workers)
 argument.
 
-The BOLD(servername) and BOLD(port) arguments specify the hostname and port number 
-of the master to connect to. These two arguments become optional when the auto mode option
-is specified for work_queue_worker. 
+The BOLD(servername) and BOLD(port) arguments specify the hostname and port number of the 
+master for the work_queue_worker to connect. These two arguments become optional when the 
+auto mode option is specified for work_queue_worker. 
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
