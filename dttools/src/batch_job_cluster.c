@@ -11,59 +11,59 @@
 
 #include <sys/stat.h>
 
-char * grid_name = NULL;
-char * grid_submit_cmd = NULL;
-char * grid_remove_cmd = NULL;
-char * grid_options = NULL;
+char * cluster_name = NULL;
+char * cluster_submit_cmd = NULL;
+char * cluster_remove_cmd = NULL;
+char * cluster_options = NULL;
 
-int batch_job_setup_grid(struct batch_queue * q) {
+int batch_job_setup_cluster(struct batch_queue * q) {
 
-	if(grid_name)
-		free(grid_name);
-	if(grid_submit_cmd)
-		free(grid_submit_cmd);
-	if(grid_remove_cmd)
-		free(grid_remove_cmd);
-	if(grid_options)
-		free(grid_options);
+	if(cluster_name)
+		free(cluster_name);
+	if(cluster_submit_cmd)
+		free(cluster_submit_cmd);
+	if(cluster_remove_cmd)
+		free(cluster_remove_cmd);
+	if(cluster_options)
+		free(cluster_options);
 
-	grid_name = grid_submit_cmd = grid_remove_cmd = grid_options = NULL;
+	cluster_name = cluster_submit_cmd = cluster_remove_cmd = cluster_options = NULL;
 
 	switch(q->type) {
 		case BATCH_QUEUE_TYPE_SGE:
-			grid_name = strdup("sge");
-			grid_submit_cmd = strdup("qsub");
-			grid_remove_cmd = strdup("qdel");
-			grid_options = strdup("-cwd -o /dev/null -j y -N");
+			cluster_name = strdup("sge");
+			cluster_submit_cmd = strdup("qsub");
+			cluster_remove_cmd = strdup("qdel");
+			cluster_options = strdup("-cwd -o /dev/null -j y -N");
 			break;
 		case BATCH_QUEUE_TYPE_MOAB:
-			grid_name = strdup("moab");
-			grid_submit_cmd = strdup("msub");
-			grid_remove_cmd = strdup("mdel");
-			grid_options = strdup("-d $CWD -o /dev/null -j oe -N");
+			cluster_name = strdup("moab");
+			cluster_submit_cmd = strdup("msub");
+			cluster_remove_cmd = strdup("mdel");
+			cluster_options = strdup("-d $CWD -o /dev/null -j oe -N");
 			break;
-		case BATCH_QUEUE_TYPE_GRID:
-			grid_name = getenv("BATCH_QUEUE_GRID_NAME");
-			grid_submit_cmd = getenv("BATCH_QUEUE_GRID_SUBMIT_COMMAND");
-			grid_remove_cmd = getenv("BATCH_QUEUE_GRID_REMOVE_COMMAND");
-			grid_options = getenv("BATCH_QUEUE_GRID_SUBMIT_OPTIONS");
+		case BATCH_QUEUE_TYPE_CLUSTER:
+			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
+			cluster_submit_cmd = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND");
+			cluster_remove_cmd = getenv("BATCH_QUEUE_CLUSTER_REMOVE_COMMAND");
+			cluster_options = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS");
 			break;
 		default:
-			debug(D_DEBUG, "Invalid grid type: %s\n", batch_queue_type_to_string(q->type));
+			debug(D_DEBUG, "Invalid cluster type: %s\n", batch_queue_type_to_string(q->type));
 			return -1;
 	}
 
-	if(grid_name && grid_submit_cmd && grid_remove_cmd && grid_options)
+	if(cluster_name && cluster_submit_cmd && cluster_remove_cmd && cluster_options)
 		return 0;
 
-	if(!grid_name)
-		debug(D_NOTICE, "Environment variable BATCH_QUEUE_GRID_NAME unset\n");
-	if(!grid_submit_cmd)
-		debug(D_NOTICE, "Environment variable BATCH_QUEUE_GRID_SUBMIT_COMMAND unset\n");
-	if(!grid_remove_cmd)
-		debug(D_NOTICE, "Environment variable BATCH_QUEUE_GRID_REMOVE_COMMAND unset\n");
-	if(!grid_options)
-		debug(D_NOTICE, "Environment variable BATCH_QUEUE_GRID_SUBMIT_OPTIONS unset\n");
+	if(!cluster_name)
+		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_NAME unset\n");
+	if(!cluster_submit_cmd)
+		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND unset\n");
+	if(!cluster_remove_cmd)
+		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_REMOVE_COMMAND unset\n");
+	if(!cluster_options)
+		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS unset\n");
 
 	return -1;
 
@@ -103,7 +103,7 @@ static int setup_batch_wrapper(const char *sysname)
 }
 
 
-batch_job_id_t batch_job_submit_simple_grid(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+batch_job_id_t batch_job_submit_simple_cluster(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
 	char line[BATCH_JOB_LINE_MAX];
 	char name[BATCH_JOB_LINE_MAX];
@@ -112,7 +112,7 @@ batch_job_id_t batch_job_submit_simple_grid(struct batch_queue * q, const char *
 
 	FILE *file;
 
-	if(setup_batch_wrapper(grid_name) < 0)
+	if(setup_batch_wrapper(cluster_name) < 0)
 		return -1;
 
 	strcpy(name, cmd);
@@ -120,7 +120,7 @@ batch_job_id_t batch_job_submit_simple_grid(struct batch_queue * q, const char *
 	if(s)
 		*s = 0;
 
-	sprintf(line, "%s %s '%s' %s %s.wrapper \"%s\"", grid_submit_cmd, grid_options, string_basename(name), q->options_text ? q->options_text : "", grid_name, cmd);
+	sprintf(line, "%s %s '%s' %s %s.wrapper \"%s\"", cluster_submit_cmd, cluster_options, string_basename(name), q->options_text ? q->options_text : "", cluster_name, cmd);
 
 	debug(D_DEBUG, "%s", line);
 
@@ -146,13 +146,13 @@ batch_job_id_t batch_job_submit_simple_grid(struct batch_queue * q, const char *
 	if(strlen(line)) {
 		debug(D_NOTICE, "job submission failed: %s", line);
 	} else {
-		debug(D_NOTICE, "job submission failed: no output from %s", grid_name);
+		debug(D_NOTICE, "job submission failed: no output from %s", cluster_name);
 	}
 	pclose(file);
 	return -1;
 }
 
-batch_job_id_t batch_job_submit_grid(struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+batch_job_id_t batch_job_submit_cluster(struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
 	char command[BATCH_JOB_LINE_MAX];
 
@@ -165,10 +165,10 @@ batch_job_id_t batch_job_submit_grid(struct batch_queue * q, const char *cmd, co
 	if(errfile)
 		sprintf(&command[strlen(command)], " 2>%s", errfile);
 
-	return batch_job_submit_simple_grid(q, command, extra_input_files, extra_output_files);
+	return batch_job_submit_simple_cluster(q, command, extra_input_files, extra_output_files);
 }
 
-batch_job_id_t batch_job_wait_grid(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+batch_job_id_t batch_job_wait_cluster(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	struct batch_job_info *info;
 	batch_job_id_t jobid;
@@ -182,7 +182,7 @@ batch_job_id_t batch_job_wait_grid(struct batch_queue * q, struct batch_job_info
 		itable_firstkey(q->job_table);
 		while(itable_nextkey(q->job_table, &ujobid, (void **) &info)) {
 			jobid = ujobid;
-			sprintf(statusfile, "%s.status.%d", grid_name, jobid);
+			sprintf(statusfile, "%s.status.%d", cluster_name, jobid);
 			file = fopen(statusfile, "r");
 			if(file) {
 				while(fgets(line, sizeof(line), file)) {
@@ -224,7 +224,7 @@ batch_job_id_t batch_job_wait_grid(struct batch_queue * q, struct batch_job_info
 	return -1;
 }
 
-int batch_job_remove_grid(struct batch_queue *q, batch_job_id_t jobid)
+int batch_job_remove_cluster(struct batch_queue *q, batch_job_id_t jobid)
 {
 	char line[BATCH_JOB_LINE_MAX];
 	struct batch_job_info *info;
@@ -240,7 +240,7 @@ int batch_job_remove_grid(struct batch_queue *q, batch_job_id_t jobid)
 	info->exited_normally = 0;
 	info->exit_signal = 1;
 
-	sprintf(line, "%s %d", grid_remove_cmd, jobid);
+	sprintf(line, "%s %d", cluster_remove_cmd, jobid);
 	system(line);
 
 	return 1;
