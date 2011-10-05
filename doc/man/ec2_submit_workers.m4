@@ -5,18 +5,18 @@ SECTION(NAME)
 BOLD(ec2_submit_workers) - submit and run work_queue_worker on the Amazon EC2 service.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(ec2_submit_workers [options] PARAM(servername) PARAM(port) PARAM(ec2-key-name) PARAM(ec2-key-file) PARAM(num-workers)))
+CODE(BOLD(ec2_submit_workers [options] PARAM(servername) PARAM(port) PARAM(EC2-key-name) PARAM(EC2-key-file) PARAM(num-workers)))
 
 SECTION(DESCRIPTION)
 CODE(ec2_submit_workers) submits and runs MANPAGE(work_queue_worker,1) on the Amazon EC2 service. 
-It calls ec2-run-instances and ec2-describe-instances that are part of the EC2 API tools to 
-create ec2 instances and run work_queue_worker on them. The number of ec2 instances created is
+It calls EC2-run-instances and EC2-describe-instances that are part of the EC2 API tools to 
+create EC2 instances and run work_queue_worker on them. The number of EC2 instances created is
 given by the BOLD(num-workers) argument since each instance runs one work_queue_worker.
 
 The BOLD(servername) and BOLD(port) arguments specify the hostname and port number of the master 
 for the work_queue_worker to connect. These two arguments become optional when the auto mode 
-option is specified for work_queue_worker. The BOLD(ec2-key-name) argument specifies the name of the
-key to use in authenticating to the EC2 service. The BOLD(ec2-key-file) gives the path of the file
+option is specified for work_queue_worker. The BOLD(EC2-key-name) argument specifies the name of the
+key to use in authenticating to the EC2 service. The BOLD(EC2-key-file) gives the path of the file
 containing the (private) key.  
 
 SECTION(OPTIONS)
@@ -28,7 +28,7 @@ OPTION_PAIR(-C, catalog)Set catalog server for work_queue_worker to <catalog>. <
 OPTION_PAIR(-t, seconds)Abort work_queue_worker after this amount of idle time (default=900s).
 OPTION_PAIR(-i, image_id)EC2 OS image ID. Default = ami-fa01f193 (Ubuntu 10.04 x86_64).
 OPTION_PAIR(-z, instance_size)EC2 instance size. Default = m1.large.
-OPTION_PAIR(-p, parameters)ec2-run-instances parameters.
+OPTION_PAIR(-p, parameters)EC2-run-instances parameters.
 OPTION_ITEM(-h)Show help message.
 OPTIONS_END
 
