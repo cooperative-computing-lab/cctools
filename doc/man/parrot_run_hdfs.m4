@@ -44,6 +44,10 @@ in either read (O_RDONLY) or write mode (O_WRONLY), and not both (O_RDWR).
 PARA
 For complete details with examples, see the LINK(Parrot User's Manual,http://www.nd.edu/~ccl/software/manuals/parrot.html)
 
+SECTION(OPTIONS)
+PARA
+See MANPAGE(parrot_run,1) for option listing.
+
 SECTION(EXIT STATUS)
 CODE(parrot_run_hdfs) returns the exit status of the process that it runs.
 If CODE(parrot_run_hdfs) is unable to start the process, it will return non-zero.
