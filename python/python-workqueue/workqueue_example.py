@@ -46,10 +46,9 @@ for i in range(5):
     print task.command, task.algorithm
 
     task.specify_input_buffer('hello from %d' % i, ifile, cache=False)
-    task.specify_output_file(ofile, ofile)
+    task.specify_output_file(ofile)
 
     outputs.append(ofile)
-
     wq.submit(task)
 
 if wq.empty():
@@ -67,6 +66,7 @@ map(os.unlink, outputs)
 
 for i in range(5):
     task = Task('hostname && date +%s.%N')
+    task.specify_input_file('/bin/hostname')
     wq.submit(task)
 
 if wq.hungry():

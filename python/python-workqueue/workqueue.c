@@ -11,6 +11,8 @@ See the file LICENSE for details.
 #include "debug.h"
 
 #include <errno.h>
+#include <libgen.h>
+#include <limits.h>
 #include <time.h>
 #include <string.h>
 
@@ -134,13 +136,16 @@ Task_specify_input_buffer(Task *self, PyObject *args, PyObject *kwds)
 static PyObject *
 Task_specify_file(Task *self, PyObject *args, PyObject *kwds, int type)
 {
-    char *kwlist[]  = { "local_name", "remote_name", "cache", NULL };
-    PyObject *rname;
-    PyObject *lname;
+    char *kwlist[] = { "local_name", "remote_name", "cache", NULL };
+    PyObject *lobject = NULL;
+    PyObject *robject = NULL;
+    char *lname;
+    char *rname;
+    char buffer[PATH_MAX];
     int cache = TRUE;
     int flags = 0;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|i", kwlist, &PyString_Type, &lname, &PyString_Type, &rname, &cache))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|O!i", kwlist, &PyString_Type, &lobject, &PyString_Type, &robject, &cache))
 	return NULL;
 
     if (cache)
@@ -148,7 +153,16 @@ Task_specify_file(Task *self, PyObject *args, PyObject *kwds, int type)
     else
     	flags = WORK_QUEUE_NOCACHE;
 
-    work_queue_task_specify_file(self->tp, PyString_AsString(lname), PyString_AsString(rname), type, flags);
+    lname = PyString_AsString(lobject);
+
+    if (robject == NULL) {
+	strncpy(buffer, PyString_AsString(lobject), PATH_MAX);
+	rname = basename(buffer);
+    } else {
+	rname = PyString_AsString(robject);
+    }
+	
+    work_queue_task_specify_file(self->tp, lname, rname, type, flags);
     Py_RETURN_NONE;
 }
 
