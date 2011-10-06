@@ -1,0 +1,61 @@
+include(manual.h)dnl
+HEADER(chirp_put)
+
+SECTION(NAME)
+BOLD(chirp_put) - copy a single file from local machine to a Chirp server
+
+SECTION(SYNOPSIS)
+CODE(BOLD(chirp_put [options] PARAM(localfile) PARAM(hostname[:port]) PARAM(remotefile)))
+
+SECTION(DESCRIPTION)
+
+BOLD(chirp_put) is a tool for copying a single file from local storage to a Chirp server.
+PARA
+BOLD(chirp_put) is a quick and simple way to copy a single local file PARAM(localfile) to a remote file given PARAM(hostname[:port]) PARAM(path)
+
+SECTION(OPTIONS)
+
+OPTIONS_BEGIN
+OPTION_PAIR(-a,mode) Require this authentication mode.
+OPTION_PAIR(-d,subsystem) Enable debugging for this subsystem.
+OPTION_PAIR(-b,size) Set transfer buffer size. (default is 65536 bytes).
+OPTION_PAIR(-t,time) Timeout for failure. (default is 3600s)
+OPTION_ITEM(-f) Follow input file like tail -f.
+OPTION_ITEM(-v) Show program version.
+OPTION_ITEM(-h) Show help text.
+OPTIONS_END
+
+SECTION(ENVIRONMENT VARIABLES)
+List any environment variables used or set in this section.
+
+SECTION(EXIT STATUS)
+On success, returns zero.  On failure, returns non-zero.
+
+SECTION(EXAMPLES)
+
+To copy a single local file using BOLD(chirp_put):
+
+LONGCODE_BEGIN
+chirp_put /tmp/mydata.dat server1.somewhere.edu /mydata/mydata.dat
+LONGCODE_END
+
+When copying big data files that take longer than 3600s to copy, using BOLD(chirp_put) with option -t time to make sure BOLD(chirp_put) have enough time to finish:
+
+LONGCODE_BEGIN
+chirp_put -t 36000 /tmp/mybigdata.dat server1.somewhere.edu /mydata/mybigdata.dat
+LONGCODE_END
+
+
+SECTION(COPYRIGHT)
+
+COPYRIGHT_BOILERPLATE
+
+SECTION(SEE ALSO)
+MANPAGE(chirp_get)
+
+LIST_BEGIN
+LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
+LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
+LIST_ITEM MANPAGE(parrot_run,1)
+LIST_ITEM MANPAGE(makeflow,1)
+LIST_END
