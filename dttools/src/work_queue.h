@@ -133,7 +133,8 @@ struct work_queue_task *work_queue_task_create(const char *full_command);
 - WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
 - WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
 @param flags May be zero to indicate no special handling, or any of the following or'd together:
-- WORK_QUEUE_CACHEABLE - The file may be cached at the execution site for later use.
+- WORK_QUEUE_NOCACHE - The file may not be cached at the execution site for later use.
+- WORK_QUEUE_CACHE - The file may be cached at the execution site for later use.
 - WORK_QUEUE_SYMLINK - Create a symlink to the file rather than copying it, if possible.
 - WORK_QUEUE_THIRDGET - Access the file on the client from a shared filesystem.
 - WORK_QUEUE_THIRDPUT - Access the file on the client from a shared filesystem (included for readability).
@@ -157,7 +158,8 @@ void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data,
 - WORK_QUEUE_INPUT to indicate this creates an input file to be consumed by the task
 - WORK_QUEUE_OUTPUT to indicate this handles an output file to be produced by the task
 @param flags May be zero to indicate no special handling, or any of the following or'd together:
-- WORK_QUEUE_CACHEABLE - The file may be cached at the execution site for later use.
+- WORK_QUEUE_NOCACHE - The file may not be cached at the execution site for later use.
+- WORK_QUEUE_CACHE - The file may be cached at the execution site for later use.
 */
 void work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags);
 
