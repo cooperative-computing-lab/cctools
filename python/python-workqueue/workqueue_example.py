@@ -9,6 +9,7 @@
 from workqueue import Task, WorkQueue, set_debug_flag
 from workqueue import WORK_QUEUE_SCHEDULE_FCFS, WORK_QUEUE_SCHEDULE_FILES
 from workqueue import WORK_QUEUE_RANDOM_PORT
+from workqueue import WORK_QUEUE_OUTPUT
 #from workqueue import WORK_QUEUE_MASTER_MODE_STANDALONE, WORK_QUEUE_WORKER_MODE_SHARED
 
 import os
@@ -46,7 +47,10 @@ for i in range(5):
     print task.command, task.algorithm
 
     task.specify_input_buffer('hello from %d' % i, ifile, cache=False)
-    task.specify_output_file(ofile)
+    if i % 2:
+	task.specify_output_file(ofile, cache=False)
+    else:
+	task.specify_file(ofile, type=WORK_QUEUE_OUTPUT, cache=False)
 
     outputs.append(ofile)
     wq.submit(task)

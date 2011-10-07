@@ -115,19 +115,19 @@ Task_specify_tag(Task *self, PyObject *args, PyObject *kwds)
 static PyObject *
 Task_specify_input_buffer(Task *self, PyObject *args, PyObject *kwds)
 {
-    char *kwlist[]  = { "buffer", "remote_name", "cache", NULL };
+    char *kwlist[]  = { "buffer", "remote_name", "flags", "cache", NULL };
     PyObject *buffer;
     PyObject *rname;
     int cache = TRUE;
     int flags = 0;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|i", kwlist, &PyString_Type, &buffer, &PyString_Type, &rname, &cache))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|ii", kwlist, &PyString_Type, &buffer, &PyString_Type, &rname, &flags, &cache))
 	return NULL;
     
     if (cache)
-    	flags = WORK_QUEUE_CACHE;
+    	flags |= WORK_QUEUE_CACHE;
     else
-    	flags = WORK_QUEUE_NOCACHE;
+    	flags |= WORK_QUEUE_NOCACHE;
 
     work_queue_task_specify_buffer(self->tp, PyString_AsString(buffer), PyString_Size(buffer), PyString_AsString(rname), flags);
     Py_RETURN_NONE;
@@ -136,7 +136,7 @@ Task_specify_input_buffer(Task *self, PyObject *args, PyObject *kwds)
 static PyObject *
 Task_specify_file(Task *self, PyObject *args, PyObject *kwds)
 {
-    char *kwlist[] = { "local_name", "remote_name", "type", "cache", NULL };
+    char *kwlist[] = { "local_name", "remote_name", "type", "flags", "cache", NULL };
     PyObject *lobject = NULL;
     PyObject *robject = NULL;
     char *lname;
@@ -146,13 +146,13 @@ Task_specify_file(Task *self, PyObject *args, PyObject *kwds)
     int flags = 0;
     int type  = WORK_QUEUE_INPUT;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|O!ii", kwlist, &PyString_Type, &lobject, &PyString_Type, &robject, &type, &cache))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|O!iii", kwlist, &PyString_Type, &lobject, &PyString_Type, &robject, &type, &flags, &cache))
 	return NULL;
 
     if (cache)
-    	flags = WORK_QUEUE_CACHE;
+    	flags |= WORK_QUEUE_CACHE;
     else
-    	flags = WORK_QUEUE_NOCACHE;
+    	flags |= WORK_QUEUE_NOCACHE;
 
     lname = PyString_AsString(lobject);
 
