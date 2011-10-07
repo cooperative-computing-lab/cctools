@@ -86,7 +86,10 @@ OPTION_ITEM(-v) Show program version.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)
-List any environment variables used or set in this section.
+
+LIST_BEGIN
+LIST_ITEM()CODE(BOLD(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).
+LIST_END
 
 SECTION(EXIT STATUS)
 On success, returns zero.  On failure, returns non-zero.
