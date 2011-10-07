@@ -48,6 +48,13 @@ SECTION(OPTIONS)
 PARA
 See MANPAGE(parrot_run,1) for option listing.
 
+SECTION(ENVIRONMENT VARIABLES)
+
+LIST_BEGIN
+LIST_ITEM()CODE(BOLD(JAVA_HOME)) Location of your Java installation.
+LIST_ITEM()CODE(BOLD(HADOOP_HOME)) Location of your Hadoop installation.
+LIST_END
+
 SECTION(EXIT STATUS)
 CODE(parrot_run_hdfs) returns the exit status of the process that it runs.
 If CODE(parrot_run_hdfs) is unable to start the process, it will return non-zero.
@@ -61,7 +68,7 @@ LONGCODE_END
 You can also run an entire shell inside of Parrot, like this:
 LONGCODE_BEGIN
 parrot_run_hdfs bash
-cd /hdfs
+cd /hdfs/server:port/
 ls -la
 cat foo
 LONGCODE_END
