@@ -14,63 +14,44 @@ PARA
 BOLD(chirp) allows connecting to a Chirp server, copying files, and managing directories, auditing node etc...
 PARA
 Here are some important  BOLD(chirp) commands:
-
-
+PARA
 BOLD(open) PARAM(host) Connect to a Chirp server.
-
-
+PARA
 BOLD(close) Close connection to current Chirp server.  
-
-
+PARA
 BOLD(get) PARAM(remotefile) [localfile] Copy a remote file to local storage.
-
-
+PARA
 BOLD(put) PARAM(localfile) [remotefile] Copy a local file to Chirp server.
-
-
+PARA
 BOLD(thirdput) PARAM(file) PARAM(3rdhost) PARAM(3rdfile) Copy a remote file to another Chirp server.
-
-
+PARA
 BOLD(getacl) PARAM(remotepath) Get acl of a remote file/directory.
-
-
+PARA
 BOLD(setacl) PARAM(remotepath) PARAM(user) PARAM(rwldax) Set acl for a remote file/directory.
-
-
+PARA
 BOLD(ls) [-la] [remotepath] List contents of a remote directory.
-
-
+PARA
 BOLD(mv) PARAM(oldname) PARAM(newname) Change name of a remote file.
-
-
+PARA
 BOLD(rm) PARAM(file) Delete a remote file.
-
-
+PARA
 BOLD(audit)	[-r] Audit current Chirp server.
-
-
+PARA
 BOLD(exit) Close connection and exit BOLD(Chirp).
-
-
+PARA
 PARA
 BOLD(chirp) also manage Chirp tickets for authentication purpose.
-
-
+PARA
 BOLD(ticket_create) [-o[utput] PARAM(ticket filename)] [-s[ubject] PARAM(subject/user)] [-d[uration] PARAM(duration)] [-b[its] <bits>] [[PARAM(directory) PARAM(acl)] ...] Creat a ticket
-
-
+PARA
 BOLD(ticket_register) PARAM(name) [PARAM(subject)] PARAM(duration) Manually register a ticket with multiple Chirp severs.
-
-
+PARA
 BOLD(ticket_delete) PARAM(name) Remove a ticket.
-
-
+PARA
 BOLD(ticket_list) PARAM(name) List registered tickets on a Chirp server.
-
-
+PARA
 BOLD(ticket_get) PARAM(name) Check status of a ticket.
-
-
+PARA
 BOLD(ticket_modify) PARAM(name) PARAM(directory) PARAM(aclmask) Modify a ticket.
 
 SECTION(OPTIONS)
