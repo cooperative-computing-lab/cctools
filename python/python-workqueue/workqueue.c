@@ -127,7 +127,7 @@ Task_specify_input_buffer(Task *self, PyObject *args, PyObject *kwds)
     if (cache)
     	flags |= WORK_QUEUE_CACHE;
     else
-    	flags |= WORK_QUEUE_NOCACHE;
+    	flags &= ~WORK_QUEUE_CACHE;
 
     work_queue_task_specify_buffer(self->tp, PyString_AsString(buffer), PyString_Size(buffer), PyString_AsString(rname), flags);
     Py_RETURN_NONE;
@@ -152,7 +152,7 @@ Task_specify_file(Task *self, PyObject *args, PyObject *kwds)
     if (cache)
     	flags |= WORK_QUEUE_CACHE;
     else
-    	flags |= WORK_QUEUE_NOCACHE;
+    	flags &= ~WORK_QUEUE_CACHE;
 
     lname = PyString_AsString(lobject);
 
