@@ -134,9 +134,9 @@ Task_specify_input_buffer(Task *self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-Task_specify_file(Task *self, PyObject *args, PyObject *kwds, int type)
+Task_specify_file(Task *self, PyObject *args, PyObject *kwds)
 {
-    char *kwlist[] = { "local_name", "remote_name", "cache", NULL };
+    char *kwlist[] = { "local_name", "remote_name", "type", "cache", NULL };
     PyObject *lobject = NULL;
     PyObject *robject = NULL;
     char *lname;
@@ -144,8 +144,9 @@ Task_specify_file(Task *self, PyObject *args, PyObject *kwds, int type)
     char buffer[PATH_MAX];
     int cache = TRUE;
     int flags = 0;
+    int type  = WORK_QUEUE_INPUT;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|O!i", kwlist, &PyString_Type, &lobject, &PyString_Type, &robject, &cache))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|O!ii", kwlist, &PyString_Type, &lobject, &PyString_Type, &robject, &type, &cache))
 	return NULL;
 
     if (cache)
@@ -169,13 +170,21 @@ Task_specify_file(Task *self, PyObject *args, PyObject *kwds, int type)
 static PyObject *
 Task_specify_input_file(Task *self, PyObject *args, PyObject *kwds)
 {
-    return Task_specify_file(self, args, kwds, WORK_QUEUE_INPUT);
+    if (kwds == NULL)
+    	kwds = PyDict_New();
+
+    PyDict_SetItemString(kwds, "type", PyLong_FromLong(WORK_QUEUE_INPUT));
+    return Task_specify_file(self, args, kwds);
 }
 
 static PyObject *
 Task_specify_output_file(Task *self, PyObject *args, PyObject *kwds)
 {
-    return Task_specify_file(self, args, kwds, WORK_QUEUE_OUTPUT);
+    if (kwds == NULL)
+    	kwds = PyDict_New();
+	
+    PyDict_SetItemString(kwds, "type", PyLong_FromLong(WORK_QUEUE_OUTPUT));
+    return Task_specify_file(self, args, kwds);
 }
 
 static PyObject *
@@ -356,6 +365,7 @@ static PyMemberDef TaskMembers[] = {
 
 static PyMethodDef TaskMethods[] = {
     TASK_METHOD(specify_algorithm),
+    TASK_METHOD(specify_file),
     TASK_METHOD(specify_input_buffer),
     TASK_METHOD(specify_input_file),
     TASK_METHOD(specify_output_file),
