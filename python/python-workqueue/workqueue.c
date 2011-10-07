@@ -886,10 +886,13 @@ initworkqueue(void)
     PyModule_AddIntConstant(m, "WORK_QUEUE_RESULT_OUTPUT_MISSING", WORK_QUEUE_RESULT_OUTPUT_MISSING);
     PyModule_AddIntConstant(m, "WORK_QUEUE_RESULT_LINK_FAIL",	   WORK_QUEUE_RESULT_LINK_FAIL);
 
-    PyModule_AddIntConstant(m, "WORK_QUEUE_INPUT",   WORK_QUEUE_INPUT);
-    PyModule_AddIntConstant(m, "WORK_QUEUE_OUTPUT",  WORK_QUEUE_OUTPUT);
-    PyModule_AddIntConstant(m, "WORK_QUEUE_NOCACHE", WORK_QUEUE_NOCACHE);
-    PyModule_AddIntConstant(m, "WORK_QUEUE_CACHE",   WORK_QUEUE_CACHE);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_INPUT",    WORK_QUEUE_INPUT);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_OUTPUT",   WORK_QUEUE_OUTPUT);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_NOCACHE",  WORK_QUEUE_NOCACHE);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_CACHE",    WORK_QUEUE_CACHE);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_SYMLINK",  WORK_QUEUE_SYMLINK);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_THIRDGET", WORK_QUEUE_THIRDGET);
+    PyModule_AddIntConstant(m, "WORK_QUEUE_THIRDPUT", WORK_QUEUE_THIRDPUT);
     
     PyModule_AddIntConstant(m, "WORK_QUEUE_MASTER_MODE_STANDALONE", WORK_QUEUE_MASTER_MODE_STANDALONE);
     PyModule_AddIntConstant(m, "WORK_QUEUE_MASTER_MODE_CATALOG",    WORK_QUEUE_MASTER_MODE_CATALOG);
