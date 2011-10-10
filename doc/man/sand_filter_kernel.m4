@@ -29,10 +29,10 @@ the size dynamically by passing in d rather than a number.
 OPTION_PAIR(-r,file)A meryl file of repeat mers to be ignored.
 OPTION_PAIR(-k,size)The k-mer size to use in candidate selection (default is 22).
 OPTION_PAIR(-w,number)The minimizer window size to use in candidate selection (default is 22).
-OPTION_PAIR(o,filename)The output file. Default is stdout.
+OPTION_PAIR(-o,filename)The output file. Default is stdout.
 OPTION_PAIR(-d,subsystem)Enable debug messages for this subsystem.  Try BOLD(-d all) to start.
-OPTION_PAIR(-v)Show version string.
-OPTION_PAIR(-h)Show help screen.
+OPTION_ITEM(-v)Show version string.
+OPTION_ITEM(-h)Show help screen.
 OPTIONS_END
 
 SECTION(EXIT STATUS)
@@ -52,14 +52,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(SAND User Manual,"http://www.nd.edu/~ccl/software/manuals/sand.html")
-LIST_ITEM LINK(Work Queue User Manual,"http://www.nd.edu/~ccl/software/manuals/workqueue.html")
-LIST_ITEM MANPAGE(sand_filter_master,1)
-LIST_ITEM MANPAGE(sand_filter_kernel,1)
-LIST_ITEM MANPAGE(sand_align_master,1)
-LIST_ITEM MANPAGE(sand_align_kernel,1)
-LIST_ITEM MANPAGE(sand_compress_reads,1)
-LIST_ITEM MANPAGE(sand_uncompress_reads,1)
-LIST_END
+SEE_ALSO_SAND

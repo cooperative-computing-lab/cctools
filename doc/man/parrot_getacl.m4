@@ -20,16 +20,13 @@ On success, returns zero.  On failure, returns non-zero.
 
 SECTION(EXAMPLES)
 Get ACL for BOLD(Chirp) directory:
+
 LONGCODE_BEGIN
-parrot_run parrot_getacl /chirp/student00.cse.nd.edu/
+% parrot_run parrot_getacl /chirp/student00.cse.nd.edu/
 LONGCODE_END
 
 SECTION(COPYRIGHT)
 COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
-LIST_BEGIN
-LIST_ITEM()LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM()LINK(Parrot Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
-LIST_ITEM()MANPAGE(parrot_run,1)
-LIST_END
+SEE_ALSO_PARROT

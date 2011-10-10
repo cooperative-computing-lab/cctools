@@ -2,7 +2,7 @@ include(manual.h)dnl
 HEADER(work_queue_worker)
 
 SECTION(NAME) 
-BOLD(work_queue_worker) - worker framework for executing tasks
+BOLD(work_queue_worker) - worker process for executing tasks
 dispatched through Work Queue
 
 SECTION(SYNOPSIS)
@@ -10,7 +10,7 @@ CODE(BOLD(work_queue_worker [options] PARAM(masterhost) PARAM(port)))
 
 SECTION(DESCRIPTION)
 
-BOLD(work_queue_worker) is the worker framework for executing tasks dispatched
+BOLD(work_queue_worker) is the worker process for executing tasks dispatched
 from a master application built using the BOLD(Work Queue) API. BOLD(work_queue_worker) 
 connects to the master application, accepts, runs, and returns tasks dispatched to it. 
 
@@ -46,11 +46,16 @@ SECTION(EXIT STATUS)
 On success, returns zero.  On failure, returns non-zero.
 
 SECTION(EXAMPLES)
-To run BOLD(work_queue_worker) in auto mode with debugging turned on for all subsystems and
-to accept tasks only from a master application with project name set to project_A and connect 
-to this master on xyz.abc.edu on port 9500:
+
+To run BOLD(work_queue_worker) to join a specific master process running on host CODE(master.somewhere.edu) port 9123:
 LONGCODE_BEGIN
-./work_queue_worker -d all -N project_A xyz.abc.edu 9500
+% work_queue_worker master.somewhere.edu 9123
+LONGCODE_END
+
+To run BOLD(work_queue_worker) in auto mode with debugging turned on for all subsystems and
+to accept tasks only from a master application with project name set to project_A:
+LONGCODE_BEGIN
+% work_queue_worker -a -d all -N project_A 
 LONGCODE_END
 
 SECTION(COPYRIGHT)
@@ -59,6 +64,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM()LINK(Work Queue User Manual,"http://www.cse.nd.edu/~ccl/software/manuals/workqueue.html")
-LIST_END
+SEE_ALSO_WORK_QUEUE

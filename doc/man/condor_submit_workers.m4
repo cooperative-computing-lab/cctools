@@ -32,11 +32,22 @@ SECTION(EXIT STATUS)
 On success, returns zero. On failure, returns non-zero.
 
 SECTION(EXAMPLES)
+
+Submit 10 worker instances to run on Condor and connect to a specific master:
+
+LONGCODE_BEGIN
+condor_submit_workers master.somewhere.edu 9123 10
+LONGCODE_END
+
 Submit 10 work_queue_worker instances to run on Condor in auto mode with their
 preferred project name set to Project_A and abort timeout set to 3600 seconds:
+
 LONGCODE_BEGIN
 condor_submit_workers -a -t 3600 -N Project_A 10
 LONGCODE_END
 
 SECTION(COPYRIGHT)
 COPYRIGHT_BOILERPLATE
+
+SECTION(SEE ALSO)
+SEE_ALSO_WORK_QUEUE

@@ -66,26 +66,20 @@ On success, returns zero.  On failure, returns non-zero.
 
 SECTION(EXAMPLES)
 
-To start a Chirp server with a root directory:
+To start a Chirp server with a local root directory:
 
 LONGCODE_BEGIN
-chirp_server -r file:///tmp/foo
+% chirp_server -r file:///tmp/foo
 LONGCODE_END
 
 Setting various authentication modes:
 
 LONGCODE_BEGIN
-chirp_server -a hostname -a unix -a ticket -r file:///tmp/foo
+% chirp_server -a hostname -a unix -a ticket -r file:///tmp/foo
 LONGCODE_END
 
 SECTION(COPYRIGHT)
-
 COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
-
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Chirp User Manual,"http://www.nd.edu/~ccl/software/manuals/chirp.html")
-LIST_ITEM MANPAGE(chirp_server_hdfs,1),MANPAGE(chirp,1)
-LIST_END
+SEE_ALSO_CHIRP

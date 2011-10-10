@@ -17,10 +17,10 @@ define(HALFTAB,SPACE()SPACE()SPACE()SPACE())
 define(TAB,HALFTAB()HALFTAB())
 define(PARAM,<i>&lt;$1&gt;</i>)
 
-define(OPTIONS_BEGIN,<dir>)
-define(OPTION_ITEM,<li> BOLD(CODE($1))TAB()HALFTAB())
-define(OPTION_PAIR,<li> BOLD(CODE($1)) PARAM($2)<br/>TAB()TAB())
-define(OPTIONS_END,</dir>)
+define(OPTIONS_BEGIN,<table>)dnl
+define(OPTION_ITEM,<tr><td> BOLD(CODE($1)) <td>)dnl
+define(OPTION_PAIR,<tr><td colspan=2> BOLD(CODE($1 PARAM($2)))<tr><td><td>)dnl
+define(OPTIONS_END,</table>)dnl
 
 define(LONGCODE_BEGIN,<pre>)
 define(LONGCODE_END,</pre>)

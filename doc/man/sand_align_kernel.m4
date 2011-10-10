@@ -55,14 +55,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(SAND User Manual,"http://www.nd.edu/~ccl/software/manuals/sand.html")
-LIST_ITEM LINK(Work Queue User Manual,"http://www.nd.edu/~ccl/software/manuals/workqueue.html")
-LIST_ITEM MANPAGE(sand_filter_master,1)
-LIST_ITEM MANPAGE(sand_filter_kernel,1)
-LIST_ITEM MANPAGE(sand_align_master,1)
-LIST_ITEM MANPAGE(sand_align_kernel,1)
-LIST_ITEM MANPAGE(sand_compress_reads,1)
-LIST_ITEM MANPAGE(sand_uncompress_reads,1)
-LIST_END
+SEE_ALSO_SAND

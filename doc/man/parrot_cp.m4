@@ -37,16 +37,18 @@ SECTION(EXAMPLES)
 To use parrot_cp you can either call the code directly:
 
 LONGCODE_BEGIN
-parrot_run tcsh
+% parrot_run tcsh
 % parrot_cp /tmp/mydata /chirp/server.nd.edu/joe/data
+% exit
 LONGCODE_END
 
 or alias calls to CODE(cp) with calls to CODE(parrot_cp):
 
 LONGCODE_BEGIN
-parrot_run bash
+% parrot_run bash
 % alias cp parrot_cp
 % cp -r /chirp/server.nd.edu/joe /tmp/joe
+% exit
 LONGCODE_END
 
 
@@ -56,9 +58,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
-LIST_ITEM MANPAGE(parrot_cp,1)
-LIST_ITEM MANPAGE(parrot_run,1)
-LIST_END
+SEE_ALSO_PARROT

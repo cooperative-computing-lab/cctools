@@ -26,16 +26,17 @@ SECTION(EXAMPLES)
 
 To get the user's credentials when accessing a remote chirp server:
 LONGCODE_BEGIN
-parrot_run parrot_whoami /chirp/server.nd.edu/joe_data/data
-	unix:joe
+% parrot_run parrot_whoami /chirp/server.nd.edu/joe_data/data
+unix:joe
 LONGCODE_END
 
 If you're working within a remote directory, PARAM(path) is not necessary:
 LONGCODE_BEGIN
-parrot_run tcsh
-% cd /multi/server.nd.edu@joes_data/
+% parrot_run tcsh
+% cd /chirp/server.nd.edu/joe_data/data
 % parrot_whoami
-	unix:joe
+unix:joe
+% exit
 LONGCODE_END
 
 SECTION(COPYRIGHT)
@@ -44,9 +45,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
-LIST_ITEM MANPAGE(parrot_whoami,1)
-LIST_ITEM MANPAGE(parrot_run,1)
-LIST_END
+SEE_ALSO_PARROT

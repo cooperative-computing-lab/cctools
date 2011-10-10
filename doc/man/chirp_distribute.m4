@@ -2,17 +2,17 @@ include(manual.h)dnl
 HEADER(chirp_stream_files)
 
 SECTION(NAME)
-BOLD(chirp_distributed) - copy a directory from one Chirp server to one or more Chirp server(s).
+BOLD(chirp_distribute) - copy a directory from one Chirp server to one or more Chirp server(s).
 
 SECTION(SYNOPSIS)
-CODE(BOLD(chirp_distributed [options] PARAM(sourcehost) PARAM(sourcepath) PARAM(host1) PARAM(host2) PARAM(host3) ...))
+CODE(BOLD(chirp_distribute [options] PARAM(sourcehost) PARAM(sourcepath) PARAM(host1) PARAM(host2) PARAM(host3) ...))
 
 SECTION(DESCRIPTION)
-BOLD(chirp_distributed) is a tool for coping commonly used data across Chirp servers. Data is originated from a Chirp server PARAM(sourcehost) PARAM(sourcepath) and is copied to a given list of Chirp server(s) PARAM(host1) PARAM(host2) PARAM(host3), etc ...
+BOLD(chirp_distribute) is a tool for coping commonly used data across Chirp servers. Data is originated from a Chirp server PARAM(sourcehost) PARAM(sourcepath) and is copied to a given list of Chirp server(s) PARAM(host1) PARAM(host2) PARAM(host3), etc ...
 PARA
-BOLD(chirp_distributed) is a quick and simple way for replicating a directory from a Chirp server to many Chirp Servers by creating a spanning tree and then transferring data concurrently from host to host using third party transfer. It is faster than manually copying data using BOLD(parrot cp), BOLD(chirp_put) or BOLD(chirp_third_put)
+BOLD(chirp_distribute) is a quick and simple way for replicating a directory from a Chirp server to many Chirp Servers by creating a spanning tree and then transferring data concurrently from host to host using third party transfer. It is faster than manually copying data using BOLD(parrot cp), BOLD(chirp_put) or BOLD(chirp_third_put)
 PARA
-BOLD(chirp_distributed) also can clean up replicated data using -X option.
+BOLD(chirp_distribute) also can clean up replicated data using -X option.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
@@ -41,25 +41,25 @@ SECTION(EXIT STATUS)
 On success, returns zero.  On failure, returns non-zero.
 
 SECTION(EXAMPLES)
-To copy a directory from server1 to server2, server3, server4 using BOLD(chirp_distributed):
+To copy a directory from server1 to server2, server3, server4 using BOLD(chirp_distribute):
 LONGCODE_BEGIN
-chirp_distributed server1.somewhere.edu /mydata server2.somewhere.edu server3.somewhere.edu server4.somewhere.edu
+chirp_distribute server1.somewhere.edu /mydata server2.somewhere.edu server3.somewhere.edu server4.somewhere.edu
 LONGCODE_END
 
-To replicate a directory from server1 to  all available Chirp server(s) in Chirp catalog using BOLD(chirp_distributed) and BOLD(chirp_status):
+To replicate a directory from server1 to  all available Chirp server(s) in Chirp catalog using BOLD(chirp_distribute) and BOLD(chirp_status):
 changequote(<!,!>)
 LONGCODE_BEGIN
-chirp_distributed server1.somewhere.edu /mydata \`chirp_status -s\`
+chirp_distribute server1.somewhere.edu /mydata \`chirp_status -s\`
 LONGCODE_END
 
-To replicate a directory from server1 to  all available Chirp server(s) in Chirp catalog using BOLD(chirp_distributed) and BOLD(chirp_status). However stop when reach 100 copies with -N option:
+To replicate a directory from server1 to  all available Chirp server(s) in Chirp catalog using BOLD(chirp_distribute) and BOLD(chirp_status). However stop when reach 100 copies with -N option:
 LONGCODE_BEGIN
-chirp_distributed -N 100 server1.somewhere.edu /mydata \`chirp_status -s\`
+chirp_distribute -N 100 server1.somewhere.edu /mydata \`chirp_status -s\`
 LONGCODE_END
 
-To clean up replicated data using BOLD(chirp_distributed) using -X option:
+To clean up replicated data using BOLD(chirp_distribute) using -X option:
 LONGCODE_BEGIN
-chirp_distributed -X server1.somewhere.edu /mydata \`chirp_status -s\`
+chirp_distribute -X server1.somewhere.edu /mydata \`chirp_status -s\`
 LONGCODE_END
 SECTION(COPYRIGHT)
 
@@ -67,9 +67,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
-LIST_ITEM MANPAGE(parrot_run,1)
-LIST_ITEM MANPAGE(makeflow,1)
-LIST_END
+SEE_ALSO_CHIRP

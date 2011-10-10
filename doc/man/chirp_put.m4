@@ -39,13 +39,13 @@ SECTION(EXAMPLES)
 To copy a single local file using BOLD(chirp_put):
 
 LONGCODE_BEGIN
-chirp_put /tmp/mydata.dat server1.somewhere.edu /mydata/mydata.dat
+% chirp_put /tmp/mydata.dat server1.somewhere.edu /mydata/mydata.dat
 LONGCODE_END
 
 When copying big data files that take longer than 3600s to copy, using BOLD(chirp_put) with option -t time to make sure BOLD(chirp_put) have enough time to finish:
 
 LONGCODE_BEGIN
-chirp_put -t 36000 /tmp/mybigdata.dat server1.somewhere.edu /mydata/mybigdata.dat
+% chirp_put -t 36000 /tmp/mybigdata.dat server1.somewhere.edu /mydata/mybigdata.dat
 LONGCODE_END
 
 
@@ -54,11 +54,5 @@ SECTION(COPYRIGHT)
 COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
-MANPAGE(chirp_get)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
-LIST_ITEM MANPAGE(parrot_run,1)
-LIST_ITEM MANPAGE(makeflow,1)
-LIST_END
+SEE_ALSO_CHIRP

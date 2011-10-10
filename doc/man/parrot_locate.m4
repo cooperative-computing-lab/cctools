@@ -37,14 +37,14 @@ SECTION(EXAMPLES)
 To check the location of a file stored in chirp:
 
 LONGCODE_BEGIN
-parrot_run parrot_locate /chirp/server.nd.edu/joe/data
+% parrot_run parrot_locate /chirp/server.nd.edu/joe/data
 	server.nd.edu:/chirp/server.nd.edu/joe/data
 LONGCODE_END
 
 or a file stored in a chirp multi-volume
 
 LONGCODE_BEGIN
-parrot_run parrot_locate /multi/server.nd.edu@multivol/data
+% parrot_run parrot_locate /multi/server.nd.edu@multivol/data
 	datastore01.nd.edu:multivol/data/ttmtteotsznxewoj
 LONGCODE_END
 
@@ -54,8 +54,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
-LIST_ITEM MANPAGE(parrot_locate,1)
-LIST_END
+SEE_ALSO_PARROT

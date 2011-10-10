@@ -8,7 +8,7 @@ PDFFILES = ${SOURCES:%.m4=%.pdf}
 MANFILES = ${SOURCES:%.m4=%.1}
 ZIPFILES = ${SOURCES:%.m4=%.1.gz}
 
-all: ${HTMLFILES} $(MANFILES) ${ZIPFILES}
+all: ${HTMLFILES} ${ZIPFILES}
 
 %.html: %.m4
 	m4 -DHTML -Imacros $< > $@
@@ -18,12 +18,6 @@ all: ${HTMLFILES} $(MANFILES) ${ZIPFILES}
 
 %.txt: %.1
 	nroff -man $< > $@
-
-%.ps: %.man
-	groff -man -Tps $< > $@
-
-%.pdf: %.ps
-	ps2pdf $< $@
 
 %.gz: %
 	gzip < $< > $@
@@ -39,4 +33,4 @@ install: all
 test:
 
 clean:
-	rm -f $(HTMLFILES) $(TXTFILES) $(MANFILES) $(PDFFILES) $(ZIPFILES) *~
+	rm -f $(HTMLFILES) $(MANFILES) $(ZIPFILES) *~

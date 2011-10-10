@@ -13,24 +13,21 @@ control list (ACL) information for the directory specified by PARAM(path).  The
 PARAM(subject) argument refers to the entity to authorize, while the
 PARAM(rights) argument is one of the following: read, write, admin, none.
 PARA
-Note, this program only works if it is executed under BOLD(Parrot) and if the
+Note, this program only works if it is executed under MANPAGE(parrot_run,1) and if the
 underlying filesystem supports ACLs.
 
 SECTION(EXIT STATUS)
 On success, returns zero.  On failure, returns non-zero.
 
 SECTION(EXAMPLES)
-Set read permissions for subject "unix:user" on a BOLD(Chirp) directory:
+Set read and list permissions for subject "unix:user" on a BOLD(Chirp) directory:
+
 LONGCODE_BEGIN
-parrot_run parrot_setacl /chirp/student00.cse.nd.edu/user unix:user read
+% parrot_run parrot_setacl /chirp/student00.cse.nd.edu/user unix:user rl
 LONGCODE_END
 
 SECTION(COPYRIGHT)
 COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
-LIST_BEGIN
-LIST_ITEM()LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM()LINK(Parrot Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
-LIST_ITEM()MANPAGE(parrot_run,1)
-LIST_END
+SEE_ALSO_PARROT

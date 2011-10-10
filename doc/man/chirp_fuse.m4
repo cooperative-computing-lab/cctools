@@ -53,11 +53,12 @@ SECTION(EXAMPLES)
 To create and use a CODE(FUSE) mount point for access to remote chirp servers:
 
 LONGCODE_BEGIN
-chirp_fuse /tmp/chirp-fuse &
-cd /tmp/chirp-fuse
-ls
-cd host:port
-cat foo/bar
+% chirp_fuse /tmp/chirp-fuse &
+% cd /tmp/chirp-fuse
+% ls
+% cd host:port
+% cat foo/bar
+% exit
 LONGCODE_END
 
 SECTION(COPYRIGHT)
@@ -66,8 +67,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Chirp User Manual,"http://www.nd.edu/~ccl/software/manuals/chirp.html")
-LIST_ITEM MANPAGE(chirp,1),MANPAGE(parrot_run,1),MANPAGE(fusermount,1)
-LIST_END
+SEE_ALSO_CHIRP

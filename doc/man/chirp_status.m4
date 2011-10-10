@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(chirp_status) - get current status of a one or more Chirp server(s)
 
 SECTION(SYNOPSIS)
-CODE(BOLD(chirp_status [options] PARAM(<nane> <value>)))
+CODE(BOLD(chirp_status [options] PARAM(nane) PARAM(value)))
 
 SECTION(DESCRIPTION)
 BOLD(chirp_status) is a tool for checking status of Chirp server(s).
@@ -44,31 +44,32 @@ SECTION(EXAMPLES)
 To show status of all available Chirp servers using BOLD(chirp_status):
 
 LONGCODE_BEGIN
-chirp_status server1.somewhere.edu
-LONGCODE_END
-or
-LONGCODE_BEGIN
-chirp_status name server1.somewhere.edu
+% chirp_status
 LONGCODE_END
 
-To show status of a particular Chirp servers BOLD(chirp_status):
+To show status of a particular Chirp server:
 
 LONGCODE_BEGIN
-chirp_status owner ownername
+% chirp_status server1.somewhere.edu
+LONGCODE_END
+
+To show all details of a single server:
+
+LONGCODE_BEGIN
+% chirp_status -l server1.somewhere.edu
 LONGCODE_END
 
 To show status of Chirp servers which belong to a particular owner using BOLD(chirp_status):
 
 LONGCODE_BEGIN
-chirp_status owner ownername
+% chirp_status owner ownername
 LONGCODE_END
 
 To show aggregate status of all Chirp servers using  BOLD(chirp_status):
 
 LONGCODE_BEGIN
-chirp_status -T
+% chirp_status -T
 LONGCODE_END
-
 
 SECTION(COPYRIGHT)
 
@@ -76,9 +77,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
-LIST_ITEM MANPAGE(parrot_run,1)
-LIST_ITEM MANPAGE(makeflow,1)
-LIST_END
+SEE_ALSO_CHIRP

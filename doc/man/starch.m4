@@ -13,7 +13,9 @@ BOLD(Starch) is a script that creates standalone application archives in the
 form of self-extracting executables (CODE(SFX)). Users may specify the command,
 executables, libraries, data, and environment scripts associated with the
 application by specifying the appropriate command line options or by using a
-configuration file and passing it to CODE(starch).
+configuration file.  BOLD(starch) is particularly useful for distributed
+computing, in that it makes an executable portable across different
+operating system variants.
 
 SECTION(OPTIONS)
 
@@ -127,7 +129,5 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM()LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM()LINK(Starch Source Repository,"http://bitbucket.org/pbui/starch")
-LIST_END
+SEE_ALSO_MAKEFLOW
+

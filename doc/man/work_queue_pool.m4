@@ -95,11 +95,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Work Queue User Manual,"http://www.nd.edu/~ccl/software/manuals/workqueue.html")
-LIST_ITEM MANPAGE(work_queue_worker,1)
-LIST_ITEM MANPAGE(condor_submit_workers,1)
-LIST_ITEM MANPAGE(sge_submit_workers,1)
-LIST_ITEM MANPAGE(makeflow,1)
-LIST_END
+SEE_ALSO_WORK_QUEUE

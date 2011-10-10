@@ -2,16 +2,15 @@ include(manual.h)dnl
 HEADER(work_queue_status)
 
 SECTION(NAME) 
-BOLD(work_queue_status) - display status and statistics on currently running 
-Work Queue applications.
+BOLD(work_queue_status) - display status of currently running Work Queue applications.
 
 SECTION(SYNOPSIS)
 CODE(BOLD(work_queue_status [options]))
 
 SECTION(DESCRIPTION)
 
-BOLD(work_queue_status) displays the status and statistics on currently running 
-Work Queue applications. The statistics displayed include:
+BOLD(work_queue_status) displays the status of currently running Work Queue applications registered with a catalog server.
+
 LIST_BEGIN
 LIST_ITEM()Hostname and port number of the application.
 LIST_ITEM()Number of waiting tasks.
@@ -38,6 +37,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM()LINK(Work Queue User Manual,"http://www.cse.nd.edu/~ccl/software/manuals/workqueue.html")
-LIST_END
+SEE_ALSO_WORK_QUEUE

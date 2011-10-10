@@ -39,25 +39,19 @@ SECTION(EXAMPLES)
 To copy a single remote file using BOLD(chirp_get):
 
 LONGCODE_BEGIN
-chirp_get server1.somewhere.edu /mydata/mydata.dat /tmp/mydata.dat
+% chirp_get server1.somewhere.edu /mydata/mydata.dat /tmp/mydata.dat
 LONGCODE_END
 
 To get, while at the same time, untar a single remote archive file using BOLD(chirp_get):
 
 LONGCODE_BEGIN
-chirp_get myhost.somewhere.edu /mydata/archive.tar.gz - | tar xvzf
+% chirp_get myhost.somewhere.edu /mydata/archive.tar.gz - | tar xvzf
 LONGCODE_END
-
 
 SECTION(COPYRIGHT)
 
 COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
-MANPAGE(chirp_put)
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
-LIST_ITEM MANPAGE(parrot_run,1)
-LIST_ITEM MANPAGE(makeflow,1)
-LIST_END
+
+SEE_ALSO_CHIRP

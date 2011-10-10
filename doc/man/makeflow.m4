@@ -128,7 +128,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM()LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM()LINK(Makeflow User Manual,"http://www.nd.edu/~ccl/software/manuals/makeflow.html")
-LIST_END
+SEE_ALSO_MAKEFLOW

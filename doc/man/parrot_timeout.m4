@@ -25,18 +25,20 @@ SECTION(EXAMPLES)
 To change the master timeout to 5 hours:
 
 LONGCODE_BEGIN
-parrot_run tcsh
+% parrot_run tcsh
 % parrot_timeout 5h
 % ./my_executable
+% exit
 LONGCODE_END
 
 To change it to 30 seconds for one program and then reset it to the default value
 LONGCODE_BEGIN
-parrot_run tcsh
+% parrot_run tcsh
 % parrot_timeout 40m
 % ./my_executable
 % parrot_timeout
 % ./my_second_executable
+% exit
 LONGCODE_END
 
 SECTION(COPYRIGHT)
@@ -45,9 +47,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
-LIST_ITEM MANPAGE(parrot_timeout,1)
-LIST_ITEM MANPAGE(parrot_run,1)
-LIST_END
+SEE_ALSO_PARROT

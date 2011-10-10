@@ -65,20 +65,21 @@ If CODE(parrot_run) is unable to start the process, it will return non-zero.
 SECTION(EXAMPLES)
 To access a single remote file using CODE(vi):
 LONGCODE_BEGIN
-parrot_run vi /anonftp/ftp.gnu.org/pub/README
+% parrot_run vi /anonftp/ftp.gnu.org/pub/README
 LONGCODE_END
 
 You can also run an entire shell inside of Parrot, like this:
 LONGCODE_BEGIN
-parrot_run bash
-cd /anonftp/ftp.gnu.org/pub
-ls -la
-cat README
+% parrot_run bash
+% cd /anonftp/ftp.gnu.org/pub
+% ls -la
+% cat README
+% exit
 LONGCODE_END
 
 To see the list of available Chirp servers around the world:
 LONGCODE_BEGIN
-parrot_run ls -la /chirp
+% parrot_run ls -la /chirp
 LONGCODE_END
 
 SECTION(COPYRIGHT)
@@ -87,7 +88,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM()LINK(The Cooperative Computing Tools,http://www.nd.edu/~ccl/software/manuals)
-LIST_ITEM()LINK(Parrot User's Manual,http://www.nd.edu/~ccl/software/manuals/parrot.html)
-LIST_END
+SEE_ALSO_PARROT

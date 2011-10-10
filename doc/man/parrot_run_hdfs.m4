@@ -62,15 +62,15 @@ If CODE(parrot_run_hdfs) is unable to start the process, it will return non-zero
 SECTION(EXAMPLES)
 To access a single remote HDFS file using CODE(cat):
 LONGCODE_BEGIN
-parrot_run_hdfs cat /hdfs/server:port/foo
+% parrot_run_hdfs cat /hdfs/server:port/foo
 LONGCODE_END
 
 You can also run an entire shell inside of Parrot, like this:
 LONGCODE_BEGIN
-parrot_run_hdfs bash
-cd /hdfs/server:port/
-ls -la
-cat foo
+% parrot_run_hdfs bash
+% cd /hdfs/server:port/
+% ls -la
+% cat foo
 LONGCODE_END
 
 SECTION(COPYRIGHT)
@@ -79,8 +79,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM()MANPAGE(parrot_run,1)
-LIST_ITEM()LINK(The Cooperative Computing Tools,http://www.nd.edu/~ccl/software/manuals)
-LIST_ITEM()LINK(Parrot User's Manual,http://www.nd.edu/~ccl/software/manuals/parrot.html)
-LIST_END
+SEE_ALSO_PARROT

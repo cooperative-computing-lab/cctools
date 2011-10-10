@@ -1,21 +1,13 @@
+<html>
+<head>
+<title>Installing the Cooperative Computing Tools</title>
+</head>
 
+<body>
+<h1>Installing the Cooperative Computing Tools</h1>
 
-
-
-
-
-
-
-
-
-
-
-
-
-<html><head><title>Installing the Cooperative Computing Tools(1)</title></head><body><h1>Installing the Cooperative Computing Tools(1)</h1>
-
-<b>March 2011</b>
-
+<b>Last Modified October 2011</b>
+<p>
 The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2005-2011 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 <h2>Overview</h2>
@@ -100,7 +92,6 @@ To use these, you must download and install them separately:
 <li> <a href=http://glite.web.cern.ch/glite/packages/R3.0>EGEE GLite</a> (Optional)
 </dir>
 
-
 Once the desired packages are correctly installed, unpack the cctools and
 then issue a configure command that points to all of the other
 installations.  Then, make and install.  For example:
@@ -115,19 +106,9 @@ installations.  Then, make and install.  For example:
 % setenv PATH ${HOME}/cctools/bin:$PATH
 </pre>
 
-<h3>Installation From a Binary Package</h3>
+<dir>
+<a href=index.html>Cooperative Computing Tools Documentation Index</a>
+</dir>
 
-To install from a binary package for your specific system,
-download a package from the <a href=http://www.cse.nd.edu/~ccl/software/download.shtml>cctools web page</a>
-Simply unpack the tarball in any directory that you like,
-and then add the <tt>bin</tt> directory to your path.
-For example, to install in <tt>$HOME/cctools</tt>:
-
-<pre>
-% cd $HOME
-% gunzip cctools-xxx-yyy.tar.gz
-% tar xvf cctools-xxx-yyy.tar
-% setenv PATH $HOME/cctools/bin:$PATH
-</pre>
-
-</body></html>
+</body>
+</html>

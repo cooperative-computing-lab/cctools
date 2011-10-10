@@ -40,7 +40,7 @@ SECTION(EXAMPLES)
 To start a Chirp server with a HDFS backend filesystem:
 
 LONGCODE_BEGIN
-chirp_server_hdfs -r hdfs://host:port/foo/bar
+% chirp_server_hdfs -r hdfs://host:port/foo/bar
 LONGCODE_END
 
 SECTION(COPYRIGHT)
@@ -49,8 +49,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Chirp User Manual,"http://www.nd.edu/~ccl/software/manuals/chirp.html")
-LIST_ITEM MANPAGE(chirp_server,1)
-LIST_END
+SEE_ALSO_CHIRP

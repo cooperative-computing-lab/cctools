@@ -50,10 +50,4 @@ SECTION(COPYRIGHT)
 COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
-
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
-LIST_ITEM MANPAGE(parrot_run,1)
-LIST_ITEM MANPAGE(parrot_lsalloc,1)
-LIST_END
+SEE_ALSO_PARROT

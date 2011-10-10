@@ -40,25 +40,25 @@ SECTION(EXAMPLES)
 To copy the file CODE(mydata) to three locations:
 
 LONGCODE_BEGIN
-chirp_stream_files copy mydata server1.somewhere.edu /mydata
-                               server2.somewhere.edu /mydata
-                               server2.somewhere.edu /mydata
+% chirp_stream_files copy mydata server1.somewhere.edu /mydata
+                                 server2.somewhere.edu /mydata
+                                 server2.somewhere.edu /mydata
 LONGCODE_END
 
 To split the file CODE(mydata) into subsets at three locations:
 
 LONGCODE_BEGIN
-chirp_stream_files split mydata server1.somewhere.edu /part1
-                                server2.somewhere.edu /part2
-                                server2.somewhere.edu /part3
+% chirp_stream_files split mydata server1.somewhere.edu /part1
+                                  server2.somewhere.edu /part2
+                                  server2.somewhere.edu /part3
 LONGCODE_END
 
 To join three remote files back into one called CODE(newdata):
 
 LONGCODE_BEGIN
-chirp_stream_files join newdata server1.somewhere.edu /part1
-                                server2.somewhere.edu /part2
-                                server2.somewhere.edu /part3
+% chirp_stream_files join newdata server1.somewhere.edu /part1
+                                  server2.somewhere.edu /part2
+                                  server2.somewhere.edu /part3
 LONGCODE_END
 
 SECTION(COPYRIGHT)
@@ -67,9 +67,4 @@ COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
 
-LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
-LIST_ITEM MANPAGE(parrot_run,1)
-LIST_ITEM MANPAGE(makeflow,1)
-LIST_END
+SEE_ALSO_CHIRP
