@@ -1167,7 +1167,7 @@ struct work_queue *work_queue_create(int port)
 		}
 	}
 
-	if(port == -1) {
+	if(port == WORK_QUEUE_RANDOM_PORT) {
 		int lowport = 9000;
 		int highport = 32767;
 
@@ -1438,7 +1438,14 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 {
 	if(t->tag)
 		free(t->tag);
-	t->tag = strdup(tag);
+	t->tag = xstrdup(tag);
+}
+
+void work_queue_task_specify_preferred_host(struct work_queue_task *t, const char *hostname)
+{
+	if(t->preferred_host)
+		free(t->preferred_host);
+	t->preferred_host = xstrdup(hostname);
 }
 
 void work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)

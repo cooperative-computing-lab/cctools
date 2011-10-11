@@ -19,7 +19,8 @@ and port of the master.
 
 #include "timestamp.h"
 
-#define WORK_QUEUE_DEFAULT_PORT 9123
+#define WORK_QUEUE_DEFAULT_PORT 9123 /**< Default Work Queue port number. */
+#define WORK_QUEUE_RANDOM_PORT -1    /**< Indicate to Work Queue to choose a random open port. */
 #define WORK_QUEUE_LINE_MAX 1024
 
 #define WORK_QUEUE_WAITFORTASK -1
@@ -34,32 +35,32 @@ and port of the master.
 #define WORK_QUEUE_RESULT_OUTPUT_MISSING 16
 #define WORK_QUEUE_RESULT_LINK_FAIL 32
 
-#define WORK_QUEUE_SCHEDULE_UNSET 0	// default setting for task.
-#define WORK_QUEUE_SCHEDULE_FCFS 1
-#define WORK_QUEUE_SCHEDULE_FILES 2
-#define WORK_QUEUE_SCHEDULE_TIME 3
-#define WORK_QUEUE_SCHEDULE_DEFAULT 3	// default setting for queue.
-#define WORK_QUEUE_SCHEDULE_PREFERRED_HOSTS 4
-#define WORK_QUEUE_SCHEDULE_RAND 5
+#define WORK_QUEUE_SCHEDULE_UNSET 0	
+#define WORK_QUEUE_SCHEDULE_FCFS 1	/**< Select worker on a first-come-first-serve basis. */
+#define WORK_QUEUE_SCHEDULE_FILES 2	/**< Select worker that has the most files required by task. */
+#define WORK_QUEUE_SCHEDULE_TIME 3	/**< Select worker that has has best execution time. */
+#define WORK_QUEUE_SCHEDULE_DEFAULT 3	/**< Default algorithm (@ref WORK_QUEUE_SCHEDULE_TIME). */
+#define WORK_QUEUE_SCHEDULE_PREFERRED_HOSTS 4 /**< Select worker from set of preferred hosts. */
+#define WORK_QUEUE_SCHEDULE_RAND 5	/**< Select a random worker. */
 #define WORK_QUEUE_SCHEDULE_MAX 5
 
-#define WORK_QUEUE_INPUT  0
-#define WORK_QUEUE_OUTPUT 1
+#define WORK_QUEUE_INPUT  0	/**< Specify an input object. */
+#define WORK_QUEUE_OUTPUT 1	/**< Specify an output object. */
 
-#define WORK_QUEUE_NOCACHE 0
-#define WORK_QUEUE_CACHE 1
-#define WORK_QUEUE_SYMLINK 2
+#define WORK_QUEUE_NOCACHE 0	/**< Do not cache file at execution site. */
+#define WORK_QUEUE_CACHE 1	/**< Cache file at execution site for later use. */
+#define WORK_QUEUE_SYMLINK 2	/**< Create a symlink to the file rather than copying it, if possible. */
 #define WORK_QUEUE_PREEXIST 4
-#define WORK_QUEUE_THIRDGET 8
-#define WORK_QUEUE_THIRDPUT 8	// THIRDPUT/THIRDGET identical flags, including both for readability
+#define WORK_QUEUE_THIRDGET 8	/**< Access the file on the client from a shared filesystem */
+#define WORK_QUEUE_THIRDPUT 8	/**< Access the file on the client from a shared filesystem (included for readability) */
 
-#define WORK_QUEUE_MASTER_MODE_STANDALONE 0
-#define WORK_QUEUE_MASTER_MODE_CATALOG 1
+#define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
+#define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
 #define WORK_QUEUE_NAME_MAX 256
 #define WORK_QUEUE_MASTER_PRIORITY_MAX 100
 #define WORK_QUEUE_MASTER_PRIORITY_DEFAULT 10
-#define WORK_QUEUE_WORKER_MODE_SHARED 0
-#define WORK_QUEUE_WORKER_MODE_EXCLUSIVE 1
+#define WORK_QUEUE_WORKER_MODE_SHARED 0	    /**< Work Queue master accepts workers in shared or non-exclusive mode. */
+#define WORK_QUEUE_WORKER_MODE_EXCLUSIVE 1  /**< Work Queue master only accepts workers that have a preference for it. */
 #define WORK_QUEUE_CATALOG_LINE_MAX 1024
 #define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 60
 #define	WORK_QUEUE_CATALOG_LIFETIME	180
@@ -132,12 +133,12 @@ struct work_queue_task *work_queue_task_create(const char *full_command);
 @param type Must be one of the following values:
 - WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
 - WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
-@param flags May be zero to indicate no special handling, or any of the following or'd together:
-- WORK_QUEUE_NOCACHE - The file may not be cached at the execution site for later use.
-- WORK_QUEUE_CACHE - The file may be cached at the execution site for later use.
-- WORK_QUEUE_SYMLINK - Create a symlink to the file rather than copying it, if possible.
-- WORK_QUEUE_THIRDGET - Access the file on the client from a shared filesystem.
-- WORK_QUEUE_THIRDPUT - Access the file on the client from a shared filesystem (included for readability).
+@param flags	May be zero to indicate no special handling, or any of the or'd together:
+		@ref WORK_QUEUE_NOCACHE,
+		@ref WORK_QUEUE_CACHE,
+		@ref WORK_QUEUE_SYMLINK,
+		@ref WORK_QUEUE_THIRDGET,
+		@ref WORK_QUEUE_THIRDPUT.
 */
 void work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags);
 
@@ -154,12 +155,12 @@ void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data,
 @param t The task to which to add a file.
 @param remote_name The name of the file at the execution site.
 @param cmd The command to run on the remote node to retrieve or store the file.
-@param type Must be one of the following values:
-- WORK_QUEUE_INPUT to indicate this creates an input file to be consumed by the task
-- WORK_QUEUE_OUTPUT to indicate this handles an output file to be produced by the task
-@param flags May be zero to indicate no special handling, or any of the following or'd together:
-- WORK_QUEUE_NOCACHE - The file may not be cached at the execution site for later use.
-- WORK_QUEUE_CACHE - The file may be cached at the execution site for later use.
+@param type	Must be one of the following values:
+		@ref WORK_QUEUE_INPUT or
+		@ref WORK_QUEUE_OUTPUT.
+@param flags	May be zero to indicate no special handling, or any of the following or'd together:
+		@ref WORK_QUEUE_NOCACHE,
+		@ref WORK_QUEUE_CACHE.
 */
 void work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags);
 
@@ -176,7 +177,7 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag);
 */
 int work_queue_task_specify_algorithm(struct work_queue_task *t, int alg);
 
-/** Indicate that the task would be optimally run on a given host.
+/* Indicate that the task would be optimally run on a given host.
 @param t The task to which to add parameters
 @param hostname The hostname to which this task would optimally be sent.
 */
@@ -220,7 +221,7 @@ void work_queue_submit(struct work_queue *q, struct work_queue_task *t);
 
 /** Wait for tasks to complete.  This call will block until the timeout has elapsed.
 @param q The work queue to wait on.
-@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant WAITFORTASK to block until a task has completed.
+@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref WORK_QUEUE_WAITFORTASK to block until a task has completed.
 @returns A completed task description, or null if the queue is empty or the timeout was reached without a completed task.  The returned task must be deleted with @ref work_queue_task_delete or resubmitted with @ref work_queue_submit.
 */
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout);
@@ -262,7 +263,7 @@ int work_queue_specify_algorithm(struct work_queue *q, int alg);
 
 /** Change the project name for a given queue.
 @param q A pointer to the queue to modify.
-@param name The new project name..
+@param name The new project name.
 */
 int work_queue_specify_name(struct work_queue *q, const char *name);
 
@@ -276,8 +277,8 @@ int work_queue_specify_priority(struct work_queue *q, int priority);
 /** Specify the master mode for a given queue. 
 @param q A pointer to the queue to modify.
 @param mode 
-<b>mode == 0</b>: standalone mode. In this mode the master would not report its information to a catalog server; 
-<b>mode == 1</b>: catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
+<b>mode == @ref WORK_QUEUE_MASTER_MODE_STANDALONE</b>: standalone mode. In this mode the master would not report its information to a catalog server; 
+<b>mode == @ref WORK_QUEUE_MASTER_MODE_CATALOG</b>: catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
 @return The mode that has been set.
 */
 int work_queue_specify_master_mode(struct work_queue *q, int mode);
@@ -285,8 +286,8 @@ int work_queue_specify_master_mode(struct work_queue *q, int mode);
 /** Specify the worker mode for a given queue. 
 @param q A pointer to the queue to modify.
 @param mode 
-<b>mode == 0</b>: shared mode. In this mode the master would not accept connections from shared workers;
-<b>mode == 1</b>: exclusive mode. In this mode the master would only accept workers that have specified a preference on it, which are the workers started with "-N name" where name is the name of the queue. 
+<b>mode == @ref WORK_QUEUE_WORKER_MODE_SHARED</b>: shared mode. In this mode the master would accept connections from shared workers;
+<b>mode == @ref WORK_QUEUE_WORKER_MODE_EXCLUSIVE</b>: exclusive mode. In this mode the master would only accept workers that have specified a preference on it, which are the workers started with "-N name" where name is the name of the queue. 
 @return The mode that has been set.
 */
 int work_queue_specify_worker_mode(struct work_queue *q, int mode);
