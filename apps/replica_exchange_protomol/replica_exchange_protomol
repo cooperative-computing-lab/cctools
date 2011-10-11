@@ -53,6 +53,7 @@ psf_file = ""
 par_file = ""
 xyz_file_name = ""
 dcd_file_name = ""
+proj_name = None
 boundary_conditions = DEFAULT_BOUNDARY_CONDITIONS
 monte_carlo_steps = DEFAULT_MONTE_CARLO_STEPS
 replica_id = None
@@ -227,7 +228,10 @@ def re_main(replica_list, num_replicas):
 	#Setup WorkQueue and initialize parameters 
 	wq = WorkQueue()
 	wq.specify_algorithm(WORK_QUEUE_SCHEDULE_FCFS)
-	wq.specify_name("replica_exchange_5100")
+
+	if proj_name:
+		wq.specify_name(proj_name)
+
 	wq.activate_fast_abort(3.0);
 
 	#Iterate through the given number of monte carlo steps
@@ -430,8 +434,9 @@ def make_directories(output_path, temp_list, num_replicas):
 if __name__ == "__main__":
 
 	#Create help string for user.
-	usage_str = "Usage: %s -x <XYZ_FILE_NAME> -d <DCD_FILE_NAME> <PDB_FILE> <PSF_FILE> <PAR_FILE> <MIN_TEMP> <MAX_TEMP> <NUM_OF_REPLICAS>" % sys.argv[0]
+	usage_str = "Usage: %s <PDB_FILE> <PSF_FILE> <PAR_FILE> <MIN_TEMP> <MAX_TEMP> <NUM_OF_REPLICAS>" % sys.argv[0]
 	help_str  = "-h		-	help\n"
+	help_str += "-n		-	specify a project name for using exclusive workers\n"
 	help_str += "-x		-	specify the name of the xyz file for output\n"
 	help_str += "-d		-	specify the name of the dcd file for output\n"
 	help_str += "-l		-	print debuging information\n"
@@ -442,7 +447,7 @@ if __name__ == "__main__":
 
 	#Check to see if there is error in the given command line arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "m:s:p:x:d:hlq", ["--help", "--xyz", "--dcd", "--dir"])
+		opts, args = getopt.getopt(sys.argv[1:], "m:s:n:p:x:d:hlq", ["--help", "--proj", "dir", "--xyz", "--dcd"])
 	except getopt.GetoptError, err:
 		print str(err) 
 		print usage_str
@@ -461,9 +466,11 @@ if __name__ == "__main__":
 		elif o in ("-d", "--dcd"):
 			generate_dcd = True
 			dcd_file_name = a
+		elif o in ("-n", "--proj"):
+			proj_name = a
 		elif o in ("-p", "--dir"):
 			output_path = a
-		elif o in ("-m", "--monte"):
+		elif o in ("-m"):
 			monte_carlo_steps = int(a)
 		elif o in ("-s"):
 			md_steps = int(a)
