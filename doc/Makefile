@@ -39,4 +39,4 @@ install: all
 test:
 
 clean:
-	rm -f $(HTMLFILES) $(MANFILES) $(ZIPFILES) *~
+	rm -rf api $(HTMLFILES) $(MANFILES) $(ZIPFILES) *~
