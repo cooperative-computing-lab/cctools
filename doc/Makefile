@@ -32,7 +32,8 @@ install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/man
 	cp man/*.html $(CCTOOLS_INSTALL_DIR)/doc/man
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/man/man1
-	cp -r api $(CCTOOLS_INSTALL_DIR)/doc/api
+	cp -rp api $(CCTOOLS_INSTALL_DIR)/doc
+	cp -rp images $(CCTOOLS_INSTALL_DIR)/doc
 	cp man/*.1.gz $(CCTOOLS_INSTALL_DIR)/share/man/man1
 
 test:
