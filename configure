@@ -32,6 +32,7 @@ case "$build_cpu" in
 	;;
 esac
 
+include_package_work_queue="work_queue"
 include_package_sand="sand"
 include_package_allpairs="allpairs"
 include_package_wavefront="wavefront"
@@ -39,6 +40,8 @@ include_package_makeflow="makeflow"
 include_package_ftplite="ftp_lite"
 include_package_s3tools="s3tools"
 include_package_chirp="chirp"
+
+work_queue_bindings=""
 
 if [ -d parrot -a $build_sys = LINUX ]
 then
@@ -65,6 +68,7 @@ rfio_path="/usr"
 dcap_path="/usr"
 irods_path="/usr"
 mysql_path="/usr"
+perl_path="/usr"
 python_path="/usr"
 xrootd_path="/usr"
 mpi_path="/usr/local"
@@ -89,6 +93,7 @@ config_readline_path=auto
 config_globus_path=auto
 config_fuse_path=auto
 config_mysql_path=auto
+config_perl_path=auto
 config_python_path=auto
 config_zlib_path=yes
 
@@ -163,6 +168,11 @@ do
 			shift
 			mysql_path=$1
 			config_mysql_path=yes
+			;;
+		--with-perl-path)
+			shift
+			perl_path=$1
+			config_perl_path=yes
 			;;
 		--with-python-path)
 			shift
@@ -242,6 +252,7 @@ Where PACKAGE may be:
     globus
     irods
     mysql
+    perl
     python
     xrootd
     zlib
@@ -269,7 +280,7 @@ done
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} doc apps"
+potential_packages="dttools ${include_package_work_queue} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} doc apps"
 
 if [ $build_sys = LINUX ]
 then
@@ -601,6 +612,32 @@ else
 	fi
 fi
 
+if [ $config_perl_path != no ]
+then
+	if check_file ${perl_path}/bin/perl
+	then
+		perl=${perl_path}/bin/perl
+	else
+		perl=0
+	fi
+
+	if [ $perl != 0 ]
+	then
+		perl_ccflags=`perl -MExtUtils::Embed -e ccopts`
+		perl_ldflags=`perl -MExtUtils::Embed -e ldopts`
+		work_queue_bindings="$work_queue_bindings perl"
+	else
+                if [ $config_perl_path = yes ]
+                then
+                        echo "*** Sorry, I couldn't find the perl libraries in $perl_path"
+                        echo "*** Check --with-perl-path and try again."
+                        exit 1
+                else
+                        echo "*** skipping perl support"
+                fi
+	fi
+fi
+
 if [ $config_python_path != no ]
 then
 	if check_file ${python_path}/bin/python2
@@ -617,12 +654,16 @@ then
 	then
 		python_version="$(${python} -V 2>&1)"
 		echo "python version is ${python_version}"
-		if [ `echo ${python_version} | awk '{print $2}' | cut -d . -f 2` -ge 4 ]
+		python_major_version=`echo ${python_version} | awk '{print $2}' | cut -d . -f 2`
+		if [ $python_major_version -ge 4 ]
 		then
-			if check_file ${python_path}/include/python2.[4-7]/Python.h
+			if check_file ${python_path}/include/python2.$python_major_version/Python.h
 			then
 				echo "found python development libraries"
 				packages="${packages} python"
+				python_ccflags=`${python}-config --cflags`
+				python_ldflags=`${python}-config --ldflags`
+				work_queue_bindings="$work_queue_bindings python"
 			else
 				python=0
 			fi
@@ -733,7 +774,15 @@ CCTOOLS_YACC=bison
 CCTOOLS_LEX=flex
 CCTOOLS_DOXYGEN=${doxygen}
 
+CCTOOLS_PERL=${perl}
+CCTOOLS_PERL_CCFLAGS=${perl_ccflags}
+CCTOOLS_PERL_LDFLAGS=${perl_ldflags}
+
 CCTOOLS_PYTHON=${python}
+CCTOOLS_PYTHON_CCFLAGS=${python_ccflags}
+CCTOOLS_PYTHON_LDFLAGS=${python_ldflags}
+
+CCTOOLS_WORK_QUEUE_BINDINGS=${work_queue_bindings}
 EOF
 
 echo ""
