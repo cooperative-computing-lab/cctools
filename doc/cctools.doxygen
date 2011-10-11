@@ -8,16 +8,16 @@ Less used interfaces are not documented, but can still be browsed through this i
 
 - <b><a href="http://www.cse.nd.edu/~ccl/software/howto/code.shtml">Writing Your First Program with Chirp</a></b>
 
+If you are writing programs to submit jobs to Work Queue, Condor, or other systems, start here:
+
+- @ref work_queue.h
+- @ref batch_job.h
+
 If you are writing programs to access Chirp, start here:
 
 - @ref chirp_reli.h
 - @ref chirp_recursive.h
 - @ref chirp_stream.h
-
-If you are writing programs to submit jobs to Work Queue, Condor, or other systems, start here:
-
-- @ref work_queue.h
-- @ref batch_job.h
 
 There are a number of other support modules that implement debugging, communication,
 data structures, and so forth.  The most commonly used are:

@@ -8,7 +8,11 @@ PDFFILES = ${SOURCES:%.m4=%.pdf}
 MANFILES = ${SOURCES:%.m4=%.1}
 ZIPFILES = ${SOURCES:%.m4=%.1.gz}
 
-all: ${HTMLFILES} ${ZIPFILES}
+all: ${HTMLFILES} ${ZIPFILES} api
+
+api:
+	mkdir -p api
+	$(CCTOOLS_DOXYGEN) cctools.doxygen.config
 
 %.html: %.m4
 	m4 -DHTML -Imacros $< > $@
@@ -28,6 +32,7 @@ install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/man
 	cp man/*.html $(CCTOOLS_INSTALL_DIR)/doc/man
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/man/man1
+	cp -r api $(CCTOOLS_INSTALL_DIR)/doc/api
 	cp man/*.1.gz $(CCTOOLS_INSTALL_DIR)/share/man/man1
 
 test:

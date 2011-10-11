@@ -11,10 +11,10 @@
 
 #include <sys/stat.h>
 
-char * cluster_name = NULL;
-char * cluster_submit_cmd = NULL;
-char * cluster_remove_cmd = NULL;
-char * cluster_options = NULL;
+static char * cluster_name = NULL;
+static char * cluster_submit_cmd = NULL;
+static char * cluster_remove_cmd = NULL;
+static char * cluster_options = NULL;
 
 int batch_job_setup_cluster(struct batch_queue * q) {
 

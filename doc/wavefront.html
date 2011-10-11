@@ -28,7 +28,7 @@ See the file COPYING for details.
 <table>
 <tr>
 	<td valign=middle>
-		<a href=wavefront_large.gif><img src=wavefront_small.gif align=right border=0></a>
+		<a href=wavefront_large.gif><img src=images/wavefront_small.gif align=right border=0></a>
 	</td>
 	<td valign=middle>
 		<div id=abstraction>
@@ -79,7 +79,7 @@ place them in files named <tt>P.i.j</tt> and give the <b>-P</b> option to Wavefr
 If you run Wavefront on a single-CPU machine, then exactly one process will run at once.  If you run it on a multi-core machine, it will employ all available processors.  If you have a Condor or SGE batch system, give the <b>-T condor</b> or <b>-T sge</b> option, and and up to 1000 jobs will run at once on Condor.  You may also explicitly
 control the maximum number using the <b>-n</b> option.  For example, here is a graph of a 100 by 100 problem run on a 64-core machine, where each F takes about five seconds to execute:
 <p>
-<img src=wavefront_progress.gif>
+<img src=images/wavefront_progress.gif>
 <p>
 The <b>-B</b> option will write a bitmap progress image every five seconds.
 Each pixel represents the state of one cell in the matrix: green indicates complete, blue currently running, yellow ready to run, and red not ready.  Here is an example of the progress of a small ten by ten job using five CPUs:
@@ -87,10 +87,10 @@ Each pixel represents the state of one cell in the matrix: green indicates compl
 
 <table>
 <tr>
-<td><img src=wavefront_progress1.gif>
-<td><img src=wavefront_progress2.gif>
-<td><img src=wavefront_progress4.gif>
-<td><img src=wavefront_progress5.gif>
+<td><img src=images/wavefront_progress1.gif>
+<td><img src=images/wavefront_progress2.gif>
+<td><img src=images/wavefront_progress4.gif>
+<td><img src=images/wavefront_progress5.gif>
 </table>
 
 Note that at the broadest part of the workload, there are not enough CPUs to run all cells at once, so some must wait.  Also note that the wave does not need to run synchronously: cells may begin to compute as soon as their dependencies are satisfied.
