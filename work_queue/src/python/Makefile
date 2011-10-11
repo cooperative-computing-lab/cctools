@@ -26,3 +26,6 @@ clean:
 	rm -fr _work_queue.so work_queue.py work_queue_wrap.* *.pyc
 
 install: all
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON_VERSION}/site-packages
+	install _work_queue.so ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON_VERSION}/site-packages
+	install  work_queue.py ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON_VERSION}/site-packages

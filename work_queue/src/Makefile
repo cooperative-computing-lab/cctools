@@ -10,10 +10,8 @@ bindings:
 clean-bindings:
 	@for m in ${CCTOOLS_WORK_QUEUE_BINDINGS}; do cd $$m; make clean; cd ..; done
 
-test: all
-	@for m in ${CCTOOLS_WORK_QUEUE_BINDINGS}; do cd $$m; make test; cd ..; done
+install test: all
+	@for m in ${CCTOOLS_WORK_QUEUE_BINDINGS}; do cd $$m; make $@; cd ..; done
 
 clean: clean-bindings
 	rm -fr *.o
-
-install: all

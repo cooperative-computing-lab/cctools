@@ -652,9 +652,9 @@ then
 
 	if [ $python != 0 ]
 	then
-		python_version="$(${python} -V 2>&1)"
+		python_version=`${python} -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('VERSION')"`
 		echo "python version is ${python_version}"
-		python_major_version=`echo ${python_version} | awk '{print $2}' | cut -d . -f 2`
+		python_major_version=`echo ${python_version} | cut -d . -f 2`
 		if [ $python_major_version -ge 4 ]
 		then
 			if check_file ${python_path}/include/python2.$python_major_version/Python.h
@@ -666,10 +666,10 @@ then
 				then
 				    python_ccflags=`${python}-config --cflags`
 				    python_ldflags=`${python}-config --ldflags`
-				elif [ -x ${python}.${python_major_version}-config ]
+				elif [ -x ${python_path}/bin/python${python_version}-config ]
 				then
-				    python_ccflags=`${python}.${python_major_version}-config --cflags`
-				    python_ldflags=`${python}.${python_major_version}-config --ldflags`
+				    python_ccflags=`${python_path}/bin/python${python_version}-config --cflags`
+				    python_ldflags=`${python_path}/bin/python${python_version}-config --ldflags`
 				else
 				    python_ccflags_file=`mktemp tmp.XXXXXX`
 				    python_ldflags_file=`mktemp tmp.XXXXXX`
@@ -814,6 +814,7 @@ CCTOOLS_PERL_LDFLAGS=${perl_ldflags}
 CCTOOLS_PYTHON=${python}
 CCTOOLS_PYTHON_CCFLAGS=${python_ccflags}
 CCTOOLS_PYTHON_LDFLAGS=${python_ldflags}
+CCTOOLS_PYTHON_VERSION=${python_version}
 
 CCTOOLS_WORK_QUEUE_BINDINGS=${work_queue_bindings}
 EOF
