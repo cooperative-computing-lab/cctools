@@ -23,7 +23,7 @@ and port of the master.
 #define WORK_QUEUE_RANDOM_PORT -1    /**< Indicate to Work Queue to choose a random open port. */
 #define WORK_QUEUE_LINE_MAX 1024
 
-#define WORK_QUEUE_WAITFORTASK -1
+#define WORK_QUEUE_WAITFORTASK -1   /**< Wait for a task to complete before returning. */
 
 #define WORK_QUEUE_RETURN_STATUS_UNSET -1
 
