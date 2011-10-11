@@ -177,7 +177,7 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag);
 */
 int work_queue_task_specify_algorithm(struct work_queue_task *t, int alg);
 
-/* Indicate that the task would be optimally run on a given host.
+/** Indicate that the task would be optimally run on a given host.
 @param t The task to which to add parameters
 @param hostname The hostname to which this task would optimally be sent.
 */
