@@ -1469,12 +1469,17 @@ void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		case SYSCALL32_pipe:
+		case SYSCALL32_pipe2:
 			if(entering) {
 				int fds[2];
 				p->syscall_result = pfs_pipe(fds);
 				if(p->syscall_result<0) {
 					p->syscall_result = -errno;
 				} else {
+					if(p->syscall==SYSCALL32_pipe2) {
+						fcntl(fds[0],F_SETFL,args[1]);
+						fcntl(fds[1],F_SETFL,args[1]);
+					}
 					tracer_copy_out(p->tracer,(void*)fds,POINTER(args[0]),sizeof(fds));
 				}
 				divert_to_dummy(p,p->syscall_result);
