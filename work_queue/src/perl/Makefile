@@ -9,7 +9,7 @@ all: work_queue.pm work_queue.so
 
 work_queue.pm: ../work_queue.i
 	@echo "SWIG work_queue.i (perl5)"
-	@swig -perl5 -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c -outcurrentdir ../work_queue.i
+	@swig -perl5 -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c -outdir . ../work_queue.i
 
 work_queue_wrap.o: work_queue_wrap.c
 	${CCTOOLS_CC} -fPIC -Wno-unused-value -Wno-unused-variable -c $< -o $@ ${ccflags} `perl -MExtUtils::Embed -e ccopts`
