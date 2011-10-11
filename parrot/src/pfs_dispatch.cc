@@ -1671,6 +1671,12 @@ void decode_syscall( struct pfs_process *p, int entering )
 					p->syscall_result = pfs_ioctl(fd,cmd,uaddr);
 				}
 
+                                if(cmd==PFS_TIOCGPGRP) {
+                                        pid_t newgrp = getpgid(pfs_current->pid);
+                                        debug(D_PROCESS,"tcgetpgrp(%d) changed from %d to %d",fd,*(pid_t*)buffer,newgrp);
+                                        *(pid_t *)buffer = newgrp;
+                                }
+
 				if(p->syscall_result<0) {
 					p->syscall_result = -errno;
 				} else {
