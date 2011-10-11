@@ -24,6 +24,7 @@ BOLD(replica_exchange_protomol) can be run on any machine accesible to work_queu
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
+OPTION_PAIR(-n, name)Specify a project name for using exclusive work_queue_worker instances.
 OPTION_PAIR(-x, filename)Specify the name of the xyz file for output.
 OPTION_PAIR(-d, filename)Specify the name of the dcd file for output.
 OPTION_PAIR(-m, number)Specify the number of monte carlo steps. Default = 100.
@@ -52,6 +53,12 @@ SECTION(EXAMPLES)
 To run a replica exchange experiment with 84 replicas in the temperature range 278 to 400K using the sample input files:
 LONGCODE_BEGIN
 % replica_exchange_protomol ww_exteq_nowater1.pdb ww_exteq_nowater1.psf par_all27_prot_lipid.inp 278 400 84
+LONGCODE_END
+
+To run a replica exchange experiment, with project name ReplExch, over 250 Monte Carlo steps running 1000 molecular dynamics steps
+and involving 84 replicas in the temperature range 278 to 400K using the sample input files:
+LONGCODE_BEGIN
+% replica_exchange_protomol -N ReplExch -m 250 -s 1000 ww_exteq_nowater1.pdb ww_exteq_nowater1.psf par_all27_prot_lipid.inp 278 400 84
 LONGCODE_END
 
 SECTION(COPYRIGHT)
