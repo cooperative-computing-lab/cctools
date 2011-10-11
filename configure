@@ -32,8 +32,6 @@ case "$build_cpu" in
 	;;
 esac
 
-potential_packages="dttools sand allpairs wavefront makeflow ftp_lite s3tools chirp doc"
-
 include_package_sand="sand"
 include_package_allpairs="allpairs"
 include_package_wavefront="wavefront"
@@ -271,7 +269,7 @@ done
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot}"
+potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} doc apps"
 
 if [ $build_sys = LINUX ]
 then

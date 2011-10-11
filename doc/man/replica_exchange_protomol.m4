@@ -37,10 +37,21 @@ OPTIONS_END
 SECTION(EXIT STATUS)
 On success, returns zero.  On failure, returns non-zero.
 
-SECTION(EXAMPLES)
-To run a replica exchange experiment with 84 replicas in the temperature range 278 to 400K using the input files in sample_input_files:
+SECTION(ENVIRONMENT VARIABLES)
+
+If the cctools are installed in a non-system directory, such as your
+home directory, then you must set the CODE(PYTHONPATH) environment
+so that the workqueue python module can be found.  For example:
+
 LONGCODE_BEGIN
-python wq_replica_exchange_checkpoint sample_input_files/ww_exteq_nowater1.pdb sample_input_files/ww_exteq_nowater1.psf sample_input_files/par_all27_prot_lipid.inp 278 400 84
+% setenv PYTHONPATH /home/fred/cctools/lib64/python2.4/site-packages
+LONGCODE_END
+
+SECTION(EXAMPLES)
+
+To run a replica exchange experiment with 84 replicas in the temperature range 278 to 400K using the sample input files:
+LONGCODE_BEGIN
+% replica_exchange_protomol ww_exteq_nowater1.pdb ww_exteq_nowater1.psf par_all27_prot_lipid.inp 278 400 84
 LONGCODE_END
 
 SECTION(COPYRIGHT)
