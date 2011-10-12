@@ -753,13 +753,28 @@ optional_include /usr/include/sys/statfs.h HAS_SYS_STATFS_H
 optional_include /usr/include/sys/statvfs.h HAS_SYS_STATVFS_H
 optional_include /usr/include/alloca.h HAS_ALLOCA_H
 
+cctools_doctargets=
+
 if check_path doxygen
 then
-    doxygen=doxygen
+	cctools_doctargets+="${cctools_doctargets} apipages"
 else
-    doxygen=true
+	echo "*** not building API documentation"
 fi
-	
+
+if check_path m4
+then
+	cctools_doctargets="${cctools_doctargets} htmlpages"
+	if check_path nroff
+	then
+		cctools_doctargets="${cctools_doctargets} manpages"
+	else
+		echo "*** not building man pages"
+	fi
+else
+	echo "*** not building html or man pages"
+fi
+
 ccflags="${ccflags} -DINSTALL_PATH=\\\"${install_path}\\\" -g -D_REENTRANT -D_GNU_SOURCE -DBUILD_USER=\\\"$build_user\\\" -DBUILD_HOST=\\\"$build_host\\\" -DCCTOOLS_VERSION_MAJOR=$major -DCCTOOLS_VERSION_MINOR=$minor -DCCTOOLS_VERSION_MICRO=$micro -DCCTOOLS_OPSYS_${build_sys} -DCCTOOLS_CPU_${build_cpu}"
 
 echo "Creating Makefile.config..."
@@ -803,9 +818,6 @@ CXXFLAGS=\$(CCTOOLS_CXXFLAGS)
 MPILD=\$(CCTOOLS_MPI_LD)
 
 CCTOOLS_AR=ar
-CCTOOLS_YACC=bison
-CCTOOLS_LEX=flex
-CCTOOLS_DOXYGEN=${doxygen}
 
 CCTOOLS_PERL=${perl}
 CCTOOLS_PERL_CCFLAGS=${perl_ccflags}
@@ -817,6 +829,8 @@ CCTOOLS_PYTHON_LDFLAGS=${python_ldflags}
 CCTOOLS_PYTHON_VERSION=${python_version}
 
 CCTOOLS_WORK_QUEUE_BINDINGS=${work_queue_bindings}
+
+CCTOOLS_DOCTARGETS=${cctools_doctargets}
 EOF
 
 echo ""

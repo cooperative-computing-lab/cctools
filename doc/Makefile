@@ -8,11 +8,17 @@ PDFFILES = ${SOURCES:%.m4=%.pdf}
 MANFILES = ${SOURCES:%.m4=%.1}
 ZIPFILES = ${SOURCES:%.m4=%.1.gz}
 
-all: ${HTMLFILES} ${ZIPFILES} api
+all: ${CCTOOLS_DOCTARGETS}
+
+htmlpages: ${HTMLFILES}
+
+manpages: ${ZIPFILES}
+
+apipages: api
 
 api:
 	mkdir -p api
-	$(CCTOOLS_DOXYGEN) cctools.doxygen.config
+	doxygen cctools.doxygen.config
 
 %.html: %.m4
 	m4 -DHTML -Imacros $< > $@
