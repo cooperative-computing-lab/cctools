@@ -122,9 +122,10 @@ def configure(args):
 	print 'Using the following libraries:'
 	print_tab_list(libraries)
 
-    with open(options.config_file, 'w+') as config_file:
-	config.write(config_file)
-	print 'Configuration saved to:', options.config_file
+    config_file = open(options.config_file, 'w+')
+    config.write(config_file)
+    print 'Configuration saved to:', options.config_file
+    config_file.close()
 
 
 # Main Execution ---------------------------------------------------------------
