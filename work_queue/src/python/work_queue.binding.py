@@ -45,6 +45,7 @@ class Task(_object):
     ##
     # Create a new task specification.
     #
+    # @param self	Reference to the current task object.
     # @param command	The shell command line to be exected by the task.
     def __init__(self, command):
     	self._task = work_queue_task_create(command)
@@ -135,6 +136,7 @@ class Task(_object):
     ##
     # Set the worker selection algorithm for task.
     #
+    # @param self	Reference to the current task object.
     # @param algorithm	One of the following algorithms to use in assigning a
     #			task to a worker:
     #			- @ref WORK_QUEUE_SCHEDULE_FCFS
@@ -149,6 +151,7 @@ class Task(_object):
     ##
     # Attach a user defined logical name to the task.
     #
+    # @param self	Reference to the current task object.
     # @param tag	The tag to attach to task.
     def specify_tag(self, tag):
     	return work_queue_task_specify_tag(self._task, tag)
@@ -156,6 +159,7 @@ class Task(_object):
     ##
     # Indicate that the task would be optimally run on a given host.
     #
+    # @param self	Reference to the current task object.
     # @param hostname	The hostname to which this task would optimally be sent.
     def specify_preferred_host(self, hostname):
     	return work_queue_task_specify_preferred_host(self._task, hostname)
@@ -163,6 +167,7 @@ class Task(_object):
     ##
     # Add a file to the task.
     #
+    # @param self	    Reference to the current task object.
     # @param local_name	    The name of the file on local disk or shared filesystem.
     # @param remote_name    The name of the file at the execution site.
     # @param type	    Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
@@ -207,6 +212,7 @@ class Task(_object):
     ##
     # Add an input bufer to the task.
     #
+    # @param self	    Reference to the current task object.
     # @param buffer	    The contents of the buffer to pass as input.
     # @param remote_name    The name of the remote file to create.
     # @param flags	    May take the same values as @ref specify_file.
@@ -218,6 +224,7 @@ class Task(_object):
     ##
     # Add a file created or handled by an arbitrary command to a task (eg. wget, ftp, chirp_get|put).
     #
+    # @param self	    Reference to the current task object.
     # @param remote_name    The name of the remote file at the execution site.
     # @param command	    The contents of the buffer to pass as input.
     # @param type	    Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
@@ -237,6 +244,7 @@ class WorkQueue(_object):
     ##
     # Create a new work queue.
     #
+    # @param self	Reference to the current work queue object.
     # @param port	The port number to listen on. If zero is specified, then the default is chosen, and if -1 is specified, a random port is chosen.
     # @param name	The project name to use.
     # @param catalog	Whether or not to enable catalog mode.
@@ -273,6 +281,7 @@ class WorkQueue(_object):
     ##
     # Turn on or off fast abort functionality for a given queue.
     #
+    # @param self	Reference to the current work queue object.
     # @param multiplier	The multiplier of the average task time at which point to abort; if negative (the default) fast_abort is deactivated.
     def activate_fast_abort(self, multiplier):
     	return work_queue_activate_fast_abort(self._work_queue, multiplier)
@@ -281,6 +290,8 @@ class WorkQueue(_object):
     # Determine whether there are any known tasks queued, running, or waiting to be collected.
     #
     # Returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
+    #
+    # @param self	Reference to the current work queue object.
     def empty(self):
     	return work_queue_empty(self._work_queue)
 
@@ -288,12 +299,15 @@ class WorkQueue(_object):
     # Determine whether the queue can support more tasks.
     #
     # Returns the number of additional tasks it can support if "hungry" and 0 if "sated".
+    #
+    # @param self	Reference to the current work queue object.
     def hungry(self):
     	return work_queue_hungry(self._work_queue)
 
     ##
     # Set the worker selection algorithm for queue.
     #
+    # @param self	Reference to the current work queue object.
     # @param algorithm	One of the following algorithms to use in assigning a
     #			task to a worker:
     #			- @ref WORK_QUEUE_SCHEDULE_FCFS
@@ -308,6 +322,7 @@ class WorkQueue(_object):
     ##
     # Change the project name for the given queue.
     #
+    # @param self   Reference to the current work queue object.
     # @param name   The new project name.
     def specify_name(self, name):
     	return work_queue_specify_name(self._work_queue, name)
@@ -315,13 +330,15 @@ class WorkQueue(_object):
     ##
     # Change the project priority for the given queue.
     #
-    # @param priority An integer that presents the priorty of this work queue master. The higher the value, the higher the priority.
+    # @param self	Reference to the current work queue object.
+    # @param priority	An integer that presents the priorty of this work queue master. The higher the value, the higher the priority.
     def specify_priority(self, priority):
     	return work_queue_specify_priority(self._work_queue, priority)
 
     ##
     # Specify the master mode for the given queue.
     #
+    # @param self   Reference to the current work queue object.
     # @param mode   This may be one of the following values: @ref WORK_QUEUE_MASTER_MODE_STANDALONE or @ref WORK_QUEUE_MASTER_MODE_CATALOG.
     def specify_master_mode(self, mode):
     	return work_queue_specify_master_mode(self._work_queue, mode)
@@ -329,6 +346,7 @@ class WorkQueue(_object):
     ##
     # Specify the worker mode for the given queue.
     #
+    # @param self   Reference to the current work queue object.
     # @param mode   This may be one of the following values: @ref WORK_QUEUE_WORKER_MODE_SHARED or @ref WORK_QUEUE_WORKER_MODE_EXCLUSIVE.
     def specify_worker_mode(self, mode):
     	return work_queue_specify_worker_mode(self._work_queue, mode)
@@ -338,7 +356,8 @@ class WorkQueue(_object):
     #
     # Gives a best effort and then returns the number of workers given the shutdown order.
     #
-    # @param n	The number to shutdown.  To shut down all workers, specify "0".
+    # @param self   Reference to the current work queue object.
+    # @param n	    The number to shutdown.  To shut down all workers, specify "0".
     def shutdown_workers(self, n):
     	return work_queue_shut_down_workers(self._work_queue, n)
 
@@ -347,6 +366,7 @@ class WorkQueue(_object):
     #
     # It is safe to re-submit a task returned by @ref wait.
     #
+    # @param self   Reference to the current work queue object.
     # @param task   A task description created from @ref work_queue::Task.
     def submit(self, task):
     	self._task_table[task.id] = task
@@ -357,6 +377,7 @@ class WorkQueue(_object):
     #
     # This call will block until the timeout has elapsed
     #
+    # @param self	Reference to the current work queue object.
     # @param timeout	The number of seconds to wait for a completed task
     #			before returning.  Use an integer to set the timeout or the constant @ref
     #			WORK_QUEUE_WAITFORTASK to block until a task has completed.
