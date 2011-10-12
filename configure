@@ -667,40 +667,28 @@ then
 				echo "found python development libraries"
 				packages="${packages} python"
 
-				if [ -x ${python}-config ]
-				then
-				    python_ccflags=`${python}-config --cflags`
-				    python_ldflags=`${python}-config --ldflags`
-				elif [ -x ${python_path}/bin/python${python_version}-config ]
-				then
-				    python_ccflags=`${python_path}/bin/python${python_version}-config --cflags`
-				    python_ldflags=`${python_path}/bin/python${python_version}-config --ldflags`
-				else
-				    python_ccflags_file=`mktemp tmp.XXXXXX`
-				    python_ldflags_file=`mktemp tmp.XXXXXX`
+				python_ccflags_file=`mktemp tmp.XXXXXX`
+				python_ldflags_file=`mktemp tmp.XXXXXX`
 
-				    ${python} > $python_ccflags_file <<EOF
+				${python} > $python_ccflags_file <<EOF
 from distutils import sysconfig
 flags = ['-I' + sysconfig.get_python_inc(),
 	 '-I' + sysconfig.get_python_inc(plat_specific=True)]
 flags.extend(sysconfig.get_config_var('CFLAGS').split())
 print ' '.join(flags)
 EOF
-				    ${python} > $python_ldflags_file <<EOF
+				${python} > $python_ldflags_file <<EOF
 from distutils import sysconfig
 libs = sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
-libs.append('-lpython'+sysconfig.get_config_var('VERSION'))
 if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
     libs.insert(0, '-L' + sysconfig.get_config_var('LIBPL'))
 libs.extend(sysconfig.get_config_var('LINKFORSHARED').split())
 print ' '.join(libs)
 EOF
-				    python_ccflags=`cat $python_ccflags_file`
-				    python_ldflags=`cat $python_ldflags_file`
-				    rm $python_ccflags_file
-				    rm $python_ldflags_file
-				fi
-
+				python_ccflags=`cat $python_ccflags_file`
+				python_ldflags=`cat $python_ldflags_file`
+				rm $python_ccflags_file
+				rm $python_ldflags_file
 				work_queue_bindings="$work_queue_bindings python"
 			else
 				python=0

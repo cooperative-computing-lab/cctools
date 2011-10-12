@@ -7,7 +7,7 @@ ldflags=${CCTOOLS_PYTHON_LDFLAGS} ${CCTOOLS_HOME}/dttools/src/libdttools.a
 
 all: work_queue.py _work_queue.so
 
-work_queue.py: ../work_queue.i work_queue.binding.py
+work_queue_wrap.c work_queue.py: ../work_queue.i work_queue.binding.py
 	@echo "SWIG work_queue.i (python)"
 	@swig -python -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c -outdir . ../work_queue.i
 	@cat work_queue.binding.py >> work_queue.py
