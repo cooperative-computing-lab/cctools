@@ -625,7 +625,12 @@ then
 	then
 		perl_ccflags=`perl -MExtUtils::Embed -e ccopts`
 		perl_ldflags=`perl -MExtUtils::Embed -e ldopts`
-		work_queue_bindings="$work_queue_bindings perl"
+		if check_path swig
+		then
+			work_queue_bindings="$work_queue_bindings perl"
+		else
+			echo "*** skipping perl bindings for work queue"
+		fi
 	else
                 if [ $config_perl_path = yes ]
                 then
