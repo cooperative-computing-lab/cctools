@@ -17,7 +17,7 @@
 
 # From the cctools python bindings, use work queue.
 
-from workqueue import *
+from work_queue import *
 
 # All other dependencies are standard python.
 
@@ -40,6 +40,7 @@ DEFAULT_OUTPUT_FREQ = 10000
 DEFAULT_PHYSICAL_TEMP = 300
 
 #-------------------------------Global Variables----------------------------
+protomol_local_install = False
 generate_xyz = False
 generate_dcd = False
 debug_mode = False
@@ -268,9 +269,6 @@ def re_main(replica_list, num_replicas):
 
 			'''Local_file - file that will be brought back and stored on the user computer.
 			   Remote_file - file that will be sent to remote worker and used in execution there.'''
-			
-			local_executable = "%s" % ("ProtoMol")
-            		remote_executable = "%s" % ("ProtoMol")
 
 			#Assign local and remote config files.
 			local_config_file = "%s/cfg/%d.cfg" % (output_path, replica_id)
@@ -301,15 +299,23 @@ def re_main(replica_list, num_replicas):
 				local_dcd_output_file = "%s/%s/%s.%d-%d.dcd" % (output_path, replica_list[j].temp, dcd_file_name, replica_list[j].id, i) 
 				remote_dcd_output_file = "%d.dcd" % (replica_id)
 
-			#Assign executable that will be run on remote worker to task string.
-			task_str = "ProtoMol %s" % remote_config_file
-
 	        #Create a task using given task string for remote worker to execute.
-			task = Task(task_str) 
-			task.tag = str(replica_id)
+			
+			#Assign executable that will be run on remote worker to task string.
+			if protomol_local_install:
+				task_str = "ProtoMol %s" % remote_config_file
+			else:
+				local_executable = "%s" % ("ProtoMol")
+				remote_executable = "%s" % ("ProtoMol")
+				task_str = "./ProtoMol %s" % remote_config_file
 		
-	        #Set the input files required by the task.
-			task.specify_input_file(local_executable, remote_executable)
+			task = Task(task_str) 
+			task.specify_tag('%s' % replica_id)
+				
+			if not protomol_local_install:
+				task.specify_input_file(local_executable, remote_executable)
+	        
+			#Set the input files required by the task.
 			task.specify_input_file(local_config_file, remote_config_file) 
 
 			if (i > 0):
@@ -443,11 +449,12 @@ if __name__ == "__main__":
 	help_str += "-m		-	specify the number of monte carlo steps\n"
 	help_str += "-s		-	specify the number of mdsteps\n"
 	help_str += "-p		-	specify the output_path for the output files generated\n"
+	help_str += "-i		-	assume ProtoMol is installed and available in PATH on worker site\n"
 	help_str += "-q		-	assign closer temperature values to the first and last quartile of the replicas.\n"
 
 	#Check to see if there is error in the given command line arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "m:s:n:p:x:d:hlq", ["--help", "--proj", "dir", "--xyz", "--dcd"])
+		opts, args = getopt.getopt(sys.argv[1:], "m:s:n:p:x:d:ihlq", ["--help", "--proj", "dir", "--xyz", "--dcd"])
 	except getopt.GetoptError, err:
 		print str(err) 
 		print usage_str
@@ -476,6 +483,8 @@ if __name__ == "__main__":
 			md_steps = int(a)
 		elif o == "-q":
 			quart_temp_split = True
+		elif o == "-i":
+			protomol_local_install = True
 
 	if debug_mode:
 		print "dmode on"
