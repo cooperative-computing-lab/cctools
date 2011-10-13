@@ -47,7 +47,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 {
 	int c;
 
-	while((c = getopt(argc, argv, "d:lt:h")) != -1) {
+	while((c = getopt(argc, argv, "d:lt:h")) != (char)-1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);
