@@ -14,10 +14,9 @@ htmlpages: ${HTMLFILES}
 
 manpages: ${ZIPFILES}
 
-apipages: api
+apipages: api/html/index.html
 
-api:
-	mkdir -p api
+api/html/index.html:
 	doxygen cctools.doxygen.config
 
 %.html: %.m4

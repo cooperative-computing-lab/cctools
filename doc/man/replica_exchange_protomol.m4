@@ -45,7 +45,7 @@ home directory, then you must set the CODE(PYTHONPATH) environment
 so that the workqueue python module can be found.  For example:
 
 LONGCODE_BEGIN
-% setenv PYTHONPATH /home/fred/cctools/lib64/python2.4/site-packages
+% setenv PYTHONPATH $HOME/cctools/lib/python2.4/site-packages
 LONGCODE_END
 
 SECTION(EXAMPLES)
