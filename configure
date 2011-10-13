@@ -750,7 +750,7 @@ cctools_doctargets=
 
 if check_path doxygen
 then
-	cctools_doctargets+="${cctools_doctargets} apipages"
+	cctools_doctargets="${cctools_doctargets} apipages"
 else
 	echo "*** not building API documentation"
 fi
