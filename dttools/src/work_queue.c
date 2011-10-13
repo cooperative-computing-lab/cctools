@@ -38,6 +38,10 @@ See the file COPYING for details.
 #include <time.h>
 #include <stdlib.h>
 
+#ifdef CCTOOLS_OPSYS_SUNOS
+extern int setenv( const char *name, const char *value, int overwrite );
+#endif
+
 #define WORKER_STATE_INIT  0
 #define WORKER_STATE_READY 1
 #define WORKER_STATE_BUSY  2
