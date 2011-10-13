@@ -93,7 +93,7 @@ static int errno_is_temporary(int e)
 }
 
 #ifndef SOCKLEN_T
-#if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN)
+#if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_AIX)
 #define SOCKLEN_T socklen_t
 #else
 #define SOCKLEN_T int
