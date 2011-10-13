@@ -36,6 +36,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdlib.h>
 
 #define WORKER_STATE_INIT  0
 #define WORKER_STATE_READY 1
