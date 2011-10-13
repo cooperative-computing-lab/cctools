@@ -253,7 +253,7 @@ batch_job_id_t batch_job_wait_hadoop(struct batch_queue * q, struct batch_job_in
 
 			if(status) {
 				int map, red;
-				time_t logtime;
+				long logtime;
 				char result[BATCH_JOB_LINE_MAX];
 				char message[BATCH_JOB_LINE_MAX];
 
