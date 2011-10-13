@@ -34,11 +34,11 @@ api:
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	cp *.html $(CCTOOLS_INSTALL_DIR)/doc
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/man
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/man/man1
+	cp *.html $(CCTOOLS_INSTALL_DIR)/doc
 	if [ -f man/chirp.html ]; then cp man/*.html $(CCTOOLS_INSTALL_DIR)/doc/man; fi
 	if [ -f man/chirp.1.gz ]; then cp man/*.1.gz $(CCTOOLS_INSTALL_DIR)/share/man/man1; fi
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/man/man1
 	if [ -d api ]; then cp -rp api $(CCTOOLS_INSTALL_DIR)/doc; fi
 	if [ -d images ]; then cp -rp images $(CCTOOLS_INSTALL_DIR)/doc; fi
 
