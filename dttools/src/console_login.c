@@ -14,7 +14,12 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
+
+#ifdef CCTOOLS_OPSYS_FREEBSD
+#include <stdlib.h>
+#else
 #include <alloca.h>
+#endif
 
 static int setecho(int fd, int onoff)
 {
