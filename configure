@@ -280,7 +280,7 @@ done
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_work_queue} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} doc apps"
+potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} doc apps"
 
 if [ $build_sys = LINUX ]
 then
@@ -612,6 +612,13 @@ else
 	fi
 fi
 
+if check_path swig
+then
+	packages="${packages} ${include_package_work_queue}"
+else
+	echo "*** skipping swig bindings for work queue"
+fi
+
 if [ $config_perl_path != no ]
 then
 	if check_file ${perl_path}/bin/perl
@@ -625,12 +632,7 @@ then
 	then
 		perl_ccflags=`perl -MExtUtils::Embed -e ccopts`
 		perl_ldflags=`perl -MExtUtils::Embed -e ldopts`
-		if check_path swig
-		then
-			work_queue_bindings="$work_queue_bindings perl"
-		else
-			echo "*** skipping perl bindings for work queue"
-		fi
+		work_queue_bindings="$work_queue_bindings perl"
 	else
                 if [ $config_perl_path = yes ]
                 then
