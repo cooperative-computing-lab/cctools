@@ -20,10 +20,10 @@ api/html/index.html:
 	doxygen cctools.doxygen.config
 
 %.html: %.m4
-	m4 -DHTML -Imacros $< > $@
+	m4 -DHTML $< > $@
 
 %.1: %.m4
-	m4 -DMAN -Imacros $< > $@
+	m4 -DMAN $< > $@
 
 %.txt: %.1
 	nroff -man $< > $@
