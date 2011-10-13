@@ -729,7 +729,12 @@ then
 	ldflags="${ldflags} -lrt"
 fi
 
-ldflags="${ldflags} -lstdc++ -ldl -lpthread -lz -lc -lm"
+if [ $build_sys != FREEBSD ]
+then
+	ldflags="${ldflags} -ldl"
+fi
+
+ldflags="${ldflags} -lstdc++ -lpthread -lz -lc -lm"
 
 if [ $build_sys = DARWIN ]
 then
