@@ -173,9 +173,12 @@ void pfs_table::complete_at_path( int dirfd, const char *path, char *full_path )
 	if(path[0]=='/') {
 		strcpy(full_path,path);
 	} else {
+#ifdef AT_FDCWD
 		if(dirfd==AT_FDCWD) {
 			sprintf(full_path,"%s/%s",working_dir,path);
-		} else {
+		} else
+#endif
+		{
 			get_full_name(dirfd,full_path);
 			strcat(full_path,"/");
 			strcat(full_path,path);
