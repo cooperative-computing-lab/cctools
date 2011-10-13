@@ -92,10 +92,12 @@ static int errno_is_temporary(int e)
 	}
 }
 
+#ifndef SOCKLEN_T
 #if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN)
 #define SOCKLEN_T socklen_t
 #else
 #define SOCKLEN_T int
+#endif
 #endif
 
 int datagram_recv(struct datagram *d, char *data, int length, char *addr, int *port, int timeout)
