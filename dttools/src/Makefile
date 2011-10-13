@@ -68,7 +68,7 @@ int_sizes.h: make_int_sizes
 	./$< > $@
 
 make_int_sizes: make_int_sizes.o
-	${CCTOOLS_LD} $^ -o $@ -static
+	${CCTOOLS_LD} $^ -o $@ ${CCTOOLS_INTERNAL_LDFLAGS}
 
 test: all
 
