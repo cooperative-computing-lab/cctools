@@ -755,11 +755,12 @@ int pfs_fchownat( int dirfd, const char *path, uid_t owner, gid_t group, int fla
 {
 	char newpath[PFS_PATH_MAX];
 	pfs_current->table->complete_at_path(dirfd,path,newpath);
+#ifdef AT_SYMLINK_NOFOLLOW
 	if(flags&AT_SYMLINK_NOFOLLOW) {
 		return pfs_lchown(newpath,owner,group);
-	} else {
-		return pfs_chown(newpath,owner,group);
 	}
+#endif
+	return pfs_chown(newpath,owner,group);
 }
 
 int pfs_futimesat( int dirfd, const char *path, const struct timeval times[2] )
@@ -781,22 +782,24 @@ int pfs_fstatat( int dirfd, const char *path, struct pfs_stat *buf, int flags )
 {
 	char newpath[PFS_PATH_MAX];
 	pfs_current->table->complete_at_path(dirfd,path,newpath);
+#ifdef AT_SYMLINK_NOFOLLOW
 	if(flags&AT_SYMLINK_NOFOLLOW) {
 		return pfs_lstat(newpath,buf);
-	} else {
-		return pfs_stat(newpath,buf);
 	}
+#endif
+	return pfs_stat(newpath,buf);
 }
 
 int pfs_unlinkat( int dirfd, const char *path, int flags )
 {
 	char newpath[PFS_PATH_MAX];
 	pfs_current->table->complete_at_path(dirfd,path,newpath);
+#ifdef AT_REMOVEDIR
 	if(flags&AT_REMOVEDIR) {
 		return pfs_rmdir(newpath);
-	} else {
-		return pfs_unlink(newpath);
 	}
+#endif
+	return pfs_unlink(newpath);
 }
 
 int pfs_renameat( int olddirfd, const char *oldpath, int newdirfd, const char *newpath )
