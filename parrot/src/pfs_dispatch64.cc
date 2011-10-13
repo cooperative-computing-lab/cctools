@@ -2158,7 +2158,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					p->syscall_result = -errno;
 				} else {
 					COPY_STAT(lbuf,kbuf);
-					tracer_copy_out(p->tracer,&kbuf,POINTER(args[1]),sizeof(kbuf));
+					tracer_copy_out(p->tracer,&kbuf,POINTER(args[2]),sizeof(kbuf));
 				}
 				divert_to_dummy(p,p->syscall_result);
 			}
