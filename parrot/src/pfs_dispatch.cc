@@ -2279,6 +2279,24 @@ void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
+		case SYSCALL32_fstatat64:
+			if(entering) {
+				struct pfs_stat lbuf;
+				struct pfs_kernel_stat kbuf;
+
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				p->syscall_result = pfs_fstatat(args[0],path,&lbuf,args[3]);
+				if(p->syscall_result<0) {
+					p->syscall_result = -errno;
+				} else {
+					COPY_STAT(lbuf,kbuf);
+					tracer_copy_out(p->tracer,&kbuf,POINTER(args[2]),sizeof(kbuf));
+				}
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+
 		case SYSCALL32_futimesat:
 			if(entering) {
 				struct timeval times[2];
