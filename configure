@@ -81,7 +81,7 @@ has_egee=no
 ccompiler=gcc
 cxxcompiler=g++
 mpicompiler=mpicc
-ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Werror -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
+ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
 
 if [ ${build_sys} != CYGWIN ]
 then
@@ -119,7 +119,10 @@ do
 		--prefix)
 			shift
 			install_path=$1
-			;;	
+			;;
+		--strict)
+			ccflags="${ccflags} -Werror"
+			;;
 		--with-globus-path)
 			shift
 			globus_path=$1
@@ -237,6 +240,7 @@ Use: configure [options]
 Where options are:
   --help
   --prefix             <path>
+  --strict
   --globus-flavor      <flavor>
   --xrootd-arch        <arch>
   --with-PACKAGE-path  <path>
