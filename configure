@@ -666,7 +666,7 @@ then
 		python_version=`${python} -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('VERSION')"`
 		echo "python version is ${python_version}"
 		python_major_version=`echo ${python_version} | cut -d . -f 2`
-		if [ $python_major_version -ge 4 ]
+		if [ $python_major_version -ge 3 ]
 		then
 			if check_file ${python_path}/include/python2.$python_major_version/Python.h
 			then
@@ -698,7 +698,7 @@ EOF
 				python=0
 			fi
 		else
-			echo "*** Sorry, we require Python >= 2.4"
+			echo "*** Sorry, we require Python >= 2.3"
 			python=0
 		fi
 	fi
@@ -707,7 +707,7 @@ EOF
 	then
                 if [ $config_python_path = yes ]
                 then
-                        echo "*** Sorry, I couldn't find the Python > 2.6.0 libraries in $python_path"
+                        echo "*** Sorry, I couldn't find the Python > 2.3 libraries in $python_path"
                         echo "*** Check --with-python-path and try again."
                         exit 1
                 else
