@@ -667,8 +667,6 @@ then
 			if check_file ${python_path}/include/python2.$python_major_version/Python.h
 			then
 				echo "found python development libraries"
-				packages="${packages} python"
-
 				python_ccflags_file=`mktemp tmp.XXXXXX`
 				python_ldflags_file=`mktemp tmp.XXXXXX`
 
