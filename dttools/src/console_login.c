@@ -15,12 +15,6 @@ See the file COPYING for details.
 #include <fcntl.h>
 #include <termios.h>
 
-#ifdef CCTOOLS_OPSYS_FREEBSD
-#include <stdlib.h>
-#else
-#include <alloca.h>
-#endif
-
 static int setecho(int fd, int onoff)
 {
 	struct termios term;
@@ -84,14 +78,17 @@ int console_login(const char *service, char *name, int namelen, char *pass, int 
 {
 	char *prompt;
 
-	prompt = alloca(strlen(service) + 10);
+	prompt = malloc(strlen(service) + 10);
 	if(!prompt)
 		return 0;
 
 	sprintf(prompt, "%s login: ", service);
 
-	return do_getline(prompt, name, namelen, 1) && do_getline("password: ", pass, passlen, 0);
+	int result = do_getline(prompt, name, namelen, 1) && do_getline("password: ", pass, passlen, 0);
 
+	free(prompt);
+
+	return result;
 }
 
 int console_input(const char *prompt, char *buf, int buflen)

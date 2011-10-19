@@ -22,9 +22,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#ifdef HAS_ALLOCA_H
-#include <alloca.h>
-#endif
 #include <errno.h>
 #include <signal.h>
 #include <unistd.h>
