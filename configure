@@ -652,6 +652,8 @@ then
 
 	if [ $perl != 0 ]
 	then
+		perl_version=`perl -e 'printf "%vd\n",$^V;'`
+		echo "perl version is ${perl_version}"
 		perl_ccflags=`perl -MExtUtils::Embed -e ccopts`
 		perl_ldflags=`perl -MExtUtils::Embed -e ldopts`
 		work_queue_bindings="$work_queue_bindings perl"
@@ -842,6 +844,7 @@ CCTOOLS_AR=ar
 CCTOOLS_PERL=${perl}
 CCTOOLS_PERL_CCFLAGS=${perl_ccflags}
 CCTOOLS_PERL_LDFLAGS=${perl_ldflags}
+CCTOOLS_PERL_VERSION=${perl_version}
 
 CCTOOLS_PYTHON=${python}
 CCTOOLS_PYTHON_CCFLAGS=${python_ccflags}

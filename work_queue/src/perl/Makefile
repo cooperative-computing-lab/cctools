@@ -22,4 +22,9 @@ test: all
 clean:
 	rm -fr work_queue.pm work_queue.${CCTOOLS_DYNAMIC_SUFFIX} work_queue_wrap.*
 
+PERL_INSTALL_DIR=$(CCTOOLS_INSTALL_DIR)/lib/perl5/site_perl/$(CCTOOLS_PERL_VERSION)
+
 install: all
+	install -d $(PERL_INSTALL_DIR)
+	install work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(PERL_INSTALL_DIR)/work_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
+	install work_queue.pm $(PERL_INSTALL_DIR)/work_queue.pm
