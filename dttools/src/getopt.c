@@ -20,66 +20,16 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
 
-/* This tells Alpha OSF/1 not to define a getopt prototype in <stdio.h>.
-   Ditto for AIX 3.2 and <stdlib.h>.  */
-#ifndef _NO_PROTO
-# define _NO_PROTO
-#endif
+/*
+Slightly modified for the CCTools: remove unnecessary header mangling
+and skip internationalization of error messages.
+*/
 
-#ifdef HAVE_CONFIG_H
-# include <config.h>
-#endif
-
+#include <stdlib.h>
 #include <stdio.h>
-
-/* Comment out all this code if we are using the GNU C Library, and are not
-   actually compiling the library itself.  This code is part of the GNU C
-   Library, but also included in many other GNU distributions.  Compiling
-   and linking in this code is a waste when using the GNU C library
-   (especially if it is a shared library).  Rather than having every GNU
-   program understand `configure --with-gnu-libc' and omit the object files,
-   it is simpler to just do this in the source for each such file.  */
-
-#define GETOPT_INTERFACE_VERSION 2
-#if !defined _LIBC && defined __GLIBC__ && __GLIBC__ >= 2
-# include <gnu-versions.h>
-# if _GNU_GETOPT_INTERFACE_VERSION == GETOPT_INTERFACE_VERSION
-#  define ELIDE_CODE
-# endif
-#endif
-
-#ifndef ELIDE_CODE
-
-
-/* This needs to come after some library #include
-   to get __GNU_LIBRARY__ defined.  */
-#ifdef	__GNU_LIBRARY__
-/* Don't include stdlib.h for non-GNU C libraries because some of them
-   contain conflicting prototypes for getopt.  */
-# include <stdlib.h>
-# include <unistd.h>
-#endif	/* GNU C library.  */
-
 #include <string.h>
 
-#ifdef VMS
-# include <unixlib.h>
-#endif
-
-#ifdef _LIBC
-# include <libintl.h>
-#else
-# include "gettext.h"
-# define _(msgid) gettext (msgid)
-#endif
-
-#if defined _LIBC && defined USE_IN_LIBIO
-# include <wchar.h>
-#endif
-
-#ifndef attribute_hidden
-# define attribute_hidden
-#endif
+#define _(msg) msg
 
 /* This version of `getopt' appears to the caller like standard Unix `getopt'
    but it behaves differently for the user, since it allows the user
@@ -1137,7 +1087,6 @@ getopt (int argc, char *const *argv, const char *optstring)
 			   0);
 }
 
-#endif	/* Not ELIDE_CODE.  */
 
 #ifdef TEST
 
