@@ -25,9 +25,6 @@ See the file COPYING for details.
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
-#ifdef HAS_ALLOCA_H
-#include <alloca.h>
-#endif
 
 static int debug_fd = 2;
 static char *debug_file = 0;
@@ -172,9 +169,10 @@ static void do_debug(int is_fatal, INT64_T flags, const char *fmt, va_list args)
 
 			if(stat(debug_file, &info) == 0) {
 				if(info.st_size >= debug_file_size) {
-					char *newname = alloca(strlen(debug_file) + 5);
+					char *newname = malloc(strlen(debug_file) + 5);
 					sprintf(newname, "%s.old", debug_file);
 					rename(debug_file, newname);
+					free(newname);
 				}
 			}
 
