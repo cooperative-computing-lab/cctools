@@ -663,12 +663,13 @@ then
 
 	if [ $python != 0 ]
 	then
-		python_version=`${python} -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('VERSION')"`
+		python_version=`${python} -V 2>&1 | cut -d " " -f 2`
 		echo "python version is ${python_version}"
-		python_major_version=`echo ${python_version} | cut -d . -f 2`
-		if [ $python_major_version -ge 3 ]
+		python_major_version=`echo ${python_version} | cut -d . -f 1`
+		python_minor_version=`echo ${python_version} | cut -d . -f 2`
+		if [ $python_major_version -ge 2 -a $python_minor_version -ge 3 ]
 		then
-			if check_file ${python_path}/include/python2.$python_major_version/Python.h
+			if check_file ${python_path}/include/python2.$python_minor_version/Python.h
 			then
 				echo "found python development libraries"
 				python_ccflags_file=`mktemp tmp.XXXXXX`
