@@ -53,8 +53,7 @@ class Task(_object):
     def __del__(self):
     	work_queue_task_delete(self._task)
 
-    @staticmethod
-    def _determine_file_flags(flags, cache):
+    def _determine_file_flags(self, flags, cache):
 	if flags is None:
 	    flags = WORK_QUEUE_CACHE
 
@@ -192,7 +191,7 @@ class Task(_object):
 	if type is None:
 	    type = WORK_QUEUE_INPUT
 
-	flags = Task._determine_file_flags(flags, cache)
+	flags = self._determine_file_flags(flags, cache)
 	return work_queue_task_specify_file(self._task, local_name, remote_name, type, flags)
 
     ##
@@ -218,7 +217,7 @@ class Task(_object):
     # @param flags	    May take the same values as @ref specify_file.
     # @param cache	    Legacy parameter for setting file caching attribute.  By default this is enabled.
     def specify_buffer(self, buffer, remote_name, flags=None, cache=True):
-	flags = Task._determine_file_flags(flags, cache)
+	flags = self._determine_file_flags(flags, cache)
 	return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
     ##
@@ -231,7 +230,7 @@ class Task(_object):
     # @param flags	    May take the same values as @ref specify_file.
     # @param cache	    Legacy parameter for setting file caching attribute.  By default this is enabled.
     def specify_file_command(self, remote_name, command, type, flags, cache=True):
-	flags = Task._determine_file_flags(flags, cache)
+	flags = self._determine_file_flags(flags, cache)
 	return work_queue_task_specify_file_command(self._task, remote_name, command, type, flags)
 
 
