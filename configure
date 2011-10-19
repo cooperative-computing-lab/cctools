@@ -286,13 +286,6 @@ export IFS
 
 potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} doc apps"
 
-if [ $build_sys = LINUX ]
-then
-	ldflags="-Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic -Xlinker --as-needed "
-else
-	ldflags="-static-libgcc"
-fi
-
 check_multiarch
 
 rm -f Makefile.config
@@ -317,6 +310,31 @@ require_path ${ccompiler}
 require_path ${cxxcompiler}
 require_path "install"
 require_gnu_make
+
+#
+# Currently, we rely on the linker --as-needed flag to sort out
+# which dynamic libraries each executable actually needs.
+# This is apparently a recent addition to gnu ld.
+# A better solution would be to explicitly specify which libraries
+# are needed by which executable, but this will come in a later version.
+#
+
+echo -n "checking if ld supports the --as-needed flag..."
+if ld --help 2>&1 | grep -- --as-needed 2>&1 >/dev/null 
+then
+        echo "yes"
+        link_as_needed="-Xlinker --as-needed"
+        link_no_as_needed="-Xlinker --no-as-needed"
+else
+        echo "no"
+fi
+
+if [ $build_sys = LINUX ]
+then
+        ldflags="-Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic ${link_as_needed}"
+else
+        ldflags="-static-libgcc"
+fi
 
 ##########################################################################
 # SWITCH TO STATIC LINKING FOR UNCOMMON THIRD-PARTY PACKAGES
@@ -539,7 +557,7 @@ then
 
 	if [ $build_sys = LINUX ]
 	then
-		cctools_readline_ldflags="-Xlinker --no-as-needed -lncurses -ltermcap -lhistory -Xlinker --as-needed"
+		cctools_readline_ldflags="${link_no_as_needed} -lncurses -ltermcap -lhistory ${link_as_needed}"
 	else 
 		library_search ncurses ${readline_path}
 		library_search termcap ${readline_path}
