@@ -60,14 +60,14 @@ listening on port CODE(9123). To start 10 workers on the Condor batch system
 for your master, you can invoke BOLD(work_queue_pool) like this: 
 
 LONGCODE_BEGIN
-work_queue_pool -T Condor barney.nd.edu 9123 10
+work_queue_pool -T condor barney.nd.edu 9123 10
 LONGCODE_END
 
 If you want to start the 10 workers on the SGE batch system instead, you only
 need to change the BOLD(CODE(-T)) option:
 
 LONGCODE_BEGIN
-work_queue_pool -T SGE barney.nd.edu 9123 10
+work_queue_pool -T sge barney.nd.edu 9123 10
 LONGCODE_END
 
 If you have access to both of the Condor and SGE systems, you can run both of
@@ -87,7 +87,7 @@ program can start workers that prefer to work for this master by specifying the
 same project name on the command line (see the BOLD(CODE(-N)) option):
 
 LONGCODE_BEGIN
-work_queue_pool -T Condor -N my_project -a 10
+work_queue_pool -T condor -N my_project -a 10
 LONGCODE_END
 
 SECTION(COPYRIGHT)
@@ -96,3 +96,5 @@ COPYRIGHT_BOILERPLATE
 SECTION(SEE ALSO)
 
 SEE_ALSO_WORK_QUEUE
+
+FOOTER

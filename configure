@@ -9,6 +9,7 @@ save_arguments $0 $@
 major=3
 minor=4
 micro=0
+release_date="10/19/2011"
 
 build_user=`whoami`
 build_host=`uname -n`
@@ -854,6 +855,9 @@ CCTOOLS_PYTHON_VERSION=${python_version}
 CCTOOLS_WORK_QUEUE_BINDINGS=${work_queue_bindings}
 
 CCTOOLS_DOCTARGETS=${cctools_doctargets}
+
+CCTOOLS_M4_ARGS=-DCCTOOLS_VERSION=${major}.${minor}.${micro} -DCCTOOLS_RELEASE_DATE=${release_date}
+
 EOF
 
 echo ""

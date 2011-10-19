@@ -116,3 +116,5 @@ LIST_ITEM MANPAGE(work_queue_worker,1)
 LIST_ITEM MANPAGE(condor_submit_workers,1)
 LIST_ITEM MANPAGE(sge_submit_workers,1)
 LIST_END
+
+FOOTER

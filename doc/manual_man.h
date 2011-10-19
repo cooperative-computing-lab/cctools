@@ -1,4 +1,4 @@
-define(HEADER,.TH "$1" 1 "October 2011" "CCL" "Cooperative Computing Tools")dnl
+define(HEADER,.TH "$1" 1 "CCTOOLS_RELEASE_DATE" "CCTools CCTOOLS_VERSION" "Cooperative Computing Tools")dnl
 define(SECTION,.SH $1
 .LP)dnl
 define(SUBSECTION,.SS $1
@@ -8,6 +8,7 @@ define(BOLD,\fB$1\fP)dnl
 define(ITALIC,\fI$1\fP)dnl
 define(CODE,\FC$1\FT)dnl
 define(LINK,$1 (BOLD($2)))dnl
+define(MANUAL,BOLD($1))dnl
 define(MANPAGE,BOLD($1($2)))dnl
 define(LIST_BEGIN)dnl
 define(LIST_ITEM,`.IP \(bu 4'

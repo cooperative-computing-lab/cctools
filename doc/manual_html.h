@@ -4,6 +4,7 @@ define(SUBSECTION,<h3>$1</h3>)dnl
 define(SUBSUBSECTION,<h4>$1</h4>)dnl
 define(PARA,<p>)dnl
 define(LINK,<a href=$2>$1</a>)dnl
+define(MANUAL,LINK($1,$2))dnl
 define(MANPAGE,LINK($1($2),$1.html))dnl
 define(BOLD,<b>$1</b>)dnl
 define(CODE,<tt>$1</tt>)dnl
@@ -25,7 +26,7 @@ define(OPTIONS_END,</table>)dnl
 define(LONGCODE_BEGIN,<pre>)
 define(LONGCODE_END,</pre>)
 
-define(FOOTER,</body></html>)dnl
+define(FOOTER,<p><hr>CCTools CCTOOLS_VERSION released on CCTOOLS_RELEASE_DATE</body></html>)dnl
 
 define(TABLE_START,<table>)dnl
 define(ROW,<tr valign=top>)dnl

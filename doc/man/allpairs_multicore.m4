@@ -87,3 +87,5 @@ LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/
 LIST_ITEM LINK(All-Pairs User Manual,"http://www.nd.edu/~ccl/software/manuals/allpairs.html")
 LIST_ITEM MANPAGE(allpairs_master,1)
 LIST_END
+
+FOOTER

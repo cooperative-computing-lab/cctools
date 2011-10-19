@@ -4,8 +4,8 @@ define(COPYRIGHT_BOILERPLATE,The Cooperative Computing Tools are Copyright (C) 2
 dnl
 define(SEE_ALSO_MAKEFLOW,
 `LIST_BEGIN
-LIST_ITEM LINK(Cooperative Computing Tools Documentation,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Makeflow User Manual,"http://www.nd.edu/~ccl/software/manuals/makeflow.html")
+LIST_ITEM MANUAL(Cooperative Computing Tools Documentation,"../index.html")
+LIST_ITEM MANUAL(Makeflow User Manual,"../makeflow.html")
 LIST_ITEM MANPAGE(makeflow,1)
 LIST_ITEM MANPAGE(makeflow_monitor,1)
 LIST_ITEM MANPAGE(starch,1)
@@ -13,8 +13,8 @@ LIST_END')dnl
 dnl
 define(SEE_ALSO_WORK_QUEUE,
 `LIST_BEGIN
-LIST_ITEM LINK(Cooperative Computing Tools Documentation,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Work Queue User Manual,"http://www.nd.edu/~ccl/software/manuals/workqueue.html")
+LIST_ITEM MANUAL(Cooperative Computing Tools Documentation,"../index.html")
+LIST_ITEM MANUAL(Work Queue User Manual,"../workqueue.html")
 LIST_ITEM MANPAGE(work_queue_worker,1)
 LIST_ITEM MANPAGE(work_queue_status,1)
 LIST_ITEM MANPAGE(work_queue_pool,1)
@@ -26,8 +26,8 @@ LIST_END')dnl
 dnl
 define(SEE_ALSO_PARROT,
 `LIST_BEGIN
-LIST_ITEM LINK(Cooperative Computing Tools Documentation,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Parrot User Manual,"http://www.nd.edu/~ccl/software/manuals/parrot.html")
+LIST_ITEM MANUAL(Cooperative Computing Tools Documentation,"../index.html")
+LIST_ITEM MANUAL(Parrot User Manual,"../parrot.html")
 LIST_ITEM MANPAGE(parrot_run,1)
 LIST_ITEM MANPAGE(parrot_run_hdfs,1)
 LIST_ITEM MANPAGE(parrot_cp,1)
@@ -42,8 +42,8 @@ LIST_ITEM MANPAGE(parrot_md5,1)
 LIST_END')dnl
 define(SEE_ALSO_CHIRP,
 `LIST_BEGIN
-LIST_ITEM LINK(Cooperative Computing Tools Documentation,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(Chirp User Manual,"http://www.nd.edu/~ccl/software/manuals/chirp.html")
+LIST_ITEM MANUAL(Cooperative Computing Tools Documentation,"../index.html")
+LIST_ITEM MANUAL(Chirp User Manual,"../chirp.html")
 LIST_ITEM MANPAGE(chirp,1)
 LIST_ITEM MANPAGE(chirp_status,1)
 LIST_ITEM MANPAGE(chirp_fuse,1)
@@ -58,8 +58,8 @@ LIST_END')dnl
 dnl
 define(SEE_ALSO_SAND,
 `LIST_BEGIN
-LIST_ITEM LINK(Cooperative Computing Tools Documentation,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(SAND User Manual,"http://www.nd.edu/~ccl/software/manuals/sand.html")
+LIST_ITEM MANUAL(Cooperative Computing Tools Documentation,"../index.html")
+LIST_ITEM MANUAL(SAND User Manual,"../sand.html")
 LIST_ITEM MANPAGE(sand_filter_master,1)
 LIST_ITEM MANPAGE(sand_filter_kernel,1)
 LIST_ITEM MANPAGE(sand_align_master,1)
@@ -68,4 +68,3 @@ LIST_ITEM MANPAGE(sand_compress_reads,1)
 LIST_ITEM MANPAGE(sand_uncompress_reads,1)
 LIST_ITEM MANPAGE(work_queue_worker,1)
 LIST_END')dnl
-
