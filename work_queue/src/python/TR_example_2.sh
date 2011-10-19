@@ -2,6 +2,8 @@
 
 . ../../../dttools/src/test_runner.common.sh
 
+export `grep CCTOOLS_PYTHON= ../../../Makefile.config`
+
 prepare()
 {
     exit 0
@@ -10,7 +12,7 @@ prepare()
 run()
 {
     export PATH=../../../dttools/src:$PATH
-    exec ./work_queue_example_2.py
+    exec ${CCTOOLS_PYTHON} ./work_queue_example_2.py
 }
 
 clean()

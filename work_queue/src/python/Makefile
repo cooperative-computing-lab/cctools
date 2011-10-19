@@ -5,6 +5,9 @@ include ${CCTOOLS_HOME}/Makefile.config
 ccflags=${CCTOOLS_PYTHON_CCFLAGS} -I${CCTOOLS_HOME}/dttools/src
 ldflags=${CCTOOLS_PYTHON_LDFLAGS} ${CCTOOLS_HOME}/dttools/src/libdttools.a
 
+# Python always uses 'so' for its modules (even on Darwin)
+CCTOOLS_DYNAMIC_SUFFIX=so
+
 all: work_queue.py _work_queue.${CCTOOLS_DYNAMIC_SUFFIX}
 
 work_queue_wrap.c work_queue.py: ../work_queue.i work_queue.binding.py
@@ -19,9 +22,9 @@ work_queue_wrap.o: work_queue_wrap.c
 # in the framework search path emitted by the Python configuration on macOS.
 
 _work_queue.${CCTOOLS_DYNAMIC_SUFFIX}: work_queue_wrap.o
-	ln -sf /System/Library/Frameworks/Python.framework . 
+	@ln -sf /System/Library/Frameworks/Python.framework . 
 	${CCTOOLS_LD} ${CCTOOLS_DYNAMIC_FLAG} $< -o $@ ${CCTOOLS_INTERNAL_LDFLAGS} ${ldflags}
-	rm Python.framework
+	@rm Python.framework
 
 test: all
 	@echo running work queue python binding tests

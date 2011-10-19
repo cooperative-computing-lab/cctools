@@ -715,6 +715,12 @@ EOF
 				python_ldflags=`cat $python_ldflags_file`
 				rm $python_ccflags_file
 				rm $python_ldflags_file
+
+				if [ $build_sys = DARWIN ]
+				then
+				    python_ldflags="$python_ldflags -undefined dynamic_lookup"
+				fi
+
 				work_queue_bindings="$work_queue_bindings python"
 			else
 				python=0
