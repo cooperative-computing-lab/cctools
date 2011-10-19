@@ -717,7 +717,7 @@ EOF
 				python=0
 			fi
 		else
-			echo "*** Sorry, we require Python >= 2.3"
+			echo "*** Sorry, we require Python >= 2.4"
 			python=0
 		fi
 	fi
@@ -726,7 +726,7 @@ EOF
 	then
                 if [ $config_python_path = yes ]
                 then
-                        echo "*** Sorry, I couldn't find the Python > 2.3 libraries in $python_path"
+                        echo "*** Sorry, I couldn't find the Python >= 2.4 libraries in $python_path"
                         echo "*** Check --with-python-path and try again."
                         exit 1
                 else
