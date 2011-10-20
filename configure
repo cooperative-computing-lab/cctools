@@ -764,7 +764,14 @@ then
 	ldflags="${ldflags} -ldl"
 fi
 
-ldflags="${ldflags} -lstdc++ -lpthread -lz -lc -lm"
+#Hack to get chirp to compile on cygwin.
+if [ ${build_sys} != CYGWIN ]
+then
+	ldflags="${ldflags} -lstdc++ -lpthread -lz -lc -lm"
+else
+	ldflags="${ldflags} -lstdc++ -lpthread -lz -lm"
+fi
+
 
 if [ $build_sys = DARWIN ]
 then
