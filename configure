@@ -672,7 +672,10 @@ fi
 
 if [ $config_python_path != no ]
 then
-	if check_file ${python_path}/bin/python2
+	if [ -n "$PYTHON" ] && check_file ${PYTHON}
+	then	
+		python=${PYTHON}
+	elif check_file ${python_path}/bin/python2
 	then	
 		python=${python_path}/bin/python2
 	elif check_file ${python_path}/bin/python
