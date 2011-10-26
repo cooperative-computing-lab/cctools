@@ -126,3 +126,4 @@ LIST_ITEM MANPAGE(allpairs_multicore,1)
 LIST_END
 
 FOOTER
+
