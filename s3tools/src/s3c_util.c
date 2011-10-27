@@ -9,6 +9,8 @@ See the file COPYING for details.
 #include <math.h>
 #include <time.h>
 
+#include <debug.h>
+#include <link.h>
 #include <list.h>
 #include <hmac.h>
 #include <b64_encode.h>
@@ -17,10 +19,7 @@ See the file COPYING for details.
 #include "s3c_util.h"
 
 char s3_default_endpoint[] = "s3.amazonaws.com";
-char s3_default_address[] = "72.21.202.66";
-
 char *s3_endpoint = s3_default_endpoint;
-char *s3_address = s3_default_address;
 int s3_timeout = 60;
 
 
@@ -32,7 +31,6 @@ int s3_set_endpoint(const char *target) {
 
 	if(s3_endpoint && s3_endpoint != s3_default_endpoint) free(s3_endpoint);
 	s3_endpoint = strdup(target);
-	s3_address = endpoint_address;
 	return 1;
 }
 
@@ -208,6 +206,40 @@ int sign_message(struct s3_message* mesg, const char* user, const char * key) {
 	return 0;
 }
 
+
+struct link * s3_send_message(struct s3_message *mesg, struct link *server, time_t stoptime) {
+	char *message_text;
+	char address[16];
+	int message_length, data_sent;
+	
+	if(!server) {
+		if(!domain_name_cache_lookup(s3_endpoint, address))
+			return NULL;
+
+		server = link_connect(address, 80, stoptime);
+	}
+	
+	if(!server)
+		return NULL;
+
+	message_length = s3_message_to_string(mesg, &message_text);
+	
+	if(message_length <= 0) {
+		link_close(server);
+		return NULL;
+	}
+	
+	data_sent = link_write(server, message_text, message_length, stoptime);
+	debug(D_TCP, "S3 Message Sent:\n%s\n", message_text);
+	free(message_text);
+	
+	if(data_sent < message_length) {
+		link_close(server);
+		server = NULL;
+	}
+	
+	return server;
+}
 
 int s3_message_to_string(struct s3_message *mesg, char** text) {
 	int msg_str_len = 0;

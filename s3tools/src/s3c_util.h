@@ -80,6 +80,7 @@ struct s3_header_object* s3_new_header_object(enum s3_header_type type, const ch
 const char * s3_get_header(enum s3_header_type type, const char* custom_type);
 int s3_header_comp(const void *a, const void *b);
 int sign_message(struct s3_message* mesg, const char* user, const char * key);
+struct link * s3_send_message(struct s3_message *mesg, struct link *server, time_t stoptime);
 int s3_message_to_string(struct s3_message *mesg, char** text);
 
 #endif

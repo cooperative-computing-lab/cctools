@@ -46,14 +46,16 @@ int s3_getacl(char* bucketname, char* filename, char* owner, struct hash_table* 
 	mesg.expect = 0;
 	mesg.amz_headers = NULL;
 
-	server = link_connect(s3_address, 80, stoptime);
-	if(!server) return -1;
+	//server = link_connect(s3_address, 80, stoptime);
 
 	sign_message(&mesg, access_key_id, access_key);
-	length = s3_message_to_string(&mesg, &text);
+	server = s3_send_message(&mesg, NULL, stoptime);
+	if(!server)
+		return -1;
+	//length = s3_message_to_string(&mesg, &text);
 
-	link_putlstring(server, text, length, stoptime);
-	free(text);
+	//link_putlstring(server, text, length, stoptime);
+	//free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
 	if(strcmp(response, "HTTP/1.1 200 OK")) {
@@ -154,8 +156,8 @@ int s3_setacl(char* bucketname, char *filename, const char* owner, struct hash_t
 	time_t stoptime = time(0)+s3_timeout;
 	char path[HEADER_LINE_MAX];
 	char response[HEADER_LINE_MAX];
-	char * text;
-	int length;
+	//char * text;
+	//int length;
 	char *id;
 	struct s3_acl_object *acl;
  
@@ -198,15 +200,18 @@ int s3_setacl(char* bucketname, char *filename, const char* owner, struct hash_t
 	mesg.expect = 0;
 	mesg.amz_headers = NULL;
 
-	server = link_connect(s3_address, 80, stoptime);
-	if(!server) return -1;
+	//server = link_connect(s3_address, 80, stoptime);
 
 	sign_message(&mesg, access_key_id, access_key);
-	length = s3_message_to_string(&mesg, &text);
+	server = s3_send_message(&mesg, NULL, stoptime);
+	if(!server)
+		return -1;
 
-	fprintf(stderr, "Message:\n%s\n", text);
-	link_putlstring(server, text, length, stoptime);
-	free(text);
+	//length = s3_message_to_string(&mesg, &text);
+
+	//fprintf(stderr, "Message:\n%s\n", text);
+	//link_putlstring(server, text, length, stoptime);
+	//free(text);
 
 	link_putliteral(server, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", stoptime);
 	link_putliteral(server, "<AccessControlPolicy><Owner><ID>", stoptime);

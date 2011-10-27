@@ -64,6 +64,8 @@ struct s3_dirent_object {
 	struct list *metadata;
 };
 
+int s3_set_endpoint(const char *target);
+
 int s3_mk_bucket(char* bucketname, enum amz_base_perm perms, const char* access_key_id, const char* access_key);
 int s3_rm_bucket(char* bucketname, const char* access_key_id, const char* access_key);
 int s3_ls_bucket(char* bucketname, struct list* dirent, const char* access_key_id, const char* access_key);
