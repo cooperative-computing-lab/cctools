@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include <stringtools.h>
 #include <console_login.h>
 #include "s3common.h"
+#include "s3c_util.h"
 
 
 char *userid = NULL;
