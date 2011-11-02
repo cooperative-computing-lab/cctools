@@ -717,7 +717,7 @@ static int build_poll_table(struct work_queue *q)
 
 static int put_file(struct work_queue_file *, struct work_queue *, struct work_queue_worker *, INT64_T *);
 
-static int put_directory(const char *dirname, struct work_queue *q, struct work_queue_worker *w, INT64_T * total_bytes)
+static int put_directory(const char *dirname, const char *remote_name, struct work_queue *q, struct work_queue_worker *w, INT64_T * total_bytes)
 {
 	DIR *dir = opendir(dirname);
 	if(!dir)
@@ -736,13 +736,16 @@ static int put_directory(const char *dirname, struct work_queue *q, struct work_
 			continue;
 		}
 
-		*buffer = '\0';
-		len = sprintf(buffer, "%s/%s", dirname, filename);
-
 		tf.type = WORK_QUEUE_FILE;
 		tf.flags = WORK_QUEUE_CACHE;
+		
+		*buffer = '\0';
+		len = sprintf(buffer, "%s/%s", dirname, filename);
 		tf.length = len;
 		tf.payload = strdup(buffer);
+		
+		*buffer = '\0';
+		len = sprintf(buffer, "%s/%s", remote_name, filename);
 		tf.remote_name = strdup(buffer);
 
 		if(!put_file(&tf, q, w, total_bytes))
@@ -791,9 +794,9 @@ static int put_file(struct work_queue_file *tf, struct work_queue *q, struct wor
 			// files in that directory won't suceed. Such failure would
 			// eventually be captured in 'start_tasks' function and in the
 			// 'start_tasks' function the corresponding worker would be removed.
-			link_putfstring(w->link, "mkdir %s %o\n", time(0) + short_timeout, tf->payload, local_info.st_mode);
+			link_putfstring(w->link, "mkdir %s %o\n", time(0) + short_timeout, tf->remote_name, local_info.st_mode);
 
-			if(!put_directory(tf->payload, q, w, total_bytes))
+			if(!put_directory(tf->payload, tf->remote_name, q, w, total_bytes))
 				return 0;
 
 			return 1;
