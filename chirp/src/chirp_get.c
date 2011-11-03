@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include <dirent.h>
 #include <time.h>
 
+#include "chirp_client.h"
 #include "chirp_reli.h"
 #include "chirp_recursive.h"
 
@@ -34,6 +35,7 @@ static void show_help(const char *cmd)
 	printf("where options are:\n");
 	printf(" -a <flag>  Require this authentication mode.\n");
 	printf(" -d <flag>  Enable debugging for this subsystem.\n");
+	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
 	printf(" -t <time>  Timeout for failure. (default is %ds)\n", timeout);
 	printf(" -v         Show program version.\n");
 	printf(" -h         This message.\n");
@@ -48,10 +50,11 @@ int main(int argc, char *argv[])
 	FILE *file;
 	INT64_T result;
 	char c;
+	char *tickets = NULL;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:d:t:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:d:i:t:vh")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auth_register_byname(optarg);
@@ -59,6 +62,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case 'i':
+			tickets = strdup(optarg);
 			break;
 		case 't':
 			timeout = string_time_parse(optarg);
@@ -77,6 +83,14 @@ int main(int argc, char *argv[])
 
 	if(!did_explicit_auth)
 		auth_register_all();
+	if(tickets) {
+		auth_ticket_load(tickets);
+		free(tickets);
+	} else if(getenv(CHIRP_CLIENT_TICKETS)) {
+		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
+	} else {
+		auth_ticket_load(NULL);
+	}
 
 	if((argc - optind) < 3) {
 		show_help(argv[0]);

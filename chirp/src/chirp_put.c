@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include <time.h>
 #include <sys/stat.h>
 
+#include "chirp_client.h"
 #include "chirp_reli.h"
 #include "chirp_recursive.h"
 #include "chirp_stream.h"
@@ -49,6 +50,7 @@ static void show_help(const char *cmd)
 	printf(" -b <size>  Set transfer buffer size. (default is %d bytes)\n", buffer_size);
 	printf(" -d <flag>  Enable debugging for this subsystem.\n");
 	printf(" -f         Follow input file like tail -f.\n");
+	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
 	printf(" -t <time>  Timeout for failure. (default is %ds)\n", timeout);
 	printf(" -v         Show program version.\n");
 	printf(" -h         This message.\n");
@@ -63,10 +65,11 @@ int main(int argc, char *argv[])
 	time_t stoptime;
 	FILE *file;
 	char c;
+	char *tickets = NULL;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:b:d:ft:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:b:d:fi:t:vh")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auth_register_byname(optarg);
@@ -80,6 +83,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'f':
 			follow_mode = 1;
+			break;
+		case 'i':
+			tickets = strdup(optarg);
 			break;
 		case 't':
 			timeout = string_time_parse(optarg);
@@ -98,6 +104,14 @@ int main(int argc, char *argv[])
 
 	if(!did_explicit_auth)
 		auth_register_all();
+	if(tickets) {
+		auth_ticket_load(tickets);
+		free(tickets);
+	} else if(getenv(CHIRP_CLIENT_TICKETS)) {
+		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
+	} else {
+		auth_ticket_load(NULL);
+	}
 
 	if((argc - optind) < 3) {
 		show_help(argv[0]);
