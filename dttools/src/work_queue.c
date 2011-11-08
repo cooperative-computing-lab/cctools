@@ -93,6 +93,8 @@ struct work_queue {
 struct work_queue_worker {
 	int state;
 	char hostname[DOMAIN_NAME_MAX];
+	char os[65];
+	char arch[65];
 	char addrport[32];
 	char hashkey[32];
 	int ncpus;
@@ -586,7 +588,7 @@ static int handle_worker(struct work_queue *q, struct link *l)
 	w = hash_table_lookup(q->worker_table, key);
 
 	if(link_readline(l, line, sizeof(line), time(0) + short_timeout)) {
-		if(sscanf(line, "ready %s %d %lld %lld %lld %lld", w->hostname, &w->ncpus, &w->memory_avail, &w->memory_total, &w->disk_avail, &w->disk_total) == 6) {
+		if(sscanf(line, "ready %s %s %s %d %lld %lld %lld %lld", w->hostname, w->os, w->arch, &w->ncpus, &w->memory_avail, &w->memory_total, &w->disk_avail, &w->disk_total) == 8) {
 			// More workers than needed are connected
 			int workers_connected = hash_table_size(q->worker_table);
 			int jobs_not_completed = list_size(q->ready_list) + q->workers_in_state[WORKER_STATE_BUSY];
@@ -597,7 +599,7 @@ static int handle_worker(struct work_queue *q, struct link *l)
 
 			if(q->worker_mode == WORK_QUEUE_WORKER_MODE_EXCLUSIVE && q->name) {
 				// For backward compatibility, we scan the line AGAIN to see if it contains extra fields
-				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"", project_names) == 1) {
+				if(sscanf(line, "ready %*s %*s %*s %*d %*d %*d %*d %*d \"%[^\"]\"", project_names) == 1) {
 					if(!match_project_names(q, project_names)) {
 						debug(D_WQ, "Preferred masters of %s (%s): %s", w->hostname, w->addrport, project_names);
 						goto reject;
@@ -610,7 +612,7 @@ static int handle_worker(struct work_queue *q, struct link *l)
 			}
 			if(w->state == WORKER_STATE_INIT) {
 				change_worker_state(q, w, WORKER_STATE_READY);
-				debug(D_WQ, "%s (%s) ready", w->hostname, w->addrport);
+				debug(D_WQ, "%s (%s) running on %s %s is ready", w->hostname, w->addrport, w->os, w->arch);
 			}
 		} else if(sscanf(line, "result %d %d", &result, &output_length) == 2) {
 			struct work_queue_task *t = w->current_task;
@@ -715,7 +717,7 @@ static int build_poll_table(struct work_queue *q)
 	return n;
 }
 
-static int put_file(struct work_queue_file *, struct work_queue *, struct work_queue_worker *, INT64_T *);
+static int put_file(struct work_queue_file *, const char *, struct work_queue *, struct work_queue_worker *, INT64_T *);
 
 static int put_directory(const char *dirname, const char *remote_name, struct work_queue *q, struct work_queue_worker *w, INT64_T * total_bytes)
 {
@@ -748,7 +750,7 @@ static int put_directory(const char *dirname, const char *remote_name, struct wo
 		len = sprintf(buffer, "%s/%s", remote_name, filename);
 		tf.remote_name = strdup(buffer);
 
-		if(!put_file(&tf, q, w, total_bytes))
+		if(!put_file(&tf, NULL, q, w, total_bytes))
 			return 0;
 	}
 
@@ -756,7 +758,7 @@ static int put_directory(const char *dirname, const char *remote_name, struct wo
 	return 1;
 }
 
-static int put_file(struct work_queue_file *tf, struct work_queue *q, struct work_queue_worker *w, INT64_T * total_bytes)
+static int put_file(struct work_queue_file *tf, const char *expanded_payload, struct work_queue *q, struct work_queue_worker *w, INT64_T * total_bytes)
 {
 	struct stat local_info;
 	struct stat *remote_info;
@@ -764,8 +766,16 @@ static int put_file(struct work_queue_file *tf, struct work_queue *q, struct wor
 	time_t stoptime;
 	INT64_T actual = 0;
 	int dir = 0;
+	char *payload;
 
-	if(stat(tf->payload, &local_info) < 0)
+	if (expanded_payload){
+		payload = xstrdup(expanded_payload);
+	}
+	else {
+		payload = xstrdup(tf->payload);
+	}
+
+	if(stat(payload, &local_info) < 0)
 		return 0;
 	if(local_info.st_mode & S_IFDIR)
 		dir = 1;
@@ -777,8 +787,8 @@ static int put_file(struct work_queue_file *tf, struct work_queue *q, struct wor
 	}
 	local_info.st_mode &= 0777;
 
-	hash_name = (char *) malloc((strlen(tf->payload) + strlen(tf->remote_name) + 2) * sizeof(char));
-	sprintf(hash_name, "%s-%s", (char *) tf->payload, tf->remote_name);
+	hash_name = (char *) malloc((strlen(payload) + strlen(tf->remote_name) + 2) * sizeof(char));
+	sprintf(hash_name, "%s-%s", payload, tf->remote_name);
 
 	remote_info = hash_table_lookup(w->current_files, hash_name);
 
@@ -788,7 +798,7 @@ static int put_file(struct work_queue_file *tf, struct work_queue *q, struct wor
 			free(remote_info);
 		}
 
-		debug(D_WQ, "%s (%s) needs file %s", w->hostname, w->addrport, tf->payload);
+		debug(D_WQ, "%s (%s) needs file %s", w->hostname, w->addrport, payload);
 		if(dir) {
 			// If mkdir fails, the future calls to 'put_file' function to place
 			// files in that directory won't suceed. Such failure would
@@ -796,13 +806,13 @@ static int put_file(struct work_queue_file *tf, struct work_queue *q, struct wor
 			// 'start_tasks' function the corresponding worker would be removed.
 			link_putfstring(w->link, "mkdir %s %o\n", time(0) + short_timeout, tf->remote_name, local_info.st_mode);
 
-			if(!put_directory(tf->payload, tf->remote_name, q, w, total_bytes))
+			if(!put_directory(payload, tf->remote_name, q, w, total_bytes))
 				return 0;
 
 			return 1;
 		}
 
-		int fd = open(tf->payload, O_RDONLY, 0);
+		int fd = open(payload, O_RDONLY, 0);
 		if(fd < 0)
 			return 0;
 
@@ -823,8 +833,78 @@ static int put_file(struct work_queue_file *tf, struct work_queue *q, struct wor
 		*total_bytes += actual;
 	}
 
+	free(payload);
 	free(hash_name);
 	return 1;
+}
+
+/** 
+ *	This function expands Work Queue environment variables such as
+ * 	$OS, $ARCH, that are specified in the definition of Work Queue 
+ * 	input files. It expands these variables based on the info reported 
+ *	by each connected worker.
+ *	Will always return a non-empty string. That is if no match is found
+ *	for any of the environment variables, it will return the input string
+ *	as is.
+ * 	*/
+char *expand_envnames(struct work_queue_worker *w, const char *payload)
+{
+	char *expanded_name;
+	char *str, *curr_pos;
+	char *delimtr = "$";
+	char *token;
+
+	str = xstrdup(payload);
+
+	expanded_name = (char *)malloc(strlen(payload) + (50 * sizeof(char)));
+	if (expanded_name == NULL){
+		return NULL;
+	}
+	else {
+		//Initialize to null byte so it works correctly with strcat.
+		*expanded_name = '\0';
+	}
+	
+	token = strtok(str, delimtr);
+	while(token) {
+		if ((curr_pos = strstr(token, "ARCH"))){
+			if ((curr_pos - token) == 0){
+				strcat(expanded_name, w->arch);
+				strcat(expanded_name, token+4);
+			}
+			else {
+				//No match. So put back '$' and rest of the string.
+				strcat(expanded_name, "$");
+				strcat(expanded_name, token);
+			}
+		}
+		else if ((curr_pos = strstr(token, "OS"))){
+			if ((curr_pos - token) == 0){
+				if (strstr(w->os, "CYGWIN")) {
+					strcat(expanded_name, "Cygwin");
+				}
+				else {
+					strcat(expanded_name, w->os);
+				}		  		
+				strcat(expanded_name, token+2);
+			}
+			else {
+				strcat(expanded_name, "$");
+				strcat(expanded_name, token);
+			}
+		}
+		else {
+			//Put back '$' only if it does not appear at start of the string.
+			if ((token - str) > 0) {
+				strcat(expanded_name, "$");
+			}	
+			strcat(expanded_name, token);
+		}
+		token = strtok(NULL, delimtr);
+	}
+
+	free(str);
+	return expanded_name;
 }
 
 static int send_input_files(struct work_queue_task *t, struct work_queue_worker *w, struct work_queue *q)
@@ -838,18 +918,27 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 	int fl;
 	time_t stoptime;
 	struct stat s;
-
+	char *expanded_payload = NULL;
 	t->status = TASK_STATUS_SENDING_INPUT;
-
+		
 	// Check input existence
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((tf = list_next_item(t->input_files))) {
 			if(tf->type == WORK_QUEUE_FILE) {
-				if(stat(tf->payload, &s) != 0) {
-					fprintf(stderr, "Could not stat %s. (%s)\n", (char *) (tf->payload), strerror(errno));
+				if (strchr(tf->payload, '$')){
+					expanded_payload = expand_envnames(w, tf->payload);
+					debug(D_WQ, "File name %s expanded to %s for %s (%s).", tf->payload, expanded_payload, w->hostname, w->addrport);
+				}
+				else {
+					expanded_payload = xstrdup(tf->payload);
+				}
+				if(stat(expanded_payload, &s) != 0) {
+					fprintf(stderr, "Could not stat %s. (%s)\n", expanded_payload, strerror(errno));
+					free(expanded_payload);
 					goto failure;
 				}
+				free(expanded_payload);
 			}
 		}
 	}
@@ -894,8 +983,17 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 					}
 				} else {				
 					open_time = timestamp_get();
-					if(!put_file(tf, q, w, &total_bytes))
+					if (strchr(tf->payload, '$')){
+						expanded_payload = expand_envnames(w, tf->payload);
+					}
+					else {
+						expanded_payload = xstrdup(tf->payload);
+					}
+					if(!put_file(tf, expanded_payload, q, w, &total_bytes)) {
+						free(expanded_payload);
 						goto failure;
+					}	
+					free(expanded_payload);
 					close_time = timestamp_get();
 					sum_time += (close_time - open_time);
 				}
@@ -912,7 +1010,6 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 			      (8.0 * w->total_bytes_transferred) / w->total_transfer_time);
 		}
 	}
-
 
 	return 1;
 
