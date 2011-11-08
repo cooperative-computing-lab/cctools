@@ -41,6 +41,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/signal.h>
+#include <sys/utsname.h>
 
 
 // Maximum time to wait before aborting if there is no connection to the master.
@@ -397,6 +398,7 @@ int main(int argc, char *argv[])
 	int ncpus;
 	char c;
 	char hostname[DOMAIN_NAME_MAX];
+	struct utsname uname_data;
 	int w;
 	char preferred_master_names[WORK_QUEUE_LINE_MAX];
 	char deletecmd[WORK_QUEUE_LINE_MAX];
@@ -517,6 +519,7 @@ int main(int argc, char *argv[])
         }	
 
 	domain_name_cache_guess(hostname);
+	uname(&uname_data);
 
 	time_t idle_stoptime = time(0) + idle_timeout;
 	time_t switch_master_time = time(0) + master_timeout;
@@ -559,11 +562,10 @@ int main(int argc, char *argv[])
 
 			link_tune(master, LINK_TUNE_INTERACTIVE);
 
-
 			if(exclusive_worker) {
-				link_putfstring(master, "ready %s %d %llu %llu %llu %llu \"%s\"\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names);
+				link_putfstring(master, "ready %s %s %s %d %llu %llu %llu %llu \"%s\"\n", time(0) + active_timeout, hostname, uname_data.sysname, uname_data.machine, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names);
 			} else {
-				link_putfstring(master, "ready %s %d %llu %llu %llu %llu\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total);
+				link_putfstring(master, "ready %s %s %s %d %llu %llu %llu %llu\n", time(0) + active_timeout, hostname, uname_data.sysname, uname_data.machine, ncpus, memory_avail, memory_total, disk_avail, disk_total);
 			}
 		}
 
