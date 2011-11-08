@@ -584,7 +584,7 @@ if __name__ == "__main__":
 	stat_file_stream.write("\n\n%s\n" % "Printing run times for each monte carlo step:")
 	count = 1
 	for i in mc_step_times:
-		stat_file_stream.write("%d %f %f\n" % (count, i))
+		stat_file_stream.write("%d %f\n" % (count, i))
 		count += 1
 	
 	stat_file_stream.close()
