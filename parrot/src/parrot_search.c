@@ -15,14 +15,14 @@ See the file COPYING for details.
 
 int main( int argc, char *argv[] )
 {
-	const char *path;
+	const char *paths = NULL;
 	const char *pattern;
 
 	if (argc == 2) {
-		path = ".";
+		paths = ".";
 		pattern = argv[1];
 	} else if (argc == 3) {
-		path = argv[1];
+		paths = argv[1];
 		pattern = argv[2];
 	} else {
 		printf("use: parrot_search [path] <pattern>\n");
@@ -35,7 +35,7 @@ int main( int argc, char *argv[] )
 	struct stat *stats = malloc(len2*sizeof(struct stat));
 
     int result;
-	while ((result = parrot_search(path, pattern, buffer, len1, stats, len2)) == -1 && errno == ERANGE) {
+	while ((result = parrot_search(paths, pattern, buffer, len1, stats, len2, PFS_SEARCH_INCLUDEROOT|PFS_SEARCH_METADATA)) == -1 && errno == ERANGE) {
 		len1 *= 2;
 		buffer = realloc(buffer, len1);
 		len2 *= 2;
@@ -46,16 +46,19 @@ int main( int argc, char *argv[] )
 		}
 	}
 
-	if (result >= 0) {
-		int i = 0;
-        int n = 0;
-		while (buffer[i]) {
-			printf("%s\n", &buffer[i]);
-			i += strlen(&buffer[i])+1;
-            n += 1;
+	if (result > 0) {
+		char *element = buffer;
+		while (1) {
+			char *next = strchr(element, ':');
+			if (next) {
+				printf("%.*s\n", (int)(next-element), element);
+				element = next+1;
+			} else {
+				printf("%s\n", element);
+				break;
+			}
 		}
-		assert(n == result);
-	} else {
+	} else if (result == -1) {
 		fprintf(stderr, "%s: %s\n", argv[0], strerror(errno));
 		exit(EXIT_FAILURE);
 	}

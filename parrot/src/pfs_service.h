@@ -50,7 +50,7 @@ public:
 	virtual int mkalloc( pfs_name *name, pfs_ssize_t size, mode_t mode );
 	virtual int lsalloc( pfs_name *name, char *alloc_name, pfs_ssize_t *size, pfs_ssize_t *inuse );
 	virtual int whoami( pfs_name *name, char *buf, int size );
-	virtual int search( const char *path, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2 );
+	virtual int search( const char *paths, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, int flags );
 	virtual int getacl( pfs_name *name, char *buf, int size );
 	virtual int setacl( pfs_name *name, const char *subject, const char *rights );
 	virtual pfs_location* locate( pfs_name *name );

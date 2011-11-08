@@ -49,11 +49,20 @@ int parrot_setacl( const char *path, const char *subject, const char *rights )
 #endif
 }
 
-int parrot_search( const char *path, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2 ) {
+#include <stdio.h>
+int parrot_search( const char *paths, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, int flags ) {
+	struct parrot_search_args psa;
+	psa.paths = paths;
+	psa.pattern = pattern;
+	psa.buffer = buffer;
+	psa.buffer_length = len1;
+	psa.stats = stats;
+	psa.stats_length = len2;
+	psa.flags = flags;
 #ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_search,path,pattern,buffer,len1,stats,len2);
+	return syscall(SYSCALL32_parrot_search,&psa);
 #else
-	return syscall(SYSCALL64_parrot_search,path,pattern,buffer,len1,stats,len2);
+	return syscall(SYSCALL64_parrot_search,&psa);
 #endif
 }
 
@@ -75,7 +84,7 @@ int parrot_cp( const char *source, const char *dest )
 #endif
 }
 
-int parrot_mkalloc( const char *path, INT64_T size, mode_t mode )
+int parrot_mkalloc( const char *path, long long size, mode_t mode )
 {
 #ifdef CCTOOLS_CPU_I386
 	return syscall(SYSCALL32_parrot_mkalloc,path,&size,mode);
@@ -84,7 +93,7 @@ int parrot_mkalloc( const char *path, INT64_T size, mode_t mode )
 #endif
 }
 
-int parrot_lsalloc( const char *path, char *alloc_path, INT64_T *total, INT64_T *inuse )
+int parrot_lsalloc( const char *path, char *alloc_path, long long *total, long long *inuse )
 {
 #ifdef CCTOOLS_CPU_I386
 	return syscall(SYSCALL32_parrot_lsalloc,path,alloc_path,total,inuse);

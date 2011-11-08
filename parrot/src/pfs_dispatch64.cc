@@ -2345,44 +2345,38 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 		case SYSCALL64_parrot_search:
 			if (entering) {
-				char path[PFS_PATH_MAX+1];
+				struct parrot_search_args psa;
+				tracer_copy_in(p->tracer, &psa, POINTER(args[0]), sizeof(psa));
+				char paths[65536];
+				tracer_copy_in_string(p->tracer, paths, POINTER(psa.paths), sizeof(paths));
 				char pattern[PFS_PATH_MAX+1];
+				tracer_copy_in_string(p->tracer, pattern, POINTER(psa.pattern), sizeof(pattern));
+				size_t len1 = psa.buffer_length;
+				size_t len2 = psa.stats_length;
+				int flags = psa.flags;
 
-				tracer_copy_in_string(p->tracer, path, POINTER(args[0]), sizeof(path));
-				tracer_copy_in_string(p->tracer, pattern, POINTER(args[1]), sizeof(pattern));
-				char *buffer;
-				pfs_size_t len1 = (pfs_size_t) args[3];
-				struct stat *stats;
-				pfs_size_t len2 = (pfs_size_t) args[5];
+				debug(D_SYSCALL, "parrot_search %s %s (%p:%zu, %p:%zu) %d", paths, pattern, psa.buffer, len1, psa.stats, len2, flags);
 
-				debug(D_SYSCALL, "parrot_search %s %zu %s %zu", path, len1, pattern, len2);
-
-				buffer = (char *) malloc(sizeof(char)*len1);
-				stats = (struct stat *) malloc(sizeof(struct stat)*len2);
+				char *buffer = (char *) malloc(sizeof(char)*len1);
+				struct stat *stats = (struct stat *) malloc(sizeof(struct stat)*len2);
 				if (!buffer || !stats) {
-					free(buffer);
-					free(stats);
 					p->syscall_result = -ENOMEM;
 				} else {
 					memset(buffer, 0, sizeof(char)*len1);
 					memset(stats, 0, sizeof(struct stat)*len2);
-					p->syscall_result = pfs_search(path, pattern, buffer, len1, stats, len2);
+					p->syscall_result = pfs_search(paths, pattern, buffer, len1, stats, len2, flags);
 					if (p->syscall_result > 0) {
-						pfs_size_t length = 0;
-						while (buffer[length]) {
-							length += strlen(&buffer[length])+1;
-						}
-						assert(buffer[length+1] == '\0');
-						length += 1;
-						tracer_copy_out(p->tracer, buffer, POINTER(args[2]), sizeof(char)*length);
-						if (p->syscall_result <= len2) /* entirely fits in stats array */
-							tracer_copy_out(p->tracer, stats, POINTER(args[4]), sizeof(struct stat)*p->syscall_result);
+						tracer_copy_out(p->tracer, buffer, POINTER(psa.buffer), sizeof(char)*strlen(buffer)+1);
+						if ((size_t)p->syscall_result <= len2) /* entirely fits in stats array */
+							tracer_copy_out(p->tracer, stats, POINTER(psa.stats), sizeof(struct stat)*p->syscall_result);
 						else
-							tracer_copy_out(p->tracer, stats, POINTER(args[4]), sizeof(struct stat)*len2);
+							tracer_copy_out(p->tracer, stats, POINTER(psa.stats), sizeof(struct stat)*len2);
 					} else if (p->syscall_result == -1) {
 						p->syscall_result = -errno;
 					}
 				}
+				free(buffer);
+				free(stats);
 				divert_to_dummy(p, p->syscall_result);
 			}
 			break;

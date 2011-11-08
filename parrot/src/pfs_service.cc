@@ -212,7 +212,7 @@ int pfs_service::whoami( pfs_name *name, char *buf, int size )
 	return -1;
 }
 
-int pfs_service::search ( const char *path, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2 )
+int pfs_service::search ( const char *paths, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, int flags )
 {
 	errno = ENOSYS;
 	return -1;
