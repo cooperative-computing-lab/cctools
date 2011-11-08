@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 
 struct parrot_search_args {
+  char callsite[64];
   const char *paths;
   const char *pattern;
   char *buffer;

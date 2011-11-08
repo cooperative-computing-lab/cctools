@@ -2504,7 +2504,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 				size_t len2 = psa.stats_length;
 				int flags = psa.flags;
 
-				debug(D_SYSCALL, "parrot_search %s %s (%p:%zu, %p:%zu) %d", paths, pattern, psa.buffer, len1, psa.stats, len2, flags);
+				debug(D_SYSCALL, "parrot_search <%s> %s %s (%p:%zu, %p:%zu) %d", psa.callsite, paths, pattern, psa.buffer, len1, psa.stats, len2, flags);
 
 				char *buffer = (char *) malloc(sizeof(char)*len1);
 				struct stat *stats = (struct stat *) malloc(sizeof(struct stat)*len2);

@@ -10,8 +10,11 @@ See the file COPYING for details.
 #include "tracer.table64.h"
 #include "int_sizes.h"
 
-#include <stdlib.h>
 #include <unistd.h>
+
+#include <stdlib.h>
+#include <string.h>
+
 
 int parrot_whoami( const char *path, char *buf, int size )
 {
@@ -50,8 +53,9 @@ int parrot_setacl( const char *path, const char *subject, const char *rights )
 }
 
 #include <stdio.h>
-int parrot_search( const char *paths, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, int flags ) {
+int parrot_search( /* DEBUG */ const char *callsite /* DEBUG */, const char *paths, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, int flags ) {
 	struct parrot_search_args psa;
+	strcpy(psa.callsite, callsite);
 	psa.paths = paths;
 	psa.pattern = pattern;
 	psa.buffer = buffer;

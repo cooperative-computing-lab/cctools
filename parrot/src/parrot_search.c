@@ -35,7 +35,7 @@ int main( int argc, char *argv[] )
 	struct stat *stats = malloc(len2*sizeof(struct stat));
 
     int result;
-	while ((result = parrot_search(paths, pattern, buffer, len1, stats, len2, PFS_SEARCH_INCLUDEROOT|PFS_SEARCH_METADATA)) == -1 && errno == ERANGE) {
+	while ((result = parrot_search("parrot_search", paths, pattern, buffer, len1, stats, len2, PFS_SEARCH_INCLUDEROOT|PFS_SEARCH_METADATA)) == -1 && errno == ERANGE) {
 		len1 *= 2;
 		buffer = realloc(buffer, len1);
 		len2 *= 2;
