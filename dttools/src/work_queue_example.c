@@ -48,8 +48,8 @@ int main(int argc, char *argv[])
 		sprintf(command, "/usr/bin/gzip < %s > %s", infile, outfile);
 
 		t = work_queue_task_create(command);
-		work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
-		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
+		work_queue_task_specify_input_file(t, infile, infile);
+		work_queue_task_specify_output_file(t, outfile, outfile);
 		work_queue_submit(q, t);
 
 		printf("submitted task: %s\n", t->command_line);
