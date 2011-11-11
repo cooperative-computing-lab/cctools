@@ -128,7 +128,7 @@ To write your own program using Work Queue, begin with <a href=work_queue_exampl
 as a starting point.  Here is a basic outline for a Work Queue master:
 
 <pre>
-q = work_queue_create(port,time);
+q = work_queue_create(port);
 
     for(all tasks) {
          t = work_queue_task_create(command);
@@ -146,7 +146,7 @@ work_queue_delete(q);
 
 First create a queue that is listening on a particular TCP port:
 <pre>
-q = work_queue_create( port , time(0)+60 ); 
+q = work_queue_create(port);
 </pre>
 
 The master then creates tasks to submit to the queue.
@@ -154,12 +154,20 @@ Each task consists of a command line to run and a statement of
 what data is needed, and what data will be produced by the command.
 Input data can be provided in the form of a file or a local memory buffer.
 Output data can be provided in the form of a file or the standard output of the program.
-In the example, we specify a command that takes a single input file
-and produces a single output file:
+It is also required to specify whether the data, input or output, need to be cached at
+the worker site for later use. In the example, we specify a command that takes a 
+single input file, produces a single output file, and requires both files to be
+cached:
 <pre>
-t = work_queue_task_create("/usr/bin/gzip -9 < infile > outfile.gz");
-work_queue_task_specify_input_file(t,"infile","infile");
-work_queue_task_specify_output_file(t,"outfile.gz","outfile.gz");
+t = work_queue_task_create("/usr/bin/gzip < infile > outfile.gz");
+work_queue_task_specify_file(t,"infile","infile",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+work_queue_task_specify_file(t,"outfile.gz","outfile.gz",WORK_QUEUE_OUTPUT,WORK_QUEUE_CACHE);
+</pre>
+
+If a file does not need to be cached at the execution site to avoid wasteful
+strorage, it can be specified so:
+<pre>
+work_queue_task_specify_file(t,"outfile.gz","outfile.gz",WORK_QUEUE_OUTPUT,WORK_QUEUE_NOCACHE);
 </pre>
 
 You can also run a program that is not necessarily installed at the
@@ -168,9 +176,9 @@ is installed on the local machine, then specify the full local path,
 and the plain remote path.  For example:
 <pre>
 t = work_queue_task_create("./my_compress_program < infile > outfile.gz");
-work_queue_task_specify_input_file(t,"/usr/local/bin/my_compress_program","my_compress_program");
-work_queue_task_specify_input_file(t,"infile","infile");
-work_queue_task_specify_output_file(t,"outfile.gz","outfile.gz");
+work_queue_task_specify_file(t,"/usr/local/bin/my_compress_program","my_compress_program",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+work_queue_task_specify_file(t,"infile","infile",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+work_queue_task_specify_file(t,"outfile.gz","outfile.gz",WORK_QUEUE_OUTPUT,WORK_QUEUE_CACHE);
 </pre>
 
 Once a task has been fully specified, it can be submitted to the queue:
@@ -227,6 +235,20 @@ that are statistical outliers.  See <tt>work_queue_activate_fast_abort</tt>.
 <li><b>Immediate Data.</b>  For a large number of tasks or workers, it may be impractical
 to create local input files for each one.  If the master already has the necessary input
 data in memory, it can pass the data directly to the remote task with <tt>work_queue_task_specify_input_buf</tt>.
+<p>
+<li><b>Environment Variables.</b>  If you have workers distributed across
+multiple operating systems (such as Linux, Cygwin, Solaris) and/or architectures (such
+as i686, x86_64) and have files specific to each of these systems, this feature 
+will help. The variables $OS and $ARCH are available for use in the specification of input
+file names. Work Queue will automatically resolve these variables to the operating system
+and architecture of each connected worker and transfer the input file corresponding
+to the resolved file name. For example:
+<pre>
+work_queue_task_specify_file(t,"infile.$OS.$ARCH","infile",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE)
+</pre>
+This will transfer infile.Linux.x86_64 to workers running on a Linux system with an
+x86_64 architecture and infile.Cygwin.i686 to workers on Cygwin with an i686
+architecture. 
 <p>
 <li><b>Statistics.</b>  The queue tracks a fair number of statistics that count the number
 of tasks, number of workers, number of failures, and so forth.  Obtain this data with <tt>work_queue_get_stats</tt>
