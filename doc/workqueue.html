@@ -235,7 +235,7 @@ that are statistical outliers.  See <tt>work_queue_activate_fast_abort</tt>.
 <li><b>Immediate Data.</b>  For a large number of tasks or workers, it may be impractical
 to create local input files for each one.  If the master already has the necessary input
 data in memory, it can pass the data directly to the remote task with <tt>work_queue_task_specify_input_buf</tt>.
-<!--<p>
+<p>
 <li><b>Environment Variables.</b>  If you have workers distributed across
 multiple operating systems (such as Linux, Cygwin, Solaris) and/or architectures (such
 as i686, x86_64) and have files specific to each of these systems, this feature 
@@ -248,7 +248,7 @@ work_queue_task_specify_file(t,"infile.$OS.$ARCH","infile",WORK_QUEUE_INPUT,WORK
 </pre>
 This will transfer infile.Linux.x86_64 to workers running on a Linux system with an
 x86_64 architecture and infile.Cygwin.i686 to workers on Cygwin with an i686
-architecture. -->
+architecture. 
 <p>
 <li><b>Statistics.</b>  The queue tracks a fair number of statistics that count the number
 of tasks, number of workers, number of failures, and so forth.  Obtain this data with <tt>work_queue_get_stats</tt>
