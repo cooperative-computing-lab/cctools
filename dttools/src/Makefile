@@ -82,7 +82,7 @@ install: all
 	install -d ${CCTOOLS_INSTALL_DIR}/include
 	install -d ${CCTOOLS_INSTALL_DIR}/include/cctools
 	for file in ${LIBRARIES} ; do install $$file ${CCTOOLS_INSTALL_DIR}/lib/$$file ; done
-	for file in ${HEADERS} ; do if [ -f $file ] ; then install $$file ${CCTOOLS_INSTALL_DIR}/include/cctools/$$file ; fi ; done
+	for file in ${HEADERS} ; do if [ -f $$file ] ; then install $$file ${CCTOOLS_INSTALL_DIR}/include/cctools/$$file ; fi ; done
 	for file in ${PROGRAMS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; done
 	for file in ${SCRIPTS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; chmod 755 ${CCTOOLS_INSTALL_DIR}/bin/$$file; done
 	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then install /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; done
