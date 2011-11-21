@@ -866,7 +866,7 @@ CCTOOLS_PERL_VERSION=${perl_version}
 CCTOOLS_PYTHON=${python}
 CCTOOLS_PYTHON_CCFLAGS=${python_ccflags}
 CCTOOLS_PYTHON_LDFLAGS=${python_ldflags}
-CCTOOLS_PYTHON_VERSION=${python_version}
+CCTOOLS_PYTHON_VERSION=${python_major_version}.${python_minor_version}
 
 CCTOOLS_WORK_QUEUE_BINDINGS=${work_queue_bindings}
 
