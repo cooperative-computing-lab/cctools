@@ -22,6 +22,8 @@ set_debug_flag('wq')
 wq = WorkQueue(WORK_QUEUE_RANDOM_PORT, name='workqueue_example', catalog=False, exclusive=False)
 os.system('work_queue_worker -d all localhost %d &' % wq.port)
 
+print wq.name
+
 wq.specify_algorithm(WORK_QUEUE_SCHEDULE_FCFS)
 #wq.specify_name('workqueue_example')
 #wq.specify_master_mode(WORK_QUEUE_MASTER_MODE_STANDALONE)

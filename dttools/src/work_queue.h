@@ -242,6 +242,12 @@ int work_queue_empty(struct work_queue *q);
 */
 int work_queue_port(struct work_queue *q);
 
+/** Get the project name of the queue.
+@param q The work queue of interest.
+@return The project name of the queue.
+*/
+const char *work_queue_name(struct work_queue *q);
+
 /** Get queue statistics.
 @param q The queue to query.
 @param s A pointer to a buffer that will be filed with statistics.

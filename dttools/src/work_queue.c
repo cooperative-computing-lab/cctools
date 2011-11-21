@@ -1367,6 +1367,11 @@ int work_queue_specify_name(struct work_queue *q, const char *name)
 	return 0;
 }
 
+const char *work_queue_name(struct work_queue *q)
+{
+	return q->name;
+}
+
 int work_queue_specify_priority(struct work_queue *q, int priority)
 {
 	if(priority > 0 && priority <= WORK_QUEUE_MASTER_PRIORITY_MAX) {

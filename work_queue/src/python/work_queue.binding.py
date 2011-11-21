@@ -268,6 +268,10 @@ class WorkQueue(_object):
 	if self._shutdown:
 	    self.shutdown_workers(0)
     	work_queue_delete(self._work_queue)
+    
+    @property
+    def name(self):
+    	return work_queue_name(self._work_queue)
 
     @property
     def port(self):
