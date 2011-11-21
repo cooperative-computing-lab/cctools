@@ -131,26 +131,36 @@ static int errno_is_temporary(int e)
 static int link_internal_sleep(struct link *link, struct timeval *timeout, int reading, int writing)
 {
 	int result;
-	fd_set rfds, wfds;
+	struct pollfd pfd;
+	int msec = (timeout->tv_sec + timeout->tv_usec/100000.0) / 1000.0;
 
-	FD_ZERO(&rfds);
-	if(reading)
-		FD_SET(link->fd, &rfds);
+	pfd.fd = link->fd;
+	pfd.revents = 0;
 
-	FD_ZERO(&wfds);
-	if(writing)
-		FD_SET(link->fd, &wfds);
+	pfd.events = 0;
+	if (reading)
+		pfd.events |= POLLIN | POLLHUP;
 
-	while(1) {
-		result = select(link->fd + 1, &rfds, &wfds, 0, timeout);
-		if(result > 0) {
-			if(reading && FD_ISSET(link->fd, &rfds))
+	if (writing)
+		pfd.events |= POLLOUT;
+
+	while (1) {
+		result = poll(&pfd, 1, msec);
+
+		debug(D_DEBUG, "result = %d, revents = %d\n", result, pfd.revents);
+
+		if (result > 0) {
+			if (reading && ((pfd.revents & POLLIN) || (pfd.revents & POLLHUP))) {
+				debug(D_DEBUG, "reading\n");
 				return 1;
-			if(writing && FD_ISSET(link->fd, &wfds))
+			}
+			if (writing && (pfd.revents & POLLOUT)) {
+				debug(D_DEBUG, "writing\n");
 				return 1;
-		} else if(result == 0) {
+			}
+		} else if (result == 0) {
 			return 0;
-		} else if(errno_is_temporary(errno)) {
+		} else if (errno_is_temporary(errno)) {
 			continue;
 		} else {
 			return 0;
