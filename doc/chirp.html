@@ -704,7 +704,7 @@ To destroy an allocation, simply delete the corresponding directory.
   authenticating. You can also give specific tickets to authenticate with
   using a comma-delimited list of ticket filenames in either the
   <strong>CHIRP_CLIENT_TICKETS</strong> environment variable or via the
-  <strong>-k <tickets></strong> option. Tickets are tried in the order
+  <strong>-i <tickets></strong> option. Tickets are tried in the order
   they are specified.
 </p>
 
@@ -715,7 +715,7 @@ To destroy an allocation, simply delete the corresponding directory.
   use tickets it finds in the current directory following the template.
 </p>
 
-<code>chirp -a ticket -k file.ticket &lt;host:port&gt;</code>
+<code>chirp -a ticket -i file.ticket &lt;host:port&gt;</code>
 
 <p>
   The above command forces ticket authentication and only uses the
