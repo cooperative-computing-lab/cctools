@@ -35,12 +35,16 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 		char digest[DIGEST_LENGTH];
 
 		for (ticket = *tickets; ticket; ticket = *(++tickets)) {
-			char command[PATH_MAX * 2 + 4096];
+			if (access(ticket, R_OK) == -1) {
+				debug(D_AUTH, "could not access ticket %s: %s", ticket, strerror(errno));
+				continue;
+			}
 
 			/* load the digest */
 			/* WARNING: openssl is *very* bad at giving sensible output. Use the last
 			 * 32 non-space characters as the MD5 sum.
 			 */
+			char command[PATH_MAX * 2 + 4096];
 			sprintf(command, "openssl rsa -in '%s' -pubout 2> /dev/null | openssl md5 2> /dev/null | tr -d '[:space:]' | tail -c 32", ticket);
 			FILE *digestf = popen(command, "r");
 			if(full_fread(digestf, digest, DIGEST_LENGTH) < DIGEST_LENGTH) {
