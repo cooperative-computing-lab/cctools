@@ -368,7 +368,7 @@ static void show_version(const char *cmd)
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s <masterhost> <port>\n", cmd);
+	printf("Use: %s [options] <masterhost> <port>\n", cmd);
 	printf("where options are:\n");
 	printf(" -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
