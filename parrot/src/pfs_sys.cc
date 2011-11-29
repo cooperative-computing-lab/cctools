@@ -846,7 +846,12 @@ int pfs_fchmodat( int dirfd, const char *path, mode_t mode, int flags )
 	return pfs_chmod(newpath,mode);
 }
 
-
+int pfs_faccessat( int dirfd, const char *path, mode_t mode )
+{
+	char newpath[PFS_PATH_MAX];
+	pfs_current->table->complete_at_path(dirfd,path,newpath);
+	return pfs_access(newpath,mode);
+}
 
 
 

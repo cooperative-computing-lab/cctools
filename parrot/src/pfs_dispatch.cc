@@ -2374,6 +2374,15 @@ void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
+		case SYSCALL32_faccessat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				p->syscall_result = pfs_faccessat(args[0],path,args[2]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
 		/*
 		Note that we call pfs_process_raise here so that the process data
 		structures are made aware of the signal propagation, possibly kicking
