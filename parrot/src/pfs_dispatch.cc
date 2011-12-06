@@ -1470,12 +1470,17 @@ void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		case SYSCALL32_pipe:
+		case SYSCALL32_pipe2:
 			if(entering) {
 				int fds[2];
 				p->syscall_result = pfs_pipe(fds);
 				if(p->syscall_result<0) {
 					p->syscall_result = -errno;
 				} else {
+					if(p->syscall==SYSCALL32_pipe2) {
+						fcntl(fds[0],F_SETFL,args[1]);
+						fcntl(fds[1],F_SETFL,args[1]);
+					}
 					tracer_copy_out(p->tracer,(void*)fds,POINTER(args[0]),sizeof(fds));
 				}
 				divert_to_dummy(p,p->syscall_result);
@@ -1666,6 +1671,12 @@ void decode_syscall( struct pfs_process *p, int entering )
 				} else {
 					p->syscall_result = pfs_ioctl(fd,cmd,uaddr);
 				}
+
+                                if(cmd==PFS_TIOCGPGRP) {
+                                        pid_t newgrp = getpgid(pfs_current->pid);
+                                        debug(D_PROCESS,"tcgetpgrp(%d) changed from %d to %d",fd,*(pid_t*)buffer,newgrp);
+                                        *(pid_t *)buffer = newgrp;
+                                }
 
 				if(p->syscall_result<0) {
 					p->syscall_result = -errno;
@@ -2269,6 +2280,24 @@ void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
+		case SYSCALL32_fstatat64:
+			if(entering) {
+				struct pfs_stat lbuf;
+				struct pfs_kernel_stat kbuf;
+
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				p->syscall_result = pfs_fstatat(args[0],path,&lbuf,args[3]);
+				if(p->syscall_result<0) {
+					p->syscall_result = -errno;
+				} else {
+					COPY_STAT(lbuf,kbuf);
+					tracer_copy_out(p->tracer,&kbuf,POINTER(args[2]),sizeof(kbuf));
+				}
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+
 		case SYSCALL32_futimesat:
 			if(entering) {
 				struct timeval times[2];
@@ -2341,6 +2370,15 @@ void decode_syscall( struct pfs_process *p, int entering )
 			if(entering) {
 				tracer_copy_in_string(p->tracer,path,(void*)args[1],sizeof(path));
 				p->syscall_result = pfs_fchmodat(args[0],path,args[2],args[3]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_faccessat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				p->syscall_result = pfs_faccessat(args[0],path,args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
 			}

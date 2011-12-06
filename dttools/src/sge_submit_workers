@@ -3,7 +3,7 @@
 show_help() 
 {
 	echo "Use: sge_submit_workers [options] <servername> <port> <num-workers>"
-	echo "options:"
+	echo "where options are:"
 	echo "  -a               Enable auto mode."
 	echo "  -s               Run as a shared worker."
 	echo "  -N <name>        Preferred master name."
@@ -80,4 +80,7 @@ chmod 755 worker.sh
 for n in `seq 1 $count`
 do
 	qsub -cwd $parameters worker.sh
+	return_status=$?
 done
+
+exit $return_status

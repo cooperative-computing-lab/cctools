@@ -21,6 +21,7 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "usage: s3get <bucket> <filename>\n");
 		return -1;
 	}
+	fprintf(stderr, "checking bucket %s for file %s\n", argv[1], argv[2]);
 
 	sprintf(remotename, "/%s", string_basename(argv[2]));
 	s3_get_file(argv[2], NULL, remotename, argv[1], s3_userid(), s3_key());

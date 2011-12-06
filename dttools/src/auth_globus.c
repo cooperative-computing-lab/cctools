@@ -166,12 +166,12 @@ void auth_globus_use_delegated_credential(int yesno)
 	use_delegated_credential = yesno;
 }
 
-int auth_globus_has_delegated_credential()
+int auth_globus_has_delegated_credential(void)
 {
 	return delegated_credential != GSS_C_NO_CREDENTIAL;
 }
 
-int auth_globus_register()
+int auth_globus_register(void)
 {
 	debug(D_AUTH, "globus: registered");
 	return auth_register("globus", auth_globus_assert, auth_globus_accept);
@@ -189,18 +189,18 @@ int _dl_load_lock = 0;
 
 #include "debug.h"
 
-int auth_globus_register()
+int auth_globus_register(void)
 {
 	debug(D_AUTH, "globus: not compiled in");
 	return 0;
 }
 
-int auth_globus_has_delegated_credential()
+int auth_globus_has_delegated_credential(void)
 {
 	return 0;
 }
 
-void auth_globus_use_delegated_credential(int onoff)
+void auth_globus_use_delegated_credential(int yesno)
 {
 }
 

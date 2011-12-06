@@ -7,6 +7,9 @@ See the file COPYING for details.
 #ifndef PROCESS_H
 #define PROCESS_H
 
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/resource.h>
 #include <sys/wait.h>
 
 /** @file process.h

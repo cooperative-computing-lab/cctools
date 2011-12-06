@@ -11,6 +11,7 @@ by building a spanning tree at runtime using third party transfers.
 The -X option will delete the directory from all of the named hosts.
 */
 
+#include "chirp_client.h"
 #include "chirp_reli.h"
 
 #include "auth.h"
@@ -168,18 +169,19 @@ static void show_use()
 {
 	printf("Use: chirp_distribute [options] <sourcehost> <sourcepath> <host1> <host2> ...\n");
 	printf("where options are:\n");
-	printf(" -X         Delete data from all of the target hosts.\n");
-	printf(" -D         Show detailed location, time, and performance of each transfer.\n");
-	printf(" -Y         Show confirmation of successful placements.\n");
-	printf(" -F <file>  Write matrix of failures to this file.\n");
-	printf(" -T <time>  Overall timeout for entire distribution. (default is %d)\n", overall_timeout);
-	printf(" -R         Randomize order of target hosts given on command line.\n");
-	printf(" -N <num>   Stop after this number of successful copies.\n");
-	printf(" -t <time>  Timeout for for each copy. (default is %ds)\n", timeout);
-	printf(" -p <num>   Maximum number of processes to run at once (default=%d)\n", maxprocs);
 	printf(" -a <flag>  Require this authentication mode.\n");
 	printf(" -d <flag>  Enable debugging for this subsystem.\n");
+	printf(" -D         Show detailed location, time, and performance of each transfer.\n");
+	printf(" -F <file>  Write matrix of failures to this file.\n");
+	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
+	printf(" -N <num>   Stop after this number of successful copies.\n");
+	printf(" -p <num>   Maximum number of processes to run at once (default=%d)\n", maxprocs);
+	printf(" -R         Randomize order of target hosts given on command line.\n");
+	printf(" -t <time>  Timeout for for each copy. (default is %ds)\n", timeout);
+	printf(" -T <time>  Overall timeout for entire distribution. (default is %d)\n", overall_timeout);
 	printf(" -v         Show program version.\n");
+	printf(" -X         Delete data from all of the target hosts.\n");
+	printf(" -Y         Show confirmation of successful placements.\n");
 	printf(" -h         This message.\n");
 	printf("\nchirp_distribute copies a directory from one host to many hosts\n");
 	printf("by creating a spanning tree and then transferring data in parallel\n");
@@ -198,6 +200,7 @@ int main(int argc, char *argv[])
 	int i, j;
 	pid_t pid;
 	int nprocs = 0;
+	char *tickets = NULL;
 
 	int length;//, start_time, end_time;
 	int server_count = 0;
@@ -211,7 +214,7 @@ int main(int argc, char *argv[])
 
 	//start_time = time(0);
 
-	while(((c = getopt(argc, argv, "RXYDF:N:T:p:d:vt:a:h")) != (char) -1)) {
+	while(((c = getopt(argc, argv, "a:d:DF:i:N:p:Rt:T:vXYh")) != (char) -1)) {
 		switch (c) {
 		case 'R':
 			randomize_mode = 1;
@@ -251,6 +254,9 @@ int main(int argc, char *argv[])
 			auth_register_byname(optarg);
 			did_explicit_auth = 1;
 			break;
+		case 'i':
+			tickets = strdup(optarg);
+			break;
 		default:
 		case 'h':
 			show_use();
@@ -260,6 +266,14 @@ int main(int argc, char *argv[])
 
 	if(!did_explicit_auth)
 		auth_register_all();
+	if(tickets) {
+		auth_ticket_load(tickets);
+		free(tickets);
+	} else if(getenv(CHIRP_CLIENT_TICKETS)) {
+		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
+	} else {
+		auth_ticket_load(NULL);
+	}
 
 	if((argc - optind) < 2) {
 		show_use();

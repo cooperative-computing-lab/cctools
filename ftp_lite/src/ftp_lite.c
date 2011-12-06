@@ -109,7 +109,8 @@ static int ftp_lite_send_command( struct ftp_lite_server *s, const char *fmt, ..
 
 static int ftp_lite_get_response( struct ftp_lite_server *s, int accept_note, char *buffer )
 {
-	char c, dash;
+	int c;
+	char dash;
 	int result;
 	int response;
 	int fields;
@@ -131,7 +132,7 @@ static int ftp_lite_get_response( struct ftp_lite_server *s, int accept_note, ch
 					c = fgetc(s->response);
 				} while(c==EOF && errno==EINTR);
 				ungetc(c,s->response);
-				if(!isdigit((int)c)) {
+				if(!isdigit(c)) {
 					result = 0;
 					errno = ECONNRESET;
 				} else if(c=='6') {

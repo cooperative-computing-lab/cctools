@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include <stringtools.h>
 #include <console_login.h>
 #include "s3common.h"
+#include "s3c_util.h"
 
 
 char *userid = NULL;
@@ -48,12 +49,16 @@ int process_configfile(char *configfile, char **username, char **password) {
 
 void s3_initialize(int* argc, char** argv) {
 	int i, mod, result, prompt = 0;
-	char *username = NULL, *password = NULL, *configfile = NULL;
+	char *username = NULL, *password = NULL, *configfile = NULL, *endpoint = NULL;
 	char **argv2;
 
 	for(i = 0; i < *argc; i++) {
 		if(argv[i][0] == '-') {
 			switch(argv[i][1]) {
+				case 'e':
+					endpoint = argv[i+1];
+					i++;
+					break;
 				case 'u':
 					if(username) free(username);
 					username = argv[i+1];
@@ -127,6 +132,10 @@ void s3_initialize(int* argc, char** argv) {
 	if(result < 0) {
 		fprintf(stderr, "Error: no username or password specified\n");
 		exit(result);
+	}
+	
+	if(endpoint || (endpoint = getenv("S3_ENDPOINT"))) {
+		s3_set_endpoint(endpoint);
 	}
 }
 

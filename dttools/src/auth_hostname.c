@@ -62,7 +62,7 @@ static int auth_hostname_accept(struct link *link, char **subject, time_t stopti
 	return 0;
 }
 
-int auth_hostname_register()
+int auth_hostname_register(void)
 {
 	debug(D_AUTH, "hostname: registered");
 	return auth_register("hostname", auth_hostname_assert, auth_hostname_accept);

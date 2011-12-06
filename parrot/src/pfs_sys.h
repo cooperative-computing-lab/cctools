@@ -85,7 +85,7 @@ int		pfs_linkat( int olddirfd, const char *oldpath, int newdirfd, const char *ne
 int		pfs_symlinkat( const char *oldpath, int newdirfd, const char *newpath );
 int		pfs_readlinkat( int dirfd, const char *path, char *buf, size_t bufsiz );
 int		pfs_fchmodat( int dirfd, const char *path, mode_t mode, int flags );
-
+int		pfs_faccessat( int dirfd, const char *path, mode_t mode );
 
 int		pfs_socket( int domain, int type, int protocol );
 int		pfs_socketpair( int domain, int type, int protocol, int *fds );

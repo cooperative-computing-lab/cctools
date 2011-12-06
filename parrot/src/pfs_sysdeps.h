@@ -245,6 +245,8 @@ struct pfs_kernel_flock64 {
 #define PFS_SETLK64	13
 #define PFS_SETLKW64	14
 
+#define PFS_TIOCGPGRP   0x540F
+
 /*
 Many data structures must be aligned on 8 byte boundaries.
 This rounds up values to multiples of 8.

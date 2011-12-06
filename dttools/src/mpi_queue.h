@@ -1,5 +1,13 @@
+/*
+Copyright (C) 2011- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #ifndef MPI_QUEUE_H
 #define MPI_QUEUE_H
+
+/** @file mpi_queue.h An MPI implementation of Work Queue. */
 
 #include "timestamp.h"
 
@@ -12,10 +20,8 @@
 #define MPI_QUEUE_RETURN_STATUS_UNSET -1
 #define MPI_QUEUE_RESULT_UNSET -1
 
-
 #define MPI_QUEUE_INPUT  0
 #define MPI_QUEUE_OUTPUT 1
-
 
 /** A task description.  This structure should only be created with @ref mpi_queue_task_create and delete with @ref mpi_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.
 */
@@ -43,6 +49,7 @@ struct mpi_queue_task {
 
 /** Create a new task specification.  Once created, the task may be passed to @ref mpi_queue_submit.
 @param full_command The shell command line to be executed by the task.
+@return A new @ref mpi_queue_task structure.
 */
 struct mpi_queue_task *mpi_queue_task_create(const char *full_command);
 

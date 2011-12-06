@@ -197,19 +197,19 @@ def parse_command_line_options():
     parser = OptionParser('%prog [options] <makeflowlog> ...')
 
     parser.add_option('-f', dest = 'format', action = 'store',
-        help = 'output format to emit', metavar = 'format', default = 'text')
+        help = 'Output format to emit.', metavar = 'format', default = 'text')
     parser.add_option('-t', dest = 'timeout', action = 'store',
-        help = 'timeout for reading the logs', metavar = 'seconds',
+        help = 'Timeout for reading the logs.', metavar = 'seconds',
         type = 'float', default = 1.0)
     parser.add_option('-m', dest = 'min_tasks', action = 'store',
-        help = 'mininum number of tasks', metavar = 'minimum',
+        help = 'Mininum number of tasks.', metavar = 'minimum',
         type = 'float', default = 0)
     parser.add_option('-S', dest = 'sort', action = 'store_true',
-        help = 'sort logs by progress', default = False)
+        help = 'Sort logs by progress.', default = False)
     parser.add_option('-P', dest = 'parse_dag', action = 'store_true',
-        help = 'parse dag for node information', default = False)
+        help = 'Parse dag for node information.', default = False)
     parser.add_option('-H', dest = 'hide_finished', action = 'store_true',
-        help = 'hide finished makeflows', default = False)
+        help = 'Hide finished makeflows.', default = False)
 
     (options, args) = parser.parse_args()
 

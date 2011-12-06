@@ -11,9 +11,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#ifdef HAS_ALLOCA_H
-#include <alloca.h>
-#endif
 
 #include "debug.h"
 
@@ -24,7 +21,7 @@ int create_dir(const char *path, int mode)
 	char oldchar;
 	int result;
 
-	temp = alloca(strlen(path) + 1);
+	temp = malloc(strlen(path) + 1);
 	strcpy(temp, path);
 
 	delim = temp;
@@ -44,6 +41,7 @@ int create_dir(const char *path, int mode)
 			if(errno == EEXIST) {
 				/* no problem, keep going */
 			} else {
+				free(temp);
 				return 0;
 			}
 		} else {
@@ -57,6 +55,9 @@ int create_dir(const char *path, int mode)
 	/* Now, last chance */
 
 	result = mkdir(temp, mode);
+
+	free(temp);
+
 	if(result != 0) {
 		if(errno == EEXIST) {
 			return 1;

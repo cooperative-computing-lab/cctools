@@ -379,7 +379,7 @@ int main(int argc, char *argv[])
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c_input = getopt(argc, argv, "A:a:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:Z:")) != -1) {
+	while((c_input = getopt(argc, argv, "A:a:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:Z:")) != (char)-1) {
 		c = (char) c_input;
 		switch (c) {
 		case 'A':
@@ -751,6 +751,7 @@ static int chirp_path_fix(char *path)
 {
 	char decodepath[CHIRP_PATH_MAX];
 	char shortpath[CHIRP_PATH_MAX];
+	char rootpath[CHIRP_PATH_MAX];
 
 	// Remove the percent-hex encoding
 	url_decode(path, decodepath, sizeof(decodepath));
@@ -759,7 +760,10 @@ static int chirp_path_fix(char *path)
 	string_collapse_path(decodepath,shortpath,1);
 
 	// Add the Chirp root and copy it back out.
-	sprintf(path, "%s/%s", chirp_root_path, shortpath);
+	sprintf(rootpath, "%s/%s", chirp_root_path, shortpath);
+
+	// Collapse again...
+	string_collapse_path(rootpath, path, 1);
 
 	return 1;
 }
@@ -1550,7 +1554,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
-			if(chirp_alloc_md5(path, (unsigned char *) dataout)) {
+			if(chirp_alloc_md5(path, (unsigned char *) dataout) >= 0) {
 				result = dataoutlength = 16;
 			} else {
 				result = errno_to_chirp(errno);

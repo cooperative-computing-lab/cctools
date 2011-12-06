@@ -7,7 +7,11 @@ See the file COPYING for details.
 #include "process.h"
 #include "list.h"
 
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/resource.h>
 #include <sys/wait.h>
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <signal.h>

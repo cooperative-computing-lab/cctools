@@ -23,9 +23,7 @@ int s3_mk_bucket(char* bucketname, enum amz_base_perm perms, const char* access_
 	struct s3_header_object *head;
 	time_t stoptime = time(0)+s3_timeout;
 	struct s3_message mesg;
-	char * text;
 	char response[HEADER_LINE_MAX];
-	int length;
 
 	if(!access_key_id || !access_key || !s3_endpoint) return -1;
 
@@ -52,15 +50,12 @@ int s3_mk_bucket(char* bucketname, enum amz_base_perm perms, const char* access_
 
 
 	sign_message(&mesg, access_key_id, access_key);
-	length = s3_message_to_string(&mesg, &text);
+	server = s3_send_message(&mesg, NULL, stoptime);
 	list_free(mesg.amz_headers);
 	list_delete(mesg.amz_headers);
 
-	server = link_connect(s3_address, 80, stoptime);
-	if(!server) return -1;
-
-	link_putlstring(server, text, length, stoptime);
-	free(text);
+	if(!server)
+		return -1;
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
 	if(strcmp(response, "HTTP/1.1 200 OK")) {
@@ -70,9 +65,7 @@ int s3_mk_bucket(char* bucketname, enum amz_base_perm perms, const char* access_
 		return -1;
 	}
 
-	//fprintf(stderr, "Response:\n");
 	do {
-	//	fprintf(stderr, "\t%s\n", response);
 		if(!strcmp(response, "Server: AmazonS3")) break;
 	} while(link_readline(server, response, HEADER_LINE_MAX, stoptime));
 
@@ -86,8 +79,6 @@ int s3_rm_bucket(char* bucketname, const char* access_key_id, const char* access
 	time_t stoptime = time(0)+s3_timeout;
 	char response[HEADER_LINE_MAX];
 	char path[] = "/";
-	char * text;
-	int length;
 
 	if(!access_key_id || !access_key || !s3_endpoint) return -1;
 
@@ -101,14 +92,9 @@ int s3_rm_bucket(char* bucketname, const char* access_key_id, const char* access
 	mesg.expect = 0;
 	mesg.amz_headers = NULL;
 
-	server = link_connect(s3_address, 80, stoptime);
-	if(!server) return -1;
-
 	sign_message(&mesg, access_key_id, access_key);
-	length = s3_message_to_string(&mesg, &text);
-
-	link_putlstring(server, text, length, stoptime);
-	free(text);
+	server = s3_send_message(&mesg, NULL, stoptime);
+	if(!server) return -1;
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
 	if(strcmp(response, "HTTP/1.1 204 No Content")) {
@@ -118,9 +104,7 @@ int s3_rm_bucket(char* bucketname, const char* access_key_id, const char* access
 		return -1;
 	}
 
-	//fprintf(stderr, "Response:\n");
 	do {
-	//	fprintf(stderr, "\t%s\n", response);
 		if(!strcmp(response, "Server: AmazonS3")) break;
 	} while(link_readline(server, response, HEADER_LINE_MAX, stoptime));
 
@@ -130,11 +114,10 @@ int s3_rm_bucket(char* bucketname, const char* access_key_id, const char* access
 
 int s3_ls_bucket(char* bucketname, struct list* dirents, const char* access_key_id, const char* access_key) {
 	struct s3_message mesg;
-	struct link* server;
+	struct link* server = NULL;
 	time_t stoptime = time(0)+s3_timeout;
 	char response[HEADER_LINE_MAX];
 	char path[HEADER_LINE_MAX];
-	char * text;
 	int length;
 	char done = 0;
 
@@ -151,23 +134,21 @@ int s3_ls_bucket(char* bucketname, struct list* dirents, const char* access_key_
 	mesg.expect = 0;
 	mesg.amz_headers = NULL;
 
-	server = link_connect(s3_address, 80, stoptime);
-	if(!server) return -1;
-
 	do {
 		char *buffer, *temp, *start, *end;
 		char trunc[25];
 		int keys;
 		sign_message(&mesg, access_key_id, access_key);
-		length = s3_message_to_string(&mesg, &text);
-		link_putlstring(server, text, length, stoptime);
-		free(text);
+		
+		server = s3_send_message(&mesg, server, stoptime);
+		if(!server)
+			return -1;
 
 		link_readline(server, response, HEADER_LINE_MAX, stoptime);
 
 		if(strcmp(response, "HTTP/1.1 200 OK")) {
 			// Error: transfer failed; close connection and return failure
-			//fprintf(stderr, "Error: list bucket failed\nResponse: %s\n", response);
+			fprintf(stderr, "Error: list bucket failed\nResponse: %s\n", response);
 			link_close(server);
 			return -1;
 		}

@@ -205,7 +205,7 @@ int auth_kerberos_accept(struct link *link, char **subject, time_t stoptime)
 	return success;
 }
 
-int auth_kerberos_register()
+int auth_kerberos_register(void)
 {
 	debug(D_AUTH, "kerberos: registered");
 	return auth_register("kerberos", auth_kerberos_assert, auth_kerberos_accept);
@@ -215,7 +215,7 @@ int auth_kerberos_register()
 
 #include "debug.h"
 
-int auth_kerberos_register()
+int auth_kerberos_register(void)
 {
 	debug(D_AUTH, "kerberos: not compiled in");
 	return 0;

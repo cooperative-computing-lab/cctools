@@ -3,7 +3,7 @@
 show_help() 
 {
 	echo "Use: condor_submit_workers [options] <servername> <port> <num-workers>"
-	echo "options:"
+	echo "where options are:"
 	echo "  -a              Enable auto mode."
 	echo "  -s              Run as a shared worker."
 	echo "  -N <name>       Preferred master name."

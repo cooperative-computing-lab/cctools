@@ -21,6 +21,7 @@ See the file COPYING for details.
 #define MODE_LONG  3
 #define MODE_TOTAL 4
 
+static int show_all_types = 0;
 static INT64_T minavail = 0;
 
 static struct nvpair_header headers[] = {
@@ -48,6 +49,7 @@ static void show_help(const char *cmd)
 	printf(" -o <file>  Send debugging output to this file.\n");
 	printf(" -O <bytes> Rotate file once it reaches this size.\n");
 	printf(" -A <size>  Only show servers with this space available. (example: -A 100MB)\n");
+	printf(" -a         Show all records, not just chirps and catalogs.\n");
 	printf(" -t <time>  Timeout.\n");
 	printf(" -s         Short output.\n");
 	printf(" -l         Long output.\n");
@@ -102,8 +104,11 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "A:c:d:t:o:O:sTlvh")) != (char) -1) {
+	while((c = getopt(argc, argv, "aA:c:d:t:o:O:sTlvh")) != (char) -1) {
 		switch (c) {
+		case 'a':
+			show_all_types = 1;
+			break;
 		case 'c':
 			catalog_host = optarg;
 			break;
@@ -173,6 +178,19 @@ int main(int argc, char *argv[])
 	qsort(table, count, sizeof(*table), (void *) compare_entries);
 
 	for(i = 0; i < count; i++) {
+		const char *etype = nvpair_lookup_string(table[i],"type");
+		if(!show_all_types) {
+			if(etype) {
+				if(!strcmp(etype,"chirp") || !strcmp(etype,"catalog")) {
+					/* ok, keep going */
+				} else {
+					continue;
+				}
+			} else {
+				continue;
+			}
+		}
+
 		if(minavail != 0) {
 			if(minavail > nvpair_lookup_integer(table[i], "avail")) {
 				continue;

@@ -14,7 +14,6 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
-#include <alloca.h>
 
 static int setecho( int fd, int onoff )
 {
@@ -76,11 +75,12 @@ int ftp_lite_login( const char *service, char *name, int namelen, char *pass, in
 {
 	char *prompt;
 
-	prompt = alloca(strlen(service)+10);
+	prompt = malloc(strlen(service)+10);
 	if(!prompt) return 0;
 
 	sprintf(prompt,"%s login: ",service);
 
-	return do_getline(prompt,name,namelen,1) && do_getline("password: ",pass,passlen,0);
-	
+	int result = do_getline(prompt,name,namelen,1) && do_getline("password: ",pass,passlen,0);
+	free(prompt);
+	return result;
 }

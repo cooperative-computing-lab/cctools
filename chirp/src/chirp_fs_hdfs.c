@@ -519,7 +519,7 @@ static INT64_T chirp_fs_hdfs_rename(const char *path, const char *newpath)
 {
 	path = FIXPATH(path);
 	newpath = FIXPATH(newpath);
-	chirp_fs_hdfs_unlink(path);
+	chirp_fs_hdfs_unlink(newpath);
 	debug(D_HDFS, "rename %s %s", path, newpath);
 	return hdfs_services->rename(fs, path, newpath);
 }

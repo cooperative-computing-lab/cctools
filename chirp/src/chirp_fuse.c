@@ -561,13 +561,14 @@ static void show_help(const char *cmd)
 {
 	printf("use: %s <mountpath>\n", cmd);
 	printf("where options are:\n");
-	printf(" -t <timeout> Timeout for network operations. (default is %ds)\n", chirp_fuse_timeout);
-	printf(" -b <bytes>   Block size for network I/O. (default is %ds)\n", (int) chirp_reli_blocksize_get());
 	printf(" -a <flag>    Require this authentication mode.\n");
+	printf(" -b <bytes>   Block size for network I/O. (default is %ds)\n", (int) chirp_reli_blocksize_get());
 	printf(" -d <flag>    Enable debugging for this subsystem.\n");
-	printf(" -o <file>    Send debugging output to this file.\n");
 	printf(" -D           Disable small file optimizations such as recursive delete.\n");
 	printf(" -f           Run in foreground for debugging.\n");
+	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
+	printf(" -o <file>    Send debugging output to this file.\n");
+	printf(" -t <timeout> Timeout for network operations. (default is %ds)\n", chirp_fuse_timeout);
 	printf(" -v           Show program version.\n");
 	printf(" -h           This message.\n");
 }
@@ -576,10 +577,11 @@ int main(int argc, char *argv[])
 {
 	char c;
 	int did_explicit_auth = 0;
+	char *tickets = NULL;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "d:Db:o:a:t:fhv")) != -1) {
+	while((c = getopt(argc, argv, "d:Db:i:o:a:t:fhv")) != -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);
@@ -589,6 +591,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'b':
 			chirp_reli_blocksize_set(atoi(optarg));
+			break;
+		case 'i':
+			tickets = strdup(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -624,6 +629,15 @@ int main(int argc, char *argv[])
 
 	if(!did_explicit_auth)
 		auth_register_all();
+	if(tickets) {
+		auth_ticket_load(tickets);
+		free(tickets);
+	} else if(getenv(CHIRP_CLIENT_TICKETS)) {
+		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
+	} else {
+		auth_ticket_load(NULL);
+	}
+
 
 	file_table = itable_create(0);
 

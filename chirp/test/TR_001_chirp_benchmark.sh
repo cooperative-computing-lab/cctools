@@ -15,7 +15,6 @@ prepare()
     sleep 5
 
     if ps ux | awk '{print $2}' | grep "^$pid$"; then
-	echo $port> $PORT_FILE
 	echo $pid > $PID_FILE
 	exit 0
     else

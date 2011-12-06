@@ -32,7 +32,7 @@ See the file COPYING for details.
 
 const char *batch_queue_type_string()
 {
-	return "local, condor, sge, moab, wq, hadoop, mpi-queue";
+	return "local, condor, sge, moab, cluster, wq, hadoop, mpi-queue";
 }
 
 batch_queue_type_t batch_queue_type_from_string(const char *str)
@@ -43,8 +43,8 @@ batch_queue_type_t batch_queue_type_from_string(const char *str)
 		return BATCH_QUEUE_TYPE_SGE;
 	if(!strcmp(str, "moab"))
 		return BATCH_QUEUE_TYPE_MOAB;
-	if(!strcmp(str, "grid"))
-		return BATCH_QUEUE_TYPE_GRID;
+	if(!strcmp(str, "cluster"))
+		return BATCH_QUEUE_TYPE_CLUSTER;
 	if(!strcmp(str, "local"))
 		return BATCH_QUEUE_TYPE_LOCAL;
 	if(!strcmp(str, "unix"))
@@ -77,8 +77,8 @@ const char *batch_queue_type_to_string(batch_queue_type_t t)
 		return "sge";
 	case BATCH_QUEUE_TYPE_MOAB:
 		return "moab";
-	case BATCH_QUEUE_TYPE_GRID:
-		return "grid";
+	case BATCH_QUEUE_TYPE_CLUSTER:
+		return "cluster";
 	case BATCH_QUEUE_TYPE_WORK_QUEUE:
 		return "wq";
 	case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
@@ -133,8 +133,8 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 		q->mpi_queue = 0;
 	}
 	
-	if(type == BATCH_QUEUE_TYPE_SGE || type == BATCH_QUEUE_TYPE_MOAB || type == BATCH_QUEUE_TYPE_GRID) {
-		batch_job_setup_grid(q);
+	if(type == BATCH_QUEUE_TYPE_SGE || type == BATCH_QUEUE_TYPE_MOAB || type == BATCH_QUEUE_TYPE_CLUSTER) {
+		batch_job_setup_cluster(q);
 	}
 
 	if(type == BATCH_QUEUE_TYPE_HADOOP) {
@@ -216,9 +216,11 @@ batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const ch
 	} else if(q->type == BATCH_QUEUE_TYPE_CONDOR) {
 		return batch_job_submit_condor(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
-		return batch_job_submit_grid(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
+		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
-		return batch_job_submit_grid(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
+		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
+	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
+		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_submit_work_queue(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
@@ -243,9 +245,11 @@ batch_job_id_t batch_job_submit_simple(struct batch_queue * q, const char *cmd, 
 	} else if(q->type == BATCH_QUEUE_TYPE_CONDOR) {
 		return batch_job_submit_simple_condor(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
-		return batch_job_submit_simple_grid(q, cmd, extra_input_files, extra_output_files);
+		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
-		return batch_job_submit_simple_grid(q, cmd, extra_input_files, extra_output_files);
+		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
+	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
+		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_submit_simple_work_queue(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
@@ -275,9 +279,11 @@ batch_job_id_t batch_job_wait_timeout(struct batch_queue * q, struct batch_job_i
 	} else if(q->type == BATCH_QUEUE_TYPE_CONDOR) {
 		return batch_job_wait_condor(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
-		return batch_job_wait_grid(q, info, stoptime);
+		return batch_job_wait_cluster(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
-		return batch_job_wait_grid(q, info, stoptime);
+		return batch_job_wait_cluster(q, info, stoptime);
+	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
+		return batch_job_wait_cluster(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_wait_work_queue(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
@@ -302,9 +308,11 @@ int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid)
 	} else if(q->type == BATCH_QUEUE_TYPE_CONDOR) {
 		return batch_job_remove_condor(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
-		return batch_job_remove_grid(q, jobid);
+		return batch_job_remove_cluster(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
-		return batch_job_remove_grid(q, jobid);
+		return batch_job_remove_cluster(q, jobid);
+	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
+		return batch_job_remove_cluster(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		return batch_job_remove_work_queue(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {

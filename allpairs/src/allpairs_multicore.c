@@ -279,7 +279,7 @@ int main(int argc, char *argv[])
 
 	debug_config(progname);
 
-	while((c = getopt(argc, argv, "b:c:e:dvh"))!=-1) {
+	while((c = getopt(argc, argv, "b:c:e:dvh")) != (char)-1) {
 		switch (c) {
 		case 'b':
 			block_size = atoi(optarg);

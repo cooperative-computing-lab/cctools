@@ -140,7 +140,11 @@ private:
 public:
 
 	pfs_service_s3() {
+		char *endpoint;
 		s3_file_cache = hash_table_create(0,NULL);
+		if((endpoint = getenv("PARROT_S3_ENDPOINT"))) {
+			s3_set_endpoint(endpoint);
+		}
 	}
 	~pfs_service_s3() {
 		//Delete file_cache;
@@ -159,6 +163,10 @@ public:
 		FILE *local_file = NULL;
 
 		char *username, *password;
+		if(!pfs_password_cache) {
+			errno = EACCES;
+			return NULL;
+		}
 		username = pfs_password_cache->username;
 		password = pfs_password_cache->password;
 
@@ -214,6 +222,11 @@ public:
 		struct list *dirents;
 		struct s3_dirent_object *d;
 		char bucket[PFS_PATH_MAX];
+		
+		if(!pfs_password_cache) {
+			errno = EACCES;
+			return NULL;
+		}
 
 		sscanf(name->hostport, "%[^:]:", bucket);
 
@@ -240,6 +253,11 @@ public:
 		struct s3_dirent_object d;
 		char bucket[PFS_PATH_MAX];
 
+		if(!pfs_password_cache) {
+			errno = EACCES;
+			return NULL;
+		}
+
 		sscanf(name->hostport, "%[^:]:", bucket);
 
 		if( s3_stat_file(name->rest, bucket, &d, pfs_password_cache->username, pfs_password_cache->password) < 0 ) {
@@ -256,6 +274,11 @@ public:
 	virtual int stat( pfs_name *name, struct pfs_stat *info ) {
 		struct s3_dirent_object d;
 		char bucket[PFS_PATH_MAX];
+
+		if(!pfs_password_cache) {
+			errno = EACCES;
+			return NULL;
+		}
 
 		sscanf(name->hostport, "%[^:]:", bucket);
 
@@ -275,6 +298,11 @@ public:
 		char path[MAX_KEY_LENGTH];
 		int result;
 		char bucket[PFS_PATH_MAX];
+
+		if(!pfs_password_cache) {
+			errno = EACCES;
+			return NULL;
+		}
 
 		sscanf(name->hostport, "%[^:]:", bucket);
 

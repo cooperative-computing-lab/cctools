@@ -38,7 +38,7 @@ static void show_help(const char *cmd)
 	printf("where batch options are:\n");
 	printf("  -d <subsystem> Enable debugging for this subsystem.\n");
 	printf("  -S <scratch>   Scratch directory. (default is /tmp/${USER}-workers)\n");
-	printf("  -T <type>      Batch system type: unix, condor, sge, workqueue, xgrid. (default is unix)\n");
+	printf("  -T <type>      Batch system type: %s. (default is local)\n",batch_queue_type_string());
 	printf("  -r <count>     Number of attemps to retry if failed to submit a worker.\n");
 	printf("  -W <path>      Path to the work_queue_worker executable.\n");
 	printf("  -h             Show this screen.\n");
@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
 	struct itable *remote_job_table;
 	int auto_worker = 0;
 
-	while((c = getopt(argc, argv, "aC:d:hN:r:sS:t:T:W:")) >= 0) {
+	while((c = getopt(argc, argv, "aC:d:hN:r:sS:t:T:W:")) != (char)-1) {
 		switch (c) {
 		case 'a':
 			strcat(worker_args, " -a");

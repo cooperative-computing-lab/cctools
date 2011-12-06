@@ -724,12 +724,14 @@ INT64_T chirp_reli_mkalloc(const char *host, const char *path, INT64_T size, INT
 
 INT64_T chirp_reli_lsalloc(const char *host, const char *path, char *allocpath, INT64_T * total, INT64_T * inuse, time_t stoptime);
 
-/** Create a new access control group.
-Note that group is deleted by calling @ref chirp_reli_unlink on the group name.
-@param host The name and port of the server hosting the group.
-@param group The group name, which is simply a path on the server.
+/** Perform multiple I/O operations in bulk.
+This operation will perform multiple I/O operations by pipelining the requests
+and the results. It is the most efficient way to perform multiple reads
+and writes simultaneously, whether against one or many files.
+@param list An array of @ref chirp_bulkio structures, each describing one I/O operation.
+@param count The number of entries in the list.
 @param stoptime The absolute time at which to abort.
-@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
+@return If all operations in the array succeed, this function will return greater than or equal to zero.  If one or more operations fail, this function will return less than zero.  The result of each individual operation may be determined by examining the result and errnum fields set in each @ref chirp_bulkio structure.
 */
 
 INT64_T chirp_reli_bulkio(struct chirp_bulkio *list, int count, time_t stoptime);

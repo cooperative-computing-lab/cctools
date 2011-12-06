@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
 	opterr = 0;
 	s3_initialize(&argc, argv);
 
-	while( (c = getopt(argc, argv, "l")) != -1 ) {
+	while( (c = getopt(argc, argv, "l")) != (char)-1 ) {
 		switch(c) {
 			case 'l':
 				long_list = 1;

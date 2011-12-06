@@ -1165,7 +1165,10 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 		strcat(output_files,",");
 	}
 
-	batch_queue_set_options(thequeue,getenv("BATCH_OPTIONS"));
+	const char *batch_submit_options = getenv("BATCH_OPTIONS");
+	if (batch_submit_options) {
+		batch_queue_set_options(thequeue, batch_submit_options);
+	}
 
 	time_t stoptime = time(0) + dag_submit_timeout;
 	int waittime = 1;
@@ -1461,11 +1464,11 @@ int main( int argc, char *argv[] )
 	int explicit_local_jobs_max = 0;
 	int skip_afs_check = 0;
 	int preserve_symlinks = 0;
-	const char *batch_submit_options = 0;
+	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	int auto_workers = 0;
 	char line[1024];
-    int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
-    int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
+	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+	int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 
 	debug_config(argv[0]);
 
@@ -1491,18 +1494,18 @@ int main( int argc, char *argv[] )
 			sprintf(line,"WORK_QUEUE_PRIORITY=%d",priority);
 			putenv(strdup(line));
 			break;
-        case 'a':
-            work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+		case 'a':
+			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
-        case 'e':
-            work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
-            break;
+		case 'e':
+			work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
+			break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg)) {
 				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
 			}
-            work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
 		case 'I':
 			display_mode = SHOW_INPUT_FILES;
@@ -1789,6 +1792,7 @@ int main( int argc, char *argv[] )
 	}
 
 	if(batch_submit_options) {
+		debug(D_DEBUG, "setting batch options to %s\n", batch_submit_options);
 		batch_queue_set_options(remote_queue,batch_submit_options);
 	}
 
