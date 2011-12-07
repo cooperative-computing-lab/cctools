@@ -49,6 +49,10 @@ static void task_complete(struct work_queue_task * t);
 static void display_progress();
 
 static int port = WORK_QUEUE_DEFAULT_PORT;
+static char *project = NULL;
+int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
+
 static int kmer_size = 22;
 static int window_size = 22;
 static int do_not_unlink = 0;
@@ -103,6 +107,8 @@ static void show_help(const char *cmd)
 	printf(" -c <file>      Checkpoint filename; will be created if necessary.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 10.)\n");
+	printf(" -N <project>   Set the project name to <project>\n");
+	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n"); 
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -389,7 +395,13 @@ int main(int argc, char ** argv)
 		fprintf(stderr, "%s: couldn't listen on port %d: %s\n",progname,port,strerror(errno));
 		exit(1);
 	}
-
+	if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG){
+		work_queue_specify_master_mode(q, WORK_QUEUE_MASTER_MODE_CATALOG);
+	}
+	if(project)
+	{
+		work_queue_specify_name(q, project); 
+	} 
 	load_sequences(sequence_filename);
 	debug(D_DEBUG, "Sequence loaded.\n", curr_rect_y, curr_rect_x);
 
@@ -446,13 +458,38 @@ int main(int argc, char ** argv)
 
 	return 0;
 }
+int parse_catalog_server_description(char* server_string) {
+	char *host;
+	int port;
+	char *colon;
+	char line[1024];
+
+	colon = strchr(server_string, ':');
+
+	if(!colon) return 0;
+
+	*colon = '\0';
+
+	host = strdup(server_string);
+	port = atoi(colon+1);
+
+	if(!port) return 0;
+		
+	sprintf(line,"CATALOG_HOST=%s",host);
+	putenv(strdup(line));
+	sprintf(line,"CATALOG_PORT=%d",port);
+	putenv(strdup(line));
+	
+	return 1;
+}
 
 static void get_options(int argc, char ** argv, const char * progname)
 {
 	char c;
 	char tmp[512];
+	char line[1024];
 
-	while ((c = getopt(argc, argv, "p:n:d:F:s:r:R:k:w:c:o:uxvh")) != (char) -1)
+	while ((c = getopt(argc, argv, "p:n:d:F:N:C:s:r:R:k:w:c:o:uxvha")) != (char) -1)
 	{
 		switch (c) {
 		case 'p':
@@ -481,6 +518,23 @@ static void get_options(int argc, char ** argv, const char * progname)
 			break;
 		case 'F':
 			wq_option_fast_abort_multiplier = atof(optarg);
+			break;
+		case 'a':
+			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+			break; 
+		case 'N':
+			if (project) free(project);
+			project = strdup(optarg);
+			sprintf(line,"WORK_QUEUE_NAME=%s",project);
+			putenv(strdup(line));
+			break;
+
+		case 'C':
+			if(!parse_catalog_server_description(optarg)) {
+				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
+				exit(1);
+			}
+			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
 		case 'u':
 			do_not_unlink = 1;
