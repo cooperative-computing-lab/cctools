@@ -74,6 +74,7 @@ static void show_help(const char *cmd)
 	printf(" -e <args>      Extra arguments to pass to the alignment program.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 10.)\n");
+	printf(" -a             Advertise the master information to a catalog server.\n");
 	printf(" -N <project>   Set the project name to <project>\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n"); 
 	printf(" -o <file>      Send debugging to this file.\n");
@@ -434,18 +435,23 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
+        fprintf(stderr, "sand_align_master running in catalog mode. Please use '-N' option to specify the name of this project.\n");
+        fprintf(stderr, "Run \"%s -h\" for help with options.\n", argv[0]);
+        return 1;
+    }
+
+	sprintf(line, "WORK_QUEUE_WORKER_MODE=%d", work_queue_worker_mode);
+    putenv(strdup(line));
+
+    sprintf(line, "WORK_QUEUE_MASTER_MODE=%d", work_queue_master_mode);
+    putenv(strdup(line));
+
 	queue = work_queue_create(port);
 	if(!queue) {
 		fprintf(stderr, "%s: couldn't listen on port %d: %s\n",progname,port,strerror(errno));
 		return 1;
 	}
-	if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG){
-		work_queue_specify_master_mode(queue, WORK_QUEUE_MASTER_MODE_CATALOG);
-	}
-	if(project)
-	{
-		work_queue_specify_name(queue, project); 
-	} 
 
 	sequence_table = hash_table_create(20000001,0);
 

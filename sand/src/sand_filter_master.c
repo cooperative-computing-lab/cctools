@@ -107,6 +107,7 @@ static void show_help(const char *cmd)
 	printf(" -c <file>      Checkpoint filename; will be created if necessary.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 10.)\n");
+	printf(" -a             Advertise the master information to a catalog server.\n");
 	printf(" -N <project>   Set the project name to <project>\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n"); 
 	printf(" -o <file>      Send debugging to this file.\n");
@@ -371,6 +372,8 @@ static void display_progress()
 
 int main(int argc, char ** argv)
 {
+	char line[1024];
+
 	debug_config(progname);
 
 	// By default, turn on fast abort option since we know each job is of very similar size (in terms of runtime).
@@ -390,18 +393,24 @@ int main(int argc, char ** argv)
 		exit(1);	
 	}
 
+	if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
+        fprintf(stderr, "sand_filter_master running in catalog mode. Please use '-N' option to specify the name of this project.\n");
+        fprintf(stderr, "Run \"%s -h\" for help with options.\n", argv[0]);
+        return 1;
+    }
+
+	sprintf(line, "WORK_QUEUE_WORKER_MODE=%d", work_queue_worker_mode);
+    putenv(strdup(line));
+
+    sprintf(line, "WORK_QUEUE_MASTER_MODE=%d", work_queue_master_mode);
+    putenv(strdup(line));
+
 	q = work_queue_create(port);
 	if (!q) {
 		fprintf(stderr, "%s: couldn't listen on port %d: %s\n",progname,port,strerror(errno));
 		exit(1);
 	}
-	if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG){
-		work_queue_specify_master_mode(q, WORK_QUEUE_MASTER_MODE_CATALOG);
-	}
-	if(project)
-	{
-		work_queue_specify_name(q, project); 
-	} 
+	
 	load_sequences(sequence_filename);
 	debug(D_DEBUG, "Sequence loaded.\n", curr_rect_y, curr_rect_x);
 
