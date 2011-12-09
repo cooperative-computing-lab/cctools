@@ -12,71 +12,43 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "debug.h"
-
 int create_dir(const char *path, int mode)
 {
 	char *temp;
-	char *delim;
-	char oldchar;
+	char *current;
 	int result;
 
-	temp = malloc(strlen(path) + 1);
+	current = temp = malloc(strlen(path) + 2);
 	strcpy(temp, path);
+    strcat(temp, "/");
 
-	delim = temp;
-
-	while((delim = strchr(delim, '/'))) {
-
-		if(delim == temp) {
-			delim++;
-			continue;
+	while((current = strchr(current, '/'))) {
+		struct stat buf;
+		char oldchar = *current;
+		if (current == temp) {
+		  current += 1;
+		  continue;
 		}
-
-		oldchar = *delim;
-		*delim = 0;
-
-		result = mkdir(temp, mode);
-		if(result != 0) {
-			if(errno == EEXIST) {
-				struct stat buf;
-				if (stat(temp, &buf) == 0) {
-					if (S_ISDIR(buf.st_mode)) {
-						/* no problem, keep going */
-					} else {
-						free(temp);
-						errno = EEXIST;
-						return 0;
-					}
-				} else {
-					free(temp);
-					return 0;
-				}
+		*current = 0;
+		if (stat(temp, &buf) == 0) {
+			if (S_ISDIR(buf.st_mode)) {
+				/* continue */
 			} else {
 				free(temp);
+				errno = ENOTDIR;
 				return 0;
 			}
+		} else if (errno == ENOENT && mkdir(temp, mode) == 0) {
+			/* continue */
 		} else {
-			/* ok, made it successfully */
-		}
-
-		*delim = oldchar;
-		delim++;
-	}
-
-	/* Now, last chance */
-
-	result = mkdir(temp, mode);
-
-	free(temp);
-
-	if(result != 0) {
-		if(errno == EEXIST) {
-			return 1;
-		} else {
+			free(temp);
 			return 0;
 		}
-	} else {
-		return 1;
+
+		*current = oldchar;
+		current += 1;
 	}
+
+	free(temp);
+	return 1;
 }
