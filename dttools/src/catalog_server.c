@@ -63,6 +63,10 @@ static INT64_T max_server_size = 0;
 
 /* Logfile for new updates. */
 static FILE *logfile = 0;
+static char *logfilename = 0;
+
+/* debug filename */
+static char *debug_filename = 0;
 
 /* Settings for the master catalog that we will report *to* */
 static int outgoing_alarm = 0;
@@ -417,13 +421,17 @@ int main(int argc, char *argv[])
 	struct link *link, *list_port = 0;
 	char ch;
 	time_t current;
+	int is_daemon = 0;
 
 	outgoing_host_list = list_create();
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "p:l:L:M:d:o:O:u:U:Shv")) != (char) -1) {
+	while((ch = getopt(argc, argv, "bp:l:L:M:d:o:O:u:U:Shv")) != (char) -1) {
 		switch (ch) {
+			case 'b':
+				is_daemon = 1;
+				break;
 			case 'd':
 				debug_flags_set(optarg);
 				break;
@@ -434,7 +442,8 @@ int main(int argc, char *argv[])
 				port = atoi(optarg);
 				break;
 			case 'o':
-				debug_config_file(optarg);
+				free(debug_filename);
+				debug_filename = strdup(optarg);
 				break;
 			case 'O':
 				debug_config_file_size(string_metric_parse(optarg));
@@ -449,8 +458,8 @@ int main(int argc, char *argv[])
 				lifetime = string_time_parse(optarg);
 				break;
 			case 'L':
-				logfile = fopen(optarg,"a");
-				if(!logfile) fatal("couldn't open %s: %s\n",optarg,strerror(errno));
+				free(logfilename);
+				logfilename = strdup(optarg);
 				break;
 			case 'S':
 				fork_mode = 0;
@@ -464,6 +473,13 @@ int main(int argc, char *argv[])
 				return 1;
 			}
 	}
+
+	if (is_daemon) daemonize(0);
+
+	debug_config_file(debug_filename);
+
+	logfile = fopen(logfilename,"a");
+	if(!logfile) fatal("couldn't open %s: %s\n",optarg,strerror(errno));
 
 	current = time(0);
 	debug(D_ALL, "*** %s starting at %s", argv[0], ctime(&current));
