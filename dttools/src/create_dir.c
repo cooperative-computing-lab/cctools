@@ -39,7 +39,19 @@ int create_dir(const char *path, int mode)
 		result = mkdir(temp, mode);
 		if(result != 0) {
 			if(errno == EEXIST) {
-				/* no problem, keep going */
+				struct stat buf;
+				if (stat(temp, &buf) == 0) {
+					if (S_ISDIR(buf.st_mode)) {
+						/* no problem, keep going */
+					} else {
+						free(temp);
+						errno = EEXIST;
+						return 0;
+					}
+				} else {
+					free(temp);
+					return 0;
+				}
 			} else {
 				free(temp);
 				return 0;
