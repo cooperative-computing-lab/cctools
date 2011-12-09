@@ -424,45 +424,45 @@ int main(int argc, char *argv[])
 
 	while((ch = getopt(argc, argv, "p:l:L:M:d:o:O:u:U:Shv")) != (char) -1) {
 		switch (ch) {
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case 'M':
-			max_server_size = string_metric_parse(optarg);
-			break;
-		case 'p':
-			port = atoi(optarg);
-			break;
-		case 'o':
-			debug_config_file(optarg);
-			break;
-		case 'O':
-			debug_config_file_size(string_metric_parse(optarg));
-			break;
-		case 'u':
-			list_push_head(outgoing_host_list, xstrdup(optarg));
-			break;
-		case 'U':
-			outgoing_timeout = string_time_parse(optarg);
-			break;
-		case 'l':
-			lifetime = string_time_parse(optarg);
-			break;
-		case 'L':
-			logfile = fopen(optarg,"a");
-			if(!logfile) fatal("couldn't open %s: %s\n",optarg,strerror(errno));
-			break;
-		case 'S':
-			fork_mode = 0;
-			break;
-		case 'v':
-			show_version(argv[0]);
-			return 0;
-		case 'h':
-		default:
-			show_help(argv[0]);
-			return 1;
-		}
+			case 'd':
+				debug_flags_set(optarg);
+				break;
+			case 'M':
+				max_server_size = string_metric_parse(optarg);
+				break;
+			case 'p':
+				port = atoi(optarg);
+				break;
+			case 'o':
+				debug_config_file(optarg);
+				break;
+			case 'O':
+				debug_config_file_size(string_metric_parse(optarg));
+				break;
+			case 'u':
+				list_push_head(outgoing_host_list, xstrdup(optarg));
+				break;
+			case 'U':
+				outgoing_timeout = string_time_parse(optarg);
+				break;
+			case 'l':
+				lifetime = string_time_parse(optarg);
+				break;
+			case 'L':
+				logfile = fopen(optarg,"a");
+				if(!logfile) fatal("couldn't open %s: %s\n",optarg,strerror(errno));
+				break;
+			case 'S':
+				fork_mode = 0;
+				break;
+			case 'v':
+				show_version(argv[0]);
+				return 0;
+			case 'h':
+			default:
+				show_help(argv[0]);
+				return 1;
+			}
 	}
 
 	current = time(0);
