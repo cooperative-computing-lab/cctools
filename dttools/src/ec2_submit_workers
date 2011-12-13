@@ -89,7 +89,9 @@ EOF
 chmod 755 worker.sh
 
 #Start EC2 instances of the required count.
-ec2-run-instances $image --instance-type $instance_size -k $keyname $parameters -n $count
+ec2run_out=$(ec2-run-instances $image --instance-type $instance_size -k $keyname $parameters -n $count)
+reservation_id=$(echo $ec2run_out | awk '{print $2}')
+echo "Created $count instance(s) under reservation $reservation_id."
 sleep 60
 
 #Wait until all of the requested instances come on-board..
@@ -97,13 +99,13 @@ running_instances=0
 while [ $running_instances -lt $count ]
 do
 	sleep 20
-	running_instances=$(ec2-describe-instances | grep $image | grep running | wc -l)
+	running_instances=$(ec2-describe-instances -F 'reservation-id'=$reservation_id | grep $image | grep running | wc -l)
 done
 
 inst_count=1
 while [ $inst_count -le $count ]
 do
-	instance=$(ec2-describe-instances | grep running | awk 'NR==var{print $4 }' var="${inst_count}")
+	instance=$(ec2-describe-instances -F 'reservation-id'=$reservation_id | grep running | awk 'NR==var{print $4 }' var="${inst_count}")
 	echo "------------------------------------------------"
 	echo "Starting worker #$inst_count on $instance"
 	scp -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $keyfile $worker worker.sh ubuntu@$instance:.
