@@ -9,6 +9,7 @@ show_help()
         echo "  -N <name>           Preferred master name."
         echo "  -C <catalog>        Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
         echo "  -t <time>           Abort after this amount of idle time. (default=900s)."
+        echo "  -d <subsystem>      Enable debugging on worker for this subsystem (try -d all to start)."
         echo "  -i <image_id>       EC2 OS image ID. Default = ami-fa01f193 (Ubuntu 10.04 x86_64)."
         echo "  -z <instance_size>  EC2 instance size. Default = m1.large."
         echo "  -p <parameters>     ec2-run-instances parameters."
@@ -22,7 +23,7 @@ image=ami-fa01f193
 instance_size=m1.large
 parameters=""
 
-while getopts asN:t:i:z:p:h opt 
+while getopts asN:C:t:d:i:z:p:h opt 
 do
         case "$opt" in
                 a)  arguments="$arguments -a"; use_auto=1;;
@@ -30,6 +31,7 @@ do
                 N)  arguments="$arguments -N $OPTARG";;
                 C)  arguments="$arguments -C $OPTARG";;
                 t)  arguments="$arguments -t $OPTARG";;
+                d)  arguments="$arguments -d $OPTARG";;
                 i)  image="$OPTARG";;
                 z)  instance_size="$OPTARG";;
                 p)  parameters="$parameters $OPTARG";;
