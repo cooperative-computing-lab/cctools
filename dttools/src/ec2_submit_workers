@@ -4,15 +4,15 @@ show_help()
 {
         echo "Use: ec2_submit_workers [options] <servername> <port> <ec2-key-name> <ec2-key-file> <num-workers>"
         echo "where options are:"
-        echo "  -a               	Enable auto mode."
-        echo "  -s               	Run as a shared worker."
-        echo "  -N <name>        	Preferred master name."
-        echo "  -C <catalog>     	Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
-        echo "  -t <time> 	        Abort after this amount of idle time. (default=900s)."
-        echo "  -i <image_id>      	EC2 OS image ID. Default = ami-fa01f193 (Ubuntu 10.04 x86_64)."
-        echo "  -z <instance_size>  	EC2 instance size. Default = m1.large."
-        echo "  -p <parameters>	    	ec2-run-instances parameters."
-	echo "  -h   	            	Show this help message."
+        echo "  -a                  Enable auto mode."
+        echo "  -s                  Run as a shared worker."
+        echo "  -N <name>           Preferred master name."
+        echo "  -C <catalog>        Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
+        echo "  -t <time>           Abort after this amount of idle time. (default=900s)."
+        echo "  -i <image_id>       EC2 OS image ID. Default = ami-fa01f193 (Ubuntu 10.04 x86_64)."
+        echo "  -z <instance_size>  EC2 instance size. Default = m1.large."
+        echo "  -p <parameters>     ec2-run-instances parameters."
+        echo "  -h                  Show this help message."
         exit 1
 }
 
@@ -32,7 +32,7 @@ do
                 t)  arguments="$arguments -t $OPTARG";;
                 i)  image="$OPTARG";;
                 z)  instance_size="$OPTARG";;
-		p)  parameters="$parameters $OPTARG";;
+                p)  parameters="$parameters $OPTARG";;
                 h)  show_help;;
                 \?) show_help;;
         esac
