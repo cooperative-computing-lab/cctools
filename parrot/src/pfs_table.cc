@@ -1569,6 +1569,7 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 	if (level == 0)
 		return 0;
 
+    int fnmatch_flags = flags & PFS_SEARCH_PERIOD ? FNM_PATHNAME | FNM_PERIOD : FNM_PATHNAME;
 	int found = 0;
 	char *current = dir+strlen(dir); /* point to end to current directory */
 	int fd;
@@ -1583,7 +1584,7 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 
 			sprintf(current, "/%s", name);
 			r = t->stat(dir, &buf);
-			if (fnmatch(pattern, base, FNM_PATHNAME) == 0) {
+			if (fnmatch(pattern, base, fnmatch_flags) == 0) {
 				const char *matched;
 				int access_flags = search_to_access(flags);
 
