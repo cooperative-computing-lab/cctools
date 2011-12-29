@@ -28,14 +28,16 @@ batch_job_id_t batch_job_submit_simple_local(struct batch_queue *q, const char *
 		debug(D_DEBUG, "couldn't create new process: %s\n", strerror(errno));
 		return -1;
 	} else {
+		/** The following code works but would duplicates the current process.
 		int result = system(cmd);
 		if(WIFEXITED(result)) {
 			_exit(WEXITSTATUS(result));
 		} else {
 			_exit(1);
-		}
+		}*/
+		execlp("sh", "sh", "-c", cmd, (char *)0);
 	}
-
+	return -1;
 }
 
 batch_job_id_t batch_job_submit_local(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)

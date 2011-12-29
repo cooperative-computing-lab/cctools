@@ -417,6 +417,9 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	catalog_host = CATALOG_HOST;
+	catalog_port = CATALOG_PORT;
+
 	while ((c = getopt(argc, argv, "aAC:d:fhN:r:sS:t:T:W:")) >= 0) {
 		switch (c) {
 			case 'a':
@@ -584,11 +587,11 @@ int main(int argc, char *argv[])
 	struct batch_job_info info;
 	while(!abort_flag) {
 		jobid = batch_job_wait_timeout(q, &info, time(0)+5);
-		if(jobid >= 0) {
+		if(jobid >= 0 && !abort_flag) {
 			itable_remove(remote_job_table,jobid);
 			jobid = batch_job_submit_simple(q, worker_cmd, string_basename(worker_path), NULL);
 			if(jobid >= 0) {
-					itable_insert(remote_job_table, jobid, NULL);
+				itable_insert(remote_job_table, jobid, NULL);
 			}
 		}
 	}
