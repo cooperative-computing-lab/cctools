@@ -9,9 +9,9 @@ CODE(BOLD(replica_exchange_protomol_barrier [options] PARAM(pdb_file) PARAM(psf_
 
 SECTION(DESCRIPTION)
 BOLD(replica_exchange_protomol_barrier) is a Work Queue application for running the barrier implementation of replica exchange simulations using the ProtoMol simulation package. At each Monte Carlo step, it transfers the configuration files and input data for each replica to the connected MANPAGE(work_queue_worker) instances, runs the ProtoMol simulation package, and gathers the output. It waits for the completion of simulation of all replicas at each step before proceeding to the next step and, therefore, incorporates a barrier at each step. At the end of every step, it randomly picks two neigboring replicas, applies the metropolis criterion, and if it is satisfied, swaps the parameters of the two replicas and continues simulations.
-
+PARA
 The BOLD(pdb_file), BOLD(psf_file), and BOLD(par_file) arguments specify the input files required for the simulation run. The BOLD(min_temp) and BOLD(max_temp) specify the temperature range in which the replicas are simulated. The number of replicas simulated is given by BOLD(num_replicas). 
-
+PARA
 BOLD(replica_exchange_protomol_barrier) can be run on any machine accesible to work_queue_worker instances. 
 
 SECTION(OPTIONS)
