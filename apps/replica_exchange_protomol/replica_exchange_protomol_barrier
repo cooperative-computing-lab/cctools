@@ -136,7 +136,7 @@ def remove_trailing_dots(file_name):
 #Function to generate a config file to send to workqueue. It returns the generated config file name.
 def generate_config(replica_obj, monte_carlo_step, xyz_input_file = None, xyz_vel_input_file = None):
 	#initialize the config file name based on the replica id.
-	cfg_file_name = "%s/%s/%s/%d-%d.cfg" % ( output_path, "simfiles", "config", replica_obj.id, monte_carlo_step)	
+	cfg_file_name = "%s/%s/%s/%d/%d-%d.cfg" % ( output_path, "simfiles", "config", replica_obj.id, replica_obj.id, monte_carlo_step)	
 	cfg_file_stream = open(cfg_file_name, "w")
 
 	#initialize string that will hold the config file values
@@ -271,7 +271,7 @@ def re_main(replica_list, num_replicas):
 			   Remote_file - file that will be sent to remote worker and used in execution there.'''
 
 			#Assign local and remote config files.
-			local_config_file = "%s/simfiles/config/%d-%d.cfg" % (output_path, replica_id, i)
+			local_config_file = "%s/simfiles/config/%d/%d-%d.cfg" % (output_path, replica_id, replica_id, i)
 			remote_config_file = "%d-%d.cfg" % (replica_id, i)
 			
 			if (i > 0):	
