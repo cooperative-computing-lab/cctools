@@ -1584,7 +1584,7 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 
 			sprintf(current, "/%s", name);
 			r = t->stat(dir, &buf);
-			if (((flags & PFS_SEARCH_RECURSIVE) && fnmatch(pattern, current, FNM_PATHNAME) == 0) || ((~flags & PFS_SEARCH_RECURSIVE) && fnmatch(pattern, base, fnmatch_flags) == 0)) {
+			if (((flags & PFS_SEARCH_RECURSIVE) && fnmatch(pattern, current, fnmatch_flags) == 0) || ((~flags & PFS_SEARCH_RECURSIVE) && fnmatch(pattern, base, fnmatch_flags) == 0)) {
 				const char *matched;
 				int access_flags = search_to_access(flags);
 
