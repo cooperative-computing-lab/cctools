@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "xmalloc.h"
 #include "macros.h"
+#include "daemon.h"
 
 #include <stdlib.h>
 #include <stdio.h>
