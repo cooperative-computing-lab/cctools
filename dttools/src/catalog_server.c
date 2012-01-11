@@ -479,8 +479,10 @@ int main(int argc, char *argv[])
 
 	debug_config_file(debug_filename);
 
-	logfile = fopen(logfilename,"a");
-	if(!logfile) fatal("couldn't open %s: %s\n",optarg,strerror(errno));
+	if(logfilename) {
+		logfile = fopen(logfilename,"a");
+		if(!logfile) fatal("couldn't open %s: %s\n",optarg,strerror(errno));
+	}
 
 	current = time(0);
 	debug(D_ALL, "*** %s starting at %s", argv[0], ctime(&current));
