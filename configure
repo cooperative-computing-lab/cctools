@@ -9,6 +9,7 @@ save_arguments $0 $@
 major=3
 minor=4
 micro=0
+release_date="10/19/2011"
 
 build_user=`whoami`
 build_host=`uname -n`
@@ -32,8 +33,7 @@ case "$build_cpu" in
 	;;
 esac
 
-potential_packages="dttools sand allpairs wavefront makeflow ftp_lite s3tools chirp"
-
+include_package_work_queue="work_queue"
 include_package_sand="sand"
 include_package_allpairs="allpairs"
 include_package_wavefront="wavefront"
@@ -41,6 +41,8 @@ include_package_makeflow="makeflow"
 include_package_ftplite="ftp_lite"
 include_package_s3tools="s3tools"
 include_package_chirp="chirp"
+
+work_queue_bindings=""
 
 if [ -d parrot -a $build_sys = LINUX ]
 then
@@ -67,6 +69,7 @@ rfio_path="/usr"
 dcap_path="/usr"
 irods_path="/usr"
 mysql_path="/usr"
+perl_path="/usr"
 python_path="/usr"
 xrootd_path="/usr"
 mpi_path="/usr/local"
@@ -79,7 +82,7 @@ has_egee=no
 ccompiler=gcc
 cxxcompiler=g++
 mpicompiler=mpicc
-ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Werror -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
+ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
 
 if [ ${build_sys} != CYGWIN ]
 then
@@ -91,6 +94,7 @@ config_readline_path=auto
 config_globus_path=auto
 config_fuse_path=auto
 config_mysql_path=auto
+config_perl_path=auto
 config_python_path=auto
 config_zlib_path=yes
 
@@ -116,7 +120,10 @@ do
 		--prefix)
 			shift
 			install_path=$1
-			;;	
+			;;
+		--strict)
+			ccflags="${ccflags} -Werror"
+			;;
 		--with-globus-path)
 			shift
 			globus_path=$1
@@ -165,6 +172,11 @@ do
 			shift
 			mysql_path=$1
 			config_mysql_path=yes
+			;;
+		--with-perl-path)
+			shift
+			perl_path=$1
+			config_perl_path=yes
 			;;
 		--with-python-path)
 			shift
@@ -229,6 +241,7 @@ Use: configure [options]
 Where options are:
   --help
   --prefix             <path>
+  --strict
   --globus-flavor      <flavor>
   --xrootd-arch        <arch>
   --with-PACKAGE-path  <path>
@@ -244,6 +257,7 @@ Where PACKAGE may be:
     globus
     irods
     mysql
+    perl
     python
     xrootd
     zlib
@@ -271,14 +285,7 @@ done
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot}"
-
-if [ $build_sys = LINUX ]
-then
-	ldflags="-Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic -Xlinker --as-needed "
-else
-	ldflags="-static-libgcc"
-fi
+potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} doc apps"
 
 check_multiarch
 
@@ -304,6 +311,31 @@ require_path ${ccompiler}
 require_path ${cxxcompiler}
 require_path "install"
 require_gnu_make
+
+#
+# Currently, we rely on the linker --as-needed flag to sort out
+# which dynamic libraries each executable actually needs.
+# This is apparently a recent addition to gnu ld.
+# A better solution would be to explicitly specify which libraries
+# are needed by which executable, but this will come in a later version.
+#
+
+echo -n "checking if ld supports the --as-needed flag..."
+if ld --help 2>&1 | grep -- --as-needed 2>&1 >/dev/null 
+then
+        echo "yes"
+        link_as_needed="-Xlinker --as-needed"
+        link_no_as_needed="-Xlinker --no-as-needed"
+else
+        echo "no"
+fi
+
+if [ $build_sys = LINUX ]
+then
+        ldflags="-Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic ${link_as_needed}"
+else
+        ldflags="-static-libgcc"
+fi
 
 ##########################################################################
 # SWITCH TO STATIC LINKING FOR UNCOMMON THIRD-PARTY PACKAGES
@@ -526,7 +558,7 @@ then
 
 	if [ $build_sys = LINUX ]
 	then
-		cctools_readline_ldflags="-Xlinker --no-as-needed -lncurses -ltermcap -lhistory -Xlinker --as-needed"
+		cctools_readline_ldflags="${link_no_as_needed} -lncurses -ltermcap -lhistory ${link_as_needed}"
 	else 
 		library_search ncurses ${readline_path}
 		library_search termcap ${readline_path}
@@ -603,9 +635,47 @@ else
 	fi
 fi
 
+if check_path swig
+then
+	packages="${packages} ${include_package_work_queue}"
+else
+	echo "*** skipping swig bindings for work queue"
+fi
+
+if [ $config_perl_path != no ]
+then
+	if check_file ${perl_path}/bin/perl
+	then
+		perl=${perl_path}/bin/perl
+	else
+		perl=0
+	fi
+
+	if [ $perl != 0 ]
+	then
+		perl_version=`perl -e 'printf "%vd\n",$^V;'`
+		echo "perl version is ${perl_version}"
+		perl_ccflags=`perl -MExtUtils::Embed -e ccopts`
+		perl_ldflags=`perl -MExtUtils::Embed -e ldopts`
+		work_queue_bindings="$work_queue_bindings perl"
+	else
+                if [ $config_perl_path = yes ]
+                then
+                        echo "*** Sorry, I couldn't find the perl libraries in $perl_path"
+                        echo "*** Check --with-perl-path and try again."
+                        exit 1
+                else
+                        echo "*** skipping perl support"
+                fi
+	fi
+fi
+
 if [ $config_python_path != no ]
 then
-	if check_file ${python_path}/bin/python2
+	if [ -n "$PYTHON" ] && check_file ${PYTHON}
+	then	
+		python=${PYTHON}
+	elif check_file ${python_path}/bin/python2
 	then	
 		python=${python_path}/bin/python2
 	elif check_file ${python_path}/bin/python
@@ -617,19 +687,49 @@ then
 
 	if [ $python != 0 ]
 	then
-		python_version="$(${python} -V 2>&1)"
+		python_version=`${python} -V 2>&1 | cut -d " " -f 2`
 		echo "python version is ${python_version}"
-		if [ `echo ${python_version} | awk '{print $2}' | cut -d . -f 2` -ge 6 ]
+		python_major_version=`echo ${python_version} | cut -d . -f 1`
+		python_minor_version=`echo ${python_version} | cut -d . -f 2`
+		if [ $python_major_version -eq 2 -a $python_minor_version -ge 4 ]
 		then
-			if check_file ${python_path}/include/python2.[6-7]/Python.h
+			if check_file ${python_path}/include/python2.$python_minor_version/Python.h
 			then
 				echo "found python development libraries"
-				packages="${packages} python"
+				python_ccflags_file=`mktemp tmp.XXXXXX`
+				python_ldflags_file=`mktemp tmp.XXXXXX`
+
+				${python} > $python_ccflags_file <<EOF
+from distutils import sysconfig
+flags = ['-I' + sysconfig.get_python_inc(),
+	 '-I' + sysconfig.get_python_inc(plat_specific=True)]
+flags.extend(sysconfig.get_config_var('CFLAGS').split())
+print ' '.join(flags)
+EOF
+				${python} > $python_ldflags_file <<EOF
+from distutils import sysconfig
+libs = sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
+if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
+    libs.insert(0, '-L' + sysconfig.get_config_var('LIBPL'))
+libs.extend(sysconfig.get_config_var('LINKFORSHARED').split())
+print ' '.join(libs)
+EOF
+				python_ccflags=`cat $python_ccflags_file`
+				python_ldflags=`cat $python_ldflags_file`
+				rm $python_ccflags_file
+				rm $python_ldflags_file
+
+				if [ $build_sys = DARWIN ]
+				then
+				    python_ldflags="$python_ldflags -undefined dynamic_lookup"
+				fi
+
+				work_queue_bindings="$work_queue_bindings python"
 			else
 				python=0
 			fi
 		else
-			echo "*** Sorry, we require Python >= 2.6.0"
+			echo "*** Sorry, we require Python >= 2.4"
 			python=0
 		fi
 	fi
@@ -638,7 +738,7 @@ then
 	then
                 if [ $config_python_path = yes ]
                 then
-                        echo "*** Sorry, I couldn't find the Python > 2.6.0 libraries in $python_path"
+                        echo "*** Sorry, I couldn't find the Python >= 2.4 libraries in $python_path"
                         echo "*** Check --with-python-path and try again."
                         exit 1
                 else
@@ -662,7 +762,19 @@ then
 	ldflags="${ldflags} -lrt"
 fi
 
-ldflags="${ldflags} -lstdc++ -ldl -lpthread -lz -lc -lm"
+if [ $build_sys != FREEBSD ]
+then
+	ldflags="${ldflags} -ldl"
+fi
+
+#Hack to get chirp to compile on cygwin.
+if [ ${build_sys} != CYGWIN ]
+then
+	ldflags="${ldflags} -lstdc++ -lpthread -lz -lc -lm"
+else
+	ldflags="${ldflags} -lstdc++ -lpthread -lz -lm"
+fi
+
 
 if [ $build_sys = DARWIN ]
 then
@@ -679,15 +791,29 @@ optional_function pwrite /usr/include/unistd.h HAS_PWRITE
 
 optional_include /usr/include/sys/statfs.h HAS_SYS_STATFS_H
 optional_include /usr/include/sys/statvfs.h HAS_SYS_STATVFS_H
-optional_include /usr/include/alloca.h HAS_ALLOCA_H
+
+cctools_doctargets=
 
 if check_path doxygen
 then
-    doxygen=doxygen
+	cctools_doctargets="${cctools_doctargets} apipages"
 else
-    doxygen=true
+	echo "*** not building API documentation"
 fi
-	
+
+if check_path m4
+then
+	cctools_doctargets="${cctools_doctargets} htmlpages"
+	if check_path nroff
+	then
+		cctools_doctargets="${cctools_doctargets} manpages"
+	else
+		echo "*** not building man pages"
+	fi
+else
+	echo "*** not building html or man pages"
+fi
+
 ccflags="${ccflags} -DINSTALL_PATH=\\\"${install_path}\\\" -g -D_REENTRANT -D_GNU_SOURCE -DBUILD_USER=\\\"$build_user\\\" -DBUILD_HOST=\\\"$build_host\\\" -DCCTOOLS_VERSION_MAJOR=$major -DCCTOOLS_VERSION_MINOR=$minor -DCCTOOLS_VERSION_MICRO=$micro -DCCTOOLS_OPSYS_${build_sys} -DCCTOOLS_CPU_${build_cpu}"
 
 echo "Creating Makefile.config..."
@@ -731,11 +857,23 @@ CXXFLAGS=\$(CCTOOLS_CXXFLAGS)
 MPILD=\$(CCTOOLS_MPI_LD)
 
 CCTOOLS_AR=ar
-CCTOOLS_YACC=bison
-CCTOOLS_LEX=flex
-CCTOOLS_DOXYGEN=${doxygen}
+
+CCTOOLS_PERL=${perl}
+CCTOOLS_PERL_CCFLAGS=${perl_ccflags}
+CCTOOLS_PERL_LDFLAGS=${perl_ldflags}
+CCTOOLS_PERL_VERSION=${perl_version}
 
 CCTOOLS_PYTHON=${python}
+CCTOOLS_PYTHON_CCFLAGS=${python_ccflags}
+CCTOOLS_PYTHON_LDFLAGS=${python_ldflags}
+CCTOOLS_PYTHON_VERSION=${python_major_version}.${python_minor_version}
+
+CCTOOLS_WORK_QUEUE_BINDINGS=${work_queue_bindings}
+
+CCTOOLS_DOCTARGETS=${cctools_doctargets}
+
+CCTOOLS_M4_ARGS=-DCCTOOLS_VERSION=${major}.${minor}.${micro} -DCCTOOLS_RELEASE_DATE=${release_date}
+
 EOF
 
 echo ""

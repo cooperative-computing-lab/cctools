@@ -59,6 +59,6 @@ struct work_queue_master *parse_work_queue_master_nvpair(struct nvpair *nv);
 
 struct work_queue_master *duplicate_work_queue_master(struct work_queue_master *master);
 
-struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port);
+struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port, struct list *regex_list);
 
 int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s);

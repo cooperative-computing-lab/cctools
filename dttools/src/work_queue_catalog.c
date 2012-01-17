@@ -111,12 +111,13 @@ struct work_queue_master *duplicate_work_queue_master(struct work_queue_master *
 	return m;
 }
 
-struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port)
+struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port, struct list *regex_list)
 {
 	struct catalog_query *q;
 	struct nvpair *nv;
 	struct list *ml;
 	struct work_queue_master *m;
+	char *regex;
 	time_t timeout = 60, stoptime;
 
 	stoptime = time(0) + timeout;
@@ -135,7 +136,18 @@ struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port
 		if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0) {
 			m = parse_work_queue_master_nvpair(nv);
 			if(m) {
-				list_push_head(ml, m);
+				if(regex_list) {
+					// Matched preferred masters
+					list_first_item(regex_list);
+					while((regex = (char *)list_next_item(regex_list))) {
+						if(whole_string_match_regex(m->proj, regex)) {
+							debug(D_WQ, "Master matched: %s -> %s\n", regex, m->proj);
+							list_push_head(ml, m);
+						}
+					}
+				} else {
+					list_push_head(ml, m);
+				}
 			} else {
 				fprintf(stderr, "Failed to parse a work queue master record!\n");
 			}
@@ -184,7 +196,6 @@ void debug_print_masters(struct list *ml)
 	struct work_queue_master *m;
 	int count = 0;
 
-	debug(D_WQ, "All available Masters:\n");
 	list_first_item(ml);
 	while((m = (struct work_queue_master *) list_next_item(ml))) {
 		debug(D_WQ, "Master %d:\n", ++count);

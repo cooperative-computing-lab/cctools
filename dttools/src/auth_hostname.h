@@ -5,4 +5,9 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-int auth_hostname_register();
+#ifndef AUTH_HOSTNAME_H
+#define AUTH_HOSTNAME_H
+
+int auth_hostname_register(void);
+
+#endif

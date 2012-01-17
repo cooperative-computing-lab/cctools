@@ -5,8 +5,13 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-int auth_unix_register();
+#ifndef AUTH_UNIX_H
+#define AUTH_UNIX_H
+
+int auth_unix_register(void);
 
 void auth_unix_challenge_dir( const char *path );
 void auth_unix_passwd_file( const char *path );
 void auth_unix_timeout_set( int secs );
+
+#endif

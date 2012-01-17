@@ -28,14 +28,26 @@ batch_job_id_t batch_job_submit_simple_local(struct batch_queue *q, const char *
 		debug(D_DEBUG, "couldn't create new process: %s\n", strerror(errno));
 		return -1;
 	} else {
-		/** The following code works but would duplicates the current process.
+		/** The following code works but would duplicates the current process because of the system() function.
 		int result = system(cmd);
 		if(WIFEXITED(result)) {
 			_exit(WEXITSTATUS(result));
 		} else {
 			_exit(1);
 		}*/
+
+		/** A note from "man system 3" as of Jan 2012:
+		 * Do not use system() from a program with set-user-ID or set-group-ID
+		 * privileges, because strange values for some environment variables
+		 * might be used to subvert system integrity. Use the exec(3) family of
+		 * functions instead, but not execlp(3) or execvp(3). system() will
+		 * not, in fact, work properly from programs with set-user-ID or
+		 * set-group-ID privileges on systems on which /bin/sh is bash version
+		 * 2, since bash 2 drops privileges on startup. (Debian uses a modified
+		 * bash which does not do this when invoked as sh.) 
+		 */
 		execlp("sh", "sh", "-c", cmd, (char *)0);
+		_exit(127);	// Failed to execute the cmd.
 	}
 	return -1;
 }

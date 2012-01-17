@@ -62,7 +62,7 @@ static int auth_address_accept(struct link *link, char **subject, time_t stoptim
 	return 0;
 }
 
-int auth_address_register()
+int auth_address_register(void)
 {
 	debug(D_AUTH, "address: registered");
 	return auth_register("address", auth_address_assert, auth_address_accept);

@@ -1,0 +1,42 @@
+/** @mainpage CCTools API Documentation
+
+This is the reference manual for the CCTools API,
+which includes Chirp, Parrot, Makeflow, Work Queue, and other software.
+Note that this documentation is a work in progress.
+Only the most widely used interfaces are documented here.
+Less used interfaces are not documented, but can still be browsed through this interface.
+
+- <b><a href="http://www.cse.nd.edu/~ccl/software/howto/code.shtml">Writing Your First Program with Chirp</a></b>
+
+If you are writing programs to submit jobs to Work Queue, Condor, or other systems, start here:
+
+- @ref work_queue.h
+- @ref batch_job.h
+
+If you are writing programs to access Chirp, start here:
+
+- @ref chirp_reli.h
+- @ref chirp_recursive.h
+- @ref chirp_stream.h
+
+There are a number of other support modules that implement debugging, communication,
+data structures, and so forth.  The most commonly used are:
+
+- @ref debug.h
+- @ref link.h
+- @ref hash_table.h
+- @ref itable.h
+- @ref md5.h
+
+Or, you can browse all documented modules in the package:
+
+- <b><a href="files.html">See All Modules</a></b>
+
+For more information about using and installing CCTools:
+
+- <a href="http://www.cse.nd.edu/~ccl/software">CCTools Software</a>
+- <a href="http://www.cse.nd.edu/~ccl/software/manuals">CCTools User Manuals</a>
+- <a href="http://www.cse.nd.edu/~ccl/software/howto">CCTools HOWTO Manuals</a>
+
+*/
+

@@ -17,6 +17,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "work_queue.h"
+#include "work_queue_catalog.h"
 #include "hash_table.h"
 #include "stringtools.h"
 #include "macros.h"
@@ -28,6 +29,7 @@ See the file COPYING for details.
 static struct work_queue *queue = 0;
 static struct hash_table *sequence_table = 0;
 static int port = WORK_QUEUE_DEFAULT_PORT;
+static char *project = NULL;
 static char align_prog[1024];
 static const char *align_prog_args = "";
 static const char *candidate_file_name;
@@ -73,6 +75,9 @@ static void show_help(const char *cmd)
 	printf(" -e <args>      Extra arguments to pass to the alignment program.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 10.)\n");
+	printf(" -a             Advertise the master information to a catalog server.\n");
+	printf(" -N <project>   Set the project name to <project>\n");
+	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n"); 
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -313,8 +318,14 @@ static struct work_queue_task * task_create( struct hash_table *sequence_table )
 int main(int argc, char *argv[])
 {
 	char c;
+	char line[1024];
 
 	const char *progname = "sand_align_master";
+
+	char *catalog_server_host = NULL;
+	int catalog_server_port = 0;
+	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+	int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 
 	debug_config(progname);
 
@@ -322,7 +333,7 @@ int main(int argc, char *argv[])
 	// One can also set the fast_abort_multiplier by the '-f' option.
 	wq_option_fast_abort_multiplier = 10;
 
-	while((c = getopt(argc, argv, "e:F:p:n:d:o:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "e:F:N:C:p:n:d:o:vha")) != (char) -1) {
 		switch (c) {
 		case 'p':
 			port = atoi(optarg);
@@ -338,6 +349,28 @@ int main(int argc, char *argv[])
 			break;
 		case 'F':
 			wq_option_fast_abort_multiplier = atof(optarg);
+			break;
+		case 'a': 
+			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+			break; 
+		case 'N':
+			if (project) free(project);
+			project = strdup(optarg);
+			sprintf(line,"WORK_QUEUE_NAME=%s",project);
+			putenv(strdup(line));
+			break;
+		case 'C':
+			if(!parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port)) {
+				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
+				exit(1);
+			}
+					
+			sprintf(line,"CATALOG_HOST=%s", catalog_server_host);
+			putenv(strdup(line));
+			sprintf(line,"CATALOG_PORT=%d", catalog_server_port);
+			putenv(strdup(line));
+
+			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -386,6 +419,18 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "%s: couldn't open output file %s: %s\n", progname,output_file_name, strerror(errno));
 		return 1;
 	}
+
+	if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
+        fprintf(stderr, "sand_align_master running in catalog mode. Please use '-N' option to specify the name of this project.\n");
+        fprintf(stderr, "Run \"%s -h\" for help with options.\n", argv[0]);
+        return 1;
+    }
+
+	sprintf(line, "WORK_QUEUE_WORKER_MODE=%d", work_queue_worker_mode);
+    putenv(strdup(line));
+
+    sprintf(line, "WORK_QUEUE_MASTER_MODE=%d", work_queue_master_mode);
+    putenv(strdup(line));
 
 	queue = work_queue_create(port);
 	if(!queue) {

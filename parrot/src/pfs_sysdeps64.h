@@ -138,6 +138,8 @@ struct pfs_kernel_sigaction {
 #define PFS_SETLK	6
 #define PFS_SETLKW	7
 
+#define PFS_TIOCGPGRP   0x540F
+
 /*
 Many data structures must be aligned on 8 byte boundaries.
 This rounds up values to multiples of 8.

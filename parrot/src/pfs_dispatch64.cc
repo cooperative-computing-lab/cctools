@@ -1087,12 +1087,18 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			break;
 
 		case SYSCALL64_pipe:
+		case SYSCALL64_pipe2:
 			if(entering) {
 				int fds[2];
 				p->syscall_result = pfs_pipe(fds);
 				if(p->syscall_result<0) {
 					p->syscall_result = -errno;
 				} else {
+					// The pipe2 variant also sets flags on the pipe ends.
+					if(p->syscall==SYSCALL64_pipe2) {
+						pfs_fcntl(fds[0],F_SETFL,(void*)args[1]);
+						pfs_fcntl(fds[1],F_SETFL,(void*)args[1]);
+					}
 					tracer_copy_out(p->tracer,(void*)fds,POINTER(args[0]),sizeof(fds));
 				}
 				divert_to_dummy(p,p->syscall_result);
@@ -1511,6 +1517,14 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			}
 			break;
 
+		case SYSCALL64_fchmod:
+                        if(entering) {
+                                p->syscall_result = pfs_fchmod(args[0],args[1]);
+                                if(p->syscall_result<0) p->syscall_result = -errno;
+                                divert_to_dummy(p,p->syscall_result);
+                        }
+                        break;
+
 		/*
 		ioctl presents both bad news and good news.
 		The bad news is that all ioctl operations are driver
@@ -1554,6 +1568,18 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					}
 				} else {
 					p->syscall_result = pfs_ioctl(fd,cmd,uaddr);
+				}
+
+				/*
+				Hack: If the process asks who the controlling terminal of a tty is,
+				the answer will be the Parrot pid.  Change that answer to the pgrp
+				of the calling process.
+				*/
+
+				if(cmd==PFS_TIOCGPGRP) {
+					pid_t newgrp = getpgid(pfs_current->pid);
+					debug(D_PROCESS,"tcgetpgrp(%d) changed from %d to %d",fd,*(pid_t*)buffer,newgrp);
+					*(pid_t *)buffer = newgrp;
 				}
 
 				if(p->syscall_result<0) {
@@ -2132,7 +2158,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					p->syscall_result = -errno;
 				} else {
 					COPY_STAT(lbuf,kbuf);
-					tracer_copy_out(p->tracer,&kbuf,POINTER(args[1]),sizeof(kbuf));
+					tracer_copy_out(p->tracer,&kbuf,POINTER(args[2]),sizeof(kbuf));
 				}
 				divert_to_dummy(p,p->syscall_result);
 			}
@@ -2194,6 +2220,15 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			if(entering) {
 				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
 				p->syscall_result = pfs_fchmodat(args[0],path,args[2],args[3]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL64_faccessat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				p->syscall_result = pfs_faccessat(args[0],path,args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
 			}

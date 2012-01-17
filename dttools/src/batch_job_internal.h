@@ -29,11 +29,11 @@ batch_job_id_t batch_job_submit_condor(struct batch_queue * q, const char *cmd, 
 batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime);
 int batch_job_remove_condor(struct batch_queue *q, batch_job_id_t jobid);
 
-int batch_job_setup_grid(struct batch_queue *q);
-batch_job_id_t batch_job_submit_simple_grid(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files);
-batch_job_id_t batch_job_submit_grid(struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files);
-batch_job_id_t batch_job_wait_grid(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime);
-int batch_job_remove_grid(struct batch_queue *q, batch_job_id_t jobid);
+int batch_job_setup_cluster(struct batch_queue *q);
+batch_job_id_t batch_job_submit_simple_cluster(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files);
+batch_job_id_t batch_job_submit_cluster(struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files);
+batch_job_id_t batch_job_wait_cluster(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime);
+int batch_job_remove_cluster(struct batch_queue *q, batch_job_id_t jobid);
 
 batch_job_id_t batch_job_submit_simple_moab(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files);
 batch_job_id_t batch_job_submit_moab(struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files);

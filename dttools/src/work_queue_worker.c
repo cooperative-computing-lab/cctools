@@ -42,6 +42,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/signal.h>
+#include <sys/utsname.h>
 
 
 // Maximum time to wait before aborting if there is no connection to the master.
@@ -293,7 +294,7 @@ static void show_version(const char *cmd)
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s <masterhost> <port>\n", cmd);
+	printf("Use: %s [options] <masterhost> <port>\n", cmd);
 	printf("where options are:\n");
 	printf(" -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
@@ -319,11 +320,12 @@ int main(int argc, char *argv[])
 	char addr[LINK_ADDRESS_MAX];
 	UINT64_T memory_avail, memory_total;
 	UINT64_T disk_avail, disk_total;
+	UINT64_T avail_space_threshold = 0;
 	int ncpus;
 	char c;
 	char hostname[DOMAIN_NAME_MAX];
+	struct utsname uname_data;
 	int w;
-	UINT64_T avail_space_threshold = 0;
 	char preferred_master_names[WORK_QUEUE_LINE_MAX];
 	char deletecmd[WORK_QUEUE_LINE_MAX];
 
@@ -433,14 +435,23 @@ int main(int argc, char *argv[])
 	printf("worker: working in %s\n", tempdir);
 	mkdir(tempdir, 0700);
 	chdir(tempdir);
+	
+	if (avail_space_threshold > 0) {
+		disk_info_get(".", &disk_avail, &disk_total);
+		if (disk_avail < avail_space_threshold) {
+                       	printf("worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
+	                goto abort;
+                }	
+        }	
 
 	domain_name_cache_guess(hostname);
+	uname(&uname_data);
 
 	time_t idle_stoptime = time(0) + idle_timeout;
 	time_t switch_master_time = time(0) + master_timeout;
 
 	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t) free);
-
+		
 	while(!abort_flag) {
 		char line[WORK_QUEUE_LINE_MAX];
 		int result, mode, fd;
@@ -449,13 +460,6 @@ int main(int argc, char *argv[])
 		char path[WORK_QUEUE_LINE_MAX];
 		char *buffer;
 		FILE *stream;
-
-		if (avail_space_threshold > 0) {
-			if (disk_avail < avail_space_threshold) {
-                        	printf("worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
-	                        break;
-                       	}	
-                }	
 
 		if(time(0) > idle_stoptime) {
 			if(master) {
@@ -484,11 +488,10 @@ int main(int argc, char *argv[])
 
 			link_tune(master, LINK_TUNE_INTERACTIVE);
 
-
 			if(exclusive_worker) {
-				link_putfstring(master, "ready %s %d %llu %llu %llu %llu \"%s\"\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names);
+				link_putfstring(master, "ready %s %d %llu %llu %llu %llu \"%s\" %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names, uname_data.sysname, uname_data.machine);
 			} else {
-				link_putfstring(master, "ready %s %d %llu %llu %llu %llu\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total);
+				link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, uname_data.sysname, uname_data.machine);
 			}
 		}
 
@@ -550,6 +553,7 @@ int main(int argc, char *argv[])
 				symlink(path, filename);
 			} else if(sscanf(line, "put %s %lld %o", filename, &length, &mode) == 3) {
 				if (avail_space_threshold > 0){
+					disk_info_get(".", &disk_avail, &disk_total);
 		                        if (disk_avail < avail_space_threshold) {
                 	                	debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
 	                        	        goto recover;
@@ -718,6 +722,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
+      abort:	
 	printf("worker: cleaning up %s\n", tempdir);
 	sprintf(deletecmd, "rm -rf %s", tempdir);
 	system(deletecmd);

@@ -184,7 +184,7 @@ xblock, yblock, and then construct a task with a list of files
 on each axis, and attach the necessary files.
 */
 
-struct work_queue_task * task_create( struct text_list *seta, struct text_list *setb )
+struct work_queue_task * ap_task_create( struct text_list *seta, struct text_list *setb )
 {
 	int x,y;
 	char *buf, *name;
@@ -357,7 +357,7 @@ int main(int argc, char **argv)
 	while(1) {
 		struct work_queue_task *task = NULL;
 		while(work_queue_hungry(q)) {
-			task = task_create(seta,setb);
+			task = ap_task_create(seta,setb);
 			if(task) {
 				work_queue_submit(q, task);
 			} else {

@@ -26,8 +26,8 @@ int s3_put_file(const char* localname, char* remotename, char* bucketname, enum 
 	struct stat st;
 	FILE* infile;
 	char response[HEADER_LINE_MAX];
-	char * text;
-	int length;
+	//char * text;
+	//int length;
 
 	if(!access_key_id || !access_key || !s3_endpoint) return -1;
 
@@ -58,15 +58,19 @@ int s3_put_file(const char* localname, char* remotename, char* bucketname, enum 
 	list_push_tail(mesg.amz_headers, head);
 
 	sign_message(&mesg, access_key_id, access_key);
-	length = s3_message_to_string(&mesg, &text);
+	server = s3_send_message(&mesg, NULL, stoptime);
+	//length = s3_message_to_string(&mesg, &text);
 	list_free(mesg.amz_headers);
 	list_delete(mesg.amz_headers);
 
-	server = link_connect(s3_address, 80, stoptime);
-	if(!server) return -1;
+	if(!server)
+		return -1;
 
-	link_putlstring(server, text, length, stoptime);
-	free(text);
+	//server = link_connect(s3_address, 80, stoptime);
+	//if(!server) return -1;
+
+	//link_putlstring(server, text, length, stoptime);
+	//free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
 	if(strcmp(response, "HTTP/1.1 100 Continue")) {
@@ -102,7 +106,7 @@ int s3_get_file(const char* localname, struct s3_dirent_object *dirent, char* re
 	struct link* server;
 	time_t stoptime = time(0)+s3_timeout;
 	char response[HEADER_LINE_MAX];
-	char * text;
+	//char * text;
 	int length;
 	FILE* outfile;
 
@@ -118,14 +122,17 @@ int s3_get_file(const char* localname, struct s3_dirent_object *dirent, char* re
 	mesg.expect = 0;
 	mesg.amz_headers = NULL;
 
-	server = link_connect(s3_address, 80, stoptime);
-	if(!server) return -1;
+	//server = link_connect(s3_address, 80, stoptime);
 
 	sign_message(&mesg, access_key_id, access_key);
-	length = s3_message_to_string(&mesg, &text);
+	server = s3_send_message(&mesg, NULL, stoptime);
+	if(!server)
+		return -1;
+	
+	//length = s3_message_to_string(&mesg, &text);
 
-	link_putlstring(server, text, length, stoptime);
-	free(text);
+	//link_putlstring(server, text, length, stoptime);
+	//free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
 	if(strcmp(response, "HTTP/1.1 200 OK")) {
@@ -181,8 +188,8 @@ int s3_rm_file(char* filename, char* bucketname, const char* access_key_id, cons
 	struct link* server;
 	time_t stoptime = time(0)+s3_timeout;
 	char response[HEADER_LINE_MAX];
-	char * text;
-	int length;
+	//char * text;
+	//int length;
 
 	if(!access_key_id || !access_key || !s3_endpoint) return -1;
 
@@ -196,14 +203,17 @@ int s3_rm_file(char* filename, char* bucketname, const char* access_key_id, cons
 	mesg.expect = 0;
 	mesg.amz_headers = NULL;
 
-	server = link_connect(s3_address, 80, stoptime);
-	if(!server) return -1;
+	//server = link_connect(s3_address, 80, stoptime);
 
 	sign_message(&mesg, access_key_id, access_key);
-	length = s3_message_to_string(&mesg, &text);
+	server = s3_send_message(&mesg, NULL, stoptime);
+	if(!server)
+		return -1;
 
-	link_putlstring(server, text, length, stoptime);
-	free(text);
+	//length = s3_message_to_string(&mesg, &text);
+
+	//link_putlstring(server, text, length, stoptime);
+	//free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
 	if(strcmp(response, "HTTP/1.1 204 No Content")) {
@@ -228,7 +238,7 @@ int s3_stat_file(char* filename, char* bucketname, struct s3_dirent_object* dire
 	struct link* server;
 	time_t stoptime = time(0)+s3_timeout;
 	char response[HEADER_LINE_MAX];
-	char * text;
+	//char * text;
 	int length;
 
 	if(!access_key_id || !access_key || !s3_endpoint) return -1;
@@ -243,14 +253,17 @@ int s3_stat_file(char* filename, char* bucketname, struct s3_dirent_object* dire
 	mesg.expect = 0;
 	mesg.amz_headers = NULL;
 
-	server = link_connect(s3_address, 80, stoptime);
-	if(!server) return -1;
+	//server = link_connect(s3_address, 80, stoptime);
 
 	sign_message(&mesg, access_key_id, access_key);
-	length = s3_message_to_string(&mesg, &text);
+	server = s3_send_message(&mesg, NULL, stoptime);
+	if(!server)
+		return -1;
 
-	link_putlstring(server, text, length, stoptime);
-	free(text);
+	//length = s3_message_to_string(&mesg, &text);
+
+	//link_putlstring(server, text, length, stoptime);
+	//free(text);
 
 	link_readline(server, response, HEADER_LINE_MAX, stoptime);
 	if(strcmp(response, "HTTP/1.1 200 OK")) {

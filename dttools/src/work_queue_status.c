@@ -69,7 +69,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 {
 	int c;
 
-    while ((c = getopt(argc, argv, "C:d:lt:h")) != -1) {
+	while((c = getopt(argc, argv, "C:d:lt:h")) != (char)-1) {
 		switch (c) {
 			case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {

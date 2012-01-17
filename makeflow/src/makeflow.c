@@ -1166,7 +1166,10 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 		strcat(output_files,",");
 	}
 
-	batch_queue_set_options(thequeue,getenv("BATCH_OPTIONS"));
+	const char *batch_submit_options = getenv("BATCH_OPTIONS");
+	if (batch_submit_options) {
+		batch_queue_set_options(thequeue, batch_submit_options);
+	}
 
 	time_t stoptime = time(0) + dag_submit_timeout;
 	int waittime = 1;
@@ -1403,6 +1406,8 @@ static void show_help(const char *cmd)
 	printf(" -a             Advertise the master information to a catalog server.\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	printf(" -e             Set the work queue master to only accept workers that have the same -N <project> option.\n");
+	printf(" -E             Enable master capacity estimation in Work Queue. Estimated master capcity may be viewed in the work queue log file or through the  work_queue_status command.\n"); 
+	printf(" -M             Enable automatic excessive worker removal in Work Queue. (-E option will be automatically added when this option is given.)\n");
 	printf(" -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	printf(" -I             Show input files.\n");
 	printf(" -O             Show output files.\n");
@@ -1422,7 +1427,6 @@ static void show_help(const char *cmd)
 	printf(" -z             Force failure on zero-length output files \n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
-	
 }
 
 int main( int argc, char *argv[] )
@@ -1437,19 +1441,21 @@ int main( int argc, char *argv[] )
 	int explicit_local_jobs_max = 0;
 	int skip_afs_check = 0;
 	int preserve_symlinks = 0;
-	const char *batch_submit_options = 0;
+	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	int auto_workers = 0;
 	char line[1024];
-    int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
-    int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
-    int work_queue_wait_routine = WORK_QUEUE_WAIT_FAST_DISPATCH;
+	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+	int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
+	int work_queue_estimate_capacity = WORK_QUEUE_SWITCH_UNSPECIFIED;
+	int work_queue_auto_remove_workers = WORK_QUEUE_SWITCH_UNSPECIFIED;
+    int work_queue_wait_routine = WORK_QUEUE_WAIT_UNSPECIFIED;
 	int capacity_tolerance = 0;
 	char *catalog_host;
 	int catalog_port;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAB:cC:d:DeF:GhiIj:J:kKl:L:N:o:Op:P:r:RS:t:T:vw:W:z:Z:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:DeEF:GhiIj:J:kKl:L:MN:o:Op:P:r:RS:t:T:vw:W:z:Z:")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1471,12 +1477,18 @@ int main( int argc, char *argv[] )
 			sprintf(line,"WORK_QUEUE_PRIORITY=%d",priority);
 			putenv(strdup(line));
 			break;
-        case 'a':
-            work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+		case 'a':
+			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
-        case 'e':
-            work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
-            break;
+		case 'e':
+			work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
+			break;
+		case 'E':
+			work_queue_estimate_capacity = WORK_QUEUE_SWITCH_ON;
+			break;
+		case 'M':
+			work_queue_auto_remove_workers = WORK_QUEUE_SWITCH_ON;
+			break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
 				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
@@ -1486,7 +1498,7 @@ int main( int argc, char *argv[] )
 			putenv(strdup(line));
 			sprintf(line,"CATALOG_PORT=%d", catalog_port);
 			putenv(strdup(line));
-            work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
 		case 'I':
 			display_mode = SHOW_INPUT_FILES;
@@ -1581,7 +1593,7 @@ int main( int argc, char *argv[] )
 			} else if (!strcmp(optarg, "adaptive")) {
 				work_queue_wait_routine = WORK_QUEUE_WAIT_ADAPTIVE;
 			} else {
-				work_queue_wait_routine = WORK_QUEUE_WAIT_FAST_DISPATCH;
+				work_queue_wait_routine = WORK_QUEUE_WAIT_UNSPECIFIED;
 			}
 			break;
 		case 't':
@@ -1602,49 +1614,52 @@ int main( int argc, char *argv[] )
 	
 	if((argc-optind)!=1) {
 		int rv = access("./Makeflow",R_OK);
-		if (rv < 0)
-		{
+		if (rv < 0) {
 			fprintf(stderr, "makeflow: No makeflow specified and file \"./Makeflow\" could not be found.\n");
 			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
 			return 1;
 		}
 		
 		dagfile = "./Makeflow";
-	}
-	else
-	{
+	} else {
 		dagfile = argv[optind];
 	}
 
 
+	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+		if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
+			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
+			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
+			return 1;
+		}
 
-    if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
-        fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
-        fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
-        return 1;
-    }
-
-    sprintf(line, "WORK_QUEUE_WORKER_MODE=%d", work_queue_worker_mode);
-    putenv(strdup(line));
-
-    sprintf(line, "WORK_QUEUE_MASTER_MODE=%d", work_queue_master_mode);
-    putenv(strdup(line));
-
-    sprintf(line, "WORK_QUEUE_WAIT_ROUTINE=%d", work_queue_wait_routine);
-    putenv(strdup(line));
-
-
-	if(port!=0) {
-		sprintf(line,"WORK_QUEUE_PORT=%d",port);
+		sprintf(line, "WORK_QUEUE_WORKER_MODE=%d", work_queue_worker_mode);
 		putenv(strdup(line));
-	} else {
-        // Use work queue default port in standalone mode when port in not
-        // specified with -p option. In work queue catalog mode, work queue
-        // would choose a random port when port is not explicitly specified.
-        if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE){
-            sprintf(line,"WORK_QUEUE_PORT=%d",WORK_QUEUE_DEFAULT_PORT);
-            putenv(strdup(line));
-        }
+
+		sprintf(line, "WORK_QUEUE_MASTER_MODE=%d", work_queue_master_mode);
+		putenv(strdup(line));
+
+		sprintf(line, "WORK_QUEUE_ESTIMATE_CAPACITY_ON=%d", work_queue_estimate_capacity);
+		putenv(strdup(line));
+
+		sprintf(line, "WORK_QUEUE_AUTO_REMOVE_WORKERS_ON=%d", work_queue_auto_remove_workers);
+		putenv(strdup(line));
+
+		sprintf(line, "WORK_QUEUE_WAIT_ROUTINE=%d", work_queue_wait_routine);
+		putenv(strdup(line));
+
+		if(port!=0) {
+			sprintf(line,"WORK_QUEUE_PORT=%d",port);
+			putenv(strdup(line));
+		} else {
+			// Use work queue default port in standalone mode when port in not
+			// specified with -p option. In work queue catalog mode, work queue
+			// would choose a random port when port is not explicitly specified.
+			if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE){
+				sprintf(line,"WORK_QUEUE_PORT=%d",WORK_QUEUE_DEFAULT_PORT);
+				putenv(strdup(line));
+			}
+		}
 	}
 
 	int dagfile_namesize = strlen(dagfile);
@@ -1792,6 +1807,7 @@ int main( int argc, char *argv[] )
 	}
 
 	if(batch_submit_options) {
+		debug(D_DEBUG, "setting batch options to %s\n", batch_submit_options);
 		batch_queue_set_options(remote_queue,batch_submit_options);
 	}
 

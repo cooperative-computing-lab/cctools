@@ -21,10 +21,6 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <string.h>
 
-#ifdef HAS_ALLOCA_H
-#include <alloca.h>
-#endif
-
 #define CHIRP_FILESYSTEM_BUFFER  65536
 
 struct CHIRP_FILE {
@@ -220,7 +216,7 @@ int cfs_create_dir(const char *path, int mode)
 	char oldchar;
 	int result;
 
-	temp = alloca(strlen(path) + 1);
+	temp = malloc(strlen(path) + 1);
 	strcpy(temp, path);
 
 	delim = temp;
@@ -240,6 +236,7 @@ int cfs_create_dir(const char *path, int mode)
 			if(errno == EEXIST) {
 				/* no problem, keep going */
 			} else {
+				free(temp);
 				return 0;
 			}
 		} else {
@@ -253,6 +250,7 @@ int cfs_create_dir(const char *path, int mode)
 	/* Now, last chance */
 
 	result = cfs->mkdir(temp, mode);
+	free(temp);
 	if(result != 0) {
 		if(errno == EEXIST) {
 			return 1;
