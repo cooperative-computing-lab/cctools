@@ -1449,7 +1449,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "rmdir %s", path) == 1) {
 			if(!chirp_path_fix(path))
 				goto failure;
-			if(chirp_acl_check(path, subject, CHIRP_ACL_DELETE) || chirp_acl_check_dir(path, subject, CHIRP_ACL_DELETE)) {
+			if(chirp_acl_check_link(path, subject, CHIRP_ACL_DELETE) || chirp_acl_check_dir(path, subject, CHIRP_ACL_DELETE)) {
 				result = chirp_alloc_rmdir(path);
 			} else {
 				goto failure;
@@ -1457,7 +1457,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "rmall %s", path) == 1) {
 			if(!chirp_path_fix(path))
 				goto failure;
-			if(chirp_acl_check(path, subject, CHIRP_ACL_DELETE) || chirp_acl_check_dir(path, subject, CHIRP_ACL_DELETE)) {
+			if(chirp_acl_check_link(path, subject, CHIRP_ACL_DELETE) || chirp_acl_check_dir(path, subject, CHIRP_ACL_DELETE)) {
 				result = chirp_alloc_rmall(path);
 			} else {
 				goto failure;

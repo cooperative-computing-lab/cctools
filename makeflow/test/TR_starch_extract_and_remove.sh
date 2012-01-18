@@ -19,6 +19,7 @@ run()
 
 clean()
 {
+    rm -rf src
     rm -f $sfxfile $tarfile 
     rm -rf $(basename $tarfile .tar.gz)
     exit 0

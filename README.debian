@@ -13,6 +13,7 @@ Optional packages:
     * libmysqlclient-dev (mysql support)
     * libreadline-dev (readline support)
     * python-dev (python package)
+    * m4 (manpages)
 
 Debian Package page:
 

@@ -53,7 +53,7 @@ static struct flag_info table[] = {
 	{"ftp", D_FTP},
 	{"nest", D_NEST},
 	{"chirp", D_CHIRP},
-	{"landlord", D_LANDLORD},
+	{"cvmfs", D_CVMFS},
 	{"multi", D_MULTI},
 	{"dcap", D_DCAP},
 	{"rfio", D_RFIO},

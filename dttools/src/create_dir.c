@@ -19,7 +19,7 @@ int create_dir(const char *path, int mode)
 
 	current = temp = malloc(strlen(path) + 2);
 	strcpy(temp, path);
-    strcat(temp, "/");
+	strcat(temp, "/");
 
 	while((current = strchr(current, '/'))) {
 		struct stat buf;

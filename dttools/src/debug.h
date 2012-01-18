@@ -49,7 +49,7 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_TCP      0x000000100	/**< Debug TCP connections and disconnections. */
 #define D_AUTH     0x000000200	/**< Debug authentication and authorization actions. */
 #define D_IRODS    0x000000400	/**< Debug the iRODS module in Parrot. */
-#define D_LANDLORD 0x000000800	/**< Debug Landlord operations. */
+#define D_CVMFS    0x000000800	/**< Debug CVMFS module in Parrot. */
 #define D_HTTP     0x000001000	/**< Debug HTTP queries. */
 #define D_FTP      0x000002000	/**< Debug FTP operations. */
 #define D_NEST     0x000004000	/**< Debug the NEST module in Parrot. */
@@ -76,10 +76,10 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_MPI      0x800000000LL  /**< Debug MPI module for Makeflow */
 
 /** Debug all remote I/O operations. */
-#define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID|D_XROOTD)
+#define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID|D_XROOTD|D_CVMFS)
 
 /** Show all debugging info. */
-#define D_ALL      0xfffffffffLL
+#define D_ALL      ~(0LL)
 
 /*
 It turns out that many libraries and tools make use of
