@@ -13,6 +13,10 @@ This module written by James Fitzgerald, B.S. 2006.
 #define FUSE_USE_VERSION 27
 
 #include <fuse.h>
+
+#include <unistd.h>
+#include <dirent.h>
+#include <fcntl.h>
 #include <pthread.h>
 
 #include "chirp_global.h"
@@ -21,18 +25,15 @@ This module written by James Fitzgerald, B.S. 2006.
 
 #include "auth_all.h"
 #include "debug.h"
-#include "stringtools.h"
 #include "itable.h"
+#include "stringtools.h"
 #include "xmalloc.h"
 
+#include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <errno.h>
-#include <signal.h>
 
 static int chirp_fuse_timeout = 60;
 static int run_in_foreground = 0;
@@ -588,7 +589,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "d:Db:i:m:o:a:t:fhv")) != -1) {
+	while((c = getopt(argc, argv, "a:b:d:Dfhi:m:o:t:v")) != -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);
@@ -600,7 +601,7 @@ int main(int argc, char *argv[])
 			chirp_reli_blocksize_set(atoi(optarg));
 			break;
 		case 'i':
-			tickets = strdup(optarg);
+			tickets = xstrdup(optarg);
 			break;
 		case 'm':
 			fa.argc = 1;
