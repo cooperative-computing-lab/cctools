@@ -34,6 +34,7 @@ OPTION_PAIR(-d,flag)Enable debugging for this subsystem.
 OPTION_ITEM(-D)Disable small file optimizations such as recursive delete.
 OPTION_ITEM(-f)Run in foreground for debugging.
 OPTION_ITEM(-h)Give help information.
+OPTION_PAIR(-m,option)Pass mount option to FUSE. Can be specified multiple times.
 OPTION_PAIR(-o,file)Send debugging output to this file.
 OPTION_PAIR(-t,timeout)Timeout for network operations. (default is 60s)
 OPTION_ITEM(-v)Show program version.
