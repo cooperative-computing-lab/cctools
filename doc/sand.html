@@ -45,13 +45,14 @@ are ready to go.</p>
 <h2>Using SAND with the Celera Assembler</h2>
 
 If you are already using the Celera Assembler version 5.4, you can easily switch to using SAND
-to accelerate assemblies by using our modified <tt>runCA</tt> script.  We assume that you have
+to accelerate assemblies by using our modified <tt>sand_runCA_5.4</tt> script. If you are using the newer 
+Celera Assembler version 6.1, you can switch to SAND by using the <tt> sand_runCA_6.1 </tt> script. We assume that you have
 installed SAND according to the instructions above and addeed it to your <tt>PATH</tt>.
 
 <ol>
-<li> Copy the script <tt>sand_runCA</tt> into the same directory where you have the normal <tt>runCA</tt> installed.
+<li> Copy the script <tt>sand_runCA_X.X</tt> into the same directory where you have the normal <tt>runCA</tt> installed.
 <li> Set <tt>ovlOverlapper=sand</tt> to your <tt>spec</tt> file.
-<li> Run <tt>sand_runCA</tt> just like you normally use <tt>runCA</tt>
+<li> Run <tt>sand_runCA_X.X</tt> just like you normally use <tt>runCA</tt>
 </ol>
 
 You will see the assembly start as normal.  When the overlapping stage begins, you will see output like this:
