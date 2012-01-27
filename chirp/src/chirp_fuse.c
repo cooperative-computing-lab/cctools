@@ -27,6 +27,7 @@ This module written by James Fitzgerald, B.S. 2006.
 #include "debug.h"
 #include "itable.h"
 #include "stringtools.h"
+#include "string_array.h"
 #include "xmalloc.h"
 
 #include <errno.h>
@@ -581,11 +582,10 @@ int main(int argc, char *argv[])
 	char c;
 	int did_explicit_auth = 0;
 	char *tickets = NULL;
-	char *fa_argv[2] = {NULL, NULL};
 	struct fuse_args fa;
 	fa.argc = 0;
-	fa.argv = fa_argv;
-	fa.allocated = 0;
+	fa.argv = string_array_new();
+	fa.allocated = 1;
 
 	debug_config(argv[0]);
 
@@ -604,8 +604,8 @@ int main(int argc, char *argv[])
 			tickets = xstrdup(optarg);
 			break;
 		case 'm':
-			fa.argc = 1;
-			fa.argv[0] = xstrdup(optarg);
+			fa.argc += 1;
+			fa.argv = string_array_append(fa.argv, optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -685,6 +685,8 @@ int main(int argc, char *argv[])
 
 	fuse_unmount(fuse_mountpoint, fuse_chan);
 	fuse_destroy(fuse_instance);
+
+	free(fa.argv);
 
 	return 0;
 }
