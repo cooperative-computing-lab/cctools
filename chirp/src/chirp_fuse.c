@@ -23,6 +23,7 @@ This module written by James Fitzgerald, B.S. 2006.
 #include "debug.h"
 #include "stringtools.h"
 #include "itable.h"
+#include "xmalloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -567,6 +568,7 @@ static void show_help(const char *cmd)
 	printf(" -D           Disable small file optimizations such as recursive delete.\n");
 	printf(" -f           Run in foreground for debugging.\n");
 	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
+	printf(" -m <options> Mount options passed to FUSE.\n");
 	printf(" -o <file>    Send debugging output to this file.\n");
 	printf(" -t <timeout> Timeout for network operations. (default is %ds)\n", chirp_fuse_timeout);
 	printf(" -v           Show program version.\n");
@@ -578,10 +580,15 @@ int main(int argc, char *argv[])
 	char c;
 	int did_explicit_auth = 0;
 	char *tickets = NULL;
+	char *fa_argv[2] = {NULL, NULL};
+	struct fuse_args fa;
+	fa.argc = 0;
+	fa.argv = fa_argv;
+	fa.allocated = 0;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "d:Db:i:o:a:t:fhv")) != -1) {
+	while((c = getopt(argc, argv, "d:Db:i:m:o:a:t:fhv")) != -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);
@@ -594,6 +601,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'i':
 			tickets = strdup(optarg);
+			break;
+		case 'm':
+			fa.argc = 1;
+			fa.argv[0] = xstrdup(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -638,20 +649,19 @@ int main(int argc, char *argv[])
 		auth_ticket_load(NULL);
 	}
 
-
 	file_table = itable_create(0);
 
 	signal(SIGHUP, exit_handler);
 	signal(SIGINT, exit_handler);
 	signal(SIGTERM, exit_handler);
 
-	fuse_chan = fuse_mount(fuse_mountpoint, 0);
+	fuse_chan = fuse_mount(fuse_mountpoint, &fa);
 	if(!fuse_chan) {
 		fprintf(stderr, "chirp_fuse: couldn't access %s\n", fuse_mountpoint);
 		return 1;
 	}
 
-	fuse_instance = fuse_new(fuse_chan, 0, &chirp_fuse_operations, sizeof(chirp_fuse_operations), 0);
+	fuse_instance = fuse_new(fuse_chan, &fa, &chirp_fuse_operations, sizeof(chirp_fuse_operations), 0);
 	if(!fuse_instance) {
 		fuse_unmount(fuse_mountpoint, fuse_chan);
 		fprintf(stderr, "chirp_fuse: couldn't access %s\n", fuse_mountpoint);
