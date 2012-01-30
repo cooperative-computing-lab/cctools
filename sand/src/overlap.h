@@ -11,6 +11,7 @@ See the file COPYING for details.
 
 #include "align.h"
 
+void ovl_write(FILE * file, struct alignment *aln, const char * id1, const char * id2);
 void overlap_write_begin( FILE * file );
 void overlap_write( FILE *file, struct alignment *a, const char *name1, const char *name2 );
 void overlap_write_end( FILE * file );
