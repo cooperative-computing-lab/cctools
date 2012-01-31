@@ -219,6 +219,7 @@ static void show_use( const char *cmd )
 	if(pfs_service_lookup("s3"))		printf(" s3");
 	if(pfs_service_lookup("root"))          printf(" root");
 	if(pfs_service_lookup("xrootd"))        printf(" xrootd");
+	if(pfs_service_lookup("cvmfs"))		printf(" cvmfs");
 	printf("\n");
 	exit(1);
 }

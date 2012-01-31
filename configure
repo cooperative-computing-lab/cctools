@@ -72,6 +72,7 @@ mysql_path="/usr"
 perl_path="/usr"
 python_path="/usr"
 xrootd_path="/usr"
+cvmfs_path="/usr"
 mpi_path="/usr/local"
 zlib_path="/usr"
 
@@ -104,6 +105,7 @@ config_rfio_path=no
 config_dcap_path=no
 config_irods_path=no
 config_xrootd_path=no
+config_cvmfs_path=no
 config_mpi_path=no
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
@@ -188,6 +190,11 @@ do
 			xrootd_path=$1
 			config_xrootd_path=yes
 			;;
+		--with-cvmfs-path)
+			shift
+			cvmfs_path=$1
+			config_cvmfs_path=yes
+			;;
 		--with-zlib-path)
 			shift
 			zlib_path=$1
@@ -261,6 +268,7 @@ Where PACKAGE may be:
     python
     xrootd
     zlib
+    cvmfs
 
 And SYSTEM may be:
     sand
@@ -533,6 +541,31 @@ else
 		exit 1
 	else
 		echo "*** skipping xrootd support"
+	fi
+fi
+
+if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/cvmfs/src/libcvmfs.h
+then
+	ccflags="${ccflags} -I${cvmfs_path}/cvmfs/src -DHAS_CVMFS"
+
+	for library in cvmfs/src/cvmfs sqlite3/src/sqlite3 libcurl/src/lib/.libs/curl
+	do
+		lib_path=${cvmfs_path}/`dirname ${library}`
+                library=`basename ${library}`
+		if ! library_search $library ${lib_path}
+		then
+			echo "*** Couldn't find $library in ${lib_path}"
+			exit 1
+		fi
+	done
+else
+	if [ $config_cvmfs_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find cvmfs in ${cvmfs_path}"
+		echo "*** Check --with-cvmfs-path and try again."
+		exit 1
+	else
+		echo "*** skipping cvmfs support"
 	fi
 fi
 
