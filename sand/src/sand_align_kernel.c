@@ -178,9 +178,9 @@ int main(int argc, char ** argv)
 
 		if(aln->quality <= min_qual) {
 			if(!strcmp(output_format,"ovl")) {
-				celera_ovlmsg_write(stdout, aln, s1->name, s2->name);
+				overlap_write_v5(stdout, aln, s1->name, s2->name);
 			} else if(!strcmp(output_format, "ovl_new")) { 
-				celera_ovl_write(stdout, aln, s1->name, s2->name); 
+				overlap_write_v7(stdout, aln, s1->name, s2->name); 
 			} else if(!strcmp(output_format,"matrix")) {
 				printf("*** %s alignment of sequences %s and %s (quality %lf):\n\n",align_type,s1->name,s2->name,aln->quality);
 				matrix_print(m,s1->data,s2->data);

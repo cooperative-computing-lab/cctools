@@ -11,9 +11,9 @@ See the file COPYING for details.
 
 #include "align.h"
 
-void celera_ovl_write(FILE * file, struct alignment *aln, const char * id1, const char * id2);
-void overlap_write_begin( FILE * file );
-void celera_ovlmsg_write( FILE *file, struct alignment *a, const char *name1, const char *name2 );
-void overlap_write_end( FILE * file );
+void overlap_write_begin(FILE * file);
+void overlap_write_v5(FILE * file, struct alignment *a, const char *name1, const char *name2);
+void overlap_write_v7(FILE * file, struct alignment *a, const char *name1, const char *name2);
+void overlap_write_end(FILE * file);
 
 #endif
