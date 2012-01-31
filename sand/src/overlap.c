@@ -10,7 +10,7 @@ See the file COPYING for details.
 
 #include "overlap.h"
 #include "macros.h"
-void ovl_write(FILE * file, struct alignment *aln, const char * id1, const char * id2)
+void celera_ovl_write(FILE * file, struct alignment *aln, const char * id1, const char * id2)
 {
 	int ahg, bhg;
 	int arh, brh;
@@ -68,7 +68,7 @@ void ovl_write(FILE * file, struct alignment *aln, const char * id1, const char 
 
 }
 
-void overlap_write(FILE * file, struct alignment *aln, const char * id1, const char * id2)
+void celera_ovlmsg_write(FILE * file, struct alignment *aln, const char * id1, const char * id2)
 {
 	int ahg, bhg;
 	int arh, brh;
