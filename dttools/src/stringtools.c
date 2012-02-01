@@ -93,7 +93,7 @@ int whole_string_match_regex(const char *text, char *pattern)
 	if(!pattern || !text)
 		return 0;
 
-	new_pattern = (char *) malloc(sizeof(char) * (strlen(pattern) + 2));
+	new_pattern = (char *) malloc(sizeof(char) * (strlen(pattern) + 3));
 	if(!new_pattern)
 		return 0;
 
