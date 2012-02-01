@@ -16,6 +16,10 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 	University of Wisconsin
 	Debugged early versions of parrot on many applications with NeST.
 
+	Dan Bradley
+	University of Wisconsin
+	Contributed the Parrot-CVMFS module.
+
 	Christophe Blanchet
 	IBCP
 	Developed new support for Parrot to work with the EGEE software and bioinformatics applications.
@@ -73,6 +77,9 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 	Sander Klous
 	NIKHEF
 	Tested and deployed parrot with BaBar and Objectivity.
+
+	Csaba Kos
+	Contributed bug fixes to Parrot and Chirp.
 
 	Peter Kunszt
 	CERN
