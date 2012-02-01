@@ -74,7 +74,6 @@ python_path="/usr"
 xrootd_path="/usr"
 cvmfs_path="/usr"
 mpi_path="/usr/local"
-zlib_path="/usr"
 
 xrootd_arch=auto
 globus_flavor=auto
@@ -97,7 +96,6 @@ config_fuse_path=auto
 config_mysql_path=auto
 config_perl_path=auto
 config_python_path=auto
-config_zlib_path=yes
 
 config_krb5_path=no
 config_egee_path=no
@@ -195,11 +193,6 @@ do
 			cvmfs_path=$1
 			config_cvmfs_path=yes
 			;;
-		--with-zlib-path)
-			shift
-			zlib_path=$1
-			config_zlib_path=yes
-			;;
 		--with-mpi-path)
 			shift
 			mpi_path=$1
@@ -267,7 +260,6 @@ Where PACKAGE may be:
     perl
     python
     xrootd
-    zlib
     cvmfs
 
 And SYSTEM may be:
@@ -625,19 +617,6 @@ else
 	echo "*** skipping fuse support"
 fi
 
-if library_search z ${zlib_path}
-then
-	if [ X${zlib_path} != X/usr ]
-	then
-		ccflags="${ccflags} -I${zlib_path}/include"
-		ldflags="${ldflags} -L${zlib_path}/lib"
-	fi
-else
-	echo "*** Sorry, I couldn't find zlib in $zlib_path"
-	echo "*** Check --with-zlib-path and try again."
-	exit 1
-fi
-
 # Solaris places kerberos includes in a strange place.
 
 if [ -d ${krb5_path}/include/kerberosv5 ]
@@ -803,9 +782,9 @@ fi
 #Hack to get chirp to compile on cygwin.
 if [ ${build_sys} != CYGWIN ]
 then
-	ldflags="${ldflags} -lstdc++ -lpthread -lz -lc -lm"
+	ldflags="${ldflags} -lstdc++ -lpthread -lc -lm"
 else
-	ldflags="${ldflags} -lstdc++ -lpthread -lz -lm"
+	ldflags="${ldflags} -lstdc++ -lpthread -lm"
 fi
 
 
