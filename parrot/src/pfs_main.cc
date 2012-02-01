@@ -58,7 +58,6 @@ int pfs_follow_symlinks = 1;
 int pfs_session_cache = 0;
 int pfs_use_helper = 1;
 int pfs_checksum_files = 1;
-int pfs_auto_gzip = 0;
 int pfs_write_rval = 0;
 const char *pfs_write_rval_file = "parrot.rval";
 int pfs_enable_small_file_optimizations = 1;
@@ -219,6 +218,7 @@ static void show_use( const char *cmd )
 	if(pfs_service_lookup("s3"))		printf(" s3");
 	if(pfs_service_lookup("root"))          printf(" root");
 	if(pfs_service_lookup("xrootd"))        printf(" xrootd");
+	if(pfs_service_lookup("cvmfs"))		printf(" cvmfs");
 	printf("\n");
 	exit(1);
 }
@@ -515,7 +515,7 @@ int main( int argc, char *argv[] )
 
 	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
 
-	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DE:FfG:Hi:kKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WYZ"))!=(char)-1) {
+	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DE:FfG:Hi:kKl:m:M:N:o:O:p:QR:sSt:T:U:u:vw:WY"))!=(char)-1) {
 		switch(c) {
 		case 'a':
 			if(!auth_register_byname(optarg)) {
@@ -626,9 +626,6 @@ int main( int argc, char *argv[] )
 		case 'W':
 			pfs_syscall_totals32 = (int*) calloc(SYSCALL32_MAX,sizeof(int));
 			pfs_syscall_totals64 = (int*) calloc(SYSCALL64_MAX,sizeof(int));
-			break;
-		case 'Z':
-			pfs_auto_gzip = 1;
 			break;
 		default:
 			show_use(argv[0]);

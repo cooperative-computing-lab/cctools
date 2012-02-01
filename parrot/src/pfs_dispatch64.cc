@@ -2225,6 +2225,15 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			}
 			break;
 
+		case SYSCALL64_faccessat:
+			if(entering) {
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				p->syscall_result = pfs_faccessat(args[0],path,args[2]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
 		case SYSCALL64_uname:
 			if(pfs_false_uname) {
 				struct utsname u;

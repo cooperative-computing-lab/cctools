@@ -26,8 +26,8 @@ See the file COPYING for details.
 #include <errno.h>
 #include <time.h>
 
-static int debug_fd = 2;
-static char *debug_file = 0;
+static int debug_fd = STDERR_FILENO;
+static char *debug_file = NULL;
 static int debug_file_size = 10485760;
 static const char *program_name = "";
 static INT64_T debug_flags = D_NOTICE;
@@ -53,7 +53,7 @@ static struct flag_info table[] = {
 	{"ftp", D_FTP},
 	{"nest", D_NEST},
 	{"chirp", D_CHIRP},
-	{"landlord", D_LANDLORD},
+	{"cvmfs", D_CVMFS},
 	{"multi", D_MULTI},
 	{"dcap", D_DCAP},
 	{"rfio", D_RFIO},
@@ -176,9 +176,11 @@ static void do_debug(int is_fatal, INT64_T flags, const char *fmt, va_list args)
 				}
 			}
 
-			debug_fd = open(debug_file, O_CREAT | O_TRUNC | O_WRONLY, 0777);
-			if(debug_fd < 0)
-				fatal("couldn't open %s: %s", debug_file, strerror(errno));
+			debug_fd = open(debug_file, O_CREAT | O_TRUNC | O_WRONLY, 0660);
+			if(debug_fd == -1){
+				debug_fd = STDERR_FILENO;
+				fatal("could not open log file `%s': %s", debug_file, strerror(errno));
+			}
 		}
 	}
 
@@ -242,15 +244,12 @@ void debug_config(const char *name)
 
 void debug_config_file(const char *f)
 {
-	if(debug_file) {
-		free(debug_file);
-		debug_file = 0;
-	}
-
+	free(debug_file);
+	debug_file = NULL;
 	if(f) {
-		if(*f == '/')
+		if(*f == '/'){
 			debug_file = strdup(f);
-		else {
+		} else {
 			char path[8192];
 			if(getcwd(path, sizeof(path)) == NULL)
 				assert(0);
@@ -259,11 +258,16 @@ void debug_config_file(const char *f)
 			strcat(path, f);
 			debug_file = strdup(path);
 		}
-		debug_fd = open(f, O_CREAT | O_APPEND | O_WRONLY, 0777);
-		if(debug_fd < 0)
-			fatal("couldn't open %s: %s", f, strerror(errno));
+		debug_fd = open(debug_file, O_CREAT | O_APPEND | O_WRONLY, 0660);
+		if (debug_fd == -1){
+			debug_fd = STDERR_FILENO;
+			fatal("could not access log file `%s' for writing: %s", debug_file, strerror(errno));
+		}
 	} else {
-		debug_fd = 2;
+		if (debug_fd != STDERR_FILENO){
+			close(debug_fd); /* we opened some file */
+		}
+		debug_fd = STDERR_FILENO;
 	}
 }
 

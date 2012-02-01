@@ -50,7 +50,6 @@ OPTION_ITEM(-v)Display version number.
 OPTION_ITEM(-w)Initial working directory.
 OPTION_ITEM(-W)Display table of system calls trapped.
 OPTION_ITEM(-Y)Force sYnchronous disk writes.
-OPTION_ITEM(-Z)Enable automatic decompression on .gz files.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)

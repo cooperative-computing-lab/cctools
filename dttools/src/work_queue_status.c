@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "catalog_server.h"
 #include "nvpair.h"
 
+#include <errno.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -83,6 +84,10 @@ int main(int argc, char *argv[])
 	}
 
 	cq = catalog_query_create(CATALOG_HOST, CATALOG_PORT, time(0) + Work_Queue_Status_Timeout);
+	if(!cq) {
+		fprintf(stderr, "couldn't query catalog %s:%d: %s\n", CATALOG_HOST, CATALOG_PORT, strerror(errno));
+		return 1;                                                                                                                                      
+	}
 
 	if(Work_Queue_Status_Mode == MODE_TABLE)
 		nvpair_print_table_header(stdout, headers);

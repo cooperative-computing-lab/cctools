@@ -29,7 +29,7 @@ SECTION(OPTIONS)
 
 OPTIONS_BEGIN
 OPTION_PAIR(-a,sw|ps|banded)Specify the type of alignment: sw (Smith-Waterman), ps (Prefix-Suffix), or banded.  If not specified, default is banded.
-OPTION_PAIR(-o,ovl|align|matrix)Specify how each alignment should be output: ovl (Celera OVL format), align (display the sequences and alignment graphically) or matrix (display the dynamic programming matrix).  MANPAGE(sand_align_master,1) expects the ovl output format, which is the default.  The other formats are useful for debugging.
+OPTION_PAIR(-o,ovl|ovl_new|align|matrix)Specify how each alignment should be output: ovl (Celera V5, V6 OVL format), ovl_new (Celera V7 overlap format), align (display the sequences and alignment graphically) or matrix (display the dynamic programming matrix).  MANPAGE(sand_align_master,1) expects the ovl output format, which is the default.  The other formats are useful for debugging.
 OPTION_PAIR(-m,length)Minimum aligment length (default: 0).
 OPTION_PAIR(-q,quality)Minimum match quality (default: 1.00)
 OPTION_ITEM(-x)Delete input file after completion.

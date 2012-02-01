@@ -11,6 +11,15 @@ See the file COPYING for details.
 Routines for computing SHA1 checksums.
 */
 
+/* When linking with libcvmfs, we have a name clash with functions of similar purpose.  Redefine the names here to protect our namespace. */
+
+#define sha1_init    dttools_sha1_init
+#define sha1_update  dttools_sha1_update
+#define sha1_final   dttools_sha1_final
+#define sha1_buffer  dttools_sha1_buffer
+#define sha1_file    dttools_sha1_file
+#define sha1_string  dttools_sha1_string
+
 #include "int_sizes.h"
 
 #define SHA1_DIGEST_LENGTH 20

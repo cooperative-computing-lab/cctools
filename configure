@@ -72,8 +72,8 @@ mysql_path="/usr"
 perl_path="/usr"
 python_path="/usr"
 xrootd_path="/usr"
+cvmfs_path="/usr"
 mpi_path="/usr/local"
-zlib_path="/usr"
 
 xrootd_arch=auto
 globus_flavor=auto
@@ -96,7 +96,6 @@ config_fuse_path=auto
 config_mysql_path=auto
 config_perl_path=auto
 config_python_path=auto
-config_zlib_path=yes
 
 config_krb5_path=no
 config_egee_path=no
@@ -104,6 +103,7 @@ config_rfio_path=no
 config_dcap_path=no
 config_irods_path=no
 config_xrootd_path=no
+config_cvmfs_path=no
 config_mpi_path=no
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
@@ -188,10 +188,10 @@ do
 			xrootd_path=$1
 			config_xrootd_path=yes
 			;;
-		--with-zlib-path)
+		--with-cvmfs-path)
 			shift
-			zlib_path=$1
-			config_zlib_path=yes
+			cvmfs_path=$1
+			config_cvmfs_path=yes
 			;;
 		--with-mpi-path)
 			shift
@@ -260,7 +260,7 @@ Where PACKAGE may be:
     perl
     python
     xrootd
-    zlib
+    cvmfs
 
 And SYSTEM may be:
     sand
@@ -536,6 +536,31 @@ else
 	fi
 fi
 
+if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/cvmfs/src/libcvmfs.h
+then
+	ccflags="${ccflags} -I${cvmfs_path}/cvmfs/src -DHAS_CVMFS"
+
+	for library in cvmfs/src/cvmfs sqlite3/src/sqlite3 libcurl/src/lib/.libs/curl
+	do
+		lib_path=${cvmfs_path}/`dirname ${library}`
+                library=`basename ${library}`
+		if ! library_search $library ${lib_path}
+		then
+			echo "*** Couldn't find $library in ${lib_path}"
+			exit 1
+		fi
+	done
+else
+	if [ $config_cvmfs_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find cvmfs in ${cvmfs_path}"
+		echo "*** Check --with-cvmfs-path and try again."
+		exit 1
+	else
+		echo "*** skipping cvmfs support"
+	fi
+fi
+
 ##########################################################################
 # SWITCH BACK TO DYNAMIC LINKING FOR COMMON SYSTEM LIBRARIES
 ##########################################################################
@@ -558,7 +583,7 @@ then
 
 	if [ $build_sys = LINUX ]
 	then
-		cctools_readline_ldflags="${link_no_as_needed} -lncurses -ltermcap -lhistory ${link_as_needed}"
+		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -ltermcap -lhistory ${link_as_needed}"
 	else 
 		library_search ncurses ${readline_path}
 		library_search termcap ${readline_path}
@@ -590,19 +615,6 @@ then
         fi
 else
 	echo "*** skipping fuse support"
-fi
-
-if library_search z ${zlib_path}
-then
-	if [ X${zlib_path} != X/usr ]
-	then
-		ccflags="${ccflags} -I${zlib_path}/include"
-		ldflags="${ldflags} -L${zlib_path}/lib"
-	fi
-else
-	echo "*** Sorry, I couldn't find zlib in $zlib_path"
-	echo "*** Check --with-zlib-path and try again."
-	exit 1
 fi
 
 # Solaris places kerberos includes in a strange place.
@@ -770,9 +782,9 @@ fi
 #Hack to get chirp to compile on cygwin.
 if [ ${build_sys} != CYGWIN ]
 then
-	ldflags="${ldflags} -lstdc++ -lpthread -lz -lc -lm"
+	ldflags="${ldflags} -lstdc++ -lpthread -lc -lm"
 else
-	ldflags="${ldflags} -lstdc++ -lpthread -lz -lm"
+	ldflags="${ldflags} -lstdc++ -lpthread -lm"
 fi
 
 

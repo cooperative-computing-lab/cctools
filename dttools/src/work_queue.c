@@ -588,7 +588,7 @@ static int handle_worker(struct work_queue *q, struct link *l)
 	w = hash_table_lookup(q->worker_table, key);
 
 	if(link_readline(l, line, sizeof(line), time(0) + short_timeout)) {
-		if(sscanf(line, "ready %s %s %s %d %lld %lld %lld %lld", w->hostname, w->os, w->arch, &w->ncpus, &w->memory_avail, &w->memory_total, &w->disk_avail, &w->disk_total) == 8) {
+		if(sscanf(line, "ready %s %d %lld %lld %lld %lld", w->hostname, &w->ncpus, &w->memory_avail, &w->memory_total, &w->disk_avail, &w->disk_total)== 6) {
 			// More workers than needed are connected
 			int workers_connected = hash_table_size(q->worker_table);
 			int jobs_not_completed = list_size(q->ready_list) + q->workers_in_state[WORKER_STATE_BUSY];
@@ -596,10 +596,10 @@ static int handle_worker(struct work_queue *q, struct link *l)
 				debug(D_WQ, "Jobs waiting + running: %d; Workers connected now: %d", jobs_not_completed, workers_connected);
 				goto reject;
 			}
-
+			
 			if(q->worker_mode == WORK_QUEUE_WORKER_MODE_EXCLUSIVE && q->name) {
 				// For backward compatibility, we scan the line AGAIN to see if it contains extra fields
-				if(sscanf(line, "ready %*s %*s %*s %*d %*d %*d %*d %*d \"%[^\"]\"", project_names) == 1) {
+				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"", project_names) == 1) {
 					if(!match_project_names(q, project_names)) {
 						debug(D_WQ, "Preferred masters of %s (%s): %s", w->hostname, w->addrport, project_names);
 						goto reject;
@@ -610,9 +610,27 @@ static int handle_worker(struct work_queue *q, struct link *l)
 					goto reject;
 				}
 			}
+
+			//Re-scan to see if worker reports its os and arch.
+			if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"", project_names) == 1) {
+				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%*[^\"]\" %s %s", w->os, w->arch) != 2) {
+					strcpy(w->os, "unknown");
+					strcpy(w->arch, "unknown");
+				}
+			} else {
+				//check in exclusive worker with no preferred project which it sends as a blank ""
+				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"\" %s %s", w->os, w->arch) != 2) {
+					//check in shared worker
+					if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d %s %s", w->os, w->arch) != 2) {
+						strcpy(w->os, "unknown");
+						strcpy(w->arch, "unknown");
+					}
+				}	
+			}
+			
 			if(w->state == WORKER_STATE_INIT) {
 				change_worker_state(q, w, WORKER_STATE_READY);
-				debug(D_WQ, "%s (%s) running on %s %s is ready", w->hostname, w->addrport, w->os, w->arch);
+				debug(D_WQ, "%s (%s) running %s on %s is ready", w->hostname, w->addrport, w->os, w->arch);
 			}
 		} else if(sscanf(line, "result %d %d", &result, &output_length) == 2) {
 			struct work_queue_task *t = w->current_task;

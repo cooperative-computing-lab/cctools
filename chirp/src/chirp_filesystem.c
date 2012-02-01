@@ -268,12 +268,12 @@ int cfs_delete_dir(const char *path)
 	struct chirp_dir *dir;
 	struct chirp_dirent *d;
 
+	if (cfs->unlink(path) == 0) /* Handle files and symlinks here */
+		return 0;
+
 	dir = cfs->opendir(path);
 	if(!dir) {
-		if(errno == ENOTDIR)
-			return cfs->unlink(path) == 0;
-		else
-			return errno == ENOENT;
+		return errno == ENOENT;
 	}
 	while((d = cfs->readdir(dir))) {
 		char subdir[PATH_MAX];

@@ -368,7 +368,7 @@ static void show_version(const char *cmd)
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s <masterhost> <port>\n", cmd);
+	printf("Use: %s [options] <masterhost> <port>\n", cmd);
 	printf("where options are:\n");
 	printf(" -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
@@ -563,9 +563,9 @@ int main(int argc, char *argv[])
 			link_tune(master, LINK_TUNE_INTERACTIVE);
 
 			if(exclusive_worker) {
-				link_putfstring(master, "ready %s %s %s %d %llu %llu %llu %llu \"%s\"\n", time(0) + active_timeout, hostname, uname_data.sysname, uname_data.machine, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names);
+				link_putfstring(master, "ready %s %d %llu %llu %llu %llu \"%s\" %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names, uname_data.sysname, uname_data.machine);
 			} else {
-				link_putfstring(master, "ready %s %s %s %d %llu %llu %llu %llu\n", time(0) + active_timeout, hostname, uname_data.sysname, uname_data.machine, ncpus, memory_avail, memory_total, disk_avail, disk_total);
+				link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, uname_data.sysname, uname_data.machine);
 			}
 		}
 

@@ -255,7 +255,7 @@ public:
 
 		if(!pfs_password_cache) {
 			errno = EACCES;
-			return NULL;
+			return -1;
 		}
 
 		sscanf(name->hostport, "%[^:]:", bucket);
@@ -277,7 +277,7 @@ public:
 
 		if(!pfs_password_cache) {
 			errno = EACCES;
-			return NULL;
+			return -1;
 		}
 
 		sscanf(name->hostport, "%[^:]:", bucket);
@@ -301,7 +301,7 @@ public:
 
 		if(!pfs_password_cache) {
 			errno = EACCES;
-			return NULL;
+			return -1;
 		}
 
 		sscanf(name->hostport, "%[^:]:", bucket);
