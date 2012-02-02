@@ -14,7 +14,7 @@ echo "Compressing reads"
 sand_compress_reads < test_20.fa > test_20.cfa
 
 echo "Starting worker for filtering"
-work_queue_worker -t 60s -d all -o worker.log localhost $port &
+work_queue_worker -t 60 -d all -o worker.log localhost $port &
 wpid=$!
 echo "Worker is process $wpid"
 
