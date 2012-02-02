@@ -131,26 +131,30 @@ static int errno_is_temporary(int e)
 static int link_internal_sleep(struct link *link, struct timeval *timeout, int reading, int writing)
 {
 	int result;
-	fd_set rfds, wfds;
+	struct pollfd pfd;
+	int msec = (timeout->tv_sec * 1000.0) + (timeout->tv_usec/1000.0);
 
-	FD_ZERO(&rfds);
-	if(reading)
-		FD_SET(link->fd, &rfds);
+	while (1) {
+		pfd.fd = link->fd;
+		pfd.revents = 0;
 
-	FD_ZERO(&wfds);
-	if(writing)
-		FD_SET(link->fd, &wfds);
-
-	while(1) {
-		result = select(link->fd + 1, &rfds, &wfds, 0, timeout);
-		if(result > 0) {
-			if(reading && FD_ISSET(link->fd, &rfds))
+		if (reading) pfd.events = POLLIN;
+		if (writing) pfd.events = POLLOUT;
+		result = poll(&pfd, 1, msec);
+		if (result > 0) {
+			if (reading && (pfd.revents & POLLIN)) {
 				return 1;
-			if(writing && FD_ISSET(link->fd, &wfds))
+			}
+			if (writing && (pfd.revents & POLLOUT)) {
 				return 1;
-		} else if(result == 0) {
+			}
+			if (pfd.revents & POLLHUP) {
+				return 0;
+			}
+			continue;
+		} else if (result == 0) {
 			return 0;
-		} else if(errno_is_temporary(errno)) {
+		} else if (errno_is_temporary(errno)) {
 			continue;
 		} else {
 			return 0;
