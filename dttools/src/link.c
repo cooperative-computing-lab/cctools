@@ -138,17 +138,21 @@ static int link_internal_sleep(struct link *link, struct timeval *timeout, int r
 		pfd.fd = link->fd;
 		pfd.revents = 0;
 
-		if (reading) pfd.events = POLLIN | POLLHUP;
+		if (reading) pfd.events = POLLIN;
 		if (writing) pfd.events = POLLOUT;
 
 		result = poll(&pfd, 1, msec);
 		if (result > 0) {
-			if (reading && ((pfd.revents & POLLIN) || (pfd.revents & POLLHUP))) {
+			if (reading && (pfd.revents & POLLIN)) {
 				return 1;
 			}
 			if (writing && (pfd.revents & POLLOUT)) {
 				return 1;
 			}
+			if (pfd.revents & POLLHUP) {
+				return 0;
+			}
+			continue;
 		} else if (result == 0) {
 			return 0;
 		} else if (errno_is_temporary(errno)) {
