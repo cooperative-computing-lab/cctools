@@ -28,11 +28,31 @@ extern "C" {
 
 extern int pfs_master_timeout;
 extern char pfs_temp_dir[];
+extern const char * pfs_cvmfs_repo_arg;
 
 static bool cvmfs_configured = false;
 static struct cvmfs_filesystem *cvmfs_filesystem_list = 0;
 static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
 static bool allow_switching_cvmfs_repos = false;
+
+#define CERN_KEY_PLACEHOLDER "<BUILTIN-cern.ch.pub>"
+
+static const char *default_cvmfs_repo = "*.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/*";
+
+static const char *cern_key_text = 
+"-----BEGIN PUBLIC KEY-----\n\
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAukBusmYyFW8KJxVMmeCj\n\
+N7vcU1mERMpDhPTa5PgFROSViiwbUsbtpP9CvfxB/KU1gggdbtWOTZVTQqA3b+p8\n\
+g5Vve3/rdnN5ZEquxeEfIG6iEZta9Zei5mZMeuK+DPdyjtvN1wP0982ppbZzKRBu\n\
+BbzR4YdrwwWXXNZH65zZuUISDJB4my4XRoVclrN5aGVz4PjmIZFlOJ+ytKsMlegW\n\
+SNDwZO9z/YtBFil/Ca8FJhRPFMKdvxK+ezgq+OQWAerVNX7fArMC+4Ya5pF3ASr6\n\
+3mlvIsBpejCUBygV4N2pxIcPJu/ZDaikmVvdPTNOTZlIFMf4zIP/YHegQSJmOyVp\n\
+HQIDAQAB\n\
+-----END PUBLIC KEY-----\n\
+";
+
+static bool wrote_cern_key;
+static std::string cern_key_fname;
 
 /*
 A cvmfs_filesystem structure represents an entire
@@ -144,6 +164,41 @@ static void cvmfs_parrot_logger(const char *msg)
 	debug(D_CVMFS, "%s", msg);
 }
 
+static bool write_cern_key()
+{
+	if( wrote_cern_key ) {
+		return true;
+	}
+
+	cern_key_fname = pfs_temp_dir;
+	cern_key_fname += "/cvmfs"; // same directory as parent of cvmfs cache
+
+	// if mkdir fails, just fall through and catch the error in fopen()
+	// (it is expected to fail if the dir already exists)
+	mkdir(cern_key_fname.c_str(),0755);
+
+	cern_key_fname += "/cern.ch.pub";
+	int key_fd = open(cern_key_fname.c_str(),O_WRONLY|O_CREAT|O_TRUNC|O_NOFOLLOW,0644);
+	if( key_fd == -1 ) {
+		debug(D_CVMFS|D_NOTICE,"ERROR: failed to open %s: errno=%d %s",
+			  cern_key_fname.c_str(), errno, strerror(errno));
+		return false;
+	}
+
+	int n_to_write = strlen(cern_key_text);
+	int n_written = write(key_fd,cern_key_text,n_to_write);
+	if( n_written != n_to_write ) {
+		debug(D_CVMFS|D_NOTICE,"ERROR: failed to write to %s: errno=%d %s",
+			  cern_key_fname.c_str(), errno, strerror(errno));
+		close(key_fd);
+		return false;
+	}
+	close(key_fd);
+
+	wrote_cern_key = true;
+	return true;
+}
+
 static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 {
 	if(cvmfs_active_filesystem != f) {
@@ -168,6 +223,19 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 
 			cvmfs_fini();
 			cvmfs_active_filesystem = NULL;
+		}
+
+		// check for references to the built-in cern.ch.pub key
+		char const *cern_key_pos = strstr(f->cvmfs_options.c_str(),CERN_KEY_PLACEHOLDER);
+		if( cern_key_pos ) {
+			if( !write_cern_key() ) {
+				debug(D_CVMFS|D_NOTICE,
+					  "ERROR: cannot load cvmfs repository %s, because failed to write cern.ch.pub",
+					  f->host.c_str());
+				return false;
+			}
+
+			f->cvmfs_options.replace(cern_key_pos-f->cvmfs_options.c_str(),strlen(CERN_KEY_PLACEHOLDER),cern_key_fname);
 		}
 
 		debug(D_CVMFS, "Initializing libcvmfs with the following options: %s", f->cvmfs_options.c_str());
@@ -195,7 +263,7 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 	if( !proxy || !proxy[0] || !strcmp(proxy,"DIRECT") ) {
 		if( !strstr(user_options,"proxies=") ) {
 			debug(D_CVMFS|D_NOTICE,"CVMFS requires an http proxy.  None has been configured!");
-			debug(D_CVMFS,"Ignoring configuration of CVMFS repository %s",repo_name);
+			debug(D_CVMFS,"Ignoring configuration of CVMFS repository %s:%s",repo_name,user_options);
 			delete f;
 			return NULL;
 		}
@@ -275,19 +343,27 @@ cvmfs_filesystem *cvmfs_filesystem::createMatch(char const *repo_name) const
  * escaped with a backslash.
  *
  * Example for /cvmfs/cms.cern.ch:
- * cms.cern.ch:force_signing,pubkey=/path/to/cern.ch.pub,url=http://cvmfs-stratum-one.cern.ch/opt/cms
+ * cms.cern.ch:pubkey=/path/to/cern.ch.pub,url=http://cvmfs-stratum-one.cern.ch/opt/cms
  *
  * Example with wildcard (using <*> to avoid compiler warning about nested comment):
- * *.cern.ch:force_signing,pubkey=/path/to/cern.ch.pub,url=http://cvmfs-stratum-one.cern.ch/opt/<*>
+ * *.cern.ch:pubkey=/path/to/cern.ch.pub,url=http://cvmfs-stratum-one.cern.ch/opt/<*>
  */
 static void cvmfs_read_config()
 {
+	std::string cvmfs_options_buf;
+
 	char *allow_switching = getenv("PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES");
 	if( allow_switching && strcmp(allow_switching,"0")!=0) {
 		allow_switching_cvmfs_repos = true;
 	}
 
-	char *cvmfs_options = getenv("PARROT_CVMFS_REPO");
+	const char *cvmfs_options = pfs_cvmfs_repo_arg;
+	if( !cvmfs_options ) {
+		cvmfs_options = getenv("PARROT_CVMFS_REPO");
+	}
+	if( !cvmfs_options ) {
+		cvmfs_options = default_cvmfs_repo;
+	}
 	if( !cvmfs_options || !cvmfs_options[0] ) {
 		debug(D_CVMFS|D_NOTICE, "No CVMFS filesystems have been configured.  To access CVMFS, you must configure PARROT_CVMFS_REPO.");
 		return;
@@ -354,13 +430,35 @@ static void cvmfs_read_config()
 			options += *cvmfs_options;
 		}
 
-		cvmfs_filesystem *f = cvmfs_filesystem_create(repo_name.c_str(),contains_wildcard,subpath.c_str(),options.c_str(),wildcard_subst);
-		if(f) {
-			debug(D_CVMFS, "filesystem configured %c%s with repo path %s and options %s",
-				  contains_wildcard ? '*' : ' ',
-				  f->host.c_str(), f->path.c_str(), f->cvmfs_options.c_str());
-			f->next = cvmfs_filesystem_list;
-			cvmfs_filesystem_list = f;
+		if( repo_name == "<default-repositories>" ) {
+			// placeholder for inserting the default configuration
+			// in case user wants to add to it
+			std::string new_options = default_cvmfs_repo;
+			new_options += " ";
+			if( !options.empty() ) {
+				// user specified some additional options to be applied to the default repos
+				int i = new_options.length();
+				while( i>1 ) {
+					i--;
+					if( isspace(new_options[i]) && !isspace(new_options[i-1]) ) {
+						new_options.insert(i,options);
+						new_options.insert(i,",");
+					}
+				}
+			}
+			new_options += cvmfs_options; // append remaining unparsed contents of config string
+			cvmfs_options_buf = new_options;
+			cvmfs_options = cvmfs_options_buf.c_str();
+		}
+		else {
+			cvmfs_filesystem *f = cvmfs_filesystem_create(repo_name.c_str(),contains_wildcard,subpath.c_str(),options.c_str(),wildcard_subst);
+			if(f) {
+				debug(D_CVMFS, "filesystem configured %c%s with repo path %s and options %s",
+					  contains_wildcard ? '*' : ' ',
+					  f->host.c_str(), f->path.c_str(), f->cvmfs_options.c_str());
+				f->next = cvmfs_filesystem_list;
+				cvmfs_filesystem_list = f;
+			}
 		}
 
 		while( isspace(*cvmfs_options) ) {

@@ -39,6 +39,7 @@ OPTION_PAIR(-o, file)Send debugging messages to this file.
 OPTION_PAIR(-O, bytes)Rotate debug files of this size.
 OPTION_PAIR(-p, host:port)Use this proxy server for HTTP requests.
 OPTION_ITEM(-Q)Inhibit catalog queries to list /chirp.
+OPTION_PAIR(-r, repos)CVMFS repositories to enable (PARROT_CVMFS_REPO).
 OPTION_PAIR(-R, cksum)Enforce this root filesystem checksum, where available.
 OPTION_ITEM(-s)Use streaming protocols without caching.
 OPTION_ITEM(-S)Enable whole session caching for all protocols.
