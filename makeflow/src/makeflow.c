@@ -313,8 +313,8 @@ int dag_width( struct dag *d )
 		if (max < level_count[i]) max = level_count[i];
 	}
 
+	free(level_count);
 	return max;
-
 }
 
 void dag_print( struct dag *d )
@@ -1408,6 +1408,7 @@ int parse_catalog_server_description(char* server_string) {
 	sprintf(line,"CATALOG_PORT=%d",port);
 	putenv(strdup(line));
 	
+	free(host);
 	return 1;
 }
 	
@@ -1517,7 +1518,6 @@ int main( int argc, char *argv[] )
 			logfilename = strdup(optarg);
 			break;
 		case 'L':
-			batchlogfilename = malloc((strlen(optarg)+1) * sizeof(char));
 			batchlogfilename = strdup(optarg);
 			break;
 		case 'D':
@@ -1571,7 +1571,7 @@ int main( int argc, char *argv[] )
 				auto_workers = MAKEFLOW_AUTO_GROUP;
 			} else {
 				show_help(argv[0]);
-                exit(1);
+				exit(1);
 			}
 			break;
 		case 'F':
@@ -1619,32 +1619,29 @@ int main( int argc, char *argv[] )
 		dagfile = argv[optind];
 	}
 
+	if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
+		fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
+		fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
+		return 1;
+	}
 
+	sprintf(line, "WORK_QUEUE_WORKER_MODE=%d", work_queue_worker_mode);
+	putenv(strdup(line));
 
-    if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
-        fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
-        fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
-        return 1;
-    }
-
-    sprintf(line, "WORK_QUEUE_WORKER_MODE=%d", work_queue_worker_mode);
-    putenv(strdup(line));
-
-    sprintf(line, "WORK_QUEUE_MASTER_MODE=%d", work_queue_master_mode);
-    putenv(strdup(line));
-
+	sprintf(line, "WORK_QUEUE_MASTER_MODE=%d", work_queue_master_mode);
+	putenv(strdup(line));
 
 	if(port!=0) {
 		sprintf(line,"WORK_QUEUE_PORT=%d",port);
 		putenv(strdup(line));
 	} else {
-        // Use work queue default port in standalone mode when port in not
-        // specified with -p option. In work queue catalog mode, work queue
-        // would choose a random port when port is not explicitly specified.
-        if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE){
-            sprintf(line,"WORK_QUEUE_PORT=%d",WORK_QUEUE_DEFAULT_PORT);
-            putenv(strdup(line));
-        }
+		// Use work queue default port in standalone mode when port in not
+		// specified with -p option. In work queue catalog mode, work queue
+		// would choose a random port when port is not explicitly specified.
+		if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE){
+			sprintf(line,"WORK_QUEUE_PORT=%d",WORK_QUEUE_DEFAULT_PORT);
+			putenv(strdup(line));
+		}
 	}
 
 	int dagfile_namesize = strlen(dagfile);
@@ -1843,4 +1840,4 @@ int main( int argc, char *argv[] )
 	}
 }
 
-
+/* vim: set sw=8 sts=8 ts=8 ft=c: */ 
