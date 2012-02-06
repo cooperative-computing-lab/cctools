@@ -14,7 +14,6 @@ See the file COPYING for details.
 void overlap_write_v7(FILE * file, struct alignment *aln, const char *id1, const char *id2)
 {
 	int ahg, bhg;
-	int arh, brh;
 
 	// IDs of overlapping fragments.
 	fprintf(file, "%s ", id1);
@@ -22,9 +21,6 @@ void overlap_write_v7(FILE * file, struct alignment *aln, const char *id1, const
 
 	// Orientation
 	fprintf(file, "%c ", aln->ori);
-
-	arh = aln->length1 - aln->end1;	// determine the right portions of sequences that 
-	brh = aln->length2 - aln->end2;	// are not in the alignment
 
 	// calculate overhangs assuming A is on the left
 	ahg = aln->start1 + aln->start2;
