@@ -87,6 +87,7 @@ struct work_queue {
 	timestamp_t total_receive_time;
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;		  /**< How to choose worker to run the task. */
+	int link_keepalive_on;
 };
 
 
@@ -229,6 +230,9 @@ static void add_worker(struct work_queue *q)
 
 	link = link_accept(q->master_link, time(0) + short_timeout);
 	if(link) {
+		if(q->link_keepalive_on) {
+			link_keepalive(link, 1);
+		}
 		link_tune(link, LINK_TUNE_INTERACTIVE);
 		if(link_address_remote(link, addr, &port)) {
 			w = malloc(sizeof(*w));
@@ -1363,6 +1367,8 @@ struct work_queue *work_queue_create(int port)
 			fprintf(stderr, "Reporting master info to catalog server failed!");
 		}
 	}
+
+	q->link_keepalive_on = 1;
 
 	debug(D_WQ, "Work Queue is listening on port %d.", port);
 	return q;

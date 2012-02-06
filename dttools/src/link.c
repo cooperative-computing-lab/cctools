@@ -98,6 +98,21 @@ static int link_squelch()
 	return 1;
 }
 
+int link_keepalive(struct link *link, int onoff) {
+	int result, value;
+
+	if(onoff > 0) {
+		value = 1;
+	} else {
+		value = 0;
+	}
+
+	result = setsockopt(link->fd, SOL_SOCKET, SO_KEEPALIVE, (void *) &value, sizeof(value));
+	if(result!= 0)
+		return 0;
+	return 1;
+}
+
 int link_nonblocking(struct link *link, int onoff)
 {
 	int result;
