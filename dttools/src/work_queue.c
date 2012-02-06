@@ -772,8 +772,10 @@ static int put_directory(const char *dirname, const char *remote_name, struct wo
 		len = sprintf(buffer, "%s/%s", remote_name, filename);
 		tf.remote_name = strdup(buffer);
 
-		if(!put_file(&tf, NULL, q, w, total_bytes))
+		if(!put_file(&tf, NULL, q, w, total_bytes)) {
+			closedir(dir);
 			return 0;
+		}
 	}
 
 	closedir(dir);
