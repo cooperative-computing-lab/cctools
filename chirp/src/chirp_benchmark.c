@@ -110,6 +110,7 @@ int do_bandwidth(const char *file, int bytes, int blocksize, int do_write)
 	fd = do_open(file, (do_write ? O_WRONLY : O_RDONLY) | O_CREAT | do_sync | O_TRUNC, 0777);
 	if(fd < 0 || fd == 0) {
 		printf("couldn't open %s: %s", file, strerror(errno));
+		free(buffer);
 		return 0;
 	}
 
