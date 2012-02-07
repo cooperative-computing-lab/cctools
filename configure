@@ -480,6 +480,21 @@ then
 	fi
 
 	ccflags="${ccflags} -DHAS_MYSQL -DHAS_BXGRID"
+
+	# MySQL requires zlib
+	if library_search z ${zlib_path}
+	then
+		if [ X${zlib_path} != X/usr ]
+		then
+		    
+			ccflags="${ccflags} -I${zlib_path}/include"
+			ldflags="${ldflags} -L${zlib_path}/lib"
+		fi
+	else
+		echo "*** Sorry, I couldn't find zlib in $zlib_path"
+		echo "*** Check --with-zlib-path and try again."
+		exit 1
+	fi
 else
 	if [ $config_mysql_path = yes ]
 	then
@@ -623,19 +638,6 @@ then
         fi
 else
 	echo "*** skipping fuse support"
-fi
-
-if library_search z ${zlib_path}
-then
-	if [ X${zlib_path} != X/usr ]
-	then
-		ccflags="${ccflags} -I${zlib_path}/include"
-		ldflags="${ldflags} -L${zlib_path}/lib"
-	fi
-else
-	echo "*** Sorry, I couldn't find zlib in $zlib_path"
-	echo "*** Check --with-zlib-path and try again."
-	exit 1
 fi
 
 # Solaris places kerberos includes in a strange place.
