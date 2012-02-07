@@ -75,6 +75,7 @@ xrootd_path="/usr"
 cvmfs_path="/usr"
 mpi_path="/usr/local"
 zlib_path="/usr"
+swig_path="/usr"
 
 xrootd_arch=auto
 globus_flavor=auto
@@ -107,6 +108,7 @@ config_irods_path=no
 config_xrootd_path=no
 config_cvmfs_path=no
 config_mpi_path=no
+config_swig_path=auto
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
 then
@@ -205,6 +207,11 @@ do
 			mpi_path=$1
 			config_mpi_path=yes
 			;;
+		--with-swig-path)
+			shift
+			swig_path=$1
+			config_swig_path=yes
+			;;
 		--without-system-sand)
 			include_package_sand=""
 			if [ $include_package_allpairs != "" ]
@@ -269,6 +276,7 @@ Where PACKAGE may be:
     xrootd
     zlib
     cvmfs
+    swig
 
 And SYSTEM may be:
     sand
@@ -512,15 +520,34 @@ then
         usempi="true"
         ccflags="${ccflags} -I${mpi_path}/include -DHAS_MPI"
 else
-    usempi="false"
-    if [ $config_mpi_path = yes ]
-    then
-        echo "*** Sorry, I couldn't find mpicc or mpi.h in $mpi_path"
-        echo "*** Check --with-mpi-path and try again."
-        exit 1
-    else
-        echo "*** skipping mpi support"
-    fi
+	usempi="false"
+	if [ $config_mpi_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find mpicc or mpi.h in $mpi_path"
+		echo "*** Check --with-mpi-path and try again."
+		exit 1
+	else
+		echo "*** skipping mpi support"
+	fi
+fi
+
+if [ $config_swig_path != no ] && check_file ${swig_path}/bin/swig
+then
+	if check_path swig
+	then
+		packages="${packages} ${include_package_work_queue}"
+	else
+		echo "*** skipping swig bindings for work queue"
+	fi
+else
+	if [ $config_swig_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find swig in $swig_path"
+		echo "*** Check --with=swig-path and try again."
+		exit 1
+	else
+		echo "*** skipping swig bindings for work queue"
+	fi
 fi
 
 if [ $config_xrootd_path != no ] && check_file ${xrootd_path}/include/xrootd/XrdVersion.hh
@@ -668,13 +695,6 @@ else
 	else
 		echo "*** skipping krb5 support"
 	fi
-fi
-
-if check_path swig
-then
-	packages="${packages} ${include_package_work_queue}"
-else
-	echo "*** skipping swig bindings for work queue"
 fi
 
 if [ $config_perl_path != no ]
@@ -892,6 +912,8 @@ CXXFLAGS=\$(CCTOOLS_CXXFLAGS)
 MPILD=\$(CCTOOLS_MPI_LD)
 
 CCTOOLS_AR=ar
+
+CCTOOLS_SWIG=${swig_path}/bin/swig
 
 CCTOOLS_PERL=${perl}
 CCTOOLS_PERL_CCFLAGS=${perl_ccflags}

@@ -12,7 +12,7 @@ all: work_queue.py _work_queue.${CCTOOLS_DYNAMIC_SUFFIX}
 
 work_queue_wrap.c work_queue.py: ../work_queue.i work_queue.binding.py
 	@echo "SWIG work_queue.i (python)"
-	@swig -python -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c ../work_queue.i
+	@${CCTOOLS_SWIG} -python -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c ../work_queue.i
 	@cat work_queue.binding.py >> work_queue.py
 
 work_queue_wrap.o: work_queue_wrap.c
