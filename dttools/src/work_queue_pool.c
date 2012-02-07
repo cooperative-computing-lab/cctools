@@ -182,6 +182,7 @@ int main(int argc, char *argv[])
 	ofs = fopen(new_worker_path, "w+");
 	if(!ofs) {
 		fprintf(stderr, "Unable to open %s/work_queue_worker for writing: %s", scratch_dir, strerror(errno));
+		fclose(ifs);
 		return EXIT_FAILURE;
 	}
 	copy_stream_to_stream(ifs, ofs);

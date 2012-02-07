@@ -443,6 +443,7 @@ struct bitmap *bitmap_load_pcx(const char *path)
 		} else {
 			printf("bitmap: %s has %d bits per pixel, I don't support that...\n", path, header.bitsperpixel);
 			fclose(file);
+			free(m);
 			return 0;
 		}
 		for(i = 0; i < palettesize; i++) {
@@ -514,7 +515,7 @@ static void swap_long(void *vdata, int length)
 
 struct bitmap *bitmap_load_sgi_rgb(const char *path)
 {
-	FILE *file;
+	FILE *file = NULL;
 	struct bitmap *m;
 	struct sgi_rgb_header header;
 	int x, y, z, doswap = 0;
@@ -626,6 +627,8 @@ struct bitmap *bitmap_load_sgi_rgb(const char *path)
 		free(start_table);
 	if(length_table)
 		free(length_table);
+	if(file)
+		fclose(file);
 	return 0;
 }
 
