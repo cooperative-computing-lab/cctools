@@ -104,6 +104,8 @@ int do_bandwidth(const char *file, int bytes, int blocksize, int do_write)
 	char *buffer = malloc(blocksize);
 	int i;
 
+    if (!buffer) return 0;
+
 	for(i = 0; i < blocksize; i++)
 		buffer[i] = (char) i;
 
