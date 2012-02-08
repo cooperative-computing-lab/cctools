@@ -1,3 +1,10 @@
+#
+#Copyright (C) 2012- The University of Notre Dame
+#This software is distributed under the GNU General Public License.
+#See the file COPYING for details.
+#
+
+
 #!/usr/bin/env perl
 
 eval 'exec /usr/bin/env perl -w -S $0 ${1+"$@"}'
@@ -293,16 +300,11 @@ my $tierLimit = -1;#100;
 ## @INC is modified at top of script
 my $command = "";
 
-if($bird == 1) {
-	$command .= "/afs/nd.edu/user37/ccl/software/cctools/bin/parrot";
-	$wkDirPrefix = "/chirp/cclws08.cse.nd.edu:9095/";
-}
-else { 
-	$wkDirPrefix = cwd();
-	chomp($wkDirPrefix); 
-	$wkDirPrefix =~ s/\n//g;
-	$wkDirPrefix .= "/";
-}
+$wkDirPrefix = cwd();
+chomp($wkDirPrefix); 
+$wkDirPrefix =~ s/\n//g;
+$wkDirPrefix .= "/";
+
 $command .= "./maker_wq_worker";
 
 #my $port = $work_queue::WORK_QUEUE_DEFAULT_PORT;

@@ -70,7 +70,7 @@ $val = $opt{protein_gff};
 $text =~ s/protein_gff:/protein_gff:$val/;
 $val = $opt{repeat_protein}; 
 if($val ne ""){
-	$text =~ s/repeat_protein:\/afs\/nd.edu\/user37\/ccl\/software\/external\/maker-203\/data\/te_proteins.fasta/repeat_protein:$val/; 
+	$text =~ s/repeat_protein:.*\/te_proteins.fasta/repeat_protein:$val/; 
 }
 $val = $opt{rmlib};
 $text =~ s/rmlib:/rmlib:$val/;
