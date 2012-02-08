@@ -1,12 +1,10 @@
 #! /usr/bin/env python
 
-# replica_exchange_protomol_barrier
-#
 # Copyright (C) 2011- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 #
-#This simple script splits a fasta file into pieces
+# This simple script splits a fasta file into pieces
 #
 
 import sys
