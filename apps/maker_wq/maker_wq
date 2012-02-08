@@ -1,0 +1,533 @@
+#!/usr/bin/env perl
+
+eval 'exec /usr/bin/env perl -w -S $0 ${1+"$@"}'
+    if 0; # not running under some shell
+
+use strict "vars";
+use strict "refs";
+use warnings;
+use Time::HiRes qw(gettimeofday); 
+
+use FindBin;
+use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::Bin/../perl/lib";
+use vars qw($RANK $LOG $CMD_ARGS);
+
+
+BEGIN{
+   if (not ($ENV{CGL_SO_SOURCE})) {
+      $ENV{CGL_SO_SOURCE} = "$FindBin::Bin/../lib/CGL/so.obo";
+   }
+   if (not ($ENV{CGL_GO_SOURCE})) {
+      $ENV{CGL_GO_SOURCE} = "$FindBin::Bin/../lib/CGL/gene_ontology.obo"
+   }
+   
+   $CMD_ARGS = join(' ', @ARGV);
+   
+   #what to do on ^C
+   $SIG{'INT'} = sub {
+      print STDERR "\n\nMaker aborted by user!!\n\n" unless($main::qq);
+      exit (1);
+   };    
+   
+   #supress warnings from storable module
+   $SIG{'__WARN__'} = sub {
+      warn $_[0] if ( $_[0] !~ /Not a CODE reference/ &&
+		      $_[0] !~ /Can\'t store item / &&
+		      $_[0] !~ /Find\:\:skip_pattern|File\/Find\.pm/
+		    );
+   };
+
+   #output to log file of seq that caused rank to die
+   $SIG{'__DIE__'} =
+   sub {
+      if (defined ($LOG) && defined $_[0]) {
+	 my $die_count = $LOG->get_die_count();
+	 $die_count++;
+	 
+	 $LOG->add_entry("DIED","RANK",$RANK);
+	 $LOG->add_entry("DIED","COUNT",$die_count);
+      }
+
+      die $_[0]."\n".
+	  "FATAL ERROR\n";
+   };
+}
+
+use Cwd;
+use FileHandle;
+use File::Path;
+use Getopt::Long qw(:config no_ignore_case);
+use File::Temp qw(tempfile tempdir);
+#use Bio::DB::Fasta;
+use GI;
+#use Dumper::GFF::GFFV3;
+use Iterator::Any;
+use Iterator::Fasta;
+use Iterator::GFF3;
+use Fasta;
+use FastaChunker;
+use maker::auto_annotator;
+use cluster;
+use repeat_mask_seq;
+use runlog;
+use ds_utility;
+use GFFDB;
+use Error qw(:try);
+use Error::Simple;
+use Process::MpiChunk;
+use Process::MpiTiers;
+use Proc::Signal;
+
+$| = 1;
+
+my $usage = "
+Usage:
+     maker [options] <maker_opts> <maker_bopts> <maker_exe>
+
+     Maker is a program that produces gene annotations in GFF3 file format using
+     evidence such as EST alignments and protein homology.  Maker can be used to
+     produce gene annotations for new genomes as well as update annoations from
+     existing genome databases.
+
+     The three input arguments are user control files that specify how maker
+     should behave. All options for maker should be set in the control files,
+     but a few can also be set on the command line. Command line options provide
+     a convenient machanism to override commonly altered control file values.
+
+     Input files listed in the control options files must be in fasta format.
+     unless otherwise specified. Please see maker documentation to learn more
+     about control file  configuration.  Maker will automatically try and locate
+     the user control files in the current working directory if these arguments
+     are not supplied when initializing maker.
+
+     It is important to note that maker does not try and recalculated data that
+     it has already calculated.  For example, if you run an analysis twice on
+     the same dataset file you will notice that maker does not rerun any of the
+     blast analyses, but instead uses the blast analyses stored from the
+     previous run.  To force maker to rerun all analyses, use the -f flag.
+
+
+Options:
+
+     -genome|g <filename> Specify the genome file.
+
+     -predictor|p <type>  Selects the predictor(s) to use when building
+                          annotations.  Defines a pool of gene models for
+                          annotation selection.
+
+                          types: snap
+                                 augustus
+                                 fgenesh
+                                 genemark
+                                 est2genome (Uses EST's directly)
+                                 protein2genome (For Prokaryotic annotation only)
+                                 model_gff (Pass through GFF3 annotations)
+                                 pred_gff (Uses passed through GFF3 predictions)
+
+                          Use a ',' to seperate types (nospaces)
+                          i.e. -predictor=snap,augustus,fgenesh
+
+     -RM_off|R           Turns all repeat masking off.
+
+     -datastore/         Forcably turn on/off MAKER's use of a two deep datastore
+      nodatastore        directory structure for output.  By default this option
+                         turns on whenever there are more the 1,000 contigs in
+                         the input genome fasta file.
+
+     -base    <string>   Set the base name MAKER uses to save output files.
+                         MAKER uses the input genome file name by default.
+
+     -retry|r <integer>  Rerun failed contigs up to the specified count.
+
+     -cpus|c  <integer>  Tells how many cpus to use for BLAST analysis.
+
+     -force|f            Forces maker to delete old files before running again.
+                         This will require all blast analyses to be re-run.
+
+     -again|a            Caculate all annotations and output files again even if
+                         no settings have changed. Does not delete old analyses.
+
+     -evaluate|e         Run Evaluator on final annotations (under development).
+
+     -fast               Causes MAKER to skip most clustering and analysis.
+                         A quick way to align evidence.  You then must re-run
+                         MAKER to produce full GFF3 output and annotations.
+
+     -quiet|q            Silences most of maker's status messages.
+
+     -qq                 Really quiet. Silences everything but major errors.
+
+     -CTL                Generate empty control files in the current directory.
+
+     -help|?             Prints this usage statement.
+
+Work Queue Options
+
+     -port <integer>     Sets the port for work_queue to listen on (default: 9135)
+ 
+     -fa   <integer>     Sets the work_queue fast abort option with the given multiplier. 
+
+     -N <project>	 Sets the project name to <project>.
+ 
+     
+
+";
+
+#-------------------------------------------------------------------------------
+#------------------------------------ MAIN -------------------------------------
+#-------------------------------------------------------------------------------
+
+
+#---global variables
+my %OPT;
+my $rank = 0;
+my $size = 1;
+$RANK = $rank;
+
+#---Process options on the command line 
+try{
+    GetOptions("RM_off|R" => \$OPT{R},
+	       "force|f" => \$OPT{force},
+	       "genome|g=s" => \$OPT{genome},
+	       "cpus|c=i" => \$OPT{cpus},
+	       "predictor=s" =>\$OPT{predictor},
+	       "retry=i" =>\$OPT{retry},
+	       "evaluate" =>\$OPT{evaluate},
+	       "again|a" =>\$OPT{again},
+	       "quiet|q" =>\$main::quiet,
+	       "qq"    =>\$main::qq,
+	       "check" =>\$OPT{check},
+	       "base=s" =>\$OPT{out_name},
+	       "datastore!" =>\$OPT{datastore},
+	       "fast" =>\$main::fast,
+	       "dtmp" =>\$main::dtmp,
+	       "MWAS=s" =>sub {exec("$FindBin::Bin/../MWAS/bin/mwas_server $_[1]")},
+	       "CTL" => sub {GI::generate_control_files(); exit(0);},
+	       "help|?" => sub {print $usage; exit(0)},
+	       "port=i" => \$OPT{port},
+	       "fa=i" => \$OPT{fast_abort},
+	       "N=s" => \$OPT{project}
+	       );
+
+    $main::quiet = 1 if($main::qq);
+}
+catch Error::Simple with{
+    my $E = shift;
+    
+    print STDERR $E->{-text};
+    die "\n\nMaker failed parsing command line options!!\n\n" if();
+};
+
+#varibles that are persistent outside of try
+my %CTL_OPT;
+my $iterator;
+my $DS_CTL;
+my $GFF_DB;
+my $build;
+my @failed;
+
+try{
+    #get arguments off the command line
+    my @ctlfiles = @ARGV;
+    
+    if (not @ctlfiles) {
+	if (-e "maker_opts.ctl" &&
+	    -e "maker_bopts.ctl" &&
+	    -e "maker_exe.ctl"
+	    ) {
+	    
+	    @ctlfiles = ("maker_opts.ctl",
+			 "maker_bopts.ctl",
+			 "maker_exe.ctl"
+			 );
+	}
+	else {
+	    print STDERR  "ERROR: Control files not found\n";
+	    print $usage;
+	    exit(0);
+	}
+    }
+    
+    #--Control file processing
+    
+    #set up control options from control files
+    %CTL_OPT = GI::load_control_files(\@ctlfiles, \%OPT, $size);
+    
+    #--open datastructure controller
+    $DS_CTL = ds_utility->new(\%CTL_OPT);
+    
+    #--set up gff database
+    $GFF_DB = new GFFDB(\%CTL_OPT);
+    $build = $GFF_DB->next_build;
+    
+    #---load genome multifasta/GFF3 file
+    $iterator = new Iterator::Any( -fasta => $CTL_OPT{'genome'},
+				   -gff => $CTL_OPT{'genome_gff'},
+				   );
+}
+catch Error::Simple with{
+    my $E = shift;
+    print STDERR $E->{-text};
+    #print STDERR "\n\nMaker failed while examining startup data\n",
+    #"(control files and input fasta files)!!\n\n";
+    my $code = 2;
+    $code = $E->{-value} if (defined($E->{-value}));
+    
+    exit($code);
+};
+
+## beginning of ztm's code, above is (mostly) stock
+print "Beginning work_queue code\n"; 
+
+use Storable qw(nfreeze nstore thaw retrieve);
+#use Digest::MD5 qw(md5_hex);
+use work_queue;
+use Data::Dumper;
+
+my $bird = 0;
+my $wkDirPrefix;
+my $initialSubmit = 10;
+my $tierLimit = -1;#100;
+
+## @INC is modified at top of script
+my $command = "";
+
+if($bird == 1) {
+	$command .= "/afs/nd.edu/user37/ccl/software/cctools/bin/parrot";
+	$wkDirPrefix = "/chirp/cclws08.cse.nd.edu:9095/";
+}
+else { 
+	$wkDirPrefix = cwd();
+	chomp($wkDirPrefix); 
+	$wkDirPrefix =~ s/\n//g;
+	$wkDirPrefix .= "/";
+}
+$command .= "./maker_wq_worker";
+
+#my $port = $work_queue::WORK_QUEUE_DEFAULT_PORT;
+my $port = "9135";
+if(defined($OPT{"port"}))
+{
+	$port = $OPT{"port"}; 
+} 
+my $queue = work_queue::work_queue_create($port);
+my $multiplier = -1;
+if(defined($OPT{"fast_abort"}))
+{
+	$multiplier = $OPT{"fast_abort"}; 
+}
+if(defined($OPT{"project"}))
+{
+	work_queue::work_queue_specify_name($queue, $OPT{"project"});
+#	print STDERR work_queue::WORK_QUEUE_MASTER_MODE_CATALOG."\n"; 
+#	work_queue::work_queue_specify_master_mode($queue, work_queue::WORK_QUEUE_MASTER_MODE_CATALOG);
+	work_queue::work_queue_specify_master_mode($queue, 1);
+
+}
+#work_queue::cctools_debug_flags_set("all");
+my $fa = work_queue::work_queue_activate_fast_abort($queue, $multiplier); 
+
+if(defined($queue)){
+print time." :: Work Queue Creation :: listening on port $port \n";}
+else{print "Failed to create Work Queue on port $port \n"; exit(0);}
+
+my $tier;
+my $fasta;
+my $highestTier;
+my $tierCtr = 0;
+my $tiersTerm = 0;
+
+
+
+
+sub SubmitTask {
+	my($counter) = @_;
+	
+	my $inFile = $counter."_todo.tier";
+	
+	### ztm :: new task, set its I/O parms
+	print "Creating task $counter\n"; 
+	my $task = work_queue::work_queue_task_create("$command $counter"); 
+	print "Specifying input $wkDirPrefix$inFile\n";
+	work_queue::work_queue_task_specify_input_file_do_not_cache($task, $wkDirPrefix.$inFile, $inFile);
+
+#	print "Specifying the worker executable ./maker.sfx\n"; 
+	print "Specifying the worker executable maker_wq_worker \n";
+
+	work_queue::work_queue_task_specify_input_file_do_not_cache($task, "maker_wq_worker", "maker_wq_worker");
+
+
+	print "Specifying tag $counter \n"; 
+	work_queue::work_queue_task_specify_tag($task, "$counter"); #parm2 must be a string
+	print "Submitting the task\n"; 
+	work_queue::work_queue_submit($queue, $task);
+	print "Task submitted\n"; 
+	print "Created task with command: $command and counter $counter\n";
+	print "Task data: $wkDirPrefix$inFile\n"; 
+	return 1;
+}
+
+sub BuildSubmit {
+	## pull $tierCtr implicitly from the global scope
+
+	my($howManyMore) = @_;
+	
+	my $highLimit = $tierCtr + $howManyMore;
+	
+	while( $tierCtr < $highLimit ) {
+		#used to do work of GenTiers() here, on the fly. now is all done at beginning
+		print "Entering submit task with parameter $tierCtr\n"; 	
+		SubmitTask($tierCtr);
+		$tierCtr++;
+	}
+}
+
+sub GenTiers {
+	## $iterator et. al. implicitly global
+	print "Generating Tiers\n";
+	my $tier;
+	my $numTiers = 0;
+	while (my $fasta = $iterator->nextFasta() ) {
+		$tier = Process::MpiTiers->new({fasta =>$fasta,
+		    CTL_OPT => \%CTL_OPT,
+		    DS_CTL  => $DS_CTL,
+		    GFF_DB  => $GFF_DB,
+		    build   => $build},
+		   '0',
+		   'Process::MpiChunk'
+		   );
+		print "On tier $numTiers\n"; 
+		nstore \$tier, ($numTiers."_todo.tier");
+		
+		$numTiers++;
+	}
+	return $numTiers;
+}
+
+print time." :: Work Queue is generating serialized tier inputs \n";
+$highestTier = GenTiers();
+print time." :: highest input generated was $highestTier \n";
+
+# generate and submit however many tiers (should ideally match number of workers) to start with
+$initialSubmit = $highestTier % 100;
+print "Submitting \n";  
+BuildSubmit($initialSubmit);
+print "Work Queue :: initial submission :: $initialSubmit tiers \n";
+
+open(LOG, ">>", "logfile"); 
+print LOG "#start\n";
+my $old_seconds = 0;
+while(!work_queue::work_queue_empty($queue)) {
+	my($t1, $t3) = gettimeofday;	
+	my $task = work_queue::work_queue_wait($queue, -1); # wait 30 seconds
+	my($t2, $t4) = gettimeofday;
+	my $e = $t2 - $t1;
+	my $e2 = $t4-$t3;
+	my $stats = new work_queue::work_queue_stats();
+	work_queue::work_queue_get_stats($queue, $stats); 	
+	my $init = work_queue::work_queue_stats::swig_workers_init_get($stats);
+	my $ready = work_queue::work_queue_stats::swig_workers_ready_get($stats); 
+	my $busy = work_queue::work_queue_stats::swig_workers_busy_get($stats);
+	my $running = work_queue::work_queue_stats::swig_tasks_running_get($stats);
+	my $waiting = work_queue::work_queue_stats::swig_tasks_waiting_get($stats); 
+	my $complete = work_queue::work_queue_stats::swig_tasks_complete_get($stats);
+	my $tdispatched = work_queue::work_queue_stats::swig_total_tasks_dispatched_get($stats);
+	my $tcomplete = $tiersTerm;#work_queue::work_queue_stats::swig_total_tasks_complete_get($stats);
+	my $tjoined = work_queue::work_queue_stats::swig_total_workers_joined_get($stats);
+	my $tremoved = work_queue::work_queue_stats::swig_total_workers_removed_get($stats); 
+	my $tsent = "0";# = work_queue::work_queue_stats::;
+	my $treceived = "0";# = work_queue::work_queue_stats::;
+	
+	my ($seconds,$microseconds) = gettimeofday; 
+	if($seconds - $old_seconds > 5){ 
+		print LOG "$seconds.$microseconds $init $ready $busy $running $waiting $complete $tdispatched $tcomplete $tjoined $tremoved $tsent $treceived\n";
+		print "$seconds.$microseconds $init $ready $busy $running $waiting $complete $tdispatched $tcomplete $tjoined $tremoved $tsent $treceived\n";
+		$old_seconds = $seconds;
+	}
+
+	if(defined($task)) {
+		print "Task defined\n";
+		my $counter = work_queue::work_queue_task::swig_tag_get($task);
+		my $output = work_queue::work_queue_task::swig_output_get($task);
+		my $host = work_queue::work_queue_task::swig_host_get($task);
+		print STDERR $output;
+		### swig doesn't provide the correct retcode; this is a kludge...
+		my $retStatus; 
+		
+		# some machines can't access the worker's path!
+		if(index($output, "No such file") != -1) {
+			print time." :: Work Queue ERROR :: $counter failed on $host\n";
+			$retStatus = -1;
+		}
+		# and just for good measure
+		elsif(index($output, "FATAL ERROR") != -1) {
+			$retStatus = -1;
+		}
+		# look at the last few lines of maker_wq_worker to see this data
+		else {
+			$retStatus = index($output, "EXIT:");
+			$retStatus = substr($output, $retStatus+5, 2);
+			$retStatus = sprintf("%d", $retStatus);
+		}
+		
+		
+		print time." :: ".sprintf("%5d", $counter)." :: \n";
+		
+		
+		
+		### the hopeful, successful ending
+		if($retStatus == 1) {
+			$tiersTerm++;
+			print "finished tier $counter, $tiersTerm done so far \n";
+			unlink "$counter\_todo.tier" or warn "Could not unlink $counter\_todo.tier: $!\n";
+			#if(-e "$counter.output"){`mv "$counter".output "$counter".output.completed`; }
+		}
+		### tier resubmission on failure
+		else {
+			### save the worker's output for later dissection
+			$/ = "";
+
+			if($retStatus == -1) {
+				print "failed, resubmitting tier $counter\n";
+				$tier = ${retrieve($counter."_todo.tier")};
+				
+				### if it failed, we want to force recomputation
+				$tier->CTL_OPT->{ 'force' } = 1; 
+				nstore \$tier, ($counter."_todo.tier");
+					
+			}
+			### general completion
+			else { 
+				print "completed, not terminated $counter, returned $retStatus\n";
+			}
+			SubmitTask($counter);
+		}
+		
+		work_queue::work_queue_task_delete($task);
+		
+	} else { #
+	}
+	
+	
+	while ( work_queue::work_queue_hungry($queue) && $tierCtr < $highestTier) { # while
+		print ":: hungry, submitting $tierCtr \n";
+		BuildSubmit(1);
+	}
+	
+	
+}
+
+print "\n".time." :: all tasks complete :: $tiersTerm tiers in total \n";
+work_queue::work_queue_delete($queue);
+close(LOG);
+
+print STDERR "\n\nMaker is now finished!!!\n\n" unless($main::qq);
+
+#clean up all children processes
+Proc::Signal::reap_children_by_name(9, 'maintain.pl');
+
+exit(0);
+#-----------------------------------------------------------------------------
+#----------------------------------- SUBS ------------------------------------
+#-----------------------------------------------------------------------------

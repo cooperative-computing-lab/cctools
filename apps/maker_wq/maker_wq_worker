@@ -1,0 +1,104 @@
+#!/usr/bin/env perl
+use strict "vars";
+use strict "refs";
+use warnings;
+
+
+use FindBin;
+use vars qw($RANK $LOG $CMD_ARGS);
+
+
+BEGIN{
+   if (not ($ENV{CGL_SO_SOURCE})) {
+      $ENV{CGL_SO_SOURCE} = "$FindBin::Bin/../lib/CGL/so.obo";
+   }
+   if (not ($ENV{CGL_GO_SOURCE})) {
+      $ENV{CGL_GO_SOURCE} = "$FindBin::Bin/../lib/CGL/gene_ontology.obo"
+   }
+   
+   $CMD_ARGS = join(' ', @ARGV);
+   
+   #what to do on ^C
+   $SIG{'INT'} = sub {
+      print STDERR "\n\nMaker aborted by user!!\n\n" unless($main::qq);
+      exit (1);
+   };    
+   
+   #supress warnings from storable module
+   $SIG{'__WARN__'} = sub {
+      warn $_[0] if ( $_[0] !~ /Not a CODE reference/ &&
+		      $_[0] !~ /Can\'t store item / &&
+		      $_[0] !~ /Find\:\:skip_pattern|File\/Find\.pm/
+		    );
+   };
+
+   #output to log file of seq that caused rank to die
+   $SIG{'__DIE__'} =
+   sub {
+      if (defined ($LOG) && defined $_[0]) {
+	 my $die_count = $LOG->get_die_count();
+	 $die_count++;
+	 
+	 $LOG->add_entry("DIED","RANK",$RANK);
+	 $LOG->add_entry("DIED","COUNT",$die_count);
+      }
+
+      die $_[0]."\n".
+	  "FATAL ERROR\n";
+   };
+}
+
+
+use Cwd;
+use FileHandle;
+use File::Path;
+use Getopt::Long qw(:config no_ignore_case);
+use GI;
+use Dumper::GFF::GFFV3;
+use Iterator::Any;
+use Iterator::Fasta;
+use Iterator::GFF3;
+use Fasta;
+use FastaChunker;
+use maker::auto_annotator;
+use cluster;
+use repeat_mask_seq;
+use runlog;
+use ds_utility;
+use GFFDB;
+use Error qw(:try);
+use Error::Simple;
+use Process::MpiChunk;
+use Process::MpiTiers;
+use Proc::Signal;
+
+### begin ztm code
+
+use Storable qw(nfreeze nstore thaw retrieve);
+
+use Data::Dumper;
+
+my $numArgs = $#ARGV + 1;
+
+if ($numArgs != 1) {
+        print "Usage: maker_wq_worker counter\n";
+        exit;
+}
+
+my $counter = $ARGV[0];
+my $tier;
+# these should just be filenames, because they reference WQ's temporary worker directory
+my $inFile = $counter."_todo.tier";
+###my $outFile = $counter.".fasta";
+	
+$tier = ${retrieve($inFile)};
+
+print Dumper($tier);
+
+	print time." :: Worker $counter :: starting \n";
+	$tier->run_all;
+	print time." :: Worker $counter :: finished \n";
+	
+	if($tier->failed) { print "EXIT:-1 \n"; exit -1; }
+	elsif($tier->terminated) { print "EXIT:1 \n"; exit 1; }
+	else { print "EXIT:0 \n"; exit 0; } 	#not done (?), not failed
