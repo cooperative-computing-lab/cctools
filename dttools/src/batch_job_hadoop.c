@@ -32,15 +32,20 @@ static int setup_hadoop_wrapper(const char *wrapperfile, const char *cmd)
 {
 	FILE *file;
 
-	//if(access(wrapperfile,R_OK|X_OK)==0) return 0;
-
 	file = fopen(wrapperfile, "w");
 	if(!file)
 		return -1;
 
+	char *escaped_cmd = escape_shell_string(cmd);
+	if (escaped_cmd == NULL) return -1;
+
 	fprintf(file, "#!/bin/sh\n");
-	if(cmd)
-		fprintf(file, "exec %s\n\n", cmd);
+	fprintf(file, "cmd=%s\n", escaped_cmd);
+	/* fprintf(file, "exec %s -- /bin/sh -c %s\n", getenv("HADOOP_PARROT_PATH"), escaped_cmd); */ /* random bash bug, look into later */
+	fprintf(file, "exec %s -- /bin/sh <<EOF\n", getenv("HADOOP_PARROT_PATH"));
+	fprintf(file, "$cmd\n");
+	fprintf(file, "EOF\n");
+	free(escaped_cmd);
 	fclose(file);
 
 	chmod(wrapperfile, 0755);
@@ -94,6 +99,7 @@ batch_job_id_t batch_job_fork_hadoop(struct batch_queue *q, const char *cmd)
 
 		outname[0] = 0;
 		while(fgets(line, sizeof(line), cmd_pipe)) {
+			debug(D_DEBUG, "batch_job_hadoop child [%d] output: %s", (int)getpid(), line);
 			char jobname[BATCH_JOB_LINE_MAX];
 			char error_string[BATCH_JOB_LINE_MAX];
 			int mapdone, reddone;
@@ -188,7 +194,7 @@ batch_job_id_t batch_job_fork_hadoop(struct batch_queue *q, const char *cmd)
 
 batch_job_id_t batch_job_submit_simple_hadoop(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
-	char line[BATCH_JOB_LINE_MAX];
+	char command[8192];
 	char *target_file;
 
 	target_file = get_hadoop_target_file(extra_input_files);
@@ -198,15 +204,13 @@ batch_job_id_t batch_job_submit_simple_hadoop(struct batch_queue *q, const char 
 	} else
 		debug(D_HDFS, "input file %s specified\n", target_file);
 
-	setup_hadoop_wrapper("hadoop.wrapper", cmd);
+	setup_hadoop_wrapper("./hadoop.wrapper", cmd);
 
-	sprintf(line,
-		"$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-*-streaming.jar -D mapred.min.split.size=100000000 -input %s -mapper \"$HADOOP_PARROT_PATH ./hadoop.wrapper\" -file hadoop.wrapper -numReduceTasks 0 -output /makeflow_tmp/job-%010d 2>&1",
-		target_file, (int) time(0));
+	sprintf(command, "%s/bin/hadoop jar %s/mapred/contrib/streaming/hadoop-*-streaming.jar -D mapreduce.job.reduces=0 -input file:///dev/null -mapper ./hadoop.wrapper -file ./hadoop.wrapper -output '%s/job-%010d' 2>&1", getenv("HADOOP_HOME"), getenv("HADOOP_HOME"), getenv("HADOOP_USER_TMP"), (int)time(0));
 
-	debug(D_HDFS, "%s\n", line);
+	debug(D_HDFS, "%s\n", command);
 
-	return batch_job_fork_hadoop(q, line);
+	return batch_job_fork_hadoop(q, command);
 
 }
 

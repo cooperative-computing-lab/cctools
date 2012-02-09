@@ -20,6 +20,28 @@ See the file COPYING for details.
 #define STRINGTOOLS_BUFFER_SIZE 256
 #define METRIC_POWER_COUNT 6
 
+char *escape_shell_string (const char *str)
+{
+	if (str == NULL) str = "";
+	char *escaped_string = malloc(strlen(str)*3+1);
+	if (escaped_string == NULL) return NULL;
+	char *old = str;
+	char *current = escaped_string;
+	strcpy(current, "'");
+	current += 1;
+	for (; *old; old++) {
+		if (*old == '\'') {
+			strcpy(current, "'\\''");
+			current += 3;
+		} else {
+			*current = *old;
+			current += 1;
+		}
+	}
+	strcpy(current, "'");
+	return escaped_string;
+}
+
 void string_from_ip_address(const unsigned char *bytes, char *str)
 {
 	sprintf(str, "%u.%u.%u.%u", (unsigned) bytes[0], (unsigned) bytes[1], (unsigned) bytes[2], (unsigned) bytes[3]);
