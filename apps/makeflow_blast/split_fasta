@@ -1,0 +1,41 @@
+#! /usr/bin/env python
+
+# Copyright (C) 2011- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+#
+# This simple script splits a fasta file into pieces
+#
+
+import sys
+import re
+
+if(len(sys.argv) < 4) :
+	sys.stderr.write("Usage: split_fasta.py query_granularity character_granularity fasta_file\n")
+	sys.exit(1)
+query_gran = sys.argv[1]
+char_gran = sys.argv[2]
+query = sys.argv[3] 
+num_chars = 0
+num_queries = 0
+num_jobs = 0
+
+FILE  = open(query, "r")
+OF = open("input." + str(num_jobs), "w")
+for line in FILE:
+	if(re.search('^>', line)):
+		if( num_queries > (int(query_gran) - 1) or num_chars > (int(char_gran) - 1) ):
+			OF.close()
+			num_jobs = num_jobs + 1
+			num_chars = 0
+			num_queries = 0
+			OF = open("input." + str(num_jobs), "w")
+		else :
+			OF.write(line)
+		num_queries += 1
+	else :
+		OF.write(line)
+		num_chars += len(line)
+FILE.close()
+OF.close()
+sys.exit(0)

@@ -323,6 +323,11 @@ pfs_service * pfs_service_lookup( const char *name )
                 extern pfs_service *pfs_service_xrootd;
         	return pfs_service_xrootd;
 #endif
+#ifdef HAS_CVMFS
+        } else if(!strcmp(name,"cvmfs")) {
+                extern pfs_service *pfs_service_cvmfs;
+            return pfs_service_cvmfs;
+#endif
 	} else {
 		return 0;
 	}

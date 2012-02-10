@@ -232,6 +232,8 @@ int link_readline(struct link *link, char *line, size_t length, time_t stoptime)
 */
 int link_fd(struct link *link);
 
+int link_keepalive(struct link *link, int onoff);
+
 int link_nonblocking(struct link *link, int onoff);
 
 /** Return the local address of the link in text format.

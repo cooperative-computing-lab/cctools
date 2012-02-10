@@ -37,7 +37,7 @@ static void show_help(const char *cmd)
 	printf("Usage: %s [options] <file_name>\n", cmd);
 	printf("The most common options are:\n");
 	printf(" -a <type>      Alignment type: sw, ps, or banded. (default: %s)\n",align_type);
-	printf(" -o <format>    Output format: ovl, align, or matrix. (default: %s)\n",output_format);
+	printf(" -o <format>    Output format: ovl, ovl_new, align, or matrix. (default: %s)\n",output_format);
 	printf(" -m <integer>	Minimum aligment length (default: %d).\n", min_align);
 	printf(" -q <integer>	Minimum match quality (default: %.2lf)\n",min_qual);
 	printf(" -x         	Delete input file after completion.\n");
@@ -100,7 +100,7 @@ int main(int argc, char ** argv)
 
 	struct cseq *c1, *c2;
 
-	if(!strcmp(output_format,"ovl")) {
+	if(!strcmp(output_format,"ovl") || !strcmp(output_format, "ovl_new")) {
 		overlap_write_begin(stdout);
 	}
 
@@ -178,7 +178,9 @@ int main(int argc, char ** argv)
 
 		if(aln->quality <= min_qual) {
 			if(!strcmp(output_format,"ovl")) {
-				overlap_write(stdout, aln, s1->name, s2->name);
+				overlap_write_v5(stdout, aln, s1->name, s2->name);
+			} else if(!strcmp(output_format, "ovl_new")) { 
+				overlap_write_v7(stdout, aln, s1->name, s2->name); 
 			} else if(!strcmp(output_format,"matrix")) {
 				printf("*** %s alignment of sequences %s and %s (quality %lf):\n\n",align_type,s1->name,s2->name,aln->quality);
 				matrix_print(m,s1->data,s2->data);
@@ -200,7 +202,7 @@ int main(int argc, char ** argv)
 
 	fclose(input);
 
-	if(!strcmp(output_format,"ovl")) {
+	if(!strcmp(output_format,"ovl") || !strcmp(output_format, "ovl_new")) {
 		overlap_write_end(stdout);
 	}
 

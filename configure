@@ -8,8 +8,8 @@ save_arguments $0 $@
 
 major=3
 minor=4
-micro=0
-release_date="10/19/2011"
+micro=2
+release_date="02/10/2012"
 
 build_user=`whoami`
 build_host=`uname -n`
@@ -72,8 +72,10 @@ mysql_path="/usr"
 perl_path="/usr"
 python_path="/usr"
 xrootd_path="/usr"
+cvmfs_path="/usr"
 mpi_path="/usr/local"
 zlib_path="/usr"
+swig_path="/usr"
 
 xrootd_arch=auto
 globus_flavor=auto
@@ -104,7 +106,9 @@ config_rfio_path=no
 config_dcap_path=no
 config_irods_path=no
 config_xrootd_path=no
+config_cvmfs_path=no
 config_mpi_path=no
+config_swig_path=auto
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
 then
@@ -188,6 +192,11 @@ do
 			xrootd_path=$1
 			config_xrootd_path=yes
 			;;
+		--with-cvmfs-path)
+			shift
+			cvmfs_path=$1
+			config_cvmfs_path=yes
+			;;
 		--with-zlib-path)
 			shift
 			zlib_path=$1
@@ -197,6 +206,11 @@ do
 			shift
 			mpi_path=$1
 			config_mpi_path=yes
+			;;
+		--with-swig-path)
+			shift
+			swig_path=$1
+			config_swig_path=yes
 			;;
 		--without-system-sand)
 			include_package_sand=""
@@ -261,6 +275,8 @@ Where PACKAGE may be:
     python
     xrootd
     zlib
+    cvmfs
+    swig
 
 And SYSTEM may be:
     sand
@@ -472,6 +488,21 @@ then
 	fi
 
 	ccflags="${ccflags} -DHAS_MYSQL -DHAS_BXGRID"
+
+	# MySQL requires zlib
+	if library_search z ${zlib_path}
+	then
+		if [ X${zlib_path} != X/usr ]
+		then
+		    
+			ccflags="${ccflags} -I${zlib_path}/include"
+			ldflags="${ldflags} -L${zlib_path}/lib"
+		fi
+	else
+		echo "*** Sorry, I couldn't find zlib in $zlib_path"
+		echo "*** Check --with-zlib-path and try again."
+		exit 1
+	fi
 else
 	if [ $config_mysql_path = yes ]
 	then
@@ -489,15 +520,40 @@ then
         usempi="true"
         ccflags="${ccflags} -I${mpi_path}/include -DHAS_MPI"
 else
-    usempi="false"
-    if [ $config_mpi_path = yes ]
-    then
-        echo "*** Sorry, I couldn't find mpicc or mpi.h in $mpi_path"
-        echo "*** Check --with-mpi-path and try again."
-        exit 1
-    else
-        echo "*** skipping mpi support"
-    fi
+	usempi="false"
+	if [ $config_mpi_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find mpicc or mpi.h in $mpi_path"
+		echo "*** Check --with-mpi-path and try again."
+		exit 1
+	else
+		echo "*** skipping mpi support"
+	fi
+fi
+
+if [ $config_swig_path != no ] && check_file ${swig_path}/bin/swig
+then
+	if check_path swig
+	then
+		swig_version=`swig -version | grep -i version | awk '{print $3}'`
+		if [ `format_version $swig_version` -ge `format_version 1.3.40` ]; then
+		    packages="${packages} ${include_package_work_queue}"
+		else
+		    echo "*** Sorry, I need swig >= 1.3.40"
+		    echo "*** skipping swig bindings for work queue"
+		fi
+	else
+		echo "*** skipping swig bindings for work queue"
+	fi
+else
+	if [ $config_swig_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find swig in $swig_path"
+		echo "*** Check --with=swig-path and try again."
+		exit 1
+	else
+		echo "*** skipping swig bindings for work queue"
+	fi
 fi
 
 if [ $config_xrootd_path != no ] && check_file ${xrootd_path}/include/xrootd/XrdVersion.hh
@@ -536,6 +592,31 @@ else
 	fi
 fi
 
+if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/cvmfs/src/libcvmfs.h
+then
+	ccflags="${ccflags} -I${cvmfs_path}/cvmfs/src -DHAS_CVMFS"
+
+	for library in cvmfs/src/cvmfs sqlite3/src/sqlite3 libcurl/src/lib/.libs/curl
+	do
+		lib_path=${cvmfs_path}/`dirname ${library}`
+                library=`basename ${library}`
+		if ! library_search $library ${lib_path}
+		then
+			echo "*** Couldn't find $library in ${lib_path}"
+			exit 1
+		fi
+	done
+else
+	if [ $config_cvmfs_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find cvmfs in ${cvmfs_path}"
+		echo "*** Check --with-cvmfs-path and try again."
+		exit 1
+	else
+		echo "*** skipping cvmfs support"
+	fi
+fi
+
 ##########################################################################
 # SWITCH BACK TO DYNAMIC LINKING FOR COMMON SYSTEM LIBRARIES
 ##########################################################################
@@ -558,7 +639,7 @@ then
 
 	if [ $build_sys = LINUX ]
 	then
-		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -ltermcap -lhistory ${link_as_needed}"
+		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
 	else 
 		library_search ncurses ${readline_path}
 		library_search termcap ${readline_path}
@@ -592,19 +673,6 @@ else
 	echo "*** skipping fuse support"
 fi
 
-if library_search z ${zlib_path}
-then
-	if [ X${zlib_path} != X/usr ]
-	then
-		ccflags="${ccflags} -I${zlib_path}/include"
-		ldflags="${ldflags} -L${zlib_path}/lib"
-	fi
-else
-	echo "*** Sorry, I couldn't find zlib in $zlib_path"
-	echo "*** Check --with-zlib-path and try again."
-	exit 1
-fi
-
 # Solaris places kerberos includes in a strange place.
 
 if [ -d ${krb5_path}/include/kerberosv5 ]
@@ -633,13 +701,6 @@ else
 	else
 		echo "*** skipping krb5 support"
 	fi
-fi
-
-if check_path swig
-then
-	packages="${packages} ${include_package_work_queue}"
-else
-	echo "*** skipping swig bindings for work queue"
 fi
 
 if [ $config_perl_path != no ]
@@ -691,7 +752,7 @@ then
 		echo "python version is ${python_version}"
 		python_major_version=`echo ${python_version} | cut -d . -f 1`
 		python_minor_version=`echo ${python_version} | cut -d . -f 2`
-		if [ $python_major_version -eq 2 -a $python_minor_version -ge 4 ]
+		if [ "$python_major_version" -eq 2 -a "$python_minor_version" -ge 4 ]
 		then
 			if check_file ${python_path}/include/python2.$python_minor_version/Python.h
 			then
@@ -857,6 +918,8 @@ CXXFLAGS=\$(CCTOOLS_CXXFLAGS)
 MPILD=\$(CCTOOLS_MPI_LD)
 
 CCTOOLS_AR=ar
+
+CCTOOLS_SWIG=${swig_path}/bin/swig
 
 CCTOOLS_PERL=${perl}
 CCTOOLS_PERL_CCFLAGS=${perl_ccflags}

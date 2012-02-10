@@ -210,8 +210,7 @@ int chirp_ticket_isticketfilename(const char *ticket_filename, const char **dige
 {
 	int n1, n2;
 	char buffer[TICKET_DIGEST_LENGTH + 1];
-	int i;
-	if(((i = sscanf(ticket_filename, TICKET_FILENAME_SCAN, &n1, buffer, &n2)) == 1) && ((n2 - n1) == TICKET_DIGEST_LENGTH) && (strlen(ticket_filename) == (size_t) n2)) {
+	if((sscanf(ticket_filename, TICKET_FILENAME_SCAN, &n1, buffer, &n2) == 1) && ((n2 - n1) == TICKET_DIGEST_LENGTH) && (strlen(ticket_filename) == (size_t) n2)) {
 		assert(n1 > 0);
 		*digest = ticket_filename + n1;
 		return 1;
@@ -224,8 +223,7 @@ int chirp_ticket_isticketsubject(const char *ticket_subject, const char **digest
 {
 	int n1, n2;
 	char buffer[TICKET_DIGEST_LENGTH + 1];
-	int i;
-	if(((i = sscanf(ticket_subject, TICKET_SUBJECT_SCAN, &n1, buffer, &n2)) == 1) && ((n2 - n1) == TICKET_DIGEST_LENGTH) && (strlen(ticket_subject) == (size_t) n2)) {
+	if((sscanf(ticket_subject, TICKET_SUBJECT_SCAN, &n1, buffer, &n2) == 1) && ((n2 - n1) == TICKET_DIGEST_LENGTH) && (strlen(ticket_subject) == (size_t) n2)) {
 		assert(n1 > 0);
 		*digest = ticket_subject + n1;
 		return 1;

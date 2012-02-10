@@ -7,6 +7,7 @@ portfile=worker.port
 
 prepare()
 {
+    cd ../src; make ; cd -
     workerport=`find_free_port`
     ../../dttools/src/work_queue_worker -d all localhost $workerport &
     workerpid=$!

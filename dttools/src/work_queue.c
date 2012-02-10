@@ -125,6 +125,8 @@ struct work_queue {
 	int maximum_workers;
 	char catalog_host[DOMAIN_NAME_MAX];
 	int catalog_port;
+
+	int link_keepalive_on;
 };
 
 
@@ -349,6 +351,9 @@ static int add_worker( struct work_queue *q )
 
 	link = link_accept(q->master_link, time(0) + short_timeout);
 	if(link) {
+		if(q->link_keepalive_on) {
+			link_keepalive(link, 1);
+		}
 		link_tune(link, LINK_TUNE_INTERACTIVE);
 		if(link_address_remote(link, addr, &port)) {
 			w = malloc(sizeof(*w));
@@ -968,8 +973,10 @@ static int put_directory(const char *dirname, const char *remote_name, struct wo
 		len = sprintf(buffer, "%s/%s", remote_name, filename);
 		tf.remote_name = strdup(buffer);
 
-		if(!put_file(&tf, NULL, q, w, total_bytes))
+		if(!put_file(&tf, NULL, q, w, total_bytes)) {
+			closedir(dir);
 			return 0;
+		}
 	}
 
 	closedir(dir);
@@ -1868,7 +1875,10 @@ struct work_queue * work_queue_create( int port )
 	q->task_statistics = task_statistics_init();
 	q->busy_workers_to_remove = 0;
 
-	debug(D_WQ,"Work Queue is listening on port %d.", port);
+	q->link_keepalive_on = 1;
+
+	debug(D_WQ, "Work Queue is listening on port %d.", port);
+
 	return q;
 
       failure:

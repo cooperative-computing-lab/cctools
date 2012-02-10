@@ -3,6 +3,7 @@
 #include "debug.h"
 #include "itable.h"
 #include "process.h"
+#include "stringtools.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -14,7 +15,6 @@
 batch_job_id_t batch_job_submit_condor(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
 	FILE *file;
-	char line[BATCH_JOB_LINE_MAX];
 	int njobs;
 	int jobid;
 
@@ -54,6 +54,7 @@ batch_job_id_t batch_job_submit_condor(struct batch_queue *q, const char *cmd, c
 	if(!file)
 		return -1;
 
+	char line[BATCH_JOB_LINE_MAX];
 	while(fgets(line, sizeof(line), file)) {
 		if(sscanf(line, "%d job(s) submitted to cluster %d", &njobs, &jobid) == 2) {
 			pclose(file);
@@ -107,7 +108,6 @@ batch_job_id_t batch_job_submit_simple_condor(struct batch_queue *q, const char 
 batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	static FILE *logfile = 0;
-	char line[BATCH_JOB_LINE_MAX];
 
 	if(!logfile) {
 		logfile = fopen(q->logfile, "r");
@@ -126,6 +126,7 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 
 		clearerr(logfile);
 
+		char line[BATCH_JOB_LINE_MAX];
 		while(fgets(line, sizeof(line), logfile)) {
 			int type, proc, subproc;
 			batch_job_id_t jobid;
@@ -212,19 +213,18 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 
 int batch_job_remove_condor(struct batch_queue *q, batch_job_id_t jobid)
 {
-	char line[256];
-	FILE *file;
+	char *command = string_format("condor_rm %d", jobid);
 
-	sprintf(line, "condor_rm %d", jobid);
-
-	file = popen(line, "r");
+	debug(D_DEBUG, "%s", command);
+	FILE *file = popen(command, "r");
+	free(command);
 	if(!file) {
-		debug(D_DEBUG, "couldn't run %s", line);
+		debug(D_DEBUG, "condor_rm failed");
 		return 0;
 	} else {
-		while(fgets(line, sizeof(line), file)) {
-			/* nothing */
-		}
+		char buffer[1024];
+		while (fread(buffer, sizeof(char), sizeof(buffer)/sizeof(char), file) > 0)
+		  ;
 		pclose(file);
 		return 1;
 	}

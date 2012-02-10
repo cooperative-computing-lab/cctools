@@ -1011,7 +1011,6 @@ static INT64_T do_audit(int argc, char **argv)
 {
 	struct chirp_audit *list;
 	int result;
-	int i;
 	int raw_mode = 0;
 
 	if(argc > 1) {
@@ -1025,6 +1024,7 @@ static INT64_T do_audit(int argc, char **argv)
 
 	result = chirp_reli_audit(current_host, "/", &list, stoptime);
 	if(result >= 0) {
+		int i;
 		if(!raw_mode)
 			printf("   FILES     DIRS      DATA OWNER\n");
 		for(i = 0; i < result; i++) {

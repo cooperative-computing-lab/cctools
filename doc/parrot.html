@@ -133,6 +133,7 @@ then the file name.  Here are all the currently supported services:
 <tr><td>/hdfs/namenode:port/path<td>Hadoop Distributed File System (HDFS)<td><a href=http://hadoop.apache.org/common/docs/current/hdfs_user_guide.html>more info</a>
 <tr><td>/xrootd/host:port/path<td>XRootD/Scalla Distributed Storage System (xrootd)<td><a href=http://project-arda-dev.web.cern.ch/project-arda-dev/xrootd/site/index.html>more info</a>
 <tr><td>/chirp/target.cs.wisc.edu/path<td>Chirp Storage System<td>included + <a href=chirp.html>more info</a> 
+<tr><td>/cvmfs/grid.cern.ch/path<td>CernVM-FS<td><a href=http://cernvm.cern.ch/portal/filesystem>more info</a> 
 </table>
 <hr>
 <p>
@@ -319,7 +320,7 @@ an ordinary <tt>cp</tt> without any performance gain or loss.
 
 <h3>HTTP Proxy Servers</h3>
 
-Both HTTP and GROW can take advantage of standard HTTP proxy servers.
+HTTP, CVMFS, and GROW can take advantage of standard HTTP proxy servers.
 To route requests through a single proxy server, set the HTTP_PROXY
 environment variable to the server name and port:
 <pre>
@@ -385,6 +386,101 @@ files have been modified and <tt>make_growfs</tt> has not yet been re-run.
 If necessary, checksums can be disabled by giving the <tt>-k</tt> option
 to either Parrot or <tt>make_growfs</tt>.
 </dir>
+
+<h3>CVMFS - CernVM-FS</h3>
+
+<p>CVMFS is a read-only filesystem, which was initially based on GROW.
+It is used within CernVM-FS to provide access to software
+repositories.  It may be used outside of CernVM-FS by mounting it as a
+FUSE module.  Parrot makes it possible to access CVMFS in cases where
+mounting CVMFS via FUSE is not an option.  Like GROW, CVMFS makes use
+of web proxies and local disk caching for scalability.  For security,
+data integrity is verified with cryptographic checksums.  For
+increased reliability and performance, CVMFS repositories may also be
+mirrored in multiple locations and accessed via groups of
+load-balanced web proxies, with fail-over between groups.
+
+<p>The CVMFS repositories hosted by the <a
+href=http://cernvm.cern.ch/>CernVM project</a> are enabled by default.
+To access a different repository, it is necessary to configure parrot
+to know how to access the repository.  This may be done with the
+<tt>-r</tt> option or with the <tt>PARROT_CVMFS_REPO</tt> environment
+variable.  The repository configuration syntax is
+
+<pre>
+repo_name:options  repo_name2:option2  ...
+</pre>
+
+<p>The repository with <tt>repo_name</tt> is used when the parrot user
+attempts to access the matching path <tt>/cvmfs/repo_name/...</tt>.
+The configured repository name may begin with <tt>*</tt>, which acts
+as a wildcard, matching one or more characters in the requested
+repository name.  This is useful when multiple repositories are hosted
+at the same site and all configuration details are the same except the
+beginnings of the repository names, as in <tt>atlas.cern.ch</tt> and
+<tt>cms.cern.ch</tt>.  Any <tt>*</tt> appearing in the options is
+replaced by the characters in the requested path that were matched by
+the <tt>*</tt> in the configured repository name.  If a cvmfs path
+matches more than one configured repository, the last one appearing in
+the configuration takes precedence.
+
+<p>The format of the repository options is
+
+<pre>
+option1=value1,option2=value2,...
+</pre>
+
+<p>Literal spaces, tabs, newlines, asterisks, equal signs, or commas
+in the options must be proceeded by a backslash to avoid being
+interpreted as delimiters.  If the same option is specified more than
+once, the last value takes precedence.  The possible options are
+listed in the table below.  The <tt>url</tt> option is required and
+has no default.  The <tt>proxies</tt> option is required and defaults
+to the proxy used by parrot, if any.
+
+<p>
+<table>
+<tr><td><b>url=URL</b> <td>The URL of the CernVM-FS server(s): 'url1;url2;...'
+<tr><td><b>proxies=HTTP_PROXIES</b>   <td>Set the HTTP proxy list, such as 'proxy1|proxy2'; default is given by -P option (HTTP_PROXY)
+<tr><td>                              <td>Proxies separated by '|' are randomly chosen for load balancing.
+                                          Groups of proxies separated by ';' may be specified for failover.
+                                          If the first group fails, the second group is used, and so on down the chain.
+<tr><td><b>cachedir=DIR</b>           <td>Where to store disk cache; default is within parrot temp directory (-t option)
+<tr><td><b>timeout=SECONDS</b> <td>Timeout for network operations; default is given by -T option (PARROT_TIMEOUT)
+<tr><td><b>timeout_direct=SECONDS</b> <td>Timeout in for network operations without proxy; default is given by -T option (PARROT_TIMEOUT)
+<tr><td><b>max_ttl=MINUTES</b>        <td>Maximum TTL for file catalogs; default: take from catalog
+<tr><td><b>allow_unsigned</b>         <td>Accept unsigned catalogs (allows man-in-the-middle attacks)
+<tr><td><b>whitelist=URL</b>          <td>HTTP location of trusted catalog certificates (defaults is /.cvmfswhitelist)
+<tr><td><b>pubkey=PEMFILE</b>         <td>Public RSA key that is used to verify the whitelist signature.
+<tr><td><b>rebuild_cachedb</b>        <td>Force rebuilding the quota cache db from cache directory
+<tr><td><b>quota_limit=MB</b>         <td>Limit size of cache. -1 (the default) means unlimited.
+<tr><td>                              <td>If not -1, files larger than quota_limit-quota_threshold will not be readable.
+<tr><td><b>quota_threshold=MB</b>     <td>Cleanup cache until size is <= threshold
+<tr><td><b>deep_mount=prefix</b>      <td>Path prefix if a repository is mounted on a nested catalog
+<tr><td><b>repo_name=NAME</b>         <td>Unique name of the mounted repository; default is the name used for this configuration entry
+<tr><td><b>mountpoint=PATH</b>        <td>Path to root of repository; default is /cvmfs/repo_name
+<tr><td><b>blacklist=FILE</b>         <td>Local blacklist for invalid certificates.  Has precedence over the whitelist.
+</table>
+
+<p>Setting the CVMFS configuration overrides the default
+configuration.  If it is desired to configure additional repositories
+but still retain the default repositories, the configuration entry
+<nobr><tt>&lt;default-repositories&gt;</tt></nobr> may be put in the
+configuration string.  Example:
+
+<pre>
+parrot_run -r '&lt;default-repositories&gt; my.repo:url=http://cvmfs.server.edu/cvmfs/my.repo.edu' ...
+</pre>
+
+<p>The configuration of the default repositories may be modified by
+specifying additional options using the syntax
+<nobr><tt>&lt;default-repositories&gt;:option1=value1,option2=value2</tt></nobr>.
+
+<p>Currently, there is a limitation of one active CVMFS repository per
+parrot session.  Attempts to access a second CVMFS repository in the
+same parrot session will be rejected.  Therefore, the utility of
+configuring multiple repositories is merely to provide the option of
+accessing any one of those repositories during a parrot session.
 
 <h3>Hadoop Distributed File System (HDFS)</h3>
 

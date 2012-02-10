@@ -151,10 +151,12 @@ char *chunk_read(struct chunk_set *chunk_set, const char *file_name, int *size)
 	if(amt != the_chunk->len && ferror(fp)) {
 		/* error reading stream */
 		free(content);
+		fclose(fp);
 		return NULL;
 	}
 
 	*size = the_chunk->len;
+	fclose(fp);
 	return content;
 }
 

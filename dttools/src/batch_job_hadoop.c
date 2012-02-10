@@ -2,6 +2,7 @@
 #include "batch_job_internal.h"
 #include "debug.h"
 #include "process.h"
+#include "stringtools.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -32,15 +33,20 @@ static int setup_hadoop_wrapper(const char *wrapperfile, const char *cmd)
 {
 	FILE *file;
 
-	//if(access(wrapperfile,R_OK|X_OK)==0) return 0;
-
 	file = fopen(wrapperfile, "w");
 	if(!file)
 		return -1;
 
+	char *escaped_cmd = escape_shell_string(cmd);
+	if (escaped_cmd == NULL) return -1;
+
 	fprintf(file, "#!/bin/sh\n");
-	if(cmd)
-		fprintf(file, "exec %s\n\n", cmd);
+	fprintf(file, "cmd=%s\n", escaped_cmd);
+	/* fprintf(file, "exec %s -- /bin/sh -c %s\n", getenv("HADOOP_PARROT_PATH"), escaped_cmd); */ /* random bash bug, look into later */
+	fprintf(file, "exec %s -- /bin/sh <<EOF\n", getenv("HADOOP_PARROT_PATH"));
+	fprintf(file, "$cmd\n");
+	fprintf(file, "EOF\n");
+	free(escaped_cmd);
 	fclose(file);
 
 	chmod(wrapperfile, 0755);
@@ -51,10 +57,9 @@ static int setup_hadoop_wrapper(const char *wrapperfile, const char *cmd)
 static char *get_hadoop_target_file(const char *input_files)
 {
 	static char result[BATCH_JOB_LINE_MAX];
-	static char match_string[BATCH_JOB_LINE_MAX];
-	char *hdfs_root = getenv("HDFS_ROOT_DIR");
-	sprintf(match_string, "%s%%[^,]", hdfs_root);
+	char *match_string = string_format("%s%%[^,]", getenv("HDFS_ROOT_DIR"));
 	sscanf(input_files, match_string, result);
+	free(match_string);
 	return result;
 }
 
@@ -94,6 +99,7 @@ batch_job_id_t batch_job_fork_hadoop(struct batch_queue *q, const char *cmd)
 
 		outname[0] = 0;
 		while(fgets(line, sizeof(line), cmd_pipe)) {
+			debug(D_DEBUG, "batch_job_hadoop child [%d] output: %s", (int)getpid(), line);
 			char jobname[BATCH_JOB_LINE_MAX];
 			char error_string[BATCH_JOB_LINE_MAX];
 			int mapdone, reddone;
@@ -117,31 +123,29 @@ batch_job_id_t batch_job_fork_hadoop(struct batch_queue *q, const char *cmd)
 
 			} else if(strlen(outname) && sscanf(line, "%*s %*s INFO streaming.StreamJob: Job complete: %s", jobname) == 1) {
 				FILE *output = NULL;
-				sprintf(line, "%ld\tSUCCESS\t%s\n", (long int) time(0), jobname);
 
 				output = fopen(outname, "w");
 				lock.l_type = F_WRLCK;
 				fcntl(fileno(output), F_SETLKW, &lock);
-				fprintf(output, "%s", line);
+				fprintf(output, "%ld\tSUCCESS\t%s\n", (long int) time(0), jobname);
 				lock.l_type = F_UNLCK;
 				fcntl(fileno(output), F_SETLKW, &lock);
 				fclose(output);
 
-				debug(D_HDFS, "hadoop_status_wrapper: %s", line);
+				debug(D_HDFS, "hadoop_status_wrapper: %ld\tSUCCESS\t%s", (long int) time(0), jobname);
 				_exit(0);
 			} else if(strlen(outname) && sscanf(line, "%*s %*s ERROR streaming.StreamJob: %s", error_string) == 1) {
 				FILE *output = NULL;
-				sprintf(line, "%ld\tFAILURE\t%s\n", (long int) time(0), error_string);
 
 				output = fopen(outname, "w");
 				lock.l_type = F_WRLCK;
 				fcntl(fileno(output), F_SETLKW, &lock);
-				fprintf(output, "%s", line);
+				fprintf(output, "%ld\tFAILURE\t%s\n", (long int) time(0), error_string);
 				lock.l_type = F_UNLCK;
 				fcntl(fileno(output), F_SETLKW, &lock);
 				fclose(output);
 
-				debug(D_HDFS, "hadoop_status_wrapper: %s", line);
+				debug(D_HDFS, "hadoop_status_wrapper: %ld\tFAILURE\t%s", (long int) time(0), error_string);
 				_exit(0);
 			}
 		}
@@ -181,14 +185,10 @@ batch_job_id_t batch_job_fork_hadoop(struct batch_queue *q, const char *cmd)
 		debug(D_DEBUG, "job %d (%s) submitted", hadoop_job->jobid, jobname);
 		return (hadoop_job->jobid);
 	}
-
-
 }
-
 
 batch_job_id_t batch_job_submit_simple_hadoop(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
-	char line[BATCH_JOB_LINE_MAX];
 	char *target_file;
 
 	target_file = get_hadoop_target_file(extra_input_files);
@@ -198,32 +198,39 @@ batch_job_id_t batch_job_submit_simple_hadoop(struct batch_queue *q, const char 
 	} else
 		debug(D_HDFS, "input file %s specified\n", target_file);
 
-	setup_hadoop_wrapper("hadoop.wrapper", cmd);
+	setup_hadoop_wrapper("./hadoop.wrapper", cmd);
 
-	sprintf(line,
-		"$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-*-streaming.jar -D mapred.min.split.size=100000000 -input %s -mapper \"$HADOOP_PARROT_PATH ./hadoop.wrapper\" -file hadoop.wrapper -numReduceTasks 0 -output /makeflow_tmp/job-%010d 2>&1",
-		target_file, (int) time(0));
+	char *command = string_format("%s/bin/hadoop jar %s/mapred/contrib/streaming/hadoop-*-streaming.jar -D mapreduce.job.reduces=0 -input file:///dev/null -mapper ./hadoop.wrapper -file ./hadoop.wrapper -output '%s/job-%010d' 2>&1", getenv("HADOOP_HOME"), getenv("HADOOP_HOME"), getenv("HADOOP_USER_TMP"), (int)time(0));
 
-	debug(D_HDFS, "%s\n", line);
+	debug(D_HDFS, "%s", command);
 
-	return batch_job_fork_hadoop(q, line);
-
+	batch_job_id_t status = batch_job_fork_hadoop(q, command);
+	free(command);
+	return status;
 }
 
 batch_job_id_t batch_job_submit_hadoop(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
-	char command[BATCH_JOB_LINE_MAX];
+	char *command = string_format("%s %s", cmd, args);
+	if (infile) {
+		char *new = string_format("%s <%s", command, infile);
+		free(command);
+		command = new;
+	}
+	if (outfile) {
+		char *new = string_format("%s >%s", command, outfile);
+		free(command);
+		command = new;
+	}
+	if (errfile) {
+		char *new = string_format("%s 2>%s", command, errfile);
+		free(command);
+		command = new;
+	}
 
-	sprintf(command, "%s %s", cmd, args);
-
-	if(infile)
-		sprintf(&command[strlen(command)], " <%s", infile);
-	if(outfile)
-		sprintf(&command[strlen(command)], " >%s", outfile);
-	if(errfile)
-		sprintf(&command[strlen(command)], " 2>%s", errfile);
-
-	return batch_job_submit_simple_hadoop(q, command, extra_input_files, extra_output_files);
+	batch_job_id_t status = batch_job_submit_simple_hadoop(q, command, extra_input_files, extra_output_files);
+	free(command);
+	return status;
 }
 
 
@@ -231,8 +238,6 @@ batch_job_id_t batch_job_wait_hadoop(struct batch_queue * q, struct batch_job_in
 {
 	struct batch_job_info *info;
 	batch_job_id_t jobid;
-	char line[BATCH_JOB_LINE_MAX];
-	char statusfile[BATCH_JOB_LINE_MAX];
 	struct batch_job_hadoop_job *hadoop_job;
 
 	while(1) {
@@ -248,7 +253,7 @@ batch_job_id_t batch_job_wait_hadoop(struct batch_queue * q, struct batch_job_in
 			jobid = ujobid;
 			hadoop_job = (struct batch_job_hadoop_job *) itable_lookup(q->hadoop_jobs, jobid);
 
-			sprintf(statusfile, "%s.status", hadoop_job->jobname);
+			char *statusfile = string_format("%s.status", hadoop_job->jobname);
 			status = fopen(statusfile, "r");
 
 			if(status) {
@@ -256,8 +261,8 @@ batch_job_id_t batch_job_wait_hadoop(struct batch_queue * q, struct batch_job_in
 				long logtime;
 				char result[BATCH_JOB_LINE_MAX];
 				char message[BATCH_JOB_LINE_MAX];
+				char line[BATCH_JOB_LINE_MAX] = "";
 
-				line[0] = 0;
 				lock.l_type = F_RDLCK;
 				fcntl(fileno(status), F_SETLKW, &lock);
 				fgets(line, sizeof(line), status);
@@ -281,8 +286,9 @@ batch_job_id_t batch_job_wait_hadoop(struct batch_queue * q, struct batch_job_in
 				if(info->finished != 0) {
 					info = itable_remove(q->job_table, jobid);
 					*info_out = *info;
-					free(info);
 					unlink(statusfile);
+					free(info);
+					free(statusfile);
 					return jobid;
 				}
 
@@ -294,6 +300,7 @@ batch_job_id_t batch_job_wait_hadoop(struct batch_queue * q, struct batch_job_in
 				}
 
 			}
+			free(statusfile);
 		}
 
 		if(itable_size(q->job_table) <= 0)

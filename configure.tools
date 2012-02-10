@@ -131,8 +131,11 @@ library_search_normal()
 	if [ $build_cpu = X86_64 -a -d $2/lib64 ]
 	then
 		libdir=$basedir/lib64
-	else
+	elif [ -d $basedir/lib ]
+        then
 		libdir=$basedir/lib
+	else
+		libdir=$basedir
 	fi
 
 	# Darwin uses dylib for dynamic libraries, other platforms use .so
@@ -474,4 +477,9 @@ check_multiarch()
 		HOST_MULTIARCH=
 		echo "no"
 	fi
+}
+
+format_version()
+{
+	echo "$@" | awk -F. '{printf("%d%03d%03d%03d", $1, $2, $3, $4); }'	
 }

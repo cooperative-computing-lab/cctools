@@ -927,38 +927,3 @@ int chirp_acl_init_reserve(const char *path, const char *subject)
 		return 0;
 	}
 }
-
-/*
-  Because each directory now contains an ACL,
-  a simple rmdir will not work on a (perceived) empty directory.
-  This function checks to see if the directory is empty,
-  save for the ACL file, and deletes it if so.
-  Otherwise, it determines an errno and returns with failure.
-*/
-
-int chirp_acl_rmdir(const char *path)
-{
-	struct chirp_dir *dir;
-	struct chirp_dirent *d;
-
-	dir = cfs->opendir(path);
-	if(dir) {
-		while((d = cfs->readdir(dir))) {
-			if(!strcmp(d->name, "."))
-				continue;
-			if(!strcmp(d->name, ".."))
-				continue;
-			if(!strcmp(d->name, CHIRP_ACL_BASE_NAME))
-				continue;
-			cfs->closedir(dir);
-			errno = ENOTEMPTY;
-			return -1;
-		}
-		cfs->closedir(dir);
-		cfs_delete_dir(path);
-		return 0;
-	} else {
-		errno = ENOENT;
-		return -1;
-	}
-}

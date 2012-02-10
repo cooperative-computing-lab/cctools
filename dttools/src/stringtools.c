@@ -5,9 +5,13 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "debug.h"
 #include "stringtools.h"
 #include "timestamp.h"
+#include "xmalloc.h"
 
+#include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -19,6 +23,28 @@ See the file COPYING for details.
 
 #define STRINGTOOLS_BUFFER_SIZE 256
 #define METRIC_POWER_COUNT 6
+
+char *escape_shell_string (const char *str)
+{
+	if (str == NULL) str = "";
+	char *escaped_string = malloc(strlen(str)*3+1);
+	if (escaped_string == NULL) return NULL;
+	const char *old = str;
+	char *current = escaped_string;
+	strcpy(current, "'");
+	current += 1;
+	for (; *old; old++) {
+		if (*old == '\'') {
+			strcpy(current, "'\\''");
+			current += 3;
+		} else {
+			*current = *old;
+			current += 1;
+		}
+	}
+	strcpy(current, "'");
+	return escaped_string;
+}
 
 void string_from_ip_address(const unsigned char *bytes, char *str)
 {
@@ -93,7 +119,7 @@ int whole_string_match_regex(const char *text, char *pattern)
 	if(!pattern || !text)
 		return 0;
 
-	new_pattern = (char *) malloc(sizeof(char) * (strlen(pattern) + 2));
+	new_pattern = (char *) malloc(sizeof(char) * (strlen(pattern) + 3));
 	if(!new_pattern)
 		return 0;
 
@@ -863,4 +889,42 @@ int getDateString(char *str)
 		return 0;
 	else
 		return 1;
+}
+
+char *string_format (const char *fmt, ...)
+{
+	va_list va;
+
+	va_start(va, fmt);
+	int n = vsnprintf(NULL, 0, fmt, va);
+	va_end(va);
+
+	if (n < 0)
+		return NULL;
+
+	char *str = xxmalloc((n+1)*sizeof(char));
+	va_start(va, fmt);
+	n = vsnprintf(str, n+1, fmt, va);
+	assert(n >= 0);
+	va_end(va);
+
+	return str;
+}
+
+char *string_getcwd (void)
+{
+	char *result = NULL;
+	size_t size = 1024;
+	result = xxrealloc(result, size);
+
+	while (getcwd(result, size) == NULL) {
+		if (errno == ERANGE) {
+			size *= 2;
+			result = xxrealloc(result, size);
+		} else {
+			fatal("couldn't getcwd: %s", strerror(errno));
+			return NULL;
+		}
+	}
+    return result;
 }
