@@ -60,7 +60,7 @@ char *string_format (const char *fmt, ...);
 /** Returns a heap allocated freeable string for the current working directory.
 	@return The current working directory.
  */
-char *string_getcwd (void)
+char *string_getcwd (void);
 
 #ifndef CCTOOLS_OPSYS_LINUX
 char *strsep(char **stringp, const char *delim);

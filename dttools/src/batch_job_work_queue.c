@@ -90,7 +90,7 @@ void specify_work_queue_task_shared_files(struct work_queue_task *t, const char 
 		char *file = strtok(files, " \t,");
 		while(file) {
 			file = strdup(file);
-			p = strchr(file, '=');
+			char *p = strchr(file, '=');
 			if(p) {
 				*p = 0;
 			}

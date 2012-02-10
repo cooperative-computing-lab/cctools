@@ -3,6 +3,7 @@
 #include "debug.h"
 #include "itable.h"
 #include "process.h"
+#include "stringtools.h"
 
 #include <stdlib.h>
 #include <stdio.h>

@@ -3,6 +3,7 @@
 #include "debug.h"
 #include "stringtools.h"
 #include "process.h"
+#include "xmalloc.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -112,7 +113,7 @@ batch_job_id_t batch_job_submit_simple_cluster(struct batch_queue * q, const cha
 	if(setup_batch_wrapper(cluster_name) < 0)
 		return -1;
 
-	char *name = xxstrdup(cmd);
+	char *name = xstrdup(cmd);
 	{
 		char *s = strchr(name, ' ');
 		if(s)

@@ -3,6 +3,7 @@
 #include "debug.h"
 #include "process.h"
 #include "macros.h"
+#include "stringtools.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -53,7 +54,7 @@ batch_job_id_t batch_job_submit_local(struct batch_queue *q, const char *cmd, co
 
 	char *command = string_format("%s %s <%s >%s 2>%s", cmd, args, infile, outfile, errfile);
 
-	batch_job_id_t status = batch_job_submit_simple_local(q, line, extra_input_files, extra_output_files);
+	batch_job_id_t status = batch_job_submit_simple_local(q, command, extra_input_files, extra_output_files);
 	free(command);
 	return status;
 }

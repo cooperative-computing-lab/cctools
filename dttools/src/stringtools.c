@@ -8,7 +8,9 @@ See the file COPYING for details.
 #include "debug.h"
 #include "stringtools.h"
 #include "timestamp.h"
+#include "xmalloc.h"
 
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -894,7 +896,7 @@ char *string_format (const char *fmt, ...)
 {
 	va_list va;
 
-	va_start(va, fmt)
+	va_start(va, fmt);
 	int n = vsnprintf(NULL, 0, fmt, va);
 	va_end(va);
 
@@ -925,4 +927,5 @@ char *string_getcwd (void)
 			return NULL;
 		}
 	}
+    return result;
 }
