@@ -64,27 +64,10 @@ batch_job_id_t batch_job_submit_simple_mpi_queue( struct batch_queue *q, const c
 
 batch_job_id_t batch_job_submit_mpi_queue( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
 {
-	struct mpi_queue_task *t;
-	char *full_command;
+	char *command = string_format("%s %s%s", cmd, args, infile ? infile : "");
 
-	if(infile)
-		full_command = (char *) malloc((strlen(cmd) + strlen(args) + strlen(infile) + 5) * sizeof(char));
-	else
-		full_command = (char *) malloc((strlen(cmd) + strlen(args) + 2) * sizeof(char));
-
-	if(!full_command) {
-		debug(D_DEBUG, "couldn't create new work_queue task: out of memory\n");
-		return -1;
-	}
-
-	if(infile)
-		sprintf(full_command, "%s %s < %s", cmd, args, infile);
-	else
-		sprintf(full_command, "%s %s", cmd, args);
-
-	t = mpi_queue_task_create(full_command);
-
-	free(full_command);
+	struct mpi_queue_task *t = mpi_queue_task_create(command);
+	free(command);
 
 	if(infile)
 		mpi_queue_task_specify_file(t, infile, MPI_QUEUE_INPUT);
