@@ -752,7 +752,7 @@ then
 		echo "python version is ${python_version}"
 		python_major_version=`echo ${python_version} | cut -d . -f 1`
 		python_minor_version=`echo ${python_version} | cut -d . -f 2`
-		if [ $python_major_version -eq 2 -a $python_minor_version -ge 4 ]
+		if [ "$python_major_version" -eq 2 -a "$python_minor_version" -ge 4 ]
 		then
 			if check_file ${python_path}/include/python2.$python_minor_version/Python.h
 			then
