@@ -27,7 +27,7 @@ char *escape_shell_string (const char *str)
 	if (str == NULL) str = "";
 	char *escaped_string = malloc(strlen(str)*3+1);
 	if (escaped_string == NULL) return NULL;
-	char *old = str;
+	const char *old = str;
 	char *current = escaped_string;
 	strcpy(current, "'");
 	current += 1;
