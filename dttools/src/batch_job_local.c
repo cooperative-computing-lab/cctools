@@ -40,23 +40,22 @@ batch_job_id_t batch_job_submit_simple_local(struct batch_queue *q, const char *
 
 batch_job_id_t batch_job_submit_local(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
-	char line[BATCH_JOB_LINE_MAX];
-
-	if(!cmd)
-		return -1;
-
-	if(!args)
+	if(cmd == NULL)
+		cmd = "/bin/false";
+	if(args == NULL)
 		args = "";
-	if(!infile)
+	if(infile == NULL)
 		infile = "/dev/null";
-	if(!outfile)
+	if(outfile == NULL)
 		outfile = "/dev/null";
-	if(!errfile)
+	if(errfile == NULL)
 		errfile = "/dev/null";
 
-	sprintf(line, "%s %s <%s >%s 2>%s", cmd, args, infile, outfile, errfile);
+	char *command = string_format("%s %s <%s >%s 2>%s", cmd, args, infile, outfile, errfile);
 
-	return batch_job_submit_simple_local(q, line, extra_input_files, extra_output_files);
+	batch_job_id_t status = batch_job_submit_simple_local(q, line, extra_input_files, extra_output_files);
+	free(command);
+	return status;
 }
 
 batch_job_id_t batch_job_wait_local(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
