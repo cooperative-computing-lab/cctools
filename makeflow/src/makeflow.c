@@ -35,10 +35,8 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "xmalloc.h"
 
-#define DAG_LINE_MAX 1048576
 #define SHOW_INPUT_FILES 2
 #define SHOW_OUTPUT_FILES 3
-#define MASTER_CATALOG_LINE_MAX 1024
 #define RANDOM_PORT_RETRY_TIME 300
 
 #define MAKEFLOW_AUTO_WIDTH 1
@@ -209,7 +207,6 @@ void dag_show_output_files(struct dag *d)
 
 static int handle_auto_workers(struct dag *d, int auto_workers)
 {
-	char start_worker_line[1024];
 	char hostname[DOMAIN_NAME_MAX];
 	int num_of_workers;
 
@@ -223,9 +220,11 @@ static int handle_auto_workers(struct dag *d, int auto_workers)
 			num_of_workers = d->remote_jobs_max;
 	}
 
-	sprintf(start_worker_line, "condor_submit_workers %s %d %d", hostname, port, num_of_workers);
-	printf("makeflow: starting %d workers: `%s`\n",num_of_workers,start_worker_line);
-	if (system(start_worker_line)) {
+	char *start_worker_command = string_format("condor_submit_workers %s %d %d", hostname, port, num_of_workers);
+	printf("makeflow: starting %d workers: `%s`\n",num_of_workers,start_worker_command);
+	int status = system(start_worker_command);
+	free(start_worker_command);
+	if (status) {
 		fprintf(stderr, "makeflow: unable to start workers.\n");
 		return 0;
 	}
@@ -319,8 +318,6 @@ int dag_width( struct dag *d )
 
 void dag_print( struct dag *d )
 {
-	char name[DAG_LINE_MAX];
-
 	struct dag_node *n;
 	struct dag_file *f;
 
@@ -329,9 +326,10 @@ void dag_print( struct dag *d )
 	printf("node [shape=ellipse];\n");
 
 	for(n=d->nodes;n;n=n->next) {
-		strncpy(name, n->command, DAG_LINE_MAX);
-		char * label = strtok(name," \t\n");
+		char *name = xstrdup(n->command);
+		char *label = strtok(name," \t\n");
 		printf("N%d [label=\"%s\"];\n",n->nodeid,label);
+		free(name);
 	}
 
 	printf("node [shape=box];\n");
@@ -363,7 +361,7 @@ const char * dag_node_state_name( dag_node_state_t state )
 struct dag_file * dag_file_create( const char *filename, struct dag_file *next )
 {
 	struct dag_file *f = malloc(sizeof(*f));
-	f->filename = strdup(filename);
+	f->filename = xstrdup(filename);
 	f->next = next;
 	return f;
 }
@@ -688,7 +686,7 @@ static char * lookupenv( const char *name, void *arg )
 {
 	const char *env = getenv(name);
 	
-	if (env) return strdup(env);
+	if (env) return xstrdup(env);
 
 	return NULL;
 }
@@ -711,10 +709,10 @@ char * dag_readline( struct dag *d, FILE *file )
 		char *hash = strchr(rawline,'#');
 		if(hash) *hash = 0;
 
-		char *substline = strdup(rawline);
+		char *substline = xstrdup(rawline);
 		substline = string_subst(substline,lookupenv,0);
 
-		char * cookedline = strdup(substline);
+		char * cookedline = xstrdup(substline);
 
 		string_replace_backslash_codes(substline,cookedline);
 		free(substline);
@@ -749,12 +747,12 @@ static int translate_filename( struct dag *d, const char *filename, char **newna
 	if (newname) /* Filename has been translated before */
 	{
 		char *temp = newname;
-		newname = strdup(temp);
+		newname = xstrdup(temp);
 		*newname_ptr = newname;
 		return 0;
 	}
 
-	newname = strdup(filename);
+	newname = xstrdup(filename);
 	char *c;
 
 	for (c = newname; *c; ++c)
@@ -767,7 +765,7 @@ static int translate_filename( struct dag *d, const char *filename, char **newna
 		*c = '_';
 	}
 
-	while (!hash_table_insert(d->filename_translation_rev, newname, strdup(filename)))
+	while (!hash_table_insert(d->filename_translation_rev, newname, xstrdup(filename)))
 	{
 		/* It's not 100% collision-proof, technically, but the odds of
 		   an unresolvable collision are unbelievably slim. */
@@ -792,7 +790,7 @@ static int translate_filename( struct dag *d, const char *filename, char **newna
 		}
 	}
 
-	hash_table_insert(d->filename_translation_fwd, filename, strdup(newname));
+	hash_table_insert(d->filename_translation_fwd, filename, xstrdup(newname));
 
 	*newname_ptr = newname;
 	return 1;
@@ -1073,7 +1071,7 @@ struct dag * dag_create( const char *filename, int clean_mode )
 	memset(d,0,sizeof(*d));
 	d->nodes = 0;
 	d->linenum = 0;
-	d->filename = strdup(filename);
+	d->filename = xstrdup(filename);
 	d->node_table = itable_create(0);
 	d->local_job_table = itable_create(0);
 	d->remote_job_table = itable_create(0);
@@ -1386,29 +1384,27 @@ static void handle_abort( int sig )
 	dag_abort_flag = 1;
 }
 
-int parse_catalog_server_description(char* server_string) {
-	char *host;
-	int port;
-	char *colon;
-	char line[1024];
+int parse_catalog_server_description(char *server_string) {
+	if (strchr(server_string, ':') == NULL) return 0;
 
-	colon = strchr(server_string, ':');
-
-	if(!colon) return 0;
-
+	char *buffer = xstrdup(server_string);
+	char *colon = strchr(buffer, ':');
 	*colon = '\0';
+	char *host = buffer;
+	char *port = colon+1;
+	while (isdigit(*port))
+		port += 1;
+	if (port == colon+1) {
+		free(buffer);
+		return 0;
+	}
+	*port = '\0';
+	port = colon+1;
 
-	host = strdup(server_string);
-	port = atoi(colon+1);
-
-	if(!port) return 0;
-		
-	sprintf(line,"CATALOG_HOST=%s",host);
-	putenv(strdup(line));
-	sprintf(line,"CATALOG_PORT=%d",port);
-	putenv(strdup(line));
+	setenv("CATALOG_HOST", host, 1);
+	setenv("CATALOG_PORT", port, 1);
 	
-	free(host);
+	free(buffer);
 	return 1;
 }
 	
@@ -1467,7 +1463,6 @@ int main( int argc, char *argv[] )
 	int preserve_symlinks = 0;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	int auto_workers = 0;
-	char line[1024];
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 
@@ -1485,15 +1480,13 @@ int main( int argc, char *argv[] )
 			clean_mode = 1;
 			break;
 		case 'N':
-			if (project) free(project);
-			project = strdup(optarg);
-			sprintf(line,"WORK_QUEUE_NAME=%s",project);
-			putenv(strdup(line));
+			free(project);
+			project = xstrdup(optarg);
+			setenv("WORK_QUEUE_NAME", project, 1);
 			break;
 		case 'P':
 			priority = atoi(optarg);
-			sprintf(line,"WORK_QUEUE_PRIORITY=%d",priority);
-			putenv(strdup(line));
+			setenv("WORK_QUEUE_PRIORITY", optarg, 1);
 			break;
 		case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -1515,10 +1508,10 @@ int main( int argc, char *argv[] )
 			display_mode = SHOW_OUTPUT_FILES;
 			break;
 		case 'l':
-			logfilename = strdup(optarg);
+			logfilename = xstrdup(optarg);
 			break;
 		case 'L':
-			batchlogfilename = strdup(optarg);
+			batchlogfilename = xstrdup(optarg);
 			break;
 		case 'D':
 			display_mode = 1;
@@ -1625,55 +1618,58 @@ int main( int argc, char *argv[] )
 		return 1;
 	}
 
-	sprintf(line, "WORK_QUEUE_WORKER_MODE=%d", work_queue_worker_mode);
-	putenv(strdup(line));
+	{
+		char *value = string_format("%d", work_queue_worker_mode);
+		setenv("WORK_QUEUE_WORKER_MODE", value, 1);
+		free(value);
+		value = string_format("%d", work_queue_master_mode);
+		setenv("WORK_QUEUE_MASTER_MODE", value, 1);
+		free(value);
+	}
 
-	sprintf(line, "WORK_QUEUE_MASTER_MODE=%d", work_queue_master_mode);
-	putenv(strdup(line));
 
 	if(port!=0) {
-		sprintf(line,"WORK_QUEUE_PORT=%d",port);
-		putenv(strdup(line));
+		char *value = string_format("%d", port);
+		setenv("WORK_QUEUE_PORT", value, 1);
+		free(value);
 	} else {
 		// Use work queue default port in standalone mode when port in not
 		// specified with -p option. In work queue catalog mode, work queue
 		// would choose a random port when port is not explicitly specified.
 		if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE){
-			sprintf(line,"WORK_QUEUE_PORT=%d",WORK_QUEUE_DEFAULT_PORT);
-			putenv(strdup(line));
+			char *value = string_format("%d", WORK_QUEUE_DEFAULT_PORT);
+			setenv("WORK_QUEUE_PORT", value, 1);
+			free(value);
 		}
 	}
 
-	int dagfile_namesize = strlen(dagfile);
-
 	if(!logfilename)
-	{
-		logfilename = malloc((dagfile_namesize+13)*sizeof(char));
-		sprintf(logfilename,"%s.makeflowlog",dagfile);
-	}
+		logfilename = string_format("%s.makeflowlog",dagfile);
 	if(!batchlogfilename)
 	{
-		batchlogfilename = malloc((dagfile_namesize+11)*sizeof(char));
 		switch (batch_queue_type) {
 		    case BATCH_QUEUE_TYPE_CONDOR:
-				sprintf(batchlogfilename,"%s.condorlog",dagfile);
+				batchlogfilename = string_format("%s.condorlog",dagfile);
 				break;
 		    case BATCH_QUEUE_TYPE_WORK_QUEUE:
-				sprintf(batchlogfilename,"%s.wqlog",dagfile);
+				batchlogfilename = string_format("%s.wqlog",dagfile);
 				break;
 		    default:
-				sprintf(batchlogfilename,"%s.batchlog",dagfile);
+				batchlogfilename = string_format("%s.batchlog",dagfile);
 				break;
 		}
 
 		// In clean mode, delete all exsiting log files
 		if(clean_mode) {
-			sprintf(batchlogfilename,"%s.condorlog",dagfile);
-			file_clean(batchlogfilename, 0);
-			sprintf(batchlogfilename,"%s.wqlog",dagfile);
-			file_clean(batchlogfilename, 0);
-			sprintf(batchlogfilename,"%s.batchlog",dagfile);
-			file_clean(batchlogfilename, 0);
+			char *cleanlog  = string_format("%s.condorlog",dagfile);
+			file_clean(cleanlog, 0);
+			free(cleanlog);
+			cleanlog = string_format("%s.wqlog",dagfile);
+			file_clean(cleanlog, 0);
+			free(cleanlog);
+			cleanlog = string_format("%s.batchlog",dagfile);
+			file_clean(cleanlog, 0);
+			free(cleanlog);
 		}
 	}
 
@@ -1757,19 +1753,19 @@ int main( int argc, char *argv[] )
 	}
 	
 	if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
-		char cwd[DAG_LINE_MAX];
-		if(getcwd(cwd,sizeof(cwd))>=0) {
-			if(!strncmp(cwd,"/afs",4)) {
-				fprintf(stderr,"makeflow: This won't work because Condor is not able to write to files in AFS.\n");
-				fprintf(stderr,"makeflow: Instead, run makeflow from a local disk like /tmp.\n");
-				fprintf(stderr,"makeflow: Or, use the work queue with -T wq and condor_submit_workers.\n");
-				
-				free(logfilename);
-				free(batchlogfilename);
+		char *cwd = string_getcwd();
+		if(!strncmp(cwd,"/afs",4)) {
+			fprintf(stderr,"makeflow: This won't work because Condor is not able to write to files in AFS.\n");
+			fprintf(stderr,"makeflow: Instead, run makeflow from a local disk like /tmp.\n");
+			fprintf(stderr,"makeflow: Or, use the work queue with -T wq and condor_submit_workers.\n");
+			
+			free(logfilename);
+			free(batchlogfilename);
+			free(cwd);
 
-				exit(1);
-			}
+			exit(1);
 		}
+		free(cwd);
 	}
 
 	setlinebuf(stdout);
@@ -1822,8 +1818,8 @@ int main( int argc, char *argv[] )
 		clean_symlinks(d,0);
 	}
 
-	if (logfilename) free(logfilename);
-	if (batchlogfilename) free(batchlogfilename);
+	free(logfilename);
+	free(batchlogfilename);
 
 	if(dag_abort_flag) {
 		fprintf(d->logfile, "# ABORTED\t%llu\n", timestamp_get());
