@@ -64,7 +64,12 @@ batch_job_id_t batch_job_submit_simple_mpi_queue( struct batch_queue *q, const c
 
 batch_job_id_t batch_job_submit_mpi_queue( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
 {
-	char *command = string_format("%s %s%s", cmd, args, infile ? infile : "");
+	char *command = string_format("%s %s", cmd, args);
+	if(infile) {
+		char *new = string_format("%s <%s", infile);
+		free(command);
+		command = new;
+	}
 
 	struct mpi_queue_task *t = mpi_queue_task_create(command);
 	free(command);
