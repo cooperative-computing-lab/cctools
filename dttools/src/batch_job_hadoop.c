@@ -56,10 +56,9 @@ static int setup_hadoop_wrapper(const char *wrapperfile, const char *cmd)
 static char *get_hadoop_target_file(const char *input_files)
 {
 	static char result[BATCH_JOB_LINE_MAX];
-	static char match_string[BATCH_JOB_LINE_MAX];
-	char *hdfs_root = getenv("HDFS_ROOT_DIR");
-	sprintf(match_string, "%s%%[^,]", hdfs_root);
+	char *match_string = string_format("%s%%[^,]", getenv("HDFS_ROOT_DIR"));
 	sscanf(input_files, match_string, result);
+	free(match_string);
 	return result;
 }
 
@@ -123,31 +122,29 @@ batch_job_id_t batch_job_fork_hadoop(struct batch_queue *q, const char *cmd)
 
 			} else if(strlen(outname) && sscanf(line, "%*s %*s INFO streaming.StreamJob: Job complete: %s", jobname) == 1) {
 				FILE *output = NULL;
-				sprintf(line, "%ld\tSUCCESS\t%s\n", (long int) time(0), jobname);
 
 				output = fopen(outname, "w");
 				lock.l_type = F_WRLCK;
 				fcntl(fileno(output), F_SETLKW, &lock);
-				fprintf(output, "%s", line);
+				fprintf(output, "%ld\tSUCCESS\t%s\n", (long int) time(0), jobname);
 				lock.l_type = F_UNLCK;
 				fcntl(fileno(output), F_SETLKW, &lock);
 				fclose(output);
 
-				debug(D_HDFS, "hadoop_status_wrapper: %s", line);
+				debug(D_HDFS, "hadoop_status_wrapper: %ld\tSUCCESS\t%s", (long int) time(0), jobname);
 				_exit(0);
 			} else if(strlen(outname) && sscanf(line, "%*s %*s ERROR streaming.StreamJob: %s", error_string) == 1) {
 				FILE *output = NULL;
-				sprintf(line, "%ld\tFAILURE\t%s\n", (long int) time(0), error_string);
 
 				output = fopen(outname, "w");
 				lock.l_type = F_WRLCK;
 				fcntl(fileno(output), F_SETLKW, &lock);
-				fprintf(output, "%s", line);
+				fprintf(output, "%ld\tFAILURE\t%s\n", (long int) time(0), error_string);
 				lock.l_type = F_UNLCK;
 				fcntl(fileno(output), F_SETLKW, &lock);
 				fclose(output);
 
-				debug(D_HDFS, "hadoop_status_wrapper: %s", line);
+				debug(D_HDFS, "hadoop_status_wrapper: %ld\tFAILURE\t%s", (long int) time(0), error_string);
 				_exit(0);
 			}
 		}
@@ -187,14 +184,10 @@ batch_job_id_t batch_job_fork_hadoop(struct batch_queue *q, const char *cmd)
 		debug(D_DEBUG, "job %d (%s) submitted", hadoop_job->jobid, jobname);
 		return (hadoop_job->jobid);
 	}
-
-
 }
-
 
 batch_job_id_t batch_job_submit_simple_hadoop(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
-	char command[8192];
 	char *target_file;
 
 	target_file = get_hadoop_target_file(extra_input_files);
@@ -206,28 +199,37 @@ batch_job_id_t batch_job_submit_simple_hadoop(struct batch_queue *q, const char 
 
 	setup_hadoop_wrapper("./hadoop.wrapper", cmd);
 
-	sprintf(command, "%s/bin/hadoop jar %s/mapred/contrib/streaming/hadoop-*-streaming.jar -D mapreduce.job.reduces=0 -input file:///dev/null -mapper ./hadoop.wrapper -file ./hadoop.wrapper -output '%s/job-%010d' 2>&1", getenv("HADOOP_HOME"), getenv("HADOOP_HOME"), getenv("HADOOP_USER_TMP"), (int)time(0));
+	command = string_format("%s/bin/hadoop jar %s/mapred/contrib/streaming/hadoop-*-streaming.jar -D mapreduce.job.reduces=0 -input file:///dev/null -mapper ./hadoop.wrapper -file ./hadoop.wrapper -output '%s/job-%010d' 2>&1", getenv("HADOOP_HOME"), getenv("HADOOP_HOME"), getenv("HADOOP_USER_TMP"), (int)time(0));
 
-	debug(D_HDFS, "%s\n", command);
+	debug(D_HDFS, "%s", command);
 
-	return batch_job_fork_hadoop(q, command);
-
+	batch_job_id_t status = batch_job_fork_hadoop(q, command);
+	free(command);
+	return status;
 }
 
 batch_job_id_t batch_job_submit_hadoop(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
-	char command[BATCH_JOB_LINE_MAX];
+	char *command = string_format("%s %s", cmd, args);
+	if (infile) {
+		char *new = string_format("%s <%s", command, infile);
+		free(command);
+		command = new;
+	}
+	if (outfile) {
+		char *new = string_format("%s >%s", command, outfile);
+		free(command);
+		command = new;
+	}
+	if (errfile) {
+		char *new = string_format("%s 2>%s", command, errfile);
+		free(command);
+		command = new;
+	}
 
-	sprintf(command, "%s %s", cmd, args);
-
-	if(infile)
-		sprintf(&command[strlen(command)], " <%s", infile);
-	if(outfile)
-		sprintf(&command[strlen(command)], " >%s", outfile);
-	if(errfile)
-		sprintf(&command[strlen(command)], " 2>%s", errfile);
-
-	return batch_job_submit_simple_hadoop(q, command, extra_input_files, extra_output_files);
+	batch_job_id_t status = batch_job_submit_simple_hadoop(q, command, extra_input_files, extra_output_files);
+	free(command);
+	return status;
 }
 
 
@@ -235,8 +237,6 @@ batch_job_id_t batch_job_wait_hadoop(struct batch_queue * q, struct batch_job_in
 {
 	struct batch_job_info *info;
 	batch_job_id_t jobid;
-	char line[BATCH_JOB_LINE_MAX];
-	char statusfile[BATCH_JOB_LINE_MAX];
 	struct batch_job_hadoop_job *hadoop_job;
 
 	while(1) {
@@ -252,7 +252,7 @@ batch_job_id_t batch_job_wait_hadoop(struct batch_queue * q, struct batch_job_in
 			jobid = ujobid;
 			hadoop_job = (struct batch_job_hadoop_job *) itable_lookup(q->hadoop_jobs, jobid);
 
-			sprintf(statusfile, "%s.status", hadoop_job->jobname);
+			char *statusfile = string_format("%s.status", hadoop_job->jobname);
 			status = fopen(statusfile, "r");
 
 			if(status) {
@@ -260,8 +260,8 @@ batch_job_id_t batch_job_wait_hadoop(struct batch_queue * q, struct batch_job_in
 				long logtime;
 				char result[BATCH_JOB_LINE_MAX];
 				char message[BATCH_JOB_LINE_MAX];
+				char line[BATCH_JOB_LINE_MAX] = "";
 
-				line[0] = 0;
 				lock.l_type = F_RDLCK;
 				fcntl(fileno(status), F_SETLKW, &lock);
 				fgets(line, sizeof(line), status);
@@ -285,8 +285,9 @@ batch_job_id_t batch_job_wait_hadoop(struct batch_queue * q, struct batch_job_in
 				if(info->finished != 0) {
 					info = itable_remove(q->job_table, jobid);
 					*info_out = *info;
-					free(info);
 					unlink(statusfile);
+					free(info);
+					free(statusfile);
 					return jobid;
 				}
 
@@ -298,6 +299,7 @@ batch_job_id_t batch_job_wait_hadoop(struct batch_queue * q, struct batch_job_in
 				}
 
 			}
+			free(statusfile);
 		}
 
 		if(itable_size(q->job_table) <= 0)
