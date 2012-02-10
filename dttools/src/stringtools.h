@@ -50,6 +50,18 @@ int strrpos(const char *str, char c);
 int getDateString(char *str);
 int string_null_or_empty(const char *str);
 
+/** Returns a heap allocated freeable string formatted using sprintf.
+    @param fmt Format string passed to sprintf.
+	@param ... Variable arguments passed to sprintf.
+	@return The formatted string.
+ */
+char *string_format (const char *fmt, ...);
+
+/** Returns a heap allocated freeable string for the current working directory.
+	@return The current working directory.
+ */
+char *string_getcwd (void)
+
 #ifndef CCTOOLS_OPSYS_LINUX
 char *strsep(char **stringp, const char *delim);
 #endif

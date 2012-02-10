@@ -5,9 +5,11 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "debug.h"
 #include "stringtools.h"
 #include "timestamp.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -886,4 +888,41 @@ int getDateString(char *str)
 		return 0;
 	else
 		return 1;
+}
+
+char *string_format (const char *fmt, ...)
+{
+	va_list va;
+
+	va_start(va, fmt)
+	int n = vsnprintf(NULL, 0, fmt, va);
+	va_end(va);
+
+	if (n < 0)
+		return NULL;
+
+	char *str = xxmalloc((n+1)*sizeof(char));
+	va_start(va, fmt);
+	n = vsnprintf(str, n+1, fmt, va);
+	assert(n >= 0);
+	va_end(va);
+
+	return str;
+}
+
+char *string_getcwd (void)
+{
+	char *result = NULL;
+	size_t size = 1024;
+	result = xxrealloc(result, size);
+
+	while (getcwd(result, size) == NULL) {
+		if (errno == ERANGE) {
+			size *= 2;
+			result = xxrealloc(result, size);
+		} else {
+			fatal("couldn't getcwd: %s", strerror(errno));
+			return NULL;
+		}
+	}
 }
