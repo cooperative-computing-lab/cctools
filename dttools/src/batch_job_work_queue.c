@@ -54,68 +54,64 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 
 void specify_work_queue_task_shared_files(struct work_queue_task *t, const char *input_files, const char *output_files)
 {
-	char *f, *p, *files;
-
 	if(input_files) {
-		files = strdup(input_files);
-		f = strtok(files, " \t,");
-		while(f) {
-			char fname[WORK_QUEUE_LINE_MAX];
-			p = strchr(f, '=');
+		char *files = strdup(input_files);
+		char *file = strtok(files, " \t,");
+		while(file) {
+			file = strdup(file);
+			char *p = strchr(file, '=');
 			if(p) {
 				*p = 0;
 			}
 
-			if(f[0] != '/') {
-				char tmp[WORK_QUEUE_LINE_MAX];
-				getcwd(tmp, WORK_QUEUE_LINE_MAX);
-				strcat(tmp, "/");
-				strcat(tmp, f);
-				string_collapse_path(tmp, fname, 1);
-			} else {
-				strcpy(fname, f);
+			if(file[0] != '/') {
+				char *cwd = string_getcwd();
+				char *new = string_format("%s/%s", cwd, file);
+				free(file);
+				free(cwd);
+				file = new;
 			}
 
 			if(p) {	
-				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE|WORK_QUEUE_THIRDGET);
-				debug(D_DEBUG, "shared file %s is %s on remote system:", f, p + 1);
+				work_queue_task_specify_file(t, file, p + 1, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE|WORK_QUEUE_THIRDGET);
+				debug(D_DEBUG, "shared file %s is %s on remote system:", file, p + 1);
 				*p = '=';
 			} else {
-				work_queue_task_specify_file(t, fname, fname, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE|WORK_QUEUE_THIRDGET);
+				work_queue_task_specify_file(t, file, file, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE|WORK_QUEUE_THIRDGET);
 			}
-			f = strtok(0, " \t,");
+			free(file);
+			file = strtok(0, " \t,");
 		}
 		free(files);
 	}
 
 	if(output_files) {
-		files = strdup(output_files);
-		f = strtok(files, " \t,");
-		while(f) {
-			char fname[WORK_QUEUE_LINE_MAX];
-			p = strchr(f, '=');
+		char *files = strdup(output_files);
+		char *file = strtok(files, " \t,");
+		while(file) {
+			file = strdup(file);
+			p = strchr(file, '=');
 			if(p) {
 				*p = 0;
 			}
 
-			if(f[0] != '/') {
-				char tmp[WORK_QUEUE_LINE_MAX];
-				getcwd(tmp, WORK_QUEUE_LINE_MAX);
-				strcat(tmp, "/");
-				strcat(tmp, f);
-				string_collapse_path(tmp, fname, 1);
-			} else {
-				strcpy(fname, f);
+			if(file[0] != '/') {
+				char *cwd = string_getcwd();
+				char *new = string_format("%s/%s", cwd, file);
+				free(file);
+				free(cwd);
+				file = new;
 			}
 
 			if(p) {	
-				work_queue_task_specify_file(t, fname, p + 1, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
-				debug(D_DEBUG, "shared file %s is %s on remote system:", f, p + 1);
+				work_queue_task_specify_file(t, file, p + 1, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
+				debug(D_DEBUG, "shared file %s is %s on remote system:", file, p + 1);
 				*p = '=';
 			} else {
-				work_queue_task_specify_file(t, fname, fname, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
+				work_queue_task_specify_file(t, file, file, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
 			}
-			f = strtok(0, " \t,");
+			free(file);
+			file = strtok(0, " \t,");
 		}
 		free(files);
 	}
@@ -123,27 +119,16 @@ void specify_work_queue_task_shared_files(struct work_queue_task *t, const char 
 
 batch_job_id_t batch_job_submit_work_queue(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
-	struct work_queue_task *t;
-	char *full_command;
-
-	if(infile)
-		full_command = (char *) malloc((strlen(cmd) + strlen(args) + strlen(infile) + 5) * sizeof(char));
-	else
-		full_command = (char *) malloc((strlen(cmd) + strlen(args) + 2) * sizeof(char));
-
-	if(!full_command) {
-		debug(D_DEBUG, "couldn't create new work_queue task: out of memory\n");
-		return -1;
+	char *command = string_format("%s %s", cmd, args);
+	if(infile) {
+		char *new = string_format("%s <%s", command, infile);
+		free(command);
+		command = new;
 	}
 
-	if(infile)
-		sprintf(full_command, "%s %s < %s", cmd, args, infile);
-	else
-		sprintf(full_command, "%s %s", cmd, args);
+	struct work_queue_task *t = work_queue_task_create(command);
 
-	t = work_queue_task_create(full_command);
-
-	free(full_command);
+	free(command);
 
 	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		if(infile)
