@@ -1443,8 +1443,8 @@ int main( int argc, char *argv[] )
 	int auto_workers = 0;
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
-	int work_queue_estimate_capacity = WORK_QUEUE_SWITCH_UNSPECIFIED;
-	int work_queue_auto_remove_workers = WORK_QUEUE_SWITCH_UNSPECIFIED;
+	int work_queue_estimate_capacity_on = 0;
+	int work_queue_auto_remove_workers_on = 0;
     int work_queue_wait_routine = WORK_QUEUE_WAIT_UNSPECIFIED;
 	char *catalog_host;
 	int catalog_port;
@@ -1478,17 +1478,16 @@ int main( int argc, char *argv[] )
 			work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
 			break;
 		case 'E':
-			work_queue_estimate_capacity = WORK_QUEUE_SWITCH_ON;
+			work_queue_estimate_capacity_on = 1; 
 			break;
 		case 'M':
-			work_queue_auto_remove_workers = WORK_QUEUE_SWITCH_ON;
+			work_queue_auto_remove_workers_on = 1;
 			break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
 				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
 			} 
-
 			setenv("CATALOG_HOST", catalog_host, 1);
 
 			char *value = string_format("%d", catalog_port);
@@ -1634,13 +1633,17 @@ int main( int argc, char *argv[] )
 		setenv("WORK_QUEUE_MASTER_MODE", value, 1);
 		free(value);
 
-		value = string_format("%d", work_queue_estimate_capacity);
-		setenv("WORK_QUEUE_MASTER_ESTIMATE_CAPACITY_ON", value, 1);
-		free(value);
+		if(work_queue_estimate_capacity_on) {
+			value = string_format("%d", WORK_QUEUE_SWITCH_ON);
+			setenv("WORK_QUEUE_ESTIMATE_CAPACITY_ON", value, 1);
+			free(value);
+		}
 
-		value = string_format("%d", work_queue_auto_remove_workers);
-		setenv("WORK_QUEUE_AUTO_REMOVE_WORKERS_ON", value, 1);
-		free(value);
+		if(work_queue_auto_remove_workers_on) {
+			value = string_format("%d", WORK_QUEUE_SWITCH_ON);
+			setenv("WORK_QUEUE_AUTO_REMOVE_WORKERS_ON", value, 1);
+			free(value);
+		}
 
 		value = string_format("%d", work_queue_wait_routine);
 		setenv("WORK_QUEUE_WAIT_ROUTINE", value, 1);
@@ -1651,11 +1654,10 @@ int main( int argc, char *argv[] )
 			setenv("WORK_QUEUE_PORT", value, 1);
 			free(value);
 		} else {
-			// Use work queue default port in standalone mode when port in not
+			// Use work queue default port in standalone mode when port is not
 			// specified with -p option. In work queue catalog mode, work queue
 			// would choose a random port when port is not explicitly specified.
 			if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE){
-
 				value = string_format("%d", WORK_QUEUE_DEFAULT_PORT);
 				setenv("WORK_QUEUE_PORT", value, 1);
 				free(value);

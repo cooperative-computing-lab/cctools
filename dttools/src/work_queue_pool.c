@@ -31,13 +31,11 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
+#define WORKERS_PER_JOB_MAX 50 
 #define EXTRA_WORKERS_MAX 20
 #define EXTRA_WORKERS_PERCENTAGE 0.2
 
 static int abort_flag = 0;
-static char worker_cmd[PATH_MAX] = "";
-static char worker_path[PATH_MAX] = "";
-static char worker_args[PATH_MAX] = "";
 static struct batch_queue *q;
 static struct itable *remote_job_table = NULL;
 static struct hash_table *processed_masters;
@@ -45,7 +43,7 @@ static int retry_count = 20;
 
 struct list *get_matching_masters(const char *catalog_host, int catalog_port, struct list *regex_list);
 void process_matching_masters(struct list* matching_masters);
-int submit_workers_for_master(struct work_queue_master *master, int count);
+static int submit_workers(char *cmd, char *input_files, int count);
 
 struct worker_status {
 	int batch_job_id;
@@ -54,6 +52,45 @@ struct worker_status {
 
 static void handle_abort( int sig ) {
 	abort_flag = 1;
+}
+
+static int locate_executable(char *name, char *path) {
+	if(strlen(path) > 0) {
+		if(access(path, R_OK | X_OK) < 0) {
+			fprintf(stderr, "Inaccessible %s specified: %s\n", name, path);
+			return 0;
+		}
+	} else {
+		if(!find_executable(name, "PATH", path, PATH_MAX)) {
+			fprintf(stderr, "Please add %s to your PATH or specify it explicitly.\n", name);
+			return 0;
+		}
+	}
+	debug(D_DEBUG, "%s path: %s", name, path);
+	return 1;
+}
+
+static int copy_executable(char *current_path, char *new_path) {
+	FILE *ifs, *ofs;
+
+	ifs = fopen(current_path, "r");
+	if(!ifs) {
+		fprintf(stderr, "Unable to open %s for reading: %s\n", current_path, strerror(errno));
+		fclose(ifs);
+		return 0;
+	}
+	ofs = fopen(new_path, "w+");
+	if(!ofs) {
+		fprintf(stderr, "Unable to open %s for writing: %s", new_path, strerror(errno));
+		fclose(ofs);
+		return 0;
+	}
+	copy_stream_to_stream(ifs, ofs);
+	fclose(ifs);
+	fclose(ofs);
+	chmod(new_path, 0777);
+
+	return 1;
 }
 
 // TODO: // This is an experimental feature!!
@@ -69,46 +106,29 @@ void start_serving_masters(const char *catalog_host, int catalog_port, struct li
 	}
 }
 
+// TODO: // This is an experimental feature!!
 void process_matching_masters(struct list* matching_masters) {
 	struct work_queue_master *m;
+	char cmd[PATH_MAX] = "";
+	char input_files[PATH_MAX] = "";
 
 	if(!matching_masters) return;
 
 	list_first_item(matching_masters);
 	while((m = (struct work_queue_master *)list_next_item(matching_masters))) {
 		if(!hash_table_lookup(processed_masters, m->proj)) {
-			printf("submit 15 workers for master: %s\n", m->proj);
-			submit_workers_for_master(m, 15);
+			printf("Submitting 15 workers for master: %s\n", m->proj);
+
+			snprintf(cmd, PATH_MAX, "./work_queue_worker -a -N %s", m->proj);
+			snprintf(input_files, PATH_MAX, "work_queue_worker");
+
+			submit_workers(cmd, input_files, 15);
+
 			hash_table_insert(processed_masters, m->proj, duplicate_work_queue_master(m));
 		} else {
 			//TODO: new features coming...
 		}
 	}
-}
-
-int submit_workers_for_master(struct work_queue_master *master, int count){
-	int i;
-	batch_job_id_t jobid;
-	char cmd[PATH_MAX] = "";
-	snprintf(cmd, PATH_MAX, "./%s -a -N %s", string_basename(worker_path), master->proj);
-
-	for (i = 0; i < count; i++) {
-		debug(D_DEBUG, "Submitting worker %d: %s\n", i + 1, cmd);
-		jobid = batch_job_submit_simple(q, cmd, string_basename(worker_path), NULL);
-		if(jobid >= 0) {
-			itable_insert(remote_job_table, jobid, NULL);
-        } else {
-			retry_count--;
-			if(!retry_count) {
-				fprintf(stderr, "Retry max reached. Stop submitting more workers..\n");
-				break;
-			}
-		    fprintf(stderr, "Failed to submit the %dth job: %s. Will retry it.\n", i+1, cmd);
-			i--;
-        }
-	}
-
-	return i;
 }
 
 int get_master_capacity(const char * catalog_host, int catalog_port, const char *proj) {
@@ -141,13 +161,13 @@ int get_master_capacity(const char * catalog_host, int catalog_port, const char 
 	return capacity;
 }
 	
-static int submit_workers(int count){
+static int submit_workers(char *cmd, char *input_files, int count){
 	int i;
 	batch_job_id_t jobid;
 
 	for (i = 0; i < count; i++) {
-		debug(D_DEBUG, "Submitting worker %d: %s\n", i + 1, worker_cmd);
-		jobid = batch_job_submit_simple(q, worker_cmd, string_basename(worker_path), NULL);
+		debug(D_DEBUG, "Submitting job %d: %s\n", i + 1, cmd);
+		jobid = batch_job_submit_simple(q, cmd, input_files, NULL);
 		if(jobid >= 0) {
 			itable_insert(remote_job_table, jobid, NULL);
         } else {
@@ -156,7 +176,7 @@ static int submit_workers(int count){
 				fprintf(stderr, "Retry max reached. Stop submitting more workers..\n");
 				break;
 			}
-		    fprintf(stderr, "Failed to submit the %dth job: %s. Will retry it.\n", i+1, worker_cmd);
+		    fprintf(stderr, "Failed to submit the %dth job: %s. Will retry it.\n", i+1, cmd);
 			i--;
         }
 	}
@@ -269,19 +289,31 @@ static void check_jobs_status_condor(struct itable **running_jobs, struct itable
 	hash_table_delete(all_job_status);
 }
 
-static int guarantee_x_running_workers_condor(int goal) {
+static int guarantee_x_running_workers_local(char *cmd, char *input_files, int goal) {
+	int goal_achieved = 0;
+	int count;
+	
+	count = submit_workers(cmd, input_files, goal);
+	if(count == goal) goal_achieved = 1;
+
+	return goal_achieved;
+}
+
+static int guarantee_x_running_workers_condor(char *cmd, char *input_files, int goal) {
 	struct itable *running_jobs;
 	struct itable *idle_jobs;
 	struct itable *bad_jobs;
 	void *x;
 	UINT64_T key;
 
+	int submitted = 0;
 	int running, idle, bad;
 	int goal_achieved = 0;
 	int count, extra;
 
 	extra = MIN(EXTRA_WORKERS_MAX, goal*EXTRA_WORKERS_PERCENTAGE);
-	count = submit_workers(goal + extra);
+	count = submit_workers(cmd, input_files, goal + extra);
+	submitted += count;
 	printf("Target number of running workers is %d and %d workers has been submitted successfully.\n", goal, count);
 
 	while(!abort_flag) {
@@ -289,6 +321,10 @@ static int guarantee_x_running_workers_condor(int goal) {
 		running = itable_size(running_jobs);
 		idle = itable_size(idle_jobs);
 		bad = itable_size(bad_jobs);
+		if(submitted > running + idle + bad) {
+			sleep(3);
+			continue;
+		}
 		printf("Running Jobs: %d, Idle Jobs: %d, Bad Jobs: %d\n", running, idle, bad);
 		
 		count = running - goal;
@@ -314,7 +350,8 @@ static int guarantee_x_running_workers_condor(int goal) {
 		count = goal+extra-running-idle;
 		if(count > 0) {
 			// submit more
-			count = submit_workers(count);
+			count = submit_workers(cmd, input_files, count);
+			submitted += count;
 			printf("%d more workers has been submitted successfully.\n", count);
 		}
 
@@ -345,6 +382,7 @@ static void show_help(const char *cmd)
 	printf("  -S <scratch>   Scratch directory. (default is /tmp/${USER}-workers)\n");
 	printf("  -T <type>      Batch system type: %s. (default is local)\n",batch_queue_type_string());
 	printf("  -r <count>     Number of attemps to retry if failed to submit a worker.\n");
+	printf("  -m <count>     Each batch job will start <count> local workers. (default is 1.)\n");
 	printf("  -W <path>      Path to the work_queue_worker executable.\n");
 	printf("  -q             Guarantee <count> running workers and quit. The workers would terminate after their idle timeouts unless the user explicitly shut them down. The user needs to manually delete the scratch directory, which is displayed on screen right before work_queue_pool exits. \n");	
 	printf("  -h             Show this screen.\n");
@@ -363,14 +401,24 @@ int main(int argc, char *argv[])
 	int c, count;
 	int goal = 0;
 	char scratch_dir[PATH_MAX] = "";
+
+	char worker_cmd[PATH_MAX] = "";
+	char worker_path[PATH_MAX] = "";
+	char worker_args[PATH_MAX] = "";
+	char worker_input_files[PATH_MAX] = "";
+	char pool_path[PATH_MAX] = "";
 	char new_worker_path[PATH_MAX];
+	char new_pool_path[PATH_MAX];
+
 	int batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
-	FILE *ifs, *ofs;
+
 	int auto_worker = 0;
 	int guarantee_x_running_workers_and_quit = 0;
 	int auto_worker_pool = 0;
+	int workers_per_job = 0;
+
 	char *catalog_host;
 	int catalog_port;
 
@@ -385,7 +433,7 @@ int main(int argc, char *argv[])
 	catalog_host = CATALOG_HOST;
 	catalog_port = CATALOG_PORT;
 
-	while((c = getopt(argc, argv, "aAC:d:hN:qr:sS:t:T:W:")) != (char)-1) {
+	while((c = getopt(argc, argv, "aAC:d:hm:N:qr:sS:t:T:W:")) != (char)-1) {
 		switch (c) {
 			case 'a':
 				strcat(worker_args, " -a");
@@ -409,6 +457,14 @@ int main(int argc, char *argv[])
 				break;
 			case 'd':
 				debug_flags_set(optarg);
+				break;
+			case 'm':
+				count = atoi(optarg);
+				if(count < 0 || count > WORKERS_PER_JOB_MAX) {
+					workers_per_job = 0;
+				} else {
+					workers_per_job = count;
+				}
 				break;
 			case 'q':
 				guarantee_x_running_workers_and_quit = 1;
@@ -468,19 +524,16 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, handle_abort);
 	signal(SIGTERM, handle_abort);
 
-	// Locate the worker program
-	if(strlen(worker_path) > 0) {
-		if(access(worker_path, R_OK | X_OK) < 0) {
-			fprintf(stderr, "Inaccessible work_queue_worker specified: %s\n", worker_path);
+
+	if(!locate_executable("work_queue_worker", worker_path)) return EXIT_FAILURE;
+
+	if(workers_per_job) {
+	    if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
+			fprintf(stderr, "Error: '-m' option is not intended for the \"local\" batch queue type (which is the default if the '-T' option is not specified).\n");
 			return EXIT_FAILURE;
 		}
-	} else {
-		if(!find_executable("work_queue_worker", "PATH", worker_path, PATH_MAX)) {
-			fprintf(stderr, "Please add work_queue_worker to your PATH or specify it explicitly.\n");
-			return EXIT_FAILURE;
-		}
+		if(!locate_executable("work_queue_pool", pool_path)) return EXIT_FAILURE;
 	}
-	debug(D_DEBUG, "work_queue_worker path: %s", worker_path);
 
 	// Create a tmp directory to hold all workers' runtime information
 	if(strlen(scratch_dir) <= 0) {
@@ -498,50 +551,54 @@ int main(int argc, char *argv[])
 	// filesystem (other than afs, etc.) because condor might not be able
 	// to access your shared file system
 	snprintf(new_worker_path, PATH_MAX, "%s/work_queue_worker", scratch_dir);
+	if(!copy_executable(worker_path, new_worker_path)) return EXIT_FAILURE;
 
-	ifs = fopen(worker_path, "r");
-	if(!ifs) {
-		fprintf(stderr, "Unable to open %s for reading: %s\n", worker_path, strerror(errno));
-		return EXIT_FAILURE;
+	if(workers_per_job) {
+		snprintf(new_pool_path, PATH_MAX, "%s/work_queue_pool", scratch_dir);
+		if(!copy_executable(pool_path, new_pool_path)) return EXIT_FAILURE;
 	}
-	ofs = fopen(new_worker_path, "w+");
-	if(!ofs) {
-		fprintf(stderr, "Unable to open %s/work_queue_worker for writing: %s", scratch_dir, strerror(errno));
-		fclose(ifs);
-		return EXIT_FAILURE;
-	}
-	copy_stream_to_stream(ifs, ofs);
-	fclose(ifs);
-	fclose(ofs);
-	chmod(new_worker_path, 0777);
 
+	// Switch to the scratch dir.
 	if(chdir(scratch_dir) < 0) {
 		fprintf(stderr, "Unable to cd into scratch directory %s: %s\n", scratch_dir, strerror(errno));
 		return EXIT_FAILURE;
 	}
 
+	// Set start worker command and specify the required input files
+	if(!workers_per_job) {
+		snprintf(worker_cmd, PATH_MAX, "./work_queue_worker %s", worker_args);
+		snprintf(worker_input_files, PATH_MAX, "work_queue_worker");
+	} else {
+		// Create multiple local workers
+		snprintf(worker_cmd, PATH_MAX, "./work_queue_pool %s %d", worker_args, workers_per_job);
+		snprintf(worker_input_files, PATH_MAX, "work_queue_worker,work_queue_pool");
+	}
+
 	q = batch_queue_create(batch_queue_type);
-	if(!q)
+	if(!q) {
 		fatal("Unable to create batch queue of type: %s", batch_queue_type_to_string(batch_queue_type));
-
+	}
 	batch_queue_set_options(q, getenv("BATCH_OPTIONS"));
-
-	snprintf(worker_cmd, PATH_MAX, "./%s %s", string_basename(worker_path), worker_args);
 	remote_job_table = itable_create(0);
 
+	// option: start x running workers and quit
 	if(guarantee_x_running_workers_and_quit) {
 		if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
-			guarantee_x_running_workers_condor(goal);
+			guarantee_x_running_workers_condor(worker_cmd, worker_input_files, goal);
+		} else if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
+			guarantee_x_running_workers_local(worker_cmd, worker_input_files, goal);
 		} else {
 			fprintf(stderr, "Sorry! Batch queue type \"%s\" is not supported for \"-q\" option at this time.\n", batch_queue_type_to_string(batch_queue_type));
-			fprintf(stderr, "Currently supported batch queue type(s) for \"-q\": ");
-			fprintf(stderr, "%s ", batch_queue_type_to_string(BATCH_QUEUE_TYPE_CONDOR));
+			fprintf(stderr, "Currently supported batch queue type(s) for \"-q\": \n");
+			fprintf(stderr, "%s\n", batch_queue_type_to_string(BATCH_QUEUE_TYPE_CONDOR));
+			fprintf(stderr, "%s\n", batch_queue_type_to_string(BATCH_QUEUE_TYPE_LOCAL));
 			fprintf(stderr, "\n");
 		}
 		printf("scratch directory: %s\n", scratch_dir);
 		return EXIT_SUCCESS;
 	}
 
+	// option: automatically allocate workers for new masters 
 	if(auto_worker_pool) {
 		processed_masters = hash_table_create(0,0);
 		while(!abort_flag){
@@ -551,16 +608,16 @@ int main(int argc, char *argv[])
 	}
 
 	if(!abort_flag) {
-		count = submit_workers(goal);
+		count = submit_workers(worker_cmd, worker_input_files, goal);
 		printf("%d workers are submitted successfully.\n", count);
 	}
 
-	// Maintain a number of workers
+	// option: maintain a fixed number of workers
 	while(!abort_flag) {
 		jobid = batch_job_wait_timeout(q, &info, time(0)+5);
 		if(jobid >= 0 && !abort_flag) {
 			itable_remove(remote_job_table,jobid);
-			jobid = batch_job_submit_simple(q, worker_cmd, string_basename(worker_path), NULL);
+			jobid = batch_job_submit_simple(q, worker_cmd, worker_input_files, NULL);
 			if(jobid >= 0) {
 				itable_insert(remote_job_table, jobid, NULL);
 			}

@@ -39,6 +39,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #ifdef CCTOOLS_OPSYS_SUNOS
 extern int setenv( const char *name, const char *value, int overwrite );
@@ -75,8 +76,7 @@ int wq_minimum_transfer_timeout = 3;
 
 struct work_queue {
 	char *name;
-	int port;
-	int master_mode;
+	int port; int master_mode;
 	int worker_mode;
 	int priority;
 	struct link * master_link;
@@ -1312,6 +1312,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t) {
 	timestamp_t avg_task_execution_time; 
 	timestamp_t avg_task_transfer_time;
 	timestamp_t avg_task_app_time; 
+	timestamp_t avg_task_time_at_master; 
 	int count, num_of_reports, effective_workers;
 
 	
@@ -1370,8 +1371,14 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t) {
 	avg_task_app_time = q->total_tasks_complete > 0 ? q->app_time / (q->total_tasks_complete + 1) : 0;
 	debug(D_WQ, "Avg task execution time: %lld; Avg task tranfer time: %lld; Avg task app time: %lld\n", avg_task_execution_time, avg_task_transfer_time, avg_task_app_time); 
 	
+
+	avg_task_time_at_master = avg_task_transfer_time + avg_task_app_time;
 	// This is the Master Capacity Equation:
-	tr->capacity = avg_task_execution_time / (avg_task_transfer_time + avg_task_app_time) + 1;
+	if(avg_task_time_at_master > 0) {	
+		tr->capacity = avg_task_execution_time / avg_task_time_at_master + 1;
+	} else {
+		tr->capacity = INT_MAX;
+	}
 
 	// Record the recent capacities' sum for quick calculation of the avg
 	ts->total_capacity += tr->capacity;
@@ -1864,20 +1871,24 @@ struct work_queue * work_queue_create( int port )
 	q->total_send_time = 0;
 	q->total_execute_time = 0;
 	q->total_receive_time = 0;
+
 	q->start_time = timestamp_get();
 	q->time_last_task_start = q->start_time;
-	q->accumulated_idle_time = 0;
+
 	q->idle_time = 0;
 	q->idle_times = list_create();
+	q->accumulated_idle_time = 0;
+
 	q->app_time = 0;
 	q->capacity = 0;
 	q->avg_capacity = 0;
-	q->task_statistics = task_statistics_init();
 	q->busy_workers_to_remove = 0;
+
+	q->task_statistics = task_statistics_init();
 
 	q->link_keepalive_on = 1;
 
-	debug(D_WQ, "Work Queue is listening on port %d.", port);
+	debug(D_WQ,"Work Queue is listening on port %d.", port);
 
 	return q;
 
@@ -2255,6 +2266,7 @@ struct work_queue_task * work_queue_wait_adaptive( struct work_queue *q, int tim
 			// start new tasks conservatively, one at a time, otherwise we
 			// might use too many workers than we actually need. 
 			start_n_tasks(q, 1);
+			//work_queue_shut_down_workers (q, 1000);
 		}
 
 		n = build_poll_table(q);

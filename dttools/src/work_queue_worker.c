@@ -43,7 +43,17 @@ See the file COPYING for details.
 #include <sys/mman.h>
 #include <sys/signal.h>
 #include <sys/utsname.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
 
+struct task_info {
+	pid_t pid;
+	int status; 
+	struct rusage rusage;
+	timestamp_t execution_end;
+	char *output;
+	INT64_T output_length;
+};
 
 // Maximum time to wait before aborting if there is no connection to the master.
 static int idle_timeout = 900;
@@ -68,6 +78,157 @@ static struct work_queue_master *actual_master = NULL;
 static struct list *preferred_masters = NULL;
 static struct hash_cache *bad_masters = NULL;
 
+static int pipefds[2];
+
+
+static void alarm_handler(int sig)
+{
+	// do nothing except interrupt the wait
+}
+
+void report_worker_ready(struct link *master) {
+	char hostname[DOMAIN_NAME_MAX];
+	UINT64_T memory_avail, memory_total;
+	UINT64_T disk_avail, disk_total;
+	int ncpus;
+	struct utsname uname_data;
+	char *pm;
+	char preferred_master_names[WORK_QUEUE_LINE_MAX];
+
+
+	domain_name_cache_guess(hostname);
+	ncpus = load_average_get_cpus();
+	memory_info_get(&memory_avail, &memory_total);
+	disk_info_get(".", &disk_avail, &disk_total);
+	uname(&uname_data);
+
+	if(exclusive_worker) {
+		preferred_master_names[0] = 0;
+		list_first_item(preferred_masters);
+		while((pm = (char *) list_next_item(preferred_masters))) {
+			sprintf(&(preferred_master_names[strlen(preferred_master_names)]), "%s ", pm);
+		}
+
+		link_putfstring(master, "ready %s %d %llu %llu %llu %llu \"%s\" %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names, uname_data.sysname, uname_data.machine);
+	} else {
+		link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, uname_data.sysname, uname_data.machine);
+	}
+
+}
+
+pid_t execute_task(const char *cmd) {
+	pid_t pid;
+
+	fflush(NULL);
+
+    if (pipe(pipefds) == -1) {
+		debug(D_DEBUG, "Failed to create pipe for output redirecting.\n");
+		return 0;
+	}
+
+	pid = fork();
+	if(pid > 0) {
+		debug(D_DEBUG, "started process %d: %s", pid, cmd);
+		close(pipefds[1]);
+		return pid;
+	} else if(pid < 0) {
+		debug(D_DEBUG, "couldn't create new process: %s\n", strerror(errno));
+		close(pipefds[0]);
+		close(pipefds[1]);
+		return 0;
+	} else {
+		close(1);
+		dup(pipefds[1]);
+
+		close(pipefds[0]);
+		close(pipefds[1]);
+
+		execlp("sh", "sh", "-c", cmd, (char *)0);
+		_exit(127);	// Failed to execute the cmd.
+	}
+	return 0;
+}
+
+struct task_info * wait_task(pid_t pid, int timeout) {
+	void *old_handler = 0;
+	int flags = 0;
+	struct task_info *ti;
+	pid_t tmp_pid;
+	int   tmp_status;
+	struct rusage tmp_rusage;
+	char *output;
+	INT64_T length;
+	FILE *stream;
+
+	if(pid <= 0) {
+		return NULL;
+	}
+
+	if(timeout == 0) {
+		flags = WNOHANG;
+	} else {
+		flags = 0;
+		old_handler = signal(SIGALRM, alarm_handler);
+		alarm(timeout);
+	}
+
+	tmp_pid = wait4(-1, &tmp_status, flags, &tmp_rusage);
+
+	if(timeout != 0) {
+		alarm(0);
+		signal(SIGALRM, old_handler);
+	}
+
+	if(tmp_pid <= 0) {
+		return NULL;
+	}
+
+	ti = malloc(sizeof(*ti));
+	if(!ti) {
+		debug(D_DEBUG, "Couldn't allocate memory to store task info.\n", strerror(errno));
+		return NULL;
+	}
+
+	ti->pid = tmp_pid;
+	ti->status = tmp_status;
+	ti->rusage = tmp_rusage;
+	ti->execution_end= timestamp_get();
+
+	// Record stdout of the child process
+	stream = fdopen(pipefds[0], "r");
+	if(stream) {
+		length = copy_stream_to_buffer(stream, &output);
+		if(length <= 0) {
+			length = 0;
+			if(output) {
+				free(output);
+			}
+			output = NULL;
+		}
+		fclose(stream);
+	} else {
+		debug(D_DEBUG, "Couldn't open pipe fd as stream (failed to read child process's output).\n", strerror(errno));
+		length = 0;
+		output = NULL;
+		close(pipefds[0]);
+	}
+
+	ti->output = output;
+	ti->output_length = length;
+
+	return ti;
+}
+
+void delete_task_info(struct task_info *ti) {
+	free(ti->output);
+	free(ti);
+}
+
+void report_task_complete(struct link *master, int result, timestamp_t execution_time, char *output, INT64_T output_length) {
+	debug(D_WQ, "result %d %lld %llu", result, output_length, execution_time);
+	link_putfstring(master, "result %d %lld %llu\n", time(0) + active_timeout, result, output_length, execution_time);
+	link_putlstring(master, output, output_length, time(0) + active_timeout);
+}
 
 static void make_hash_key(const char *addr, int port, char *key)
 {
@@ -150,6 +311,32 @@ struct list *get_work_queue_masters(const char *catalog_host, int catalog_port)
 	// Must delete the query otherwise it would occupy 1 tcp connection forever!
 	catalog_query_delete(q);
 	return ml;
+}
+
+struct distribution_node {
+	void *item;
+	int weight;
+};
+
+void *select_item_by_weight(struct distribution_node distribution[], int n) {
+	int i, w, x, sum;
+
+
+	sum = 0;
+	for(i=0; i < n; i++) {
+		w = distribution[i].weight;	
+		if(w < 0) return NULL;
+		sum += w;
+	}
+
+	x = rand() % sum;
+
+	for(i = 0; i < n; i++) {
+		x -= distribution[i].weight;
+		if(x <= 0) return distribution[i].item;
+	}
+
+	return NULL;
 }
 
 struct link *auto_link_connect(char *addr, int *port, time_t master_stoptime)
@@ -312,33 +499,27 @@ static void show_help(const char *cmd)
 int main(int argc, char *argv[])
 {
 	const char *host = NULL;
-	char *pm;
 	int port = WORK_QUEUE_DEFAULT_PORT;
 	char actual_addr[LINK_ADDRESS_MAX];
 	int actual_port;
 	struct link *master = 0;
 	char addr[LINK_ADDRESS_MAX];
-	UINT64_T memory_avail, memory_total;
 	UINT64_T disk_avail, disk_total;
 	UINT64_T avail_space_threshold = 0;
-	int ncpus;
 	char c;
-	char hostname[DOMAIN_NAME_MAX];
-	struct utsname uname_data;
 	int w;
-	char preferred_master_names[WORK_QUEUE_LINE_MAX];
 	char deletecmd[WORK_QUEUE_LINE_MAX];
-
-	ncpus = load_average_get_cpus();
-	memory_info_get(&memory_avail, &memory_total);
-	disk_info_get(".", &disk_avail, &disk_total);
+	timestamp_t execution_start, execution_end;
+	int task_running = 0;
+	struct task_info *ti;
+	pid_t pid;
+	time_t readline_stoptime;
 
 	preferred_masters = list_create();
 	if(!preferred_masters) {
 		fprintf(stderr, "Cannot allocate memory to store preferred work queue masters names.\n");
 		exit(1);
 	}
-
 
 	debug_config(argv[0]);
 
@@ -389,6 +570,15 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	srand((unsigned int)(getpid() ^ time(NULL)));
+
+	/** random selection test
+	struct distribution_node array[3] = { {"A", 20}, {"B", 30}, {"C", 50} };
+	char *string;
+	string = (char *)select_item_by_weight(array, 3);
+	printf("%s\n", string);
+	exit(0);*/
+		
 	if(!auto_worker) {
 		if((argc - optind) != 2) {
 			show_help(argv[0]);
@@ -403,26 +593,18 @@ int main(int argc, char *argv[])
 		}
 	}
 
-
-	preferred_master_names[0] = 0;
-	list_first_item(preferred_masters);
-	while((pm = (char *) list_next_item(preferred_masters))) {
-		sprintf(&(preferred_master_names[strlen(preferred_master_names)]), "%s ", pm);
-	}
-
 	if(auto_worker && exclusive_worker && !list_size(preferred_masters)) {
 		fprintf(stderr, "Worker is running under exclusive mode. But no preferred master is specified.\n");
 		fprintf(stderr, "Please specify the preferred master names with -N option or add -s option to allow the worker to work for any available masters.\n");
 		exit(1);
 	}
 
-
 	signal(SIGTERM, handle_abort);
 	signal(SIGQUIT, handle_abort);
 	signal(SIGINT, handle_abort);
 
+	// Setup working space(dir)
 	const char *workdir;
-
 	if(getenv("_CONDOR_SCRATCH_DIR")) {
 		workdir = getenv("_CONDOR_SCRATCH_DIR");
 	} else {
@@ -436,22 +618,22 @@ int main(int argc, char *argv[])
 	mkdir(tempdir, 0700);
 	chdir(tempdir);
 	
+	// Check available disk space
 	if (avail_space_threshold > 0) {
 		disk_info_get(".", &disk_avail, &disk_total);
 		if (disk_avail < avail_space_threshold) {
-                       	printf("worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
-	                goto abort;
-                }	
-        }	
+			printf("worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
+			goto abort;
+		}	
+	}	
 
-	domain_name_cache_guess(hostname);
-	uname(&uname_data);
 
 	time_t idle_stoptime = time(0) + idle_timeout;
 	time_t switch_master_time = time(0) + master_timeout;
 
 	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t) free);
 		
+	// Start serving masters
 	while(!abort_flag) {
 		char line[WORK_QUEUE_LINE_MAX];
 		int result, mode, fd;
@@ -488,41 +670,70 @@ int main(int argc, char *argv[])
 
 			link_tune(master, LINK_TUNE_INTERACTIVE);
 
-			if(exclusive_worker) {
-				link_putfstring(master, "ready %s %d %llu %llu %llu %llu \"%s\" %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names, uname_data.sysname, uname_data.machine);
-			} else {
-				link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, uname_data.sysname, uname_data.machine);
-			}
+			report_worker_ready(master);
 		}
 
-		if(link_readline(master, line, sizeof(line), time(0) + active_timeout)) {
+		
+		// TODO - wait for forked task completion
+		if(task_running) { // there is a local job running
+			ti = wait_task(pid, 5);
+			if(ti) {
+				report_task_complete(master, ti->status, ti->execution_end-execution_start, ti->output, ti->output_length);
+				delete_task_info(ti);
+				task_running = 0;
+			} 
+		} 
+
+		if(task_running) {
+			readline_stoptime = time(0) + 1;
+		} else {
+			readline_stoptime = time(0) + active_timeout;
+		}
+
+		if(link_readline(master, line, sizeof(line), readline_stoptime)) {
 			debug(D_WQ, "%s", line);
 			if(sscanf(line, "work %lld", &length)) {
-				timestamp_t execution_start, execution_end;
 				buffer = malloc(length + 10);
 				link_read(master, buffer, length, time(0) + active_timeout);
 				buffer[length] = 0;
 				strcat(buffer, " 2>&1");
 				debug(D_WQ, "%s", buffer);
-				execution_start = timestamp_get();
-				stream = popen(buffer, "r");
-				free(buffer);
-				if(stream) {
-					length = copy_stream_to_buffer(stream, &buffer);
-					if(length < 0)
-						length = 0;
-					result = pclose(stream);
-				} else {
-					length = 0;
-					result = -1;
-					buffer = 0;
-				}
-				execution_end = timestamp_get();
-				debug(D_WQ, "result %d %lld %llu", result, length, execution_end - execution_start);
-				link_putfstring(master, "result %d %lld %llu\n", time(0) + active_timeout, result, length, execution_end - execution_start);
-				link_putlstring(master, buffer, length, time(0) + active_timeout);
-				if(buffer)
+
+				// TODO wrong sscanf check
+				char *string = NULL;
+				if(sscanf(line, "work %lld %s", &length, string) == 2 && !strncmp(string, "exit", 4)) {
+					pid = execute_task(buffer);
 					free(buffer);
+					if(pid < 0) {
+						fprintf(stderr,"work_queue_worker: couldn't submit local job. \nShutting down worker...\n");
+						break;
+					}
+					task_running = 1;
+				} else {
+					execution_start = timestamp_get();
+
+					// execute the command
+					stream = popen(buffer, "r");
+					free(buffer);
+					if(stream) {
+						length = copy_stream_to_buffer(stream, &buffer);
+						if(length < 0)
+							length = 0;
+						result = pclose(stream);
+					} else {
+						length = 0;
+						result = -1;
+						buffer = 0;
+					}
+					execution_end = timestamp_get();
+
+					// return job done
+					report_task_complete(master, result, execution_end-execution_start, buffer, length);
+
+					if(buffer) {
+						free(buffer);
+					}
+				}
 			} else if(sscanf(line, "stat %s", filename) == 1) {
 				struct stat st;
 				if(!stat(filename, &st)) {
@@ -552,13 +763,13 @@ int main(int argc, char *argv[])
 				}
 				symlink(path, filename);
 			} else if(sscanf(line, "put %s %lld %o", filename, &length, &mode) == 3) {
-				if (avail_space_threshold > 0){
+				if (avail_space_threshold > 0) {
 					disk_info_get(".", &disk_avail, &disk_total);
-		                        if (disk_avail < avail_space_threshold) {
-                	                	debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
-	                        	        goto recover;
-                        		}	
-                		}	
+					if (disk_avail < avail_space_threshold) {
+						debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
+						goto recover;
+					}	
+				}	
 
 				mode = mode | 0600;
 				char *cur_pos, *tmp_pos;
@@ -710,7 +921,7 @@ int main(int argc, char *argv[])
 			idle_stoptime = time(0) + idle_timeout;
 
 		} else {
-		      recover:
+recover:
 			link_close(master);
 			master = 0;
 			if(auto_worker) {
@@ -722,7 +933,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-      abort:	
+abort:	
 	printf("worker: cleaning up %s\n", tempdir);
 	sprintf(deletecmd, "rm -rf %s", tempdir);
 	system(deletecmd);
