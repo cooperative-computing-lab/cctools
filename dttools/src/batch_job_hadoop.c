@@ -97,7 +97,7 @@ batch_job_id_t batch_job_submit_simple_hadoop(struct batch_queue *q, const char 
 		free(job);
 		return -1;
 	}
-	char *hadoop_streaming_jar = string_format("%s/mapred/contrib/streaming/hadoop-2*-streaming.jar", getenv("HADOOP_HOME"));
+	char *hadoop_streaming_jar = string_format("%s/mapred/contrib/streaming/hadoop-*-streaming.jar", getenv("HADOOP_HOME"));
 	glob_t g;
 	if (glob(hadoop_streaming_jar, 0, NULL, &g) != 0 || g.gl_pathc != 1) {
 		close(fd);
