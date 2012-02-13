@@ -122,17 +122,17 @@ pid_t execute_task(const char *cmd) {
 	fflush(NULL);
 
     if (pipe(pipefds) == -1) {
-		debug(D_DEBUG, "Failed to create pipe for output redirecting.\n");
+		debug(D_WQ, "Failed to create pipe for output redirecting.\n");
 		return 0;
 	}
 
 	pid = fork();
 	if(pid > 0) {
-		debug(D_DEBUG, "started process %d: %s", pid, cmd);
+		debug(D_WQ, "started process %d: %s", pid, cmd);
 		close(pipefds[1]);
 		return pid;
 	} else if(pid < 0) {
-		debug(D_DEBUG, "couldn't create new process: %s\n", strerror(errno));
+		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
 		close(pipefds[0]);
 		close(pipefds[1]);
 		return 0;
@@ -199,7 +199,7 @@ int wait_task(pid_t pid, int timeout, struct task_info *ti) {
 		}
 		fclose(stream);
 	} else {
-		debug(D_DEBUG, "Couldn't open pipe fd as stream (failed to read child process's output).\n", strerror(errno));
+		debug(D_WQ, "Couldn't open pipe fd as stream (failed to read child process's output).\n", strerror(errno));
 		length = 0;
 		output = NULL;
 		close(pipefds[0]);
@@ -469,24 +469,24 @@ static void handle_abort(int sig)
 
 static void show_version(const char *cmd)
 {
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
+	fprintf(stdout, "%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
 }
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s [options] <masterhost> <port>\n", cmd);
-	printf("where options are:\n");
-	printf(" -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
-	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	printf(" -d <subsystem> Enable debugging for this subsystem.\n");
-	printf(" -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
-	printf(" -s             Run as a shared worker. By default the worker would only work on preferred projects.\n");
-	printf(" -t <time>      Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
-	printf(" -o <file>      Send debugging to this file.\n");
-	printf(" -v             Show version string\n");
-	printf(" -w <size>      Set TCP window size.\n");
-	printf(" -z <size>      Set available disk space threshold (in MB) before aborting. By default no checks on available space are performed.\n");
-	printf(" -h             Show this help screen\n");
+	fprintf(stdout, "Use: %s [options] <masterhost> <port>\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
+	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
+	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem.\n");
+	fprintf(stdout, " -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
+	fprintf(stdout, " -s             Run as a shared worker. By default the worker would only work on preferred projects.\n");
+	fprintf(stdout, " -t <time>      Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
+	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
+	fprintf(stdout, " -v             Show version string\n");
+	fprintf(stdout, " -w <size>      Set TCP window size.\n");
+	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB) before aborting. By default no checks on available space are performed.\n");
+	fprintf(stdout, " -h             Show this help screen\n");
 }
 
 int main(int argc, char *argv[])
@@ -599,7 +599,7 @@ int main(int argc, char *argv[])
 	char tempdir[WORK_QUEUE_LINE_MAX];
 	sprintf(tempdir, "%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 
-	printf("worker: working in %s\n", tempdir);
+	fprintf(stdout, "worker: working in %s\n", tempdir);
 	mkdir(tempdir, 0700);
 	chdir(tempdir);
 	
@@ -607,7 +607,7 @@ int main(int argc, char *argv[])
 	if (avail_space_threshold > 0) {
 		disk_info_get(".", &disk_avail, &disk_total);
 		if (disk_avail < avail_space_threshold) {
-			printf("worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
+			fprintf(stderr, "worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
 			goto abort;
 		}	
 	}	
@@ -630,12 +630,12 @@ int main(int argc, char *argv[])
 
 		if(time(0) > idle_stoptime) {
 			if(master) {
-				printf("worker: gave up after waiting %ds to receive a task.\n", idle_timeout);
+				fprintf(stdout, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			} else {
 				if(auto_worker) {
-					printf("worker: gave up after waiting %ds to connect to all the available masters.\n", idle_timeout);
+					fprintf(stdout, "work_queue_worker: giving up because couldn't connect to any master in %d seconds.\n", idle_timeout);
 				} else {
-					printf("worker: gave up after waiting %ds to connect to %s port %d.\n", idle_timeout, host, port);
+					fprintf(stdout, "work_queue_worker: giving up because couldn't connect to %s:%d in %d seconds.\n", host, port, idle_timeout);
 				}
 			}
 			break;
@@ -917,7 +917,7 @@ recover:
 	}
 
 abort:	
-	printf("worker: cleaning up %s\n", tempdir);
+	fprintf(stdout, "work_queue_worker: cleaning up %s\n", tempdir);
 	sprintf(deletecmd, "rm -rf %s", tempdir);
 	system(deletecmd);
 
