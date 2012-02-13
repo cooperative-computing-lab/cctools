@@ -318,12 +318,11 @@ static struct work_queue_task * task_create( struct hash_table *sequence_table )
 int main(int argc, char *argv[])
 {
 	char c;
-	char line[1024];
 
 	const char *progname = "sand_align_master";
 
-	char *catalog_server_host = NULL;
-	int catalog_server_port = 0;
+	char *catalog_host = NULL;
+	int catalog_port = 0;
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 
@@ -354,21 +353,21 @@ int main(int argc, char *argv[])
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break; 
 		case 'N':
-			if (project) free(project);
-			project = strdup(optarg);
-			sprintf(line,"WORK_QUEUE_NAME=%s",project);
-			putenv(strdup(line));
+			free(project);
+			project = xstrdup(optarg);
+			setenv("WORK_QUEUE_NAME", project, 1);
 			break;
 		case 'C':
-			if(!parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port)) {
+			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
 				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
 			}
-					
-			sprintf(line,"CATALOG_HOST=%s", catalog_server_host);
-			putenv(strdup(line));
-			sprintf(line,"CATALOG_PORT=%d", catalog_server_port);
-			putenv(strdup(line));
+
+			setenv("CATALOG_HOST", catalog_host, 1);
+
+			char *value = string_format("%d", catalog_port);
+			setenv("CATALOG_PORT", value, 1);
+			free(value);
 
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
@@ -426,11 +425,13 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-	sprintf(line, "WORK_QUEUE_WORKER_MODE=%d", work_queue_worker_mode);
-    putenv(strdup(line));
+	char *value = string_format("%d", work_queue_worker_mode);
+	setenv("WORK_QUEUE_WORKER_MODE", value, 1);
+	free(value);
 
-    sprintf(line, "WORK_QUEUE_MASTER_MODE=%d", work_queue_master_mode);
-    putenv(strdup(line));
+	value = string_format("%d", work_queue_master_mode);
+	setenv("WORK_QUEUE_MASTER_MODE", value, 1);
+	free(value);
 
 	queue = work_queue_create(port);
 	if(!queue) {
