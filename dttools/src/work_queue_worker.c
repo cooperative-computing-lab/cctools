@@ -149,19 +149,15 @@ pid_t execute_task(const char *cmd) {
 	return 0;
 }
 
-struct task_info * wait_task(pid_t pid, int timeout) {
-	void *old_handler = 0;
+int wait_task(pid_t pid, int timeout, struct task_info *ti) {
 	int flags = 0;
-	struct task_info *ti;
+	void *old_handler = 0;
 	pid_t tmp_pid;
 	int   tmp_status;
 	struct rusage tmp_rusage;
-	char *output;
-	INT64_T length;
-	FILE *stream;
 
-	if(pid <= 0) {
-		return NULL;
+	if(pid <= 0 || timeout < 0 || !ti) {
+		return 0;
 	}
 
 	if(timeout == 0) {
@@ -172,7 +168,7 @@ struct task_info * wait_task(pid_t pid, int timeout) {
 		alarm(timeout);
 	}
 
-	tmp_pid = wait4(-1, &tmp_status, flags, &tmp_rusage);
+	tmp_pid = wait4(pid, &tmp_status, flags, &tmp_rusage);
 
 	if(timeout != 0) {
 		alarm(0);
@@ -180,13 +176,7 @@ struct task_info * wait_task(pid_t pid, int timeout) {
 	}
 
 	if(tmp_pid <= 0) {
-		return NULL;
-	}
-
-	ti = malloc(sizeof(*ti));
-	if(!ti) {
-		debug(D_DEBUG, "Couldn't allocate memory to store task info.\n", strerror(errno));
-		return NULL;
+		return 0;
 	}
 
 	ti->pid = tmp_pid;
@@ -195,7 +185,9 @@ struct task_info * wait_task(pid_t pid, int timeout) {
 	ti->execution_end= timestamp_get();
 
 	// Record stdout of the child process
-	stream = fdopen(pipefds[0], "r");
+	char *output;
+	INT64_T length;
+	FILE *stream = fdopen(pipefds[0], "r");
 	if(stream) {
 		length = copy_stream_to_buffer(stream, &output);
 		if(length <= 0) {
@@ -216,15 +208,15 @@ struct task_info * wait_task(pid_t pid, int timeout) {
 	ti->output = output;
 	ti->output_length = length;
 
-	return ti;
+	return 1;
 }
 
-void delete_task_info(struct task_info *ti) {
+void clear_task_info(struct task_info *ti) {
 	free(ti->output);
-	free(ti);
+	memset(ti, 0, sizeof(ti));
 }
 
-void report_task_complete(struct link *master, int result, timestamp_t execution_time, char *output, INT64_T output_length) {
+void report_task_complete(struct link *master, int result, char *output, INT64_T output_length, timestamp_t execution_time) {
 	debug(D_WQ, "result %d %lld %llu", result, output_length, execution_time);
 	link_putfstring(master, "result %d %lld %llu\n", time(0) + active_timeout, result, output_length, execution_time);
 	link_putlstring(master, output, output_length, time(0) + active_timeout);
@@ -319,8 +311,9 @@ struct distribution_node {
 };
 
 void *select_item_by_weight(struct distribution_node distribution[], int n) {
+	// A distribution example:
+	// struct distribution_node array[3] = { {"A", 20}, {"B", 30}, {"C", 50} };
 	int i, w, x, sum;
-
 
 	sum = 0;
 	for(i=0; i < n; i++) {
@@ -511,7 +504,6 @@ int main(int argc, char *argv[])
 	char deletecmd[WORK_QUEUE_LINE_MAX];
 	timestamp_t execution_start, execution_end;
 	int task_running = 0;
-	struct task_info *ti;
 	pid_t pid;
 	time_t readline_stoptime;
 
@@ -571,13 +563,6 @@ int main(int argc, char *argv[])
 	}
 
 	srand((unsigned int)(getpid() ^ time(NULL)));
-
-	/** random selection test
-	struct distribution_node array[3] = { {"A", 20}, {"B", 30}, {"C", 50} };
-	char *string;
-	string = (char *)select_item_by_weight(array, 3);
-	printf("%s\n", string);
-	exit(0);*/
 		
 	if(!auto_worker) {
 		if((argc - optind) != 2) {
@@ -674,12 +659,12 @@ int main(int argc, char *argv[])
 		}
 
 		
-		// TODO - wait for forked task completion
-		if(task_running) { // there is a local job running
-			ti = wait_task(pid, 5);
-			if(ti) {
-				report_task_complete(master, ti->status, ti->execution_end-execution_start, ti->output, ti->output_length);
-				delete_task_info(ti);
+		// Wait for forked task's completion
+		if(task_running) { 
+			struct task_info ti;
+			if(wait_task(pid, 5, &ti)) {
+				report_task_complete(master, ti.status, ti.output, ti.output_length, ti.execution_end - execution_start);
+				clear_task_info(&ti);
 				task_running = 0;
 			} 
 		} 
@@ -698,10 +683,10 @@ int main(int argc, char *argv[])
 				buffer[length] = 0;
 				strcat(buffer, " 2>&1");
 				debug(D_WQ, "%s", buffer);
+				execution_start = timestamp_get();
 
-				// TODO wrong sscanf check
-				char *string = NULL;
-				if(sscanf(line, "work %lld %s", &length, string) == 2 && !strncmp(string, "exit", 4)) {
+				char string[WORK_QUEUE_LINE_MAX];
+				if(sscanf(line, "work %lld %s", &length, string) == 2 && !strncmp(string, "fork", 4)) {
 					pid = execute_task(buffer);
 					free(buffer);
 					if(pid < 0) {
@@ -710,8 +695,6 @@ int main(int argc, char *argv[])
 					}
 					task_running = 1;
 				} else {
-					execution_start = timestamp_get();
-
 					// execute the command
 					stream = popen(buffer, "r");
 					free(buffer);
@@ -728,7 +711,7 @@ int main(int argc, char *argv[])
 					execution_end = timestamp_get();
 
 					// return job done
-					report_task_complete(master, result, execution_end-execution_start, buffer, length);
+					report_task_complete(master, result, buffer, length, execution_end-execution_start);
 
 					if(buffer) {
 						free(buffer);
