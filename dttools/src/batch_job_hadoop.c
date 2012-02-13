@@ -3,21 +3,34 @@
 #include "debug.h"
 #include "process.h"
 #include "stringtools.h"
+#include "xmalloc.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include <assert.h>
 #include <errno.h>
-#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
+#include <unistd.h>
+
+#include <fcntl.h>
+#include <glob.h>
 #include <sys/stat.h>
 
-static int setup_hadoop_wrapper(const char *wrapperfile, const char *cmd)
-{
-	FILE *file;
+static const char WRAPPER_TEMPLATE[] = "./hadoop.wrapper.XXXXXX";
 
-	file = fopen(wrapperfile, "w");
-	if(!file)
+struct hadoop_job {
+	FILE *status_file;
+	pid_t child;
+	struct batch_job_info info;
+	char wrapper[sizeof(WRAPPER_TEMPLATE)+1];
+};
+
+static int setup_hadoop_wrapper (int fd, const char *cmd)
+{
+	FILE *file = fdopen(fd, "w");
+
+	if (file == NULL)
 		return -1;
 
 	char *escaped_cmd = escape_shell_string(cmd);
@@ -25,94 +38,96 @@ static int setup_hadoop_wrapper(const char *wrapperfile, const char *cmd)
 
 	fprintf(file, "#!/bin/sh\n");
 	fprintf(file, "cmd=%s\n", escaped_cmd);
+	free(escaped_cmd);
 	/* fprintf(file, "exec %s -- /bin/sh -c %s\n", getenv("HADOOP_PARROT_PATH"), escaped_cmd); */ /* random bash bug, look into later */
 	fprintf(file, "exec %s -- /bin/sh <<EOF\n", getenv("HADOOP_PARROT_PATH"));
 	fprintf(file, "$cmd\n");
 	fprintf(file, "EOF\n");
-	free(escaped_cmd);
 	fclose(file);
-
-	chmod(wrapperfile, 0755);
 
 	return 0;
 }
 
-static char *get_hadoop_target_file(const char *input_files)
+batch_job_id_t batch_job_fork_hadoop(struct batch_queue *q, char *hadoop_streaming_command[], struct hadoop_job *job)
 {
-	static char result[BATCH_JOB_LINE_MAX];
-	char *match_string = string_format("%s%%[^,]", getenv("HDFS_ROOT_DIR"));
-	sscanf(input_files, match_string, result);
-	free(match_string);
-	return result;
-}
-
-batch_job_id_t batch_job_fork_hadoop(struct batch_queue *q, const char *cmd)
-{
-	int childpid;
-	time_t finish_time;
-
-	fflush(NULL);
-	debug(D_HDFS, "forking hadoop_status_wrapper\n");
-	if((childpid = fork()) < 0) {
+	int status_pipe[2];
+	FILE *status_file;
+	if (pipe(status_pipe) == -1)
 		return -1;
-	} else if(!childpid) {
-		// CHILD
-		char line[BATCH_JOB_LINE_MAX];
-		FILE *cmd_pipe;
-
-		cmd_pipe = popen(cmd, "r");
-		if(!cmd_pipe) {
-			debug(D_DEBUG, "hadoop_status_wrapper: couldn't submit job: %s", strerror(errno));
-			_exit(-1 * time(0));
-		}
-
-		while(fgets(line, sizeof(line), cmd_pipe)) {
-			if(!strncmp(line, "Streaming Command Failed!", 25)) {
-				debug(D_HDFS, "hadoop_status_wrapper: job %d failed", (int)getpid());
-				_exit(-1 * time(0));
-			}
-		}
-		finish_time = time(0);
-
-		if(pclose(cmd_pipe)) {
-			_exit(-1 * finish_time);
-		} else {
-			_exit(finish_time);
-		}
-
-	} else {
-		//PARENT
-		struct batch_job_info *info;
-
-		info = malloc(sizeof(*info));
-		memset(info, 0, sizeof(*info));
-		info->submitted = info->started = time(0);
-		itable_insert(q->job_table, childpid, info);
-		debug(D_DEBUG, "job %d submitted", childpid);
-		return childpid;
+	if (fcntl(status_pipe[0], F_SETFL, O_NONBLOCK) == -1 || ((status_file = fdopen(status_pipe[0], "r")) == NULL)) {
+		close(status_pipe[0]);
+		close(status_pipe[1]);
+		return -1;
 	}
-	return -1;
+	pid_t pid = fork();
+	if (pid == 0) { /* CHILD */
+		signal(SIGINT, SIG_IGN); /* if user interrupts parent, we'll kill process manually in batch_job_remove_hadoop */
+		close(status_pipe[0]);
+		close(STDIN_FILENO);
+		if (open("/dev/null", O_RDONLY|O_NOCTTY) != STDIN_FILENO) _exit(1);
+		if (dup2(status_pipe[1], STDOUT_FILENO) != STDOUT_FILENO) _exit(1);
+		if (dup2(status_pipe[1], STDERR_FILENO) != STDERR_FILENO) _exit(1);
+		if (execv(hadoop_streaming_command[0], hadoop_streaming_command) == -1)
+			_exit(1);
+		return -1;
+	} else if (pid > 0) { /* PARENT */
+		close(status_pipe[1]);
+		job->child = pid;
+		job->status_file = status_file;
+		job->info.submitted = job->info.started = time(0);
+		itable_insert(q->job_table, (int) job->child, job);
+		debug(D_DEBUG, "job %d submitted", (int) job->child);
+		return job->child;
+	} else {
+		return -1;
+	}
 }
 
 batch_job_id_t batch_job_submit_simple_hadoop(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
-	char *target_file;
-
-	target_file = get_hadoop_target_file(extra_input_files);
-	if(!target_file) {
-		debug(D_DEBUG, "couldn't create new hadoop task: no input file specified\n");
+	int i;
+	struct hadoop_job *job = xxmalloc(sizeof(struct hadoop_job));
+	strcpy(job->wrapper, WRAPPER_TEMPLATE);
+	int fd = mkstemp(job->wrapper);
+	if (fd == -1)
 		return -1;
-	} else
-		debug(D_HDFS, "input file %s specified\n", target_file);
+	chmod(job->wrapper, 0644);
+	if (setup_hadoop_wrapper(fd, cmd) == -1) { /* closes fd on success */
+		close(fd);
+		free(job);
+		return -1;
+	}
+	char *hadoop_streaming_jar = string_format("%s/mapred/contrib/streaming/hadoop-2*-streaming.jar", getenv("HADOOP_HOME"));
+	glob_t g;
+	if (glob(hadoop_streaming_jar, 0, NULL, &g) != 0 || g.gl_pathc != 1) {
+		close(fd);
+		free(job);
+		debug(D_HDFS, "could not locate hadoop streaming jar using pattern `%s'.", hadoop_streaming_jar);
+		return -1;
+	}
+	free(hadoop_streaming_jar);
+	hadoop_streaming_jar = xstrdup(g.gl_pathv[0]);
+	globfree(&g);
 
-	setup_hadoop_wrapper("./hadoop.wrapper", cmd);
+	char *hadoop_streaming_command[] = {
+		string_format("%s/bin/hadoop", getenv("HADOOP_HOME")),
+		string_format("jar"),
+		hadoop_streaming_jar,
+		string_format("-Dmapreduce.job.reduces=0"),
+		string_format("-input"),
+		string_format("file:///dev/null"),
+		string_format("-mapper"),
+		string_format("%s", job->wrapper),
+		string_format("-file"),
+		string_format("%s", job->wrapper),
+		string_format("-output"),
+		string_format("%s/job-%010d", getenv("HADOOP_USER_TMP"), (int) time(0)),
+		NULL,
+	};
 
-	char *command = string_format("%s/bin/hadoop jar %s/mapred/contrib/streaming/hadoop-*-streaming.jar -D mapreduce.job.maps=1 -D mapreduce.job.reduces=0 -D mapreduce.input.fileinputformat.split.minsize=10000000 -input %s -mapper ./hadoop.wrapper -file ./hadoop.wrapper -output '%s/job-%010d' 2>&1", getenv("HADOOP_HOME"), getenv("HADOOP_HOME"), target_file, getenv("HADOOP_USER_TMP"), (int)time(0));
-
-	debug(D_HDFS, "%s", command);
-
-	batch_job_id_t status = batch_job_fork_hadoop(q, command);
-	free(command);
+	batch_job_id_t status = batch_job_fork_hadoop(q, hadoop_streaming_command, job);
+	for (i = 0; hadoop_streaming_command[i]; i++)
+		free(hadoop_streaming_command[i]);
 	return status;
 }
 
@@ -141,60 +156,82 @@ batch_job_id_t batch_job_submit_hadoop(struct batch_queue *q, const char *cmd, c
 }
 
 
-batch_job_id_t batch_job_wait_hadoop(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+batch_job_id_t batch_job_wait_hadoop(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
 {
-	struct batch_job_info *info;
-	batch_job_id_t jobid;
+	UINT64_T key;
+	struct hadoop_job *job;
 
-	while(1) {
-		UINT64_T ujobid;
-		itable_firstkey(q->job_table);
-		while(itable_nextkey(q->job_table, &ujobid, (void **) &info)) {
-			int status;
-			jobid = ujobid;
-
-			if(waitpid(jobid, &status, WNOHANG) > 0){
-				if(WIFEXITED(status)) {
-					int result = WEXITSTATUS(status);
-					if(result > 0) {
-						debug(D_DEBUG, "job %d success", jobid);
-						info->finished = result;
-						info->exited_normally = 1;
-					} else {
-						debug(D_DEBUG, "job %d failed", jobid);
-						info->finished = -1 * result;
-						info->exited_normally = 0;
-					}
-				} else {
-					debug(D_DEBUG, "job %d failed", jobid);
-					info->finished = time(0);
-					info->exited_normally = 0;
-				}
-			}
-
-			if(info->finished != 0) {
-				info = itable_remove(q->job_table, jobid);
-				memcpy(info_out, info, sizeof(*info));
-				free(info);
-				return jobid;
+restart:
+	itable_firstkey(q->job_table);
+	while (itable_nextkey(q->job_table, &key, (void **) &job)) {
+		/* read the status until empty */
+		char line[BATCH_JOB_LINE_MAX];
+		while (fgets(line, sizeof(line), job->status_file) > 0) {
+			debug(D_DEBUG, "hadoop-streaming job %d output: %s", (int) job->child, line);
+			if (strstr(line, "Streaming Command Failed!")) {
+				debug(D_HDFS, "hadoop-streaming job %d failed", job->child);
+				/* job->info.exited_normally = 0; */
+				/* job->info.finished = time(0); */
 			}
 		}
 
-		if(itable_size(q->job_table) <= 0)
-			return 0;
-
-		if(stoptime != 0 && time(0) >= stoptime)
-			return -1;
-
-		sleep(1);
+		int status;
+		pid_t child = waitpid(job->child, &status, WNOHANG);
+		if (child > 0) {
+			assert(child == job->child);
+			job->info.finished = time(0);
+			if (WIFEXITED(status)) {
+				int result = WEXITSTATUS(status);
+				job->info.exit_code = result;
+				job->info.exited_normally = 1;
+				if (result == 0)
+					debug(D_HDFS, "hadoop-streaming job %d exited successfully.", (int)job->child);
+				else
+					debug(D_HDFS, "hadoop-streaming job %d failed with exit status %d.", (int)job->child, result);
+			} else if (WIFSIGNALED(status)) {
+					int sig = WTERMSIG(status);
+					debug(D_HDFS, "hadoop-streaming job %d terminated by signal %d.", (int)job->child, sig);
+					job->info.exited_normally = 0;
+					job->info.exit_signal = sig;
+			}
+			memcpy(info_out, &job->info, sizeof(job->info));
+			fclose(job->status_file);
+			unlink(job->wrapper);
+			free(job);
+			itable_remove(q->job_table, key);
+			return key;
+		}
 	}
 
-	return -1;
+	if (stoptime > 0 && time(0) >= stoptime)
+		return -1;
+
+	sleep(1);
+	goto restart;
 }
 
 
 int batch_job_remove_hadoop(struct batch_queue *q, batch_job_id_t jobid)
 {
+	UINT64_T key = jobid;
+	struct hadoop_job *job;
+	if ((job = itable_lookup(q->job_table, key))) {
+		int status;
+		debug(D_DEBUG, "sending hadoop-streaming job %d SIGTERM.", (int)job->child);
+		kill(job->child, SIGTERM);
+		sleep(2); /* give time to exit gracefully */
+		pid_t child = waitpid(job->child, &status, WNOHANG);
+		if (child <= 0) {
+			debug(D_DEBUG, "forcibly killing hadoop-streaming job %d with SIGKILL.", (int)job->child);
+			kill(job->child, SIGKILL); /* force exit */
+			child = waitpid(job->child, &status, 0); /* wait forever */
+		}
+		assert(child == job->child);
+		fclose(job->status_file);
+		unlink(job->wrapper);
+		free(job);
+		itable_remove(q->job_table, key);
+		return 1;
+	}
 	return 0;
 }
-
