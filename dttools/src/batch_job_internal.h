@@ -14,7 +14,6 @@ struct batch_queue {
 	char *options_text;
 	struct itable *job_table;
 	struct itable *output_table;
-	struct itable *hadoop_jobs;
 	struct work_queue *work_queue;
 	struct mpi_queue *mpi_queue;
 };
