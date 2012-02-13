@@ -599,7 +599,7 @@ int main(int argc, char *argv[])
 	char tempdir[WORK_QUEUE_LINE_MAX];
 	sprintf(tempdir, "%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 
-	fprintf(stdout, "worker: working in %s\n", tempdir);
+	fprintf(stdout, "work_queue_worker: working in %s\n", tempdir);
 	mkdir(tempdir, 0700);
 	chdir(tempdir);
 	
