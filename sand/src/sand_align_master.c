@@ -17,6 +17,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "work_queue.h"
+#include "work_queue_catalog.h"
 #include "hash_table.h"
 #include "stringtools.h"
 #include "macros.h"
@@ -175,7 +176,7 @@ static void task_complete( struct work_queue_task *t )
 	fflush(output_file);
 
 	tasks_done++;
-	tasks_runtime += (t->finish_time - t->start_time);
+	tasks_runtime += (t->time_receive_output_finish - t->time_send_input_start);
 	tasks_filetime += t->total_transfer_time;
 
 	work_queue_task_delete(t);
@@ -314,36 +315,15 @@ static struct work_queue_task * task_create( struct hash_table *sequence_table )
 	return t;
 }
 
-int parse_catalog_server_description(char* server_string) {
-	char *host;
-	int port;
-	char *colon;
-	char line[1024];
-
-	colon = strchr(server_string, ':');
-
-	if(!colon) return 0;
-
-	*colon = '\0';
-
-	host = strdup(server_string);
-	port = atoi(colon+1);
-
-	if(!port) return 0;
-		
-	sprintf(line,"CATALOG_HOST=%s",host);
-	putenv(strdup(line));
-	sprintf(line,"CATALOG_PORT=%d",port);
-	putenv(strdup(line));
-	
-	return 1;
-}
 int main(int argc, char *argv[])
 {
 	char c;
 	char line[1024];
 
 	const char *progname = "sand_align_master";
+
+	char *catalog_server_host = NULL;
+	int catalog_server_port = 0;
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 
@@ -379,12 +359,17 @@ int main(int argc, char *argv[])
 			sprintf(line,"WORK_QUEUE_NAME=%s",project);
 			putenv(strdup(line));
 			break;
-
 		case 'C':
-			if(!parse_catalog_server_description(optarg)) {
+			if(!parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port)) {
 				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
 			}
+					
+			sprintf(line,"CATALOG_HOST=%s", catalog_server_host);
+			putenv(strdup(line));
+			sprintf(line,"CATALOG_PORT=%d", catalog_server_port);
+			putenv(strdup(line));
+
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
 		case 'o':

@@ -19,6 +19,10 @@ and port of the master.
 
 #include "timestamp.h"
 
+#define WORK_QUEUE_SWITCH_UNSPECIFIED -1
+#define WORK_QUEUE_SWITCH_OFF 0
+#define WORK_QUEUE_SWITCH_ON  1
+
 #define WORK_QUEUE_DEFAULT_PORT 9123 /**< Default Work Queue port number. */
 #define WORK_QUEUE_RANDOM_PORT -1    /**< Indicate to Work Queue to choose a random open port. */
 #define WORK_QUEUE_LINE_MAX 1024
@@ -61,14 +65,22 @@ and port of the master.
 #define WORK_QUEUE_MASTER_PRIORITY_DEFAULT 10
 #define WORK_QUEUE_WORKER_MODE_SHARED 0	    /**< Work Queue master accepts workers in shared or non-exclusive mode. */
 #define WORK_QUEUE_WORKER_MODE_EXCLUSIVE 1  /**< Work Queue master only accepts workers that have a preference for it. */
-#define WORK_QUEUE_CATALOG_LINE_MAX 1024
-#define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 60
-#define	WORK_QUEUE_CATALOG_LIFETIME	180
+
+#define WORK_QUEUE_WAIT_UNSPECIFIED -1	
+#define WORK_QUEUE_WAIT_FCFS 0				/**< First come first serve. */
+#define WORK_QUEUE_WAIT_FAST_DISPATCH 1		/**< Dispatch task to new workers first. */
+#define WORK_QUEUE_WAIT_ADAPTIVE 2 			/**< If master is busy, do not use new workers. */
+
+#define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
+
+#define WORK_QUEUE_CAPACITY_TOLERANCE_MAX 1000
+#define WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT 1
+
+#define WORK_QUEUE_WORKERS_NO_LIMIT -1
 
 #define WORK_QUEUE_FS_CMD 1
 #define WORK_QUEUE_FS_PATH 2
 #define WORK_QUEUE_FS_SYMLINK 3
-
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler;	/**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
@@ -88,18 +100,27 @@ struct work_queue_task {
 	int return_status;		/**< The exit code of the command line. */
 	int result;			/**< The result of the task (successful, failed return_status, missing input file, missing output file). */
 	char *host;			/**< The name of the host on which it ran. */
-	timestamp_t submit_time;	/**< The time the task was submitted. */
-	timestamp_t transfer_start_time;	/**< The time at which it started to transfer input files. */
-	timestamp_t start_time;		/**< The time representing the start of the task. Recorded as the timestamp immediately after all its input files were transferred. */
-	timestamp_t finish_time;	/**< The time representing the end of the task. Recorded as the timestamp immediately after all its output files were received. */
-	timestamp_t computation_time;	/**< Elapsed time between start_time and the beginning of the transfer of output files. */
-	INT64_T total_bytes_transferred;/**< Number of bytes transferred since task has last started transferring input data. */
+
+	timestamp_t time_task_submit;	/**< The time at which this task was submitted */
+	timestamp_t time_task_finish;	/**< The time at which this task was finished */
+	timestamp_t time_app_delay;	 /**< time spent in upper-level application (outside of work_queue_wait)>*/
+	timestamp_t time_send_input_start;	/**< The time at which it started to transfer input files. */
+	timestamp_t time_send_input_finish;	/**< The time at which it finished transferring input files. */
+	timestamp_t time_execute_cmd_start;		    /**< The time at which the task began. */
+	timestamp_t time_execute_cmd_finish;		/**< The time at which the task finished (discovered by the master). */
+	timestamp_t time_receive_output_start;	/**< The time at which it started to transfer output files. */
+	timestamp_t time_receive_output_finish;	/**< The time at which it finished transferring output files. */
+
+    INT64_T total_bytes_transferred;    /**< Number of bytes transferred since task has last started transferring input data. */
 	timestamp_t total_transfer_time;    /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
+	timestamp_t cmd_execution_time;    /**< Time spent in microseconds for executing the command on the worker. */
 };
 
 /** Statistics describing a work queue. */
 
 struct work_queue_stats {
+	int port;
+	int priority;
 	int workers_init;		/**< Number of workers initializing. */
 	int workers_ready;		/**< Number of workers ready for tasks. */
 	int workers_busy;		/**< Number of workers running tasks. */
@@ -115,6 +136,12 @@ struct work_queue_stats {
 	timestamp_t total_send_time;/**<Total time in microseconds spent in sending data to workers. */
 	timestamp_t total_receive_time;
 				    /**<Total time in microseconds spent in receiving data from workers. */
+	double efficiency;
+	double idle_percentage;
+	int capacity;
+	int avg_capacity;
+	int total_workers_connected;
+	int excessive_workers_removed;
 };
 
 /** @name Functions - Tasks */

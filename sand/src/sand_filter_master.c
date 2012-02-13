@@ -17,6 +17,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "work_queue.h"
+#include "work_queue_catalog.h"
 #include "memory_info.h"
 #include "macros.h"
 #include "delete_dir.h"
@@ -322,7 +323,7 @@ static void task_complete( struct work_queue_task * t )
 		fputs(t->output, outfile);
 		fflush(outfile);
 		total_processed++;
-		tasks_runtime += (t->finish_time - t->start_time);
+		tasks_runtime += (t->time_receive_output_finish - t->time_send_input_start);
 		tasks_filetime += t->total_transfer_time;
 		work_queue_task_delete(t);
 	} else {
@@ -467,36 +468,14 @@ int main(int argc, char ** argv)
 
 	return 0;
 }
-int parse_catalog_server_description(char* server_string) {
-	char *host;
-	int port;
-	char *colon;
-	char line[1024];
-
-	colon = strchr(server_string, ':');
-
-	if(!colon) return 0;
-
-	*colon = '\0';
-
-	host = strdup(server_string);
-	port = atoi(colon+1);
-
-	if(!port) return 0;
-		
-	sprintf(line,"CATALOG_HOST=%s",host);
-	putenv(strdup(line));
-	sprintf(line,"CATALOG_PORT=%d",port);
-	putenv(strdup(line));
-	
-	return 1;
-}
 
 static void get_options(int argc, char ** argv, const char * progname)
 {
 	char c;
 	char tmp[512];
 	char line[1024];
+	char *catalog_server_host = NULL;
+	int catalog_server_port = 0;
 
 	while ((c = getopt(argc, argv, "p:n:d:F:N:C:s:r:R:k:w:c:o:uxvha")) != (char) -1)
 	{
@@ -539,10 +518,16 @@ static void get_options(int argc, char ** argv, const char * progname)
 			break;
 
 		case 'C':
-			if(!parse_catalog_server_description(optarg)) {
+			if(!parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port)) {
 				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
 			}
+					
+			sprintf(line,"CATALOG_HOST=%s", catalog_server_host);
+			putenv(strdup(line));
+			sprintf(line,"CATALOG_PORT=%d", catalog_server_port);
+			putenv(strdup(line));
+
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
 		case 'u':

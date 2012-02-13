@@ -249,6 +249,8 @@ void *list_pop_tail(struct list *l)
 
 void *list_peek_head(struct list *l)
 {
+	if(!l) return 0;
+
 	if(l->head) {
 		return l->head->data;
 	} else {
@@ -258,6 +260,8 @@ void *list_peek_head(struct list *l)
 
 void *list_peek_tail(struct list *l)
 {
+	if(!l) return 0;
+
 	if(l->tail) {
 		return l->tail->data;
 	} else {
