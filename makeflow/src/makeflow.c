@@ -134,7 +134,7 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 			tmp = hash_table_lookup(d->file_table,f->filename);
 			// if a source file is also a target file 
 			if(tmp) {
-				debug(D_DEBUG, "%d depends on %d\n", n->nodeid, tmp->nodeid);
+				debug(D_DEBUG, "%d depends on %d", n->nodeid, tmp->nodeid);
 				if(nodeid == -1) {
 					m = tmp;  // m holds the parent node
 					nodeid = m->nodeid;
@@ -180,7 +180,7 @@ void dag_show_input_files(struct dag *d)
 			tmp = hash_table_lookup(d->file_table,f->filename);
 			// if a source file is also a target file 
 			if(!tmp) {
-				debug(D_DEBUG, "Found independent input file: %s\n", f->filename);
+				debug(D_DEBUG, "Found independent input file: %s", f->filename);
 				hash_table_insert(ih, f->filename, (void *)NULL);
 			} 
 		}
@@ -188,7 +188,7 @@ void dag_show_input_files(struct dag *d)
 
 	hash_table_firstkey(ih);
 	while(hash_table_nextkey(ih,&key,&value)) {
-		printf("%s\n",key);
+		debug(D_DEBUG, "%s",key);
 	}
 
 	hash_table_delete(ih);
@@ -202,7 +202,7 @@ void dag_show_output_files(struct dag *d)
 	hash_table_firstkey(d->file_table);
 
 	while(hash_table_nextkey(d->file_table, &key,&value)) {
-		printf("%s\n", key);
+		debug(D_DEBUG, "%s", key);
 	}
 }
 
@@ -222,11 +222,11 @@ static int handle_auto_workers(struct dag *d, int auto_workers)
 	}
 
 	char *start_worker_command = string_format("condor_submit_workers %s %d %d", hostname, port, num_of_workers);
-	printf("makeflow: starting %d workers: `%s`\n",num_of_workers,start_worker_command);
+	debug(D_DEBUG, "starting %d workers: `%s`",num_of_workers,start_worker_command);
 	int status = system(start_worker_command);
 	free(start_worker_command);
 	if (status) {
-		fprintf(stderr, "makeflow: unable to start workers.\n");
+		debug(D_DEBUG, "unable to start workers.");
 		return 0;
 	}
 
@@ -322,29 +322,29 @@ void dag_print( struct dag *d )
 	struct dag_node *n;
 	struct dag_file *f;
 
-	printf("digraph {\n");
+	fprintf(stdout, "digraph {\n");
 
-	printf("node [shape=ellipse];\n");
+	fprintf(stdout, "node [shape=ellipse];\n");
 
 	for(n=d->nodes;n;n=n->next) {
 		char *name = xstrdup(n->command);
 		char *label = strtok(name," \t\n");
-		printf("N%d [label=\"%s\"];\n",n->nodeid,label);
+		fprintf(stdout, "N%d [label=\"%s\"];\n",n->nodeid,label);
 		free(name);
 	}
 
-	printf("node [shape=box];\n");
+	fprintf(stdout, "node [shape=box];\n");
 
 	for(n=d->nodes;n;n=n->next) {
 		for(f=n->source_files;f;f=f->next) {
-			printf("\"%s\" -> N%d;\n",f->filename,n->nodeid);
+			fprintf(stdout, "\"%s\" -> N%d;\n",f->filename,n->nodeid);
 		}
 		for(f=n->target_files;f;f=f->next) {
-			printf("N%d -> \"%s\";\n",n->nodeid,f->filename);
+			fprintf(stdout, "N%d -> \"%s\";\n",n->nodeid,f->filename);
 		}
 	}
 
-	printf("}\n");
+	fprintf(stdout, "}\n");
 }
 
 const char * dag_node_state_name( dag_node_state_t state )
@@ -409,18 +409,18 @@ void dag_abort_all( struct dag *d )
 	UINT64_T jobid;
 	struct dag_node *n;
 
-	printf("makeflow: got abort signal...\n");
+	debug(D_DEBUG, "got abort signal...\n");
 
 	itable_firstkey(d->local_job_table);
 	while(itable_nextkey(d->local_job_table,&jobid,(void**)&n)) {
-		printf("makeflow: aborting local job %llu\n",jobid);
+		debug(D_DEBUG, "aborting local job %llu\n",jobid);
 		batch_job_remove(local_queue,jobid);
 		dag_node_state_change(d,n,DAG_NODE_STATE_ABORTED);
 	}
 
 	itable_firstkey(d->remote_job_table);
 	while(itable_nextkey(d->remote_job_table,&jobid,(void**)&n)) {
-		printf("makeflow: aborting remote job %llu\n",jobid);
+		debug(D_DEBUG, "aborting remote job %llu\n",jobid);
 		batch_job_remove(remote_queue,jobid);
 		dag_node_state_change(d,n,DAG_NODE_STATE_ABORTED);
 	}
@@ -431,18 +431,18 @@ void file_clean( const char *filename, int silent )
 	if (!filename) return;
 
 	if(unlink(filename)==0) {
-		if (!silent) printf("makeflow: deleted file %s\n",filename);
+		if (!silent) debug(D_DEBUG, "deleted file %s\n",filename);
 	} else {
 		if(errno==ENOENT) {
 			// nothing
 		} else if (errno==EISDIR) {
 			if(!delete_dir(filename)) {
-				if (!silent) printf("makeflow: couldn't delete directory %s: %s\n",filename,strerror(errno));
+				if (!silent) debug(D_DEBUG, "couldn't delete directory %s: %s\n",filename,strerror(errno));
 			} else {
-				if (!silent) printf("makeflow: deleted directory %s\n",filename);
+				if (!silent) debug(D_DEBUG, "deleted directory %s\n",filename);
 			}
 		} else {
-			if (!silent) printf("makeflow: couldn't delete %s: %s\n",filename,strerror(errno));
+			if (!silent) debug(D_DEBUG, "couldn't delete %s: %s\n",filename,strerror(errno));
 		}
 	}
 }
@@ -500,13 +500,13 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	// If a job was submitted to Condor, then just reconnect to it.	
 	if(n->state==DAG_NODE_STATE_RUNNING && !n->local_job && batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
 		// Reconnect the Condor jobs
-		printf("makeflow: rule still running: %s\n",n->command);
+		debug(D_DEBUG, "rule still running: %s\n",n->command);
 		itable_insert(d->remote_job_table,n->jobid,n);
 		d->remote_jobs_running++;
 
 	// Otherwise, we cannot reconnect to the job, so rerun it
 	} else if(n->state==DAG_NODE_STATE_RUNNING || n->state==DAG_NODE_STATE_FAILED || n->state==DAG_NODE_STATE_ABORTED) {
-		printf("makeflow: will retry failed rule: %s\n",n->command);
+		debug(D_DEBUG, "will retry failed rule: %s\n",n->command);
 		goto rerun;
 	}
 
@@ -702,7 +702,7 @@ char * dag_readline( struct dag *d, FILE *file )
 		{
 			debug(D_DEBUG, "read line %d\n", d->linenum);
 			if (d->linenum % 100000 == 0)
-				printf("makeflow: reading line %d\n", d->linenum);
+				debug(D_DEBUG, "reading line %d\n", d->linenum);
 		}
 
 		string_chomp(rawline);
@@ -928,7 +928,7 @@ void dag_node_parse_filelist( struct dag *d, struct dag_node *n, char *filelist,
 			newname = NULL;
 			rv = translate_filename(d, filename, &newname);
 			if (rv && !clean_mode) {
-				printf("makeflow: creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
+				debug(D_DEBUG, "creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
 				rv = symlink(filename, newname);
 				if (rv < 0 && errno != EEXIST) {
 					//TODO: Check for if symlink points to right place
@@ -1018,7 +1018,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 	}
 
 	if(!colon) {
-		fprintf(stderr,"makeflow: error at %s:%d: %s\n",d->filename,d->linenum,line);
+		fprintf(stderr, "makeflow: error at %s:%d: %s\n",d->filename,d->linenum,line);
 		exit(1);
 	}
 
@@ -1106,7 +1106,7 @@ struct dag * dag_create( const char *filename, int clean_mode )
 		for(f=n->target_files;f;f=f->next) {
 			m = hash_table_lookup(d->file_table,f->filename);
 			if(m) {
-				fprintf(stderr,"makeflow: %s is defined multiple times at %s:%d and %s:%d\n",f->filename,d->filename,n->linenum,d->filename,m->linenum);
+				fprintf(stderr, "makeflow: %s is defined multiple times at %s:%d and %s:%d\n",f->filename,d->filename,n->linenum,d->filename,m->linenum);
 				exit(1);
 			} else {
 				hash_table_insert(d->file_table,f->filename,n);
@@ -1134,7 +1134,7 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 		thequeue = remote_queue;
 	}
 
-	printf("makeflow: %s\n",n->command);
+	debug(D_DEBUG, "%s\n",n->command);
 
 	input_files = malloc((n->source_file_names_size + 1) * sizeof(char));
 	input_files[0] = '\0';
@@ -1176,10 +1176,10 @@ void dag_node_submit( struct dag *d, struct dag_node *n )
 		n->jobid = batch_job_submit_simple(thequeue,n->command,input_files,output_files);
 		if(n->jobid>=0) break;
 
-		fprintf(stderr,"makeflow: couldn't submit batch job, still trying...\n");
+		debug(D_DEBUG,"couldn't submit batch job, still trying...\n");
 
 		if(time(0)>stoptime) {
-			fprintf(stderr,"makeflow: unable to submit job after %d seconds!\n",dag_submit_timeout);
+			debug(D_DEBUG,"unable to submit job after %d seconds!\n",dag_submit_timeout);
 			break;
 		}
 
@@ -1261,13 +1261,13 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 	if(info->exited_normally && info->exit_code==0) {
 		for(f=n->target_files;f;f=f->next) {
 			if(access(f->filename,R_OK)!=0) {
-				fprintf(stderr,"makeflow: %s did not create file %s\n",n->command,f->filename);
+				debug(D_DEBUG,"%s did not create file %s\n",n->command,f->filename);
 				job_failed=1;
 			} else {
 				if (output_len_check){
 					if (stat(f->filename,&stat_info)==0){
 						if (stat_info.st_size<=0){
-							fprintf(stderr,"makeflow: %s created a file of length %ld\n",n->command,(long)stat_info.st_size);
+							debug(D_DEBUG,"%s created a file of length %ld\n",n->command,(long)stat_info.st_size);
 		                                	job_failed=1;
 						}
 					}
@@ -1276,9 +1276,9 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 		}
 	} else {
 		if(info->exited_normally) {
-			fprintf(stderr,"makeflow: %s failed with exit code %d\n",n->command,info->exit_code);
+			debug(D_DEBUG,"%s failed with exit code %d\n",n->command,info->exit_code);
 		} else {
-			fprintf(stderr,"makeflow: %s crashed with signal %d (%s)\n",n->command,info->exit_signal,strsignal(info->exit_signal));
+			debug(D_DEBUG,"%s crashed with signal %d (%s)\n",n->command,info->exit_signal,strsignal(info->exit_signal));
 		}
 		job_failed = 1;
 	}
@@ -1288,10 +1288,10 @@ void dag_node_complete( struct dag *d, struct dag_node *n, struct batch_job_info
 		if(dag_retry_flag || info->exit_code==101) {
 			n->failure_count++;
 			if(n->failure_count>dag_retry_max) {
-				fprintf(stderr,"makeflow: job %s failed too many times.\n",n->command);
+				debug(D_DEBUG,"job %s failed too many times.\n",n->command);
 				dag_failed_flag = 1;
 			} else {
-				fprintf(stderr,"makeflow: will retry failed job %s\n",n->command);
+				debug(D_DEBUG,"will retry failed job %s\n",n->command);
 				dag_node_state_change(d,n,DAG_NODE_STATE_WAITING);
 			}
 		} else {
@@ -1312,7 +1312,7 @@ int dag_check( struct dag *d )
 	struct dag_node *n;
 	struct dag_file *f;
 
-	printf("makeflow: checking rules for consistency...\n");
+	debug(D_DEBUG, "checking rules for consistency...\n");
 
 	for(n=d->nodes;n;n=n->next) {
 		for(f=n->source_files;f;f=f->next) {
@@ -1329,7 +1329,7 @@ int dag_check( struct dag *d )
 				continue;
 			}
 
-			fprintf(stderr,"makeflow: error: %s does not exist, and is not created by any rule.\n",f->filename);
+			fprintf(stderr,"makeflow: %s does not exist, and is not created by any rule.\n",f->filename);
 			clean_symlinks(d, 1);
 			return 0;
 		}
@@ -1387,44 +1387,44 @@ static void handle_abort( int sig )
 
 static void show_version(const char *cmd)
 {
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
+	fprintf(stdout, "%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
 }
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s [options] <dagfile>\n", cmd);
-	printf("where options are:\n");
-	printf(" -c             Clean up: remove logfile and all targets.\n");
-	printf(" -T <type>      Batch system type: %s. (default is local)\n",batch_queue_type_string());
-	printf(" -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
-	printf(" -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
-	printf(" -p <port>      Port number to use with work queue.         (default is %d, -1=random)\n",WORK_QUEUE_DEFAULT_PORT);
-	printf(" -N <project>   Set the project name to <project>\n");
-	printf(" -P <integer>   Priority. Higher the value, higher the priority.\n");
-	printf(" -a             Advertise the master information to a catalog server.\n");
-	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	printf(" -e             Set the work queue master to only accept workers that have the same -N <project> option.\n");
-	printf(" -E             Enable master capacity estimation in Work Queue. Estimated master capcity may be viewed in the work queue log file or through the  work_queue_status command.\n"); 
-	printf(" -M             Enable automatic excessive worker removal in Work Queue. (-E option will be automatically added when this option is given.)\n");
-	printf(" -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
-	printf(" -I             Show input files.\n");
-	printf(" -O             Show output files.\n");
-	printf(" -D             Display the Makefile as a Dot graph.\n");
-	printf(" -B <options>   Add these options to all batch submit files.\n");
-	printf(" -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n",dag_submit_timeout);
-	printf(" -r <n>         Automatically retry failed batch jobs up to n times.\n");
-	printf(" -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
-	printf(" -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
-	printf(" -A             Disable the check for AFS.                  (experts only.)\n");;
-	printf(" -k             Syntax check.\n");
-	printf(" -w <mode>      Auto Work Queue mode. Mode is either 'width' or 'group' (DAG [width] or largest [group] of tasks).\n");
-	printf(" -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
-	printf(" -d <subsystem> Enable debugging for this subsystem\n");
-	printf(" -o <file>      Send debugging to this file.\n");
-	printf(" -K             Preserve (i.e., do not clean) intermediate symbolic links\n");
-	printf(" -z             Force failure on zero-length output files \n");
-	printf(" -v             Show version string\n");
-	printf(" -h             Show this help screen\n");
+	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " -c             Clean up: remove logfile and all targets.\n");
+	fprintf(stdout, " -T <type>      Batch system type: %s. (default is local)\n",batch_queue_type_string());
+	fprintf(stdout, " -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
+	fprintf(stdout, " -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
+	fprintf(stdout, " -p <port>      Port number to use with work queue.         (default is %d, -1=random)\n",WORK_QUEUE_DEFAULT_PORT);
+	fprintf(stdout, " -N <project>   Set the project name to <project>\n");
+	fprintf(stdout, " -P <integer>   Priority. Higher the value, higher the priority.\n");
+	fprintf(stdout, " -a             Advertise the master information to a catalog server.\n");
+	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
+	fprintf(stdout, " -e             Set the work queue master to only accept workers that have the same -N <project> option.\n");
+	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capcity may be viewed in the work queue log file or through the  work_queue_status command.\n"); 
+	fprintf(stdout, " -M             Enable automatic excessive worker removal in Work Queue. (-E option will be automatically added when this option is given.)\n");
+	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
+	fprintf(stdout, " -I             Show input files.\n");
+	fprintf(stdout, " -O             Show output files.\n");
+	fprintf(stdout, " -D             Display the Makefile as a Dot graph.\n");
+	fprintf(stdout, " -B <options>   Add these options to all batch submit files.\n");
+	fprintf(stdout, " -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n",dag_submit_timeout);
+	fprintf(stdout, " -r <n>         Automatically retry failed batch jobs up to n times.\n");
+	fprintf(stdout, " -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
+	fprintf(stdout, " -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
+	fprintf(stdout, " -A             Disable the check for AFS.                  (experts only.)\n");;
+	fprintf(stdout, " -k             Syntax check.\n");
+	fprintf(stdout, " -w <mode>      Auto Work Queue mode. Mode is either 'width' or 'group' (DAG [width] or largest [group] of tasks).\n");
+	fprintf(stdout, " -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
+	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem\n");
+	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
+	fprintf(stdout, " -K             Preserve (i.e., do not clean) intermediate symbolic links\n");
+	fprintf(stdout, " -z             Force failure on zero-length output files \n");
+	fprintf(stdout, " -v             Show version string\n");
+	fprintf(stdout, " -h             Show this help screen\n");
 }
 
 int main( int argc, char *argv[] )
@@ -1445,7 +1445,7 @@ int main( int argc, char *argv[] )
 	int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 	int work_queue_estimate_capacity_on = 0;
 	int work_queue_auto_remove_workers_on = 0;
-    int work_queue_wait_routine = WORK_QUEUE_WAIT_UNSPECIFIED;
+	int work_queue_wait_routine = WORK_QUEUE_WAIT_UNSPECIFIED;
 	char *catalog_host;
 	int catalog_port;
 
@@ -1485,7 +1485,7 @@ int main( int argc, char *argv[] )
 			break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
-				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
+				fprintf(stderr, "makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
 			} 
 			setenv("CATALOG_HOST", catalog_host, 1);
@@ -1548,7 +1548,7 @@ int main( int argc, char *argv[] )
 		case 'T':
 			batch_queue_type = batch_queue_type_from_string(optarg);
 			if(batch_queue_type==BATCH_QUEUE_TYPE_UNKNOWN) {
-				fprintf(stderr,"makeflow: unknown batch queue type: %s\n",optarg);
+				fprintf(stderr, "makeflow: unknown batch queue type: %s\n",optarg);
 				return 1;
 			}
 			break;
@@ -1573,7 +1573,7 @@ int main( int argc, char *argv[] )
 			} else if(!strcmp(optarg,"fcfs")) {
 				wq_option_scheduler = WORK_QUEUE_SCHEDULE_FCFS;
 			} else {
-				fprintf(stderr,"makeflow: unknown scheduling mode %s\n",optarg);
+				fprintf(stderr, "makeflow: unknown scheduling mode %s\n",optarg);
 				return 1;
 			}
 			break;
@@ -1706,7 +1706,7 @@ int main( int argc, char *argv[] )
 
 	if (syntax_check)
 	{
-		printf("makeflow: %s: Syntax OK.\n", dagfile);
+		fprintf(stdout, "%s: Syntax OK.\n", dagfile);
 		return 0;
 	}
 
@@ -1777,9 +1777,9 @@ int main( int argc, char *argv[] )
 	if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
 		char *cwd = string_getcwd();
 		if(!strncmp(cwd,"/afs",4)) {
-			fprintf(stderr,"makeflow: This won't work because Condor is not able to write to files in AFS.\n");
-			fprintf(stderr,"makeflow: Instead, run makeflow from a local disk like /tmp.\n");
-			fprintf(stderr,"makeflow: Or, use the work queue with -T wq and condor_submit_workers.\n");
+			fprintf(stderr, "makeflow: This won't work because Condor is not able to write to files in AFS.\n");
+			fprintf(stderr, "makeflow: Instead, run makeflow from a local disk like /tmp.\n");
+			fprintf(stderr, "makeflow: Or, use the work queue with -T wq and condor_submit_workers.\n");
 			
 			free(logfilename);
 			free(batchlogfilename);
@@ -1816,7 +1816,7 @@ int main( int argc, char *argv[] )
 	}
 
 	port = batch_queue_port(remote_queue);
-	if(port>0) printf("makeflow: listening on port %d.\n",port);
+	if(port>0) debug(D_DEBUG, "listening on port %d.\n",port);
 
 	if(auto_workers>0) {
 		if(!handle_auto_workers(d, auto_workers)) {
@@ -1845,15 +1845,15 @@ int main( int argc, char *argv[] )
 
 	if(dag_abort_flag) {
 		fprintf(d->logfile, "# ABORTED\t%llu\n", timestamp_get());
-		fprintf(stderr,"makeflow: workflow was aborted.\n");
+		debug(D_DEBUG,"workflow was aborted.\n");
 		return 1;
 	} else if(dag_failed_flag) {
 		fprintf(d->logfile, "# FAILED\t%llu\n", timestamp_get());
-		fprintf(stderr,"makeflow: workflow failed.\n");
+		debug(D_DEBUG,"workflow failed.\n");
 		return 1;
 	} else {
 		fprintf(d->logfile, "# COMPLETED\t%llu\n", timestamp_get());
-		printf("makeflow: nothing left to do.\n");
+		debug(D_DEBUG, "nothing left to do.\n");
 		return 0;
 	}
 }
