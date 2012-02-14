@@ -1845,15 +1845,15 @@ int main( int argc, char *argv[] )
 
 	if(dag_abort_flag) {
 		fprintf(d->logfile, "# ABORTED\t%llu\n", timestamp_get());
-		debug(D_DEBUG,"workflow was aborted.\n");
+		fprintf(stderr,"workflow was aborted.\n");
 		return 1;
 	} else if(dag_failed_flag) {
 		fprintf(d->logfile, "# FAILED\t%llu\n", timestamp_get());
-		debug(D_DEBUG,"workflow failed.\n");
+		fprintf(stderr,"workflow failed.\n");
 		return 1;
 	} else {
 		fprintf(d->logfile, "# COMPLETED\t%llu\n", timestamp_get());
-		debug(D_DEBUG, "nothing left to do.\n");
+		fprintf(stderr,"nothing left to do.\n");
 		return 0;
 	}
 }
