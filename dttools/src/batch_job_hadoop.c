@@ -121,7 +121,7 @@ batch_job_id_t batch_job_submit_simple_hadoop(struct batch_queue *q, const char 
 		string_format("-file"),
 		string_format("%s", job->wrapper),
 		string_format("-output"),
-		string_format("%s/job-%010lu%d", getenv("HADOOP_USER_TMP"), (unsigned long) time(0), rand()),
+		string_format("%s/job-%010lu.%010d", getenv("HADOOP_USER_TMP"), (unsigned long) time(0), rand()),
 		NULL,
 	};
 
