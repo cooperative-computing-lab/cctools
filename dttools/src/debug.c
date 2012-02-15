@@ -201,6 +201,18 @@ void debug(INT64_T flags, const char *fmt, ...)
 	va_end(args);
 }
 
+void warn(INT64_T flags, const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+
+        int save_errno = errno;
+        do_debug(0, flags, fmt, args);
+        errno = save_errno;
+
+	va_end(args);
+}
+
 void fatal(const char *fmt, ...)
 {
 	struct fatal_callback *f;

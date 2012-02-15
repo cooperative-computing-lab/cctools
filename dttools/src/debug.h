@@ -91,6 +91,7 @@ transparently modify the linker namespace we are using.
 
 #define debug                  cctools_debug
 #define fatal                  cctools_fatal
+#define warn                   cctools_warn
 #define debug_config           cctools_debug_config
 #define debug_config_file      cctools_debug_config_file
 #define debug_config_file_size cctools_debug_config_file_size
@@ -109,6 +110,14 @@ Logs a debugging message, if the given flags are active.
 */
 
 void debug(INT64_T flags, const char *fmt, ...);
+
+/** Emit a warning message.
+Logs a warning message, regardless of if given flags are active.
+@param flags Any of the standard debugging flags OR-ed together.
+@param fmt A printf-style formatting string, followed by the necessary arguments.
+*/
+
+void warn(INT64_T flags, const char *fmt, ...);
 
 /** Emit a fatal debugging message and exit.
 Displays a printf-style message, and then forcibly exits the program.
