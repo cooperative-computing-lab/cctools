@@ -354,7 +354,7 @@ int main(int argc, char *argv[])
 			break; 
 		case 'N':
 			free(project);
-			project = xstrdup(optarg);
+			project = xxstrdup(optarg);
 			setenv("WORK_QUEUE_NAME", project, 1);
 			break;
 		case 'C':

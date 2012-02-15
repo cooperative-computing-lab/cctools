@@ -16,7 +16,7 @@ See the file COPYING for details.
 #include "text_list.h"
 #include "hash_table.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "macros.h"
 #include "envtools.h"
 #include "fast_popen.h"

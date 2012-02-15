@@ -12,7 +12,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "create_dir.h"
 #include "hash_table.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "md5.h"
 
 #include <stdlib.h>

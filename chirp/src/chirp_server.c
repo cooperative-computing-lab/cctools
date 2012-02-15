@@ -33,7 +33,7 @@ See the file COPYING for details.
 #include "catalog_server.h"
 #include "domain_name_cache.h"
 #include "list.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "md5.h"
 #include "load_average.h"
 #include "memory_info.h"

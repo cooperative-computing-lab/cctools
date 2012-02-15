@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "nvpair.h"
 #include "hash_table.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "macros.h"
 
 #include <stdlib.h>
@@ -44,7 +44,7 @@ void nvpair_delete(struct nvpair *n)
 
 void nvpair_parse(struct nvpair *n, const char *data)
 {
-	char *text = xstrdup(data);
+	char *text = xxstrdup(data);
 	char *name, *value;
 
 	name = strtok(text, " ");
@@ -135,7 +135,7 @@ void nvpair_insert_string(struct nvpair *n, const char *name, const char *value)
 	old = hash_table_remove(n->table, name);
 	if(old)
 		free(old);
-	hash_table_insert(n->table, name, xstrdup(value));
+	hash_table_insert(n->table, name, xxstrdup(value));
 }
 
 void nvpair_insert_integer(struct nvpair *n, const char *name, INT64_T ivalue)
@@ -338,7 +338,7 @@ void nvpair_print_table(struct nvpair *n, FILE * s, struct nvpair_header *h)
 		char *aligned = xxmalloc(h->width + 1);
 		char *line;
 		if(!text) {
-			line = xstrdup("???");
+			line = xxstrdup("???");
 		} else if(h->mode == NVPAIR_MODE_METRIC) {
 			line = xxmalloc(10);
 			string_metric(atof(text), -1, line);

@@ -12,7 +12,7 @@ See the file COPYING for details.
 
 extern "C" {
 #include "debug.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "stringtools.h"
 #include "macros.h"
 #include "itable.h"

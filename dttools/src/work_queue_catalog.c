@@ -14,7 +14,7 @@ See the file COPYING for details.
 #include "nvpair.h"
 #include "hash_cache.h"
 #include "list.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "domain_name_cache.h"

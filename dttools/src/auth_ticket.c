@@ -8,7 +8,7 @@
 #include "link.h"
 #include "md5.h"
 #include "sort_dir.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 
 #include <sys/stat.h>
 

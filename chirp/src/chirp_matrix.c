@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "auth_all.h"
 #include "debug.h"
 #include "chirp_matrix.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "username.h"
 #include "stringtools.h"
 #include "macros.h"

@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "envtools.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "itable.h"
 #include "create_dir.h"
 #include "delete_dir.h"

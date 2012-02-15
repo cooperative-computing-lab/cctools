@@ -38,7 +38,7 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "auth_all.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "list.h"
 #include "domain_name_cache.h"
 #include "md5.h"
@@ -120,7 +120,7 @@ static INT64_T do_put_one_dir( const char *source_file, const char *target_host,
 			while((d=readdir(dir))) {
 				if(!strcmp(d->d_name,".")) continue;
 				if(!strcmp(d->d_name,"..")) continue;
-				list_push_tail(work_list,xstrdup(d->d_name));
+				list_push_tail(work_list,xxstrdup(d->d_name));
 			}
 			closedir(dir);
 			while((name=list_pop_head(work_list))) {

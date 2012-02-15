@@ -511,7 +511,7 @@ static void get_options(int argc, char ** argv, const char * progname)
 			break; 
 		case 'N':
 			free(project);
-			project = xstrdup(optarg);
+			project = xxstrdup(optarg);
 			setenv("WORK_QUEUE_NAME", project, 1);
 			break;
 

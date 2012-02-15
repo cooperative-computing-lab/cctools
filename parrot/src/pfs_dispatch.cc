@@ -18,7 +18,7 @@ extern "C" {
 #include "tracer.h"
 #include "stringtools.h"
 #include "full_io.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "int_sizes.h"
 #include "macros.h"
 #include "debug.h"

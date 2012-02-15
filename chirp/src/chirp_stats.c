@@ -7,7 +7,7 @@ See the file COPYING for details.
 #include "chirp_stats.h"
 
 #include "debug.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "hash_table.h"
 #include "link.h"
 

@@ -18,7 +18,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "fast_popen.h"
 #include "text_list.h"
 #include "memory_info.h"

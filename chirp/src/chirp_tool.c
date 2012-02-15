@@ -31,7 +31,7 @@ See the file COPYING for details.
 #include "auth_all.h"
 #include "auth_ticket.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "list.h"
 #include "domain_name_cache.h"
 #include "md5.h"

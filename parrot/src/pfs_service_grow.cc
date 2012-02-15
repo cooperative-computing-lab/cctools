@@ -57,7 +57,7 @@ extern "C" {
 #include "full_io.h"
 #include "http_query.h"
 #include "hash_table.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "macros.h"
 #include "sha1.h"
 #include "sleeptools.h"
@@ -226,9 +226,9 @@ struct grow_dirent * grow_dirent_create_from_file( FILE *file, struct grow_diren
 		d->inode = inode++;
 
 		if(fields>=6) {
-			d->name = xstrdup(name);
+			d->name = xxstrdup(name);
 			if(linkname[0]) {
-				d->linkname = xstrdup(linkname);
+				d->linkname = xxstrdup(linkname);
 			} else {
 				d->linkname = 0;
 			}

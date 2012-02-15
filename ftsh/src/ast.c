@@ -6,7 +6,7 @@ See the file COPYING for details.
 */
 
 #include "ast.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -203,7 +203,7 @@ struct ast_word * ast_word_create( int line, const char *text )
 	ALLOC(w);
 
 	w->line = line;
-	w->text = xstrdup(text);
+	w->text = xxstrdup(text);
 	w->next = 0;
 
 	return w;

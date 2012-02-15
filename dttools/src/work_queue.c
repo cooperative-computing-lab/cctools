@@ -22,7 +22,7 @@ See the file COPYING for details.
 #include "process.h"
 #include "username.h"
 #include "create_dir.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "load_average.h"
 
 #include <unistd.h>
@@ -688,7 +688,7 @@ static int match_project_names(struct work_queue *q, const char *project_names)
 	if(!q || !project_names)
 		return 0;
 
-	str = xstrdup(project_names);
+	str = xxstrdup(project_names);
 	token = strtok(str, delims);
 	while(token) {
 		// token holds the preferred master name pattern
@@ -994,10 +994,10 @@ static int put_file(struct work_queue_file *tf, const char *expanded_payload, st
 	char *payload;
 
 	if (expanded_payload){
-		payload = xstrdup(expanded_payload);
+		payload = xxstrdup(expanded_payload);
 	}
 	else {
-		payload = xstrdup(tf->payload);
+		payload = xxstrdup(tf->payload);
 	}
 
 	if(stat(payload, &local_info) < 0)
@@ -1079,7 +1079,7 @@ char *expand_envnames(struct work_queue_worker *w, const char *payload)
 	char *delimtr = "$";
 	char *token;
 
-	str = xstrdup(payload);
+	str = xxstrdup(payload);
 
 	expanded_name = (char *)malloc(strlen(payload) + (50 * sizeof(char)));
 	if (expanded_name == NULL){
@@ -1156,7 +1156,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 					debug(D_WQ, "File name %s expanded to %s for %s (%s).", tf->payload, expanded_payload, w->hostname, w->addrport);
 				}
 				else {
-					expanded_payload = xstrdup(tf->payload);
+					expanded_payload = xxstrdup(tf->payload);
 				}
 				if(stat(expanded_payload, &s) != 0) {
 					fprintf(stderr, "Could not stat %s. (%s)\n", expanded_payload, strerror(errno));
@@ -1212,7 +1212,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 						expanded_payload = expand_envnames(w, tf->payload);
 					}
 					else {
-						expanded_payload = xstrdup(tf->payload);
+						expanded_payload = xxstrdup(tf->payload);
 					}
 					if(!put_file(tf, expanded_payload, q, w, &total_bytes)) {
 						free(expanded_payload);
@@ -2413,14 +2413,14 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 {
 	if(t->tag)
 		free(t->tag);
-	t->tag = xstrdup(tag);
+	t->tag = xxstrdup(tag);
 }
 
 void work_queue_task_specify_preferred_host(struct work_queue_task *t, const char *hostname)
 {
 	if(t->preferred_host)
 		free(t->preferred_host);
-	t->preferred_host = xstrdup(hostname);
+	t->preferred_host = xxstrdup(hostname);
 }
 
 void work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)

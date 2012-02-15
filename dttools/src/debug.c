@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "stringtools.h"
 #include "full_io.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "full_io.h"
 
 #include <assert.h>

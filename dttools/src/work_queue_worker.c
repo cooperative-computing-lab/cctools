@@ -18,7 +18,7 @@ See the file COPYING for details.
 #include "hash_cache.h"
 #include "link.h"
 #include "list.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "load_average.h"

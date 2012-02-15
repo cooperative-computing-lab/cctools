@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "stringtools.h"
 #include "timestamp.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 
 #include <assert.h>
 #include <errno.h>

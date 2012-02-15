@@ -11,7 +11,7 @@ See the file COPYING for details.
 
 #include "itable.h"
 #include "hash_table.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "int_sizes.h"
 #include "stringtools.h"
 #include "full_io.h"
@@ -154,7 +154,7 @@ static char *alloc_state_root(const char *path)
 	while(1) {
 		sprintf(statename, "%s/.__alloc", dirname);
 		if(cfs_file_size(statename) >= 0) {
-			return xstrdup(dirname);
+			return xxstrdup(dirname);
 		}
 		s = strrchr(dirname, '/');
 		if(!s)
@@ -373,7 +373,7 @@ INT64_T chirp_alloc_open(const char *path, INT64_T flags, INT64_T mode)
 		if(fd >= 0) {
 			if(!fd_table)
 				fd_table = itable_create(0);
-			itable_insert(fd_table, fd, xstrdup(path));
+			itable_insert(fd_table, fd, xxstrdup(path));
 			if(flags & O_TRUNC) {
 				alloc_state_update(a, -space_consumed(filesize));
 			}

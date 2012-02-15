@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 #include "macros.h"
 #include "buffer.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "md5.h"
 
 #include <sys/stat.h>

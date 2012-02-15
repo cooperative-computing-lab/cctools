@@ -34,7 +34,7 @@ See the file COPYING for details.
 #include "int_sizes.h"
 #include "list.h"
 #include "timestamp.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 
 #define SHOW_INPUT_FILES 2
 #define SHOW_OUTPUT_FILES 3
@@ -327,7 +327,7 @@ void dag_print( struct dag *d )
 	fprintf(stdout, "node [shape=ellipse];\n");
 
 	for(n=d->nodes;n;n=n->next) {
-		char *name = xstrdup(n->command);
+		char *name = xxstrdup(n->command);
 		char *label = strtok(name," \t\n");
 		fprintf(stdout, "N%d [label=\"%s\"];\n",n->nodeid,label);
 		free(name);
@@ -362,7 +362,7 @@ const char * dag_node_state_name( dag_node_state_t state )
 struct dag_file * dag_file_create( const char *filename, struct dag_file *next )
 {
 	struct dag_file *f = malloc(sizeof(*f));
-	f->filename = xstrdup(filename);
+	f->filename = xxstrdup(filename);
 	f->next = next;
 	return f;
 }
@@ -687,7 +687,7 @@ static char * lookupenv( const char *name, void *arg )
 {
 	const char *env = getenv(name);
 	
-	if (env) return xstrdup(env);
+	if (env) return xxstrdup(env);
 
 	return NULL;
 }
@@ -710,10 +710,10 @@ char * dag_readline( struct dag *d, FILE *file )
 		char *hash = strchr(rawline,'#');
 		if(hash) *hash = 0;
 
-		char *substline = xstrdup(rawline);
+		char *substline = xxstrdup(rawline);
 		substline = string_subst(substline,lookupenv,0);
 
-		char * cookedline = xstrdup(substline);
+		char * cookedline = xxstrdup(substline);
 
 		string_replace_backslash_codes(substline,cookedline);
 		free(substline);
@@ -748,12 +748,12 @@ static int translate_filename( struct dag *d, const char *filename, char **newna
 	if (newname) /* Filename has been translated before */
 	{
 		char *temp = newname;
-		newname = xstrdup(temp);
+		newname = xxstrdup(temp);
 		*newname_ptr = newname;
 		return 0;
 	}
 
-	newname = xstrdup(filename);
+	newname = xxstrdup(filename);
 	char *c;
 
 	for (c = newname; *c; ++c)
@@ -766,7 +766,7 @@ static int translate_filename( struct dag *d, const char *filename, char **newna
 		*c = '_';
 	}
 
-	while (!hash_table_insert(d->filename_translation_rev, newname, xstrdup(filename)))
+	while (!hash_table_insert(d->filename_translation_rev, newname, xxstrdup(filename)))
 	{
 		/* It's not 100% collision-proof, technically, but the odds of
 		   an unresolvable collision are unbelievably slim. */
@@ -791,7 +791,7 @@ static int translate_filename( struct dag *d, const char *filename, char **newna
 		}
 	}
 
-	hash_table_insert(d->filename_translation_fwd, filename, xstrdup(newname));
+	hash_table_insert(d->filename_translation_fwd, filename, xxstrdup(newname));
 
 	*newname_ptr = newname;
 	return 1;
@@ -1056,7 +1056,7 @@ struct dag_node * dag_node_parse( struct dag *d, FILE *file, int clean_mode )
 		c+=6;
 	}
 
-	n->original_command = xstrdup(c);
+	n->original_command = xxstrdup(c);
 	n->command = translate_command(d, c, n->local_job);
 
 	free(line);
@@ -1072,7 +1072,7 @@ struct dag * dag_create( const char *filename, int clean_mode )
 	memset(d,0,sizeof(*d));
 	d->nodes = 0;
 	d->linenum = 0;
-	d->filename = xstrdup(filename);
+	d->filename = xxstrdup(filename);
 	d->node_table = itable_create(0);
 	d->local_job_table = itable_create(0);
 	d->remote_job_table = itable_create(0);
@@ -1464,7 +1464,7 @@ int main( int argc, char *argv[] )
 			break;
 		case 'N':
 			free(project);
-			project = xstrdup(optarg);
+			project = xxstrdup(optarg);
 			setenv("WORK_QUEUE_NAME", project, 1);
 			break;
 		case 'P':
@@ -1503,10 +1503,10 @@ int main( int argc, char *argv[] )
 			display_mode = SHOW_OUTPUT_FILES;
 			break;
 		case 'l':
-			logfilename = xstrdup(optarg);
+			logfilename = xxstrdup(optarg);
 			break;
 		case 'L':
-			batchlogfilename = xstrdup(optarg);
+			batchlogfilename = xxstrdup(optarg);
 			break;
 		case 'D':
 			display_mode = 1;

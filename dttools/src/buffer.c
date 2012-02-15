@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 #include "buffer.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 
 #include <assert.h>
 #include <stdarg.h>

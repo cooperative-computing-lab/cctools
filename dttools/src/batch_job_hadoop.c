@@ -3,7 +3,7 @@
 #include "debug.h"
 #include "process.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -106,7 +106,7 @@ batch_job_id_t batch_job_submit_simple_hadoop(struct batch_queue *q, const char 
 		return -1;
 	}
 	free(hadoop_streaming_jar);
-	hadoop_streaming_jar = xstrdup(g.gl_pathv[0]);
+	hadoop_streaming_jar = xxstrdup(g.gl_pathv[0]);
 	globfree(&g);
 
 	char *hadoop_streaming_command[] = {

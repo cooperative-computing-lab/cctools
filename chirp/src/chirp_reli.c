@@ -14,7 +14,7 @@ See the file COPYING for details.
 #include "full_io.h"
 #include "sleeptools.h"
 #include "hash_table.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "list.h"
 
 #include <string.h>

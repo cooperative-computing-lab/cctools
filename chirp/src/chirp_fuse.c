@@ -28,7 +28,7 @@ This module written by James Fitzgerald, B.S. 2006.
 #include "itable.h"
 #include "stringtools.h"
 #include "string_array.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 
 #include <errno.h>
 #include <signal.h>
@@ -601,7 +601,7 @@ int main(int argc, char *argv[])
 			chirp_reli_blocksize_set(atoi(optarg));
 			break;
 		case 'i':
-			tickets = xstrdup(optarg);
+			tickets = xxstrdup(optarg);
 			break;
 		case 'm':
 			fa.argc += 1;
