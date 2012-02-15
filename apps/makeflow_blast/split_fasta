@@ -30,6 +30,7 @@ for line in FILE:
 			num_chars = 0
 			num_queries = 0
 			OF = open("input." + str(num_jobs), "w")
+			OF.write(line)
 		else :
 			OF.write(line)
 		num_queries += 1
