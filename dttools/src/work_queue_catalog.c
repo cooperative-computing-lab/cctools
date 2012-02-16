@@ -169,12 +169,13 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 
 	if(time(0) - last_update_time < WORK_QUEUE_CATALOG_UPDATE_INTERVAL) return 1;
 
-    if(!outgoing_datagram) {
-        outgoing_datagram = datagram_create(0);
-        if(!outgoing_datagram)
-            fprintf(stderr, "Couldn't create outgoing udp port, thus work queue master info won't be sent to the catalog server!");
-            return 0;
-    }
+	if(!outgoing_datagram) {
+		outgoing_datagram = datagram_create(0);
+		if(!outgoing_datagram) {
+			fprintf(stderr, "Couldn't create outgoing udp port, thus work queue master info won't be sent to the catalog server!\n");
+			return 0;
+		}
+	}
 
 	if(!username_get(owner)) {
 		strcpy(owner,"unknown");

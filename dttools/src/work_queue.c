@@ -1807,13 +1807,6 @@ struct work_queue * work_queue_create( int port )
 		q->worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 	}
 
-    if (q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
-		strncpy(q->catalog_host, CATALOG_HOST, DOMAIN_NAME_MAX);
-		q->catalog_port = CATALOG_PORT;
-        update_catalog(q);
-    }
-
-
 	q->estimate_capacity_on = WORK_QUEUE_SWITCH_UNSPECIFIED;
 	q->auto_remove_workers_on = WORK_QUEUE_SWITCH_UNSPECIFIED;
 	q->work_queue_wait_routine = WORK_QUEUE_WAIT_UNSPECIFIED;
@@ -1833,7 +1826,6 @@ struct work_queue * work_queue_create( int port )
 	if(envstring) {
 		work_queue_specify_wait_routine(q, atoi(envstring));
 	}
-
 
 	if(q->auto_remove_workers_on) {
 		if(q->estimate_capacity_on == WORK_QUEUE_SWITCH_UNSPECIFIED) {
@@ -1890,9 +1882,8 @@ struct work_queue * work_queue_create( int port )
 	q->task_statistics = task_statistics_init();
 
 	q->link_keepalive_on = 1;
-
+	
 	debug(D_WQ,"Work Queue is listening on port %d.", port);
-
 	return q;
 
       failure:
@@ -1984,6 +1975,10 @@ int work_queue_specify_master_mode(struct work_queue *q, int mode)
 {
 	switch (mode) {
 	case WORK_QUEUE_MASTER_MODE_CATALOG:
+		/* Set the catalog host and port */
+		strncpy(q->catalog_host, CATALOG_HOST, DOMAIN_NAME_MAX);
+		q->catalog_port = CATALOG_PORT;
+		/* Fall through to set mode */
 	case WORK_QUEUE_MASTER_MODE_STANDALONE:
 		q->master_mode = mode;
 		break;
