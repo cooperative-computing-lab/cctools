@@ -74,15 +74,14 @@ static int copy_executable(char *current_path, char *new_path) {
 	FILE *ifs, *ofs;
 
 	ifs = fopen(current_path, "r");
-	if(!ifs) {
+	if(ifs == NULL) {
 		fprintf(stderr, "Unable to open %s for reading: %s\n", current_path, strerror(errno));
-		fclose(ifs);
 		return 0;
 	}
 	ofs = fopen(new_path, "w+");
-	if(!ofs) {
+	if(ofs == NULL) {
 		fprintf(stderr, "Unable to open %s for writing: %s", new_path, strerror(errno));
-		fclose(ofs);
+		fclose(ifs);
 		return 0;
 	}
 	copy_stream_to_stream(ifs, ofs);

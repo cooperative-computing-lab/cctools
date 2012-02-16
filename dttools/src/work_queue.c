@@ -1335,7 +1335,10 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t) {
 	ts = q->task_statistics;
 	if(!ts) {
 		ts = task_statistics_init();
-		if(!ts) return;
+		if(!ts) {
+			free(tr);
+			return;
+		}
 		q->task_statistics = ts;
 	}
 
@@ -1343,7 +1346,11 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t) {
 	reports = ts->reports;
 	if(!reports) {
 		reports = list_create();
-		if(!reports) return;
+		if(!reports) {
+		    free(tr);
+		    free(ts);
+		    return;
+		}
 		ts->reports = reports;
 	}
 
