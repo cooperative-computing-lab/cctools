@@ -82,9 +82,12 @@ while not wq.empty():
     if t:
 	print t.id, t.return_status, t.result, t.host
 	print t.preferred_host, t.status
-	print t.submit_time, t.start_time, t.finish_time
-	print t.transfer_start_time, t.computation_time
+	print t.submit_time, t.finish_time, t.app_delay
+	print t.send_input_start, t.send_input_finish
+	print t.execute_cmd_start, t.execute_cmd_finish
+	print t.receive_output_start, t.receive_output_finish
 	print t.total_bytes_transferred, t.total_transfer_time
+	print t.cmd_execution_time
 	print t.output
     
     print wq.stats.workers_init, wq.stats.workers_ready, wq.stats.workers_busy, \

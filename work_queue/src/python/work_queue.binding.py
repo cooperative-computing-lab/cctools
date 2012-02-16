@@ -107,31 +107,51 @@ class Task(_object):
 
     @property
     def submit_time(self):
-        return self._task.submit_time
-
-    @property
-    def start_time(self):
-        return self._task.start_time
+        return self._task.time_task_submit
 
     @property
     def finish_time(self):
-        return self._task.finish_time
+        return self._task.time_task_finish
 
     @property
-    def transfer_start_time(self):
-        return self._task.transfer_start_time
+    def app_delay(self):
+        return self._task.time_app_delay
 
     @property
-    def computation_time(self):
-        return self._task.computation_time
-
+    def send_input_start(self):
+        return self._task.time_send_input_start
+    
+    @property
+    def send_input_finish(self):
+        return self._task.time_send_input_finish
+    
+    @property
+    def execute_cmd_start(self):
+        return self._task.time_execute_cmd_start
+    
+    @property
+    def execute_cmd_finish(self):
+        return self._task.time_execute_cmd_finish
+    
+    @property
+    def receive_output_start(self):
+        return self._task.time_receive_output_start
+    
+    @property
+    def receive_output_finish(self):
+        return self._task.time_receive_output_finish
+    
     @property
     def total_bytes_transferred(self):
         return self._task.total_bytes_transferred
-
+    
     @property
     def total_transfer_time(self):
         return self._task.total_transfer_time
+    
+    @property
+    def cmd_execution_time(self):
+        return self._task.cmd_execution_time 
 
     ##
     # Set the worker selection algorithm for task.
