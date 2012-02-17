@@ -47,13 +47,13 @@ batch_job_id_t batch_job_submit_simple_local(struct batch_queue *q, const char *
 		 * 2, since bash 2 drops privileges on startup. (Debian uses a modified
 		 * bash which does not do this when invoked as sh.) 
 		 */
-		execlp("sh", "sh", "-c", cmd, (char *)0);
+		execlp("sh", "sh", "-c", cmd, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
 	return -1;
 }
 
-batch_job_id_t batch_job_submit_local(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+batch_job_id_t batch_job_submit_local(struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
 	if(cmd == NULL)
 		cmd = "/bin/false";
@@ -132,4 +132,3 @@ int batch_job_remove_local(struct batch_queue *q, batch_job_id_t jobid)
 		return 0;
 	}
 }
-

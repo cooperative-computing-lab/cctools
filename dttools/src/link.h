@@ -185,7 +185,7 @@ int link_usleep(struct link *link, int usec, int reading, int writing);
 @param writing Wait for the link to become writable.
 @return One if the link becomes readable or writable before the timeout expires, zero otherwise.
 */
-int  link_sleep( struct link *link, time_t stoptime, int reading, int writing );
+int link_sleep(struct link *link, time_t stoptime, int reading, int writing);
 
 /** Close a connection.
 @param link The connection to close.

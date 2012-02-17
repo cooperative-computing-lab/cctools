@@ -48,7 +48,7 @@ See the file COPYING for details.
 
 struct task_info {
 	pid_t pid;
-	int status; 
+	int status;
 	struct rusage rusage;
 	timestamp_t execution_end;
 	char *output;
@@ -86,7 +86,8 @@ static void alarm_handler(int sig)
 	// do nothing except interrupt the wait
 }
 
-void report_worker_ready(struct link *master) {
+void report_worker_ready(struct link *master)
+{
 	char hostname[DOMAIN_NAME_MAX];
 	UINT64_T memory_avail, memory_total;
 	UINT64_T disk_avail, disk_total;
@@ -116,12 +117,13 @@ void report_worker_ready(struct link *master) {
 
 }
 
-pid_t execute_task(const char *cmd) {
+pid_t execute_task(const char *cmd)
+{
 	pid_t pid;
 
 	fflush(NULL);
 
-    if (pipe(pipefds) == -1) {
+	if(pipe(pipefds) == -1) {
 		debug(D_WQ, "Failed to create pipe for output redirecting.\n");
 		return 0;
 	}
@@ -143,17 +145,18 @@ pid_t execute_task(const char *cmd) {
 		close(pipefds[0]);
 		close(pipefds[1]);
 
-		execlp("sh", "sh", "-c", cmd, (char *)0);
+		execlp("sh", "sh", "-c", cmd, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
 	return 0;
 }
 
-int wait_task(pid_t pid, int timeout, struct task_info *ti) {
+int wait_task(pid_t pid, int timeout, struct task_info *ti)
+{
 	int flags = 0;
 	void *old_handler = 0;
 	pid_t tmp_pid;
-	int   tmp_status;
+	int tmp_status;
 	struct rusage tmp_rusage;
 
 	if(pid <= 0 || timeout < 0 || !ti) {
@@ -182,7 +185,7 @@ int wait_task(pid_t pid, int timeout, struct task_info *ti) {
 	ti->pid = tmp_pid;
 	ti->status = tmp_status;
 	ti->rusage = tmp_rusage;
-	ti->execution_end= timestamp_get();
+	ti->execution_end = timestamp_get();
 
 	// Record stdout of the child process
 	char *output;
@@ -211,12 +214,14 @@ int wait_task(pid_t pid, int timeout, struct task_info *ti) {
 	return 1;
 }
 
-void clear_task_info(struct task_info *ti) {
+void clear_task_info(struct task_info *ti)
+{
 	free(ti->output);
 	memset(ti, 0, sizeof(ti));
 }
 
-void report_task_complete(struct link *master, int result, char *output, INT64_T output_length, timestamp_t execution_time) {
+void report_task_complete(struct link *master, int result, char *output, INT64_T output_length, timestamp_t execution_time)
+{
 	debug(D_WQ, "result %d %lld %llu", result, output_length, execution_time);
 	link_putfstring(master, "result %d %lld %llu\n", time(0) + active_timeout, result, output_length, execution_time);
 	link_putlstring(master, output, output_length, time(0) + active_timeout);
@@ -310,15 +315,17 @@ struct distribution_node {
 	int weight;
 };
 
-void *select_item_by_weight(struct distribution_node distribution[], int n) {
+void *select_item_by_weight(struct distribution_node distribution[], int n)
+{
 	// A distribution example:
 	// struct distribution_node array[3] = { {"A", 20}, {"B", 30}, {"C", 50} };
 	int i, w, x, sum;
 
 	sum = 0;
-	for(i=0; i < n; i++) {
-		w = distribution[i].weight;	
-		if(w < 0) return NULL;
+	for(i = 0; i < n; i++) {
+		w = distribution[i].weight;
+		if(w < 0)
+			return NULL;
 		sum += w;
 	}
 
@@ -326,7 +333,8 @@ void *select_item_by_weight(struct distribution_node distribution[], int n) {
 
 	for(i = 0; i < n; i++) {
 		x -= distribution[i].weight;
-		if(x <= 0) return distribution[i].item;
+		if(x <= 0)
+			return distribution[i].item;
 	}
 
 	return NULL;
@@ -562,8 +570,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	srand((unsigned int)(getpid() ^ time(NULL)));
-		
+	srand((unsigned int) (getpid() ^ time(NULL)));
+
 	if(!auto_worker) {
 		if((argc - optind) != 2) {
 			show_help(argv[0]);
@@ -602,22 +610,22 @@ int main(int argc, char *argv[])
 	fprintf(stdout, "work_queue_worker: working in %s\n", tempdir);
 	mkdir(tempdir, 0700);
 	chdir(tempdir);
-	
+
 	// Check available disk space
-	if (avail_space_threshold > 0) {
+	if(avail_space_threshold > 0) {
 		disk_info_get(".", &disk_avail, &disk_total);
-		if (disk_avail < avail_space_threshold) {
+		if(disk_avail < avail_space_threshold) {
 			fprintf(stderr, "worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
 			goto abort;
-		}	
-	}	
+		}
+	}
 
 
 	time_t idle_stoptime = time(0) + idle_timeout;
 	time_t switch_master_time = time(0) + master_timeout;
 
 	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t) free);
-		
+
 	// Start serving masters
 	while(!abort_flag) {
 		char line[WORK_QUEUE_LINE_MAX];
@@ -658,16 +666,15 @@ int main(int argc, char *argv[])
 			report_worker_ready(master);
 		}
 
-		
 		// Wait for forked task's completion
-		if(task_running) { 
+		if(task_running) {
 			struct task_info ti;
 			if(wait_task(pid, 5, &ti)) {
 				report_task_complete(master, ti.status, ti.output, ti.output_length, ti.execution_end - execution_start);
 				clear_task_info(&ti);
 				task_running = 0;
-			} 
-		} 
+			}
+		}
 
 		if(task_running) {
 			readline_stoptime = time(0) + 1;
@@ -690,7 +697,7 @@ int main(int argc, char *argv[])
 					pid = execute_task(buffer);
 					free(buffer);
 					if(pid < 0) {
-						fprintf(stderr,"work_queue_worker: couldn't submit local job. \nShutting down worker...\n");
+						fprintf(stderr, "work_queue_worker: couldn't submit local job. \nShutting down worker...\n");
 						break;
 					}
 					task_running = 1;
@@ -711,7 +718,7 @@ int main(int argc, char *argv[])
 					execution_end = timestamp_get();
 
 					// return job done
-					report_task_complete(master, result, buffer, length, execution_end-execution_start);
+					report_task_complete(master, result, buffer, length, execution_end - execution_start);
 
 					if(buffer) {
 						free(buffer);
@@ -746,13 +753,13 @@ int main(int argc, char *argv[])
 				}
 				symlink(path, filename);
 			} else if(sscanf(line, "put %s %lld %o", filename, &length, &mode) == 3) {
-				if (avail_space_threshold > 0) {
+				if(avail_space_threshold > 0) {
 					disk_info_get(".", &disk_avail, &disk_total);
-					if (disk_avail < avail_space_threshold) {
+					if(disk_avail < avail_space_threshold) {
 						debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
 						goto recover;
-					}	
-				}	
+					}
+				}
 
 				mode = mode | 0600;
 				char *cur_pos, *tmp_pos;
@@ -904,7 +911,7 @@ int main(int argc, char *argv[])
 			idle_stoptime = time(0) + idle_timeout;
 
 		} else {
-recover:
+		      recover:
 			link_close(master);
 			master = 0;
 			if(auto_worker) {
@@ -916,7 +923,7 @@ recover:
 		}
 	}
 
-abort:	
+      abort:
 	fprintf(stdout, "work_queue_worker: cleaning up %s\n", tempdir);
 	sprintf(deletecmd, "rm -rf %s", tempdir);
 	system(deletecmd);

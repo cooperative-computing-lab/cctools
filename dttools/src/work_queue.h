@@ -39,7 +39,7 @@ and port of the master.
 #define WORK_QUEUE_RESULT_OUTPUT_MISSING 16
 #define WORK_QUEUE_RESULT_LINK_FAIL 32
 
-#define WORK_QUEUE_SCHEDULE_UNSET 0	
+#define WORK_QUEUE_SCHEDULE_UNSET 0
 #define WORK_QUEUE_SCHEDULE_FCFS 1	/**< Select worker on a first-come-first-serve basis. */
 #define WORK_QUEUE_SCHEDULE_FILES 2	/**< Select worker that has the most files required by task. */
 #define WORK_QUEUE_SCHEDULE_TIME 3	/**< Select worker that has has best execution time. */
@@ -66,10 +66,10 @@ and port of the master.
 #define WORK_QUEUE_WORKER_MODE_SHARED 0	    /**< Work Queue master accepts workers in shared or non-exclusive mode. */
 #define WORK_QUEUE_WORKER_MODE_EXCLUSIVE 1  /**< Work Queue master only accepts workers that have a preference for it. */
 
-#define WORK_QUEUE_WAIT_UNSPECIFIED -1	
+#define WORK_QUEUE_WAIT_UNSPECIFIED -1
 #define WORK_QUEUE_WAIT_FCFS 0				/**< First come first serve. */
 #define WORK_QUEUE_WAIT_FAST_DISPATCH 1		/**< Dispatch task to new workers first. */
-#define WORK_QUEUE_WAIT_ADAPTIVE 2 			/**< If master is busy, do not use new workers. */
+#define WORK_QUEUE_WAIT_ADAPTIVE 2			/**< If master is busy, do not use new workers. */
 
 #define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
 
@@ -111,9 +111,9 @@ struct work_queue_task {
 	timestamp_t time_receive_output_start;	/**< The time at which it started to transfer output files. */
 	timestamp_t time_receive_output_finish;	/**< The time at which it finished transferring output files. */
 
-    INT64_T total_bytes_transferred;    /**< Number of bytes transferred since task has last started transferring input data. */
+	INT64_T total_bytes_transferred;/**< Number of bytes transferred since task has last started transferring input data. */
 	timestamp_t total_transfer_time;    /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
-	timestamp_t cmd_execution_time;    /**< Time spent in microseconds for executing the command on the worker. */
+	timestamp_t cmd_execution_time;	   /**< Time spent in microseconds for executing the command on the worker. */
 };
 
 /** Statistics describing a work queue. */

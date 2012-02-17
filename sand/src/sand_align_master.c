@@ -70,14 +70,14 @@ static void show_help(const char *cmd)
 {
 	printf("Use: %s [options] <sand_align_kernel> <candidates.cand> <sequences.cfa> <overlaps.ovl>\n", cmd);
 	printf("where options are:\n");
-	printf(" -p <port>      Port number for work queue master to listen on. (default: %d)\n",port);
-	printf(" -n <number>    Maximum number of candidates per task. (default is %d)\n",max_pairs_per_task);
+	printf(" -p <port>      Port number for work queue master to listen on. (default: %d)\n", port);
+	printf(" -n <number>    Maximum number of candidates per task. (default is %d)\n", max_pairs_per_task);
 	printf(" -e <args>      Extra arguments to pass to the alignment program.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 10.)\n");
 	printf(" -a             Advertise the master information to a catalog server.\n");
 	printf(" -N <project>   Set the project name to <project>\n");
-	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n"); 
+	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -91,24 +91,14 @@ static void display_progress(struct work_queue *q)
 
 	work_queue_get_stats(q, &info);
 
-	if(row_count==0) {
+	if(row_count == 0) {
 		printf(" Total | Workers   | Tasks                      Avg | K-Cand K-Seqs | Total\n");
 		printf("  Time | Idle Busy | Submit Idle  Run   Done   Time | Loaded Loaded | Speedup\n");
 		row_count = row_limit;
 	}
 
-	printf("%6d | %4d %4d | %6d %4d %4d %6d %6.2lf | %6d %6d | %5.2lf\n",
-		(int) (time(0) - start_time),
-		info.workers_init + info.workers_ready,
-		info.workers_busy,
-		tasks_submitted,
-		info.tasks_waiting,
-		info.tasks_running,
-		tasks_done,
-		tasks_done ? tasks_runtime / (double) tasks_done / 1000000.0 : 0,
-		candidates_loaded / 1000,
-		sequences_loaded / 1000,
-		(time(0)>start_time) ? (tasks_runtime/1000000.0) / (time(0)-start_time) : 0);
+	printf("%6d | %4d %4d | %6d %4d %4d %6d %6.2lf | %6d %6d | %5.2lf\n", (int) (time(0) - start_time), info.workers_init + info.workers_ready, info.workers_busy, tasks_submitted, info.tasks_waiting, info.tasks_running, tasks_done,
+	       tasks_done ? tasks_runtime / (double) tasks_done / 1000000.0 : 0, candidates_loaded / 1000, sequences_loaded / 1000, (time(0) > start_time) ? (tasks_runtime / 1000000.0) / (time(0) - start_time) : 0);
 
 	row_count--;
 
@@ -124,32 +114,36 @@ If the file is completely empty, then there is a problem and
 we reject the output.
 */
 
-static char * confirm_output( char *output )
+static char *confirm_output(char *output)
 {
 	char *s = output;
 	char *result = 0;
 
-	while(unsigned_isspace(*s)) s++;
+	while(unsigned_isspace(*s))
+		s++;
 
-	if(*s!='[') {
-		debug(D_NOTICE,"aligment output did not begin with [:\n%s\n",output);
+	if(*s != '[') {
+		debug(D_NOTICE, "aligment output did not begin with [:\n%s\n", output);
 		return 0;
 	}
 
 	s++;
 
-	while(unsigned_isspace(*s)) s++;
+	while(unsigned_isspace(*s))
+		s++;
 
 	result = s;
 
-	while(*s) s++;
+	while(*s)
+		s++;
 
 	s--;
 
-	while(unsigned_isspace(*s)) s--;
+	while(unsigned_isspace(*s))
+		s--;
 
-	if(*s!=']') {
-		debug(D_NOTICE,"aligment output did not end with ]:\n%s\n",output);
+	if(*s != ']') {
+		debug(D_NOTICE, "aligment output did not end with ]:\n%s\n", output);
 		return 0;
 	}
 
@@ -158,21 +152,21 @@ static char * confirm_output( char *output )
 	return result;
 }
 
-static void task_complete( struct work_queue_task *t )
+static void task_complete(struct work_queue_task *t)
 {
-	if(t->return_status!=0) {
-		debug(D_NOTICE,"task failed with status %d on host %s\n",t->return_status,t->host);
-		work_queue_submit(queue,t);
+	if(t->return_status != 0) {
+		debug(D_NOTICE, "task failed with status %d on host %s\n", t->return_status, t->host);
+		work_queue_submit(queue, t);
 		return;
 	}
 
 	char *clean_output = confirm_output(t->output);
 	if(!clean_output) {
-		work_queue_submit(queue,t);
+		work_queue_submit(queue, t);
 		return;
 	}
 
-	fprintf(output_file,"%s",clean_output);
+	fprintf(output_file, "%s", clean_output);
 	fflush(output_file);
 
 	tasks_done++;
@@ -190,62 +184,68 @@ static int candidate_read(FILE * fp, char *name1, char *name2, char *extra_data)
 
 	long start_of_line = ftell(fp);
 
-	if(!fgets(line, CAND_FILE_LINE_MAX, fp)) return CANDIDATE_WAIT;
+	if(!fgets(line, CAND_FILE_LINE_MAX, fp))
+		return CANDIDATE_WAIT;
 
-	if(line[strlen(line)-1]!='\n') {
-		fseek(fp,start_of_line,SEEK_SET);
+	if(line[strlen(line) - 1] != '\n') {
+		fseek(fp, start_of_line, SEEK_SET);
 		return CANDIDATE_WAIT;
 	}
 
-	if(!strcmp(line,"EOF\n")) {
+	if(!strcmp(line, "EOF\n")) {
 		more_candidates = 0;
 		return CANDIDATE_EOF;
 	}
 
 	int n = sscanf(line, "%s %s %[^\n]", name1, name2, extra_data);
-	if(n!=3) fatal("candidate file is corrupted: %s\n",line);
+	if(n != 3)
+		fatal("candidate file is corrupted: %s\n", line);
 
 	candidates_loaded++;
 
 	return CANDIDATE_SUCCESS;
 }
 
-struct cseq * sequence_lookup( struct hash_table *h, const char *name )
+struct cseq *sequence_lookup(struct hash_table *h, const char *name)
 {
-	struct cseq *c = hash_table_lookup(h,name);
-	if(c) return c;
+	struct cseq *c = hash_table_lookup(h, name);
+	if(c)
+		return c;
 
 	while(1) {
 		c = cseq_read(sequence_file);
-		if(!c) break;
+		if(!c)
+			break;
 
 		sequences_loaded++;
 
-		hash_table_insert(h,c->name,c);
-		if(!strcmp(name,c->name)) return c;
+		hash_table_insert(h, c->name, c);
+		if(!strcmp(name, c->name))
+			return c;
 
 		int size = hash_table_size(h);
-		if(size%100000 ==0 )debug(D_DEBUG,"loaded %d sequences",size);
+		if(size % 100000 == 0)
+			debug(D_DEBUG, "loaded %d sequences", size);
 	}
 
-	fatal("candidate file contains invalid sequence name: %s\n",name);
+	fatal("candidate file contains invalid sequence name: %s\n", name);
 	return 0;
 }
 
-static void buffer_ensure( char **buffer, int *buffer_size, int buffer_used, int buffer_delta )
+static void buffer_ensure(char **buffer, int *buffer_size, int buffer_used, int buffer_delta)
 {
 	int buffer_needed = buffer_used + buffer_delta;
 
-	if(buffer_needed>*buffer_size) {
+	if(buffer_needed > *buffer_size) {
 		do {
-			*buffer_size *=2 ;
-		} while( buffer_needed > *buffer_size );
+			*buffer_size *= 2;
+		} while(buffer_needed > *buffer_size);
 
-		*buffer = realloc(*buffer,*buffer_size);
+		*buffer = realloc(*buffer, *buffer_size);
 	}
 }
 
-static struct work_queue_task * task_create( struct hash_table *sequence_table )
+static struct work_queue_task *task_create(struct hash_table *sequence_table)
 {
 	char aname1[CAND_FILE_LINE_MAX];
 	char aname2[CAND_FILE_LINE_MAX];
@@ -257,52 +257,54 @@ static struct work_queue_task * task_create( struct hash_table *sequence_table )
 
 	struct cseq *s1, *s2;
 
-	int result = candidate_read(candidate_file,aname1,aname2,aextra);
-	if(result!=CANDIDATE_SUCCESS) return 0;
+	int result = candidate_read(candidate_file, aname1, aname2, aextra);
+	if(result != CANDIDATE_SUCCESS)
+		return 0;
 
-	s1 = sequence_lookup(sequence_table,aname1);
-	s2 = sequence_lookup(sequence_table,aname2);
+	s1 = sequence_lookup(sequence_table, aname1);
+	s2 = sequence_lookup(sequence_table, aname2);
 
 	static int buffer_size = 1024;
 	char *buffer = malloc(buffer_size);
 	int buffer_pos = 0;
 
-	buffer_ensure(&buffer,&buffer_size,buffer_pos,cseq_size(s1)+cseq_size(s2)+10);
+	buffer_ensure(&buffer, &buffer_size, buffer_pos, cseq_size(s1) + cseq_size(s2) + 10);
 
-	buffer_pos += cseq_sprint(&buffer[buffer_pos],s1,"");
-	buffer_pos += cseq_sprint(&buffer[buffer_pos],s2,aextra);
+	buffer_pos += cseq_sprint(&buffer[buffer_pos], s1, "");
+	buffer_pos += cseq_sprint(&buffer[buffer_pos], s2, aextra);
 
 	int npairs = 1;
 	int nseqs = 2;
 
 	do {
-		result = candidate_read(candidate_file,bname1,bname2,bextra);
-		if(result!=CANDIDATE_SUCCESS) break;
+		result = candidate_read(candidate_file, bname1, bname2, bextra);
+		if(result != CANDIDATE_SUCCESS)
+			break;
 
-		s1 = sequence_lookup(sequence_table,bname1);
-		s2 = sequence_lookup(sequence_table,bname2);
+		s1 = sequence_lookup(sequence_table, bname1);
+		s2 = sequence_lookup(sequence_table, bname2);
 
-		if(strcmp(aname1,bname1)!=0) {
-			buffer_ensure(&buffer,&buffer_size,buffer_pos,cseq_size(s1)+cseq_size(s2)+10);
-			buffer_pos += cseq_sprint(&buffer[buffer_pos],0,"");
-			buffer_pos += cseq_sprint(&buffer[buffer_pos],s1,"");
-			strcpy(aname1,bname1);
-			strcpy(aname2,bname2);
-			strcpy(aextra,bextra);
+		if(strcmp(aname1, bname1) != 0) {
+			buffer_ensure(&buffer, &buffer_size, buffer_pos, cseq_size(s1) + cseq_size(s2) + 10);
+			buffer_pos += cseq_sprint(&buffer[buffer_pos], 0, "");
+			buffer_pos += cseq_sprint(&buffer[buffer_pos], s1, "");
+			strcpy(aname1, bname1);
+			strcpy(aname2, bname2);
+			strcpy(aextra, bextra);
 			nseqs++;
 		}
 
-		buffer_ensure(&buffer,&buffer_size,buffer_pos,cseq_size(s2)+10);
-		buffer_pos += cseq_sprint(&buffer[buffer_pos],s2,bextra);
+		buffer_ensure(&buffer, &buffer_size, buffer_pos, cseq_size(s2) + 10);
+		buffer_pos += cseq_sprint(&buffer[buffer_pos], s2, bextra);
 
 		nseqs++;
 		npairs++;
 
-	} while( npairs < max_pairs_per_task );
+	} while(npairs < max_pairs_per_task);
 
-	debug(D_DEBUG,"created task of %d sequences and %d comparisons\n",nseqs,npairs);
+	debug(D_DEBUG, "created task of %d sequences and %d comparisons\n", nseqs, npairs);
 
-	char cmd[strlen(align_prog)+strlen(align_prog_args)+100];
+	char cmd[strlen(align_prog) + strlen(align_prog_args) + 100];
 
 	sprintf(cmd, "./%s %s aligndata", "align", align_prog_args);
 
@@ -349,9 +351,9 @@ int main(int argc, char *argv[])
 		case 'F':
 			wq_option_fast_abort_multiplier = atof(optarg);
 			break;
-		case 'a': 
+		case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
-			break; 
+			break;
 		case 'N':
 			free(project);
 			project = xxstrdup(optarg);
@@ -359,7 +361,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
-				fprintf(stderr,"makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
+				fprintf(stderr, "makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
 			}
 
@@ -391,39 +393,39 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	if(!find_executable(argv[optind],"PATH",align_prog,sizeof(align_prog))) {
-		fprintf(stderr, "%s: couldn't find alignment program %s: is it in your path?\n",progname,argv[optind]);
+	if(!find_executable(argv[optind], "PATH", align_prog, sizeof(align_prog))) {
+		fprintf(stderr, "%s: couldn't find alignment program %s: is it in your path?\n", progname, argv[optind]);
 		return 1;
 	}
-			
+
 
 	candidate_file_name = argv[optind + 1];
 	sequence_file_name = argv[optind + 2];
 	output_file_name = argv[optind + 3];
 
-	sequence_file = fopen(sequence_file_name,"r");
+	sequence_file = fopen(sequence_file_name, "r");
 	if(!sequence_file) {
 		fprintf(stderr, "%s: couldn't open sequence file %s: %s\n", progname, sequence_file_name, strerror(errno));
 		return 1;
 	}
 
-	candidate_file = fopen(candidate_file_name,"r");
+	candidate_file = fopen(candidate_file_name, "r");
 	if(!candidate_file) {
-		fprintf(stderr, "%s: couldn't open candidate file %s: %s\n", progname,candidate_file_name, strerror(errno));
+		fprintf(stderr, "%s: couldn't open candidate file %s: %s\n", progname, candidate_file_name, strerror(errno));
 		return 1;
 	}
 
 	output_file = fopen(output_file_name, "a");
 	if(!output_file) {
-		fprintf(stderr, "%s: couldn't open output file %s: %s\n", progname,output_file_name, strerror(errno));
+		fprintf(stderr, "%s: couldn't open output file %s: %s\n", progname, output_file_name, strerror(errno));
 		return 1;
 	}
 
 	if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
-        fprintf(stderr, "sand_align_master running in catalog mode. Please use '-N' option to specify the name of this project.\n");
-        fprintf(stderr, "Run \"%s -h\" for help with options.\n", argv[0]);
-        return 1;
-    }
+		fprintf(stderr, "sand_align_master running in catalog mode. Please use '-N' option to specify the name of this project.\n");
+		fprintf(stderr, "Run \"%s -h\" for help with options.\n", argv[0]);
+		return 1;
+	}
 
 	char *value = string_format("%d", work_queue_worker_mode);
 	setenv("WORK_QUEUE_WORKER_MODE", value, 1);
@@ -435,25 +437,25 @@ int main(int argc, char *argv[])
 
 	queue = work_queue_create(port);
 	if(!queue) {
-		fprintf(stderr, "%s: couldn't listen on port %d: %s\n",progname,port,strerror(errno));
+		fprintf(stderr, "%s: couldn't listen on port %d: %s\n", progname, port, strerror(errno));
 		return 1;
 	}
 
-	sequence_table = hash_table_create(20000001,0);
+	sequence_table = hash_table_create(20000001, 0);
 
 	start_time = time(0);
 
 	struct work_queue_task *t;
 
-	while( more_candidates || !work_queue_empty(queue) ) {
+	while(more_candidates || !work_queue_empty(queue)) {
 
 		if(last_display_time < time(0))
 			display_progress(queue);
 
-		while( more_candidates && work_queue_hungry(queue) ) {
-			t = task_create( sequence_table );
+		while(more_candidates && work_queue_hungry(queue)) {
+			t = task_create(sequence_table);
 			if(t) {
-				work_queue_submit(queue,t);
+				work_queue_submit(queue, t);
 				tasks_submitted++;
 			} else {
 				break;
@@ -461,14 +463,16 @@ int main(int argc, char *argv[])
 		}
 
 		if(work_queue_empty(queue)) {
-			if(more_candidates) sleep(5);
+			if(more_candidates)
+				sleep(5);
 		} else {
 			if(work_queue_hungry(queue)) {
-				t = work_queue_wait(queue,0);
+				t = work_queue_wait(queue, 0);
 			} else {
-				t = work_queue_wait(queue,5);
+				t = work_queue_wait(queue, 5);
 			}
-			if(t) task_complete(t);
+			if(t)
+				task_complete(t);
 		}
 	}
 
