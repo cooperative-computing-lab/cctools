@@ -46,15 +46,6 @@ See the file COPYING for details.
 #include <sys/resource.h>
 #include <sys/wait.h>
 
-struct task_info {
-	pid_t pid;
-	int status;
-	struct rusage rusage;
-	timestamp_t execution_end;
-	char *output;
-	INT64_T output_length;
-};
-
 // Maximum time to wait before aborting if there is no connection to the master.
 static int idle_timeout = 900;
 
@@ -70,7 +61,9 @@ static int abort_flag = 0;
 // Catalog mode control variables
 static int auto_worker = 0;
 static int exclusive_worker = 1;
+
 static const int non_preference_priority_max = 100;
+
 static char *catalog_server_host = NULL;
 static int catalog_server_port = 0;
 static struct work_queue_master *actual_master = NULL;
@@ -79,7 +72,6 @@ static struct list *preferred_masters = NULL;
 static struct hash_cache *bad_masters = NULL;
 
 static int pipefds[2];
-
 
 static void alarm_handler(int sig)
 {
@@ -115,6 +107,27 @@ void report_worker_ready(struct link *master)
 		link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, uname_data.sysname, uname_data.machine);
 	}
 
+}
+
+#define TASK_NONE 0
+#define TASK_RUNNING 1
+#define TASK_COMPLETE 2
+
+struct task_info {
+	pid_t pid;
+	int status;
+	struct rusage rusage;
+	timestamp_t execution_end;
+	char *output;
+	INT64_T output_length;
+};
+
+void clear_task_info(struct task_info *ti)
+{
+	if(ti->output) {
+		free(ti->output);
+	}
+	memset(ti, 0, sizeof(*ti));
 }
 
 pid_t execute_task(const char *cmd)
@@ -154,10 +167,10 @@ pid_t execute_task(const char *cmd)
 int wait_task(pid_t pid, int timeout, struct task_info *ti)
 {
 	int flags = 0;
-	void *old_handler = 0;
 	pid_t tmp_pid;
 	int tmp_status;
 	struct rusage tmp_rusage;
+	struct sigaction new_action, old_action;
 
 	if(pid <= 0 || timeout < 0 || !ti) {
 		return 0;
@@ -167,20 +180,25 @@ int wait_task(pid_t pid, int timeout, struct task_info *ti)
 		flags = WNOHANG;
 	} else {
 		flags = 0;
-		old_handler = signal(SIGALRM, alarm_handler);
+		new_action.sa_handler = alarm_handler;
+		sigemptyset(&new_action.sa_mask);
+		new_action.sa_flags = 0;
+		sigaction(SIGALRM, &new_action, &old_action);
 		alarm(timeout);
 	}
 
-	tmp_pid = wait4(pid, &tmp_status, flags, &tmp_rusage);
+	tmp_pid = wait4(-1, &tmp_status, flags, &tmp_rusage);
 
 	if(timeout != 0) {
 		alarm(0);
-		signal(SIGALRM, old_handler);
+		sigaction(SIGALRM, &old_action, NULL);
 	}
 
 	if(tmp_pid <= 0) {
 		return 0;
 	}
+
+	clear_task_info(ti);
 
 	ti->pid = tmp_pid;
 	ti->status = tmp_status;
@@ -214,15 +232,9 @@ int wait_task(pid_t pid, int timeout, struct task_info *ti)
 	return 1;
 }
 
-void clear_task_info(struct task_info *ti)
-{
-	free(ti->output);
-	memset(ti, 0, sizeof(ti));
-}
-
 void report_task_complete(struct link *master, int result, char *output, INT64_T output_length, timestamp_t execution_time)
 {
-	debug(D_WQ, "result %d %lld %llu", result, output_length, execution_time);
+	debug(D_WQ, "Task complete: result %d %lld %llu", result, output_length, execution_time);
 	link_putfstring(master, "result %d %lld %llu\n", time(0) + active_timeout, result, output_length, execution_time);
 	link_putlstring(master, output, output_length, time(0) + active_timeout);
 }
@@ -511,7 +523,7 @@ int main(int argc, char *argv[])
 	int w;
 	char deletecmd[WORK_QUEUE_LINE_MAX];
 	timestamp_t execution_start, execution_end;
-	int task_running = 0;
+	int task_status= TASK_NONE;
 	pid_t pid;
 	time_t readline_stoptime;
 
@@ -636,6 +648,9 @@ int main(int argc, char *argv[])
 		char *buffer;
 		FILE *stream;
 
+		struct task_info ti;
+		memset(&ti, 0, sizeof(ti));
+
 		if(time(0) > idle_stoptime) {
 			if(master) {
 				fprintf(stdout, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
@@ -665,18 +680,18 @@ int main(int argc, char *argv[])
 
 			report_worker_ready(master);
 		}
-
 		// Wait for forked task's completion
-		if(task_running) {
-			struct task_info ti;
-			if(wait_task(pid, 5, &ti)) {
-				report_task_complete(master, ti.status, ti.output, ti.output_length, ti.execution_end - execution_start);
-				clear_task_info(&ti);
-				task_running = 0;
+		if(task_status == TASK_RUNNING) {
+			int tmp_timeout = 5;
+			debug(D_WQ, "Waiting %d seconds for process %d to finish ...", tmp_timeout, pid);
+			if(wait_task(pid, tmp_timeout, &ti)) {
+				task_status = TASK_COMPLETE;
+			} else {
+				debug(D_WQ, "Task (process %d) is not done yet.\n", pid);
 			}
 		}
 
-		if(task_running) {
+		if(task_status != TASK_NONE) {
 			readline_stoptime = time(0) + 1;
 		} else {
 			readline_stoptime = time(0) + active_timeout;
@@ -700,7 +715,7 @@ int main(int argc, char *argv[])
 						fprintf(stderr, "work_queue_worker: couldn't submit local job. \nShutting down worker...\n");
 						break;
 					}
-					task_running = 1;
+					task_status = TASK_RUNNING;
 				} else {
 					// execute the command
 					stream = popen(buffer, "r");
@@ -911,6 +926,17 @@ int main(int argc, char *argv[])
 			idle_stoptime = time(0) + idle_timeout;
 
 		} else {
+			if(task_status == TASK_RUNNING) {
+				debug(D_WQ, "No message from the master.\n");
+				continue;
+			} 
+			
+			if (task_status == TASK_COMPLETE) {
+				report_task_complete(master, ti.status, ti.output, ti.output_length, ti.execution_end - execution_start);
+				task_status = TASK_NONE;
+				continue;
+			}
+
 		      recover:
 			link_close(master);
 			master = 0;
