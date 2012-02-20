@@ -1363,28 +1363,38 @@ void dag_run(struct dag *d)
 			break;
 
 		if(d->remote_jobs_running) {
-			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + 5);
+			int tmp_timeout = 5;
+			debug(D_DEBUG, "Waiting %d seconds for any job to finish ...\n", tmp_timeout);
+			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
+				debug(D_DEBUG, "Job %d has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
 				if(n)
 					dag_node_complete(d, n, &info);
+			} else {
+				debug(D_DEBUG, "No job has finished in the last %d seconds.\n", tmp_timeout);
 			}
 		}
 
 		if(d->local_jobs_running) {
 			time_t stoptime;
+			int tmp_timeout = 5;
 
 			if(d->remote_jobs_running) {
 				stoptime = time(0);
 			} else {
-				stoptime = time(0) + 5;
+				stoptime = time(0) + tmp_timeout;
 			}
 
+			debug(D_DEBUG, "Waiting %d seconds for any job to finish ...\n", tmp_timeout);
 			jobid = batch_job_wait_timeout(local_queue, &info, stoptime);
 			if(jobid > 0) {
+				debug(D_DEBUG, "Job %d has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n)
 					dag_node_complete(d, n, &info);
+			} else {
+				debug(D_DEBUG, "No job has finished in the last %d seconds.\n", tmp_timeout);
 			}
 		}
 	}

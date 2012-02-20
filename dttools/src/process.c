@@ -25,14 +25,17 @@ static void alarm_handler(int sig)
 
 static int process_work(int timeout)
 {
-	void *old_handler = 0;
 	int flags = 0;
+	struct sigaction new_action, old_action;
 
 	if(timeout == 0) {
 		flags = WNOHANG;
 	} else {
 		flags = 0;
-		old_handler = signal(SIGALRM, alarm_handler);
+		new_action.sa_handler = alarm_handler;
+		sigemptyset(&new_action.sa_mask);
+		new_action.sa_flags = 0;
+		sigaction(SIGALRM, &new_action, &old_action);
 		alarm(timeout);
 	}
 
@@ -42,7 +45,7 @@ static int process_work(int timeout)
 
 	if(timeout != 0) {
 		alarm(0);
-		signal(SIGALRM, old_handler);
+		sigaction(SIGALRM, &old_action, NULL);
 	}
 
 	if(p.pid <= 0) {
