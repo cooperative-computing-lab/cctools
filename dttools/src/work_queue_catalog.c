@@ -181,7 +181,7 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 		strcpy(owner,"unknown");
 	}
 
-	snprintf(text, WORK_QUEUE_CATALOG_LINE_MAX, "type wq_master\nproject %s\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running%d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\ncapacity %d\nversion %d.%d.%d\nowner %s", project_name, s->priority, s->port, WORK_QUEUE_CATALOG_LIFETIME, s->tasks_waiting, s->total_tasks_complete, s->tasks_running, s->total_tasks_dispatched, s->workers_init, s->workers_ready, s->workers_busy, s->workers_init + s->workers_ready + s->workers_busy, s->capacity, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
+	snprintf(text, WORK_QUEUE_CATALOG_LINE_MAX, "type wq_master\nproject %s\nstart_time %llu\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running%d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\ncapacity %d\nversion %d.%d.%d\nowner %s", project_name, s->start_time, s->priority, s->port, WORK_QUEUE_CATALOG_LIFETIME, s->tasks_waiting, s->total_tasks_complete, s->tasks_running, s->total_tasks_dispatched, s->workers_init, s->workers_ready, s->workers_busy, s->workers_init + s->workers_ready + s->workers_busy, s->capacity, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
 
 	if(domain_name_cache_lookup(catalog_host, address)) {
 		debug(D_WQ, "Sending the master information to the catalog server at %s:%d ...", catalog_host, catalog_port);

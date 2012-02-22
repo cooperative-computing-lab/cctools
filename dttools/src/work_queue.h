@@ -133,6 +133,7 @@ struct work_queue_stats {
 	int total_workers_removed;	/**< Total number of times a worker was removed from the queue. */
 	INT64_T total_bytes_sent;   /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
 	INT64_T total_bytes_received;	/**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
+	timestamp_t start_time;     /**<The time at which the master started. */
 	timestamp_t total_send_time;/**<Total time in microseconds spent in sending data to workers. */
 	timestamp_t total_receive_time;
 				    /**<Total time in microseconds spent in receiving data from workers. */

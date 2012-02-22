@@ -334,6 +334,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_send_time = q->total_send_time;
 	s->total_receive_time = q->total_receive_time;
 	effective_workers = get_num_of_effective_workers(q);
+	s->start_time = q->start_time;
 	wall_clock_time = timestamp_get() - q->start_time;
 	s->efficiency = (long double) (q->total_execute_time) / (wall_clock_time * effective_workers);
 	s->idle_percentage = get_idle_percentage(q);
