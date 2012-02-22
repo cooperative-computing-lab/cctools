@@ -202,7 +202,7 @@ void debug_print_masters(struct list *ml)
 
 	list_first_item(ml);
 	while((m = (struct work_queue_master *) list_next_item(ml))) {
-		if(timestamp_fmt(timestr, sizeof(timestr) - 1, "%R %b %d, %Y", m->start_time) == 0) {
+		if(timestamp_fmt(timestr, sizeof(timestr), "%R %b %d, %Y", m->start_time) == 0) {
 			strcpy(timestr, "unknown time");
 		}
 		debug(D_WQ, "%d:\t%s@%s:%d started on %s\n", ++count, m->proj, m->addr, m->port, timestr);

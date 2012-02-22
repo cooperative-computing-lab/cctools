@@ -352,7 +352,7 @@ void nvpair_print_table(struct nvpair *n, FILE * s, struct nvpair_header *h)
 				if(h->mode == NVPAIR_MODE_TIME) {
 					ts *= 1000000;
 				}
-				ret = timestamp_fmt(line, h->width - 1, "%R %b %d, %Y", ts);
+				ret = timestamp_fmt(line, h->width, "%R %b %d, %Y", ts);
 			}
 			if(ret == 0) {
 				strcpy(line, "???");
