@@ -147,7 +147,7 @@ void process_matched_masters(struct list *matched_masters)
 			snprintf(input_files, PATH_MAX, "work_queue_worker");
 
 			int num_of_workers = 15;
-			//submit_workers(cmd, input_files, num_of_workers);
+			submit_workers(cmd, input_files, num_of_workers);
 			printf("%d workers has been submitted for master: %s@%s:%d\n", num_of_workers, m->proj, m->addr, m->port);
 
 		   	pm = (struct processed_master *)malloc(sizeof(*pm));
@@ -175,7 +175,7 @@ void process_matched_masters(struct list *matched_masters)
 					free(tmp_pm->master_hash_key);
 					free(tmp_pm);
 				} else {
-					fprintf(stderr, "Error: failed to remove %s from the processed masters.\n", tmp_key);
+					fprintf(stderr, "Error: failed to remove %s from the processed masters list.\n", tmp_key);
 					exit(1);
 				}
 			}
