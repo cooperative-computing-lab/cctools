@@ -33,6 +33,7 @@ static struct nvpair_header headers[] = {
 	{"workers", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 10},
 	{"workers_busy", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 15},
 	{"capacity", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 10},
+	{"start_time", NVPAIR_MODE_TIMESTAMP, NVPAIR_ALIGN_RIGHT, 20}, // The widths of the NV_PAIR_TIME and the NV_PAIR_TIMESTAMP fields should be >= 20
 	{"lastheardfrom", NVPAIR_MODE_TIME, NVPAIR_ALIGN_RIGHT, 20},
 	{NULL,}
 };
