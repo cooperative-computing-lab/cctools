@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "stringtools.h"
 #include "domain_name_cache.h"
+#include "timestamp.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +39,7 @@ struct work_queue_master {
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 	char proj[WORK_QUEUE_NAME_MAX];
+	timestamp_t start_time;
 	int priority;
 	int capacity;
 	int tasks_waiting;

@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "stringtools.h"
 #include "domain_name_cache.h"
+#include "timestamp.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,6 +66,7 @@ struct work_queue_master *parse_work_queue_master_nvpair(struct nvpair *nv)
 	strncpy(m->addr, nvpair_lookup_string(nv, "address"), LINK_ADDRESS_MAX);
 	strncpy(m->proj, nvpair_lookup_string(nv, "project"), WORK_QUEUE_NAME_MAX);
 	m->port = nvpair_lookup_integer(nv, "port");
+	m->start_time = nvpair_lookup_integer(nv, "start_time");
 	m->priority = nvpair_lookup_integer(nv, "priority");
 	if(m->priority < 0) m->priority = 0;
 	m->capacity = nvpair_lookup_integer(nv, "capacity");
@@ -196,15 +198,13 @@ void debug_print_masters(struct list *ml)
 {
 	struct work_queue_master *m;
 	int count = 0;
+	char timestr[1024];
 
 	list_first_item(ml);
 	while((m = (struct work_queue_master *) list_next_item(ml))) {
-		debug(D_WQ, "Master %d:\n", ++count);
-		debug(D_WQ, "addr:\t%s\n", m->addr);
-		debug(D_WQ, "port:\t%d\n", m->port);
-		debug(D_WQ, "project:\t%s\n", m->proj);
-		debug(D_WQ, "priority:\t%d\n", m->priority);
-		debug(D_WQ, "capacity:\t%d\n", m->capacity);
-		debug(D_WQ, "\n");
+		if(timestamp_fmt(timestr, sizeof(timestr) - 1, "%R %b %d, %Y", m->start_time) == 0) {
+			strcpy(timestr, "unknown time");
+		}
+		debug(D_WQ, "%d:\t%s@%s:%d started on %s\n", ++count, m->proj, m->addr, m->port, timestr);
 	}
 }

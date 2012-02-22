@@ -41,8 +41,8 @@ static struct itable *remote_job_table = NULL;
 static struct hash_table *processed_masters;
 static int retry_count = 20;
 
-struct list *get_matching_masters(const char *catalog_host, int catalog_port, struct list *regex_list);
-void process_matching_masters(struct list *matching_masters);
+struct list *get_matched_masters(const char *catalog_host, int catalog_port, struct list *regex_list);
+void process_matched_masters(struct list *matched_masters);
 static int submit_workers(char *cmd, char *input_files, int count);
 
 struct worker_status {
@@ -98,40 +98,90 @@ static int copy_executable(char *current_path, char *new_path)
 // TODO: // This is an experimental feature!!
 void start_serving_masters(const char *catalog_host, int catalog_port, struct list *regex_list)
 {
-	struct list *matching_masters;
+	struct list *matched_masters;
 
 	while(!abort_flag) {
-		matching_masters = get_masters_from_catalog(catalog_host, catalog_port, regex_list);
+		matched_masters = get_masters_from_catalog(catalog_host, catalog_port, regex_list);
 		debug(D_WQ, "Matching masters:\n");
-		debug_print_masters(matching_masters);
-		process_matching_masters(matching_masters);
+		debug_print_masters(matched_masters);
+		process_matched_masters(matched_masters);
 		sleep(6);
 	}
 }
 
-// TODO: // This is an experimental feature!!
-void process_matching_masters(struct list *matching_masters)
+static void master_to_hash_key(struct work_queue_master *m, char *key)
+{
+	sprintf(key, "%s-%d-%llu", m->addr, m->port, m->start_time);
+}
+
+struct processed_master {
+	char *master_hash_key;
+	int hit;
+};
+
+// TODO: This is an experimental feature!!
+void process_matched_masters(struct list *matched_masters)
 {
 	struct work_queue_master *m;
 	char cmd[PATH_MAX] = "";
 	char input_files[PATH_MAX] = "";
+	char key[WORK_QUEUE_CATALOG_LINE_MAX];
 
-	if(!matching_masters)
+	if(!matched_masters)
 		return;
 
-	list_first_item(matching_masters);
-	while((m = (struct work_queue_master *) list_next_item(matching_masters))) {
-		if(!hash_table_lookup(processed_masters, m->proj)) {
-			printf("Submitting 15 workers for master: %s\n", m->proj);
+	char *tmp_key;
+	struct processed_master *tmp_pm;
+	hash_table_firstkey(processed_masters);
+	while(hash_table_nextkey(processed_masters ,&tmp_key, (void **) &tmp_pm)) {
+		tmp_pm->hit = 0;
+	}
+
+	list_first_item(matched_masters);
+	while((m = (struct work_queue_master *) list_next_item(matched_masters))) {
+		struct processed_master *pm;
+		master_to_hash_key(m, key);
+		if((pm = hash_table_lookup(processed_masters, key)) == 0) {
 
 			snprintf(cmd, PATH_MAX, "./work_queue_worker -a -N %s", m->proj);
 			snprintf(input_files, PATH_MAX, "work_queue_worker");
 
-			submit_workers(cmd, input_files, 15);
+			int num_of_workers = 15;
+			//submit_workers(cmd, input_files, num_of_workers);
+			printf("%d workers has been submitted for master: %s@%s:%d\n", num_of_workers, m->proj, m->addr, m->port);
 
-			hash_table_insert(processed_masters, m->proj, duplicate_work_queue_master(m));
+		   	pm = (struct processed_master *)malloc(sizeof(*pm));
+			if(pm == NULL) {
+				fprintf(stderr, "Cannot allocate memory to record processed masters!\n");
+				exit(1);
+			}
+			pm->master_hash_key = strdup(key);
+			pm->hit = 1;
+			hash_table_insert(processed_masters, key, pm);
 		} else {
-			//TODO: new features coming...
+			debug(D_WQ, "Project %s@%s:%d has been processed. Skipping ...\n", m->proj, m->addr, m->port);
+			pm->hit = 1;
+		}
+	}
+
+	debug(D_WQ, "Processed masters list size: %d\n", hash_table_size(processed_masters));
+	hash_table_firstkey(processed_masters);
+	while(hash_table_nextkey(processed_masters, &tmp_key, (void **) &tmp_pm)) {
+		if(tmp_pm) {
+			if(tmp_pm->hit == 0) {
+				tmp_pm = hash_table_remove(processed_masters, tmp_key);
+				if(tmp_pm) {
+					debug(D_WQ, "Removed %s from the processed masters list.\n", tmp_pm->master_hash_key);
+					free(tmp_pm->master_hash_key);
+					free(tmp_pm);
+				} else {
+					fprintf(stderr, "Error: failed to remove %s from the processed masters.\n", tmp_key);
+					exit(1);
+				}
+			}
+		} else {
+			fprintf(stderr, "Error: processed masters list contains invalid information.\n");
+			exit(1);
 		}
 	}
 }
@@ -395,6 +445,7 @@ static void show_help(const char *cmd)
 	printf("  -r <count>     Number of attemps to retry if failed to submit a worker.\n");
 	printf("  -m <count>     Each batch job will start <count> local workers. (default is 1.)\n");
 	printf("  -W <path>      Path to the work_queue_worker executable.\n");
+	printf("  -A             Enable auto worker pool feature (experimental).\n");
 	printf("  -q             Guarantee <count> running workers and quit. The workers would terminate after their idle timeouts unless the user explicitly shut them down. The user needs to manually delete the scratch directory, which is displayed on screen right before work_queue_pool exits. \n");
 	printf("  -h             Show this screen.\n");
 	printf("\n");
