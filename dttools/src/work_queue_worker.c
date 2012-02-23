@@ -684,7 +684,7 @@ int main(int argc, char *argv[])
 		if(task_status == TASK_RUNNING) {
 			int tmp_timeout = 5;
 			debug(D_WQ, "Waiting %d seconds for process %d to finish ...", tmp_timeout, pid);
-			if(wait_task(pid, tmp_timeout, &ti)) {
+			if(wait_task(pid, tmp_timeout, &ti) && abort_flag == 0) {
 				task_status = TASK_COMPLETE;
 			} else {
 				debug(D_WQ, "Task (process %d) is not done yet.\n", pid);
