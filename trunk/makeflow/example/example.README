@@ -1,0 +1,55 @@
+
+This is a preview of the Makeflow workflow engine.
+It is still under development and not fully documented yet.
+
+Makeflow uses a simplified version of Makefiles to represent
+workflows for distributed computing.  It is not tied to any
+particular batch system, and it currently works with Unix
+processes, Condor, SGE, and a custom system called Work Queue (wq).
+
+The file example.makeflow in this directory contains an example
+workflow that takes an image, swirls it around in 4 permutations,
+and joins the results into a gif animation.
+
+Looking at the source, you should see that it looks almost identical
+to a Makefile.  The main difference is that Makeflow is STRICT:
+You must declare all source files needed by a rule, and all of the
+target files created by a rule, because Makeflow will use that
+information to create batch jobs.  You cannot have a phony rule
+like "clean:" because such a rule does not actually create a
+file named "clean".
+
+To run it on your local machine as if it were a Makefile:
+    makeflow example.makeflow
+
+To clean up the results of the run:
+    makeflow -c example.makeflow
+
+To cause Makeflow to submit jobs to Condor:
+    makeflow -T condor example.makeflow
+
+To submit Makeflow as a Condor job that submits more Condor jobs:
+    condor_submit_makeflow example.makeflow
+
+(In this configuration, makeflow behaves like dagman: it can
+recover from a failure of the submissino machine.  We haven't
+implemented a clean condor_rm of a makeflow yet, but it is quite doable.)
+
+You will notice that a workflow can run very slowly if you submit
+each batch job to a system like Condor, because it typically
+takes 30 seconds or so to start each batch job running.  To get
+around this limitation, we provide the Work Queue system, which
+works as follows:
+
+To start your Makeflow with Work Queue on port 9123:
+    makeflow -T wq -p 9123 example.makeflow
+
+Then, start as many workers as you like on whatever machines you
+have available.  You can ssh to another machine and run:
+    work_queue_worker servername 9123
+
+Or, you can submit 100 workers to Condor like this:
+    condor_submit_workers servername 9123 100
+
+For more information, please check out our manuals and mailing list here:
+http://www.cse.nd.edu/~ccl/software/help.shtml

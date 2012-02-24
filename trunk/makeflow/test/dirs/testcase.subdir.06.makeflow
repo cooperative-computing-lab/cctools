@@ -1,0 +1,3 @@
+# specify everything (directories and files) in the target file section, but directory at the end (order of the targets creation is not as specified). This should work.
+mydir/1.txt mydir/2.txt mydir: input
+	mkdir -p mydir; cp input/hello mydir/1.txt; cp input/hello mydir/2.txt

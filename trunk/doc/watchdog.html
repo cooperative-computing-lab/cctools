@@ -1,0 +1,83 @@
+<html>
+
+<head>
+<title>Watchdog User's Manual</title>
+</head>
+
+<body>
+
+<h1>Watchdog User's Manual</h1>
+<b>February 2006</b>
+<p>
+
+The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain
+and Copyright (C) 2005- The University of Notre Dame.  All rights reserved.
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+
+<h2>Overview</h2>
+
+Keeping a collection of processes running in large distributed system
+presents many practical challenges.  Machines reboot, programs crash,
+filesystems go up and down, and software must be upgraded.  Ensuring
+that a collection of services is always running and up-to-date can require
+a large amount of manual activity in the face of these challenges.
+<p>
+<b>watchdog</b> is a tool for keeping server processes running continuously.
+The idea is simple: watchdog is responsible for starting a server.
+If the server should crash or exit, watchdog restarts it.
+If the program on disk is upgraded, watchdog will cleanly stop and
+restart the server to take advantage of the new version.
+To avoid storms of coordinated activity in a large cluster,
+these actions are taken with an exponential backoff and a random factor.
+<p>
+<b>watchdog</b> is recommended for running the
+<a href=chirp.html>chirp and catalog servers</a> found elsewhere in this package.
+
+<h2>Invocation</h2>
+
+To run a server under the eye of watchdog, simply place <tt>watchdog</tt>
+in front of the server name.  That is, if you normally run:
+
+<pre>
+/path/to/chirp_server -r /my/data -p 10101
+</pre>
+
+Then run this instead:
+
+<pre>
+watchdog /path/to/chirp_server -r /my/data -p 10101
+</pre>
+
+For most situations, this is all that is needed.
+You may fine tune the behavior of watchdog in
+the following ways:
+<p>
+<b>Logging.</b>  Watchdog keeps a log of all actions that it
+performs on the watched process.  Use the <tt>-d all</tt> option
+to see them, and the <tt>-o file</tt> option to direct them
+to a log file.
+<p>
+<b>Upgrading.</b>  To upgrade servers running on a large cluster,
+simply install the new binary in the filesystem.  By default,
+each watchdog will check for an upgraded binary once per hour
+and restart if necessary.  Checks are randomly distributed around
+the hour so that the network and/or filesystem will not be overloaded.
+(To force a restart, send a SIGHUP to the watchdog.)
+Use the <tt>-c</tt> option to change the upgrade check interval.
+<p>
+<b>Timing.</b>  Watchdog has several internal timers to ensure
+that the system is not overloaded by cyclic errors.  These can
+be adjusted by various options (in parentheses.) A minimum time
+of ten seconds (-m) must pass between a server stop and restart,
+regardless of the cause of the restart.  If the server exits within
+the first minute (-s) of execution, it is considered to have failed.
+For each such failure, the minimum restart time is doubled, up to
+a maximum of one hour (-M).  If the program must be stopped, it
+is first sent an advisory SIGTERM signal.  If it does not exit
+voluntarily within one minute (-S), then it is killed outright
+with a SIGKILL signal.
+
+</body
+
+</html>

@@ -1,0 +1,38 @@
+
+#
+# Print three words separately
+#
+
+for name in three blind mice
+	echo ${name}
+end
+
+#
+# Treat each word in the variable separately
+#
+
+WORDS="four fat cats"
+for name in ${WORDS}
+	echo ${name}
+end
+
+#
+# Treat the variable as one word
+#
+
+for name in "${WORDS}"
+	echo ${name}
+end
+
+#
+# Build a multiplication table.
+#
+
+for i in 1 2 3 4 5 6 8 9
+	for j in 1 2 3 4 5 6 7 8 9
+		k=${i} .mul. ${j}
+		printf "%02d " ${k}
+	end
+	echo ""
+end
+

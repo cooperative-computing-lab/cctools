@@ -1,0 +1,125 @@
+
+This package is developed primarily by:
+
+	Douglas Thain
+	Cooperative Computing Lab
+	University of Notre Dame
+	http://www.cse.nd.edu/~ccl
+
+Many thanks go a host of contributors and colleagues, in alphabetical order.
+
+	Michael Albrecht
+	University of Notre Dame
+	Created the Parrot-S3 module and contributed to Work Queue and Makeflow.
+
+	John Bent
+	University of Wisconsin
+	Debugged early versions of parrot on many applications with NeST.
+
+	Dan Bradley
+	University of Wisconsin
+	Contributed the Parrot-CVMFS module.
+
+	Christophe Blanchet
+	IBCP
+	Developed new support for Parrot to work with the EGEE software and bioinformatics applications.
+
+	Hoang Bui
+	University of Notre Dame
+	Created the chirp_distribute and chirp_matrix modules.
+
+	Peter Bui
+	University of Notre Dame
+	Created the Parrot-HDFS module and many improvements to Makeflow and Work Queue.
+
+	Benjamin Couturier
+	CERN
+	Provided patches to work with the CASTOR name space.
+
+	Patrick Donnelly
+	University of Notre Dame
+	Created the chirp_filesystem backend and the Chirp-HDFS module.
+	
+	Michael Ernst, Patrick Fuhrmann, and Tigran Mkrtchyan
+	Fermi National Labs and DESY
+	Provided invaluable help installing, configuring, and using dcache
+	for use with Parrot.
+	
+	Jamie Frey
+	University of Wisconsin
+	Debugged and deployed ftp_lite.
+
+	Jeffrey Hemmes
+	University of Notre Dame
+	Developed support for distributed access control lists.
+
+	Miron Livny
+	University of Wisconsin	
+	Provided excellent strategic and technical advice as my Ph.D. advisor.
+
+	Zach Miller
+	University of Wisconsin
+	Tested and deployed parrot with BLAST.
+
+	Chris Moretti
+	University of Notre Dame
+	Contributed extensively to the implementation of Chirp,
+	abstractions for distributed computing, and the SAND assembler.
+
+	Kevin Partington
+	University of Notre Dame
+	COntributed features to Makeflow and Work Queue.
+
+	Francesco Prelz
+	INFN Milan
+	Contributed numerous bug fixes and performance improvements to Parrot.
+
+	Sander Klous
+	NIKHEF
+	Tested and deployed parrot with BaBar and Objectivity.
+
+	Csaba Kos
+	Contributed bug fixes to Parrot and Chirp.
+
+	Peter Kunszt
+	CERN
+	Patches to run on variations of Linux
+	Glite-IO module.
+
+	Paul Madrid
+	University of Notre Dame
+	Implemented the reservation ACL feature.
+
+	Michael Olson
+	University of Notre Dame
+	Contributed to the design and implementation of SAND.
+
+	Kevin Partington
+	University of Notre Dame
+	Contributed to features in Makeflow.
+
+	Alain Roy
+	University of Wisconsin
+	Tested and deployed ftsh with the Virtual Data Toolkit.
+
+	Hugh Sasse
+	De Montfort University, U.K.
+	Contributed to the Fault Tolerant Shell
+
+	Ulrich Schwickerath	
+	FZH Hamburg
+	Contributed RFIO driver and Infiniband support for Parrot.
+
+	Igor Sfiligoi, Aureliano Rama, Simone Pagan Griso, Donatella Lucchesi
+	INFN Padova and Fermi National Laboratory
+	Contributed to the Design and implementation of the GROW filesystem.
+
+	Andrew Thrasher
+	University of Notre Dame
+	Contributed to the design and implementation of SAND
+
+	Li Yu
+	Notre Dame
+	Contributed to work queue, makeflow, all-pairs, and SAND.
+
+Thanks to one and all!

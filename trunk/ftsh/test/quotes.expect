@@ -1,0 +1,14 @@
+three unquoted args
+
+
+these are double quoted
+these are single quoted
+spaces betweeen args
+'single in double'
+"double in single"
+"backwhacked doubles" in doubles
+'backwhacked singles' in doubles
+"backwhacked doubles" in singles
+'backwhacked singles' in singles
+backwhacked spaces between args
+backwhacked weird stuff like pipe | semicolon ; arrow > < ampersand &

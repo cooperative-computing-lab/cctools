@@ -1,0 +1,485 @@
+
+save_arguments()
+{
+cat >configure.rerun <<EOF
+#!/bin/sh
+$@
+EOF
+chmod 755 configure.rerun
+}
+
+check_file ()
+{
+	echo -n "checking for $1..."
+	if [ -f $1 ]
+	then
+		echo "yes"
+		return 0
+	else
+		echo "no"
+		return 1
+	fi
+}
+
+check_path ()
+{
+	echo -n "checking for $1..."
+	IFS=":"
+	for dir in $PATH
+	do
+		if [ -x $dir/$1 ]
+		then
+			echo "$dir/$1"
+			IFS=" "
+			return 0
+		fi
+	done
+	echo "not found"
+	IFS=" "
+	return 1
+}
+
+check_function()
+{
+	echo -n "checking for $1 in $2..."
+	if grep $1 $2 >/dev/null 2>&1
+	then
+		echo "yes"
+		return 0
+	else
+		echo "no"
+		return 1
+	fi
+}
+
+require_file ()
+{
+	if check_file $1
+	then
+		return 0
+	else
+		echo "Sorry, I can't proceed without file $1";
+		exit 1
+	fi
+}
+
+require_path ()
+{
+	if check_path $1
+	then
+		return 0
+	else
+		echo "Sorry, I can't proceed without program $1";
+		exit 1
+	fi
+}
+
+require_function ()
+{
+	if check_function $1 $2
+	then
+		return 0
+	else
+		echo "Sorry, I can't proceed without function $1";
+		exit 1
+	fi
+}
+
+library_search_mode=prefer_dynamic
+
+library_search()
+{
+	if library_search_normal $@;
+	then
+		return 0
+	fi
+	if [ X$HOST_MULTIARCH != X ] && library_search_multiarch $@;
+	then
+		return 0
+	fi
+
+	return 1
+}
+
+library_search_multiarch()
+{
+	if [ X$3 = X ];
+	then
+		library_search_normal $1 $2 $HOST_MULTIARCH
+	else
+		library_search_normal $1 $2 $HOST_MULTIARCH/$3
+	fi
+}
+
+library_search_normal()
+{
+	# If the second argument is root, and we are not careful,
+	# we will end up with a path that has two slashes, which
+	# means something unintended in Windows
+
+	if [ $2 = / ]
+	then
+		basedir=
+	else
+		basedir=$2
+	fi
+
+	# If we are running on a 64-bit platform, then the native libraries
+	# for compiling will be found in /lib64, if it exists.  The files in
+	# /lib are compatibilities libraries for 32-bit.
+	
+	if [ $build_cpu = X86_64 -a -d $2/lib64 ]
+	then
+		libdir=$basedir/lib64
+	elif [ -d $basedir/lib ]
+        then
+		libdir=$basedir/lib
+	else
+		libdir=$basedir
+	fi
+
+	# Darwin uses dylib for dynamic libraries, other platforms use .so
+
+	if [ $build_sys = DARWIN ]
+	then
+		dynamic_suffix=dylib
+	else
+		dynamic_suffix=so
+	fi
+
+	# If a third argument is given, it means libraries are found in
+	# a subdirectory of lib, such as "mysql".
+
+	if [ X$3 != X -a -d "$libdir/$3" ]
+	then
+		libdir="$libdir/$3"
+	fi
+
+	# Now check for the library file in all of the known places,
+	# and add it to the link line as appropriate for the type and platform.
+
+	if [ $library_search_mode = prefer_static -o $library_search_mode = require_static ]
+	then
+		if check_file $libdir/lib$1.a
+		then
+			ldflags="${ldflags} $libdir/lib$1.a"
+			return 0
+		fi
+	fi
+
+	if [ $library_search_mode != require_static ]
+	then
+		if check_file $libdir/lib$1.$dynamic_suffix
+		then
+			# If this is not a standard library directory, add it to the library search path.
+			# (Adding standard directories to the path has unintended effects.)
+			if [ $libdir != /lib -a $libdir != /lib64 -a $libdir != /usr/lib -a $libdir != /usr/lib64 ]
+			then
+				ldflags="${ldflags} -L$libdir"
+			fi
+			ldflags="${ldflags} -l$1"
+			return 0
+		fi
+	fi
+
+	if [ $library_search_mode = prefer_dynamic ]
+	then
+		if check_file $libdir/lib$1.a
+		then
+			ldflags="${ldflags} $libdir/lib$1.a"
+			return 0
+		fi
+	fi
+	
+	return 1
+}
+
+optional_function()
+{
+	multiarch_include=`echo $2 | sed "s|include/|include/$HOST_MULTIARCH/|"`
+
+	if check_function $1 $2
+	then
+		ccflags="${ccflags} -D$3"
+		return 0
+	elif [ X$HOST_MULTIARCH != X ] && check_function $1 $multiarch_include;
+	then
+		ccflags="${ccflags} -D$3"
+		return 0
+	fi
+		
+	return 1
+}
+
+optional_file()
+{
+	if check_file $1
+	then
+		ccflags="${ccflags} -D$2"
+		return 0
+	else
+		return 1
+	fi
+}
+
+optional_include()
+{
+	multiarch_include=`echo $1 | sed "s|include/|include/$HOST_MULTIARCH/|"`
+
+	if optional_file $1 $2;
+	then
+		return 0
+	elif [ X$HOST_MULTIARCH != X ] && optional_file $multiarch_include $2;
+	then
+		return 0
+	fi
+
+	return 1
+}
+
+optional_pfs_service()
+{
+	service=$1
+	shift 1
+
+	echo -n "including pfs_service_${service}..."
+
+	for lib in $@; do
+		if echo $ccflags | grep "$lib" > /dev/null 2>&1
+		then
+			true
+		else
+			echo "no"
+			return 1
+		fi
+	done
+
+	echo "yes"
+	ccflag="HAS_$(echo ${service} | tr [a-z] [A-Z])"
+	if echo $ccflags | grep $ccflag > /dev/null 2>&1
+	then
+		true
+	else
+		ccflags="${ccflags} -D${ccflag}"
+	fi
+	pfs_optional_services="${pfs_optional_services} pfs_service_${service}.o"
+	return 0
+}
+
+check_gnu_make()
+{
+	if check_path $1
+	then
+		echo -n "checking if $1 is GNU make..."
+		kind=`$1 -v 2>&1| head -1 | awk '{print $1}'`
+		if [ X$kind = XGNU ]
+		then
+			echo "yes"
+			MAKE=$1
+			export MAKE
+			return 0
+		else
+			echo "no"
+		fi
+	fi
+
+	return 1
+}
+
+require_gnu_make()
+{
+	echo "checking for GNU make in several places..."
+	if check_gnu_make make
+	then
+		return 0
+	else
+		if check_gnu_make gmake
+		then
+			return 0
+		else
+			if check_gnu_make gnumake
+			then
+				return 0
+			fi
+		fi
+	fi
+
+	echo "Sorry, you must have GNU make/gmake/gnumake in your path."
+	exit 1
+}
+
+check_perl_version()
+{
+	if check_path "perl"
+	then
+		echo -n "checking perl version..."
+		cat >configure.perl-test <<EOF
+print "\$]\n";
+ 
+\$v = \$ARGV[0]+\$ARGV[1]/1000+\$ARGV[2]/1000000;
+ 
+if(\$v>=\$]) {
+        exit 1;
+} else  {
+        exit 0;
+} 
+EOF
+		if perl configure.perl-test $1 $2 $3
+		then
+			return 0
+		else
+			return 1
+		fi
+	fi
+
+	return 1
+}
+
+fix_globus_install()
+{
+	if check_file "${1}/include/${2}/globus_config.h"
+	then
+		echo "globus source install has been configured properly"
+	else
+		echo "*** globus source install has not been configured properly"
+		echo "*** try running \"gpt-build -nosrc $2\" to set it up properly."
+		exit 1
+	fi
+}
+
+check_for_globus_flavors()
+{
+	echo "examining the globus installation in $1..."
+
+	if check_perl_version 5 5 0
+	then
+		echo "perl version is ok"
+	else
+		echo "*** sorry, the globus build tools require"
+		echo "*** perl >= v5.5.0 in order to even examine the installation."
+		exit 1
+	fi
+
+	#
+	# globus-makefile-header seems to move around.
+	# Use -f rather than -x, because the AFS acl may
+	# not match the UNIX perms.
+	#	
+
+	GMH=$1/sbin/globus-makefile-header
+	echo "checking for $GMH..."
+	if [ ! -f "${GMH}" ]
+	then
+		GMH=$1/bin/globus-makefile-header
+		echo "checking for $GMH..."
+		if [ ! -f "${GMH}" ]
+		then
+			echo "not found"
+			return 1
+		fi
+	fi
+
+	#
+	# Some installations have a trailing " " afer the pound-bang
+	# line, so we'll try to perl it directly if it looks like
+	# a perl script.  However, we don't want to universally assume
+	# that it is perl without some evidence.
+	#
+	 
+	if head -1 $GMH | grep perl > /dev/null 2>&1
+	then
+		GMH="perl ${GMH}"
+	fi
+
+	#
+	# Now search for any flavor we can think of...
+	#
+
+	for compiler in gcc64 gcc32 vendorcc32
+	do
+		for debug in "" dbg
+		do
+			if check_for_globus "$1" "$2" "${compiler}${debug}" "${GMH}"
+			then
+				return 0
+			fi
+		done
+	done
+
+	return 1
+}
+
+check_for_globus()
+{
+	echo -n "checking for globus package $2 flavor $3 in $1..."
+
+	GLOBUS_LOCATION=$1
+	export GLOBUS_LOCATION
+
+	#
+	# Run globus-makefile-header and dump the output into
+	# a Makefile.  Note that the single-dash option form
+	# stops working with version > 2.0
+	#
+
+	$4 --static --flavor=$3 $2 2> Makefile.config.globus.errors > Makefile.config.globus
+
+	#
+	# This script seems to always exit with status zero,
+	# even if it detects an error.
+	#
+
+	if [ $? -eq 0 ]
+	then
+		#
+		# Some busted versions put error messages
+		# in the output Makefile itself.
+		#
+
+		if grep ERROR Makefile.config.globus > /dev/null
+		then
+			#
+			# On the other hand, some working versions have
+			# the string ERROR in a package name!
+			#
+
+			if grep ERROR_VERSION Makefile.config.globus > /dev/null
+			then
+				echo "tricky, but yes!"
+				return 0
+			else
+				rm Makefile.config.globus
+				echo "broken"
+				return 1
+			fi
+		else
+			echo "yes"
+			return 0
+		fi
+	else
+		#
+		# Never seen this happen, but perhaps the script
+		# will indicate the package is not present
+		#
+
+		echo "no"
+		return 1
+	fi
+}
+
+check_multiarch()
+{
+	echo -n "checking for multiarch environment..." 
+	if [ -r /etc/debian_version ]; then
+		HOST_MULTIARCH=`dpkg-architecture -qDEB_HOST_MULTIARCH 2> /dev/null`
+		echo "$HOST_MULTIARCH"
+	else
+		HOST_MULTIARCH=
+		echo "no"
+	fi
+}
+
+format_version()
+{
+	echo "$@" | awk -F. '{printf("%d%03d%03d%03d", $1, $2, $3, $4); }'	
+}

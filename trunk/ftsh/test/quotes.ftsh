@@ -1,0 +1,20 @@
+
+#
+# Try all of the variations on quotation.
+#
+
+echo three unquoted args
+echo ""
+echo ''
+echo "these" "are" "double" "quoted"
+echo 'these' 'are' 'single' 'quoted'
+echo "spaces"     "betweeen"         "args"
+echo "'single in double'"
+echo '"double in single"'
+echo "\"backwhacked doubles\" in doubles"
+echo "\'backwhacked singles\' in doubles"
+echo '\"backwhacked doubles\" in singles'
+echo '\'backwhacked singles\' in singles'
+echo backwhacked\ spaces\ between\ args
+echo backwhacked weird stuff like pipe \| semicolon \; arrow \> \< ampersand \&
+

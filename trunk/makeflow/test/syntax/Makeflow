@@ -1,0 +1,12 @@
+CP=/bin/cp
+BASEDIR=../../src/
+
+makeflow.c: $BASEDIR/makeflow.c
+	$CP $BASEDIR/makeflow.c makeflow.c
+
+condor_submit_makeflow: $BASEDIR/makeflow
+	$CP $BASEDIR/condor_submit_makeflow condor_submit_makeflow
+
+total_line_count.txt: makeflow.c condor_submit_makeflow
+	LOCAL cat makeflow.c condor_submit_makeflow | wc -l > total_line_count.txt
+

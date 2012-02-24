@@ -1,0 +1,178 @@
+
+a=10
+b=21
+c=171
+
+#
+# string comparison
+#
+
+if foo .eq. foo
+	echo "ok"
+else
+	failure
+end
+
+if foo .ne. baz
+	echo "ok"
+else
+	failure
+end
+
+#
+# integer comparison
+#
+
+if $a .eql. 10
+	echo "ok"
+else
+	failure
+end
+
+try
+	if $a .eql. crap
+		echo "shouldn't return true"
+	else
+		echo "shouldn't return false"
+	end
+catch
+	echo "not a number"
+end
+
+#
+#
+# add sub mul div to eq
+#
+
+for x in (0 .sub. $a) .to. $a
+	y=$x .mul. $b .add. $c
+	z=( $y .sub. $c ) .div. $b
+	if $x .eq. $z
+		echo $x $y $z ok
+	else
+		failure
+	end
+end
+
+#
+# mod lt eq to
+#
+
+for x in 1 .to. 19
+	y=$x .mod. 10
+	if $x .lt. 10
+		if $y .eq. $x
+			echo $x $y ok
+		else
+			failure
+		end
+	else
+		if $y .eq. ( $x .sub. 10 )
+			echo $x $y ok
+		else
+			failure
+		end
+	end
+end
+
+# gt lt and not
+
+for x in -10 .to. 10
+	y=$x .add. 1
+	z=$x .sub. 1
+	if ( $y .gt. $x ) .and. ( $z .lt. $x )
+		echo $x $y $z ok
+	else
+		failure
+	end
+	if .not. (( $y .gt. $x ) .and. ( $z .lt. $x ))
+		failure
+	else
+		echo not $x $y $x ok
+	end
+end
+
+for a in true false
+	for b in true false
+		x=($a .and. $b)
+		y=($a .or. $b)
+		z=(.not. $a)
+		w=(.not. $b)
+
+		echo "$a and $b = $x"
+		echo "$a or $b = $y"
+		echo "not $a = $z"
+		echo "not $b = $w"
+	end
+end
+
+function testall
+	if .exists. $1
+		echo "$1 exists"
+	end
+	if .isr. $1
+		echo "$1 readable"
+	end
+	if .isw. $1
+		echo "$1 writeable"
+	end
+	if .isx. $1
+		echo "$1 executable"
+	end
+
+	if .islink. $1
+		echo "$1 is a link"
+	else if .isdir. $1
+		echo "$1 is a dir"
+	else if .issock. $1
+		echo "$1 is a socket"
+	else if .ispipe. $1
+		echo "$1 is a pipe"
+	else if .isfile. $1
+		echo "$1 is a file"
+	else if .isblock. $1
+		echo "$1 is a block device"
+	else if .ischar. $1
+		echo "$1 is a char device"
+	else
+		echo "$1 is unknown type"
+	end
+end
+
+rm -rf a
+testall a
+touch a
+
+chmod 000 a
+testall a
+
+chmod 400 a
+testall a
+
+chmod 200 a
+testall a
+
+chmod 100 a
+testall a
+
+rm -rf g
+mkdir g
+chmod 700 g
+testall g
+
+rm -rf h
+touch h
+chmod 700 h
+testall h
+
+rm -rf i
+ln -s h i
+testall i
+
+#
+# Skip fifos because they can't be tested everywhere.
+#
+
+#rm -rf /tmp/k
+#mkfifo /tmp/k
+#testall /tmp/k

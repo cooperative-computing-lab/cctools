@@ -1,0 +1,255 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2010- The University of Notre Dame.
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details
+
+""" Makeflow monitor """
+
+from collections import deque
+from optparse import OptionParser
+from time import sleep, time, ctime as time_ctime
+
+import os
+import sys
+
+# Constants
+
+MF_STATES = ['waiting', 'running', 'complete', 'failed', 'aborted']
+
+MF_LOG_TIME	 = 0
+MF_LOG_NODE_ID	 = 1
+MF_LOG_NEW_STATE = 2
+MF_LOG_JOB_ID	 = 3
+MF_LOG_WAITING	 = 4
+MF_LOG_RUNNING	 = 5
+MF_LOG_COMPLETE	 = 6
+MF_LOG_FAILED	 = 7
+MF_LOG_ABORTED	 = 8
+MF_LOG_TOTAL	 = 9
+
+MF_MAX_HISTORY_LENGTH = 250
+
+# MakeflowLog Parser
+
+def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
+    if makeflow is None:
+        makeflow = {}
+
+    if 'history' in makeflow:
+        history = makeflow['history']
+    else:
+        history = deque(maxlen = MF_MAX_HISTORY_LENGTH)
+
+    if 'prev_stream_pos' in makeflow:
+        log_stream.seek(makeflow['prev_stream_pos'], os.SEEK_SET)
+
+    slist = None
+    for line in log_stream:
+        if line.startswith('#'):
+            slist = line.split()
+            if slist[1] in ['STARTED']:
+                makeflow['start_time'] = int(slist[2])/1000000.0
+            elif slist[1] in ['FAILED', 'ABORTED', 'COMPLETED']:
+                makeflow['finished'] = True
+                makeflow['elapsed_time'] = int(slist[2])/1000000.0 - makeflow['start_time'] 
+                makeflow['average_task_rate'] = makeflow['total'] / makeflow['elapsed_time']
+            continue
+        else:
+            slist = map(int, line.split())
+
+        if 'start_time' not in makeflow:
+            makeflow['start_time'] = slist[MF_LOG_TIME]/1000000.0
+
+        history.append((slist[MF_LOG_COMPLETE], slist[MF_LOG_TIME]/1000000.0))
+
+        for s, i in zip(MF_STATES, range(MF_LOG_WAITING, MF_LOG_TOTAL)):
+            makeflow[s] = slist[i]
+
+        makeflow['total'] = slist[MF_LOG_TOTAL]
+        makeflow['last_event'] = slist
+
+    if 'start_time' in makeflow and not makeflow['finished']:
+        start_time = makeflow['start_time']
+        if slist is None:
+            current_time = time()
+        else:
+            current_time = slist[MF_LOG_TIME]/1000000.0
+
+        makeflow['elapsed_time']     = current_time - start_time
+        makeflow['percent_complete'] = float(makeflow['complete']) / float(makeflow['total'])
+        try:
+            makeflow['average_task_rate'] = float(makeflow['complete']) / float(makeflow['elapsed_time'])
+        except ZeroDivisionError:
+            makeflow['average_task_rate'] = 0
+
+        try:
+            if len(history) >= MF_MAX_HISTORY_LENGTH / 2:
+                makeflow['current_task_rate']   = float(history[-1][0] - history[0][0]) / float(history[-1][1] - history[0][1])
+                makeflow['estimated_time_left'] = (makeflow['total'] - makeflow['complete']) / makeflow['current_task_rate']
+            else:
+                makeflow['current_task_rate']   = 0
+                makeflow['estimated_time_left'] = (makeflow['total'] - makeflow['complete']) / makeflow['average_task_rate']
+        except ZeroDivisionError:
+            makeflow['estimated_time_left'] = None
+
+    makeflow['prev_stream_pos'] = log_stream.tell()
+    makeflow['history']  = history
+    return makeflow
+
+def parse_makeflowlog(log_path, parse_dag = False):
+    makeflow = None
+    with open(log_path, 'r') as log_stream:
+        makeflow = parse_makeflow_stream(log_stream, parse_dag)
+    return makeflow
+
+# Emit text output
+
+def emit_text(makeflow, field_width=13, progress_width=55):
+    tlist = [()]
+
+    tlist.append(('makeflow', makeflow['log_path']))
+
+    if 'start_time' not in makeflow:
+        tlist.append(('status', 'waiting for events...'))
+    elif makeflow['finished']:
+        tlist.append(('status', 'finished'))
+        tlist.append(('time',
+                      ', '.join(['start: '   + time_ctime(makeflow['start_time']),
+                                 'elapsed: ' + time_format(makeflow['elapsed_time'])])))
+        tlist.append(('tasks/minute', 
+                      'average: %0.2f' % (makeflow['average_task_rate'] * 60.0)))
+    else:
+        progress_bars = int(progress_width * makeflow['percent_complete']) - 1
+        progress_text = str('=' * progress_bars + '>').ljust(progress_width)
+
+        tlist.append(('status',
+                      '[%s] %0.2f %%' % (progress_text, makeflow['percent_complete'] * 100.0)))
+        tlist.append(('time',
+                      ', '.join(['start: '   + time_ctime(makeflow['start_time']),
+                                 'elapsed: ' + time_format(makeflow['elapsed_time']),
+                                 'left: '    + time_format(makeflow['estimated_time_left'])])))
+        tlist.append(('tasks/minute',
+                      ', '.join(['current: %0.2f' % (makeflow['current_task_rate'] * 60.0),
+                                 'average: %0.2f' % (makeflow['average_task_rate'] * 60.0)])))
+        tlist.append(('tasks',
+                      ', '.join(['%s: %d' % (s, makeflow[s]) for s in MF_STATES + ['total']])))
+
+    for m in tlist:
+        if m:
+            field   = str(m[0].title() + ':').rjust(field_width)
+            message = str(m[1])
+            print field, message
+        else:
+            print
+
+# Emitter table
+
+EMITTER_TABLE = {
+    'text' : emit_text,
+}
+
+# Monitor makeflows
+
+def monitor_makeflows(log_paths, options): 
+    makeflows = []
+    for lp in log_paths:
+        makeflows.append({'log_path': lp, 'finished': False, 'percent_complete': 0.0, 'total': float('+infinity')})
+
+    while makeflows:
+        os.system('clear')
+
+        next_makeflows = []
+        for makeflow in makeflows:
+            try:
+                with open(makeflow['log_path'], 'r') as log_stream:
+                    parse_makeflow_stream(log_stream, options.parse_dag, makeflow)
+            except IOError as e:
+                print >>sys.stderr, 'unable to open %s: %s' % (makeflow['log_path'], str(e))
+                continue
+            except ValueError as e:
+                print >>sys.stderr, 'unable to parse %s: %s' % (makeflow['log_path'], str(e))
+                continue
+
+            if (options.hide_finished and makeflow['finished']) or \
+                float(makeflow['total']) < options.min_tasks:
+                continue
+            
+            try:
+                options.emitter(makeflow)
+            except KeyError as e:
+                print >>sys.stderr, 'unable to emit %s: missing %s' % (makeflow['log_path'], str(e))
+            finally:
+                next_makeflows.append(makeflow)
+        
+        makeflows = next_makeflows
+        
+        if options.sort:
+            makeflows = sorted(makeflows, key = lambda mf: mf['percent_complete'])
+
+        sleep(options.timeout)
+
+    print >>sys.stderr, 'No makeflowlogs to monitor...'
+
+# Parse command line options
+
+def parse_command_line_options():
+    parser = OptionParser('%prog [options] <makeflowlog> ...')
+
+    parser.add_option('-f', dest = 'format', action = 'store',
+        help = 'Output format to emit.', metavar = 'format', default = 'text')
+    parser.add_option('-t', dest = 'timeout', action = 'store',
+        help = 'Timeout for reading the logs.', metavar = 'seconds',
+        type = 'float', default = 1.0)
+    parser.add_option('-m', dest = 'min_tasks', action = 'store',
+        help = 'Mininum number of tasks.', metavar = 'minimum',
+        type = 'float', default = 0)
+    parser.add_option('-S', dest = 'sort', action = 'store_true',
+        help = 'Sort logs by progress.', default = False)
+    parser.add_option('-P', dest = 'parse_dag', action = 'store_true',
+        help = 'Parse dag for node information.', default = False)
+    parser.add_option('-H', dest = 'hide_finished', action = 'store_true',
+        help = 'Hide finished makeflows.', default = False)
+
+    (options, args) = parser.parse_args()
+
+    if not args:
+        parser.print_help()
+        sys.exit(1)
+
+    if options.format not in EMITTER_TABLE:
+        print >>sys.stderr, 'invalid format specified:', options.format
+
+    options.emitter = EMITTER_TABLE[options.format]
+
+    return args, options 
+
+# Formatting Functions
+
+def time_format(seconds):
+    TDELTAS = (60, 60, 24, 365)
+    tlist   = []
+    ctime   = seconds
+
+    if seconds is None:
+        return 'N/A'
+
+    for d in TDELTAS:
+        if ctime >= d:
+            tlist.append(ctime % d)
+            ctime = ctime / d 
+        else:
+            tlist.append(ctime)
+            break
+
+    return ':'.join(reversed(map(lambda d: '%02d' % d, tlist)))
+
+# Main Execution
+
+if __name__ == '__main__':
+    try:
+        monitor_makeflows(*parse_command_line_options())
+    except KeyboardInterrupt:
+        sys.exit(0)
+
+# vim: sts=4 sw=4 ts=8 expandtab ft=python

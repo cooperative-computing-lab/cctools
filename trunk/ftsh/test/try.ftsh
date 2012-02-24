@@ -1,0 +1,107 @@
+
+#
+# A really trivial try block
+#
+
+try for 10 seconds
+	echo "Not too hard."
+end
+
+#
+# This try should always succeed
+#
+
+try
+	try for 10 seconds
+		sleep 1
+	end
+	echo "Try did not expire, as expected."
+catch
+	echo "Try expired incorrectly!"
+	failure
+end
+
+#
+# This try should always fail
+#
+
+try
+	try for 1 second
+		sleep 10
+	end
+	echo "Try should not have succeeded!."
+catch
+	echo "Try failed as expected."
+end
+
+#
+# This try should succeed after several times through
+#
+
+try
+	tm=6
+
+	try for 10 times
+		newtm=${tm} .sub. 1
+		tm=${newtm}
+		try for 3 seconds
+			sleep ${tm}
+		end
+	end
+	echo "Try eventually succeeded, as expected"
+catch
+	echo "Try failed unexpectedly."
+	failure
+end
+
+#
+# Test lots of variations on syntax
+#
+
+try 1 time 10 seconds
+	echo "Testing"
+end
+
+try for 1 time 10 seconds
+	echo "Testing"
+end
+
+try 1 time or 10 seconds
+	echo "Testing"
+end
+
+try for 1 time or 10 seconds
+	echo "Testing"
+end
+
+try 10 seconds 1 time
+	echo "Testing"
+end
+
+try for 10 seconds 1 time
+	echo "Testing"
+end
+
+try 10 seconds or 1 time
+	echo "Testing"
+end
+
+try for 10 seconds or 1 time
+	echo "Testing"
+end
+
+try for 10 seconds or 1 time
+	echo "Testing"
+end
+
+try for 10 seconds or 1 time
+	echo "Testing"
+end
+
+try 10 seconds or 1 time every 10 seconds
+        echo "Testing"
+end
+
+try 1 time or 10 seconds every 10 seconds
+        echo "Testing"
+end

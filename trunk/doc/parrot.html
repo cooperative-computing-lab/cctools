@@ -1,0 +1,690 @@
+<html>
+
+<head>
+<title>Parrot User's Manual</title>
+</head>
+
+<h1>Parrot User's Manual</h1>
+<b>October 2011</b>
+<p>
+
+Parrot is Copyright (C) 2003-2004 Douglas Thain and
+Copyright (C) 2005- The University of Notre Dame.
+All rights reserved.
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+<p>
+The Glite module of Parrot is Copyright (c) Members of the EGEE Collaboration. 2004.
+See http://eu-egee.org/partners/ for details on the copyright holders.
+For license conditions see the license file or http://eu-egee.org/license.html
+<p>
+<b>Please use the following citation to refer to Parrot:</b><br>
+<dir>
+<li> Douglas Thain and Miron Livny, <a href=http://www.cse.nd.edu/~dthain/papers/parrot-scpe.pdf>Parrot: An Application Environment for Data-Intensive Computing</a>, Scalable Computing: Practice and Experience, Volume 6, Number 3, Pages 9--18, 2005.
+</dir>
+
+<h2>Overview</h2>
+
+Parrot is a tool for attaching old programs to new storage systems.  Parrot makes a remote storage system appear as a file system to a legacy application.  Parrot does not require any special privileges, any recompiling, or any change whatsoever to existing programs.  It can be used by normal users doing normal tasks.  For example, an anonymous FTP service is made available to <code>vi</code> like so:
+<dir>
+<pre>
+% parrot_run vi /anonftp/ftp.gnu.org/pub/README
+</pre>
+</dir>
+<p>
+Parrot is useful to <i>users</i> of distributed systems, because it frees them from rewriting code to work with new systems and relying on remote administrators to trust and install new software.
+Parrot is also useful to <i>developers</i> of distributed systems, because it allows rapid deployment of new code to real applications and real users that do not have the time, inclination, or permissions to build a kernel-level filesystem.
+<p>
+Parrot currently supports a variety of remote I/O systems, all detailed below.
+We welcome contributions of new remote I/O drivers from others.
+However, if you are working on a protocol driver
+please drop us a note so that we can make sure work
+is not duplicated.
+<p>
+Almost any application - whether static or dynmically linked,
+standard or commercial, command-line or GUI - should work with
+Parrot.  There are a few exceptions.  Because Parrot relies on
+the Linux <code>ptrace</code> interface
+any program that relies on the ptrace interface cannot run under Parrot.
+This means Parrot cannot run a debugger, nor can it run itself recursively.
+In addition, Parrot cannot run setuid programs, as the operating system
+system considers this a security risk.
+<p>
+Parrot also provide a new experimental features called <i>identity boxing</i>.
+This feature allows you to securely run a visiting application within
+a protection domain without become root or creating a new account.
+Read below for more information on identity boxing.
+<p>
+Parrot currently runs on the Linux operating system with either
+Intel compatible (i386) or AMD compatible (x86_64) processors.
+It relies on some fairly low level details in order to implement
+system call trapping.  Ports to other platforms and processors
+Linux may be possible in the future.
+<p>
+Like any software, Parrot is bound to have some bugs.
+Please check the <a href=http://www.cse.nd.edu/~ccl/software/parrot/known-bugs.html>known bugs</a> page for the latest scoop.
+
+<h2>Installation</h2>
+
+Parrot is distributed as part of the
+<a href=http://www.cse.nd.edu/~ccl/software>Cooperative Computing Tools</a>.
+To install, please read the <a href=install.html>cctools installation instructions</a>.
+
+<h2>Examples</h2>
+
+To use Parrot, you simply use the <code>parrot</code> command followed by any other Unix program.  For example, to run a Parrot-enabled <code>vi</code>, execute this command:
+<dir>
+<pre>
+% parrot_run vi /anonftp/ftp.gnu.org/pub/README
+</pre>
+</dir>
+Of course, it can be clumsy to put <code>parrot_run</code> before every command you run, so try starting a shell with Parrot already loaded:
+<dir>
+<pre>
+% parrot_run bash
+</pre>
+</dir>
+Now, you should be able to run any standard command using Parrot filenames.  Here are some examples to get you thinking:
+<dir>
+<pre>
+% cp /http/www.nd.edu/~dthain/papers/parrot-agm2003.pdf .
+% grep Yahoo /http/www.yahoo.com
+% set autolist
+% cat /anonftp/ftp.gnu.org/pub<b>[Press TAB here]</b>
+</pre>
+</dir>
+<p>
+
+<center>
+<table width=75% border=2>
+<tr bgcolor=#ffffaa>
+<td>
+Hint: You may find it useful to have some visual indication
+of when Parrot is active, so we recommend that you modify
+your shell startup scripts to change the prompt when Parrot is enabled.
+If you use <tt>tcsh</tt>, you might add something like this to your <tt>.cshrc</tt>:
+<pre>
+        if ( $?PARROT_ENABLED ) then
+                set prompt = " (Parrot) %n@%m%~%# "
+        else
+                set prompt = " %n@%m%~%# "
+        endif
+</pre>
+</table>
+</center>
+<p>
+
+We have limited the examples so far to HTTP and anonymous FTP, as they are
+the only services we know that absolutely everyone is familiar with.
+There are a number of other more powerful and secure remote services
+that you may be less familiar with.  Parrot supports them in the same form:
+The filename begins with the service type, then the host name,
+then the file name.  Here are all the currently supported services:
+
+<hr>
+<table>
+<tr><td><b>example path</b><td><b>remote service</b><td><b>more info</b>
+<tr><td>/http/www.somewhere.com/index.html<td>Hypertext Transfer Protocol<td>included
+<tr><td>/grow/www.somewhere.com/index.html<td>GROW - Global Read-Only Web Filesystem <td>included
+<tr><td>/ftp/ftp.cs.wisc.edu/RoadMap<td>File Transfer Protocol<td>included
+<tr><td>/anonftp/ftp.cs.wisc.edu/RoadMap<td>Anonymous File Transfer Protocol<td>included
+<tr><td>/gsiftp/ftp.globus.org/path<td>Globus Security + File Transfer Protocol<td><a href=http://www.globus.org/gridftp>more info</a>
+<tr><td>/irods/host:port/zone/home/user/path<td>iRODS<td><a href=http://irods.sdsc.edu>more info</a>
+<tr><td>/hdfs/namenode:port/path<td>Hadoop Distributed File System (HDFS)<td><a href=http://hadoop.apache.org/common/docs/current/hdfs_user_guide.html>more info</a>
+<tr><td>/xrootd/host:port/path<td>XRootD/Scalla Distributed Storage System (xrootd)<td><a href=http://project-arda-dev.web.cern.ch/project-arda-dev/xrootd/site/index.html>more info</a>
+<tr><td>/chirp/target.cs.wisc.edu/path<td>Chirp Storage System<td>included + <a href=chirp.html>more info</a> 
+<tr><td>/cvmfs/grid.cern.ch/path<td>CernVM-FS<td><a href=http://cernvm.cern.ch/portal/filesystem>more info</a> 
+</table>
+<hr>
+<p>
+The following protocols have been supported in the past, but are not currently in active use.
+<p>
+<hr>
+<table>
+<tr><td>/nest/nest.cs.wisc.edu/path<td>Network Storage Technology<td><a href=http://www.cs.wisc.edu/condor/nest>more info</a>
+<tr><td>/rfio/host.cern.ch/path<td>Castor Remote File I/O<td><a href=http://castor.web.cern.ch/castor/Welcome.html>more info</a>
+<tr><td>/dcap/dcap.cs.wisc.edu/pnfs/cs.wisc.edu/path<td>DCache Access Protocol<td><a href=http://dcache.desy.de>more info</a>
+<tr><td>/lfn/logical/path<td>Logical File Name - Grid File Access Library<td><a href=http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html>more info</a>
+<tr><td>/srm/server/path<td>Site File Name - Grid File Access Library<td><a href=http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html>more info</a>
+<tr><td>/guid/abc123<td>Globally Unique File Name - Grid File Access Library<td><a href=http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html>more info</a>
+<tr><td>/gfal/protocol://host//path<td>Grid File Access Library<td><a href=http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html>more info</a>
+</table>
+<hr>
+<p>
+You will notice quite quickly that not all remote I/O systems
+provide all of the functionality common to an ordinary file system.
+For example, HTTP is incapable of listing files.
+If you attempt to perform a directory listing on an HTTP
+server, Parrot will attempt to keep <code>ls</code> happy
+by producing a bogus directory entry:
+<pre>
+    % parrot_run ls -la /http/www.yahoo.com/
+    -r--r--r--    1 dthain   dthain          0 Jul 16 11:50 /http/www.yahoo.com
+</pre>
+
+A less-drastic example is found in FTP.  If you attempt
+to perform a directory listing of an FTP server, Parrot
+fills in the available information -- the file names and
+their sizes -- but again inserts bogus information to fill the rest out:
+<pre>
+    % parrot_run ls -la /anonftp/ftp.gnu.org/pub
+    -rwxrwxrwx 1 dthain dip    580 Oct  5 16:00 CRYPTO.README
+    -rwxrwxrwx 1 dthain dip 166697 Oct  5 16:00 find.txt.gz
+    drwxrwxrwx 1 dthain dip      0 Oct  5 16:00 gnu
+...
+</pre>
+
+If you would like to get a better idea of the underlying behavior
+of Parrot, try running it with the <code>-d remote</code> option,
+which will display all of the remote I/O operations that it performs
+on a program's behalf:
+
+<pre>
+    % parrot_run -d remote ls -la /anonftp/ftp.gnu.org
+    ...
+    ftp.cs.wisc.edu <-- TYPE I
+    ftp.cs.wisc.edu --> 200 Type set to I.
+    ftp.cs.wisc.edu <-- PASV
+    ftp.cs.wisc.edu --> 227 Entering Passive Mode (128,105,2,28,194,103)
+    ftp.cs.wisc.edu <-- NLST /
+    ftp.cs.wisc.edu --> 150 Opening BINARY mode data connection for file list.
+    ...
+</pre>
+
+If your program is upset by the unusual semantics of such
+storage systems, then consider using the Chirp protocol and
+server:
+
+<h2>The Chirp Protocol and Server</h2>
+
+Although Parrot works with many different protocols,
+is it limited by the capabilities provided by each underlying system.
+(For example, HTTP does not have reliable directory listings.)
+Thus, we have developed a custom protocol, <b>Chirp</b>,
+which provides secure remote file access with all of the capabilities
+needed for running arbitrary Unix programs.
+<b>Chirp</b> is included with the distribution of Parrot,
+and requires no extra steps to install.
+<p>
+To start a Chirp server, simply do the following:
+<pre>
+    % chirp_server -d all
+</pre>
+The <b>-d all</b> option turns on debugging, which helps you to understand
+how it works initially.  You may remove this option once everything
+is working.
+<p>
+Suppose the Chirp server is running on <tt>bird.cs.wisc.edu</tt>.
+Using Parrot, you may access all of the Unix features of
+that host from elsewhere:
+<pre>
+    % parrot_run tcsh
+    % cd /chirp/bird.cs.wisc.edu
+    % ls -la
+    % ...
+</pre>
+In general, Parrot gives better performance and usability
+with Chirp than with other protocols.
+You can read extensively about the Chirp server and protocol
+<a href=chirp.html>in the Chirp manual</a>.
+<p>
+In addition, Parrot provides several custom command line tools
+(<tt>parrot_getacl</tt>, <tt>parrot_setacl</tt>, <tt>parrot_lsalloc</tt>,
+and <tt>parrot_mkalloc</tt>) that can be used to manage the
+access control and space allocation features of Chirp from the Unix command line.
+
+<h2>Name Resolution</h2>
+
+In addition to accessing remote storage, Parrot allows you
+to create a custom namespace for any program.  All file name
+activity passes through the Parrot <b>name resolver</b>, which
+can transform any given filename according to a series of rules
+that you specify.
+<p>
+The simplest name resolver is the <b>mountlist</b>, given
+by the <b>-m mountfile</b> option.  This file corresponds closely
+to <tt>/etc/ftsab</tt> in Unix.  A mountlist is simply a file with two
+columns.  The first column gives a logical directory or file name,
+while the second gives the physical path that it must be connected
+to.
+<p>
+For example, if a database is stored at an FTP server under the
+path <tt>/anonftp/ftp.cs.wisc.edu/db</tt>, it may be spliced into the
+filesystem under <tt>/dbase</tt> with a mount list like this:
+<pre>
+     /dbase       /anonftp/ftp.cs.wisc.edu/db
+</pre>
+Instruct Parrot to use the mountlist as follows:
+<pre>
+    % parrot_run -m mountfile tcsh
+    % cd /dbase
+    % ls -la
+</pre>
+A single mount entry may be given on the command line
+with the <b>-M</b> option as follows:
+<pre>
+    % parrot_run -M /dbase=/anonftp/ftp.cs.wisc.edu/db tcsh
+</pre>
+A more sophisticated way to perform name binding is with
+an <i>external resolver</i>.  This is a program executed
+whenever Parrot needs to locate a file or directory.
+The program accepts a logical file name and then returns
+the physical location where it can be found.
+<p>
+Suppose that you have a database service that locates
+the nearest copy of a file for you.  If you run the
+command <tt>locate_file</tt>, it will print out the nearest
+copy of a file.  For example:
+<pre>
+    % locate_file /1523.data
+    /chirp/server.nd.edu/mix/1523.data
+</pre>
+
+To connect the program <tt>locate_file</tt> to Parrot,
+simply give a mount string that specifies the program
+as a resolver:
+<pre>
+    % parrot_run -M /dbase=resolver:/path/to/locate_file tcsh
+</pre>
+
+Now, if you attempt to access files under /dbase,
+Parrot will execute <tt>locate_file</tt> and access
+the data stored there:
+<pre>
+    % cat /dbase/1523.data
+    (see contents of /chirp/server.nd.edu/mix/1523.data)
+</pre>
+
+<h2>More Efficient Copies with <tt>parrot_cp</tt></h2>
+
+If you are using Parrot to copy lots of files across the network,
+you may see better performance using the <tt>parrot_cp</tt> tool.
+This program looks like an ordinary <tt>cp</tt>, but it makes
+use of an optimized Parrot system call that streams entire files
+over the network, instead of copying them block by block.
+<p>
+To use <tt>parrot_cp</tt>, simply use your shell to alias calls
+to <tt>cp</tt> with calls to <tt>parrot_cp</tt>:
+<p>
+<pre>
+% parrot_run tcsh
+% alias cp parrot_cp
+% cp /tmp/mydata /chirp/server.nd.edu/joe/data
+% cp -rR /chirp/server.nd.edu/joe /tmp/joe
+ </pre>
+<p>
+If run outside of Parrot, <tt>parrot_cp</tt> will operate as
+an ordinary <tt>cp</tt> without any performance gain or loss.
+
+<h2>Notes on Protocols</h2>
+
+<h3>HTTP Proxy Servers</h3>
+
+HTTP, CVMFS, and GROW can take advantage of standard HTTP proxy servers.
+To route requests through a single proxy server, set the HTTP_PROXY
+environment variable to the server name and port:
+<pre>
+    % setenv HTTP_PROXY "http://proxy.nd.edu:8080"
+</pre>
+Multiple proxy servers can be given, separated by a semicolon.
+This will cause Parrot to try each proxy in order until one succeeds.
+If <tt>DIRECT</tt> is given as the last name in the list, then
+Parrot will fall back on a direct connection to the target web server.
+For example:
+<pre>
+    % setenv HTTP_PROXY "http://proxy.nd.edu:8080;http://proxy.wisc.edu:1000;DIRECT"
+</pre>
+
+
+<h3>GROW - Global Read Only Web Filesystem</h3>
+
+Although the strict HTTP protocol does not allow for correct
+structured directory listings, it is possible to emulate
+directory listings with a little help from the underlying filesystem.
+We call this technique GROW, a global filesystem based on the Web.
+GROW requires the exporter of data to run a script (<tt>make_growfs</tt>)
+that generates a complete directory listing of the data that you wish to
+export.  This directory listing is then used to produce reliable metadata.
+Of course, if the data changes, the script must be run again,
+so GROW is only useful for data that changes infrequently.
+<p>
+To set up an GROW filesystem, you must run <tt>make_growfs</tt>
+on the web server machine with the name of the local storage directory
+as the argument.  For example, suppose that the web server
+<tt>my.server.com</tt> stores pages for the URL
+<tt>http://my.server.com/~fred</tt> in the local directory <tt>/home/fred/www</tt>.
+In this case, you should run the following command:
+<p>
+<pre>
+    % make_growfs /home/fred/www
+</pre>
+Now, others may perceive the web server as a file server under the /grow
+hierarchy.  For example:
+<pre>
+    % parrot_run tcsh
+    % cd /grow/my.server.com/~fred
+    % ls -la
+</pre>
+
+In addition to providing precise directory metadata, GROW offers
+two additional advantages over plain HTTP:
+<dir>
+<li><b>Aggressive Caching.</b>  GROW caches files in an on-disk
+cache, but unlike plain HTTP, does not need to issue up-to-date
+checks against the server.   Using the cached directory metadata,
+it can tell if a file is up-to-date without any network communication.
+The directory is only checked for changes at the beginning of program
+execution, so changes become visible only to newly executed programs.
+<li><b>SHA-1 Integrity.</b>
+<tt>make_growfs</tt> generates SHA-1 checksums on the directory
+and each file so that the integrity of the system can be verified at
+runtime.
+If a checksum fails, GROW will attempt to reload the file or directory
+listing in order to repair the error, trying until the master timeout
+(set by the -T option) expires.  This will also occur if the underlying
+files have been modified and <tt>make_growfs</tt> has not yet been re-run.
+If necessary, checksums can be disabled by giving the <tt>-k</tt> option
+to either Parrot or <tt>make_growfs</tt>.
+</dir>
+
+<h3>CVMFS - CernVM-FS</h3>
+
+<p>CVMFS is a read-only filesystem, which was initially based on GROW.
+It is used within CernVM-FS to provide access to software
+repositories.  It may be used outside of CernVM-FS by mounting it as a
+FUSE module.  Parrot makes it possible to access CVMFS in cases where
+mounting CVMFS via FUSE is not an option.  Like GROW, CVMFS makes use
+of web proxies and local disk caching for scalability.  For security,
+data integrity is verified with cryptographic checksums.  For
+increased reliability and performance, CVMFS repositories may also be
+mirrored in multiple locations and accessed via groups of
+load-balanced web proxies, with fail-over between groups.
+
+<p>The CVMFS repositories hosted by the <a
+href=http://cernvm.cern.ch/>CernVM project</a> are enabled by default.
+To access a different repository, it is necessary to configure parrot
+to know how to access the repository.  This may be done with the
+<tt>-r</tt> option or with the <tt>PARROT_CVMFS_REPO</tt> environment
+variable.  The repository configuration syntax is
+
+<pre>
+repo_name:options  repo_name2:option2  ...
+</pre>
+
+<p>The repository with <tt>repo_name</tt> is used when the parrot user
+attempts to access the matching path <tt>/cvmfs/repo_name/...</tt>.
+The configured repository name may begin with <tt>*</tt>, which acts
+as a wildcard, matching one or more characters in the requested
+repository name.  This is useful when multiple repositories are hosted
+at the same site and all configuration details are the same except the
+beginnings of the repository names, as in <tt>atlas.cern.ch</tt> and
+<tt>cms.cern.ch</tt>.  Any <tt>*</tt> appearing in the options is
+replaced by the characters in the requested path that were matched by
+the <tt>*</tt> in the configured repository name.  If a cvmfs path
+matches more than one configured repository, the last one appearing in
+the configuration takes precedence.
+
+<p>The format of the repository options is
+
+<pre>
+option1=value1,option2=value2,...
+</pre>
+
+<p>Literal spaces, tabs, newlines, asterisks, equal signs, or commas
+in the options must be proceeded by a backslash to avoid being
+interpreted as delimiters.  If the same option is specified more than
+once, the last value takes precedence.  The possible options are
+listed in the table below.  The <tt>url</tt> option is required and
+has no default.  The <tt>proxies</tt> option is required and defaults
+to the proxy used by parrot, if any.
+
+<p>
+<table>
+<tr><td><b>url=URL</b> <td>The URL of the CernVM-FS server(s): 'url1;url2;...'
+<tr><td><b>proxies=HTTP_PROXIES</b>   <td>Set the HTTP proxy list, such as 'proxy1|proxy2'; default is given by -P option (HTTP_PROXY)
+<tr><td>                              <td>Proxies separated by '|' are randomly chosen for load balancing.
+                                          Groups of proxies separated by ';' may be specified for failover.
+                                          If the first group fails, the second group is used, and so on down the chain.
+<tr><td><b>cachedir=DIR</b>           <td>Where to store disk cache; default is within parrot temp directory (-t option)
+<tr><td><b>timeout=SECONDS</b> <td>Timeout for network operations; default is given by -T option (PARROT_TIMEOUT)
+<tr><td><b>timeout_direct=SECONDS</b> <td>Timeout in for network operations without proxy; default is given by -T option (PARROT_TIMEOUT)
+<tr><td><b>max_ttl=MINUTES</b>        <td>Maximum TTL for file catalogs; default: take from catalog
+<tr><td><b>allow_unsigned</b>         <td>Accept unsigned catalogs (allows man-in-the-middle attacks)
+<tr><td><b>whitelist=URL</b>          <td>HTTP location of trusted catalog certificates (defaults is /.cvmfswhitelist)
+<tr><td><b>pubkey=PEMFILE</b>         <td>Public RSA key that is used to verify the whitelist signature.
+<tr><td><b>rebuild_cachedb</b>        <td>Force rebuilding the quota cache db from cache directory
+<tr><td><b>quota_limit=MB</b>         <td>Limit size of cache. -1 (the default) means unlimited.
+<tr><td>                              <td>If not -1, files larger than quota_limit-quota_threshold will not be readable.
+<tr><td><b>quota_threshold=MB</b>     <td>Cleanup cache until size is <= threshold
+<tr><td><b>deep_mount=prefix</b>      <td>Path prefix if a repository is mounted on a nested catalog
+<tr><td><b>repo_name=NAME</b>         <td>Unique name of the mounted repository; default is the name used for this configuration entry
+<tr><td><b>mountpoint=PATH</b>        <td>Path to root of repository; default is /cvmfs/repo_name
+<tr><td><b>blacklist=FILE</b>         <td>Local blacklist for invalid certificates.  Has precedence over the whitelist.
+</table>
+
+<p>Setting the CVMFS configuration overrides the default
+configuration.  If it is desired to configure additional repositories
+but still retain the default repositories, the configuration entry
+<nobr><tt>&lt;default-repositories&gt;</tt></nobr> may be put in the
+configuration string.  Example:
+
+<pre>
+parrot_run -r '&lt;default-repositories&gt; my.repo:url=http://cvmfs.server.edu/cvmfs/my.repo.edu' ...
+</pre>
+
+<p>The configuration of the default repositories may be modified by
+specifying additional options using the syntax
+<nobr><tt>&lt;default-repositories&gt;:option1=value1,option2=value2</tt></nobr>.
+
+<p>Currently, there is a limitation of one active CVMFS repository per
+parrot session.  Attempts to access a second CVMFS repository in the
+same parrot session will be rejected.  Therefore, the utility of
+configuring multiple repositories is merely to provide the option of
+accessing any one of those repositories during a parrot session.
+
+<h3>Hadoop Distributed File System (HDFS)</h3>
+
+HDFS is the primary distributed filesystem used in the <a
+    href="http://hadoop.apache.org">Hadoop</a> project.  Parrot supports read
+and write access to HDFS systems using the <tt>parrot_run_hdfs</tt> wrapper.  This
+script checks that the appropriate environmental variables are defined and
+calls <tt>parrot</tt>.
+<p>
+In particular, you must ensure that you define the following environmental
+variables:
+
+<pre>
+JAVA_HOME     Location of your Java installation.
+HADOOP_HOME   Location of your Hadoop installation.
+</pre>
+
+Based on these environmental variables, <tt>parrot_run_hdfs</tt> will attempt to
+find the appropriate paths for <tt>libjvm.so</tt> and <tt>libhdfs.so</tt>.
+These paths are stored in the environmental variables <tt>LIBJVM_PATH</tt> and
+<tt>LIBHDFS_PATH</tt>, which are used by the HDFS Parrot module to load the
+necessary shared libraries at run-time.  To avoid the startup overhead of
+searching for these libraries, you may set the paths manually in your
+environment before calling <tt>parrot_run_hdfs</tt>, or you may edit the script
+directly.
+
+<p>
+
+Note that while Parrot supports read access to HDFS, it only provides
+write-once support on HDFS.  This is because the current implementations of
+HDFS do not provide reliable append operations.  Likewise, files can only be
+opened in either read (<tt>O_RDONLY</tt>) or write mode (<tt>O_WRONLY</tt>),
+and not both (<tt>O_RDWR</tt>).
+
+<h3>EGEE Data Access: GFAL, LFN, GUID, SRM, RFIO, DCAP, and LFC</h3>
+
+The EGEE project is a European-wide grid computing project.
+The EGEE software stack, GLite, can be downloaded <a href=http://glite.web.cern.ch/glite/packages/R3.0/R20060502/default.asp>here</a>.  (Warning: it's big.)
+Parrot can be connected to several different but related components of EGEE.
+<p>
+The simplest way to use Parrot with EGEE is through the Grid File Access Library (GFAL).  This library is attached to Parrot under the paths <tt>/lfn</tt>, <tt>/guid</tt>, <tt>/srm</tt>, <tt>/rfio</tt>, <tt>/dcap</tt>, and <tt>/gfal</tt>.  This manual does not document all of the details of GFAL itself, you should read <a href=http://wiki.nesc.ac.uk/read/egee-na3-etf?action=browse&diff=1&id=InductionNotesGFAL>that manual</a> for more information.
+<p>
+For example, suppose that you have an RFIO server running on <tt>server.somewhere.edu</tt>.  To access this server, try the following:
+<pre>
+    % parrot_run tcsh
+    % cd /rfio/server.somewhere.edu/
+    % ls -la
+</pre>
+
+Or, to access a file by logical name or by GUID, note that you can either use
+a pathname-like syntax, or specify a URL with colons.  Both ways are acceptable:
+<pre>
+    % parrot_run tcsh
+
+    % cat /lfn/baud/testgfal15 
+    % cat lfn:baud/testgfal15 
+
+    % cat /guid/2cd59291-7ae7-4778-af6d-b1f423719441
+    % cat guid:2cd59291-7ae7-4778-af6d-b1f423719441
+</pre>
+
+In these cases, Parrot pre-processes the paths so that they are formatted correctly
+for use by the GFAL.  However, you can also compose paths directly for you by GFAL,
+by accessing files underneath <tt>/gfal</tt>.  This syntax can be useful if you
+are attempting to harness some new GFAL capability that Parrot is not aware of.
+For example:
+
+<pre>
+    % parrot_run tcsh
+    % cd /gfal/rfio://server.somewhere.edu//
+    % ls -la
+</pre>
+
+As noted above, GFAL requires some setup to work properly.
+If you are having difficulties, make sure that you have
+set all of the GFAL environment variables appropriately:
+
+<pre>
+    LCG_GFAL_INFOSYS
+    LCG_CATALOG_TYPE
+    LFC_HOST
+    LCG_RFIO_TYPE
+    LCG_GFAL_VO
+</pre>
+
+And, if using RFIO, make sure that the appropriate
+dynamic library <tt>libshift.so</tt> is in your
+library search path:
+
+<pre>
+    export LD_LIBRARY_PATH=/opt/lhc/lib
+</pre>
+
+Use of the GFAL involves many complex interacting pieces
+of software.  It is recommended that you run Parrot with the <tt>-d remote</tt>
+flag in order to debug problems using GFAL.
+
+<h3>EGEE Data Catalog: LFC</h3>
+
+In addition to using GFAL, Parrot can access an LHC file catalog (LFC) directly
+under the path <tt>/lfc</tt>.  For example:
+
+<pre>
+    % parrot_run cat /lfc/my/logical/name
+</pre>
+
+In this case, Parrot itself performs the lookup against the LFC,
+and uses its own access methods to retrieve the file directly.
+This can be useful when Parrot supports a protocol (such as GSIFTP)
+that is not directly supported by the GFAL library itself.
+<p>
+Use of the LFC involves many complex interacting pieces
+of software.  It is recommended that you run Parrot with the <tt>-d remote</tt>
+flag in order to debug problems using LFC.
+
+<h2>Identity Boxing</h2>
+
+Parot provides a unique feature known as <i>identity boxing</i>.
+This feature allows you to run a (possibly) untrusted program
+within a protection domain, as if it were run in a completely separate account.
+Using an identity box, you do not need to become root or even
+to manage account names: you can create any identity that you like on the fly.
+<p>
+For example, suppose that you wish to allow a friend to log into your
+private workstation.  Instead of creating a new account, simply use a
+script supplied with Parrot to create an identity box:
+<p>
+<pre>
+% whoami
+dthain
+% parrot_identity_box MyFriend
+% whoami
+MyFriend
+% touch ~dthain/private-data
+touch: creating ~dthain/private-data': Permission denied
+</pre>
+<p>
+Note that the shell running within the identity box cannot change or
+modify any of the supervising user's data.  In fact, the contained
+user can only access items that are world-readable or world-writable.
+<p>
+You can give the contained user access to other parts of the filesystem
+by creating access control lists. (ACLs)  An ACL is a list of users
+and the resources that they are allowed to access.  Each directory
+has it's own ACL in the file <tt>.__acl</tt>.  This file does not
+appear in a directory listing, but you can read and write it just the same.
+<p>
+For example, <tt>MyFriend</tt> above can see his initial ACL as follows:
+<p>
+<pre>
+% cat .__acl
+MyFriend rwlxa
+</pre>
+
+This means that <tt>MyFriend</tt> can read, write, list, execute, and
+administer items in the current directory.  Now, suppose that <tt>MyFriend</tt>
+wants to allow <tt>Freddy</tt> read access to the same directory.
+Simply edit the ACL file to read:
+<pre>
+MyFriend rwlxa
+Freddy   rl
+</pre>
+
+Identity boxing and ACLs are particularly useful when using distributed
+storage.  You can read more about ACLs and identity boxing in the
+<a href=chirp.html>Chirp</a> manual.
+
+<h2>64-Bit Support</h2>
+
+In all modes, Parrot supports applications that access large (>2GB) files
+that require 64-bit seek pointers.   However, we have found that many tools
+and filesystems do not manipulate such large files properly.  If possible,
+we advise users to break up files into smaller pieces for processing.
+<p>
+Parrot supports 64 bit programs and processors in the following combinations:
+<center>
+<table border=1>
+<tr> <td colspan=2 align=center> <b>Program Type</b>
+<tr> <td> 32-bit <td> 64-bit <td> <b>CPU Type</b>
+<tr> <td><font size=+1 color=green>YES</font> <td> <font size=+1 color=red>NO</font><td> Parrot for 32-bit X86 CPU    <br> Pentium, Xeon, Athlon, Sempron
+<tr> <td><font size=+1 color=green>YES</font> <td> <font size=+1 color=green>YES</font> <td > Parrot for 64-bit X86_64 CPU <br> Opteron, Athlon64, Turion64, Sempron64
+</table>
+</center>
+
+<h2>For More Information</h2>
+
+For the latest information on Parrot, visit the home page:
+
+<dir>
+<li> <a href=http://www.nd.edu/~ccl/software/parrot>Parrot Home Page</a>
+</dir>
+
+An exhaustive list of all options and commands can be found in the manual pages:
+
+<dir>
+<li> <a href=man/parrot_run.html>parrot_run</a>
+<li> <a href=man/parrot_run_hdfs.html>parrot_run_hdfs</a>
+<li> <a href=man/parrot_cp.html>parrot_cp</a>
+<li> <a href=man/parrot_md5.html>parrot_md5</a>
+<li> <a href=man/parrot_getacl.html>parrot_getacl</a>
+<li> <a href=man/parrot_setacl.html>parrot_setacl</a>
+<li> <a href=man/parrot_mkalloc.html>parrot_mkalloc</a>
+<li> <a href=man/parrot_lsalloc.html>parrot_lsalloc</a>
+<li> <a href=man/parrot_locate.html>parrot_locate</a>
+<li> <a href=man/parrot_timeout.html>parrot_timeout</a>
+<li> <a href=man/parrot_whoami.html>parrot_whoami</a>
+</dir>

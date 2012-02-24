@@ -1,0 +1,14 @@
+# meta.makeflow: Simple makeflow that operates on another makeflow to render it
+# correct. Also tests that the command translation prepends "./" to the correct
+# token, even with early input or output tokens.
+#
+# Expected test case results: Success.
+# Expected test case results: Failure: "capital.360.jpg" does not exist and is not defined by a rule.
+#
+# Created by Kevin Partington, 22 February 2010
+# Copyright 2010 The University of Notre Dame. All rights reserved. See file
+# COPYING for details.
+
+correct.makeflow: typo.makeflow
+	LOCAL < typo.makeflow > correct.makeflow sed "s!capital!capitol!g"
+

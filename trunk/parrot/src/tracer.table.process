@@ -1,0 +1,34 @@
+#!/usr/bin/perl
+
+if($ARGV[0] eq "table") {
+	$dotable = 1;
+} elsif($ARGV[0] eq "header") {
+	$doheader = 1;
+} else {
+	die "Use: $0 <table|header>\n";
+}
+
+$bits = $ARGV[1];
+
+if($dotable) {
+	print "static const char * syscall${bits}_names[] = {\n";
+}
+
+while(<STDIN>) {
+	($name,$number) = split;
+	if($dotable) {
+		print "\"$name\",\n";
+	}
+
+	if($doheader) {
+		print "#define SYSCALL${bits}_$name $number\n";
+	}
+}
+
+if($doheader) {
+	print "#define SYSCALL${bits}_MAX $number\n";
+}
+
+if($dotable) {
+    print "};\n";
+}

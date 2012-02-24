@@ -1,0 +1,146 @@
+<!--
+Copyright (C) 2012- The University of Notre Dame
+#This software is distributed under the GNU General Public License.
+#See the file COPYING for details.
+#
+-->
+
+<tool id="dist_maker" name="DistMaker" version="0.0.1">
+  <description>Run MAKER in parallel using work queue</description>
+
+  <command interpreter="perl">
+     maker.pl --genome "$genome" --ests "$ests" --est_reads "$est_reads" --proteins "$proteins" --alt_est "$alt_est" --est_gff "$est_gff" --altest_gff "$altest_gff" --protein_gff "$protein_gff" --repeat_protein "$repeat_protein" --rmlib "$rmlib" --rm_gff "$rm_gff" --model_gff "$model_gff" --pred_gff "$pred_gff" --other_gff "$other_gff" --organism_type "$organism_type" 
+#if $snap_opts.snap == "snap":
+	--snap
+	--snap_hmm "$snap_opts.snap_hmm.value"
+#end if
+#if $augustus_opts.augustus == "augustus":
+	--augustus
+	--augustus_hmm "$augustus_opts.augustus_hmm.value"
+#end if
+#if $genemark_opts.genemark == "genemark":
+	--genemark
+	--genemark_hmm "$genemark_opts.genemark_hmm.value"
+#end if
+#if $fgenesh_opts.fgenesh == "fgenesh":
+	--fgenesh
+	--fgenesh_param "$fgenesh_opts.fgenesh_param.value"
+#end if
+#if $est2genome.value == True:
+	--est2genome
+#end if
+#if $protein2genome.value == True:
+	--protein2genome
+#end if
+--output $output1
+--error $error1
+   </command>
+
+   <inputs>
+     <param name="genome" type="data" format="fasta" label="genome sequences"/>
+     <param name="ests" type="data" format="fasta" label="assembled ESTs" optional="true"/>     
+     <param name="est_reads" type="data" format="fasta" label="unassembled ESTs" optional="true"/>
+     <param name="proteins" type="data" format="fasta" label="assembled Proteins" optional="true"/>
+     <param name="alt_est" type="data" format="fasta" label="ESTs from a related organism" optional="true"/>
+     <param name="est_gff" type="data" format="gff" label="EST from a external gff file" optional="true"/>
+     <param name="altest_gff" type="data" format="gff" label="ESTs from a external gff file for an alternate organism" optional="true"/>
+     <param name="protein_gff" type="data" format="gff" label="Protein evidence from a gff file" optional="true"/>
+     <param name="repeat_protein" type="data" format="fasta" label="Database of TE proteins" optional="true"/>
+     <param name="rmlib" type="data" format="fasta" label="Organism specific repeat library" optional="true"/>
+     <param name="rm_gff" type="data" format="gff" label="Repeats from a external gff file" optional="true"/>
+     <param name="model_gff" type="data" format="gff" label="Gene models from a external gff file" optional="true"/>
+     <param name="pred_gff" type="data" format="gff" label="Ab-initio predictions from a external gff file" optional="true"/>
+     <param name="other_gff" type="data" format="gff" label="Features to pass-through from a external gff file" optional="true"/>
+
+
+     <param name="organism_type" type="select" label="Organism type" >
+     	<option value="eukaryotic" selected="True">Eukaryotic</option>
+     	<option value="prokaryotic" >Prokaryotic</option>
+     </param>
+    <conditional name="snap_opts">
+     	<param name="snap" type="select" label="Run SNAP?" >
+		<option value="snap" selected="True">Run SNAP</option>
+	     	<option value="no_snap" >Don't run SNAP</option>
+	</param>
+	<when value="no_snap"/>
+	<when value="snap">
+		<param name="snap_hmm" type="file" label="SNAP hmm to use"/>
+	</when>
+    </conditional> 
+    <conditional name="augustus_opts">
+     	<param name="augustus" type="select" label="Run Augustus?" >
+		<option value="augustus">Run Augustus</option>
+	     	<option value="no_augustus" selected="True">Don't run Augustus</option>
+	</param>
+	<when value="no_augustus"/>
+	<when value="augustus">
+		<param name="augustus_hmm" type="select" label="Augustus hmm to use">
+			<option value="aedes">Aedes aaegypti</option>
+			<option value="pea_aphid">Pea aphid</option>
+		</param>
+	</when>
+    </conditional> 
+    <conditional name="genemark_opts">
+     	<param name="genemark" type="select" label="Run Genemark?" >
+		<option value="genemark">Run Genemark</option>
+	     	<option value="no_genemark" selected="True">Don't run Genemark</option>
+	</param>
+	<when value="no_genemark"/>
+	<when value="genemark">
+		<param name="genemark_hmm" type="file" label="Genemark hmm to use">
+		<!--	<option value="aedes">Aedes aaegypti</option>
+			<option value="pea_aphid">Pea aphid</option>
+		-->
+		</param>
+	</when>
+    </conditional> 
+    <conditional name="fgenesh_opts">
+     	<param name="fgenesh" type="select" label="Run FGENESH?" >
+		<option value="fgenesh">Run FGENESH</option>
+	     	<option value="no_fgenesh" selected="True">Don't run FGENESH</option>
+	</param>
+	<when value="no_fgenesh"/>
+	<when value="fgenesh">
+		<param name="fgenesh_param" type="file" label="FGENESH parameter file to use">
+		<!--	<option value="aedes">Aedes aaegypti</option>
+			<option value="pea_aphid">Pea aphid</option>
+		-->
+		</param>
+	</when>
+    </conditional> 
+
+     <param name="est2genome" type="boolean" truevalue="est2genome" falsevalue="" checked="True" label="Run est2genome?" />
+     <param name="protein2genome" type="boolean" truevalue="protein2genome" falsevalue="" checked="True" label="Run protein2genome?" />
+
+
+<!--     <param name="snap" type="boolean" truevalue="snap" falsevalue="" checked="True" label="Organism type" >
+     <param name="snap" type="boolean" truevalue="snap" falsevalue="" checked="True" label="Organism type" >-->
+
+<!--TODO: add elements for fgenesh, genemark, 
+	predictor - This tells MAKER what programs to run for generating annotations.
+
+        est2genome - Allows high quality spliced Exonerate EST alignments to become gene annotations. This only happens when there is no gene prediction overlapping the region. This is useful for generating gene annotations in the absence of a trained gene predictor.
+        protein2genome - Attempts to build gene models directly from protein alignments (works on prokaryotes only)
+        model_gff - This allows user defined models to be used
+        pred_gff - This allows user provided ab initio predictions
+        snap
+        augustus
+        genemark
+        fgenesh 
+
+ -->
+    </inputs>
+     <outputs>
+        <data name="output1" format="gff" label="GFF annotation">
+        </data>
+        <data name="error1" format="txt" label="error from Maker">
+        </data>
+    </outputs>
+    <requirements>
+    </requirements>
+    <tests>
+    </tests>
+    <help>
+    </help>
+</tool>  
+

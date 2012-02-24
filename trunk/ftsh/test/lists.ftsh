@@ -1,0 +1,32 @@
+
+a="a b c"
+
+try
+	b=$a
+catch
+	echo "Assignment failed, as expected"
+end
+
+try
+	b="$a"
+	echo "Assignment succeeded, as expected"
+end
+
+c=5 .to. 100 .step. 5
+
+for x in $c
+	echo $x
+end
+
+for x in "$c"
+	echo $x
+end
+
+for n in 1 .to. 10
+	echo $n
+end
+
+for n in 10 .to. 1
+	echo $n
+end
+

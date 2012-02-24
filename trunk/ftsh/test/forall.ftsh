@@ -1,0 +1,30 @@
+
+#
+# We'd like to do something really interesting like
+# pinging a remote hosts, but that isn't likely to work
+# in many private build situations.
+#
+# Instead, just pack and unpack some files.
+#
+
+FILES="t1 t2 t3"
+try
+	try for 30 seconds
+		forall file in ${FILES}
+			echo "creating"
+			cat $0 > ${file}
+		end
+		forall file in ${FILES}
+			echo "compressing"
+			gzip -f ${file}
+		end
+		forall file in ${FILES}
+			echo "deleting files"
+			rm -f ${file} ${file}.gz
+		end
+	end
+	echo "correct success"
+catch
+	echo "incorrect failure"
+	failure
+end

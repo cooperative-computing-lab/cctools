@@ -1,0 +1,21 @@
+
+function consume
+	while $# .gt. 0
+		echo "$# $1"
+		shift
+	end
+end
+
+function printit
+	consume $@
+	consume "$@"
+	consume ${@}
+	consume "${@}"
+end
+
+args="the quick brown fox jumps over the lazy dog"
+
+printit $args
+printit "$args"
+printit ${args}
+printit "${args}"

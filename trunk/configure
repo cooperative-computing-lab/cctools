@@ -1,0 +1,960 @@
+#!/bin/sh
+
+uname -a
+
+. ./configure.tools
+
+save_arguments $0 $@
+
+major=3
+minor=4
+micro=2
+release_date="02/10/2012"
+
+build_user=`whoami`
+build_host=`uname -n`
+build_sys=`uname -s | tr \[a-z\] \[A-Z\] | awk -F_ '{print $1}'`
+build_cpu=`uname -m | tr \[a-z\] \[A-Z\]`
+
+if [ "${build_cpu}" = unknown ]
+then
+	build_cpu=`uname -p | tr \[a-z\] \[A-Z\]`
+fi
+
+case "$build_cpu" in
+	I[0-9]86)
+	build_cpu=I386
+	;;
+	POWER\ MACINTOSH)
+	build_cpu=POWERPC
+	;;
+	SUN4V)
+	build_cpu=SPARC
+	;;
+esac
+
+include_package_work_queue="work_queue"
+include_package_sand="sand"
+include_package_allpairs="allpairs"
+include_package_wavefront="wavefront"
+include_package_makeflow="makeflow"
+include_package_ftplite="ftp_lite"
+include_package_s3tools="s3tools"
+include_package_chirp="chirp"
+
+work_queue_bindings=""
+
+if [ -d parrot -a $build_sys = LINUX ]
+then
+	if [ $build_cpu = I386 -o $build_cpu = X86_64 ]
+	then
+		echo "including parrot, because this system is $build_sys and $build_cpu"
+		include_package_parrot="parrot"
+	else
+		echo "skipping parrot, because this cpu is ${build_cpu}, not I386"
+		include_package_parrot=""
+	fi
+else
+	echo "skipping parrot, because this system is ${build_sys}, not LINUX"
+fi
+
+install_path="$HOME/cctools"
+
+krb5_path="/usr"
+readline_path="/usr"
+globus_path="/usr"
+fuse_path="/usr"
+egee_path="/opt"
+rfio_path="/usr"
+dcap_path="/usr"
+irods_path="/usr"
+mysql_path="/usr"
+perl_path="/usr"
+python_path="/usr"
+xrootd_path="/usr"
+cvmfs_path="/usr"
+mpi_path="/usr/local"
+zlib_path="/usr"
+swig_path="/usr"
+
+xrootd_arch=auto
+globus_flavor=auto
+has_egee=no
+
+ccompiler=gcc
+cxxcompiler=g++
+mpicompiler=mpicc
+ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
+
+if [ ${build_sys} != CYGWIN ]
+then
+	ccflags="${ccflags} -fPIC"
+fi
+
+
+config_readline_path=auto
+config_globus_path=auto
+config_fuse_path=auto
+config_mysql_path=auto
+config_perl_path=auto
+config_python_path=auto
+config_zlib_path=yes
+
+config_krb5_path=no
+config_egee_path=no
+config_rfio_path=no
+config_dcap_path=no
+config_irods_path=no
+config_xrootd_path=no
+config_cvmfs_path=no
+config_mpi_path=no
+config_swig_path=auto
+
+if [ "X${GLOBUS_LOCATION}" != "X" ]
+then
+	globus_path=${GLOBUS_LOCATION}
+fi
+
+IFS=" ="
+export IFS
+
+while [ $# -gt 0 ]
+do
+	case $1 in
+		--prefix)
+			shift
+			install_path=$1
+			;;
+		--strict)
+			ccflags="${ccflags} -Werror"
+			;;
+		--with-globus-path)
+			shift
+			globus_path=$1
+			config_globus_path=yes
+			;;
+		--globus-flavor)
+			shift
+			globus_flavor=$1
+			;;
+		--with-krb5-path)
+			shift
+			krb5_path=$1
+			config_krb5_path=yes
+			;;
+		--with-readline-path)
+			shift
+			readline_path=$1
+			config_readline_path=yes
+			;;
+		--with-fuse-path)
+			shift
+			fuse_path=$1
+			config_fuse_path=yes
+			;;
+		--with-egee-path)
+			shift
+			egee_path=$1
+			config_egee_path=yes
+			;;
+		--with-rfio-path)
+			shift
+			rfio_path=$1
+			config_rfio_path=yes
+			;;
+		--with-dcap-path)
+			shift
+			dcap_path=$1
+			config_dcap_path=yes
+			;;
+		--with-irods-path)
+			shift
+			irods_path=$1
+			config_irods_path=yes
+			;;
+		--with-mysql-path)
+			shift
+			mysql_path=$1
+			config_mysql_path=yes
+			;;
+		--with-perl-path)
+			shift
+			perl_path=$1
+			config_perl_path=yes
+			;;
+		--with-python-path)
+			shift
+			python_path=$1
+			config_python_path=yes
+			;;
+		--with-xrootd-path)
+			shift
+			xrootd_path=$1
+			config_xrootd_path=yes
+			;;
+		--with-cvmfs-path)
+			shift
+			cvmfs_path=$1
+			config_cvmfs_path=yes
+			;;
+		--with-zlib-path)
+			shift
+			zlib_path=$1
+			config_zlib_path=yes
+			;;
+		--with-mpi-path)
+			shift
+			mpi_path=$1
+			config_mpi_path=yes
+			;;
+		--with-swig-path)
+			shift
+			swig_path=$1
+			config_swig_path=yes
+			;;
+		--without-system-sand)
+			include_package_sand=""
+			if [ $include_package_allpairs != "" ]
+			then
+				echo "*** skipping system 'allpairs' because of dependencies"
+				include_package_allpairs=""
+			fi
+			;;
+		--without-system-allpairs)
+			include_package_allpairs=""
+			;;
+		--without-system-wavefront)
+			include_package_wavefront=""
+			;;
+		--without-system-makeflow)
+			include_package_makeflow=""
+			;;
+		--without-system-ftp-lite)
+			include_package_ftplite=""
+			;;
+		--without-system-s3tools)
+			include_package_s3tools=""
+			;;
+		--without-system-chirp)
+			include_package_chirp=""
+			;;
+		--without-system-parrot)
+			include_package_parrot=""
+			;;
+		--xrootd-arch)
+			shift
+			xrootd_arch=$1
+			;;
+		--with-*-path)
+			echo "ignoring unknown package $1"
+			shift
+			;;
+		-h | -help | --h | --help)
+			cat <<EOF
+Use: configure [options]
+Where options are:
+  --help
+  --prefix             <path>
+  --strict
+  --globus-flavor      <flavor>
+  --xrootd-arch        <arch>
+  --with-PACKAGE-path  <path>
+  --without-system-SYSTEM
+
+Where PACKAGE may be:
+    readline
+    egee
+    krb5
+    fuse
+    rfio
+    dcap
+    globus
+    irods
+    mysql
+    perl
+    python
+    xrootd
+    zlib
+    cvmfs
+    swig
+
+And SYSTEM may be:
+    sand
+    allpairs
+    wavefront
+    makeflow
+    ftp-lite
+    s3tools
+    chirp
+    parrot
+EOF
+			exit 1
+			;;
+		*)
+			echo "Unknown argument $1"
+			exit 1
+			;;
+	esac
+	shift
+done
+
+IFS=" "
+export IFS
+
+potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} doc apps"
+
+check_multiarch
+
+rm -f Makefile.config
+echo "checking for all the things I know how to build..."
+for p in $potential_packages
+do
+	if [ -d $p ]
+	then
+		echo "package $p found"
+		packages="${packages} $p"
+		if [ -d `pwd`/$p/src ]
+		then
+			internal_ccflags="${internal_ccflags} -I`pwd`/$p/src"
+			internal_ldflags="${internal_ldflags} -L`pwd`/$p/src"
+		fi
+	else
+		echo "package $p not found (that's ok)"
+	fi
+done
+
+require_path ${ccompiler}
+require_path ${cxxcompiler}
+require_path "install"
+require_gnu_make
+
+#
+# Currently, we rely on the linker --as-needed flag to sort out
+# which dynamic libraries each executable actually needs.
+# This is apparently a recent addition to gnu ld.
+# A better solution would be to explicitly specify which libraries
+# are needed by which executable, but this will come in a later version.
+#
+
+echo -n "checking if ld supports the --as-needed flag..."
+if ld --help 2>&1 | grep -- --as-needed 2>&1 >/dev/null 
+then
+        echo "yes"
+        link_as_needed="-Xlinker --as-needed"
+        link_no_as_needed="-Xlinker --no-as-needed"
+else
+        echo "no"
+fi
+
+if [ $build_sys = LINUX ]
+then
+        ldflags="-Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic ${link_as_needed}"
+else
+        ldflags="-static-libgcc"
+fi
+
+##########################################################################
+# SWITCH TO STATIC LINKING FOR UNCOMMON THIRD-PARTY PACKAGES
+##########################################################################
+library_search_mode=prefer_static
+##########################################################################
+
+if [ $config_egee_path != no ] && check_file "${egee_path}/lcg/include/lcg_util.h"
+then
+	has_egee=yes
+	globus_flavor=gcc32dbgpthr
+	fix_globus_install ${egee_path}/globus ${globus_flavor}
+	ccflags="${ccflags} -I${egee_path}/globus/include/${globus_flavor} -I${egee_path}/lcg/include -I${egee_path}/edg/include  -I${egee_path}/lcg/include/lfc -I${egee_path}/lcg/include/dpm -DHAS_EGEE -DHAS_GLOBUS_GSS"
+	ldflags="${ldflags} -L${egee_path}/globus/lib -L${egee_path}/edg/lib -L${egee_path}/lcg/lib -ldpm -llfc -lgfal -llcg_util -lcgsi_plugin_gsoap_2.6 -lglobus_gss_assist_${globus_flavor} -lglobus_gssapi_gsi_${globus_flavor} -lglobus_gsi_proxy_core_${globus_flavor} -lglobus_gsi_credential_${globus_flavor} -lglobus_gsi_callback_${globus_flavor} -lglobus_oldgaa_${globus_flavor} -lglobus_gsi_sysconfig_${globus_flavor} -lglobus_gsi_cert_utils_${globus_flavor} -lglobus_openssl_${globus_flavor} -lglobus_proxy_ssl_${globus_flavor} -lglobus_openssl_error_${globus_flavor} -lglobus_common_${globus_flavor} -lldap_${globus_flavor} -llber_${globus_flavor} -lsasl -lssl_${globus_flavor} -lcrypto_${globus_flavor} -lltdl_${globus_flavor} -llutil_${globus_flavor} -luuid"
+else
+	has_egee=no
+	if [ $config_egee_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find EGEE in $egee_path"
+		echo "*** Check --with-egee-path and try again."
+		exit 1
+	else
+		echo "*** skipping egee support"
+	fi
+fi
+
+if [ $has_egee = yes ]
+then
+	echo "using egee version of rfio"
+else
+	if [ $config_rfio_path != no ] && library_search shift ${rfio_path}
+	then
+		ccflags="${ccflags} -I${rfio_path}/include -DHAS_RFIO"
+	else
+		if [ $config_rfio_path = yes ]
+		then
+			  echo "*** Sorry, I couldn't find RFIO in $rfio_path"
+			  echo "*** Check --with-rfio-path and try again."
+			  exit 1
+		else
+			  echo "*** skipping rfio support"
+		fi
+	fi
+fi
+
+if [ $config_dcap_path != no ] && library_search dcap ${dcap_path}
+then
+	ccflags="${ccflags} -I${dcap_path}/dcap -DHAS_DCAP"
+else
+	if [ $config_dcap_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find dcap in ${dcap_path}"
+		echo "*** Check --with-dcap-path and try again."
+		exit 1
+	else
+		echo "*** skipping dcap support"
+	fi
+fi
+
+if [ $has_egee = yes ]
+then	
+	echo "using egee version of globus"
+else
+	if [ x$globus_flavor = xauto ]
+	then
+		if [ $build_cpu = X86_64 ] 
+		then
+			globus_flavor=gcc64
+		else
+			globus_flavor=gcc32
+		fi
+	fi
+
+	echo "using a globus flavor of '$globus_flavor' (if this is wrong, use the --globus-flavor argument)"
+
+	if [ $config_globus_path != no ]
+	then
+		if check_file ${globus_path}/include/${globus_flavor}/globus_common.h
+		then
+			ccflags="${ccflags} -I${globus_path}/include/${globus_flavor} -DHAS_GLOBUS_GSS"
+			ldflags="${ldflags} -L${globus_path}/lib"
+			for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
+			do
+				library_search ${library}_${globus_flavor} ${globus_path}
+			done
+
+			cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${globus_path}/lib -lglobus_gss_assist_${globus_flavor}"
+
+		elif check_file ${globus_path}/include/globus/globus_common.h
+		then
+			ccflags="${ccflags} -I${globus_path}/lib/globus/include -I${globus_path}/include/globus -DHAS_GLOBUS_GSS"
+			ldflags="${ldflags} -L${globus_path}/lib"
+			for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
+			do
+				library_search $library ${globus_path}
+			done
+
+                        cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${globus_path}/lib -lglobus_gss_assist"
+
+		else
+			if [ $config_globus_path = yes ]
+			then
+				echo "*** Sorry, I couldn't find Globus in $globus_path"
+				echo "*** Check --with-globus-path and try again."
+				exit 1
+			else
+				echo "*** skipping globus support"
+			fi
+		fi
+	else
+		echo "*** skipping globus support"
+	fi
+fi
+
+if [ $config_irods_path != no ] && library_search RodsAPIs "${irods_path}" core/obj
+then
+	ccflags="${ccflags} -I${irods_path}/lib/core/include -I${irods_path}/lib/api/include -I${irods_path}/lib/md5/include -I${irods_path}/server/core/include -I${irods_path}/server/api/include -I${irods_path}/server/icat/include -I${irods_path}/server/drivers/include -I${irods_path}/server/re/include -DHAS_IRODS"
+else
+	if [ $config_irods_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find IRODS in $irods_path"
+		echo "*** Check --with-irods-path and try again."
+		exit 1
+	else
+		echo "*** skipping irods support"
+	fi
+fi
+
+if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysql
+then
+	if [ ${mysql_path} != /usr ]
+	then
+		ccflags="${ccflags} -I${mysql_path}/include"
+	fi
+
+	ccflags="${ccflags} -DHAS_MYSQL -DHAS_BXGRID"
+
+	# MySQL requires zlib
+	if library_search z ${zlib_path}
+	then
+		if [ X${zlib_path} != X/usr ]
+		then
+		    
+			ccflags="${ccflags} -I${zlib_path}/include"
+			ldflags="${ldflags} -L${zlib_path}/lib"
+		fi
+	else
+		echo "*** Sorry, I couldn't find zlib in $zlib_path"
+		echo "*** Check --with-zlib-path and try again."
+		exit 1
+	fi
+else
+	if [ $config_mysql_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find MySQL in $mysql_path"
+		echo "*** Check --with-mysql-path and try again."
+		exit 1
+	else
+		echo "*** skipping mysql support"
+	fi
+fi
+
+if [ $config_mpi_path != no ] && check_file ${mpi_path}/bin/mpicc && check_file ${mpi_path}/include/mpi.h
+then
+        mpilinker=${mpi_path}/bin/mpicc
+        usempi="true"
+        ccflags="${ccflags} -I${mpi_path}/include -DHAS_MPI"
+else
+	usempi="false"
+	if [ $config_mpi_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find mpicc or mpi.h in $mpi_path"
+		echo "*** Check --with-mpi-path and try again."
+		exit 1
+	else
+		echo "*** skipping mpi support"
+	fi
+fi
+
+if [ $config_swig_path != no ]
+then
+	swig=""
+	if check_file ${swig_path}/bin/swig
+	then
+		swig=${swig_path}/bin/swig
+	else
+		if check_path swig
+		then
+			swig=`which swig`
+		else
+			echo "*** skipping swig bindings for work queue"
+		fi
+	fi
+
+	if [ -n "$swig" ]
+	then
+		swig_version=`${swig} -version | grep -i version | awk '{print $3}'`
+		if [ `format_version $swig_version` -ge `format_version 1.3.40` ]
+		then
+			packages="${packages} ${include_package_work_queue}"
+		else
+			echo "*** Sorry, I need swig >= 1.3.40"
+			echo "*** skipping swig bindings for work queue"
+		fi
+	fi
+else
+	if [ $config_swig_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find swig in $swig_path"
+		echo "*** Check --with=swig-path and try again."
+		exit 1
+	else
+		echo "*** skipping swig bindings for work queue"
+	fi
+fi
+
+if [ $config_xrootd_path != no ] && check_file ${xrootd_path}/include/xrootd/XrdVersion.hh
+then
+	if [ x$xrootd_arch = xauto ]
+	then
+		if [ $build_cpu = X86_64 ] 
+		then
+			xrootd_arch=x86_64_linux_26
+		else
+			xrootd_arch=i386_linux26
+		fi
+	fi
+
+	echo "using an xrootd arch of '$xrootd_arch' (if this is wrong, use the --xrootd-arch argument)"
+
+	ccflags="${ccflags} -I${xrootd_path}/include/xrootd -DHAS_XROOTD"
+
+	for library in XrdPosix XrdClient XrdSys XrdNet XrdNetUtil XrdOuc
+	do
+		if ! library_search $library ${xrootd_path} ${xrootd_arch}
+		then
+			echo "*** Couldn't find $library in ${xrootd_path}"
+			exit 1
+		fi
+			
+	done
+else
+	if [ $config_xrootd_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find xrootd in ${xrootd_path}"
+		echo "*** Check --with-xrootd-path and try again."
+		exit 1
+	else
+		echo "*** skipping xrootd support"
+	fi
+fi
+
+if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/cvmfs/src/libcvmfs.h
+then
+	ccflags="${ccflags} -I${cvmfs_path}/cvmfs/src -DHAS_CVMFS"
+
+	for library in cvmfs/src/cvmfs sqlite3/src/sqlite3 libcurl/src/lib/.libs/curl
+	do
+		lib_path=${cvmfs_path}/`dirname ${library}`
+                library=`basename ${library}`
+		if ! library_search $library ${lib_path}
+		then
+			echo "*** Couldn't find $library in ${lib_path}"
+			exit 1
+		fi
+	done
+else
+	if [ $config_cvmfs_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find cvmfs in ${cvmfs_path}"
+		echo "*** Check --with-cvmfs-path and try again."
+		exit 1
+	else
+		echo "*** skipping cvmfs support"
+	fi
+fi
+
+##########################################################################
+# SWITCH BACK TO DYNAMIC LINKING FOR COMMON SYSTEM LIBRARIES
+##########################################################################
+library_search_mode=prefer_dynamic
+##########################################################################
+
+if [ $config_readline_path != no ] && library_search readline ${readline_path}
+then
+	if [ ${readline_path} != /usr ]
+	then
+		ccflags="${ccflags} -I${readline_path}/include"
+	fi
+	
+	ccflags="${ccflags} -DHAS_LIBREADLINE"
+
+	# We rely on the --as-needed flag to figure out what dynamic
+	# libraries are actually used by each executable.
+	# However, libreadline doesn't properly specify a dependency
+	# on ncurses, termcap, and history, so we must force them to link.
+
+	if [ $build_sys = LINUX ]
+	then
+		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
+	else 
+		library_search ncurses ${readline_path}
+		library_search termcap ${readline_path}
+		library_search history ${readline_path}
+	fi
+else	
+	echo "*** skipping readline..."
+fi
+
+if [ $config_fuse_path != no ]
+then
+        if library_search fuse ${fuse_path} || library_search fuse /
+        then
+                if [ x${fuse_path} != x/ -a x${fuse_path} != x/usr ]
+                then
+                        ccflags="${ccflags} -I${fuse_path}/include"
+                fi
+                ccflags="${ccflags} -DHAS_FUSE"
+        else
+                if [ $config_fuse_path = yes ]
+                then
+
+        		echo "*** Sorry, I couldn't find Fuse in $fuse_path"
+        		echo "*** Check --with-fuse-path and try again."
+        		exit 1
+                else
+                        echo "*** skipping fuse support"
+                fi
+        fi
+else
+	echo "*** skipping fuse support"
+fi
+
+# Solaris places kerberos includes in a strange place.
+
+if [ -d ${krb5_path}/include/kerberosv5 ]
+then
+	krb5_include_path=${krb5_path}/include/kerberosv5
+else
+	krb5_include_path=${krb5_path}/include
+fi
+
+if [ $config_krb5_path != no ] && check_file ${krb5_include_path}/krb5.h && library_search krb5 "${krb5_path}"
+then
+	if [ ${krb5_include_path} != /usr/include ]
+	then
+		ccflags="${ccflags} -I${krb5_include_path}"
+	fi
+
+	cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${krb5_path}/lib -lkrb5"
+
+	ccflags="${ccflags} -DHAS_KRB5"
+else
+	if [ $config_krb5_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find Kerberos in $krb5_path"
+		echo "*** Check --with-krb5-path and try again."
+		exit 1
+	else
+		echo "*** skipping krb5 support"
+	fi
+fi
+
+if [ $config_perl_path != no ]
+then
+	if check_file ${perl_path}/bin/perl
+	then
+		perl=${perl_path}/bin/perl
+	else
+		perl=0
+	fi
+
+	if [ $perl != 0 ]
+	then
+		perl_version=`perl -e 'printf "%vd\n",$^V;'`
+		echo "perl version is ${perl_version}"
+		perl_ccflags=`perl -MExtUtils::Embed -e ccopts`
+		perl_ldflags=`perl -MExtUtils::Embed -e ldopts`
+		work_queue_bindings="$work_queue_bindings perl"
+	else
+                if [ $config_perl_path = yes ]
+                then
+                        echo "*** Sorry, I couldn't find the perl libraries in $perl_path"
+                        echo "*** Check --with-perl-path and try again."
+                        exit 1
+                else
+                        echo "*** skipping perl support"
+                fi
+	fi
+fi
+
+if [ $config_python_path != no ]
+then
+	if [ -n "$PYTHON" ] && check_file ${PYTHON}
+	then	
+		python=${PYTHON}
+	elif check_file ${python_path}/bin/python2
+	then	
+		python=${python_path}/bin/python2
+	elif check_file ${python_path}/bin/python
+ 	then
+		python=${python_path}/bin/python
+	else
+		python=0
+	fi
+
+	if [ $python != 0 ]
+	then
+		python_version=`${python} -V 2>&1 | cut -d " " -f 2`
+		echo "python version is ${python_version}"
+		python_major_version=`echo ${python_version} | cut -d . -f 1`
+		python_minor_version=`echo ${python_version} | cut -d . -f 2`
+		if [ "$python_major_version" -eq 2 -a "$python_minor_version" -ge 4 ]
+		then
+			if check_file ${python_path}/include/python2.$python_minor_version/Python.h
+			then
+				echo "found python development libraries"
+				python_ccflags_file=`mktemp tmp.XXXXXX`
+				python_ldflags_file=`mktemp tmp.XXXXXX`
+
+				${python} > $python_ccflags_file <<EOF
+from distutils import sysconfig
+flags = ['-I' + sysconfig.get_python_inc(),
+	 '-I' + sysconfig.get_python_inc(plat_specific=True)]
+flags.extend(sysconfig.get_config_var('CFLAGS').split())
+print ' '.join(flags)
+EOF
+				${python} > $python_ldflags_file <<EOF
+from distutils import sysconfig
+libs = sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
+if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
+    libs.insert(0, '-L' + sysconfig.get_config_var('LIBPL'))
+libs.extend(sysconfig.get_config_var('LINKFORSHARED').split())
+print ' '.join(libs)
+EOF
+				python_ccflags=`cat $python_ccflags_file`
+				python_ldflags=`cat $python_ldflags_file`
+				rm $python_ccflags_file
+				rm $python_ldflags_file
+
+				if [ $build_sys = DARWIN ]
+				then
+				    python_ldflags="$python_ldflags -undefined dynamic_lookup"
+				fi
+
+				work_queue_bindings="$work_queue_bindings python"
+			else
+				python=0
+			fi
+		else
+			echo "*** Sorry, we require Python >= 2.4"
+			python=0
+		fi
+	fi
+
+	if [ $python = 0 ]
+	then
+                if [ $config_python_path = yes ]
+                then
+                        echo "*** Sorry, I couldn't find the Python >= 2.4 libraries in $python_path"
+                        echo "*** Check --with-python-path and try again."
+                        exit 1
+                else
+                        echo "*** skipping python support"
+                fi
+	fi
+fi
+
+linker="gcc"
+
+library_search ssl	/usr
+library_search crypto	/usr
+library_search resolv   /usr
+library_search socket   /usr
+library_search nsl      /usr
+
+# Finally, add in standard system libraries found everywhere
+
+if [ $build_sys != DARWIN ]
+then
+	ldflags="${ldflags} -lrt"
+fi
+
+if [ $build_sys != FREEBSD ]
+then
+	ldflags="${ldflags} -ldl"
+fi
+
+#Hack to get chirp to compile on cygwin.
+if [ ${build_sys} != CYGWIN ]
+then
+	ldflags="${ldflags} -lstdc++ -lpthread -lz -lc -lm"
+else
+	ldflags="${ldflags} -lstdc++ -lpthread -lz -lm"
+fi
+
+
+if [ $build_sys = DARWIN ]
+then
+	cctools_dynamic_suffix=dylib
+	cctools_dynamic_flag=-dynamiclib
+else
+	cctools_dynamic_suffix=so
+	cctools_dynamic_flag=-shared
+fi
+
+optional_function strsignal /usr/include/string.h HAS_STRSIGNAL
+optional_function pread /usr/include/unistd.h HAS_PREAD
+optional_function pwrite /usr/include/unistd.h HAS_PWRITE
+
+optional_include /usr/include/sys/statfs.h HAS_SYS_STATFS_H
+optional_include /usr/include/sys/statvfs.h HAS_SYS_STATVFS_H
+
+cctools_doctargets=
+
+if check_path doxygen
+then
+	cctools_doctargets="${cctools_doctargets} apipages"
+else
+	echo "*** not building API documentation"
+fi
+
+if check_path m4
+then
+	cctools_doctargets="${cctools_doctargets} htmlpages"
+	if check_path nroff
+	then
+		cctools_doctargets="${cctools_doctargets} manpages"
+	else
+		echo "*** not building man pages"
+	fi
+else
+	echo "*** not building html or man pages"
+fi
+
+ccflags="${ccflags} -DINSTALL_PATH=\\\"${install_path}\\\" -g -D_REENTRANT -D_GNU_SOURCE -DBUILD_USER=\\\"$build_user\\\" -DBUILD_HOST=\\\"$build_host\\\" -DCCTOOLS_VERSION_MAJOR=$major -DCCTOOLS_VERSION_MINOR=$minor -DCCTOOLS_VERSION_MICRO=$micro -DCCTOOLS_OPSYS_${build_sys} -DCCTOOLS_CPU_${build_cpu}"
+
+echo "Creating Makefile.config..."
+
+cat <<EOF >>Makefile.config
+# Generated at `date` by `whoami`@`uname -n`
+
+CCTOOLS_INSTALL_DIR=${install_path}
+CCTOOLS_PACKAGES=${packages}
+
+CCTOOLS_CC=@echo COMPILE \$@; ${ccompiler}
+CCTOOLS_BASE_CCFLAGS=${ccflags}
+CCTOOLS_INTERNAL_CCFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CCFLAGS}
+CCTOOLS_CCFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CCFLAGS}
+
+CCTOOLS_CXX=@echo COMPILE \$@; ${cxxcompiler}
+CCTOOLS_BASE_CXXFLAGS=${ccflags}
+CCTOOLS_INTERNAL_CXXFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CXXFLAGS}
+CCTOOLS_CXXFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CXXFLAGS}
+
+CCTOOLS_LD=@echo LINK \$@; ${linker}
+CCTOOLS_BASE_LDFLAGS=${ldflags}
+CCTOOLS_INTERNAL_LDFLAGS= ${internal_ldflags} \${CCTOOLS_BASE_LDFLAGS}
+CCTOOLS_LDFLAGS=-L\${CCTOOLS_INSTALL_DIR}/lib \${CCTOOLS_BASE_LDFLAGS}
+
+CCTOOLS_MPI_LD=@echo MPI_LINK \$@; ${mpilinker}
+CCTOOLS_USE_MPI=$usempi
+
+CCTOOLS_READLINE_LDFLAGS=${cctools_readline_ldflags}
+
+CCTOOLS_DYNAMIC_SUFFIX=${cctools_dynamic_suffix}
+CCTOOLS_DYNAMIC_FLAG=${cctools_dynamic_flag}
+CCTOOLS_DYNAMIC_AUTH_LIBS=${cctools_dynamic_auth_libs}
+
+CC=\$(CCTOOLS_CC)
+CCFLAGS=\$(CCTOOLS_CCFLAGS)
+LD=\$(CCTOOLS_LD)
+LDFLAGS=\$(CCTOOLS_LDFLAGS)
+CXX=\$(CCTOOLS_CXX)
+CXXFLAGS=\$(CCTOOLS_CXXFLAGS)
+MPILD=\$(CCTOOLS_MPI_LD)
+
+CCTOOLS_AR=ar
+
+CCTOOLS_SWIG=${swig}
+
+CCTOOLS_PERL=${perl}
+CCTOOLS_PERL_CCFLAGS=${perl_ccflags}
+CCTOOLS_PERL_LDFLAGS=${perl_ldflags}
+CCTOOLS_PERL_VERSION=${perl_version}
+
+CCTOOLS_PYTHON=${python}
+CCTOOLS_PYTHON_CCFLAGS=${python_ccflags}
+CCTOOLS_PYTHON_LDFLAGS=${python_ldflags}
+CCTOOLS_PYTHON_VERSION=${python_major_version}.${python_minor_version}
+
+CCTOOLS_WORK_QUEUE_BINDINGS=${work_queue_bindings}
+
+CCTOOLS_DOCTARGETS=${cctools_doctargets}
+
+CCTOOLS_M4_ARGS=-DCCTOOLS_VERSION=${major}.${minor}.${micro} -DCCTOOLS_RELEASE_DATE=${release_date}
+
+EOF
+
+echo ""
+echo "To re-configure, type './configure.rerun'"
+echo "To build, type '${MAKE}'"
+echo "To install, type '${MAKE} install'"
+echo ""
+
+exit 0

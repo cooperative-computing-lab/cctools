@@ -1,0 +1,66 @@
+
+------------------------------------------------------------
+This software package is
+Copyright (c) 2003-2004 Douglas Thain
+Copyright (c) 2005- The University of Notre Dame
+All rights reserved.
+------------------------------------------------------------
+This product includes software developed by and/or derived
+from the Globus Project (http://www.globus.org/)
+to which the U.S. Government retains certain rights.
+------------------------------------------------------------
+This product includes code derived from the RSA Data
+Security, Inc. MD5 Message-Digest Algorithm.
+------------------------------------------------------------
+This product includes public domain code for the
+SHA1 algorithm written by Peter Gutmann, David Ireland,
+and A. M. Kutchman.
+------------------------------------------------------------
+The Glite module of Parrot is Copyright (c) Members of the EGEE Collaboration. 2004.
+See http://eu-egee.org/partners/ for details on the copyright holders.
+For license conditions see the license file or http://eu-egee.org/license.html
+------------------------------------------------------------
+
+This is the build system for a collection
+of software developed by Douglas Thain at the
+University of Wisconsin 1999-2004 and continuing
+at the University of Notre Dame in 2004.
+Many other people mentioned in the file CREDITS
+have made contributions of time, effort, and code.
+
+You can read more about this software at:
+   http://www.cse.nd.edu/~ccl/software
+
+Please note that all of this software is copyrighted
+and distributed under the GNU General Public License described in the file COPYING.
+You must read and understand that license.
+
+Documentation and other instructions for each of the
+individual packages may be found in the various
+subdirectories.  For example, parrot/src contains
+the source for Parrot, while parrot/doc contains
+the documentation.
+
+To build and install all of these packages in your
+home directory, simply type:
+
+	./configure --prefix ~/cctools
+	make
+	make install
+
+This software may optionally use a variety of 
+external packages such as NeST and Globus.
+If you have these packages, you should
+direct configure to them with a command such as:
+
+	./configure --prefix ~/cctools
+		--with-globus-path /usr/local/globus
+		--with-nest-path /usr/local/nest
+		...
+
+For a list of all possible external packages, type
+
+	./configure --help
+
+Good luck and enjoy,
+Doug

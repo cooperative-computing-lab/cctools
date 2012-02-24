@@ -1,0 +1,49 @@
+#!/bin/sh
+
+vid="$1"
+shift
+command="$@"
+parrot=`which parrot_run`
+
+if [ "X$vid" = X ]
+then
+	echo "Use: $0 <identity> [command]";
+	exit 1
+fi
+
+# Clean up the VID so that it can be used in the passwd file.
+cleanvid=`echo -n "$vid" | tr : _`
+
+# Get the current user's real uid and gid
+uid=`id -u`
+gid=`id -g`
+
+# Create a private home directory for this process.
+mkdir -p /tmp/home.${uid}/$cleanvid
+HOME=/tmp/home.${uid}/$cleanvid
+
+# Create a private passwd file listing only this user.
+cat > $HOME/.passwd << EOF
+$cleanvid:x:$uid:$gid:Unknown:$HOME:$SHELL
+EOF
+cat /etc/passwd >> $HOME/.passwd
+
+cat > $HOME/.group <<EOF
+none:x:$gid:$cleanvid
+EOF
+cat /etc/group >> $HOME/.group
+
+# Create a private ACL so that this user can read and write here.
+cat > $HOME/.__acl << EOF
+$vid rwlax
+EOF
+
+# If no command was given, run the user's shell in the home dir
+if [ "X$command" = X ]
+then
+	command=$SHELL
+	cd $HOME
+fi
+
+# Finally, fork off parrot with a private environment and password file.
+exec /usr/bin/env -i HOME=${HOME} SHELL=${SHELL} LANG=${LANG} TERM=${TERM} ${parrot} -H -M/etc/passwd=${HOME}/.passwd -M/etc/group=${HOME}/.group -u $vid -- $command

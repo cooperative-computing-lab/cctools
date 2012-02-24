@@ -1,0 +1,25 @@
+#!/bin/sh
+
+if [ X$1 = X ]
+then
+	echo "use: condor_submit_makeflow [makeflowoptions] <makeflowfile>"
+	exit 1
+fi
+
+makeflow=`which makeflow`
+if [ $? != 0 ]
+then
+	echo "$0: Sorry, I cannot find makeflow in your PATH."
+	exit 1
+fi
+
+condor_submit << EOF
+universe = local
+cmd = $makeflow
+arguments = -T condor -l makeflow.\$(CLUSTER).makeflowlog -L makeflow.\$(CLUSTER).condorlog $@
+output = makeflow.\$(CLUSTER).output
+error = makeflow.\$(CLUSTER).error
+log = makeflow.\$(CLUSTER).condorlog
+getenv = true
+queue
+EOF

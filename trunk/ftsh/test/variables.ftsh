@@ -1,0 +1,34 @@
+
+#
+# Check that variables can be set, examined,
+# and redirected as files.
+#
+
+function printit
+	echo "name is ${1}"
+	echo name is ${1}
+	echo "name" "is" "$1"
+        echo "name is $1"
+        echo name is $1
+        echo "name" "is" "$1"
+end
+
+name=value
+printit ${name}
+printit "${name}"
+printit $name
+printit "$name"
+
+name="quoted value"
+printit ${name}
+printit "${name}"
+printit $name
+printit "$name"
+
+echo hello dolly -> v
+sort -< v -> sv
+
+printit ${v}
+printit "${v}"
+printit $v
+printit "$v"

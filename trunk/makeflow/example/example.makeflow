@@ -1,0 +1,29 @@
+#
+# This is a sample Makeflow script that retrieves an image from the web,
+# creates four variations of it, and then combines them into an animation.
+# A Makeflow script is a subset of the Makefile language, see the manual
+# for more information.
+#
+
+CURL=/usr/bin/curl
+CONVERT=/usr/bin/convert
+URL=http://www.cse.nd.edu/~ccl/images/capitol.jpg
+
+capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
+	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
+
+capitol.90.jpg: capitol.jpg
+	$CONVERT -swirl 90 capitol.jpg capitol.90.jpg
+
+capitol.180.jpg: capitol.jpg
+	$CONVERT -swirl 180 capitol.jpg capitol.180.jpg
+
+capitol.270.jpg: capitol.jpg
+	$CONVERT -swirl 270 capitol.jpg capitol.270.jpg
+
+capitol.360.jpg: capitol.jpg
+	$CONVERT -swirl 360 capitol.jpg capitol.360.jpg
+
+capitol.jpg:
+	$CURL -o capitol.jpg $URL
+

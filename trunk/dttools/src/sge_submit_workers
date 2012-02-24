@@ -1,0 +1,86 @@
+#!/bin/sh
+
+show_help() 
+{
+	echo "Use: sge_submit_workers [options] <servername> <port> <num-workers>"
+	echo "where options are:"
+	echo "  -a               Enable auto mode."
+	echo "  -s               Run as a shared worker."
+	echo "  -N <name>        Preferred master name."
+	echo "  -C <catalog>     Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
+	echo "  -t <time>        Abort after this amount of idle time. (default=900s)"
+	echo "  -p <parameters>  SGE qsub parameters."
+	echo "  -h               Show this help message."
+	exit 1
+}
+
+arguments=""
+use_auto=0
+parameters=""
+
+while getopts asN:t:p:h opt 
+do
+	case "$opt" in
+		a)  arguments="$arguments -a"; use_auto=1;;
+		s)  arguments="$arguments -s";;
+		N)  arguments="$arguments -N $OPTARG";;
+		C)  arguments="$arguments -C $OPTARG";;
+		t)  arguments="$arguments -t $OPTARG";;
+		p)  parameters="$parameters $OPTARG";;
+		h)  show_help;;
+		\?) show_help;;
+	esac
+done
+
+shift $(expr $OPTIND - 1)
+
+if [ $use_auto = 0 ]; then
+    if [ X$3 = X ]
+    then
+	show_help	
+    fi
+    host=$1
+    port=$2
+    count=$3
+else
+    if [ X$1 = X ]
+    then
+	show_help	
+    fi
+    host=
+    port=
+    count=$1
+fi
+
+worker=`which work_queue_worker 2>/dev/null`
+if [ $? != 0 ]
+then
+	echo "$0: please add 'work_queue_worker' to your PATH."
+	exit 1
+fi
+
+qsub=`which qsub 2>/dev/null`
+if [ $? != 0 ]
+then
+	echo "$0: please add 'qsub' to your PATH."
+	exit 1
+fi
+
+mkdir -p ${USER}-workers
+cd ${USER}-workers
+cp $worker .
+
+cat >worker.sh <<EOF
+#!/bin/sh
+./work_queue_worker $arguments $host $port
+EOF
+
+chmod 755 worker.sh
+
+for n in `seq 1 $count`
+do
+	qsub -cwd $parameters worker.sh
+	return_status=$?
+done
+
+exit $return_status
