@@ -142,6 +142,14 @@ the <tt>qsub</tt> command.  This call has no effect on other queue types.
 */
 void batch_queue_set_options(struct batch_queue *q, const char *options);
 
+/** Get batch queue options.
+This call returns the additional options to be passed to the batch system each
+time a job is submitted.
+@param q The batch queue.
+@return An allocate string containing the the batch queue options.
+*/
+char *batch_queue_options(struct batch_queue *q);
+
 /** Delete a batch queue.
 Note that this function just destroys the internal data structures,
 it does not abort running jobs.  To properly clean up running jobs,
