@@ -955,15 +955,22 @@ char *string_trim_spaces(char *s)
 	return string_trim(s, isspace);
 }
 
-
-int isquote(int c)
-{
-	return (c == '\'' || c == '"');
-}
-
 char *string_trim_quotes(char *s)
 {
-	return string_trim(s, isquote);
+	char *front, *back;
+
+	front = s;
+	back  = s + strlen(s) - 1;
+
+	while (*front == '\'' || *front == '"') {
+		if (*back != *front)
+			break;
+		*back = 0;
+		back--;
+		front++;
+	}
+
+	return front;
 }
 
 /* vim: set sts=8 sw=8 ts=8 ft=c: */
