@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "process.h"
 #include "stringtools.h"
 #include "timestamp.h"
+#include "xxmalloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
