@@ -930,3 +930,40 @@ char *string_getcwd(void)
 	}
 	return result;
 }
+
+char *string_trim(char *s, int func(int))
+{
+	char *p;
+
+	/* Skip front */
+	while (func(*s))
+		s++;
+
+	/* Skip back */
+	p = s + strlen(s) - 1;
+	while (func(*p))
+		p--;
+
+	/* Terminate string */
+	*(p + 1) = 0;
+
+	return s;
+}
+
+char *string_trim_spaces(char *s)
+{
+	return string_trim(s, isspace);
+}
+
+
+int isquote(int c)
+{
+	return (c == '\'' || c == '"');
+}
+
+char *string_trim_quotes(char *s)
+{
+	return string_trim(s, isquote);
+}
+
+/* vim: set sts=8 sw=8 ts=8 ft=c: */
