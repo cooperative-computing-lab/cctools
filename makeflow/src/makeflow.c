@@ -919,8 +919,7 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 	}
 
 	d->linenum = 0;
-	if(d->filename)
-		free(d->filename);
+	free(d->filename);
 	d->filename = xxstrdup(filename);
 
 	while((line = dag_readline(d)) != NULL) {
@@ -995,7 +994,7 @@ char *dag_readline(struct dag *d)
 
 		char *subst_line = xxstrdup(raw_line);
 		subst_line = string_subst(subst_line, dag_lookup_callback, d);
-		if (d->linetext) free(d->linetext);
+		free(d->linetext);
 		d->linetext = xxstrdup(subst_line);
 		return subst_line;
 	}
