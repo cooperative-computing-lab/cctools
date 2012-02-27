@@ -995,6 +995,8 @@ char *dag_readline(struct dag *d)
 
 		char *subst_line = xxstrdup(raw_line);
 		subst_line = string_subst(subst_line, dag_lookup_callback, d);
+		if (d->linetext) free(d->linetext);
+		d->linetext = xxstrdup(subst_line);
 		return subst_line;
 	}
 
