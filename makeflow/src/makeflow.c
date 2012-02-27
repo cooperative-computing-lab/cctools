@@ -115,7 +115,7 @@ struct dag_node {
 	int children;
 	int children_left;
 	int level;
-	struct hash_table *options;
+	struct hash_table *variables;
 };
 
 int dag_width(struct dag *d);
@@ -125,7 +125,7 @@ int dag_check_dependencies(struct dag *d);
 int dag_parse_variable(struct dag *d, char *line);
 int dag_parse_node(struct dag *d, char *line, int clean_mode);
 int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, int source, int clean_mode);
-int dag_parse_node_option(struct dag *d, struct dag_node *n, char *line);
+int dag_parse_node_options(struct dag *d, struct dag_node *n, char *line);
 int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line);
 char *dag_lookup_callback(const char *name, void *arg);
 
@@ -900,7 +900,7 @@ struct dag_node *dag_node_create(struct dag *d)
 	n->linenum = d->linenum;
 	n->state = DAG_NODE_STATE_WAITING;
 	n->nodeid = d->nodeid_counter++;
-	n->options = hash_table_create(0, 0);
+	n->variables = hash_table_create(0, 0);
 
 	return n;
 }
@@ -1045,8 +1045,8 @@ int dag_parse_node(struct dag *d, char *line, int clean_mode)
 
 	while((line = dag_readline(d)) != NULL) {
 		if(line[0] == '@') {
-			if (!dag_parse_node_option(d, n, line)) {
-				dag_parse_error(d, "option");
+			if (!dag_parse_node_options(d, n, line)) {
+				dag_parse_error(d, "node options");
 				return 0;
 			}
 		} else {
@@ -1056,7 +1056,7 @@ int dag_parse_node(struct dag *d, char *line, int clean_mode)
 				itable_insert(d->node_table, n->nodeid, n);
 				return 1;
 			} else {
-				dag_parse_error(d, "command");
+				dag_parse_error(d, "node command");
 				return 0;
 			}
 		}
@@ -1076,6 +1076,8 @@ int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, i
 	for (i = 0; i < argc; i++) {
 		filename = argv[i];
 		newname  = NULL;
+		debug(D_DEBUG, "node %s file=%s", (source ? "input" : "output"), filename);
+
 		if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && strchr(filename, '/')) {
 			int rv = translate_filename(d, filename, &newname);
 			if(rv && !clean_mode) {
@@ -1154,11 +1156,11 @@ int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
 	}
 	n->original_command = xxstrdup(command);
 	n->command = translate_command(d, command, n->local_job);
-	debug(D_DEBUG, "command=%s", command);
+	debug(D_DEBUG, "node command=%s", command);
 	return 1;
 }
 
-int dag_parse_node_option(struct dag *d, struct dag_node *n, char *line)
+int dag_parse_node_options(struct dag *d, struct dag_node *n, char *line)
 {
 	char *name  = line + 1;
 	char *value = name;
@@ -1170,9 +1172,10 @@ int dag_parse_node_option(struct dag *d, struct dag_node *n, char *line)
 	value  = value + 1;
 	value  = string_trim_spaces(value);
 	value  = string_trim_quotes(value);
+	value  = string_subst(value, dag_lookup_callback, d);
 
-	debug(D_DEBUG, "option name=%s, value=%s", name, value);
-	hash_table_insert(n->options, name, xxstrdup(value));
+	hash_table_insert(n->variables, name, xxstrdup(value));
+	debug(D_DEBUG, "node variable key=%s, value=%s", name, value);
 	return 1;
 }
 
@@ -1237,8 +1240,19 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		strcat(output_files, ",");
 	}
 
-	const char *batch_submit_options = getenv("BATCH_OPTIONS");
+	/* Before setting the batch job options (stored in the node's
+	 * "BATCH_OPTIONS" variable or in the "BATCH_OPTIONS" environment
+	 * variable), we must save the previous global queue value, and then
+	 * restore it after we submit. */
+	char *batch_submit_options = hash_table_lookup(n->variables, "BATCH_OPTIONS");
+	char *old_batch_submit_options = NULL;
+
+	if(batch_submit_options == NULL) {
+		batch_submit_options = dag_lookup_callback("BATCH_OPTIONS", d);
+	}
+
 	if(batch_submit_options) {
+		old_batch_submit_options = batch_queue_options(thequeue);
 		batch_queue_set_options(thequeue, batch_submit_options);
 	}
 
@@ -1261,6 +1275,12 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		waittime *= 2;
 		if(waittime > 60)
 			waittime = 60;
+	}
+
+	/* Restore old batch job options. */
+	if (old_batch_submit_options) {
+		batch_queue_set_options(thequeue, old_batch_submit_options);
+		free(old_batch_submit_options);
 	}
 
 	if(n->jobid >= 0) {
