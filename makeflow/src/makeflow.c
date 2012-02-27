@@ -622,7 +622,6 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 
 void dag_log_recover(struct dag *d, const char *filename)
 {
-	int linenum = 0;
 	char *line;
 	int nodeid, state, jobid;
 	int first_run = 1;
@@ -631,6 +630,7 @@ void dag_log_recover(struct dag *d, const char *filename)
 
 	d->logfile = fopen(filename, "r");
 	if(d->logfile) {
+		int linenum = 0;
 		first_run = 0;
 
 		while((line = get_line(d->logfile))) {
@@ -863,31 +863,6 @@ static char *translate_command(struct dag *d, char *old_command, int is_local)
 	return new_command;
 }
 
-void dag_parse_assignment(struct dag *d, char *line)
-{
-	char *name = line;
-	char *eq = strchr(line, '=');
-	char *value = eq + 1;
-
-	// advance value to the first non-whitespace
-	while(*value && isspace((int) *value))
-		value++;
-
-	// set = and any preceding whitespace to null
-	do {
-		*eq = 0;
-		if(eq > line)
-			eq--;
-	} while(eq > line && isspace((int) *eq));
-
-	if(eq == name) {
-		fprintf(stderr, "makeflow: error at %s:%d: variable assignment has no name!\n", d->filename, d->linenum);
-		exit(1);
-	}
-
-	setenv(name, value, 1);
-}
-
 struct dag *dag_create()
 {
 	struct dag *d = malloc(sizeof(*d));
@@ -1109,7 +1084,7 @@ int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, i
 				if(rv < 0 && errno != EEXIST) {
 					/* TODO: Check for if symlink points to right place? */
 					fprintf(stderr, "makeflow: could not create symbolic link (%s)\n", strerror(errno));
-					return 0;
+					goto failure;
 				}
 
 				/* Create symlink for output files, otherwise Condor will fail on write-back */
@@ -1117,7 +1092,7 @@ int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, i
 					int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
 					if(fd < 0) {
 						fprintf(stderr, "makeflow: could not create symbolic link target (%s): %s\n", filename, strerror(errno));
-						return 0;
+						goto failure;
 					}
 					close(fd);
 				}
@@ -1158,7 +1133,12 @@ int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, i
 		if(newname != filename)
 			free(newname);
 	}
+	free(argv);
 	return 1;
+
+failure:
+	free(argv);
+	return 0;
 }
 
 int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
