@@ -1,0 +1,11 @@
+uname.disc:
+    @BATCH_OPTIONS  'requirements = MachineGroup == "disc"'
+    uname -a > uname.disc
+
+uname.ccl:
+    @BATCH_OPTIONS  "requirements = MachineGroup == "ccl""
+    uname -a > uname.ccl
+
+uname.gh:
+    @BATCH_OPTIONS  requirements = MachineGroup == "gh"
+    uname -a > uname.gh
