@@ -68,7 +68,7 @@ typedef enum {
 } dag_node_state_t;
 
 struct dag {
-	const char *filename;
+	char *filename;
 	struct dag_node *nodes;
 	struct itable *node_table;
 	struct itable *local_job_table;
@@ -77,8 +77,12 @@ struct dag {
 	struct hash_table *completed_files;
 	struct hash_table *filename_translation_rev;
 	struct hash_table *filename_translation_fwd;
+	struct hash_table *variables;
 	FILE *logfile;
+	FILE *dagfile;
+	char *linetext;
 	int node_states[DAG_NODE_STATE_MAX];
+	int colnum;
 	int linenum;
 	int local_jobs_running;
 	int local_jobs_max;
@@ -111,9 +115,20 @@ struct dag_node {
 	int children;
 	int children_left;
 	int level;
+	struct hash_table *options;
 };
 
 int dag_width(struct dag *d);
+void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info);
+char *dag_readline(struct dag *d);
+int dag_check_dependencies(struct dag *d);
+int dag_parse_variable(struct dag *d, char *line);
+int dag_parse_node(struct dag *d, char *line, int clean_mode);
+int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, int source, int clean_mode);
+int dag_parse_node_option(struct dag *d, struct dag_node *n, char *line);
+int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line);
+char *dag_lookup_callback(const char *name, void *arg);
+
 
 int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 {
@@ -132,7 +147,7 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 			// d->file_table contains all target files
 			// get the node (tmp) that outputs current source file
 			tmp = hash_table_lookup(d->file_table, f->filename);
-			// if a source file is also a target file 
+			// if a source file is also a target file
 			if(tmp) {
 				debug(D_DEBUG, "%d depends on %d", n->nodeid, tmp->nodeid);
 				if(nodeid == -1) {
@@ -179,7 +194,7 @@ void dag_show_input_files(struct dag *d)
 			// d->file_table contains all target files
 			// get the node (tmp) that outputs current source file
 			tmp = hash_table_lookup(d->file_table, f->filename);
-			// if a source file is also a target file 
+			// if a source file is also a target file
 			if(!tmp) {
 				debug(D_DEBUG, "Found independent input file: %s", f->filename);
 				hash_table_insert(ih, f->filename, (void *) NULL);
@@ -512,7 +527,7 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 
 	// Below are a bunch of situations when a node has to be rerun.
 
-	// If a job was submitted to Condor, then just reconnect to it. 
+	// If a job was submitted to Condor, then just reconnect to it.
 	if(n->state == DAG_NODE_STATE_RUNNING && !n->local_job && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
 		// Reconnect the Condor jobs
 		debug(D_DEBUG, "rule still running: %s\n", n->command);
@@ -690,7 +705,7 @@ void dag_log_recover(struct dag *d, const char *filename)
 
 	dag_count_states(d);
 
-	// Decide rerun tasks 
+	// Decide rerun tasks
 	if(!first_run) {
 		struct itable *rerun_table = itable_create(0);
 		for(n = d->nodes; n; n = n->next) {
@@ -698,48 +713,6 @@ void dag_log_recover(struct dag *d, const char *filename)
 		}
 		itable_delete(rerun_table);
 	}
-}
-
-static char *lookupenv(const char *name, void *arg)
-{
-	const char *env = getenv(name);
-
-	if(env)
-		return xxstrdup(env);
-
-	return NULL;
-}
-
-char *dag_readline(struct dag *d, FILE * file)
-{
-	char *rawline = get_line(file);
-
-	if(rawline) {
-		d->linenum++;
-		if(d->linenum % 1000 == 0) {
-			debug(D_DEBUG, "read line %d\n", d->linenum);
-			if(d->linenum % 100000 == 0)
-				debug(D_DEBUG, "reading line %d\n", d->linenum);
-		}
-
-		string_chomp(rawline);
-
-		char *hash = strchr(rawline, '#');
-		if(hash)
-			*hash = 0;
-
-		char *substline = xxstrdup(rawline);
-		substline = string_subst(substline, lookupenv, 0);
-
-		char *cookedline = xxstrdup(substline);
-
-		string_replace_backslash_codes(substline, cookedline);
-		free(substline);
-
-		return cookedline;
-	}
-
-	return 0;
 }
 
 static int translate_filename(struct dag *d, const char *filename, char **newname_ptr)
@@ -915,39 +888,242 @@ void dag_parse_assignment(struct dag *d, char *line)
 	setenv(name, value, 1);
 }
 
-void dag_node_parse_filelist(struct dag *d, struct dag_node *n, char *filelist, int source, int clean_mode)
+struct dag *dag_create()
+{
+	struct dag *d = malloc(sizeof(*d));
+	memset(d, 0, sizeof(*d));
+	d->nodes = 0;
+	d->colnum = 0;
+	d->linenum = 0;
+	d->linetext = NULL;
+	d->filename = NULL;
+	d->dagfile = NULL;
+	d->node_table = itable_create(0);
+	d->local_job_table = itable_create(0);
+	d->remote_job_table = itable_create(0);
+	d->file_table = hash_table_create(0, 0);
+	d->completed_files = hash_table_create(0, 0);
+	d->variables = hash_table_create(0, 0);
+	d->local_jobs_running = 0;
+	d->local_jobs_max = 1;
+	d->remote_jobs_running = 0;
+	d->remote_jobs_max = 100;
+	d->nodeid_counter = 0;
+	d->filename_translation_rev = hash_table_create(0, 0);
+	d->filename_translation_fwd = hash_table_create(0, 0);
+
+	memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
+	return d;
+}
+
+struct dag_node *dag_node_create(struct dag *d)
+{
+	struct dag_node *n;
+
+	n = malloc(sizeof(struct dag_node));
+	memset(n, 0, sizeof(struct dag_node));
+	n->linenum = d->linenum;
+	n->state = DAG_NODE_STATE_WAITING;
+	n->nodeid = d->nodeid_counter++;
+	n->options = hash_table_create(0, 0);
+
+	return n;
+}
+
+#define dag_parse_error(dag, type) \
+	fprintf(stderr, "makeflow: invalid " type " in file %s at line %d, column %d:\n%s\n", (dag)->filename, (dag)->linenum, (dag)->colnum, (dag)->linetext ? (dag)->linetext : "");
+
+int dag_parse(struct dag *d, const char *filename, int clean_mode)
+{
+	char *line = NULL;
+
+	d->dagfile = fopen(filename, "r");
+	if(d->dagfile == NULL) {
+		fprintf(stderr, "makeflow: unable to open file %s: %s\n", filename, strerror(errno));
+		goto failure;
+	}
+
+	d->linenum = 0;
+	if(d->filename)
+		free(d->filename);
+	d->filename = xxstrdup(filename);
+
+	while((line = dag_readline(d)) != NULL) {
+		if (strlen(line) == 0)
+			continue;
+
+		if(line[0] == '#') {
+			continue;
+		} else if(strchr(line, '=')) {
+			if(!dag_parse_variable(d, line)) {
+				dag_parse_error(d, "variable");
+				goto failure;
+			}
+		} else if(strstr(line, ":")) {
+			if(!dag_parse_node(d, line, clean_mode)) {
+				dag_parse_error(d, "node");
+				goto failure;
+			}
+		} else {
+			dag_parse_error(d, "syntax");
+			goto failure;
+		}
+
+		free(line);
+	}
+
+	fclose(d->dagfile);
+	return dag_check_dependencies(d);
+
+failure:
+	if(d->dagfile) fclose(d->dagfile);
+	return 0;
+}
+
+int dag_check_dependencies(struct dag *d)
+{
+	struct dag_node *n, *m;
+	struct dag_file *f;
+
+	for(n = d->nodes; n; n = n->next) {
+		for(f = n->target_files; f; f = f->next) {
+			m = hash_table_lookup(d->file_table, f->filename);
+			if(m) {
+				fprintf(stderr, "makeflow: %s is defined multiple times at %s:%d and %s:%d\n", f->filename, d->filename, n->linenum, d->filename, m->linenum);
+				return 0;
+			} else {
+				hash_table_insert(d->file_table, f->filename, n);
+			}
+		}
+	}
+
+	return 1;
+}
+
+char *dag_readline(struct dag *d)
+{
+	char *raw_line = get_line(d->dagfile);
+
+	if(raw_line) {
+		d->colnum = 1;
+		d->linenum++;
+
+		if(d->linenum % 1000 == 0) {
+			debug(D_DEBUG, "read line %d\n", d->linenum);
+		}
+
+		string_chomp(raw_line);
+		while(isspace(*raw_line)) {
+			raw_line++;
+			d->colnum++;
+		}
+
+		char *subst_line = xxstrdup(raw_line);
+		subst_line = string_subst(subst_line, dag_lookup_callback, d);
+		return subst_line;
+	}
+
+	return NULL;
+}
+
+
+int dag_parse_variable(struct dag *d, char *line)
+{
+	char *name  = line;
+	char *value = NULL;
+
+	value  = strchr(line, '=');
+	*value = 0;
+	value  = value + 1;
+
+	name  = string_trim_spaces(name);
+	value = string_trim_spaces(value);
+	value = string_trim_quotes(value);
+
+	if (strlen(name) == 0) {
+		dag_parse_error(d, "variable name");
+		return 0;
+	}
+
+	debug(D_DEBUG, "variable name=%s, value=%s", name, value);
+	hash_table_insert(d->variables, name, xxstrdup(value));
+	return 1;
+}
+
+int dag_parse_node(struct dag *d, char *line, int clean_mode)
+{
+	char *outputs = line;
+	char *inputs  = NULL;
+	struct dag_node *n;
+
+	n = dag_node_create(d);
+
+	inputs  = strchr(line, ':');
+	*inputs = 0;
+	inputs  = inputs + 1;
+
+	outputs = string_trim_spaces(outputs);
+	inputs  = string_trim_spaces(inputs);
+
+	dag_parse_node_filelist(d, n, outputs, 0, clean_mode);
+	dag_parse_node_filelist(d, n, inputs, 1, clean_mode);
+
+	while((line = dag_readline(d)) != NULL) {
+		if(line[0] == '@') {
+			if (!dag_parse_node_option(d, n, line)) {
+				dag_parse_error(d, "option");
+				return 0;
+			}
+		} else {
+			if (dag_parse_node_command(d, n, line)) {
+				n->next = d->nodes;
+				d->nodes = n;
+				itable_insert(d->node_table, n->nodeid, n);
+				return 1;
+			} else {
+				dag_parse_error(d, "command");
+				return 0;
+			}
+		}
+	}
+
+	return 1;
+}
+
+int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, int source, int clean_mode)
 {
 	char *filename;
 	char *newname;
-	int rv;
+	char **argv;
+	int i, argc;
 
-	filename = strtok(filelist, " \t\n");
-	while(filename) {
+	string_split_quotes(filelist, &argc, &argv);
+	for (i = 0; i < argc; i++) {
+		filename = argv[i];
+		newname  = NULL;
 		if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && strchr(filename, '/')) {
-			newname = NULL;
-			rv = translate_filename(d, filename, &newname);
+			int rv = translate_filename(d, filename, &newname);
 			if(rv && !clean_mode) {
 				debug(D_DEBUG, "creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
 				rv = symlink(filename, newname);
 				if(rv < 0 && errno != EEXIST) {
-					//TODO: Check for if symlink points to right place
+					/* TODO: Check for if symlink points to right place? */
 					fprintf(stderr, "makeflow: could not create symbolic link (%s)\n", strerror(errno));
-					exit(1);
+					return 0;
 				}
 
-				if(access(filename, R_OK) < 0) {
-					int fd;
-
-					fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
+				/* Create symlink for output files, otherwise Condor will fail on write-back */
+				if(!source && access(filename, R_OK) < 0) {
+					int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
 					if(fd < 0) {
-						fprintf(stderr, "makeflow: could not create symbolic link target (%s)\n", strerror(errno));
-						exit(1);
+						fprintf(stderr, "makeflow: could not create symbolic link target (%s): %s\n", filename, strerror(errno));
+						return 0;
 					}
 					close(fd);
 				}
 			}
 
-			if(!newname)
+			if(newname == NULL)
 				newname = filename;
 
 			if(source) {
@@ -957,14 +1133,11 @@ void dag_node_parse_filelist(struct dag *d, struct dag_node *n, char *filelist, 
 				dag_node_add_target_file(n, newname);
 				n->target_file_names_size += strlen(filename) + 1;
 			}
-
-			if(newname != filename)
-				free(newname);
 		} else if(filename[0] == '/' && batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-			// Translate only explicit absolute paths for work queue tasks.
-			newname = NULL;
-			rv = translate_filename(d, filename, &newname);
-
+			/* Translate only explicit absolute paths for work queue tasks.
+			 * TODO: should we check this return value? */
+			translate_filename(d, filename, &newname);
+			/* We have to reserve extra space so we can do renaming later. */
 			if(source) {
 				dag_node_add_source_file(n, filename);
 				n->source_file_names_size += strlen(filename) + strlen(newname) + 2;
@@ -972,9 +1145,6 @@ void dag_node_parse_filelist(struct dag *d, struct dag_node *n, char *filelist, 
 				dag_node_add_target_file(n, filename);
 				n->target_file_names_size += strlen(filename) + strlen(newname) + 2;
 			}
-
-			if(newname != filename)
-				free(newname);
 		} else {
 			if(source) {
 				dag_node_add_source_file(n, filename);
@@ -985,143 +1155,62 @@ void dag_node_parse_filelist(struct dag *d, struct dag_node *n, char *filelist, 
 			}
 		}
 
-		filename = strtok(0, " \t\n");
+		if(newname != filename)
+			free(newname);
 	}
+	return 1;
 }
 
-struct dag_node *dag_node_parse(struct dag *d, FILE * file, int clean_mode)
+int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
 {
-	char *line;
-	char *eq;
-	char *colon;
-	char *targetfiles;
-	char *sourcefiles;
+	char *command = line;
 
-	while(1) {
-		line = dag_readline(d, file);
-		if(!line)
-			return 0;
+	while (*command && isspace(*command))
+		command++;
 
-		if(string_isspace(line)) {
-			free(line);
-			continue;
-		}
-
-		eq = strchr(line, '=');
-		colon = strchr(line, ':');
-
-		if(eq) {
-			if(!colon || colon > eq) {
-				dag_parse_assignment(d, line);
-				continue;
-			}
-		}
-
-		break;
-	}
-
-	if(!colon) {
-		fprintf(stderr, "makeflow: error at %s:%d: %s\n", d->filename, d->linenum, line);
-		exit(1);
-	}
-
-	struct dag_node *n = malloc(sizeof(*n));
-	memset(n, 0, sizeof(*n));
-	n->only_my_children = 0;
-	n->children = 0;
-	n->children_left = 0;
-	n->level = 0;
-	n->linenum = d->linenum;
-	n->state = DAG_NODE_STATE_WAITING;
-	n->nodeid = d->nodeid_counter++;
-	n->local_job = 0;
-	n->failure_count = 0;
-
-	*colon = 0;
-	targetfiles = line;
-	sourcefiles = colon + 1;
-
-	dag_node_parse_filelist(d, n, targetfiles, 0, clean_mode);
-	dag_node_parse_filelist(d, n, sourcefiles, 1, clean_mode);
-
-	free(line);
-
-	line = dag_readline(d, file);
-	if(!line) {
-		fprintf(stderr, "makeflow: error at %s:%d: expected a command\n", d->filename, d->linenum);
-		exit(1);
-	}
-
-	char *c = line;
-	while(*c && isspace((int) *c))
-		c++;
-	if(!strncmp(c, "LOCAL ", 6)) {
+	if (strncmp(command, "LOCAL ", 6) == 0) {
 		n->local_job = 1;
-		c += 6;
+		command += 6;
 	}
-
-	n->original_command = xxstrdup(c);
-	n->command = translate_command(d, c, n->local_job);
-
-	free(line);
-	return n;
+	n->original_command = xxstrdup(command);
+	n->command = translate_command(d, command, n->local_job);
+	debug(D_DEBUG, "command=%s", command);
+	return 1;
 }
 
-struct dag *dag_create(const char *filename, int clean_mode)
+int dag_parse_node_option(struct dag *d, struct dag_node *n, char *line)
 {
-	FILE *file = fopen(filename, "r");
-	if(!file)
-		return 0;
+	char *name  = line + 1;
+	char *value = name;
 
-	struct dag *d = malloc(sizeof(*d));
-	memset(d, 0, sizeof(*d));
-	d->nodes = 0;
-	d->linenum = 0;
-	d->filename = xxstrdup(filename);
-	d->node_table = itable_create(0);
-	d->local_job_table = itable_create(0);
-	d->remote_job_table = itable_create(0);
-	d->file_table = hash_table_create(0, 0);
-	d->completed_files = hash_table_create(0, 0);
-	d->local_jobs_running = 0;
-	d->local_jobs_max = 1;
-	d->remote_jobs_running = 0;
-	d->remote_jobs_max = 100;
-	d->nodeid_counter = 0;
-	d->filename_translation_rev = hash_table_create(0, 0);
-	d->filename_translation_fwd = hash_table_create(0, 0);
+	while(!isspace(*value))
+		value++;
 
-	memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
+	*value = 0;
+	value  = value + 1;
+	value  = string_trim_spaces(value);
+	value  = string_trim_quotes(value);
 
-	struct dag_node *n, *m;
-	struct dag_file *f;
-
-	while((n = dag_node_parse(d, file, clean_mode))) {
-		n->next = d->nodes;
-		d->nodes = n;
-		itable_insert(d->node_table, n->nodeid, n);
-	}
-
-	if(!clean_mode) {
-		debug(D_DEBUG, "checking for duplicate targets...\n");
-	}
-
-	for(n = d->nodes; n; n = n->next) {
-		for(f = n->target_files; f; f = f->next) {
-			m = hash_table_lookup(d->file_table, f->filename);
-			if(m) {
-				fprintf(stderr, "makeflow: %s is defined multiple times at %s:%d and %s:%d\n", f->filename, d->filename, n->linenum, d->filename, m->linenum);
-				exit(1);
-			} else {
-				hash_table_insert(d->file_table, f->filename, n);
-			}
-		}
-	}
-
-	return d;
+	debug(D_DEBUG, "option name=%s, value=%s", name, value);
+	hash_table_insert(n->options, name, xxstrdup(value));
+	return 1;
 }
 
-void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info);
+char *dag_lookup_callback(const char *name, void *arg)
+{
+	struct dag *d = (struct dag *)arg;
+	const char *value;
+
+	value = (const char *)hash_table_lookup(d->variables, name);
+	if(value)
+		return xxstrdup(value);
+
+	value = getenv(name);
+	if(value)
+		return xxstrdup(value);
+
+	return NULL;
+}
 
 void dag_node_submit(struct dag *d, struct dag_node *n)
 {
@@ -1718,10 +1807,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	int no_symlinks = (clean_mode || syntax_check || display_mode);
-	struct dag *d = dag_create(dagfile, no_symlinks);
-	if(!d) {
-		fprintf(stderr, "makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
+	struct dag *d = dag_create();
+	if(!d || !dag_parse(d, dagfile, clean_mode || syntax_check || display_mode)) {
+		fprintf(stderr, "makeflow: couldn't parse %s\n", dagfile);
 		free(logfilename);
 		free(batchlogfilename);
 		return 1;
