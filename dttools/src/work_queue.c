@@ -731,6 +731,7 @@ static int handle_worker(struct work_queue *q, struct link *l)
 			if(workers_connected > jobs_not_completed) {
 				debug(D_WQ, "Jobs waiting + running: %d; Workers connected now: %d", jobs_not_completed, workers_connected);
 				if(q->workers_in_state[WORKER_STATE_READY] >= list_size(q->ready_list)) {
+					debug(D_NOTICE, "The number of remaining tasks is less than the number of ready workers.");
 					goto reject;
 				}
 			}
@@ -739,12 +740,12 @@ static int handle_worker(struct work_queue *q, struct link *l)
 				// For backward compatibility, we scan the line AGAIN to see if it contains extra fields
 				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"", project_names) == 1) {
 					if(!match_project_names(q, project_names)) {
-						debug(D_WQ, "Preferred masters of %s (%s): %s", w->hostname, w->addrport, project_names);
+						debug(D_NOTICE, "Preferred masters of %s (%s): %s", w->hostname, w->addrport, project_names);
 						goto reject;
 					}
 				} else {
 					// No extra fields, so this is a shared worker
-					debug(D_WQ, "%s (%s) is a shared worker. But the master does not allow shared workers.", w->hostname, w->addrport);
+					debug(D_NOTICE, "%s (%s) is a shared worker. But the master does not allow shared workers.", w->hostname, w->addrport);
 					goto reject;
 				}
 			}
@@ -1629,7 +1630,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 		change_worker_state(q, w, WORKER_STATE_BUSY);
 		return 1;
 	} else {
-		debug(D_WQ, "%s (%s) removed because couldn't send task.", w->hostname, w->addrport);
+		debug(D_NOTICE, "%s (%s) removed because couldn't send task.", w->hostname, w->addrport);
 		remove_worker(q, w);	// puts w->current_task back into q->ready_list
 		return 0;
 	}
