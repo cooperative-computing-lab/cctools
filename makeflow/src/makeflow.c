@@ -118,16 +118,22 @@ struct dag_node {
 	struct hash_table *variables;
 };
 
+struct dag_pair {
+	struct dag *dag;
+	struct dag_node *node;
+};
+
 int dag_width(struct dag *d);
 void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info);
-char *dag_readline(struct dag *d);
+char *dag_readline(struct dag *d, struct dag_node *n);
 int dag_check_dependencies(struct dag *d);
 int dag_parse_variable(struct dag *d, char *line);
 int dag_parse_node(struct dag *d, char *line, int clean_mode);
 int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, int source, int clean_mode);
-int dag_parse_node_options(struct dag *d, struct dag_node *n, char *line);
+int dag_parse_node_variable(struct dag *d, struct dag_node *n, char *line);
 int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line);
-char *dag_lookup_callback(const char *name, void *arg);
+char *dag_lookup(const char *name, void *arg);
+char *dag_lookup_pair(const char *name, void *arg);
 
 
 int dag_estimate_nodes_needed(struct dag *d, int actual_max)
@@ -922,7 +928,7 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 	free(d->filename);
 	d->filename = xxstrdup(filename);
 
-	while((line = dag_readline(d)) != NULL) {
+	while((line = dag_readline(d, NULL)) != NULL) {
 		if (strlen(line) == 0)
 			continue;
 
@@ -974,8 +980,9 @@ int dag_check_dependencies(struct dag *d)
 	return 1;
 }
 
-char *dag_readline(struct dag *d)
+char *dag_readline(struct dag *d, struct dag_node *n)
 {
+	struct dag_pair p = {d, n};
 	char *raw_line = get_line(d->dagfile);
 
 	if(raw_line) {
@@ -993,7 +1000,7 @@ char *dag_readline(struct dag *d)
 		}
 
 		char *subst_line = xxstrdup(raw_line);
-		subst_line = string_subst(subst_line, dag_lookup_callback, d);
+		subst_line = string_subst(subst_line, dag_lookup_pair, &p);
 		free(d->linetext);
 		d->linetext = xxstrdup(subst_line);
 		return subst_line;
@@ -1001,7 +1008,6 @@ char *dag_readline(struct dag *d)
 
 	return NULL;
 }
-
 
 int dag_parse_variable(struct dag *d, char *line)
 {
@@ -1044,14 +1050,14 @@ int dag_parse_node(struct dag *d, char *line, int clean_mode)
 	dag_parse_node_filelist(d, n, outputs, 0, clean_mode);
 	dag_parse_node_filelist(d, n, inputs, 1, clean_mode);
 
-	while((line = dag_readline(d)) != NULL) {
-		if(line[0] == '@') {
-			if (!dag_parse_node_options(d, n, line)) {
+	while((line = dag_readline(d, n)) != NULL) {
+		if(line[0] == '@' && strchr(line, '=')) {
+			if(!dag_parse_node_variable(d, n, line)) {
 				dag_parse_error(d, "node options");
 				return 0;
 			}
 		} else {
-			if (dag_parse_node_command(d, n, line)) {
+			if(dag_parse_node_command(d, n, line)) {
 				n->next = d->nodes;
 				d->nodes = n;
 				itable_insert(d->node_table, n->nodeid, n);
@@ -1144,6 +1150,26 @@ failure:
 	return 0;
 }
 
+int dag_parse_node_variable(struct dag *d, struct dag_node *n, char *line)
+{
+	struct dag_pair p = {d, n};
+	char *name  = line + 1;
+	char *value = NULL;
+
+	value  = strchr(line, '=');
+	*value = 0;
+	value  = value + 1;
+
+	name   = string_trim_spaces(name);
+	value  = string_trim_spaces(value);
+	value  = string_trim_quotes(value);
+	value  = string_subst(value, dag_lookup_pair, &p);
+
+	hash_table_insert(n->variables, name, xxstrdup(value));
+	debug(D_DEBUG, "node variable key=%s, value=%s", name, value);
+	return 1;
+}
+
 int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
 {
 	char *command = line;
@@ -1161,34 +1187,32 @@ int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
 	return 1;
 }
 
-int dag_parse_node_options(struct dag *d, struct dag_node *n, char *line)
+char *dag_lookup(const char *name, void *arg)
 {
-	char *name  = line + 1;
-	char *value = name;
-
-	while(!isspace(*value))
-		value++;
-
-	*value = 0;
-	value  = value + 1;
-	value  = string_trim_spaces(value);
-	value  = string_trim_quotes(value);
-	value  = string_subst(value, dag_lookup_callback, d);
-
-	hash_table_insert(n->variables, name, xxstrdup(value));
-	debug(D_DEBUG, "node variable key=%s, value=%s", name, value);
-	return 1;
+	struct dag_pair p = {(struct dag *)arg, NULL};
+	return dag_lookup_pair(name, &p);
 }
 
-char *dag_lookup_callback(const char *name, void *arg)
+char *dag_lookup_pair(const char *name, void *arg)
 {
-	struct dag *d = (struct dag *)arg;
+	struct dag_pair *p = (struct dag_pair *)arg;
 	const char *value;
 
-	value = (const char *)hash_table_lookup(d->variables, name);
-	if(value)
-		return xxstrdup(value);
+	/* Try node variables table */
+	if (p->node) {
+		value = (const char *)hash_table_lookup(p->node->variables, name);
+		if(value)
+			return xxstrdup(value);
+	}
+	
+	/* Try dag variables table */
+	if (p->dag) {
+		value = (const char *)hash_table_lookup(p->dag->variables, name);
+		if(value)
+			return xxstrdup(value);
+	}
 
+	/* Try environment */
 	value = getenv(name);
 	if(value)
 		return xxstrdup(value);
@@ -1249,7 +1273,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	char *old_batch_submit_options = NULL;
 
 	if(batch_submit_options == NULL) {
-		batch_submit_options = dag_lookup_callback("BATCH_OPTIONS", d);
+		batch_submit_options = dag_lookup("BATCH_OPTIONS", d);
 	}
 
 	if(batch_submit_options) {
