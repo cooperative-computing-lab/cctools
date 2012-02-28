@@ -127,7 +127,7 @@ int dag_width(struct dag *d);
 void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info);
 char *dag_readline(struct dag *d, struct dag_node *n);
 int dag_check_dependencies(struct dag *d);
-int dag_parse_variable(struct dag *d, char *line);
+int dag_parse_variable(struct dag *d, char *line, struct hash_table *t);
 int dag_parse_node(struct dag *d, char *line, int clean_mode);
 int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, int source, int clean_mode);
 int dag_parse_node_variable(struct dag *d, struct dag_node *n, char *line);
@@ -935,7 +935,7 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 		if(line[0] == '#') {
 			continue;
 		} else if(strchr(line, '=')) {
-			if(!dag_parse_variable(d, line)) {
+			if(!dag_parse_variable(d, line, d->variables)) {
 				dag_parse_error(d, "variable");
 				goto failure;
 			}
@@ -1009,7 +1009,7 @@ char *dag_readline(struct dag *d, struct dag_node *n)
 	return NULL;
 }
 
-int dag_parse_variable(struct dag *d, char *line)
+int dag_parse_variable(struct dag *d, char *line, struct hash_table *t)
 {
 	char *name  = line;
 	char *value = NULL;
@@ -1028,7 +1028,7 @@ int dag_parse_variable(struct dag *d, char *line)
 	}
 
 	debug(D_DEBUG, "variable name=%s, value=%s", name, value);
-	hash_table_insert(d->variables, name, xxstrdup(value));
+	hash_table_insert(t, name, xxstrdup(value));
 	return 1;
 }
 
@@ -1052,7 +1052,7 @@ int dag_parse_node(struct dag *d, char *line, int clean_mode)
 
 	while((line = dag_readline(d, n)) != NULL) {
 		if(line[0] == '@' && strchr(line, '=')) {
-			if(!dag_parse_node_variable(d, n, line)) {
+			if(!dag_parse_variable(d, line, n->variables)) {
 				dag_parse_error(d, "node options");
 				return 0;
 			}
@@ -1148,26 +1148,6 @@ int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, i
 failure:
 	free(argv);
 	return 0;
-}
-
-int dag_parse_node_variable(struct dag *d, struct dag_node *n, char *line)
-{
-	struct dag_pair p = {d, n};
-	char *name  = line + 1;
-	char *value = NULL;
-
-	value  = strchr(line, '=');
-	*value = 0;
-	value  = value + 1;
-
-	name   = string_trim_spaces(name);
-	value  = string_trim_spaces(value);
-	value  = string_trim_quotes(value);
-	value  = string_subst(value, dag_lookup_pair, &p);
-
-	hash_table_insert(n->variables, name, xxstrdup(value));
-	debug(D_DEBUG, "node variable key=%s, value=%s", name, value);
-	return 1;
 }
 
 int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
