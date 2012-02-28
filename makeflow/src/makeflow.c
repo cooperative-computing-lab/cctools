@@ -130,7 +130,6 @@ int dag_check_dependencies(struct dag *d);
 int dag_parse_variable(struct dag *d, char *line, struct hash_table *t);
 int dag_parse_node(struct dag *d, char *line, int clean_mode);
 int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, int source, int clean_mode);
-int dag_parse_node_variable(struct dag *d, struct dag_node *n, char *line);
 int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line);
 char *dag_lookup(const char *name, void *arg);
 char *dag_lookup_pair(const char *name, void *arg);
@@ -1053,7 +1052,7 @@ int dag_parse_node(struct dag *d, char *line, int clean_mode)
 	while((line = dag_readline(d, n)) != NULL) {
 		if(line[0] == '@' && strchr(line, '=')) {
 			if(!dag_parse_variable(d, line, n->variables)) {
-				dag_parse_error(d, "node options");
+				dag_parse_error(d, "node variable");
 				return 0;
 			}
 		} else {
