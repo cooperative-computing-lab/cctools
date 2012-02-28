@@ -58,6 +58,9 @@ static int active_timeout = 3600;
 // Flag gets set on receipt of a terminal signal.
 static int abort_flag = 0;
 
+//Threshold for available disk space (MB) beyond which clean up and restart.
+static UINT64_T disk_avail_threshold = 100;
+
 // Catalog mode control variables
 static int auto_worker = 0;
 static int exclusive_worker = 1;
@@ -505,7 +508,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
 	fprintf(stdout, " -v             Show version string\n");
 	fprintf(stdout, " -w <size>      Set TCP window size.\n");
-	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB) before aborting. By default no checks on available space are performed.\n");
+	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB) before aborting. (default=%lluMB)\n", disk_avail_threshold);
 	fprintf(stdout, " -h             Show this help screen\n");
 }
 
@@ -518,7 +521,6 @@ int main(int argc, char *argv[])
 	struct link *master = 0;
 	char addr[LINK_ADDRESS_MAX];
 	UINT64_T disk_avail, disk_total;
-	UINT64_T avail_space_threshold = 0;
 	char c;
 	int w;
 	char deletecmd[WORK_QUEUE_LINE_MAX];
@@ -573,7 +575,7 @@ int main(int argc, char *argv[])
 			link_window_set(w, w);
 			break;
 		case 'z':
-			avail_space_threshold = string_metric_parse(optarg) * 1024 * 1024;
+			disk_avail_threshold = string_metric_parse(optarg);
 			break;
 		case 'h':
 		default:
@@ -623,11 +625,12 @@ int main(int argc, char *argv[])
 	mkdir(tempdir, 0700);
 	chdir(tempdir);
 
+	disk_avail_threshold *= 1024 * 1024; //convert MB to Bytes.
 	// Check available disk space
-	if(avail_space_threshold > 0) {
+	if(disk_avail_threshold > 0) {
 		disk_info_get(".", &disk_avail, &disk_total);
-		if(disk_avail < avail_space_threshold) {
-			fprintf(stderr, "worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
+		if(disk_avail < disk_avail_threshold) {
+			fprintf(stderr, "worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, disk_avail_threshold);
 			goto abort;
 		}
 	}
@@ -768,10 +771,10 @@ int main(int argc, char *argv[])
 				}
 				symlink(path, filename);
 			} else if(sscanf(line, "put %s %lld %o", filename, &length, &mode) == 3) {
-				if(avail_space_threshold > 0) {
+				if(disk_avail_threshold > 0) {
 					disk_info_get(".", &disk_avail, &disk_total);
-					if(disk_avail < avail_space_threshold) {
-						debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
+					if(disk_avail < disk_avail_threshold) {
+						debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, disk_avail_threshold);
 						goto recover;
 					}
 				}
