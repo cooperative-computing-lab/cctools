@@ -508,7 +508,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
 	fprintf(stdout, " -v             Show version string\n");
 	fprintf(stdout, " -w <size>      Set TCP window size.\n");
-	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB) before aborting. (default=%lluMB)\n", disk_avail_threshold);
+	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%lluMB)\n", disk_avail_threshold);
 	fprintf(stdout, " -h             Show this help screen\n");
 }
 
