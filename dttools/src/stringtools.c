@@ -973,4 +973,9 @@ char *string_trim_quotes(char *s)
 	return front;
 }
 
+int string_istrue(char *s)
+{
+	return (strcasecmp(s, "true") == 0) || (strcasecmp(s, "yes") == 0) || (atoi(s) > 0);
+}
+
 /* vim: set sts=8 sw=8 ts=8 ft=c: */

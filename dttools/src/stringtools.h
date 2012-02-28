@@ -65,6 +65,7 @@ char *string_getcwd (void);
 char *string_trim(char *s, int(func)(int));
 char *string_trim_spaces(char *s);
 char *string_trim_quotes(char *s);
+int string_istrue(char *s);
 
 #ifndef CCTOOLS_OPSYS_LINUX
 char *strsep(char **stringp, const char *delim);
