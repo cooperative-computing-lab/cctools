@@ -1265,16 +1265,12 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		strcat(output_files, ",");
 	}
 
-	/* Before setting the batch job options (stored in the node's
-	 * "BATCH_OPTIONS" variable or in the "BATCH_OPTIONS" environment
+	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
 	 * restore it after we submit. */
-	char *batch_submit_options = hash_table_lookup(n->variables, "BATCH_OPTIONS");
+	struct dag_pair p = {d, n};
+	char *batch_submit_options = dag_lookup_pair("BATCH_OPTIONS", &p);
 	char *old_batch_submit_options = NULL;
-
-	if(batch_submit_options == NULL) {
-		batch_submit_options = dag_lookup("BATCH_OPTIONS", d);
-	}
 
 	if(batch_submit_options) {
 		old_batch_submit_options = batch_queue_options(thequeue);
