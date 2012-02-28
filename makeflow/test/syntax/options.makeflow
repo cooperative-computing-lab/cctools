@@ -9,3 +9,11 @@ uname.ccl:
 uname.gh:
 	@BATCH_OPTIONS=requirements = MachineGroup == "gh"
 	uname -a > uname.gh
+
+uname.local.0:
+	@BATCH_LOCAL=TRUE
+	uname -a > uname.local.0
+
+uname.local.1:
+	@BATCH_LOCAL=FALSE
+	uname -a > uname.local.1

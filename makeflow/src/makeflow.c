@@ -127,7 +127,7 @@ int dag_width(struct dag *d);
 void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info);
 char *dag_readline(struct dag *d, struct dag_node *n);
 int dag_check_dependencies(struct dag *d);
-int dag_parse_variable(struct dag *d, char *line, struct hash_table *t);
+int dag_parse_variable(struct dag *d, char *line, size_t prefix, struct hash_table *t);
 int dag_parse_node(struct dag *d, char *line, int clean_mode);
 int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, int source, int clean_mode);
 int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line);
@@ -934,7 +934,7 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 		if(line[0] == '#') {
 			continue;
 		} else if(strchr(line, '=')) {
-			if(!dag_parse_variable(d, line, d->variables)) {
+			if(!dag_parse_variable(d, line, 0, d->variables)) {
 				dag_parse_error(d, "variable");
 				goto failure;
 			}
@@ -1008,9 +1008,9 @@ char *dag_readline(struct dag *d, struct dag_node *n)
 	return NULL;
 }
 
-int dag_parse_variable(struct dag *d, char *line, struct hash_table *t)
+int dag_parse_variable(struct dag *d, char *line, size_t prefix, struct hash_table *t)
 {
-	char *name  = line;
+	char *name  = line + prefix;
 	char *value = NULL;
 
 	value  = strchr(line, '=');
@@ -1051,7 +1051,7 @@ int dag_parse_node(struct dag *d, char *line, int clean_mode)
 
 	while((line = dag_readline(d, n)) != NULL) {
 		if(line[0] == '@' && strchr(line, '=')) {
-			if(!dag_parse_variable(d, line, n->variables)) {
+			if(!dag_parse_variable(d, line, 1, n->variables)) {
 				dag_parse_error(d, "node variable");
 				return 0;
 			}
@@ -1153,13 +1153,20 @@ int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
 {
 	char *command = line;
 
-	while (*command && isspace(*command))
+	while(*command && isspace(*command))
 		command++;
 
-	if (strncmp(command, "LOCAL ", 6) == 0) {
+	if(strncmp(command, "LOCAL ", 6) == 0) {
 		n->local_job = 1;
 		command += 6;
 	}
+
+	struct dag_pair p = {d, n};
+	char *local = dag_lookup_pair("BATCH_LOCAL", &p);
+
+	if (local && string_istrue(local))
+		n->local_job = 1;
+
 	n->original_command = xxstrdup(command);
 	n->command = translate_command(d, command, n->local_job);
 	debug(D_DEBUG, "node command=%s", command);
