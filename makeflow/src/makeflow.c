@@ -928,8 +928,10 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 	d->filename = xxstrdup(filename);
 
 	while((line = dag_readline(d, NULL)) != NULL) {
-		if (strlen(line) == 0)
+		if (strlen(line) == 0) {
+			free(line);
 			continue;
+		}
 
 		if(line[0] == '#') {
 			continue;
@@ -951,10 +953,12 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 		free(line);
 	}
 
+	free(line);
 	fclose(d->dagfile);
 	return dag_check_dependencies(d);
 
 failure:
+	free(line);
 	if(d->dagfile) fclose(d->dagfile);
 	return 0;
 }
@@ -1029,7 +1033,7 @@ int dag_parse_variable(struct dag *d, struct dag_node *n, char *line)
 	name  = string_trim_spaces(name);
 	value = string_trim_spaces(value);
 	value = string_trim_quotes(value);
-	
+
 	if(strlen(name) == 0) {
 		dag_parse_error(d, "variable name");
 		return 0;
@@ -1051,6 +1055,7 @@ int dag_parse_variable(struct dag *d, struct dag_node *n, char *line)
 			new_value = calloc(strlen(old_value) + strlen(value) + 2, sizeof(char));
 			new_value = strcpy(new_value, old_value);
 			new_value = strcat(new_value, " ");
+			free(old_value);
 			value = strcat(new_value, value);
 		}
 	} else {
@@ -1084,6 +1089,7 @@ int dag_parse_node(struct dag *d, char *line, int clean_mode)
 		if(line[0] == '@' && strchr(line, '=')) {
 			if(!dag_parse_variable(d, n, line)) {
 				dag_parse_error(d, "node variable");
+				free(line);
 				return 0;
 			}
 		} else {
@@ -1091,14 +1097,18 @@ int dag_parse_node(struct dag *d, char *line, int clean_mode)
 				n->next = d->nodes;
 				d->nodes = n;
 				itable_insert(d->node_table, n->nodeid, n);
+				free(line);
 				return 1;
 			} else {
 				dag_parse_error(d, "node command");
+				free(line);
 				return 0;
 			}
 		}
+		free(line);
 	}
 
+	free(line);
 	return 1;
 }
 
@@ -1195,8 +1205,11 @@ int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
 	struct dag_pair p = {d, n};
 	char *local = dag_lookup_pair("BATCH_LOCAL", &p);
 
-	if (local && string_istrue(local))
-		n->local_job = 1;
+	if (local) {
+		if(string_istrue(local))
+			n->local_job = 1;
+		free(local);
+	}
 
 	n->original_command = xxstrdup(command);
 	n->command = translate_command(d, command, n->local_job);
@@ -1221,7 +1234,7 @@ char *dag_lookup_pair(const char *name, void *arg)
 		if(value)
 			return xxstrdup(value);
 	}
-	
+
 	/* Try dag variables table */
 	if (p->dag) {
 		value = (const char *)hash_table_lookup(p->dag->variables, name);
@@ -1292,6 +1305,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	if(batch_submit_options) {
 		old_batch_submit_options = batch_queue_options(thequeue);
 		batch_queue_set_options(thequeue, batch_submit_options);
+		free(batch_submit_options);
 	}
 
 	time_t stoptime = time(0) + dag_submit_timeout;
