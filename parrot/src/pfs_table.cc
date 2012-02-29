@@ -304,15 +304,25 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 	pfs_file *file=0;
 	int force_stream = pfs_force_stream;
 
-        /* Yes, this is a hack, but it is quite a valuable one. */
-        /* No need to make local copies if we are pushing files around. */
+	// Hack: Disable caching when doing plain old file copies.
+
         if(
                 !strcmp(pfs_current->name,"cp") ||
                 !strcmp(string_back(pfs_current->name,3),"/cp")
         ) {
                 force_stream = 1;
         }
-                                                                                                  
+
+	// Hack: Almost all calls to open a directory are routed
+	// through opendir(), which sets O_DIRECTORY.  In a few
+	// cases, such as the use of openat in pwd, the flag
+	// is not set, set we detect it here.
+
+	const char *basename = string_basename(lname);
+	if(!strcmp(basename,".") || !strcmp(basename,"..")) {
+		flags |= O_DIRECTORY;
+	}
+
 	if(resolve_name(lname,&pname)) {
 		if(flags&O_DIRECTORY) {
 			file = pname.service->getdir(&pname);

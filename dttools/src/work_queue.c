@@ -221,7 +221,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 {
 	struct work_queue_task *t = malloc(sizeof(*t));
 	memset(t, 0, sizeof(*t));
-	t->command_line = strdup(command_line);
+	t->command_line = xxstrdup(command_line);
 	t->tag = NULL;
 	t->worker_selection_algorithm = WORK_QUEUE_SCHEDULE_UNSET;
 	t->output = NULL;
@@ -461,7 +461,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					debug(D_WQ, "Cannot create directory - %s (%s)", tmp_local_name, strerror(errno));
 					goto failure;
 				}
-				hash_table_insert(received_items, tmp_local_name, strdup(tmp_local_name));
+				hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
 			} else if(strncmp(type, "file", 4) == 0) {
 				// actually place the file
 				if(length >= 0) {
@@ -501,7 +501,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					}
 					*total_bytes += length;
 
-					hash_table_insert(received_items, tmp_local_name, strdup(tmp_local_name));
+					hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
 				} else {
 					debug(D_NOTICE, "%s on %s (%s) has invalid length: %lld", remote_name, w->addrport, w->hostname, length);
 					goto failure;
@@ -732,6 +732,7 @@ static int handle_worker(struct work_queue *q, struct link *l)
 			if(workers_connected > jobs_not_completed) {
 				debug(D_WQ, "Jobs waiting + running: %d; Workers connected now: %d", jobs_not_completed, workers_connected);
 				if(q->workers_in_state[WORKER_STATE_READY] >= list_size(q->ready_list)) {
+					debug(D_NOTICE, "The number of remaining tasks is less than the number of ready workers.");
 					goto reject;
 				}
 			}
@@ -740,12 +741,12 @@ static int handle_worker(struct work_queue *q, struct link *l)
 				// For backward compatibility, we scan the line AGAIN to see if it contains extra fields
 				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"", project_names) == 1) {
 					if(!match_project_names(q, project_names)) {
-						debug(D_WQ, "Preferred masters of %s (%s): %s", w->hostname, w->addrport, project_names);
+						debug(D_NOTICE, "Preferred masters of %s (%s): %s", w->hostname, w->addrport, project_names);
 						goto reject;
 					}
 				} else {
 					// No extra fields, so this is a shared worker
-					debug(D_WQ, "%s (%s) is a shared worker. But the master does not allow shared workers.", w->hostname, w->addrport);
+					debug(D_NOTICE, "%s (%s) is a shared worker. But the master does not allow shared workers.", w->hostname, w->addrport);
 					goto reject;
 				}
 			}
@@ -891,7 +892,7 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 	// Change worker state and do some performance statistics
 	change_worker_state(q, w, WORKER_STATE_READY);
 
-	t->host = strdup(w->addrport);
+	t->host = xxstrdup(w->addrport);
 	task_time = t->total_transfer_time + t->cmd_execution_time;
 
 	q->total_tasks_complete++;
@@ -972,11 +973,11 @@ static int put_directory(const char *dirname, const char *remote_name, struct wo
 		*buffer = '\0';
 		len = sprintf(buffer, "%s/%s", dirname, filename);
 		tf.length = len;
-		tf.payload = strdup(buffer);
+		tf.payload = xxstrdup(buffer);
 
 		*buffer = '\0';
 		len = sprintf(buffer, "%s/%s", remote_name, filename);
-		tf.remote_name = strdup(buffer);
+		tf.remote_name = xxstrdup(buffer);
 
 		if(!put_file(&tf, NULL, q, w, total_bytes)) {
 			closedir(dir);
@@ -1630,7 +1631,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 		change_worker_state(q, w, WORKER_STATE_BUSY);
 		return 1;
 	} else {
-		debug(D_WQ, "%s (%s) removed because couldn't send task.", w->hostname, w->addrport);
+		debug(D_NOTICE, "%s (%s) removed because couldn't send task.", w->hostname, w->addrport);
 		remove_worker(q, w);	// puts w->current_task back into q->ready_list
 		return 0;
 	}
@@ -1970,7 +1971,7 @@ int work_queue_specify_name(struct work_queue *q, const char *name)
 	if(q && name) {
 		if(q->name)
 			free(q->name);
-		q->name = strdup(name);
+		q->name = xxstrdup(name);
 		setenv("WORK_QUEUE_NAME", q->name, 1);
 	}
 	return 0;
@@ -2449,8 +2450,8 @@ void work_queue_task_specify_file(struct work_queue_task *t, const char *local_n
 	tf->type = WORK_QUEUE_FILE;
 	tf->flags = flags;
 	tf->length = strlen(local_name);
-	tf->payload = strdup(local_name);
-	tf->remote_name = strdup(remote_name);
+	tf->payload = xxstrdup(local_name);
+	tf->remote_name = xxstrdup(remote_name);
 
 	if(type == WORK_QUEUE_INPUT) {
 		list_push_tail(t->input_files, tf);
@@ -2467,7 +2468,7 @@ void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data,
 	tf->length = length;
 	tf->payload = malloc(length);
 	memcpy(tf->payload, data, length);
-	tf->remote_name = strdup(remote_name);
+	tf->remote_name = xxstrdup(remote_name);
 	list_push_tail(t->input_files, tf);
 }
 
@@ -2477,8 +2478,8 @@ void work_queue_task_specify_file_command(struct work_queue_task *t, const char 
 	tf->type = WORK_QUEUE_REMOTECMD;
 	tf->flags = flags;
 	tf->length = strlen(cmd);
-	tf->payload = strdup(cmd);
-	tf->remote_name = strdup(remote_name);
+	tf->payload = xxstrdup(cmd);
+	tf->remote_name = xxstrdup(remote_name);
 
 	if(type == WORK_QUEUE_INPUT) {
 		list_push_tail(t->input_files, tf);

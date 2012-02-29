@@ -37,7 +37,7 @@ OPTION_ITEM(-s)Run as a shared worker. By default the worker would only work on 
 OPTION_PAIR(-t, time)Abort after this amount of idle time. (default=900s)
 OPTION_PAIR(-o, file)Send debugging to this file.
 OPTION_PAIR(-w, size)Set TCP window size.
-OPTION_PAIR(-z, size)Set available disk space threshold (in MB) before aborting. By default no checks on available space are done.
+OPTION_PAIR(-z, size)Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
 OPTION_ITEM(-v)Show version string.
 OPTION_ITEM(-h)Show this help message.
 OPTIONS_END
