@@ -17,3 +17,13 @@ uname.local.0:
 uname.local.1:
 	@BATCH_LOCAL=FALSE
 	uname -a > uname.local.1
+
+COMMAND0="uname"
+uname.append.0:
+	@COMMAND0+=-a
+	$COMMAND0 > uname.append.0
+
+COMMAND1+="uname"
+uname.append.1:
+	@COMMAND1+=-a
+	$COMMAND1 > uname.append.1
