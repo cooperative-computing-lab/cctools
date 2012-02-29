@@ -643,6 +643,7 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 				remote_info = malloc(sizeof(*remote_info));
 				memcpy(remote_info, &local_info, sizeof(local_info));
 				hash_table_insert(w->current_files, hash_name, remote_info);
+				free(hash_name);
 			}
 
 		}
