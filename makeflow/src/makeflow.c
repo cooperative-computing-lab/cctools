@@ -1278,7 +1278,7 @@ char *dag_lookup_set(const char *name, void *arg)
 	const char *value;
 
 	/* Try node variables table */
-	if (s->node) {
+	if(s->node) {
 		value = (const char *)hash_table_lookup(s->node->variables, name);
 		if(value) {
 			s->table = s->node->variables;
@@ -1287,7 +1287,7 @@ char *dag_lookup_set(const char *name, void *arg)
 	}
 
 	/* Try dag variables table */
-	if (s->dag) {
+	if(s->dag) {
 		value = (const char *)hash_table_lookup(s->dag->variables, name);
 		if(value) {
 			s->table = s->dag->variables;
@@ -1297,8 +1297,9 @@ char *dag_lookup_set(const char *name, void *arg)
 
 	/* Try environment */
 	value = getenv(name);
-	if(value)
+	if(value) {
 		return xxstrdup(value);
+	}
 
 	return NULL;
 }
