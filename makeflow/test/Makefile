@@ -8,7 +8,7 @@ all:
 test-makeflow:
 	@echo running makeflow tests
 	@${CCTOOLS_HOME}/dttools/src/test_runner.sh TR_makeflow*.sh
-	@if [ x$$CCTOOLS_TEST_ND != x0 ]; then ${CCTOOLS_HOME}/dttools/src/test_runner.sh ND_*.sh; fi
+	@if [ x$$CCTOOLS_TEST_ND = x1 ]; then ${CCTOOLS_HOME}/dttools/src/test_runner.sh ND_*.sh; fi
 
 test-starch:
 	@echo running starch tests
