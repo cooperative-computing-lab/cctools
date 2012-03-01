@@ -1020,6 +1020,13 @@ char *dag_readline(struct dag *d, struct dag_node *n)
 			debug(D_DEBUG, "read line %d\n", d->linenum);
 		}
 
+		/* Chop off comments
+		 * TODO: this will break if we use # in a string. */
+		char *hash = strrchr(raw_line, '#');
+		if (hash) {
+			*hash = 0;
+		}
+
 		string_chomp(raw_line);
 		while(isspace(*raw_line)) {
 			raw_line++;
