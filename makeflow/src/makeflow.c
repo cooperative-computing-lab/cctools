@@ -78,6 +78,7 @@ struct dag {
 	struct hash_table *filename_translation_rev;
 	struct hash_table *filename_translation_fwd;
 	struct hash_table *variables;
+	struct hash_table *collect_table;
 	FILE *logfile;
 	FILE *dagfile;
 	char *linetext;
@@ -118,9 +119,10 @@ struct dag_node {
 	struct hash_table *variables;
 };
 
-struct dag_pair {
+struct dag_lookup_set {
 	struct dag *dag;
 	struct dag_node *node;
+	struct hash_table *table;
 };
 
 int dag_width(struct dag *d);
@@ -132,7 +134,7 @@ int dag_parse_node(struct dag *d, char *line, int clean_mode);
 int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, int source, int clean_mode);
 int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line);
 char *dag_lookup(const char *name, void *arg);
-char *dag_lookup_pair(const char *name, void *arg);
+char *dag_lookup_set(const char *name, void *arg);
 
 
 int dag_estimate_nodes_needed(struct dag *d, int actual_max)
@@ -891,6 +893,11 @@ struct dag *dag_create()
 	d->nodeid_counter = 0;
 	d->filename_translation_rev = hash_table_create(0, 0);
 	d->filename_translation_fwd = hash_table_create(0, 0);
+	d->collect_table = hash_table_create(0, 0);
+
+	/* Add _MAKEFLOW_COLLECT_LIST to variables table to ensure it is in
+	 * global DAG scope. */
+	hash_table_insert(d->variables, "_MAKEFLOW_COLLECT_LIST", xxstrdup(""));
 
 	memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
 	return d;
@@ -968,6 +975,8 @@ int dag_check_dependencies(struct dag *d)
 	struct dag_node *n, *m;
 	struct dag_file *f;
 
+	/* Walk list of nodes and associate target files with the nodes that
+	 * generate them. */
 	for(n = d->nodes; n; n = n->next) {
 		for(f = n->target_files; f; f = f->next) {
 			m = hash_table_lookup(d->file_table, f->filename);
@@ -979,13 +988,28 @@ int dag_check_dependencies(struct dag *d)
 			}
 		}
 	}
+	
+	/* Parse _MAKEFLOW_COLLECT_LIST and record which target files should be
+	 * garbage collected. */
+	char *collect_list = dag_lookup("_MAKEFLOW_COLLECT_LIST", d);
+	int i, argc;
+	char **argv;
+
+	if(collect_list == NULL)
+		return 1;
+
+	string_split_quotes(collect_list, &argc, &argv);
+	for(i = 0; i < argc; i++) {
+		debug(D_DEBUG, "collect list file=%s", argv[i]);
+		hash_table_insert(d->collect_table, argv[i], (void *)NULL);
+	}
 
 	return 1;
 }
 
 char *dag_readline(struct dag *d, struct dag_node *n)
 {
-	struct dag_pair p = {d, n};
+	struct dag_lookup_set s = {d, n, NULL};
 	char *raw_line = get_line(d->dagfile);
 
 	if(raw_line) {
@@ -1003,7 +1027,7 @@ char *dag_readline(struct dag *d, struct dag_node *n)
 		}
 
 		char *subst_line = xxstrdup(raw_line);
-		subst_line = string_subst(subst_line, dag_lookup_pair, &p);
+		subst_line = string_subst(subst_line, dag_lookup_set, &s);
 		free(d->linetext);
 		d->linetext = xxstrdup(subst_line);
 		return subst_line;
@@ -1039,30 +1063,25 @@ int dag_parse_variable(struct dag *d, struct dag_node *n, char *line)
 		return 0;
 	}
 
-	if(append) {
-		struct dag_pair p = {d, n};
+	struct dag_lookup_set s = {d, n, NULL};
+	char *old_value = (char *)dag_lookup_set(name, &s);
+	if(append && old_value) {
 		char *new_value = NULL;
-		char *old_value = (char *)dag_lookup_pair(name, &p);
-		debug(D_DEBUG, "old_value=%s", old_value);
-		if(old_value == NULL) {
-			value = xxstrdup(value);
+		if(s.table) {
+			free(hash_table_remove(s.table, name));
 		} else {
-			if(n) {
-				free(hash_table_remove(n->variables, name));
-			} else {
-				free(hash_table_remove(d->variables, name));
-			}
-			new_value = calloc(strlen(old_value) + strlen(value) + 2, sizeof(char));
-			new_value = strcpy(new_value, old_value);
-			new_value = strcat(new_value, " ");
-			free(old_value);
-			value = strcat(new_value, value);
+			s.table = d->variables;
 		}
+		new_value = calloc(strlen(old_value) + strlen(value) + 2, sizeof(char));
+		new_value = strcpy(new_value, old_value);
+		new_value = strcat(new_value, " ");
+		free(old_value);
+		value = strcat(new_value, value);
+		hash_table_insert(s.table, name, value);
 	} else {
-		value = xxstrdup(value);
+		hash_table_insert((n ? n->variables : d->variables), name, xxstrdup(value));
 	}
 
-	hash_table_insert((n ? n->variables : d->variables), name, value);
 	debug(D_DEBUG, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
 	return 1;
 }
@@ -1202,8 +1221,8 @@ int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
 		command += 6;
 	}
 
-	struct dag_pair p = {d, n};
-	char *local = dag_lookup_pair("BATCH_LOCAL", &p);
+	struct dag_lookup_set s = {d, n};
+	char *local = dag_lookup_set("BATCH_LOCAL", &s);
 
 	if (local) {
 		if(string_istrue(local))
@@ -1219,34 +1238,38 @@ int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
 
 char *dag_lookup(const char *name, void *arg)
 {
-	struct dag_pair p = {(struct dag *)arg, NULL};
-	return dag_lookup_pair(name, &p);
+	struct dag_lookup_set s = {(struct dag *)arg, NULL, NULL};
+	return dag_lookup_set(name, &s);
 }
 
-char *dag_lookup_pair(const char *name, void *arg)
+char *dag_lookup_set(const char *name, void *arg)
 {
-	struct dag_pair *p = (struct dag_pair *)arg;
+	struct dag_lookup_set *s = (struct dag_lookup_set *)arg;
 	const char *value;
 
 	/* Try node variables table */
-	if (p->node) {
-		value = (const char *)hash_table_lookup(p->node->variables, name);
-		if(value)
+	if (s->node) {
+		value = (const char *)hash_table_lookup(s->node->variables, name);
+		if(value) {
+			s->table = s->node->variables;
 			return xxstrdup(value);
+		}
 	}
 
 	/* Try dag variables table */
-	if (p->dag) {
-		value = (const char *)hash_table_lookup(p->dag->variables, name);
-		if(value)
+	if (s->dag) {
+		value = (const char *)hash_table_lookup(s->dag->variables, name);
+		if(value) {
+			s->table = s->dag->variables;
 			return xxstrdup(value);
+		}
 	}
 
 	/* Try environment */
 	value = getenv(name);
 	if(value)
 		return xxstrdup(value);
-
+	
 	return NULL;
 }
 
@@ -1298,8 +1321,8 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
 	 * restore it after we submit. */
-	struct dag_pair p = {d, n};
-	char *batch_submit_options = dag_lookup_pair("BATCH_OPTIONS", &p);
+	struct dag_lookup_set s = {d, n, NULL};
+	char *batch_submit_options = dag_lookup_set("BATCH_OPTIONS", &s);
 	char *old_batch_submit_options = NULL;
 
 	if(batch_submit_options) {
@@ -1450,11 +1473,9 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 			dag_failed_flag = 1;
 		}
 	} else {
-
 		for(f = n->target_files; f; f = f->next) {
 			hash_table_insert(d->completed_files, f->filename, f->filename);
 		}
-
 		dag_node_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
 }
