@@ -10,13 +10,12 @@ prepare()
     mkdir $test_dir
     cd $test_dir
     ln -s ../../src/makeflow .
-    ln -s ../syntax/variable_scope.makeflow Makeflow
+    ln -s ../syntax/collect.makeflow Makeflow
 cat > ../$test_output <<EOF
-0
-1
-1 2
-0
-1
+7
+5
+6
+5
 EOF
     exit 0
 }
@@ -24,8 +23,8 @@ EOF
 run()
 {
     cd $test_dir
-    if ./makeflow -d all; then
-    	exec diff ../$test_output out.all
+    if ./makeflow -g incr_time -G 1 -d all; then
+    	exec diff ../$test_output _collect.7
     else
     	exit 1
     fi
