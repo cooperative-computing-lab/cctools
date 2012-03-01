@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <signal.h>
 #include <fcntl.h>
+#include <dirent.h>
 #include <unistd.h>
 
 #include "catalog_query.h"
@@ -60,7 +61,7 @@ static int dag_retry_flag = 0;
 static int dag_retry_max = 100;
 
 static dag_gc_method_t dag_gc_method = DAG_GC_NONE;
-static int dag_gc_param = 5;
+static int dag_gc_param = -1;
 
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
@@ -1590,19 +1591,43 @@ void dag_gc_ref_incr(struct dag *d, const char *file, int increment)
 	}
 }
 
+/* TODO: move this to a more appropriate location? */
+int directory_inode_count(const char *dirname)
+{
+	DIR *dir;
+	struct dirent *d;
+	int inode_count = 0;
+
+	dir = opendir(dirname);
+	if(dir == NULL)
+		return INT_MAX;
+
+	while((d = readdir(dir)))
+		inode_count++;
+	closedir(dir);
+
+	return inode_count;
+}
+
 void dag_gc(struct dag *d)
 {
-	switch (dag_gc_method) {
+	char cwd[PATH_MAX];
+
+	switch(dag_gc_method) {
 		case DAG_GC_INCR_FILE:
 			debug(D_DEBUG, "Performing incremental file (%d) garbage collection", dag_gc_param);
 			dag_gc_all(d, DAG_GC_MIN_THRESHOLD, dag_gc_param, UINT_MAX);
 			break;
 		case DAG_GC_INCR_TIME:
-			debug(D_DEBUG, "performing incremental time (%d) garbage collection", dag_gc_param);
+			debug(D_DEBUG, "Performing incremental time (%d) garbage collection", dag_gc_param);
 			dag_gc_all(d, DAG_GC_MIN_THRESHOLD, UINT_MAX, time(0) + dag_gc_param);
 			break;
 		case DAG_GC_ON_DEMAND:
-			//dag_gc_on_demand(d);
+			getcwd(cwd, PATH_MAX);
+			if(directory_inode_count(cwd) >= dag_gc_param) {
+				debug(D_DEBUG, "Performing on demand (%d) garbage collection", dag_gc_param);
+				dag_gc_all(d, DAG_GC_MIN_THRESHOLD, UINT_MAX, UINT_MAX);
+			}
 			break;
 		default:
 			break;
@@ -1799,10 +1824,16 @@ int main(int argc, char *argv[])
 				dag_gc_method = DAG_GC_REF_COUNT;
 			} else if (strcasecmp(optarg, "incr_file") == 0) {
 				dag_gc_method = DAG_GC_INCR_FILE;
+				if (dag_gc_param < 0)
+					dag_gc_param = 16;	/* Try to collect at most 16 files. */
 			} else if (strcasecmp(optarg, "incr_time") == 0) {
 				dag_gc_method = DAG_GC_INCR_TIME;
+				if (dag_gc_param < 0)
+					dag_gc_param = 5;	/* Timeout of 5. */
 			} else if (strcasecmp(optarg, "on_demand") == 0) {
 				dag_gc_method = DAG_GC_ON_DEMAND;
+				if (dag_gc_param < 0)
+					dag_gc_param = 1 << 14; /* Inode threshold of 2^14. */
 			} else {
 				fprintf(stderr, "makeflow: invalid garbage collection method: %s\n", optarg);
 				exit(1);
