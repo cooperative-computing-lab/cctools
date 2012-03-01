@@ -1,0 +1,22 @@
+date.0:
+	@_MAKEFLOW_COLLECT_LIST+=date.0
+	date > date.0
+
+date.1:
+	@_MAKEFLOW_COLLECT_LIST+=date.1
+	date > date.1
+
+date.2:
+	@_MAKEFLOW_COLLECT_LIST+=date.2
+	date > date.2
+
+date.all.0: date.0 date.1 date.2
+	cat date.0 date.1 date.2 > date.all.0
+
+date.all.1: date.all.0
+	@_MAKEFLOW_COLLECT_LIST+=date.all.0
+	cat date.all.0 > date.all.1
+
+date.all.2: date.all.0 date.all.1
+	@_MAKEFLOW_COLLECT_LIST+=date.all.0 date.all.1
+	cat date.all.0 date.all.1 > date.all.2
