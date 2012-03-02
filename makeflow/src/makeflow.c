@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "catalog_server.h"
 #include "work_queue_catalog.h"
 #include "datagram.h"
+#include "disk_info.h"
 #include "domain_name_cache.h"
 #include "link.h"
 #include "macros.h"
@@ -44,7 +45,8 @@ See the file COPYING for details.
 #define MAKEFLOW_AUTO_WIDTH 1
 #define MAKEFLOW_AUTO_GROUP 2
 
-#define DAG_GC_MIN_THRESHOLD 1
+#define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
+#define MAKEFLOW_GC_MIN_THRESHOLD 1
 
 typedef enum {
 	DAG_GC_NONE,
@@ -1016,7 +1018,7 @@ int dag_check_dependencies(struct dag *d)
 	string_split_quotes(collect_list, &argc, &argv);
 	for(i = 0; i < argc; i++) {
 		/* Must initialize to non-zero for hash_table functions to work properly. */
-		hash_table_insert(d->collect_table, argv[i], (void *)DAG_GC_MIN_THRESHOLD);
+		hash_table_insert(d->collect_table, argv[i], (void *)MAKEFLOW_GC_MIN_THRESHOLD);
 		debug(D_DEBUG, "Added %s to garbage collection list", argv[i]);
 	}
 	free(argv);
@@ -1587,7 +1589,7 @@ void dag_gc_ref_incr(struct dag *d, const char *file, int increment)
 
 		/* Perform collection immediately if we are using reference
 		 * counting. */
-		if (ref_count <= DAG_GC_MIN_THRESHOLD && dag_gc_method == DAG_GC_REF_COUNT)
+		if (ref_count <= MAKEFLOW_GC_MIN_THRESHOLD && dag_gc_method == DAG_GC_REF_COUNT)
 			dag_gc_file(d, file, ref_count);
 	}
 }
@@ -1610,6 +1612,16 @@ int directory_inode_count(const char *dirname)
 	return inode_count;
 }
 
+int directory_low_disk(const char *path)
+{
+	UINT64_T avail, total;
+
+	if(disk_info_get(path, &avail, &total) >= 0)
+		return avail <= MAKEFLOW_MIN_SPACE;
+
+	return 0;
+}
+
 void dag_gc(struct dag *d)
 {
 	char cwd[PATH_MAX];
@@ -1617,17 +1629,17 @@ void dag_gc(struct dag *d)
 	switch(dag_gc_method) {
 		case DAG_GC_INCR_FILE:
 			debug(D_DEBUG, "Performing incremental file (%d) garbage collection", dag_gc_param);
-			dag_gc_all(d, DAG_GC_MIN_THRESHOLD, dag_gc_param, UINT_MAX);
+			dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, dag_gc_param, UINT_MAX);
 			break;
 		case DAG_GC_INCR_TIME:
 			debug(D_DEBUG, "Performing incremental time (%d) garbage collection", dag_gc_param);
-			dag_gc_all(d, DAG_GC_MIN_THRESHOLD, UINT_MAX, time(0) + dag_gc_param);
+			dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, UINT_MAX, time(0) + dag_gc_param);
 			break;
 		case DAG_GC_ON_DEMAND:
 			getcwd(cwd, PATH_MAX);
-			if(directory_inode_count(cwd) >= dag_gc_param) {
+			if(directory_inode_count(cwd) >= dag_gc_param || directory_low_disk(cwd)) {
 				debug(D_DEBUG, "Performing on demand (%d) garbage collection", dag_gc_param);
-				dag_gc_all(d, DAG_GC_MIN_THRESHOLD, UINT_MAX, UINT_MAX);
+				dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, UINT_MAX, UINT_MAX);
 			}
 			break;
 		default:
