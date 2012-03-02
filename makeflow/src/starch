@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 # Copyright (c) 2010- The University of Notre Dame.
 # This software is distributed under the GNU General Public License.
@@ -19,48 +19,48 @@ from ConfigParser import ConfigParser, NoSectionError, NoOptionError
 import os
 import sys
 
-# Todo -------------------------------------------------------------------------
+# Todo
 
 """
 1. Keep track of files added to avoid duplication (efficiency).
 """
 
-# Global variables -------------------------------------------------------------
+# Global variables
 
 STARCH_AUTODETECT = True
 STARCH_VERBOSE    = False
 STARCH_PLATFORM   = 'Linux'
 
-# Shell scripts ----------------------------------------------------------------
+# Shell scripts
 
 SFX_SH='''#!/bin/sh
 
 SFX_FILE=$0
 SFX_EXIT_STATUS=0
 
-if [ -z $SFX_DIR ]; then
-    basename=$(basename $SFX_FILE)
-    SFX_DIR=$(hostname).$USER.$basename.dir
+if [ -z "$SFX_DIR" ]; then
+    basename=`basename $SFX_FILE`
+    SFX_DIR=`hostname`.$USER.$basename.dir
 
-    if [ ! -z $CONDOR_SCRATCH_DIR ]; then
+    if [ ! -z "$CONDOR_SCRATCH_DIR" ]; then
         SFX_DIR=$CONDOR_SCRATCH_DIR/$SFX_DIR
-    elif [ ! -z $_CONDOR_SCRATCH_DIR ]; then
+    elif [ ! -z "$_CONDOR_SCRATCH_DIR" ]; then
         SFX_DIR=$_CONDOR_SCRATCH_DIR/$SFX_DIR
-    elif [ ! -z $XGRID_AGENT_NAME ]; then
-        SFX_DIR=$(pwd)/$SFX_DIR
+    elif [ ! -z "$XGRID_AGENT_NAME" ]; then
+        SFX_DIR=`pwd`/$SFX_DIR
     else
         SFX_DIR=/tmp/$SFX_DIR
     fi
 
-    if [ ! -z $SFX_UNIQUE ] && [ $SFX_UNIQUE = 1 ]; then
-        SFX_DIR=$(mktemp -d -u $SFX_DIR.XXXXXX)
+    if [ ! -z "$SFX_UNIQUE" ] && [ "$SFX_UNIQUE" = 1 ]; then
+        SFX_DIR=`mktemp -d -u $SFX_DIR.XXXXXX`
     fi
 fi
 
 extract() {
-    if [ ! -d $SFX_DIR -o $SFX_EXTRACT_FORCE -eq 1 ]; then
+    if [ ! -d "$SFX_DIR" -o "$SFX_EXTRACT_FORCE" -eq 1 ]; then
         mkdir -p $SFX_DIR 2> /dev/null
-        archive=$(awk '/^__ARCHIVE__/ {print NR + 1; exit 0; }' $SFX_FILE)
+        archive=`awk '/^__ARCHIVE__/ {print NR + 1; exit 0; }' $SFX_FILE)`
         tail -n+$archive $SFX_FILE | tar xj -C $SFX_DIR
         SFX_EXIT_STATUS=$?
     fi
@@ -71,19 +71,19 @@ run() {
     SFX_EXIT_STATUS=$?
 }
 
-if [ -z $SFX_EXTRACT_ONLY ]; then
+if [ -z "$SFX_EXTRACT_ONLY" ]; then
     SFX_EXTRACT_ONLY=0
 fi
 
-if [ -z $SFX_EXTRACT_FORCE ]; then
+if [ -z "$SFX_EXTRACT_FORCE" ]; then
     SFX_EXTRACT_FORCE=0
 fi
 
-if [ -z $SFX_KEEP ]; then
+if [ -z "$SFX_KEEP" ]; then
     SFX_KEEP=0
 fi
 
-if [ $SFX_EXTRACT_ONLY -eq 1 ]; then
+if [ "$SFX_EXTRACT_ONLY" -eq 1 ]; then
     extract
     echo $SFX_DIR
     SFX_KEEP=1
@@ -91,7 +91,7 @@ else
     extract && run $@
 fi
 
-if [ $SFX_KEEP -ne 1 ]; then
+if [ "$SFX_KEEP" -ne 1 ]; then
     rm -fr $SFX_DIR
 fi
 
@@ -101,27 +101,27 @@ __ARCHIVE__
 '''
 
 RUN_SH = '''#!/bin/sh
-SFX_DIR=$(dirname $0)
+SFX_DIR=`dirname $0`
 
-if [ -d $SFX_DIR/env ]; then
+if [ -d "$SFX_DIR/env" ]; then
     for f in $SFX_DIR/env/*; do
         . $f
     done
 fi
 
-if [ -d $SFX_DIR/bin ]; then
+if [ -d "$SFX_DIR/bin" ]; then
     export PATH=$SFX_DIR/bin:$PATH
 fi
 
-if [ -d $SFX_DIR/lib ]; then
-    if [ "$(uname -s)" == "Darwin" ]; then
-        if [ -z $DYLD_LIBRARY_PATH ]; then
+if [ -d "$SFX_DIR/lib" ]; then
+    if [ x"`uname -s`" == x"Darwin" ]; then
+        if [ -z "$DYLD_LIBRARY_PATH" ]; then
             export DYLD_LIBRARY_PATH=$SFX_DIR/lib
         else
             export DYLD_LIBRARY_PATH=$SFX_DIR/lib:$DYLD_LIBRARY_PATH
         fi
     else
-        if [ -z $LD_LIBRARY_PATH ]; then
+        if [ -z "$LD_LIBRARY_PATH" ]; then
             export LD_LIBRARY_PATH=$SFX_DIR/lib
         else
             export LD_LIBRARY_PATH=$SFX_DIR/lib:$LD_LIBRARY_PATH
@@ -131,7 +131,7 @@ fi
 %s
 '''
 
-# Create SFX --------------------------------------------------------------------
+# Create SFX
 
 def create_sfx(sfx_path, executables, libraries, data, environments, command):
     """ Create self-extracting executable
@@ -167,7 +167,7 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
 
         debug('    adding library: %s (%s)' % (lib_name, real_path))
         archive.addfile(lib_info, open(real_path))
-    
+
     debug('adding data...')
     for data_path, real_path in map(lambda s: s.split(':'), data):
         add_data_to_archive(archive, os.path.normpath(data_path), os.path.normpath(real_path))
@@ -215,7 +215,7 @@ def add_data_to_archive(archive, data_path, real_path):
         debug('    adding data: %s (%s)' % (data_path, real_path))
         archive.addfile(data_info, open(real_path))
 
-# Print utilities --------------------------------------------------------------
+# Print utilities
 
 def debug(s):
     if STARCH_VERBOSE:
@@ -228,7 +228,7 @@ def error(s):
     print >>sys.stderr, '[E]', s
     sys.exit(1)
 
-# Find file utilities ----------------------------------------------------------
+# Find file utilities
 
 def find_files(files, env_var, default_paths = None):
     if default_paths:
@@ -311,7 +311,7 @@ def autodetect_libraries_darwin(executable):
     return libs
 
 
-# Configuration Parser ---------------------------------------------------------
+# Configuration Parser
 
 class StarchConfigParser(ConfigParser):
     def get(self, section, name, default = None):
@@ -320,7 +320,7 @@ class StarchConfigParser(ConfigParser):
         except (NoSectionError, NoOptionError), e:
             return default
 
-# Parse commandline options ----------------------------------------------------
+# Parse commandline options
 
 def parse_command_line_options():
     global STARCH_VERBOSE
@@ -332,7 +332,7 @@ def parse_command_line_options():
     parser.add_option('-A', dest = 'autodetect', action = 'store_false',
         help = 'Do not automatically detect library dependencies (default: enabled).', default=True)
     parser.add_option('-C', dest = 'config', action = 'store',
-        help = 'Use configuration file.', metavar = 'cfg', default = None) 
+        help = 'Use configuration file.', metavar = 'cfg', default = None)
     parser.add_option('-c', dest = 'command', action = 'store',
         help = 'Specify command to execute.', metavar = 'cmd', default = '')
     parser.add_option('-d', dest = 'data', action = 'append',
@@ -380,9 +380,9 @@ def parse_command_line_options():
     return args[0], options.executables, options.libraries, \
                     options.data, options.environments, options.command
 
-# Main execution ---------------------------------------------------------------
+# Main execution
 
 if __name__ == '__main__':
     create_sfx(*parse_command_line_options())
 
-# vim: sts=4 sw=4 ts=8 expandtab ft=python
+# vim: set sts=4 sw=4 ts=8 expandtab ft=python:

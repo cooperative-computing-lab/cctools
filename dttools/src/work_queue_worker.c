@@ -49,11 +49,17 @@ See the file COPYING for details.
 // Maximum time to wait before aborting if there is no connection to the master.
 static int idle_timeout = 900;
 
-// Maxium time to wait before switching to another master.
+// Maximum time to wait before switching to another master.
 static int master_timeout = 60;
 
 // Maximum time to wait when actively communicating with the master.
 static int active_timeout = 3600;
+
+// Initial value for backoff interval when worker fails to connect to a master.
+static int init_backoff_interval = 1; //corresponds to 1 second.
+
+// Maximum value for backoff interval when worker fails to connect to a master.
+static int max_backoff_interval = 60; //corresponds to 60 seconds.
 
 // Flag gets set on receipt of a terminal signal.
 static int abort_flag = 0;
@@ -501,14 +507,16 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
 	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem.\n");
-	fprintf(stdout, " -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
 	fprintf(stdout, " -s             Run as a shared worker. By default the worker would only work on preferred projects.\n");
-	fprintf(stdout, " -t <time>      Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
+	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem.\n");
 	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
-	fprintf(stdout, " -v             Show version string\n");
+	fprintf(stdout, " -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
+	fprintf(stdout, " -t <time>      Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
 	fprintf(stdout, " -w <size>      Set TCP window size.\n");
+	fprintf(stdout, " -i <time>      Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
+	fprintf(stdout, " -b <time>      Set maxmimum value for backoff interval when worker fails to connect to a master. (default=%ds)\n", max_backoff_interval);
 	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%lluMB)\n", disk_avail_threshold);
+	fprintf(stdout, " -v             Show version string\n");
 	fprintf(stdout, " -h             Show this help screen\n");
 }
 
@@ -528,6 +536,7 @@ int main(int argc, char *argv[])
 	int task_status= TASK_NONE;
 	pid_t pid;
 	time_t readline_stoptime;
+	int backoff_multiplier = 2; 
 
 	preferred_masters = list_create();
 	if(!preferred_masters) {
@@ -537,7 +546,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aC:d:ihN:o:st:w:z:v")) != (char) -1) {
+	while((c = getopt(argc, argv, "aC:sd:t:o:N:w:i:b:z:vh")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
@@ -567,16 +576,26 @@ int main(int argc, char *argv[])
 		case 'N':
 			list_push_tail(preferred_masters, strdup(optarg));
 			break;
-		case 'v':
-			show_version(argv[0]);
-			return 0;
 		case 'w':
 			w = string_metric_parse(optarg);
 			link_window_set(w, w);
 			break;
+		case 'i':
+			init_backoff_interval = string_metric_parse(optarg);
+			break;
+		case 'b':
+			max_backoff_interval = string_metric_parse(optarg);
+			if (max_backoff_interval < init_backoff_interval) {
+				fprintf(stderr, "Maximum backoff interval provided must be greater than the initial backoff interval of %ds.\n", init_backoff_interval);
+				exit(1);
+			}
+			break;
 		case 'z':
 			disk_avail_threshold = string_metric_parse(optarg);
 			break;
+		case 'v':
+			show_version(argv[0]);
+			return 0;
 		case 'h':
 		default:
 			show_help(argv[0]);
@@ -635,9 +654,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
-
 	time_t idle_stoptime = time(0) + idle_timeout;
 	time_t switch_master_time = time(0) + master_timeout;
+	int backoff_interval = init_backoff_interval;
 
 	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t) free);
 
@@ -675,13 +694,21 @@ int main(int argc, char *argv[])
 				master = link_connect(addr, port, idle_stoptime);
 			}
 			if(!master) {
-				sleep(5);
+				
+				if (backoff_interval > max_backoff_interval) {
+					backoff_interval = max_backoff_interval;
+				}
+			
+				sleep(backoff_interval);
+				backoff_interval *= backoff_multiplier;
 				continue;
 			}
 
 			link_tune(master, LINK_TUNE_INTERACTIVE);
 
 			report_worker_ready(master);
+			//reset backoff interval after connection to master.
+			backoff_interval = init_backoff_interval; 
 		}
 		// Wait for forked task's completion
 		if(task_status == TASK_RUNNING) {
