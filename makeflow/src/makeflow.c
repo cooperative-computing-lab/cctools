@@ -95,6 +95,7 @@ struct dag {
 	struct hash_table *filename_translation_fwd;
 	struct hash_table *variables;
 	struct hash_table *collect_table;
+	struct list *export_list;
 	FILE *logfile;
 	FILE *dagfile;
 	char *linetext;
@@ -149,6 +150,7 @@ int dag_parse_variable(struct dag *d, struct dag_node *n, char *line);
 int dag_parse_node(struct dag *d, char *line, int clean_mode);
 int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, int source, int clean_mode);
 int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line);
+int dag_parse_export(struct dag *d, char *line);
 char *dag_lookup(const char *name, void *arg);
 char *dag_lookup_set(const char *name, void *arg);
 void dag_gc_ref_incr(struct dag *d, const char *file, int increment);
@@ -911,6 +913,7 @@ struct dag *dag_create()
 	d->filename_translation_rev = hash_table_create(0, 0);
 	d->filename_translation_fwd = hash_table_create(0, 0);
 	d->collect_table = hash_table_create(0, 0);
+	d->export_list = list_create();
 
 	/* Add _MAKEFLOW_COLLECT_LIST to variables table to ensure it is in
 	 * global DAG scope. */
@@ -967,6 +970,11 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 		} else if(strstr(line, ":")) {
 			if(!dag_parse_node(d, line, clean_mode)) {
 				dag_parse_error(d, "node");
+				goto failure;
+			}
+		} else if(strncmp(line, "export ", 7) == 0) {
+			if(!dag_parse_export(d, line)) {
+				dag_parse_error(d, "export");
 				goto failure;
 			}
 		} else {
@@ -1268,6 +1276,20 @@ int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
 	return 1;
 }
 
+int dag_parse_export(struct dag *d, char *line)
+{
+	int i, argc;
+	char **argv;
+
+	string_split_quotes(line + 7, &argc, &argv);
+	for(i = 0; i < argc; i++) {
+		list_push_tail(d->export_list, xxstrdup(argv[i]));
+		debug(D_DEBUG, "export variable=%s", argv[i]);
+	}
+	free(argv);
+	return 1;
+}
+
 char *dag_lookup(const char *name, void *arg)
 {
 	struct dag_lookup_set s = {(struct dag *)arg, NULL, NULL};
@@ -1304,6 +1326,21 @@ char *dag_lookup_set(const char *name, void *arg)
 	}
 
 	return NULL;
+}
+
+void dag_export_variables(struct dag *d, struct dag_node *n)
+{
+	struct dag_lookup_set s = {d, n, NULL};
+	char *key;
+
+	list_first_item(d->export_list);
+	while((key = list_next_item(d->export_list))) {
+		char *value = dag_lookup_set(key, &s);
+		if(value) {
+			setenv(key, value, 1);
+			debug(D_DEBUG, "export %s=%s", key, value);
+		}
+	}
 }
 
 void dag_node_submit(struct dag *d, struct dag_node *n)
@@ -1366,6 +1403,11 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 	time_t stoptime = time(0) + dag_submit_timeout;
 	int waittime = 1;
+
+	/* Export variables before each submit. We have to do this before each
+	 * node submission because each node may have local variables
+	 * definitions. */
+	dag_export_variables(d, n);
 
 	while(1) {
 		n->jobid = batch_job_submit_simple(thequeue, n->command, input_files, output_files);
