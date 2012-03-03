@@ -508,8 +508,16 @@ char *string_subst(char *value, string_subst_lookup_t lookup, void *arg)
 		if(!dollar)
 			return value;
 
-		while(dollar > value && *(dollar - 1) == '\\') {
-			dollar = strchr(dollar + 1, '$');
+		while(dollar > value) {
+			if(*(dollar - 1) == '\\') {
+				dollar = strchr(dollar + 1, '$');
+			} else if(*(dollar + 1) == '$') {
+				*dollar = ' ';
+				dollar = strchr(dollar + 2, '$');
+			} else {
+				break;
+			}
+			
 			if(!dollar)
 				return value;
 		}
