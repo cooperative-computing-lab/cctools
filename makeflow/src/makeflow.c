@@ -1605,9 +1605,9 @@ int dag_gc_file(struct dag *d, const char *file, int count)
 	}
 }
 
-void dag_gc_all(struct dag *d, UINT64_T threshold, UINT64_T maxfiles, time_t stoptime)
+void dag_gc_all(struct dag *d, int threshold, int maxfiles, time_t stoptime)
 {
-	INT64_T collected = 0;
+	int collected = 0;
 	char *key;
 	PTRINT_T value;
 
@@ -1627,7 +1627,7 @@ void dag_gc_ref_incr(struct dag *d, const char *file, int increment)
 	if (ref_count) {
 		ref_count = ref_count + increment;
 		hash_table_insert(d->collect_table, file, (void *)ref_count);
-		debug(D_DEBUG, "Marked file %s references (%ld)", file, ref_count - 1);
+		debug(D_DEBUG, "Marked file %s references (%d)", file, ref_count - 1);
 
 		/* Perform collection immediately if we are using reference
 		 * counting. */
@@ -1675,13 +1675,13 @@ void dag_gc(struct dag *d)
 			break;
 		case DAG_GC_INCR_TIME:
 			debug(D_DEBUG, "Performing incremental time (%d) garbage collection", dag_gc_param);
-			dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, UINT_MAX, time(0) + dag_gc_param);
+			dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, INT_MAX, time(0) + dag_gc_param);
 			break;
 		case DAG_GC_ON_DEMAND:
 			getcwd(cwd, PATH_MAX);
 			if(directory_inode_count(cwd) >= dag_gc_param || directory_low_disk(cwd)) {
 				debug(D_DEBUG, "Performing on demand (%d) garbage collection", dag_gc_param);
-				dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, UINT_MAX, INT_MAX);
+				dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, INT_MAX, INT_MAX);
 			}
 			break;
 		default:
@@ -1745,7 +1745,7 @@ void dag_run(struct dag *d)
 		dag_abort_all(d);
 	} else {
 		if(dag_gc_method != DAG_GC_NONE) {
-			dag_gc_all(d, UINT_MAX, UINT_MAX, INT_MAX);
+			dag_gc_all(d, INT_MAX, INT_MAX, INT_MAX);
 		}
 	}
 }
