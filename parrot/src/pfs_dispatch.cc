@@ -1190,7 +1190,7 @@ nargs array and adjust the offset as needed.
 void decode_mmap( struct pfs_process *p, int syscall, int entering, INT64_T *args )
 {
 	if(entering) {
-		UINT32_T addr, orig_length, prot, fd, flags;
+		UINT32_T addr, prot, fd, flags;
 		UINT32_T nargs[TRACER_ARGS_MAX];
 		pfs_size_t length, channel_offset, source_offset;
 
@@ -1203,7 +1203,7 @@ void decode_mmap( struct pfs_process *p, int syscall, int entering, INT64_T *arg
 		}
 
 		addr = nargs[0];
-		orig_length = nargs[1];
+		length = nargs[1];
 		prot = nargs[2];
 		flags = nargs[3];
 		fd = nargs[4];
@@ -1229,7 +1229,7 @@ void decode_mmap( struct pfs_process *p, int syscall, int entering, INT64_T *arg
 		}
 		#endif
 
-		debug(D_SYSCALL,"mmap addr=0x%x len=0x%x prot=0x%x flags=0x%x fd=%d offset=0x%llx",addr,orig_length,prot,flags,fd,source_offset);
+		debug(D_SYSCALL,"mmap addr=0x%x len=0x%x prot=0x%x flags=0x%x fd=%d offset=0x%llx",addr,length,prot,flags,fd,source_offset);
 
 		if(flags&MAP_ANONYMOUS) {
 			/* great, just do it. */
