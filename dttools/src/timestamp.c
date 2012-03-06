@@ -36,7 +36,6 @@ timestamp_t timestamp_get()
 int timestamp_fmt(char *buf, size_t size, const char *fmt, timestamp_t ts) 
 {
 	time_t tv_sec; 
-	struct tm t;
 	struct tm *tp;
 
 	if(buf == NULL || size < 0) return 0;
@@ -44,6 +43,7 @@ int timestamp_fmt(char *buf, size_t size, const char *fmt, timestamp_t ts)
 	tv_sec = ts / 1000000;
 
 #if defined (_XOPEN_SOURCE) || defined (_BSD_SOURCE) || defined (_SVID_SOURCE) || defined (_POSIX_SOURCE) || _POSIX_C_SOURCE >= 1 
+	struct tm t;
 	tp = localtime_r(&tv_sec, &t);
 #else
 	tp = localtime(&tv_sec);
