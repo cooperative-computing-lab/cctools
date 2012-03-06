@@ -156,7 +156,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 			if(i==pfs_channel_fd()) continue;
 			if(flags[i]>=0) {
 				child->table->attach(i,dup(i),flags[i],0666,"fd");
-				debug(D_PROCESS,"attaching to inherited fd %d with flags %d",i,flags);
+				debug(D_PROCESS,"attaching to inherited fd %d with flags %d",i,flags[i]);
 			} 
 		}
 
