@@ -1,22 +1,22 @@
 VAR1 = 1 # Global
 out.0:
-    @VAR1 = 0
-    echo $VAR1 > out.0 # Should display 0
+	@VAR1=0
+	echo ${VAR1} > out.0 # Should display 0
 
 out.1:
-    echo $VAR1 > out.1 # Should display 1 
+	echo ${VAR1} > out.1 # Should display 1 
 
 out.2:
-    @VAR1+=2
-    echo $VAR1 > out.2 # Should display 1 2
+	@VAR1+=2
+	echo ${VAR1} > out.2 # Should display 1 2
 
 out.3:
-    @VAR2+=0
-    echo $VAR2 > out.3 # Should display 0
+	@VAR2+=0
+	echo ${VAR2} > out.3 # Should display 0
 
 out.4:
-    @VAR2+=1
-    echo $VAR2 > out.4 # Should display 1
+	@VAR2+=1
+	echo ${VAR2} > out.4 # Should display 1
 
 out.all: out.0 out.1 out.2 out.3 out.4
-    cat out.0 out.1 out.2 out.3 out.4 > out.all
+	cat out.0 out.1 out.2 out.3 out.4 > out.all
