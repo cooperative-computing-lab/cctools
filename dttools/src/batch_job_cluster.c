@@ -17,16 +17,12 @@ static char * cluster_submit_cmd = NULL;
 static char * cluster_remove_cmd = NULL;
 static char * cluster_options = NULL;
 
-int batch_job_setup_cluster(struct batch_queue * q) {
-
-	if(cluster_name)
-		free(cluster_name);
-	if(cluster_submit_cmd)
-		free(cluster_submit_cmd);
-	if(cluster_remove_cmd)
-		free(cluster_remove_cmd);
-	if(cluster_options)
-		free(cluster_options);
+int batch_job_setup_cluster(struct batch_queue * q)
+{
+	free(cluster_name);
+	free(cluster_submit_cmd);
+	free(cluster_remove_cmd);
+	free(cluster_options);
 
 	cluster_name = cluster_submit_cmd = cluster_remove_cmd = cluster_options = NULL;
 
@@ -70,7 +66,7 @@ int batch_job_setup_cluster(struct batch_queue * q) {
 
 }
 
-static int setup_batch_wrapper(const char *sysname)
+static int setup_batch_wrapper(struct batch_queue *q, const char *sysname)
 {
 	char *wrapperfile = string_format("%s.wrapper", sysname);
 
@@ -84,7 +80,11 @@ static int setup_batch_wrapper(const char *sysname)
 	}
 
 	fprintf(file, "#!/bin/sh\n");
-	fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
+	if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+		fprintf(file, "logfile=%s.status.${PBS_JOBID}\n", sysname);
+	} else {
+		fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
+	}
 	fprintf(file, "starttime=`date +%%s`\n");
 	fprintf(file, "cat > $logfile <<EOF\n");
 	fprintf(file, "start $starttime\n");
@@ -110,7 +110,7 @@ batch_job_id_t batch_job_submit_simple_cluster(struct batch_queue * q, const cha
 	batch_job_id_t jobid;
 	struct batch_job_info *info;
 
-	if(setup_batch_wrapper(cluster_name) < 0)
+	if(setup_batch_wrapper(q, cluster_name) < 0)
 		return -1;
 
 	char *name = xxstrdup(cmd);
@@ -133,7 +133,7 @@ batch_job_id_t batch_job_submit_simple_cluster(struct batch_queue * q, const cha
 
 	char line[BATCH_JOB_LINE_MAX] = "";
 	while(fgets(line, sizeof(line), file)) {
-		if(sscanf(line, "Your job %d", &jobid) == 1) {
+		if(sscanf(line, "Your job %d", &jobid) == 1 || sscanf(line, "%d", &jobid) == 1) {
 			debug(D_DEBUG, "job %d submitted", jobid);
 			pclose(file);
 			info = malloc(sizeof(*info));
