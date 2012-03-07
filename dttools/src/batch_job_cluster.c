@@ -37,7 +37,7 @@ int batch_job_setup_cluster(struct batch_queue * q)
 			cluster_name = strdup("moab");
 			cluster_submit_cmd = strdup("msub");
 			cluster_remove_cmd = strdup("mdel");
-			cluster_options = strdup("-d $CWD -o /dev/null -j oe -N");
+			cluster_options = strdup("-d `pwd` -o /dev/null -j oe -N");
 			break;
 		case BATCH_QUEUE_TYPE_CLUSTER:
 			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
@@ -81,10 +81,9 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname)
 
 	fprintf(file, "#!/bin/sh\n");
 	if(q->type == BATCH_QUEUE_TYPE_MOAB) {
-		fprintf(file, "logfile=%s.status.${PBS_JOBID}\n", sysname);
-	} else {
-		fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
+		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
 	}
+	fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
 	fprintf(file, "starttime=`date +%%s`\n");
 	fprintf(file, "cat > $logfile <<EOF\n");
 	fprintf(file, "start $starttime\n");
