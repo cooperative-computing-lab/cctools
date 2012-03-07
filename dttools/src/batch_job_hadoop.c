@@ -76,7 +76,7 @@ batch_job_id_t batch_job_fork_hadoop(struct batch_queue *q, char *hadoop_streami
 		job->status_file = status_file;
 		job->info.submitted = job->info.started = time(0);
 		itable_insert(q->job_table, (int) job->child, job);
-		debug(D_DEBUG, "job %d submitted", (int) job->child);
+		debug(D_BATCH, "job %d submitted", (int) job->child);
 		return job->child;
 	} else {
 		return -1;
@@ -167,7 +167,7 @@ restart:
 		/* read the status until empty */
 		char line[BATCH_JOB_LINE_MAX];
 		while (fgets(line, sizeof(line), job->status_file) > 0) {
-			debug(D_DEBUG, "hadoop-streaming job %d output: %s", (int) job->child, line);
+			debug(D_BATCH, "hadoop-streaming job %d output: %s", (int) job->child, line);
 			if (strstr(line, "Streaming Command Failed!")) {
 				debug(D_HDFS, "hadoop-streaming job %d failed", job->child);
 				/* job->info.exited_normally = 0; */
@@ -217,12 +217,12 @@ int batch_job_remove_hadoop(struct batch_queue *q, batch_job_id_t jobid)
 	struct hadoop_job *job;
 	if ((job = itable_lookup(q->job_table, key))) {
 		int status;
-		debug(D_DEBUG, "sending hadoop-streaming job %d SIGTERM.", (int)job->child);
+		debug(D_BATCH, "sending hadoop-streaming job %d SIGTERM.", (int)job->child);
 		kill(job->child, SIGTERM);
 		sleep(2); /* give time to exit gracefully */
 		pid_t child = waitpid(job->child, &status, WNOHANG);
 		if (child <= 0) {
-			debug(D_DEBUG, "forcibly killing hadoop-streaming job %d with SIGKILL.", (int)job->child);
+			debug(D_BATCH, "forcibly killing hadoop-streaming job %d with SIGKILL.", (int)job->child);
 			kill(job->child, SIGKILL); /* force exit */
 			child = waitpid(job->child, &status, 0); /* wait forever */
 		}

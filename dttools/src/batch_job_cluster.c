@@ -50,7 +50,7 @@ int batch_job_setup_cluster(struct batch_queue * q)
 			cluster_options = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS");
 			break;
 		default:
-			debug(D_DEBUG, "Invalid cluster type: %s\n", batch_queue_type_to_string(q->type));
+			debug(D_BATCH, "Invalid cluster type: %s\n", batch_queue_type_to_string(q->type));
 			return -1;
 	}
 
@@ -125,19 +125,19 @@ batch_job_id_t batch_job_submit_simple_cluster(struct batch_queue * q, const cha
 	char *command = string_format("%s %s '%s' %s %s.wrapper \"%s\"", cluster_submit_cmd, cluster_options, string_basename(name), q->options_text ? q->options_text : "", cluster_name, cmd);
 	free(name);
 
-	debug(D_DEBUG, "%s", command);
+	debug(D_BATCH, "%s", command);
 
 	FILE *file = popen(command, "r");
 	free(command);
 	if(!file) {
-		debug(D_DEBUG, "couldn't submit job: %s", strerror(errno));
+		debug(D_BATCH, "couldn't submit job: %s", strerror(errno));
 		return -1;
 	}
 
 	char line[BATCH_JOB_LINE_MAX] = "";
 	while(fgets(line, sizeof(line), file)) {
 		if(sscanf(line, "Your job %d", &jobid) == 1 || sscanf(line, "%d", &jobid) == 1) {
-			debug(D_DEBUG, "job %d submitted", jobid);
+			debug(D_BATCH, "job %d submitted", jobid);
 			pclose(file);
 			info = malloc(sizeof(*info));
 			memset(info, 0, sizeof(*info));
@@ -199,7 +199,7 @@ batch_job_id_t batch_job_wait_cluster(struct batch_queue * q, struct batch_job_i
 					if(sscanf(line, "start %d", &t)) {
 						info->started = t;
 					} else if(sscanf(line, "stop %d %d", &c, &t) == 2) {
-						debug(D_DEBUG, "job %d complete", jobid);
+						debug(D_BATCH, "job %d complete", jobid);
 						if(!info->started)
 							info->started = t;
 						info->finished = t;
@@ -218,7 +218,7 @@ batch_job_id_t batch_job_wait_cluster(struct batch_queue * q, struct batch_job_i
 					return jobid;
 				}
 			} else {
-				debug(D_DEBUG, "could not open status file \"%s\"", statusfile);
+				debug(D_BATCH, "could not open status file \"%s\"", statusfile);
 			}
 
 			free(statusfile);

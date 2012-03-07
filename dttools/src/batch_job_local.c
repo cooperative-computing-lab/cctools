@@ -18,7 +18,7 @@ batch_job_id_t batch_job_submit_simple_local(struct batch_queue *q, const char *
 	fflush(NULL);
 	jobid = fork();
 	if(jobid > 0) {
-		debug(D_DEBUG, "started process %d: %s", jobid, cmd);
+		debug(D_BATCH, "started process %d: %s", jobid, cmd);
 		struct batch_job_info *info = malloc(sizeof(*info));
 		memset(info, 0, sizeof(*info));
 		info->submitted = time(0);
@@ -26,7 +26,7 @@ batch_job_id_t batch_job_submit_simple_local(struct batch_queue *q, const char *
 		itable_insert(q->job_table, jobid, info);
 		return jobid;
 	} else if(jobid < 0) {
-		debug(D_DEBUG, "couldn't create new process: %s\n", strerror(errno));
+		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
 		return -1;
 	} else {
 		/** The following code works but would duplicates the current process because of the system() function.
@@ -121,14 +121,14 @@ int batch_job_remove_local(struct batch_queue *q, batch_job_id_t jobid)
 {
 	if(itable_lookup(q->job_table, jobid)) {
 		if(kill(jobid, SIGTERM) == 0) {
-			debug(D_DEBUG, "signalled process %d", jobid);
+			debug(D_BATCH, "signalled process %d", jobid);
 			return 1;
 		} else {
-			debug(D_DEBUG, "could not signal process %d: %s\n", jobid, strerror(errno));
+			debug(D_BATCH, "could not signal process %d: %s\n", jobid, strerror(errno));
 			return 0;
 		}
 	} else {
-		debug(D_DEBUG, "process %d is not under my control.\n", jobid);
+		debug(D_BATCH, "process %d is not under my control.\n", jobid);
 		return 0;
 	}
 }

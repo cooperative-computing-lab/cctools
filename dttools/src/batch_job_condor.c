@@ -20,7 +20,7 @@ batch_job_id_t batch_job_submit_condor(struct batch_queue *q, const char *cmd, c
 
 	file = fopen("condor.submit", "w");
 	if(!file) {
-		debug(D_DEBUG, "could not create condor.submit: %s", strerror(errno));
+		debug(D_BATCH, "could not create condor.submit: %s", strerror(errno));
 		return -1;
 	}
 
@@ -58,7 +58,7 @@ batch_job_id_t batch_job_submit_condor(struct batch_queue *q, const char *cmd, c
 	while(fgets(line, sizeof(line), file)) {
 		if(sscanf(line, "%d job(s) submitted to cluster %d", &njobs, &jobid) == 2) {
 			pclose(file);
-			debug(D_DEBUG, "job %d submitted to condor", jobid);
+			debug(D_BATCH, "job %d submitted to condor", jobid);
 			struct batch_job_info *info;
 			info = malloc(sizeof(*info));
 			memset(info, 0, sizeof(*info));
@@ -69,7 +69,7 @@ batch_job_id_t batch_job_submit_condor(struct batch_queue *q, const char *cmd, c
 	}
 
 	pclose(file);
-	debug(D_DEBUG, "failed to submit job to condor!");
+	debug(D_BATCH, "failed to submit job to condor!");
 	return -1;
 }
 
@@ -98,7 +98,7 @@ int setup_condor_wrapper(const char *wrapperfile)
 batch_job_id_t batch_job_submit_simple_condor(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
 	if(setup_condor_wrapper("condor.sh") < 0) {
-		debug(D_DEBUG, "could not create condor.sh: %s", strerror(errno));
+		debug(D_BATCH, "could not create condor.sh: %s", strerror(errno));
 		return -1;
 	}
 
@@ -149,13 +149,13 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 					itable_insert(q->job_table, jobid, info);
 				}
 
-				debug(D_DEBUG, "line: %s", line);
+				debug(D_BATCH, "line: %s", line);
 
 				if(type == 0) {
 					info->submitted = current;
 				} else if(type == 1) {
 					info->started = current;
-					debug(D_DEBUG, "job %d running now", jobid);
+					debug(D_BATCH, "job %d running now", jobid);
 				} else if(type == 9) {
 					itable_remove(q->job_table, jobid);
 
@@ -163,7 +163,7 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 					info->exited_normally = 0;
 					info->exit_signal = SIGKILL;
 
-					debug(D_DEBUG, "job %d was removed", jobid);
+					debug(D_BATCH, "job %d was removed", jobid);
 
 					memcpy(info_out, info, sizeof(*info));
 					free(info);
@@ -175,15 +175,15 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 
 					fgets(line, sizeof(line), logfile);
 					if(sscanf(line, " (%d) Normal termination (return value %d)", &logcode, &exitcode) == 2) {
-						debug(D_DEBUG, "job %d completed normally with status %d.", jobid, exitcode);
+						debug(D_BATCH, "job %d completed normally with status %d.", jobid, exitcode);
 						info->exited_normally = 1;
 						info->exit_code = exitcode;
 					} else if(sscanf(line, " (%d) Abnormal termination (signal %d)", &logcode, &exitcode) == 2) {
-						debug(D_DEBUG, "job %d completed abnormally with signal %d.", jobid, exitcode);
+						debug(D_BATCH, "job %d completed abnormally with signal %d.", jobid, exitcode);
 						info->exited_normally = 0;
 						info->exit_signal = exitcode;
 					} else {
-						debug(D_DEBUG, "job %d completed with unknown status.", jobid);
+						debug(D_BATCH, "job %d completed with unknown status.", jobid);
 						info->exited_normally = 0;
 						info->exit_signal = 0;
 					}
@@ -215,11 +215,11 @@ int batch_job_remove_condor(struct batch_queue *q, batch_job_id_t jobid)
 {
 	char *command = string_format("condor_rm %d", jobid);
 
-	debug(D_DEBUG, "%s", command);
+	debug(D_BATCH, "%s", command);
 	FILE *file = popen(command, "r");
 	free(command);
 	if(!file) {
-		debug(D_DEBUG, "condor_rm failed");
+		debug(D_BATCH, "condor_rm failed");
 		return 0;
 	} else {
 		char buffer[1024];

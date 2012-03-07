@@ -23,7 +23,7 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 			if(p) {
 				*p = 0;
 				work_queue_task_specify_input_file(t, f, p + 1);
-				debug(D_DEBUG, "local file %s is %s on remote system:", f, p + 1);
+				debug(D_BATCH, "local file %s is %s on remote system:", f, p + 1);
 				*p = '=';
 			} else {
 				work_queue_task_specify_input_file(t, f, f);
@@ -41,7 +41,7 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 			if(p) {
 				*p = 0;
 				work_queue_task_specify_output_file(t, f, p + 1);
-				debug(D_DEBUG, "remote file %s is %s on local system:", f, p + 1);
+				debug(D_BATCH, "remote file %s is %s on local system:", f, p + 1);
 				*p = '=';
 			} else {
 				work_queue_task_specify_output_file(t, f, f);
@@ -74,7 +74,7 @@ void specify_work_queue_task_shared_files(struct work_queue_task *t, const char 
 
 			if(p) {
 				work_queue_task_specify_file(t, file, p + 1, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE | WORK_QUEUE_THIRDGET);
-				debug(D_DEBUG, "shared file %s is %s on remote system:", file, p + 1);
+				debug(D_BATCH, "shared file %s is %s on remote system:", file, p + 1);
 				*p = '=';
 			} else {
 				work_queue_task_specify_file(t, file, file, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE | WORK_QUEUE_THIRDGET);
@@ -105,7 +105,7 @@ void specify_work_queue_task_shared_files(struct work_queue_task *t, const char 
 
 			if(p) {
 				work_queue_task_specify_file(t, file, p + 1, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
-				debug(D_DEBUG, "shared file %s is %s on remote system:", file, p + 1);
+				debug(D_BATCH, "shared file %s is %s on remote system:", file, p + 1);
 				*p = '=';
 			} else {
 				work_queue_task_specify_file(t, file, file, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
