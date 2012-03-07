@@ -19,10 +19,14 @@ static char * cluster_options = NULL;
 
 int batch_job_setup_cluster(struct batch_queue * q)
 {
-	free(cluster_name);
-	free(cluster_submit_cmd);
-	free(cluster_remove_cmd);
-	free(cluster_options);
+	if(cluster_name)
+		free(cluster_name);
+	if(cluster_submit_cmd)
+		free(cluster_submit_cmd);
+	if(cluster_remove_cmd)
+		free(cluster_remove_cmd);
+	if(cluster_options)
+		free(cluster_options);
 
 	cluster_name = cluster_submit_cmd = cluster_remove_cmd = cluster_options = NULL;
 
@@ -213,7 +217,10 @@ batch_job_id_t batch_job_wait_cluster(struct batch_queue * q, struct batch_job_i
 					free(statusfile);
 					return jobid;
 				}
+			} else {
+				debug(D_DEBUG, "could not open status file \"%s\"", statusfile);
 			}
+
 			free(statusfile);
 		}
 
