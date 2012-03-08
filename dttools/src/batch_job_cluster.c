@@ -41,7 +41,7 @@ int batch_job_setup_cluster(struct batch_queue * q)
 			cluster_name = strdup("moab");
 			cluster_submit_cmd = strdup("msub");
 			cluster_remove_cmd = strdup("mdel");
-			cluster_options = strdup("-d `pwd` -o /dev/null -j oe -N");
+			cluster_options = strdup("-d `pwd` -o /dev/null -v BATCH_JOB_COMMAND -j oe -N");
 			break;
 		case BATCH_QUEUE_TYPE_CLUSTER:
 			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
@@ -85,14 +85,18 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname)
 
 	fprintf(file, "#!/bin/sh\n");
 	if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+		fprintf(file, "CMD=${BATCH_JOB_COMMAND}");
 		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
+	} else {
+		fprintf(file, "CMD=$@\n");
 	}
+
 	fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
 	fprintf(file, "starttime=`date +%%s`\n");
 	fprintf(file, "cat > $logfile <<EOF\n");
 	fprintf(file, "start $starttime\n");
 	fprintf(file, "EOF\n\n");
-	fprintf(file, "eval \"$@\"\n\n");
+	fprintf(file, "eval \"$CMD\"\n\n");
 	fprintf(file, "status=$?\n");
 	fprintf(file, "stoptime=`date +%%s`\n");
 	fprintf(file, "cat >> $logfile <<EOF\n");
@@ -126,6 +130,8 @@ batch_job_id_t batch_job_submit_simple_cluster(struct batch_queue * q, const cha
 	free(name);
 
 	debug(D_BATCH, "%s", command);
+
+	setenv("BATCH_JOB_COMMAND", cmd, 1);
 
 	FILE *file = popen(command, "r");
 	free(command);
