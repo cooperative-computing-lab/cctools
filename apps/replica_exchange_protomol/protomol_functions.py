@@ -60,7 +60,7 @@ class Replica(object):
 
 
 #Function to generate a config file to send to workqueue. It returns the generated config file name.
-def generate_config(output_path, pdb_file, psf_file, par_file, md_steps, output_freq, replica_obj, monte_carlo_step, generate_xyz = None, generate_dcd = None, vel_input_file = None):
+def generate_config(output_path, pdb_file, psf_file, par_file, monte_carlo_step, md_steps, output_freq, replica_obj, generate_xyz = False, generate_dcd = False):
 
 	#initialize the config file name based on the replica id.
 	cfg_file_name = "%s/%s/%s/%d/%d-%d.cfg" % ( output_path, "simfiles", "config", replica_obj.id, replica_obj.id, monte_carlo_step)	
@@ -83,7 +83,7 @@ def generate_config(output_path, pdb_file, psf_file, par_file, md_steps, output_
 	write_str += "psffile %s\n" % parsed_psf_file
 	write_str += "parfile %s\n" % parsed_par_file
 	
-	if vel_input_file:
+	if monte_carlo_step > 0:
 		write_str += "velfile %s.%d-%d.vel\n" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_obj.id, monte_carlo_step)
 
 	write_str += "dofinPDBPosFile true\n" 

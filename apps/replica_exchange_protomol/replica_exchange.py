@@ -37,7 +37,6 @@ generate_xyz = False
 generate_dcd = False
 debug_mode = False
 quart_temp_split = False
-vel_file_input = False
 
 mc_step_times = []
 
@@ -205,7 +204,6 @@ def assign_task_input_files(task, replica_list, replica_id, replica_next_startin
 	#Velocity input only required after first step since it is output 
 	#of first step.
 	if (replica_next_starting_step > 0):	
-		vel_file_input = True
 		#Assign local and remote velocity input files.
 		local_velocity_input_file = "%s/simfiles/%s/%s-%d.vel" % (output_path, replica_list[replica_id].temp, exchgd_replica_pdb, replica_next_starting_step)
 		remote_velocity_input_file = "%s-%d.vel" % (replica_pdb, replica_next_starting_step)
@@ -524,10 +522,6 @@ def create_replica_exch_pairs(replica_list, num_replicas):
 		if debug_mode: 
 			print "For step %d, exchange will be attempted for replica %d and %d." % (i, replica_1, replica_2)
 		
-	if debug_mode: 
-		for i in replica_list:
-			print "Replica %d has the following exchange steps: %s." % (i.id, i.exch_steps)
-
 
 #Main function.
 if __name__ == "__main__":
@@ -624,16 +618,16 @@ if __name__ == "__main__":
 		#	to the top and bottom 25% of replicas.
 		if quart_temp_split:
 			if x < math.ceil(0.25 * num_replicas):
-                        	replica_temp =  min_temp + (x * inc / 3)
+				replica_temp =  min_temp + (x * inc / 3)
 
-        	        elif x >= math.ceil(0.75 * num_replicas):
-			        replica_temp =  max_temp - (((num_replicas-1) - x) * inc / 3)
+			elif x >= math.ceil(0.75 * num_replicas):
+				replica_temp =  max_temp - (((num_replicas-1) - x) * inc / 3)
 
-	                else:
-        	                replica_temp =  min_temp + (x * inc)
+			else:
+				replica_temp =  min_temp + (x * inc)
 		
 		#If not quart split, split temperature range uniformly 
-		#		                    among all replicas.	
+		#                    among all replicas.	
 		else:
 			replica_temp =  min_temp + (x * inc)
 	
@@ -657,7 +651,7 @@ if __name__ == "__main__":
 	#create config files here.
 	for i in range(monte_carlo_steps):
 		for j in range(num_replicas):
-			generate_config(output_path, pdb_file, psf_file, par_file, md_steps, output_freq, replica_list[j], i)
+			generate_config(output_path, pdb_file, psf_file, par_file, i, md_steps, output_freq, replica_list[j])
 
 	replicas_to_run = []
 	for i in range(num_replicas):
