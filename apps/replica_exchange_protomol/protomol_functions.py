@@ -50,20 +50,17 @@ class Replica(object):
 		self.temp = temp
 		self.exchgd_replica_id = -1
 		self.potential_energy = None
-		self.new_xyz_output_file = None
-		self.new_dcd_output_file = None
 		self.prev_temp = None
-		self.pdb = None
 		self.exch_steps = []
 		self.running = 0
 		self.last_seen_step = -1
 
 	def __str__(self):
-		return "ID: %d Temp %f" % (self.id, self.temp)
+		return "Replica %d at temp %f" % (self.id, self.temp)
 
 
 #Function to generate a config file to send to workqueue. It returns the generated config file name.
-def generate_config(output_path, pdb_file, psf_file, par_file, md_steps, output_freq, replica_obj, monte_carlo_step, generate_xyz = None, generate_dcd = None, xyz_input_file = None, vel_input_file = None):
+def generate_config(output_path, pdb_file, psf_file, par_file, md_steps, output_freq, replica_obj, monte_carlo_step, generate_xyz = None, generate_dcd = None, vel_input_file = None):
 
 	#initialize the config file name based on the replica id.
 	cfg_file_name = "%s/%s/%s/%d/%d-%d.cfg" % ( output_path, "simfiles", "config", replica_obj.id, replica_obj.id, monte_carlo_step)	
