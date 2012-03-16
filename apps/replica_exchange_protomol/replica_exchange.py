@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-# replica_exchange_nobarrier
+# replica_exchange.py
 #
 # Copyright (C) 2011- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
@@ -534,21 +534,21 @@ if __name__ == "__main__":
 
 	#Create help string for user.
 	usage_str = "Usage: %s <PDB_FILE> <PSF_FILE> <PAR_FILE> <MIN_TEMP> <MAX_TEMP> <NUM_OF_REPLICAS>" % sys.argv[0]
-	help_str  = "-h		-	help\n"
-	help_str += "-n		-	specify a project name for using exclusive workers\n"
+	help_str = "-n		-	specify a project name for using exclusive workers\n"
 	help_str += "-x		-	specify the name of the xyz file for output\n"
 	help_str += "-d		-	specify the name of the dcd file for output\n"
-	help_str += "-l		-	print debuging information\n"
 	help_str += "-m		-	specify the number of monte carlo steps\n"
 	help_str += "-s		-	specify the number of mdsteps\n"
 	help_str += "-p		-	specify the output_path for the output files generated\n"
+	help_str += "-q		-	assign closer temperature values to the first and last quartile of the replicas.\n"
 	help_str += "-i		-	assume ProtoMol is installed and available in PATH on worker site\n"
 	help_str += "-b		-	use barrier in waiting for all replicas to finish their steps before attempting exchange.\n"
-	help_str += "-q		-	assign closer temperature values to the first and last quartile of the replicas.\n"
+	help_str += "-l		-	print debuging information\n"
+	help_str += "-h		-	help"
 
 	#Check to see if there is error in the given command line arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "m:s:n:p:x:d:ibhlq", ["--help", "--proj", "dir", "--xyz", "--dcd"])
+		opts, args = getopt.getopt(sys.argv[1:], "n:x:d:m:s:p:qiblh", ["--help"])
 	except getopt.GetoptError, err:
 		print str(err) 
 		print usage_str
@@ -561,15 +561,15 @@ if __name__ == "__main__":
 			sys.exit(0)
 		elif o == "-l":
 			debug_mode = True
-		elif o in ("-x", "--xyz"):
+		elif o in ("-x"):
 			generate_xyz = True
 			xyz_file_name = a
-		elif o in ("-d", "--dcd"):
+		elif o in ("-d"):
 			generate_dcd = True
 			dcd_file_name = a
-		elif o in ("-n", "--proj"):
+		elif o in ("-n"):
 			proj_name = a
-		elif o in ("-p", "--dir"):
+		elif o in ("-p"):
 			output_path = a
 		elif o in ("-m"):
 			monte_carlo_steps = int(a)
@@ -582,14 +582,15 @@ if __name__ == "__main__":
 		elif o == "-b":
 			use_barrier = True
 
+	#Check for the 6 mandatory arguments.
+	if len(args) != 6:
+		print usage_str
+		sys.exit(1)
+
 	if debug_mode:
 		print "Debug mode on.."
 		set_debug_flag("wq")
 		set_debug_flag("debug")
-
-	if len(args) != 6:
-		print usage_str
-		sys.exit(1)
 
 	protomol_path = locate(EXECUTABLE)
 	if protomol_path:
