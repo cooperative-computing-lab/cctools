@@ -50,7 +50,6 @@ num_replica_exchanges = 0
 num_task_resubmissions = 0
 replica_temp_execution_list = []
 replica_exch_list = []
-total_monte_carlo_step_time = 0
 step_time = 0
 
 
@@ -91,7 +90,7 @@ def locate(executable):
 #Function to generate execution script that runs simulations of a replica 
 # over given number of steps
 def generate_execn_script(replica_obj, replica_next_starting_step, replica_next_ending_step):
-	#initialize the script file name based on the replica id.
+	#assign script file name based on the replica id.
 	execn_script_name = "%s/%s/%s/exec-%d.sh" % (output_path, "simfiles", "runs", replica_obj.id)	
 	execn_script_stream = open(execn_script_name, "w")
 
@@ -184,9 +183,8 @@ def assign_task_input_files(task, replica_list, replica_id, replica_next_startin
 	else:
 		exchgd_replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_id)
 	
-	'''Local_file: file name for file brought back and stored on local site where this is run.
-	   Remote_file: file name for file sent to remote worker and used in execution there.'''
-		
+	'''Local_file: name for file brought back and stored on local site where this is run.
+	   Remote_file: name for file sent to remote worker and used in execution there.'''
 	#Assign local and remote execution scripts 
 	local_execn_file = "%s/simfiles/%s/exec-%d.sh" % (output_path, "runs", replica_id)
 	remote_execn_file = "exec-%d.sh" % (replica_id)
@@ -210,9 +208,6 @@ def assign_task_input_files(task, replica_list, replica_id, replica_next_startin
 		task.specify_input_file(local_velocity_input_file, remote_velocity_input_file, cache=False)
 		
 	for i in range(replica_next_starting_step, replica_next_ending_step+1):
-		'''Local_file: file name for file brought back and stored on local site where this is run.
-		Remote_file: file name for file sent to remote worker and used in execution there.'''
-
 		#Assign local and remote config files.
 		local_config_file = "%s/simfiles/config/%d/%d-%d.cfg" % (output_path, replica_id, replica_id, i)
 		remote_config_file = "%d-%d.cfg" % (replica_id, i)
@@ -231,11 +226,12 @@ def assign_task_input_files(task, replica_list, replica_id, replica_next_startin
 # Major replica exchange and scheduling is handled here
 def wq_main(wq, replica_list, replicas_to_run):
 
-	#Variable that tracks replicas which completed simulations over all MC steps
-	num_replicas_completed = 0
 	#Stat collection variables
 	global replicas_running
 	global step_time
+	
+	#Variable that tracks replicas which completed simulations over all MC steps
+	num_replicas_completed = 0
 
 	#-------Perform computation for each replica at current monte carlo step--------
 	'''Each computation is a task in work queue.
@@ -254,23 +250,27 @@ def wq_main(wq, replica_list, replicas_to_run):
 					#Each replica does computation at its current temperature
 					replica_temperature = replica_list[j].temp
 			
-					'''Record the last seen step of replica. The last_seen_step will be
-					the step at which this replica will be brought back and attempted
-					for an exchange.'''
+					'''Get the last seen step of replica. The last_seen_step
+					is the step at which this replica was brought back and 
+					attempted for an exchange.'''
 					replica_last_seen_step = replica_list[j].last_seen_step
 					
-					#record starting, ending steps for current iteration of this replica.
+					#record the starting, ending steps for current iteration of 
+					#this replica.
 					replica_next_starting_step = replica_last_seen_step + 1
 					if replica_next_starting_step >= monte_carlo_steps:
 						break
 			
 					if use_barrier:
-							replica_next_ending_step = replica_next_starting_step
+						#Barrier version, so run one step at a time.
+						replica_next_ending_step = replica_next_starting_step
 					else:
-						#If there are no more exchange steps for this replica, run the
-						#remainder of monte carlo steps.
+						#Run all steps until the step where the replica will be
+						#chosen to attempt an exchange. 
 						if len(replica_list[j].exch_steps) > 0:
 							replica_next_ending_step = replica_list[j].exch_steps[0]
+						#If there are no more exchange steps for this replica, run the
+						#remainder of monte carlo steps.
 						else:
 							replica_next_ending_step = monte_carlo_steps-1
 
@@ -282,37 +282,39 @@ def wq_main(wq, replica_list, replicas_to_run):
 					assign_task_input_files(task, replica_list, replica_id, replica_next_starting_step, replica_next_ending_step)		
 					assign_task_output_files(task, replica_list, replica_id, replica_next_starting_step, replica_next_ending_step)
 
-					#Submit the task to WorkQueue for execution at remote worker.
-					wq.submit(task)
-					
+					#Keep count of replicas that iterated through all MC steps.
 					if (replica_next_ending_step == monte_carlo_steps-1):
 						num_replicas_completed += 1
 
+					#Submit the task to WorkQueue for execution at remote worker.
+					wq.submit(task)
+				
 					#Submitted for execution. So mark this replica as running.
 					replica_list[j].running = 1
 					replicas_running += 1
 
 			#Wait for tasks to complete.
 			if use_barrier:
-				replicas_to_run=wq_wait_barrier(wq, replica_list, 30, replica_next_starting_step)
+				replicas_to_run=wq_wait_barrier(wq, replica_list, replica_next_starting_step, 30)
 			else:
 				replicas_to_run=wq_wait_nobarrier(wq, replica_list, 30)
 				
 
-def wq_wait_barrier(wq, replica_list, timeout, monte_carlo_step):
+'''The barrier version where it waits for all replicas to finish a given MC step.
+   Returns all the replicas that it waited for.'''
+def wq_wait_barrier(wq, replica_list, monte_carlo_step, timeout):
 
 	#Stat collection variables
-	global num_replica_exchanges
 	global step_time
-	global total_monte_carlo_step_time
 	global num_task_resubmissions
 	global replicas_running
 
+	#Initialize list that contains replicas that will be returned to run next.
 	replica_to_run = []
 
 	#Wait for all replicas to finish execution,
 	while not wq.empty():
-		task = wq.wait(10)
+		task = wq.wait(timeout)
 		if (task):
 			#Get replica id from finished task.
 			replica_id = int(task.tag)
@@ -322,12 +324,11 @@ def wq_wait_barrier(wq, replica_list, timeout, monte_carlo_step):
 				num_task_resubmissions += 1
 				print "Replica failed!"
 				time.sleep(3)
-				
 				#Resubmit the task.
 				wq.submit(task) 
 				continue
 
-			#Task was succesful. Update all information.
+			#Task was succesful. Update run information.
 			replicas_running -= 1
 			replica_list[replica_id].running = 0
 				
@@ -342,28 +343,36 @@ def wq_wait_barrier(wq, replica_list, timeout, monte_carlo_step):
 			replica_list[replica_id].prev_temp = replica_list[replica_id].temp
 			replica_list[replica_id].exchgd_replica_id = replica_id
 
+			#Add this replica to return list.
 			replica_to_run.append(replica_id)
-	
+
+	#Get replica exchange pair for current step and attempt exchange.
 	cur = replica_exch_list[monte_carlo_step].pop(0)
 	next = replica_exch_list[monte_carlo_step].pop(0)
-		
-	if debug_mode: print "Replicas %d & %d are attempted for an exchange at step %d" % (cur, next, monte_carlo_step)
+	if debug_mode: 
+		print "Replicas %d & %d are attempted for an exchange at step %d" % (cur, next, monte_carlo_step)
+
+	#Attempt exchange between the two.
 	attempt_replica_exch(replica_list, cur, next)
 
-	#Update time stats.
+	#Update time stats for this MC step.
 	step_time = time.time() - step_time
-	total_monte_carlo_step_time += step_time
 	mc_step_times.append(step_time)
 
 	return replica_to_run
 
 
+'''The nobarrier version where it receives a finished replica, waits for its 
+   exchange partner to finish, attempts an exchange between the two, and continues 
+   waiting for the rest similarly.
+   Returns the replica pair that finished and was attempted for an exchange.'''
 def wq_wait_nobarrier(wq, replica_list, timeout):
 	
+	#Stat collection variables
 	global num_task_resubmissions
 	global replicas_running
 	
-	#Wait for all tasks to finish execution.
+	#Wait for a task to finish execution.
 	while not wq.empty():
 		task = wq.wait(timeout)
 		if (task):
@@ -380,7 +389,7 @@ def wq_wait_nobarrier(wq, replica_list, timeout):
 				wq.submit(task) 
 				continue
 
-			#Task was succesful. Update all information.
+			#Task was succesful. Update run information.
 			replicas_running -= 1
 			replica_list[replica_id].running = 0
 
@@ -395,9 +404,10 @@ def wq_wait_nobarrier(wq, replica_list, timeout):
 			replica_list[replica_id].prev_temp = replica_list[replica_id].temp
 			replica_list[replica_id].exchgd_replica_id = replica_id
 
-			#Replica should be currently at this step which is the exchange step.
+			#Replica should be currently at this step which is its exchange step.
 			if len(replica_list[replica_id].exch_steps) > 0:	
 				replica_exch_step = replica_list[replica_id].exch_steps.pop(0)
+			#Else replica is at the last MC step of this run.
 			else:
 				replica_exch_step = monte_carlo_steps - 1
 
@@ -408,11 +418,16 @@ def wq_wait_nobarrier(wq, replica_list, timeout):
 				replica_exch_partner = replica_exch_list[replica_exch_step][0]
 			else:
 				if (replica_exch_step != (monte_carlo_steps-1)):
+					#If this replica is not part of the exchange pair for this
+					#step and is not at the last MC step of the run, something 
+					#is amiss..
 					print "Replica %d should not be here at step %d" % (replica_id, replica_exch_step)
 					sys.exit(1)
 				else:
+					#If all replicas have completed last MC step, return.
 					if replicas_running == 0:
 						return
+					#If not, loop back to receive other replicas.
 					else:
 						continue
 
@@ -430,7 +445,7 @@ def wq_wait_nobarrier(wq, replica_list, timeout):
 					print "Partner of replica %d - replica %d is currently at step %d which is beyond step %d" % (replica_id, replica_exch_partner, replica_list[replica_exch_partner].exch_steps[0], replica_exch_step)
 					sys.exit(1)
 				else:
-					#Make sure the replicas are checked in the same order they were picked at the start.
+					#Make sure the replicas are checked in the same order they were chosen at the start.
 					if (replica_exch_partner == replica_exch_list[replica_exch_step][0]):
 						replica_1 = replica_exch_partner
 						replica_2 = replica_id
@@ -438,32 +453,38 @@ def wq_wait_nobarrier(wq, replica_list, timeout):
 						replica_1 = replica_id
 						replica_2 = replica_exch_partner
 						
-					#Attempt exchange between and proceed to next iteration.
-					if debug_mode: print "Replicas %d & %d are attempted for an exchange at step %d" % (replica_1, replica_2, replica_exch_step)
+					if debug_mode: 
+						print "Replicas %d & %d are attempted for an exchange at step %d" % (replica_1, replica_2, replica_exch_step)
+					
+					#Attempt exchange between the two.
 					attempt_replica_exch(replica_list, replica_1, replica_2)
 				
-					#Generate config and run the next steps of these replicas.
+					#Add these two replicas to return list.
 					replicas_to_run = [replica_1, replica_2]
+					
 					return replicas_to_run
 
 
-def attempt_replica_exch(replica_list, cur, next):
+#Check if two replicas satisfy the criteria to undergo an exchange.
+def attempt_replica_exch(replica_list, replica1, replica2):
 	global num_replica_exchanges
 	
-	#Check for metropolis criteria with the randomly chosen replica and its immediate neighbor.
-	if (metropolis(replica_list[cur].potential_energy, replica_list[next].potential_energy, replica_list[cur].temp, replica_list[next].temp)):
-		if debug_mode: print "Replicas %d and %d exchanged" % (cur, next)
-		#Swap the fields of the two replicas being exchanged.
-		T = replica_list[next].temp
-		replica_list[next].temp = replica_list[cur].temp
-		replica_list[cur].temp = T
+	#Check for metropolis criteria.
+	if (metropolis(replica_list[replica1].potential_energy, replica_list[replica2].potential_energy, replica_list[replica1].temp, replica_list[replica2].temp)):
+		#Swap fields of the two replicas being exchanged.
+		T = replica_list[replica2].temp
+		replica_list[replica2].temp = replica_list[replica1].temp
+		replica_list[replica1].temp = T
 			
-		replica_list[cur].exchgd_replica_id = replica_list[next].id
-		replica_list[next].exchgd_replica_id = replica_list[cur].id
+		replica_list[replica1].exchgd_replica_id = replica_list[replica2].id
+		replica_list[replica2].exchgd_replica_id = replica_list[replica1].id
 			
-		replica_temp_execution_list[cur].append(replica_list[cur].temp)
-		replica_temp_execution_list[next].append(replica_list[next].temp)
+		replica_temp_execution_list[replica1].append(replica_list[replica1].temp)
+		replica_temp_execution_list[replica2].append(replica_list[replica2].temp)
 			
+		if debug_mode: 
+			print "Replicas %d and %d exchanged" % (replica1, replica2)
+		
 		#Keep count of exchanges.
 		num_replica_exchanges += 1
 
@@ -500,7 +521,9 @@ def make_directories(output_path, temp_list, num_replicas):
 	if not os.path.exists(newdir4):
 		os.makedirs(newdir4)
 
-	
+
+#Function to determine the replica exchange pairs that will be attempted for an
+#exchange at each MC step.
 def create_replica_exch_pairs(replica_list, num_replicas):
 	#Compute random pair (replica, neighbor) for each step to attempt exchange.
 	for i in range(monte_carlo_steps):
@@ -542,7 +565,7 @@ if __name__ == "__main__":
 
 	#Check to see if there is error in the given command line arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "n:x:d:m:s:p:qiblh", ["--help"])
+		opts, args = getopt.getopt(sys.argv[1:], "n:x:d:m:s:p:qiblh", ["help"])
 	except getopt.GetoptError, err:
 		print str(err) 
 		print usage_str
@@ -675,13 +698,22 @@ if __name__ == "__main__":
 	#Write stats to a stats file
 	stat_file_name = "%s/%s.stat" % (output_path,  remove_trailing_dots(parse_file_name(pdb_file)))
 	stat_file_stream = open(stat_file_name, "w")
+
 	stat_file_stream.write("%s\n" % "Printing replica temperature execution matrix:")
-	
 	#Sort and format the replica exchange matrix.
 	for itr in range(num_replicas):
 		 replica_temp_execution_list[itr].sort()
 		 unique(replica_temp_execution_list[itr])
 		 stat_file_stream.write("Replica %d: %s\n" % (itr, replica_temp_execution_list[itr]))
+
+	#If barrier version was used, write the MC step times to stats file.
+	if use_barrier:
+		#Write run time for each step to stats file
+		stat_file_stream.write("\n\n%s\n" % "Printing run times for each monte carlo step:")
+		count = 1
+		for i in mc_step_times:
+			stat_file_stream.write("%d %f\n" % (count, i))
+			count += 1
 
 	stat_file_stream.close()
 	
