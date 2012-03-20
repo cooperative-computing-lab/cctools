@@ -272,7 +272,7 @@ class WorkQueue(_object):
     # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
     #
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=True, exclusive=True, shutdown=False):
+    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=False, exclusive=True, shutdown=False):
         self._work_queue = work_queue_create(port)
         self._stats      = work_queue_stats()
         self._task_table = {}
