@@ -45,6 +45,7 @@ See the file COPYING for details.
 
 
 static int abort_flag = 0;
+static int pool_config_updated = 1;
 static struct batch_queue *q;
 static struct itable *job_table = NULL;
 static struct hash_table *processed_masters;
@@ -172,6 +173,11 @@ int decide_worker_distribution(struct list *matched_masters, struct pool_config 
 static void handle_abort(int sig)
 {
 	abort_flag = 1;
+}
+
+static void handle_config(int sig)
+{
+	pool_config_updated = 1;
 }
 
 struct worker_distribution_node {
@@ -389,12 +395,10 @@ void display_pool_config(struct pool_config *pc) {
 struct pool_config *update_pool_config(const char *pool_config_path, struct pool_config *old_config) {
 	struct stat config_stat;
 	static time_t last_modified = 0;
-	int pool_config_updated = 0;
 	struct pool_config *pc = NULL;
 
 	if(stat(pool_config_path, &config_stat) == 0) {
 		if(config_stat.st_mtime > last_modified) {
-			pool_config_updated = 1;
 			last_modified = config_stat.st_mtime;
 		} else {
 			return old_config;
@@ -431,7 +435,10 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 	struct pool_config *pc = NULL;
 
 	while(!abort_flag) {
-		pc = update_pool_config(pool_config_path, pc);
+		if(pool_config_updated) {
+			pool_config_updated = 0;
+			pc = update_pool_config(pool_config_path, pc);
+		}
 		if(!pc) {
 			abort_flag = 1;
 			fprintf(stderr, "Failed to load a valid pool configuration.\n");
@@ -1041,6 +1048,9 @@ int main(int argc, char *argv[])
 	char new_worker_path[PATH_MAX];
 	char *pool_config_path = "work_queue_pool.conf";
 	char pool_config_canonical_path[PATH_MAX];
+	char pool_pid_canonical_path[PATH_MAX];
+
+	pool_pid_canonical_path[0] = 0;
 
 	int batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 	batch_job_id_t jobid;
@@ -1053,6 +1063,8 @@ int main(int argc, char *argv[])
 
 	char *catalog_host;
 	int catalog_port;
+
+	char pidfile_path[PATH_MAX];
 
 	struct list *regex_list;
 
@@ -1155,11 +1167,43 @@ int main(int argc, char *argv[])
 			}
 			goal = strtol(argv[optind], NULL, 10);
 		}
+	} else {
+		pid_t pid;
+		pid = getpid();
+		char *p;
+		p = strrchr(argv[0], '/');
+		if(!p) {
+			p = argv[0];
+		} else {
+			p++;
+		}
+		snprintf(pidfile_path, PATH_MAX, "%s.pid", p);
+
+		struct stat tmp_stat;
+		if(stat(pidfile_path, &tmp_stat) == 0) {
+			fprintf(stderr, "Error: file '%s' already exists but %s is trying to store the pid of itself in this file.\n", pidfile_path, argv[0]);
+			return EXIT_FAILURE;
+		}
+
+		FILE *pidfile = fopen(pidfile_path, "w");
+		if(!pidfile) {
+			fprintf(stderr, "Error: can't create file - '%s' for storing pid\n", pidfile_path); 
+			return EXIT_FAILURE;
+		}
+		char buffer[20]; // big enought for a pid
+		snprintf(buffer, 20, "%d", pid);
+		if(fputs(buffer, pidfile) == EOF) {
+			fprintf(stderr, "Error: failed to write pid to file - '%s'.\n", pidfile_path); 
+			return EXIT_FAILURE;
+		}	
+		fclose(pidfile);
 	}
 
 	signal(SIGINT, handle_abort);
 	signal(SIGQUIT, handle_abort);
 	signal(SIGTERM, handle_abort);
+
+	signal(SIGUSR1, handle_config);
 
 
 	if(!locate_executable("work_queue_worker", worker_path))
@@ -1206,6 +1250,10 @@ int main(int argc, char *argv[])
 			} else {
 				return EXIT_FAILURE;
 			}
+
+			// get pool pid file's absolute path (for later delete this file while in the scratch dir
+			strncpy(pool_pid_canonical_path, pool_config_canonical_path, strlen(pool_config_canonical_path));
+			strncat(pool_pid_canonical_path, pidfile_path, strlen(pidfile_path));
 
 			p = pool_config_path;
 			if(len > 2) {
@@ -1296,9 +1344,11 @@ int main(int argc, char *argv[])
 
 	// Abort all jobs
 	remove_workers(job_table);
+	printf("All workers aborted.\n");
 	delete_dir(scratch_dir);
-	debug(D_WQ, "All jobs aborted.\n");
-
+	if(pool_pid_canonical_path[0]) {
+		unlink(pool_pid_canonical_path);
+	}
 	batch_queue_delete(q);
 
 	return EXIT_SUCCESS;
