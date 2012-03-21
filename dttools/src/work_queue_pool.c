@@ -45,7 +45,7 @@ See the file COPYING for details.
 
 
 static int abort_flag = 0;
-static int pool_config_updated = 1;
+static sig_atomic_t pool_config_updated = 1;
 static struct batch_queue *q;
 static struct itable *job_table = NULL;
 static struct hash_table *processed_masters;
@@ -1187,13 +1187,14 @@ int main(int argc, char *argv[])
 
 		FILE *pidfile = fopen(pidfile_path, "w");
 		if(!pidfile) {
-			fprintf(stderr, "Error: can't create file - '%s' for storing pid\n", pidfile_path); 
+			fprintf(stderr, "Error: can't create file - '%s' for storing pid: %s\n", pidfile_path, strerror(errno)); 
 			return EXIT_FAILURE;
 		}
-		char buffer[20]; // big enought for a pid
-		snprintf(buffer, 20, "%d", pid);
-		if(fputs(buffer, pidfile) == EOF) {
+
+		if(fprintf(pidfile, "%d", pid) < 0) {
 			fprintf(stderr, "Error: failed to write pid to file - '%s'.\n", pidfile_path); 
+			fclose(pidfile);
+			unlink(pidfile_path);
 			return EXIT_FAILURE;
 		}	
 		fclose(pidfile);
@@ -1252,7 +1253,7 @@ int main(int argc, char *argv[])
 			}
 
 			// get pool pid file's absolute path (for later delete this file while in the scratch dir
-			strncpy(pool_pid_canonical_path, pool_config_canonical_path, strlen(pool_config_canonical_path));
+			strncpy(pool_pid_canonical_path, pool_config_canonical_path, PATH_MAX);
 			strncat(pool_pid_canonical_path, pidfile_path, strlen(pidfile_path));
 
 			p = pool_config_path;
