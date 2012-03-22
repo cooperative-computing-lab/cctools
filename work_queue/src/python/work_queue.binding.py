@@ -21,6 +21,8 @@ def set_debug_flag(*flags):
     for flag in flags:
         cctools_debug_flags_set(flag)
 
+version = work_queue_version()
+
 cctools_debug_config('work_queue_python')
 
 ##

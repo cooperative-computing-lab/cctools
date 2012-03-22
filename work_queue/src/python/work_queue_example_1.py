@@ -16,9 +16,12 @@ from work_queue import WORK_QUEUE_TASK_ORDER_LIFO
 import os
 import sys
 import time
+import work_queue
 
 set_debug_flag('debug')
 set_debug_flag('wq')
+
+print work_queue.version
 
 wq = WorkQueue(WORK_QUEUE_RANDOM_PORT, name='workqueue_example', catalog=True, exclusive=False)
 os.system('work_queue_worker -d all localhost %d &' % wq.port)

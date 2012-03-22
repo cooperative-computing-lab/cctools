@@ -2781,3 +2781,10 @@ static void enforce_pool_decisions(struct work_queue *q) {
 	list_free(decisions);
 	list_delete(decisions);
 }
+
+const char *work_queue_version(void)
+{
+    static char buffer[10];
+    sprintf(buffer, "%d.%d.%d", CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
+    return buffer;
+}
