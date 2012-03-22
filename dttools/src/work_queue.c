@@ -107,6 +107,7 @@ struct work_queue {
 	double fast_abort_multiplier;
 
 	int worker_selection_algorithm;		  /**< How to choose worker to run the task. */
+	int task_ordering;
 
 	timestamp_t time_last_task_start;
 	timestamp_t idle_time;
@@ -1868,6 +1869,7 @@ struct work_queue *work_queue_create(int port)
 
 	q->fast_abort_multiplier = wq_option_fast_abort_multiplier;
 	q->worker_selection_algorithm = wq_option_scheduler;
+	q->task_ordering = WORK_QUEUE_TASK_ORDER_DEFAULT;
 
 	envstring = getenv("WORK_QUEUE_NAME");
 	if(envstring)
@@ -2134,7 +2136,12 @@ void work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	t->result = WORK_QUEUE_RESULT_UNSET;
 
 	/* Then, add it to the ready list and mark it as submitted. */
-	list_push_tail(q->ready_list, t);
+	if (q->task_ordering == WORK_QUEUE_TASK_ORDER_LIFO){
+		list_push_head(q->ready_list, t);
+	}	
+	else {
+		list_push_tail(q->ready_list, t);
+	}	
 	t->time_task_submit = timestamp_get();
 	q->total_tasks_submitted++;
 }
@@ -2609,6 +2616,16 @@ int work_queue_specify_algorithm(struct work_queue *q, int alg)
 {
 	if(q && alg > WORK_QUEUE_SCHEDULE_UNSET && alg <= WORK_QUEUE_SCHEDULE_MAX) {
 		q->worker_selection_algorithm = alg;
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+int work_queue_specify_task_order(struct work_queue *q, int order)
+{
+	if(q && order >= WORK_QUEUE_TASK_ORDER_FIFO && order <= WORK_QUEUE_TASK_ORDER_LIFO) {
+		q->task_ordering = order;
 		return 0;
 	} else {
 		return 1;

@@ -52,6 +52,10 @@ and port of the master.
 #define WORK_QUEUE_SCHEDULE_RAND 5	/**< Select a random worker. */
 #define WORK_QUEUE_SCHEDULE_MAX 5
 
+#define WORK_QUEUE_TASK_ORDER_FIFO 0  /**< Retrieve tasks based on first-in-first-out order. */
+#define WORK_QUEUE_TASK_ORDER_LIFO 1  /**< Retrieve tasks based on last-in-first-out order. */
+#define WORK_QUEUE_TASK_ORDER_DEFAULT 0  /**< Default task ordering (@ref WORK_QUEUE_TASK_ORDER_FIFO). */
+ 
 #define WORK_QUEUE_INPUT  0	/**< Specify an input object. */
 #define WORK_QUEUE_OUTPUT 1	/**< Specify an output object. */
 
@@ -298,6 +302,12 @@ int work_queue_activate_fast_abort(struct work_queue *q, double multiplier);
 @param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
 */
 int work_queue_specify_algorithm(struct work_queue *q, int alg);
+
+/** Specify how the submitted tasks should be ordered. Either as FIFO or LIFO.
+@param q A pointer to the queue to modify.
+@param order The ordering to use for dispatching submitted tasks. Valid possibilities are defined in this file as "WORK_QUEUE_TASK_ORDER_X" values.
+*/
+int work_queue_specify_task_order(struct work_queue *q, int order);
 
 /** Change the project name for a given queue.
 @param q A pointer to the queue to modify.
