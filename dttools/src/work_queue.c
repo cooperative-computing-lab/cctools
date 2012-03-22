@@ -1915,7 +1915,7 @@ struct work_queue *work_queue_create(int port)
 		work_queue_specify_wait_routine(q, atoi(envstring));
 	}
 
-	if(q->auto_remove_workers_on) {
+	if(q->auto_remove_workers_on == WORK_QUEUE_SWITCH_ON) {
 		if(q->estimate_capacity_on == WORK_QUEUE_SWITCH_UNSPECIFIED) {
 			q->estimate_capacity_on = WORK_QUEUE_SWITCH_ON;
 		}
