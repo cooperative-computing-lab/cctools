@@ -344,6 +344,18 @@ class WorkQueue(_object):
         return work_queue_specify_algorithm(self._work_queue, algorithm)
 
     ##
+    # Set the order for dispatching submitted tasks in the queue.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param order  	One of the following algorithms to use in dispatching
+	# 					submitted tasks to workers:
+    #                   - @ref WORK_QUEUE_TASK_ORDER_FIFO
+    #                   - @ref WORK_QUEUE_TASK_ORDER_LIFO
+    #                   - @ref WORK_QUEUE_TASK_ORDER_DEFAULT
+    def specify_task_order(self, order):
+        return work_queue_specify_task_order(self._work_queue, order)
+
+    ##
     # Change the project name for the given queue.
     #
     # @param self   Reference to the current work queue object.
