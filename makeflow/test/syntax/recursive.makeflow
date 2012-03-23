@@ -1,0 +1,6 @@
+uname.append.0 uname.append.1: options.makeflow
+	@BATCH_LOCAL=1
+	MAKEFLOW options.makeflow
+
+capitol.montage.gif: test.makeflow
+	LOCAL MAKEFLOW test.makeflow .
