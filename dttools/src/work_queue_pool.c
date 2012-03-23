@@ -19,6 +19,8 @@ See the file COPYING for details.
 #include "catalog_server.h"
 #include "work_queue_catalog.h"
 #include "list.h"
+#include "get_line.h"
+#include "get_canonical_path.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -35,77 +37,468 @@ See the file COPYING for details.
 #define EXTRA_WORKERS_MAX 20
 #define EXTRA_WORKERS_PERCENTAGE 0.2
 
+#define POOL_CONFIG_LINE_MAX 4096
+#define INITIAL_WORKERS_DEFAULT 15
+#define INITIAL_WORKERS_MAX 100
+#define WORKERS_DEFAULT 100
+#define WORKERS_MAX 500
+
+
 static int abort_flag = 0;
+static sig_atomic_t pool_config_updated = 1;
 static struct batch_queue *q;
-static struct itable *remote_job_table = NULL;
+static struct itable *job_table = NULL;
 static struct hash_table *processed_masters;
 static int retry_count = 20;
 
-struct list *get_matched_masters(const char *catalog_host, int catalog_port, struct list *regex_list);
-void process_matched_masters(struct list *matched_masters);
-static int submit_workers(char *cmd, char *input_files, int count);
+static char name_of_this_pool[WORK_QUEUE_POOL_NAME_MAX];
+typedef enum {
+	TABLE_ALIGN_LEFT,
+	TABLE_ALIGN_RIGHT
+} table_align_t;
+
+struct pool_table_header {
+	const char *name;
+	table_align_t align;
+	int width;
+};
+
+static struct pool_table_header headers[] = {
+	{"project", TABLE_ALIGN_LEFT, 20},
+	{"host", TABLE_ALIGN_LEFT, 15},
+	{"port", TABLE_ALIGN_RIGHT, 6},
+	{"capacity", TABLE_ALIGN_RIGHT, 10},
+	{"worker_need", TABLE_ALIGN_RIGHT, 15},
+	{"worker_active", TABLE_ALIGN_RIGHT, 15},
+	{"worker_assign", TABLE_ALIGN_RIGHT, 15},
+	{NULL,}
+};
+
+static void fill_string(const char *str, char *buf, int buflen, table_align_t align)
+{
+	int stlen = strlen(str);
+	memset(buf, ' ', buflen);
+	buf[buflen] = 0;
+	if(align == TABLE_ALIGN_LEFT) {
+		while(stlen > 0 && buflen > 0) {
+			*buf++ = *str++;
+			stlen--;
+			buflen--;
+		}
+	} else {
+		str = str + stlen - 1;
+		buf = buf + buflen - 1;
+		while(stlen > 0 && buflen > 0) {
+			*buf-- = *str--;
+			stlen--;
+			buflen--;
+		}
+	}
+}
+
+void auto_pool_print_table_header(FILE * s, struct pool_table_header *h)
+{
+	while(h->name) {
+		char *n = xxmalloc(h->width + 1);
+		fill_string(h->name, n, h->width, h->align);
+		string_toupper(n);
+		printf("%s ", n);
+		free(n);
+		h++;
+	}
+	printf("\n");
+}
+
+void auto_pool_print_table_body(struct list *masters, FILE *stream, struct pool_table_header *header)
+{
+	if(!masters || !stream || !header) {
+		return;
+	}
+	struct work_queue_master *m;	
+	list_first_item(masters);
+	while((m = (struct work_queue_master *)list_next_item(masters))) {
+		struct pool_table_header *h = header;
+		while(h->name) {
+			char *aligned = xxmalloc(h->width + 1);
+			char *line;
+			line = xxmalloc(h->width);
+			if(strcmp(h->name, "project") == 0) {
+				snprintf(line, h->width, "%s", m->proj);
+			} else if (strcmp(h->name, "host") == 0) {
+				snprintf(line, h->width, "%s", m->addr);
+			} else if (strcmp(h->name, "port") == 0) {
+				snprintf(line, h->width, "%d", m->port);
+			} else if (strcmp(h->name, "capacity") == 0) {
+				if(m->capacity > 0) {
+					snprintf(line, h->width, "%d", m->capacity);
+				} else {
+					strncpy(line, "unknown", h->width);
+				}
+			} else if (strcmp(h->name, "worker_need") == 0) {
+				snprintf(line, h->width, "%d", m->workers_need);
+			} else if (strcmp(h->name, "worker_active") == 0) {
+				snprintf(line, h->width, "%d", m->workers_from_this_pool);
+			} else if (strcmp(h->name, "worker_assign") == 0) {
+				snprintf(line, h->width, "%d", m->target_workers_from_pool);
+			} else {
+				strncpy(line, "???", h->width);
+			}
+
+			fill_string(line, aligned, h->width, h->align);
+			printf("%s ", aligned);
+			free(line);
+			free(aligned);
+			h++;
+		}
+		printf("\n");
+	}
+}
 
 struct worker_status {
 	int batch_job_id;
 	char status;
 };
 
+struct pool_config {
+	struct list *project;
+	struct list *distribution;
+	unsigned int max_workers;
+};
+
+struct list *get_matched_masters(const char *catalog_host, int catalog_port, struct list *regex_list);
+static int submit_workers(char *cmd, char *input_files, int count);
+void submit_workers_for_new_masters(struct list *matched_masters, struct pool_config *pc);
+int decide_worker_distribution(struct list *matched_masters, struct pool_config *pc, const char *catalog_host, int catalog_port);
+
 static void handle_abort(int sig)
 {
 	abort_flag = 1;
 }
 
-static int locate_executable(char *name, char *path)
+static void handle_config(int sig)
 {
-	if(strlen(path) > 0) {
-		if(access(path, R_OK | X_OK) < 0) {
-			fprintf(stderr, "Inaccessible %s specified: %s\n", name, path);
-			return 0;
+	pool_config_updated = 1;
+}
+
+struct worker_distribution_node {
+	char *name;
+	unsigned int default_max;
+	unsigned int hit;
+};
+
+void set_pool_name(char *pool_name, size_t size) {
+	char hostname[DOMAIN_NAME_MAX];
+	pid_t pid;
+
+	domain_name_cache_guess(hostname);
+	pid = getpid();
+
+	snprintf(pool_name, size, "%s-%d", hostname, pid);
+}
+
+void destroy_pool_config(struct pool_config **ppc) {
+	struct pool_config *pc = *ppc;
+	if(!pc) return;
+
+	if(pc->project) {
+		char *p;
+		while((p = (char *)list_pop_tail(pc->project))) {
+			free(p);
 		}
-	} else {
-		if(!find_executable(name, "PATH", path, PATH_MAX)) {
-			fprintf(stderr, "Please add %s to your PATH or specify it explicitly.\n", name);
+	}
+	list_delete(pc->project);
+
+	if(pc->distribution) {
+		struct worker_distribution_node *wdn;
+		while((wdn = (struct worker_distribution_node *)list_pop_tail(pc->distribution))) {
+			free(wdn->name);
+			free(wdn);
+		}
+	}
+	list_delete(pc->distribution);
+
+	free(pc);
+	pc = NULL;
+}
+
+int add_worker_distribution(struct pool_config *pc, const char *value) {
+	if(!pc || !value) {
+		return 0;
+	}
+
+	if(!pc->project) {
+		pc->project = list_create();
+		if(!pc->project) {
+			fprintf(stderr, "Cannot allocate memory for list!\n");
 			return 0;
 		}
 	}
-	debug(D_DEBUG, "%s path: %s", name, path);
+
+	if(!pc->distribution) {
+		pc->distribution = list_create();
+		if(!pc->distribution) {
+			fprintf(stderr, "Cannot allocate memory for list!\n");
+			return 0;
+		}
+	}
+
+	char *distribution, *d, *eq;
+
+	distribution = strdup(value);
+	d = strtok(distribution, " \t,"); 
+	while(d) {
+		eq = strchr(d, '=');
+		if(eq) {
+			int default_max;
+
+			*eq = '\0';
+			default_max = atoi(eq+1);
+			if(default_max < 0) {
+				*eq = '=';
+				fprintf(stderr, "Default maximum number of workers in \"%s\" is invalid.\n", d);
+				free(distribution);
+				return 0;
+			}
+
+			struct worker_distribution_node *wdn;
+			wdn = (struct worker_distribution_node *)xxmalloc(sizeof(*wdn));
+
+			wdn->name = xxstrdup(d);
+			wdn->default_max = default_max;
+
+			list_push_tail(pc->project, xxstrdup(wdn->name));
+			list_push_tail(pc->distribution, wdn);
+
+			*eq = '=';
+		} else {
+			fprintf(stderr, "Invalid worker distribution item: \"%s\".\n", d);
+			free(distribution);
+			return 0;
+		}
+		d = strtok(0, " \t,");
+	}
+	free(distribution);
+
 	return 1;
 }
 
-static int copy_executable(char *current_path, char *new_path)
-{
-	FILE *ifs, *ofs;
+struct pool_config *get_pool_config(const char *path) {
+	struct pool_config *pc = (struct pool_config *)malloc(sizeof(*pc));
+	if(!pc) {
+		fprintf(stderr, "Failed to allocate memory for pool configuration - %s\n", strerror(errno));
+		return NULL;
+	}
 
-	ifs = fopen(current_path, "r");
-	if(ifs == NULL) {
-		fprintf(stderr, "Unable to open %s for reading: %s\n", current_path, strerror(errno));
+	pc->project = list_create();
+	if(!pc->project) {
+		fprintf(stderr, "Cannot allocate memory for list!\n");
 		return 0;
 	}
-	ofs = fopen(new_path, "w+");
-	if(ofs == NULL) {
-		fprintf(stderr, "Unable to open %s for writing: %s", new_path, strerror(errno));
-		fclose(ifs);
+
+	pc->distribution = list_create();
+	if(!pc->distribution) {
+		fprintf(stderr, "Cannot allocate memory for list!\n");
 		return 0;
 	}
-	copy_stream_to_stream(ifs, ofs);
-	fclose(ifs);
-	fclose(ofs);
-	chmod(new_path, 0777);
 
-	return 1;
+	// Set defaults
+	pc->max_workers = WORKERS_DEFAULT;
+
+	// Read in new configuration from file
+	FILE *fp;
+
+	fp = fopen(path, "r");
+	if(!fp) {
+		fprintf(stderr, "Failed to open pool configuration file: \"%s\".\n", path);
+		return 0;
+	}
+
+	char *line;
+	int line_count = 0;
+	while((line = get_line(fp))) {
+		line_count++;
+		int len;
+		char *name, *value;
+		string_chomp(line);
+		if(string_isspace(line)) {
+			continue;
+		}
+		
+		len = strlen(line);
+		name = (char *)xxmalloc(len * sizeof(char));
+		value = (char *)xxmalloc(len * sizeof(char));
+		
+		if(sscanf(line, " %[^: \t] : %[^\r\n]", name, value) == 2) {
+			if(!strncmp(name, "distribution", strlen(name))) {
+				if(!add_worker_distribution(pc, value)) {
+					fprintf(stderr, "Error loading configuration: failed to record worker distribution.\n");
+					goto fail;
+				}
+			} else if(!strncmp(name, "max_workers", strlen(name))) {
+				int max_workers = atoi(value);
+				if(max_workers <= 0 || max_workers > WORKERS_MAX) {
+					fprintf(stderr, "Invalid configuration: max_workers (%d) out of range [1, %d]\n", max_workers, WORKERS_MAX);
+					goto fail;
+				}
+				pc->max_workers = max_workers;
+			} else {
+				fprintf(stderr, "Invalid configuration: invalid item -- %s found at line %d.\n", name, line_count);
+				goto fail;
+			}
+		} else {
+			fprintf(stderr, "Line %d in %s is invalid: \"%s\". Should be \"item_name:item_value\".\n", line_count, path, line);
+			free(name);
+			free(value);
+			goto fail;
+		}
+
+		free(name);
+		free(value);
+	}
+	fclose(fp);
+	return pc;
+
+fail:
+	fclose(fp);
+	return NULL;
+}
+
+void display_pool_config(struct pool_config *pc) {
+	if(!pc) return;
+
+	printf("** Maximum Number of Workers:\n\t%d\n\n", pc->max_workers);
+	if(pc->project) {
+		char *p;
+		int i = 0;
+		printf("** Preferred Projects:\n");
+		list_first_item(pc->project);
+		while((p = (char *)list_next_item(pc->project))) {
+			i++;
+			printf("\t%d: %s\n", i, p);
+		}
+		printf("\n");
+	}
+
+	if(pc->distribution) {
+		struct worker_distribution_node *wdn;
+		int i = 0;
+		printf("** Worker Distribution Assignment:\n");
+		list_first_item(pc->distribution);
+		while((wdn = (struct worker_distribution_node *)list_next_item(pc->distribution))) {
+			i++;
+			printf("\t%d: %s %d\n", i, wdn->name, wdn->default_max);
+		}
+		printf("\n");
+	}
+}
+
+struct pool_config *update_pool_config(const char *pool_config_path, struct pool_config *old_config) {
+	struct stat config_stat;
+	static time_t last_modified = 0;
+	struct pool_config *pc = NULL;
+
+	if(stat(pool_config_path, &config_stat) == 0) {
+		if(config_stat.st_mtime > last_modified) {
+			last_modified = config_stat.st_mtime;
+		} else {
+			return old_config;
+		}
+	} else {
+		fprintf(stderr, "Cannot stat pool configuration file - %s (%s)\nUsing old configuration ...\n\n", pool_config_path, strerror(errno));
+		display_pool_config(old_config);
+		return old_config;
+	}
+
+	// Need to load new pool configuration
+	pc = get_pool_config(pool_config_path);
+	if(!pc) {	
+		fprintf(stderr, "New pool configuration is malformatted.\nUsing old configuration ...\n\n");
+		pc = old_config;
+	} else {
+		destroy_pool_config(&old_config);
+		printf("New work queue pool configuration has been loaded.\n\n");
+	}
+	display_pool_config(pc);
+	return pc;
 }
 
 // TODO: // This is an experimental feature!!
-void start_serving_masters(const char *catalog_host, int catalog_port, struct list *regex_list)
+void start_serving_masters(const char *catalog_host, int catalog_port, const char *pool_config_path) 
 {
 	struct list *matched_masters;
+	batch_job_id_t jobid;
+	struct batch_job_info info;
+
+	char cmd[PATH_MAX] = "";
+	char input_files[PATH_MAX] = "";
+
+	struct pool_config *pc = NULL;
 
 	while(!abort_flag) {
-		matched_masters = get_masters_from_catalog(catalog_host, catalog_port, regex_list);
+		if(pool_config_updated) {
+			pool_config_updated = 0;
+			pc = update_pool_config(pool_config_path, pc);
+		}
+		if(!pc) {
+			abort_flag = 1;
+			fprintf(stderr, "Failed to load a valid pool configuration.\n");
+			return;
+		}
+
+		matched_masters = get_masters_from_catalog(catalog_host, catalog_port, pc->project);
+		if(!matched_masters) {
+			sleep(5);
+			continue;
+		}
 		debug(D_WQ, "Matching masters:\n");
 		debug_print_masters(matched_masters);
-		process_matched_masters(matched_masters);
-		sleep(6);
+
+		//submit_workers_for_new_masters(matched_masters, pc);
+		int n = decide_worker_distribution(matched_masters, pc, catalog_host, catalog_port);
+
+		// TODO -t option
+		snprintf(cmd, PATH_MAX, "./work_queue_worker -a -t 60 -p %s", name_of_this_pool);
+		snprintf(input_files, PATH_MAX, "work_queue_worker");
+
+		n -= itable_size(job_table);
+		if(n > 0) {
+			// sum_waiting is the maximum # of workers that all masters would possibly need from the pool
+			// this field is useful when masters are at the end of their lifecycle (when masters have no waiting tasks)
+			// without this field, the pool may submit unnecessary workers due to the stale data in catalog server
+			int sum_waiting = 0;
+			struct work_queue_master *m;	
+			list_first_item(matched_masters);
+			while((m = (struct work_queue_master *)list_next_item(matched_masters))) {
+				sum_waiting += m->tasks_waiting;
+			}
+
+			n = MIN(n, sum_waiting);
+
+			if(n > 0) {
+				submit_workers(cmd, input_files, n);
+				printf("%d more workers has just been submitted.\n", n);
+			}
+		} 
+		printf("%d workers are being maintained.\n", itable_size(job_table));
+
+		printf("Number of matched masters: %d.\n\n", list_size(matched_masters));
+		if(list_size(matched_masters)) {
+			auto_pool_print_table_header(stdout, headers);
+			auto_pool_print_table_body(matched_masters, stdout, headers);
+			printf("\n*******************************\n\n"); 
+		}
+
+		list_free(matched_masters); // we can do this because work_queue_master struct does not contain dynamically allocated memory
+		list_delete(matched_masters);
+
+		if(itable_size(job_table)) {
+			jobid = batch_job_wait_timeout(q, &info, time(0) + 5);
+			if(jobid >= 0 && !abort_flag) {
+				itable_remove(job_table, jobid);
+			}
+		} else {
+			sleep(5);
+		}
 	}
 }
 
@@ -114,13 +507,154 @@ static void master_to_hash_key(struct work_queue_master *m, char *key)
 	sprintf(key, "%s-%d-%llu", m->addr, m->port, m->start_time);
 }
 
+int decide_worker_distribution(struct list *matched_masters, struct pool_config *pc, const char *catalog_host, int catalog_port) {
+	struct work_queue_master *m;
+
+	if(!pc || !matched_masters) {
+		return -1;
+	}
+
+	void **pointers;
+	pointers = (void **)xxmalloc(list_size(matched_masters) * sizeof(void *));
+
+	// set default max workers from this pool for every master
+	int sum = 0;
+	struct worker_distribution_node *wdn;
+	list_first_item(pc->distribution);
+	while((wdn = (struct worker_distribution_node *)list_next_item(pc->distribution))) {
+		wdn->hit = 0;	// how many projects are matched to a distribution node
+
+		int i = 0;
+		list_first_item(matched_masters);
+		while((m = (struct work_queue_master *)list_next_item(matched_masters))) {
+			if(whole_string_match_regex(m->proj, wdn->name)) {
+				wdn->hit++;
+				pointers[i] = m;
+				i++;
+			}
+		}
+
+		if( i == 0) {
+			continue;
+		}
+
+		int default_max = wdn->default_max / wdn->hit;
+
+		int j;
+		for(j = 0; j < i; j++) {
+			m = pointers[j];
+			m->default_max_workers_from_pool = default_max;
+			sum += default_max;
+		}
+	}
+
+	// shrink default_max if needed
+	if(sum > pc->max_workers) {
+		double shrink_factor;
+		struct work_queue_master *tmp = NULL;
+		shrink_factor = (double) pc->max_workers/ sum;
+		sum = 0;
+		list_first_item(matched_masters);
+		while((m = (struct work_queue_master *)list_next_item(matched_masters))) {
+			//printf("proj: %s; target: %d; ",m->proj, m->target_workers_from_pool);
+			m->default_max_workers_from_pool = (double)m->default_max_workers_from_pool * shrink_factor + 0.5;
+				//printf("after shrink: %d\n", m->target_workers_from_pool);
+			sum += m->default_max_workers_from_pool;
+			tmp = m;
+		}
+		if(tmp) {
+			tmp->default_max_workers_from_pool += pc->max_workers - sum;
+		}
+		sum = pc->max_workers;
+	}
+
+	// make final decisions on masters whose needs are less than its default max allowed.
+	sum = 0;
+	list_first_item(matched_masters);
+	int i = 0;
+	int sum_decided_workers = 0; 
+	int sum_need_of_hungry_masters = 0; 
+	int sum_weight_of_hungry_masters = 0; 
+	while((m = (struct work_queue_master *) list_next_item(matched_masters))) {
+		if(m->capacity > 0) {
+			m->workers_need = m->capacity - m->workers;
+			if(m->workers_need < 0) {
+				m->workers_need = 0;
+			}
+			m->workers_need = MIN(m->workers_need, m->tasks_waiting);
+		} else {
+			m->workers_need = m->tasks_waiting;
+		}
+
+		m->workers_from_this_pool = workers_by_item(m->workers_by_pool, name_of_this_pool); 
+		if(m->workers_from_this_pool == -1) {
+			m->workers_from_this_pool = 0;
+		}
+
+		int potential_decision = m->workers_need + m->workers_from_this_pool;
+		m->target_workers_from_pool = MIN(m->default_max_workers_from_pool, potential_decision); 
+		if(m->default_max_workers_from_pool >= potential_decision) {
+			// This is final decision
+			m->target_workers_from_pool = potential_decision;
+			sum_decided_workers += m->target_workers_from_pool; 
+		} else {
+			m->target_workers_from_pool = m->default_max_workers_from_pool;
+			sum_weight_of_hungry_masters += m->default_max_workers_from_pool;
+			sum_need_of_hungry_masters += potential_decision;
+			pointers[i] = m;
+			i++;
+		}
+	}
+
+	const int workers_to_decide = MIN(sum_need_of_hungry_masters, pc->max_workers - sum_decided_workers);
+	int j;
+	struct work_queue_master *tmp = NULL;
+	sum = 0;
+	for(j = 0; j < i; j++) {
+		m = pointers[j];
+		double portion = (double)m->default_max_workers_from_pool / sum_weight_of_hungry_masters;
+		m->target_workers_from_pool = (double)workers_to_decide * portion + 0.5;
+		sum += m->target_workers_from_pool;
+		tmp = m;
+	}
+	if(tmp) {
+		tmp->target_workers_from_pool += workers_to_decide - sum;
+	}
+
+	free(pointers);
+
+	// advertise decision to the catalog server
+	char decision[WORK_QUEUE_CATALOG_LINE_MAX];
+	char *c = decision;
+	int x;
+	list_first_item(matched_masters);
+	while((m = (struct work_queue_master *)list_next_item(matched_masters))) {
+		x = snprintf(c, WORK_QUEUE_CATALOG_LINE_MAX - (c - decision), "%s:%d,", m->proj, m->target_workers_from_pool);
+		if(x <= 0) {
+			fprintf(stderr, "failed to advertise decision item: %s:%d\n", m->proj, m->target_workers_from_pool);
+			continue;
+		}
+		c += x;
+	}
+	if(c - decision > 0) {
+		*(c-1) = '\0';
+	} else {
+		strncpy(decision, "n/a", 4);
+	}
+	advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, decision);
+
+	return sum_decided_workers + workers_to_decide; 
+
+}
+
 struct processed_master {
 	char *master_hash_key;
 	int hit;
 };
 
-// TODO: This is an experimental feature!!
-void process_matched_masters(struct list *matched_masters)
+// old function -- submit a fixed number of workers to a newly started master
+// kept for research purposes (compare with smarter utilities)
+void submit_workers_for_new_masters(struct list *matched_masters, struct pool_config *pc)
 {
 	struct work_queue_master *m;
 	char cmd[PATH_MAX] = "";
@@ -143,18 +677,18 @@ void process_matched_masters(struct list *matched_masters)
 		master_to_hash_key(m, key);
 		if((pm = hash_table_lookup(processed_masters, key)) == 0) {
 
-			snprintf(cmd, PATH_MAX, "./work_queue_worker -a -N %s", m->proj);
+			snprintf(cmd, PATH_MAX, "./work_queue_worker -a -N %s -p %s", m->proj, name_of_this_pool);
 			snprintf(input_files, PATH_MAX, "work_queue_worker");
 
-			int num_of_workers = 15;
-			submit_workers(cmd, input_files, num_of_workers);
-			printf("%d workers has been submitted for master: %s@%s:%d\n", num_of_workers, m->proj, m->addr, m->port);
+			submit_workers(cmd, input_files, 10);
+			printf("10 workers has been submitted for master: %s@%s:%d\n", m->proj, m->addr, m->port);
 
 		   	pm = (struct processed_master *)malloc(sizeof(*pm));
 			if(pm == NULL) {
 				fprintf(stderr, "Cannot allocate memory to record processed masters!\n");
 				exit(1);
 			}
+
 			pm->master_hash_key = strdup(key);
 			pm->hit = 1;
 			hash_table_insert(processed_masters, key, pm);
@@ -226,7 +760,7 @@ static int submit_workers(char *cmd, char *input_files, int count)
 		debug(D_DEBUG, "Submitting job %d: %s\n", i + 1, cmd);
 		jobid = batch_job_submit_simple(q, cmd, input_files, NULL);
 		if(jobid >= 0) {
-			itable_insert(remote_job_table, jobid, NULL);
+			itable_insert(job_table, jobid, NULL);
 		} else {
 			retry_count--;
 			if(!retry_count) {
@@ -250,7 +784,7 @@ static void remove_workers(struct itable *jobs)
 		// The key is the job id
 		printf("work_queue_pool: aborting remote job %llu\n", key);
 		batch_job_remove(q, key);
-		itable_remove(remote_job_table, key);
+		itable_remove(job_table, key);
 	}
 }
 
@@ -319,8 +853,8 @@ static void check_jobs_status_condor(struct itable **running_jobs, struct itable
 	idle_job_table = itable_create(0);
 	bad_job_table = itable_create(0);
 
-	itable_firstkey(remote_job_table);
-	while(itable_nextkey(remote_job_table, &ikey, &x)) {
+	itable_firstkey(job_table);
+	while(itable_nextkey(job_table, &ikey, &x)) {
 		sprintf(hash_key, "%d", (int) ikey);
 		ws = hash_table_lookup(all_job_status, hash_key);
 		if(ws) {
@@ -435,6 +969,46 @@ static int guarantee_x_running_workers_condor(char *cmd, char *input_files, int 
 	return goal_achieved;
 }
 
+static int locate_executable(char *name, char *path)
+{
+	if(strlen(path) > 0) {
+		if(access(path, R_OK | X_OK) < 0) {
+			fprintf(stderr, "Inaccessible %s specified: %s\n", name, path);
+			return 0;
+		}
+	} else {
+		if(!find_executable(name, "PATH", path, PATH_MAX)) {
+			fprintf(stderr, "Please add %s to your PATH or specify it explicitly.\n", name);
+			return 0;
+		}
+	}
+	debug(D_DEBUG, "%s path: %s", name, path);
+	return 1;
+}
+
+static int copy_executable(char *current_path, char *new_path)
+{
+	FILE *ifs, *ofs;
+
+	ifs = fopen(current_path, "r");
+	if(ifs == NULL) {
+		fprintf(stderr, "Unable to open %s for reading: %s\n", current_path, strerror(errno));
+		return 0;
+	}
+	ofs = fopen(new_path, "w+");
+	if(ofs == NULL) {
+		fprintf(stderr, "Unable to open %s for writing: %s", new_path, strerror(errno));
+		fclose(ifs);
+		return 0;
+	}
+	copy_stream_to_stream(ifs, ofs);
+	fclose(ifs);
+	fclose(ofs);
+	chmod(new_path, 0777);
+
+	return 1;
+}
+
 static void show_help(const char *cmd)
 {
 	printf("Use: %s [options] <count>\n", cmd);
@@ -446,6 +1020,7 @@ static void show_help(const char *cmd)
 	printf("  -m <count>     Each batch job will start <count> local workers. (default is 1.)\n");
 	printf("  -W <path>      Path to the work_queue_worker executable.\n");
 	printf("  -A             Enable auto worker pool feature (experimental).\n");
+	printf("  -c <path>      Path to the work_queue_pool configuration file (default is work_queue_pool.conf). This option is only effective when '-A' is present.\n");
 	printf("  -q             Guarantee <count> running workers and quit. The workers would terminate after their idle timeouts unless the user explicitly shut them down. The user needs to manually delete the scratch directory, which is displayed on screen right before work_queue_pool exits. \n");
 	printf("  -h             Show this screen.\n");
 	printf("\n");
@@ -454,7 +1029,7 @@ static void show_help(const char *cmd)
 	printf("  -t <time>      Abort after this amount of idle time.\n");
 	printf("  -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	printf("  -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
-	printf("  -s             Run as a shared worker. By default the workers would only work for preferred projects.\n");
+	printf("  -s             Run as a shared worker. By default the workers would only work for their preferred project(s).\n");
 	printf("  -o <file>      Send debugging to this file.\n");
 }
 
@@ -469,8 +1044,13 @@ int main(int argc, char *argv[])
 	char worker_args[PATH_MAX] = "";
 	char worker_input_files[PATH_MAX] = "";
 	char pool_path[PATH_MAX] = "";
+	char new_pool_path[PATH_MAX] = "";
 	char new_worker_path[PATH_MAX];
-	char new_pool_path[PATH_MAX];
+	char *pool_config_path = "work_queue_pool.conf";
+	char pool_config_canonical_path[PATH_MAX];
+	char pool_pid_canonical_path[PATH_MAX];
+
+	pool_pid_canonical_path[0] = 0;
 
 	int batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 	batch_job_id_t jobid;
@@ -484,6 +1064,8 @@ int main(int argc, char *argv[])
 	char *catalog_host;
 	int catalog_port;
 
+	char pidfile_path[PATH_MAX];
+
 	struct list *regex_list;
 
 	regex_list = list_create();
@@ -495,7 +1077,9 @@ int main(int argc, char *argv[])
 	catalog_host = CATALOG_HOST;
 	catalog_port = CATALOG_PORT;
 
-	while((c = getopt(argc, argv, "aAC:d:hm:N:qr:sS:t:T:W:")) != (char) -1) {
+	set_pool_name(name_of_this_pool, WORK_QUEUE_POOL_NAME_MAX);
+
+	while((c = getopt(argc, argv, "aAc:C:d:hm:N:qr:sS:t:T:W:")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			strcat(worker_args, " -a");
@@ -533,6 +1117,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'A':
 			auto_worker_pool = 1;
+			break;
+		case 'c':
+			pool_config_path = xxstrdup(optarg);
 			break;
 		case 'T':
 			batch_queue_type = batch_queue_type_from_string(optarg);
@@ -580,11 +1167,44 @@ int main(int argc, char *argv[])
 			}
 			goal = strtol(argv[optind], NULL, 10);
 		}
+	} else {
+		pid_t pid;
+		pid = getpid();
+		char *p;
+		p = strrchr(argv[0], '/');
+		if(!p) {
+			p = argv[0];
+		} else {
+			p++;
+		}
+		snprintf(pidfile_path, PATH_MAX, "%s.pid", p);
+
+		struct stat tmp_stat;
+		if(stat(pidfile_path, &tmp_stat) == 0) {
+			fprintf(stderr, "Error: file '%s' already exists but %s is trying to store the pid of itself in this file.\n", pidfile_path, argv[0]);
+			return EXIT_FAILURE;
+		}
+
+		FILE *pidfile = fopen(pidfile_path, "w");
+		if(!pidfile) {
+			fprintf(stderr, "Error: can't create file - '%s' for storing pid: %s\n", pidfile_path, strerror(errno)); 
+			return EXIT_FAILURE;
+		}
+
+		if(fprintf(pidfile, "%d", pid) < 0) {
+			fprintf(stderr, "Error: failed to write pid to file - '%s'.\n", pidfile_path); 
+			fclose(pidfile);
+			unlink(pidfile_path);
+			return EXIT_FAILURE;
+		}	
+		fclose(pidfile);
 	}
 
 	signal(SIGINT, handle_abort);
 	signal(SIGQUIT, handle_abort);
 	signal(SIGTERM, handle_abort);
+
+	signal(SIGUSR1, handle_config);
 
 
 	if(!locate_executable("work_queue_worker", worker_path))
@@ -609,20 +1229,60 @@ int main(int argc, char *argv[])
 	create_dir(scratch_dir, 0755);
 	debug(D_DEBUG, "scratch dir: %s", scratch_dir);
 
+	// get absolute path for pool config file
+	if(auto_worker_pool) {
+		struct stat tmp_stat;
+		if(stat(pool_config_path, &tmp_stat) != 0) {
+			fprintf(stderr, "Error: failed to locate expected pool configuration file - %s (%s).\n", pool_config_path, strerror(errno));
+			return EXIT_FAILURE;
+		}
+		if(pool_config_path[0] == '/') {
+			strncpy(pool_config_path, pool_config_canonical_path, PATH_MAX);
+		} else {
+			get_canonical_path(".", pool_config_canonical_path, PATH_MAX);
+			char *p;
+			int len = strlen(pool_config_canonical_path);
+			if(len > 0) {
+				p = &(pool_config_canonical_path[len - 1]);
+				if(*p != '/' && len + 1 < PATH_MAX) {
+					*(p+1) = '/';
+					*(p+2) = '\0';
+				}
+			} else {
+				return EXIT_FAILURE;
+			}
+
+			// get pool pid file's absolute path (for later delete this file while in the scratch dir
+			strncpy(pool_pid_canonical_path, pool_config_canonical_path, PATH_MAX);
+			strncat(pool_pid_canonical_path, pidfile_path, strlen(pidfile_path));
+
+			p = pool_config_path;
+			if(len > 2) {
+				if(!strncmp(pool_config_path, "./", 2)) {
+					p = pool_config_path + 2;
+				}
+			}
+			strncat(pool_config_canonical_path, p, strlen(p));
+		}
+	}
+
 	// Copy the worker program to the tmp directory and we will enter that
 	// directory afterwards. We have to copy the worker program to a local
 	// filesystem (other than afs, etc.) because condor might not be able
 	// to access your shared file system
 	snprintf(new_worker_path, PATH_MAX, "%s/work_queue_worker", scratch_dir);
-	if(!copy_executable(worker_path, new_worker_path))
+	if(!copy_executable(worker_path, new_worker_path)) {
 		return EXIT_FAILURE;
+	}
 
 	if(workers_per_job) {
 		snprintf(new_pool_path, PATH_MAX, "%s/work_queue_pool", scratch_dir);
-		if(!copy_executable(pool_path, new_pool_path))
+		if(!copy_executable(pool_path, new_pool_path)) {
 			return EXIT_FAILURE;
+		}
 	}
-	// Switch to the scratch dir.
+
+	// ATTENTION: switch to the scratch dir.
 	if(chdir(scratch_dir) < 0) {
 		fprintf(stderr, "Unable to cd into scratch directory %s: %s\n", scratch_dir, strerror(errno));
 		return EXIT_FAILURE;
@@ -642,7 +1302,7 @@ int main(int argc, char *argv[])
 		fatal("Unable to create batch queue of type: %s", batch_queue_type_to_string(batch_queue_type));
 	}
 	batch_queue_set_options(q, getenv("BATCH_OPTIONS"));
-	remote_job_table = itable_create(0);
+	job_table = itable_create(0);
 
 	// option: start x running workers and quit
 	if(guarantee_x_running_workers_and_quit) {
@@ -663,9 +1323,7 @@ int main(int argc, char *argv[])
 	// option: automatically allocate workers for new masters 
 	if(auto_worker_pool) {
 		processed_masters = hash_table_create(0, 0);
-		while(!abort_flag) {
-			start_serving_masters(catalog_host, catalog_port, regex_list);
-		}
+		start_serving_masters(catalog_host, catalog_port, pool_config_canonical_path);
 		hash_table_delete(processed_masters);
 	}
 
@@ -677,19 +1335,21 @@ int main(int argc, char *argv[])
 	while(!abort_flag) {
 		jobid = batch_job_wait_timeout(q, &info, time(0) + 5);
 		if(jobid >= 0 && !abort_flag) {
-			itable_remove(remote_job_table, jobid);
+			itable_remove(job_table, jobid);
 			jobid = batch_job_submit_simple(q, worker_cmd, worker_input_files, NULL);
 			if(jobid >= 0) {
-				itable_insert(remote_job_table, jobid, NULL);
+				itable_insert(job_table, jobid, NULL);
 			}
 		}
 	}
 
 	// Abort all jobs
-	remove_workers(remote_job_table);
+	remove_workers(job_table);
+	printf("All workers aborted.\n");
 	delete_dir(scratch_dir);
-	debug(D_WQ, "All jobs aborted.\n");
-
+	if(pool_pid_canonical_path[0]) {
+		unlink(pool_pid_canonical_path);
+	}
 	batch_queue_delete(q);
 
 	return EXIT_SUCCESS;

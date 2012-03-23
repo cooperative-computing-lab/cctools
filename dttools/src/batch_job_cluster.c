@@ -17,8 +17,8 @@ static char * cluster_submit_cmd = NULL;
 static char * cluster_remove_cmd = NULL;
 static char * cluster_options = NULL;
 
-int batch_job_setup_cluster(struct batch_queue * q) {
-
+int batch_job_setup_cluster(struct batch_queue * q)
+{
 	if(cluster_name)
 		free(cluster_name);
 	if(cluster_submit_cmd)
@@ -41,7 +41,7 @@ int batch_job_setup_cluster(struct batch_queue * q) {
 			cluster_name = strdup("moab");
 			cluster_submit_cmd = strdup("msub");
 			cluster_remove_cmd = strdup("mdel");
-			cluster_options = strdup("-d $CWD -o /dev/null -j oe -N");
+			cluster_options = strdup("-d `pwd` -o /dev/null -v BATCH_JOB_COMMAND -j oe -N");
 			break;
 		case BATCH_QUEUE_TYPE_CLUSTER:
 			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
@@ -50,7 +50,7 @@ int batch_job_setup_cluster(struct batch_queue * q) {
 			cluster_options = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS");
 			break;
 		default:
-			debug(D_DEBUG, "Invalid cluster type: %s\n", batch_queue_type_to_string(q->type));
+			debug(D_BATCH, "Invalid cluster type: %s\n", batch_queue_type_to_string(q->type));
 			return -1;
 	}
 
@@ -70,7 +70,7 @@ int batch_job_setup_cluster(struct batch_queue * q) {
 
 }
 
-static int setup_batch_wrapper(const char *sysname)
+static int setup_batch_wrapper(struct batch_queue *q, const char *sysname)
 {
 	char *wrapperfile = string_format("%s.wrapper", sysname);
 
@@ -84,12 +84,19 @@ static int setup_batch_wrapper(const char *sysname)
 	}
 
 	fprintf(file, "#!/bin/sh\n");
+	if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+		fprintf(file, "CMD=${BATCH_JOB_COMMAND}\n");
+		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
+	} else {
+		fprintf(file, "CMD=$@\n");
+	}
+
 	fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
 	fprintf(file, "starttime=`date +%%s`\n");
 	fprintf(file, "cat > $logfile <<EOF\n");
 	fprintf(file, "start $starttime\n");
 	fprintf(file, "EOF\n\n");
-	fprintf(file, "eval \"$@\"\n\n");
+	fprintf(file, "eval \"$CMD\"\n\n");
 	fprintf(file, "status=$?\n");
 	fprintf(file, "stoptime=`date +%%s`\n");
 	fprintf(file, "cat >> $logfile <<EOF\n");
@@ -110,7 +117,7 @@ batch_job_id_t batch_job_submit_simple_cluster(struct batch_queue * q, const cha
 	batch_job_id_t jobid;
 	struct batch_job_info *info;
 
-	if(setup_batch_wrapper(cluster_name) < 0)
+	if(setup_batch_wrapper(q, cluster_name) < 0)
 		return -1;
 
 	char *name = xxstrdup(cmd);
@@ -122,19 +129,21 @@ batch_job_id_t batch_job_submit_simple_cluster(struct batch_queue * q, const cha
 	char *command = string_format("%s %s '%s' %s %s.wrapper \"%s\"", cluster_submit_cmd, cluster_options, string_basename(name), q->options_text ? q->options_text : "", cluster_name, cmd);
 	free(name);
 
-	debug(D_DEBUG, "%s", command);
+	debug(D_BATCH, "%s", command);
+
+	setenv("BATCH_JOB_COMMAND", cmd, 1);
 
 	FILE *file = popen(command, "r");
 	free(command);
 	if(!file) {
-		debug(D_DEBUG, "couldn't submit job: %s", strerror(errno));
+		debug(D_BATCH, "couldn't submit job: %s", strerror(errno));
 		return -1;
 	}
 
 	char line[BATCH_JOB_LINE_MAX] = "";
 	while(fgets(line, sizeof(line), file)) {
-		if(sscanf(line, "Your job %d", &jobid) == 1) {
-			debug(D_DEBUG, "job %d submitted", jobid);
+		if(sscanf(line, "Your job %d", &jobid) == 1 || sscanf(line, "%d", &jobid) == 1) {
+			debug(D_BATCH, "job %d submitted", jobid);
 			pclose(file);
 			info = malloc(sizeof(*info));
 			memset(info, 0, sizeof(*info));
@@ -196,7 +205,7 @@ batch_job_id_t batch_job_wait_cluster(struct batch_queue * q, struct batch_job_i
 					if(sscanf(line, "start %d", &t)) {
 						info->started = t;
 					} else if(sscanf(line, "stop %d %d", &c, &t) == 2) {
-						debug(D_DEBUG, "job %d complete", jobid);
+						debug(D_BATCH, "job %d complete", jobid);
 						if(!info->started)
 							info->started = t;
 						info->finished = t;
@@ -214,7 +223,10 @@ batch_job_id_t batch_job_wait_cluster(struct batch_queue * q, struct batch_job_i
 					free(statusfile);
 					return jobid;
 				}
+			} else {
+				debug(D_BATCH, "could not open status file \"%s\"", statusfile);
 			}
+
 			free(statusfile);
 		}
 

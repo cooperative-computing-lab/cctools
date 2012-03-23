@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-# replica_exchange_nobarrier
+# replica_exchange.py
 #
 # Copyright (C) 2011- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
@@ -32,11 +32,13 @@ import getopt
 
 #-------------------------------Global Variables----------------------------
 protomol_local_install = False
+use_barrier = False
 generate_xyz = False
 generate_dcd = False
 debug_mode = False
 quart_temp_split = False
-vel_file_input = False
+
+mc_step_times = []
 
 #------------------------------Global Data--------------------------------------
 replica_id = None
@@ -48,6 +50,7 @@ num_replica_exchanges = 0
 num_task_resubmissions = 0
 replica_temp_execution_list = []
 replica_exch_list = []
+step_time = 0
 
 
 #--------------------------------Program Meat-----------------------------------
@@ -87,7 +90,7 @@ def locate(executable):
 #Function to generate execution script that runs simulations of a replica 
 # over given number of steps
 def generate_execn_script(replica_obj, replica_next_starting_step, replica_next_ending_step):
-	#initialize the script file name based on the replica id.
+	#assign script file name based on the replica id.
 	execn_script_name = "%s/%s/%s/exec-%d.sh" % (output_path, "simfiles", "runs", replica_obj.id)	
 	execn_script_stream = open(execn_script_name, "w")
 
@@ -143,17 +146,15 @@ def assign_task_output_files(task, replica_list, replica_id, replica_next_starti
 	#Find pdb file for current replica
 	replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_id)
 	
-	j = replica_id
-	
 	#Assign local and remote xyz output files.
 	if generate_xyz:
-		local_xyz_output_file = "%s/simfiles/%s/%s.%d-%d.xyz" % (output_path, replica_list[j].temp, xyz_file_name, replica_id, replica_next_ending_step) 
+		local_xyz_output_file = "%s/simfiles/%s/%s.%d-%d.xyz" % (output_path, replica_list[replica_id].temp, xyz_file_name, replica_id, replica_next_ending_step) 
 		remote_xyz_output_file = "%d.xyz" % (replica_id)
 		task.specify_output_file(remote_xyz_output_file, local_xyz_output_file)
 
 	#Assign local and remote dcd output files.
 	if generate_dcd:
-		local_dcd_output_file = "%s/simfiles/%s/%s.%d-%d.dcd" % (output_path, replica_list[j].temp, dcd_file_name, replica_id, replica_next_ending_step) 
+		local_dcd_output_file = "%s/simfiles/%s/%s.%d-%d.dcd" % (output_path, replica_list[replica_id].temp, dcd_file_name, replica_id, replica_next_ending_step) 
 		remote_dcd_output_file = "%d.dcd" % (replica_id)
 		task.specify_output_file(remote_dcd_output_file, local_dcd_output_file)
 
@@ -163,11 +164,11 @@ def assign_task_output_files(task, replica_list, replica_id, replica_next_starti
 	task.specify_output_file(local_energies_file, remote_energies_file, cache=False)
 
 	#Assign local and remote velocity output files.
-	local_velocity_output_file = "%s/simfiles/%s/%s-%d.vel" % (output_path, replica_list[j].temp, replica_pdb, replica_next_ending_step+1)
+	local_velocity_output_file = "%s/simfiles/%s/%s-%d.vel" % (output_path, replica_list[replica_id].temp, replica_pdb, replica_next_ending_step+1)
 	remote_velocity_output_file = "%s-%d.vel" % (replica_pdb, replica_next_ending_step+1)
 	task.specify_output_file(local_velocity_output_file, remote_velocity_output_file, cache=False)
 		
-	pdb_output_file = "%s/simfiles/%s/%s-%d.pdb" % (output_path, replica_list[j].temp, replica_pdb, replica_next_ending_step+1)	
+	pdb_output_file = "%s/simfiles/%s/%s-%d.pdb" % (output_path, replica_list[replica_id].temp, replica_pdb, replica_next_ending_step+1)	
 	task.specify_output_file(pdb_output_file, parse_file_name(pdb_output_file), cache=False)
 
 
@@ -176,17 +177,14 @@ def assign_task_input_files(task, replica_list, replica_id, replica_next_startin
 	#Find pdb file for current replica
 	replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_id)
 
-	j = replica_id
-
 	#Find pdb file for replica that exchanged with current replica in last step
-	if (replica_list[j].exchgd_replica_id > -1):
-		exchgd_replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_list[j].exchgd_replica_id)
+	if (replica_list[replica_id].exchgd_replica_id > -1):
+		exchgd_replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_list[replica_id].exchgd_replica_id)
 	else:
 		exchgd_replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_id)
 	
-	'''Local_file: file name for file brought back and stored on local site where this is run.
-	   Remote_file: file name for file sent to remote worker and used in execution there.'''
-		
+	'''Local_file: name for file brought back and stored on local site where this is run.
+	   Remote_file: name for file sent to remote worker and used in execution there.'''
 	#Assign local and remote execution scripts 
 	local_execn_file = "%s/simfiles/%s/exec-%d.sh" % (output_path, "runs", replica_id)
 	remote_execn_file = "exec-%d.sh" % (replica_id)
@@ -197,30 +195,26 @@ def assign_task_input_files(task, replica_list, replica_id, replica_next_startin
 	task.specify_input_file(par_file, parse_file_name(par_file))
 
 	#Assign local and remote pdb inputs 
-	local_pdb_input_file = "%s/simfiles/%s/%s-%d.pdb" % (output_path, replica_list[j].temp, exchgd_replica_pdb, replica_next_starting_step)
+	local_pdb_input_file = "%s/simfiles/%s/%s-%d.pdb" % (output_path, replica_list[replica_id].temp, exchgd_replica_pdb, replica_next_starting_step)
 	remote_pdb_input_file = "%s-%d.pdb" % (replica_pdb, replica_next_starting_step)	
 	task.specify_input_file(local_pdb_input_file, remote_pdb_input_file, cache=False)
 
 	#Velocity input only required after first step since it is output 
 	#of first step.
 	if (replica_next_starting_step > 0):	
-		vel_file_input = True
 		#Assign local and remote velocity input files.
-		local_velocity_input_file = "%s/simfiles/%s/%s-%d.vel" % (output_path, replica_list[j].temp, exchgd_replica_pdb, replica_next_starting_step)
+		local_velocity_input_file = "%s/simfiles/%s/%s-%d.vel" % (output_path, replica_list[replica_id].temp, exchgd_replica_pdb, replica_next_starting_step)
 		remote_velocity_input_file = "%s-%d.vel" % (replica_pdb, replica_next_starting_step)
 		task.specify_input_file(local_velocity_input_file, remote_velocity_input_file, cache=False)
 		
 	for i in range(replica_next_starting_step, replica_next_ending_step+1):
-		'''Local_file: file name for file brought back and stored on local site where this is run.
-		Remote_file: file name for file sent to remote worker and used in execution there.'''
-
 		#Assign local and remote config files.
 		local_config_file = "%s/simfiles/config/%d/%d-%d.cfg" % (output_path, replica_id, replica_id, i)
 		remote_config_file = "%d-%d.cfg" % (replica_id, i)
 		task.specify_input_file(local_config_file, remote_config_file, cache=False) 
 
 		#Call function to generate execution script.
-		generate_execn_script(replica_list[j], replica_next_starting_step, replica_next_ending_step)
+		generate_execn_script(replica_list[replica_id], replica_next_starting_step, replica_next_ending_step)
 
 	#Assign executable that will be run on remote worker to task string.
 	if not protomol_local_install:
@@ -232,41 +226,53 @@ def assign_task_input_files(task, replica_list, replica_id, replica_next_startin
 # Major replica exchange and scheduling is handled here
 def wq_main(wq, replica_list, replicas_to_run):
 
-	#Variable that tracks replicas which completed simulations over all MC steps
-	num_replicas_completed = 0
 	#Stat collection variables
 	global replicas_running
+	global step_time
+	
+	#Variable that tracks replicas which completed simulations over all MC steps
+	num_replicas_completed = 0
 
 	#-------Perform computation for each replica at current monte carlo step--------
 	'''Each computation is a task in work queue.
 	   Each task will be run on one of the connected workers.'''
-
+	
 	while num_replicas_completed < len(replica_list):
 			#Iterate through the given set of replicas and start their
 			#		 computation for the current monte carlo step.
 			for j in replicas_to_run:
 				
 				if not replica_list[j].running:
+					#Initialize step time.
+					step_time = time.time()
+						
 					replica_id = replica_list[j].id
 					#Each replica does computation at its current temperature
 					replica_temperature = replica_list[j].temp
 			
-					'''Record the last seen step of replica. The last_seen_step will be
-					the step at which this replica will be brought back and attempted
-					for an exchange.'''
+					'''Get the last seen step of replica. The last_seen_step
+					is the step at which this replica was brought back and 
+					attempted for an exchange.'''
 					replica_last_seen_step = replica_list[j].last_seen_step
 					
-					#record starting, ending steps for current iteration of this replica.
+					#record the starting, ending steps for current iteration of 
+					#this replica.
 					replica_next_starting_step = replica_last_seen_step + 1
 					if replica_next_starting_step >= monte_carlo_steps:
 						break
 			
-					#If there are no more exchange steps for this replica, run the
-					#remainder of monte carlo steps.
-					if len(replica_list[j].exch_steps) > 0:
-						replica_next_ending_step = replica_list[j].exch_steps[0]
+					if use_barrier:
+						#Barrier version, so run one step at a time.
+						replica_next_ending_step = replica_next_starting_step
 					else:
-						replica_next_ending_step = monte_carlo_steps-1
+						#Run all steps until the step where the replica will be
+						#chosen to attempt an exchange. 
+						if len(replica_list[j].exch_steps) > 0:
+							replica_next_ending_step = replica_list[j].exch_steps[0]
+						#If there are no more exchange steps for this replica, run the
+						#remainder of monte carlo steps.
+						else:
+							replica_next_ending_step = monte_carlo_steps-1
 
 					#Set the last_seen_step to the next exchange step at which the
 					#replica (its output) will be brought back.
@@ -276,26 +282,97 @@ def wq_main(wq, replica_list, replicas_to_run):
 					assign_task_input_files(task, replica_list, replica_id, replica_next_starting_step, replica_next_ending_step)		
 					assign_task_output_files(task, replica_list, replica_id, replica_next_starting_step, replica_next_ending_step)
 
-					#Submit the task to WorkQueue for execution at remote worker.
-					wq.submit(task)
-					
+					#Keep count of replicas that iterated through all MC steps.
 					if (replica_next_ending_step == monte_carlo_steps-1):
 						num_replicas_completed += 1
 
+					#Submit the task to WorkQueue for execution at remote worker.
+					wq.submit(task)
+				
 					#Submitted for execution. So mark this replica as running.
 					replica_list[j].running = 1
 					replicas_running += 1
 
 			#Wait for tasks to complete.
-			replicas_to_run=wq_wait(wq, replica_list, 30)
+			if use_barrier:
+				replicas_to_run=wq_wait_barrier(wq, replica_list, replica_next_starting_step, 30)
+			else:
+				replicas_to_run=wq_wait_nobarrier(wq, replica_list, 30)
 				
 
-def wq_wait(wq, replica_list, timeout):
+'''The barrier version where it waits for all replicas to finish a given MC step.
+   Returns all the replicas that it waited for.'''
+def wq_wait_barrier(wq, replica_list, monte_carlo_step, timeout):
+
+	#Stat collection variables
+	global step_time
+	global num_task_resubmissions
+	global replicas_running
+
+	#Initialize list that contains replicas that will be returned to run next.
+	replica_to_run = []
+
+	#Wait for all replicas to finish execution,
+	while not wq.empty():
+		task = wq.wait(timeout)
+		if (task):
+			#Get replica id from finished task.
+			replica_id = int(task.tag)
+			
+			# Check if task (replica) failed. If so, resubmit.
+			if task.result != 0:
+				num_task_resubmissions += 1
+				print "Replica failed!"
+				time.sleep(3)
+				#Resubmit the task.
+				wq.submit(task) 
+				continue
+
+			#Task was succesful. Update run information.
+			replicas_running -= 1
+			replica_list[replica_id].running = 0
+				
+		    #Get potential energy value of the completed replica run.	
+			energies_file =  "%s/simfiles/eng/%d/%d.eng" % (output_path, replica_id, replica_id) 
+			energies_stream = open(energies_file, "r")
+			slist = (energies_stream.readline()).split()
+			potential_energy = float(slist[1])
+			replica_list[replica_id].potential_energy = potential_energy
+			
+			#Store temperature and exchanged replica id values from the current run.
+			replica_list[replica_id].prev_temp = replica_list[replica_id].temp
+			replica_list[replica_id].exchgd_replica_id = replica_id
+
+			#Add this replica to return list.
+			replica_to_run.append(replica_id)
+
+	#Get replica exchange pair for current step and attempt exchange.
+	cur = replica_exch_list[monte_carlo_step].pop(0)
+	next = replica_exch_list[monte_carlo_step].pop(0)
+	if debug_mode: 
+		print "Replicas %d & %d are attempted for an exchange at step %d" % (cur, next, monte_carlo_step)
+
+	#Attempt exchange between the two.
+	attempt_replica_exch(replica_list, cur, next)
+
+	#Update time stats for this MC step.
+	step_time = time.time() - step_time
+	mc_step_times.append(step_time)
+
+	return replica_to_run
+
+
+'''The nobarrier version where it receives a finished replica, waits for its 
+   exchange partner to finish, attempts an exchange between the two, and continues 
+   waiting for the rest similarly.
+   Returns the replica pair that finished and was attempted for an exchange.'''
+def wq_wait_nobarrier(wq, replica_list, timeout):
 	
+	#Stat collection variables
 	global num_task_resubmissions
 	global replicas_running
 	
-	#Wait for all tasks to finish execution.
+	#Wait for a task to finish execution.
 	while not wq.empty():
 		task = wq.wait(timeout)
 		if (task):
@@ -312,7 +389,7 @@ def wq_wait(wq, replica_list, timeout):
 				wq.submit(task) 
 				continue
 
-			#Task was succesful. Update all information.
+			#Task was succesful. Update run information.
 			replicas_running -= 1
 			replica_list[replica_id].running = 0
 
@@ -327,9 +404,10 @@ def wq_wait(wq, replica_list, timeout):
 			replica_list[replica_id].prev_temp = replica_list[replica_id].temp
 			replica_list[replica_id].exchgd_replica_id = replica_id
 
-			#Replica should be currently at this step which is the exchange step.
+			#Replica should be currently at this step which is its exchange step.
 			if len(replica_list[replica_id].exch_steps) > 0:	
 				replica_exch_step = replica_list[replica_id].exch_steps.pop(0)
+			#Else replica is at the last MC step of this run.
 			else:
 				replica_exch_step = monte_carlo_steps - 1
 
@@ -340,11 +418,16 @@ def wq_wait(wq, replica_list, timeout):
 				replica_exch_partner = replica_exch_list[replica_exch_step][0]
 			else:
 				if (replica_exch_step != (monte_carlo_steps-1)):
+					#If this replica is not part of the exchange pair for this
+					#step and is not at the last MC step of the run, something 
+					#is amiss..
 					print "Replica %d should not be here at step %d" % (replica_id, replica_exch_step)
 					sys.exit(1)
 				else:
+					#If all replicas have completed last MC step, return.
 					if replicas_running == 0:
 						return
+					#If not, loop back to receive other replicas.
 					else:
 						continue
 
@@ -362,7 +445,7 @@ def wq_wait(wq, replica_list, timeout):
 					print "Partner of replica %d - replica %d is currently at step %d which is beyond step %d" % (replica_id, replica_exch_partner, replica_list[replica_exch_partner].exch_steps[0], replica_exch_step)
 					sys.exit(1)
 				else:
-					#Make sure the replicas are checked in the same order they were picked at the start.
+					#Make sure the replicas are checked in the same order they were chosen at the start.
 					if (replica_exch_partner == replica_exch_list[replica_exch_step][0]):
 						replica_1 = replica_exch_partner
 						replica_2 = replica_id
@@ -370,32 +453,38 @@ def wq_wait(wq, replica_list, timeout):
 						replica_1 = replica_id
 						replica_2 = replica_exch_partner
 						
-					#Attempt exchange between and proceed to next iteration.
-					if debug_mode: print "Replicas %d & %d are attempted for an exchange at step %d" % (replica_1, replica_2, replica_exch_step)
+					if debug_mode: 
+						print "Replicas %d & %d are attempted for an exchange at step %d" % (replica_1, replica_2, replica_exch_step)
+					
+					#Attempt exchange between the two.
 					attempt_replica_exch(replica_list, replica_1, replica_2)
 				
-					#Generate config and run the next steps of these replicas.
+					#Add these two replicas to return list.
 					replicas_to_run = [replica_1, replica_2]
+					
 					return replicas_to_run
 
 
-def attempt_replica_exch(replica_list, cur, next):
+#Check if two replicas satisfy the criteria to undergo an exchange.
+def attempt_replica_exch(replica_list, replica1, replica2):
 	global num_replica_exchanges
 	
-	#Check for metropolis criteria with the randomly chosen replica and its immediate neighbor.
-	if (metropolis(replica_list[cur].potential_energy, replica_list[next].potential_energy, replica_list[cur].temp, replica_list[next].temp)):
-		if debug_mode: print "Replicas %d and %d exchanged" % (cur, next)
-		#Swap the fields of the two replicas being exchanged.
-		T = replica_list[next].temp
-		replica_list[next].temp = replica_list[cur].temp
-		replica_list[cur].temp = T
+	#Check for metropolis criteria.
+	if (metropolis(replica_list[replica1].potential_energy, replica_list[replica2].potential_energy, replica_list[replica1].temp, replica_list[replica2].temp)):
+		#Swap fields of the two replicas being exchanged.
+		T = replica_list[replica2].temp
+		replica_list[replica2].temp = replica_list[replica1].temp
+		replica_list[replica1].temp = T
 			
-		replica_list[cur].exchgd_replica_id = replica_list[next].id
-		replica_list[next].exchgd_replica_id = replica_list[cur].id
+		replica_list[replica1].exchgd_replica_id = replica_list[replica2].id
+		replica_list[replica2].exchgd_replica_id = replica_list[replica1].id
 			
-		replica_temp_execution_list[cur].append(replica_list[cur].temp)
-		replica_temp_execution_list[next].append(replica_list[next].temp)
+		replica_temp_execution_list[replica1].append(replica_list[replica1].temp)
+		replica_temp_execution_list[replica2].append(replica_list[replica2].temp)
 			
+		if debug_mode: 
+			print "Replicas %d and %d exchanged" % (replica1, replica2)
+		
 		#Keep count of exchanges.
 		num_replica_exchanges += 1
 
@@ -432,7 +521,9 @@ def make_directories(output_path, temp_list, num_replicas):
 	if not os.path.exists(newdir4):
 		os.makedirs(newdir4)
 
-	
+
+#Function to determine the replica exchange pairs that will be attempted for an
+#exchange at each MC step.
 def create_replica_exch_pairs(replica_list, num_replicas):
 	#Compute random pair (replica, neighbor) for each step to attempt exchange.
 	for i in range(monte_carlo_steps):
@@ -454,30 +545,27 @@ def create_replica_exch_pairs(replica_list, num_replicas):
 		if debug_mode: 
 			print "For step %d, exchange will be attempted for replica %d and %d." % (i, replica_1, replica_2)
 		
-	if debug_mode: 
-		for i in replica_list:
-			print "Replica %d has the following exchange steps: %s." % (i.id, i.exch_steps)
-
 
 #Main function.
 if __name__ == "__main__":
 
 	#Create help string for user.
 	usage_str = "Usage: %s <PDB_FILE> <PSF_FILE> <PAR_FILE> <MIN_TEMP> <MAX_TEMP> <NUM_OF_REPLICAS>" % sys.argv[0]
-	help_str  = "-h		-	help\n"
-	help_str += "-n		-	specify a project name for using exclusive workers\n"
+	help_str = "-n		-	specify a project name for using exclusive workers\n"
 	help_str += "-x		-	specify the name of the xyz file for output\n"
 	help_str += "-d		-	specify the name of the dcd file for output\n"
-	help_str += "-l		-	print debuging information\n"
 	help_str += "-m		-	specify the number of monte carlo steps\n"
 	help_str += "-s		-	specify the number of mdsteps\n"
 	help_str += "-p		-	specify the output_path for the output files generated\n"
-	help_str += "-i		-	assume ProtoMol is installed and available in PATH on worker site\n"
 	help_str += "-q		-	assign closer temperature values to the first and last quartile of the replicas.\n"
+	help_str += "-i		-	assume ProtoMol is installed and available in PATH on worker site\n"
+	help_str += "-b		-	use barrier in waiting for all replicas to finish their steps before attempting exchange.\n"
+	help_str += "-l		-	print debuging information\n"
+	help_str += "-h		-	help"
 
 	#Check to see if there is error in the given command line arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "m:s:n:p:x:d:ihlq", ["--help", "--proj", "dir", "--xyz", "--dcd"])
+		opts, args = getopt.getopt(sys.argv[1:], "n:x:d:m:s:p:qiblh", ["help"])
 	except getopt.GetoptError, err:
 		print str(err) 
 		print usage_str
@@ -490,15 +578,15 @@ if __name__ == "__main__":
 			sys.exit(0)
 		elif o == "-l":
 			debug_mode = True
-		elif o in ("-x", "--xyz"):
+		elif o in ("-x"):
 			generate_xyz = True
 			xyz_file_name = a
-		elif o in ("-d", "--dcd"):
+		elif o in ("-d"):
 			generate_dcd = True
 			dcd_file_name = a
-		elif o in ("-n", "--proj"):
+		elif o in ("-n"):
 			proj_name = a
-		elif o in ("-p", "--dir"):
+		elif o in ("-p"):
 			output_path = a
 		elif o in ("-m"):
 			monte_carlo_steps = int(a)
@@ -508,15 +596,18 @@ if __name__ == "__main__":
 			quart_temp_split = True
 		elif o == "-i":
 			protomol_local_install = True
+		elif o == "-b":
+			use_barrier = True
+
+	#Check for the 6 mandatory arguments.
+	if len(args) != 6:
+		print usage_str
+		sys.exit(1)
 
 	if debug_mode:
 		print "Debug mode on.."
 		set_debug_flag("wq")
 		set_debug_flag("debug")
-
-	if len(args) != 6:
-		print usage_str
-		sys.exit(1)
 
 	protomol_path = locate(EXECUTABLE)
 	if protomol_path:
@@ -550,16 +641,16 @@ if __name__ == "__main__":
 		#	to the top and bottom 25% of replicas.
 		if quart_temp_split:
 			if x < math.ceil(0.25 * num_replicas):
-                        	replica_temp =  min_temp + (x * inc / 3)
+				replica_temp =  min_temp + (x * inc / 3)
 
-        	        elif x >= math.ceil(0.75 * num_replicas):
-			        replica_temp =  max_temp - (((num_replicas-1) - x) * inc / 3)
+			elif x >= math.ceil(0.75 * num_replicas):
+				replica_temp =  max_temp - (((num_replicas-1) - x) * inc / 3)
 
-	                else:
-        	                replica_temp =  min_temp + (x * inc)
+			else:
+				replica_temp =  min_temp + (x * inc)
 		
 		#If not quart split, split temperature range uniformly 
-		#		                    among all replicas.	
+		#                    among all replicas.	
 		else:
 			replica_temp =  min_temp + (x * inc)
 	
@@ -583,7 +674,7 @@ if __name__ == "__main__":
 	#create config files here.
 	for i in range(monte_carlo_steps):
 		for j in range(num_replicas):
-			generate_config(output_path, pdb_file, psf_file, par_file, md_steps, output_freq, replica_list[j], i)
+			generate_config(output_path, pdb_file, psf_file, par_file, i, md_steps, output_freq, replica_list[j])
 
 	replicas_to_run = []
 	for i in range(num_replicas):
@@ -607,13 +698,22 @@ if __name__ == "__main__":
 	#Write stats to a stats file
 	stat_file_name = "%s/%s.stat" % (output_path,  remove_trailing_dots(parse_file_name(pdb_file)))
 	stat_file_stream = open(stat_file_name, "w")
+
 	stat_file_stream.write("%s\n" % "Printing replica temperature execution matrix:")
-	
 	#Sort and format the replica exchange matrix.
 	for itr in range(num_replicas):
 		 replica_temp_execution_list[itr].sort()
 		 unique(replica_temp_execution_list[itr])
 		 stat_file_stream.write("Replica %d: %s\n" % (itr, replica_temp_execution_list[itr]))
+
+	#If barrier version was used, write the MC step times to stats file.
+	if use_barrier:
+		#Write run time for each step to stats file
+		stat_file_stream.write("\n\n%s\n" % "Printing run times for each monte carlo step:")
+		count = 1
+		for i in mc_step_times:
+			stat_file_stream.write("%d %f\n" % (count, i))
+			count += 1
 
 	stat_file_stream.close()
 	

@@ -25,7 +25,11 @@ and port of the master.
 
 #define WORK_QUEUE_DEFAULT_PORT 9123 /**< Default Work Queue port number. */
 #define WORK_QUEUE_RANDOM_PORT -1    /**< Indicate to Work Queue to choose a random open port. */
-#define WORK_QUEUE_LINE_MAX 1024
+
+#define WORK_QUEUE_LINE_MAX 1024	/**< LIne max between master and worker */
+#define WORK_QUEUE_CATALOG_LINE_MAX 4096 	/**< Line max between master/worker/worker_pool and the catalog server. */
+
+#define WORK_QUEUE_POOL_NAME_MAX 100
 
 #define WORK_QUEUE_WAITFORTASK -1   /**< Wait for a task to complete before returning. */
 
@@ -48,6 +52,10 @@ and port of the master.
 #define WORK_QUEUE_SCHEDULE_RAND 5	/**< Select a random worker. */
 #define WORK_QUEUE_SCHEDULE_MAX 5
 
+#define WORK_QUEUE_TASK_ORDER_FIFO 0  /**< Retrieve tasks based on first-in-first-out order. */
+#define WORK_QUEUE_TASK_ORDER_LIFO 1  /**< Retrieve tasks based on last-in-first-out order. */
+#define WORK_QUEUE_TASK_ORDER_DEFAULT 0  /**< Default task ordering (@ref WORK_QUEUE_TASK_ORDER_FIFO). */
+ 
 #define WORK_QUEUE_INPUT  0	/**< Specify an input object. */
 #define WORK_QUEUE_OUTPUT 1	/**< Specify an output object. */
 
@@ -124,6 +132,7 @@ struct work_queue_stats {
 	int workers_init;		/**< Number of workers initializing. */
 	int workers_ready;		/**< Number of workers ready for tasks. */
 	int workers_busy;		/**< Number of workers running tasks. */
+	char workers_by_pool[WORK_QUEUE_CATALOG_LINE_MAX];		/**< Number of workers from each pool. */
 	int tasks_running;		/**< Number of tasks currently running. */
 	int tasks_waiting;		/**< Number of tasks waiting for a CPU. */
 	int tasks_complete;		/**< Number of tasks waiting to be returned to user. */
@@ -135,8 +144,7 @@ struct work_queue_stats {
 	INT64_T total_bytes_received;	/**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
 	timestamp_t start_time;     /**<The time at which the master started. */
 	timestamp_t total_send_time;/**<Total time in microseconds spent in sending data to workers. */
-	timestamp_t total_receive_time;
-				    /**<Total time in microseconds spent in receiving data from workers. */
+	timestamp_t total_receive_time;	/**<Total time in microseconds spent in receiving data from workers. */
 	double efficiency;
 	double idle_percentage;
 	int capacity;
@@ -294,6 +302,12 @@ int work_queue_activate_fast_abort(struct work_queue *q, double multiplier);
 @param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
 */
 int work_queue_specify_algorithm(struct work_queue *q, int alg);
+
+/** Specify how the submitted tasks should be ordered. Either as FIFO or LIFO.
+@param q A pointer to the queue to modify.
+@param order The ordering to use for dispatching submitted tasks. Valid possibilities are defined in this file as "WORK_QUEUE_TASK_ORDER_X" values.
+*/
+int work_queue_specify_task_order(struct work_queue *q, int order);
 
 /** Change the project name for a given queue.
 @param q A pointer to the queue to modify.

@@ -372,7 +372,7 @@ static INT64_T do_open(int argc, char **argv)
 		strcpy(current_host, argv[1]);
 		strcpy(current_remote_dir, "/");
 		if(interactive_mode)
-			printf("connected to %s as %s\n", current_host, current_subject);
+			fprintf(stderr, "connected to %s as %s\n", current_host, current_subject);
 		return 0;
 	} else {
 		return -1;

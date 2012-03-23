@@ -69,6 +69,8 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define TIME_SLOT_MASTER_IDLE 2
 #define TIME_SLOT_APPLICATION 3
 
+#define POOL_DECISION_ENFORCEMENT_INTERVAL_DEFAULT 10
+
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
 int wq_tolerable_transfer_time_multiplier = 10;
@@ -105,6 +107,7 @@ struct work_queue {
 	double fast_abort_multiplier;
 
 	int worker_selection_algorithm;		  /**< How to choose worker to run the task. */
+	int task_ordering;
 
 	timestamp_t time_last_task_start;
 	timestamp_t idle_time;
@@ -126,6 +129,7 @@ struct work_queue {
 	int maximum_workers;
 	char catalog_host[DOMAIN_NAME_MAX];
 	int catalog_port;
+	struct hash_table *workers_by_pool;
 
 	int link_keepalive_on;
 };
@@ -151,6 +155,7 @@ struct work_queue_worker {
 	timestamp_t total_task_time;
 	timestamp_t total_transfer_time;
 	timestamp_t start_time;
+	char pool_name[WORK_QUEUE_POOL_NAME_MAX];
 };
 
 struct pending_output {
@@ -212,7 +217,8 @@ int work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance);
 int work_queue_specify_auto_remove_workers_on(struct work_queue *q, int value);
 int work_queue_specify_maximum_workers(struct work_queue *q, int max);
 
-static void update_catalog(struct work_queue *q);
+static void update_catalog(struct work_queue *q, int now);
+static void enforce_pool_decisions(struct work_queue *q);
 
 static int short_timeout = 5;
 static int next_taskid = 1;
@@ -284,7 +290,7 @@ static void change_worker_state(struct work_queue *q, struct work_queue_worker *
 	w->state = state;
 	q->workers_in_state[state]++;
 	if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
-		update_catalog(q);
+		update_catalog(q, 0);
 	}
 	debug(D_WQ, "Number of workers in state 'busy': %d;  'ready': %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_READY]);
 }
@@ -322,6 +328,26 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->workers_init = q->workers_in_state[WORKER_STATE_INIT];
 	s->workers_ready = q->workers_in_state[WORKER_STATE_READY];
 	s->workers_busy = q->workers_in_state[WORKER_STATE_BUSY];
+
+	char *c = s->workers_by_pool;
+	char *key;
+	struct pool_info *pi;
+	int x;
+	hash_table_firstkey(q->workers_by_pool);
+	while(hash_table_nextkey(q->workers_by_pool, &key, (void **) &pi)) {
+		x = snprintf(c, WORK_QUEUE_CATALOG_LINE_MAX - (c - s->workers_by_pool), "%s:%d,", pi->name, pi->count);
+		if(x <= 0) {
+			fprintf(stderr, "failed to record worker_by_pool item: %s:%d\n", pi->name, pi->count);
+			continue;
+		}
+		c += x;
+	}
+	if(c - s->workers_by_pool > 0) {
+		*(c-1) = '\0';
+	} else {
+		strncpy(s->workers_by_pool, "n/a", 4); 
+	}
+
 	s->tasks_waiting = list_size(q->ready_list);
 	s->tasks_running = q->workers_in_state[WORKER_STATE_BUSY];
 	s->tasks_complete = list_size(q->complete_list);
@@ -387,7 +413,12 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	char *key, *value;
 	struct work_queue_task *t;
 
-	debug(D_WQ, "worker %s removed", w->addrport);
+	if((w->pool_name)[0]) {
+		debug(D_WQ, "worker %s from pool \"%s\" removed", w->addrport, w->pool_name);
+	} else {
+		debug(D_WQ, "worker %s removed", w->addrport);
+	}
+
 	q->total_workers_removed++;
 
 	hash_table_firstkey(w->current_files);
@@ -411,6 +442,21 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 		}
 		w->current_task = 0;
 	}
+	
+	if((w->pool_name)[0]) {
+		struct pool_info *pi;
+		pi = hash_table_lookup(q->workers_by_pool, w->pool_name);
+		if(!pi) {
+			debug(D_NOTICE, "Error: removing worker from pool \"%s\" but failed to find out how many workers are from that pool.", w->pool_name);
+		} else {
+			if(pi->count == 0) {
+				debug(D_NOTICE, "Error: removing worker from pool \"%s\" but record indicates no workers from that pool are connected.", w->pool_name);
+			} else {
+				pi->count -= 1;
+			}
+		}
+	}
+
 	change_worker_state(q, w, WORKER_STATE_NONE);
 	if(w->link)
 		link_close(w->link);
@@ -725,6 +771,7 @@ static int handle_worker(struct work_queue *q, struct link *l)
 	w = hash_table_lookup(q->worker_table, key);
 
 	if(link_readline(l, line, sizeof(line), time(0) + short_timeout)) {
+		debug(D_WQ, "msg from worker: %s", line);
 		if(sscanf(line, "ready %s %d %lld %lld %lld %lld", w->hostname, &w->ncpus, &w->memory_avail, &w->memory_total, &w->disk_avail, &w->disk_total) == 6) {
 			// More workers than needed are connected
 			int workers_connected = hash_table_size(q->worker_table);
@@ -750,6 +797,7 @@ static int handle_worker(struct work_queue *q, struct link *l)
 					goto reject;
 				}
 			}
+
 			if(w->state == WORKER_STATE_INIT) {
 				change_worker_state(q, w, WORKER_STATE_READY);
 				q->total_workers_connected++;
@@ -771,6 +819,31 @@ static int handle_worker(struct work_queue *q, struct link *l)
 					}
 				}
 			}
+
+			char buffer[100]; //host name + pid
+			buffer[0] = '\0';
+			if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%*[^\"]\" %*s %*s %s", buffer) != 1) {
+				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"\" %*s %*s %s", buffer) != 1) {
+					if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d %*s %*s %s", buffer) != 1) {
+						(w->pool_name)[0] = 0;
+					}
+				}
+			}
+			if(buffer[0] != '\0') {
+				struct pool_info *pi;
+				strncpy(w->pool_name, buffer, WORK_QUEUE_POOL_NAME_MAX);
+				pi = hash_table_lookup(q->workers_by_pool, w->pool_name);
+				if(!pi) {
+					pi = xxmalloc(sizeof(*pi));
+					strncpy(pi->name, w->pool_name, WORK_QUEUE_POOL_NAME_MAX);
+					pi->count = 1;
+					hash_table_insert(q->workers_by_pool, w->pool_name, pi);
+				} else {
+					pi->count += 1;
+				}
+			}
+
+			
 
 			if(w->state == WORKER_STATE_INIT) {
 				change_worker_state(q, w, WORKER_STATE_READY);
@@ -1796,6 +1869,7 @@ struct work_queue *work_queue_create(int port)
 
 	q->fast_abort_multiplier = wq_option_fast_abort_multiplier;
 	q->worker_selection_algorithm = wq_option_scheduler;
+	q->task_ordering = WORK_QUEUE_TASK_ORDER_DEFAULT;
 
 	envstring = getenv("WORK_QUEUE_NAME");
 	if(envstring)
@@ -1841,7 +1915,7 @@ struct work_queue *work_queue_create(int port)
 		work_queue_specify_wait_routine(q, atoi(envstring));
 	}
 
-	if(q->auto_remove_workers_on) {
+	if(q->auto_remove_workers_on == WORK_QUEUE_SWITCH_ON) {
 		if(q->estimate_capacity_on == WORK_QUEUE_SWITCH_UNSPECIFIED) {
 			q->estimate_capacity_on = WORK_QUEUE_SWITCH_ON;
 		}
@@ -1896,6 +1970,7 @@ struct work_queue *work_queue_create(int port)
 	q->task_statistics = task_statistics_init();
 
 	q->link_keepalive_on = 1;
+	q->workers_by_pool = hash_table_create(0,0);
 
 	debug(D_WQ, "Work Queue is listening on port %d.", port);
 	return q;
@@ -2033,6 +2108,9 @@ void work_queue_delete(struct work_queue *q)
 		while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 			remove_worker(q, w);
 		}
+		if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
+			update_catalog(q, 1);
+		}
 		hash_table_delete(q->worker_table);
 		list_delete(q->ready_list);
 		list_delete(q->complete_list);
@@ -2058,7 +2136,12 @@ void work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	t->result = WORK_QUEUE_RESULT_UNSET;
 
 	/* Then, add it to the ready list and mark it as submitted. */
-	list_push_tail(q->ready_list, t);
+	if (q->task_ordering == WORK_QUEUE_TASK_ORDER_LIFO){
+		list_push_head(q->ready_list, t);
+	}	
+	else {
+		list_push_tail(q->ready_list, t);
+	}	
 	t->time_task_submit = timestamp_get();
 	q->total_tasks_submitted++;
 }
@@ -2101,7 +2184,7 @@ struct work_queue_task *work_queue_wait_fcfs(struct work_queue *q, int timeout)
 
 	while(1) {
 		if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
-			update_catalog(q);
+			update_catalog(q, 0);
 		}
 
 		t = list_pop_head(q->complete_list);
@@ -2176,7 +2259,7 @@ struct work_queue_task *work_queue_wait_fast_dispatch(struct work_queue *q, int 
 
 	while(1) {
 		if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
-			update_catalog(q);
+			update_catalog(q, 0);
 		}
 
 		t = list_pop_head(q->complete_list);
@@ -2266,7 +2349,7 @@ struct work_queue_task *work_queue_wait_adaptive(struct work_queue *q, int timeo
 
 	while(1) {
 		if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
-			update_catalog(q);
+			update_catalog(q, 0);
 		}
 
 		t = list_pop_head(q->complete_list);
@@ -2350,11 +2433,12 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	struct work_queue_task *result;
 	static timestamp_t last_left_time = 0;
 	static int last_left_status = 0;	// 0 -- did not return any done task; 1 -- returned done task 
+	static time_t next_pool_decision_enforcement = 0;
 
 	if(last_left_time && last_left_status == 1) {
 		if(q->total_tasks_complete > MIN_TIME_LIST_SIZE) {
 			timestamp_t tmp_time = timestamp_get() - last_left_time;
-			// A simple way of discarding outliers that require much calculation.
+			// A simple way of discarding outliers that does not require much calculation.
 			// Works for workloads that has stable app times.
 			if(tmp_time > WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER * (q->app_time / q->total_tasks_complete)) {
 				debug(D_WQ, "Discarding outlier task app time: %lld\n", tmp_time);
@@ -2364,6 +2448,11 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 		} else {
 			q->app_time += timestamp_get() - last_left_time;
 		}
+	}
+
+	if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && next_pool_decision_enforcement < time(0)) {
+		enforce_pool_decisions(q);
+		next_pool_decision_enforcement = time(0) + POOL_DECISION_ENFORCEMENT_INTERVAL_DEFAULT;
 	}
 
 	switch (q->work_queue_wait_routine) {
@@ -2533,6 +2622,16 @@ int work_queue_specify_algorithm(struct work_queue *q, int alg)
 	}
 }
 
+int work_queue_specify_task_order(struct work_queue *q, int order)
+{
+	if(q && order >= WORK_QUEUE_TASK_ORDER_FIFO && order <= WORK_QUEUE_TASK_ORDER_LIFO) {
+		q->task_ordering = order;
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
 static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	if(!w)
@@ -2608,11 +2707,77 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 	return timeout;
 }
 
-static void update_catalog(struct work_queue *q)
+static void update_catalog(struct work_queue *q, int now)
 {
 	struct work_queue_stats s;
 	work_queue_get_stats(q, &s);
-	if(!advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s)) {
+	if(!advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, now)) {
 		fprintf(stderr, "Reporting master status to the catalog server (%s@%d) failed!\n", q->catalog_host, q->catalog_port);
 	}
+}
+
+static int release_worker(struct work_queue *q, struct work_queue_worker *w)
+{
+	if(!w)
+		return 0;
+
+	link_putliteral(w->link, "release\n", time(0) + short_timeout);
+	remove_worker(q, w);
+	return 1;
+}
+
+static int remove_workers_from_pool(struct work_queue *q, const char *pool_name, int workers_to_release) {
+	struct work_queue_worker *w;
+	char *key;
+	int i = 0;
+
+	if(!q)
+		return -1;
+
+	// send worker the "exit" msg
+	hash_table_firstkey(q->worker_table);
+	while(i < workers_to_release && hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+		if(!strncmp(w->pool_name, pool_name, WORK_QUEUE_POOL_NAME_MAX)) {
+			release_worker(q, w);
+			i++;
+		}
+	}
+
+	return i;
+}
+
+static void enforce_pool_decisions(struct work_queue *q) {
+	struct list *decisions;
+
+	debug(D_WQ, "Get pool decision from catalog server.\n");
+	decisions = list_create();
+	if(!decisions) {
+		debug(D_NOTICE, "Failed to create list to store worker pool decisions!\n");
+		return;
+	}
+	if(!get_pool_decisions_from_catalog(q->catalog_host, q->catalog_port, q->name, decisions)) {
+		fprintf(stderr, "Failed to receive pool decisions from the catalog server(%s@%d)!\n", q->catalog_host, q->catalog_port);
+	}
+
+	if(!list_size(decisions)) {
+		return;
+	}
+
+	struct pool_info *d;
+	list_first_item(decisions);
+    while((d = (struct pool_info *)list_next_item(decisions))) {
+		struct pool_info *pi;
+		pi = hash_table_lookup(q->workers_by_pool, d->name);
+		if(pi) {
+			debug(D_WQ, "Workers from pool %s: %d; Pool decison: %d\n", pi->name, pi->count, d->count);
+			int workers_to_release = pi->count - d->count;
+			if(workers_to_release > 0) {
+				int k = remove_workers_from_pool(q, pi->name, workers_to_release);
+				printf("%d worker(s) has been rejected to enforce the pool decison.\n", k);
+			}
+		} 
+	}
+
+	list_free(decisions);
+	list_delete(decisions);
 }

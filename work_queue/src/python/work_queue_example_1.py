@@ -11,6 +11,7 @@ from work_queue import WORK_QUEUE_SCHEDULE_FCFS, WORK_QUEUE_SCHEDULE_FILES
 from work_queue import WORK_QUEUE_RANDOM_PORT
 from work_queue import WORK_QUEUE_OUTPUT
 #from workqueue import WORK_QUEUE_MASTER_MODE_STANDALONE, WORK_QUEUE_WORKER_MODE_SHARED
+from work_queue import WORK_QUEUE_TASK_ORDER_LIFO
 
 import os
 import sys
@@ -28,6 +29,7 @@ wq.specify_algorithm(WORK_QUEUE_SCHEDULE_FCFS)
 #wq.specify_name('workqueue_example')
 #wq.specify_master_mode(WORK_QUEUE_MASTER_MODE_STANDALONE)
 #wq.specify_worker_mode(WORK_QUEUE_WORKER_MODE_SHARED)
+wq.specify_task_order(WORK_QUEUE_TASK_ORDER_LIFO)
 
 if wq.empty():
     print 'work queue is empty'

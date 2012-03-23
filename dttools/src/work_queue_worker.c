@@ -55,6 +55,8 @@ static int master_timeout = 60;
 // Maximum time to wait when actively communicating with the master.
 static int active_timeout = 3600;
 
+static int bad_master_expiration_timeout = 30;
+
 // Initial value for backoff interval when worker fails to connect to a master.
 static int init_backoff_interval = 1; //corresponds to 1 second.
 
@@ -71,10 +73,11 @@ static UINT64_T disk_avail_threshold = 100;
 static int auto_worker = 0;
 static int exclusive_worker = 1;
 
-static const int non_preference_priority_max = 100;
+static const int non_preference_priority_max = WORK_QUEUE_MASTER_PRIORITY_MAX / 2;
 
 static char *catalog_server_host = NULL;
 static int catalog_server_port = 0;
+static char *pool_name = NULL;
 static struct work_queue_master *actual_master = NULL;
 
 static struct list *preferred_masters = NULL;
@@ -96,13 +99,19 @@ void report_worker_ready(struct link *master)
 	struct utsname uname_data;
 	char *pm;
 	char preferred_master_names[WORK_QUEUE_LINE_MAX];
-
+	char name_of_pool[WORK_QUEUE_POOL_NAME_MAX];
 
 	domain_name_cache_guess(hostname);
 	ncpus = load_average_get_cpus();
 	memory_info_get(&memory_avail, &memory_total);
 	disk_info_get(".", &disk_avail, &disk_total);
 	uname(&uname_data);
+
+	if(pool_name) {
+		strncpy(name_of_pool, pool_name, WORK_QUEUE_POOL_NAME_MAX);
+	} else {
+		name_of_pool[0] = '\0';
+	}
 
 	if(exclusive_worker) {
 		preferred_master_names[0] = 0;
@@ -111,9 +120,9 @@ void report_worker_ready(struct link *master)
 			sprintf(&(preferred_master_names[strlen(preferred_master_names)]), "%s ", pm);
 		}
 
-		link_putfstring(master, "ready %s %d %llu %llu %llu %llu \"%s\" %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names, uname_data.sysname, uname_data.machine);
+		link_putfstring(master, "ready %s %d %llu %llu %llu %llu \"%s\" %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names, uname_data.sysname, uname_data.machine, name_of_pool);
 	} else {
-		link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, uname_data.sysname, uname_data.machine);
+		link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, uname_data.sysname, uname_data.machine, name_of_pool);
 	}
 
 }
@@ -261,74 +270,144 @@ static void make_hash_key(const char *addr, int port, char *key)
 static void record_bad_master(struct work_queue_master *m)
 {
 	char key[LINK_ADDRESS_MAX + 10];	// addr:port
-	int lifetime = 10;
 
 	if(!m)
 		return;
 
 	make_hash_key(m->addr, m->port, key);
-	hash_cache_insert(bad_masters, key, m, lifetime);
-	debug(D_WQ, "Master at %s:%d is not receiving more workers.\nWon't connect to this master in %d seconds.", m->addr, m->port, lifetime);
+	hash_cache_insert(bad_masters, key, m, bad_master_expiration_timeout);
+	debug(D_WQ, "Master at %s:%d is not receiving more workers.\nWon't connect to this master in %d seconds.", m->addr, m->port, bad_master_expiration_timeout);
 }
 
-struct list *get_work_queue_masters(const char *catalog_host, int catalog_port)
+int reset_preferred_masters(struct work_queue_pool *pool) {
+	struct work_queue_master *m;
+
+	while((m = (struct work_queue_master *)list_pop_head(preferred_masters))) {
+		free(m);
+	}
+
+	int count = 0;
+
+	char *pds = xxstrdup(pool->decision);
+	char *pd = strtok(pds, " \t,"); 
+	while(pd) {
+		char *eq = strchr(pd, ':');
+		if(eq) {
+			*eq = '\0';
+			if(list_push_tail(preferred_masters, xxstrdup(pd))) {
+				count++;
+			} else {
+				fprintf(stderr, "Error: failed to insert item during resetting preferred masters.\n");
+			}
+			*eq = ':';
+		} else {
+			if(!strncmp(pd, "n/a", 4)) {
+				break;
+			} else {
+				fprintf(stderr, "Invalid pool decision item: \"%s\".\n", pd);
+				break;
+			}
+		}
+		pd = strtok(0, " \t,");
+	}
+	free(pds);
+	return count;
+}
+
+int get_masters_and_pool_info(const char *catalog_host, int catalog_port, struct list **masters_list, struct work_queue_pool **pool)
 {
 	struct catalog_query *q;
 	struct nvpair *nv;
-	struct list *ml;
-	struct work_queue_master *m;
 	char *pm;
+	struct work_queue_master *m;
 	time_t timeout = 60, stoptime;
 	char key[LINK_ADDRESS_MAX + 10];	// addr:port
 
 	stoptime = time(0) + timeout;
 
+	*pool = NULL;
+
+	struct list *ml = list_create();
+	if(!ml) {
+		fprintf(stderr, "Failed to create list structure to store masters information.\n");
+		*masters_list = NULL;
+		return 0;
+	}
+	*masters_list = ml;
+
+	int work_queue_pool_not_found;
+
+	if(pool_name) {
+		work_queue_pool_not_found = 1;
+	} else {
+		// pool name has not been set by -p option
+		work_queue_pool_not_found = 0;
+	}
+
 	q = catalog_query_create(catalog_host, catalog_port, stoptime);
 	if(!q) {
 		fprintf(stderr, "Failed to query catalog server at %s:%d\n", catalog_host, catalog_port);
-		return NULL;
+		return 0;
 	}
-
-	ml = list_create();
-	if(!ml)
-		return NULL;
 
 	while((nv = catalog_query_read(q, stoptime))) {
 		if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0) {
 			m = parse_work_queue_master_nvpair(nv);
-
-			list_first_item(preferred_masters);
-			while((pm = (char *) list_next_item(preferred_masters))) {
-				if(whole_string_match_regex(m->proj, pm)) {
-					// preferred master found
-					break;
-				}
-			}
-
-			if(pm) {
-				// This is a preferred master
-				m->priority += non_preference_priority_max;
-			} else {
-				// Master name does not match any preferred master names
-				if(exclusive_worker) {
-					continue;
-				} else {
-					m->priority = non_preference_priority_max < m->priority ? non_preference_priority_max : m->priority;
-				}
-			}
 
 			// exclude 'bad' masters
 			make_hash_key(m->addr, m->port, key);
 			if(!hash_cache_lookup(bad_masters, key)) {
 				list_push_priority(ml, m, m->priority);
 			}
+		} 
+		if(work_queue_pool_not_found) {
+			if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_POOL) == 0) {
+				struct work_queue_pool *tmp_pool;
+				tmp_pool = parse_work_queue_pool_nvpair(nv);
+				if(strncmp(tmp_pool->name, pool_name, WORK_QUEUE_POOL_NAME_MAX) == 0) {
+					*pool = tmp_pool;
+					work_queue_pool_not_found = 0;
+				} else {
+					free(tmp_pool);
+				}
+			}
 		}
 		nvpair_delete(nv);
 	}
 
+	if(*pool) {
+		reset_preferred_masters(*pool);
+	}
+
+	// trim masters list
+	list_first_item(ml);
+	while((m = (struct work_queue_master *)list_next_item(ml))) {
+		list_first_item(preferred_masters);
+		while((pm = (char *)list_next_item(preferred_masters))) {
+			if(whole_string_match_regex(m->proj, pm)) {
+				// preferred master found
+				break;
+			}
+		}
+
+		if(pm) {
+			// This is a preferred master
+			m->priority += non_preference_priority_max;
+		} else {
+			// Master name does not match any preferred master names
+			if(exclusive_worker) {
+				list_remove(ml, m);
+				free(m);
+			} else {
+				m->priority = non_preference_priority_max < m->priority ? non_preference_priority_max : m->priority;
+			}
+		}
+
+	}
+
 	// Must delete the query otherwise it would occupy 1 tcp connection forever!
 	catalog_query_delete(q);
-	return ml;
+	return 1;
 }
 
 struct distribution_node {
@@ -350,6 +429,10 @@ void *select_item_by_weight(struct distribution_node distribution[], int n)
 		sum += w;
 	}
 
+	if(sum == 0) {
+		return NULL;
+	}
+
 	x = rand() % sum;
 
 	for(i = 0; i < n; i++) {
@@ -361,19 +444,65 @@ void *select_item_by_weight(struct distribution_node distribution[], int n)
 	return NULL;
 }
 
+struct work_queue_master * select_master(struct list *ml, struct work_queue_pool *pool) {
+	if(!ml) {
+		return NULL;
+	}
+
+	if(!list_size(ml)) {
+		return NULL;
+	}
+
+	if(!pool) {
+		return list_pop_head(ml);
+	}
+
+	struct distribution_node *distribution;
+	distribution = xxmalloc(sizeof(struct distribution_node)*list_size(ml));
+
+	debug(D_WQ, "Selecting a project from %d project(s).", list_size(ml));
+    struct work_queue_master *m;
+	int i = 0;
+	list_first_item(ml);
+	while((m = (struct work_queue_master *)list_next_item(ml))) {
+		(distribution[i]).item = (void *)m;
+		int provided = workers_by_item(m->workers_by_pool, pool->name);
+		int target = workers_by_item(pool->decision, m->proj);
+		if(provided == -1) {
+			provided = 0;
+		}
+		int n = target - provided;
+		if(n < 0) {
+			n = 0;
+		}
+		(distribution[i]).weight = n;
+		debug(D_WQ, "\tproject: %s; weight: %d", m->proj, n);
+		i++;
+	}
+
+   	m = (struct work_queue_master *)select_item_by_weight(distribution, list_size(ml));
+	debug(D_WQ, "Selected project: %s", m->proj);
+	if(m) {
+		list_remove(ml, m);
+	}
+	free(distribution);
+	return m;
+}
+
 struct link *auto_link_connect(char *addr, int *port, time_t master_stoptime)
 {
 	struct link *master = 0;
 	struct list *ml;
 	struct work_queue_master *m;
+	struct work_queue_pool *pool;
 
-	ml = get_work_queue_masters(catalog_server_host, catalog_server_port);
-	if(!ml)
+	get_masters_and_pool_info(catalog_server_host, catalog_server_port, &ml, &pool);
+	if(!ml) {
 		return NULL;
+	}
 	debug_print_masters(ml);
-
-	list_first_item(ml);
-	while((m = (struct work_queue_master *) list_next_item(ml))) {
+	
+	while((m = (struct work_queue_master *)select_master(ml, pool))) {
 		master = link_connect(m->addr, m->port, master_stoptime);
 		if(master) {
 			debug(D_WQ, "Talking to the Master at:\n");
@@ -537,6 +666,7 @@ int main(int argc, char *argv[])
 	pid_t pid;
 	time_t readline_stoptime;
 	int backoff_multiplier = 2; 
+	int got_released = 0;
 
 	preferred_masters = list_create();
 	if(!preferred_masters) {
@@ -546,7 +676,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aC:sd:t:o:N:w:i:b:z:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "aC:sd:t:o:p:N:w:i:b:z:vh")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
@@ -575,6 +705,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'N':
 			list_push_tail(preferred_masters, strdup(optarg));
+			break;
+		case 'p':
+			pool_name = xxstrdup(optarg);
 			break;
 		case 'w':
 			w = string_metric_parse(optarg);
@@ -619,7 +752,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(auto_worker && exclusive_worker && !list_size(preferred_masters)) {
+	if(auto_worker && exclusive_worker && !list_size(preferred_masters) && !pool_name) {
 		fprintf(stderr, "Worker is running under exclusive mode. But no preferred master is specified.\n");
 		fprintf(stderr, "Please specify the preferred master names with -N option or add -s option to allow the worker to work for any available masters.\n");
 		exit(1);
@@ -713,11 +846,11 @@ int main(int argc, char *argv[])
 		// Wait for forked task's completion
 		if(task_status == TASK_RUNNING) {
 			int tmp_timeout = 5;
-			debug(D_WQ, "Waiting %d seconds for process %d to finish ...", tmp_timeout, pid);
+			//debug(D_WQ, "Waiting %d seconds for process %d to finish ...", tmp_timeout, pid);
 			if(wait_task(pid, tmp_timeout, &ti) && abort_flag == 0) {
 				task_status = TASK_COMPLETE;
 			} else {
-				debug(D_WQ, "Task (process %d) is not done yet.\n", pid);
+				//debug(D_WQ, "Task (process %d) is not done yet.\n", pid);
 			}
 		}
 
@@ -947,7 +1080,24 @@ int main(int argc, char *argv[])
 					break;
 				}
 				link_putliteral(master, "thirdput complete\n", time(0) + active_timeout);
-			} else if(!strncmp(line, "exit", 4)) {
+			} else if(!strncmp(line, "release", 8)) {
+				if(task_status == TASK_RUNNING) {
+					kill(pid, SIGTERM);
+				}
+				task_status = TASK_NONE;
+				char *m;
+				int p;
+				if(actual_master) {
+					m = actual_master->addr;
+					p = actual_port;
+				} else {
+					m = addr;
+					p = port;
+				}
+				printf("I'm released by master@%s:%d. Looking for another master now ...\n", m, p);
+				got_released = 1;
+				goto recover;
+			} else if(!strncmp(line, "exit", 5)) {
 				break;
 			} else {
 				link_putliteral(master, "error\n", time(0) + active_timeout);
@@ -975,7 +1125,11 @@ int main(int argc, char *argv[])
 			}
 			sprintf(deletecmd, "rm -rf %s/*", tempdir);
 			system(deletecmd);
-			sleep(5);
+			if(got_released) {
+				got_released = 0;
+			} else {
+				sleep(5);
+			}
 		}
 	}
 

@@ -30,9 +30,6 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/stat.h>
 
-
-//static char *catalog_server_host = NULL;
-//static int catalog_server_port = 0;
 static struct datagram *outgoing_datagram = NULL;
 
 int parse_catalog_server_description(char *server_string, char **host, int *port)
@@ -56,12 +53,69 @@ int parse_catalog_server_description(char *server_string, char **host, int *port
 	return *port;
 }
 
+struct work_queue_pool *parse_work_queue_pool_nvpair(struct nvpair *nv)
+{
+	struct work_queue_pool *p;
+
+	p = xxmalloc(sizeof(*p));
+
+	strncpy(p->addr, nvpair_lookup_string(nv, "address"), LINK_ADDRESS_MAX);
+	strncpy(p->name, nvpair_lookup_string(nv, "pool_name"), WORK_QUEUE_POOL_NAME_MAX);
+	strncpy(p->decision, nvpair_lookup_string(nv, "decision"), WORK_QUEUE_CATALOG_LINE_MAX);
+	strncpy(p->owner, nvpair_lookup_string(nv, "owner"), USERNAME_MAX);
+
+	return p;
+}
+
+// workers_by_item format: "item1_name:item1_value, item2_name:item2_value, ..."
+// returns the item value of item - "item_name"
+int workers_by_item(const char *workers_by_item, const char *item_name) {
+	if(!workers_by_item || !item_name) {
+		return -1;
+	}
+
+	char *wbi, *item, *eq;
+
+	wbi = xxstrdup(workers_by_item);
+	item = strtok(wbi, " \t,"); 
+	while(item) {
+		eq = strchr(item, ':');
+		if(eq) {
+			int n;
+
+			*eq = '\0';
+			if(!strncmp(item, item_name, WORK_QUEUE_CATALOG_LINE_MAX)) {
+				n = atoi(eq+1);
+				if(n < 0) {
+					*eq = '=';
+					fprintf(stderr, "Number of workers in item \"%s\" is invalid.\n", item);
+					break;
+				} else {
+					free(wbi);
+					return n;
+				}
+			} 
+
+			*eq = ':';
+		} else {
+			if(!strncmp(item, "n/a", 3)) {
+				break;
+			} else {
+				fprintf(stderr, "Invalid worker distribution item: \"%s\".\n", item);
+				break;
+			}
+		}
+		item = strtok(0, " \t,");
+	}
+	free(wbi);
+	return -1;
+}
+
 struct work_queue_master *parse_work_queue_master_nvpair(struct nvpair *nv)
 {
 	struct work_queue_master *m;
 
 	m = xxmalloc(sizeof(struct work_queue_master));
-	if(!m) return NULL;
 
 	strncpy(m->addr, nvpair_lookup_string(nv, "address"), LINK_ADDRESS_MAX);
 	strncpy(m->proj, nvpair_lookup_string(nv, "project"), WORK_QUEUE_NAME_MAX);
@@ -78,6 +132,15 @@ struct work_queue_master *parse_work_queue_master_nvpair(struct nvpair *nv)
 	m->workers_ready = nvpair_lookup_integer(nv, "workers_ready");
 	m->workers_busy = nvpair_lookup_integer(nv, "workers_busy");
 	m->workers = nvpair_lookup_integer(nv, "workers");
+
+	const char *workers_by_pool;
+	workers_by_pool = nvpair_lookup_string(nv, "workers_by_pool");
+
+	if(workers_by_pool) {
+		strncpy(m->workers_by_pool, workers_by_pool, WORK_QUEUE_CATALOG_LINE_MAX);
+	} else {
+		strncpy(m->workers_by_pool, "unknown", WORK_QUEUE_CATALOG_LINE_MAX);
+	}
 
 	const char *owner;
 	owner = nvpair_lookup_string(nv, "owner");
@@ -162,7 +225,83 @@ struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port
 	return ml;
 }
 
-int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s)
+
+int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, int now)
+{
+	char address[DATAGRAM_ADDRESS_MAX];
+	char owner[USERNAME_MAX];
+	static char text[WORK_QUEUE_CATALOG_LINE_MAX];
+	static time_t last_update_time = 0;
+
+	if(!now) {
+		if(time(0) - last_update_time < WORK_QUEUE_CATALOG_UPDATE_INTERVAL) return 1;
+	}
+
+	if(!outgoing_datagram) {
+		outgoing_datagram = datagram_create(0);
+		if(!outgoing_datagram) {
+			fprintf(stderr, "Couldn't create outgoing udp port, thus work queue master info won't be sent to the catalog server!\n");
+			return 0;
+		}
+	}
+
+	if(!username_get(owner)) {
+		strcpy(owner,"unknown");
+	}
+
+	snprintf(text, WORK_QUEUE_CATALOG_LINE_MAX, "type wq_master\nproject %s\nstart_time %llu\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running %d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nworkers_by_pool %s\ncapacity %d\nversion %d.%d.%d\nowner %s", project_name, s->start_time, s->priority, s->port, WORK_QUEUE_CATALOG_LIFETIME, s->tasks_waiting, s->total_tasks_complete, s->tasks_running, s->total_tasks_dispatched, s->workers_init, s->workers_ready, s->workers_busy, s->workers_ready + s->workers_busy, s->workers_by_pool, s->capacity, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
+
+	if(domain_name_cache_lookup(catalog_host, address)) {
+		debug(D_WQ, "Sending the master information to the catalog server at %s:%d ...", catalog_host, catalog_port);
+		datagram_send(outgoing_datagram, text, strlen(text), address, catalog_port);
+	}
+
+	last_update_time = time(0);
+	return 1;
+}
+
+int get_pool_decisions_from_catalog(const char *catalog_host, int catalog_port, const char *proj, struct list *decisions) {
+	struct catalog_query *q;
+	struct nvpair *nv;
+	time_t timeout = 60, stoptime;
+
+	stoptime = time(0) + timeout;
+
+	if(!decisions) {
+		fprintf(stderr, "No list to store pool decisions.\n");
+		return 0;
+	}
+
+	q = catalog_query_create(catalog_host, catalog_port, stoptime);
+	if(!q) {
+		fprintf(stderr, "Failed to query catalog server at %s:%d\n", catalog_host, catalog_port);
+		return 0;
+	}
+
+	while((nv = catalog_query_read(q, stoptime))) {
+		if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_POOL) == 0) {
+			struct work_queue_pool *p;
+			p = parse_work_queue_pool_nvpair(nv);
+			debug(D_WQ, "pool %s's decision: %s\n", p->name, p->decision);
+			int x = workers_by_item(p->decision, proj);
+			if(x >= 0) {
+				struct pool_info *pi;
+				pi = (struct pool_info *)xxmalloc(sizeof(*pi));
+				strncpy(pi->name, p->name, WORK_QUEUE_POOL_NAME_MAX);
+				pi->count = x;
+				list_push_tail(decisions, pi);
+			}
+			free(p);
+		}
+		nvpair_delete(nv);
+	}
+
+	// Must delete the query otherwise it would occupy 1 tcp connection forever!
+	catalog_query_delete(q);
+	return 1;
+}
+
+int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_port, const char *pool_name, const char *decision)
 {
 	char address[DATAGRAM_ADDRESS_MAX];
 	char owner[USERNAME_MAX];
@@ -183,16 +322,20 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 		strcpy(owner,"unknown");
 	}
 
-	snprintf(text, WORK_QUEUE_CATALOG_LINE_MAX, "type wq_master\nproject %s\nstart_time %llu\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running%d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\ncapacity %d\nversion %d.%d.%d\nowner %s", project_name, s->start_time, s->priority, s->port, WORK_QUEUE_CATALOG_LIFETIME, s->tasks_waiting, s->total_tasks_complete, s->tasks_running, s->total_tasks_dispatched, s->workers_init, s->workers_ready, s->workers_busy, s->workers_init + s->workers_ready + s->workers_busy, s->capacity, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
+	snprintf(text, WORK_QUEUE_CATALOG_LINE_MAX, "type wq_pool\npool_name %s\ndecision %s\nowner %s", pool_name, decision, owner);
+	debug(D_WQ, "Pool ad: \n%s\n", text);
 
 	if(domain_name_cache_lookup(catalog_host, address)) {
-		debug(D_WQ, "Sending the master information to the catalog server at %s:%d ...", catalog_host, catalog_port);
+		debug(D_WQ, "Sending the pool decision to the catalog server at %s:%d ...", catalog_host, catalog_port);
 		datagram_send(outgoing_datagram, text, strlen(text), address, catalog_port);
 	}
 
 	last_update_time = time(0);
 	return 1;
 }
+
+
+
 
 void debug_print_masters(struct list *ml)
 {

@@ -272,7 +272,7 @@ class WorkQueue(_object):
     # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
     #
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=True, exclusive=True, shutdown=False):
+    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=False, exclusive=True, shutdown=False):
         self._work_queue = work_queue_create(port)
         self._stats      = work_queue_stats()
         self._task_table = {}
@@ -342,6 +342,18 @@ class WorkQueue(_object):
     #                   - @ref WORK_QUEUE_SCHEDULE_RAND
     def specify_algorithm(self, algorithm):
         return work_queue_specify_algorithm(self._work_queue, algorithm)
+
+    ##
+    # Set the order for dispatching submitted tasks in the queue.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param order  	One of the following algorithms to use in dispatching
+	# 					submitted tasks to workers:
+    #                   - @ref WORK_QUEUE_TASK_ORDER_FIFO
+    #                   - @ref WORK_QUEUE_TASK_ORDER_LIFO
+    #                   - @ref WORK_QUEUE_TASK_ORDER_DEFAULT
+    def specify_task_order(self, order):
+        return work_queue_specify_task_order(self._work_queue, order)
 
     ##
     # Change the project name for the given queue.
