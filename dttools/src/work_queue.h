@@ -398,11 +398,6 @@ void work_queue_task_specify_output_file(struct work_queue_task *t, const char *
 */
 void work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname);
 
-/** Return the version of Work Queue.
-@return Version string in the form of Major.Minor.Micro.
-*/
-const char *work_queue_version(void);
-
 //@}
 
 #endif
