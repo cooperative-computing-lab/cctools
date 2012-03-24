@@ -310,6 +310,7 @@ struct pool_config *get_pool_config(const char *path) {
 	fp = fopen(path, "r");
 	if(!fp) {
 		fprintf(stderr, "Failed to open pool configuration file: \"%s\".\n", path);
+		free(pc);
 		return 0;
 	}
 
