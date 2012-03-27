@@ -2663,6 +2663,38 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	return i;
 }
 
+int taskid_comparator(void *t, const void *r) {
+
+	struct work_queue_task *task_in_queue = t;
+	const struct work_queue_task *task_to_remove = r;
+
+	if (task_in_queue->taskid == task_to_remove->taskid) {
+		return 1;
+	}	
+	return 0;
+}
+
+/**
+ * Note this is different from work_queue_task_delete(). This simply removes the
+ * task from ready list and returns without cleaning up the task. This means the 
+ * task can be resubmitted to queue again from userland. It is still up to the 
+ * user to call work_queue_task_delete() when the task is no longer required.
+ */
+int work_queue_task_remove(struct work_queue *q, struct work_queue_task *t) {
+
+	struct work_queue_task *matched_task;
+
+	if (t->taskid > 0){
+		matched_task = list_find(q->ready_list, taskid_comparator, t);
+		if (matched_task) {	
+			list_remove(q->ready_list,matched_task);
+			debug(D_WQ, "Task with tag %s is removed.", matched_task->tag);
+			return 0;
+		}
+	}
+	return 1;
+}
+
 int work_queue_empty(struct work_queue *q)
 {
 	return ((list_size(q->ready_list) + list_size(q->complete_list) + q->workers_in_state[WORKER_STATE_BUSY]) == 0);

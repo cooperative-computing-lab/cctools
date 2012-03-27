@@ -340,6 +340,12 @@ int work_queue_specify_master_mode(struct work_queue *q, int mode);
 */
 int work_queue_specify_worker_mode(struct work_queue *q, int mode);
 
+/** Remove a task from the queue's ready list.
+@param q A pointer to the queue to modify.
+@param t The task to remove from the queue.
+*/
+int work_queue_task_remove(struct work_queue *q, struct work_queue_task *t);
+
 /** Shut down workers connected to the work_queue system. Gives a best effort and then returns the number of workers given the shut down order.
 @param q A pointer to the queue to query.
 @param n The number to shut down. All workers if given "0".
