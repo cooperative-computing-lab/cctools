@@ -1134,6 +1134,9 @@ int main(int argc, char *argv[])
 	}
 
       abort:
+	if(pool_name) {
+		free(pool_name);
+	}
 	fprintf(stdout, "work_queue_worker: cleaning up %s\n", tempdir);
 	sprintf(deletecmd, "rm -rf %s", tempdir);
 	system(deletecmd);
