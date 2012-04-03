@@ -414,8 +414,9 @@ class WorkQueue(_object):
     # @param self   Reference to the current work queue object.
     # @param task   A task description created from @ref work_queue::Task.
     def submit(self, task):
-        self._task_table[task.id] = task
-        return work_queue_submit(self._work_queue, task._task)
+		taskid = work_queue_submit(self._work_queue, task._task)
+		self._task_table[taskid] = task
+		return taskid 
 
     ##
     # Wait for tasks to complete.
@@ -427,9 +428,9 @@ class WorkQueue(_object):
     #                   before returning.  Use an integer to set the timeout or the constant @ref
     #                   WORK_QUEUE_WAITFORTASK to block until a task has completed.
     def wait(self, timeout=WORK_QUEUE_WAITFORTASK):
-        task_pointer = work_queue_wait(self._work_queue, timeout)
-        if task_pointer:
-            task = self._task_table[int(task_pointer.taskid)]
-            del(self._task_table[task_pointer.taskid])
-            return task
-        return None
+		task_pointer = work_queue_wait(self._work_queue, timeout)
+		if task_pointer:
+			task = self._task_table[int(task_pointer.taskid)]
+			del(self._task_table[task_pointer.taskid])
+			return task
+		return None
