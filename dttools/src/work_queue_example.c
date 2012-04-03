@@ -23,6 +23,7 @@ int main(int argc, char *argv[])
 	struct work_queue *q;
 	struct work_queue_task *t;
 	int port = WORK_QUEUE_DEFAULT_PORT;
+	int taskid;
 	int i;
 
 	if(argc < 2) {
@@ -50,9 +51,9 @@ int main(int argc, char *argv[])
 		t = work_queue_task_create(command);
 		work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
-		work_queue_submit(q, t);
+		taskid = work_queue_submit(q, t);
 
-		printf("submitted task: %s\n", t->command_line);
+		printf("submitted task (id# %d): %s\n", taskid, t->command_line);
 	}
 
 	printf("waiting for tasks to complete...\n");
@@ -61,7 +62,7 @@ int main(int argc, char *argv[])
 
 		t = work_queue_wait(q, 5);
 		if(t) {
-			printf("task complete: %s (return code %d)\n", t->command_line, t->return_status);
+			printf("task (id# %d) complete: %s (return code %d)\n", t->taskid, t->command_line, t->return_status);
 			work_queue_task_delete(t);
 		}
 	}
