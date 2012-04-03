@@ -235,7 +235,6 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->output_files = list_create();
 	t->return_status = WORK_QUEUE_RETURN_STATUS_UNSET;
 	t->result = WORK_QUEUE_RESULT_UNSET;
-	t->taskid = next_taskid++;
 
 	t->time_task_submit = t->time_task_finish = 0;
 	t->time_send_input_start = t->time_send_input_finish = 0;
@@ -2134,6 +2133,9 @@ void work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	t->total_transfer_time = 0;
 	t->cmd_execution_time = 0;
 	t->result = WORK_QUEUE_RESULT_UNSET;
+	
+	//Increment taskid. So we get a unique taskid for every submit.
+	t->taskid = next_taskid++;
 
 	/* Then, add it to the ready list and mark it as submitted. */
 	if (q->task_ordering == WORK_QUEUE_TASK_ORDER_LIFO){
