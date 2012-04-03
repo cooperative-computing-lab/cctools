@@ -2119,7 +2119,7 @@ void work_queue_delete(struct work_queue *q)
 	}
 }
 
-void work_queue_submit(struct work_queue *q, struct work_queue_task *t)
+int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 {
 	/* If the task has been used before, clear out accumlated state. */
 	if(t->output) {
@@ -2146,6 +2146,8 @@ void work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	}	
 	t->time_task_submit = timestamp_get();
 	q->total_tasks_submitted++;
+
+	return (t->taskid);
 }
 
 static int add_more_workers(struct work_queue *q, time_t stoptime)

@@ -252,8 +252,9 @@ struct work_queue *work_queue_create(int port);
 It is safe to re-submit a task returned by @ref work_queue_wait.
 @param q A work queue returned from @ref work_queue_create.
 @param t A task description returned from @ref work_queue_task_create.
+@return The unique taskid assigned to the submitted task. 
 */
-void work_queue_submit(struct work_queue *q, struct work_queue_task *t);
+int work_queue_submit(struct work_queue *q, struct work_queue_task *t);
 
 /** Wait for tasks to complete.  This call will block until the timeout has elapsed.
 @param q The work queue to wait on.
