@@ -797,11 +797,6 @@ static int handle_worker(struct work_queue *q, struct link *l)
 				}
 			}
 
-			if(w->state == WORKER_STATE_INIT) {
-				change_worker_state(q, w, WORKER_STATE_READY);
-				q->total_workers_connected++;
-				debug(D_WQ, "%s (%s) ready", w->hostname, w->addrport);
-			}
 			//Re-scan to see if worker reports its os and arch.
 			if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"", project_names) == 1) {
 				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%*[^\"]\" %s %s", w->os, w->arch) != 2) {
@@ -842,10 +837,9 @@ static int handle_worker(struct work_queue *q, struct link *l)
 				}
 			}
 
-			
-
 			if(w->state == WORKER_STATE_INIT) {
 				change_worker_state(q, w, WORKER_STATE_READY);
+				q->total_workers_connected++;
 				debug(D_WQ, "%s (%s) running %s on %s is ready", w->hostname, w->addrport, w->os, w->arch);
 			}
 		} else if(sscanf(line, "result %d %lld", &result, &output_length) == 2) {
