@@ -254,7 +254,7 @@ int mpi_queue_empty(struct mpi_queue *q)
 
 
 
-void mpi_queue_submit(struct mpi_queue *q, struct mpi_queue_task *t)
+int mpi_queue_submit(struct mpi_queue *q, struct mpi_queue_task *t)
 {
 	/* If the task has been used before, clear out accumlated state. */
 	static int next_taskid = 1;
@@ -274,6 +274,8 @@ void mpi_queue_submit(struct mpi_queue *q, struct mpi_queue_task *t)
 	list_push_tail(q->ready_list, t);
 	t->submit_time = timestamp_get();
 	q->total_tasks_submitted++;
+
+	return (t->taskid);
 }
 
 int dispatch_task(struct link *mpi_link, struct mpi_queue_task *t, int timeout)
