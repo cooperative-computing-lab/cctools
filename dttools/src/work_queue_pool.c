@@ -49,6 +49,7 @@ static sig_atomic_t pool_config_updated = 1;
 static struct batch_queue *q;
 static struct itable *job_table = NULL;
 static struct hash_table *processed_masters;
+static int worker_timeout = 0;
 static int retry_count = 20;
 
 static char name_of_this_pool[WORK_QUEUE_POOL_NAME_MAX];
@@ -457,8 +458,11 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 		//submit_workers_for_new_masters(matched_masters, pc);
 		int n = decide_worker_distribution(matched_masters, pc, catalog_host, catalog_port);
 
-		// TODO -t option
-		snprintf(cmd, PATH_MAX, "./work_queue_worker -a -t 60 -p %s", name_of_this_pool);
+		if(worker_timeout > 0) {
+			snprintf(cmd, PATH_MAX, "./work_queue_worker -a -t %d -p %s", worker_timeout, name_of_this_pool);
+		} else {
+			snprintf(cmd, PATH_MAX, "./work_queue_worker -a -p %s", name_of_this_pool);
+		}
 		snprintf(input_files, PATH_MAX, "work_queue_worker");
 
 		n -= itable_size(job_table);
@@ -1101,6 +1105,7 @@ int main(int argc, char *argv[])
 		case 't':
 			strcat(worker_args, " -t ");
 			strcat(worker_args, optarg);
+			worker_timeout = atoi(optarg);
 			break;
 		case 'd':
 			debug_flags_set(optarg);
