@@ -764,7 +764,7 @@ then
 		python_version=`${python} -V 2>&1 | cut -d " " -f 2`
 		echo "python version is ${python_version}"
 		python_major_version=`echo ${python_version} | cut -d . -f 1`
-		python_minor_version=`echo ${python_version} | cut -d . -f 2`
+		python_minor_version=`echo ${python_version} | cut -d . -f 2 | cut -d . -f 1,2`
 		if [ "$python_major_version" -eq 2 -a "$python_minor_version" -ge 4 ]
 		then
 			if check_file ${python_path}/include/python2.$python_minor_version/Python.h
@@ -777,7 +777,9 @@ then
 from distutils import sysconfig
 flags = ['-I' + sysconfig.get_python_inc(),
 	 '-I' + sysconfig.get_python_inc(plat_specific=True)]
-flags.extend(sysconfig.get_config_var('CFLAGS').split())
+syscfgflags = sysconfig.get_config_var('CFLAGS')
+if not syscfgflags is None:
+    flags.extend(syscfgflags.split())
 print ' '.join(flags)
 EOF
 				${python} > $python_ldflags_file <<EOF
