@@ -62,7 +62,7 @@ and port of the master.
 #define WORK_QUEUE_WORKER_MODE_SHARED 0	    /**< Work Queue master accepts workers in shared or non-exclusive mode. */
 #define WORK_QUEUE_WORKER_MODE_EXCLUSIVE 1  /**< Work Queue master only accepts workers that have a preference for it. */
 #define WORK_QUEUE_CATALOG_LINE_MAX 1024
-#define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 60
+#define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 15
 #define	WORK_QUEUE_CATALOG_LIFETIME	180
 
 #define WORK_QUEUE_FS_CMD 1

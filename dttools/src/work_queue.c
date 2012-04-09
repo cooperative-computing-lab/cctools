@@ -190,7 +190,7 @@ static void change_worker_state(struct work_queue *q, struct work_queue_worker *
 	q->workers_in_state[w->state]--;
 	w->state = state;
 	q->workers_in_state[state]++;
-	if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
+	if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && time(0) - catalog_update_time >= WORK_QUEUE_CATALOG_UPDATE_INTERVAL) {
 		update_catalog(q);
 		catalog_update_time = time(0);
 	}
