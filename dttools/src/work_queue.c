@@ -1828,12 +1828,7 @@ struct work_queue *work_queue_create(int port)
 		if(envstring)
 			highport = atoi(envstring);
 
-		for(port = lowport; port < highport; port++) {
-			q->master_link = link_serve(port);
-			if(q->master_link) {
-				break;
-			}
-		}
+		q->master_link = link_serve_range(lowport, highport);
 	} else {
 		q->master_link = link_serve(port);
 	}
