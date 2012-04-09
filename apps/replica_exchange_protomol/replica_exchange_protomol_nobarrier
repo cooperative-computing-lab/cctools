@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-# replica_exchange_nobarrier
+# replica_exchange_protomol_nobarrier
 #
 # Copyright (C) 2011- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
@@ -19,9 +19,6 @@
 # From the cctools python bindings, use work queue.
 from work_queue import *
 
-# Get ProtoMol related bindings from protomol_functions.
-from protomol_functions import *
-
 # All other dependencies are standard python.
 import time
 import sys
@@ -29,6 +26,16 @@ import os
 import pprint
 import re
 import getopt
+import math
+import random
+
+
+#-------------------------------Constants-----------------------------------
+DEFAULT_OUTPUT_PATH = '.'
+DEFAULT_MDSTEPS = 10000
+DEFAULT_BOUNDARY_CONDITIONS = "Vacuum"
+DEFAULT_MONTE_CARLO_STEPS = 100
+DEFAULT_OUTPUT_FREQ = 10000
 
 #-------------------------------Global Variables----------------------------
 protomol_local_install = False
@@ -39,8 +46,18 @@ quart_temp_split = False
 vel_file_input = False
 
 #------------------------------Global Data--------------------------------------
-replica_id = None
+pdb_file = ""
+psf_file = ""
+par_file = ""
+xyz_file_name = ""
+dcd_file_name = ""
 proj_name = None
+boundary_conditions = DEFAULT_BOUNDARY_CONDITIONS
+monte_carlo_steps = DEFAULT_MONTE_CARLO_STEPS
+replica_id = None
+md_steps = DEFAULT_MDSTEPS
+output_freq = DEFAULT_OUTPUT_FREQ
+output_path = DEFAULT_OUTPUT_PATH
 replicas_running = 0
 
 #------------------------Stat Collection Variables------------------------------
@@ -49,8 +66,25 @@ num_task_resubmissions = 0
 replica_temp_execution_list = []
 replica_exch_list = []
 
+#------------------------Initialize random generator---------------------------- 
+random.seed()
 
-#--------------------------------Program Meat-----------------------------------
+#-------------------------Define Replica Object---------------------------------
+class Replica(object):
+	def __init__(self, id, temp):
+		self.id	= id
+		self.temp = temp
+		self.exchgd_replica_id = -1
+		self.potential_energy = None
+		self.prev_temp = None
+		self.pdb = None
+		self.last_seen_step = -1
+		self.running = 0
+		self.exch_steps = []
+
+	def __str__(self):
+		return "ID: %d Temp %f" % (self.id, self.temp)
+
 
 #Function to drop repetetive values and gather just the unique ones.
 def unique(inlist, keep_val=True):
@@ -84,8 +118,89 @@ def locate(executable):
     return None
 
 
-#Function to generate execution script that runs simulations of a replica 
-# over given number of steps
+#Function to parse the file name from a string holding its location.
+def parse_file_name(file_name):
+	split_name = file_name.split('/')
+	return split_name[len(split_name)-1]
+
+
+#Function to parse the file name and leave out its extension.
+def remove_trailing_dots(file_name):
+	split_name = file_name.split('.')
+	return split_name[0]
+
+
+#Function to generate a config file to send to workqueue. It returns the generated config file name.
+def generate_config(replica_obj, monte_carlo_step, xyz_input_file = None, xyz_vel_input_file = None):
+	#initialize the config file name based on the replica id.
+	cfg_file_name = "%s/%s/%s/%d/%d-%d.cfg" % ( output_path, "simfiles", "config", replica_obj.id, replica_obj.id, monte_carlo_step)	
+	cfg_file_stream = open(cfg_file_name, "w")
+
+	#initialize string that will hold the config file values
+	write_str = ""
+
+	#Parse supplied files so only actual file name is passed, not full path of the file name
+	input_pdb = "%s.%d-%d.pdb" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_obj.id, monte_carlo_step)
+	parsed_psf_file = parse_file_name(psf_file)
+	parsed_par_file = parse_file_name(par_file)
+
+	#Start writing the config file parameters and values
+	write_str += "randomtype 1\n" 
+	write_str += "numsteps %d\n" % md_steps
+	write_str += "outputfreq %d\n" % output_freq
+
+	write_str += "posfile %s\n" % input_pdb
+	write_str += "psffile %s\n" % parsed_psf_file
+	write_str += "parfile %s\n" % parsed_par_file
+	
+	if vel_file_input:
+		write_str += "velfile %s.%d-%d.vel\n" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_obj.id, monte_carlo_step)
+
+	write_str += "dofinPDBPosFile true\n" 
+	write_str += "finPDBPosFile %s.%d-%d.pdb\n" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_obj.id, monte_carlo_step+1)
+	write_str += "finXYZVelFile %s.%d-%d.vel\n" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_obj.id, monte_carlo_step+1)
+
+	write_str += "temperature %f\n" % replica_obj.temp
+	write_str += "boundaryConditions %s\n" % boundary_conditions
+	write_str += "cellManager Cubic\n"
+	write_str += "cellsize 69\n"
+
+	if generate_xyz:
+		write_str += "XYZPosFile %d.xyz\n" % replica_obj.id
+		write_str += "XYZPosFileOutputFreq %d\n" % md_steps 
+	if generate_dcd:
+		write_str += "DCDFile %d.dcd\n" % replica_obj.id
+		write_str += "DCDFileOutputFreq %d\n" % output_freq
+
+	write_str += "allEnergiesFile %d.eng\n" % replica_obj.id
+	write_str += "allEnergiesFileOutputFreq %d\n" % output_freq
+	
+	write_str += "seed %d\n" % random.randint(1, 1000000)
+	write_str += "shake on\n"
+
+	write_str += "integrator {\n"
+	write_str += "level 0 langevinImpulse {\n"
+	write_str += "temperature %f\n" % replica_obj.temp
+	write_str += "gamma 5\n"
+	write_str += "timestep 2\n"
+	write_str += "force bond\n"
+	write_str += "force angle\n"
+	write_str += "force dihedral\n"
+	write_str += "force improper\n"
+	write_str += "force LennardJones Coulomb\n"
+	write_str += " -switchingFunction C2 -switchingFunction C1 -algorithm NonbondedCutoff\n"
+	write_str += "   -switchon          10\n"
+	write_str += "   -cutoff            12\n"
+	write_str += "   -cutoff            12\n"
+	write_str += "   -cutoff            12\n"
+	write_str += "}\n}"
+
+	#Write to the config file
+	cfg_file_stream.write(write_str)
+	
+	return cfg_file_name
+
+
 def generate_execn_script(replica_obj, replica_next_starting_step, replica_next_ending_step):
 	#initialize the script file name based on the replica id.
 	execn_script_name = "%s/%s/%s/exec-%d.sh" % (output_path, "simfiles", "runs", replica_obj.id)	
@@ -93,9 +208,9 @@ def generate_execn_script(replica_obj, replica_next_starting_step, replica_next_
 
 	#check if protomol comes installed on the remote worker site.
 	if protomol_local_install:
-		execn_string = "%s" % EXECUTABLE
+		execn_string = "ProtoMol"
 	else:
-		execn_string = "./%s" % EXECUTABLE
+		execn_string = "./ProtoMol"
 
 	#initialize string that will hold the file strings.
 	write_str = ""
@@ -115,6 +230,25 @@ def generate_execn_script(replica_obj, replica_next_starting_step, replica_next_
 	return execn_script_name
 
 	
+#Function that to perform metropolis criteria check for two replicas.
+def metropolis( u_i, u_j, t_i, t_j ):
+    # Metropolis for replica i with potential energy u_i, temp t_i
+    #            and replica j with potential energy u_j, temp t_j
+	K_b = 0.001987191 #Constants.boltzmann()
+	deltaE = (1.0 / (K_b * t_i) - 1.0/ (K_b * t_j) ) - (u_j - u_i)
+
+	if( deltaE < 0 ):
+		return True
+
+	acceptProb = math.exp(-deltaE) 
+	randNum = random.random()
+
+	if( randNum < acceptProb ):
+		return True
+	else:
+		return False
+
+
 #Setup and initalize WorkQueue
 def create_wq():
 	#Instantiate workqueue instance.	
@@ -126,114 +260,9 @@ def create_wq():
 	return wq
 
 
-#Create a new WorkQueue task.
-def create_wq_task(replica_id):
-	#Task string will be running the execution script.
-	task_str = "./exec-%d.sh" % replica_id
-
-	#Create a task using given task string for remote worker to execute.
-	task = Task(task_str) 
-	task.specify_tag('%s' % replica_id)
-
-	return task
-
-
-#Assign all the input files for the task (replica).
-def assign_task_output_files(task, replica_list, replica_id, replica_next_starting_step, replica_next_ending_step):
-	#Find pdb file for current replica
-	replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_id)
-	
-	j = replica_id
-	
-	#Assign local and remote xyz output files.
-	if generate_xyz:
-		local_xyz_output_file = "%s/simfiles/%s/%s.%d-%d.xyz" % (output_path, replica_list[j].temp, xyz_file_name, replica_id, replica_next_ending_step) 
-		remote_xyz_output_file = "%d.xyz" % (replica_id)
-		task.specify_output_file(remote_xyz_output_file, local_xyz_output_file)
-
-	#Assign local and remote dcd output files.
-	if generate_dcd:
-		local_dcd_output_file = "%s/simfiles/%s/%s.%d-%d.dcd" % (output_path, replica_list[j].temp, dcd_file_name, replica_id, replica_next_ending_step) 
-		remote_dcd_output_file = "%d.dcd" % (replica_id)
-		task.specify_output_file(remote_dcd_output_file, local_dcd_output_file)
-
-	#Assign local and remote (output) energies files.
-	local_energies_file = "%s/simfiles/eng/%d/%d.eng" % (output_path, replica_id, replica_id) 
-	remote_energies_file = "%d.eng" % replica_id
-	task.specify_output_file(local_energies_file, remote_energies_file, cache=False)
-
-	#Assign local and remote velocity output files.
-	local_velocity_output_file = "%s/simfiles/%s/%s-%d.vel" % (output_path, replica_list[j].temp, replica_pdb, replica_next_ending_step+1)
-	remote_velocity_output_file = "%s-%d.vel" % (replica_pdb, replica_next_ending_step+1)
-	task.specify_output_file(local_velocity_output_file, remote_velocity_output_file, cache=False)
-		
-	pdb_output_file = "%s/simfiles/%s/%s-%d.pdb" % (output_path, replica_list[j].temp, replica_pdb, replica_next_ending_step+1)	
-	task.specify_output_file(pdb_output_file, parse_file_name(pdb_output_file), cache=False)
-
-
-#Assign all the output files for the task (replica).
-def assign_task_input_files(task, replica_list, replica_id, replica_next_starting_step, replica_next_ending_step):
-	#Find pdb file for current replica
-	replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_id)
-
-	j = replica_id
-
-	#Find pdb file for replica that exchanged with current replica in last step
-	if (replica_list[j].exchgd_replica_id > -1):
-		exchgd_replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_list[j].exchgd_replica_id)
-	else:
-		exchgd_replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_id)
-	
-	'''Local_file: file name for file brought back and stored on local site where this is run.
-	   Remote_file: file name for file sent to remote worker and used in execution there.'''
-		
-	#Assign local and remote execution scripts 
-	local_execn_file = "%s/simfiles/%s/exec-%d.sh" % (output_path, "runs", replica_id)
-	remote_execn_file = "exec-%d.sh" % (replica_id)
-	task.specify_input_file(local_execn_file, remote_execn_file, cache=False)
-
-	#Assign local and remote psf and par inputs 
-	task.specify_input_file(psf_file, parse_file_name(psf_file))
-	task.specify_input_file(par_file, parse_file_name(par_file))
-
-	#Assign local and remote pdb inputs 
-	local_pdb_input_file = "%s/simfiles/%s/%s-%d.pdb" % (output_path, replica_list[j].temp, exchgd_replica_pdb, replica_next_starting_step)
-	remote_pdb_input_file = "%s-%d.pdb" % (replica_pdb, replica_next_starting_step)	
-	task.specify_input_file(local_pdb_input_file, remote_pdb_input_file, cache=False)
-
-	#Velocity input only required after first step since it is output 
-	#of first step.
-	if (replica_next_starting_step > 0):	
-		vel_file_input = True
-		#Assign local and remote velocity input files.
-		local_velocity_input_file = "%s/simfiles/%s/%s-%d.vel" % (output_path, replica_list[j].temp, exchgd_replica_pdb, replica_next_starting_step)
-		remote_velocity_input_file = "%s-%d.vel" % (replica_pdb, replica_next_starting_step)
-		task.specify_input_file(local_velocity_input_file, remote_velocity_input_file, cache=False)
-		
-	for i in range(replica_next_starting_step, replica_next_ending_step+1):
-		'''Local_file: file name for file brought back and stored on local site where this is run.
-		Remote_file: file name for file sent to remote worker and used in execution there.'''
-
-		#Assign local and remote config files.
-		local_config_file = "%s/simfiles/config/%d/%d-%d.cfg" % (output_path, replica_id, replica_id, i)
-		remote_config_file = "%d-%d.cfg" % (replica_id, i)
-		task.specify_input_file(local_config_file, remote_config_file, cache=False) 
-
-		#Call function to generate execution script.
-		generate_execn_script(replica_list[j], replica_next_starting_step, replica_next_ending_step)
-
-	#Assign executable that will be run on remote worker to task string.
-	if not protomol_local_install:
-		local_executable = "%s" % (EXECUTABLE)
-		remote_executable = "%s" % (EXECUTABLE)
-		task.specify_input_file(local_executable, remote_executable)
-
-
 # Major replica exchange and scheduling is handled here
 def wq_main(wq, replica_list, replicas_to_run):
 
-	#Variable that tracks replicas which completed simulations over all MC steps
-	num_replicas_completed = 0
 	#Stat collection variables
 	global replicas_running
 
@@ -241,54 +270,129 @@ def wq_main(wq, replica_list, replicas_to_run):
 	'''Each computation is a task in work queue.
 	   Each task will be run on one of the connected workers.'''
 
-	while num_replicas_completed < len(replica_list):
-			#Iterate through the given set of replicas and start their
-			#		 computation for the current monte carlo step.
-			for j in replicas_to_run:
-				
-				if not replica_list[j].running:
-					replica_id = replica_list[j].id
-					#Each replica does computation at its current temperature
-					replica_temperature = replica_list[j].temp
+	#Iterate through the given set of replicas and start their
+	#		 computation for the current monte carlo step.
+	for j in replicas_to_run:
+		
+		if not replica_list[j].running:
+			replica_id = replica_list[j].id
+			#Each replica does computation at its current temperature
+			replica_temperature = replica_list[j].temp
+	
+			'''Record the last seen step of replica. The last_seen_step will be
+			the step at which this replica will be brought back and attempted
+			for an exchange.'''
+			replica_last_seen_step = replica_list[j].last_seen_step
 			
-					'''Record the last seen step of replica. The last_seen_step will be
-					the step at which this replica will be brought back and attempted
-					for an exchange.'''
-					replica_last_seen_step = replica_list[j].last_seen_step
-					
-					#record starting, ending steps for current iteration of this replica.
-					replica_next_starting_step = replica_last_seen_step + 1
-					if replica_next_starting_step >= monte_carlo_steps:
-						break
+			#record starting, ending steps for current iteration of this replica.
+			replica_next_starting_step = replica_last_seen_step + 1
+			if replica_next_starting_step >= monte_carlo_steps:
+				return
+	
+			#If there are no more exchange steps for this replica, run the
+			#remainder of monte carlo steps.
+			if len(replica_list[j].exch_steps) > 0:
+				replica_next_ending_step = replica_list[j].exch_steps[0]
+			else:
+				replica_next_ending_step = monte_carlo_steps-1
+
+			#Set the last_seen_step to the next exchange step at which the
+			#replica (its output) will be brought back.
+			replica_list[j].last_seen_step = replica_next_ending_step
+
+			#Find pdb file for current replica
+			replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_id)
+		
+			#Find pdb file for replica that exchanged with current replica in last step
+			if (replica_list[j].exchgd_replica_id > -1):
+				exchgd_replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_list[j].exchgd_replica_id)
+			else:
+				exchgd_replica_pdb = "%s.%d" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_id)
 			
-					#If there are no more exchange steps for this replica, run the
-					#remainder of monte carlo steps.
-					if len(replica_list[j].exch_steps) > 0:
-						replica_next_ending_step = replica_list[j].exch_steps[0]
-					else:
-						replica_next_ending_step = monte_carlo_steps-1
-
-					#Set the last_seen_step to the next exchange step at which the
-					#replica (its output) will be brought back.
-					replica_list[j].last_seen_step = replica_next_ending_step
-
-					task = create_wq_task(replica_id)
-					assign_task_input_files(task, replica_list, replica_id, replica_next_starting_step, replica_next_ending_step)		
-					assign_task_output_files(task, replica_list, replica_id, replica_next_starting_step, replica_next_ending_step)
-
-					#Submit the task to WorkQueue for execution at remote worker.
-					wq.submit(task)
-					
-					if (replica_next_ending_step == monte_carlo_steps-1):
-						num_replicas_completed += 1
-
-					#Submitted for execution. So mark this replica as running.
-					replica_list[j].running = 1
-					replicas_running += 1
-
-			#Wait for tasks to complete.
-			replicas_to_run=wq_wait(wq, replica_list, 30)
+			'''Local_file: file name for file brought back and stored on local site where this is run.
+			   Remote_file: file name for file sent to remote worker and used in execution there.'''
 				
+			#Task string will be running the execution script.
+			task_str = "./exec-%d.sh" % replica_id
+		
+		    	#Create a task using given task string for remote worker to execute.
+			task = Task(task_str) 
+			task.specify_tag('%s' % replica_id)
+		
+			#Assign local and remote execution scripts 
+			local_execn_file = "%s/simfiles/%s/exec-%d.sh" % (output_path, "runs", replica_id)
+			remote_execn_file = "exec-%d.sh" % (replica_id)
+			task.specify_input_file(local_execn_file, remote_execn_file, cache=False)
+
+			#Assign local and remote psf and par inputs 
+			task.specify_input_file(psf_file, parse_file_name(psf_file))
+			task.specify_input_file(par_file, parse_file_name(par_file))
+
+			#Assign local and remote pdb inputs 
+			local_pdb_input_file = "%s/simfiles/%s/%s-%d.pdb" % (output_path, replica_list[j].temp, exchgd_replica_pdb, replica_next_starting_step)
+			remote_pdb_input_file = "%s-%d.pdb" % (replica_pdb, replica_next_starting_step)	
+			task.specify_input_file(local_pdb_input_file, remote_pdb_input_file, cache=False)
+
+			#Velocity input only required after first step since it is output 
+			#of first step.
+			if (replica_next_starting_step > 0):	
+				vel_file_input = True
+				#Assign local and remote velocity input files.
+				local_velocity_input_file = "%s/simfiles/%s/%s-%d.vel" % (output_path, replica_list[j].temp, exchgd_replica_pdb, replica_next_starting_step)
+				remote_velocity_input_file = "%s-%d.vel" % (replica_pdb, replica_next_starting_step)
+				task.specify_input_file(local_velocity_input_file, remote_velocity_input_file, cache=False)
+				
+			#Assign local and remote xyz output files.
+			if generate_xyz:
+				local_xyz_output_file = "%s/simfiles/%s/%s.%d-%d.xyz" % (output_path, replica_list[j].temp, xyz_file_name, replica_id, replica_next_ending_step) 
+				remote_xyz_output_file = "%d.xyz" % (replica_id)
+				task.specify_output_file(remote_xyz_output_file, local_xyz_output_file)
+
+			#Assign local and remote dcd output files.
+			if generate_dcd:
+				local_dcd_output_file = "%s/simfiles/%s/%s.%d-%d.dcd" % (output_path, replica_list[j].temp, dcd_file_name, replica_id, replica_next_ending_step) 
+				remote_dcd_output_file = "%d.dcd" % (replica_id)
+				task.specify_output_file(remote_dcd_output_file, local_dcd_output_file)
+		
+			#Assign local and remote (output) energies files.
+			local_energies_file = "%s/simfiles/eng/%d/%d.eng" % (output_path, replica_id, replica_id) 
+			remote_energies_file = "%d.eng" % replica_id
+			task.specify_output_file(local_energies_file, remote_energies_file, cache=False)
+
+			#Assign executable that will be run on remote worker to task string.
+			if not protomol_local_install:
+				local_executable = "%s" % ("ProtoMol")
+				remote_executable = "%s" % ("ProtoMol")
+				task.specify_input_file(local_executable, remote_executable)
+
+			#Assign local and remote velocity output files.
+			local_velocity_output_file = "%s/simfiles/%s/%s-%d.vel" % (output_path, replica_list[j].temp, replica_pdb, replica_next_ending_step+1)
+			remote_velocity_output_file = "%s-%d.vel" % (replica_pdb, replica_next_ending_step+1)
+			task.specify_output_file(local_velocity_output_file, remote_velocity_output_file, cache=False)
+				
+			pdb_output_file = "%s/simfiles/%s/%s-%d.pdb" % (output_path, replica_list[j].temp, replica_pdb, replica_next_ending_step+1)	
+			task.specify_output_file(pdb_output_file, parse_file_name(pdb_output_file), cache=False)
+
+			for i in range(replica_next_starting_step, replica_next_ending_step+1):
+				'''Local_file: file name for file brought back and stored on local site where this is run.
+			   	   Remote_file: file name for file sent to remote worker and used in execution there.'''
+	
+			   	#Assign local and remote config files.
+				local_config_file = "%s/simfiles/config/%d/%d-%d.cfg" % (output_path, replica_id, replica_id, i)
+				remote_config_file = "%d-%d.cfg" % (replica_id, i)
+				task.specify_input_file(local_config_file, remote_config_file, cache=False) 
+				
+				#Call function to generate execution script.
+				generate_execn_script(replica_list[j], replica_next_starting_step, replica_next_ending_step)
+
+			
+			#Submit the task to WorkQueue for execution at remote worker.
+			wq.submit(task)
+			
+			#Submitted for execution. So mark this replica as running.
+			replica_list[j].running = 1
+			replicas_running += 1
+
 
 def wq_wait(wq, replica_list, timeout):
 	
@@ -316,7 +420,7 @@ def wq_wait(wq, replica_list, timeout):
 			replicas_running -= 1
 			replica_list[replica_id].running = 0
 
-		   	#Get potential energy value of the completed replica run.	
+		    	#Get potential energy value of the completed replica run.	
 			energies_file =  "%s/simfiles/eng/%d/%d.eng" % (output_path, replica_id, replica_id) 
 			energies_stream = open(energies_file, "r")
 			slist = (energies_stream.readline()).split()
@@ -376,7 +480,7 @@ def wq_wait(wq, replica_list, timeout):
 				
 					#Generate config and run the next steps of these replicas.
 					replicas_to_run = [replica_1, replica_2]
-					return replicas_to_run
+					wq_main(wq, replica_list, replicas_to_run)
 
 
 def attempt_replica_exch(replica_list, cur, next):
@@ -518,12 +622,12 @@ if __name__ == "__main__":
 		print usage_str
 		sys.exit(1)
 
-	protomol_path = locate(EXECUTABLE)
+	protomol_path = locate('ProtoMol')
 	if protomol_path:
 		command = "cp %s ." % protomol_path
 		os.system(command)
 	else:
-		print "Error: Please add %s to your PATH." % (EXECUTABLE)
+		print "Error: Please add ProtoMol to your PATH."
 		sys.exit(1)
 		
 	#Begin timing after parsing command line arguments.
@@ -583,7 +687,7 @@ if __name__ == "__main__":
 	#create config files here.
 	for i in range(monte_carlo_steps):
 		for j in range(num_replicas):
-			generate_config(output_path, pdb_file, psf_file, par_file, md_steps, output_freq, replica_list[j], i)
+			generate_config(replica_list[j], i)
 
 	replicas_to_run = []
 	for i in range(num_replicas):
@@ -595,6 +699,9 @@ if __name__ == "__main__":
 	#Start the run.
 	wq_main(wq, replica_list, replicas_to_run)  	
 
+	#Wait for workqueue to finish all tasks
+	wq_wait(wq, replica_list, 30)
+
 	#Track total run time.
 	total_run_time = (time.time() - total_run_time)
 
@@ -602,7 +709,7 @@ if __name__ == "__main__":
 	print "Total Run Time:                  %f"  % total_run_time
 	print "Number of failures:              %d"  % num_task_resubmissions
 	print "Replica Exchanges:               %d"  % num_replica_exchanges
-	print "Acceptance Rate:                 %f"  % ((num_replica_exchanges * 100) / monte_carlo_steps)
+	print "Acceptance Rate:                 %f" % ((num_replica_exchanges * 100) / monte_carlo_steps)
 	
 	#Write stats to a stats file
 	stat_file_name = "%s/%s.stat" % (output_path,  remove_trailing_dots(parse_file_name(pdb_file)))

@@ -26,16 +26,6 @@ typedef UINT64_T timestamp_t;
 
 timestamp_t timestamp_get(void);
 
-/** Formats timestamp_t ts according to the format specification fmt and stores the result as a string in array buf.
-@param buf The array that holds the formatted string.
-@param size The size of array buf.
-@param fmt The specification of the desired format.
-@param ts The time value to format.
-@return The number of characters placed in the array buf.
-*/
-
-int timestamp_fmt(char *buf, size_t size, const char *fmt, timestamp_t ts);
-
 /** Sleep for a specified time.
 @param interval The number of microseconds to sleep for.
 */

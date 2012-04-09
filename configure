@@ -8,7 +8,7 @@ save_arguments $0 $@
 
 major=3
 minor=4
-micro=3
+micro=2
 release_date="02/10/2012"
 
 build_user=`whoami`
@@ -608,7 +608,7 @@ if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/cvmfs/src/libcvmfs.h
 then
 	ccflags="${ccflags} -I${cvmfs_path}/cvmfs/src -DHAS_CVMFS"
 
-	for library in cvmfs/src/cvmfs sqlite3/src/sqlite3 libcurl/src/lib/.libs/curl c-ares/src/.libs/cares
+	for library in cvmfs/src/cvmfs sqlite3/src/sqlite3 libcurl/src/lib/.libs/curl
 	do
 		lib_path=${cvmfs_path}/`dirname ${library}`
                 library=`basename ${library}`
@@ -652,7 +652,6 @@ then
 	if [ $build_sys = LINUX ]
 	then
 		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
-		ldflags=`echo $ldflags | sed "s/-lreadline/$cctools_readline_ldflags/"`
 	else 
 		library_search ncurses ${readline_path}
 		library_search termcap ${readline_path}
@@ -764,7 +763,7 @@ then
 		python_version=`${python} -V 2>&1 | cut -d " " -f 2`
 		echo "python version is ${python_version}"
 		python_major_version=`echo ${python_version} | cut -d . -f 1`
-		python_minor_version=`echo ${python_version} | cut -d . -f 2 | cut -d . -f 1,2`
+		python_minor_version=`echo ${python_version} | cut -d . -f 2`
 		if [ "$python_major_version" -eq 2 -a "$python_minor_version" -ge 4 ]
 		then
 			if check_file ${python_path}/include/python2.$python_minor_version/Python.h
@@ -777,9 +776,7 @@ then
 from distutils import sysconfig
 flags = ['-I' + sysconfig.get_python_inc(),
 	 '-I' + sysconfig.get_python_inc(plat_specific=True)]
-syscfgflags = sysconfig.get_config_var('CFLAGS')
-if not syscfgflags is None:
-    flags.extend(syscfgflags.split())
+flags.extend(sysconfig.get_config_var('CFLAGS').split())
 print ' '.join(flags)
 EOF
 				${python} > $python_ldflags_file <<EOF

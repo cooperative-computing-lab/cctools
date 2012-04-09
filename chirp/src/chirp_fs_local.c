@@ -10,7 +10,7 @@ See the file COPYING for details.
 
 #include "create_dir.h"
 #include "hash_table.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "int_sizes.h"
 #include "stringtools.h"
 #include "full_io.h"

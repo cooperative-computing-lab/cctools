@@ -104,6 +104,7 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	q->options_text = 0;
 	q->job_table = itable_create(0);
 	q->output_table = itable_create(0);
+	q->hadoop_jobs = NULL;
 
 	if(type == BATCH_QUEUE_TYPE_CONDOR)
 		q->logfile = strdup("condor.logfile");
@@ -139,17 +140,13 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	if(type == BATCH_QUEUE_TYPE_HADOOP) {
 		int fail = 0;
 
-		if(!getenv("HADOOP_HOME")) {
-			debug(D_NOTICE, "error: environment variable HADOOP_HOME not set\n");
-			fail = 1;
-		}
+	   if(!getenv("HADOOP_HOME")) {
+				debug(D_NOTICE, "error: environment variable HADOOP_HOME not set\n");
+				fail = 1;
+			}
 		if(!getenv("HDFS_ROOT_DIR")) {
-			debug(D_NOTICE, "error: environment variable HDFS_ROOT_DIR not set\n");
-			fail = 1;
-		}
-		if(!getenv("HADOOP_USER_TMP")) {
-			debug(D_NOTICE, "error: environment variable HADOOP_USER_TMP not set\n");
-			fail = 1;
+				debug(D_NOTICE, "error: environment variable HDFS_ROOT_DIR not set\n");
+				fail = 1;
 		}
 		if(!getenv("HADOOP_PARROT_PATH")) {
 			/* Note: HADOOP_PARROT_PATH is the path to Parrot on the remote node, not on the local machine. */
@@ -161,6 +158,10 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 			batch_queue_delete(q);
 			return 0;
 		}
+
+		q->hadoop_jobs = itable_create(0);
+	} else {
+		q->hadoop_jobs = NULL;
 	}
 
 	return q;
@@ -179,6 +180,8 @@ void batch_queue_delete(struct batch_queue *q)
 			free(q->logfile);
 		if(q->work_queue)
 			work_queue_delete(q->work_queue);
+		if(q->hadoop_jobs)
+			itable_delete(q->hadoop_jobs);
 		free(q);
 	}
 }

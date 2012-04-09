@@ -18,7 +18,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "stringtools.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "fast_popen.h"
 #include "text_list.h"
 #include "memory_info.h"
@@ -279,7 +279,7 @@ int main(int argc, char *argv[])
 
 	debug_config(progname);
 
-	while((c = getopt(argc, argv, "b:c:e:d:vh")) != (char)-1) {
+	while((c = getopt(argc, argv, "b:c:e:dvh")) != (char)-1) {
 		switch (c) {
 		case 'b':
 			block_size = atoi(optarg);

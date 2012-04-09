@@ -33,7 +33,7 @@ See the file COPYING for details.
 #include "catalog_server.h"
 #include "domain_name_cache.h"
 #include "list.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "md5.h"
 #include "load_average.h"
 #include "memory_info.h"
@@ -587,23 +587,7 @@ int main(int argc, char *argv[])
 			chirp_alloc_init(chirp_root_path, root_quota);
 	}
 
-	if(port == 0) {
-		int low = 1024;
-		int high = 32767;
-
-		const char *lowstr = getenv("CHIRP_LOW_PORT");
-		if(lowstr)
-			low = atoi(lowstr);
-		const char *highstr = getenv("CHIRP_HIGH_PORT");
-		if(highstr)
-			high = atoi(highstr);
-
-		link = link_serve_addrrange(listen_on_interface, low, high);
-	}
-	else {
-		link = link_serve_address(listen_on_interface, port);
-	}
-
+	link = link_serve_address(listen_on_interface, port);
 	if(!link) {
 		if(listen_on_interface) {
 			fatal("couldn't listen on interface %s port %d: %s", listen_on_interface, port, strerror(errno));

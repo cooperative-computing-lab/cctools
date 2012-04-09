@@ -17,7 +17,7 @@ See the file COPYING for details.
 
 #include "macros.h"
 #include "sleeptools.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "variable.h"
 #include "stringtools.h"
 #include "hash_table.h"
@@ -94,7 +94,7 @@ char * ast_function_execute( int line, int argc, char **argv, time_t stoptime )
 		if(f) {
 			if(ast_group_execute(f->body,stoptime)) {
 				if(variable_rval_get()) {
-					rval = xxstrdup(variable_rval_get());
+					rval = xstrdup(variable_rval_get());
 					ftsh_error(FTSH_ERROR_STRUCTURE,line,"function %s returns %s",argv[0],rval);
 				} else {
 					ftsh_error(FTSH_ERROR_FAILURE,line,"function %s did not return a value",argv[0]);
@@ -642,7 +642,7 @@ static char * ast_expr_list_execute( int linenum, struct expr *e, time_t stoptim
 				v[length-2] = 0;
 			}
 			if(line) {
-				line = string_combine_multi(line,xxstrdup(" "),v,0);
+				line = string_combine_multi(line,xstrdup(" "),v,0);
 			} else {
 				line = v;
 			}
@@ -703,11 +703,11 @@ char * ast_word_list_execute( int linenum, struct ast_word *w )
 				return 0;
 			}
 		} else {
-			t=xxstrdup(w->text);
+			t=xstrdup(w->text);
 		}
 
 		if(line) {
-			line = string_combine_multi( line, xxstrdup(" "), t, 0 );
+			line = string_combine_multi( line, xstrdup(" "), t, 0 );
 		} else {
 			line = t;
 		}
@@ -751,7 +751,7 @@ static char * ast_bareword_execute( int linenum, char *line )
 
 	if(string_split_quotes(line,&argc,&argv)) {
 		if(argc==1) {
-			result = xxstrdup(argv[0]);
+			result = xstrdup(argv[0]);
 		} else if(argc>1) {
 			ftsh_error(FTSH_ERROR_SYNTAX,linenum,"expected only one word here, but got garbage following '%s'",argv[0]);
 		} else {

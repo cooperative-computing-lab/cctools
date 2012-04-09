@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 #include "buffer.h"
 #include "md5.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -156,7 +156,7 @@ int chirp_ticket_read(const char *ticket, struct chirp_ticket *ct)
 			char *acl = xxmalloc(n + 1);
 			memcpy(acl, s, n);
 			acl[n] = '\0';
-			ct->rights[ct->nrights - 1].acl = xxstrdup(acl);
+			ct->rights[ct->nrights - 1].acl = xstrdup(acl);
 			free(acl);
 		} else if(*buffer == '\0') {
 			if(ct->subject && ct->ticket && ct->nrights > 0) {
@@ -170,8 +170,8 @@ int chirp_ticket_read(const char *ticket, struct chirp_ticket *ct)
 	if(ct->rights == NULL) {
 		assert(ct->nrights == 0);
 		ct->rights = xxrealloc(ct->rights, sizeof(*ct->rights) * (++ct->nrights) + 1);
-		ct->rights[ct->nrights - 1].directory = xxstrdup("/");
-		ct->rights[ct->nrights - 1].acl = xxstrdup("n");
+		ct->rights[ct->nrights - 1].directory = xstrdup("/");
+		ct->rights[ct->nrights - 1].acl = xstrdup("n");
 		ct->nrights = 1;
 	}
 	return status && !ct->expired;

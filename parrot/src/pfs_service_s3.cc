@@ -20,7 +20,7 @@ extern "C" {
 #include "full_io.h"
 #include "http_query.h"
 #include "hash_table.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "macros.h"
 #include "sha1.h"
 #include "sleeptools.h"

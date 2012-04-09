@@ -5,6 +5,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -13,7 +14,6 @@ See the file COPYING for details.
 #include "pfs_service.h"
 #include "pfs_pointer.h"
 #include "pfs_file.h"
-#include "pfs_mmap.h"
 #include "pfs_process.h"
 #include "pfs_file_cache.h"
 
@@ -24,7 +24,6 @@ extern "C" {
 #include "full_io.h"
 #include "get_canonical_path.h"
 #include "pfs_resolve.h"
-#include "pfs_channel.h"
 #include "md5.h"
 }
 
@@ -66,7 +65,6 @@ pfs_table::pfs_table()
 	pointer_count = sysconf(_SC_OPEN_MAX);
 	pointers = new pfs_pointer* [pointer_count];
 	fd_flags = new int[pointer_count];
-	mmap_list = 0;
 
 	for( i=0; i<pointer_count; i++ ) {
 		pointers[i] = 0;
@@ -79,15 +77,6 @@ pfs_table::~pfs_table()
 	for(int i=0;i<pointer_count;i++) {
 		this->close(i);
 	}
-
-	pfs_mmap *m;
-
-	while(mmap_list) {
-		m = mmap_list;
-		mmap_list = m->next;
-		delete m;
-	}
-
 	delete [] pointers;
 	delete [] fd_flags;
 }
@@ -107,35 +96,18 @@ pfs_table * pfs_table::fork()
 
 	strcpy(table->working_dir,this->working_dir);
 
-	pfs_mmap *m;
-
-	for(m=mmap_list;m;m=m->next) {
-		pfs_mmap *n = new pfs_mmap(m);
-		n->next = table->mmap_list;
-		table->mmap_list = n;
-	}
-
 	return table;
 }
 
 void pfs_table::close_on_exec()
 {
 	int i;
-
 	for(i=0;i<pointer_count;i++) {
 		if(this->pointers[i]) {
 			if((this->fd_flags[i])&FD_CLOEXEC) {
 				this->close(i);
 			}
 		}
-	}
-
-	pfs_mmap *m;
-
-	while(mmap_list) {
-		m = mmap_list;
-		mmap_list = m->next;
-		delete m;
 	}
 }
 
@@ -332,25 +304,15 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 	pfs_file *file=0;
 	int force_stream = pfs_force_stream;
 
-	// Hack: Disable caching when doing plain old file copies.
-
+        /* Yes, this is a hack, but it is quite a valuable one. */
+        /* No need to make local copies if we are pushing files around. */
         if(
                 !strcmp(pfs_current->name,"cp") ||
                 !strcmp(string_back(pfs_current->name,3),"/cp")
         ) {
                 force_stream = 1;
         }
-
-	// Hack: Almost all calls to open a directory are routed
-	// through opendir(), which sets O_DIRECTORY.  In a few
-	// cases, such as the use of openat in pwd, the flag
-	// is not set, set we detect it here.
-
-	const char *basename = string_basename(lname);
-	if(!strcmp(basename,".") || !strcmp(basename,"..")) {
-		flags |= O_DIRECTORY;
-	}
-
+                                                                                                  
 	if(resolve_name(lname,&pname)) {
 		if(flags&O_DIRECTORY) {
 			file = pname.service->getdir(&pname);
@@ -1784,188 +1746,4 @@ int pfs_table::md5_slow( const char *path, unsigned char *digest )
 	} else {
 		return -1;
 	}
-}
-
-void pfs_table::mmap_print()
-{
-	struct pfs_mmap *m;
-
-	debug(D_CHANNEL,"%12s %8s %8s %8s %4s %4s %s","address","length","foffset", "channel", "prot", "flag", "file");
-
-	for(m=mmap_list;m;m=m->next) {
-	  debug(D_CHANNEL,"%12x %8x %8x %8x %4x %4x %s",m->logical_addr,m->map_length,m->file_offset,m->channel_offset,m->prot,m->flags,m->file->get_name()->path);
-	}
-}
-
-static int load_file_to_channel( pfs_file *file, pfs_size_t length, pfs_size_t start, pfs_size_t blocksize )
-{
-	pfs_size_t data_left = length;
-	pfs_size_t offset = 0;
-	pfs_size_t chunk, actual;
-
-	while(data_left>0) {
-		chunk = MIN(data_left,blocksize);
-		actual = file->read(pfs_channel_base()+start+offset,chunk,offset);
-		if(actual>0) {
-			offset += actual;
-			data_left -= actual;
-		} else if(actual==0) {
-			memset(pfs_channel_base()+start+offset,0,data_left);
-			offset += data_left;
-			data_left = 0;
-		} else {
-			break;
-		}
-	}
-
-	if(data_left) {
-		debug(D_CHANNEL,"loading: failed: %s",strerror(errno));
-		return 0;
-	} else {
-		/*
-		we must invalidate the others' mapping of this file,
-		otherwise, they will see old data that was in this place.
-		*/
-		msync(pfs_channel_base()+start,length,MS_INVALIDATE|MS_SYNC);
-		return 1;
-	}
-}
-
-static int save_file_from_channel( pfs_file *file, pfs_size_t file_offset, pfs_size_t channel_offset, pfs_size_t map_length, pfs_size_t blocksize )
-{
-	pfs_size_t data_left = map_length;
-	pfs_size_t chunk, actual;
-
-	while(data_left>0) {
-		chunk = MIN(data_left,blocksize);
-		actual = file->write(pfs_channel_base()+channel_offset+file_offset,chunk,file_offset);
-		if(actual>0) {
-			file_offset += actual;
-			data_left -= actual;
-		} else {
-			break;
-		}
-	}
-
-	if(data_left) {
-		debug(D_CHANNEL,"writing: failed: %s",strerror(errno));
-		return 0;
-	}
-
-	return 1;
-}
-
-pfs_size_t pfs_table::mmap_create_object( pfs_file *file, pfs_size_t file_offset, pfs_size_t map_length, int prot, int flags )
-{
-	pfs_size_t channel_offset;
-	pfs_ssize_t file_length;
-
-	file_length = file->get_size();
-	if(file_length<0) return -1;
-
-	if(!pfs_channel_lookup(file->get_name()->path,&channel_offset)) {
-
-		if(!pfs_channel_alloc(file->get_name()->path,file_length,&channel_offset)) {
-			errno = ENOMEM;
-			return -1;
-		}
-
-		debug(D_CHANNEL,"%s loading to channel %llx size %llx",file->get_name()->path,channel_offset,file_length);
-
-		if(!load_file_to_channel(file,file_length,channel_offset,1024*1024)) {
-			pfs_channel_free(channel_offset);
-			return -1;
-		}
-	} else {
-		debug(D_CHANNEL,"%s cached at channel %llx",file->get_name()->path,channel_offset);
-	}
-
-	pfs_mmap *m;
-
-	m = new pfs_mmap( file, 0, channel_offset, map_length, file_offset, prot, flags );
-
-	m->next = mmap_list;
-	mmap_list = m;
-
-	return channel_offset;
-}
-
-pfs_size_t pfs_table::mmap_create( int fd, pfs_size_t file_offset, pfs_size_t map_length, int prot, int flags )
-{
-	return mmap_create_object(pointers[fd]->file,file_offset,map_length,prot,flags);
-}
-
-int pfs_table::mmap_update( pfs_size_t logical_addr, pfs_size_t channel_offset )
-{
-	if(mmap_list && !mmap_list->logical_addr) {
-		mmap_list->logical_addr = logical_addr;
-		return 0;
-	}
-
-	debug(D_NOTICE,"warning: mmap logical address (%llx) does not match any map with channel offset (%llx)",logical_addr,channel_offset);
-
-	errno = ENOENT;
-	return -1;
-}
-
-int pfs_table::mmap_delete( pfs_size_t logical_addr, pfs_size_t length )
-{
-	pfs_mmap *m, **p;
-
-	p = &mmap_list;
-
-	for(m=mmap_list;m;p=&m->next,m=m->next) {
-		if( logical_addr >= m->logical_addr && ( logical_addr < (m->logical_addr+m->map_length ) ) ) {
-
-			// Remove the map from the list.
-			*p = m->next;
-
-			// Write back the portion of the file that is mapped in.
-			if(m->flags&MAP_SHARED && m->prot&PROT_WRITE && m->file) {
-				save_file_from_channel(m->file,m->file_offset,m->channel_offset,m->map_length,1024*1024);
-			}
-
-			// If there is a fragment left over before the unmap, add it as a new map
-			// This will increase the reference count of both the file and the memory object.
-
-			if(logical_addr>m->logical_addr) {
-				mmap_create_object(
-					m->file,
-					m->file_offset,
-					logical_addr-m->logical_addr,
-					m->prot,
-					m->flags);
-				mmap_update(m->logical_addr,0);
-			}
-
-			// If there is a fragment left over after the unmap, add it as a new map
-			// This will increase the reference count of both the file and the memory object.
-
-			if((logical_addr+length) < (m->logical_addr+m->map_length)) {
-				mmap_create_object(
-					m->file,
-					m->file_offset+m->map_length-(m->logical_addr-logical_addr),
-					m->map_length - length - (logical_addr - m->logical_addr),
-					m->prot,
-					m->flags);
-				mmap_update(logical_addr+length,0);
-			}
-
-			// Decrement (and possibly free) the file in the channel.
-			pfs_channel_free(m->channel_offset);
-
-			// Delete the mapping, which may also delete the file object.
-			delete m;
-
-			return 0;
-		}
-	}
-
-	/*
-	It is quite common that an munmap will not match any existing mapping.
-	This happens particularly for anonymous mmaps, which are not recorded here.
-	In this case, simply return succcess;
-	*/
-	
-	return 0;
 }

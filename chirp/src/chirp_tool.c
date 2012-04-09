@@ -31,7 +31,7 @@ See the file COPYING for details.
 #include "auth_all.h"
 #include "auth_ticket.h"
 #include "stringtools.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "list.h"
 #include "domain_name_cache.h"
 #include "md5.h"
@@ -372,7 +372,7 @@ static INT64_T do_open(int argc, char **argv)
 		strcpy(current_host, argv[1]);
 		strcpy(current_remote_dir, "/");
 		if(interactive_mode)
-			fprintf(stderr, "connected to %s as %s\n", current_host, current_subject);
+			printf("connected to %s as %s\n", current_host, current_subject);
 		return 0;
 	} else {
 		return -1;

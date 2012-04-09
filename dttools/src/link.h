@@ -74,30 +74,14 @@ which is usually what you want.
 */
 struct link *link_serve(int port);
 
-/** Prepare to accept connections.
-@ref link_serve_range will accept connections on any network interface, which is usually what you want.
-@param low The low port in a range to listen on (inclusive).
-@param high The high port in a range to listen on (inclusive).
-@return link A server endpoint that can be passed to @ref link_accept, or null on failure.
-*/
-struct link *link_serve_range(int low, int high);
-
 /** Prepare to accept connections on one network interface.
-Functions like @ref link_serve, except that the server will only be visible on the given network interface.
+Functions like @ref link_serve, except that the server will
+only be visible on the given network interface.
 @param addr IP address of the network interface.
 @param port The port number to listen on.
 @return link A server endpoint that can be passed to @ref link_accept, or null on failure.
 */
 struct link *link_serve_address(const char *addr, int port);
-
-/** Prepare to accept connections on one network interface.
-Functions like @ref link_serve, except that the server will only be visible on the given network interface and allows for a port range.
-@param addr IP address of the network interface.
-@param low The low port in a range to listen on (inclusive).
-@param high The high port in a range to listen on (inclusive).
-@return link A server endpoint that can be passed to @ref link_accept, or null on failure.
-*/
-struct link *link_serve_addrrange(const char *addr, int low, int high);
 
 /** Accept one connection.
 @param master A link returned from @ref link_serve or @ref link_serve_address.
@@ -193,15 +177,6 @@ int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_lis
 @return One if the link becomes readable or writable before the timeout expires, zero otherwise.
 */
 int link_usleep(struct link *link, int usec, int reading, int writing);
-
-/** Block until a link is readable or writable.
-@param link The link to wait on.
-@param stoptime The time at which to abort.
-@param reading Wait for the link to become readable.
-@param writing Wait for the link to become writable.
-@return One if the link becomes readable or writable before the timeout expires, zero otherwise.
-*/
-int link_sleep(struct link *link, time_t stoptime, int reading, int writing);
 
 /** Close a connection.
 @param link The connection to close.

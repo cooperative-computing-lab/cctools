@@ -32,7 +32,7 @@ effort (for example the reengineering of a great many Capstone chips).
 */
 
 #include "sha1.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 
 #include <stdio.h>
 #include <string.h>

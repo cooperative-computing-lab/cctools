@@ -19,7 +19,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "auth_all.h"
 #include "stringtools.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "full_io.h"
 
 static int timeout = 3600;

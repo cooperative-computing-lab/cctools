@@ -10,7 +10,7 @@ See the file COPYING for details.
 
 #include "http_query.h"
 #include "nvpair.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "stringtools.h"
 
 #define QUERY "GET HTTP/1.0 /query.text\n\n"

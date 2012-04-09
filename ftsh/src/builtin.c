@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "builtin.h"
 #include "ftsh_error.h"
 #include "buffer.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -70,7 +70,7 @@ static int builtin_export( int line, int argc, char **argv, time_t stoptime )
 	name = argv[1];
 
 	value = buffer_load(name);
-	if(!value) value = xxstrdup("");
+	if(!value) value = xstrdup("");
 
 	expr = malloc(strlen(name)+strlen(value)+3);
 	if(!expr) {

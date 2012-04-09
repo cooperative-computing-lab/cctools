@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "stringtools.h"
 #include "full_io.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "full_io.h"
 
 #include <assert.h>
@@ -74,7 +74,6 @@ static struct flag_info table[] = {
 	{"user", D_USER},
 	{"xrootd", D_XROOTD},
 	{"remote", D_REMOTE},
-	{"batch", D_BATCH},
 	{"all", ~0},
 	{"time", 0},		/* backwards compatibility */
 	{"pid", 0},		/* backwards compatibility */
@@ -198,18 +197,6 @@ void debug(INT64_T flags, const char *fmt, ...)
 		do_debug(0, flags, fmt, args);
 		errno = save_errno;
 	}
-
-	va_end(args);
-}
-
-void warn(INT64_T flags, const char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-
-        int save_errno = errno;
-        do_debug(0, flags, fmt, args);
-        errno = save_errno;
 
 	va_end(args);
 }

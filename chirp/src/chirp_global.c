@@ -44,7 +44,7 @@ Parrot to show the last message time and the space used (in MB.)
 #include "full_io.h"
 #include "sleeptools.h"
 #include "hash_table.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 
 #include <string.h>
 #include <stdlib.h>

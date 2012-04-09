@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "tracer.h"
 #include "stringtools.h"
 #include "full_io.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "debug.h"
 
 #include <stdlib.h>

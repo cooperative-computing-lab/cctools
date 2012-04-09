@@ -12,7 +12,7 @@ See the file COPYING for details.
 #include "auth.h"
 #include "link.h"
 #include "debug.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "domain_name_cache.h"
 
 #include <string.h>
@@ -171,7 +171,7 @@ int auth_kerberos_accept(struct link *link, char **subject, time_t stoptime)
 								debug(D_AUTH, "kerberos: sorry, you come from another realm\n");
 							} else {
 								debug(D_AUTH, "kerberos: local user is %s\n", username);
-								*subject = xxstrdup(username);
+								*subject = xstrdup(username);
 								success = 1;
 							}
 							krb5_auth_con_free(context, auth_context);

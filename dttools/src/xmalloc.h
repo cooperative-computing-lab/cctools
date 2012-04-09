@@ -7,10 +7,10 @@ See the file COPYING for details.
 
 #include <sys/types.h>
 
-#ifndef XXMALLOC_H
-#define XXMALLOC_H
+#ifndef XMALLOC_H
+#define XMALLOC_H
 
-/** @file xxmalloc.h
+/** @file xmalloc.h
 Brittle memory allocation routines.
 These routines may be used in place of <tt>malloc</tt> and <tt>strdup</tt>.
 If they fail due to the (rare) possibility of heap exhaustion, they will
@@ -31,6 +31,6 @@ void *xxrealloc(void *ptr, size_t nbytes);
 @return On success, returns a valid pointer.  On failure, aborts by calling @ref fatal.
 */
 
-char *xxstrdup(const char *str);
+char *xstrdup(const char *str);
 
 #endif

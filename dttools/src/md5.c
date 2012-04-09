@@ -28,7 +28,7 @@ documentation and/or software.
 
 #include "md5.h"
 #include "int_sizes.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 
 #include <string.h>
 #include <stdio.h>

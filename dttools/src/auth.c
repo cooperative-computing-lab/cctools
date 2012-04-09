@@ -9,7 +9,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "stringtools.h"
 #include "domain_name_cache.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -78,10 +78,10 @@ int auth_assert(struct link *link, char **type, char **subject, time_t stoptime)
 					debug(D_AUTH, "reading back auth info from server");
 					if(!link_readline(link, line, sizeof(line), stoptime))
 						return 0;
-					*type = xxstrdup(line);
+					*type = xstrdup(line);
 					if(!link_readline(link, line, sizeof(line), stoptime))
 						return 0;
-					*subject = xxstrdup(line);
+					*subject = xstrdup(line);
 					auth_sanitize(*subject);
 					debug(D_AUTH, "server thinks I am %s:%s", *type, *subject);
 					return 1;
@@ -138,7 +138,7 @@ int auth_accept(struct link *link, char **typeout, char **subject, time_t stopti
 			debug(D_AUTH, "'%s' authentication succeeded", type);
 			debug(D_AUTH, "%s:%d is %s:%s\n", addr, port, type, *subject);
 			link_putfstring(link, "yes\n%s\n%s\n", stoptime, type, *subject);
-			*typeout = xxstrdup(type);
+			*typeout = xstrdup(type);
 			return 1;
 		} else {
 			debug(D_AUTH, "%s:%d could not authenticate using '%s'", addr, port, type);

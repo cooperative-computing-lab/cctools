@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 #include "auth.h"
 #include "debug.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -88,7 +88,7 @@ static int auth_globus_assert(struct link *link, time_t stoptime)
 				char *reason;
 				globus_gss_assist_display_status_str(&reason, "", major, minor, token);
 				if(!reason)
-					reason = xxstrdup("unknown reason");
+					reason = xstrdup("unknown reason");
 				debug(D_AUTH, "globus: credentials rejected: %s", reason);
 				if(reason)
 					free(reason);
@@ -142,7 +142,7 @@ static int auth_globus_accept(struct link *link, char **subject, time_t stoptime
 				char *reason;
 				globus_gss_assist_display_status_str(&reason, "", major, minor, token);
 				if(!reason)
-					reason = xxstrdup("unknown reason");
+					reason = xstrdup("unknown reason");
 				debug(D_AUTH, "globus: couldn't authenticate client: %s", reason);
 				if(reason)
 					free(reason);

@@ -9,7 +9,7 @@ See the file COPYING for details.
 #include "chirp_protocol.h"
 
 #include "macros.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "hash_table.h"
 #include "debug.h"
 #include "username.h"
@@ -204,7 +204,7 @@ static struct chirp_dir * chirp_fs_hdfs_opendir( const char *path )
 	}
 
 	dir->i = 0;
-	dir->path = xxstrdup(path);
+	dir->path = xstrdup(path);
 
 	return dir;
 }
@@ -321,7 +321,7 @@ static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 		debug(D_HDFS, "open %s failed: %s", path, strerror(errno));
 		return -1;
 	} else {
-		open_files[fd].name = xxstrdup(path);
+		open_files[fd].name = xstrdup(path);
 		return fd;
 	}
 }

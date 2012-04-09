@@ -23,7 +23,7 @@ See the file COPYING for details.
 #include "copy_stream.h"
 #include "list.h"
 #include "url_encode.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -528,8 +528,8 @@ INT64_T chirp_client_ticket_get(struct chirp_client * c, const char *name, char 
 				goto failure;
 			if(sscanf(line, "%s %s", path, acl) == 2) {
 				*rights = xxrealloc(*rights, sizeof(char *) * 2 * (nrights + 2));
-				(*rights)[nrights * 2 + 0] = xxstrdup(path);
-				(*rights)[nrights * 2 + 1] = xxstrdup(acl);
+				(*rights)[nrights * 2 + 0] = xstrdup(path);
+				(*rights)[nrights * 2 + 1] = xstrdup(acl);
 				(*rights)[nrights * 2 + 2] = NULL;
 				(*rights)[nrights * 2 + 3] = NULL;
 				nrights++;

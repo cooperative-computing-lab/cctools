@@ -39,17 +39,12 @@ while not wq.empty():
     	print task.result
     	print task.host
     	print task.submit_time
+    	print task.start_time
     	print task.finish_time
-    	print task.app_delay
-    	print task.send_input_start
-    	print task.send_input_finish
-    	print task.execute_cmd_start
-    	print task.execute_cmd_finish
-    	print task.receive_output_start
-    	print task.receive_output_finish
+    	print task.transfer_start_time
+    	print task.computation_time
     	print task.total_bytes_transferred
     	print task.total_transfer_time
-    	print task.cmd_execution_time
     	del task
     print '** work queue'
     print wq.stats.workers_init
@@ -66,10 +61,3 @@ while not wq.empty():
     print wq.stats.total_bytes_received
     print wq.stats.total_send_time
     print wq.stats.total_receive_time
-    print wq.stats.efficiency
-    print wq.stats.idle_percentage
-    print wq.stats.capacity
-    print wq.stats.avg_capacity
-    print wq.stats.total_workers_connected
-    print wq.stats.excessive_workers_removed
-

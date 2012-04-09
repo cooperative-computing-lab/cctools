@@ -147,13 +147,7 @@ static int link_internal_sleep(struct link *link, struct timeval *timeout, int r
 {
 	int result;
 	struct pollfd pfd;
-	int msec;
-
-	if(timeout) {
-		msec = (timeout->tv_sec * 1000.0) + (timeout->tv_usec/1000.0);
-	} else {
-		msec = -1;
-	}
+	int msec = (timeout->tv_sec * 1000.0) + (timeout->tv_usec/1000.0);
 
 	while (1) {
 		pfd.fd = link->fd;
@@ -253,24 +247,13 @@ struct link *link_attach(int fd)
 
 struct link *link_serve(int port)
 {
-	return link_serve_addrrange(0, port, port);
-}
-
-struct link *link_serve_range(int low, int high)
-{
-	return link_serve_addrrange(0, low, high);
+	return link_serve_address(0, port);
 }
 
 struct link *link_serve_address(const char *addr, int port)
 {
-  return link_serve_addrrange(addr, port, port);
-}
-
-struct link *link_serve_addrrange(const char *addr, int low, int high)
-{
 	struct link *link = 0;
 	struct sockaddr_in address;
-	int port;
 	int success;
 	int value;
 
@@ -287,13 +270,14 @@ struct link *link_serve_addrrange(const char *addr, int low, int high)
 
 	link_window_configure(link);
 
-	if(addr || ! (low == 0 && high == 0)) {
+	if(addr != 0 || port != LINK_PORT_ANY) {
 
 		memset(&address, 0, sizeof(address));
 #if defined(CCTOOLS_OPSYS_DARWIN)
 		address.sin_len = sizeof(address);
 #endif
 		address.sin_family = AF_INET;
+		address.sin_port = htons(port);
 
 		if(addr) {
 			string_to_ip_address(addr, (unsigned char *) &address.sin_addr.s_addr);
@@ -301,21 +285,9 @@ struct link *link_serve_addrrange(const char *addr, int low, int high)
 			address.sin_addr.s_addr = htonl(INADDR_ANY);
 		}
 
-		if(high < low)
-			fatal("high port %d is less than low port %d in range", high, low);
-
-		for (port = low; port <= high; port++) {
-			address.sin_port = htons(port);
-			success = bind(link->fd, (struct sockaddr *) &address, sizeof(address));
-			if(success == -1) {
-				if(errno == EADDRINUSE) {
-					continue;
-				} else {
-					goto failure;
-				}
-			}
-			break;
-		}
+		success = bind(link->fd, (struct sockaddr *) &address, sizeof(address));
+		if(success < 0)
+			goto failure;
 	}
 
 	success = listen(link->fd, 5);

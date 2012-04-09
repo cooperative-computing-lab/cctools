@@ -19,9 +19,6 @@
 # From the cctools python bindings, use work queue.
 from work_queue import *
 
-# Get ProtoMol related bindings from protomol_functions.
-from protomol_functions import *
-
 # All other dependencies are standard python.
 import time
 import sys
@@ -29,6 +26,17 @@ import os
 import pprint
 import re
 import getopt
+import math
+import random
+
+
+#-------------------------------Constants-----------------------------------
+DEFAULT_MONTE_CARLO_STEPS = 100
+DEFAULT_OUTPUT_PATH = '.'
+DEFAULT_MDSTEPS = 10000
+DEFAULT_BOUNDARY_CONDITIONS = "Vacuum"
+DEFAULT_OUTPUT_FREQ = 10000
+DEFAULT_PHYSICAL_TEMP = 300
 
 #-------------------------------Global Variables----------------------------
 protomol_local_install = False
@@ -41,8 +49,18 @@ vel_file_input = False
 mc_step_times = []
 
 #-----------------------------Global Data-------------------------------------
-replica_id = None
+pdb_file = ""
+psf_file = ""
+par_file = ""
+xyz_file_name = ""
+dcd_file_name = ""
 proj_name = None
+boundary_conditions = DEFAULT_BOUNDARY_CONDITIONS
+monte_carlo_steps = DEFAULT_MONTE_CARLO_STEPS
+replica_id = None
+md_steps = DEFAULT_MDSTEPS
+output_freq = DEFAULT_OUTPUT_FREQ
+output_path = DEFAULT_OUTPUT_PATH
 
 #------------------------Stat Collection Variables------------------------------
 num_replica_exchanges = 0
@@ -51,8 +69,25 @@ num_task_resubmissions = 0
 replica_temp_execution_list = []
 replica_exch_list = []
 
+#------------------------Initialize random generator---------------------------- 
+random.seed()
 
-#--------------------------------Program Meat-----------------------------------
+#-------------------------Define Replica Object---------------------------------
+class Replica(object):
+	def __init__(self, id, temp):
+		self.id	= id
+		self.temp = temp
+		self.exchgd_replica_id = -1
+		self.potential_energy = None
+		self.new_xyz_output_file = None
+		self.new_dcd_output_file = None
+		self.prev_temp = None
+		self.pdb = None
+		self.exch_steps = []
+	
+	def __str__(self):
+		return "ID: %d Temp %f" % (self.id, self.temp)
+
 
 #Function to drop repetetive values and gather just the unique ones.
 def unique(inlist, keep_val=True):
@@ -84,6 +119,108 @@ def locate(executable):
             return exe
 
     return None
+
+
+#Function to parse the file name from a string holding its location.
+def parse_file_name(file_name):
+	split_name = file_name.split('/')
+	return split_name[len(split_name)-1]
+
+
+#Function to parse the file name and leave out its extension.
+def remove_trailing_dots(file_name):
+	split_name = file_name.split('.')
+	return split_name[0]
+
+
+#Function to generate a config file to send to workqueue. It returns the generated config file name.
+def generate_config(replica_obj, monte_carlo_step, xyz_input_file = None, xyz_vel_input_file = None):
+	#initialize the config file name based on the replica id.
+	cfg_file_name = "%s/%s/%s/%d/%d-%d.cfg" % ( output_path, "simfiles", "config", replica_obj.id, replica_obj.id, monte_carlo_step)	
+	cfg_file_stream = open(cfg_file_name, "w")
+
+	#initialize string that will hold the config file values
+	write_str = ""
+
+	#Parse supplied files so only actual file name is passed, not full path of the file name
+	input_pdb = "%s.%d-%d.pdb" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_obj.id, monte_carlo_step)
+	parsed_psf_file = parse_file_name(psf_file)
+	parsed_par_file = parse_file_name(par_file)
+
+	#Start writing the config file parameters and values
+	write_str += "randomtype 1\n" 
+	write_str += "numsteps %d\n" % md_steps
+	write_str += "outputfreq %d\n" % output_freq
+
+	write_str += "posfile %s\n" % input_pdb
+	write_str += "psffile %s\n" % parsed_psf_file
+	write_str += "parfile %s\n" % parsed_par_file
+	
+	if vel_file_input:
+		write_str += "velfile %s.%d-%d.vel\n" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_obj.id, monte_carlo_step)
+
+	write_str += "dofinPDBPosFile true\n" 
+	write_str += "finPDBPosFile %s.%d-%d.pdb\n" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_obj.id, monte_carlo_step+1)
+	write_str += "finXYZVelFile %s.%d-%d.vel\n" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_obj.id, monte_carlo_step+1)
+
+	write_str += "temperature %f\n" % replica_obj.temp
+	write_str += "boundaryConditions %s\n" % boundary_conditions
+	write_str += "cellManager Cubic\n"
+	write_str += "cellsize 69\n"
+
+	if generate_xyz:
+		write_str += "XYZPosFile %d.xyz\n" % replica_obj.id
+		write_str += "XYZPosFileOutputFreq %d\n" % md_steps 
+	if generate_dcd:
+		write_str += "DCDFile %d.dcd\n" % replica_obj.id
+		write_str += "DCDFileOutputFreq %d\n" % output_freq
+
+	write_str += "allEnergiesFile %d.eng\n" % replica_obj.id
+	write_str += "allEnergiesFileOutputFreq %d\n" % output_freq
+	
+	write_str += "seed %d\n" % random.randint(1, 1000000)
+	write_str += "shake on\n"
+
+	write_str += "integrator {\n"
+	write_str += "level 0 langevinImpulse {\n"
+	write_str += "temperature %f\n" % replica_obj.temp
+	write_str += "gamma 5\n"
+	write_str += "timestep 2\n"
+	write_str += "force bond\n"
+	write_str += "force angle\n"
+	write_str += "force dihedral\n"
+	write_str += "force improper\n"
+	write_str += "force LennardJones Coulomb\n"
+	write_str += " -switchingFunction C2 -switchingFunction C1 -algorithm NonbondedCutoff\n"
+	write_str += "   -switchon          10\n"
+	write_str += "   -cutoff            12\n"
+	write_str += "   -cutoff            12\n"
+	write_str += "   -cutoff            12\n"
+	write_str += "}\n}"
+
+	#Write to the config file
+	cfg_file_stream.write(write_str)
+	
+	return cfg_file_name
+
+	
+#Function that to perform metropolis criteria check for two replicas.
+def metropolis( u_i, u_j, t_i, t_j ):
+    # Metropolis for replica i with potential energy u_i, temp t_i
+    #            and replica j with potential energy u_j, temp t_j
+    K_b = 0.001987191 #Constants.boltzmann()
+    deltaE = (1 / (K_b * t_i) - 1/ (K_b * t_j) ) - (u_j - u_i)
+
+    if( deltaE < 0 ):
+        return True
+
+    acceptProb = math.exp(-deltaE) 
+    randNum = random.random()
+
+    if( randNum < acceptProb ):
+        return True
+    else:
+	return False
 
 
 # Major replicaexchange and scheduling is handled here
@@ -162,14 +299,14 @@ def re_main(replica_list, num_replicas):
 				local_dcd_output_file = "%s/simfiles/%s/%s.%d-%d.dcd" % (output_path, replica_list[j].temp, dcd_file_name, replica_list[j].id, i) 
 				remote_dcd_output_file = "%d.dcd" % (replica_id)
 
-		    #Create a task using given task string for remote worker to execute.
+		        #Create a task using given task string for remote worker to execute.
 			#Assign executable that will be run on remote worker to task string.
 			if protomol_local_install:
-				task_str = "%s %s" % (EXECUTABLE, remote_config_file)
+				task_str = "ProtoMol %s" % remote_config_file
 			else:
-				local_executable = "%s" % (EXECUTABLE)
-				remote_executable = "%s" % (EXECUTABLE)
-				task_str = "./%s %s" % (EXECUTABLE, remote_config_file)
+				local_executable = "%s" % ("ProtoMol")
+				remote_executable = "%s" % ("ProtoMol")
+				task_str = "./ProtoMol %s" % remote_config_file
 		
 			task = Task(task_str) 
 			task.specify_tag('%s' % replica_id)
@@ -228,7 +365,7 @@ def re_main(replica_list, num_replicas):
 				#Task was succesful. Update all information.
 				replicas_running -= 1
 				
-			    #Get potential energy value of the completed replica run.	
+			        #Get potential energy value of the completed replica run.	
 				energies_file =  "%s/simfiles/eng/%d/%d.eng" % (output_path, replica_id, replica_id) 
 				energies_stream = open(energies_file, "r")
 				slist = (energies_stream.readline()).split()
@@ -242,9 +379,23 @@ def re_main(replica_list, num_replicas):
 	
 		cur = replica_exch_list[i].pop(0)
 		next = replica_exch_list[i].pop(0)
-		
 		if debug_mode: print "Replicas %d & %d are attempted for an exchange at step %d" % (cur, next, i)
-		attempt_replica_exch(replica_list, cur, next)
+
+		#Check for metropolis criteria with the randomly chosen replica and its immediate neighbor.
+		if (metropolis(replica_list[cur].potential_energy, replica_list[next].potential_energy, replica_list[cur].temp, replica_list[next].temp)):
+			if debug_mode: print "Replicas %d and %d exchanged" % (cur, next)
+			#Swap the fields of the two replicas being exchanged.
+			T = replica_list[next].temp
+			replica_list[next].temp = replica_list[cur].temp
+			replica_list[cur].temp = T
+			
+			replica_list[cur].exchgd_replica_id = replica_list[next].id
+			replica_list[next].exchgd_replica_id = replica_list[cur].id
+			
+			replica_temp_execution_list[cur].append(replica_list[cur].temp)
+			replica_temp_execution_list[next].append(replica_list[next].temp)
+
+			num_replica_exchanges += 1
 
 		#Update time stats.
 		step_time = time.time() - step_time
@@ -252,27 +403,6 @@ def re_main(replica_list, num_replicas):
 		mc_step_times.append(step_time)
 
 		#Loop back to the top
-
-
-def attempt_replica_exch(replica_list, cur, next):
-	global num_replica_exchanges
-	
-	#Check for metropolis criteria with the randomly chosen replica and its immediate neighbor.
-	if (metropolis(replica_list[cur].potential_energy, replica_list[next].potential_energy, replica_list[cur].temp, replica_list[next].temp)):
-		if debug_mode: print "Replicas %d and %d exchanged" % (cur, next)
-		#Swap the fields of the two replicas being exchanged.
-		T = replica_list[next].temp
-		replica_list[next].temp = replica_list[cur].temp
-		replica_list[cur].temp = T
-			
-		replica_list[cur].exchgd_replica_id = replica_list[next].id
-		replica_list[next].exchgd_replica_id = replica_list[cur].id
-			
-		replica_temp_execution_list[cur].append(replica_list[cur].temp)
-		replica_temp_execution_list[next].append(replica_list[next].temp)
-			
-		#Keep count of exchanges.
-		num_replica_exchanges += 1
 
 
 #Function to create directories to hold files from the simulations.
@@ -388,12 +518,12 @@ if __name__ == "__main__":
 		print usage_str
 		sys.exit(1)
 
-	protomol_path = locate(EXECUTABLE)
+	protomol_path = locate('ProtoMol')
 	if protomol_path:
 		command = "cp %s ." % protomol_path
 		os.system(command)
 	else:
-		print "Error: Please add %s to your PATH." % (EXECUTABLE)
+		print "Error: Please add ProtoMol to your PATH."
 		sys.exit(1)
 		
 	#Begin timing after parsing command line arguments.
@@ -408,6 +538,7 @@ if __name__ == "__main__":
 	min_temp = int(args[3])
 	max_temp = int(args[4])
 	num_replicas = int(args[5])
+	replica_list = []
 
 	#Split up the temperature range for assigning to each replica.
 	inc = float(( max_temp -  min_temp)) / float(num_replicas-1)
@@ -447,11 +578,11 @@ if __name__ == "__main__":
 	make_directories(output_path, temp_list, num_replicas)
 
 	#Create random replica pairs to check for exchange at each step.
-	create_replica_exch_pairs(replica_list, num_replicas)
+        create_replica_exch_pairs(replica_list, num_replicas)
 
 	for i in range(monte_carlo_steps):
 		for j in range (num_replicas):
-			generate_config(output_path, pdb_file, psf_file, par_file, md_steps, output_freq, replica_list[j], i)
+			generate_config(replica_list[j], i)
 
 	#Start the run.
 	re_main(replica_list, num_replicas)  	

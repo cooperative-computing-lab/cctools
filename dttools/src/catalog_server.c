@@ -16,7 +16,7 @@ See the file COPYING for details.
 #include "domain_name_cache.h"
 #include "username.h"
 #include "list.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "macros.h"
 #include "daemon.h"
 
@@ -450,7 +450,7 @@ int main(int argc, char *argv[])
 				debug_config_file_size(string_metric_parse(optarg));
 				break;
 			case 'u':
-				list_push_head(outgoing_host_list, xxstrdup(optarg));
+				list_push_head(outgoing_host_list, xstrdup(optarg));
 				break;
 			case 'U':
 				outgoing_timeout = string_time_parse(optarg);

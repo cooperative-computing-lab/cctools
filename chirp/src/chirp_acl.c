@@ -15,7 +15,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "stringtools.h"
 #include "username.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -270,7 +270,7 @@ char *chirp_acl_ticket_callback (const char *digest)
 	chirp_ticket_filename(path, NULL, digest);
 
 	if (ticket_read(path, &ct)) {
-		char *ticket = xxstrdup(ct.ticket);
+		char *ticket = xstrdup(ct.ticket);
 		chirp_ticket_free(&ct);
 		return ticket;
 	}
@@ -332,8 +332,8 @@ int chirp_acl_ticket_get(const char *ticket_dir, const char *subject, const char
 		return -1;
 	}
 	if(strcmp(ct.subject, subject) == 0 || strcmp(subject, chirp_super_user) == 0) {
-		*ticket_esubject = xxstrdup(ct.subject);
-		*ticket = xxstrdup(ct.ticket);
+		*ticket_esubject = xstrdup(ct.subject);
+		*ticket = xstrdup(ct.ticket);
 
 		time_t now;
 		time(&now);
@@ -343,8 +343,8 @@ int chirp_acl_ticket_get(const char *ticket_dir, const char *subject, const char
 		size_t n;
 		*ticket_rights = (char **) xxmalloc(sizeof(char *) * 2 * (ct.nrights + 1));
 		for(n = 0; n < ct.nrights; n++) {
-			(*ticket_rights)[n * 2 + 0] = xxstrdup(ct.rights[n].directory);
-			(*ticket_rights)[n * 2 + 1] = xxstrdup(ct.rights[n].acl);
+			(*ticket_rights)[n * 2 + 0] = xstrdup(ct.rights[n].directory);
+			(*ticket_rights)[n * 2 + 1] = xstrdup(ct.rights[n].acl);
 		}
 		(*ticket_rights)[n * 2 + 0] = NULL;
 		(*ticket_rights)[n * 2 + 1] = NULL;
@@ -387,7 +387,7 @@ int chirp_acl_ticket_list(const char *ticket_dir, const char *subject, char ***t
 				n = n + 1;
 				*ticket_subjects = (char **) xxrealloc(*ticket_subjects, (n + 1) * sizeof(char *));
 				chirp_ticket_subject(ticket_subject, d->name);
-				(*ticket_subjects)[n - 1] = xxstrdup(ticket_subject);
+				(*ticket_subjects)[n - 1] = xstrdup(ticket_subject);
 				(*ticket_subjects)[n] = NULL;
 			}
 			chirp_ticket_free(&ct);
@@ -523,7 +523,7 @@ int chirp_acl_ticket_modify(const char *ticket_dir, const char *subject, const c
 
 			if(strcmp(where, path) == 0) {
 				free(ct.rights[n].acl);
-				ct.rights[n].acl = xxstrdup(chirp_acl_flags_to_text(flags));	/* replace old acl mask */
+				ct.rights[n].acl = xstrdup(chirp_acl_flags_to_text(flags));	/* replace old acl mask */
 				replaced = 1;
 			}
 		}
@@ -534,8 +534,8 @@ int chirp_acl_ticket_modify(const char *ticket_dir, const char *subject, const c
 			char collapsed_directory[CHIRP_PATH_MAX];
 			sprintf(directory, "/%s", path + strlen(ticket_dir));
 			string_collapse_path(directory, collapsed_directory, 1);
-			ct.rights[ct.nrights - 1].directory = xxstrdup(collapsed_directory);
-			ct.rights[ct.nrights - 1].acl = xxstrdup(chirp_acl_flags_to_text(flags));
+			ct.rights[ct.nrights - 1].directory = xstrdup(collapsed_directory);
+			ct.rights[ct.nrights - 1].acl = xstrdup(chirp_acl_flags_to_text(flags));
 		}
 		status = ticket_write(ticket_filename, &ct);
 	} else {
@@ -558,11 +558,11 @@ int chirp_acl_whoami(const char *subject, char **esubject)
 		chirp_ticket_filename(ticket_filename, subject, NULL);
 		if(!ticket_read(ticket_filename, &ct))
 			return 0;
-		*esubject = xxstrdup(ct.subject);
+		*esubject = xstrdup(ct.subject);
 		chirp_ticket_free(&ct);
 		return 1;
 	} else {
-		*esubject = xxstrdup(subject);
+		*esubject = xstrdup(subject);
 		return 1;
 	}
 }

@@ -11,7 +11,6 @@ from work_queue import WORK_QUEUE_SCHEDULE_FCFS, WORK_QUEUE_SCHEDULE_FILES
 from work_queue import WORK_QUEUE_RANDOM_PORT
 from work_queue import WORK_QUEUE_OUTPUT
 #from workqueue import WORK_QUEUE_MASTER_MODE_STANDALONE, WORK_QUEUE_WORKER_MODE_SHARED
-from work_queue import WORK_QUEUE_TASK_ORDER_LIFO
 
 import os
 import sys
@@ -20,7 +19,7 @@ import time
 set_debug_flag('debug')
 set_debug_flag('wq')
 
-wq = WorkQueue(WORK_QUEUE_RANDOM_PORT, name='workqueue_example', catalog=True, exclusive=False)
+wq = WorkQueue(WORK_QUEUE_RANDOM_PORT, name='workqueue_example', catalog=False, exclusive=False)
 os.system('work_queue_worker -d all localhost %d &' % wq.port)
 
 print wq.name
@@ -29,7 +28,6 @@ wq.specify_algorithm(WORK_QUEUE_SCHEDULE_FCFS)
 #wq.specify_name('workqueue_example')
 #wq.specify_master_mode(WORK_QUEUE_MASTER_MODE_STANDALONE)
 #wq.specify_worker_mode(WORK_QUEUE_WORKER_MODE_SHARED)
-wq.specify_task_order(WORK_QUEUE_TASK_ORDER_LIFO)
 
 if wq.empty():
     print 'work queue is empty'
@@ -84,12 +82,9 @@ while not wq.empty():
     if t:
 	print t.id, t.return_status, t.result, t.host
 	print t.preferred_host, t.status
-	print t.submit_time, t.finish_time, t.app_delay
-	print t.send_input_start, t.send_input_finish
-	print t.execute_cmd_start, t.execute_cmd_finish
-	print t.receive_output_start, t.receive_output_finish
+	print t.submit_time, t.start_time, t.finish_time
+	print t.transfer_start_time, t.computation_time
 	print t.total_bytes_transferred, t.total_transfer_time
-	print t.cmd_execution_time
 	print t.output
     
     print wq.stats.workers_init, wq.stats.workers_ready, wq.stats.workers_busy, \

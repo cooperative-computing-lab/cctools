@@ -7,7 +7,7 @@ See the file COPYING for details.
 
 #include "auth.h"
 #include "debug.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "stringtools.h"
 
 #include <stdlib.h>
@@ -195,7 +195,7 @@ static int auth_unix_accept(struct link *link, char **subject, time_t stoptime)
 				if(p) {
 					debug(D_AUTH, "unix: client is subject %s", p->pw_name);
 					link_putliteral(link, "yes\n", stoptime);
-					*subject = xxstrdup(p->pw_name);
+					*subject = xstrdup(p->pw_name);
 					success = 1;
 				} else {
 					debug(D_AUTH, "unix: there is no user corresponding to uid %d", buf.st_uid);

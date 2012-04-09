@@ -11,7 +11,7 @@ See the file COPYING for details.
 extern "C" {
 #include "hash_table.h"
 #include "stringtools.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 }
 
 #include <errno.h>
@@ -59,7 +59,7 @@ void pfs_dircache::invalidate()
 void pfs_dircache::begin( const char *path )
 {
 	invalidate();
-	dircache_path = xxstrdup(path);
+	dircache_path = xstrdup(path);
 }
 
 void pfs_dircache::insert( const char *name, struct pfs_stat *buf, pfs_dir *dir )

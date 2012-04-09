@@ -35,7 +35,7 @@ attempted in the order chosen.
 - "kerberos"
 - "unix"
 - "hostname"
-- "address"
+- "address
 @see auth_register_all
 */
 

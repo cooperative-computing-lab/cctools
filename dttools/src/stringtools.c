@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "stringtools.h"
 #include "timestamp.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -24,19 +24,17 @@ See the file COPYING for details.
 #define STRINGTOOLS_BUFFER_SIZE 256
 #define METRIC_POWER_COUNT 6
 
-char *escape_shell_string(const char *str)
+char *escape_shell_string (const char *str)
 {
-	if(str == NULL)
-		str = "";
-	char *escaped_string = malloc(strlen(str) * 3 + 1);
-	if(escaped_string == NULL)
-		return NULL;
+	if (str == NULL) str = "";
+	char *escaped_string = malloc(strlen(str)*3+1);
+	if (escaped_string == NULL) return NULL;
 	const char *old = str;
 	char *current = escaped_string;
 	strcpy(current, "'");
 	current += 1;
-	for(; *old; old++) {
-		if(*old == '\'') {
+	for (; *old; old++) {
+		if (*old == '\'') {
 			strcpy(current, "'\\''");
 			current += 3;
 		} else {
@@ -131,6 +129,7 @@ int whole_string_match_regex(const char *text, char *pattern)
 	strncat(new_pattern, pattern, strlen(pattern));
 	if(text[strlen(pattern) - 1] != '$')
 		strncat(new_pattern, "$", 1);
+
 	return string_match_regex(text, new_pattern);
 }
 
@@ -893,7 +892,7 @@ int getDateString(char *str)
 		return 1;
 }
 
-char *string_format(const char *fmt, ...)
+char *string_format (const char *fmt, ...)
 {
 	va_list va;
 
@@ -901,26 +900,26 @@ char *string_format(const char *fmt, ...)
 	int n = vsnprintf(NULL, 0, fmt, va);
 	va_end(va);
 
-	if(n < 0)
+	if (n < 0)
 		return NULL;
 
-	char *str = xxmalloc((n + 1) * sizeof(char));
+	char *str = xxmalloc((n+1)*sizeof(char));
 	va_start(va, fmt);
-	n = vsnprintf(str, n + 1, fmt, va);
+	n = vsnprintf(str, n+1, fmt, va);
 	assert(n >= 0);
 	va_end(va);
 
 	return str;
 }
 
-char *string_getcwd(void)
+char *string_getcwd (void)
 {
 	char *result = NULL;
 	size_t size = 1024;
 	result = xxrealloc(result, size);
 
-	while(getcwd(result, size) == NULL) {
-		if(errno == ERANGE) {
+	while (getcwd(result, size) == NULL) {
+		if (errno == ERANGE) {
 			size *= 2;
 			result = xxrealloc(result, size);
 		} else {
@@ -928,5 +927,5 @@ char *string_getcwd(void)
 			return NULL;
 		}
 	}
-	return result;
+    return result;
 }

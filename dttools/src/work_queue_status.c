@@ -21,8 +21,6 @@ enum {
 
 static int Work_Queue_Status_Mode = MODE_TABLE;
 static int Work_Queue_Status_Timeout = 30;
-char *catalog_host = NULL;
-int catalog_port = 0;
 
 static struct nvpair_header headers[] = {
 	{"project", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 20},
@@ -32,9 +30,7 @@ static struct nvpair_header headers[] = {
 	{"tasks_complete", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 15},
 	{"workers", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 10},
 	{"workers_busy", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 15},
-	{"capacity", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 10},
-	{"start_time", NVPAIR_MODE_TIMESTAMP, NVPAIR_ALIGN_RIGHT, 20}, // The widths of the NV_PAIR_TIME and the NV_PAIR_TIMESTAMP fields should be >= 20
-	{"lastheardfrom", NVPAIR_MODE_TIME, NVPAIR_ALIGN_RIGHT, 20},
+	{"lastheardfrom", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 15},
 	{NULL,}
 };
 
@@ -48,38 +44,12 @@ static void work_queue_status_show_help(const char *progname)
 	printf(" -h          This message.\n");
 }
 
-int parse_catalog_server_description(char *server_string, char **host, int *port)
-{
-	char *colon;
-
-	colon = strchr(server_string, ':');
-
-	if(!colon) {
-		*host = NULL;
-		*port = 0;
-		return 0;
-	}
-
-	*colon = '\0';
-
-	*host = strdup(server_string);
-	*port = atoi(colon + 1);
-
-	return *port;
-}
-
 static void work_queue_status_parse_command_line_arguments(int argc, char *argv[])
 {
 	int c;
 
-	while((c = getopt(argc, argv, "C:d:lt:h")) != (char) -1) {
+	while((c = getopt(argc, argv, "d:lt:h")) != (char)-1) {
 		switch (c) {
-		case 'C':
-			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
-				fprintf(stderr, "Cannot parse catalog description: %s. \n", optarg);
-				exit(EXIT_FAILURE);
-			}
-			break;
 		case 'd':
 			debug_flags_set(optarg);
 			break;
@@ -113,19 +83,10 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if(!catalog_host) {
-		catalog_host = strdup(CATALOG_HOST);
-		catalog_port = CATALOG_PORT;
-	}
-
-	cq = catalog_query_create(catalog_host, catalog_port, time(0) + Work_Queue_Status_Timeout);
-	if(!cq) {
-		fprintf(stderr, "Failed to query catalog server at %s:%d. \n", catalog_host, catalog_port);
-		exit(EXIT_FAILURE);
-	}
+	cq = catalog_query_create(CATALOG_HOST, CATALOG_PORT, time(0) + Work_Queue_Status_Timeout);
 	if(!cq) {
 		fprintf(stderr, "couldn't query catalog %s:%d: %s\n", CATALOG_HOST, CATALOG_PORT, strerror(errno));
-		return 1;
+		return 1;                                                                                                                                      
 	}
 
 	if(Work_Queue_Status_Mode == MODE_TABLE)

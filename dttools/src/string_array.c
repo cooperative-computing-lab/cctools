@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "xxmalloc.h"
+#include "xmalloc.h"
 
 #include <assert.h>
 #include <stddef.h>

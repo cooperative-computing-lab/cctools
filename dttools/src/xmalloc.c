@@ -6,7 +6,7 @@ See the file COPYING for details.
 */
 
 #include "debug.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -28,7 +28,7 @@ void *xxmalloc(size_t nbytes)
 	}
 }
 
-char *xxstrdup(const char *str)
+char *xstrdup(const char *str)
 {
 	void *result = strdup(str);
 	if(result) {

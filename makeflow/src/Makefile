@@ -21,9 +21,8 @@ install: all
 	install -d ${CCTOOLS_INSTALL_DIR}/
 	install -d ${CCTOOLS_INSTALL_DIR}/bin
 	install makeflow ${CCTOOLS_INSTALL_DIR}/bin
-	install -m755 condor_submit_makeflow ${CCTOOLS_INSTALL_DIR}/bin
+	chmod 755 condor_submit_makeflow
+	install condor_submit_makeflow ${CCTOOLS_INSTALL_DIR}/bin
 	install makeflow_log_parser ${CCTOOLS_INSTALL_DIR}/bin
 	install makeflow_monitor ${CCTOOLS_INSTALL_DIR}/bin
-	sed 's|/usr/bin/env python|${CCTOOLS_PYTHON}|' starch > starch.bin
-	install -m755 starch.bin ${CCTOOLS_INSTALL_DIR}/bin/starch
-	rm -f starch.bin
+	install starch ${CCTOOLS_INSTALL_DIR}/bin

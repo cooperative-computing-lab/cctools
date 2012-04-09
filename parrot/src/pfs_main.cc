@@ -16,7 +16,7 @@ extern "C" {
 #include "tracer.h"
 #include "stringtools.h"
 #include "auth_all.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "create_dir.h"
 #include "file_cache.h"
 #include "md5.h"
@@ -481,7 +481,7 @@ int main( int argc, char *argv[] )
 
 	s = getenv("PARROT_DEBUG_FLAGS");
 	if(s) {
-		char *x = xxstrdup(s);
+		char *x = xstrdup(s);
 		int nargs;
 		char **args;
 		if(string_split(x,&nargs,&args)) {
@@ -494,7 +494,7 @@ int main( int argc, char *argv[] )
 
 	s = getenv("PARROT_CHIRP_AUTH");
 	if(s) {
-		char *x = xxstrdup(s);
+		char *x = xstrdup(s);
 		int nargs;
 		char **args;
 		if(string_split(x,&nargs,&args)) {
@@ -508,7 +508,7 @@ int main( int argc, char *argv[] )
 
 	s = getenv("PARROT_USER_PASS");
 	if(s) {
-		char *x = xxstrdup(s);
+		char *x = xstrdup(s);
 		int nargs;
 		char **args;
 		if(string_split(x,&nargs,&args)) {

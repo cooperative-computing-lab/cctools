@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include "pfs_sysdeps.h"
 #include "pfs_channel.h"
+#include "pfs_channel_cache.h"
 #include "pfs_process.h"
 #include "pfs_sys.h"
 #include "pfs_poll.h"
@@ -17,7 +18,7 @@ extern "C" {
 #include "tracer.h"
 #include "stringtools.h"
 #include "full_io.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "int_sizes.h"
 #include "macros.h"
 #include "debug.h"
@@ -124,7 +125,7 @@ static void decode_read( struct pfs_process *p, int entering, int syscall, INT64
 	char *local_addr;
 	
 	if(entering) {
-		if(!pfs_channel_alloc(0,length,&p->io_channel_offset)) {
+		if(!pfs_channel_alloc(length,&p->io_channel_offset)) {
 			divert_to_dummy(p,-ENOMEM);
 			return;
 		}
@@ -195,7 +196,7 @@ static void decode_write( struct pfs_process *p, int entering, int syscall, INT6
 	if(entering) {
 		void *uaddr = POINTER(args[1]);
 		INT64_T length = args[2];
-		if(!pfs_channel_alloc(0,length,&p->io_channel_offset)) {
+		if(!pfs_channel_alloc(length,&p->io_channel_offset)) {
 			divert_to_dummy(p,-ENOMEM);
 			return;
 		}
@@ -428,7 +429,7 @@ static void decode_stat( struct pfs_process *p, int entering, int syscall, INT64
 		}
 
 		if(p->syscall_result>=0) {
-			if(!pfs_channel_alloc(0,sizeof(kbuf64),&p->io_channel_offset)) {
+			if(!pfs_channel_alloc(sizeof(kbuf64),&p->io_channel_offset)) {
 				divert_to_dummy(p,-ENOMEM);
 			} else {
 				local_addr = pfs_channel_base() + p->io_channel_offset;
@@ -1190,7 +1191,7 @@ nargs array and adjust the offset as needed.
 void decode_mmap( struct pfs_process *p, int syscall, int entering, INT64_T *args )
 {
 	if(entering) {
-		UINT32_T addr, prot, fd, flags;
+		UINT32_T addr, orig_length, prot, fd, flags;
 		UINT32_T nargs[TRACER_ARGS_MAX];
 		pfs_size_t length, channel_offset, source_offset;
 
@@ -1203,7 +1204,7 @@ void decode_mmap( struct pfs_process *p, int syscall, int entering, INT64_T *arg
 		}
 
 		addr = nargs[0];
-		length = nargs[1];
+		orig_length = nargs[1];
 		prot = nargs[2];
 		flags = nargs[3];
 		fd = nargs[4];
@@ -1229,57 +1230,43 @@ void decode_mmap( struct pfs_process *p, int syscall, int entering, INT64_T *arg
 		}
 		#endif
 
-		debug(D_SYSCALL,"mmap addr=0x%x len=0x%x prot=0x%x flags=0x%x fd=%d offset=0x%llx",addr,length,prot,flags,fd,source_offset);
+		debug(D_SYSCALL,"mmap addr=0x%x len=0x%x prot=0x%x flags=0x%x fd=%d offset=0x%llx",addr,orig_length,prot,flags,fd,source_offset);
 
 		if(flags&MAP_ANONYMOUS) {
 			/* great, just do it. */
 			debug(D_SYSCALL,"mmap skipped b/c anonymous");
-		}
-
-		channel_offset = pfs_mmap_create(fd,source_offset,length,prot,flags);
-		if(channel_offset<0) {
-			divert_to_dummy(p,-errno);
-			return;
-		}
-
-		nargs[3] = flags & ~MAP_DENYWRITE;
-		nargs[4] = pfs_channel_fd();
-		nargs[5] = channel_offset+source_offset;
-
-		debug(D_SYSCALL,"channel_offset=0x%llx source_offset=0x%llx total=0x%x",channel_offset,source_offset,nargs[5]);
-
-		if(p->syscall==SYSCALL32_mmap) {
-			tracer_copy_out(p->tracer,nargs,POINTER(args[0]),sizeof(nargs));
 		} else {
-			nargs[5] = nargs[5] / getpagesize();
-			for(int i=0;i<TRACER_ARGS_MAX;i++) {
-				args[i] = nargs[i];
+			char file_name[PFS_PATH_MAX];
+
+			if(pfs_get_full_name(fd,file_name)!=0) {
+				debug(D_SYSCALL,"mmap failed name: %s",strerror(errno));
+				divert_to_dummy(p,-errno);
+				return;
 			}
-			tracer_args_set(p->tracer,p->syscall,args,6);
-			p->syscall_args_changed = 1;
-		}	
 
-		debug(D_SYSCALL,"mmap changed: fd=%d addr=0x%x",nargs[4],nargs[5]);
-	} else {
-		/*
-		On exit from the system call, retrieve the logical address of
-		the mmap as returned to the application.  Then, update the 
-		mmap record that corresponds to the proper channel offset.
-		On failure, we must unmap the object, which will have a logical
-		address of zero because it was never set.
-		*/
+			if(pfs_channel_cache_alloc(file_name,fd,&length,&channel_offset)) {
+				nargs[3] = flags & ~MAP_DENYWRITE;
+				nargs[4] = pfs_channel_fd();
+				nargs[5] = channel_offset+source_offset;
 
-		if(args[3]&MAP_ANONYMOUS) {
-			// nothing to do
-		} else {
-			tracer_result_get(p->tracer,&p->syscall_result);
+				debug(D_SYSCALL,"channel_offset=0x%llx source_offset=0x%llx total=0x%x",channel_offset,source_offset,nargs[5]);
 
-			if(p->syscall_result!=-1) {
-				pfs_mmap_update(p->syscall_result,0);
+				if(p->syscall==SYSCALL32_mmap) {
+					tracer_copy_out(p->tracer,nargs,POINTER(args[0]),sizeof(nargs));
+				} else {
+					nargs[5] = nargs[5] / getpagesize();
+					for(int i=0;i<TRACER_ARGS_MAX;i++) {
+						args[i] = nargs[i];
+					}
+					tracer_args_set(p->tracer,p->syscall,args,6);
+					p->syscall_args_changed = 1;
+				}	
+				debug(D_SYSCALL,"mmap changed: fd=%d addr=0x%x",nargs[4],nargs[5]);
 			} else {
-				pfs_mmap_delete(0,0);
+				debug(D_SYSCALL,"mmap failed cache: %s",strerror(errno));
+				divert_to_dummy(p,-errno);
+				return;
 			}
-
 		}
 	}
 }
@@ -1807,11 +1794,19 @@ void decode_syscall( struct pfs_process *p, int entering )
 			decode_mmap(p,p->syscall,entering,args);
 			break;
 
+		/*
+		XXX Incomplete but acceptable for now.
+		We permit the application to munmap whatever it likes.
+		This might be an anonymous map that we don't track,
+		or it could be file.  In the latter case, we would like
+		to decrement the reference count.  At the moment, we
+		can't tell the difference, nor can we reverse map the
+		application's space into our own address space.
+		Once loaded, mmaped objects just stay in until the
+		parent pfs process dies.
+		*/
+
 		case SYSCALL32_munmap:
-			if(entering) {
-				p->syscall_result = pfs_mmap_delete(args[0],args[1]);
-				divert_to_dummy(p,p->syscall_result);
-			}
 			break;
 
 		/*

@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <stdio.h>
 #include <time.h>
+#include <time.h>
 
 /* Authentication Environment Variable */
 #define CHIRP_CLIENT_TICKETS  "CHIRP_CLIENT_TICKETS"

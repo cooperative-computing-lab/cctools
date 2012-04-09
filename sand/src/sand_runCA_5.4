@@ -2852,7 +2852,6 @@ sub overlapTrim {
 
     return if (getGlobal("doOverlapTrimming") == 0);
     return if (getGlobal("ovlOverlapper") eq "umd");
-    return if (getGlobal("ovlOverlapper") eq "sand"); 
 
     goto alldone if (-e "$wrk/0-overlaptrim/overlaptrim.success");
 

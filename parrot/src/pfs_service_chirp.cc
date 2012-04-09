@@ -13,7 +13,7 @@ extern "C" {
 #include "chirp_global.h"
 #include "stringtools.h"
 #include "debug.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "macros.h"
 #include "hash_table.h"
 }
@@ -59,7 +59,7 @@ static void chirp_dircache_invalidate()
 static void chirp_dircache_begin( const char *path )
 {
 	chirp_dircache_invalidate();
-	chirp_dircache_path = xxstrdup(path);
+	chirp_dircache_path = xstrdup(path);
 }
 
 static void chirp_dircache_insert( const char *name, struct chirp_stat *info, void *arg )

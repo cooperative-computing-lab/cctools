@@ -17,6 +17,5 @@ See the file COPYING for details.
 #define CATALOG_PORT (getenv("CATALOG_PORT") ? atoi(getenv("CATALOG_PORT")) : CATALOG_PORT_DEFAULT )
 
 #define CATALOG_TYPE_WORK_QUEUE_MASTER "wq_master"
-#define CATALOG_TYPE_WORK_QUEUE_POOL "wq_pool"
 
 #endif

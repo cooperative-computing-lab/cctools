@@ -2715,8 +2715,7 @@ sub merTrim {
 
     return if (getGlobal("doOverlapBasedTrimming") == 0);
     return if (getGlobal("ovlOverlapper") eq "umd");
-    return if (getGlobal("ovlOverlapper") eq "sand");
- 
+
     #  Skip mer based trimming if it is done, or if the ovlStore already exists.
     #
     goto alldone if (-e "$wrk/0-mertrim/mertrim.success");

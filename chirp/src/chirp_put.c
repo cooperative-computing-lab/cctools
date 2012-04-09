@@ -21,7 +21,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "auth_all.h"
 #include "stringtools.h"
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "full_io.h"
 
 #if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD
