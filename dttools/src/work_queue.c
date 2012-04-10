@@ -1812,26 +1812,17 @@ struct work_queue *work_queue_create(int port)
 			port = atoi(envstring);
 		} else {
 			// indicate using a random available port
-			port = -1;
+			port = 0;
 		}
 	}
 
-	if(port == WORK_QUEUE_RANDOM_PORT) {
-		int lowport = 9000;
-		int highport = 32767;
+	/* compatibility code */
+	if (getenv("WORK_QUEUE_LOW_PORT"))
+		setenv("TCP_LOW_PORT", getenv("WORK_QUEUE_LOW_PORT"), 0);
+	if (getenv("WORK_QUEUE_HIGH_PORT"))
+		setenv("TCP_HIGH_PORT", getenv("WORK_QUEUE_HIGH_PORT"), 0);
 
-		envstring = getenv("WORK_QUEUE_LOW_PORT");
-		if(envstring)
-			lowport = atoi(envstring);
-
-		envstring = getenv("WORK_QUEUE_HIGH_PORT");
-		if(envstring)
-			highport = atoi(envstring);
-
-		q->master_link = link_serve_range(lowport, highport);
-	} else {
-		q->master_link = link_serve(port);
-	}
+	q->master_link = link_serve(port);
 
 	if(!q->master_link) {
 		goto failure;

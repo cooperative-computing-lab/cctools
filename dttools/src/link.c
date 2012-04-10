@@ -253,24 +253,13 @@ struct link *link_attach(int fd)
 
 struct link *link_serve(int port)
 {
-	return link_serve_addrrange(0, port, port);
-}
-
-struct link *link_serve_range(int low, int high)
-{
-	return link_serve_addrrange(0, low, high);
+	return link_serve_address(0, port);
 }
 
 struct link *link_serve_address(const char *addr, int port)
 {
-  return link_serve_addrrange(addr, port, port);
-}
-
-struct link *link_serve_addrrange(const char *addr, int low, int high)
-{
 	struct link *link = 0;
 	struct sockaddr_in address;
-	int port;
 	int success;
 	int value;
 
@@ -287,8 +276,7 @@ struct link *link_serve_addrrange(const char *addr, int low, int high)
 
 	link_window_configure(link);
 
-	if(addr || ! (low == 0 && high == 0)) {
-
+	if(addr || port == 0) {
 		memset(&address, 0, sizeof(address));
 #if defined(CCTOOLS_OPSYS_DARWIN)
 		address.sin_len = sizeof(address);
@@ -299,6 +287,19 @@ struct link *link_serve_addrrange(const char *addr, int low, int high)
 			string_to_ip_address(addr, (unsigned char *) &address.sin_addr.s_addr);
 		} else {
 			address.sin_addr.s_addr = htonl(INADDR_ANY);
+		}
+
+		int low = 1024;
+		int high = 32767;
+		if(port == 0) {
+			const char *lowstr = getenv("TCP_LOW_PORT");
+			if (lowstr)
+				low = atoi(lowstr);
+			const char *highstr = getenv("TCP_HIGH_PORT");
+			if (highstr)
+				high = atoi(highstr);
+		} else {
+			low = high = port;
 		}
 
 		if(high < low)

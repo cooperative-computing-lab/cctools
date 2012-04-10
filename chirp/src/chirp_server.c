@@ -587,22 +587,7 @@ int main(int argc, char *argv[])
 			chirp_alloc_init(chirp_root_path, root_quota);
 	}
 
-	if(port == 0) {
-		int low = 1024;
-		int high = 32767;
-
-		const char *lowstr = getenv("CHIRP_LOW_PORT");
-		if(lowstr)
-			low = atoi(lowstr);
-		const char *highstr = getenv("CHIRP_HIGH_PORT");
-		if(highstr)
-			high = atoi(highstr);
-
-		link = link_serve_addrrange(listen_on_interface, low, high);
-	}
-	else {
-		link = link_serve_address(listen_on_interface, port);
-	}
+	link = link_serve_address(listen_on_interface, port);
 
 	if(!link) {
 		if(listen_on_interface) {
