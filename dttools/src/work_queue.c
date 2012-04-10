@@ -1810,9 +1810,6 @@ struct work_queue *work_queue_create(int port)
 		envstring = getenv("WORK_QUEUE_PORT");
 		if(envstring) {
 			port = atoi(envstring);
-		} else {
-			// indicate using a random available port
-			port = 0;
 		}
 	}
 

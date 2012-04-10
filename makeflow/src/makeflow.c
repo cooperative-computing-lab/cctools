@@ -1472,6 +1472,7 @@ int main(int argc, char *argv[])
 	int work_queue_wait_routine = WORK_QUEUE_WAIT_UNSPECIFIED;
 	char *catalog_host;
 	int catalog_port;
+	int port_set = 0;
 
 	debug_config(argv[0]);
 
@@ -1481,6 +1482,7 @@ int main(int argc, char *argv[])
 			skip_afs_check = 1;
 			break;
 		case 'p':
+			port_set = 1;
 			port = atoi(optarg);
 			break;
 		case 'c':
@@ -1673,7 +1675,7 @@ int main(int argc, char *argv[])
 		setenv("WORK_QUEUE_WAIT_ROUTINE", value, 1);
 		free(value);
 
-		if(port != 0) {
+		if(port_set) {
 			value = string_format("%d", port);
 			setenv("WORK_QUEUE_PORT", value, 1);
 			free(value);
