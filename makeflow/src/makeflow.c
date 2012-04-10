@@ -69,6 +69,8 @@ static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
+static char *makeflow_exe = NULL;
+
 static char *project = NULL;
 static int priority = 0;
 static int port = 0;
@@ -158,6 +160,7 @@ int dag_parse_export(struct dag *d, char *line);
 char *dag_lookup(const char *name, void *arg);
 char *dag_lookup_set(const char *name, void *arg);
 void dag_gc_ref_incr(struct dag *d, const char *file, int increment);
+void dag_export_variables(struct dag *d, struct dag_node *n);
 
 
 int dag_estimate_nodes_needed(struct dag *d, int actual_max)
@@ -518,12 +521,15 @@ void dag_node_clean(struct dag *d, struct dag_node *n)
 
 		hash_table_remove(d->completed_files, f->filename);
 	}
-	
+
 	/* If the node is a Makeflow job, then we should recursively call the
 	 * clean operation on it. */
 	if(n->makeflow_job) {
 		char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 3));
 		sprintf(command, "%s -c", n->command);
+		/* Export environment variables in case nested Makeflow
+		 * requires them. */
+		dag_export_variables(d, n);
 		system(command);
 		free(command);
 	}
@@ -1262,6 +1268,22 @@ failure:
 	return 0;
 }
 
+void dag_parse_node_set_command(struct dag *d, struct dag_node *n, char *command)
+{
+	struct dag_lookup_set s = {d, n};
+	char *local = dag_lookup_set("BATCH_LOCAL", &s);
+
+	if (local) {
+		if(string_istrue(local))
+			n->local_job = 1;
+		free(local);
+	}
+
+	n->original_command = xxstrdup(command);
+	n->command = translate_command(d, command, n->local_job);
+	debug(D_DEBUG, "node command=%s", n->command);
+}
+
 int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
 {
 	char *command = line;
@@ -1277,18 +1299,7 @@ int dag_parse_node_command(struct dag *d, struct dag_node *n, char *line)
 		return dag_parse_node_makeflow_command(d, n, command + 9);
 	}
 
-	struct dag_lookup_set s = {d, n};
-	char *local = dag_lookup_set("BATCH_LOCAL", &s);
-
-	if (local) {
-		if(string_istrue(local))
-			n->local_job = 1;
-		free(local);
-	}
-
-	n->original_command = xxstrdup(command);
-	n->command = translate_command(d, command, n->local_job);
-	debug(D_DEBUG, "node command=%s", n->command);
+	dag_parse_node_set_command(d, n, command);
 	return 1;
 }
 
@@ -1312,11 +1323,12 @@ int dag_parse_node_makeflow_command(struct dag *d, struct dag_node *n, char *lin
 			dag_parse_error(d, "node makeflow command");
 			goto failure;
 	}
-	char *command = xxmalloc(sizeof(char) * (strlen(n->makeflow_cwd) + strlen(n->makeflow_dag) + 20));
-	sprintf(command, "cd \"%s\" && makeflow \"%s\"", n->makeflow_cwd, n->makeflow_dag);
-	n->command = command;
-	debug(D_DEBUG, "node makeflow command=%s", n->command);
 	free(argv);
+
+	char *command = xxmalloc(sizeof(char) * (strlen(n->makeflow_cwd) + strlen(makeflow_exe) + strlen(n->makeflow_dag) + 20));
+	sprintf(command, "cd \"%s\" && %s \"%s\"", n->makeflow_cwd, makeflow_exe, n->makeflow_dag);
+	dag_parse_node_set_command(d, n, command);
+	free(command);
 	return 1;
 failure:
 	free(argv);
@@ -1870,6 +1882,8 @@ int main(int argc, char *argv[])
 	int port_set = 0;
 
 	debug_config(argv[0]);
+
+	makeflow_exe = argv[0];
 
 	while((c = getopt(argc, argv, "aAB:cC:d:DeEF:g:G:hiIj:J:kKl:L:MN:o:Op:P:r:RS:t:T:vw:W:z:Z:")) != (char) -1) {
 		switch (c) {
