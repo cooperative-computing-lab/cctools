@@ -252,8 +252,9 @@ struct work_queue *work_queue_create(int port);
 It is safe to re-submit a task returned by @ref work_queue_wait.
 @param q A work queue returned from @ref work_queue_create.
 @param t A task description returned from @ref work_queue_task_create.
+@return The unique taskid assigned to the submitted task. 
 */
-void work_queue_submit(struct work_queue *q, struct work_queue_task *t);
+int work_queue_submit(struct work_queue *q, struct work_queue_task *t);
 
 /** Wait for tasks to complete.  This call will block until the timeout has elapsed.
 @param q The work queue to wait on.
@@ -262,13 +263,15 @@ void work_queue_submit(struct work_queue *q, struct work_queue_task *t);
 */
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout);
 
-/** Determine whether the queue can support more tasks. Returns the number of additional tasks it can support if "hungry" and 0 if "sated".
+/** Determine whether the queue can support more tasks. 
 @param q A pointer to the queue to query.
+@returns The number of additional tasks it can support if "hungry" and 0 if "sated".
 */
 int work_queue_hungry(struct work_queue *q);
 
-/** Determine whether there are any known tasks queued, running, or waiting to be collected. Returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
+/** Determine whether there are any known tasks queued, running, or waiting to be collected. 
 @param q A pointer to the queue to query.
+@returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
 */
 int work_queue_empty(struct work_queue *q);
 
@@ -339,6 +342,12 @@ int work_queue_specify_master_mode(struct work_queue *q, int mode);
 @return The mode that has been set.
 */
 int work_queue_specify_worker_mode(struct work_queue *q, int mode);
+
+/** Remove a task from the queue's ready list.
+@param q A pointer to the queue to modify.
+@param t The task to remove from the queue.
+*/
+int work_queue_task_remove(struct work_queue *q, struct work_queue_task *t);
 
 /** Shut down workers connected to the work_queue system. Gives a best effort and then returns the number of workers given the shut down order.
 @param q A pointer to the queue to query.

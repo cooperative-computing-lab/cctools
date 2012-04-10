@@ -80,6 +80,9 @@ static int catalog_server_port = 0;
 static char *pool_name = NULL;
 static struct work_queue_master *actual_master = NULL;
 
+static char *os_name = NULL; 
+static char *arch_name = NULL;
+
 static struct list *preferred_masters = NULL;
 static struct hash_cache *bad_masters = NULL;
 
@@ -96,7 +99,6 @@ void report_worker_ready(struct link *master)
 	UINT64_T memory_avail, memory_total;
 	UINT64_T disk_avail, disk_total;
 	int ncpus;
-	struct utsname uname_data;
 	char *pm;
 	char preferred_master_names[WORK_QUEUE_LINE_MAX];
 	char name_of_pool[WORK_QUEUE_POOL_NAME_MAX];
@@ -105,7 +107,6 @@ void report_worker_ready(struct link *master)
 	ncpus = load_average_get_cpus();
 	memory_info_get(&memory_avail, &memory_total);
 	disk_info_get(".", &disk_avail, &disk_total);
-	uname(&uname_data);
 
 	if(pool_name) {
 		strncpy(name_of_pool, pool_name, WORK_QUEUE_POOL_NAME_MAX);
@@ -120,9 +121,9 @@ void report_worker_ready(struct link *master)
 			sprintf(&(preferred_master_names[strlen(preferred_master_names)]), "%s ", pm);
 		}
 
-		link_putfstring(master, "ready %s %d %llu %llu %llu %llu \"%s\" %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names, uname_data.sysname, uname_data.machine, name_of_pool);
+		link_putfstring(master, "ready %s %d %llu %llu %llu %llu \"%s\" %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names, os_name, arch_name, name_of_pool);
 	} else {
-		link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, uname_data.sysname, uname_data.machine, name_of_pool);
+		link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, os_name, arch_name, name_of_pool);
 	}
 
 }
@@ -645,6 +646,8 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -i <time>      Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
 	fprintf(stdout, " -b <time>      Set maxmimum value for backoff interval when worker fails to connect to a master. (default=%ds)\n", max_backoff_interval);
 	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%lluMB)\n", disk_avail_threshold);
+	fprintf(stdout, " -A <arch>      Set architecture string for the worker to report to master instead of the value in uname (%s).\n", arch_name);
+	fprintf(stdout, " -O <os>        Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
 	fprintf(stdout, " -v             Show version string\n");
 	fprintf(stdout, " -h             Show this help screen\n");
 }
@@ -667,16 +670,22 @@ int main(int argc, char *argv[])
 	time_t readline_stoptime;
 	int backoff_multiplier = 2; 
 	int got_released = 0;
+	struct utsname uname_data;
 
 	preferred_masters = list_create();
 	if(!preferred_masters) {
 		fprintf(stderr, "Cannot allocate memory to store preferred work queue masters names.\n");
 		exit(1);
 	}
+	
+	//obtain the architecture and os on which worker is running.
+	uname(&uname_data);
+	os_name = xxstrdup(uname_data.sysname);
+	arch_name = xxstrdup(uname_data.machine);
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aC:sd:t:o:p:N:w:i:b:z:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "aC:sd:t:o:p:N:w:i:b:z:A:O:vh")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
@@ -725,6 +734,14 @@ int main(int argc, char *argv[])
 			break;
 		case 'z':
 			disk_avail_threshold = string_metric_parse(optarg);
+			break;
+		case 'A':
+			free(arch_name); //free the arch string obtained from uname
+			arch_name = xxstrdup(optarg);
+			break;
+		case 'O':
+			free(os_name); //free the os string obtained from uname
+			os_name = xxstrdup(optarg);
 			break;
 		case 'v':
 			show_version(argv[0]);
@@ -1134,6 +1151,11 @@ int main(int argc, char *argv[])
 	}
 
       abort:
+	if(pool_name) {
+		free(pool_name);
+	}
+	free(os_name);
+	free(arch_name);
 	fprintf(stdout, "work_queue_worker: cleaning up %s\n", tempdir);
 	sprintf(deletecmd, "rm -rf %s", tempdir);
 	system(deletecmd);

@@ -235,7 +235,6 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->output_files = list_create();
 	t->return_status = WORK_QUEUE_RETURN_STATUS_UNSET;
 	t->result = WORK_QUEUE_RESULT_UNSET;
-	t->taskid = next_taskid++;
 
 	t->time_task_submit = t->time_task_finish = 0;
 	t->time_send_input_start = t->time_send_input_finish = 0;
@@ -798,11 +797,6 @@ static int handle_worker(struct work_queue *q, struct link *l)
 				}
 			}
 
-			if(w->state == WORKER_STATE_INIT) {
-				change_worker_state(q, w, WORKER_STATE_READY);
-				q->total_workers_connected++;
-				debug(D_WQ, "%s (%s) ready", w->hostname, w->addrport);
-			}
 			//Re-scan to see if worker reports its os and arch.
 			if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"", project_names) == 1) {
 				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%*[^\"]\" %s %s", w->os, w->arch) != 2) {
@@ -843,10 +837,9 @@ static int handle_worker(struct work_queue *q, struct link *l)
 				}
 			}
 
-			
-
 			if(w->state == WORKER_STATE_INIT) {
 				change_worker_state(q, w, WORKER_STATE_READY);
+				q->total_workers_connected++;
 				debug(D_WQ, "%s (%s) running %s on %s is ready", w->hostname, w->addrport, w->os, w->arch);
 			}
 		} else if(sscanf(line, "result %d %lld", &result, &output_length) == 2) {
@@ -1817,38 +1810,22 @@ struct work_queue *work_queue_create(int port)
 		envstring = getenv("WORK_QUEUE_PORT");
 		if(envstring) {
 			port = atoi(envstring);
-		} else {
-			// indicate using a random available port
-			port = -1;
 		}
 	}
 
-	if(port == WORK_QUEUE_RANDOM_PORT) {
-		int lowport = 9000;
-		int highport = 32767;
+	/* compatibility code */
+	if (getenv("WORK_QUEUE_LOW_PORT"))
+		setenv("TCP_LOW_PORT", getenv("WORK_QUEUE_LOW_PORT"), 0);
+	if (getenv("WORK_QUEUE_HIGH_PORT"))
+		setenv("TCP_HIGH_PORT", getenv("WORK_QUEUE_HIGH_PORT"), 0);
 
-		envstring = getenv("WORK_QUEUE_LOW_PORT");
-		if(envstring)
-			lowport = atoi(envstring);
-
-		envstring = getenv("WORK_QUEUE_HIGH_PORT");
-		if(envstring)
-			highport = atoi(envstring);
-
-		for(port = lowport; port < highport; port++) {
-			q->master_link = link_serve(port);
-			if(q->master_link) {
-				break;
-			}
-		}
-	} else {
-		q->master_link = link_serve(port);
-	}
+	q->master_link = link_serve(port);
 
 	if(!q->master_link) {
 		goto failure;
 	} else {
-		q->port = port;
+		char address[LINK_ADDRESS_MAX];
+		link_address_local(q->master_link, address, &q->port);
 	}
 
 	q->ready_list = list_create();
@@ -1972,7 +1949,7 @@ struct work_queue *work_queue_create(int port)
 	q->link_keepalive_on = 1;
 	q->workers_by_pool = hash_table_create(0,0);
 
-	debug(D_WQ, "Work Queue is listening on port %d.", port);
+	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
 
       failure:
@@ -2120,7 +2097,7 @@ void work_queue_delete(struct work_queue *q)
 	}
 }
 
-void work_queue_submit(struct work_queue *q, struct work_queue_task *t)
+int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 {
 	/* If the task has been used before, clear out accumlated state. */
 	if(t->output) {
@@ -2134,6 +2111,9 @@ void work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	t->total_transfer_time = 0;
 	t->cmd_execution_time = 0;
 	t->result = WORK_QUEUE_RESULT_UNSET;
+	
+	//Increment taskid. So we get a unique taskid for every submit.
+	t->taskid = next_taskid++;
 
 	/* Then, add it to the ready list and mark it as submitted. */
 	if (q->task_ordering == WORK_QUEUE_TASK_ORDER_LIFO){
@@ -2144,6 +2124,8 @@ void work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	}	
 	t->time_task_submit = timestamp_get();
 	q->total_tasks_submitted++;
+
+	return (t->taskid);
 }
 
 static int add_more_workers(struct work_queue *q, time_t stoptime)
@@ -2661,6 +2643,38 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	}
 
 	return i;
+}
+
+int taskid_comparator(void *t, const void *r) {
+
+	struct work_queue_task *task_in_queue = t;
+	const struct work_queue_task *task_to_remove = r;
+
+	if (task_in_queue->taskid == task_to_remove->taskid) {
+		return 1;
+	}	
+	return 0;
+}
+
+/**
+ * Note this is different from work_queue_task_delete(). This simply removes the
+ * task from ready list and returns without cleaning up the task. This means the 
+ * task can be resubmitted to queue again from userland. It is still up to the 
+ * user to call work_queue_task_delete() when the task is no longer required.
+ */
+int work_queue_task_remove(struct work_queue *q, struct work_queue_task *t) {
+
+	struct work_queue_task *matched_task;
+
+	if (t->taskid > 0){
+		matched_task = list_find(q->ready_list, taskid_comparator, t);
+		if (matched_task) {	
+			list_remove(q->ready_list,matched_task);
+			debug(D_WQ, "Task with tag %s is removed.", matched_task->tag);
+			return 0;
+		}
+	}
+	return 1;
 }
 
 int work_queue_empty(struct work_queue *q)

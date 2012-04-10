@@ -588,6 +588,7 @@ int main(int argc, char *argv[])
 	}
 
 	link = link_serve_address(listen_on_interface, port);
+
 	if(!link) {
 		if(listen_on_interface) {
 			fatal("couldn't listen on interface %s port %d: %s", listen_on_interface, port, strerror(errno));

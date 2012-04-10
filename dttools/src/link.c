@@ -276,24 +276,45 @@ struct link *link_serve_address(const char *addr, int port)
 
 	link_window_configure(link);
 
-	if(addr != 0 || port != LINK_PORT_ANY) {
-
-		memset(&address, 0, sizeof(address));
+	memset(&address, 0, sizeof(address));
 #if defined(CCTOOLS_OPSYS_DARWIN)
-		address.sin_len = sizeof(address);
+	address.sin_len = sizeof(address);
 #endif
-		address.sin_family = AF_INET;
+	address.sin_family = AF_INET;
+
+	if(addr) {
+		string_to_ip_address(addr, (unsigned char *) &address.sin_addr.s_addr);
+	} else {
+		address.sin_addr.s_addr = htonl(INADDR_ANY);
+	}
+
+	int low = 1024;
+	int high = 32767;
+	if(port == 0) {
+		const char *lowstr = getenv("TCP_LOW_PORT");
+		if (lowstr)
+			low = atoi(lowstr);
+		const char *highstr = getenv("TCP_HIGH_PORT");
+		if (highstr)
+			high = atoi(highstr);
+	} else {
+		low = high = port;
+	}
+
+	if(high < low)
+		fatal("high port %d is less than low port %d in range", high, low);
+
+	for (port = low; port <= high; port++) {
 		address.sin_port = htons(port);
-
-		if(addr) {
-			string_to_ip_address(addr, (unsigned char *) &address.sin_addr.s_addr);
-		} else {
-			address.sin_addr.s_addr = htonl(INADDR_ANY);
-		}
-
 		success = bind(link->fd, (struct sockaddr *) &address, sizeof(address));
-		if(success < 0)
-			goto failure;
+		if(success == -1) {
+			if(errno == EADDRINUSE) {
+				continue;
+			} else {
+				goto failure;
+			}
+		}
+		break;
 	}
 
 	success = listen(link->fd, 5);
