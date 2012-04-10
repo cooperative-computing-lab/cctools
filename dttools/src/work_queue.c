@@ -1824,7 +1824,8 @@ struct work_queue *work_queue_create(int port)
 	if(!q->master_link) {
 		goto failure;
 	} else {
-		q->port = port;
+		char address[LINK_ADDRESS_MAX];
+		link_address_local(q->master_link, address, &q->port);
 	}
 
 	q->ready_list = list_create();
@@ -1948,7 +1949,7 @@ struct work_queue *work_queue_create(int port)
 	q->link_keepalive_on = 1;
 	q->workers_by_pool = hash_table_create(0,0);
 
-	debug(D_WQ, "Work Queue is listening on port %d.", port);
+	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
 
       failure:
