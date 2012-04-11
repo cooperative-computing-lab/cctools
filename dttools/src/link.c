@@ -147,7 +147,13 @@ static int link_internal_sleep(struct link *link, struct timeval *timeout, int r
 {
 	int result;
 	struct pollfd pfd;
-	int msec = (timeout->tv_sec * 1000.0) + (timeout->tv_usec/1000.0);
+	int msec;
+
+	if(timeout) {
+		msec = (timeout->tv_sec * 1000.0) + (timeout->tv_usec/1000.0);
+	} else {
+		msec = -1;
+	}
 
 	while (1) {
 		pfd.fd = link->fd;
