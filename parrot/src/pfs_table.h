@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "pfs_types.h"
 #include "pfs_refcount.h"
 #include "pfs_name.h"
+#include "pfs_mmap.h"
 
 class pfs_file;
 class pfs_pointer;
@@ -103,6 +104,13 @@ public:
 	void	follow_symlink( struct pfs_name *pname, int depth = 0 );
 	int	resolve_name( const char *cname, pfs_name *pname, bool do_follow_symlink = true, int depth = 0 );
 
+	/* mmap operations */
+	pfs_size_t mmap_create_object( pfs_file *file, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
+	pfs_size_t mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
+	int	   mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
+	int	   mmap_delete( pfs_size_t logical_address, pfs_size_t length );
+	void       mmap_print();
+
 	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );
 
 	int find_empty( int lowest );
@@ -120,6 +128,8 @@ private:
 	pfs_pointer **pointers;
 	int         *fd_flags;
 	char        working_dir[PFS_PATH_MAX];
+	pfs_mmap    *mmap_list;
+
 };
 
 #endif

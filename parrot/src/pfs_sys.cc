@@ -673,6 +673,30 @@ int pfs_get_full_name( int fd, char *name )
 	END
 }
 
+pfs_size_t pfs_mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags )
+{
+	BEGIN
+	debug(D_LIBCALL,"mmap_create %d %llx %llx %x %x",fd,file_offset,length,prot,flags);
+	result = pfs_current->table->mmap_create(fd,file_offset,length,prot,flags);
+	END
+}
+
+int	pfs_mmap_update( pfs_size_t logical_address, pfs_size_t channel_address )
+{
+	BEGIN
+	debug(D_LIBCALL,"mmap_update %llx %llx",logical_address,channel_address);
+	result = pfs_current->table->mmap_update(logical_address,channel_address);
+	END
+}
+
+int	pfs_mmap_delete( pfs_size_t logical_address, pfs_size_t length )
+{
+	BEGIN
+	debug(D_LIBCALL,"mmap_delete %llx %llx",logical_address,length);
+	result = pfs_current->table->mmap_delete(logical_address,length);
+	END
+}
+ 
 int pfs_get_local_name( const char *rpath, char *lpath, char *firstline, int length )
 {
 	int fd;
