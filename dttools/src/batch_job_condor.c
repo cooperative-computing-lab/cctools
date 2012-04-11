@@ -149,7 +149,6 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 					itable_insert(q->job_table, jobid, info);
 				}
 
-
 				debug(D_DEBUG, "line: %s", line);
 
 				if(type == 0) {
@@ -167,7 +166,7 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 					debug(D_DEBUG, "job %d was removed", jobid);
 
 					memcpy(info_out, info, sizeof(*info));
-
+					free(info);
 					return jobid;
 				} else if(type == 5) {
 					itable_remove(q->job_table, jobid);
@@ -190,6 +189,7 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 					}
 
 					memcpy(info_out, info, sizeof(*info));
+					free(info);
 					return jobid;
 				}
 			}
