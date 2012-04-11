@@ -86,6 +86,14 @@ struct dirent * pfs_dir::fdreaddir( pfs_off_t offset, pfs_off_t *next_offset )
 	return &d.entry;
 }
 
+// A directory object is always seekable, since it constructs
+// sequentially in memory, and is then accessed randomly.
+
+int pfs_dir::is_seekable()
+{
+	return 1;
+}
+
 int pfs_dir::append( const char *srcname )
 {
 	char name[PFS_PATH_MAX];

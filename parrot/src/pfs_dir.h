@@ -26,6 +26,8 @@ public:
 	virtual int append( const char *name );
 	virtual struct dirent * fdreaddir( pfs_off_t offset, pfs_off_t *next_offset );
 
+	virtual int is_seekable();
+
 private:
 	char *data;
 	pfs_off_t length;
