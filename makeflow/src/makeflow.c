@@ -1422,7 +1422,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -T <type>      Batch system type: %s. (default is local)\n", batch_queue_type_string());
 	fprintf(stdout, " -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	fprintf(stdout, " -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
-	fprintf(stdout, " -p <port>      Port number to use with work queue.         (default is %d, -1=random)\n", WORK_QUEUE_DEFAULT_PORT);
+	fprintf(stdout, " -p <port>      Port number to use with work queue.         (default is %d, 0=random)\n", WORK_QUEUE_DEFAULT_PORT);
 	fprintf(stdout, " -N <project>   Set the project name to <project>\n");
 	fprintf(stdout, " -P <integer>   Priority. Higher the value, higher the priority.\n");
 	fprintf(stdout, " -a             Advertise the master information to a catalog server.\n");
