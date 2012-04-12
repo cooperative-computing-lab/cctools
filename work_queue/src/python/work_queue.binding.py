@@ -361,8 +361,7 @@ class WorkQueue(_object):
     # @param self   Reference to the current work queue object.
     # @param name   The new project name.
     def specify_name(self, name):
-		work_queue_specify_master_mode(self._work_queue, WORK_QUEUE_MASTER_MODE_CATALOG)
-		return work_queue_specify_name(self._work_queue, name)
+        return work_queue_specify_name(self._work_queue, name)
 
     ##
     # Change the project priority for the given queue.
