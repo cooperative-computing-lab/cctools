@@ -467,6 +467,8 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 				printf("\n*******************************\n\n"); 
 			}
 
+			list_free(matched_masters); // we can do this because work_queue_master struct does not contain dynamically allocated memory
+			list_delete(matched_masters);
 			sleep(5);
 			continue;
 		}
