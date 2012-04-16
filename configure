@@ -652,6 +652,7 @@ then
 	if [ $build_sys = LINUX ]
 	then
 		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
+		ldflags=`echo $ldflags | sed "s/-lreadline/$cctools_readline_ldflags/"`
 	else 
 		library_search ncurses ${readline_path}
 		library_search termcap ${readline_path}
