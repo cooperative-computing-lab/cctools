@@ -7,7 +7,7 @@ See the file COPYING for details.
 
 #include "pfs_channel.h"
 
-#include "xxmalloc.h"
+#include "xmalloc.h"
 #include "debug.h"
 
 #include <stdlib.h>
@@ -41,7 +41,7 @@ static struct entry * entry_create( const char *name, pfs_size_t start, pfs_size
 	if(!e) return 0;
 
 	if(name) {
-		e->name = xxstrdup(name);
+		e->name = xstrdup(name);
 	} else {
 		e->name = 0;
 	}
@@ -143,7 +143,7 @@ int pfs_channel_alloc( const char *name, pfs_size_t length, pfs_size_t *start )
 					if(!f) return 0;
 				}
 
-				e->name = name ? xxstrdup(name) : 0;
+				e->name = name ? xstrdup(name) : 0;
 				e->length = length;
 				e->inuse = 1;
 				*start = e->start;
