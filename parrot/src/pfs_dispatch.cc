@@ -1232,8 +1232,8 @@ void decode_mmap( struct pfs_process *p, int syscall, int entering, INT64_T *arg
 		debug(D_SYSCALL,"mmap addr=0x%x len=0x%x prot=0x%x flags=0x%x fd=%d offset=0x%llx",addr,length,prot,flags,fd,source_offset);
 
 		if(flags&MAP_ANONYMOUS) {
-			/* great, just do it. */
 			debug(D_SYSCALL,"mmap skipped b/c anonymous");
+			return;
 		}
 
 		channel_offset = pfs_mmap_create(fd,source_offset,length,prot,flags);
