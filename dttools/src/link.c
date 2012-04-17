@@ -411,21 +411,23 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 		/* If the remote address can be found, then we are really connected. */
 		/* Also, on bsd-derived systems, failure to connect is indicated by a second connect returning EINVAL. */
 
-		if(result < 0 && !errno_is_temporary(errno)) {
-			if(errno == EINVAL)
-				errno = ECONNREFUSED;
-			break;
-		}
-
-		if(link_address_remote(link, link->raddr, &link->rport)) {
-
-			debug(D_TCP, "made connection to %s:%d", link->raddr, link->rport);
-
+		if(result < 0) {
+			if(!errno_is_temporary(errno)) {
+				if(errno == EINVAL)
+					errno = ECONNREFUSED;
+				break;
+			} else {
+				debug(D_TCP, "connection to %s:%d not made yet: %s", addr, port, strerror(errno));
+			}
+		} else {
+			if(link_address_remote(link, link->raddr, &link->rport)) {
+				debug(D_TCP, "made connection to %s:%d", link->raddr, link->rport);
 #ifdef CCTOOLS_OPSYS_CYGWIN
-			link_nonblocking(link, 1);
+				link_nonblocking(link, 1);
 #endif
-			return link;
-		}
+				return link;
+			}
+		} 
 	} while(link_sleep(link, stoptime, 0, 1));
 
 	debug(D_TCP, "connection to %s:%d failed (%s)", addr, port, strerror(errno));
