@@ -1307,6 +1307,7 @@ int dag_parse_node_makeflow_command(struct dag *d, struct dag_node *n, char *lin
 {
 	int argc;
 	char **argv;
+	char *wrapper = NULL;
 
 	n->makeflow_job = 1;
 	string_split_quotes(line, &argc, &argv);
@@ -1319,15 +1320,20 @@ int dag_parse_node_makeflow_command(struct dag *d, struct dag_node *n, char *lin
 			n->makeflow_dag = xxstrdup(argv[0]);
 			n->makeflow_cwd = xxstrdup(argv[1]);
 			break;
+		case 3:
+			n->makeflow_dag = xxstrdup(argv[0]);
+			n->makeflow_cwd = xxstrdup(argv[1]);
+			wrapper = argv[2];
+			break;
 		default:
 			dag_parse_error(d, "node makeflow command");
 			goto failure;
 	}
-	free(argv);
 
 	char *command = xxmalloc(sizeof(char) * (strlen(n->makeflow_cwd) + strlen(makeflow_exe) + strlen(n->makeflow_dag) + 20));
-	sprintf(command, "cd \"%s\" && %s \"%s\"", n->makeflow_cwd, makeflow_exe, n->makeflow_dag);
+	sprintf(command, "cd \"%s\" && %s %s \"%s\"", n->makeflow_cwd, wrapper ? wrapper : "", makeflow_exe, n->makeflow_dag);
 	dag_parse_node_set_command(d, n, command);
+	free(argv);
 	free(command);
 	return 1;
 failure:
