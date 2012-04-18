@@ -19,7 +19,7 @@ run()
 {
     cd $test_dir
     if ./makeflow; then
-    	exec makeflow -c
+    	exec ./makeflow -c
     else
     	exit 1
     fi
