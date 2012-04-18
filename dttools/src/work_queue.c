@@ -432,6 +432,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	if(t) {
 		if(t->result & WORK_QUEUE_RESULT_INPUT_MISSING || t->result & WORK_QUEUE_RESULT_OUTPUT_MISSING || t->result & WORK_QUEUE_RESULT_FUNCTION_FAIL) {
 			list_push_head(q->complete_list, w->current_task);
+			t->status = TASK_STATUS_COMPLETE;
 		} else {
 			t->result = WORK_QUEUE_RESULT_UNSET;
 			t->total_bytes_transferred = 0;
@@ -945,6 +946,7 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 
 	// At this point, a task is completed.
 	list_push_head(q->complete_list, w->current_task);
+	t->status = TASK_STATUS_COMPLETE;
 	w->current_task = 0;
 	t->time_task_finish = timestamp_get();
 

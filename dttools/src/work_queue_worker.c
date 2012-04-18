@@ -823,7 +823,7 @@ int main(int argc, char *argv[])
 		struct task_info ti;
 		memset(&ti, 0, sizeof(ti));
 
-		if(time(0) > idle_stoptime) {
+		if(time(0) > idle_stoptime && task_status == TASK_NONE) {
 			if(master) {
 				fprintf(stdout, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			} else {
@@ -873,6 +873,7 @@ int main(int argc, char *argv[])
 
 		if(task_status != TASK_NONE) {
 			readline_stoptime = time(0) + 1;
+			idle_stoptime = time(0) + idle_timeout;
 		} else {
 			readline_stoptime = time(0) + active_timeout;
 		}

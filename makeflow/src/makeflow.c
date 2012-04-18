@@ -1827,13 +1827,13 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -T <type>      Batch system type: %s. (default is local)\n", batch_queue_type_string());
 	fprintf(stdout, " -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	fprintf(stdout, " -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
-	fprintf(stdout, " -p <port>      Port number to use with work queue.         (default is %d, -1=random)\n", WORK_QUEUE_DEFAULT_PORT);
+	fprintf(stdout, " -p <port>      Port number to use with work queue.         (default is %d, 0=random)\n", WORK_QUEUE_DEFAULT_PORT);
 	fprintf(stdout, " -N <project>   Set the project name to <project>\n");
 	fprintf(stdout, " -P <integer>   Priority. Higher the value, higher the priority.\n");
 	fprintf(stdout, " -a             Advertise the master information to a catalog server.\n");
 	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	fprintf(stdout, " -e             Set the work queue master to only accept workers that have the same -N <project> option.\n");
-	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capcity may be viewed in the work queue log file or through the  work_queue_status command.\n");
+	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capacity may be viewed in the work queue log file or through the  work_queue_status command.\n");
 	fprintf(stdout, " -M             Enable automatic excessive worker removal in Work Queue. (-E option will be automatically added when this option is given.)\n");
 	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	fprintf(stdout, " -I             Show input files.\n");

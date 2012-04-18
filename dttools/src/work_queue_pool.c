@@ -467,6 +467,8 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 				printf("\n*******************************\n\n"); 
 			}
 
+			list_free(matched_masters); // we can do this because work_queue_master struct does not contain dynamically allocated memory
+			list_delete(matched_masters);
 			sleep(5);
 			continue;
 		}
@@ -1067,8 +1069,12 @@ int main(int argc, char *argv[])
 	char *pool_config_path = "work_queue_pool.conf";
 	char pool_config_canonical_path[PATH_MAX];
 	char pool_pid_canonical_path[PATH_MAX];
+	char pool_name_canonical_path[PATH_MAX];
+	char pidfile_path[PATH_MAX];
+	char poolnamefile_path[PATH_MAX];
 
 	pool_pid_canonical_path[0] = 0;
+	pool_name_canonical_path[0] = 0;
 
 	int batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 	batch_job_id_t jobid;
@@ -1082,7 +1088,6 @@ int main(int argc, char *argv[])
 	char *catalog_host;
 	int catalog_port;
 
-	char pidfile_path[PATH_MAX];
 
 	struct list *regex_list;
 
@@ -1200,27 +1205,55 @@ int main(int argc, char *argv[])
 		} else {
 			p++;
 		}
+
+		FILE *fp;
+		struct stat tmp_stat;
+
+		if(make_decision_only) {
+			// Write pool name to file
+			snprintf(poolnamefile_path, PATH_MAX, "%s.poolname", p);
+
+			if(stat(poolnamefile_path, &tmp_stat) == 0) {
+				fprintf(stderr, "Error: file '%s' already exists but %s is trying to store the pool name of itself in this file.\n", poolnamefile_path, argv[0]);
+				return EXIT_FAILURE;
+			}
+
+			FILE *fp = fopen(poolnamefile_path, "w");
+			if(!fp) {
+				fprintf(stderr, "Error: can't create file - '%s' for storing poolname: %s\n", poolnamefile_path, strerror(errno)); 
+				return EXIT_FAILURE;
+			}
+
+			if(fprintf(fp, "%s\n", name_of_this_pool) < 0) {
+				fprintf(stderr, "Error: failed to write pool name to file - '%s'.\n", poolnamefile_path); 
+				fclose(fp);
+				unlink(poolnamefile_path);
+				return EXIT_FAILURE;
+			}	
+			fclose(fp);
+		}
+
+		// Write pid to file
 		snprintf(pidfile_path, PATH_MAX, "%s.pid", p);
 
-		struct stat tmp_stat;
 		if(stat(pidfile_path, &tmp_stat) == 0) {
 			fprintf(stderr, "Error: file '%s' already exists but %s is trying to store the pid of itself in this file.\n", pidfile_path, argv[0]);
 			return EXIT_FAILURE;
 		}
 
-		FILE *pidfile = fopen(pidfile_path, "w");
-		if(!pidfile) {
+		fp = fopen(pidfile_path, "w");
+		if(!fp) {
 			fprintf(stderr, "Error: can't create file - '%s' for storing pid: %s\n", pidfile_path, strerror(errno)); 
 			return EXIT_FAILURE;
 		}
 
-		if(fprintf(pidfile, "%d", pid) < 0) {
+		if(fprintf(fp, "%d\n", pid) < 0) {
 			fprintf(stderr, "Error: failed to write pid to file - '%s'.\n", pidfile_path); 
-			fclose(pidfile);
+			fclose(fp);
 			unlink(pidfile_path);
 			return EXIT_FAILURE;
 		}	
-		fclose(pidfile);
+		fclose(fp);
 	}
 
 	signal(SIGINT, handle_abort);
@@ -1278,6 +1311,12 @@ int main(int argc, char *argv[])
 			// get pool pid file's absolute path (for later delete this file while in the scratch dir
 			strncpy(pool_pid_canonical_path, pool_config_canonical_path, PATH_MAX);
 			strncat(pool_pid_canonical_path, pidfile_path, strlen(pidfile_path));
+
+			if(make_decision_only) {
+				// get pool pid file's absolute path (for later delete this file while in the scratch dir
+				strncpy(pool_name_canonical_path, pool_config_canonical_path, PATH_MAX);
+				strncat(pool_name_canonical_path, poolnamefile_path, strlen(poolnamefile_path));
+			}
 
 			p = pool_config_path;
 			if(len > 2) {
@@ -1372,6 +1411,9 @@ int main(int argc, char *argv[])
 	delete_dir(scratch_dir);
 	if(pool_pid_canonical_path[0]) {
 		unlink(pool_pid_canonical_path);
+	}
+	if(make_decision_only && pool_name_canonical_path[0]) {
+		unlink(pool_name_canonical_path);
 	}
 	batch_queue_delete(q);
 
