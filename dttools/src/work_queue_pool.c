@@ -1224,7 +1224,7 @@ int main(int argc, char *argv[])
 				return EXIT_FAILURE;
 			}
 
-			if(fprintf(fp, "%s", name_of_this_pool) < 0) {
+			if(fprintf(fp, "%s\n", name_of_this_pool) < 0) {
 				fprintf(stderr, "Error: failed to write pool name to file - '%s'.\n", poolnamefile_path); 
 				fclose(fp);
 				unlink(poolnamefile_path);
@@ -1247,7 +1247,7 @@ int main(int argc, char *argv[])
 			return EXIT_FAILURE;
 		}
 
-		if(fprintf(fp, "%d", pid) < 0) {
+		if(fprintf(fp, "%d\n", pid) < 0) {
 			fprintf(stderr, "Error: failed to write pid to file - '%s'.\n", pidfile_path); 
 			fclose(fp);
 			unlink(pidfile_path);
