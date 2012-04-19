@@ -771,8 +771,19 @@ static int translate_filename(struct dag *d, const char *filename, char **newnam
 		return 0;
 
 	/* If there are no slashes in path, then we don't need to translate. */
-	if(!strchr(filename, '/'))
+	if(!strchr(filename, '/')) {
+		*newname_ptr = NULL;
 		return 0;
+	}
+
+	/* If the filename is in the current directory and doesn't contain any
+	 * additional slashes, then we can also skip translation.
+	 *
+	 * Note: this doesn't handle redundant ./'s such as ./././././foo/bar */
+	if(!strncmp(filename, "./", 2) && !strchr(filename + 2, '/')) {
+		*newname_ptr = NULL;
+		return 0;
+	}
 
 	/* First check for if the filename has already been translated-- if so,
 	   use that translation */
