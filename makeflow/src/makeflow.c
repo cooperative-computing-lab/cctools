@@ -1245,7 +1245,7 @@ int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, i
 				dag_node_add_target_file(n, newname);
 				n->target_file_names_size += strlen(filename) + 1;
 			}
-		} else if(filename[0] == '/' && batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+		} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE && strchr(filename, '/')) {
 			/* Translate only explicit absolute paths for work queue tasks.
 			 * TODO: should we check this return value? */
 			translate_filename(d, filename, &newname);
