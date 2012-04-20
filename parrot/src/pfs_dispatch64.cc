@@ -2256,15 +2256,17 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_kill:
 		case SYSCALL64_tkill:
 			if(entering) {
-				debug(D_PROCESS,"tkill %d %d %d",args[0],args[1],args[2]);
-				pfs_process_raise(args[0],args[1],0);
+				debug(D_PROCESS,"%s %d %d %d",tracer_syscall64_name(p->syscall),args[0],args[1],args[2]);
+				p->syscall_result = pfs_process_raise(args[0],args[1],0);
+				divert_to_dummy(p,p->syscall_result);
 			}
 			break;
 
 		case SYSCALL64_tgkill:
 			if(entering) {
 				debug(D_PROCESS,"tgkill %d %d %d",args[0],args[1],args[2]);
-				pfs_process_raise(args[1],args[2],0);
+				p->syscall_result = pfs_process_raise(args[1],args[2],0);
+				divert_to_dummy(p,p->syscall_result);
 			}
 			break;
 

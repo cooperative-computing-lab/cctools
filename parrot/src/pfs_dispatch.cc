@@ -2399,14 +2399,18 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_kill:
 		case SYSCALL32_tkill:
 			if(entering) {
-				pfs_process_raise(args[0],args[1],0);
+				debug(D_PROCESS,"tkill %d %d %d",args[0],args[1],args[2]);
+				p->syscall_result = pfs_process_raise(args[0],args[1],0);
+				divert_to_dummy(p,p->syscall_result);
 			}
 			break;
 
 
 		case SYSCALL32_tgkill:
 			if(entering) {
-				pfs_process_raise(args[0],args[2],0);
+				debug(D_PROCESS,"tgkill %d %d %d",args[0],args[1],args[2]);
+				p->syscall_result = pfs_process_raise(args[1],args[2],0);
+				divert_to_dummy(p,p->syscall_result);
 			}
 			break;
 
