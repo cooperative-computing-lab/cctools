@@ -226,13 +226,15 @@ void work_queue_submit(struct work_queue *q, struct work_queue_task *t);
 */
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout);
 
-/** Determine whether the queue can support more tasks. Returns the number of additional tasks it can support if "hungry" and 0 if "sated".
+/** Determine whether the queue can support more tasks. 
 @param q A pointer to the queue to query.
+@returns The number of additional tasks it can support if "hungry" and 0 if "sated".
 */
 int work_queue_hungry(struct work_queue *q);
 
-/** Determine whether there are any known tasks queued, running, or waiting to be collected. Returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
+/** Determine whether there are any known tasks queued, running, or waiting to be collected. 
 @param q A pointer to the queue to query.
+@returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
 */
 int work_queue_empty(struct work_queue *q);
 
