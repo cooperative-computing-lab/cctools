@@ -1341,7 +1341,7 @@ int dag_parse_node_makeflow_command(struct dag *d, struct dag_node *n, char *lin
 	}
 
 	char *command = xxmalloc(sizeof(char) * (strlen(n->makeflow_cwd) + strlen(makeflow_exe) + strlen(n->makeflow_dag) + 20));
-	sprintf(command, "cd '%s' && %s %s '%s'", n->makeflow_cwd, wrapper ? wrapper : "", makeflow_exe, n->makeflow_dag);
+	sprintf(command, "cd %s && %s %s %s", n->makeflow_cwd, wrapper ? wrapper : "", makeflow_exe, n->makeflow_dag);
 	dag_parse_node_filelist(d, n, argv[0], 1, 0);
 	dag_parse_node_set_command(d, n, command);
 	free(argv);
