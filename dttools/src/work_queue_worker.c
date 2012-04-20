@@ -382,7 +382,6 @@ static void show_help(const char *cmd)
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -w <size>      Set TCP window size.\n");
-	printf(" -z <size>      Set available disk space threshold (in MB) before aborting. (default=%lluMB)\n", disk_avail_threshold);
 	printf(" -z <size>      Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%lluMB)\n", disk_avail_threshold);
 	printf(" -h             Show this help screen\n");
 }
