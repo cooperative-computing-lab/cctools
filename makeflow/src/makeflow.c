@@ -1902,11 +1902,6 @@ int main(int argc, char *argv[])
 
 	makeflow_exe = argv[0];
 
-	if(getenv("_MAKEFLOW_GC_METHOD"))
-		dag_gc_method = atoi(getenv("_MAKEFLOW_GC_METHOD"));
-	if(getenv("_MAKEFLOW_GC_PARAM"))
-		dag_gc_param = atoi(getenv("_MAKEFLOW_GC_PARAM"));
-
 	while((c = getopt(argc, argv, "aAB:cC:d:DeEF:g:G:hiIj:J:kKl:L:MN:o:Op:P:r:RS:t:T:vw:W:z:Z:")) != (char) -1) {
 		switch (c) {
 		case 'A':
@@ -2084,15 +2079,6 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
-	
-	/* Export garbage collection information so child Makeflows pick them up. */
-	char *value;
-	value = string_format("%d", dag_gc_method);
-	setenv("_MAKEFLOW_GC_METHOD", value, 1);
-	free(value);
-	value = string_format("%d", dag_gc_param);
-	setenv("_MAKEFLOW_GC_PARAM", value, 1);
-	free(value);
 
 	const char *dagfile;
 
@@ -2116,7 +2102,7 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		value = string_format("%d", work_queue_worker_mode);
+		char *value = string_format("%d", work_queue_worker_mode);
 		setenv("WORK_QUEUE_WORKER_MODE", value, 1);
 		free(value);
 
