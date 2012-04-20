@@ -1820,7 +1820,7 @@ void dag_run(struct dag *d)
 	if(dag_abort_flag) {
 		dag_abort_all(d);
 	} else {
-		if(dag_gc_method != DAG_GC_NONE) {
+		if(!dag_failed_flag && dag_gc_method != DAG_GC_NONE) {
 			dag_gc_all(d, INT_MAX, INT_MAX, INT_MAX);
 		}
 	}
