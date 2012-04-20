@@ -693,7 +693,7 @@ int main(int argc, char *argv[])
 		case 'C':
 			port = parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port);
 			if(!port) {
-				fprintf(stderr, "The provided catalog server is invalid. The format of the '-s' option should be '-s HOSTNAME:PORT'.\n");
+				fprintf(stderr, "The provided catalog server is invalid. The format of the '-C' option is '-C HOSTNAME:PORT'.\n");
 				exit(1);
 			}
 			auto_worker = 1;

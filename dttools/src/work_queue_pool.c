@@ -474,9 +474,9 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 		}
 
 		if(worker_timeout > 0) {
-			snprintf(cmd, PATH_MAX, "./work_queue_worker -a -t %d -p %s", worker_timeout, name_of_this_pool);
+			snprintf(cmd, PATH_MAX, "./work_queue_worker -a -C %s:%d -t %d -p %s", catalog_host, catalog_port, worker_timeout, name_of_this_pool);
 		} else {
-			snprintf(cmd, PATH_MAX, "./work_queue_worker -a -p %s", name_of_this_pool);
+			snprintf(cmd, PATH_MAX, "./work_queue_worker -a -C %s:%d -p %s", catalog_host, catalog_port, name_of_this_pool);
 		}
 		snprintf(input_files, PATH_MAX, "work_queue_worker");
 
@@ -1109,6 +1109,16 @@ int main(int argc, char *argv[])
 			auto_worker = 1;
 			break;
 		case 'C':
+			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
+				fprintf(stderr, "The provided catalog server is invalid. The format of the '-C' option is '-C HOSTNAME:PORT'.\n");
+				exit(1);
+			}
+
+			if(catalog_port < 0 || catalog_port > 65535) {
+				fprintf(stderr, "The provided catalog server port - '%d' is out of range.\n", catalog_port);
+				exit(1);
+			}
+
 			strcat(worker_args, " -C ");
 			strcat(worker_args, optarg);
 			break;
