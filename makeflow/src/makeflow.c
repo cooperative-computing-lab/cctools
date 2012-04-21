@@ -1718,8 +1718,11 @@ void dag_gc_ref_incr(struct dag *d, const char *file, int increment)
 		/* Perform collection immediately if we are using reference
 		 * counting and report to Makeflowlog. */
 		if(ref_count <= MAKEFLOW_GC_MIN_THRESHOLD && dag_gc_method == DAG_GC_REF_COUNT) {
+			timestamp_t start_time, stop_time;
+			start_time = timestamp_get();
 			dag_gc_file(d, file, ref_count);
-			fprintf(d->logfile, "# GC\t%llu\t%d\n", timestamp_get(), ++dag_gc_collected);
+			stop_time = timestamp_get();
+			fprintf(d->logfile, "# GC\t%llu\t%d\t%llu\t%d\n", timestamp_get(), 1, stop_time - start_time, ++dag_gc_collected);
 		}
 	}
 }
