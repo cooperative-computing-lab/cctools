@@ -64,6 +64,7 @@ static int dag_retry_max = 100;
 
 static dag_gc_method_t dag_gc_method = DAG_GC_NONE;
 static int dag_gc_param = -1;
+static int dag_gc_collected = 0;
 
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
@@ -1686,13 +1687,22 @@ void dag_gc_all(struct dag *d, int threshold, int maxfiles, time_t stoptime)
 	int collected = 0;
 	char *key;
 	PTRINT_T value;
+	timestamp_t start_time, stop_time;
 
 	/* This will walk the table of files to collect and will remove any
 	 * that are below or equal to the threshold. */
+	start_time = timestamp_get();
 	hash_table_firstkey(d->collect_table);
 	while(hash_table_nextkey(d->collect_table, &key, (void **)&value) && time(0) < stoptime && collected < maxfiles) {
 		if(value <= threshold && dag_gc_file(d, key, (int)value))
 			collected++;
+	}
+	stop_time = timestamp_get();
+
+	/* Record total amount of files collected to Makeflowlog. */
+	if(collected > 0) {
+		dag_gc_collected += collected;
+		fprintf(d->logfile, "# GC\t%llu\t%d\t%llu\t%d\n", timestamp_get(), collected, stop_time - start_time, dag_gc_collected);
 	}
 }
 
@@ -1700,15 +1710,17 @@ void dag_gc_ref_incr(struct dag *d, const char *file, int increment)
 {
 	/* Increment the garbage file by specified amount */
 	PTRINT_T ref_count = (PTRINT_T)hash_table_remove(d->collect_table, file);
-	if (ref_count) {
+	if(ref_count) {
 		ref_count = ref_count + increment;
 		hash_table_insert(d->collect_table, file, (void *)ref_count);
 		debug(D_DEBUG, "Marked file %s references (%d)", file, ref_count - 1);
 
 		/* Perform collection immediately if we are using reference
-		 * counting. */
-		if (ref_count <= MAKEFLOW_GC_MIN_THRESHOLD && dag_gc_method == DAG_GC_REF_COUNT)
+		 * counting and report to Makeflowlog. */
+		if(ref_count <= MAKEFLOW_GC_MIN_THRESHOLD && dag_gc_method == DAG_GC_REF_COUNT) {
 			dag_gc_file(d, file, ref_count);
+			fprintf(d->logfile, "# GC\t%llu\t%d\n", timestamp_get(), ++dag_gc_collected);
+		}
 	}
 }
 
