@@ -1836,7 +1836,7 @@ void dag_run(struct dag *d)
 		 * amount of tasks have passed. */
 		if(dag_gc_barrier == 0) {
 			dag_gc(d);
-			dag_gc_barrier = d->nodeid_counter*dag_gc_task_ratio;
+			dag_gc_barrier = MAX(d->nodeid_counter*dag_gc_task_ratio, 1);
 		}
 		dag_gc_barrier--;
 	}
