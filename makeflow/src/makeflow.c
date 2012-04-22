@@ -65,7 +65,7 @@ static int dag_retry_max = 100;
 static dag_gc_method_t dag_gc_method = DAG_GC_NONE;
 static int dag_gc_param = -1;
 static int dag_gc_collected = 0;
-static int dag_gc_barrier = 0;
+static int dag_gc_barrier = 1;
 static double dag_gc_task_ratio = 0.05;
 
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
@@ -1834,11 +1834,11 @@ void dag_run(struct dag *d)
 		/* Rather than try to garbage collect after each time in this
 		 * wait loop, perform garbage collection after a proportional
 		 * amount of tasks have passed. */
+		dag_gc_barrier--;
 		if(dag_gc_barrier == 0) {
 			dag_gc(d);
 			dag_gc_barrier = MAX(d->nodeid_counter*dag_gc_task_ratio, 1);
 		}
-		dag_gc_barrier--;
 	}
 
 	if(dag_abort_flag) {
