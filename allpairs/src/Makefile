@@ -9,11 +9,11 @@ LOCAL_LDFLAGS=../../sand/src/libsandtools.a -ldttools ${CCTOOLS_INTERNAL_LDFLAGS
 
 all: ${TARGETS}
 
-allpairs_multicore: allpairs_multicore.o allpairs_compare.o
-	${CCTOOLS_LD} -o $@ $^ -lpthread ${LOCAL_LDFLAGS}
+allpairs_multicore: allpairs_multicore.o allpairs_compare.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
+	${CCTOOLS_LD} -o $@ allpairs_multicore.o allpairs_compare.o -lpthread ${LOCAL_LDFLAGS}
 
-allpairs_master: allpairs_master.o allpairs_compare.o
-	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
+allpairs_master: allpairs_master.o allpairs_compare.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
+	${CCTOOLS_LD} -o $@ allpairs_master.o allpairs_compare.o ${LOCAL_LDFLAGS}
 
 test:
 
