@@ -31,7 +31,6 @@ struct text_list *text_list_load(const char *path)
 	struct text_list *t = text_list_create();
 
 	while(fgets(line, sizeof(line), file)) {
-		printf("text_list_load: %s\n", line);
 		string_chomp(line);
 		text_list_append(t, line);
 	}
