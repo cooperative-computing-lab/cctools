@@ -125,7 +125,7 @@ struct dag_node {
 	int linenum;
 	int nodeid;
 	int local_job;
-	int makeflow_job;
+	int nested_job;
 	int failure_count;
 	dag_node_state_t state;
 	const char *command;
@@ -139,7 +139,7 @@ struct dag_node {
 	batch_job_id_t jobid;
 	struct dag_node *next;
 	int children;
-	int children_left;
+	int children_remaining;
 	int level;
 	struct hash_table *variables;
 };
@@ -150,7 +150,7 @@ struct dag_lookup_set {
 	struct hash_table *table;
 };
 
-int dag_width(struct dag *d);
+int dag_width(struct dag *d, int nested_jobs);
 void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info);
 char *dag_readline(struct dag *d, struct dag_node *n);
 int dag_check_dependencies(struct dag *d);
@@ -269,7 +269,7 @@ static int handle_auto_workers(struct dag *d, int auto_workers)
 		num_of_workers = dag_estimate_nodes_needed(d, d->remote_jobs_max);
 	} else {		/* if (auto_workers == MAKEFLOW_AUTO_WIDTH) ALWAYS TRUE */
 
-		num_of_workers = dag_width(d);
+		num_of_workers = dag_width(d, 0);
 		if(num_of_workers > d->remote_jobs_max)
 			num_of_workers = d->remote_jobs_max;
 	}
@@ -289,9 +289,9 @@ static int handle_auto_workers(struct dag *d, int auto_workers)
 /* Code added by kparting to compute the width of the graph.
    Original algorithm by pbui, with improvements by kparting */
 
-int dag_width(struct dag *d)
+int dag_width(struct dag *d, int nested_jobs)
 {
-	struct dag_node *n, *tmp;
+	struct dag_node *n, *parent;
 	struct dag_file *f;
 
 	/* 1. Find the number of immediate children for all nodes; also,
@@ -299,19 +299,18 @@ int dag_width(struct dag *d)
 
 	for(n = d->nodes; n != NULL; n = n->next) {
 		for(f = n->source_files; f != NULL; f = f->next) {
-			tmp = (struct dag_node *) hash_table_lookup(d->file_table, f->filename);
-			if(!tmp)
-				continue;
-			++tmp->children;
+			parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename);
+			if(parent)
+				parent->children++;
 		}
 	}
 
-	struct list *list = list_create();
+	struct list *leaves = list_create();
 
 	for(n = d->nodes; n != NULL; n = n->next) {
-		n->children_left = n->children;
+		n->children_remaining = n->children;
 		if(n->children == 0)
-			list_push_tail(list, n);
+			list_push_tail(leaves, n);
 	}
 
 	/* 2. Assign every node a "reverse depth" level. Normally by depth,
@@ -323,43 +322,44 @@ int dag_width(struct dag *d)
 
 	int max_level = 0;
 
-	while(list_size(list) > 0) {
-		struct dag_node *n = (struct dag_node *) list_pop_head(list);
+	while(list_size(leaves) > 0) {
+		struct dag_node *n = (struct dag_node *) list_pop_head(leaves);
 
 		for(f = n->source_files; f != NULL; f = f->next) {
-			tmp = (struct dag_node *) hash_table_lookup(d->file_table, f->filename);
-			if(!tmp)
+			parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename);
+			if(!parent)
 				continue;
 
-			if(tmp->level < n->level + 1)
-				tmp->level = n->level + 1;
+			if(parent->level < n->level + 1)
+				parent->level = n->level + 1;
 
-			if(tmp->level > max_level)
-				max_level = tmp->level;
+			if(parent->level > max_level)
+				max_level = parent->level;
 
-			--tmp->children_left;
-			if(tmp->children_left == 0)
-				list_push_tail(list, tmp);
+			parent->children_remaining--;
+			if(parent->children_remaining == 0)
+				list_push_tail(leaves, parent);
 		}
 	}
+	list_delete(leaves);
 
 	/* 3. Now that every node has a level, simply create an array and then
 	   go through the list once more to count the number of nodes in each
 	   level. */
 
-	int *level_count = malloc((max_level + 1) * sizeof(*level_count));
+	size_t level_count_size = (max_level + 1) * sizeof(int);
+	int *level_count = malloc(level_count_size);
 
-	int i;
-	for(i = 0; i <= max_level; ++i) {	/* yes, should be <=, no joke */
-		level_count[i] = 0;
-	}
+	memset(level_count, 0, level_count_size);
 
 	for(n = d->nodes; n != NULL; n = n->next) {
-		++level_count[n->level];
+		if (nested_jobs && !n->nested_job)
+			continue;
+		level_count[n->level]++;
 	}
 
-	int max = 0;
-	for(i = 0; i <= max_level; ++i) {	/* yes, should still be <=, srsly */
+	int i, max = 0;
+	for(i = 0; i <= max_level; i++) {
 		if(max < level_count[i])
 			max = level_count[i];
 	}
@@ -527,7 +527,7 @@ void dag_node_clean(struct dag *d, struct dag_node *n)
 
 	/* If the node is a Makeflow job, then we should recursively call the
 	 * clean operation on it. */
-	if(n->makeflow_job) {
+	if(n->nested_job) {
 		char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 3));
 		sprintf(command, "%s -c", n->command);
 		/* Export environment variables in case nested Makeflow
@@ -1067,15 +1067,19 @@ int dag_check_dependencies(struct dag *d)
 		}
 	}
 
+	return 1;
+}
+
+void dag_prepare_gc(struct dag *d)
+{
 	/* Parse _MAKEFLOW_COLLECT_LIST and record which target files should be
 	 * garbage collected. */
 	char *collect_list = dag_lookup("_MAKEFLOW_COLLECT_LIST", d);
+	if(collect_list == NULL)
+		return;
+
 	int i, argc;
 	char **argv;
-
-	if(collect_list == NULL)
-		return 1;
-
 	string_split_quotes(collect_list, &argc, &argv);
 	for(i = 0; i < argc; i++) {
 		/* Must initialize to non-zero for hash_table functions to work properly. */
@@ -1086,11 +1090,30 @@ int dag_check_dependencies(struct dag *d)
 
 	/* Mark garbage files with reference counts. This will be used to
 	 * detect when it is safe to remove a garbage file. */
+	struct dag_node *n;
+	struct dag_file *f;
 	for(n = d->nodes; n; n = n->next)
 		for(f = n->source_files; f; f = f->next)
 			dag_gc_ref_incr(d, f->filename, 1);
+}
 
-	return 1;
+void dag_prepare_nested_jobs(struct dag *d)
+{
+	/* Update nested jobs with appropriate number of local jobs (total
+	 * local jobs max / maximum number of concurrent nests). */
+	int dag_nested_width = dag_width(d, 1);
+	if(dag_nested_width > 0) {
+		dag_nested_width = MIN(dag_nested_width, d->local_jobs_max);
+		struct dag_node *n;
+		for(n = d->nodes; n; n = n->next) {
+			if(n->nested_job && (n->local_job || batch_queue_type == BATCH_QUEUE_TYPE_LOCAL)) {
+				char *command = xxmalloc(strlen(n->command) + 20);
+				sprintf(command, "%s -j %d", n->command, d->local_jobs_max / dag_nested_width);
+				free((char *)n->command);
+				n->command = command;
+			}
+		}
+	}
 }
 
 char *dag_readline(struct dag *d, struct dag_node *n)
@@ -1343,7 +1366,7 @@ int dag_parse_node_makeflow_command(struct dag *d, struct dag_node *n, char *lin
 	char **argv;
 	char *wrapper = NULL;
 
-	n->makeflow_job = 1;
+	n->nested_job = 1;
 	string_split_quotes(line, &argc, &argv);
 	switch(argc) {
 		case 1:
@@ -2269,6 +2292,9 @@ int main(int argc, char *argv[])
 			d->remote_jobs_max = MIN(d->local_jobs_max, n);
 		}
 	}
+	
+	dag_prepare_gc(d);
+	dag_prepare_nested_jobs(d);
 
 	if(display_mode) {
 		free(logfilename);
