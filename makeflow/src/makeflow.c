@@ -600,6 +600,11 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 				fprintf(stderr, "makeflow: input file %s does not exist and is not created by any rule.\n", f->filename);
 				exit(1);
 			} else {
+				/* If input file is missing, but node completed and file was garbage, then avoid rerunning. */
+				if(n->state == DAG_NODE_STATE_COMPLETE && hash_table_lookup(d->collect_table, f->filename)) {
+					dag_gc_ref_incr(d, f->filename, -1);
+					continue;
+				}
 				goto rerun;
 			}
 		}
@@ -608,6 +613,10 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	// Rerun if an output file is missing.
 	for(f = n->target_files; f; f = f->next) {
 		if(stat(f->filename, &filestat) < 0) {
+			/* If output file is missing, but node completed and file was garbage, then avoid rerunning. */
+			if(n->state == DAG_NODE_STATE_COMPLETE && hash_table_lookup(d->collect_table, f->filename)) {
+				continue;
+			}
 			goto rerun;
 		}
 	}
@@ -629,6 +638,9 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 	if(itable_lookup(rerun_table, n->nodeid))
 		return;
 
+	// Mark this node as having been rerun already
+	itable_insert(rerun_table, n->nodeid, n);
+
 	// Remove running batch jobs
 	if(n->state == DAG_NODE_STATE_RUNNING) {
 		if(n->local_job) {
@@ -647,6 +659,18 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 	dag_node_clean(d, n);
 	dag_node_state_change(d, n, DAG_NODE_STATE_WAITING);
 
+	// For each parent node, rerun it if input file was garbage collected
+	for(f1 = n->source_files; f1; f1 = f1->next) {
+		if(hash_table_lookup(d->collect_table, f1->filename) == NULL)
+			continue;
+
+		p = hash_table_lookup(d->file_table, f1->filename);
+		if (p) {
+			dag_node_force_rerun(rerun_table, d, p);
+			dag_gc_ref_incr(d, f1->filename, 1);
+		}
+	}
+
 	// For each child node, rerun it
 	for(f1 = n->target_files; f1; f1 = f1->next) {
 		for(p = d->nodes; p; p = p->next) {
@@ -662,9 +686,6 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 			}
 		}
 	}
-
-	// Mark this node as having been rerun already
-	itable_insert(rerun_table, n->nodeid, n);
 }
 
 
@@ -1674,7 +1695,7 @@ int dag_check(struct dag *d)
 
 int dag_gc_file(struct dag *d, const char *file, int count)
 {
-	if(unlink(file) < 0) {
+	if(access(file, R_OK) == 0 && unlink(file) < 0) {
 		debug(D_NOTICE, "makeflow: unable to collect %s: %s", file, strerror(errno));
 		return 0;
 	} else {
