@@ -93,8 +93,6 @@ struct work_queue {
 
 	INT64_T total_tasks_submitted;
 	INT64_T total_tasks_complete;
-	INT64_T total_task_time;
-	INT64_T total_wait_time;
 	INT64_T total_workers_joined;
 	INT64_T total_workers_removed;
 	INT64_T total_bytes_sent;
@@ -927,7 +925,6 @@ static int handle_worker(struct work_queue *q, struct link *l)
 static int receive_output_from_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	struct work_queue_task *t;
-	timestamp_t task_time;
 
 	t = w->current_task;
 	if(!t)
@@ -961,13 +958,11 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 	change_worker_state(q, w, WORKER_STATE_READY);
 
 	t->host = xxstrdup(w->addrport);
-	task_time = t->total_transfer_time + t->cmd_execution_time;
 
 	q->total_tasks_complete++;
-	q->total_task_time += task_time;
-
 	w->total_tasks_complete++;
-	w->total_task_time += task_time;
+
+	w->total_task_time += t->cmd_execution_time;
 
 	debug(D_WQ, "%s (%s) done in %.02lfs total tasks %d average %.02lfs", w->hostname, w->addrport, (t->time_receive_output_finish - t->time_send_input_start) / 1000000.0, w->total_tasks_complete,
 	      w->total_task_time / w->total_tasks_complete / 1000000.0);
@@ -1770,12 +1765,12 @@ void abort_slow_workers(struct work_queue *q)
 	if(q->total_tasks_complete < 10)
 		return;
 
-	timestamp_t average_task_time = q->total_task_time / q->total_tasks_complete;
+	timestamp_t average_task_time = (q->total_execute_time + q->total_send_time) / q->total_tasks_complete;
 	timestamp_t current = timestamp_get();
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->state == WORKER_STATE_BUSY) {
+		if(w->state == WORKER_STATE_BUSY && w->current_task->status == TASK_STATUS_EXECUTING) {
 			timestamp_t runtime = current - w->current_task->time_send_input_start;
 			if(runtime > (average_task_time * multiplier)) {
 				debug(D_NOTICE, "%s (%s) has run too long: %.02lf s (average is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
