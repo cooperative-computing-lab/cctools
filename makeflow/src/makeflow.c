@@ -1996,6 +1996,10 @@ int main(int argc, char *argv[])
 	if(s) {
 		work_queue_name = xxstrdup(s);
 	}
+	s = getenv("WORK_QUEUE_AUTO_REMOVE_WORKERS_ON");
+	if(s) {
+		work_queue_auto_remove_workers_on = atoi(s);
+	}
 
 	while((c = getopt(argc, argv, "aAB:cC:d:DeEF:g:G:hiIj:J:kKl:L:MN:o:Op:P:r:RS:t:T:vw:W:z:Z:")) != (char) -1) {
 		switch (c) {
