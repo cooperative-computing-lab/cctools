@@ -82,6 +82,8 @@ INT64_T pfs_write_count = 0;
 
 const char * pfs_cvmfs_repo_arg = 0;
 
+int pfs_irods_debug_level = 0;
+
 /*
 This process at the very top of the traced tree
 and its final exit status, which we use to determine
@@ -175,6 +177,7 @@ static void show_use( const char *cmd )
 	printf("  -H         Disable use of helper library.\n");
 	printf("  -h         Show this screen.\n");
 	printf("  -i <files> Comma-delimited list of tickets to use for authentication.\n");
+	printf("  -I <num>   Set the debug level output for the iRODS driver.\n");
 	printf("  -K         Checksum files where available.\n");
 	printf("  -k         Do not checksum files.\n");
 	printf("  -l <path>  Path to ld.so to use.                      (PARROT_LDSO_PATH)\n");
@@ -518,7 +521,7 @@ int main( int argc, char *argv[] )
 
 	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
 
-	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DE:FfG:Hi:kKl:m:M:N:o:O:p:Qr:R:sSt:T:U:u:vw:WY"))!=(char)-1) {
+	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DE:FfG:Hi:I:kKl:m:M:N:o:O:p:Qr:R:sSt:T:U:u:vw:WY"))!=(char)-1) {
 		switch(c) {
 		case 'a':
 			if(!auth_register_byname(optarg)) {
@@ -560,6 +563,9 @@ int main( int argc, char *argv[] )
 			break;
 		case 'H':
 			pfs_use_helper = 0;
+			break;
+		case 'I':
+			pfs_irods_debug_level = atoi(optarg);
 			break;
 		case 'i':
 			tickets = strdup(optarg);
