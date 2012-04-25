@@ -74,7 +74,6 @@ static struct batch_queue *remote_queue = 0;
 
 static char *makeflow_exe = NULL;
 
-static char *project = NULL;
 static int priority = 0;
 static int port = 0;
 static int output_len_check = 0;
@@ -1922,7 +1921,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	fprintf(stdout, " -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
 	fprintf(stdout, " -p <port>      Port number to use with work queue.         (default is %d, 0=random)\n", WORK_QUEUE_DEFAULT_PORT);
-	fprintf(stdout, " -N <project>   Set the project name to <project>\n");
+	fprintf(stdout, " -N <project>   Set the project name to <project>.\n");
 	fprintf(stdout, " -P <integer>   Priority. Higher the value, higher the priority.\n");
 	fprintf(stdout, " -a             Advertise the master information to a catalog server.\n");
 	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
@@ -1971,6 +1970,7 @@ int main(int argc, char *argv[])
 	int work_queue_estimate_capacity_on = 0;
 	int work_queue_auto_remove_workers_on = 0;
 	int work_queue_wait_routine = WORK_QUEUE_WAIT_UNSPECIFIED;
+	char *work_queue_name = NULL;
 	char *catalog_host;
 	int catalog_port;
 	int port_set = 0;
@@ -1988,6 +1988,14 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
+	s = getenv("WORK_QUEUE_MASTER_MODE");
+	if(s) {
+		work_queue_master_mode = atoi(s);
+	}
+	s = getenv("WORK_QUEUE_NAME");
+	if(s) {
+		work_queue_name = xxstrdup(s);
+	}
 
 	while((c = getopt(argc, argv, "aAB:cC:d:DeEF:g:G:hiIj:J:kKl:L:MN:o:Op:P:r:RS:t:T:vw:W:z:Z:")) != (char) -1) {
 		switch (c) {
@@ -2002,9 +2010,8 @@ int main(int argc, char *argv[])
 			clean_mode = 1;
 			break;
 		case 'N':
-			free(project);
-			project = xxstrdup(optarg);
-			setenv("WORK_QUEUE_NAME", project, 1);
+			free(work_queue_name);
+			work_queue_name = xxstrdup(optarg);
 			break;
 		case 'P':
 			priority = atoi(optarg);
@@ -2183,7 +2190,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
+		if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !work_queue_name) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
 			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
 			return 1;
@@ -2196,6 +2203,10 @@ int main(int argc, char *argv[])
 		value = string_format("%d", work_queue_master_mode);
 		setenv("WORK_QUEUE_MASTER_MODE", value, 1);
 		free(value);
+
+		if(work_queue_name) {
+			setenv("WORK_QUEUE_NAME", work_queue_name, 1);
+		}
 
 		if(work_queue_estimate_capacity_on) {
 			value = string_format("%d", WORK_QUEUE_SWITCH_ON);
