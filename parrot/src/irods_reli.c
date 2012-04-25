@@ -22,6 +22,8 @@ See the file COPYING for details.
 #include <errno.h>
 #include <string.h>
 
+extern int pfs_irods_debug_level;
+
 static struct hash_table *connect_cache = 0;
 static rodsEnv irods_env;
 static int got_irods_env = 0;
@@ -58,7 +60,7 @@ static int irods_reli_errno( int e )
 	if(e==CAT_NO_ROWS_FOUND) {
 		unix_errno = ENOENT;
 	} else {
-		unix_errno = getUnixErrno(e);
+		unix_errno = getErrno(e);
 		if(unix_errno>32) {
 			debug(D_NOTICE,"irods returned unexpected error code %d",e);
 			unix_errno = EIO;
@@ -100,7 +102,7 @@ static struct irods_server * connect_to_host( const char *hostport )
 	}
 
 	if(!got_irods_env) {
-		rodsLogLevel(100);
+		rodsLogLevel(pfs_irods_debug_level);
 		if(getRodsEnv(&irods_env)<0) {
 			debug(D_IRODS,"couldn't load irods environment!");
 			return 0;
@@ -240,7 +242,7 @@ struct irods_file * irods_reli_open ( const char *host, const char *path, int fl
 
 static int irods_reli_lseek_if_needed( struct irods_file *file, INT64_T offset )
 {
-	fileLseekInp_t request;
+	openedDataObjInp_t request;
 	fileLseekOut_t *response=0;
 	int result;
 
@@ -251,7 +253,8 @@ static int irods_reli_lseek_if_needed( struct irods_file *file, INT64_T offset )
 
 	if(file->offset==offset)  return 0;
 
-	request.fileInx = file->fd;
+	memset(&request,0,sizeof(request));
+	request.l1descInx = file->fd;
 	request.offset  = offset;
 	request.whence  = SEEK_SET;
 
@@ -272,7 +275,7 @@ static int irods_reli_lseek_if_needed( struct irods_file *file, INT64_T offset )
 int irods_reli_pread ( struct irods_file *file, char *data, int length, INT64_T offset )
 {
 	int result;
-	dataObjReadInp_t request;
+	openedDataObjInp_t request;
 	bytesBuf_t       response;
 
 	struct irods_server *server = connect_to_host(file->host);
@@ -282,6 +285,7 @@ int irods_reli_pread ( struct irods_file *file, char *data, int length, INT64_T 
 
 	if(irods_reli_lseek_if_needed(file,offset)<0) return -1;
 
+	memset(&request,0,sizeof(request));
 	request.l1descInx = file->fd;
 	request.len = length;
 
@@ -305,7 +309,7 @@ int irods_reli_pread ( struct irods_file *file, char *data, int length, INT64_T 
 int irods_reli_pwrite    ( struct irods_file *file, const char *data, int length, INT64_T offset )
 {
 	int result;
-	dataObjWriteInp_t request;
+	openedDataObjInp_t request;
 	bytesBuf_t        response;
 
 	struct irods_server *server = connect_to_host(file->host);
@@ -315,6 +319,7 @@ int irods_reli_pwrite    ( struct irods_file *file, const char *data, int length
 
 	if(irods_reli_lseek_if_needed(file,offset)<0) return -1;
 
+	memset(&request,0,sizeof(request));
 	request.l1descInx = file->fd;
 	request.len = length;
 
@@ -338,7 +343,7 @@ int irods_reli_pwrite    ( struct irods_file *file, const char *data, int length
 int irods_reli_close    ( struct irods_file *file )
 {
 	int result;
-	dataObjCloseInp_t request;
+	openedDataObjInp_t request;
 
 	struct irods_server *server = connect_to_host(file->host);
 	if(!server) return -1;
@@ -410,7 +415,7 @@ int irods_reli_stat ( const char *host, const char *path, struct pfs_stat *info 
 		info->st_mode = S_IFREG | 0755;
 		info->st_size = response->objSize;
 		info->st_blocks = info->st_size/512+1;
-		info->st_nlink = response->numCopies;
+		info->st_nlink = 1;
 	}
 
 	info->st_blksize = 4096;
@@ -429,9 +434,9 @@ int irods_reli_getdir( const char *host, const char *path, void (*callback) ( co
 	int result;
 	int keepgoing;
 
+	queryHandle_t query_handle;
 	genQueryInp_t query_in;
 	genQueryOut_t *query_out = 0;
-	rodsArguments_t args;
 	sqlResult_t *value;
 
 	/* Special case: /irods looks like an empty dir */
@@ -448,11 +453,12 @@ int irods_reli_getdir( const char *host, const char *path, void (*callback) ( co
 	/* First we set up a query for file names */
 
 	memset(&query_in,0,sizeof(query_in));
-	memset(&args,0,sizeof(args));
 	query_out = 0;
 
+	rclInitQueryHandle(&query_handle,server->conn);
+
 	debug(D_IRODS,"queryDataObjInColl %s %s",host,path);
-	result = queryDataObjInColl(server->conn,(char*)path,&args,&query_in,&query_out);
+	result = queryDataObjInColl(&query_handle,(char*)path,0,&query_in,&query_out,0);
 	debug(D_IRODS,"= %d",result);
 
 	if(result<0 && result!=CAT_NO_ROWS_FOUND) {
@@ -490,11 +496,12 @@ int irods_reli_getdir( const char *host, const char *path, void (*callback) ( co
 	/* Now we set up a SECOND query for directory names */
 
 	memset(&query_in,0,sizeof(query_in));
-	memset(&args,0,sizeof(args));
 	query_out = 0;
 
+	rclInitQueryHandle(&query_handle,server->conn);
+
 	debug(D_IRODS,"queryCollInColl %s %s",host,path);
-	result = queryCollInColl(server->conn,(char*)path,&args,&query_in,&query_out);
+	result = queryCollInColl(&query_handle,(char*)path,0,&query_in,&query_out);
 	debug(D_IRODS,"= %d",result);
 
 	if(result<0 && result!=CAT_NO_ROWS_FOUND) {
@@ -638,7 +645,7 @@ int irods_reli_rmdir ( const char *host, const char *path )
 	addKeyVal (&request.condInput, FORCE_FLAG_KW, "");
 
 	debug(D_IRODS,"rcRmColl %s %s",host,path);
-	result = rcRmColl(server->conn,&request);
+	result = rcRmColl(server->conn,&request,0);
 	debug(D_IRODS,"= %d",result);
 
 	clearKeyVal (&request.condInput);

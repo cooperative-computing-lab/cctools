@@ -29,6 +29,7 @@ OPTION_PAIR(-E, url)Endpoint for gLite combined catalog ifc.
 OPTION_PAIR(-G, gid)Fake this gid; Real gid stays the same.
 OPTION_ITEM(-H)Disable use of helper library.
 OPTION_ITEM(-h)Show this screen.
+OPTION_ITEM(-I) Set the iRODS driver internal debug level.
 OPTION_ITEM(-K)Checksum files where available.
 OPTION_ITEM(-k)Do not checksum files.
 OPTION_PAIR(-l, path)Path to ld.so to use.
