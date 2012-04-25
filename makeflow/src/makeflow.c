@@ -1970,10 +1970,20 @@ int main(int argc, char *argv[])
 	char *catalog_host;
 	int catalog_port;
 	int port_set = 0;
+	char *s;
 
 	debug_config(argv[0]);
 
 	makeflow_exe = argv[0];
+			
+	s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
+	if(s) {
+		batch_queue_type = batch_queue_type_from_string(s);
+		if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
+			fprintf(stderr, "makeflow: unknown batch queue type: %s (from $MAKEFLOW_BATCH_QUEUE_TYPE)\n", s);
+			return 1;
+		}
+	}
 
 	while((c = getopt(argc, argv, "aAB:cC:d:DeEF:g:G:hiIj:J:kKl:L:MN:o:Op:P:r:RS:t:T:vw:W:z:Z:")) != (char) -1) {
 		switch (c) {
@@ -2284,7 +2294,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	char *s = getenv("MAKEFLOW_MAX_REMOTE_JOBS");
+	s = getenv("MAKEFLOW_MAX_REMOTE_JOBS");
 	if(s) {
 		d->remote_jobs_max = MIN(d->remote_jobs_max, atoi(s));
 	}
