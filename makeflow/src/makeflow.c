@@ -68,6 +68,8 @@ static int dag_gc_collected = 0;
 static int dag_gc_barrier = 1;
 static double dag_gc_task_ratio = 0.05;
 
+static char *dag_current_symbol = NULL;
+
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
@@ -131,6 +133,7 @@ struct dag_node {
 	const char *original_command;
 	const char *makeflow_cwd;
 	const char *makeflow_dag;
+	const char *symbol;
 	struct dag_file *source_files;
 	struct dag_file *target_files;
 	int source_file_names_size;
@@ -743,6 +746,9 @@ void dag_log_recover(struct dag *d, const char *filename)
 			/* Record node information to log */
 			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->original_command);
 
+			/* Record node symbol to log */
+			fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->symbol);
+
 			/* Record node parents to log */
 			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
 			for(f = n->source_files; f; f = f->next) {
@@ -985,6 +991,11 @@ struct dag_node *dag_node_create(struct dag *d)
 	n->state = DAG_NODE_STATE_WAITING;
 	n->nodeid = d->nodeid_counter++;
 	n->variables = hash_table_create(0, 0);
+	if(dag_current_symbol) {
+		n->symbol = xxstrdup(dag_current_symbol);
+		free(dag_current_symbol);
+		dag_current_symbol = NULL;
+	}
 
 	return n;
 }
@@ -1013,6 +1024,13 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 		}
 
 		if(line[0] == '#') {
+			if(strncmp(line, "# SYMBOL", 8) == 0) {
+				char *symbol = strchr(line, '\t');
+				if(symbol) {
+					free(dag_current_symbol);
+					dag_current_symbol = xxstrdup(symbol + 1);
+				}
+			}
 			continue;
 		} else if(strchr(line, '=')) {
 			if(!dag_parse_variable(d, NULL, line)) {
@@ -1136,7 +1154,7 @@ char *dag_readline(struct dag *d, struct dag_node *n)
 		/* Chop off comments
 		 * TODO: this will break if we use # in a string. */
 		char *hash = strrchr(raw_line, '#');
-		if (hash) {
+		if (hash && hash != raw_line) {
 			*hash = 0;
 		}
 
