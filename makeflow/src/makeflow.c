@@ -747,7 +747,9 @@ void dag_log_recover(struct dag *d, const char *filename)
 			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->original_command);
 
 			/* Record node symbol to log */
-			fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->symbol);
+			if(n->symbol) {
+				fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->symbol);
+			}
 
 			/* Record node parents to log */
 			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
