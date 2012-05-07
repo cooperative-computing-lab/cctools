@@ -60,7 +60,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define TASK_STATUS_EXECUTING 2
 #define TASK_STATUS_WAITING_FOR_OUTPUT 3
 #define TASK_STATUS_RECEIVING_OUTPUT 4
-#define TASK_STATUS_COMPLETE 4
+#define TASK_STATUS_COMPLETE 5
 
 #define MIN_TIME_LIST_SIZE 20
 
