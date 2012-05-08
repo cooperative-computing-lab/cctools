@@ -43,6 +43,7 @@ static int check_implicit_acl( const char *path, int checkflags )
 	struct stat64 info;
 
 	if(stat64(path,&info)==0) {
+		if(info.st_mode&S_IWOTH) flags |= IBOX_ACL_WRITE|IBOX_ACL_LIST;
 		if(info.st_mode&S_IROTH) flags |= IBOX_ACL_READ|IBOX_ACL_LIST;
 		if(info.st_mode&S_IXOTH) flags |= IBOX_ACL_EXECUTE;
 		if((flags&checkflags)==checkflags) {
