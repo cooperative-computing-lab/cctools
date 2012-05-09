@@ -281,10 +281,10 @@ static void record_bad_master(struct work_queue_master *m)
 }
 
 int reset_preferred_masters(struct work_queue_pool *pool) {
-	struct work_queue_master *m;
+	char *pm;
 
-	while((m = (char *)list_pop_head(preferred_masters))) {
-		free(m);
+	while((pm = (char *)list_pop_head(preferred_masters))) {
+		free(pm);
 	}
 
 	int count = 0;

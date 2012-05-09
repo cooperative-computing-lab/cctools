@@ -1213,6 +1213,9 @@ int main(int argc, char *argv[])
 			if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
 				fprintf(stderr, "unknown batch queue type: %s\n", optarg);
 				return EXIT_FAILURE;
+			} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+				fprintf(stderr, "Invalid batch queue type: %s\n", optarg);
+				return EXIT_FAILURE;
 			}
 			break;
 		case 'W':
