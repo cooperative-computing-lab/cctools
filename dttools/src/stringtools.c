@@ -117,6 +117,7 @@ void string_chomp(char *start)
 int whole_string_match_regex(const char *text, char *pattern)
 {
 	char *new_pattern;
+	int result;
 
 	if(!pattern || !text)
 		return 0;
@@ -131,7 +132,11 @@ int whole_string_match_regex(const char *text, char *pattern)
 	strncat(new_pattern, pattern, strlen(pattern));
 	if(text[strlen(pattern) - 1] != '$')
 		strncat(new_pattern, "$", 1);
-	return string_match_regex(text, new_pattern);
+
+	result = string_match_regex(text, new_pattern);
+	free(new_pattern);
+
+	return result;
 }
 
 

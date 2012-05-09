@@ -26,8 +26,7 @@ and port of the master.
 #define WORK_QUEUE_DEFAULT_PORT 9123 /**< Default Work Queue port number. */
 #define WORK_QUEUE_RANDOM_PORT -1    /**< Indicate to Work Queue to choose a random open port. */
 
-#define WORK_QUEUE_LINE_MAX 1024	/**< LIne max between master and worker */
-#define WORK_QUEUE_CATALOG_LINE_MAX 4096 	/**< Line max between master/worker/worker_pool and the catalog server. */
+#define WORK_QUEUE_LINE_MAX 4096	/**< LIne max between master and worker */
 
 #define WORK_QUEUE_POOL_NAME_MAX 100
 
@@ -132,7 +131,7 @@ struct work_queue_stats {
 	int workers_init;		/**< Number of workers initializing. */
 	int workers_ready;		/**< Number of workers ready for tasks. */
 	int workers_busy;		/**< Number of workers running tasks. */
-	char workers_by_pool[WORK_QUEUE_CATALOG_LINE_MAX];		/**< Number of workers from each pool. */
+	char *workers_by_pool;	/**< Number of workers from each pool. Note that this is dynamically allocated memory*/
 	int tasks_running;		/**< Number of tasks currently running. */
 	int tasks_waiting;		/**< Number of tasks waiting for a CPU. */
 	int tasks_complete;		/**< Number of tasks waiting to be returned to user. */
@@ -287,11 +286,16 @@ int work_queue_port(struct work_queue *q);
 */
 const char *work_queue_name(struct work_queue *q);
 
-/** Get queue statistics.
+/** Get queue statistics. Notice: please call work_queue_free_stats after using the buffer s because s would contain dynamically allocated memory after being filled.
 @param q The queue to query.
 @param s A pointer to a buffer that will be filed with statistics.
 */
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s);
+
+/** Free dynamically allocated memory in queue statistics.
+@param s A pointer to a buffer that contains queue statistics.
+*/
+void work_queue_free_stats(struct work_queue_stats *s);
 
 /** Turn on or off fast abort functionality for a given queue.
 @param q A pointer to the queue to modify.

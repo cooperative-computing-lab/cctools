@@ -314,6 +314,61 @@ static double get_idle_percentage(struct work_queue *q)
 	return (long double) (q->accumulated_idle_time + q->idle_time) / (timestamp_get() - accumulated_idle_start);
 }
 
+static char *get_workers_by_pool_string(struct work_queue *q) {
+	char *string;
+	const int increment = 1024;
+	int length = increment;
+
+	if(!(string = (char *)malloc(length * sizeof(char)))) {
+		fprintf(stderr, "Writing 'workers by pool' information to string failed: %s", strerror(errno));
+		return NULL;
+	}
+
+	int i = 0;
+	char *key;
+	struct pool_info *pi;
+
+	hash_table_firstkey(q->workers_by_pool);
+	while(hash_table_nextkey(q->workers_by_pool, &key, (void **) &pi)) {
+		int n, size;
+retry:
+		size = length - i;
+		n = snprintf(string + i, size, "%s:%d,", pi->name, pi->count);
+
+		if(n <= 0) {
+			fprintf(stderr, "Failed to record worker_by_pool item: %s:%d\n", pi->name, pi->count);
+			continue;
+		}
+
+		if(n >= size) {
+			length += increment;
+
+			char *old_string = string;
+			if(!(string = (char *)realloc(string, length * sizeof(char)))) {
+				fprintf(stderr, "Realloc memory for 'workers_by_pool' string failed: %s", strerror(errno));
+				free(old_string);
+				return NULL;
+			}
+			goto retry;
+		}
+
+		i += n;
+	}
+
+	if(i > 0) {
+		*(string + i -1) = '\0';
+	} else {
+		strncpy(string, "n/a", 4); 
+	}
+
+	return string;
+}
+
+void work_queue_free_stats(struct work_queue_stats *s) {
+	// free dynamically allocated memory in work_queue_status
+	free(s->workers_by_pool);
+}
+
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 {
 	INT64_T effective_workers;
@@ -325,25 +380,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->workers_init = q->workers_in_state[WORKER_STATE_INIT];
 	s->workers_ready = q->workers_in_state[WORKER_STATE_READY];
 	s->workers_busy = q->workers_in_state[WORKER_STATE_BUSY];
-
-	char *c = s->workers_by_pool;
-	char *key;
-	struct pool_info *pi;
-	int x;
-	hash_table_firstkey(q->workers_by_pool);
-	while(hash_table_nextkey(q->workers_by_pool, &key, (void **) &pi)) {
-		x = snprintf(c, WORK_QUEUE_CATALOG_LINE_MAX - (c - s->workers_by_pool), "%s:%d,", pi->name, pi->count);
-		if(x <= 0) {
-			fprintf(stderr, "failed to record worker_by_pool item: %s:%d\n", pi->name, pi->count);
-			continue;
-		}
-		c += x;
-	}
-	if(c - s->workers_by_pool > 0) {
-		*(c-1) = '\0';
-	} else {
-		strncpy(s->workers_by_pool, "n/a", 4); 
-	}
+	s->workers_by_pool = get_workers_by_pool_string(q);
 
 	s->tasks_waiting = list_size(q->ready_list);
 	s->tasks_running = q->workers_in_state[WORKER_STATE_BUSY];
@@ -470,12 +507,12 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
  */
 static int get_output_item(char *remote_name, char *local_name, struct work_queue *q, struct work_queue_worker *w, struct hash_table *received_items, INT64_T * total_bytes)
 {
-	char line[WORK_QUEUE_CATALOG_LINE_MAX];
+	char line[WORK_QUEUE_LINE_MAX];
 	int fd;
 	INT64_T actual, length;
 	time_t stoptime;
 	char type[256];
-	char tmp_remote_name[WORK_QUEUE_CATALOG_LINE_MAX], tmp_local_name[WORK_QUEUE_CATALOG_LINE_MAX];
+	char tmp_remote_name[WORK_QUEUE_LINE_MAX], tmp_local_name[WORK_QUEUE_LINE_MAX];
 	char *cur_pos, *tmp_pos;
 	int remote_name_len;
 	int local_name_len;
@@ -755,8 +792,8 @@ static int match_project_names(struct work_queue *q, const char *project_names)
 
 static int handle_worker(struct work_queue *q, struct link *l)
 {
-	char line[WORK_QUEUE_CATALOG_LINE_MAX];
-	char key[WORK_QUEUE_CATALOG_LINE_MAX];
+	char line[WORK_QUEUE_LINE_MAX];
+	char key[WORK_QUEUE_LINE_MAX];
 	struct work_queue_worker *w;
 	int result;
 	INT64_T output_length;
@@ -1020,7 +1057,7 @@ static int put_directory(const char *dirname, const char *remote_name, struct wo
 	struct dirent *file;
 	struct work_queue_file tf;
 
-	char buffer[WORK_QUEUE_CATALOG_LINE_MAX];
+	char buffer[WORK_QUEUE_LINE_MAX];
 
 	while((file = readdir(dir))) {
 		char *filename = file->d_name;
@@ -1605,14 +1642,12 @@ struct work_queue_worker *find_worker_by_random(struct work_queue *q)
 	char *key;
 	struct work_queue_worker *w;
 	struct work_queue_worker *best_worker = 0;
-	struct work_queue_stats qs;
 	int num_workers_ready;
 	int random_ready_worker, ready_worker_count = 1;
 
 	srand(time(0));
 
-	work_queue_get_stats(q, &qs);
-	num_workers_ready = qs.workers_ready;
+	num_workers_ready = q->workers_in_state[WORKER_STATE_READY];
 
 	if(num_workers_ready > 0) {
 		random_ready_worker = (rand() % num_workers_ready) + 1;
@@ -2457,7 +2492,7 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 void receive_pending_output(struct work_queue *q, struct pending_output *p)
 {
 	struct work_queue_worker *w;
-	char key[WORK_QUEUE_CATALOG_LINE_MAX];
+	char key[WORK_QUEUE_LINE_MAX];
 
 	if(!p)
 		return;
@@ -2481,18 +2516,19 @@ void receive_pending_output(struct work_queue *q, struct pending_output *p)
 
 int work_queue_hungry(struct work_queue *q)
 {
-	struct work_queue_stats qs;
-	int i, j;
-	work_queue_get_stats(q, &qs);
+	if(q->total_tasks_submitted < 100)
+		return (100 - q->total_tasks_submitted);
 
-	if(qs.total_tasks_dispatched < 100)
-		return (100 - qs.total_tasks_dispatched);
+	int i, j, workers_init, workers_ready, workers_busy;
+	workers_init = q->workers_in_state[WORKER_STATE_INIT];
+	workers_ready = q->workers_in_state[WORKER_STATE_READY];
+	workers_busy = q->workers_in_state[WORKER_STATE_BUSY];
 
 	//i = 1.1 * number of current workers
 	//j = # of queued tasks.
 	//i-j = # of tasks to queue to re-reach the status quo.
-	i = (1.1 * (qs.workers_init + qs.workers_ready + qs.workers_busy));
-	j = (qs.tasks_waiting);
+	i = (1.1 * (workers_init + workers_ready + workers_busy));
+	j = list_size(q->ready_list);
 	return MAX(i - j, 0);
 }
 
@@ -2725,6 +2761,7 @@ static void update_catalog(struct work_queue *q, int now)
 	if(!advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, now)) {
 		fprintf(stderr, "Reporting master status to the catalog server (%s@%d) failed!\n", q->catalog_host, q->catalog_port);
 	}
+	work_queue_free_stats(&s);
 }
 
 static int release_worker(struct work_queue *q, struct work_queue_worker *w)

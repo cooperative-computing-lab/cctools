@@ -1372,7 +1372,7 @@ void dag_run(struct dag *d)
 				if(n)
 					dag_node_complete(d, n, &info);
 			} else {
-				debug(D_DEBUG, "No job has finished in the last %d seconds.\n", tmp_timeout);
+				debug(D_DEBUG, "No job has finished in the past %d seconds.\n", tmp_timeout);
 			}
 		}
 

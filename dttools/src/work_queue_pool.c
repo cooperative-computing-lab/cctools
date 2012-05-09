@@ -467,8 +467,9 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 				printf("\n*******************************\n\n"); 
 			}
 
-			list_free(matched_masters); // we can do this because work_queue_master struct does not contain dynamically allocated memory
-			list_delete(matched_masters);
+			free_work_queue_master_list(matched_masters);
+			matched_masters = NULL;
+
 			sleep(5);
 			continue;
 		}
@@ -508,8 +509,8 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 			printf("\n*******************************\n\n"); 
 		}
 
-		list_free(matched_masters); // we can do this because work_queue_master struct does not contain dynamically allocated memory
-		list_delete(matched_masters);
+		free_work_queue_master_list(matched_masters);
+		matched_masters = NULL;
 
 		if(itable_size(job_table)) {
 			jobid = batch_job_wait_timeout(q, &info, time(0) + 5);
@@ -520,12 +521,69 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 			sleep(5);
 		}
 	}
+
+	// aborted
+	free_work_queue_master_list(matched_masters);
+	if(pc) {
+		destroy_pool_config(&pc);
+	}
 }
 
 static void master_to_hash_key(struct work_queue_master *m, char *key)
 {
 	sprintf(key, "%s-%d-%llu", m->addr, m->port, m->start_time);
 }
+
+char *get_pool_decision_string(struct list *ml) {
+	struct work_queue_master *m;
+	char *string;
+	const int increment = 1024;
+	int length = increment;
+
+	if(!(string = (char *)malloc(length * sizeof(char)))) {
+		fprintf(stderr, "Writing 'workers by pool' information to string failed: %s", strerror(errno));
+		return NULL;
+	}
+
+
+	int i = 0;
+	list_first_item(ml);
+	while((m = (struct work_queue_master *)list_next_item(ml))) {
+		int n, size;
+
+retry:
+		size = length - i;
+		n = snprintf(string + i, size, "%s:%d,", m->proj, m->target_workers_from_pool);
+
+		if(n <= 0) {
+			fprintf(stderr, "failed to advertise decision item: %s:%d\n", m->proj, m->target_workers_from_pool);
+			continue;
+		}
+
+		if(n >= size) {
+			length += increment;
+
+			char *old_string = string;
+			printf("realloc: %d", length); 
+			if(!(string = (char *)realloc(string, length * sizeof(char)))) {
+				fprintf(stderr, "Realloc memory for 'decision' string failed: %s", strerror(errno));
+				free(old_string);
+				return NULL;
+			}
+			goto retry;
+		}
+		i += n;
+	}
+
+	if(i > 0) {
+		*(string + i -1) = '\0';
+	} else {
+		strncpy(string, "n/a", 4);
+	}
+
+	return string;
+}
+
 
 int decide_worker_distribution(struct list *matched_masters, struct pool_config *pc, const char *catalog_host, int catalog_port) {
 	struct work_queue_master *m;
@@ -644,24 +702,15 @@ int decide_worker_distribution(struct list *matched_masters, struct pool_config 
 	free(pointers);
 
 	// advertise decision to the catalog server
-	char decision[WORK_QUEUE_CATALOG_LINE_MAX];
-	char *c = decision;
-	int x;
-	list_first_item(matched_masters);
-	while((m = (struct work_queue_master *)list_next_item(matched_masters))) {
-		x = snprintf(c, WORK_QUEUE_CATALOG_LINE_MAX - (c - decision), "%s:%d,", m->proj, m->target_workers_from_pool);
-		if(x <= 0) {
-			fprintf(stderr, "failed to advertise decision item: %s:%d\n", m->proj, m->target_workers_from_pool);
-			continue;
-		}
-		c += x;
-	}
-	if(c - decision > 0) {
-		*(c-1) = '\0';
+	char *decision;
+
+	decision = get_pool_decision_string(matched_masters);
+	if(decision) {
+		advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, decision);
+		free(decision);
 	} else {
-		strncpy(decision, "n/a", 4);
+		fprintf(stderr, "Failed to convert pool decisions into a single string.\n");
 	}
-	advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, decision);
 
 	return sum_decided_workers + workers_to_decide; 
 
@@ -679,7 +728,7 @@ void submit_workers_for_new_masters(struct list *matched_masters, struct pool_co
 	struct work_queue_master *m;
 	char cmd[PATH_MAX] = "";
 	char input_files[PATH_MAX] = "";
-	char key[WORK_QUEUE_CATALOG_LINE_MAX];
+	char key[WORK_QUEUE_LINE_MAX];
 
 	if(!matched_masters)
 		return;
@@ -1416,6 +1465,10 @@ int main(int argc, char *argv[])
 	}
 
 	// Abort all jobs
+	if(regex_list) {
+		list_free(regex_list);
+		list_delete(regex_list);
+	}
 	remove_workers(job_table);
 	printf("All workers aborted.\n");
 	delete_dir(scratch_dir);

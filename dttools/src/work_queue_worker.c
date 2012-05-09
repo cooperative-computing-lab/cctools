@@ -283,7 +283,7 @@ static void record_bad_master(struct work_queue_master *m)
 int reset_preferred_masters(struct work_queue_pool *pool) {
 	struct work_queue_master *m;
 
-	while((m = (struct work_queue_master *)list_pop_head(preferred_masters))) {
+	while((m = (char *)list_pop_head(preferred_masters))) {
 		free(m);
 	}
 
@@ -369,7 +369,7 @@ int get_masters_and_pool_info(const char *catalog_host, int catalog_port, struct
 					*pool = tmp_pool;
 					work_queue_pool_not_found = 0;
 				} else {
-					free(tmp_pool);
+					free_work_queue_pool(tmp_pool);
 				}
 			}
 		}
@@ -398,7 +398,7 @@ int get_masters_and_pool_info(const char *catalog_host, int catalog_port, struct
 			// Master name does not match any preferred master names
 			if(exclusive_worker) {
 				list_remove(ml, m);
-				free(m);
+				free_work_queue_master(m);
 			} else {
 				m->priority = non_preference_priority_max < m->priority ? non_preference_priority_max : m->priority;
 			}
@@ -516,8 +516,9 @@ struct link *auto_link_connect(char *addr, int *port, time_t master_stoptime)
 			strncpy(addr, m->addr, LINK_ADDRESS_MAX);
 			(*port) = m->port;
 
-			if(actual_master)
-				free(actual_master);
+			if(actual_master) {
+				free_work_queue_master(actual_master);
+			}
 			actual_master = duplicate_work_queue_master(m);
 
 			break;
@@ -526,8 +527,8 @@ struct link *auto_link_connect(char *addr, int *port, time_t master_stoptime)
 		}
 	}
 
-	list_free(ml);
-	list_delete(ml);
+	free_work_queue_master_list(ml);
+	free_work_queue_pool(pool);
 
 	return master;
 }
@@ -808,7 +809,7 @@ int main(int argc, char *argv[])
 	time_t switch_master_time = time(0) + master_timeout;
 	int backoff_interval = init_backoff_interval;
 
-	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t) free);
+	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t)free_work_queue_master);
 
 	// Start serving masters
 	while(!abort_flag) {
