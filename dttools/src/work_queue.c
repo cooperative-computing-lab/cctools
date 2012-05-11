@@ -2812,8 +2812,13 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int ta
 	struct work_queue_task *matched_task;
 
 	if (taskid > 0){
-		//see if task is in ready list.
-		if ((matched_task = list_find(q->ready_list, taskid_comparator, &taskid))) {
+		//see if task is executing at a worker.
+		if ((matched_task = find_running_task_by_id(q->running_tasks, taskid))) {
+			if (cancel_running_task(q, matched_task)) {
+				return matched_task;
+			}	
+		} //if not, see if task is in ready list.
+		else if ((matched_task = list_find(q->ready_list, taskid_comparator, &taskid))) {
 			list_remove(q->ready_list, matched_task);
 			debug(D_WQ, "Task with id %d is removed from ready list.", matched_task->taskid);
 			return matched_task;
@@ -2822,11 +2827,6 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int ta
 			list_remove(q->complete_list, matched_task);
 			debug(D_WQ, "Task with id %d is removed from complete list.", matched_task->taskid);
 			return matched_task;
-		} //if not, see if task is executing at a worker.
-		else if ((matched_task = find_running_task_by_id(q->running_tasks, taskid))) {
-			if (cancel_running_task(q, matched_task)) {
-				return matched_task;
-			}	
 		} 
 		else { 
 			debug(D_WQ, "Task with id %d is not found in queue.", taskid);
@@ -2841,8 +2841,13 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 	struct work_queue_task *matched_task;
 
 	if (tasktag){
-		//see if task is in ready list.
-		if ((matched_task = list_find(q->ready_list, tasktag_comparator, tasktag))) {
+		//see if task is executing at a worker.
+		if ((matched_task = find_running_task_by_tag(q->running_tasks, tasktag))) {
+			if (cancel_running_task(q, matched_task)) {
+				return matched_task;
+			}
+		} //if not, see if task is in ready list.
+		else if ((matched_task = list_find(q->ready_list, tasktag_comparator, tasktag))) {
 			list_remove(q->ready_list, matched_task);
 			debug(D_WQ, "Task with tag %s and id %d is removed from ready list.", matched_task->tag, matched_task->taskid);
 			return matched_task;
@@ -2851,12 +2856,7 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 			list_remove(q->complete_list, matched_task);
 			debug(D_WQ, "Task with tag %s and id %d is removed from complete list.", matched_task->tag, matched_task->taskid);
 			return matched_task;
-		} //if not, see if task is executing at a worker.
-		else if ((matched_task = find_running_task_by_tag(q->running_tasks, tasktag))) {
-			if (cancel_running_task(q, matched_task)) {
-				return matched_task;
-			}
-		}
+		} 
 		else { 
 			debug(D_WQ, "Task with tag %s is not found in queue.", tasktag);
 		}
