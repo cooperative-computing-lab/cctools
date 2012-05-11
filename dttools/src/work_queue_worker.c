@@ -881,7 +881,6 @@ int main(int argc, char *argv[])
 		}
 
 		if(link_readline(master, line, sizeof(line), readline_stoptime)) {
-			debug(D_WQ, "%s", line);
 			if(sscanf(line, "work %lld", &length)) {
 				buffer = malloc(length + 10);
 				link_read(master, buffer, length, time(0) + active_timeout);

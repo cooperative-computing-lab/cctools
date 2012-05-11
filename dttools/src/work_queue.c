@@ -832,7 +832,6 @@ static int handle_worker(struct work_queue *q, struct link *l)
 	w = hash_table_lookup(q->worker_table, key);
 
 	if(link_readline(l, line, sizeof(line), time(0) + short_timeout)) {
-		debug(D_WQ, "msg from worker: %s", line);
 		if(sscanf(line, "ready %s %d %lld %lld %lld %lld", w->hostname, &w->ncpus, &w->memory_avail, &w->memory_total, &w->disk_avail, &w->disk_total) == 6) {
 			// More workers than needed are connected
 			int workers_connected = hash_table_size(q->worker_table);
