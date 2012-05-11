@@ -131,6 +131,7 @@ void report_worker_ready(struct link *master)
 #define TASK_NONE 0
 #define TASK_RUNNING 1
 #define TASK_COMPLETE 2
+#define TASK_CANCELLED 3
 
 struct task_info {
 	pid_t pid;
@@ -824,7 +825,7 @@ int main(int argc, char *argv[])
 		struct task_info ti;
 		memset(&ti, 0, sizeof(ti));
 
-		if(time(0) > idle_stoptime && task_status == TASK_NONE) {
+		if(time(0) > idle_stoptime && (task_status == TASK_NONE || task_status == TASK_CANCELLED)) {
 			if(master) {
 				fprintf(stdout, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			} else {
@@ -872,7 +873,7 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		if(task_status != TASK_NONE) {
+		if((task_status != TASK_NONE && task_status != TASK_CANCELLED)) {
 			readline_stoptime = time(0) + 1;
 			idle_stoptime = time(0) + idle_timeout;
 		} else {
@@ -987,8 +988,12 @@ int main(int argc, char *argv[])
 			} else if(sscanf(line, "unlink %s", path) == 1) {
 				result = remove(path);
 				if(result != 0) {	// 0 - succeeded; otherwise, failed
-					fprintf(stderr, "Could not remove file: %s.(%s)\n", path, strerror(errno));
-					goto recover;
+					if (task_status != TASK_CANCELLED) {
+						//recover only if it wasn't a cancelled task since it could
+						//have been cancelled before (output) file was generated.
+						fprintf(stderr, "Could not remove file: %s.(%s)\n", path, strerror(errno));
+						goto recover;
+					}	
 				}
 			} else if(sscanf(line, "mkdir %s %o", filename, &mode) == 2) {
 				if(!create_dir(filename, mode | 0700)) {
@@ -1099,6 +1104,13 @@ int main(int argc, char *argv[])
 					break;
 				}
 				link_putliteral(master, "thirdput complete\n", time(0) + active_timeout);
+			} else if(!strncmp(line, "kill", 5)){
+				debug(D_WQ, "Kill message received: cancelling execution of current task\n");
+				if(task_status == TASK_RUNNING) {
+					kill(pid, SIGTERM);
+				}
+				task_status = TASK_CANCELLED;
+				report_task_complete(master, -1, NULL, 0, (timestamp_get() - execution_start));
 			} else if(!strncmp(line, "release", 8)) {
 				if(task_status == TASK_RUNNING) {
 					kill(pid, SIGTERM);
