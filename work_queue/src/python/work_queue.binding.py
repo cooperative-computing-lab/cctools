@@ -388,13 +388,20 @@ class WorkQueue(_object):
         return work_queue_specify_worker_mode(self._work_queue, mode)
 	
     ##
-    # Specify the task to remove from the given queue. This prevents execution
-    # of the submitted task if it hasn't executed yet. 
+    # Cancel task identified by its taskid and remove from the given queue. 
     #
     # @param self   Reference to the current work queue object.
-    # @param task   A task description created from @ref work_queue::Task.
-    def task_remove(self, task):
-        return work_queue_task_remove(self._work_queue, task._task)
+    # @param id     The taskid returned from @ref submit.
+    def cancel_task_by_id(self, id):
+        return work_queue_cancel_by_taskid(self._work_queue, id)
+
+    ##
+    # Cancel task identified by its tag and remove from the given queue. 
+    #
+    # @param self   Reference to the current work queue object.
+    # @param tag    The tag assigned to task using @ref specify_tag.
+    def cancel_task_by_tag(self, tag):
+        return work_queue_cancel_by_tasktag(self._work_queue, tag)
 
     ##
     # Shutdown workers connected to queue.
