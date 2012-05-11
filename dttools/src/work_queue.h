@@ -347,11 +347,19 @@ int work_queue_specify_master_mode(struct work_queue *q, int mode);
 */
 int work_queue_specify_worker_mode(struct work_queue *q, int mode);
 
-/** Remove a task from the queue's ready list.
+/** Cancel a submitted task using its task id and remove it from queue.
 @param q A pointer to the queue to modify.
-@param t The task to remove from the queue.
+@param id The taskid returned from @ref work_queue_submit.
+@return The task description of the cancelled task, or null if the task was not found in queue. The returned task must be deleted with @ref work_queue_task_delete or resubmitted with @ref work_queue_submit.
 */
-int work_queue_task_remove(struct work_queue *q, struct work_queue_task *t);
+struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int id);
+
+/** Cancel a submitted task using its tag and remove it from queue.
+@param q A pointer to the queue to modify.
+@param tag The tag name assigned to task using @ref work_queue_task_specify_tag.
+@return The task description of the cancelled task, or null if the task was not found in queue. The returned task must be deleted with @ref work_queue_task_delete or resubmitted with @ref work_queue_submit.
+*/
+struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const char *tag);
 
 /** Shut down workers connected to the work_queue system. Gives a best effort and then returns the number of workers given the shut down order.
 @param q A pointer to the queue to query.

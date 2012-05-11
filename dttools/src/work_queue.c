@@ -61,6 +61,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define TASK_STATUS_WAITING_FOR_OUTPUT 3
 #define TASK_STATUS_RECEIVING_OUTPUT 4
 #define TASK_STATUS_COMPLETE 5
+#define TASK_STATUS_CANCELLED 6
 
 #define MIN_TIME_LIST_SIZE 20
 
@@ -85,6 +86,9 @@ struct work_queue {
 	struct link *master_link;
 	struct list *ready_list;
 	struct list *complete_list;
+
+	struct itable *running_tasks;
+
 	struct list *receive_output_waiting_list;
 	struct hash_table *worker_table;
 	struct link_info *poll_table;
@@ -475,6 +479,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 			t->cmd_execution_time = 0;
 			list_push_head(q->ready_list, w->current_task);
 		}
+		itable_remove(q->running_tasks, t->taskid);
 		w->current_task = 0;
 	}
 	
@@ -740,6 +745,27 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 	return 1;
 }
 
+static void delete_all_files(struct work_queue_task *t, struct work_queue_worker *w) {
+
+	struct work_queue_file *tf;
+	
+	if(t->input_files) {
+		list_first_item(t->input_files);
+		while((tf = list_next_item(t->input_files))) {
+			debug(D_WQ, "%s (%s) unlink %s", w->hostname, w->addrport, tf->remote_name);
+			link_putfstring(w->link, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
+		}
+	}
+
+	if(t->output_files) {
+		list_first_item(t->output_files);
+		while((tf = list_next_item(t->output_files))) {
+			debug(D_WQ, "%s (%s) unlink %s", w->hostname, w->addrport, tf->remote_name);
+			link_putfstring(w->link, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
+		}
+	}
+}
+
 static void delete_uncacheable_files(struct work_queue_task *t, struct work_queue_worker *w)
 {
 	struct work_queue_file *tf;
@@ -884,6 +910,14 @@ static int handle_worker(struct work_queue *q, struct link *l)
 			timestamp_t observed_execution_time;
 
 			t = w->current_task;
+			//if cancelled, bypass retrieval of output and accounting work.		
+			if (t->status == TASK_STATUS_CANCELLED) {
+				debug(D_WQ, "Cancelled task with id %d returned from worker %s (%s).", t->taskid, w->hostname, w->addrport);
+			 	delete_all_files(t, w);	//delete all files associated with task.
+				change_worker_state(q, w, WORKER_STATE_READY);
+				start_task_on_worker(q, w);
+				return 1;
+			}
 
 			observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
 
@@ -979,6 +1013,7 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 	delete_uncacheable_files(t, w);
 
 	// At this point, a task is completed.
+	itable_remove(q->running_tasks, t->taskid);
 	list_push_head(q->complete_list, w->current_task);
 	t->status = TASK_STATUS_COMPLETE;
 	w->current_task = 0;
@@ -1500,7 +1535,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	// Update the lastest capacity and avg capacity variables
 	q->capacity = tr->capacity;
 	q->avg_capacity = ts->total_capacity / num_of_reports;
-	debug(D_WQ, "Lastest master capacity: %d; Avg master capacity: %d\n", q->capacity, q->avg_capacity);
+	debug(D_WQ, "Latest master capacity: %d; Avg master capacity: %d\n", q->capacity, q->avg_capacity);
 }
 
 static int remove_workers_base_on_capacity(struct work_queue *q)
@@ -1724,6 +1759,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 		return 0;
 
 	w->current_task = t;
+	itable_insert(q->running_tasks, t->taskid, w); //add worker as execution site for t.
 
 	if(start_one_task(q, w, t)) {
 		change_worker_state(q, w, WORKER_STATE_BUSY);
@@ -1862,6 +1898,8 @@ struct work_queue *work_queue_create(int port)
 
 	q->ready_list = list_create();
 	q->complete_list = list_create();
+
+	q->running_tasks = itable_create(0);
 
 	q->receive_output_waiting_list = list_create();
 	q->worker_table = hash_table_create(0, 0);
@@ -2123,6 +2161,9 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_delete(q->worker_table);
 		list_delete(q->ready_list);
 		list_delete(q->complete_list);
+		
+		itable_delete(q->running_tasks);
+
 		free(q->poll_table);
 		link_close(q->master_link);
 		free(q);
@@ -2678,36 +2719,150 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	return i;
 }
 
+//comparator function for checking if a task matches given taskid.
 int taskid_comparator(void *t, const void *r) {
 
 	struct work_queue_task *task_in_queue = t;
-	const struct work_queue_task *task_to_remove = r;
+	const int *taskid = r;
 
-	if (task_in_queue->taskid == task_to_remove->taskid) {
+	if (task_in_queue->taskid == *taskid) {
 		return 1;
 	}	
 	return 0;
 }
 
+//comparator function for checking if a task matches given tag.
+int tasktag_comparator(void *t, const void *r) {
+
+	struct work_queue_task *task_in_queue = t;
+	const char *tasktag = r;
+
+	if (!strcmp(task_in_queue->tag, tasktag)) {
+		return 1;
+	}	
+	return 0;
+}
+
+int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
+
+	struct work_queue_worker *w;
+	w = itable_lookup(q->running_tasks, t->taskid);
+	
+	if (w) {
+		//send message to worker asking to kill its task.
+		link_putliteral(w->link, "kill\n", time(0) + short_timeout);
+		
+		//update table and state.
+		itable_remove(q->running_tasks, t->taskid);
+		t->status = TASK_STATUS_CANCELLED;
+	
+		if (t->tag)
+			debug(D_WQ, "Task with tag %s and id %d is aborted at worker %s (%s) and removed.", t->tag, t->taskid, w->hostname, w->addrport);
+		else
+			debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
+			
+		return 1;
+	} 
+	
+	return 0;
+}
+
+struct work_queue_task *find_running_task_by_id(struct itable *itbl, int taskid) {
+	
+	struct work_queue_worker *w;
+	struct work_queue_task *t;
+
+	w=itable_lookup(itbl, taskid);
+	if(w) {
+		t = w->current_task;
+		if (t){
+			return t;
+		}
+	}
+	
+	return NULL;
+}
+
+struct work_queue_task *find_running_task_by_tag(struct itable *itbl, const char *tasktag) {
+	
+	struct work_queue_worker *w;
+	struct work_queue_task *t;
+	UINT64_T taskid;
+
+	itable_firstkey(itbl);
+	while(itable_nextkey(itbl, &taskid, (void**)&w)) {
+		t = w->current_task;
+		if (t && tasktag_comparator(t, tasktag)) {
+			return t;
+		}
+	} 
+	
+	return NULL;
+}
+
 /**
- * Note this is different from work_queue_task_delete(). This simply removes the
- * task from ready list and returns without cleaning up the task. This means the 
- * task can be resubmitted to queue again from userland. It is still up to the 
- * user to call work_queue_task_delete() when the task is no longer required.
+ * Cancel submitted task as long as it has not been retrieved through wait().
+ * This is non-blocking and has a worst-case running time of O(n) where n is 
+ * number of submitted tasks.
+ * This returns the work_queue_task struct corresponding to specified task and 
+ * null if the task is not found.
  */
-int work_queue_task_remove(struct work_queue *q, struct work_queue_task *t) {
+struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int taskid) {
 
 	struct work_queue_task *matched_task;
 
-	if (t->taskid > 0){
-		matched_task = list_find(q->ready_list, taskid_comparator, t);
-		if (matched_task) {	
-			list_remove(q->ready_list,matched_task);
-			debug(D_WQ, "Task with tag %s is removed.", matched_task->tag);
-			return 0;
+	if (taskid > 0){
+		//see if task is in ready list.
+		if ((matched_task = list_find(q->ready_list, taskid_comparator, &taskid))) {
+			list_remove(q->ready_list, matched_task);
+			debug(D_WQ, "Task with id %d is removed from ready list.", matched_task->taskid);
+			return matched_task;
+		} //if not, see if task is in complete list.
+		else if ((matched_task = list_find(q->complete_list, taskid_comparator, &taskid))) {
+			list_remove(q->complete_list, matched_task);
+			debug(D_WQ, "Task with id %d is removed from complete list.", matched_task->taskid);
+			return matched_task;
+		} //if not, see if task is executing at a worker.
+		else if ((matched_task = find_running_task_by_id(q->running_tasks, taskid))) {
+			if (cancel_running_task(q, matched_task)) {
+				return matched_task;
+			}	
+		} 
+		else { 
+			debug(D_WQ, "Task with id %d is not found in queue.", taskid);
+		}	
+	}
+	
+	return NULL;
+}
+
+struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const char* tasktag) {
+
+	struct work_queue_task *matched_task;
+
+	if (tasktag){
+		//see if task is in ready list.
+		if ((matched_task = list_find(q->ready_list, tasktag_comparator, tasktag))) {
+			list_remove(q->ready_list, matched_task);
+			debug(D_WQ, "Task with tag %s and id %d is removed from ready list.", matched_task->tag, matched_task->taskid);
+			return matched_task;
+		} //if not, see if task is in complete list.
+		else if ((matched_task = list_find(q->complete_list, tasktag_comparator, tasktag))) {
+			list_remove(q->complete_list, matched_task);
+			debug(D_WQ, "Task with tag %s and id %d is removed from complete list.", matched_task->tag, matched_task->taskid);
+			return matched_task;
+		} //if not, see if task is executing at a worker.
+		else if ((matched_task = find_running_task_by_tag(q->running_tasks, tasktag))) {
+			if (cancel_running_task(q, matched_task)) {
+				return matched_task;
+			}
+		}
+		else { 
+			debug(D_WQ, "Task with tag %s is not found in queue.", tasktag);
 		}
 	}
-	return 1;
+	
+	return NULL;
 }
 
 int work_queue_empty(struct work_queue *q)
