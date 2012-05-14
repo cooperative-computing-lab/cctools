@@ -68,8 +68,6 @@ static int dag_gc_collected = 0;
 static int dag_gc_barrier = 1;
 static double dag_gc_task_ratio = 0.05;
 
-static char *dag_current_symbol = NULL;
-
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
@@ -993,11 +991,6 @@ struct dag_node *dag_node_create(struct dag *d)
 	n->state = DAG_NODE_STATE_WAITING;
 	n->nodeid = d->nodeid_counter++;
 	n->variables = hash_table_create(0, 0);
-	if(dag_current_symbol) {
-		n->symbol = xxstrdup(dag_current_symbol);
-		free(dag_current_symbol);
-		dag_current_symbol = NULL;
-	}
 
 	return n;
 }
@@ -1026,14 +1019,7 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 		}
 
 		if(line[0] == '#') {
-			if(strncmp(line, "# SYMBOL", 8) == 0) {
-				char *symbol = strchr(line, '\t');
-				if(symbol) {
-					free(dag_current_symbol);
-					dag_current_symbol = xxstrdup(symbol + 1);
-				}
-			}
-			continue;
+			/* Skip comments */
 		} else if(strchr(line, '=')) {
 			if(!dag_parse_variable(d, NULL, line)) {
 				dag_parse_error(d, "variable");
@@ -1153,17 +1139,18 @@ char *dag_readline(struct dag *d, struct dag_node *n)
 			debug(D_DEBUG, "read line %d\n", d->linenum);
 		}
 
+		/* Strip whitespace */
+		string_chomp(raw_line);
+		while(isspace(*raw_line)) {
+			raw_line++;
+			d->colnum++;
+		}
+
 		/* Chop off comments
 		 * TODO: this will break if we use # in a string. */
 		char *hash = strrchr(raw_line, '#');
 		if (hash && hash != raw_line) {
 			*hash = 0;
-		}
-
-		string_chomp(raw_line);
-		while(isspace(*raw_line)) {
-			raw_line++;
-			d->colnum++;
 		}
 
 		char *subst_line = xxstrdup(raw_line);
@@ -1245,7 +1232,15 @@ int dag_parse_node(struct dag *d, char *line, int clean_mode)
 	dag_parse_node_filelist(d, n, inputs, 1, clean_mode);
 
 	while((line = dag_readline(d, n)) != NULL) {
-		if(line[0] == '@' && strchr(line, '=')) {
+		if(line[0] == '#') {
+			if(strncmp(line, "# SYMBOL", 8) == 0) {
+				char *symbol = strchr(line, '\t');
+				if(symbol) {
+					n->symbol = xxstrdup(symbol + 1);
+					debug(D_DEBUG, "node symbol=%s", n->symbol);
+				}
+			}
+		} else if(line[0] == '@' && strchr(line, '=')) {
 			if(!dag_parse_variable(d, n, line)) {
 				dag_parse_error(d, "node variable");
 				free(line);
