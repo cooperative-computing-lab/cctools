@@ -392,7 +392,7 @@ class WorkQueue(_object):
     #
     # @param self   Reference to the current work queue object.
     # @param id     The taskid returned from @ref submit.
-    def cancel_task_by_id(self, id):
+    def cancel_by_taskid(self, id):
         return work_queue_cancel_by_taskid(self._work_queue, id)
 
     ##
@@ -400,7 +400,7 @@ class WorkQueue(_object):
     #
     # @param self   Reference to the current work queue object.
     # @param tag    The tag assigned to task using @ref specify_tag.
-    def cancel_task_by_tag(self, tag):
+    def cancel_by_tasktag(self, tag):
         return work_queue_cancel_by_tasktag(self._work_queue, tag)
 
     ##
