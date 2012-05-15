@@ -46,7 +46,7 @@ print "waiting for tasks to complete..."
 while not wq.empty():
     t = wq.wait(5)
     if t:
-	print "task (id# %d) complete: %s (return code %d)" % (t.id, t.command, t.return_status)
+        print "task (id# %d) complete: %s (return code %d)" % (t.id, t.command, t.return_status)
     #task object will be garbage collected by Python automatically when it goes out of scope
 
 print "all tasks complete!"
