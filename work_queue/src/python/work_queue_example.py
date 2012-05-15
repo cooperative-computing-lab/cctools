@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2010- The University of Notre Dame.
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
+# This program is a very simple example of how to use Work Queue.
+# It accepts a list of files on the command line.
+# Each file is compressed with gzip and returned to the user.
+
+from work_queue import *
+
+import os
+import sys
+import time
+
+port = WORK_QUEUE_DEFAULT_PORT
+
+if len(sys.argv) < 2:
+    print "work_queue_example <file1> [file2] [file3] ..."
+    print "Each file given on the command line will be compressed using a remote worker."
+    sys.exit(1)
+
+try:
+    wq = WorkQueue(port)
+except:
+    print "Work Queue could not be created on port %d" % port
+
+print "listening on port %d..." % wq.port
+
+for i in range(1, len(sys.argv)):
+    infile = "%s" % sys.argv[i] 
+    outfile = "%s.gz" % sys.argv[i]
+    command = "/usr/bin/gzip < %s > %s" % (infile, outfile)
+    
+    t = Task(command)
+    
+    t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=True)
+    t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=True)
+    taskid = wq.submit(t)
+
+    print "submitted task (id# %d): %s" % (taskid, t.command)
+
+print "waiting for tasks to complete..."
+
+while not wq.empty():
+    t = wq.wait(5)
+    if t:
+	print "task (id# %d) complete: %s (return code %d)" % (t.id, t.command, t.return_status)
+    #task object will be garbage collected by Python automatically when it goes out of scope
+
+print "all tasks complete!"
+
+#work queue object will be garbage collected by Python automatically when it goes out of scope
+sys.exit(0)
