@@ -309,7 +309,12 @@ struct link *link_serve_address(const char *addr, int port)
 		success = bind(link->fd, (struct sockaddr *) &address, sizeof(address));
 		if(success == -1) {
 			if(errno == EADDRINUSE) {
-				continue;
+				//If a port is specified, fail!
+				if (low == high) { 
+					goto failure;
+				} else {	
+					continue;
+				}	
 			} else {
 				goto failure;
 			}
