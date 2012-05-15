@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	printf("listening on port %d...\n", port);
+	printf("listening on port %d...\n", work_queue_port(q));
 
 	for(i = 1; i < argc; i++) {
 
