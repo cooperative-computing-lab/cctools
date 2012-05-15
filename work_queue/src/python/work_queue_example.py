@@ -24,7 +24,8 @@ if len(sys.argv) < 2:
 try:
     wq = WorkQueue(port)
 except:
-    print "Work Queue could not be created on port %d" % port
+    print "Instantiation of Work Queue failed!" 
+    sys.exit(1)
 
 print "listening on port %d..." % wq.port
 
