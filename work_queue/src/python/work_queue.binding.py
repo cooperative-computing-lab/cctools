@@ -274,6 +274,9 @@ class WorkQueue(_object):
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
     def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=False, exclusive=True, shutdown=False):
         self._work_queue = work_queue_create(port)
+        if not self._work_queue:
+            raise 
+
         self._stats      = work_queue_stats()
         self._task_table = {}
         self._shutdown   = shutdown
