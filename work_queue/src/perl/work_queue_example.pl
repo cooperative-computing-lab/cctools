@@ -10,6 +10,11 @@ if ($#ARGV < 0) {
 }
 
 my $wq = work_queue::work_queue_create($work_queue::WORK_QUEUE_DEFAULT_PORT);
+if (not defined($wq)) {
+	print "Instantiation of Work Queue failed!\n";
+	exit 1;
+}
+
 my $port = work_queue::work_queue_port($wq);
 print "listening on port $port...\n"; 
 
