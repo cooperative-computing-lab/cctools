@@ -387,7 +387,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->workers_by_pool = get_workers_by_pool_string(q);
 
 	s->tasks_waiting = list_size(q->ready_list);
-	s->tasks_running = q->workers_in_state[WORKER_STATE_BUSY];
+	s->tasks_running = itable_size(q->running_tasks);
 	s->tasks_complete = list_size(q->complete_list);
 	s->total_tasks_dispatched = q->total_tasks_submitted;
 	s->total_tasks_complete = q->total_tasks_complete;
@@ -2946,7 +2946,7 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 	retry_transfer_rate = 0;
 	num_of_free_workers = q->workers_in_state[WORKER_STATE_INIT] + q->workers_in_state[WORKER_STATE_READY];
 	total_tasks_complete = q->total_tasks_complete;
-	total_tasks_running = q->workers_in_state[WORKER_STATE_BUSY];
+	total_tasks_running = itable_size(q->running_tasks);
 	total_tasks_waiting = list_size(q->ready_list);
 	if(total_tasks_complete > total_tasks_running && num_of_free_workers > total_tasks_waiting) {
 		// The master has already tried most of the workers connected and has free workers for retrying slow workers
