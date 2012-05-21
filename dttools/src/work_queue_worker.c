@@ -673,6 +673,7 @@ int main(int argc, char *argv[])
 	int backoff_multiplier = 2; 
 	int got_released = 0;
 	struct utsname uname_data;
+	struct task_info ti;
 
 	preferred_masters = list_create();
 	if(!preferred_masters) {
@@ -822,9 +823,6 @@ int main(int argc, char *argv[])
 		char *buffer;
 		FILE *stream;
 
-		struct task_info ti;
-		memset(&ti, 0, sizeof(ti));
-
 		if(time(0) > idle_stoptime && (task_status == TASK_NONE || task_status == TASK_CANCELLED)) {
 			if(master) {
 				fprintf(stdout, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
@@ -867,13 +865,20 @@ int main(int argc, char *argv[])
 			int tmp_timeout = 5;
 			//debug(D_WQ, "Waiting %d seconds for process %d to finish ...", tmp_timeout, pid);
 			if(wait_task(pid, tmp_timeout, &ti) && abort_flag == 0) {
-				task_status = TASK_COMPLETE;
+				if (WIFEXITED(ti.status)){
+					task_status = TASK_COMPLETE;
+				} else {
+					//mark as cancelled if process did not exit normally.
+					task_status = TASK_CANCELLED;
+					debug(D_WQ, "Task (process %d) was aborted.\n", pid);
+					report_task_complete(master, ti.status, ti.output, ti.output_length, ti.execution_end - execution_start);
+				}	
 			} else {
 				//debug(D_WQ, "Task (process %d) is not done yet.\n", pid);
 			}
 		}
 
-		if((task_status != TASK_NONE && task_status != TASK_CANCELLED)) {
+		if(task_status != TASK_NONE && task_status != TASK_CANCELLED) {
 			readline_stoptime = time(0) + 1;
 			idle_stoptime = time(0) + idle_timeout;
 		} else {
@@ -1104,12 +1109,9 @@ int main(int argc, char *argv[])
 				}
 				link_putliteral(master, "thirdput complete\n", time(0) + active_timeout);
 			} else if(!strncmp(line, "kill", 5)){
-				debug(D_WQ, "Kill message received: cancelling execution of current task\n");
 				if(task_status == TASK_RUNNING) {
 					kill(pid, SIGTERM);
 				}
-				task_status = TASK_CANCELLED;
-				report_task_complete(master, -1, NULL, 0, (timestamp_get() - execution_start));
 			} else if(!strncmp(line, "release", 8)) {
 				if(task_status == TASK_RUNNING) {
 					kill(pid, SIGTERM);
