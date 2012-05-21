@@ -45,11 +45,12 @@ See the file COPYING for details.
 extern int setenv(const char *name, const char *value, int overwrite);
 #endif
 
-#define WORKER_STATE_INIT  0
-#define WORKER_STATE_READY 1
-#define WORKER_STATE_BUSY  2
-#define WORKER_STATE_NONE  3
-#define WORKER_STATE_MAX   (WORKER_STATE_NONE+1)
+#define WORKER_STATE_INIT 		0
+#define WORKER_STATE_READY 		1
+#define WORKER_STATE_BUSY 		2
+#define WORKER_STATE_CANCELLED 	3
+#define WORKER_STATE_NONE 		4
+#define WORKER_STATE_MAX 		(WORKER_STATE_NONE+1)
 
 #define WORK_QUEUE_FILE 0
 #define WORK_QUEUE_BUFFER 1
@@ -745,18 +746,22 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 	return 1;
 }
 
-static void delete_all_files(struct work_queue_task *t, struct work_queue_worker *w) {
+static void delete_cancel_task_files(struct work_queue_task *t, struct work_queue_worker *w) {
 
 	struct work_queue_file *tf;
-	
+
+	//Delete only inputs files that are not to be cached.
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((tf = list_next_item(t->input_files))) {
-			debug(D_WQ, "%s (%s) unlink %s", w->hostname, w->addrport, tf->remote_name);
-			link_putfstring(w->link, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
+			if(!(tf->flags & WORK_QUEUE_CACHE) && !(tf->flags & WORK_QUEUE_PREEXIST)) {
+				debug(D_WQ, "%s (%s) unlink %s", w->hostname, w->addrport, tf->remote_name);
+				link_putfstring(w->link, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
+			}
 		}
 	}
-
+	
+	//Delete all output files since they are not needed as the task was aborted.
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((tf = list_next_item(t->output_files))) {
@@ -908,20 +913,15 @@ static int handle_worker(struct work_queue *q, struct link *l)
 			int actual;
 			timestamp_t observed_execution_time;
 
-			t = w->current_task;
-			//if cancelled, bypass retrieval of output and accounting work.		
-			if (t->status == TASK_STATUS_CANCELLED) {
-				debug(D_WQ, "Cancelled task with id %d returned from worker %s (%s).", t->taskid, w->hostname, w->addrport);
-				//delete all files associated with task.
-			 	delete_all_files(t, w);	
-				//cancelled task is a clone of the original - we did this since 
-				//we return the original task in cancel_by_taskid/tag(). Now 
-				//delete this clone quietly as we no longer need it.
-				work_queue_task_delete(t); 
+			//if worker's task was cancelled, bypass retrieval of output & accounting.		
+			if (w->state == WORKER_STATE_CANCELLED) {
+				debug(D_WQ, "Worker %s (%s) that ran cancelled task is now available.", w->hostname, w->addrport);
 				change_worker_state(q, w, WORKER_STATE_READY);
 				start_task_on_worker(q, w);
 				return 1;
 			}
+
+			t = w->current_task;
 
 			observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
 
@@ -2723,53 +2723,6 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	return i;
 }
 
-struct work_queue_task* clone_task(struct work_queue_task *t) {
-
-	struct work_queue_task *ct = malloc(sizeof(*t));
-	struct work_queue_file *tf, *ctf;
-
-	//Do a shallow copy first for the non-pointers.
-	memcpy(ct, t, sizeof(*t));
-
-	//Deep copy for the pointers.
-	if (t->command_line)
-		ct->command_line = xxstrdup(t->command_line);
-	if (t->tag)
-		ct->tag = xxstrdup(t->tag);
-	if (t->output)
-		ct->output = xxstrdup(t->output);
-	ct->input_files = list_create();
-	ct->output_files = list_create();
-	if(t->input_files) {
-		list_first_item(t->input_files);
-		while((tf = list_next_item(t->input_files))) {
-			ctf = malloc(sizeof(*tf));
-			//Shallow copy first for the non-pointers.
-			memcpy(ctf, tf, sizeof(*tf));
-			//Deep copy next for the pointers.
-			ctf->payload = xxstrdup(tf->payload);
-			ctf->remote_name = xxstrdup(tf->remote_name);
-			list_push_tail(ct->input_files, ctf);
-		}
-	}
-	if(t->output_files) {
-		list_first_item(t->output_files);
-		while((tf = list_next_item(t->output_files))) {
-			ctf = malloc(sizeof(*tf));
-			memcpy(ctf, tf, sizeof(*tf));
-			ctf->payload = xxstrdup(tf->payload);
-			ctf->remote_name = xxstrdup(tf->remote_name);
-			list_push_tail(ct->output_files, ctf);
-		}
-	}
-	if (t->preferred_host)
-		ct->preferred_host = xxstrdup(t->preferred_host);
-	if (t->host)
-		ct->host = xxstrdup(t->host);
-
-	return ct;
-}
-
 //comparator function for checking if a task matches given taskid.
 int taskid_comparator(void *t, const void *r) {
 
@@ -2797,26 +2750,22 @@ int tasktag_comparator(void *t, const void *r) {
 int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
 
 	struct work_queue_worker *w;
-	struct work_queue_task *ct;
 	w = itable_lookup(q->running_tasks, t->taskid);
 	
 	if (w) {
 		//send message to worker asking to kill its task.
 		link_putliteral(w->link, "kill\n", time(0) + short_timeout);
-	
 		//update table and state.
 		itable_remove(q->running_tasks, t->taskid);
 		t->status = TASK_STATUS_CANCELLED;
-		//clone task so user can delete the original while we wait for worker to 
-		//abort the task & report back.
-		ct = clone_task(t);
-		w->current_task = ct;
 
 		if (t->tag)
 			debug(D_WQ, "Task with tag %s and id %d is aborted at worker %s (%s) and removed.", t->tag, t->taskid, w->hostname, w->addrport);
 		else
 			debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
 			
+		delete_cancel_task_files(t, w); //delete files associated with cancelled task.
+		change_worker_state(q, w, WORKER_STATE_CANCELLED);
 		return 1;
 	} 
 	
