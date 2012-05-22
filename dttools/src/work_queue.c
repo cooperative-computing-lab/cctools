@@ -94,7 +94,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORK_QUEUE_SWITCH_ON  1
 
 double wq_option_fast_abort_multiplier = -1.0;
-int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
+int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 int wq_tolerable_transfer_time_multiplier = 10;
 int wq_minimum_transfer_timeout = 3;
 
@@ -2557,12 +2557,6 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 	t->tag = xxstrdup(tag);
 }
 
-void work_queue_task_specify_preferred_host(struct work_queue_task *t, const char *hostname)
-{
-	if(t->preferred_host)
-		free(t->preferred_host);
-	t->preferred_host = xxstrdup(hostname);
-}
 
 void work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)
 {
