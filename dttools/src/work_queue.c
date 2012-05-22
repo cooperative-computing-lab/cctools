@@ -339,10 +339,16 @@ char * work_queue_get_worker_summary( struct work_queue *q )
 	}
 
 	size_t length;
-	char * result = strdup(buffer_tostring(b,&length));
+	char *result;
+	const char * buffer_string = buffer_tostring(b,&length);
+	if(buffer_string) {
+		result = xxstrdup(buffer_string);
+	} else {
+		result = xxmalloc(4 * sizeof(char));
+		strncpy(result, "n/a", 4);
+	}
 
 	buffer_delete(b);
-
 	return result;
 }
 
