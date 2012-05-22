@@ -129,7 +129,6 @@ struct work_queue {
 	INT64_T excessive_workers_removed;
 	int busy_workers_to_remove;
 	int capacity_tolerance;
-	int maximum_workers;
 	char catalog_host[DOMAIN_NAME_MAX];
 	int catalog_port;
 	struct hash_table *workers_by_pool;
@@ -218,7 +217,6 @@ int work_queue_specify_estimate_capacity_on(struct work_queue *q, int value);
 int work_queue_specify_wait_routine(struct work_queue *q, int routine);
 int work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance);
 int work_queue_specify_auto_remove_workers_on(struct work_queue *q, int value);
-int work_queue_specify_maximum_workers(struct work_queue *q, int max);
 
 static void update_catalog(struct work_queue *q, int now);
 static void enforce_pool_decisions(struct work_queue *q);
@@ -1995,13 +1993,6 @@ struct work_queue *work_queue_create(int port)
 		q->capacity_tolerance = WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT;
 	}
 
-	envstring = getenv("WORK_QUEUE_MAXIMUM_WORKERS");
-	if(envstring) {
-		work_queue_specify_maximum_workers(q, atoi(envstring));
-	} else {
-		q->maximum_workers = WORK_QUEUE_WORKERS_NO_LIMIT;
-	}
-
 	q->total_send_time = 0;
 	q->total_execute_time = 0;
 	q->total_receive_time = 0;
@@ -2031,17 +2022,6 @@ struct work_queue *work_queue_create(int port)
 	free(q);
 	return 0;
 }
-
-int work_queue_specify_maximum_workers(struct work_queue *q, int max)
-{
-	if(max > 0) {
-		q->maximum_workers = max;
-	} else {
-		q->maximum_workers = WORK_QUEUE_WORKERS_NO_LIMIT;
-	}
-	return q->maximum_workers;
-}
-
 
 int work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
 {
