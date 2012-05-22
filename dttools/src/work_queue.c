@@ -134,8 +134,6 @@ struct work_queue {
 	char catalog_host[DOMAIN_NAME_MAX];
 	int catalog_port;
 	struct hash_table *workers_by_pool;
-
-	int link_keepalive_on;
 };
 
 
@@ -419,9 +417,7 @@ static int add_worker(struct work_queue *q)
 
 	link = link_accept(q->master_link, time(0) + short_timeout);
 	if(link) {
-		if(q->link_keepalive_on) {
-			link_keepalive(link, 1);
-		}
+		link_keepalive(link, 1);
 		link_tune(link, LINK_TUNE_INTERACTIVE);
 		if(link_address_remote(link, addr, &port)) {
 			w = malloc(sizeof(*w));
@@ -2013,7 +2009,6 @@ struct work_queue *work_queue_create(int port)
 
 	q->task_statistics = task_statistics_init();
 
-	q->link_keepalive_on = 1;
 	q->workers_by_pool = hash_table_create(0,0);
 
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
