@@ -247,21 +247,11 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	struct work_queue_task *t = malloc(sizeof(*t));
 	memset(t, 0, sizeof(*t));
 	t->command_line = xxstrdup(command_line);
-	t->tag = NULL;
 	t->worker_selection_algorithm = WORK_QUEUE_SCHEDULE_UNSET;
-	t->output = NULL;
 	t->input_files = list_create();
 	t->output_files = list_create();
 	t->return_status = -1;
 	t->result = WORK_QUEUE_RESULT_UNSET;
-
-	t->time_task_submit = t->time_task_finish = 0;
-	t->time_send_input_start = t->time_send_input_finish = 0;
-	t->time_execute_cmd_start = t->time_execute_cmd_finish = 0;
-	t->time_receive_output_start = t->time_receive_output_finish = 0;
-
-	t->total_bytes_transferred = 0;
-	t->cmd_execution_time = 0;
 	t->status = TASK_STATUS_INITIALIZING;
 	return t;
 }
