@@ -19,24 +19,10 @@ and port of the master.
 
 #include "timestamp.h"
 
-/*
-These items are shared implementation details of the Work Queue protocol
-and should not be documented in the user-visible API.
-*/
-
-#define WORK_QUEUE_LINE_MAX 4096
-#define WORK_QUEUE_POOL_NAME_MAX 128
-
-#define WORK_QUEUE_SWITCH_UNSPECIFIED -1
-#define WORK_QUEUE_SWITCH_OFF 0
-#define WORK_QUEUE_SWITCH_ON  1
-
 #define WORK_QUEUE_DEFAULT_PORT 9123 /**< Default Work Queue port number. */
 #define WORK_QUEUE_RANDOM_PORT -1    /**< Indicate to Work Queue to choose a random open port. */
 
-#define WORK_QUEUE_WAITFORTASK -1   /**< Wait for a task to complete before returning. */
-
-#define WORK_QUEUE_RETURN_STATUS_UNSET -1
+#define WORK_QUEUE_WAITFORTASK -1    /**< Wait for a task to complete before returning. */
 
 #define WORK_QUEUE_RESULT_UNSET 0
 #define WORK_QUEUE_RESULT_INPUT_FAIL 1
@@ -65,7 +51,7 @@ and should not be documented in the user-visible API.
 #define WORK_QUEUE_NOCACHE 0	/**< Do not cache file at execution site. */
 #define WORK_QUEUE_CACHE 1	/**< Cache file at execution site for later use. */
 #define WORK_QUEUE_SYMLINK 2	/**< Create a symlink to the file rather than copying it, if possible. */
-#define WORK_QUEUE_PREEXIST 4
+#define WORK_QUEUE_PREEXIST 4   /**< If the filename already exists on the host, use it in place. */
 #define WORK_QUEUE_THIRDGET 8	/**< Access the file on the client from a shared filesystem */
 #define WORK_QUEUE_THIRDPUT 8	/**< Access the file on the client from a shared filesystem (included for readability) */
 
@@ -74,10 +60,6 @@ and should not be documented in the user-visible API.
 
 #define WORK_QUEUE_WORKER_MODE_SHARED 0	    /**< Work Queue master accepts workers in shared or non-exclusive mode. */
 #define WORK_QUEUE_WORKER_MODE_EXCLUSIVE 1  /**< Work Queue master only accepts workers that have a preference for it. */
-
-#define WORK_QUEUE_FS_CMD 1
-#define WORK_QUEUE_FS_PATH 2
-#define WORK_QUEUE_FS_SYMLINK 3
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler;	/**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
@@ -322,8 +304,8 @@ int work_queue_specify_priority(struct work_queue *q, int priority);
 /** Specify the master mode for a given queue. 
 @param q A pointer to the queue to modify.
 @param mode 
-<b>mode == @ref WORK_QUEUE_MASTER_MODE_STANDALONE</b>: standalone mode. In this mode the master would not report its information to a catalog server; 
-<b>mode == @ref WORK_QUEUE_MASTER_MODE_CATALOG</b>: catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
+- @ref WORK_QUEUE_MASTER_MODE_STANDALONE - standalone mode. In this mode the master would not report its information to a catalog server; 
+- @ref WORK_QUEUE_MASTER_MODE_CATALOG - catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
 @return The mode that has been set.
 */
 int work_queue_specify_master_mode(struct work_queue *q, int mode);
@@ -331,8 +313,8 @@ int work_queue_specify_master_mode(struct work_queue *q, int mode);
 /** Specify the worker mode for a given queue. 
 @param q A pointer to the queue to modify.
 @param mode 
-<b>mode == @ref WORK_QUEUE_WORKER_MODE_SHARED</b>: shared mode. In this mode the master would accept connections from shared workers;
-<b>mode == @ref WORK_QUEUE_WORKER_MODE_EXCLUSIVE</b>: exclusive mode. In this mode the master would only accept workers that have specified a preference on it, which are the workers started with "-N name" where name is the name of the queue. 
+- @ref WORK_QUEUE_WORKER_MODE_SHARED - shared mode. In this mode the master would accept connections from shared workers;
+- @ref WORK_QUEUE_WORKER_MODE_EXCLUSIVE - exclusive mode. In this mode the master would only accept workers that have specified a preference on it, which are the workers started with "-N name" where name is the name of the queue. 
 @return The mode that has been set.
 */
 int work_queue_specify_worker_mode(struct work_queue *q, int mode);

@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "work_queue.h"
+#include "work_queue_protocol.h"
 
 #include "catalog_query.h"
 #include "catalog_server.h"

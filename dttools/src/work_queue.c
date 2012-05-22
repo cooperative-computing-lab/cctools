@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "work_queue.h"
+#include "work_queue_protocol.h"
 #include "work_queue_catalog.h"
 
 #include "int_sizes.h"
@@ -87,6 +88,10 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define WORK_QUEUE_CAPACITY_TOLERANCE_MAX 1000
 #define WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT 1
+
+#define WORK_QUEUE_SWITCH_UNSPECIFIED -1
+#define WORK_QUEUE_SWITCH_OFF 0
+#define WORK_QUEUE_SWITCH_ON  1
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
@@ -246,7 +251,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->output = NULL;
 	t->input_files = list_create();
 	t->output_files = list_create();
-	t->return_status = WORK_QUEUE_RETURN_STATUS_UNSET;
+	t->return_status = -1;
 	t->result = WORK_QUEUE_RESULT_UNSET;
 
 	t->time_task_submit = t->time_task_finish = 0;

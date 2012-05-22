@@ -8,6 +8,8 @@ See the file COPYING for details.
 #define WORK_QUEUE_CATALOG_H
 
 #include "work_queue.h"
+#include "work_queue_protocol.h"
+
 #include "catalog_query.h"
 #include "catalog_server.h"
 #include "datagram.h"
