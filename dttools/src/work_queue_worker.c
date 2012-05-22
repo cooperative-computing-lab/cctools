@@ -73,7 +73,7 @@ static UINT64_T disk_avail_threshold = 100;
 static int auto_worker = 0;
 static int exclusive_worker = 1;
 
-static const int non_preference_priority_max = WORK_QUEUE_MASTER_PRIORITY_MAX / 2;
+static const int non_preference_priority_max = 1000;
 
 static char *catalog_server_host = NULL;
 static int catalog_server_port = 0;

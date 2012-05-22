@@ -35,6 +35,7 @@ See the file COPYING for details.
 
 #define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 10
 #define	WORK_QUEUE_CATALOG_LIFETIME	60
+#define WORK_QUEUE_NAME_MAX 256
 
 struct work_queue_master {
 	char addr[LINK_ADDRESS_MAX];

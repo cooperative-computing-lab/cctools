@@ -19,16 +19,20 @@ and port of the master.
 
 #include "timestamp.h"
 
+/*
+These items are shared implementation details of the Work Queue protocol
+and should not be documented in the user-visible API.
+*/
+
+#define WORK_QUEUE_LINE_MAX 4096
+#define WORK_QUEUE_POOL_NAME_MAX 128
+
 #define WORK_QUEUE_SWITCH_UNSPECIFIED -1
 #define WORK_QUEUE_SWITCH_OFF 0
 #define WORK_QUEUE_SWITCH_ON  1
 
 #define WORK_QUEUE_DEFAULT_PORT 9123 /**< Default Work Queue port number. */
 #define WORK_QUEUE_RANDOM_PORT -1    /**< Indicate to Work Queue to choose a random open port. */
-
-#define WORK_QUEUE_LINE_MAX 4096	/**< LIne max between master and worker */
-
-#define WORK_QUEUE_POOL_NAME_MAX 100
 
 #define WORK_QUEUE_WAITFORTASK -1   /**< Wait for a task to complete before returning. */
 
@@ -67,19 +71,9 @@ and port of the master.
 
 #define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
 #define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
-#define WORK_QUEUE_NAME_MAX 256
-#define WORK_QUEUE_MASTER_PRIORITY_MAX 100
-#define WORK_QUEUE_MASTER_PRIORITY_DEFAULT 10
+
 #define WORK_QUEUE_WORKER_MODE_SHARED 0	    /**< Work Queue master accepts workers in shared or non-exclusive mode. */
 #define WORK_QUEUE_WORKER_MODE_EXCLUSIVE 1  /**< Work Queue master only accepts workers that have a preference for it. */
-
-#define WORK_QUEUE_WAIT_UNSPECIFIED -1
-#define WORK_QUEUE_WAIT_FCFS 0				/**< First come first serve. */
-#define WORK_QUEUE_WAIT_FAST_DISPATCH 1		/**< Dispatch task to new workers first. */
-#define WORK_QUEUE_WAIT_ADAPTIVE 2			/**< If master is busy, do not use new workers. */
-
-#define WORK_QUEUE_CAPACITY_TOLERANCE_MAX 1000
-#define WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT 1
 
 #define WORK_QUEUE_FS_CMD 1
 #define WORK_QUEUE_FS_PATH 2
@@ -99,7 +93,7 @@ struct work_queue_task {
 	struct list *output_files;	/**< The output files (other than the standard output stream) created by the program expected to be retrieved from the task. */
 	char *preferred_host;		/**< The hostname where the task should preferrentially be run. */
 	int taskid;			/**< A unique task id number. */
-	int status;	/**< Current status of the task. */
+	int status;			/**< Current status of the task. */
 	int return_status;		/**< The exit code of the command line. */
 	int result;			/**< The result of the task (successful, failed return_status, missing input file, missing output file). */
 	char *host;			/**< The name of the host on which it ran. */

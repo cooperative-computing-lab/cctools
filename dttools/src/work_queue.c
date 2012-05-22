@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "work_queue.h"
+#include "work_queue_catalog.h"
 
 #include "int_sizes.h"
 #include "link.h"
@@ -12,7 +13,6 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "catalog_query.h"
 #include "catalog_server.h"
-#include "work_queue_catalog.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
 #include "hash_table.h"
@@ -74,6 +74,19 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define POOL_DECISION_ENFORCEMENT_INTERVAL_DEFAULT 10
 
 #define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
+
+// FIXME: we only need one implementation of wait
+
+#define WORK_QUEUE_WAIT_UNSPECIFIED -1
+#define WORK_QUEUE_WAIT_FCFS 0				/**< First come first serve. */
+#define WORK_QUEUE_WAIT_FAST_DISPATCH 1		/**< Dispatch task to new workers first. */
+#define WORK_QUEUE_WAIT_ADAPTIVE 2			/**< If master is busy, do not use new workers. */
+
+#define WORK_QUEUE_MASTER_PRIORITY_MAX 100
+#define WORK_QUEUE_MASTER_PRIORITY_DEFAULT 10
+
+#define WORK_QUEUE_CAPACITY_TOLERANCE_MAX 1000
+#define WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT 1
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
