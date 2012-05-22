@@ -1933,7 +1933,7 @@ struct work_queue *work_queue_create(int port)
 
 	q->fast_abort_multiplier = wq_option_fast_abort_multiplier;
 	q->worker_selection_algorithm = wq_option_scheduler;
-	q->task_ordering = WORK_QUEUE_TASK_ORDER_DEFAULT;
+	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 
 	envstring = getenv("WORK_QUEUE_NAME");
 	if(envstring)
@@ -2086,15 +2086,15 @@ int work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance)
 	return q->capacity_tolerance;
 }
 
-int work_queue_specify_name(struct work_queue *q, const char *name)
+void work_queue_specify_name(struct work_queue *q, const char *name)
 {
-	if(q && name) {
-		if(q->name)
-			free(q->name);
+	if(q->name) free(q->name);
+	if(name) {
 		q->name = xxstrdup(name);
 		setenv("WORK_QUEUE_NAME", q->name, 1);
+	} else {
+		q->name = 0;
 	}
-	return 0;
 }
 
 const char *work_queue_name(struct work_queue *q)
@@ -2102,45 +2102,23 @@ const char *work_queue_name(struct work_queue *q)
 	return q->name;
 }
 
-int work_queue_specify_priority(struct work_queue *q, int priority)
+void work_queue_specify_priority(struct work_queue *q, int priority)
 {
-	if(priority > 0 && priority <= WORK_QUEUE_MASTER_PRIORITY_MAX) {
-		q->priority = priority;
-	} else {
-		q->priority = WORK_QUEUE_MASTER_PRIORITY_DEFAULT;
-	}
-	return q->priority;
+	q->priority = priority;
 }
 
-int work_queue_specify_master_mode(struct work_queue *q, int mode)
+void work_queue_specify_master_mode(struct work_queue *q, int mode)
 {
-	switch (mode) {
-	case WORK_QUEUE_MASTER_MODE_CATALOG:
-		/* Set the catalog host and port */
+	q->master_mode = mode;
+	if(mode==WORK_QUEUE_MASTER_MODE_CATALOG) {
 		strncpy(q->catalog_host, CATALOG_HOST, DOMAIN_NAME_MAX);
 		q->catalog_port = CATALOG_PORT;
-		/* Fall through to set mode */
-	case WORK_QUEUE_MASTER_MODE_STANDALONE:
-		q->master_mode = mode;
-		break;
-	default:
-		q->master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	}
-
-	return q->master_mode;
 }
 
-int work_queue_specify_worker_mode(struct work_queue *q, int mode)
+void work_queue_specify_worker_mode(struct work_queue *q, int mode)
 {
-	switch (mode) {
-	case WORK_QUEUE_WORKER_MODE_EXCLUSIVE:
-	case WORK_QUEUE_WORKER_MODE_SHARED:
-		q->worker_mode = mode;
-		break;
-	default:
-		q->worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
-	}
-	return q->worker_mode;
+	q->worker_mode = mode;
 }
 
 void work_queue_delete(struct work_queue *q)
@@ -2633,57 +2611,42 @@ void work_queue_task_specify_file_command(struct work_queue_task *t, const char 
 
 void work_queue_task_specify_output_file(struct work_queue_task *t, const char *rname, const char *fname)
 {
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
+	work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
 }
 
 void work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname)
 {
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+	work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 }
 
 void work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf, int length, const char *rname)
 {
-	return work_queue_task_specify_buffer(t, buf, length, rname, WORK_QUEUE_NOCACHE);
+	work_queue_task_specify_buffer(t, buf, length, rname, WORK_QUEUE_NOCACHE);
 }
 
 void work_queue_task_specify_input_file(struct work_queue_task *t, const char *fname, const char *rname)
 {
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+	work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 }
 
 void work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, const char *fname, const char *rname)
 {
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
+	work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
 }
 
-int work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
+void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
 {
-	if(t && alg >= WORK_QUEUE_SCHEDULE_UNSET && alg <= WORK_QUEUE_SCHEDULE_MAX) {
-		t->worker_selection_algorithm = alg;
-		return 0;
-	} else {
-		return 1;
-	}
+	t->worker_selection_algorithm = alg;
 }
 
-int work_queue_specify_algorithm(struct work_queue *q, int alg)
+void work_queue_specify_algorithm(struct work_queue *q, int alg)
 {
-	if(q && alg > WORK_QUEUE_SCHEDULE_UNSET && alg <= WORK_QUEUE_SCHEDULE_MAX) {
-		q->worker_selection_algorithm = alg;
-		return 0;
-	} else {
-		return 1;
-	}
+	q->worker_selection_algorithm = alg;
 }
 
-int work_queue_specify_task_order(struct work_queue *q, int order)
+void work_queue_specify_task_order(struct work_queue *q, int order)
 {
-	if(q && order >= WORK_QUEUE_TASK_ORDER_FIFO && order <= WORK_QUEUE_TASK_ORDER_LIFO) {
-		q->task_ordering = order;
-		return 0;
-	} else {
-		return 1;
-	}
+	q->task_ordering = order;
 }
 
 static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)

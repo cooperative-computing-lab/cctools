@@ -43,7 +43,6 @@ and port of the master.
 
 #define WORK_QUEUE_TASK_ORDER_FIFO 0  /**< Retrieve tasks based on first-in-first-out order. */
 #define WORK_QUEUE_TASK_ORDER_LIFO 1  /**< Retrieve tasks based on last-in-first-out order. */
-#define WORK_QUEUE_TASK_ORDER_DEFAULT 0  /**< Default task ordering (@ref WORK_QUEUE_TASK_ORDER_FIFO). */
  
 #define WORK_QUEUE_INPUT  0	/**< Specify an input object. */
 #define WORK_QUEUE_OUTPUT 1	/**< Specify an output object. */
@@ -182,7 +181,7 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag);
 @param t The task to which to add parameters
 @param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
 */
-int work_queue_task_specify_algorithm(struct work_queue_task *t, int alg);
+void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg);
 
 /** Indicate that the task would be optimally run on a given host.
 @param t The task to which to add parameters
@@ -280,44 +279,41 @@ int work_queue_activate_fast_abort(struct work_queue *q, double multiplier);
 @param q A pointer to the queue to modify.
 @param alg The algorithm to use in assigning a task to a worker. Valid possibilities are defined in this file as "WORK_QUEUE_SCHEDULE_X" values.
 */
-int work_queue_specify_algorithm(struct work_queue *q, int alg);
+void work_queue_specify_algorithm(struct work_queue *q, int alg);
 
 /** Specify how the submitted tasks should be ordered. Either as FIFO or LIFO.
 @param q A pointer to the queue to modify.
 @param order The ordering to use for dispatching submitted tasks. Valid possibilities are defined in this file as "WORK_QUEUE_TASK_ORDER_X" values.
 */
-int work_queue_specify_task_order(struct work_queue *q, int order);
+void work_queue_specify_task_order(struct work_queue *q, int order);
 
 /** Change the project name for a given queue.
 @param q A pointer to the queue to modify.
 @param name The new project name.
 */
-int work_queue_specify_name(struct work_queue *q, const char *name);
+void work_queue_specify_name(struct work_queue *q, const char *name);
 
 /** Change the priority for a given queue.
 @param q A pointer to the queue to modify.
 @param priority An integer that presents the priorty of this work queue master. The higher the value, the higher the priority.
-@return The priority that has been set.
 */
-int work_queue_specify_priority(struct work_queue *q, int priority);
+void work_queue_specify_priority(struct work_queue *q, int priority);
 
 /** Specify the master mode for a given queue. 
 @param q A pointer to the queue to modify.
 @param mode 
 - @ref WORK_QUEUE_MASTER_MODE_STANDALONE - standalone mode. In this mode the master would not report its information to a catalog server; 
 - @ref WORK_QUEUE_MASTER_MODE_CATALOG - catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
-@return The mode that has been set.
 */
-int work_queue_specify_master_mode(struct work_queue *q, int mode);
+void work_queue_specify_master_mode(struct work_queue *q, int mode);
 
 /** Specify the worker mode for a given queue. 
 @param q A pointer to the queue to modify.
 @param mode 
 - @ref WORK_QUEUE_WORKER_MODE_SHARED - shared mode. In this mode the master would accept connections from shared workers;
 - @ref WORK_QUEUE_WORKER_MODE_EXCLUSIVE - exclusive mode. In this mode the master would only accept workers that have specified a preference on it, which are the workers started with "-N name" where name is the name of the queue. 
-@return The mode that has been set.
 */
-int work_queue_specify_worker_mode(struct work_queue *q, int mode);
+void work_queue_specify_worker_mode(struct work_queue *q, int mode);
 
 /** Cancel a submitted task using its task id and remove it from queue.
 @param q A pointer to the queue to modify.
