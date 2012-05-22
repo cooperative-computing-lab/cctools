@@ -1429,7 +1429,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	fprintf(stdout, " -e             Set the work queue master to only accept workers that have the same -N <project> option.\n");
 	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capacity may be viewed in the work queue log file or through the  work_queue_status command.\n");
-	fprintf(stdout, " -M             Enable automatic excessive worker removal in Work Queue. (-E option will be automatically added when this option is given.)\n");
 	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	fprintf(stdout, " -I             Show input files.\n");
 	fprintf(stdout, " -O             Show output files.\n");
@@ -1468,7 +1467,6 @@ int main(int argc, char *argv[])
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 	int work_queue_estimate_capacity_on = 0;
-	int work_queue_auto_remove_workers_on = 0;
 	char *catalog_host;
 	int catalog_port;
 	int port_set = 0;
@@ -1504,9 +1502,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'E':
 			work_queue_estimate_capacity_on = 1;
-			break;
-		case 'M':
-			work_queue_auto_remove_workers_on = 1;
 			break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
@@ -1649,12 +1644,6 @@ int main(int argc, char *argv[])
 
 		if(work_queue_estimate_capacity_on) {
 			setenv("WORK_QUEUE_ESTIMATE_CAPACITY_ON","1",1);
-			free(value);
-		}
-
-		if(work_queue_auto_remove_workers_on) {
-			setenv("WORK_QUEUE_AUTO_REMOVE_WORKERS_ON","1", 1);
-			free(value);
 		}
 
 		if(port_set) {
