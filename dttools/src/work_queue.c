@@ -203,7 +203,7 @@ static int get_num_of_effective_workers(struct work_queue *q);
 static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, INT64_T length);
 static double get_idle_percentage(struct work_queue *q);
 
-void receive_pending_output(struct work_queue *q, struct pending_output *p);
+static void receive_pending_output(struct work_queue *q, struct pending_output *p);
 static int receive_output_from_worker(struct work_queue *q, struct work_queue_worker *w);
 
 static struct task_statistics *task_statistics_init();
@@ -211,12 +211,11 @@ static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t d
 static void add_task_report(struct work_queue *q, struct work_queue_task *t);
 
 static int remove_workers_base_on_capacity(struct work_queue *q);
-int work_queue_shut_down_workers(struct work_queue *q, int n);
 
-int work_queue_specify_estimate_capacity_on(struct work_queue *q, int value);
-int work_queue_specify_wait_routine(struct work_queue *q, int routine);
-int work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance);
-int work_queue_specify_auto_remove_workers_on(struct work_queue *q, int value);
+static int work_queue_specify_estimate_capacity_on(struct work_queue *q, int value);
+static int work_queue_specify_wait_routine(struct work_queue *q, int routine);
+static int work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance);
+static int work_queue_specify_auto_remove_workers_on(struct work_queue *q, int value);
 
 static void update_catalog(struct work_queue *q, int now);
 static void enforce_pool_decisions(struct work_queue *q);
@@ -626,7 +625,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
  * Comparison function for sorting by file/dir names in the output files list
  * of a task
  */
-int filename_comparator(const void *a, const void *b)
+static int filename_comparator(const void *a, const void *b)
 {
 	int rv;
 	rv = strcmp(*(char *const *) a, *(char *const *) b);
@@ -1212,7 +1211,7 @@ static int put_file(struct work_queue_file *tf, const char *expanded_payload, st
  *	for any of the environment variables, it will return the input string
  *	as is.
  * 	*/
-char *expand_envnames(struct work_queue_worker *w, const char *payload)
+static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 {
 	char *expanded_name;
 	char *str, *curr_pos;
@@ -1620,7 +1619,7 @@ static int remove_workers_base_on_capacity(struct work_queue *q)
 	return workers_removed;
 }
 
-struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)
+static struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
 	struct work_queue_worker *w;
@@ -1657,7 +1656,7 @@ struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work
 	return best_worker;
 }
 
-struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q)
+static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q)
 {
 	char *key;
 	struct work_queue_worker *w;
@@ -1672,7 +1671,7 @@ struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q)
 	return best_worker;
 }
 
-struct work_queue_worker *find_worker_by_random(struct work_queue *q)
+static struct work_queue_worker *find_worker_by_random(struct work_queue *q)
 {
 	char *key;
 	struct work_queue_worker *w;
@@ -1703,7 +1702,7 @@ struct work_queue_worker *find_worker_by_random(struct work_queue *q)
 	return best_worker;
 }
 
-struct work_queue_worker *find_worker_by_time(struct work_queue *q)
+static struct work_queue_worker *find_worker_by_time(struct work_queue *q)
 {
 	char *key;
 	struct work_queue_worker *w;
@@ -1731,7 +1730,7 @@ struct work_queue_worker *find_worker_by_time(struct work_queue *q)
 }
 
 // use task-specific algorithm if set, otherwise default to the queue's setting.
-struct work_queue_worker *find_best_worker(struct work_queue *q, struct work_queue_task *t)
+static struct work_queue_worker *find_best_worker(struct work_queue *q, struct work_queue_task *t)
 {
 	int a = t->worker_selection_algorithm;
 
@@ -1827,7 +1826,7 @@ int work_queue_activate_fast_abort(struct work_queue *q, double multiplier)
 	}
 }
 
-void abort_slow_workers(struct work_queue *q)
+static void abort_slow_workers(struct work_queue *q)
 {
 	struct work_queue_worker *w;
 	char *key;
@@ -2194,7 +2193,7 @@ static int add_more_workers(struct work_queue *q, time_t stoptime)
 	return count;
 }
 
-int master_poll(struct work_queue *q, struct link_info *links, int nlinks, int msec)
+static int master_poll(struct work_queue *q, struct link_info *links, int nlinks, int msec)
 {
 	timestamp_t idle_start;
 	int result;
@@ -2511,7 +2510,7 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return result;
 }
 
-void receive_pending_output(struct work_queue *q, struct pending_output *p)
+static void receive_pending_output(struct work_queue *q, struct pending_output *p)
 {
 	struct work_queue_worker *w;
 	char key[WORK_QUEUE_LINE_MAX];
@@ -2701,7 +2700,7 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 }
 
 //comparator function for checking if a task matches given taskid.
-int taskid_comparator(void *t, const void *r) {
+static int taskid_comparator(void *t, const void *r) {
 
 	struct work_queue_task *task_in_queue = t;
 	const int *taskid = r;
@@ -2713,7 +2712,7 @@ int taskid_comparator(void *t, const void *r) {
 }
 
 //comparator function for checking if a task matches given tag.
-int tasktag_comparator(void *t, const void *r) {
+static int tasktag_comparator(void *t, const void *r) {
 
 	struct work_queue_task *task_in_queue = t;
 	const char *tasktag = r;
@@ -2724,7 +2723,7 @@ int tasktag_comparator(void *t, const void *r) {
 	return 0;
 }
 
-int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
+static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
 
 	struct work_queue_worker *w;
 	w = itable_lookup(q->running_tasks, t->taskid);
@@ -2749,7 +2748,7 @@ int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
 	return 0;
 }
 
-struct work_queue_task *find_running_task_by_id(struct itable *itbl, int taskid) {
+static struct work_queue_task *find_running_task_by_id(struct itable *itbl, int taskid) {
 	
 	struct work_queue_worker *w;
 	struct work_queue_task *t;
@@ -2765,7 +2764,7 @@ struct work_queue_task *find_running_task_by_id(struct itable *itbl, int taskid)
 	return NULL;
 }
 
-struct work_queue_task *find_running_task_by_tag(struct itable *itbl, const char *tasktag) {
+static struct work_queue_task *find_running_task_by_tag(struct itable *itbl, const char *tasktag) {
 	
 	struct work_queue_worker *w;
 	struct work_queue_task *t;
