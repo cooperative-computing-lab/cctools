@@ -78,8 +78,6 @@ and port of the master.
 #define WORK_QUEUE_WAIT_FAST_DISPATCH 1		/**< Dispatch task to new workers first. */
 #define WORK_QUEUE_WAIT_ADAPTIVE 2			/**< If master is busy, do not use new workers. */
 
-#define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
-
 #define WORK_QUEUE_CAPACITY_TOLERANCE_MAX 1000
 #define WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT 1
 

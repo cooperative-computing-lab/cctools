@@ -73,6 +73,8 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define POOL_DECISION_ENFORCEMENT_INTERVAL_DEFAULT 10
 
+#define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
+
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
 int wq_tolerable_transfer_time_multiplier = 10;
