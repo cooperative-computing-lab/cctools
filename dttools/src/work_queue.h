@@ -97,7 +97,6 @@ struct work_queue_stats {
 	int workers_init;		/**< Number of workers initializing. */
 	int workers_ready;		/**< Number of workers ready for tasks. */
 	int workers_busy;		/**< Number of workers running tasks. */
-	char *workers_by_pool;	/**< Number of workers from each pool. Note that this is dynamically allocated memory*/
 	int tasks_running;		/**< Number of tasks currently running. */
 	int tasks_waiting;		/**< Number of tasks waiting for a CPU. */
 	int tasks_complete;		/**< Number of tasks waiting to be returned to user. */
@@ -105,11 +104,11 @@ struct work_queue_stats {
 	int total_tasks_complete;	/**< Total number of tasks returned complete. */
 	int total_workers_joined;	/**< Total number of times a worker joined the queue. */
 	int total_workers_removed;	/**< Total number of times a worker was removed from the queue. */
-	INT64_T total_bytes_sent;   /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
+	INT64_T total_bytes_sent;	/**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
 	INT64_T total_bytes_received;	/**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
-	timestamp_t start_time;     /**<The time at which the master started. */
-	timestamp_t total_send_time;/**<Total time in microseconds spent in sending data to workers. */
-	timestamp_t total_receive_time;	/**<Total time in microseconds spent in receiving data from workers. */
+	timestamp_t start_time;		/**< Absolute time at which the master started. */
+	timestamp_t total_send_time;	/**< Total time in microseconds spent in sending data to workers. */
+	timestamp_t total_receive_time;	/**< Total time in microseconds spent in receiving data from workers. */
 	double efficiency;
 	double idle_percentage;
 	int capacity;
@@ -271,16 +270,18 @@ int work_queue_port(struct work_queue *q);
 const char *work_queue_name(struct work_queue *q);
 
 /** Get queue statistics.
-After using the buffer, the user must call @ref work_queue_free_stats to release the memory.
 @param q A work queue object.
 @param s A pointer to a buffer that will be filed with statistics.
 */
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s);
 
-/** Free dynamically allocated memory in queue statistics.
-@param s A pointer to a buffer that contains queue statistics.
+/** Summarize workers.
+This function summarizes the workers currently connected to the master,
+indicating how many from each worker pool are attached.
+@param q A work queue object.
+@return A newly allocated string describing the distribution of workers by pool.  The caller must release this string via free().
 */
-void work_queue_free_stats(struct work_queue_stats *s);
+char * work_queue_get_worker_summary( struct work_queue *q );
 
 /** Turn on or off fast abort functionality for a given queue.
 @param q A work queue object.
@@ -415,5 +416,6 @@ void work_queue_task_specify_output_file(struct work_queue_task *t, const char *
 void work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname);
 
 //@}
+
 
 #endif

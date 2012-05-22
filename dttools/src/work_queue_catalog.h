@@ -94,7 +94,7 @@ void free_work_queue_master_list(struct list *ml);
 
 struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port, struct list *regex_list);
 
-int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, int now);
+int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, const char *workers_summary, int now);
 
 int get_pool_decisions_from_catalog(const char *catalog_host, int catalog_port, const char *proj, struct list *decisions);
 

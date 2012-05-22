@@ -25,6 +25,7 @@ See the file COPYING for details.
 #include "create_dir.h"
 #include "xxmalloc.h"
 #include "load_average.h"
+#include "buffer.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -334,59 +335,25 @@ static double get_idle_percentage(struct work_queue *q)
 	return (long double) (q->accumulated_idle_time + q->idle_time) / (timestamp_get() - accumulated_idle_start);
 }
 
-static char *get_workers_by_pool_string(struct work_queue *q) {
-	char *string;
-	const int increment = 1024;
-	int length = increment;
 
-	if(!(string = (char *)malloc(length * sizeof(char)))) {
-		fprintf(stderr, "Writing 'workers by pool' information to string failed: %s", strerror(errno));
-		return NULL;
-	}
-
-	int i = 0;
+char * work_queue_get_worker_summary( struct work_queue *q )
+{
 	char *key;
 	struct pool_info *pi;
 
+	struct buffer_t *b = buffer_create();
+
 	hash_table_firstkey(q->workers_by_pool);
 	while(hash_table_nextkey(q->workers_by_pool, &key, (void **) &pi)) {
-		int n, size;
-retry:
-		size = length - i;
-		n = snprintf(string + i, size, "%s:%d,", pi->name, pi->count);
-
-		if(n <= 0) {
-			fprintf(stderr, "Failed to record worker_by_pool item: %s:%d\n", pi->name, pi->count);
-			continue;
-		}
-
-		if(n >= size) {
-			length += increment;
-
-			char *old_string = string;
-			if(!(string = (char *)realloc(string, length * sizeof(char)))) {
-				fprintf(stderr, "Realloc memory for 'workers_by_pool' string failed: %s", strerror(errno));
-				free(old_string);
-				return NULL;
-			}
-			goto retry;
-		}
-
-		i += n;
+		buffer_printf(b,"%s:%d ",pi->name,pi->count);
 	}
 
-	if(i > 0) {
-		*(string + i -1) = '\0';
-	} else {
-		strncpy(string, "n/a", 4); 
-	}
+	size_t length;
+	char * result = strdup(buffer_tostring(b,&length));
 
-	return string;
-}
+	buffer_delete(b);
 
-void work_queue_free_stats(struct work_queue_stats *s) {
-	// free dynamically allocated memory in work_queue_status
-	free(s->workers_by_pool);
+	return result;
 }
 
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
@@ -400,7 +367,6 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->workers_init = q->workers_in_state[WORKER_STATE_INIT];
 	s->workers_ready = q->workers_in_state[WORKER_STATE_READY];
 	s->workers_busy = q->workers_in_state[WORKER_STATE_BUSY];
-	s->workers_by_pool = get_workers_by_pool_string(q);
 
 	s->tasks_waiting = list_size(q->ready_list);
 	s->tasks_running = itable_size(q->running_tasks);
@@ -2869,10 +2835,11 @@ static void update_catalog(struct work_queue *q, int now)
 {
 	struct work_queue_stats s;
 	work_queue_get_stats(q, &s);
-	if(!advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, now)) {
+	char * worker_summary = work_queue_get_worker_summary(q);
+	if(!advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, worker_summary, now)) {
 		fprintf(stderr, "Reporting master status to the catalog server (%s@%d) failed!\n", q->catalog_host, q->catalog_port);
 	}
-	work_queue_free_stats(&s);
+	free(worker_summary);
 }
 
 static int release_worker(struct work_queue *q, struct work_queue_worker *w)
