@@ -69,7 +69,6 @@ struct work_queue_task {
 	struct list *input_files;	/**< The files to transfer to the worker and place in the executing directory. */
 	struct list *output_files;	/**< The output files (other than the standard output stream) created by the program expected to be retrieved from the task. */
 	int taskid;			/**< A unique task id number. */
-	int status;			/**< Current status of the task. */
 	int return_status;		/**< The exit code of the command line. */
 	int result;			/**< The result of the task (successful, failed return_status, missing input file, missing output file). */
 	char *host;			/**< The name of the host on which it ran. */

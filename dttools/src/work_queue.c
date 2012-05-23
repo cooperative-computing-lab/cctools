@@ -58,14 +58,6 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORK_QUEUE_BUFFER 1
 #define WORK_QUEUE_REMOTECMD 2
 
-#define TASK_STATUS_INITIALIZING 0
-#define TASK_STATUS_SENDING_INPUT 1
-#define TASK_STATUS_EXECUTING 2
-#define TASK_STATUS_WAITING_FOR_OUTPUT 3
-#define TASK_STATUS_RECEIVING_OUTPUT 4
-#define TASK_STATUS_COMPLETE 5
-#define TASK_STATUS_CANCELLED 6
-
 #define MIN_TIME_LIST_SIZE 20
 
 #define TIME_SLOT_TASK_TRANSFER 0
@@ -103,7 +95,6 @@ struct work_queue {
 
 	struct itable *running_tasks;
 
-	struct list *receive_output_waiting_list;
 	struct hash_table *worker_table;
 	struct link_info *poll_table;
 	int poll_table_size;
@@ -232,7 +223,6 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->output_files = list_create();
 	t->return_status = -1;
 	t->result = WORK_QUEUE_RESULT_UNSET;
-	t->status = TASK_STATUS_INITIALIZING;
 	return t;
 }
 
@@ -427,7 +417,6 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	if(t) {
 		if(t->result & WORK_QUEUE_RESULT_INPUT_MISSING || t->result & WORK_QUEUE_RESULT_OUTPUT_MISSING || t->result & WORK_QUEUE_RESULT_FUNCTION_FAIL) {
 			list_push_head(q->complete_list, w->current_task);
-			t->status = TASK_STATUS_COMPLETE;
 		} else {
 			t->result = WORK_QUEUE_RESULT_UNSET;
 			t->total_bytes_transferred = 0;
@@ -611,7 +600,6 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 	timestamp_t sum_time;
 
 	// Start transfer ...
-	t->status = TASK_STATUS_RECEIVING_OUTPUT;
 	received_items = hash_table_create(0, 0);
 
 	//  Sorting list will make sure that upper level dirs sit before their
@@ -908,7 +896,6 @@ static int handle_worker(struct work_queue *q, struct link *l)
 			t->time_execute_cmd_finish = t->time_execute_cmd_start + t->cmd_execution_time;
 			q->total_execute_time += t->cmd_execution_time;
 
-			t->status = TASK_STATUS_WAITING_FOR_OUTPUT;
 			// Receive output immediately and start a new task on the this worker if available
 			if(receive_output_from_worker(q, w)) {
 				start_task_on_worker(q, w);
@@ -957,7 +944,6 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 	// At this point, a task is completed.
 	itable_remove(q->running_tasks, t->taskid);
 	list_push_head(q->complete_list, w->current_task);
-	t->status = TASK_STATUS_COMPLETE;
 	w->current_task = 0;
 	t->time_task_finish = timestamp_get();
 
@@ -1217,7 +1203,6 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 	time_t stoptime;
 	struct stat s;
 	char *expanded_payload = NULL;
-	t->status = TASK_STATUS_SENDING_INPUT;
 
 	// Check input existence
 	if(t->input_files) {
@@ -1333,7 +1318,6 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 	//communicate with the master during task execution):
 	//link_putfstring(w->link, "work %zu\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
 	link_putfstring(w->link, "work %zu fork\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
-	t->status = TASK_STATUS_EXECUTING;
 	debug(D_WQ, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
 	return 1;
 }
@@ -1672,7 +1656,7 @@ static void abort_slow_workers(struct work_queue *q)
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->state == WORKER_STATE_BUSY && w->current_task->status == TASK_STATUS_EXECUTING) {
+		if(w->state == WORKER_STATE_BUSY) {
 			timestamp_t runtime = current - w->current_task->time_send_input_start;
 			if(runtime > (average_task_time * multiplier)) {
 				debug(D_NOTICE, "%s (%s) has run too long: %.02lf s (average is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
@@ -1732,7 +1716,6 @@ struct work_queue *work_queue_create(int port)
 
 	q->running_tasks = itable_create(0);
 
-	q->receive_output_waiting_list = list_create();
 	q->worker_table = hash_table_create(0, 0);
 
 	// The poll table is initially null, and will be created
@@ -2240,7 +2223,6 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 		link_putliteral(w->link, "kill\n", time(0) + short_timeout);
 		//update table and state.
 		itable_remove(q->running_tasks, t->taskid);
-		t->status = TASK_STATUS_CANCELLED;
 
 		if (t->tag)
 			debug(D_WQ, "Task with tag %s and id %d is aborted at worker %s (%s) and removed.", t->tag, t->taskid, w->hostname, w->addrport);
