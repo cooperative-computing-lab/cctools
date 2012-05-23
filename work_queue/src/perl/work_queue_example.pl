@@ -1,7 +1,22 @@
 #!/usr/bin/perl 
 
-use strict;
 use work_queue;
+
+#create aliases to variables & functions in work_queue module
+*work_queue_create=*work_queue::work_queue_create;
+*work_queue_port=*work_queue::work_queue_port;
+*work_queue_task_create=*work_queue::work_queue_task_create;
+*work_queue_task_specify_file=*work_queue::work_queue_task_specify_file;
+*work_queue_submit=*work_queue::work_queue_submit;
+*work_queue_wait=*work_queue::work_queue_wait;
+*work_queue_empty=*work_queue::work_queue_empty;
+*work_queue_task_delete=*work_queue::work_queue_task_delete;
+*work_queue_delete=*work_queue::work_queue_delete;
+*WORK_QUEUE_DEFAULT_PORT=*work_queue::WORK_QUEUE_DEFAULT_PORT;
+*WORK_QUEUE_INPUT=*work_queue::WORK_QUEUE_INPUT;
+*WORK_QUEUE_OUTPUT=*work_queue::WORK_QUEUE_OUTPUT;
+*WORK_QUEUE_CACHE=*work_queue::WORK_QUEUE_CACHE;
+*WORK_QUEUE_NOCACHE=*work_queue::WORK_QUEUE_NOCACHE;
 
 if ($#ARGV < 0) {
 	print "work_queue_example <file1> [file2] [file3] ...\n";
@@ -9,13 +24,13 @@ if ($#ARGV < 0) {
 	exit 1;
 }
 
-my $wq = work_queue::work_queue_create($work_queue::WORK_QUEUE_DEFAULT_PORT);
-if (not defined($wq)) {
+my $q = work_queue_create($WORK_QUEUE_DEFAULT_PORT);
+if (not defined($q)) {
 	print "Instantiation of Work Queue failed!\n";
 	exit 1;
 }
 
-my $port = work_queue::work_queue_port($wq);
+my $port = work_queue_port($q);
 print "listening on port $port...\n"; 
 
 for (my $i = 0; $i <= $#ARGV; $i++) {
@@ -23,25 +38,28 @@ for (my $i = 0; $i <= $#ARGV; $i++) {
 	my $outfile = $ARGV[$i] . ".gz";
 	my $command = "/usr/bin/gzip < $infile > $outfile";
 
-    my $task = work_queue::work_queue_task_create($command);
+    my $t = work_queue_task_create($command);
 
-    work_queue::work_queue_task_specify_file($task, $infile, $infile, $work_queue::WORK_QUEUE_INPUT, $work_queue::WORK_QUEUE_CACHE);
-    work_queue::work_queue_task_specify_file($task, $outfile, $outfile, $work_queue::WORK_QUEUE_OUTPUT, $work_queue::WORK_QUEUE_CACHE);
+    work_queue_task_specify_file($t, $infile, $infile, $WORK_QUEUE_INPUT, $WORK_QUEUE_CACHE);
+    work_queue_task_specify_file($t, $outfile, $outfile, $WORK_QUEUE_OUTPUT, $WORK_QUEUE_CACHE);
 
-    work_queue::work_queue_submit($wq, $task);
-    print "submitted task (id# $task->{taskid}): $task->{command_line}\n";
+    my $taskid = work_queue_submit($q, $t);
+    print "submitted task (id# $t->{taskid}): $t->{command_line}\n";
 }
 
 print "waiting for tasks to complete...\n";
 
-while (not work_queue::work_queue_empty($wq)) {
-    my $task = work_queue::work_queue_wait($wq, 5);
+while (not work_queue_empty($q)) {
+    my $t = work_queue_wait($q, 5);
 
-    if (defined($task)) {
-		print "task (id# $task->{taskid}) complete: $task->{command_line} (return code $task->{return_status})\n";
-    }
+    if (defined($t)) {
+		print "task (id# $t->{taskid}) complete: $t->{command_line} (return code $t->{return_status})\n";
+		work_queue_task_delete($t);
+	}
 }
 
 print "all tasks complete!\n";
+
+work_queue_delete($q);
 
 exit 0;
