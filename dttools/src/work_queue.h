@@ -96,6 +96,7 @@ struct work_queue_stats {
 	int workers_init;		/**< Number of workers initializing. */
 	int workers_ready;		/**< Number of workers ready for tasks. */
 	int workers_busy;		/**< Number of workers running tasks. */
+	int workers_cancelling;	/**< Number of workers aborting their tasks. */
 	int tasks_running;		/**< Number of tasks currently running. */
 	int tasks_waiting;		/**< Number of tasks waiting for a CPU. */
 	int tasks_complete;		/**< Number of tasks waiting to be returned to user. */

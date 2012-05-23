@@ -50,7 +50,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_STATE_INIT 		0
 #define WORKER_STATE_READY 		1
 #define WORKER_STATE_BUSY 		2
-#define WORKER_STATE_CANCELLED 	3
+#define WORKER_STATE_CANCELLING	3
 #define WORKER_STATE_NONE 		4
 #define WORKER_STATE_MAX 		(WORKER_STATE_NONE+1)
 
@@ -324,6 +324,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->workers_init = q->workers_in_state[WORKER_STATE_INIT];
 	s->workers_ready = q->workers_in_state[WORKER_STATE_READY];
 	s->workers_busy = q->workers_in_state[WORKER_STATE_BUSY];
+	s->workers_cancelling = q->workers_in_state[WORKER_STATE_CANCELLING];
 
 	s->tasks_waiting = list_size(q->ready_list);
 	s->tasks_running = itable_size(q->running_tasks);
@@ -846,8 +847,9 @@ static int handle_worker(struct work_queue *q, struct link *l)
 			int actual;
 			timestamp_t observed_execution_time;
 
-			//if worker's task was cancelled, bypass retrieval of output & accounting.		
-			if (w->state == WORKER_STATE_CANCELLED) {
+			//worker finished cancelling its task. Skip task output retrieval 
+			//and a start new task.		
+			if (w->state == WORKER_STATE_CANCELLING) {
 				debug(D_WQ, "Worker %s (%s) that ran cancelled task is now available.", w->hostname, w->addrport);
 				change_worker_state(q, w, WORKER_STATE_READY);
 				start_task_on_worker(q, w);
@@ -1314,7 +1316,7 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 
 static int get_num_of_effective_workers(struct work_queue *q)
 {
-	return q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_READY];
+	return q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_READY] + q->workers_in_state[WORKER_STATE_CANCELLING];
 }
 
 static struct task_statistics *task_statistics_init()
@@ -2018,15 +2020,16 @@ int work_queue_hungry(struct work_queue *q)
 	if(q->total_tasks_submitted < 100)
 		return (100 - q->total_tasks_submitted);
 
-	int i, j, workers_init, workers_ready, workers_busy;
+	int i, j, workers_init, workers_ready, workers_busy, workers_cancelling;
 	workers_init = q->workers_in_state[WORKER_STATE_INIT];
 	workers_ready = q->workers_in_state[WORKER_STATE_READY];
 	workers_busy = q->workers_in_state[WORKER_STATE_BUSY];
+	workers_cancelling = q->workers_in_state[WORKER_STATE_CANCELLING];
 
 	//i = 1.1 * number of current workers
 	//j = # of queued tasks.
 	//i-j = # of tasks to queue to re-reach the status quo.
-	i = (1.1 * (workers_init + workers_ready + workers_busy));
+	i = (1.1 * (workers_init + workers_ready + workers_busy + workers_cancelling));
 	j = list_size(q->ready_list);
 	return MAX(i - j, 0);
 }
@@ -2188,7 +2191,7 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 	if (w) {
 		//send message to worker asking to kill its task.
 		link_putliteral(w->link, "kill\n", time(0) + short_timeout);
-		//update table and state.
+		//update table.
 		itable_remove(q->running_tasks, t->taskid);
 
 		if (t->tag)
@@ -2197,7 +2200,7 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 			debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
 			
 		delete_cancel_task_files(t, w); //delete files associated with cancelled task.
-		change_worker_state(q, w, WORKER_STATE_CANCELLED);
+		change_worker_state(q, w, WORKER_STATE_CANCELLING);
 		return 1;
 	} 
 	
