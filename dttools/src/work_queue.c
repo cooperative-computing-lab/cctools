@@ -850,6 +850,13 @@ static int handle_worker(struct work_queue *q, struct link *l)
 			//worker finished cancelling its task. Skip task output retrieval 
 			//and a start new task.		
 			if (w->state == WORKER_STATE_CANCELLING) {
+				//worker sends output after result message. Quietly discard it.
+				char *tmp = malloc(output_length + 1);
+				if(output_length > 0) {
+					stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T) output_length);
+					actual = link_read(l, tmp, output_length, stoptime);
+				} 
+				free(tmp);
 				debug(D_WQ, "Worker %s (%s) that ran cancelled task is now available.", w->hostname, w->addrport);
 				change_worker_state(q, w, WORKER_STATE_READY);
 				start_task_on_worker(q, w);
