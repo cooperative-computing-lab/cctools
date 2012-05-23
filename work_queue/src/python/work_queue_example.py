@@ -22,12 +22,12 @@ if len(sys.argv) < 2:
     sys.exit(1)
 
 try:
-    wq = WorkQueue(port)
+    q = WorkQueue(port)
 except:
     print "Instantiation of Work Queue failed!" 
     sys.exit(1)
 
-print "listening on port %d..." % wq.port
+print "listening on port %d..." % q.port
 
 for i in range(1, len(sys.argv)):
     infile = "%s" % sys.argv[i] 
@@ -38,14 +38,14 @@ for i in range(1, len(sys.argv)):
     
     t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=True)
     t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=True)
-    taskid = wq.submit(t)
+    taskid = q.submit(t)
 
     print "submitted task (id# %d): %s" % (taskid, t.command)
 
 print "waiting for tasks to complete..."
 
-while not wq.empty():
-    t = wq.wait(5)
+while not q.empty():
+    t = q.wait(5)
     if t:
         print "task (id# %d) complete: %s (return code %d)" % (t.id, t.command, t.return_status)
     #task object will be garbage collected by Python automatically when it goes out of scope
