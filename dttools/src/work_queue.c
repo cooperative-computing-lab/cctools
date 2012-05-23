@@ -2307,7 +2307,7 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 
 int work_queue_empty(struct work_queue *q)
 {
-	return ((list_size(q->ready_list) + list_size(q->complete_list) + q->workers_in_state[WORKER_STATE_BUSY]) == 0);
+	return ((list_size(q->ready_list) + list_size(q->complete_list) + itable_size(q->running_tasks)) == 0);
 }
 
 static int tolerable_transfer_rate_denominator = 10;
