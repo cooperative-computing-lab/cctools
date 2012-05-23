@@ -75,9 +75,6 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORK_QUEUE_CAPACITY_TOLERANCE_MAX 1000
 #define WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT 1
 
-#define WORK_QUEUE_SWITCH_OFF 0
-#define WORK_QUEUE_SWITCH_ON  1
-
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 int wq_tolerable_transfer_time_multiplier = 10;
@@ -1758,7 +1755,7 @@ struct work_queue *work_queue_create(int port)
 	}
 
 	// Set defaults
-	q->estimate_capacity_on = WORK_QUEUE_SWITCH_OFF;
+	q->estimate_capacity_on = 0;
 	q->capacity_tolerance = WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT;
 
 	envstring = getenv("WORK_QUEUE_ESTIMATE_CAPACITY_ON");
@@ -1802,13 +1799,7 @@ failure:
 
 void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
 {
-	if(value == WORK_QUEUE_SWITCH_ON) {
-		q->estimate_capacity_on = WORK_QUEUE_SWITCH_ON;
-	} else if(value == WORK_QUEUE_SWITCH_OFF) {
-		q->estimate_capacity_on = WORK_QUEUE_SWITCH_OFF;
-	} else {
-		q->estimate_capacity_on = WORK_QUEUE_SWITCH_OFF;
-	}
+	q->estimate_capacity_on = value;
 }
 
 void work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance)
