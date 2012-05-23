@@ -14,12 +14,37 @@ font-size: 75%
 font-align: left;
 white-space: pre;
 border: solid 1px black;
-padding: 5px;
-margin: 20px;
+padding: 0.25%;
+margin: 0.5%;
+margin-top: 1%;
+margin-bottom: 1%;
+}
+table {
+font-family: monospace;
+font-align: center;
+font-size: 75%
+border: solid 1px black;
+width: 99%;
+margin: 0.5%;
+margin-top: 1%;
+margin-bottom: 1%;
+word-wrap: break-word;
+border-collapse: collapse;
+table-layout: fixed;
+}
+th, td{
+padding: 0.25%;
+border: solid 1px black;
+}
+.c_th, .c_td {
+background-color: #F8ECE0;
+}
+.py_th, .py_td {
+background-color: #EFFBFB;
 }
 </style>
 <h1>Work Queue User's Manual</h1>
-<b>Last Updated March 2011</b>
+<b>Last Updated May 2012</b>
 <p>
 Work Queue is Copyright (C) 2009 The University of Notre Dame.
 This software is distributed under the GNU General Public License.
@@ -58,11 +83,24 @@ Let's begin by running a simple but complete example of a master and a worker.
 After trying it out, we will then show how to write a program from scratch.
 <p>
 We assume that you have already downloaded and installed the cctools in
-the directory CCTOOLS.  Next,  download <a href=work_queue_example.c>work_queue_example.c</a>
-and compile it like this:
+the directory CCTOOLS.  Next, download the example file for the language of your
+choice: 
+<li>C: <a href=work_queue_example.c>work_queue_example.c</a></li>
+<li>Python: <a href=work_queue_example.py>work_queue_example.py</a></li>
+<li>Perl: <a href=work_queue_example.pl>work_queue_example.pl</a></li>
 
+<p>
+If you are using the C example, compile it like this:
 <pre>
 gcc work_queue_example.c -o work_queue_example -I${CCTOOLS}/include/cctools -L${CCTOOLS}/lib -ldttools -lm
+</pre>
+If you are using the Python example, set PYTHONPATH to include the Python modules in cctools:
+<pre>
+export PYTHONPATH=${PYTHONPATH}:${CCTOOLS}/lib/python2.6/site-packages
+</pre>
+If you are using the Perl example, set PERL5LIB to include the Perl modules in cctools:
+<pre>
+export PERL5LIB=${PERL5LIB}:/afs/nd.edu/user28/dpandiar/Public/cctools/lib/perl5/site_perl
 </pre>
 
 This example program simply compresses a bunch of files in parallel.  List the files to be
@@ -73,6 +111,7 @@ For example, to compress files <tt>a</tt>, <tt>b</tt>, and <tt>c</tt>, run this:
 <pre>
 ./work_queue_example a b c
 </pre>
+
 You will see this right away:
 <pre>
 listening on port 9123...
@@ -100,20 +139,21 @@ system.
 If you have access to a Condor pool, you can use this shortcut to submit
 ten workers at once via Condor:
 <pre>
-% condor_submit_workers MACHINENAME 9123 10
-Submitting job(s)..........
-Logging submit event(s)..........
+% condor_submit_workers MACHINENAME 9123 10 
+Submitting job(s).......... 
+Logging submit event(s).......... 
 10 job(s) submitted to cluster 298.
 </pre>
 
 Or, if you have access to an SGE cluster, do this:
 <pre>
-% sge_submit_workers MACHINENAME 9123 10
-Your job 153083 ("worker.sh") has been submitted
-Your job 153084 ("worker.sh") has been submitted
-Your job 153085 ("worker.sh") has been submitted
+% sge_submit_workers MACHINENAME 9123 10 
+Your job 153083 ("worker.sh") has been submitted 
+Your job 153084 ("worker.sh") has been submitted 
+Your job 153085 ("worker.sh") has been submitted 
 ...
 </pre>
+
 <p>
 When the master completes, if the workers were not shut down in the
 master, your workers will still be available, so you can either run
@@ -124,7 +164,10 @@ If you forget to remove them, they will exit automatically after fifteen minutes
 
 <h2>Writing a Master Program</h2>
 
-To write your own program using Work Queue, begin with <a href=work_queue_example.c>work_queue_example.c</a>
+To write your own program using Work Queue, begin with <a
+href=work_queue_example.c>C example</a> or <a
+href=work_queue_example.py>Python example</a> or <a
+href=work_queue_example.pl>Perl example</a> 
 as a starting point.  Here is a basic outline for a Work Queue master:
 
 <pre>
@@ -145,9 +188,21 @@ work_queue_delete(q);
 </pre>
 
 First create a queue that is listening on a particular TCP port:
-<pre>
-q = work_queue_create(port);
-</pre>
+<table>
+<tr>
+ <th class="c_th">C/Perl</th>
+ <th class="py_th">Python</th>
+</tr>
+<tr>
+ <td class = "c_td">
+ q = work_queue_create(port);
+ </td>
+ <td class="py_td">
+ q = WorkQueue(port)
+ </td>
+</tr>
+</table>
+
 
 The master then creates tasks to submit to the queue.
 Each task consists of a command line to run and a statement of
@@ -158,58 +213,141 @@ It is also required to specify whether the data, input or output, need to be cac
 the worker site for later use. In the example, we specify a command that takes a 
 single input file, produces a single output file, and requires both files to be
 cached:
-<pre>
-t = work_queue_task_create("/usr/bin/gzip < infile > outfile.gz");
-work_queue_task_specify_file(t,"infile","infile",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
-work_queue_task_specify_file(t,"outfile.gz","outfile.gz",WORK_QUEUE_OUTPUT,WORK_QUEUE_CACHE);
-</pre>
+<table>
+<tr>
+ <th class="c_th">C/Perl</th>
+ <th class="py_th">Python</th>
+</tr>
+<tr>
+ <td class = "c_td">
+ t = work_queue_task_create(command); <br> 
+ work_queue_task_specify_file(t,infile,infile,WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); <br>
+ work_queue_task_specify_file(t,outfile,outfile,WORK_QUEUE_OUTPUT,WORK_QUEUE_CACHE);
+ </td>
+ <td class="py_td">
+ t = Task(command) <br>
+ t.specify_file(infile,infile,WORK_QUEUE_INPUT,cache=True) <br> 
+ t.specify_file(outfile,outfile,WORK_QUEUE_OUTPUT,cache=True) 
+ </td>
+</tr>
+</table>
 
 If a file does not need to be cached at the execution site to avoid wasteful
 strorage, it can be specified so:
-<pre>
-work_queue_task_specify_file(t,"outfile.gz","outfile.gz",WORK_QUEUE_OUTPUT,WORK_QUEUE_NOCACHE);
-</pre>
+<table>
+<tr>
+ <th class="c_th">C/Perl</th>
+ <th class="py_th">Python</th>
+</tr>
+<tr>
+ <td class = "c_td">
+ work_queue_task_specify_file(t,outfile,outfile,WORK_QUEUE_OUTPUT,WORK_QUEUE_NOCACHE);
+ </td>
+ <td class = "py_td">
+ t.specify_file(outfile,outfile,WORK_QUEUE_OUTPUT,cache=False) 
+ </td>
+</tr>
+</table>
 
 You can also run a program that is not necessarily installed at the
 remote location, by specifying it as an input file.  If the file
 is installed on the local machine, then specify the full local path,
 and the plain remote path.  For example:
-<pre>
-t = work_queue_task_create("./my_compress_program < infile > outfile.gz");
-work_queue_task_specify_file(t,"/usr/local/bin/my_compress_program","my_compress_program",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
-work_queue_task_specify_file(t,"infile","infile",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
-work_queue_task_specify_file(t,"outfile.gz","outfile.gz",WORK_QUEUE_OUTPUT,WORK_QUEUE_CACHE);
-</pre>
+<table>
+<tr>
+ <th class="c_th">C/Perl</th>
+ <th class="py_th">Python</th>
+</tr>
+<tr>
+ <td class = "c_td">
+ t = work_queue_task_create("./compress < a > a.gz");  <br>
+ work_queue_task_specify_file(t,"/home/compress","compress",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); <br>
+ work_queue_task_specify_file(t,"a","a",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); <br>
+ work_queue_task_specify_file(t,"a.gz","a.gz",WORK_QUEUE_OUTPUT,WORK_QUEUE_CACHE); 
+ </td>
+ <td class = "py_td">
+ t = Task("./compress < a > a.gz") <br> 
+ t.specify_file("/home/compress","compress",WORK_QUEUE_INPUT,cache=True) <br>
+ t.specify_file("a","a",WORK_QUEUE_INPUT,cache=True) <br>
+ t.specify_file("a.gz","a.gz",WORK_QUEUE_OUTPUT,cache=True) 
+ </td>
+</tr>
+</table>
 
-Once a task has been fully specified, it can be submitted to the queue:
-<pre>
-work_queue_submit(q,t);
-</pre>
+Once a task has been fully specified, it can be submitted to the queue where it
+gets assigned a unique taskid:
+<table>
+<tr>
+ <th class="c_th">C/Perl</th>
+ <th class="py_th">Python</th>
+</tr>
+<tr>
+ <td class = "c_td">
+ taskid = work_queue_submit(q,t);
+ </td>
+ <td class = "py_td">
+ taskid = q.submit(t)
+ </td>
+</tr>
+</table>
 
 Next, wait for a task to complete, stating how long you are willing
 to wait for a result, in seconds.  (If no tasks have completed by the timeout,
-<tt>work_queue_wait</tt> will returns null.)
+<tt>work_queue_wait</tt> will return null.)
 
-<pre>
-t = work_queue_wait(q,5);
-</pre>
+<table>
+<tr>
+ <th class="c_th">C/Perl</th>
+ <th class="py_th">Python</th>
+</tr>
+<tr>
+ <td class = "c_td">
+ t = work_queue_wait(q,5);
+ </td>
+ <td class = "py_td">
+ t = q.wait(5)
+ </td>
+</tr>
+</table>
 
 A completed task will have its output files written to disk.
 You may examine the standard output of the task in <tt>t->output</tt>
-and the exit code in <tt>t->exit_status</tt>  When you are done
+and the exit code in <tt>t->exit_status</tt>. When you are done
 with the task, delete it:
 
-<pre>
-work_queue_task_delete(t);
-</pre>
+<table>
+<tr>
+ <th class="c_th">C/Perl</th>
+ <th class="py_th">Python</th>
+</tr>
+<tr>
+ <td class = "c_td">
+ work_queue_task_delete(t);
+ </td>
+ <td class = "py_td">
+ Deleted automatically when object goes out of scope.
+ </td>
+</tr>
+</table>
 
 Continue submitting and waiting for tasks until all work is complete.
 You may check to make sure that the queue is empty with <tt>work_queue_empty</tt>
 When all is done, delete the queue:
 
-<pre>
-work_queue_delete(q);
-</pre>
+<table>
+<tr>
+ <th class="c_th">C/Perl</th>
+ <th class="py_th">Python</th>
+</tr>
+<tr>
+ <td class = "c_td">
+ work_queue_delete(q);
+ </td>
+ <td class = "py_td">
+ Deleted automatically when object goes out of scope.
+ </td>
+</tr>
+</table>
 
 Full details of all of the Work Queue functions can be found in
 the <a href=http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html>Work Queue API</a>.
@@ -243,11 +381,22 @@ will help. The variables $OS and $ARCH are available for use in the specificatio
 file names. Work Queue will automatically resolve these variables to the operating system
 and architecture of each connected worker and transfer the input file corresponding
 to the resolved file name. For example:
-<pre>
-work_queue_task_specify_file(t,"infile.$OS.$ARCH","infile",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE)
-</pre>
-This will transfer infile.Linux.x86_64 to workers running on a Linux system with an
-x86_64 architecture and infile.Cygwin.i686 to workers on Cygwin with an i686
+<table>
+<tr>
+ <th class="c_th">C/Perl</th>
+ <th class="py_th">Python</th>
+</tr>
+<tr>
+ <td class = "c_td">
+ work_queue_task_specify_file(t,"a.$OS.$ARCH","a",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE)
+ </td>
+ <td class = "py_td">
+ t.specify_file(t,"a.$OS.$ARCH","a",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE)
+ </td>
+</tr>
+</table>
+This will transfer <tt>a.Linux.x86_64</tt> to workers running on a Linux system with an
+x86_64 architecture and <tt>a.Cygwin.i686</tt> to workers on Cygwin with an i686
 architecture. 
 <p>
 <li><b>Statistics.</b>  The queue tracks a fair number of statistics that count the number
