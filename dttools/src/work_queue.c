@@ -72,9 +72,6 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORK_QUEUE_MASTER_PRIORITY_MAX 100
 #define WORK_QUEUE_MASTER_PRIORITY_DEFAULT 10
 
-#define WORK_QUEUE_CAPACITY_TOLERANCE_MAX 1000
-#define WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT 1
-
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 int wq_tolerable_transfer_time_multiplier = 10;
@@ -86,15 +83,16 @@ struct work_queue {
 	int master_mode;
 	int worker_mode;
 	int priority;
+
 	struct link *master_link;
-	struct list *ready_list;
-	struct list *complete_list;
-
-	struct itable *running_tasks;
-
-	struct hash_table *worker_table;
 	struct link_info *poll_table;
 	int poll_table_size;
+
+	struct list       *ready_list;
+	struct list       *complete_list;
+	struct itable     *running_tasks;
+	struct hash_table *worker_table;
+
 	int workers_in_state[WORKER_STATE_MAX];
 
 	INT64_T total_tasks_submitted;
@@ -103,37 +101,34 @@ struct work_queue {
 	INT64_T total_workers_removed;
 	INT64_T total_bytes_sent;
 	INT64_T total_bytes_received;
+	INT64_T total_workers_connected;
 
 	timestamp_t start_time;
 	timestamp_t total_send_time;
 	timestamp_t total_receive_time;
 	timestamp_t total_execute_time;
-	double fast_abort_multiplier;
 
-	int worker_selection_algorithm;		  /**< How to choose worker to run the task. */
+	double fast_abort_multiplier;
+	int worker_selection_algorithm;
 	int task_ordering;
 
 	timestamp_t time_last_task_start;
 	timestamp_t idle_time;
 	timestamp_t accumulated_idle_time;
 	timestamp_t app_time;
+
 	struct list *idle_times;
 	double idle_percentage;
 	struct task_statistics *task_statistics;
 
 	int estimate_capacity_on;
-	int auto_remove_workers_on;
 	int capacity;
 	int avg_capacity;
-	INT64_T total_workers_connected;
-	INT64_T excessive_workers_removed;
-	int busy_workers_to_remove;
-	int capacity_tolerance;
+
 	char catalog_host[DOMAIN_NAME_MAX];
 	int catalog_port;
 	struct hash_table *workers_by_pool;
 };
-
 
 struct work_queue_worker {
 	int state;
@@ -202,7 +197,6 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t);
 static void update_app_time(struct work_queue *q, timestamp_t last_left_time, int last_left_status);
 
 static void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value);
-static void work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance);
 
 static void update_catalog(struct work_queue *q, int now);
 static void enforce_pool_decisions(struct work_queue *q);
@@ -351,7 +345,6 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->capacity = q->capacity;
 	s->avg_capacity = q->avg_capacity;
 	s->total_workers_connected = q->total_workers_connected;
-	s->excessive_workers_removed = q->excessive_workers_removed;
 }
 
 static int add_worker(struct work_queue *q)
@@ -1754,18 +1747,11 @@ struct work_queue *work_queue_create(int port)
 		q->worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 	}
 
-	// Set defaults
 	q->estimate_capacity_on = 0;
-	q->capacity_tolerance = WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT;
 
 	envstring = getenv("WORK_QUEUE_ESTIMATE_CAPACITY_ON");
 	if(envstring) {
 		work_queue_specify_estimate_capacity_on(q, atoi(envstring));
-	}
-
-	envstring = getenv("WORK_QUEUE_CAPACITY_TOLERANCE");
-	if(envstring) {
-		work_queue_specify_capacity_tolerance(q, atoi(envstring));
 	}
 
 	q->total_send_time = 0;
@@ -1782,7 +1768,6 @@ struct work_queue *work_queue_create(int port)
 	q->app_time = 0;
 	q->capacity = 0;
 	q->avg_capacity = 0;
-	q->busy_workers_to_remove = 0;
 
 	q->task_statistics = task_statistics_init();
 
@@ -1800,15 +1785,6 @@ failure:
 void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
 {
 	q->estimate_capacity_on = value;
-}
-
-void work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance)
-{
-	if(tolerance > 0 && tolerance <= WORK_QUEUE_CAPACITY_TOLERANCE_MAX) {
-		q->capacity_tolerance = tolerance;
-	} else {
-		q->capacity_tolerance = WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT;
-	}
 }
 
 void work_queue_specify_name(struct work_queue *q, const char *name)

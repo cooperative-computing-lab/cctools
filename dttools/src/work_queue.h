@@ -113,7 +113,6 @@ struct work_queue_stats {
 	int capacity;
 	int avg_capacity;
 	int total_workers_connected;
-	int excessive_workers_removed;
 };
 
 /** @name Functions - Tasks */
