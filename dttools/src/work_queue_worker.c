@@ -795,7 +795,7 @@ int main(int argc, char *argv[])
 	char c;
 	int w;
 	char deletecmd[WORK_QUEUE_LINE_MAX];
-	timestamp_t execution_start, execution_end;
+	timestamp_t execution_start;
 	int task_status= TASK_NONE;
 	pid_t pid;
 	time_t readline_stoptime;
@@ -953,7 +953,6 @@ int main(int argc, char *argv[])
 		char filename[WORK_QUEUE_LINE_MAX];
 		char path[WORK_QUEUE_LINE_MAX];
 		char *buffer;
-		FILE *stream;
 
 		if(time(0) > idle_stoptime && (task_status == TASK_NONE || task_status == TASK_CANCELLED)) {
 			if(master) {
@@ -1026,45 +1025,20 @@ int main(int argc, char *argv[])
 				debug(D_WQ, "%s", buffer);
 				execution_start = timestamp_get();
 
-				char string[WORK_QUEUE_LINE_MAX];
-				if(sscanf(line, "work %lld %s", &length, string) == 2 && !strncmp(string, "fork", 4)) {
-					pid = execute_task(buffer);
-					free(buffer);
-					if(pid < 0) {
-						fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
-						break;
-					}
-
-					snprintf(stdout_file, 50, "%d.task.stdout.tmp", pid);
-					if((stdout_file_fd = open(stdout_file, O_CREAT | O_WRONLY)) == -1) {
-						fprintf(stderr, "work_queue_worker: failed to open standard output file. Shutting down worker...\n");
-						break;
-					}
-
-					task_status = TASK_RUNNING;
-				} else {
-					// execute the command
-					stream = popen(buffer, "r");
-					free(buffer);
-					if(stream) {
-						length = copy_stream_to_buffer(stream, &buffer);
-						if(length < 0)
-							length = 0;
-						result = pclose(stream);
-					} else {
-						length = 0;
-						result = -1;
-						buffer = 0;
-					}
-					execution_end = timestamp_get();
-
-					// return job done
-					report_task_complete(master, result, buffer, length, execution_end - execution_start);
-
-					if(buffer) {
-						free(buffer);
-					}
+				pid = execute_task(buffer);
+				free(buffer);
+				if(pid < 0) {
+					fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
+					break;
 				}
+
+				snprintf(stdout_file, 50, "%d.task.stdout.tmp", pid);
+				if((stdout_file_fd = open(stdout_file, O_CREAT | O_WRONLY)) == -1) {
+					fprintf(stderr, "work_queue_worker: failed to open standard output file. Shutting down worker...\n");
+					break;
+				}
+
+				task_status = TASK_RUNNING;
 			} else if(sscanf(line, "stat %s", filename) == 1) {
 				struct stat st;
 				if(!stat(filename, &st)) {
