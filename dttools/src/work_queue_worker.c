@@ -46,6 +46,7 @@ See the file COPYING for details.
 #include <sys/utsname.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
+#include <sys/poll.h>
 
 // Maximum time to wait before aborting if there is no connection to the master.
 static int idle_timeout = 900;
@@ -70,6 +71,14 @@ static int abort_flag = 0;
 //Threshold for available disk space (MB) beyond which clean up and restart.
 static UINT64_T disk_avail_threshold = 100;
 
+// Set stdout buffer size to 1 MB
+#define STDOUT_BUFFER_SIZE 1048576        
+static void *stdout_buffer = NULL;		// a buffer that holds the stdout of a task (read from the pipe)
+static size_t stdout_buffer_used = 0;
+static char stdout_file[50];			// name of the file that stores a task's stdout 
+static int stdout_file_fd = 0;
+
+
 // Catalog mode control variables
 static int auto_worker = 0;
 static int exclusive_worker = 1;
@@ -88,11 +97,6 @@ static struct list *preferred_masters = NULL;
 static struct hash_cache *bad_masters = NULL;
 
 static int pipefds[2];
-
-static void alarm_handler(int sig)
-{
-	// do nothing except interrupt the wait
-}
 
 void report_worker_ready(struct link *master)
 {
@@ -164,8 +168,16 @@ pid_t execute_task(const char *cmd)
 
 	pid = fork();
 	if(pid > 0) {
-		debug(D_WQ, "started process %d: %s", pid, cmd);
+		// Set pipe's read end to be non-blocking
+		int flag;
+		flag = fcntl(pipefds[0], F_GETFL);
+		flag |= O_NONBLOCK;	
+		fcntl(pipefds[0], F_SETFL, flag);
+
+		// Close pipe's write end
 		close(pipefds[1]);
+
+		debug(D_WQ, "started process %d: %s", pid, cmd);
 		return pid;
 	} else if(pid < 0) {
 		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
@@ -185,40 +197,143 @@ pid_t execute_task(const char *cmd)
 	return 0;
 }
 
-int wait_task(pid_t pid, int timeout, struct task_info *ti)
+static int errno_is_temporary(int e)
+{
+	if(e == EINTR || e == EAGAIN) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+// Wait until 'stoptime' to see if fd is ready for reading.
+// Returns  1 if there are contents ready to be read.
+// Returns  0 if nothing can be read yet.
+// Returns -1 if something went wrong.
+static int read_poll(int fd, const time_t stoptime) {
+	int msec;
+
+	if(stoptime > 0) {
+		msec = (stoptime - time(0)) * 1000;
+		if(msec <= 0) {
+			return 0;
+		} 
+	} else {
+		msec = -1;
+	}
+
+
+	int result;
+	struct pollfd pfd;
+
+	while(1) {
+		pfd.fd = fd;
+		pfd.events = POLLIN;
+		pfd.revents = 0;
+
+		result = poll(&pfd, 1, msec);
+				
+		if (result > 0) {
+			if (pfd.revents & POLLIN) {
+				return 1;
+			}
+		} else if (result == 0) {
+			return 0;
+		} else {
+			if (errno_is_temporary(errno) == 0) {
+				// errno is not temporary, something is broken then
+				return -1;
+			}
+		} 
+
+		if(stoptime > 0) {
+			msec = (stoptime - time(0)) * 1000;
+			if(msec <= 0) {
+				return 0;
+			} 
+		} else {
+			msec = -1;
+		}
+	}
+}
+
+
+static int wait_task(pid_t pid, int timeout, struct task_info *ti)
 {
 	int flags = 0;
-	pid_t tmp_pid;
-	int tmp_status;
-	struct rusage tmp_rusage;
-	struct sigaction new_action, old_action;
+	//struct sigaction new_action, old_action;
+	static int stdout_in_file = 0;
 
 	if(pid <= 0 || timeout < 0 || !ti) {
 		return 0;
 	}
 
-	if(timeout == 0) {
-		flags = WNOHANG;
+	time_t stoptime;
+	if(timeout > 0) {
+		stoptime = time(0) + timeout;
 	} else {
-		flags = 0;
-		new_action.sa_handler = alarm_handler;
-		sigemptyset(&new_action.sa_mask);
-		new_action.sa_flags = 0;
-		sigaction(SIGALRM, &new_action, &old_action);
-		alarm(timeout);
+		stoptime = 0;
 	}
 
-	tmp_pid = wait4(-1, &tmp_status, flags, &tmp_rusage);
+	ssize_t chunk;
+	char *buffer;
+	size_t space_left;
+	while (1) {
+		buffer = stdout_buffer + stdout_buffer_used;
+		space_left = STDOUT_BUFFER_SIZE - stdout_buffer_used;
 
-	if(timeout != 0) {
-		alarm(0);
-		sigaction(SIGALRM, &old_action, NULL);
+		if(space_left > 0) {
+			chunk = read(pipefds[0], buffer, space_left);
+			if(chunk < 0) {
+				if(errno_is_temporary(errno)) {
+					int r = read_poll(pipefds[0], stoptime);
+					if(r == 1) {
+						// pipe has contents for reading
+						continue;
+					} else if (r == 0) {
+						// task not done && nothing in the pipe
+						return 0;
+					} else {
+						// poll failed with non-temporary error
+						return -1;
+					}
+				}
+			} else if (chunk == 0) {
+				// task done
+				close(pipefds[0]);
+				break;
+			} else {
+				stdout_buffer_used += chunk;
+			}
+		} else {
+			if(full_write(stdout_file_fd, stdout_buffer, stdout_buffer_used) == -1) {
+				return -1;
+			}
+			stdout_in_file = 1;
+			stdout_buffer_used = 0;
+		}
 	}
 
-	if(tmp_pid <= 0) {
-		return 0;
+	// flush stdout buffer to stdout file if needed
+	if(stdout_in_file) {
+		if(full_write(stdout_file_fd, stdout_buffer, stdout_buffer_used) == -1) {
+			return -1;
+		}
+		close(stdout_file_fd);
 	}
 
+	// Get task return status
+	pid_t tmp_pid;
+	int tmp_status;
+	struct rusage tmp_rusage;
+
+	tmp_pid = wait4(pid, &tmp_status, flags, &tmp_rusage);
+
+	if(tmp_pid != pid) {
+		return -1;
+	}
+
+	// Fill task_info struct
 	clear_task_info(ti);
 
 	ti->pid = tmp_pid;
@@ -229,22 +344,35 @@ int wait_task(pid_t pid, int timeout, struct task_info *ti)
 	// Record stdout of the child process
 	char *output;
 	INT64_T length;
-	FILE *stream = fdopen(pipefds[0], "r");
-	if(stream) {
-		length = copy_stream_to_buffer(stream, &output);
-		if(length <= 0) {
-			length = 0;
-			if(output) {
-				free(output);
+	if(stdout_in_file) { 
+		// Task stdout is in a file on disk. Extract the file contents into a buffer.
+		FILE *stream = fopen(stdout_file, "r");
+		if(stream) {
+			length = copy_stream_to_buffer(stream, &output);
+			if(length <= 0) {
+				length = 0;
+				if(output) {
+					free(output);
+				}
+				output = NULL;
 			}
+			fclose(stream);
+		} else {
+			debug(D_WQ, "Couldn't open the file that stores the standard output: %s\n", strerror(errno));
+			length = 0;
 			output = NULL;
 		}
-		fclose(stream);
-	} else {
-		debug(D_WQ, "Couldn't open pipe fd as stream (failed to read child process's output).\n", strerror(errno));
-		length = 0;
-		output = NULL;
-		close(pipefds[0]);
+		unlink(stdout_file);
+		stdout_in_file = 0;
+	} else { 
+		// Task stdout is all in a buffer
+		length = stdout_buffer_used;
+		output = malloc(length);
+		if(output) {
+			memcpy(output, stdout_buffer, length); 
+		} else {
+			length = 0;
+		}
 	}
 
 	ti->output = output;
@@ -681,6 +809,9 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Cannot allocate memory to store preferred work queue masters names.\n");
 		exit(1);
 	}
+
+	// Initialize the buffer that stores task standard output
+	stdout_buffer = xxmalloc(STDOUT_BUFFER_SIZE);
 	
 	//obtain the architecture and os on which worker is running.
 	uname(&uname_data);
@@ -900,9 +1031,16 @@ int main(int argc, char *argv[])
 					pid = execute_task(buffer);
 					free(buffer);
 					if(pid < 0) {
-						fprintf(stderr, "work_queue_worker: couldn't submit local job. \nShutting down worker...\n");
+						fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
 						break;
 					}
+
+					snprintf(stdout_file, 50, "%d.task.stdout.tmp", pid);
+					if((stdout_file_fd = open(stdout_file, O_CREAT | O_WRONLY)) == -1) {
+						fprintf(stderr, "work_queue_worker: failed to open standard output file. Shutting down worker...\n");
+						break;
+					}
+
 					task_status = TASK_RUNNING;
 				} else {
 					// execute the command
@@ -1166,13 +1304,26 @@ int main(int argc, char *argv[])
 		}
 	}
 
-      abort:
+abort:
+	fprintf(stdout, "work_queue_worker: cleaning up %s\n", tempdir);
+
+	// Free dynamically allocated memory
+	if(stdout_buffer) {
+		free(stdout_buffer);
+	}
 	if(pool_name) {
 		free(pool_name);
 	}
 	free(os_name);
 	free(arch_name);
-	fprintf(stdout, "work_queue_worker: cleaning up %s\n", tempdir);
+	
+
+	// Kill running task if needed
+	if(task_status == TASK_RUNNING) {
+		kill(pid, SIGTERM);
+	}
+
+	// Remove unneeded contents on disk
 	sprintf(deletecmd, "rm -rf %s", tempdir);
 	system(deletecmd);
 
