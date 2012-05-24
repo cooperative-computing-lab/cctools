@@ -2,22 +2,6 @@
 
 use work_queue;
 
-#create aliases to variables & functions in work_queue module
-*work_queue_create=*work_queue::work_queue_create;
-*work_queue_port=*work_queue::work_queue_port;
-*work_queue_task_create=*work_queue::work_queue_task_create;
-*work_queue_task_specify_file=*work_queue::work_queue_task_specify_file;
-*work_queue_submit=*work_queue::work_queue_submit;
-*work_queue_wait=*work_queue::work_queue_wait;
-*work_queue_empty=*work_queue::work_queue_empty;
-*work_queue_task_delete=*work_queue::work_queue_task_delete;
-*work_queue_delete=*work_queue::work_queue_delete;
-*WORK_QUEUE_DEFAULT_PORT=*work_queue::WORK_QUEUE_DEFAULT_PORT;
-*WORK_QUEUE_INPUT=*work_queue::WORK_QUEUE_INPUT;
-*WORK_QUEUE_OUTPUT=*work_queue::WORK_QUEUE_OUTPUT;
-*WORK_QUEUE_CACHE=*work_queue::WORK_QUEUE_CACHE;
-*WORK_QUEUE_NOCACHE=*work_queue::WORK_QUEUE_NOCACHE;
-
 if ($#ARGV < 0) {
 	print "work_queue_example <file1> [file2] [file3] ...\n";
 	print "Each file given on the command line will be compressed using a remote worker.\n";
