@@ -9,7 +9,7 @@ all: work_queue.pm work_queue.${CCTOOLS_DYNAMIC_SUFFIX}
 
 work_queue_wrap.c work_queue.pm: ../work_queue.i
 	@echo "SWIG work_queue.i (perl5)"
-	@${CCTOOLS_SWIG} -perl5 -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c ../work_queue.i
+	@${CCTOOLS_SWIG} -perl5 -exportall -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c ../work_queue.i
 
 work_queue_wrap.o: work_queue_wrap.c
 	${CCTOOLS_CC} -fPIC -Wno-unused-value -Wno-unused-variable -c $< -o $@ ${ccflags}
