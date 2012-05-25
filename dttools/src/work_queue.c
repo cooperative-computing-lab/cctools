@@ -429,9 +429,7 @@ static void update_catalog(struct work_queue *q, int now)
 	struct work_queue_stats s;
 	work_queue_get_stats(q, &s);
 	char * worker_summary = work_queue_get_worker_summary(q);
-	if(!advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, worker_summary, now)) {
-		fprintf(stderr, "Reporting master status to the catalog server (%s@%d) failed!\n", q->catalog_host, q->catalog_port);
-	}
+	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, worker_summary, now);
 	free(worker_summary);
 }
 
@@ -529,11 +527,12 @@ static void enforce_pool_decisions(struct work_queue *q) {
 	debug(D_WQ, "Get pool decision from catalog server.\n");
 	decisions = list_create();
 	if(!decisions) {
-		debug(D_NOTICE, "Failed to create list to store worker pool decisions!\n");
+		debug(D_WQ, "Failed to create list to store worker pool decisions!\n");
 		return;
 	}
 	if(!get_pool_decisions_from_catalog(q->catalog_host, q->catalog_port, q->name, decisions)) {
-		fprintf(stderr, "Failed to receive pool decisions from the catalog server(%s@%d)!\n", q->catalog_host, q->catalog_port);
+		debug(D_WQ, "Failed to receive pool decisions from the catalog server(%s@%d)!\n", q->catalog_host, q->catalog_port);
+		return;
 	}
 
 	if(!list_size(decisions)) {
@@ -1366,7 +1365,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 					expanded_payload = xxstrdup(tf->payload);
 				}
 				if(stat(expanded_payload, &s) != 0) {
-					fprintf(stderr, "Could not stat %s. (%s)\n", expanded_payload, strerror(errno));
+					debug(D_WQ,"Could not stat %s: %s\n", expanded_payload, strerror(errno));
 					free(expanded_payload);
 					goto failure;
 				}
@@ -1535,7 +1534,6 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	// Record task statistics for master capacity estimation.
 	tr = (struct task_report *) malloc(sizeof(struct task_report));
 	if(!tr) {
-		fprintf(stderr, "Failed to allocate memory for task report.\n");
 		return;
 	} else {
 		tr->time_transfer_data = t->total_transfer_time;
