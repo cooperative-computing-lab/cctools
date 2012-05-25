@@ -1,11 +1,9 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd"> 
 <html>
 
 <head>
-<title>Work Queue User's Manual</title>
-</head>
-
-<body>
-
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <style type="text/css">
 .code_area {
 font-family: monospace;
@@ -25,6 +23,11 @@ margin: 0%;
 padding: 0.3%;
 }
 </style>
+
+<title>Work Queue User's Manual</title>
+</head>
+
+<body>
 
 <h1>Work Queue User's Manual</h1>
 <b>Last Updated May 2012</b>
@@ -68,11 +71,12 @@ After trying it out, we will then show how to write a program from scratch.
 We assume that you have already downloaded and installed the cctools in
 the directory CCTOOLS.  Next, download the example file for the language of your
 choice: 
+<ul>
 <li>C: <a href=work_queue_example.c>work_queue_example.c</a></li>
 <li>Python: <a href=work_queue_example.py>work_queue_example.py</a></li>
 <li>Perl: <a href=work_queue_example.pl>work_queue_example.pl</a></li>
+</ul>
 
-<p>
 If you are using the C example, compile it like this:
 <div class ="code_area"><pre class="code_snip">
 gcc work_queue_example.c -o work_queue_example -I${CCTOOLS}/include/cctools -L${CCTOOLS}/lib -ldttools -lm
@@ -306,7 +310,7 @@ tens to hundreds of workers.  As you scale your program up to larger sizes,
 you may find the following features helpful.  All are described in the
 <a href=http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html>Work Queue API</a>.
 
-<dir>
+<ul>
 <li><b>Pipelined Submission.</b>  If you have a <b>very</b> large number of tasks to run,
 it may not be possible to submit all of the tasks, and then wait for all of them.  Instead,
 submit a small number of tasks, then alternate waiting and submiting to keep a constant
@@ -345,7 +349,7 @@ architecture.
 <li><b>Statistics.</b>  The queue tracks a fair number of statistics that count the number
 of tasks, number of workers, number of failures, and so forth.  Obtain this data with <tt>work_queue_get_stats</tt>
 in order to make a progress bar or other user-visible information.
-</dir>
+</ul>
 
 <h2>For More Information</h2>
 
