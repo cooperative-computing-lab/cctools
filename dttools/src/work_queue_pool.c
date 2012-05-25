@@ -38,11 +38,7 @@ See the file COPYING for details.
 #define EXTRA_WORKERS_PERCENTAGE 0.2
 
 #define POOL_CONFIG_LINE_MAX 4096
-#define INITIAL_WORKERS_DEFAULT 15
-#define INITIAL_WORKERS_MAX 100
-#define WORKERS_DEFAULT 100
-#define WORKERS_MAX 500
-
+#define MAX_WORKERS_DEFAULT 100
 
 static int abort_flag = 0;
 static sig_atomic_t pool_config_updated = 1;
@@ -304,7 +300,7 @@ struct pool_config *get_pool_config(const char *path) {
 	}
 
 	// Set defaults
-	pc->max_workers = WORKERS_DEFAULT;
+	pc->max_workers = MAX_WORKERS_DEFAULT;
 
 	// Read in new configuration from file
 	FILE *fp;
@@ -339,8 +335,8 @@ struct pool_config *get_pool_config(const char *path) {
 				}
 			} else if(!strncmp(name, "max_workers", strlen(name))) {
 				int max_workers = atoi(value);
-				if(max_workers <= 0 || max_workers > WORKERS_MAX) {
-					fprintf(stderr, "Invalid configuration: max_workers (%d) out of range [1, %d]\n", max_workers, WORKERS_MAX);
+				if(max_workers <= 0) {
+					fprintf(stderr, "Invalid configuration: max_workers (current value: %d) should be greater than 0.\n", max_workers);
 					goto fail;
 				}
 				pc->max_workers = max_workers;
