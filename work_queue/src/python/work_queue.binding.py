@@ -162,8 +162,6 @@ class Task(_object):
     #                   - @ref WORK_QUEUE_SCHEDULE_FCFS
     #                   - @ref WORK_QUEUE_SCHEDULE_FILES
     #                   - @ref WORK_QUEUE_SCHEDULE_TIME
-    #                   - @ref WORK_QUEUE_SCHEDULE_DEFAULT
-    #                   - @ref WORK_QUEUE_SCHEDULE_PREFERRED_HOSTS
     #                   - @ref WORK_QUEUE_SCHEDULE_RAND
     def specify_algorithm(self, algorithm):
         return work_queue_task_specify_algorithm(self._task, algorithm)
@@ -340,8 +338,6 @@ class WorkQueue(_object):
     #                   - @ref WORK_QUEUE_SCHEDULE_FCFS
     #                   - @ref WORK_QUEUE_SCHEDULE_FILES
     #                   - @ref WORK_QUEUE_SCHEDULE_TIME
-    #                   - @ref WORK_QUEUE_SCHEDULE_DEFAULT
-    #                   - @ref WORK_QUEUE_SCHEDULE_PREFERRED_HOSTS
     #                   - @ref WORK_QUEUE_SCHEDULE_RAND
     def specify_algorithm(self, algorithm):
         return work_queue_specify_algorithm(self._work_queue, algorithm)
@@ -354,7 +350,6 @@ class WorkQueue(_object):
 	# 					submitted tasks to workers:
     #                   - @ref WORK_QUEUE_TASK_ORDER_FIFO
     #                   - @ref WORK_QUEUE_TASK_ORDER_LIFO
-    #                   - @ref WORK_QUEUE_TASK_ORDER_DEFAULT
     def specify_task_order(self, order):
         return work_queue_specify_task_order(self._work_queue, order)
 
@@ -402,7 +397,7 @@ class WorkQueue(_object):
     # Cancel task identified by its tag and remove from the given queue. 
     #
     # @param self   Reference to the current work queue object.
-    # @param tag    The tag assigned to task using @ref specify_tag.
+    # @param tag    The tag assigned to task using @ref work_queue_task_specify_tag.
     def cancel_by_tasktag(self, tag):
         return work_queue_cancel_by_tasktag(self._work_queue, tag)
 

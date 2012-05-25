@@ -168,7 +168,7 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag);
 /** Select the scheduling algorithm for a single task.
 To change the scheduling algorithm for all tasks, use @ref work_queue_specify_algorithm instead.
 @param t A task object.
-@param alg The algorithm to use in assigning this task to a worker:
+@param algo The algorithm to use in assigning this task to a worker:
 - @ref WORK_QUEUE_SCHEDULE_FCFS	 - Select worker on a first-come-first-serve basis.
 - @ref WORK_QUEUE_SCHEDULE_FILES - Select worker that has the most data required by the task.
 - @ref WORK_QUEUE_SCHEDULE_TIME	 - Select worker that has the fastest execution time on previous tasks.
@@ -291,10 +291,10 @@ int work_queue_activate_fast_abort(struct work_queue *q, double multiplier);
 
 /** Change the worker selection algorithm.
 Note that this function controls which <b>worker</b> will be selected
-for a given task while @ref work_queue_task_order controls which <b>task</b>
+for a given task while @ref work_queue_specify_task_order controls which <b>task</b>
 will be executed next.
 @param q A work queue object.
-@param alg The algorithm to use in assigning a task to a worker:
+@param algo The algorithm to use in assigning a task to a worker:
 - @ref WORK_QUEUE_SCHEDULE_FCFS	 - Select worker on a first-come-first-serve basis.
 - @ref WORK_QUEUE_SCHEDULE_FILES - Select worker that has the most data required by the task.
 - @ref WORK_QUEUE_SCHEDULE_TIME	 - Select worker that has the fastest execution time on previous tasks.
