@@ -23,14 +23,6 @@ and port of the master.
 #define WORK_QUEUE_RANDOM_PORT  -1    /**< Indicates that any port number may be chosen. */
 #define WORK_QUEUE_WAITFORTASK  -1    /**< Wait for a task to complete before returning. */
 
-#define WORK_QUEUE_RESULT_UNSET 0
-#define WORK_QUEUE_RESULT_INPUT_FAIL 1
-#define WORK_QUEUE_RESULT_INPUT_MISSING 2
-#define WORK_QUEUE_RESULT_FUNCTION_FAIL 4
-#define WORK_QUEUE_RESULT_OUTPUT_FAIL 8
-#define WORK_QUEUE_RESULT_OUTPUT_MISSING 16
-#define WORK_QUEUE_RESULT_LINK_FAIL 32
-
 #define WORK_QUEUE_SCHEDULE_UNSET 0
 #define WORK_QUEUE_SCHEDULE_FCFS	 1 /**< Select worker on a first-come-first-serve basis. */
 #define WORK_QUEUE_SCHEDULE_FILES	 2 /**< Select worker that has the most data required by the task. */
@@ -226,9 +218,17 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t);
 
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the queue is empty.
+If a task has completed, the corresponding task object will be returned by this function.
+The caller may examine the task and then dispose of it using @ref work_queue_task_delete.
+
+If the task ran to completion, then the <tt>result</tt> field will be zero and the <tt>return_status</tt>
+field will contain the Unix exit code of the task.
+If the task could not, then the <tt>result</tt> field will be non-zero and the
+<tt>return_status</tt> field will be undefined.
+
 @param q A work queue object.
 @param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref WORK_QUEUE_WAITFORTASK to block until a task has completed.
-@returns A completed task description, or null if the queue is empty or the timeout was reached without a completed task.  The returned task may be deleted with @ref work_queue_task_delete or resubmitted with @ref work_queue_submit.
+@returns A completed task description, or null if the queue is empty or the timeout was reached without a completed task.
 */
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout);
 

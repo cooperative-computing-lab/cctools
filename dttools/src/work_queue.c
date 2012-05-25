@@ -54,6 +54,17 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_STATE_NONE 		4
 #define WORKER_STATE_MAX 		(WORKER_STATE_NONE+1)
 
+// FIXME: These internal error flags should be clearly distinguished
+// from the task result codes given by work_queue_wait.
+
+#define WORK_QUEUE_RESULT_UNSET 0
+#define WORK_QUEUE_RESULT_INPUT_FAIL 1
+#define WORK_QUEUE_RESULT_INPUT_MISSING 2
+#define WORK_QUEUE_RESULT_FUNCTION_FAIL 4
+#define WORK_QUEUE_RESULT_OUTPUT_FAIL 8
+#define WORK_QUEUE_RESULT_OUTPUT_MISSING 16
+#define WORK_QUEUE_RESULT_LINK_FAIL 32
+
 #define WORK_QUEUE_FILE 0
 #define WORK_QUEUE_BUFFER 1
 #define WORK_QUEUE_REMOTECMD 2
