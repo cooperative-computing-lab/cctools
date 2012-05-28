@@ -13,7 +13,7 @@ border: solid 1px black;
 }
 .code_header {
 text-decoration:underline;
-background: #F6F6B3;
+background: #F4F4AE;
 margin: 0%;
 padding: 0.3%;
 }
@@ -178,11 +178,11 @@ First create a queue that is listening on a particular TCP port:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
-q = work_queue_create(port);
+ q = work_queue_create(port);
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
-q = WorkQueue(port)
+ q = WorkQueue(port)
 </pre>
 </div>
 
@@ -198,15 +198,15 @@ cached:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
-t = work_queue_task_create(command);  
-work_queue_task_specify_file(t,infile,infile,WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); 
-work_queue_task_specify_file(t,outfile,outfile,WORK_QUEUE_OUTPUT,WORK_QUEUE_CACHE);
+ t = work_queue_task_create(command);  
+ work_queue_task_specify_file(t,infile,infile,WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); 
+ work_queue_task_specify_file(t,outfile,outfile,WORK_QUEUE_OUTPUT,WORK_QUEUE_CACHE);
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
-t = Task(command) 
-t.specify_file(infile,infile,WORK_QUEUE_INPUT,cache=True)  
-t.specify_file(outfile,outfile,WORK_QUEUE_OUTPUT,cache=True) 
+ t = Task(command) 
+ t.specify_file(infile,infile,WORK_QUEUE_INPUT,cache=True)  
+ t.specify_file(outfile,outfile,WORK_QUEUE_OUTPUT,cache=True) 
 </pre>
 </div>
 
@@ -282,7 +282,7 @@ with the task, delete it:
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- Deleted automatically when task object goes out of scope.
+ Deleted automatically when task object goes out of scope
 </pre>
 </div>
 
@@ -296,7 +296,7 @@ When all is done, delete the queue:
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- Deleted automatically when work_queue object goes out of scope.
+ Deleted automatically when work_queue object goes out of scope
 </pre>
 </div>
 
@@ -339,7 +339,7 @@ to the resolved file name. For example:
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- t.specify_file(t,"a.$OS.$ARCH","a",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE)
+ t.specify_file(t,"a.$OS.$ARCH","a",WORK_QUEUE_INPUT,cache=True)
 </pre>
 </div>
 This will transfer <tt>a.Linux.x86_64</tt> to workers running on a Linux system with an
