@@ -2,19 +2,21 @@
 
 use work_queue;
 
+my $port = $WORK_QUEUE_DEFAULT_PORT;
+
 if ($#ARGV < 0) {
 	print "work_queue_example <file1> [file2] [file3] ...\n";
 	print "Each file given on the command line will be compressed using a remote worker.\n";
 	exit 1;
 }
 
-my $q = work_queue_create($WORK_QUEUE_DEFAULT_PORT);
+my $q = work_queue_create($port);
 if (not defined($q)) {
 	print "Instantiation of Work Queue failed!\n";
 	exit 1;
 }
 
-my $port = work_queue_port($q);
+$port = work_queue_port($q);
 print "listening on port $port...\n"; 
 
 for (my $i = 0; $i <= $#ARGV; $i++) {
