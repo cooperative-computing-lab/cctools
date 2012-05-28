@@ -1466,7 +1466,7 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 	//Old work command (worker does not fork to execute a task, thus can't
 	//communicate with the master during task execution):
 	//link_putfstring(w->link, "work %zu\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
-	link_putfstring(w->link, "work %zu fork\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
+	link_putfstring(w->link, "work %zu\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
 	debug(D_WQ, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
 	return 1;
 }

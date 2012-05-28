@@ -134,6 +134,10 @@ int link_nonblocking(struct link *link, int onoff)
 	return 1;
 }
 
+int link_buffer_empty(struct link *link) {
+	return link->buffer_length > 0 ? 0 : 1;
+}
+
 static int errno_is_temporary(int e)
 {
 	if(e == EINTR || e == EWOULDBLOCK || e == EAGAIN || e == EINPROGRESS || e == EALREADY || e == EISCONN) {
