@@ -2,14 +2,10 @@
 #
 # Python Work Queue bindings.
 #
-# The objects and methods provided by this package should correspond to the
-# native C API in @ref work_queue.h.
+# The objects and methods provided by this package correspond to the native 
+# C API in @ref work_queue.h.
 #
-# The new SWIG-based bindings provides two levels of access to the Work Queue
-# library.  The first version provides a 1-to-1 function correspondance to the
-# C API.
-#
-# The second version provides a more Pythonic or higher-level interface that
+# The SWIG-based Python bindings provide a higher-level interface that
 # revolves around the following objects:
 #
 # - @ref work_queue::WorkQueue
@@ -27,19 +23,6 @@ cctools_debug_config('work_queue_python')
 # Python Task object
 #
 # This class is used to create a task specification.
-#
-# Example:
-# @code
-# # Create and specify Task
-# task = Task('date > current.date')
-# task.specify_algorithm(WORK_QUEUE_SCHEDULE_FCFS)
-# task.specify_input_file('/usr/bin/date', 'date')
-# task.specify_tag('my date task')
-#
-# # Create Work Queue and submit Task
-# work_queue = WorkQueue()
-# work_queue.submit(task)
-# @endcode
 class Task(_object):
 
     ##
