@@ -387,6 +387,21 @@ static void make_hash_key(const char *addr, int port, char *key)
 	sprintf(key, "%s:%d", addr, port);
 }
 
+static int have_enough_disk_space() {
+	UINT64_T disk_avail, disk_total;
+
+	// Check available disk space
+	if(disk_avail_threshold > 0) {
+		disk_info_get(".", &disk_avail, &disk_total);
+		if(disk_avail < disk_avail_threshold) {
+			debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, disk_avail_threshold);
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
 /**
  * Reasons for a master being bad:
  * 1. The master does not need more workers right now;
@@ -951,14 +966,9 @@ static int do_symlink(const char *path, char *filename) {
 }
 
 static int do_put(struct link *master, char *filename, INT64_T length, int mode) {
-	UINT64_T disk_avail, disk_total;
 
-	if(disk_avail_threshold > 0) {
-		disk_info_get(".", &disk_avail, &disk_total);
-		if(disk_avail < disk_avail_threshold) {
-			debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, disk_avail_threshold);
-			return 0;
-		}
+	if(!have_enough_disk_space()) {
+		return 0;
 	}
 
 	mode = mode | 0600;
@@ -1238,7 +1248,6 @@ static void abort_worker() {
 	free(os_name);
 	free(arch_name);
 	
-
 	// Kill running task if needed
 	if(task_status == TASK_RUNNING) {
 		kill(pid, SIGTERM);
@@ -1293,23 +1302,6 @@ static int setup_workspace() {
 	} 
 
 	fprintf(stdout, "work_queue_worker: working in %s\n", workspace);
-	return 1;
-}
-
-static int have_enough_disk_space() {
-	UINT64_T disk_avail, disk_total;
-
-	disk_avail_threshold *= 1024 * 1024; //convert MB to Bytes.
-
-	// Check available disk space
-	if(disk_avail_threshold > 0) {
-		disk_info_get(".", &disk_avail, &disk_total);
-		if(disk_avail < disk_avail_threshold) {
-			fprintf(stderr, "worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, disk_avail_threshold);
-			return 0;
-		}
-	}
-
 	return 1;
 }
 
@@ -1412,6 +1404,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'z':
 			disk_avail_threshold = string_metric_parse(optarg);
+			disk_avail_threshold *= 1024 * 1024; //convert MB to Bytes.
 			break;
 		case 'A':
 			free(arch_name); //free the arch string obtained from uname
