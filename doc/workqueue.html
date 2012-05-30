@@ -347,6 +347,25 @@ This will transfer <tt>a.Linux.x86_64</tt> to workers running on a Linux system 
 x86_64 architecture and <tt>a.Cygwin.i686</tt> to workers on Cygwin with an i686
 architecture. 
 <p>
+<li><b>Cancel Task.</b> This feature is useful in workflows where there are redundant tasks 
+or tasks that become obsolete as other tasks finish. Tasks that have been submitted can be 
+cancelled and immediately retrieved without waiting for Work Queue to return them in 
+<tt>work_queue_wait</tt>. The tasks to cancel can be identified by either their 
+<tt>taskid</tt> or <tt>tag</tt>. For example:
+<div class="code_area">
+<h4 class="code_header">C/Perl</h4>
+<pre class="code_snip">
+ t = work_queue_cancel_by_tasktag(q,"task3");
+</pre>
+<h4 class="code_header">Python</h4>
+<pre class="code_snip">
+ t = q.cancel_by_tasktag("task3")
+</pre>
+</div>
+This cancels a task with <tt>tag</tt> named 'task4'. Note that in the presence of tasks with 
+the same tag, <tt>work_queue_cancel_by_tasktag</tt> will cancel and retrieve only one of the 
+matching tasks.
+<p>
 <li><b>Statistics.</b>  The queue tracks a fair number of statistics that count the number
 of tasks, number of workers, number of failures, and so forth.  Obtain this data with <tt>work_queue_get_stats</tt>
 in order to make a progress bar or other user-visible information.
