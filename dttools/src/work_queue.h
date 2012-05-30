@@ -37,10 +37,10 @@ and port of the master.
 
 #define WORK_QUEUE_NOCACHE 0	/**< Do not cache file at execution site. */
 #define WORK_QUEUE_CACHE 1	/**< Cache file at execution site for later use. */
-#define WORK_QUEUE_SYMLINK 2	/**< Create a symlink to the file rather than copying it, if possible. */
-#define WORK_QUEUE_PREEXIST 4   /**< If the filename already exists on the host, use it in place. */
-#define WORK_QUEUE_THIRDGET 8	/**< Access the file on the client from a shared filesystem */
-#define WORK_QUEUE_THIRDPUT 8	/**< Access the file on the client from a shared filesystem (included for readability) */
+#define WORK_QUEUE_SYMLINK 2	/* Create a symlink to the file rather than copying it, if possible. */
+#define WORK_QUEUE_PREEXIST 4   /* If the filename already exists on the host, use it in place. */
+#define WORK_QUEUE_THIRDGET 8	/* Access the file on the client from a shared filesystem */
+#define WORK_QUEUE_THIRDPUT 8	/* Access the file on the client from a shared filesystem (included for readability) */
 
 #define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
 #define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
@@ -144,7 +144,7 @@ void work_queue_task_specify_file(struct work_queue_task *t, const char *local_n
 */
 void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags);
 
-/** Add a file created or handled by an arbitrary command to a task (eg: wget, ftp, chirp_get|put).
+/* Add a file created or handled by an arbitrary command to a task (eg: wget, ftp, chirp_get|put).
 @param t A task object.
 @param remote_name The name of the file at the execution site.
 @param cmd The command to run on the remote node to retrieve or store the file.
