@@ -270,8 +270,6 @@ static void handle_query(struct link *query_link)
 	link_address_remote(query_link, addr, &port);
 	debug(D_DEBUG, "www query from %s:%d", addr, port);
 
-	link_nonblocking(query_link, 0);
-
 	if(link_readline(query_link, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
 		string_chomp(line);
 		if(sscanf(line, "%s %s %s", action, url, version) != 3) {
@@ -297,6 +295,7 @@ static void handle_query(struct link *query_link)
 	if(!stream) {
 		return;
 	}
+	link_nonblocking(query_link, 0);
 
 	current = time(0);
 	fprintf(stream, "HTTP/1.1 200 OK\n");
