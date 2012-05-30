@@ -35,6 +35,9 @@ See the file COPYING for details.
 
 #define MAX_TABLE_SIZE 10000
 
+/* Timeout in communicating with the querying client */
+#define HANDLE_QUERY_TIMEOUT 15
+
 /* The table of nvpairs, hashed on address:port */
 static struct hash_cache *table = 0;
 
@@ -265,25 +268,34 @@ static void handle_query(struct link *query_link)
 	int i, n;
 
 	link_address_remote(query_link, addr, &port);
-
 	debug(D_DEBUG, "www query from %s:%d", addr, port);
 
 	link_nonblocking(query_link, 0);
-	stream = fdopen(link_fd(query_link), "r+");
-	if(!stream)
-		return;
 
-	if(!fgets(line, sizeof(line), stream))
-		return;
-	string_chomp(line);
-	if(sscanf(line, "%s %s %s", action, url, version) != 3)
-		return;
-
-	while(1) {
-		if(!fgets(line, sizeof(line), stream))
+	if(link_readline(query_link, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
+		string_chomp(line);
+		if(sscanf(line, "%s %s %s", action, url, version) != 3) {
 			return;
-		if(line[0] == '\n' || line[0] == '\r')
-			break;
+		}
+
+		// Consume the rest of the query
+		while(1) {
+			if(!link_readline(query_link, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
+				return;
+			}
+
+			if(line[0] == 0) {
+				break;
+			}
+		}
+	} else {
+		return;
+	}
+
+	// Output response
+	stream = fdopen(link_fd(query_link), "w");
+	if(!stream) {
+		return;
 	}
 
 	current = time(0);
@@ -553,10 +565,14 @@ int main(int argc, char *argv[])
 					pid_t pid = fork();
 					if(pid == 0) {
 						handle_query(link);
+						debug(D_DEBUG, "Handling query done.");
+						link_close(link);
 						exit(0);
 					}
 				} else {
 					handle_query(link);
+					debug(D_DEBUG, "Handling query done.");
+					link_close(link);
 				}
 				link_close(link);
 			}
