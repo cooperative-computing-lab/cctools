@@ -37,3 +37,5 @@ install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON_VERSION}/site-packages
 	install _work_queue.${CCTOOLS_DYNAMIC_SUFFIX} ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON_VERSION}/site-packages
 	install  work_queue.py ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON_VERSION}/site-packages
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
+        install work_queue_example.py ${CCTOOLS_INSTALL_DIR}/doc/work_queue_example.py

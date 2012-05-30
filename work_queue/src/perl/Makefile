@@ -28,3 +28,6 @@ install: all
 	install -d $(PERL_INSTALL_DIR)
 	install work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(PERL_INSTALL_DIR)/work_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
 	install work_queue.pm $(PERL_INSTALL_DIR)/work_queue.pm
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
+	install work_queue_example.pl ${CCTOOLS_INSTALL_DIR}/doc/work_queue_example.pl
+

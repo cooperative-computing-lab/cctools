@@ -86,4 +86,5 @@ install: all
 	for file in ${PROGRAMS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; done
 	for file in ${SCRIPTS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; chmod 755 ${CCTOOLS_INSTALL_DIR}/bin/$$file; done
 	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then install /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; done
-
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
+	install work_queue_example.c ${CCTOOLS_INSTALL_DIR}/doc/work_queue_example.c
