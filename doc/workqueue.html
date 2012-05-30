@@ -323,7 +323,8 @@ that are statistical outliers.  See <tt>work_queue_activate_fast_abort</tt>.
 <p>
 <li><b>Immediate Data.</b>  For a large number of tasks or workers, it may be impractical
 to create local input files for each one.  If the master already has the necessary input
-data in memory, it can pass the data directly to the remote task with <tt>work_queue_task_specify_input_buf</tt>.
+data in memory, it can pass the data directly to the remote task with
+<tt>work_queue_task_specify_buffer</tt>.
 <p>
 <li><b>Environment Variables.</b>  If you have workers distributed across
 multiple operating systems (such as Linux, Cygwin, Solaris) and/or architectures (such
