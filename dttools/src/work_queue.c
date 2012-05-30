@@ -362,7 +362,12 @@ static void change_worker_state(struct work_queue *q, struct work_queue_worker *
 	q->workers_in_state[w->state]--;
 	w->state = state;
 	q->workers_in_state[state]++;
-	debug(D_WQ, "Number of workers in state 'busy': %d;  'ready': %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_READY]);
+	debug(D_WQ, "workers total: %d init: %d ready: %d busy: %d cancelling: %d",
+		hash_table_size(q->worker_table),
+		q->workers_in_state[WORKER_STATE_INIT],
+		q->workers_in_state[WORKER_STATE_READY],
+		q->workers_in_state[WORKER_STATE_BUSY],
+		q->workers_in_state[WORKER_STATE_CANCELLING]);
 }
 
 static void link_to_hash_key(struct link *link, char *key)
