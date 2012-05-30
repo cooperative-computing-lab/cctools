@@ -10,9 +10,7 @@
 
 from work_queue import *
 
-import os
 import sys
-import time
 
 port = WORK_QUEUE_DEFAULT_PORT
 
