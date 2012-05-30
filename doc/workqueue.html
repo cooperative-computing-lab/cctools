@@ -326,11 +326,11 @@ to create local input files for each one.  If the master already has the necessa
 data in memory, it can pass the data directly to the remote task with
 <tt>work_queue_task_specify_buffer</tt>.
 <p>
-<li><b>Environment Variables.</b>  If you have workers distributed across
+<li><b>String Interpolation.</b>  If you have workers distributed across
 multiple operating systems (such as Linux, Cygwin, Solaris) and/or architectures (such
 as i686, x86_64) and have files specific to each of these systems, this feature 
-will help. The variables $OS and $ARCH are available for use in the specification of input
-file names. Work Queue will automatically resolve these variables to the operating system
+will help. The strings $OS and $ARCH are available for use in the specification of input
+file names. Work Queue will automatically resolve these strings to the operating system
 and architecture of each connected worker and transfer the input file corresponding
 to the resolved file name. For example:
 <div class="code_area">
