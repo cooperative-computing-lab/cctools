@@ -1465,7 +1465,6 @@ int main(int argc, char *argv[])
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	int auto_workers = 0;
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
-	int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 	int work_queue_estimate_capacity_on = 0;
 	char *catalog_host;
 	int catalog_port;
@@ -1473,7 +1472,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAB:cC:d:DeEF:GhiIj:J:kKl:L:MN:o:Op:P:r:RS:t:T:vw:W:z:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:DEF:GhiIj:J:kKl:L:MN:o:Op:P:r:RS:t:T:vw:W:z:")) != (char) -1) {
 		switch (c) {
 		case 'A':
 			skip_afs_check = 1;
@@ -1496,9 +1495,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
-			break;
-		case 'e':
-			work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_EXCLUSIVE;
 			break;
 		case 'E':
 			work_queue_estimate_capacity_on = 1;
@@ -1634,11 +1630,7 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		char *value = string_format("%d", work_queue_worker_mode);
-		setenv("WORK_QUEUE_WORKER_MODE", value, 1);
-		free(value);
-
-		value = string_format("%d", work_queue_master_mode);
+		char *value = string_format("%d", work_queue_master_mode);
 		setenv("WORK_QUEUE_MASTER_MODE", value, 1);
 		free(value);
 

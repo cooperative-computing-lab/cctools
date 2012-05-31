@@ -45,9 +45,6 @@ and port of the master.
 #define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
 #define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
 
-#define WORK_QUEUE_WORKER_MODE_SHARED 0	    /**< Work Queue master accepts workers in shared or non-exclusive mode. */
-#define WORK_QUEUE_WORKER_MODE_EXCLUSIVE 1  /**< Work Queue master only accepts workers that have a preference for it. */
-
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler;	/**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
 
@@ -332,14 +329,6 @@ void work_queue_specify_priority(struct work_queue *q, int priority);
 - @ref WORK_QUEUE_MASTER_MODE_CATALOG - catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
 */
 void work_queue_specify_master_mode(struct work_queue *q, int mode);
-
-/** Specify the worker mode for a given queue. 
-@param q A work queue object.
-@param mode 
-- @ref WORK_QUEUE_WORKER_MODE_SHARED - shared mode. In this mode the master would accept connections from shared workers;
-- @ref WORK_QUEUE_WORKER_MODE_EXCLUSIVE - exclusive mode. In this mode the master would only accept workers that have specified a preference on it, which are the workers started with "-N name" where name is the name of the queue. 
-*/
-void work_queue_specify_worker_mode(struct work_queue *q, int mode);
 
 /** Cancel a submitted task using its task id and remove it from queue.
 @param q A work queue object.

@@ -785,37 +785,6 @@ void submit_workers_for_new_masters(struct list *matched_masters, struct pool_co
 	}
 }
 
-int get_master_capacity(const char *catalog_host, int catalog_port, const char *proj)
-{
-	struct catalog_query *q;
-	struct nvpair *nv;
-	time_t stoptime;
-	int capacity = 0;
-
-	stoptime = time(0) + 5;
-
-	q = catalog_query_create(catalog_host, catalog_port, stoptime);
-	if(!q) {
-		fprintf(stderr, "Failed to query catalog server at %s:%d\n", catalog_host, catalog_port);
-		return 0;
-	}
-
-	while((nv = catalog_query_read(q, stoptime))) {
-		if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0) {
-			if(strcmp(nvpair_lookup_string(nv, proj), proj) == 0) {
-				capacity = nvpair_lookup_integer(nv, "capacity");
-				nvpair_delete(nv);
-				break;
-			}
-		}
-		nvpair_delete(nv);
-	}
-
-	// Must delete the query otherwise it would occupy 1 tcp connection forever!
-	catalog_query_delete(q);
-	return capacity;
-}
-
 static int submit_workers(char *cmd, char *input_files, int count)
 {
 	int i;

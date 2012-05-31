@@ -39,6 +39,9 @@ See the file COPYING for details.
 #define	WORK_QUEUE_CATALOG_LIFETIME	60
 #define WORK_QUEUE_NAME_MAX 256
 
+#define WORK_QUEUE_PROTOCOL_BLANK_FIELD "-"
+#define WORK_QUEUE_PROTOCOL_FIELD_MAX 256
+
 struct work_queue_master {
 	char addr[LINK_ADDRESS_MAX];
 	int port;

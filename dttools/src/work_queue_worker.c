@@ -122,12 +122,10 @@ static int stdout_in_file = 0;
 static char *catalog_server_host = NULL;
 static int catalog_server_port = 0;
 static int auto_worker = 0;
-static int exclusive_worker = 1;
 static char *pool_name = NULL;
 static struct work_queue_master *actual_master = NULL;
 static struct list *preferred_masters = NULL;
 static struct hash_cache *bad_masters = NULL;
-static const int non_preference_priority_max = 1000;
 static int released_by_master = 0;
 
 // Function declarations
@@ -144,33 +142,17 @@ static void report_worker_ready(struct link *master)
 	UINT64_T memory_avail, memory_total;
 	UINT64_T disk_avail, disk_total;
 	int ncpus;
-	char *pm;
-	char preferred_master_names[WORK_QUEUE_LINE_MAX];
-	char name_of_pool[WORK_QUEUE_POOL_NAME_MAX];
+	char *name_of_master;
+	char *name_of_pool;
 
 	domain_name_cache_guess(hostname);
 	ncpus = load_average_get_cpus();
 	memory_info_get(&memory_avail, &memory_total);
 	disk_info_get(".", &disk_avail, &disk_total);
+	name_of_master = actual_master ? actual_master->proj : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
+	name_of_pool = pool_name ? pool_name : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
 
-	if(pool_name) {
-		strncpy(name_of_pool, pool_name, WORK_QUEUE_POOL_NAME_MAX);
-	} else {
-		name_of_pool[0] = '\0';
-	}
-
-	if(exclusive_worker) {
-		preferred_master_names[0] = 0;
-		list_first_item(preferred_masters);
-		while((pm = (char *) list_next_item(preferred_masters))) {
-			sprintf(&(preferred_master_names[strlen(preferred_master_names)]), "%s ", pm);
-		}
-
-		link_putfstring(master, "ready %s %d %llu %llu %llu %llu \"%s\" %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names, os_name, arch_name, name_of_pool);
-	} else {
-		link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, os_name, arch_name, name_of_pool);
-	}
-
+	link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, name_of_master, name_of_pool, os_name, arch_name);
 }
 
 
@@ -530,19 +512,11 @@ static int get_masters_and_pool_info(const char *catalog_host, int catalog_port,
 			}
 		}
 
-		if(pm) {
-			// This is a preferred master
-			m->priority += non_preference_priority_max;
-		} else {
-			// Master name does not match any preferred master names
-			if(exclusive_worker) {
-				list_remove(ml, m);
-				free_work_queue_master(m);
-			} else {
-				m->priority = non_preference_priority_max < m->priority ? non_preference_priority_max : m->priority;
-			}
+		if(!pm) {
+			// Master name does not match any of the preferred master names
+			list_remove(ml, m);
+			free_work_queue_master(m);
 		}
-
 	}
 
 	// Must delete the query otherwise it would occupy 1 tcp connection forever!
@@ -1275,9 +1249,9 @@ static void check_arguments(int argc, char **argv) {
 		}
 	}
 
-	if(auto_worker && exclusive_worker && !list_size(preferred_masters) && !pool_name) {
-		fprintf(stderr, "Worker is running under exclusive mode. But no preferred master is specified.\n");
-		fprintf(stderr, "Please specify the preferred master names with -N option or add -s option to allow the worker to work for any available masters.\n");
+	if(auto_worker && !list_size(preferred_masters) && !pool_name) {
+		fprintf(stderr, "Worker is running under auto mode. But no preferred master name is specified.\n");
+		fprintf(stderr, "Please specify the preferred master names with the -N option.\n");
 		exit(1);
 	}
 
@@ -1321,7 +1295,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
 	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	fprintf(stdout, " -s             Run as a shared worker. By default the worker would only work on preferred projects.\n");
 	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem.\n");
 	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
 	fprintf(stdout, " -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
@@ -1356,7 +1329,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aC:sd:t:o:p:N:w:i:b:z:A:O:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "aC:d:t:o:p:N:w:i:b:z:A:O:vh")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
@@ -1366,12 +1339,6 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "The provided catalog server is invalid. The format of the '-C' option is '-C HOSTNAME:PORT'.\n");
 				exit(1);
 			}
-			auto_worker = 1;
-			break;
-		case 's':
-			auto_worker = 1;
-			// This is a shared worker
-			exclusive_worker = 0;
 			break;
 		case 'd':
 			debug_flags_set(optarg);
