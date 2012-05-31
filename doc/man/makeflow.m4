@@ -51,7 +51,7 @@ OPTION_PAIR(-l, logfile)Use this file for the makeflow log. (default is X.makefl
 OPTION_PAIR(-L, logfile)Use this file for the batch system log. (default is X.PARAM(type)log)
 OPTION_PAIR(-r, n)Automatically retry failed batch jobs up to n times.
 OPTION_PAIR(-S, timeout)Time to retry failed batch job submission. (default is 3600s)
-OPTION_PAIR(-T, type)Batch system type: local, condor, sge, moab, wq, hadoop, mpi-queue. (default is local)
+OPTION_PAIR(-T, type)Batch system type: local, condor, sge, moab, cluster, wq, hadoop, mpi-queue. (default is local)
 OPTIONS_END
 
 SUBSECTION(Debugging Options)

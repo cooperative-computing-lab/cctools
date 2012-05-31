@@ -324,6 +324,18 @@ has three preferred projects. The worker would ask the catalog server for
 available masters and only work for a master if its project name matches one
 of the worker's preferences.
 
+<h3>Supported Makeflow Drivers</h3>
+The full list of supported Makeflow drivers include
+<ul>
+	<li>Local - local execution on a single multicore system</li>
+	<li>Condor - execution on a campus grid via the local <a href="http://www.cs.wisc.edu/condor">Condor Pool</a></li>
+	<li>SGE - execution on a high-performance cluster using the <a href="http://www.oracle.com/us/products/tools/oracle-grid-engine-075549.html">Oracle Grid Engine</a> (formerly the Sun Grid Engine).</li>
+	<li>Moab - execution on a high-performance cluster using the <a href="http://www.adaptivecomputing.com/resources/docs/mwm/6-0/index.php">Moab Workload Manager</a></li>
+	<li>Cluster - execution on a high-performance cluster using a user-defined cluster manager</li>
+	<li>Work Queue - execution on a lightweight, scalable master-worker <a href="http://cse.nd.edu/~ccl/software/workqueue/">framework</a> managed directly by Makeflow</li>
+	<li>Hadoop - execution on a cluster managed by the <a href="http://hadoop.apache.org/">Hadoop</a> framework, using data stored in <a href="http://hadoop.apache.org/hdfs">HDFS</a>.</li>
+</ul>
+
 <h2>For More Information</h2>
 
 For the latest information about Makeflow, please visit our <a href=http://www.cse.nd.edu/~ccl/software/makeflow>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
