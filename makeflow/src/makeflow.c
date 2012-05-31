@@ -1510,7 +1510,6 @@ int main(int argc, char *argv[])
 			setenv("CATALOG_PORT", value, 1);
 			free(value);
 
-			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
 		case 'I':
 			display_mode = SHOW_INPUT_FILES;
