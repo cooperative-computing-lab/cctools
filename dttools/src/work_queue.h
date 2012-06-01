@@ -20,7 +20,7 @@ and port of the master.
 #include "timestamp.h"
 
 #define WORK_QUEUE_DEFAULT_PORT 9123  /**< Default Work Queue port number. */
-#define WORK_QUEUE_RANDOM_PORT  -1    /**< Indicates that any port number may be chosen. */
+#define WORK_QUEUE_RANDOM_PORT  0    /**< Indicates that any port number may be chosen. */
 #define WORK_QUEUE_WAITFORTASK  -1    /**< Wait for a task to complete before returning. */
 
 #define WORK_QUEUE_SCHEDULE_UNSET 0
