@@ -21,20 +21,16 @@ Each file is compressed with gzip and returned to the user.
 int main(int argc, char *argv[])
 {
 	struct work_queue *q;
-	struct work_queue_task *t, *t1;
+	struct work_queue_task *t;
 	int port = WORK_QUEUE_DEFAULT_PORT;
 	int taskid;
 	int i;
-
-	int taskids[7];
 
 	if(argc < 2) {
 		printf("work_queue_example <file1> [file2] [file3] ...\n");
 		printf("Each file given on the command line will be compressed using a remote worker.\n");
 		return 0;
 	}
-
-	cctools_debug_flags_set("all");
 
 	q = work_queue_create(port);
 	if(!q) {
@@ -50,13 +46,12 @@ int main(int argc, char *argv[])
 
 		sprintf(infile, "%s", argv[i]);
 		sprintf(outfile, "%s.gz", argv[i]);
-		sprintf(command, "sleep 5; /usr/bin/gzip < %s > %s", infile, outfile);
+		sprintf(command, "/usr/bin/gzip < %s > %s", infile, outfile);
 
 		t = work_queue_task_create(command);
-		work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
-		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+		work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
 		taskid = work_queue_submit(q, t);
-		taskids[i-1] = taskid;
 
 		printf("submitted task (id# %d): %s\n", taskid, t->command_line);
 	}
@@ -67,18 +62,8 @@ int main(int argc, char *argv[])
 
 		t = work_queue_wait(q, 5);
 		if(t) {
-			if(t->taskid == taskids[1]) {
-				printf("task (id# %d) complete: %s (return code %d)\n", t->taskid, t->command_line, t->return_status);
-				printf("Cancelling task id %d..\n", taskids[3]);
-				if ((t1 = work_queue_cancel_by_taskid(q, taskids[3]))) {
-					//printf("Deleting task id %d..\n", taskids[3]);
-					//work_queue_task_delete(t1);
-				}
-				work_queue_task_delete(t);
-			} else {
-				printf("task (id# %d) complete: %s (return code %d)\n", t->taskid, t->command_line, t->return_status);
-				work_queue_task_delete(t);
-			}
+			printf("task (id# %d) complete: %s (return code %d)\n", t->taskid, t->command_line, t->return_status);
+			work_queue_task_delete(t);
 		}
 	}
 
