@@ -266,7 +266,6 @@ class WorkQueue(_object):
             work_queue_specify_name(self._work_queue, name)
 
         work_queue_specify_master_mode(self._work_queue, catalog)
-        work_queue_specify_worker_mode(self._work_queue, exclusive)
 
     def __del__(self):
         if self._shutdown:
