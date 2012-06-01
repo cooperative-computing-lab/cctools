@@ -62,6 +62,12 @@ static time_t starttime;
 /* If true, for for every query */
 static int fork_mode = 1;
 
+/* The maximum number of simultaneous children that can be running. */
+static int child_procs_max = 50;
+
+/* Number of query processses currently running. */
+static int child_procs_count = 0;
+
 /* The maximum size of a server that will actually be believed. */
 static INT64_T max_server_size = 0;
 
@@ -94,9 +100,15 @@ void reap_child(int sig)
 	pid_t pid;
 	int status;
 
-	do {
+	while(1) {
 		pid = waitpid(-1, &status, WNOHANG);
-	} while(pid > 0);
+		if(pid>0) {
+			child_procs_count--;
+			continue;
+		} else {
+			break;
+		}
+	}
 }
 
 static void install_handler(int sig, void (*handler) (int sig))
@@ -420,6 +432,7 @@ static void show_help(const char *cmd)
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -O <bytes>     Rotate debug file once it reaches this size.\n");
 	printf(" -u <host>      Send status updates to this host. (default is %s)\n", CATALOG_HOST_DEFAULT);
+	printf(" -m <n>         Maximum number of child processes.  (default is %d)\n",child_procs_max);
 	printf(" -M <size>      Maximum size of a server to be believed.  (default is any)\n");
 	printf(" -U <time>      Send status updates at this interval. (default is 5m)\n");
 	printf(" -L <file>      Log new updates to this file.\n");
@@ -439,13 +452,16 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "bp:l:L:M:d:o:O:u:U:Shv")) != (char) -1) {
+	while((ch = getopt(argc, argv, "bp:l:L:m:M:d:o:O:u:U:Shv")) != (char) -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
 				break;
 			case 'd':
 				debug_flags_set(optarg);
+				break;
+			case 'm':
+				child_procs_max = atoi(optarg);
 				break;
 			case 'M':
 				max_server_size = string_metric_parse(optarg);
@@ -543,7 +559,9 @@ int main(int argc, char *argv[])
 
 		FD_ZERO(&rfds);
 		FD_SET(ufd, &rfds);
-		FD_SET(lfd, &rfds);
+		if(child_procs_count < child_procs_max) {
+			FD_SET(lfd, &rfds);
+		}
 		maxfd = MAX(ufd, lfd) + 1;
 
 		timeout.tv_sec = 5;
@@ -564,13 +582,12 @@ int main(int argc, char *argv[])
 					pid_t pid = fork();
 					if(pid == 0) {
 						handle_query(link);
-						debug(D_DEBUG, "Handling query done.");
-						link_close(link);
-						exit(0);
+						_exit(0);
+					} else if (pid>0) {
+						child_procs_count++;
 					}
 				} else {
 					handle_query(link);
-					debug(D_DEBUG, "Handling query done.");
 					link_close(link);
 				}
 				link_close(link);
