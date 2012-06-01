@@ -361,14 +361,6 @@ class WorkQueue(_object):
         return work_queue_specify_master_mode(self._work_queue, mode)
 
     ##
-    # Specify the worker mode for the given queue.
-    #
-    # @param self   Reference to the current work queue object.
-    # @param mode   This may be one of the following values: @ref WORK_QUEUE_WORKER_MODE_SHARED or @ref WORK_QUEUE_WORKER_MODE_EXCLUSIVE.
-    def specify_worker_mode(self, mode):
-        return work_queue_specify_worker_mode(self._work_queue, mode)
-	
-    ##
     # Cancel task identified by its taskid and remove from the given queue. 
     #
     # @param self   Reference to the current work queue object.
