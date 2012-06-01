@@ -76,7 +76,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define TIME_SLOT_MASTER_IDLE 2
 #define TIME_SLOT_APPLICATION 3
 
-#define POOL_DECISION_ENFORCEMENT_INTERVAL_DEFAULT 15
+#define POOL_DECISION_ENFORCEMENT_INTERVAL_DEFAULT 60
 
 #define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
 

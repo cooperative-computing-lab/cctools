@@ -33,6 +33,8 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
+#define CATALOG_QUERY_INTERVAL 60
+
 #define WORKERS_PER_JOB_MAX 50
 #define EXTRA_WORKERS_MAX 20
 #define EXTRA_WORKERS_PERCENTAGE 0.2
@@ -421,12 +423,13 @@ struct pool_config *update_pool_config(const char *pool_config_path, struct pool
 	return pc;
 }
 
-// TODO: // This is an experimental feature!!
+// This is an experimental feature!!
 void start_serving_masters(const char *catalog_host, int catalog_port, const char *pool_config_path) 
 {
 	struct list *matched_masters;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
+	static time_t next_catalog_query_time = 0;
 
 	char cmd[PATH_MAX] = "";
 	char input_files[PATH_MAX] = "";
@@ -444,11 +447,16 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 			return;
 		}
 
-		matched_masters = get_masters_from_catalog(catalog_host, catalog_port, pc->project);
-		if(!matched_masters) {
-			sleep(5);
-			continue;
+		if(next_catalog_query_time <= time(0)) {
+			next_catalog_query_time = time(0) + CATALOG_QUERY_INTERVAL;
+			matched_masters = get_masters_from_catalog(catalog_host, catalog_port, pc->project);
+			if(!matched_masters) {
+				goto check_workers;
+			}
+		} else {
+			goto check_workers;
 		}
+
 		debug(D_WQ, "Matching masters:\n");
 		debug_print_masters(matched_masters);
 
@@ -508,6 +516,7 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 		free_work_queue_master_list(matched_masters);
 		matched_masters = NULL;
 
+check_workers:
 		if(itable_size(job_table)) {
 			jobid = batch_job_wait_timeout(q, &info, time(0) + 5);
 			if(jobid >= 0 && !abort_flag) {
