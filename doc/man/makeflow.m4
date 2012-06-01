@@ -67,7 +67,7 @@ OPTION_PAIR(-C, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:P
 OPTION_ITEM(-e)Set the WorkQueue master to only accept workers that have the same -N PARAM(project) option.
 OPTION_PAIR(-F, #)WorkQueue fast abort multiplier. (default is deactivated)
 OPTION_PAIR(-N, project)Set the project name to PARAM(project).
-OPTION_PAIR(-p, port)Port number to use with WorkQueue . (default is 9123, -1=random)
+OPTION_PAIR(-p, port)Port number to use with WorkQueue. (default is 9123, 0=arbitrary)
 OPTION_PAIR(-P, integer)Priority. Higher the value, higher the priority.
 OPTION_PAIR(-w, mode)Auto WorkQueue mode. Mode is either 'width' or 'group' (DAG [width] or largest [group] of tasks).
 OPTION_PAIR(-W, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
@@ -101,6 +101,12 @@ minimum of the argument and the environment variable is used.
 PARA
 Note that variables defined in your BOLD(Makeflow) are exported to the
 environment.
+
+SUBSECTION(TCP_LOW_PORT)
+Inclusive low port in range used with CODE(-p 0).
+
+SUBSECTION(TCP_HIGH_PORT))
+Inclusive high port in range used with CODE(-p 0).
 
 SECTION(EXIT STATUS)
 On success, returns zero.  On failure, returns non-zero.

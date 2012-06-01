@@ -1422,7 +1422,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -T <type>      Batch system type: %s. (default is local)\n", batch_queue_type_string());
 	fprintf(stdout, " -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	fprintf(stdout, " -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
-	fprintf(stdout, " -p <port>      Port number to use with work queue.         (default is %d, 0=random)\n", WORK_QUEUE_DEFAULT_PORT);
+	fprintf(stdout, " -p <port>      Port number to use with work queue.         (default is %d, 0=arbitrary)\n", WORK_QUEUE_DEFAULT_PORT);
 	fprintf(stdout, " -N <project>   Set the project name to <project>\n");
 	fprintf(stdout, " -P <integer>   Priority. Higher the value, higher the priority.\n");
 	fprintf(stdout, " -a             Advertise the master information to a catalog server.\n");
@@ -1644,7 +1644,7 @@ int main(int argc, char *argv[])
 		} else {
 			// Use work queue default port in standalone mode when port is not
 			// specified with -p option. In work queue catalog mode, work queue
-			// would choose a random port when port is not explicitly specified.
+			// would choose an arbitrary port when port is not explicitly specified.
 			if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE) {
 				value = string_format("%d", WORK_QUEUE_DEFAULT_PORT);
 				setenv("WORK_QUEUE_PORT", value, 1);
