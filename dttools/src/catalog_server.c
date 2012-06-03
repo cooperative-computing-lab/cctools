@@ -95,22 +95,6 @@ void ignore_signal(int sig)
 {
 }
 
-void reap_child(int sig)
-{
-	pid_t pid;
-	int status;
-
-	while(1) {
-		pid = waitpid(-1, &status, WNOHANG);
-		if(pid>0) {
-			child_procs_count--;
-			continue;
-		} else {
-			break;
-		}
-	}
-}
-
 static void install_handler(int sig, void (*handler) (int sig))
 {
 	struct sigaction s;
@@ -520,7 +504,7 @@ int main(int argc, char *argv[])
 
 	install_handler(SIGPIPE, ignore_signal);
 	install_handler(SIGHUP, ignore_signal);
-	install_handler(SIGCHLD, reap_child);
+	install_handler(SIGCHLD, ignore_signal);
 	install_handler(SIGINT, shutdown_clean);
 	install_handler(SIGTERM, shutdown_clean);
 	install_handler(SIGQUIT, shutdown_clean);
@@ -557,6 +541,17 @@ int main(int argc, char *argv[])
 			outgoing_alarm = time(0) + outgoing_timeout;
 		}
 
+		while(1) {
+			int status;
+			pid_t pid = waitpid(-1, &status, WNOHANG);
+			if(pid>0) {
+				child_procs_count--;
+				continue;
+			} else {
+				break;
+			}
+		}
+
 		FD_ZERO(&rfds);
 		FD_SET(ufd, &rfds);
 		if(child_procs_count < child_procs_max) {
@@ -588,7 +583,6 @@ int main(int argc, char *argv[])
 					}
 				} else {
 					handle_query(link);
-					link_close(link);
 				}
 				link_close(link);
 			}
