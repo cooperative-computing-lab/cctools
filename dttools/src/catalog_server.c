@@ -68,6 +68,9 @@ static int child_procs_max = 50;
 /* Number of query processses currently running. */
 static int child_procs_count = 0;
 
+/* Maximum time to allow a child process to run. */
+static int child_procs_timeout = 60;
+
 /* The maximum size of a server that will actually be believed. */
 static INT64_T max_server_size = 0;
 
@@ -417,6 +420,7 @@ static void show_help(const char *cmd)
 	printf(" -O <bytes>     Rotate debug file once it reaches this size.\n");
 	printf(" -u <host>      Send status updates to this host. (default is %s)\n", CATALOG_HOST_DEFAULT);
 	printf(" -m <n>         Maximum number of child processes.  (default is %d)\n",child_procs_max);
+	printf(" -T <time>	Maximum time to allow a query process to run.  (default is %ds)\n",child_procs_timeout);
 	printf(" -M <size>      Maximum size of a server to be believed.  (default is any)\n");
 	printf(" -U <time>      Send status updates at this interval. (default is 5m)\n");
 	printf(" -L <file>      Log new updates to this file.\n");
@@ -436,7 +440,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "bp:l:L:m:M:d:o:O:u:U:Shv")) != (char) -1) {
+	while((ch = getopt(argc, argv, "bp:l:L:m:M:d:o:O:u:U:SThv")) != (char) -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
@@ -476,6 +480,9 @@ int main(int argc, char *argv[])
 			case 'S':
 				fork_mode = 0;
 				break;
+			case 'T':
+				child_procs_timeout = string_time_parse(optarg);
+				break;
 			case 'v':
 				show_version(argv[0]);
 				return 0;
@@ -508,6 +515,7 @@ int main(int argc, char *argv[])
 	install_handler(SIGINT, shutdown_clean);
 	install_handler(SIGTERM, shutdown_clean);
 	install_handler(SIGQUIT, shutdown_clean);
+	install_handler(SIGALRM, shutdown_clean);
 
 	domain_name_cache_guess(hostname);
 	username_get(owner);
@@ -576,6 +584,7 @@ int main(int argc, char *argv[])
 				if(fork_mode) {
 					pid_t pid = fork();
 					if(pid == 0) {
+						alarm(child_procs_timeout);
 						handle_query(link);
 						_exit(0);
 					} else if (pid>0) {
