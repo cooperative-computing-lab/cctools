@@ -175,9 +175,6 @@ class Task(_object):
     # @param flags          May be zero to indicate no special handling, or any of the following or'd together:
     #                       - @ref WORK_QUEUE_NOCACHE
     #                       - @ref WORK_QUEUE_CACHE
-    #                       - @ref WORK_QUEUE_SYMLINK
-    #                       - @ref WORK_QUEUE_THIRDGET
-    #                       - @ref WORK_QUEUE_THIRDPUT
     # @param cache          Legacy parameter for setting file caching attribute.  By default this is enabled.
     #
     # Example:
