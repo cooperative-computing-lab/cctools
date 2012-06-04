@@ -82,6 +82,8 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define WORK_QUEUE_MASTER_PRIORITY_DEFAULT 10
 
+#define LOG_LINE_SIZE 256 //size for log line written by specify_log()
+
 // work_queue_worker struct related
 #define WORKER_OS_NAME_MAX 65
 #define WORKER_ARCH_NAME_MAX 65
@@ -143,6 +145,8 @@ struct work_queue {
 	char catalog_host[DOMAIN_NAME_MAX];
 	int catalog_port;
 	struct hash_table *workers_by_pool;
+
+	FILE *logfile; 
 };
 
 struct work_queue_worker {
@@ -362,6 +366,20 @@ void work_queue_task_delete(struct work_queue_task *t)
 /********** work_queue internal functions *************/
 /******************************************************/
 
+static void log_worker_states(struct work_queue *q)
+{
+	struct timeval timestamp;
+	gettimeofday(&timestamp, NULL);
+	struct work_queue_stats s;
+	work_queue_get_stats(q, &s);
+	char buf[LOG_LINE_SIZE];
+	int len;
+	len = sprintf(buf, "%16ld %23d %12d %13d %12d %18d %16d %13d %13d %14d\n", (timestamp.tv_sec * 1000000 + timestamp.tv_usec),
+		s.total_workers_connected, s.workers_init, s.workers_ready, s.workers_busy, s.workers_cancelling,
+		s.total_tasks_dispatched, s.tasks_waiting, s.tasks_running, s.tasks_complete);
+	write(q->logfile, buf, len);
+}
+
 static void change_worker_state(struct work_queue *q, struct work_queue_worker *w, int state)
 {
 	q->workers_in_state[w->state]--;
@@ -373,6 +391,9 @@ static void change_worker_state(struct work_queue *q, struct work_queue_worker *
 		q->workers_in_state[WORKER_STATE_READY],
 		q->workers_in_state[WORKER_STATE_BUSY],
 		q->workers_in_state[WORKER_STATE_CANCELLING]);
+	if(q->logfile) {
+		log_worker_states(q);
+	}
 }
 
 static void link_to_hash_key(struct link *link, char *key)
@@ -2039,6 +2060,9 @@ void work_queue_delete(struct work_queue *q)
 
 		free(q->poll_table);
 		link_close(q->master_link);
+		if(q->logfile) {
+			close(q->logfile);
+		}
 		free(q);
 	}
 }
@@ -2431,3 +2455,18 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_workers_connected = q->total_workers_connected;
 }
 
+void work_queue_specify_log(struct work_queue *q, const char *logfile)
+{
+	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+	q->logfile = open(logfile, O_WRONLY | O_CREAT | O_APPEND, mode);
+	if(q->logfile) {
+		char buf[LOG_LINE_SIZE];
+		int len;
+		len = sprintf(buf, "%16s %23s%12s %13s %12s %18s %16s %13s %13s %14s\n", "timestamp",
+			"total_workers_connected ", "workers_init", "workers_ready", "workers_busy", "workers_cancelling",
+			"tasks_dispatched", "tasks_waiting", "tasks_running", "tasks_complete");
+		write(q->logfile, buf, len);
+		log_worker_states(q);
+	}
+	debug(D_WQ, "log enabled and is being written to %s\n", logfile);
+}

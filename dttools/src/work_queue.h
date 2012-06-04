@@ -105,6 +105,7 @@ struct work_queue_stats {
 	int total_workers_connected;
 };
 
+
 /** @name Functions - Tasks */
 
 //@{
@@ -356,6 +357,12 @@ This function should only be called after @ref work_queue_empty returns true.
 */
 void work_queue_delete(struct work_queue *q);
 
+/** Add a log file that records the states of the connected workers and submitted tasks.
+@param q A work queue object.
+@param logfile The filename.
+*/
+void work_queue_specify_log(struct work_queue *q, const char *logfile);
+
 //@}
 
 /** @name Functions - Deprecated */
@@ -404,6 +411,5 @@ void work_queue_task_specify_output_file(struct work_queue_task *t, const char *
 void work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname);
 
 //@}
-
 
 #endif
