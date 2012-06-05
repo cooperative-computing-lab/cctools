@@ -325,6 +325,14 @@ static void handle_query(struct link *query_link)
 		fprintf(stream, "Content-type: text/plain\n\n");
 		for(i = 0; i < n; i++)
 			nvpair_print_text(array[i], stream);
+	} else if(!strcmp(path, "/query.json")) {
+		fprintf(stream, "Content-type: text/plain\n\n");
+		fprintf(stream,"[\n");
+		for(i = 0; i < n; i++) {
+			nvpair_print_json(array[i], stream);
+			fprintf(stream,",\n");
+		}
+		fprintf(stream,"]\n");
 	} else if(!strcmp(path, "/query.oldclassads")) {
 		fprintf(stream, "Content-type: text/plain\n\n");
 		for(i = 0; i < n; i++)
@@ -376,6 +384,7 @@ static void handle_query(struct link *query_link)
 		fprintf(stream, "<a href=/query.text>text</a> - ");
 		fprintf(stream, "<a href=/query.html>html</a> - ");
 		fprintf(stream, "<a href=/query.xml>xml</a> - ");
+		fprintf(stream, "<a href=/query.json>json</a> - ");
 		fprintf(stream, "<a href=/query.oldclassads>oldclassads</a> - ");
 		fprintf(stream, "<a href=/query.newclassads>newclassads</a>");
 		fprintf(stream, "<p>\n");

@@ -118,6 +118,12 @@ void nvpair_print_text(struct nvpair *n, FILE * stream);
 */
 void nvpair_print_xml(struct nvpair *n, FILE * stream);
 
+/** Print an entire nvpair in JSON form.
+@param n The nnvpair to print.
+@param stream The stream on which to print.
+*/
+void nvpair_print_json(struct nvpair *n, FILE * stream);
+
 /** Print an entire nvpair in new ClassAd form.
 @param n The nvpair to print.
 @param stream The stream on which to print.

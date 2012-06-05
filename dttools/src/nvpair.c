@@ -174,6 +174,32 @@ void nvpair_print_text(struct nvpair *n, FILE * s)
 	fprintf(s, "\n");
 }
 
+void nvpair_print_json(struct nvpair *n, FILE * s)
+{
+	char *key;
+	void *value;
+
+	int i = 0;
+	int count = hash_table_size(n->table);
+
+	fprintf(s, "{\n");
+	hash_table_firstkey(n->table);
+	while(hash_table_nextkey(n->table, &key, &value)) {
+
+		fprintf(s,"%s:",key);
+
+		if(string_is_integer(value)) {
+			fprintf(s,"%s",(char*)value);
+		} else {
+			fprintf(s,"\"%s\"",(char*)value);
+		}		
+
+		i++;
+		if(i<count) fprintf(s,",\n");
+	}
+	fprintf(s, "\n}\n");
+}
+
 void nvpair_print_xml(struct nvpair *n, FILE * s)
 {
 	char *key;
