@@ -196,7 +196,7 @@ int link_sleep(struct link *link, time_t stoptime, int reading, int writing)
 		tptr = 0;
 	} else {
 		timeout = stoptime - time(0);
-		if(timeout < 0) {
+		if(timeout <= 0) {
 			errno = ECONNRESET;
 			return 0;
 		}
