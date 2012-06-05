@@ -73,13 +73,13 @@ clean:
 	rm -f core *~ *.o *.os *.a *.${CCTOOLS_DYNAMIC_SUFFIX} ${TARGETS}
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install -d ${CCTOOLS_INSTALL_DIR}/lib
-	install -d ${CCTOOLS_INSTALL_DIR}/include
-	install -d ${CCTOOLS_INSTALL_DIR}/include/cctools
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/lib
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/include
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/include/cctools
 	if [ -f ${CCTOOLS_INSTALL_DIR}/bin/chirp_server ]; then mv ${CCTOOLS_INSTALL_DIR}/bin/chirp_server ${CCTOOLS_INSTALL_DIR}/bin/chirp_server.old; fi
-	for file in ${PROGRAMS} ${SCRIPTS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; done
-	for file in ${LIBRARIES} ; do install $$file ${CCTOOLS_INSTALL_DIR}/lib/$$file ; done
-	for file in ${HEADERS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/include/cctools/$$file ; done
+	for file in ${PROGRAMS} ${SCRIPTS} ; do ${CCTOOLS_INSTALL} $$file ${CCTOOLS_INSTALL_DIR}/bin ; done
+	for file in ${LIBRARIES} ; do ${CCTOOLS_INSTALL} $$file ${CCTOOLS_INSTALL_DIR}/lib ; done
+	for file in ${HEADERS} ; do ${CCTOOLS_INSTALL} $$file ${CCTOOLS_INSTALL_DIR}/include/cctools ; done
 

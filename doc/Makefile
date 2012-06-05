@@ -32,10 +32,10 @@ api/html/index.html:
 	gzip < $< > $@
 
 install: all
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/man
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/images
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/man/man1
+	${CCTOOLS_INSTALL} -d $(CCTOOLS_INSTALL_DIR)/doc
+	${CCTOOLS_INSTALL} -d $(CCTOOLS_INSTALL_DIR)/doc/man
+	${CCTOOLS_INSTALL} -d $(CCTOOLS_INSTALL_DIR)/doc/images
+	${CCTOOLS_INSTALL} -d $(CCTOOLS_INSTALL_DIR)/share/man/man1
 	cp *.html $(CCTOOLS_INSTALL_DIR)/doc
 	if [ -f man/chirp.html ]; then cp man/*.html $(CCTOOLS_INSTALL_DIR)/doc/man; fi
 	if [ -f man/chirp.1.gz ]; then cp man/*.1.gz $(CCTOOLS_INSTALL_DIR)/share/man/man1; fi

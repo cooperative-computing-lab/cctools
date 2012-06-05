@@ -22,8 +22,8 @@ clean:
 	rm -f core *~ *.o *.a ${TARGETS} 
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}/
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install wavefront ${CCTOOLS_INSTALL_DIR}/bin
-	install wavefront_master ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} wavefront ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} wavefront_master ${CCTOOLS_INSTALL_DIR}/bin
 

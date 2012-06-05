@@ -325,8 +325,26 @@ done
 
 require_path ${ccompiler}
 require_path ${cxxcompiler}
-require_path "install"
 require_gnu_make
+
+require_path install
+install_program=`which install`
+
+if [ $build_sys = SUNOS ]
+then
+	if [ $install_program = /usr/sbin/install ]
+	then
+		echo $install_program is hopelessly broken...
+		install_program=/usr/ucb/install
+		if [ -x $install_program ]
+		then
+			echo "using $install_program instead"
+		else
+			echo "*** Sorry, I can't proceed without $install_program"
+			exit 1
+		fi
+	fi
+fi
 
 #
 # Currently, we rely on the linker --as-needed flag to sort out
@@ -944,6 +962,8 @@ CXXFLAGS=\$(CCTOOLS_CXXFLAGS)
 MPILD=\$(CCTOOLS_MPI_LD)
 
 CCTOOLS_AR=ar
+
+CCTOOLS_INSTALL=${install_program}
 
 CCTOOLS_SWIG=${swig}
 

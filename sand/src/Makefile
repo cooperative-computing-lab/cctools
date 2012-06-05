@@ -25,6 +25,6 @@ clean:
 	rm -f core *~ *.o *.os *.so $(PROGRAMS) libsandtools.a
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	for p in ${PROGRAMS} ${SCRIPTS}; do install $$p ${CCTOOLS_INSTALL_DIR}/bin; done
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/bin
+	for p in ${PROGRAMS} ${SCRIPTS}; do ${CCTOOLS_INSTALL} $$p ${CCTOOLS_INSTALL_DIR}/bin; done

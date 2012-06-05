@@ -64,25 +64,24 @@ clean:
 	rm -f core *~ *.o *.a ${TARGETS} tracer.table.c tracer.table.h tracer.table64.c tracer.table64.h
 
 install: all parrot_client.h
-	install -d ${CCTOOLS_INSTALL_DIR}
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install -d ${CCTOOLS_INSTALL_DIR}/lib
-	install -d ${CCTOOLS_INSTALL_DIR}/include
-	install -d ${CCTOOLS_INSTALL_DIR}/include/cctools
-	install parrot_run ${CCTOOLS_INSTALL_DIR}/bin
-	install libparrot_client.a ${CCTOOLS_INSTALL_DIR}/lib
-	install parrot_client.h ${CCTOOLS_INSTALL_DIR}/include/cctools
-	install libparrot_helper.so ${CCTOOLS_INSTALL_DIR}/lib
-	install parrot_identity_box ${CCTOOLS_INSTALL_DIR}/bin
-	install make_growfs ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_mkalloc ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_lsalloc ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_setacl ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_getacl ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_whoami ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_md5 ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_cp ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_locate ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_timeout ${CCTOOLS_INSTALL_DIR}/bin
-	chmod 755 parrot_run_hdfs
-	install parrot_run_hdfs ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/lib
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/include
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/include/cctools
+	${CCTOOLS_INSTALL} parrot_run ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} libparrot_client.a ${CCTOOLS_INSTALL_DIR}/lib
+	${CCTOOLS_INSTALL} parrot_client.h ${CCTOOLS_INSTALL_DIR}/include/cctools
+	${CCTOOLS_INSTALL} libparrot_helper.so ${CCTOOLS_INSTALL_DIR}/lib
+	${CCTOOLS_INSTALL} -m 755 parrot_identity_box ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} -m 755 make_growfs ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} parrot_mkalloc ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} parrot_lsalloc ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} parrot_setacl ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} parrot_getacl ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} parrot_whoami ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} parrot_md5 ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} parrot_cp ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} parrot_locate ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} parrot_timeout ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} -m 755 parrot_run_hdfs ${CCTOOLS_INSTALL_DIR}/bin

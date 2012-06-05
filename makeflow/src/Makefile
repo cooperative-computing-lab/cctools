@@ -18,12 +18,12 @@ clean:
 test: all
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}/
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install makeflow ${CCTOOLS_INSTALL_DIR}/bin
-	install -m755 condor_submit_makeflow ${CCTOOLS_INSTALL_DIR}/bin
-	install makeflow_log_parser ${CCTOOLS_INSTALL_DIR}/bin
-	install makeflow_monitor ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/
+	${CCTOOLS_INSTALL} -d ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} makeflow ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} -m 755 condor_submit_makeflow ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} makeflow_log_parser ${CCTOOLS_INSTALL_DIR}/bin
+	${CCTOOLS_INSTALL} makeflow_monitor ${CCTOOLS_INSTALL_DIR}/bin
 	sed 's|/usr/bin/env python|${CCTOOLS_PYTHON}|' starch > starch.bin
-	install -m755 starch.bin ${CCTOOLS_INSTALL_DIR}/bin/starch
+	${CCTOOLS_INSTALL} -m 755 starch.bin ${CCTOOLS_INSTALL_DIR}/bin
 	rm -f starch.bin
