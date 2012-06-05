@@ -146,7 +146,7 @@ struct work_queue {
 	int catalog_port;
 	struct hash_table *workers_by_pool;
 
-	FILE *logfile; 
+	int logfile;
 };
 
 struct work_queue_worker {
