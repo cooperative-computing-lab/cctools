@@ -186,7 +186,7 @@ void nvpair_print_json(struct nvpair *n, FILE * s)
 	hash_table_firstkey(n->table);
 	while(hash_table_nextkey(n->table, &key, &value)) {
 
-		fprintf(s,"%s:",key);
+		fprintf(s,"\"%s\":",key);
 
 		if(string_is_integer(value)) {
 			fprintf(s,"%s",(char*)value);
