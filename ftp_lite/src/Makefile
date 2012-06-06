@@ -19,8 +19,7 @@ clean:
 	rm -f ftp_lite_test ftp_lite_copy libftp_lite.a core *~ *.o *.so so_locations
 
 install:
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install -d ${CCTOOLS_INSTALL_DIR}/lib
-	install -d ${CCTOOLS_INSTALL_DIR}/include
-	install libftp_lite.a ${CCTOOLS_INSTALL_DIR}/lib
-	install ftp_lite.h ${CCTOOLS_INSTALL_DIR}/include/cctools
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/include
+	cp libftp_lite.a ${CCTOOLS_INSTALL_DIR}/lib
+	cp ftp_lite.h ${CCTOOLS_INSTALL_DIR}/include/cctools

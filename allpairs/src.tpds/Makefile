@@ -27,10 +27,9 @@ clean:
 	rm -f core *~ *.o *.a ${TARGETS} 
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}/
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install allpairs ${CCTOOLS_INSTALL_DIR}/bin
-	install allpairs_wait ${CCTOOLS_INSTALL_DIR}/bin
-	install allpairs_status ${CCTOOLS_INSTALL_DIR}/bin
-	install allpairs_cleanup ${CCTOOLS_INSTALL_DIR}/bin	
-	install allpairs_wrapper.sh ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
+	cp allpairs ${CCTOOLS_INSTALL_DIR}/bin
+	cp allpairs_wait ${CCTOOLS_INSTALL_DIR}/bin
+	cp allpairs_status ${CCTOOLS_INSTALL_DIR}/bin
+	cp allpairs_cleanup ${CCTOOLS_INSTALL_DIR}/bin	
+	cp allpairs_wrapper.sh ${CCTOOLS_INSTALL_DIR}/bin

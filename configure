@@ -325,7 +325,6 @@ done
 
 require_path ${ccompiler}
 require_path ${cxxcompiler}
-require_path "install"
 require_gnu_make
 
 #

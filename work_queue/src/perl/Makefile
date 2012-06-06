@@ -25,9 +25,10 @@ clean:
 PERL_INSTALL_DIR=$(CCTOOLS_INSTALL_DIR)/lib/perl5/site_perl/$(CCTOOLS_PERL_VERSION)
 
 install: all
-	install -d $(PERL_INSTALL_DIR)
-	install work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(PERL_INSTALL_DIR)/work_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
-	install work_queue.pm $(PERL_INSTALL_DIR)/work_queue.pm
+	mkdir -p $(PERL_INSTALL_DIR)
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
-	install work_queue_example.pl ${CCTOOLS_INSTALL_DIR}/doc/work_queue_example.pl
+	chmod 755 work_queue_example.pl
+	cp work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(PERL_INSTALL_DIR)
+	cp work_queue.pm $(PERL_INSTALL_DIR)
+	cp work_queue_example.pl ${CCTOOLS_INSTALL_DIR}/doc
 

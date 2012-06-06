@@ -3,11 +3,11 @@ CCTOOLS_HOME = ../../
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
-TARGETS =  wavefront wavefront_master
+PROGRAMS =  wavefront wavefront_master
 
 LOCAL_LDFLAGS=-ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
-all: ${TARGETS}
+all: ${PROGRAMS}
 
 
 wavefront: wavefront.o 
@@ -19,11 +19,9 @@ wavefront_master: wavefront_master.o
 test:
 
 clean:
-	rm -f core *~ *.o *.a ${TARGETS} 
+	rm -f core *~ *.o *.a ${PROGRAMS} 
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}/
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install wavefront ${CCTOOLS_INSTALL_DIR}/bin
-	install wavefront_master ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
+	cp ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
 

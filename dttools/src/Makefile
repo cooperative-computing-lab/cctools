@@ -76,15 +76,15 @@ clean:
 	rm -f core *~ *.o *.os *.so libdttools.a make_int_sizes int_sizes.h large_chunk.txt $(PROGRAMS)
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install -d ${CCTOOLS_INSTALL_DIR}/lib
-	install -d ${CCTOOLS_INSTALL_DIR}/include
-	install -d ${CCTOOLS_INSTALL_DIR}/include/cctools
-	for file in ${LIBRARIES} ; do install $$file ${CCTOOLS_INSTALL_DIR}/lib/$$file ; done
-	for file in ${HEADERS} ; do if [ -f $$file ] ; then install $$file ${CCTOOLS_INSTALL_DIR}/include/cctools/$$file ; fi ; done
-	for file in ${PROGRAMS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; done
-	for file in ${SCRIPTS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; chmod 755 ${CCTOOLS_INSTALL_DIR}/bin/$$file; done
-	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then install /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; done
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
-	install work_queue_example.c ${CCTOOLS_INSTALL_DIR}/doc/work_queue_example.c
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/include
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/include/cctools
+	chmod 755 ${SCRIPTS}
+	cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
+	cp ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
+	cp ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
+	cp work_queue_example.c ${CCTOOLS_INSTALL_DIR}/doc
+	for file in ${HEADERS} ; do if [ -f $$file ] ; then cp $$file ${CCTOOLS_INSTALL_DIR}/include/cctools ; fi ; done
+	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then cp /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; done
