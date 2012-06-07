@@ -82,8 +82,6 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define WORK_QUEUE_MASTER_PRIORITY_DEFAULT 10
 
-#define LOG_LINE_SIZE 1024 //size for log line written by specify_log()
-
 // work_queue_worker struct related
 #define WORKER_OS_NAME_MAX 65
 #define WORKER_ARCH_NAME_MAX 65
@@ -146,7 +144,7 @@ struct work_queue {
 	int catalog_port;
 	struct hash_table *workers_by_pool;
 
-	int logfile;
+	FILE *logfile;
 };
 
 struct work_queue_worker {
@@ -370,16 +368,13 @@ static void log_worker_states(struct work_queue *q)
 {
 	struct work_queue_stats s;
 	work_queue_get_stats(q, &s);
-	char buf[LOG_LINE_SIZE];
-	int len;
-	len = sprintf(buf, "%16llu %25llu %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25lld %25lld %25llu %25llu %25f %25f %25d %25d %25d %25d\n",
+	fprintf(q->logfile, "%16llu %25llu %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25lld %25lld %25llu %25llu %25f %25f %25d %25d %25d %25d\n",
 		timestamp_get(), s.start_time, // time
 		s.workers_init, s.workers_ready, s.workers_busy, s.workers_cancelling, // workers
 		s.tasks_waiting, s.tasks_running, s.tasks_complete, // tasks
 		s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_connected, // totals
 		s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received, s.total_send_time, s.total_receive_time,
 		s.efficiency, s.idle_percentage, s.capacity, s.avg_capacity, s.port, s.priority); // other
-	write(q->logfile, buf, len);
 }
 
 static void change_worker_state(struct work_queue *q, struct work_queue_worker *w, int state)
@@ -2063,7 +2058,7 @@ void work_queue_delete(struct work_queue *q)
 		free(q->poll_table);
 		link_close(q->master_link);
 		if(q->logfile) {
-			close(q->logfile);
+			fclose(q->logfile);
 		}
 		free(q);
 	}
@@ -2459,11 +2454,10 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 
 void work_queue_specify_log(struct work_queue *q, const char *logfile)
 {
-	q->logfile = open(logfile, O_WRONLY | O_CREAT | O_APPEND, 777);
+	q->logfile = fopen(logfile, "a");
 	if(q->logfile) {
-		char buf[LOG_LINE_SIZE];
-		int len;
-		len = sprintf(buf, "%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
+		setvbuf(q->logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
+		fprintf(q->logfile, "%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
 			"timestamp", "start_time",
 			"workers_init", "workers_ready", "workers_busy", "workers_cancelling", // workers
 			"tasks_waiting", "tasks_running", "tasks_complete", // tasks
@@ -2471,7 +2465,6 @@ void work_queue_specify_log(struct work_queue *q, const char *logfile)
 			"total_workers_removed", "total_bytes_sent", "total_bytes_received", "total_send_time", "total_receive_time",
 			"efficiency", "idle_percentage", "capacity", "avg_capacity", // other
 			"port", "priority");
-		write(q->logfile, buf, len);
 		log_worker_states(q);
 	}
 	debug(D_WQ, "log enabled and is being written to %s\n", logfile);
