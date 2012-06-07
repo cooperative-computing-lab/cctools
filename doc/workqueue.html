@@ -57,10 +57,10 @@ href="http://www.cse.nd.edu/~ccl/software">Cooperating Computing
 Tools</a>.  You can download the CCTools from <a
 href="http://www.cse.nd.edu/~ccl/software/download">this web page</a>,
 follow the <a href=install.html>installation instructions</a>, and you
-are ready to go. From the same <a
-href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">website</a>,
-or from within the CCTools you can view documentation for the full set
-features of the Work Queue API.</p>
+are ready to go. You can view documentation for the full set of features of the
+Work Queue API from either within the CCTools or <a
+href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">here</a> and <a
+href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/namespaceWorkQueuePython.html">here</a>.
 
 
 <h2>Building and Running Work Queue</h2>
@@ -362,7 +362,7 @@ cancelled and immediately retrieved without waiting for Work Queue to return the
  t = q.cancel_by_tasktag("task3")
 </pre>
 </div>
-This cancels a task with <tt>tag</tt> named 'task4'. Note that in the presence of tasks with 
+This cancels a task with <tt>tag</tt> named 'task3'. Note that in the presence of tasks with 
 the same tag, <tt>work_queue_cancel_by_tasktag</tt> will cancel and retrieve only one of the 
 matching tasks.
 <p>
