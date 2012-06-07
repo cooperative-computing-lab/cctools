@@ -24,6 +24,7 @@ OPTION_ITEM(-s)Run as a shared worker.
 OPTION_PAIR(-N, name)Preferred project name for work_queue_worker to connect.
 OPTION_PAIR(-C, catalog)Set catalog server for work_queue_worker to <catalog>. <catalog> format: HOSTNAME:PORT.
 OPTION_PAIR(-t, seconds)Abort work_queue_worker after this amount of idle time (default=900s).
+OPTION_PAIR(-j)Use job array to submit workers.
 OPTION_PAIR(-p, parameters)SGE qsub parameters.
 OPTION_ITEM(-h)Show help message.
 OPTIONS_END
