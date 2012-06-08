@@ -1,5 +1,13 @@
 #!/usr/bin/perl 
 
+# Copyright (c) 2010- The University of Notre Dame.
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+#
+# This program is a very simple example of how to use Work Queue.
+# It accepts a list of files on the command line.
+# Each file is compressed with gzip and returned to the user.
+
 use work_queue;
 
 my $port = $WORK_QUEUE_DEFAULT_PORT;
