@@ -578,7 +578,7 @@ static void enforce_pool_decisions(struct work_queue *q) {
 			int workers_to_release = pi->count - d->count;
 			if(workers_to_release > 0) {
 				int k = remove_workers_from_pool(q, pi->name, workers_to_release);
-				printf("%d worker(s) has been rejected to enforce the pool decison.\n", k);
+				debug(D_WQ, "%d worker(s) has been rejected to enforce the pool decison.\n", k);
 			}
 		} 
 	}
