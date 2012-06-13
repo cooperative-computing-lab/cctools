@@ -204,10 +204,10 @@ int main( int argc, char *argv[] )
 				fflush(logfile);
 				tasks_done++;
 			} else {
-				fprintf(stderr,"unexpected output: %s\nfrom command: %s\non host: %s",t->output,t->command_line,t->host);
+				fprintf(stderr,"unexpected output: %s\nfrom command: %s\non host: %s",t->output,t->command_line,t->hostaddr);
 			}
 		} else {
-		    fprintf(stderr,"function failed return value (%i) result (%i) on host %s. output:\n%s\n",t->return_status,t->result,t->host,t->output);
+		    fprintf(stderr,"function failed return value (%i) result (%i) on host %s. output:\n%s\n",t->return_status,t->result,t->hostaddr,t->output);
 		}
 		work_queue_task_delete(t);
 		if(work_queue_empty(queue))
