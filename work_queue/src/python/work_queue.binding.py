@@ -83,10 +83,14 @@ class Task(_object):
     @property
     def result(self):
         return self._task.result
+	
+    @property
+    def hostname(self):
+        return self._task.hostname
 
     @property
-    def host(self):
-        return self._task.host
+    def hostaddr(self):
+        return self._task.hostaddr
 
     @property
     def submit_time(self):
