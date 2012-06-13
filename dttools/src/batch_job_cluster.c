@@ -43,6 +43,11 @@ int batch_job_setup_cluster(struct batch_queue * q)
 			cluster_remove_cmd = strdup("mdel");
 			cluster_options = strdup("-d `pwd` -o /dev/null -v BATCH_JOB_COMMAND -j oe -N");
 			break;
+		case BATCH_QUEUE_TYPE_TORQUE:
+			cluster_name = strdup("torque");
+			cluster_submit_cmd = strdup("qsub");
+			cluster_remove_cmd = strdup("qdel");
+			cluster_options = strdup("-d `pwd` -k n -v BATCH_JOB_COMMAND -N");
 		case BATCH_QUEUE_TYPE_CLUSTER:
 			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
 			cluster_submit_cmd = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND");
@@ -84,7 +89,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname)
 	}
 
 	fprintf(file, "#!/bin/sh\n");
-	if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+	if(q->type == BATCH_QUEUE_TYPE_MOAB || q->type == BATCH_QUEUE_TYPE_TORQUE) {
 		fprintf(file, "CMD=${BATCH_JOB_COMMAND}\n");
 		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
 	} else {

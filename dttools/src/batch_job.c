@@ -43,6 +43,8 @@ batch_queue_type_t batch_queue_type_from_string(const char *str)
 		return BATCH_QUEUE_TYPE_SGE;
 	if(!strcmp(str, "moab"))
 		return BATCH_QUEUE_TYPE_MOAB;
+	if(!strcmp(str, "torque"))
+		return BATCH_QUEUE_TYPE_TORQUE;
 	if(!strcmp(str, "cluster"))
 		return BATCH_QUEUE_TYPE_CLUSTER;
 	if(!strcmp(str, "local"))
@@ -77,6 +79,8 @@ const char *batch_queue_type_to_string(batch_queue_type_t t)
 		return "sge";
 	case BATCH_QUEUE_TYPE_MOAB:
 		return "moab";
+	case BATCH_QUEUE_TYPE_TORQUE:
+		return "torque";
 	case BATCH_QUEUE_TYPE_CLUSTER:
 		return "cluster";
 	case BATCH_QUEUE_TYPE_WORK_QUEUE:
@@ -132,7 +136,7 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 		q->mpi_queue = 0;
 	}
 	
-	if(type == BATCH_QUEUE_TYPE_SGE || type == BATCH_QUEUE_TYPE_MOAB || type == BATCH_QUEUE_TYPE_CLUSTER) {
+	if(type == BATCH_QUEUE_TYPE_SGE || type == BATCH_QUEUE_TYPE_MOAB || type == BATCH_QUEUE_TYPE_TORQUE || type == BATCH_QUEUE_TYPE_CLUSTER) {
 		batch_job_setup_cluster(q);
 	}
 
@@ -216,6 +220,8 @@ batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const ch
 		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
 		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
+	} else if(q->type == BATCH_QUEUE_TYPE_TORQUE) {
+		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
 		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
@@ -244,6 +250,8 @@ batch_job_id_t batch_job_submit_simple(struct batch_queue * q, const char *cmd, 
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
 		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
+	} else if(q->type == BATCH_QUEUE_TYPE_TORQUE) {
 		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
 		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
@@ -279,6 +287,8 @@ batch_job_id_t batch_job_wait_timeout(struct batch_queue * q, struct batch_job_i
 		return batch_job_wait_cluster(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
 		return batch_job_wait_cluster(q, info, stoptime);
+	} else if(q->type == BATCH_QUEUE_TYPE_TORQUE) {
+		return batch_job_wait_cluster(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
 		return batch_job_wait_cluster(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
@@ -307,6 +317,8 @@ int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid)
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
 		return batch_job_remove_cluster(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+		return batch_job_remove_cluster(q, jobid);
+	} else if(q->type == BATCH_QUEUE_TYPE_TORQUE) {
 		return batch_job_remove_cluster(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
 		return batch_job_remove_cluster(q, jobid);
