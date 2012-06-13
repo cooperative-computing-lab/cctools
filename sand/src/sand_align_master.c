@@ -155,7 +155,7 @@ static char *confirm_output(char *output)
 static void task_complete(struct work_queue_task *t)
 {
 	if(t->return_status != 0) {
-		debug(D_NOTICE, "task failed with status %d on host %s\n", t->return_status, t->hostaddr);
+		debug(D_NOTICE, "task failed with status %d on host %s\n", t->return_status, t->host);
 		work_queue_submit(queue, t);
 		return;
 	}

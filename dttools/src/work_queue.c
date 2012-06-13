@@ -356,8 +356,8 @@ void work_queue_task_delete(struct work_queue_task *t)
 		}
 		if(t->hostname)
 			free(t->hostname);
-		if(t->hostaddr)
-			free(t->hostaddr);
+		if(t->host)
+			free(t->host);
 		free(t);
 	}
 }
@@ -946,7 +946,7 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 	change_worker_state(q, w, WORKER_STATE_READY);
 
 	t->hostname = xxstrdup(w->hostname);
-	t->hostaddr = xxstrdup(w->addrport);
+	t->host = xxstrdup(w->addrport);
 
 	q->total_tasks_complete++;
 	w->total_tasks_complete++;
@@ -2078,9 +2078,9 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 		free(t->hostname);
 		t->hostname = 0;
 	}
-	if(t->hostaddr) {
-		free(t->hostaddr);
-		t->hostaddr = 0;
+	if(t->host) {
+		free(t->host);
+		t->host = 0;
 	}
 	t->total_transfer_time = 0;
 	t->cmd_execution_time = 0;

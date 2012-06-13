@@ -89,8 +89,8 @@ class Task(_object):
         return self._task.hostname
 
     @property
-    def hostaddr(self):
-        return self._task.hostaddr
+    def host(self):
+        return self._task.host
 
     @property
     def submit_time(self):

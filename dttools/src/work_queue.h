@@ -60,8 +60,8 @@ struct work_queue_task {
 	int taskid;			/**< A unique task id number. */
 	int return_status;		/**< The exit code of the command line. */
 	int result;			/**< The result of the task (successful, failed return_status, missing input file, missing output file). */
-	char *hostname;			/**< The name of the host on which it ran. */
-	char *hostaddr;			/**< The address and port of the host on which it ran. */		
+	char *host;			/**< The address and port of the host on which it ran. */
+	char *hostname;			/**< The name of the host on which it ran. */		
 
 	timestamp_t time_task_submit;	/**< The time at which this task was submitted */
 	timestamp_t time_task_finish;	/**< The time at which this task was finished */
