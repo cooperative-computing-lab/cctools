@@ -1807,10 +1807,16 @@ void decode_syscall( struct pfs_process *p, int entering )
 			decode_mmap(p,p->syscall,entering,args);
 			break;
 
+		/*
+		For unmap, we update our internal records for what
+		is unmapped, which may cause a flush of dirty data.
+		However, we do not divert the system call, because
+		we still want the real mapping undone in the process.
+		*/
+
 		case SYSCALL32_munmap:
 			if(entering) {
-				p->syscall_result = pfs_mmap_delete(args[0],args[1]);
-				divert_to_dummy(p,p->syscall_result);
+				pfs_mmap_delete(args[0],args[1]);
 			}
 			break;
 
