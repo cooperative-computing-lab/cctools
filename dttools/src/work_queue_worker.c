@@ -194,7 +194,7 @@ static pid_t execute_task(const char *cmd)
 		close(pipefds[1]);
 		return 0;
 	} else {
-		int fd = open("/dev/null", "r");
+		int fd = open("/dev/null", O_RDONLY);
 		if (fd == -1) fatal("could not open /dev/null: %s", strerror(errno));
 		int result = dup2(fd, STDIN_FILENO);
 		if (result == -1) fatal("could not dup /dev/null to stdin: %s", strerror(errno));
@@ -202,7 +202,7 @@ static pid_t execute_task(const char *cmd)
 		result = dup2(pipefds[1], STDOUT_FILENO);
 		if (result == -1) fatal("could not dup pipe to stdout: %s", strerror(errno));
 
-		fd = open("/dev/null", "w");
+		fd = open("/dev/null", O_WRONLY);
 		if (fd == -1) fatal("could not open /dev/null: %s", strerror(errno));
 		result = dup2(fd, STDERR_FILENO);
 		if (result == -1) fatal("could not dup /dev/null to stderr: %s", strerror(errno));
