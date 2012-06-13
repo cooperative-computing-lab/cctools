@@ -227,7 +227,7 @@ batch_job_id_t batch_job_wait_work_queue(struct batch_queue * q, struct batch_jo
 		}
 
 		fprintf(logfile, "TASK %llu %d %d %d %d %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %s \"%s\" \"%s\"\n", timestamp_get(), t->taskid, t->result, t->return_status, t->worker_selection_algorithm, t->time_task_submit, t->time_task_finish,
-			t->time_send_input_start, t->time_send_input_finish, t->time_execute_cmd_start, t->time_execute_cmd_finish, t->time_receive_output_start, t->time_receive_output_finish, t->total_bytes_transferred, t->total_transfer_time, t->host,
+			t->time_send_input_start, t->time_send_input_finish, t->time_execute_cmd_start, t->time_execute_cmd_finish, t->time_receive_output_start, t->time_receive_output_finish, t->total_bytes_transferred, t->total_transfer_time, t->hostaddr,
 			t->tag ? t->tag : "", t->command_line);
 
 		taskid = t->taskid;
