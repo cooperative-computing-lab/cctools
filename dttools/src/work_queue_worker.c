@@ -202,10 +202,8 @@ static pid_t execute_task(const char *cmd)
 		result = dup2(pipefds[1], STDOUT_FILENO);
 		if (result == -1) fatal("could not dup pipe to stdout: %s", strerror(errno));
 
-		fd = open("/dev/null", O_WRONLY);
-		if (fd == -1) fatal("could not open /dev/null: %s", strerror(errno));
-		result = dup2(fd, STDERR_FILENO);
-		if (result == -1) fatal("could not dup /dev/null to stderr: %s", strerror(errno));
+		result = dup2(pipefds[1], STDERR_FILENO);
+		if (result == -1) fatal("could not dup pipe to stderr: %s", strerror(errno));
 
 		close(pipefds[0]);
 		close(pipefds[1]);
@@ -893,7 +891,6 @@ static int do_work(struct link *master, INT64_T length) {
 	link_read(master, cmd, length, time(0) + active_timeout);
 	cmd[length] = 0;
 
-	strcat(cmd, " 2>&1");
 	debug(D_WQ, "%s", cmd);
 	execution_start = timestamp_get();
 
