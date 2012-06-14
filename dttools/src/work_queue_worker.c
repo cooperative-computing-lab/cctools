@@ -259,8 +259,8 @@ static void get_task_stdout(char **task_output, INT64_T *task_output_length) {
 		if(full_write(stdout_file_fd, stdout_buffer, stdout_buffer_used) == -1) {
 			debug(D_WQ, "Task stdout truncated: failed to write contents to file - %s.\n", stdout_file);
 		}
-		close(stdout_file_fd);
 	}
+	close(stdout_file_fd);
 
 	// Record stdout of the child process
 	char *output;
