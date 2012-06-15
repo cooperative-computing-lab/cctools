@@ -6,6 +6,7 @@ class Sweeper:
     def __init__(self):
         self.port = WORK_QUEUE_DEFAULT_PORT
         self.progname = ""
+        self.paramvalues = []
         self.command = []
         self.sweeps = []
         self.inputlist = []
@@ -42,6 +43,7 @@ class Sweeper:
 
     def addsweep(self, start, stop, step):
         self.command.append("%s")
+        self.paramvalues.append("%s")
         r = []
         for i in xrange(start, stop+step, step):
             r.append(i)
@@ -60,7 +62,7 @@ class Sweeper:
 
         for item in itertools.product(*self.sweeps):
             command  = ' '.join(self.command) % (item)
-            paramdir = '_'.join(self.command) % (item)
+            paramdir = '_'.join(self.paramvalues) % (item)
 
             os.system("mkdir %s/%s" % (self.progname, paramdir))
 
@@ -69,6 +71,7 @@ class Sweeper:
                 t.specify_file(i, i, WORK_QUEUE_INPUT, cache=True)
             for i in self.outputlist:
                 out = "%s/%s/%s" % (self.progname, paramdir, i)
+                #out = i
                 t.specify_file(out, out, WORK_QUEUE_OUTPUT, cache=True)
 
             taskid = self.q.submit(t)
