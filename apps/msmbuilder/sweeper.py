@@ -1,12 +1,11 @@
 from work_queue import *
-import sys
-import math
-import itertools
+import sys, os, math, itertools
 
 class Sweeper:
     """A parameter sweeper"""
     def __init__(self):
         self.port = WORK_QUEUE_DEFAULT_PORT
+        self.progname = ""
         self.command = []
         self.sweeps = []
         self.inputlist = []
@@ -29,6 +28,7 @@ class Sweeper:
         return (start+n*step for n in range(count))
 
     def addprog(self, progname):
+        self.progname = progname
         self.command.append(progname)
 
     def addparameter(self, param):
@@ -56,14 +56,20 @@ class Sweeper:
 
         print "listening on port %d..." % self.q.port
 
+        os.system("mkdir %s" % (self.progname))
+
         for item in itertools.product(*self.sweeps):
             command  = ' '.join(self.command) % (item)
+            paramdir = '_'.join(self.command) % (item)
+
+            os.system("mkdir %s/%s" % (self.progname, paramdir))
 
             t = Task(command)
             for i in self.inputlist:
                 t.specify_file(i, i, WORK_QUEUE_INPUT, cache=True)
             for i in self.outputlist:
-                t.specify_file(i, i, WORK_QUEUE_OUTPUT, cache=True)
+                out = "%s/%s/%s" % (self.progname, paramdir, i)
+                t.specify_file(out, out, WORK_QUEUE_OUTPUT, cache=True)
 
             taskid = self.q.submit(t)
             print "submitted task (id# %d): %s" % (taskid, t.command)
