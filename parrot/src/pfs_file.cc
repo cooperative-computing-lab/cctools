@@ -86,6 +86,30 @@ int pfs_file::fchown( uid_t uid, gid_t gid )
 	return -1;
 }
 
+ssize_t pfs_file::fgetxattr( const char *name, void *data, size_t size )
+{
+	errno = ENOTSUP;
+	return -1;
+}
+
+ssize_t pfs_file::flistxattr( char *list, size_t size )
+{
+	errno = ENOTSUP;
+	return -1;
+}
+
+int pfs_file::fsetxattr( const char *name, const void *data, size_t size, int flags )
+{
+	errno = ENOTSUP;
+	return -1;
+}
+
+int pfs_file::fremovexattr( const char *name )
+{
+	errno = ENOTSUP;
+	return -1;
+}
+
 int pfs_file::flock( int op )
 {
 	errno = ENOSYS;

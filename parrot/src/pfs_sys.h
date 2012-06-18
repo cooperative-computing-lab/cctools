@@ -86,6 +86,20 @@ int		pfs_readlinkat( int dirfd, const char *path, char *buf, size_t bufsiz );
 int		pfs_fchmodat( int dirfd, const char *path, mode_t mode, int flags );
 int		pfs_faccessat( int dirfd, const char *path, mode_t mode );
 
+
+ssize_t pfs_getxattr (const char *path, const char *name, void *value, size_t size);
+ssize_t pfs_lgetxattr (const char *path, const char *name, void *value, size_t size);
+ssize_t pfs_fgetxattr (int fd, const char *name, void *value, size_t size);
+ssize_t pfs_listxattr (const char *path, char *list, size_t size);
+ssize_t pfs_llistxattr (const char *path, char *list, size_t size);
+ssize_t pfs_flistxattr (int fd, char *list, size_t size);
+int pfs_setxattr (const char *path, const char *name, const void *value, size_t size, int flags);
+int pfs_lsetxattr (const char *path, const char *name, const void *value, size_t size, int flags);
+int pfs_fsetxattr (int fd, const char *name, const void *value, size_t size, int flags);
+int pfs_removexattr (const char *path, const char *name);
+int pfs_lremovexattr (const char *path, const char *name);
+int pfs_fremovexattr (int fd, const char *name);
+
 int		pfs_socket( int domain, int type, int protocol );
 int		pfs_socketpair( int domain, int type, int protocol, int *fds );
 int		pfs_accept( int fd, struct sockaddr *addr, int * addrlen );

@@ -1261,6 +1261,158 @@ int pfs_table::truncate( const char *n, pfs_off_t offset )
 	return result;
 }
 
+ssize_t pfs_table::getxattr (const char *path, const char *name, void *value, size_t size)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname)) {
+		result = pname.service->getxattr(&pname,name,value,size);
+	}
+
+	return result;
+}
+
+ssize_t pfs_table::lgetxattr (const char *path, const char *name, void *value, size_t size)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname,false)) {
+		result = pname.service->lgetxattr(&pname,name,value,size);
+	}
+
+	return result;
+}
+
+ssize_t pfs_table::fgetxattr (int fd, const char *name, void *value, size_t size)
+{
+	int result;
+
+	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
+		errno = EBADF;
+		result = -1;
+	} else {
+		result = pointers[fd]->file->fgetxattr(name,value,size);
+	}
+
+	return result;
+}
+
+ssize_t pfs_table::listxattr (const char *path, char *list, size_t size)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname)) {
+		result = pname.service->listxattr(&pname,list,size);
+	}
+
+	return result;
+}
+
+ssize_t pfs_table::llistxattr (const char *path, char *list, size_t size)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname,false)) {
+		result = pname.service->llistxattr(&pname,list,size);
+	}
+
+	return result;
+}
+
+ssize_t pfs_table::flistxattr (int fd, char *list, size_t size)
+{
+	int result;
+
+	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
+		errno = EBADF;
+		result = -1;
+	} else {
+		result = pointers[fd]->file->flistxattr(list,size);
+	}
+
+	return result;
+}
+
+int pfs_table::setxattr (const char *path, const char *name, const void *value, size_t size, int flags)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname)) {
+		result = pname.service->setxattr(&pname,name,value,size,flags);
+	}
+
+	return result;
+}
+
+int pfs_table::lsetxattr (const char *path, const char *name, const void *value, size_t size, int flags)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname,false)) {
+		result = pname.service->lsetxattr(&pname,name,value,size,flags);
+	}
+
+	return result;
+}
+
+int pfs_table::fsetxattr (int fd, const char *name, const void *value, size_t size, int flags)
+{
+	int result;
+
+	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
+		errno = EBADF;
+		result = -1;
+	} else {
+		result = pointers[fd]->file->fsetxattr(name,value,size,flags);
+	}
+
+	return result;
+}
+
+int pfs_table::removexattr (const char *path, const char *name)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname)) {
+		result = pname.service->removexattr(&pname,name);
+	}
+
+	return result;
+}
+
+int pfs_table::lremovexattr (const char *path, const char *name)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname,false)) {
+		result = pname.service->lremovexattr(&pname,name);
+	}
+
+	return result;
+}
+
+int pfs_table::fremovexattr (int fd, const char *name)
+{
+	int result;
+
+	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
+		errno = EBADF;
+		result = -1;
+	} else {
+		result = pointers[fd]->file->fremovexattr(name);
+	}
+
+	return result;
+}
+
 int pfs_table::utime( const char *n, struct utimbuf *buf )
 {
 	pfs_name pname;

@@ -47,6 +47,15 @@ public:
 	virtual int mkdir( pfs_name *name, mode_t mode );
 	virtual int rmdir( pfs_name *name );
 
+	virtual ssize_t getxattr ( pfs_name *name, const char *attrname, void *value, size_t size );
+	virtual ssize_t lgetxattr ( pfs_name *name, const char *attrname, void *value, size_t size );
+	virtual ssize_t listxattr ( pfs_name *name, char *attrlist, size_t size );
+	virtual ssize_t llistxattr ( pfs_name *name, char *attrlist, size_t size );
+	virtual int setxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags );
+	virtual int lsetxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags );
+	virtual int removexattr ( pfs_name *name, const char *attrname );
+	virtual int lremovexattr ( pfs_name *name, const char *attrname );
+
 	virtual int mkalloc( pfs_name *name, pfs_ssize_t size, mode_t mode );
 	virtual int lsalloc( pfs_name *name, char *alloc_name, pfs_ssize_t *size, pfs_ssize_t *inuse );
 	virtual int whoami( pfs_name *name, char *buf, int size );
