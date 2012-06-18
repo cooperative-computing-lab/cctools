@@ -1527,12 +1527,12 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			break;
 
 		case SYSCALL64_fchmod:
-                        if(entering) {
-                                p->syscall_result = pfs_fchmod(args[0],args[1]);
-                                if(p->syscall_result<0) p->syscall_result = -errno;
-                                divert_to_dummy(p,p->syscall_result);
-                        }
-                        break;
+			if(entering) {
+				p->syscall_result = pfs_fchmod(args[0],args[1]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
 
 		/*
 		ioctl presents both bad news and good news.
@@ -2669,7 +2669,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
                 case SYSCALL64_llistxattr:
                 case SYSCALL64_lremovexattr:
                 case SYSCALL64_lsetxattr:
-		case SYSCALL64_removexattr:
+				case SYSCALL64_removexattr:
                 case SYSCALL64_setxattr:
                         divert_to_dummy(p,-EOPNOTSUPP);
                         break;
