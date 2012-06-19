@@ -454,7 +454,6 @@ public:
 	virtual ssize_t getxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
 	{
 		ssize_t result;
-		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"getxattr %s %s",name->rest,attrname);
 		result = ::getxattr(name->rest,attrname,value,size);
@@ -464,7 +463,6 @@ public:
 	virtual ssize_t lgetxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
 	{
 		ssize_t result;
-		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"lgetxattr %s %s",name->rest,attrname);
 		result = ::lgetxattr(name->rest,attrname,value,size);
@@ -474,7 +472,6 @@ public:
 	virtual ssize_t listxattr ( pfs_name *name, char *attrlist, size_t size )
 	{
 		ssize_t result;
-		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"listxattr %s",name->rest);
 		result = ::listxattr(name->rest,attrlist,size);
@@ -484,7 +481,6 @@ public:
 	virtual ssize_t llistxattr ( pfs_name *name, char *attrlist, size_t size )
 	{
 		ssize_t result;
-		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"llistxattr %s",name->rest);
 		result = ::llistxattr(name->rest,attrlist,size);
@@ -494,7 +490,6 @@ public:
 	virtual int setxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
 	{
 		int result;
-		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"setxattr %s %s <> %d",name->rest,attrname,flags);
 		result = ::setxattr(name->rest,attrname,value,size,flags);
@@ -504,7 +499,6 @@ public:
 	virtual int lsetxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
 	{
 		int result;
-		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"lsetxattr %s %s <> %d",name->rest,attrname,flags);
 		result = ::lsetxattr(name->rest,attrname,value,size,flags);
@@ -514,7 +508,6 @@ public:
 	virtual int removexattr ( pfs_name *name, const char *attrname )
 	{
 		int result;
-		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"removexattr %s %s",name->rest,attrname);
 		result = ::removexattr(name->rest,attrname);
@@ -524,7 +517,6 @@ public:
 	virtual int lremovexattr ( pfs_name *name, const char *attrname )
 	{
 		int result;
-		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"lremovexattr %s %s",name->rest,attrname);
 		result = ::lremovexattr(name->rest,attrname);
