@@ -88,25 +88,37 @@ int pfs_file::fchown( uid_t uid, gid_t gid )
 
 ssize_t pfs_file::fgetxattr( const char *name, void *data, size_t size )
 {
-	errno = ENOTSUP;
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	* GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	* */
+	errno = EOPNOTSUPP;
 	return -1;
 }
 
 ssize_t pfs_file::flistxattr( char *list, size_t size )
 {
-	errno = ENOTSUP;
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	* GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	* */
+	errno = EOPNOTSUPP;
 	return -1;
 }
 
 int pfs_file::fsetxattr( const char *name, const void *data, size_t size, int flags )
 {
-	errno = ENOTSUP;
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	* GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	* */
+	errno = EOPNOTSUPP;
 	return -1;
 }
 
 int pfs_file::fremovexattr( const char *name )
 {
-	errno = ENOTSUP;
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	* GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	* */
+	errno = EOPNOTSUPP;
 	return -1;
 }
 
