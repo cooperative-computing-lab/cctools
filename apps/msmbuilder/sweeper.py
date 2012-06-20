@@ -1,36 +1,24 @@
 from work_queue import *
-import sys, os, math, itertools
+import sys, os, itertools
 
 class Sweeper:
     """A parameter sweeper"""
     def __init__(self):
         self.port = WORK_QUEUE_DEFAULT_PORT
         self.progname = ""
+        self.envpath = ""
         self.paramvalues = []
         self.command = []
         self.sweeps = []
         self.inputlist = []
         self.outputlist = []
 
-    def frange2(self, start, stop, n):
-        L = [0.0] * n
-        nm1 = n - 1
-        nmlinv = 1.0 / nm1
-        for i in range(n):
-            L[i] = nmlinv * (start*(nm1-i)+stop*i)
-        return L
-
-    def frange(self, start, stop = None, step = 1.):
-        if stop is None:
-            stop, start = start, 0.
-        else:
-            start = float(start)
-        count = int(math.ceil(stop-start)/step)
-        return (start+n*step for n in range(count))
-
     def addprog(self, progname):
         self.progname = progname
         self.command.append(progname)
+
+    def setenv(self, pathtoenv):
+        self.envpath = pathtoenv
 
     def addparameter(self, param):
         self.command.append(str(param))
@@ -41,11 +29,11 @@ class Sweeper:
     def addoutput(self, output):
         self.outputlist.append(output)
 
-    def addsweep(self, start, stop, step):
+    def addsweep(self, iterlist):
         self.command.append("%s")
         self.paramvalues.append("%s")
         r = []
-        for i in xrange(start, stop+step, step):
+        for i in iterlist:
             r.append(i)
         self.sweeps.append(r)
 
@@ -66,13 +54,20 @@ class Sweeper:
 
             os.system("mkdir %s/%s" % (self.progname, paramdir))
 
-            t = Task(command)
-            for i in self.inputlist:
-                t.specify_file(i, i, WORK_QUEUE_INPUT, cache=True)
-            for i in self.outputlist:
-                out = "%s/%s/%s" % (self.progname, paramdir, i)
-                #out = i
-                t.specify_file(out, out, WORK_QUEUE_OUTPUT, cache=True)
+            env = open(self.envpath).read()
+            script = """
+                    %(env)s
+                    %(command)s
+                    """ % {'env': env, 'command': command}
+            taskcommand = 'bash script.sh'
+
+            t = Task(taskcommand)
+            t.specify_buffer(script, 'script.sh')
+
+            for input in self.inputlist:
+                t.specify_file(input, input, WORK_QUEUE_INPUT, cache=True)
+            for output in self.outputlist:
+                t.specify_file("%s/%s/%s" % (self.progname, paramdir, output), output, WORK_QUEUE_OUTPUT, cache=True)
 
             taskid = self.q.submit(t)
             print "submitted task (id# %d): %s" % (taskid, t.command)
