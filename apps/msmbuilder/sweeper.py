@@ -1,35 +1,55 @@
+# Copyright (C) 2012- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+#
+# This program provides a simple api to sweep though a range of parameters
+#
+
 from work_queue import *
 import sys, os, itertools
 
 class Sweeper:
-    """A parameter sweeper"""
+    """Provides a simple api for a program to sweep through a range of parameters."""
     def __init__(self):
-        self.port = WORK_QUEUE_DEFAULT_PORT
-        self.progname = ""
-        self.envpath = ""
-        self.paramvalues = []
-        self.command = []
-        self.sweeps = []
-        self.inputlist = []
-        self.outputlist = []
+        self.port = WORK_QUEUE_DEFAULT_PORT # 9123
+        self.progname = "" # the program to sweep with
+        self.envpath = "" # path to a environment set up script
+        self.paramvalues = [] # list of arguments e.g. -l -o 27
+        self.command = [] # list of the full command to be run
+        self.sweeps = [] # list of variables to sweep over
+        self.inputlist = [] # list of input files
+        self.outputlist = [] # list of output files
 
     def addprog(self, progname):
-        self.progname = progname
+        """The program (sans parameters) to sweep with.
+            @param progname The base program that will be run."""
         self.command.append(progname)
+        self.progname, sep, tail = progname.partition('.') # remove file extension so we can create a nice directory
 
     def setenv(self, pathtoenv):
+        """Set the path to a env script to set up an environment for the command to run in.
+            @param pathtoenv The path to a script to run first."""
         self.envpath = pathtoenv
 
     def addparameter(self, param):
+        """Add a parameter to the list of parameters(arguments).
+            @param param The argument to be added."""
         self.command.append(str(param))
 
     def addinput(self, input):
+        """Add a file (or directory) to the input list.
+            @param input The file or directory to be included as input."""
         self.inputlist.append(input)
 
     def addoutput(self, output):
+        """Add a file (or directory) to the output list.
+            Output will be placed in progname/parameters/
+            @param output The file to be recieved back from the worker as output."""
         self.outputlist.append(output)
 
     def addsweep(self, iterlist):
+        """Add a sweep to the command.
+            @param iterlist An iterable object that contains the values to sweep over."""
         self.command.append("%s")
         self.paramvalues.append("%s")
         r = []
@@ -38,6 +58,7 @@ class Sweeper:
         self.sweeps.append(r)
 
     def sweep(self):
+        """Sweep over the command."""
         try:
             self.q = WorkQueue(self.port)
         except:
@@ -46,20 +67,18 @@ class Sweeper:
 
         print "listening on port %d..." % self.q.port
 
-        os.system("mkdir %s" % (self.progname))
-
         for item in itertools.product(*self.sweeps):
-            command  = ' '.join(self.command) % (item)
+            command  = ' '.join(self.command) % (item) # create the command
             paramdir = '_'.join(self.paramvalues) % (item)
 
-            os.system("mkdir %s/%s" % (self.progname, paramdir))
+            os.system("mkdir -p %s/%s" % (self.progname, paramdir))
 
             env = open(self.envpath).read()
             script = """
                     %(env)s
                     %(command)s
                     """ % {'env': env, 'command': command}
-            taskcommand = 'bash script.sh'
+            taskcommand = 'tcsh script.sh'
 
             t = Task(taskcommand)
             t.specify_buffer(script, 'script.sh')
