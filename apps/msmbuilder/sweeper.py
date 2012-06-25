@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright (C) 2012- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
@@ -95,11 +96,12 @@ class Sweeper:
                     """ % {'env': env, 'command': command}
             taskcommand = 'tcsh script.sh'
 
+	    print command
             t = Task(taskcommand)
             t.specify_buffer(script, 'script.sh')
 
             for input in self.inputlist:
-                t.specify_file(input, input, WORK_QUEUE_INPUT, cache=False)
+                t.specify_file(input, input, WORK_QUEUE_INPUT, cache=True)
             for output in self.outputlist:
                 t.specify_file("%s/%s/%s" % (self.progname, paramdir, output), output, WORK_QUEUE_OUTPUT, cache=False)
 
