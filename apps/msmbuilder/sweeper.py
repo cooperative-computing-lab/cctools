@@ -15,7 +15,7 @@ class Sweeper:
         Usage: import sweeper
                x = sweeper.Sweeper()"""
     def __init__(self):
-        self.port = WORK_QUEUE_DEFAULT_PORT # 9123
+        self.port = WORK_QUEUE_RANDOM_PORT  # random, default is 9123
         self.progname = ""                  # the program to sweep with
         self.envpath = ""                   # path to a environment set up script
         self.paramvalues = []               # list of arguments e.g. -l -o 27
@@ -83,9 +83,9 @@ class Sweeper:
             command  = ' '.join(self.command) % (item) # create the command
             paramdir = '_'.join(self.paramvalues) % (item)
 
-            os.system("mkdir -p %s/%s" % (self.progname, paramdir))
+            os.system("mkdir -p %s/%s" % (self.progname, paramdir)) # create progname/params, this is where the output will go ex. BuildMSM/11_2/Data
 
-            if (self.envpath):
+            if (self.envpath): # if a env script was specified
                 env = open(self.envpath).read()
             else:
                 env = ""
@@ -93,17 +93,18 @@ class Sweeper:
             script = """
                     %(env)s
                     %(command)s
-                    """ % {'env': env, 'command': command}
-            taskcommand = 'tcsh script.sh'
+                    """ % {'env': env, 'command': command} # combine an env script and the command into one script
+            taskcommand = 'tcsh script.sh' # run with tsch
 
 	    print command
             t = Task(taskcommand)
             t.specify_buffer(script, 'script.sh')
 
             for input in self.inputlist:
-                t.specify_file(input, input, WORK_QUEUE_INPUT, cache=True)
+                t.specify_file(input, input, WORK_QUEUE_INPUT, cache=True) # cache the input since it is the same for all commands
             for output in self.outputlist:
-                t.specify_file("%s/%s/%s" % (self.progname, paramdir, output), output, WORK_QUEUE_OUTPUT, cache=False)
+                # we want the output on the local machine to go to progname/params/
+                t.specify_file("%s/%s/%s" % (self.progname, paramdir, output), output, WORK_QUEUE_OUTPUT, cache=False) # do not cache the output
 
             taskid = self.q.submit(t)
             print "submitted task (id# %d): %s" % (taskid, t.command)
