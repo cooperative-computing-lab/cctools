@@ -22,7 +22,11 @@ extern "C" {
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#if defined(HAS_SYS_XATTR_H)
+#include <sys/xattr.h>
+#elif defined(HAS_ATTR_XATTR_H)
 #include <attr/xattr.h>
+#endif
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/vfs.h>
@@ -228,6 +232,7 @@ process to sleep and wait for actual input to become ready.
 		END
 	}
 
+#if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
 	virtual ssize_t fgetxattr( const char *name, void *data, size_t size ) {
 		ssize_t result;
 		debug(D_LOCAL,"fgetxattr %d %s",fd,name);
@@ -255,6 +260,8 @@ process to sleep and wait for actual input to become ready.
 		result = ::fremovexattr(fd,name);
 		END
 	}
+
+#endif
 
 	virtual int flock( int op ) {
 		int result;

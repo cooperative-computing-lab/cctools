@@ -866,6 +866,8 @@ optional_function pwrite /usr/include/unistd.h HAS_PWRITE
 
 optional_include /usr/include/sys/statfs.h HAS_SYS_STATFS_H
 optional_include /usr/include/sys/statvfs.h HAS_SYS_STATVFS_H
+optional_include /usr/include/sys/xattr.h HAS_SYS_XATTR_H
+optional_include /usr/include/attr/xattr.h HAS_ATTR_XATTR_H
 
 cctools_doctargets=
 
