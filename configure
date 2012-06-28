@@ -8,8 +8,8 @@ save_arguments $0 $@
 
 major=3
 minor=5
-micro=0
-release_date="06/04/2012"
+micro=1
+release_date="06/28/2012"
 
 build_user=`whoami`
 build_host=`uname -n`
