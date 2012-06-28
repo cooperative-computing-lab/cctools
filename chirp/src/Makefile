@@ -9,7 +9,7 @@ SERVER_SOURCES = chirp_stats.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chir
 PROGRAMS=chirp chirp_get chirp_put chirp_server chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute
 SCRIPTS=chirp_audit_cluster chirp_server_hdfs
 LIBRARIES=libchirp.a libchirp_client.${CCTOOLS_DYNAMIC_SUFFIX}
-HEADERS=chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h
+PUBLIC_HEADERS=chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h
 
 TARGETS = ${PROGRAMS} ${LIBRARIES}
 LIBRARY_OBJECTS = ${LIBRARY_SOURCES:%.c=%.o}
@@ -80,4 +80,4 @@ install: all
 	chmod 755 ${SCRIPTS}
 	cp ${PROGRAMS} ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
 	cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
-	cp ${HEADERS} ${CCTOOLS_INSTALL_DIR}/include/cctools
+	cp ${PUBLIC_HEADERS} ${CCTOOLS_INSTALL_DIR}/include/cctools

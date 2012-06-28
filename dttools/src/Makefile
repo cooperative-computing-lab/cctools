@@ -5,6 +5,7 @@ include ../../Makefile.rules
 SOURCES = auth.c auth_all.c auth_unix.c auth_globus.c auth_kerberos.c auth_hostname.c auth_address.c auth_ticket.c b64_encode.c batch_job.c batch_job_condor.c batch_job_hadoop.c batch_job_local.c batch_job_mpi_queue.c batch_job_cluster.c batch_job_work_queue.c bitmap.c buffer.c catalog_query.c change_process_title.c chunk.c console_login.c clean_dir.c copy_stream.c create_dir.c daemon.c datagram.c debug.c delete_dir.c disk_info.c domain_name.c domain_name_cache.c dpopen.c envtools.c fast_popen.c full_io.c file_cache.c get_canonical_path.c get_line.c getopt.c hdfs_library.c hash_cache.c hash_table.c hmac.c http_query.c itable.c link.c list.c load_average.c memory_info.c mergesort.c md5.c mpi_queue.c nvpair.c nvpair_database.c password_cache.c preadwrite.c process.c sha1.c sleeptools.c sort_dir.c stringtools.c string_array.c text_array.c text_list.c timestamp.c timer.c url_encode.c username.c work_queue.c work_queue_catalog.c xxmalloc.c
 
 EXTRA_HEADERS = int_sizes.h macros.h batch_job_internal.h
+PUBLIC_HEADERS = work_queue.h batch_job.h timestamp.h debug.h int_sizes.h auth.h auth_all.h auth_unix.h auth_globus.h auth_kerberos.h auth_hostname.h auth_addres.h auth_ticket.h
 
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
@@ -86,5 +87,5 @@ install: all
 	cp ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
 	cp ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
 	cp work_queue_example.c ${CCTOOLS_INSTALL_DIR}/doc
-	for file in ${HEADERS} ; do if [ -f $$file ] ; then cp $$file ${CCTOOLS_INSTALL_DIR}/include/cctools ; fi ; done
+	for file in ${PUBLIC_HEADERS} ; do if [ -f $$file ] ; then cp $$file ${CCTOOLS_INSTALL_DIR}/include/cctools ; fi ; done
 	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then cp /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; done

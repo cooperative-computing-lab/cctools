@@ -8,6 +8,7 @@ See the file COPYING for details.
 #define CHIRP_RECURSIVE_H
 
 #include "int_sizes.h"
+#include <time.h>
 
 /** @file chirp_recursive.h
 A high level interface to put and get large directories trees to and from Chirp servers.
