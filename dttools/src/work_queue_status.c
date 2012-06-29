@@ -42,10 +42,11 @@ static void work_queue_status_show_help(const char *progname)
 {
 	printf("usage: %s\n", progname);
 	printf("Options:\n");
-	printf(" -d <flag>   Enable debugging for this subsystem.\n");
-	printf(" -t <time>   RPC timeout (default is %ds).\n", Work_Queue_Status_Timeout);
-	printf(" -l          Long output.\n");
-	printf(" -h          This message.\n");
+	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n");
+	printf(" -d <flag>      Enable debugging for this subsystem.\n");
+	printf(" -t <time>      RPC timeout (default is %ds).\n", Work_Queue_Status_Timeout);
+	printf(" -l             Long output.\n");
+	printf(" -h             This message.\n");
 }
 
 int parse_catalog_server_description(char *server_string, char **host, int *port)
