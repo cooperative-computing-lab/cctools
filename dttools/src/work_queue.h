@@ -332,11 +332,12 @@ void work_queue_specify_priority(struct work_queue *q, int priority);
 */
 void work_queue_specify_master_mode(struct work_queue *q, int mode);
 
-/** Remove a task from the queue's ready list.
+/** Cancel a submitted task using its task id and remove it from queue.
 @param q A work queue object.
-@param t The task to remove from the queue.
+@param id The taskid returned from @ref work_queue_submit.
+@return The task description of the cancelled task, or null if the task was not found in queue. The returned task must be deleted with @ref work_queue_task_delete or resubmitted with @ref work_queue_submit.
 */
-int work_queue_task_remove(struct work_queue *q, struct work_queue_task *t);
+struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int id);
 
 /** Cancel a submitted task using its tag and remove it from queue.
 @param q A work queue object.

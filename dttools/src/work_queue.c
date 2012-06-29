@@ -630,12 +630,12 @@ static int add_worker(struct work_queue *q)
  */
 static int get_output_item(char *remote_name, char *local_name, struct work_queue *q, struct work_queue_worker *w, struct hash_table *received_items, INT64_T * total_bytes)
 {
-	char line[WORK_QUEUE_CATALOG_LINE_MAX];
+	char line[WORK_QUEUE_LINE_MAX];
 	int fd;
 	INT64_T actual, length;
 	time_t stoptime;
 	char type[256];
-	char tmp_remote_name[WORK_QUEUE_CATALOG_LINE_MAX], tmp_local_name[WORK_QUEUE_CATALOG_LINE_MAX];
+	char tmp_remote_name[WORK_QUEUE_LINE_MAX], tmp_local_name[WORK_QUEUE_LINE_MAX];
 	char *cur_pos, *tmp_pos;
 	int remote_name_len;
 	int local_name_len;
@@ -1206,7 +1206,7 @@ static int put_directory(const char *dirname, const char *remote_name, struct wo
 	struct dirent *file;
 	struct work_queue_file tf;
 
-	char buffer[WORK_QUEUE_CATALOG_LINE_MAX];
+	char buffer[WORK_QUEUE_LINE_MAX];
 
 	while((file = readdir(dir))) {
 		char *filename = file->d_name;
@@ -2192,9 +2192,8 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 
 int work_queue_hungry(struct work_queue *q)
 {
-	struct work_queue_stats qs;
-	int i, j;
-	work_queue_get_stats(q, &qs);
+	if(q->total_tasks_submitted < 100)
+		return (100 - q->total_tasks_submitted);
 
 	int i, j, workers_init, workers_ready, workers_busy, workers_cancelling;
 	workers_init = q->workers_in_state[WORKER_STATE_INIT];
@@ -2242,12 +2241,13 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	return i;
 }
 
+//comparator function for checking if a task matches given taskid.
 static int taskid_comparator(void *t, const void *r) {
 
 	struct work_queue_task *task_in_queue = t;
-	const struct work_queue_task *task_to_remove = r;
+	const int *taskid = r;
 
-	if (task_in_queue->taskid == task_to_remove->taskid) {
+	if (task_in_queue->taskid == *taskid) {
 		return 1;
 	}	
 	return 0;
@@ -2323,24 +2323,68 @@ static struct work_queue_task *find_running_task_by_tag(struct itable *itbl, con
 }
 
 /**
- * Note this is different from work_queue_task_delete(). This simply removes the
- * task from ready list and returns without cleaning up the task. This means the 
- * task can be resubmitted to queue again from userland. It is still up to the 
- * user to call work_queue_task_delete() when the task is no longer required.
+ * Cancel submitted task as long as it has not been retrieved through wait().
+ * This is non-blocking and has a worst-case running time of O(n) where n is 
+ * number of submitted tasks.
+ * This returns the work_queue_task struct corresponding to specified task and 
+ * null if the task is not found.
  */
-int work_queue_task_remove(struct work_queue *q, struct work_queue_task *t) {
+struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int taskid) {
 
 	struct work_queue_task *matched_task;
 
-	if (t->taskid > 0){
-		matched_task = list_find(q->ready_list, taskid_comparator, t);
-		if (matched_task) {	
-			list_remove(q->ready_list,matched_task);
-			debug(D_WQ, "Task with tag %s is removed.", matched_task->tag);
-			return 0;
+	if (taskid > 0){
+		//see if task is executing at a worker.
+		if ((matched_task = find_running_task_by_id(q->running_tasks, taskid))) {
+			if (cancel_running_task(q, matched_task)) {
+				return matched_task;
+			}	
+		} //if not, see if task is in ready list.
+		else if ((matched_task = list_find(q->ready_list, taskid_comparator, &taskid))) {
+			list_remove(q->ready_list, matched_task);
+			debug(D_WQ, "Task with id %d is removed from ready list.", matched_task->taskid);
+			return matched_task;
+		} //if not, see if task is in complete list.
+		else if ((matched_task = list_find(q->complete_list, taskid_comparator, &taskid))) {
+			list_remove(q->complete_list, matched_task);
+			debug(D_WQ, "Task with id %d is removed from complete list.", matched_task->taskid);
+			return matched_task;
+		} 
+		else { 
+			debug(D_WQ, "Task with id %d is not found in queue.", taskid);
+		}	
+	}
+	
+	return NULL;
+}
+
+struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const char* tasktag) {
+
+	struct work_queue_task *matched_task;
+
+	if (tasktag){
+		//see if task is executing at a worker.
+		if ((matched_task = find_running_task_by_tag(q->running_tasks, tasktag))) {
+			if (cancel_running_task(q, matched_task)) {
+				return matched_task;
+			}
+		} //if not, see if task is in ready list.
+		else if ((matched_task = list_find(q->ready_list, tasktag_comparator, tasktag))) {
+			list_remove(q->ready_list, matched_task);
+			debug(D_WQ, "Task with tag %s and id %d is removed from ready list.", matched_task->tag, matched_task->taskid);
+			return matched_task;
+		} //if not, see if task is in complete list.
+		else if ((matched_task = list_find(q->complete_list, tasktag_comparator, tasktag))) {
+			list_remove(q->complete_list, matched_task);
+			debug(D_WQ, "Task with tag %s and id %d is removed from complete list.", matched_task->tag, matched_task->taskid);
+			return matched_task;
+		} 
+		else { 
+			debug(D_WQ, "Task with tag %s is not found in queue.", tasktag);
 		}
 	}
-	return 1;
+	
+	return NULL;
 }
 
 int work_queue_empty(struct work_queue *q)

@@ -57,7 +57,7 @@ struct work_queue_master {
 	int workers_ready;
 	int workers_busy;
 	int workers;
-	char workers_by_pool[WORK_QUEUE_CATALOG_LINE_MAX];
+	char *workers_by_pool;
 	char owner[USERNAME_MAX];
 	int default_max_workers_from_pool;
 	int workers_need;
@@ -68,7 +68,7 @@ struct work_queue_master {
 struct work_queue_pool {
 	char addr[LINK_ADDRESS_MAX];
 	char name[WORK_QUEUE_POOL_NAME_MAX];
-	char decision[WORK_QUEUE_CATALOG_LINE_MAX];
+	char *decision;
 	char owner[USERNAME_MAX];
 };
 
@@ -83,11 +83,17 @@ int parse_catalog_server_description(char *server_string, char **host, int *port
 
 struct work_queue_pool *parse_work_queue_pool_nvpair(struct nvpair *nv);
 
+void free_work_queue_pool(struct work_queue_pool *p);
+
 int workers_by_item(const char *workers_by_item, const char *item_name);
 
 struct work_queue_master *parse_work_queue_master_nvpair(struct nvpair *nv);
 
 struct work_queue_master *duplicate_work_queue_master(struct work_queue_master *master);
+
+void free_work_queue_master(struct work_queue_master *m);
+
+void free_work_queue_master_list(struct list *ml);
 
 struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port, struct list *regex_list);
 

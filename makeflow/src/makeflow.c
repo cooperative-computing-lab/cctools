@@ -72,11 +72,12 @@ static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
-static char *makeflow_exe = NULL;
-
+static char *project = NULL;
 static int priority = 0;
 static int port = 0;
 static int output_len_check = 0;
+
+static char *makeflow_exe = NULL;
 
 typedef enum {
 	DAG_NODE_STATE_WAITING = 0,
@@ -1872,7 +1873,7 @@ void dag_run(struct dag *d)
 				if(n)
 					dag_node_complete(d, n, &info);
 			} else {
-				debug(D_DEBUG, "No job has finished in the last %d seconds.\n", tmp_timeout);
+				debug(D_DEBUG, "No job has finished in the past %d seconds.\n", tmp_timeout);
 			}
 		}
 
@@ -1936,7 +1937,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	fprintf(stdout, " -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
 	fprintf(stdout, " -p <port>      Port number to use with work queue.         (default is %d, 0=arbitrary)\n", WORK_QUEUE_DEFAULT_PORT);
-	fprintf(stdout, " -N <project>   Set the project name to <project>.\n");
+	fprintf(stdout, " -N <project>   Set the project name to <project>\n");
 	fprintf(stdout, " -P <integer>   Priority. Higher the value, higher the priority.\n");
 	fprintf(stdout, " -a             Advertise the master information to a catalog server.\n");
 	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
@@ -1945,8 +1946,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	fprintf(stdout, " -I             Show input files.\n");
 	fprintf(stdout, " -O             Show output files.\n");
-	fprintf(stdout, " -g <gc_method> Set garbage collection method.\n");
-	fprintf(stdout, " -G <gc_param>  Set garbage collection parameter.\n");
 	fprintf(stdout, " -D             Display the Makefile as a Dot graph.\n");
 	fprintf(stdout, " -B <options>   Add these options to all batch submit files.\n");
 	fprintf(stdout, " -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n", dag_submit_timeout);
@@ -1981,7 +1980,6 @@ int main(int argc, char *argv[])
 	int auto_workers = 0;
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	int work_queue_estimate_capacity_on = 0;
-	char *work_queue_name = NULL;
 	char *catalog_host;
 	int catalog_port;
 	int port_set = 0;
@@ -2005,11 +2003,7 @@ int main(int argc, char *argv[])
 	}
 	s = getenv("WORK_QUEUE_NAME");
 	if(s) {
-		work_queue_name = xxstrdup(s);
-	}
-	s = getenv("WORK_QUEUE_AUTO_REMOVE_WORKERS_ON");
-	if(s) {
-		work_queue_auto_remove_workers_on = atoi(s);
+		project = xxstrdup(s);
 	}
 	s = getenv("WORK_QUEUE_FAST_ABORT_MULTIPLIER");
 	if(s) {
@@ -2029,8 +2023,8 @@ int main(int argc, char *argv[])
 			clean_mode = 1;
 			break;
 		case 'N':
-			free(work_queue_name);
-			work_queue_name = xxstrdup(optarg);
+			free(project);
+			project = xxstrdup(optarg);
 			break;
 		case 'P':
 			priority = atoi(optarg);
@@ -2191,7 +2185,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !work_queue_name) {
+		if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
 			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
 			return 1;
@@ -2201,8 +2195,8 @@ int main(int argc, char *argv[])
 		setenv("WORK_QUEUE_MASTER_MODE", value, 1);
 		free(value);
 
-		if(work_queue_name) {
-			setenv("WORK_QUEUE_NAME", work_queue_name, 1);
+		if(project) {
+			setenv("WORK_QUEUE_NAME", project, 1);
 		}
 
 		if(work_queue_estimate_capacity_on) {
@@ -2254,9 +2248,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	int no_symlinks = (clean_mode || syntax_check || display_mode);
 	struct dag *d = dag_create();
-	if(!d || !dag_parse(d, dagfile, clean_mode || syntax_check || display_mode)) {
-		fprintf(stderr, "makeflow: couldn't parse %s\n", dagfile);
+	if(!d || !dag_parse(d, dagfile, no_symlinks)) {
+		fprintf(stderr, "makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
 		free(logfilename);
 		free(batchlogfilename);
 		return 1;
