@@ -33,16 +33,14 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
+#define CATALOG_QUERY_INTERVAL 60
+
 #define WORKERS_PER_JOB_MAX 50
 #define EXTRA_WORKERS_MAX 20
 #define EXTRA_WORKERS_PERCENTAGE 0.2
 
 #define POOL_CONFIG_LINE_MAX 4096
-#define INITIAL_WORKERS_DEFAULT 15
-#define INITIAL_WORKERS_MAX 100
-#define WORKERS_DEFAULT 100
-#define WORKERS_MAX 500
-
+#define MAX_WORKERS_DEFAULT 100
 
 static int abort_flag = 0;
 static sig_atomic_t pool_config_updated = 1;
@@ -304,7 +302,7 @@ struct pool_config *get_pool_config(const char *path) {
 	}
 
 	// Set defaults
-	pc->max_workers = WORKERS_DEFAULT;
+	pc->max_workers = MAX_WORKERS_DEFAULT;
 
 	// Read in new configuration from file
 	FILE *fp;
@@ -339,8 +337,8 @@ struct pool_config *get_pool_config(const char *path) {
 				}
 			} else if(!strncmp(name, "max_workers", strlen(name))) {
 				int max_workers = atoi(value);
-				if(max_workers <= 0 || max_workers > WORKERS_MAX) {
-					fprintf(stderr, "Invalid configuration: max_workers (%d) out of range [1, %d]\n", max_workers, WORKERS_MAX);
+				if(max_workers <= 0) {
+					fprintf(stderr, "Invalid configuration: max_workers (current value: %d) should be greater than 0.\n", max_workers);
 					goto fail;
 				}
 				pc->max_workers = max_workers;
@@ -425,12 +423,13 @@ struct pool_config *update_pool_config(const char *pool_config_path, struct pool
 	return pc;
 }
 
-// TODO: // This is an experimental feature!!
+// This is an experimental feature!!
 void start_serving_masters(const char *catalog_host, int catalog_port, const char *pool_config_path) 
 {
 	struct list *matched_masters;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
+	static time_t next_catalog_query_time = 0;
 
 	char cmd[PATH_MAX] = "";
 	char input_files[PATH_MAX] = "";
@@ -448,11 +447,16 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 			return;
 		}
 
-		matched_masters = get_masters_from_catalog(catalog_host, catalog_port, pc->project);
-		if(!matched_masters) {
-			sleep(5);
-			continue;
+		if(next_catalog_query_time <= time(0)) {
+			next_catalog_query_time = time(0) + CATALOG_QUERY_INTERVAL;
+			matched_masters = get_masters_from_catalog(catalog_host, catalog_port, pc->project);
+			if(!matched_masters) {
+				goto check_workers;
+			}
+		} else {
+			goto check_workers;
 		}
+
 		debug(D_WQ, "Matching masters:\n");
 		debug_print_masters(matched_masters);
 
@@ -511,6 +515,7 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 		list_free(matched_masters); // we can do this because work_queue_master struct does not contain dynamically allocated memory
 		list_delete(matched_masters);
 
+check_workers:
 		if(itable_size(job_table)) {
 			jobid = batch_job_wait_timeout(q, &info, time(0) + 5);
 			if(jobid >= 0 && !abort_flag) {
@@ -738,37 +743,6 @@ void submit_workers_for_new_masters(struct list *matched_masters, struct pool_co
 			exit(1);
 		}
 	}
-}
-
-int get_master_capacity(const char *catalog_host, int catalog_port, const char *proj)
-{
-	struct catalog_query *q;
-	struct nvpair *nv;
-	time_t stoptime;
-	int capacity = 0;
-
-	stoptime = time(0) + 5;
-
-	q = catalog_query_create(catalog_host, catalog_port, stoptime);
-	if(!q) {
-		fprintf(stderr, "Failed to query catalog server at %s:%d\n", catalog_host, catalog_port);
-		return 0;
-	}
-
-	while((nv = catalog_query_read(q, stoptime))) {
-		if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0) {
-			if(strcmp(nvpair_lookup_string(nv, proj), proj) == 0) {
-				capacity = nvpair_lookup_integer(nv, "capacity");
-				nvpair_delete(nv);
-				break;
-			}
-		}
-		nvpair_delete(nv);
-	}
-
-	// Must delete the query otherwise it would occupy 1 tcp connection forever!
-	catalog_query_delete(q);
-	return capacity;
 }
 
 static int submit_workers(char *cmd, char *input_files, int count)

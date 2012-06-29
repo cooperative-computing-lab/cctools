@@ -21,7 +21,5 @@ clean:
 	rm -f core *~ *.o *.a ${TARGETS} 
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}/
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install allpairs_multicore ${CCTOOLS_INSTALL_DIR}/bin
-	install allpairs_master ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
+	cp ${TARGETS} ${CCTOOLS_INSTALL_DIR}/bin

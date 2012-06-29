@@ -134,6 +134,10 @@ int link_nonblocking(struct link *link, int onoff)
 	return 1;
 }
 
+int link_buffer_empty(struct link *link) {
+	return link->buffer_length > 0 ? 0 : 1;
+}
+
 static int errno_is_temporary(int e)
 {
 	if(e == EINTR || e == EWOULDBLOCK || e == EAGAIN || e == EINPROGRESS || e == EALREADY || e == EISCONN) {
@@ -192,7 +196,7 @@ int link_sleep(struct link *link, time_t stoptime, int reading, int writing)
 		tptr = 0;
 	} else {
 		timeout = stoptime - time(0);
-		if(timeout < 0) {
+		if(timeout <= 0) {
 			errno = ECONNRESET;
 			return 0;
 		}
@@ -309,7 +313,12 @@ struct link *link_serve_address(const char *addr, int port)
 		success = bind(link->fd, (struct sockaddr *) &address, sizeof(address));
 		if(success == -1) {
 			if(errno == EADDRINUSE) {
-				continue;
+				//If a port is specified, fail!
+				if (low == high) { 
+					goto failure;
+				} else {	
+					continue;
+				}	
 			} else {
 				goto failure;
 			}

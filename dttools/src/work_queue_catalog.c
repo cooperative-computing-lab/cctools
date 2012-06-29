@@ -225,9 +225,7 @@ struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port
 	return ml;
 }
 
-
-int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, int now)
-{
+int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, const char *workers_by_pool, int now) {
 	char address[DATAGRAM_ADDRESS_MAX];
 	char owner[USERNAME_MAX];
 	static char text[WORK_QUEUE_CATALOG_LINE_MAX];
@@ -251,6 +249,9 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 
 	snprintf(text, WORK_QUEUE_CATALOG_LINE_MAX, "type wq_master\nproject %s\nstart_time %llu\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running %d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nworkers_by_pool %s\ncapacity %d\nversion %d.%d.%d\nowner %s", project_name, s->start_time, s->priority, s->port, WORK_QUEUE_CATALOG_LIFETIME, s->tasks_waiting, s->total_tasks_complete, s->tasks_running, s->total_tasks_dispatched, s->workers_init, s->workers_ready, s->workers_busy, s->workers_ready + s->workers_busy, s->workers_by_pool, s->capacity, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
 
+	buffer_printf(buffer, "type wq_master\nproject %s\nstart_time %llu\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running %d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nworkers_by_pool %s\ncapacity %d\nversion %d.%d.%d\nowner %s", project_name, s->start_time, s->priority, s->port, WORK_QUEUE_CATALOG_LIFETIME, s->tasks_waiting, s->total_tasks_complete, s->workers_busy, s->total_tasks_dispatched, s->workers_init, s->workers_ready, s->workers_busy, s->workers_ready + s->workers_busy, workers_by_pool, s->capacity, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
+
+	text = buffer_tostring(buffer, &text_size);
 	if(domain_name_cache_lookup(catalog_host, address)) {
 		debug(D_WQ, "Sending the master information to the catalog server at %s:%d ...", catalog_host, catalog_port);
 		datagram_send(outgoing_datagram, text, strlen(text), address, catalog_port);

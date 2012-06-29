@@ -127,6 +127,11 @@ static void get_linux_version()
 					pfs_trap_after_fork = 0;
 					return;
 				}
+			} else if(major==3) {
+				if(minor<=2) {
+					pfs_trap_after_fork = 0;
+					return;
+				}
 			}
 		}
 	}

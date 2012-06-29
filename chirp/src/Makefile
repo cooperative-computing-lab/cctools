@@ -9,7 +9,7 @@ SERVER_SOURCES = chirp_stats.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chir
 PROGRAMS=chirp chirp_get chirp_put chirp_server chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute
 SCRIPTS=chirp_audit_cluster chirp_server_hdfs
 LIBRARIES=libchirp.a libchirp_client.${CCTOOLS_DYNAMIC_SUFFIX}
-HEADERS=chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h
+PUBLIC_HEADERS=chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h
 
 TARGETS = ${PROGRAMS} ${LIBRARIES}
 LIBRARY_OBJECTS = ${LIBRARY_SOURCES:%.c=%.o}
@@ -73,13 +73,11 @@ clean:
 	rm -f core *~ *.o *.os *.a *.${CCTOOLS_DYNAMIC_SUFFIX} ${TARGETS}
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install -d ${CCTOOLS_INSTALL_DIR}/lib
-	install -d ${CCTOOLS_INSTALL_DIR}/include
-	install -d ${CCTOOLS_INSTALL_DIR}/include/cctools
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/include/cctools
 	if [ -f ${CCTOOLS_INSTALL_DIR}/bin/chirp_server ]; then mv ${CCTOOLS_INSTALL_DIR}/bin/chirp_server ${CCTOOLS_INSTALL_DIR}/bin/chirp_server.old; fi
-	for file in ${PROGRAMS} ${SCRIPTS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; done
-	for file in ${LIBRARIES} ; do install $$file ${CCTOOLS_INSTALL_DIR}/lib/$$file ; done
-	for file in ${HEADERS} ; do install $$file ${CCTOOLS_INSTALL_DIR}/include/cctools/$$file ; done
-
+	chmod 755 ${SCRIPTS}
+	cp ${PROGRAMS} ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
+	cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
+	cp ${PUBLIC_HEADERS} ${CCTOOLS_INSTALL_DIR}/include/cctools

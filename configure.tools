@@ -224,17 +224,20 @@ optional_file()
 
 optional_include()
 {
-	multiarch_include=`echo $1 | sed "s|include/|include/$HOST_MULTIARCH/|"`
+	echo -n "checking for header $1..."
 
-	if optional_file $1 $2;
+cat > .configure.tmp.c << EOF
+#include <$1>
+EOF
+	if gcc .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1 
 	then
+		echo yes
+		ccflags="${ccflags} -D$2"
 		return 0
-	elif [ X$HOST_MULTIARCH != X ] && optional_file $multiarch_include $2;
-	then
-		return 0
+	else
+		echo no
+		return 1
 	fi
-
-	return 1
 }
 
 optional_pfs_service()

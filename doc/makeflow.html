@@ -253,76 +253,75 @@ The default port number is 9123.  Sometimes, however, the port number might be
 not available on your system. You can change the default port via the '-p
 &lt;port number&gt;' option. For example, if you want the master to listen on port
 9567 by default, you can run the following command: 
+
 <pre>
 % makeflow -T wq -p 9567 exmaple.makeflow
 </pre>
 
-<h3>Set Project Name</h3>
-The hostname:port is the default way for workers to identify masters.  Anyone
-can start a worker and connect to your master at the hostname:port.  Sometimes
-you don't want other people's workers to work on your project.  To
-<strong>avoid anonymous worker connections</strong>, you will need to set a
-project name with the '-N' option for both your master and workers and enable
-the exclusive worker mode on your work queue master with the "-e" option: 
-<pre>
-% makeflow -T wq -N proj1 -e example.makeflow
-</pre>
-This would inform the master to only allow connections from workers who have a
-preference on "proj1".  If the '-e' option is not specified, the master would
-accept shared workers submitted by anyone. To add a project preference for the
-worker, add the '-N' option to the worker as well:
-<pre>
-% work_queue_worker -N proj1 barney.nd.edu 9123
-</pre>
-You can even assign mulitple preferred project names to a single worker. The
-worker would only work for the master whose name is contained in the list of
-the worker's preferred project names.
+<h3>Master Worker Matching</h3>
+Explicitly specifying the hostname:port is the default way for a worker to
+locate a master. A simpler way to match workers to masters is to use the
+project name matching. You can give the master a project name with the -N
+option:
+<pre> 
+% makeflow -T wq -a -N MyProj example.makeflow 
+</pre> 
+The -N option gives the master a project name called 'MyProj'. The -a option
+enables the catalog mode of the master.  Only in the catalog mode a master
+would advertise its information, such as the project name, running status,
+hostname and port number, to a catalog server. Then a worker could retrieve
+these information from the same catalog server.  The above command uses the
+default catalog server at Notre Dame which runs 24/7. We will talk about how to
+set up your own catalog server later.
 
-<h3>Enable Catalog Mode</h3>
-In the catalog mode, the master would advertise its information, such as
-project name, running status, and hostname and port number, to a catalog
-server. The workers (with proper options turned on) would contact the catalog
-server to ask for available masters and then work for them. The catalog mode
-allows a set of workers to work for different masters without stopping them
-and telling them a new master's hostname:port for each master. It also allows
-different users to share their computing resources. So your workers could work
-for other's projects when they are idle and other's workers could also work
-for yours.
 <p>
-To make use of the catalog mode, you will have to have a catalog server to
-pass information between potential masters and workers. Say you want to run
-your catalog server on a machine named barney.nd.edu (the default port that
-the catalog server will be listening on is 9097, you can change it via the
-'-p' option), do:
+To start a worker that automatically finds MyProj's master via the default Notre
+Dame catalog server:
+<pre>
+% work_queue_worker -a -N MyProj 
+</pre>
+The '-a' option enables the catalog mode on the worker, which tells the worker
+to contact a catalog server to find out a project's (specified by -N option)
+hostname and port.  
+
+<p>
+You can also give multiple -N options to a worker. The worker will find out
+which ones of the specified projects are running from the catalog server and
+randomly select one to work for. When one project is done, the worker would
+repeat this process.  Thus, the worker can work for a different master without
+being stopped and given the different master's hostname and port. An example of
+specifying multiple projects:
+<pre>
+% work_queue_worker -a -N proj1 -N proj2 -N proj3
+</pre>
+
+<p>
+Now let's look at how to set up your own catalog server. Say you want to run
+your catalog server on a machine named barney.nd.edu (the default port that the
+catalog server will be listening on is 9097, you can change it via the '-p'
+option), do:
 <pre>
 barney% catalog_server
 </pre>
 Now you have a catalog server listening at barney.nd.edu:9097. To make your
-masters and workers contact this catalog server, add the '-C hostname:port'
-option to both the master and worker programs: 
+masters and workers contact this catalog server, simply add the '-C
+hostname:port' option to both of your master and worker: 
 <pre>
-% makeflow -T wq -C barney.nd.edu:9097 -N proj1 example.makeflow
-% work_queue_worker -C barney.nd.edu:9097 -s
+% makeflow -T wq -C barney.nd.edu:9097 -N MyProj example.makeflow
+% work_queue_worker -C barney.nd.edu:9097 -a -N MyProj 
 </pre>
-The '-C' option turns on the catalog mode. Note that the '-s' option in the
-above worker command tells the worker to run in a shared worker mode, as
-opposed to the default exlusive mode which would let the worker only work for
-masters that it prefers (set by the -N option).
-<p>
-At Notre Dame, we have already had a catalog server runing 24/7. The work
-queue master and worker program would contact the Notre Dame catalog server by
-default. Thus, you don't have to specify the catalog server explicitly with
-the '-C' option unless you have your own catalog server. To turn on the
-catalog mode in this case you will use the '-a' option, again on both the
-master and worker programs.
-<pre>
-% makeflow -T wq -a -N proj1 example.makeflow
-% work_queue_worker -a -N proj1 -N proj2 -N proj3
-</pre>
-Note that this time the worker is not run with the '-s' option. Instead, it
-has three preferred projects. The worker would ask the catalog server for
-available masters and only work for a master if its project name matches one
-of the worker's preferences.
+
+<h3>Supported Makeflow Drivers</h3>
+The full list of supported Makeflow drivers include
+<ul>
+	<li>Local - local execution on a single multicore system</li>
+	<li>Condor - execution on a campus grid via the local <a href="http://www.cs.wisc.edu/condor">Condor Pool</a></li>
+	<li>SGE - execution on a high-performance cluster using the <a href="http://www.oracle.com/us/products/tools/oracle-grid-engine-075549.html">Oracle Grid Engine</a> (formerly the Sun Grid Engine).</li>
+	<li>Moab - execution on a high-performance cluster using the <a href="http://www.adaptivecomputing.com/resources/docs/mwm/6-0/index.php">Moab Workload Manager</a></li>
+	<li>Cluster - execution on a high-performance cluster using a user-defined cluster manager</li>
+	<li>Work Queue - execution on a lightweight, scalable master-worker <a href="http://cse.nd.edu/~ccl/software/workqueue/">framework</a> managed directly by Makeflow</li>
+	<li>Hadoop - execution on a cluster managed by the <a href="http://hadoop.apache.org/">Hadoop</a> framework, using data stored in <a href="http://hadoop.apache.org/hdfs">HDFS</a>.</li>
+</ul>
 
 <h2>For More Information</h2>
 

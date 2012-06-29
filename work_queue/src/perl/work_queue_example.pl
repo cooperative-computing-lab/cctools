@@ -1,32 +1,59 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl 
 
-use strict;
+# Copyright (c) 2010- The University of Notre Dame.
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+#
+# This program is a very simple example of how to use Work Queue.
+# It accepts a list of files on the command line.
+# Each file is compressed with gzip and returned to the user.
+
 use work_queue;
 
-my $wq = work_queue::work_queue_create(int(*work_queue::WORK_QUEUE_RANDOM_PORT));
+my $port = $WORK_QUEUE_DEFAULT_PORT;
 
-work_queue::work_queue_specify_name($wq, "work_queue_perl");
-
-print work_queue::work_queue_port($wq) . "\n";
-
-for (my $i = 0; $i < 1000; $i++) {
-    my $task = work_queue::work_queue_task_create("date");
-
-    work_queue::work_queue_task_specify_algorithm($task, int(*work_queue::WORK_QUEUE_SCHEDULE_FCFS));
-    work_queue::work_queue_task_specify_tag($task, "current date/time " . $i);
-    work_queue::work_queue_task_specify_input_file($task, "/bin/date", "date");
-
-    print "$task->{worker_selection_algorithm}\n";
-    print "$task->{command_line}\n";
-    print "$task->{tag}\n";
-    
-    work_queue::work_queue_submit($wq, $task);
+if ($#ARGV < 0) {
+	print "work_queue_example <file1> [file2] [file3] ...\n";
+	print "Each file given on the command line will be compressed using a remote worker.\n";
+	exit 1;
 }
 
-while (not work_queue::work_queue_empty($wq)) {
-    my $task = work_queue::work_queue_wait($wq, 1);
-
-    if (defined($task)) {
-    	print "$task->{command_line}, $task->{result}, $task->{output}\n";
-    }
+my $q = work_queue_create($port);
+if (not defined($q)) {
+	print "Instantiation of Work Queue failed!\n";
+	exit 1;
 }
+
+$port = work_queue_port($q);
+print "listening on port $port...\n"; 
+
+for (my $i = 0; $i <= $#ARGV; $i++) {
+	my $infile = $ARGV[$i]; 
+	my $outfile = $ARGV[$i] . ".gz";
+	my $command = "/usr/bin/gzip < $infile > $outfile";
+
+    my $t = work_queue_task_create($command);
+
+    work_queue_task_specify_file($t, $infile, $infile, $WORK_QUEUE_INPUT, $WORK_QUEUE_CACHE);
+    work_queue_task_specify_file($t, $outfile, $outfile, $WORK_QUEUE_OUTPUT, $WORK_QUEUE_CACHE);
+
+    my $taskid = work_queue_submit($q, $t);
+    print "submitted task (id# $t->{taskid}): $t->{command_line}\n";
+}
+
+print "waiting for tasks to complete...\n";
+
+while (not work_queue_empty($q)) {
+    my $t = work_queue_wait($q, 5);
+
+    if (defined($t)) {
+		print "task (id# $t->{taskid}) complete: $t->{command_line} (return code $t->{return_status})\n";
+		work_queue_task_delete($t);
+	}
+}
+
+print "all tasks complete!\n";
+
+work_queue_delete($q);
+
+exit 0;

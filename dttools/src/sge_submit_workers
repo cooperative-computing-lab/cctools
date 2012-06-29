@@ -9,6 +9,7 @@ show_help()
 	echo "  -N <name>        Preferred master name."
 	echo "  -C <catalog>     Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
 	echo "  -t <time>        Abort after this amount of idle time. (default=900s)"
+	echo "  -j               Use job array to submit workers."	
 	echo "  -p <parameters>  SGE qsub parameters."
 	echo "  -h               Show this help message."
 	exit 1
@@ -16,9 +17,10 @@ show_help()
 
 arguments=""
 use_auto=0
+use_jobarray=0
 parameters=""
 
-while getopts asN:t:p:h opt 
+while getopts asN:t:jp:h opt 
 do
 	case "$opt" in
 		a)  arguments="$arguments -a"; use_auto=1;;
@@ -26,6 +28,7 @@ do
 		N)  arguments="$arguments -N $OPTARG";;
 		C)  arguments="$arguments -C $OPTARG";;
 		t)  arguments="$arguments -t $OPTARG";;
+		j)  use_jobarray=1;;
 		p)  parameters="$parameters $OPTARG";;
 		h)  show_help;;
 		\?) show_help;;
@@ -77,10 +80,15 @@ EOF
 
 chmod 755 worker.sh
 
-for n in `seq 1 $count`
-do
-	qsub -cwd $parameters worker.sh
-	return_status=$?
-done
+if [ $use_jobarray = 1 ]
+then
+	qsub -t 1-$count:1 -cwd $parameters worker.sh	
+else 
+	for n in `seq 1 $count`
+	do
+		qsub -cwd $parameters worker.sh
+	done
+fi
+return_status=$?
 
 exit $return_status

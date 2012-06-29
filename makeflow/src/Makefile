@@ -4,6 +4,7 @@ include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
 TARGETS = makeflow
+SCRIPTS = condor_submit_makeflow makeflow_log_parser makeflow_monitor starch
 
 LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
@@ -18,12 +19,6 @@ clean:
 test: all
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}/
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install makeflow ${CCTOOLS_INSTALL_DIR}/bin
-	install -m755 condor_submit_makeflow ${CCTOOLS_INSTALL_DIR}/bin
-	install makeflow_log_parser ${CCTOOLS_INSTALL_DIR}/bin
-	install makeflow_monitor ${CCTOOLS_INSTALL_DIR}/bin
-	sed 's|/usr/bin/env python|${CCTOOLS_PYTHON}|' starch > starch.bin
-	install -m755 starch.bin ${CCTOOLS_INSTALL_DIR}/bin/starch
-	rm -f starch.bin
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
+	chmod 755 ${SCRIPTS}
+	cp makeflow ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin

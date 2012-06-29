@@ -877,7 +877,98 @@ int pfs_faccessat( int dirfd, const char *path, mode_t mode )
 	return pfs_access(newpath,mode);
 }
 
+ssize_t pfs_getxattr (const char *path, const char *name, void *value, size_t size)
+{
+	BEGIN
+	debug(D_LIBCALL,"getxattr %s %s",path,name);
+	result = pfs_current->table->getxattr(path,name,value,size);
+	END
+}
 
+ssize_t pfs_lgetxattr (const char *path, const char *name, void *value, size_t size)
+{
+	BEGIN
+	debug(D_LIBCALL,"lgetxattr %s %s",path,name);
+	result = pfs_current->table->lgetxattr(path,name,value,size);
+	END
+}
 
+ssize_t pfs_fgetxattr (int fd, const char *name, void *value, size_t size)
+{
+	BEGIN
+	debug(D_LIBCALL,"fgetxattr %d %s",fd,name);
+	result = pfs_current->table->fgetxattr(fd,name,value,size);
+	END
+}
 
+ssize_t pfs_listxattr (const char *path, char *list, size_t size)
+{
+	BEGIN
+	debug(D_LIBCALL,"listxattr %s",path);
+	result = pfs_current->table->listxattr(path,list,size);
+	END
+}
 
+ssize_t pfs_llistxattr (const char *path, char *list, size_t size)
+{
+	BEGIN
+	debug(D_LIBCALL,"llistxattr %s",path);
+	result = pfs_current->table->llistxattr(path,list,size);
+	END
+}
+
+ssize_t pfs_flistxattr (int fd, char *list, size_t size)
+{
+	BEGIN
+	debug(D_LIBCALL,"flistxattr %d",fd);
+	result = pfs_current->table->flistxattr(fd,list,size);
+	END
+}
+
+int pfs_setxattr (const char *path, const char *name, const void *value, size_t size, int flags)
+{
+	BEGIN
+	debug(D_LIBCALL,"setxattr %s %s <> %zu %d",path,name,size,flags);
+	result = pfs_current->table->setxattr(path,name,value,size,flags);
+	END
+}
+
+int pfs_lsetxattr (const char *path, const char *name, const void *value, size_t size, int flags)
+{
+	BEGIN
+	debug(D_LIBCALL,"lsetxattr %s %s <> %zu %d",path,name,size,flags);
+	result = pfs_current->table->lsetxattr(path,name,value,size,flags);
+	END
+}
+
+int pfs_fsetxattr (int fd, const char *name, const void *value, size_t size, int flags)
+{
+	BEGIN
+	debug(D_LIBCALL,"fsetxattr %d %s <> %zu %d",fd,name,size,flags);
+	result = pfs_current->table->fsetxattr(fd,name,value,size,flags);
+	END
+}
+
+int pfs_removexattr (const char *path, const char *name)
+{
+	BEGIN
+	debug(D_LIBCALL,"removexattr %s %s",path,name);
+	result = pfs_current->table->removexattr(path,name);
+	END
+}
+
+int pfs_lremovexattr (const char *path, const char *name)
+{
+	BEGIN
+	debug(D_LIBCALL,"lremovexattr %s %s",path,name);
+	result = pfs_current->table->lremovexattr(path,name);
+	END
+}
+
+int pfs_fremovexattr (int fd, const char *name)
+{
+	BEGIN
+	debug(D_LIBCALL,"fremovexattr %d %s",fd,name);
+	result = pfs_current->table->fremovexattr(fd,name);
+	END
+}

@@ -21,6 +21,12 @@ extern "C" {
 #include <stdio.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#if defined(HAS_SYS_XATTR_H)
+#include <sys/xattr.h>
+#elif defined(HAS_ATTR_XATTR_H)
+#include <attr/xattr.h>
+#endif
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/vfs.h>
@@ -225,6 +231,37 @@ process to sleep and wait for actual input to become ready.
 		END
 	}
 
+#if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
+	virtual ssize_t fgetxattr( const char *name, void *data, size_t size ) {
+		ssize_t result;
+		debug(D_LOCAL,"fgetxattr %d %s",fd,name);
+		result = ::fgetxattr(fd,name,data,size);
+		END
+	}
+
+	virtual ssize_t flistxattr( char *list, size_t size ) {
+		ssize_t result;
+		debug(D_LOCAL,"flistxattr %d",fd);
+		result = ::flistxattr(fd,list,size);
+		END
+	}
+
+	virtual int fsetxattr( const char *name, const void *data, size_t size, int flags ) {
+		int result;
+		debug(D_LOCAL,"fsetxattr %d %s <> %d",fd,name,flags);
+		result = ::fsetxattr(fd,name,data,size,flags);
+		END
+	}
+
+	virtual int fremovexattr( const char *name ) {
+		int result;
+		debug(D_LOCAL,"fremovexattr %d %s",fd,name);
+		result = ::fremovexattr(fd,name);
+		END
+	}
+
+#endif
+
 	virtual int flock( int op ) {
 		int result;
 		debug(D_LOCAL,"flock %d %d",fd,op);
@@ -417,6 +454,78 @@ public:
 		if(!pfs_acl_check(newname,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"rename %s %s",oldname->rest,newname->rest);
 		result = ::rename(oldname->rest,newname->rest);
+		END
+	}
+
+	virtual ssize_t getxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
+	{
+		ssize_t result;
+		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
+		debug(D_LOCAL,"getxattr %s %s",name->rest,attrname);
+		result = ::getxattr(name->rest,attrname,value,size);
+		END
+	}
+	
+	virtual ssize_t lgetxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
+	{
+		ssize_t result;
+		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
+		debug(D_LOCAL,"lgetxattr %s %s",name->rest,attrname);
+		result = ::lgetxattr(name->rest,attrname,value,size);
+		END
+	}
+	
+	virtual ssize_t listxattr ( pfs_name *name, char *attrlist, size_t size )
+	{
+		ssize_t result;
+		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
+		debug(D_LOCAL,"listxattr %s",name->rest);
+		result = ::listxattr(name->rest,attrlist,size);
+		END
+	}
+	
+	virtual ssize_t llistxattr ( pfs_name *name, char *attrlist, size_t size )
+	{
+		ssize_t result;
+		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
+		debug(D_LOCAL,"llistxattr %s",name->rest);
+		result = ::llistxattr(name->rest,attrlist,size);
+		END
+	}
+	
+	virtual int setxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
+	{
+		int result;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
+		debug(D_LOCAL,"setxattr %s %s <> %d",name->rest,attrname,flags);
+		result = ::setxattr(name->rest,attrname,value,size,flags);
+		END
+	}
+	
+	virtual int lsetxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
+	{
+		int result;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
+		debug(D_LOCAL,"lsetxattr %s %s <> %d",name->rest,attrname,flags);
+		result = ::lsetxattr(name->rest,attrname,value,size,flags);
+		END
+	}
+	
+	virtual int removexattr ( pfs_name *name, const char *attrname )
+	{
+		int result;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
+		debug(D_LOCAL,"removexattr %s %s",name->rest,attrname);
+		result = ::removexattr(name->rest,attrname);
+		END
+	}
+	
+	virtual int lremovexattr ( pfs_name *name, const char *attrname )
+	{
+		int result;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
+		debug(D_LOCAL,"lremovexattr %s %s",name->rest,attrname);
+		result = ::lremovexattr(name->rest,attrname);
 		END
 	}
 

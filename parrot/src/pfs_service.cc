@@ -135,6 +135,78 @@ int pfs_service::truncate( pfs_name *name, pfs_off_t length )
 	return -1;
 }
 
+ssize_t pfs_service::getxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+ssize_t pfs_service::lgetxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+ssize_t pfs_service::listxattr ( pfs_name *name, char *attrlist, size_t size )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+ssize_t pfs_service::llistxattr ( pfs_name *name, char *attrlist, size_t size )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+int pfs_service::setxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+int pfs_service::lsetxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+int pfs_service::removexattr ( pfs_name *name, const char *attrname )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+int pfs_service::lremovexattr ( pfs_name *name, const char *attrname )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
 int pfs_service::utime( pfs_name *name, struct utimbuf *buf )
 {
 	return 0;

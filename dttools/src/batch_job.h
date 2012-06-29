@@ -27,6 +27,7 @@ typedef enum {
 	BATCH_QUEUE_TYPE_CONDOR,              /**< Batch jobs will be sent to Condor pool. */
 	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine. */
 	BATCH_QUEUE_TYPE_MOAB,                /**< Batch jobs will be sent to the Moab Workload Manager. */
+	BATCH_QUEUE_TYPE_TORQUE,              /**< Batch jobs will be send to the Torque Scheduler. */
 	BATCH_QUEUE_TYPE_CLUSTER,                /**< Batch jobs will be sent to a user-defined cluster manager. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE,          /**< Batch jobs will be sent to the Work Queue. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS, /**< Batch jobs will be sent to the Work Queue, all files are stored on a shared filesystem. */

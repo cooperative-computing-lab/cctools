@@ -7,9 +7,9 @@ uname -a
 save_arguments $0 $@
 
 major=3
-minor=4
-micro=3
-release_date="02/10/2012"
+minor=5
+micro=0
+release_date="06/04/2012"
 
 build_user=`whoami`
 build_host=`uname -n`
@@ -41,6 +41,8 @@ include_package_makeflow="makeflow"
 include_package_ftplite="ftp_lite"
 include_package_s3tools="s3tools"
 include_package_chirp="chirp"
+include_package_apps="apps"
+include_package_doc="doc"
 
 work_queue_bindings=""
 
@@ -241,6 +243,12 @@ do
 		--without-system-parrot)
 			include_package_parrot=""
 			;;
+		--without-system-apps)
+			include_package_apps=""
+			;;
+		--without-system-doc)
+			include_package_doc=""
+			;;
 		--xrootd-arch)
 			shift
 			xrootd_arch=$1
@@ -287,6 +295,8 @@ And SYSTEM may be:
     s3tools
     chirp
     parrot
+    apps
+    doc
 EOF
 			exit 1
 			;;
@@ -301,7 +311,7 @@ done
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} doc apps"
+potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} ${include_package_doc} ${include_package_apps}"
 
 check_multiarch
 
@@ -325,7 +335,6 @@ done
 
 require_path ${ccompiler}
 require_path ${cxxcompiler}
-require_path "install"
 require_gnu_make
 
 #
@@ -865,8 +874,10 @@ optional_function strsignal /usr/include/string.h HAS_STRSIGNAL
 optional_function pread /usr/include/unistd.h HAS_PREAD
 optional_function pwrite /usr/include/unistd.h HAS_PWRITE
 
-optional_include /usr/include/sys/statfs.h HAS_SYS_STATFS_H
-optional_include /usr/include/sys/statvfs.h HAS_SYS_STATVFS_H
+optional_include sys/statfs.h HAS_SYS_STATFS_H
+optional_include sys/statvfs.h HAS_SYS_STATVFS_H
+optional_include sys/xattr.h HAS_SYS_XATTR_H
+optional_include attr/xattr.h HAS_ATTR_XATTR_H
 
 cctools_doctargets=
 
@@ -890,7 +901,18 @@ else
 	echo "*** not building html or man pages"
 fi
 
-ccflags="${ccflags} -DINSTALL_PATH=\\\"${install_path}\\\" -g -D_REENTRANT -D_GNU_SOURCE -DBUILD_USER=\\\"$build_user\\\" -DBUILD_HOST=\\\"$build_host\\\" -DCCTOOLS_VERSION_MAJOR=$major -DCCTOOLS_VERSION_MINOR=$minor -DCCTOOLS_VERSION_MICRO=$micro -DCCTOOLS_OPSYS_${build_sys} -DCCTOOLS_CPU_${build_cpu}"
+# We always compile with debugging enabled,
+# however on Solaris, the -g option results in a different
+# debugging format that causes linking errors in getopt code.
+
+if [ $build_sys = SUNOS ]
+then
+	debug_flag="-gstabs+"
+else
+	debug_flag="-g"
+fi
+
+ccflags="${ccflags} -DINSTALL_PATH=\\\"${install_path}\\\" $debug_flag -D_REENTRANT -D_GNU_SOURCE -DBUILD_USER=\\\"$build_user\\\" -DBUILD_HOST=\\\"$build_host\\\" -DCCTOOLS_VERSION_MAJOR=$major -DCCTOOLS_VERSION_MINOR=$minor -DCCTOOLS_VERSION_MICRO=$micro -DCCTOOLS_OPSYS_${build_sys} -DCCTOOLS_CPU_${build_cpu}"
 
 echo "Creating Makefile.config..."
 

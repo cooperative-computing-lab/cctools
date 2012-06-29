@@ -326,7 +326,6 @@ int main(int argc, char *argv[])
 	char *catalog_host = NULL;
 	int catalog_port = 0;
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
-	int work_queue_worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
 
 	debug_config(progname);
 
@@ -427,11 +426,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	char *value = string_format("%d", work_queue_worker_mode);
-	setenv("WORK_QUEUE_WORKER_MODE", value, 1);
-	free(value);
-
-	value = string_format("%d", work_queue_master_mode);
+	char *value = string_format("%d", work_queue_master_mode);
 	setenv("WORK_QUEUE_MASTER_MODE", value, 1);
 	free(value);
 

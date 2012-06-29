@@ -8,6 +8,8 @@ See the file COPYING for details.
 #define WORK_QUEUE_CATALOG_H
 
 #include "work_queue.h"
+#include "work_queue_protocol.h"
+
 #include "catalog_query.h"
 #include "catalog_server.h"
 #include "datagram.h"
@@ -33,8 +35,12 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 10
-#define	WORK_QUEUE_CATALOG_LIFETIME	60
+#define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 60
+#define	WORK_QUEUE_CATALOG_LIFETIME	300
+
+#define WORK_QUEUE_NAME_MAX 256
+#define WORK_QUEUE_PROTOCOL_BLANK_FIELD "-"
+#define WORK_QUEUE_PROTOCOL_FIELD_MAX 256
 
 struct work_queue_master {
 	char addr[LINK_ADDRESS_MAX];
@@ -85,7 +91,7 @@ struct work_queue_master *duplicate_work_queue_master(struct work_queue_master *
 
 struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port, struct list *regex_list);
 
-int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, int now);
+int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, const char *workers_summary, int now);
 
 int get_pool_decisions_from_catalog(const char *catalog_host, int catalog_port, const char *proj, struct list *decisions);
 

@@ -252,6 +252,13 @@ int link_keepalive(struct link *link, int onoff);
 
 int link_nonblocking(struct link *link, int onoff);
 
+
+/** Check whether a link has unread contents in its buffer.
+@param link The link to examine.
+@return 1 if buffer is empty, 0 otherwise.
+*/
+int link_buffer_empty(struct link *link);
+
 /** Return the local address of the link in text format.
 @param link The link to examine.
 @param addr Pointer to a string of at least @ref LINK_ADDRESS_MAX bytes, which will be filled with a text representation of the local IP address.

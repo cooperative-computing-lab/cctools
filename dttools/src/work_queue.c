@@ -5,6 +5,8 @@ See the file COPYING for details.
 */
 
 #include "work_queue.h"
+#include "work_queue_protocol.h"
+#include "work_queue_catalog.h"
 
 #include "int_sizes.h"
 #include "link.h"
@@ -12,7 +14,6 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "catalog_query.h"
 #include "catalog_server.h"
-#include "work_queue_catalog.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
 #include "hash_table.h"
@@ -24,6 +25,7 @@ See the file COPYING for details.
 #include "create_dir.h"
 #include "xxmalloc.h"
 #include "load_average.h"
+#include "buffer.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -45,22 +47,27 @@ See the file COPYING for details.
 extern int setenv(const char *name, const char *value, int overwrite);
 #endif
 
-#define WORKER_STATE_INIT  0
-#define WORKER_STATE_READY 1
-#define WORKER_STATE_BUSY  2
-#define WORKER_STATE_NONE  3
-#define WORKER_STATE_MAX   (WORKER_STATE_NONE+1)
+#define WORKER_STATE_INIT 		0
+#define WORKER_STATE_READY 		1
+#define WORKER_STATE_BUSY 		2
+#define WORKER_STATE_CANCELLING	3
+#define WORKER_STATE_NONE 		4
+#define WORKER_STATE_MAX 		(WORKER_STATE_NONE+1)
+
+// FIXME: These internal error flags should be clearly distinguished
+// from the task result codes given by work_queue_wait.
+
+#define WORK_QUEUE_RESULT_UNSET 0
+#define WORK_QUEUE_RESULT_INPUT_FAIL 1
+#define WORK_QUEUE_RESULT_INPUT_MISSING 2
+#define WORK_QUEUE_RESULT_FUNCTION_FAIL 4
+#define WORK_QUEUE_RESULT_OUTPUT_FAIL 8
+#define WORK_QUEUE_RESULT_OUTPUT_MISSING 16
+#define WORK_QUEUE_RESULT_LINK_FAIL 32
 
 #define WORK_QUEUE_FILE 0
 #define WORK_QUEUE_BUFFER 1
 #define WORK_QUEUE_REMOTECMD 2
-
-#define TASK_STATUS_INITIALIZING 0
-#define TASK_STATUS_SENDING_INPUT 1
-#define TASK_STATUS_EXECUTING 2
-#define TASK_STATUS_WAITING_FOR_OUTPUT 3
-#define TASK_STATUS_RECEIVING_OUTPUT 4
-#define TASK_STATUS_COMPLETE 4
 
 #define MIN_TIME_LIST_SIZE 20
 
@@ -69,10 +76,20 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define TIME_SLOT_MASTER_IDLE 2
 #define TIME_SLOT_APPLICATION 3
 
-#define POOL_DECISION_ENFORCEMENT_INTERVAL_DEFAULT 10
+#define POOL_DECISION_ENFORCEMENT_INTERVAL_DEFAULT 60
+
+#define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
+
+#define WORK_QUEUE_MASTER_PRIORITY_DEFAULT 10
+
+// work_queue_worker struct related
+#define WORKER_OS_NAME_MAX 65
+#define WORKER_ARCH_NAME_MAX 65
+#define WORKER_ADDRPORT_MAX 32
+#define WORKER_HASHKEY_MAX 32
 
 double wq_option_fast_abort_multiplier = -1.0;
-int wq_option_scheduler = WORK_QUEUE_SCHEDULE_DEFAULT;
+int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 int wq_tolerable_transfer_time_multiplier = 10;
 int wq_minimum_transfer_timeout = 3;
 
@@ -80,15 +97,17 @@ struct work_queue {
 	char *name;
 	int port;
 	int master_mode;
-	int worker_mode;
 	int priority;
+
 	struct link *master_link;
-	struct list *ready_list;
-	struct list *complete_list;
-	struct list *receive_output_waiting_list;
-	struct hash_table *worker_table;
 	struct link_info *poll_table;
 	int poll_table_size;
+
+	struct list       *ready_list;
+	struct list       *complete_list;
+	struct itable     *running_tasks;
+	struct hash_table *worker_table;
+
 	int workers_in_state[WORKER_STATE_MAX];
 
 	INT64_T total_tasks_submitted;
@@ -97,49 +116,44 @@ struct work_queue {
 	INT64_T total_workers_removed;
 	INT64_T total_bytes_sent;
 	INT64_T total_bytes_received;
+	INT64_T total_workers_connected;
 
 	timestamp_t start_time;
 	timestamp_t total_send_time;
 	timestamp_t total_receive_time;
 	timestamp_t total_execute_time;
-	double fast_abort_multiplier;
 
-	int worker_selection_algorithm;		  /**< How to choose worker to run the task. */
+	double fast_abort_multiplier;
+	int worker_selection_algorithm;
 	int task_ordering;
 
 	timestamp_t time_last_task_start;
 	timestamp_t idle_time;
 	timestamp_t accumulated_idle_time;
 	timestamp_t app_time;
+
 	struct list *idle_times;
 	double idle_percentage;
 	struct task_statistics *task_statistics;
 
 	int estimate_capacity_on;
-	int auto_remove_workers_on;
 	int capacity;
 	int avg_capacity;
-	int work_queue_wait_routine;
-	INT64_T total_workers_connected;
-	INT64_T excessive_workers_removed;
-	int busy_workers_to_remove;
-	int capacity_tolerance;
-	int maximum_workers;
+
 	char catalog_host[DOMAIN_NAME_MAX];
 	int catalog_port;
 	struct hash_table *workers_by_pool;
 
-	int link_keepalive_on;
+	FILE *logfile;
 };
-
 
 struct work_queue_worker {
 	int state;
 	char hostname[DOMAIN_NAME_MAX];
-	char os[65];
-	char arch[65];
-	char addrport[32];
-	char hashkey[32];
+	char os[WORKER_OS_NAME_MAX];
+	char arch[WORKER_ARCH_NAME_MAX];
+	char addrport[WORKER_ADDRPORT_MAX];
+	char hashkey[WORKER_HASHKEY_MAX];
 	int ncpus;
 	INT64_T memory_avail;
 	INT64_T memory_total;
@@ -156,11 +170,6 @@ struct work_queue_worker {
 	char pool_name[WORK_QUEUE_POOL_NAME_MAX];
 };
 
-struct pending_output {
-	timestamp_t start;
-	struct link *link;
-};
-
 struct time_slot {
 	timestamp_t start;
 	timestamp_t duration;
@@ -173,7 +182,6 @@ struct task_statistics {
 	timestamp_t total_time_execute_cmd;
 	INT64_T total_capacity;
 	INT64_T total_busy_workers;
-
 };
 
 struct task_report {
@@ -191,58 +199,129 @@ struct work_queue_file {
 	char *remote_name;	// name on remote machine.
 };
 
-static int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
-static int start_n_tasks(struct work_queue *q, int n);
 
-static int get_num_of_effective_workers(struct work_queue *q);
-static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, INT64_T length);
-static double get_idle_percentage(struct work_queue *q);
-
-void receive_pending_output(struct work_queue *q, struct pending_output *p);
-static int receive_output_from_worker(struct work_queue *q, struct work_queue_worker *w);
+static int put_file(struct work_queue_file *, const char *, struct work_queue *, struct work_queue_worker *, INT64_T *);
 
 static struct task_statistics *task_statistics_init();
 static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t duration, int type, timestamp_t * accumulated_time, struct list *time_list);
 static void add_task_report(struct work_queue *q, struct work_queue_task *t);
-
-static int remove_workers_base_on_capacity(struct work_queue *q);
-int work_queue_shut_down_workers(struct work_queue *q, int n);
-
-int work_queue_specify_estimate_capacity_on(struct work_queue *q, int value);
-int work_queue_specify_wait_routine(struct work_queue *q, int routine);
-int work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance);
-int work_queue_specify_auto_remove_workers_on(struct work_queue *q, int value);
-int work_queue_specify_maximum_workers(struct work_queue *q, int max);
-
-static void update_catalog(struct work_queue *q, int now);
-static void enforce_pool_decisions(struct work_queue *q);
+static void update_app_time(struct work_queue *q, timestamp_t last_left_time, int last_left_status);
 
 static int short_timeout = 5;
 static int next_taskid = 1;
+
+static int tolerable_transfer_rate_denominator = 10;
+static long double minimum_allowed_transfer_rate = 100000;	// 100 KB/s
+
+/******************************************************/
+/********** work_queue_task public functions **********/
+/******************************************************/
 
 struct work_queue_task *work_queue_task_create(const char *command_line)
 {
 	struct work_queue_task *t = malloc(sizeof(*t));
 	memset(t, 0, sizeof(*t));
 	t->command_line = xxstrdup(command_line);
-	t->tag = NULL;
 	t->worker_selection_algorithm = WORK_QUEUE_SCHEDULE_UNSET;
-	t->output = NULL;
 	t->input_files = list_create();
 	t->output_files = list_create();
-	t->return_status = WORK_QUEUE_RETURN_STATUS_UNSET;
+	t->return_status = -1;
 	t->result = WORK_QUEUE_RESULT_UNSET;
-
-	t->time_task_submit = t->time_task_finish = 0;
-	t->time_send_input_start = t->time_send_input_finish = 0;
-	t->time_execute_cmd_start = t->time_execute_cmd_finish = 0;
-	t->time_receive_output_start = t->time_receive_output_finish = 0;
-
-	t->total_bytes_transferred = 0;
-	t->cmd_execution_time = 0;
-	t->status = TASK_STATUS_INITIALIZING;
 	return t;
+}
+
+void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
+{
+	if(t->tag)
+		free(t->tag);
+	t->tag = xxstrdup(tag);
+}
+
+
+void work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)
+{
+	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
+
+	tf->type = WORK_QUEUE_FILE;
+	tf->flags = flags;
+	tf->length = strlen(local_name);
+	tf->payload = xxstrdup(local_name);
+	tf->remote_name = xxstrdup(remote_name);
+
+	if(type == WORK_QUEUE_INPUT) {
+		list_push_tail(t->input_files, tf);
+	} else {
+		list_push_tail(t->output_files, tf);
+	}
+}
+
+void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags)
+{
+	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
+	tf->type = WORK_QUEUE_BUFFER;
+	tf->flags = flags;
+	tf->length = length;
+	tf->payload = malloc(length);
+	memcpy(tf->payload, data, length);
+	tf->remote_name = xxstrdup(remote_name);
+	list_push_tail(t->input_files, tf);
+}
+
+void work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags)
+{
+	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
+	tf->type = WORK_QUEUE_REMOTECMD;
+	tf->flags = flags;
+	tf->length = strlen(cmd);
+	tf->payload = xxstrdup(cmd);
+	tf->remote_name = xxstrdup(remote_name);
+
+	if(type == WORK_QUEUE_INPUT) {
+		list_push_tail(t->input_files, tf);
+	} else {
+		list_push_tail(t->output_files, tf);
+	}
+}
+
+void work_queue_task_specify_output_file(struct work_queue_task *t, const char *rname, const char *fname)
+{
+	work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
+}
+
+void work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname)
+{
+	work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+}
+
+void work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf, int length, const char *rname)
+{
+	work_queue_task_specify_buffer(t, buf, length, rname, WORK_QUEUE_NOCACHE);
+}
+
+void work_queue_task_specify_input_file(struct work_queue_task *t, const char *fname, const char *rname)
+{
+	work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+}
+
+void work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, const char *fname, const char *rname)
+{
+	work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
+}
+
+void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
+{
+	t->worker_selection_algorithm = alg;
+}
+
+void work_queue_specify_algorithm(struct work_queue *q, int alg)
+{
+	q->worker_selection_algorithm = alg;
+}
+
+void work_queue_specify_task_order(struct work_queue *q, int order)
+{
+	q->task_ordering = order;
 }
 
 void work_queue_task_delete(struct work_queue_task *t)
@@ -275,10 +354,29 @@ void work_queue_task_delete(struct work_queue_task *t)
 			}
 			list_delete(t->output_files);
 		}
+		if(t->hostname)
+			free(t->hostname);
 		if(t->host)
 			free(t->host);
 		free(t);
 	}
+}
+
+/******************************************************/
+/********** work_queue internal functions *************/
+/******************************************************/
+
+static void log_worker_states(struct work_queue *q)
+{
+	struct work_queue_stats s;
+	work_queue_get_stats(q, &s);
+	fprintf(q->logfile, "%16llu %25llu %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25lld %25lld %25llu %25llu %25f %25f %25d %25d %25d %25d\n",
+		timestamp_get(), s.start_time, // time
+		s.workers_init, s.workers_ready, s.workers_busy, s.workers_cancelling, // workers
+		s.tasks_waiting, s.tasks_running, s.tasks_complete, // tasks
+		s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_connected, // totals
+		s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received, s.total_send_time, s.total_receive_time,
+		s.efficiency, s.idle_percentage, s.capacity, s.avg_capacity, s.port, s.priority); // other
 }
 
 static void change_worker_state(struct work_queue *q, struct work_queue_worker *w, int state)
@@ -286,10 +384,15 @@ static void change_worker_state(struct work_queue *q, struct work_queue_worker *
 	q->workers_in_state[w->state]--;
 	w->state = state;
 	q->workers_in_state[state]++;
-	if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
-		update_catalog(q, 0);
+	debug(D_WQ, "workers total: %d init: %d ready: %d busy: %d cancelling: %d",
+		hash_table_size(q->worker_table),
+		q->workers_in_state[WORKER_STATE_INIT],
+		q->workers_in_state[WORKER_STATE_READY],
+		q->workers_in_state[WORKER_STATE_BUSY],
+		q->workers_in_state[WORKER_STATE_CANCELLING]);
+	if(q->logfile) {
+		log_worker_states(q);
 	}
-	debug(D_WQ, "Number of workers in state 'busy': %d;  'ready': %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_READY]);
 }
 
 static void link_to_hash_key(struct link *link, char *key)
@@ -314,101 +417,58 @@ static double get_idle_percentage(struct work_queue *q)
 	return (long double) (q->accumulated_idle_time + q->idle_time) / (timestamp_get() - accumulated_idle_start);
 }
 
-void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
+static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, INT64_T length)
 {
-	INT64_T effective_workers;
-	timestamp_t wall_clock_time;
+	timestamp_t timeout;
+	struct work_queue_task *t;
+	long double avg_queue_transfer_rate, avg_worker_transfer_rate, retry_transfer_rate, tolerable_transfer_rate;
+	INT64_T total_tasks_complete, total_tasks_running, total_tasks_waiting, num_of_free_workers;
 
-	memset(s, 0, sizeof(*s));
-	s->port = q->port;
-	s->priority = q->priority;
-	s->workers_init = q->workers_in_state[WORKER_STATE_INIT];
-	s->workers_ready = q->workers_in_state[WORKER_STATE_READY];
-	s->workers_busy = q->workers_in_state[WORKER_STATE_BUSY];
+	t = w->current_task;
 
-	char *c = s->workers_by_pool;
-	char *key;
-	struct pool_info *pi;
-	int x;
-	hash_table_firstkey(q->workers_by_pool);
-	while(hash_table_nextkey(q->workers_by_pool, &key, (void **) &pi)) {
-		x = snprintf(c, WORK_QUEUE_CATALOG_LINE_MAX - (c - s->workers_by_pool), "%s:%d,", pi->name, pi->count);
-		if(x <= 0) {
-			fprintf(stderr, "failed to record worker_by_pool item: %s:%d\n", pi->name, pi->count);
-			continue;
-		}
-		c += x;
-	}
-	if(c - s->workers_by_pool > 0) {
-		*(c-1) = '\0';
+	if(w->total_transfer_time) {
+		avg_worker_transfer_rate = (long double) w->total_bytes_transferred / w->total_transfer_time * 1000000;
 	} else {
-		strncpy(s->workers_by_pool, "n/a", 4); 
+		avg_worker_transfer_rate = 0;
 	}
 
-	s->tasks_waiting = list_size(q->ready_list);
-	s->tasks_running = q->workers_in_state[WORKER_STATE_BUSY];
-	s->tasks_complete = list_size(q->complete_list);
-	s->total_tasks_dispatched = q->total_tasks_submitted;
-	s->total_tasks_complete = q->total_tasks_complete;
-	s->total_workers_joined = q->total_workers_joined;
-	s->total_workers_removed = q->total_workers_removed;
-	s->total_bytes_sent = q->total_bytes_sent;
-	s->total_bytes_received = q->total_bytes_received;
-	s->total_send_time = q->total_send_time;
-	s->total_receive_time = q->total_receive_time;
-	effective_workers = get_num_of_effective_workers(q);
-	s->start_time = q->start_time;
-	wall_clock_time = timestamp_get() - q->start_time;
-	s->efficiency = (long double) (q->total_execute_time) / (wall_clock_time * effective_workers);
-	s->idle_percentage = get_idle_percentage(q);
-	// Estimate master capacity, i.e. how many workers can this master handle
-	s->capacity = q->capacity;
-	s->avg_capacity = q->avg_capacity;
-	s->total_workers_connected = q->total_workers_connected;
-	s->excessive_workers_removed = q->excessive_workers_removed;
+	retry_transfer_rate = 0;
+	num_of_free_workers = q->workers_in_state[WORKER_STATE_INIT] + q->workers_in_state[WORKER_STATE_READY];
+	total_tasks_complete = q->total_tasks_complete;
+	total_tasks_running = itable_size(q->running_tasks);
+	total_tasks_waiting = list_size(q->ready_list);
+	if(total_tasks_complete > total_tasks_running && num_of_free_workers > total_tasks_waiting) {
+		// The master has already tried most of the workers connected and has free workers for retrying slow workers
+		if(t->total_bytes_transferred) {
+			avg_queue_transfer_rate = (long double) (q->total_bytes_sent + q->total_bytes_received) / (q->total_send_time + q->total_receive_time) * 1000000;
+			retry_transfer_rate = (long double) length / t->total_bytes_transferred * avg_queue_transfer_rate;
+		}
+	}
+
+	tolerable_transfer_rate = MAX(avg_worker_transfer_rate / tolerable_transfer_rate_denominator, retry_transfer_rate);
+	tolerable_transfer_rate = MAX(minimum_allowed_transfer_rate, tolerable_transfer_rate);
+
+	timeout = MAX(3, length / tolerable_transfer_rate);	// try at least 3 seconds
+
+	debug(D_WQ, "%s (%s) will try up to %lld seconds for the transfer of this %.3Lf MB file.", w->hostname, w->addrport, timeout, (long double) length / 1000000);
+	return timeout;
 }
 
-static int add_worker(struct work_queue *q)
+static void update_catalog(struct work_queue *q, int now)
 {
-	struct link *link;
-	struct work_queue_worker *w;
-	char addr[LINK_ADDRESS_MAX];
-	int port;
-
-	link = link_accept(q->master_link, time(0) + short_timeout);
-	if(link) {
-		if(q->link_keepalive_on) {
-			link_keepalive(link, 1);
-		}
-		link_tune(link, LINK_TUNE_INTERACTIVE);
-		if(link_address_remote(link, addr, &port)) {
-			w = malloc(sizeof(*w));
-			memset(w, 0, sizeof(*w));
-			w->state = WORKER_STATE_NONE;
-			w->link = link;
-			w->current_files = hash_table_create(0, 0);
-			w->start_time = timestamp_get();
-			link_to_hash_key(link, w->hashkey);
-			sprintf(w->addrport, "%s:%d", addr, port);
-			hash_table_insert(q->worker_table, w->hashkey, w);
-			change_worker_state(q, w, WORKER_STATE_INIT);
-			debug(D_WQ, "worker %s added", w->addrport);
-			debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
-			q->total_workers_joined++;
-
-			return 1;
-		} else {
-			link_close(link);
-		}
-	}
-
-	return 0;
+	struct work_queue_stats s;
+	work_queue_get_stats(q, &s);
+	char * worker_summary = work_queue_get_worker_summary(q);
+	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, worker_summary, now);
+	free(worker_summary);
 }
 
 static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	char *key, *value;
 	struct work_queue_task *t;
+
+	if(!q || !w) return;
 
 	if((w->pool_name)[0]) {
 		debug(D_WQ, "worker %s from pool \"%s\" removed", w->addrport, w->pool_name);
@@ -430,7 +490,6 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	if(t) {
 		if(t->result & WORK_QUEUE_RESULT_INPUT_MISSING || t->result & WORK_QUEUE_RESULT_OUTPUT_MISSING || t->result & WORK_QUEUE_RESULT_FUNCTION_FAIL) {
 			list_push_head(q->complete_list, w->current_task);
-			t->status = TASK_STATUS_COMPLETE;
 		} else {
 			t->result = WORK_QUEUE_RESULT_UNSET;
 			t->total_bytes_transferred = 0;
@@ -461,6 +520,107 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	free(w);
 
 	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
+}
+
+static int release_worker(struct work_queue *q, struct work_queue_worker *w)
+{
+	if(!w) return 0;
+
+	link_putliteral(w->link, "release\n", time(0) + short_timeout);
+	remove_worker(q, w);
+	return 1;
+}
+
+static int remove_workers_from_pool(struct work_queue *q, const char *pool_name, int workers_to_release) {
+	struct work_queue_worker *w;
+	char *key;
+	int i = 0;
+
+	if(!q)
+		return -1;
+
+	// send worker the "exit" msg
+	hash_table_firstkey(q->worker_table);
+	while(i < workers_to_release && hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+		if(!strncmp(w->pool_name, pool_name, WORK_QUEUE_POOL_NAME_MAX)) {
+			release_worker(q, w);
+			i++;
+		}
+	}
+
+	return i;
+}
+
+static void enforce_pool_decisions(struct work_queue *q) {
+	struct list *decisions;
+
+	debug(D_WQ, "Get pool decision from catalog server.\n");
+	decisions = list_create();
+	if(!decisions) {
+		debug(D_WQ, "Failed to create list to store worker pool decisions!\n");
+		return;
+	}
+	if(!get_pool_decisions_from_catalog(q->catalog_host, q->catalog_port, q->name, decisions)) {
+		debug(D_WQ, "Failed to receive pool decisions from the catalog server(%s@%d)!\n", q->catalog_host, q->catalog_port);
+		return;
+	}
+
+	if(!list_size(decisions)) {
+		return;
+	}
+
+	struct pool_info *d;
+	list_first_item(decisions);
+	while((d = (struct pool_info *)list_next_item(decisions))) {
+		struct pool_info *pi;
+		pi = hash_table_lookup(q->workers_by_pool, d->name);
+		if(pi) {
+			debug(D_WQ, "Workers from pool %s: %d; Pool decison: %d\n", pi->name, pi->count, d->count);
+			int workers_to_release = pi->count - d->count;
+			if(workers_to_release > 0) {
+				int k = remove_workers_from_pool(q, pi->name, workers_to_release);
+				debug(D_WQ, "%d worker(s) has been rejected to enforce the pool decison.\n", k);
+			}
+		} 
+	}
+
+	list_free(decisions);
+	list_delete(decisions);
+}
+
+static int add_worker(struct work_queue *q)
+{
+	struct link *link;
+	struct work_queue_worker *w;
+	char addr[LINK_ADDRESS_MAX];
+	int port;
+
+	link = link_accept(q->master_link, time(0) + short_timeout);
+	if(link) {
+		link_keepalive(link, 1);
+		link_tune(link, LINK_TUNE_INTERACTIVE);
+		if(link_address_remote(link, addr, &port)) {
+			w = malloc(sizeof(*w));
+			memset(w, 0, sizeof(*w));
+			w->state = WORKER_STATE_NONE;
+			w->link = link;
+			w->current_files = hash_table_create(0, 0);
+			w->start_time = timestamp_get();
+			link_to_hash_key(link, w->hashkey);
+			sprintf(w->addrport, "%s:%d", addr, port);
+			hash_table_insert(q->worker_table, w->hashkey, w);
+			change_worker_state(q, w, WORKER_STATE_INIT);
+			debug(D_WQ, "worker %s added", w->addrport);
+			debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
+			q->total_workers_joined++;
+
+			return 1;
+		} else {
+			link_close(link);
+		}
+	}
+
+	return 0;
 }
 
 /**
@@ -587,7 +747,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
  * Comparison function for sorting by file/dir names in the output files list
  * of a task
  */
-int filename_comparator(const void *a, const void *b)
+static int filename_comparator(const void *a, const void *b)
 {
 	int rv;
 	rv = strcmp(*(char *const *) a, *(char *const *) b);
@@ -613,7 +773,6 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 	timestamp_t sum_time;
 
 	// Start transfer ...
-	t->status = TASK_STATUS_RECEIVING_OUTPUT;
 	received_items = hash_table_create(0, 0);
 
 	//  Sorting list will make sure that upper level dirs sit before their
@@ -703,6 +862,31 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 	return 1;
 }
 
+static void delete_cancel_task_files(struct work_queue_task *t, struct work_queue_worker *w) {
+
+	struct work_queue_file *tf;
+
+	//Delete only inputs files that are not to be cached.
+	if(t->input_files) {
+		list_first_item(t->input_files);
+		while((tf = list_next_item(t->input_files))) {
+			if(!(tf->flags & WORK_QUEUE_CACHE) && !(tf->flags & WORK_QUEUE_PREEXIST)) {
+				debug(D_WQ, "%s (%s) unlink %s", w->hostname, w->addrport, tf->remote_name);
+				link_putfstring(w->link, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
+			}
+		}
+	}
+	
+	//Delete all output files since they are not needed as the task was aborted.
+	if(t->output_files) {
+		list_first_item(t->output_files);
+		while((tf = list_next_item(t->output_files))) {
+			debug(D_WQ, "%s (%s) unlink %s", w->hostname, w->addrport, tf->remote_name);
+			link_putfstring(w->link, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
+		}
+	}
+}
+
 static void delete_uncacheable_files(struct work_queue_task *t, struct work_queue_worker *w)
 {
 	struct work_queue_file *tf;
@@ -728,200 +912,6 @@ static void delete_uncacheable_files(struct work_queue_task *t, struct work_queu
 	}
 }
 
-static int match_project_names(struct work_queue *q, const char *project_names)
-{
-	char *str;
-	char *token = NULL;
-	char *delims = " \t";
-
-	if(!q || !project_names)
-		return 0;
-
-	str = xxstrdup(project_names);
-	token = strtok(str, delims);
-	while(token) {
-		// token holds the preferred master name pattern
-		debug(D_WQ, "Matching %s against %s", q->name, project_names);
-		if(whole_string_match_regex(q->name, token)) {
-			free(str);
-			return 1;	// Match found!
-		}
-
-		token = strtok(NULL, delims);
-	}
-	free(str);
-	return 0;
-}
-
-static int handle_worker(struct work_queue *q, struct link *l)
-{
-	char line[WORK_QUEUE_CATALOG_LINE_MAX];
-	char key[WORK_QUEUE_CATALOG_LINE_MAX];
-	struct work_queue_worker *w;
-	int result;
-	INT64_T output_length;
-	time_t stoptime;
-	timestamp_t execution_time;
-
-	char project_names[WORK_QUEUE_LINE_MAX];
-
-	link_to_hash_key(l, key);
-	w = hash_table_lookup(q->worker_table, key);
-
-	if(link_readline(l, line, sizeof(line), time(0) + short_timeout)) {
-		debug(D_WQ, "msg from worker: %s", line);
-		if(sscanf(line, "ready %s %d %lld %lld %lld %lld", w->hostname, &w->ncpus, &w->memory_avail, &w->memory_total, &w->disk_avail, &w->disk_total) == 6) {
-			// More workers than needed are connected
-			int workers_connected = hash_table_size(q->worker_table);
-			int jobs_not_completed = list_size(q->ready_list) + q->workers_in_state[WORKER_STATE_BUSY];
-			if(workers_connected > jobs_not_completed) {
-				debug(D_WQ, "Jobs waiting + running: %d; Workers connected now: %d", jobs_not_completed, workers_connected);
-				if(q->workers_in_state[WORKER_STATE_READY] >= list_size(q->ready_list)) {
-					debug(D_NOTICE, "The number of remaining tasks is less than the number of ready workers.");
-					goto reject;
-				}
-			}
-
-			if(q->worker_mode == WORK_QUEUE_WORKER_MODE_EXCLUSIVE && q->name) {
-				// For backward compatibility, we scan the line AGAIN to see if it contains extra fields
-				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"", project_names) == 1) {
-					if(!match_project_names(q, project_names)) {
-						debug(D_NOTICE, "Preferred masters of %s (%s): %s", w->hostname, w->addrport, project_names);
-						goto reject;
-					}
-				} else {
-					// No extra fields, so this is a shared worker
-					debug(D_NOTICE, "%s (%s) is a shared worker. But the master does not allow shared workers.", w->hostname, w->addrport);
-					goto reject;
-				}
-			}
-
-			//Re-scan to see if worker reports its os and arch.
-			if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%[^\"]\"", project_names) == 1) {
-				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%*[^\"]\" %s %s", w->os, w->arch) != 2) {
-					strcpy(w->os, "unknown");
-					strcpy(w->arch, "unknown");
-				}
-			} else {
-				//check in exclusive worker with no preferred project which it sends as a blank ""
-				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"\" %s %s", w->os, w->arch) != 2) {
-					//check in shared worker
-					if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d %s %s", w->os, w->arch) != 2) {
-						strcpy(w->os, "unknown");
-						strcpy(w->arch, "unknown");
-					}
-				}
-			}
-
-			char buffer[100]; //host name + pid
-			buffer[0] = '\0';
-			if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"%*[^\"]\" %*s %*s %s", buffer) != 1) {
-				if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d \"\" %*s %*s %s", buffer) != 1) {
-					if(sscanf(line, "ready %*s %*d %*d %*d %*d %*d %*s %*s %s", buffer) != 1) {
-						(w->pool_name)[0] = 0;
-					}
-				}
-			}
-			if(buffer[0] != '\0') {
-				struct pool_info *pi;
-				strncpy(w->pool_name, buffer, WORK_QUEUE_POOL_NAME_MAX);
-				pi = hash_table_lookup(q->workers_by_pool, w->pool_name);
-				if(!pi) {
-					pi = xxmalloc(sizeof(*pi));
-					strncpy(pi->name, w->pool_name, WORK_QUEUE_POOL_NAME_MAX);
-					pi->count = 1;
-					hash_table_insert(q->workers_by_pool, w->pool_name, pi);
-				} else {
-					pi->count += 1;
-				}
-			}
-
-			if(w->state == WORKER_STATE_INIT) {
-				change_worker_state(q, w, WORKER_STATE_READY);
-				q->total_workers_connected++;
-				debug(D_WQ, "%s (%s) running %s on %s is ready", w->hostname, w->addrport, w->os, w->arch);
-			}
-		} else if(sscanf(line, "result %d %lld", &result, &output_length) == 2) {
-			struct work_queue_task *t;
-			int actual;
-			timestamp_t observed_execution_time;
-
-			t = w->current_task;
-
-			observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
-
-			if(sscanf(line, "result %d %lld %llu", &result, &output_length, &execution_time) == 3) {
-				t->cmd_execution_time = observed_execution_time > execution_time ? execution_time : observed_execution_time;
-			} else {
-				t->cmd_execution_time = observed_execution_time;
-			}
-
-			t->output = malloc(output_length + 1);
-			if(output_length > 0) {
-				//stoptime = time(0) + MAX(1.0,output_length/1250000.0);
-				stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T) output_length);
-				actual = link_read(l, t->output, output_length, stoptime);
-				if(actual != output_length) {
-					free(t->output);
-					t->output = 0;
-					goto failure;
-				}
-			} else {
-				actual = 0;
-			}
-			t->output[actual] = 0;
-
-			t->return_status = result;
-			if(t->return_status != 0)
-				t->result |= WORK_QUEUE_RESULT_FUNCTION_FAIL;
-
-			t->time_execute_cmd_finish = t->time_execute_cmd_start + t->cmd_execution_time;
-			q->total_execute_time += t->cmd_execution_time;
-
-			t->status = TASK_STATUS_WAITING_FOR_OUTPUT;
-
-			if(q->work_queue_wait_routine == WORK_QUEUE_WAIT_FAST_DISPATCH || q->work_queue_wait_routine == WORK_QUEUE_WAIT_ADAPTIVE) {
-				// Receiving output delayed
-				struct pending_output *p;
-				p = (struct pending_output *) malloc(sizeof(struct pending_output));
-				if(!p) {
-					free(t->output);
-					t->output = 0;
-					goto failure;
-				}
-				p->start = timestamp_get();
-				p->link = l;
-				list_push_head(q->receive_output_waiting_list, p);
-				debug(D_WQ, "%s (%s) has finished its task. Output transfer is postponed.", w->hostname, w->addrport);
-			} else {
-				//q->work_queue_wait_routine == WORK_QUEUE_WAIT_FCFS
-				// Receive output immediately and start a new task on the this worker if available
-				if(receive_output_from_worker(q, w)) {
-					start_task_on_worker(q, w);
-				}
-			}
-		} else {
-			debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-			goto failure;
-		}
-	} else {
-		debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
-		goto failure;
-	}
-
-	return 1;
-
-      reject:
-	debug(D_NOTICE, "%s (%s) is rejected and removed.", w->hostname, w->addrport);
-	remove_worker(q, w);
-	return 0;
-
-      failure:
-	debug(D_NOTICE, "%s (%s) failed and removed.", w->hostname, w->addrport);
-	remove_worker(q, w);
-	return 0;
-}
-
 static int receive_output_from_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	struct work_queue_task *t;
@@ -943,20 +933,17 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 
 	// At this point, a task is completed.
 	list_push_head(q->complete_list, w->current_task);
-	t->status = TASK_STATUS_COMPLETE;
 	w->current_task = 0;
 	t->time_task_finish = timestamp_get();
 
 	// Record statistics information for capacity estimation
 	if(q->estimate_capacity_on) {
 		add_task_report(q, t);
-		if(q->auto_remove_workers_on) {
-			remove_workers_base_on_capacity(q);
-		}
 	}
 	// Change worker state and do some performance statistics
 	change_worker_state(q, w, WORKER_STATE_READY);
 
+	t->hostname = xxstrdup(w->hostname);
 	t->host = xxstrdup(w->addrport);
 
 	q->total_tasks_complete++;
@@ -972,6 +959,207 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 	debug(D_NOTICE, "%s (%s) failed and removed because cannot receive output.", w->hostname, w->addrport);
 	remove_worker(q, w);
 	return 0;
+}
+
+static int field_set(const char *field) {
+	if(strncmp(field, WORK_QUEUE_PROTOCOL_BLANK_FIELD, strlen(WORK_QUEUE_PROTOCOL_BLANK_FIELD) + 1) == 0) {
+		return 0;
+	}
+	return 1;
+}
+
+static int process_ready(struct work_queue *q, struct work_queue_worker *w, const char *line) {
+	if(!q || !w || !line) return 0;
+
+	//Format: hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, proj_name, pool_name, os, arch
+	char items[10][WORK_QUEUE_PROTOCOL_FIELD_MAX];
+	int n = sscanf(line, "ready %s %s %s %s %s %s %s %s %s %s", items[0], items[1], items[2], items[3], items[4], items[5], items[6], items[7], items[8], items[9]);
+
+	if(n < 6) {
+		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
+		return 0;
+	}
+
+	// Copy basic fields 
+	strncpy(w->hostname, items[0], DOMAIN_NAME_MAX);
+	w->ncpus = atoi(items[1]);
+	w->memory_avail = atoll(items[2]);
+	w->memory_total = atoll(items[3]);
+	w->disk_avail = atoll(items[4]);
+	w->disk_total = atoll(items[5]);
+
+	if(n >= 7 && field_set(items[6])) { // intended project name
+		if(q->name) {
+			if(strncmp(q->name, items[6], WORK_QUEUE_NAME_MAX) != 0) {
+				goto reject;
+			}
+		} else {
+			goto reject;
+		}
+	}
+
+	if(n >= 8 && field_set(items[7])) { // worker pool name
+		strncpy(w->pool_name, items[7], WORK_QUEUE_POOL_NAME_MAX);
+	} else {
+		strcpy(w->pool_name, "unmanaged");
+	}
+
+	struct pool_info *pi;
+	pi = hash_table_lookup(q->workers_by_pool, w->pool_name);
+	if(!pi) {
+		pi = xxmalloc(sizeof(*pi));
+		strncpy(pi->name, w->pool_name, WORK_QUEUE_POOL_NAME_MAX);
+		pi->count = 1;
+		hash_table_insert(q->workers_by_pool, w->pool_name, pi);
+	} else {
+		pi->count += 1;
+	}
+
+	if(n >= 9 && field_set(items[8])) { // operating system
+		strncpy(w->os, items[8], WORKER_OS_NAME_MAX);
+	} else {
+		strcpy(w->os, "unknown");
+	}
+
+	if(n == 10 && field_set(items[9])) { // architecture
+		strncpy(w->arch, items[9], WORKER_ARCH_NAME_MAX);
+	} else {
+		strcpy(w->arch, "unknown");
+	}
+
+	if(w->state == WORKER_STATE_INIT) {
+		change_worker_state(q, w, WORKER_STATE_READY);
+		q->total_workers_connected++;
+		debug(D_WQ, "%s (%s) running %s (operating system) on %s (architecture) is ready", w->hostname, w->addrport, w->os, w->arch);
+	}
+
+	return 1;
+
+reject:
+	debug(D_NOTICE, "%s (%s) is rejected: the worker's intended project name (%s) does not match the master's (%s).", w->hostname, w->addrport, items[7], q->name);
+	return 0;
+}
+
+static int process_result(struct work_queue *q, struct work_queue_worker *w, struct link *l, const char *line) {
+	if(!q || !l || !line || !w) return 0; 
+
+	int result;
+	INT64_T output_length;
+	timestamp_t execution_time;
+
+	//Format: result, output length, execution time
+	char items[3][WORK_QUEUE_PROTOCOL_FIELD_MAX];
+	int n = sscanf(line, "result %s %s %s", items[0], items[1], items[2]);
+
+	if(n < 2) {
+		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
+		return 0;
+	}
+
+	result = atoi(items[0]);
+	output_length = atoll(items[1]);
+
+	struct work_queue_task *t;
+	int actual;
+	timestamp_t stoptime, observed_execution_time;
+
+	//worker finished cancelling its task. Skip task output retrieval 
+	//and a start new task.		
+	if (w->state == WORKER_STATE_CANCELLING) {
+		//worker sends output after result message. Quietly discard it.
+		char *tmp = malloc(output_length + 1);
+		if(output_length > 0) {
+			stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T) output_length);
+			actual = link_read(l, tmp, output_length, stoptime);
+		} 
+		free(tmp);
+		debug(D_WQ, "Worker %s (%s) that ran cancelled task is now available.", w->hostname, w->addrport);
+		change_worker_state(q, w, WORKER_STATE_READY);
+		start_task_on_worker(q, w);
+		return 1;
+	}
+
+	t = w->current_task;
+
+	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
+
+	if(n == 3) {
+		execution_time = atoll(items[2]);
+		t->cmd_execution_time = observed_execution_time > execution_time ? execution_time : observed_execution_time;
+	} else {
+		t->cmd_execution_time = observed_execution_time;
+	}
+
+	t->output = malloc(output_length + 1);
+	if(output_length > 0) {
+		//stoptime = time(0) + MAX(1.0,output_length/1250000.0);
+		stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T) output_length);
+		actual = link_read(l, t->output, output_length, stoptime);
+		if(actual != output_length) {
+			free(t->output);
+			t->output = 0;
+			return 0;
+		}
+	} else {
+		actual = 0;
+	}
+	t->output[actual] = 0;
+
+	t->return_status = result;
+	if(t->return_status != 0)
+		t->result |= WORK_QUEUE_RESULT_FUNCTION_FAIL;
+
+	t->time_execute_cmd_finish = t->time_execute_cmd_start + t->cmd_execution_time;
+	q->total_execute_time += t->cmd_execution_time;
+
+	// Receive output immediately and start a new task on the this worker if available
+	if(receive_output_from_worker(q, w)) {
+		start_task_on_worker(q, w);
+	}
+		
+	return 1;
+}
+
+static int prefix_is(const char *string, const char *prefix) {
+	size_t n;
+
+	if(!string || !prefix) return 0;
+
+	if((n = strlen(prefix)) == 0) return 0;
+	
+	if(strncmp(string, prefix, n) == 0) return 1;
+
+	return 0;
+}
+
+static void handle_worker(struct work_queue *q, struct link *l)
+{
+	char line[WORK_QUEUE_LINE_MAX];
+	char key[WORK_QUEUE_LINE_MAX];
+	struct work_queue_worker *w;
+
+	link_to_hash_key(l, key);
+	w = hash_table_lookup(q->worker_table, key);
+
+	int keep_worker;
+	if(link_readline(l, line, sizeof(line), time(0) + short_timeout)) {
+		if(prefix_is(line, "ready")) {
+			keep_worker = process_ready(q, w, line);
+		}  else if (prefix_is(line, "result")) {
+			keep_worker = process_result(q, w, l, line);
+		} else {
+			debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
+			keep_worker = 0;
+		}
+	} else {
+		debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
+		keep_worker = 0;
+	}
+
+	if(!keep_worker) {
+		remove_worker(q, w);
+		debug(D_NOTICE, "%s (%s) is removed.", w->hostname, w->addrport);
+	}
 }
 
 static int build_poll_table(struct work_queue *q)
@@ -1008,8 +1196,6 @@ static int build_poll_table(struct work_queue *q)
 
 	return n;
 }
-
-static int put_file(struct work_queue_file *, const char *, struct work_queue *, struct work_queue_worker *, INT64_T *);
 
 static int put_directory(const char *dirname, const char *remote_name, struct work_queue *q, struct work_queue_worker *w, INT64_T * total_bytes)
 {
@@ -1140,7 +1326,7 @@ static int put_file(struct work_queue_file *tf, const char *expanded_payload, st
  *	for any of the environment variables, it will return the input string
  *	as is.
  * 	*/
-char *expand_envnames(struct work_queue_worker *w, const char *payload)
+static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 {
 	char *expanded_name;
 	char *str, *curr_pos;
@@ -1206,7 +1392,6 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 	time_t stoptime;
 	struct stat s;
 	char *expanded_payload = NULL;
-	t->status = TASK_STATUS_SENDING_INPUT;
 
 	// Check input existence
 	if(t->input_files) {
@@ -1220,7 +1405,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 					expanded_payload = xxstrdup(tf->payload);
 				}
 				if(stat(expanded_payload, &s) != 0) {
-					fprintf(stderr, "Could not stat %s. (%s)\n", expanded_payload, strerror(errno));
+					debug(D_WQ,"Could not stat %s: %s\n", expanded_payload, strerror(errno));
 					free(expanded_payload);
 					goto failure;
 				}
@@ -1321,15 +1506,14 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 	//Old work command (worker does not fork to execute a task, thus can't
 	//communicate with the master during task execution):
 	//link_putfstring(w->link, "work %zu\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
-	link_putfstring(w->link, "work %zu fork\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
-	t->status = TASK_STATUS_EXECUTING;
+	link_putfstring(w->link, "work %zu\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
 	debug(D_WQ, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
 	return 1;
 }
 
 static int get_num_of_effective_workers(struct work_queue *q)
 {
-	return q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_READY];
+	return q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_READY] + q->workers_in_state[WORKER_STATE_CANCELLING];
 }
 
 static struct task_statistics *task_statistics_init()
@@ -1390,7 +1574,6 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	// Record task statistics for master capacity estimation.
 	tr = (struct task_report *) malloc(sizeof(struct task_report));
 	if(!tr) {
-		fprintf(stderr, "Failed to allocate memory for task report.\n");
 		return;
 	} else {
 		tr->time_transfer_data = t->total_transfer_time;
@@ -1466,89 +1649,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	debug(D_WQ, "Lastest master capacity: %d; Avg master capacity: %d\n", q->capacity, q->avg_capacity);
 }
 
-static int remove_workers_base_on_capacity(struct work_queue *q)
-{
-	// Right now this function would completely shut down the remote worker (by
-	// sending the "exit" msg to the worker).
-	struct list *reports;
-	struct task_report *tr;
-	struct task_statistics *ts;
-	int num_of_reports;
-	int connected_workers, busy_workers, excessive_workers, workers_removed;
-	int idle_percentage;
-	double avg_capacity, capacity_stddev, avg_busy_workers, busy_workers_stddev;
-
-	if(!q)
-		return 0;
-	if(q->work_queue_wait_routine != WORK_QUEUE_WAIT_ADAPTIVE)
-		return 0;
-
-	ts = q->task_statistics;
-	if(!ts) {
-		return 0;
-	}
-
-	reports = ts->reports;
-	if(!reports) {
-		return 0;
-	}
-
-	num_of_reports = list_size(reports);
-	if(!num_of_reports)
-		return 0;
-
-	idle_percentage = get_idle_percentage(q) * 100;
-	debug(D_WQ, "Current master idle percentage: %d%%\n", idle_percentage);
-
-	// Do not remove workers if ...
-	if(idle_percentage > 0 || num_of_reports < MIN_TIME_LIST_SIZE)
-		return 0;
-
-	// Calculate the standard deviation of the master capacities
-	avg_capacity = (double) ts->total_capacity / num_of_reports;
-	capacity_stddev = 0;
-	list_first_item(reports);
-	while((tr = (struct task_report *) list_next_item(reports))) {
-		capacity_stddev += ((double) tr->capacity - avg_capacity) * ((double) tr->capacity - avg_capacity);
-	}
-	capacity_stddev = sqrt(capacity_stddev / (num_of_reports - 1));	// sample standard deviation
-	debug(D_WQ, "Avg capacity: %.2f over last %d finished tasks; stddev: %.2f\n", avg_capacity, num_of_reports, capacity_stddev);
-
-	// Calculate the standard deviation of the number of busy workers
-	avg_busy_workers = (double) ts->total_busy_workers / num_of_reports;
-	busy_workers_stddev = 0;
-	list_first_item(reports);
-	while((tr = (struct task_report *) list_next_item(reports))) {
-		busy_workers_stddev += ((double) tr->busy_workers - avg_busy_workers) * ((double) tr->busy_workers - avg_busy_workers);
-	}
-	busy_workers_stddev = sqrt(busy_workers_stddev / (num_of_reports - 1));	// sample standard deviation
-	debug(D_WQ, "Avg busy workers: %.2f over last %d finished tasks; stddev: %.2f\n", avg_busy_workers, num_of_reports, busy_workers_stddev);
-
-	connected_workers = hash_table_size(q->worker_table);
-	busy_workers = q->workers_in_state[WORKER_STATE_BUSY];
-
-	workers_removed = 0;
-	if(busy_workers_stddev < 1) {
-		if(connected_workers == busy_workers && connected_workers > avg_capacity + q->capacity_tolerance) {
-			if(capacity_stddev < 1) {
-				excessive_workers = busy_workers - (avg_capacity + q->capacity_tolerance) + 1;	// "+ 1" act as the C math library's ceil function
-			} else {
-				excessive_workers = busy_workers - (avg_capacity + capacity_stddev * (double) (q->capacity_tolerance)) + 1;
-			}
-			q->busy_workers_to_remove = MAX(0, excessive_workers);
-			debug(D_WQ, "Plan to remove %d busy workers. Waiting for them to return ongoing tasks.\n", excessive_workers);
-		} else if(connected_workers > busy_workers) {
-			excessive_workers = connected_workers - MAX(busy_workers, avg_capacity + q->capacity_tolerance + 1);
-			workers_removed = work_queue_shut_down_workers(q, excessive_workers);
-			q->excessive_workers_removed += workers_removed;
-			debug(D_WQ, "%d excessive workers has just been removed.\n", workers_removed);
-		}
-	}
-
-	return workers_removed;
-}
-
-struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)
+static struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
 	struct work_queue_worker *w;
@@ -1585,7 +1686,7 @@ struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work
 	return best_worker;
 }
 
-struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q)
+static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q)
 {
 	char *key;
 	struct work_queue_worker *w;
@@ -1600,7 +1701,7 @@ struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q)
 	return best_worker;
 }
 
-struct work_queue_worker *find_worker_by_random(struct work_queue *q)
+static struct work_queue_worker *find_worker_by_random(struct work_queue *q)
 {
 	char *key;
 	struct work_queue_worker *w;
@@ -1633,7 +1734,7 @@ struct work_queue_worker *find_worker_by_random(struct work_queue *q)
 	return best_worker;
 }
 
-struct work_queue_worker *find_worker_by_time(struct work_queue *q)
+static struct work_queue_worker *find_worker_by_time(struct work_queue *q)
 {
 	char *key;
 	struct work_queue_worker *w;
@@ -1661,7 +1762,7 @@ struct work_queue_worker *find_worker_by_time(struct work_queue *q)
 }
 
 // use task-specific algorithm if set, otherwise default to the queue's setting.
-struct work_queue_worker *find_best_worker(struct work_queue *q, struct work_queue_task *t)
+static struct work_queue_worker *find_best_worker(struct work_queue *q, struct work_queue_task *t)
 {
 	int a = t->worker_selection_algorithm;
 
@@ -1716,47 +1817,7 @@ static void start_tasks(struct work_queue *q)
 	}
 }
 
-static int start_n_tasks(struct work_queue *q, int n)
-{				// start at most "n" tasks
-	struct work_queue_task *t;
-	struct work_queue_worker *w;
-	int count = 0;
-
-	if(!q || n <= 0)
-		return 0;
-
-	while(list_size(q->ready_list) && q->workers_in_state[WORKER_STATE_READY]) {
-		t = list_peek_head(q->ready_list);
-		w = find_best_worker(q, t);
-		if(w) {
-			if(start_task_on_worker(q, w)) {	// successfully started one task on the worker
-				count++;
-				if(count == n)
-					break;
-			}
-		} else {
-			break;
-		}
-	}
-
-	return count;
-}
-
-int work_queue_activate_fast_abort(struct work_queue *q, double multiplier)
-{
-	if(multiplier >= 1) {
-		q->fast_abort_multiplier = multiplier;
-		return 0;
-	} else if(multiplier < 0) {
-		q->fast_abort_multiplier = multiplier;
-		return 0;
-	} else {
-		q->fast_abort_multiplier = -1.0;
-		return 1;
-	}
-}
-
-void abort_slow_workers(struct work_queue *q)
+static void abort_slow_workers(struct work_queue *q)
 {
 	struct work_queue_worker *w;
 	char *key;
@@ -1770,7 +1831,7 @@ void abort_slow_workers(struct work_queue *q)
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->state == WORKER_STATE_BUSY && w->current_task->status == TASK_STATUS_EXECUTING) {
+		if(w->state == WORKER_STATE_BUSY) {
 			timestamp_t runtime = current - w->current_task->time_send_input_start;
 			if(runtime > (average_task_time * multiplier)) {
 				debug(D_NOTICE, "%s (%s) has run too long: %.02lf s (average is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
@@ -1780,21 +1841,34 @@ void abort_slow_workers(struct work_queue *q)
 	}
 }
 
-int work_queue_port(struct work_queue *q)
+static void update_app_time(struct work_queue *q, timestamp_t last_left_time, int last_left_status)
 {
-	char addr[LINK_ADDRESS_MAX];
-	int port;
+	if(!q) return;
 
-	if(!q)
-		return 0;
+	timestamp_t t1, t2;
 
-	if(link_address_local(q->master_link, addr, &port)) {
-		return port;
-	} else {
-		return 0;
+	if(last_left_time && last_left_status == 1) {
+		t1 = timestamp_get() - last_left_time;
+
+		if(q->total_tasks_complete > MIN_TIME_LIST_SIZE) {
+			t2 = q->app_time / q->total_tasks_complete;
+			// A simple way of discarding outliers that does not require much calculation.
+			// Works for workloads that has stable app times.
+			if(t1 > WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER * t2) {
+				debug(D_WQ, "Discarding outlier task app time: %lld\n", t1);
+				q->app_time += t2;
+			} else {
+				q->app_time += t1;
+			}
+		} else {
+			q->app_time += t1; 
+		}
 	}
 }
 
+/******************************************************/
+/********** work_queue public functions **********/
+/******************************************************/
 
 struct work_queue *work_queue_create(int port)
 {
@@ -1828,7 +1902,6 @@ struct work_queue *work_queue_create(int port)
 	q->ready_list = list_create();
 	q->complete_list = list_create();
 
-	q->receive_output_waiting_list = list_create();
 	q->worker_table = hash_table_create(0, 0);
 
 	// The poll table is initially null, and will be created
@@ -1843,7 +1916,7 @@ struct work_queue *work_queue_create(int port)
 
 	q->fast_abort_multiplier = wq_option_fast_abort_multiplier;
 	q->worker_selection_algorithm = wq_option_scheduler;
-	q->task_ordering = WORK_QUEUE_TASK_ORDER_DEFAULT;
+	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 
 	envstring = getenv("WORK_QUEUE_NAME");
 	if(envstring)
@@ -1863,66 +1936,11 @@ struct work_queue *work_queue_create(int port)
 		q->priority = WORK_QUEUE_MASTER_PRIORITY_DEFAULT;
 	}
 
-	envstring = getenv("WORK_QUEUE_WORKER_MODE");
-	if(envstring) {
-		work_queue_specify_worker_mode(q, atoi(envstring));
-	} else {
-		q->worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
-	}
-
-	q->estimate_capacity_on = WORK_QUEUE_SWITCH_UNSPECIFIED;
-	q->auto_remove_workers_on = WORK_QUEUE_SWITCH_UNSPECIFIED;
-	q->work_queue_wait_routine = WORK_QUEUE_WAIT_UNSPECIFIED;
-
-	envstring = getenv("WORK_QUEUE_AUTO_REMOVE_WORKERS_ON");
-	if(envstring) {
-		work_queue_specify_auto_remove_workers_on(q, atoi(envstring));
-	}
+	q->estimate_capacity_on = 0;
 
 	envstring = getenv("WORK_QUEUE_ESTIMATE_CAPACITY_ON");
 	if(envstring) {
-		work_queue_specify_estimate_capacity_on(q, atoi(envstring));
-	}
-	// Normal user should not set this!
-	envstring = getenv("WORK_QUEUE_WAIT_ROUTINE");
-	if(envstring) {
-		work_queue_specify_wait_routine(q, atoi(envstring));
-	}
-
-	if(q->auto_remove_workers_on == WORK_QUEUE_SWITCH_ON) {
-		if(q->estimate_capacity_on == WORK_QUEUE_SWITCH_UNSPECIFIED) {
-			q->estimate_capacity_on = WORK_QUEUE_SWITCH_ON;
-		}
-		if(q->work_queue_wait_routine == WORK_QUEUE_WAIT_UNSPECIFIED) {
-			q->work_queue_wait_routine = WORK_QUEUE_WAIT_ADAPTIVE;
-		}
-		if(q->work_queue_wait_routine != WORK_QUEUE_WAIT_ADAPTIVE || !q->estimate_capacity_on) {
-			fprintf(stderr, "Auto remove workers has been turned off!\n");
-			fprintf(stderr, "In order to use auto remove workers, please do not turn \"estimate capacity\" option off or\n");
-			fprintf(stderr, "set \"work_queue_wait routine\" option to ones other than \"adaptive\".\n");
-			q->auto_remove_workers_on = WORK_QUEUE_SWITCH_OFF;
-		}
-	} else {
-		if(q->estimate_capacity_on == WORK_QUEUE_SWITCH_UNSPECIFIED) {
-			q->estimate_capacity_on = WORK_QUEUE_SWITCH_OFF;
-		}
-		if(q->work_queue_wait_routine == WORK_QUEUE_WAIT_UNSPECIFIED) {
-			q->work_queue_wait_routine = WORK_QUEUE_WAIT_FCFS;
-		}
-	}
-
-	envstring = getenv("WORK_QUEUE_CAPACITY_TOLERANCE");
-	if(envstring) {
-		work_queue_specify_capacity_tolerance(q, atoi(envstring));
-	} else {
-		q->capacity_tolerance = WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT;
-	}
-
-	envstring = getenv("WORK_QUEUE_MAXIMUM_WORKERS");
-	if(envstring) {
-		work_queue_specify_maximum_workers(q, atoi(envstring));
-	} else {
-		q->maximum_workers = WORK_QUEUE_WORKERS_NO_LIMIT;
+		q->estimate_capacity_on = atoi(envstring);
 	}
 
 	q->total_send_time = 0;
@@ -1939,91 +1957,64 @@ struct work_queue *work_queue_create(int port)
 	q->app_time = 0;
 	q->capacity = 0;
 	q->avg_capacity = 0;
-	q->busy_workers_to_remove = 0;
 
 	q->task_statistics = task_statistics_init();
 
-	q->link_keepalive_on = 1;
 	q->workers_by_pool = hash_table_create(0,0);
 
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
 
-      failure:
+failure:
 	debug(D_NOTICE, "Could not create work_queue on port %i.", port);
 	free(q);
 	return 0;
 }
 
-int work_queue_specify_maximum_workers(struct work_queue *q, int max)
+int work_queue_activate_fast_abort(struct work_queue *q, double multiplier)
 {
-	if(max > 0) {
-		q->maximum_workers = max;
+	if(multiplier >= 1) {
+		q->fast_abort_multiplier = multiplier;
+		return 0;
+	} else if(multiplier < 0) {
+		q->fast_abort_multiplier = multiplier;
+		return 0;
 	} else {
-		q->maximum_workers = WORK_QUEUE_WORKERS_NO_LIMIT;
+		q->fast_abort_multiplier = -1.0;
+		return 1;
 	}
-	return q->maximum_workers;
 }
 
-
-int work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
+int work_queue_port(struct work_queue *q)
 {
-	if(value == WORK_QUEUE_SWITCH_ON) {
-		q->estimate_capacity_on = WORK_QUEUE_SWITCH_ON;
-	} else if(value == WORK_QUEUE_SWITCH_OFF) {
-		q->estimate_capacity_on = WORK_QUEUE_SWITCH_OFF;
+	char addr[LINK_ADDRESS_MAX];
+	int port;
+
+	if(!q)
+		return 0;
+
+	if(link_address_local(q->master_link, addr, &port)) {
+		return port;
 	} else {
-		q->estimate_capacity_on = WORK_QUEUE_SWITCH_UNSPECIFIED;
+		return 0;
 	}
-	return q->estimate_capacity_on;
 }
 
 
-int work_queue_specify_auto_remove_workers_on(struct work_queue *q, int value)
+void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
 {
-	if(value == WORK_QUEUE_SWITCH_ON) {
-		q->auto_remove_workers_on = WORK_QUEUE_SWITCH_ON;
-	} else if(value == WORK_QUEUE_SWITCH_OFF) {
-		q->auto_remove_workers_on = WORK_QUEUE_SWITCH_OFF;
-	} else {
-		q->auto_remove_workers_on = WORK_QUEUE_SWITCH_UNSPECIFIED;
-	}
-	return q->auto_remove_workers_on;
+	q->estimate_capacity_on = value;
 }
 
-int work_queue_specify_wait_routine(struct work_queue *q, int routine)
+void work_queue_specify_name(struct work_queue *q, const char *name)
 {
-	switch (routine) {
-	case WORK_QUEUE_WAIT_FCFS:
-	case WORK_QUEUE_WAIT_FAST_DISPATCH:
-	case WORK_QUEUE_WAIT_ADAPTIVE:
-		q->work_queue_wait_routine = routine;
-		break;
-	default:
-		q->work_queue_wait_routine = WORK_QUEUE_WAIT_UNSPECIFIED;
-	}
-	return q->work_queue_wait_routine;
-}
-
-int work_queue_specify_capacity_tolerance(struct work_queue *q, int tolerance)
-{
-	if(tolerance > 0 && tolerance <= WORK_QUEUE_CAPACITY_TOLERANCE_MAX) {
-		q->capacity_tolerance = tolerance;
-	} else {
-		q->capacity_tolerance = WORK_QUEUE_CAPACITY_TOLERANCE_DEFAULT;
-	}
-	return q->capacity_tolerance;
-}
-
-int work_queue_specify_name(struct work_queue *q, const char *name)
-{
-	if(q && name) {
-		if(q->name)
-			free(q->name);
+	if(q->name) free(q->name);
+	if(name) {
 		q->name = xxstrdup(name);
 		setenv("WORK_QUEUE_NAME", q->name, 1);
+	} else {
+		q->name = 0;
 	}
-	return 0;
 }
 
 const char *work_queue_name(struct work_queue *q)
@@ -2031,45 +2022,18 @@ const char *work_queue_name(struct work_queue *q)
 	return q->name;
 }
 
-int work_queue_specify_priority(struct work_queue *q, int priority)
+void work_queue_specify_priority(struct work_queue *q, int priority)
 {
-	if(priority > 0 && priority <= WORK_QUEUE_MASTER_PRIORITY_MAX) {
-		q->priority = priority;
-	} else {
-		q->priority = WORK_QUEUE_MASTER_PRIORITY_DEFAULT;
-	}
-	return q->priority;
+	q->priority = priority;
 }
 
-int work_queue_specify_master_mode(struct work_queue *q, int mode)
+void work_queue_specify_master_mode(struct work_queue *q, int mode)
 {
-	switch (mode) {
-	case WORK_QUEUE_MASTER_MODE_CATALOG:
-		/* Set the catalog host and port */
+	q->master_mode = mode;
+	if(mode==WORK_QUEUE_MASTER_MODE_CATALOG) {
 		strncpy(q->catalog_host, CATALOG_HOST, DOMAIN_NAME_MAX);
 		q->catalog_port = CATALOG_PORT;
-		/* Fall through to set mode */
-	case WORK_QUEUE_MASTER_MODE_STANDALONE:
-		q->master_mode = mode;
-		break;
-	default:
-		q->master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	}
-
-	return q->master_mode;
-}
-
-int work_queue_specify_worker_mode(struct work_queue *q, int mode)
-{
-	switch (mode) {
-	case WORK_QUEUE_WORKER_MODE_EXCLUSIVE:
-	case WORK_QUEUE_WORKER_MODE_SHARED:
-		q->worker_mode = mode;
-		break;
-	default:
-		q->worker_mode = WORK_QUEUE_WORKER_MODE_SHARED;
-	}
-	return q->worker_mode;
 }
 
 void work_queue_delete(struct work_queue *q)
@@ -2090,6 +2054,9 @@ void work_queue_delete(struct work_queue *q)
 		list_delete(q->complete_list);
 		free(q->poll_table);
 		link_close(q->master_link);
+		if(q->logfile) {
+			fclose(q->logfile);
+		}
 		free(q);
 	}
 }
@@ -2100,6 +2067,10 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	if(t->output) {
 		free(t->output);
 		t->output = 0;
+	}
+	if(t->hostname) {
+		free(t->hostname);
+		t->hostname = 0;
 	}
 	if(t->host) {
 		free(t->host);
@@ -2125,358 +2096,98 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	return (t->taskid);
 }
 
-static int add_more_workers(struct work_queue *q, time_t stoptime)
-{
-	int count;
-
-	count = 0;
-	do {
-		if(add_worker(q))
-			count++;
-	} while(link_usleep(q->master_link, 0, 1, 0) && stoptime > time(0));
-	return count;
-}
-
-int master_poll(struct work_queue *q, struct link_info *links, int nlinks, int msec)
-{
-	timestamp_t idle_start;
-	int result;
-
-	idle_start = timestamp_get();
-	result = link_poll(links, nlinks, msec);
-	q->idle_time += timestamp_get() - idle_start;
-
-	return result;
-}
-
-struct work_queue_task *work_queue_wait_fcfs(struct work_queue *q, int timeout)
-{
-	struct work_queue_task *t;
-	int i, n, msec, result;
-	time_t stoptime;
-
-	if(timeout == WORK_QUEUE_WAITFORTASK) {
-		stoptime = 0;
-	} else {
-		stoptime = time(0) + timeout;
-	}
-
-	while(1) {
-		if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
-			update_catalog(q, 0);
-		}
-
-		t = list_pop_head(q->complete_list);
-		if(t) {
-			return t;
-		}
-
-		if(q->workers_in_state[WORKER_STATE_BUSY] == 0 && list_size(q->ready_list) == 0)
-			break;
-
-		start_tasks(q);
-
-		n = build_poll_table(q);
-
-		// Wait no longer than the caller's patience.
-		if(stoptime) {
-			msec = MAX(0, (stoptime - time(0)) * 1000);
-		} else {
-			msec = 5000;
-		}
-
-		result = master_poll(q, q->poll_table, n, msec);
-
-		// If a process is waiting to complete, return without a task.
-		if(process_pending()) {
-			break;
-		}
-		// If nothing was awake, restart the loop or return without a task.
-		if(result <= 0) {
-			if(stoptime && time(0) >= stoptime) {
-				break;
-			} else {
-				continue;
-			}
-		}
-		// If the master link was awake, then accept as many workers as possible.
-		if(q->poll_table[0].revents) {
-			add_more_workers(q, stoptime);
-		}
-		// Then consider all existing active workers and dispatch tasks.
-		for(i = 1; i < n; i++) {
-			if(q->poll_table[i].revents) {
-				handle_worker(q, q->poll_table[i].link);
-			}
-		}
-
-		// If fast abort is enabled, kill off slow workers.
-		if(q->fast_abort_multiplier > 0) {
-			abort_slow_workers(q);
-		}
-	}
-
-	return 0;
-}
-
-/**
- * This function is for research use only.
- */
-struct work_queue_task *work_queue_wait_fast_dispatch(struct work_queue *q, int timeout)
-{
-	struct work_queue_task *t;
-	struct pending_output *po;
-	int i, n, msec, result;
-	time_t stoptime;
-	static int added_workers = 0;
-
-	if(timeout == WORK_QUEUE_WAITFORTASK) {
-		stoptime = 0;
-	} else {
-		stoptime = time(0) + timeout;
-	}
-
-	while(1) {
-		if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
-			update_catalog(q, 0);
-		}
-
-		t = list_pop_head(q->complete_list);
-		if(t) {
-			return t;
-		}
-
-		if(q->workers_in_state[WORKER_STATE_BUSY] == 0 && list_size(q->ready_list) == 0)
-			break;
-
-		// Upper level application may have just submitted some new tasks. Try to dispatch them to ready workers.
-		start_tasks(q);
-
-		if(added_workers == 0) {
-			if((po = list_pop_head(q->receive_output_waiting_list))) {
-				receive_pending_output(q, po);
-				free(po);
-			}
-		}
-		added_workers = 0;
-
-		n = build_poll_table(q);
-
-		// Wait no longer than the caller's patience.
-		if(stoptime) {
-			msec = MAX(0, (stoptime - time(0)) * 1000);
-		} else {
-			msec = 5000;
-		}
-
-		// There are output waiting for being tranferred back. So, do not waste time on polling.
-		if(list_size(q->receive_output_waiting_list) != 0) {
-			msec = 0;
-		}
-
-		result = master_poll(q, q->poll_table, n, msec);
-
-		// If a process is waiting to complete, return without a task.
-		if(process_pending()) {
-			break;
-		}
-		// If nothing was awake, restart the loop or return without a task.
-		if(result <= 0) {
-			if(stoptime && time(0) >= stoptime) {
-				break;
-			} else {
-				continue;
-			}
-		}
-		// If the master link was awake, then accept as many workers as possible.
-		if(q->poll_table[0].revents) {
-			added_workers = add_more_workers(q, stoptime);
-		}
-		// Then consider all existing active workers and dispatch tasks.
-		for(i = 1; i < n; i++) {
-			if(q->poll_table[i].revents) {
-				handle_worker(q, q->poll_table[i].link);
-			}
-		}
-
-		// This is after polling because new added workers must be in READY state in order to receive tasks.
-		start_tasks(q);
-
-		// If fast abort is enabled, kill off slow workers.
-		if(q->fast_abort_multiplier > 0) {
-			abort_slow_workers(q);
-		}
-	}
-
-	return 0;
-}
-
-// make a smarter decision on whether to start new task on a new worker or an old worker.
-struct work_queue_task *work_queue_wait_adaptive(struct work_queue *q, int timeout)
-{
-	struct work_queue_task *t;
-	struct pending_output *po;
-	int i, n, msec, result, percentage;
-	int ready_workers;
-	time_t stoptime;
-
-	if(timeout == WORK_QUEUE_WAITFORTASK) {
-		stoptime = 0;
-	} else {
-		stoptime = time(0) + timeout;
-	}
-
-	while(1) {
-		if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
-			update_catalog(q, 0);
-		}
-
-		t = list_pop_head(q->complete_list);
-		if(t) {
-			return t;
-		}
-
-		if(q->workers_in_state[WORKER_STATE_BUSY] == 0 && list_size(q->ready_list) == 0)
-			break;
-
-		if((po = list_pop_head(q->receive_output_waiting_list))) {
-			receive_pending_output(q, po);
-			free(po);
-			continue;
-		}
-
-		percentage = get_idle_percentage(q) * 100;
-		ready_workers = q->workers_in_state[WORKER_STATE_READY];
-		if(ready_workers > 0 && percentage > 0) {
-			// start new tasks conservatively, one at a time, otherwise we
-			// might use too many workers than we actually need. 
-			start_n_tasks(q, 1);
-			//work_queue_shut_down_workers (q, 1000);
-		}
-
-		n = build_poll_table(q);
-
-		// Wait no longer than the caller's patience.
-		if(stoptime) {
-			msec = MAX(0, (stoptime - time(0)) * 1000);
-		} else {
-			msec = 5000;
-		}
-
-		// there are ready tasks and ready workers
-		if(list_size(q->ready_list) && q->workers_in_state[WORKER_STATE_READY]) {
-			msec = 0;
-		}
-		// There are output waiting for being tranferred back. So, do not waste
-		// time on polling.
-		if(list_size(q->receive_output_waiting_list) != 0) {
-			msec = 0;
-		}
-
-		result = master_poll(q, q->poll_table, n, msec);
-
-		// If a process is waiting to complete, return without a task.
-		if(process_pending()) {
-			break;
-		}
-		// If nothing was awake, restart the loop or return without a task.
-		if(result <= 0) {
-			if(stoptime && time(0) >= stoptime) {
-				break;
-			} else {
-				continue;
-			}
-		}
-		// If the master link was awake, then accept as many workers as possible.
-		if(q->poll_table[0].revents) {
-			add_more_workers(q, stoptime);
-		}
-		// Then consider all existing active workers and dispatch tasks.
-		for(i = 1; i < n; i++) {
-			if(q->poll_table[i].revents) {
-				handle_worker(q, q->poll_table[i].link);
-			}
-		}
-
-		// If fast abort is enabled, kill off slow workers.
-		if(q->fast_abort_multiplier > 0) {
-			abort_slow_workers(q);
-		}
-	}
-
-	return 0;
-}
-
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 {
-	struct work_queue_task *result;
+	struct work_queue_task *t;
+	time_t stoptime;
+
 	static timestamp_t last_left_time = 0;
 	static int last_left_status = 0;	// 0 -- did not return any done task; 1 -- returned done task 
 	static time_t next_pool_decision_enforcement = 0;
 
-	if(last_left_time && last_left_status == 1) {
-		if(q->total_tasks_complete > MIN_TIME_LIST_SIZE) {
-			timestamp_t tmp_time = timestamp_get() - last_left_time;
-			// A simple way of discarding outliers that does not require much calculation.
-			// Works for workloads that has stable app times.
-			if(tmp_time > WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER * (q->app_time / q->total_tasks_complete)) {
-				debug(D_WQ, "Discarding outlier task app time: %lld\n", tmp_time);
-			} else {
-				q->app_time += tmp_time;
-			}
-		} else {
-			q->app_time += timestamp_get() - last_left_time;
-		}
-	}
+	update_app_time(q, last_left_time, last_left_status);
 
 	if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && next_pool_decision_enforcement < time(0)) {
 		enforce_pool_decisions(q);
 		next_pool_decision_enforcement = time(0) + POOL_DECISION_ENFORCEMENT_INTERVAL_DEFAULT;
 	}
 
-	switch (q->work_queue_wait_routine) {
-	case WORK_QUEUE_WAIT_FCFS:
-		result = work_queue_wait_fcfs(q, timeout);
-		break;
-	case WORK_QUEUE_WAIT_FAST_DISPATCH:
-		result = work_queue_wait_fast_dispatch(q, timeout);
-		break;
-	case WORK_QUEUE_WAIT_ADAPTIVE:
-		result = work_queue_wait_adaptive(q, timeout);
-		break;
-	default:
-		result = work_queue_wait_fcfs(q, timeout);
+	if(timeout == WORK_QUEUE_WAITFORTASK) {
+		stoptime = 0;
+	} else {
+		stoptime = time(0) + timeout;
+	}
+
+	while(1) {
+		if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
+			update_catalog(q, 0);
+		}
+
+		t = list_pop_head(q->complete_list);
+		if(t) {
+			last_left_time = timestamp_get();
+			last_left_status = 1;
+			return t;
+		}
+
+		if(q->workers_in_state[WORKER_STATE_BUSY] == 0 && list_size(q->ready_list) == 0)
+			break;
+
+		start_tasks(q);
+
+		int n = build_poll_table(q);
+
+		// Wait no longer than the caller's patience.
+		int msec;
+		if(stoptime) {
+			msec = MAX(0, (stoptime - time(0)) * 1000);
+		} else {
+			msec = 5000;
+		}
+
+		// Poll all links for activity.
+		timestamp_t idle_start = timestamp_get();
+		int result = link_poll(q->poll_table, n, msec);
+		q->idle_time += timestamp_get() - idle_start;
+
+		// If a process is waiting to complete, return without a task.
+		if(process_pending()) {
+			break;
+		}
+
+		// If nothing was awake, restart the loop or return without a task.
+		if(result <= 0) {
+			if(stoptime && time(0) >= stoptime) {
+				break;
+			} else {
+				continue;
+			}
+		}
+
+		// If the master link was awake, then accept as many workers as possible.
+		if(q->poll_table[0].revents) {
+			do {
+				add_worker(q);
+			} while(link_usleep(q->master_link, 0, 1, 0) && (stoptime > time(0)));
+		}
+
+		// Then consider all existing active workers and dispatch tasks.
+		int i;
+		for(i = 1; i < n; i++) {
+			if(q->poll_table[i].revents) {
+				handle_worker(q, q->poll_table[i].link);
+			}
+		}
+
+		// If fast abort is enabled, kill off slow workers.
+		if(q->fast_abort_multiplier > 0) {
+			abort_slow_workers(q);
+		}
 	}
 
 	last_left_time = timestamp_get();
-	last_left_status = result ? 1 : 0;
-
-	return result;
-}
-
-void receive_pending_output(struct work_queue *q, struct pending_output *p)
-{
-	struct work_queue_worker *w;
-	char key[WORK_QUEUE_CATALOG_LINE_MAX];
-
-	if(!p)
-		return;
-
-	link_to_hash_key(p->link, key);
-	w = hash_table_lookup(q->worker_table, key);
-	if(!w)
-		return;
-
-	// make sure it's not a new worker (orginal worker might be disconnected and replaced)
-	if(p->start > w->start_time) {
-		if(receive_output_from_worker(q, w)) {
-			if(q->auto_remove_workers_on && q->busy_workers_to_remove > 0) {
-				q->busy_workers_to_remove--;
-			} else {
-				start_task_on_worker(q, w);
-			}
-		}
-	}
+	last_left_status = 0;
+	return 0;
 }
 
 int work_queue_hungry(struct work_queue *q)
@@ -2485,131 +2196,20 @@ int work_queue_hungry(struct work_queue *q)
 	int i, j;
 	work_queue_get_stats(q, &qs);
 
-	if(qs.total_tasks_dispatched < 100)
-		return (100 - qs.total_tasks_dispatched);
+	int i, j, workers_init, workers_ready, workers_busy, workers_cancelling;
+	workers_init = q->workers_in_state[WORKER_STATE_INIT];
+	workers_ready = q->workers_in_state[WORKER_STATE_READY];
+	workers_busy = q->workers_in_state[WORKER_STATE_BUSY];
+	workers_cancelling = q->workers_in_state[WORKER_STATE_CANCELLING];
 
 	//i = 1.1 * number of current workers
 	//j = # of queued tasks.
 	//i-j = # of tasks to queue to re-reach the status quo.
-	i = (1.1 * (qs.workers_init + qs.workers_ready + qs.workers_busy));
-	j = (qs.tasks_waiting);
+	i = (1.1 * (workers_init + workers_ready + workers_busy + workers_cancelling));
+	j = list_size(q->ready_list);
 	return MAX(i - j, 0);
 }
 
-
-void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
-{
-	if(t->tag)
-		free(t->tag);
-	t->tag = xxstrdup(tag);
-}
-
-void work_queue_task_specify_preferred_host(struct work_queue_task *t, const char *hostname)
-{
-	if(t->preferred_host)
-		free(t->preferred_host);
-	t->preferred_host = xxstrdup(hostname);
-}
-
-void work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)
-{
-	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
-
-	tf->type = WORK_QUEUE_FILE;
-	tf->flags = flags;
-	tf->length = strlen(local_name);
-	tf->payload = xxstrdup(local_name);
-	tf->remote_name = xxstrdup(remote_name);
-
-	if(type == WORK_QUEUE_INPUT) {
-		list_push_tail(t->input_files, tf);
-	} else {
-		list_push_tail(t->output_files, tf);
-	}
-}
-
-void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags)
-{
-	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
-	tf->type = WORK_QUEUE_BUFFER;
-	tf->flags = flags;
-	tf->length = length;
-	tf->payload = malloc(length);
-	memcpy(tf->payload, data, length);
-	tf->remote_name = xxstrdup(remote_name);
-	list_push_tail(t->input_files, tf);
-}
-
-void work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags)
-{
-	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
-	tf->type = WORK_QUEUE_REMOTECMD;
-	tf->flags = flags;
-	tf->length = strlen(cmd);
-	tf->payload = xxstrdup(cmd);
-	tf->remote_name = xxstrdup(remote_name);
-
-	if(type == WORK_QUEUE_INPUT) {
-		list_push_tail(t->input_files, tf);
-	} else {
-		list_push_tail(t->output_files, tf);
-	}
-}
-
-void work_queue_task_specify_output_file(struct work_queue_task *t, const char *rname, const char *fname)
-{
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
-}
-
-void work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname)
-{
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
-}
-
-void work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf, int length, const char *rname)
-{
-	return work_queue_task_specify_buffer(t, buf, length, rname, WORK_QUEUE_NOCACHE);
-}
-
-void work_queue_task_specify_input_file(struct work_queue_task *t, const char *fname, const char *rname)
-{
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
-}
-
-void work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, const char *fname, const char *rname)
-{
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
-}
-
-int work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
-{
-	if(t && alg >= WORK_QUEUE_SCHEDULE_UNSET && alg <= WORK_QUEUE_SCHEDULE_MAX) {
-		t->worker_selection_algorithm = alg;
-		return 0;
-	} else {
-		return 1;
-	}
-}
-
-int work_queue_specify_algorithm(struct work_queue *q, int alg)
-{
-	if(q && alg > WORK_QUEUE_SCHEDULE_UNSET && alg <= WORK_QUEUE_SCHEDULE_MAX) {
-		q->worker_selection_algorithm = alg;
-		return 0;
-	} else {
-		return 1;
-	}
-}
-
-int work_queue_specify_task_order(struct work_queue *q, int order)
-{
-	if(q && order >= WORK_QUEUE_TASK_ORDER_FIFO && order <= WORK_QUEUE_TASK_ORDER_LIFO) {
-		q->task_ordering = order;
-		return 0;
-	} else {
-		return 1;
-	}
-}
 
 static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)
 {
@@ -2642,7 +2242,7 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	return i;
 }
 
-int taskid_comparator(void *t, const void *r) {
+static int taskid_comparator(void *t, const void *r) {
 
 	struct work_queue_task *task_in_queue = t;
 	const struct work_queue_task *task_to_remove = r;
@@ -2651,6 +2251,75 @@ int taskid_comparator(void *t, const void *r) {
 		return 1;
 	}	
 	return 0;
+}
+
+//comparator function for checking if a task matches given tag.
+static int tasktag_comparator(void *t, const void *r) {
+
+	struct work_queue_task *task_in_queue = t;
+	const char *tasktag = r;
+
+	if (!strcmp(task_in_queue->tag, tasktag)) {
+		return 1;
+	}	
+	return 0;
+}
+
+static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
+
+	struct work_queue_worker *w;
+	w = itable_lookup(q->running_tasks, t->taskid);
+	
+	if (w) {
+		//send message to worker asking to kill its task.
+		link_putliteral(w->link, "kill\n", time(0) + short_timeout);
+		//update table.
+		itable_remove(q->running_tasks, t->taskid);
+
+		if (t->tag)
+			debug(D_WQ, "Task with tag %s and id %d is aborted at worker %s (%s) and removed.", t->tag, t->taskid, w->hostname, w->addrport);
+		else
+			debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
+			
+		delete_cancel_task_files(t, w); //delete files associated with cancelled task.
+		change_worker_state(q, w, WORKER_STATE_CANCELLING);
+		return 1;
+	} 
+	
+	return 0;
+}
+
+static struct work_queue_task *find_running_task_by_id(struct itable *itbl, int taskid) {
+	
+	struct work_queue_worker *w;
+	struct work_queue_task *t;
+
+	w=itable_lookup(itbl, taskid);
+	if(w) {
+		t = w->current_task;
+		if (t){
+			return t;
+		}
+	}
+	
+	return NULL;
+}
+
+static struct work_queue_task *find_running_task_by_tag(struct itable *itbl, const char *tasktag) {
+	
+	struct work_queue_worker *w;
+	struct work_queue_task *t;
+	UINT64_T taskid;
+
+	itable_firstkey(itbl);
+	while(itable_nextkey(itbl, &taskid, (void**)&w)) {
+		t = w->current_task;
+		if (t && tasktag_comparator(t, tasktag)) {
+			return t;
+		}
+	} 
+	
+	return NULL;
 }
 
 /**
@@ -2676,119 +2345,84 @@ int work_queue_task_remove(struct work_queue *q, struct work_queue_task *t) {
 
 int work_queue_empty(struct work_queue *q)
 {
-	return ((list_size(q->ready_list) + list_size(q->complete_list) + q->workers_in_state[WORKER_STATE_BUSY]) == 0);
+	return ((list_size(q->ready_list) + list_size(q->complete_list) + itable_size(q->running_tasks)) == 0);
 }
 
-static int tolerable_transfer_rate_denominator = 10;
-static long double minimum_allowed_transfer_rate = 100000;	// 100 KB/s
-static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, INT64_T length)
+char * work_queue_get_worker_summary( struct work_queue *q )
 {
-	timestamp_t timeout;
-	struct work_queue_task *t;
-	long double avg_queue_transfer_rate, avg_worker_transfer_rate, retry_transfer_rate, tolerable_transfer_rate;
-	INT64_T total_tasks_complete, total_tasks_running, total_tasks_waiting, num_of_free_workers;
-
-	t = w->current_task;
-
-	if(w->total_transfer_time) {
-		avg_worker_transfer_rate = (long double) w->total_bytes_transferred / w->total_transfer_time * 1000000;
-	} else {
-		avg_worker_transfer_rate = 0;
-	}
-
-	retry_transfer_rate = 0;
-	num_of_free_workers = q->workers_in_state[WORKER_STATE_INIT] + q->workers_in_state[WORKER_STATE_READY];
-	total_tasks_complete = q->total_tasks_complete;
-	total_tasks_running = q->workers_in_state[WORKER_STATE_BUSY];
-	total_tasks_waiting = list_size(q->ready_list);
-	if(total_tasks_complete > total_tasks_running && num_of_free_workers > total_tasks_waiting) {
-		// The master has already tried most of the workers connected and has free workers for retrying slow workers
-		if(t->total_bytes_transferred) {
-			avg_queue_transfer_rate = (long double) (q->total_bytes_sent + q->total_bytes_received) / (q->total_send_time + q->total_receive_time) * 1000000;
-			retry_transfer_rate = (long double) length / t->total_bytes_transferred * avg_queue_transfer_rate;
-		}
-	}
-
-	tolerable_transfer_rate = MAX(avg_worker_transfer_rate / tolerable_transfer_rate_denominator, retry_transfer_rate);
-	tolerable_transfer_rate = MAX(minimum_allowed_transfer_rate, tolerable_transfer_rate);
-
-	timeout = MAX(3, length / tolerable_transfer_rate);	// try at least 3 seconds
-
-	debug(D_WQ, "%s (%s) will try up to %lld seconds for the transfer of this %.3Lf MB file.", w->hostname, w->addrport, timeout, (long double) length / 1000000);
-	return timeout;
-}
-
-static void update_catalog(struct work_queue *q, int now)
-{
-	struct work_queue_stats s;
-	work_queue_get_stats(q, &s);
-	if(!advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, now)) {
-		fprintf(stderr, "Reporting master status to the catalog server (%s@%d) failed!\n", q->catalog_host, q->catalog_port);
-	}
-}
-
-static int release_worker(struct work_queue *q, struct work_queue_worker *w)
-{
-	if(!w)
-		return 0;
-
-	link_putliteral(w->link, "release\n", time(0) + short_timeout);
-	remove_worker(q, w);
-	return 1;
-}
-
-static int remove_workers_from_pool(struct work_queue *q, const char *pool_name, int workers_to_release) {
-	struct work_queue_worker *w;
 	char *key;
-	int i = 0;
+	struct pool_info *pi;
 
-	if(!q)
-		return -1;
+	struct buffer_t *b = buffer_create();
 
-	// send worker the "exit" msg
-	hash_table_firstkey(q->worker_table);
-	while(i < workers_to_release && hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(!strncmp(w->pool_name, pool_name, WORK_QUEUE_POOL_NAME_MAX)) {
-			release_worker(q, w);
-			i++;
-		}
+	hash_table_firstkey(q->workers_by_pool);
+	while(hash_table_nextkey(q->workers_by_pool, &key, (void **) &pi)) {
+		buffer_printf(b,"%s:%d ",pi->name,pi->count);
 	}
 
-	return i;
+	size_t length;
+	char *result;
+	const char * buffer_string = buffer_tostring(b,&length);
+	if(buffer_string) {
+		result = xxstrdup(buffer_string);
+	} else {
+		result = xxmalloc(4 * sizeof(char));
+		strncpy(result, "n/a", 4);
+	}
+
+	buffer_delete(b);
+	return result;
 }
 
-static void enforce_pool_decisions(struct work_queue *q) {
-	struct list *decisions;
+void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
+{
+	INT64_T effective_workers;
+	timestamp_t wall_clock_time;
 
-	debug(D_WQ, "Get pool decision from catalog server.\n");
-	decisions = list_create();
-	if(!decisions) {
-		debug(D_NOTICE, "Failed to create list to store worker pool decisions!\n");
-		return;
-	}
-	if(!get_pool_decisions_from_catalog(q->catalog_host, q->catalog_port, q->name, decisions)) {
-		fprintf(stderr, "Failed to receive pool decisions from the catalog server(%s@%d)!\n", q->catalog_host, q->catalog_port);
-	}
+	memset(s, 0, sizeof(*s));
+	s->port = q->port;
+	s->priority = q->priority;
+	s->workers_init = q->workers_in_state[WORKER_STATE_INIT];
+	s->workers_ready = q->workers_in_state[WORKER_STATE_READY];
+	s->workers_busy = q->workers_in_state[WORKER_STATE_BUSY];
+	s->workers_cancelling = q->workers_in_state[WORKER_STATE_CANCELLING];
 
-	if(!list_size(decisions)) {
-		return;
-	}
+	s->tasks_waiting = list_size(q->ready_list);
+	s->tasks_running = itable_size(q->running_tasks);
+	s->tasks_complete = list_size(q->complete_list);
+	s->total_tasks_dispatched = q->total_tasks_submitted;
+	s->total_tasks_complete = q->total_tasks_complete;
+	s->total_workers_joined = q->total_workers_joined;
+	s->total_workers_removed = q->total_workers_removed;
+	s->total_bytes_sent = q->total_bytes_sent;
+	s->total_bytes_received = q->total_bytes_received;
+	s->total_send_time = q->total_send_time;
+	s->total_receive_time = q->total_receive_time;
+	effective_workers = get_num_of_effective_workers(q);
+	s->start_time = q->start_time;
+	wall_clock_time = timestamp_get() - q->start_time;
+	s->efficiency = (long double) (q->total_execute_time) / (wall_clock_time * effective_workers);
+	s->idle_percentage = get_idle_percentage(q);
+	// Estimate master capacity, i.e. how many workers can this master handle
+	s->capacity = q->capacity;
+	s->avg_capacity = q->avg_capacity;
+	s->total_workers_connected = q->total_workers_connected;
+}
 
-	struct pool_info *d;
-	list_first_item(decisions);
-    while((d = (struct pool_info *)list_next_item(decisions))) {
-		struct pool_info *pi;
-		pi = hash_table_lookup(q->workers_by_pool, d->name);
-		if(pi) {
-			debug(D_WQ, "Workers from pool %s: %d; Pool decison: %d\n", pi->name, pi->count, d->count);
-			int workers_to_release = pi->count - d->count;
-			if(workers_to_release > 0) {
-				int k = remove_workers_from_pool(q, pi->name, workers_to_release);
-				printf("%d worker(s) has been rejected to enforce the pool decison.\n", k);
-			}
-		} 
+void work_queue_specify_log(struct work_queue *q, const char *logfile)
+{
+	q->logfile = fopen(logfile, "a");
+	if(q->logfile) {
+		setvbuf(q->logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
+		fprintf(q->logfile, "%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
+			"timestamp", "start_time",
+			"workers_init", "workers_ready", "workers_busy", "workers_cancelling", // workers
+			"tasks_waiting", "tasks_running", "tasks_complete", // tasks
+			"total_tasks_dispatched", "total_tasks_complete", "total_workers_joined", "total_workers_connected", // totals
+			"total_workers_removed", "total_bytes_sent", "total_bytes_received", "total_send_time", "total_receive_time",
+			"efficiency", "idle_percentage", "capacity", "avg_capacity", // other
+			"port", "priority");
+		log_worker_states(q);
 	}
-
-	list_free(decisions);
-	list_delete(decisions);
+	debug(D_WQ, "log enabled and is being written to %s\n", logfile);
 }
