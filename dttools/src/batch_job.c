@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "process.h"
 #include "stringtools.h"
 #include "timestamp.h"
+#include "xxmalloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -201,10 +202,18 @@ void batch_queue_set_options(struct batch_queue *q, const char *options_text)
 	}
 
 	if(options_text) {
-		q->options_text = strdup(options_text);
+		q->options_text = xxstrdup(options_text);
 	} else {
-		q->options_text = 0;
+		q->options_text = NULL;
 	}
+}
+
+char *batch_queue_options(struct batch_queue *q)
+{
+    if (q->options_text)
+    	return xxstrdup(q->options_text);
+    else
+    	return NULL;
 }
 
 batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)

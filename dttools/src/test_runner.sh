@@ -57,9 +57,9 @@ run_tests()
 
 show_help()
 {
-    echo "Use: test_runner.sh [options] test_case.sh ..."
-    echo "options:"
-    echo "  -l <log_file> Set log file (default is $$CCTOOLS_TEST_LOG)."
+    echo "Use: `basename $0` [options] test_case.sh ..."
+    echo "Options:"
+    echo "  -l <log_file> Set log file (default is \$CCTOOLS_TEST_LOG)."
     echo "  -v            Enable verbose output."
     echo "  -h            Show this help message."
 

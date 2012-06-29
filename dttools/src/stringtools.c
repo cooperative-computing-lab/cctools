@@ -513,8 +513,16 @@ char *string_subst(char *value, string_subst_lookup_t lookup, void *arg)
 		if(!dollar)
 			return value;
 
-		while(dollar > value && *(dollar - 1) == '\\') {
-			dollar = strchr(dollar + 1, '$');
+		while(dollar > value) {
+			if(*(dollar - 1) == '\\') {
+				dollar = strchr(dollar + 1, '$');
+			} else if(*(dollar + 1) == '$') {
+				*dollar = ' ';
+				dollar = strchr(dollar + 2, '$');
+			} else {
+				break;
+			}
+			
 			if(!dollar)
 				return value;
 		}
@@ -935,3 +943,52 @@ char *string_getcwd(void)
 	}
 	return result;
 }
+
+char *string_trim(char *s, int func(int))
+{
+	char *p;
+
+	/* Skip front */
+	while (func(*s))
+		s++;
+
+	/* Skip back */
+	p = s + strlen(s) - 1;
+	while (func(*p))
+		p--;
+
+	/* Terminate string */
+	*(p + 1) = 0;
+
+	return s;
+}
+
+char *string_trim_spaces(char *s)
+{
+	return string_trim(s, isspace);
+}
+
+char *string_trim_quotes(char *s)
+{
+	char *front, *back;
+
+	front = s;
+	back  = s + strlen(s) - 1;
+
+	while (*front == '\'' || *front == '"') {
+		if (*back != *front)
+			break;
+		*back = 0;
+		back--;
+		front++;
+	}
+
+	return front;
+}
+
+int string_istrue(char *s)
+{
+	return (strcasecmp(s, "true") == 0) || (strcasecmp(s, "yes") == 0) || (atoi(s) > 0);
+}
+
+/* vim: set sts=8 sw=8 ts=8 ft=c: */

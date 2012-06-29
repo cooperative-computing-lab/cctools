@@ -6,6 +6,7 @@
 # Copyright University of Notre Dame, 2010. See file COPYING for details.
 
 VAR=cool
+VAR="ultra-cool"
 =bad
 
 output:
