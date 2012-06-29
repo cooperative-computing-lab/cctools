@@ -410,10 +410,10 @@ static void record_bad_master(struct work_queue_master *m)
 }
 
 static int reset_preferred_masters(struct work_queue_pool *pool) {
-	struct work_queue_master *m;
+	char *pm;
 
-	while((m = (struct work_queue_master *)list_pop_head(preferred_masters))) {
-		free(m);
+	while((pm = (char *)list_pop_head(preferred_masters))) {
+		free(pm);
 	}
 
 	int count = 0;
@@ -498,7 +498,7 @@ static int get_masters_and_pool_info(const char *catalog_host, int catalog_port,
 					*pool = tmp_pool;
 					work_queue_pool_not_found = 0;
 				} else {
-					free(tmp_pool);
+					free_work_queue_pool(tmp_pool);
 				}
 			}
 		}
@@ -631,8 +631,9 @@ static struct link *auto_link_connect(char *addr, int *port)
 			strncpy(addr, m->addr, LINK_ADDRESS_MAX);
 			(*port) = m->port;
 
-			if(actual_master)
-				free(actual_master);
+			if(actual_master) {
+				free_work_queue_master(actual_master);
+			}
 			actual_master = duplicate_work_queue_master(m);
 
 			break;
@@ -641,8 +642,8 @@ static struct link *auto_link_connect(char *addr, int *port)
 		}
 	}
 
-	list_free(ml);
-	list_delete(ml);
+	free_work_queue_master_list(ml);
+	free_work_queue_pool(pool);
 
 	return master;
 }

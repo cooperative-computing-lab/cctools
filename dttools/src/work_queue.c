@@ -497,6 +497,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 			t->cmd_execution_time = 0;
 			list_push_head(q->ready_list, w->current_task);
 		}
+		itable_remove(q->running_tasks, t->taskid);
 		w->current_task = 0;
 	}
 	
@@ -932,6 +933,7 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 	delete_uncacheable_files(t, w);
 
 	// At this point, a task is completed.
+	itable_remove(q->running_tasks, t->taskid);
 	list_push_head(q->complete_list, w->current_task);
 	w->current_task = 0;
 	t->time_task_finish = timestamp_get();
@@ -1646,7 +1648,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	// Update the lastest capacity and avg capacity variables
 	q->capacity = tr->capacity;
 	q->avg_capacity = ts->total_capacity / num_of_reports;
-	debug(D_WQ, "Lastest master capacity: %d; Avg master capacity: %d\n", q->capacity, q->avg_capacity);
+	debug(D_WQ, "Latest master capacity: %d; Avg master capacity: %d\n", q->capacity, q->avg_capacity);
 }
 
 static struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)
@@ -1706,14 +1708,12 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q)
 	char *key;
 	struct work_queue_worker *w;
 	struct work_queue_worker *best_worker = 0;
-	struct work_queue_stats qs;
 	int num_workers_ready;
 	int random_ready_worker, ready_worker_count = 1;
 
 	srand(time(0));
 
-	work_queue_get_stats(q, &qs);
-	num_workers_ready = qs.workers_ready;
+	num_workers_ready = q->workers_in_state[WORKER_STATE_READY];
 
 	if(num_workers_ready > 0) {
 		random_ready_worker = (rand() % num_workers_ready) + 1;
@@ -1790,6 +1790,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 		return 0;
 
 	w->current_task = t;
+	itable_insert(q->running_tasks, t->taskid, w); //add worker as execution site for t.
 
 	if(start_one_task(q, w, t)) {
 		change_worker_state(q, w, WORKER_STATE_BUSY);
@@ -1901,6 +1902,8 @@ struct work_queue *work_queue_create(int port)
 
 	q->ready_list = list_create();
 	q->complete_list = list_create();
+
+	q->running_tasks = itable_create(0);
 
 	q->worker_table = hash_table_create(0, 0);
 
@@ -2052,6 +2055,9 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_delete(q->worker_table);
 		list_delete(q->ready_list);
 		list_delete(q->complete_list);
+		
+		itable_delete(q->running_tasks);
+
 		free(q->poll_table);
 		link_close(q->master_link);
 		if(q->logfile) {
