@@ -300,7 +300,7 @@ int tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, int 
 
 	if(has_fast_write) {
 		result = full_pwrite64(t->memory_file,data,length,iuaddr);
-		if( result!=length && errno==EINVAL ) {
+		if( result!=length ) {
 			has_fast_write = 0;
 			debug(D_SYSCALL,"writing to /proc/X/mem failed, falling back to slow ptrace write");
 		} else {
