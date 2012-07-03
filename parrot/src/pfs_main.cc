@@ -70,7 +70,6 @@ const char *pfs_root_checksum=0;
 const char *pfs_initial_working_directory=0;
 
 char *pfs_false_uname = 0;
-char *pfs_ccurl = 0;
 char *pfs_ldso_path = 0;
 uid_t pfs_uid = 0;
 gid_t pfs_gid = 0;
@@ -177,7 +176,6 @@ static void show_use( const char *cmd )
 	printf("  -D         Disable small file optimizations.\n");
 	printf("  -F         Enable file snapshot caching for all protocols.\n");
 	printf("  -f         Disable following symlinks.\n");
-	printf("  -E <url>   Endpoint for gLite combined catalog ifc. (PARROT_GLITE_CCURL)\n");
 	printf("  -G <num>   Fake this gid; Real gid stays the same.          (PARROT_GID)\n");
 	printf("  -H         Disable use of helper library.\n");
 	printf("  -h         Show this screen.\n");
@@ -478,9 +476,6 @@ int main( int argc, char *argv[] )
 	s = getenv("PARROT_TIMEOUT");
 	if(s) pfs_master_timeout = string_time_parse(s);
 
-	s = getenv("PARROT_GLITE_CCURL");
-	if(s) pfs_ccurl = s;
-
 	s = getenv("PARROT_FORCE_SYNC");
 	if(s) pfs_force_sync = 1;
 
@@ -526,7 +521,7 @@ int main( int argc, char *argv[] )
 
 	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
 
-	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DE:FfG:Hi:I:kKl:m:M:N:o:O:p:Qr:R:sSt:T:U:u:vw:WY"))!=(char)-1) {
+	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DFfG:Hi:I:kKl:m:M:N:o:O:p:Qr:R:sSt:T:U:u:vw:WY"))!=(char)-1) {
 		switch(c) {
 		case 'a':
 			if(!auth_register_byname(optarg)) {
@@ -553,9 +548,6 @@ int main( int argc, char *argv[] )
 			break;
 		case 'D':
 			pfs_enable_small_file_optimizations = 0;
-			break;
-		case 'E':
-			pfs_ccurl = optarg;
 			break;
 		case 'F':
 			pfs_force_cache = 1;

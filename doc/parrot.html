@@ -14,10 +14,6 @@ All rights reserved.
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 <p>
-The Glite module of Parrot is Copyright (c) Members of the EGEE Collaboration. 2004.
-See http://eu-egee.org/partners/ for details on the copyright holders.
-For license conditions see the license file or http://eu-egee.org/license.html
-<p>
 <b>Please use the following citation to refer to Parrot:</b><br>
 <dir>
 <li> Douglas Thain and Miron Livny, <a href=http://www.cse.nd.edu/~dthain/papers/parrot-scpe.pdf>Parrot: An Application Environment for Data-Intensive Computing</a>, Scalable Computing: Practice and Experience, Volume 6, Number 3, Pages 9--18, 2005.
@@ -132,8 +128,8 @@ then the file name.  Here are all the currently supported services:
 <tr><td>/irods/host:port/zone/home/user/path<td>iRODS<td><a href=http://irods.sdsc.edu>more info</a>
 <tr><td>/hdfs/namenode:port/path<td>Hadoop Distributed File System (HDFS)<td><a href=http://hadoop.apache.org/common/docs/current/hdfs_user_guide.html>more info</a>
 <tr><td>/xrootd/host:port/path<td>XRootD/Scalla Distributed Storage System (xrootd)<td><a href=http://project-arda-dev.web.cern.ch/project-arda-dev/xrootd/site/index.html>more info</a>
-<tr><td>/chirp/target.cs.wisc.edu/path<td>Chirp Storage System<td>included + <a href=chirp.html>more info</a> 
 <tr><td>/cvmfs/grid.cern.ch/path<td>CernVM-FS<td><a href=http://cernvm.cern.ch/portal/filesystem>more info</a> 
+<tr><td>/chirp/target.cs.wisc.edu/path<td>Chirp Storage System<td>included + <a href=chirp.html>more info</a> 
 </table>
 <hr>
 <p>
@@ -514,87 +510,6 @@ write-once support on HDFS.  This is because the current implementations of
 HDFS do not provide reliable append operations.  Likewise, files can only be
 opened in either read (<tt>O_RDONLY</tt>) or write mode (<tt>O_WRONLY</tt>),
 and not both (<tt>O_RDWR</tt>).
-
-<h3>EGEE Data Access: GFAL, LFN, GUID, SRM, RFIO, DCAP, and LFC</h3>
-
-The EGEE project is a European-wide grid computing project.
-The EGEE software stack, GLite, can be downloaded <a href=http://glite.web.cern.ch/glite/packages/R3.0/R20060502/default.asp>here</a>.  (Warning: it's big.)
-Parrot can be connected to several different but related components of EGEE.
-<p>
-The simplest way to use Parrot with EGEE is through the Grid File Access Library (GFAL).  This library is attached to Parrot under the paths <tt>/lfn</tt>, <tt>/guid</tt>, <tt>/srm</tt>, <tt>/rfio</tt>, <tt>/dcap</tt>, and <tt>/gfal</tt>.  This manual does not document all of the details of GFAL itself, you should read <a href=http://wiki.nesc.ac.uk/read/egee-na3-etf?action=browse&diff=1&id=InductionNotesGFAL>that manual</a> for more information.
-<p>
-For example, suppose that you have an RFIO server running on <tt>server.somewhere.edu</tt>.  To access this server, try the following:
-<pre>
-    % parrot_run tcsh
-    % cd /rfio/server.somewhere.edu/
-    % ls -la
-</pre>
-
-Or, to access a file by logical name or by GUID, note that you can either use
-a pathname-like syntax, or specify a URL with colons.  Both ways are acceptable:
-<pre>
-    % parrot_run tcsh
-
-    % cat /lfn/baud/testgfal15 
-    % cat lfn:baud/testgfal15 
-
-    % cat /guid/2cd59291-7ae7-4778-af6d-b1f423719441
-    % cat guid:2cd59291-7ae7-4778-af6d-b1f423719441
-</pre>
-
-In these cases, Parrot pre-processes the paths so that they are formatted correctly
-for use by the GFAL.  However, you can also compose paths directly for you by GFAL,
-by accessing files underneath <tt>/gfal</tt>.  This syntax can be useful if you
-are attempting to harness some new GFAL capability that Parrot is not aware of.
-For example:
-
-<pre>
-    % parrot_run tcsh
-    % cd /gfal/rfio://server.somewhere.edu//
-    % ls -la
-</pre>
-
-As noted above, GFAL requires some setup to work properly.
-If you are having difficulties, make sure that you have
-set all of the GFAL environment variables appropriately:
-
-<pre>
-    LCG_GFAL_INFOSYS
-    LCG_CATALOG_TYPE
-    LFC_HOST
-    LCG_RFIO_TYPE
-    LCG_GFAL_VO
-</pre>
-
-And, if using RFIO, make sure that the appropriate
-dynamic library <tt>libshift.so</tt> is in your
-library search path:
-
-<pre>
-    export LD_LIBRARY_PATH=/opt/lhc/lib
-</pre>
-
-Use of the GFAL involves many complex interacting pieces
-of software.  It is recommended that you run Parrot with the <tt>-d remote</tt>
-flag in order to debug problems using GFAL.
-
-<h3>EGEE Data Catalog: LFC</h3>
-
-In addition to using GFAL, Parrot can access an LHC file catalog (LFC) directly
-under the path <tt>/lfc</tt>.  For example:
-
-<pre>
-    % parrot_run cat /lfc/my/logical/name
-</pre>
-
-In this case, Parrot itself performs the lookup against the LFC,
-and uses its own access methods to retrieve the file directly.
-This can be useful when Parrot supports a protocol (such as GSIFTP)
-that is not directly supported by the GFAL library itself.
-<p>
-Use of the LFC involves many complex interacting pieces
-of software.  It is recommended that you run Parrot with the <tt>-d remote</tt>
-flag in order to debug problems using LFC.
 
 <h2>Identity Boxing</h2>
 

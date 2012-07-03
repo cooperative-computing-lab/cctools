@@ -66,7 +66,6 @@ krb5_path="/usr"
 readline_path="/usr"
 globus_path="/usr"
 fuse_path="/usr"
-egee_path="/opt"
 rfio_path="/usr"
 dcap_path="/usr"
 irods_path="/usr"
@@ -81,7 +80,6 @@ swig_path="/usr"
 
 xrootd_arch=auto
 globus_flavor=auto
-has_egee=no
 
 ccompiler=gcc
 cxxcompiler=g++
@@ -103,7 +101,6 @@ config_python_path=auto
 config_zlib_path=yes
 
 config_krb5_path=no
-config_egee_path=no
 config_rfio_path=no
 config_dcap_path=no
 config_irods_path=no
@@ -153,11 +150,6 @@ do
 			shift
 			fuse_path=$1
 			config_fuse_path=yes
-			;;
-		--with-egee-path)
-			shift
-			egee_path=$1
-			config_egee_path=yes
 			;;
 		--with-rfio-path)
 			shift
@@ -271,7 +263,6 @@ Where options are:
 
 Where PACKAGE may be:
     readline
-    egee
     krb5
     fuse
     rfio
@@ -368,41 +359,17 @@ fi
 library_search_mode=prefer_static
 ##########################################################################
 
-if [ $config_egee_path != no ] && check_file "${egee_path}/lcg/include/lcg_util.h"
+if [ $config_rfio_path != no ] && library_search shift ${rfio_path}
 then
-	has_egee=yes
-	globus_flavor=gcc32dbgpthr
-	fix_globus_install ${egee_path}/globus ${globus_flavor}
-	ccflags="${ccflags} -I${egee_path}/globus/include/${globus_flavor} -I${egee_path}/lcg/include -I${egee_path}/edg/include  -I${egee_path}/lcg/include/lfc -I${egee_path}/lcg/include/dpm -DHAS_EGEE -DHAS_GLOBUS_GSS"
-	ldflags="${ldflags} -L${egee_path}/globus/lib -L${egee_path}/edg/lib -L${egee_path}/lcg/lib -ldpm -llfc -lgfal -llcg_util -lcgsi_plugin_gsoap_2.6 -lglobus_gss_assist_${globus_flavor} -lglobus_gssapi_gsi_${globus_flavor} -lglobus_gsi_proxy_core_${globus_flavor} -lglobus_gsi_credential_${globus_flavor} -lglobus_gsi_callback_${globus_flavor} -lglobus_oldgaa_${globus_flavor} -lglobus_gsi_sysconfig_${globus_flavor} -lglobus_gsi_cert_utils_${globus_flavor} -lglobus_openssl_${globus_flavor} -lglobus_proxy_ssl_${globus_flavor} -lglobus_openssl_error_${globus_flavor} -lglobus_common_${globus_flavor} -lldap_${globus_flavor} -llber_${globus_flavor} -lsasl -lssl_${globus_flavor} -lcrypto_${globus_flavor} -lltdl_${globus_flavor} -llutil_${globus_flavor} -luuid"
+	ccflags="${ccflags} -I${rfio_path}/include -DHAS_RFIO"
 else
-	has_egee=no
-	if [ $config_egee_path = yes ]
+	if [ $config_rfio_path = yes ]
 	then
-		echo "*** Sorry, I couldn't find EGEE in $egee_path"
-		echo "*** Check --with-egee-path and try again."
-		exit 1
+		  echo "*** Sorry, I couldn't find RFIO in $rfio_path"
+		  echo "*** Check --with-rfio-path and try again."
+		  exit 1
 	else
-		echo "*** skipping egee support"
-	fi
-fi
-
-if [ $has_egee = yes ]
-then
-	echo "using egee version of rfio"
-else
-	if [ $config_rfio_path != no ] && library_search shift ${rfio_path}
-	then
-		ccflags="${ccflags} -I${rfio_path}/include -DHAS_RFIO"
-	else
-		if [ $config_rfio_path = yes ]
-		then
-			  echo "*** Sorry, I couldn't find RFIO in $rfio_path"
-			  echo "*** Check --with-rfio-path and try again."
-			  exit 1
-		else
-			  echo "*** skipping rfio support"
-		fi
+		  echo "*** skipping rfio support"
 	fi
 fi
 
@@ -420,59 +387,54 @@ else
 	fi
 fi
 
-if [ $has_egee = yes ]
-then	
-	echo "using egee version of globus"
-else
-	if [ x$globus_flavor = xauto ]
+if [ x$globus_flavor = xauto ]
+then
+	if [ $build_cpu = X86_64 ] 
 	then
-		if [ $build_cpu = X86_64 ] 
-		then
-			globus_flavor=gcc64
-		else
-			globus_flavor=gcc32
-		fi
-	fi
-
-	echo "using a globus flavor of '$globus_flavor' (if this is wrong, use the --globus-flavor argument)"
-
-	if [ $config_globus_path != no ]
-	then
-		if check_file ${globus_path}/include/${globus_flavor}/globus_common.h
-		then
-			ccflags="${ccflags} -I${globus_path}/include/${globus_flavor} -DHAS_GLOBUS_GSS"
-			ldflags="${ldflags} -L${globus_path}/lib"
-			for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
-			do
-				library_search ${library}_${globus_flavor} ${globus_path}
-			done
-
-			cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${globus_path}/lib -lglobus_gss_assist_${globus_flavor}"
-
-		elif check_file ${globus_path}/include/globus/globus_common.h
-		then
-			ccflags="${ccflags} -I${globus_path}/lib/globus/include -I${globus_path}/include/globus -DHAS_GLOBUS_GSS"
-			ldflags="${ldflags} -L${globus_path}/lib"
-			for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
-			do
-				library_search $library ${globus_path}
-			done
-
-                        cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${globus_path}/lib -lglobus_gss_assist"
-
-		else
-			if [ $config_globus_path = yes ]
-			then
-				echo "*** Sorry, I couldn't find Globus in $globus_path"
-				echo "*** Check --with-globus-path and try again."
-				exit 1
-			else
-				echo "*** skipping globus support"
-			fi
-		fi
+		globus_flavor=gcc64
 	else
-		echo "*** skipping globus support"
+		globus_flavor=gcc32
 	fi
+fi
+
+echo "using a globus flavor of '$globus_flavor' (if this is wrong, use the --globus-flavor argument)"
+
+if [ $config_globus_path != no ]
+then
+	if check_file ${globus_path}/include/${globus_flavor}/globus_common.h
+	then
+		ccflags="${ccflags} -I${globus_path}/include/${globus_flavor} -DHAS_GLOBUS_GSS"
+		ldflags="${ldflags} -L${globus_path}/lib"
+		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
+		do
+			library_search ${library}_${globus_flavor} ${globus_path}
+		done
+
+		cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${globus_path}/lib -lglobus_gss_assist_${globus_flavor}"
+
+	elif check_file ${globus_path}/include/globus/globus_common.h
+	then
+		ccflags="${ccflags} -I${globus_path}/lib/globus/include -I${globus_path}/include/globus -DHAS_GLOBUS_GSS"
+		ldflags="${ldflags} -L${globus_path}/lib"
+		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
+		do
+			library_search $library ${globus_path}
+		done
+
+		cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${globus_path}/lib -lglobus_gss_assist"
+
+	else
+		if [ $config_globus_path = yes ]
+		then
+			echo "*** Sorry, I couldn't find Globus in $globus_path"
+			echo "*** Check --with-globus-path and try again."
+			exit 1
+		else
+			echo "*** skipping globus support"
+		fi
+	fi
+else
+	echo "*** skipping globus support"
 fi
 
 if [ $config_irods_path != no ] && library_search RodsAPIs "${irods_path}" core/obj
