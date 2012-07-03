@@ -171,7 +171,7 @@ static pid_t execute_task(const char *cmd)
 	fflush(NULL);
 
 	if(pipe(pipefds) == -1) {
-		debug(D_WQ, "Failed to create pipe for output redirecting.\n");
+		debug(D_WQ, "Failed to create pipe for output redirecting: %s.\n", strerror(errno));
 		return 0;
 	}
 
