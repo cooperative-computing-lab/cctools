@@ -520,7 +520,7 @@ then
 	if [ -n "$swig" ]
 	then
 		swig_version=`${swig} -version | grep -i version | awk '{print $3}'`
-		if [ `format_version $swig_version` -ge `format_version 1.3.40` ]
+		if [ `format_version $swig_version` -ge `format_version 1.3.29` ]
 		then
 			packages="${packages} ${include_package_work_queue}"
 		else

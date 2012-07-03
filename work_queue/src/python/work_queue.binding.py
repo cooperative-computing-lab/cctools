@@ -69,14 +69,6 @@ class Task(_object):
         return self._task.taskid
 
     @property
-    def preferred_host(self):
-        return self._task.preferred_host
-
-    @property
-    def status(self):
-        return self._task.status
-
-    @property
     def return_status(self):
         return self._task.return_status
 

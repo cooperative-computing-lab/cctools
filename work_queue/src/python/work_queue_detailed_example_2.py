@@ -21,6 +21,7 @@ for i in range(5):
 
     wq.submit(task)
 
+os.environ['PATH'] = '../../../dttools/src:' + os.environ['PATH']
 os.system('work_queue_worker -d all -t 5 localhost %d &' % wq.port)
 
 while not wq.empty():
@@ -33,8 +34,6 @@ while not wq.empty():
     	print 'tag', task.tag
     	print 'output', task.output
     	print 'id', task.id
-    	print task.preferred_host
-    	print task.status
     	print task.return_status
     	print task.result
     	print task.host
@@ -71,5 +70,4 @@ while not wq.empty():
     print wq.stats.capacity
     print wq.stats.avg_capacity
     print wq.stats.total_workers_connected
-    print wq.stats.excessive_workers_removed
 
