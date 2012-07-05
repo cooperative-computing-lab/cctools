@@ -17,8 +17,7 @@ test-starch:
 test-nd: test
 	@echo running notre dame makeflow tests
 
-#test: test-makeflow test-starch
-test: test-starch
+test: test-makeflow test-starch
 
 clean:
 
