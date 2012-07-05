@@ -714,6 +714,67 @@ int irods_reli_truncate ( const char *host, const char *path, INT64_T length )
 	return 0;
 }
 
+int irods_reli_getfile ( const char *host, const char *path, const char *local_path )
+{
+	dataObjInp_t request;
+	int result;
+
+	struct irods_server *server = connect_to_host(host);
+	if(!server) return -1;
+
+	memset(&request,0,sizeof(request));
+	strcpy(request.objPath,path);
+
+	request.numThreads = 0; // server chooses threads
+	request.openFlags = O_RDONLY;
+
+	addKeyVal (&request.condInput, FORCE_FLAG_KW, "");
+
+	debug(D_IRODS,"rcDataObjGet %s %s %s",host,path,local_path);
+	result = rcDataObjGet(server->conn,&request,(char*) local_path);
+	debug(D_IRODS,"= %d",result);
+
+	clearKeyVal(&request.condInput);
+
+	if(result<0) {
+		errno = irods_reli_errno(result);
+		return -1;
+	}
+
+	return 0;
+}
+
+int irods_reli_putfile ( const char *host, const char *path, const char *local_path )
+{
+	dataObjInp_t request;
+	int result;
+
+	struct irods_server *server = connect_to_host(host);
+	if(!server) return -1;
+
+	memset(&request,0,sizeof(request));
+	strcpy(request.objPath,path);
+
+	request.numThreads = 0; // server chooses threads
+	request.openFlags = O_CREAT|O_WRONLY;
+
+	addKeyVal (&request.condInput, FORCE_FLAG_KW, "");
+	addKeyVal (&request.condInput, ALL_KW, "");
+
+	debug(D_IRODS,"rcDataObjPut %s %s %s",host,path,local_path);
+	result = rcDataObjPut(server->conn,&request,(char*)local_path);
+	debug(D_IRODS,"= %d",result);
+
+	clearKeyVal (&request.condInput);
+
+	if(result<0) {
+		errno = irods_reli_errno(result);
+		return -1;
+	}
+
+	return 0;
+}
+
 static unsigned char hex_to_nybble( char h )
 {
 	switch(h) {

@@ -207,6 +207,14 @@ public:
 		return irods_reli_md5(name->hostport,name->rest,digest);
 	}
 
+	virtual pfs_ssize_t putfile( pfs_name *source, pfs_name *target ) {
+		return irods_reli_putfile(target->hostport,target->rest,source->path);
+	}
+
+	virtual pfs_ssize_t getfile( pfs_name *source, pfs_name *target ) {
+		return irods_reli_getfile(source->hostport,source->rest,target->path);
+	}
+
 	virtual int get_default_port() {
 		return 1247;
 	}
