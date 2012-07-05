@@ -369,13 +369,15 @@ def parse_command_line_options():
         options.environments.extend(config.get('starch', 'environments', '').split())
         if not options.command:
             options.command = config.get('starch', 'command', '')
-
+    
     if not options.executables:
         error('no executables specified')
 
     if not options.command:
         options.command = os.path.basename(options.executables[0]) + ' $@'
         warn('no command specified, so using: %s' % options.command)
+    
+    debug('command ... ' + options.command)
 
     return args[0], options.executables, options.libraries, \
                     options.data, options.environments, options.command

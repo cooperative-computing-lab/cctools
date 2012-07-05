@@ -18,6 +18,8 @@ run_and_test()
 
 run_tests()
 {
+    result=0
+
     for test_script in $@
     do
     	success=0
@@ -51,8 +53,11 @@ run_tests()
 	else
 	    [ $verbose = 0 ] && echo "fail"
 	    echo "=== tested $test_script: fail" >> $log_file
+	    result=1
 	fi
     done
+
+    return $result
 }
 
 show_help()
