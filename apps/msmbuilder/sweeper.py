@@ -8,7 +8,8 @@
 #
 
 from work_queue import *
-import sys, os, itertools
+import itertools, sys, os
+from subprocess import *
 
 class Sweeper:
     """Provides a simple api for a program to sweep through a range of parameters.
@@ -36,6 +37,19 @@ class Sweeper:
             Usage: x.setenv("env.sh")
             @param pathtoenv The path to a script to run first."""
         self.envpath = pathtoenv
+
+    def addtuple(self, flag, iterlist):
+        """Add a flag/sweep pair to the command. This has the same functionality as addparameter() and addsweep() used together.
+            Usage: x.addtuple("-n", xrange(1,10,2))
+            @param flag The flag to be added to the command.
+            @param iterlist An interable list object that contains the values to sweep over."""
+        self.command.append(str(flag))
+        self.command.append('%s')
+        self.paramvalues.append('%s')
+        r = []
+        for i in iterlist:
+            r.append(i)
+        self.sweeps.append(r)
 
     def addparameter(self, param):
         """Add a parameter to the list of parameters(arguments).
@@ -81,30 +95,30 @@ class Sweeper:
 
         for item in itertools.product(*self.sweeps):
             command  = ' '.join(self.command) % (item) # create the command
-            paramdir = '_'.join(self.paramvalues) % (item)
-
-            os.system("mkdir -p %s/%s" % (self.progname, paramdir)) # create progname/params, this is where the output will go ex. BuildMSM/11_2/Data
+            commdir = '_'.join(self.command) % (item)
+            
+            # create progname/commdir, this is where the output will go ex. BuildMSM-sweep/command_with_underscores/Data
+            os.system("mkdir -p %s-sweep/%s" % (self.progname, commdir))
 
             if (self.envpath): # if a env script was specified
                 env = open(self.envpath).read()
             else:
                 env = ""
 
-            script = """
-                    %(env)s
-                    %(command)s
-                    """ % {'env': env, 'command': command} # combine an env script and the command into one script
+            script = """%(env)s%(command)s\n""" % {'env': env, 'command': command} # combine an env script and the command into one script
+            fo = open('%s-sweep/%s/%s-script' % (self.progname, commdir, commdir), 'w')
+            fo.write(script)
+            fo.close
             taskcommand = 'tcsh script.sh' # run with tsch
 
-	    print command
             t = Task(taskcommand)
             t.specify_buffer(script, 'script.sh')
 
             for input in self.inputlist:
-                t.specify_file(input, input, WORK_QUEUE_INPUT, cache=True) # cache the input since it is the same for all commands
+                t.specify_file(os.path.abspath(input), input, WORK_QUEUE_INPUT, cache=True) # cache the input since it is the same for all commands
             for output in self.outputlist:
-                # we want the output on the local machine to go to progname/params/
-                t.specify_file("%s/%s/%s" % (self.progname, paramdir, output), output, WORK_QUEUE_OUTPUT, cache=False) # do not cache the output
+                # we want the output on the local machine to go to progname-sweep/params/
+                t.specify_file("%s-sweep/%s/%s" % (self.progname, commdir, output), output, WORK_QUEUE_OUTPUT, cache=False) # do not cache the output
 
             taskid = self.q.submit(t)
             print "submitted task (id# %d): %s" % (taskid, t.command)
@@ -117,4 +131,59 @@ class Sweeper:
                 print "task (id# %d) complete %s (return code %d)" % (t.id, t.command, t.return_status)
 
         print "all tasks complete!"
+        print 'output and a copy of the script run by each worker located in %s-sweep' % (self.progname)
+        sys.exit(0)
+
+    def myfork (self, sqlscript, host, username, password):
+        check_call(['/usr/bin/mysql', '-vvv', '--host='+host, '--user='+username, '--password='+password], stdin=sqlscript)
+        """
+        pid = os.fork()
+        if pid == 0:
+            #print('/usr/bin/mysql', ['mysql', '-vvv', '--host=', host, '--user=', username, '--password=', password])
+            fd = os.open(sqlscript, 'r')
+            os.dup2(fd, 0)
+            os.execv('/usr/bin/mysql', ['mysql', '-vvv', '--host='+host, '--user='+username, '--password='+password])
+        os.waitpid(pid, 0)
+        """
+        
+        """if pid == 0:
+            os.setsid()
+            pid = os.fork()
+            if pid > 0:
+                os._exit(0)
+            for i in range(0, 1025):
+                os.close(i)
+            os.open('/dev/null')
+            os.open('FOOBAR', 'w')
+            os.open('FOOBAR', 'w')
+            os.execv('/usr/bin/mysql', ['mysql', '-vvv', '-h', host, '-u', username, '-p', password])
+            os.exit(0)
+            """
+
+    def sqldbsubmit(self, host, user):
+        """Submit the commands to a MyWorkQueue MySQL database
+            @param host The MySQL host.
+            @param user The MySQL user."""
+        sqlscript = ""
+        for item in itertools.product(*self.sweeps):
+            #INSERT INTO commands VALUES (command_id, username, personal_id, name, command, status, stdout)
+            #INSERT INTO files VALUES (fileid, command_id, local_path, remote_path, type, flags)
+            command = ' '.join(self.command) % (item)
+            sqlscript += 'INSERT INTO ccltest.commands VALUES (command_id, \'%s\', personal_id, name, \'%s\', 2, stdout);\n' % (user, command)
+
+            # the input for each command generated by the sweeper should be the same
+            for input in self.inputlist:
+                sqlscript += 'INSERT INTO ccltest.files VALUES (fileid, command_id, \'%s\', \'%s\', 1, 2);\n' % (os.path.abspath(input), input)
+            # the output if different for each command
+            for output in self.outputlist:
+                sqlscript += 'INSERT INTO ccltest.files VALUES (fileid, command_id, \'%s\', \'%s\', 2, 1);\n' % (os.path.abspath(output), output)
+            sqlscript += '\n'
+
+        print sqlscript
+        fo = open('sqlscript', 'w')
+        fo.write(sqlscript)
+        fo.close
+        #self.myfork(open('sqlscript'), host, user, open('secret/mysql.pwd').read().strip())
+        #print 'mysql -vvv -h %s -u %s -p < sqlscript' % (host, user)
+        os.system(('mysql -vvv -h %s -u %s -p < sqlscript') % (host, user))
         sys.exit(0)
