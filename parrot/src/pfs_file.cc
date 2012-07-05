@@ -160,6 +160,11 @@ int pfs_file::get_local_name( char *n )
 	return -1;
 }
 
+int pfs_file::get_block_size()
+{
+	return name.service->get_block_size();
+}
+
 pfs_off_t pfs_file::get_last_offset()
 {
 	return last_offset;

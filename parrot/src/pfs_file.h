@@ -44,6 +44,7 @@ public:
 	virtual pfs_name *get_name();
 	virtual int get_real_fd();
 	virtual int get_local_name( char *n );
+	virtual int get_block_size();
 	virtual int is_seekable();
 	virtual pfs_off_t get_last_offset();
 	virtual void set_last_offset( pfs_off_t offset );

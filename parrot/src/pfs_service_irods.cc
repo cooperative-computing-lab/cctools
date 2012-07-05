@@ -219,6 +219,10 @@ public:
 		return 1247;
 	}
 
+	virtual int get_block_size() {
+		return 1048576;
+	}
+
 	virtual int is_seekable() {
 		return 1;
 	}

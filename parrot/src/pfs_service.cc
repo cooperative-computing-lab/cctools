@@ -13,6 +13,7 @@ See the file COPYING for details.
 extern "C" {
 #include "chirp_reli.h"
 #include "hash_table.h"
+#include "stringtools.h"
 }
 
 #include <stdio.h>
@@ -417,6 +418,27 @@ void pfs_service_emulate_statfs( struct pfs_statfs *buf )
 	memset(buf,0,sizeof(*buf));
 }
 
+/*
+The block size is a hint given from the kernel to the
+application indicating what is the most 'efficient' amount
+of data to be read at one time from a file.  For most local
+Unix filesystems, this value is the page size, typically 4KB.
+The main user of this information is the standard library,
+which allocates standard I/O buffers according to the block size.
+
+Because Parrot increases the latency of most system calls,
+we hint that the most efficient default block size is 64KB,
+which works well for local files and low latency remote services
+like Chirp.  This value is overridden in some services that
+have high latency small read operations, like irods.
+
+In addition, the block size is overridden for certain applications
+with known behavior.  The linker (ld) makes lots of tiny reads and
+writes to patch up small areas of a program, so we suggest an
+unusually small block size.  Likewise copy (cp) is moving large
+amounts of data from place to place, so we hint a larger blocksize.
+*/
+
 static int default_block_size = 65336;
 
 void pfs_service_set_block_size( int bs )
@@ -425,10 +447,12 @@ void pfs_service_set_block_size( int bs )
 	chirp_reli_blocksize_set(bs);
 }
 
-int  pfs_service_get_block_size()
+int  pfs_service::get_block_size()
 {
-	if(!strcmp(pfs_current->name,"ld")) {
+	if(!strcmp(string_back(pfs_current->name,3),"/ld")) {
 		return 4096;
+	} else if(!strcmp(string_back(pfs_current->name,3),"/cp")) {
+		return 1048576;
 	} else {
 		return default_block_size;
 	}

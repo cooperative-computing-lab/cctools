@@ -950,7 +950,7 @@ int pfs_table::fstat( int fd, struct pfs_stat *b )
 		pfs_file *file = pointers[fd]->file;
 		result = file->fstat(b);
 		if(result>=0) {
-			b->st_blksize = pfs_service_get_block_size();
+			b->st_blksize = file->get_block_size();
 		}
 	}
 
@@ -1446,7 +1446,7 @@ int pfs_table::stat( const char *n, struct pfs_stat *b )
 	if(resolve_name(n,&pname)) {
 		result = pname.service->stat(&pname,b);
 		if(result>=0) {
-			b->st_blksize = pfs_service_get_block_size();
+			b->st_blksize = pname.service->get_block_size();
 		} else if(errno==ENOENT && !pname.hostport[0]) {
 			pfs_service_emulate_stat(&pname,b);
 			b->st_mode = S_IFDIR | 0555;
@@ -1477,7 +1477,7 @@ int pfs_table::lstat( const char *n, struct pfs_stat *b )
 	if(resolve_name(n,&pname,false)) {
 		result = pname.service->lstat(&pname,b);
 		if(result>=0) {
-			b->st_blksize = pfs_service_get_block_size();
+			b->st_blksize = pname.service->get_block_size();
 		} else if(errno==ENOENT && !pname.hostport[0]) {
 			pfs_service_emulate_stat(&pname,b);
 			b->st_mode = S_IFDIR | 0555;
@@ -1823,7 +1823,8 @@ pfs_ssize_t pfs_table::copyfile_slow( const char *source, const char *target )
 	pfs_stat info;
 	pfs_ssize_t total, ractual, wactual;
 	void *buffer;
-	int buffer_size = pfs_service_get_block_size();
+	int buffer_size;
+
 	int result;
 
 	sourcefile = open_object(source,O_RDONLY,0,0);
@@ -1850,6 +1851,7 @@ pfs_ssize_t pfs_table::copyfile_slow( const char *source, const char *target )
 		return -1;
 	}
 
+	buffer_size = MAX(sourcefile->get_block_size(),targetfile->get_block_size());
 	buffer = malloc(buffer_size);
 
 	total = 0;
@@ -1905,13 +1907,14 @@ int pfs_table::md5_slow( const char *path, unsigned char *digest )
 	md5_context_t context;
 	pfs_file *file;
 	unsigned char *buffer;
-	int buffer_size = pfs_service_get_block_size();
+	int buffer_size;
 	pfs_off_t total=0;
 	int result;
 
 	file = open_object(path,O_RDONLY,0,0);
 	if(!file) return -1;
 
+	buffer_size = file->get_block_size();
 	buffer = (unsigned char *)malloc(buffer_size);
 
 	md5_init(&context);
