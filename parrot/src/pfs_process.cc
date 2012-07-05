@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "pfs_dispatch.h"
 #include "pfs_poll.h"
 #include "pfs_channel.h"
+#include "pfs_paranoia.h"
 
 extern "C" {
 #include "debug.h"
@@ -35,6 +36,30 @@ struct pfs_process * pfs_process_lookup( pid_t pid )
 {
 	return (struct pfs_process *) itable_lookup(pfs_process_table,pid);
 }
+
+/*
+It would be nice if we could clean up everyone quietly and then
+some time later, kill hard.  However, on Linux, if someone kills
+us before we have a chance to clean up, then due to a "feature"
+of ptrace, all our children will be left stuck in a debug-wait
+state.  So, rather than chance ourselves getting killed, we
+will be very aggressive about cleaning up.  Upon receiving any
+shutdown signal, we immediately blow away everyone involved,
+and then kill ourselves.
+*/
+
+void pfs_process_kill_everyone( int sig )
+{   
+	debug(D_NOTICE,"received signal %d (%s), killing all my children...",sig,string_signal(sig));
+	pfs_process_killall();
+	debug(D_NOTICE,"sending myself %d (%s), goodbye!",sig,string_signal(sig));
+	while(1) {
+		signal(sig,SIG_DFL);
+		sigsetmask(~sigmask(sig));
+		kill(getpid(),sig);
+		kill(getpid(),SIGKILL);
+	}
+}   
 
 /*
 For every process interested in asynchronous events,
@@ -173,6 +198,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 	}
 
 	itable_insert(pfs_process_table,pid,child);
+	pfs_paranoia_add_pid(pid);
 
 	nprocs++;
 
@@ -185,6 +211,7 @@ void pfs_process_delete( struct pfs_process *p )
 {
 	/* The file table was deleted in pfs_process_stop */
 	itable_remove(pfs_process_table,p->pid);
+	pfs_paranoia_delete_pid(p->pid);
 	tracer_detach(p->tracer);
 	free(p);
 }

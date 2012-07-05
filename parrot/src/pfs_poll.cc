@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "pfs_poll.h"
 #include "pfs_process.h"
 #include "pfs_critical.h"
+#include "pfs_paranoia.h"
 
 extern "C" {
 #include "macros.h"
@@ -115,6 +116,13 @@ void pfs_poll_sleep()
 			if(p->flags&PFS_POLL_EXCEPT) FD_SET(p->fd,&efds);
 		}
 	}
+	// Also poll watchdog fd, if necessary.
+	pid_t pfs_watchdog_fd = -1;
+	if ((pfs_watchdog_fd = pfs_paranoia_monitor_fd()) > 0) {
+		maxfd = MAX(pfs_watchdog_fd, maxfd);
+		FD_SET(pfs_watchdog_fd, &rfds);
+	}
+
 	for(i=0;i<sleep_table_size;i++) {
 		s = &sleep_table[i];
 		if(s->pid>=0) {
@@ -146,6 +154,11 @@ void pfs_poll_sleep()
 	CRITICAL_BEGIN
 
 	if(result>0) {
+		if ((pfs_watchdog_fd > 0) && FD_ISSET(pfs_watchdog_fd, &rfds)) {
+			debug(D_NOTICE,"watchdog died unexpectedly; killing everyone.");
+			pfs_process_kill_everyone(SIGKILL);
+			// Note - above does not return.
+		}
 		for(i=0;i<poll_table_size;i++) {
 			p = &poll_table[i];
 			if(p->pid>=0) {

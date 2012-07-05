@@ -24,6 +24,10 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 	IBCP
 	Developed new support for Parrot to work with the EGEE software and bioinformatics applications.
 
+	Brian Bockelman
+	University of Nebraska-Lincoln
+	Contributed the Parrot "Paranoid" shutdown mode.
+
 	Hoang Bui
 	University of Notre Dame
 	Created the chirp_distribute and chirp_matrix modules.
