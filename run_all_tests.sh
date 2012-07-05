@@ -5,8 +5,7 @@ if [ ! -r Makefile.config ]; then
     exit 1
 fi
 
-#CCTOOLS_PACKAGES="`grep CCTOOLS_PACKAGES Makefile.config | cut -d = -f 2`"
-CCTOOLS_PACKAGES="sand makeflow"
+CCTOOLS_PACKAGES="`grep CCTOOLS_PACKAGES Makefile.config | cut -d = -f 2`"
 CCTOOLS_TEST_LOG=`pwd`/cctools.test.log
 CCTOOLS_TEST_RESULTS=`pwd`/cctools.test.results
 
