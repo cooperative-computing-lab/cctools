@@ -19,7 +19,7 @@ prepare()
 
 run()
 {
-    exec ../src/allpairs_master -d all -p `cat $portfile` set.list set.list BITWISE
+    exec ../src/allpairs_master -d all -x 1 -y 1 -p `cat $portfile` set.list set.list BITWISE
 }
 
 clean()
