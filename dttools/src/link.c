@@ -420,6 +420,9 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 		/* If the remote address can be found, then we are really connected. */
 		/* Also, on bsd-derived systems, failure to connect is indicated by a second connect returning EINVAL. */
 
+		/* On OSX, the following is a possible way of indicating a successful connection: */
+		if(result<0 && errno==EISCONN) result=0;
+
 		if(result < 0) {
 			if(!errno_is_temporary(errno)) {
 				if(errno == EINVAL)
