@@ -1329,7 +1329,7 @@ int main(int argc, char *argv[])
 			return EXIT_FAILURE;
 		}
 		if(pool_config_path[0] == '/') {
-			strncpy(pool_config_path, pool_config_canonical_path, PATH_MAX);
+			strncpy(pool_config_canonical_path, pool_config_path, PATH_MAX);
 		} else {
 			get_canonical_path(".", pool_config_canonical_path, PATH_MAX);
 			char *p;
