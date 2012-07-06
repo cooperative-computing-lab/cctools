@@ -251,6 +251,8 @@ int main(int argc, char **argv)
 	struct work_queue *q;
 	int port = WORK_QUEUE_DEFAULT_PORT;
 
+	debug_config("allpairs_master");
+
 	extra_files_list = list_create();
 
 	while((c = getopt(argc, argv, "e:f:t:x:y:p:N:E:d:vh")) != (char) -1) {
