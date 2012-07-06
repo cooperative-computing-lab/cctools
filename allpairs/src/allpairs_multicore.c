@@ -260,9 +260,12 @@ static int main_loop_program( const char *funcpath, struct text_list *seta, stru
 				/* then finish one process for each core */
 				for(c=0;c<n;c++) {
 					printf("%s\t%s\t",text_list_get(seta,i+c),text_list_get(setb,j));
+					int lines = 0;
 					while(fgets(line,sizeof(line),proc[c])) {
 						printf("%s",line);
+						lines++;
 					}
+					if(lines==0) printf("\n");
 					fast_pclose(proc[c]);
 				}
 			}
