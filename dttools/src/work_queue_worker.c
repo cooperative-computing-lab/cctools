@@ -168,6 +168,9 @@ static pid_t execute_task(const char *cmd)
 {
 	pid_t pid;
 
+	// reset the internal stdout buffer
+	stdout_buffer_used = 0;
+
 	fflush(NULL);
 
 	if(pipe(pipefds) == -1) {
