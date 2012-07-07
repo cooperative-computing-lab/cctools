@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include <time.h>
 #include <signal.h>
 
+#include "cctools.h"
 #include "debug.h"
 #include "work_queue.h"
 #include "text_array.h"
@@ -91,12 +92,6 @@ static void task_prime()
 	}
 }
 
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 static void show_help(const char *cmd)
 {
 	printf("Use: %s [options] <command> <xsize> <ysize> <inputdata> <outputdata>\n", cmd);
@@ -139,7 +134,7 @@ int main( int argc, char *argv[] )
 				debug_config_file(optarg);
 				break;
 			case 'v':
-				show_version(progname);
+				print_version(stdout, progname);
 				exit(0);
 				break;
 			case 'h':
@@ -148,6 +143,8 @@ int main( int argc, char *argv[] )
 				break;
 		}
 	}
+
+	debug_version(D_DEBUG, argv[0]);
 
 	if( (argc-optind)!=5 ) {
 		show_help(progname);

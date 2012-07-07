@@ -5,6 +5,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "cctools.h"
 #include "catalog_server.h"
 #include "datagram.h"
 #include "link.h"
@@ -413,11 +414,6 @@ static void handle_query(struct link *query_link)
 	fclose(stream);
 }
 
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 static void show_help(const char *cmd)
 {
 	printf("Use: %s [options]\n", cmd);
@@ -493,7 +489,7 @@ int main(int argc, char *argv[])
 				child_procs_timeout = string_time_parse(optarg);
 				break;
 			case 'v':
-				show_version(argv[0]);
+				print_version(stdout, argv[0]);
 				return 0;
 			case 'h':
 			default:
@@ -501,6 +497,8 @@ int main(int argc, char *argv[])
 				return 1;
 			}
 	}
+
+	debug_version(D_DEBUG, argv[0]);
 
 	if (is_daemon) daemonize(0);
 

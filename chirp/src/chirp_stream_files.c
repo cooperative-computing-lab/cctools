@@ -12,9 +12,10 @@ See the file COPYING for details.
 #include "chirp_client.h"
 #include "chirp_reli.h"
 #include "chirp_stream.h"
-#include "full_io.h"
 
 #include "debug.h"
+#include "cctools.h"
+#include "full_io.h"
 #include "auth_all.h"
 #include "stringtools.h"
 
@@ -25,11 +26,6 @@ See the file COPYING for details.
 static int timeout = 3600;
 static int buffer_size = 1048576;
 static int stream_mode = MODE_SPLIT;
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
 
 static void show_help(const char *cmd)
 {
@@ -82,7 +78,7 @@ int main(int argc, char *argv[])
 			timeout = string_time_parse(optarg);
 			break;
 		case 'v':
-			show_version(argv[0]);
+			print_version(stdout, argv[0]);
 			exit(0);
 			break;
 		case 'h':
@@ -92,6 +88,8 @@ int main(int argc, char *argv[])
 
 		}
 	}
+
+	debug_version(D_DEBUG, argv[0]);
 
 	if(!did_explicit_auth)
 		auth_register_all();

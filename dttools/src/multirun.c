@@ -26,6 +26,8 @@ Example use:
 #include <errno.h>
 #include <sys/wait.h>
 
+#include "cctools.h"
+
 static int debug = 0;
 static char *name;
 static const char *fileprefix = 0;
@@ -133,11 +135,6 @@ static void ignore_signal(int sig)
 {
 }
 
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 static void use(char *program)
 {
 	fprintf(stderr, "Use: %s [options] <command> [params]\n", program);
@@ -189,7 +186,7 @@ int main(int argc, char *argv[])
 				break;
 
 			case 'v':
-				show_version(argv[0]);
+				print_version(stdout, argv[0]);
 				exit(0);
 				break;
 

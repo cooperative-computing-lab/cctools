@@ -11,12 +11,8 @@ See the file COPYING for details.
 
 #include "compressed_sequence.h"
 
+#include "cctools.h"
 #include "debug.h"
-
-static void show_version(const char *cmd)
-{
-        printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
 
 static void show_help(const char *cmd)
 {
@@ -43,7 +39,7 @@ int main(int argc, char ** argv)
 			quiet_mode = 1;
 			break;
 		case 'v':
-			show_version(progname);
+			print_version(stdout, progname);
 			exit(0);
 			break;
                 case 'h':
@@ -53,6 +49,8 @@ int main(int argc, char ** argv)
                         break;
                 }
         }
+
+	debug_version(D_DEBUG, argv[0]);
 
 	if( optind<argc ) {
 		infile = fopen(argv[optind], "r");

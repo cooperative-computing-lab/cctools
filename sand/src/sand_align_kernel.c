@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include <fcntl.h>
 #include <sys/types.h>
 
+#include "cctools.h"
 #include "align.h"
 #include "compressed_sequence.h"
 #include "overlap.h"
@@ -26,11 +27,6 @@ static double min_qual = 1.0;
 
 static const char *output_format = "ovl";
 static const char *align_type = "banded";
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
 
 static void show_help(const char *cmd)
 {
@@ -76,7 +72,7 @@ int main(int argc, char ** argv)
 			debug_flags_set(optarg);
 			break;
 		case 'v':
-			show_version(argv[0]);
+			print_version(stdout, argv[0]);
 			exit(0);
 			break;
 		default:
@@ -86,6 +82,8 @@ int main(int argc, char ** argv)
 			break;
 		}
 	}
+
+	debug_version(D_DEBUG, argv[0]);
 
 	fileindex = optind;
 	if ((argc - optind) == 1) {

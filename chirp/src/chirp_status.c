@@ -6,6 +6,7 @@ See the file COPYING for details.
 */
 
 #include "catalog_query.h"
+#include "cctools.h"
 #include "nvpair.h"
 #include "link.h"
 #include "stringtools.h"
@@ -34,11 +35,6 @@ static struct nvpair_header headers[] = {
 	{"avail", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
 	{0,}
 };
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
 
 static void show_help(const char *cmd)
 {
@@ -128,7 +124,7 @@ int main(int argc, char *argv[])
 			debug_config_file_size(string_metric_parse(optarg));
 			break;
 		case 'v':
-			show_version(argv[0]);
+			print_version(stdout, argv[0]);
 			return 1;
 		case 's':
 			mode = MODE_SHORT;
@@ -145,6 +141,8 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
+
+	debug_version(D_DEBUG, argv[0]);
 
 	if(argc - optind == 0) {
 		// fine, keep going

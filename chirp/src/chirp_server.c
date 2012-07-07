@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "chirp_audit.h"
 #include "chirp_thirdput.h"
 
+#include "cctools.h"
 #include "daemon.h"
 #include "macros.h"
 #include "debug.h"
@@ -108,11 +109,6 @@ int chirp_group_cache_time = 900;
 char chirp_owner[USERNAME_MAX] = "";
 
 struct chirp_filesystem *cfs = 0;
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
 
 static void show_help(const char *cmd)
 {
@@ -467,7 +463,7 @@ int main(int argc, char *argv[])
 			advertise_timeout = string_time_parse(optarg);
 			break;
 		case 'v':
-			show_version(argv[0]);
+			print_version(stdout, argv[0]);
 			return 1;
 		case 'w':
 			strcpy(chirp_owner, optarg);
@@ -510,6 +506,7 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
+
 	if(is_daemon) daemonize(0); /* don't chdir to "/" */
 
 	/* Ensure that all files are created private by default (again because of daemonize). */
@@ -517,6 +514,8 @@ int main(int argc, char *argv[])
 
 	/* open debug file now because daemonize closes all open fds */
 	debug_config_file(chirp_debug_file);
+
+	debug_version(D_DEBUG, argv[0]);
 
 	/* if chirp_transient_path is NULL, use CWD */
 	if(chirp_transient_path == NULL){

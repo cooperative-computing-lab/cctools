@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "ftsh_error.h"
 #include "multi_fork.h"
 
+#include "cctools.h"
 #include "xxmalloc.h"
 #include "stringtools.h"
 #include "macros.h"
@@ -33,14 +34,9 @@ static void null_handler( int sig )
 {
 }
 
-static void show_version( char *cmd )
-{
-	fprintf(stderr,"ftsh version %d.%d.%d built by %s@%s at %s on %s\n",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,BUILD_USER,BUILD_HOST,__TIME__,__DATE__);
-}
-
 static void show_help( char *cmd )
 {
-	show_version(cmd);
+	print_version(stderr, cmd);
 	fprintf(stderr,"\
 Use: ftsh [options] <program> [arg1] [arg2]\n\
 Where options are:\n\
@@ -158,7 +154,7 @@ static int ftsh_main( int argc, char *argv[] )
 				parse_debug_mode = 1;
 				break;
 			case 'v':
-				show_version(argv[0]);
+				print_version(stderr, argv[0]);
 				return 1;
 				break;
 			case 'h':
@@ -168,6 +164,8 @@ static int ftsh_main( int argc, char *argv[] )
 				break;
 		}
 	}
+
+	debug_version(D_DEBUG, argv[0]);
 
 	if(optind>=argc) {
 		show_help(argv[0]);

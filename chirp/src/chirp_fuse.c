@@ -24,6 +24,7 @@ This module written by James Fitzgerald, B.S. 2006.
 #include "chirp_reli.h"
 
 #include "auth_all.h"
+#include "cctools.h"
 #include "debug.h"
 #include "itable.h"
 #include "stringtools.h"
@@ -555,11 +556,6 @@ static void exit_handler(int sig)
 	_exit(0);
 }
 
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 static void show_help(const char *cmd)
 {
 	printf("use: %s <mountpath>\n", cmd);
@@ -621,7 +617,7 @@ int main(int argc, char *argv[])
 			run_in_foreground = 1;
 			break;
 		case 'v':
-			show_version(argv[0]);
+			print_version(stdout, argv[0]);
 			return 0;
 			break;
 		case 'h':
@@ -631,6 +627,8 @@ int main(int argc, char *argv[])
 			break;
 		}
 	}
+
+	debug_version(D_DEBUG, argv[0]);
 
 	if((argc - optind) != 1) {
 		show_help(argv[0]);

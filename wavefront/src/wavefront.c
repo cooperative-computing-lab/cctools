@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <sys/wait.h>
 
+#include "cctools.h"
 #include "list.h"
 #include "itable.h"
 #include "debug.h"
@@ -357,12 +358,6 @@ static double measure_task_time()
 	return task_time;
 }
 
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 static void show_help(const char *cmd)
 {
 	printf("Use: %s [options] <command> <xsize> <ysize>\n", cmd);
@@ -446,7 +441,7 @@ int main( int argc, char *argv[] )
 				ystart = atoi(optarg);
 				break;
 			case 'v':
-				show_version(progname);
+				print_version(stdout, progname);
 				exit(0);
 				break;
 			case 'h':
@@ -455,6 +450,8 @@ int main( int argc, char *argv[] )
 				break;
 		}
 	}
+
+	debug_version(D_DEBUG, argv[0]);
 
 	if( (argc-optind<3) ) {
 		show_help(progname);

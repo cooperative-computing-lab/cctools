@@ -72,11 +72,6 @@ static void show_help(const char *cmd)
 	printf(" -h            Show this help screen\n");
 }
 
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 /* Cygwin does not have 64-bit I/O, while Darwin has it by default. */
 
 #if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD
@@ -701,11 +696,13 @@ int main(int argc, char** argv)
 	    exit(0);
 	    break;
 	case 'v':
-	    show_version(argv[0]);
+	    print_version(stdout, argv[0]);
 	    exit(0);
 	    break;
 	}
     }
+
+	debug_version(D_DEBUG, argv[0]);
 
     /*
       Declare and initialize indices for where on the command line certain required arguments are.

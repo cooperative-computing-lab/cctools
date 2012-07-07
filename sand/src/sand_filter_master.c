@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+#include "cctools.h"
 #include "debug.h"
 #include "work_queue.h"
 #include "work_queue_catalog.h"
@@ -41,7 +42,6 @@ enum filter_master_task_result {
 
 // FUNCTIONS
 static void get_options(int argc, char **argv, const char *progname);
-static void show_version(const char *cmd);
 static void show_help(const char *cmd);
 static void load_sequences(const char *file);
 static size_t load_rectangle_to_file(int rect_id, struct cseq **sequences, int cseq_count);
@@ -87,11 +87,6 @@ static int total_retried = 0;
 static int total_processed = 0;
 static timestamp_t tasks_runtime = 0;
 static timestamp_t tasks_filetime = 0;
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
 
 static void show_help(const char *cmd)
 {
@@ -538,7 +533,7 @@ static void get_options(int argc, char **argv, const char *progname)
 			debug_config_file(optarg);
 			break;
 		case 'v':
-			show_version(progname);
+			print_version(stdout, progname);
 			exit(0);
 		default:
 		case 'h':
@@ -546,6 +541,8 @@ static void get_options(int argc, char **argv, const char *progname)
 			exit(0);
 		}
 	}
+
+	debug_version(D_DEBUG, argv[0]);
 
 	if(argc - optind != 2) {
 		show_help(progname);

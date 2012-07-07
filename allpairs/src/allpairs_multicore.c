@@ -16,6 +16,7 @@ See the file COPYING for details.
 
 #include "allpairs_compare.h"
 
+#include "cctools.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -30,11 +31,6 @@ static const char *progname = "allpairs_multicore";
 static const char *extra_arguments = "";
 static int block_size = 0;
 static int num_cores = 0;
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
 
 static void show_help(const char *cmd)
 {
@@ -297,7 +293,7 @@ int main(int argc, char *argv[])
 			debug_flags_set(optarg);
 			break;
 		case 'v':
-			show_version(progname);
+			print_version(stdout, progname);
 			exit(0);
 			break;
 		default:
@@ -307,6 +303,8 @@ int main(int argc, char *argv[])
 			break;
 		}
 	}
+
+	debug_version(D_DEBUG, argv[0]);
 
 	if((argc - optind) < 3) {
 		show_help(progname);

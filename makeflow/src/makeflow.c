@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include <dirent.h>
 #include <unistd.h>
 
+#include "cctools.h"
 #include "catalog_query.h"
 #include "catalog_server.h"
 #include "work_queue_catalog.h"
@@ -1923,11 +1924,6 @@ static void handle_abort(int sig)
 	dag_abort_flag = 1;
 }
 
-static void show_version(const char *cmd)
-{
-	fprintf(stdout, "%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
@@ -2117,7 +2113,7 @@ int main(int argc, char *argv[])
 			debug_config_file(optarg);
 			break;
 		case 'v':
-			show_version(argv[0]);
+			print_version(stdout, argv[0]);
 			return 0;
 		case 'h':
 			show_help(argv[0]);
@@ -2168,6 +2164,8 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
+
+	debug_version(D_DEBUG, argv[0]);
 
 	const char *dagfile;
 

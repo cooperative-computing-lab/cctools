@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "pfs_paranoia.h"
 
 extern "C" {
+#include "cctools.h"
 #include "tracer.h"
 #include "stringtools.h"
 #include "auth_all.h"
@@ -95,18 +96,10 @@ static pid_t root_pid = -1;
 static int root_exitstatus = 0;
 static int channel_size = 10;
 
-static void show_version( const char *cmd )
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n",cmd,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,BUILD_USER,BUILD_HOST,__DATE__,__TIME__);
-	exit(1);
-}
-
-static void get_linux_version()
+static void get_linux_version(const char *cmd)
 {
 	struct utsname name;
 	int major,minor,micro,fields;
-
-	debug(D_DEBUG,"%s version %d.%d.%d built by %s@%s on %s at %s\n","parrot",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,BUILD_USER,BUILD_HOST,__DATE__,__TIME__);
 
 	uname(&name);
 
@@ -609,7 +602,8 @@ int main( int argc, char *argv[] )
 			pfs_force_sync = 1;
 			break;
 		case 'v':
-			show_version(argv[0]);
+			print_version(stdout, argv[0]);
+			exit(EXIT_SUCCESS);
 			break;
 		case 'w':
 			pfs_initial_working_directory = optarg;
@@ -626,7 +620,8 @@ int main( int argc, char *argv[] )
 
 	if(optind>=argc) show_use(argv[0]);
 
-	get_linux_version();
+	debug_version(D_DEBUG, argv[0]);
+	get_linux_version(argv[0]);
 
 	pfs_file_cache = file_cache_init(pfs_temp_dir);
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
