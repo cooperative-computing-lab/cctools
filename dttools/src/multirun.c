@@ -186,7 +186,7 @@ int main(int argc, char *argv[])
 				break;
 
 			case 'v':
-				print_version(stdout, argv[0]);
+				cctools_version_print(stdout, argv[0]);
 				exit(0);
 				break;
 

@@ -696,13 +696,13 @@ int main(int argc, char** argv)
 	    exit(0);
 	    break;
 	case 'v':
-	    print_version(stdout, argv[0]);
+	    cctools_version_print(stdout, argv[0]);
 	    exit(0);
 	    break;
 	}
     }
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
     /*
       Declare and initialize indices for where on the command line certain required arguments are.

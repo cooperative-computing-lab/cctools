@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
 			timeout = string_time_parse(optarg);
 			break;
 		case 'v':
-			print_version(stdout, argv[0]);
+			cctools_version_print(stdout, argv[0]);
 			exit(0);
 			break;
 		case 'h':
@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(!did_explicit_auth)
 		auth_register_all();

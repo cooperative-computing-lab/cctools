@@ -18,13 +18,13 @@ See the file COPYING for details.
     @param stream The file stream to print to.
     @param cmd    The name of the program running (argv[0]).
   */
-void print_version (FILE *stream, const char *cmd);
+void cctools_version_print (FILE *stream, const char *cmd);
 
 /** Create a new buffer.
     @param type   The debug type.
     @param cmd    The name of the program running (argv[0]).
   */
-void debug_version (int type, const char *cmd);
+void cctools_version_debug (int type, const char *cmd);
 
 
 #endif /* CCTOOLS_H */

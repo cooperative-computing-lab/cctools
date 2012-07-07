@@ -39,7 +39,7 @@ int main(int argc, char ** argv)
 			quiet_mode = 1;
 			break;
 		case 'v':
-			print_version(stdout, progname);
+			cctools_version_print(stdout, progname);
 			exit(0);
 			break;
                 case 'h':
@@ -50,7 +50,7 @@ int main(int argc, char ** argv)
                 }
         }
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if( optind<argc ) {
 		infile = fopen(argv[optind], "r");

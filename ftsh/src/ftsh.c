@@ -36,7 +36,7 @@ static void null_handler( int sig )
 
 static void show_help( char *cmd )
 {
-	print_version(stderr, cmd);
+	cctools_version_print(stderr, cmd);
 	fprintf(stderr,"\
 Use: ftsh [options] <program> [arg1] [arg2]\n\
 Where options are:\n\
@@ -154,7 +154,7 @@ static int ftsh_main( int argc, char *argv[] )
 				parse_debug_mode = 1;
 				break;
 			case 'v':
-				print_version(stderr, argv[0]);
+				cctools_version_print(stderr, argv[0]);
 				return 1;
 				break;
 			case 'h':
@@ -165,7 +165,7 @@ static int ftsh_main( int argc, char *argv[] )
 		}
 	}
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(optind>=argc) {
 		show_help(argv[0]);

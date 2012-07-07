@@ -533,7 +533,7 @@ static void get_options(int argc, char **argv, const char *progname)
 			debug_config_file(optarg);
 			break;
 		case 'v':
-			print_version(stdout, progname);
+			cctools_version_print(stdout, progname);
 			exit(0);
 		default:
 		case 'h':
@@ -542,7 +542,7 @@ static void get_options(int argc, char **argv, const char *progname)
 		}
 	}
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(argc - optind != 2) {
 		show_help(progname);

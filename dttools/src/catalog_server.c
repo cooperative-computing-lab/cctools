@@ -489,7 +489,7 @@ int main(int argc, char *argv[])
 				child_procs_timeout = string_time_parse(optarg);
 				break;
 			case 'v':
-				print_version(stdout, argv[0]);
+				cctools_version_print(stdout, argv[0]);
 				return 0;
 			case 'h':
 			default:
@@ -498,7 +498,7 @@ int main(int argc, char *argv[])
 			}
 	}
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if (is_daemon) daemonize(0);
 

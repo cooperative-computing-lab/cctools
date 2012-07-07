@@ -293,7 +293,7 @@ int main(int argc, char *argv[])
 			debug_flags_set(optarg);
 			break;
 		case 'v':
-			print_version(stdout, progname);
+			cctools_version_print(stdout, progname);
 			exit(0);
 			break;
 		default:
@@ -304,7 +304,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if((argc - optind) < 3) {
 		show_help(progname);

@@ -99,7 +99,7 @@ static void get_options(int argc, char **argv, const char *progname)
 			debug_flags_set(optarg);
 			break;
 		case 'v':
-			print_version(stdout, progname);
+			cctools_version_print(stdout, progname);
 			exit(0);
 		case 'h':
 			show_help(progname);
@@ -131,7 +131,7 @@ int main(int argc, char **argv)
 	debug_config(progname);
 	get_options(argc, argv, progname);
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	unsigned long start_mem, cand_mem, table_mem;
 

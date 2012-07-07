@@ -617,7 +617,7 @@ int main(int argc, char *argv[])
 			run_in_foreground = 1;
 			break;
 		case 'v':
-			print_version(stdout, argv[0]);
+			cctools_version_print(stdout, argv[0]);
 			return 0;
 			break;
 		case 'h':
@@ -628,7 +628,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if((argc - optind) != 1) {
 		show_help(argv[0]);

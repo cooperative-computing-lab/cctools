@@ -560,7 +560,7 @@ int main(int argc, char *argv[])
 			debug_config_file(optarg);
 			break;
 		case 'v':
-			print_version(stdout, argv[0]);
+			cctools_version_print(stdout, argv[0]);
 			return 0;
 		case 'w':
 			w = string_metric_parse(optarg);
@@ -573,7 +573,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if ((argc - optind) != 2) {
 	    show_help(argv[0]);

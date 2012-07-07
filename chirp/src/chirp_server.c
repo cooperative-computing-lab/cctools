@@ -463,7 +463,7 @@ int main(int argc, char *argv[])
 			advertise_timeout = string_time_parse(optarg);
 			break;
 		case 'v':
-			print_version(stdout, argv[0]);
+			cctools_version_print(stdout, argv[0]);
 			return 1;
 		case 'w':
 			strcpy(chirp_owner, optarg);
@@ -515,7 +515,7 @@ int main(int argc, char *argv[])
 	/* open debug file now because daemonize closes all open fds */
 	debug_config_file(chirp_debug_file);
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	/* if chirp_transient_path is NULL, use CWD */
 	if(chirp_transient_path == NULL){

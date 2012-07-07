@@ -1388,7 +1388,7 @@ int main(int argc, char *argv[])
 			os_name = xxstrdup(optarg);
 			break;
 		case 'v':
-			print_version(stdout, argv[0]);
+			cctools_version_print(stdout, argv[0]);
 			return 0;
 		case 'h':
 		default:
@@ -1397,7 +1397,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	check_arguments(argc, argv);
 

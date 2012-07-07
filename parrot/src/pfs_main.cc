@@ -602,7 +602,7 @@ int main( int argc, char *argv[] )
 			pfs_force_sync = 1;
 			break;
 		case 'v':
-			print_version(stdout, argv[0]);
+			cctools_version_print(stdout, argv[0]);
 			exit(EXIT_SUCCESS);
 			break;
 		case 'w':
@@ -620,7 +620,7 @@ int main( int argc, char *argv[] )
 
 	if(optind>=argc) show_use(argv[0]);
 
-	debug_version(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 	get_linux_version(argv[0]);
 
 	pfs_file_cache = file_cache_init(pfs_temp_dir);
