@@ -12,7 +12,7 @@ function detect_packages()
     echo -n "Detecting packages ..."
 
     PACKAGES_CONFIG=""
-    for package in fuse irods mysql hdfs python globus openmpi swig xrootd
+    for package in fuse irods mysql hdfs python globus openmpi swig xrootd cvmfs
     do
         if [ -d $EXTERNAL/$package/`sys` ]; then
             echo -n " $package"
