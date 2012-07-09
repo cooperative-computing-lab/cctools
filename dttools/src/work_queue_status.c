@@ -116,6 +116,8 @@ int main(int argc, char *argv[])
 	struct catalog_query *cq;
 	struct nvpair *nv;
 
+    debug_config(argv[0]);
+
 	work_queue_status_parse_command_line_arguments(argc, argv);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
