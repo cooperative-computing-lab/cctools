@@ -131,6 +131,7 @@ struct chirp_client *chirp_client_connect(const char *hostport, int negotiate_au
 		c->link = link_connect(addr, port, stoptime);
 		c->broken = 0;
 		c->serial = global_serial++;
+		strcpy(c->hostport, hostport);
 		if(c->link) {
 			link_tune(c->link, LINK_TUNE_INTERACTIVE);
 			if(negotiate_auth) {
@@ -141,7 +142,6 @@ struct chirp_client *chirp_client_connect(const char *hostport, int negotiate_au
 				if(result) {
 					free(type);
 					free(subject);
-					strcpy(c->hostport, hostport);
 					return c;
 				} else {
 					chirp_client_disconnect(c);
