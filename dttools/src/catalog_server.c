@@ -498,11 +498,11 @@ int main(int argc, char *argv[])
 			}
 	}
 
-	cctools_version_debug(D_DEBUG, argv[0]);
-
 	if (is_daemon) daemonize(0);
 
 	debug_config_file(debug_filename);
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(logfilename) {
 		logfile = fopen(logfilename,"a");
