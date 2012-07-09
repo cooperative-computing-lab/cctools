@@ -4,6 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "cctools.h"
 #include "batch_job.h"
 #include "hash_table.h"
 #include "copy_stream.h"
