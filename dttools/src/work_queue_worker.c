@@ -1389,7 +1389,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
-			return 0;
+			exit(EXIT_SUCCESS);
 		case 'h':
 		default:
 			show_help(argv[0]);

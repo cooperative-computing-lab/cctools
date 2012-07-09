@@ -1125,7 +1125,9 @@ int main(int argc, char *argv[])
 
 	set_pool_name(name_of_this_pool, WORK_QUEUE_POOL_NAME_MAX);
 
-	while((c = getopt(argc, argv, "aAc:C:d:hm:N:Pqr:sS:t:T:W:")) != (char) -1) {
+	debug_config(argv[0]);
+
+	while((c = getopt(argc, argv, "aAc:C:d:hm:N:o:O:Pqr:sS:t:T:vW:")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			strcat(worker_args, " -a");
@@ -1169,6 +1171,12 @@ int main(int argc, char *argv[])
 				workers_per_job = count;
 			}
 			break;
+		case 'o':
+			debug_config_file(optarg);
+			break;
+		case 'O':
+			debug_config_file_size(string_metric_parse(optarg));
+			break;
 		case 'P':
 			auto_worker_pool = 1;
 			make_decision_only = 1;
@@ -1201,12 +1209,17 @@ int main(int argc, char *argv[])
 		case 'r':
 			retry_count = atoi(optarg);
 			break;
+		case 'v':
+			cctools_version_print(stdout, argv[0]);
+			exit(EXIT_SUCCESS);
 		case 'h':
 		default:
 			show_help(argv[0]);
 			return EXIT_FAILURE;
 		}
 	}
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(!auto_worker_pool) {
 		if(!auto_worker) {

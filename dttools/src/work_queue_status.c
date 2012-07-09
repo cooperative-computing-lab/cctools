@@ -73,7 +73,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 {
 	int c;
 
-	while((c = getopt(argc, argv, "C:d:lt:h")) != (char) -1) {
+	while((c = getopt(argc, argv, "C:d:lo:O:t:vh")) != (char) -1) {
 		switch (c) {
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
@@ -87,6 +87,12 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 		case 'l':
 			Work_Queue_Status_Mode = MODE_LONG;
 			break;
+		case 'o':
+			debug_config_file(optarg);
+			break;
+		case 'O':
+			debug_config_file_size(string_metric_parse(optarg));
+			break;
 		case 't':
 			Work_Queue_Status_Timeout = strtol(optarg, NULL, 10);
 			break;
@@ -94,6 +100,9 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			work_queue_status_show_help(argv[0]);
 			exit(EXIT_SUCCESS);
 			break;
+		case 'v':
+			cctools_version_print(stdout, argv[0]);
+			exit(EXIT_SUCCESS);
 		default:
 			work_queue_status_show_help(argv[0]);
 			exit(EXIT_FAILURE);
@@ -108,6 +117,8 @@ int main(int argc, char *argv[])
 	struct nvpair *nv;
 
 	work_queue_status_parse_command_line_arguments(argc, argv);
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(optind > argc) {
 		work_queue_status_show_help("work_queue_status");
