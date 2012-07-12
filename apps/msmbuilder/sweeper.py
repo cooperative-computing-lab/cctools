@@ -101,8 +101,9 @@ class Sweeper:
             r.append(i)
         self.sweeps.append(r)
 
-    def sweep(self):
-        """Sweep over the command."""
+    def sweep(self, interpreter='bash'):
+        """Sweep over the command.
+            @param interpreter The interpreter to run the script with."""
         try:
             self.q = WorkQueue(self.port)
         except:
@@ -133,7 +134,7 @@ class Sweeper:
             fo.write(script)
             fo.close
             # TODO add an option to specify the interpreter
-            taskcommand = 'bash script.sh' # run with bash
+            taskcommand = '%s script.sh' % (interpreter) # run with bash
 
             t = Task(taskcommand)
             t.specify_buffer(script, 'script.sh')
@@ -164,13 +165,14 @@ class Sweeper:
         print "all tasks complete!"
         print 'output and a copy of the script run by each worker located in %s-sweep' % (self.progname)
 
-    def sqldbsubmit(self, host, user,  dbname, pwfile):
+    def sqldbsubmit(self, host, user,  dbname, pwfile, interpreter='bash'):
         """Submit the commands to a MyWorkQueue MySQL database
             Usage: x.sqldbsubmit('cvrl-sql.crc.nd.edu', 'ccl', 'ccltest', 'secret/mysql.pwd')
             @param host The MySQL host.
             @param user The MySQL user.
             @param dbname The name of the db
-            @param pwfile A file containing the pw for the mysql server."""
+            @param pwfile A file containing the pw for the mysql server.
+            @param interpreter The interpreter to run the script"""
         sqlscript = ""
         for item in itertools.product(*self.sweeps):
             command  = ' '.join(self.command) % (item) # create the command
@@ -182,6 +184,7 @@ class Sweeper:
             localpath = os.path.abspath('%s-sweep/%s/%s-script' % (self.progname, commdir, commdir))
             # location of the script on the worker
             remotepath = '%s-script' % (commdir)
+            dbcommand = '%s ./' % (interpreter)+remotepath
             
             # create progname-sweep/commdir, this is where the output will go ex. BuildMSM-sweep/command_with_underscores/Data
             os.system("mkdir -p %s-sweep/%s" % (self.progname, commdir))
@@ -200,22 +203,21 @@ class Sweeper:
             #INSERT INTO commands VALUES (command_id, username, personal_id, name, command, status, stdout)
             #INSERT INTO files VALUES (fileid, command_id, local_path, remote_path, type, flags, checksum)
             # add the command to the table
-            sqlscript += 'INSERT INTO %s.commands VALUES (command_id, \'%s\', personal_id, name, \'%s\', 2, stdout);\n' % (dbname, user, 'bash '+remotepath)
+            sqlscript += 'INSERT INTO %s.commands VALUES (command_id, \'%s\', personal_id, name, \'%s\', 2, stdout);\n' % (dbname, user, dbcommand)
 
             # add script as input so it is sent to the worker - no caching
-            # get the checksum of the input script
-            self._checksum(localpath)
+            # get the checksum of the input script (localpath)
             sqlscript += 'INSERT INTO %s.files VALUES (fileid, command_id, \'%s\', \'%s\', 1, 1, \'%s\');\n' % (dbname, localpath, remotepath, self._checksum(localpath))
             # add the input files to the myworkqueue db
             for input in self.inputlist:
                 # TODO get the checksum of input files, check if the input is the same
-                sqlscript += 'INSERT INTO %s.files VALUES (fileid, command_id, \'%s\', \'%s\', 1, %s, \'%s\');\n' % (dbname, os.path.abspath(input[0]), input[0], input[1], self.checksum(localpath))
+                sqlscript += 'INSERT INTO %s.files VALUES (fileid, command_id, \'%s\', \'%s\', 1, %s, \'%s\');\n' % (dbname, os.path.abspath(input[0]), input[0], input[1], self.checksum(input))
             # add the output files to the myworkqueue db
             for output in self.outputlist:
                 outputdir = '%s-sweep/%s/' % (self.progname, commdir)
                 sqlscript += 'INSERT INTO %s.files VALUES (fileid, command_id, \'%s\', \'%s\', 2, %s, checksum);\n' % (dbname, os.path.abspath(outputdir+output[0]), output[0], output[1])
                 # each command in the commands table has a unique command_id, this needs to be associated with the correct input/output files
-                sqlscript += 'UPDATE %s.files SET files.command_id=(SELECT MAX(command_id) FROM %s.commands WHERE command=\'%s\' LIMIT 1) WHERE files.command_id=0;\n' % (dbname, dbname, 'bash '+remotepath)
+                sqlscript += 'UPDATE %s.files SET files.command_id=(SELECT MAX(command_id) FROM %s.commands WHERE command=\'%s\' LIMIT 1) WHERE files.command_id=0;\n' % (dbname, dbname, dbcommand)
             sqlscript += '\n'
 
         # create a copy of the sqlscript that was run
