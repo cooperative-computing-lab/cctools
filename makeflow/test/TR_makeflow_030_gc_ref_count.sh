@@ -15,7 +15,7 @@ cat > ../$test_output <<EOF
 7
 5
 6
-5
+7
 EOF
     exit 0
 }

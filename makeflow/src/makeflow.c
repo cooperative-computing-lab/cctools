@@ -165,6 +165,7 @@ int dag_parse_export(struct dag *d, char *line);
 char *dag_lookup(const char *name, void *arg);
 char *dag_lookup_set(const char *name, void *arg);
 void dag_gc_ref_incr(struct dag *d, const char *file, int increment);
+void dag_gc_ref_count(struct dag *d, const char *file);
 void dag_export_variables(struct dag *d, struct dag_node *n);
 
 
@@ -1705,6 +1706,9 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 		 * perform collection if we are doing reference counting. */
 		for(f = n->source_files; f; f = f->next) {
 			dag_gc_ref_incr(d, f->filename, -1);
+			if (dag_gc_method == DAG_GC_REF_COUNT) {
+				dag_gc_ref_count(d, f->filename);
+			}
 		}
 		dag_node_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
@@ -1785,16 +1789,18 @@ void dag_gc_ref_incr(struct dag *d, const char *file, int increment)
 		ref_count = ref_count + increment;
 		hash_table_insert(d->collect_table, file, (void *)ref_count);
 		debug(D_DEBUG, "Marked file %s references (%d)", file, ref_count - 1);
+	}
+}
 
-		/* Perform collection immediately if we are using reference
-		 * counting and report to Makeflowlog. */
-		if(ref_count <= MAKEFLOW_GC_MIN_THRESHOLD && dag_gc_method == DAG_GC_REF_COUNT) {
-			timestamp_t start_time, stop_time;
-			start_time = timestamp_get();
-			dag_gc_file(d, file, ref_count);
-			stop_time = timestamp_get();
-			fprintf(d->logfile, "# GC\t%llu\t%d\t%llu\t%d\n", timestamp_get(), 1, stop_time - start_time, ++dag_gc_collected);
-		}
+void dag_gc_ref_count(struct dag *d, const char *file)
+{
+	PTRINT_T ref_count = (PTRINT_T)hash_table_remove(d->collect_table, file);
+	if(ref_count && ref_count <= MAKEFLOW_GC_MIN_THRESHOLD) {
+		timestamp_t start_time, stop_time;
+		start_time = timestamp_get();
+		dag_gc_file(d, file, ref_count);
+		stop_time = timestamp_get();
+		fprintf(d->logfile, "# GC\t%llu\t%d\t%llu\t%d\n", timestamp_get(), 1, stop_time - start_time, ++dag_gc_collected);
 	}
 }
 
