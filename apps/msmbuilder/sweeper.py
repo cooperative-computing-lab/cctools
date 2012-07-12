@@ -8,7 +8,7 @@
 #
 
 from work_queue import *
-import itertools, sys, os, re
+import itertools, sys, os, re, hashlib, mmap
 from subprocess import *
 
 class Sweeper:
@@ -30,7 +30,8 @@ class Sweeper:
             Usage: x.addprog("echo")
             @param progname The base program that will be run."""
         self.command.append(progname)
-        self.progname, sep, tail = progname.partition('.') # remove file extension so we can create a nice directory
+        # remove the file extension so we can create a nice directory
+        self.progname, sep, tail = progname.partition('.')
 
     def setenv(self, pathtoenv):
         """Set the path to a env script to set up an environment for the command to run in.
@@ -43,6 +44,7 @@ class Sweeper:
             Usage: x.setenvdir('myenvdir')
                    x.setenv('env.sh') # set ups env on worker using myenvdir
             @param pathtoenvdir The path to the directory."""
+        # TODO contained in the envdir should be a script that sets up the env, this needs to be added to the env script
         r = []
         r.append(pathtoenvdir)
         r.append(caching)
@@ -110,8 +112,10 @@ class Sweeper:
         print "listening on port %d..." % self.q.port
 
         for item in itertools.product(*self.sweeps):
-            command  = ' '.join(self.command) % (item) # create the command
+            # create the commad
+            command  = ' '.join(self.command) % (item)
             commdir = '_'.join(self.command) % (item)
+            # we want to replace illegal file characters with _
             regex = re.compile('[:/" ()<>|?*]|(\\\)')
             commdir = regex.sub('_', commdir)
             
@@ -123,22 +127,25 @@ class Sweeper:
             else:
                 env = ""
 
-            script = """%(env)s%(command)s\n""" % {'env': env, 'command': command} # combine an env script and the command into one script
+            # combine an env script and the command into one
+            script = """%(env)s%(command)s\n""" % {'env': env, 'command': command}
             fo = open('%s-sweep/%s/%s-script' % (self.progname, commdir, commdir), 'w')
             fo.write(script)
             fo.close
-            taskcommand = 'bash script.sh' # run with tsch
+            # TODO add an option to specify the interpreter
+            taskcommand = 'bash script.sh' # run with bash
 
             t = Task(taskcommand)
             t.specify_buffer(script, 'script.sh')
 
             for input in self.inputlist:
                 if input[1] == 2: # 2 means caching should be true
-                    t.specify_file(os.path.abspath(input[0]), input[0], WORK_QUEUE_INPUT, cache=True) # cache the input since it is the same for all commands
+                    # the input is usually the same for all the commands
+                    t.specify_file(os.path.abspath(input[0]), input[0], WORK_QUEUE_INPUT, cache=True)
                 else:
                     t.specify_file(os.path.abspath(input[0]), input[0], WORK_QUEUE_INPUT, cache=False)
             for output in self.outputlist:
-                # we want the output on the local machine to go to progname-sweep/params/
+                # we want the output on the remote machine to go to progname-sweep/params/ on the local machine
                 if output[1] == 2: # 2 means caching should be true
                     t.specify_file("%s-sweep/%s/%s" % (self.progname, commdir, output[0]), output[0], WORK_QUEUE_OUTPUT, cache=True)
                 else:
@@ -156,21 +163,27 @@ class Sweeper:
 
         print "all tasks complete!"
         print 'output and a copy of the script run by each worker located in %s-sweep' % (self.progname)
-        sys.exit(0)
 
     def sqldbsubmit(self, host, user,  dbname, pwfile):
         """Submit the commands to a MyWorkQueue MySQL database
+            Usage: x.sqldbsubmit('cvrl-sql.crc.nd.edu', 'ccl', 'ccltest', 'secret/mysql.pwd')
             @param host The MySQL host.
             @param user The MySQL user.
+            @param dbname The name of the db
             @param pwfile A file containing the pw for the mysql server."""
         sqlscript = ""
         for item in itertools.product(*self.sweeps):
             command  = ' '.join(self.command) % (item) # create the command
             commdir = '_'.join(self.command) % (item)
+            # we want to replace all illegal file characters with _
             regex = re.compile('[:/" ()<>|?*]|(\\\)')
             commdir = regex.sub('_', commdir)
-           
-            # create progname/commdir, this is where the output will go ex. BuildMSM-sweep/command_with_underscores/Data
+            # this is the location of the script on the master
+            localpath = os.path.abspath('%s-sweep/%s/%s-script' % (self.progname, commdir, commdir))
+            # location of the script on the worker
+            remotepath = '%s-script' % (commdir)
+            
+            # create progname-sweep/commdir, this is where the output will go ex. BuildMSM-sweep/command_with_underscores/Data
             os.system("mkdir -p %s-sweep/%s" % (self.progname, commdir))
 
             if (self.envpath): # if a env script was specified
@@ -178,29 +191,46 @@ class Sweeper:
             else:
                 env = ""
 
-            script = """%(env)s%(command)s\n""" % {'env': env, 'command': command} # combine an env script and the command into one script
-            fo = open('%s-sweep/%s/%s-script' % (self.progname, commdir, commdir), 'w')
+            # combine the env script and the command into one
+            script = """%(env)s%(command)s\n""" % {'env': env, 'command': command}
+            fo = open(localpath, 'w')
             fo.write(script)
-            fo.close
+            fo.close()
 
             #INSERT INTO commands VALUES (command_id, username, personal_id, name, command, status, stdout)
-            #INSERT INTO files VALUES (fileid, command_id, local_path, remote_path, type, flags)
-            sqlscript += 'INSERT INTO %s.commands VALUES (command_id, \'%s\', personal_id, name, \'%s\', 2, stdout);\n' % (dbname, user, 'bash '+'./%s-script' % (commdir))
+            #INSERT INTO files VALUES (fileid, command_id, local_path, remote_path, type, flags, checksum)
+            # add the command to the table
+            sqlscript += 'INSERT INTO %s.commands VALUES (command_id, \'%s\', personal_id, name, \'%s\', 2, stdout);\n' % (dbname, user, 'bash '+remotepath)
 
             # add script as input so it is sent to the worker - no caching
-            sqlscript += 'INSERT INTO %s.files VALUES (fileid, command_id, \'%s\', \'%s\', 1, 1);\n' % (dbname, os.path.abspath('%s-sweep/%s/%s-script' % (self.progname, commdir, commdir)), '%s-script' % (commdir))
-            # the input for each command generated by the sweeper should be the same
+            # get the checksum of the input script
+            self._checksum(localpath)
+            sqlscript += 'INSERT INTO %s.files VALUES (fileid, command_id, \'%s\', \'%s\', 1, 1, \'%s\');\n' % (dbname, localpath, remotepath, self._checksum(localpath))
+            # add the input files to the myworkqueue db
             for input in self.inputlist:
-                sqlscript += 'INSERT INTO %s.files VALUES (fileid, command_id, \'%s\', \'%s\', 1, %s);\n' % (dbname, os.path.abspath(input[0]), input[0], input[1])
-            # the output if different for each command
+                # TODO get the checksum of input files, check if the input is the same
+                sqlscript += 'INSERT INTO %s.files VALUES (fileid, command_id, \'%s\', \'%s\', 1, %s, \'%s\');\n' % (dbname, os.path.abspath(input[0]), input[0], input[1], self.checksum(localpath))
+            # add the output files to the myworkqueue db
             for output in self.outputlist:
                 outputdir = '%s-sweep/%s/' % (self.progname, commdir)
-                sqlscript += 'INSERT INTO %s.files VALUES (fileid, command_id, \'%s\', \'%s\', 2, %s);\n' % (dbname, os.path.abspath(outputdir+output[0]), output[0], output[1])
-                sqlscript += 'UPDATE %s.files SET files.command_id=(SELECT MAX(command_id) FROM %s.commands WHERE command=\'%s\' LIMIT 1) WHERE files.command_id=0;\n' % (dbname, dbname, 'bash '+'./%s-script' % (commdir))
+                sqlscript += 'INSERT INTO %s.files VALUES (fileid, command_id, \'%s\', \'%s\', 2, %s, checksum);\n' % (dbname, os.path.abspath(outputdir+output[0]), output[0], output[1])
+                # each command in the commands table has a unique command_id, this needs to be associated with the correct input/output files
+                sqlscript += 'UPDATE %s.files SET files.command_id=(SELECT MAX(command_id) FROM %s.commands WHERE command=\'%s\' LIMIT 1) WHERE files.command_id=0;\n' % (dbname, dbname, 'bash '+remotepath)
             sqlscript += '\n'
 
+        # create a copy of the sqlscript that was run
         fo = open('%s-sweep/sqlscript' % (self.progname), 'w')
         fo.write(sqlscript)
         fo.close()
+        # note that the password comes from a file
         os.system(('mysql --debug-check --show-warnings -h %s -u %s --password=%s < %s-sweep/sqlscript') % (host, user, open(pwfile).read().strip(), self.progname))
-        sys.exit(0)
+
+    def _checksum(self, filename):
+        try:
+            f = open(localpath)
+            # this is faster but doesn't seem to work in ND afs space
+            map = mmap.mmap(f.fileno(), 0, flags=mmap.MAP_PRIVATE, prot=mmap.PROT_READ)
+            return hashlib.sha1(map).hexdigest()
+        except:
+            # slightly slower but always works
+            return hashlib.sha1(open(filename, 'rb').read()).hexdigest()
