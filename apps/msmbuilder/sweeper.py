@@ -15,7 +15,8 @@ class Sweeper:
     """Provides a simple api for a program to sweep through a range of parameters.
         Usage: import sweeper
                x = sweeper.Sweeper()"""
-    def __init__(self):
+    def __init__(self, verbose):
+        self.verbose = verbose              # turn on/off verbose mode
         self.port = WORK_QUEUE_RANDOM_PORT  # random, default is 9123
         self.progname = ""                  # the program to sweep with
         self.envpath = ""                   # path to a environment set up script
@@ -155,8 +156,7 @@ class Sweeper:
                     t.specify_file("%s-sweep/%s/%s" % (self.progname, commdir, output[0]), output[0], WORK_QUEUE_OUTPUT, cache=False)
 
             taskid = self.q.submit(t)
-            print "submitted task (id# %d): %s" 
-                    % (taskid, t.command)
+            print "submitted task (id# %d): %s" % (taskid, t.command)
 
         print "waiting for tasks to complete..."
 
@@ -176,7 +176,6 @@ class Sweeper:
             @param dbname The name of the db
             @param pwfile A file containing the pw for the mysql server.
             @param interpreter The interpreter to run the script"""
-        sqlscript = ""
         # create the db object
         db = _mysql.connect(host=host, user=user, db=dbname, passwd=pw)
         # we want to replace all illegal file characters with _
@@ -193,7 +192,6 @@ class Sweeper:
             remotepath = '%s-script' % (commdir)
             dbcommand = '%s ./' % (interpreter)+remotepath
             if self._checkdup(dbcommand, db): 
-                print 'duplicate command', dbcommand
                 continue
 
             # create progname-sweep/commdir, this is where the output will go ex. BuildMSM-sweep/command_with_underscores/Data
@@ -281,18 +279,20 @@ class Sweeper:
                 # if we found a duplicate
                 cid = i
 
-        print cid
         # if we did not find a duplicate
         if cid < 0:
-            print 'new command'
+            print 'new command', cid
             return 0 # new command, input everything
 
+        print 'duplicte command cid=', cid, dbcommand
         # find the files associated with this commnand_id
         dbconn.query("""SELECT remote_path,checksum FROM files WHERE command_id='%s'""" % (cid))
         r = dbconn.store_result()
         for file, hash in r.fetch_row(maxrows=0):
             for input in self.inputlist:
                 if file in input and hash not in input:
-                    print 'file changed', file, hash
+                    print 'file changed', file, hash, 'updating cid', cid, 'to avaliable'
+                    dbconn.query("""UPDATE commands SET status=2 WHERE command_id='%s'""" % (cid))
                     return 1 # file changed, rerun command (set status to Avaliable) 
+        print 'files identical, doing nothing to cid', cid
         return 1
