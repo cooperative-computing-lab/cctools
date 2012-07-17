@@ -9,14 +9,13 @@
 
 from work_queue import *
 import itertools, sys, os, re, hashlib, mmap, _mysql
-from subprocess import *
 
 class Sweeper:
     """Provides a simple api for a program to sweep through a range of parameters.
         Usage: import sweeper
                x = sweeper.Sweeper()"""
-    def __init__(self, verbose):
-        self.verbose = verbose              # turn on/off verbose mode
+    def __init__(self, verbose=0):
+        self.vb = verbose              # turn on/off verbose mode
         self.port = WORK_QUEUE_RANDOM_PORT  # random, default is 9123
         self.progname = ""                  # the program to sweep with
         self.envpath = ""                   # path to a environment set up script
@@ -33,12 +32,14 @@ class Sweeper:
         self.command.append(progname)
         # remove the file extension so we can create a nice directory
         self.progname, sep, tail = progname.partition('.')
+        if self.vb: print 'added program = %s' % (progname)
 
     def setenv(self, pathtoenv):
         """Set the path to a env script to set up an environment for the command to run in.
             Usage: x.setenv("env.sh")
             @param pathtoenv The path to a script to run first."""
         self.envpath = pathtoenv
+        if self.vb: print 'added environment script = %s' % (pathtoenv)
 
     def setenvdir(self, pathtoenvdir, caching=2):
         """Specify a directory to be submitted that contains an environment for the worker to run in, a script will still have to set the env up.
@@ -50,6 +51,7 @@ class Sweeper:
         r.append(pathtoenvdir)
         r.append(caching)
         self.inputlist.append(r)
+        if self.vb: print 'added environment directory = %s caching = %s' % (pathtoenvdir, caching)
 
     def addtuple(self, flag, iterlist):
         """Add a flag/sweep pair to the command. This has the same functionality as addparameter() and addsweep() used together.
@@ -59,10 +61,8 @@ class Sweeper:
         self.command.append(str(flag))
         self.command.append('%s')
         self.paramvalues.append('%s')
-        r = []
-        for i in iterlist:
-            r.append(i)
-        self.sweeps.append(r)
+        self.sweeps.append(iterlist)
+        if self.vb: print 'added tuple = %s sweep = %s' % (flag, iterlist)
 
     def addparameter(self, param):
         """Add a parameter to the list of parameters(arguments).
@@ -71,6 +71,7 @@ class Sweeper:
                    x.addparameter("> out")
             @param param The argument to be added."""
         self.command.append(str(param))
+        if self.vb: print 'added parameter = %s' % (param)
 
     def addinput(self, input, caching=2):
         """Add a file (or directory) to the input list.
@@ -81,6 +82,7 @@ class Sweeper:
         r.append(caching)
         r.append(self._checksum(input))
         self.inputlist.append(r)
+        if self.vb: print 'added input = %s caching = %s' % (input, caching)
 
     def addoutput(self, output, caching=1):
         """Add a file (or directory) to the output list.
@@ -91,6 +93,7 @@ class Sweeper:
         r.append(output)
         r.append(caching)
         self.outputlist.append(r)
+        if self.vb: print 'added output = %s caching = %s' % (output, caching)
 
     def addsweep(self, iterlist):
         """Add a sweep to the command.
@@ -98,10 +101,8 @@ class Sweeper:
             @param iterlist An iterable object that contains the values to sweep over."""
         self.command.append("%s")
         self.paramvalues.append("%s")
-        r = []
-        for i in iterlist:
-            r.append(i)
-        self.sweeps.append(r)
+        self.sweeps.append(iterlist)
+        if self.vb: print 'added sweep = %s' % (iterlist)
 
     def sweep(self, interpreter='bash'):
         """Sweep over the command.
@@ -117,6 +118,7 @@ class Sweeper:
         for item in itertools.product(*self.sweeps):
             # create the commad
             command  = ' '.join(self.command) % (item)
+            if self.vb: print 'created command = %s' % (command)
             commdir = '_'.join(self.command) % (item)
             # we want to replace illegal file characters with _
             regex = re.compile('[:/" ()<>|?*]|(\\\)')
@@ -124,9 +126,15 @@ class Sweeper:
             
             # create progname/commdir, this is where the output will go ex. BuildMSM-sweep/command_with_underscores/Data
             os.system("mkdir -p %s-sweep/%s" % (self.progname, commdir))
+            if self.vb: print 'created directory = %s-sweep/%s' % (self.progname, commdir)
 
             if (self.envpath): # if a env script was specified
-                env = open(self.envpath).read()
+                try:
+                    env = open(self.envpath).read()
+                except:
+                    print 'error: could not open', self.envpath
+                    print 'exiting'
+                    sys.exit(1)
             else:
                 env = ""
 
@@ -136,8 +144,9 @@ class Sweeper:
                      % (self.progname, commdir, commdir), 'w')
             fo.write(script)
             fo.close
-            # TODO add an option to specify the interpreter
+            if self.vb: print 'created script = %s-sweep/%s/%s-script' % (self.progname, commdir, commdir)
             taskcommand = '%s script.sh' % (interpreter) # run with bash
+            if self.vb: print 'created taskcommand = %s' % (taskcommand)
 
             t = Task(taskcommand)
             t.specify_buffer(script, 'script.sh')
@@ -178,10 +187,12 @@ class Sweeper:
             @param interpreter The interpreter to run the script"""
         # create the db object
         db = _mysql.connect(host=host, user=user, db=dbname, passwd=pw)
+        if self.vb: print 'connected to mysql server = %s user = %s using database = %s' % (host, user, dbname)
         # we want to replace all illegal file characters with _
         regex = re.compile('[:/" ()<>|?*]|(\\\)')
         for item in itertools.product(*self.sweeps):
             command  = ' '.join(self.command) % (item) # create the command
+            if self.vb: print 'created command = %s' % (command)
             commdir = '_'.join(self.command) % (item)
             # replace illegal characters with _
             commdir = regex.sub('_', commdir)
@@ -196,9 +207,15 @@ class Sweeper:
 
             # create progname-sweep/commdir, this is where the output will go ex. BuildMSM-sweep/command_with_underscores/Data
             os.system("mkdir -p %s-sweep/%s" % (self.progname, commdir))
+            if self.vb: print 'created directory = %s-sweep/%s' % (self.progname, commdir)
 
             if (self.envpath): # if a env script was specified
-                env = open(self.envpath).read()
+                try:
+                    env = open(self.envpath).read()
+                except:
+                    print 'error: could not open', self.envpath
+                    print 'exiting'
+                    sys.exit(1)
             else:
                 env = ""
 
@@ -207,6 +224,7 @@ class Sweeper:
             fo = open(localpath, 'w')
             fo.write(script)
             fo.close()
+            if self.vb: print 'created script = %s-sweep/%s/%s-script' % (self.progname, commdir, commdir)
 
             #INSERT INTO commands VALUES (command_id, username, personal_id, name, command, status, stdout)
             #INSERT INTO files VALUES (fileid, command_id, local_path, remote_path, type, flags, checksum)
@@ -281,18 +299,18 @@ class Sweeper:
 
         # if we did not find a duplicate
         if cid < 0:
-            print 'new command', cid
+            if self.vb: print 'new command =', dbcommand
             return 0 # new command, input everything
 
-        print 'duplicte command cid=', cid, dbcommand
+        if slef.vb: print 'duplicte command = %s cid = %s' % (dbcommand, cid)
         # find the files associated with this commnand_id
         dbconn.query("""SELECT remote_path,checksum FROM files WHERE command_id='%s'""" % (cid))
         r = dbconn.store_result()
         for file, hash in r.fetch_row(maxrows=0):
             for input in self.inputlist:
                 if file in input and hash not in input:
-                    print 'file changed', file, hash, 'updating cid', cid, 'to avaliable'
+                    if self.vb: print 'file changed', file, hash, 'updating cid', cid, 'to avaliable'
                     dbconn.query("""UPDATE commands SET status=2 WHERE command_id='%s'""" % (cid))
                     return 1 # file changed, rerun command (set status to Avaliable) 
-        print 'files identical, doing nothing to cid', cid
+        if self.vb: print 'files identical, doing nothing to command = %s cid = %s' % (dbcommand, cid)
         return 1
