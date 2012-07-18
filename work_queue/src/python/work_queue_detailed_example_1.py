@@ -21,6 +21,7 @@ set_debug_flag('debug')
 set_debug_flag('wq')
 
 wq = WorkQueue(WORK_QUEUE_RANDOM_PORT, name='workqueue_example', catalog=True, exclusive=False)
+os.environ['PATH'] = '../../../dttools/src:' + os.environ['PATH']
 os.system('work_queue_worker -d all localhost %d &' % wq.port)
 
 print wq.name
@@ -83,7 +84,6 @@ while not wq.empty():
     t = wq.wait(1)
     if t:
 	print t.id, t.return_status, t.result, t.host
-	print t.preferred_host, t.status
 	print t.submit_time, t.finish_time, t.app_delay
 	print t.send_input_start, t.send_input_finish
 	print t.execute_cmd_start, t.execute_cmd_finish
