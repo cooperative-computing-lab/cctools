@@ -2,7 +2,7 @@
 
 show_help() 
 {
-	echo "Use: sge_submit_workers [options] <servername> <port> <num-workers>"
+	echo "Use: torque_submit_workers [options] <servername> <port> <num-workers>"
 	echo "where options are:"
 	echo "  -a               Enable auto mode."
 	echo "  -s               Run as a shared worker."
@@ -10,7 +10,7 @@ show_help()
 	echo "  -C <catalog>     Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
 	echo "  -t <time>        Abort after this amount of idle time. (default=900s)"
 	echo "  -j               Use job array to submit workers."	
-	echo "  -p <parameters>  SGE qsub parameters."
+	echo "  -p <parameters>  torque qsub parameters."
 	echo "  -h               Show this help message."
 	exit 1
 }
