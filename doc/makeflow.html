@@ -159,6 +159,11 @@ Or, submit 10 worker processes to SGE like this:
 % sge_submit_workers barney.nd.edu 9123 10
 </pre>
 
+Or, submit 10 worker processes to Torque like this:
+<pre>
+% torque_submit_workers barney.nd.edu 9123 10
+</pre>
+
 Or, you can start workers manually on any other machine you can log into:
 <pre>
 % work_queue_worker barney.nd.edu 9123
@@ -174,7 +179,8 @@ so you can either run another Makeflow with the same workers,
 remove them from the batch system, or wait for them to expire.
 If you do nothing for 15 minutes, they will automatically exit.
 <p>
-Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>
+Note that <tt>condor_submit_workers</tt>, <tt>sge_submit_workers</tt>,
+and <tt>torque_submit_workers</tt>.
 are simple shell scripts, so you can edit them directly if you would
 like to change batch options or other details.
 
