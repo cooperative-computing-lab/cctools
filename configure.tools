@@ -232,10 +232,12 @@ EOF
 	if gcc .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1 
 	then
 		echo yes
+		rm -f .configure.tmp.c .configure.tmp.out
 		ccflags="${ccflags} -D$2"
 		return 0
 	else
 		echo no
+		rm -f .configure.tmp.c .configure.tmp.out
 		return 1
 	fi
 }
