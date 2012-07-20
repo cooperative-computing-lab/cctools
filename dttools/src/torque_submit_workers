@@ -20,17 +20,17 @@ use_auto=0
 use_jobarray=0
 parameters=""
 
-while getopts asN:t:jp:h opt 
+while getopts aC:hjN:p:st: opt 
 do
 	case "$opt" in
 		a)  arguments="$arguments -a"; use_auto=1;;
-		s)  arguments="$arguments -s";;
-		N)  arguments="$arguments -N $OPTARG";;
 		C)  arguments="$arguments -C $OPTARG";;
-		t)  arguments="$arguments -t $OPTARG";;
-		j)  use_jobarray=1;;
-		p)  parameters="$parameters $OPTARG";;
 		h)  show_help;;
+		j)  use_jobarray=1;;
+		N)  arguments="$arguments -N $OPTARG";;
+		p)  parameters="$parameters $OPTARG";;
+		s)  arguments="$arguments -s";;
+		t)  arguments="$arguments -t $OPTARG";;
 		\?) show_help;;
 	esac
 done
