@@ -2013,7 +2013,7 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	while((c = getopt(argc, argv, "aAB:cC:d:DEF:g:G:hiIj:J:kKl:L:MN:o:Op:P:r:RS:t:T:vw:W:z:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:DEF:g:G:hIj:J:kKl:L:N:o:Op:P:r:RS:t:T:vw:W:z")) != (char) -1) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
