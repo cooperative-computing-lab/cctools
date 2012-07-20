@@ -2015,160 +2015,160 @@ int main(int argc, char *argv[])
 
 	while((c = getopt(argc, argv, "aAB:cC:d:DEF:g:G:hiIj:J:kKl:L:MN:o:Op:P:r:RS:t:T:vw:W:z:")) != (char) -1) {
 		switch (c) {
-		case 'A':
-			skip_afs_check = 1;
-			break;
-		case 'p':
-			port_set = 1;
-			port = atoi(optarg);
-			break;
-		case 'c':
-			clean_mode = 1;
-			break;
-		case 'N':
-			free(project);
-			project = xxstrdup(optarg);
-			break;
-		case 'P':
-			priority = atoi(optarg);
-			setenv("WORK_QUEUE_PRIORITY", optarg, 1);
-			break;
-		case 'a':
-			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
-			break;
-		case 'E':
-			work_queue_estimate_capacity_on = 1;
-			break;
-		case 'C':
-			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
-				fprintf(stderr, "makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
-				exit(1);
-			}
-			setenv("CATALOG_HOST", catalog_host, 1);
-
-			char *value = string_format("%d", catalog_port);
-			setenv("CATALOG_PORT", value, 1);
-			free(value);
-
-			break;
-		case 'I':
-			display_mode = SHOW_INPUT_FILES;
-			break;
-		case 'O':
-			display_mode = SHOW_OUTPUT_FILES;
-			break;
-		case 'g':
-			if (strcasecmp(optarg, "none") == 0) {
-				dag_gc_method = DAG_GC_NONE;
-			} else if (strcasecmp(optarg, "ref_count") == 0) {
-				dag_gc_method = DAG_GC_REF_COUNT;
-			} else if (strcasecmp(optarg, "incr_file") == 0) {
-				dag_gc_method = DAG_GC_INCR_FILE;
-				if (dag_gc_param < 0)
-					dag_gc_param = 16;	/* Try to collect at most 16 files. */
-			} else if (strcasecmp(optarg, "incr_time") == 0) {
-				dag_gc_method = DAG_GC_INCR_TIME;
-				if (dag_gc_param < 0)
-					dag_gc_param = 5;	/* Timeout of 5. */
-			} else if (strcasecmp(optarg, "on_demand") == 0) {
-				dag_gc_method = DAG_GC_ON_DEMAND;
-				if (dag_gc_param < 0)
-					dag_gc_param = 1 << 14; /* Inode threshold of 2^14. */
-			} else {
-				fprintf(stderr, "makeflow: invalid garbage collection method: %s\n", optarg);
-				exit(1);
-			}
-			break;
-		case 'G':
-			dag_gc_param = atoi(optarg);
-			break;
-		case 'l':
-			logfilename = xxstrdup(optarg);
-			break;
-		case 'L':
-			batchlogfilename = xxstrdup(optarg);
-			break;
-		case 'D':
-			display_mode = 1;
-			break;
-		case 'k':
-			syntax_check = 1;
-			break;
-		case 'S':
-			dag_submit_timeout = atoi(optarg);
-			break;
-		case 'R':
-			dag_retry_flag = 1;
-			break;
-		case 'r':
-			dag_retry_flag = 1;
-			dag_retry_max = atoi(optarg);
-			break;
-		case 'j':
-			explicit_local_jobs_max = atoi(optarg);
-			break;
-		case 'J':
-			explicit_remote_jobs_max = atoi(optarg);
-			break;
-		case 'B':
-			batch_submit_options = optarg;
-			break;
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case 'o':
-			debug_config_file(optarg);
-			break;
-		case 'v':
-			cctools_version_print(stdout, argv[0]);
-			return 0;
-		case 'h':
-			show_help(argv[0]);
-			return 0;
-		case 'T':
-			batch_queue_type = batch_queue_type_from_string(optarg);
-			if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
-				fprintf(stderr, "makeflow: unknown batch queue type: %s\n", optarg);
-				return 1;
-			}
-			break;
-		case 'w':
-			if(!strcmp(optarg, "width")) {
-				auto_workers = MAKEFLOW_AUTO_WIDTH;
-			} else if(!strcmp(optarg, "group")) {
-				auto_workers = MAKEFLOW_AUTO_GROUP;
-			} else {
+			case 'a':
+				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+				break;
+			case 'A':
+				skip_afs_check = 1;
+				break;
+			case 'B':
+				batch_submit_options = optarg;
+				break;
+			case 'c':
+				clean_mode = 1;
+				break;
+			case 'C':
+				if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
+					fprintf(stderr, "makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
+					exit(1);
+				}
+				setenv("CATALOG_HOST", catalog_host, 1);
+	
+				char *value = string_format("%d", catalog_port);
+				setenv("CATALOG_PORT", value, 1);
+				free(value);
+	
+				break;
+			case 'd':
+				debug_flags_set(optarg);
+				break;
+			case 'D':
+				display_mode = 1;
+				break;
+			case 'E':
+				work_queue_estimate_capacity_on = 1;
+				break;
+			case 'F':
+				wq_option_fast_abort_multiplier = atof(optarg);
+				break;
+			case 'g':
+				if (strcasecmp(optarg, "none") == 0) {
+					dag_gc_method = DAG_GC_NONE;
+				} else if (strcasecmp(optarg, "ref_count") == 0) {
+					dag_gc_method = DAG_GC_REF_COUNT;
+				} else if (strcasecmp(optarg, "incr_file") == 0) {
+					dag_gc_method = DAG_GC_INCR_FILE;
+					if (dag_gc_param < 0)
+						dag_gc_param = 16;	/* Try to collect at most 16 files. */
+				} else if (strcasecmp(optarg, "incr_time") == 0) {
+					dag_gc_method = DAG_GC_INCR_TIME;
+					if (dag_gc_param < 0)
+						dag_gc_param = 5;	/* Timeout of 5. */
+				} else if (strcasecmp(optarg, "on_demand") == 0) {
+					dag_gc_method = DAG_GC_ON_DEMAND;
+					if (dag_gc_param < 0)
+						dag_gc_param = 1 << 14; /* Inode threshold of 2^14. */
+				} else {
+					fprintf(stderr, "makeflow: invalid garbage collection method: %s\n", optarg);
+					exit(1);
+				}
+				break;
+			case 'G':
+				dag_gc_param = atoi(optarg);
+				break;
+			case 'h':
 				show_help(argv[0]);
-				exit(1);
-			}
-			break;
-		case 'F':
-			wq_option_fast_abort_multiplier = atof(optarg);
-			break;
-		case 'W':
-			if(!strcmp(optarg, "files")) {
-				wq_option_scheduler = WORK_QUEUE_SCHEDULE_FILES;
-			} else if(!strcmp(optarg, "time")) {
-				wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
-			} else if(!strcmp(optarg, "fcfs")) {
-				wq_option_scheduler = WORK_QUEUE_SCHEDULE_FCFS;
-			} else {
-				fprintf(stderr, "makeflow: unknown scheduling mode %s\n", optarg);
+				return 0;
+			case 'I':
+				display_mode = SHOW_INPUT_FILES;
+				break;
+			case 'j':
+				explicit_local_jobs_max = atoi(optarg);
+				break;
+			case 'J':
+				explicit_remote_jobs_max = atoi(optarg);
+				break;
+			case 'k':
+				syntax_check = 1;
+				break;
+			case 'K':
+				preserve_symlinks = 1;
+				break;
+			case 'l':
+				logfilename = xxstrdup(optarg);
+				break;
+			case 'L':
+				batchlogfilename = xxstrdup(optarg);
+				break;
+			case 'N':
+				free(project);
+				project = xxstrdup(optarg);
+				break;
+			case 'o':
+				debug_config_file(optarg);
+				break;
+			case 'O':
+				display_mode = SHOW_OUTPUT_FILES;
+				break;
+			case 'p':
+				port_set = 1;
+				port = atoi(optarg);
+				break;
+			case 'P':
+				priority = atoi(optarg);
+				setenv("WORK_QUEUE_PRIORITY", optarg, 1);
+				break;
+			case 'r':
+				dag_retry_flag = 1;
+				dag_retry_max = atoi(optarg);
+				break;
+			case 'R':
+				dag_retry_flag = 1;
+				break;
+			case 'S':
+				dag_submit_timeout = atoi(optarg);
+				break;
+			case 't':
+				setenv("WORK_QUEUE_CAPACITY_TOLERANCE", optarg, 1);
+				break;
+			case 'T':
+				batch_queue_type = batch_queue_type_from_string(optarg);
+				if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
+					fprintf(stderr, "makeflow: unknown batch queue type: %s\n", optarg);
+					return 1;
+				}
+				break;
+			case 'v':
+				cctools_version_print(stdout, argv[0]);
+				return 0;
+			case 'w':
+				if(!strcmp(optarg, "width")) {
+					auto_workers = MAKEFLOW_AUTO_WIDTH;
+				} else if(!strcmp(optarg, "group")) {
+					auto_workers = MAKEFLOW_AUTO_GROUP;
+				} else {
+					show_help(argv[0]);
+					exit(1);
+				}
+				break;
+			case 'W':
+				if(!strcmp(optarg, "files")) {
+					wq_option_scheduler = WORK_QUEUE_SCHEDULE_FILES;
+				} else if(!strcmp(optarg, "time")) {
+					wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
+				} else if(!strcmp(optarg, "fcfs")) {
+					wq_option_scheduler = WORK_QUEUE_SCHEDULE_FCFS;
+				} else {
+					fprintf(stderr, "makeflow: unknown scheduling mode %s\n", optarg);
+					return 1;
+				}
+				break;
+			case 'z':
+				output_len_check = 1;
+				break;
+			default:
+				show_help(argv[0]);
 				return 1;
-			}
-			break;
-		case 'K':
-			preserve_symlinks = 1;
-			break;
-		case 't':
-			setenv("WORK_QUEUE_CAPACITY_TOLERANCE", optarg, 1);
-			break;
-		case 'z':
-			output_len_check = 1;
-			break;
-		default:
-			show_help(argv[0]);
-			return 1;
 		}
 	}
 
