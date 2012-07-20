@@ -1315,7 +1315,7 @@ int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, i
 				n->target_file_names_size += strlen(filename) + 1;
 			}
 		} else if(filename[0] == '/' && batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-			/* Translate only explicit absolute paths for work queue tasks.
+			/* Translate only explicit absolute paths for Work Queue tasks.
 			 * TODO: should we check this return value? */
 			translate_filename(d, filename, &newname);
 			/* We have to reserve extra space so we can do renaming later. */
@@ -1933,37 +1933,38 @@ static void handle_abort(int sig)
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
-	fprintf(stdout, "where options are:\n");
-	fprintf(stdout, " -c             Clean up: remove logfile and all targets.\n");
-	fprintf(stdout, " -T <type>      Batch system type: %s. (default is local)\n", batch_queue_type_string());
+	fprintf(stdout, "Frequently used options:\n");
+	fprintf(stdout, "-c             Clean up: remove logfile and all targets.\n");
+	fprintf(stdout, "-T <type>      Batch system type: %s. (default is local)\n", batch_queue_type_string());
+	fprintf(stdout, "Where options are:\n");
+	fprintf(stdout, " -a             Advertise the master information to a catalog server.\n");
+	fprintf(stdout, " -A             Disable the check for AFS.                  (experts only.)\n");;
+	fprintf(stdout, " -B <options>   Add these options to all batch submit files.\n");
+	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
+	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem\n");
+	fprintf(stdout, " -D             Display the Makefile as a Dot graph.\n");
+	fprintf(stdout, " -e             Set the Work Queue master to only accept workers that have the same -N <project> option.\n");
+	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capacity may be viewed in the Work Queue log file or through the  work_queue_status command.\n");
+	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
+	fprintf(stdout, " -h             Show this help screen\n");
+	fprintf(stdout, " -I             Show input files.\n");
 	fprintf(stdout, " -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	fprintf(stdout, " -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
-	fprintf(stdout, " -p <port>      Port number to use with work queue.         (default is %d, 0=arbitrary)\n", WORK_QUEUE_DEFAULT_PORT);
-	fprintf(stdout, " -N <project>   Set the project name to <project>\n");
-	fprintf(stdout, " -P <integer>   Priority. Higher the value, higher the priority.\n");
-	fprintf(stdout, " -a             Advertise the master information to a catalog server.\n");
-	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	fprintf(stdout, " -e             Set the work queue master to only accept workers that have the same -N <project> option.\n");
-	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capacity may be viewed in the work queue log file or through the  work_queue_status command.\n");
-	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
-	fprintf(stdout, " -I             Show input files.\n");
-	fprintf(stdout, " -O             Show output files.\n");
-	fprintf(stdout, " -D             Display the Makefile as a Dot graph.\n");
-	fprintf(stdout, " -B <options>   Add these options to all batch submit files.\n");
-	fprintf(stdout, " -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n", dag_submit_timeout);
-	fprintf(stdout, " -r <n>         Automatically retry failed batch jobs up to n times.\n");
+	fprintf(stdout, " -k             Syntax check.\n");
+	fprintf(stdout, " -K             Preserve (i.e., do not clean) intermediate symbolic links\n");
 	fprintf(stdout, " -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
 	fprintf(stdout, " -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
-	fprintf(stdout, " -A             Disable the check for AFS.                  (experts only.)\n");;
-	fprintf(stdout, " -k             Syntax check.\n");
+	fprintf(stdout, " -N <project>   Set the project name to <project>\n");
+	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
+	fprintf(stdout, " -O             Show output files.\n");
+	fprintf(stdout, " -p <port>      Port number to use with Work Queue.         (default is %d, 0=arbitrary)\n", WORK_QUEUE_DEFAULT_PORT);
+	fprintf(stdout, " -P <integer>   Priority. Higher the value, higher the priority.\n");
+	fprintf(stdout, " -r <n>         Automatically retry failed batch jobs up to n times.\n");
+	fprintf(stdout, " -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n", dag_submit_timeout);
+	fprintf(stdout, " -v             Show version string\n");
 	fprintf(stdout, " -w <mode>      Auto Work Queue mode. Mode is either 'width' or 'group' (DAG [width] or largest [group] of tasks).\n");
 	fprintf(stdout, " -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
-	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem\n");
-	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
-	fprintf(stdout, " -K             Preserve (i.e., do not clean) intermediate symbolic links\n");
 	fprintf(stdout, " -z             Force failure on zero-length output files \n");
-	fprintf(stdout, " -v             Show version string\n");
-	fprintf(stdout, " -h             Show this help screen\n");
 }
 
 int main(int argc, char *argv[])
@@ -2212,8 +2213,8 @@ int main(int argc, char *argv[])
 			setenv("WORK_QUEUE_PORT", value, 1);
 			free(value);
 		} else {
-			// Use work queue default port in standalone mode when port is not
-			// specified with -p option. In work queue catalog mode, work queue
+			// Use Work Queue default port in standalone mode when port is not
+			// specified with -p option. In Work Queue catalog mode, Work Queue
 			// would choose an arbitrary port when port is not explicitly specified.
 			if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE) {
 				value = string_format("%d", WORK_QUEUE_DEFAULT_PORT);
@@ -2337,7 +2338,7 @@ int main(int argc, char *argv[])
 		if(!strncmp(cwd, "/afs", 4)) {
 			fprintf(stderr, "makeflow: This won't work because Condor is not able to write to files in AFS.\n");
 			fprintf(stderr, "makeflow: Instead, run makeflow from a local disk like /tmp.\n");
-			fprintf(stderr, "makeflow: Or, use the work queue with -T wq and condor_submit_workers.\n");
+			fprintf(stderr, "makeflow: Or, use the Work Queue with -T wq and condor_submit_workers.\n");
 
 			free(logfilename);
 			free(batchlogfilename);
