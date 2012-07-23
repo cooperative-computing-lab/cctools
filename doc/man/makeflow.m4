@@ -64,7 +64,6 @@ SUBSECTION(WorkQueue Options)
 OPTIONS_BEGIN
 OPTION_ITEM(-a)Advertise the master information to a catalog server.
 OPTION_PAIR(-C, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
-OPTION_ITEM(-e)Set the WorkQueue master to only accept workers that have the same -N PARAM(project) option.
 OPTION_PAIR(-F, #)WorkQueue fast abort multiplier. (default is deactivated)
 OPTION_PAIR(-N, project)Set the project name to PARAM(project).
 OPTION_PAIR(-p, port)Port number to use with WorkQueue. (default is 9123, 0=arbitrary)

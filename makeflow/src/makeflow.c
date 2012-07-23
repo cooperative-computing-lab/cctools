@@ -1943,7 +1943,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem\n");
 	fprintf(stdout, " -D             Display the Makefile as a Dot graph.\n");
-	fprintf(stdout, " -e             Set the Work Queue master to only accept workers that have the same -N <project> option.\n");
 	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capacity may be viewed in the Work Queue log file or through the  work_queue_status command.\n");
 	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	fprintf(stdout, " -h             Show this help screen\n");
