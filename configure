@@ -2,6 +2,11 @@
 
 uname -a
 
+if [ -z "$USER" ]; then
+  USER=`whoami`
+  export USER
+fi
+
 . ./configure.tools
 
 save_arguments $0 $@
@@ -37,7 +42,7 @@ configure_arguments=`echo "$*" | sed 's/#/\\\\#/' | sed 's/\\$/$$/'`
 # The above sed commands are to escape the output for the Makefile.
 system_information=`uname -a | sed 's/#/\\\\#/' | sed 's/\\$/$$/'`
 
-build_user=`whoami`
+build_user="$USER"
 build_host=`uname -n`
 build_sys=`uname -s | tr \[a-z\] \[A-Z\] | awk -F_ '{print $1}'`
 build_cpu=`uname -m | tr \[a-z\] \[A-Z\]`
@@ -905,7 +910,7 @@ ccflags="${ccflags} -DINSTALL_PATH='\"${install_path}\"' $debug_flag -D_REENTRAN
 echo "Creating Makefile.config..."
 
 cat <<EOF >>Makefile.config
-# Generated at `date` by `whoami`@`uname -n`
+# Generated at `date` by $USER@`uname -n`
 
 CCTOOLS_INSTALL_DIR=${install_path}
 CCTOOLS_PACKAGES=${packages}
