@@ -10,6 +10,8 @@
 from work_queue import *
 import itertools, sys, os, re, hashlib, mmap, _mysql
 
+MAX_FILES_IN_DIR = 10000 # not sure what the max is for AFS, but in a test mkdir threw an error at 31190
+
 class Sweeper:
     """Provides a simple api for a program to sweep through a range of parameters.
         Usage: import sweeper
@@ -25,6 +27,7 @@ class Sweeper:
         self.inputlist = []                 # list of input files
         self.outputlist = []                # list of output files
         self.keys = []                      # list of keys
+        self.env = ''                       # the environment
 
     def addprog(self, progname):
         """The program (sans parameters) to sweep with.
@@ -48,9 +51,11 @@ class Sweeper:
                    x.setenv('env.sh') # set ups env on worker using myenvdir
             @param pathtoenvdir The path to the directory."""
         # TODO contained in the envdir should be a script that sets up the env, this needs to be added to the env script
+        self.env = pathtoenvdir
         r = []
         r.append(pathtoenvdir)
         r.append(caching)
+        r.append(self._checksum(pathtoenvdir))
         self.inputlist.append(r)
         if self.vb: print 'added environment directory = %s caching = %s' % (pathtoenvdir, caching)
 
@@ -128,18 +133,24 @@ class Sweeper:
 
         print "listening on port %d..." % self.q.port
 
+        regex = re.compile('[:/" ()<>|?*]|(\\\)')
+        filenum = 0 # count how many files are created in the dir
+        dirnum = 0 # used to identify a output dir for sweeps of greater than the max number of files in a dir
         for item in itertools.product(*self.sweeps):
+            commdir = '_'.join(self.command) % (item)
+            # we want to replace illegal file characters with _
+            commdir = regex.sub('_', commdir)
+            filenum += 1
+            if filenum >= MAX_FILES_IN_DIR:
+                filenum = 0
+                dirnum += 1
+            os.system("mkdir -p %s-sweep%d/%s" % (self.progname, dirnum, commdir))
+            if self.vb: print 'created directory = %s-sweep%d/%s' % (self.progname, dirnum, commdir)
+
             # create the commad
             command  = ' '.join(self.command) % (item)
             if self.vb: print 'created command = %s' % (command)
-            commdir = '_'.join(self.command) % (item)
-            # we want to replace illegal file characters with _
-            regex = re.compile('[:/" ()<>|?*]|(\\\)')
-            commdir = regex.sub('_', commdir)
             
-            # create progname/commdir, this is where the output will go ex. BuildMSM-sweep/command_with_underscores/Data
-            os.system("mkdir -p %s-sweep/%s" % (self.progname, commdir))
-            if self.vb: print 'created directory = %s-sweep/%s' % (self.progname, commdir)
 
             if (self.envpath): # if a env script was specified
                 try:
@@ -153,11 +164,11 @@ class Sweeper:
 
             # combine an env script and the command into one
             script = """%(env)s%(command)s\n""" % {'env': env, 'command': command}
-            fo = open('%s-sweep/%s/%s-script' 
-                     % (self.progname, commdir, commdir), 'w')
+            fo = open('%s-sweep%d/%s/%s-script' 
+                     % (self.progname, dirnum, commdir, commdir), 'w')
             fo.write(script)
             fo.close
-            if self.vb: print 'created script = %s-sweep/%s/%s-script' % (self.progname, commdir, commdir)
+            if self.vb: print 'created script = %s-sweep%d/%s/%s-script' % (self.progname, dirnum, commdir, commdir)
             taskcommand = '%s script.sh' % (interpreter) # run with bash
             if self.vb: print 'created taskcommand = %s' % (taskcommand)
 
@@ -203,24 +214,32 @@ class Sweeper:
         if self.vb: print 'connected to mysql server = %s user = %s using database = %s' % (host, user, dbname)
         # we want to replace all illegal file characters with _
         regex = re.compile('[:/" ()<>|?*]|(\\\)')
+
+        filenum = 0 # used to identify a output dir for sweeps of greater than MAX_FILES_IN_DIR number of files in a dir
+        dirnum = 0 # identifies the output dir
         for item in itertools.product(*self.sweeps):
-            command  = ' '.join(self.command) % (item) # create the command
-            if self.vb: print 'created command = %s' % (command)
             commdir = '_'.join(self.command) % (item)
             # replace illegal characters with _
             commdir = regex.sub('_', commdir)
-            outputdir = '%s-sweep/%s/' % (self.progname, commdir)
+            filenum += 1
+            if filenum >= MAX_FILES_IN_DIR:
+                filenum = 0
+                dirnum += 1
+            os.system("mkdir -p %s-sweep%d/%s" % (self.progname, dirnum, commdir))
+            if self.vb: print 'created directory = %s-sweep%d/%s' % (self.progname, dirnum, commdir)
+
+            command  = ' '.join(self.command) % (item) # create the command
+            if self.vb: print 'created command = %s' % (command)
+
+            outputdir = '%s-sweep%d/%s/' % (self.progname, dirnum, commdir)
             # this is the location of the script on the master
-            localpath = os.path.abspath('%s-sweep/%s/%s-script' % (self.progname, commdir, commdir))
+            localpath = os.path.abspath('%s-sweep%d/%s/%s-script' % (self.progname, dirnum, commdir, commdir))
             # location of the script on the worker
             remotepath = '%s-script' % (commdir)
             dbcommand = '%s ./' % (interpreter)+remotepath
             if self._checkdup(dbcommand, db): 
+                # if the command and it's input is identical
                 continue
-
-            # create progname-sweep/commdir, this is where the output will go ex. BuildMSM-sweep/command_with_underscores/Data
-            os.system("mkdir -p %s-sweep/%s" % (self.progname, commdir))
-            if self.vb: print 'created directory = %s-sweep/%s' % (self.progname, commdir)
 
             if (self.envpath): # if a env script was specified
                 try:
@@ -237,20 +256,18 @@ class Sweeper:
             fo = open(localpath, 'w')
             fo.write(script)
             fo.close()
-            if self.vb: print 'created script = %s-sweep/%s/%s-script' % (self.progname, commdir, commdir)
+            if self.vb: print 'created script = %s-sweep%d/%s/%s-script' % (self.progname, dirnum, commdir, commdir)
 
             #INSERT INTO commands VALUES (command_id, username, personal_id, name, command, status, stdout)
             #INSERT INTO files VALUES (fileid, command_id, local_path, remote_path, type, flags, checksum)
             # add the command to the table
-            db.query("""INSERT INTO %s.commands VALUES (command_id, \'%s\', personal_id, name, \'%s\', 2, stdout, env)""" 
-                    % (dbname, user, dbcommand,))
+            db.query("""INSERT INTO %s.commands VALUES (command_id, \'%s\', personal_id, name, \'%s\', 2, stdout, \'%s\')""" 
+                    % (dbname, user, dbcommand, self.env))
 
-            #TODO metadata
             for value,key in itertools.izip(item,self.keys):
                 if key is not '':
                     self.addmetadata(key,value,db)
                     db.query("""INSERT INTO cmdmeta VALUES ((SELECT MAX(command_id) FROM commands LIMIT 1), (SELECT MAX(meta_id) from metadata LIMIT 1))""")
-
             
             # add script as input so it is sent to the worker - no caching
             # get the checksum of the input script (localpath)
