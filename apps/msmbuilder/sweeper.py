@@ -212,6 +212,11 @@ class Sweeper:
         # create the db object
         db = _mysql.connect(host=host, user=user, db=dbname, passwd=pw)
         if self.vb: print 'connected to mysql server = %s user = %s using database = %s' % (host, user, dbname)
+
+        # if the tables metadata or cmdmeta do not exist, create them
+        db.query("""CREATE TABLE IF NOT EXISTS %s.testtest (meta_id int(11) auto_increment NOT NULL, label varchar(256) default NULL, value varchar(256) default NULL, PRIMARY KEY (meta_id)) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;""" % dbname)
+        db.query("""CREATE TABLE IF NOT EXISTS %s.experiment (command_id int(11) NOT NULL, meta_id int(11) NOT NULL) ENGINE=MyISAM DEFAULT CHARSET=utf8;""" % dbname)
+
         # we want to replace all illegal file characters with _
         regex = re.compile('[:/" ()<>|?*]|(\\\)')
 
