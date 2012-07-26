@@ -131,7 +131,18 @@ batch_job_id_t batch_job_submit_simple_cluster(struct batch_queue * q, const cha
 		if(s)
 			*s = 0;
 	}
-	char *command = string_format("%s %s '%s' %s %s.wrapper \"%s\"", cluster_submit_cmd, cluster_options, string_basename(name), q->options_text ? q->options_text : "", cluster_name, cmd);
+	char *command = NULL;
+	switch(q->type) {
+		case BATCH_QUEUE_TYPE_TORQUE:
+			command = string_format("%s %s '%s' %s %s.wrapper", cluster_submit_cmd, cluster_options, string_basename(name), q->options_text ? q->options_text : "", cluster_name);
+			break;
+		case BATCH_QUEUE_TYPE_SGE:
+		case BATCH_QUEUE_TYPE_MOAB:
+		case BATCH_QUEUE_TYPE_CLUSTER:
+		default:
+			command = string_format("%s %s '%s' %s %s.wrapper \"%s\"", cluster_submit_cmd, cluster_options, string_basename(name), q->options_text ? q->options_text : "", cluster_name, cmd);
+			break;
+	}
 	free(name);
 
 	debug(D_BATCH, "%s", command);
