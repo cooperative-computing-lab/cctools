@@ -224,11 +224,11 @@ static int handle_auto_workers(struct dag *d, int auto_workers)
 	}
 
 	char *start_worker_command = string_format("condor_submit_workers %s %d %d", hostname, port, num_of_workers);
-	debug(D_DEBUG, "starting %d workers: `%s`", num_of_workers, start_worker_command);
+	printf("starting %d workers: `%s`", num_of_workers, start_worker_command);
 	int status = system(start_worker_command);
 	free(start_worker_command);
 	if(status) {
-		debug(D_DEBUG, "unable to start workers.");
+		fprintf(stderr,"unable to start workers.");
 		return 0;
 	}
 
@@ -415,18 +415,18 @@ void dag_abort_all(struct dag *d)
 	UINT64_T jobid;
 	struct dag_node *n;
 
-	debug(D_DEBUG, "got abort signal...\n");
+	printf("got abort signal...\n");
 
 	itable_firstkey(d->local_job_table);
 	while(itable_nextkey(d->local_job_table, &jobid, (void **) &n)) {
-		debug(D_DEBUG, "aborting local job %llu\n", jobid);
+		printf("aborting local job %llu\n", jobid);
 		batch_job_remove(local_queue, jobid);
 		dag_node_state_change(d, n, DAG_NODE_STATE_ABORTED);
 	}
 
 	itable_firstkey(d->remote_job_table);
 	while(itable_nextkey(d->remote_job_table, &jobid, (void **) &n)) {
-		debug(D_DEBUG, "aborting remote job %llu\n", jobid);
+		printf("aborting remote job %llu\n", jobid);
 		batch_job_remove(remote_queue, jobid);
 		dag_node_state_change(d, n, DAG_NODE_STATE_ABORTED);
 	}
@@ -439,21 +439,21 @@ void file_clean(const char *filename, int silent)
 
 	if(unlink(filename) == 0) {
 		if(!silent)
-			debug(D_DEBUG, "deleted file %s\n", filename);
+			printf("deleted file %s\n", filename);
 	} else {
 		if(errno == ENOENT) {
 			// nothing
 		} else if(errno == EISDIR) {
 			if(!delete_dir(filename)) {
 				if(!silent)
-					debug(D_DEBUG, "couldn't delete directory %s: %s\n", filename, strerror(errno));
+					fprintf(stderr,"couldn't delete directory %s: %s\n", filename, strerror(errno));
 			} else {
 				if(!silent)
-					debug(D_DEBUG, "deleted directory %s\n", filename);
+					printf("deleted directory %s\n", filename);
 			}
 		} else {
 			if(!silent)
-				debug(D_DEBUG, "couldn't delete %s: %s\n", filename, strerror(errno));
+				fprintf(stderr, "couldn't delete %s: %s\n", filename, strerror(errno));
 		}
 	}
 }
@@ -515,13 +515,13 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	// If a job was submitted to Condor, then just reconnect to it. 
 	if(n->state == DAG_NODE_STATE_RUNNING && !n->local_job && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
 		// Reconnect the Condor jobs
-		debug(D_DEBUG, "rule still running: %s\n", n->command);
+		printf("rule still running: %s\n", n->command);
 		itable_insert(d->remote_job_table, n->jobid, n);
 		d->remote_jobs_running++;
 
 		// Otherwise, we cannot reconnect to the job, so rerun it
 	} else if(n->state == DAG_NODE_STATE_RUNNING || n->state == DAG_NODE_STATE_FAILED || n->state == DAG_NODE_STATE_ABORTED) {
-		debug(D_DEBUG, "will retry failed rule: %s\n", n->command);
+		printf("will retry failed rule: %s\n", n->command);
 		goto rerun;
 	}
 	// Rerun if an input file has been updated since the last execution.
@@ -927,7 +927,7 @@ void dag_node_parse_filelist(struct dag *d, struct dag_node *n, char *filelist, 
 			newname = NULL;
 			rv = translate_filename(d, filename, &newname);
 			if(rv && !clean_mode) {
-				debug(D_DEBUG, "creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
+				debug(D_DEBUG,"creating symlink \"./%s\" for file \"%s\"\n", newname, filename);
 				rv = symlink(filename, newname);
 				if(rv < 0 && errno != EEXIST) {
 					//TODO: Check for if symlink points to right place
@@ -1138,7 +1138,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		thequeue = remote_queue;
 	}
 
-	debug(D_DEBUG, "%s\n", n->command);
+	printf("%s\n", n->command);
 
 	input_files = malloc((n->source_file_names_size + 1) * sizeof(char));
 	input_files[0] = '\0';
@@ -1181,10 +1181,10 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		if(n->jobid >= 0)
 			break;
 
-		debug(D_DEBUG, "couldn't submit batch job, still trying...\n");
+		fprintf(stderr,"couldn't submit batch job, still trying...\n");
 
 		if(time(0) > stoptime) {
-			debug(D_DEBUG, "unable to submit job after %d seconds!\n", dag_submit_timeout);
+			fprintf(stderr,"unable to submit job after %d seconds!\n", dag_submit_timeout);
 			break;
 		}
 
@@ -1272,7 +1272,7 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 	if(info->exited_normally && info->exit_code == 0) {
 		for(f = n->target_files; f; f = f->next) {
 			if(access(f->filename, R_OK) != 0) {
-				debug(D_DEBUG, "%s did not create file %s\n", n->command, f->filename);
+				fprintf(stderr,"%s did not create file %s\n", n->command, f->filename);
 				job_failed = 1;
 			} else {
 				if(output_len_check) {
@@ -1287,9 +1287,9 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 		}
 	} else {
 		if(info->exited_normally) {
-			debug(D_DEBUG, "%s failed with exit code %d\n", n->command, info->exit_code);
+			fprintf(stderr,"%s failed with exit code %d\n", n->command, info->exit_code);
 		} else {
-			debug(D_DEBUG, "%s crashed with signal %d (%s)\n", n->command, info->exit_signal, strsignal(info->exit_signal));
+			fprintf(stderr,"%s crashed with signal %d (%s)\n", n->command, info->exit_signal, strsignal(info->exit_signal));
 		}
 		job_failed = 1;
 	}
@@ -1299,10 +1299,10 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 		if(dag_retry_flag || info->exit_code == 101) {
 			n->failure_count++;
 			if(n->failure_count > dag_retry_max) {
-				debug(D_DEBUG, "job %s failed too many times.\n", n->command);
+				fprintf(stderr,"job %s failed too many times.\n", n->command);
 				dag_failed_flag = 1;
 			} else {
-				debug(D_DEBUG, "will retry failed job %s\n", n->command);
+				fprintf(stderr,"will retry failed job %s\n", n->command);
 				dag_node_state_change(d, n, DAG_NODE_STATE_WAITING);
 			}
 		} else {
@@ -1364,15 +1364,12 @@ void dag_run(struct dag *d)
 
 		if(d->remote_jobs_running) {
 			int tmp_timeout = 5;
-			debug(D_DEBUG, "Waiting %d seconds for any job to finish ...\n", tmp_timeout);
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
 				debug(D_DEBUG, "Job %d has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
 				if(n)
 					dag_node_complete(d, n, &info);
-			} else {
-				debug(D_DEBUG, "No job has finished in the past %d seconds.\n", tmp_timeout);
 			}
 		}
 
@@ -1386,15 +1383,12 @@ void dag_run(struct dag *d)
 				stoptime = time(0) + tmp_timeout;
 			}
 
-			debug(D_DEBUG, "Waiting %d seconds for any job to finish ...\n", tmp_timeout);
 			jobid = batch_job_wait_timeout(local_queue, &info, stoptime);
 			if(jobid > 0) {
 				debug(D_DEBUG, "Job %d has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n)
 					dag_node_complete(d, n, &info);
-			} else {
-				debug(D_DEBUG, "No job has finished in the last %d seconds.\n", tmp_timeout);
 			}
 		}
 	}
@@ -1803,7 +1797,7 @@ int main(int argc, char *argv[])
 
 	port = batch_queue_port(remote_queue);
 	if(port > 0)
-		debug(D_DEBUG, "listening on port %d.\n", port);
+		printf("listening for workers on port %d.\n", port);
 
 	if(auto_workers > 0) {
 		if(!handle_auto_workers(d, auto_workers)) {
