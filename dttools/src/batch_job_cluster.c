@@ -41,13 +41,13 @@ int batch_job_setup_cluster(struct batch_queue * q)
 			cluster_name = strdup("moab");
 			cluster_submit_cmd = strdup("msub");
 			cluster_remove_cmd = strdup("mdel");
-			cluster_options = strdup("-d `pwd` -o /dev/null -v BATCH_JOB_COMMAND -j oe -N");
+			cluster_options = strdup("-d . -o /dev/null -v BATCH_JOB_COMMAND -j oe -N");
 			break;
 		case BATCH_QUEUE_TYPE_TORQUE:
 			cluster_name = strdup("torque");
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
-			cluster_options = strdup("-d `pwd` -k n -v BATCH_JOB_COMMAND -N");
+			cluster_options = strdup("-d . -o /dev/null -v BATCH_JOB_COMMAND -j oe -N");
 			break;
 		case BATCH_QUEUE_TYPE_CLUSTER:
 			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
