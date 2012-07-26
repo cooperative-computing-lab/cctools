@@ -13,8 +13,8 @@ save_arguments $0 $@
 
 major=3
 minor=5
-micro=2
-release_date="07/24/2012"
+micro=3
+release_date="07/26/2012"
 
 build_user="$USER"
 build_host=`uname -n`
