@@ -48,6 +48,7 @@ int batch_job_setup_cluster(struct batch_queue * q)
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
 			cluster_options = strdup("-d `pwd` -k n -v BATCH_JOB_COMMAND -N");
+			break;
 		case BATCH_QUEUE_TYPE_CLUSTER:
 			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
 			cluster_submit_cmd = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND");
