@@ -32,7 +32,7 @@ class Task(_object):
     # @param command    The shell command line to be exected by the task.
     def __init__(self, command):
         self._task = work_queue_task_create(command)
-
+ 
     def __del__(self):
         work_queue_task_delete(self._task)
 
@@ -47,91 +47,7 @@ class Task(_object):
             flags &= ~WORK_QUEUE_CACHE
 
         return flags
-
-    @property
-    def algorithm(self):
-        return self._task.worker_selection_algorithm
-
-    @property
-    def command(self):
-        return self._task.command_line
-
-    @property
-    def tag(self):
-        return self._task.tag
-
-    @property
-    def output(self):
-        return self._task.output
-
-    @property
-    def id(self):
-        return self._task.taskid
-
-    @property
-    def return_status(self):
-        return self._task.return_status
-
-    @property
-    def result(self):
-        return self._task.result
-	
-    @property
-    def hostname(self):
-        return self._task.hostname
-
-    @property
-    def host(self):
-        return self._task.host
-
-    @property
-    def submit_time(self):
-        return self._task.time_task_submit
-
-    @property
-    def finish_time(self):
-        return self._task.time_task_finish
-
-    @property
-    def app_delay(self):
-        return self._task.time_app_delay
-
-    @property
-    def send_input_start(self):
-        return self._task.time_send_input_start
-    
-    @property
-    def send_input_finish(self):
-        return self._task.time_send_input_finish
-    
-    @property
-    def execute_cmd_start(self):
-        return self._task.time_execute_cmd_start
-    
-    @property
-    def execute_cmd_finish(self):
-        return self._task.time_execute_cmd_finish
-    
-    @property
-    def receive_output_start(self):
-        return self._task.time_receive_output_start
-    
-    @property
-    def receive_output_finish(self):
-        return self._task.time_receive_output_finish
-    
-    @property
-    def total_bytes_transferred(self):
-        return self._task.total_bytes_transferred
-    
-    @property
-    def total_transfer_time(self):
-        return self._task.total_transfer_time
-    
-    @property
-    def cmd_execution_time(self):
-        return self._task.cmd_execution_time 
-
+   
     ##
     # Set the worker selection algorithm for task.
     #
@@ -173,7 +89,7 @@ class Task(_object):
     #                       - @ref WORK_QUEUE_CACHE
     # @param cache          Legacy parameter for setting file caching attribute.  By default this is enabled.
     #
-    # Example:
+    # For example:
     # @code
     # # The following are equivalent
     # >>> task.specify_file("/etc/hosts", type=WORK_QUEUE_INPUT, flags=WORK_QUEUE_NOCACHE)
@@ -216,17 +132,266 @@ class Task(_object):
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
     ##
-    # Add a file created or handled by an arbitrary command to a task (eg. wget, ftp, chirp_get|put).
+    # Add a file created or handled by an arbitrary command to a task (eg: wget, ftp, chirp_get|put).
     #
     # @param self           Reference to the current task object.
     # @param remote_name    The name of the remote file at the execution site.
     # @param command        The contents of the buffer to pass as input.
     # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
     # @param flags          May take the same values as @ref specify_file.
-    # @param cache          Legacy parameter for setting file caching attribute.  By default this is enabled.
+    # @param cache          Legacy parameter for setting file caching attribute. By default this is enabled.
     def specify_file_command(self, remote_name, command, type, flags, cache=True):
         flags = Task._determine_file_flags(flags, cache)
         return work_queue_task_specify_file_command(self._task, remote_name, command, type, flags)
+
+    ##
+    # Get the user-defined logical name for the task. 
+    # 
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.tag
+    # @endcode 
+    @property
+    def tag(self):
+        return self._task.tag
+
+    ## 
+    # Get the shell command executed by the task.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.command
+    # @endcode
+    @property
+    def command(self):
+        return self._task.command_line
+    
+    ##
+    # Get the algorithm for choosing worker to run the task.	 
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.algorithm
+    # @endcode
+    @property
+    def algorithm(self):
+        return self._task.worker_selection_algorithm
+
+    ## 
+    # Get the standard output of the task. Must be called only after the task
+	# completes execution.  	
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.output
+    # @endcode
+    @property
+    def output(self):
+        return self._task.output
+
+    ## 
+    # Get the task id number. Must be called only after the task was submitted. 
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.id
+    # @endcode
+    @property
+    def id(self):
+        return self._task.taskid
+
+    ## 
+    # Get the exit code of the command executed by the task. Must be called only
+	# after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.return_status
+    # @endcode
+    @property
+    def return_status(self):
+        return self._task.return_status
+
+    ## 
+    # Get the result of the task (successful, failed return_status, missing input file, missing output file). 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.result
+    # @endcode
+    @property
+    def result(self):
+        return self._task.result
+
+    ## 
+    # Get the address and port of the host on which the task ran.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.host
+    # @endcode
+    @property
+    def host(self):
+        return self._task.host
+		
+    ## 
+    # Get the name of the host on which the task ran.  
+	# Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.hostname
+    # @endcode
+    @property
+    def hostname(self):
+        return self._task.hostname
+
+    ## 
+    # Get the time at which this task was submitted.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.submit_time
+    # @endcode
+    @property
+    def submit_time(self):
+        return self._task.time_task_submit
+
+    ## 
+    # Get the time at which this task was finished. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.finish_time
+    # @endcode
+    @property
+    def finish_time(self):
+        return self._task.time_task_finish
+
+    ## 
+    # Get the time spent in upper-level application (outside of work_queue_wait).
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.app_delay
+    # @endcode
+    @property
+    def app_delay(self):
+        return self._task.time_app_delay
+
+    ## 
+    # Get the time at which the task started to transfer input files. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.send_input_start
+    # @endcode
+    @property
+    def send_input_start(self):
+        return self._task.time_send_input_start
+
+    ## 
+    # Get the time at which the task finished transferring input files. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.send_input_finish
+    # @endcode
+    @property
+    def send_input_finish(self):
+        return self._task.time_send_input_finish
+
+    ## 
+    # The time at which the task began.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.execute_cmd_start
+    # @endcode
+    @property
+    def execute_cmd_start(self):
+        return self._task.time_execute_cmd_start
+
+    ## 
+    # Get the time at which the task finished (discovered by the master). 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.execute_cmd_finish
+    # @endcode
+    @property
+    def execute_cmd_finish(self):
+        return self._task.time_execute_cmd_finish
+
+    ## 
+	# Get the time at which the task started to transfer output files. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.receive_output_start
+    # @endcode
+    @property
+    def receive_output_start(self):
+        return self._task.time_receive_output_start
+
+    ## 
+    # Get the time at which the task finished transferring output files. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.receive_output_finish
+    # @endcode
+    @property
+    def receive_output_finish(self):
+        return self._task.time_receive_output_finish
+
+    ## 
+    # Get the number of bytes transferred since task started transferring input data.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.total_bytes_transferred
+    # @endcode
+    @property
+    def total_bytes_transferred(self):
+        return self._task.total_bytes_transferred
+
+    ## 
+    # Get the time comsumed in microseconds for transferring total_bytes_transferred. 
+   	# Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.total_transfer_time
+    # @endcode
+    @property
+    def total_transfer_time(self):
+        return self._task.total_transfer_time
+
+    ## 
+    # Get the time spent in microseconds for executing the command on the worker. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.cmd_execution_time
+    # @endcode
+    @property
+    def cmd_execution_time(self):
+        return self._task.cmd_execution_time 
 
 
 ##
@@ -265,14 +430,35 @@ class WorkQueue(_object):
             self.shutdown_workers(0)
         work_queue_delete(self._work_queue)
     
+    ##
+    # Get the project name of the queue. 
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print q.name
+    # @endcode
     @property
     def name(self):
         return work_queue_name(self._work_queue)
 
+    ##
+    # Get the listening port of the queue.  
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print q.port
+    # @endcode
     @property
     def port(self):
         return work_queue_port(self._work_queue)
 
+    ##
+    # Get queue statistics.  
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print q.stats
+    # @endcode
     @property
     def stats(self):
         work_queue_get_stats(self._work_queue, self._stats)
