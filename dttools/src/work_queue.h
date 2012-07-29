@@ -63,9 +63,9 @@ struct work_queue_task {
 	char *host;			/**< The address and port of the host on which it ran. */
 	char *hostname;			/**< The name of the host on which it ran. */		
 
-	timestamp_t time_task_submit;	/**< The time at which this task was submitted */
-	timestamp_t time_task_finish;	/**< The time at which this task was finished */
-	timestamp_t time_app_delay;	 /**< time spent in upper-level application (outside of work_queue_wait)>*/
+	timestamp_t time_task_submit;	/**< The time at which this task was submitted. */
+	timestamp_t time_task_finish;	/**< The time at which this task was finished. */
+	timestamp_t time_app_delay;	 /**< The time spent in upper-level application (outside of work_queue_wait). */
 	timestamp_t time_send_input_start;	/**< The time at which it started to transfer input files. */
 	timestamp_t time_send_input_finish;	/**< The time at which it finished transferring input files. */
 	timestamp_t time_execute_cmd_start;		    /**< The time at which the task began. */
@@ -143,7 +143,7 @@ void work_queue_task_specify_file(struct work_queue_task *t, const char *local_n
 */
 void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags);
 
-/* Add a file created or handled by an arbitrary command to a task (eg: wget, ftp, chirp_get|put).
+/** Add a file created or handled by an arbitrary command to a task (eg: wget, ftp, chirp_get|put).
 @param t A task object.
 @param remote_name The name of the file at the execution site.
 @param cmd The command to run on the remote node to retrieve or store the file.
