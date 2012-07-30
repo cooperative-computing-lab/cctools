@@ -28,6 +28,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "full_io.h"
 #include "create_dir.h"
+#include "delete_dir.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -1200,56 +1201,8 @@ static int handle_link(struct link *master) {
 	return r;
 }
 
-static int remove_path(const char *path) {
-	// Recursively removes sub-directories and deletes the specified directory. 
-	DIR *dirptr;
-	struct dirent *direntryptr;
-	struct stat info;
- 	char *dirent_name = NULL;
-
-	if (stat(path, &info) == 0) {
-		if(S_ISDIR(info.st_mode)) {
-			// If it is directory loop through its contents and recursively 
-			// clean its sub-directories. 
-			dirptr = opendir(path);
-			if (!dirptr) {
-				fprintf(stderr, "Opening path %s failed when trying to remove it: %s.\n", path, strerror(errno));
-				return 0;	
-			}
-			
-			while ((direntryptr = readdir(dirptr))) {
-				if ((strcmp(direntryptr->d_name, ".") && strcmp(direntryptr->d_name, "..")) != 0) {
-					if (dirent_name != NULL)
-						free(dirent_name);
-				 	dirent_name = (char *) malloc((strlen(path) + FILENAME_LEN) * sizeof(char));
-					sprintf(dirent_name, "%s/%s", path, direntryptr->d_name);
-					if (remove_path(dirent_name) == 0) {
-						closedir(dirptr);
-						return 0;	
-					}	
-				}	
-			}
-			
-			closedir(dirptr);
-			
-			if (rmdir(path) != 0) {	
-				fprintf(stderr, "Removing path (dir) %s failed: %s\n", path, strerror(errno));	
-				closedir(dirptr);
-				return 0;
-			}
-		} else {
-			// If it is a file, simply unlink.
-			if (unlink(path) != 0) {
-				fprintf(stderr, "Removing path (file) %s failed: %s\n", path, strerror(errno));	
-				return 0;
-			}
-		}
-	}
-	return 1;
-}
-
-static int remove_dir_contents(const char *dir_name) {
-	// Similar to remove_path() except only deletes the contents of specified directory. 
+static int delete_dir_contents(const char *dir_name) {
+	// Delete entire directory contents without deleting directory itself. 
 	DIR *dirptr;
 	struct dirent *direntryptr;
  	char *dirent_name = NULL;
@@ -1266,7 +1219,7 @@ static int remove_dir_contents(const char *dir_name) {
 				free(dirent_name);
 			dirent_name = (char *) malloc((strlen(dir_name) + FILENAME_LEN) * sizeof(char));
 			sprintf(dirent_name, "%s/%s", dir_name, direntryptr->d_name);
-			if (remove_path(dirent_name) == 0) {
+			if (delete_dir(dirent_name) == 0) {
 				closedir(dirptr);
 				return 0;	
 			}	
@@ -1287,7 +1240,7 @@ static void disconnect_master(struct link *master) {
 	kill_task();
 
 	// Remove the contents of the workspace. 
-	remove_dir_contents(workspace);
+	delete_dir_contents(workspace);
 
 	if(released_by_master) {
 		released_by_master = 0;
@@ -1315,7 +1268,7 @@ static void abort_worker() {
 	}
 
 	// Remove workspace. 
-	remove_path(workspace);
+	delete_dir(workspace);
 }
 
 static void check_arguments(int argc, char **argv) {
