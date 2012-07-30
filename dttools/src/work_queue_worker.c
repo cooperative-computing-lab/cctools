@@ -51,6 +51,8 @@ See the file COPYING for details.
 
 #define STDOUT_BUFFER_SIZE 1048576        
 
+#define FILENAME_LEN 255
+
 #define PIPE_ACTIVE 1
 #define LINK_ACTIVE 2
 #define POLL_FAIL 4
@@ -1198,8 +1200,84 @@ static int handle_link(struct link *master) {
 	return r;
 }
 
+static int remove_path(const char *path) {
+	// Recursively removes sub-directories and deletes the specified directory. 
+	DIR *dirptr;
+	struct dirent *direntryptr;
+	struct stat info;
+ 	char *dirent_name = NULL;
+
+	if (stat(path, &info) == 0) {
+		if(S_ISDIR(info.st_mode)) {
+			// If it is directory loop through its contents and recursively 
+			// clean its sub-directories. 
+			dirptr = opendir(path);
+			if (!dirptr) {
+				fprintf(stderr, "Opening path %s failed when trying to remove it: %s.\n", path, strerror(errno));
+				return 0;	
+			}
+			
+			while ((direntryptr = readdir(dirptr))) {
+				if ((strcmp(direntryptr->d_name, ".") && strcmp(direntryptr->d_name, "..")) != 0) {
+					if (dirent_name != NULL)
+						free(dirent_name);
+				 	dirent_name = (char *) malloc((strlen(path) + FILENAME_LEN) * sizeof(char));
+					sprintf(dirent_name, "%s/%s", path, direntryptr->d_name);
+					if (remove_path(dirent_name) == 0) {
+						closedir(dirptr);
+						return 0;	
+					}	
+				}	
+			}
+			
+			closedir(dirptr);
+			
+			if (rmdir(path) != 0) {	
+				fprintf(stderr, "Removing path (dir) %s failed: %s\n", path, strerror(errno));	
+				closedir(dirptr);
+				return 0;
+			}
+		} else {
+			// If it is a file, simply unlink.
+			if (unlink(path) != 0) {
+				fprintf(stderr, "Removing path (file) %s failed: %s\n", path, strerror(errno));	
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
+static int remove_dir_contents(const char *dir_name) {
+	// Similar to remove_path() except only deletes the contents of specified directory. 
+	DIR *dirptr;
+	struct dirent *direntryptr;
+ 	char *dirent_name = NULL;
+
+	dirptr = opendir(dir_name);
+	if (!dirptr) {
+		fprintf(stderr, "Opening directory %s failed when trying to remove its contents: %s.\n", dir_name, strerror(errno));
+		return 0;	
+	}
+		
+	while ((direntryptr = readdir(dirptr))) {
+		if ((strcmp(direntryptr->d_name, ".") && strcmp(direntryptr->d_name, "..")) != 0) {
+			if (dirent_name != NULL)
+				free(dirent_name);
+			dirent_name = (char *) malloc((strlen(dir_name) + FILENAME_LEN) * sizeof(char));
+			sprintf(dirent_name, "%s/%s", dir_name, direntryptr->d_name);
+			if (remove_path(dirent_name) == 0) {
+				closedir(dirptr);
+				return 0;	
+			}	
+		}	
+	}
+		
+	closedir(dirptr);
+	return 1;
+}
+
 static void disconnect_master(struct link *master) {
-	char deletecmd[WORK_QUEUE_LINE_MAX];
 	link_close(master);
 
 	if(auto_worker) {
@@ -1208,8 +1286,8 @@ static void disconnect_master(struct link *master) {
 
 	kill_task();
 
-	sprintf(deletecmd, "rm -rf %s/*", workspace);
-	system(deletecmd);
+	// Remove the contents of the workspace. 
+	remove_dir_contents(workspace);
 
 	if(released_by_master) {
 		released_by_master = 0;
@@ -1219,8 +1297,6 @@ static void disconnect_master(struct link *master) {
 }
 
 static void abort_worker() {
-	char deletecmd[WORK_QUEUE_LINE_MAX];
-
 	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
 
 	// Free dynamically allocated memory
@@ -1238,9 +1314,8 @@ static void abort_worker() {
 		kill(pid, SIGTERM);
 	}
 
-	// Remove unneeded contents on disk
-	sprintf(deletecmd, "rm -rf %s", workspace);
-	system(deletecmd);
+	// Remove workspace. 
+	remove_path(workspace);
 }
 
 static void check_arguments(int argc, char **argv) {
