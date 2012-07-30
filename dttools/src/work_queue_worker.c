@@ -52,8 +52,6 @@ See the file COPYING for details.
 
 #define STDOUT_BUFFER_SIZE 1048576        
 
-#define FILENAME_LEN 255
-
 #define PIPE_ACTIVE 1
 #define LINK_ACTIVE 2
 #define POLL_FAIL 4
@@ -1199,35 +1197,6 @@ static int handle_link(struct link *master) {
 	}
 
 	return r;
-}
-
-static int delete_dir_contents(const char *dir_name) {
-	// Delete entire directory contents without deleting directory itself. 
-	DIR *dirptr;
-	struct dirent *direntryptr;
- 	char *dirent_name = NULL;
-
-	dirptr = opendir(dir_name);
-	if (!dirptr) {
-		fprintf(stderr, "Opening directory %s failed when trying to remove its contents: %s.\n", dir_name, strerror(errno));
-		return 0;	
-	}
-		
-	while ((direntryptr = readdir(dirptr))) {
-		if ((strcmp(direntryptr->d_name, ".") && strcmp(direntryptr->d_name, "..")) != 0) {
-			if (dirent_name != NULL)
-				free(dirent_name);
-			dirent_name = (char *) malloc((strlen(dir_name) + FILENAME_LEN) * sizeof(char));
-			sprintf(dirent_name, "%s/%s", dir_name, direntryptr->d_name);
-			if (delete_dir(dirent_name) == 0) {
-				closedir(dirptr);
-				return 0;	
-			}	
-		}	
-	}
-		
-	closedir(dirptr);
-	return 1;
 }
 
 static void disconnect_master(struct link *master) {
