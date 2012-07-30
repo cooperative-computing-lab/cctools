@@ -993,7 +993,7 @@ EOF
 echo ""
 echo "To re-configure, type './configure.rerun'"
 echo "To build, type '${MAKE}'"
-echo "To install, type '${MAKE} install'"
+echo "To build and install, type '${MAKE} install'"
 echo ""
 
 exit 0
