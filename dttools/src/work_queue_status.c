@@ -19,22 +19,19 @@ enum {
 	MODE_LONG
 };
 
-static int Work_Queue_Status_Mode = MODE_TABLE;
-static int Work_Queue_Status_Timeout = 30;
+static int work_queue_status_mode = MODE_TABLE;
+static int work_queue_status_timeout = 30;
 char *catalog_host = NULL;
 int catalog_port = 0;
 
 static struct nvpair_header headers[] = {
-	{"project", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 20},
-	{"name", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 25},
-	{"port", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8},
-	{"tasks_waiting", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 15},
-	{"tasks_complete", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 15},
-	{"workers", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 10},
-	{"workers_busy", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 15},
-	{"capacity", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 10},
-	{"start_time", NVPAIR_MODE_TIMESTAMP, NVPAIR_ALIGN_RIGHT, 20}, // The widths of the NV_PAIR_TIME and the NV_PAIR_TIMESTAMP fields should be >= 20
-	{"lastheardfrom", NVPAIR_MODE_TIME, NVPAIR_ALIGN_RIGHT, 20},
+	{"project",       "PROJECT", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 20},
+	{"name",          "NAME",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 20},
+	{"port",          "PORT",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 6},
+	{"tasks_waiting", "WAITING",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8},
+	{"workers_busy",  "BUSY",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8},
+	{"tasks_complete","COMPLETE",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8},
+	{"workers",       "WORKERS", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8},
 	{NULL,}
 };
 
@@ -44,7 +41,7 @@ static void work_queue_status_show_help(const char *progname)
 	printf("Options:\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n");
 	printf(" -d <flag>      Enable debugging for this subsystem.\n");
-	printf(" -t <time>      RPC timeout (default is %ds).\n", Work_Queue_Status_Timeout);
+	printf(" -t <time>      RPC timeout (default is %ds).\n", work_queue_status_timeout);
 	printf(" -l             Long output.\n");
 	printf(" -h             This message.\n");
 }
@@ -85,10 +82,10 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			debug_flags_set(optarg);
 			break;
 		case 'l':
-			Work_Queue_Status_Mode = MODE_LONG;
+			work_queue_status_mode = MODE_LONG;
 			break;
 		case 't':
-			Work_Queue_Status_Timeout = strtol(optarg, NULL, 10);
+			work_queue_status_timeout = strtol(optarg, NULL, 10);
 			break;
 		case 'h':
 			work_queue_status_show_help(argv[0]);
@@ -119,7 +116,7 @@ int main(int argc, char *argv[])
 		catalog_port = CATALOG_PORT;
 	}
 
-	cq = catalog_query_create(catalog_host, catalog_port, time(0) + Work_Queue_Status_Timeout);
+	cq = catalog_query_create(catalog_host, catalog_port, time(0) + work_queue_status_timeout);
 	if(!cq) {
 		fprintf(stderr, "Failed to query catalog server at %s:%d. \n", catalog_host, catalog_port);
 		exit(EXIT_FAILURE);
@@ -129,12 +126,12 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if(Work_Queue_Status_Mode == MODE_TABLE)
+	if(work_queue_status_mode == MODE_TABLE)
 		nvpair_print_table_header(stdout, headers);
 
-	while((nv = catalog_query_read(cq, time(0) + Work_Queue_Status_Timeout))) {
+	while((nv = catalog_query_read(cq, time(0) + work_queue_status_timeout))) {
 		if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0) {
-			if(Work_Queue_Status_Mode == MODE_TABLE)
+			if(work_queue_status_mode == MODE_TABLE)
 				nvpair_print_table(nv, stdout, headers);
 			else
 				nvpair_print_text(nv, stdout);
@@ -142,7 +139,7 @@ int main(int argc, char *argv[])
 		nvpair_delete(nv);
 	}
 
-	if(Work_Queue_Status_Mode == MODE_TABLE)
+	if(work_queue_status_mode == MODE_TABLE)
 		nvpair_print_table_footer(stdout, headers);
 
 	return EXIT_SUCCESS;
