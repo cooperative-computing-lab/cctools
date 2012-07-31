@@ -73,7 +73,7 @@ bool printdebug=false;
 
 void createDatabase(){
     string dbcreation="CREATE SCHEMA `"+schema+"`;";
-    string cmcreation="CREATE TABLE `"+schema+"`.`commands` (`command_id` int(11) NOT NULL auto_increment,`username` varchar(45) default NULL,`personal_id` int(11) default NULL,`name` varchar(45) default NULL, `command` mediumtext,`status` enum('Queueing','Available','Processing','Submitted','Completed') default 'Queueing',`stdout` longtext,PRIMARY KEY  (`command_id`),KEY `status_name_idx` (`status`,`name`)) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;";
+    string cmcreation="CREATE TABLE `"+schema+"`.`commands` (`command_id` int(11) NOT NULL auto_increment,`username` varchar(45) default NULL,`personal_id` int(11) default NULL,`name` varchar(45) default NULL, `command` mediumtext,`status` enum('Queueing','Available','Processing','Submitted','Completed') default 'Queueing',`stdout` longtext, `env` varchar(45), PRIMARY KEY  (`command_id`),KEY `status_name_idx` (`status`,`name`)) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;";
     string fcreation="CREATE TABLE `"+schema+"`.`files` (`fileid` int(11) NOT NULL auto_increment,`command_id` int(11) NOT NULL,`local_path` varchar(256) default NULL,`remote_path` varchar(256) default NULL,`type` enum('INPUT','OUTPUT') default 'INPUT',`flags` enum('NOCACHE','CACHE','SYMLINK','THIRDGET','THIRDPUT') default 'NOCACHE',PRIMARY KEY  (`fileid`),KEY `command_id_idx` (`command_id`)) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;";
 
 
