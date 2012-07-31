@@ -588,6 +588,11 @@ public:
 		if(!pfs_acl_check_dir(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"rmdir %s",name->rest);
 		result = ::rmdir(name->rest);
+		if(result == -1 && errno == ENOTEMPTY) {
+			// If we failed to remove the directory because it contains
+			// only an acl file, remove the acl and the directory.
+			result = ibox_acl_rmdir(name->rest);
+		}
 		END
 	}
 

@@ -315,6 +315,7 @@ int ibox_acl_rmdir(const char *path)
 {
 	void *dir;
 	struct dirent *d;
+	int result;
 
 	dir = opendir(path);
 	if(dir) {
@@ -330,8 +331,8 @@ int ibox_acl_rmdir(const char *path)
 			return -1;
 		}
 		closedir(dir);
-		delete_dir(dir);
-		return 0;
+		result = delete_dir(path);
+		return result ? 0 : -1;
 	} else {
 		errno = ENOENT;
 		return -1;
