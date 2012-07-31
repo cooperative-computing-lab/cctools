@@ -1274,6 +1274,8 @@ static int setup_workspace() {
 	const char *workdir;
 	if(getenv("_CONDOR_SCRATCH_DIR")) {
 		workdir = getenv("_CONDOR_SCRATCH_DIR");
+	} else if(getenv("TEMP")) {
+		workdir = getenv("TEMP");
 	} else {
 		workdir = "/tmp";
 	}
