@@ -101,6 +101,7 @@ typedef enum {
 
 struct nvpair_header {
 	const char *name;
+	const char *title;
 	nvpair_mode_t mode;
 	nvpair_align_t align;
 	int width;
