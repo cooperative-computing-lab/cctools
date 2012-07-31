@@ -1,0 +1,42 @@
+﻿DEPENDENCIES:
+- MySQL for Python http://sourceforge.net/projects/mysql-python/
+- MyWorkQueue http://developer.cse.nd.edu/gf/project/myworkqueue/
+    - Connector/C++ http://dev.mysql.com/downloads/connector/cpp/
+- A MySQL database http://www.mysql.com/downloads/
+
+
+INSTALLATION:
+- Download and install the current unstable version of cctools http://nd.edu/~ccl/software/files/cctools-current-source.tar.gz
+    - Sweeper.py will be in the source files in cctools/apps/sweeper
+
+- Download and install MySQL for Python http://sourceforge.net/projects/mysql-python/
+    - $PYTHONPATH needs to have a path to MySQL for Python
+    - For easy installation, navigate to cctools/lib/python2.6/site-packages and run the command “easy_install -d . MySQL-python”
+
+- Download and build MyWorkQueue http://developer.cse.nd.edu/gf/project/myworkqueue/
+    - svn checkout http://developer.cse.nd.edu/svn/myworkqueue
+    - Download and install Connector/C++ http://dev.mysql.com/downloads/connector/cpp/
+        - Ensure that MyWorkQueue’s ./build links to the correct location of Connector/C++
+    - Modify the constants in the beginning MyWorkQueue to correspond with your setup
+    - To build, run ./build <progname>
+    - Create a database with the command
+        ./<progname> -v -mysql_host <host> -mysql_schema <schema> -user <user> -p -create
+
+USAGE:
+- Sweeper has verbose enabled by default. To turn off verbose mode, define your variable as sweeper.Sweeper(0)
+- Below is a simple code which outputs 20, 40, 60, 80 to a file named out:
+
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+import sweeper
+x = sweeper.Sweeper(0)
+x.addprog("echo")
+#x.setenv("env.sh")
+x.addsweep(xrange(20,100,20))
+x.addparameter('> out')
+x.addoutput("out")
+x.sqldbsubmit('host', 'user', 'schemaname', 'password')
+
+- If your program needs to run in a specific environment, use setenv(‘pathtoenv’) to specify an environment. (the environment must contain a script env.sh that sets up the environment)
+
+- If you want to tag the parameters that were run and add them to the database, use addtuple(‘flag’, ‘sweep’, ‘tag’) to specify what parameter was run, the values, and the tag describing it.
