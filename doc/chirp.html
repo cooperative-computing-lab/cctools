@@ -95,7 +95,7 @@ shell to list and access Chirp servers like so:
 <tr >
 <td bgcolor=#eeee77>
 <pre>
- % parrot tcsh
+ % parrot_run tcsh
  % cd /chirp
  % ls
 angband.somewhere.edu:9094
@@ -249,7 +249,7 @@ http://dopey:9097
 Or, set an environment variable and use Parrot:
 <pre>
 % setenv CATALOG_HOST dopey
-% parrot tcsh
+% parrot_run tcsh
 % ls /chirp
 </pre>
 And you will see <a href=http://chirp.cse.nd.edu:9097>something like this.</a>
@@ -341,7 +341,7 @@ hostname:*.mydomain.edu rwl
 Or, if you are using Parrot, you can use <tt>parrot_getacl</tt>
 to examine ACLs in the same way:
 <pre>
-% parrot tcsh
+% parrot_run tcsh
 % cd /chirp/host.mydomain.edu
 % parrot_getacl
 unix:dthain rwlda
@@ -388,7 +388,7 @@ a <tt>setacl</tt> command like this:
 </pre>
 Or, you can accomplish the same thing using <tt>parrot_setacl</tt> inside of Parrot:
 <pre>
-% parrot tcsh
+% parrot_run tcsh
 % cd /chirp/host.mydomain.edu
 % parrot_setacl . /O=Univ_of_Somewhere/CN=Fred_Flint rwlda
 </pre>
@@ -917,7 +917,7 @@ For example, if you are having trouble getting Parrot to connect
 to a Chirp server, then run both as follows:
 <pre>
 % chirp_server -d all [more options] ...
-% parrot -d all tcsh
+% parrot_run -d all tcsh
 </pre>
 Of course, this is likely to show way more information than you
 will be able to process.  Instead, turn on a debugging flags
