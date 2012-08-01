@@ -73,7 +73,7 @@ bool printdebug=false;
 
 void createDatabase(){
     string dbcreation="CREATE SCHEMA `"+schema+"`;";
-    string cmcreation="CREATE TABLE `"+schema+"`.`commands` (`command_id` int(11) NOT NULL auto_increment,`username` varchar(45) default NULL,`personal_id` int(11) default NULL,`name` varchar(45) default NULL, `command` mediumtext,`status` enum('Queueing','Available','Processing','Submitted','Completed') default 'Queueing',`stdout` longtext, `env` varchar(45), PRIMARY KEY  (`command_id`),KEY `status_name_idx` (`status`,`name`)) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;";
+    string cmcreation="CREATE TABLE `"+schema+"`.`commands` (`command_id` int(11) NOT NULL auto_increment,`username` varchar(45) default NULL,`personal_id` int(11) default NULL,`name` varchar(45) default NULL, `command` mediumtext,`status` enum('Queueing','Available','Processing','Submitted','Completed') default 'Queueing',`stdout` longtext, `env` varchar(256), PRIMARY KEY  (`command_id`),KEY `status_name_idx` (`status`,`name`)) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;";
     string fcreation="CREATE TABLE `"+schema+"`.`files` (`fileid` int(11) NOT NULL auto_increment,`command_id` int(11) NOT NULL,`local_path` varchar(256) default NULL,`remote_path` varchar(256) default NULL,`type` enum('INPUT','OUTPUT') default 'INPUT',`flags` enum('NOCACHE','CACHE','SYMLINK','THIRDGET','THIRDPUT') default 'NOCACHE',PRIMARY KEY  (`fileid`),KEY `command_id_idx` (`command_id`)) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;";
 
 
@@ -191,11 +191,11 @@ void addJobsToQueue(ResultSet* rs){
         int type=WORK_QUEUE_INPUT;
         int flags=WORK_QUEUE_CACHE;
 
-        if(stringEquals(rs->getString(8), "OUTPUT")){
+        if(stringEquals(rs->getString(9), "OUTPUT")){
             type=WORK_QUEUE_OUTPUT;
         }
 
-        if(stringEquals(rs->getString(9), "NOCACHE")){
+        if(stringEquals(rs->getString(10), "NOCACHE")){
             flags=WORK_QUEUE_NOCACHE;
         }
 
@@ -240,8 +240,20 @@ void addJobsToQueue(ResultSet* rs){
                     work_queue_submit(q, t);
                 }
 
+                // TODO env
+                // make sure it sends env as input
+                // 6 == env
+                // environments/cvrl/env.sh; cmd
                 if(printdebug) println("Create the task");
-                t = work_queue_task_create(rs->getString(4).c_str());
+                if (rs->getString(6) != "") {
+                    println("ALERT! ENVIRONMENT DETECTED!");
+                    char fullcmd[256];
+                    sprintf(fullcmd, "bash %s/env.sh; %s", rs->getString(6).c_str(), rs->getString(4).c_str());
+                    t = work_queue_task_create(fullcmd);
+                }
+                else {
+                    t = work_queue_task_create(rs->getString(4).c_str());
+                }
 
                 if(printdebug) println("Setting the tag");
                 work_queue_task_specify_tag(t, intToStr(rs->getInt(1)).c_str());
@@ -250,7 +262,7 @@ void addJobsToQueue(ResultSet* rs){
             }
 
             if(printdebug) println("Add files to job (We must have already created the job)");
-            work_queue_task_specify_file(t, rs->getString(6).c_str(), rs->getString(7).c_str(), type, flags);
+            work_queue_task_specify_file(t, rs->getString(7).c_str(), rs->getString(8).c_str(), type, flags);
 
         }
 
@@ -319,7 +331,9 @@ int getJobs(int number, ResultSet* jobinfo){
     int changed=stmt -> executeUpdate(update);
 
     //Make query
-    string query="select c.command_id as command_id, c.username as username, c.personal_id as personal_id, c.command as command, c.status as status, f.local_path as local_path, f.remote_path as remote_path, f.type as type, f.flags as flags from (select * from commands where status='Processing') c join files f on c.command_id=f.command_id where c.name='"+name+"' order by c.command_id";
+    // TODO env
+    string query="select c.command_id as command_id, c.username as username, c.personal_id as personal_id, c.command as command, c.status as status, c.env as env, f.local_path as local_path, f.remote_path as remote_path, f.type as type, f.flags as flags from (select * from commands where status='Processing') c join files f on c.command_id=f.command_id where c.name='"+name+"' order by c.command_id";
+    //string query="select c.command_id as command_id, c.username as username, c.personal_id as personal_id, c.command as command, c.status as status, f.local_path as local_path, f.remote_path as remote_path, f.type as type, f.flags as flags from (select * from commands where status='Processing') c join files f on c.command_id=f.command_id where c.name='"+name+"' order by c.command_id";
 
     if(printdebug) println("\tFinding currently owned jobs");
     //if(printdebug) println(query);

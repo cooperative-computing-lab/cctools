@@ -10,13 +10,13 @@
 from work_queue import *
 import itertools, sys, os, re, hashlib, mmap, _mysql
 
-MAX_FILES_IN_DIR = 10000 # not sure what the max is for AFS, but in a test mkdir threw an error at 31190
+MAX_FILES_IN_DIR = 10000 # not sure what the max is for AFS, but in testing mkdir fails at 31000+
 
 class Sweeper:
     """Provides a simple api for a program to sweep through a range of parameters.
         Usage: import sweeper
                x = sweeper.Sweeper()"""
-    def __init__(self, verbose=0):
+    def __init__(self, verbose=1):
         self.vb = verbose                   # turn on/off verbose mode
         self.port = WORK_QUEUE_RANDOM_PORT  # random, default is 9123
         self.progname = ""                  # the program to sweep with
@@ -42,28 +42,29 @@ class Sweeper:
         """Set the path to a env script to set up an environment for the command to run in.
             Usage: x.setenv("env.sh")
             @param pathtoenv The path to a script to run first."""
-        self.envpath = pathtoenv
-        if self.vb: print 'added environment script = %s' % (pathtoenv)
+        self.envpath = os.path.abspath(pathtoenv)
+        if self.vb: print 'added environment script = %s' % (self.envpath)
 
     def setenvdir(self, pathtoenvdir, caching=2):
         """Specify a directory to be submitted that contains an environment for the worker to run in, a script will still have to set the env up.
             Usage: x.setenvdir('myenvdir')
                    x.setenv('env.sh') # set ups env on worker using myenvdir
-            @param pathtoenvdir The path to the directory."""
-        # TODO contained in the envdir should be a script that sets up the env, this needs to be added to the env script
-        self.env = pathtoenvdir
+            @param pathtoenvdir The path to the directory.
+            @param caching Set caching to on or off 2 == on 1 == off.""" 
+        self.env = os.path.abspath(pathtoenvdir)
         r = []
-        r.append(pathtoenvdir)
+        r.append(self.env)
         r.append(caching)
         r.append(self._checksum(pathtoenvdir))
         self.inputlist.append(r)
-        if self.vb: print 'added environment directory = %s caching = %s' % (pathtoenvdir, caching)
+        if self.vb: print 'added environment directory = %s caching = %s' % (self.env, caching)
 
     def addtuple(self, flag, iterlist, key=''):
         """Add a flag/sweep pair to the command. This has the same functionality as addparameter() and addsweep() used together.
-            Usage: x.addtuple("-n", xrange(1,10,2))
+            Usage: x.addtuple("-n", xrange(1,10,2), 'lagtime')
             @param flag The flag to be added to the command.
-            @param iterlist An interable list object that contains the values to sweep over."""
+            @param iterlist An interable list object that contains the values to sweep over.
+            @param key A key to tag these commands with in a MyWorkQueue database."""
         self.command.append(str(flag))
         self.command.append('%s')
         self.paramvalues.append('%s')
@@ -85,7 +86,8 @@ class Sweeper:
     def addinput(self, input, caching=2):
         """Add a file (or directory) to the input list.
             Usage: x.addinput("infile")
-            @param input The file or directory to be included as input."""
+            @param input The file or directory to be included as input.
+            @param caching Set caching to on or off 2 == on 1 == off.""" 
         r = []
         r.append(input)
         r.append(caching)
@@ -97,7 +99,8 @@ class Sweeper:
         """Add a file (or directory) to the output list.
             Output will be placed in progname/parameters/
             Usage: a.addoutput("outfile")
-            @param output The file to be recieved back from the worker as output."""
+            @param output The file to be recieved back from the worker as output.
+            @param caching Set caching to on or off 2 == on 1 == off.""" 
         r = []
         r.append(output)
         r.append(caching)
@@ -107,7 +110,8 @@ class Sweeper:
     def addsweep(self, iterlist, key=''):
         """Add a sweep to the command.
             Usage: x.addsweep(xrange(1,10,2))
-            @param iterlist An iterable object that contains the values to sweep over."""
+            @param iterlist An iterable object that contains the values to sweep over.
+            @param key A key to tag these commands with in a MyWorkQueue database."""
         self.command.append("%s")
         self.paramvalues.append("%s")
         self.sweeps.append(iterlist)
@@ -117,9 +121,19 @@ class Sweeper:
             if self.vb: print 'added key = %s' % (key)
 
     def addmetadata(self, key, value, dbconn):
+        """Add a metadata key value pair to the database.
+            Usage: x.addmetadata('lagtime','30',dbconn)
+            @param key A key to tag a command with in a MyWorkQueue database.
+            @param value A value to be paired with the key.
+            @param dbconn A _mysql database connection object."""
         dbconn.query("""INSERT INTO metadata VALUES (meta_id, \'%s\', \'%s\')""" % (key, value))
 
     def associatemetadata(self, cid, mid, dbconn):
+        """Associate a command_id with a meta_id (key value pair).
+            Usage: x.associatemetadata('4232','1234',dbconn)
+            @param cid A command_id.
+            @param mid A meta_id.
+            @param dbconn A _mysql database connection object."""
         dbconn.query("""INSERT INTO cmdmeta VALUES (%d, %d)""" % (cid, mid))
 
     def sweep(self, interpreter='bash'):
@@ -293,6 +307,9 @@ class Sweeper:
                         % (dbname, dbname, dbcommand))
     
     def _checksum(self, filename):
+        """Get the sha1 checksum of a file or directory.
+            @param filename The path to a file or directory to hash.
+            @return The sha1 hash."""
         #try:
         #    f = open(localpath)
         #    # this is faster but doesn't seem to work in ND afs space
@@ -331,6 +348,11 @@ class Sweeper:
             return hashlib.sha1(open(filename, 'rb').read()).hexdigest()
 
     def _checkdup(self, dbcommand, dbconn):
+        """Check for a duplicate command and inputfiles.
+            @param dbcommand A command to check, ex. 'bash ./echo_5__out'.
+            @param dbconn A _mysql database connection object.
+            @return 1 Indicates that the files and input are identical.
+            @return 0 Indicates that the files or command has been changed."""
         dbconn.query("""SELECT command_id FROM commands WHERE command='%s'""" % (dbcommand)) 
         r = dbconn.store_result()
         cid = -1 # we want the command_id to be -1 if we can't find a duplicate
