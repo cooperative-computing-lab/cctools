@@ -1,7 +1,9 @@
 DEPENDENCIES:
+- CCTools http://nd.edu/~ccl/software/download.shtml
 - MySQL for Python http://sourceforge.net/projects/mysql-python/
-- MyWorkQueue http://developer.cse.nd.edu/gf/project/myworkqueue/
+- MyWorkQueue
     - Connector/C++ http://dev.mysql.com/downloads/connector/cpp/
+    - If you download CCTools, MyWorkQueue is also included in the directory with Sweeper
 - A MySQL database http://www.mysql.com/downloads/
 
 
