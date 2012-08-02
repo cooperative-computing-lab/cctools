@@ -1065,13 +1065,13 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, str
 	int actual;
 	timestamp_t stoptime, observed_execution_time;
 
-	//worker finished cancelling its task. Skip task output retrieval 
-	//and a start new task.		
+	//Worker finished cancelling task. Skip task output retrieval and start new task.		
 	if (w->state == WORKER_STATE_CANCELLING) {
 		//worker sends output after result message. Quietly discard it.
 		char *tmp = malloc(output_length + 1);
 		if(output_length > 0) {
-			stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T) output_length);
+			//Try atleast 3 secs..don't need calculations from get_transfer_wait_time() since this is discarded.
+			stoptime = time(0) + MAX(3, output_length / minimum_allowed_transfer_rate); 
 			actual = link_read(l, tmp, output_length, stoptime);
 		} 
 		free(tmp);
@@ -1095,6 +1095,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, str
 	t->output = malloc(output_length + 1);
 	if(output_length > 0) {
 		//stoptime = time(0) + MAX(1.0,output_length/1250000.0);
+		debug(D_WQ, "Receiving stdout of task (size: %lld bytes) from %s (%s) ...", output_length, w->addrport, w->hostname);
 		stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T) output_length);
 		actual = link_read(l, t->output, output_length, stoptime);
 		if(actual != output_length) {
@@ -1102,6 +1103,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, str
 			t->output = 0;
 			return 0;
 		}
+		debug(D_WQ, "Got %d bytes from %s (%s)", actual, w->hostname, w->addrport);
 	} else {
 		actual = 0;
 	}
