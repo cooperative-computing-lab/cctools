@@ -1,4 +1,4 @@
-﻿DEPENDENCIES:
+DEPENDENCIES:
 - MySQL for Python http://sourceforge.net/projects/mysql-python/
 - MyWorkQueue http://developer.cse.nd.edu/gf/project/myworkqueue/
     - Connector/C++ http://dev.mysql.com/downloads/connector/cpp/
@@ -26,17 +26,18 @@ USAGE:
 - Sweeper has verbose enabled by default. To turn off verbose mode, define your variable as sweeper.Sweeper(0)
 - Below is a simple code which outputs 20, 40, 60, 80 to a file named out:
 
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-import sweeper
-x = sweeper.Sweeper(0)
-x.addprog("echo")
-#x.setenv("env.sh")
-x.addsweep(xrange(20,100,20))
-x.addparameter('> out')
-x.addoutput("out")
-x.sqldbsubmit('host', 'user', 'schemaname', 'password')
+    #!/usr/bin/python
+    import sweeper
+    x = sweeper.Sweeper()
+    x.addprog("echo")
+    x.addsweep(xrange(20,100,20))
+    x.addparameter('> out')
+    x.addoutput("out")
+    x.sqldbsubmit('host', 'user', 'schemaname', 'password')
 
 - If your program needs to run in a specific environment, use setenv(‘pathtoenv’) to specify an environment. (the environment must contain a script env.sh that sets up the environment)
 
 - If you want to tag the parameters that were run and add them to the database, use addtuple(‘flag’, ‘sweep’, ‘tag’) to specify what parameter was run, the values, and the tag describing it.
+
+- If you have commands stored in the database, run MyWorkQueue with the command 
+"mywq -v -hostname <localmachine> -port <port> -name <desiredname> -local <number> -remote <number> -mysql_host <hostname> -mysql_schema <schema> -user <user>-p"
