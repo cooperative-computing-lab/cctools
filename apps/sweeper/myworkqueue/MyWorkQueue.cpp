@@ -240,13 +240,10 @@ void addJobsToQueue(ResultSet* rs){
                     work_queue_submit(q, t);
                 }
 
-                // TODO env
-                // make sure it sends env as input
-                // 6 == env
                 // environments/cvrl/env.sh; cmd
                 if(printdebug) println("Create the task");
                 if (rs->getString(6) != "") {
-                    println("ALERT! ENVIRONMENT DETECTED!");
+                    printf("Environment specified, executing %s/env.shi\n", rs->getString(6));
                     char fullcmd[256];
                     sprintf(fullcmd, "bash %s/env.sh; %s", rs->getString(6).c_str(), rs->getString(4).c_str());
                     t = work_queue_task_create(fullcmd);
@@ -331,9 +328,7 @@ int getJobs(int number, ResultSet* jobinfo){
     int changed=stmt -> executeUpdate(update);
 
     //Make query
-    // TODO env
     string query="select c.command_id as command_id, c.username as username, c.personal_id as personal_id, c.command as command, c.status as status, c.env as env, f.local_path as local_path, f.remote_path as remote_path, f.type as type, f.flags as flags from (select * from commands where status='Processing') c join files f on c.command_id=f.command_id where c.name='"+name+"' order by c.command_id";
-    //string query="select c.command_id as command_id, c.username as username, c.personal_id as personal_id, c.command as command, c.status as status, f.local_path as local_path, f.remote_path as remote_path, f.type as type, f.flags as flags from (select * from commands where status='Processing') c join files f on c.command_id=f.command_id where c.name='"+name+"' order by c.command_id";
 
     if(printdebug) println("\tFinding currently owned jobs");
     //if(printdebug) println(query);
