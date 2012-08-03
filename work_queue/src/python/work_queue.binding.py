@@ -459,6 +459,10 @@ class WorkQueue(_object):
     # @code
     # >>> print q.stats
     # @endcode
+    # The fields in @ref work_queue_stats can also be individually accessed through this call. For example:
+    # @code
+	# >>> print q.stats.workers_busy
+	# @endcode
     @property
     def stats(self):
         work_queue_get_stats(self._work_queue, self._stats)
