@@ -243,7 +243,7 @@ void addJobsToQueue(ResultSet* rs){
                 // environments/cvrl/env.sh; cmd
                 if(printdebug) println("Create the task");
                 if (rs->getString(6) != "") {
-                    printf("Environment specified, executing %s/env.shi\n", rs->getString(6));
+                    printf("Environment specified, executing %s/env.sh\n", rs->getString(6).c_str());
                     char fullcmd[256];
                     sprintf(fullcmd, "bash %s/env.sh; %s", rs->getString(6).c_str(), rs->getString(4).c_str());
                     t = work_queue_task_create(fullcmd);
