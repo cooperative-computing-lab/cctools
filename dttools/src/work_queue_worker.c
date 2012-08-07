@@ -50,6 +50,10 @@ See the file COPYING for details.
 #include <sys/wait.h>
 #include <sys/poll.h>
 
+#ifdef CCTOOLS_OPSYS_SUNOS
+extern int setenv(const char *name, const char *value, int overwrite);
+#endif
+
 #define STDOUT_BUFFER_SIZE 1048576        
 
 #define PIPE_ACTIVE 1
@@ -1412,6 +1416,10 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "work_queue_worker: failed to setup workspace at %s.\n", workspace);
 		exit(1);
 	}
+
+	// set $WORK_QUEUE_SANDBOX to workspace.
+	debug(D_WQ, "WORK_QUEUE_SANDBOX set to %s.\n", workspace);
+	setenv("WORK_QUEUE_SANDBOX", workspace, 0);
 
 	// change to workspace
 	chdir(workspace);
