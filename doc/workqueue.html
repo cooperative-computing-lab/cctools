@@ -30,7 +30,7 @@ padding: 0.3%;
 <body>
 
 <h1>Work Queue User's Manual</h1>
-<b>Last Updated May 2012</b>
+<b>Last Updated August 2012</b>
 <p>
 Work Queue is Copyright (C) 2009 The University of Notre Dame.
 This software is distributed under the GNU General Public License.
@@ -186,61 +186,60 @@ First create a queue that is listening on a particular TCP port:
 </pre>
 </div>
 
-The master then creates tasks to submit to the queue.
-Each task consists of a command line to run and a statement of
-what data is needed, and what data will be produced by the command.
-Input data can be provided in the form of a file or a local memory buffer.
-Output data can be provided in the form of a file or the standard output of the program.
-It is also required to specify whether the data, input or output, need to be cached at
-the worker site for later use. In the example, we specify a command that takes a 
-single input file, produces a single output file, and requires both files to be
-cached:
+The master then creates tasks to submit to the queue. Each task consists of a
+command line to run and a statement of what data is needed, and what data will
+be produced by the command. Input data can be provided in the form of a file or
+a local memory buffer. Output data can be provided in the form of a file or the
+standard output of the program. It is also required to specify whether the
+data, input or output, need to be cached at the worker site for later use. 
+<p>
+In the example, we specify a command that takes a single input file and produces
+a single output file. We then create a task by providing the specified command
+as an argument:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
  t = work_queue_task_create(command);  
- work_queue_task_specify_file(t,infile,infile,WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); 
- work_queue_task_specify_file(t,outfile,outfile,WORK_QUEUE_OUTPUT,WORK_QUEUE_CACHE);
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
  t = Task(command) 
- t.specify_file(infile,infile,WORK_QUEUE_INPUT,cache=True)  
- t.specify_file(outfile,outfile,WORK_QUEUE_OUTPUT,cache=True) 
 </pre>
 </div>
 
-If a file does not need to be cached at the execution site to avoid wasteful
-strorage, it can be specified so:
+The input and output files associated with the execution of the task must be
+explicitly specified. In the example, we also specify the executable in the
+command invocation as an input file so that it is transferred and installed in
+the working directory of the worker. We require this executable to be cached so
+that it can be used by subsequent tasks that need it in their execution. On the
+other hand, the input and output of the task are not required to be cached
+since they are not used by subsequent tasks.
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
+ work_queue_task_specify_file(t,"/usr/bin/gzip","gzip",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); 
+ work_queue_task_specify_file(t,infile,infile,WORK_QUEUE_INPUT,WORK_QUEUE_NOCACHE); 
  work_queue_task_specify_file(t,outfile,outfile,WORK_QUEUE_OUTPUT,WORK_QUEUE_NOCACHE);
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
+ t.specify_file("/usr/bin/gzip","gzip",WORK_QUEUE_INPUT,cache=True); 
+ t.specify_file(infile,infile,WORK_QUEUE_INPUT,cache=False)  
  t.specify_file(outfile,outfile,WORK_QUEUE_OUTPUT,cache=False) 
 </pre>
 </div>
 
-You can also run a program that is not necessarily installed at the
-remote location, by specifying it as an input file.  If the file
-is installed on the local machine, then specify the full local path,
-and the plain remote path.  For example:
+We can also run a program that is already installed at the remote site, where
+the worker runs, by specifying its installed location (and removing the
+specification of the executable as an input file). For example:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
- t = work_queue_task_create("./my_compress_program < a > a.gz");  
- work_queue_task_specify_file(t,"/usr/local/bin/my_compress_program","my_compress_program",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); 
- work_queue_task_specify_file(t,"a","a",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); 
- work_queue_task_specify_file(t,"a.gz","a.gz",WORK_QUEUE_OUTPUT,WORK_QUEUE_CACHE); 
+ t = work_queue_task_create("/usr/bin/gzip < a > a.gz");  
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- t = Task("./my_compress_program < a > a.gz")  
- t.specify_file("/usr/local/bin/my_compress_program","my_compress_program",WORK_QUEUE_INPUT,cache=True)
- t.specify_file("a","a",WORK_QUEUE_INPUT,cache=True) 
- t.specify_file("a.gz","a.gz",WORK_QUEUE_OUTPUT,cache=True) 
+ t = Task("/usr/bin/gzip < a > a.gz")  
 </pre>
 </div>
 
