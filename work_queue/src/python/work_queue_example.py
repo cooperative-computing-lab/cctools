@@ -30,7 +30,7 @@ print "listening on port %d..." % q.port
 for i in range(1, len(sys.argv)):
     infile = "%s" % sys.argv[i] 
     outfile = "%s.gz" % sys.argv[i]
-    command = "$WORK_QUEUE_SANDBOX/gzip < %s > %s" % (infile, outfile)
+    command = "./gzip < %s > %s" % (infile, outfile)
     
     t = Task(command)
     

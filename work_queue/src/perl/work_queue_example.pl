@@ -30,7 +30,7 @@ print "listening on port $port...\n";
 for (my $i = 0; $i <= $#ARGV; $i++) {
 	my $infile = $ARGV[$i]; 
 	my $outfile = $ARGV[$i] . ".gz";
-	my $command = "\$WORK_QUEUE_SANDBOX/gzip < $infile > $outfile";
+	my $command = "./gzip < $infile > $outfile";
 
     my $t = work_queue_task_create($command);
 
