@@ -30,12 +30,13 @@ print "listening on port %d..." % q.port
 for i in range(1, len(sys.argv)):
     infile = "%s" % sys.argv[i] 
     outfile = "%s.gz" % sys.argv[i]
-    command = "/usr/bin/gzip < %s > %s" % (infile, outfile)
+    command = "$WORK_QUEUE_SANDBOX/gzip < %s > %s" % (infile, outfile)
     
     t = Task(command)
     
-    t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=True)
-    t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=True)
+    t.specify_file("/usr/bin/gzip", "gzip", WORK_QUEUE_INPUT, cache=True)
+    t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=False)
+    t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=False)
     taskid = q.submit(t)
 
     print "submitted task (id# %d): %s" % (taskid, t.command)
