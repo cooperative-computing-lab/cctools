@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 
 		sprintf(infile, "%s", argv[i]);
 		sprintf(outfile, "%s.gz", argv[i]);
-		sprintf(command, "$WORK_QUEUE_SANDBOX/gzip < %s > %s", infile, outfile);
+		sprintf(command, "./gzip < %s > %s", infile, outfile);
 
 		t = work_queue_task_create(command);
 		work_queue_task_specify_file(t, "/usr/bin/gzip", "gzip", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
