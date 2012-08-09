@@ -19,7 +19,7 @@ endif
 TEST_PROGRAMS = work_queue_example microbench hmac_test chunk_test multirun
 PROGRAM_SOURCES = ${PROGRAMS:%=%.c} ${TEST_PROGRAMS:%=%.c}
 SCRIPTS = condor_submit_workers sge_submit_workers torque_submit_workers
-CYGWINLIB = cygwin1.dll sh.exe
+CYGWINLIB = cygwin1.dll cyggcc_s-1.dll cygintl-8.dll cygreadline7.dll cygncursesw-10.dll cygiconv-2.dll cygattr-1.dll sh.exe
 
 all: ${LIBRARIES} $(PROGRAMS) $(TEST_PROGRAMS)
 
