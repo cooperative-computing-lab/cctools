@@ -58,7 +58,7 @@ Tools</a>.  You can download the CCTools from <a
 href="http://www.cse.nd.edu/~ccl/software/download">this web page</a>,
 follow the <a href=install.html>installation instructions</a>, and you
 are ready to go. You can view documentation for the full set of features of the
-Work Queue API from either within the CCTools or <a
+Work Queue API from either within the CCTools package or <a
 href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">here</a> and <a
 href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/namespaceWorkQueuePython.html">here</a>.
 
@@ -229,9 +229,34 @@ since they are not used by subsequent tasks.
 </pre>
 </div>
 
+Note that the specified input directories and files for each task are
+transferred and setup in the sandbox directory of the worker (unless an absolute
+path is specified for their location). This sandbox serves as the work space of
+the worker where all directories and files related to the execution of its tasks
+are stored. The tasks are executed by each worker inside its sandbox.
+Therefore, all task outputs are stored within the sandbox directory (unless an
+absolute path is specified for their storage during task execution). The path of
+the sandbox directory is exported to the execution environment of each worker
+through the WORK_QUEUE_SANDBOX shell environment variable. This shell variable
+can be accessed in the execution environment of the worker to describe and
+access the locations of files in the sandbox directory. An example of its usage
+is given below:
+<div class="code_area">
+<h4 class="code_header">C/Perl</h4>
+<pre class="code_snip">
+ t = work_queue_task_create("$WORK_QUEUE_SANDBOX/gzip < a > a.gz");  
+</pre>
+<h4 class="code_header">Python</h4>
+<pre class="code_snip">
+ t = Task("$WORK_QUEUE_SANDBOX/gzip < a > a.gz")  
+</pre>
+</div>
+
+<p>
 We can also run a program that is already installed at the remote site, where
-the worker runs, by specifying its installed location (and removing the
-specification of the executable as an input file). For example:
+the worker runs, by specifying its installed location in the command line of the
+task (and removing the specification of the executable as an input file). For
+example:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
@@ -342,9 +367,14 @@ to the resolved file name. For example:
  t.specify_file(t,"a.$OS.$ARCH","a",WORK_QUEUE_INPUT,cache=True)
 </pre>
 </div>
-This will transfer <tt>a.Linux.x86_64</tt> to workers running on a Linux system with an
-x86_64 architecture and <tt>a.Cygwin.i686</tt> to workers on Cygwin with an i686
-architecture. 
+This will transfer <tt>a.Linux.x86_64</tt> to workers running on a Linux system
+with an x86_64 architecture and <tt>a.Cygwin.i686</tt> to workers on Cygwin with
+an i686 architecture. 
+<p>
+Note this feature is specifically designed for specifying and distingushing
+input file names for different platforms and architectures. This is different
+from the $WORK_QUEUE_SANDBOX shell environment variable that exports the
+location of the working directory of the worker to its execution environment.
 <p>
 <li><b>Cancel Task.</b> This feature is useful in workflows where there are redundant tasks 
 or tasks that become obsolete as other tasks finish. Tasks that have been submitted can be 
