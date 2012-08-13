@@ -907,12 +907,14 @@ static int do_work(struct link *master, INT64_T length) {
 	free(cmd);
 	if(pid < 0) {
 		fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
+		abort_flag = 1;
 		return 0;
 	}
 
 	snprintf(stdout_file, 50, "%d.task.stdout.tmp", pid);
 	if((stdout_file_fd = open(stdout_file, O_CREAT | O_WRONLY)) == -1) {
 		fprintf(stderr, "work_queue_worker: failed to open standard output file. Shutting down worker...\n");
+		abort_flag = 1;
 		return 0;
 	}
 
