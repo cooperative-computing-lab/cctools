@@ -755,9 +755,9 @@ static struct link *connect_master(time_t stoptime) {
 		if(stoptime < time(0)) {
 			// Failed to connect to any master.
 			if(auto_worker) {
-				fprintf(stdout, "work_queue_worker: giving up because couldn't connect to any master in %d seconds.\n", idle_timeout);
+				debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to any master in %d seconds.\n", idle_timeout);
 			} else {
-				fprintf(stdout, "work_queue_worker: giving up because couldn't connect to %s:%d in %d seconds.\n", actual_addr, actual_port, idle_timeout);
+				debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to %s:%d in %d seconds.\n", actual_addr, actual_port, idle_timeout);
 			}
 			break;
 		}
