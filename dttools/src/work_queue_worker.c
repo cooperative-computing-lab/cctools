@@ -201,7 +201,7 @@ static pid_t execute_task(const char *cmd)
 		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
 		close(pipefds[0]);
 		close(pipefds[1]);
-		return 0;
+		return pid;
 	} else {
 		int fd = open("/dev/null", O_RDONLY);
 		if (fd == -1) fatal("could not open /dev/null: %s", strerror(errno));
@@ -907,13 +907,13 @@ static int do_work(struct link *master, INT64_T length) {
 	free(cmd);
 	if(pid < 0) {
 		fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
-		return -1;
+		return 0;
 	}
 
 	snprintf(stdout_file, 50, "%d.task.stdout.tmp", pid);
 	if((stdout_file_fd = open(stdout_file, O_CREAT | O_WRONLY)) == -1) {
 		fprintf(stderr, "work_queue_worker: failed to open standard output file. Shutting down worker...\n");
-		return -1;
+		return 0;
 	}
 
 	task_status = TASK_RUNNING;
