@@ -862,7 +862,7 @@ static void work_for_master(struct link *master) {
 	// Start serving masters
 	while(!abort_flag) {
 		if(time(0) > idle_stoptime && task_status != TASK_RUNNING) {
-			fprintf(stdout, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
+			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			abort_flag = 1;
 			break;
 		}
