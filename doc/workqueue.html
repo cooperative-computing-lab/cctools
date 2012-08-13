@@ -52,24 +52,25 @@ highly scalable scientific applications in biometrics, bioinformatics,
 economics, and other fields.  It can also be used as an execution engine
 for the <a href="http://www.cse.nd.edu/~ccl/software/makeflow">Makeflow</a> workflow engine.
 <p>
-<p>Work Queue is part of the <a
-href="http://www.cse.nd.edu/~ccl/software">Cooperating Computing
-Tools</a>.  You can download the CCTools from <a
-href="http://www.cse.nd.edu/~ccl/software/download">this web page</a>,
-follow the <a href=install.html>installation instructions</a>, and you
-are ready to go. You can view documentation for the full set of features of the
-Work Queue API from either within the CCTools package or <a
-href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">here</a> and <a
-href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/namespaceWorkQueuePython.html">here</a>.
 
-
-<h2>Building and Running Work Queue</h2>
-
-Let's begin by running a simple but complete example of a master and a worker.
-After trying it out, we will then show how to write a program from scratch.
+<h2>Installing Work Queue</h2>
 <p>
-We assume that you have already downloaded and installed the cctools in
-the directory CCTOOLS.  Next, download the example file for the language of your
+Work Queue is part of the <a href="http://www.cse.nd.edu/~ccl/software">Cooperating Computing Tools</a>.  
+The CCTools package can be downloaded from <a href="http://www.cse.nd.edu/~ccl/software/download">this web page</a>.
+Follow the <a href=install.html>installation instructions</a> to setup CCTools
+required for running Work Queue.  The documentation for the full set of features
+of the Work Queue API can be viewed from either within the CCTools package or 
+<a href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">here</a>
+and <a href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/namespaceWorkQueuePython.html">here</a>.
+
+<h2>Building Work Queue Application</h2>
+
+Let's begin by running a simple but complete example of a Work Queue
+application. After trying it out, we will then show how to write a Work Queue
+application from scratch.
+<p>
+We assume that you have downloaded and installed the cctools package in the
+directory CCTOOLS. Next, download the example file for the language of your
 choice: 
 <ul>
 <li>C: <a href=work_queue_example.c>work_queue_example.c</a></li>
@@ -90,11 +91,14 @@ If you are using the Perl example, set PERL5LIB to include the Perl modules in c
 export PERL5LIB=${PERL5LIB}:${CCTOOLS}/lib/perl5/site_perl
 </pre></div>
 
-This example program simply compresses a bunch of files in parallel.  List the files to be
-compressed on the command line.  Each will be transmitted to a remote worker, compressed,
-and then sent back to the master.  (This isn't necessarily faster than doing it locally,
-but it is easy to run.)
-For example, to compress files <tt>a</tt>, <tt>b</tt>, and <tt>c</tt>, run this:
+<h2>Running Work Queue Application</h2>
+The example application simply compresses a bunch of files in parallel. The
+files to be compressed must be listed on the command line. Each will be
+transmitted to a remote worker, compressed, and then sent back to the Work Queue
+master.
+
+To compress files <tt>a</tt>, <tt>b</tt>, and <tt>c</tt> with this example
+application, run it as:
 <div class ="code_area"><pre class="code_snip">
 ./work_queue_example a b c
 </pre></div>
@@ -108,9 +112,9 @@ submitted task: /usr/bin/gzip < c > c.gz
 waiting for tasks to complete...
 </pre></div>
 
-The master is now waiting for workers to connect and begin requesting work.
-(Without any workers, it will wait forever.)  You can start one worker on the
-same machine by opening a new shell and running:
+The Work Queue master is now waiting for workers to connect and begin requesting
+work. (Without any workers, it will wait forever.) You can start one worker on
+the same machine by opening a new shell and running:
 
 <div class ="code_area"><pre class="code_snip">
 work_queue_worker MACHINENAME 9123
@@ -149,7 +153,7 @@ with <tt>kill</tt>, <tt>condor_rm</tt>, or <tt>qdel</tt> as appropriate.
 If you forget to remove them, they will exit automatically after fifteen minutes.
 (This can be adjusted with the <tt>-t</tt> option to <tt>worker</tt>.)
 
-<h2>Writing a Master Program</h2>
+<h2>Writing Work Queue Master Program</h2>
 
 To write your own program using Work Queue, begin with <a
 href=work_queue_example.c>C example</a> or <a
