@@ -217,7 +217,7 @@ command invocation as an input file so that it is transferred and installed in
 the working directory of the worker. We require this executable to be cached so
 that it can be used by subsequent tasks that need it in their execution. On the
 other hand, the input and output of the task are not required to be cached
-since they are not used by subsequent tasks.
+since they are not used by subsequent tasks in this example.
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
@@ -235,16 +235,14 @@ since they are not used by subsequent tasks.
 
 Note that the specified input directories and files for each task are
 transferred and setup in the sandbox directory of the worker (unless an absolute
-path is specified for their location). This sandbox serves as the work space of
-the worker where all directories and files related to the execution of its tasks
-are stored. The tasks are executed by each worker inside its sandbox.
-Therefore, all task outputs are stored within the sandbox directory (unless an
-absolute path is specified for their storage during task execution). The path of
-the sandbox directory is exported to the execution environment of each worker
-through the WORK_QUEUE_SANDBOX shell environment variable. This shell variable
-can be accessed in the execution environment of the worker to describe and
-access the locations of files in the sandbox directory. An example of its usage
-is given below:
+path is specified for their location). This sandbox serves as the initial
+working directory of each task executed by the worker. The task outputs are also
+stored in the sandbox directory (unless an absolute path is specified for their
+storage). The path of the sandbox directory is exported to the execution
+environment of each worker through the WORK_QUEUE_SANDBOX shell environment
+variable. This shell variable can be used in the execution environment of
+the worker to describe and access the locations of files in the sandbox
+directory. An example of its usage is given below:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
@@ -376,9 +374,10 @@ with an x86_64 architecture and <tt>a.Cygwin.i686</tt> to workers on Cygwin with
 an i686 architecture. 
 <p>
 Note this feature is specifically designed for specifying and distingushing
-input file names for different platforms and architectures. This is different
-from the $WORK_QUEUE_SANDBOX shell environment variable that exports the
-location of the working directory of the worker to its execution environment.
+input file names for different platforms and architectures. Also, this is
+different from the $WORK_QUEUE_SANDBOX shell environment variable that exports
+the location of the working directory of the worker to its execution
+environment.
 <p>
 <li><b>Cancel Task.</b> This feature is useful in workflows where there are redundant tasks 
 or tasks that become obsolete as other tasks finish. Tasks that have been submitted can be 
