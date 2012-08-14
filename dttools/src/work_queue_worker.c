@@ -106,12 +106,13 @@ static int abort_flag = 0;
 static UINT64_T disk_avail_threshold = 100;
 
 
-// Basice worker global variables
+// Basic worker global variables
 static char actual_addr[LINK_ADDRESS_MAX];
 static int actual_port;
 static char workspace[WORK_QUEUE_LINE_MAX];
 static char *os_name = NULL; 
 static char *arch_name = NULL;
+static char *user_specified_workdir = NULL;
 
 // Forked task related
 static int pipefds[2];
@@ -1234,9 +1235,12 @@ static void abort_worker() {
 	if(pool_name) {
 		free(pool_name);
 	}
+	if(user_specified_workdir) {
+		free(user_specified_workdir);
+	} 
 	free(os_name);
 	free(arch_name);
-	
+
 	// Kill running task if needed
 	if(task_status == TASK_RUNNING) {
 		kill(pid, SIGTERM);
@@ -1278,7 +1282,9 @@ static void check_arguments(int argc, char **argv) {
 static int setup_workspace() {
 	// Setup working space(dir)
 	const char *workdir;
-	if(getenv("_CONDOR_SCRATCH_DIR")) {
+	if (user_specified_workdir){
+		workdir = user_specified_workdir;	
+	} else if(getenv("_CONDOR_SCRATCH_DIR")) {
 		workdir = getenv("_CONDOR_SCRATCH_DIR");
 	} else if(getenv("TEMP")) {
 		workdir = getenv("TEMP");
@@ -1316,6 +1322,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%lluMB)\n", disk_avail_threshold);
 	fprintf(stdout, " -A <arch>      Set architecture string for the worker to report to master instead of the value in uname (%s).\n", arch_name);
 	fprintf(stdout, " -O <os>        Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
+	fprintf(stdout, " -s <path>      Set the location for creating the working directory of the worker.\n.");
 	fprintf(stdout, " -v             Show version string\n");
 	fprintf(stdout, " -h             Show this help screen\n");
 }
@@ -1340,7 +1347,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aC:d:t:o:p:N:w:i:b:z:A:O:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "aC:d:t:o:p:N:w:i:b:z:A:O:s:vh")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
@@ -1391,6 +1398,9 @@ int main(int argc, char *argv[])
 		case 'O':
 			free(os_name); //free the os string obtained from uname
 			os_name = xxstrdup(optarg);
+			break;
+		case 's':
+			user_specified_workdir = xxstrdup(optarg);
 			break;
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
