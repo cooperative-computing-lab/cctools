@@ -1068,6 +1068,7 @@ int dag_check_dependencies(struct dag *d)
 			m = hash_table_lookup(d->file_table, f->filename);
 			if(m) {
 				fprintf(stderr, "makeflow: %s is defined multiple times at %s:%d and %s:%d\n", f->filename, d->filename, n->linenum, d->filename, m->linenum);
+				errno = EINVAL;
 				return 0;
 			} else {
 				hash_table_insert(d->file_table, f->filename, n);
