@@ -30,12 +30,13 @@ print "listening on port $port...\n";
 for (my $i = 0; $i <= $#ARGV; $i++) {
 	my $infile = $ARGV[$i]; 
 	my $outfile = $ARGV[$i] . ".gz";
-	my $command = "/usr/bin/gzip < $infile > $outfile";
+	my $command = "./gzip < $infile > $outfile";
 
     my $t = work_queue_task_create($command);
 
-    work_queue_task_specify_file($t, $infile, $infile, $WORK_QUEUE_INPUT, $WORK_QUEUE_CACHE);
-    work_queue_task_specify_file($t, $outfile, $outfile, $WORK_QUEUE_OUTPUT, $WORK_QUEUE_CACHE);
+    work_queue_task_specify_file($t, "/usr/bin/gzip", "gzip", $WORK_QUEUE_INPUT, $WORK_QUEUE_CACHE);
+    work_queue_task_specify_file($t, $infile, $infile, $WORK_QUEUE_INPUT, $WORK_QUEUE_NOCACHE);
+    work_queue_task_specify_file($t, $outfile, $outfile, $WORK_QUEUE_OUTPUT, $WORK_QUEUE_NOCACHE);
 
     my $taskid = work_queue_submit($q, $t);
     print "submitted task (id# $t->{taskid}): $t->{command_line}\n";

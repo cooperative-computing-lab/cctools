@@ -569,15 +569,13 @@ else
 	fi
 fi
 
-if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/cvmfs/src/libcvmfs.h
+if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/include/libcvmfs.h
 then
-	ccflags="${ccflags} -I${cvmfs_path}/cvmfs/src -DHAS_CVMFS"
+	ccflags="${ccflags} -I${cvmfs_path}/include -DHAS_CVMFS"
 
-	for library in cvmfs/src/cvmfs sqlite3/src/sqlite3 libcurl/src/lib/.libs/curl c-ares/src/.libs/cares
+	for library in cvmfs 
 	do
-		lib_path=${cvmfs_path}/`dirname ${library}`
-                library=`basename ${library}`
-		if ! library_search $library ${lib_path}
+		if ! library_search $library ${cvmfs_path}
 		then
 			echo "*** Couldn't find $library in ${lib_path}"
 			exit 1

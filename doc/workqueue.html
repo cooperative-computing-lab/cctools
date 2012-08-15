@@ -30,7 +30,7 @@ padding: 0.3%;
 <body>
 
 <h1>Work Queue User's Manual</h1>
-<b>Last Updated May 2012</b>
+<b>Last Updated August 2012</b>
 <p>
 Work Queue is Copyright (C) 2009 The University of Notre Dame.
 This software is distributed under the GNU General Public License.
@@ -52,24 +52,25 @@ highly scalable scientific applications in biometrics, bioinformatics,
 economics, and other fields.  It can also be used as an execution engine
 for the <a href="http://www.cse.nd.edu/~ccl/software/makeflow">Makeflow</a> workflow engine.
 <p>
-<p>Work Queue is part of the <a
-href="http://www.cse.nd.edu/~ccl/software">Cooperating Computing
-Tools</a>.  You can download the CCTools from <a
-href="http://www.cse.nd.edu/~ccl/software/download">this web page</a>,
-follow the <a href=install.html>installation instructions</a>, and you
-are ready to go. You can view documentation for the full set of features of the
-Work Queue API from either within the CCTools or <a
-href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">here</a> and <a
-href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/namespaceWorkQueuePython.html">here</a>.
 
-
-<h2>Building and Running Work Queue</h2>
-
-Let's begin by running a simple but complete example of a master and a worker.
-After trying it out, we will then show how to write a program from scratch.
+<h2>Installing Work Queue</h2>
 <p>
-We assume that you have already downloaded and installed the cctools in
-the directory CCTOOLS.  Next, download the example file for the language of your
+Work Queue is part of the <a href="http://www.cse.nd.edu/~ccl/software">Cooperating Computing Tools</a>.  
+The CCTools package can be downloaded from <a href="http://www.cse.nd.edu/~ccl/software/download">this web page</a>.
+Follow the <a href=install.html>installation instructions</a> to setup CCTools
+required for running Work Queue.  The documentation for the full set of features
+of the Work Queue API can be viewed from either within the CCTools package or 
+<a href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">here</a>
+and <a href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/namespaceWorkQueuePython.html">here</a>.
+
+<h2>Building Work Queue Application</h2>
+
+Let's begin by running a simple but complete example of a Work Queue
+application. After trying it out, we will then show how to write a Work Queue
+application from scratch.
+<p>
+We assume that you have downloaded and installed the cctools package in the
+directory CCTOOLS. Next, download the example file for the language of your
 choice: 
 <ul>
 <li>C: <a href=work_queue_example.c>work_queue_example.c</a></li>
@@ -90,11 +91,14 @@ If you are using the Perl example, set PERL5LIB to include the Perl modules in c
 export PERL5LIB=${PERL5LIB}:${CCTOOLS}/lib/perl5/site_perl
 </pre></div>
 
-This example program simply compresses a bunch of files in parallel.  List the files to be
-compressed on the command line.  Each will be transmitted to a remote worker, compressed,
-and then sent back to the master.  (This isn't necessarily faster than doing it locally,
-but it is easy to run.)
-For example, to compress files <tt>a</tt>, <tt>b</tt>, and <tt>c</tt>, run this:
+<h2>Running Work Queue Application</h2>
+The example application simply compresses a bunch of files in parallel. The
+files to be compressed must be listed on the command line. Each will be
+transmitted to a remote worker, compressed, and then sent back to the Work Queue
+master.
+
+To compress files <tt>a</tt>, <tt>b</tt>, and <tt>c</tt> with this example
+application, run it as:
 <div class ="code_area"><pre class="code_snip">
 ./work_queue_example a b c
 </pre></div>
@@ -108,9 +112,9 @@ submitted task: /usr/bin/gzip < c > c.gz
 waiting for tasks to complete...
 </pre></div>
 
-The master is now waiting for workers to connect and begin requesting work.
-(Without any workers, it will wait forever.)  You can start one worker on the
-same machine by opening a new shell and running:
+The Work Queue master is now waiting for workers to connect and begin requesting
+work. (Without any workers, it will wait forever.) You can start one worker on
+the same machine by opening a new shell and running:
 
 <div class ="code_area"><pre class="code_snip">
 work_queue_worker MACHINENAME 9123
@@ -149,7 +153,7 @@ with <tt>kill</tt>, <tt>condor_rm</tt>, or <tt>qdel</tt> as appropriate.
 If you forget to remove them, they will exit automatically after fifteen minutes.
 (This can be adjusted with the <tt>-t</tt> option to <tt>worker</tt>.)
 
-<h2>Writing a Master Program</h2>
+<h2>Writing Work Queue Master Program</h2>
 
 To write your own program using Work Queue, begin with <a
 href=work_queue_example.c>C example</a> or <a
@@ -186,61 +190,83 @@ First create a queue that is listening on a particular TCP port:
 </pre>
 </div>
 
-The master then creates tasks to submit to the queue.
-Each task consists of a command line to run and a statement of
-what data is needed, and what data will be produced by the command.
-Input data can be provided in the form of a file or a local memory buffer.
-Output data can be provided in the form of a file or the standard output of the program.
-It is also required to specify whether the data, input or output, need to be cached at
-the worker site for later use. In the example, we specify a command that takes a 
-single input file, produces a single output file, and requires both files to be
-cached:
+The master then creates tasks to submit to the queue. Each task consists of a
+command line to run and a statement of what data is needed, and what data will
+be produced by the command. Input data can be provided in the form of a file or
+a local memory buffer. Output data can be provided in the form of a file or the
+standard output of the program. It is also required to specify whether the
+data, input or output, need to be cached at the worker site for later use. 
+<p>
+In the example, we specify a command that takes a single input file and produces
+a single output file. We then create a task by providing the specified command
+as an argument:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
  t = work_queue_task_create(command);  
- work_queue_task_specify_file(t,infile,infile,WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); 
- work_queue_task_specify_file(t,outfile,outfile,WORK_QUEUE_OUTPUT,WORK_QUEUE_CACHE);
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
  t = Task(command) 
- t.specify_file(infile,infile,WORK_QUEUE_INPUT,cache=True)  
- t.specify_file(outfile,outfile,WORK_QUEUE_OUTPUT,cache=True) 
 </pre>
 </div>
 
-If a file does not need to be cached at the execution site to avoid wasteful
-strorage, it can be specified so:
+The input and output files associated with the execution of the task must be
+explicitly specified. In the example, we also specify the executable in the
+command invocation as an input file so that it is transferred and installed in
+the working directory of the worker. We require this executable to be cached so
+that it can be used by subsequent tasks that need it in their execution. On the
+other hand, the input and output of the task are not required to be cached
+since they are not used by subsequent tasks in this example.
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
+ work_queue_task_specify_file(t,"/usr/bin/gzip","gzip",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); 
+ work_queue_task_specify_file(t,infile,infile,WORK_QUEUE_INPUT,WORK_QUEUE_NOCACHE); 
  work_queue_task_specify_file(t,outfile,outfile,WORK_QUEUE_OUTPUT,WORK_QUEUE_NOCACHE);
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
+ t.specify_file("/usr/bin/gzip","gzip",WORK_QUEUE_INPUT,cache=True); 
+ t.specify_file(infile,infile,WORK_QUEUE_INPUT,cache=False)  
  t.specify_file(outfile,outfile,WORK_QUEUE_OUTPUT,cache=False) 
 </pre>
 </div>
 
-You can also run a program that is not necessarily installed at the
-remote location, by specifying it as an input file.  If the file
-is installed on the local machine, then specify the full local path,
-and the plain remote path.  For example:
+Note that the specified input directories and files for each task are
+transferred and setup in the sandbox directory of the worker (unless an absolute
+path is specified for their location). This sandbox serves as the initial
+working directory of each task executed by the worker. The task outputs are also
+stored in the sandbox directory (unless an absolute path is specified for their
+storage). The path of the sandbox directory is exported to the execution
+environment of each worker through the WORK_QUEUE_SANDBOX shell environment
+variable. This shell variable can be used in the execution environment of
+the worker to describe and access the locations of files in the sandbox
+directory. An example of its usage is given below:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
- t = work_queue_task_create("./my_compress_program < a > a.gz");  
- work_queue_task_specify_file(t,"/usr/local/bin/my_compress_program","my_compress_program",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); 
- work_queue_task_specify_file(t,"a","a",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); 
- work_queue_task_specify_file(t,"a.gz","a.gz",WORK_QUEUE_OUTPUT,WORK_QUEUE_CACHE); 
+ t = work_queue_task_create("$WORK_QUEUE_SANDBOX/gzip < a > a.gz");  
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- t = Task("./my_compress_program < a > a.gz")  
- t.specify_file("/usr/local/bin/my_compress_program","my_compress_program",WORK_QUEUE_INPUT,cache=True)
- t.specify_file("a","a",WORK_QUEUE_INPUT,cache=True) 
- t.specify_file("a.gz","a.gz",WORK_QUEUE_OUTPUT,cache=True) 
+ t = Task("$WORK_QUEUE_SANDBOX/gzip < a > a.gz")  
+</pre>
+</div>
+
+<p>
+We can also run a program that is already installed at the remote site, where
+the worker runs, by specifying its installed location in the command line of the
+task (and removing the specification of the executable as an input file). For
+example:
+<div class="code_area">
+<h4 class="code_header">C/Perl</h4>
+<pre class="code_snip">
+ t = work_queue_task_create("/usr/bin/gzip < a > a.gz");  
+</pre>
+<h4 class="code_header">Python</h4>
+<pre class="code_snip">
+ t = Task("/usr/bin/gzip < a > a.gz")  
 </pre>
 </div>
 
@@ -343,9 +369,15 @@ to the resolved file name. For example:
  t.specify_file(t,"a.$OS.$ARCH","a",WORK_QUEUE_INPUT,cache=True)
 </pre>
 </div>
-This will transfer <tt>a.Linux.x86_64</tt> to workers running on a Linux system with an
-x86_64 architecture and <tt>a.Cygwin.i686</tt> to workers on Cygwin with an i686
-architecture. 
+This will transfer <tt>a.Linux.x86_64</tt> to workers running on a Linux system
+with an x86_64 architecture and <tt>a.Cygwin.i686</tt> to workers on Cygwin with
+an i686 architecture. 
+<p>
+Note this feature is specifically designed for specifying and distingushing
+input file names for different platforms and architectures. Also, this is
+different from the $WORK_QUEUE_SANDBOX shell environment variable that exports
+the location of the working directory of the worker to its execution
+environment.
 <p>
 <li><b>Cancel Task.</b> This feature is useful in workflows where there are redundant tasks 
 or tasks that become obsolete as other tasks finish. Tasks that have been submitted can be 
