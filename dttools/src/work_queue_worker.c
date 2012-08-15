@@ -1322,7 +1322,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%lluMB)\n", disk_avail_threshold);
 	fprintf(stdout, " -A <arch>      Set architecture string for the worker to report to master instead of the value in uname (%s).\n", arch_name);
 	fprintf(stdout, " -O <os>        Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
-	fprintf(stdout, " -s <path>      Set the location for creating the working directory of the worker.\n.");
+	fprintf(stdout, " -s <path>      Set the location for creating the working directory of the worker.\n");
 	fprintf(stdout, " -v             Show version string\n");
 	fprintf(stdout, " -h             Show this help screen\n");
 }
