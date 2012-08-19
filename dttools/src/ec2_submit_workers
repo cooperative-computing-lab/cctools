@@ -6,7 +6,7 @@ show_help()
         echo "where options are:"
         echo "  -a                  Enable auto mode."
         echo "  -s                  Run as a shared worker."
-        echo "  -N <name>           Preferred master name."
+        echo "  -N <name>           Preferred project name for worker."
         echo "  -C <catalog>        Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
         echo "  -t <time>           Abort after this amount of idle time. (default=900s)."
         echo "  -d <subsystem>      Enable debugging on worker for this subsystem (try -d all to start)."
