@@ -1294,7 +1294,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				errno = ENOMEM;
 				goto failure;
 			}
-		} else if(sscanf(line, "fsetxattr %lld %s %zu %d", &fd, xattrname, xattrsize, xattrflags) == 4) {
+		} else if(sscanf(line, "fsetxattr %lld %s %zu %d", &fd, xattrname, &xattrsize, &xattrflags) == 4) {
 			if(xattrsize > MAX_BUFFER_SIZE) {
 				errno = ENOSPC;
 				goto failure;
@@ -1456,7 +1456,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				errno = ENOMEM;
 				goto failure;
 			}
-		} else if(sscanf(line, "setxattr %s %s %zu %d", path, xattrname, xattrsize, xattrflags) == 4) {
+		} else if(sscanf(line, "setxattr %s %s %zu %d", path, xattrname, &xattrsize, &xattrflags) == 4) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
@@ -1487,7 +1487,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				result = -1;
 				errno = ENOMEM;
 			}
-		} else if(sscanf(line, "lsetxattr %s %s %zu %d", path, xattrname, xattrsize, xattrflags) == 4) {
+		} else if(sscanf(line, "lsetxattr %s %s %zu %d", path, xattrname, &xattrsize, &xattrflags) == 4) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
