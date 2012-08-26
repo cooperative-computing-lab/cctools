@@ -976,3 +976,69 @@ INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode)
 
 	return result;
 }
+
+INT64_T chirp_alloc_getxattr (const char *path, const char *name, void *data, size_t size)
+{
+	return cfs->getxattr(path, name, data, size);
+}
+
+INT64_T chirp_alloc_fgetxattr (int fd, const char *name, void *data, size_t size)
+{
+	return cfs->getxattr(fd, name, data, size);
+}
+
+INT64_T chirp_alloc_lgetxattr (const char *path, const char *name, void *data, size_t size)
+{
+	return cfs->lgetxattr(path, name, data, size);
+}
+
+INT64_T chirp_alloc_listxattr (const char *path, char *list, size_t size)
+{
+	return cfs->listxattr(path, list, size);
+}
+
+INT64_T chirp_alloc_listxattr (int fd, char *list, size_t size)
+{
+	return cfs->flistxattr(fd, list, size);
+}
+
+INT64_T chirp_alloc_llistxattr (const char *path, char *list, size_t size)
+{
+	return cfs->listxattr(path, list, size);
+}
+
+INT64_T chirp_alloc_setxattr (const char *path, const char *name, const void *data, size_t size, int flags)
+{
+	/* FIXME check allocated */
+	return cfs->setxattr(path, name, data, size, flags);
+}
+
+INT64_T chirp_alloc_fsetxattr (int fd, const char *name, const void *data, size_t size, int flags)
+{
+	/* FIXME check allocated */
+	return cfs->setxattr(fd, name, data, size, flags);
+}
+
+INT64_T chirp_alloc_lsetxattr (const char *path, const char *name, const void *data, size_t size, int flags)
+{
+	/* FIXME check allocated */
+	return cfs->lsetxattr(path, name, data, size, flags);
+}
+
+INT64_T chirp_alloc_removexattr (const char *path, const char *name)
+{
+	/* FIXME check allocated */
+	return cfs->removexattr(path, name);
+}
+
+INT64_T chirp_alloc_fremovexattr (int fd, const char *name)
+{
+	/* FIXME check allocated */
+	return cfs->removexattr(fd, name);
+}
+
+INT64_T chirp_alloc_lremovexattr (const char *path, const char *name)
+{
+	/* FIXME check allocated */
+	return cfs->lremovexattr(path, name);
+}

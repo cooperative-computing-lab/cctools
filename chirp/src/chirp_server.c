@@ -847,6 +847,11 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		char newacl[CHIRP_LINE_MAX];
 		char hostname[CHIRP_LINE_MAX];
 
+		/* extended attributes */
+		char xattrname[CHIRP_LINE_MAX];
+		size_t xattrsize;
+		int xattrflags;
+
 		char debug_flag[CHIRP_LINE_MAX];
 
 		INT64_T fd, length, flags, offset, actual;
@@ -1259,6 +1264,65 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			result = chirp_alloc_fsync(fd);
 		} else if(sscanf(line, "ftruncate %lld %lld", &fd, &length) == 2) {
 			result = chirp_alloc_ftruncate(fd, length);
+		} else if(sscanf(line, "fgetxattr %lld %s", &fd, xattrname) == 2) {
+			dataout = malloc(MAX_BUFFER_SIZE);
+			if(dataout) {
+				result = chirp_alloc_fgetxattr(fd, xattrname, dataout, MAX_BUFFER_SIZE);
+				if (result > 0) {
+					dataoutlength = result;
+				} else {
+					assert(result == -1);
+					free(dataout);
+					dataout = 0;
+				}
+			} else {
+				errno = ENOMEM;
+				goto failure;
+			}
+		} else if(sscanf(line, "flistxattr %lld", &fd) == 1) {
+			dataout = malloc(MAX_BUFFER_SIZE);
+			if(dataout) {
+				result = chirp_alloc_flistxattr(fd, dataout, MAX_BUFFER_SIZE);
+				if (result > 0) {
+					dataoutlength = result;
+				} else {
+					assert(result == -1);
+					free(dataout);
+					dataout = 0;
+				}
+			} else {
+				errno = ENOMEM;
+				goto failure;
+			}
+		} else if(sscanf(line, "fsetxattr %lld %s %zu %d", &fd, xattrname, xattrsize, xattrflags) == 4) {
+			if(xattrsize > MAX_BUFFER_SIZE) {
+				errno = ENOSPC;
+				goto failure;
+			}
+			void *data = malloc(xattrsize);
+			if(data) {
+				int actual = link_read(l, data, xattrsize, stalltime);
+				if(actual != xattrsize) {
+					free(data);
+					break;
+				}
+				if(space_available(xattrsize)) {
+					result = chirp_alloc_fsetxattr(fd, xattrname, data, xattrsize, xattrflags);
+				} else {
+					result = -1;
+					errno = ENOSPC;
+				}
+				free(data);
+				if(result > 0) {
+					chirp_stats_update(0,0,result);
+				}
+			} else {
+				link_soak(l, xattrsize, stalltime);
+				result = -1;
+				errno = ENOMEM;
+			}
+		} else if(sscanf(line, "fremovexattr %lld %s", &fd, xattrname) == 2) {
+			result = chirp_alloc_fremovexattr(fd, xattrname);
 		} else if(sscanf(line, "unlink %s", path) == 1) {
 			if(!chirp_path_fix(path))
 				goto failure;
@@ -1316,6 +1380,156 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if(!chirp_acl_check(newpath, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = chirp_alloc_rename(path, newpath);
+		} else if(sscanf(line, "getxattr %s %s", path, xattrname) == 2) {
+			if(!chirp_path_fix(path))
+				goto failure;
+			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
+				goto failure;
+			dataout = malloc(MAX_BUFFER_SIZE);
+			if(dataout) {
+				result = chirp_alloc_getxattr(path, xattrname, dataout, MAX_BUFFER_SIZE);
+				if (result > 0) {
+					dataoutlength = result;
+				} else {
+					assert(result == -1);
+					free(dataout);
+					dataout = 0;
+				}
+			} else {
+				errno = ENOMEM;
+				goto failure;
+			}
+		} else if(sscanf(line, "lgetxattr %s %s", path, xattrname) == 2) {
+			if(!chirp_path_fix(path))
+				goto failure;
+			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
+				goto failure;
+			dataout = malloc(MAX_BUFFER_SIZE);
+			if(dataout) {
+				result = chirp_alloc_lgetxattr(path, xattrname, dataout, MAX_BUFFER_SIZE);
+				if (result > 0) {
+					dataoutlength = result;
+				} else {
+					assert(result == -1);
+					free(dataout);
+					dataout = 0;
+				}
+			} else {
+				errno = ENOMEM;
+				goto failure;
+			}
+		} else if(sscanf(line, "listxattr %s", path) == 1) {
+			if(!chirp_path_fix(path))
+				goto failure;
+			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
+				goto failure;
+			dataout = malloc(MAX_BUFFER_SIZE);
+			if(dataout) {
+				result = chirp_alloc_listxattr(path, dataout, MAX_BUFFER_SIZE);
+				if (result > 0) {
+					dataoutlength = result;
+				} else {
+					assert(result == -1);
+					free(dataout);
+					dataout = 0;
+				}
+			} else {
+				errno = ENOMEM;
+				goto failure;
+			}
+		} else if(sscanf(line, "llistxattr %s", path) == 1) {
+			if(!chirp_path_fix(path))
+				goto failure;
+			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
+				goto failure;
+			dataout = malloc(MAX_BUFFER_SIZE);
+			if(dataout) {
+				result = chirp_alloc_llistxattr(path, dataout, MAX_BUFFER_SIZE);
+				if (result > 0) {
+					dataoutlength = result;
+				} else {
+					assert(result == -1);
+					free(dataout);
+					dataout = 0;
+				}
+			} else {
+				errno = ENOMEM;
+				goto failure;
+			}
+		} else if(sscanf(line, "setxattr %s %s %zu %d", path, xattrname, xattrsize, xattrflags) == 4) {
+			if(!chirp_path_fix(path))
+				goto failure;
+			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
+				goto failure;
+			if(xattrsize > MAX_BUFFER_SIZE) {
+				errno = ENOSPC;
+				goto failure;
+			}
+			void *data = malloc(xattrsize);
+			if(data) {
+				int actual = link_read(l, data, xattrsize, stalltime);
+				if(actual != xattrsize) {
+					free(data);
+					break;
+				}
+				if(space_available(xattrsize)) {
+					result = chirp_alloc_setxattr(path, xattrname, data, xattrsize, xattrflags);
+				} else {
+					result = -1;
+					errno = ENOSPC;
+				}
+				free(data);
+				if(result > 0) {
+					chirp_stats_update(0,0,result);
+				}
+			} else {
+				link_soak(l, xattrsize, stalltime);
+				result = -1;
+				errno = ENOMEM;
+			}
+		} else if(sscanf(line, "lsetxattr %s %s %zu %d", path, xattrname, xattrsize, xattrflags) == 4) {
+			if(!chirp_path_fix(path))
+				goto failure;
+			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
+				goto failure;
+			if(xattrsize > MAX_BUFFER_SIZE) {
+				errno = ENOSPC;
+				goto failure;
+			}
+			void *data = malloc(xattrsize);
+			if(data) {
+				int actual = link_read(l, data, xattrsize, stalltime);
+				if(actual != xattrsize) {
+					free(data);
+					break;
+				}
+				if(space_available(xattrsize)) {
+					result = chirp_alloc_lsetxattr(path, xattrname, data, xattrsize, xattrflags);
+				} else {
+					result = -1;
+					errno = ENOSPC;
+				}
+				free(data);
+				if(result > 0) {
+					chirp_stats_update(0,0,result);
+				}
+			} else {
+				link_soak(l, xattrsize, stalltime);
+				result = -1;
+				errno = ENOMEM;
+			}
+		} else if(sscanf(line, "removexattr %s %s", path, xattrname) == 2) {
+			if(!chirp_path_fix(path))
+				goto failure;
+			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
+				goto failure;
+			result = chirp_alloc_removexattr(path, xattrname);
+		} else if(sscanf(line, "lremovexattr %s %s", path, xattrname) == 2) {
+			if(!chirp_path_fix(path))
+				goto failure;
+			if(!chirp_acl_check_link(path, subject, CHIRP_ACL_WRITE))
+				goto failure;
+			result = chirp_alloc_lremovexattr(path, xattrname);
 		} else if(sscanf(line, "link %s %s", path, newpath) == 2) {
 			/* Can only hard link to files on which you already have r/w perms */
 			if(!chirp_path_fix(path))

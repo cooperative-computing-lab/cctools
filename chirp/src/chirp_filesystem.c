@@ -608,4 +608,74 @@ INT64_T cfs_basic_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T st
 	}
 }
 
+INT64_T cfs_stub_getxattr ( const char *path, const char *name, void *data, size_t size )
+{
+	errno = ENOSYS;
+	return -1;
+}
 
+INT64_T cfs_stub_fgetxattr ( int fd, const char *name, void *data, size_t size )
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+INT64_T cfs_stub_lgetxattr ( const char *path, const char *name, void *data, size_t size )
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+INT64_T cfs_stub_listxattr ( const char *path, char *list, size_t size )
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+INT64_T cfs_stub_flistxattr ( int fd, char *list, size_t size )
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+INT64_T cfs_stub_llistxattr ( const char *path, data *data, size_t size )
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+INT64_T cfs_stub_setxattr ( const char *path, const char *name, const void *data, size_t size, int flags )
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+INT64_T cfs_stub_fsetxattr ( int fd, const char *name, const void *data, size_t size, int flags )
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+INT64_T cfs_stub_lsetxattr ( const char *path, const char *name, const void *data, size_t size, int flags )
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+INT64_T cfs_stub_removexattr ( const char *path, const char *name )
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+INT64_T cfs_stub_fremovexattr ( int fd, const char *name )
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+INT64_T cfs_stub_lremovexattr ( const char *path, const char *name )
+{
+	errno = ENOSYS;
+	return -1;
+}
