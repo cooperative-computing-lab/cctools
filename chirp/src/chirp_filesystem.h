@@ -105,9 +105,9 @@ struct chirp_filesystem {
     INT64_T (*listxattr)  ( const char *path, char *data, size_t size );
     INT64_T (*flistxattr)  ( int fd, char *data, size_t size );
     INT64_T (*llistxattr)  ( const char *path, char *data, size_t size );
-    INT64_T (*setxattr)  ( const char *path, const char *name, void *data, size_t size, int flags );
-    INT64_T (*fsetxattr)  ( int fd, const char *name, void *data, size_t size, int flags );
-    INT64_T (*lsetxattr)  ( const char *path, const char *name, void *data, size_t size, int flags );
+    INT64_T (*setxattr)  ( const char *path, const char *name, const void *data, size_t size, int flags );
+    INT64_T (*fsetxattr)  ( int fd, const char *name, const void *data, size_t size, int flags );
+    INT64_T (*lsetxattr)  ( const char *path, const char *name, const void *data, size_t size, int flags );
     INT64_T (*removexattr)  ( const char *path, const char *name );
     INT64_T (*fremovexattr)  ( int fd, const char *name );
     INT64_T (*lremovexattr)  ( const char *path, const char *name );
