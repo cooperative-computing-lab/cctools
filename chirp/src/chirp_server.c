@@ -914,14 +914,15 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				errno = ENOMEM;
 			}
 		} else if(sscanf(line, "pwrite %lld %lld %lld", &fd, &length, &offset) == 3) {
-			char *data;
 			INT64_T orig_length = length;
 			length = MIN(length, MAX_BUFFER_SIZE);
-			data = malloc(length);
+			char *data = malloc(length);
 			if(data) {
 				actual = link_read(l, data, length, stalltime);
-				if(actual != length)
+				if(actual != length) {
+					free(data);
 					break;
+				}
 				if(space_available(length)) {
 					result = chirp_alloc_pwrite(fd, data, length, offset);
 				} else {
@@ -940,14 +941,15 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				break;
 			}
 		} else if(sscanf(line, "swrite %lld %lld %lld %lld %lld", &fd, &length, &stride_length, &stride_skip, &offset) == 5) {
-			char *data;
 			INT64_T orig_length = length;
 			length = MIN(length, MAX_BUFFER_SIZE);
-			data = malloc(length);
+			char *data = malloc(length);
 			if(data) {
 				actual = link_read(l, data, length, stalltime);
-				if(actual != length)
+				if(actual != length) {
+					free(data);
 					break;
+				}
 				if(space_available(length)) {
 					result = chirp_alloc_swrite(fd, data, length, stride_length, stride_skip, offset);
 				} else {
