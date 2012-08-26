@@ -315,12 +315,12 @@ static INT64_T chirp_fs_chirp_setxattr ( const char *path, const char *name, con
 static INT64_T chirp_fs_chirp_fsetxattr ( int fd, const char *name, const void *data, size_t size, int flags )
 {
 	SETUP_FILE
-	return chirp_reli_fgetxattr(chirp_fs_chirp_hostport, file, name, data, size, flags, STOPTIME);
+	return chirp_reli_fsetxattr(chirp_fs_chirp_hostport, file, name, data, size, flags, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_lsetxattr ( const char *path, const char *name, const void *data, size_t size, int flags )
 {
-	return chirp_reli_lsetxattr(chirp_fs_chirp_hostport, file, name, data, size, flags, STOPTIME);
+	return chirp_reli_lsetxattr(chirp_fs_chirp_hostport, path, name, data, size, flags, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_removexattr ( const char *path, const char *name )
@@ -336,7 +336,7 @@ static INT64_T chirp_fs_chirp_fremovexattr ( int fd, const char *name )
 
 static INT64_T chirp_fs_chirp_lremovexattr ( const char *path, const char *name )
 {
-	return chirp_reli_lremovexattr(chirp_fs_chirp_hostport, fd, name, STOPTIME);
+	return chirp_reli_lremovexattr(chirp_fs_chirp_hostport, path, name, STOPTIME);
 }
 
 static int chirp_fs_chirp_do_acl_check()
