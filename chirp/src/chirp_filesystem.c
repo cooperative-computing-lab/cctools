@@ -638,7 +638,7 @@ INT64_T cfs_stub_flistxattr ( int fd, char *list, size_t size )
 	return -1;
 }
 
-INT64_T cfs_stub_llistxattr ( const char *path, data *data, size_t size )
+INT64_T cfs_stub_llistxattr ( const char *path, char *list, size_t size )
 {
 	errno = ENOSYS;
 	return -1;
