@@ -156,6 +156,22 @@ public:
 		return chirp_global_fchown(file,uid,gid,time(0)+pfs_master_timeout);
 	}
 
+	virtual ssize_t fgetxattr( const char *name, void *data, size_t size ) {
+		return chirp_global_fgetxattr(file,name,data,size,time(0)+pfs_master_timeout);
+	}
+
+	virtual ssize_t flistxattr( char *list, size_t size ) {
+		return chirp_global_flistxattr(file,list,size,time(0)+pfs_master_timeout);
+	}
+
+	virtual int fsetxattr( const char *name, const void *data, size_t size, int flags ) {
+		return chirp_global_fsetxattr(file,name,data,size,flags,time(0)+pfs_master_timeout);
+	}
+
+	virtual int fremovexattr( const char *name ) {
+		return chirp_global_fremovexattr(file,name,time(0)+pfs_master_timeout);
+	}
+
 	virtual int fsync() {
 		chirp_dircache_invalidate();
 		return chirp_global_flush(file,time(0)+pfs_master_timeout)>=0 ? 0 : -1;
@@ -312,6 +328,46 @@ public:
 		}
 		return result;
 
+	}
+
+	virtual ssize_t getxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
+	{
+		return chirp_global_getxattr(name->hostport,name->rest,attrname,value,size,time(0)+pfs_master_timeout);
+	}
+	
+	virtual ssize_t lgetxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
+	{
+		return chirp_global_lgetxattr(name->hostport,name->rest,attrname,value,size,time(0)+pfs_master_timeout);
+	}
+	
+	virtual ssize_t listxattr ( pfs_name *name, char *attrlist, size_t size )
+	{
+		return chirp_global_listxattr(name->hostport,name->rest,attrlist,size,time(0)+pfs_master_timeout);
+	}
+	
+	virtual ssize_t llistxattr ( pfs_name *name, char *attrlist, size_t size )
+	{
+		return chirp_global_llistxattr(name->hostport,name->rest,attrlist,size,time(0)+pfs_master_timeout);
+	}
+	
+	virtual int setxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
+	{
+		return chirp_global_setxattr(name->hostport,name->rest,attrname,value,size,flags,time(0)+pfs_master_timeout);
+	}
+	
+	virtual int lsetxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
+	{
+		return chirp_global_lsetxattr(name->hostport,name->rest,attrname,value,size,flags,time(0)+pfs_master_timeout);
+	}
+	
+	virtual int removexattr ( pfs_name *name, const char *attrname )
+	{
+		return chirp_global_removexattr(name->hostport,name->rest,attrname,time(0)+pfs_master_timeout);
+	}
+	
+	virtual int lremovexattr ( pfs_name *name, const char *attrname )
+	{
+		return chirp_global_lremovexattr(name->hostport,name->rest,attrname,time(0)+pfs_master_timeout);
 	}
 
 	virtual int chdir( pfs_name *name, char *newname ) {

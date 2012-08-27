@@ -886,3 +886,191 @@ INT64_T chirp_global_mkalloc(const char *host, const char *path, INT64_T size, I
 		return -1;
 	}
 }
+
+INT64_T chirp_global_getxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime)
+{
+	if(is_multi_path(host)) {
+		errno = EACCES;
+		return -1;
+	} else if(not_empty(path)) {
+		return chirp_reli_getxattr(host, path, name, data, size, stoptime);
+	} else if(not_empty(host)) {
+		if(server_lookup(host, stoptime)) {
+			errno = EACCES;
+			return -1;
+		} else {
+			errno = ENOENT;
+			return -1;
+		}
+	} else {
+		errno = EACCES;
+		return -1;
+	}
+}
+
+INT64_T chirp_global_fgetxattr(const char *host, struct chirp_file *file, const char *name, void *data, size_t size, time_t stoptime)
+{
+	return chirp_reli_fgetxattr(host, file, name, data, size, stoptime);
+}
+
+INT64_T chirp_global_lgetxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime)
+{
+	if(is_multi_path(host)) {
+		errno = EACCES;
+		return -1;
+	} else if(not_empty(path)) {
+		return chirp_reli_lgetxattr(host, path, name, data, size, stoptime);
+	} else if(not_empty(host)) {
+		if(server_lookup(host, stoptime)) {
+			errno = EACCES;
+			return -1;
+		} else {
+			errno = ENOENT;
+			return -1;
+		}
+	} else {
+		errno = EACCES;
+		return -1;
+	}
+}
+
+INT64_T chirp_global_listxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime)
+{
+	if(is_multi_path(host)) {
+		errno = EACCES;
+		return -1;
+	} else if(not_empty(path)) {
+		return chirp_reli_listxattr(host, path, list, size, stoptime);
+	} else if(not_empty(host)) {
+		if(server_lookup(host, stoptime)) {
+			errno = EACCES;
+			return -1;
+		} else {
+			errno = ENOENT;
+			return -1;
+		}
+	} else {
+		errno = EACCES;
+		return -1;
+	}
+}
+
+INT64_T chirp_global_flistxattr(const char *host, struct chirp_file *file, char *list, size_t size, time_t stoptime)
+{
+	return chirp_reli_flistxattr(host, file, list, size, stoptime);
+}
+
+INT64_T chirp_global_llistxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime)
+{
+	if(is_multi_path(host)) {
+		errno = EACCES;
+		return -1;
+	} else if(not_empty(path)) {
+		return chirp_reli_llistxattr(host, path, list, size, stoptime);
+	} else if(not_empty(host)) {
+		if(server_lookup(host, stoptime)) {
+			errno = EACCES;
+			return -1;
+		} else {
+			errno = ENOENT;
+			return -1;
+		}
+	} else {
+		errno = EACCES;
+		return -1;
+	}
+}
+
+INT64_T chirp_global_setxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+{
+	if(is_multi_path(host)) {
+		errno = EACCES;
+		return -1;
+	} else if(not_empty(path)) {
+		return chirp_reli_setxattr(host, path, name, data, size, flags, stoptime);
+	} else if(not_empty(host)) {
+		if(server_lookup(host, stoptime)) {
+			errno = EACCES;
+			return -1;
+		} else {
+			errno = ENOENT;
+			return -1;
+		}
+	} else {
+		errno = EACCES;
+		return -1;
+	}
+}
+
+INT64_T chirp_global_fsetxattr(const char *host, struct chirp_file *file, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+{
+	return chirp_reli_fsetxattr(host, file, name, data, size, flags, stoptime);
+}
+
+INT64_T chirp_global_lsetxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+{
+	if(is_multi_path(host)) {
+		errno = EACCES;
+		return -1;
+	} else if(not_empty(path)) {
+		return chirp_reli_lsetxattr(host, path, name, data, size, flags, stoptime);
+	} else if(not_empty(host)) {
+		if(server_lookup(host, stoptime)) {
+			errno = EACCES;
+			return -1;
+		} else {
+			errno = ENOENT;
+			return -1;
+		}
+	} else {
+		errno = EACCES;
+		return -1;
+	}
+}
+
+INT64_T chirp_global_removexattr(const char *host, const char *path, const char *name, time_t stoptime)
+{
+	if(is_multi_path(host)) {
+		errno = EACCES;
+		return -1;
+	} else if(not_empty(path)) {
+		return chirp_reli_removexattr(host, path, name, stoptime);
+	} else if(not_empty(host)) {
+		if(server_lookup(host, stoptime)) {
+			errno = EACCES;
+			return -1;
+		} else {
+			errno = ENOENT;
+			return -1;
+		}
+	} else {
+		errno = EACCES;
+		return -1;
+	}
+}
+
+INT64_T chirp_global_fremovexattr(const char *host, struct chirp_file *file, const char *name, time_t stoptime)
+{
+	return chirp_reli_fremovexattr(host, file, name, stoptime);
+}
+
+INT64_T chirp_global_lremovexattr(const char *host, const char *path, const char *name, time_t stoptime)
+{
+	if(is_multi_path(host)) {
+		errno = EACCES;
+		return -1;
+	} else if(not_empty(path)) {
+		return chirp_reli_lremovexattr(host, path, name, stoptime);
+	} else if(not_empty(host)) {
+		if(server_lookup(host, stoptime)) {
+			errno = EACCES;
+			return -1;
+		} else {
+			errno = ENOENT;
+			return -1;
+		}
+	} else {
+		errno = EACCES;
+		return -1;
+	}
+}
