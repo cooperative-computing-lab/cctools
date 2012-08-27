@@ -698,7 +698,7 @@ INT64_T chirp_reli_getxattr(const char *host, const char *path, const char *name
 	RETRY_ATOMIC( result = chirp_client_getxattr(client,path,name,data,size,stoptime); )
 }
 
-INT64_T chirp_reli_fgetxattr(const char *host, struct chirp_file *file, const char *name, void *data, size_t size, time_t stoptime)
+INT64_T chirp_reli_fgetxattr(struct chirp_file *file, const char *name, void *data, size_t size, time_t stoptime)
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_fgetxattr(client,file->fd,name,data,size,stoptime); )
@@ -714,7 +714,7 @@ INT64_T chirp_reli_listxattr(const char *host, const char *path, char *list, siz
 	RETRY_ATOMIC( result = chirp_client_listxattr(client,path,list,size,stoptime); )
 }
 
-INT64_T chirp_reli_flistxattr(const char *host, struct chirp_file *file, char *list, size_t size, time_t stoptime)
+INT64_T chirp_reli_flistxattr(struct chirp_file *file, char *list, size_t size, time_t stoptime)
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_flistxattr(client,file->fd,list,size,stoptime); )
@@ -730,7 +730,7 @@ INT64_T chirp_reli_setxattr(const char *host, const char *path, const char *name
 	RETRY_ATOMIC( result = chirp_client_setxattr(client,path,name,data,size,flags,stoptime); )
 }
 
-INT64_T chirp_reli_fsetxattr(const char *host, struct chirp_file *file, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+INT64_T chirp_reli_fsetxattr(struct chirp_file *file, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_fsetxattr(client,file->fd,name,data,size,flags,stoptime); )
@@ -746,7 +746,7 @@ INT64_T chirp_reli_removexattr(const char *host, const char *path, const char *n
 	RETRY_ATOMIC( result = chirp_client_removexattr(client,path,name,stoptime); )
 }
 
-INT64_T chirp_reli_fremovexattr(const char *host, struct chirp_file *file, const char *name, time_t stoptime)
+INT64_T chirp_reli_fremovexattr(struct chirp_file *file, const char *name, time_t stoptime)
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_fremovexattr(client,file->fd,name,stoptime); )

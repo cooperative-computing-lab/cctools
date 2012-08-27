@@ -283,7 +283,7 @@ static INT64_T chirp_fs_chirp_getxattr ( const char *path, const char *name, voi
 static INT64_T chirp_fs_chirp_fgetxattr ( int fd, const char *name, void *data, size_t size )
 {
 	SETUP_FILE
-	return chirp_reli_fgetxattr(chirp_fs_chirp_hostport, file, name, data, size, STOPTIME);
+	return chirp_reli_fgetxattr(file, name, data, size, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_lgetxattr ( const char *path, const char *name, void *data, size_t size )
@@ -299,7 +299,7 @@ static INT64_T chirp_fs_chirp_listxattr ( const char *path, char *list, size_t s
 static INT64_T chirp_fs_chirp_flistxattr ( int fd, char *list, size_t size )
 {
 	SETUP_FILE
-	return chirp_reli_flistxattr(chirp_fs_chirp_hostport, file, list, size, STOPTIME);
+	return chirp_reli_flistxattr(file, list, size, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_llistxattr ( const char *path, char *list, size_t size )
@@ -315,7 +315,7 @@ static INT64_T chirp_fs_chirp_setxattr ( const char *path, const char *name, con
 static INT64_T chirp_fs_chirp_fsetxattr ( int fd, const char *name, const void *data, size_t size, int flags )
 {
 	SETUP_FILE
-	return chirp_reli_fsetxattr(chirp_fs_chirp_hostport, file, name, data, size, flags, STOPTIME);
+	return chirp_reli_fsetxattr(file, name, data, size, flags, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_lsetxattr ( const char *path, const char *name, const void *data, size_t size, int flags )
@@ -331,7 +331,7 @@ static INT64_T chirp_fs_chirp_removexattr ( const char *path, const char *name )
 static INT64_T chirp_fs_chirp_fremovexattr ( int fd, const char *name )
 {
 	SETUP_FILE
-	return chirp_reli_fremovexattr(chirp_fs_chirp_hostport, file, name, STOPTIME);
+	return chirp_reli_fremovexattr(file, name, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_lremovexattr ( const char *path, const char *name )
