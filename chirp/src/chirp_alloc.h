@@ -66,5 +66,6 @@ INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode);
 
 INT64_T chirp_alloc_file_size(const char *path);
 INT64_T chirp_alloc_fd_size(int fd);
+INT64_T chirp_alloc_search(const char *subject, const char *dir, const char *pattern, struct link *l, time_t stalltime);
 
 #endif

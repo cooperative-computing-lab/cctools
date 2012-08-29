@@ -109,6 +109,7 @@ public:
 	pfs_ssize_t copyfile_slow( const char *source, const char *target );
 	int	md5( const char *path, unsigned char *digest );
 	int	md5_slow( const char *path, unsigned char *digest );
+	int search( const char *dirlist, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2 );
 	
 	/* network operations */
 	int	socket( int domain, int type, int protocol );

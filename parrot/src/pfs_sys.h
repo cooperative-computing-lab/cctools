@@ -134,6 +134,7 @@ int		pfs_get_full_name( int fd, char *name );
 int		pfs_get_local_name( const char *rpath, char *lpath, char *firstline, int length );
 int		pfs_is_nonblocking( int fd );
 int		pfs_resolve_name( const char *path, struct pfs_name *pname );
+int		pfs_search( const char *path, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2 );
 
   pfs_size_t	pfs_mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
 int		pfs_mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );

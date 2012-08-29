@@ -98,6 +98,7 @@ static INT64_T do_matrix_create(int argc, char **argv);
 static INT64_T do_matrix_list(int argc, char **argv);
 static INT64_T do_matrix_delete(int argc, char **argv);
 static INT64_T do_remote_debug(int argc, char **argv);
+static INT64_T do_search(int argc, char **argv);
 
 static int process_command(int argc, char **argv);
 
@@ -166,6 +167,7 @@ static struct command list[] = {
 	{"help", 0, 0, 0, "", do_help},
 	{"exit", 0, 0, 0, "", do_quit},
 	{"quit", 0, 0, 0, "", do_quit},
+	{"search", 1, 2, 2, "<pattern> <directory>", do_search},
 	{0, 0, 0, 0, 0},
 };
 
@@ -1163,4 +1165,20 @@ static INT64_T do_matrix_delete(int argc, char **argv)
 	char path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], path);
 	return chirp_matrix_delete(current_host, path, stoptime);
+}
+
+static INT64_T do_search(int argc, char **argv)
+{
+    char **array;
+	INT64_T result = chirp_reli_search(current_host, argv[1], argv[2], &array, stoptime);
+
+	if (result == 0) {
+		int i;
+		for (i = 0; array[i]; i++)
+			printf("%s\n", array[i]);
+		free(array);
+		return 0;
+	}
+	else
+		return 1;
 }

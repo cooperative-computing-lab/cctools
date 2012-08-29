@@ -22,6 +22,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "copy_stream.h"
 #include "list.h"
+#include "string_array.h"
 #include "url_encode.h"
 #include "xxmalloc.h"
 
@@ -1546,4 +1547,18 @@ INT64_T chirp_client_lsalloc(struct chirp_client * c, char const *path, char *al
 	return result;
 }
 
+INT64_T chirp_client_search(struct chirp_client *c, const char *pattern, const char *dir, char ***array, time_t stoptime)
+{
+	INT64_T result = simple_command(c, stoptime, "search %s %s\n", pattern, dir);
+	*array = string_array_new();
 
+	if (result == 0) {
+		char path[CHIRP_PATH_MAX];
+		while (link_readline(c->link, path, sizeof(path), stoptime)) {
+			if (strcmp(path, "") == 0) break;
+			*array = string_array_append(*array, path);
+		}
+	}
+
+	return 0;
+}

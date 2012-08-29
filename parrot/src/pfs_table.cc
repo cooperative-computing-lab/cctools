@@ -35,6 +35,7 @@ extern "C" {
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <fnmatch.h>
 #include <ctype.h>
 #include <math.h>
 #include <signal.h>
@@ -1726,6 +1727,79 @@ int pfs_table::whoami( const char *n, char *buf, int length )
 	}
 
 	return result;
+}
+
+static int search_directory (pfs_table *t, unsigned level, const char *base, char *dir, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, size_t *i, size_t *j)
+{
+	if (level == 0)
+		return 0;
+
+	int found = 0;
+	char *current = dir+strlen(dir); /* point to end to current directory */
+	int fd;
+	if ((fd = t->open(dir, O_DIRECTORY|O_RDONLY, 0, 0))) {
+		struct dirent *entry;
+		while ((entry = t->fdreaddir(fd))) {
+			const char *name = entry->d_name;
+			int r;
+			struct pfs_stat buf;
+
+			if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
+
+			sprintf(current, "/%s", name);
+			r = t->stat(base, &buf);
+			if (fnmatch(pattern, base, FNM_PATHNAME) == 0) {
+				size_t l = strlen(dir);
+				if (l+*i+2 >= len1) { /* +2 for terminating 2 NUL bytes */
+					errno = ERANGE;
+					return -1;
+				} else {
+					strcpy(buffer+*i, dir);
+					*i += l+1;
+					buffer[*i] = '\0'; /* second terminating NUL byte */
+				}
+
+				if (*j == len2) {
+					errno = ERANGE;
+					return -1;
+				} else {
+					COPY_STAT(buf, stats[*j]);
+					*j += 1;
+				}
+				found += 1;
+			}
+
+			if (r == 0 && S_ISDIR(buf.st_mode)) {
+				int result = search_directory(t, level-1, base, dir, pattern, buffer, len1, stats, len2, i, j);
+				if (result == -1)
+					return -1;
+				else
+					found += result;
+			}
+			*current = '\0'; /* clear current entry */
+		}
+		t->close(fd);
+	}
+
+	return found;
+}
+
+int pfs_table::search( const char *path, const char *patt, char *buffer, size_t len1, struct stat *stats, size_t len2 )
+{
+	unsigned level = 1;
+	const char *s;
+	char directory[PFS_PATH_MAX+1];
+	char pattern[PFS_PATH_MAX+1];
+	size_t i = 0, j = 0;
+
+
+	string_collapse_path(path, directory, 0);
+
+	for (s = patt; *s == '/'; s++) ; /* remove leading slashes from pattern */
+	sprintf(pattern, "/%s", s); /* add leading slash for base directory */
+	for (s = strchr(pattern, '/'); s; s = strchr(s+1, '/')) level++; /* count the number of nested directories to descend at maximum */
+
+	return search_directory(this, level, directory+strlen(directory), directory, pattern, buffer, len1, stats, len2, &i, &j);
 }
 
 int pfs_table::getacl( const char *n, char *buf, int length )

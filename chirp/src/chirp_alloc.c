@@ -18,19 +18,25 @@ See the file COPYING for details.
 #include "delete_dir.h"
 #include "debug.h"
 
-#include <assert.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+
+#include <dirent.h>
+#include <fnmatch.h>
+
+#include <assert.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 static struct hash_table *alloc_table = 0;
 static struct hash_table *root_table = 0;
 static struct itable *fd_table = 0;
 static int recovery_in_progress = 0;
 static int alloc_enabled = 0;
+
+extern char *chirp_root_path;
 
 struct alloc_state {
 	FILE *file;
@@ -353,6 +359,51 @@ int chirp_alloc_flush_needed()
 time_t chirp_alloc_last_flush_time()
 {
 	return last_flush_time;
+}
+
+static void search_directory (const char *subject, unsigned level, const char *base, char *dir, const char *pattern, struct link *l, time_t stoptime)
+{
+	if (level == 0)
+		return;
+
+	void *dirp = chirp_alloc_opendir(dir);
+	char *current = dir+strlen(dir); /* point to end to current directory */
+
+	if (dirp) {
+		const char *entry;
+		while ((entry = chirp_alloc_readdir(dirp))) {
+			if (strcmp(entry, ".") == 0 || strcmp(entry, "..") == 0 || strncmp(entry, ".__", 3) == 0) continue;
+
+			sprintf(current, "/%s", entry);
+			if (fnmatch(pattern, base, FNM_PATHNAME) == 0) {
+				link_putfstring(l, "%s\n", stoptime, dir);
+			}
+			if (is_a_directory(dir) && chirp_acl_check_dir(chirp_root_path, dir, subject, CHIRP_ACL_LIST)) {
+				search_directory(subject, level-1, base, dir, pattern, l, stoptime);
+			}
+			*current = '\0'; /* clear current entry */
+		}
+		chirp_alloc_closedir(dirp);
+	}
+}
+
+/* Note we need the subject because we must check the ACL for any nested directories. */
+INT64_T chirp_alloc_search(const char *subject, const char *dir, const char *patt, struct link *l, time_t stoptime)
+{
+	unsigned level = 1;
+	const char *s;
+	char directory[CHIRP_PATH_MAX];
+	char pattern[CHIRP_PATH_MAX];
+
+	string_collapse_path(dir, directory, 0);
+
+	for (s = patt; *s == '/'; s++) ; /* remove leading slashes from pattern */
+	sprintf(pattern, "/%s", s); /* add leading slash for base directory */
+	for (s = strchr(pattern, '/'); s; s = strchr(s+1, '/')) level++; /* count the number of nested directories to descend at maximum */
+
+	search_directory(subject, level, directory+strlen(directory), directory, pattern, l, stoptime);
+
+	return 0;
 }
 
 INT64_T chirp_alloc_open(const char *path, INT64_T flags, INT64_T mode)
