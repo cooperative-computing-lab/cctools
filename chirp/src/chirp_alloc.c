@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "macros.h"
+#include "chirp_acl.h"
 #include "chirp_alloc.h"
 #include "chirp_protocol.h"
 #include "chirp_filesystem.h"
@@ -370,15 +371,15 @@ static void search_directory (const char *subject, unsigned level, const char *b
 	char *current = dir+strlen(dir); /* point to end to current directory */
 
 	if (dirp) {
-		const char *entry;
+		struct chirp_dirent *entry;
 		while ((entry = chirp_alloc_readdir(dirp))) {
-			if (strcmp(entry, ".") == 0 || strcmp(entry, "..") == 0 || strncmp(entry, ".__", 3) == 0) continue;
+			if (strcmp(entry->name, ".") == 0 || strcmp(entry->name, "..") == 0 || strncmp(entry->name, ".__", 3) == 0) continue;
 
-			sprintf(current, "/%s", entry);
+			sprintf(current, "/%s", entry->name);
 			if (fnmatch(pattern, base, FNM_PATHNAME) == 0) {
 				link_putfstring(l, "%s\n", stoptime, dir);
 			}
-			if (is_a_directory(dir) && chirp_acl_check_dir(chirp_root_path, dir, subject, CHIRP_ACL_LIST)) {
+			if (cfs_isdir(dir) && chirp_acl_check_dir(dir, subject, CHIRP_ACL_LIST)) {
 				search_directory(subject, level-1, base, dir, pattern, l, stoptime);
 			}
 			*current = '\0'; /* clear current entry */
