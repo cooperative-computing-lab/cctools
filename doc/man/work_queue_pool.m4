@@ -26,7 +26,13 @@ option is present, then the BOLD(PARAM(hostname)) and BOLD(PARAM(port))
 arguments are not needed and the workers would contact a catalog server to find
 out the appropriate masters (see the BOLD(CODE(-N)) option). In either case,
 the BOLD(PARAM(number)) argument specifies the number of workers that
-BOLD(work_queue_pool) should maintain.
+BOLD(work_queue_pool) should maintain.  
+PARA
+If a BOLD(work_queue_worker) process managed by the BOLD(work_queue_pool) is
+shutdown (i.e. failure, eviction, etc.), then the BOLD(work_queue_pool) will
+re-submit a new BOLD(work_queue_worker) to the specified batch system
+BOLD(PARAM(type)) in order to maintain a constant BOLD(PARAM(number)) of
+BOLD(work_queue_worker) processes.
 
 SECTION(OPTIONS)
 

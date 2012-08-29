@@ -21,6 +21,7 @@ public:
 	virtual void * connect( pfs_name *name );
 	virtual void disconnect( pfs_name *name, void *cxn );
 	virtual int get_default_port();
+	virtual int get_block_size();
 	virtual int tilde_is_special();
 	virtual int is_seekable();
 	virtual int is_local();
@@ -47,10 +48,18 @@ public:
 	virtual int mkdir( pfs_name *name, mode_t mode );
 	virtual int rmdir( pfs_name *name );
 
+	virtual ssize_t getxattr ( pfs_name *name, const char *attrname, void *value, size_t size );
+	virtual ssize_t lgetxattr ( pfs_name *name, const char *attrname, void *value, size_t size );
+	virtual ssize_t listxattr ( pfs_name *name, char *attrlist, size_t size );
+	virtual ssize_t llistxattr ( pfs_name *name, char *attrlist, size_t size );
+	virtual int setxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags );
+	virtual int lsetxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags );
+	virtual int removexattr ( pfs_name *name, const char *attrname );
+	virtual int lremovexattr ( pfs_name *name, const char *attrname );
+
 	virtual int mkalloc( pfs_name *name, pfs_ssize_t size, mode_t mode );
 	virtual int lsalloc( pfs_name *name, char *alloc_name, pfs_ssize_t *size, pfs_ssize_t *inuse );
 	virtual int whoami( pfs_name *name, char *buf, int size );
-	virtual int search( const char *paths, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, int flags );
 	virtual int getacl( pfs_name *name, char *buf, int size );
 	virtual int setacl( pfs_name *name, const char *subject, const char *rights );
 	virtual pfs_location* locate( pfs_name *name );

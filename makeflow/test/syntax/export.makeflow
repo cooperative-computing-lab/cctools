@@ -1,0 +1,22 @@
+VAR0=0
+VAR1=1
+export VAR1
+
+out.0:
+	echo $$VAR0 > out.0 # Display nothing
+
+out.1:
+	echo $$VAR1 > out.1 # Display 1
+
+out.2:
+	@VAR1=2
+	echo $$VAR1 > out.2 # Display 2
+
+out.3:
+	echo $$ > out.3	    # Display $
+
+out.4:
+	echo \$ > out.4	    # Display \$
+
+out.all: out.0 out.1 out.2 out.3 out.4
+	cat out.0 out.1 out.2 out.3 out.4 > out.all

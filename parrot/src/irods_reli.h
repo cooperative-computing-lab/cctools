@@ -28,4 +28,7 @@ int irods_reli_rename   ( const char *server, const char *path, const char *newp
 int irods_reli_truncate ( const char *server, const char *path, INT64_T size );
 int irods_reli_md5      ( const char *server, const char *path, char *digest );
 
+int irods_reli_putfile ( const char *host, const char *path, const char *local_path );
+int irods_reli_getfile ( const char *host, const char *path, const char *local_path );
+
 #endif

@@ -77,7 +77,6 @@ struct mpi_queue_file {
 
 struct mpi_queue_task *mpi_queue_task_create(const char *command_line)
 {
-	static int next_taskid = 1;
 	struct mpi_queue_task *t = malloc(sizeof(*t));
 	memset(t, 0, sizeof(*t));
 
@@ -86,7 +85,6 @@ struct mpi_queue_task *mpi_queue_task_create(const char *command_line)
 	t->output = NULL;
 	t->input_files = list_create();
 	t->output_files = list_create();
-	t->taskid = next_taskid++;
 
 	t->status = MPI_QUEUE_TASK_STATUS_INITIALIZING;
 	t->return_status = MPI_QUEUE_RETURN_STATUS_UNSET;
@@ -256,9 +254,10 @@ int mpi_queue_empty(struct mpi_queue *q)
 
 
 
-void mpi_queue_submit(struct mpi_queue *q, struct mpi_queue_task *t)
+int mpi_queue_submit(struct mpi_queue *q, struct mpi_queue_task *t)
 {
 	/* If the task has been used before, clear out accumlated state. */
+	static int next_taskid = 1;
 
 	if(t->output) {
 		free(t->output);
@@ -268,11 +267,15 @@ void mpi_queue_submit(struct mpi_queue *q, struct mpi_queue_task *t)
 	t->total_transfer_time = 0;
 	t->result = MPI_QUEUE_RESULT_UNSET;
 
+	//Increment taskid. So we get a unique taskid for every submit.
+	t->taskid = next_taskid++;
+	
 	/* Then, add it to the ready list and mark it as submitted. */
-
 	list_push_tail(q->ready_list, t);
 	t->submit_time = timestamp_get();
 	q->total_tasks_submitted++;
+
+	return (t->taskid);
 }
 
 int dispatch_task(struct link *mpi_link, struct mpi_queue_task *t, int timeout)

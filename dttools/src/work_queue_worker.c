@@ -5,9 +5,12 @@ See the file COPYING for details.
 */
 
 #include "work_queue.h"
+#include "work_queue_protocol.h"
 
+#include "cctools.h"
 #include "catalog_query.h"
 #include "catalog_server.h"
+#include "work_queue_catalog.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
 #include "nvpair.h"
@@ -17,7 +20,7 @@ See the file COPYING for details.
 #include "hash_cache.h"
 #include "link.h"
 #include "list.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "load_average.h"
@@ -25,6 +28,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "full_io.h"
 #include "create_dir.h"
+#include "delete_dir.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -42,110 +46,360 @@ See the file COPYING for details.
 #include <sys/mman.h>
 #include <sys/signal.h>
 #include <sys/utsname.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
+#include <sys/poll.h>
 
+#ifdef CCTOOLS_OPSYS_SUNOS
+extern int setenv(const char *name, const char *value, int overwrite);
+#endif
+
+#define STDOUT_BUFFER_SIZE 1048576        
+
+#define PIPE_ACTIVE 1
+#define LINK_ACTIVE 2
+#define POLL_FAIL 4
+
+#define TASK_NONE 0
+#define TASK_RUNNING 1
+#define TASK_CANCELLED 2
+
+struct task_info {
+	pid_t pid;
+	int status;
+	struct rusage rusage;
+	timestamp_t execution_end;
+	char *output;
+	INT64_T output_length;
+};
+
+struct distribution_node {
+	void *item;
+	int weight;
+};
 
 // Maximum time to wait before aborting if there is no connection to the master.
 static int idle_timeout = 900;
 
-// Maxium time to wait before switching to another master.
-static int master_timeout = 60;
+// Maximum time to wait before switching to another master. Used in auto mode.
+static const int master_timeout = 15;
 
 // Maximum time to wait when actively communicating with the master.
-static int active_timeout = 3600;
+static const int active_timeout = 3600;
+
+// The timeout in which a bad master expires
+static const int bad_master_expiration_timeout = 15;
+
+// A short timeout constant
+static const int short_timeout = 5;
+
+// Initial value for backoff interval (in seconds) when worker fails to connect to a master.
+static int init_backoff_interval = 1; 
+
+// Maximum value for backoff interval (in seconds) when worker fails to connect to a master.
+static int max_backoff_interval = 60; 
 
 // Flag gets set on receipt of a terminal signal.
 static int abort_flag = 0;
 
+//Threshold for available disk space (MB) beyond which clean up and restart.
+static UINT64_T disk_avail_threshold = 100;
+
+
+// Basic worker global variables
+static char actual_addr[LINK_ADDRESS_MAX];
+static int actual_port;
+static char workspace[WORK_QUEUE_LINE_MAX];
+static char *os_name = NULL; 
+static char *arch_name = NULL;
+static char *user_specified_workdir = NULL;
+
+// Forked task related
+static int pipefds[2];
+static int task_status= TASK_NONE;
+static timestamp_t execution_start;
+static pid_t pid;
+static void *stdout_buffer = NULL;		// a buffer that holds the stdout of a task (read from the pipe)
+static size_t stdout_buffer_used = 0;
+static char stdout_file[50];			// name of the file that stores a task's stdout 
+static int stdout_file_fd = 0;
+static int stdout_in_file = 0;
+
 // Catalog mode control variables
-static int auto_worker = 0;
-static int exclusive_worker = 1;
-static const int non_preference_priority_max = 100;
 static char *catalog_server_host = NULL;
 static int catalog_server_port = 0;
-static struct wq_master *actual_master = NULL;
-
+static int auto_worker = 0;
+static char *pool_name = NULL;
+static struct work_queue_master *actual_master = NULL;
 static struct list *preferred_masters = NULL;
 static struct hash_cache *bad_masters = NULL;
+static int released_by_master = 0;
 
-struct wq_master {
-	char addr[LINK_ADDRESS_MAX];
-	int port;
-	char proj[WORK_QUEUE_NAME_MAX];
-	int priority;
-};
+// Function declarations
+static int poll_master_and_task(struct link *master, int task_pipe_fd, int timeout);
+static int handle_task(struct link *master);
+static int handle_link(struct link *master);
+static void disconnect_master(struct link *master);
+static void report_task_complete(struct link *master, int result, char *output, INT64_T output_length, timestamp_t execution_time);
+static void show_help(const char *cmd);
 
-void debug_print_masters(struct list *ml)
+static void report_worker_ready(struct link *master)
 {
-	struct wq_master *m;
-	int count = 0;
+	char hostname[DOMAIN_NAME_MAX];
+	UINT64_T memory_avail, memory_total;
+	UINT64_T disk_avail, disk_total;
+	int ncpus;
+	char *name_of_master;
+	char *name_of_pool;
 
-	debug(D_WQ, "All available Masters:\n");
-	list_first_item(ml);
-	while((m = (struct wq_master *) list_next_item(ml))) {
-		debug(D_WQ, "Master %d:\n", ++count);
-		debug(D_WQ, "addr:\t%s\n", m->addr);
-		debug(D_WQ, "port:\t%d\n", m->port);
-		debug(D_WQ, "project:\t%s\n", m->proj);
-		debug(D_WQ, "priority:\t%d\n", m->priority);
-		debug(D_WQ, "\n");
+	domain_name_cache_guess(hostname);
+	ncpus = load_average_get_cpus();
+	memory_info_get(&memory_avail, &memory_total);
+	disk_info_get(".", &disk_avail, &disk_total);
+	name_of_master = actual_master ? actual_master->proj : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
+	name_of_pool = pool_name ? pool_name : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
+
+	link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, name_of_master, name_of_pool, os_name, arch_name);
+}
+
+
+static void clear_task_info(struct task_info *ti)
+{
+	if(ti->output) {
+		free(ti->output);
+	}
+	memset(ti, 0, sizeof(*ti));
+}
+
+static pid_t execute_task(const char *cmd)
+{
+	pid_t pid;
+
+	// reset the internal stdout buffer
+	stdout_buffer_used = 0;
+
+	fflush(NULL);
+
+	if(pipe(pipefds) == -1) {
+		debug(D_WQ, "Failed to create pipe for output redirecting: %s.", strerror(errno));
+		return 0;
+	}
+
+	pid = fork();
+	if(pid > 0) {
+		// Set pipe's read end to be non-blocking
+		int flag;
+		flag = fcntl(pipefds[0], F_GETFL);
+		flag |= O_NONBLOCK;	
+		fcntl(pipefds[0], F_SETFL, flag);
+
+		// Close pipe's write end
+		close(pipefds[1]);
+
+		debug(D_WQ, "started process %d: %s", pid, cmd);
+		return pid;
+	} else if(pid < 0) {
+		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
+		close(pipefds[0]);
+		close(pipefds[1]);
+		return pid;
+	} else {
+		int fd = open("/dev/null", O_RDONLY);
+		if (fd == -1) fatal("could not open /dev/null: %s", strerror(errno));
+		int result = dup2(fd, STDIN_FILENO);
+		if (result == -1) fatal("could not dup /dev/null to stdin: %s", strerror(errno));
+
+		result = dup2(pipefds[1], STDOUT_FILENO);
+		if (result == -1) fatal("could not dup pipe to stdout: %s", strerror(errno));
+
+		result = dup2(pipefds[1], STDERR_FILENO);
+		if (result == -1) fatal("could not dup pipe to stderr: %s", strerror(errno));
+
+		close(pipefds[0]);
+		close(pipefds[1]);
+
+		execlp("sh", "sh", "-c", cmd, (char *) 0);
+		_exit(127);	// Failed to execute the cmd.
+	}
+	return 0;
+}
+
+static int errno_is_temporary(int e)
+{
+	if(e == EINTR || e == EWOULDBLOCK || e == EAGAIN || e == EINPROGRESS || e == EALREADY || e == EISCONN) {
+		return 1;
+	} else {
+		return 0;
 	}
 }
 
+static int read_task_stdout(time_t stoptime) {
+	ssize_t chunk;
+	char *buffer;
+	size_t space_left;
+
+	while (1) {
+		buffer = stdout_buffer + stdout_buffer_used;
+		space_left = STDOUT_BUFFER_SIZE - stdout_buffer_used;
+
+		if(space_left > 0) {
+			chunk = read(pipefds[0], buffer, space_left);
+			if(chunk < 0) {
+				if(errno_is_temporary(errno)) {
+					return 0;
+				} else {
+					return -1;
+				}
+			} else if (chunk == 0) {
+				// task done
+				close(pipefds[0]);
+				return 1;
+			} else {
+				stdout_buffer_used += chunk;
+			}
+		} else {
+			if(full_write(stdout_file_fd, stdout_buffer, stdout_buffer_used) == -1) {
+				return -1;
+			}
+			stdout_in_file = 1;
+			stdout_buffer_used = 0;
+
+			if(stoptime < time(0)) {
+				return 0;
+			}
+		}
+	}
+}
+
+static void get_task_stdout(char **task_output, INT64_T *task_output_length) {
+	// flush stdout buffer to stdout file if needed
+	if(stdout_in_file) {
+		if(full_write(stdout_file_fd, stdout_buffer, stdout_buffer_used) == -1) {
+			debug(D_WQ, "Task stdout truncated: failed to write contents to file - %s.\n", stdout_file);
+		}
+	}
+	close(stdout_file_fd);
+
+	// Record stdout of the child process
+	char *output;
+	INT64_T length;
+	if(stdout_in_file) { 
+		// Task stdout is in a file on disk. Extract the file contents into a buffer.
+		FILE *stream = fopen(stdout_file, "r");
+		if(stream) {
+			length = copy_stream_to_buffer(stream, &output);
+			if(length <= 0) {
+				length = 0;
+				if(output) {
+					free(output);
+				}
+				output = NULL;
+			}
+			fclose(stream);
+		} else {
+			debug(D_WQ, "Couldn't open the file that stores the standard output: %s\n", strerror(errno));
+			length = 0;
+			output = NULL;
+		}
+		unlink(stdout_file);
+		stdout_in_file = 0;
+	} else { 
+		// Task stdout is all in a buffer
+		length = stdout_buffer_used;
+		output = malloc(length);
+		if(output) {
+			memcpy(output, stdout_buffer, length); 
+		} else {
+			length = 0;
+		}
+	}
+
+	*task_output = output;
+	*task_output_length = length;
+}
+
+static int collect_task_info(struct task_info *ti) {
+	// Get task return status
+	pid_t tmp_pid;
+	int status;
+	struct rusage rusage;
+	int flags = 0;
+
+	tmp_pid = wait4(pid, &status, flags, &rusage);
+
+	if(tmp_pid != pid) {
+		return 0;
+	}
+
+	// Fill task_info struct
+	clear_task_info(ti);
+
+	ti->pid = tmp_pid;
+	ti->status = status;
+	ti->rusage = rusage;
+	ti->execution_end = timestamp_get();
+
+	get_task_stdout(&(ti->output), &(ti->output_length));
+
+	return 1;
+}
+
+static int handle_task(struct link *master) {
+	struct task_info ti;
+	memset(&ti, 0, sizeof(ti));
+
+	int result = read_task_stdout(time(0) + short_timeout);
+
+	// Failed to retrieve task standard output
+	if(result == -1) {
+		return 0;
+	}
+
+	if(result == 1) {
+		// Task has terminated.
+		if(!collect_task_info(&ti)) {
+			return 0;
+		}
+
+		if (WIFEXITED(ti.status)){
+			task_status = TASK_NONE;
+		} else {
+			//mark as cancelled if process did not exit normally.
+			debug(D_WQ, "Task (process %d) was aborted.\n", pid);
+			task_status = TASK_CANCELLED;
+		}	
+
+		report_task_complete(master, ti.status, ti.output, ti.output_length, ti.execution_end - execution_start);
+	} 
+
+	return 1;
+}
+
+static void report_task_complete(struct link *master, int result, char *output, INT64_T output_length, timestamp_t execution_time)
+{
+	debug(D_WQ, "Task complete: result %d %lld %llu", result, output_length, execution_time);
+	link_putfstring(master, "result %d %lld %llu\n", time(0) + active_timeout, result, output_length, execution_time);
+	link_putlstring(master, output, output_length, time(0) + active_timeout);
+}
 
 static void make_hash_key(const char *addr, int port, char *key)
 {
 	sprintf(key, "%s:%d", addr, port);
 }
 
-int parse_catalog_server_description(char *server_string, char **host, int *port)
-{
-	char *colon;
+static int have_enough_disk_space() {
+	UINT64_T disk_avail, disk_total;
 
-	colon = strchr(server_string, ':');
-
-	if(!colon) {
-		*host = NULL;
-		*port = 0;
-		return 0;
+	// Check available disk space
+	if(disk_avail_threshold > 0) {
+		disk_info_get(".", &disk_avail, &disk_total);
+		if(disk_avail < disk_avail_threshold) {
+			debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, disk_avail_threshold);
+			return 0;
+		}
 	}
 
-	*colon = '\0';
-
-	*host = strdup(server_string);
-	*port = atoi(colon + 1);
-
-	return *port;
-}
-
-struct wq_master *parse_wq_master_nvpair(struct nvpair *nv)
-{
-	struct wq_master *m;
-
-	m = xxmalloc(sizeof(struct wq_master));
-
-	strncpy(m->addr, nvpair_lookup_string(nv, "address"), LINK_ADDRESS_MAX);
-	strncpy(m->proj, nvpair_lookup_string(nv, "project"), WORK_QUEUE_NAME_MAX);
-	m->port = nvpair_lookup_integer(nv, "port");
-	m->priority = nvpair_lookup_integer(nv, "priority");
-	if(m->priority < 0)
-		m->priority = 0;
-
-	return m;
-}
-
-struct wq_master *duplicate_wq_master(struct wq_master *master)
-{
-	struct wq_master *m;
-
-	m = xxmalloc(sizeof(struct wq_master));
-	strncpy(m->addr, master->addr, LINK_ADDRESS_MAX);
-	strncpy(m->proj, master->proj, WORK_QUEUE_NAME_MAX);
-	m->port = master->port;
-	m->priority = master->priority;
-	if(m->priority < 0)
-		m->priority = 0;
-
-	return m;
+	return 1;
 }
 
 /**
@@ -153,93 +407,229 @@ struct wq_master *duplicate_wq_master(struct wq_master *master)
  * 1. The master does not need more workers right now;
  * 2. The master is already shut down but its record is still in the catalog server.
  */
-static void record_bad_master(struct wq_master *m)
+static void record_bad_master(struct work_queue_master *m)
 {
 	char key[LINK_ADDRESS_MAX + 10];	// addr:port
-	int lifetime = 10;
 
 	if(!m)
 		return;
 
 	make_hash_key(m->addr, m->port, key);
-	hash_cache_insert(bad_masters, key, m, lifetime);
-	debug(D_WQ, "Master at %s:%d is not receiving more workers.\nWon't connect to this master in %d seconds.", m->addr, m->port, lifetime);
+	hash_cache_insert(bad_masters, key, m, bad_master_expiration_timeout);
+	debug(D_WQ, "Master at %s:%d is not receiving more workers.\nWon't connect to this master in %d seconds.", m->addr, m->port, bad_master_expiration_timeout);
 }
 
-struct list *get_work_queue_masters(const char *catalog_host, int catalog_port)
+static int reset_preferred_masters(struct work_queue_pool *pool) {
+	char *pm;
+
+	while((pm = (char *)list_pop_head(preferred_masters))) {
+		free(pm);
+	}
+
+	int count = 0;
+
+	char *pds = xxstrdup(pool->decision);
+	char *pd = strtok(pds, " \t,"); 
+	while(pd) {
+		char *eq = strchr(pd, ':');
+		if(eq) {
+			*eq = '\0';
+			if(list_push_tail(preferred_masters, xxstrdup(pd))) {
+				count++;
+			} else {
+				fprintf(stderr, "Error: failed to insert item during resetting preferred masters.\n");
+			}
+			*eq = ':';
+		} else {
+			if(!strncmp(pd, "n/a", 4)) {
+				break;
+			} else {
+				fprintf(stderr, "Invalid pool decision item: \"%s\".\n", pd);
+				break;
+			}
+		}
+		pd = strtok(0, " \t,");
+	}
+	free(pds);
+	return count;
+}
+
+static int get_masters_and_pool_info(const char *catalog_host, int catalog_port, struct list **masters_list, struct work_queue_pool **pool)
 {
 	struct catalog_query *q;
 	struct nvpair *nv;
-	struct list *ml;
-	struct wq_master *m;
 	char *pm;
+	struct work_queue_master *m;
 	time_t timeout = 60, stoptime;
 	char key[LINK_ADDRESS_MAX + 10];	// addr:port
 
 	stoptime = time(0) + timeout;
 
+	*pool = NULL;
+
+	struct list *ml = list_create();
+	if(!ml) {
+		fprintf(stderr, "Failed to create list structure to store masters information.\n");
+		*masters_list = NULL;
+		return 0;
+	}
+	*masters_list = ml;
+
+	int work_queue_pool_not_found;
+
+	if(pool_name) {
+		work_queue_pool_not_found = 1;
+	} else {
+		// pool name has not been set by -p option
+		work_queue_pool_not_found = 0;
+	}
+
 	q = catalog_query_create(catalog_host, catalog_port, stoptime);
 	if(!q) {
 		fprintf(stderr, "Failed to query catalog server at %s:%d\n", catalog_host, catalog_port);
-		return NULL;
+		return 0;
 	}
-
-	ml = list_create();
-	if(!ml)
-		return NULL;
 
 	while((nv = catalog_query_read(q, stoptime))) {
 		if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0) {
-			m = parse_wq_master_nvpair(nv);
-
-			list_first_item(preferred_masters);
-			while((pm = (char *) list_next_item(preferred_masters))) {
-				if(whole_string_match_regex(m->proj, pm)) {
-					// preferred master found
-					break;
-				}
-			}
-
-			if(pm) {
-				// This is a preferred master
-				m->priority += non_preference_priority_max;
-			} else {
-				// Master name does not match any preferred master names
-				if(exclusive_worker) {
-					continue;
-				} else {
-					m->priority = non_preference_priority_max < m->priority ? non_preference_priority_max : m->priority;
-				}
-			}
+			m = parse_work_queue_master_nvpair(nv);
 
 			// exclude 'bad' masters
 			make_hash_key(m->addr, m->port, key);
 			if(!hash_cache_lookup(bad_masters, key)) {
 				list_push_priority(ml, m, m->priority);
 			}
+		} 
+		if(work_queue_pool_not_found) {
+			if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_POOL) == 0) {
+				struct work_queue_pool *tmp_pool;
+				tmp_pool = parse_work_queue_pool_nvpair(nv);
+				if(strncmp(tmp_pool->name, pool_name, WORK_QUEUE_POOL_NAME_MAX) == 0) {
+					*pool = tmp_pool;
+					work_queue_pool_not_found = 0;
+				} else {
+					free_work_queue_pool(tmp_pool);
+				}
+			}
 		}
 		nvpair_delete(nv);
 	}
 
+	if(*pool) {
+		reset_preferred_masters(*pool);
+	}
+
+	// trim masters list
+	list_first_item(ml);
+	while((m = (struct work_queue_master *)list_next_item(ml))) {
+		list_first_item(preferred_masters);
+		while((pm = (char *)list_next_item(preferred_masters))) {
+			if(whole_string_match_regex(m->proj, pm)) {
+				// preferred master found
+				break;
+			}
+		}
+
+		if(!pm) {
+			// Master name does not match any of the preferred master names
+			list_remove(ml, m);
+			free_work_queue_master(m);
+		}
+	}
+
 	// Must delete the query otherwise it would occupy 1 tcp connection forever!
 	catalog_query_delete(q);
-	return ml;
+	return 1;
+}
+static void *select_item_by_weight(struct distribution_node distribution[], int n)
+{
+	// A distribution example:
+	// struct distribution_node array[3] = { {"A", 20}, {"B", 30}, {"C", 50} };
+	int i, w, x, sum;
+
+	sum = 0;
+	for(i = 0; i < n; i++) {
+		w = distribution[i].weight;
+		if(w < 0)
+			return NULL;
+		sum += w;
+	}
+
+	if(sum == 0) {
+		return NULL;
+	}
+
+	x = rand() % sum;
+
+	for(i = 0; i < n; i++) {
+		x -= distribution[i].weight;
+		if(x <= 0)
+			return distribution[i].item;
+	}
+
+	return NULL;
 }
 
-struct link *auto_link_connect(char *addr, int *port, time_t master_stoptime)
-{
-	struct link *master = 0;
-	struct list *ml;
-	struct wq_master *m;
-
-	ml = get_work_queue_masters(catalog_server_host, catalog_server_port);
-	if(!ml)
+static struct work_queue_master * select_master(struct list *ml, struct work_queue_pool *pool) {
+	if(!ml) {
 		return NULL;
-	debug_print_masters(ml);
+	}
 
+	if(!list_size(ml)) {
+		return NULL;
+	}
+
+	if(!pool) {
+		return list_pop_head(ml);
+	}
+
+	struct distribution_node *distribution;
+	distribution = xxmalloc(sizeof(struct distribution_node)*list_size(ml));
+
+	debug(D_WQ, "Selecting a project from %d project(s).", list_size(ml));
+    struct work_queue_master *m;
+	int i = 0;
 	list_first_item(ml);
-	while((m = (struct wq_master *) list_next_item(ml))) {
-		master = link_connect(m->addr, m->port, master_stoptime);
+	while((m = (struct work_queue_master *)list_next_item(ml))) {
+		(distribution[i]).item = (void *)m;
+		int provided = workers_by_item(m->workers_by_pool, pool->name);
+		int target = workers_by_item(pool->decision, m->proj);
+		if(provided == -1) {
+			provided = 0;
+		}
+		int n = target - provided;
+		if(n < 0) {
+			n = 0;
+		}
+		(distribution[i]).weight = n;
+		debug(D_WQ, "\tproject: %s; weight: %d", m->proj, n);
+		i++;
+	}
+
+   	m = (struct work_queue_master *)select_item_by_weight(distribution, list_size(ml));
+	debug(D_WQ, "Selected project: %s", m->proj);
+	if(m) {
+		list_remove(ml, m);
+	}
+	free(distribution);
+	return m;
+}
+
+static struct link *auto_link_connect(char *addr, int *port)
+{
+	struct link *master = NULL;
+	struct list *ml;
+	struct work_queue_master *m;
+	struct work_queue_pool *pool;
+
+	get_masters_and_pool_info(catalog_server_host, catalog_server_port, &ml, &pool);
+	if(!ml) {
+		return NULL;
+	}
+	debug_print_masters(ml);
+	
+	while((m = (struct work_queue_master *)select_master(ml, pool))) {
+		master = link_connect(m->addr, m->port, time(0) + master_timeout);
 		if(master) {
 			debug(D_WQ, "Talking to the Master at:\n");
 			debug(D_WQ, "addr:\t%s\n", m->addr);
@@ -251,18 +641,19 @@ struct link *auto_link_connect(char *addr, int *port, time_t master_stoptime)
 			strncpy(addr, m->addr, LINK_ADDRESS_MAX);
 			(*port) = m->port;
 
-			if(actual_master)
-				free(actual_master);
-			actual_master = duplicate_wq_master(m);
+			if(actual_master) {
+				free_work_queue_master(actual_master);
+			}
+			actual_master = duplicate_work_queue_master(m);
 
 			break;
 		} else {
-			record_bad_master(duplicate_wq_master(m));
+			record_bad_master(duplicate_work_queue_master(m));
 		}
 	}
 
-	list_free(ml);
-	list_delete(ml);
+	free_work_queue_master_list(ml);
+	free_work_queue_pool(pool);
 
 	return master;
 }
@@ -302,7 +693,7 @@ struct link *auto_link_connect(char *addr, int *port, time_t master_stoptime)
  * end
  *
  */
-int stream_output_item(struct link *master, const char *filename)
+static int stream_output_item(struct link *master, const char *filename)
 {
 	DIR *dir;
 	struct dirent *dent;
@@ -350,10 +741,564 @@ int stream_output_item(struct link *master, const char *filename)
 
 	return 1;
 
-      failure:
+failure:
 	fprintf(stderr, "Failed to transfer ouput item - %s. (%s)\n", filename, strerror(errno));
 	link_putfstring(master, "missing %s %d\n", time(0) + active_timeout, filename, errno);
 	return 0;
+}
+
+static struct link *connect_master(time_t stoptime) {
+	struct link *master = NULL;
+	int backoff_multiplier = 2; 
+	int backoff_interval = init_backoff_interval;
+
+	while(!abort_flag) {
+		if(stoptime < time(0)) {
+			// Failed to connect to any master.
+			if(auto_worker) {
+				debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to any master in %d seconds.\n", idle_timeout);
+			} else {
+				debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to %s:%d in %d seconds.\n", actual_addr, actual_port, idle_timeout);
+			}
+			break;
+		}
+
+		if(auto_worker) {
+			master = auto_link_connect(actual_addr, &actual_port);
+		} else {
+			master = link_connect(actual_addr, actual_port, time(0) + master_timeout);
+		}
+
+		if(!master) {
+			if (backoff_interval > max_backoff_interval) {
+				backoff_interval = max_backoff_interval;
+			}
+		
+			sleep(backoff_interval);
+			backoff_interval *= backoff_multiplier;
+			continue;
+		}
+
+		link_tune(master, LINK_TUNE_INTERACTIVE);
+		report_worker_ready(master);
+
+		//reset backoff interval after connection to master.
+		backoff_interval = init_backoff_interval; 
+
+		return master;
+	}
+
+	return NULL;
+}
+
+
+static int poll_master_and_task(struct link *master, int task_pipe_fd, int timeout)
+{
+	struct pollfd pfds[2];
+	int result, ret, n;
+
+	pfds[0].fd = link_fd(master);
+	pfds[0].events = POLLIN;
+	pfds[0].revents = 0;
+
+	pfds[1].fd = task_pipe_fd;
+	pfds[1].events = POLLIN;
+	pfds[1].revents = 0;
+
+	ret = 0;
+
+	//n = (task_status == TASK_RUNNING) ? 2 : 1;
+	if(task_status == TASK_RUNNING) {
+		n = 2;
+	} else {
+		n = 1;
+	}
+
+	int msec = timeout * 1000;
+	// check if master link has buffer contents.
+	if(!link_buffer_empty(master)) {
+		ret |= LINK_ACTIVE;
+		msec = 0;
+	}
+
+	result = poll(pfds, n, msec);
+	if (result > 0) {
+		if (pfds[0].revents & POLLIN) {
+			ret |= LINK_ACTIVE;
+		}
+
+		if (pfds[0].revents & POLLHUP) {
+			ret |= LINK_ACTIVE;
+		}
+
+		if(n == 2) {
+			if (pfds[1].revents & POLLIN) {
+				ret |= PIPE_ACTIVE;
+			}
+
+			if (pfds[1].revents & POLLHUP) {
+				ret |= PIPE_ACTIVE;
+			}
+		}
+	} else if (result == 0) {
+	} else {
+		if (!errno_is_temporary(errno)) {
+			// errno is not temporary, something is broken then
+			ret |= POLL_FAIL;
+		}
+	} 
+
+	return ret;
+}
+
+
+static void work_for_master(struct link *master) {
+	if(!master) {
+		return;
+	}
+
+	debug(D_WQ, "Working for master at %s:%d.\n", actual_addr, actual_port);
+
+	time_t idle_stoptime = time(0) + idle_timeout;
+	// Start serving masters
+	while(!abort_flag) {
+		if(time(0) > idle_stoptime && task_status != TASK_RUNNING) {
+			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
+			abort_flag = 1;
+			break;
+		}
+
+		int result = poll_master_and_task(master, pipefds[0], 5);
+
+		if(result & POLL_FAIL) {
+			abort_flag = 1;
+			break;
+		} 
+
+		int ok = 1;
+		if(result & PIPE_ACTIVE) {
+			ok &= handle_task(master);
+		} 
+
+		if(result & LINK_ACTIVE) {
+			ok &= handle_link(master);
+		} 
+
+		if(!ok) {
+			disconnect_master(master);
+			break;
+		}
+
+		if(result != 0) {
+			idle_stoptime = time(0) + idle_timeout;
+		}
+	}
+}
+
+static int do_work(struct link *master, INT64_T length) {
+	char *cmd = malloc(length + 10);
+
+	link_read(master, cmd, length, time(0) + active_timeout);
+	cmd[length] = 0;
+
+	debug(D_WQ, "%s", cmd);
+	execution_start = timestamp_get();
+
+	pid = execute_task(cmd);
+	free(cmd);
+	if(pid < 0) {
+		fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
+		abort_flag = 1;
+		return 0;
+	}
+
+	snprintf(stdout_file, 50, "%d.task.stdout.tmp", pid);
+	if((stdout_file_fd = open(stdout_file, O_CREAT | O_WRONLY)) == -1) {
+		fprintf(stderr, "work_queue_worker: failed to open standard output file. Shutting down worker...\n");
+		abort_flag = 1;
+		return 0;
+	}
+
+	task_status = TASK_RUNNING;
+	return 1;
+}
+
+static int do_stat(struct link *master, const char *filename) {
+	struct stat st;
+	if(!stat(filename, &st)) {
+		debug(D_WQ, "result 1 %lu %lu", (unsigned long int) st.st_size, (unsigned long int) st.st_mtime);
+		link_putfstring(master, "result 1 %lu %lu\n", time(0) + active_timeout, (unsigned long int) st.st_size, (unsigned long int) st.st_mtime);
+	} else {
+		debug(D_WQ, "result 0 0 0");
+		link_putliteral(master, "result 0 0 0\n", time(0) + active_timeout);
+	}
+	return 1;
+}
+
+static int do_symlink(const char *path, char *filename) {
+	int mode = 0;
+	char *cur_pos, *tmp_pos;
+
+	cur_pos = filename;
+
+	if(!strncmp(cur_pos, "./", 2)) {
+		cur_pos += 2;
+	}
+
+	tmp_pos = strrchr(cur_pos, '/');
+	if(tmp_pos) {
+		*tmp_pos = '\0';
+		if(!create_dir(cur_pos, mode | 0700)) {
+			debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
+			return 0;
+		}
+		*tmp_pos = '/';
+	}
+	symlink(path, filename);
+	return 1;
+}
+
+static int do_put(struct link *master, char *filename, INT64_T length, int mode) {
+
+	if(!have_enough_disk_space()) {
+		return 0;
+	}
+
+	mode = mode | 0600;
+	char *cur_pos, *tmp_pos;
+
+	cur_pos = filename;
+
+	if(!strncmp(cur_pos, "./", 2)) {
+		cur_pos += 2;
+	}
+
+	tmp_pos = strrchr(cur_pos, '/');
+	if(tmp_pos) {
+		*tmp_pos = '\0';
+		if(!create_dir(cur_pos, mode | 0700)) {
+			debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
+			return 0;
+		}
+		*tmp_pos = '/';
+	}
+
+	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
+	if(fd < 0) {
+		return 0;
+	}
+
+	INT64_T actual = link_stream_to_fd(master, fd, length, time(0) + active_timeout);
+	close(fd);
+	if(actual != length) {
+		return 0;
+	}
+
+	return 1;
+}
+
+static int do_unlink(const char *path) {
+	int result = remove(path);
+	if(result != 0) {	// 0 - succeeded; otherwise, failed
+		if (task_status != TASK_CANCELLED) {
+			//recover only if it wasn't a cancelled task since it could
+			//have been cancelled before (output) file was generated.
+			fprintf(stderr, "Could not remove file: %s.(%s)\n", path, strerror(errno));
+			return 0;
+		}	
+	}
+	return 1;
+}
+
+static int do_mkdir(const char *filename, int mode) {
+	if(!create_dir(filename, mode | 0700)) {
+		debug(D_WQ, "Could not create directory - %s (%s)\n", filename, strerror(errno));
+		return 0;
+	}
+	return 1;
+}
+
+static int do_rget(struct link *master, const char *filename) {
+	stream_output_item(master, filename);
+	link_putliteral(master, "end\n", time(0) + active_timeout);
+	return 1;
+}
+
+static int do_get(struct link *master, const char *filename) {
+	int fd;
+	INT64_T length;
+	struct stat info;
+	if(stat(filename, &info) != 0) {
+		fprintf(stderr, "Output file %s was not created. (%s)\n", filename, strerror(errno));
+		return 0;
+	}
+	// send back a single file
+	fd = open(filename, O_RDONLY, 0);
+	if(fd >= 0) {
+		length = (INT64_T) info.st_size;
+		link_putfstring(master, "%lld\n", time(0) + active_timeout, length);
+		INT64_T actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
+		close(fd);
+		if(actual != length) {
+			debug(D_WQ, "Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, length, actual);
+			return 0;
+		}
+	} else {
+		fprintf(stderr, "Could not open output file %s. (%s)\n", filename, strerror(errno));
+		return 0;
+	}
+
+	return 1;
+}
+
+static int do_thirdget(int mode, char *filename, const char *path) {
+	char cmd[WORK_QUEUE_LINE_MAX];
+	char *cur_pos, *tmp_pos;
+
+	if(mode != WORK_QUEUE_FS_CMD) {
+		struct stat info;
+		if(stat(path, &info) != 0) {
+			debug(D_WQ, "Path %s not accessible. (%s)\n", path, strerror(errno));
+			return 0;
+		}
+		if(!strcmp(filename, path)) {
+			debug(D_WQ, "thirdget aborted: filename (%s) and path (%s) are the same\n", filename, path);
+			return 1;
+		}
+	}
+
+	cur_pos = filename;
+	if(!strncmp(cur_pos, "./", 2)) {
+		cur_pos += 2;
+	}
+
+	tmp_pos = strrchr(cur_pos, '/');
+	if(tmp_pos) {
+		*tmp_pos = '\0';
+		if(!create_dir(cur_pos, mode | 0700)) {
+			debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
+			return 0;
+		}
+		*tmp_pos = '/';
+	}
+
+	switch (mode) {
+	case WORK_QUEUE_FS_SYMLINK:
+		if(symlink(path, filename) != 0) {
+			debug(D_WQ, "Could not thirdget %s, symlink (%s) failed. (%s)\n", filename, path, strerror(errno));
+			return 0;
+		}
+	case WORK_QUEUE_FS_PATH:
+		sprintf(cmd, "/bin/cp %s %s", path, filename);
+		if(system(cmd) != 0) {
+			debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (/bin/cp %s)\n", filename, path, filename, strerror(errno));
+			return 0;
+		}
+		break;
+	case WORK_QUEUE_FS_CMD:
+		if(system(path) != 0) {
+			debug(D_WQ, "Could not thirdget %s, command (%s) failed. (%s)\n", filename, path, strerror(errno));
+			return 0;
+		}
+		break;
+	}
+	return 1;
+}
+
+static int do_thirdput(struct link *master, int mode, const char *filename, const char *path) {
+	struct stat info;
+	char cmd[WORK_QUEUE_LINE_MAX];
+
+	switch (mode) {
+	case WORK_QUEUE_FS_SYMLINK:
+	case WORK_QUEUE_FS_PATH:
+		if(stat(filename, &info) != 0) {
+			debug(D_WQ, "File %s not accessible. (%s)\n", filename, strerror(errno));
+			return 0;
+		}
+		if(!strcmp(filename, path)) {
+			debug(D_WQ, "thirdput aborted: filename (%s) and path (%s) are the same\n", filename, path);
+			return 1;
+		}
+		sprintf(cmd, "/bin/cp %s %s", filename, path);
+		if(system(cmd) != 0) {
+			debug(D_WQ, "Could not thirdput %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
+			return 0;
+		}
+		break;
+	case WORK_QUEUE_FS_CMD:
+		if(system(path) != 0) {
+			debug(D_WQ, "Could not thirdput %s, command (%s) failed. (%s)\n", filename, path, strerror(errno));
+			return 0;
+		}
+		break;
+	}
+	link_putliteral(master, "thirdput complete\n", time(0) + active_timeout);
+	return 1;
+
+}
+
+static void kill_task() {
+	if(task_status == TASK_RUNNING) {
+		kill(pid, SIGTERM);
+	}
+	task_status = TASK_NONE;
+}
+
+static int do_kill() {
+	kill_task();
+	return 1;
+}
+
+static int do_release() {
+	kill_task();
+	debug(D_WQ, "Released by master at %s:%d.\n", actual_addr, actual_port);
+	released_by_master = 1;
+	return 0;
+}
+
+
+
+static int handle_link(struct link *master) {
+	char line[WORK_QUEUE_LINE_MAX];
+	char filename[WORK_QUEUE_LINE_MAX];
+	char path[WORK_QUEUE_LINE_MAX];
+	INT64_T length;
+	int mode, r;
+
+	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
+		debug(D_WQ, "Received command: %s.\n", line);
+		if(sscanf(line, "work %lld", &length)) {
+			r = do_work(master, length);
+		} else if(sscanf(line, "stat %s", filename) == 1) {
+			r = do_stat(master, filename);
+		} else if(sscanf(line, "symlink %s %s", path, filename) == 2) {
+			r = do_symlink(path, filename);
+		} else if(sscanf(line, "put %s %lld %o", filename, &length, &mode) == 3) {
+			r = do_put(master, filename, length, mode);
+		} else if(sscanf(line, "unlink %s", path) == 1) {
+			r = do_unlink(path);
+		} else if(sscanf(line, "mkdir %s %o", filename, &mode) == 2) {
+			r = do_mkdir(filename, mode);
+		} else if(sscanf(line, "rget %s", filename) == 1) {
+			r = do_rget(master, filename);
+		} else if(sscanf(line, "get %s", filename) == 1) {	// for backward compatibility
+			r = do_get(master, filename);
+		} else if(sscanf(line, "thirdget %d %s %[^\n]", &mode, filename, path) == 3) {
+			r = do_thirdget(mode, filename, path);
+		} else if(sscanf(line, "thirdput %d %s %[^\n]", &mode, filename, path) == 3) {
+			r = do_thirdput(master, mode, filename, path);
+		} else if(!strncmp(line, "kill", 5)){
+			r = do_kill();
+		} else if(!strncmp(line, "release", 8)) {
+			r = do_release();
+		} else if(!strncmp(line, "exit", 5)) {
+			kill_task();
+			r = 0;
+		} else {
+			debug(D_WQ, "Unrecognized master message: %s.\n", line);
+			r = 0;
+		}
+	} else {
+		r = 0;
+	}
+
+	return r;
+}
+
+static void disconnect_master(struct link *master) {
+	link_close(master);
+
+	if(auto_worker) {
+		record_bad_master(duplicate_work_queue_master(actual_master));
+	}
+
+	kill_task();
+
+	// Remove the contents of the workspace. 
+	delete_dir_contents(workspace);
+
+	if(released_by_master) {
+		released_by_master = 0;
+	} else {
+		sleep(5);
+	}
+}
+
+static void abort_worker() {
+	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
+
+	// Free dynamically allocated memory
+	if(stdout_buffer) {
+		free(stdout_buffer);
+	}
+	if(pool_name) {
+		free(pool_name);
+	}
+	if(user_specified_workdir) {
+		free(user_specified_workdir);
+	} 
+	free(os_name);
+	free(arch_name);
+
+	// Kill running task if needed
+	if(task_status == TASK_RUNNING) {
+		kill(pid, SIGTERM);
+	}
+
+	// Remove workspace. 
+	delete_dir(workspace);
+}
+
+static void check_arguments(int argc, char **argv) {
+	const char *host = NULL;
+
+	if(!auto_worker) {
+		if((argc - optind) != 2) {
+			show_help(argv[0]);
+			exit(1);
+		}
+		host = argv[optind];
+		actual_port = atoi(argv[optind + 1]);
+
+		if(!domain_name_cache_lookup(host, actual_addr)) {
+			fprintf(stderr, "couldn't lookup address of host %s\n", host);
+			exit(1);
+		}
+	}
+
+	if(auto_worker && !list_size(preferred_masters) && !pool_name) {
+		fprintf(stderr, "Worker is running under auto mode. But no preferred master name is specified.\n");
+		fprintf(stderr, "Please specify the preferred master names with the -N option.\n");
+		exit(1);
+	}
+
+	if(!catalog_server_host) {
+		catalog_server_host = CATALOG_HOST;
+		catalog_server_port = CATALOG_PORT;
+	}
+}
+
+static int setup_workspace() {
+	// Setup working space(dir)
+	const char *workdir;
+	if (user_specified_workdir){
+		workdir = user_specified_workdir;	
+	} else if(getenv("_CONDOR_SCRATCH_DIR")) {
+		workdir = getenv("_CONDOR_SCRATCH_DIR");
+	} else if(getenv("TEMP")) {
+		workdir = getenv("TEMP");
+	} else {
+		workdir = "/tmp";
+	}
+
+	sprintf(workspace, "%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
+	if(mkdir(workspace, 0700) == -1) {
+		return 0;
+	} 
+
+	fprintf(stdout, "work_queue_worker: working in %s\n", workspace);
+	return 1;
 }
 
 static void handle_abort(int sig)
@@ -361,78 +1306,57 @@ static void handle_abort(int sig)
 	abort_flag = 1;
 }
 
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 static void show_help(const char *cmd)
 {
-	printf("Use: %s [options] <masterhost> <port>\n", cmd);
-	printf("where options are:\n");
-	printf(" -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
-	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	printf(" -d <subsystem> Enable debugging for this subsystem.\n");
-	printf(" -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
-	printf(" -s             Run as a shared worker. By default the worker would only work on preferred projects.\n");
-	printf(" -t <time>      Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
-	printf(" -o <file>      Send debugging to this file.\n");
-	printf(" -v             Show version string\n");
-	printf(" -w <size>      Set TCP window size.\n");
-	printf(" -z <size>      Set available disk space threshold (in MB) before aborting. By default no checks on available space are performed.\n");
-	printf(" -h             Show this help screen\n");
+	fprintf(stdout, "Use: %s [options] <masterhost> <port>\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
+	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
+	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem.\n");
+	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
+	fprintf(stdout, " -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
+	fprintf(stdout, " -t <time>      Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
+	fprintf(stdout, " -w <size>      Set TCP window size.\n");
+	fprintf(stdout, " -i <time>      Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
+	fprintf(stdout, " -b <time>      Set maxmimum value for backoff interval when worker fails to connect to a master. (default=%ds)\n", max_backoff_interval);
+	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%lluMB)\n", disk_avail_threshold);
+	fprintf(stdout, " -A <arch>      Set architecture string for the worker to report to master instead of the value in uname (%s).\n", arch_name);
+	fprintf(stdout, " -O <os>        Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
+	fprintf(stdout, " -s <path>      Set the location for creating the working directory of the worker.\n");
+	fprintf(stdout, " -v             Show version string\n");
+	fprintf(stdout, " -h             Show this help screen\n");
 }
 
 int main(int argc, char *argv[])
 {
-	const char *host = NULL;
-	char *pm;
-	int port = WORK_QUEUE_DEFAULT_PORT;
-	char actual_addr[LINK_ADDRESS_MAX];
-	int actual_port;
-	struct link *master = 0;
-	char addr[LINK_ADDRESS_MAX];
-	UINT64_T memory_avail, memory_total;
-	UINT64_T disk_avail, disk_total;
-	UINT64_T avail_space_threshold = 0;
-	int ncpus;
 	char c;
-	char hostname[DOMAIN_NAME_MAX];
-	struct utsname uname_data;
 	int w;
-	char preferred_master_names[WORK_QUEUE_LINE_MAX];
-	char deletecmd[WORK_QUEUE_LINE_MAX];
-
-	ncpus = load_average_get_cpus();
-	memory_info_get(&memory_avail, &memory_total);
-	disk_info_get(".", &disk_avail, &disk_total);
+	struct utsname uname_data;
+	struct link *master = NULL;
 
 	preferred_masters = list_create();
 	if(!preferred_masters) {
 		fprintf(stderr, "Cannot allocate memory to store preferred work queue masters names.\n");
 		exit(1);
 	}
-
+	
+	//obtain the architecture and os on which worker is running.
+	uname(&uname_data);
+	os_name = xxstrdup(uname_data.sysname);
+	arch_name = xxstrdup(uname_data.machine);
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aC:d:ihN:o:st:w:z:v")) != (char) -1) {
+	while((c = getopt(argc, argv, "aC:d:t:o:p:N:w:i:b:z:A:O:s:vh")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
 			break;
 		case 'C':
-			port = parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port);
-			if(!port) {
-				fprintf(stderr, "The provided catalog server is invalid. The format of the '-s' option should be '-s HOSTNAME:PORT'.\n");
+			if(!parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port)) {
+				fprintf(stderr, "The provided catalog server is invalid. The format of the '-C' option is '-C HOSTNAME:PORT'.\n");
 				exit(1);
 			}
-			auto_worker = 1;
-			break;
-		case 's':
-			auto_worker = 1;
-			// This is a shared worker
-			exclusive_worker = 0;
 			break;
 		case 'd':
 			debug_flags_set(optarg);
@@ -446,16 +1370,41 @@ int main(int argc, char *argv[])
 		case 'N':
 			list_push_tail(preferred_masters, strdup(optarg));
 			break;
-		case 'v':
-			show_version(argv[0]);
-			return 0;
+		case 'p':
+			pool_name = xxstrdup(optarg);
+			break;
 		case 'w':
 			w = string_metric_parse(optarg);
 			link_window_set(w, w);
 			break;
-		case 'z':
-			avail_space_threshold = string_metric_parse(optarg) * 1024 * 1024;
+		case 'i':
+			init_backoff_interval = string_metric_parse(optarg);
 			break;
+		case 'b':
+			max_backoff_interval = string_metric_parse(optarg);
+			if (max_backoff_interval < init_backoff_interval) {
+				fprintf(stderr, "Maximum backoff interval provided must be greater than the initial backoff interval of %ds.\n", init_backoff_interval);
+				exit(1);
+			}
+			break;
+		case 'z':
+			disk_avail_threshold = string_metric_parse(optarg);
+			disk_avail_threshold *= 1024 * 1024; //convert MB to Bytes.
+			break;
+		case 'A':
+			free(arch_name); //free the arch string obtained from uname
+			arch_name = xxstrdup(optarg);
+			break;
+		case 'O':
+			free(os_name); //free the os string obtained from uname
+			os_name = xxstrdup(optarg);
+			break;
+		case 's':
+			user_specified_workdir = xxstrdup(optarg);
+			break;
+		case 'v':
+			cctools_version_print(stdout, argv[0]);
+			exit(EXIT_SUCCESS);
 		case 'h':
 		default:
 			show_help(argv[0]);
@@ -463,340 +1412,42 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(!auto_worker) {
-		if((argc - optind) != 2) {
-			show_help(argv[0]);
-			exit(1);
-		}
-		host = argv[optind];
-		port = atoi(argv[optind + 1]);
+	cctools_version_debug(D_DEBUG, argv[0]);
 
-		if(!domain_name_cache_lookup(host, addr)) {
-			fprintf(stderr, "couldn't lookup address of host %s\n", host);
-			exit(1);
-		}
-	}
-
-
-	preferred_master_names[0] = 0;
-	list_first_item(preferred_masters);
-	while((pm = (char *) list_next_item(preferred_masters))) {
-		sprintf(&(preferred_master_names[strlen(preferred_master_names)]), "%s ", pm);
-	}
-
-	if(auto_worker && exclusive_worker && !list_size(preferred_masters)) {
-		fprintf(stderr, "Worker is running under exclusive mode. But no preferred master is specified.\n");
-		fprintf(stderr, "Please specify the preferred master names with -N option or add -s option to allow the worker to work for any available masters.\n");
-		exit(1);
-	}
-
+	check_arguments(argc, argv);
 
 	signal(SIGTERM, handle_abort);
 	signal(SIGQUIT, handle_abort);
 	signal(SIGINT, handle_abort);
 
-	const char *workdir;
-
-	if(getenv("_CONDOR_SCRATCH_DIR")) {
-		workdir = getenv("_CONDOR_SCRATCH_DIR");
-	} else {
-		workdir = "/tmp";
+	srand((unsigned int) (getpid() ^ time(NULL)));
+	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t)free_work_queue_master);
+	stdout_buffer = xxmalloc(STDOUT_BUFFER_SIZE);
+	
+	if(!setup_workspace()) {
+		fprintf(stderr, "work_queue_worker: failed to setup workspace at %s.\n", workspace);
+		exit(1);
 	}
 
-	char tempdir[WORK_QUEUE_LINE_MAX];
-	sprintf(tempdir, "%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
+	// set $WORK_QUEUE_SANDBOX to workspace.
+	debug(D_WQ, "WORK_QUEUE_SANDBOX set to %s.\n", workspace);
+	setenv("WORK_QUEUE_SANDBOX", workspace, 0);
 
-	printf("worker: working in %s\n", tempdir);
-	mkdir(tempdir, 0700);
-	chdir(tempdir);
-	
-	if (avail_space_threshold > 0) {
-		disk_info_get(".", &disk_avail, &disk_total);
-		if (disk_avail < avail_space_threshold) {
-                       	printf("worker: aborting since available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
-	                goto abort;
-                }	
-        }	
+	// change to workspace
+	chdir(workspace);
 
-	domain_name_cache_guess(hostname);
-	uname(&uname_data);
+	if(!have_enough_disk_space()) {
+		goto abort;
+	}
 
-	time_t idle_stoptime = time(0) + idle_timeout;
-	time_t switch_master_time = time(0) + master_timeout;
-
-	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t) free);
-		
 	while(!abort_flag) {
-		char line[WORK_QUEUE_LINE_MAX];
-		int result, mode, fd;
-		INT64_T length;
-		char filename[WORK_QUEUE_LINE_MAX];
-		char path[WORK_QUEUE_LINE_MAX];
-		char *buffer;
-		FILE *stream;
-
-		if(time(0) > idle_stoptime) {
-			if(master) {
-				printf("worker: gave up after waiting %ds to receive a task.\n", idle_timeout);
-			} else {
-				if(auto_worker) {
-					printf("worker: gave up after waiting %ds to connect to all the available masters.\n", idle_timeout);
-				} else {
-					printf("worker: gave up after waiting %ds to connect to %s port %d.\n", idle_timeout, host, port);
-				}
-			}
+		if((master = connect_master(time(0) + idle_timeout)) == NULL) {
 			break;
 		}
-
-		switch_master_time = time(0) + master_timeout;
-		if(!master) {
-			if(auto_worker) {
-				master = auto_link_connect(actual_addr, &actual_port, switch_master_time);
-			} else {
-				master = link_connect(addr, port, idle_stoptime);
-			}
-			if(!master) {
-				sleep(5);
-				continue;
-			}
-
-			link_tune(master, LINK_TUNE_INTERACTIVE);
-
-			if(exclusive_worker) {
-				link_putfstring(master, "ready %s %d %llu %llu %llu %llu \"%s\" %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, preferred_master_names, uname_data.sysname, uname_data.machine);
-			} else {
-				link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, uname_data.sysname, uname_data.machine);
-			}
-		}
-
-		if(link_readline(master, line, sizeof(line), time(0) + active_timeout)) {
-			debug(D_WQ, "%s", line);
-			if(sscanf(line, "work %lld", &length)) {
-				buffer = malloc(length + 10);
-				link_read(master, buffer, length, time(0) + active_timeout);
-				buffer[length] = 0;
-				strcat(buffer, " 2>&1");
-				debug(D_WQ, "%s", buffer);
-				stream = popen(buffer, "r");
-				free(buffer);
-				if(stream) {
-					length = copy_stream_to_buffer(stream, &buffer);
-					if(length < 0)
-						length = 0;
-					result = pclose(stream);
-				} else {
-					length = 0;
-					result = -1;
-					buffer = 0;
-				}
-				debug(D_WQ, "result %d %lld", result, length);
-				link_putfstring(master, "result %d %lld\n", time(0) + active_timeout, result, length);
-				link_putlstring(master, buffer, length, time(0) + active_timeout);
-				if(buffer)
-					free(buffer);
-			} else if(sscanf(line, "stat %s", filename) == 1) {
-				struct stat st;
-				if(!stat(filename, &st)) {
-					debug(D_WQ, "result 1 %lu %lu", (unsigned long int) st.st_size, (unsigned long int) st.st_mtime);
-					link_putfstring(master, "result 1 %lu %lu\n", time(0) + active_timeout, (unsigned long int) st.st_size, (unsigned long int) st.st_mtime);
-				} else {
-					debug(D_WQ, "result 0 0 0");
-					link_putliteral(master, "result 0 0 0\n", time(0) + active_timeout);
-				}
-			} else if(sscanf(line, "symlink %s %s", path, filename) == 2) {
-				char *cur_pos, *tmp_pos;
-
-				cur_pos = filename;
-
-				if(!strncmp(cur_pos, "./", 2)) {
-					cur_pos += 2;
-				}
-
-				tmp_pos = strrchr(cur_pos, '/');
-				if(tmp_pos) {
-					*tmp_pos = '\0';
-					if(!create_dir(cur_pos, mode | 0700)) {
-						debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
-						goto recover;
-					}
-					*tmp_pos = '/';
-				}
-				symlink(path, filename);
-			} else if(sscanf(line, "put %s %lld %o", filename, &length, &mode) == 3) {
-				if (avail_space_threshold > 0){
-					disk_info_get(".", &disk_avail, &disk_total);
-		                        if (disk_avail < avail_space_threshold) {
-                	                	debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, avail_space_threshold);
-	                        	        goto recover;
-                        		}	
-                		}	
-
-				mode = mode | 0600;
-				char *cur_pos, *tmp_pos;
-
-				cur_pos = filename;
-
-				if(!strncmp(cur_pos, "./", 2)) {
-					cur_pos += 2;
-				}
-
-				tmp_pos = strrchr(cur_pos, '/');
-				if(tmp_pos) {
-					*tmp_pos = '\0';
-					if(!create_dir(cur_pos, mode | 0700)) {
-						debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
-						goto recover;
-					}
-					*tmp_pos = '/';
-				}
-
-				fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
-				if(fd < 0)
-					goto recover;
-				INT64_T actual = link_stream_to_fd(master, fd, length, time(0) + active_timeout);
-				close(fd);
-				if(actual != length)
-					goto recover;
-			} else if(sscanf(line, "unlink %s", path) == 1) {
-				result = remove(path);
-				if(result != 0) {	// 0 - succeeded; otherwise, failed
-					fprintf(stderr, "Could not remove file: %s.(%s)\n", path, strerror(errno));
-					goto recover;
-				}
-			} else if(sscanf(line, "mkdir %s %o", filename, &mode) == 2) {
-				if(!create_dir(filename, mode | 0700)) {
-					debug(D_WQ, "Could not create directory - %s (%s)\n", filename, strerror(errno));
-					goto recover;
-				}
-			} else if(sscanf(line, "rget %s", filename) == 1) {
-				stream_output_item(master, filename);
-				link_putliteral(master, "end\n", time(0) + active_timeout);
-			} else if(sscanf(line, "get %s", filename) == 1) {	// for backward compatibility
-				struct stat info;
-				if(stat(filename, &info) != 0) {
-					fprintf(stderr, "Output file %s was not created. (%s)\n", filename, strerror(errno));
-					goto recover;
-				}
-				// send back a single file
-				fd = open(filename, O_RDONLY, 0);
-				if(fd >= 0) {
-					length = (INT64_T) info.st_size;
-					link_putfstring(master, "%lld\n", time(0) + active_timeout, length);
-					INT64_T actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
-					close(fd);
-					if(actual != length) {
-						debug(D_WQ, "Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, length, actual);
-						goto recover;
-					}
-				} else {
-					fprintf(stderr, "Could not open output file %s. (%s)\n", filename, strerror(errno));
-					goto recover;
-				}
-			} else if(sscanf(line, "thirdget %d %s %[^\n]", &mode, filename, path) == 3) {
-				char cmd[WORK_QUEUE_LINE_MAX];
-				char *cur_pos, *tmp_pos;
-
-				if(mode != WORK_QUEUE_FS_CMD) {
-					struct stat info;
-					if(stat(path, &info) != 0) {
-						debug(D_WQ, "Path %s not accessible. (%s)\n", path, strerror(errno));
-						goto recover;
-					}
-					if(!strcmp(filename, path)) {
-						debug(D_WQ, "thirdget aborted: filename (%s) and path (%s) are the same\n", filename, path);
-						continue;
-					}
-				}
-
-				cur_pos = filename;
-				if(!strncmp(cur_pos, "./", 2)) {
-					cur_pos += 2;
-				}
-
-				tmp_pos = strrchr(cur_pos, '/');
-				if(tmp_pos) {
-					*tmp_pos = '\0';
-					if(!create_dir(cur_pos, mode | 0700)) {
-						debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
-						goto recover;
-					}
-					*tmp_pos = '/';
-				}
-
-				switch (mode) {
-				case WORK_QUEUE_FS_SYMLINK:
-					if(symlink(path, filename) != 0) {
-						debug(D_WQ, "Could not thirdget %s, symlink (%s) failed. (%s)\n", filename, path, strerror(errno));
-						goto recover;
-					}
-				case WORK_QUEUE_FS_PATH:
-					sprintf(cmd, "/bin/cp %s %s", path, filename);
-					if(system(cmd) != 0) {
-						debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (/bin/cp %s)\n", filename, path, filename, strerror(errno));
-						goto recover;
-					}
-					break;
-				case WORK_QUEUE_FS_CMD:
-					if(system(path) != 0) {
-						debug(D_WQ, "Could not thirdget %s, command (%s) failed. (%s)\n", filename, path, strerror(errno));
-						goto recover;
-					}
-					break;
-				}
-			} else if(sscanf(line, "thirdput %d %s %[^\n]", &mode, filename, path) == 3) {
-				struct stat info;
-				char cmd[WORK_QUEUE_LINE_MAX];
-
-				switch (mode) {
-				case WORK_QUEUE_FS_SYMLINK:
-				case WORK_QUEUE_FS_PATH:
-					if(stat(filename, &info) != 0) {
-						debug(D_WQ, "File %s not accessible. (%s)\n", filename, strerror(errno));
-						goto recover;
-					}
-					if(!strcmp(filename, path)) {
-						debug(D_WQ, "thirdput aborted: filename (%s) and path (%s) are the same\n", filename, path);
-						continue;
-					}
-					sprintf(cmd, "/bin/cp %s %s", filename, path);
-					if(system(cmd) != 0) {
-						debug(D_WQ, "Could not thirdput %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
-						goto recover;
-					}
-					break;
-				case WORK_QUEUE_FS_CMD:
-					if(system(path) != 0) {
-						debug(D_WQ, "Could not thirdput %s, command (%s) failed. (%s)\n", filename, path, strerror(errno));
-						goto recover;
-					}
-					break;
-				}
-				link_putliteral(master, "thirdput complete\n", time(0) + active_timeout);
-			} else if(!strcmp(line, "exit")) {
-				break;
-			} else {
-				link_putliteral(master, "error\n", time(0) + active_timeout);
-			}
-
-			idle_stoptime = time(0) + idle_timeout;
-
-		} else {
-		      recover:
-			link_close(master);
-			master = 0;
-			if(auto_worker) {
-				record_bad_master(duplicate_wq_master(actual_master));
-			}
-			sprintf(deletecmd, "rm -rf %s/*", tempdir);
-			system(deletecmd);
-			sleep(5);
-		}
+		work_for_master(master);
 	}
 
-      abort:	
-	printf("worker: cleaning up %s\n", tempdir);
-	sprintf(deletecmd, "rm -rf %s", tempdir);
-	system(deletecmd);
-
+abort:
+	abort_worker();
 	return 0;
 }

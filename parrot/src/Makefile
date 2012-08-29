@@ -1,12 +1,15 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-TARGETS = parrot_run libparrot_client.a libparrot_helper.so parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp parrot_timeout parrot_search
-PARROT_OBJECTS =  pfs_main.o pfs_poll.o tracer.o pfs_dispatch.o pfs_dispatch64.o pfs_process.o pfs_channel_cache.o pfs_channel.o pfs_sys.o pfs_table.o pfs_resolve.o pfs_service.o pfs_file.o pfs_file_cache.o pfs_dir.o pfs_dircache.o pfs_pointer.o pfs_location.o ibox_acl.o pfs_service_local.o pfs_service_http.o pfs_service_grow.o pfs_service_chirp.o pfs_service_multi.o pfs_service_nest.o pfs_service_ftp.o pfs_service_gfal.o pfs_service_lfc.o pfs_service_rfio.o pfs_service_dcap.o pfs_file_gzip.o pfs_service_irods.o irods_reli.o pfs_service_hdfs.o pfs_service_bxgrid.o pfs_service_s3.o pfs_service_xrootd.o
+PROGRAMS = parrot_run parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp parrot_timeout
+LIBRARIES = libparrot_helper.so libparrot_client.a
+SCRIPTS = make_growfs parrot_identity_box parrot_run_hdfs
+
+PARROT_OBJECTS =  pfs_main.o pfs_poll.o tracer.o pfs_paranoia.o pfs_dispatch.o pfs_dispatch64.o pfs_process.o pfs_channel.o pfs_sys.o pfs_table.o pfs_resolve.o pfs_service.o pfs_file.o pfs_file_cache.o pfs_dir.o pfs_dircache.o pfs_pointer.o pfs_location.o ibox_acl.o pfs_service_local.o pfs_service_http.o pfs_service_grow.o pfs_service_chirp.o pfs_service_multi.o pfs_service_nest.o pfs_service_ftp.o pfs_service_rfio.o pfs_service_dcap.o pfs_service_irods.o irods_reli.o pfs_service_hdfs.o pfs_service_bxgrid.o pfs_service_s3.o pfs_service_xrootd.o pfs_service_cvmfs.o
 
 LOCAL_LDFLAGS=-lchirp -ls3client -ldttools -lftp_lite -ldl ${CCTOOLS_INTERNAL_LDFLAGS}
 
-all: ${TARGETS}
+all: ${PROGRAMS} ${LIBRARIES}
 
 parrot_run: ${PARROT_OBJECTS}
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
@@ -41,9 +44,6 @@ parrot_md5: parrot_md5.o parrot_client.o
 parrot_cp: parrot_cp.o parrot_client.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-parrot_search: parrot_search.o parrot_client.o
-	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-
 libparrot_client.a: parrot_client.o
 	ar rv $@ $^
 
@@ -64,29 +64,14 @@ tracer.table.h: tracer.table.in tracer.table.process
 test:
 
 clean:
-	rm -f core *~ *.o *.a ${TARGETS} tracer.table.c tracer.table.h tracer.table64.c tracer.table64.h
+	rm -f core *~ *.o *.a ${PROGRAMS} ${LIBRARIES} tracer.table.c tracer.table.h tracer.table64.c tracer.table64.h
 
 install: all parrot_client.h
-	install -d ${CCTOOLS_INSTALL_DIR}
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install -d ${CCTOOLS_INSTALL_DIR}/lib
-	install -d ${CCTOOLS_INSTALL_DIR}/include
-	install -d ${CCTOOLS_INSTALL_DIR}/include/cctools
-	install parrot_run ${CCTOOLS_INSTALL_DIR}/bin
-	install libparrot_client.a ${CCTOOLS_INSTALL_DIR}/lib
-	install parrot_client.h ${CCTOOLS_INSTALL_DIR}/include/cctools
-	install libparrot_helper.so ${CCTOOLS_INSTALL_DIR}/lib
-	install parrot_identity_box ${CCTOOLS_INSTALL_DIR}/bin
-	install make_growfs ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_mkalloc ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_lsalloc ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_setacl ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_getacl ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_whoami ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_md5 ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_cp ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_search ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_locate ${CCTOOLS_INSTALL_DIR}/bin
-	install parrot_timeout ${CCTOOLS_INSTALL_DIR}/bin
-	chmod 755 parrot_run_hdfs
-	install parrot_run_hdfs ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/include/cctools
+	chmod 755 ${SCRIPTS}
+	cp ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
+	cp ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
+	cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
+	cp parrot_client.h ${CCTOOLS_INSTALL_DIR}/include/cctools

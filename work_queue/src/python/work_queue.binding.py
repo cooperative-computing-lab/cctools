@@ -2,14 +2,10 @@
 #
 # Python Work Queue bindings.
 #
-# The objects and methods provided by this package should correspond to the
-# native C API in @ref work_queue.h.
+# The objects and methods provided by this package correspond to the native 
+# C API in @ref work_queue.h.
 #
-# The new SWIG-based bindings provides two levels of access to the Work Queue
-# library.  The first version provides a 1-to-1 function correspondance to the
-# C API.
-#
-# The second version provides a more Pythonic or higher-level interface that
+# The SWIG-based Python bindings provide a higher-level interface that
 # revolves around the following objects:
 #
 # - @ref work_queue::WorkQueue
@@ -19,7 +15,7 @@ import os
 
 def set_debug_flag(*flags):
     for flag in flags:
-    	cctools_debug_flags_set(flag)
+        cctools_debug_flags_set(flag)
 
 cctools_debug_config('work_queue_python')
 
@@ -27,212 +23,375 @@ cctools_debug_config('work_queue_python')
 # Python Task object
 #
 # This class is used to create a task specification.
-#
-# Example:
-# @code
-# # Create and specify Task
-# task = Task('date > current.date')
-# task.specify_algorithm(WORK_QUEUE_SCHEDULE_FCFS)
-# task.specify_input_file('/usr/bin/date', 'date')
-# task.specify_tag('my date task')
-#
-# # Create Work Queue and submit Task
-# work_queue = WorkQueue()
-# work_queue.submit(task)
-# @endcode
 class Task(_object):
 
     ##
     # Create a new task specification.
     #
-    # @param self	Reference to the current task object.
-    # @param command	The shell command line to be exected by the task.
+    # @param self       Reference to the current task object.
+    # @param command    The shell command line to be exected by the task.
     def __init__(self, command):
-    	self._task = work_queue_task_create(command)
-
+        self._task = work_queue_task_create(command)
+ 
     def __del__(self):
-    	work_queue_task_delete(self._task)
+        work_queue_task_delete(self._task)
 
     @staticmethod
     def _determine_file_flags(flags, cache):
-	if flags is None:
-	    flags = WORK_QUEUE_CACHE
+        if flags is None:
+            flags = WORK_QUEUE_CACHE
 
-	if cache:
-	    flags |= WORK_QUEUE_CACHE
-	else:
-	    flags &= ~WORK_QUEUE_CACHE
+        if cache:
+            flags |= WORK_QUEUE_CACHE
+        else:
+            flags &= ~WORK_QUEUE_CACHE
 
-	return flags
-
-    @property
-    def algorithm(self):
-    	return self._task.worker_selection_algorithm
-
-    @property
-    def command(self):
-    	return self._task.command_line
-
-    @property
-    def tag(self):
-    	return self._task.tag
-
-    @property
-    def output(self):
-    	return self._task.output
-
-    @property
-    def id(self):
-    	return self._task.taskid
-
-    @property
-    def preferred_host(self):
-    	return self._task.preferred_host
-
-    @property
-    def status(self):
-    	return self._task.status
-
-    @property
-    def return_status(self):
-    	return self._task.return_status
-
-    @property
-    def result(self):
-    	return self._task.result
-
-    @property
-    def host(self):
-    	return self._task.host
-
-    @property
-    def submit_time(self):
-    	return self._task.submit_time
-
-    @property
-    def start_time(self):
-    	return self._task.start_time
-
-    @property
-    def finish_time(self):
-    	return self._task.finish_time
-
-    @property
-    def transfer_start_time(self):
-    	return self._task.transfer_start_time
-
-    @property
-    def computation_time(self):
-    	return self._task.computation_time
-
-    @property
-    def total_bytes_transferred(self):
-    	return self._task.total_bytes_transferred
-
-    @property
-    def total_transfer_time(self):
-    	return self._task.total_transfer_time
-
+        return flags
+   
     ##
     # Set the worker selection algorithm for task.
     #
-    # @param self	Reference to the current task object.
-    # @param algorithm	One of the following algorithms to use in assigning a
-    #			task to a worker:
-    #			- @ref WORK_QUEUE_SCHEDULE_FCFS
-    #			- @ref WORK_QUEUE_SCHEDULE_FILES
-    #			- @ref WORK_QUEUE_SCHEDULE_TIME
-    #			- @ref WORK_QUEUE_SCHEDULE_DEFAULT
-    #			- @ref WORK_QUEUE_SCHEDULE_PREFERRED_HOSTS
-    #			- @ref WORK_QUEUE_SCHEDULE_RAND
+    # @param self       Reference to the current task object.
+    # @param algorithm  One of the following algorithms to use in assigning a
+    #                   task to a worker:
+    #                   - @ref WORK_QUEUE_SCHEDULE_FCFS
+    #                   - @ref WORK_QUEUE_SCHEDULE_FILES
+    #                   - @ref WORK_QUEUE_SCHEDULE_TIME
+    #                   - @ref WORK_QUEUE_SCHEDULE_RAND
     def specify_algorithm(self, algorithm):
-    	return work_queue_task_specify_algorithm(self._task, algorithm)
+        return work_queue_task_specify_algorithm(self._task, algorithm)
 
     ##
     # Attach a user defined logical name to the task.
     #
-    # @param self	Reference to the current task object.
-    # @param tag	The tag to attach to task.
+    # @param self       Reference to the current task object.
+    # @param tag        The tag to attach to task.
     def specify_tag(self, tag):
-    	return work_queue_task_specify_tag(self._task, tag)
+        return work_queue_task_specify_tag(self._task, tag)
    
     ##
     # Indicate that the task would be optimally run on a given host.
     #
-    # @param self	Reference to the current task object.
-    # @param hostname	The hostname to which this task would optimally be sent.
+    # @param self       Reference to the current task object.
+    # @param hostname   The hostname to which this task would optimally be sent.
     def specify_preferred_host(self, hostname):
-    	return work_queue_task_specify_preferred_host(self._task, hostname)
+        return work_queue_task_specify_preferred_host(self._task, hostname)
 
     ##
     # Add a file to the task.
     #
-    # @param self	    Reference to the current task object.
-    # @param local_name	    The name of the file on local disk or shared filesystem.
+    # @param self           Reference to the current task object.
+    # @param local_name     The name of the file on local disk or shared filesystem.
     # @param remote_name    The name of the file at the execution site.
-    # @param type	    Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
-    # @param flags	    May be zero to indicate no special handling, or any of the following or'd together:
-    #			    - @ref WORK_QUEUE_NOCACHE
-    #			    - @ref WORK_QUEUE_CACHE
-    #			    - @ref WORK_QUEUE_SYMLINK
-    #			    - @ref WORK_QUEUE_THIRDGET
-    #			    - @ref WORK_QUEUE_THIRDPUT
-    # @param cache	    Legacy parameter for setting file caching attribute.  By default this is enabled.
+    # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
+    # @param flags          May be zero to indicate no special handling, or any of the following or'd together:
+    #                       - @ref WORK_QUEUE_NOCACHE
+    #                       - @ref WORK_QUEUE_CACHE
+    # @param cache          Legacy parameter for setting file caching attribute.  By default this is enabled.
     #
-    # Example:
+    # For example:
     # @code
     # # The following are equivalent
     # >>> task.specify_file("/etc/hosts", type=WORK_QUEUE_INPUT, flags=WORK_QUEUE_NOCACHE)
     # >>> task.specify_file("/etc/hosts", "hosts", type=WORK_QUEUE_INPUT, cache=false)
     # @endcode
     def specify_file(self, local_name, remote_name=None, type=None, flags=None, cache=True):
-	if remote_name is None:
-	    remote_name = os.path.basename(local_name)
+        if remote_name is None:
+            remote_name = os.path.basename(local_name)
 
-	if type is None:
-	    type = WORK_QUEUE_INPUT
+        if type is None:
+            type = WORK_QUEUE_INPUT
 
-	flags = Task._determine_file_flags(flags, cache)
-	return work_queue_task_specify_file(self._task, local_name, remote_name, type, flags)
+        flags = Task._determine_file_flags(flags, cache)
+        return work_queue_task_specify_file(self._task, local_name, remote_name, type, flags)
 
     ##
     # Add a input file to the task.
     #
     # This is just a wrapper for @ref specify_file with type set to @ref WORK_QUEUE_INPUT.
     def specify_input_file(self, local_name, remote_name=None, flags=None, cache=True):
-    	return self.specify_file(local_name, remote_name, WORK_QUEUE_INPUT, flags, cache)
+        return self.specify_file(local_name, remote_name, WORK_QUEUE_INPUT, flags, cache)
 
     ##
     # Add a output file to the task.
     #
     # This is just a wrapper for @ref specify_file with type set to @ref WORK_QUEUE_OUTPUT.
     def specify_output_file(self, local_name, remote_name=None, flags=None, cache=True):
-    	return self.specify_file(local_name, remote_name, WORK_QUEUE_OUTPUT, flags, cache)
+        return self.specify_file(local_name, remote_name, WORK_QUEUE_OUTPUT, flags, cache)
 
     ##
     # Add an input bufer to the task.
     #
-    # @param self	    Reference to the current task object.
-    # @param buffer	    The contents of the buffer to pass as input.
+    # @param self           Reference to the current task object.
+    # @param buffer         The contents of the buffer to pass as input.
     # @param remote_name    The name of the remote file to create.
-    # @param flags	    May take the same values as @ref specify_file.
-    # @param cache	    Legacy parameter for setting file caching attribute.  By default this is enabled.
+    # @param flags          May take the same values as @ref specify_file.
+    # @param cache          Legacy parameter for setting file caching attribute.  By default this is enabled.
     def specify_buffer(self, buffer, remote_name, flags=None, cache=True):
-	flags = Task._determine_file_flags(flags, cache)
-	return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
+        flags = Task._determine_file_flags(flags, cache)
+        return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
     ##
-    # Add a file created or handled by an arbitrary command to a task (eg. wget, ftp, chirp_get|put).
+    # Add a file created or handled by an arbitrary command to a task (eg: wget, ftp, chirp_get|put).
     #
-    # @param self	    Reference to the current task object.
+    # @param self           Reference to the current task object.
     # @param remote_name    The name of the remote file at the execution site.
-    # @param command	    The contents of the buffer to pass as input.
-    # @param type	    Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
-    # @param flags	    May take the same values as @ref specify_file.
-    # @param cache	    Legacy parameter for setting file caching attribute.  By default this is enabled.
+    # @param command        The contents of the buffer to pass as input.
+    # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
+    # @param flags          May take the same values as @ref specify_file.
+    # @param cache          Legacy parameter for setting file caching attribute. By default this is enabled.
     def specify_file_command(self, remote_name, command, type, flags, cache=True):
-	flags = Task._determine_file_flags(flags, cache)
-	return work_queue_task_specify_file_command(self._task, remote_name, command, type, flags)
+        flags = Task._determine_file_flags(flags, cache)
+        return work_queue_task_specify_file_command(self._task, remote_name, command, type, flags)
+
+    ##
+    # Get the user-defined logical name for the task. 
+    # 
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.tag
+    # @endcode 
+    @property
+    def tag(self):
+        return self._task.tag
+
+    ## 
+    # Get the shell command executed by the task.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.command
+    # @endcode
+    @property
+    def command(self):
+        return self._task.command_line
+    
+    ##
+    # Get the algorithm for choosing worker to run the task.	 
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.algorithm
+    # @endcode
+    @property
+    def algorithm(self):
+        return self._task.worker_selection_algorithm
+
+    ## 
+    # Get the standard output of the task. Must be called only after the task
+	# completes execution.  	
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.output
+    # @endcode
+    @property
+    def output(self):
+        return self._task.output
+
+    ## 
+    # Get the task id number. Must be called only after the task was submitted. 
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.id
+    # @endcode
+    @property
+    def id(self):
+        return self._task.taskid
+
+    ## 
+    # Get the exit code of the command executed by the task. Must be called only
+	# after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.return_status
+    # @endcode
+    @property
+    def return_status(self):
+        return self._task.return_status
+
+    ## 
+    # Get the result of the task (successful, failed return_status, missing input file, missing output file). 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.result
+    # @endcode
+    @property
+    def result(self):
+        return self._task.result
+
+    ## 
+    # Get the address and port of the host on which the task ran.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.host
+    # @endcode
+    @property
+    def host(self):
+        return self._task.host
+		
+    ## 
+    # Get the name of the host on which the task ran.  
+	# Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.hostname
+    # @endcode
+    @property
+    def hostname(self):
+        return self._task.hostname
+
+    ## 
+    # Get the time at which this task was submitted.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.submit_time
+    # @endcode
+    @property
+    def submit_time(self):
+        return self._task.time_task_submit
+
+    ## 
+    # Get the time at which this task was finished. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.finish_time
+    # @endcode
+    @property
+    def finish_time(self):
+        return self._task.time_task_finish
+
+    ## 
+    # Get the time spent in upper-level application (outside of work_queue_wait).
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.app_delay
+    # @endcode
+    @property
+    def app_delay(self):
+        return self._task.time_app_delay
+
+    ## 
+    # Get the time at which the task started to transfer input files. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.send_input_start
+    # @endcode
+    @property
+    def send_input_start(self):
+        return self._task.time_send_input_start
+
+    ## 
+    # Get the time at which the task finished transferring input files. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.send_input_finish
+    # @endcode
+    @property
+    def send_input_finish(self):
+        return self._task.time_send_input_finish
+
+    ## 
+    # The time at which the task began.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.execute_cmd_start
+    # @endcode
+    @property
+    def execute_cmd_start(self):
+        return self._task.time_execute_cmd_start
+
+    ## 
+    # Get the time at which the task finished (discovered by the master). 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.execute_cmd_finish
+    # @endcode
+    @property
+    def execute_cmd_finish(self):
+        return self._task.time_execute_cmd_finish
+
+    ## 
+	# Get the time at which the task started to transfer output files. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.receive_output_start
+    # @endcode
+    @property
+    def receive_output_start(self):
+        return self._task.time_receive_output_start
+
+    ## 
+    # Get the time at which the task finished transferring output files. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.receive_output_finish
+    # @endcode
+    @property
+    def receive_output_finish(self):
+        return self._task.time_receive_output_finish
+
+    ## 
+    # Get the number of bytes transferred since task started transferring input data.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.total_bytes_transferred
+    # @endcode
+    @property
+    def total_bytes_transferred(self):
+        return self._task.total_bytes_transferred
+
+    ## 
+    # Get the time comsumed in microseconds for transferring total_bytes_transferred. 
+   	# Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.total_transfer_time
+    # @endcode
+    @property
+    def total_transfer_time(self):
+        return self._task.total_transfer_time
+
+    ## 
+    # Get the time spent in microseconds for executing the command on the worker. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.cmd_execution_time
+    # @endcode
+    @property
+    def cmd_execution_time(self):
+        return self._task.cmd_execution_time 
 
 
 ##
@@ -244,84 +403,120 @@ class WorkQueue(_object):
     ##
     # Create a new work queue.
     #
-    # @param self	Reference to the current work queue object.
-    # @param port	The port number to listen on. If zero is specified, then the default is chosen, and if -1 is specified, a random port is chosen.
-    # @param name	The project name to use.
-    # @param catalog	Whether or not to enable catalog mode.
-    # @param exclusive	Whether or not the workers should be exclusive.
-    # @param shutdown	Automatically shutdown workers when queue is finished. Disabled by default.
+    # @param self       Reference to the current work queue object.
+    # @param port       The port number to listen on. If zero is specified, then the default is chosen, and if -1 is specified, a random port is chosen.
+    # @param name       The project name to use.
+    # @param catalog    Whether or not to enable catalog mode.
+    # @param exclusive  Whether or not the workers should be exclusive.
+    # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
     #
-    # @see work_queue_create	- For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=True, exclusive=True, shutdown=False):
-    	self._work_queue = work_queue_create(port)
-    	self._stats	 = work_queue_stats()
-    	self._task_table = {}
-    	self._shutdown	 = shutdown
+    # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
+    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=False, exclusive=True, shutdown=False):
+        self._shutdown   = shutdown
+        self._work_queue = work_queue_create(port)
+        if not self._work_queue:
+            raise 
 
-	if name:
-	    work_queue_specify_name(self._work_queue, name)
+        self._stats      = work_queue_stats()
+        self._task_table = {}
 
-    	work_queue_specify_master_mode(self._work_queue, catalog)
-    	work_queue_specify_worker_mode(self._work_queue, exclusive)
+        if name:
+            work_queue_specify_name(self._work_queue, name)
+
+        work_queue_specify_master_mode(self._work_queue, catalog)
 
     def __del__(self):
-	if self._shutdown:
-	    self.shutdown_workers(0)
-    	work_queue_delete(self._work_queue)
+        if self._shutdown:
+            self.shutdown_workers(0)
+        work_queue_delete(self._work_queue)
     
+    ##
+    # Get the project name of the queue. 
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print q.name
+    # @endcode
     @property
     def name(self):
-    	return work_queue_name(self._work_queue)
+        return work_queue_name(self._work_queue)
 
+    ##
+    # Get the listening port of the queue.  
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print q.port
+    # @endcode
     @property
     def port(self):
-    	return work_queue_port(self._work_queue)
+        return work_queue_port(self._work_queue)
 
+    ##
+    # Get queue statistics.  
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print q.stats
+    # @endcode
+    # The fields in @ref work_queue_stats can also be individually accessed through this call. For example:
+    # @code
+    # >>> print q.stats.workers_busy
+    # @endcode
     @property
     def stats(self):
-    	work_queue_get_stats(self._work_queue, self._stats)
-    	return self._stats
+        work_queue_get_stats(self._work_queue, self._stats)
+        return self._stats
 
     ##
     # Turn on or off fast abort functionality for a given queue.
     #
-    # @param self	Reference to the current work queue object.
-    # @param multiplier	The multiplier of the average task time at which point to abort; if negative (the default) fast_abort is deactivated.
+    # @param self       Reference to the current work queue object.
+    # @param multiplier The multiplier of the average task time at which point to abort; if negative (the default) fast_abort is deactivated.
     def activate_fast_abort(self, multiplier):
-    	return work_queue_activate_fast_abort(self._work_queue, multiplier)
+        return work_queue_activate_fast_abort(self._work_queue, multiplier)
 
     ##
     # Determine whether there are any known tasks queued, running, or waiting to be collected.
     #
     # Returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
     #
-    # @param self	Reference to the current work queue object.
+    # @param self       Reference to the current work queue object.
     def empty(self):
-    	return work_queue_empty(self._work_queue)
+        return work_queue_empty(self._work_queue)
 
     ##
     # Determine whether the queue can support more tasks.
     #
     # Returns the number of additional tasks it can support if "hungry" and 0 if "sated".
     #
-    # @param self	Reference to the current work queue object.
+    # @param self       Reference to the current work queue object.
     def hungry(self):
-    	return work_queue_hungry(self._work_queue)
+        return work_queue_hungry(self._work_queue)
 
     ##
     # Set the worker selection algorithm for queue.
     #
-    # @param self	Reference to the current work queue object.
-    # @param algorithm	One of the following algorithms to use in assigning a
-    #			task to a worker:
-    #			- @ref WORK_QUEUE_SCHEDULE_FCFS
-    #			- @ref WORK_QUEUE_SCHEDULE_FILES
-    #			- @ref WORK_QUEUE_SCHEDULE_TIME
-    #			- @ref WORK_QUEUE_SCHEDULE_DEFAULT
-    #			- @ref WORK_QUEUE_SCHEDULE_PREFERRED_HOSTS
-    #			- @ref WORK_QUEUE_SCHEDULE_RAND
+    # @param self       Reference to the current work queue object.
+    # @param algorithm  One of the following algorithms to use in assigning a
+    #                   task to a worker:
+    #                   - @ref WORK_QUEUE_SCHEDULE_FCFS
+    #                   - @ref WORK_QUEUE_SCHEDULE_FILES
+    #                   - @ref WORK_QUEUE_SCHEDULE_TIME
+    #                   - @ref WORK_QUEUE_SCHEDULE_RAND
     def specify_algorithm(self, algorithm):
-    	return work_queue_specify_algorithm(self._work_queue, algorithm)
+        return work_queue_specify_algorithm(self._work_queue, algorithm)
+
+    ##
+    # Set the order for dispatching submitted tasks in the queue.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param order  	One of the following algorithms to use in dispatching
+	# 					submitted tasks to workers:
+    #                   - @ref WORK_QUEUE_TASK_ORDER_FIFO
+    #                   - @ref WORK_QUEUE_TASK_ORDER_LIFO
+    def specify_task_order(self, order):
+        return work_queue_specify_task_order(self._work_queue, order)
 
     ##
     # Change the project name for the given queue.
@@ -329,15 +524,15 @@ class WorkQueue(_object):
     # @param self   Reference to the current work queue object.
     # @param name   The new project name.
     def specify_name(self, name):
-    	return work_queue_specify_name(self._work_queue, name)
+        return work_queue_specify_name(self._work_queue, name)
 
     ##
     # Change the project priority for the given queue.
     #
-    # @param self	Reference to the current work queue object.
-    # @param priority	An integer that presents the priorty of this work queue master. The higher the value, the higher the priority.
+    # @param self       Reference to the current work queue object.
+    # @param priority   An integer that presents the priorty of this work queue master. The higher the value, the higher the priority.
     def specify_priority(self, priority):
-    	return work_queue_specify_priority(self._work_queue, priority)
+        return work_queue_specify_priority(self._work_queue, priority)
 
     ##
     # Specify the master mode for the given queue.
@@ -345,15 +540,23 @@ class WorkQueue(_object):
     # @param self   Reference to the current work queue object.
     # @param mode   This may be one of the following values: @ref WORK_QUEUE_MASTER_MODE_STANDALONE or @ref WORK_QUEUE_MASTER_MODE_CATALOG.
     def specify_master_mode(self, mode):
-    	return work_queue_specify_master_mode(self._work_queue, mode)
+        return work_queue_specify_master_mode(self._work_queue, mode)
 
     ##
-    # Specify the worker mode for the given queue.
+    # Cancel task identified by its taskid and remove from the given queue. 
     #
     # @param self   Reference to the current work queue object.
-    # @param mode   This may be one of the following values: @ref WORK_QUEUE_WORKER_MODE_SHARED or @ref WORK_QUEUE_WORKER_MODE_EXCLUSIVE.
-    def specify_worker_mode(self, mode):
-    	return work_queue_specify_worker_mode(self._work_queue, mode)
+    # @param id     The taskid returned from @ref submit.
+    def cancel_by_taskid(self, id):
+        return work_queue_cancel_by_taskid(self._work_queue, id)
+
+    ##
+    # Cancel task identified by its tag and remove from the given queue. 
+    #
+    # @param self   Reference to the current work queue object.
+    # @param tag    The tag assigned to task using @ref work_queue_task_specify_tag.
+    def cancel_by_tasktag(self, tag):
+        return work_queue_cancel_by_tasktag(self._work_queue, tag)
 
     ##
     # Shutdown workers connected to queue.
@@ -361,9 +564,9 @@ class WorkQueue(_object):
     # Gives a best effort and then returns the number of workers given the shutdown order.
     #
     # @param self   Reference to the current work queue object.
-    # @param n	    The number to shutdown.  To shut down all workers, specify "0".
+    # @param n      The number to shutdown.  To shut down all workers, specify "0".
     def shutdown_workers(self, n):
-    	return work_queue_shut_down_workers(self._work_queue, n)
+        return work_queue_shut_down_workers(self._work_queue, n)
 
     ##
     # Submit a task to the queue.
@@ -373,22 +576,23 @@ class WorkQueue(_object):
     # @param self   Reference to the current work queue object.
     # @param task   A task description created from @ref work_queue::Task.
     def submit(self, task):
-    	self._task_table[task.id] = task
-    	return work_queue_submit(self._work_queue, task._task)
+		taskid = work_queue_submit(self._work_queue, task._task)
+		self._task_table[taskid] = task
+		return taskid 
 
     ##
     # Wait for tasks to complete.
     #
     # This call will block until the timeout has elapsed
     #
-    # @param self	Reference to the current work queue object.
-    # @param timeout	The number of seconds to wait for a completed task
-    #			before returning.  Use an integer to set the timeout or the constant @ref
-    #			WORK_QUEUE_WAITFORTASK to block until a task has completed.
+    # @param self       Reference to the current work queue object.
+    # @param timeout    The number of seconds to wait for a completed task
+    #                   before returning.  Use an integer to set the timeout or the constant @ref
+    #                   WORK_QUEUE_WAITFORTASK to block until a task has completed.
     def wait(self, timeout=WORK_QUEUE_WAITFORTASK):
-    	task_pointer = work_queue_wait(self._work_queue, timeout)
-	if task_pointer:
-	    task = self._task_table[int(task_pointer.taskid)]
-	    del(self._task_table[task_pointer.taskid])
-	    return task
-	return None
+		task_pointer = work_queue_wait(self._work_queue, timeout)
+		if task_pointer:
+			task = self._task_table[int(task_pointer.taskid)]
+			del(self._task_table[task_pointer.taskid])
+			return task
+		return None

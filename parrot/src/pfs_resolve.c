@@ -9,7 +9,7 @@ See the file COPYING for details.
 #include "pfs_types.h"
 #include "debug.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "hash_table.h"
 
 #include <stdio.h>
@@ -44,7 +44,7 @@ static void add_mount_entry( const char *prefix, const char *redirect )
 void pfs_resolve_manual_config( const char *str )
 {
 	char *e;
-	str = xstrdup(str);
+	str = xxstrdup(str);
 	e = strchr(str,'=');
 	if(!e) fatal("badly formed mount string: %s",str);
 	*e = 0;
@@ -279,7 +279,7 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, time_t
 	if(result==PFS_RESOLVE_UNCHANGED || result==PFS_RESOLVE_CHANGED) {
 		debug(D_RESOLVE,"%s = %s",logical_name,physical_name);
 		if(!hash_table_lookup(resolve_cache,logical_name)) {
-			hash_table_insert(resolve_cache,logical_name,xstrdup(physical_name));
+			hash_table_insert(resolve_cache,logical_name,xxstrdup(physical_name));
 		}
 	}
 

@@ -89,7 +89,9 @@ typedef enum {
 	NVPAIR_MODE_STRING,
 	NVPAIR_MODE_INTEGER,
 	NVPAIR_MODE_URL,
-	NVPAIR_MODE_METRIC
+	NVPAIR_MODE_METRIC,
+	NVPAIR_MODE_TIME,
+	NVPAIR_MODE_TIMESTAMP
 } nvpair_mode_t;
 
 typedef enum {
@@ -99,6 +101,7 @@ typedef enum {
 
 struct nvpair_header {
 	const char *name;
+	const char *title;
 	nvpair_mode_t mode;
 	nvpair_align_t align;
 	int width;
@@ -115,6 +118,12 @@ void nvpair_print_text(struct nvpair *n, FILE * stream);
 @param stream The stream on which to print.
 */
 void nvpair_print_xml(struct nvpair *n, FILE * stream);
+
+/** Print an entire nvpair in JSON form.
+@param n The nnvpair to print.
+@param stream The stream on which to print.
+*/
+void nvpair_print_json(struct nvpair *n, FILE * stream);
 
 /** Print an entire nvpair in new ClassAd form.
 @param n The nvpair to print.

@@ -4,6 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "cctools.h"
 #include "mpi_queue.h"
 #include "copy_stream.h"
 #include "domain_name_cache.h"
@@ -518,11 +519,6 @@ int worker_main() {
 	return 1;
 }
 
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 static void show_help(const char *cmd)
 {
 	printf("Use: %s <masterhost> <port>\n", cmd);
@@ -564,7 +560,7 @@ int main(int argc, char *argv[])
 			debug_config_file(optarg);
 			break;
 		case 'v':
-			show_version(argv[0]);
+			cctools_version_print(stdout, argv[0]);
 			return 0;
 		case 'w':
 			w = string_metric_parse(optarg);
@@ -576,6 +572,8 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if ((argc - optind) != 2) {
 	    show_help(argv[0]);

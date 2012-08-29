@@ -3,6 +3,7 @@
 #include "debug.h"
 #include "stringtools.h"
 #include "process.h"
+#include "xxmalloc.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,8 +17,8 @@ static char * cluster_submit_cmd = NULL;
 static char * cluster_remove_cmd = NULL;
 static char * cluster_options = NULL;
 
-int batch_job_setup_cluster(struct batch_queue * q) {
-
+int batch_job_setup_cluster(struct batch_queue * q)
+{
 	if(cluster_name)
 		free(cluster_name);
 	if(cluster_submit_cmd)
@@ -40,7 +41,13 @@ int batch_job_setup_cluster(struct batch_queue * q) {
 			cluster_name = strdup("moab");
 			cluster_submit_cmd = strdup("msub");
 			cluster_remove_cmd = strdup("mdel");
-			cluster_options = strdup("-d $CWD -o /dev/null -j oe -N");
+			cluster_options = strdup("-d . -o /dev/null -v BATCH_JOB_COMMAND -j oe -N");
+			break;
+		case BATCH_QUEUE_TYPE_TORQUE:
+			cluster_name = strdup("torque");
+			cluster_submit_cmd = strdup("qsub");
+			cluster_remove_cmd = strdup("qdel");
+			cluster_options = strdup("-d . -o /dev/null -v BATCH_JOB_COMMAND -j oe -N");
 			break;
 		case BATCH_QUEUE_TYPE_CLUSTER:
 			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
@@ -49,7 +56,7 @@ int batch_job_setup_cluster(struct batch_queue * q) {
 			cluster_options = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS");
 			break;
 		default:
-			debug(D_DEBUG, "Invalid cluster type: %s\n", batch_queue_type_to_string(q->type));
+			debug(D_BATCH, "Invalid cluster type: %s\n", batch_queue_type_to_string(q->type));
 			return -1;
 	}
 
@@ -69,27 +76,33 @@ int batch_job_setup_cluster(struct batch_queue * q) {
 
 }
 
-static int setup_batch_wrapper(const char *sysname)
+static int setup_batch_wrapper(struct batch_queue *q, const char *sysname)
 {
-	FILE *file;
-	char wrapperfile[BATCH_JOB_LINE_MAX];
-	
-	sprintf(wrapperfile, "%s.wrapper", sysname);
+	char *wrapperfile = string_format("%s.wrapper", sysname);
 
 	if(access(wrapperfile, R_OK | X_OK) == 0)
 		return 0;
 
-	file = fopen(wrapperfile, "w");
-	if(!file)
+	FILE *file = fopen(wrapperfile, "w");
+	if(!file) {
+		free(wrapperfile);
 		return -1;
+	}
 
 	fprintf(file, "#!/bin/sh\n");
+	if(q->type == BATCH_QUEUE_TYPE_MOAB || q->type == BATCH_QUEUE_TYPE_TORQUE) {
+		fprintf(file, "CMD=${BATCH_JOB_COMMAND}\n");
+		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
+	} else {
+		fprintf(file, "CMD=$@\n");
+	}
+
 	fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
 	fprintf(file, "starttime=`date +%%s`\n");
 	fprintf(file, "cat > $logfile <<EOF\n");
 	fprintf(file, "start $starttime\n");
 	fprintf(file, "EOF\n\n");
-	fprintf(file, "eval \"$@\"\n\n");
+	fprintf(file, "eval \"$CMD\"\n\n");
 	fprintf(file, "status=$?\n");
 	fprintf(file, "stoptime=`date +%%s`\n");
 	fprintf(file, "cat >> $logfile <<EOF\n");
@@ -99,41 +112,55 @@ static int setup_batch_wrapper(const char *sysname)
 
 	chmod(wrapperfile, 0755);
 
+	free(wrapperfile);
+
 	return 0;
 }
 
 
 batch_job_id_t batch_job_submit_simple_cluster(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
-	char line[BATCH_JOB_LINE_MAX];
-	char name[BATCH_JOB_LINE_MAX];
 	batch_job_id_t jobid;
 	struct batch_job_info *info;
 
-	FILE *file;
-
-	if(setup_batch_wrapper(cluster_name) < 0)
+	if(setup_batch_wrapper(q, cluster_name) < 0)
 		return -1;
 
-	strcpy(name, cmd);
-	char *s = strchr(name, ' ');
-	if(s)
-		*s = 0;
+	char *name = xxstrdup(cmd);
+	{
+		char *s = strchr(name, ' ');
+		if(s)
+			*s = 0;
+	}
+	char *command = NULL;
+	switch(q->type) {
+		case BATCH_QUEUE_TYPE_TORQUE:
+			command = string_format("%s %s '%s' %s %s.wrapper", cluster_submit_cmd, cluster_options, string_basename(name), q->options_text ? q->options_text : "", cluster_name);
+			break;
+		case BATCH_QUEUE_TYPE_SGE:
+		case BATCH_QUEUE_TYPE_MOAB:
+		case BATCH_QUEUE_TYPE_CLUSTER:
+		default:
+			command = string_format("%s %s '%s' %s %s.wrapper \"%s\"", cluster_submit_cmd, cluster_options, string_basename(name), q->options_text ? q->options_text : "", cluster_name, cmd);
+			break;
+	}
+	free(name);
 
-	sprintf(line, "%s %s '%s' %s %s.wrapper \"%s\"", cluster_submit_cmd, cluster_options, string_basename(name), q->options_text ? q->options_text : "", cluster_name, cmd);
+	debug(D_BATCH, "%s", command);
 
-	debug(D_DEBUG, "%s", line);
+	setenv("BATCH_JOB_COMMAND", cmd, 1);
 
-	file = popen(line, "r");
+	FILE *file = popen(command, "r");
+	free(command);
 	if(!file) {
-		debug(D_DEBUG, "couldn't submit job: %s", strerror(errno));
+		debug(D_BATCH, "couldn't submit job: %s", strerror(errno));
 		return -1;
 	}
 
-	line[0] = 0;
+	char line[BATCH_JOB_LINE_MAX] = "";
 	while(fgets(line, sizeof(line), file)) {
-		if(sscanf(line, "Your job %d", &jobid) == 1) {
-			debug(D_DEBUG, "job %d submitted", jobid);
+		if(sscanf(line, "Your job %d", &jobid) == 1 || sscanf(line, "%d", &jobid) == 1) {
+			debug(D_BATCH, "job %d submitted", jobid);
 			pclose(file);
 			info = malloc(sizeof(*info));
 			memset(info, 0, sizeof(*info));
@@ -154,27 +181,32 @@ batch_job_id_t batch_job_submit_simple_cluster(struct batch_queue * q, const cha
 
 batch_job_id_t batch_job_submit_cluster(struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
-	char command[BATCH_JOB_LINE_MAX];
+	char *command = string_format("%s %s", cmd, args);
+	if (infile) {
+		char *new = string_format("%s <%s", command, infile);
+		free(command);
+		command = new;
+	}
+	if (outfile) {
+		char *new = string_format("%s >%s", command, outfile);
+		free(command);
+		command = new;
+	}
+	if (errfile) {
+		char *new = string_format("%s 2>%s", command, errfile);
+		free(command);
+		command = new;
+	}
 
-	sprintf(command, "%s %s", cmd, args);
-
-	if(infile)
-		sprintf(&command[strlen(command)], " <%s", infile);
-	if(outfile)
-		sprintf(&command[strlen(command)], " >%s", outfile);
-	if(errfile)
-		sprintf(&command[strlen(command)], " 2>%s", errfile);
-
-	return batch_job_submit_simple_cluster(q, command, extra_input_files, extra_output_files);
+	batch_job_id_t status = batch_job_submit_simple_cluster(q, command, extra_input_files, extra_output_files);
+	free(command);
+	return status;
 }
 
 batch_job_id_t batch_job_wait_cluster(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	struct batch_job_info *info;
 	batch_job_id_t jobid;
-	FILE *file;
-	char statusfile[BATCH_JOB_LINE_MAX];
-	char line[BATCH_JOB_LINE_MAX];
 	int t, c;
 
 	while(1) {
@@ -182,14 +214,15 @@ batch_job_id_t batch_job_wait_cluster(struct batch_queue * q, struct batch_job_i
 		itable_firstkey(q->job_table);
 		while(itable_nextkey(q->job_table, &ujobid, (void **) &info)) {
 			jobid = ujobid;
-			sprintf(statusfile, "%s.status.%d", cluster_name, jobid);
-			file = fopen(statusfile, "r");
+			char *statusfile = string_format("%s.status.%d", cluster_name, jobid);
+			FILE *file = fopen(statusfile, "r");
 			if(file) {
+				char line[BATCH_JOB_LINE_MAX];
 				while(fgets(line, sizeof(line), file)) {
 					if(sscanf(line, "start %d", &t)) {
 						info->started = t;
 					} else if(sscanf(line, "stop %d %d", &c, &t) == 2) {
-						debug(D_DEBUG, "job %d complete", jobid);
+						debug(D_BATCH, "job %d complete", jobid);
 						if(!info->started)
 							info->started = t;
 						info->finished = t;
@@ -204,9 +237,14 @@ batch_job_id_t batch_job_wait_cluster(struct batch_queue * q, struct batch_job_i
 					info = itable_remove(q->job_table, jobid);
 					*info_out = *info;
 					free(info);
+					free(statusfile);
 					return jobid;
 				}
+			} else {
+				debug(D_BATCH, "could not open status file \"%s\"", statusfile);
 			}
+
+			free(statusfile);
 		}
 
 		if(itable_size(q->job_table) <= 0)
@@ -226,7 +264,6 @@ batch_job_id_t batch_job_wait_cluster(struct batch_queue * q, struct batch_job_i
 
 int batch_job_remove_cluster(struct batch_queue *q, batch_job_id_t jobid)
 {
-	char line[BATCH_JOB_LINE_MAX];
 	struct batch_job_info *info;
 
 	info = itable_lookup(q->job_table, jobid);
@@ -240,8 +277,9 @@ int batch_job_remove_cluster(struct batch_queue *q, batch_job_id_t jobid)
 	info->exited_normally = 0;
 	info->exit_signal = 1;
 
-	sprintf(line, "%s %d", cluster_remove_cmd, jobid);
-	system(line);
+	char *command = string_format("%s %d", cluster_remove_cmd, jobid);
+	system(command);
+	free(command);
 
 	return 1;
 }

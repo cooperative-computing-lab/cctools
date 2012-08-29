@@ -9,7 +9,6 @@ See the file COPYING for details.
 #define PFS_SYS_H
 
 #include "pfs_types.h"
-#include "pfs_search.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -87,6 +86,20 @@ int		pfs_readlinkat( int dirfd, const char *path, char *buf, size_t bufsiz );
 int		pfs_fchmodat( int dirfd, const char *path, mode_t mode, int flags );
 int		pfs_faccessat( int dirfd, const char *path, mode_t mode );
 
+
+ssize_t pfs_getxattr (const char *path, const char *name, void *value, size_t size);
+ssize_t pfs_lgetxattr (const char *path, const char *name, void *value, size_t size);
+ssize_t pfs_fgetxattr (int fd, const char *name, void *value, size_t size);
+ssize_t pfs_listxattr (const char *path, char *list, size_t size);
+ssize_t pfs_llistxattr (const char *path, char *list, size_t size);
+ssize_t pfs_flistxattr (int fd, char *list, size_t size);
+int pfs_setxattr (const char *path, const char *name, const void *value, size_t size, int flags);
+int pfs_lsetxattr (const char *path, const char *name, const void *value, size_t size, int flags);
+int pfs_fsetxattr (int fd, const char *name, const void *value, size_t size, int flags);
+int pfs_removexattr (const char *path, const char *name);
+int pfs_lremovexattr (const char *path, const char *name);
+int pfs_fremovexattr (int fd, const char *name);
+
 int		pfs_socket( int domain, int type, int protocol );
 int		pfs_socketpair( int domain, int type, int protocol, int *fds );
 int		pfs_accept( int fd, struct sockaddr *addr, int * addrlen );
@@ -122,7 +135,9 @@ int		pfs_get_local_name( const char *rpath, char *lpath, char *firstline, int le
 int		pfs_is_nonblocking( int fd );
 int		pfs_resolve_name( const char *path, struct pfs_name *pname );
 
-int		pfs_search( const char *paths, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, int flags );
+  pfs_size_t	pfs_mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
+int		pfs_mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
+int		pfs_mmap_delete( pfs_size_t logical_address, pfs_size_t length );
  
 #ifdef __cplusplus
 }

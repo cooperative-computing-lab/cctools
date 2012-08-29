@@ -7,7 +7,7 @@ See the file COPYING for details.
 
 #include "auth.h"
 #include "debug.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "stringtools.h"
 
 #include <stdlib.h>
@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <pwd.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 static char challenge_dir[AUTH_LINE_MAX] = "/tmp";
 static char alternate_passwd_file[AUTH_LINE_MAX] = "\0";
@@ -177,7 +178,10 @@ static int auth_unix_accept(struct link *link, char **subject, time_t stoptime)
 				some NFS clients to refresh cached metadata.
 				*/
 
-				system("ls -la > /dev/null");
+				DIR *d = opendir(challenge_dir);
+				if(d) {
+				    closedir(d);
+				}
 
 				if(stat(path,&buf)==0) {
 					file_exists = 1;
@@ -195,7 +199,7 @@ static int auth_unix_accept(struct link *link, char **subject, time_t stoptime)
 				if(p) {
 					debug(D_AUTH, "unix: client is subject %s", p->pw_name);
 					link_putliteral(link, "yes\n", stoptime);
-					*subject = xstrdup(p->pw_name);
+					*subject = xxstrdup(p->pw_name);
 					success = 1;
 				} else {
 					debug(D_AUTH, "unix: there is no user corresponding to uid %d", buf.st_uid);

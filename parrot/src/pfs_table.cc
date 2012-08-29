@@ -5,19 +5,17 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 
-#include "pfs_search.h"
 #include "pfs_table.h"
 #include "pfs_service.h"
 #include "pfs_pointer.h"
 #include "pfs_file.h"
+#include "pfs_mmap.h"
 #include "pfs_process.h"
 #include "pfs_file_cache.h"
-#include "pfs_file_gzip.h"
 
 extern "C" {
 #include "debug.h"
@@ -26,10 +24,10 @@ extern "C" {
 #include "full_io.h"
 #include "get_canonical_path.h"
 #include "pfs_resolve.h"
+#include "pfs_channel.h"
 #include "md5.h"
 }
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -37,7 +35,6 @@ extern "C" {
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <fnmatch.h>
 #include <ctype.h>
 #include <math.h>
 #include <signal.h>
@@ -53,7 +50,6 @@ extern "C" {
 extern int pfs_force_stream;
 extern int pfs_force_sync;
 extern int pfs_follow_symlinks;
-extern int pfs_auto_gzip;
 extern int pfs_enable_small_file_optimizations;
 
 extern const char * pfs_initial_working_directory;
@@ -70,6 +66,7 @@ pfs_table::pfs_table()
 	pointer_count = sysconf(_SC_OPEN_MAX);
 	pointers = new pfs_pointer* [pointer_count];
 	fd_flags = new int[pointer_count];
+	mmap_list = 0;
 
 	for( i=0; i<pointer_count; i++ ) {
 		pointers[i] = 0;
@@ -82,6 +79,15 @@ pfs_table::~pfs_table()
 	for(int i=0;i<pointer_count;i++) {
 		this->close(i);
 	}
+
+	pfs_mmap *m;
+
+	while(mmap_list) {
+		m = mmap_list;
+		mmap_list = m->next;
+		delete m;
+	}
+
 	delete [] pointers;
 	delete [] fd_flags;
 }
@@ -101,18 +107,35 @@ pfs_table * pfs_table::fork()
 
 	strcpy(table->working_dir,this->working_dir);
 
+	pfs_mmap *m;
+
+	for(m=mmap_list;m;m=m->next) {
+		pfs_mmap *n = new pfs_mmap(m);
+		n->next = table->mmap_list;
+		table->mmap_list = n;
+	}
+
 	return table;
 }
 
 void pfs_table::close_on_exec()
 {
 	int i;
+
 	for(i=0;i<pointer_count;i++) {
 		if(this->pointers[i]) {
 			if((this->fd_flags[i])&FD_CLOEXEC) {
 				this->close(i);
 			}
 		}
+	}
+
+	pfs_mmap *m;
+
+	while(mmap_list) {
+		m = mmap_list;
+		mmap_list = m->next;
+		delete m;
 	}
 }
 
@@ -308,17 +331,26 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 	pfs_name pname;
 	pfs_file *file=0;
 	int force_stream = pfs_force_stream;
-	int allow_gzip = 1;
 
-        /* Yes, this is a hack, but it is quite a valuable one. */
-        /* No need to make local copies if we are pushing files around. */
+	// Hack: Disable caching when doing plain old file copies.
+
         if(
                 !strcmp(pfs_current->name,"cp") ||
                 !strcmp(string_back(pfs_current->name,3),"/cp")
         ) {
                 force_stream = 1;
         }
-                                                                                                  
+
+	// Hack: Almost all calls to open a directory are routed
+	// through opendir(), which sets O_DIRECTORY.  In a few
+	// cases, such as the use of openat in pwd, the flag
+	// is not set, set we detect it here.
+
+	const char *basename = string_basename(lname);
+	if(!strcmp(basename,".") || !strcmp(basename,"..")) {
+		flags |= O_DIRECTORY;
+	}
+
 	if(resolve_name(lname,&pname)) {
 		if(flags&O_DIRECTORY) {
 			file = pname.service->getdir(&pname);
@@ -327,7 +359,6 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 		} else if(pname.service->is_seekable()) {
 			if(force_cache) {
 				file = pfs_cache_open(&pname,flags,mode);
-				allow_gzip = 0;
 			} else {
 				file = pname.service->open(&pname,flags,mode);
 			}
@@ -336,17 +367,10 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 				file = pname.service->open(&pname,flags,mode);
 			} else {
 				file = pfs_cache_open(&pname,flags,mode);
-				allow_gzip = 0;
 			}
 		}
 	} else {
 		file = 0;
-	}
-
-	if(file && pfs_auto_gzip && allow_gzip) {
-		if(string_match("*.gz",pname.logical_name)) {
-			file = pfs_gzip_open(file,flags,mode);
-		}
 	}
 
 	return file;
@@ -926,7 +950,7 @@ int pfs_table::fstat( int fd, struct pfs_stat *b )
 		pfs_file *file = pointers[fd]->file;
 		result = file->fstat(b);
 		if(result>=0) {
-			b->st_blksize = pfs_service_get_block_size();
+			b->st_blksize = file->get_block_size();
 		}
 	}
 
@@ -1237,6 +1261,158 @@ int pfs_table::truncate( const char *n, pfs_off_t offset )
 	return result;
 }
 
+ssize_t pfs_table::getxattr (const char *path, const char *name, void *value, size_t size)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname)) {
+		result = pname.service->getxattr(&pname,name,value,size);
+	}
+
+	return result;
+}
+
+ssize_t pfs_table::lgetxattr (const char *path, const char *name, void *value, size_t size)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname,false)) {
+		result = pname.service->lgetxattr(&pname,name,value,size);
+	}
+
+	return result;
+}
+
+ssize_t pfs_table::fgetxattr (int fd, const char *name, void *value, size_t size)
+{
+	int result;
+
+	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
+		errno = EBADF;
+		result = -1;
+	} else {
+		result = pointers[fd]->file->fgetxattr(name,value,size);
+	}
+
+	return result;
+}
+
+ssize_t pfs_table::listxattr (const char *path, char *list, size_t size)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname)) {
+		result = pname.service->listxattr(&pname,list,size);
+	}
+
+	return result;
+}
+
+ssize_t pfs_table::llistxattr (const char *path, char *list, size_t size)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname,false)) {
+		result = pname.service->llistxattr(&pname,list,size);
+	}
+
+	return result;
+}
+
+ssize_t pfs_table::flistxattr (int fd, char *list, size_t size)
+{
+	int result;
+
+	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
+		errno = EBADF;
+		result = -1;
+	} else {
+		result = pointers[fd]->file->flistxattr(list,size);
+	}
+
+	return result;
+}
+
+int pfs_table::setxattr (const char *path, const char *name, const void *value, size_t size, int flags)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname)) {
+		result = pname.service->setxattr(&pname,name,value,size,flags);
+	}
+
+	return result;
+}
+
+int pfs_table::lsetxattr (const char *path, const char *name, const void *value, size_t size, int flags)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname,false)) {
+		result = pname.service->lsetxattr(&pname,name,value,size,flags);
+	}
+
+	return result;
+}
+
+int pfs_table::fsetxattr (int fd, const char *name, const void *value, size_t size, int flags)
+{
+	int result;
+
+	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
+		errno = EBADF;
+		result = -1;
+	} else {
+		result = pointers[fd]->file->fsetxattr(name,value,size,flags);
+	}
+
+	return result;
+}
+
+int pfs_table::removexattr (const char *path, const char *name)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname)) {
+		result = pname.service->removexattr(&pname,name);
+	}
+
+	return result;
+}
+
+int pfs_table::lremovexattr (const char *path, const char *name)
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(path,&pname,false)) {
+		result = pname.service->lremovexattr(&pname,name);
+	}
+
+	return result;
+}
+
+int pfs_table::fremovexattr (int fd, const char *name)
+{
+	int result;
+
+	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
+		errno = EBADF;
+		result = -1;
+	} else {
+		result = pointers[fd]->file->fremovexattr(name);
+	}
+
+	return result;
+}
+
 int pfs_table::utime( const char *n, struct utimbuf *buf )
 {
 	pfs_name pname;
@@ -1270,7 +1446,7 @@ int pfs_table::stat( const char *n, struct pfs_stat *b )
 	if(resolve_name(n,&pname)) {
 		result = pname.service->stat(&pname,b);
 		if(result>=0) {
-			b->st_blksize = pfs_service_get_block_size();
+			b->st_blksize = pname.service->get_block_size();
 		} else if(errno==ENOENT && !pname.hostport[0]) {
 			pfs_service_emulate_stat(&pname,b);
 			b->st_mode = S_IFDIR | 0555;
@@ -1301,7 +1477,7 @@ int pfs_table::lstat( const char *n, struct pfs_stat *b )
 	if(resolve_name(n,&pname,false)) {
 		result = pname.service->lstat(&pname,b);
 		if(result>=0) {
-			b->st_blksize = pfs_service_get_block_size();
+			b->st_blksize = pname.service->get_block_size();
 		} else if(errno==ENOENT && !pname.hostport[0]) {
 			pfs_service_emulate_stat(&pname,b);
 			b->st_mode = S_IFDIR | 0555;
@@ -1552,230 +1728,6 @@ int pfs_table::whoami( const char *n, char *buf, int length )
 	return result;
 }
 
-static int search_to_access (int flags)
-{
-	int access_flags = F_OK;
-	if (flags & PFS_SEARCH_R_OK)
-		access_flags |= R_OK;
-	if (flags & PFS_SEARCH_W_OK)
-		access_flags |= W_OK;
-	if (flags & PFS_SEARCH_X_OK)
-		access_flags |= X_OK;
-    return access_flags;
-}
-
-static int search_directory (pfs_table *t, unsigned level, const char *base, char *dir, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, size_t *i, size_t *j, int flags)
-{
-	if (level == 0)
-		return 0;
-
-    int fnmatch_flags = flags & PFS_SEARCH_PERIOD ? FNM_PATHNAME | FNM_PERIOD : FNM_PATHNAME;
-	int found = 0;
-	char *current = dir+strlen(dir); /* point to end to current directory */
-	int fd;
-	if ((fd = t->open(dir, O_DIRECTORY|O_RDONLY, 0, 0))) {
-		struct dirent *entry;
-		while ((entry = t->fdreaddir(fd))) {
-			const char *name = entry->d_name;
-			int r;
-			struct pfs_stat buf;
-
-			if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
-
-			sprintf(current, "/%s", name);
-			r = t->stat(dir, &buf);
-			if (((flags & PFS_SEARCH_RECURSIVE) && fnmatch(pattern, current, fnmatch_flags) == 0) || ((~flags & PFS_SEARCH_RECURSIVE) && fnmatch(pattern, base, fnmatch_flags) == 0)) {
-				const char *matched;
-				int access_flags = search_to_access(flags);
-
-				if (flags & PFS_SEARCH_INCLUDEROOT)
-					matched = dir;
-				else
-					matched = base;
-				size_t l = strlen(matched);
-
-				if (l+*i+2 >= len1) { /* +2 for terminating 2 NUL bytes */
-					errno = ERANGE;
-					return -1;
-				} else if (t->access(dir, access_flags) == 0) {
-					if (*i == 0) {
-						sprintf(buffer+*i, "%s", matched);
-						*i += l;
-                    } else {
-						sprintf(buffer+*i, ":%s", matched);
-						*i += l+1;
-                    }
-
-					if (stats && flags & PFS_SEARCH_METADATA) {
-						if (*j == len2) {
-							errno = ERANGE;
-							return -1;
-						} else {
-							COPY_STAT(buf, stats[*j]);
-							*j += 1;
-						}
-					}
-					if (flags & PFS_SEARCH_STOPATFIRST) {
-						return 1;
-					}
-					else
-						found += 1;
-				}
-			}
-
-			if (r == 0 && S_ISDIR(buf.st_mode)) {
-				int result = search_directory(t, level-1, base, dir, pattern, buffer, len1, stats, len2, i, j, flags);
-				if (result == -1)
-					return -1;
-				else if (flags & PFS_SEARCH_STOPATFIRST && result == 1) {
-					return 1;
-				}
-				else
-					found += result;
-			}
-			*current = '\0'; /* clear current entry */
-		}
-		t->close(fd);
-	}
-
-	return found;
-}
-
-static int is_pattern (const char *pattern)
-{
-	for (; *pattern; pattern += 1) {
-		switch (*pattern) {
-			case '\\':
-#if 0
-				/* we need to change the pattern to remove the backslashes
-				 * so we can do exact matches, future work.
-				 */
-				pattern += 1;
-				if (*pattern == '\0') {
-					return 0;
-                }
-				break;
-#endif
-			case '*':
-			case '?':
-			case '[':
-				return 1;
-			case '"':
-			case '\'':
-			{
-              /*
-				const char quote = *pattern;
-                quote = quote;
-              */
-				/* quoting behavior isn't very clear... */
-			}
-			default:
-				break;
-		}
-	}
-	return 0;
-}
-
-int pfs_table::search( const char *paths, const char *patt, char *buffer, size_t len1, struct stat *stats, size_t len2, int flags )
-{
-	unsigned level = 0;
-	const char *s;
-	const char *start = paths;
-	const char *end;
-	char pattern[PFS_PATH_MAX+1];
-	size_t i = 0, j = 0;
-	int found = 0;
-	int result;
-	int exact_match = 0;
-
-	for (s = patt; *s == '/'; s++) ; /* remove leading slashes from pattern */
-	sprintf(pattern, "/%s", s); /* add leading slash for base directory */
-
-	if (!is_pattern(pattern))
-		exact_match = 1;
-
-	if (flags & PFS_SEARCH_RECURSIVE) {
-		level = PFS_SEARCH_DEPTH_MAX;
-	} else {
-		for (s = strchr(pattern, '/'); s; s = strchr(s+1, '/')) level++; /* count the number of nested directories to descend at maximum */
-	}
-
-	int done = 0;
-	do {
-		char path[PFS_PATH_MAX+1];
-		char directory[PFS_PATH_MAX+1];
-		end = strchr(start, PFS_SEARCH_DELIMITER);
-		if (end) {
-			if (start == end) { /* "::" ? */
-				strcpy(path, ".");
-            } else {
-                ptrdiff_t length = end-start; /* C++ doesn't let us properly cast these to void pointers for proper byte length */
-                memset(path, 0, sizeof(path));
-				strncpy(path, start, length);
-            }
-			start = end+1;
-		} else {
-			strcpy(path, start);
-			done = 1;
-		}
-
-		string_collapse_path(path, directory, 0);
-
-		if (exact_match) {
-			struct pfs_stat buf;
-			int access_flags = search_to_access(flags);
-			const char *base = directory+strlen(directory);
-
-			strcat(directory, pattern);
-			result = this->stat(directory, &buf);
-			if (result == 0) {
-				const char *matched;
-				if (flags & PFS_SEARCH_INCLUDEROOT)
-					matched = directory;
-				else
-					matched = base;
-				size_t l = strlen(matched);
-
-				if (l+i+2 >= len1) { /* +2 for terminating 2 NUL bytes */
-					errno = ERANGE;
-					return -1;
-				} else if (this->access(directory, access_flags) == 0) {
-					if (i == 0) {
-						sprintf(buffer+i, "%s", matched);
-						i += l;
-                    } else {
-						sprintf(buffer+i, ":%s", matched);
-						i += l+1;
-                    }
-
-					if (stats && flags & PFS_SEARCH_METADATA) {
-						if (j == len2) {
-							errno = ERANGE;
-							return -1;
-						} else {
-							COPY_STAT(buf, stats[j]);
-							j += 1;
-						}
-					}
-					result = 1;
-				}
-			} else {
-                result = 0;
-            }
-		} else {
-			result = search_directory(this, level, directory+strlen(directory), directory, pattern, buffer, len1, stats, len2, &i, &j, flags);
-		}
-		if (result == -1)
-			return -1;
-		else if (flags & PFS_SEARCH_STOPATFIRST && result == 1) {
-			return result;
-		} else
-			found += result;
-	} while (!done);
-
-    return found;
-}
-
 int pfs_table::getacl( const char *n, char *buf, int length )
 {
 	pfs_name pname;
@@ -1871,7 +1823,8 @@ pfs_ssize_t pfs_table::copyfile_slow( const char *source, const char *target )
 	pfs_stat info;
 	pfs_ssize_t total, ractual, wactual;
 	void *buffer;
-	int buffer_size = pfs_service_get_block_size();
+	int buffer_size;
+
 	int result;
 
 	sourcefile = open_object(source,O_RDONLY,0,0);
@@ -1898,6 +1851,7 @@ pfs_ssize_t pfs_table::copyfile_slow( const char *source, const char *target )
 		return -1;
 	}
 
+	buffer_size = MAX(sourcefile->get_block_size(),targetfile->get_block_size());
 	buffer = malloc(buffer_size);
 
 	total = 0;
@@ -1953,13 +1907,14 @@ int pfs_table::md5_slow( const char *path, unsigned char *digest )
 	md5_context_t context;
 	pfs_file *file;
 	unsigned char *buffer;
-	int buffer_size = pfs_service_get_block_size();
+	int buffer_size;
 	pfs_off_t total=0;
 	int result;
 
 	file = open_object(path,O_RDONLY,0,0);
 	if(!file) return -1;
 
+	buffer_size = file->get_block_size();
 	buffer = (unsigned char *)malloc(buffer_size);
 
 	md5_init(&context);
@@ -1984,4 +1939,188 @@ int pfs_table::md5_slow( const char *path, unsigned char *digest )
 	} else {
 		return -1;
 	}
+}
+
+void pfs_table::mmap_print()
+{
+	struct pfs_mmap *m;
+
+	debug(D_CHANNEL,"%12s %8s %8s %8s %4s %4s %s","address","length","foffset", "channel", "prot", "flag", "file");
+
+	for(m=mmap_list;m;m=m->next) {
+	  debug(D_CHANNEL,"%12x %8x %8x %8x %4x %4x %s",m->logical_addr,m->map_length,m->file_offset,m->channel_offset,m->prot,m->flags,m->file->get_name()->path);
+	}
+}
+
+static int load_file_to_channel( pfs_file *file, pfs_size_t length, pfs_size_t start, pfs_size_t blocksize )
+{
+	pfs_size_t data_left = length;
+	pfs_size_t offset = 0;
+	pfs_size_t chunk, actual;
+
+	while(data_left>0) {
+		chunk = MIN(data_left,blocksize);
+		actual = file->read(pfs_channel_base()+start+offset,chunk,offset);
+		if(actual>0) {
+			offset += actual;
+			data_left -= actual;
+		} else if(actual==0) {
+			memset(pfs_channel_base()+start+offset,0,data_left);
+			offset += data_left;
+			data_left = 0;
+		} else {
+			break;
+		}
+	}
+
+	if(data_left) {
+		debug(D_CHANNEL,"loading: failed: %s",strerror(errno));
+		return 0;
+	} else {
+		/*
+		we must invalidate the others' mapping of this file,
+		otherwise, they will see old data that was in this place.
+		*/
+		msync(pfs_channel_base()+start,length,MS_INVALIDATE|MS_SYNC);
+		return 1;
+	}
+}
+
+static int save_file_from_channel( pfs_file *file, pfs_size_t file_offset, pfs_size_t channel_offset, pfs_size_t map_length, pfs_size_t blocksize )
+{
+	pfs_size_t data_left = map_length;
+	pfs_size_t chunk, actual;
+
+	while(data_left>0) {
+		chunk = MIN(data_left,blocksize);
+		actual = file->write(pfs_channel_base()+channel_offset+file_offset,chunk,file_offset);
+		if(actual>0) {
+			file_offset += actual;
+			data_left -= actual;
+		} else {
+			break;
+		}
+	}
+
+	if(data_left) {
+		debug(D_CHANNEL,"writing: failed: %s",strerror(errno));
+		return 0;
+	}
+
+	return 1;
+}
+
+pfs_size_t pfs_table::mmap_create_object( pfs_file *file, pfs_size_t file_offset, pfs_size_t map_length, int prot, int flags )
+{
+	pfs_size_t channel_offset;
+	pfs_ssize_t file_length;
+
+	file_length = file->get_size();
+	if(file_length<0) return -1;
+
+	if(!pfs_channel_lookup(file->get_name()->path,&channel_offset)) {
+
+		if(!pfs_channel_alloc(file->get_name()->path,file_length,&channel_offset)) {
+			errno = ENOMEM;
+			return -1;
+		}
+
+		debug(D_CHANNEL,"%s loading to channel %llx size %llx",file->get_name()->path,channel_offset,file_length);
+
+		if(!load_file_to_channel(file,file_length,channel_offset,1024*1024)) {
+			pfs_channel_free(channel_offset);
+			return -1;
+		}
+	} else {
+		debug(D_CHANNEL,"%s cached at channel %llx",file->get_name()->path,channel_offset);
+	}
+
+	pfs_mmap *m;
+
+	m = new pfs_mmap( file, 0, channel_offset, map_length, file_offset, prot, flags );
+
+	m->next = mmap_list;
+	mmap_list = m;
+
+	return channel_offset;
+}
+
+pfs_size_t pfs_table::mmap_create( int fd, pfs_size_t file_offset, pfs_size_t map_length, int prot, int flags )
+{
+	return mmap_create_object(pointers[fd]->file,file_offset,map_length,prot,flags);
+}
+
+int pfs_table::mmap_update( pfs_size_t logical_addr, pfs_size_t channel_offset )
+{
+	if(mmap_list && !mmap_list->logical_addr) {
+		mmap_list->logical_addr = logical_addr;
+		return 0;
+	}
+
+	debug(D_NOTICE,"warning: mmap logical address (%llx) does not match any map with channel offset (%llx)",logical_addr,channel_offset);
+
+	errno = ENOENT;
+	return -1;
+}
+
+int pfs_table::mmap_delete( pfs_size_t logical_addr, pfs_size_t length )
+{
+	pfs_mmap *m, **p;
+
+	p = &mmap_list;
+
+	for(m=mmap_list;m;p=&m->next,m=m->next) {
+		if( logical_addr >= m->logical_addr && ( logical_addr < (m->logical_addr+m->map_length ) ) ) {
+
+			// Remove the map from the list.
+			*p = m->next;
+
+			// Write back the portion of the file that is mapped in.
+			if(m->flags&MAP_SHARED && m->prot&PROT_WRITE && m->file) {
+				save_file_from_channel(m->file,m->file_offset,m->channel_offset,m->map_length,1024*1024);
+			}
+
+			// If there is a fragment left over before the unmap, add it as a new map
+			// This will increase the reference count of both the file and the memory object.
+
+			if(logical_addr>m->logical_addr) {
+				mmap_create_object(
+					m->file,
+					m->file_offset,
+					logical_addr-m->logical_addr,
+					m->prot,
+					m->flags);
+				mmap_update(m->logical_addr,0);
+			}
+
+			// If there is a fragment left over after the unmap, add it as a new map
+			// This will increase the reference count of both the file and the memory object.
+
+			if((logical_addr+length) < (m->logical_addr+m->map_length)) {
+				mmap_create_object(
+					m->file,
+					m->file_offset+m->map_length-(m->logical_addr-logical_addr),
+					m->map_length - length - (logical_addr - m->logical_addr),
+					m->prot,
+					m->flags);
+				mmap_update(logical_addr+length,0);
+			}
+
+			// Decrement (and possibly free) the file in the channel.
+			pfs_channel_free(m->channel_offset);
+
+			// Delete the mapping, which may also delete the file object.
+			delete m;
+
+			return 0;
+		}
+	}
+
+	/*
+	It is quite common that an munmap will not match any existing mapping.
+	This happens particularly for anonymous mmaps, which are not recorded here.
+	In this case, simply return succcess;
+	*/
+	
+	return 0;
 }

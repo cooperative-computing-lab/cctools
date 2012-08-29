@@ -5,19 +5,22 @@ show_help()
         echo "Use: ec2_remove_workers [options] <num_workers>"
         echo "where options are:"
         echo "  -a                      Remove all running workers (EC2 instances)."
-	echo "  -i <image_id>           EC2 OS image ID of running workers. Default = ami-fa01f193."
+        echo "  -i <image_id>           EC2 OS image ID of running workers. Default = ami-fa01f193."
+        echo "  -r <reservation_id>     Restrict removed instances to this reservation ID."
         echo "  -h                      Show this help message."
         exit 1
 }
 
 remove_all=0
 image=ami-fa01f193
+reservation=
 
-while getopts i:ah opt 
+while getopts i:r:ah opt 
 do
         case "$opt" in
                 a)  remove_all=1;;
                 i)  image="$OPTARG";;
+                r)  reservation="$OPTARG";;
 		h)  show_help;;
                 \?) show_help;;
         esac
@@ -40,7 +43,13 @@ then
         exit 1
 fi
 
-running_instances=$(ec2-describe-instances | grep $image | grep running | wc -l)
+if [ $reservation ] 
+then
+	running_instances=$(ec2-describe-instances -F "reservation-id"=$reservation | grep running | wc -l)
+else
+	running_instances=$(ec2-describe-instances -F "image-id"=$image | grep running | wc -l)
+fi
+
 if [ ! -n "$running_instances" ];
 then
 	echo "No workers to remove."
@@ -56,10 +65,16 @@ fi
 
 for (( i=1; i<=$num_remove_instances; i++ ))
 do
-	instance=$(ec2-describe-instances | grep $image | grep running | awk 'NR==1{print $2}')
+	if [ $reservation ]
+	then
+		instance=$(ec2-describe-instances -F "reservation-id"=$reservation | grep running | awk 'NR==1{print $2}')
+	else
+		instance=$(ec2-describe-instances -F "image-id"=$image | grep running | awk 'NR==1{print $2}')
+	fi
+
 	if [ -n "$instance" ]; 
 	then
-        	$ec2remove $instance
+       	$ec2remove $instance
 		return_status=$?
 	fi
 done

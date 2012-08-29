@@ -16,5 +16,6 @@ See the file COPYING for details.
 */
 
 int delete_dir(const char *dir);
+int delete_dir_contents(const char *dir);
 
 #endif

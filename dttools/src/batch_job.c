@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "process.h"
 #include "stringtools.h"
 #include "timestamp.h"
+#include "xxmalloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,6 +44,8 @@ batch_queue_type_t batch_queue_type_from_string(const char *str)
 		return BATCH_QUEUE_TYPE_SGE;
 	if(!strcmp(str, "moab"))
 		return BATCH_QUEUE_TYPE_MOAB;
+	if(!strcmp(str, "torque"))
+		return BATCH_QUEUE_TYPE_TORQUE;
 	if(!strcmp(str, "cluster"))
 		return BATCH_QUEUE_TYPE_CLUSTER;
 	if(!strcmp(str, "local"))
@@ -77,6 +80,8 @@ const char *batch_queue_type_to_string(batch_queue_type_t t)
 		return "sge";
 	case BATCH_QUEUE_TYPE_MOAB:
 		return "moab";
+	case BATCH_QUEUE_TYPE_TORQUE:
+		return "torque";
 	case BATCH_QUEUE_TYPE_CLUSTER:
 		return "cluster";
 	case BATCH_QUEUE_TYPE_WORK_QUEUE:
@@ -104,7 +109,6 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	q->options_text = 0;
 	q->job_table = itable_create(0);
 	q->output_table = itable_create(0);
-	q->hadoop_jobs = NULL;
 
 	if(type == BATCH_QUEUE_TYPE_CONDOR)
 		q->logfile = strdup("condor.logfile");
@@ -133,20 +137,24 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 		q->mpi_queue = 0;
 	}
 	
-	if(type == BATCH_QUEUE_TYPE_SGE || type == BATCH_QUEUE_TYPE_MOAB || type == BATCH_QUEUE_TYPE_CLUSTER) {
+	if(type == BATCH_QUEUE_TYPE_SGE || type == BATCH_QUEUE_TYPE_MOAB || type == BATCH_QUEUE_TYPE_TORQUE || type == BATCH_QUEUE_TYPE_CLUSTER) {
 		batch_job_setup_cluster(q);
 	}
 
 	if(type == BATCH_QUEUE_TYPE_HADOOP) {
 		int fail = 0;
 
-	   if(!getenv("HADOOP_HOME")) {
-				debug(D_NOTICE, "error: environment variable HADOOP_HOME not set\n");
-				fail = 1;
-			}
+		if(!getenv("HADOOP_HOME")) {
+			debug(D_NOTICE, "error: environment variable HADOOP_HOME not set\n");
+			fail = 1;
+		}
 		if(!getenv("HDFS_ROOT_DIR")) {
-				debug(D_NOTICE, "error: environment variable HDFS_ROOT_DIR not set\n");
-				fail = 1;
+			debug(D_NOTICE, "error: environment variable HDFS_ROOT_DIR not set\n");
+			fail = 1;
+		}
+		if(!getenv("HADOOP_USER_TMP")) {
+			debug(D_NOTICE, "error: environment variable HADOOP_USER_TMP not set\n");
+			fail = 1;
 		}
 		if(!getenv("HADOOP_PARROT_PATH")) {
 			/* Note: HADOOP_PARROT_PATH is the path to Parrot on the remote node, not on the local machine. */
@@ -158,10 +166,6 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 			batch_queue_delete(q);
 			return 0;
 		}
-
-		q->hadoop_jobs = itable_create(0);
-	} else {
-		q->hadoop_jobs = NULL;
 	}
 
 	return q;
@@ -180,8 +184,6 @@ void batch_queue_delete(struct batch_queue *q)
 			free(q->logfile);
 		if(q->work_queue)
 			work_queue_delete(q->work_queue);
-		if(q->hadoop_jobs)
-			itable_delete(q->hadoop_jobs);
 		free(q);
 	}
 }
@@ -200,10 +202,18 @@ void batch_queue_set_options(struct batch_queue *q, const char *options_text)
 	}
 
 	if(options_text) {
-		q->options_text = strdup(options_text);
+		q->options_text = xxstrdup(options_text);
 	} else {
-		q->options_text = 0;
+		q->options_text = NULL;
 	}
+}
+
+char *batch_queue_options(struct batch_queue *q)
+{
+    if (q->options_text)
+    	return xxstrdup(q->options_text);
+    else
+    	return NULL;
 }
 
 batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
@@ -218,6 +228,8 @@ batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const ch
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
 		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
+	} else if(q->type == BATCH_QUEUE_TYPE_TORQUE) {
 		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
 		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
@@ -247,6 +259,8 @@ batch_job_id_t batch_job_submit_simple(struct batch_queue * q, const char *cmd, 
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
 		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
+	} else if(q->type == BATCH_QUEUE_TYPE_TORQUE) {
 		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
 	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
 		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
@@ -282,6 +296,8 @@ batch_job_id_t batch_job_wait_timeout(struct batch_queue * q, struct batch_job_i
 		return batch_job_wait_cluster(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
 		return batch_job_wait_cluster(q, info, stoptime);
+	} else if(q->type == BATCH_QUEUE_TYPE_TORQUE) {
+		return batch_job_wait_cluster(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
 		return batch_job_wait_cluster(q, info, stoptime);
 	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
@@ -310,6 +326,8 @@ int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid)
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
 		return batch_job_remove_cluster(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
+		return batch_job_remove_cluster(q, jobid);
+	} else if(q->type == BATCH_QUEUE_TYPE_TORQUE) {
 		return batch_job_remove_cluster(q, jobid);
 	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
 		return batch_job_remove_cluster(q, jobid);

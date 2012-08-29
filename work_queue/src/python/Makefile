@@ -12,7 +12,7 @@ all: work_queue.py _work_queue.${CCTOOLS_DYNAMIC_SUFFIX}
 
 work_queue_wrap.c work_queue.py: ../work_queue.i work_queue.binding.py
 	@echo "SWIG work_queue.i (python)"
-	@swig -python -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c ../work_queue.i
+	@${CCTOOLS_SWIG} -python -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c ../work_queue.i
 	@cat work_queue.binding.py >> work_queue.py
 
 work_queue_wrap.o: work_queue_wrap.c
@@ -21,7 +21,7 @@ work_queue_wrap.o: work_queue_wrap.c
 # The odd symlink in the following rule is necessary to overcome a problem
 # in the framework search path emitted by the Python configuration on macOS.
 
-_work_queue.${CCTOOLS_DYNAMIC_SUFFIX}: work_queue_wrap.o
+_work_queue.${CCTOOLS_DYNAMIC_SUFFIX}: work_queue_wrap.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
 	@ln -sf /System/Library/Frameworks/Python.framework . 
 	${CCTOOLS_LD} ${CCTOOLS_DYNAMIC_FLAG} $< -o $@ ${CCTOOLS_INTERNAL_LDFLAGS} ${ldflags}
 	@rm Python.framework
@@ -34,6 +34,9 @@ clean:
 	rm -fr Python.framework _work_queue.${CCTOOLS_DYNAMIC_SUFFIX} work_queue.py work_queue_wrap.* *.pyc
 
 install: all
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON_VERSION}/site-packages
-	install _work_queue.${CCTOOLS_DYNAMIC_SUFFIX} ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON_VERSION}/site-packages
-	install  work_queue.py ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON_VERSION}/site-packages
+	chmod 755 work_queue_example.py
+	cp _work_queue.${CCTOOLS_DYNAMIC_SUFFIX} ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON_VERSION}/site-packages
+	cp work_queue.py ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON_VERSION}/site-packages
+	cp work_queue_example.py ${CCTOOLS_INSTALL_DIR}/doc/work_queue_example.py

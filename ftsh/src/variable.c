@@ -5,7 +5,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "buffer.h"
 #include "ftsh_error.h"
 #include "list.h"
@@ -115,15 +115,15 @@ static char * variable_print_argv( int withquotes )
 	char *result=0;
 	int i;
 
-	result = xstrdup("");
+	result = xxstrdup("");
 
 	for(i=1;i<head->argc;i++) {
-		result = string_combine(result,xstrdup(head->argv[i]));
+		result = string_combine(result,xxstrdup(head->argv[i]));
 		if(i!=(head->argc-1)) {
 			if(withquotes) {
-				result = string_combine(result,xstrdup("\" \""));
+				result = string_combine(result,xxstrdup("\" \""));
 			} else {
-				result = string_combine(result,xstrdup(" "));
+				result = string_combine(result,xxstrdup(" "));
 			}
 		}
 	}
@@ -138,23 +138,23 @@ static char * variable_get( const char *name, int line, int withquotes )
 
 	if(!strcmp(name,"$")) {
 		sprintf(buffer,"%d",(int)getpid());
-		return xstrdup(buffer);
+		return xxstrdup(buffer);
 	} else if(!strcmp(name,"#")) {
 		sprintf(buffer,"%d",head->argc-1);
-		return xstrdup(buffer);
+		return xxstrdup(buffer);
 	} else if(!strcmp(name,"@")) {
 		return variable_print_argv(withquotes);
 	} else if(!strcmp(name,"*")) {
 		return variable_print_argv(0);
 	} else if( sscanf(name,"%d",&arg)==1 ) {
 		if(arg>=head->argc) {
-			return xstrdup("");
+			return xxstrdup("");
 		} else {
-			return xstrdup(head->argv[arg]);
+			return xxstrdup(head->argv[arg]);
 		}
 	} else if( isvalid(name) ) {
 		char *result = getenv(name);
-		if(result) return xstrdup(result);
+		if(result) return xxstrdup(result);
 		result = buffer_load(name);
 		if(result) string_chomp(result);
 		return result;
@@ -239,7 +239,7 @@ char * variable_subst( char *value, int line )
 		*end = oldend;
 
 		if(!subvalue) {
-			subvalue = xstrdup("");
+			subvalue = xxstrdup("");
 		}
  
 		length = strlen(value) - (end-dollar) + strlen(subvalue) + 1;

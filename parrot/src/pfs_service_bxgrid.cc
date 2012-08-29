@@ -15,7 +15,7 @@ extern "C" {
 #include "domain_name.h"
 #include "hash_table.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 }
 
 #include <string.h>
@@ -279,13 +279,13 @@ struct bxgrid_replica_list * bxgrid_lookup_replica_list( MYSQL *mysql_cxn, const
 		replica_list->replicas = (char **)xxmalloc(sizeof(char *) * replica_list->nreplicas);
 		for (int i = 0; i < replica_list->nreplicas; i++) {
 			BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
-			replica_list->replicas[i] = xstrdup(rep_row[0]);
+			replica_list->replicas[i] = xxstrdup(rep_row[0]);
 			debug(D_BXGRID, "= %s", replica_list->replicas[i]);
 
 			if (bxgrid_cache_rtol_query) {
 				replica_location = (struct bxgrid_replica_location *)xxmalloc(sizeof(struct bxgrid_replica_location));
-				replica_location->host = xstrdup(rep_row[1]);
-				replica_location->path = xstrdup(rep_row[2]);
+				replica_location->host = xxstrdup(rep_row[1]);
+				replica_location->path = xxstrdup(rep_row[2]);
 				hash_table_insert(bxgrid_rtol_query_cache, replica_list->replicas[i], replica_location);
 			}
 		}
@@ -389,8 +389,8 @@ int bxgrid_lookup_replica_location( MYSQL *mysql_cxn, const char *replicaid, cha
 			BXGRID_FETCH_AND_CHECK(rep_row, rep_res, -1);
 
 			replica_location = (struct bxgrid_replica_location *)xxmalloc(sizeof(struct bxgrid_replica_location));
-			replica_location->host = xstrdup(rep_row[0]);
-			replica_location->path = xstrdup(rep_row[1]);
+			replica_location->host = xxstrdup(rep_row[0]);
+			replica_location->path = xxstrdup(rep_row[1]);
 			hash_table_insert(bxgrid_rtol_query_cache, replicaid, replica_location);
 			mysql_free_result(rep_res);
 		}

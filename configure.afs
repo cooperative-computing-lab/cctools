@@ -1,0 +1,38 @@
+#!/bin/sh
+
+EXTERNAL="/afs/nd.edu/user37/ccl/software/external"
+
+# Taken from /afs/nd.edu/user37/ccl/software/scripts/cctools_export
+
+function detect_packages()
+{
+    unset GLOBUS_LOCATION
+    export GLOBUS_LOCATION
+    
+    echo -n "Detecting packages ..."
+
+    PACKAGES_CONFIG=""
+    for package in fuse irods mysql hdfs python globus openmpi swig xrootd cvmfs
+    do
+        if [ -d $EXTERNAL/$package/`sys` ]; then
+            echo -n " $package"
+            if [ $package = openmpi ]; then
+                PACKAGES_CONFIG="$PACKAGES_CONFIG --with-mpi-path $EXTERNAL/$package"
+            else
+                PACKAGES_CONFIG="$PACKAGES_CONFIG --with-$package-path $EXTERNAL/$package"
+            fi
+            if [ $package = hdfs ]
+            then
+                export JAVA_HOME=$EXTERNAL/java/jdk
+            fi
+        fi
+    done
+
+    echo ""
+}
+
+detect_packages
+
+./configure --strict $PACKAGES_CONFIG $@
+
+# vim: set sts=4 sw=4 ts=8 expandtab ft=sh:

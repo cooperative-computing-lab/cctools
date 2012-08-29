@@ -5,9 +5,13 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "debug.h"
 #include "stringtools.h"
 #include "timestamp.h"
+#include "xxmalloc.h"
 
+#include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -19,6 +23,30 @@ See the file COPYING for details.
 
 #define STRINGTOOLS_BUFFER_SIZE 256
 #define METRIC_POWER_COUNT 6
+
+char *escape_shell_string(const char *str)
+{
+	if(str == NULL)
+		str = "";
+	char *escaped_string = malloc(strlen(str) * 3 + 1);
+	if(escaped_string == NULL)
+		return NULL;
+	const char *old = str;
+	char *current = escaped_string;
+	strcpy(current, "'");
+	current += 1;
+	for(; *old; old++) {
+		if(*old == '\'') {
+			strcpy(current, "'\\''");
+			current += 3;
+		} else {
+			*current = *old;
+			current += 1;
+		}
+	}
+	strcpy(current, "'");
+	return escaped_string;
+}
 
 void string_from_ip_address(const unsigned char *bytes, char *str)
 {
@@ -89,11 +117,12 @@ void string_chomp(char *start)
 int whole_string_match_regex(const char *text, char *pattern)
 {
 	char *new_pattern;
+	int result;
 
 	if(!pattern || !text)
 		return 0;
 
-	new_pattern = (char *) malloc(sizeof(char) * (strlen(pattern) + 2));
+	new_pattern = (char *) malloc(sizeof(char) * (strlen(pattern) + 3));
 	if(!new_pattern)
 		return 0;
 
@@ -104,7 +133,10 @@ int whole_string_match_regex(const char *text, char *pattern)
 	if(text[strlen(pattern) - 1] != '$')
 		strncat(new_pattern, "$", 1);
 
-	return string_match_regex(text, new_pattern);
+	result = string_match_regex(text, new_pattern);
+	free(new_pattern);
+
+	return result;
 }
 
 
@@ -481,8 +513,16 @@ char *string_subst(char *value, string_subst_lookup_t lookup, void *arg)
 		if(!dollar)
 			return value;
 
-		while(dollar > value && *(dollar - 1) == '\\') {
-			dollar = strchr(dollar + 1, '$');
+		while(dollar > value) {
+			if(*(dollar - 1) == '\\') {
+				dollar = strchr(dollar + 1, '$');
+			} else if(*(dollar + 1) == '$') {
+				*dollar = ' ';
+				dollar = strchr(dollar + 2, '$');
+			} else {
+				break;
+			}
+			
 			if(!dollar)
 				return value;
 		}
@@ -865,3 +905,90 @@ int getDateString(char *str)
 	else
 		return 1;
 }
+
+char *string_format(const char *fmt, ...)
+{
+	va_list va;
+
+	va_start(va, fmt);
+	int n = vsnprintf(NULL, 0, fmt, va);
+	va_end(va);
+
+	if(n < 0)
+		return NULL;
+
+	char *str = xxmalloc((n + 1) * sizeof(char));
+	va_start(va, fmt);
+	n = vsnprintf(str, n + 1, fmt, va);
+	assert(n >= 0);
+	va_end(va);
+
+	return str;
+}
+
+char *string_getcwd(void)
+{
+	char *result = NULL;
+	size_t size = 1024;
+	result = xxrealloc(result, size);
+
+	while(getcwd(result, size) == NULL) {
+		if(errno == ERANGE) {
+			size *= 2;
+			result = xxrealloc(result, size);
+		} else {
+			fatal("couldn't getcwd: %s", strerror(errno));
+			return NULL;
+		}
+	}
+	return result;
+}
+
+char *string_trim(char *s, int func(int))
+{
+	char *p;
+
+	/* Skip front */
+	while (func(*s))
+		s++;
+
+	/* Skip back */
+	p = s + strlen(s) - 1;
+	while (func(*p))
+		p--;
+
+	/* Terminate string */
+	*(p + 1) = 0;
+
+	return s;
+}
+
+char *string_trim_spaces(char *s)
+{
+	return string_trim(s, isspace);
+}
+
+char *string_trim_quotes(char *s)
+{
+	char *front, *back;
+
+	front = s;
+	back  = s + strlen(s) - 1;
+
+	while (*front == '\'' || *front == '"') {
+		if (*back != *front)
+			break;
+		*back = 0;
+		back--;
+		front++;
+	}
+
+	return front;
+}
+
+int string_istrue(char *s)
+{
+	return (strcasecmp(s, "true") == 0) || (strcasecmp(s, "yes") == 0) || (atoi(s) > 0);
+}
+
+/* vim: set sts=8 sw=8 ts=8 ft=c: */

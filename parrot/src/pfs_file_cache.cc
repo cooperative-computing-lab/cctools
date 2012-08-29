@@ -7,7 +7,6 @@ See the file COPYING for details.
 
 #include "pfs_file.h"
 #include "pfs_file_cache.h"
-#include "pfs_file_gzip.h"
 #include "pfs_service.h"
 
 extern "C" {
@@ -32,7 +31,6 @@ extern "C" {
 
 extern struct file_cache *pfs_file_cache;
 extern int pfs_session_cache;
-extern int pfs_auto_gzip;
 extern int pfs_master_timeout;
 
 static struct hash_table * not_found_table = 0;
@@ -226,12 +224,6 @@ pfs_file * pfs_cache_open( pfs_name *name, int flags, mode_t mode )
 	} else {
 		rfile = name->service->open(name,O_RDONLY,0);
 		ok_to_fail = 0;
-	}
-
-	if(rfile && pfs_auto_gzip) {
-		if(string_match("*.gz",name->logical_name)) {
-			rfile = pfs_gzip_open(rfile,flags,mode);
-		}
 	}
 
 	if(rfile) {

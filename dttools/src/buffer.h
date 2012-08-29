@@ -39,7 +39,7 @@ void buffer_delete(buffer_t * b);
   */
 int buffer_vprintf(buffer_t * b, const char *format, va_list ap);
 
-/** Print the formatted output to the buffer. The format string follows the
+/** Appends the formatted output to the buffer. The format string follows the
     same semantics as the UNIX vprintf function.
     @param b The buffer to fill.
     @param format The format string.

@@ -67,6 +67,4 @@ int chirp_acl_init_copy(const char *path);
 int chirp_acl_init_reserve(const char *path, const char *subject);
 int chirp_acl_whoami(const char *subject, char **esubject);
 
-int is_a_directory(const char *filename);
-
 #endif

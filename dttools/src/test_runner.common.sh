@@ -13,7 +13,8 @@ dispatch()
 	clean $@
 	;;
 	*)
-	echo unknown command: $1
+	echo "unknown command: $1"
+	echo "use: $0 [prepare|run|clean]"
 	;;
     esac
 

@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "pfs_types.h"
 #include "pfs_refcount.h"
 #include "pfs_name.h"
+#include "pfs_mmap.h"
 
 class pfs_file;
 class pfs_pointer;
@@ -83,6 +84,20 @@ public:
 	int	rmdir( const char *path );
 	struct dirent * fdreaddir( int fd );
 
+    /* extended attributes */
+	ssize_t getxattr (const char *path, const char *name, void *value, size_t size);
+	ssize_t lgetxattr (const char *path, const char *name, void *value, size_t size);
+	ssize_t fgetxattr (int fd, const char *name, void *value, size_t size);
+	ssize_t listxattr (const char *path, char *list, size_t size);
+	ssize_t llistxattr (const char *path, char *list, size_t size);
+	ssize_t flistxattr (int fd, char *list, size_t size);
+	int setxattr (const char *path, const char *name, const void *value, size_t size, int flags);
+	int lsetxattr (const char *path, const char *name, const void *value, size_t size, int flags);
+	int fsetxattr (int fd, const char *name, const void *value, size_t size, int flags);
+	int removexattr (const char *path, const char *name);
+	int lremovexattr (const char *path, const char *name);
+	int fremovexattr (int fd, const char *name);
+
 	/* custom Parrot syscalls */
 	int	mkalloc( const char *path, pfs_ssize_t size, mode_t mode );
 	int	lsalloc( const char *path, char *alloc_path, pfs_ssize_t *total, pfs_ssize_t *inuse );
@@ -94,7 +109,6 @@ public:
 	pfs_ssize_t copyfile_slow( const char *source, const char *target );
 	int	md5( const char *path, unsigned char *digest );
 	int	md5_slow( const char *path, unsigned char *digest );
-	int search( const char *paths, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, int flags );
 	
 	/* network operations */
 	int	socket( int domain, int type, int protocol );
@@ -103,6 +117,13 @@ public:
 
 	void	follow_symlink( struct pfs_name *pname, int depth = 0 );
 	int	resolve_name( const char *cname, pfs_name *pname, bool do_follow_symlink = true, int depth = 0 );
+
+	/* mmap operations */
+	pfs_size_t mmap_create_object( pfs_file *file, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
+	pfs_size_t mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
+	int	   mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
+	int	   mmap_delete( pfs_size_t logical_address, pfs_size_t length );
+	void       mmap_print();
 
 	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );
 
@@ -121,6 +142,8 @@ private:
 	pfs_pointer **pointers;
 	int         *fd_flags;
 	char        working_dir[PFS_PATH_MAX];
+	pfs_mmap    *mmap_list;
+
 };
 
 #endif

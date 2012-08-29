@@ -35,10 +35,16 @@ public:
 	virtual void * mmap( void *start, pfs_size_t length, int prot, int flags, pfs_off_t offset );
 	virtual struct dirent * fdreaddir( pfs_off_t offset, pfs_off_t *next_offset );
 
+	virtual ssize_t fgetxattr( const char *name, void *data, size_t size );
+	virtual ssize_t flistxattr( char *list, size_t size );
+	virtual int fsetxattr( const char *name, const void *data, size_t size, int flags );
+	virtual int fremovexattr( const char *name );
+
 	virtual pfs_ssize_t get_size();
 	virtual pfs_name *get_name();
 	virtual int get_real_fd();
 	virtual int get_local_name( char *n );
+	virtual int get_block_size();
 	virtual int is_seekable();
 	virtual pfs_off_t get_last_offset();
 	virtual void set_last_offset( pfs_off_t offset );

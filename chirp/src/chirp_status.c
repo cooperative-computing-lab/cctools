@@ -6,6 +6,7 @@ See the file COPYING for details.
 */
 
 #include "catalog_query.h"
+#include "cctools.h"
 #include "nvpair.h"
 #include "link.h"
 #include "stringtools.h"
@@ -25,20 +26,15 @@ static int show_all_types = 0;
 static INT64_T minavail = 0;
 
 static struct nvpair_header headers[] = {
-	{"type", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
-	{"name", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 25},
-	{"port", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 5},
-	{"owner", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 10},
-	{"version", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
-	{"total", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
-	{"avail", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
+	{"type",   "TYPE",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
+	{"name",   "NAME",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 25},
+	{"port",   "PORT",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 5},
+	{"owner",  "OWNER",   NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 10},
+	{"version","VERSION", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
+	{"total",  "TOTAL",   NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
+	{"avail",  "AVAIL",   NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
 	{0,}
 };
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
 
 static void show_help(const char *cmd)
 {
@@ -128,7 +124,7 @@ int main(int argc, char *argv[])
 			debug_config_file_size(string_metric_parse(optarg));
 			break;
 		case 'v':
-			show_version(argv[0]);
+			cctools_version_print(stdout, argv[0]);
 			return 1;
 		case 's':
 			mode = MODE_SHORT;
@@ -145,6 +141,8 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(argc - optind == 0) {
 		// fine, keep going

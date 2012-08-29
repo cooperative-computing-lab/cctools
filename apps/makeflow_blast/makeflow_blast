@@ -1,0 +1,120 @@
+#! /usr/bin/env python
+
+# Copyright (C) 2011- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+#
+# This program generates makeflows to parallelize the 
+# popular blastall program.
+#
+
+import sys
+import re
+import string
+import getopt
+import subprocess
+import os
+
+def usage():
+	sys.stderr.write("Usage: makeflow_blast query_granularity character_granularity [blastall arguments]")
+	subprocess.call(["blastall"], stdout=sys.stderr)
+
+#In which global variables are used with abandon
+def count_splits():
+	FILE = open(query, "r")
+	num_chars = 0
+	num_queries = 0
+	num_jobs = 1
+	for line in FILE:
+		if(re.search('^>', line)):
+			if(num_queries > (int(query_gran) - 1) or num_chars > (int(char_gran) - 1) ):
+				num_jobs = num_jobs + 1
+				num_chars = 0
+				num_queries = 0
+			num_queries += 1
+		else:
+			num_chars += len(line)
+	FILE.close()
+	return num_jobs
+
+#In which global variables are used with abandon
+def check_blast( args=None ):
+	null = open(os.devnull, 'w')
+	TMPF = open("tmp", "w")
+	TMPF.write(">TestSeq\nATATATATTTCCCAGGTAGACCACACAGAGACAGATACACCACA\n")
+	TMPF.close()
+	blast_arguments = 'blastall ' + string.join(args)
+	blast_arguments = re.sub(query,"tmp",blast_arguments)
+	try:
+		subprocess.check_call(re.split("\s+",blast_arguments), stdout=null,stderr=null)
+	except subprocess.CalledProcessError, err:
+		return(1)
+	rm_path = os.curdir + "/tmp"
+	os.remove(rm_path)
+	os.remove(output)
+	null.close()
+	return(0)
+
+#Check input in a bunch of ways (getopt wont finish unless it recognizes all the flags, so we put in all the blast options as well
+options = None
+args = None
+try:
+	(options,args) = getopt.gnu_getopt(sys.argv,'p:d:i:e:m:o:F:G:E:X:I:q:r:v:b:f:g:Q:D:a:O:J:M:W:z:K:P:Y:S:T:l:U:y:Z:R:n:L:A:w:t:B:V:C:s:')
+except getopt.GetoptError, err:
+	usage()
+	sys.exit(1)
+
+query = None
+output = None
+database = None
+for o, a in options:
+	if o == "-i":
+		query = a
+	elif o == "-o":
+		output = a
+	elif o == "-d":
+		database = a
+		
+#Basically, do we have the things we need, and does blast know what to do with the rest of the things
+if (query == None or output == None or database == None or len(sys.argv) < 3 or check_blast(sys.argv[3:]) == 1) :
+	usage()
+	sys.exit(1)
+
+#Survived input validation
+query_gran = sys.argv[1]
+char_gran = sys.argv[2]
+blast_args = string.join(sys.argv[3:])
+inputlist = ""
+outputlist = ""
+errorlist = ""
+num_splits = count_splits()
+for i in range(num_splits):
+	inputlist = inputlist + "input." + str(i) + " "
+	outputlist = outputlist + "output." + str(i) + " "
+	errorlist = errorlist + "error." + str(i) + " "
+
+#Here we actually start generating the Makeflow
+#How to get inputs
+print str(inputlist) + ": " + query + " split_fasta"
+print "\tLOCAL python split_fasta " + query_gran + " " + char_gran + " " + query + "\n"
+
+#How to get outputs
+db_split = re.split("/",database)
+database = db_split[0]
+for i in range(num_splits):
+	temp_cmd= re.sub("-i\s*" + query,'-i input.'+str(i),blast_args)
+	temp_cmd= re.sub("-o\s*" + output,'-o output.'+str(i),temp_cmd)
+	print "output." + str(i) + " error." + str(i) + ": blastall input." + str(i) + " " + database 
+	print "\tblastall " + temp_cmd + " 2> error." + str(i) + "\n"
+
+#How to concatenate and cleanup outputs (very naive)
+print output + ": find cat " + outputlist
+print "\tLOCAL find . -maxdepth 1 -name 'output.*' -exec cat {} \\\\;> " + output + ";find . -maxdepth 1 -name 'output.*' -exec rm {} \\\\;\n"
+
+#How to concatenate and cleanup errors (very naive)
+print "error: find cat " + errorlist
+print "\tLOCAL find . -maxdepth 1 -name 'error.*' -exec cat {} \\\\;> error;find . -maxdepth 1 -name 'error.*' -exec rm {} \\\\;\n"
+
+#How to cleanup inputs (very naive)
+print "clean: find rm error " + output + " " + inputlist
+print "\tLOCAL find . -maxdepth 1 -name 'input.*' -exec rm {} \\\\; > clean\n"

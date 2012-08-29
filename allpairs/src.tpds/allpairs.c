@@ -38,7 +38,7 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "auth_all.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "list.h"
 #include "domain_name_cache.h"
 #include "md5.h"
@@ -70,11 +70,6 @@ static void show_help(const char *cmd)
 	printf(" -P <path>      Path for remote matrix metadata (default: /userid/matrixmeta/HOSTNAME_DATE_WorkloadID)\n");
 	printf(" -v             Show version string\n");
 	printf(" -h            Show this help screen\n");
-}
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
 }
 
 /* Cygwin does not have 64-bit I/O, while Darwin has it by default. */
@@ -120,7 +115,7 @@ static INT64_T do_put_one_dir( const char *source_file, const char *target_host,
 			while((d=readdir(dir))) {
 				if(!strcmp(d->d_name,".")) continue;
 				if(!strcmp(d->d_name,"..")) continue;
-				list_push_tail(work_list,xstrdup(d->d_name));
+				list_push_tail(work_list,xxstrdup(d->d_name));
 			}
 			closedir(dir);
 			while((name=list_pop_head(work_list))) {
@@ -701,11 +696,13 @@ int main(int argc, char** argv)
 	    exit(0);
 	    break;
 	case 'v':
-	    show_version(argv[0]);
+	    cctools_version_print(stdout, argv[0]);
 	    exit(0);
 	    break;
 	}
     }
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
     /*
       Declare and initialize indices for where on the command line certain required arguments are.

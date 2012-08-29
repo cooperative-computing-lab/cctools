@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <limits.h>
 
+#include "cctools.h"
 #include "memory_info.h"
 #include "debug.h"
 #include "macros.h"
@@ -45,11 +46,6 @@ static unsigned long get_mem_usage()
 	UINT64_T rss, total;
 	memory_usage_get(&rss, &total);
 	return rss / 1024;
-}
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
 }
 
 static void show_help(const char *cmd)
@@ -103,7 +99,7 @@ static void get_options(int argc, char **argv, const char *progname)
 			debug_flags_set(optarg);
 			break;
 		case 'v':
-			show_version(progname);
+			cctools_version_print(stdout, progname);
 			exit(0);
 		case 'h':
 			show_help(progname);
@@ -134,6 +130,8 @@ int main(int argc, char **argv)
 
 	debug_config(progname);
 	get_options(argc, argv, progname);
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	unsigned long start_mem, cand_mem, table_mem;
 

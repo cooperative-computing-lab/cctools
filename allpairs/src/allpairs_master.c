@@ -10,13 +10,14 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
+#include "cctools.h"
 #include "debug.h"
 #include "work_queue.h"
 #include "envtools.h"
 #include "text_list.h"
 #include "hash_table.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "macros.h"
 #include "envtools.h"
 #include "fast_popen.h"
@@ -42,11 +43,6 @@ static int xblock = 0;
 static int yblock = 0;
 static int xstop = 0;
 static int ystop = 0;
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
 
 static void show_help(const char *cmd)
 {
@@ -251,6 +247,8 @@ int main(int argc, char **argv)
 	struct work_queue *q;
 	int port = WORK_QUEUE_DEFAULT_PORT;
 
+	debug_config("allpairs_master");
+
 	extra_files_list = list_create();
 
 	while((c = getopt(argc, argv, "e:f:t:x:y:p:N:E:d:vh")) != (char) -1) {
@@ -283,7 +281,7 @@ int main(int argc, char **argv)
 			debug_flags_set(optarg);
 			break;
 		case 'v':
-			show_version(progname);
+			cctools_version_print(stdout, progname);
 			exit(0);
 			break;
 		case 'h':
@@ -295,6 +293,8 @@ int main(int argc, char **argv)
 			return 1;
 		}
 	}
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if((argc - optind) < 3) {
 		show_help(progname);

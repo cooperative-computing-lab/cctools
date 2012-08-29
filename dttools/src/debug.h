@@ -49,7 +49,7 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_TCP      0x000000100	/**< Debug TCP connections and disconnections. */
 #define D_AUTH     0x000000200	/**< Debug authentication and authorization actions. */
 #define D_IRODS    0x000000400	/**< Debug the iRODS module in Parrot. */
-#define D_LANDLORD 0x000000800	/**< Debug Landlord operations. */
+#define D_CVMFS    0x000000800	/**< Debug CVMFS module in Parrot. */
 #define D_HTTP     0x000001000	/**< Debug HTTP queries. */
 #define D_FTP      0x000002000	/**< Debug FTP operations. */
 #define D_NEST     0x000004000	/**< Debug the NEST module in Parrot. */
@@ -74,12 +74,13 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_USER	   0x200000000LL  /**< Debug custom user application. */
 #define D_XROOTD   0x400000000LL  /**< Debug Xrootd module in Parrot */
 #define D_MPI      0x800000000LL  /**< Debug MPI module for Makeflow */
+#define D_BATCH   0x1000000000LL  /**< Debug batch_job modules */
 
 /** Debug all remote I/O operations. */
-#define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID|D_XROOTD)
+#define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID|D_XROOTD|D_CVMFS)
 
 /** Show all debugging info. */
-#define D_ALL      0xfffffffffLL
+#define D_ALL      ~(0LL)
 
 /*
 It turns out that many libraries and tools make use of
@@ -91,6 +92,7 @@ transparently modify the linker namespace we are using.
 
 #define debug                  cctools_debug
 #define fatal                  cctools_fatal
+#define warn                   cctools_warn
 #define debug_config           cctools_debug_config
 #define debug_config_file      cctools_debug_config_file
 #define debug_config_file_size cctools_debug_config_file_size
@@ -109,6 +111,14 @@ Logs a debugging message, if the given flags are active.
 */
 
 void debug(INT64_T flags, const char *fmt, ...);
+
+/** Emit a warning message.
+Logs a warning message, regardless of if given flags are active.
+@param flags Any of the standard debugging flags OR-ed together.
+@param fmt A printf-style formatting string, followed by the necessary arguments.
+*/
+
+void warn(INT64_T flags, const char *fmt, ...);
 
 /** Emit a fatal debugging message and exit.
 Displays a printf-style message, and then forcibly exits the program.

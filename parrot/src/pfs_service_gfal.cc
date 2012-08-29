@@ -19,7 +19,7 @@ extern "C" {
 #include "gfal_api.h"
 #include "stringtools.h"
 #include "debug.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "macros.h"
 }
 

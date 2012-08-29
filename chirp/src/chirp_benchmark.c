@@ -104,12 +104,15 @@ int do_bandwidth(const char *file, int bytes, int blocksize, int do_write)
 	char *buffer = malloc(blocksize);
 	int i;
 
+    if (!buffer) return 0;
+
 	for(i = 0; i < blocksize; i++)
 		buffer[i] = (char) i;
 
 	fd = do_open(file, (do_write ? O_WRONLY : O_RDONLY) | O_CREAT | do_sync | O_TRUNC, 0777);
 	if(fd < 0 || fd == 0) {
 		printf("couldn't open %s: %s", file, strerror(errno));
+		free(buffer);
 		return 0;
 	}
 

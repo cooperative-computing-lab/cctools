@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include "ast_execute.h"
 #include "ast_print.h"
 
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "macros.h"
 
 #include <stdio.h>
@@ -219,14 +219,14 @@ static char * expr_eval_access( struct expr *e, time_t stoptime )
 			#ifdef ELOOP
 			case ELOOP:
 			#endif
-				result = xstrdup("false");
+				result = xxstrdup("false");
 				break;
 			default:
 				result = 0;
 				break;
 		}
 	} else {
-		result = xstrdup("true");
+		result = xxstrdup("true");
 	}
 
 	if(result) {
@@ -250,7 +250,7 @@ static char * expr_eval_islink( struct expr *e, time_t stoptime )
 
 	result = readlink(path,buf,sizeof(buf));
 	if(result>=0) {
-		r = xstrdup("true");
+		r = xxstrdup("true");
 	} else switch(errno) {
 		case EINVAL:
 		case ENOENT:
@@ -258,7 +258,7 @@ static char * expr_eval_islink( struct expr *e, time_t stoptime )
 		case EISDIR:
 		case EACCES:
 		case ENAMETOOLONG:
-			r = xstrdup("false");
+			r = xxstrdup("false");
 			break;
 		default:
 			r = 0;
@@ -297,7 +297,7 @@ static char * expr_eval_filetype( struct expr *e, time_t stoptime )
 			#ifdef EACCES
 			case EACCES:
 			#endif
-				result = xstrdup("false");
+				result = xxstrdup("false");
 				break;
 
 			default:
@@ -335,9 +335,9 @@ static char * expr_eval_filetype( struct expr *e, time_t stoptime )
 		}
 
 		if(ival) {
-			result = xstrdup("true");
+			result = xxstrdup("true");
 		} else {
-			result = xstrdup("false");
+			result = xxstrdup("false");
 		}
 	}
 
@@ -407,7 +407,7 @@ static char * expr_eval_fcall( struct expr *e, time_t stoptime )
 		for(f=e->a;f;f=f->next) argc++;
 		argv = xxmalloc( sizeof(char*)*argc );
 		for(i=0;i<argc;i++) argv[0] = 0;
-		argv[0] = xstrdup(name);
+		argv[0] = xxstrdup(name);
 		f = e->a;
 		for(i=1;i<argc;i++) {
 			argv[i] = expr_eval(f,stoptime);

@@ -5,6 +5,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "cctools.h"
 #include "catalog_server.h"
 #include "datagram.h"
 #include "link.h"
@@ -16,8 +17,9 @@ See the file COPYING for details.
 #include "domain_name_cache.h"
 #include "username.h"
 #include "list.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "macros.h"
+#include "daemon.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -33,6 +35,9 @@ See the file COPYING for details.
 #endif
 
 #define MAX_TABLE_SIZE 10000
+
+/* Timeout in communicating with the querying client */
+#define HANDLE_QUERY_TIMEOUT 15
 
 /* The table of nvpairs, hashed on address:port */
 static struct hash_cache *table = 0;
@@ -58,11 +63,24 @@ static time_t starttime;
 /* If true, for for every query */
 static int fork_mode = 1;
 
+/* The maximum number of simultaneous children that can be running. */
+static int child_procs_max = 50;
+
+/* Number of query processses currently running. */
+static int child_procs_count = 0;
+
+/* Maximum time to allow a child process to run. */
+static int child_procs_timeout = 60;
+
 /* The maximum size of a server that will actually be believed. */
 static INT64_T max_server_size = 0;
 
 /* Logfile for new updates. */
 static FILE *logfile = 0;
+static char *logfilename = 0;
+
+/* debug filename */
+static char *debug_filename = 0;
 
 /* Settings for the master catalog that we will report *to* */
 static int outgoing_alarm = 0;
@@ -79,16 +97,6 @@ void shutdown_clean(int sig)
 
 void ignore_signal(int sig)
 {
-}
-
-void reap_child(int sig)
-{
-	pid_t pid;
-	int status;
-
-	do {
-		pid = waitpid(-1, &status, WNOHANG);
-	} while(pid > 0);
 }
 
 static void install_handler(int sig, void (*handler) (int sig))
@@ -230,14 +238,14 @@ static void handle_updates(struct datagram *update_port)
 }
 
 static struct nvpair_header html_headers[] = {
-	{"type", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
-	{"name", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
-	{"port", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 0},
-	{"owner", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
-	{"total", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 0},
-	{"avail", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 0},
-	{"load5", NVPAIR_MODE_STRING, NVPAIR_ALIGN_RIGHT, 0},
-	{"version", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
+	{"type", "TYPE", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
+	{"name", "NAME", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
+	{"port", "PORT", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 0},
+	{"owner", "OWNER", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
+	{"total", "TOTAL", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 0},
+	{"avail", "AVAIL", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 0},
+	{"load5", "LOAD5", NVPAIR_MODE_STRING, NVPAIR_ALIGN_RIGHT, 0},
+	{"version", "VERSION", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
 	{0,}
 };
 
@@ -260,26 +268,34 @@ static void handle_query(struct link *query_link)
 	int i, n;
 
 	link_address_remote(query_link, addr, &port);
-
 	debug(D_DEBUG, "www query from %s:%d", addr, port);
 
-	link_nonblocking(query_link, 0);
-	stream = fdopen(link_fd(query_link), "r+");
-	if(!stream)
-		return;
-
-	if(!fgets(line, sizeof(line), stream))
-		return;
-	string_chomp(line);
-	if(sscanf(line, "%s %s %s", action, url, version) != 3)
-		return;
-
-	while(1) {
-		if(!fgets(line, sizeof(line), stream))
+	if(link_readline(query_link, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
+		string_chomp(line);
+		if(sscanf(line, "%s %s %s", action, url, version) != 3) {
 			return;
-		if(line[0] == '\n' || line[0] == '\r')
-			break;
+		}
+
+		// Consume the rest of the query
+		while(1) {
+			if(!link_readline(query_link, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
+				return;
+			}
+
+			if(line[0] == 0) {
+				break;
+			}
+		}
+	} else {
+		return;
 	}
+
+	// Output response
+	stream = fdopen(link_fd(query_link), "w");
+	if(!stream) {
+		return;
+	}
+	link_nonblocking(query_link, 0);
 
 	current = time(0);
 	fprintf(stream, "HTTP/1.1 200 OK\n");
@@ -310,6 +326,14 @@ static void handle_query(struct link *query_link)
 		fprintf(stream, "Content-type: text/plain\n\n");
 		for(i = 0; i < n; i++)
 			nvpair_print_text(array[i], stream);
+	} else if(!strcmp(path, "/query.json")) {
+		fprintf(stream, "Content-type: text/plain\n\n");
+		fprintf(stream,"[\n");
+		for(i = 0; i < n; i++) {
+			nvpair_print_json(array[i], stream);
+			fprintf(stream,",\n");
+		}
+		fprintf(stream,"]\n");
 	} else if(!strcmp(path, "/query.oldclassads")) {
 		fprintf(stream, "Content-type: text/plain\n\n");
 		for(i = 0; i < n; i++)
@@ -361,6 +385,7 @@ static void handle_query(struct link *query_link)
 		fprintf(stream, "<a href=/query.text>text</a> - ");
 		fprintf(stream, "<a href=/query.html>html</a> - ");
 		fprintf(stream, "<a href=/query.xml>xml</a> - ");
+		fprintf(stream, "<a href=/query.json>json</a> - ");
 		fprintf(stream, "<a href=/query.oldclassads>oldclassads</a> - ");
 		fprintf(stream, "<a href=/query.newclassads>newclassads</a>");
 		fprintf(stream, "<p>\n");
@@ -389,11 +414,6 @@ static void handle_query(struct link *query_link)
 	fclose(stream);
 }
 
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 static void show_help(const char *cmd)
 {
 	printf("Use: %s [options]\n", cmd);
@@ -404,6 +424,8 @@ static void show_help(const char *cmd)
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -O <bytes>     Rotate debug file once it reaches this size.\n");
 	printf(" -u <host>      Send status updates to this host. (default is %s)\n", CATALOG_HOST_DEFAULT);
+	printf(" -m <n>         Maximum number of child processes.  (default is %d)\n",child_procs_max);
+	printf(" -T <time>	Maximum time to allow a query process to run.  (default is %ds)\n",child_procs_timeout);
 	printf(" -M <size>      Maximum size of a server to be believed.  (default is any)\n");
 	printf(" -U <time>      Send status updates at this interval. (default is 5m)\n");
 	printf(" -L <file>      Log new updates to this file.\n");
@@ -417,52 +439,74 @@ int main(int argc, char *argv[])
 	struct link *link, *list_port = 0;
 	char ch;
 	time_t current;
+	int is_daemon = 0;
 
 	outgoing_host_list = list_create();
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "p:l:L:M:d:o:O:u:U:Shv")) != (char) -1) {
+	while((ch = getopt(argc, argv, "bp:l:L:m:M:d:o:O:u:U:SThv")) != (char) -1) {
 		switch (ch) {
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case 'M':
-			max_server_size = string_metric_parse(optarg);
-			break;
-		case 'p':
-			port = atoi(optarg);
-			break;
-		case 'o':
-			debug_config_file(optarg);
-			break;
-		case 'O':
-			debug_config_file_size(string_metric_parse(optarg));
-			break;
-		case 'u':
-			list_push_head(outgoing_host_list, xstrdup(optarg));
-			break;
-		case 'U':
-			outgoing_timeout = string_time_parse(optarg);
-			break;
-		case 'l':
-			lifetime = string_time_parse(optarg);
-			break;
-		case 'L':
-			logfile = fopen(optarg,"a");
-			if(!logfile) fatal("couldn't open %s: %s\n",optarg,strerror(errno));
-			break;
-		case 'S':
-			fork_mode = 0;
-			break;
-		case 'v':
-			show_version(argv[0]);
-			return 0;
-		case 'h':
-		default:
-			show_help(argv[0]);
-			return 1;
-		}
+			case 'b':
+				is_daemon = 1;
+				break;
+			case 'd':
+				debug_flags_set(optarg);
+				break;
+			case 'm':
+				child_procs_max = atoi(optarg);
+				break;
+			case 'M':
+				max_server_size = string_metric_parse(optarg);
+				break;
+			case 'p':
+				port = atoi(optarg);
+				break;
+			case 'o':
+				free(debug_filename);
+				debug_filename = strdup(optarg);
+				break;
+			case 'O':
+				debug_config_file_size(string_metric_parse(optarg));
+				break;
+			case 'u':
+				list_push_head(outgoing_host_list, xxstrdup(optarg));
+				break;
+			case 'U':
+				outgoing_timeout = string_time_parse(optarg);
+				break;
+			case 'l':
+				lifetime = string_time_parse(optarg);
+				break;
+			case 'L':
+				free(logfilename);
+				logfilename = strdup(optarg);
+				break;
+			case 'S':
+				fork_mode = 0;
+				break;
+			case 'T':
+				child_procs_timeout = string_time_parse(optarg);
+				break;
+			case 'v':
+				cctools_version_print(stdout, argv[0]);
+				return 0;
+			case 'h':
+			default:
+				show_help(argv[0]);
+				return 1;
+			}
+	}
+
+	if (is_daemon) daemonize(0);
+
+	debug_config_file(debug_filename);
+
+	cctools_version_debug(D_DEBUG, argv[0]);
+
+	if(logfilename) {
+		logfile = fopen(logfilename,"a");
+		if(!logfile) fatal("couldn't open %s: %s\n",optarg,strerror(errno));
 	}
 
 	current = time(0);
@@ -474,10 +518,11 @@ int main(int argc, char *argv[])
 
 	install_handler(SIGPIPE, ignore_signal);
 	install_handler(SIGHUP, ignore_signal);
-	install_handler(SIGCHLD, reap_child);
+	install_handler(SIGCHLD, ignore_signal);
 	install_handler(SIGINT, shutdown_clean);
 	install_handler(SIGTERM, shutdown_clean);
 	install_handler(SIGQUIT, shutdown_clean);
+	install_handler(SIGALRM, shutdown_clean);
 
 	domain_name_cache_guess(hostname);
 	username_get(owner);
@@ -511,9 +556,22 @@ int main(int argc, char *argv[])
 			outgoing_alarm = time(0) + outgoing_timeout;
 		}
 
+		while(1) {
+			int status;
+			pid_t pid = waitpid(-1, &status, WNOHANG);
+			if(pid>0) {
+				child_procs_count--;
+				continue;
+			} else {
+				break;
+			}
+		}
+
 		FD_ZERO(&rfds);
 		FD_SET(ufd, &rfds);
-		FD_SET(lfd, &rfds);
+		if(child_procs_count < child_procs_max) {
+			FD_SET(lfd, &rfds);
+		}
 		maxfd = MAX(ufd, lfd) + 1;
 
 		timeout.tv_sec = 5;
@@ -533,8 +591,11 @@ int main(int argc, char *argv[])
 				if(fork_mode) {
 					pid_t pid = fork();
 					if(pid == 0) {
+						alarm(child_procs_timeout);
 						handle_query(link);
-						exit(0);
+						_exit(0);
+					} else if (pid>0) {
+						child_procs_count++;
 					}
 				} else {
 					handle_query(link);

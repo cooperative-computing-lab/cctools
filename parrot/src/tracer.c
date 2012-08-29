@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "tracer.h"
 #include "stringtools.h"
 #include "full_io.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "debug.h"
 
 #include <stdlib.h>
@@ -300,7 +300,7 @@ int tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, int 
 
 	if(has_fast_write) {
 		result = full_pwrite64(t->memory_file,data,length,iuaddr);
-		if( result!=length && errno==EINVAL ) {
+		if( result!=length ) {
 			has_fast_write = 0;
 			debug(D_SYSCALL,"writing to /proc/X/mem failed, falling back to slow ptrace write");
 		} else {
@@ -369,18 +369,30 @@ int tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, int l
 }
 
 /*
-Tidbit:
-The reason we must have pread64 here is that the target address
-of the read in user space can easily be above 2GB (2^31) on 
-many machines.  We don't need full 64 bit access, but we need
-to access addresses above 2GB, which can only be done with the
-64-bit calls.
+Notes on tracer_copy_in:
+1 - The various versions of the Linux kernel disagree on when and
+where it is possible to read from /proc/pid/mem.  Some disallow
+entirely, some allow only for certain address ranges, and some
+allow it completely.  For example, on Ubuntu 12.02 with Linux 3.2,
+we see successes intermixed with failures with no apparent pattern.
+
+We don't want to retry a failing method unnecessarily, so we keep
+track of the number of successes and failures.  If the fast read
+has succeeded at any point, we keep trying it.  If we have 100 failures
+with no successes, then we stop trying it.  In any case, if the fast
+read fails, we fall back to the slow method.
+
+2 - pread64 is necessary regardless of whether the target process
+is 32 or 64 bit, since the 32-bit pread() cannot read above the 2GB
+limit on a 32-bit process.
 */
 
 int tracer_copy_in( struct tracer *t, void *data, const void *uaddr, int length )
 {
 	int result;
-	static int has_fast_read = 1;
+	static int fast_read_success = 0;
+	static int fast_read_failure = 0;
+	static int fast_read_attempts = 100;
 
 	UPTRINT_T iuaddr = (UPTRINT_T)uaddr;
 
@@ -388,13 +400,17 @@ int tracer_copy_in( struct tracer *t, void *data, const void *uaddr, int length 
 	if(!tracer_is_64bit(t)) iuaddr &= 0xffffffff;
 #endif
 
-	if(has_fast_read) {
+	if(fast_read_success>0 || fast_read_failure<fast_read_attempts) {
 		result = full_pread64(t->memory_file,data,length,iuaddr);
-		if( result<=0 && errno==EINVAL ) {
-			has_fast_read = 0;
-			debug(D_SYSCALL,"reading from /proc/X/mem failed, falling back to slow ptrace read");
-		} else {
+		if(result>0) {
+			fast_read_success++;
 			return result;
+		} else {
+			fast_read_failure++;
+			// fall through to slow method, print message on the last attempt.
+			if(fast_read_success==0 && fast_read_failure>=fast_read_attempts) {
+				debug(D_SYSCALL,"reading from /proc/X/mem failed, falling back to slow ptrace read");
+			}
 		}
 	}
 

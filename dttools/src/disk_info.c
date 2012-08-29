@@ -19,6 +19,10 @@ See the file COPYING for details.
 #include <sys/statvfs.h>
 #endif
 
+#ifdef HAS_SYS_VFS_H
+#include <sys/vfs.h>
+#endif
+
 int disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total)
 {
 #ifdef CCTOOLS_OPSYS_SUNOS

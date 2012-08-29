@@ -9,7 +9,7 @@ all: work_queue.pm work_queue.${CCTOOLS_DYNAMIC_SUFFIX}
 
 work_queue_wrap.c work_queue.pm: ../work_queue.i
 	@echo "SWIG work_queue.i (perl5)"
-	@swig -perl5 -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c ../work_queue.i
+	@${CCTOOLS_SWIG} -perl5 -exportall -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c ../work_queue.i
 
 work_queue_wrap.o: work_queue_wrap.c
 	${CCTOOLS_CC} -fPIC -Wno-unused-value -Wno-unused-variable -c $< -o $@ ${ccflags}
@@ -25,6 +25,10 @@ clean:
 PERL_INSTALL_DIR=$(CCTOOLS_INSTALL_DIR)/lib/perl5/site_perl/$(CCTOOLS_PERL_VERSION)
 
 install: all
-	install -d $(PERL_INSTALL_DIR)
-	install work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(PERL_INSTALL_DIR)/work_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
-	install work_queue.pm $(PERL_INSTALL_DIR)/work_queue.pm
+	mkdir -p $(PERL_INSTALL_DIR)
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
+	chmod 755 work_queue_example.pl
+	cp work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(PERL_INSTALL_DIR)
+	cp work_queue.pm $(PERL_INSTALL_DIR)
+	cp work_queue_example.pl ${CCTOOLS_INSTALL_DIR}/doc
+

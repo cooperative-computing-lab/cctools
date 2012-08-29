@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 #include "buffer.h"
 #include "md5.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -156,7 +156,7 @@ int chirp_ticket_read(const char *ticket, struct chirp_ticket *ct)
 			char *acl = xxmalloc(n + 1);
 			memcpy(acl, s, n);
 			acl[n] = '\0';
-			ct->rights[ct->nrights - 1].acl = xstrdup(acl);
+			ct->rights[ct->nrights - 1].acl = xxstrdup(acl);
 			free(acl);
 		} else if(*buffer == '\0') {
 			if(ct->subject && ct->ticket && ct->nrights > 0) {
@@ -170,8 +170,8 @@ int chirp_ticket_read(const char *ticket, struct chirp_ticket *ct)
 	if(ct->rights == NULL) {
 		assert(ct->nrights == 0);
 		ct->rights = xxrealloc(ct->rights, sizeof(*ct->rights) * (++ct->nrights) + 1);
-		ct->rights[ct->nrights - 1].directory = xstrdup("/");
-		ct->rights[ct->nrights - 1].acl = xstrdup("n");
+		ct->rights[ct->nrights - 1].directory = xxstrdup("/");
+		ct->rights[ct->nrights - 1].acl = xxstrdup("n");
 		ct->nrights = 1;
 	}
 	return status && !ct->expired;
@@ -210,8 +210,7 @@ int chirp_ticket_isticketfilename(const char *ticket_filename, const char **dige
 {
 	int n1, n2;
 	char buffer[TICKET_DIGEST_LENGTH + 1];
-	int i;
-	if(((i = sscanf(ticket_filename, TICKET_FILENAME_SCAN, &n1, buffer, &n2)) == 1) && ((n2 - n1) == TICKET_DIGEST_LENGTH) && (strlen(ticket_filename) == (size_t) n2)) {
+	if((sscanf(ticket_filename, TICKET_FILENAME_SCAN, &n1, buffer, &n2) == 1) && ((n2 - n1) == TICKET_DIGEST_LENGTH) && (strlen(ticket_filename) == (size_t) n2)) {
 		assert(n1 > 0);
 		*digest = ticket_filename + n1;
 		return 1;
@@ -224,8 +223,7 @@ int chirp_ticket_isticketsubject(const char *ticket_subject, const char **digest
 {
 	int n1, n2;
 	char buffer[TICKET_DIGEST_LENGTH + 1];
-	int i;
-	if(((i = sscanf(ticket_subject, TICKET_SUBJECT_SCAN, &n1, buffer, &n2)) == 1) && ((n2 - n1) == TICKET_DIGEST_LENGTH) && (strlen(ticket_subject) == (size_t) n2)) {
+	if((sscanf(ticket_subject, TICKET_SUBJECT_SCAN, &n1, buffer, &n2) == 1) && ((n2 - n1) == TICKET_DIGEST_LENGTH) && (strlen(ticket_subject) == (size_t) n2)) {
 		assert(n1 > 0);
 		*digest = ticket_subject + n1;
 		return 1;

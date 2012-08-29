@@ -14,7 +14,7 @@ See the file COPYING for details.
 #include "full_io.h"
 #include "sleeptools.h"
 #include "hash_table.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "list.h"
 
 #include <string.h>
@@ -620,11 +620,6 @@ INT64_T chirp_reli_mkdir_recursive( const char *host, const char *path, INT64_T 
 
 	/* this is the error that really counts */
 	return chirp_reli_mkdir(host,path,mode,stoptime);
-}
-
-INT64_T chirp_reli_search( const char *host, const char *pattern, const char *dir, char ***array, time_t stoptime )
-{
-	RETRY_ATOMIC( result = chirp_client_search(client, pattern, dir, array, stoptime); )
 }
 
 INT64_T chirp_reli_rmdir( const char *host, const char *path, time_t stoptime )

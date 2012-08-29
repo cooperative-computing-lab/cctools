@@ -60,3 +60,28 @@ int delete_dir(const char *dirname)
 
 	return result;
 }
+
+int delete_dir_contents(const char *dirname) {
+	char subdir[PATH_MAX];
+	struct dirent *d;
+	DIR *dir;
+
+	int result = 1;
+
+	dir = opendir(dirname);
+	if (!dir) {
+		return 0;	
+	}
+		
+	while ((d = readdir(dir))) {
+		if ((strcmp(d->d_name, ".") && strcmp(d->d_name, "..")) != 0) {
+			sprintf(subdir, "%s/%s", dirname, d->d_name);
+			if (!delete_dir(subdir)) {
+				result = 0;
+			}	
+		}	
+	}
+		
+	closedir(dir);
+	return result;
+}

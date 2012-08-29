@@ -23,7 +23,7 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 			if(p) {
 				*p = 0;
 				work_queue_task_specify_input_file(t, f, p + 1);
-				debug(D_DEBUG, "local file %s is %s on remote system:", f, p + 1);
+				debug(D_BATCH, "local file %s is %s on remote system:", f, p + 1);
 				*p = '=';
 			} else {
 				work_queue_task_specify_input_file(t, f, f);
@@ -41,7 +41,7 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 			if(p) {
 				*p = 0;
 				work_queue_task_specify_output_file(t, f, p + 1);
-				debug(D_DEBUG, "remote file %s is %s on local system:", f, p + 1);
+				debug(D_BATCH, "remote file %s is %s on local system:", f, p + 1);
 				*p = '=';
 			} else {
 				work_queue_task_specify_output_file(t, f, f);
@@ -54,68 +54,64 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 
 void specify_work_queue_task_shared_files(struct work_queue_task *t, const char *input_files, const char *output_files)
 {
-	char *f, *p, *files;
-
 	if(input_files) {
-		files = strdup(input_files);
-		f = strtok(files, " \t,");
-		while(f) {
-			char fname[WORK_QUEUE_LINE_MAX];
-			p = strchr(f, '=');
+		char *files = strdup(input_files);
+		char *file = strtok(files, " \t,");
+		while(file) {
+			file = strdup(file);
+			char *p = strchr(file, '=');
 			if(p) {
 				*p = 0;
 			}
 
-			if(f[0] != '/') {
-				char tmp[WORK_QUEUE_LINE_MAX];
-				getcwd(tmp, WORK_QUEUE_LINE_MAX);
-				strcat(tmp, "/");
-				strcat(tmp, f);
-				string_collapse_path(tmp, fname, 1);
-			} else {
-				strcpy(fname, f);
+			if(file[0] != '/') {
+				char *cwd = string_getcwd();
+				char *new = string_format("%s/%s", cwd, file);
+				free(file);
+				free(cwd);
+				file = new;
 			}
 
-			if(p) {	
-				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE|WORK_QUEUE_THIRDGET);
-				debug(D_DEBUG, "shared file %s is %s on remote system:", f, p + 1);
+			if(p) {
+				work_queue_task_specify_file(t, file, p + 1, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE | WORK_QUEUE_THIRDGET);
+				debug(D_BATCH, "shared file %s is %s on remote system:", file, p + 1);
 				*p = '=';
 			} else {
-				work_queue_task_specify_file(t, fname, fname, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE|WORK_QUEUE_THIRDGET);
+				work_queue_task_specify_file(t, file, file, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE | WORK_QUEUE_THIRDGET);
 			}
-			f = strtok(0, " \t,");
+			free(file);
+			file = strtok(0, " \t,");
 		}
 		free(files);
 	}
 
 	if(output_files) {
-		files = strdup(output_files);
-		f = strtok(files, " \t,");
-		while(f) {
-			char fname[WORK_QUEUE_LINE_MAX];
-			p = strchr(f, '=');
+		char *files = strdup(output_files);
+		char *file = strtok(files, " \t,");
+		while(file) {
+			file = strdup(file);
+			char *p = strchr(file, '=');
 			if(p) {
 				*p = 0;
 			}
 
-			if(f[0] != '/') {
-				char tmp[WORK_QUEUE_LINE_MAX];
-				getcwd(tmp, WORK_QUEUE_LINE_MAX);
-				strcat(tmp, "/");
-				strcat(tmp, f);
-				string_collapse_path(tmp, fname, 1);
-			} else {
-				strcpy(fname, f);
+			if(file[0] != '/') {
+				char *cwd = string_getcwd();
+				char *new = string_format("%s/%s", cwd, file);
+				free(file);
+				free(cwd);
+				file = new;
 			}
 
-			if(p) {	
-				work_queue_task_specify_file(t, fname, p + 1, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
-				debug(D_DEBUG, "shared file %s is %s on remote system:", f, p + 1);
+			if(p) {
+				work_queue_task_specify_file(t, file, p + 1, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
+				debug(D_BATCH, "shared file %s is %s on remote system:", file, p + 1);
 				*p = '=';
 			} else {
-				work_queue_task_specify_file(t, fname, fname, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
+				work_queue_task_specify_file(t, file, file, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
 			}
-			f = strtok(0, " \t,");
+			free(file);
+			file = strtok(0, " \t,");
 		}
 		free(files);
 	}
@@ -123,33 +119,22 @@ void specify_work_queue_task_shared_files(struct work_queue_task *t, const char 
 
 batch_job_id_t batch_job_submit_work_queue(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
-	struct work_queue_task *t;
-	char *full_command;
-
-	if(infile)
-		full_command = (char *) malloc((strlen(cmd) + strlen(args) + strlen(infile) + 5) * sizeof(char));
-	else
-		full_command = (char *) malloc((strlen(cmd) + strlen(args) + 2) * sizeof(char));
-
-	if(!full_command) {
-		debug(D_DEBUG, "couldn't create new work_queue task: out of memory\n");
-		return -1;
+	char *command = string_format("%s %s", cmd, args);
+	if(infile) {
+		char *new = string_format("%s <%s", command, infile);
+		free(command);
+		command = new;
 	}
 
-	if(infile)
-		sprintf(full_command, "%s %s < %s", cmd, args, infile);
-	else
-		sprintf(full_command, "%s %s", cmd, args);
+	struct work_queue_task *t = work_queue_task_create(command);
 
-	t = work_queue_task_create(full_command);
-
-	free(full_command);
+	free(command);
 
 	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		if(infile)
-			work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE|WORK_QUEUE_THIRDGET);
+			work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE | WORK_QUEUE_THIRDGET);
 		if(cmd)
-			work_queue_task_specify_file(t, cmd, cmd, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE|WORK_QUEUE_THIRDGET);
+			work_queue_task_specify_file(t, cmd, cmd, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE | WORK_QUEUE_THIRDGET);
 
 		specify_work_queue_task_shared_files(t, extra_input_files, extra_output_files);
 	} else {
@@ -170,7 +155,7 @@ batch_job_id_t batch_job_submit_work_queue(struct batch_queue *q, const char *cm
 	return t->taskid;
 }
 
-batch_job_id_t batch_job_submit_simple_work_queue(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+batch_job_id_t batch_job_submit_simple_work_queue(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
 	struct work_queue_task *t;
 
@@ -210,9 +195,9 @@ batch_job_id_t batch_job_wait_work_queue(struct batch_queue * q, struct batch_jo
 
 	struct work_queue_task *t = work_queue_wait(q->work_queue, timeout);
 	if(t) {
-		info->submitted = t->submit_time / 1000000;
-		info->started = t->start_time / 1000000;
-		info->finished = t->finish_time / 1000000;
+		info->submitted = t->time_task_submit / 1000000;
+		info->started = t->time_send_input_start / 1000000;
+		info->finished = t->time_receive_output_finish / 1000000;
 		info->exited_normally = 1;
 		info->exit_code = t->return_status;
 		info->exit_signal = 0;
@@ -240,16 +225,23 @@ batch_job_id_t batch_job_wait_work_queue(struct batch_queue * q, struct batch_jo
 			}
 			free(outfile);
 		}
-		fprintf(logfile, "TASK %llu %d %d %d %d %llu %llu %llu %llu %llu %s \"%s\" \"%s\"\n", timestamp_get(), t->taskid, t->result, t->return_status, t->worker_selection_algorithm, t->submit_time, t->transfer_start_time, t->finish_time,
-			t->total_bytes_transferred, t->total_transfer_time, t->host, t->tag ? t->tag : "", t->command_line);
+
+		fprintf(logfile, "TASK %llu %d %d %d %d %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %s \"%s\" \"%s\"\n", timestamp_get(), t->taskid, t->result, t->return_status, t->worker_selection_algorithm, t->time_task_submit, t->time_task_finish,
+			t->time_send_input_start, t->time_send_input_finish, t->time_execute_cmd_start, t->time_execute_cmd_finish, t->time_receive_output_start, t->time_receive_output_finish, t->total_bytes_transferred, t->total_transfer_time, t->host,
+			t->tag ? t->tag : "", t->command_line);
 
 		taskid = t->taskid;
 		work_queue_task_delete(t);
 	}
 	// Print to work queue log since status has been changed.
 	work_queue_get_stats(q->work_queue, &s);
-	fprintf(logfile, "QUEUE %llu %d %d %d %d %d %d %d %d %d %d %lld %lld\n", timestamp_get(), s.workers_init, s.workers_ready, s.workers_busy, s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete,
-		s.total_workers_joined, s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received);
+
+	char * workers_by_pool = work_queue_get_worker_summary(q->work_queue);
+
+	fprintf(logfile, "QUEUE %llu %d %d %d %d %d %d %d %d %d %d %lld %lld %.2f %.2f %d %d %d %s\n", timestamp_get(), s.workers_init, s.workers_ready, s.workers_busy, s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity, s.avg_capacity, s.total_workers_connected, workers_by_pool);
+
+	free(workers_by_pool);
+
 	fflush(logfile);
 	fsync(fileno(logfile));
 
@@ -268,4 +260,3 @@ int batch_job_remove_work_queue(struct batch_queue *q, batch_job_id_t jobid)
 {
 	return 0;
 }
-

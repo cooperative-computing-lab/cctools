@@ -27,6 +27,7 @@ typedef enum {
 	BATCH_QUEUE_TYPE_CONDOR,              /**< Batch jobs will be sent to Condor pool. */
 	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine. */
 	BATCH_QUEUE_TYPE_MOAB,                /**< Batch jobs will be sent to the Moab Workload Manager. */
+	BATCH_QUEUE_TYPE_TORQUE,              /**< Batch jobs will be send to the Torque Scheduler. */
 	BATCH_QUEUE_TYPE_CLUSTER,                /**< Batch jobs will be sent to a user-defined cluster manager. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE,          /**< Batch jobs will be sent to the Work Queue. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS, /**< Batch jobs will be sent to the Work Queue, all files are stored on a shared filesystem. */
@@ -141,6 +142,14 @@ the <tt>qsub</tt> command.  This call has no effect on other queue types.
 @param options The options to pass to the batch system.
 */
 void batch_queue_set_options(struct batch_queue *q, const char *options);
+
+/** Get batch queue options.
+This call returns the additional options to be passed to the batch system each
+time a job is submitted.
+@param q The batch queue.
+@return An allocate string containing the the batch queue options.
+*/
+char *batch_queue_options(struct batch_queue *q);
 
 /** Delete a batch queue.
 Note that this function just destroys the internal data structures,

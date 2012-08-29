@@ -20,7 +20,7 @@ extern "C" {
 #include "full_io.h"
 #include "http_query.h"
 #include "hash_table.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "macros.h"
 #include "sha1.h"
 #include "sleeptools.h"
@@ -255,7 +255,7 @@ public:
 
 		if(!pfs_password_cache) {
 			errno = EACCES;
-			return NULL;
+			return -1;
 		}
 
 		sscanf(name->hostport, "%[^:]:", bucket);
@@ -277,7 +277,7 @@ public:
 
 		if(!pfs_password_cache) {
 			errno = EACCES;
-			return NULL;
+			return -1;
 		}
 
 		sscanf(name->hostport, "%[^:]:", bucket);
@@ -301,7 +301,7 @@ public:
 
 		if(!pfs_password_cache) {
 			errno = EACCES;
-			return NULL;
+			return -1;
 		}
 
 		sscanf(name->hostport, "%[^:]:", bucket);

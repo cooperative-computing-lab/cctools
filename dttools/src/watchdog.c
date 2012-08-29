@@ -6,6 +6,7 @@ See the file COPYING for details.
 */
 
 #include "stringtools.h"
+#include "cctools.h"
 #include "debug.h"
 
 #include <stdlib.h>
@@ -172,11 +173,6 @@ static void install_handler(int sig, void (*handler) (int sig))
 	sigaction(sig, &s, 0);
 }
 
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 void show_help(const char *cmd)
 {
 	printf("use: %s [options] <program> <program-args>\n", cmd);
@@ -238,7 +234,7 @@ int main(int argc, char *argv[])
 			stop_interval = string_time_parse(optarg);
 			break;
 		case 'v':
-			show_version(argv[0]);
+			cctools_version_print(stdout, argv[0]);
 			exit(0);
 			break;
 		case 'h':
@@ -247,6 +243,8 @@ int main(int argc, char *argv[])
 			break;
 		}
 	}
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(optind >= argc) {
 		show_help(argv[0]);

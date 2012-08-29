@@ -26,12 +26,13 @@ See the file COPYING for details.
 #include "chirp_matrix.h"
 
 #include "b64_encode.h"
+#include "cctools.h"
 #include "timestamp.h"
 #include "debug.h"
 #include "auth_all.h"
 #include "auth_ticket.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "list.h"
 #include "domain_name_cache.h"
 #include "md5.h"
@@ -97,13 +98,12 @@ static INT64_T do_matrix_create(int argc, char **argv);
 static INT64_T do_matrix_list(int argc, char **argv);
 static INT64_T do_matrix_delete(int argc, char **argv);
 static INT64_T do_remote_debug(int argc, char **argv);
-static INT64_T do_search(int argc, char **argv);
 
 static int process_command(int argc, char **argv);
 
 static int timeout = 3600;
 static time_t stoptime = 0;
-static char current_host[CHIRP_PATH_MAX] = { 0 };
+static char current_host[CHIRP_PATH_MAX] = {0};
 static char current_local_dir[CHIRP_PATH_MAX];
 static char current_remote_dir[CHIRP_PATH_MAX];
 static char current_subject[CHIRP_LINE_MAX];
@@ -166,14 +166,8 @@ static struct command list[] = {
 	{"help", 0, 0, 0, "", do_help},
 	{"exit", 0, 0, 0, "", do_quit},
 	{"quit", 0, 0, 0, "", do_quit},
-	{"search", 1, 2, 2, "<pattern> <directory>", do_search},
 	{0, 0, 0, 0, 0},
 };
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
 
 static void show_help(const char *cmd)
 {
@@ -227,11 +221,13 @@ int main(int argc, char *argv[])
 			timeout = string_time_parse(optarg);
 			break;
 		case 'v':
-			show_version(argv[0]);
+			cctools_version_print(stdout, argv[0]);
 			exit(0);
 			break;
 		}
 	}
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(!did_explicit_auth)
 		auth_register_all();
@@ -374,7 +370,7 @@ static INT64_T do_open(int argc, char **argv)
 		strcpy(current_host, argv[1]);
 		strcpy(current_remote_dir, "/");
 		if(interactive_mode)
-			printf("connected to %s as %s\n", current_host, current_subject);
+			fprintf(stderr, "connected to %s as %s\n", current_host, current_subject);
 		return 0;
 	} else {
 		return -1;
@@ -1013,7 +1009,6 @@ static INT64_T do_audit(int argc, char **argv)
 {
 	struct chirp_audit *list;
 	int result;
-	int i;
 	int raw_mode = 0;
 
 	if(argc > 1) {
@@ -1027,6 +1022,7 @@ static INT64_T do_audit(int argc, char **argv)
 
 	result = chirp_reli_audit(current_host, "/", &list, stoptime);
 	if(result >= 0) {
+		int i;
 		if(!raw_mode)
 			printf("   FILES     DIRS      DATA OWNER\n");
 		for(i = 0; i < result; i++) {
@@ -1167,20 +1163,4 @@ static INT64_T do_matrix_delete(int argc, char **argv)
 	char path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], path);
 	return chirp_matrix_delete(current_host, path, stoptime);
-}
-
-static INT64_T do_search(int argc, char **argv)
-{
-    char **array;
-	INT64_T result = chirp_reli_search(current_host, argv[1], argv[2], &array, stoptime);
-
-	if (result == 0) {
-		int i;
-		for (i = 0; array[i]; i++)
-			printf("%s\n", array[i]);
-		free(array);
-		return 0;
-	}
-	else
-		return 1;
 }

@@ -43,5 +43,6 @@ int ibox_acl_from_open_flags(int flags);
 
 int ibox_acl_init_copy(const char *path);
 int ibox_acl_init_reserve(const char *path, const char *subject);
+int ibox_acl_rmdir(const char *path);
 
 #endif

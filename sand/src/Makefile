@@ -2,7 +2,7 @@ include ../../Makefile.config
 include ../../Makefile.rules
 
 PROGRAMS = sand_align_master sand_align_kernel sand_filter_master sand_filter_kernel sand_compress_reads sand_uncompress_reads
-SCRIPTS = sand_runCA
+SCRIPTS = sand_runCA_5.4 sand_runCA_6.1 sand_runCA_7.0
 SOURCES =  compressed_sequence.o sequence_filter.c sequence.c matrix.c overlap.c align.c
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = *.h
@@ -25,6 +25,6 @@ clean:
 	rm -f core *~ *.o *.os *.so $(PROGRAMS) libsandtools.a
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	for p in ${PROGRAMS} ${SCRIPTS}; do install $$p ${CCTOOLS_INSTALL_DIR}/bin; done
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
+	chmod 755 ${PROGRAMS} ${SCRIPTS}
+	cp ${PROGRAMS} ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin

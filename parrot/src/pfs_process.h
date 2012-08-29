@@ -91,6 +91,7 @@ extern "C" int  pfs_process_getpid();
 extern "C" char * pfs_process_name();
 extern "C" void pfs_process_kill();
 extern "C" void pfs_process_killall();
+extern "C" void pfs_process_kill_everyone(int);
 
 PTRINT_T pfs_process_heap_address( struct pfs_process *p );
 PTRINT_T pfs_process_scratch_address( struct pfs_process *p );

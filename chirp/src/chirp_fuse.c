@@ -13,6 +13,10 @@ This module written by James Fitzgerald, B.S. 2006.
 #define FUSE_USE_VERSION 27
 
 #include <fuse.h>
+
+#include <unistd.h>
+#include <dirent.h>
+#include <fcntl.h>
 #include <pthread.h>
 
 #include "chirp_global.h"
@@ -20,18 +24,18 @@ This module written by James Fitzgerald, B.S. 2006.
 #include "chirp_reli.h"
 
 #include "auth_all.h"
+#include "cctools.h"
 #include "debug.h"
-#include "stringtools.h"
 #include "itable.h"
+#include "stringtools.h"
+#include "string_array.h"
+#include "xxmalloc.h"
 
+#include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <errno.h>
-#include <signal.h>
 
 static int chirp_fuse_timeout = 60;
 static int run_in_foreground = 0;
@@ -552,11 +556,6 @@ static void exit_handler(int sig)
 	_exit(0);
 }
 
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 static void show_help(const char *cmd)
 {
 	printf("use: %s <mountpath>\n", cmd);
@@ -567,6 +566,7 @@ static void show_help(const char *cmd)
 	printf(" -D           Disable small file optimizations such as recursive delete.\n");
 	printf(" -f           Run in foreground for debugging.\n");
 	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
+	printf(" -m <options> Mount options passed to FUSE.\n");
 	printf(" -o <file>    Send debugging output to this file.\n");
 	printf(" -t <timeout> Timeout for network operations. (default is %ds)\n", chirp_fuse_timeout);
 	printf(" -v           Show program version.\n");
@@ -578,10 +578,14 @@ int main(int argc, char *argv[])
 	char c;
 	int did_explicit_auth = 0;
 	char *tickets = NULL;
+	struct fuse_args fa;
+	fa.argc = 0;
+	fa.argv = string_array_new();
+	fa.allocated = 1;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "d:Db:i:o:a:t:fhv")) != -1) {
+	while((c = getopt(argc, argv, "a:b:d:Dfhi:m:o:t:v")) != -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);
@@ -593,7 +597,11 @@ int main(int argc, char *argv[])
 			chirp_reli_blocksize_set(atoi(optarg));
 			break;
 		case 'i':
-			tickets = strdup(optarg);
+			tickets = xxstrdup(optarg);
+			break;
+		case 'm':
+			fa.argc += 1;
+			fa.argv = string_array_append(fa.argv, optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -609,7 +617,7 @@ int main(int argc, char *argv[])
 			run_in_foreground = 1;
 			break;
 		case 'v':
-			show_version(argv[0]);
+			cctools_version_print(stdout, argv[0]);
 			return 0;
 			break;
 		case 'h':
@@ -619,6 +627,8 @@ int main(int argc, char *argv[])
 			break;
 		}
 	}
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if((argc - optind) != 1) {
 		show_help(argv[0]);
@@ -638,20 +648,19 @@ int main(int argc, char *argv[])
 		auth_ticket_load(NULL);
 	}
 
-
 	file_table = itable_create(0);
 
 	signal(SIGHUP, exit_handler);
 	signal(SIGINT, exit_handler);
 	signal(SIGTERM, exit_handler);
 
-	fuse_chan = fuse_mount(fuse_mountpoint, 0);
+	fuse_chan = fuse_mount(fuse_mountpoint, &fa);
 	if(!fuse_chan) {
 		fprintf(stderr, "chirp_fuse: couldn't access %s\n", fuse_mountpoint);
 		return 1;
 	}
 
-	fuse_instance = fuse_new(fuse_chan, 0, &chirp_fuse_operations, sizeof(chirp_fuse_operations), 0);
+	fuse_instance = fuse_new(fuse_chan, &fa, &chirp_fuse_operations, sizeof(chirp_fuse_operations), 0);
 	if(!fuse_instance) {
 		fuse_unmount(fuse_mountpoint, fuse_chan);
 		fprintf(stderr, "chirp_fuse: couldn't access %s\n", fuse_mountpoint);
@@ -674,6 +683,8 @@ int main(int argc, char *argv[])
 
 	fuse_unmount(fuse_mountpoint, fuse_chan);
 	fuse_destroy(fuse_instance);
+
+	free(fa.argv);
 
 	return 0;
 }

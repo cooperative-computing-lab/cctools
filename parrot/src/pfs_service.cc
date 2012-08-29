@@ -13,6 +13,7 @@ See the file COPYING for details.
 extern "C" {
 #include "chirp_reli.h"
 #include "hash_table.h"
+#include "stringtools.h"
 }
 
 #include <stdio.h>
@@ -135,6 +136,78 @@ int pfs_service::truncate( pfs_name *name, pfs_off_t length )
 	return -1;
 }
 
+ssize_t pfs_service::getxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+ssize_t pfs_service::lgetxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+ssize_t pfs_service::listxattr ( pfs_name *name, char *attrlist, size_t size )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+ssize_t pfs_service::llistxattr ( pfs_name *name, char *attrlist, size_t size )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+int pfs_service::setxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+int pfs_service::lsetxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+int pfs_service::removexattr ( pfs_name *name, const char *attrname )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+int pfs_service::lremovexattr ( pfs_name *name, const char *attrname )
+{
+	/* Despite what `man getxattr` says, linux doesn't have an ENOTSUP errno.
+	** GNU defines ENOTSUP as EOPNOTSUPP. We should mirror Linux in this case.
+	** */
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
 int pfs_service::utime( pfs_name *name, struct utimbuf *buf )
 {
 	return 0;
@@ -207,12 +280,6 @@ int pfs_service::lsalloc( pfs_name *name, char *alloc_name, pfs_ssize_t *size, p
 }
 
 int pfs_service::whoami( pfs_name *name, char *buf, int size )
-{
-	errno = ENOSYS;
-	return -1;
-}
-
-int pfs_service::search ( const char *paths, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, int flags )
 {
 	errno = ENOSYS;
 	return -1;
@@ -329,6 +396,11 @@ pfs_service * pfs_service_lookup( const char *name )
                 extern pfs_service *pfs_service_xrootd;
         	return pfs_service_xrootd;
 #endif
+#ifdef HAS_CVMFS
+        } else if(!strcmp(name,"cvmfs")) {
+                extern pfs_service *pfs_service_cvmfs;
+            return pfs_service_cvmfs;
+#endif
 	} else {
 		return 0;
 	}
@@ -346,6 +418,27 @@ void pfs_service_emulate_statfs( struct pfs_statfs *buf )
 	memset(buf,0,sizeof(*buf));
 }
 
+/*
+The block size is a hint given from the kernel to the
+application indicating what is the most 'efficient' amount
+of data to be read at one time from a file.  For most local
+Unix filesystems, this value is the page size, typically 4KB.
+The main user of this information is the standard library,
+which allocates standard I/O buffers according to the block size.
+
+Because Parrot increases the latency of most system calls,
+we hint that the most efficient default block size is 64KB,
+which works well for local files and low latency remote services
+like Chirp.  This value is overridden in some services that
+have high latency small read operations, like irods.
+
+In addition, the block size is overridden for certain applications
+with known behavior.  The linker (ld) makes lots of tiny reads and
+writes to patch up small areas of a program, so we suggest an
+unusually small block size.  Likewise copy (cp) is moving large
+amounts of data from place to place, so we hint a larger blocksize.
+*/
+
 static int default_block_size = 65336;
 
 void pfs_service_set_block_size( int bs )
@@ -354,10 +447,12 @@ void pfs_service_set_block_size( int bs )
 	chirp_reli_blocksize_set(bs);
 }
 
-int  pfs_service_get_block_size()
+int  pfs_service::get_block_size()
 {
-	if(!strcmp(pfs_current->name,"ld")) {
+	if(!strcmp(string_back(pfs_current->name,3),"/ld")) {
 		return 4096;
+	} else if(!strcmp(string_back(pfs_current->name,3),"/cp")) {
+		return 1048576;
 	} else {
 		return default_block_size;
 	}

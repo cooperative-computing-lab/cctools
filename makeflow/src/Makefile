@@ -4,13 +4,14 @@ include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
 TARGETS = makeflow
+SCRIPTS = condor_submit_makeflow makeflow_log_parser makeflow_monitor starch
 
 LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
 all: ${TARGETS}
 
-makeflow: makeflow.o
-	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
+makeflow: makeflow.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
+	${CCTOOLS_LD} makeflow.o ${LOCAL_LDFLAGS} -o $@
 
 clean:
 	rm -f core *~ *.o *.a ${TARGETS} 
@@ -18,11 +19,6 @@ clean:
 test: all
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}/
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install makeflow ${CCTOOLS_INSTALL_DIR}/bin
-	chmod 755 condor_submit_makeflow
-	install condor_submit_makeflow ${CCTOOLS_INSTALL_DIR}/bin
-	install makeflow_log_parser ${CCTOOLS_INSTALL_DIR}/bin
-	install makeflow_monitor ${CCTOOLS_INSTALL_DIR}/bin
-	install starch ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
+	chmod 755 ${SCRIPTS}
+	cp makeflow ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin

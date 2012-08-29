@@ -98,6 +98,21 @@ static int link_squelch()
 	return 1;
 }
 
+int link_keepalive(struct link *link, int onoff) {
+	int result, value;
+
+	if(onoff > 0) {
+		value = 1;
+	} else {
+		value = 0;
+	}
+
+	result = setsockopt(link->fd, SOL_SOCKET, SO_KEEPALIVE, (void *) &value, sizeof(value));
+	if(result!= 0)
+		return 0;
+	return 1;
+}
+
 int link_nonblocking(struct link *link, int onoff)
 {
 	int result;
@@ -119,6 +134,10 @@ int link_nonblocking(struct link *link, int onoff)
 	return 1;
 }
 
+int link_buffer_empty(struct link *link) {
+	return link->buffer_length > 0 ? 0 : 1;
+}
+
 static int errno_is_temporary(int e)
 {
 	if(e == EINTR || e == EWOULDBLOCK || e == EAGAIN || e == EINPROGRESS || e == EALREADY || e == EISCONN) {
@@ -131,26 +150,36 @@ static int errno_is_temporary(int e)
 static int link_internal_sleep(struct link *link, struct timeval *timeout, int reading, int writing)
 {
 	int result;
-	fd_set rfds, wfds;
+	struct pollfd pfd;
+	int msec;
 
-	FD_ZERO(&rfds);
-	if(reading)
-		FD_SET(link->fd, &rfds);
+	if(timeout) {
+		msec = (timeout->tv_sec * 1000.0) + (timeout->tv_usec/1000.0);
+	} else {
+		msec = -1;
+	}
 
-	FD_ZERO(&wfds);
-	if(writing)
-		FD_SET(link->fd, &wfds);
+	while (1) {
+		pfd.fd = link->fd;
+		pfd.revents = 0;
 
-	while(1) {
-		result = select(link->fd + 1, &rfds, &wfds, 0, timeout);
-		if(result > 0) {
-			if(reading && FD_ISSET(link->fd, &rfds))
+		if (reading) pfd.events = POLLIN;
+		if (writing) pfd.events = POLLOUT;
+		result = poll(&pfd, 1, msec);
+		if (result > 0) {
+			if (reading && (pfd.revents & POLLIN)) {
 				return 1;
-			if(writing && FD_ISSET(link->fd, &wfds))
+			}
+			if (writing && (pfd.revents & POLLOUT)) {
 				return 1;
-		} else if(result == 0) {
+			}
+			if (pfd.revents & POLLHUP) {
+				return 0;
+			}
+			continue;
+		} else if (result == 0) {
 			return 0;
-		} else if(errno_is_temporary(errno)) {
+		} else if (errno_is_temporary(errno)) {
 			continue;
 		} else {
 			return 0;
@@ -167,7 +196,7 @@ int link_sleep(struct link *link, time_t stoptime, int reading, int writing)
 		tptr = 0;
 	} else {
 		timeout = stoptime - time(0);
-		if(timeout < 0) {
+		if(timeout <= 0) {
 			errno = ECONNRESET;
 			return 0;
 		}
@@ -251,24 +280,50 @@ struct link *link_serve_address(const char *addr, int port)
 
 	link_window_configure(link);
 
-	if(addr != 0 || port != LINK_PORT_ANY) {
-
-		memset(&address, 0, sizeof(address));
+	memset(&address, 0, sizeof(address));
 #if defined(CCTOOLS_OPSYS_DARWIN)
-		address.sin_len = sizeof(address);
+	address.sin_len = sizeof(address);
 #endif
-		address.sin_family = AF_INET;
+	address.sin_family = AF_INET;
+
+	if(addr) {
+		string_to_ip_address(addr, (unsigned char *) &address.sin_addr.s_addr);
+	} else {
+		address.sin_addr.s_addr = htonl(INADDR_ANY);
+	}
+
+	int low = 1024;
+	int high = 32767;
+	if(port == 0) {
+		const char *lowstr = getenv("TCP_LOW_PORT");
+		if (lowstr)
+			low = atoi(lowstr);
+		const char *highstr = getenv("TCP_HIGH_PORT");
+		if (highstr)
+			high = atoi(highstr);
+	} else {
+		low = high = port;
+	}
+
+	if(high < low)
+		fatal("high port %d is less than low port %d in range", high, low);
+
+	for (port = low; port <= high; port++) {
 		address.sin_port = htons(port);
-
-		if(addr) {
-			string_to_ip_address(addr, (unsigned char *) &address.sin_addr.s_addr);
-		} else {
-			address.sin_addr.s_addr = htonl(INADDR_ANY);
-		}
-
 		success = bind(link->fd, (struct sockaddr *) &address, sizeof(address));
-		if(success < 0)
-			goto failure;
+		if(success == -1) {
+			if(errno == EADDRINUSE) {
+				//If a port is specified, fail!
+				if (low == high) { 
+					goto failure;
+				} else {	
+					continue;
+				}	
+			} else {
+				goto failure;
+			}
+		}
+		break;
 	}
 
 	success = listen(link->fd, 5);
@@ -365,21 +420,26 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 		/* If the remote address can be found, then we are really connected. */
 		/* Also, on bsd-derived systems, failure to connect is indicated by a second connect returning EINVAL. */
 
-		if(result < 0 && !errno_is_temporary(errno)) {
-			if(errno == EINVAL)
-				errno = ECONNREFUSED;
-			break;
-		}
+		/* On OSX, the following is a possible way of indicating a successful connection: */
+		if(result<0 && errno==EISCONN) result=0;
 
-		if(link_address_remote(link, link->raddr, &link->rport)) {
-
-			debug(D_TCP, "made connection to %s:%d", link->raddr, link->rport);
-
+		if(result < 0) {
+			if(!errno_is_temporary(errno)) {
+				if(errno == EINVAL)
+					errno = ECONNREFUSED;
+				break;
+			} else {
+				debug(D_TCP, "connection to %s:%d not made yet: %s", addr, port, strerror(errno));
+			}
+		} else {
+			if(link_address_remote(link, link->raddr, &link->rport)) {
+				debug(D_TCP, "made connection to %s:%d", link->raddr, link->rport);
 #ifdef CCTOOLS_OPSYS_CYGWIN
-			link_nonblocking(link, 1);
+				link_nonblocking(link, 1);
 #endif
-			return link;
-		}
+				return link;
+			}
+		} 
 	} while(link_sleep(link, stoptime, 0, 1));
 
 	debug(D_TCP, "connection to %s:%d failed (%s)", addr, port, strerror(errno));

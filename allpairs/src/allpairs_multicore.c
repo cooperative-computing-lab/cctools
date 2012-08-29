@@ -16,9 +16,10 @@ See the file COPYING for details.
 
 #include "allpairs_compare.h"
 
+#include "cctools.h"
 #include "debug.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 #include "fast_popen.h"
 #include "text_list.h"
 #include "memory_info.h"
@@ -30,11 +31,6 @@ static const char *progname = "allpairs_multicore";
 static const char *extra_arguments = "";
 static int block_size = 0;
 static int num_cores = 0;
-
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
 
 static void show_help(const char *cmd)
 {
@@ -260,9 +256,12 @@ static int main_loop_program( const char *funcpath, struct text_list *seta, stru
 				/* then finish one process for each core */
 				for(c=0;c<n;c++) {
 					printf("%s\t%s\t",text_list_get(seta,i+c),text_list_get(setb,j));
+					int lines = 0;
 					while(fgets(line,sizeof(line),proc[c])) {
 						printf("%s",line);
+						lines++;
 					}
+					if(lines==0) printf("\n");
 					fast_pclose(proc[c]);
 				}
 			}
@@ -279,7 +278,7 @@ int main(int argc, char *argv[])
 
 	debug_config(progname);
 
-	while((c = getopt(argc, argv, "b:c:e:dvh")) != (char)-1) {
+	while((c = getopt(argc, argv, "b:c:e:d:vh")) != (char)-1) {
 		switch (c) {
 		case 'b':
 			block_size = atoi(optarg);
@@ -294,7 +293,7 @@ int main(int argc, char *argv[])
 			debug_flags_set(optarg);
 			break;
 		case 'v':
-			show_version(progname);
+			cctools_version_print(stdout, progname);
 			exit(0);
 			break;
 		default:
@@ -304,6 +303,8 @@ int main(int argc, char *argv[])
 			break;
 		}
 	}
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if((argc - optind) < 3) {
 		show_help(progname);

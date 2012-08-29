@@ -7,7 +7,8 @@ all:
 test:
 
 install:
-	cp replica_exchange_protomol ${CCTOOLS_INSTALL_DIR}/bin
+	cp protomol_functions.py ${CCTOOLS_INSTALL_DIR}/bin
+	cp replica_exchange.py ${CCTOOLS_INSTALL_DIR}/bin
 
 clean:
 

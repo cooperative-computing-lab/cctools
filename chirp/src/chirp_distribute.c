@@ -16,6 +16,7 @@ The -X option will delete the directory from all of the named hosts.
 
 #include "auth.h"
 #include "auth_all.h"
+#include "cctools.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "timestamp.h"
@@ -160,11 +161,6 @@ struct target_info {
 	int cid;
 };
 
-static void show_version(const char *cmd)
-{
-	printf("%s version %d.%d.%d built by %s@%s on %s at %s\n", cmd, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
-}
-
 static void show_use()
 {
 	printf("Use: chirp_distribute [options] <sourcehost> <sourcepath> <host1> <host2> ...\n");
@@ -244,7 +240,7 @@ int main(int argc, char *argv[])
 			debug_flags_set(optarg);
 			break;
 		case 'v':
-			show_version(argv[0]);
+			cctools_version_print(stdout, argv[0]);
 			return 0;
 			break;
 		case 't':
@@ -263,6 +259,8 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
+
+	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(!did_explicit_auth)
 		auth_register_all();

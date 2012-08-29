@@ -16,7 +16,6 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <stdio.h>
 #include <time.h>
-#include <time.h>
 
 /* Authentication Environment Variable */
 #define CHIRP_CLIENT_TICKETS  "CHIRP_CLIENT_TICKETS"
@@ -110,6 +109,5 @@ INT64_T chirp_client_fsync_begin(struct chirp_client *c, INT64_T fd, time_t stop
 INT64_T chirp_client_fsync_finish(struct chirp_client *c, INT64_T fd, time_t stoptime);
 INT64_T chirp_client_fstat_begin(struct chirp_client *c, INT64_T fd, struct chirp_stat *buf, time_t stoptime);
 INT64_T chirp_client_fstat_finish(struct chirp_client *c, INT64_T fd, struct chirp_stat *buf, time_t stoptime);
-INT64_T chirp_client_search(struct chirp_client *c, const char *pattern, const char *dir, char ***array, time_t stoptime);
 
 #endif

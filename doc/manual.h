@@ -20,6 +20,7 @@ LIST_ITEM MANPAGE(work_queue_status,1)
 LIST_ITEM MANPAGE(work_queue_pool,1)
 LIST_ITEM MANPAGE(condor_submit_workers,1)
 LIST_ITEM MANPAGE(sge_submit_workers,1)
+LIST_ITEM MANPAGE(torque_submit_workers,1)
 LIST_ITEM MANPAGE(ec2_submit_workers,1)
 LIST_ITEM MANPAGE(ec2_remove_workers,1)
 LIST_END')dnl

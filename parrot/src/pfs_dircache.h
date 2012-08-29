@@ -12,7 +12,7 @@ See the file COPYING for details.
 extern "C" {
 #include "hash_table.h"
 #include "stringtools.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 }
 
 class pfs_dir;

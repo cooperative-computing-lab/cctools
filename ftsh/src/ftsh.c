@@ -13,7 +13,8 @@ See the file COPYING for details.
 #include "ftsh_error.h"
 #include "multi_fork.h"
 
-#include "xmalloc.h"
+#include "cctools.h"
+#include "xxmalloc.h"
 #include "stringtools.h"
 #include "macros.h"
 
@@ -33,14 +34,9 @@ static void null_handler( int sig )
 {
 }
 
-static void show_version( char *cmd )
-{
-	fprintf(stderr,"ftsh version %d.%d.%d built by %s@%s at %s on %s\n",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,BUILD_USER,BUILD_HOST,__TIME__,__DATE__);
-}
-
 static void show_help( char *cmd )
 {
-	show_version(cmd);
+	cctools_version_print(stderr, cmd);
 	fprintf(stderr,"\
 Use: ftsh [options] <program> [arg1] [arg2]\n\
 Where options are:\n\
@@ -158,7 +154,7 @@ static int ftsh_main( int argc, char *argv[] )
 				parse_debug_mode = 1;
 				break;
 			case 'v':
-				show_version(argv[0]);
+				cctools_version_print(stderr, argv[0]);
 				return 1;
 				break;
 			case 'h':
@@ -169,6 +165,8 @@ static int ftsh_main( int argc, char *argv[] )
 		}
 	}
 
+	cctools_version_debug(D_DEBUG, argv[0]);
+
 	if(optind>=argc) {
 		show_help(argv[0]);
 		return 1;
@@ -177,35 +175,35 @@ static int ftsh_main( int argc, char *argv[] )
 	/* Reset the environment for my children */
 
 	sprintf(env,"FTSH_VERSION=%d.%d.%d",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
-	putenv(xstrdup(env));
+	putenv(xxstrdup(env));
 
 	if(log_file) {
 		sprintf(env,"FTSH_LOG_FILE=%s",log_file);
-		putenv(xstrdup(env));
+		putenv(xxstrdup(env));
 	}
 
 	sprintf(env,"FTSH_LOG_LEVEL=%d",log_level);
-	putenv(xstrdup(env));
+	putenv(xxstrdup(env));
 
 	if(log_decimal) {
 		sprintf(env,"FTSH_LOG_DECIMAL=");
-		putenv(xstrdup(env));
+		putenv(xxstrdup(env));
 	}
 
 	sprintf(env,"FTSH_KILL_TIMEOUT=%d",MAX(kill_timeout-5,0));
-	putenv(xstrdup(env));
+	putenv(xxstrdup(env));
 
 	sprintf(env,"FTSH_KILL_MODE=%s",kill_mode);
-	putenv(xstrdup(env));
+	putenv(xxstrdup(env));
 
 	sprintf(env,"FTSH_VERSION_MAJOR=%d",CCTOOLS_VERSION_MAJOR);
-	putenv(xstrdup(env));
+	putenv(xxstrdup(env));
 
 	sprintf(env,"FTSH_VERSION_MINOR=%d",CCTOOLS_VERSION_MINOR);
-	putenv(xstrdup(env));
+	putenv(xxstrdup(env));
 
 	sprintf(env,"FTSH_VERSION_MICRO=%d",CCTOOLS_VERSION_MICRO);
-	putenv(xstrdup(env));
+	putenv(xxstrdup(env));
 
 	/* Now, initialize my systems */
 
@@ -267,7 +265,7 @@ int main( int argc, char *argv[] )
 		int i;
 
 		/* Split the first argument into pieces */
-		string_split_quotes(xstrdup(argv[1]),&tmp_argc,&tmp_argv);
+		string_split_quotes(xxstrdup(argv[1]),&tmp_argc,&tmp_argv);
 
 		/* Allocate a new argument array */
 		new_argc = tmp_argc + argc;

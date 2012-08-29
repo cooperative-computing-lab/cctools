@@ -29,8 +29,8 @@ scanner.c: scanner.l parser.tab.h
 test:
 
 install: all
-	install -d ${CCTOOLS_INSTALL_DIR}/bin
-	install ftsh ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
+	cp ftsh ${CCTOOLS_INSTALL_DIR}/bin
 
 clean:
 	rm -f ${PROGRAMS} ${OBJECTS} ${LIBRARIES} parser.tab.c parser.tab.h scanner.c *~

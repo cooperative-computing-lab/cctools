@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "xmalloc.h"
+#include "xxmalloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,7 +27,7 @@ int find_executable(const char *exe_name, const char *env_path_var, char *exe_pa
 	if(!getenv(env_path_var))
 		return 0;
 
-	env_paths = xstrdup(getenv(env_path_var));
+	env_paths = xxstrdup(getenv(env_path_var));
 
 	for(cur_path = strtok(env_paths, ":"); cur_path; cur_path = strtok(NULL, ":")) {
 		snprintf(exe_path, max_length, "%s/%s", cur_path, exe_name);
