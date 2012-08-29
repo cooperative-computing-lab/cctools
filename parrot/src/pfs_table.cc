@@ -9,6 +9,7 @@ See the file COPYING for details.
 #define _GNU_SOURCE
 #endif
 
+#include "pfs_search.h"
 #include "pfs_table.h"
 #include "pfs_service.h"
 #include "pfs_pointer.h"
@@ -28,6 +29,7 @@ extern "C" {
 #include "md5.h"
 }
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -1729,7 +1731,19 @@ int pfs_table::whoami( const char *n, char *buf, int length )
 	return result;
 }
 
-static int search_directory (pfs_table *t, unsigned level, const char *base, char *dir, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, size_t *i, size_t *j)
+static int search_to_access (int flags)
+{
+	int access_flags = F_OK;
+	if (flags & PFS_SEARCH_R_OK)
+		access_flags |= R_OK;
+	if (flags & PFS_SEARCH_W_OK)
+		access_flags |= W_OK;
+	if (flags & PFS_SEARCH_X_OK)
+		access_flags |= X_OK;
+    return access_flags;
+}
+
+static int search_directory (pfs_table *t, unsigned level, const char *base, char *dir, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, size_t *i, size_t *j, int flags)
 {
 	if (level == 0)
 		return 0;
@@ -1747,32 +1761,53 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 			if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
 
 			sprintf(current, "/%s", name);
-			r = t->stat(base, &buf);
+			r = t->stat(dir, &buf);
 			if (fnmatch(pattern, base, FNM_PATHNAME) == 0) {
-				size_t l = strlen(dir);
+				const char *matched;
+				int access_flags = search_to_access(flags);
+
+				if (flags & PFS_SEARCH_INCLUDEROOT)
+					matched = dir;
+				else
+					matched = base;
+				size_t l = strlen(matched);
+
 				if (l+*i+2 >= len1) { /* +2 for terminating 2 NUL bytes */
 					errno = ERANGE;
 					return -1;
-				} else {
-					strcpy(buffer+*i, dir);
-					*i += l+1;
-					buffer[*i] = '\0'; /* second terminating NUL byte */
-				}
+				} else if (t->access(dir, access_flags) == 0) {
+					if (*i == 0) {
+						sprintf(buffer+*i, "%s", matched);
+						*i += l;
+                    } else {
+						sprintf(buffer+*i, ":%s", matched);
+						*i += l+1;
+                    }
 
-				if (*j == len2) {
-					errno = ERANGE;
-					return -1;
-				} else {
-					COPY_STAT(buf, stats[*j]);
-					*j += 1;
+					if (stats && flags & PFS_SEARCH_METADATA) {
+						if (*j == len2) {
+							errno = ERANGE;
+							return -1;
+						} else {
+							COPY_STAT(buf, stats[*j]);
+							*j += 1;
+						}
+					}
+					if (flags & PFS_SEARCH_STOPATFIRST) {
+						return 1;
+					}
+					else
+						found += 1;
 				}
-				found += 1;
 			}
 
 			if (r == 0 && S_ISDIR(buf.st_mode)) {
-				int result = search_directory(t, level-1, base, dir, pattern, buffer, len1, stats, len2, i, j);
+				int result = search_directory(t, level-1, base, dir, pattern, buffer, len1, stats, len2, i, j, flags);
 				if (result == -1)
 					return -1;
+				else if (flags & PFS_SEARCH_STOPATFIRST && result == 1) {
+					return 1;
+				}
 				else
 					found += result;
 			}
@@ -1784,22 +1819,139 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 	return found;
 }
 
-int pfs_table::search( const char *path, const char *patt, char *buffer, size_t len1, struct stat *stats, size_t len2 )
+static int is_pattern (const char *pattern)
 {
-	unsigned level = 1;
+	for (; *pattern; pattern += 1) {
+		switch (*pattern) {
+			case '\\':
+#if 0
+				/* we need to change the pattern to remove the backslashes
+				 * so we can do exact matches, future work.
+				 */
+				pattern += 1;
+				if (*pattern == '\0') {
+					return 0;
+                }
+				break;
+#endif
+			case '*':
+			case '?':
+			case '[':
+				return 1;
+			case '"':
+			case '\'':
+			{
+              /*
+				const char quote = *pattern;
+                quote = quote;
+              */
+				/* quoting behavior isn't very clear... */
+			}
+			default:
+				break;
+		}
+	}
+	return 0;
+}
+
+int pfs_table::search( const char *paths, const char *patt, char *buffer, size_t len1, struct stat *stats, size_t len2, int flags )
+{
+	unsigned level = 0;
 	const char *s;
-	char directory[PFS_PATH_MAX+1];
+	const char *start = paths;
+	const char *end;
 	char pattern[PFS_PATH_MAX+1];
 	size_t i = 0, j = 0;
-
-
-	string_collapse_path(path, directory, 0);
+	int found = 0;
+	int result;
+	int exact_match = 0;
 
 	for (s = patt; *s == '/'; s++) ; /* remove leading slashes from pattern */
 	sprintf(pattern, "/%s", s); /* add leading slash for base directory */
-	for (s = strchr(pattern, '/'); s; s = strchr(s+1, '/')) level++; /* count the number of nested directories to descend at maximum */
 
-	return search_directory(this, level, directory+strlen(directory), directory, pattern, buffer, len1, stats, len2, &i, &j);
+	if (!is_pattern(pattern))
+		exact_match = 1;
+
+	if (flags & PFS_SEARCH_RECURSIVE) {
+		level = PFS_SEARCH_DEPTH_MAX;
+	} else {
+		for (s = strchr(pattern, '/'); s; s = strchr(s+1, '/')) level++; /* count the number of nested directories to descend at maximum */
+	}
+
+	int done = 0;
+	do {
+		char path[PFS_PATH_MAX+1];
+		char directory[PFS_PATH_MAX+1];
+		end = strchr(start, PFS_SEARCH_DELIMITER);
+		if (end) {
+			if (start == end) { /* "::" ? */
+				strcpy(path, ".");
+            } else {
+                ptrdiff_t length = end-start; /* C++ doesn't let us properly cast these to void pointers for proper byte length */
+                memset(path, 0, sizeof(path));
+				strncpy(path, start, length);
+            }
+			start = end+1;
+		} else {
+			strcpy(path, start);
+			done = 1;
+		}
+
+		string_collapse_path(path, directory, 0);
+
+		if (exact_match) {
+			struct pfs_stat buf;
+			int access_flags = search_to_access(flags);
+			const char *base = directory+strlen(directory);
+
+			strcat(directory, pattern);
+			result = this->stat(directory, &buf);
+			if (result == 0) {
+				const char *matched;
+				if (flags & PFS_SEARCH_INCLUDEROOT)
+					matched = directory;
+				else
+					matched = base;
+				size_t l = strlen(matched);
+
+				if (l+i+2 >= len1) { /* +2 for terminating 2 NUL bytes */
+					errno = ERANGE;
+					return -1;
+				} else if (this->access(directory, access_flags) == 0) {
+					if (i == 0) {
+						sprintf(buffer+i, "%s", matched);
+						i += l;
+                    } else {
+						sprintf(buffer+i, ":%s", matched);
+						i += l+1;
+                    }
+
+					if (stats && flags & PFS_SEARCH_METADATA) {
+						if (j == len2) {
+							errno = ERANGE;
+							return -1;
+						} else {
+							COPY_STAT(buf, stats[j]);
+							j += 1;
+						}
+					}
+					result = 1;
+				}
+			} else {
+                result = 0;
+            }
+		} else {
+			result = search_directory(this, level, directory+strlen(directory), directory, pattern, buffer, len1, stats, len2, &i, &j, flags);
+		}
+		if (result == -1)
+			return -1;
+		else if (flags & PFS_SEARCH_STOPATFIRST && result == 1) {
+			return result;
+		} else
+			found += result;
+	} while (!done);
+
+    return found;
 }
 
 int pfs_table::getacl( const char *n, char *buf, int length )
