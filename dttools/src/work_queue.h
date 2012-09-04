@@ -17,6 +17,7 @@ program can be run on any machine, and simply needs to be told the host
 and port of the master.
 */
 
+#include <sys/types.h>
 #include "timestamp.h"
 
 #define WORK_QUEUE_DEFAULT_PORT 9123  /**< Default Work Queue port number. */
@@ -131,6 +132,21 @@ struct work_queue_task *work_queue_task_create(const char *full_command);
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 */
 void work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags);
+
+/** Add a file piece to a task.
+@param t A task object.
+@param local_name The name of the file on local disk or shared filesystem.
+@param remote_name The name of the file at the remote execution site.
+@param start_byte The starting byte offset of the file piece to be transferred.
+@param end_byte The ending byte offset of the file piece to be transferred.
+@param type Must be one of the following values:
+- @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
+- @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
+@param flags	May be zero to indicate no special handling or any of the following or'd together:
+- @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
+- @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
+*/
+void work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags);
 
 /** Add an input buffer to a task.
 @param t A task object.

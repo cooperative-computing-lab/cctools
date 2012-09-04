@@ -60,12 +60,6 @@ See the file COPYING for details.
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
-static INT64_T get_stat_result(struct chirp_client *c, struct chirp_stat *info, time_t stoptime);
-static INT64_T get_statfs_result(struct chirp_client *c, struct chirp_statfs *info, time_t stoptime);
-static INT64_T send_command(struct chirp_client *c, time_t stoptime, char const *fmt, ...);
-static INT64_T get_result(struct chirp_client *c, time_t stoptime);
-static INT64_T simple_command(struct chirp_client *c, time_t stoptime, char const *fmt, ...);
-
 static int global_serial = 0;
 
 struct chirp_client {
@@ -74,6 +68,207 @@ struct chirp_client {
 	int broken;
 	int serial;
 };
+
+static INT64_T convert_result(INT64_T result)
+{
+	if(result >= 0) {
+		return result;
+	} else {
+		switch (result) {
+		case CHIRP_ERROR_NOT_AUTHENTICATED:
+		case CHIRP_ERROR_NOT_AUTHORIZED:
+			errno = EACCES;
+			break;
+		case CHIRP_ERROR_DOESNT_EXIST:
+			errno = ENOENT;
+			break;
+		case CHIRP_ERROR_ALREADY_EXISTS:
+			errno = EEXIST;
+			break;
+		case CHIRP_ERROR_TOO_BIG:
+			errno = EFBIG;
+			break;
+		case CHIRP_ERROR_NO_SPACE:
+			errno = ENOSPC;
+			break;
+		case CHIRP_ERROR_NO_MEMORY:
+			errno = ENOMEM;
+			break;
+		case CHIRP_ERROR_INVALID_REQUEST:
+			errno = EINVAL;
+			break;
+		case CHIRP_ERROR_TOO_MANY_OPEN:
+			errno = EMFILE;
+			break;
+		case CHIRP_ERROR_BUSY:
+			errno = EBUSY;
+			break;
+		case CHIRP_ERROR_TRY_AGAIN:
+			errno = EAGAIN;
+			break;
+		case CHIRP_ERROR_NOT_DIR:
+			errno = ENOTDIR;
+			break;
+		case CHIRP_ERROR_IS_DIR:
+			errno = EISDIR;
+			break;
+		case CHIRP_ERROR_NOT_EMPTY:
+			errno = ENOTEMPTY;
+			break;
+		case CHIRP_ERROR_CROSS_DEVICE_LINK:
+			errno = EXDEV;
+			break;
+		case CHIRP_ERROR_NO_SUCH_PROCESS:
+			errno = ESRCH;
+			break;
+		case CHIRP_ERROR_IS_A_PIPE:
+			errno = ESPIPE;
+			break;
+		case CHIRP_ERROR_NOT_SUPPORTED:
+			errno = ENOTSUP;
+			break;
+		case CHIRP_ERROR_GRP_UNREACHABLE:
+		case CHIRP_ERROR_TIMED_OUT:
+		case CHIRP_ERROR_DISCONNECTED:
+		case CHIRP_ERROR_UNKNOWN:
+			errno = ECONNRESET;
+			break;
+		}
+		return -1;
+	}
+}
+
+static INT64_T get_stat_result(struct chirp_client *c, struct chirp_stat *info, time_t stoptime)
+{
+	char line[CHIRP_LINE_MAX];
+	INT64_T fields;
+
+	memset(info, 0, sizeof(*info));
+
+	if(!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) {
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+
+	fields = sscanf(line, "%lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %llu %llu %llu\n", &info->cst_dev, &info->cst_ino, &info->cst_mode, &info->cst_nlink, &info->cst_uid, &info->cst_gid, &info->cst_rdev, &info->cst_size, &info->cst_blksize,
+			&info->cst_blocks, &info->cst_atime, &info->cst_mtime, &info->cst_ctime);
+
+	info->cst_dev = -1;
+	info->cst_rdev = 0;
+
+	if(fields != 13) {
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+
+	return 0;
+}
+
+static INT64_T get_statfs_result(struct chirp_client *c, struct chirp_statfs *info, time_t stoptime)
+{
+	char line[CHIRP_LINE_MAX];
+	INT64_T fields;
+
+	memset(info, 0, sizeof(*info));
+
+	if(!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) {
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+
+	fields = sscanf(line, "%lld %lld %lld %lld %lld %lld %lld\n", &info->f_type, &info->f_bsize, &info->f_blocks, &info->f_bfree, &info->f_bavail, &info->f_files, &info->f_ffree);
+
+	if(fields != 7) {
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+
+	return 0;
+}
+
+static INT64_T get_result(struct chirp_client *c, time_t stoptime)
+{
+	char line[CHIRP_LINE_MAX];
+	INT64_T result;
+	INT64_T fields;
+
+	if(!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) {
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+
+	fields = sscanf(line, "%lld", &result);
+	if(fields != 1) {
+		errno = ECONNRESET;
+		c->broken = 1;
+		return -1;
+	}
+
+	result = convert_result(result);
+	if(result >= 0) {
+		debug(D_CHIRP, " = %lld", result);
+	} else {
+		debug(D_CHIRP, " = %lld (%s)", result, strerror(errno));
+	}
+
+	return result;
+}
+
+static INT64_T send_command_varargs(struct chirp_client *c, time_t stoptime, char const *fmt, va_list args)
+{
+	INT64_T result;
+	char command[CHIRP_LINE_MAX];
+
+	vsprintf(command, fmt, args);
+
+	if(c->broken) {
+		errno = ECONNRESET;
+		return -1;
+	}
+
+	debug(D_CHIRP, "%s: %s", c->hostport, command);
+
+	result = link_putstring(c->link, command, stoptime);
+	if(result < 0) {
+		c->broken = 1;
+		errno = ECONNRESET;
+	}
+
+	return result;
+}
+
+static INT64_T send_command(struct chirp_client *c, time_t stoptime, char const *fmt, ...)
+{
+	INT64_T result;
+	va_list args;
+
+	va_start(args, fmt);
+	result = send_command_varargs(c, stoptime, fmt, args);
+	va_end(args);
+
+	return result;
+}
+
+static INT64_T simple_command(struct chirp_client *c, time_t stoptime, char const *fmt, ...)
+{
+	INT64_T result;
+	va_list args;
+
+	va_start(args, fmt);
+	result = send_command_varargs(c, stoptime, fmt, args);
+	va_end(args);
+
+	if(result >= 0) {
+		return get_result(c, stoptime);
+	} else {
+		return result;
+	}
+}
 
 struct chirp_client *chirp_client_connect_condor(time_t stoptime)
 {
@@ -1359,207 +1554,6 @@ INT64_T chirp_client_lsalloc(struct chirp_client * c, char const *path, char *al
 		}
 	}
 	return result;
-}
-
-static INT64_T convert_result(INT64_T result)
-{
-	if(result >= 0) {
-		return result;
-	} else {
-		switch (result) {
-		case CHIRP_ERROR_NOT_AUTHENTICATED:
-		case CHIRP_ERROR_NOT_AUTHORIZED:
-			errno = EACCES;
-			break;
-		case CHIRP_ERROR_DOESNT_EXIST:
-			errno = ENOENT;
-			break;
-		case CHIRP_ERROR_ALREADY_EXISTS:
-			errno = EEXIST;
-			break;
-		case CHIRP_ERROR_TOO_BIG:
-			errno = EFBIG;
-			break;
-		case CHIRP_ERROR_NO_SPACE:
-			errno = ENOSPC;
-			break;
-		case CHIRP_ERROR_NO_MEMORY:
-			errno = ENOMEM;
-			break;
-		case CHIRP_ERROR_INVALID_REQUEST:
-			errno = EINVAL;
-			break;
-		case CHIRP_ERROR_TOO_MANY_OPEN:
-			errno = EMFILE;
-			break;
-		case CHIRP_ERROR_BUSY:
-			errno = EBUSY;
-			break;
-		case CHIRP_ERROR_TRY_AGAIN:
-			errno = EAGAIN;
-			break;
-		case CHIRP_ERROR_NOT_DIR:
-			errno = ENOTDIR;
-			break;
-		case CHIRP_ERROR_IS_DIR:
-			errno = EISDIR;
-			break;
-		case CHIRP_ERROR_NOT_EMPTY:
-			errno = ENOTEMPTY;
-			break;
-		case CHIRP_ERROR_CROSS_DEVICE_LINK:
-			errno = EXDEV;
-			break;
-		case CHIRP_ERROR_NO_SUCH_PROCESS:
-			errno = ESRCH;
-			break;
-		case CHIRP_ERROR_IS_A_PIPE:
-			errno = ESPIPE;
-			break;
-		case CHIRP_ERROR_NOT_SUPPORTED:
-			errno = ENOTSUP;
-			break;
-		case CHIRP_ERROR_GRP_UNREACHABLE:
-		case CHIRP_ERROR_TIMED_OUT:
-		case CHIRP_ERROR_DISCONNECTED:
-		case CHIRP_ERROR_UNKNOWN:
-			errno = ECONNRESET;
-			break;
-		}
-		return -1;
-	}
-}
-
-static INT64_T get_stat_result(struct chirp_client *c, struct chirp_stat *info, time_t stoptime)
-{
-	char line[CHIRP_LINE_MAX];
-	INT64_T fields;
-
-	memset(info, 0, sizeof(*info));
-
-	if(!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) {
-		c->broken = 1;
-		errno = ECONNRESET;
-		return -1;
-	}
-
-	fields = sscanf(line, "%lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %llu %llu %llu\n", &info->cst_dev, &info->cst_ino, &info->cst_mode, &info->cst_nlink, &info->cst_uid, &info->cst_gid, &info->cst_rdev, &info->cst_size, &info->cst_blksize,
-			&info->cst_blocks, &info->cst_atime, &info->cst_mtime, &info->cst_ctime);
-
-	info->cst_dev = -1;
-	info->cst_rdev = 0;
-
-	if(fields != 13) {
-		c->broken = 1;
-		errno = ECONNRESET;
-		return -1;
-	}
-
-	return 0;
-}
-
-static INT64_T get_statfs_result(struct chirp_client *c, struct chirp_statfs *info, time_t stoptime)
-{
-	char line[CHIRP_LINE_MAX];
-	INT64_T fields;
-
-	memset(info, 0, sizeof(*info));
-
-	if(!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) {
-		c->broken = 1;
-		errno = ECONNRESET;
-		return -1;
-	}
-
-	fields = sscanf(line, "%lld %lld %lld %lld %lld %lld %lld\n", &info->f_type, &info->f_bsize, &info->f_blocks, &info->f_bfree, &info->f_bavail, &info->f_files, &info->f_ffree);
-
-	if(fields != 7) {
-		c->broken = 1;
-		errno = ECONNRESET;
-		return -1;
-	}
-
-	return 0;
-}
-
-static INT64_T get_result(struct chirp_client *c, time_t stoptime)
-{
-	char line[CHIRP_LINE_MAX];
-	INT64_T result;
-	INT64_T fields;
-
-	if(!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) {
-		c->broken = 1;
-		errno = ECONNRESET;
-		return -1;
-	}
-
-	fields = sscanf(line, "%lld", &result);
-	if(fields != 1) {
-		errno = ECONNRESET;
-		c->broken = 1;
-		return -1;
-	}
-
-	result = convert_result(result);
-	if(result >= 0) {
-		debug(D_CHIRP, " = %lld", result);
-	} else {
-		debug(D_CHIRP, " = %lld (%s)", result, strerror(errno));
-	}
-
-	return result;
-}
-
-static INT64_T send_command_varargs(struct chirp_client *c, time_t stoptime, char const *fmt, va_list args)
-{
-	INT64_T result;
-	char command[CHIRP_LINE_MAX];
-
-	vsprintf(command, fmt, args);
-
-	if(c->broken) {
-		errno = ECONNRESET;
-		return -1;
-	}
-
-	debug(D_CHIRP, "%s: %s", c->hostport, command);
-
-	result = link_putstring(c->link, command, stoptime);
-	if(result < 0) {
-		c->broken = 1;
-		errno = ECONNRESET;
-	}
-
-	return result;
-}
-
-static INT64_T send_command(struct chirp_client *c, time_t stoptime, char const *fmt, ...)
-{
-	INT64_T result;
-	va_list args;
-
-	va_start(args, fmt);
-	result = send_command_varargs(c, stoptime, fmt, args);
-	va_end(args);
-
-	return result;
-}
-
-static INT64_T simple_command(struct chirp_client *c, time_t stoptime, char const *fmt, ...)
-{
-	INT64_T result;
-	va_list args;
-
-	va_start(args, fmt);
-	result = send_command_varargs(c, stoptime, fmt, args);
-	va_end(args);
-
-	if(result >= 0) {
-		return get_result(c, stoptime);
-	} else {
-		return result;
-	}
 }
 
 INT64_T chirp_client_getxattr(struct chirp_client *c, const char *path, const char *name, void *data, size_t size, time_t stoptime)
