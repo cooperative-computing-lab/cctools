@@ -22,11 +22,6 @@ extern "C" {
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#if defined(HAS_SYS_XATTR_H)
-#include <sys/xattr.h>
-#elif defined(HAS_ATTR_XATTR_H)
-#include <attr/xattr.h>
-#endif
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/vfs.h>
@@ -35,6 +30,16 @@ extern "C" {
 #include <utime.h>
 #include <dirent.h>
 #include <sys/poll.h>
+
+#if defined(HAS_SYS_XATTR_H)
+#include <sys/xattr.h>
+#endif
+#if defined(HAS_ATTR_XATTR_H)
+#include <attr/xattr.h>
+#endif
+#ifndef ENOATTR
+#define ENOATTR  EINVAL
+#endif
 
 #define END debug(D_LOCAL,"= %d %s",(int)result,((result>=0) ? "" : strerror(errno)) ); return result;
 

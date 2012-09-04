@@ -37,8 +37,12 @@ See the file COPYING for details.
 
 #if defined(HAS_SYS_XATTR_H)
 #include <sys/xattr.h>
-#elif defined(HAS_ATTR_XATTR_H)
+#endif
+#if defined(HAS_ATTR_XATTR_H)
 #include <attr/xattr.h>
+#endif
+#ifndef ENOATTR
+#define ENOATTR  EINVAL
 #endif
 
 /* Cygwin does not have 64-bit I/O, while Darwin has it by default. */

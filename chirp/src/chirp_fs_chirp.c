@@ -388,7 +388,6 @@ struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_md5,
 	chirp_fs_chirp_setrep,
 
-#if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
 	chirp_fs_chirp_getxattr,
 	chirp_fs_chirp_fgetxattr,
 	chirp_fs_chirp_lgetxattr,
@@ -401,20 +400,6 @@ struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_removexattr,
 	chirp_fs_chirp_fremovexattr,
 	chirp_fs_chirp_lremovexattr,
-#else
-	cfs_stub_getxattr,
-	cfs_stub_fgetxattr,
-	cfs_stub_lgetxattr,
-	cfs_stub_listxattr,
-	cfs_stub_flistxattr,
-	cfs_stub_llistxattr,
-	cfs_stub_setxattr,
-	cfs_stub_fsetxattr,
-	cfs_stub_lsetxattr,
-	cfs_stub_removexattr,
-	cfs_stub_fremovexattr,
-	cfs_stub_lremovexattr,
-#endif
 
 	chirp_fs_chirp_do_acl_check
 };

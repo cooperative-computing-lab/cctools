@@ -63,6 +63,16 @@ See the file COPYING for details.
 #include <sys/wait.h>
 #include <sys/select.h>
 
+#if defined(HAS_SYS_XATTR_H)
+#include <sys/xattr.h>
+#endif
+#if defined(HAS_ATTR_XATTR_H)
+#include <attr/xattr.h>
+#endif
+#ifndef ENOATTR
+#define ENOATTR  EINVAL
+#endif
+
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
@@ -1283,7 +1293,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			dataout = malloc(MAX_BUFFER_SIZE);
 			if(dataout) {
 				result = chirp_alloc_flistxattr(fd, dataout, MAX_BUFFER_SIZE);
-				if (result > 0) {
+				if (result >= 0) {
 					dataoutlength = result;
 				} else {
 					assert(result == -1);
@@ -1426,7 +1436,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			dataout = malloc(MAX_BUFFER_SIZE);
 			if(dataout) {
 				result = chirp_alloc_listxattr(path, dataout, MAX_BUFFER_SIZE);
-				if (result > 0) {
+				if (result >= 0) {
 					dataoutlength = result;
 				} else {
 					assert(result == -1);
@@ -1445,7 +1455,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			dataout = malloc(MAX_BUFFER_SIZE);
 			if(dataout) {
 				result = chirp_alloc_llistxattr(path, dataout, MAX_BUFFER_SIZE);
-				if (result > 0) {
+				if (result >= 0) {
 					dataoutlength = result;
 				} else {
 					assert(result == -1);
@@ -1872,6 +1882,7 @@ static int errno_to_chirp(int e)
 		return CHIRP_ERROR_NO_SPACE;
 	case ENOMEM:
 		return CHIRP_ERROR_NO_MEMORY;
+	case ENOATTR:
 	case ENOSYS:
 	case EINVAL:
 		return CHIRP_ERROR_INVALID_REQUEST;
