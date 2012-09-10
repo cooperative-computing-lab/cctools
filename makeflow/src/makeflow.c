@@ -243,7 +243,7 @@ void dag_show_input_files(struct dag *d)
 
 	hash_table_firstkey(ih);
 	while(hash_table_nextkey(ih, &key, &value)) {
-		debug(D_DEBUG, "%s", key);
+		printf("%s\n", key);
 	}
 
 	hash_table_delete(ih);
@@ -257,7 +257,7 @@ void dag_show_output_files(struct dag *d)
 	hash_table_firstkey(d->file_table);
 
 	while(hash_table_nextkey(d->file_table, &key, &value)) {
-		debug(D_DEBUG, "%s", key);
+		printf("%s\n", key);
 	}
 }
 
