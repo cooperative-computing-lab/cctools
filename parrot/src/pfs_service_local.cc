@@ -240,28 +240,44 @@ process to sleep and wait for actual input to become ready.
 	virtual ssize_t fgetxattr( const char *name, void *data, size_t size ) {
 		ssize_t result;
 		debug(D_LOCAL,"fgetxattr %d %s",fd,name);
-		result = ::fgetxattr(fd,name,data,size);
+#ifdef CCTOOLS_OPSYS_DARWIN
+		result = ::fgetxattr(fd, name, data, size, 0, 0);
+#else
+		result = ::fgetxattr(fd, name, data, size);
+#endif
 		END
 	}
 
 	virtual ssize_t flistxattr( char *list, size_t size ) {
 		ssize_t result;
 		debug(D_LOCAL,"flistxattr %d",fd);
-		result = ::flistxattr(fd,list,size);
+#ifdef CCTOOLS_OPSYS_DARWIN
+		result = ::flistxattr(fd, list, size, 0);
+#else
+		result = ::flistxattr(fd, list, size);
+#endif
 		END
 	}
 
 	virtual int fsetxattr( const char *name, const void *data, size_t size, int flags ) {
 		int result;
 		debug(D_LOCAL,"fsetxattr %d %s <> %d",fd,name,flags);
-		result = ::fsetxattr(fd,name,data,size,flags);
+#ifdef CCTOOLS_OPSYS_DARWIN
+		result = ::fsetxattr(fd, name, data, size, 0, flags);
+#else
+		result = ::fsetxattr(fd, name, data, size, flags);
+#endif
 		END
 	}
 
 	virtual int fremovexattr( const char *name ) {
 		int result;
 		debug(D_LOCAL,"fremovexattr %d %s",fd,name);
-		result = ::fremovexattr(fd,name);
+#ifdef CCTOOLS_OPSYS_DARWIN
+		result = ::fremovexattr(fd, name, 0);
+#else
+		result = ::fremovexattr(fd, name);
+#endif
 		END
 	}
 
@@ -462,57 +478,81 @@ public:
 		END
 	}
 
-	virtual ssize_t getxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
+	virtual ssize_t getxattr ( pfs_name *name, const char *attrname, void *data, size_t size )
 	{
 		ssize_t result;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"getxattr %s %s",name->rest,attrname);
-		result = ::getxattr(name->rest,attrname,value,size);
+#ifdef CCTOOLS_OPSYS_DARWIN
+		result = ::getxattr(name->rest, attrname, data, size, 0, 0);
+#else
+		result = ::getxattr(name->rest, attrname, data, size);
+#endif
 		END
 	}
 	
-	virtual ssize_t lgetxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
+	virtual ssize_t lgetxattr ( pfs_name *name, const char *attrname, void *data, size_t size )
 	{
 		ssize_t result;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"lgetxattr %s %s",name->rest,attrname);
-		result = ::lgetxattr(name->rest,attrname,value,size);
+#ifdef CCTOOLS_OPSYS_DARWIN
+		result = ::getxattr(name->rest, attrname, data, size, 0, XATTR_NOFOLLOW);
+#else
+		result = ::lgetxattr(name->rest, attrname, data, size);
+#endif
 		END
 	}
 	
-	virtual ssize_t listxattr ( pfs_name *name, char *attrlist, size_t size )
+	virtual ssize_t listxattr ( pfs_name *name, char *list, size_t size )
 	{
 		ssize_t result;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"listxattr %s",name->rest);
-		result = ::listxattr(name->rest,attrlist,size);
+#ifdef CCTOOLS_OPSYS_DARWIN
+		result = ::listxattr(name->rest, list, size, 0);
+#else
+		result = ::listxattr(name->rest, list, size);
+#endif
 		END
 	}
 	
-	virtual ssize_t llistxattr ( pfs_name *name, char *attrlist, size_t size )
+	virtual ssize_t llistxattr ( pfs_name *name, char *list, size_t size )
 	{
 		ssize_t result;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"llistxattr %s",name->rest);
-		result = ::llistxattr(name->rest,attrlist,size);
+#ifdef CCTOOLS_OPSYS_DARWIN
+		result = ::listxattr(name->rest, list, size, XATTR_NOFOLLOW);
+#else
+		result = ::llistxattr(name->rest, list, size);
+#endif
 		END
 	}
 	
-	virtual int setxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
+	virtual int setxattr ( pfs_name *name, const char *attrname, const void *data, size_t size, int flags )
 	{
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"setxattr %s %s <> %d",name->rest,attrname,flags);
-		result = ::setxattr(name->rest,attrname,value,size,flags);
+#ifdef CCTOOLS_OPSYS_DARWIN
+		result = ::setxattr(name->rest, attrname, data, size, 0, flags);
+#else
+		result = ::setxattr(name->rest, attrname, data, size, flags);
+#endif
 		END
 	}
 	
-	virtual int lsetxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
+	virtual int lsetxattr ( pfs_name *name, const char *attrname, const void *data, size_t size, int flags )
 	{
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"lsetxattr %s %s <> %d",name->rest,attrname,flags);
-		result = ::lsetxattr(name->rest,attrname,value,size,flags);
+#ifdef CCTOOLS_OPSYS_DARWIN
+		result = ::setxattr(name->rest, attrname, data, size, 0, XATTR_NOFOLLOW|flags);
+#else
+		result = ::lsetxattr(name->rest, attrname, data, size, flags);
+#endif
 		END
 	}
 	
@@ -521,7 +561,11 @@ public:
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"removexattr %s %s",name->rest,attrname);
-		result = ::removexattr(name->rest,attrname);
+#ifdef CCTOOLS_OPSYS_DARWIN
+		result = ::removexattr(name->rest, attrname, 0);
+#else
+		result = ::removexattr(name->rest, attrname);
+#endif
 		END
 	}
 	
@@ -530,7 +574,11 @@ public:
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"lremovexattr %s %s",name->rest,attrname);
-		result = ::lremovexattr(name->rest,attrname);
+#ifdef CCTOOLS_OPSYS_DARWIN
+		result = ::removexattr(name->rest, attrname, XATTR_NOFOLLOW);
+#else
+		result = ::lremovexattr(name->rest, attrname);
+#endif
 		END
 	}
 

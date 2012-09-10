@@ -451,62 +451,110 @@ static INT64_T chirp_fs_local_setrep( const char *path, int nreps )
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
 static INT64_T chirp_fs_local_getxattr ( const char *path, const char *name, void *data, size_t size )
 {
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return getxattr(path, name, data, size, 0, 0);
+#else
 	return getxattr(path, name, data, size);
+#endif
 }
 
 static INT64_T chirp_fs_local_fgetxattr ( int fd, const char *name, void *data, size_t size )
 {
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return fgetxattr(fd, name, data, size, 0, 0);
+#else
 	return fgetxattr(fd, name, data, size);
+#endif
 }
 
 static INT64_T chirp_fs_local_lgetxattr ( const char *path, const char *name, void *data, size_t size )
 {
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return getxattr(path, name, data, size, 0, XATTR_NOFOLLOW);
+#else
 	return lgetxattr(path, name, data, size);
+#endif
 }
 
 static INT64_T chirp_fs_local_listxattr ( const char *path, char *list, size_t size )
 {
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return listxattr(path, list, size, 0);
+#else
 	return listxattr(path, list, size);
+#endif
 }
 
 static INT64_T chirp_fs_local_flistxattr ( int fd, char *list, size_t size )
 {
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return flistxattr(fd, list, size, 0);
+#else
 	return flistxattr(fd, list, size);
+#endif
 }
 
 static INT64_T chirp_fs_local_llistxattr ( const char *path, char *list, size_t size )
 {
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return listxattr(path, list, size, XATTR_NOFOLLOW);
+#else
 	return llistxattr(path, list, size);
+#endif
 }
 
 static INT64_T chirp_fs_local_setxattr ( const char *path, const char *name, const void *data, size_t size, int flags )
 {
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return setxattr(path, name, data, size, 0, flags);
+#else
 	return setxattr(path, name, data, size, flags);
+#endif
 }
 
 static INT64_T chirp_fs_local_fsetxattr ( int fd, const char *name, const void *data, size_t size, int flags )
 {
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return fsetxattr(fd, name, data, size, 0, flags);
+#else
 	return fsetxattr(fd, name, data, size, flags);
+#endif
 }
 
 static INT64_T chirp_fs_local_lsetxattr ( const char *path, const char *name, const void *data, size_t size, int flags )
 {
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return setxattr(path, name, data, size, 0, XATTR_NOFOLLOW|flags);
+#else
 	return lsetxattr(path, name, data, size, flags);
+#endif
 }
 
 static INT64_T chirp_fs_local_removexattr ( const char *path, const char *name )
 {
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return removexattr(path, name, 0);
+#else
 	return removexattr(path, name);
+#endif
 }
 
 static INT64_T chirp_fs_local_fremovexattr ( int fd, const char *name )
 {
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return fremovexattr(fd, name, 0);
+#else
 	return fremovexattr(fd, name);
+#endif
 }
 
 static INT64_T chirp_fs_local_lremovexattr ( const char *path, const char *name )
 {
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return removexattr(path, name, XATTR_NOFOLLOW);
+#else
 	return lremovexattr(path, name);
+#endif
 }
 #endif
 
