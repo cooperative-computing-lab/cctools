@@ -58,6 +58,19 @@ INT64_T chirp_global_md5(const char *host, const char *path, unsigned char *dige
 INT64_T chirp_global_mkalloc(const char *host, const char *path, INT64_T size, INT64_T mode, time_t stoptime);
 INT64_T chirp_global_lsalloc(const char *host, const char *path, char *alloc_path, INT64_T * size, INT64_T * inuse, time_t stoptime);
 
+INT64_T chirp_global_getxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime);
+INT64_T chirp_global_fgetxattr(struct chirp_file *file, const char *name, void *data, size_t size, time_t stoptime);
+INT64_T chirp_global_lgetxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime);
+INT64_T chirp_global_listxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime);
+INT64_T chirp_global_flistxattr(struct chirp_file *file, char *list, size_t size, time_t stoptime);
+INT64_T chirp_global_llistxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime);
+INT64_T chirp_global_setxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime);
+INT64_T chirp_global_fsetxattr(struct chirp_file *file, const char *name, const void *data, size_t size, int flags, time_t stoptime);
+INT64_T chirp_global_lsetxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime);
+INT64_T chirp_global_removexattr(const char *host, const char *path, const char *name, time_t stoptime);
+INT64_T chirp_global_fremovexattr(struct chirp_file *file, const char *name, time_t stoptime);
+INT64_T chirp_global_lremovexattr(const char *host, const char *path, const char *name, time_t stoptime);
+
 void chirp_global_inhibit_catalog(int onoff);
 
 #endif

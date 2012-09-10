@@ -90,6 +90,20 @@ INT64_T chirp_client_truncate(struct chirp_client *c, const char *path, INT64_T 
 INT64_T chirp_client_utime(struct chirp_client *c, const char *path, time_t actime, time_t modtime, time_t stoptime);
 INT64_T chirp_client_md5(struct chirp_client *c, const char *path, unsigned char digest[16], time_t stoptime);
 INT64_T chirp_client_setrep(struct chirp_client *c, const char *path, int nreps, time_t stoptime);
+
+INT64_T chirp_client_getxattr(struct chirp_client *c, const char *path, const char *name, void *data, size_t size, time_t stoptime);
+INT64_T chirp_client_fgetxattr(struct chirp_client *c, INT64_T fd, const char *name, void *data, size_t size, time_t stoptime);
+INT64_T chirp_client_lgetxattr(struct chirp_client *c, const char *path, const char *name, void *data, size_t size, time_t stoptime);
+INT64_T chirp_client_listxattr(struct chirp_client *c, const char *path, char *list, size_t size, time_t stoptime);
+INT64_T chirp_client_flistxattr(struct chirp_client *c, INT64_T fd, char *list, size_t size, time_t stoptime);
+INT64_T chirp_client_llistxattr(struct chirp_client *c, const char *path, char *list, size_t size, time_t stoptime);
+INT64_T chirp_client_setxattr(struct chirp_client *c, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime);
+INT64_T chirp_client_fsetxattr(struct chirp_client *c, INT64_T fd, const char *name, const void *data, size_t size, int flags, time_t stoptime);
+INT64_T chirp_client_lsetxattr(struct chirp_client *c, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime);
+INT64_T chirp_client_removexattr(struct chirp_client *c, const char *path, const char *name, time_t stoptime);
+INT64_T chirp_client_fremovexattr(struct chirp_client *c, INT64_T fd, const char *name, time_t stoptime);
+INT64_T chirp_client_lremovexattr(struct chirp_client *c, const char *path, const char *name, time_t stoptime);
+
 INT64_T chirp_client_remote_debug(struct chirp_client *c, const char *flag, time_t stoptime);
 INT64_T chirp_client_localpath(struct chirp_client *c, const char *path, char *localpath, int length, time_t stoptime);
 INT64_T chirp_client_audit(struct chirp_client *c, const char *path, struct chirp_audit **list, time_t stoptime);

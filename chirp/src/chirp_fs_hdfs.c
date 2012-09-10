@@ -750,5 +750,18 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_md5,
 	chirp_fs_hdfs_setrep,
 
+	cfs_stub_getxattr,
+	cfs_stub_fgetxattr,
+	cfs_stub_lgetxattr,
+	cfs_stub_listxattr,
+	cfs_stub_flistxattr,
+	cfs_stub_llistxattr,
+	cfs_stub_setxattr,
+	cfs_stub_fsetxattr,
+	cfs_stub_lsetxattr,
+	cfs_stub_removexattr,
+	cfs_stub_fremovexattr,
+	cfs_stub_lremovexattr,
+
 	chirp_fs_hdfs_do_acl_check,
 };

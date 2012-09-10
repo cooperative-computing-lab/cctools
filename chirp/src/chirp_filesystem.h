@@ -42,6 +42,19 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime );
 INT64_T cfs_basic_md5(const char *path, unsigned char digest[16]);
 
+INT64_T cfs_stub_getxattr (const char *path, const char *name, void *data, size_t size);
+INT64_T cfs_stub_fgetxattr (int fd, const char *name, void *data, size_t size);
+INT64_T cfs_stub_lgetxattr (const char *path, const char *name, void *data, size_t size);
+INT64_T cfs_stub_listxattr (const char *path, char *list, size_t size);
+INT64_T cfs_stub_flistxattr (int fd, char *list, size_t size);
+INT64_T cfs_stub_llistxattr (const char *path, char *list, size_t size);
+INT64_T cfs_stub_setxattr (const char *path, const char *name, const void *data, size_t size, int flags);
+INT64_T cfs_stub_fsetxattr (int fd, const char *name, const void *data, size_t size, int flags);
+INT64_T cfs_stub_lsetxattr (const char *path, const char *name, const void *data, size_t size, int flags);
+INT64_T cfs_stub_removexattr (const char *path, const char *name);
+INT64_T cfs_stub_fremovexattr (int fd, const char *name);
+INT64_T cfs_stub_lremovexattr (const char *path, const char *name);
+
 struct chirp_filesystem {
 	const char * (*init) ( const char *url );
 
@@ -85,6 +98,19 @@ struct chirp_filesystem {
 	INT64_T (*utime)     ( const char *path, time_t atime, time_t mtime  );
 	INT64_T (*md5)       ( const char *path, unsigned char digest[16] );
 	INT64_T (*setrep)    ( const char *path, int nreps );
+
+    INT64_T (*getxattr)  ( const char *path, const char *name, void *data, size_t size );
+    INT64_T (*fgetxattr)  ( int fd, const char *name, void *data, size_t size );
+    INT64_T (*lgetxattr)  ( const char *path, const char *name, void *data, size_t size );
+    INT64_T (*listxattr)  ( const char *path, char *data, size_t size );
+    INT64_T (*flistxattr)  ( int fd, char *data, size_t size );
+    INT64_T (*llistxattr)  ( const char *path, char *data, size_t size );
+    INT64_T (*setxattr)  ( const char *path, const char *name, const void *data, size_t size, int flags );
+    INT64_T (*fsetxattr)  ( int fd, const char *name, const void *data, size_t size, int flags );
+    INT64_T (*lsetxattr)  ( const char *path, const char *name, const void *data, size_t size, int flags );
+    INT64_T (*removexattr)  ( const char *path, const char *name );
+    INT64_T (*fremovexattr)  ( int fd, const char *name );
+    INT64_T (*lremovexattr)  ( const char *path, const char *name );
 
 	int (*do_acl_check) ();
 };

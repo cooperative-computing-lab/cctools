@@ -646,6 +646,19 @@ This only has an effect if the server backend supports replication, currently on
 
 INT64_T chirp_reli_setrep(const char *host, const char *path, int nreps, time_t stoptime );
 
+INT64_T chirp_reli_getxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime);
+INT64_T chirp_reli_fgetxattr(struct chirp_file *file, const char *name, void *data, size_t size, time_t stoptime);
+INT64_T chirp_reli_lgetxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime);
+INT64_T chirp_reli_listxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime);
+INT64_T chirp_reli_flistxattr(struct chirp_file *file, char *list, size_t size, time_t stoptime);
+INT64_T chirp_reli_llistxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime);
+INT64_T chirp_reli_setxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime);
+INT64_T chirp_reli_fsetxattr(struct chirp_file *file, const char *name, const void *data, size_t size, int flags, time_t stoptime);
+INT64_T chirp_reli_lsetxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime);
+INT64_T chirp_reli_removexattr(const char *host, const char *path, const char *name, time_t stoptime);
+INT64_T chirp_reli_fremovexattr(struct chirp_file *file, const char *name, time_t stoptime);
+INT64_T chirp_reli_lremovexattr(const char *host, const char *path, const char *name, time_t stoptime);
+
 /** Set the debug options on the remote server.
 @param host The name and port of the Chirp server to access.
 @param flag A debug flag to set on the server. Pass NULL to not change. Pass "clear" to clear.
