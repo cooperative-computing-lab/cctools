@@ -63,11 +63,10 @@ See the file COPYING for details.
 #include <sys/wait.h>
 #include <sys/select.h>
 
-#if defined(HAS_SYS_XATTR_H)
-#include <sys/xattr.h>
-#endif
 #if defined(HAS_ATTR_XATTR_H)
 #include <attr/xattr.h>
+#elif defined(HAS_SYS_XATTR_H)
+#include <sys/xattr.h>
 #endif
 #ifndef ENOATTR
 #define ENOATTR  EINVAL
