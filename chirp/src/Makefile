@@ -15,6 +15,10 @@ TARGETS = ${PROGRAMS} ${LIBRARIES}
 LIBRARY_OBJECTS = ${LIBRARY_SOURCES:%.c=%.o}
 SERVER_OBJECTS = ${SERVER_SOURCES:%.c=%.o}
 
+DTTOOLS_STATIC_LIBRARY = ../../dttools/src/libdttools.a
+CHIRP_STATIC_LIBRARY = libchirp.a
+STATIC_LIBRARIES = ${CHIRP_STATIC_LIBRARY} ${DTTOOLS_STATIC_LIBRARY}
+
 all: ${TARGETS}
 
 # This is the library intended to be used by clients of the system.
@@ -28,43 +32,43 @@ libchirp.a: ${LIBRARY_OBJECTS}
 # Note that we explicitly include auth_all.o and ${CCTOOLS_DYNAMIC_AUTH_LIBS}
 # to force the inclusion of the various authentication infrastructures.
 
-libchirp_client.${CCTOOLS_DYNAMIC_SUFFIX}: ${LIBRARY_OBJECTS} ../../dttools/src/auth_all.o
-	${CCTOOLS_LD} ${CCTOOLS_DYNAMIC_FLAG} -o $@ $^ ../../dttools/src/libdttools.a ${CCTOOLS_DYNAMIC_AUTH_LIBS}
+libchirp_client.${CCTOOLS_DYNAMIC_SUFFIX}: ${LIBRARY_OBJECTS} ../../dttools/src/auth_all.o ${DTTOOLS_STATIC_LIBRARY}
+	${CCTOOLS_LD} ${CCTOOLS_DYNAMIC_FLAG} -o $@ $^ ${CCTOOLS_DYNAMIC_AUTH_LIBS}
 
-chirp: chirp_tool.o libchirp.a
+chirp: chirp_tool.o ${STATIC_LIBRARIES}
 	${CCTOOLS_LD} -o $@ $^ ${CCTOOLS_READLINE_LDFLAGS} ${LOCAL_LDFLAGS}
 
-chirp_server: chirp_server.o ${SERVER_OBJECTS} libchirp.a
+chirp_server: chirp_server.o ${SERVER_OBJECTS} ${STATIC_LIBRARIES}
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-chirp_get: chirp_get.o libchirp.a
+chirp_get: chirp_get.o ${STATIC_LIBRARIES}
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-chirp_put: chirp_put.o libchirp.a
+chirp_put: chirp_put.o ${STATIC_LIBRARIES}
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-chirp_benchmark: chirp_benchmark.o libchirp.a
+chirp_benchmark: chirp_benchmark.o ${STATIC_LIBRARIES}
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-chirp_status: chirp_status.o libchirp.a
+chirp_status: chirp_status.o ${STATIC_LIBRARIES}
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-chirp_fuse: chirp_fuse.o libchirp.a
+chirp_fuse: chirp_fuse.o ${STATIC_LIBRARIES}
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-chirp_distribute: chirp_distribute.o libchirp.a
+chirp_distribute: chirp_distribute.o ${STATIC_LIBRARIES}
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-chirp_matrix_benchmark: chirp_matrix_benchmark.o libchirp.a
+chirp_matrix_benchmark: chirp_matrix_benchmark.o ${STATIC_LIBRARIES}
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-chirp_matrix_roc: chirp_matrix_roc.o libchirp.a
+chirp_matrix_roc: chirp_matrix_roc.o ${STATIC_LIBRARIES}
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-chirp_matrix_verify: chirp_matrix_verify.o libchirp.a
+chirp_matrix_verify: chirp_matrix_verify.o ${STATIC_LIBRARIES}
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
-chirp_stream_files: chirp_stream_files.o libchirp.a
+chirp_stream_files: chirp_stream_files.o ${STATIC_LIBRARIES}
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 test:	all
