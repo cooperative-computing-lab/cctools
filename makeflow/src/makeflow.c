@@ -41,6 +41,7 @@ See the file COPYING for details.
 
 #define SHOW_INPUT_FILES 2
 #define SHOW_OUTPUT_FILES 3
+#define SHOW_MAKEFLOW_ANALYSIS 4 
 #define RANDOM_PORT_RETRY_TIME 300
 
 #define MAKEFLOW_AUTO_WIDTH 1
@@ -152,6 +153,9 @@ struct dag_lookup_set {
 	struct hash_table *table;
 };
 
+int dag_depth(struct dag *d);
+int dag_width_uniform_task(struct dag *d);
+int dag_width_guaranteed_max(struct dag *d);
 int dag_width(struct dag *d, int nested_jobs);
 void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info);
 char *dag_readline(struct dag *d, struct dag_node *n);
@@ -168,8 +172,15 @@ void dag_gc_ref_incr(struct dag *d, const char *file, int increment);
 void dag_gc_ref_count(struct dag *d, const char *file);
 void dag_export_variables(struct dag *d, struct dag_node *n);
 
-
-int dag_estimate_nodes_needed(struct dag *d, int actual_max)
+/** 
+ * If the return value is x, a positive integer, that means at least x tasks
+ * can be run in parallel during a certain point of the execution of the
+ * workflow. The following algorithm counts the number of direct child nodes of
+ * each node (a node represents a task). Node A is a direct child of Node B
+ * only when Node B is the only parent node of Node A. Then it returns the
+ * maximum among the direct children counts.
+ */
+int dag_width_guaranteed_max(struct dag *d)
 {
 	struct dag_node *n, *m, *tmp;
 	struct dag_file *f;
@@ -204,9 +215,6 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 		// m != 0 : current node depends on at least one exsisting node
 		if(m && depends_on_single_node && nodeid != -1) {
 			m->only_my_children++;
-			// return if maximum number of possible nodes is reached
-			if(m->only_my_children == actual_max)
-				return actual_max;
 		}
 	}
 
@@ -216,6 +224,95 @@ int dag_estimate_nodes_needed(struct dag *d, int actual_max)
 	}
 
 	return max;
+}
+
+/** 
+ * returns the depth of the given DAG.
+ */
+int dag_depth(struct dag *d)
+{
+	struct dag_node *n, *parent;
+	struct dag_file *f;
+
+	struct list *level_unsolved_nodes = list_create();
+	for(n = d->nodes; n != NULL; n = n->next) {
+		n->level = 0;
+		for(f = n->source_files; f != NULL; f = f->next) {
+			if((parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename)) != NULL) {
+				n->level = -1;
+				list_push_tail(level_unsolved_nodes, n);
+				break;
+			}
+		}
+	}
+
+	int max_level = 0;
+	while((n = (struct dag_node *) list_pop_head(level_unsolved_nodes)) != NULL) {
+		for(f = n->source_files; f != NULL; f = f->next) {
+			if((parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename)) != NULL) {
+				if(parent->level == -1) {
+					n->level = -1;
+					list_push_tail(level_unsolved_nodes, n);
+					break;
+				} else {
+					int tmp_level = parent->level + 1;
+					n->level = n->level > tmp_level ? n->level : tmp_level;
+					max_level = n->level > max_level ? n->level : max_level;
+				}	
+			}
+		}
+	}
+	list_delete(level_unsolved_nodes);
+	
+	return max_level+1;
+}
+
+/** 
+ * This algorithm assumes all the tasks take the same amount of time to execute
+ * and each task would be executed as early as possible. If the return value is
+ * x, a positive integer, that means at least x tasks can be run in parallel
+ * during a certain point of the execution of the workflow. 
+ *
+ * The following algorithm first determines the level (depth) of each node by
+ * calling the dag_depth() function and then count how many nodes are there at
+ * each level. Then it returns the maximum of the numbers of nodes at each
+ * level.
+ */
+int dag_width_uniform_task(struct dag *d)
+{
+	struct dag_node *n;
+
+	int depth = dag_depth(d);
+
+	size_t level_count_array_size = (depth) * sizeof(int);
+	int *level_count = malloc(level_count_array_size);
+	if(!level_count) {
+		return -1;
+	}
+	memset(level_count, 0, level_count_array_size);
+
+	for(n = d->nodes; n != NULL; n = n->next) {
+		level_count[n->level]++;
+	}
+
+	int i, max = 0;
+	for(i = 0; i < depth; i++) {
+		if(max < level_count[i]) {
+			max = level_count[i];
+		}
+	}
+
+	free(level_count);
+	return max;
+}
+
+void dag_show_analysis(struct dag *d) {
+	int depth = dag_depth(d);
+	printf("depth\t%d\n", depth);
+	int width_uniform_task = dag_width_uniform_task(d);
+	printf("width_uniform_task\t%d\n", width_uniform_task);
+	int width_guaranteed_max = dag_width_guaranteed_max(d);
+	printf("width_guaranteed_max\t%d\n", width_guaranteed_max);
 }
 
 void dag_show_input_files(struct dag *d)
@@ -261,37 +358,10 @@ void dag_show_output_files(struct dag *d)
 	}
 }
 
-static int handle_auto_workers(struct dag *d, int auto_workers)
-{
-	char hostname[DOMAIN_NAME_MAX];
-	int num_of_workers;
-
-	domain_name_cache_guess(hostname);
-
-	if(auto_workers == MAKEFLOW_AUTO_GROUP) {
-		num_of_workers = dag_estimate_nodes_needed(d, d->remote_jobs_max);
-	} else {		/* if (auto_workers == MAKEFLOW_AUTO_WIDTH) ALWAYS TRUE */
-
-		num_of_workers = dag_width(d, 0);
-		if(num_of_workers > d->remote_jobs_max)
-			num_of_workers = d->remote_jobs_max;
-	}
-
-	char *start_worker_command = string_format("condor_submit_workers %s %d %d", hostname, port, num_of_workers);
-	printf("starting %d workers: `%s`", num_of_workers, start_worker_command);
-	int status = system(start_worker_command);
-	free(start_worker_command);
-	if(status) {
-		fprintf(stderr,"unable to start workers.");
-		return 0;
-	}
-
-	return 1;
-}
-
-/* Code added by kparting to compute the width of the graph.
-   Original algorithm by pbui, with improvements by kparting */
-
+/** 
+ * Code added by kparting to compute the width of the graph. Original algorithm
+ * by pbui, with improvements by kparting.
+ */
 int dag_width(struct dag *d, int nested_jobs)
 {
 	struct dag_node *n, *parent;
@@ -301,6 +371,7 @@ int dag_width(struct dag *d, int nested_jobs)
 	   determine leaves by adding nodes with children==0 to list. */
 
 	for(n = d->nodes; n != NULL; n = n->next) {
+		n->level = 0; // initialize 'level' value to 0 because other functions might have modified this value.
 		for(f = n->source_files; f != NULL; f = f->next) {
 			parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename);
 			if(parent)
@@ -587,7 +658,9 @@ void dag_clean(struct dag *d)
 
 void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
 
-// Decide whether to rerun a node based on file system status
+/** 
+ * Decide whether to rerun a node based on file system status
+ */
 void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n)
 {
 	struct stat filestat;
@@ -1976,7 +2049,8 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -D             Display the Makefile as a Dot graph.\n");
 	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capacity may be viewed in the Work Queue log file or through the  work_queue_status command.\n");
 	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
-	fprintf(stdout, " -h             Show this help screen\n");
+	fprintf(stdout, " -h             Show this help screen.\n");
+	fprintf(stdout, " -i             Show the pre-execution analysis of the Makeflow script - <dagfile>.\n");
 	fprintf(stdout, " -I             Show input files.\n");
 	fprintf(stdout, " -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
 	fprintf(stdout, " -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
@@ -1992,7 +2066,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -r <n>         Automatically retry failed batch jobs up to n times.\n");
 	fprintf(stdout, " -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n", dag_submit_timeout);
 	fprintf(stdout, " -v             Show version string\n");
-	fprintf(stdout, " -w <mode>      Auto Work Queue mode. Mode is either 'width' or 'group' (DAG [width] or largest [group] of tasks).\n");
 	fprintf(stdout, " -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
 	fprintf(stdout, " -z             Force failure on zero-length output files \n");
 }
@@ -2010,7 +2083,6 @@ int main(int argc, char *argv[])
 	int skip_afs_check = 0;
 	int preserve_symlinks = 0;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
-	int auto_workers = 0;
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	int work_queue_estimate_capacity_on = 0;
 	char *catalog_host;
@@ -2043,7 +2115,7 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	while((c = getopt(argc, argv, "aAB:cC:d:DEF:g:G:hIj:J:kKl:L:N:o:Op:P:r:RS:t:T:vw:W:z")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:DEF:g:G:hiIj:J:kKl:L:N:o:Op:P:r:RS:t:T:vW:z")) != (char) -1) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2109,6 +2181,9 @@ int main(int argc, char *argv[])
 			case 'h':
 				show_help(argv[0]);
 				return 0;
+			case 'i':
+				display_mode = SHOW_MAKEFLOW_ANALYSIS;	
+				break;
 			case 'I':
 				display_mode = SHOW_INPUT_FILES;
 				break;
@@ -2171,16 +2246,6 @@ int main(int argc, char *argv[])
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
-			case 'w':
-				if(!strcmp(optarg, "width")) {
-					auto_workers = MAKEFLOW_AUTO_WIDTH;
-				} else if(!strcmp(optarg, "group")) {
-					auto_workers = MAKEFLOW_AUTO_GROUP;
-				} else {
-					show_help(argv[0]);
-					exit(1);
-				}
-				break;
 			case 'W':
 				if(!strcmp(optarg, "files")) {
 					wq_option_scheduler = WORK_QUEUE_SCHEDULE_FILES;
@@ -2305,6 +2370,10 @@ int main(int argc, char *argv[])
 		dag_show_output_files(d);
 		exit(0);
 	}
+	if(display_mode == SHOW_MAKEFLOW_ANALYSIS) {
+		dag_show_analysis(d);
+		exit(0);
+	}
 
 	if(explicit_local_jobs_max) {
 		d->local_jobs_max = explicit_local_jobs_max;
@@ -2408,12 +2477,6 @@ int main(int argc, char *argv[])
 	port = batch_queue_port(remote_queue);
 	if(port > 0)
 		printf("listening for workers on port %d.\n", port);
-
-	if(auto_workers > 0) {
-		if(!handle_auto_workers(d, auto_workers)) {
-			exit(1);
-		}
-	}
 
 	dag_log_recover(d, logfilename);
 
