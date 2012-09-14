@@ -76,9 +76,6 @@ cp $worker .
 cat >worker.sh <<EOF
 #!/bin/sh
 
-### Specify the PI group for this job
-#PBS -W group_list=$USER
-
 cd $PWD
 ./work_queue_worker $arguments $host $port
 EOF
