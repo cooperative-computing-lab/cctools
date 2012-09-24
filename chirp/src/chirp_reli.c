@@ -622,9 +622,9 @@ INT64_T chirp_reli_mkdir_recursive( const char *host, const char *path, INT64_T 
 	return chirp_reli_mkdir(host,path,mode,stoptime);
 }
 
-INT64_T chirp_reli_search( const char *host, const char *pattern, const char *dir, char ***array, time_t stoptime )
+INT64_T chirp_reli_search( const char *host, const char *pattern, const char *path, int flags, struct chirp_search_result **results, time_t stoptime )
 {
-	RETRY_ATOMIC( result = chirp_client_search(client, pattern, dir, array, stoptime); )
+	RETRY_ATOMIC( result = chirp_client_search(client,pattern,path,flags,results,stoptime); )
 }
 
 INT64_T chirp_reli_rmdir( const char *host, const char *path, time_t stoptime )

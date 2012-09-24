@@ -149,6 +149,7 @@ static INT64_T get_stat_result(struct chirp_client *c, struct chirp_stat *info, 
 	info->cst_rdev = 0;
 
 	if(fields != 13) {
+		printf("!=13\n");
 		c->broken = 1;
 		errno = ECONNRESET;
 		return -1;
@@ -1547,18 +1548,25 @@ INT64_T chirp_client_lsalloc(struct chirp_client * c, char const *path, char *al
 	return result;
 }
 
-INT64_T chirp_client_search(struct chirp_client *c, const char *pattern, const char *dir, char ***array, time_t stoptime)
+INT64_T chirp_client_search(struct chirp_client *c, const char *pattern, const char *path, int flags, struct chirp_search_result **results, time_t stoptime)
 {
-	INT64_T result = simple_command(c, stoptime, "search %s %s\n", pattern, dir);
-	*array = string_array_new();
+	INT64_T result = simple_command(c, stoptime, "search %s %s %d\n", pattern, path, flags);
 
 	if (result == 0) {
 		char path[CHIRP_PATH_MAX];
+		struct chirp_search_result **current = results;
+
 		while (link_readline(c->link, path, sizeof(path), stoptime)) {
-			if (strcmp(path, "") == 0) break;
-			*array = string_array_append(*array, path);
+			if (strcmp(path, "0") == 0) break;
+			*current = malloc(sizeof(struct chirp_search_result));	
+			(*current)->path = malloc(sizeof(path));
+			(*current)->info = malloc(sizeof(struct chirp_stat));	
+			get_stat_result(c, (*current)->info, stoptime);
+			strcpy((*current)->path, path);
+			current = &(*current)->next;
 		}
+		*current = NULL;
 	}
 
-	return 0;
+	return result;
 }

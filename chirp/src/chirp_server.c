@@ -790,25 +790,6 @@ static int chirp_path_fix(char *path)
 	return 1;
 }
 
-static char *chirp_stat_string(struct chirp_stat *info)
-{
-	static char line[CHIRP_LINE_MAX];
-
-	sprintf(line, "%lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld", (long long) info->cst_dev, (long long) info->cst_ino, (long long) info->cst_mode, (long long) info->cst_nlink, (long long) info->cst_uid, (long long) info->cst_gid,
-		(long long) info->cst_rdev, (long long) info->cst_size, (long long) info->cst_blksize, (long long) info->cst_blocks, (long long) info->cst_atime, (long long) info->cst_mtime, (long long) info->cst_ctime);
-
-	return line;
-}
-
-static char *chirp_statfs_string(struct chirp_statfs *info)
-{
-	static char line[CHIRP_LINE_MAX];
-
-	sprintf(line, "%lld %lld %lld %lld %lld %lld %lld", (long long) info->f_type, (long long) info->f_bsize, (long long) info->f_blocks, (long long) info->f_bfree, (long long) info->f_bavail, (long long) info->f_files, (long long) info->f_ffree);
-
-	return line;
-}
-
 /*
   A note on integers:
   Various operating systems employ integers of different sizes
@@ -1599,14 +1580,31 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			strcat(line,"\n");
 			write(config_pipe[1],line,strlen(line));
 			debug_flags_set(debug_flag);
-		} else if (sscanf(line, "search %s %s", pattern, path)==2)  {
-			if(!chirp_path_fix(path))
-				goto failure;
-			if(!chirp_acl_check_dir(path, subject, CHIRP_ACL_LIST))
-				goto failure;
-			link_putliteral(l, "0\n", stalltime);	
-			chirp_alloc_search(subject, path, pattern, l, stalltime);
-			link_putliteral(l, "\n", stalltime);
+		} else if(sscanf(line, "search %s %s %lld", pattern, path, &flags)==3) {
+			char *ps = path, *pe;
+			char fixed[CHIRP_PATH_MAX];	
+			link_putliteral(l, "0\n", stalltime);
+
+			for (;;) {
+				if((pe = strchr(ps, CHIRP_SEARCH_DELIMITER)) != NULL) 
+					*pe = '\0';
+
+				strcpy(fixed, ps);
+
+				if(!chirp_path_fix(fixed))
+					goto failure;
+				if(!chirp_acl_check_dir(fixed, subject, CHIRP_ACL_LIST))
+					goto failure;
+
+				chirp_alloc_search(subject, fixed, pattern, flags, l, stalltime);
+				
+				if (pe != NULL) {
+					ps = pe + 1;
+					*pe = CHIRP_SEARCH_DELIMITER; 
+				} else
+					break;
+			}
+
 			result = 0;
 		} else {
 			result = -1;

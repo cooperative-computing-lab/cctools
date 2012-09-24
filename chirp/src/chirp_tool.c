@@ -145,6 +145,7 @@ static struct command list[] = {
 	{"setacl", 1, 3, 3, "<remotepath> <user> <rwldax>", do_setacl},
 	{"resetacl", 1, 2, 2, "<remotepath> <rwldax>", do_resetacl},
 	{"ls", 1, 0, 2, "[-la] [remotepath]", do_ls},
+	{"search", 1, 2, 2, "<pattern> <directory>", do_search},
 	{"mv", 1, 2, 2, "<oldname> <newname>", do_mv},
 	{"rm", 1, 1, 1, "<file>", do_rm},
 	{"mkdir", 1, 1, 2, "[-p] <dir>", do_mkdir},
@@ -167,7 +168,6 @@ static struct command list[] = {
 	{"help", 0, 0, 0, "", do_help},
 	{"exit", 0, 0, 0, "", do_quit},
 	{"quit", 0, 0, 0, "", do_quit},
-	{"search", 1, 2, 2, "<pattern> <directory>", do_search},
 	{0, 0, 0, 0, 0},
 };
 
@@ -1169,14 +1169,21 @@ static INT64_T do_matrix_delete(int argc, char **argv)
 
 static INT64_T do_search(int argc, char **argv)
 {
-    char **array;
-	INT64_T result = chirp_reli_search(current_host, argv[1], argv[2], &array, stoptime);
+	struct chirp_search_result** results = malloc(sizeof(struct chirp_search_result*));
+	int flags = 0;
+	INT64_T result = chirp_reli_search(current_host, argv[1], argv[2], flags, results, stoptime);
 
 	if (result == 0) {
-		int i;
-		for (i = 0; array[i]; i++)
-			printf("%s\n", array[i]);
-		free(array);
+		struct chirp_search_result *current = *results;
+		
+		while (current != NULL) {
+			long_ls_callback(current->path, current->info, 0);	
+			struct chirp_search_result *next = current->next;
+			free(current->path);
+			free(current->info);
+			free(current);
+			current = next;
+		}
 		return 0;
 	}
 	else

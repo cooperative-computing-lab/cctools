@@ -7,6 +7,8 @@ See the file COPYING for details.
 #include "chirp_filesystem.h"
 #include "chirp_fs_local.h"
 #include "chirp_protocol.h"
+#include "chirp_alloc.h"
+#include "chirp_acl.h"
 
 #include "create_dir.h"
 #include "hash_table.h"
@@ -21,6 +23,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <string.h>
 #include <dirent.h>
+#include <fnmatch.h>
 #include <utime.h>
 #include <unistd.h>
 #include <sys/fcntl.h>
@@ -378,6 +381,53 @@ static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs * buf
 	return result;
 }
 
+static void search_directory (const char *subject, unsigned level, const char *base, char *dir, const char *pattern, struct link *l, time_t stoptime)
+{
+        if (level == 0)
+                return;
+
+        void *dirp = chirp_fs_local_opendir(dir);
+        char *current = dir + strlen(dir); /* point to end to current directory */
+
+        if (dirp) {
+                struct chirp_dirent *entry;
+                struct chirp_stat *stat_buf = malloc(sizeof(struct chirp_stat));
+                while ((entry = chirp_fs_local_readdir(dirp))) {
+                        if (strcmp(entry->name, ".") == 0 || strcmp(entry->name, "..") == 0 || strncmp(entry->name, ".__", 3) == 0) continue;
+
+                        sprintf(current, "/%s", entry->name);
+                        if (fnmatch(pattern, base, FNM_PATHNAME) == 0) {
+                                chirp_fs_local_stat(dir, stat_buf);
+                                link_putfstring(l, "%s\n%s\n", stoptime, dir, chirp_stat_string(stat_buf) );
+                        }
+                        if (cfs_isdir(dir) && chirp_acl_check_dir(dir, subject, CHIRP_ACL_LIST)) {
+                                search_directory(subject, level-1, base, dir, pattern, l, stoptime);
+                        }
+                        *current = '\0'; /* clear current entry */
+                }
+                chirp_alloc_closedir(dirp);
+        }
+}
+
+/* Note we need the subject because we must check the ACL for any nested directories. */
+static INT64_T chirp_fs_local_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime)
+{
+        unsigned level = 1;
+        const char *s;
+        char directory[CHIRP_PATH_MAX];
+        char pattern[CHIRP_PATH_MAX];
+		
+        string_collapse_path(dir, directory, 0);	
+
+        for (s = patt; *s == '/'; s++) ; /* remove leading slashes from pattern */
+        sprintf(pattern, "/%s", s); /* add leading slash for base directory */
+        for (s = strchr(pattern, '/'); s; s = strchr(s+1, '/')) level++; /* count the number of nested directories to descend at maximum */
+
+        search_directory(subject, level, directory+strlen(directory), directory, pattern, l, stoptime);
+
+        return 0;
+}
+
 static INT64_T chirp_fs_local_access(const char *path, INT64_T mode)
 {
 	return access(path, mode);
@@ -459,6 +509,8 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_fchmod,
 	chirp_fs_local_ftruncate,
 	chirp_fs_local_fsync,
+
+	chirp_fs_local_search,
 
 	chirp_fs_local_opendir,
 	chirp_fs_local_readdir,

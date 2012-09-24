@@ -362,49 +362,9 @@ time_t chirp_alloc_last_flush_time()
 	return last_flush_time;
 }
 
-static void search_directory (const char *subject, unsigned level, const char *base, char *dir, const char *pattern, struct link *l, time_t stoptime)
+INT64_T chirp_alloc_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime)
 {
-	if (level == 0)
-		return;
-
-	void *dirp = chirp_alloc_opendir(dir);
-	char *current = dir+strlen(dir); /* point to end to current directory */
-
-	if (dirp) {
-		struct chirp_dirent *entry;
-		while ((entry = chirp_alloc_readdir(dirp))) {
-			if (strcmp(entry->name, ".") == 0 || strcmp(entry->name, "..") == 0 || strncmp(entry->name, ".__", 3) == 0) continue;
-
-			sprintf(current, "/%s", entry->name);
-			if (fnmatch(pattern, base, FNM_PATHNAME) == 0) {
-				link_putfstring(l, "%s\n", stoptime, dir);
-			}
-			if (cfs_isdir(dir) && chirp_acl_check_dir(dir, subject, CHIRP_ACL_LIST)) {
-				search_directory(subject, level-1, base, dir, pattern, l, stoptime);
-			}
-			*current = '\0'; /* clear current entry */
-		}
-		chirp_alloc_closedir(dirp);
-	}
-}
-
-/* Note we need the subject because we must check the ACL for any nested directories. */
-INT64_T chirp_alloc_search(const char *subject, const char *dir, const char *patt, struct link *l, time_t stoptime)
-{
-	unsigned level = 1;
-	const char *s;
-	char directory[CHIRP_PATH_MAX];
-	char pattern[CHIRP_PATH_MAX];
-
-	string_collapse_path(dir, directory, 0);
-
-	for (s = patt; *s == '/'; s++) ; /* remove leading slashes from pattern */
-	sprintf(pattern, "/%s", s); /* add leading slash for base directory */
-	for (s = strchr(pattern, '/'); s; s = strchr(s+1, '/')) level++; /* count the number of nested directories to descend at maximum */
-
-	search_directory(subject, level, directory+strlen(directory), directory, pattern, l, stoptime);
-
-	return 0;
+	return cfs->search(subject, dir, patt, flags, l, stoptime);
 }
 
 INT64_T chirp_alloc_open(const char *path, INT64_T flags, INT64_T mode)
@@ -1027,4 +987,23 @@ INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode)
 	}
 
 	return result;
+}
+
+char *chirp_stat_string(struct chirp_stat *info)
+{
+	static char line[CHIRP_LINE_MAX];
+
+	sprintf(line, "%lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld", (long long) info->cst_dev, (long long) info->cst_ino, (long long) info->cst_mode, (long long) info->cst_nlink, (long long) info->cst_uid, (long long) info->cst_gid,
+		(long long) info->cst_rdev, (long long) info->cst_size, (long long) info->cst_blksize, (long long) info->cst_blocks, (long long) info->cst_atime, (long long) info->cst_mtime, (long long) info->cst_ctime);
+
+	return line;
+}
+
+char *chirp_statfs_string(struct chirp_statfs *info)
+{
+	static char line[CHIRP_LINE_MAX];
+
+	sprintf(line, "%lld %lld %lld %lld %lld %lld %lld", (long long) info->f_type, (long long) info->f_bsize, (long long) info->f_blocks, (long long) info->f_bfree, (long long) info->f_bavail, (long long) info->f_files, (long long) info->f_ffree);
+
+	return line;
 }

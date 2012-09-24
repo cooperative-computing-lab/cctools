@@ -179,6 +179,11 @@ static INT64_T chirp_fs_hdfs_fstat(int fd, struct chirp_stat *buf)
 	return chirp_fs_hdfs_stat(open_files[fd].name, buf);
 }
 
+static INT64_T chirp_fs_hdfs_search( const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime )
+{
+	return 1; //FIXME
+}
+
 struct chirp_dir {
 	int i;
 	int n;
@@ -721,6 +726,8 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_fchmod,
 	chirp_fs_hdfs_ftruncate,
 	chirp_fs_hdfs_fsync,
+
+	chirp_fs_hdfs_search,
 
 	chirp_fs_hdfs_opendir,
 	chirp_fs_hdfs_readdir,

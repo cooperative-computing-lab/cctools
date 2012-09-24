@@ -58,6 +58,8 @@ struct chirp_filesystem {
 	INT64_T (*ftruncate) ( int fd, INT64_T length );
 	INT64_T (*fsync)     ( int fd );
 
+	INT64_T (*search) ( const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime );
+
 	struct chirp_dir    * (*opendir)   ( const char *path );
 	struct chirp_dirent * (*readdir)   ( struct chirp_dir *dir );
 	void                  (*closedir)  ( struct chirp_dir *dir );
