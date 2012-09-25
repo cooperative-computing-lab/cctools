@@ -96,7 +96,7 @@ PUBLIC_HEADERS = auth.h  \
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
 LIBRARIES = libdttools.a
-PROGRAMS = catalog_update catalog_server work_queue_worker work_queue_pool work_queue_status watchdog
+PROGRAMS = catalog_server work_queue_worker work_queue_pool work_queue_status watchdog
 
 ifeq (${CCTOOLS_USE_MPI},true)
 	PROGRAMS += mpi_queue_worker
@@ -110,9 +110,6 @@ CYGWINLIB = cygwin1.dll cyggcc_s-1.dll cygintl-8.dll cygreadline7.dll cygncurses
 all: ${LIBRARIES} $(PROGRAMS) $(TEST_PROGRAMS)
 
 auth_test: auth_test.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-catalog_update: catalog_update.o libdttools.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 catalog_server: catalog_server.o libdttools.a
