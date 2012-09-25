@@ -6,6 +6,7 @@ See the file COPYING for details.
 */
 
 #include "domain_name.h"
+#include "link.h"
 #include "stringtools.h"
 #include "debug.h"
 
@@ -28,8 +29,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
-#define LINK_ADDRESS_MAX 48
 
 int domain_name_lookup_reverse(const char *addr, char *name)
 {
