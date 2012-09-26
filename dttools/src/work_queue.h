@@ -8,13 +8,13 @@ See the file COPYING for details.
 #define WORK_QUEUE_H
 
 /** @file work_queue.h A master-worker library.
- The work queue provides an implementation of the master-worker computing
-model using TCP sockets, Unix applications, and files as intermediate buffers.
-A master process uses @ref work_queue_create to create a queue, then
-@ref work_queue_submit to submit tasks.  Once tasks are running, call
-@ref work_queue_wait to wait for completion.  The generic <tt>worker</tt>
-program can be run on any machine, and simply needs to be told the host
-and port of the master.
+ The work queue provides an implementation of the master-worker computing model
+ using TCP sockets, Unix applications, and files as intermediate buffers.  A
+ master process uses @ref work_queue_create to create a queue, then @ref
+ work_queue_submit to submit tasks.  Once tasks are running, call @ref
+ work_queue_wait to wait for completion. A generic worker program, named
+ <tt>work_queue_worker</tt>, can be run on any machine, and simply needs to be
+ told the host and port of the master.
 */
 
 #include <sys/types.h>
