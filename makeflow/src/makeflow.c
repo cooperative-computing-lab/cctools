@@ -307,12 +307,10 @@ int dag_width_uniform_task(struct dag *d)
 }
 
 void dag_show_analysis(struct dag *d) {
-	int depth = dag_depth(d);
-	printf("depth\t%d\n", depth);
-	int width_uniform_task = dag_width_uniform_task(d);
-	printf("width_uniform_task\t%d\n", width_uniform_task);
-	int width_guaranteed_max = dag_width_guaranteed_max(d);
-	printf("width_guaranteed_max\t%d\n", width_guaranteed_max);
+	printf("num_of_tasks\t%d\n", itable_size(d->node_table));
+	printf("depth\t%d\n", dag_depth(d));
+	printf("width_uniform_task\t%d\n", dag_width_uniform_task(d));
+	printf("width_guaranteed_max\t%d\n", dag_width_guaranteed_max(d));
 }
 
 void dag_show_input_files(struct dag *d)
