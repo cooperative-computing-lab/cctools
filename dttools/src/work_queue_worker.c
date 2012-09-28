@@ -33,6 +33,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
@@ -137,6 +138,7 @@ static int released_by_master = 0;
 
 // Function declarations
 static int poll_master_and_task(struct link *master, int task_pipe_fd, int timeout);
+static int path_within_workspace(const char *path, const char *workspace);
 static int handle_task(struct link *master);
 static int handle_link(struct link *master);
 static void disconnect_master(struct link *master);
@@ -1175,9 +1177,19 @@ static int handle_link(struct link *master) {
 		} else if(sscanf(line, "symlink %s %s", path, filename) == 2) {
 			r = do_symlink(path, filename);
 		} else if(sscanf(line, "put %s %lld %o", filename, &length, &mode) == 3) {
-			r = do_put(master, filename, length, mode);
+			if(path_within_workspace(filename, workspace)) {
+				r = do_put(master, filename, length, mode);
+			} else {
+				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
+				r= 0;
+			}
 		} else if(sscanf(line, "unlink %s", path) == 1) {
-			r = do_unlink(path);
+			if(path_within_workspace(filename, workspace)) {
+				r = do_unlink(path);
+			} else {
+				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
+				r= 0;
+			}
 		} else if(sscanf(line, "mkdir %s %o", filename, &mode) == 2) {
 			r = do_mkdir(filename, mode);
 		} else if(sscanf(line, "rget %s", filename) == 1) {
@@ -1299,6 +1311,49 @@ static int setup_workspace() {
 
 	fprintf(stdout, "work_queue_worker: working in %s\n", workspace);
 	return 1;
+}
+
+static int path_within_workspace(const char *path, const char *workspace) {
+	if(!path) return 0;
+
+	char absolute_workspace[PATH_MAX+1];
+	if(!realpath(workspace, absolute_workspace)) {
+		debug(D_WQ, "Failed to resolve the absolute path of workspace - %s: %s", path, strerror(errno));
+		return 0;
+	}	
+
+	char *p;
+	if(path[0] == '/') {
+		p = strstr(path, absolute_workspace);
+		if(p != path) {
+			return 0;
+		}
+	}
+
+	char absolute_path[PATH_MAX+1];
+	char *tmp_path = xxstrdup(path);
+
+	int rv = 1;
+	while((p = strrchr(tmp_path, '/')) != NULL) {
+		//debug(D_WQ, "Check if %s is within workspace - %s", tmp_path, absolute_workspace);
+		*p = '\0';
+		if(realpath(tmp_path, absolute_path)) {
+			p = strstr(absolute_path, absolute_workspace);
+			if(p != absolute_path) {
+				rv = 0;
+			}
+			break;
+		} else {
+			if(errno != ENOENT) {
+				debug(D_WQ, "Failed to resolve the absolute path of %s: %s", tmp_path, strerror(errno));
+				rv = 0;
+				break;
+			}
+		}
+	}
+
+	free(tmp_path);
+	return rv;
 }
 
 static void handle_abort(int sig)
