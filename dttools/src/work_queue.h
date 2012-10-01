@@ -243,7 +243,7 @@ If the task could not, then the <tt>result</tt> field will be non-zero and the
 
 @param q A work queue object.
 @param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref WORK_QUEUE_WAITFORTASK to block until a task has completed.
-@returns A completed task description, or null if the queue is empty or the timeout was reached without a completed task.
+@returns A completed task description, or null if the queue is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
 */
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout);
 
