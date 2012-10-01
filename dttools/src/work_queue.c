@@ -273,8 +273,18 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 	return 1;
 }
 
-void work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags)
+int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags)
 {
+	if(!t || !local_name || !remote_name) {
+		return 0;
+	}
+
+	// @param remote_name should not be an absolute path. @see
+	// work_queue_task_specify_file
+	if(remote_name[0] == '/') {
+		return 0;
+	}
+
 	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
 
 	tf->type = WORK_QUEUE_FILE_PIECE;
@@ -290,10 +300,21 @@ void work_queue_task_specify_file_piece(struct work_queue_task *t, const char *l
 	} else {
 		list_push_tail(t->output_files, tf);
 	}
+	return 1;
 }
 
-void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags)
+int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags)
 {
+	if(!t || !remote_name) {
+		return 0;
+	}
+
+	// @param remote_name should not be an absolute path. @see
+	// work_queue_task_specify_file
+	if(remote_name[0] == '/') {
+		return 0;
+	}
+
 	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
 	tf->type = WORK_QUEUE_BUFFER;
 	tf->flags = flags;
@@ -302,10 +323,22 @@ void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data,
 	memcpy(tf->payload, data, length);
 	tf->remote_name = xxstrdup(remote_name);
 	list_push_tail(t->input_files, tf);
+
+	return 1;
 }
 
-void work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags)
+int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags)
 {
+	if(!t || !remote_name || !cmd) {
+		return 0;
+	}
+
+	// @param remote_name should not be an absolute path. @see
+	// work_queue_task_specify_file
+	if(remote_name[0] == '/') {
+		return 0;
+	}
+
 	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
 	tf->type = WORK_QUEUE_REMOTECMD;
 	tf->flags = flags;
@@ -318,31 +351,32 @@ void work_queue_task_specify_file_command(struct work_queue_task *t, const char 
 	} else {
 		list_push_tail(t->output_files, tf);
 	}
+	return 1;
 }
 
-void work_queue_task_specify_output_file(struct work_queue_task *t, const char *rname, const char *fname)
+int work_queue_task_specify_output_file(struct work_queue_task *t, const char *rname, const char *fname)
 {
-	work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
 }
 
-void work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname)
+int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname)
 {
-	work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 }
 
-void work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf, int length, const char *rname)
+int work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf, int length, const char *rname)
 {
-	work_queue_task_specify_buffer(t, buf, length, rname, WORK_QUEUE_NOCACHE);
+	return work_queue_task_specify_buffer(t, buf, length, rname, WORK_QUEUE_NOCACHE);
 }
 
-void work_queue_task_specify_input_file(struct work_queue_task *t, const char *fname, const char *rname)
+int work_queue_task_specify_input_file(struct work_queue_task *t, const char *fname, const char *rname)
 {
-	work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 }
 
-void work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, const char *fname, const char *rname)
+int work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, const char *fname, const char *rname)
 {
-	work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
 }
 
 void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
