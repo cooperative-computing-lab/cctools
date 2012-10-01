@@ -130,8 +130,9 @@ struct work_queue_task *work_queue_task_create(const char *full_command);
 @param flags	May be zero to indicate no special handling or any of the following or'd together:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
+@return 1 if the task file is successfully specified, 0 if either of @param t, @param local_name, or @param remote_name is null or @param remote_name is an absolute path.
 */
-void work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags);
+int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags);
 
 /** Add a file piece to a task.
 @param t A task object.

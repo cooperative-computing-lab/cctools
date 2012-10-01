@@ -242,8 +242,21 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 }
 
 
-void work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)
+int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)
 {
+	if(!t || !local_name || !remote_name) {
+		return 0;
+	}
+
+	// @param remote_name is the path of the file as on the worker machine. In
+	// the Work Queue framework, workers are prohibitted from writing to paths
+	// outside of their workspaces. When a task is specified, the workspace of
+	// the worker(the worker on which the task will be executed) is unlikely to
+	// be known. Thus @param remote_name should not be an absolute path.
+	if(remote_name[0] == '/') {
+		return 0;
+	}
+
 	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
 
 	tf->type = WORK_QUEUE_FILE;
@@ -257,6 +270,7 @@ void work_queue_task_specify_file(struct work_queue_task *t, const char *local_n
 	} else {
 		list_push_tail(t->output_files, tf);
 	}
+	return 1;
 }
 
 void work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags)
