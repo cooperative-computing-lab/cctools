@@ -34,7 +34,7 @@ for i in range(1, len(sys.argv)):
     
     t = Task(command)
     
-    if not t.specify_file("/usr/bin/gzip", "/gzip", WORK_QUEUE_INPUT, cache=True):
+    if not t.specify_file("/usr/bin/gzip", "gzip", WORK_QUEUE_INPUT, cache=True):
         print "specify_file() failed for /usr/bin/gzip: check if arguments are null or remote name is an absolute path." 
         sys.exit(1) 
     if not t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=False):
