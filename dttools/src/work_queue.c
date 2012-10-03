@@ -26,6 +26,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "load_average.h"
 #include "buffer.h"
+#include "link_nvpair.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -53,6 +54,8 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_STATE_CANCELLING	3
 #define WORKER_STATE_NONE 		4
 #define WORKER_STATE_MAX 		(WORKER_STATE_NONE+1)
+
+static const char * work_queue_state_names[] = {"init","ready","busy","cancel","none"};
 
 // FIXME: These internal error flags should be clearly distinguished
 // from the task result codes given by work_queue_wait.
@@ -575,10 +578,10 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 		struct pool_info *pi;
 		pi = hash_table_lookup(q->workers_by_pool, w->pool_name);
 		if(!pi) {
-			debug(D_NOTICE, "Error: removing worker from pool \"%s\" but failed to find out how many workers are from that pool.", w->pool_name);
+			debug(D_WQ, "Error: removing worker from pool \"%s\" but failed to find out how many workers are from that pool.", w->pool_name);
 		} else {
 			if(pi->count == 0) {
-				debug(D_NOTICE, "Error: removing worker from pool \"%s\" but record indicates no workers from that pool are connected.", w->pool_name);
+				debug(D_WQ, "Error: removing worker from pool \"%s\" but record indicates no workers from that pool are connected.", w->pool_name);
 			} else {
 				pi->count -= 1;
 			}
@@ -783,7 +786,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 				}
 			} else if(strncmp(type, "missing", 7) == 0) {
 				// now length holds the errno
-				debug(D_NOTICE, "Failed to retrieve %s from %s (%s): %s", remote_name, w->addrport, w->hostname, strerror(length));
+				debug(D_WQ, "Failed to retrieve %s from %s (%s): %s", remote_name, w->addrport, w->hostname, strerror(length));
 				w->current_task->result |= WORK_QUEUE_RESULT_OUTPUT_MISSING;
 			} else {
 				debug(D_WQ, "Invalid output item type - %s\n", type);
@@ -1028,7 +1031,7 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 	return 1;
 
       failure:
-	debug(D_NOTICE, "%s (%s) failed and removed because cannot receive output.", w->hostname, w->addrport);
+	debug(D_WQ, "%s (%s) failed and removed because cannot receive output.", w->hostname, w->addrport);
 	remove_worker(q, w);
 	return 0;
 }
@@ -1194,6 +1197,152 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, str
 	return 1;
 }
 
+static struct nvpair * queue_to_nvpair( struct work_queue *q )
+{
+	struct nvpair *nv = nvpair_create();
+	if(!nv) return 0;
+
+	struct work_queue_stats info;
+	work_queue_get_stats(q,&info);
+
+	nvpair_insert_integer(nv,"port",info.port);
+	if(q->name) nvpair_insert_string(nv,"project",q->name);
+	nvpair_insert_integer(nv,"priority",info.priority);
+	nvpair_insert_integer(nv,"workers",info.workers_ready+info.workers_busy+info.workers_cancelling);
+	nvpair_insert_integer(nv,"workers_init",info.workers_init);
+	nvpair_insert_integer(nv,"workers_ready",info.workers_ready);
+	nvpair_insert_integer(nv,"workers_busy",info.workers_busy);
+	nvpair_insert_integer(nv,"workers_cancelling",info.workers_cancelling);
+	nvpair_insert_integer(nv,"tasks_running",info.tasks_running);
+	nvpair_insert_integer(nv,"tasks_waiting",info.tasks_waiting);
+	nvpair_insert_integer(nv,"tasks_complete",info.total_tasks_complete);
+	nvpair_insert_integer(nv,"total_tasks_dispatched",info.total_tasks_dispatched);
+	nvpair_insert_integer(nv,"total_tasks_complete",info.total_tasks_complete);
+	nvpair_insert_integer(nv,"total_workers_joined",info.total_workers_joined);
+	nvpair_insert_integer(nv,"total_workers_removed",info.total_workers_removed);
+	nvpair_insert_integer(nv,"total_bytes_sent",info.total_bytes_sent);
+	nvpair_insert_integer(nv,"total_bytes_received",info.total_bytes_received);
+	nvpair_insert_integer(nv,"start_time",info.start_time);
+	nvpair_insert_integer(nv,"total_send_time",info.total_send_time);
+	nvpair_insert_integer(nv,"total_receive_time",info.total_receive_time);
+
+	return nv;
+}
+
+struct nvpair * worker_to_nvpair( struct work_queue_worker *w )
+{
+	struct nvpair *nv = nvpair_create();
+	if(!nv) return 0;
+
+	nvpair_insert_string(nv,"state",work_queue_state_names[w->state]);
+	nvpair_insert_string(nv,"hostname",w->hostname);
+	nvpair_insert_string(nv,"os",w->os);
+	nvpair_insert_string(nv,"arch",w->arch);
+	nvpair_insert_string(nv,"addrport",w->addrport);
+	nvpair_insert_integer(nv,"ncpus",w->ncpus);
+	nvpair_insert_integer(nv,"memory_avail",w->memory_avail);
+	nvpair_insert_integer(nv,"memory_total",w->memory_total);
+	nvpair_insert_integer(nv,"disk_avail",w->disk_avail);
+	nvpair_insert_integer(nv,"disk_total",w->disk_total);
+	nvpair_insert_integer(nv,"total_tasks_complete",w->total_tasks_complete);
+	nvpair_insert_integer(nv,"total_bytes_transferred",w->total_bytes_transferred);
+	nvpair_insert_integer(nv,"total_transfer_time",w->total_transfer_time);
+
+	nvpair_insert_integer(nv,"start_time",w->start_time);
+
+	struct work_queue_task *t = w->current_task;
+	if(t) {
+		nvpair_insert_integer(nv,"current_task_id",t->taskid);
+		nvpair_insert_string(nv,"current_task_command",t->command_line);
+	}
+
+	return nv;
+}
+
+struct nvpair * task_to_nvpair( struct work_queue_task *t, const char *state, const char *host )
+{
+	struct nvpair *nv = nvpair_create();
+	if(!nv) return 0;
+
+	nvpair_insert_integer(nv,"taskid",t->taskid);
+	nvpair_insert_string(nv,"state",state);
+	if(t->tag) nvpair_insert_string(nv,"tag",t->tag);
+	nvpair_insert_string(nv,"command",t->command_line);
+	if(host) nvpair_insert_string(nv,"host",host);
+
+	return nv;
+}
+
+static int process_queue_status( struct work_queue *q, struct link *l, time_t stoptime )
+{
+	struct nvpair *nv = queue_to_nvpair( q );
+	if(nv) {
+		link_nvpair_write(l,nv,stoptime);
+		nvpair_delete(nv);
+	}
+
+	return 0;
+}
+
+static int process_task_status( struct work_queue *q, struct link *l, time_t stoptime )
+{
+	struct work_queue_task *t;
+	struct work_queue_worker *w;
+	struct nvpair *nv;
+	UINT64_T key;
+
+	itable_firstkey(q->running_tasks);
+	while(itable_nextkey(q->running_tasks,&key,(void**)&w)) {
+		t = w->current_task;
+		if(t) {
+			nv = task_to_nvpair(t,"running",w->hostname);
+			if(nv) {
+				link_nvpair_write(l,nv,stoptime);
+				nvpair_delete(nv);
+			}
+		}
+	}
+
+	list_first_item(q->ready_list);
+	while((t = list_next_item(q->ready_list))) {
+		nv = task_to_nvpair(t,"waiting",0);
+		if(nv) {
+			link_nvpair_write(l,nv,stoptime);
+			nvpair_delete(nv);
+		}
+	}
+
+	list_first_item(q->complete_list);
+	while((t = list_next_item(q->complete_list))) {
+		nv = task_to_nvpair(t,"complete",0);
+		if(nv) {
+			link_nvpair_write(l,nv,stoptime);
+			nvpair_delete(nv);
+		}
+	}
+
+	return 0;
+}
+
+static int process_worker_status( struct work_queue *q, struct link *l, time_t stoptime )
+{
+	struct work_queue_worker *w;
+	struct nvpair *nv;
+	char *key;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+		if(w->state==WORKER_STATE_INIT) continue;
+		nv = worker_to_nvpair(w);
+		if(nv) {
+			link_nvpair_write(l,nv,stoptime);
+			nvpair_delete(nv);
+		}
+	}
+
+	return 0;
+}
+
 static int prefix_is(const char *string, const char *prefix) {
 	size_t n;
 
@@ -1215,12 +1364,20 @@ static void handle_worker(struct work_queue *q, struct link *l)
 	link_to_hash_key(l, key);
 	w = hash_table_lookup(q->worker_table, key);
 
+	time_t stoptime = time(0)+60;
+
 	int keep_worker;
 	if(link_readline(l, line, sizeof(line), time(0) + short_timeout)) {
 		if(prefix_is(line, "ready")) {
 			keep_worker = process_ready(q, w, line);
-		}  else if (prefix_is(line, "result")) {
+		} else if (prefix_is(line,"result")) {
 			keep_worker = process_result(q, w, l, line);
+		} else if (prefix_is(line,"queue_status")) {
+			keep_worker = process_queue_status(q,l,stoptime);
+		} else if (prefix_is(line,"task_status")) {
+			keep_worker = process_task_status(q,l,stoptime);
+		} else if (prefix_is(line,"worker_status")) {
+			keep_worker = process_worker_status(q,l,stoptime);
 		} else {
 			debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 			keep_worker = 0;
@@ -1232,7 +1389,7 @@ static void handle_worker(struct work_queue *q, struct link *l)
 
 	if(!keep_worker) {
 		remove_worker(q, w);
-		debug(D_NOTICE, "%s (%s) is removed.", w->hostname, w->addrport);
+		debug(D_WQ, "%s (%s) is removed.", w->hostname, w->addrport);
 	}
 }
 
@@ -1635,7 +1792,7 @@ static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t d
 		*accumulated_time += ts->duration;
 		list_push_tail(time_list, ts);
 	} else {
-		debug(D_NOTICE, "Failed to record time slot of type %d.", type);
+		debug(D_WQ, "Failed to record time slot of type %d.", type);
 	}
 
 	// trim time list
@@ -1886,7 +2043,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 		change_worker_state(q, w, WORKER_STATE_BUSY);
 		return 1;
 	} else {
-		debug(D_NOTICE, "%s (%s) removed because couldn't send task.", w->hostname, w->addrport);
+		debug(D_WQ, "%s (%s) removed because couldn't send task.", w->hostname, w->addrport);
 		remove_worker(q, w);	// puts w->current_task back into q->ready_list
 		return 0;
 	}
@@ -1925,7 +2082,7 @@ static void abort_slow_workers(struct work_queue *q)
 		if(w->state == WORKER_STATE_BUSY) {
 			timestamp_t runtime = current - w->current_task->time_send_input_start;
 			if(runtime > (average_task_time * multiplier)) {
-				debug(D_NOTICE, "%s (%s) has run too long: %.02lf s (average is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
+				debug(D_WQ, "%s (%s) has run too long: %.02lf s (average is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
 				remove_worker(q, w);
 			}
 		}

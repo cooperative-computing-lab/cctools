@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "catalog_query.h"
 #include "catalog_server.h"
 
+#include "link_nvpair.h"
 #include "http_query.h"
 #include "nvpair.h"
 #include "xxmalloc.h"
@@ -42,24 +43,7 @@ struct catalog_query *catalog_query_create(const char *host, int port, time_t st
 
 struct nvpair *catalog_query_read(struct catalog_query *q, time_t stoptime)
 {
-	struct nvpair *nv = nvpair_create();
-	char line[65536];
-	int lines = 0;
-
-	while(link_readline(q->link, line, sizeof(line), stoptime)) {
-		string_chomp(line);
-		if(!line[0])
-			break;
-		nvpair_parse(nv, line);
-		lines++;
-	}
-
-	if(lines) {
-		return nv;
-	} else {
-		nvpair_delete(nv);
-		return 0;
-	}
+	return link_nvpair_read(q->link,stoptime);
 }
 
 void catalog_query_delete(struct catalog_query *q)
