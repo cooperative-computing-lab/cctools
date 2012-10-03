@@ -413,34 +413,41 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 	debug(D_TCP, "connecting to %s:%d", addr, port);
 
-	do {
+	while(1) {
+		// First attempt a non-blocking connect
 		result = connect(link->fd, (struct sockaddr *) &address, sizeof(address));
 
-		/* On some platforms, errno is not set correctly. */
-		/* If the remote address can be found, then we are really connected. */
-		/* Also, on bsd-derived systems, failure to connect is indicated by a second connect returning EINVAL. */
+		// On many platforms, non-blocking connect sets errno in unexpected ways:
 
-		/* On OSX, the following is a possible way of indicating a successful connection: */
+		// On OSX, result=-1 and errno==EISCONN indicates a successful connection.
 		if(result<0 && errno==EISCONN) result=0;
 
-		if(result < 0) {
-			if(!errno_is_temporary(errno)) {
-				if(errno == EINVAL)
-					errno = ECONNREFUSED;
-				break;
-			} else {
-				debug(D_TCP, "connection to %s:%d not made yet: %s", addr, port, strerror(errno));
-			}
-		} else {
-			if(link_address_remote(link, link->raddr, &link->rport)) {
-				debug(D_TCP, "made connection to %s:%d", link->raddr, link->rport);
+		// On BSD-derived systems, failure to connect is indicated by errno = EINVAL.
+		// Set it to something more explanatory.
+	       	if(result<0 && errno==EINVAL) errno=ECONNREFUSED;
+
+		// Otherwise, a non-temporary errno should cause us to bail out.
+		if(result<0 && !errno_is_temporary(errno)) break;
+
+		// If the remote address is valid, we are connected no matter what.
+		if(link_address_remote(link, link->raddr, &link->rport)) {
+			debug(D_TCP, "made connection to %s:%d", link->raddr, link->rport);
 #ifdef CCTOOLS_OPSYS_CYGWIN
-				link_nonblocking(link, 1);
+			link_nonblocking(link, 1);
 #endif
-				return link;
-			}
-		} 
-	} while(link_sleep(link, stoptime, 0, 1));
+			return link;
+		}
+
+		// if the time has expired, bail out
+		if( time(0) >= stoptime ) break;
+
+		// wait for some activity on the socket.
+		link_sleep(link, stoptime, 0, 1);
+
+		// No matter how the sleep ends, we want to go back to the top
+		// and call connect again to get a proper errno.
+	}
+
 
 	debug(D_TCP, "connection to %s:%d failed (%s)", addr, port, strerror(errno));
 
