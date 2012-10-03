@@ -127,7 +127,7 @@ int nvpair_print_alloc(struct nvpair *n, char **text)
 		nvpair_print(n, *text, needed + 1);
 	}
 
-	return 1;
+	return needed;
 }
 
 void nvpair_insert_string(struct nvpair *n, const char *name, const char *value)
