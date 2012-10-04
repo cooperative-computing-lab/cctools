@@ -1167,25 +1167,44 @@ static INT64_T do_matrix_delete(int argc, char **argv)
 	return chirp_matrix_delete(current_host, path, stoptime);
 }
 
-static INT64_T do_search(int argc, char **argv)
-{
-	struct chirp_search_result** results = malloc(sizeof(struct chirp_search_result*));
-	int flags = 0;
-	INT64_T result = chirp_reli_search(current_host, argv[1], argv[2], flags, results, stoptime);
+void do_search_callback(char *path, struct chirp_stat *info, int error, void *arg) {
+	if (error) {
+		printf("error: ");
+		switch (error) {
+			case CHIRP_SEARCH_EPATH: 
+			printf("directory %s does not exist\n", path);
+			break;
 
-	if (result == 0) {
-		struct chirp_search_result *current = *results;
-		
-		while (current != NULL) {
-			long_ls_callback(current->path, current->info, 0);	
-			struct chirp_search_result *next = current->next;
-			free(current->path);
-			free(current->info);
-			free(current);
-			current = next;
+			case CHIRP_SEARCH_EPERM:
+			printf("not authorized to access %s\n", path);
+			break;
+
+			case CHIRP_SEARCH_ESTAT:
+			printf("could not stat file %s\n", path);
+			break;
+
+			case CHIRP_SEARCH_EOPEN:
+			printf("could not open directory %s\n", path);
+			break;
 		}
-		return 0;
+
+		return;
 	}
+
+	printf("match: ");
+
+	if (info)
+		long_ls_callback(path, info, 0);
 	else
-		return 1;
+		printf("%s\n", path);
+
+	free(path);
+	free(info);
+}
+
+static INT64_T do_search(int argc, char **argv)
+{	
+	int flags = CHIRP_SEARCH_RECURSIVE|CHIRP_SEARCH_METADATA|CHIRP_SEARCH_INCLUDEROOT|CHIRP_SEARCH_PERIOD;
+	INT64_T result = chirp_reli_search(current_host, argv[1], argv[2], flags, do_search_callback, NULL, stoptime);
+	return result;
 }

@@ -1581,30 +1581,42 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			write(config_pipe[1],line,strlen(line));
 			debug_flags_set(debug_flag);
 		} else if(sscanf(line, "search %s %s %lld", pattern, path, &flags)==3) {
-			char *ps = path, *pe;
-			char fixed[CHIRP_PATH_MAX];	
 			link_putliteral(l, "0\n", stalltime);
-
+			char fixed[CHIRP_PATH_MAX];
+			char *ps = path, *pe;
+	
 			for (;;) {
 				if((pe = strchr(ps, CHIRP_SEARCH_DELIMITER)) != NULL) 
 					*pe = '\0';
 
 				strcpy(fixed, ps);
+				chirp_path_fix(fixed);
 
-				if(!chirp_path_fix(fixed))
-					goto failure;
-				if(!chirp_acl_check_dir(fixed, subject, CHIRP_ACL_LIST))
-					goto failure;
+				if(access(fixed, F_OK) == -1) { 
+					link_putfstring(l, "%s\n", stalltime, fixed);
+					link_putfstring(l, "%d\n", stalltime, CHIRP_SEARCH_EPATH);
+					link_putfstring(l, "0\n", stalltime);
 
-				chirp_alloc_search(subject, fixed, pattern, flags, l, stalltime);
-				
+				} else if(!chirp_acl_check(fixed, subject, CHIRP_ACL_WRITE)) {
+					link_putfstring(l, "%s\n", stalltime, fixed);
+					link_putfstring(l, "%d\n", stalltime, CHIRP_SEARCH_EPERM);
+					link_putfstring(l, "0\n", stalltime);
+
+				} else {
+					int found = chirp_alloc_search(subject, fixed, pattern, flags, l, stalltime);
+					if (found && (flags & CHIRP_SEARCH_STOPATFIRST))
+						break;
+				}
+
 				if (pe != NULL) {
 					ps = pe + 1;
 					*pe = CHIRP_SEARCH_DELIMITER; 
 				} else
 					break;
 			}
-
+			
+			link_putliteral(l, "\n", stalltime);
+			do_getdir_result = 1;
 			result = 0;
 		} else {
 			result = -1;
@@ -1614,7 +1626,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		if(do_no_result) {
 			/* nothing */
 		} else if(result < 0) {
-		      failure:
+			failure:
 			result = errno_to_chirp(errno);
 			sprintf(line, "%lld\n", result);
 		} else if(do_stat_result) {

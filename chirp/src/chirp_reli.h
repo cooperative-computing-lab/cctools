@@ -280,7 +280,7 @@ Performs a search on a directory for file names matching the given glob expressi
 @return On success, returns zero. On failure, returns less than zero and sets errno.
 */
 
-INT64_T chirp_reli_search( const char *host, const char *pattern, const char *path, int flags, struct chirp_search_result **results, time_t stoptime );
+INT64_T chirp_reli_search( const char *host, const char *pattern, const char *path, int flags, chirp_search_t callback, void *arg, time_t stoptime );
 
 /** Get a detailed directory listing.
 Gets a detailed directory listing from a Chirp server, and then calls the callback once for each element in the directory.

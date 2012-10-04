@@ -78,9 +78,17 @@ struct chirp_search_result {
 #define CHIRP_SEARCH_RECURSIVE   (1<<1)
 #define CHIRP_SEARCH_METADATA    (1<<2)
 #define CHIRP_SEARCH_INCLUDEROOT (1<<3)
-#define CHIRP_SEARCH_R_OK        (1<<4)
-#define CHIRP_SEARCH_W_OK        (1<<5)
-#define CHIRP_SEARCH_X_OK        (1<<6)
+#define CHIRP_SEARCH_PERIOD 	 (1<<4)
+#define CHIRP_SEARCH_R_OK        (1<<5)
+#define CHIRP_SEARCH_W_OK        (1<<6)
+#define CHIRP_SEARCH_X_OK        (1<<7)
+
+/** Streaming errors for the search operation */
+
+#define CHIRP_SEARCH_EPATH 1  /**< The requested search path does not exist */
+#define CHIRP_SEARCH_EPERM 2  /**< The user is not authorized to access the requested path */
+#define CHIRP_SEARCH_ESTAT 3  /**< The file was not able to be statted */
+#define CHIRP_SEARCH_EOPEN 4  /**< The directory was not able to be opened */
 
 /** Options for the search operation */
 
@@ -156,5 +164,18 @@ to display or otherwise act upon each location at which a given file is stored.
 */
 
 typedef void (*chirp_loc_t) (const char *location, void *arg);
+
+/** A callback function typedef used to display a search operation result.
+A function matching this type is called by @ref chirp_reli_search
+to display or otherwise act upon each matched file or error resulting from
+the search operation.
+@param path If <tt>error</tt> is zero, this is the path of a matched file. If <tt>error</tt> is non-zero, the meaning of this argument depends on the error code.
+@param info A pointer to a chirp_stat struct for the matched file.
+@param error One of CHIRP_SEARCH_EPATH, CHIRP_SEARCH_EPERM, CHIRP_SEARCH_EOPEN, or CHIRP_SEARCH_ESTAT.
+@param arg  A convenience pointer corresponding to the <tt>arg</tt> passed from @ref chirp_reli_search.
+@see chirp_reli_search
+*/
+
+typedef void (*chirp_search_t) (char *path, struct chirp_stat *info, int error, void *arg);
 
 #endif
