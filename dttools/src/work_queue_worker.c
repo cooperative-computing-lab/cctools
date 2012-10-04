@@ -1000,28 +1000,15 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode)
 }
 
 static int do_unlink(const char *path) {
-	int result; 
-
-	struct stat stat_info;
-
-	if(stat(path, &stat_info) < 0) {
-		fprintf(stderr, "Could not stat %s.(%s)\n", path, strerror(errno));
-		return 0;
-	} else { 
-		if(stat_info.st_mode & S_IFDIR) 
-			result = delete_dir(path);
-		else
-			result = remove(path);
-	}
-	
-	if(result != 0) { //one of the calls failed	
+	//Use delete_dir() since it calls unlink() if path is a file.	
+	if(delete_dir(path) != 0) { 
 		if (task_status != TASK_CANCELLED) {
 			//recover only if it wasn't a cancelled task since it could
 			//have been cancelled before (output) file was generated.
 			fprintf(stderr, "Could not remove %s.(%s)\n", path, strerror(errno));
 			return 0;
 		}	
-	}
+	}	
 	return 1;
 }
 
