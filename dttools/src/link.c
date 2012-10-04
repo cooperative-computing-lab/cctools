@@ -439,7 +439,10 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 		}
 
 		// if the time has expired, bail out
-		if( time(0) >= stoptime ) break;
+		if( time(0) >= stoptime ) {
+			errno = ETIMEDOUT;
+			break;
+		}
 
 		// wait for some activity on the socket.
 		link_sleep(link, stoptime, 0, 1);
