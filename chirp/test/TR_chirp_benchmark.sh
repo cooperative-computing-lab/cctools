@@ -8,18 +8,22 @@ PORT_FILE=chirp_server.port
 
 prepare()
 {
-    ../src/chirp_server -Z $PORT_FILE &
-    pid=$!
-
-    # give the server a moment to generate the port file
-    sleep 5
-
-    if ps ux | awk '{print $2}' | grep "^$pid$"; then
+	rm -f $PORT_FILE	
+	../src/chirp_server -Z $PORT_FILE &
+	pid=$!
 	echo $pid > $PID_FILE
-	exit 0
-    else
-    	exit 1
-    fi
+
+	for i in 1 2 3 4 5
+	do
+		if [ -f $PORT_FILE ]
+		then
+			exit 0
+		else
+			sleep 1
+		fi
+	done
+
+	exit 1
 }
 
 run()
@@ -30,7 +34,11 @@ run()
 
 clean()
 {
-    kill -9 `cat $PID_FILE`
+	if [ -f $PID_FILE ]
+	then
+		kill -9 `cat $PID_FILE`
+	fi
+
     rm -f $TEST_FILE
     rm -f $PID_FILE
     rm -f $PORT_FILE
