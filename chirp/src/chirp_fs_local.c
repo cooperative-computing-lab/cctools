@@ -330,11 +330,7 @@ static INT64_T chirp_fs_local_rmdir(const char *path)
 		chirp_fs_local_closedir(dir);
 
 		if(empty) {
-			if(delete_dir(path)) {
-				return 0;
-			} else {
-				return -1;
-			}
+			return delete_dir(path);
 		} else {
 			errno = ENOTEMPTY;
 			return -1;

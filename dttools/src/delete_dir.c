@@ -19,27 +19,19 @@ See the file COPYING for details.
 int delete_dir(const char *dirname)
 {
 	char subdir[PATH_MAX];
-	int result;
+	int result = 0;
 	struct dirent *d;
 	DIR *dir;
 
 	dir = opendir(dirname);
 	if(!dir) {
-		if(errno == ENOTDIR) {
-			result = unlink(dirname);
-			if(result == 0) {
-				return 1;
-			} else {
-				return 0;
-			}
-		} else if(errno == ENOENT) {
-			return 1;
-		} else {
+		if(errno == ENOTDIR) 
+			return unlink(dirname);
+		else if(errno == ENOENT) 
 			return 0;
-		}
+		else 
+			return -1;
 	}
-
-	result = 1;
 
 	while((d = readdir(dir))) {
 		if(!strcmp(d->d_name, "."))
@@ -47,15 +39,13 @@ int delete_dir(const char *dirname)
 		if(!strcmp(d->d_name, ".."))
 			continue;
 		sprintf(subdir, "%s/%s", dirname, d->d_name);
-		if(!delete_dir(subdir)) {
-			result = 0;
-		}
+		result = delete_dir(subdir);
 	}
 
 	closedir(dir);
 
 	if(rmdir(dirname) != 0) {
-		result = 0;
+		result = -1;
 	}
 
 	return result;
@@ -66,18 +56,18 @@ int delete_dir_contents(const char *dirname) {
 	struct dirent *d;
 	DIR *dir;
 
-	int result = 1;
+	int result = 0;
 
 	dir = opendir(dirname);
 	if (!dir) {
-		return 0;	
+		return -1;	
 	}
 		
 	while ((d = readdir(dir))) {
 		if ((strcmp(d->d_name, ".") && strcmp(d->d_name, "..")) != 0) {
 			sprintf(subdir, "%s/%s", dirname, d->d_name);
-			if (!delete_dir(subdir)) {
-				result = 0;
+			if (delete_dir(subdir) != 0) {
+				result = -1;
 			}	
 		}	
 	}

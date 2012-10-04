@@ -587,7 +587,7 @@ void file_clean(const char *filename, int silent)
 		if(errno == ENOENT) {
 			// nothing
 		} else if(errno == EISDIR) {
-			if(!delete_dir(filename)) {
+			if(delete_dir(filename) != 0) {
 				if(!silent)
 					fprintf(stderr,"couldn't delete directory %s: %s\n", filename, strerror(errno));
 			} else {

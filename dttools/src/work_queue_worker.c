@@ -1000,11 +1000,7 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode)
 }
 
 static int do_unlink(const char *path) {
-	/* return value of remove() is 0 on success while return value of
-	delete_dir() is 1 on success. So we need two variables to hold and check
-	the results of these two calls. */
-	int dir_result = 1; 
-	int file_result = 0;
+	int result; 
 
 	struct stat stat_info;
 
@@ -1013,12 +1009,12 @@ static int do_unlink(const char *path) {
 		return 0;
 	} else { 
 		if(stat_info.st_mode & S_IFDIR) 
-			dir_result = delete_dir(path);
+			result = delete_dir(path);
 		else
-			file_result = remove(path);
+			result = remove(path);
 	}
 	
-	if(file_result != 0 || dir_result != 1) { //one of the calls failed	
+	if(result != 0) { //one of the calls failed	
 		if (task_status != TASK_CANCELLED) {
 			//recover only if it wasn't a cancelled task since it could
 			//have been cancelled before (output) file was generated.

@@ -12,10 +12,16 @@ See the file COPYING for details.
 
 /** Delete a directory recursively.
 @param dir The full path of the directory to delete.
-@return One on success, zero on failure.
+@return 0 on success, -1 on failure.
 */
 
 int delete_dir(const char *dir);
+
+/** Delete only the contents of the directory recursively.
+@param dir The full path of the directory to delete.
+@return 0 on success, -1 on failure.
+*/
+
 int delete_dir_contents(const char *dir);
 
 #endif
