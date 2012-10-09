@@ -892,6 +892,62 @@ static INT64_T do_matrix_delete(int argc, char **argv)
 	return chirp_matrix_delete(current_host, path, stoptime);
 }
 
+static INT64_T do_xattr_get(int argc, char **argv)
+{
+	char full_path[CHIRP_PATH_MAX];
+	complete_remote_path(argv[1], full_path);
+	char data[65536];
+	INT64_T size;
+
+	if((size = chirp_reli_getxattr(current_host, full_path, argv[2], data, sizeof(data), stoptime)) > 0) {
+		write(STDOUT_FILENO, data, (size_t)size);
+		write(STDOUT_FILENO, "\n", 1);
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
+static INT64_T do_xattr_list(int argc, char **argv)
+{
+	char full_path[CHIRP_PATH_MAX];
+	complete_remote_path(argv[1], full_path);
+	char data[65536];
+	INT64_T size;
+
+	if((size = chirp_reli_listxattr(current_host, full_path, data, sizeof(data), stoptime)) > 0) {
+		char *current;
+		for(current = data; *current; current = current+strlen(current)+1) {
+			write(STDOUT_FILENO, current, strlen(current));
+			write(STDOUT_FILENO, "\n", 1);
+		}
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
+static INT64_T do_xattr_set(int argc, char **argv)
+{
+	char full_path[CHIRP_PATH_MAX];
+	complete_remote_path(argv[1], full_path);
+	INT64_T size;
+
+	if(argc == 3) {
+		if((size = chirp_reli_removexattr(current_host, full_path, argv[2], stoptime)) >= 0) {
+			return 0;
+		} else {
+			return -1;
+		}
+	} else {
+		if((size = chirp_reli_setxattr(current_host, full_path, argv[2], argv[3], strlen(argv[3]), 0, stoptime)) >= 0) {
+			return 0;
+		} else {
+			return -1;
+		}
+	}
+}
+
 static struct command list[] = {
 	{"audit", 1, 0, 1, "[-r]", do_audit},
 	{"cat", 1, 1, 100, "<file> [file2] [file3] ...", do_cat},
@@ -938,6 +994,9 @@ static struct command list[] = {
 	{"timeout", 0, 1, 1, "<seconds>", do_timeout},
 	{"whoami", 1, 0, 0, "", do_whoami},
 	{"whoareyou", 1, 1, 1, "<hostname>", do_whoareyou},
+	{"xattr_get", 1, 2, 2, "<file> <attribute>", do_xattr_get},
+	{"xattr_list", 1, 1, 1, "<file>", do_xattr_list},
+	{"xattr_set", 1, 2, 3, "<file> <attribute> [value]", do_xattr_set},
 	{0, 0, 0, 0, 0},
 };
 
