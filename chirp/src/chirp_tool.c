@@ -55,52 +55,6 @@ See the file COPYING for details.
 
 #define BUFFER_SIZE 32768
 
-static INT64_T do_open(int argc, char **argv);
-static INT64_T do_close(int argc, char **argv);
-static INT64_T do_get(int argc, char **argv);
-static INT64_T do_put(int argc, char **argv);
-static INT64_T do_cat(int argc, char **argv);
-static INT64_T do_cd(int argc, char **argv);
-static INT64_T do_lcd(int argc, char **argv);
-static INT64_T do_pwd(int argc, char **argv);
-static INT64_T do_lpwd(int argc, char **argv);
-static INT64_T do_getacl(int argc, char **argv);
-static INT64_T do_ticket_create(int argc, char **argv);
-static INT64_T do_ticket_register(int argc, char **argv);
-static INT64_T do_ticket_delete(int argc, char **argv);
-static INT64_T do_ticket_list(int argc, char **argv);
-static INT64_T do_ticket_get(int argc, char **argv);
-static INT64_T do_ticket_modify(int argc, char **argv);
-static INT64_T do_setacl(int argc, char **argv);
-static INT64_T do_resetacl(int argc, char **argv);
-static INT64_T do_ls(int argc, char **argv);
-static INT64_T do_mv(int argc, char **argv);
-static INT64_T do_rm(int argc, char **argv);
-static INT64_T do_mkdir(int argc, char **argv);
-static INT64_T do_rmdir(int argc, char **argv);
-static INT64_T do_stat(int argc, char **argv);
-static INT64_T do_statfs(int argc, char **argv);
-static INT64_T do_chmod(int argc, char **argv);
-static INT64_T do_timeout(int argc, char **argv);
-static INT64_T do_debug(int argc, char **argv);
-static INT64_T do_help(int argc, char **argv);
-static INT64_T do_quit(int argc, char **argv);
-static INT64_T do_whoami(int argc, char **argv);
-static INT64_T do_whoareyou(int argc, char **argv);
-static INT64_T do_md5(int argc, char **argv);
-static INT64_T do_setrep(int argc, char **argv);
-static INT64_T do_localpath(int argc, char **argv);
-static INT64_T do_audit(int argc, char **argv);
-static INT64_T do_thirdput(int argc, char **argv);
-static INT64_T do_mkalloc(int argc, char **argv);
-static INT64_T do_lsalloc(int argc, char **argv);
-static INT64_T do_matrix_create(int argc, char **argv);
-static INT64_T do_matrix_list(int argc, char **argv);
-static INT64_T do_matrix_delete(int argc, char **argv);
-static INT64_T do_remote_debug(int argc, char **argv);
-
-static int process_command(int argc, char **argv);
-
 static int timeout = 3600;
 static time_t stoptime = 0;
 static char current_host[CHIRP_PATH_MAX] = {0};
@@ -119,234 +73,7 @@ struct command {
 	char *help;
 	  INT64_T(*handler) (int argc, char **argv);
 };
-
-static struct command list[] = {
-	{"audit", 1, 0, 1, "[-r]", do_audit},
-	{"cat", 1, 1, 100, "<file> [file2] [file3] ...", do_cat},
-	{"cd", 1, 1, 1, "<remotedir>", do_cd},
-	{"chmod", 1, 2, 2, "<mode> <path>", do_chmod},
-	{"close", 1, 0, 0, "", do_close},
-	{"debug", 0, 0, 1, "[subsystem]", do_debug},
-	{"df", 1, 0, 1, "[-k|-m|-g|-t]", do_statfs},
-	{"exit", 0, 0, 0, "", do_quit},
-	{"get", 1, 1, 2, "<remotefile> [localfile]", do_get},
-	{"getacl", 1, 0, 1, "[remotepath]", do_getacl},
-	{"help", 0, 0, 0, "", do_help},
-	{"lcd", 0, 1, 1, "<localdir>", do_lcd},
-	{"listacl", 1, 0, 1, "[remotepath]", do_getacl},
-	{"localpath", 1, 0, 1, "[remotepath]", do_localpath},
-	{"lpwd", 0, 0, 0, "", do_lpwd},
-	{"ls", 1, 0, 2, "[-la] [remotepath]", do_ls},
-	{"lsalloc", 1, 0, 1, "[path]", do_lsalloc},
-	{"matrix_create", 1, 4, 4, "<path> <width> <height> <nhosts>", do_matrix_create},
-	{"matrix_delete", 1, 1, 1, "<path>", do_matrix_delete},
-	{"matrix_list", 1, 1, 1, "<path>", do_matrix_list},
-	{"md5", 1, 1, 1, "<path>", do_md5},
-	{"mkalloc", 1, 2, 2, "<path> <size>", do_mkalloc},
-	{"mkdir", 1, 1, 2, "[-p] <dir>", do_mkdir},
-	{"mv", 1, 2, 2, "<oldname> <newname>", do_mv},
-	{"open", 0, 1, 1, "<host>", do_open},
-	{"put", 1, 1, 2, "<localfile> [remotefile]", do_put},
-	{"pwd", 1, 0, 0, "", do_pwd},
-	{"quit", 0, 0, 0, "", do_quit},
-	{"remote_debug", 1, 1, 1, "[subsystem]", do_remote_debug},
-	{"resetacl", 1, 2, 2, "<remotepath> <rwldax>", do_resetacl},
-	{"rm", 1, 1, 1, "<file>", do_rm},
-	{"rmdir", 1, 1, 1, "<dir>", do_rmdir},
-	{"setacl", 1, 3, 3, "<remotepath> <user> <rwldax>", do_setacl},
-	{"setrep", 1, 2, 2, "<path> <nreps>", do_setrep},
-	{"stat", 1, 1, 1, "<file>", do_stat},
-	{"thirdput", 1, 3, 3, "<file> <3rdhost> <3rdfile>", do_thirdput},
-	{"ticket_create", 1, 0, 100, "[-o[utput] <ticket filename>] [-s[ubject] <subject/user>] [-d[uration] <duration>] [-b[its] <bits>] [[<directory> <acl>] ...]", do_ticket_create},
-	{"ticket_delete", 1, 1, 1, "<name>", do_ticket_delete},
-	{"ticket_get", 1, 1, 1, "<name>", do_ticket_get},
-	{"ticket_list", 1, 0, 1, "<name>", do_ticket_list},
-	{"ticket_modify", 1, 3, 3, "<name> <directory> <aclmask>", do_ticket_modify},
-	{"ticket_register", 1, 2, 3, "<name> [<subject>] <duration>", do_ticket_register},
-	{"timeout", 0, 1, 1, "<seconds>", do_timeout},
-	{"whoami", 1, 0, 0, "", do_whoami},
-	{"whoareyou", 1, 1, 1, "<hostname>", do_whoareyou},
-	{0, 0, 0, 0, 0},
-};
-
-static void show_help(const char *cmd)
-{
-	printf("use: %s [options] [hostname] [command]\n", cmd);
-	printf("where options are:\n");
-	printf(" -a <flag>  Require this authentication mode.\n");
-	printf(" -d <flag>  Enable debugging for this subsystem.\n");
-	printf(" -h         This message.\n");
-	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
-	printf(" -l         Long transfer information.\n");
-	printf(" -q         Quiet mode; supress messages and table headers.\n");
-	printf(" -t <time>  Set remote operation timeout.\n");
-	printf(" -v         Show program version.\n");
-}
-
-
-int main(int argc, char *argv[])
-{
-	char *temp;
-	int did_explicit_auth = 0;
-	char *tickets = NULL;
-	char prompt[CHIRP_LINE_MAX];
-	char line[CHIRP_LINE_MAX];
-	char **user_argv = 0;
-	int user_argc;
-	char c;
-	int result = 0;
-
-	debug_config(argv[0]);
-
-	while((c = getopt(argc, argv, "+a:d:hi:lt:v")) != (char) -1) {
-		switch (c) {
-		case 'a':
-			auth_register_byname(optarg);
-			did_explicit_auth = 1;
-			break;
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case 'h':
-			show_help(argv[0]);
-			exit(0);
-			break;
-		case 'i':
-			tickets = strdup(optarg);
-			break;
-		case 'l':
-			long_information = 1;
-			break;
-		case 't':
-			timeout = string_time_parse(optarg);
-			break;
-		case 'v':
-			cctools_version_print(stdout, argv[0]);
-			exit(0);
-			break;
-		}
-	}
-
-	cctools_version_debug(D_DEBUG, argv[0]);
-
-	if(!did_explicit_auth)
-		auth_register_all();
-	if(tickets) {
-		auth_ticket_load(tickets);
-		free(tickets);
-	} else if(getenv(CHIRP_CLIENT_TICKETS)) {
-		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
-	} else {
-		auth_ticket_load(NULL);
-	}
-
-	getcwd(current_local_dir, CHIRP_PATH_MAX);
-
-	interactive_mode = isatty(0);
-
-	if(optind < argc) {
-		stoptime = time(0) + timeout;
-		if(do_open(1, &argv[optind - 1])) {
-			fprintf(stderr, "couldn't open %s: %s\n", argv[optind], strerror(errno));
-			return 1;
-		}
-	}
-
-	if((argc - optind) > 1) {
-		return !process_command(argc - optind - 1, &argv[optind + 1]);
-	}
-
-	while(1) {
-		if(interactive_mode) {
-			sprintf(prompt, " chirp:%s:%s> ", current_host, current_remote_dir);
-		} else {
-			prompt[0] = 0;
-		}
-
-#ifdef HAS_LIBREADLINE
-		temp = readline(prompt);
-		if(!temp)
-			break;
-		strcpy(line, temp);
-		free(temp);
-#else
-		printf("%s", prompt);
-		fflush(stdout);
-		if(!fgets(line, CHIRP_LINE_MAX, stdin))
-			break;
-#endif
-
-		if(!line[0])
-			continue;
-
-		if(!interactive_mode && (temp = strchr(line, '#'))) {	/* comment? */
-			for(temp--; temp > line && isspace((int) *temp); temp--);	/* preceding space? */
-			if(temp <= line)
-				continue;	/* else not comment */
-		}
-#ifdef HAS_LIBREADLINE
-		add_history(line);
-#endif
-
-		{
-			char *start = line, *last = strlen(line) + line;
-			while(*start != '\0') {	/* process compound commands */
-				char *end = strchr(start, ';');
-				while(end != NULL && end != start && *(end - 1) == '\\')
-					end = strchr(end + 1, ';');
-				if(end == NULL)
-					end = start + strlen(start);
-				*end = '\0';
-
-				if(user_argv)
-					free(user_argv);
-				string_split(start, &user_argc, &user_argv);
-				if(user_argc == 0) {
-					start++;
-					continue;
-				}
-				result = process_command(user_argc, user_argv);
-				start = end == last ? last : end + 1;
-			}
-		}
-		if(!interactive_mode && !result)
-			break;
-	}
-
-	if(result) {
-		return 0;
-	} else {
-		return 1;
-	}
-}
-
-static int process_command(int argc, char **argv)
-{
-	int i;
-
-	for(i = 0; list[i].name; i++) {
-		if(!strcmp(list[i].name, argv[0])) {
-			if(!current_host[0] && list[i].must_be_open) {
-				printf("not connected\n");
-				return 0;
-			} else if(((argc - 1) >= list[i].minargs) && ((argc - 1) <= list[i].maxargs)) {
-				stoptime = time(0) + timeout;
-				if(list[i].handler(argc, argv) < 0) {
-					fprintf(stderr, "couldn't %s: %s\n", argv[0], strerror(errno));
-					return 0;
-				} else {
-					return 1;
-				}
-			} else {
-				printf("use: %s %s\n", argv[0], list[i].help);
-				return 0;
-			}
-		}
-	}
-
-	printf("unknown command: %s  (try 'help')\n", argv[0]);
-	return 0;
-}
+static struct command list[];
 
 static void acl_simple(char **acl)
 {
@@ -362,6 +89,13 @@ static void acl_simple(char **acl)
 		*acl = ".";
 }
 
+static INT64_T do_close(int argc, char **argv)
+{
+	current_host[0] = 0;
+	current_remote_dir[0] = 0;
+	return 0;
+}
+
 static INT64_T do_open(int argc, char **argv)
 {
 	do_close(0, 0);
@@ -375,13 +109,6 @@ static INT64_T do_open(int argc, char **argv)
 	} else {
 		return -1;
 	}
-}
-
-static INT64_T do_close(int argc, char **argv)
-{
-	current_host[0] = 0;
-	current_remote_dir[0] = 0;
-	return 0;
 }
 
 static void complete_local_path(const char *file, char *full_path)
@@ -1163,4 +890,231 @@ static INT64_T do_matrix_delete(int argc, char **argv)
 	char path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], path);
 	return chirp_matrix_delete(current_host, path, stoptime);
+}
+
+static struct command list[] = {
+	{"audit", 1, 0, 1, "[-r]", do_audit},
+	{"cat", 1, 1, 100, "<file> [file2] [file3] ...", do_cat},
+	{"cd", 1, 1, 1, "<remotedir>", do_cd},
+	{"chmod", 1, 2, 2, "<mode> <path>", do_chmod},
+	{"close", 1, 0, 0, "", do_close},
+	{"debug", 0, 0, 1, "[subsystem]", do_debug},
+	{"df", 1, 0, 1, "[-k|-m|-g|-t]", do_statfs},
+	{"exit", 0, 0, 0, "", do_quit},
+	{"get", 1, 1, 2, "<remotefile> [localfile]", do_get},
+	{"getacl", 1, 0, 1, "[remotepath]", do_getacl},
+	{"help", 0, 0, 0, "", do_help},
+	{"lcd", 0, 1, 1, "<localdir>", do_lcd},
+	{"listacl", 1, 0, 1, "[remotepath]", do_getacl},
+	{"localpath", 1, 0, 1, "[remotepath]", do_localpath},
+	{"lpwd", 0, 0, 0, "", do_lpwd},
+	{"ls", 1, 0, 2, "[-la] [remotepath]", do_ls},
+	{"lsalloc", 1, 0, 1, "[path]", do_lsalloc},
+	{"matrix_create", 1, 4, 4, "<path> <width> <height> <nhosts>", do_matrix_create},
+	{"matrix_delete", 1, 1, 1, "<path>", do_matrix_delete},
+	{"matrix_list", 1, 1, 1, "<path>", do_matrix_list},
+	{"md5", 1, 1, 1, "<path>", do_md5},
+	{"mkalloc", 1, 2, 2, "<path> <size>", do_mkalloc},
+	{"mkdir", 1, 1, 2, "[-p] <dir>", do_mkdir},
+	{"mv", 1, 2, 2, "<oldname> <newname>", do_mv},
+	{"open", 0, 1, 1, "<host>", do_open},
+	{"put", 1, 1, 2, "<localfile> [remotefile]", do_put},
+	{"pwd", 1, 0, 0, "", do_pwd},
+	{"quit", 0, 0, 0, "", do_quit},
+	{"remote_debug", 1, 1, 1, "[subsystem]", do_remote_debug},
+	{"resetacl", 1, 2, 2, "<remotepath> <rwldax>", do_resetacl},
+	{"rm", 1, 1, 1, "<file>", do_rm},
+	{"rmdir", 1, 1, 1, "<dir>", do_rmdir},
+	{"setacl", 1, 3, 3, "<remotepath> <user> <rwldax>", do_setacl},
+	{"setrep", 1, 2, 2, "<path> <nreps>", do_setrep},
+	{"stat", 1, 1, 1, "<file>", do_stat},
+	{"thirdput", 1, 3, 3, "<file> <3rdhost> <3rdfile>", do_thirdput},
+	{"ticket_create", 1, 0, 100, "[-o[utput] <ticket filename>] [-s[ubject] <subject/user>] [-d[uration] <duration>] [-b[its] <bits>] [[<directory> <acl>] ...]", do_ticket_create},
+	{"ticket_delete", 1, 1, 1, "<name>", do_ticket_delete},
+	{"ticket_get", 1, 1, 1, "<name>", do_ticket_get},
+	{"ticket_list", 1, 0, 1, "<name>", do_ticket_list},
+	{"ticket_modify", 1, 3, 3, "<name> <directory> <aclmask>", do_ticket_modify},
+	{"ticket_register", 1, 2, 3, "<name> [<subject>] <duration>", do_ticket_register},
+	{"timeout", 0, 1, 1, "<seconds>", do_timeout},
+	{"whoami", 1, 0, 0, "", do_whoami},
+	{"whoareyou", 1, 1, 1, "<hostname>", do_whoareyou},
+	{0, 0, 0, 0, 0},
+};
+
+static int process_command(int argc, char **argv)
+{
+	int i;
+
+	for(i = 0; list[i].name; i++) {
+		if(!strcmp(list[i].name, argv[0])) {
+			if(!current_host[0] && list[i].must_be_open) {
+				printf("not connected\n");
+				return 0;
+			} else if(((argc - 1) >= list[i].minargs) && ((argc - 1) <= list[i].maxargs)) {
+				stoptime = time(0) + timeout;
+				if(list[i].handler(argc, argv) < 0) {
+					fprintf(stderr, "couldn't %s: %s\n", argv[0], strerror(errno));
+					return 0;
+				} else {
+					return 1;
+				}
+			} else {
+				printf("use: %s %s\n", argv[0], list[i].help);
+				return 0;
+			}
+		}
+	}
+
+	printf("unknown command: %s  (try 'help')\n", argv[0]);
+	return 0;
+}
+
+static void show_help(const char *cmd)
+{
+	printf("use: %s [options] [hostname] [command]\n", cmd);
+	printf("where options are:\n");
+	printf(" -a <flag>  Require this authentication mode.\n");
+	printf(" -d <flag>  Enable debugging for this subsystem.\n");
+	printf(" -h         This message.\n");
+	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
+	printf(" -l         Long transfer information.\n");
+	printf(" -q         Quiet mode; supress messages and table headers.\n");
+	printf(" -t <time>  Set remote operation timeout.\n");
+	printf(" -v         Show program version.\n");
+}
+
+int main(int argc, char *argv[])
+{
+	char *temp;
+	int did_explicit_auth = 0;
+	char *tickets = NULL;
+	char prompt[CHIRP_LINE_MAX];
+	char line[CHIRP_LINE_MAX];
+	char **user_argv = 0;
+	int user_argc;
+	char c;
+	int result = 0;
+
+	debug_config(argv[0]);
+
+	while((c = getopt(argc, argv, "+a:d:hi:lt:v")) != (char) -1) {
+		switch (c) {
+		case 'a':
+			auth_register_byname(optarg);
+			did_explicit_auth = 1;
+			break;
+		case 'd':
+			debug_flags_set(optarg);
+			break;
+		case 'h':
+			show_help(argv[0]);
+			exit(0);
+			break;
+		case 'i':
+			tickets = strdup(optarg);
+			break;
+		case 'l':
+			long_information = 1;
+			break;
+		case 't':
+			timeout = string_time_parse(optarg);
+			break;
+		case 'v':
+			cctools_version_print(stdout, argv[0]);
+			exit(0);
+			break;
+		}
+	}
+
+	cctools_version_debug(D_DEBUG, argv[0]);
+
+	if(!did_explicit_auth)
+		auth_register_all();
+	if(tickets) {
+		auth_ticket_load(tickets);
+		free(tickets);
+	} else if(getenv(CHIRP_CLIENT_TICKETS)) {
+		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
+	} else {
+		auth_ticket_load(NULL);
+	}
+
+	getcwd(current_local_dir, CHIRP_PATH_MAX);
+
+	interactive_mode = isatty(0);
+
+	if(optind < argc) {
+		stoptime = time(0) + timeout;
+		if(do_open(1, &argv[optind - 1])) {
+			fprintf(stderr, "couldn't open %s: %s\n", argv[optind], strerror(errno));
+			return 1;
+		}
+	}
+
+	if((argc - optind) > 1) {
+		return !process_command(argc - optind - 1, &argv[optind + 1]);
+	}
+
+	while(1) {
+		if(interactive_mode) {
+			sprintf(prompt, " chirp:%s:%s> ", current_host, current_remote_dir);
+		} else {
+			prompt[0] = 0;
+		}
+
+#ifdef HAS_LIBREADLINE
+		temp = readline(prompt);
+		if(!temp)
+			break;
+		strcpy(line, temp);
+		free(temp);
+#else
+		printf("%s", prompt);
+		fflush(stdout);
+		if(!fgets(line, CHIRP_LINE_MAX, stdin))
+			break;
+#endif
+
+		if(!line[0])
+			continue;
+
+		if(!interactive_mode && (temp = strchr(line, '#'))) {	/* comment? */
+			for(temp--; temp > line && isspace((int) *temp); temp--);	/* preceding space? */
+			if(temp <= line)
+				continue;	/* else not comment */
+		}
+#ifdef HAS_LIBREADLINE
+		add_history(line);
+#endif
+
+		{
+			char *start = line, *last = strlen(line) + line;
+			while(*start != '\0') {	/* process compound commands */
+				char *end = strchr(start, ';');
+				while(end != NULL && end != start && *(end - 1) == '\\')
+					end = strchr(end + 1, ';');
+				if(end == NULL)
+					end = start + strlen(start);
+				*end = '\0';
+
+				if(user_argv)
+					free(user_argv);
+				string_split(start, &user_argc, &user_argv);
+				if(user_argc == 0) {
+					start++;
+					continue;
+				}
+				result = process_command(user_argc, user_argv);
+				start = end == last ? last : end + 1;
+			}
+		}
+		if(!interactive_mode && !result)
+			break;
+	}
+
+	if(result) {
+		return 0;
+	} else {
+		return 1;
+	}
 }
