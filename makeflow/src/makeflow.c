@@ -447,7 +447,7 @@ void dag_print(struct dag *d)
 
 	fprintf(stdout, "digraph {\n");
 
-	fprintf(stdout, "node [shape=ellipse];\n");
+	fprintf(stdout, "node [shape=ellipse, color = green, style = unfilled];\n");
 
 	for(n = d->nodes; n; n = n->next) {
 		char *name = xxstrdup(n->command);
@@ -456,7 +456,7 @@ void dag_print(struct dag *d)
 		free(name);
 	}
 
-	fprintf(stdout, "node [shape=box];\n");
+	fprintf(stdout, "node [shape=box,color = blue,style = unfilled];\n");
 
 	for(n = d->nodes; n; n = n->next) {
 		for(f = n->source_files; f; f = f->next) {
