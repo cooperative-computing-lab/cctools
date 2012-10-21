@@ -2544,41 +2544,25 @@ void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
-		case SYSCALL32_parrot_search:
+		case SYSCALL32_search:
 			if (entering) {
-				struct parrot_search_args psa;
-				tracer_copy_in(p->tracer, &psa, POINTER(args[0]), sizeof(psa));
-				char paths[65536];
-				tracer_copy_in_string(p->tracer, paths, POINTER(psa.paths), sizeof(paths));
- 				char pattern[PFS_PATH_MAX+1];
-				tracer_copy_in_string(p->tracer, pattern, POINTER(psa.pattern), sizeof(pattern));
-				size_t len1 = psa.buffer_length;
-				size_t len2 = psa.stats_length;
-				int flags = psa.flags;
- 
-				debug(D_SYSCALL, "parrot_search <%s> %s %s (%p:%zu, %p:%zu) %d", psa.callsite, paths, pattern, psa.buffer, len1, psa.stats, len2, flags);
- 
-				char *buffer = (char *) malloc(sizeof(char)*len1);
-				struct stat *stats = (struct stat *) malloc(sizeof(struct stat)*len2);
- 				if (!buffer || !stats) {
+				char path[PFS_PATH_MAX];
+				char pattern[PFS_PATH_MAX];
+				int flags = args[2];
+				int buffer_length = args[4];
+				char *buffer = (char*) malloc(buffer_length);
+
+				if (!buffer) {
  					p->syscall_result = -ENOMEM;
- 				} else {
- 					memset(buffer, 0, sizeof(char)*len1);
- 					memset(stats, 0, sizeof(struct stat)*len2);
-					p->syscall_result = pfs_search(paths, pattern, buffer, len1, stats, len2, flags);
- 					if (p->syscall_result > 0) {
-						tracer_copy_out(p->tracer, buffer, POINTER(psa.buffer), sizeof(char)*strlen(buffer)+1);
-						if ((size_t)p->syscall_result <= len2) /* entirely fits in stats array */
-							tracer_copy_out(p->tracer, stats, POINTER(psa.stats), sizeof(struct stat)*p->syscall_result);
- 						else
-							tracer_copy_out(p->tracer, stats, POINTER(psa.stats), sizeof(struct stat)*len2);
-					} else if (p->syscall_result == -1) {
-						p->syscall_result = -errno;
- 					}
- 				}
-				free(buffer);
-				free(stats);
-				divert_to_dummy(p, p->syscall_result);
+					break;
+				}
+
+				tracer_copy_in(p->tracer, buffer, POINTER(args[3]), buffer_length);
+				tracer_copy_in_string(p->tracer, path, POINTER(args[0]), sizeof(path));
+				tracer_copy_in_string(p->tracer, pattern, POINTER(args[1]), sizeof(pattern));
+				p->syscall_result = pfs_search(path, pattern, flags, buffer, buffer_length);
+				tracer_copy_out(p->tracer, buffer, POINTER(args[3]), buffer_length);
+				divert_to_dummy(p,p->syscall_result);
 			}
 			break;
 
