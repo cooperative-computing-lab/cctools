@@ -24,6 +24,7 @@ SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_PAIR(-a,method)Enable this authentication method.
 OPTION_PAIR(-A,file)Use this file as the default ACL.
+OPTION_ITEM(-b)Run as daemon.
 OPTION_PAIR(-c,dir)Challenge directory for unix filesystem authentication.
 OPTION_ITEM(-C)Do not create a core dump, even due to a crash.
 OPTION_PAIR(-d,flag)Enable debugging for this sybsystem

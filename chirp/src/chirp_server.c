@@ -133,6 +133,7 @@ static void show_help(const char *cmd)
 	printf("\nLess common options are:\n");
 	printf(" -A <file>   Use this file as the default ACL.\n");
 	printf(" -a <method> Enable this authentication method.\n");
+	printf(" -b          Run as a daemon.\n");
 	printf(" -c <dir>    Challenge directory for unix filesystem authentication.\n");
 	printf(" -C          Do not create a core dump, even due to a crash.\n");
 	printf(" -E          Exit if parent process dies.\n");
