@@ -84,7 +84,6 @@ static const char * work_queue_state_names[] = {"init","ready","busy","cancel","
 
 #define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
 
-#define WORK_QUEUE_MASTER_PRIORITY_DEFAULT 10
 
 // work_queue_worker struct related
 #define WORKER_OS_NAME_MAX 65
@@ -2149,15 +2148,12 @@ struct work_queue *work_queue_create(int port)
 
 	q->ready_list = list_create();
 	q->complete_list = list_create();
-
 	q->running_tasks = itable_create(0);
 
 	q->worker_table = hash_table_create(0, 0);
-
 	// The poll table is initially null, and will be created
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
-	q->poll_table = 0;
 
 	int i;
 	for(i = 0; i < WORKER_STATE_MAX; i++) {
@@ -2168,46 +2164,10 @@ struct work_queue *work_queue_create(int port)
 	q->worker_selection_algorithm = wq_option_scheduler;
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 
-	envstring = getenv("WORK_QUEUE_NAME");
-	if(envstring)
-		work_queue_specify_name(q, envstring);
-
-	envstring = getenv("WORK_QUEUE_MASTER_MODE");
-	if(envstring) {
-		work_queue_specify_master_mode(q, atoi(envstring));
-	} else {
-		q->master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
-	}
-
-	envstring = getenv("WORK_QUEUE_PRIORITY");
-	if(envstring) {
-		work_queue_specify_priority(q, atoi(envstring));
-	} else {
-		q->priority = WORK_QUEUE_MASTER_PRIORITY_DEFAULT;
-	}
-
-	q->estimate_capacity_on = 0;
-
-	envstring = getenv("WORK_QUEUE_ESTIMATE_CAPACITY_ON");
-	if(envstring) {
-		q->estimate_capacity_on = atoi(envstring);
-	}
-
-	q->total_send_time = 0;
-	q->total_execute_time = 0;
-	q->total_receive_time = 0;
-
+	// Capacity estimation related
 	q->start_time = timestamp_get();
 	q->time_last_task_start = q->start_time;
-
-	q->idle_time = 0;
 	q->idle_times = list_create();
-	q->accumulated_idle_time = 0;
-
-	q->app_time = 0;
-	q->capacity = 0;
-	q->avg_capacity = 0;
-
 	q->task_statistics = task_statistics_init();
 
 	q->workers_by_pool = hash_table_create(0,0);

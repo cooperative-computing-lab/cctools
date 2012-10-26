@@ -97,6 +97,19 @@ const char *batch_queue_type_to_string(batch_queue_type_t t)
 	}
 }
 
+struct work_queue *batch_queue_get_work_queue(struct batch_queue *q) {
+	if(!q) {
+		debug(D_BATCH, "error: batch queue has not been created yet.\n");
+		return NULL;
+	}
+	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE || q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
+		return q->work_queue;
+	} else {
+		debug(D_BATCH, "error: batch queue type is not Work Queue.\n");
+	}
+	return NULL;
+}
+
 struct batch_queue *batch_queue_create(batch_queue_type_t type)
 {
 	struct batch_queue *q;

@@ -51,7 +51,8 @@ static void display_progress();
 
 static int port = WORK_QUEUE_DEFAULT_PORT;
 static char *project = NULL;
-int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+static int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+static int priority = 0;
 
 static int kmer_size = 22;
 static int window_size = 22;
@@ -104,6 +105,7 @@ static void show_help(const char *cmd)
 	printf(" -F <#>         Work Queue fast abort multiplier.     (default is 10.)\n");
 	printf(" -a             Advertise the master information to a catalog server.\n");
 	printf(" -N <project>   Set the project name to <project>\n");
+	printf(" -P <integer>   Priority. Higher the value, higher the priority.\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
@@ -392,20 +394,21 @@ int main(int argc, char **argv)
 	}
 
 	if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
-		fprintf(stderr, "sand_filter_master running in catalog mode. Please use '-N' option to specify the name of this project.\n");
-		fprintf(stderr, "Run \"%s -h\" for help with options.\n", argv[0]);
+		fprintf(stderr, "sand_filter: sand filter master running in catalog mode. Please use '-N' option to specify the name of this project.\n");
+		fprintf(stderr, "sand_filter: Run \"%s -h\" for help with options.\n", argv[0]);
 		return 1;
 	}
-
-	char *value = string_format("%d", work_queue_master_mode);
-	setenv("WORK_QUEUE_MASTER_MODE", value, 1);
-	free(value);
 
 	q = work_queue_create(port);
 	if(!q) {
 		fprintf(stderr, "%s: couldn't listen on port %d: %s\n", progname, port, strerror(errno));
 		exit(1);
 	}
+
+	// advanced work queue options
+	work_queue_specify_master_mode(q, work_queue_master_mode);
+	work_queue_specify_name(q, project);
+	work_queue_specify_priority(q, priority);
 
 	load_sequences(sequence_filename);
 	debug(D_DEBUG, "Sequence loaded.\n", curr_rect_y, curr_rect_x);
@@ -474,7 +477,7 @@ static void get_options(int argc, char **argv, const char *progname)
 	char *catalog_host = NULL;
 	int catalog_port = 0;
 
-	while((c = getopt(argc, argv, "p:n:d:F:N:C:s:r:R:k:w:c:o:uxvha")) != (char) -1) {
+	while((c = getopt(argc, argv, "p:P:n:d:F:N:C:s:r:R:k:w:c:o:uxvha")) != (char) -1) {
 		switch (c) {
 		case 'p':
 			port = atoi(optarg);
@@ -509,9 +512,10 @@ static void get_options(int argc, char **argv, const char *progname)
 		case 'N':
 			free(project);
 			project = xxstrdup(optarg);
-			setenv("WORK_QUEUE_NAME", project, 1);
 			break;
-
+		case 'P':
+			priority = atoi(optarg);
+			break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
 				fprintf(stderr, "makeflow: catalog server should be given as HOSTNAME:PORT'.\n");

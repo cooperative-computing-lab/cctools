@@ -52,6 +52,12 @@ struct batch_job_info {
 */
 struct batch_queue *batch_queue_create(batch_queue_type_t type);
 
+/** Get the work queue object out of a batch queue.
+@param q the pointer to the batch queue object.
+@return the pointer to the work queue object in the given batch queue.
+*/
+struct work_queue *batch_queue_get_work_queue(struct batch_queue *q);
+
 /** Submit a simple batch job.
 @param q The queue to submit to.
 @param cmdline The command line to execute.  This line will be interpreted by the shell, so it may include output redirection, multiple commands, pipes, and so forth.

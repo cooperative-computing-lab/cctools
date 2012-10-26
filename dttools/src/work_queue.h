@@ -344,6 +344,12 @@ void work_queue_specify_name(struct work_queue *q, const char *name);
 */
 void work_queue_specify_priority(struct work_queue *q, int priority);
 
+/** Change whether to estimate master capacity for a given queue.
+@param q A work queue object.
+@param estimate_capacity_on if the value of this parameter is 1, then work queue should estimate the master capacity. If the value is 0, then work queue would not estimate its master capacity.
+*/
+void work_queue_specify_estimate_capacity_on(struct work_queue *q, int estimate_capacity_on);
+
 /** Specify the master mode for a given queue. 
 @param q A work queue object.
 @param mode 

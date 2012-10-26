@@ -2045,7 +2045,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem\n");
 	fprintf(stdout, " -D             Display the Makefile as a Dot graph.\n");
-	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capacity may be viewed in the Work Queue log file or through the  work_queue_status command.\n");
+	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capacity may be viewed in the Work Queue log file.\n");
 	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	fprintf(stdout, " -h             Show this help screen.\n");
 	fprintf(stdout, " -i             Show the pre-execution analysis of the Makeflow script - <dagfile>.\n");
@@ -2113,7 +2113,7 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	while((c = getopt(argc, argv, "aAB:cC:d:DEF:g:G:hiIj:J:kKl:L:N:o:Op:P:r:RS:t:T:vW:z")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:DEF:g:G:hiIj:J:kKl:L:N:o:Op:P:r:RS:T:vW:z")) != (char) -1) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2219,7 +2219,6 @@ int main(int argc, char *argv[])
 				break;
 			case 'P':
 				priority = atoi(optarg);
-				setenv("WORK_QUEUE_PRIORITY", optarg, 1);
 				break;
 			case 'r':
 				dag_retry_flag = 1;
@@ -2230,9 +2229,6 @@ int main(int argc, char *argv[])
 				break;
 			case 'S':
 				dag_submit_timeout = atoi(optarg);
-				break;
-			case 't':
-				setenv("WORK_QUEUE_CAPACITY_TOLERANCE", optarg, 1);
 				break;
 			case 'T':
 				batch_queue_type = batch_queue_type_from_string(optarg);
@@ -2289,18 +2285,7 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		char *value = string_format("%d", work_queue_master_mode);
-		setenv("WORK_QUEUE_MASTER_MODE", value, 1);
-		free(value);
-
-		if(project) {
-			setenv("WORK_QUEUE_NAME", project, 1);
-		}
-
-		if(work_queue_estimate_capacity_on) {
-			setenv("WORK_QUEUE_ESTIMATE_CAPACITY_ON","1",1);
-		}
-
+		char *value;
 		if(port_set) {
 			value = string_format("%d", port);
 			setenv("WORK_QUEUE_PORT", value, 1);
@@ -2461,6 +2446,19 @@ int main(int argc, char *argv[])
 		if(port != 0)
 			fprintf(stderr, "makeflow: perhaps port %d is already in use?\n", port);
 		exit(1);
+	}
+
+	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+		struct work_queue *q = batch_queue_get_work_queue(remote_queue);
+		if(!q) {
+			fprintf(stderr, "makeflow: cannot get work queue object.\n");
+			exit(1);
+		}
+
+		work_queue_specify_master_mode(q, work_queue_master_mode);
+		work_queue_specify_name(q, project);
+		work_queue_specify_priority(q, priority);
+		work_queue_specify_estimate_capacity_on(q, work_queue_estimate_capacity_on);
 	}
 
 	if(batch_submit_options) {

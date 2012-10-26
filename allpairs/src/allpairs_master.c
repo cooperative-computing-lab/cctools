@@ -48,14 +48,15 @@ static void show_help(const char *cmd)
 {
 	printf("Usage: %s [options] <set A> <set B> <compare function>\n", cmd);
 	printf("The most common options are:\n");
-	printf(" -p <port>	The port that the master will be listening on.\n");
+	printf(" -p <port>		The port that the master will be listening on.\n");
 	printf(" -e <args>      Extra arguments to pass to the comparison function.\n");
 	printf(" -f <file>      Extra input file needed by the comparison function.  (may be given multiple times)\n");
 	printf(" -t <seconds>   Estimated time to run one comparison.  (default chosen at runtime)\n");
 	printf(" -x <items>	Width of one work unit, in items to compare.  (default chosen at runtime)\n");
 	printf(" -y <items>	Height of one work unit, in items to compare.  (default chosen at runtime)\n");
-	printf(" -N <project>   Report the master information to a catalog server with the project name - <project>\n");
-	printf(" -E <priority>  Priority. Higher the value, higher the priority.\n");
+	printf(" -a             Advertise the master information to a catalog server.\n");
+	printf(" -N <project>   Set the project name to <project>\n");
+	printf(" -P <integer>   Priority. Higher the value, higher the priority.\n");
 	printf(" -d <flag>	Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	printf(" -v         	Show program version.\n");
 	printf(" -h         	Display this message.\n");
@@ -246,47 +247,54 @@ int main(int argc, char **argv)
 	char c;
 	struct work_queue *q;
 	int port = WORK_QUEUE_DEFAULT_PORT;
+	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+	char *project = NULL;
+	int priority = 0;
 
 	debug_config("allpairs_master");
 
 	extra_files_list = list_create();
 
-	while((c = getopt(argc, argv, "e:f:t:x:y:p:N:E:d:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "ad:e:f:hN:p:P:t:vx:y:")) != (char) -1) {
 		switch (c) {
+	    case 'a':
+			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+			break;
+		case 'd':
+			debug_flags_set(optarg);
+			break;
 		case 'e':
 			extra_arguments = optarg;
 			break;
 		case 'f':
 			list_push_head(extra_files_list,optarg);
 			break;
+		case 'h':
+			show_help(progname);
+			exit(0);
+			break;
+		case 'N':
+			free(project);
+			project = xxstrdup(optarg);
+			break;
+		case 'p':
+			port = atoi(optarg);
+			break;
+		case 'P':
+			priority = atoi(optarg);
+			break;
 		case 't':
 			compare_program_time = atof(optarg);
+			break;
+		case 'v':
+			cctools_version_print(stdout, progname);
+			exit(0);
 			break;
 		case 'x':
 			xblock = atoi(optarg);
 			break;
 		case 'y':
 			yblock = atoi(optarg);
-			break;
-		case 'p':
-			port = atoi(optarg);
-			break;
-		case 'N':
-			setenv("WORK_QUEUE_NAME", optarg, 1);
-			break;
-		case 'E':
-			setenv("WORK_QUEUE_PRIORITY", optarg, 1);
-			break;
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case 'v':
-			cctools_version_print(stdout, progname);
-			exit(0);
-			break;
-		case 'h':
-			show_help(progname);
-			exit(0);
 			break;
 		default:
 			show_help(progname);
@@ -346,11 +354,22 @@ int main(int argc, char **argv)
 
 	fprintf(stderr, "%s: using block size of %dx%d\n",progname,xblock,yblock);
 
+	if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
+		fprintf(stderr, "allpairs: allpairs master running in catalog mode. Please use '-N' option to specify the name of this project.\n");
+		fprintf(stderr, "allpairs: Run \"%s -h\" for help with options.\n", argv[0]);
+		return 1;
+	}
+
 	q = work_queue_create(port);
 	if(!q) {
 		fprintf(stderr,"%s: could not create work queue on port %d: %s\n",progname,port,strerror(errno));
 		return 1;
 	}
+
+	// advanced work queue options
+	work_queue_specify_master_mode(q, work_queue_master_mode);
+	work_queue_specify_name(q, project);
+	work_queue_specify_priority(q, priority);
 
 	fprintf(stderr, "%s: listening for workers on port %d...\n",progname,work_queue_port(q));
 
