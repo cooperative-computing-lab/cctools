@@ -518,7 +518,7 @@ static void get_options(int argc, char **argv, const char *progname)
 			break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
-				fprintf(stderr, "makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
+				fprintf(stderr, "sand_filter: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
 			}
 
