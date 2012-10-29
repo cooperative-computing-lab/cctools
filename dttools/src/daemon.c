@@ -77,19 +77,26 @@ void daemonize (int cdroot)
 	umask(0);
 
 	int fd, max = fd_max();
-	for (fd = 0; fd < max; fd++) {
+	for (fd = STDERR_FILENO+1; fd < max; fd++) {
 		if (close(fd) == -1 && errno != EBADF) {
 			debug(D_DEBUG, "could not close open file descriptor: %s", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	int fd0 = open("/dev/null", O_RDONLY);
-	int fd1 = open("/dev/null", O_WRONLY);
-	int fd2 = open("/dev/null", O_WRONLY);
-
-	if (!(fd0 == STDIN_FILENO && fd1 == STDOUT_FILENO && fd2 == STDERR_FILENO)) {
-		debug(D_DEBUG, "could not open `/dev/null': %d %d %d: %s", fd0, fd1, fd2, strerror(errno));
-		exit(EXIT_FAILURE);
-	}
+    FILE *file0 = freopen("/dev/null", O_RDONLY, stdin);
+    if (file0 == NULL) {
+        debug(D_DEBUG, "could not reopen stdin: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    FILE *file1 = freopen("/dev/null", O_WRONLY, stdout);
+    if (file1 == NULL) {
+        debug(D_DEBUG, "could not reopen stdout: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    FILE *file2 = freopen("/dev/null", O_WRONLY, stderr);
+    if (file2 == NULL) {
+        debug(D_DEBUG, "could not reopen stderr: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
 }
