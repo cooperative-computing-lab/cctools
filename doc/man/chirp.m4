@@ -41,14 +41,14 @@ LIST_END
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_PAIR(-a,mode) Require this authentication mode.
-OPTION_PAIR(-d,subsystem) Enable debugging for this subsystem.
-OPTION_ITEM(-h) Show help text.
-OPTION_PAIR(-i,files) Comma-delimited list of tickets to use for authentication.
-OPTION_ITEM(-l) Long transfer information.
-OPTION_ITEM(-q) Quiet mode; supress messages and table headers.
-OPTION_PAIR(-t,time) Set remote operation timeout.
-OPTION_ITEM(-v) Show program version.
+OPTION_PAIR(-a,mode)Require this authentication mode.
+OPTION_PAIR(-d,subsystem)Enable debugging for this subsystem.
+OPTION_ITEM(-h)Show help text.
+OPTION_PAIR(-i,files)Comma-delimited list of tickets to use for authentication.
+OPTION_ITEM(-l)Long transfer information.
+OPTION_ITEM(-q)Quiet mode; supress messages and table headers.
+OPTION_PAIR(-t,time)Set remote operation timeout.
+OPTION_ITEM(-v)Show program version.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)

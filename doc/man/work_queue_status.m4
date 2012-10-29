@@ -26,9 +26,9 @@ LIST_END
 SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_PAIR(-C, catalog)Set catalog server to <catalog>. Format: HOSTNAME:PORT
-OPTION_ITEM(-Q) Show summary information about queues. (default)
-OPTION_ITEM(-T) Show details of all tasks in the queue.
-OPTION_ITEM(-W) Show details of all workers connected to the master.
+OPTION_ITEM(-Q)Show summary information about queues. (default)
+OPTION_ITEM(-T)Show details of all tasks in the queue.
+OPTION_ITEM(-W)Show details of all workers connected to the master.
 OPTION_PAIR(-d, subsystem)Enable debugging for the given subsystem. Try -d all as a start.
 OPTION_PAIR(-t, time)RPC timeout (default=300s).
 OPTION_ITEM(-l)Long output.

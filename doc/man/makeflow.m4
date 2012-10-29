@@ -56,8 +56,8 @@ OPTIONS_END
 
 SUBSECTION(Debugging Options)
 OPTIONS_BEGIN
-OPTION_PAIR(-d, subsystem) Enable debugging for this subsystem.
-OPTION_PAIR(-o, file) Send debugging to this file.
+OPTION_PAIR(-d, subsystem)Enable debugging for this subsystem.
+OPTION_PAIR(-o, file)Send debugging to this file.
 OPTIONS_END
 
 SUBSECTION(WorkQueue Options)
