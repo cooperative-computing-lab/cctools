@@ -40,9 +40,9 @@ static int fd_max (void)
 	return max;
 }
 
-void daemonize (int cdroot)
+void daemonize (int cdroot, const char *pidfile)
 {
-	/* Become seesion leader and lose controlling terminal */
+	/* Become session leader and lose controlling terminal */
 	pid_t pid = fork();
 	if (pid < 0) {
 		debug(D_DEBUG, "could not fork: %s", strerror(errno));
@@ -64,6 +64,12 @@ void daemonize (int cdroot)
 		exit(EXIT_FAILURE);
 	} else if (pid > 0) {
 		exit(EXIT_SUCCESS); /* exit parent */
+	}
+
+	if (pidfile) {
+		FILE *file = fopen(pidfile, "w");
+		fprintf(file, "%ld", (long)getpid());
+		fclose(file);
 	}
 
 	if (cdroot){

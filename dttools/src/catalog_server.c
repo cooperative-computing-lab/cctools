@@ -418,6 +418,8 @@ static void show_help(const char *cmd)
 {
 	printf("Use: %s [options]\n", cmd);
 	printf("where options are:\n");
+	printf(" -b             Run as a daemon.\n", port);
+	printf(" -B <file>      Write process identifier (PID) to file.\n", port);
 	printf(" -p <port>      Port number to listen on (default is %d)\n", port);
 	printf(" -l <secs>      Lifetime of data, in seconds (default is %d)\n", lifetime);
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
@@ -440,15 +442,20 @@ int main(int argc, char *argv[])
 	char ch;
 	time_t current;
 	int is_daemon = 0;
+	char *pidfile = NULL;
 
 	outgoing_host_list = list_create();
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "bp:l:L:m:M:d:o:O:u:U:SThv")) != (char) -1) {
+	while((ch = getopt(argc, argv, "bB:p:l:L:m:M:d:o:O:u:U:SThv")) != (char) -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
+				break;
+			case 'B':
+				free(pidfile);
+				pidfile = strdup(optarg);
 				break;
 			case 'd':
 				debug_flags_set(optarg);
@@ -498,7 +505,7 @@ int main(int argc, char *argv[])
 			}
 	}
 
-	if (is_daemon) daemonize(0);
+	if (is_daemon) daemonize(0, pidfile);
 
 	debug_config_file(debug_filename);
 

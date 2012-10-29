@@ -134,6 +134,7 @@ static void show_help(const char *cmd)
 	printf(" -A <file>   Use this file as the default ACL.\n");
 	printf(" -a <method> Enable this authentication method.\n");
 	printf(" -b          Run as a daemon.\n");
+	printf(" -B <file>   Write process identifier (PID) to file.\n");
 	printf(" -c <dir>    Challenge directory for unix filesystem authentication.\n");
 	printf(" -C          Do not create a core dump, even due to a crash.\n");
 	printf(" -E          Exit if parent process dies.\n");
@@ -377,6 +378,7 @@ int main(int argc, char *argv[])
 	int c_input;
 	time_t current;
 	int is_daemon = 0;
+	char *pidfile = NULL;
 
 	change_process_title_init(argv);
 	change_process_title("chirp_server");
@@ -388,7 +390,7 @@ int main(int argc, char *argv[])
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c_input = getopt(argc, argv, "A:a:bc:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:Z:")) != (char)-1) {
+	while((c_input = getopt(argc, argv, "A:a:bB:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:Z:")) != (char)-1) {
 		c = (char) c_input;
 		switch (c) {
 		case 'A':
@@ -400,6 +402,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'b':
 			is_daemon = 1;
+			break;
+		case 'B':
+			free(pidfile);
+			pidfile = strdup(optarg);
 			break;
 		case 'c':
 			auth_unix_challenge_dir(optarg);
@@ -517,7 +523,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(is_daemon) daemonize(0); /* don't chdir to "/" */
+	if(is_daemon) daemonize(0, pidfile); /* don't chdir to "/" */
 
 	/* Ensure that all files are created private by default (again because of daemonize). */
 	umask(0077);

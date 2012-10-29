@@ -38,6 +38,8 @@ overwriting another service's record.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
+OPTION_ITEM(-b)           Run as a daemon.
+OPTION_PAIR(-B,file)      Write process identifier (PID) to file.
 OPTION_PAIR(-p,port)      Port number to listen on (default is 9097)
 OPTION_PAIR(-l,secs)      Lifetime of data, in seconds (default is 1800)
 OPTION_PAIR(-d,subsystem) Enable debugging for this subsystem
