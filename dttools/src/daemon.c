@@ -84,17 +84,17 @@ void daemonize (int cdroot)
 		}
 	}
 
-    FILE *file0 = freopen("/dev/null", O_RDONLY, stdin);
+    FILE *file0 = freopen("/dev/null", "r", stdin);
     if (file0 == NULL) {
         debug(D_DEBUG, "could not reopen stdin: %s", strerror(errno));
         exit(EXIT_FAILURE);
     }
-    FILE *file1 = freopen("/dev/null", O_WRONLY, stdout);
+    FILE *file1 = freopen("/dev/null", "w", stdout);
     if (file1 == NULL) {
         debug(D_DEBUG, "could not reopen stdout: %s", strerror(errno));
         exit(EXIT_FAILURE);
     }
-    FILE *file2 = freopen("/dev/null", O_WRONLY, stderr);
+    FILE *file2 = freopen("/dev/null", "w", stderr);
     if (file2 == NULL) {
         debug(D_DEBUG, "could not reopen stderr: %s", strerror(errno));
         exit(EXIT_FAILURE);
