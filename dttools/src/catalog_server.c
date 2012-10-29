@@ -418,22 +418,22 @@ static void show_help(const char *cmd)
 {
 	printf("Use: %s [options]\n", cmd);
 	printf("where options are:\n");
-	printf(" -b             Run as a daemon.\n", port);
-	printf(" -B <file>      Write process identifier (PID) to file.\n", port);
-	printf(" -p <port>      Port number to listen on (default is %d)\n", port);
-	printf(" -l <secs>      Lifetime of data, in seconds (default is %d)\n", lifetime);
+	printf(" -b             Run as a daemon.\n");
+	printf(" -B <file>      Write process identifier (PID) to file.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
+	printf(" -h             Show this help screen\n");
+	printf(" -l <secs>      Lifetime of data, in seconds (default is %d)\n", lifetime);
+	printf(" -L <file>      Log new updates to this file.\n");
+	printf(" -m <n>         Maximum number of child processes.  (default is %d)\n",child_procs_max);
+	printf(" -M <size>      Maximum size of a server to be believed.  (default is any)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -O <bytes>     Rotate debug file once it reaches this size.\n");
-	printf(" -u <host>      Send status updates to this host. (default is %s)\n", CATALOG_HOST_DEFAULT);
-	printf(" -m <n>         Maximum number of child processes.  (default is %d)\n",child_procs_max);
-	printf(" -T <time>	Maximum time to allow a query process to run.  (default is %ds)\n",child_procs_timeout);
-	printf(" -M <size>      Maximum size of a server to be believed.  (default is any)\n");
-	printf(" -U <time>      Send status updates at this interval. (default is 5m)\n");
-	printf(" -L <file>      Log new updates to this file.\n");
+	printf(" -p <port>      Port number to listen on (default is %d)\n", port);
 	printf(" -S             Single process mode; do not work on queries.\n");
+	printf(" -T <time>	Maximum time to allow a query process to run.  (default is %ds)\n",child_procs_timeout);
+	printf(" -u <host>      Send status updates to this host. (default is %s)\n", CATALOG_HOST_DEFAULT);
+	printf(" -U <time>      Send status updates at this interval. (default is 5m)\n");
 	printf(" -v             Show version string\n");
-	printf(" -h             Show this help screen\n");
 }
 
 int main(int argc, char *argv[])
@@ -448,7 +448,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "bB:p:l:L:m:M:d:o:O:u:U:SThv")) != (char) -1) {
+	while((ch = getopt(argc, argv, "bB:d:hl:L:m:M:o:O:p:ST:u:U:v")) != (char) -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
@@ -460,14 +460,22 @@ int main(int argc, char *argv[])
 			case 'd':
 				debug_flags_set(optarg);
 				break;
+			case 'h':
+			default:
+				show_help(argv[0]);
+				return 1;
+			case 'l':
+				lifetime = string_time_parse(optarg);
+				break;
+			case 'L':
+				free(logfilename);
+				logfilename = strdup(optarg);
+				break;
 			case 'm':
 				child_procs_max = atoi(optarg);
 				break;
 			case 'M':
 				max_server_size = string_metric_parse(optarg);
-				break;
-			case 'p':
-				port = atoi(optarg);
 				break;
 			case 'o':
 				free(debug_filename);
@@ -476,18 +484,8 @@ int main(int argc, char *argv[])
 			case 'O':
 				debug_config_file_size(string_metric_parse(optarg));
 				break;
-			case 'u':
-				list_push_head(outgoing_host_list, xxstrdup(optarg));
-				break;
-			case 'U':
-				outgoing_timeout = string_time_parse(optarg);
-				break;
-			case 'l':
-				lifetime = string_time_parse(optarg);
-				break;
-			case 'L':
-				free(logfilename);
-				logfilename = strdup(optarg);
+			case 'p':
+				port = atoi(optarg);
 				break;
 			case 'S':
 				fork_mode = 0;
@@ -495,13 +493,15 @@ int main(int argc, char *argv[])
 			case 'T':
 				child_procs_timeout = string_time_parse(optarg);
 				break;
+			case 'u':
+				list_push_head(outgoing_host_list, xxstrdup(optarg));
+				break;
+			case 'U':
+				outgoing_timeout = string_time_parse(optarg);
+				break;
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
-			case 'h':
-			default:
-				show_help(argv[0]);
-				return 1;
 			}
 	}
 
