@@ -1073,7 +1073,6 @@ static void show_help(const char *cmd)
 	printf("  -t <time>      Abort after this amount of idle time.\n");
 	printf("  -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	printf("  -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
-	printf("  -s             Run as a shared worker. By default the workers would only work for their preferred project(s).\n");
 	printf("  -o <file>      Send debugging to this file.\n");
 }
 
@@ -1128,7 +1127,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAc:C:d:hm:N:o:O:Pqr:sS:t:T:vW:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAc:C:d:hm:N:o:O:Pqr:S:t:T:vW:")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			strcat(worker_args, " -a");
@@ -1152,9 +1151,6 @@ int main(int argc, char *argv[])
 			strcat(worker_args, " -N ");
 			strcat(worker_args, optarg);
 			list_push_tail(regex_list, strdup(optarg));
-			break;
-		case 's':
-			strcat(worker_args, " -s");
 			break;
 		case 't':
 			strcat(worker_args, " -t ");
