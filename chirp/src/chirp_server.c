@@ -68,9 +68,6 @@ See the file COPYING for details.
 #elif defined(HAS_SYS_XATTR_H)
 #include <sys/xattr.h>
 #endif
-#ifndef ENOATTR
-#define ENOATTR  EINVAL
-#endif
 
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
@@ -1888,7 +1885,9 @@ static int errno_to_chirp(int e)
 		return CHIRP_ERROR_NO_SPACE;
 	case ENOMEM:
 		return CHIRP_ERROR_NO_MEMORY;
+#ifdef ENOATTR
 	case ENOATTR:
+#endif
 	case ENOSYS:
 	case EINVAL:
 		return CHIRP_ERROR_INVALID_REQUEST;
