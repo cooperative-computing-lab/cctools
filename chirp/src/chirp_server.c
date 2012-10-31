@@ -1593,15 +1593,9 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				chirp_path_fix(fixed);
 
 				if(access(fixed, F_OK) == -1) { 
-					link_putfstring(l, "%s\n", stalltime, fixed);
-					link_putfstring(l, "%d\n", stalltime, CHIRP_SEARCH_EPATH);
-					link_putfstring(l, "0\n", stalltime);
-
+					link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
 				} else if(!chirp_acl_check(fixed, subject, CHIRP_ACL_WRITE)) {
-					link_putfstring(l, "%s\n", stalltime, fixed);
-					link_putfstring(l, "%d\n", stalltime, CHIRP_SEARCH_EPERM);
-					link_putfstring(l, "0\n", stalltime);
-
+					link_putfstring(l, "%d:%d:%s:\n", stalltime, EPERM, CHIRP_SEARCH_ERR_OPEN, fixed);
 				} else {
 					int found = chirp_alloc_search(subject, fixed, pattern, flags, l, stalltime);
 					if (found && (flags & CHIRP_SEARCH_STOPATFIRST))
@@ -1615,7 +1609,6 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					break;
 			}
 			
-			link_putliteral(l, "\n", stalltime);
 			do_getdir_result = 1;
 			result = 0;
 		} else {

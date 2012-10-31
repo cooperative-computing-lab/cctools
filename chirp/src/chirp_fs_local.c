@@ -388,14 +388,15 @@ static INT64_T chirp_fs_local_access(const char *path, INT64_T mode)
 
 static int search_to_access (int flags)
 {
-        int access_flags = F_OK;
-        if (flags & CHIRP_SEARCH_R_OK)
-                access_flags |= R_OK;
-        if (flags & CHIRP_SEARCH_W_OK)
-                access_flags |= W_OK;
-        if (flags & CHIRP_SEARCH_X_OK)
-                access_flags |= X_OK;
-    return access_flags;
+	int access_flags = F_OK;
+	if (flags & CHIRP_SEARCH_R_OK)
+		access_flags |= R_OK;
+	if (flags & CHIRP_SEARCH_W_OK)
+		access_flags |= W_OK;
+	if (flags & CHIRP_SEARCH_X_OK)
+		access_flags |= X_OK;
+
+	return access_flags;
 }
 
 static int search_directory (const char *subject, unsigned level, const char *base, char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
@@ -415,6 +416,7 @@ static int search_directory (const char *subject, unsigned level, const char *ba
         char *current = dir + strlen(dir); /* point to end to current directory */
 
         if (dirp) {
+		errno = 0;
                 struct chirp_dirent *entry;
                 struct chirp_stat *stat_buf = malloc(sizeof(struct chirp_stat));
                 while ((entry = chirp_fs_local_readdir(dirp))) {
@@ -423,16 +425,18 @@ static int search_directory (const char *subject, unsigned level, const char *ba
                         if (strcmp(entry->name, ".") == 0 || strcmp(entry->name, "..") == 0 || strncmp(entry->name, ".__", 3) == 0) continue;
                         sprintf(current, "/%s", entry->name);
 
-                        if (fnmatch(pattern, base, fnmatch_flags) == 0 && chirp_fs_local_access(dir, access_flags)) {
-                                link_putfstring(l, "%s\n", stoptime, includeroot ? dir : entry->name);
+                        if (fnmatch(pattern, base, fnmatch_flags) == 0 && chirp_fs_local_access(dir, access_flags) == 0) {
+				char *match_name = includeroot ? dir : entry->name; 
 
 				if (metadata) {
-					if ((chirp_fs_local_stat(dir, stat_buf)) == -1)
-						link_putfstring(l, "%d\n0\n", stoptime, CHIRP_SEARCH_ESTAT);
-					else
-						link_putfstring(l, "0\n%s\n", stoptime, chirp_stat_string(stat_buf));
+					// A match was found, but the matched file couldn't be statted. Generate a result and an error.
+					if ((chirp_fs_local_stat(dir, stat_buf)) == -1) {
+                                		link_putfstring(l, "0:%s::\n", stoptime, match_name);
+						link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, match_name);
+					} else
+						link_putfstring(l, "0:%s:%s:\n", stoptime, match_name, chirp_stat_string(stat_buf));
 				} else
-					link_putfstring(l, "0\n0\n", stoptime);
+					link_putfstring(l, "0:%s::\n", stoptime, match_name);
 				if (stopatfirst)
 					return 1;
                         }
@@ -443,13 +447,24 @@ static int search_directory (const char *subject, unsigned level, const char *ba
 					if (stopatfirst && found)
 						return 1;
 				} else
-					link_putfstring(l, "%s\n%d\n0\n", stoptime, dir, CHIRP_SEARCH_EPERM);
+					link_putfstring(l, "%d:%d:%s:\n", stoptime, EPERM, CHIRP_SEARCH_ERR_OPEN, dir);
                         }
                         *current = '\0'; /* clear current entry */
+			errno = 0;
                 }
+
+		// Read error
+		if (errno) link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_READ, dir);
+
+		errno = 0;
 		chirp_alloc_closedir(dirp);
-	} else
-		link_putfstring(l, "%s\n0\n%d\n", stoptime, dir, CHIRP_SEARCH_EOPEN );
+
+		// Close error
+		if (errno) link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, dir);
+
+	} else {
+		link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_OPEN, dir);
+	}
 
 	return 0;
 }

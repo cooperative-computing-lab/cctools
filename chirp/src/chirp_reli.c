@@ -622,11 +622,6 @@ INT64_T chirp_reli_mkdir_recursive( const char *host, const char *path, INT64_T 
 	return chirp_reli_mkdir(host,path,mode,stoptime);
 }
 
-INT64_T chirp_reli_search( const char *host, const char *pattern, const char *path, int flags, chirp_search_t callback, void *arg, time_t stoptime )
-{
-	RETRY_ATOMIC( result = chirp_client_search(client,pattern,path,flags,callback,arg,stoptime); )
-}
-
 INT64_T chirp_reli_rmdir( const char *host, const char *path, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_rmdir(client,path,stoptime); )
@@ -726,6 +721,12 @@ INT64_T chirp_reli_mkalloc( const char *host, const char *path, INT64_T size, IN
 INT64_T chirp_reli_lsalloc( const char *host, const char *path, char *allocpath, INT64_T *total, INT64_T *inuse, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_lsalloc(client,path,allocpath,total,inuse,stoptime); )
+}
+
+CHIRP_SEARCH *chirp_reli_opensearch( const char *host, const char *paths, const char *pattern, int flags, time_t stoptime )
+{
+	//CHIRP_SEARCH *result;
+	RETRY_ATOMIC( CHIRP_SEARCH *result = chirp_client_opensearch(client, paths, pattern, flags, stoptime); )
 }
 
 struct chirp_dir {

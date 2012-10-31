@@ -145,7 +145,7 @@ static struct command list[] = {
 	{"setacl", 1, 3, 3, "<remotepath> <user> <rwldax>", do_setacl},
 	{"resetacl", 1, 2, 2, "<remotepath> <rwldax>", do_resetacl},
 	{"ls", 1, 0, 2, "[-la] [remotepath]", do_ls},
-	{"search", 1, 2, 2, "<pattern> <directory>", do_search},
+	{"search", 1, 2, 2, "<directory> <pattern>", do_search},
 	{"mv", 1, 2, 2, "<oldname> <newname>", do_mv},
 	{"rm", 1, 1, 1, "<file>", do_rm},
 	{"mkdir", 1, 1, 2, "[-p] <dir>", do_mkdir},
@@ -1167,44 +1167,38 @@ static INT64_T do_matrix_delete(int argc, char **argv)
 	return chirp_matrix_delete(current_host, path, stoptime);
 }
 
-void do_search_callback(char *path, struct chirp_stat *info, int error, void *arg) {
-	if (error) {
-		printf("error: ");
-		switch (error) {
-			case CHIRP_SEARCH_EPATH: 
-			printf("directory %s does not exist\n", path);
-			break;
-
-			case CHIRP_SEARCH_EPERM:
-			printf("not authorized to access %s\n", path);
-			break;
-
-			case CHIRP_SEARCH_ESTAT:
-			printf("could not stat file %s\n", path);
-			break;
-
-			case CHIRP_SEARCH_EOPEN:
-			printf("could not open directory %s\n", path);
-			break;
-		}
-
-		return;
-	}
-
-	printf("match: ");
-
-	if (info)
-		long_ls_callback(path, info, 0);
-	else
-		printf("%s\n", path);
-
-	free(path);
-	free(info);
+static char *strerrsource(int errsource) {
+        switch (errsource) {
+                case CHIRP_SEARCH_ERR_OPEN: return "Open";
+                case CHIRP_SEARCH_ERR_READ: return "Read";
+                case CHIRP_SEARCH_ERR_CLOSE: return "Close";
+                case CHIRP_SEARCH_ERR_STAT: return "Stat";
+                default: return "Unknown";
+        }
 }
 
 static INT64_T do_search(int argc, char **argv)
 {	
 	int flags = CHIRP_SEARCH_RECURSIVE|CHIRP_SEARCH_METADATA|CHIRP_SEARCH_INCLUDEROOT|CHIRP_SEARCH_PERIOD;
-	INT64_T result = chirp_reli_search(current_host, argv[1], argv[2], flags, do_search_callback, NULL, stoptime);
-	return result;
+	CHIRP_SEARCH *s = chirp_reli_opensearch(current_host, argv[1], argv[2], flags, stoptime);
+	struct chirp_searchent *res;
+
+        while ((res = chirp_client_readsearch(s)) != NULL) {
+
+                if (res->err) {
+                        printf("%s error on %s: %s\n", strerrsource(res->errsource), res->path, strerror(res->err));
+                        continue;
+                }
+
+                printf("%-30s", res->path);
+
+                if (flags & CHIRP_SEARCH_METADATA)
+                        printf("\t%-10lld\t%-10lld\n", res->info->cst_size, res->info->cst_ino);
+                else
+                        printf("\n");
+        }
+
+        chirp_client_closesearch(s);
+
+	return 0;
 }

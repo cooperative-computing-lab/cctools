@@ -269,18 +269,17 @@ To put an entire directory tree, see @ref chirp_recursive_put instead.
 
 INT64_T chirp_reli_putfile_buffer(const char *host, const char *path, const char *buffer, INT64_T mode, INT64_T length, time_t stoptime);
 
-/** Search a directory for files whose names match a pattern.
-Performs a search on a directory for file names matching the given glob expression. Information about each match is written to a results buffer.
+/** Open a file search stream
+Performs a search operation on the Chirp server and stores its results to be read via readsearch
 @param host The name and port of the Chirp server to access.
-@param pattern The glob expression to search for.
-@param path The pathname of the directory to search within.
-@param flags A bit flag specifying search options.
-@param results The pointer at which to place the search results.
+@param paths The pathnames of the directories to search.
+@param pattern The pattern to search for 
+@param flags Bit flags controlling various aspects of the search
 @param stoptime The absolute time at which to abort.
-@return On success, returns zero. On failure, returns less than zero and sets errno.
+@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */
 
-INT64_T chirp_reli_search( const char *host, const char *pattern, const char *path, int flags, chirp_search_t callback, void *arg, time_t stoptime );
+CHIRP_SEARCH *chirp_reli_opensearch( const char *host, const char *paths, const char *pattern, int flags, time_t stoptime );
 
 /** Get a detailed directory listing.
 Gets a detailed directory listing from a Chirp server, and then calls the callback once for each element in the directory.

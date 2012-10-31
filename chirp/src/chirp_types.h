@@ -66,11 +66,22 @@ struct chirp_dirent {
 
 /** Describes a result from a search operation */
 
-struct chirp_search_result {
+struct chirp_searchent {
 	char *path;			/**< Path of the matching file. */
 	struct chirp_stat *info;	/**< The properties of the matching file. */
-	struct chirp_search_result *next;
+	int errsource;
+	int err;
 };
+
+/** Keeps track of the state of a search stream */
+
+struct chirp_searchstream {
+        struct chirp_searchent *entry;
+        char *data;
+        int i;
+};
+
+#define CHIRP_SEARCH struct chirp_searchstream
 
 /** Bit flags for the search operation */
 
@@ -85,10 +96,10 @@ struct chirp_search_result {
 
 /** Streaming errors for the search operation */
 
-#define CHIRP_SEARCH_EPATH 1  /**< The requested search path does not exist */
-#define CHIRP_SEARCH_EPERM 2  /**< The user is not authorized to access the requested path */
-#define CHIRP_SEARCH_ESTAT 3  /**< The file was not able to be statted */
-#define CHIRP_SEARCH_EOPEN 4  /**< The directory was not able to be opened */
+#define CHIRP_SEARCH_ERR_OPEN    1
+#define CHIRP_SEARCH_ERR_READ    2
+#define CHIRP_SEARCH_ERR_CLOSE   3
+#define CHIRP_SEARCH_ERR_STAT    4
 
 /** Options for the search operation */
 
@@ -164,18 +175,5 @@ to display or otherwise act upon each location at which a given file is stored.
 */
 
 typedef void (*chirp_loc_t) (const char *location, void *arg);
-
-/** A callback function typedef used to display a search operation result.
-A function matching this type is called by @ref chirp_reli_search
-to display or otherwise act upon each matched file or error resulting from
-the search operation.
-@param path If <tt>error</tt> is zero, this is the path of a matched file. If <tt>error</tt> is non-zero, the meaning of this argument depends on the error code.
-@param info A pointer to a chirp_stat struct for the matched file.
-@param error One of CHIRP_SEARCH_EPATH, CHIRP_SEARCH_EPERM, CHIRP_SEARCH_EOPEN, or CHIRP_SEARCH_ESTAT.
-@param arg  A convenience pointer corresponding to the <tt>arg</tt> passed from @ref chirp_reli_search.
-@see chirp_reli_search
-*/
-
-typedef void (*chirp_search_t) (char *path, struct chirp_stat *info, int error, void *arg);
 
 #endif
