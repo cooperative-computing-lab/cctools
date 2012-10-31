@@ -809,8 +809,7 @@ static int poll_master_and_task(struct link *master, int task_pipe_fd, int timeo
 
 	ret = 0;
 
-	//n = (task_status == TASK_RUNNING) ? 2 : 1;
-	if(task_status == TASK_RUNNING) {
+	if(task_status != TASK_NONE) {
 		n = 2;
 	} else {
 		n = 1;
@@ -1144,7 +1143,7 @@ static void kill_task() {
 	if(task_status == TASK_RUNNING) {
 		kill(pid, SIGTERM);
 	}
-	task_status = TASK_NONE;
+	task_status = TASK_CANCELLED;
 }
 
 static int do_kill() {
