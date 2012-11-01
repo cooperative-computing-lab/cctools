@@ -27,6 +27,7 @@ See the file COPYING for details.
 #include "load_average.h"
 #include "buffer.h"
 #include "link_nvpair.h"
+#include "get_canonical_path.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -102,6 +103,8 @@ struct work_queue {
 	int master_mode;
 	int priority;
 
+	char workingdir[PATH_MAX];
+
 	struct link *master_link;
 	struct link_info *poll_table;
 	int poll_table_size;
@@ -171,6 +174,7 @@ struct work_queue_worker {
 	timestamp_t total_transfer_time;
 	timestamp_t start_time;
 	char pool_name[WORK_QUEUE_POOL_NAME_MAX];
+	char workspace[WORKER_WORKSPACE_NAME_MAX];
 };
 
 struct time_slot {
@@ -1017,9 +1021,6 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 	// Change worker state and do some performance statistics
 	change_worker_state(q, w, WORKER_STATE_READY);
 
-	t->hostname = xxstrdup(w->hostname);
-	t->host = xxstrdup(w->addrport);
-
 	q->total_tasks_complete++;
 	w->total_tasks_complete++;
 
@@ -1045,9 +1046,9 @@ static int field_set(const char *field) {
 static int process_ready(struct work_queue *q, struct work_queue_worker *w, const char *line) {
 	if(!q || !w || !line) return 0;
 
-	//Format: hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, proj_name, pool_name, os, arch
-	char items[10][WORK_QUEUE_PROTOCOL_FIELD_MAX];
-	int n = sscanf(line, "ready %s %s %s %s %s %s %s %s %s %s", items[0], items[1], items[2], items[3], items[4], items[5], items[6], items[7], items[8], items[9]);
+	//Format: hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, proj_name, pool_name, os, arch, workspace
+	char items[11][WORK_QUEUE_PROTOCOL_FIELD_MAX];
+	int n = sscanf(line, "ready %s %s %s %s %s %s %s %s %s %s %s", items[0], items[1], items[2], items[3], items[4], items[5], items[6], items[7], items[8], items[9], items[10]);
 
 	if(n < 6) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
@@ -1095,10 +1096,16 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 		strcpy(w->os, "unknown");
 	}
 
-	if(n == 10 && field_set(items[9])) { // architecture
+	if(n >= 10 && field_set(items[9])) { // architecture
 		strncpy(w->arch, items[9], WORKER_ARCH_NAME_MAX);
 	} else {
 		strcpy(w->arch, "unknown");
+	}
+
+	if(n == 11 && field_set(items[10])) { // workspace
+		strncpy(w->workspace, items[10], WORKER_WORKSPACE_NAME_MAX);
+	} else {
+		strcpy(w->workspace, "unknown");
 	}
 
 	if(w->state == WORKER_STATE_INIT) {
@@ -1206,6 +1213,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q )
 
 	nvpair_insert_integer(nv,"port",info.port);
 	if(q->name) nvpair_insert_string(nv,"project",q->name);
+	nvpair_insert_string(nv,"working_dir",q->workingdir);
 	nvpair_insert_integer(nv,"priority",info.priority);
 	nvpair_insert_integer(nv,"workers",info.workers_ready+info.workers_busy+info.workers_cancelling);
 	nvpair_insert_integer(nv,"workers_init",info.workers_init);
@@ -1237,7 +1245,8 @@ struct nvpair * worker_to_nvpair( struct work_queue_worker *w )
 	nvpair_insert_string(nv,"hostname",w->hostname);
 	nvpair_insert_string(nv,"os",w->os);
 	nvpair_insert_string(nv,"arch",w->arch);
-	nvpair_insert_string(nv,"addrport",w->addrport);
+	nvpair_insert_string(nv,"working_dir",w->workspace);
+	nvpair_insert_string(nv,"address_port",w->addrport);
 	nvpair_insert_integer(nv,"ncpus",w->ncpus);
 	nvpair_insert_integer(nv,"memory_avail",w->memory_avail);
 	nvpair_insert_integer(nv,"memory_total",w->memory_total);
@@ -1248,6 +1257,7 @@ struct nvpair * worker_to_nvpair( struct work_queue_worker *w )
 	nvpair_insert_integer(nv,"total_transfer_time",w->total_transfer_time);
 
 	nvpair_insert_integer(nv,"start_time",w->start_time);
+	nvpair_insert_integer(nv,"current_time",timestamp_get()); 
 
 	struct work_queue_task *t = w->current_task;
 	if(t) {
@@ -1296,6 +1306,17 @@ static int process_task_status( struct work_queue *q, struct link *l, time_t sto
 		if(t) {
 			nv = task_to_nvpair(t,"running",w->hostname);
 			if(nv) {
+				// Include detailed information on where the task is running:
+				// address and port, workspace
+				nvpair_insert_string(nv, "address_port", w->addrport);
+				nvpair_insert_string(nv, "working_dir", w->workspace);
+
+				// Timestamps on running task related events 
+				nvpair_insert_integer(nv, "submit_to_queue_time", t->time_task_submit); 
+				nvpair_insert_integer(nv, "send_input_start_time", t->time_send_input_start);
+				nvpair_insert_integer(nv, "execute_cmd_start_time", t->time_execute_cmd_start);
+				nvpair_insert_integer(nv, "current_time", timestamp_get()); 
+
 				link_nvpair_write(l,nv,stoptime);
 				nvpair_delete(nv);
 			}
@@ -1749,8 +1770,10 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 	if(!send_input_files(t, w, q))
 		return 0;
 	t->time_send_input_finish = timestamp_get();
-
 	t->time_execute_cmd_start = timestamp_get();
+	t->hostname = xxstrdup(w->hostname);
+	t->host = xxstrdup(w->addrport);
+
 	//Old work command (worker does not fork to execute a task, thus can't
 	//communicate with the master during task execution):
 	//link_putfstring(w->link, "work %zu\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
@@ -2145,6 +2168,8 @@ struct work_queue *work_queue_create(int port)
 		char address[LINK_ADDRESS_MAX];
 		link_address_local(q->master_link, address, &q->port);
 	}
+
+	get_canonical_path(".", q->workingdir, PATH_MAX);
 
 	q->ready_list = list_create();
 	q->complete_list = list_create();

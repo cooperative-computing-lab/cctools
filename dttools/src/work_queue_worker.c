@@ -110,7 +110,7 @@ static UINT64_T disk_avail_threshold = 100;
 // Basic worker global variables
 static char actual_addr[LINK_ADDRESS_MAX];
 static int actual_port;
-static char workspace[WORK_QUEUE_LINE_MAX];
+static char workspace[WORKER_WORKSPACE_NAME_MAX];
 static char *os_name = NULL; 
 static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
@@ -161,7 +161,7 @@ static void report_worker_ready(struct link *master)
 	name_of_master = actual_master ? actual_master->proj : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
 	name_of_pool = pool_name ? pool_name : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
 
-	link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, name_of_master, name_of_pool, os_name, arch_name);
+	link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, name_of_master, name_of_pool, os_name, arch_name, workspace);
 }
 
 
