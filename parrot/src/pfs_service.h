@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "pfs_file.h"
 #include "pfs_dir.h"
 #include "pfs_location.h"
+#include "pfs_search.h"
 
 class pfs_service {
 public:
@@ -60,9 +61,11 @@ public:
 	virtual int mkalloc( pfs_name *name, pfs_ssize_t size, mode_t mode );
 	virtual int lsalloc( pfs_name *name, char *alloc_name, pfs_ssize_t *size, pfs_ssize_t *inuse );
 	virtual int whoami( pfs_name *name, char *buf, int size );
-	virtual int search( const char *paths, const char *pattern, char *buffer, size_t len1, struct stat *stats, size_t len2, int flags );
 	virtual int getacl( pfs_name *name, char *buf, int size );
 	virtual int setacl( pfs_name *name, const char *subject, const char *rights );
+
+	virtual int search( pfs_name *name, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i );
+
 	virtual pfs_location* locate( pfs_name *name );
 
 	virtual pfs_ssize_t putfile( pfs_name *source, pfs_name *target );

@@ -619,10 +619,10 @@ int pfs_whoami( const char *path, char *buf, int size )
 
 int pfs_search( const char *paths, const char *pattern, int flags, char *buffer, size_t buffer_length )
 {
-    BEGIN
-    debug(D_LIBCALL,"search %s %s %d %zu %d",paths,pattern,flags,buffer,buffer_length);
-    result = pfs_current->table->search(paths,pattern,flags,buffer,buffer_length);
-    END
+	BEGIN
+	debug(D_LIBCALL,"search %s %s %d %zu %d",paths,pattern,flags,buffer,buffer_length);
+	result = pfs_current->table->search(paths,pattern,flags,buffer,buffer_length);
+	END
 }
 
 int pfs_getacl( const char *path, char *buf, int size )

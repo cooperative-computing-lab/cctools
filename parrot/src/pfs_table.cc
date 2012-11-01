@@ -1744,7 +1744,7 @@ static int search_to_access (int flags)
 }
 
 static int search_error (int err, int errsource, char *path, char *buffer, size_t *i, size_t buffer_length) {
-	size_t n = snprintf(buffer+*i, buffer_length-*i,  "%s%d:%d:%s", *i==0 ? "" : ":", err, errsource, path);
+	size_t n = snprintf(buffer+*i, buffer_length-*i,  "%s%d|%d|%s", *i==0 ? "" : "|", err, errsource, path);
 
 	if (n>=buffer_length-*i) {
 		return -1;
@@ -1760,7 +1760,7 @@ static int search_stat_pack(struct pfs_stat p_info, char *buffer, size_t *i, siz
 	size_t n = snprintf(
 		buffer + *i,
 		buffer_length - *i,
-		":%zd,%zd,%d,%zd,%d,%d,%zd,%zd,%zd,%zd,%zd,%zd,%zd",
+		"|%zd,%zd,%d,%zd,%d,%d,%zd,%zd,%zd,%zd,%zd,%zd,%zd",
 		info.st_dev,
 		info.st_ino,
 		info.st_mode,
@@ -1834,7 +1834,7 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 
 			if (t->access(dir, access_flags) == 0) {
 
-				size_t l = snprintf(buffer+*i, buffer_length-*i, "%s0:%s", *i==0 ? "" : ":", matched);
+				size_t l = snprintf(buffer+*i, buffer_length-*i, "%s0|%s", *i==0 ? "" : "|", matched);
 
 				if (l >= buffer_length-*i) {
 					errno = ERANGE;
@@ -1849,11 +1849,11 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 						return -1;
 					}
 				} else {
-					if ((size_t)snprintf(buffer+*i, buffer_length-*i, ":") >= buffer_length-*i) {
+					if ((size_t)snprintf(buffer+*i, buffer_length-*i, "|") >= buffer_length-*i) {
 						errno = ERANGE;
 						return -1;
 					}
-					*i++;
+					(*i)++;
 				}
 
 				if (flags & PFS_SEARCH_STOPATFIRST)
@@ -1940,6 +1940,8 @@ static int is_pattern (const char *pattern)
 
 int pfs_table::search( const char *paths, const char *patt, int flags, char *buffer, size_t buffer_length )
 {
+	pfs_name pname;
+
 	unsigned level = 0;
 	const char *s;
 	const char *start = paths;
@@ -1983,7 +1985,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 
 		string_collapse_path(path, directory, 0);
 
-		if (exact_match) {
+		if (0 && exact_match) {
 			struct pfs_stat buf;
 			int access_flags = search_to_access(flags);
 			const char *base = directory+strlen(directory);
@@ -2006,7 +2008,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 						sprintf(buffer+i, "%s", matched);
 						i += l;
 					} else {
-						sprintf(buffer+i, ":%s", matched);
+						sprintf(buffer+i, "|%s", matched);
 						i += l+1;
 					}
 
@@ -2016,8 +2018,25 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 				result = 0;
 			}
 		} else {
-			result = search_directory(this, level, directory+strlen(directory), directory, pattern, buffer, buffer_length, &i, flags);
+			/* Check to see if search is implemented in the service */
+			if(resolve_name(path, &pname)) {
+				if ((result = pname.service->search(&pname, pattern, flags, buffer, buffer_length, &i))==-1) {
+					result = search_directory(
+						this,
+						level, 
+						directory+strlen(directory), 
+						directory, 
+						pattern, 
+						buffer, 
+						buffer_length, 
+						&i, 
+						flags
+					);
+				}
+			} else 
+				result = -1;
 		}
+
 		if (result == -1)
 			return -errno;
 		else if (flags & PFS_SEARCH_STOPATFIRST && result == 1) {
@@ -2026,7 +2045,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 			found += result;
 	} while (!done);
 
-    return found;
+	return found;
 }
 
 int pfs_table::getacl( const char *n, char *buf, int length )

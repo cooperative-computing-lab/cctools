@@ -24,7 +24,7 @@ struct searchstream {
 
 #define SEARCH struct searchstream
 
-#define PFS_SEARCH_DELIMITER   ':'
+#define PFS_SEARCH_DELIMITER   '|'
 #define PFS_SEARCH_DEPTH_MAX   200
 
 #define PFS_SEARCH_STOPATFIRST (1<<0)

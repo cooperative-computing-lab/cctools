@@ -2545,26 +2545,26 @@ void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		case SYSCALL32_search:
-			if (entering) {
-				char path[PFS_PATH_MAX];
-				char pattern[PFS_PATH_MAX];
-				int flags = args[2];
-				int buffer_length = args[4];
-				char *buffer = (char*) malloc(buffer_length);
+                        if (entering) {
+                                char path[PFS_PATH_MAX];
+                                char pattern[PFS_PATH_MAX];
+                                int flags = args[2];
+                                int buffer_length = args[4];
+                                char *buffer = (char*) malloc(buffer_length);
 
-				if (!buffer) {
- 					p->syscall_result = -ENOMEM;
-					break;
-				}
+                                if (!buffer) {
+                                        p->syscall_result = -ENOMEM;
+                                        break;
+                                }
 
-				tracer_copy_in(p->tracer, buffer, POINTER(args[3]), buffer_length);
-				tracer_copy_in_string(p->tracer, path, POINTER(args[0]), sizeof(path));
-				tracer_copy_in_string(p->tracer, pattern, POINTER(args[1]), sizeof(pattern));
-				p->syscall_result = pfs_search(path, pattern, flags, buffer, buffer_length);
-				tracer_copy_out(p->tracer, buffer, POINTER(args[3]), buffer_length);
-				divert_to_dummy(p,p->syscall_result);
-			}
-			break;
+                                tracer_copy_in(p->tracer, buffer, POINTER(args[3]), buffer_length);
+                                tracer_copy_in_string(p->tracer, path, POINTER(args[0]), sizeof(path));
+                                tracer_copy_in_string(p->tracer, pattern, POINTER(args[1]), sizeof(pattern));
+                                p->syscall_result = pfs_search(path, pattern, flags, buffer, buffer_length);
+                                tracer_copy_out(p->tracer, buffer, POINTER(args[3]), buffer_length);
+                                divert_to_dummy(p,p->syscall_result);
+                        }
+                        break;
 
 		case SYSCALL32_parrot_setacl:
 			if(entering) {

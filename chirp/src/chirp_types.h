@@ -103,7 +103,7 @@ struct chirp_searchstream {
 
 /** Options for the search operation */
 
-#define CHIRP_SEARCH_DELIMITER   ':'
+#define CHIRP_SEARCH_DELIMITER   '|'
 #define CHIRP_SEARCH_DEPTH_MAX   200
 
 /** Describes the type of a bulk I/O operation. Used by @ref chirp_bulkio */

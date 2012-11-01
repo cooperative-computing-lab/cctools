@@ -125,6 +125,8 @@ SEARCH *opensearch( const char *path, const char *pattern, int flags )
 
 	SEARCH *result = malloc(sizeof(SEARCH));
 	result->entry = (struct searchent*) malloc(sizeof(struct searchent));
+	result->entry->info = NULL;
+	result->entry->path = NULL;
 	result->data = buffer;
 	result->i = 0;
 	
@@ -133,7 +135,7 @@ SEARCH *opensearch( const char *path, const char *pattern, int flags )
 
 static char *readsearch_next(char *data, int *i) {
 	data += *i;
-	char *tail = strchr(data, ':');
+	char *tail = strchr(data, '|');
 	int length = (tail==NULL) ? strlen(data) : tail - data;
 
 	if (length==0) return NULL;
@@ -206,8 +208,8 @@ struct searchent *readsearch(SEARCH *search)
 }
 
 int closesearch(SEARCH *search) {
-	free(search->data);
-	free(search->entry);
-	free(search);
+        free(search->entry);
+        free(search->data);
+        free(search);
 	return 0;
 }

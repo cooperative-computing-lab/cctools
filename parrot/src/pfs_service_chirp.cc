@@ -11,6 +11,9 @@ See the file COPYING for details.
 
 extern "C" {
 #include "chirp_global.h"
+#include "chirp_types.h"
+#include "chirp_reli.h"
+#include "chirp_client.h"
 #include "stringtools.h"
 #include "debug.h"
 #include "xxmalloc.h"
@@ -189,6 +192,79 @@ public:
 		} else {
 			return 0;
 		}
+	}
+
+	static int search_chirp_stat_pack( struct chirp_stat c_info, char *buffer, size_t *i, size_t buffer_length ) {
+		struct stat info;	
+		COPY_CSTAT(c_info, info);
+		size_t n = snprintf(
+			buffer + *i,
+			buffer_length - *i,
+			"|%zd,%zd,%d,%zd,%d,%d,%zd,%zd,%zd,%zd,%zd,%zd,%zd",
+			info.st_dev,
+			info.st_ino,
+			info.st_mode,
+			info.st_nlink,
+			info.st_uid,
+			info.st_gid,
+			info.st_rdev,
+			info.st_size,
+			info.st_atime,
+			info.st_mtime,
+			info.st_ctime,
+			info.st_blksize,
+			info.st_blocks
+		);
+
+		if (n>=buffer_length-*i) {
+			return -1;
+		} else {
+			*i += n;
+			return 0;
+		}
+	}
+
+	virtual int search( pfs_name *name, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i )
+	{
+		if (strlen(name->rest)==0) {
+			sprintf(name->rest, "/");
+		}
+
+		CHIRP_SEARCH *s = chirp_reli_opensearch(name->hostport, name->rest, pattern, flags, time(0)+pfs_master_timeout);
+		struct chirp_searchent *res;
+		size_t l;
+
+		while ((res = chirp_client_readsearch(s)) != NULL) {
+			if (res->err) 
+				l = snprintf(buffer+*i, buffer_length-*i,  "%s%d|%d|%s", *i==0 ? "" : "|", res->err, res->errsource, res->path); 
+			else 
+				l = snprintf(buffer+*i, buffer_length-*i, "%s0|%s", *i==0 ? "" : "|", res->path);
+
+			if (l >= buffer_length-*i) {
+				errno = ERANGE;
+				return -1;
+			}
+
+			*i += l;
+
+			if (res->err == 0) {
+				if (flags & PFS_SEARCH_METADATA && res->info != NULL) {
+					if (search_chirp_stat_pack(*(res->info), buffer, i, buffer_length) == -1) {
+						errno = ERANGE;
+						return -1;
+					}
+				} else {
+					if ((size_t)snprintf(buffer+*i, buffer_length-*i, "|") >= buffer_length-*i) {
+						errno = ERANGE;
+						return -1;
+					}
+					(*i)++;
+				}
+			}
+		}
+
+		chirp_client_closesearch(s);
+		return 0;
 	}
 
 	virtual pfs_dir * getdir( pfs_name *name ) {
