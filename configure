@@ -23,7 +23,7 @@ version="$major.$minor.$micro $type"
 
 # The release date is set automatically at configure time (the default).
 # For a tagged release, this should be the hard-coded date of the release.
-release_date="10/31/2012"
+release_date="11/02/2012"
 
 # Bourne shell is tricky when you use backtick command substitution backslash
 # has special meaning even when surrounded by single-quotes. It is necessary to
