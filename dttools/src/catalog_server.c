@@ -445,7 +445,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "bp:l:L:m:M:d:o:O:u:U:SThv")) != (char) -1) {
+	while((ch = getopt(argc, argv, "bp:l:L:m:M:d:o:O:u:U:ST:hv")) != (char) -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
