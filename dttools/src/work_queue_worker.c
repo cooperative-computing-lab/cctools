@@ -997,12 +997,29 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode)
 }
 
 static int do_unlink(const char *path) {
-	int result = remove(path);
-	if(result != 0) {	// 0 - succeeded; otherwise, failed
+	/* return value of remove() is 0 on success while return value of
+	delete_dir() is 1 on success. So we need two variables to hold and check
+	the results of these two calls. */
+	int dir_result = 1; 
+	int file_result = 0;
+
+	struct stat stat_info;
+
+	if(stat(path, &stat_info) < 0) {
+		fprintf(stderr, "Could not stat %s.(%s)\n", path, strerror(errno));
+		return 0;
+	} else { 
+		if(stat_info.st_mode & S_IFDIR) 
+			dir_result = delete_dir(path);
+		else
+			file_result = remove(path);
+	}
+	
+	if(file_result != 0 || dir_result != 1) { //one of the calls failed	
 		if (task_status != TASK_CANCELLED) {
 			//recover only if it wasn't a cancelled task since it could
 			//have been cancelled before (output) file was generated.
-			fprintf(stderr, "Could not remove file: %s.(%s)\n", path, strerror(errno));
+			fprintf(stderr, "Could not remove %s.(%s)\n", path, strerror(errno));
 			return 0;
 		}	
 	}
