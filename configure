@@ -685,10 +685,10 @@ then
 
 	if [ $perl != 0 ]
 	then
-		perl_version=`perl -e 'printf "%vd\n",$^V;'`
+		perl_version=`${perl} -e 'printf "%vd\n",$^V;'`
 		echo "perl version is ${perl_version}"
-		perl_ccflags=`perl -MExtUtils::Embed -e ccopts`
-		perl_ldflags=`perl -MExtUtils::Embed -e ldopts`
+		perl_ccflags=`${perl} -MExtUtils::Embed -e ccopts`
+		perl_ldflags=`${perl} -MExtUtils::Embed -e ldopts`
 		work_queue_bindings="$work_queue_bindings perl"
 	else
                 if [ $config_perl_path = yes ]
