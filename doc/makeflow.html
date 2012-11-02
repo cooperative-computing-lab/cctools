@@ -185,17 +185,17 @@ are simple shell scripts, so you can edit them directly if you would
 like to change batch options or other details.
 
 <h2>Makeflow Log Format</h2>
-After you  have executed the <tt>example.makeflow</tt> makeflow script, you
+After you  have executed the <tt>example.makeflow</tt> Makeflow script, you
 should see a log file named <tt>example.makeflow.makeflowlog</tt> under the
-directory where you ran the <tt>makeflow</tt> command.  The makeflow log file
-records all the tasks that makeflow tries to run and how the tasks status
+directory where you ran the <tt>makeflow</tt> command.  The Makeflow log file
+records all the tasks that Makeflow tries to run and how the tasks status
 change during the previous executions.  
 
 <p>
 In Makeflow, each task is called a node. You can think of it as a tree node in
 a tree structure of the target workflow. There is a unique id, a positive
 integer, associated with each node. This id is referred as node id. The
-makeflow log file starts with a list of node (task) descriptions where each
+Makeflow log file starts with a list of node (task) descriptions where each
 task is specified in the following format:
 
 <pre>
@@ -208,13 +208,13 @@ task is specified in the following format:
 </pre>
 
 These annotation lines all start with '#' and will be treated as comments by
-<tt>makeflow</tt>. When <tt>makeflow</tt> tries to resume the execution of a
-makeflow script from a existing makeflow log file, it will skip the scanning of
-these commented lines. Also, annotations being commented out allows third-party
-applications, such as gnuplot, to skip them when plotting data.
+Makeflow. When Makeflow tries to resume the execution of a Makeflow script from
+a existing Makeflow log file, it will skip the scanning of these commented
+lines. Also, annotations being commented out allows third-party applications,
+such as gnuplot, to skip them when plotting data.
 
 <p>
-The body sections of a makeflow log file come after the node specificiation
+The body sections of a Makeflow log file come after the node specificiation
 section. The following is a snippet from <tt>example.makeflow.makeflowlog</tt>:
 <pre>
 # STARTED timestamp
@@ -233,7 +233,7 @@ section. The following is a snippet from <tt>example.makeflow.makeflowlog</tt>:
 # COMPLETED timestamp
 </pre>
 
-If a makeflow execution is completed without errors, a body section of the log
+If a Makeflow execution is completed without errors, a body section of the log
 consists of a series of node (task) status change lines (the 10 column line)
 surrounded by a pair of "# STARTED" and "# COMPLETED" lines which record the
 start and end unix time of that execution.  A node status change line has the
@@ -254,7 +254,7 @@ Here is the column specificiation:
 		<li> aborted </li>
 	</ol>
 	<li><b>job_id</b> - the job id of this node in the underline execution
-	system (local or batch system). If the makeflow is executed locally, the
+	system (local or batch system). If the Makeflow is executed locally, the
 	job id would be the process id of the process that executes this node. If
 	the underline execution system is a batch system, such as Condor or SGE,
 	the job id would be the job id assigned by the batch system when the task
@@ -264,11 +264,11 @@ Here is the column specificiation:
 	<li><b>nodes_complete</b> - the number of nodes has been completed.</li>
 	<li><b>nodes_failed</b> - the number of nodes has failed.</li>
 	<li><b>nodes_aborted</b> - the number of nodes has been aborted.</li>
-	<li><b>node_id_counter</b> - total number of nodes in this makeflow</li>
+	<li><b>node_id_counter</b> - total number of nodes in this Makeflow</li>
 </ul>
 
-You might also see the following two lines in the makeflow log file if the
-makeflow is aborted or failed during a execution. The unix time at which such
+You might also see the following two lines in the Makeflow log file if the
+Makeflow is aborted or failed during a execution. The unix time at which such
 event occured is recorded:
 <pre>
 # ABORTED timestamp
@@ -276,7 +276,7 @@ event occured is recorded:
 </pre>
 
 <tt>Makeflow</tt> garbage-collects system memory associate with each task at
-runtime. The makeflow log file also logs the garbage collection activities. You
+runtime. The Makeflow log file also logs the garbage collection activities. You
 will find garbage collection related lines start with the '# GC' prefix:
 <pre>
 # GC timestamp collected time_spent dag_gc_collected
@@ -287,7 +287,7 @@ garbage collection cycle:
 	<li><b>timestamp</b> - the unix time (in microseconds) when this line is written to the log file. </li>
 	<li><b>collected</b> - the number of files were collected in this garbage collection cycle.</li>
 	<li><b>time_spent</b> - the length of time this cycle took.</li>
-	<li><b>dag_gc_collected</b> - the total number of files has been collected so far since the start this makeflow execution.</li>
+	<li><b>dag_gc_collected</b> - the total number of files has been collected so far since the start this Makeflow execution.</li>
 </ul>
 
 <h2>The Fine Details</h2>
@@ -355,6 +355,12 @@ then you can generate an image of your workload like this:
 % makeflow -D example.makeflow | dot -T gif > example.gif
 </pre>
 
+<h3>Total number of tasks in a Makeflow</h3>
+The following command parses Makeflow's '-D' option output and returns the
+total number of tasks in the given Makeflow script:
+<pre>
+% makeflow -D example.makeflow | grep '^N[0-9]\+ \[label=' | wc -l
+</pre>
 
 <h2>Running Makeflow with Work Queue</h2>
 With the '-T wq' option, Makeflow runs as a master process that dispatches
