@@ -1784,15 +1784,117 @@ static int search_stat_pack(struct pfs_stat p_info, char *buffer, size_t *i, siz
 	}
 }
 
-static int search_directory (pfs_table *t, unsigned level, const char *base, char *dir, const char *pattern, char *buffer, size_t buffer_length, size_t *i, int flags)
+static int search_match_file(const char *pattern, const char *name) 
 {
-	if (level == 0)
-		return 0;
+	char *subpat, *subend;
 
-	int fnmatch_flags = flags & PFS_SEARCH_PERIOD ? FNM_PATHNAME | FNM_PERIOD : FNM_PATHNAME;
+	do {
+		subend = strchr(pattern, '|');
+
+		if (subend == NULL) {
+			subpat = (char*) malloc(strlen(pattern)+1);
+			strcpy(subpat, pattern);
+		} else {
+			subpat = (char*) malloc(subend-pattern+1);
+			strncpy(subpat, pattern, subend-pattern);
+			subpat[subend-pattern] = '\0';
+		}
+
+		char *filepat = strrchr(subpat, '/');
+
+		if (filepat<=subpat) {
+			filepat = (filepat==subpat) ? filepat+1 : subpat;
+
+			if (fnmatch(filepat, name, FNM_PATHNAME)==0) {
+				free(subpat);
+				return 1;
+			}
+		}
+	
+		pattern = subend + 1;
+		free(subpat);
+
+	} while(subend != NULL);
+
+	return 0;
+}
+
+static int search_match_dir(const char *pattern, char *npattern, const char *name) 
+{
+	int recursive, match = 0;
+	char *subpat, *subend;
+	size_t i = 0;
+
+	/* FIXME: npattern buffer bounds checks */
+	do {
+		/* Retrieve the next subpattern */
+		subend = strchr(pattern, '|');
+
+		if (subend == NULL) {
+			subpat = (char*) malloc(strlen(pattern)+1);
+			strcpy(subpat, pattern);
+		} else {
+			subpat = (char*) malloc(subend-pattern+1);
+			strncpy(subpat, pattern, subend-pattern);
+			subpat[subend-pattern] = '\0';
+		}
+
+		/* Retrieve the top directory of the subpattern */
+		if (*subpat == '/') {
+			recursive = 0;
+			subpat++;
+		} else
+			recursive = 1;
+
+		char *toppat, *topend = strchr(subpat, '/');
+
+		if (topend==NULL)
+			toppat = subpat;
+		else {
+			toppat = (char*) malloc(topend-subpat+1);
+			strncpy(toppat, subpat, topend-subpat);
+			toppat[topend-subpat] = '\0';
+		}
+
+		/* Check for a match and build the new pattern string */
+		if (fnmatch(toppat, name, FNM_PATHNAME)==0) {
+			match = 1;
+
+			if (recursive) {
+				i += sprintf(npattern+i, "%s", i==0 ? "" : "|");
+				i += sprintf(npattern+i, "%s", subpat);
+				if (topend!=NULL) 
+					i += sprintf(npattern+i, "|%s", topend);
+			} else if (topend!=NULL) {
+				i += sprintf(npattern+i, "%s", i==0 ? "" : "|");
+				i += sprintf(npattern+i, "%s", topend);
+			}
+
+		} else if (recursive) {
+			match = 1;
+			i += sprintf(npattern+i, "%s%s", i==0 ? "" : "|", subpat); 
+		}
+
+		pattern = subend + 1;
+
+		if (!recursive) subpat--;
+		if (topend!=NULL) free(toppat); 
+		free(subpat);
+
+	} while(subend != NULL);
+
+	if (i==0) *npattern = '\0';
+
+	return match;
+}
+
+static int search_directory(pfs_table *t, const char *base, char *dir, const char *pattern, char *buffer, size_t buffer_length, size_t *i, int flags)
+{
+	if (strlen(pattern)==0) return 0;
+
 	int found = 0;
-	char *current = dir+strlen(dir); /* point to end to current directory */
 	int fd = t->open(dir, O_DIRECTORY|O_RDONLY, 0, 0);
+	char npattern[PFS_PATH_MAX] ;
 
 	if (fd==-1) {
 		if (search_error(errno, PFS_SEARCH_ERR_OPEN, dir, buffer, i, buffer_length) == -1) {
@@ -1804,13 +1906,14 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 
 	errno = 0;
 	struct dirent *entry;
+	char *current = dir+strlen(dir); /* point to end to current directory */
+
 	while ((entry = t->fdreaddir(fd))) {
 		const char *name = entry->d_name;
 		struct pfs_stat statbuf;
+                sprintf(current, "/%s", name);
 
 		if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
-
-		sprintf(current, "/%s", name);
 
 		int stat_r = t->stat(dir, &statbuf);
 
@@ -1823,14 +1926,14 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 			continue;
 		}
 	
-		if (((flags & PFS_SEARCH_RECURSIVE) && fnmatch(pattern, current, fnmatch_flags) == 0) || ((~flags & PFS_SEARCH_RECURSIVE) && fnmatch(pattern, base, fnmatch_flags) == 0)) {
+		if (search_match_file(pattern, name)) {
 			const char *matched;
 			int access_flags = search_to_access(flags);
 
 			if (flags & PFS_SEARCH_INCLUDEROOT)
 				matched = dir;
 			else
-				matched = base;
+				matched = name;
 
 			if (t->access(dir, access_flags) == 0) {
 
@@ -1871,9 +1974,9 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 			continue;
 		}
 
-		if (S_ISDIR(statbuf.st_mode)) {
+		if (S_ISDIR(statbuf.st_mode) && search_match_dir(pattern, npattern, name)) {
+			int result = search_directory(t, base, dir, npattern, buffer, buffer_length, i, flags);
 
-			int result = search_directory(t, level-1, base, dir, pattern, buffer, buffer_length, i, flags);
 			if (result == -1)
 				return -1;
 			else if (flags & PFS_SEARCH_STOPATFIRST && result == 1)
@@ -1881,7 +1984,7 @@ static int search_directory (pfs_table *t, unsigned level, const char *base, cha
 			else
 				found += result;
 		}
-		*current = '\0'; /* clear current entry */
+		*current = '\0';
 	}
 
 	if (errno) {	
@@ -1915,7 +2018,7 @@ static int is_pattern (const char *pattern)
 				pattern += 1;
 				if (*pattern == '\0') {
 					return 0;
-                }
+				}
 				break;
 #endif
 			case '*':
@@ -1925,10 +2028,10 @@ static int is_pattern (const char *pattern)
 			case '"':
 			case '\'':
 			{
-              /*
+				/*
 				const char quote = *pattern;
-                quote = quote;
-              */
+				quote = quote;
+				*/
 				/* quoting behavior isn't very clear... */
 			}
 			default:
@@ -1941,31 +2044,22 @@ static int is_pattern (const char *pattern)
 int pfs_table::search( const char *paths, const char *patt, int flags, char *buffer, size_t buffer_length )
 {
 	pfs_name pname;
-
-	unsigned level = 0;
-	const char *s;
 	const char *start = paths;
 	const char *end;
-	char pattern[PFS_PATH_MAX+1];
+	const char *pattern = patt;
 	size_t i = 0;
 	int found = 0;
 	int result;
 	int exact_match = 0;
 
-	for (s = patt; *s == '/'; s++) ; /* remove leading slashes from pattern */
-	sprintf(pattern, "/%s", s); /* add leading slash for base directory */
-
 	if (!is_pattern(pattern))
 		exact_match = 1;
 
-	if (flags & PFS_SEARCH_RECURSIVE) {
-		level = PFS_SEARCH_DEPTH_MAX;
-	} else {
-		for (s = strchr(pattern, '/'); s; s = strchr(s+1, '/')) level++; /* count the number of nested directories to descend at maximum */
-	}
-
 	int done = 0;
+
 	do {
+		if (strlen(start)==0) break;
+
 		char path[PFS_PATH_MAX+1];
 		char directory[PFS_PATH_MAX+1];
 		end = strchr(start, PFS_SEARCH_DELIMITER);
@@ -2018,12 +2112,12 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 				result = 0;
 			}
 		} else {
+
 			/* Check to see if search is implemented in the service */
 			if(resolve_name(path, &pname)) {
 				if ((result = pname.service->search(&pname, pattern, flags, buffer, buffer_length, &i))==-1) {
 					result = search_directory(
-						this,
-						level, 
+						this,	
 						directory+strlen(directory), 
 						directory, 
 						pattern, 

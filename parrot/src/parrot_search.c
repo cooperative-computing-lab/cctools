@@ -27,23 +27,40 @@ int main( int argc, char *argv[] )
 {
 	const char *paths = NULL;
 	const char *pattern;
+	int flags = 0;
+	char c;
 
-	if (argc == 2) {
+        while((c = getopt(argc, argv, "+rmi")) != (char) -1) {
+                switch (c) {
+                	case 's': 
+				flags |= PFS_SEARCH_STOPATFIRST;
+				break;
+                	case 'i': 
+				flags |= PFS_SEARCH_INCLUDEROOT;
+				break;
+                	case 'm': 
+				flags |= PFS_SEARCH_METADATA;
+				break;
+		}
+	}	
+
+	if (argc-optind == 1) {
 		paths = ".";
-		pattern = argv[1];
-	} else if (argc == 3) {
-		paths = argv[1];
-		pattern = argv[2];
+		pattern = argv[optind];
+	} else if (argc-optind == 2) {
+		paths = argv[optind];
+		pattern = argv[optind+1];
 	} else {
-		printf("use: parrot_search [path] <pattern>\n");
+		printf("use: parrot_search [options] [path] <pattern>\n");
 		exit(EXIT_FAILURE);
 	}
 
-	int flags = PFS_SEARCH_METADATA|PFS_SEARCH_INCLUDEROOT;
 	SEARCH *s = opensearch(paths, pattern, flags);
 	struct searchent *res;
+	int i = 0;
 
 	while ((res = readsearch(s)) != NULL) {
+		i++;
 
 		if (res->err) {
 			printf("%s error on %s: %s\n", strerrsource(res->errsource), res->path, strerror(res->err));
@@ -57,6 +74,8 @@ int main( int argc, char *argv[] )
 		else
 			printf("\n");
 	}
+
+	if (i==0) printf("\n");
 
 	closesearch(s);
 

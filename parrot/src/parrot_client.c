@@ -138,7 +138,10 @@ static char *readsearch_next(char *data, int *i) {
 	char *tail = strchr(data, '|');
 	int length = (tail==NULL) ? strlen(data) : tail - data;
 
-	if (length==0) return NULL;
+	if (length==0) {
+		(*i)++;
+		return NULL;
+	}
 
 	char *next = malloc(length + 1);
 	strncpy(next, data, length);
