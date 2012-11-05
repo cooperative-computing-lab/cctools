@@ -1894,7 +1894,7 @@ static int search_directory(pfs_table *t, const char *base, char *dir, const cha
 
 	int found = 0;
 	int fd = t->open(dir, O_DIRECTORY|O_RDONLY, 0, 0);
-	char npattern[PFS_PATH_MAX] ;
+	char npattern[PFS_PATH_MAX];
 
 	if (fd==-1) {
 		if (search_error(errno, PFS_SEARCH_ERR_OPEN, dir, buffer, i, buffer_length) == -1) {

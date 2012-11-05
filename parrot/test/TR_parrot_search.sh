@@ -24,7 +24,7 @@ run()
     $psearch fixtures/a b/foo >> $out
     $psearch fixtures/a /b/foo >> $out
     $psearch fixtures/a "/*/foo" >> $out
-    $psearch fixtures/a "*/b*" >> $out
+    $psearch fixtures/a "*/*r" >> $out
 
     failures=`diff --ignore-all-space $out $expected`
     [ -z "$failures" ] && echo "all tests passed" || echo $failures

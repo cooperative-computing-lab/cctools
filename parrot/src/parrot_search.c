@@ -30,7 +30,7 @@ int main( int argc, char *argv[] )
 	int flags = 0;
 	char c;
 
-        while((c = getopt(argc, argv, "+rmi")) != (char) -1) {
+        while((c = getopt(argc, argv, "+smi")) != (char) -1) {
                 switch (c) {
                 	case 's': 
 				flags |= PFS_SEARCH_STOPATFIRST;
@@ -60,13 +60,13 @@ int main( int argc, char *argv[] )
 	int i = 0;
 
 	while ((res = readsearch(s)) != NULL) {
-		i++;
 
 		if (res->err) {
 			printf("%s error on %s: %s\n", strerrsource(res->errsource), res->path, strerror(res->err));
 			continue;
 		}
 
+		i++;
 		printf("%-30s", res->path);
 
 		if (flags & PFS_SEARCH_METADATA)
@@ -75,7 +75,7 @@ int main( int argc, char *argv[] )
 			printf("\n");
 	}
 
-	if (i==0) printf("\n");
+	if (i==0) printf("no results\n");
 
 	closesearch(s);
 

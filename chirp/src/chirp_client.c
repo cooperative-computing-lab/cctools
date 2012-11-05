@@ -1566,6 +1566,8 @@ CHIRP_SEARCH *chirp_client_opensearch(struct chirp_client *c, const char *path, 
 			i += l;
 		}
 
+		if (i==0) *buffer = '\0';
+
 		CHIRP_SEARCH *result = malloc(sizeof(CHIRP_SEARCH));
 		result->entry = (struct chirp_searchent*) malloc(sizeof(struct chirp_searchent));
 		result->entry->info = NULL;
