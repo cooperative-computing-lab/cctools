@@ -55,11 +55,11 @@ int main( int argc, char *argv[] )
 		exit(EXIT_FAILURE);
 	}
 
-	SEARCH *s = opensearch(paths, pattern, flags);
+	SEARCH *s = parrot_opensearch(paths, pattern, flags);
 	struct searchent *res;
 	int i = 0;
 
-	while ((res = readsearch(s)) != NULL) {
+	while ((res = parrot_readsearch(s)) != NULL) {
 
 		if (res->err) {
 			printf("%s error on %s: %s\n", strerrsource(res->errsource), res->path, strerror(res->err));
@@ -77,7 +77,7 @@ int main( int argc, char *argv[] )
 
 	if (i==0) printf("no results\n");
 
-	closesearch(s);
+	parrot_closesearch(s);
 
 	return 0;
 }

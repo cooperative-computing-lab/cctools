@@ -98,7 +98,7 @@ int parrot_timeout( const char *time )
 #endif
 }
 
-SEARCH *opensearch( const char *path, const char *pattern, int flags ) 
+SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags ) 
 {
 	int err;
 	size_t buffer_size = 2048;
@@ -177,7 +177,7 @@ static struct stat *readsearch_unpack_stat(char *stat_str) {
 	return info;
 }
 
-struct searchent *readsearch(SEARCH *search) 
+struct searchent *parrot_readsearch(SEARCH *search) 
 {
 	int i = search->i;
 	char *data = search->data;
@@ -210,7 +210,7 @@ struct searchent *readsearch(SEARCH *search)
 	return search->entry;
 }
 
-int closesearch(SEARCH *search) {
+int parrot_closesearch(SEARCH *search) {
         free(search->entry);
         free(search->data);
         free(search);

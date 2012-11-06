@@ -1786,7 +1786,8 @@ static int search_stat_pack(struct pfs_stat p_info, char *buffer, size_t *i, siz
 
 static int search_match_file(const char *pattern, const char *name) 
 {
-	char *subpat, *subend;
+	char *subpat;
+	const char *subend;
 
 	do {
 		subend = strchr(pattern, '|');
@@ -1822,7 +1823,8 @@ static int search_match_file(const char *pattern, const char *name)
 static int search_match_dir(const char *pattern, char *npattern, const char *name) 
 {
 	int recursive, match = 0;
-	char *subpat, *subend;
+	char *subpat;
+	const char *subend;
 	size_t i = 0;
 
 	/* FIXME: npattern buffer bounds checks */

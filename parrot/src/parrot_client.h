@@ -21,9 +21,9 @@ int parrot_cp( const char *source, const char *dest );
 int parrot_mkalloc( const char *path, long long size, mode_t mode );
 int parrot_lsalloc( const char *path, char *alloc_path, long long *total, long long *inuse );
 int parrot_timeout( const char *time );
-SEARCH *opensearch(const char *path, const char *pattern, int flags);
-struct searchent *readsearch(SEARCH *search);
-int closesearch(SEARCH *search);
+SEARCH *parrot_opensearch(const char *path, const char *pattern, int flags);
+struct searchent *parrot_readsearch(SEARCH *search);
+int parrot_closesearch(SEARCH *search);
 
 #endif
 
