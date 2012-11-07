@@ -14,7 +14,6 @@ See the file COPYING for details.
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <stdio.h>
 
 int parrot_whoami( const char *path, char *buf, int size )
@@ -135,6 +134,9 @@ SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags )
 
 static char *readsearch_next(char *data, int *i) {
 	data += *i;
+
+        if (*data=='\0') return NULL;
+
 	char *tail = strchr(data, '|');
 	int length = (tail==NULL) ? strlen(data) : tail - data;
 
@@ -177,8 +179,7 @@ static struct stat *readsearch_unpack_stat(char *stat_str) {
 	return info;
 }
 
-struct searchent *parrot_readsearch(SEARCH *search) 
-{
+struct searchent *parrot_readsearch(SEARCH *search) {
 	int i = search->i;
 	char *data = search->data;
 	char *err_str = readsearch_next(data, &i);

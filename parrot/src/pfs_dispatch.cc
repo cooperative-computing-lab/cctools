@@ -2546,7 +2546,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_search:
                         if (entering) {
-                                char path[PFS_PATH_MAX];
+                                char path[2*PFS_PATH_MAX];
                                 char pattern[PFS_PATH_MAX];
                                 int flags = args[2];
                                 int buffer_length = args[4];

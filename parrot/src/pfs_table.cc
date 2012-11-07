@@ -2059,7 +2059,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 
 	int done = 0;
 
-	do {
+	do {	
 		if (strlen(start)==0) break;
 
 		char path[PFS_PATH_MAX+1];
@@ -2114,7 +2114,6 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 				result = 0;
 			}
 		} else {
-
 			/* Check to see if search is implemented in the service */
 			if(resolve_name(path, &pname)) {
 				if ((result = pname.service->search(&pname, pattern, flags, buffer, buffer_length, &i))==-1) {
