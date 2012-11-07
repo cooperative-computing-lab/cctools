@@ -547,9 +547,9 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	if(!q || !w) return;
 
 	if((w->pool_name)[0]) {
-		debug(D_WQ, "worker %s from pool \"%s\" removed", w->addrport, w->pool_name);
+		debug(D_WQ, "worker %s (%s) from pool \"%s\" removed", w->hostname, w->addrport, w->pool_name);
 	} else {
-		debug(D_WQ, "worker %s removed", w->addrport);
+		debug(D_WQ, "worker %s (%s) removed", w->hostname, w->addrport);
 	}
 
 	q->total_workers_removed++;
@@ -1031,7 +1031,7 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 	return 1;
 
       failure:
-	debug(D_WQ, "%s (%s) failed and removed because cannot receive output.", w->hostname, w->addrport);
+	debug(D_WQ, "Removing worker %s (%s): cannot receive output.", w->hostname, w->addrport);
 	remove_worker(q, w);
 	return 0;
 }
@@ -1408,8 +1408,8 @@ static void handle_worker(struct work_queue *q, struct link *l)
 	}
 
 	if(!keep_worker) {
+		debug(D_WQ, "Removing worker %s (%s): failed to process the worker's request", w->hostname, w->addrport);
 		remove_worker(q, w);
-		debug(D_WQ, "%s (%s) is removed.", w->hostname, w->addrport);
 	}
 }
 
@@ -2065,7 +2065,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 		change_worker_state(q, w, WORKER_STATE_BUSY);
 		return 1;
 	} else {
-		debug(D_WQ, "%s (%s) removed because couldn't send task.", w->hostname, w->addrport);
+		debug(D_WQ, "Removing worker %s (%s): couldn't send task.", w->hostname, w->addrport);
 		remove_worker(q, w);	// puts w->current_task back into q->ready_list
 		return 0;
 	}
@@ -2104,7 +2104,7 @@ static void abort_slow_workers(struct work_queue *q)
 		if(w->state == WORKER_STATE_BUSY) {
 			timestamp_t runtime = current - w->current_task->time_send_input_start;
 			if(runtime > (average_task_time * multiplier)) {
-				debug(D_WQ, "%s (%s) has run too long: %.02lf s (average is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
+				debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
 				remove_worker(q, w);
 			}
 		}
