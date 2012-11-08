@@ -1,9 +1,35 @@
 
+The Cooperative Computing Tools (cctools) is a software
+package for enabling large scale distributed computing
+on clusters, clouds, and grids.  It is used primarily for
+attacking large scale problems in science and engineering.
+
+You can read more about this software at:
+   http://www.nd.edu/~ccl/software
+
+The software is developed by members of the Cooperative
+Computing Lab at the University of Notre Dame, led by
+Prof. Douglas Thain.  The file CREDITS lists the many
+people that have contributed to the software over the years.
+
+For complete instructions on how to build, install, and use
+the software, see here:
+   http://www.nd.edu/~ccl/software/manuals
+
+If you are impatient, the following commands will build
+and install the software in your home directory:
+
+   ./configure --prefix $HOME/cctools
+   make install
+   export PATH=$HOME/cctools/bin
+   chirp_status
+   
 ------------------------------------------------------------
 This software package is
 Copyright (c) 2003-2004 Douglas Thain
 Copyright (c) 2005- The University of Notre Dame
-All rights reserved.
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
 ------------------------------------------------------------
 This product includes software developed by and/or derived
 from the Globus Project (http://www.globus.org/)
@@ -20,47 +46,3 @@ The Glite module of Parrot is Copyright (c) Members of the EGEE Collaboration. 2
 See http://eu-egee.org/partners/ for details on the copyright holders.
 For license conditions see the license file or http://eu-egee.org/license.html
 ------------------------------------------------------------
-
-This is the build system for a collection
-of software developed by Douglas Thain at the
-University of Wisconsin 1999-2004 and continuing
-at the University of Notre Dame in 2004.
-Many other people mentioned in the file CREDITS
-have made contributions of time, effort, and code.
-
-You can read more about this software at:
-   http://www.cse.nd.edu/~ccl/software
-
-Please note that all of this software is copyrighted
-and distributed under the GNU General Public License described in the file COPYING.
-You must read and understand that license.
-
-Documentation and other instructions for each of the
-individual packages may be found in the various
-subdirectories.  For example, parrot/src contains
-the source for Parrot, while parrot/doc contains
-the documentation.
-
-To build and install all of these packages in your
-home directory, simply type:
-
-	./configure --prefix ~/cctools
-	make
-	make install
-
-This software may optionally use a variety of 
-external packages such as NeST and Globus.
-If you have these packages, you should
-direct configure to them with a command such as:
-
-	./configure --prefix ~/cctools
-		--with-globus-path /usr/local/globus
-		--with-nest-path /usr/local/nest
-		...
-
-For a list of all possible external packages, type
-
-	./configure --help
-
-Good luck and enjoy,
-Doug
