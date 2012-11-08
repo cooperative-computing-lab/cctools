@@ -440,34 +440,89 @@ int dag_width(struct dag *d, int nested_jobs)
 	return max;
 }
 
-void dag_print(struct dag *d)
+struct dot_node {
+	int id;
+	int count;
+	int print;
+	struct dag_file *source;
+};
+
+void dag_print(struct dag *d, int condense_display)
 {
+	
 	struct dag_node *n;
 	struct dag_file *f;
+	struct hash_table *h;
+	struct dot_node *t;
+
+	char *name;
+	char *label;
+	
+	h = hash_table_create(0,0);
 
 	fprintf(stdout, "digraph {\n");
 
 	fprintf(stdout, "node [shape=ellipse, color = green, style = unfilled];\n");
 
+	for(n = d->nodes; n; n = n->next){
+		name = xxstrdup(n->command);
+		label = strtok(name, " \t\n");
+		t = hash_table_lookup(h, label);
+		if (!t) {
+			t = malloc(sizeof(*t));
+			t->id = n->nodeid;
+			t->count = 1;
+			t->print = 1;
+			t->source = n->source_files;
+			hash_table_insert(h, label, t);
+		} else {
+			t->count++;
+		}
+		
+		free(name);
+	}
+	
+
 	for(n = d->nodes; n; n = n->next) {
-		char *name = xxstrdup(n->command);
-		char *label = strtok(name, " \t\n");
-		fprintf(stdout, "N%d [label=\"%s\"];\n", n->nodeid, label);
+        	name = xxstrdup(n->command);
+		label = strtok(name, " \t\n");
+		t = hash_table_lookup(h, label);
+		if(!condense_display || t->print){
+			if((t->count == 1) || !condense_display) fprintf(stdout, "N%d [label=\"%s\"];\n", condense_display?t->id:n->nodeid, label);
+			else fprintf(stdout, "N%d [label=\"%s x%d\"];\n", t->id, label, t->count);
+			t->print = 0;
+		}
 		free(name);
 	}
 
 	fprintf(stdout, "node [shape=box,color = blue,style = unfilled];\n");
 
 	for(n = d->nodes; n; n = n->next) {
+
+		name = xxstrdup(n->command);
+                label = strtok(name, " \t\n");
+                t = hash_table_lookup(h, label);
+
+
 		for(f = n->source_files; f; f = f->next) {
-			fprintf(stdout, "\"%s\" -> N%d;\n", f->filename, n->nodeid);
+			fprintf(stdout, "\"%s\" -> N%d;\n", f->filename, condense_display?t->id:n->nodeid);
 		}
 		for(f = n->target_files; f; f = f->next) {
-			fprintf(stdout, "N%d -> \"%s\";\n", n->nodeid, f->filename);
+			fprintf(stdout, "N%d -> \"%s\";\n", condense_display?t->id:n->nodeid, f->filename);
 		}
+
+		free(name);
 	}
 
 	fprintf(stdout, "}\n");
+
+	hash_table_firstkey(h);
+	while(hash_table_nextkey(h, &label ,(void **)&t)) {
+		free(t);
+		hash_table_remove(h, label);
+	}
+
+	hash_table_delete(h);
 }
 
 const char *dag_node_state_name(dag_node_state_t state)
@@ -1810,6 +1865,7 @@ int dag_check(struct dag *d)
 {
 	struct dag_node *n;
 	struct dag_file *f;
+	int error = 0;
 
 	debug(D_DEBUG, "checking rules for consistency...\n");
 
@@ -1828,12 +1884,17 @@ int dag_check(struct dag *d)
 				continue;
 			}
 
-			fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
-			clean_symlinks(d, 1);
-			return 0;
+			if (!error){
+				fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
+			}
+			error = 1;
 		}
 	}
 
+	if(error) {
+		clean_symlinks(d, 1);
+		return 0;
+	}
 	return 1;
 }
 
@@ -2044,7 +2105,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -B <options>   Add these options to all batch submit files.\n");
 	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem\n");
-	fprintf(stdout, " -D             Display the Makefile as a Dot graph.\n");
+	fprintf(stdout, " -D             Display the Makefile as a Dot graph. Additional option 'c' to condense similar boxes, else type 'none' for full expansion\n");
 	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capacity may be viewed in the Work Queue log file.\n");
 	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	fprintf(stdout, " -h             Show this help screen.\n");
@@ -2075,6 +2136,7 @@ int main(int argc, char *argv[])
 	char *batchlogfilename = NULL;
 	int clean_mode = 0;
 	int display_mode = 0;
+	int condense_display = 0;
 	int syntax_check = 0;
 	int explicit_remote_jobs_max = 0;
 	int explicit_local_jobs_max = 0;
@@ -2113,7 +2175,7 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	while((c = getopt(argc, argv, "aAB:cC:d:DEF:g:G:hiIj:J:kKl:L:N:o:Op:P:r:RS:T:vW:z")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:D:EF:g:G:hiIj:J:kKl:L:N:o:Op:P:r:RS:T:vW:z")) != (char) -1) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2143,6 +2205,7 @@ int main(int argc, char *argv[])
 				debug_flags_set(optarg);
 				break;
 			case 'D':
+				if (strcasecmp(optarg, "c") == 0) condense_display = 1;
 				display_mode = 1;
 				break;
 			case 'E':
@@ -2396,7 +2459,7 @@ int main(int argc, char *argv[])
 	if(display_mode) {
 		free(logfilename);
 		free(batchlogfilename);
-		dag_print(d);
+		dag_print(d, condense_display);
 		return 0;
 	}
 
