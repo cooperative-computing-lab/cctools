@@ -734,7 +734,7 @@ then
 				python_ccflags_file=`mktemp tmp.XXXXXX`
 				python_ldflags_file=`mktemp tmp.XXXXXX`
 
-				${python} > $python_ccflags_file <<EOF
+				env HOME=/var/empty ${python} > $python_ccflags_file <<EOF
 from distutils import sysconfig
 flags = ['-I' + sysconfig.get_python_inc(),
 	 '-I' + sysconfig.get_python_inc(plat_specific=True)]
@@ -743,7 +743,7 @@ if not syscfgflags is None:
     flags.extend(syscfgflags.split())
 print ' '.join(flags)
 EOF
-				${python} > $python_ldflags_file <<EOF
+				env HOME=/var/empty ${python} > $python_ldflags_file <<EOF
 from distutils import sysconfig
 libs = sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
 if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
