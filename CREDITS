@@ -9,13 +9,17 @@ and other items.  In alphabetical order:
 	University of Notre Dame
 	Created the Parrot-S3 module and contributed to Work Queue and Makeflow.
 
+	Chris Bauschka
+	Purdue University
+	Contributed to Work Queue and the Sweeper abstraction.
+
 	John Bent
 	University of Wisconsin
 	Debugged early versions of parrot on many applications with NeST.
 
 	Dan Bradley
 	University of Wisconsin
-	Contributed the Parrot-CVMFS module.
+	Contributed the Parrot-CVMFS module and a variety of bug fixes.
 
 	Christophe Blanchet
 	IBCP
@@ -39,8 +43,12 @@ and other items.  In alphabetical order:
 
 	Patrick Donnelly
 	University of Notre Dame
-	Created the chirp_filesystem backend and the Chirp-HDFS module.
+	Contributed to Chirp, Parrot, HDFS Support, and ticket authentication.
 	
+	Iheanyi Ekuchuku
+	University of Notre Dame
+	Contributed to Work Queue and the Sweeper abstraction.
+
 	Michael Ernst, Patrick Fuhrmann, and Tigran Mkrtchyan
 	Fermi National Labs and DESY
 	Provided invaluable help installing, configuring, and using dcache
@@ -69,11 +77,15 @@ and other items.  In alphabetical order:
 
 	Kevin Partington
 	University of Notre Dame
-	COntributed features to Makeflow and Work Queue.
+	Contributed features to Makeflow and Work Queue.
 
 	Francesco Prelz
 	INFN Milan
 	Contributed numerous bug fixes and performance improvements to Parrot.
+
+	Dinesh Rajan
+	University of Notre Dame
+	Contributed to Work Queue and multiple elastic applications.
 
 	Sander Klous
 	NIKHEF
@@ -117,7 +129,7 @@ and other items.  In alphabetical order:
 
 	Andrew Thrasher
 	University of Notre Dame
-	Contributed to the design and implementation of SAND
+	Contributed to SAND and several Work Queue applications.
 
 	Li Yu
 	Notre Dame
