@@ -62,7 +62,6 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define TASK_NONE 0
 #define TASK_RUNNING 1
-#define TASK_CANCELLED 2
 
 struct task_info {
 	pid_t pid;
@@ -318,8 +317,10 @@ static void get_task_stdout(char **task_output, INT64_T *task_output_length) {
 	*task_output_length = length;
 }
 
-static int collect_task_info(struct task_info *ti) {
-	// Get task return status
+
+// Wait for the task process to terminate and collect information about the
+// task process if parameter 'ti' is not NULL
+static int wait_task_process(struct task_info *ti) {
 	pid_t tmp_pid;
 	int status;
 	struct rusage rusage;
@@ -329,25 +330,31 @@ static int collect_task_info(struct task_info *ti) {
 
 	if(tmp_pid != pid) {
 		return 0;
+	} 
+	
+	task_status = TASK_NONE;
+
+	char *output;
+	INT64_T output_length;
+	// Cleanup the file/buffer used to store task stdout 
+	get_task_stdout(&output, &output_length);
+
+	if(ti) {
+		memset(ti, 0, sizeof(struct task_info));
+		ti->pid = tmp_pid;
+		ti->status = status;
+		ti->rusage = rusage;
+		ti->execution_end = timestamp_get();
+		ti->output = output;
+		ti->output_length = output_length;
+	} else {
+		free(output);
 	}
-
-	// Fill task_info struct
-	clear_task_info(ti);
-
-	ti->pid = tmp_pid;
-	ti->status = status;
-	ti->rusage = rusage;
-	ti->execution_end = timestamp_get();
-
-	get_task_stdout(&(ti->output), &(ti->output_length));
 
 	return 1;
 }
 
 static int handle_task(struct link *master) {
-	struct task_info ti;
-	memset(&ti, 0, sizeof(ti));
-
 	int result = read_task_stdout(time(0) + short_timeout);
 
 	// Failed to retrieve task standard output
@@ -357,19 +364,17 @@ static int handle_task(struct link *master) {
 
 	if(result == 1) {
 		// Task has terminated.
-		if(!collect_task_info(&ti)) {
+		struct task_info ti;
+		if(!wait_task_process(&ti)) {
 			return 0;
 		}
 
-		if (WIFEXITED(ti.status)){
-			task_status = TASK_NONE;
-		} else {
-			//mark as cancelled if process did not exit normally.
-			debug(D_WQ, "Task (process %d) was aborted.\n", pid);
-			task_status = TASK_CANCELLED;
-		}	
+		if (!WIFEXITED(ti.status)){
+			debug(D_WQ, "Task (process %d) did not exit normally.\n", pid);
+		} 
 
 		report_task_complete(master, ti.status, ti.output, ti.output_length, ti.execution_end - execution_start);
+		clear_task_info(&ti);
 	} 
 
 	return 1;
@@ -631,7 +636,7 @@ static struct link *auto_link_connect(char *addr, int *port)
 	while((m = (struct work_queue_master *)select_master(ml, pool))) {
 		master = link_connect(m->addr, m->port, time(0) + master_timeout);
 		if(master) {
-			debug(D_WQ, "Talking to the Master at:\n");
+			debug(D_WQ, "talking to the master at:\n");
 			debug(D_WQ, "addr:\t%s\n", m->addr);
 			debug(D_WQ, "port:\t%d\n", m->port);
 			debug(D_WQ, "project:\t%s\n", m->proj);
@@ -807,7 +812,7 @@ static int poll_master_and_task(struct link *master, int task_pipe_fd, int timeo
 
 	ret = 0;
 
-	if(task_status != TASK_NONE) {
+	if(task_status == TASK_RUNNING) {
 		n = 2;
 	} else {
 		n = 1;
@@ -856,12 +861,12 @@ static void work_for_master(struct link *master) {
 		return;
 	}
 
-	debug(D_WQ, "Working for master at %s:%d.\n", actual_addr, actual_port);
+	debug(D_WQ, "working for master at %s:%d.\n", actual_addr, actual_port);
 
 	time_t idle_stoptime = time(0) + idle_timeout;
 	// Start serving masters
 	while(!abort_flag) {
-		if(time(0) > idle_stoptime && task_status != TASK_RUNNING) {
+		if(time(0) > idle_stoptime && task_status == TASK_NONE) {
 			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			abort_flag = 1;
 			break;
@@ -1016,12 +1021,15 @@ static int do_unlink(const char *path) {
 	}
 	
 	if(file_result != 0 || dir_result != 1) { //one of the calls failed	
-		if (task_status != TASK_CANCELLED) {
-			//recover only if it wasn't a cancelled task since it could
-			//have been cancelled before (output) file was generated.
-			fprintf(stderr, "Could not remove %s.(%s)\n", path, strerror(errno));
-			return 0;
-		}	
+		struct stat buf;
+		if(stat(path, &buf) != 0) {
+			if(errno == ENOENT) {
+				// If the path does not exist, return success
+				return 1;
+			}
+		}
+		// Failed to do unlink
+		return 0;
 	}
 	return 1;
 }
@@ -1154,11 +1162,14 @@ static int do_thirdput(struct link *master, int mode, const char *filename, cons
 
 }
 
+// Kill task if there's one running
 static void kill_task() {
 	if(task_status == TASK_RUNNING) {
+		debug(D_WQ, "terminating the current running task - process %d", pid);
 		kill(pid, SIGTERM);
+		// This reaps the killed child process created by function execute_task
+		wait_task_process(NULL);
 	}
-	task_status = TASK_CANCELLED;
 }
 
 static int do_kill() {
@@ -1183,7 +1194,7 @@ static int handle_link(struct link *master) {
 	int mode, r;
 
 	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
-		debug(D_WQ, "Received command: %s.\n", line);
+		debug(D_WQ, "received command: %s.\n", line);
 		if(sscanf(line, "work %lld", &length)) {
 			r = do_work(master, length);
 		} else if(sscanf(line, "stat %s", filename) == 1) {
@@ -1216,6 +1227,7 @@ static int handle_link(struct link *master) {
 			r = 0;
 		}
 	} else {
+		debug(D_WQ, "Failed to read from master.\n");
 		r = 0;
 	}
 
@@ -1223,6 +1235,7 @@ static int handle_link(struct link *master) {
 }
 
 static void disconnect_master(struct link *master) {
+	debug(D_WQ, "Disconnecting the current master ...\n");
 	link_close(master);
 
 	if(auto_worker) {
@@ -1242,12 +1255,13 @@ static void disconnect_master(struct link *master) {
 }
 
 static void abort_worker() {
-	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
-
 	// Free dynamically allocated memory
 	if(stdout_buffer) {
 		free(stdout_buffer);
+		stdout_buffer = NULL;
+		stdout_buffer_used = 0;
 	}
+
 	if(pool_name) {
 		free(pool_name);
 	}
@@ -1257,12 +1271,11 @@ static void abort_worker() {
 	free(os_name);
 	free(arch_name);
 
-	// Kill running task if needed
-	if(task_status == TASK_RUNNING) {
-		kill(pid, SIGTERM);
-	}
+	// Kill running task if any 
+    kill_task();	
 
 	// Remove workspace. 
+	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
 	delete_dir(workspace);
 }
 

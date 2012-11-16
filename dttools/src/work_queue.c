@@ -958,7 +958,7 @@ static int receive_output_from_worker(struct work_queue *q, struct work_queue_wo
 	return 1;
 
       failure:
-	debug(D_WQ, "Removing worker %s (%s): cannot receive output.", w->hostname, w->addrport);
+	debug(D_WQ, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
 	remove_worker(q, w);
 	return 0;
 }
@@ -1099,6 +1099,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, str
 		stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T) output_length);
 		actual = link_read(l, t->output, output_length, stoptime);
 		if(actual != output_length) {
+			debug(D_WQ, "Failure: actual received stdout size (%lld bytes) is different from expected (%lld bytes).", actual, output_length);
 			free(t->output);
 			t->output = 0;
 			return 0;
@@ -1161,7 +1162,6 @@ static void handle_worker(struct work_queue *q, struct link *l)
 	}
 
 	if(!keep_worker) {
-		debug(D_WQ, "Removing worker %s (%s): failed to process the worker's request", w->hostname, w->addrport);
 		remove_worker(q, w);
 	}
 }
@@ -1798,7 +1798,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 		change_worker_state(q, w, WORKER_STATE_BUSY);
 		return 1;
 	} else {
-		debug(D_WQ, "Removing worker %s (%s): couldn't send task.", w->hostname, w->addrport);
+		debug(D_WQ, "Failed to send task to worker %s (%s).", w->hostname, w->addrport);
 		remove_worker(q, w);	// puts w->current_task back into q->ready_list
 		return 0;
 	}
