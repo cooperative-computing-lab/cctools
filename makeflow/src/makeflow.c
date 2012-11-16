@@ -1179,8 +1179,13 @@ char *dag_readline(struct dag *d, struct dag_node *n)
 
 		char *subst_line = xxstrdup(raw_line);
 		subst_line = string_subst(subst_line, dag_lookup_set, &s);
+
 		free(d->linetext);
 		d->linetext = xxstrdup(subst_line);
+
+		/* Expand escaped characters. */
+		string_replace_backslash_codes(subst_line, subst_line);
+
 		return subst_line;
 	}
 
