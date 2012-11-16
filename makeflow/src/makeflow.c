@@ -1309,7 +1309,13 @@ char *dag_readline(struct dag *d, struct dag_node *n)
 		free(d->linetext);
 		d->linetext = xxstrdup(subst_line);
 
-		/* Expand escaped characters. */
+		/* Expand backslash-escaped characters. */
+		/* NOTE: This function call is responsible for translating escape
+		character sequences such as \n, \t, etc. which are found in the
+		makeflow file into their ASCII character equivalents. Such escape
+		sequences are necessary for assigning values to variables which
+		contain multiple lines of text, since the entire assignment
+		statement must be contained on one line. */
 		string_replace_backslash_codes(subst_line, subst_line);
 
 		return subst_line;
