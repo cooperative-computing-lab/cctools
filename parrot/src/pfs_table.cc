@@ -1545,6 +1545,19 @@ int pfs_table::symlink( const char *n1, const char *n2 )
 	return result;
 }
 
+/*
+Readlink is ordinarily passed down to each driver.
+However, when we are examining the /proc filesystem,
+there are a few elements that must be manually interpreted
+so that the caller gets the logical name rather than the
+physical name, which may have been redirected to the
+cache directory.
+
+Note that /proc/self is handled in resolve_name, where it
+is manually mapped to /proc/(pid), otherwise the path would
+refer to parrot itself.
+*/
+
 int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 {
 	pfs_name pname;
@@ -1564,6 +1577,15 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 				errno = ENOENT;
 				result = -1;
 			}
+		} else if(sscanf(pname.path,"/proc/%d/exe",&pid)==1) {
+			struct pfs_process *target = pfs_process_lookup(pid);
+			if(target) {
+				strncpy(buf,target->name,size);
+				result = MIN(size,(pfs_size_t)strlen(target->name));
+			} else {
+				result = pname.service->readlink(&pname,buf,size);
+			}
+
 		} else {
 			result = pname.service->readlink(&pname,buf,size);
 		}
