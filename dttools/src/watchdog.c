@@ -318,7 +318,7 @@ int main(int argc, char *argv[])
 				for(i = 0; i < start_failures; i++) {
 					wait_time *= 2;
 				}
-				if(wait_time > max_wait_time || wait_time <= min_wait_time) {
+				if(wait_time > max_wait_time || wait_time < min_wait_time) {
 					wait_time = max_wait_time;
 				}
 				if(time_in_state >= wait_time) {
