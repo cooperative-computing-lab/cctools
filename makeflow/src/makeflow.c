@@ -159,6 +159,7 @@ int dag_width_guaranteed_max(struct dag *d);
 int dag_width(struct dag *d, int nested_jobs);
 void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info);
 char *dag_readline(struct dag *d, struct dag_node *n);
+int dag_check (struct dag *d);
 int dag_check_dependencies(struct dag *d);
 int dag_parse_variable(struct dag *d, struct dag_node *n, char *line);
 int dag_parse_node(struct dag *d, char *line, int clean_mode);
@@ -444,23 +445,38 @@ struct dot_node {
 	int id;
 	int count;
 	int print;
-	struct dag_file *source;
 };
 
-void dag_print(struct dag *d, int condense_display)
+void dag_print(struct dag *d, int condense_display, int change_size)
 {
-	
 	struct dag_node *n;
 	struct dag_file *f;
 	struct hash_table *h;
 	struct dot_node *t;
 
+	struct stat st;
+	const char *fn;
+
 	char *name;
 	char *label;
+
+        double average = 0;
+        double width = 0;
+
+        fprintf(stdout, "digraph {\n");
+
+	if (change_size){
+		fprintf(stdout, "node [fixedsize = true]");
+		dag_check(d);
+		hash_table_firstkey(d->completed_files);
+		while(hash_table_nextkey(d->completed_files, &label, (void**)&name)) {
+			stat(label, &st);
+			average+=((double) st.st_size)/((double) hash_table_size(d->completed_files));
+		}
+	}
+		
 	
 	h = hash_table_create(0,0);
-
-	fprintf(stdout, "digraph {\n");
 
 	fprintf(stdout, "node [shape=ellipse, color = green, style = unfilled];\n");
 
@@ -473,7 +489,6 @@ void dag_print(struct dag *d, int condense_display)
 			t->id = n->nodeid;
 			t->count = 1;
 			t->print = 1;
-			t->source = n->source_files;
 			hash_table_insert(h, label, t);
 		} else {
 			t->count++;
@@ -488,6 +503,7 @@ void dag_print(struct dag *d, int condense_display)
 		label = strtok(name, " \t\n");
 		t = hash_table_lookup(h, label);
 		if(!condense_display || t->print){
+
 			if((t->count == 1) || !condense_display) fprintf(stdout, "N%d [label=\"%s\"];\n", condense_display?t->id:n->nodeid, label);
 			else fprintf(stdout, "N%d [label=\"%s x%d\"];\n", t->id, label, t->count);
 			t->print = 0;
@@ -497,7 +513,7 @@ void dag_print(struct dag *d, int condense_display)
 
 	fprintf(stdout, "node [shape=box,color = blue,style = unfilled];\n");
 
-	for(n = d->nodes; n; n = n->next) {
+	for(n =	d->nodes; n; n = n->next) {
 
 		name = xxstrdup(n->command);
                 label = strtok(name, " \t\n");
@@ -505,6 +521,17 @@ void dag_print(struct dag *d, int condense_display)
 
 
 		for(f = n->source_files; f; f = f->next) {
+			if (change_size) {
+				fn = f->filename;
+				if (stat(fn, &st) == 0) {
+					width = (double)(st.st_size)/average;
+				} else {
+					width = 1;
+				}
+				if (width <.5) width = .5;
+				if (width > 5) width = 5;
+				fprintf(stdout, "node [width = %.3lf];\n", width);
+			}
 			fprintf(stdout, "\"%s\" -> N%d;\n", f->filename, condense_display?t->id:n->nodeid);
 		}
 		for(f = n->target_files; f; f = f->next) {
@@ -2116,7 +2143,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -B <options>   Add these options to all batch submit files.\n");
 	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem\n");
-	fprintf(stdout, " -D             Display the Makefile as a Dot graph. Additional option 'c' to condense similar boxes, else type 'none' for full expansion\n");
+	fprintf(stdout, " -D             Display the Makefile as a Dot graph. Additional options 'c' to condense similar boxes, 's' to change the size of the boxes proportional to file size, else type 'none' for full expansion\n");
 	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capacity may be viewed in the Work Queue log file.\n");
 	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	fprintf(stdout, " -h             Show this help screen.\n");
@@ -2148,6 +2175,7 @@ int main(int argc, char *argv[])
 	int clean_mode = 0;
 	int display_mode = 0;
 	int condense_display = 0;
+	int change_size = 0;
 	int syntax_check = 0;
 	int explicit_remote_jobs_max = 0;
 	int explicit_local_jobs_max = 0;
@@ -2217,6 +2245,7 @@ int main(int argc, char *argv[])
 				break;
 			case 'D':
 				if (strcasecmp(optarg, "c") == 0) condense_display = 1;
+				if (strcasecmp(optarg, "s") == 0) change_size = 1;
 				display_mode = 1;
 				break;
 			case 'E':
@@ -2470,7 +2499,7 @@ int main(int argc, char *argv[])
 	if(display_mode) {
 		free(logfilename);
 		free(batchlogfilename);
-		dag_print(d, condense_display);
+		dag_print(d, condense_display, change_size);
 		return 0;
 	}
 
