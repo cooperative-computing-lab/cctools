@@ -36,6 +36,7 @@ typedef enum {
 	BATCH_QUEUE_TYPE_MPI_QUEUE            /**< Batch jobs will be sent to the MPI Queue. */
 } batch_queue_type_t;
 
+
 /** Describes a batch job when it has completed. */
 struct batch_job_info {
 	time_t submitted;	/**< Time the job was submitted to the system. */
@@ -153,9 +154,17 @@ void batch_queue_set_options(struct batch_queue *q, const char *options);
 This call returns the additional options to be passed to the batch system each
 time a job is submitted.
 @param q The batch queue.
-@return An allocate string containing the the batch queue options.
+@return An allocated string containing the the batch queue options.
 */
 char *batch_queue_options(struct batch_queue *q);
+
+/** Get batch queue type.
+This call returns the type of the batch queue.
+@param q The batch queue.
+@return The type of the batch queue, defined when it was created.
+*/
+batch_queue_type_t batch_queue_get_type(struct batch_queue *q);
+
 
 /** Delete a batch queue.
 Note that this function just destroys the internal data structures,

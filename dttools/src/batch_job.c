@@ -221,6 +221,11 @@ void batch_queue_set_options(struct batch_queue *q, const char *options_text)
 	}
 }
 
+batch_queue_type_t batch_queue_get_type(struct batch_queue *q)
+{
+	return q->type;	
+}
+
 char *batch_queue_options(struct batch_queue *q)
 {
     if (q->options_text)
