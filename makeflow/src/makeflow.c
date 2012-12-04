@@ -449,12 +449,20 @@ struct dot_node {
 	int print;
 };
 
+struct file_node {
+	int id;
+	char *name;
+	double size;
+};
+
 void dag_print(struct dag *d, int condense_display, int change_size)
 {
 	struct dag_node *n;
 	struct dag_file *f;
-	struct hash_table *h;
+	struct hash_table *h, *g;
 	struct dot_node *t;
+
+	struct file_node *e;
 
 	struct stat st;
 	const char *fn;
@@ -468,7 +476,6 @@ void dag_print(struct dag *d, int condense_display, int change_size)
         fprintf(stdout, "digraph {\n");
 
 	if (change_size){
-		fprintf(stdout, "node [fixedsize = true]");
 		dag_check(d);
 		hash_table_firstkey(d->completed_files);
 		while(hash_table_nextkey(d->completed_files, &label, (void**)&name)) {
@@ -480,7 +487,7 @@ void dag_print(struct dag *d, int condense_display, int change_size)
 	
 	h = hash_table_create(0,0);
 
-	fprintf(stdout, "node [shape=ellipse, color = green, style = unfilled];\n");
+	fprintf(stdout, "node [shape=ellipse,color = green,style = unfilled,fixedsize = false];\n");
 
 	for(n = d->nodes; n; n = n->next){
 		name = xxstrdup(n->command);
@@ -513,7 +520,62 @@ void dag_print(struct dag *d, int condense_display, int change_size)
 		free(name);
 	}
 
-	fprintf(stdout, "node [shape=box,color = blue,style = unfilled];\n");
+	fprintf(stdout, "node [shape=box,color=blue,style=unfilled,fixedsize=false];\n");
+
+	g = hash_table_create(0,0);
+
+	for(n = d->nodes; n; n = n->next){
+		for (f = n->source_files; f; f = f->next){
+			fn = f->filename;
+			e = hash_table_lookup(g, fn);
+			if (!e) {
+				e = malloc(sizeof(*e));
+				e->id = hash_table_size(g);
+				e->name = xxstrdup(fn);
+				if (stat(fn, &st) == 0) {
+					e->size = (double)(st.st_size);	
+				}
+				else e->size = -1;
+				hash_table_insert(g, fn, e);
+			}
+		}
+		for (f = n->target_files; f; f = f->next){
+			fn = f->filename;
+                        e = hash_table_lookup(g, fn);
+                        if (!e) {
+                                e = malloc(sizeof(*e));
+                                e->id = hash_table_size(g);
+				e->name = xxstrdup(fn);
+                                if (stat(fn, &st) == 0){
+					e->size = (double)(st.st_size);
+				}
+                                else e->size = -1;
+				hash_table_insert(g, fn, e);
+                        }
+                }
+	}
+
+	hash_table_firstkey(g);
+        while(hash_table_nextkey(g, &label ,(void **)&e)) {
+		fn = e->name;
+		fprintf(stdout, "F%d [label = \"%s", e->id, fn);
+
+		if (change_size) { 
+			if (e->size >= 0){
+				width = 5*(e->size/average);
+				if (width <2.5) width = 2.5;
+                                if (width >25) width = 25;
+				fprintf(stdout, "\\nsize:%.0lfkb\", style=filled, fillcolor=skyblue1, fixedsize=true, width=%lf, height=0.75", e->size/1024, width);
+			} else {
+				fprintf(stdout, "\", fixedsize = false, style = unfilled, ");
+			}
+		} else fprintf(stdout, "\"");
+
+		fprintf(stdout, "];\n");
+				
+        }
+
+	fprintf(stdout, "\n");
 
 	for(n =	d->nodes; n; n = n->next) {
 
@@ -523,21 +585,12 @@ void dag_print(struct dag *d, int condense_display, int change_size)
 
 
 		for(f = n->source_files; f; f = f->next) {
-			if (change_size) {
-				fn = f->filename;
-				if (stat(fn, &st) == 0) {
-					width = (double)(st.st_size)/average;
-				} else {
-					width = 1;
-				}
-				if (width <.5) width = .5;
-				if (width > 5) width = 5;
-				fprintf(stdout, "node [width = %.3lf];\n", width);
-			}
-			fprintf(stdout, "\"%s\" -> N%d;\n", f->filename, condense_display?t->id:n->nodeid);
+			e = hash_table_lookup(g, f->filename);
+			fprintf(stdout, "F%d -> N%d;\n", e->id, condense_display?t->id:n->nodeid);
 		}
 		for(f = n->target_files; f; f = f->next) {
-			fprintf(stdout, "N%d -> \"%s\";\n", condense_display?t->id:n->nodeid, f->filename);
+			e = hash_table_lookup(g, f->filename);
+			fprintf(stdout, "N%d -> F%d;\n", condense_display?t->id:n->nodeid, e->id);
 		}
 
 		free(name);
@@ -551,6 +604,13 @@ void dag_print(struct dag *d, int condense_display, int change_size)
 		hash_table_remove(h, label);
 	}
 
+	hash_table_firstkey(g);
+        while(hash_table_nextkey(g, &label ,(void **)&e)) {
+                free(e);
+                hash_table_remove(g, label);
+        }
+
+	hash_table_delete(g);
 	hash_table_delete(h);
 }
 
