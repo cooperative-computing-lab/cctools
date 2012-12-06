@@ -43,6 +43,9 @@ See the file COPYING for details.
 #define POOL_CONFIG_LINE_MAX 4096
 #define MAX_WORKERS_DEFAULT 100
 
+#define LOG_INTERVAL 15 
+
+static time_t last_log_time; 
 static int abort_flag = 0;
 static sig_atomic_t pool_config_updated = 1;
 static struct batch_queue *q;
@@ -486,18 +489,34 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 		}
 		snprintf(input_files, PATH_MAX, "work_queue_worker");
 
+		// sum_waiting is the maximum # of workers that all masters would possibly need from the pool
+		// this field is useful when masters are at the end of their lifecycle (when masters have no waiting tasks)
+		// without this field, the pool may submit unnecessary workers due to the stale data in catalog server
+		int sum_waiting = 0;
+
+		// we compute the following sums for logging purposes
+		int sum_masters = 0;
+		int sum_running = 0;
+		int sum_workers_connected = 0;
+		int sum_capacity = 0;
+
+		struct work_queue_master *m;	
+		list_first_item(matched_masters);
+		while((m = (struct work_queue_master *)list_next_item(matched_masters))) {
+			sum_waiting += m->tasks_waiting;
+
+			sum_masters += 1;
+			// sum of the number of running tasks on each master
+			sum_running += m->tasks_running;
+			// m->workers_from_this_pool only has value after decide_worker_distribution() has been called
+			sum_workers_connected += m->workers_from_this_pool; 
+			// maximum possible capacity the masters have
+			sum_capacity += m->capacity > 0 ? m->capacity : m->tasks_waiting; 
+		}
+		int workers_desired = n;
+
 		n -= itable_size(job_table);
 		if(n > 0) {
-			// sum_waiting is the maximum # of workers that all masters would possibly need from the pool
-			// this field is useful when masters are at the end of their lifecycle (when masters have no waiting tasks)
-			// without this field, the pool may submit unnecessary workers due to the stale data in catalog server
-			int sum_waiting = 0;
-			struct work_queue_master *m;	
-			list_first_item(matched_masters);
-			while((m = (struct work_queue_master *)list_next_item(matched_masters))) {
-				sum_waiting += m->tasks_waiting;
-			}
-
 			n = MIN(n, sum_waiting);
 
 			if(n > 0) {
@@ -505,7 +524,15 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 				printf("%d more workers has just been submitted.\n", n);
 			}
 		} 
-		printf("%d workers are being maintained.\n", itable_size(job_table));
+
+		int workers_submitted = itable_size(job_table);
+		printf("%d workers are being maintained.\n", workers_submitted);
+
+		time_t now = time(0);
+		if(now - last_log_time >= LOG_INTERVAL) {	
+			debug(D_LOG, "%llu %d %d %d %d %d %d %d", timestamp_get(), workers_desired, workers_submitted, sum_workers_connected, sum_masters, sum_capacity, sum_running, sum_waiting);
+			last_log_time = now; 
+		}
 
 		printf("Number of matched masters: %d.\n\n", list_size(matched_masters));
 		if(list_size(matched_masters)) {
@@ -1058,6 +1085,8 @@ static void show_help(const char *cmd)
 	printf("Use: %s [options] <count>\n", cmd);
 	printf("where batch options are:\n");
 	printf("  -d <subsystem> Enable debugging for this subsystem.\n");
+	printf("  -l <file>      Send the %s debugging output to this file.\n", cmd);
+	printf("  -L <size>      Rotate the %s debugging file after this size.\n", cmd);
 	printf("  -S <scratch>   Scratch directory. (default is /tmp/${USER}-workers)\n");
 	printf("  -T <type>      Batch system type: %s. (default is local)\n", batch_queue_type_string());
 	printf("  -r <count>     Number of attemps to retry if failed to submit a worker.\n");
@@ -1073,12 +1102,13 @@ static void show_help(const char *cmd)
 	printf("  -t <time>      Abort after this amount of idle time.\n");
 	printf("  -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	printf("  -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
-	printf("  -o <file>      Send debugging to this file.\n");
+	printf("  -o <file>      Send worker debugging output to this file.\n");
 }
 
 int main(int argc, char *argv[])
 {
 	int c, count;
+	FILE *fp;
 	int goal = 0;
 	char scratch_dir[PATH_MAX] = "";
 
@@ -1089,9 +1119,11 @@ int main(int argc, char *argv[])
 	char pool_path[PATH_MAX] = "";
 	char new_pool_path[PATH_MAX] = "";
 	char new_worker_path[PATH_MAX];
+	char starting_dir_canonical_path[PATH_MAX];
 	char *pool_config_path = "work_queue_pool.conf";
 	char pool_config_canonical_path[PATH_MAX];
 	char pool_pid_canonical_path[PATH_MAX];
+	char pool_log_canonical_path[PATH_MAX];
 	char pool_name_canonical_path[PATH_MAX];
 	char pidfile_path[PATH_MAX];
 	char poolnamefile_path[PATH_MAX];
@@ -1111,7 +1143,6 @@ int main(int argc, char *argv[])
 	char *catalog_host;
 	int catalog_port;
 
-
 	struct list *regex_list;
 
 	regex_list = list_create();
@@ -1124,10 +1155,26 @@ int main(int argc, char *argv[])
 	catalog_port = CATALOG_PORT;
 
 	set_pool_name(name_of_this_pool, WORK_QUEUE_POOL_NAME_MAX);
+	
+	get_canonical_path(".", starting_dir_canonical_path, PATH_MAX);
+	char *p;
+	int len = strlen(starting_dir_canonical_path);
+	if(len > 0) {
+		p = &(starting_dir_canonical_path[len - 1]);
+		if(*p != '/' && len + 1 < PATH_MAX) {
+			*(p+1) = '/';
+			*(p+2) = '\0';
+		}
+	} else {
+		fprintf(stderr, "cannot get the absolute path of the current directory!\n");
+		return EXIT_FAILURE;
+	}
+
+	last_log_time = time(0) - LOG_INTERVAL;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAc:C:d:hm:N:o:O:Pqr:S:t:T:vW:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAc:C:d:hm:l:L:N:o:O:Pqr:S:t:T:vW:")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			strcat(worker_args, " -a");
@@ -1159,6 +1206,27 @@ int main(int argc, char *argv[])
 			break;
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case 'l':
+			if(optarg[0] == '/') {
+				strncpy(pool_log_canonical_path, optarg, PATH_MAX);
+			} else {
+				char *p = optarg;
+				if(strlen(optarg) > 2) {
+					if(!strncmp(pool_config_path, "./", 2)) {
+						p = pool_config_path + 2;
+					}
+				}
+				strncpy(pool_log_canonical_path, starting_dir_canonical_path, PATH_MAX);
+				strncat(pool_log_canonical_path, p, strlen(p));
+			}
+
+			debug_flags_set("log");
+			debug_config_file(pool_log_canonical_path);
+			printf("Debug flag is set as \"log\". Log output can be found in path: %s\n", pool_log_canonical_path);
+			break;
+		case 'L':
+			debug_config_file_size(string_metric_parse(optarg));
 			break;
 		case 'm':
 			count = atoi(optarg);
@@ -1252,7 +1320,6 @@ int main(int argc, char *argv[])
 			p++;
 		}
 
-		FILE *fp;
 		struct stat tmp_stat;
 
 		if(make_decision_only) {
@@ -1338,38 +1405,27 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "Error: failed to locate expected pool configuration file - %s (%s).\n", pool_config_path, strerror(errno));
 			return EXIT_FAILURE;
 		}
+
+		// get pool pid file's absolute path (for later delete this file while in the scratch dir
+		strncpy(pool_pid_canonical_path, starting_dir_canonical_path, PATH_MAX);
+		strncat(pool_pid_canonical_path, pidfile_path, strlen(pidfile_path));
+		
+		if(make_decision_only) {
+			// get pool pid file's absolute path (for later delete this file while in the scratch dir
+			strncpy(pool_name_canonical_path, starting_dir_canonical_path, PATH_MAX);
+			strncat(pool_name_canonical_path, poolnamefile_path, strlen(poolnamefile_path));
+		}
+
 		if(pool_config_path[0] == '/') {
 			strncpy(pool_config_canonical_path, pool_config_path, PATH_MAX);
 		} else {
-			get_canonical_path(".", pool_config_canonical_path, PATH_MAX);
-			char *p;
-			int len = strlen(pool_config_canonical_path);
-			if(len > 0) {
-				p = &(pool_config_canonical_path[len - 1]);
-				if(*p != '/' && len + 1 < PATH_MAX) {
-					*(p+1) = '/';
-					*(p+2) = '\0';
-				}
-			} else {
-				return EXIT_FAILURE;
-			}
-
-			// get pool pid file's absolute path (for later delete this file while in the scratch dir
-			strncpy(pool_pid_canonical_path, pool_config_canonical_path, PATH_MAX);
-			strncat(pool_pid_canonical_path, pidfile_path, strlen(pidfile_path));
-
-			if(make_decision_only) {
-				// get pool pid file's absolute path (for later delete this file while in the scratch dir
-				strncpy(pool_name_canonical_path, pool_config_canonical_path, PATH_MAX);
-				strncat(pool_name_canonical_path, poolnamefile_path, strlen(poolnamefile_path));
-			}
-
 			p = pool_config_path;
-			if(len > 2) {
+			if(strlen(pool_config_path) > 2) {
 				if(!strncmp(pool_config_path, "./", 2)) {
 					p = pool_config_path + 2;
 				}
 			}
+			strncpy(pool_config_canonical_path, starting_dir_canonical_path, PATH_MAX);
 			strncat(pool_config_canonical_path, p, strlen(p));
 		}
 	}

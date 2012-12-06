@@ -460,7 +460,7 @@ static void change_worker_state(struct work_queue *q, struct work_queue_worker *
 	q->workers_in_state[w->state]--;
 	w->state = state;
 	q->workers_in_state[state]++;
-	debug(D_WQ, "workers total: %d init: %d ready: %d busy: %d cancelling: %d",
+	debug(D_WQ, "workers status -- total: %d, init: %d, ready: %d, busy: %d, cancelling: %d.",
 		hash_table_size(q->worker_table),
 		q->workers_in_state[WORKER_STATE_INIT],
 		q->workers_in_state[WORKER_STATE_READY],
