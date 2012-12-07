@@ -75,7 +75,6 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_XROOTD   0x400000000LL  /**< Debug Xrootd module in Parrot */
 #define D_MPI      0x800000000LL  /**< Debug MPI module for Makeflow */
 #define D_BATCH   0x1000000000LL  /**< Debug batch_job modules */
-#define D_LOG     0x2000000000LL  /**< Debug batch_job modules */
 
 /** Debug all remote I/O operations. */
 #define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID|D_XROOTD|D_CVMFS)

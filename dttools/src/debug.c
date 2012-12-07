@@ -75,7 +75,6 @@ static struct flag_info table[] = {
 	{"xrootd", D_XROOTD},
 	{"remote", D_REMOTE},
 	{"batch", D_BATCH},
-	{"log", D_LOG},
 	{"all", ~0},
 	{"time", 0},		/* backwards compatibility */
 	{"pid", 0},		/* backwards compatibility */

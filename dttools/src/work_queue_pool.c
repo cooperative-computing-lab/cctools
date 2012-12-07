@@ -55,6 +55,8 @@ static int make_decision_only = 0;
 static int worker_timeout = 0;
 static int retry_count = 20;
 
+static FILE *logfile = NULL;
+
 static char name_of_this_pool[WORK_QUEUE_POOL_NAME_MAX];
 typedef enum {
 	TABLE_ALIGN_LEFT,
@@ -529,8 +531,8 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 		printf("%d workers are being maintained.\n", workers_submitted);
 
 		time_t now = time(0);
-		if(now - last_log_time >= LOG_INTERVAL) {	
-			debug(D_LOG, "%llu %d %d %d %d %d %d %d", timestamp_get(), workers_desired, workers_submitted, sum_workers_connected, sum_masters, sum_capacity, sum_running, sum_waiting);
+		if(now - last_log_time >= LOG_INTERVAL && logfile) {	
+			fprintf(logfile, "%llu %d %d %d %d %d %d %d\n", timestamp_get(), workers_desired, workers_submitted, sum_workers_connected, sum_masters, sum_capacity, sum_running, sum_waiting);
 			last_log_time = now; 
 		}
 
@@ -1085,8 +1087,7 @@ static void show_help(const char *cmd)
 	printf("Use: %s [options] <count>\n", cmd);
 	printf("where batch options are:\n");
 	printf("  -d <subsystem> Enable debugging for this subsystem.\n");
-	printf("  -l <file>      Send the %s debugging output to this file.\n", cmd);
-	printf("  -L <size>      Rotate the %s debugging file after this size.\n", cmd);
+	printf("  -l <path>      Log work_queue_pool status to a file whose path is <path>.\n");
 	printf("  -S <scratch>   Scratch directory. (default is /tmp/${USER}-workers)\n");
 	printf("  -T <type>      Batch system type: %s. (default is local)\n", batch_queue_type_string());
 	printf("  -r <count>     Number of attemps to retry if failed to submit a worker.\n");
@@ -1142,6 +1143,7 @@ int main(int argc, char *argv[])
 
 	char *catalog_host;
 	int catalog_port;
+
 
 	struct list *regex_list;
 
@@ -1221,12 +1223,11 @@ int main(int argc, char *argv[])
 				strncat(pool_log_canonical_path, p, strlen(p));
 			}
 
-			debug_flags_set("log");
-			debug_config_file(pool_log_canonical_path);
-			printf("Debug flag is set as \"log\". Log output can be found in path: %s\n", pool_log_canonical_path);
-			break;
-		case 'L':
-			debug_config_file_size(string_metric_parse(optarg));
+			if((logfile = fopen(pool_log_canonical_path, "a")) != NULL) {
+				printf("Log is written to file '%s'.\n", pool_log_canonical_path);
+			} else {
+				fprintf(stderr, "Failed to open log file '%s' for appending. No log would be generated for this run.\n", pool_log_canonical_path);
+			}
 			break;
 		case 'm':
 			count = atoi(optarg);
@@ -1508,6 +1509,9 @@ int main(int argc, char *argv[])
 	}
 
 	// Abort all jobs
+	if(logfile) {
+		fclose(logfile);
+	}
 	if(regex_list) {
 		list_free(regex_list);
 		list_delete(regex_list);
