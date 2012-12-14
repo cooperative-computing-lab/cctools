@@ -196,7 +196,12 @@ static pid_t execute_task(const char *cmd)
 
 		// Close pipe's write end
 		close(pipefds[1]);
-
+	
+		// Make child process the leader of its own process group. This allows
+		// signals to also be delivered to processes forked by the child process.
+		// This is currently used by kill_task(). 
+		setpgid(pid, 0); 
+		
 		debug(D_WQ, "started process %d: %s", pid, cmd);
 		return pid;
 	} else if(pid < 0) {
@@ -1150,7 +1155,9 @@ static int do_thirdput(struct link *master, int mode, const char *filename, cons
 static void kill_task() {
 	if(task_status == TASK_RUNNING) {
 		debug(D_WQ, "terminating the current running task - process %d", pid);
-		kill(pid, SIGTERM);
+		// Send signal to process group of child which is denoted by -ve value of child pid.
+		// This is done to ensure delivery of signal to processes forked by the child. 
+		kill((-1*pid), SIGTERM);
 	}
 }
 
