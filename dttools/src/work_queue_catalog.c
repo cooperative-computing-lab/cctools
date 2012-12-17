@@ -50,6 +50,8 @@ int parse_catalog_server_description(char *server_string, char **host, int *port
 	*host = strdup(server_string);
 	*port = atoi(colon + 1);
 
+	*colon = ':';
+
 	// if (*port) == 0, parsing failed, thus return 0
 	return *port;
 }
