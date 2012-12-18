@@ -1180,6 +1180,16 @@ static int do_release() {
 	return 0;
 }
 
+static int do_healthcheck(struct link *master){
+	//Respond to healthcheck only when running a task. When not running a task,
+	//master can determine my health when it tries sending me a task. 
+	if(task_status == TASK_RUNNING) {
+		link_putliteral(master, "alive\n", time(0) + active_timeout);
+		debug(D_WQ, "sent response to healthcheck from master at %s:%d.\n", actual_addr, actual_port);
+	}
+	return 1;
+}
+
 static int handle_link(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
@@ -1226,6 +1236,8 @@ static int handle_link(struct link *master) {
 		} else if(!strncmp(line, "exit", 5)) {
 			kill_and_reap_task();
 			r = 0;
+		} else if(!strncmp(line, "check", 6)) {
+			r = do_healthcheck(master);
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;

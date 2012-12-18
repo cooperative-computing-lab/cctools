@@ -85,6 +85,8 @@ static const char * work_queue_state_names[] = {"init","ready","busy","cancel","
 
 #define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
 
+#define HEALTHCHECK_INTERVAL_DEFAULT 300  //in seconds
+#define HEALTHCHECK_TIMEOUT_DEFAULT 30    //in seconds
 
 // work_queue_worker struct related
 #define WORKER_OS_NAME_MAX 65
@@ -151,6 +153,8 @@ struct work_queue {
 	struct hash_table *workers_by_pool;
 
 	FILE *logfile;
+	int healthcheck_interval;
+	int healthcheck_timeout;
 };
 
 struct work_queue_worker {
@@ -175,6 +179,9 @@ struct work_queue_worker {
 	timestamp_t start_time;
 	char pool_name[WORK_QUEUE_POOL_NAME_MAX];
 	char workspace[WORKER_WORKSPACE_NAME_MAX];
+	timestamp_t last_msg_sent_time; 
+	timestamp_t last_msg_recv_time; 
+	timestamp_t healthcheck_sent_time; 
 };
 
 struct time_slot {
@@ -217,8 +224,13 @@ static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t d
 static void add_task_report(struct work_queue *q, struct work_queue_task *t);
 static void update_app_time(struct work_queue *q, timestamp_t last_left_time, int last_left_status);
 
+static int prefix_is(const char *string, const char *prefix); 
+static int process_healthcheck_reply(struct work_queue_worker *w);
+
 static int short_timeout = 5;
 static int next_taskid = 1;
+
+static timestamp_t link_poll_start; //tracks when we poll link; used to timeout unacknowledged healthchecks
 
 static int tolerable_transfer_rate_denominator = 10;
 static long double minimum_allowed_transfer_rate = 100000;	// 100 KB/s
@@ -476,6 +488,65 @@ static void link_to_hash_key(struct link *link, char *key)
 	sprintf(key, "0x%p", link);
 }
 
+/**
+ * This function sends a message to the worker and records the time a message is 
+ * successfully sent to the worker. This timestamp is then used in healthcheck computations. 
+ */
+static int send_worker_msg(struct work_queue_worker *w, const char *fmt, time_t stoptime, ...) 
+{
+	va_list va;
+		
+	va_start(va, stoptime);
+	//call link_putvfstring to send the message on the link	
+	int result = link_putvfstring(w->link, fmt, stoptime, va);	
+	if (result > 0) 
+		w->last_msg_sent_time = timestamp_get();		
+	va_end(va);
+
+	return result;  
+}
+
+/**
+ * This function receives a message from the worker and records the time a message is successfully 
+ * received. This timestamp is then used in healthcheck computations. 
+ */
+static int recv_worker_msg(struct work_queue_worker *w, char *line, size_t length, time_t stoptime) 
+{
+	//call link_readline to recieve message from the link	
+	int result = link_readline(w->link, line, length, stoptime);	
+	if (result > 0) 
+		w->last_msg_recv_time = timestamp_get();	
+	return result;  
+}
+
+/**
+ * This function returns when it receives a non-healthcheck message from worker. If it receives a 
+ * healthcheck message, it processes the message and goes back to receiving messages until a 
+ * non-healthcheck message is received. It records the time a non-healthcheck message is successfully 
+ * received. This timestamp is then used in healthcheck computations. 
+ */
+static int recv_nonhealthcheck_worker_msg(struct work_queue_worker *w, char *line, size_t length, time_t stoptime)
+{
+	int result;	
+	while ((result = link_readline(w->link, line, length, stoptime)) > 0) {
+		if(prefix_is(line, "alive")) {
+			process_healthcheck_reply(w);
+		}	
+		else { 
+			w->last_msg_recv_time = timestamp_get();
+			break;
+		}	
+	}
+	
+	return result;
+}
+
+static int process_healthcheck_reply(struct work_queue_worker *w) {
+	debug(D_WQ, "Got healthcheck response from %s (%s)", w->hostname, w->addrport);
+	w->last_msg_recv_time = timestamp_get();
+	return 1;
+}
+
 static double get_idle_percentage(struct work_queue *q)
 {
 	// Calculate the master's idle percentage for since the most recent
@@ -603,7 +674,7 @@ static int release_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	if(!w) return 0;
 
-	link_putliteral(w->link, "release\n", time(0) + short_timeout);
+	send_worker_msg(w, "%s\n", time(0) + short_timeout, "release");
 	remove_worker(q, w);
 	return 1;
 }
@@ -690,7 +761,7 @@ static int add_worker(struct work_queue *q)
 			debug(D_WQ, "worker %s added", w->addrport);
 			debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
 			q->total_workers_joined++;
-
+			
 			return 1;
 		} else {
 			link_close(link);
@@ -721,14 +792,14 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 		return 1;
 
 	debug(D_WQ, "%s (%s) sending back %s to %s", w->hostname, w->addrport, remote_name, local_name);
-	link_putfstring(w->link, "rget %s\n", time(0) + short_timeout, remote_name);
+	send_worker_msg(w, "rget %s\n", time(0) + short_timeout, remote_name);
 
 	strcpy(tmp_local_name, local_name);
 	remote_name_len = strlen(remote_name);
 	local_name_len = strlen(local_name);
 
 	while(1) {
-		if(!link_readline(w->link, line, sizeof(line), time(0) + short_timeout)) {
+		if(!recv_nonhealthcheck_worker_msg(w, line, sizeof(line), time(0) + short_timeout)) {
 			goto link_failure;
 		}
 
@@ -874,8 +945,8 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 					char thirdput_result[WORK_QUEUE_LINE_MAX];
 					debug(D_WQ, "putting %s from %s (%s) to shared filesystem from %s", tf->remote_name, w->hostname, w->addrport, tf->payload);
 					open_time = timestamp_get();
-					link_putfstring(w->link, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, tf->remote_name, tf->payload);
-					link_readline(w->link, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+					send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, tf->remote_name, tf->payload);
+					recv_nonhealthcheck_worker_msg(w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
 					close_time = timestamp_get();
 					sum_time += (close_time - open_time);
 				}
@@ -883,8 +954,8 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 				char thirdput_result[WORK_QUEUE_LINE_MAX];
 				debug(D_WQ, "putting %s from %s (%s) to remote filesystem using %s", tf->remote_name, w->hostname, w->addrport, tf->payload);
 				open_time = timestamp_get();
-				link_putfstring(w->link, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, tf->remote_name, tf->payload);
-				link_readline(w->link, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+				send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, tf->remote_name, tf->payload);
+				recv_nonhealthcheck_worker_msg(w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
 				close_time = timestamp_get();
 				sum_time += (close_time - open_time);
 			} else {
@@ -949,7 +1020,7 @@ static void delete_cancel_task_files(struct work_queue_task *t, struct work_queu
 		while((tf = list_next_item(t->input_files))) {
 			if(!(tf->flags & WORK_QUEUE_CACHE) && !(tf->flags & WORK_QUEUE_PREEXIST)) {
 				debug(D_WQ, "%s (%s) unlink %s", w->hostname, w->addrport, tf->remote_name);
-				link_putfstring(w->link, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
+				send_worker_msg(w, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
 			}
 		}
 	}
@@ -959,7 +1030,7 @@ static void delete_cancel_task_files(struct work_queue_task *t, struct work_queu
 		list_first_item(t->output_files);
 		while((tf = list_next_item(t->output_files))) {
 			debug(D_WQ, "%s (%s) unlink %s", w->hostname, w->addrport, tf->remote_name);
-			link_putfstring(w->link, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
+			send_worker_msg(w, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
 		}
 	}
 }
@@ -973,7 +1044,7 @@ static void delete_uncacheable_files(struct work_queue_task *t, struct work_queu
 		while((tf = list_next_item(t->input_files))) {
 			if(!(tf->flags & WORK_QUEUE_CACHE) && !(tf->flags & WORK_QUEUE_PREEXIST)) {
 				debug(D_WQ, "%s (%s) unlink %s", w->hostname, w->addrport, tf->remote_name);
-				link_putfstring(w->link, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
+				send_worker_msg(w, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
 			}
 		}
 	}
@@ -983,7 +1054,7 @@ static void delete_uncacheable_files(struct work_queue_task *t, struct work_queu
 		while((tf = list_next_item(t->output_files))) {
 			if(!(tf->flags & WORK_QUEUE_CACHE) && !(tf->flags & WORK_QUEUE_PREEXIST)) {
 				debug(D_WQ, "%s (%s) unlink %s", w->hostname, w->addrport, tf->remote_name);
-				link_putfstring(w->link, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
+				send_worker_msg(w, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
 			}
 		}
 	}
@@ -1388,11 +1459,13 @@ static void handle_worker(struct work_queue *q, struct link *l)
 	time_t stoptime = time(0)+60;
 
 	int keep_worker;
-	if(link_readline(l, line, sizeof(line), time(0) + short_timeout)) {
+	if(recv_worker_msg(w, line, sizeof(line), time(0) + short_timeout)) {
 		if(prefix_is(line, "ready")) {
 			keep_worker = process_ready(q, w, line);
 		} else if (prefix_is(line,"result")) {
 			keep_worker = process_result(q, w, l, line);
+		} else if (prefix_is(line,"alive")) {
+			keep_worker = process_healthcheck_reply(w);
 		} else if (prefix_is(line,"queue_status")) {
 			keep_worker = process_queue_status(q,l,stoptime);
 		} else if (prefix_is(line,"task_status")) {
@@ -1535,7 +1608,7 @@ static int put_file(struct work_queue_file *tf, const char *expanded_payload, st
 			// files in that directory won't suceed. Such failure would
 			// eventually be captured in 'start_tasks' function and in the
 			// 'start_tasks' function the corresponding worker would be removed.
-			link_putfstring(w->link, "mkdir %s %o\n", time(0) + short_timeout, tf->remote_name, local_info.st_mode);
+			send_worker_msg(w, "mkdir %s %o\n", time(0) + short_timeout, tf->remote_name, local_info.st_mode);
 
 			if(!put_directory(payload, tf->remote_name, q, w, total_bytes))
 				return 0;
@@ -1565,7 +1638,7 @@ static int put_file(struct work_queue_file *tf, const char *expanded_payload, st
 		}
 		
 		stoptime = time(0) + get_transfer_wait_time(q, w, bytes_to_send);
-		link_putfstring(w->link, "put %s %lld 0%o\n", time(0) + short_timeout, tf->remote_name, bytes_to_send, local_info.st_mode);
+		send_worker_msg(w, "put %s %lld 0%o\n", time(0) + short_timeout, tf->remote_name, bytes_to_send, local_info.st_mode);
 		actual = link_stream_from_fd(w->link, fd, bytes_to_send, stoptime);
 		close(fd); 
 		
@@ -1692,7 +1765,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 
 				stoptime = time(0) + get_transfer_wait_time(q, w, (INT64_T) fl);
 				open_time = timestamp_get();
-				link_putfstring(w->link, "put %s %lld %o\n", time(0) + short_timeout, tf->remote_name, (INT64_T) fl, 0777);
+				send_worker_msg(w, "put %s %lld %o\n", time(0) + short_timeout, tf->remote_name, (INT64_T) fl, 0777);
 				actual = link_putlstring(w->link, tf->payload, fl, stoptime);
 				close_time = timestamp_get();
 				if(actual != (fl))
@@ -1702,7 +1775,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 			} else if(tf->type == WORK_QUEUE_REMOTECMD) {
 				debug(D_WQ, "%s (%s) needs %s from remote filesystem using %s", w->hostname, w->addrport, tf->remote_name, tf->payload);
 				open_time = timestamp_get();
-				link_putfstring(w->link, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, tf->remote_name, tf->payload);
+				send_worker_msg(w, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, tf->remote_name, tf->payload);
 				close_time = timestamp_get();
 				sum_time += (close_time - open_time);
 			} else {
@@ -1714,9 +1787,9 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 					} else {
 						open_time = timestamp_get();
 						if(tf->flags & WORK_QUEUE_SYMLINK) {
-							link_putfstring(w->link, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_SYMLINK, tf->remote_name, tf->payload);
+							send_worker_msg(w, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_SYMLINK, tf->remote_name, tf->payload);
 						} else {
-							link_putfstring(w->link, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, tf->remote_name, tf->payload);
+							send_worker_msg(w, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, tf->remote_name, tf->payload);
 						}
 						close_time = timestamp_get();
 						sum_time += (close_time - open_time);
@@ -1774,10 +1847,7 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 	t->hostname = xxstrdup(w->hostname);
 	t->host = xxstrdup(w->addrport);
 
-	//Old work command (worker does not fork to execute a task, thus can't
-	//communicate with the master during task execution):
-	//link_putfstring(w->link, "work %zu\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
-	link_putfstring(w->link, "work %zu\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
+	send_worker_msg(w, "work %zu\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
 	debug(D_WQ, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
 	return 1;
 }
@@ -2087,6 +2157,41 @@ static void start_tasks(struct work_queue *q)
 	}
 }
 
+static void do_healthchecks(struct work_queue *q) {
+	struct work_queue_worker *w;
+	char *key;
+	timestamp_t current = timestamp_get();
+	
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+		if(w->state == WORKER_STATE_BUSY) {
+			timestamp_t healthcheck_elapsed_time = (current - w->last_msg_sent_time)/1000000;
+			//send new healthcheck only if we received a response since last healthcheck AND are past healthcheck interval 
+			if(w->last_msg_recv_time >= w->healthcheck_sent_time) {	
+				if(healthcheck_elapsed_time >= q->healthcheck_interval) {
+					if (send_worker_msg(w, "%s\n", time(0) + short_timeout, "check") < 0) {
+						debug(D_WQ, "Failed to send healthcheck to worker %s (%s).", w->hostname, w->addrport);
+						remove_worker(q, w);
+					} else {
+						debug(D_WQ, "Sent healthcheck to worker %s (%s)", w->hostname, w->addrport);
+						w->healthcheck_sent_time = current;	
+					}	
+				}
+			} else { 
+				// if we aren't sending a healthcheck message, check if worker is dead using following logic:
+				// if we haven't received a message from worker since we last sent a healthcheck message and if the time since 
+				// we last polled link for responses has exceeded timeout for unacknowledged healthchecks, mark worker as dead.
+				if (w->last_msg_recv_time < w->healthcheck_sent_time) {	
+					if (((link_poll_start - w->healthcheck_sent_time)/1000000) >= q->healthcheck_timeout) { 
+						debug(D_WQ, "Removing worker %s (%s): hasn't responded to health check for more than %d s", w->hostname, w->addrport, q->healthcheck_timeout);
+						remove_worker(q, w);
+					}
+				}	
+			}
+		}
+	}
+}
+
 static void abort_slow_workers(struct work_queue *q)
 {
 	struct work_queue_worker *w;
@@ -2196,7 +2301,10 @@ struct work_queue *work_queue_create(int port)
 	q->task_statistics = task_statistics_init();
 
 	q->workers_by_pool = hash_table_create(0,0);
-
+	
+	q->healthcheck_interval = HEALTHCHECK_INTERVAL_DEFAULT;
+	q->healthcheck_timeout = HEALTHCHECK_TIMEOUT_DEFAULT; 
+	
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
 
@@ -2360,6 +2468,10 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 		if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
 			update_catalog(q, 0);
 		}
+		
+		if(q->healthcheck_interval > 0) {
+			do_healthchecks(q);
+		}
 
 		t = list_pop_head(q->complete_list);
 		if(t) {
@@ -2384,9 +2496,9 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 		}
 
 		// Poll all links for activity.
-		timestamp_t idle_start = timestamp_get();
+		link_poll_start = timestamp_get();
 		int result = link_poll(q->poll_table, n, msec);
-		q->idle_time += timestamp_get() - idle_start;
+		q->idle_time += timestamp_get() - link_poll_start;
 
 		// If a process is waiting to complete, return without a task.
 		if(process_pending()) {
@@ -2453,7 +2565,7 @@ static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)
 	if(!w)
 		return 0;
 
-	link_putliteral(w->link, "exit\n", time(0) + short_timeout);
+	send_worker_msg(w, "%s\n", time(0) + short_timeout, "exit");
 	remove_worker(q, w);
 	return 1;
 }
@@ -2510,7 +2622,7 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 	
 	if (w) {
 		//send message to worker asking to kill its task.
-		link_putliteral(w->link, "kill\n", time(0) + short_timeout);
+		send_worker_msg(w, "%s\n", time(0) + short_timeout, "kill");
 		//update table.
 		itable_remove(q->running_tasks, t->taskid);
 
