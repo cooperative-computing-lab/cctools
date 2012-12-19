@@ -85,8 +85,8 @@ static const char * work_queue_state_names[] = {"init","ready","busy","cancel","
 
 #define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
 
-#define HEALTHCHECK_INTERVAL_DEFAULT 300  //in seconds
-#define HEALTHCHECK_TIMEOUT_DEFAULT 30    //in seconds
+#define KEEPALIVE_INTERVAL_DEFAULT 300  //in seconds
+#define KEEPALIVE_TIMEOUT_DEFAULT 30    //in seconds
 
 // work_queue_worker struct related
 #define WORKER_OS_NAME_MAX 65
@@ -153,8 +153,8 @@ struct work_queue {
 	struct hash_table *workers_by_pool;
 
 	FILE *logfile;
-	int healthcheck_interval;
-	int healthcheck_timeout;
+	int keepalive_interval;
+	int keepalive_timeout;
 };
 
 struct work_queue_worker {
@@ -181,7 +181,7 @@ struct work_queue_worker {
 	char workspace[WORKER_WORKSPACE_NAME_MAX];
 	timestamp_t last_msg_sent_time; 
 	timestamp_t last_msg_recv_time; 
-	timestamp_t healthcheck_sent_time; 
+	timestamp_t keepalive_check_sent_time; 
 };
 
 struct time_slot {
@@ -225,12 +225,12 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t);
 static void update_app_time(struct work_queue *q, timestamp_t last_left_time, int last_left_status);
 
 static int prefix_is(const char *string, const char *prefix); 
-static int process_healthcheck_reply(struct work_queue_worker *w);
+static int process_keepalive_reply(struct work_queue_worker *w);
 
 static int short_timeout = 5;
 static int next_taskid = 1;
 
-static timestamp_t link_poll_start; //tracks when we poll link; used to timeout unacknowledged healthchecks
+static timestamp_t link_poll_start; //tracks when we poll link; used to timeout unacknowledged keepalive checks
 
 static int tolerable_transfer_rate_denominator = 10;
 static long double minimum_allowed_transfer_rate = 100000;	// 100 KB/s
@@ -489,8 +489,8 @@ static void link_to_hash_key(struct link *link, char *key)
 }
 
 /**
- * This function sends a message to the worker and records the time a message is 
- * successfully sent to the worker. This timestamp is then used in healthcheck computations. 
+ * This function sends a message to the worker and records the time the message is 
+ * successfully sent. This timestamp is used to determine when to send keepalive checks.
  */
 static int send_worker_msg(struct work_queue_worker *w, const char *fmt, time_t stoptime, ...) 
 {
@@ -508,7 +508,7 @@ static int send_worker_msg(struct work_queue_worker *w, const char *fmt, time_t 
 
 /**
  * This function receives a message from the worker and records the time a message is successfully 
- * received. This timestamp is then used in healthcheck computations. 
+ * received. This timestamp is then used in keepalive timeout computations. 
  */
 static int recv_worker_msg(struct work_queue_worker *w, char *line, size_t length, time_t stoptime) 
 {
@@ -520,17 +520,17 @@ static int recv_worker_msg(struct work_queue_worker *w, char *line, size_t lengt
 }
 
 /**
- * This function returns when it receives a non-healthcheck message from worker. If it receives a 
- * healthcheck message, it processes the message and goes back to receiving messages until a 
- * non-healthcheck message is received. It records the time a non-healthcheck message is successfully 
- * received. This timestamp is then used in healthcheck computations. 
+ * This function returns when it receives a non-keepalive message from worker. If it receives a 
+ * keepalive message, it processes the message and goes back to receiving messages until a 
+ * non-keepalive message is received. It records the time a non-keepalive message is successfully 
+ * received. This timestamp is then used in keepalive timeout computations. 
  */
-static int recv_nonhealthcheck_worker_msg(struct work_queue_worker *w, char *line, size_t length, time_t stoptime)
+static int recv_nonkeepalive_worker_msg(struct work_queue_worker *w, char *line, size_t length, time_t stoptime)
 {
 	int result;	
 	while ((result = link_readline(w->link, line, length, stoptime)) > 0) {
 		if(prefix_is(line, "alive")) {
-			process_healthcheck_reply(w);
+			process_keepalive_reply(w);
 		}	
 		else { 
 			w->last_msg_recv_time = timestamp_get();
@@ -541,8 +541,8 @@ static int recv_nonhealthcheck_worker_msg(struct work_queue_worker *w, char *lin
 	return result;
 }
 
-static int process_healthcheck_reply(struct work_queue_worker *w) {
-	debug(D_WQ, "Got healthcheck response from %s (%s)", w->hostname, w->addrport);
+static int process_keepalive_reply(struct work_queue_worker *w) {
+	debug(D_WQ, "Got keepalive response from %s (%s)", w->hostname, w->addrport);
 	w->last_msg_recv_time = timestamp_get();
 	return 1;
 }
@@ -799,7 +799,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 	local_name_len = strlen(local_name);
 
 	while(1) {
-		if(!recv_nonhealthcheck_worker_msg(w, line, sizeof(line), time(0) + short_timeout)) {
+		if(!recv_nonkeepalive_worker_msg(w, line, sizeof(line), time(0) + short_timeout)) {
 			goto link_failure;
 		}
 
@@ -946,7 +946,7 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 					debug(D_WQ, "putting %s from %s (%s) to shared filesystem from %s", tf->remote_name, w->hostname, w->addrport, tf->payload);
 					open_time = timestamp_get();
 					send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, tf->remote_name, tf->payload);
-					recv_nonhealthcheck_worker_msg(w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+					recv_nonkeepalive_worker_msg(w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
 					close_time = timestamp_get();
 					sum_time += (close_time - open_time);
 				}
@@ -955,7 +955,7 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 				debug(D_WQ, "putting %s from %s (%s) to remote filesystem using %s", tf->remote_name, w->hostname, w->addrport, tf->payload);
 				open_time = timestamp_get();
 				send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, tf->remote_name, tf->payload);
-				recv_nonhealthcheck_worker_msg(w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+				recv_nonkeepalive_worker_msg(w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
 				close_time = timestamp_get();
 				sum_time += (close_time - open_time);
 			} else {
@@ -1465,7 +1465,7 @@ static void handle_worker(struct work_queue *q, struct link *l)
 		} else if (prefix_is(line,"result")) {
 			keep_worker = process_result(q, w, l, line);
 		} else if (prefix_is(line,"alive")) {
-			keep_worker = process_healthcheck_reply(w);
+			keep_worker = process_keepalive_reply(w);
 		} else if (prefix_is(line,"queue_status")) {
 			keep_worker = process_queue_status(q,l,stoptime);
 		} else if (prefix_is(line,"task_status")) {
@@ -2157,7 +2157,7 @@ static void start_tasks(struct work_queue *q)
 	}
 }
 
-static void do_healthchecks(struct work_queue *q) {
+static void do_keepalive_checks(struct work_queue *q) {
 	struct work_queue_worker *w;
 	char *key;
 	timestamp_t current = timestamp_get();
@@ -2165,25 +2165,26 @@ static void do_healthchecks(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 		if(w->state == WORKER_STATE_BUSY) {
-			timestamp_t healthcheck_elapsed_time = (current - w->last_msg_sent_time)/1000000;
-			//send new healthcheck only if we received a response since last healthcheck AND are past healthcheck interval 
-			if(w->last_msg_recv_time >= w->healthcheck_sent_time) {	
-				if(healthcheck_elapsed_time >= q->healthcheck_interval) {
+			timestamp_t keepalive_elapsed_time = (current - w->last_msg_sent_time)/1000000;
+			// send new keepalive check only (1) if we received a response since last keepalive check AND 
+			// (2) we are past keepalive interval 
+			if(w->last_msg_recv_time >= w->keepalive_check_sent_time) {	
+				if(keepalive_elapsed_time >= q->keepalive_interval) {
 					if (send_worker_msg(w, "%s\n", time(0) + short_timeout, "check") < 0) {
-						debug(D_WQ, "Failed to send healthcheck to worker %s (%s).", w->hostname, w->addrport);
+						debug(D_WQ, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
 						remove_worker(q, w);
 					} else {
-						debug(D_WQ, "Sent healthcheck to worker %s (%s)", w->hostname, w->addrport);
-						w->healthcheck_sent_time = current;	
+						debug(D_WQ, "Sent keepalive check to worker %s (%s)", w->hostname, w->addrport);
+						w->keepalive_check_sent_time = current;	
 					}	
 				}
 			} else { 
-				// if we aren't sending a healthcheck message, check if worker is dead using following logic:
-				// if we haven't received a message from worker since we last sent a healthcheck message and if the time since 
-				// we last polled link for responses has exceeded timeout for unacknowledged healthchecks, mark worker as dead.
-				if (w->last_msg_recv_time < w->healthcheck_sent_time) {	
-					if (((link_poll_start - w->healthcheck_sent_time)/1000000) >= q->healthcheck_timeout) { 
-						debug(D_WQ, "Removing worker %s (%s): hasn't responded to health check for more than %d s", w->hostname, w->addrport, q->healthcheck_timeout);
+				// if we aren't sending a keepalive check, determine if worker is dead using following logic:
+				// if we haven't received a message from worker since we last sent a keepalive check and if time since we 
+				// last polled link for responses has exceeded timeout for unacknowledged keepalive checks, mark worker as dead.
+				if (w->last_msg_recv_time < w->keepalive_check_sent_time) {	
+					if (((link_poll_start - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
+						debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
 						remove_worker(q, w);
 					}
 				}	
@@ -2302,8 +2303,8 @@ struct work_queue *work_queue_create(int port)
 
 	q->workers_by_pool = hash_table_create(0,0);
 	
-	q->healthcheck_interval = HEALTHCHECK_INTERVAL_DEFAULT;
-	q->healthcheck_timeout = HEALTHCHECK_TIMEOUT_DEFAULT; 
+	q->keepalive_interval = KEEPALIVE_INTERVAL_DEFAULT;
+	q->keepalive_timeout = KEEPALIVE_TIMEOUT_DEFAULT; 
 	
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
@@ -2469,8 +2470,8 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 			update_catalog(q, 0);
 		}
 		
-		if(q->healthcheck_interval > 0) {
-			do_healthchecks(q);
+		if(q->keepalive_interval > 0) {
+			do_keepalive_checks(q);
 		}
 
 		t = list_pop_head(q->complete_list);
