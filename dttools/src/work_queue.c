@@ -412,6 +412,16 @@ void work_queue_specify_task_order(struct work_queue *q, int order)
 	q->task_ordering = order;
 }
 
+void work_queue_specify_keepalive_interval(struct work_queue *q, int interval) 
+{
+	q->keepalive_interval = interval;
+}
+
+void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout) 
+{
+	q->keepalive_timeout = timeout;
+}
+
 void work_queue_task_delete(struct work_queue_task *t)
 {
 	struct work_queue_file *tf;

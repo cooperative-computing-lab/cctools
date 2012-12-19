@@ -390,6 +390,17 @@ void work_queue_delete(struct work_queue *q);
 */
 void work_queue_specify_log(struct work_queue *q, const char *logfile);
 
+/** Change the keepalive interval for a given queue.
+@param q A work queue object.
+@param seconds The minimum number of seconds to wait before sending new keepalive checks to workers.
+*/
+void work_queue_specify_keepalive_interval(struct work_queue *q, int interval);
+
+/** Change the keepalive timeout for identifying dead workers for a given queue.
+@param q A work queue object.
+@param seconds The minimum number of seconds to wait for a keepalive response from worker before marking it as dead.
+*/
+void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout);
 //@}
 
 /** @name Functions - Deprecated */
