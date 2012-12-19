@@ -225,7 +225,6 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t);
 static void update_app_time(struct work_queue *q, timestamp_t last_left_time, int last_left_status);
 
 static int prefix_is(const char *string, const char *prefix); 
-static int process_keepalive_reply(struct work_queue_worker *w);
 
 static int short_timeout = 5;
 static int next_taskid = 1;
@@ -517,43 +516,25 @@ static int send_worker_msg(struct work_queue_worker *w, const char *fmt, time_t 
 }
 
 /**
- * This function receives a message from the worker and records the time a message is successfully 
- * received. This timestamp is then used in keepalive timeout computations. 
+ * This function receives a message from worker and records the time a message is successfully 
+ * received. This timestamp is used in keepalive timeout computations. It handles messages as below:
+ * keepalive message: message is processed and 0 is returned 
+ * nonkeepalive message:  message is not processed and 1 is returned 
+ * failure to read from link: -1 is returned. 
  */
 static int recv_worker_msg(struct work_queue_worker *w, char *line, size_t length, time_t stoptime) 
 {
 	//call link_readline to recieve message from the link	
 	int result = link_readline(w->link, line, length, stoptime);	
-	if (result > 0) 
+	if (result <= 0) {	
+		return -1;
+	} else {	
 		w->last_msg_recv_time = timestamp_get();	
-	return result;  
-}
-
-/**
- * This function returns when it receives a non-keepalive message from worker. If it receives a 
- * keepalive message, it processes the message and goes back to receiving messages until a 
- * non-keepalive message is received. It records the time a non-keepalive message is successfully 
- * received. This timestamp is then used in keepalive timeout computations. 
- */
-static int recv_nonkeepalive_worker_msg(struct work_queue_worker *w, char *line, size_t length, time_t stoptime)
-{
-	int result;	
-	while ((result = link_readline(w->link, line, length, stoptime)) > 0) {
 		if(prefix_is(line, "alive")) {
-			process_keepalive_reply(w);
-		}	
-		else { 
-			w->last_msg_recv_time = timestamp_get();
-			break;
+			debug(D_WQ, "Got keepalive response from %s (%s)", w->hostname, w->addrport);
+			return 0;	
 		}	
 	}
-	
-	return result;
-}
-
-static int process_keepalive_reply(struct work_queue_worker *w) {
-	debug(D_WQ, "Got keepalive response from %s (%s)", w->hostname, w->addrport);
-	w->last_msg_recv_time = timestamp_get();
 	return 1;
 }
 
@@ -797,6 +778,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 	char *cur_pos, *tmp_pos;
 	int remote_name_len;
 	int local_name_len;
+	int recv_msg_result;
 
 	if(hash_table_lookup(received_items, local_name))
 		return 1;
@@ -809,10 +791,14 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 	local_name_len = strlen(local_name);
 
 	while(1) {
-		if(!recv_nonkeepalive_worker_msg(w, line, sizeof(line), time(0) + short_timeout)) {
+		//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
+		do { 			
+			recv_msg_result = recv_worker_msg(w, line, sizeof(line), time(0) + short_timeout);
+		} while (recv_msg_result == 0);
+		if (recv_msg_result < 0) {
 			goto link_failure;
 		}
-
+		
 		if(sscanf(line, "%s %s %lld", type, tmp_remote_name, &length) == 3) {
 			tmp_local_name[local_name_len] = '\0';
 			strcat(tmp_local_name, &(tmp_remote_name[remote_name_len]));
@@ -925,6 +911,7 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 	char *key, *value;
 	struct hash_table *received_items;
 	INT64_T total_bytes = 0;
+	int recv_msg_result = 0;
 
 	timestamp_t open_time = 0;
 	timestamp_t close_time = 0;
@@ -956,7 +943,13 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 					debug(D_WQ, "putting %s from %s (%s) to shared filesystem from %s", tf->remote_name, w->hostname, w->addrport, tf->payload);
 					open_time = timestamp_get();
 					send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, tf->remote_name, tf->payload);
-					recv_nonkeepalive_worker_msg(w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+					//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
+					do { 
+						recv_msg_result = recv_worker_msg(w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+					} while (recv_msg_result == 0);
+					if (recv_msg_result < 0) {
+						return 0;
+					}
 					close_time = timestamp_get();
 					sum_time += (close_time - open_time);
 				}
@@ -965,7 +958,13 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 				debug(D_WQ, "putting %s from %s (%s) to remote filesystem using %s", tf->remote_name, w->hostname, w->addrport, tf->payload);
 				open_time = timestamp_get();
 				send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, tf->remote_name, tf->payload);
-				recv_nonkeepalive_worker_msg(w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+				//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
+				do { 
+					recv_msg_result = recv_worker_msg(w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+				} while (recv_msg_result == 0);
+				if (recv_msg_result < 0) {
+					return 0;	
+				}
 				close_time = timestamp_get();
 				sum_time += (close_time - open_time);
 			} else {
@@ -1469,13 +1468,14 @@ static void handle_worker(struct work_queue *q, struct link *l)
 	time_t stoptime = time(0)+60;
 
 	int keep_worker;
-	if(recv_worker_msg(w, line, sizeof(line), time(0) + short_timeout)) {
+	int result = recv_worker_msg(w, line, sizeof(line), time(0) + short_timeout);
+
+	//if result > 0, it means a non-keepalive message is left to consume
+	if(result > 0) {
 		if(prefix_is(line, "ready")) {
 			keep_worker = process_ready(q, w, line);
 		} else if (prefix_is(line,"result")) {
 			keep_worker = process_result(q, w, l, line);
-		} else if (prefix_is(line,"alive")) {
-			keep_worker = process_keepalive_reply(w);
 		} else if (prefix_is(line,"queue_status")) {
 			keep_worker = process_queue_status(q,l,stoptime);
 		} else if (prefix_is(line,"task_status")) {
@@ -1486,9 +1486,11 @@ static void handle_worker(struct work_queue *q, struct link *l)
 			debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 			keep_worker = 0;
 		}
-	} else {
+	} else if(result < 0){
 		debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
 		keep_worker = 0;
+	} else {
+		//do nothing..message was consumed and processed in recv_worker_msg()
 	}
 
 	if(!keep_worker) {
