@@ -96,7 +96,6 @@ static const char * work_queue_state_names[] = {"init","ready","busy","cancel","
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
-int wq_tolerable_transfer_time_multiplier = 10;
 int wq_minimum_transfer_timeout = 3;
 
 struct work_queue {
@@ -586,7 +585,7 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 	tolerable_transfer_rate = MAX(avg_worker_transfer_rate / tolerable_transfer_rate_denominator, retry_transfer_rate);
 	tolerable_transfer_rate = MAX(minimum_allowed_transfer_rate, tolerable_transfer_rate);
 
-	timeout = MAX(3, length / tolerable_transfer_rate);	// try at least 3 seconds
+	timeout = MAX(wq_minimum_transfer_timeout, length / tolerable_transfer_rate);	// try at least wq_minimum_transfer_timeout seconds
 
 	debug(D_WQ, "%s (%s) will try up to %lld seconds for the transfer of this %.3Lf MB file.", w->hostname, w->addrport, timeout, (long double) length / 1000000);
 	return timeout;
@@ -1229,8 +1228,8 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, str
 		//worker sends output after result message. Quietly discard it.
 		char *tmp = malloc(output_length + 1);
 		if(output_length > 0) {
-			//Try atleast 3 secs..don't need calculations from get_transfer_wait_time() since this is discarded.
-			stoptime = time(0) + MAX(3, output_length / minimum_allowed_transfer_rate); 
+			//Try atleast wq_minimum_transfer_timeout secs..don't need calculations from get_transfer_wait_time() since this is discarded.
+			stoptime = time(0) + MAX(wq_minimum_transfer_timeout, output_length / minimum_allowed_transfer_rate); 
 			actual = link_read(l, tmp, output_length, stoptime);
 		} 
 		free(tmp);
