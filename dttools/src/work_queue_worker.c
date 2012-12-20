@@ -1164,7 +1164,7 @@ static void kill_task() {
 		debug(D_WQ, "terminating the current running task - process %d", pid);
 		// Send signal to process group of child which is denoted by -ve value of child pid.
 		// This is done to ensure delivery of signal to processes forked by the child. 
-		kill((-1*pid), SIGTERM);
+		kill((-1*pid), SIGKILL);
 	}
 }
 
