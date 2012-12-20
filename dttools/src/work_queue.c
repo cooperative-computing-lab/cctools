@@ -516,10 +516,11 @@ static int send_worker_msg(struct work_queue_worker *w, const char *fmt, time_t 
 
 /**
  * This function receives a message from worker and records the time a message is successfully 
- * received. This timestamp is used in keepalive timeout computations. It handles messages as below:
- * keepalive message: message is processed and 0 is returned 
- * nonkeepalive message:  message is not processed and 1 is returned 
- * failure to read from link: -1 is returned. 
+ * received. This timestamp is used in keepalive timeout computations. 
+ * Its return value is:
+ * -1 : failure to read from link
+ *  0 : a keepalive message was received and message is processed 
+ *  1 : a non-keepalive message was received but NOT processed 
  */
 static int recv_worker_msg(struct work_queue_worker *w, char *line, size_t length, time_t stoptime) 
 {

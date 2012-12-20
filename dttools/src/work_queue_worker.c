@@ -1152,6 +1152,7 @@ static int do_thirdput(struct link *master, int mode, const char *filename, cons
 
 }
 
+// Kill task if there's one running
 static void kill_task() {
 	if(task_status == TASK_RUNNING) {
 		//make sure a few seconds have passed since child process was created to avoid sending a signal 
@@ -1168,7 +1169,6 @@ static void kill_task() {
 	}
 }
 
-// Kill task if there's one running
 static void kill_and_reap_task() {
 	kill_task();
 	// This reaps the killed child process created by function execute_task
