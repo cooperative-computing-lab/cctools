@@ -1154,6 +1154,13 @@ static int do_thirdput(struct link *master, int mode, const char *filename, cons
 
 static void kill_task() {
 	if(task_status == TASK_RUNNING) {
+		//make sure a few seconds have passed since child process was created to avoid sending a signal 
+		//before it has been fully initialized. Else, the signal sent to that process gets lost.	
+		timestamp_t elapsed_time_execution_start = timestamp_get() -
+		execution_start;
+		if (elapsed_time_execution_start/1000000 < 3)
+			sleep(3 - (elapsed_time_execution_start/1000000));	
+		
 		debug(D_WQ, "terminating the current running task - process %d", pid);
 		// Send signal to process group of child which is denoted by -ve value of child pid.
 		// This is done to ensure delivery of signal to processes forked by the child. 
