@@ -35,9 +35,11 @@ SUBSECTION(Commands)
 OPTIONS_BEGIN
 OPTION_ITEM(-c)Clean up: remove logfile and all targets.
 OPTION_ITEM(-D)Display the Makefile as a Dot graph.
+OPTION_ITEM(-f)Write summary of workflow to file.
 OPTION_ITEM(-k)Syntax check.
 OPTION_ITEM(-h)Show this help screen.
 OPTION_ITEM(-I)Show input files.
+OPTION_ITEM(-m)Email summary of workflow to address.
 OPTION_ITEM(-O)Show output files.
 OPTION_ITEM(-v)Show version string.
 OPTIONS_END

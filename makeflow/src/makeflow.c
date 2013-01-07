@@ -23,7 +23,6 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 #include "datagram.h"
 #include "disk_info.h"
-#include "display_size.h"
 #include "domain_name_cache.h"
 #include "link.h"
 #include "macros.h"
@@ -2380,11 +2379,10 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 	int tasks_completed = 0;
 	int tasks_aborted = 0;
 	int tasks_unrun = 0;
-	int (*string_equal_pointer)(void*, const void*) = &string_equal;
 
 	for (n = d->nodes; n; n = n->next){
 		state = n->state;
-		if (state == DAG_NODE_STATE_FAILED && !list_find(failed_tasks, string_equal_pointer, (void*)fn))
+		if (state == DAG_NODE_STATE_FAILED && !list_find(failed_tasks, (int (*) (void *, const void *)) string_equal, (void*)fn))
 			list_push_tail(failed_tasks, (void*)n->command);
 		else if (state == DAG_NODE_STATE_ABORTED)
 			tasks_aborted++;
@@ -2392,7 +2390,7 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 			tasks_completed++;
 			for (f = n->source_files; f; f = f->next){
 				fn = f->filename;
-				if (!list_find(output_files, string_equal_pointer, (void*)fn)) list_push_tail(output_files, (void*)fn);
+				if (!list_find(output_files, (int (*) (void *, const void*)) string_equal, (void*)fn)) list_push_tail(output_files, (void*)fn);
 			}
 		}
 		else tasks_unrun++;
@@ -2410,7 +2408,7 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 		summarize(summary_file, summary_email, "Output files:\n");
 		for (list_first_item(output_files); (fn = list_next_item(output_files)) != NULL;){
 			stat(fn,&st);
-			size = human_readable_size(st.st_size);
+			size = string_metric(st.st_size, -1, NULL);
 			summarize(summary_file, summary_email, "\t%s\t%s\n", fn, size);
 		}
 	}
