@@ -44,6 +44,7 @@ void string_toupper(char *str);
 int string_isspace(const char *str);
 int string_is_integer(const char *str);
 void string_replace_backslash_codes(const char *instr, char *outstr);
+int string_equal(const char *str1, const char *str2);
 
 int strpos(const char *str, char c);
 int strrpos(const char *str, char c);

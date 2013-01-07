@@ -991,4 +991,8 @@ int string_istrue(char *s)
 	return (strcasecmp(s, "true") == 0) || (strcasecmp(s, "yes") == 0) || (atoi(s) > 0);
 }
 
+int string_equal(const char *str1, const char *str2){
+	return !strcmp(str1, str2);
+}
+
 /* vim: set sts=8 sw=8 ts=8 ft=c: */

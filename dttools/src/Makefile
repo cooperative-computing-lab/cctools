@@ -33,6 +33,7 @@ SOURCES = auth.c  \
           debug.c  \
           delete_dir.c  \
           disk_info.c  \
+          display_size.c \
           domain_name.c  \
           domain_name_cache.c  \
           dpopen.c  \

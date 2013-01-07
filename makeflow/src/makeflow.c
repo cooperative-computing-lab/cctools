@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <fcntl.h>
 #include <dirent.h>
 #include <unistd.h>
@@ -22,6 +23,7 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 #include "datagram.h"
 #include "disk_info.h"
+#include "display_size.h"
 #include "domain_name_cache.h"
 #include "link.h"
 #include "macros.h"
@@ -2295,6 +2297,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem\n");
 	fprintf(stdout, " -D             Display the Makefile as a Dot graph. Additional options 'c' to condense similar boxes, 's' to change the size of the boxes proportional to file size, else type 'none' for full expansion\n");
 	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capacity may be viewed in the Work Queue log file.\n");
+	fprintf(stdout, " -f <file>      Write summary of workflow to this file upon success or failure.\n");
 	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
 	fprintf(stdout, " -h             Show this help screen.\n");
 	fprintf(stdout, " -i             Show the pre-execution analysis of the Makeflow script - <dagfile>.\n");
@@ -2305,6 +2308,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -K             Preserve (i.e., do not clean) intermediate symbolic links\n");
 	fprintf(stdout, " -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
 	fprintf(stdout, " -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
+	fprintf(stdout, " -m <email>     Send summary of workflow to this email address upon success or failure.\n");
 	fprintf(stdout, " -N <project>   Set the project name to <project>\n");
 	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
 	fprintf(stdout, " -O             Show output files.\n");
@@ -2317,6 +2321,116 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -z             Force failure on zero-length output files \n");
 }
 
+
+static void summarize(FILE *file, FILE *email, const char *format, ...){
+	va_list args;
+	if(file){
+		va_start(args, format);
+		vfprintf(file, format, args);
+		va_end(args);
+	}
+	if(email){
+		va_start(args, format);
+		vfprintf(email, format, args);
+		va_end(args);
+	}
+}
+
+static void create_summary(struct dag *d, const char *write_summary_to, const char *email_summary_to, timestamp_t runtime, timestamp_t time_completed, int argc, char *argv[], const char *dagfile){
+	char buffer[50];
+	FILE *summary_file = NULL;
+	FILE *summary_email = NULL;
+	if(write_summary_to) summary_file = fopen(write_summary_to, "w");
+	if(email_summary_to){
+		summary_email = popen("sendmail -t", "w");
+		fprintf(summary_email, "To: %s\n", email_summary_to);
+		timestamp_fmt(buffer, 50, "%c", time_completed);
+		fprintf(summary_email, "Subject: Makeflow Run Summary - %s \n", buffer);
+	}
+
+	int i;
+	for(i=0; i<argc; i++) summarize(summary_file, summary_email, "%s ", argv[i]);
+	summarize(summary_file, summary_email, "\n");
+
+	if(dag_abort_flag)       summarize(summary_file, summary_email, "Workflow aborted:\t ");
+	else if(dag_failed_flag) summarize(summary_file, summary_email, "Workflow failed:\t ");
+	else                     summarize(summary_file, summary_email, "Workflow completed:\t ");
+	timestamp_fmt(buffer, 50, "%c\n", time_completed);
+	summarize(summary_file, summary_email, "%s", buffer);
+
+	int seconds = runtime / 1000000;
+	int hours = seconds/3600;
+	int minutes = (seconds - hours*3600)/60;
+	seconds = seconds - hours*3600 - minutes*60;
+	summarize(summary_file, summary_email, "Total runtime:\t\t %d:%02d:%02d\n",hours, minutes, seconds);
+
+	summarize(summary_file, summary_email, "Workflow file:\t\t %s\n", dagfile);
+
+	struct dag_node *n;
+	struct dag_file *f;
+	const char *fn;
+	struct stat st;
+	const char* size;
+	dag_node_state_t state;
+	struct list *output_files;
+	output_files = list_create();
+	struct list *failed_tasks;
+	failed_tasks = list_create();
+	int total_tasks = itable_size(d->node_table);
+	int tasks_completed = 0;
+	int tasks_aborted = 0;
+	int tasks_unrun = 0;
+	int (*string_equal_pointer)(void*, const void*) = &string_equal;
+
+	for (n = d->nodes; n; n = n->next){
+		state = n->state;
+		if (state == DAG_NODE_STATE_FAILED && !list_find(failed_tasks, string_equal_pointer, (void*)fn))
+			list_push_tail(failed_tasks, (void*)n->command);
+		else if (state == DAG_NODE_STATE_ABORTED)
+			tasks_aborted++;
+		else if (state == DAG_NODE_STATE_COMPLETE){
+			tasks_completed++;
+			for (f = n->source_files; f; f = f->next){
+				fn = f->filename;
+				if (!list_find(output_files, string_equal_pointer, (void*)fn)) list_push_tail(output_files, (void*)fn);
+			}
+		}
+		else tasks_unrun++;
+	}
+	
+	summarize(summary_file, summary_email, "Number of tasks:\t %d\n", total_tasks); 
+	summarize(summary_file, summary_email, "Completed tasks:\t %d/%d\n", tasks_completed, total_tasks);
+	if (tasks_aborted != 0) summarize(summary_file, summary_email, "Aborted tasks:\t %d/%d\n", tasks_aborted, total_tasks);
+	if (tasks_unrun != 0) summarize(summary_file, summary_email, "Tasks not run:\t\t %d/%d\n", tasks_unrun, total_tasks);
+	if (list_size(failed_tasks) > 0) summarize(summary_file, summary_email, "Failed tasks:\t\t %d/%d\n", list_size(failed_tasks),total_tasks);
+	for (list_first_item(failed_tasks); (fn = list_next_item(failed_tasks)) != NULL;)
+		summarize(summary_file, summary_email, "\t%s\n", fn);
+
+	if (list_size(output_files) > 0){
+		summarize(summary_file, summary_email, "Output files:\n");
+		for (list_first_item(output_files); (fn = list_next_item(output_files)) != NULL;){
+			stat(fn,&st);
+			size = human_readable_size(st.st_size);
+			summarize(summary_file, summary_email, "\t%s\t%s\n", fn, size);
+		}
+	}
+
+	list_free(output_files);
+	list_delete(output_files);
+	list_free(failed_tasks);
+	list_delete(failed_tasks);
+
+	if(write_summary_to){
+		fprintf(stderr, "writing summary to %s.\n", write_summary_to);
+		fclose(summary_file);
+	}
+	if(email_summary_to){
+		fprintf(stderr, "emailing summary to %s.\n", email_summary_to);
+		fclose(summary_email);
+	}
+}
+
+
 int main(int argc, char *argv[])
 {
 	char c;
@@ -2327,6 +2441,7 @@ int main(int argc, char *argv[])
 	int condense_display = 0;
 	int change_size = 0;
 	int syntax_check = 0;
+	char *email_summary_to = NULL;
 	int explicit_remote_jobs_max = 0;
 	int explicit_local_jobs_max = 0;
 	int skip_afs_check = 0;
@@ -2334,9 +2449,12 @@ int main(int argc, char *argv[])
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	int work_queue_estimate_capacity_on = 0;
+	char *write_summary_to = NULL;
 	char *catalog_host;
 	int catalog_port;
 	int port_set = 0;
+	timestamp_t runtime = 0;
+	timestamp_t time_completed = 0;
 	char *s;
 
 	debug_config(argv[0]);
@@ -2364,7 +2482,7 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	while((c = getopt(argc, argv, "aAB:cC:d:D:EF:g:G:hiIj:J:kKl:L:N:o:Op:P:r:RS:T:vW:z")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:D:E:f:F:g:G:hiIj:J:kKl:L:m:N:o:Op:P:r:RS:T:vW:z")) != (char) -1) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2401,6 +2519,9 @@ int main(int argc, char *argv[])
 			case 'E':
 				work_queue_estimate_capacity_on = 1;
 				break;
+			case 'f':
+				write_summary_to = xxstrdup(optarg);
+			break;
 			case 'F':
 				wq_option_fast_abort_multiplier = atof(optarg);
 				break;
@@ -2455,6 +2576,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'L':
 				batchlogfilename = xxstrdup(optarg);
+				break;
+			case 'm':
+				email_summary_to = xxstrdup(optarg);
 				break;
 			case 'N':
 				free(project);
@@ -2735,7 +2859,10 @@ int main(int argc, char *argv[])
 	signal(SIGTERM, handle_abort);
 
 	fprintf(d->logfile, "# STARTED\t%llu\n", timestamp_get());
+	runtime = timestamp_get();
 	dag_run(d);
+	time_completed = timestamp_get();
+	runtime = time_completed - runtime;
 
 	batch_queue_delete(local_queue);
 	batch_queue_delete(remote_queue);
@@ -2744,8 +2871,12 @@ int main(int argc, char *argv[])
 		clean_symlinks(d, 0);
 	}
 
+	if(write_summary_to || email_summary_to) create_summary(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile);
 	free(logfilename);
 	free(batchlogfilename);
+	free(write_summary_to);
+	free(email_summary_to);
+
 
 	if(dag_abort_flag) {
 		fprintf(d->logfile, "# ABORTED\t%llu\n", timestamp_get());
