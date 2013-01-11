@@ -228,7 +228,7 @@ static int prefix_is(const char *string, const char *prefix);
 static int short_timeout = 5;
 static int next_taskid = 1;
 
-static timestamp_t link_poll_start; //tracks when we poll link; used to timeout unacknowledged keepalive checks
+static timestamp_t link_poll_end; //tracks when we poll link; used to timeout unacknowledged keepalive checks
 
 static int tolerable_transfer_rate_denominator = 10;
 static long double minimum_allowed_transfer_rate = 100000;	// 100 KB/s
@@ -2195,7 +2195,7 @@ static void do_keepalive_checks(struct work_queue *q) {
 				// if we haven't received a message from worker since we last sent a keepalive check and if time since we 
 				// last polled link for responses has exceeded timeout for unacknowledged keepalive checks, mark worker as dead.
 				if (w->last_msg_recv_time < w->keepalive_check_sent_time) {	
-					if (((link_poll_start - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
+					if (((link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
 						debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
 						remove_worker(q, w);
 					}
@@ -2509,9 +2509,10 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 		}
 
 		// Poll all links for activity.
-		link_poll_start = timestamp_get();
+		timestamp_t link_poll_start = timestamp_get();
 		int result = link_poll(q->poll_table, n, msec);
-		q->idle_time += timestamp_get() - link_poll_start;
+		link_poll_end = timestamp_get();	
+		q->idle_time += link_poll_end - link_poll_start;
 
 		// If a process is waiting to complete, return without a task.
 		if(process_pending()) {
