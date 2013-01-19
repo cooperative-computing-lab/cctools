@@ -1760,20 +1760,20 @@ static int search_stat_pack(struct pfs_stat p_info, char *buffer, size_t *i, siz
 	size_t n = snprintf(
 		buffer + *i,
 		buffer_length - *i,
-		"|%zd,%zd,%d,%zd,%d,%d,%zd,%zd,%zd,%zd,%zd,%zd,%zd",
-		info.st_dev,
-		info.st_ino,
-		info.st_mode,
-		info.st_nlink,
-		info.st_uid,
-		info.st_gid,
-		info.st_rdev,
-		info.st_size,
-		info.st_atime,
-		info.st_mtime,
-		info.st_ctime,
-		info.st_blksize,
-		info.st_blocks
+		"|%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld",
+		(long)info.st_dev,
+		(long)info.st_ino,
+		(long)info.st_mode,
+		(long)info.st_nlink,
+		(long)info.st_uid,
+		(long)info.st_gid,
+		(long)info.st_rdev,
+		(long)info.st_size,
+		(long)info.st_atime,
+		(long)info.st_mtime,
+		(long)info.st_ctime,
+		(long)info.st_blksize,
+		(long)info.st_blocks
 	);
 
 	if (n>=buffer_length-*i) {
