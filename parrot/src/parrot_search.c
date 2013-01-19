@@ -56,6 +56,10 @@ int main( int argc, char *argv[] )
 	}
 
 	SEARCH *s = parrot_opensearch(paths, pattern, flags);
+	if (!s) {
+		fprintf(stdout, "could not search: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
 	struct searchent *res;
 	int i = 0;
 
