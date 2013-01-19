@@ -156,24 +156,27 @@ static char *readsearch_next(char *data, int *i) {
 static struct stat *readsearch_unpack_stat(char *stat_str) {
 	if (stat_str==NULL) return NULL;
 	
-	struct stat *info = (struct stat*) malloc(sizeof(struct stat));
+	struct stat *info = (struct stat*) calloc(1, sizeof(struct stat));
+	long dev, ino, mode, nlink, uid, gid, rdev, size, atime, mtime, ctime, blksize, blocks;
 	sscanf(
 		stat_str, 
-		"%zd,%zd,%d,%zd,%d,%d,%zd,%zd,%zd,%zd,%zd,%zd,%zd", 
-		&info->st_dev,
-		&info->st_ino,
-		&info->st_mode,
-		&info->st_nlink,
-		&info->st_uid,
-		&info->st_gid,
-		&info->st_rdev,
-		&info->st_size,
-		&info->st_atime,
-		&info->st_mtime,
-		&info->st_ctime,
-		&info->st_blksize,
-		&info->st_blocks
+		"%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld", 
+		&dev, &ino, &mode, &nlink, &uid, &gid, &rdev, &size, &atime, &mtime, &ctime, &blksize, &blocks
 	);
+
+	info->st_dev = (dev_t) dev;
+	info->st_ino = (ino_t) ino;
+	info->st_mode = (mode_t) mode;
+	info->st_nlink = (nlink_t) nlink;
+	info->st_uid = (uid_t) uid;
+	info->st_gid = (gid_t) gid;
+	info->st_rdev = (dev_t) rdev;
+	info->st_size = (off_t) size;
+	info->st_atime = (time_t) atime;
+	info->st_mtime = (time_t) mtime;
+	info->st_ctime = (time_t) ctime;
+	info->st_blksize = (blksize_t) blksize;
+	info->st_blocks = (blkcnt_t) blocks;
 
 	free(stat_str);
 	return info;
