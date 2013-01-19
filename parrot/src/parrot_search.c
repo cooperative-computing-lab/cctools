@@ -74,7 +74,7 @@ int main( int argc, char *argv[] )
 		printf("%-30s", res->path);
 
 		if (flags & PFS_SEARCH_METADATA)
-			printf("\t%-10zd\t%-10zd\n", res->info->st_size, res->info->st_ino);
+			printf("\t%-10ld\t%-10ld\n", (long)res->info->st_size, (long)res->info->st_ino);
 		else
 			printf("\n");
 	}
