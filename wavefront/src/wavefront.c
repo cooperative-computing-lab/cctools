@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <limits.h>
 
 #include "cctools.h"
 #include "list.h"
@@ -22,8 +23,6 @@ See the file COPYING for details.
 #include "load_average.h"
 #include "macros.h"
 #include "timestamp.h"
-
-#define PATH_MAX 256
 
 #define WAVEFRONT_TASK_STATE_COMPLETE   MAKE_RGBA(0,0,255,0)
 #define WAVEFRONT_TASK_STATE_RUNNING    MAKE_RGBA(0,255,0,0)
