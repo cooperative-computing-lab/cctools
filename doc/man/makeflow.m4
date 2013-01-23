@@ -33,6 +33,7 @@ execution engine.
 
 SUBSECTION(Commands)
 OPTIONS_BEGIN
+OPTION_ITEM(-b)Bundle input files accessable from the local file system.
 OPTION_ITEM(-c)Clean up: remove logfile and all targets.
 OPTION_ITEM(-D)Display the Makefile as a Dot graph.
 OPTION_ITEM(-f)Write summary of workflow to file.
