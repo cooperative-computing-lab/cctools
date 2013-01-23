@@ -35,6 +35,7 @@ void string_cookie(char *str, int length);
 char *string_subst(char *value, string_subst_lookup_t lookup, void *arg);
 char *string_combine(char *first, char *second);
 char *string_combine_multi(char *first, ...);
+char *string_combine_nofree(const char *a, const char *b);
 char *string_signal(int sig);
 void string_split_path(const char *str, char *first, char *rest);
 void string_split_multipath(const char *input, char *first, char *rest);

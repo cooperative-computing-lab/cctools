@@ -624,18 +624,20 @@ char *strsep(char **stringp, const char *delim)
 
 #endif
 
+//Asumes heap for a and b! Probably a bad idea. string_combine_nofree below
+//does the same function, without freeing the arguments.
 char *string_combine(char *a, char *b)
 {
 	char *r;
+	size_t a_len = strlen(a);
 
 	if(a && b) {
-		r = malloc(strlen(a) + strlen(b) + 1);
+		r = realloc(a, (a_len + strlen(b) + 1) * sizeof(char));
 		if(r) {
-			strcpy(r, a);
-			strcat(r, b);
+			strcat(a, b);
 		}
 	} else {
-		r = 0;
+		r = NULL;
 	}
 
 	if(a)
@@ -646,6 +648,22 @@ char *string_combine(char *a, char *b)
 	return r;
 }
 
+char *string_combine_nofree(const char *a, const char *b)
+{
+	char *r;
+
+	if(a && b) {
+		r = calloc(strlen(a) + strlen(b) + 1, sizeof(char));
+		if(r) {
+			strcpy(r, a);
+			strcat(r, b);
+		}
+	} else {
+		r = NULL;
+	}
+
+	return r;
+}
 
 
 char *string_combine_multi(char *r, ...)
