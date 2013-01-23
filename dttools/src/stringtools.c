@@ -634,7 +634,7 @@ char *string_combine(char *a, char *b)
 	if(a && b) {
 		r = realloc(a, (a_len + strlen(b) + 1) * sizeof(char));
 		if(r) {
-			strcat(a, b);
+			strcat(r, b);
 		}
 	} else {
 		r = NULL;
@@ -942,6 +942,22 @@ char *string_format(const char *fmt, ...)
 	va_end(va);
 
 	return str;
+}
+
+int string_nformat (char *str, const int max, const char *fmt, ...)
+{
+	va_list(va);
+	va_start(va, fmt);
+	size_t n = vsnprintf(str, fmt, max, va);
+	va_end(va);
+
+	if( max <= n )
+	{
+		fprintf(stderr, "String '%30s...' is %z (greater than the %z limit).", str);
+		exit(1);
+	}
+
+	return n;
 }
 
 char *string_getcwd(void)

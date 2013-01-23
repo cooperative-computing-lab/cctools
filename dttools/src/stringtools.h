@@ -56,8 +56,19 @@ int string_null_or_empty(const char *str);
     @param fmt Format string passed to sprintf.
 	@param ... Variable arguments passed to sprintf.
 	@return The formatted string.
- */
+*/
 char *string_format (const char *fmt, ...);
+
+/** Writes a string formatted using snprintf. It is an error if the string is longer than the buffer provided.
+  @param str Output string buffer, passed as first argument of snprintf.
+  @param max Maximum number of characters to write to str, counting the final '\0'.
+  @param fmt Format string passed to snprintf.
+  @param ... Variable arguments passed to snprintf
+  @return The number of character written, not counting the final '\0'.
+ */
+
+int string_nformat(char *str, const int max, const char *fmt, ...);
+
 
 /** Returns a heap allocated freeable string for the current working directory.
 	@return The current working directory.
