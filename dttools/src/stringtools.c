@@ -944,16 +944,16 @@ char *string_format(const char *fmt, ...)
 	return str;
 }
 
-int string_nformat (char *str, const int max, const char *fmt, ...)
+int string_nformat (char *str, const size_t max, const char *fmt, ...)
 {
 	va_list(va);
 	va_start(va, fmt);
-	size_t n = vsnprintf(str, fmt, max, va);
+	size_t n = vsnprintf(str, max, fmt, va);
 	va_end(va);
 
 	if( max <= n )
 	{
-		fprintf(stderr, "String '%30s...' is %z (greater than the %z limit).", str);
+		fprintf(stderr, "String '%30s...' is %zd (greater than the %zd limit).", str, n, max);
 		exit(1);
 	}
 

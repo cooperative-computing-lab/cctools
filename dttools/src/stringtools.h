@@ -5,6 +5,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include <stdlib.h>
+
 #ifndef STRINGTOOLS_H
 #define STRINGTOOLS_H
 
@@ -67,7 +69,7 @@ char *string_format (const char *fmt, ...);
   @return The number of character written, not counting the final '\0'.
  */
 
-int string_nformat(char *str, const int max, const char *fmt, ...);
+int string_nformat(char *str, const size_t max, const char *fmt, ...);
 
 
 /** Returns a heap allocated freeable string for the current working directory.
