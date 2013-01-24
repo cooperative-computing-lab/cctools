@@ -628,22 +628,20 @@ char *strsep(char **stringp, const char *delim)
 //does the same function, without freeing the arguments.
 char *string_combine(char *a, char *b)
 {
-	char *r;
+	char *r = NULL;
 	size_t a_len = strlen(a);
 
 	if(a && b) {
 		r = realloc(a, (a_len + strlen(b) + 1) * sizeof(char));
-		if(r) {
-			strcat(r, b);
-		}
-	} else {
-		r = NULL;
 	}
 
-	if(a)
-		free(a);
-	if(b)
-		free(b);
+	if(r)
+	{
+		strcat(r, b);
+
+		if(b)
+			free(b);
+	}
 
 	return r;
 }

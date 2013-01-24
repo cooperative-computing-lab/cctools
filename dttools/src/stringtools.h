@@ -35,6 +35,16 @@ char *string_pad_right(char *str, int length);
 char *string_pad_left(char *str, int length);
 void string_cookie(char *str, int length);
 char *string_subst(char *value, string_subst_lookup_t lookup, void *arg);
+
+/** Appends second to first, both null terminated strings. Returns the new
+  formed string. Both first and second are deallocated before the function
+  returns (use string_combine_nofree if this is not desired). If the new string
+  cannot be allocated (function returns NULL), then first and second are not modified.
+
+  @param first Null terminated string.
+  @param second Null terminated string.
+  @return Null terminated string concatenating second to first.
+  */
 char *string_combine(char *first, char *second);
 char *string_combine_multi(char *first, ...);
 char *string_combine_nofree(const char *a, const char *b);
