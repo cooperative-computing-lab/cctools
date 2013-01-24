@@ -1,0 +1,2 @@
+The input rows and columns are a sequence from 0 to 9. The function that
+wavefront applies is simply the sum of xfile, yfile and dfile.
