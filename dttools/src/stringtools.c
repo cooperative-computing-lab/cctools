@@ -950,10 +950,7 @@ int string_nformat (char *str, const size_t max, const char *fmt, ...)
 	va_end(va);
 
 	if( max <= n )
-	{
-		fprintf(stderr, "String '%30s...' is %zd (greater than the %zd limit).", str, n, max);
-		exit(1);
-	}
+		fatal("String '%30s...' is %zd (greater than the %zd limit).", str, n, max);
 
 	return n;
 }

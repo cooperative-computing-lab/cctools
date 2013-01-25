@@ -23,6 +23,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "timestamp.h"
 #include "stringtools.h"
+#include "getopt_aux.h"
 
 #define WAVEFRONT_TASK_STATE_COMPLETE   MAKE_RGBA(0,0,255,0)
 #define WAVEFRONT_TASK_STATE_RUNNING    MAKE_RGBA(0,255,0,0)

@@ -13,17 +13,9 @@ prepare()
 	pid=$!
 	echo $pid > $PID_FILE
 
-	for i in 1 2 3 4 5
-	do
-		if [ -f $PORT_FILE ]
-		then
-			exit 0
-		else
-			sleep 1
-		fi
-	done
+	wait_for_file_creation $PORT_FILE 5
 
-	exit 1
+	exit 0
 }
 
 run()

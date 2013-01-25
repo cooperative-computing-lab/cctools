@@ -23,6 +23,7 @@ See the file COPYING for details.
 #include "fast_popen.h"
 #include "list.h"
 #include "timestamp.h"
+#include "getopt_aux.h"
 
 #include "allpairs_compare.h"
 
@@ -31,6 +32,7 @@ See the file COPYING for details.
 static const char *progname = "allpairs_master";
 static char allpairs_multicore_program[ALLPAIRS_LINE_MAX] = "allpairs_multicore";
 static char allpairs_compare_program[ALLPAIRS_LINE_MAX];
+static char *output_filename = NULL;
 
 static double compare_program_time = 0.0;
 static const char * extra_arguments = "";
@@ -51,6 +53,7 @@ static void show_help(const char *cmd)
 	printf(" -p <port>		The port that the master will be listening on.\n");
 	printf(" -e <args>      Extra arguments to pass to the comparison function.\n");
 	printf(" -f <file>      Extra input file needed by the comparison function.  (may be given multiple times)\n");
+	printf(" -o <file>      Write output to this file (default to standard output)");
 	printf(" -t <seconds>   Estimated time to run one comparison.  (default chosen at runtime)\n");
 	printf(" -x <items>	Width of one work unit, in items to compare.  (default chosen at runtime)\n");
 	printf(" -y <items>	Height of one work unit, in items to compare.  (default chosen at runtime)\n");
@@ -60,6 +63,7 @@ static void show_help(const char *cmd)
 	printf(" -d <flag>	Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	printf(" -v         	Show program version.\n");
 	printf(" -h         	Display this message.\n");
+	printf(" -Z <file>      Select port at random and write it to this file.\n");
 }
 
 /*
@@ -74,7 +78,7 @@ double estimate_run_time( struct text_list *seta, struct text_list *setb )
 	timestamp_t starttime, stoptime;
 	int x,y;
 
-	fprintf(stderr, "%s: sampling execution time of %s...\n",progname,allpairs_compare_program);
+	fprintf(stdout, "%s: sampling execution time of %s...\n",progname,allpairs_compare_program);
 
 	starttime = timestamp_get();
 
@@ -88,13 +92,11 @@ double estimate_run_time( struct text_list *seta, struct text_list *setb )
 				);
 
 			FILE *file = fast_popen(line);
-			if(!file) {
-				fprintf(stderr,"%s: couldn't execute %s: %s\n",progname,line,strerror(errno));
-				exit(1);
-			}
+			if(!file)
+				fatal("%s: couldn't execute %s: %s\n",progname,line,strerror(errno));
 
 			while(fgets(line,sizeof(line),file)) {
-				fprintf(stderr,"%s",line);
+				fprintf(stdout,"%s",line);
 			}
 
 			fast_pclose(file);
@@ -128,7 +130,7 @@ void estimate_block_size( struct text_list *seta, struct text_list *setb, int *x
 		}
 	}
 
-	fprintf(stderr, "%s: %s estimated at %.02lfs per comparison\n",progname,allpairs_compare_program,compare_program_time);
+	fprintf(stdout, "%s: %s estimated at %.02lfs per comparison\n",progname,allpairs_compare_program,compare_program_time);
 
 	int block_limit = 60;
 	double block_time;
@@ -237,8 +239,23 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 
 void task_complete( struct work_queue_task *t )
 {
+	FILE *output = stdout;
+	if(output_filename)
+	{
+		output = fopen(output_filename, "a");
+		if(!output)
+		{
+			fprintf(stderr, "Cannot open %s for writing. Output to stdout instead.\n", output_filename);
+			output = stdout;
+		}
+	}
+
 	string_chomp(t->output);
-	printf("%s\n",t->output);
+	fprintf(output, "%s\n",t->output);
+
+	if(output != stdout)
+		fclose(output);
+
 	work_queue_task_delete(t);
 }
 
@@ -247,6 +264,7 @@ int main(int argc, char **argv)
 	char c;
 	struct work_queue *q;
 	int port = WORK_QUEUE_DEFAULT_PORT;
+	static const char *port_file = NULL;
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	char *project = NULL;
 	int priority = 0;
@@ -255,7 +273,7 @@ int main(int argc, char **argv)
 
 	extra_files_list = list_create();
 
-	while((c = getopt(argc, argv, "ad:e:f:hN:p:P:t:vx:y:")) != (char) -1) {
+	while((c = getopt(argc, argv, "ad:e:f:hN:p:P:t:vx:y:Z:o:")) != (char) -1) {
 		switch (c) {
 	    case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -268,6 +286,10 @@ int main(int argc, char **argv)
 			break;
 		case 'f':
 			list_push_head(extra_files_list,optarg);
+			break;
+		case 'o':
+			free(output_filename);
+			output_filename=xxstrdup(optarg);
 			break;
 		case 'h':
 			show_help(progname);
@@ -296,6 +318,10 @@ int main(int argc, char **argv)
 		case 'y':
 			yblock = atoi(optarg);
 			break;
+		case 'Z':
+			port_file = optarg;
+			port = 0;
+			break;
 		default:
 			show_help(progname);
 			return 1;
@@ -315,7 +341,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	fprintf(stderr, "%s: %s has %d elements\n",progname,argv[optind],text_list_size(seta));
+	fprintf(stdout, "%s: %s has %d elements\n",progname,argv[optind],text_list_size(seta));
 
 	struct text_list *setb = text_list_load(argv[optind+1]);
 	if(!setb) {
@@ -323,7 +349,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	fprintf(stderr, "%s: %s has %d elements\n",progname,argv[optind+1],text_list_size(setb));
+	fprintf(stdout, "%s: %s has %d elements\n",progname,argv[optind+1],text_list_size(setb));
 
 	if (!find_executable("allpairs_multicore","PATH",allpairs_multicore_program,sizeof(allpairs_multicore_program))) {
 		fprintf(stderr,"%s: couldn't find allpairs_multicore in path\n",progname);
@@ -352,7 +378,7 @@ int main(int argc, char **argv)
 		estimate_block_size(seta,setb,&xblock,&yblock);
 	}
 
-	fprintf(stderr, "%s: using block size of %dx%d\n",progname,xblock,yblock);
+	fprintf(stdout, "%s: using block size of %dx%d\n",progname,xblock,yblock);
 
 	if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
 		fprintf(stderr, "allpairs: allpairs master running in catalog mode. Please use '-N' option to specify the name of this project.\n");
@@ -361,17 +387,25 @@ int main(int argc, char **argv)
 	}
 
 	q = work_queue_create(port);
+
+	//Read the port the queue is actually running, in case we just called
+	//work_queue_create(LINK_PORT_ANY)
+	port  = work_queue_port(q);
+
 	if(!q) {
 		fprintf(stderr,"%s: could not create work queue on port %d: %s\n",progname,port,strerror(errno));
 		return 1;
 	}
+
+	if(port_file)
+		opts_write_port_file(port_file, port);
 
 	// advanced work queue options
 	work_queue_specify_master_mode(q, work_queue_master_mode);
 	work_queue_specify_name(q, project);
 	work_queue_specify_priority(q, priority);
 
-	fprintf(stderr, "%s: listening for workers on port %d...\n",progname,work_queue_port(q));
+	fprintf(stdout, "%s: listening for workers on port %d...\n",progname,work_queue_port(q));
 
 	while(1) {
 		struct work_queue_task *task = NULL;
