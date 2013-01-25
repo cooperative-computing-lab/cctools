@@ -22,8 +22,13 @@ See the file COPYING for details.
 #include "load_average.h"
 #include "macros.h"
 #include "timestamp.h"
+<<<<<<< HEAD
 
 #define PATH_MAX 256
+=======
+#include "stringtools.h"
+#include "getopt_aux.h"
+>>>>>>> db01a16... allpairs_master and wavefront_master now accept the -Z <port_file> flag, to write the port selected arbitrarily.
 
 #define WAVEFRONT_TASK_STATE_COMPLETE   MAKE_RGBA(0,0,255,0)
 #define WAVEFRONT_TASK_STATE_RUNNING    MAKE_RGBA(0,255,0,0)

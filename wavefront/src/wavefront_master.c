@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "text_array.h"
 #include "macros.h"
+#include "getopt_aux.h"
 
 #define WAVEFRONT_LINE_MAX 1024
 
@@ -29,7 +30,8 @@ static struct text_array *array = 0;
 static struct work_queue *queue = 0;
 static int xsize = 0;
 static int ysize = 0;
-static int port = 9068;
+static int port = WORK_QUEUE_DEFAULT_PORT;
+static const char *port_file = NULL;
 static const char *infile;
 static const char *outfile;
 static FILE *logfile;
@@ -105,6 +107,8 @@ static void show_help(const char *cmd)
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
+	printf(" -Z <file>      Select port at random and write it to this file.\n");
+
 }
 
 static void display_progress( struct work_queue *q )
@@ -129,7 +133,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(progname);
 
-	while((c=getopt(argc,argv,"ad:hN:p:P:o:v"))!=(char)-1) {
+	while((c=getopt(argc,argv,"ad:hN:p:P:o:v:Z:"))!=(char)-1) {
 		switch(c) {
 	    	case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -157,6 +161,10 @@ int main( int argc, char *argv[] )
 			case 'v':
 				cctools_version_print(stdout, progname);
 				exit(0);
+				break;
+			case 'Z':
+				port_file = optarg;
+				port = 0;
 				break;
 			default:
 				show_help(progname);
@@ -207,17 +215,25 @@ int main( int argc, char *argv[] )
 	}
 
 	queue = work_queue_create(port);
+
+	//Read the port the queue is actually running, in case we just called
+	//work_queue_create(LINK_PORT_ANY)
+	port  = work_queue_port(queue); 
+
 	if(!queue) {
 		fprintf(stderr,"%s: could not create work queue on port %d: %s\n",progname,port,strerror(errno));
 		return 1;
 	}
+
+	if(port_file)
+		opts_write_port_file(port_file, port);
 
 	// advanced work queue options
 	work_queue_specify_master_mode(queue, work_queue_master_mode);
 	work_queue_specify_name(queue, project);
 	work_queue_specify_priority(queue, priority);
 
-	fprintf(stderr, "%s: listening for workers on port %d...\n",progname,work_queue_port(queue));
+	fprintf(stdout, "%s: listening for workers on port %d...\n",progname,work_queue_port(queue));
 
 	task_prime();
 

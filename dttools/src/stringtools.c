@@ -926,6 +926,22 @@ char *string_format(const char *fmt, ...)
 	return str;
 }
 
+<<<<<<< HEAD
+=======
+int string_nformat (char *str, const size_t max, const char *fmt, ...)
+{
+	va_list(va);
+	va_start(va, fmt);
+	size_t n = vsnprintf(str, max, fmt, va);
+	va_end(va);
+
+	if( max <= n )
+		fatal("String '%30s...' is %zd (greater than the %zd limit).", str, n, max);
+
+	return n;
+}
+
+>>>>>>> db01a16... allpairs_master and wavefront_master now accept the -Z <port_file> flag, to write the port selected arbitrarily.
 char *string_getcwd(void)
 {
 	char *result = NULL;

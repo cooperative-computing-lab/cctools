@@ -43,6 +43,7 @@ SOURCES = auth.c  \
           get_canonical_path.c  \
           get_line.c  \
           getopt.c  \
+          getopt_aux.c  \
           hdfs_library.c  \
           hash_cache.c  \
           hash_table.c  \
