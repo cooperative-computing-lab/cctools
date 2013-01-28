@@ -140,7 +140,12 @@ static void remove_expired_records()
 
 	time_t current = time(0);
 
+	// Only clean every clean_interval seconds.
 	if((current-last_clean_time)<clean_interval) return;
+
+	// After restarting, all records will have appear to be stale.
+	// Run for a minimum of lifetime seconds before cleaning anything up.
+	if((current-starttime)<lifetime ) return;
 
 	nvpair_database_firstkey(table);
 	while(nvpair_database_nextkey(table, &key, &nv)) {
