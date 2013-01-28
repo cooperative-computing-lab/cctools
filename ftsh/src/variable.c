@@ -118,12 +118,12 @@ static char * variable_print_argv( int withquotes )
 	result = xxstrdup("");
 
 	for(i=1;i<head->argc;i++) {
-		result = string_combine(result,xxstrdup(head->argv[i]));
+		result = string_combine(result,head->argv[i]);
 		if(i!=(head->argc-1)) {
 			if(withquotes) {
-				result = string_combine(result,xxstrdup("\" \""));
+				result = string_combine(result,"\" \"");
 			} else {
-				result = string_combine(result,xxstrdup(" "));
+				result = string_combine(result," ");
 			}
 		}
 	}

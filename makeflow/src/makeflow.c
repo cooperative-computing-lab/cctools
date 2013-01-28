@@ -39,6 +39,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "timestamp.h"
 #include "xxmalloc.h"
+#include "getopt_aux.h"
 
 #define SHOW_INPUT_FILES 2
 #define SHOW_OUTPUT_FILES 3
@@ -78,6 +79,7 @@ static struct batch_queue *remote_queue = 0;
 static char *project = NULL;
 static int priority = 0;
 static int port = 0;
+static const char *port_file = NULL;
 static int output_len_check = 0;
 
 static char *makeflow_exe = NULL;
@@ -2324,6 +2326,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -v             Show version string\n");
 	fprintf(stdout, " -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
 	fprintf(stdout, " -z             Force failure on zero-length output files \n");
+	fprintf(stdout, " -Z <file>      Select port at random and write it to this file.\n");
 }
 
 
@@ -2486,7 +2489,7 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	while((c = getopt(argc, argv, "aAB:cC:d:D:E:f:F:g:G:hiIj:J:kKl:L:m:N:o:Op:P:r:RS:T:vW:z")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:D:E:f:F:g:G:hiIj:J:kKl:L:m:N:o:Op:P:r:RS:T:vW:zZ:")) != (char) -1) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2636,6 +2639,11 @@ int main(int argc, char *argv[])
 			case 'z':
 				output_len_check = 1;
 				break;
+			case 'Z':
+				port_file = optarg;
+				port = 0;
+				port_set = 1; //WQ is going to set the port, so we continue as if already set.
+				break;
 			default:
 				show_help(argv[0]);
 				return 1;
@@ -2666,20 +2674,19 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		char *value;
-		if(port_set) {
-			value = string_format("%d", port);
-			setenv("WORK_QUEUE_PORT", value, 1);
-			free(value);
-		} else {
 			// Use Work Queue default port in standalone mode when port is not
 			// specified with -p option. In Work Queue catalog mode, Work Queue
 			// would choose an arbitrary port when port is not explicitly specified.
-			if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE) {
-				value = string_format("%d", WORK_QUEUE_DEFAULT_PORT);
-				setenv("WORK_QUEUE_PORT", value, 1);
-				free(value);
-			}
+		if(!port_set && work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE) {
+			port_set = 1;
+			port = WORK_QUEUE_DEFAULT_PORT;
+		}
+
+		if(port_set) {
+			char *value;
+			value = string_format("%d", port);
+			setenv("WORK_QUEUE_PORT", value, 1);
+			free(value);
 		}
 	}
 
@@ -2844,6 +2851,9 @@ int main(int argc, char *argv[])
 		work_queue_specify_name(q, project);
 		work_queue_specify_priority(q, priority);
 		work_queue_specify_estimate_capacity_on(q, work_queue_estimate_capacity_on);
+		port = work_queue_port(q);
+		if(port_file)
+			opts_write_port_file(port_file, port);
 	}
 
 	if(batch_submit_options) {

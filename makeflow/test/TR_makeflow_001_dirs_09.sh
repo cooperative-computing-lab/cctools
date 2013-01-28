@@ -2,21 +2,12 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-prepare()
-{
-    clean $@
-}
+# a single directory as a target
+MAKE_FILE=dirs/testcase.subdir.09.makeflow
 
-run()
-{
-    exec ../src/makeflow -d all -T wq -p `cat worker.port` dirs/testcase.subdir.${i}.makeflow
-}
+PRODUCTS="mydir/mysubdir/1.txt"
 
-clean()
-{
-    exec ../src/makeflow -c dirs/testcase.subdir.${i}.makeflow
-}
-
-i=09
+. ./makeflow_dirs_test_common.sh
 
 dispatch $@
+
