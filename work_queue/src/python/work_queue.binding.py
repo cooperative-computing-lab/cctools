@@ -543,6 +543,14 @@ class WorkQueue(_object):
         return work_queue_specify_master_mode(self._work_queue, mode)
 
     ##
+    # Specify a log file that records the states of connected workers and submitted tasks. 
+    #
+    # @param self     Reference to the current work queue object.
+    # @param logfile  Filename. 
+    def specify_log(self, logfile):
+        return work_queue_specify_log(self._work_queue, logfile)
+    
+	##
     # Cancel task identified by its taskid and remove from the given queue. 
     #
     # @param self   Reference to the current work queue object.
