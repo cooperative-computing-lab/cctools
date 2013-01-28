@@ -550,7 +550,11 @@ class WorkQueue(_object):
     def specify_log(self, logfile):
         return work_queue_specify_log(self._work_queue, logfile)
     
+<<<<<<< HEAD
     ##
+=======
+	##
+>>>>>>> b4ba1e9... Add missing python binding for work_queue_specify_log().
     # Cancel task identified by its taskid and remove from the given queue. 
     #
     # @param self   Reference to the current work queue object.
