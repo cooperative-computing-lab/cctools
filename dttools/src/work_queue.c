@@ -2822,7 +2822,7 @@ void work_queue_specify_log(struct work_queue *q, const char *logfile)
 	q->logfile = fopen(logfile, "a");
 	if(q->logfile) {
 		setvbuf(q->logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
-		fprintf(q->logfile, "%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
+		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
 			"timestamp", "start_time",
 			"workers_init", "workers_ready", "workers_busy", "workers_cancelling", // workers
 			"tasks_waiting", "tasks_running", "tasks_complete", // tasks
