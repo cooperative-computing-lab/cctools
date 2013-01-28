@@ -2,21 +2,13 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-prepare()
-{
-    clean $@
-}
+# many directories. Prove on redundant transfer with debug on!
+MAKE_FILE=dirs/testcase.subdir.11.makeflow
 
-run()
-{
-    exec ../src/makeflow -d all -T wq -p `cat worker.port` dirs/testcase.subdir.${i}.makeflow
-}
+PRODUCTS="1.txt mydir.txt mydir/1.txt mydir/2.txt mydir/1/a.txt mydir/1/b.txt mydir/1/haha/lala.txt mydir/1/haha/wawa.txt"
 
-clean()
-{
-    exec ../src/makeflow -c dirs/testcase.subdir.${i}.makeflow
-}
-
-i=11
+. ./makeflow_dirs_test_common.sh
 
 dispatch $@
+
+

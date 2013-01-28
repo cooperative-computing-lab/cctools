@@ -642,7 +642,7 @@ static char * ast_expr_list_execute( int linenum, struct expr *e, time_t stoptim
 				v[length-2] = 0;
 			}
 			if(line) {
-				line = string_combine_multi(line,xxstrdup(" "),v,0);
+				line = string_combine_multi(line," ",v,0);
 			} else {
 				line = v;
 			}
@@ -707,7 +707,7 @@ char * ast_word_list_execute( int linenum, struct ast_word *w )
 		}
 
 		if(line) {
-			line = string_combine_multi( line, xxstrdup(" "), t, 0 );
+			line = string_combine_multi( line, " ", t, 0 );
 		} else {
 			line = t;
 		}

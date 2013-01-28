@@ -2,21 +2,13 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-prepare()
-{
-    clean $@
-}
+# dir depth larger than 2. Target is the sub-directory
+# 'mysubdir'.
+MAKE_FILE=dirs/testcase.subdir.10.makeflow
 
-run()
-{
-    exec ../src/makeflow -d all -T wq -p `cat worker.port` dirs/testcase.subdir.${i}.makeflow
-}
+PRODUCTS="mydir/mysubdir/1.txt"
 
-clean()
-{
-    exec ../src/makeflow -c dirs/testcase.subdir.${i}.makeflow
-}
-
-i=10
+. ./makeflow_dirs_test_common.sh
 
 dispatch $@
+
