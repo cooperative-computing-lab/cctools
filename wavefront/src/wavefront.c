@@ -13,6 +13,8 @@ See the file COPYING for details.
 #include <string.h>
 #include <sys/wait.h>
 
+#include <limits.h>
+
 #include "cctools.h"
 #include "list.h"
 #include "itable.h"
@@ -23,7 +25,6 @@ See the file COPYING for details.
 #include "macros.h"
 #include "timestamp.h"
 
-#define PATH_MAX 256
 #include "stringtools.h"
 #include "getopt_aux.h"
 
@@ -118,17 +119,17 @@ int wavefront_task_submit_recursive( struct wavefront_task *n )
 	sprintf(extra_output_files,"output.%d.%d",n->x,n->y);
 	sprintf(extra_input_files,"wavefront,%s",function);
 
-	for(i=-1;i<n->width;i++) {
-		strcat(extra_input_files,",");
-		sprintf(filename,"R.%d.%d",n->x+i,n->y-1);
-		strcat(extra_input_files,filename);
-	}
+    for(i=-1;i<n->width;i++) {
+      strcat(extra_input_files,",");
+      sprintf(filename,"R.%d.%d",n->x+i,n->y-1);
+      strcat(extra_input_files,filename);
+    }
 
-	for(j=0;j<n->height;j++) {
-		strcat(extra_input_files,",");
-		sprintf(filename,"R.%d.%d",n->x-1,n->y+j);
-		strcat(extra_input_files,filename);
-	}
+    for(j=0;j<n->height;j++) {
+      strcat(extra_input_files,",");
+      sprintf(filename,"R.%d.%d",n->x-1,n->y+j);
+      strcat(extra_input_files,filename);
+    }
 
 	return batch_job_submit_simple(batch_q,command,extra_input_files,extra_output_files);
 }

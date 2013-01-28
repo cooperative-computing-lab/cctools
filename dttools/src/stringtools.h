@@ -33,6 +33,13 @@ char *string_pad_right(char *str, int length);
 char *string_pad_left(char *str, int length);
 void string_cookie(char *str, int length);
 char *string_subst(char *value, string_subst_lookup_t lookup, void *arg);
+
+/** Appends second to first, both null terminated strings. Returns the new
+  formed string. First argument is reallocated with realloc.
+  @param first Null terminated string.
+  @param second Null terminated string.
+  @return Null terminated string concatenating second to first.
+  */
 char *string_combine(char *first, char *second);
 char *string_combine_multi(char *first, ...);
 char *string_signal(int sig);
