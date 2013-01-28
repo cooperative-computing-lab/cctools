@@ -110,7 +110,7 @@ int wavefront_task_submit_recursive( struct wavefront_task *n )
 	char command[PATH_MAX];
 	char filename[PATH_MAX];
 	char extra_output_files[PATH_MAX];
-	char *extra_input_files;
+	char *extra_input_files=NULL;
 
 	string_nformat(command, PATH_MAX, "./wavefront -M -X %d -Y %d ./%s %d %d >output.%d.%d 2>&1", n->x,n->y,function,n->width,n->height,n->x,n->y);
 	string_nformat(extra_output_files, PATH_MAX, "output.%d.%d",n->x,n->y);
@@ -118,14 +118,14 @@ int wavefront_task_submit_recursive( struct wavefront_task *n )
 
 	for(i=-1;i<n->width;i++) {
 		string_nformat(filename, PATH_MAX, "R.%d.%d", n->x+i,n->y-1);
-		string_combine(extra_input_files, ",");
-		string_combine(extra_input_files, filename);
+		extra_input_files=string_combine(extra_input_files, ",");
+		extra_input_files=string_combine(extra_input_files, filename);
 	}
 
 	for(j=0;j<n->height;j++) {
 		string_nformat(filename, PATH_MAX, "R.%d.%d",n->x-1,n->y+j);
-		string_combine(extra_input_files, ",");
-		string_combine(extra_input_files, filename);
+		extra_input_files=string_combine(extra_input_files, ",");
+		extra_input_files=string_combine(extra_input_files, filename);
 	}
 
 	batch_job_id_t job_id = batch_job_submit_simple(batch_q,command,extra_input_files,extra_output_files);

@@ -624,9 +624,7 @@ char *strsep(char **stringp, const char *delim)
 
 #endif
 
-//Asumes heap for a and b! Probably a bad idea. string_combine_nofree below
-//does the same function, without freeing the arguments.
-char *string_combine(char *a, char *b)
+char *string_combine(char *a, const char *b)
 {
 	char *r = NULL;
 	size_t a_len = strlen(a);
@@ -636,33 +634,13 @@ char *string_combine(char *a, char *b)
 	}
 
 	if(r)
-	{
 		strcat(r, b);
+	else
+		fatal("Cannot allocate memory for string concatenation.\n");
 
-		if(b)
-			free(b);
-	}
-
-	return r;
-}
-
-char *string_combine_nofree(const char *a, const char *b)
-{
-	char *r;
-
-	if(a && b) {
-		r = calloc(strlen(a) + strlen(b) + 1, sizeof(char));
-		if(r) {
-			strcpy(r, a);
-			strcat(r, b);
-		}
-	} else {
-		r = NULL;
-	}
 
 	return r;
 }
-
 
 char *string_combine_multi(char *r, ...)
 {

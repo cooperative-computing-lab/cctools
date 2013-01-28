@@ -19,7 +19,7 @@ prepare()
     pid=$!
 	echo $pid > $PIDMASTER_FILE
 
-    ln -s ../src/allpairs_multicore .
+    #ln -s ../src/allpairs_multicore .
 
 	wait_for_file_creation $PORT_FILE 5
 	exit 0
