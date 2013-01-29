@@ -54,7 +54,7 @@ OPTION_PAIR(-w,name)The name of this server's owner.  (default is username)
 OPTION_PAIR(-W,file)Use alternate password file for unix authentication
 OPTION_PAIR(-y,dir)Location of transient data (default is pwd).
 OPTION_PAIR(-z,time)Set max timeout for unix filesystem authentication. (default is 5s)
-OPTION_PAIR(-Z,file)Select port at random and write to this file.  (default is disabled)
+OPTION_PAIR(-Z,file)Select port at random and write it to this file.  (default is disabled)
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)

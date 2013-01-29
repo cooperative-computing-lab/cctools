@@ -15,7 +15,6 @@ prepare()
 run()
 {
 	answer=1854882
-	port=`find_free_port`
 
 	../src/wavefront ./sum_wf.sh 9 9
 

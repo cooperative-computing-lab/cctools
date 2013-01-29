@@ -67,6 +67,7 @@ OPTION_PAIR(-C, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:P
 OPTION_PAIR(-F, #)WorkQueue fast abort multiplier. (default is deactivated)
 OPTION_PAIR(-N, project)Set the project name to PARAM(project).
 OPTION_PAIR(-p, port)Port number to use with WorkQueue. (default is 9123, 0=arbitrary)
+OPTION_PAIR(-Z,file)Select port at random and write it to this file.  (default is disabled)
 OPTION_PAIR(-P, integer)Priority. Higher the value, higher the priority.
 OPTION_PAIR(-w, mode)Auto WorkQueue mode. Mode is either 'width' or 'group' (DAG [width] or largest [group] of tasks).
 OPTION_PAIR(-W, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
