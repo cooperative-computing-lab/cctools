@@ -23,7 +23,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "debug.h"
 #include "link.h"
-#include "getopt.h"
+#include "getopt_aux.h"
 #include "auth_all.h"
 #include "stringtools.h"
 #include "full_io.h"
@@ -77,7 +77,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 static int errno_to_chirp(int e);
 
 static int port = CHIRP_PORT;
-static const char *port_file = 0;
+static const char *port_file = NULL;
 static int idle_timeout = 60;	/* one minute */
 static int stall_timeout = 3600;	/* one hour */
 static int parent_check_timeout = 300;	/* five minutes */
@@ -154,7 +154,7 @@ static void show_help(const char *cmd)
 	printf(" -W <file>   Use alternate password file for unix authentication\n");
 	printf(" -y <dir>    Location of transient data (default is pwd).\n");
 	printf(" -z <time>   Set max timeout for unix filesystem authentication. (default is 5s)\n");
-	printf(" -Z <file>   Select port at random and write to this file.  (default is disabled)\n");
+	printf(" -Z <file>   Select port at random and write it to this file.  (default is disabled)\n");
 	printf("\n");
 	printf("Where debug flags are: ");
 	debug_flags_print(stdout);
@@ -509,7 +509,7 @@ int main(int argc, char *argv[])
 		case 'z':
 			auth_unix_timeout_set(atoi(optarg));
 			break;
-	        case 'Z':
+	    case 'Z':
 			port_file = optarg;
 			port = 0;
 			break;
@@ -613,12 +613,8 @@ int main(int argc, char *argv[])
 
 	debug(D_DEBUG,"now listening port on port %d\n",port);
 
-	if(port_file) {
-		FILE *file = fopen(port_file,"w");
-		if(!file) fatal("couldn't write to %s: %s\n",port_file,strerror(errno));
-		fprintf(file,"%d\n",port);
-		fclose(file);
-	}
+	if(port_file)
+		opts_write_port_file(port_file, port);
 
 	starttime = time(0);
 	catalog_port = datagram_create(0);

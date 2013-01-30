@@ -624,29 +624,23 @@ char *strsep(char **stringp, const char *delim)
 
 #endif
 
-char *string_combine(char *a, char *b)
+char *string_combine(char *a, const char *b)
 {
-	char *r;
+	char *r = NULL;
+	size_t a_len = strlen(a);
 
 	if(a && b) {
-		r = malloc(strlen(a) + strlen(b) + 1);
-		if(r) {
-			strcpy(r, a);
-			strcat(r, b);
-		}
-	} else {
-		r = 0;
+		r = realloc(a, (a_len + strlen(b) + 1) * sizeof(char));
 	}
 
-	if(a)
-		free(a);
-	if(b)
-		free(b);
+	if(r)
+		strcat(r, b);
+	else
+		fatal("Cannot allocate memory for string concatenation.\n");
+
 
 	return r;
 }
-
-
 
 char *string_combine_multi(char *r, ...)
 {
@@ -924,6 +918,19 @@ char *string_format(const char *fmt, ...)
 	va_end(va);
 
 	return str;
+}
+
+int string_nformat (char *str, const size_t max, const char *fmt, ...)
+{
+	va_list(va);
+	va_start(va, fmt);
+	size_t n = vsnprintf(str, max, fmt, va);
+	va_end(va);
+
+	if( max <= n )
+		fatal("String '%30s...' is %zd (greater than the %zd limit).", str, n, max);
+
+	return n;
 }
 
 char *string_getcwd(void)

@@ -6,6 +6,8 @@ See the file COPYING for details.
 */
 
 #include "nvpair.h"
+#include "nvpair_private.h"
+
 #include "hash_table.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -16,10 +18,6 @@ See the file COPYING for details.
 #include <string.h>
 
 #define NVPAIR_LINE_MAX 1024
-
-struct nvpair {
-	struct hash_table *table;
-};
 
 struct nvpair *nvpair_create()
 {
@@ -33,6 +31,8 @@ void nvpair_delete(struct nvpair *n)
 {
 	char *key;
 	void *value;
+
+	if(!n) return;
 
 	hash_table_firstkey(n->table);
 	while(hash_table_nextkey(n->table, &key, &value)) {
@@ -128,6 +128,12 @@ int nvpair_print_alloc(struct nvpair *n, char **text)
 	}
 
 	return needed;
+}
+
+void nvpair_remove( struct nvpair *n, const char *name )
+{
+	char * old = hash_table_remove(n->table,name);
+	if(old) free(old);
 }
 
 void nvpair_insert_string(struct nvpair *n, const char *name, const char *value)

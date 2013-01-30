@@ -27,6 +27,7 @@ SECTION(OPTIONS)
 
 OPTIONS_BEGIN
 OPTION_PAIR(-p, port)The port that the master will be listening on.
+OPTION_PAIR(-Z,file)Select port at random and write it to this file.  (default is disabled)
 OPTION_PAIR(-e, args)Extra arguments to pass to the comparison function.
 OPTION_PAIR(-f, file)Extra input file needed by the comparison function. (may be given multiple times)
 OPTION_PAIR(-t, seconds)Estimated time to run one comparison. (default chosen at runtime)

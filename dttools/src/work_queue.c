@@ -2191,10 +2191,9 @@ static void do_keepalive_checks(struct work_queue *q) {
 					}	
 				}
 			} else { 
-				// if we aren't sending a keepalive check, determine if worker is dead using following logic:
-				// if we haven't received a message from worker since we last sent a keepalive check and if time since we 
-				// last polled link for responses has exceeded timeout for unacknowledged keepalive checks, mark worker as dead.
-				if (w->last_msg_recv_time < w->keepalive_check_sent_time) {	
+				// Here because we haven't received a message from worker since its last keepalive check. Check if time 
+				// since we last polled link for responses has exceeded keepalive timeout. If so, remove the worker.
+				if (link_poll_end > w->keepalive_check_sent_time) {
 					if (((link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
 						debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
 						remove_worker(q, w);
@@ -2822,7 +2821,7 @@ void work_queue_specify_log(struct work_queue *q, const char *logfile)
 	q->logfile = fopen(logfile, "a");
 	if(q->logfile) {
 		setvbuf(q->logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
-		fprintf(q->logfile, "%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
+		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
 			"timestamp", "start_time",
 			"workers_init", "workers_ready", "workers_busy", "workers_cancelling", // workers
 			"tasks_waiting", "tasks_running", "tasks_complete", // tasks
