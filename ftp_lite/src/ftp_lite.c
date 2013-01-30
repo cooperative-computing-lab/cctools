@@ -584,7 +584,7 @@ ftp_lite_size_t ftp_lite_size( struct ftp_lite_server *s, const char *path )
 		return -1;
 	}
 
-	fields = sscanf(buffer,"%d %lld",&response,&size);
+	fields = sscanf(buffer,"%d %" PRId64 "",&response,&size);
 	if(fields!=2) {
 		errno = EINVAL;
 		return -1;

@@ -150,7 +150,7 @@ static INT64_T get_stat_result(struct chirp_client *c, struct chirp_stat *info, 
 		return -1;
 	}
 
-	fields = sscanf(line, "%lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %llu %llu %llu\n", &info->cst_dev, &info->cst_ino, &info->cst_mode, &info->cst_nlink, &info->cst_uid, &info->cst_gid, &info->cst_rdev, &info->cst_size, &info->cst_blksize,
+	fields = sscanf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 "\n", &info->cst_dev, &info->cst_ino, &info->cst_mode, &info->cst_nlink, &info->cst_uid, &info->cst_gid, &info->cst_rdev, &info->cst_size, &info->cst_blksize,
 			&info->cst_blocks, &info->cst_atime, &info->cst_mtime, &info->cst_ctime);
 
 	info->cst_dev = -1;
@@ -178,7 +178,7 @@ static INT64_T get_statfs_result(struct chirp_client *c, struct chirp_statfs *in
 		return -1;
 	}
 
-	fields = sscanf(line, "%lld %lld %lld %lld %lld %lld %lld\n", &info->f_type, &info->f_bsize, &info->f_blocks, &info->f_bfree, &info->f_bavail, &info->f_files, &info->f_ffree);
+	fields = sscanf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 "\n", &info->f_type, &info->f_bsize, &info->f_blocks, &info->f_bfree, &info->f_bavail, &info->f_files, &info->f_ffree);
 
 	if(fields != 7) {
 		c->broken = 1;
@@ -201,7 +201,7 @@ static INT64_T get_result(struct chirp_client *c, time_t stoptime)
 		return -1;
 	}
 
-	fields = sscanf(line, "%lld", &result);
+	fields = sscanf(line, "%" PRId64 "", &result);
 	if(fields != 1) {
 		errno = ECONNRESET;
 		c->broken = 1;
@@ -737,7 +737,7 @@ INT64_T chirp_client_ticket_get(struct chirp_client * c, const char *name, char 
 				(*rights)[nrights * 2 + 2] = NULL;
 				(*rights)[nrights * 2 + 3] = NULL;
 				nrights++;
-			} else if(sscanf(line, "%lld", &result) == 1 && result == 0) {
+			} else if(sscanf(line, "%" SCNd64, &result) == 1 && result == 0) {
 				break;
 			} else
 				goto failure;
@@ -1519,7 +1519,7 @@ INT64_T chirp_client_audit(struct chirp_client * c, const char *path, struct chi
 			errno = ECONNRESET;
 			break;
 		} else {
-			sscanf(line, "%s %lld %lld %lld", entry->name, &entry->nfiles, &entry->ndirs, &entry->nbytes);
+			sscanf(line, "%s %" SCNd64 " %" SCNd64 " %" SCNd64, entry->name, &entry->nfiles, &entry->ndirs, &entry->nbytes);
 		}
 		entry++;
 	}
@@ -1545,7 +1545,7 @@ INT64_T chirp_client_lsalloc(struct chirp_client * c, char const *path, char *al
 	result = simple_command(c, stoptime, "lsalloc %s\n", safepath);
 	if(result == 0) {
 		if(link_readline(c->link, line, sizeof(line), stoptime)) {
-			sscanf(line, "%s %lld %lld", allocpath, total, inuse);
+			sscanf(line, "%s %" SCNd64 " %" SCNd64, allocpath, total, inuse);
 		} else {
 			c->broken = 1;
 			errno = ECONNRESET;

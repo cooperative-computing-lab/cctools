@@ -5,6 +5,11 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+
 #ifdef HAS_IRODS
 
 #include "irods_reli.h"
@@ -16,11 +21,6 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "debug.h"
 #include "stringtools.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
 
 extern int pfs_irods_debug_level;
 

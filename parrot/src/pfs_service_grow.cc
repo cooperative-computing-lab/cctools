@@ -204,8 +204,8 @@ struct grow_dirent * grow_dirent_create_from_file( FILE *file, struct grow_diren
                         &type,
                         name,
                         &d->mode,
-                        &d->size,
-                        &d->mtime,
+                        (long long int *) &d->size,
+                        (long unsigned int *) &d->mtime,
                         d->checksum,
                         linkname);
 
@@ -215,8 +215,8 @@ struct grow_dirent * grow_dirent_create_from_file( FILE *file, struct grow_diren
 			&type,
 			name,
 			&d->mode,
-			&d->size,
-			&d->mtime,
+			(long long unsigned int *) &d->size,
+			(long int *) &d->mtime,
 			d->checksum,
 			linkname);
 

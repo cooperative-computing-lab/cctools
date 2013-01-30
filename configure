@@ -114,7 +114,7 @@ globus_flavor=auto
 ccompiler=gcc
 cxxcompiler=g++
 mpicompiler=mpicc
-ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions --pedantic-errors -std=c99"
+ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
 
 if [ ${build_sys} != CYGWIN ]
 then
@@ -918,7 +918,7 @@ CCTOOLS_INSTALL_DIR=${install_path}
 CCTOOLS_PACKAGES=${packages}
 
 CCTOOLS_CC=@echo COMPILE \$@; ${ccompiler}
-CCTOOLS_BASE_CCFLAGS=${ccflags}
+CCTOOLS_BASE_CCFLAGS=${ccflags} --pedantic-errors -std=c99
 CCTOOLS_INTERNAL_CCFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CCFLAGS}
 CCTOOLS_CCFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CCFLAGS}
 

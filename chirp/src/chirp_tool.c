@@ -71,9 +71,107 @@ struct command {
 	int must_be_open;
 	int minargs, maxargs;
 	char *help;
-	  INT64_T(*handler) (int argc, char **argv);
+    INT64_T(*handler) (int argc, char **argv);
 };
-static struct command list[];
+
+static INT64_T do_xattr_set(int argc, char **argv);
+static INT64_T do_xattr_list(int argc, char **argv);
+static INT64_T do_xattr_get(int argc, char **argv);
+static INT64_T do_matrix_delete(int argc, char **argv);
+static INT64_T do_matrix_list(int argc, char **argv);
+static INT64_T do_matrix_create(int argc, char **argv);
+static INT64_T do_lsalloc(int argc, char **argv);
+static INT64_T do_mkalloc(int argc, char **argv);
+static INT64_T do_thirdput(int argc, char **argv);
+static INT64_T do_help(int argc, char **argv);
+static INT64_T do_quit(int argc, char **argv);
+static INT64_T do_timeout(int argc, char **argv);
+static INT64_T do_audit(int argc, char **argv);
+static INT64_T do_localpath(int argc, char **argv);
+static INT64_T do_setrep(int argc, char **argv);
+static INT64_T do_md5(int argc, char **argv);
+static INT64_T do_whoareyou(int argc, char **argv);
+static INT64_T do_whoami(int argc, char **argv);
+static INT64_T do_remote_debug(int argc, char **argv);
+static INT64_T do_debug(int argc, char **argv);
+static INT64_T do_chmod(int argc, char **argv);
+static INT64_T do_mv(int argc, char **argv);
+static INT64_T do_statfs(int argc, char **argv);
+static INT64_T do_stat(int argc, char **argv);
+static INT64_T do_mkdir(int argc, char **argv);
+static INT64_T do_rmdir(int argc, char **argv);
+static INT64_T do_rm(int argc, char **argv);
+static INT64_T do_ls(int argc, char **argv);
+static INT64_T do_getacl(int argc, char **argv);
+static INT64_T do_resetacl(int argc, char **argv);
+static INT64_T do_setacl(int argc, char **argv);
+static INT64_T do_ticket_modify(int argc, char **argv);
+static INT64_T do_ticket_get(int argc, char **argv);
+static INT64_T do_ticket_list(int argc, char **argv);
+static INT64_T do_ticket_delete(int argc, char **argv);
+static INT64_T do_ticket_register(int argc, char **argv);
+static INT64_T do_ticket_create(int argc, char **argv);
+static INT64_T do_put(int argc, char **argv);
+static INT64_T do_get(int argc, char **argv);
+static INT64_T do_lpwd(int argc, char **argv);
+static INT64_T do_pwd(int argc, char **argv);
+static INT64_T do_lcd(int argc, char **argv);
+static INT64_T do_cd(int argc, char **argv);
+static INT64_T do_cat(int argc, char **argv);
+static INT64_T do_open(int argc, char **argv);
+static INT64_T do_close(int argc, char **argv);
+
+static struct command list[] = {
+	{"audit", 1, 0, 1, "[-r]", do_audit},
+	{"cat", 1, 1, 100, "<file> [file2] [file3] ...", do_cat},
+	{"cd", 1, 1, 1, "<remotedir>", do_cd},
+	{"chmod", 1, 2, 2, "<mode> <path>", do_chmod},
+	{"close", 1, 0, 0, "", do_close},
+	{"debug", 0, 0, 1, "[subsystem]", do_debug},
+	{"df", 1, 0, 1, "[-k|-m|-g|-t]", do_statfs},
+	{"exit", 0, 0, 0, "", do_quit},
+	{"get", 1, 1, 2, "<remotefile> [localfile]", do_get},
+	{"getacl", 1, 0, 1, "[remotepath]", do_getacl},
+	{"help", 0, 0, 0, "", do_help},
+	{"lcd", 0, 1, 1, "<localdir>", do_lcd},
+	{"listacl", 1, 0, 1, "[remotepath]", do_getacl},
+	{"localpath", 1, 0, 1, "[remotepath]", do_localpath},
+	{"lpwd", 0, 0, 0, "", do_lpwd},
+	{"ls", 1, 0, 2, "[-la] [remotepath]", do_ls},
+	{"lsalloc", 1, 0, 1, "[path]", do_lsalloc},
+	{"matrix_create", 1, 4, 4, "<path> <width> <height> <nhosts>", do_matrix_create},
+	{"matrix_delete", 1, 1, 1, "<path>", do_matrix_delete},
+	{"matrix_list", 1, 1, 1, "<path>", do_matrix_list},
+	{"md5", 1, 1, 1, "<path>", do_md5},
+	{"mkalloc", 1, 2, 2, "<path> <size>", do_mkalloc},
+	{"mkdir", 1, 1, 2, "[-p] <dir>", do_mkdir},
+	{"mv", 1, 2, 2, "<oldname> <newname>", do_mv},
+	{"open", 0, 1, 1, "<host>", do_open},
+	{"put", 1, 1, 2, "<localfile> [remotefile]", do_put},
+	{"pwd", 1, 0, 0, "", do_pwd},
+	{"quit", 0, 0, 0, "", do_quit},
+	{"remote_debug", 1, 1, 1, "[subsystem]", do_remote_debug},
+	{"resetacl", 1, 2, 2, "<remotepath> <rwldax>", do_resetacl},
+	{"rm", 1, 1, 1, "<file>", do_rm},
+	{"rmdir", 1, 1, 1, "<dir>", do_rmdir},
+	{"setacl", 1, 3, 3, "<remotepath> <user> <rwldax>", do_setacl},
+	{"setrep", 1, 2, 2, "<path> <nreps>", do_setrep},
+	{"stat", 1, 1, 1, "<file>", do_stat},
+	{"thirdput", 1, 3, 3, "<file> <3rdhost> <3rdfile>", do_thirdput},
+	{"ticket_create", 1, 0, 100, "[-o[utput] <ticket filename>] [-s[ubject] <subject/user>] [-d[uration] <duration>] [-b[its] <bits>] [[<directory> <acl>] ...]", do_ticket_create},
+	{"ticket_delete", 1, 1, 1, "<name>", do_ticket_delete},
+	{"ticket_get", 1, 1, 1, "<name>", do_ticket_get},
+	{"ticket_list", 1, 0, 1, "<name>", do_ticket_list},
+	{"ticket_modify", 1, 3, 3, "<name> <directory> <aclmask>", do_ticket_modify},
+	{"ticket_register", 1, 2, 3, "<name> [<subject>] <duration>", do_ticket_register},
+	{"timeout", 0, 1, 1, "<seconds>", do_timeout},
+	{"whoami", 1, 0, 0, "", do_whoami},
+	{"whoareyou", 1, 1, 1, "<hostname>", do_whoareyou},
+	{"xattr_get", 1, 2, 2, "<file> <attribute>", do_xattr_get},
+	{"xattr_list", 1, 1, 1, "<file>", do_xattr_list},
+	{"xattr_set", 1, 2, 3, "<file> <attribute> [value]", do_xattr_set},
+	{0, 0, 0, 0, 0},
+};
 
 static void acl_simple(char **acl)
 {
@@ -453,7 +551,7 @@ static void long_ls_callback(const char *name, struct chirp_stat *info, void *ar
 		strftime(timestr, sizeof(timestr), "%b %d %H:%M", localtime(&t));
 	}
 
-	printf("%c%c%c%c%c%c%c%c%c%c %4lld %8lld %8lld %8lld %s %s\n", S_ISDIR(info->cst_mode) ? 'd' : '-', info->cst_mode & 0400 ? 'r' : '-', info->cst_mode & 0200 ? 'w' : '-', info->cst_mode & 0100 ? 'x' : '-', info->cst_mode & 0040 ? 'r' : '-',
+	printf("%c%c%c%c%c%c%c%c%c%c %4" PRId64 " %8" PRId64 " %8" PRId64 " %8" PRId64 " %s %s\n", S_ISDIR(info->cst_mode) ? 'd' : '-', info->cst_mode & 0400 ? 'r' : '-', info->cst_mode & 0200 ? 'w' : '-', info->cst_mode & 0100 ? 'x' : '-', info->cst_mode & 0040 ? 'r' : '-',
 	       info->cst_mode & 0020 ? 'w' : '-', info->cst_mode & 0010 ? 'x' : '-', info->cst_mode & 0004 ? 'r' : '-', info->cst_mode & 0002 ? 'w' : '-', info->cst_mode & 0001 ? 'x' : '-', info->cst_nlink, info->cst_uid, info->cst_gid, info->cst_size,
 	       timestr, name);
 }
@@ -570,16 +668,16 @@ static INT64_T do_stat(int argc, char **argv)
 	if(chirp_reli_stat(current_host, full_path, &info, stoptime) < 0) {
 		return -1;
 	} else {
-		printf("device:  %lld\n", info.cst_dev);
-		printf("inode:   %lld\n", info.cst_ino);
-		printf("mode:    %04llo\n", info.cst_mode);
-		printf("nlink:   %lld\n", info.cst_nlink);
-		printf("uid:     %lld\n", info.cst_uid);
-		printf("gid:     %lld\n", info.cst_gid);
-		printf("rdevice: %lld\n", info.cst_rdev);
-		printf("size:    %lld\n", info.cst_size);
-		printf("blksize: %lld\n", info.cst_blksize);
-		printf("blocks:  %lld\n", info.cst_blocks);
+		printf("device:  %" PRId64 "\n", info.cst_dev);
+		printf("inode:   %" PRId64 "\n", info.cst_ino);
+		printf("mode:    %04" PRId64 "\n", info.cst_mode);
+		printf("nlink:   %" PRId64 "\n", info.cst_nlink);
+		printf("uid:     %" PRId64 "\n", info.cst_uid);
+		printf("gid:     %" PRId64 "\n", info.cst_gid);
+		printf("rdevice: %" PRId64 "\n", info.cst_rdev);
+		printf("size:    %" PRId64 "\n", info.cst_size);
+		printf("blksize: %" PRId64 "\n", info.cst_blksize);
+		printf("blocks:  %" PRId64 "\n", info.cst_blocks);
 		t = info.cst_atime;
 		printf("atime:   %s", ctime(&t));
 		t = info.cst_mtime;
@@ -754,9 +852,9 @@ static INT64_T do_audit(int argc, char **argv)
 			printf("   FILES     DIRS      DATA OWNER\n");
 		for(i = 0; i < result; i++) {
 			if(raw_mode) {
-				printf("%lld %lld %lld %s\n", list[i].nfiles, list[i].ndirs, list[i].nbytes, list[i].name);
+				printf("%" PRId64 " %" PRId64 " %" PRId64 " %s\n", list[i].nfiles, list[i].ndirs, list[i].nbytes, list[i].name);
 			} else {
-				printf("%8lld %8lld %8sB %s\n", list[i].nfiles, list[i].ndirs, string_metric(list[i].nbytes, -1, 0), list[i].name);
+				printf("%8" PRId64 " %8" PRId64 " %8sB %s\n", list[i].nfiles, list[i].ndirs, string_metric(list[i].nbytes, -1, 0), list[i].name);
 			}
 		}
 		free(list);
@@ -809,7 +907,7 @@ static INT64_T do_thirdput(int argc, char **argv)
 		stop++;
 
 	if(result > 0) {
-		printf("%lld bytes transferred in %d seconds ", result, (int) (stop - start));
+		printf("%" PRId64 " bytes transferred in %d seconds ", result, (int) (stop - start));
 		printf("(%.1lfMB/s)\n", result / (double) (stop - start) / 1024.0 / 1024.0);
 	}
 
@@ -948,57 +1046,6 @@ static INT64_T do_xattr_set(int argc, char **argv)
 	}
 }
 
-static struct command list[] = {
-	{"audit", 1, 0, 1, "[-r]", do_audit},
-	{"cat", 1, 1, 100, "<file> [file2] [file3] ...", do_cat},
-	{"cd", 1, 1, 1, "<remotedir>", do_cd},
-	{"chmod", 1, 2, 2, "<mode> <path>", do_chmod},
-	{"close", 1, 0, 0, "", do_close},
-	{"debug", 0, 0, 1, "[subsystem]", do_debug},
-	{"df", 1, 0, 1, "[-k|-m|-g|-t]", do_statfs},
-	{"exit", 0, 0, 0, "", do_quit},
-	{"get", 1, 1, 2, "<remotefile> [localfile]", do_get},
-	{"getacl", 1, 0, 1, "[remotepath]", do_getacl},
-	{"help", 0, 0, 0, "", do_help},
-	{"lcd", 0, 1, 1, "<localdir>", do_lcd},
-	{"listacl", 1, 0, 1, "[remotepath]", do_getacl},
-	{"localpath", 1, 0, 1, "[remotepath]", do_localpath},
-	{"lpwd", 0, 0, 0, "", do_lpwd},
-	{"ls", 1, 0, 2, "[-la] [remotepath]", do_ls},
-	{"lsalloc", 1, 0, 1, "[path]", do_lsalloc},
-	{"matrix_create", 1, 4, 4, "<path> <width> <height> <nhosts>", do_matrix_create},
-	{"matrix_delete", 1, 1, 1, "<path>", do_matrix_delete},
-	{"matrix_list", 1, 1, 1, "<path>", do_matrix_list},
-	{"md5", 1, 1, 1, "<path>", do_md5},
-	{"mkalloc", 1, 2, 2, "<path> <size>", do_mkalloc},
-	{"mkdir", 1, 1, 2, "[-p] <dir>", do_mkdir},
-	{"mv", 1, 2, 2, "<oldname> <newname>", do_mv},
-	{"open", 0, 1, 1, "<host>", do_open},
-	{"put", 1, 1, 2, "<localfile> [remotefile]", do_put},
-	{"pwd", 1, 0, 0, "", do_pwd},
-	{"quit", 0, 0, 0, "", do_quit},
-	{"remote_debug", 1, 1, 1, "[subsystem]", do_remote_debug},
-	{"resetacl", 1, 2, 2, "<remotepath> <rwldax>", do_resetacl},
-	{"rm", 1, 1, 1, "<file>", do_rm},
-	{"rmdir", 1, 1, 1, "<dir>", do_rmdir},
-	{"setacl", 1, 3, 3, "<remotepath> <user> <rwldax>", do_setacl},
-	{"setrep", 1, 2, 2, "<path> <nreps>", do_setrep},
-	{"stat", 1, 1, 1, "<file>", do_stat},
-	{"thirdput", 1, 3, 3, "<file> <3rdhost> <3rdfile>", do_thirdput},
-	{"ticket_create", 1, 0, 100, "[-o[utput] <ticket filename>] [-s[ubject] <subject/user>] [-d[uration] <duration>] [-b[its] <bits>] [[<directory> <acl>] ...]", do_ticket_create},
-	{"ticket_delete", 1, 1, 1, "<name>", do_ticket_delete},
-	{"ticket_get", 1, 1, 1, "<name>", do_ticket_get},
-	{"ticket_list", 1, 0, 1, "<name>", do_ticket_list},
-	{"ticket_modify", 1, 3, 3, "<name> <directory> <aclmask>", do_ticket_modify},
-	{"ticket_register", 1, 2, 3, "<name> [<subject>] <duration>", do_ticket_register},
-	{"timeout", 0, 1, 1, "<seconds>", do_timeout},
-	{"whoami", 1, 0, 0, "", do_whoami},
-	{"whoareyou", 1, 1, 1, "<hostname>", do_whoareyou},
-	{"xattr_get", 1, 2, 2, "<file> <attribute>", do_xattr_get},
-	{"xattr_list", 1, 1, 1, "<file>", do_xattr_list},
-	{"xattr_set", 1, 2, 3, "<file> <attribute> [value]", do_xattr_set},
-	{0, 0, 0, 0, 0},
-};
 
 static int process_command(int argc, char **argv)
 {

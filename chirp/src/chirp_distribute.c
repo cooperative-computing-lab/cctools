@@ -293,7 +293,7 @@ int main(int argc, char *argv[])
 
 	result = chirp_reli_stat(sourcehost, sourcepath, &buf, time(0) + 20);
 	if(result < 0) {
-		printf("%s %s %lld %i %s chirp stat failed\n", sourcehost, sourcepath, result, errno, strerror(errno));
+		printf("%s %s %" PRId64 " %i %s chirp stat failed\n", sourcehost, sourcepath, result, errno, strerror(errno));
 		if(errno == 2)
 			return 0;
 	}

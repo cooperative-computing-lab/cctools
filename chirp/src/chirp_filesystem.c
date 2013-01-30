@@ -158,7 +158,7 @@ size_t cfs_fread(void *ptr, size_t size, size_t nitems, CHIRP_FILE * file)
 		if(t == -1 || t == 0)
 			return nitems_read;
 		file->offset += t;
-		ptr += size;
+		ptr = (char *) ptr + size; //Previously void arithmetic.
 		nitems_read++;
 	}
 	return nitems_read;

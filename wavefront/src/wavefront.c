@@ -586,7 +586,7 @@ int main( int argc, char *argv[] )
 
 					wavefront_task_complete(b,ready_list,task);
 				} else {
-					printf("job %llu failed, aborting this workload\n",jobid);
+					printf("job %" PRIu64 " failed, aborting this workload\n",jobid);
 					abort_mode = 1;
 				}
 			}

@@ -32,7 +32,7 @@ prepare()
 
 run()
 {
-    ../../dttools/src/work_queue_worker localhost `cat $PORT_FILE` &
+    ../../dttools/src/work_queue_worker -dall localhost `cat $PORT_FILE` &
     pid=$!
 	echo $pid > $PIDWORKER_FILE
 
@@ -58,7 +58,6 @@ clean()
 	rm -f $PIDMASTER_FILE
 	rm -f $PIDWORKER_FILE
 	rm -f $PORT_FILE
-    rm -f allpairs_multicore
 
     exit 0
 }

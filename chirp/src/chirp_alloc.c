@@ -97,7 +97,7 @@ static struct alloc_state *alloc_state_load(const char *path)
 		}
 	}
 
-	fscanf(s->file, "%lld %lld", &s->size, &s->inuse);
+	fscanf(s->file, "%" SCNd64 " %" SCNd64 "", &s->size, &s->inuse);
 
 	s->dirty = 0;
 
@@ -122,7 +122,7 @@ static void alloc_state_save(const char *path, struct alloc_state *s)
 	if(s->dirty) {
 		ftruncate(fileno(s->file), 0);
 		fseek(s->file, 0, SEEK_SET);
-		fprintf(s->file, "%lld\n%lld\n", s->size, s->inuse);
+		fprintf(s->file, "%" PRId64 "\n%" PRId64 "\n", s->size, s->inuse);
 	}
 	fclose(s->file);
 	free(s);
@@ -135,7 +135,7 @@ static int alloc_state_create(const char *path, INT64_T size)
 	sprintf(statepath, "%s/.__alloc", path);
 	file = fopen(statepath, "w");
 	if(file) {
-		fprintf(file, "%lld 0\n", size);
+		fprintf(file, "%" PRId64 " 0\n", size);
 		fclose(file);
 		return 1;
 	} else {
@@ -539,7 +539,7 @@ struct chirp_dirent * chirp_alloc_readdir( struct chirp_dir *dir )
 
 void chirp_alloc_closedir( struct chirp_dir *dir )
 {
-	return cfs->closedir(dir);
+	cfs->closedir(dir);
 }
 
 INT64_T chirp_alloc_getfile(const char *path, struct link * link, time_t stoptime)
@@ -801,7 +801,7 @@ INT64_T chirp_alloc_rmdir(const char *path)
 			if(cfs->rmdir(path) == 0) {
 				if(d != a) {
 					alloc_state_update(a, -d->size);
-					debug(D_ALLOC, "rmalloc %s %lld", path, d->size);
+					debug(D_ALLOC, "rmalloc %s %" PRId64 "", path, d->size);
 				}
 				chirp_alloc_flush();
 				result = 0;
@@ -960,7 +960,7 @@ INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode)
 			if(result == 0) {
 				if(alloc_state_create(path, size)) {
 					alloc_state_update(a, size);
-					debug(D_ALLOC, "mkalloc %s %lld", path, size);
+					debug(D_ALLOC, "mkalloc %s %" PRId64 "", path, size);
 					chirp_alloc_flush();
 				} else {
 					result = -1;

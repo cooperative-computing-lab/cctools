@@ -170,7 +170,7 @@ static void do_get( const char *rfile, const char *lfile )
 
 	length = ftp_lite_stream_to_stream(data,file);
 	if(length>=0) {
-		printf("got %lld bytes\n",length);
+		printf("got %" PRId64 " bytes\n",length);
 	} else {
 		printf("couldn't get file: %s\n",strerror(errno));
 	}
@@ -201,7 +201,7 @@ static void do_put( const char *lfile, const char *rfile )
 
 	length = ftp_lite_stream_to_stream(file,data);
 	if(length>=0) {
-		printf("put %lld bytes\n",length);
+		printf("put %" PRId64 " bytes\n",length);
 	} else {
 		printf("couldn't put file: %s\n",strerror(errno));
 	}

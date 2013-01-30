@@ -739,9 +739,9 @@ int main( int argc, char *argv[] )
 
 	if(pfs_syscall_totals32) {
 		printf("\nParrot System Call Summary:\n");
-		printf("%lld syscalls\n",pfs_syscall_count);
-		printf("%lld bytes read\n",pfs_read_count);
-		printf("%lld bytes written\n",pfs_write_count);
+		printf("%lld syscalls\n", (long long int) pfs_syscall_count);
+		printf("%lld bytes read\n", (long long int) pfs_read_count);
+		printf("%lld bytes written\n", (long long int) pfs_write_count);
 
 		printf("\n32-bit System Calls:\n");
 		for(i=0;i<SYSCALL32_MAX;i++) {

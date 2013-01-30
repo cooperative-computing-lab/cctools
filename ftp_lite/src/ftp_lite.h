@@ -9,9 +9,10 @@ See the file COPYING for details.
 #define FTP_LITE_H
 
 #include <stdio.h>
+#include <inttypes.h>
 
-typedef long long ftp_lite_off_t;
-typedef long long ftp_lite_size_t;
+typedef int64_t ftp_lite_off_t;
+typedef int64_t ftp_lite_size_t;
 
 #define FTP_LITE_LINE_MAX 32768
 #define FTP_LITE_DEFAULT_PORT 21

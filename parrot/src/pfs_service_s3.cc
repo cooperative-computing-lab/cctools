@@ -175,7 +175,8 @@ public:
 
 		if( !(local_name = (char*)hash_table_lookup(s3_file_cache, path)) ) {
 			local_name = new char[L_tmpnam];
-			tmpnam(local_name);
+			strcpy(local_name, "pfs-XXXXXX");
+			mkstemp(local_name);
 			hash_table_insert(s3_file_cache, path, local_name);
 			local_exists = 1;
 		}
