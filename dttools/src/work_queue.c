@@ -466,7 +466,7 @@ static void log_worker_states(struct work_queue *q)
 {
 	struct work_queue_stats s;
 	work_queue_get_stats(q, &s);
-	fprintf(q->logfile, "%16llu %25llu %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25lld %25lld %25llu %25llu %25f %25f %25d %25d %25d %25d\n",
+	fprintf(q->logfile, "%16" PRIu64 " %25" PRIu64 " %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25" PRId64 " %25" PRId64 " %25" PRId64 " %25" PRId64 " %25f %25f %25d %25d %25d %25d\n",
 		timestamp_get(), s.start_time, // time
 		s.workers_init, s.workers_ready, s.workers_busy, s.workers_cancelling, // workers
 		s.tasks_waiting, s.tasks_running, s.tasks_complete, // tasks
@@ -493,7 +493,7 @@ static void change_worker_state(struct work_queue *q, struct work_queue_worker *
 
 static void link_to_hash_key(struct link *link, char *key)
 {
-	sprintf(key, "0x%p", link);
+	sprintf(key, "0x%p", (void *) link);
 }
 
 /**
@@ -799,7 +799,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 			goto link_failure;
 		}
 		
-		if(sscanf(line, "%s %s %lld", type, tmp_remote_name, &length) == 3) {
+		if(sscanf(line, "%s %s %" PRId64, type, tmp_remote_name, &length) == 3) {
 			tmp_local_name[local_name_len] = '\0';
 			strcat(tmp_local_name, &(tmp_remote_name[remote_name_len]));
 
@@ -2191,10 +2191,9 @@ static void do_keepalive_checks(struct work_queue *q) {
 					}	
 				}
 			} else { 
-				// if we aren't sending a keepalive check, determine if worker is dead using following logic:
-				// if we haven't received a message from worker since we last sent a keepalive check and if time since we 
-				// last polled link for responses has exceeded timeout for unacknowledged keepalive checks, mark worker as dead.
-				if (w->last_msg_recv_time < w->keepalive_check_sent_time) {	
+				// Here because we haven't received a message from worker since its last keepalive check. Check if time 
+				// since we last polled link for responses has exceeded keepalive timeout. If so, remove the worker.
+				if (link_poll_end > w->keepalive_check_sent_time) {
 					if (((link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
 						debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
 						remove_worker(q, w);

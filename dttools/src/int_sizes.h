@@ -27,6 +27,6 @@
 #define UINT16_FORMAT "%" PRIu16
 #define UINT32_FORMAT "%" PRIu32
 #define UINT64_FORMAT "%" PRIu64
-#define UPTR_FORMAT   "%zd"
+#define UPTR_FORMAT   "%zu"
 
 #endif

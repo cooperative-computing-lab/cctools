@@ -143,7 +143,7 @@ batch_job_id_t batch_job_wait_mpi_queue( struct batch_queue *q, struct batch_job
 			}
 			free(outfile);
 		}
-		fprintf(logfile, "TASK %llu %d %d %d %llu %llu \"%s\" \"%s\"\n", timestamp_get(), t->taskid, t->result, t->return_status, t->submit_time, t->finish_time, t->tag ? t->tag : "", t->command_line);
+		fprintf(logfile, "TASK %" PRIu64 " %d %d %d %" PRIu64 " %" PRIu64 " \"%s\" \"%s\"\n", timestamp_get(), t->taskid, t->result, t->return_status, t->submit_time, t->finish_time, t->tag ? t->tag : "", t->command_line);
 
 		taskid = t->taskid;
 		mpi_queue_task_delete(t);

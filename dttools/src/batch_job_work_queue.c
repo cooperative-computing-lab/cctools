@@ -226,7 +226,7 @@ batch_job_id_t batch_job_wait_work_queue(struct batch_queue * q, struct batch_jo
 			free(outfile);
 		}
 
-		fprintf(logfile, "TASK %llu %d %d %d %d %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %s \"%s\" \"%s\"\n", timestamp_get(), t->taskid, t->result, t->return_status, t->worker_selection_algorithm, t->time_task_submit, t->time_task_finish,
+		fprintf(logfile, "TASK %" PRIu64 " %d %d %d %d %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRId64 " %" PRIu64 " %s \"%s\" \"%s\"\n", timestamp_get(), t->taskid, t->result, t->return_status, t->worker_selection_algorithm, t->time_task_submit, t->time_task_finish,
 			t->time_send_input_start, t->time_send_input_finish, t->time_execute_cmd_start, t->time_execute_cmd_finish, t->time_receive_output_start, t->time_receive_output_finish, t->total_bytes_transferred, t->total_transfer_time, t->host,
 			t->tag ? t->tag : "", t->command_line);
 
@@ -238,7 +238,7 @@ batch_job_id_t batch_job_wait_work_queue(struct batch_queue * q, struct batch_jo
 
 	char * workers_by_pool = work_queue_get_worker_summary(q->work_queue);
 
-	fprintf(logfile, "QUEUE %llu %d %d %d %d %d %d %d %d %d %d %lld %lld %.2f %.2f %d %d %d %s\n", timestamp_get(), s.workers_init, s.workers_ready, s.workers_busy, s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity, s.avg_capacity, s.total_workers_connected, workers_by_pool);
+	fprintf(logfile, "QUEUE %" PRIu64 " %d %d %d %d %d %d %d %d %d %d %" PRId64 " %" PRId64 " %.2f %.2f %d %d %d %s\n", timestamp_get(), s.workers_init, s.workers_ready, s.workers_busy, s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity, s.avg_capacity, s.total_workers_connected, workers_by_pool);
 
 	free(workers_by_pool);
 

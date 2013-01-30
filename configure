@@ -114,7 +114,7 @@ globus_flavor=auto
 ccompiler=gcc
 cxxcompiler=g++
 mpicompiler=mpicc
-ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
+ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions --pedantic-errors -std=c99"
 
 if [ ${build_sys} != CYGWIN ]
 then

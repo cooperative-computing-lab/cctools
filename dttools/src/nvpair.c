@@ -380,7 +380,7 @@ void nvpair_print_table(struct nvpair *n, FILE * s, struct nvpair_header *h)
 			line = xxmalloc(h->width);
 			timestamp_t ts;
 			int ret = 0;
-			if(sscanf(text, "%llu", &ts) == 1) {
+			if(sscanf(text, "%" PRIu64, &ts) == 1) {
 				if(h->mode == NVPAIR_MODE_TIME) {
 					ts *= 1000000;
 				}
