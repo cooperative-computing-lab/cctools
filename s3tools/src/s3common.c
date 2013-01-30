@@ -16,8 +16,8 @@ See the file COPYING for details.
 char *userid = NULL;
 char *key = NULL;
 
-inline const char* s3_userid() { return userid; }
-inline const char* s3_key() { return key; }
+const char* s3_userid() { return userid; }
+const char* s3_key() { return key; }
 
 int process_userpass(char *userpass, char **username, char **password) {
 	int nargs;

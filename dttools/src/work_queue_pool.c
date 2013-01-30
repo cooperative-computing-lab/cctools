@@ -532,7 +532,7 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 
 		time_t now = time(0);
 		if(now - last_log_time >= LOG_INTERVAL && logfile) {	
-			fprintf(logfile, "%llu %d %d %d %d %d %d %d\n", timestamp_get(), workers_desired, workers_submitted, sum_workers_connected, sum_masters, sum_capacity, sum_running, sum_waiting);
+			fprintf(logfile, "%" PRIu64 " %d %d %d %d %d %d %d\n", timestamp_get(), workers_desired, workers_submitted, sum_workers_connected, sum_masters, sum_capacity, sum_running, sum_waiting);
 			last_log_time = now; 
 		}
 
@@ -566,7 +566,7 @@ check_workers:
 
 static void master_to_hash_key(struct work_queue_master *m, char *key)
 {
-	sprintf(key, "%s-%d-%llu", m->addr, m->port, m->start_time);
+	sprintf(key, "%s-%d-%" PRIu64, m->addr, m->port, m->start_time);
 }
 
 char *get_pool_decision_string(struct list *ml) {
@@ -855,7 +855,7 @@ static void remove_workers(struct itable *jobs)
 	itable_firstkey(jobs);
 	while(itable_nextkey(jobs, &key, &x)) {
 		// The key is the job id
-		printf("work_queue_pool: aborting remote job %llu\n", key);
+		printf("work_queue_pool: aborting remote job %" PRIu64 "\n", key);
 		batch_job_remove(q, key);
 		itable_remove(job_table, key);
 	}

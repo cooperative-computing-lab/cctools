@@ -35,13 +35,13 @@ char **string_array_append (char **oarray, char *str)
 	size_t olength = *((size_t *) tmp); 
 	size_t nlength = olength + strlen(str)+1 + sizeof(char *);
 	narray = xxrealloc(oarray, nlength);
-	ptrdiff_t offset = ((void *)narray)-((void *)oarray)+sizeof(char *); /* difference including extra pointer */
+	ptrdiff_t offset = ((char *)narray)-((char *)oarray)+sizeof(char *); /* difference including extra pointer */
 	for (tmp = narray; *tmp; tmp++)
-		*tmp = ((void *)*tmp)+offset; /* correct the address */
-	*tmp = (char *) (((void *)narray)+olength+sizeof(char *)); /* set to new string location */
+		*tmp = ((char *)*tmp)+offset; /* correct the address */
+	*tmp = (char *) (((char *)narray)+olength+sizeof(char *)); /* set to new string location */
 	strcpy(*tmp, str);
 	tmp++; /* now points to the old data length */
-    memmove(((void *)tmp)+sizeof(char *), tmp, olength-(((void *)tmp)-((void *)narray))); /* careful with pointer arithmetic */
+    memmove(((char *)tmp)+sizeof(char *), tmp, olength-(((char *)tmp)-((char *)narray))); /* careful with pointer arithmetic */
 	*tmp = NULL; /* set NULL terminated final entry */
 	tmp++;
 	*((size_t *) tmp) = nlength; /* set the new length */

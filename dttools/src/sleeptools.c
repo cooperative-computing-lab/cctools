@@ -25,5 +25,5 @@ void sleep_until(time_t stoptime)
 
 void sleep_for(time_t interval)
 {
-	return sleep_until(time(0) + interval);
+	sleep_until(time(0) + interval);
 }

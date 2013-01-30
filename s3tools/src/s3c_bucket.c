@@ -166,7 +166,7 @@ int s3_ls_bucket(char* bucketname, struct list* dirents, const char* access_key_
 			link_read(server, buffer, length, stoptime);
 		} else {
 			struct list *buf;
-			int clen = 0;
+			unsigned int clen = 0;
 			buf = list_create();
 			do {
 				link_readline(server, response, HEADER_LINE_MAX, stoptime);

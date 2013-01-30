@@ -167,7 +167,7 @@ restart:
 	while (itable_nextkey(q->job_table, &key, (void **) &job)) {
 		/* read the status until empty */
 		char line[BATCH_JOB_LINE_MAX];
-		while (fgets(line, sizeof(line), job->status_file) > 0) {
+		while (fgets(line, sizeof(line), job->status_file)) {
 			debug(D_BATCH, "hadoop-streaming job %d output: %s", (int) job->child, line);
 			if (strstr(line, "Streaming Command Failed!")) {
 				debug(D_HDFS, "hadoop-streaming job %d failed", job->child);

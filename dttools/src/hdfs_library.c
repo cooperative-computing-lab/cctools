@@ -15,8 +15,11 @@ See the file COPYING for details.
 
 #include "debug.h"
 
+//Use the cryptic *(void **)(&hs->lval) cast, rather than just
+////hs->lval because we get a warning that we cannot convert a
+////funtion pointer to a function type.
 #define HDFS_LOAD_FUNC( lval, name ) \
-	hs->lval = dlsym(hs->libhdfs_handle,name); \
+	*(void **)(&hs->lval) = dlsym(hs->libhdfs_handle,name); \
 	if(!hs->lval) { \
 		debug(D_NOTICE|D_HDFS,"couldn't find %s in libhdfs.so",name); \
 		goto failure; \

@@ -33,7 +33,7 @@ void url_decode(const char *s, char *t, int length)
 {
 	while(*s && length > 1) {
 		if(*s == '%') {
-			int x;
+			unsigned int x;
 			sscanf(s + 1, "%2x", &x);
 			*t++ = x;
 			s += 3;
