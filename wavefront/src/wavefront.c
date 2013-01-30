@@ -43,7 +43,7 @@ static int progress_bitmap_interval = 5;
 static FILE * progress_log_file = 0;
 static int abort_mode = 0;
 static int block_size = 1;
-static int batch_system_type = BATCH_QUEUE_TYPE_CONDOR;
+static int batch_system_type = BATCH_QUEUE_TYPE_LOCAL;
 static int verify_mode = 0;
 static struct batch_queue * batch_q = 0;
 
@@ -374,8 +374,7 @@ static void show_help(const char *cmd)
 	printf(" -t <secs>      Interval between image writes, in seconds. (default=%d)\n",progress_bitmap_interval);
 	printf(" -A             Automatically choose between multicore and batch mode.\n");
 	printf(" -M             Run the whole problem locally in multicore mode. (default)\n");
-	printf(" -D             Run the whole problem in distributed mode.\n");
-	printf(" -T <type>      Type of batch system: %s\n",batch_queue_type_string());
+	printf(" -T <type>      Run in distributed mode with <type> batch system: %s. (default=%s)\n",batch_queue_type_string(), batch_queue_type_to_string(batch_system_type));
 	printf(" -V             Verify mode: check the configuration and then exit.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -424,10 +423,8 @@ int main( int argc, char *argv[] )
 			case 'M':
 				wavefront_mode = WAVEFRONT_MODE_MULTICORE;
 				break;
-			case 'D':
-				wavefront_mode = WAVEFRONT_MODE_DISTRIBUTED;
-				break;
 			case 'T':
+				wavefront_mode = WAVEFRONT_MODE_DISTRIBUTED;
 				batch_system_type = batch_queue_type_from_string(optarg);
 				if(batch_system_type==BATCH_QUEUE_TYPE_UNKNOWN) {
 					fprintf(stderr,"unknown batch system type: %s\n",optarg);
