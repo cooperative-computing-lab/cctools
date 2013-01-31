@@ -49,6 +49,7 @@ OPTION_PAIR(-j, #)Max number of local jobs to run at once. (default is # of core
 OPTION_PAIR(-J, #)Max number of remote jobs to run at once. (default is 100)
 OPTION_PAIR(-l, logfile)Use this file for the makeflow log. (default is X.makeflowlog)
 OPTION_PAIR(-L, logfile)Use this file for the batch system log. (default is X.PARAM(type)log)
+OPTION_ITEM(-R)Automatically retry failed batch jobs up to 100 times.
 OPTION_PAIR(-r, n)Automatically retry failed batch jobs up to n times.
 OPTION_PAIR(-S, timeout)Time to retry failed batch job submission. (default is 3600s)
 OPTION_PAIR(-T, type)Batch system type: local, condor, sge, moab, cluster, wq, hadoop, mpi-queue. (default is local)
