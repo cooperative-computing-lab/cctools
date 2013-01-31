@@ -50,7 +50,7 @@ OPTION_PAIR(-M,size)Maximum size of a server to be believed.  (default is any)
 OPTION_PAIR(-o,file)Send debugging to this file.
 OPTION_PAIR(-O,bytes)Rotate debug file once it reaches this size.
 OPTION_PAIR(-p,port)Port number to listen on (default is 9097)
-OPTION_ITEM(-S)Single process mode; do not work on queries.
+OPTION_ITEM(-S)Single process mode; do not fork on queries.
 OPTION_PAIR(-T,time)Maximum time to allow a query process to run.  (default is 60s)
 OPTION_PAIR(-u,host)Send status updates to this host. (default is chirp.cse.nd.edu)
 OPTION_PAIR(-U,time)Send status updates at this interval. (default is 5m)
