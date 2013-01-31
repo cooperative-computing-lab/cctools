@@ -2321,6 +2321,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -O             Show output files.\n");
 	fprintf(stdout, " -p <port>      Port number to use with Work Queue.         (default is %d, 0=arbitrary)\n", WORK_QUEUE_DEFAULT_PORT);
 	fprintf(stdout, " -P <integer>   Priority. Higher the value, higher the priority.\n");
+	fprintf(stdout, " -R             Automatically retry failed batch jobs up to %d times.\n", dag_retry_max);
 	fprintf(stdout, " -r <n>         Automatically retry failed batch jobs up to n times.\n");
 	fprintf(stdout, " -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n", dag_submit_timeout);
 	fprintf(stdout, " -v             Show version string\n");
