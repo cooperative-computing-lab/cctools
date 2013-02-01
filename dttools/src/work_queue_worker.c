@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "work_queue_protocol.h"
 
 #include "cctools.h"
+#include "macros.h"
 #include "catalog_query.h"
 #include "catalog_server.h"
 #include "work_queue_catalog.h"
@@ -57,6 +58,9 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define STDOUT_BUFFER_SIZE 1048576        
 
+#define MIN_TERMINATE_BOUNDARY 0 
+#define TERMINATE_BOUNDARY_LEEWAY 30
+
 #define PIPE_ACTIVE 1
 #define LINK_ACTIVE 2
 #define POLL_FAIL 4
@@ -102,8 +106,13 @@ static int max_backoff_interval = 60;
 // Flag gets set on receipt of a terminal signal.
 static int abort_flag = 0;
 
-//Threshold for available disk space (MB) beyond which clean up and restart.
+// Threshold for available disk space (MB) beyond which clean up and restart.
 static UINT64_T disk_avail_threshold = 100;
+
+// Terminate only when:
+// terminate_boundary - (current_time - worker_start_time)%terminate_boundary ~~ 0
+// Use case: hourly charge resource such as Amazon EC2
+static int terminate_boundary = 0;
 
 
 // Basic worker global variables
@@ -113,6 +122,7 @@ static char workspace[WORKER_WORKSPACE_NAME_MAX];
 static char *os_name = NULL; 
 static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
+static time_t worker_start_time = 0;
 
 // Forked task related
 static int pipefds[2];
@@ -767,12 +777,23 @@ static struct link *connect_master(time_t stoptime) {
 	while(!abort_flag) {
 		if(stoptime < time(0)) {
 			// Failed to connect to any master.
-			if(auto_worker) {
-				debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to any master in %d seconds.\n", idle_timeout);
+			if(terminate_boundary > 0) {
+				time_t elapsed_time = time(0) - worker_start_time;
+				int time_to_boundary = terminate_boundary - (elapsed_time % terminate_boundary);
+				debug(D_DEBUG, "Elapsed time: %ld sec. Terminate boundary: %d sec. Time to next terminate boundary: %d sec.", elapsed_time, terminate_boundary, time_to_boundary);
+				if(time_to_boundary < TERMINATE_BOUNDARY_LEEWAY) { 
+					// the $TERMINATE_BOUNDARY_LEEWAY seconds is just to allow some extra time to process the shutdown of the worker so that we don't surpass the boundary 
+					debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to any master in %d seconds and terminate boundary almost reached.\n", idle_timeout);
+					break;
+				}
 			} else {
-				debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to %s:%d in %d seconds.\n", actual_addr, actual_port, idle_timeout);
+				if(auto_worker) {
+					debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to any master in %d seconds.\n", idle_timeout);
+				} else {
+					debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to %s:%d in %d seconds.\n", actual_addr, actual_port, idle_timeout);
+				}
+				break;
 			}
-			break;
 		}
 
 		if(auto_worker) {
@@ -1429,6 +1450,8 @@ int main(int argc, char *argv[])
 	struct utsname uname_data;
 	struct link *master = NULL;
 
+	worker_start_time = time(0);
+
 	preferred_masters = list_create();
 	if(!preferred_masters) {
 		fprintf(stderr, "Cannot allocate memory to store preferred work queue masters names.\n");
@@ -1442,10 +1465,13 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aC:d:t:o:p:N:w:i:b:z:A:O:s:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "aC:B:d:t:o:p:N:w:i:b:z:A:O:s:vh")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
+			break;
+		case 'B':
+			terminate_boundary = MAX(MIN_TERMINATE_BOUNDARY, string_time_parse(optarg));
 			break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port)) {
@@ -1522,6 +1548,10 @@ int main(int argc, char *argv[])
 	if(!setup_workspace()) {
 		fprintf(stderr, "work_queue_worker: failed to setup workspace at %s.\n", workspace);
 		exit(1);
+	}
+
+	if(idle_timeout > terminate_boundary) {
+		idle_timeout = MAX(short_timeout, terminate_boundary - TERMINATE_BOUNDARY_LEEWAY);
 	}
 
 	// set $WORK_QUEUE_SANDBOX to workspace.
