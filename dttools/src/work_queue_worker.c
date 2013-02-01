@@ -30,26 +30,29 @@ See the file COPYING for details.
 #include "create_dir.h"
 #include "delete_dir.h"
 
-#include <stdio.h>
-#include <time.h>
 #include <unistd.h>
-#include <limits.h>
-#include <stdlib.h>
-#include <string.h>
+
+#include <dirent.h>
 #include <fcntl.h>
+
+#include <sys/mman.h>
+#include <sys/poll.h>
+#include <sys/resource.h>
+#include <sys/signal.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
+
+#include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <signal.h>
-#include <dirent.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <sys/signal.h>
-#include <sys/utsname.h>
-#include <sys/resource.h>
-#include <sys/wait.h>
-#include <sys/poll.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 #ifdef CCTOOLS_OPSYS_SUNOS
 extern int setenv(const char *name, const char *value, int overwrite);
