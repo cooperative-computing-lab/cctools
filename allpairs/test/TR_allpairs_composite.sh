@@ -39,7 +39,7 @@ run()
 	wait_for_file_creation $TEST_OUTPUT_STEP 5
 	wait_for_file_modification $TEST_OUTPUT_STEP 3
 
-	awk '$3 ~ /0$/{print $1}' $TEST_OUTPUT_STEP | sort -n | uniq > $TEST_OUTPUT
+	awk '$3 ~ /^0$/{print $1}' $TEST_OUTPUT_STEP | sort -n | uniq > $TEST_OUTPUT
 
 	diff $TEST_TRUTH $TEST_OUTPUT
 	exit $?

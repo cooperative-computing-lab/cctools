@@ -17,6 +17,7 @@ PARA
 When using CODE(chirp_status) with long form option (-l), it lists additional information such as average load, available memory, operating system, up time, etc...
 
 SECTION(OPTIONS)
+OPTIONS_BEGIN
 OPTION_PAIR(-c,host)Query the catalog on this host.
 OPTION_PAIR(-d,subsystem)Enable debugging for this subsystem.
 OPTION_PAIR(-o,file)Send debugging output to this file.
