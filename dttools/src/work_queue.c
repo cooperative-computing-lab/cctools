@@ -1614,7 +1614,6 @@ static int put_file(struct work_queue_file *tf, const char *expanded_payload, st
 			free(remote_info);
 		}
 
-		debug(D_WQ, "%s (%s) needs file %s", w->hostname, w->addrport, payload);
 		if(dir) {
 			// If mkdir fails, the future calls to 'put_file' function to place
 			// files in that directory won't suceed. Such failure would
@@ -1627,6 +1626,7 @@ static int put_file(struct work_queue_file *tf, const char *expanded_payload, st
 
 			return 1;
 		}
+		debug(D_WQ, "%s (%s) needs file %s", w->hostname, w->addrport, payload);
 
 		int fd = open(payload, O_RDONLY, 0);
 		if(fd < 0)
