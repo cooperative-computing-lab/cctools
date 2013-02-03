@@ -624,6 +624,12 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	hash_table_delete(w->current_files);
 
 	hash_table_remove(q->worker_table, w->hashkey);
+	
+	//If worker was cancelling, don't add that task to queue since it was already handed back to user space.
+	if (w->state == WORKER_STATE_CANCELLING) {
+		w->current_task = 0;	
+	}	
+	
 	t = w->current_task;
 	if(t) {
 		if(t->result & WORK_QUEUE_RESULT_INPUT_MISSING || t->result & WORK_QUEUE_RESULT_OUTPUT_MISSING || t->result & WORK_QUEUE_RESULT_FUNCTION_FAIL) {
@@ -2142,7 +2148,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 
 	w->current_task = t;
 	itable_insert(q->running_tasks, t->taskid, w); //add worker as execution site for t.
-
+	
 	if(start_one_task(q, w, t)) {
 		change_worker_state(q, w, WORKER_STATE_BUSY);
 		return 1;
