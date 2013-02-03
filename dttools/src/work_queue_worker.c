@@ -1546,7 +1546,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	if(idle_timeout > terminate_boundary) {
+	if(terminate_boundary > 0 && idle_timeout > terminate_boundary) {
 		idle_timeout = MAX(short_timeout, terminate_boundary - TERMINATE_BOUNDARY_LEEWAY);
 	}
 
