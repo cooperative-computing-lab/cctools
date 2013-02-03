@@ -622,11 +622,6 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	hash_table_remove(q->worker_table, w->hashkey);
 	
-	//If worker was cancelling, don't add that task to queue since it was already handed back to user space.
-	if (w->state == WORKER_STATE_CANCELLING) {
-		w->current_task = 0;	
-	}	
-	
 	t = w->current_task;
 	if(t) {
 		if(t->result & WORK_QUEUE_RESULT_INPUT_MISSING || t->result & WORK_QUEUE_RESULT_OUTPUT_MISSING || t->result & WORK_QUEUE_RESULT_FUNCTION_FAIL) {
