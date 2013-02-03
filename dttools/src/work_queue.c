@@ -1878,16 +1878,6 @@ static struct task_statistics *task_statistics_init()
 	return ts;
 }
 
-static void task_statistics_destroy(struct task_statistics *ts)
-{
-	if(!ts) return;
-	if(ts->reports) {
-		list_free(ts->reports);
-		list_delete(ts->reports);
-	}
-	free(ts);
-}
-
 static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t duration, int type, timestamp_t * accumulated_time, struct list *time_list)
 {
 	struct time_slot *ts;
@@ -2417,15 +2407,7 @@ void work_queue_delete(struct work_queue *q)
 		list_delete(q->complete_list);
 		itable_delete(q->running_tasks);
 	
-		list_free(q->idle_times);
 		list_delete(q->idle_times);
-		task_statistics_destroy(q->task_statistics);
-
-		hash_table_firstkey(q->workers_by_pool);
-		struct pool_info *pi;
-		while(hash_table_nextkey(q->workers_by_pool, &key, (void **) &pi)) {
-			free(pi);
-		}
 		hash_table_delete(q->workers_by_pool);
 		
 		free(q->poll_table);
