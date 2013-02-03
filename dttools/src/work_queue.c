@@ -2408,9 +2408,11 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_delete(q->worker_table);
 		list_delete(q->ready_list);
 		list_delete(q->complete_list);
-		
 		itable_delete(q->running_tasks);
-
+	
+		list_delete(q->idle_times);
+		hash_table_delete(q->workers_by_pool);
+		
 		free(q->poll_table);
 		link_close(q->master_link);
 		if(q->logfile) {
