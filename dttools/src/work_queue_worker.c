@@ -1162,14 +1162,19 @@ static int do_thirdput(struct link *master, int mode, const char *filename, cons
 
 }
 
-// Kill task if there's one running
 static void kill_task() {
 	if(task_status == TASK_RUNNING) {
 		debug(D_WQ, "terminating the current running task - process %d", pid);
 		kill(pid, SIGTERM);
-		// This reaps the killed child process created by function execute_task
-		wait_task_process(NULL);
 	}
+}
+
+// Kill task if there's one running
+static void kill_and_reap_task() {
+	kill_task();
+	// This reaps the killed child process created by function execute_task
+	if(task_status == TASK_RUNNING) 
+		wait_task_process(NULL);
 }
 
 static int do_kill() {
@@ -1178,13 +1183,11 @@ static int do_kill() {
 }
 
 static int do_release() {
-	kill_task();
+	kill_and_reap_task();
 	debug(D_WQ, "Released by master at %s:%d.\n", actual_addr, actual_port);
 	released_by_master = 1;
 	return 0;
 }
-
-
 
 static int handle_link(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
@@ -1220,7 +1223,7 @@ static int handle_link(struct link *master) {
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
 		} else if(!strncmp(line, "exit", 5)) {
-			kill_task();
+			kill_and_reap_task();
 			r = 0;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
@@ -1242,7 +1245,7 @@ static void disconnect_master(struct link *master) {
 		record_bad_master(duplicate_work_queue_master(actual_master));
 	}
 
-	kill_task();
+	kill_and_reap_task();
 
 	// Remove the contents of the workspace. 
 	delete_dir_contents(workspace);
@@ -1272,7 +1275,7 @@ static void abort_worker() {
 	free(arch_name);
 
 	// Kill running task if any 
-    kill_task();	
+    kill_and_reap_task();	
 
 	// Remove workspace. 
 	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
