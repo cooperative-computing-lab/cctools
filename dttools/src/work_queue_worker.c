@@ -1183,8 +1183,7 @@ static int do_kill() {
 }
 
 static int do_release() {
-	kill_and_reap_task();
-	debug(D_WQ, "Released by master at %s:%d.\n", actual_addr, actual_port);
+	debug(D_WQ, "released by master at %s:%d.\n", actual_addr, actual_port);
 	released_by_master = 1;
 	return 0;
 }
