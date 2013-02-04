@@ -1646,9 +1646,15 @@ int dag_prepare_for_batch_system(struct dag *d) {
 				break;
 				
 			default:
+
+				if(f->remotename) {
+					fprintf(stderr, "makeflow: automatic file renaming (%s=%s) only works with Condor or Work Queue drivers\n", f->filename, f->remotename);
+					goto failure;
+				}
 				break;
 				
 			}
+
 			f = f->next;
 			
 			/* If we're done with the source files, switch to checking target files */
@@ -2643,7 +2649,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	dag_prepare_for_batch_system(d);
+	if(dag_prepare_for_batch_system(d)) {
+		return 1;
+	}
+
 	dag_prepare_gc(d);
 	dag_prepare_nested_jobs(d);
 
