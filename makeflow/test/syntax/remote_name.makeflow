@@ -1,17 +1,15 @@
-# typo.makeflow: Example makeflow from cctools website... with a typographical
-# error.
 #
-# Expected test case results: Failure: "capital.360.jpg" does not exist and is not defined by a rule.
+# This is a sample Makeflow script that retrieves an image from the web,
+# creates four variations of it, and then combines them into an animation.
+# A Makeflow script is a subset of the Makefile language, see the manual
+# for more information.
 #
-# Created by Kevin Partington, 22 February 2010
-# Copyright 2010 The University of Notre Dame. All rights reserved. See file
-# COPYING for details.
 
 CURL=/usr/bin/curl
 CONVERT=/usr/bin/convert
 URL=http://www.cse.nd.edu/~ccl/images/capitol.jpg
 
-capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capital.360.jpg
+capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
 	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
 
 capitol.90.jpg: capitol.jpg
@@ -26,6 +24,6 @@ capitol.270.jpg: capitol.jpg
 capitol.360.jpg: capitol.jpg
 	$CONVERT -swirl 360 capitol.jpg capitol.360.jpg
 
-capitol.jpg:
-	LOCAL $CURL -o capitol.jpg $URL
+capitol.jpg->capitolio.jpg:
+	$CURL -o capitolio.jpg $URL
 

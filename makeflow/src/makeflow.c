@@ -1258,17 +1258,13 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 	d->filename = xxstrdup(filename);
 
 	while((line = dag_readline(d, NULL)) != NULL) {
-		char *c;
 		
 		if (strlen(line) == 0  || line[0] == '#' ) {
 			/* Skip blank lines and comments */
 			free(line);
 			continue;
 		}
-
-		
-		if( (c = strstr(line, ":="))) {
-			*c = ' ';
+		if(strchr(line, '=')) {
 			if(!dag_parse_variable(d, NULL, line)) {
 				dag_parse_error(d, "variable");
 				goto failure;
@@ -1276,11 +1272,6 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 		} else if(strstr(line, ":")) {
 			if(!dag_parse_node(d, line, clean_mode)) {
 				dag_parse_error(d, "node");
-				goto failure;
-			}
-		} else if(strchr(line, '=')) {
-			if(!dag_parse_variable(d, NULL, line)) {
-				dag_parse_error(d, "variable");
 				goto failure;
 			}
 		} else if(strncmp(line, "export ", 7) == 0) {
@@ -1552,9 +1543,10 @@ int dag_parse_node_filelist(struct dag *d, struct dag_node *n, char *filelist, i
 		newname  = NULL;
 		debug(D_DEBUG, "node %s file=%s", (source ? "input" : "output"), filename);
 
-		if((newname = strchr(filename, '='))) {
+		// remote renaming
+		if((newname = strstr(filename, "->"))) {
 			*newname = '\0';
-			newname++;
+			newname+=2;
 		}
 		
 		if(source) {
