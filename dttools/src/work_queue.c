@@ -624,6 +624,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	hash_table_delete(w->current_files);
 
 	hash_table_remove(q->worker_table, w->hashkey);
+	
 	t = w->current_task;
 	if(t) {
 		if(t->result & WORK_QUEUE_RESULT_INPUT_MISSING || t->result & WORK_QUEUE_RESULT_OUTPUT_MISSING || t->result & WORK_QUEUE_RESULT_FUNCTION_FAIL) {
@@ -1614,7 +1615,6 @@ static int put_file(struct work_queue_file *tf, const char *expanded_payload, st
 			free(remote_info);
 		}
 
-		debug(D_WQ, "%s (%s) needs file %s", w->hostname, w->addrport, payload);
 		if(dir) {
 			// If mkdir fails, the future calls to 'put_file' function to place
 			// files in that directory won't suceed. Such failure would
@@ -1627,6 +1627,7 @@ static int put_file(struct work_queue_file *tf, const char *expanded_payload, st
 
 			return 1;
 		}
+		debug(D_WQ, "%s (%s) needs file %s", w->hostname, w->addrport, payload);
 
 		int fd = open(payload, O_RDONLY, 0);
 		if(fd < 0)
@@ -1878,6 +1879,16 @@ static struct task_statistics *task_statistics_init()
 		memset(ts, 0, sizeof(struct task_statistics));
 	}
 	return ts;
+}
+
+static void task_statistics_destroy(struct task_statistics *ts)
+{
+	if(!ts) return;
+	if(ts->reports) {
+		list_free(ts->reports);
+		list_delete(ts->reports);
+	}
+	free(ts);
 }
 
 static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t duration, int type, timestamp_t * accumulated_time, struct list *time_list)
@@ -2142,7 +2153,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 
 	w->current_task = t;
 	itable_insert(q->running_tasks, t->taskid, w); //add worker as execution site for t.
-
+	
 	if(start_one_task(q, w, t)) {
 		change_worker_state(q, w, WORKER_STATE_BUSY);
 		return 1;
@@ -2407,9 +2418,19 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_delete(q->worker_table);
 		list_delete(q->ready_list);
 		list_delete(q->complete_list);
-		
 		itable_delete(q->running_tasks);
+	
+		list_free(q->idle_times);
+		list_delete(q->idle_times);
+		task_statistics_destroy(q->task_statistics);
 
+		hash_table_firstkey(q->workers_by_pool);
+		struct pool_info *pi;
+		while(hash_table_nextkey(q->workers_by_pool, &key, (void **) &pi)) {
+			free(pi);
+		}
+		hash_table_delete(q->workers_by_pool);
+		
 		free(q->poll_table);
 		link_close(q->master_link);
 		if(q->logfile) {
@@ -2646,6 +2667,7 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 			
 		delete_cancel_task_files(t, w); //delete files associated with cancelled task.
 		change_worker_state(q, w, WORKER_STATE_CANCELLING);
+		w->current_task = 0; //reset worker's current task field.	
 		return 1;
 	} 
 	

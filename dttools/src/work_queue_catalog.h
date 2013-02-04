@@ -36,7 +36,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 
 #define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 60
-#define	WORK_QUEUE_CATALOG_LIFETIME	300
+#define	WORK_QUEUE_CATALOG_LIFETIME 300 
 
 #define WORK_QUEUE_NAME_MAX 256
 #define WORK_QUEUE_PROTOCOL_BLANK_FIELD "-"
@@ -61,7 +61,8 @@ struct work_queue_master {
 	char owner[USERNAME_MAX];
 	int default_max_workers_from_pool;
 	int workers_need;
-	int workers_from_this_pool;
+	int workers_need_from_pool;
+	int workers_connected_from_pool;
 	int target_workers_from_pool;
 };
 

@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "work_queue_protocol.h"
 
 #include "cctools.h"
+#include "macros.h"
 #include "catalog_query.h"
 #include "catalog_server.h"
 #include "work_queue_catalog.h"
@@ -30,32 +31,38 @@ See the file COPYING for details.
 #include "create_dir.h"
 #include "delete_dir.h"
 
-#include <stdio.h>
-#include <time.h>
 #include <unistd.h>
-#include <limits.h>
-#include <stdlib.h>
-#include <string.h>
+
+#include <dirent.h>
 #include <fcntl.h>
+
+#include <sys/mman.h>
+#include <sys/poll.h>
+#include <sys/resource.h>
+#include <sys/signal.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
+
+#include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <signal.h>
-#include <dirent.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <sys/signal.h>
-#include <sys/utsname.h>
-#include <sys/resource.h>
-#include <sys/wait.h>
-#include <sys/poll.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 #ifdef CCTOOLS_OPSYS_SUNOS
 extern int setenv(const char *name, const char *value, int overwrite);
 #endif
 
 #define STDOUT_BUFFER_SIZE 1048576        
+
+#define MIN_TERMINATE_BOUNDARY 0 
+#define TERMINATE_BOUNDARY_LEEWAY 30
 
 #define PIPE_ACTIVE 1
 #define LINK_ACTIVE 2
@@ -102,8 +109,13 @@ static int max_backoff_interval = 60;
 // Flag gets set on receipt of a terminal signal.
 static int abort_flag = 0;
 
-//Threshold for available disk space (MB) beyond which clean up and restart.
+// Threshold for available disk space (MB) beyond which clean up and restart.
 static UINT64_T disk_avail_threshold = 100;
+
+// Terminate only when:
+// terminate_boundary - (current_time - worker_start_time)%terminate_boundary ~~ 0
+// Use case: hourly charge resource such as Amazon EC2
+static int terminate_boundary = 0;
 
 
 // Basic worker global variables
@@ -113,6 +125,7 @@ static char workspace[WORKER_WORKSPACE_NAME_MAX];
 static char *os_name = NULL; 
 static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
+static time_t worker_start_time = 0;
 
 // Forked task related
 static int pipefds[2];
@@ -134,15 +147,6 @@ static struct work_queue_master *actual_master = NULL;
 static struct list *preferred_masters = NULL;
 static struct hash_cache *bad_masters = NULL;
 static int released_by_master = 0;
-
-// Function declarations
-static int poll_master_and_task(struct link *master, int task_pipe_fd, int timeout);
-static int path_within_workspace(const char *path, const char *workspace);
-static int handle_task(struct link *master);
-static int handle_link(struct link *master);
-static void disconnect_master(struct link *master);
-static void report_task_complete(struct link *master, int result, char *output, INT64_T output_length, timestamp_t execution_time);
-static void show_help(const char *cmd);
 
 static void report_worker_ready(struct link *master)
 {
@@ -361,6 +365,13 @@ static int wait_task_process(struct task_info *ti) {
 	return 1;
 }
 
+static void report_task_complete(struct link *master, int result, char *output, INT64_T output_length, timestamp_t execution_time)
+{
+	debug(D_WQ, "Task complete: result %d %lld %llu", result, output_length, execution_time);
+	link_putfstring(master, "result %d %lld %llu\n", time(0) + active_timeout, result, output_length, execution_time);
+	link_putlstring(master, output, output_length, time(0) + active_timeout);
+}
+
 static int handle_task(struct link *master) {
 	int result = read_task_stdout(time(0) + short_timeout);
 
@@ -385,13 +396,6 @@ static int handle_task(struct link *master) {
 	} 
 
 	return 1;
-}
-
-static void report_task_complete(struct link *master, int result, char *output, INT64_T output_length, timestamp_t execution_time)
-{
-	debug(D_WQ, "Task complete: result %d %lld %llu", result, output_length, execution_time);
-	link_putfstring(master, "result %d %lld %llu\n", time(0) + active_timeout, result, output_length, execution_time);
-	link_putlstring(master, output, output_length, time(0) + active_timeout);
 }
 
 static void make_hash_key(const char *addr, int port, char *key)
@@ -767,12 +771,23 @@ static struct link *connect_master(time_t stoptime) {
 	while(!abort_flag) {
 		if(stoptime < time(0)) {
 			// Failed to connect to any master.
-			if(auto_worker) {
-				debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to any master in %d seconds.\n", idle_timeout);
+			if(terminate_boundary > 0) {
+				time_t elapsed_time = time(0) - worker_start_time;
+				int time_to_boundary = terminate_boundary - (elapsed_time % terminate_boundary);
+				debug(D_DEBUG, "Elapsed time: %ld sec. Terminate boundary: %d sec. Time to next terminate boundary: %d sec.", elapsed_time, terminate_boundary, time_to_boundary);
+				if(time_to_boundary < TERMINATE_BOUNDARY_LEEWAY) { 
+					// the $TERMINATE_BOUNDARY_LEEWAY seconds is just to allow some extra time to process the shutdown of the worker so that we don't surpass the boundary 
+					debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to any master in %d seconds and terminate boundary almost reached.\n", idle_timeout);
+					break;
+				}
 			} else {
-				debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to %s:%d in %d seconds.\n", actual_addr, actual_port, idle_timeout);
+				if(auto_worker) {
+					debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to any master in %d seconds.\n", idle_timeout);
+				} else {
+					debug(D_NOTICE, "work_queue_worker: giving up because couldn't connect to %s:%d in %d seconds.\n", actual_addr, actual_port, idle_timeout);
+				}
+				break;
 			}
-			break;
 		}
 
 		if(auto_worker) {
@@ -860,50 +875,6 @@ static int poll_master_and_task(struct link *master, int task_pipe_fd, int timeo
 	} 
 
 	return ret;
-}
-
-
-static void work_for_master(struct link *master) {
-	if(!master) {
-		return;
-	}
-
-	debug(D_WQ, "working for master at %s:%d.\n", actual_addr, actual_port);
-
-	time_t idle_stoptime = time(0) + idle_timeout;
-	// Start serving masters
-	while(!abort_flag) {
-		if(time(0) > idle_stoptime && task_status == TASK_NONE) {
-			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
-			abort_flag = 1;
-			break;
-		}
-
-		int result = poll_master_and_task(master, pipefds[0], 5);
-
-		if(result & POLL_FAIL) {
-			abort_flag = 1;
-			break;
-		} 
-
-		int ok = 1;
-		if(result & PIPE_ACTIVE) {
-			ok &= handle_task(master);
-		} 
-
-		if(result & LINK_ACTIVE) {
-			ok &= handle_link(master);
-		} 
-
-		if(!ok) {
-			disconnect_master(master);
-			break;
-		}
-
-		if(result != 0) {
-			idle_stoptime = time(0) + idle_timeout;
-		}
-	}
 }
 
 static int do_work(struct link *master, INT64_T length) {
@@ -1197,6 +1168,95 @@ static int send_keepalive(struct link *master){
 	return 1;
 }
 
+
+static void disconnect_master(struct link *master) {
+	debug(D_WQ, "Disconnecting the current master ...\n");
+	link_close(master);
+
+	if(auto_worker) {
+		record_bad_master(duplicate_work_queue_master(actual_master));
+	}
+
+	kill_and_reap_task();
+
+	// Remove the contents of the workspace. 
+	delete_dir_contents(workspace);
+
+	if(released_by_master) {
+		released_by_master = 0;
+	} else {
+		sleep(5);
+	}
+}
+
+static void abort_worker() {
+	// Free dynamically allocated memory
+	if(stdout_buffer) {
+		free(stdout_buffer);
+		stdout_buffer = NULL;
+		stdout_buffer_used = 0;
+	}
+
+	if(pool_name) {
+		free(pool_name);
+	}
+	if(user_specified_workdir) {
+		free(user_specified_workdir);
+	} 
+	free(os_name);
+	free(arch_name);
+
+	// Kill running task if any 
+    kill_and_reap_task();	
+
+	// Remove workspace. 
+	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
+	delete_dir(workspace);
+}
+
+static int path_within_workspace(const char *path, const char *workspace) {
+	if(!path) return 0;
+
+	char absolute_workspace[PATH_MAX+1];
+	if(!realpath(workspace, absolute_workspace)) {
+		debug(D_WQ, "Failed to resolve the absolute path of workspace - %s: %s", path, strerror(errno));
+		return 0;
+	}	
+
+	char *p;
+	if(path[0] == '/') {
+		p = strstr(path, absolute_workspace);
+		if(p != path) {
+			return 0;
+		}
+	}
+
+	char absolute_path[PATH_MAX+1];
+	char *tmp_path = xxstrdup(path);
+
+	int rv = 1;
+	while((p = strrchr(tmp_path, '/')) != NULL) {
+		//debug(D_WQ, "Check if %s is within workspace - %s", tmp_path, absolute_workspace);
+		*p = '\0';
+		if(realpath(tmp_path, absolute_path)) {
+			p = strstr(absolute_path, absolute_workspace);
+			if(p != absolute_path) {
+				rv = 0;
+			}
+			break;
+		} else {
+			if(errno != ENOENT) {
+				debug(D_WQ, "Failed to resolve the absolute path of %s: %s", tmp_path, strerror(errno));
+				rv = 0;
+				break;
+			}
+		}
+	}
+
+	free(tmp_path);
+	return rv;
+}
+
 static int handle_link(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
@@ -1257,49 +1317,74 @@ static int handle_link(struct link *master) {
 	return r;
 }
 
-static void disconnect_master(struct link *master) {
-	debug(D_WQ, "Disconnecting the current master ...\n");
-	link_close(master);
-
-	if(auto_worker) {
-		record_bad_master(duplicate_work_queue_master(actual_master));
+static void work_for_master(struct link *master) {
+	if(!master) {
+		return;
 	}
 
-	kill_and_reap_task();
+	debug(D_WQ, "working for master at %s:%d.\n", actual_addr, actual_port);
 
-	// Remove the contents of the workspace. 
-	delete_dir_contents(workspace);
+	time_t idle_stoptime = time(0) + idle_timeout;
+	// Start serving masters
+	while(!abort_flag) {
+		if(time(0) > idle_stoptime && task_status == TASK_NONE) {
+			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
+			abort_flag = 1;
+			break;
+		}
 
-	if(released_by_master) {
-		released_by_master = 0;
-	} else {
-		sleep(5);
+		int result = poll_master_and_task(master, pipefds[0], 5);
+
+		if(result & POLL_FAIL) {
+			abort_flag = 1;
+			break;
+		} 
+
+		int ok = 1;
+		if(result & PIPE_ACTIVE) {
+			ok &= handle_task(master);
+		} 
+
+		if(result & LINK_ACTIVE) {
+			ok &= handle_link(master);
+		} 
+
+		if(!ok) {
+			disconnect_master(master);
+			break;
+		}
+
+		if(result != 0) {
+			idle_stoptime = time(0) + idle_timeout;
+		}
 	}
 }
 
-static void abort_worker() {
-	// Free dynamically allocated memory
-	if(stdout_buffer) {
-		free(stdout_buffer);
-		stdout_buffer = NULL;
-		stdout_buffer_used = 0;
-	}
+static void handle_abort(int sig)
+{
+	abort_flag = 1;
+}
 
-	if(pool_name) {
-		free(pool_name);
-	}
-	if(user_specified_workdir) {
-		free(user_specified_workdir);
-	} 
-	free(os_name);
-	free(arch_name);
-
-	// Kill running task if any 
-    kill_and_reap_task();	
-
-	// Remove workspace. 
-	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
-	delete_dir(workspace);
+static void show_help(const char *cmd)
+{
+	fprintf(stdout, "Use: %s [options] <masterhost> <port>\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
+	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
+	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem.\n");
+	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
+	fprintf(stdout, " -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
+	fprintf(stdout, " -t <time>      Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
+	fprintf(stdout, " -w <size>      Set TCP window size.\n");
+	fprintf(stdout, " -i <time>      Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
+	fprintf(stdout, " -b <time>      Set maxmimum value for backoff interval when worker fails to connect to a master. (default=%ds)\n", max_backoff_interval);
+	fprintf(stdout, " -B <time>      Set the worker to terminate itself only when the elapsed time is multiples of <time>.\n");
+	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%lluMB)\n", disk_avail_threshold);
+	fprintf(stdout, " -A <arch>      Set architecture string for the worker to report to master instead of the value in uname (%s).\n", arch_name);
+	fprintf(stdout, " -O <os>        Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
+	fprintf(stdout, " -s <path>      Set the location for creating the working directory of the worker.\n");
+	fprintf(stdout, " -v             Show version string\n");
+	fprintf(stdout, " -h             Show this help screen\n");
 }
 
 static void check_arguments(int argc, char **argv) {
@@ -1353,74 +1438,7 @@ static int setup_workspace() {
 	return 1;
 }
 
-static int path_within_workspace(const char *path, const char *workspace) {
-	if(!path) return 0;
 
-	char absolute_workspace[PATH_MAX+1];
-	if(!realpath(workspace, absolute_workspace)) {
-		debug(D_WQ, "Failed to resolve the absolute path of workspace - %s: %s", path, strerror(errno));
-		return 0;
-	}	
-
-	char *p;
-	if(path[0] == '/') {
-		p = strstr(path, absolute_workspace);
-		if(p != path) {
-			return 0;
-		}
-	}
-
-	char absolute_path[PATH_MAX+1];
-	char *tmp_path = xxstrdup(path);
-
-	int rv = 1;
-	while((p = strrchr(tmp_path, '/')) != NULL) {
-		//debug(D_WQ, "Check if %s is within workspace - %s", tmp_path, absolute_workspace);
-		*p = '\0';
-		if(realpath(tmp_path, absolute_path)) {
-			p = strstr(absolute_path, absolute_workspace);
-			if(p != absolute_path) {
-				rv = 0;
-			}
-			break;
-		} else {
-			if(errno != ENOENT) {
-				debug(D_WQ, "Failed to resolve the absolute path of %s: %s", tmp_path, strerror(errno));
-				rv = 0;
-				break;
-			}
-		}
-	}
-
-	free(tmp_path);
-	return rv;
-}
-
-static void handle_abort(int sig)
-{
-	abort_flag = 1;
-}
-
-static void show_help(const char *cmd)
-{
-	fprintf(stdout, "Use: %s [options] <masterhost> <port>\n", cmd);
-	fprintf(stdout, "where options are:\n");
-	fprintf(stdout, " -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
-	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem.\n");
-	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
-	fprintf(stdout, " -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
-	fprintf(stdout, " -t <time>      Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
-	fprintf(stdout, " -w <size>      Set TCP window size.\n");
-	fprintf(stdout, " -i <time>      Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
-	fprintf(stdout, " -b <time>      Set maxmimum value for backoff interval when worker fails to connect to a master. (default=%ds)\n", max_backoff_interval);
-	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%lluMB)\n", disk_avail_threshold);
-	fprintf(stdout, " -A <arch>      Set architecture string for the worker to report to master instead of the value in uname (%s).\n", arch_name);
-	fprintf(stdout, " -O <os>        Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
-	fprintf(stdout, " -s <path>      Set the location for creating the working directory of the worker.\n");
-	fprintf(stdout, " -v             Show version string\n");
-	fprintf(stdout, " -h             Show this help screen\n");
-}
 
 int main(int argc, char *argv[])
 {
@@ -1428,6 +1446,8 @@ int main(int argc, char *argv[])
 	int w;
 	struct utsname uname_data;
 	struct link *master = NULL;
+
+	worker_start_time = time(0);
 
 	preferred_masters = list_create();
 	if(!preferred_masters) {
@@ -1442,10 +1462,13 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aC:d:t:o:p:N:w:i:b:z:A:O:s:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "aC:B:d:t:o:p:N:w:i:b:z:A:O:s:vh")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
+			break;
+		case 'B':
+			terminate_boundary = MAX(MIN_TERMINATE_BOUNDARY, string_time_parse(optarg));
 			break;
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_server_host, &catalog_server_port)) {
@@ -1522,6 +1545,10 @@ int main(int argc, char *argv[])
 	if(!setup_workspace()) {
 		fprintf(stderr, "work_queue_worker: failed to setup workspace at %s.\n", workspace);
 		exit(1);
+	}
+
+	if(terminate_boundary > 0 && idle_timeout > terminate_boundary) {
+		idle_timeout = MAX(short_timeout, terminate_boundary - TERMINATE_BOUNDARY_LEEWAY);
 	}
 
 	// set $WORK_QUEUE_SANDBOX to workspace.
