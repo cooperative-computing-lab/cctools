@@ -17,7 +17,7 @@ micro=0
 
 # On a release, type would be changed from TRUNK to RELEASE.  TRUNK is a useful
 # signal that the user is not using a blessed (tagged) release.
-type="TRUNK"
+type="RC"
 
 version="$major.$minor.$micro $type"
 
