@@ -360,13 +360,6 @@ static void handle_query(struct link *query_link)
 
 	qsort(array, n, sizeof(struct nvpair *), compare_nvpair);
 
-	/* slurp out each of the options available */
-
-	// strtok by ?
-	// strtok by &
-	// strtok by =
-
-
 	if(!strcmp(path, "/query.text")) {
 		fprintf(stream, "Content-type: text/plain\n\n");
 		for(i = 0; i < n; i++)
