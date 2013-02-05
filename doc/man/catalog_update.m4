@@ -55,12 +55,12 @@ SECTION(EXAMPLES)
 PARA
 
 The following example sends an update to the catalog server located at
-CODE(chirp.cse.nd.edu) with the fields CODE(type) set to "node", CODE(name) set
+CODE(catalog.cse.nd.edu) with the fields CODE(type) set to "node", CODE(name) set
 to "testnode00", and CODE(has_java) set to "yes".  These fields can be queried
 from the catalog server by clients using CODE(chirp_status).
 
 LONGCODE_BEGIN
-catalog_update -c chirp.cse.nd.edu type=node name=testnode00 has_java=yes
+catalog_update -c catalog.cse.nd.edu type=node name=testnode00 has_java=yes
 LONGCODE_END
 
 SECTION(COPYRIGHT)

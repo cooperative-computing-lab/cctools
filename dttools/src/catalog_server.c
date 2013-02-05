@@ -57,7 +57,10 @@ static time_t clean_interval = 60;
 /* The port upon which to listen. */
 static int port = CATALOG_PORT_DEFAULT;
 
-/* This machine's canonical name. */
+/* The preferred hostname set on the command line. */
+static const char *preferred_hostname = 0;
+
+/* This machine's canonical hostname. */
 static char hostname[DOMAIN_NAME_MAX];
 
 /* This process's owner */
@@ -183,7 +186,7 @@ static void update_all_catalogs(struct datagram *outgoing_dgram)
 	char text[DATAGRAM_PAYLOAD_MAX];
 	int length;
 
-	length = sprintf(text, "type catalog\nversion %d.%d.%d\nurl http://%s:%d\nname %s\nowner %s\nstarttime %lu\nport %d\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, owner, (long)starttime, port);
+	length = sprintf(text, "type catalog\nversion %d.%d.%d\nurl http://%s:%d\nname %s\nowner %s\nstarttime %lu\nport %d\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, preferred_hostname, port, preferred_hostname, owner, (long)starttime, port);
 
 	if(!length)
 		return;
@@ -357,6 +360,13 @@ static void handle_query(struct link *query_link)
 
 	qsort(array, n, sizeof(struct nvpair *), compare_nvpair);
 
+	/* slurp out each of the options available */
+
+	// strtok by ?
+	// strtok by &
+	// strtok by =
+
+
 	if(!strcmp(path, "/query.text")) {
 		fprintf(stream, "Content-type: text/plain\n\n");
 		for(i = 0; i < n; i++)
@@ -392,17 +402,17 @@ static void handle_query(struct link *query_link)
 			const char *name = nvpair_lookup_string(nv, "name");
 			if(!name)
 				name = "unknown";
-			fprintf(stream, "<title>%s storage catalog: %s</title>\n", hostname, name);
+			fprintf(stream, "<title>%s catalog server: %s</title>\n", preferred_hostname, name);
 			fprintf(stream, "<center>\n");
-			fprintf(stream, "<h1>%s storage catalog</h1>\n", hostname);
+			fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
 			fprintf(stream, "<h2>%s</h2>\n", name);
 			fprintf(stream, "<p><a href=/>return to catalog view</a><p>\n");
 			nvpair_print_html_solo(nv, stream);
 			fprintf(stream, "</center>\n");
 		} else {
-			fprintf(stream, "<title>%s storage catalog</title>\n", hostname);
+			fprintf(stream, "<title>%s catalog server</title>\n", preferred_hostname);
 			fprintf(stream, "<center>\n");
-			fprintf(stream, "<h1>%s storage catalog</h1>\n", hostname);
+			fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
 			fprintf(stream, "<h2>Unknown Item!</h2>\n");
 			fprintf(stream, "</center>\n");
 		}
@@ -414,9 +424,9 @@ static void handle_query(struct link *query_link)
 		INT64_T sum_devices = 0;
 
 		fprintf(stream, "Content-type: text/html\n\n");
-		fprintf(stream, "<title>%s storage catalog</title>\n", hostname);
+		fprintf(stream, "<title>%s catalog server</title>\n", preferred_hostname);
 		fprintf(stream, "<center>\n");
-		fprintf(stream, "<h1>%s storage catalog</h1>\n", hostname);
+		fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
 		fprintf(stream, "<a href=/query.text>text</a> - ");
 		fprintf(stream, "<a href=/query.html>html</a> - ");
 		fprintf(stream, "<a href=/query.xml>xml</a> - ");
@@ -462,6 +472,7 @@ static void show_help(const char *cmd)
 	printf(" -L <file>      Log new updates to this file.\n");
 	printf(" -m <n>         Maximum number of child processes.  (default is %d)\n",child_procs_max);
 	printf(" -M <size>      Maximum size of a server to be believed.  (default is any)\n");
+	printf(" -n <name>      Preferred host name of this server.\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -O <bytes>     Rotate debug file once it reaches this size.\n");
 	printf(" -p <port>      Port number to listen on (default is %d)\n", port);
@@ -484,7 +495,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "bB:d:hH:l:L:m:M:o:O:p:ST:u:U:v")) != (char) -1) {
+	while((ch = getopt(argc, argv, "bB:d:hH:l:L:m:M:n:o:O:p:ST:u:U:v")) != (char) -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
@@ -514,6 +525,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'M':
 				max_server_size = string_metric_parse(optarg);
+				break;
+			case 'n':
+				preferred_hostname = optarg;
 				break;
 			case 'o':
 				free(debug_filename);
@@ -569,7 +583,11 @@ int main(int argc, char *argv[])
 	install_handler(SIGQUIT, shutdown_clean);
 	install_handler(SIGALRM, shutdown_clean);
 
-	domain_name_cache_guess(hostname);
+	if(!preferred_hostname) {
+		domain_name_cache_guess(hostname);
+		preferred_hostname = hostname;
+	}
+
 	username_get(owner);
 	starttime = time(0);
 

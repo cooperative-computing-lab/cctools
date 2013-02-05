@@ -10,7 +10,7 @@ See the file COPYING for details.
 
 #include <stdlib.h>
 
-#define CATALOG_HOST_DEFAULT "chirp.cse.nd.edu"
+#define CATALOG_HOST_DEFAULT "catalog.cse.nd.edu"
 #define CATALOG_PORT_DEFAULT 9097
 
 #define CATALOG_HOST (getenv("CATALOG_HOST") ? getenv("CATALOG_HOST") : CATALOG_HOST_DEFAULT )

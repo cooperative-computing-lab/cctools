@@ -47,7 +47,7 @@ OPTION_ITEM(-R)Read-only mode.
 OPTION_PAIR(-s,time)Abort stalled operations after this long. (default is 3600s)
 OPTION_PAIR(-t,time)Disconnect idle clients after this time. (default is 60s)
 OPTION_PAIR(-T,time)Maximum time to cache group information. (default is 900s)
-OPTION_PAIR(-u,host)Send status updates to this host. (default is chirp.cse.nd.edu)
+OPTION_PAIR(-u,host)Send status updates to this host. (default is catalog.cse.nd.edu)
 OPTION_PAIR(-U,time)Send status updates at this interval. (default is 5m)
 OPTION_ITEM(-v)Show version info.
 OPTION_PAIR(-w,name)The name of this server's owner.  (default is username)
