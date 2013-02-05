@@ -46,7 +46,7 @@ struct work_queue_master {
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 	char proj[WORK_QUEUE_NAME_MAX];
-	timestamp_t start_time;
+	time_t start_time;
 	int priority;
 	int capacity;
 	int tasks_waiting;
