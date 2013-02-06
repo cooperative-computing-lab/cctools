@@ -241,7 +241,6 @@ static int update_all_catalogs( const char *url )
 	struct chirp_statfs info;
 	struct utsname name;
 	char text[DATAGRAM_PAYLOAD_MAX];
-	unsigned uptime;
 	int length;
 	int cpus;
 	double avg[3];
@@ -261,11 +260,10 @@ static int update_all_catalogs( const char *url )
 	}
 
 	memory_info_get(&memory_avail, &memory_total);
-	uptime = time(0) - starttime;
 
 	length = sprintf(text,
-			 "type chirp\nversion %d.%d.%d\nurl chirp://%s:%d\nname %s\nowner %s\ntotal %llu\navail %llu\nuptime %u\nport %d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nminfree %llu\nmemory_total %llu\nmemory_avail %llu\ncpus %d\nbackend %s\n",
-			 CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, chirp_owner, info.f_blocks * info.f_bsize, info.f_bavail * info.f_bsize, uptime, port, name.machine, name.sysname, name.release, avg[0], avg[1], avg[2], minimum_space_free, memory_total, memory_avail, cpus, url);
+			 "type chirp\nversion %d.%d.%d\nurl chirp://%s:%d\nname %s\nowner %s\ntotal %llu\navail %llu\nstarttime %lu\nport %d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nminfree %llu\nmemory_total %llu\nmemory_avail %llu\ncpus %d\nbackend %s\n",
+			 CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, chirp_owner, info.f_blocks * info.f_bsize, info.f_bavail * info.f_bsize, (unsigned long) starttime, port, name.machine, name.sysname, name.release, avg[0], avg[1], avg[2], minimum_space_free, memory_total, memory_avail, cpus, url);
 
 	chirp_stats_summary(&text[length], DATAGRAM_PAYLOAD_MAX - length);
 	list_iterate(catalog_host_list, update_one_catalog, text);
