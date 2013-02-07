@@ -254,7 +254,6 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 	t->tag = xxstrdup(tag);
 }
 
-
 int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)
 {
 	if(!t || !local_name || !remote_name) {
@@ -395,26 +394,6 @@ int work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, c
 void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
 {
 	t->worker_selection_algorithm = alg;
-}
-
-void work_queue_specify_algorithm(struct work_queue *q, int alg)
-{
-	q->worker_selection_algorithm = alg;
-}
-
-void work_queue_specify_task_order(struct work_queue *q, int order)
-{
-	q->task_ordering = order;
-}
-
-void work_queue_specify_keepalive_interval(struct work_queue *q, int interval) 
-{
-	q->keepalive_interval = interval;
-}
-
-void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout) 
-{
-	q->keepalive_timeout = timeout;
 }
 
 void work_queue_task_delete(struct work_queue_task *t)
@@ -2262,6 +2241,98 @@ static void update_app_time(struct work_queue *q, timestamp_t last_left_time, in
 	}
 }
 
+static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)
+{
+	if(!w)
+		return 0;
+
+	send_worker_msg(w, "%s\n", time(0) + short_timeout, "exit");
+	remove_worker(q, w);
+	return 1;
+}
+
+//comparator function for checking if a task matches given taskid.
+static int taskid_comparator(void *t, const void *r) {
+
+	struct work_queue_task *task_in_queue = t;
+	const int *taskid = r;
+
+	if (task_in_queue->taskid == *taskid) {
+		return 1;
+	}	
+	return 0;
+}
+
+//comparator function for checking if a task matches given tag.
+static int tasktag_comparator(void *t, const void *r) {
+
+	struct work_queue_task *task_in_queue = t;
+	const char *tasktag = r;
+
+	if (!strcmp(task_in_queue->tag, tasktag)) {
+		return 1;
+	}	
+	return 0;
+}
+
+static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
+
+	struct work_queue_worker *w;
+	w = itable_lookup(q->running_tasks, t->taskid);
+	
+	if (w) {
+		//send message to worker asking to kill its task.
+		send_worker_msg(w, "%s\n", time(0) + short_timeout, "kill");
+		//update table.
+		itable_remove(q->running_tasks, t->taskid);
+
+		if (t->tag)
+			debug(D_WQ, "Task with tag %s and id %d is aborted at worker %s (%s) and removed.", t->tag, t->taskid, w->hostname, w->addrport);
+		else
+			debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
+			
+		delete_cancel_task_files(t, w); //delete files associated with cancelled task.
+		change_worker_state(q, w, WORKER_STATE_CANCELLING);
+		w->current_task = 0; //reset worker's current task field.	
+		return 1;
+	} 
+	
+	return 0;
+}
+
+static struct work_queue_task *find_running_task_by_id(struct itable *itbl, int taskid) {
+	
+	struct work_queue_worker *w;
+	struct work_queue_task *t;
+
+	w=itable_lookup(itbl, taskid);
+	if(w) {
+		t = w->current_task;
+		if (t){
+			return t;
+		}
+	}
+	
+	return NULL;
+}
+
+static struct work_queue_task *find_running_task_by_tag(struct itable *itbl, const char *tasktag) {
+	
+	struct work_queue_worker *w;
+	struct work_queue_task *t;
+	UINT64_T taskid;
+
+	itable_firstkey(itbl);
+	while(itable_nextkey(itbl, &taskid, (void**)&w)) {
+		t = w->current_task;
+		if (t && tasktag_comparator(t, tasktag)) {
+			return t;
+		}
+	} 
+	
+	return NULL;
+}
+
 /******************************************************/
 /********** work_queue public functions **********/
 /******************************************************/
@@ -2364,10 +2435,19 @@ int work_queue_port(struct work_queue *q)
 	}
 }
 
-
 void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
 {
 	q->estimate_capacity_on = value;
+}
+
+void work_queue_specify_algorithm(struct work_queue *q, int alg)
+{
+	q->worker_selection_algorithm = alg;
+}
+
+void work_queue_specify_task_order(struct work_queue *q, int order)
+{
+	q->task_ordering = order;
 }
 
 void work_queue_specify_name(struct work_queue *q, const char *name)
@@ -2591,17 +2671,6 @@ int work_queue_hungry(struct work_queue *q)
 	return MAX(i - j, 0);
 }
 
-
-static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)
-{
-	if(!w)
-		return 0;
-
-	send_worker_msg(w, "%s\n", time(0) + short_timeout, "exit");
-	remove_worker(q, w);
-	return 1;
-}
-
 int work_queue_shut_down_workers(struct work_queue *q, int n)
 {
 	struct work_queue_worker *w;
@@ -2621,88 +2690,6 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	}
 
 	return i;
-}
-
-//comparator function for checking if a task matches given taskid.
-static int taskid_comparator(void *t, const void *r) {
-
-	struct work_queue_task *task_in_queue = t;
-	const int *taskid = r;
-
-	if (task_in_queue->taskid == *taskid) {
-		return 1;
-	}	
-	return 0;
-}
-
-//comparator function for checking if a task matches given tag.
-static int tasktag_comparator(void *t, const void *r) {
-
-	struct work_queue_task *task_in_queue = t;
-	const char *tasktag = r;
-
-	if (!strcmp(task_in_queue->tag, tasktag)) {
-		return 1;
-	}	
-	return 0;
-}
-
-static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
-
-	struct work_queue_worker *w;
-	w = itable_lookup(q->running_tasks, t->taskid);
-	
-	if (w) {
-		//send message to worker asking to kill its task.
-		send_worker_msg(w, "%s\n", time(0) + short_timeout, "kill");
-		//update table.
-		itable_remove(q->running_tasks, t->taskid);
-
-		if (t->tag)
-			debug(D_WQ, "Task with tag %s and id %d is aborted at worker %s (%s) and removed.", t->tag, t->taskid, w->hostname, w->addrport);
-		else
-			debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
-			
-		delete_cancel_task_files(t, w); //delete files associated with cancelled task.
-		change_worker_state(q, w, WORKER_STATE_CANCELLING);
-		w->current_task = 0; //reset worker's current task field.	
-		return 1;
-	} 
-	
-	return 0;
-}
-
-static struct work_queue_task *find_running_task_by_id(struct itable *itbl, int taskid) {
-	
-	struct work_queue_worker *w;
-	struct work_queue_task *t;
-
-	w=itable_lookup(itbl, taskid);
-	if(w) {
-		t = w->current_task;
-		if (t){
-			return t;
-		}
-	}
-	
-	return NULL;
-}
-
-static struct work_queue_task *find_running_task_by_tag(struct itable *itbl, const char *tasktag) {
-	
-	struct work_queue_worker *w;
-	struct work_queue_task *t;
-	UINT64_T taskid;
-
-	itable_firstkey(itbl);
-	while(itable_nextkey(itbl, &taskid, (void**)&w)) {
-		t = w->current_task;
-		if (t && tasktag_comparator(t, tasktag)) {
-			return t;
-		}
-	} 
-	
-	return NULL;
 }
 
 /**
@@ -2773,6 +2760,16 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 int work_queue_empty(struct work_queue *q)
 {
 	return ((list_size(q->ready_list) + list_size(q->complete_list) + itable_size(q->running_tasks)) == 0);
+}
+
+void work_queue_specify_keepalive_interval(struct work_queue *q, int interval) 
+{
+	q->keepalive_interval = interval;
+}
+
+void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout) 
+{
+	q->keepalive_timeout = timeout;
 }
 
 char * work_queue_get_worker_summary( struct work_queue *q )
