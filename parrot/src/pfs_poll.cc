@@ -23,15 +23,6 @@ extern "C" {
 #include <stdio.h>
 #include <signal.h>
 
-/*
-This code has a race condition that is unavoidable.
-We want to select on a number of file descriptors,
-but be woken up if a sigchild comes in.  Sadly, Linux
-has no atomic pselect.  To combat this, we put an
-upper bound on the select sleep time, and check an
-integer shortly before selecting.  Not much else
-to do.
-*/
 
 #define POLL_TIME_MAX 1
 
@@ -54,15 +45,9 @@ static struct sleep_entry sleep_table[SLEEP_TABLE_MAX];
 
 static int poll_table_size = 0;
 static int sleep_table_size = 0;
-static int poll_abort_now = 0;
 
 extern void install_handler( int sig, void (*handler)(int sig));
 extern void handle_sigchld( int sig );
-
-void pfs_poll_abort()
-{
-	poll_abort_now = 1;
-}
 
 void pfs_poll_init()
 {
@@ -90,7 +75,7 @@ void pfs_poll_sleep()
 {
 	struct timeval curtime;
 	struct timeval stoptime;
-	struct timeval sleeptime;
+	struct timespec sleeptime;
 	fd_set rfds, wfds, efds;
 	struct sleep_entry *s;
 	struct poll_entry *p;
@@ -100,8 +85,6 @@ void pfs_poll_sleep()
 	FD_ZERO(&rfds);
 	FD_ZERO(&wfds);
 	FD_ZERO(&efds);
-
-	poll_abort_now = 0;
 
 	gettimeofday(&curtime,0);
 	stoptime = curtime;
@@ -133,25 +116,20 @@ void pfs_poll_sleep()
 	}
 
 	sleeptime.tv_sec = stoptime.tv_sec - curtime.tv_sec;
-	sleeptime.tv_usec = stoptime.tv_usec - curtime.tv_usec;
+	sleeptime.tv_nsec = 1000 * (stoptime.tv_usec - curtime.tv_usec);
 
-	while(sleeptime.tv_usec<0) {
-		sleeptime.tv_usec += 1000000;
+	while(sleeptime.tv_nsec<0) {
+		sleeptime.tv_nsec += 1000000000;
 		sleeptime.tv_sec -= 1;
 	}
 
-	CRITICAL_END
+	/* We wake on file descriptors and SIGCHLD */
+	sigset_t childmask;
+	sigemptyset(&childmask);
+	sigaddset(&childmask, SIGCHLD);
+	sigaddset(&childmask, SIGPIPE);
 
-	if(!poll_abort_now && sleeptime.tv_sec>0) usleep(1);
-
-	if(sleeptime.tv_sec<0 || poll_abort_now) {
-		sleeptime.tv_sec = 0;
-		sleeptime.tv_usec = 0;
-	}
-
-	result = select(maxfd,&rfds,&wfds,&efds,&sleeptime);
-
-	CRITICAL_BEGIN
+	result = pselect(maxfd,&rfds,&wfds,&efds,&sleeptime,&childmask);
 
 	if(result>0) {
 		if ((pfs_watchdog_fd > 0) && FD_ISSET(pfs_watchdog_fd, &rfds)) {
@@ -177,8 +155,7 @@ void pfs_poll_sleep()
 	} else if(result==0) {
 		// select timed out, which should never happen, except
 		// that it does when the jvm linked with hdfs sets up its
-		// signal handlers to avoid sigchld.  In that case, re-install
-		install_handler(SIGCHLD,handle_sigchld);
+		// signal handlers to avoid sigchld.
 
 		gettimeofday(&curtime,0);
 
