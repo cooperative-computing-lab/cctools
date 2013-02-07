@@ -2310,6 +2310,8 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -P <integer>   Priority. Higher the value, higher the priority.\n");
 	fprintf(stdout, " -r <n>         Automatically retry failed batch jobs up to n times.\n");
 	fprintf(stdout, " -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n", dag_submit_timeout);
+	fprintf(stdout, " -t <timeout>   Work Queue keepalive timeout.           (default is %ds)\n", WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
+	fprintf(stdout, " -u <interval>  Work Queue keepalive interval.           (default is %ds)\n", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
 	fprintf(stdout, " -v             Show version string\n");
 	fprintf(stdout, " -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
 	fprintf(stdout, " -z             Force failure on zero-length output files \n");
@@ -2332,6 +2334,8 @@ int main(int argc, char *argv[])
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	int work_queue_estimate_capacity_on = 0;
+	int work_queue_keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
+	int work_queue_keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
 	char *catalog_host;
 	int catalog_port;
 	int port_set = 0;
@@ -2362,7 +2366,7 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	while((c = getopt(argc, argv, "aAB:cC:d:D:EF:g:G:hiIj:J:kKl:L:N:o:Op:P:r:RS:T:vW:z")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:D:EF:g:G:hiIj:J:kKl:L:N:o:Op:P:r:RS:t:T:u:vW:z")) != (char) -1) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2481,12 +2485,18 @@ int main(int argc, char *argv[])
 			case 'S':
 				dag_submit_timeout = atoi(optarg);
 				break;
+			case 't':
+				work_queue_keepalive_timeout = atoi(optarg);
+				break;
 			case 'T':
 				batch_queue_type = batch_queue_type_from_string(optarg);
 				if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
 					fprintf(stderr, "makeflow: unknown batch queue type: %s\n", optarg);
 					return 1;
 				}
+				break;
+			case 'u':
+				work_queue_keepalive_interval = atoi(optarg);
 				break;
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
@@ -2714,6 +2724,8 @@ int main(int argc, char *argv[])
 		work_queue_specify_name(q, project);
 		work_queue_specify_priority(q, priority);
 		work_queue_specify_estimate_capacity_on(q, work_queue_estimate_capacity_on);
+		work_queue_specify_keepalive_interval(q, work_queue_keepalive_interval);
+		work_queue_specify_keepalive_timeout(q, work_queue_keepalive_timeout);
 	}
 
 	if(batch_submit_options) {
