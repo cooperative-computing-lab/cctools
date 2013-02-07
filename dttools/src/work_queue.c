@@ -1708,6 +1708,7 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 			}
 		} else if((curr_pos = strstr(token, "OS"))) {
 			if((curr_pos - token) == 0) {
+				//Cygwin oddly reports OS name in all caps and includes version info. 
 				if(strstr(w->os, "CYGWIN")) {
 					strcat(expanded_name, "Cygwin");
 				} else {
@@ -1719,7 +1720,7 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 				strcat(expanded_name, token);
 			}
 		} else {
-			//Put back '$' only if it does not appear at start of the string.
+			//If token and str don't point to same location, then $ sign was before token and needs to be put back.
 			if((token - str) > 0) {
 				strcat(expanded_name, "$");
 			}
