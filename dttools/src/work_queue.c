@@ -85,9 +85,6 @@ static const char * work_queue_state_names[] = {"init","ready","busy","cancel","
 
 #define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
 
-#define KEEPALIVE_INTERVAL_DEFAULT 300  //in seconds
-#define KEEPALIVE_TIMEOUT_DEFAULT 30    //in seconds
-
 // work_queue_worker struct related
 #define WORKER_OS_NAME_MAX 65
 #define WORKER_ARCH_NAME_MAX 65
@@ -2325,8 +2322,8 @@ struct work_queue *work_queue_create(int port)
 
 	q->workers_by_pool = hash_table_create(0,0);
 	
-	q->keepalive_interval = KEEPALIVE_INTERVAL_DEFAULT;
-	q->keepalive_timeout = KEEPALIVE_TIMEOUT_DEFAULT; 
+	q->keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
+	q->keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT; 
 	
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
