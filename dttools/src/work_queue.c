@@ -230,209 +230,6 @@ static timestamp_t link_poll_end; //tracks when we poll link; used to timeout un
 static int tolerable_transfer_rate_denominator = 10;
 static long double minimum_allowed_transfer_rate = 100000;	// 100 KB/s
 
-/******************************************************/
-/********** work_queue_task public functions **********/
-/******************************************************/
-
-struct work_queue_task *work_queue_task_create(const char *command_line)
-{
-	struct work_queue_task *t = malloc(sizeof(*t));
-	memset(t, 0, sizeof(*t));
-	t->command_line = xxstrdup(command_line);
-	t->worker_selection_algorithm = WORK_QUEUE_SCHEDULE_UNSET;
-	t->input_files = list_create();
-	t->output_files = list_create();
-	t->return_status = -1;
-	t->result = WORK_QUEUE_RESULT_UNSET;
-	return t;
-}
-
-void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
-{
-	if(t->tag)
-		free(t->tag);
-	t->tag = xxstrdup(tag);
-}
-
-int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)
-{
-	if(!t || !local_name || !remote_name) {
-		return 0;
-	}
-
-	// @param remote_name is the path of the file as on the worker machine. In
-	// the Work Queue framework, workers are prohibitted from writing to paths
-	// outside of their workspaces. When a task is specified, the workspace of
-	// the worker(the worker on which the task will be executed) is unlikely to
-	// be known. Thus @param remote_name should not be an absolute path.
-	if(remote_name[0] == '/') {
-		return 0;
-	}
-
-	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
-
-	tf->type = WORK_QUEUE_FILE;
-	tf->flags = flags;
-	tf->length = strlen(local_name);
-	tf->payload = xxstrdup(local_name);
-	tf->remote_name = xxstrdup(remote_name);
-
-	if(type == WORK_QUEUE_INPUT) {
-		list_push_tail(t->input_files, tf);
-	} else {
-		list_push_tail(t->output_files, tf);
-	}
-	return 1;
-}
-
-int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags)
-{
-	if(!t || !local_name || !remote_name) {
-		return 0;
-	}
-
-	// @param remote_name should not be an absolute path. @see
-	// work_queue_task_specify_file
-	if(remote_name[0] == '/') {
-		return 0;
-	}
-
-	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
-
-	tf->type = WORK_QUEUE_FILE_PIECE;
-	tf->flags = flags;
-	tf->length = strlen(local_name);
-	tf->start_byte = start_byte;	
-	tf->end_byte = end_byte;	
-	tf->payload = xxstrdup(local_name);
-	tf->remote_name = xxstrdup(remote_name);
-
-	if(type == WORK_QUEUE_INPUT) {
-		list_push_tail(t->input_files, tf);
-	} else {
-		list_push_tail(t->output_files, tf);
-	}
-	return 1;
-}
-
-int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags)
-{
-	if(!t || !remote_name) {
-		return 0;
-	}
-
-	// @param remote_name should not be an absolute path. @see
-	// work_queue_task_specify_file
-	if(remote_name[0] == '/') {
-		return 0;
-	}
-
-	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
-	tf->type = WORK_QUEUE_BUFFER;
-	tf->flags = flags;
-	tf->length = length;
-	tf->payload = malloc(length);
-	memcpy(tf->payload, data, length);
-	tf->remote_name = xxstrdup(remote_name);
-	list_push_tail(t->input_files, tf);
-
-	return 1;
-}
-
-int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags)
-{
-	if(!t || !remote_name || !cmd) {
-		return 0;
-	}
-
-	// @param remote_name should not be an absolute path. @see
-	// work_queue_task_specify_file
-	if(remote_name[0] == '/') {
-		return 0;
-	}
-
-	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
-	tf->type = WORK_QUEUE_REMOTECMD;
-	tf->flags = flags;
-	tf->length = strlen(cmd);
-	tf->payload = xxstrdup(cmd);
-	tf->remote_name = xxstrdup(remote_name);
-
-	if(type == WORK_QUEUE_INPUT) {
-		list_push_tail(t->input_files, tf);
-	} else {
-		list_push_tail(t->output_files, tf);
-	}
-	return 1;
-}
-
-int work_queue_task_specify_output_file(struct work_queue_task *t, const char *rname, const char *fname)
-{
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
-}
-
-int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname)
-{
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
-}
-
-int work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf, int length, const char *rname)
-{
-	return work_queue_task_specify_buffer(t, buf, length, rname, WORK_QUEUE_NOCACHE);
-}
-
-int work_queue_task_specify_input_file(struct work_queue_task *t, const char *fname, const char *rname)
-{
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
-}
-
-int work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, const char *fname, const char *rname)
-{
-	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
-}
-
-void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
-{
-	t->worker_selection_algorithm = alg;
-}
-
-void work_queue_task_delete(struct work_queue_task *t)
-{
-	struct work_queue_file *tf;
-	if(t) {
-		if(t->command_line)
-			free(t->command_line);
-		if(t->tag)
-			free(t->tag);
-		if(t->output)
-			free(t->output);
-		if(t->input_files) {
-			while((tf = list_pop_tail(t->input_files))) {
-				if(tf->payload)
-					free(tf->payload);
-				if(tf->remote_name)
-					free(tf->remote_name);
-				free(tf);
-			}
-			list_delete(t->input_files);
-		}
-		if(t->output_files) {
-			while((tf = list_pop_tail(t->output_files))) {
-				if(tf->payload)
-					free(tf->payload);
-				if(tf->remote_name)
-					free(tf->remote_name);
-				free(tf);
-			}
-			list_delete(t->output_files);
-		}
-		if(t->hostname)
-			free(t->hostname);
-		if(t->host)
-			free(t->host);
-		free(t);
-	}
-}
 
 /******************************************************/
 /********** work_queue internal functions *************/
@@ -2332,6 +2129,211 @@ static struct work_queue_task *find_running_task_by_tag(struct itable *itbl, con
 	
 	return NULL;
 }
+
+/******************************************************/
+/********** work_queue_task public functions **********/
+/******************************************************/
+
+struct work_queue_task *work_queue_task_create(const char *command_line)
+{
+	struct work_queue_task *t = malloc(sizeof(*t));
+	memset(t, 0, sizeof(*t));
+	t->command_line = xxstrdup(command_line);
+	t->worker_selection_algorithm = WORK_QUEUE_SCHEDULE_UNSET;
+	t->input_files = list_create();
+	t->output_files = list_create();
+	t->return_status = -1;
+	t->result = WORK_QUEUE_RESULT_UNSET;
+	return t;
+}
+
+void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
+{
+	if(t->tag)
+		free(t->tag);
+	t->tag = xxstrdup(tag);
+}
+
+int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)
+{
+	if(!t || !local_name || !remote_name) {
+		return 0;
+	}
+
+	// @param remote_name is the path of the file as on the worker machine. In
+	// the Work Queue framework, workers are prohibitted from writing to paths
+	// outside of their workspaces. When a task is specified, the workspace of
+	// the worker(the worker on which the task will be executed) is unlikely to
+	// be known. Thus @param remote_name should not be an absolute path.
+	if(remote_name[0] == '/') {
+		return 0;
+	}
+
+	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
+
+	tf->type = WORK_QUEUE_FILE;
+	tf->flags = flags;
+	tf->length = strlen(local_name);
+	tf->payload = xxstrdup(local_name);
+	tf->remote_name = xxstrdup(remote_name);
+
+	if(type == WORK_QUEUE_INPUT) {
+		list_push_tail(t->input_files, tf);
+	} else {
+		list_push_tail(t->output_files, tf);
+	}
+	return 1;
+}
+
+int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags)
+{
+	if(!t || !local_name || !remote_name) {
+		return 0;
+	}
+
+	// @param remote_name should not be an absolute path. @see
+	// work_queue_task_specify_file
+	if(remote_name[0] == '/') {
+		return 0;
+	}
+
+	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
+
+	tf->type = WORK_QUEUE_FILE_PIECE;
+	tf->flags = flags;
+	tf->length = strlen(local_name);
+	tf->start_byte = start_byte;	
+	tf->end_byte = end_byte;	
+	tf->payload = xxstrdup(local_name);
+	tf->remote_name = xxstrdup(remote_name);
+
+	if(type == WORK_QUEUE_INPUT) {
+		list_push_tail(t->input_files, tf);
+	} else {
+		list_push_tail(t->output_files, tf);
+	}
+	return 1;
+}
+
+int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags)
+{
+	if(!t || !remote_name) {
+		return 0;
+	}
+
+	// @param remote_name should not be an absolute path. @see
+	// work_queue_task_specify_file
+	if(remote_name[0] == '/') {
+		return 0;
+	}
+
+	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
+	tf->type = WORK_QUEUE_BUFFER;
+	tf->flags = flags;
+	tf->length = length;
+	tf->payload = malloc(length);
+	memcpy(tf->payload, data, length);
+	tf->remote_name = xxstrdup(remote_name);
+	list_push_tail(t->input_files, tf);
+
+	return 1;
+}
+
+int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags)
+{
+	if(!t || !remote_name || !cmd) {
+		return 0;
+	}
+
+	// @param remote_name should not be an absolute path. @see
+	// work_queue_task_specify_file
+	if(remote_name[0] == '/') {
+		return 0;
+	}
+
+	struct work_queue_file *tf = malloc(sizeof(struct work_queue_file));
+	tf->type = WORK_QUEUE_REMOTECMD;
+	tf->flags = flags;
+	tf->length = strlen(cmd);
+	tf->payload = xxstrdup(cmd);
+	tf->remote_name = xxstrdup(remote_name);
+
+	if(type == WORK_QUEUE_INPUT) {
+		list_push_tail(t->input_files, tf);
+	} else {
+		list_push_tail(t->output_files, tf);
+	}
+	return 1;
+}
+
+int work_queue_task_specify_output_file(struct work_queue_task *t, const char *rname, const char *fname)
+{
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
+}
+
+int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname)
+{
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+}
+
+int work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf, int length, const char *rname)
+{
+	return work_queue_task_specify_buffer(t, buf, length, rname, WORK_QUEUE_NOCACHE);
+}
+
+int work_queue_task_specify_input_file(struct work_queue_task *t, const char *fname, const char *rname)
+{
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+}
+
+int work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, const char *fname, const char *rname)
+{
+	return work_queue_task_specify_file(t, fname, rname, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
+}
+
+void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
+{
+	t->worker_selection_algorithm = alg;
+}
+
+void work_queue_task_delete(struct work_queue_task *t)
+{
+	struct work_queue_file *tf;
+	if(t) {
+		if(t->command_line)
+			free(t->command_line);
+		if(t->tag)
+			free(t->tag);
+		if(t->output)
+			free(t->output);
+		if(t->input_files) {
+			while((tf = list_pop_tail(t->input_files))) {
+				if(tf->payload)
+					free(tf->payload);
+				if(tf->remote_name)
+					free(tf->remote_name);
+				free(tf);
+			}
+			list_delete(t->input_files);
+		}
+		if(t->output_files) {
+			while((tf = list_pop_tail(t->output_files))) {
+				if(tf->payload)
+					free(tf->payload);
+				if(tf->remote_name)
+					free(tf->remote_name);
+				free(tf);
+			}
+			list_delete(t->output_files);
+		}
+		if(t->hostname)
+			free(t->hostname);
+		if(t->host)
+			free(t->host);
+		free(t);
+	}
+}
+
 
 /******************************************************/
 /********** work_queue public functions **********/
