@@ -824,7 +824,7 @@ int decide_worker_distribution(struct list *matched_masters, struct pool_config 
 				m->workers_need = MIN(m->workers_need, m->tasks_waiting);
 			} else {
 				if(pc->default_capacity > 0) {
-					m->workers_need = pc->default_capacity - m->workers; 
+					m->workers_need = MIN(pc->default_capacity - m->workers, m->tasks_waiting); 
 					if(m->workers_need < 0) {
 						m->workers_need = 0;
 					}
