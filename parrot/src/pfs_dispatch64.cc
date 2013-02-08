@@ -1008,12 +1008,12 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						child_signal = args[0]&0xff;
 						clone_files = args[0]&CLONE_FILES;
 					}
-                                        pid_t notify_parent;
-                                        if(args[0]&(CLONE_PARENT|CLONE_THREAD)) {
-                                                notify_parent = p->ppid;
-                                        } else {
-                                                notify_parent = p->pid;
-                                        }
+					pid_t notify_parent;
+					if(args[0]&(CLONE_PARENT|CLONE_THREAD)) {
+						notify_parent = p->ppid;
+					} else {
+						notify_parent = p->pid;
+					}
 					child = pfs_process_create(childpid,p->pid,notify_parent,clone_files,child_signal);
 					child->syscall_result = 0;
 					if(args[0]&CLONE_THREAD) child->tgid = p->tgid;
