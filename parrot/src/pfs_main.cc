@@ -343,6 +343,11 @@ struct timeval clock_to_timeval( clock_t c )
 	return result;
 }
 
+void handle_sigchld( int sig  )
+{
+	pfs_poll_abort();
+}
+
 static void handle_sigio( int sig )
 {
 	pfs_process_sigio();
@@ -395,6 +400,7 @@ int main( int argc, char *argv[] )
 	install_handler(SIGINT,pass_through);
 	install_handler(SIGTTIN,control_terminal);
 	install_handler(SIGTTOU,control_terminal);
+	install_handler(SIGCHLD,handle_sigchld);
 	install_handler(SIGIO,handle_sigio);
 	install_handler(SIGXFSZ,ignore_signal);
 
