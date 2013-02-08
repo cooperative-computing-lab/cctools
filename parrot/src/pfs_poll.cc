@@ -23,7 +23,6 @@ extern "C" {
 #include <stdio.h>
 #include <signal.h>
 
-
 #define POLL_TIME_MAX 1
 
 #define POLL_TABLE_MAX 4096
@@ -45,9 +44,15 @@ static struct sleep_entry sleep_table[SLEEP_TABLE_MAX];
 
 static int poll_table_size = 0;
 static int sleep_table_size = 0;
+static int poll_abort_now = 0;
 
 extern void install_handler( int sig, void (*handler)(int sig));
 extern void handle_sigchld( int sig );
+
+void pfs_poll_abort()
+{
+	poll_abort_now = 1;
+}
 
 void pfs_poll_init()
 {
@@ -86,6 +91,8 @@ void pfs_poll_sleep()
 	FD_ZERO(&wfds);
 	FD_ZERO(&efds);
 
+	poll_abort_now = 0;
+
 	gettimeofday(&curtime,0);
 	stoptime = curtime;
 	stoptime.tv_sec += POLL_TIME_MAX;
@@ -123,10 +130,13 @@ void pfs_poll_sleep()
 		sleeptime.tv_sec -= 1;
 	}
 
-	/* We wake on file descriptors and SIGCHLD */
+	if(sleeptime.tv_sec<0 || poll_abort_now) {
+		sleeptime.tv_sec = 0;
+		sleeptime.tv_nsec = 0;
+	}
+
 	sigset_t childmask;
 	sigemptyset(&childmask);
-	sigaddset(&childmask, SIGCHLD);
 	sigaddset(&childmask, SIGPIPE);
 
 	result = pselect(maxfd,&rfds,&wfds,&efds,&sleeptime,&childmask);
@@ -155,7 +165,8 @@ void pfs_poll_sleep()
 	} else if(result==0) {
 		// select timed out, which should never happen, except
 		// that it does when the jvm linked with hdfs sets up its
-		// signal handlers to avoid sigchld.
+		// signal handlers to avoid sigchld.  In that case, re-install
+		install_handler(SIGCHLD,handle_sigchld);
 
 		gettimeofday(&curtime,0);
 
