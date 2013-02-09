@@ -252,6 +252,11 @@ int link_keepalive(struct link *link, int onoff);
 
 int link_nonblocking(struct link *link, int onoff);
 
+/** Allow SIGCHLD to interrupt any link polling.
+@param link The link to change.
+@param yes Boolean flag.
+*/
+void link_handle_children(struct link *link, int yes);
 
 /** Check whether a link has unread contents in its buffer.
 @param link The link to examine.

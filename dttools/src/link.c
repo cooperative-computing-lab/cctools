@@ -29,6 +29,8 @@ See the file COPYING for details.
 #include <errno.h>
 
 #include <assert.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -48,11 +50,19 @@ struct link {
 	size_t buffer_length;
 	char raddr[LINK_ADDRESS_MAX];
 	int rport;
+    int handle_children;
 };
 
 static int link_send_window = 65536;
 static int link_recv_window = 65536;
 static int link_override_window = 0;
+
+static sigjmp_buf sigenv;
+
+static void handle_SIGCHLD (int signo)
+{
+	siglongjmp(sigenv, 1);
+}
 
 void link_window_set(int send_buffer, int recv_buffer)
 {
@@ -134,6 +144,11 @@ int link_nonblocking(struct link *link, int onoff)
 	return 1;
 }
 
+void link_handle_children(struct link *link, int yes)
+{
+	link->handle_children = yes;
+}
+
 int link_buffer_empty(struct link *link) {
 	return link->buffer_length > 0 ? 0 : 1;
 }
@@ -153,6 +168,33 @@ static int link_internal_sleep(struct link *link, struct timeval *timeout, int r
 	struct pollfd pfd;
 	int msec;
 
+	/* Optionally, a process using the link library can elect to have SIGCHLD
+	* terminate a sleep on a link. The reason for this is that there is a race
+	* condition...
+	*/
+	sigset_t mask;
+	struct sigaction act, oact;
+	if (link->handle_children) {
+		/* We use sigsetjmp as a workaround for avoiding the race condition outlined
+		 * in "Advanced Programming in UNIX" section 10.16 (sigsuspend function).
+		 */
+		if (sigsetjmp(sigenv, 0)) {
+			result = 0;
+			errno = EINTR;
+			goto sigend;
+		}
+		sigemptyset(&act.sa_mask);
+		act.sa_flags = 0;
+		act.sa_handler = handle_SIGCHLD;
+		if (sigaction(SIGCHLD, &act, &oact) == -1) {
+			fatal("could not set SIGCHLD handler: %s", strerror(errno));
+		}
+		sigemptyset(&mask);
+		sigaddset(&mask, SIGCHLD);
+		if (sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1)
+			fatal("could not block SIGCHLD: %s", strerror(errno));
+	}
+	
 	if(timeout) {
 		msec = (timeout->tv_sec * 1000.0) + (timeout->tv_usec/1000.0);
 	} else {
@@ -168,23 +210,49 @@ static int link_internal_sleep(struct link *link, struct timeval *timeout, int r
 		result = poll(&pfd, 1, msec);
 		if (result > 0) {
 			if (reading && (pfd.revents & POLLIN)) {
-				return 1;
+				result = 1;
+				goto sigend;
 			}
 			if (writing && (pfd.revents & POLLOUT)) {
-				return 1;
+				result = 1;
+				goto sigend;
 			}
 			if (pfd.revents & POLLHUP) {
-				return 0;
+				result = 0;
+				goto sigend;
 			}
 			continue;
 		} else if (result == 0) {
-			return 0;
+			result = 0;
+			goto sigend;
 		} else if (errno_is_temporary(errno)) {
 			continue;
 		} else {
-			return 0;
+			result = 0;
+			goto sigend;
 		}
 	}
+
+sigend:
+	if (link->handle_children) {
+		sigemptyset(&mask);
+		sigaddset(&mask, SIGCHLD);
+		if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
+			fatal("could not block SIGCHLD: %s", strerror(errno));
+		if (sigaction(SIGCHLD, &oact, NULL) == -1) {
+			fatal("could not restore SIGCHLD handler: %s", strerror(errno));
+		}
+	    /* Before unblocking SIGCHLD, we will queue a SIGCHLD signal if needed by a
+	     * previous signal handler.
+	     */
+	    raise(SIGCHLD);
+		sigemptyset(&mask);
+		sigaddset(&mask, SIGCHLD);
+		if (sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1)
+			fatal("could not unblock SIGCHLD: %s", strerror(errno));
+	}
+
+	return result;
 }
 
 int link_sleep(struct link *link, time_t stoptime, int reading, int writing)
@@ -233,6 +301,7 @@ static struct link *link_create()
 	link->buffer_length = 0;
 	link->raddr[0] = 0;
 	link->rport = 0;
+	link->handle_children = 0;
 
 	return link;
 }
