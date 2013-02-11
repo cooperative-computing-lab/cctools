@@ -48,6 +48,7 @@ See the file COPYING for details.
 #define POOL_CONFIG_IGNORE_CAPACITY 1
 #define MAX_WORKERS_DEFAULT 100
 
+static time_t pool_start_time;
 static time_t last_log_time; 
 static int abort_flag = 0;
 static sig_atomic_t pool_config_updated = 1;
@@ -518,6 +519,8 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 			matched_masters = get_masters_from_catalog(catalog_host, catalog_port, pc->project);
 			if(!matched_masters) {
 				last_decision_time = time(0);
+				last_decision_amount = 0; 
+				advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, pool_start_time, "n/a");
 				goto check_workers;
 			}
 		} else {
@@ -914,20 +917,19 @@ int decide_worker_distribution(struct list *matched_masters, struct pool_config 
 
 	free(pointers);
 
+	last_decision_time = time(0);
+	last_decision_amount = sum_decided_workers;
+
 	// advertise decision to the catalog server
 	char *decision;
-
 	decision = get_pool_decision_string(matched_masters);
-
 	if(decision) {
-		advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, decision);
+		advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, pool_start_time, decision);
 		free(decision);
 	} else {
 		fprintf(stderr, "Failed to convert pool decisions into a single string.\n");
 	}
 
-	last_decision_amount = sum_decided_workers;
-	last_decision_time = time(0);
 	return sum_decided_workers; 
 }
 
@@ -1322,6 +1324,7 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	pool_start_time = time(0);
 	last_log_time = time(0) - LOG_INTERVAL;
 	last_decision_time = time(0);
 
