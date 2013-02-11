@@ -1743,10 +1743,37 @@ failure:
 int dag_parse_export(struct dag *d, char *line)
 {
 	int i, argc;
+	char *end_export, *equal;
 	char **argv;
 
-	string_split_quotes(line + 7, &argc, &argv);
+	end_export = strstr(line, "export ");
+
+	if(!end_export)
+		return 0;
+	else
+		end_export += strlen("export ");
+
+	while(isblank(*end_export))
+		end_export++;
+
+	if(end_export == '\0')
+		return 0;
+
+	string_split_quotes(end_export, &argc, &argv);
 	for(i = 0; i < argc; i++) {
+		equal = strchr(argv[i], '=');
+		if(equal)
+		{
+			if(!dag_parse_variable(d, NULL, argv[i]))
+			{
+				return 0;
+			}
+			else
+			{
+				*equal = '\0';
+				setenv(argv[i], equal + 1, 1); //this shouldn't be here...
+			}
+		}
 		list_push_tail(d->export_list, xxstrdup(argv[i]));
 		debug(D_DEBUG, "export variable=%s", argv[i]);
 	}
