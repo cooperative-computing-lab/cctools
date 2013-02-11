@@ -1961,11 +1961,11 @@ static void do_keepalive_checks(struct work_queue *q) {
 	
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->state == WORKER_STATE_BUSY) {
-			timestamp_t keepalive_elapsed_time = (current - w->last_msg_sent_time)/1000000;
+		if(w->state == WORKER_STATE_BUSY || w->state == WORKER_STATE_CANCELLING) {
 			// send new keepalive check only (1) if we received a response since last keepalive check AND 
 			// (2) we are past keepalive interval 
 			if(w->last_msg_recv_time >= w->keepalive_check_sent_time) {	
+				timestamp_t keepalive_elapsed_time = (current - w->last_msg_sent_time)/1000000;
 				if(keepalive_elapsed_time >= q->keepalive_interval) {
 					if (send_worker_msg(w, "%s\n", time(0) + short_timeout, "check") < 0) {
 						debug(D_WQ, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
