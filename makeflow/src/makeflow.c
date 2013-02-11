@@ -1263,7 +1263,12 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 			free(line);
 			continue;
 		}
-		if(strchr(line, '=')) {
+		if(strncmp(line, "export ", 7) == 0) {
+			if(!dag_parse_export(d, line)) {
+				dag_parse_error(d, "export");
+				goto failure;
+			}
+		} else if(strchr(line, '=')) {
 			if(!dag_parse_variable(d, NULL, line)) {
 				dag_parse_error(d, "variable");
 				goto failure;
@@ -1271,11 +1276,6 @@ int dag_parse(struct dag *d, const char *filename, int clean_mode)
 		} else if(strstr(line, ":")) {
 			if(!dag_parse_node(d, line, clean_mode)) {
 				dag_parse_error(d, "node");
-				goto failure;
-			}
-		} else if(strncmp(line, "export ", 7) == 0) {
-			if(!dag_parse_export(d, line)) {
-				dag_parse_error(d, "export");
 				goto failure;
 			}
 		} else {
