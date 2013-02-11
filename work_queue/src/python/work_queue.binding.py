@@ -550,7 +550,7 @@ class WorkQueue(_object):
     def specify_log(self, logfile):
         return work_queue_specify_log(self._work_queue, logfile)
     
-	##
+    ##
     # Cancel task identified by its taskid and remove from the given queue. 
     #
     # @param self   Reference to the current work queue object.
@@ -575,6 +575,24 @@ class WorkQueue(_object):
     # @param n      The number to shutdown.  To shut down all workers, specify "0".
     def shutdown_workers(self, n):
         return work_queue_shut_down_workers(self._work_queue, n)
+
+    ##
+    # Change keepalive interval for a given queue.
+    #
+    # @param self     Reference to the current work queue object.
+    # @param interval Minimum number of seconds to wait before sending new keepalive
+    #                 checks to workers.
+    def specify_keepalive_interval(self, interval):
+        return work_queue_specify_keepalive_interval(self._work_queue, interval)
+
+    ##
+    # Change keepalive timeout for a given queue.
+    #
+    # @param self     Reference to the current work queue object.
+    # @param timeout  Minimum number of seconds to wait for a keepalive response
+    #                 from worker before marking it as dead.
+    def specify_keepalive_timeout(self, timeout):
+        return work_queue_specify_keepalive_timeout(self._work_queue, timeout)
 
     ##
     # Submit a task to the queue.

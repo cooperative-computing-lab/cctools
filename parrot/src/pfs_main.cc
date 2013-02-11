@@ -261,7 +261,7 @@ of our children for its consideration.
 
 static void pass_through( int sig )
 {
-	pfs_process_raise(root_pid,sig,1);
+	pfs_process_raise(root_pid, sig, 1 /* really send it */);
 }
 
 /*

@@ -93,19 +93,22 @@ typedef enum {
 	DAG_NODE_STATE_MAX = 5
 } dag_node_state_t;
 
+// A target file for a production rule is deemed "garbage
+// collectable" if ...
+
 struct dag {
-	char *filename;
-	struct dag_node *nodes;
-	struct itable *node_table;
-	struct itable *local_job_table;
-	struct itable *remote_job_table;
-	struct hash_table *file_table;
-	struct hash_table *completed_files;
-	struct hash_table *filename_translation_rev;
-	struct hash_table *filename_translation_fwd;
-	struct list *symlinks_created;
-	struct hash_table *variables;
-	struct hash_table *collect_table;
+	char *filename;					// Source makeflow file path.
+	struct dag_node *nodes;				// Linked list of all production rules, without ordering.
+	struct itable *node_table;			// Mapping from unique integers dag_node->nodeid to nodes.
+	struct itable *local_job_table;			// Mapping from unique integers dag_node->jobid  to nodes, rules with prefix LOCAL.
+	struct itable *remote_job_table;		// Mapping from unique integers dag_node->jobid  to nodes.
+	struct hash_table *file_table;			// Mapping filenames to dag_nodes (answers: which production rule has filename as a target?)
+	struct hash_table *completed_files;		// Records which target files have been updated/generated.
+	struct hash_table *filename_translation_fwd;	// Mapping renaming filenames to slash-less filenames. This is needed for some remote file systems.
+	struct hash_table *filename_translation_rev;	// Mapping from slash-less filenames to the original filenames.
+	struct list *symlinks_created;			// Remote filenames for which a symlink was created (used now only for Condor, and only for the final cleanup).
+	struct hash_table *variables;			// Mappings between variables defined in the makeflow file and their substitution.
+	struct hash_table *collect_table;		// Keeps the reference counts of filenames of files that are garbage collectable.
 	struct list *export_list;
 	FILE *logfile;
 	int node_states[DAG_NODE_STATE_MAX];
@@ -144,7 +147,10 @@ struct dag_file {
  * source_files and target_files members (i.e., a dag_node has no
  * explicit knowledge of its logical dag_node ascendants or descendants).
  * For a given filename, we can test if it is a sink of the dag d
- * with a lookup on the hash table d->file_table. */
+ * with a lookup on the hash table d->file_table. In fact,
+ * dag_node acts more like the edge of the dag, with the nodes
+ * being sets of source/target files (that is, a file may be part
+ * of different nodes).*/
 struct dag_node {
 	int only_my_children;
 	time_t previous_completion;
@@ -1105,7 +1111,7 @@ static int translate_filename(struct dag *d, const char *filename, char **newnam
 		*c = '_';
 	}
 
-	while(!hash_table_insert(d->filename_translation_rev, newname, xxstrdup(filename))) {
+	while(!hash_table_insert(d->filename_translation_rev, newname, xxstrdup(filename))) { //memory leak?
 		/* It's not 100% collision-proof, technically, but the odds of
 		   an unresolvable collision are unbelievably slim. */
 
@@ -1315,7 +1321,13 @@ int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode)
 			free(line);
 			continue;
 		}
-		if(strchr(line, '=')) {
+		if(strncmp(line, "export ", 7) == 0) {
+			if(!dag_parse_export(bk, line)) {
+				dag_parse_error(bk, "export");
+				goto failure;
+			}
+		}
+		else if(strchr(line, '=')) {
 			if(!dag_parse_variable(bk, NULL, line)) {
 				dag_parse_error(bk, "variable");
 				goto failure;
@@ -1323,11 +1335,6 @@ int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode)
 		} else if(strstr(line, ":")) {
 			if(!dag_parse_node(bk, line, clean_mode)) {
 				dag_parse_error(bk, "node");
-				goto failure;
-			}
-		} else if(strncmp(line, "export ", 7) == 0) {
-			if(!dag_parse_export(bk, line)) {
-				dag_parse_error(bk, "export");
 				goto failure;
 			}
 		} else {
@@ -1614,7 +1621,6 @@ int dag_parse_node_filelist(struct dag_parse *bk, struct dag_node *n, char *file
 }
 
 int dag_prepare_for_batch_system(struct dag *d) {
-
 	struct dag_node *n;
 	struct dag_file *f;
 	int source;
@@ -1624,7 +1630,6 @@ int dag_prepare_for_batch_system(struct dag *d) {
 		source = 1;
 		for(f = n->source_files; f; ) {
 			switch(batch_queue_type) {
-			
 			case BATCH_QUEUE_TYPE_CONDOR:
 				
 				rv = 0;
@@ -1691,13 +1696,11 @@ int dag_prepare_for_batch_system(struct dag *d) {
 				break;
 				
 			default:
-
 				if(f->remotename) {
 					fprintf(stderr, "makeflow: automatic file renaming (%s=%s) only works with Condor or Work Queue drivers\n", f->filename, f->remotename);
 					goto failure;
 				}
 				break;
-				
 			}
 
 			f = f->next;
@@ -2366,6 +2369,8 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -R             Automatically retry failed batch jobs up to %d times.\n", dag_retry_max);
 	fprintf(stdout, " -r <n>         Automatically retry failed batch jobs up to n times.\n");
 	fprintf(stdout, " -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n", dag_submit_timeout);
+	fprintf(stdout, " -t <timeout>   Work Queue keepalive timeout.           (default is %ds)\n", WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
+	fprintf(stdout, " -u <interval>  Work Queue keepalive interval.           (default is %ds)\n", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
 	fprintf(stdout, " -v             Show version string\n");
 	fprintf(stdout, " -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
 	fprintf(stdout, " -z             Force failure on zero-length output files \n");
@@ -2499,6 +2504,8 @@ int main(int argc, char *argv[])
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	int work_queue_estimate_capacity_on = 0;
+	int work_queue_keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
+	int work_queue_keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
 	char *write_summary_to = NULL;
 	char *catalog_host;
 	int catalog_port;
@@ -2532,7 +2539,7 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	while((c = getopt(argc, argv, "aAB:cC:d:D:E:f:F:g:G:hiIj:J:kKl:L:m:N:o:Op:P:r:RS:T:vW:zZ:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAB:cC:d:D:E:f:F:g:G:hiIj:J:kKl:L:m:N:o:Op:P:r:RS:t:T:u:vW:zZ:")) != (char) -1) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2657,12 +2664,18 @@ int main(int argc, char *argv[])
 			case 'S':
 				dag_submit_timeout = atoi(optarg);
 				break;
+			case 't':
+				work_queue_keepalive_timeout = atoi(optarg);
+				break;
 			case 'T':
 				batch_queue_type = batch_queue_type_from_string(optarg);
 				if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
 					fprintf(stderr, "makeflow: unknown batch queue type: %s\n", optarg);
 					return 1;
 				}
+				break;
+			case 'u':
+				work_queue_keepalive_interval = atoi(optarg);
 				break;
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
@@ -2893,6 +2906,8 @@ int main(int argc, char *argv[])
 		work_queue_specify_name(q, project);
 		work_queue_specify_priority(q, priority);
 		work_queue_specify_estimate_capacity_on(q, work_queue_estimate_capacity_on);
+		work_queue_specify_keepalive_interval(q, work_queue_keepalive_interval);
+		work_queue_specify_keepalive_timeout(q, work_queue_keepalive_timeout);
 		port = work_queue_port(q);
 		if(port_file)
 			opts_write_port_file(port_file, port);

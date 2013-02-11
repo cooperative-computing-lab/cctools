@@ -46,6 +46,9 @@ See the file COPYING for details.
 #define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
 #define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
 
+#define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
+#define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
+
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler;	/**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
 
