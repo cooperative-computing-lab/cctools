@@ -33,6 +33,7 @@ execution engine.
 
 SUBSECTION(Commands)
 OPTIONS_BEGIN
+OPTION_ITEM(-b)Create portable bundle of workflow.
 OPTION_ITEM(-c)Clean up: remove logfile and all targets.
 OPTION_ITEM(-D)Display the Makefile as a Dot graph.
 OPTION_ITEM(-f)Write summary of workflow to file.
@@ -120,7 +121,7 @@ Run makeflow locally with debugging:
 LONGCODE_BEGIN
 makeflow -d all Makeflow
 LONGCODE_END
-   
+
 Run makeflow on Condor will special requirements:
 LONGCODE_BEGIN
 makeflow -T condor -B "requirements = MachineGroup == 'ccl'" Makeflow

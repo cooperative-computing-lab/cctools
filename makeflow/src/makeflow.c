@@ -20,6 +20,8 @@ See the file COPYING for details.
 #include "cctools.h"
 #include "catalog_query.h"
 #include "catalog_server.h"
+#include "create_dir.h"
+#include "copy_stream.h"
 #include "work_queue_catalog.h"
 #include "datagram.h"
 #include "disk_info.h"
@@ -319,17 +321,15 @@ void dag_show_analysis(struct dag *d) {
 	printf("width_guaranteed_max\t%d\n", dag_width_guaranteed_max(d));
 }
 
-void dag_show_input_files(struct dag *d)
+struct hash_table * input_files(struct dag *d)
 {
 	struct dag_node *n, *tmp;
 	struct dag_file *f;
 	struct hash_table *ih;
-	char *key;
-	void *value;
 
-	ih = hash_table_create(0, 0);
+	ih = hash_table_create(0,0);
 	for(n = d->nodes; n; n = n->next) {
-		// for each source file, see if it is a target file of another node
+		//for each source file, see if it is a target file of another node
 		for(f = n->source_files; f; f = f->next) {
 			// d->file_table contains all target files
 			// get the node (tmp) that outputs current source file
@@ -342,9 +342,44 @@ void dag_show_input_files(struct dag *d)
 		}
 	}
 
+	return ih;
+}
+
+
+void dag_show_input_files(struct dag *d)
+{
+	char *key;
+	void *value;
+	struct hash_table *ih;
+	ih = input_files(d);
 	hash_table_firstkey(ih);
 	while(hash_table_nextkey(ih, &key, &value)) {
 		printf("%s\n", key);
+	}
+
+	hash_table_delete(ih);
+}
+
+void collect_input_files(struct dag *d, char* destination)
+{
+	FILE *from=NULL, *to=NULL;
+
+	struct hash_table *ih;
+	ih = input_files(d);
+
+	char *key;
+	void *value;
+	char file_destination[1024];
+
+	hash_table_firstkey(ih);
+	while(hash_table_nextkey(ih, &key, &value)) {
+		from = fopen(key, "r");
+		const char *basename = string_basename(key);
+		sprintf(file_destination, "%s/%s", destination, basename);
+		to = fopen(file_destination, "w");
+		copy_stream_to_stream(from, to);
+		fclose(from);
+		fclose(to);
 	}
 
 	hash_table_delete(ih);
@@ -2291,6 +2326,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "Where options are:\n");
 	fprintf(stdout, " -a             Advertise the master information to a catalog server.\n");
 	fprintf(stdout, " -A             Disable the check for AFS.                  (experts only.)\n");;
+	fprintf(stdout, " -b <directory> Create portable bundle of workflow in <directory>\n");            
 	fprintf(stdout, " -B <options>   Add these options to all batch submit files.\n");
 	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem\n");
@@ -2438,6 +2474,7 @@ int main(int argc, char *argv[])
 	char c;
 	char *logfilename = NULL;
 	char *batchlogfilename = NULL;
+	char *bundle_directory = NULL;
 	int clean_mode = 0;
 	int display_mode = 0;
 	int condense_display = 0;
@@ -2486,13 +2523,16 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	while((c = getopt(argc, argv, "aAB:cC:d:D:E:f:F:g:G:hiIj:J:kKl:L:m:N:o:Op:P:r:RS:t:T:u:vW:zZ:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAb:B:cC:d:D:E:f:F:g:G:hiIj:J:kKl:L:m:N:o:Op:P:r:RS:t:T:u:vW:zZ:")) != (char) -1) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 				break;
 			case 'A':
 				skip_afs_check = 1;
+				break;
+			case 'b':
+				bundle_directory = xxstrdup(optarg);
 				break;
 			case 'B':
 				batch_submit_options = optarg;
@@ -2734,6 +2774,40 @@ int main(int argc, char *argv[])
 	if(syntax_check) {
 		fprintf(stdout, "%s: Syntax OK.\n", dagfile);
 		return 0;
+	}
+
+	if(bundle_directory){
+		//Create Bundle!
+		fprintf(stderr, "Creating workflow bundle...\n");
+		if(!dag_check(d)) exit(1);
+
+		struct stat s;
+		if(!stat(bundle_directory, &s)){
+			fprintf(stderr, "Target directory, %s, already exists.\n", bundle_directory);
+			exit(1);
+		}
+		fprintf(stderr, "Creating new directory, %s ..........", bundle_directory);
+		if(!create_dir(bundle_directory, 0777)) {
+			fprintf(stderr, "FAILED\n");
+			exit(1);
+		}
+		fprintf(stderr, "COMPLETE\n");
+
+		dag_show_input_files(d);
+		collect_input_files(d, bundle_directory);
+
+		FILE *from=NULL, *to=NULL;
+		from = fopen(dagfile, "r");
+		
+		fprintf(stderr, "Copying %s into %s\n", dagfile, bundle_directory);
+		char output_makeflow[1024];
+		sprintf(output_makeflow, "%s/%s", bundle_directory, dagfile);
+		to = fopen(output_makeflow, "w");
+		copy_stream_to_stream(from, to);
+		fclose(from);
+		fclose(to);
+		free(bundle_directory);
+		exit(0);
 	}
 
 	if(display_mode == SHOW_INPUT_FILES) {
