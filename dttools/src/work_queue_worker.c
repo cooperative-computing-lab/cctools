@@ -1138,12 +1138,8 @@ static int do_release() {
 }
 
 static int send_keepalive(struct link *master){
-	//Respond to keepalive only when running a task. When not running a task,
-	//master can determine if I am alive when it tries sending me a task. 
-	if(task_status == TASK_RUNNING) {
-		link_putliteral(master, "alive\n", time(0) + active_timeout);
-		debug(D_WQ, "sent response to keepalive check from master at %s:%d.\n", actual_addr, actual_port);
-	}
+	link_putliteral(master, "alive\n", time(0) + active_timeout);
+	debug(D_WQ, "sent response to keepalive check from master at %s:%d.\n", actual_addr, actual_port);
 	return 1;
 }
 
