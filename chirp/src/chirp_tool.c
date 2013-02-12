@@ -453,7 +453,7 @@ static void long_ls_callback(const char *name, struct chirp_stat *info, void *ar
 		strftime(timestr, sizeof(timestr), "%b %d %H:%M", localtime(&t));
 	}
 
-	printf("%c%c%c%c%c%c%c%c%c%c %4lld %8lld %8lld %8lld %s %s\n", S_ISDIR(info->cst_mode) ? 'd' : '-', info->cst_mode & 0400 ? 'r' : '-', info->cst_mode & 0200 ? 'w' : '-', info->cst_mode & 0100 ? 'x' : '-', info->cst_mode & 0040 ? 'r' : '-',
+	printf("%c%c%c%c%c%c%c%c%c%c %4" PRId64 " %8" PRId64 " %8" PRId64 " %8" PRId64 " %s %s\n", S_ISDIR(info->cst_mode) ? 'd' : '-', info->cst_mode & 0400 ? 'r' : '-', info->cst_mode & 0200 ? 'w' : '-', info->cst_mode & 0100 ? 'x' : '-', info->cst_mode & 0040 ? 'r' : '-',
 	       info->cst_mode & 0020 ? 'w' : '-', info->cst_mode & 0010 ? 'x' : '-', info->cst_mode & 0004 ? 'r' : '-', info->cst_mode & 0002 ? 'w' : '-', info->cst_mode & 0001 ? 'x' : '-', info->cst_nlink, info->cst_uid, info->cst_gid, info->cst_size,
 	       timestr, name);
 }
@@ -570,16 +570,16 @@ static INT64_T do_stat(int argc, char **argv)
 	if(chirp_reli_stat(current_host, full_path, &info, stoptime) < 0) {
 		return -1;
 	} else {
-		printf("device:  %lld\n", info.cst_dev);
-		printf("inode:   %lld\n", info.cst_ino);
-		printf("mode:    %04llo\n", info.cst_mode);
-		printf("nlink:   %lld\n", info.cst_nlink);
-		printf("uid:     %lld\n", info.cst_uid);
-		printf("gid:     %lld\n", info.cst_gid);
-		printf("rdevice: %lld\n", info.cst_rdev);
-		printf("size:    %lld\n", info.cst_size);
-		printf("blksize: %lld\n", info.cst_blksize);
-		printf("blocks:  %lld\n", info.cst_blocks);
+		printf("device:  %" PRId64 "\n", info.cst_dev);
+		printf("inode:   %" PRId64 "\n", info.cst_ino);
+		printf("mode:    %04" PRIu64 "\n", info.cst_mode);
+		printf("nlink:   %" PRId64 "\n", info.cst_nlink);
+		printf("uid:     %" PRId64 "\n", info.cst_uid);
+		printf("gid:     %" PRId64 "\n", info.cst_gid);
+		printf("rdevice: %" PRId64 "\n", info.cst_rdev);
+		printf("size:    %" PRId64 "\n", info.cst_size);
+		printf("blksize: %" PRId64 "\n", info.cst_blksize);
+		printf("blocks:  %" PRId64 "\n", info.cst_blocks);
 		t = info.cst_atime;
 		printf("atime:   %s", ctime(&t));
 		t = info.cst_mtime;
@@ -754,9 +754,9 @@ static INT64_T do_audit(int argc, char **argv)
 			printf("   FILES     DIRS      DATA OWNER\n");
 		for(i = 0; i < result; i++) {
 			if(raw_mode) {
-				printf("%lld %lld %lld %s\n", list[i].nfiles, list[i].ndirs, list[i].nbytes, list[i].name);
+				printf("%" PRId64 " %" PRId64 " %" PRId64 " %s\n", list[i].nfiles, list[i].ndirs, list[i].nbytes, list[i].name);
 			} else {
-				printf("%8lld %8lld %8sB %s\n", list[i].nfiles, list[i].ndirs, string_metric(list[i].nbytes, -1, 0), list[i].name);
+				printf("%8" PRId64 " %8" PRId64 " %8sB %s\n", list[i].nfiles, list[i].ndirs, string_metric(list[i].nbytes, -1, 0), list[i].name);
 			}
 		}
 		free(list);
@@ -809,7 +809,7 @@ static INT64_T do_thirdput(int argc, char **argv)
 		stop++;
 
 	if(result > 0) {
-		printf("%lld bytes transferred in %d seconds ", result, (int) (stop - start));
+		printf("%" PRId64 " bytes transferred in %d seconds ", result, (int) (stop - start));
 		printf("(%.1lfMB/s)\n", result / (double) (stop - start) / 1024.0 / 1024.0);
 	}
 

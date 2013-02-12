@@ -8,8 +8,8 @@ See the file COPYING for details.
 
 #define DEFAULT_CONFIGFILE_NAME ".s3tools.conf"
 
-inline const char* s3_userid();
-inline const char* s3_key();
+const char* s3_userid();
+const char* s3_key();
 
 void s3_initialize(int* argc, char** argv);
 int s3_register_userid(const char *userid, const char* key);

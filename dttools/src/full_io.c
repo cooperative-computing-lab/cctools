@@ -36,7 +36,7 @@ ssize_t full_read(int fd, void *buf, size_t count)
 		} else {
 			total += chunk;
 			count -= chunk;
-			buf += chunk;
+			buf = (char *) buf + chunk; //Previously without the cast! (but sizeof char == 1)
 		}
 	}
 
@@ -69,7 +69,7 @@ ssize_t full_write(int fd, const void *buf, size_t count)
 		} else {
 			total += chunk;
 			count -= chunk;
-			buf += chunk;
+			buf = (char *) buf + chunk; //Previously without the cast! (but sizeof char == 1)
 		}
 	}
 
@@ -86,8 +86,8 @@ ssize_t full_write(int fd, const void *buf, size_t count)
 
 INT64_T full_pread64(int fd, void *buf, INT64_T count, INT64_T offset)
 {
-	INT64_T total = 0;
-	INT64_T chunk = 0;
+	ssize_t total = 0;
+	ssize_t chunk = 0;
 
 	while(count > 0) {
 #if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD
@@ -106,8 +106,8 @@ INT64_T full_pread64(int fd, void *buf, INT64_T count, INT64_T offset)
 		} else {
 			total += chunk;
 			count -= chunk;
-			buf += chunk;
-			offset += chunk;
+			buf = (char *) buf + chunk; //Previously without the cast! (but sizeof char == 1)
+			offset += (INT64_T) chunk;
 		}
 	}
 
@@ -124,8 +124,8 @@ INT64_T full_pread64(int fd, void *buf, INT64_T count, INT64_T offset)
 
 INT64_T full_pwrite64(int fd, const void *buf, INT64_T count, INT64_T offset)
 {
-	INT64_T total = 0;
-	INT64_T chunk = 0;
+	ssize_t total = 0;
+	ssize_t chunk = 0;
 
 	while(count > 0) {
 #if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD
@@ -144,8 +144,8 @@ INT64_T full_pwrite64(int fd, const void *buf, INT64_T count, INT64_T offset)
 		} else {
 			total += chunk;
 			count -= chunk;
-			buf += chunk;
-			offset += chunk;
+			buf = (char *) buf + chunk; //Previously without the cast! (but sizeof char == 1)
+			offset += (INT64_T) chunk;
 		}
 	}
 
@@ -178,7 +178,7 @@ ssize_t full_pread(int fd, void *buf, size_t count, off_t offset)
 		} else {
 			total += chunk;
 			count -= chunk;
-			buf += chunk;
+			buf = (char *) buf + chunk; //Previously without the cast! (but sizeof char == 1)
 			offset += chunk;
 		}
 	}
@@ -212,7 +212,7 @@ ssize_t full_pwrite(int fd, const void *buf, size_t count, off_t offset)
 		} else {
 			total += chunk;
 			count -= chunk;
-			buf += chunk;
+			buf = (char *) buf + chunk; //Previously without the cast! (but sizeof char == 1)
 			offset += chunk;
 		}
 	}
@@ -246,7 +246,7 @@ ssize_t full_fread(FILE * file, void *buf, size_t count)
 		} else {
 			total += chunk;
 			count -= chunk;
-			buf += chunk;
+			buf = (char *) buf + chunk; //Previously without the cast! (but sizeof char == 1)
 		}
 	}
 
@@ -279,7 +279,7 @@ ssize_t full_fwrite(FILE * file, const void *buf, size_t count)
 		} else {
 			total += chunk;
 			count -= chunk;
-			buf += chunk;
+			buf = (char *) buf + chunk; //Previously without the cast! (but sizeof char == 1)
 		}
 	}
 

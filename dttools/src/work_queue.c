@@ -239,13 +239,17 @@ static void log_worker_states(struct work_queue *q)
 {
 	struct work_queue_stats s;
 	work_queue_get_stats(q, &s);
-	fprintf(q->logfile, "%16llu %25llu %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25d %25lld %25lld %25llu %25llu %25f %25f %25d %25d %25d %25d\n",
-		timestamp_get(), s.start_time, // time
-		s.workers_init, s.workers_ready, s.workers_busy, s.workers_cancelling, // workers
-		s.tasks_waiting, s.tasks_running, s.tasks_complete, // tasks
-		s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_connected, // totals
-		s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received, s.total_send_time, s.total_receive_time,
-		s.efficiency, s.idle_percentage, s.capacity, s.avg_capacity, s.port, s.priority); // other
+
+	fprintf(q->logfile, "%16" PRIu64 " %25" PRIu64 " ", timestamp_get(), s.start_time); // time
+	fprintf(q->logfile, "%25d %25d %25d %25d ", s.workers_init, s.workers_ready, s.workers_busy, s.workers_cancelling);
+	fprintf(q->logfile, "%25d %25d %25d ", s.tasks_waiting, s.tasks_running, s.tasks_complete);
+	fprintf(q->logfile, "%25d %25d %25d %25d ", s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_connected);
+	fprintf(q->logfile, "%25d %25" PRId64 " %25" PRId64 " ", s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received); 
+	fprintf(q->logfile, "%25" PRIu64 " %25" PRIu64 " ", s.total_send_time, s.total_receive_time);
+	fprintf(q->logfile, "%25f %25f ", s.efficiency, s.idle_percentage);
+	fprintf(q->logfile, "%25d %25d ", s.capacity, s.avg_capacity);
+	fprintf(q->logfile, "%25d %25d ", s.port, s.priority);
+	fprintf(q->logfile, "\n");
 }
 
 static void change_worker_state(struct work_queue *q, struct work_queue_worker *w, int state)
@@ -266,7 +270,7 @@ static void change_worker_state(struct work_queue *q, struct work_queue_worker *
 
 static void link_to_hash_key(struct link *link, char *key)
 {
-	sprintf(key, "0x%p", link);
+	sprintf(key, "0x%p", (void *) link);
 }
 
 /**
@@ -573,7 +577,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 			goto link_failure;
 		}
 		
-		if(sscanf(line, "%s %s %lld", type, tmp_remote_name, &length) == 3) {
+		if(sscanf(line, "%s %s %" SCNd64, type, tmp_remote_name, &length) == 3) {
 			tmp_local_name[local_name_len] = '\0';
 			strcat(tmp_local_name, &(tmp_remote_name[remote_name_len]));
 

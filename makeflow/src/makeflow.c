@@ -764,7 +764,7 @@ void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate)
 	 * node_id_counter - total number of nodes in this makeflow.
 	 *
 	 */
-	fprintf(d->logfile, "%llu %d %d %d %d %d %d %d %d %d\n", timestamp_get(), n->nodeid, newstate, n->jobid, d->node_states[0], d->node_states[1], d->node_states[2], d->node_states[3], d->node_states[4], d->nodeid_counter);
+	fprintf(d->logfile, "%" PRIu64 " %d %d %d %d %d %d %d %d %d\n", timestamp_get(), n->nodeid, newstate, n->jobid, d->node_states[0], d->node_states[1], d->node_states[2], d->node_states[3], d->node_states[4], d->nodeid_counter);
 }
 
 void dag_abort_all(struct dag *d)
@@ -776,14 +776,14 @@ void dag_abort_all(struct dag *d)
 
 	itable_firstkey(d->local_job_table);
 	while(itable_nextkey(d->local_job_table, &jobid, (void **) &n)) {
-		printf("aborting local job %llu\n", jobid);
+		printf("aborting local job %" PRIu64 "\n", jobid);
 		batch_job_remove(local_queue, jobid);
 		dag_node_state_change(d, n, DAG_NODE_STATE_ABORTED);
 	}
 
 	itable_firstkey(d->remote_job_table);
 	while(itable_nextkey(d->remote_job_table, &jobid, (void **) &n)) {
-		printf("aborting remote job %llu\n", jobid);
+		printf("aborting remote job %" PRIu64 "\n", jobid);
 		batch_job_remove(remote_queue, jobid);
 		dag_node_state_change(d, n, DAG_NODE_STATE_ABORTED);
 	}
@@ -1013,7 +1013,7 @@ void dag_log_recover(struct dag *d, const char *filename)
 
 			if(line[0] == '#')
 				continue;
-			if(sscanf(line, "%llu %d %d %d", &previous_completion_time, &nodeid, &state, &jobid) == 4) {
+			if(sscanf(line, "%" SCNu64 " %d %d %d", &previous_completion_time, &nodeid, &state, &jobid) == 4) {
 				n = itable_lookup(d->node_table, nodeid);
 				if(n) {
 					n->state = state;
@@ -2243,7 +2243,7 @@ void dag_gc_all(struct dag *d, int threshold, int maxfiles, time_t stoptime)
 		 * dag_gc_collected - the total number of files has been collected so far since the start this makeflow execution.
 		 *
 		 */
-		fprintf(d->logfile, "# GC\t%llu\t%d\t%llu\t%d\n", timestamp_get(), collected, stop_time - start_time, dag_gc_collected);
+		fprintf(d->logfile, "# GC\t%" PRIu64 "\t%d\t%" PRIu64 "\t%d\n", timestamp_get(), collected, stop_time - start_time, dag_gc_collected);
 	}
 }
 
@@ -2274,7 +2274,7 @@ void dag_gc_ref_count(struct dag *d, const char *file)
 		 * dag_gc_collected - the total number of files has been collected so far since the start this makeflow execution.
 		 *
 		 */
-		fprintf(d->logfile, "# GC\t%llu\t%d\t%llu\t%d\n", timestamp_get(), 1, stop_time - start_time, ++dag_gc_collected);
+		fprintf(d->logfile, "# GC\t%" PRIu64 "\t%d\t%" PRIu64 "\t%d\n", timestamp_get(), 1, stop_time - start_time, ++dag_gc_collected);
 	}
 }
 
@@ -3034,7 +3034,7 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, handle_abort);
 	signal(SIGTERM, handle_abort);
 
-	fprintf(d->logfile, "# STARTED\t%llu\n", timestamp_get());
+	fprintf(d->logfile, "# STARTED\t%" PRIu64 "\n", timestamp_get());
 	runtime = timestamp_get();
 	dag_run(d);
 	time_completed = timestamp_get();
@@ -3055,15 +3055,15 @@ int main(int argc, char *argv[])
 
 
 	if(dag_abort_flag) {
-		fprintf(d->logfile, "# ABORTED\t%llu\n", timestamp_get());
+		fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "workflow was aborted.\n");
 		return 1;
 	} else if(dag_failed_flag) {
-		fprintf(d->logfile, "# FAILED\t%llu\n", timestamp_get());
+		fprintf(d->logfile, "# FAILED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "workflow failed.\n");
 		return 1;
 	} else {
-		fprintf(d->logfile, "# COMPLETED\t%llu\n", timestamp_get());
+		fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "nothing left to do.\n");
 		return 0;
 	}

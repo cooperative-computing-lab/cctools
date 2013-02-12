@@ -152,7 +152,7 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 				string_chomp(line);
 				debug(D_HTTP, "%s", line);
 				sscanf(line, "Location: %s", newurl);
-				sscanf(line, "Content-Length: %lld", size);
+				sscanf(line, "Content-Length: %" SCNd64, size);
 				if(strlen(line) <= 2) {
 					break;
 				}

@@ -138,7 +138,9 @@ static void stop_working(int sig)
 	keepgoing = 0;
 }
 
-static void *install_handler(int sig, void (*handler) (int sig))
+
+//return type is void (*fn)(int)
+static void (*install_handler(int sig, void (*handler)(int)))(int)
 {
 	struct sigaction s, olds;
 	s.sa_handler = handler;

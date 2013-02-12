@@ -97,7 +97,7 @@ static struct alloc_state *alloc_state_load(const char *path)
 		}
 	}
 
-	fscanf(s->file, "%lld %lld", &s->size, &s->inuse);
+	fscanf(s->file, "%" SCNd64 " %" SCNd64, &s->size, &s->inuse);
 
 	s->dirty = 0;
 
@@ -122,7 +122,7 @@ static void alloc_state_save(const char *path, struct alloc_state *s)
 	if(s->dirty) {
 		ftruncate(fileno(s->file), 0);
 		fseek(s->file, 0, SEEK_SET);
-		fprintf(s->file, "%lld\n%lld\n", s->size, s->inuse);
+		fprintf(s->file, "%" PRId64 "\n%" PRId64 "\n", s->size, s->inuse);
 	}
 	fclose(s->file);
 	free(s);
@@ -135,7 +135,7 @@ static int alloc_state_create(const char *path, INT64_T size)
 	sprintf(statepath, "%s/.__alloc", path);
 	file = fopen(statepath, "w");
 	if(file) {
-		fprintf(file, "%lld 0\n", size);
+		fprintf(file, "%" PRId64 " 0\n", size);
 		fclose(file);
 		return 1;
 	} else {

@@ -142,7 +142,16 @@ void log_work_queue_status(struct work_queue *q) {
 	struct work_queue_stats s;
 	work_queue_get_stats(q, &s);
 
-	fprintf(logfile, "QUEUE %llu %d %d %d %d %d %d %d %d %d %d %lld %lld %.2f %.2f %d %d %d\n", timestamp_get(), s.workers_init, s.workers_ready, s.workers_busy, s.tasks_running, s.tasks_waiting, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity, s.avg_capacity, s.total_workers_connected);
+	fprintf(logfile, "QUEUE %" PRIu64 " ", timestamp_get());
+			fprintf(logfile, "%d %d %d ", s.workers_init, s.workers_ready, s.workers_busy);
+			fprintf(logfile, "%d %d %d ", s.tasks_running, s.tasks_waiting, s.tasks_complete);
+			fprintf(logfile, "%d %d ", s.total_tasks_dispatched, s.total_tasks_complete);
+			fprintf(logfile, "%d %d ", s.total_workers_joined, s.total_workers_removed);
+			fprintf(logfile, "%" PRId64 " %" PRId64 " ", s.total_bytes_sent, s.total_bytes_received);
+			fprintf(logfile, "%.2f %.2f ", s.efficiency, s.idle_percentage);
+			fprintf(logfile, "%d %d ", s.capacity, s.avg_capacity);
+ 			fprintf(logfile, "%d ", s.total_workers_connected);
+			fprintf(logfile, "\n");
 
 	fflush(logfile);
 	fsync(fileno(logfile));

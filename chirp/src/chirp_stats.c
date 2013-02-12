@@ -61,7 +61,7 @@ void chirp_stats_summary(char *buf, int length)
 
 	if(!stats_table) stats_table = hash_table_create(0,0);
 
-	chunk = snprintf(buf,length,"bytes_written %llu\nbytes_read %llu\ntotal_ops %llu\n",total_bytes_written,total_bytes_read,total_ops);
+	chunk = snprintf(buf,length,"bytes_written %" PRIu64 "\nbytes_read %" PRIu64 "\ntotal_ops %" PRIu64 "\n",total_bytes_written,total_bytes_read,total_ops);
 	length -= chunk;
 	buf += chunk;
 
@@ -72,7 +72,7 @@ void chirp_stats_summary(char *buf, int length)
 
 	hash_table_firstkey(stats_table);
 	while(hash_table_nextkey(stats_table,&addr,(void**)&s)) {
-		chunk = snprintf(buf, length, "%s,1,1,%llu,%llu,%llu; ", s->addr, s->ops, s->bytes_read, s->bytes_written);
+		chunk = snprintf(buf, length, "%s,1,1,%" PRIu64 ",%" PRIu64 ",%" PRIu64 "; ", s->addr, s->ops, s->bytes_read, s->bytes_written);
 		buf += chunk;
 		length -= chunk;
 	}
@@ -111,7 +111,7 @@ void chirp_stats_report( int pipefd, const char *addr, const char *subject, int 
 	char line[PIPE_BUF];
 
 	if(time(0)-child_report_time > interval) {
-		snprintf(line,PIPE_BUF,"stats %s %s %lld %lld %lld\n",addr,subject,child_ops,child_bytes_read,child_bytes_written);
+		snprintf(line,PIPE_BUF,"stats %s %s %" PRId64 " %" PRId64 " %" PRId64 "\n",addr,subject,child_ops,child_bytes_read,child_bytes_written);
 		write(pipefd,line,strlen(line));
 		debug(D_DEBUG,"sending stats: %s",line);
 		child_ops = child_bytes_read = child_bytes_written = 0;

@@ -79,7 +79,6 @@ SOURCES = auth.c  \
           xxmalloc.c
 
 EXTRA_HEADERS = batch_job_internal.h \
-                int_sizes.h  \
                 macros.h
 PUBLIC_HEADERS = auth.h  \
                  auth_address.h  \
@@ -157,18 +156,10 @@ libdttools.a: ${OBJECTS}
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
 
-${SOURCES} ${PROGRAM_SOURCES} : int_sizes.h
-
-int_sizes.h: make_int_sizes
-	./$< > $@
-
-make_int_sizes: make_int_sizes.o
-	${CCTOOLS_LD} $^ -o $@ ${CCTOOLS_INTERNAL_LDFLAGS}
-
 test: all
 
 clean:
-	rm -f core *~ *.o *.os *.so libdttools.a make_int_sizes int_sizes.h large_chunk.txt $(PROGRAMS)
+	rm -f core *~ *.o *.os *.so libdttools.a large_chunk.txt $(PROGRAMS)
 
 install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin

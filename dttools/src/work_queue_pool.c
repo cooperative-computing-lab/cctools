@@ -561,7 +561,14 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 
 		time_t now = time(0);
 		if(now - last_log_time >= LOG_INTERVAL && logfile) {	
-			fprintf(logfile, "%llu %d %d %d %d %d %d %d %llu %llu\n", timestamp_get(), workers_desired, workers_submitted, sum_workers_connected, sum_masters, sum_capacity, sum_running, sum_waiting, get_current_worker_time(), get_current_billing_cycles(pc->billing_cycle));
+			fprintf(logfile, "%" PRIu64 " ",  timestamp_get());
+			fprintf(logfile, "%d %d ", workers_desired, workers_submitted); 
+			fprintf(logfile, "%d %d %d ", sum_workers_connected, sum_masters, sum_capacity); 
+			fprintf(logfile, "%d %d ",    sum_running, sum_waiting);
+			fprintf(logfile, "%" PRIu64 " ", get_current_worker_time());
+			fprintf(logfile, "%" PRIu64 " ", get_current_billing_cycles(pc->billing_cycle));
+			fprintf(logfile, "\n");
+
 			last_log_time = now; 
 
 			fflush(logfile);
@@ -968,7 +975,7 @@ static void remove_workers(struct itable *jobs)
 	itable_firstkey(jobs);
 	while(itable_nextkey(jobs, &key, &x)) {
 		// The key is the job id
-		printf("work_queue_pool: aborting remote job %llu\n", key);
+		printf("work_queue_pool: aborting remote job %" PRIu64 "\n", key);
 		batch_job_remove(q, key);
 		struct batch_job_info *info = itable_lookup(job_table, key);
 		if(info) {

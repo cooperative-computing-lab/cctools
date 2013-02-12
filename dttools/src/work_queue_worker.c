@@ -249,7 +249,7 @@ static int read_task_stdout(time_t stoptime) {
 	size_t space_left;
 
 	while (1) {
-		buffer = stdout_buffer + stdout_buffer_used;
+		buffer = (char *) stdout_buffer + stdout_buffer_used; //Previously without the cast!
 		space_left = STDOUT_BUFFER_SIZE - stdout_buffer_used;
 
 		if(space_left > 0) {
@@ -1258,17 +1258,17 @@ static int handle_link(struct link *master) {
 	char filename[WORK_QUEUE_LINE_MAX];
 	char path[WORK_QUEUE_LINE_MAX];
 	INT64_T length;
-	int mode, r;
+	unsigned int mode, r;
 
 	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
 		debug(D_WQ, "received command: %s.\n", line);
-		if(sscanf(line, "work %lld", &length)) {
+		if(sscanf(line, "work %" SCNd64, &length)) {
 			r = do_work(master, length);
 		} else if(sscanf(line, "stat %s", filename) == 1) {
 			r = do_stat(master, filename);
 		} else if(sscanf(line, "symlink %s %s", path, filename) == 2) {
 			r = do_symlink(path, filename);
-		} else if(sscanf(line, "put %s %lld %o", filename, &length, &mode) == 3) {
+		} else if(sscanf(line, "put %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
 			if(path_within_workspace(filename, workspace)) {
 				r = do_put(master, filename, length, mode);
 			} else {
@@ -1288,9 +1288,9 @@ static int handle_link(struct link *master) {
 			r = do_rget(master, filename);
 		} else if(sscanf(line, "get %s", filename) == 1) {	// for backward compatibility
 			r = do_get(master, filename);
-		} else if(sscanf(line, "thirdget %d %s %[^\n]", &mode, filename, path) == 3) {
+		} else if(sscanf(line, "thirdget %o %s %[^\n]", &mode, filename, path) == 3) {
 			r = do_thirdget(mode, filename, path);
-		} else if(sscanf(line, "thirdput %d %s %[^\n]", &mode, filename, path) == 3) {
+		} else if(sscanf(line, "thirdput %o %s %[^\n]", &mode, filename, path) == 3) {
 			r = do_thirdput(master, mode, filename, path);
 		} else if(!strncmp(line, "kill", 5)){
 			r = do_kill();
@@ -1375,7 +1375,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -i <time>      Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
 	fprintf(stdout, " -b <time>      Set maxmimum value for backoff interval when worker fails to connect to a master. (default=%ds)\n", max_backoff_interval);
 	fprintf(stdout, " -B <time>      Set the worker to terminate itself only when the elapsed time is multiples of <time>.\n");
-	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%lluMB)\n", disk_avail_threshold);
+	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%" PRIu64 "MB)\n", disk_avail_threshold);
 	fprintf(stdout, " -A <arch>      Set architecture string for the worker to report to master instead of the value in uname (%s).\n", arch_name);
 	fprintf(stdout, " -O <os>        Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
 	fprintf(stdout, " -s <path>      Set the location for creating the working directory of the worker.\n");
