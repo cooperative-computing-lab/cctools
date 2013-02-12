@@ -187,7 +187,7 @@ int master_main(const char *host, int port, const char *addr) {
 					mpi_queue_job_delete(job);
 				}
 
-			} else if(sscanf(line, "work %d %lld", &jobid, &length)) {
+			} else if(sscanf(line, "work %d %" SCNd64 , &jobid, &length)) {
 				op = malloc(sizeof(*op));
 				memset(op, 0, sizeof(*op));
 				op->type = MPI_QUEUE_OP_WORK;
