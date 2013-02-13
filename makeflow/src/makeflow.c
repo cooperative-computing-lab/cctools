@@ -368,7 +368,7 @@ struct hash_table * input_files(struct dag *d)
 			// if a source file is also a target file
 			if(!tmp) {
 				debug(D_DEBUG, "Found independent input file: %s", f->filename);
-				hash_table_insert(ih, f->filename, (void *) NULL);
+				hash_table_insert(ih, f->filename, (void *) f->remotename);
 			}
 		}
 	}
@@ -400,13 +400,14 @@ void collect_input_files(struct dag *d, char* destination)
 
 	char *key;
 	void *value;
-	char file_destination[1024];
+	char file_destination[PATH_MAX];
 
 	hash_table_firstkey(ih);
 	while(hash_table_nextkey(ih, &key, &value)) {
 		from = fopen(key, "r");
-		const char *basename = string_basename(key);
-		sprintf(file_destination, "%s/%s", destination, basename);
+		if(!value)
+			value = key;
+		sprintf(file_destination, "%s/%s", destination, (char *) value);
 		to = fopen(file_destination, "w");
 		copy_stream_to_stream(from, to);
 		fclose(from);
@@ -2967,7 +2968,6 @@ int main(int argc, char *argv[])
 	}
 
 	if(syntax_check) {
-		dag_to_file(d, "Makeflow.rewrite");
 		fprintf(stdout, "%s: Syntax OK.\n", dagfile);
 		return 0;
 	}
@@ -2992,16 +2992,10 @@ int main(int argc, char *argv[])
 		dag_show_input_files(d);
 		collect_input_files(d, bundle_directory);
 
-		FILE *from=NULL, *to=NULL;
-		from = fopen(dagfile, "r");
-		
-		fprintf(stderr, "Copying %s into %s\n", dagfile, bundle_directory);
-		char output_makeflow[1024];
+		char output_makeflow[PATH_MAX];
 		sprintf(output_makeflow, "%s/%s", bundle_directory, dagfile);
-		to = fopen(output_makeflow, "w");
-		copy_stream_to_stream(from, to);
-		fclose(from);
-		fclose(to);
+		fprintf(stderr, "Writing workflow, %s, to %s\n", dagfile, output_makeflow);
+		dag_to_file(d, output_makeflow);
 		free(bundle_directory);
 		exit(0);
 	}
