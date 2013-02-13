@@ -207,6 +207,10 @@ int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 int dag_parse_node_makeflow_command(struct dag_parse *bk, struct dag_node *n, char *line);
 int dag_parse_export(struct dag_parse *bk, char *line);
 
+int dag_to_file(const struct dag *d, const char *dag_file);
+
+
+
 /** 
  * If the return value is x, a positive integer, that means at least x tasks
  * can be run in parallel during a certain point of the execution of the
@@ -2441,6 +2445,117 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -Z <file>      Select port at random and write it to this file.\n");
 }
 
+/* The dag_to_file_* functions write a struct dag in memory to a
+ * file, using the remotename names generated from
+ * translate_filename, rather than the original filenames.
+ *
+ * Eventually, we would like to pass a 'convert_name' function,
+ * instead of using just the remotenames.
+ *
+ * BUG: Currently, expansions are writen instead of variables.
+ * BUG: Error handling is not very good.
+ * BUG: Integrate more with dttools (use DEBUG, etc.)
+ *
+ * The entry function is dag_to_file(dag, filename).
+ * */
+
+int dag_to_file_vars(const struct dag *d, FILE *dag_stream);
+int dag_to_file_exports(const struct dag *d, FILE *dag_stream);
+int dag_to_file_nodes(const struct dag *d, FILE *dag_stream);
+
+int dag_to_file(const struct dag *d, const char *dag_file)
+{
+	FILE *dag_stream = fopen(dag_file, "w");
+
+	if(!dag_stream)
+		return 1;
+
+	dag_to_file_vars(d, dag_stream);
+	dag_to_file_exports(d, dag_stream);
+	dag_to_file_nodes(d, dag_stream);
+
+	fclose(dag_stream);
+
+	return 0;
+}
+
+/* Writes 'var=value' pairs from the dag to the stream */
+int dag_to_file_vars(const struct dag *d, FILE *dag_stream)
+{
+	char *var;
+	void *value;
+
+	struct hash_table *vars = d->variables;
+
+	hash_table_firstkey(vars);
+	while(hash_table_nextkey(vars, &var, &value)) {
+		fprintf(dag_stream, "%s=\"%s\"\n", var, (char *) value);
+	}
+
+	return 0;
+}
+
+/* Writes 'export var' tokens from the dag to the stream */
+int dag_to_file_exports(const struct dag *d, FILE *dag_stream)
+{
+	char *var;
+
+	struct list *vars = d->export_list;
+
+	list_first_item(vars);
+	for(var = list_next_item(vars);  var; var = list_next_item(vars))
+		fprintf(dag_stream, "export %s\n", var);
+
+	return 0;
+
+}
+
+/* Writes a list of files to the the stream, using remotename
+ * instead of filename if available */
+int dag_to_file_files(const struct dag_file *fs, FILE *dag_stream)
+{
+	//here we may want to call the linker renaming function,
+	//instead of using f->remotename
+	
+	const struct dag_file *f;
+	for(f = fs; f; f = f->next)
+	{
+		fprintf(dag_stream, "%s", f->remotename ? f->remotename : f->filename);
+
+		if(f->next)
+			fprintf(dag_stream, " ");
+	}
+
+	return 0;
+}
+
+/* Writes a production rule to the stream, using remotenames when
+ * available */
+int dag_to_file_node(const struct dag_node *n, FILE *dag_stream)
+{
+	fprintf(dag_stream, "\n");
+	dag_to_file_files(n->target_files, dag_stream);
+	fprintf(dag_stream, ": ");
+	dag_to_file_files(n->source_files, dag_stream);
+	fprintf(dag_stream, "\n");
+	fprintf(dag_stream, "\t%s\n", n->command);
+	fprintf(dag_stream, "\n");
+
+	return 0;
+}
+
+/* Writes all the rules to the stream */
+int dag_to_file_nodes(const struct dag *d, FILE *dag_stream)
+{
+	struct dag_node *n;
+
+	for(n = d->nodes;  n; n = n->next)
+		dag_to_file_node(n, dag_stream);
+
+	return 0;
+}
+
+
 
 static void summarize(FILE *file, FILE *email, const char *format, ...){
 	va_list args;
@@ -2852,6 +2967,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(syntax_check) {
+		dag_to_file(d, "Makeflow.rewrite");
 		fprintf(stdout, "%s: Syntax OK.\n", dagfile);
 		return 0;
 	}
