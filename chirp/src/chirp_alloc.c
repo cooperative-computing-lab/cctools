@@ -539,7 +539,7 @@ struct chirp_dirent * chirp_alloc_readdir( struct chirp_dir *dir )
 
 void chirp_alloc_closedir( struct chirp_dir *dir )
 {
-	return cfs->closedir(dir);
+	cfs->closedir(dir);
 }
 
 INT64_T chirp_alloc_getfile(const char *path, struct link * link, time_t stoptime)

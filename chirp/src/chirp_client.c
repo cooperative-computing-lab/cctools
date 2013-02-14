@@ -150,7 +150,7 @@ static INT64_T get_stat_result(struct chirp_client *c, struct chirp_stat *info, 
 		return -1;
 	}
 
-	fields = sscanf(line, "%" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNu64 " %" SCNu64 " %" SCNu64 "\n", &info->cst_dev, &info->cst_ino, &info->cst_mode, &info->cst_nlink, &info->cst_uid, &info->cst_gid, &info->cst_rdev, &info->cst_size, &info->cst_blksize,
+	fields = sscanf(line, "%" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "\n", &info->cst_dev, &info->cst_ino, &info->cst_mode, &info->cst_nlink, &info->cst_uid, &info->cst_gid, &info->cst_rdev, &info->cst_size, &info->cst_blksize,
 			&info->cst_blocks, &info->cst_atime, &info->cst_mtime, &info->cst_ctime);
 
 	info->cst_dev = -1;

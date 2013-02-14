@@ -72,6 +72,7 @@ include_package_makeflow="makeflow"
 include_package_ftplite="ftp_lite"
 include_package_s3tools="s3tools"
 include_package_chirp="chirp"
+include_package_monitor="monitor"
 include_package_doc="doc"
 
 work_queue_bindings=""
@@ -265,6 +266,9 @@ do
 		--without-system-parrot)
 			include_package_parrot=""
 			;;
+		--without-system-monitor)
+			include_package_monitor=""
+			;;
 		--without-system-doc)
 			include_package_doc=""
 			;;
@@ -313,6 +317,7 @@ And SYSTEM may be:
     s3tools
     chirp
     parrot
+    monitor
     doc
 EOF
 			exit 1
@@ -328,7 +333,7 @@ done
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} ${include_package_doc}"
+potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} ${include_package_monitor} ${include_package_doc}"
 
 check_multiarch
 

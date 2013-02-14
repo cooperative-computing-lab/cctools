@@ -73,7 +73,15 @@ struct command {
 	char *help;
 	  INT64_T(*handler) (int argc, char **argv);
 };
-static struct command list[];
+
+/* Standard C does not let:
+   static struct command list[];
+   Thus, we have to write the size of the array instead of the
+   array being computed automatically when initialized below.
+   Hopefully we do not have commands to chirp that often.
+*/
+
+static struct command list[50];
 
 static void acl_simple(char **acl)
 {
@@ -948,6 +956,8 @@ static INT64_T do_xattr_set(int argc, char **argv)
 	}
 }
 
+/* If adding a command below, remember to modify the size of
+ * struct command list[] at the top of this file. */
 static struct command list[] = {
 	{"audit", 1, 0, 1, "[-r]", do_audit},
 	{"cat", 1, 1, 100, "<file> [file2] [file3] ...", do_cat},

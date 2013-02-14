@@ -78,7 +78,7 @@ int s3_getacl(char* bucketname, char* filename, char* owner, struct hash_table* 
 	} else {
 		struct list *buf;
 		char *temp;
-		int clen = 0;
+		unsigned int clen = 0;
 		buf = list_create();
 		do {
 			link_readline(server, response, HEADER_LINE_MAX, stoptime);

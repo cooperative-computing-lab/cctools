@@ -167,7 +167,8 @@ int master_main(const char *host, int port, const char *addr) {
 		
 		if(link_readline(master, line, sizeof(line), time(0) + short_timeout)) {
 			struct mpi_queue_operation *op;
-			int jobid, mode;
+			int jobid;
+			unsigned int mode;
 			INT64_T length;
 			char path[MPI_QUEUE_LINE_MAX];
 			op = NULL;
@@ -416,7 +417,8 @@ int worker_main() {
 
 	while(!abort_flag) {
 		char filename[MPI_QUEUE_LINE_MAX];
-		int mode, result;
+		unsigned int mode;
+		int result;
 		FILE *stream;
 		MPI_Status mpi_status;
 
