@@ -160,8 +160,8 @@ struct file_info
 
 struct io_info
 {
-	unsigned long int chars_read;
-	unsigned long int chars_written;
+	uint64_t chars_read;
+	uint64_t chars_written;
 };
 
 struct monitor_info
