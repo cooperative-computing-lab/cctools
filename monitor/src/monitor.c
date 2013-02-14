@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 
-/* Monitors a set of programs for CPU load average, memory and
+/* Monitors a set of programs for CPU time, memory and
  * disk utilization. The monitor works 'indirectly', that is, by
  * observing how the environment changed while a process was
  * running, therefore all the information reported should be
@@ -36,7 +36,6 @@ See the file COPYING for details.
  * wall:   Wall time (in clicks).
  * user:   Time the process has spent in user mode (in clicks).
  * kernel: Time the process has spent in kernel mode (in clicks).
- * load:   (user + kernel)/wall
  * vmem:   Current total virtual memory size.
  * rssmem  Current total resident memory size.
  * shmem   Amount of shared memory.
@@ -61,7 +60,7 @@ See the file COPYING for details.
  * can also monitor the process children.
  *
  * Each monitored process gets a 'struct monitor_info', itself
- * composed of 'struct mem_info', 'struct load_info', etc. There
+ * composed of 'struct mem_info', 'struct click_info', etc. There
  * is a global variable that keeps a table relating pids to
  * the corresponding struct monitor_info.
  *
@@ -120,7 +119,7 @@ See the file COPYING for details.
 #include <inttypes.h>
 #include <sys/types.h>
 
-#ifdef __FREEBSD
+#if defined(__APPLE__) || defined(__FreeBSD__)
 	#include <sys/param.h>
     #include <sys/mount.h>
 #else
@@ -142,9 +141,8 @@ struct mem_info
 };
 
 //time in clicks, no seconds:
-struct load_info
+struct click_info
 {
-	double            cpu_wall_ratio;
 	unsigned long int wall_time;
 	unsigned long int user_time;
 	unsigned long int kernel_time;
@@ -170,10 +168,10 @@ struct monitor_info
 	const char *cmd;
 	int         running;
 	FILE       *log_file;
-	struct timeval time_initial;
+	struct timeval click_initial;
 
 	struct mem_info  mem;
-	struct load_info load;
+	struct click_info load;
 	struct file_info file;
 	struct io_info   io;
 
@@ -310,49 +308,44 @@ double timeval_to_double(struct timeval *time, struct timeval *origin)
 
 }
 
-int get_load_usage(pid_t pid, struct timeval *time_initial, struct load_info *load)
+int get_click_usage(pid_t pid, struct timeval *time_initial, struct click_info *click)
 {
 	/* /dev/proc/[pid]/stat */
 	
 	struct timeval time;
 	
-	FILE *fcpu = open_proc_file(pid, "stat");
-	if(!fcpu)
+	FILE *fstat = open_proc_file(pid, "stat");
+	if(!fstat)
 	{
 		return 1;
 	}
 
 	gettimeofday(&time, NULL);
 
-	fscanf(fcpu,
+	fscanf(fstat,
 			"%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
 			"%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
 			"%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s" /* faults */
 			"%lu" /* user mode time (in clock ticks) */
 			"%lu" /* kernel mode time (in clock ticks) */
 			/* .... */,
-			&load->user_time, &load->kernel_time);
+			&click->user_time, &click->kernel_time);
 
-	load->wall_time = (time.tv_sec - time_initial->tv_sec) * sysconf(_SC_CLK_TCK); 
-
-	if(load->wall_time > 0)
-		load->cpu_wall_ratio = (load->user_time + load->kernel_time)/(1.0 * load->wall_time);
-	else
-		load->cpu_wall_ratio = 0;
+	click->wall_time = (time.tv_sec - time_initial->tv_sec) * sysconf(_SC_CLK_TCK); 
 
 	return 0;
 }
 
-void log_load_usage(FILE *log_file, struct load_info *load)
+void log_click_usage(FILE *log_file, struct click_info *click)
 {
-	/* wall . user . kernel . load */
-	fprintf(log_file, "%ld\t",  load->wall_time);
-	fprintf(log_file, "%ld\t%ld\t%4.4lf", load->user_time, load->kernel_time, load->cpu_wall_ratio);
+	/* wall . user . kernel . time */
+	fprintf(log_file, "%ld\t",  click->wall_time);
+	fprintf(log_file, "%ld\t%ld", click->user_time, click->kernel_time);
 }
 
-void hdr_load_usage(FILE *log_file)
+void hdr_click_usage(FILE *log_file)
 {
-	fprintf(log_file, "wall\tuser\tkernel\tload");
+	fprintf(log_file, "wall\tuser\tkernel");
 }
 
 int get_mem_usage(pid_t pid, struct mem_info *mem)
@@ -454,12 +447,9 @@ void hdr_io_usage(FILE *log_file)
 	fprintf(log_file, "rchars\twchars");
 }
 
-
-#define log_order load mem disk file io
-
 void monitor_log_hdr(struct monitor_info *m)
 {
-	hdr_load_usage(m->log_file);
+	hdr_click_usage(m->log_file);
 	fprintf(m->log_file, "\t");
 
 	hdr_mem_usage(m->log_file);
@@ -477,7 +467,7 @@ void monitor_log_hdr(struct monitor_info *m)
 
 void monitor_log(struct monitor_info *m)
 {
-	log_load_usage(m->log_file, &m->load);
+	log_click_usage(m->log_file, &m->load);
 	fprintf(m->log_file, "\t");
 
 	log_mem_usage(m->log_file,  &m->mem);
@@ -498,9 +488,9 @@ void monitor_log(struct monitor_info *m)
 
 int monitor_once(struct monitor_info *m, int counter)
 {
-	//check memory every memt, load every loadt, and disk every
+	//check memory every memt, time every loadt, and disk every
 	//dist intervals.
-	int memt = 1, loadt = 1, diskt = 1;
+	int memt = 1, timet = 1, diskt = 1;
 
 	int change = 0;
 	if( counter % memt == 0)
@@ -508,9 +498,9 @@ int monitor_once(struct monitor_info *m, int counter)
 		get_mem_usage(m->pid, &m->mem);
 		change = 1;
 	}
-	if( counter % loadt == 0)
+	if( counter % timet == 0)
 	{
-		get_load_usage(m->pid, &m->time_initial, &m->load);
+		get_click_usage(m->pid, &m->click_initial, &m->load);
 		change = 1;
 	}
 	if( counter % diskt == 0)
@@ -576,7 +566,7 @@ struct monitor_info *spawn_child(const char *cmd)
 		m->pid     = pid;
 		m->running = 1;
 
-		gettimeofday(&m->time_initial, NULL);
+		gettimeofday(&m->click_initial, NULL);
 		memcpy(&m->disk_initial, &disk_initial, sizeof(struct statfs));
 		
 		m->log_file   = open_log_file(pid, "log");
