@@ -12,18 +12,43 @@ See the file COPYING for details.
  * considered just as an estimate (this is in contrast with
  * direct methods, such as ptrace).
  *
- * Each monitor mechanism has two functions: get_MECHANISM_usage,
- * and log_MECHANISM_usage. For example, for memory we have
- * get_mem_usage and log_mem_usage. In general, all functions
- * return 0 on success, or some other integer on failure. The
- * exception are function that open files, which return NULL on
- * failure, or a file pointer on success.
+ * Each monitor target has three functions: get_TARGET_usage,
+ * hdr_TARGET_usage, and log_TARGET_usage. For example, for
+ * memory we have get_mem_usage, hdr_mem_usage, and
+ * log_mem_usage. In general, all functions return 0 on success,
+ * or some other integer on failure. The exception are function
+ * that open files, which return NULL on failure, or a file
+ * pointer on success.
  *
- * The get_MECHANISM_usage functions are called at intervals.
+ * The get_TARGET_usage functions are called at intervals.
  * Between each interval, the monitor does nothing. For each
  * process monitored, a log text file is written, called
  * log-PID-XXXXXX, in which PID is the pid of the process, and
  * XXXXXX a random set of six digits.
+ *
+ * log_TARGET_usage writes the corresponding information to the
+ * log. Each field is separated by \t. hdr_TARGET_usage is called
+ * only once, and it writes the title of the corresponding column
+ * to the log file.
+ *
+ * Currently, the columns are:
+ *
+ * wall:   Wall time (in clicks).
+ * user:   Time the process has spent in user mode (in clicks).
+ * kernel: Time the process has spent in kernel mode (in clicks).
+ * load:   (user + kernel)/wall
+ * vmem:   Current total virtual memory size.
+ * rssmem  Current total resident memory size.
+ * shmem   Amount of shared memory.
+ * frBlks  Free blocks of the working directory's filesystem. 
+ * AvBlks  Available blocks of the working directory's filesystem. 
+ * frNodes Free nodes of the working directory's filesystem. 
+ * files   File count of the working directory.
+ * dirs    Directory count of the working directory.
+ * bytes   Total byte count of files in the working directory.
+ * blks    Block count (512 bytes) in the working directory.
+ * rchars  Read char count using *read system calls.
+ * wchars  Writen char count using *write system calls.
  *
  * The log files are written to the home directory of the monitor
  * process. A flag will be added later to indicate a prefered
@@ -65,6 +90,9 @@ See the file COPYING for details.
  *
  * We sleep one second waiting for the child process to be
  * created, which is not very good form.
+ *
+ * If the process writes something outside the working directory,
+ * right now we are out of luck.
  *
  */
 
@@ -113,6 +141,7 @@ struct mem_info
 	uint64_t data;
 };
 
+//time in clicks, no seconds:
 struct load_info
 {
 	double            cpu_wall_ratio;
@@ -200,11 +229,16 @@ int get_disk_usage(struct statfs *disk)
 
 void log_disk_usage(FILE *log_file, struct statfs *disk, struct statfs *disk_initial)
 {
-	/* Free blocks \t Available blocks \t Free nodes \n */
-	fprintf(log_file, "statfs:\t");
+	/* Free blocks . Available blocks . Free nodes */
+
 	fprintf(log_file, "%ld\t", disk->f_bfree - disk_initial->f_bfree);
 	fprintf(log_file, "%ld\t", disk->f_bavail - disk_initial->f_bavail);
-	fprintf(log_file, "%ld\n", disk->f_ffree - disk_initial->f_ffree);
+	fprintf(log_file, "%ld", disk->f_ffree - disk_initial->f_ffree);
+}
+
+void hdr_disk_usage(FILE *log_file)
+{
+	fprintf(log_file, "frBlks\tavBlks\tfrNodes");
 }
 
 int get_file_usage(struct file_info *file)
@@ -256,12 +290,15 @@ int get_file_usage(struct file_info *file)
 
 void log_file_usage(FILE *log_file, struct file_info *file)
 {
-	/* files\t dirs\t bytes\t blocks\n */
-	fprintf(log_file, "fts:\t");
-	fprintf(log_file, "%d\t%d\t%d\t%d\n", file->files, file->directories, (int) file->byte_count, (int) file->block_count);
+	/* files . dirs . bytes . blocks */
+	fprintf(log_file, "%d\t%d\t%d\t%d", file->files, file->directories, (int) file->byte_count, (int) file->block_count);
 
 }
 
+void hdr_file_usage(FILE *log_file)
+{
+	fprintf(log_file, "files\tdirs\tbytes\tblks");
+}
 
 
 double timeval_to_double(struct timeval *time, struct timeval *origin)
@@ -308,11 +345,14 @@ int get_load_usage(pid_t pid, struct timeval *time_initial, struct load_info *lo
 
 void log_load_usage(FILE *log_file, struct load_info *load)
 {
-	//wall user kernel load
-	fprintf(log_file, "clicks:\t");
+	/* wall . user . kernel . load */
 	fprintf(log_file, "%ld\t",  load->wall_time);
-	fprintf(log_file, "%ld\t%ld\t%lf\n",  
-			load->user_time, load->kernel_time, load->cpu_wall_ratio);
+	fprintf(log_file, "%ld\t%ld\t%4.4lf", load->user_time, load->kernel_time, load->cpu_wall_ratio);
+}
+
+void hdr_load_usage(FILE *log_file)
+{
+	fprintf(log_file, "wall\tuser\tkernel\tload");
 }
 
 int get_mem_usage(pid_t pid, struct mem_info *mem)
@@ -341,11 +381,16 @@ int get_mem_usage(pid_t pid, struct mem_info *mem)
 
 void log_mem_usage(FILE *log_file, struct mem_info *mem)
 {
-	//total virtual\t resident\t shared\n
-	fprintf(log_file, "memory:\t");
-	fprintf(log_file, "%" PRIu64 "\t%" PRIu64 "\t%" PRIu64 "\n",
+	/* total virtual . resident . shared */
+	fprintf(log_file, "%" PRIu64 "\t%" PRIu64 "\t%" PRIu64,
 				mem->virtual, mem->resident, mem->shared);
 }
+
+void hdr_mem_usage(FILE *log_file)
+{
+	fprintf(log_file, "vmem\trssmem\tshmem");
+}
+
 
 int get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value)
 {
@@ -400,14 +445,58 @@ int get_io_usage(pid_t pid, struct io_info *io)
 
 void log_io_usage(FILE *log_file, struct io_info *io)
 {
-	//total chars read, total chars written
-	fprintf(log_file, "io:\t");
-	fprintf(log_file, "%" PRIu64 "\t%" PRIu64 "\n",
-			io->chars_read, io->chars_written);
+	/* total chars read . total chars written */
+	fprintf(log_file, "%" PRIu64 "\t%" PRIu64, io->chars_read, io->chars_written);
 }
 		
+void hdr_io_usage(FILE *log_file)
+{
+	fprintf(log_file, "rchars\twchars");
+}
 
-int monitor_once(struct monitor_info *target, int counter)
+
+#define log_order load mem disk file io
+
+void monitor_log_hdr(struct monitor_info *m)
+{
+	hdr_load_usage(m->log_file);
+	fprintf(m->log_file, "\t");
+
+	hdr_mem_usage(m->log_file);
+	fprintf(m->log_file, "\t");
+
+	hdr_disk_usage(m->log_file);
+	fprintf(m->log_file, "\t");
+
+	hdr_file_usage(m->log_file);
+	fprintf(m->log_file, "\t");
+
+	hdr_io_usage(m->log_file);
+	fprintf(m->log_file, "\n");
+}
+
+void monitor_log(struct monitor_info *m)
+{
+	log_load_usage(m->log_file, &m->load);
+	fprintf(m->log_file, "\t");
+
+	log_mem_usage(m->log_file,  &m->mem);
+	fprintf(m->log_file, "\t");
+
+	log_disk_usage(m->log_file, &m->disk, &m->disk_initial);
+	fprintf(m->log_file, "\t");
+
+	log_file_usage(m->log_file, &m->file);
+	fprintf(m->log_file, "\t");
+
+	log_io_usage(m->log_file, &m->io);
+	fprintf(m->log_file, "\n");
+
+	fflush(m->log_file);
+}
+
+
+int monitor_once(struct monitor_info *m, int counter)
 {
 	//check memory every memt, load every loadt, and disk every
 	//dist intervals.
@@ -416,34 +505,26 @@ int monitor_once(struct monitor_info *target, int counter)
 	int change = 0;
 	if( counter % memt == 0)
 	{
-		get_mem_usage(target->pid, &target->mem);
+		get_mem_usage(m->pid, &m->mem);
 		change = 1;
 	}
 	if( counter % loadt == 0)
 	{
-		get_load_usage(target->pid, &target->time_initial, &target->load);
+		get_load_usage(m->pid, &m->time_initial, &m->load);
 		change = 1;
 	}
 	if( counter % diskt == 0)
 	{
-		get_disk_usage(&target->disk);
-		get_file_usage(&target->file);
-		get_io_usage(target->pid, &target->io);
+		get_disk_usage(&m->disk);
+		get_file_usage(&m->file);
+		get_io_usage(m->pid, &m->io);
 		change = 1;
 	}
 
 	counter++; //if counter overflows, doing mod arithmetic, so that's ok.
 
 	if(change)
-	{
-		fprintf(target->log_file, "\n");
-		log_load_usage(target->log_file, &target->load);
-		log_mem_usage(target->log_file,  &target->mem);
-		log_disk_usage(target->log_file, &target->disk, &target->disk_initial);
-		log_file_usage(target->log_file, &target->file);
-		log_io_usage(target->log_file, &target->io);
-		fflush(target->log_file);
-	}
+		monitor_log(m);
 
 	return change;
 }
@@ -485,24 +566,25 @@ struct monitor_info *spawn_child(const char *cmd)
 
 	if(pid > 0)
 	{
-		struct monitor_info *info = malloc(sizeof(struct monitor_info));
-		memset(info, 0, sizeof(struct monitor_info));
+		struct monitor_info *m = malloc(sizeof(struct monitor_info));
+		memset(m, 0, sizeof(struct monitor_info));
 
         close(STDIN_FILENO);
         close(STDOUT_FILENO);
 
 		setpgid(pid, 0);
-		info->pid     = pid;
-		info->running = 1;
+		m->pid     = pid;
+		m->running = 1;
 
-		gettimeofday(&info->time_initial, NULL);
-		memcpy(&info->disk_initial, &disk_initial, sizeof(struct statfs));
+		gettimeofday(&m->time_initial, NULL);
+		memcpy(&m->disk_initial, &disk_initial, sizeof(struct statfs));
 		
-		info->log_file   = open_log_file(pid, "log");
+		m->log_file   = open_log_file(pid, "log");
 
-		fprintf(info->log_file, "command:\t%s\n", cmd);
-		fflush(info->log_file);
-		return info;
+		fprintf(m->log_file, "command:\t%s\n", cmd);
+		monitor_log_hdr(m);
+
+		return m;
 	}
 	else if(pid < 0)
 	{
