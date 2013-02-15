@@ -93,6 +93,9 @@ See the file COPYING for details.
  * If the process writes something outside the working directory,
  * right now we are out of luck.
  *
+ * If processes share the same working directory, or the same
+ * filesystem, then we are duplicating the most expensive checks.
+ *
  */
 
 #include "itable.h"
@@ -592,22 +595,41 @@ struct monitor_info *spawn_child(const char *cmd)
 
 }
 
+// Return the pid of the child that sent the signal, without removing the
+// waitable state.
+pid_t waiting_child()
+{
+	pid_t pid;
+	
+#if defined(__APPLE__) || defined(__FreeBSD__)
+	int status;
+	pid = wait4(-1, &status, WSTOPPED | WCONTINUED | WNOWAIT, NULL);
+#else
+	siginfo_t cinfo;
+	if(waitid(P_ALL, 0, &cinfo, WEXITED | WSTOPPED | WCONTINUED | WNOWAIT) == 0)
+		pid = cinfo.si_pid;
+	else
+		return -1;
+#endif
+
+	return pid;
+}
+
+/* sigchild signal handler */
 void check_child(const int signal)
 {
 	int status;
-	siginfo_t cinfo;
+	pid_t pid;
 
-	//which children we got a signal about?
-	if(waitid(P_ALL, 0, &cinfo, WEXITED | WSTOPPED | WCONTINUED | WNOWAIT) != 0)
-		return;
+	//zombie, tell us who you were!
+	pid = waiting_child();
 
-	//monitor that process once more, maybe for the last time if
-	//WEXITED above.
-	struct monitor_info *m = itable_lookup(children, cinfo.si_pid);
+	//monitor that process once more, maybe for the last time.
+	struct monitor_info *m = itable_lookup(children, pid);
 	monitor_once(m, 0);
 
 	//die zombie die
-	waitpid(cinfo.si_pid, &status, WNOHANG);
+	waitpid(pid, &status, WNOHANG);
 
 	if( WIFEXITED(status) )
 	{
