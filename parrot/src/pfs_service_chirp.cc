@@ -264,7 +264,7 @@ public:
 		}
 
 		chirp_client_closesearch(s);
-		return 0;
+		return buffer==NULL ? 0 : strlen(buffer);
 	}
 
 	virtual pfs_dir * getdir( pfs_name *name ) {

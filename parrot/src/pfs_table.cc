@@ -1793,10 +1793,10 @@ static int search_match_file(const char *pattern, const char *name)
 		subend = strchr(pattern, '|');
 
 		if (subend == NULL) {
-			subpat = (char*) malloc(strlen(pattern)+1);
+			subpat = (char*) alloca(strlen(pattern)+1);
 			strcpy(subpat, pattern);
 		} else {
-			subpat = (char*) malloc(subend-pattern+1);
+			subpat = (char*) alloca(subend-pattern+1);
 			strncpy(subpat, pattern, subend-pattern);
 			subpat[subend-pattern] = '\0';
 		}
@@ -1807,13 +1807,12 @@ static int search_match_file(const char *pattern, const char *name)
 			filepat = (filepat==subpat) ? filepat+1 : subpat;
 
 			if (fnmatch(filepat, name, FNM_PATHNAME)==0) {
-				free(subpat);
+				//free(subpat);
 				return 1;
 			}
 		}
 	
 		pattern = subend + 1;
-		free(subpat);
 
 	} while(subend != NULL);
 
@@ -1833,10 +1832,10 @@ static int search_match_dir(const char *pattern, char *npattern, const char *nam
 		subend = strchr(pattern, '|');
 
 		if (subend == NULL) {
-			subpat = (char*) malloc(strlen(pattern)+1);
+			subpat = (char*) alloca(strlen(pattern)+1);
 			strcpy(subpat, pattern);
 		} else {
-			subpat = (char*) malloc(subend-pattern+1);
+			subpat = (char*) alloca(subend-pattern+1);
 			strncpy(subpat, pattern, subend-pattern);
 			subpat[subend-pattern] = '\0';
 		}
@@ -1853,7 +1852,7 @@ static int search_match_dir(const char *pattern, char *npattern, const char *nam
 		if (topend==NULL)
 			toppat = subpat;
 		else {
-			toppat = (char*) malloc(topend-subpat+1);
+			toppat = (char*) alloca(topend-subpat+1);
 			strncpy(toppat, subpat, topend-subpat);
 			toppat[topend-subpat] = '\0';
 		}
@@ -1880,14 +1879,26 @@ static int search_match_dir(const char *pattern, char *npattern, const char *nam
 		pattern = subend + 1;
 
 		if (!recursive) subpat--;
-		if (topend!=NULL) free(toppat); 
-		free(subpat);
-
 	} while(subend != NULL);
 
 	if (i==0) *npattern = '\0';
 
 	return match;
+}
+
+static int search_is_recursive(const char *pattern) 
+{
+	char *p = (char*) pattern;
+
+	for (;;) {
+		if (*p != '/') return 1;
+		p = strchr(p, '|');
+		
+		if (p == NULL)
+			return 0;
+		else 
+			p++;
+	} 
 }
 
 static int search_directory(pfs_table *t, const char *base, char *dir, const char *pattern, char *buffer, size_t buffer_length, size_t *i, int flags)
@@ -1909,6 +1920,7 @@ static int search_directory(pfs_table *t, const char *base, char *dir, const cha
 	errno = 0;
 	struct dirent *entry;
 	char *current = dir+strlen(dir); /* point to end to current directory */
+	int recursive_pattern = search_is_recursive(pattern);
 
 	while ((entry = t->fdreaddir(fd))) {
 		const char *name = entry->d_name;
@@ -1917,15 +1929,17 @@ static int search_directory(pfs_table *t, const char *base, char *dir, const cha
 
 		if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
 
-		int stat_r = t->stat(dir, &statbuf);
+		if (flags & PFS_SEARCH_METADATA || recursive_pattern) {
+			int stat_r = t->stat(dir, &statbuf);
 
-		/* If the file cannot be statted and stat information was requested, return an error and no result. */
-		if (stat_r!=0 && flags & PFS_SEARCH_METADATA) {
-			if (search_error(errno, PFS_SEARCH_ERR_STAT, dir, buffer, i, buffer_length) == -1) {
-				errno = ERANGE;
-				return -1;
+			/* If the file cannot be statted and stat information was requested, return an error and no result. */
+			if (stat_r!=0 && flags & PFS_SEARCH_METADATA) {
+				if (search_error(errno, PFS_SEARCH_ERR_STAT, dir, buffer, i, buffer_length) == -1) {
+					errno = ERANGE;
+					return -1;
+				}
+				continue;
 			}
-			continue;
 		}
 	
 		if (search_match_file(pattern, name)) {
@@ -1937,7 +1951,7 @@ static int search_directory(pfs_table *t, const char *base, char *dir, const cha
 			else
 				matched = name;
 
-			if (t->access(dir, access_flags) == 0) {
+			if (access_flags == F_OK || t->access(dir, access_flags) == 0) {
 
 				size_t l = snprintf(buffer+*i, buffer_length-*i, "%s0|%s", *i==0 ? "" : "|", matched);
 
@@ -1968,24 +1982,34 @@ static int search_directory(pfs_table *t, const char *base, char *dir, const cha
 			}
 		}
 
-		if (stat_r!=0) {
-			if (search_error(errno, PFS_SEARCH_ERR_STAT, dir, buffer, i, buffer_length) == -1) {
-				errno = ERANGE;
-				return -1;
+		if ((recursive_pattern && S_ISDIR(statbuf.st_mode) && search_match_dir(pattern, npattern, name))
+		     || (!recursive_pattern && search_match_dir(pattern, npattern, name))) {
+			
+			if (!recursive_pattern) {
+				int stat_r = t->stat(dir, &statbuf);
+
+				/* If the file cannot be statted and stat information was requested, return an error and no result. */
+				if (stat_r!=0 && flags & PFS_SEARCH_METADATA) {
+					if (search_error(errno, PFS_SEARCH_ERR_STAT, dir, buffer, i, buffer_length) == -1) {
+						errno = ERANGE;
+						return -1;
+					}
+					continue;
+				}
 			}
-			continue;
-		}
 
-		if (S_ISDIR(statbuf.st_mode) && search_match_dir(pattern, npattern, name)) {
-			int result = search_directory(t, base, dir, npattern, buffer, buffer_length, i, flags);
+			if (recursive_pattern || S_ISDIR(statbuf.st_mode)) {
+				int result = search_directory(t, base, dir, npattern, buffer, buffer_length, i, flags);
 
-			if (result == -1)
-				return -1;
-			else if (flags & PFS_SEARCH_STOPATFIRST && result == 1)
-				return 1;
-			else
-				found += result;
+				if (result == -1)
+					return -1;
+				else if (flags & PFS_SEARCH_STOPATFIRST && result == 1)
+					return 1;
+				else
+					found += result;
+			}
 		}
+ 
 		*current = '\0';
 	}
 
@@ -2026,6 +2050,7 @@ static int is_pattern (const char *pattern)
 			case '*':
 			case '?':
 			case '[':
+			case '|':
 				return 1;
 			case '"':
 			case '\'':
@@ -2043,13 +2068,12 @@ static int is_pattern (const char *pattern)
 	return 0;
 }
 
-int pfs_table::search( const char *paths, const char *patt, int flags, char *buffer, size_t buffer_length )
+int pfs_table::search( const char *paths, const char *patt, int flags, char *buffer, size_t buffer_length, size_t *i )
 {
 	pfs_name pname;
 	const char *start = paths;
 	const char *end;
 	const char *pattern = patt;
-	size_t i = 0;
 	int found = 0;
 	int result;
 	int exact_match = 0;
@@ -2081,31 +2105,42 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 
 		string_collapse_path(path, directory, 0);
 
-		if (0 && exact_match) {
-			struct pfs_stat buf;
+		if (exact_match && *pattern == '/') {
+			struct pfs_stat statbuf;
 			int access_flags = search_to_access(flags);
-			const char *base = directory+strlen(directory);
+			const char *base = directory + strlen(directory);
 
 			strcat(directory, pattern);
-			result = this->stat(directory, &buf);
+
+			result = this->stat(directory, &statbuf);
 			if (result == 0) {
 				const char *matched;
 				if (flags & PFS_SEARCH_INCLUDEROOT)
 					matched = directory;
 				else
-					matched = base;
-				size_t l = strlen(matched);
+					matched = strrchr(base, '/') + 1;
 
-				if (l+i+2 >= buffer_length) { /* +2 for terminating 2 NUL bytes */
-					errno = ERANGE;
-					return -1;
-				} else if (this->access(directory, access_flags) == 0) {
-					if (i == 0) {
-						sprintf(buffer+i, "%s", matched);
-						i += l;
+				if (access_flags == F_OK || this->access(directory, access_flags) == 0) {
+					size_t l = snprintf(buffer+*i, buffer_length-*i, "%s0|%s", *i==0 ? "" : "|", matched);
+
+					if (l >= buffer_length-*i) {
+						errno = ERANGE;
+						return -1;
+					}
+
+					*i += l;
+
+					if (flags & PFS_SEARCH_METADATA) {
+						if (search_stat_pack(statbuf, buffer, i, buffer_length) == -1) {
+							errno = ERANGE;
+							return -1;
+						}
 					} else {
-						sprintf(buffer+i, "|%s", matched);
-						i += l+1;
+						if ((size_t)snprintf(buffer+*i, buffer_length-*i, "|") >= buffer_length-*i) {
+							errno = ERANGE;
+							return -1;
+						}
+						(*i)++;
 					}
 
 					result = 1;
@@ -2116,7 +2151,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 		} else {
 			/* Check to see if search is implemented in the service */
 			if(resolve_name(path, &pname)) {
-				if ((result = pname.service->search(&pname, pattern, flags, buffer, buffer_length, &i))==-1) {
+				if ( 0 || (result = pname.service->search(&pname, pattern, flags, buffer, buffer_length, i))==-1) {
 					result = search_directory(
 						this,	
 						directory+strlen(directory), 
@@ -2124,7 +2159,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 						pattern, 
 						buffer, 
 						buffer_length, 
-						&i, 
+						i, 
 						flags
 					);
 				}

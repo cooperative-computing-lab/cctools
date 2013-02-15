@@ -97,10 +97,10 @@ int parrot_timeout( const char *time )
 #endif
 }
 
-SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags ) 
+SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags) 
 {
 	int err;
-	size_t buffer_size = 2048;
+	size_t buffer_size = 16384;
 	char *buffer;
 
 	do {
@@ -121,6 +121,7 @@ SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags )
 	} while (err==-1 && errno==ERANGE);
 
 	if (err==-1) return NULL;
+        if (err==0) *buffer = '\0';
 
 	SEARCH *result = malloc(sizeof(SEARCH));
 	result->entry = (struct searchent*) malloc(sizeof(struct searchent));
