@@ -12,22 +12,28 @@ See the file COPYING for details.
  * considered just as an estimate (this is in contrast with
  * direct methods, such as ptrace).
  *
- * Each monitor target has three functions: get_TARGET_usage,
- * hdr_TARGET_usage, and log_TARGET_usage. For example, for
- * memory we have get_mem_usage, hdr_mem_usage, and
- * log_mem_usage. In general, all functions return 0 on success,
- * or some other integer on failure. The exception are function
- * that open files, which return NULL on failure, or a file
- * pointer on success.
+ * Use as:
  *
- * The get_TARGET_usage functions are called at intervals.
+ * resource_monitor -i 120 some-command-line
+ *
+ * to monitor some-command-line at two minute intervals.
+ *
+ * Each monitor taget resource has three functions:
+ * get_RESOURCE_usage, hdr_RESOURCE_usage, and
+ * log_RESOURCE_usage. For example, for memory we have
+ * get_mem_usage, hdr_mem_usage, and log_mem_usage. In general,
+ * all functions return 0 on success, or some other integer on
+ * failure. The exception are function that open files, which
+ * return NULL on failure, or a file pointer on success.
+ *
+ * The get_RESOURCE_usage functions are called at intervals.
  * Between each interval, the monitor does nothing. For each
  * process monitored, a log text file is written, called
  * log-PID-XXXXXX, in which PID is the pid of the process, and
  * XXXXXX a random set of six digits.
  *
- * log_TARGET_usage writes the corresponding information to the
- * log. Each field is separated by \t. hdr_TARGET_usage is called
+ * log_RESOURCE_usage writes the corresponding information to the
+ * log. Each field is separated by \t. hdr_RESOURCE_usage is called
  * only once, and it writes the title of the corresponding column
  * to the log file.
  *
@@ -658,7 +664,7 @@ void check_child(const int signal)
 
 static void show_help(const char *cmd)
 {
-	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
+	fprintf(stdout, "Use: %s [options] command-line-and-options\n", cmd);
 	fprintf(stdout, "-i <n>			Interval bewteen observations, in seconds. (default=%d)\n", DEFAULT_INTERVAL);
 	fprintf(stdout, "-d <subsystem>		Enable debugging for this subsystem.\n");
 	fprintf(stdout, "-o <directory>		Write logs to this directory. NOT IMPLEMENTED (default=.)\n");

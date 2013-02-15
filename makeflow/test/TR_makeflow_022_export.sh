@@ -2,7 +2,7 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-TEST_INPUT=`basename $0 .sh`.input
+TEST_INPUT=export.input
 
 export ECHOA=`which echo`
 export ECHOB=echoY
