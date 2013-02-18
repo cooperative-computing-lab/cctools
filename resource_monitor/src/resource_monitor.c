@@ -602,20 +602,20 @@ void log_working_dir_info(struct working_dir_info *d)
 
 int itable_addto_count(struct itable *table, void *key, int value)
 {
-	int64_t count = (int64_t) itable_lookup(table, (int64_t) key);
+	uintptr_t count = (uintptr_t) itable_lookup(table, (uintptr_t) key);
 	count += value;                              //we get 0 if lookup fails, so that's ok.
 
 	if(count != 0)
-		itable_insert(table, (int64_t) key, (void *) count);
+		itable_insert(table, (uintptr_t) key, (void *) count);
 	else
-		itable_remove(table, (int64_t) key);
+		itable_remove(table, (uintptr_t) key);
 
 	return count;
 }
 
 int inc_fs_count(struct filesys_info *f)
 {
-	int64_t count = itable_addto_count(filesys_rc, f, 1);
+	int count = itable_addto_count(filesys_rc, f, 1);
 
 	debug(D_DEBUG, "filesystem %d reference count +1, now %d references.\n", f->id, count);
 
@@ -624,7 +624,7 @@ int inc_fs_count(struct filesys_info *f)
 
 int dec_fs_count(struct filesys_info *f)
 {
-	int64_t count = itable_addto_count(filesys_rc, f, -1);
+	int count = itable_addto_count(filesys_rc, f, -1);
 
 	debug(D_DEBUG, "filesystem %d reference count -1, now %d references.\n", f->id, count);
 
@@ -639,7 +639,7 @@ int dec_fs_count(struct filesys_info *f)
 
 int inc_wd_count(struct working_dir_info *d)
 {
-	int64_t count = itable_addto_count(working_dirs_rc, d, 1);
+	int count = itable_addto_count(working_dirs_rc, d, 1);
 
 	debug(D_DEBUG, "working directory %s reference count +1, now %d references.\n", d->path, count); 
 
@@ -648,7 +648,7 @@ int inc_wd_count(struct working_dir_info *d)
 
 int dec_wd_count(struct working_dir_info *d)
 {
-	int64_t count = (int64_t) itable_addto_count(working_dirs_rc, d, -1);
+	int count = itable_addto_count(working_dirs_rc, d, -1);
 
 	debug(D_DEBUG, "working directory %s reference count -1, now %d references.\n", d->path, count); 
 
