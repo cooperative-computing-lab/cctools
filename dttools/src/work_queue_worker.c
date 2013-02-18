@@ -973,6 +973,7 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode)
 	INT64_T actual = link_stream_to_fd(master, fd, length, time(0) + active_timeout);
 	close(fd);
 	if(actual != length) {
+		debug(D_WQ, "Failed to put file - %s (%s)\n", filename, strerror(errno));
 		return 0;
 	}
 
