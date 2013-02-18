@@ -4,7 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-
 /* Monitors a set of programs for CPU time, memory and
  * disk utilization. The monitor works 'indirectly', that is, by
  * observing how the environment changed while a process was
@@ -16,7 +15,7 @@ See the file COPYING for details.
  *
  * resource_monitor -i 120 some-command-line
  *
- * to monitor some-command-line at two minute intervals.
+ * to monitor some-command-line at two minutes intervals.
  *
  * Each monitor taget resource has three functions:
  * get_RESOURCE_usage, hdr_RESOURCE_usage, and
@@ -26,38 +25,55 @@ See the file COPYING for details.
  * failure. The exception are function that open files, which
  * return NULL on failure, or a file pointer on success.
  *
- * The get_RESOURCE_usage functions are called at intervals.
- * Between each interval, the monitor does nothing. For each
- * process monitored, a log text file is written, called
- * log-PID-XXXXXX, in which PID is the pid of the process, and
- * XXXXXX a random set of six digits.
+ * The get_RESOURCE_usage functions are called at given intervals.
+ * Between each interval, the monitor does nothing. All processes
+ * monitored write to the same text log file. If no file name is provided,
+ * for the log, then the log file is written to a file called
+ * log-monitor-PID, in which PID is the pid of the monitor.
  *
  * log_RESOURCE_usage writes the corresponding information to the
- * log. Each field is separated by \t. hdr_RESOURCE_usage is called
- * only once, and it writes the title of the corresponding column
- * to the log file.
+ * log. Each field is separated by \t. There are three kind of
+ * rows, one for processes, one for working directories, and one
+ * for filesystems. The functions hdr_RESOURCE_usage are called
+ * only once, and write the order of the columns, per type of
+ * row, at the beginning of the log file.
  *
  * Currently, the columns are:
- *
+ * 
+ * id: One of P (process), D (working directory), F (filesystem)
  * wall:   Wall time (in clicks).
+ *
+ * Subsequently, For id P:
+ *
+ * pid:    Pid of the process
  * user:   Time the process has spent in user mode (in clicks).
  * kernel: Time the process has spent in kernel mode (in clicks).
  * vmem:   Current total virtual memory size.
  * rssmem  Current total resident memory size.
  * shmem   Amount of shared memory.
- * frBlks  Free blocks of the working directory's filesystem. 
- * AvBlks  Available blocks of the working directory's filesystem. 
- * frNodes Free nodes of the working directory's filesystem. 
- * files   File count of the working directory.
- * dirs    Directory count of the working directory.
- * bytes   Total byte count of files in the working directory.
- * blks    Block count (512 bytes) in the working directory.
  * rchars  Read char count using *read system calls.
  * wchars  Writen char count using *write system calls.
+ * wd      Pathname of the working directory.
+ * fs      Filesystem id of the working directory
  *
- * The log files are written to the home directory of the monitor
+ * For id D:
+ * 
+ * wd      Pathname of the directory.
+ * files   File count of the directory.
+ * dirs    Directory count of the directory.
+ * bytes   Total byte count of files in the directory.
+ * blks    Block count (512 bytes) in the directory.
+ *
+ * For id F:
+ *
+ * devid   Filesystem id
+ * frBlks  Free blocks of the filesystem. 
+ * AvBlks  Available blocks of the filesystem. 
+ * frNodes Free nodes of the filesystem. 
+ *
+ * The log file is written to the home directory of the monitor
  * process. A flag will be added later to indicate a prefered
- * output directory.
+ * output file.
  *
  * While all the logic supports the monitoring of several
  * processes by the same monitor, only one monitor can
@@ -65,15 +81,21 @@ See the file COPYING for details.
  * wrap the calls to fork and clone in the monitor such that we
  * can also monitor the process children.
  *
- * Each monitored process gets a 'struct monitor_info', itself
+ * Each monitored process gets a 'struct process_info', itself
  * composed of 'struct mem_info', 'struct click_info', etc. There
- * is a global variable that keeps a table relating pids to
- * the corresponding struct monitor_info.
+ * is a global variable, 'processes', that keeps a table relating pids to
+ * the corresponding struct process_info.
+ *
+ * Likewise, there are tables that relate paths to 'struct
+ * working_dir_info' ('working_dirs'), and device ids to 'struct
+ * filesys_info' ('filesysms').
  *
  * The monitor program handles SIGCHLD, by either retrieving the
  * last usage of the child (getrusage through waitpid) and
  * removing it from the table above described, or logging SIGSTOP
- * and SIGCONT.
+ * and SIGCONT. On SIGINT, the monitor sends the sigint signal to
+ * the first processes it created, and cleans up the monitoring
+ * tables.
  *
  * monitor takes the -i<seconds> flag, which indicates how often
  * the resources are checked. The logic is there to allow, say,
@@ -93,9 +115,6 @@ See the file COPYING for details.
  * statfs: Called in current working directory. A process might
  * be writting in a different filesystem.
  *
- * We sleep one second waiting for the child process to be
- * created, which is not very good form.
- *
  * If the process writes something outside the working directory,
  * right now we are out of luck.
  *
@@ -104,8 +123,11 @@ See the file COPYING for details.
  *
  */
 
+#include "hash_table.h"
 #include "itable.h"
+#include "stringtools.h"
 #include "debug.h"
+#include "xxmalloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -138,7 +160,24 @@ See the file COPYING for details.
 
 #define DEFAULT_INTERVAL 60 /* in seconds */
 
-struct itable *children; /* Maps the pid of a process to a unique struct monitor. */
+FILE  *log_file;                /* All monitoring information of all processes is written here. */
+
+uint64_t clicks_initial;        /* Time at which monitoring started, in clicks. */
+
+pid_t  first_process_pid;
+
+struct itable *processes;       /* Maps the pid of a process to a unique struct process_info. */
+struct hash_table *working_dirs; /* Maps paths to working directory structures. */
+struct itable *filesysms;        /* Maps st_dev ids (from stat syscall) to filesystem structures. */
+struct itable *working_dirs_rc;  /* Counts how many process_info use a working_dir_info. */
+struct itable *filesys_rc;       /* Counts how many working_dir_info use a filesys_info. */
+
+//time in clicks, no seconds:
+struct click_info
+{
+	unsigned long int user_time;
+	unsigned long int kernel_time;
+};
 
 struct mem_info
 {
@@ -149,55 +188,64 @@ struct mem_info
 	uint64_t data;
 };
 
-//time in clicks, no seconds:
-struct click_info
-{
-	unsigned long int wall_time;
-	unsigned long int user_time;
-	unsigned long int kernel_time;
-};
-
-struct file_info
-{
-	int      files;
-	int      directories;
-	off_t    byte_count;
-	blkcnt_t block_count;
-};
-
 struct io_info
 {
 	uint64_t chars_read;
 	uint64_t chars_written;
 };
 
-struct monitor_info
+struct working_dir_info
 {
+	uint64_t wall_time;
+	char 	*path;
+	int      files;
+	int      directories;
+	off_t    byte_count;
+	blkcnt_t block_count;
+
+	struct filesys_info *fs;
+};
+
+struct filesys_info
+{
+	uint64_t        wall_time;
+	int             id;
+	char           *path;			// Sample path on the filesystem.
+	struct statfs   disk;			// Current result of statfs call.
+	struct statfs   disk_initial;   // Result of the first time we call statfs.
+};
+
+struct process_info
+{
+	uint64_t    wall_time;
 	pid_t       pid;
 	const char *cmd;
 	int         running;
-	FILE       *log_file;
-	struct timeval click_initial;
 
-	struct mem_info  mem;
-	struct click_info load;
-	struct file_info file;
-	struct io_info   io;
+	struct mem_info   mem;
+	struct click_info click;
+	struct io_info    io;
 
-	struct statfs    disk;
-	struct statfs    disk_initial;
+	struct working_dir_info *wd;
 };
 
-FILE *open_log_file(pid_t pid, const char *prefix)
+
+FILE *open_log_file(const char *filename)
 {
 	FILE *log;
 	char flog_path[PATH_MAX];	
-	sprintf(flog_path, "%s-%d-XXXXXX", prefix, pid);
-	mkstemp(flog_path);
+
+	if(filename)
+		strncpy(flog_path, filename, PATH_MAX);
+	else
+	{
+		sprintf(flog_path, "log-monitor-%d", getpid());
+		mkstemp(flog_path);
+	}
 
 	if((log = fopen(flog_path, "w")) == NULL)
 	{
-		debug(D_DEBUG, "monitor: could not open log file %s : %s\n", flog_path, strerror(errno));
+		debug(D_DEBUG, "could not open log file %s : %s\n", flog_path, strerror(errno));
 		return NULL;
 	}
 
@@ -214,27 +262,29 @@ FILE *open_proc_file(pid_t pid, char *filename)
 
 		if((fproc = fopen(fproc_path, "r")) == NULL)
 		{
-				debug(D_DEBUG, "monitor: could not process file %s : %s\n", fproc_path, strerror(errno));
+				debug(D_DEBUG, "could not process file %s : %s\n", fproc_path, strerror(errno));
 				return NULL;
 		}
 
 		return fproc;
 }
 
-int get_disk_usage(struct statfs *disk)
+int get_fs_usage(const char *path, struct statfs *disk)
 {
 	char cwd[PATH_MAX];
 
-	if(statfs(getcwd(cwd, PATH_MAX - 1), disk) > 0)
+	debug(D_DEBUG, "statfs on path: %s\n", path);
+
+	if(statfs(path, disk) > 0)
 	{
-		debug(D_DEBUG, "monitor: could statfs on %s : %s\n", cwd, strerror(errno));
+		debug(D_DEBUG, "could statfs on %s : %s\n", cwd, strerror(errno));
 		return 1;
 	}
 
 	return 0;
 }
 
-void log_disk_usage(FILE *log_file, struct statfs *disk, struct statfs *disk_initial)
+void log_fs_usage(struct statfs *disk, struct statfs *disk_initial)
 {
 	/* Free blocks . Available blocks . Free nodes */
 
@@ -243,23 +293,27 @@ void log_disk_usage(FILE *log_file, struct statfs *disk, struct statfs *disk_ini
 	fprintf(log_file, "%ld", disk->f_ffree - disk_initial->f_ffree);
 }
 
-void hdr_disk_usage(FILE *log_file)
+void hdr_fs_usage()
 {
 	fprintf(log_file, "frBlks\tavBlks\tfrNodes");
 }
 
-int get_file_usage(struct file_info *file)
+int get_wd_usage(struct working_dir_info *d)
 {
-	char *argv[] = {".", NULL};
+	char *argv[] = {d->path, NULL};
 	FTS *hierarchy;
 	FTSENT *entry;
-	memset(file, 0, sizeof(struct file_info));
+
+	d->files = 0;
+	d->directories = 0;
+	d->byte_count = 0;
+	d->block_count = 0;
 
 	hierarchy = fts_open(argv, FTS_PHYSICAL, NULL);
 
 	if(!hierarchy)
 	{
-		debug(D_DEBUG, "monitor: fts_open error: %s\n", strerror(errno));
+		debug(D_DEBUG, "fts_open error: %s\n", strerror(errno));
 		return 1;
 	}
 
@@ -268,22 +322,22 @@ int get_file_usage(struct file_info *file)
 		switch(entry->fts_info)
 		{
 			case FTS_D:
-				file->directories++;
+				d->directories++;
 				break;
 			case FTS_DC:
 			case FTS_DP:
 				break;
 			case FTS_SL:
 			case FTS_DEFAULT:
-				file->files++;
+				d->files++;
 				break;
 			case FTS_F:
-				file->files++;
-				file->byte_count  += entry->fts_statp->st_size;
-				file->block_count += entry->fts_statp->st_blocks;
+				d->files++;
+				d->byte_count  += entry->fts_statp->st_size;
+				d->block_count += entry->fts_statp->st_blocks;
 				break;
 			case FTS_ERR:
-				debug(D_DEBUG, "monitor: fts_read error %s: %s\n", entry->fts_name, strerror(errno));
+				debug(D_DEBUG, "fts_read error %s: %s\n", entry->fts_name, strerror(errno));
 				break;
 			default:
 				break;
@@ -295,14 +349,14 @@ int get_file_usage(struct file_info *file)
 	return 0;
 }
 
-void log_file_usage(FILE *log_file, struct file_info *file)
+void log_wd_usage(struct working_dir_info *dir)
 {
 	/* files . dirs . bytes . blocks */
-	fprintf(log_file, "%d\t%d\t%d\t%d", file->files, file->directories, (int) file->byte_count, (int) file->block_count);
+	fprintf(log_file, "%d\t%d\t%d\t%d", dir->files, dir->directories, (int) dir->byte_count, (int) dir->block_count);
 
 }
 
-void hdr_file_usage(FILE *log_file)
+void hdr_wd_usage()
 {
 	fprintf(log_file, "files\tdirs\tbytes\tblks");
 }
@@ -317,11 +371,9 @@ double timeval_to_double(struct timeval *time, struct timeval *origin)
 
 }
 
-int get_click_usage(pid_t pid, struct timeval *time_initial, struct click_info *click)
+int get_click_usage(pid_t pid, struct click_info *click)
 {
 	/* /dev/proc/[pid]/stat */
-	
-	struct timeval time;
 	
 	FILE *fstat = open_proc_file(pid, "stat");
 	if(!fstat)
@@ -329,7 +381,6 @@ int get_click_usage(pid_t pid, struct timeval *time_initial, struct click_info *
 		return 1;
 	}
 
-	gettimeofday(&time, NULL);
 
 	fscanf(fstat,
 			"%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
@@ -340,21 +391,19 @@ int get_click_usage(pid_t pid, struct timeval *time_initial, struct click_info *
 			/* .... */,
 			&click->user_time, &click->kernel_time);
 
-	click->wall_time = (time.tv_sec - time_initial->tv_sec) * sysconf(_SC_CLK_TCK); 
 
 	return 0;
 }
 
-void log_click_usage(FILE *log_file, struct click_info *click)
+void log_click_usage(struct click_info *click)
 {
-	/* wall . user . kernel . time */
-	fprintf(log_file, "%ld\t",  click->wall_time);
+	/* user . kernel . time */
 	fprintf(log_file, "%ld\t%ld", click->user_time, click->kernel_time);
 }
 
-void hdr_click_usage(FILE *log_file)
+void hdr_click_usage()
 {
-	fprintf(log_file, "wall\tuser\tkernel");
+	fprintf(log_file, "user\tkernel");
 }
 
 int get_mem_usage(pid_t pid, struct mem_info *mem)
@@ -381,14 +430,14 @@ int get_mem_usage(pid_t pid, struct mem_info *mem)
 	return 0;
 }
 
-void log_mem_usage(FILE *log_file, struct mem_info *mem)
+void log_mem_usage(struct mem_info *mem)
 {
 	/* total virtual . resident . shared */
 	fprintf(log_file, "%" PRIu64 "\t%" PRIu64 "\t%" PRIu64,
 				mem->virtual, mem->resident, mem->shared);
 }
 
-void hdr_mem_usage(FILE *log_file)
+void hdr_mem_usage()
 {
 	fprintf(log_file, "vmem\trssmem\tshmem");
 }
@@ -445,160 +494,466 @@ int get_io_usage(pid_t pid, struct io_info *io)
 
 }
 
-void log_io_usage(FILE *log_file, struct io_info *io)
+void log_io_usage(struct io_info *io)
 {
 	/* total chars read . total chars written */
 	fprintf(log_file, "%" PRIu64 "\t%" PRIu64, io->chars_read, io->chars_written);
 }
 		
-void hdr_io_usage(FILE *log_file)
+void hdr_io_usage()
 {
 	fprintf(log_file, "rchars\twchars");
 }
 
-void monitor_log_hdr(struct monitor_info *m)
+void hdr_process_log()
 {
-	hdr_click_usage(m->log_file);
-	fprintf(m->log_file, "\t");
-
-	hdr_mem_usage(m->log_file);
-	fprintf(m->log_file, "\t");
-
-	hdr_disk_usage(m->log_file);
-	fprintf(m->log_file, "\t");
-
-	hdr_file_usage(m->log_file);
-	fprintf(m->log_file, "\t");
-
-	hdr_io_usage(m->log_file);
-	fprintf(m->log_file, "\n");
+	fprintf(log_file, "wall\ttype=P\tpid");
 }
 
-void monitor_log(struct monitor_info *m)
+void hdr_wd_log()
 {
-	log_click_usage(m->log_file, &m->load);
-	fprintf(m->log_file, "\t");
-
-	log_mem_usage(m->log_file,  &m->mem);
-	fprintf(m->log_file, "\t");
-
-	log_disk_usage(m->log_file, &m->disk, &m->disk_initial);
-	fprintf(m->log_file, "\t");
-
-	log_file_usage(m->log_file, &m->file);
-	fprintf(m->log_file, "\t");
-
-	log_io_usage(m->log_file, &m->io);
-	fprintf(m->log_file, "\n");
-
-	fflush(m->log_file);
+	fprintf(log_file, "wall\ttype=D\tpath");
 }
 
-
-int monitor_once(struct monitor_info *m, int counter)
+void hdr_fs_log()
 {
-	//check memory every memt, time every loadt, and disk every
-	//dist intervals.
-	int memt = 1, timet = 1, diskt = 1;
-
-	int change = 0;
-	if( counter % memt == 0)
-	{
-		get_mem_usage(m->pid, &m->mem);
-		change = 1;
-	}
-	if( counter % timet == 0)
-	{
-		get_click_usage(m->pid, &m->click_initial, &m->load);
-		change = 1;
-	}
-	if( counter % diskt == 0)
-	{
-		get_disk_usage(&m->disk);
-		get_file_usage(&m->file);
-		get_io_usage(m->pid, &m->io);
-		change = 1;
-	}
-
-	counter++; //if counter overflows, doing mod arithmetic, so that's ok.
-
-	if(change)
-		monitor_log(m);
-
-	return change;
+	fprintf(log_file, "wall\ttype=F\tdevid");
 }
 
-
-int monitor_children(long int interval /*in seconds */)
+void monitor_log_hdr()
 {
-	pid_t pid;
-	struct monitor_info *mon_info;
-	struct timeval timeout;
 
-	uint64_t i = 0;
-	do
-	{ 
-		itable_firstkey(children);
-		while(itable_nextkey(children, (uint64_t *) &pid, (void **) &mon_info))
-			monitor_once(mon_info, i);
+	fprintf(log_file, "\none second = %ld clicks\n\n", sysconf(_SC_CLK_TCK));
 
-		/* wait for interval seconds. */
-		timeout.tv_sec  = interval;
-		timeout.tv_usec = 0;
-		select(0, NULL, NULL, NULL, &timeout);
-	} while(itable_size(children) > 0);
+	hdr_process_log();
+	fprintf(log_file, "\t");
+
+	hdr_click_usage();
+	fprintf(log_file, "\t");
+
+	hdr_mem_usage();
+	fprintf(log_file, "\t");
+
+	hdr_io_usage();
+	fprintf(log_file, "\n");
+
+	hdr_wd_log();
+	fprintf(log_file, "\t");
+
+	hdr_wd_usage();
+	fprintf(log_file, "\n");
+
+	hdr_fs_log();
+	fprintf(log_file, "\t");
+
+	hdr_fs_usage();
+	fprintf(log_file, "\n\n");
+}
+
+void log_wall_clicks(uint64_t clicks)
+{
+	fprintf(log_file, "%" PRIu64, clicks);
+}
+
+void log_process_info(struct process_info *p)
+{
+	log_wall_clicks(p->wall_time);
+	fprintf(log_file, "\t");
+
+	fprintf(log_file, "P\t%d\t", p->pid);
+
+	log_click_usage(&p->click);
+	fprintf(log_file, "\t");
+
+	log_mem_usage(&p->mem);
+	fprintf(log_file, "\t");
+
+	log_io_usage(&p->io);
+	fprintf(log_file, "\t");
+
+	fprintf(log_file, "%s", p->wd->path);
+	fprintf(log_file, "\t");
+
+	fprintf(log_file, "%d", p->wd->fs->id);
+	fprintf(log_file, "\n");
+}
+
+void log_filesystem_info(struct filesys_info *f)
+{
+	log_wall_clicks(f->wall_time);
+	fprintf(log_file, "\t");
+
+	fprintf(log_file, "F\t%d\t", f->id);
+
+	log_fs_usage(&f->disk, &f->disk_initial);
+	fprintf(log_file, "\n");
+}
+
+void log_working_dir_info(struct working_dir_info *d)
+{
+	log_wall_clicks(d->wall_time);
+	fprintf(log_file, "\t");
+
+	fprintf(log_file, "D\t%s\t", d->path);
+
+	log_wd_usage(d);
+	fprintf(log_file, "\n");
+}
+
+int itable_addto_count(struct itable *table, void *key, int value)
+{
+	int64_t count = (int64_t) itable_lookup(table, (int64_t) key);
+	count += value;                              //we get 0 if lookup fails, so that's ok.
+
+	if(count != 0)
+		itable_insert(table, (int64_t) key, (void *) count);
+	else
+		itable_remove(table, (int64_t) key);
+
+	return count;
+}
+
+int inc_fs_count(struct filesys_info *f)
+{
+	int64_t count = itable_addto_count(filesys_rc, f, 1);
+
+	debug(D_DEBUG, "filesystem %d reference count +1, now %d references.\n", f->id, count);
+
+	return count;
+}
+
+int dec_fs_count(struct filesys_info *f)
+{
+	int64_t count = itable_addto_count(filesys_rc, f, -1);
+
+	debug(D_DEBUG, "filesystem %d reference count -1, now %d references.\n", f->id, count);
+
+	if(count < 1)
+	{
+		debug(D_DEBUG, "filesystem %d is not monitored anymore.\n", f->id, count);
+		free(f);	
+	}
+
+	return count;
+}
+
+int inc_wd_count(struct working_dir_info *d)
+{
+	int64_t count = itable_addto_count(working_dirs_rc, d, 1);
+
+	debug(D_DEBUG, "working directory %s reference count +1, now %d references.\n", d->path, count); 
+
+	return count;
+}
+
+int dec_wd_count(struct working_dir_info *d)
+{
+	int64_t count = (int64_t) itable_addto_count(working_dirs_rc, d, -1);
+
+	debug(D_DEBUG, "working directory %s reference count -1, now %d references.\n", d->path, count); 
+
+	if(count < 1)
+	{
+		debug(D_DEBUG, "working directory %s is not monitored anymore.\n", d->path);
+
+		dec_fs_count((void *) d->fs);
+		free(d->path);
+		free(d);	
+	}
+
+	return count;
+}
+
+int get_device_id(char *path)
+{
+	struct stat dinfo;
+
+	if(stat(path, &dinfo) != 0)
+	{
+		debug(D_DEBUG, "stat call on %s failed : %s\n", path, strerror(errno));
+		return -1;
+	}
+
+	return dinfo.st_dev;
+}
+
+struct filesys_info *lookup_or_create_fs(struct filesys_info *previous, char *path)
+{
+	uint64_t dev_id = get_device_id(path);
+	struct filesys_info *inventory = itable_lookup(filesysms, dev_id);
+
+	if(!inventory) 
+	{
+		debug(D_DEBUG, "filesystem %d added to monitor.\n", dev_id);
+
+		inventory = (struct filesys_info *) malloc(sizeof(struct filesys_info));
+		inventory->path = xxstrdup(path);
+		inventory->id   = dev_id;
+		itable_insert(filesysms, dev_id, (void *) inventory);
+		get_fs_usage(inventory->path, &inventory->disk_initial);
+	}
+
+	if(inventory != previous)
+	{
+		inc_fs_count(inventory);
+		if(previous)
+			dec_fs_count(previous);
+	}
+
+	return inventory;
+
+}
+
+struct working_dir_info *lookup_or_create_wd(struct working_dir_info *previous, char *path)
+{
+	struct working_dir_info *inventory = hash_table_lookup(working_dirs, path);
+
+	if(!inventory) 
+	{
+		debug(D_DEBUG, "working directory %s added to monitor.\n", path);
+
+		inventory = (struct working_dir_info *) malloc(sizeof(struct working_dir_info));
+		inventory->path = xxstrdup(path);
+		hash_table_insert(working_dirs, inventory->path, (void *) inventory);
+
+		if(previous)
+			inventory->fs = lookup_or_create_fs(previous->fs, inventory->path);
+		else
+			inventory->fs = lookup_or_create_fs(NULL, inventory->path);
+	}
+
+	if(inventory != previous)
+	{
+		inc_wd_count(inventory);
+		if(previous)
+			dec_wd_count(previous);
+	}
+
+	return inventory;
+}
+
+int get_wd(struct process_info *p)
+{
+	char  *symlink = string_format("/proc/%d/cwd", p->pid);
+	char   target[PATH_MAX];
+
+	memset(target, 0, PATH_MAX); //readlink does not add '\0' to its result.
+
+	if(readlink(symlink, target, PATH_MAX - 1) < 0) 
+	{
+		debug(D_DEBUG, "could not read symlink to working directory %s : %s\n", symlink, strerror(errno));
+		return 1;
+	}
+
+	p->wd = lookup_or_create_wd(p->wd, target);
 
 	return 0;
 }
 
-	
-/* this is some ugly code... need to prettify */
-struct monitor_info *spawn_child(const char *cmd)
+
+uint64_t clicks_since_epoch()
+{
+	uint64_t clicks;
+	struct timeval time; 
+
+	gettimeofday(&time, NULL);
+
+	clicks  = time.tv_sec * sysconf(_SC_CLK_TCK); 
+	clicks += (time.tv_usec * sysconf(_SC_CLK_TCK))/1000000; 
+
+	return clicks;
+}
+
+uint64_t clicks_since_launched()
+{
+	return (clicks_since_epoch() - clicks_initial);
+}
+
+int monitor_process_once(struct process_info *p)
+{
+	p->wall_time = clicks_since_launched();
+
+	get_click_usage(p->pid, &p->click);
+	get_mem_usage(p->pid, &p->mem);
+	get_io_usage(p->pid, &p->io);
+	get_wd(p);
+
+	return 0;
+}
+
+int monitor_wd_once(struct working_dir_info *d)
+{
+	d->wall_time = clicks_since_launched();
+
+	get_wd_usage(d);
+
+	return 0;
+}
+
+int monitor_fs_once(struct filesys_info *f)
+{
+	f->wall_time = clicks_since_launched();
+
+	get_fs_usage(f->path, &f->disk);
+
+	return 0;
+}
+
+void monitor_final_cleanup(int signum)
 {
 	pid_t pid;
+	struct process_info     *p = NULL;
 
-	struct statfs disk_initial;
+	if(itable_lookup(processes, first_process_pid))
+	{
+		debug(D_DEBUG, "sending SIGINT to first process (%d).\n", first_process_pid);
+		kill(first_process_pid, SIGINT);
+	}
 
-	get_disk_usage(&disk_initial);
-	
+	debug(D_DEBUG, "cleaning up remaining processes.\n");
+	itable_firstkey(processes);
+	while(itable_nextkey(processes, (uint64_t *) &pid, (void **) &p))
+	{
+		monitor_process_once(p);
+		log_process_info(p);
+	}
+
+}
+
+
+//this is really three different functions: (need to split)
+int monitor_resources(long int interval /*in seconds */)
+{
+	pid_t pid;
+	char path[PATH_MAX];
+	int dev_id;
+
+	struct process_info     *p = NULL;
+	struct working_dir_info *d = NULL;
+	struct filesys_info     *f = NULL;
+
+	struct timeval timeout;
+
+	// Loop while there are processes to monitor.
+	while(1)
+	{ 
+		hash_table_firstkey(working_dirs);
+		while(hash_table_nextkey(working_dirs, (char **) &path, (void **) &d))
+		{
+			monitor_wd_once(d);
+			log_working_dir_info(d);
+		}
+
+		itable_firstkey(filesysms);
+		while(itable_nextkey(filesysms, (uint64_t *) &dev_id, (void **) &f))
+		{
+			monitor_fs_once(f);
+			log_filesystem_info(f);
+		}
+
+		itable_firstkey(processes);
+		while(itable_nextkey(processes, (uint64_t *) &pid, (void **) &p))
+		{
+			monitor_process_once(p);
+			log_process_info(p);
+		}
+		
+		/* wait for interval seconds. */
+		timeout.tv_sec  = interval;
+		timeout.tv_usec = 0;
+
+		if(itable_size(processes) < 1)
+			break;
+		
+		debug(D_DEBUG, "sleeping for: %d seconds\n", interval);
+		select(0, NULL, NULL, NULL, &timeout);
+	}
+
+	return 0;
+}
+
+void wakeup_after_fork(int signum)
+{
+	if(signum == SIGCONT)
+		signal(SIGCONT, SIG_DFL);
+}
+
+pid_t monitor_fork(void)
+{
+	pid_t pid;
+	sigset_t set;
+	void (*prev_handler)(int signum);
+
+
 	pid = fork();
+
+	prev_handler = signal(SIGCONT, wakeup_after_fork);
+	sigfillset(&set);
+	sigdelset(&set, SIGCONT);
 
 	if(pid > 0)
 	{
-		struct monitor_info *m = malloc(sizeof(struct monitor_info));
-		memset(m, 0, sizeof(struct monitor_info));
+		debug(D_DEBUG, "fork %d -> %d\n", getpid(), pid);
 
-        close(STDIN_FILENO);
-        close(STDOUT_FILENO);
+		signal(SIGCONT, prev_handler);
+		struct process_info *p = malloc(sizeof(struct process_info));
+		p->pid = pid;
+		p->running = 0;
 
+		fprintf(log_file, "fork:\t%d\t%d\n", getpid(), pid);
+
+		itable_insert(processes, p->pid, (void *) p);
+
+		monitor_process_once(p);
+
+		p->running = 1;
+		kill(pid, SIGCONT);
+	}
+	else
+	{
+	//	sigsuspend(&set);
+		signal(SIGCONT, prev_handler);
+	}
+
+	return pid;
+}
+
+	
+struct process_info *spawn_first_process(const char *cmd)
+{
+	pid_t pid;
+	pid = monitor_fork();
+
+	fprintf(log_file, "command: %s\n", cmd);
+
+	if(pid > 0)
+	{
+		first_process_pid = pid;
+		close(STDIN_FILENO);
+		close(STDOUT_FILENO);
 		setpgid(pid, 0);
-		m->pid     = pid;
-		m->running = 1;
-
-		gettimeofday(&m->click_initial, NULL);
-		memcpy(&m->disk_initial, &disk_initial, sizeof(struct statfs));
-		
-		m->log_file   = open_log_file(pid, "log");
-
-		fprintf(m->log_file, "command:\t%s\n", cmd);
-		monitor_log_hdr(m);
-
-		return m;
 	}
 	else if(pid < 0)
-	{
-		fatal("monitor: fork failed: %s\n", strerror(errno));
-		return NULL;
-	}
+		fatal("fork failed: %s\n", strerror(errno));
 	else //child
 	{
-		sleep(1); //hack so we get initial disk and time. must find a better solution!
+		debug(D_DEBUG, "executing: %s\n", cmd);
 		execlp("sh", "sh", "-c", cmd, (char *) NULL);
 		//We get here only if execlp fails.
-		fatal("monitor: error executing %s:\n", cmd, strerror(errno));
-		return NULL;
+		fatal("error executing %s:\n", cmd, strerror(errno));
 	}
 
+	return itable_lookup(processes, pid);
+
+}
+
+void cleanup_process(struct process_info *p)
+{
+	debug(D_DEBUG, "cleaning process: %d\n", p->pid);
+
+	dec_wd_count(p->wd);
+	itable_remove(processes, p->pid);
+	free(p);
 }
 
 // Return the pid of the child that sent the signal, without removing the
@@ -622,7 +977,7 @@ pid_t waiting_child()
 }
 
 /* sigchild signal handler */
-void check_child(const int signal)
+void monitor_check_child(const int signal)
 {
 	int status;
 	pid_t pid;
@@ -631,35 +986,37 @@ void check_child(const int signal)
 	pid = waiting_child();
 
 	//monitor that process once more, maybe for the last time.
-	struct monitor_info *m = itable_lookup(children, pid);
-	monitor_once(m, 0);
+	struct process_info *p = itable_lookup(processes, pid);
+	monitor_process_once(p);
 
 	//die zombie die
 	waitpid(pid, &status, WNOHANG);
 
 	if( WIFEXITED(status) )
 	{
-			fprintf(m->log_file, "\nProcess %d finished normally: %d.\n", m->pid, WEXITSTATUS(status) );
-			itable_remove(children, m->pid);
-			free(m);
+			fprintf(log_file, "\nProcess %d finished normally: %d.\n", p->pid, WEXITSTATUS(status) );
+			cleanup_process(p);
 	} 
 	else if ( WIFSIGNALED(status) )
 	{
-			fprintf(m->log_file, "\nProcess %d terminated with signal: %s.\n", m->pid, strsignal(WTERMSIG(status)) );
-			itable_remove(children, m->pid);
-			free(m);
+			fprintf(log_file, "\nProcess %d terminated with signal: %s.\n", p->pid, strsignal(WTERMSIG(status)) );
+			cleanup_process(p);
 	} 
 	else if ( WIFSTOPPED(status) )
 	{
-			fprintf(m->log_file, "\nProcess %d on hold with signal: %s.\n", m->pid, strsignal(WIFSTOPPED(status)) );
-			m->running = 0;
+			fprintf(log_file, "\nProcess %d on hold with signal: %s.\n", p->pid, strsignal(WIFSTOPPED(status)) );
+			p->running = 0;
 	} 
 	else if ( WIFCONTINUED(status) )
 	{
-			fprintf(m->log_file, "\nProcess %d received SIGCONT.\n", m->pid );
-			m->running = 1;
+			fprintf(log_file, "\nProcess %d received SIGCONT.\n", p->pid );
+			p->running = 1;
 	}
 
+	//if there are no more process running, do the cleanup and
+	//exit.
+	if(itable_size(processes) < 1)
+		monitor_final_cleanup(SIGINT);
 }
 
 static void show_help(const char *cmd)
@@ -674,13 +1031,14 @@ static void show_help(const char *cmd)
 
 int main(int argc, char **argv) {
 	int i;
-	struct monitor_info *m;
 	char cmd[1024] = {'\0'};
 	char c;
 	uint64_t interval = DEFAULT_INTERVAL;
 
 	debug_config(argv[0]);
-	signal(SIGCHLD, check_child);
+
+	signal(SIGCHLD, monitor_check_child);
+	signal(SIGINT, monitor_final_cleanup);
 
 
 	while((c = getopt(argc, argv, "d:i:")) > 0)
@@ -692,7 +1050,7 @@ int main(int argc, char **argv) {
 			case 'i':
 				interval = strtoll(optarg, NULL, 10);
 				if(interval < 1)
-					fatal("monitor: interval cannot be set to less than one second.");
+					fatal("interval cannot be set to less than one second.");
 					break;
 			default:
 				show_help(argv[0]);
@@ -702,7 +1060,12 @@ int main(int argc, char **argv) {
 	}
 		
 
-	children = itable_create(0);
+	processes    = itable_create(0);
+	working_dirs = hash_table_create(0,0);
+	filesysms    = itable_create(0);
+	
+	working_dirs_rc = itable_create(0);
+	filesys_rc      = itable_create(0);
 
 	//this is ugly, concatenating command and arguments
 	for(i = optind; i < argc; i++)
@@ -710,15 +1073,18 @@ int main(int argc, char **argv) {
 		strcat(cmd, argv[i]);
 		strcat(cmd, " ");
 	}
+	
+	log_file = open_log_file(NULL);
+	monitor_log_hdr(log_file);
 
-	m = spawn_child(cmd);
+	clicks_initial = clicks_since_epoch();
 
-	itable_insert(children, m->pid, (void *) m);
+	spawn_first_process(cmd);
 
-	monitor_children(interval);
+	monitor_resources(interval);
 
-	fclose(m->log_file);
+	fclose(log_file);
 
-	return 0;
+	exit(0);
 
 }
