@@ -31,7 +31,6 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "itable.h"
 #include "debug.h"
-#include "batch_job.h"
 #include "work_queue.h"
 #include "delete_dir.h"
 #include "stringtools.h"
@@ -39,9 +38,11 @@ See the file COPYING for details.
 #include "get_line.h"
 #include "int_sizes.h"
 #include "list.h"
-#include "timestamp.h"
 #include "xxmalloc.h"
 #include "getopt_aux.h"
+
+#include "dag.h"
+#include "visitors.h"
 
 #define SHOW_INPUT_FILES 2
 #define SHOW_OUTPUT_FILES 3
@@ -88,102 +89,6 @@ static int output_len_check = 0;
 
 static char *makeflow_exe = NULL;
 
-typedef enum {
-	DAG_NODE_STATE_WAITING = 0,
-	DAG_NODE_STATE_RUNNING = 1,
-	DAG_NODE_STATE_COMPLETE = 2,
-	DAG_NODE_STATE_FAILED = 3,
-	DAG_NODE_STATE_ABORTED = 4,
-	DAG_NODE_STATE_MAX = 5
-} dag_node_state_t;
-
-struct dag {
-	char *filename;					// Source makeflow file path.
-	struct dag_node *nodes;				// Linked list of all production rules, without ordering.
-	struct itable *node_table;			// Mapping from unique integers dag_node->nodeid to nodes.
-	struct itable *local_job_table;			// Mapping from unique integers dag_node->jobid  to nodes, rules with prefix LOCAL.
-	struct itable *remote_job_table;		// Mapping from unique integers dag_node->jobid  to nodes.
-	struct hash_table *file_table;			// Mapping filenames to dag_nodes (answers: which production rule has filename as a target?)
-	struct hash_table *completed_files;		// Records which target files have been updated/generated.
-	struct hash_table *filename_translation_fwd;	// Mapping renaming filenames to slash-less filenames. This is needed for some remote file systems.
-	struct hash_table *filename_translation_rev;	// Mapping from slash-less filenames to the original filenames.
-	struct list *symlinks_created;			// Remote filenames for which a symlink was created (used now only for Condor, and only for the final cleanup).
-	struct hash_table *variables;			// Mappings between variables defined in the makeflow file and their substitution.
-	struct hash_table *collect_table;		// Keeps the reference counts of filenames of files that are garbage collectable.
-	struct list *export_list;			// List of variables with prefix export. (these are setenv'ed eventually).
-	FILE *logfile;
-	int node_states[DAG_NODE_STATE_MAX];		// node_states[STATE] keeps the count of nodes that have state STATE \in dag_node_state_t.
-	int local_jobs_running;				// Count of jobs running locally.
-	int local_jobs_max;				// Maximum number of jobs that can run locally (default load_average_get_cpus)
-	int remote_jobs_running;			// Count of jobs running remotelly.
-	int remote_jobs_max;				// Maximum number of jobs that can run remotelly (default at least max_remote_jobs_default)
-	int nodeid_counter;				// Keeps a count of production rules read so far (used for the value of dag_node->nodeid).
-};
-
-/* Bookkeeping for parsing a makeflow file */
-struct dag_parse {
-	struct dag *d;
-	FILE *dag_stream;
-	char *linetext;
-	int colnum;
-	int linenum;
-};
-
-
-/* struct dag_file implements a linked list of files. filename is
- * the path given in the makeflow file, and remotename is a
- * unique slash-less pathname that is resolved to filename, but
- * that can easily be sent to a remote batch system. remotename
- * is obtained from filename with the translate_filename
- * function. */
-struct dag_file {
-	const char *filename;
-	char *remotename;
-	struct dag_file *next;
-};
-
-/* struct dag_node implements a linked list of nodes. A dag_node
- * represents a production rule from source files to target
- * files. The actual dag structure is given implicitly by the
- * source_files and target_files members (i.e., a dag_node has no
- * explicit knowledge of its logical dag_node ascendants or descendants).
- * For a given filename, we can test if it is a sink of the dag d
- * with a lookup on the hash table d->file_table. In fact,
- * dag_node acts more like the edge of the dag, with the nodes
- * being sets of source/target files (that is, a file may be part
- * of different nodes).*/
-struct dag_node {
-	int only_my_children;
-	time_t previous_completion;
-	int linenum;
-	int nodeid;
-	int local_job;
-	int nested_job;
-	int failure_count;
-	dag_node_state_t state;
-	const char *command;
-	const char *original_command;
-	const char *makeflow_cwd;
-	const char *makeflow_dag;
-	const char *symbol;
-	struct dag_file *source_files;
-	struct dag_file *target_files;
-	int source_file_names_size;
-	int target_file_names_size;
-	batch_job_id_t jobid;
-	struct dag_node *next;
-	int children;
-	int children_remaining;
-	int level;
-	struct hash_table *variables;
-};
-
-struct dag_lookup_set {
-	struct dag *dag;
-	struct dag_node *node;
-	struct hash_table *table;
-};
-
 int dag_depth(struct dag *d);
 int dag_width_uniform_task(struct dag *d);
 int dag_width_guaranteed_max(struct dag *d);
@@ -206,10 +111,6 @@ int dag_parse_node_filelist(struct dag_parse *bk, struct dag_node *n, char *file
 int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line);
 int dag_parse_node_makeflow_command(struct dag_parse *bk, struct dag_node *n, char *line);
 int dag_parse_export(struct dag_parse *bk, char *line);
-
-int dag_to_file(const struct dag *d, const char *dag_file);
-
-
 
 /** 
  * If the return value is x, a positive integer, that means at least x tasks
@@ -513,176 +414,6 @@ int dag_width(struct dag *d, int nested_jobs)
 	return max;
 }
 
-struct dot_node {
-	int id;
-	int count;
-	int print;
-};
-
-struct file_node {
-	int id;
-	char *name;
-	double size;
-};
-
-void dag_print(struct dag *d, int condense_display, int change_size)
-{
-	struct dag_node *n;
-	struct dag_file *f;
-	struct hash_table *h, *g;
-	struct dot_node *t;
-
-	struct file_node *e;
-
-	struct stat st;
-	const char *fn;
-
-	char *name;
-	char *label;
-
-        double average = 0;
-        double width = 0;
-
-        fprintf(stdout, "digraph {\n");
-
-	if (change_size){
-		dag_check(d);
-		hash_table_firstkey(d->completed_files);
-		while(hash_table_nextkey(d->completed_files, &label, (void**)&name)) {
-			stat(label, &st);
-			average+=((double) st.st_size)/((double) hash_table_size(d->completed_files));
-		}
-	}
-		
-	
-	h = hash_table_create(0,0);
-
-	fprintf(stdout, "node [shape=ellipse,color = green,style = unfilled,fixedsize = false];\n");
-
-	for(n = d->nodes; n; n = n->next){
-		name = xxstrdup(n->command);
-		label = strtok(name, " \t\n");
-		t = hash_table_lookup(h, label);
-		if (!t) {
-			t = malloc(sizeof(*t));
-			t->id = n->nodeid;
-			t->count = 1;
-			t->print = 1;
-			hash_table_insert(h, label, t);
-		} else {
-			t->count++;
-		}
-		
-		free(name);
-	}
-	
-
-	for(n = d->nodes; n; n = n->next) {
-        	name = xxstrdup(n->command);
-		label = strtok(name, " \t\n");
-		t = hash_table_lookup(h, label);
-		if(!condense_display || t->print){
-
-			if((t->count == 1) || !condense_display) fprintf(stdout, "N%d [label=\"%s\"];\n", condense_display?t->id:n->nodeid, label);
-			else fprintf(stdout, "N%d [label=\"%s x%d\"];\n", t->id, label, t->count);
-			t->print = 0;
-		}
-		free(name);
-	}
-
-	fprintf(stdout, "node [shape=box,color=blue,style=unfilled,fixedsize=false];\n");
-
-	g = hash_table_create(0,0);
-
-	for(n = d->nodes; n; n = n->next){
-		for (f = n->source_files; f; f = f->next){
-			fn = f->filename;
-			e = hash_table_lookup(g, fn);
-			if (!e) {
-				e = malloc(sizeof(*e));
-				e->id = hash_table_size(g);
-				e->name = xxstrdup(fn);
-				if (stat(fn, &st) == 0) {
-					e->size = (double)(st.st_size);	
-				}
-				else e->size = -1;
-				hash_table_insert(g, fn, e);
-			}
-		}
-		for (f = n->target_files; f; f = f->next){
-			fn = f->filename;
-                        e = hash_table_lookup(g, fn);
-                        if (!e) {
-                                e = malloc(sizeof(*e));
-                                e->id = hash_table_size(g);
-				e->name = xxstrdup(fn);
-                                if (stat(fn, &st) == 0){
-					e->size = (double)(st.st_size);
-				}
-                                else e->size = -1;
-				hash_table_insert(g, fn, e);
-                        }
-                }
-	}
-
-	hash_table_firstkey(g);
-        while(hash_table_nextkey(g, &label ,(void **)&e)) {
-		fn = e->name;
-		fprintf(stdout, "F%d [label = \"%s", e->id, fn);
-
-		if (change_size) { 
-			if (e->size >= 0){
-				width = 5*(e->size/average);
-				if (width <2.5) width = 2.5;
-                                if (width >25) width = 25;
-				fprintf(stdout, "\\nsize:%.0lfkb\", style=filled, fillcolor=skyblue1, fixedsize=true, width=%lf, height=0.75", e->size/1024, width);
-			} else {
-				fprintf(stdout, "\", fixedsize = false, style = unfilled, ");
-			}
-		} else fprintf(stdout, "\"");
-
-		fprintf(stdout, "];\n");
-				
-        }
-
-	fprintf(stdout, "\n");
-
-	for(n =	d->nodes; n; n = n->next) {
-
-		name = xxstrdup(n->command);
-                label = strtok(name, " \t\n");
-                t = hash_table_lookup(h, label);
-
-
-		for(f = n->source_files; f; f = f->next) {
-			e = hash_table_lookup(g, f->filename);
-			fprintf(stdout, "F%d -> N%d;\n", e->id, condense_display?t->id:n->nodeid);
-		}
-		for(f = n->target_files; f; f = f->next) {
-			e = hash_table_lookup(g, f->filename);
-			fprintf(stdout, "N%d -> F%d;\n", condense_display?t->id:n->nodeid, e->id);
-		}
-
-		free(name);
-	}
-
-	fprintf(stdout, "}\n");
-
-	hash_table_firstkey(h);
-	while(hash_table_nextkey(h, &label ,(void **)&t)) {
-		free(t);
-		hash_table_remove(h, label);
-	}
-
-	hash_table_firstkey(g);
-        while(hash_table_nextkey(g, &label ,(void **)&e)) {
-                free(e);
-                hash_table_remove(g, label);
-        }
-
-	hash_table_delete(g);
-	hash_table_delete(h);
-}
 
 const char *dag_node_state_name(dag_node_state_t state)
 {
@@ -2446,115 +2177,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -Z <file>      Select port at random and write it to this file.\n");
 }
 
-/* The dag_to_file_* functions write a struct dag in memory to a
- * file, using the remotename names generated from
- * translate_filename, rather than the original filenames.
- *
- * Eventually, we would like to pass a 'convert_name' function,
- * instead of using just the remotenames.
- *
- * BUG: Currently, expansions are writen instead of variables.
- * BUG: Error handling is not very good.
- * BUG: Integrate more with dttools (use DEBUG, etc.)
- *
- * The entry function is dag_to_file(dag, filename).
- * */
-
-int dag_to_file_vars(const struct dag *d, FILE *dag_stream);
-int dag_to_file_exports(const struct dag *d, FILE *dag_stream);
-int dag_to_file_nodes(const struct dag *d, FILE *dag_stream);
-
-int dag_to_file(const struct dag *d, const char *dag_file)
-{
-	FILE *dag_stream = fopen(dag_file, "w");
-
-	if(!dag_stream)
-		return 1;
-
-	dag_to_file_vars(d, dag_stream);
-	dag_to_file_exports(d, dag_stream);
-	dag_to_file_nodes(d, dag_stream);
-
-	fclose(dag_stream);
-
-	return 0;
-}
-
-/* Writes 'var=value' pairs from the dag to the stream */
-int dag_to_file_vars(const struct dag *d, FILE *dag_stream)
-{
-	char *var;
-	void *value;
-
-	struct hash_table *vars = d->variables;
-
-	hash_table_firstkey(vars);
-	while(hash_table_nextkey(vars, &var, &value)) {
-		fprintf(dag_stream, "%s=\"%s\"\n", var, (char *) value);
-	}
-
-	return 0;
-}
-
-/* Writes 'export var' tokens from the dag to the stream */
-int dag_to_file_exports(const struct dag *d, FILE *dag_stream)
-{
-	char *var;
-
-	struct list *vars = d->export_list;
-
-	list_first_item(vars);
-	for(var = list_next_item(vars);  var; var = list_next_item(vars))
-		fprintf(dag_stream, "export %s\n", var);
-
-	return 0;
-
-}
-
-/* Writes a list of files to the the stream, using remotename
- * instead of filename if available */
-int dag_to_file_files(const struct dag_file *fs, FILE *dag_stream)
-{
-	//here we may want to call the linker renaming function,
-	//instead of using f->remotename
-	
-	const struct dag_file *f;
-	for(f = fs; f; f = f->next)
-	{
-		fprintf(dag_stream, "%s", f->remotename ? f->remotename : f->filename);
-
-		if(f->next)
-			fprintf(dag_stream, " ");
-	}
-
-	return 0;
-}
-
-/* Writes a production rule to the stream, using remotenames when
- * available */
-int dag_to_file_node(const struct dag_node *n, FILE *dag_stream)
-{
-	fprintf(dag_stream, "\n");
-	dag_to_file_files(n->target_files, dag_stream);
-	fprintf(dag_stream, ": ");
-	dag_to_file_files(n->source_files, dag_stream);
-	fprintf(dag_stream, "\n");
-	fprintf(dag_stream, "\t%s\n", n->command);
-	fprintf(dag_stream, "\n");
-
-	return 0;
-}
-
-/* Writes all the rules to the stream */
-int dag_to_file_nodes(const struct dag *d, FILE *dag_stream)
-{
-	struct dag_node *n;
-
-	for(n = d->nodes;  n; n = n->next)
-		dag_to_file_node(n, dag_stream);
-
-	return 0;
-}
 
 
 
@@ -2975,7 +2597,6 @@ int main(int argc, char *argv[])
 	if(bundle_directory){
 		//Create Bundle!
 		fprintf(stderr, "Creating workflow bundle...\n");
-		if(!dag_check(d)) exit(1);
 
 		struct stat s;
 		if(!stat(bundle_directory, &s)){
@@ -3052,13 +2673,6 @@ int main(int argc, char *argv[])
 	dag_prepare_gc(d);
 	dag_prepare_nested_jobs(d);
 
-	if(display_mode) {
-		free(logfilename);
-		free(batchlogfilename);
-		dag_print(d, condense_display, change_size);
-		return 0;
-	}
-
 	if(clean_mode) {
 		dag_clean(d);
 		file_clean(logfilename, 0);
@@ -3072,6 +2686,14 @@ int main(int argc, char *argv[])
 		free(logfilename);
 		free(batchlogfilename);
 		return 1;
+	}
+
+
+	if(display_mode) {
+		free(logfilename);
+		free(batchlogfilename);
+		dag_to_dot(d, condense_display, change_size);
+		return 0;
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {

@@ -10,7 +10,7 @@ export ECHOC=echoX
 
 prepare()
 {
-cat > ../$TEST_INPUT <<EOF
+cat > $TEST_INPUT <<EOF
 $ECHOA echob
 $ECHOA echob
 EOF
@@ -20,7 +20,7 @@ EOF
 run()
 {
 	../src/makeflow syntax/export.external.makeflow
-	exec diff ../$TEST_INPUT out.all
+	exec diff $TEST_INPUT out.all
 }
 
 clean()
