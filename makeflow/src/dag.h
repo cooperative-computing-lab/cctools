@@ -8,8 +8,10 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "batch_job.h"
 
-#ifndef DAG_H
-#define DAG_H
+#ifndef MAKEFLOW_DAG_H
+#define MAKEFLOW_DAG_H
+
+#define MAX_REMOTE_JOBS_DEFAULT 100;
 
 typedef enum {
 	DAG_NODE_STATE_WAITING = 0,
@@ -107,4 +109,18 @@ struct dag_lookup_set {
 	struct hash_table *table;
 };
 
+struct dag_node *dag_node_create(struct dag *d, int linenum);
+struct dag *dag_create();
+struct dag_file *dag_file_create(const char *filename, char *remotename, struct dag_file *next);
+
+struct hash_table *dag_input_files(struct dag *d);
+
+void dag_node_add_source_file(struct dag_node *n, const char *filename, char *remotename);
+void dag_node_add_target_file(struct dag_node *n, const char *filename, char *remotename);
+void dag_count_states(struct dag *d);
+const char *dag_node_state_name(dag_node_state_t state);
+void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate);
+
+char *dag_lookup(const char *name, void *arg);
+char *dag_lookup_set(const char *name, void *arg);
 #endif
