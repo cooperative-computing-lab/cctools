@@ -937,7 +937,7 @@ void monitor_wds_summary_once(struct wdir_info *d, int divisor)
 
 	// files+directories byte_count
 	fprintf(log_file, "%10d\t", (d->files + d->directories) / divisor);
-	fprintf(log_file, "%10jd\t", d->byte_count / divisor);
+	fprintf(log_file, "%10jd\t", (intmax_t) d->byte_count / divisor);
 }
 
 void monitor_fss_summary_once(struct filesys_info *f, int divisor)
