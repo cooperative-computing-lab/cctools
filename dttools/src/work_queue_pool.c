@@ -1337,7 +1337,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAB:c:C:d:hm:l:L:N:o:O:Pqr:S:t:T:vW:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAc:C:d:hm:l:L:N:o:O:Pqr:S:t:T:vW:")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			strcat(worker_args, " -a");
