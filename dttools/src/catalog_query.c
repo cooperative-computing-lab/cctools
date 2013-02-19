@@ -14,8 +14,6 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "stringtools.h"
 
-#define QUERY "GET HTTP/1.0 /query.text\n\n"
-
 struct catalog_query {
 	struct link *link;
 };

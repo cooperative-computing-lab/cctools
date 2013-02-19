@@ -135,8 +135,8 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 	}
 
 	if(cache_reload == 0) {
-		debug(D_HTTP, "%s %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n", action, url, actual_host);
-		link_putfstring(link, "%s %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host);
+		debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", action, url, actual_host);
+		link_putfstring(link, "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host);
 	} else {
 		//  force refresh of cache end-to-end (RFC 2616)
 		debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", action, url, actual_host);
