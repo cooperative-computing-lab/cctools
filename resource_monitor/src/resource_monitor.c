@@ -17,13 +17,14 @@ See the file COPYING for details.
  *
  * to monitor some-command-line at two minutes intervals.
  *
- * Each monitor taget resource has three functions:
- * get_RESOURCE_usage, hdr_RESOURCE_usage, and
- * log_RESOURCE_usage. For example, for memory we have
- * get_mem_usage, hdr_mem_usage, and log_mem_usage. In general,
- * all functions return 0 on success, or some other integer on
- * failure. The exception are function that open files, which
- * return NULL on failure, or a file pointer on success.
+ * Each monitor target resource has five functions:
+ * get_RESOURCE_usage, max_RESOURCE_usage, acc_RESOURCE_usage,
+ * hdr_RESOURCE_usage, and log_RESOURCE_usage. For example, for
+ * memory we have get_mem_usage, hdr_mem_usage, and
+ * log_mem_usage. In general, all functions return 0 on success,
+ * or some other integer on failure. The exception are function
+ * that open files, which return NULL on failure, or a file
+ * pointer on success.
  *
  * The get_RESOURCE_usage functions are called at given intervals.
  * Between each interval, the monitor does nothing. All processes
@@ -31,45 +32,25 @@ See the file COPYING for details.
  * for the log, then the log file is written to a file called
  * log-monitor-PID, in which PID is the pid of the monitor.
  *
- * log_RESOURCE_usage writes the corresponding information to the
- * log. Each field is separated by \t. There are three kind of
- * rows, one for processes, one for working directories, and one
- * for filesystems. The functions hdr_RESOURCE_usage are called
- * only once, and write the order of the columns, per type of
- * row, at the beginning of the log file.
+ * The max_RESOURCE_usage(max, other) compare field by field max
+ * and other, recording the maximum in max. The
+ * acc_RESOURCE_usage(accum, other) adds the contents of other,
+ * field by field, to accum.
+ *
+ * monitor_CATEGORY_summary writes the corresponding information to the
+ * log. CATEGORY is one of process, working directory of
+ * filesystem. Each field is separated by \t.
  *
  * Currently, the columns are:
  * 
- * id: One of P (process), D (working directory), F (filesystem)
- * wall:   Wall time (in clicks).
- *
- * Subsequently, For id P:
- *
- * pid:    Pid of the process
- * user:   Time the process has spent in user mode (in clicks).
- * kernel: Time the process has spent in kernel mode (in clicks).
- * vmem:   Current total virtual memory size.
- * rssmem  Current total resident memory size.
- * shmem   Amount of shared memory.
- * rchars  Read char count using *read system calls.
- * wchars  Writen char count using *write system calls.
- * wd      Pathname of the working directory.
- * fs      Filesystem id of the working directory
- *
- * For id D:
- * 
- * wd      Pathname of the directory.
- * files   File count of the directory.
- * dirs    Directory count of the directory.
- * bytes   Total byte count of files in the directory.
- * blks    Block count (512 bytes) in the directory.
- *
- * For id F:
- *
- * devid   Filesystem id
- * frBlks  Free blocks of the filesystem. 
- * AvBlks  Available blocks of the filesystem. 
- * frNodes Free nodes of the filesystem. 
+ * type:      one of max, accum, or avg.
+ * wall:      wall time (in clicks).
+ * cpu-time:  user-mode time + kernel-mode time.
+ * vmem:      current total virtual memory size.
+ * io:        read chars count using *read system calls + writen char count using *write system calls.
+ * files+dir  total file + directory count of all working directories.
+ * bytes      total byte count of all working directories.
+ * fr_nodes   total free nodes of all the filesystems used by working directories. 
  *
  * The log file is written to the home directory of the monitor
  * process. A flag will be added later to indicate a prefered
@@ -87,7 +68,7 @@ See the file COPYING for details.
  * the corresponding struct process_info.
  *
  * Likewise, there are tables that relate paths to 'struct
- * working_dir_info' ('working_dirs'), and device ids to 'struct
+ * wdir_info' ('wdirs'), and device ids to 'struct
  * filesys_info' ('filesysms').
  *
  * The monitor program handles SIGCHLD, by either retrieving the
@@ -106,6 +87,9 @@ See the file COPYING for details.
 
 /* BUGS:
  *
+ * LOTS of code repetition that probably can be eliminated with
+ * calls to function pointers and some macros.
+ *
  * BSDs: kvm interface is not implemented.
  *
  * io: may report zero if process ends before we read
@@ -118,13 +102,14 @@ See the file COPYING for details.
  * If the process writes something outside the working directory,
  * right now we are out of luck.
  *
- * If processes share the same working directory, or the same
- * filesystem, then we are duplicating the most expensive checks.
+ * For /a/b, if a and b are working directories of two different
+ * processes, then b usage is logged twice.
  *
  */
 
 #include "hash_table.h"
 #include "itable.h"
+#include "list.h"
 #include "stringtools.h"
 #include "debug.h"
 #include "xxmalloc.h"
@@ -166,17 +151,18 @@ uint64_t clicks_initial;        /* Time at which monitoring started, in clicks. 
 
 pid_t  first_process_pid;
 
-struct itable *processes;       /* Maps the pid of a process to a unique struct process_info. */
-struct hash_table *working_dirs; /* Maps paths to working directory structures. */
+struct itable *processes;        /* Maps the pid of a process to a unique struct process_info. */
+struct hash_table *wdirs; /* Maps paths to working directory structures. */
 struct itable *filesysms;        /* Maps st_dev ids (from stat syscall) to filesystem structures. */
-struct itable *working_dirs_rc;  /* Counts how many process_info use a working_dir_info. */
-struct itable *filesys_rc;       /* Counts how many working_dir_info use a filesys_info. */
+struct itable *wdirs_rc;  /* Counts how many process_info use a wdir_info. */
+struct itable *filesys_rc;       /* Counts how many wdir_info use a filesys_info. */
+struct list   *zombies;          /* List of process_info that finished, for cleanup */
 
 //time in clicks, no seconds:
 struct click_info
 {
-	unsigned long int user_time;
-	unsigned long int kernel_time;
+	uint64_t user_time;
+	uint64_t kernel_time;
 };
 
 struct mem_info
@@ -188,13 +174,14 @@ struct mem_info
 	uint64_t data;
 };
 
+
 struct io_info
 {
 	uint64_t chars_read;
 	uint64_t chars_written;
 };
 
-struct working_dir_info
+struct wdir_info
 {
 	uint64_t wall_time;
 	char 	*path;
@@ -211,7 +198,7 @@ struct filesys_info
 	uint64_t        wall_time;
 	int             id;
 	char           *path;			// Sample path on the filesystem.
-	struct statfs   disk;			// Current result of statfs call.
+	struct statfs   disk;			// Current result of statfs call minus disk_initial.
 	struct statfs   disk_initial;   // Result of the first time we call statfs.
 };
 
@@ -226,7 +213,7 @@ struct process_info
 	struct click_info click;
 	struct io_info    io;
 
-	struct working_dir_info *wd;
+	struct wdir_info *wd;
 };
 
 
@@ -269,7 +256,7 @@ FILE *open_proc_file(pid_t pid, char *filename)
 		return fproc;
 }
 
-int get_fs_usage(const char *path, struct statfs *disk)
+int get_dsk_usage(const char *path, struct statfs *disk)
 {
 	char cwd[PATH_MAX];
 
@@ -284,21 +271,38 @@ int get_fs_usage(const char *path, struct statfs *disk)
 	return 0;
 }
 
-void log_fs_usage(struct statfs *disk, struct statfs *disk_initial)
+void log_dsk_usage(struct statfs *disk)
 {
 	/* Free blocks . Available blocks . Free nodes */
 
-	fprintf(log_file, "%ld\t", disk->f_bfree - disk_initial->f_bfree);
-	fprintf(log_file, "%ld\t", disk->f_bavail - disk_initial->f_bavail);
-	fprintf(log_file, "%ld", disk->f_ffree - disk_initial->f_ffree);
+	fprintf(log_file, "%ld\t", disk->f_bfree);
+	fprintf(log_file, "%ld\t", disk->f_bavail);
+	fprintf(log_file, "%ld", disk->f_ffree);
 }
 
-void hdr_fs_usage()
+void max_dsk_usage(struct statfs *max, struct statfs *other)
+{
+	if(max->f_bfree < other->f_bfree)
+		max->f_bfree = other->f_bfree;
+	if(max->f_bavail < other->f_bavail)
+		max->f_bavail = other->f_bavail;
+	if(max->f_ffree < other->f_ffree)
+		max->f_ffree = other->f_ffree;
+}
+
+void acc_dsk_usage(struct statfs *acc, struct statfs *other)
+{
+	acc->f_bfree  += other->f_bfree;
+	acc->f_bavail += other->f_bavail;
+	acc->f_ffree  += other->f_ffree;
+}
+
+void hdr_dsk_usage()
 {
 	fprintf(log_file, "frBlks\tavBlks\tfrNodes");
 }
 
-int get_wd_usage(struct working_dir_info *d)
+int get_wd_usage(struct wdir_info *d)
 {
 	char *argv[] = {d->path, NULL};
 	FTS *hierarchy;
@@ -349,7 +353,27 @@ int get_wd_usage(struct working_dir_info *d)
 	return 0;
 }
 
-void log_wd_usage(struct working_dir_info *dir)
+void max_wd_usage(struct wdir_info *max, struct wdir_info *other)
+{
+	if(max->files < other->files)
+		max->files = other->files;
+	if(max->directories < other->directories)
+		max->directories = other->directories;
+	if(max->byte_count < other->byte_count)
+		max->byte_count = other->byte_count;
+	if(max->block_count < other->block_count)
+		max->block_count = other->block_count;
+}
+
+void acc_wd_usage(struct wdir_info *acc, struct wdir_info *other)
+{
+	acc->files       += other->files;
+	acc->directories += other->directories;
+	acc->byte_count  += other->byte_count;
+	acc->block_count += other->block_count;
+}
+
+void log_wd_usage(struct wdir_info *dir)
 {
 	/* files . dirs . bytes . blocks */
 	fprintf(log_file, "%d\t%d\t%d\t%d", dir->files, dir->directories, (int) dir->byte_count, (int) dir->block_count);
@@ -361,15 +385,6 @@ void hdr_wd_usage()
 	fprintf(log_file, "files\tdirs\tbytes\tblks");
 }
 
-
-double timeval_to_double(struct timeval *time, struct timeval *origin)
-{
-	double  secs = time->tv_sec  - origin->tv_sec;
-	double usecs = time->tv_usec - origin->tv_usec;
-
-	return(secs + usecs/1000000.0);
-
-}
 
 int get_click_usage(pid_t pid, struct click_info *click)
 {
@@ -386,8 +401,8 @@ int get_click_usage(pid_t pid, struct click_info *click)
 			"%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
 			"%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
 			"%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s" /* faults */
-			"%lu" /* user mode time (in clock ticks) */
-			"%lu" /* kernel mode time (in clock ticks) */
+			"%" SCNu64 /* user mode time (in clock ticks) */
+			"%" SCNu64 /* kernel mode time (in clock ticks) */
 			/* .... */,
 			&click->user_time, &click->kernel_time);
 
@@ -395,10 +410,26 @@ int get_click_usage(pid_t pid, struct click_info *click)
 	return 0;
 }
 
+void max_click_usage(struct click_info *max, struct click_info *other)
+{
+	if(max->user_time < other->user_time)
+		max->user_time = other->user_time;
+
+	if(max->kernel_time < other->kernel_time)
+		max->kernel_time = other->kernel_time;
+
+}
+
+void acc_click_usage(struct click_info *acc, struct click_info *other)
+{
+	acc->user_time   += other->user_time;
+	acc->kernel_time += other->kernel_time;
+}
+
 void log_click_usage(struct click_info *click)
 {
 	/* user . kernel . time */
-	fprintf(log_file, "%ld\t%ld", click->user_time, click->kernel_time);
+	fprintf(log_file, "%" PRIu64 "\t%" PRIu64, click->user_time, click->kernel_time);
 }
 
 void hdr_click_usage()
@@ -428,6 +459,26 @@ int get_mem_usage(pid_t pid, struct mem_info *mem)
 	fclose(fmem);
 
 	return 0;
+}
+
+void max_mem_usage(struct mem_info *max, struct mem_info *other)
+{
+	if(max->virtual < other->virtual)
+		max->virtual = other->virtual;
+	if(max->resident < other->resident)
+		max->resident = other->resident;
+	if(max->shared < other->shared)
+		max->shared = other->shared;
+	if(max->data < other->data)
+		max->data = other->data;
+}
+
+void acc_mem_usage(struct mem_info *acc, struct mem_info *other)
+{
+		acc->virtual  += other->virtual;
+		acc->resident += other->resident;
+		acc->shared   += other->shared;
+		acc->data     += other->data;
 }
 
 void log_mem_usage(struct mem_info *mem)
@@ -494,6 +545,20 @@ int get_io_usage(pid_t pid, struct io_info *io)
 
 }
 
+void max_io_usage(struct io_info *max, struct io_info *other)
+{
+	if(max->chars_read < other->chars_read)
+		max->chars_read = other->chars_read;
+	if(max->chars_written < other->chars_written)
+		max->chars_written = other->chars_written;
+}
+
+void acc_io_usage(struct io_info *acc, struct io_info *other)
+{
+	acc->chars_read    += other->chars_read;
+	acc->chars_written += other->chars_written;
+}
+
 void log_io_usage(struct io_info *io)
 {
 	/* total chars read . total chars written */
@@ -520,85 +585,6 @@ void hdr_fs_log()
 	fprintf(log_file, "wall\ttype=F\tdevid");
 }
 
-void monitor_log_hdr()
-{
-
-	fprintf(log_file, "\none second = %ld clicks\n\n", sysconf(_SC_CLK_TCK));
-
-	hdr_process_log();
-	fprintf(log_file, "\t");
-
-	hdr_click_usage();
-	fprintf(log_file, "\t");
-
-	hdr_mem_usage();
-	fprintf(log_file, "\t");
-
-	hdr_io_usage();
-	fprintf(log_file, "\n");
-
-	hdr_wd_log();
-	fprintf(log_file, "\t");
-
-	hdr_wd_usage();
-	fprintf(log_file, "\n");
-
-	hdr_fs_log();
-	fprintf(log_file, "\t");
-
-	hdr_fs_usage();
-	fprintf(log_file, "\n\n");
-}
-
-void log_wall_clicks(uint64_t clicks)
-{
-	fprintf(log_file, "%" PRIu64, clicks);
-}
-
-void log_process_info(struct process_info *p)
-{
-	log_wall_clicks(p->wall_time);
-	fprintf(log_file, "\t");
-
-	fprintf(log_file, "P\t%d\t", p->pid);
-
-	log_click_usage(&p->click);
-	fprintf(log_file, "\t");
-
-	log_mem_usage(&p->mem);
-	fprintf(log_file, "\t");
-
-	log_io_usage(&p->io);
-	fprintf(log_file, "\t");
-
-	fprintf(log_file, "%s", p->wd->path);
-	fprintf(log_file, "\t");
-
-	fprintf(log_file, "%d", p->wd->fs->id);
-	fprintf(log_file, "\n");
-}
-
-void log_filesystem_info(struct filesys_info *f)
-{
-	log_wall_clicks(f->wall_time);
-	fprintf(log_file, "\t");
-
-	fprintf(log_file, "F\t%d\t", f->id);
-
-	log_fs_usage(&f->disk, &f->disk_initial);
-	fprintf(log_file, "\n");
-}
-
-void log_working_dir_info(struct working_dir_info *d)
-{
-	log_wall_clicks(d->wall_time);
-	fprintf(log_file, "\t");
-
-	fprintf(log_file, "D\t%s\t", d->path);
-
-	log_wd_usage(d);
-	fprintf(log_file, "\n");
-}
 
 int itable_addto_count(struct itable *table, void *key, int value)
 {
@@ -631,24 +617,25 @@ int dec_fs_count(struct filesys_info *f)
 	if(count < 1)
 	{
 		debug(D_DEBUG, "filesystem %d is not monitored anymore.\n", f->id, count);
+		free(f->path);
 		free(f);	
 	}
 
 	return count;
 }
 
-int inc_wd_count(struct working_dir_info *d)
+int inc_wd_count(struct wdir_info *d)
 {
-	int count = itable_addto_count(working_dirs_rc, d, 1);
+	int count = itable_addto_count(wdirs_rc, d, 1);
 
 	debug(D_DEBUG, "working directory %s reference count +1, now %d references.\n", d->path, count); 
 
 	return count;
 }
 
-int dec_wd_count(struct working_dir_info *d)
+int dec_wd_count(struct wdir_info *d)
 {
-	int count = itable_addto_count(working_dirs_rc, d, -1);
+	int count = itable_addto_count(wdirs_rc, d, -1);
 
 	debug(D_DEBUG, "working directory %s reference count -1, now %d references.\n", d->path, count); 
 
@@ -662,6 +649,40 @@ int dec_wd_count(struct working_dir_info *d)
 	}
 
 	return count;
+}
+
+void cleanup_zombie(struct process_info *p)
+{
+	int status;
+
+	debug(D_DEBUG, "cleaning process: %d\n", p->pid);
+
+	//die zombie die
+	waitpid(p->pid, &status, WNOHANG);
+
+	if( WIFEXITED(status) )
+	{
+		debug(D_DEBUG, "process %d finished: %d.\n", p->pid, WEXITSTATUS(status) );
+		fprintf(log_file, "\nProcess %d finished normally: %d.\n", p->pid, WEXITSTATUS(status) );
+	} 
+	else if ( WIFSIGNALED(status) )
+	{
+		debug(D_DEBUG, "process %d terminated: %s.\n", p->pid, strsignal(WTERMSIG(status)) );
+		fprintf(log_file, "\nProcess %d terminated with signal: %s.\n", p->pid, strsignal(WTERMSIG(status)) );
+	} 
+
+	if(p->wd)
+		dec_wd_count(p->wd);
+
+	itable_remove(processes, p->pid);
+	free(p);
+}
+
+void cleanup_zombies(void)
+{
+	//FIX RACE CONDITION!!!! 
+	while(list_size(zombies) > 0)
+		cleanup_zombie(list_pop_head(zombies));
 }
 
 int get_device_id(char *path)
@@ -690,7 +711,7 @@ struct filesys_info *lookup_or_create_fs(struct filesys_info *previous, char *pa
 		inventory->path = xxstrdup(path);
 		inventory->id   = dev_id;
 		itable_insert(filesysms, dev_id, (void *) inventory);
-		get_fs_usage(inventory->path, &inventory->disk_initial);
+		get_dsk_usage(inventory->path, &inventory->disk_initial);
 	}
 
 	if(inventory != previous)
@@ -704,17 +725,17 @@ struct filesys_info *lookup_or_create_fs(struct filesys_info *previous, char *pa
 
 }
 
-struct working_dir_info *lookup_or_create_wd(struct working_dir_info *previous, char *path)
+struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
 {
-	struct working_dir_info *inventory = hash_table_lookup(working_dirs, path);
+	struct wdir_info *inventory = hash_table_lookup(wdirs, path);
 
 	if(!inventory) 
 	{
 		debug(D_DEBUG, "working directory %s added to monitor.\n", path);
 
-		inventory = (struct working_dir_info *) malloc(sizeof(struct working_dir_info));
+		inventory = (struct wdir_info *) malloc(sizeof(struct wdir_info));
 		inventory->path = xxstrdup(path);
-		hash_table_insert(working_dirs, inventory->path, (void *) inventory);
+		hash_table_insert(wdirs, inventory->path, (void *) inventory);
 
 		if(previous)
 			inventory->fs = lookup_or_create_fs(previous->fs, inventory->path);
@@ -729,6 +750,8 @@ struct working_dir_info *lookup_or_create_wd(struct working_dir_info *previous, 
 			dec_wd_count(previous);
 	}
 
+	debug(D_DEBUG, "filesystem of %s is %d\n", inventory->path, inventory->fs->id);
+
 	return inventory;
 }
 
@@ -739,13 +762,18 @@ int get_wd(struct process_info *p)
 
 	memset(target, 0, PATH_MAX); //readlink does not add '\0' to its result.
 
-	if(readlink(symlink, target, PATH_MAX - 1) < 0) 
+	if(readlink(symlink, target, PATH_MAX - 1) < 0 || strlen(target) < 1)
 	{
 		debug(D_DEBUG, "could not read symlink to working directory %s : %s\n", symlink, strerror(errno));
+		free(symlink);
+		p->wd = NULL;
 		return 1;
 	}
 
 	p->wd = lookup_or_create_wd(p->wd, target);
+	debug(D_DEBUG, "working directory of %d is %s\n", p->pid, p->wd->path);
+	
+	free(symlink);
 
 	return 0;
 }
@@ -771,6 +799,8 @@ uint64_t clicks_since_launched()
 
 int monitor_process_once(struct process_info *p)
 {
+	debug(D_DEBUG, "monitoring process: %d\n", p->pid);
+
 	p->wall_time = clicks_since_launched();
 
 	get_click_usage(p->pid, &p->click);
@@ -781,10 +811,11 @@ int monitor_process_once(struct process_info *p)
 	return 0;
 }
 
-int monitor_wd_once(struct working_dir_info *d)
+int monitor_wd_once(struct wdir_info *d)
 {
-	d->wall_time = clicks_since_launched();
+	debug(D_DEBUG, "monitoring %s\n", d->path);
 
+	d->wall_time = clicks_since_launched();
 	get_wd_usage(d);
 
 	return 0;
@@ -794,78 +825,183 @@ int monitor_fs_once(struct filesys_info *f)
 {
 	f->wall_time = clicks_since_launched();
 
-	get_fs_usage(f->path, &f->disk);
+	get_dsk_usage(f->path, &f->disk);
+
+	f->disk.f_bfree  -= f->disk_initial.f_bfree;
+	f->disk.f_bavail -= f->disk_initial.f_bavail;
+	f->disk.f_ffree  -= f->disk_initial.f_ffree;
 
 	return 0;
 }
 
 void monitor_final_cleanup(int signum)
 {
-	pid_t pid;
-	struct process_info     *p = NULL;
-
 	if(itable_lookup(processes, first_process_pid))
 	{
 		debug(D_DEBUG, "sending SIGINT to first process (%d).\n", first_process_pid);
 		kill(first_process_pid, SIGINT);
 	}
 
-	debug(D_DEBUG, "cleaning up remaining processes.\n");
-	itable_firstkey(processes);
-	while(itable_nextkey(processes, (uint64_t *) &pid, (void **) &p))
-	{
-		monitor_process_once(p);
-		log_process_info(p);
-	}
+	cleanup_zombies();
 
+	exit(0);
 }
 
+void monitor_processes_once(struct process_info *max, struct process_info *acc)
+{
+	uint64_t pid;
+	struct process_info *p;
 
-//this is really three different functions: (need to split)
+	memset(max, 0, sizeof( struct process_info ));
+	memset(acc, 0, sizeof( struct process_info ));
+
+	itable_firstkey(processes);
+	while(itable_nextkey(processes, &pid, (void **) &p))
+	{
+		monitor_process_once(p);
+
+		max_mem_usage(&max->mem, &p->mem);
+		acc_mem_usage(&acc->mem, &p->mem);
+		
+		max_click_usage(&max->click, &p->click);
+		acc_click_usage(&acc->click, &p->click);
+
+		max_io_usage(&max->io, &p->io);
+		acc_io_usage(&acc->io, &p->io);
+	}
+}
+
+void monitor_wds_once(struct wdir_info *max, struct wdir_info *acc)
+{
+	struct wdir_info *d;
+	char *path;
+
+	bzero(max, sizeof( struct wdir_info ));
+	bzero(acc, sizeof( struct wdir_info ));
+
+	hash_table_firstkey(wdirs);
+	while(hash_table_nextkey(wdirs, &path, (void **) &d))
+	{
+		monitor_wd_once(d);
+
+		max_wd_usage(max, d);
+		acc_wd_usage(acc, d);
+	}
+}
+
+void monitor_fss_once(struct filesys_info *max, struct filesys_info *acc)
+{
+	struct   filesys_info *f;
+	uint64_t dev_id;
+
+	bzero(max, sizeof( struct filesys_info ));
+	bzero(acc, sizeof( struct filesys_info ));
+
+	itable_firstkey(filesysms);
+	while(itable_nextkey(filesysms, &dev_id, (void **) &f))
+	{
+		monitor_fs_once(f);
+
+		max_dsk_usage(&max->disk, &f->disk);
+		acc_dsk_usage(&max->disk, &f->disk);
+	}
+}
+
+void monitor_summary_header()
+{
+	char *headings[15] = {"", "wall-time", "cpu-time", "virtual", "io-rw", "file+dir", "bytes", "fr_vnodes", NULL};
+	int i;
+
+	for(i = 0; headings[i]; i++)
+		fprintf(log_file, "%10s\t", headings[i]);
+
+	fprintf(log_file, "\n");
+}
+
+//The divisor is used when p = accum, to compute the average.
+void monitor_processes_summary_once(struct process_info *p, int divisor)
+{
+	if(divisor < 1)
+		return;
+
+	// user+kernel virtual rchars+wchars
+	fprintf(log_file, "%10" PRIu64 "\t", (p->click.user_time + p->click.kernel_time) / divisor);
+	fprintf(log_file, "%10" PRIu64 "\t", p->mem.virtual / divisor);
+	fprintf(log_file, "%10" PRIu64 "\t", (p->io.chars_read + p->io.chars_written)   / divisor);
+}
+
+void monitor_wds_summary_once(struct wdir_info *d, int divisor)
+{
+	if(divisor < 1)
+		return;
+
+	// files+directories byte_count
+	fprintf(log_file, "%10d\t", (d->files + d->directories) / divisor);
+	fprintf(log_file, "%10ld\t", d->byte_count / divisor);
+}
+
+void monitor_fss_summary_once(struct filesys_info *f, int divisor)
+{
+	if(divisor < 1)
+		return;
+
+	// free-nodes
+	fprintf(log_file, "%10ld\t", f->disk.f_ffree / divisor);
+}
+
 int monitor_resources(long int interval /*in seconds */)
 {
-	pid_t pid;
-	char path[PATH_MAX];
-	int dev_id;
+	uint64_t clicks;
+	struct process_info  pmax, pacc;
+	struct wdir_info     dmax, dacc;
+	struct filesys_info  fmax, facc;
 
-	struct process_info     *p = NULL;
-	struct working_dir_info *d = NULL;
-	struct filesys_info     *f = NULL;
 
+	// Loop while there are processes to monitor, that is 
+	// itable_size(processes) < 1). The check is in a if/break
+	// pair below to mitigate a race condition in which the last
+	// process exits after the while(...) is tested, but before
+	// we reach select.
 	struct timeval timeout;
-
-	// Loop while there are processes to monitor.
 	while(1)
 	{ 
-		hash_table_firstkey(working_dirs);
-		while(hash_table_nextkey(working_dirs, (char **) &path, (void **) &d))
-		{
-			monitor_wd_once(d);
-			log_working_dir_info(d);
-		}
 
-		itable_firstkey(filesysms);
-		while(itable_nextkey(filesysms, (uint64_t *) &dev_id, (void **) &f))
-		{
-			monitor_fs_once(f);
-			log_filesystem_info(f);
-		}
+		debug(D_DEBUG, "Beginning monitor round");
+		clicks = clicks_since_launched();
 
-		itable_firstkey(processes);
-		while(itable_nextkey(processes, (uint64_t *) &pid, (void **) &p))
-		{
-			monitor_process_once(p);
-			log_process_info(p);
-		}
-		
+		monitor_processes_once(&pmax, &pacc);
+		monitor_wds_once(&dmax, &dacc);
+		monitor_fss_once(&fmax, &facc);
+
+		fprintf(log_file, "%-10s\t%10" PRIu64 "\t", "max", clicks);
+		monitor_processes_summary_once(&pmax, 1);
+		monitor_wds_summary_once(&dmax, 1);
+		monitor_fss_summary_once(&fmax, 1);
+		fprintf(log_file, "\n");
+
+		fprintf(log_file, "%-10s\t%10" PRIu64 "\t", "acc", clicks);
+		monitor_processes_summary_once(&pacc, 1);
+		monitor_wds_summary_once(&dacc, 1);
+		monitor_fss_summary_once(&facc, 1);
+		fprintf(log_file, "\n");
+
+		fprintf(log_file, "%-10s\t%10" PRIu64 "\t", "avg", clicks);
+		monitor_processes_summary_once(&pacc, itable_size(processes));
+		monitor_wds_summary_once(&dacc, hash_table_size(wdirs));
+		monitor_fss_summary_once(&facc, itable_size(filesysms));
+		fprintf(log_file, "\n");
+
 		/* wait for interval seconds. */
 		timeout.tv_sec  = interval;
 		timeout.tv_usec = 0;
 
+		cleanup_zombies();
+
+		//If no more process are alive, break out of loop.
 		if(itable_size(processes) < 1)
 			break;
 		
-		debug(D_DEBUG, "sleeping for: %d seconds\n", interval);
+		debug(D_DEBUG, "sleeping for: %ld seconds\n", interval);
 		select(0, NULL, NULL, NULL, &timeout);
 	}
 
@@ -925,6 +1061,7 @@ struct process_info *spawn_first_process(const char *cmd)
 	pid = monitor_fork();
 
 	fprintf(log_file, "command: %s\n", cmd);
+	monitor_summary_header();
 
 	if(pid > 0)
 	{
@@ -947,14 +1084,6 @@ struct process_info *spawn_first_process(const char *cmd)
 
 }
 
-void cleanup_process(struct process_info *p)
-{
-	debug(D_DEBUG, "cleaning process: %d\n", p->pid);
-
-	dec_wd_count(p->wd);
-	itable_remove(processes, p->pid);
-	free(p);
-}
 
 // Return the pid of the child that sent the signal, without removing the
 // waitable state.
@@ -964,59 +1093,39 @@ pid_t waiting_child()
 	
 #if defined(__APPLE__) || defined(__FreeBSD__)
 	int status;
-	pid = wait4(-1, &status, WSTOPPED | WCONTINUED | WNOWAIT, NULL);
+	pid = wait4(-1, &status, WNOWAIT, NULL);
 #else
 	siginfo_t cinfo;
-	if(waitid(P_ALL, 0, &cinfo, WEXITED | WSTOPPED | WCONTINUED | WNOWAIT) == 0)
+	if(waitid(P_ALL, 0, &cinfo, WEXITED | WNOWAIT) == 0)
 		pid = cinfo.si_pid;
 	else
 		return -1;
 #endif
 
+
+
 	return pid;
 }
+
 
 /* sigchild signal handler */
 void monitor_check_child(const int signal)
 {
-	int status;
 	pid_t pid;
 
 	//zombie, tell us who you were!
 	pid = waiting_child();
 
-	//monitor that process once more, maybe for the last time.
+	debug(D_DEBUG, "SIGCHLD from %d\n", pid);
 	struct process_info *p = itable_lookup(processes, pid);
-	monitor_process_once(p);
+	if(!p)
+		return;
 
-	//die zombie die
-	waitpid(pid, &status, WNOHANG);
+	debug(D_DEBUG, "adding process %d to cleanup list.\n", p->pid);
 
-	if( WIFEXITED(status) )
-	{
-			fprintf(log_file, "\nProcess %d finished normally: %d.\n", p->pid, WEXITSTATUS(status) );
-			cleanup_process(p);
-	} 
-	else if ( WIFSIGNALED(status) )
-	{
-			fprintf(log_file, "\nProcess %d terminated with signal: %s.\n", p->pid, strsignal(WTERMSIG(status)) );
-			cleanup_process(p);
-	} 
-	else if ( WIFSTOPPED(status) )
-	{
-			fprintf(log_file, "\nProcess %d on hold with signal: %s.\n", p->pid, strsignal(WIFSTOPPED(status)) );
-			p->running = 0;
-	} 
-	else if ( WIFCONTINUED(status) )
-	{
-			fprintf(log_file, "\nProcess %d received SIGCONT.\n", p->pid );
-			p->running = 1;
-	}
+	p->running = 0;
 
-	//if there are no more process running, do the cleanup and
-	//exit.
-	if(itable_size(processes) < 1)
-		monitor_final_cleanup(SIGINT);
+	list_push_tail(zombies, p);
 }
 
 static void show_help(const char *cmd)
@@ -1061,10 +1170,11 @@ int main(int argc, char **argv) {
 		
 
 	processes    = itable_create(0);
-	working_dirs = hash_table_create(0,0);
+	wdirs = hash_table_create(0,0);
 	filesysms    = itable_create(0);
+	zombies      = list_create();
 	
-	working_dirs_rc = itable_create(0);
+	wdirs_rc = itable_create(0);
 	filesys_rc      = itable_create(0);
 
 	//this is ugly, concatenating command and arguments
@@ -1075,7 +1185,6 @@ int main(int argc, char **argv) {
 	}
 	
 	log_file = open_log_file(NULL);
-	monitor_log_hdr(log_file);
 
 	clicks_initial = clicks_since_epoch();
 
@@ -1087,4 +1196,88 @@ int main(int argc, char **argv) {
 
 	exit(0);
 
+}
+
+
+
+//Logs per row:
+
+void monitor_log_hdr()
+{
+
+	fprintf(log_file, "\none second = %ld clicks\n\n", sysconf(_SC_CLK_TCK));
+
+	hdr_process_log();
+	fprintf(log_file, "\t");
+
+	hdr_click_usage();
+	fprintf(log_file, "\t");
+
+	hdr_mem_usage();
+	fprintf(log_file, "\t");
+
+	hdr_io_usage();
+	fprintf(log_file, "\n");
+
+	hdr_wd_log();
+	fprintf(log_file, "\t");
+
+	hdr_wd_usage();
+	fprintf(log_file, "\n");
+
+	hdr_fs_log();
+	fprintf(log_file, "\t");
+
+	hdr_dsk_usage();
+	fprintf(log_file, "\n\n");
+}
+
+void log_wall_clicks(uint64_t clicks)
+{
+	fprintf(log_file, "%" PRIu64, clicks);
+}
+
+void log_process_info(struct process_info *p)
+{
+	log_wall_clicks(p->wall_time);
+	fprintf(log_file, "\t");
+
+	fprintf(log_file, "P\t%d\t", p->pid);
+
+	log_click_usage(&p->click);
+	fprintf(log_file, "\t");
+
+	log_mem_usage(&p->mem);
+	fprintf(log_file, "\t");
+
+	log_io_usage(&p->io);
+	fprintf(log_file, "\t");
+
+	fprintf(log_file, "%s", p->wd->path);
+	fprintf(log_file, "\t");
+
+	fprintf(log_file, "%d", p->wd->fs->id);
+	fprintf(log_file, "\n");
+}
+
+void log_filesystem_info(struct filesys_info *f)
+{
+	log_wall_clicks(f->wall_time);
+	fprintf(log_file, "\t");
+
+	fprintf(log_file, "F\t%d\t", f->id);
+
+	log_dsk_usage(&f->disk);
+	fprintf(log_file, "\n");
+}
+
+void log_wdir_info(struct wdir_info *d)
+{
+	log_wall_clicks(d->wall_time);
+	fprintf(log_file, "\t");
+
+	fprintf(log_file, "D\t%s\t", d->path);
+
+	log_wd_usage(d);
+	fprintf(log_file, "\n");
 }
