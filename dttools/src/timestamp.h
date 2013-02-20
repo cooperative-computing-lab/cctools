@@ -16,7 +16,16 @@ Portable routines for high resolution timing.
 #include <time.h>
 
 /** A type to hold the current time, in microseconds since January 1st, 1970. */
+
+//swig does not like uint64_t. long long int as a quick fix
+//now...
+
+#ifdef SWIG_FIX
+typedef long long int timestamp_t;
+#else
 typedef UINT64_T timestamp_t;
+#endif
+
 
 #define TIMESTAMP_FORMAT UINT64_FORMAT
 
