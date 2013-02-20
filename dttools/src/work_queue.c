@@ -1241,7 +1241,7 @@ static void handle_worker(struct work_queue *q, struct link *l)
 
 	time_t stoptime = time(0)+60;
 
-	int keep_worker;
+	int keep_worker = 1; //flag to signal whether to keep or remove worker. 1 = keep, 0 = remove
 	int result = recv_worker_msg(w, line, sizeof(line), time(0) + short_timeout);
 
 	//if result > 0, it means a non-keepalive message is left to consume
