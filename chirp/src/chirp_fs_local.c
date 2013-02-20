@@ -407,10 +407,10 @@ static int search_match_file(const char *pattern, const char *name)
 		subend = strchr(pattern, '|');
 
 		if (subend == NULL) {
-			subpat = (char*) malloc(strlen(pattern)+1);
+			subpat = (char*) alloca(strlen(pattern)+1);
 			strcpy(subpat, pattern);
 		} else {
-			subpat = (char*) malloc(subend-pattern+1);
+			subpat = (char*) alloca(subend-pattern+1);
 			strncpy(subpat, pattern, subend-pattern);
 			subpat[subend-pattern] = '\0';
 		}
@@ -421,13 +421,11 @@ static int search_match_file(const char *pattern, const char *name)
 			filepat = (filepat==subpat) ? filepat+1 : subpat;
 
 			if (fnmatch(filepat, name, FNM_PATHNAME)==0) {
-				free(subpat);
 				return 1;
 			}
 		}
 	
 		pattern = subend + 1;
-		free(subpat);
 
 	} while(subend != NULL);
 
@@ -447,10 +445,10 @@ static int search_match_dir(const char *pattern, char *npattern, const char *nam
 		subend = strchr(pattern, '|');
 
 		if (subend == NULL) {
-			subpat = (char*) malloc(strlen(pattern)+1);
+			subpat = (char*) alloca(strlen(pattern)+1);
 			strcpy(subpat, pattern);
 		} else {
-			subpat = (char*) malloc(subend-pattern+1);
+			subpat = (char*) alloca(subend-pattern+1);
 			strncpy(subpat, pattern, subend-pattern);
 			subpat[subend-pattern] = '\0';
 		}
@@ -467,7 +465,7 @@ static int search_match_dir(const char *pattern, char *npattern, const char *nam
 		if (topend==NULL)
 			toppat = subpat;
 		else {
-			toppat = (char*) malloc(topend-subpat+1);
+			toppat = (char*) alloca(topend-subpat+1);
 			strncpy(toppat, subpat, topend-subpat);
 			toppat[topend-subpat] = '\0';
 		}
@@ -493,8 +491,6 @@ static int search_match_dir(const char *pattern, char *npattern, const char *nam
 		pattern = subend + 1;
 
 		if (!recursive) subpat--;
-		if (topend!=NULL) free(toppat); 
-		free(subpat);
 
 	} while(subend != NULL);
 
@@ -519,7 +515,7 @@ static int search_directory (const char *subject, const char *base, char *dir, c
         if (dirp) {
 		errno = 0;
                 struct chirp_dirent *entry;
-                struct chirp_stat *stat_buf = malloc(sizeof(struct chirp_stat));
+                struct chirp_stat *stat_buf = alloca(sizeof(struct chirp_stat));
                 while ((entry = chirp_fs_local_readdir(dirp))) {
                         int access_flags = search_to_access(flags);
 			char *name = entry->name;
@@ -527,7 +523,7 @@ static int search_directory (const char *subject, const char *base, char *dir, c
                         if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0 || strncmp(name, ".__", 3) == 0) continue;
                         sprintf(current, "/%s", name);
 
-                        if (search_match_file(pattern, name) && chirp_fs_local_access(dir, access_flags) == 0) {
+                        if (search_match_file(pattern, name) /*&& chirp_fs_local_access(dir, access_flags) == 0*/) {
 				char *match_name = includeroot ? dir : name; 
 
 				if (metadata) {

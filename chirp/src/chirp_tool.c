@@ -1179,7 +1179,7 @@ static char *strerrsource(int errsource) {
 
 static INT64_T do_search(int argc, char **argv)
 {	
-	int flags = CHIRP_SEARCH_RECURSIVE|CHIRP_SEARCH_METADATA|CHIRP_SEARCH_INCLUDEROOT|CHIRP_SEARCH_PERIOD;
+	int flags = CHIRP_SEARCH_METADATA|CHIRP_SEARCH_INCLUDEROOT|CHIRP_SEARCH_PERIOD;
 	CHIRP_SEARCH *s = chirp_reli_opensearch(current_host, argv[1], argv[2], flags, stoptime);
 	struct chirp_searchent *res;
 

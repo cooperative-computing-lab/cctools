@@ -63,6 +63,8 @@ See the file COPYING for details.
 #include <sys/wait.h>
 #include <sys/select.h>
 
+#include <searchent.h>
+
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
@@ -100,6 +102,7 @@ static const char *listen_on_interface = 0;
 static const char *chirp_root_url = ".";
 static const char *chirp_root_path = 0;
 static char *chirp_debug_file = NULL;
+static int sim_latency = 0;
 
 char *chirp_transient_path = NULL;	/* local file system stuff */
 extern const char *chirp_ticket_path;
@@ -378,7 +381,7 @@ int main(int argc, char *argv[])
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c_input = getopt(argc, argv, "A:a:bc:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:Z:")) != (char)-1) {
+	while((c_input = getopt(argc, argv, "A:a:bc:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:Z:l:")) != (char)-1) {
 		c = (char) c_input;
 		switch (c) {
 		case 'A':
@@ -499,6 +502,9 @@ int main(int argc, char *argv[])
 	        case 'Z':
 			port_file = optarg;
 			port = 0;
+			break;
+	        case 'l':
+			sim_latency = atoi(optarg);
 			break;
 		case 'h':
 		default:
@@ -862,6 +868,14 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		chirp_stats_report(config_pipe[1],addr,subject,advertise_alarm);
 
 		chirp_stats_update(1,0,0);
+
+		// Simulate network latency
+		if (sim_latency > 0) {
+			struct timeval tv;
+			tv.tv_sec = 0;
+			tv.tv_usec = sim_latency;
+			select(0, NULL, NULL, NULL, &tv);
+		}
 
 		debug(D_CHIRP, "%s", line);
 
@@ -1581,34 +1595,45 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			write(config_pipe[1],line,strlen(line));
 			debug_flags_set(debug_flag);
 		} else if(sscanf(line, "search %s %s %lld", pattern, path, &flags)==3) {
-			link_putliteral(l, "0\n", stalltime);
-			char fixed[CHIRP_PATH_MAX];
-			char *ps = path, *pe;
-	
-			for (;;) {
-				if((pe = strchr(ps, CHIRP_SEARCH_DELIMITER)) != NULL) 
-					*pe = '\0';
 
-				strcpy(fixed, ps);
-				chirp_path_fix(fixed);
+                        int has_search = 0;
 
-				if(access(fixed, F_OK) == -1) { 
-					link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
-				} else if(!chirp_acl_check(fixed, subject, CHIRP_ACL_WRITE)) {
-					link_putfstring(l, "%d:%d:%s:\n", stalltime, EPERM, CHIRP_SEARCH_ERR_OPEN, fixed);
-				} else {
-					int found = chirp_alloc_search(subject, fixed, pattern, flags, l, stalltime);
-					if (found && (flags & CHIRP_SEARCH_STOPATFIRST))
+                        if (has_search) {
+				SEARCH *s = opensearch(path, pattern, flags, "chirp_server");
+                                char *sp = s->data;
+                                for (; *sp != '\0'; sp++) if (*sp == ':') *sp = '|';
+				link_putfstring(l, "%s\n", s->data);
+                        } else {
+
+				link_putliteral(l, "0\n", stalltime);
+				char fixed[CHIRP_PATH_MAX];
+				char *ps = path, *pe;
+		
+				for (;;) {
+					if((pe = strchr(ps, CHIRP_SEARCH_DELIMITER)) != NULL) 
+						*pe = '\0';
+
+					strcpy(fixed, ps);
+					chirp_path_fix(fixed);
+
+					if(access(fixed, F_OK) == -1) {
+						link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
+					} else if(!chirp_acl_check(fixed, subject, CHIRP_ACL_WRITE)) {
+						link_putfstring(l, "%d:%d:%s:\n", stalltime, EPERM, CHIRP_SEARCH_ERR_OPEN, fixed);
+					} else {
+						int found = chirp_alloc_search(subject, fixed, pattern, flags, l, stalltime);
+						if (found && (flags & CHIRP_SEARCH_STOPATFIRST))
+							break;
+					}
+
+					if (pe != NULL) {
+						ps = pe + 1;
+						*pe = CHIRP_SEARCH_DELIMITER; 
+					} else
 						break;
 				}
-
-				if (pe != NULL) {
-					ps = pe + 1;
-					*pe = CHIRP_SEARCH_DELIMITER; 
-				} else
-					break;
-			}
-			
+                        }
+	
 			do_getdir_result = 1;
 			result = 0;
 		} else {

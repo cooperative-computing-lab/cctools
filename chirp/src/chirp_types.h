@@ -86,13 +86,12 @@ struct chirp_searchstream {
 /** Bit flags for the search operation */
 
 #define CHIRP_SEARCH_STOPATFIRST (1<<0)
-#define CHIRP_SEARCH_RECURSIVE   (1<<1)
-#define CHIRP_SEARCH_METADATA    (1<<2)
-#define CHIRP_SEARCH_INCLUDEROOT (1<<3)
-#define CHIRP_SEARCH_PERIOD 	 (1<<4)
-#define CHIRP_SEARCH_R_OK        (1<<5)
-#define CHIRP_SEARCH_W_OK        (1<<6)
-#define CHIRP_SEARCH_X_OK        (1<<7)
+#define CHIRP_SEARCH_METADATA    (1<<1)
+#define CHIRP_SEARCH_INCLUDEROOT (1<<2)
+#define CHIRP_SEARCH_PERIOD 	 (1<<3)
+#define CHIRP_SEARCH_R_OK        (1<<4)
+#define CHIRP_SEARCH_W_OK        (1<<5)
+#define CHIRP_SEARCH_X_OK        (1<<6)
 
 /** Streaming errors for the search operation */
 
