@@ -36,8 +36,10 @@ See the file COPYING for details.
 #include <sys/stat.h>
 
 #define WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL 30 
+#define	WORK_QUEUE_CATALOG_MASTER_AD_LIFETIME 300 
+
 #define WORK_QUEUE_CATALOG_POOL_UPDATE_INTERVAL 15 
-#define	WORK_QUEUE_CATALOG_LIFETIME 300 
+#define	WORK_QUEUE_CATALOG_POOL_AD_LIFETIME 180 
 
 #define WORK_QUEUE_NAME_MAX 256
 #define WORK_QUEUE_PROTOCOL_BLANK_FIELD "-"
@@ -103,5 +105,5 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 
 int get_pool_decisions_from_catalog(const char *catalog_host, int catalog_port, const char *proj, struct list *decisions);
 
-int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_port, const char *pool_name, time_t pool_start_time, const char *decision);
+int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_port, const char *pool_name, pid_t pid, time_t pool_start_time, const char *decision);
 #endif

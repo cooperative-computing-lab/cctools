@@ -520,7 +520,7 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 			if(!matched_masters) {
 				last_decision_time = time(0);
 				last_decision_amount = 0; 
-				advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, pool_start_time, "n/a");
+				advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, getpid(), pool_start_time, "n/a");
 				goto check_workers;
 			}
 		} else {
@@ -931,7 +931,7 @@ int decide_worker_distribution(struct list *matched_masters, struct pool_config 
 	char *decision;
 	decision = get_pool_decision_string(matched_masters);
 	if(decision) {
-		advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, pool_start_time, decision);
+		advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, getpid(), pool_start_time, decision);
 		free(decision);
 	} else {
 		fprintf(stderr, "Failed to convert pool decisions into a single string.\n");
