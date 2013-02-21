@@ -55,6 +55,9 @@ See the file COPYING for details.
 #define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
 #define MAKEFLOW_GC_MIN_THRESHOLD 1
 
+#define RESOURCE_MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
+#define RESOURCE_MONITOR_LOG_FORMAT "log-rule-%06.6d"
+
 typedef enum {
 	DAG_GC_NONE,
 	DAG_GC_REF_COUNT,
@@ -87,6 +90,9 @@ static const char *port_file = NULL;
 static int output_len_check = 0;
 
 static char *makeflow_exe = NULL;
+static char *monitor_exe  = NULL;
+
+static int  monitor_interval = 60;
 
 int dag_depth(struct dag *d);
 int dag_width_uniform_task(struct dag *d);
@@ -1124,11 +1130,17 @@ int dag_parse_variable(struct dag_parse *bk, struct dag_node *n, char *line)
 	return 1;
 }
 
+char *monitor_log_name(int nodeid)
+{
+	return string_format(RESOURCE_MONITOR_LOG_FORMAT, nodeid);
+}
+
 int dag_parse_node(struct dag_parse *bk, char *line, int clean_mode)
 {
 	struct dag *d = bk->d;
 	char *outputs = line;
 	char *inputs  = NULL;
+	char *log_name;
 	struct dag_node *n;
 
 	n = dag_node_create(bk->d, bk->linenum);
@@ -1137,11 +1149,26 @@ int dag_parse_node(struct dag_parse *bk, char *line, int clean_mode)
 	*inputs = 0;
 	inputs  = inputs + 1;
 
+	inputs  = string_trim_spaces(inputs); 
 	outputs = string_trim_spaces(outputs);
-	inputs  = string_trim_spaces(inputs);
+
+	if(monitor_exe)
+	{
+		log_name = monitor_log_name(n->nodeid);
+		debug(D_DEBUG, "adding monitor %s and log %s to rule %d.\n", monitor_exe, log_name, n->nodeid);
+		inputs  = string_format("%s %s", monitor_exe, inputs);
+		outputs = string_format("%s %s", log_name, outputs);
+	}
 
 	dag_parse_node_filelist(bk, n, outputs, 0, clean_mode);
 	dag_parse_node_filelist(bk, n, inputs, 1, clean_mode);
+
+	if(monitor_exe)
+	{
+		free(log_name);
+		free(inputs);
+		free(outputs);
+	}
 
 	while((line = dag_parse_readline(bk, n)) != NULL) {
 		if(line[0] == '#') {
@@ -1337,7 +1364,9 @@ void dag_parse_node_set_command(struct dag_parse *bk, struct dag_node *n, char *
 
 int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 {
-	char *command = line;
+	char *log_name;
+	char *command;
+
 
 	while(*command && isspace(*command))
 		command++;
@@ -1350,7 +1379,17 @@ int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 		return dag_parse_node_makeflow_command(bk, n, command + 9);
 	}
 
+	if(monitor_exe)
+	{
+		log_name = monitor_log_name(n->nodeid);
+		command = string_format("./%s -o %s -i %d -- %s", monitor_exe, log_name, monitor_interval, command);
+	}
+
 	dag_parse_node_set_command(bk, n, command);
+
+	if(monitor_exe)
+		free(command);
+
 	return 1;
 }
 
@@ -2081,6 +2120,61 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 	}
 }
 
+char *monitor_locate(const char *path_from_cmdline)
+{
+	char *monitor_org_path, *path_from_env;
+	debug(D_DEBUG,"locating monitor executable...");
+
+	path_from_env = getenv(RESOURCE_MONITOR_ENV_VAR);
+	if(path_from_cmdline)
+	{
+		monitor_org_path = xxstrdup(path_from_cmdline);
+		debug(D_DEBUG,"trying monitor path provided at command line: %s\n", path_from_cmdline);
+	}
+	else if(path_from_env)
+	{
+		monitor_org_path = xxstrdup(path_from_env);
+		debug(D_DEBUG,"trying monitor from $%s.", RESOURCE_MONITOR_ENV_VAR);
+	}
+	else
+	{
+		monitor_org_path = string_format("%s/bin/resource_monitor\n", INSTALL_PATH);
+		debug(D_DEBUG,"trying monitor at default location %s.\n", monitor_org_path);
+	}
+
+	return monitor_org_path;
+}
+
+char *monitor_copy_to_wd(char *path_from_cmdline)
+{
+	char *mon_unique;
+	char *monitor_org;
+	monitor_org = monitor_locate(path_from_cmdline);
+
+	return monitor_org;
+
+	if(!monitor_org)
+		fatal("Monitor program could not be found.\n");
+
+	mon_unique = string_format("monitor-XXXXXX");
+	mkstemp(mon_unique);
+
+	debug(D_DEBUG,"copying monitor %s to %s.\n", monitor_org, mon_unique);
+
+	if(copy_file_to_file(monitor_org, mon_unique) < 0)
+		fatal("Could not copy monitor %s to %s in local directory.\n", monitor_org, mon_unique);
+
+	chmod(mon_unique, 0777);
+
+	return mon_unique;
+}
+
+//atexit handler
+void monitor_delete_exe(void)
+{
+	unlink(monitor_exe);
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -2136,7 +2230,7 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	while((c = getopt(argc, argv, "aAb:B:cC:d:D:E:f:F:g:G:hiIj:J:kKl:L:m:N:o:Op:P:r:RS:t:T:u:vW:zZ:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAb:B:cC:d:D:E:f:F:g:G:hiIj:J:kKl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:")) != (char) -1) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2236,6 +2330,10 @@ int main(int argc, char *argv[])
 				break;
 			case 'm':
 				email_summary_to = xxstrdup(optarg);
+				break;
+			case 'M':
+				monitor_exe      = "./resource_monitor";
+				monitor_interval = atoi(optarg);
 				break;
 			case 'N':
 				free(project);
@@ -2361,7 +2459,7 @@ int main(int argc, char *argv[])
 			break;
 		}
 
-		// In clean mode, delete all exsiting log files
+		// In clean mode, delete all existing log files
 		if(clean_mode) {
 			char *cleanlog = string_format("%s.condorlog", dagfile);
 			file_clean(cleanlog, 0);
@@ -2385,6 +2483,7 @@ int main(int argc, char *argv[])
 
 	if(syntax_check) {
 		fprintf(stdout, "%s: Syntax OK.\n", dagfile);
+		dag_to_file(d, "res");
 		return 0;
 	}
 

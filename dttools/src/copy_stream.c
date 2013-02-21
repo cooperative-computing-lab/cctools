@@ -195,3 +195,26 @@ void copy_fd_pair(int leftin, int leftout, int rightin, int rightout)
 	install_handler(SIGTERM, old_sigterm);
 	install_handler(SIGTERM, old_sigchld);
 }
+
+int copy_file_to_file(const char *input, const char *output)
+{
+	int count;
+
+	FILE *in, *out;
+
+	in  = fopen(input, "r");
+	if(!in)
+		return -1;
+
+	out = fopen(output, "w");
+	if(!out)
+		return -1;
+
+	count = copy_stream_to_stream(in, out);
+	fflush(out);
+
+	fclose(in);
+	fclose(out);
+
+	return count;	
+}
