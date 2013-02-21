@@ -13,7 +13,7 @@ See the file COPYING for details.
  *
  * Use as:
  *
- * resource_monitor -i 120 some-command-line
+ * resource_monitor -i 120 -- some-command-line-and-options
  *
  * to monitor some-command-line at two minutes intervals.
  *
@@ -843,7 +843,7 @@ void monitor_fss_once(struct filesys_info *acc)
 
 void monitor_summary_header()
 {
-	char *headings[15] = {"no.proc", "wall-time", "cpu-time", "virtual", "io-rw", "file+dir", "bytes", "fr_vnodes", NULL};
+	char *headings[15] = { "wall-time", "no.proc", "cpu-time", "virtual", "io-rw", "file+dir", "bytes", "fr_vnodes", NULL };
 	int i;
 
 	for(i = 0; headings[i]; i++)
@@ -973,6 +973,8 @@ struct process_info *spawn_first_process(const char *cmd)
 	pid = monitor_fork();
 
 	fprintf(log_file, "command: %s\n", cmd);
+	fprintf(log_file, "wall time click zero is: %" PRIu64 "\n", clicks_since_epoch());
+
 	monitor_summary_header();
 
 	if(pid > 0)
@@ -1045,7 +1047,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "Use: %s [options] command-line-and-options\n", cmd);
 	fprintf(stdout, "-i <n>			Interval bewteen observations, in seconds. (default=%d)\n", DEFAULT_INTERVAL);
 	fprintf(stdout, "-d <subsystem>		Enable debugging for this subsystem.\n");
-	fprintf(stdout, "-o <directory>		Write logs to this directory. NOT IMPLEMENTED (default=.)\n");
+	fprintf(stdout, "-o <logfile>		Write log to logfile (default=log-PID-XXXXXX)\n");
 }
 
 
