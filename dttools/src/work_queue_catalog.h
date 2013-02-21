@@ -105,5 +105,5 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 
 int get_pool_decisions_from_catalog(const char *catalog_host, int catalog_port, const char *proj, struct list *decisions);
 
-int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_port, const char *pool_name, pid_t pid, time_t pool_start_time, const char *decision);
+int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_port, const char *pool_name, pid_t pid, time_t pool_start_time, const char *decision, int workers_requested);
 #endif

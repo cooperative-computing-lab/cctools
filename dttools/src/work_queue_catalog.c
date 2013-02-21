@@ -360,7 +360,7 @@ int get_pool_decisions_from_catalog(const char *catalog_host, int catalog_port, 
 	return 1;
 }
 
-int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_port, const char *pool_name, pid_t pid, time_t start_time, const char *decision)
+int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_port, const char *pool_name, pid_t pid, time_t start_time, const char *decision, int workers_requested)
 {
 	char address[DATAGRAM_ADDRESS_MAX];
 	char owner[USERNAME_MAX];
@@ -390,7 +390,7 @@ int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_por
 	INT64_T port = 65535 + pid; 
 
 	buffer = buffer_create();
-	buffer_printf(buffer, "type wq_pool\npool_name %s\nport %lld\nstarttime %llu\ndecision %s\nowner %s\nlifetime %d", pool_name, port, start_time, decision, owner, WORK_QUEUE_CATALOG_POOL_AD_LIFETIME);
+	buffer_printf(buffer, "type wq_pool\npool_name %s\nport %lld\nstarttime %llu\ndecision %s\nworkers_requested %d\nowner %s\nlifetime %d", pool_name, port, start_time, decision, workers_requested, owner, WORK_QUEUE_CATALOG_POOL_AD_LIFETIME);
 
 	text = buffer_tostring(buffer, &text_size);
 	debug(D_WQ, "Pool AD: \n%s\n", text);

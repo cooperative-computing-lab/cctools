@@ -54,6 +54,7 @@ static int abort_flag = 0;
 static sig_atomic_t pool_config_updated = 1;
 static struct batch_queue *q;
 static struct itable *job_table = NULL;
+static char *decision_string = NULL;
 static int make_decision_only = 0;
 static int worker_timeout = 0;
 static int retry_count = 20;
@@ -176,6 +177,7 @@ struct pool_config {
 	struct list *project;
 	struct list *distribution;
 	unsigned int max_workers;
+	unsigned int min_workers;
 	unsigned int default_capacity;
 	unsigned int max_change_per_min;
 	unsigned int billing_cycle;
@@ -323,6 +325,7 @@ struct pool_config *get_pool_config(const char *path) {
 
 	// Set defaults
 	pc->max_workers = MAX_WORKERS_DEFAULT;
+	pc->min_workers = 0; 
 	pc->default_capacity = 0;
 	pc->max_change_per_min = 0;
 	pc->mode = POOL_CONFIG_MODE_ON_DEMAND;
@@ -373,6 +376,13 @@ struct pool_config *get_pool_config(const char *path) {
 					goto fail;
 				}
 				pc->max_workers = max_workers;
+			} else if(!strncmp(name, "min_workers", strlen(name))) {
+				int min_workers = atoi(value);
+				if(min_workers <= 0) {
+					fprintf(stderr, "Invalid configuration: min_workers (current value: %d) should be greater than 0.\n", min_workers);
+					goto fail;
+				}
+				pc->min_workers = min_workers;
 			} else if(!strncmp(name, "mode", strlen(name))) {
 				if(!strncmp(value, "fixed", strlen(value))) {
 					pc->mode = POOL_CONFIG_MODE_FIXED;
@@ -424,6 +434,13 @@ struct pool_config *get_pool_config(const char *path) {
 		free(value);
 	}
 	fclose(fp);
+
+	// sanity checks
+	if(pc->min_workers > pc->max_workers) {
+		fprintf(stderr, "Invalid configuration: min_workers (%d) is greater than max_workers (%d).\n", pc->min_workers, pc->max_workers);
+		goto fail;
+	}
+	
 	return pc;
 
 fail:
@@ -502,16 +519,22 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 	char input_files[PATH_MAX] = "";
 
 	struct pool_config *pc = NULL;
-
 	while(!abort_flag) {
 		if(pool_config_updated) {
 			pool_config_updated = 0;
 			pc = update_pool_config(pool_config_path, pc);
-		}
-		if(!pc) {
-			abort_flag = 1;
-			fprintf(stderr, "Failed to load a valid pool configuration.\n");
-			return;
+			if(!pc) {
+				abort_flag = 1;
+				fprintf(stderr, "Failed to load a valid pool configuration.\n");
+				return;
+			}
+
+			if(worker_timeout > 0) {
+				snprintf(cmd, PATH_MAX, "./work_queue_worker -a -B %d -C %s:%d -t %d -p %s", pc->worker_terminate_boundary, catalog_host, catalog_port, worker_timeout, name_of_this_pool);
+			} else {
+				snprintf(cmd, PATH_MAX, "./work_queue_worker -a -B %d -C %s:%d -p %s", pc->worker_terminate_boundary, catalog_host, catalog_port, name_of_this_pool);
+			}
+			snprintf(input_files, PATH_MAX, "work_queue_worker");
 		}
 
 		if(next_catalog_query_time <= time(0)) {
@@ -520,7 +543,7 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 			if(!matched_masters) {
 				last_decision_time = time(0);
 				last_decision_amount = 0; 
-				advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, getpid(), pool_start_time, "n/a");
+				advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, getpid(), pool_start_time, "n/a", itable_size(job_table));
 				goto check_workers;
 			}
 		} else {
@@ -530,8 +553,7 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 		debug(D_WQ, "Matching masters:\n");
 		debug_print_masters(matched_masters);
 
-		int n = decide_worker_distribution(matched_masters, pc, catalog_host, catalog_port);
-		int workers_desired = n;
+		int workers_desired = decide_worker_distribution(matched_masters, pc, catalog_host, catalog_port);
 
 		// sum_waiting is the maximum # of workers that all masters would possibly need from the pool
 		// this field is useful when masters are at the end of their lifecycle (when masters have no waiting tasks)
@@ -586,20 +608,21 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 			free_work_queue_master_list(matched_masters);
 			matched_masters = NULL;
 
+			advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, getpid(), pool_start_time, decision_string, 0);
+
 			sleep(5);
 			continue;
 		}
 
-		if(worker_timeout > 0) {
-			snprintf(cmd, PATH_MAX, "./work_queue_worker -a -B %d -C %s:%d -t %d -p %s", pc->worker_terminate_boundary, catalog_host, catalog_port, worker_timeout, name_of_this_pool);
-		} else {
-			snprintf(cmd, PATH_MAX, "./work_queue_worker -a -B %d -C %s:%d -p %s", pc->worker_terminate_boundary, catalog_host, catalog_port, name_of_this_pool);
-		}
-		snprintf(input_files, PATH_MAX, "work_queue_worker");
-
-
-		n -= itable_size(job_table);
+		int n = workers_desired - itable_size(job_table);
 		if(n > 0) {
+			// The following line of code is important. At the end of workloads
+			// (i.e., no waiting tasks), the decision would allow each master
+			// to hold whatever number of workers that have already had (so
+			// those workers won't discconnect and bounce between masters), and
+			// some of those would time out -- making itable_size(job_table) <
+			// workers_desired (the decision). But since no enough waiting
+			// tasks left, we don't need to resubmit those timed out workers.
 			n = MIN(n, sum_waiting);
 
 			if(n > 0) {
@@ -610,6 +633,8 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 
 		workers_submitted = itable_size(job_table);
 		printf("%d workers are being maintained.\n", workers_submitted);
+
+		advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, getpid(), pool_start_time, decision_string, MAX(workers_submitted, pc->min_workers));
 
 		printf("Number of matched masters: %d.\n\n", list_size(matched_masters));
 		if(list_size(matched_masters)) {
@@ -622,6 +647,14 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 		matched_masters = NULL;
 
 check_workers:
+		if(pc->min_workers > 0) {
+			int extra_workers_needed = pc->min_workers - itable_size(job_table);
+			if(extra_workers_needed > 0) {
+				submit_workers(cmd, input_files, extra_workers_needed);
+				printf("%d more workers has just been submitted to meet the min_workers requirement.\n", extra_workers_needed);
+			}
+		}
+
 		if(itable_size(job_table)) {
 			jobid = batch_job_wait_timeout(q, &info, time(0) + 5);
 			if(jobid >= 0 && !abort_flag) {
@@ -656,6 +689,9 @@ check_workers:
 	free_work_queue_master_list(matched_masters);
 	if(pc) {
 		destroy_pool_config(&pc);
+	}
+	if(decision_string) {
+		free(decision_string);
 	}
 }
 
@@ -928,12 +964,11 @@ int decide_worker_distribution(struct list *matched_masters, struct pool_config 
 	last_decision_amount = sum_decided_workers;
 
 	// advertise decision to the catalog server
-	char *decision;
-	decision = get_pool_decision_string(matched_masters);
-	if(decision) {
-		advertise_pool_decision_to_catalog(catalog_host, catalog_port, name_of_this_pool, getpid(), pool_start_time, decision);
-		free(decision);
-	} else {
+	if(decision_string) {
+		free(decision_string);
+		decision_string = NULL;
+	}
+	if((decision_string = get_pool_decision_string(matched_masters)) == NULL) {
 		fprintf(stderr, "Failed to convert pool decisions into a single string.\n");
 	}
 
