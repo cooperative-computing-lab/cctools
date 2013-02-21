@@ -2393,6 +2393,7 @@ struct work_queue *work_queue_create(int port)
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 
 	// Capacity estimation related
+	q->estimate_capacity_on = 1;
 	q->start_time = timestamp_get();
 	q->time_last_task_start = q->start_time;
 	q->idle_times = list_create();
