@@ -32,5 +32,6 @@ install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
 	cp ${TARGETS} ${CCTOOLS_INSTALL_DIR}/bin
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib
-	cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
 
+
+#cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
