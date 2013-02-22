@@ -1,10 +1,16 @@
 CCTOOLS_HOME = ../../
 
+UNAME := $(shell uname)
+
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
 TARGETS = resource_monitor
 LIBRARIES = librmonitor_helper.so
+
+ifeq (${UNAME}, Darwin)
+LIBRARIES = 
+endif
 
 LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
