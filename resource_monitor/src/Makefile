@@ -20,4 +20,3 @@ test: all
 install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
 	cp resource_monitor ${CCTOOLS_INSTALL_DIR}/bin
-	cp resource_monitor ../../makeflow/src/

@@ -1155,9 +1155,10 @@ int dag_parse_node(struct dag_parse *bk, char *line, int clean_mode)
 	if(monitor_exe)
 	{
 		log_name = monitor_log_name(n->nodeid);
-		debug(D_DEBUG, "adding monitor %s and log %s to rule %d.\n", monitor_exe, log_name, n->nodeid);
+		debug(D_DEBUG, "adding monitor %s and log %s{,-summary} to rule %d.\n", monitor_exe, log_name, n->nodeid);
+
 		inputs  = string_format("%s %s", monitor_exe, inputs);
-		outputs = string_format("%s %s", log_name, outputs);
+		outputs = string_format("%s %s-summary %s", log_name, log_name, outputs);
 	}
 
 	dag_parse_node_filelist(bk, n, outputs, 0, clean_mode);
@@ -2138,7 +2139,7 @@ char *monitor_locate(const char *path_from_cmdline)
 	}
 	else
 	{
-		monitor_org_path = string_format("%s/bin/resource_monitor\n", INSTALL_PATH);
+		monitor_org_path = string_format("./resource_monitor");
 		debug(D_DEBUG,"trying monitor at default location %s.\n", monitor_org_path);
 	}
 
@@ -2151,8 +2152,6 @@ char *monitor_copy_to_wd(char *path_from_cmdline)
 	char *monitor_org;
 	monitor_org = monitor_locate(path_from_cmdline);
 
-	return monitor_org;
-
 	if(!monitor_org)
 		fatal("Monitor program could not be found.\n");
 
@@ -2162,7 +2161,8 @@ char *monitor_copy_to_wd(char *path_from_cmdline)
 	debug(D_DEBUG,"copying monitor %s to %s.\n", monitor_org, mon_unique);
 
 	if(copy_file_to_file(monitor_org, mon_unique) < 0)
-		fatal("Could not copy monitor %s to %s in local directory.\n", monitor_org, mon_unique);
+		fatal("Could not copy monitor %s to %s in local directory: %s\n", 
+				monitor_org, mon_unique, strerror(errno));
 
 	chmod(mon_unique, 0777);
 
@@ -2332,8 +2332,9 @@ int main(int argc, char *argv[])
 				email_summary_to = xxstrdup(optarg);
 				break;
 			case 'M':
-				monitor_exe      = "./resource_monitor";
+				monitor_exe      = monitor_copy_to_wd( NULL );
 				monitor_interval = atoi(optarg);
+				atexit(monitor_delete_exe);
 				break;
 			case 'N':
 				free(project);
