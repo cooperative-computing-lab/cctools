@@ -142,15 +142,18 @@ See the file COPYING for details.
 	#include  <sys/vfs.h>
 #endif
 
+#include "rmonitor_helper_comm.h"
+
 
 #define DEFAULT_INTERVAL 1 /* in seconds */
 
-FILE  *log_file;                /* All monitoring information of all processes is written here. */
-FILE  *log_file_summary;        /* Final statistics are written to this file. */
+FILE  *log_file;               /* All monitoring information of all processes is written here. */
+FILE  *log_file_summary;       /* Final statistics are written to this file. */
 
+int    monitor_queue_fd;       /* File descriptor of a datagram socket to which (great)* grandchildren processes report to the monitor. */
+pid_t  first_process_pid;      /* pid of the process given at the command line */
 uint64_t usecs_initial;        /* Time at which monitoring started, in usecs. */
 
-pid_t  first_process_pid;
 
 struct itable *processes;        /* Maps the pid of a process to a unique struct process_info. */
 struct hash_table *wdirs; /* Maps paths to working directory structures. */
@@ -229,7 +232,6 @@ struct tree_info
 	int64_t  nodes;
 };
 
-struct tree_info     tree_avg;
 struct tree_info     tree_max;
 struct tree_info     tree_min;
 
@@ -834,6 +836,7 @@ void monitor_processes_once(struct process_info *acc)
 	acc->wall_time = usecs_since_epoch();
 
 	itable_firstkey(processes);
+
 	while(itable_nextkey(processes, &pid, (void **) &p))
 	{
 		monitor_process_once(p);
@@ -935,9 +938,12 @@ int64_t avgop(int64_t a, int64_t b, void *arg)
 {
 	// Terribly inexact arithmethic, but it allow us to have an
 	// estimate of the average using little memory.
-	//
+	
+
 	double     n = 1.0 * *((uint64_t *) arg);
-	uint64_t avg = round((a*(n - 1) + b) / n);
+	uint64_t avg = ceil((a*(n - 1) + b) / n);
+
+	debug(D_DEBUG, "no: %d  a: %" PRIu64 " b: %" PRIu64 " n: %lf av: %" PRIu64 "\n", itable_size(processes), a, b, n, avg);
 
 	return avg;
 }
@@ -958,22 +964,105 @@ void monitor_summary_log(struct tree_info *tr)
 
 void monitor_final_summary()
 {
-	fprintf(log_file_summary, "%12s\t%12s\t%12s\t%12s\n", "        ", "max", "min", "avg");
-	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\t%12" PRId64 "\n", "processes:", tree_max.num_processes, tree_min.num_processes, tree_avg.num_processes);
-	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12s\t%12s\n", "cpu_time:", tree_max.cpu_time, "-", "-");
-	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\t%12" PRId64 "\n", "memory:", tree_max.memory, tree_min.memory, tree_avg.memory);
-	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12s\t%12s\n", "io-chars:", tree_max.io, "-", "-");
-	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\t%12" PRId64 "\n", "vnodes:", tree_max.vnodes, tree_min.vnodes, tree_avg.vnodes);
-	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\t%12" PRId64 "\n", "bytes:", tree_max.bytes, tree_min.bytes, tree_avg.bytes);
-	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\t%12" PRId64 "\n", "nodes:", tree_max.nodes, tree_min.nodes, tree_avg.nodes);
+	fprintf(log_file_summary, "%12s\t%12s\t%12s\n", "        ", "max", "min");
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "processes:", tree_max.num_processes, tree_min.num_processes);
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12s\n", "cpu_time:", tree_max.cpu_time, "-");
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "memory:", tree_max.memory, tree_min.memory);
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12s\n", "io-chars:", tree_max.io, "-");
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "vnodes:", tree_max.vnodes, tree_min.vnodes);
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "bytes:", tree_max.bytes, tree_min.bytes);
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "nodes:", tree_max.nodes, tree_min.nodes);
 
 }
 
+void monitor_add_process(pid_t pid)
+{
+	struct process_info *p = malloc(sizeof(struct process_info));
+	p->pid = pid;
+	p->running = 0;
+	p->wd = NULL;
+
+	itable_insert(processes, p->pid, (void *) p);
+
+	monitor_process_once(p);
+
+	p->running = 1;
+}
+
+void monitor_remove_process(uint64_t pid)
+{
+	struct process_info *p = itable_lookup(processes, pid);
+	p->running = 0;
+	list_push_tail(zombies, p);
+}
+
+void monitor_dispatch_msg(void)
+{
+	struct monitor_msg msg;
+	recv_monitor_msg(monitor_queue_fd, &msg);
+
+	debug(D_DEBUG,"message \"%s\" from %d\n", str_msgtype(msg.type), msg.origin);
+
+	switch(msg.type)
+	{
+		case BRANCH:
+			monitor_add_process(msg.origin);
+			break;
+		case END:
+			monitor_remove_process(msg.data.p);
+			break;
+		case CHDIR:
+			break;
+		case OPEN:
+			break;
+		case READ:
+			break;
+		case WRITE:
+			break;
+		default:
+			break;
+	};
+}
+
+int wait_for_messages(int interval)
+{
+	struct timeval timeout;
+
+	/* wait for interval seconds. */
+	timeout.tv_sec  = 0;
+	timeout.tv_usec = 0;
+
+	debug(D_DEBUG, "sleeping for: %ld seconds\n", interval);
+
+	//If grandchildren processes cannot talk to us, simply wait.
+	//Else, wait, and check socket for messages.
+	if(monitor_queue_fd < 0)
+	{
+		select(0, NULL, NULL, NULL, &timeout);
+	}
+	else
+	{
+		int count = 1;
+		while(count > 0)
+		{
+			fd_set rset;
+			FD_ZERO(&rset);
+			FD_SET(monitor_queue_fd, &rset);
+			timeout.tv_sec  = interval;
+			interval = 0;                     //Next loop we do not wait at all
+			count = select(monitor_queue_fd + 1, &rset, NULL, NULL, &timeout);
+
+			if(count > 0)
+				monitor_dispatch_msg();
+		}
+	}
+
+	return 0;
+}
 
 int monitor_resources(long int interval /*in seconds */)
 {
 	uint64_t round;
-	struct timeval timeout;
 
 	struct process_info  p;
 	struct wdir_info     d;
@@ -989,7 +1078,7 @@ int monitor_resources(long int interval /*in seconds */)
 	round = 1;
 	while(itable_size(processes) > 0)
 	{ 
-		debug(D_DEBUG, "Beginning monitor round");
+		debug(D_DEBUG, "Beginning monitor round.\n");
 
 		monitor_processes_once(&p);
 		monitor_wds_once(&d);
@@ -1001,28 +1090,21 @@ int monitor_resources(long int interval /*in seconds */)
 		{
 			memcpy(&tree_max, &tree_now, sizeof(struct tree_info));
 			memcpy(&tree_min, &tree_now, sizeof(struct tree_info));
-			memcpy(&tree_avg, &tree_now, sizeof(struct tree_info));
 		}
 		else
 		{
 			monitor_update_tree(&tree_max, &tree_now, NULL, maxop);
 			monitor_update_tree(&tree_min, &tree_now, NULL, minop);
-			monitor_update_tree(&tree_avg, &tree_now, (void *) &round, avgop);
 		}
 
 		monitor_summary_log(&tree_now);
-
-		/* wait for interval seconds. */
-		timeout.tv_sec  = interval;
-		timeout.tv_usec = 0;
 
 		cleanup_zombies();
 		//If no more process are alive, break out of loop.
 		if(itable_size(processes) < 1)
 			break;
 		
-		debug(D_DEBUG, "sleeping for: %ld seconds\n", interval);
-		select(0, NULL, NULL, NULL, &timeout);
+		wait_for_messages(interval);
 
 		//cleanup processes which by terminating may have awaken
 		//select.
@@ -1040,12 +1122,12 @@ void wakeup_after_fork(int signum)
 		signal(SIGCONT, SIG_DFL);
 }
 
+
 pid_t monitor_fork(void)
 {
 	pid_t pid;
 	sigset_t set;
 	void (*prev_handler)(int signum);
-
 
 	pid = fork();
 
@@ -1057,16 +1139,9 @@ pid_t monitor_fork(void)
 	{
 		debug(D_DEBUG, "fork %d -> %d\n", getpid(), pid);
 
+		monitor_add_process(pid);
+
 		signal(SIGCONT, prev_handler);
-		struct process_info *p = malloc(sizeof(struct process_info));
-		p->pid = pid;
-		p->running = 0;
-
-		itable_insert(processes, p->pid, (void *) p);
-
-		monitor_process_once(p);
-
-		p->running = 1;
 		kill(pid, SIGCONT);
 	}
 	else
@@ -1083,10 +1158,11 @@ pid_t monitor_fork(void)
 struct process_info *spawn_first_process(const char *cmd)
 {
 	pid_t pid;
-	pid = monitor_fork();
 
 	fprintf(log_file_summary, "command: %s\n", cmd);
 	fprintf(log_file_summary, "start:\t%" PRIu64 " %s", usecs_since_epoch(), current_time());
+
+	pid = monitor_fork();
 
 	monitor_summary_header();
 
@@ -1138,7 +1214,7 @@ pid_t waiting_child()
 /* sigchild signal handler */
 void monitor_check_child(const int signal)
 {
-	pid_t pid;
+	uint64_t pid;
 
 	//zombie, tell us who you were!
 	pid = waiting_child();
@@ -1148,11 +1224,18 @@ void monitor_check_child(const int signal)
 	if(!p)
 		return;
 
-	debug(D_DEBUG, "adding process %d to cleanup list.\n", p->pid);
-
-	p->running = 0;
-
-	list_push_tail(zombies, p);
+	if(p->pid == first_process_pid)
+	{
+		debug(D_DEBUG, "adding all processes to cleanup list.\n");
+		itable_firstkey(processes);
+		while(itable_nextkey(processes, &pid, (void **) &p))
+			monitor_remove_process(pid);
+	}
+	else
+	{
+		debug(D_DEBUG, "adding process %d to cleanup list.\n", pid);
+		monitor_remove_process(p->pid);
+	}
 }
 
 void monitor_final_cleanup(int signum)
@@ -1174,7 +1257,6 @@ void monitor_final_cleanup(int signum)
 
 	monitor_final_summary();
 
-	//write final report here
 	fclose(log_file);
 	fclose(log_file_summary);
 
@@ -1203,7 +1285,6 @@ int main(int argc, char **argv) {
 	signal(SIGCHLD, monitor_check_child);
 	signal(SIGINT, monitor_final_cleanup);
 
-
 	while((c = getopt(argc, argv, "d:i:o:")) > 0)
 	{
 		switch (c) {
@@ -1224,6 +1305,8 @@ int main(int argc, char **argv) {
 				break;
 		}
 	}
+
+	monitor_helper_init("./librmonitor_helper.so", &monitor_queue_fd);
 		
 
 	processes    = itable_create(0);
