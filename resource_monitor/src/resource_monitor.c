@@ -40,17 +40,20 @@ See the file COPYING for details.
  *
  * Currently, the columns are:
  * 
- * wall:      wall time (in clicks).
+ * wall:      wall time (in usecs).
+ * no.proc:   number of processes
  * cpu-time:  user-mode time + kernel-mode time.
- * vmem:      current total virtual memory size.
+ * vmem:      current total memory size (virtual).
  * io:        read chars count using *read system calls + writen char count using *write system calls.
  * files+dir  total file + directory count of all working directories.
  * bytes      total byte count of all working directories.
- * fr_nodes   total free nodes of all the filesystems used by working directories. 
+ * nodes      total occupied nodes of all the filesystems used by working directories since the start of the task. 
  *
  * The log file is written to the home directory of the monitor
  * process. A flag will be added later to indicate a prefered
- * output file.
+ * output file. Additionally, a summary log file is written at
+ * the end, reporting the command run, starting and ending times,
+ * and maximum, minimum, and average of the resources monitored.
  *
  * While all the logic supports the monitoring of several
  * processes by the same monitor, only one monitor can
@@ -59,7 +62,7 @@ See the file COPYING for details.
  * can also monitor the process children.
  *
  * Each monitored process gets a 'struct process_info', itself
- * composed of 'struct mem_info', 'struct click_info', etc. There
+ * composed of 'struct mem_info', 'struct cpu_time_info', etc. There
  * is a global variable, 'processes', that keeps a table relating pids to
  * the corresponding struct process_info.
  *
@@ -115,6 +118,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <math.h>
 
+#include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -139,11 +143,12 @@ See the file COPYING for details.
 #endif
 
 
-#define DEFAULT_INTERVAL 60 /* in seconds */
+#define DEFAULT_INTERVAL 1 /* in seconds */
 
 FILE  *log_file;                /* All monitoring information of all processes is written here. */
+FILE  *log_file_summary;        /* Final statistics are written to this file. */
 
-uint64_t clicks_initial;        /* Time at which monitoring started, in clicks. */
+uint64_t usecs_initial;        /* Time at which monitoring started, in usecs. */
 
 pid_t  first_process_pid;
 
@@ -154,8 +159,8 @@ struct itable *wdirs_rc;  /* Counts how many process_info use a wdir_info. */
 struct itable *filesys_rc;       /* Counts how many wdir_info use a filesys_info. */
 struct list   *zombies;          /* List of process_info that finished, for cleanup */
 
-//time in clicks, no seconds:
-struct click_info
+//time in usecs, no seconds:
+struct cpu_time_info
 {
 	uint64_t user_time;
 	uint64_t kernel_time;
@@ -205,34 +210,53 @@ struct process_info
 	const char *cmd;
 	int         running;
 
-	struct mem_info   mem;
-	struct click_info click;
-	struct io_info    io;
+	struct mem_info      mem;
+	struct cpu_time_info cpu;
+	struct io_info       io;
 
 	struct wdir_info *wd;
 };
 
-
-FILE *open_log_file(const char *filename)
+struct tree_info
 {
-	FILE *log;
-	char flog_path[PATH_MAX];	
+	int64_t  wall_time;
+	int64_t  num_processes;
+	int64_t  cpu_time;
+	int64_t  memory; 
+	int64_t  io;
+	int64_t  vnodes;
+	int64_t  bytes;
+	int64_t  nodes;
+};
+
+struct tree_info     tree_avg;
+struct tree_info     tree_max;
+struct tree_info     tree_min;
+
+void open_log_files(const char *filename)
+{
+	char *flog_path;
+	char *flog_path_summary;
 
 	if(filename)
-		strncpy(flog_path, filename, PATH_MAX);
+		flog_path         = xxstrdup(filename);
 	else
+		flog_path = string_format("log-monitor-%d", getpid());
+
+	flog_path_summary = string_format("%s-summary", flog_path); 
+
+	if((log_file = fopen(flog_path, "w")) == NULL)
 	{
-		sprintf(flog_path, "log-monitor-%d", getpid());
-		mkstemp(flog_path);
+		fatal("could not open log file %s : %s\n", flog_path, strerror(errno));
+	}
+	
+	if((log_file_summary = fopen(flog_path_summary, "w")) == NULL)
+	{
+		fatal("could not open log file %s : %s\n", flog_path_summary, strerror(errno));
 	}
 
-	if((log = fopen(flog_path, "w")) == NULL)
-	{
-		debug(D_DEBUG, "could not open log file %s : %s\n", flog_path, strerror(errno));
-		return NULL;
-	}
-
-	return log;
+	free(flog_path);
+	free(flog_path_summary);
 }
 
 
@@ -359,17 +383,22 @@ void hdr_wd_usage()
 	fprintf(log_file, "files\tdirs\tbytes\tblks");
 }
 
+uint64_t clicks_to_usecs(uint64_t clicks)
+{
+	return (clicks * (1000000 / sysconf(_SC_CLK_TCK)));
+}
 
-int get_click_usage(pid_t pid, struct click_info *click)
+int get_cpu_time_usage(pid_t pid, struct cpu_time_info *cpu)
 {
 	/* /dev/proc/[pid]/stat */
+
+	uint64_t kernel, user;
 	
 	FILE *fstat = open_proc_file(pid, "stat");
 	if(!fstat)
 	{
 		return 1;
 	}
-
 
 	fscanf(fstat,
 			"%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
@@ -378,25 +407,27 @@ int get_click_usage(pid_t pid, struct click_info *click)
 			"%" SCNu64 /* user mode time (in clock ticks) */
 			"%" SCNu64 /* kernel mode time (in clock ticks) */
 			/* .... */,
-			&click->user_time, &click->kernel_time);
+			&kernel, &user);
 
+	cpu->user_time   = clicks_to_usecs(user);	
+	cpu->kernel_time = clicks_to_usecs(kernel);	
 
 	return 0;
 }
 
-void acc_click_usage(struct click_info *acc, struct click_info *other)
+void acc_cpu_time_usage(struct cpu_time_info *acc, struct cpu_time_info *other)
 {
 	acc->user_time   += other->user_time;
 	acc->kernel_time += other->kernel_time;
 }
 
-void log_click_usage(struct click_info *click)
+void log_cpu_time_usage(struct cpu_time_info *usec)
 {
 	/* user . kernel . time */
-	fprintf(log_file, "%" PRIu64 "\t%" PRIu64, click->user_time, click->kernel_time);
+	fprintf(log_file, "%" PRIu64 "\t%" PRIu64, usec->user_time, usec->kernel_time);
 }
 
-void hdr_click_usage()
+void hdr_cpu_time_usage()
 {
 	fprintf(log_file, "user\tkernel");
 }
@@ -595,6 +626,32 @@ int dec_wd_count(struct wdir_info *d)
 	return count;
 }
 
+char *current_time(void)
+{
+	time_t secs = time(NULL);
+
+	return ctime(&secs);
+}
+
+uint64_t usecs_since_epoch()
+{
+	uint64_t usecs;
+	struct timeval time; 
+
+	gettimeofday(&time, NULL);
+
+	usecs  = time.tv_sec * 1000000; 
+	usecs += time.tv_usec;
+
+	return usecs;
+}
+
+uint64_t usecs_since_launched()
+{
+	return (usecs_since_epoch() - usecs_initial);
+}
+
+
 void cleanup_zombie(struct process_info *p)
 {
 	int status;
@@ -604,15 +661,21 @@ void cleanup_zombie(struct process_info *p)
 	//die zombie die
 	waitpid(p->pid, &status, WNOHANG);
 
+	if(p->pid == first_process_pid)
+		fprintf(log_file_summary, "end:\t%" PRIu64 " %s", (uint64_t) usecs_since_epoch(), current_time());
+
 	if( WIFEXITED(status) )
 	{
 		debug(D_DEBUG, "process %d finished: %d.\n", p->pid, WEXITSTATUS(status) );
-		fprintf(log_file, "\nProcess %d finished normally: %d.\n", p->pid, WEXITSTATUS(status) );
+		if(p->pid == first_process_pid)
+			fprintf(log_file_summary, "exit-type:\tnormal\nexit-status:\t%d\n", WEXITSTATUS(status) );
 	} 
 	else if ( WIFSIGNALED(status) )
 	{
 		debug(D_DEBUG, "process %d terminated: %s.\n", p->pid, strsignal(WTERMSIG(status)) );
-		fprintf(log_file, "\nProcess %d terminated with signal: %s.\n", p->pid, strsignal(WTERMSIG(status)) );
+		if(p->pid == first_process_pid)
+			fprintf(log_file_summary, "exit-type:\tsignal %d %s\nexit-status:\t%d\n", 
+					WTERMSIG(status), strsignal(WTERMSIG(status)), WEXITSTATUS(status));
 	} 
 
 	if(p->wd)
@@ -723,31 +786,13 @@ int get_wd(struct process_info *p)
 }
 
 
-uint64_t clicks_since_epoch()
-{
-	uint64_t clicks;
-	struct timeval time; 
-
-	gettimeofday(&time, NULL);
-
-	clicks  = time.tv_sec * sysconf(_SC_CLK_TCK); 
-	clicks += (time.tv_usec * sysconf(_SC_CLK_TCK))/1000000; 
-
-	return clicks;
-}
-
-uint64_t clicks_since_launched()
-{
-	return (clicks_since_epoch() - clicks_initial);
-}
-
 int monitor_process_once(struct process_info *p)
 {
 	debug(D_DEBUG, "monitoring process: %d\n", p->pid);
 
-	p->wall_time = clicks_since_launched();
+	p->wall_time = usecs_since_epoch();
 
-	get_click_usage(p->pid, &p->click);
+	get_cpu_time_usage(p->pid, &p->cpu);
 	get_mem_usage(p->pid, &p->mem);
 	get_io_usage(p->pid, &p->io);
 	get_wd(p);
@@ -759,7 +804,7 @@ int monitor_wd_once(struct wdir_info *d)
 {
 	debug(D_DEBUG, "monitoring %s\n", d->path);
 
-	d->wall_time = clicks_since_launched();
+	d->wall_time = usecs_since_epoch();
 	get_wd_usage(d);
 
 	return 0;
@@ -767,36 +812,26 @@ int monitor_wd_once(struct wdir_info *d)
 
 int monitor_fs_once(struct filesys_info *f)
 {
-	f->wall_time = clicks_since_launched();
+	f->wall_time = usecs_since_epoch();
 
 	get_dsk_usage(f->path, &f->disk);
 
-	f->disk.f_bfree  -= f->disk_initial.f_bfree;
-	f->disk.f_bavail -= f->disk_initial.f_bavail;
-	f->disk.f_ffree  -= f->disk_initial.f_ffree;
+	f->disk.f_bfree  = f->disk_initial.f_bfree  - f->disk.f_bfree;
+	f->disk.f_bavail = f->disk_initial.f_bavail - f->disk.f_bavail;
+	f->disk.f_ffree  = f->disk_initial.f_ffree  - f->disk.f_ffree;
 
 	return 0;
 }
 
-void monitor_final_cleanup(int signum)
-{
-	if(itable_lookup(processes, first_process_pid))
-	{
-		debug(D_DEBUG, "sending SIGINT to first process (%d).\n", first_process_pid);
-		kill(first_process_pid, SIGINT);
-	}
-
-	cleanup_zombies();
-
-	exit(0);
-}
 
 void monitor_processes_once(struct process_info *acc)
 {
 	uint64_t pid;
 	struct process_info *p;
 
-	memset(acc, 0, sizeof( struct process_info ));
+	bzero(acc, sizeof( struct process_info ));
+
+	acc->wall_time = usecs_since_epoch();
 
 	itable_firstkey(processes);
 	while(itable_nextkey(processes, &pid, (void **) &p))
@@ -805,7 +840,7 @@ void monitor_processes_once(struct process_info *acc)
 
 		acc_mem_usage(&acc->mem, &p->mem);
 		
-		acc_click_usage(&acc->click, &p->click);
+		acc_cpu_time_usage(&acc->cpu, &p->cpu);
 
 		acc_io_usage(&acc->io, &p->io);
 	}
@@ -817,6 +852,8 @@ void monitor_wds_once(struct wdir_info *acc)
 	char *path;
 
 	bzero(acc, sizeof( struct wdir_info ));
+
+	acc->wall_time = usecs_since_epoch();
 
 	hash_table_firstkey(wdirs);
 	while(hash_table_nextkey(wdirs, &path, (void **) &d))
@@ -833,6 +870,8 @@ void monitor_fss_once(struct filesys_info *acc)
 
 	bzero(acc, sizeof( struct filesys_info ));
 
+	acc->wall_time = usecs_since_epoch();
+
 	itable_firstkey(filesysms);
 	while(itable_nextkey(filesysms, &dev_id, (void **) &f))
 	{
@@ -843,80 +882,153 @@ void monitor_fss_once(struct filesys_info *acc)
 
 void monitor_summary_header()
 {
-	char *headings[15] = { "wall-time", "no.proc", "cpu-time", "virtual", "io-rw", "file+dir", "bytes", "fr_vnodes", NULL };
+	char *headings[15] = { "wall-time", "no.proc", "cpu-time", "memory", "io-rw", "file+dir", "bytes", "fr_vnodes", NULL };
 	int i;
 
+	fprintf(log_file, "#");
 	for(i = 0; headings[i]; i++)
 		fprintf(log_file, "%10s\t", headings[i]);
 
 	fprintf(log_file, "\n");
 }
 
-//The divisor is used when p = accum, to compute the average.
-void monitor_processes_summary_once(struct process_info *p)
+void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct wdir_info *d, struct filesys_info *f)
 {
-	// no.proc user+kernel virtual rchars+wchars
-	fprintf(log_file, "%10d\t"         , itable_size(processes));
-	fprintf(log_file, "%10" PRIu64 "\t", (p->click.user_time + p->click.kernel_time));
-	fprintf(log_file, "%10" PRIu64 "\t", p->mem.virtual);
-	fprintf(log_file, "%10" PRIu64 "\t", (p->io.chars_read + p->io.chars_written));
+	tr->wall_time     = (int64_t) p->wall_time;
+	tr->num_processes = (int64_t) itable_size(processes);
+	tr->cpu_time      = (int64_t) (p->cpu.user_time + p->cpu.kernel_time);
+	tr->memory        = (int64_t) p->mem.virtual;
+	tr->io            = (int64_t) (p->io.chars_read + p->io.chars_written);
+
+	tr->vnodes        = (int64_t) (d->files + d->directories);
+	tr->bytes         = (int64_t) d->byte_count;
+
+	tr->nodes         = (int64_t) f->disk.f_ffree;
 }
 
-void monitor_wds_summary_once(struct wdir_info *d)
+//Computes result = op(result, tr, arg), per field.
+void monitor_update_tree(struct tree_info *result, struct tree_info *tr, void *arg, int64_t (*op)(int64_t, int64_t, void *))
 {
-	// files+directories byte_count
-	fprintf(log_file, "%10d\t", (d->files + d->directories));
-	fprintf(log_file, "%10jd\t", (intmax_t) d->byte_count);
+	result->wall_time     = op(result->wall_time, tr->wall_time, arg);
+	result->num_processes = op(result->num_processes, tr->num_processes, arg);
+	result->cpu_time      = op(result->cpu_time, tr->cpu_time, arg);
+	result->memory        = op(result->memory, tr->memory, arg);
+	result->io            = op(result->io, tr->io, arg);
+
+	result->vnodes        = op(result->vnodes, tr->vnodes, arg);
+	result->bytes         = op(result->bytes, tr->bytes, arg);
+
+	result->nodes         = op(result->nodes, tr->nodes, arg);
 }
 
-void monitor_fss_summary_once(struct filesys_info *f)
+int64_t maxop(int64_t a, int64_t b, void *arg)
 {
-	// free-nodes
-	fprintf(log_file, "%10ld\t", f->disk.f_ffree);
+	return ( a > b ? a : b);
 }
+
+int64_t minop(int64_t a, int64_t b, void *arg)
+{
+	return ( a < b ? a : b);
+}
+
+int64_t avgop(int64_t a, int64_t b, void *arg)
+{
+	// Terribly inexact arithmethic, but it allow us to have an
+	// estimate of the average using little memory.
+	//
+	double     n = 1.0 * *((uint64_t *) arg);
+	uint64_t avg = round((a*(n - 1) + b) / n);
+
+	return avg;
+}
+
+void monitor_summary_log(struct tree_info *tr)
+{
+	fprintf(log_file, "%12" PRId64 "\t", tr->wall_time);
+	fprintf(log_file, "%12" PRId64 "\t", tr->num_processes);
+	fprintf(log_file, "%12" PRId64 "\t", tr->cpu_time);
+	fprintf(log_file, "%12" PRId64 "\t", tr->memory);
+	fprintf(log_file, "%12" PRId64 "\t", tr->io);
+                               
+	fprintf(log_file, "%12" PRId64 "\t", tr->vnodes);
+	fprintf(log_file, "%12" PRId64 "\t", tr->bytes);
+                               
+	fprintf(log_file, "%12" PRId64 "\n", tr->nodes);
+}
+
+void monitor_final_summary()
+{
+	fprintf(log_file_summary, "%12s\t%12s\t%12s\t%12s\n", "        ", "max", "min", "avg");
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\t%12" PRId64 "\n", "processes:", tree_max.num_processes, tree_min.num_processes, tree_avg.num_processes);
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12s\t%12s\n", "cpu_time:", tree_max.cpu_time, "-", "-");
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\t%12" PRId64 "\n", "memory:", tree_max.memory, tree_min.memory, tree_avg.memory);
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12s\t%12s\n", "io-chars:", tree_max.io, "-", "-");
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\t%12" PRId64 "\n", "vnodes:", tree_max.vnodes, tree_min.vnodes, tree_avg.vnodes);
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\t%12" PRId64 "\n", "bytes:", tree_max.bytes, tree_min.bytes, tree_avg.bytes);
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\t%12" PRId64 "\n", "nodes:", tree_max.nodes, tree_min.nodes, tree_avg.nodes);
+
+}
+
 
 int monitor_resources(long int interval /*in seconds */)
 {
-	uint64_t clicks;
-	struct process_info  pacc;
-	struct wdir_info     dacc;
-	struct filesys_info  facc;
+	uint64_t round;
+	struct timeval timeout;
 
+	struct process_info  p;
+	struct wdir_info     d;
+	struct filesys_info  f;
+
+	struct tree_info     tree_now;
 
 	// Loop while there are processes to monitor, that is 
-	// itable_size(processes) < 1). The check is in a if/break
-	// pair below to mitigate a race condition in which the last
-	// process exits after the while(...) is tested, but before
-	// we reach select.
-	struct timeval timeout;
-	while(1)
+	// itable_size(processes) > 0). The check is done again in a
+	// if/break pair below to mitigate a race condition in which
+	// the last process exits after the while(...) is tested, but
+	// before we reach select.
+	round = 1;
+	while(itable_size(processes) > 0)
 	{ 
-
 		debug(D_DEBUG, "Beginning monitor round");
-		clicks = clicks_since_launched();
 
-		monitor_processes_once(&pacc);
-		monitor_wds_once(&dacc);
-		monitor_fss_once(&facc);
+		monitor_processes_once(&p);
+		monitor_wds_once(&d);
+		monitor_fss_once(&f);
 
-		fprintf(log_file, "%10" PRIu64 "\t", clicks);
-		monitor_processes_summary_once(&pacc);
-		monitor_wds_summary_once(&dacc);
-		monitor_fss_summary_once(&facc);
-		fprintf(log_file, "\n");
+		monitor_collate_tree(&tree_now, &p, &d, &f);
+
+		if(round == 1)
+		{
+			memcpy(&tree_max, &tree_now, sizeof(struct tree_info));
+			memcpy(&tree_min, &tree_now, sizeof(struct tree_info));
+			memcpy(&tree_avg, &tree_now, sizeof(struct tree_info));
+		}
+		else
+		{
+			monitor_update_tree(&tree_max, &tree_now, NULL, maxop);
+			monitor_update_tree(&tree_min, &tree_now, NULL, minop);
+			monitor_update_tree(&tree_avg, &tree_now, (void *) &round, avgop);
+		}
+
+		monitor_summary_log(&tree_now);
 
 		/* wait for interval seconds. */
 		timeout.tv_sec  = interval;
 		timeout.tv_usec = 0;
 
 		cleanup_zombies();
-
 		//If no more process are alive, break out of loop.
 		if(itable_size(processes) < 1)
 			break;
 		
 		debug(D_DEBUG, "sleeping for: %ld seconds\n", interval);
 		select(0, NULL, NULL, NULL, &timeout);
+
+		//cleanup processes which by terminating may have awaken
+		//select.
+		cleanup_zombies();
+
+		round++;
 	}
 
 	return 0;
@@ -966,14 +1078,15 @@ pid_t monitor_fork(void)
 	return pid;
 }
 
+
 	
 struct process_info *spawn_first_process(const char *cmd)
 {
 	pid_t pid;
 	pid = monitor_fork();
 
-	fprintf(log_file, "command: %s\n", cmd);
-	fprintf(log_file, "wall time click zero is: %" PRIu64 "\n", clicks_since_epoch());
+	fprintf(log_file_summary, "command: %s\n", cmd);
+	fprintf(log_file_summary, "start:\t%" PRIu64 " %s", usecs_since_epoch(), current_time());
 
 	monitor_summary_header();
 
@@ -1042,6 +1155,32 @@ void monitor_check_child(const int signal)
 	list_push_tail(zombies, p);
 }
 
+void monitor_final_cleanup(int signum)
+{
+	struct process_info *p;
+	if(itable_lookup(processes, first_process_pid))
+	{
+		p = itable_lookup(processes, first_process_pid);
+
+		debug(D_DEBUG, "sending SIGINT to first process (%d).\n", first_process_pid);
+
+		signal(SIGCHLD, SIG_DFL);
+		kill(first_process_pid, SIGINT);
+
+		list_push_tail(zombies, p);
+	}
+
+	cleanup_zombies();
+
+	monitor_final_summary();
+
+	//write final report here
+	fclose(log_file);
+	fclose(log_file_summary);
+
+	exit(0);
+}
+
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] command-line-and-options\n", cmd);
@@ -1102,18 +1241,17 @@ int main(int argc, char **argv) {
 		strcat(cmd, " ");
 	}
 	
-	log_file = open_log_file(log_path);
+	open_log_files(log_path);
 
-	clicks_initial = clicks_since_epoch();
+	usecs_initial = usecs_since_epoch();
 
 	spawn_first_process(cmd);
 
 	monitor_resources(interval);
 
-	fclose(log_file);
+	monitor_final_cleanup(0);
 
-	exit(0);
-
+	return 0;
 }
 
 
