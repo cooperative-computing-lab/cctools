@@ -302,7 +302,7 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 
 	buffer = buffer_create();
 
-	buffer_printf(buffer, "type wq_master\nproject %s\nstarttime %llu\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running %d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nworkers_by_pool %s\ncapacity %d\nversion %d.%d.%d\nowner %s", project_name, (s->start_time)/1000000, s->priority, s->port, WORK_QUEUE_CATALOG_MASTER_AD_LIFETIME, s->tasks_waiting, s->total_tasks_complete, s->workers_busy, s->total_tasks_dispatched, s->workers_init, s->workers_ready, s->workers_busy, s->workers_ready + s->workers_busy, workers_by_pool, s->capacity, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
+	buffer_printf(buffer, "type wq_master\nproject %s\nstarttime %llu\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntasks_running %d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nworkers_by_pool %s\ncapacity %d\nversion %d.%d.%d\nowner %s", project_name, (s->start_time)/1000000, s->priority, s->port, WORK_QUEUE_CATALOG_MASTER_AD_LIFETIME, s->tasks_waiting, s->total_tasks_complete, s->workers_busy, s->total_tasks_dispatched, s->workers_init, s->workers_ready, s->workers_busy, s->workers_ready + s->workers_busy, workers_by_pool, s->capacity, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
 
 	text = buffer_tostring(buffer, &text_size);
 	if(domain_name_cache_lookup(catalog_host, address)) {
