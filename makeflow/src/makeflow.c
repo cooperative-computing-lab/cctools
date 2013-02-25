@@ -92,7 +92,7 @@ static int output_len_check = 0;
 static char *makeflow_exe = NULL;
 static char *monitor_exe  = NULL;
 
-static int  monitor_interval = 60;
+static int  monitor_interval = 1;
 
 int dag_depth(struct dag *d);
 int dag_width_uniform_task(struct dag *d);
@@ -1135,15 +1135,30 @@ char *monitor_log_name(int nodeid)
 	return string_format(RESOURCE_MONITOR_LOG_FORMAT, nodeid);
 }
 
-int dag_parse_node(struct dag_parse *bk, char *line, int clean_mode)
+int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode)
 {
 	struct dag *d = bk->d;
-	char *outputs = line;
+	char *line;
+	char *outputs = NULL;
 	char *inputs  = NULL;
 	char *log_name;
 	struct dag_node *n;
 
 	n = dag_node_create(bk->d, bk->linenum);
+
+	if(monitor_exe)
+	{
+		log_name = monitor_log_name(n->nodeid);
+		debug(D_DEBUG, "adding monitor %s and log %s{,-summary} to rule %d.\n", monitor_exe, log_name, n->nodeid);
+
+		line = string_format("%s %s-summary %s %s", log_name, log_name, line_org, monitor_exe);
+	}
+	else
+	{
+		line = xxstrdup(line_org);
+	}
+
+	outputs = line;
 
 	inputs  = strchr(line, ':');
 	*inputs = 0;
@@ -1152,24 +1167,8 @@ int dag_parse_node(struct dag_parse *bk, char *line, int clean_mode)
 	inputs  = string_trim_spaces(inputs); 
 	outputs = string_trim_spaces(outputs);
 
-	if(monitor_exe)
-	{
-		log_name = monitor_log_name(n->nodeid);
-		debug(D_DEBUG, "adding monitor %s and log %s{,-summary} to rule %d.\n", monitor_exe, log_name, n->nodeid);
-
-		inputs  = string_format("%s %s", monitor_exe, inputs);
-		outputs = string_format("%s %s-summary %s", log_name, log_name, outputs);
-	}
-
 	dag_parse_node_filelist(bk, n, outputs, 0, clean_mode);
 	dag_parse_node_filelist(bk, n, inputs, 1, clean_mode);
-
-	if(monitor_exe)
-	{
-		free(log_name);
-		free(inputs);
-		free(outputs);
-	}
 
 	while((line = dag_parse_readline(bk, n)) != NULL) {
 		if(line[0] == '#') {
@@ -2123,27 +2122,29 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 
 char *monitor_locate(const char *path_from_cmdline)
 {
-	char *monitor_org_path, *path_from_env;
+	char *path_from_env;
+	char *monitor_path;
+
 	debug(D_DEBUG,"locating monitor executable...");
 
 	path_from_env = getenv(RESOURCE_MONITOR_ENV_VAR);
 	if(path_from_cmdline)
 	{
-		monitor_org_path = xxstrdup(path_from_cmdline);
+		monitor_path = xxstrdup(path_from_cmdline);
 		debug(D_DEBUG,"trying monitor path provided at command line: %s\n", path_from_cmdline);
 	}
 	else if(path_from_env)
 	{
-		monitor_org_path = xxstrdup(path_from_env);
+		monitor_path = xxstrdup(path_from_env);
 		debug(D_DEBUG,"trying monitor from $%s.", RESOURCE_MONITOR_ENV_VAR);
 	}
 	else
 	{
-		monitor_org_path = string_format("./resource_monitor");
-		debug(D_DEBUG,"trying monitor at default location %s.\n", monitor_org_path);
+		monitor_path = string_format("%s/bin/resource_monitor", INSTALL_PATH);
+		debug(D_DEBUG,"trying monitor at default location %s.\n", monitor_path);
 	}
 
-	return monitor_org_path;
+	return monitor_path;
 }
 
 char *monitor_copy_to_wd(char *path_from_cmdline)
@@ -2155,8 +2156,7 @@ char *monitor_copy_to_wd(char *path_from_cmdline)
 	if(!monitor_org)
 		fatal("Monitor program could not be found.\n");
 
-	mon_unique = string_format("monitor-XXXXXX");
-	mkstemp(mon_unique);
+	mon_unique = string_format("monitor-%d", getpid());
 
 	debug(D_DEBUG,"copying monitor %s to %s.\n", monitor_org, mon_unique);
 
@@ -2172,6 +2172,7 @@ char *monitor_copy_to_wd(char *path_from_cmdline)
 //atexit handler
 void monitor_delete_exe(void)
 {
+	debug(D_DEBUG, "unlinking %s\n", monitor_exe);
 	unlink(monitor_exe);
 }
 
@@ -2484,7 +2485,6 @@ int main(int argc, char *argv[])
 
 	if(syntax_check) {
 		fprintf(stdout, "%s: Syntax OK.\n", dagfile);
-		dag_to_file(d, "res");
 		return 0;
 	}
 
