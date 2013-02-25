@@ -98,3 +98,53 @@ pid_t __vfork()
 	return fork();
 }
 
+
+int chdir(const char *path)
+{
+	int   status;
+	typeof(chdir) *original_chdir = dlsym(RTLD_NEXT, "chdir");
+
+	debug(D_DEBUG, "chdir from %d.\n", getpid());
+	status = original_chdir(path);
+
+	if(status == 0)
+	{
+		struct monitor_msg msg;
+		char  *newpath = getcwd(NULL, 0);
+
+		msg.type   = CHDIR;
+		msg.origin = getpid();
+		strcpy(msg.data.s, newpath);
+		free(newpath);
+
+		send_monitor_msg(&msg);
+	}
+
+	return status;
+}
+
+int fchdir(int fd)
+{
+	int   status;
+	typeof(fchdir) *original_fchdir = dlsym(RTLD_NEXT, "fchdir");
+
+	debug(D_DEBUG, "fchdir from %d.\n", getpid());
+	status = original_fchdir(fd);
+
+	if(status == 0)
+	{
+		struct monitor_msg msg;
+		char  *newpath = getcwd(NULL, 0);
+
+		msg.type   = CHDIR;
+		msg.origin = getpid();
+		strcpy(msg.data.s, newpath);
+		free(newpath);
+
+		send_monitor_msg(&msg);
+	}
+
+	return status;
+}
+
+

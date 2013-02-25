@@ -166,7 +166,6 @@ struct hash_table *wdirs; /* Maps paths to working directory structures. */
 struct itable *filesysms;        /* Maps st_dev ids (from stat syscall) to filesystem structures. */
 struct itable *wdirs_rc;  /* Counts how many process_info use a wdir_info. */
 struct itable *filesys_rc;       /* Counts how many wdir_info use a filesys_info. */
-struct list   *zombies;          /* List of process_info that finished, for cleanup */
 
 //time in usecs, no seconds:
 struct cpu_time_info
@@ -355,10 +354,12 @@ int itable_addto_count(struct itable *table, void *key, int value)
 	uintptr_t count = (uintptr_t) itable_lookup(table, (uintptr_t) key);
 	count += value;                              //we get 0 if lookup fails, so that's ok.
 
-	if(count != 0)
+	if(count > 0)
 		itable_insert(table, (uintptr_t) key, (void *) count);
-	else
+	else if(count == 0)
 		itable_remove(table, (uintptr_t) key);
+	else
+		fatal("Negative reference count!\n");
 
 	return count;
 }
@@ -611,7 +612,7 @@ int get_device_id(char *path)
 	return dinfo.st_dev;
 }
 
-struct filesys_info *lookup_or_create_fs(struct filesys_info *previous, char *path)
+struct filesys_info *lookup_or_create_fs(char *path)
 {
 	uint64_t dev_id = get_device_id(path);
 	struct filesys_info *inventory = itable_lookup(filesysms, dev_id);
@@ -627,15 +628,9 @@ struct filesys_info *lookup_or_create_fs(struct filesys_info *previous, char *pa
 		get_dsk_usage(inventory->path, &inventory->disk_initial);
 	}
 
-	if(inventory != previous)
-	{
-		inc_fs_count(inventory);
-		if(previous)
-			dec_fs_count(previous);
-	}
+	inc_fs_count(inventory);
 
 	return inventory;
-
 }
 
 struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
@@ -650,10 +645,7 @@ struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
 		inventory->path = xxstrdup(path);
 		hash_table_insert(wdirs, inventory->path, (void *) inventory);
 
-		if(previous)
-			inventory->fs = lookup_or_create_fs(previous->fs, inventory->path);
-		else
-			inventory->fs = lookup_or_create_fs(NULL, inventory->path);
+		inventory->fs = lookup_or_create_fs(inventory->path);
 	}
 
 	if(inventory != previous)
@@ -667,30 +659,6 @@ struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
 
 	return inventory;
 }
-
-int get_wd(struct process_info *p)
-{
-	char  *symlink = string_format("/proc/%d/cwd", p->pid);
-	char   target[PATH_MAX];
-
-	memset(target, 0, PATH_MAX); //readlink does not add '\0' to its result.
-
-	if(readlink(symlink, target, PATH_MAX - 1) < 0 || strlen(target) < 1)
-	{
-		debug(D_DEBUG, "could not read symlink to working directory %s : %s\n", symlink, strerror(errno));
-		free(symlink);
-		p->wd = NULL;
-		return 1;
-	}
-
-	p->wd = lookup_or_create_wd(p->wd, target);
-	debug(D_DEBUG, "working directory of %d is %s\n", p->pid, p->wd->path);
-	
-	free(symlink);
-
-	return 0;
-}
-
 
 /***
  * Functions to track a single process, workind directory, or
@@ -706,14 +674,13 @@ int monitor_process_once(struct process_info *p)
 	get_cpu_time_usage(p->pid, &p->cpu);
 	get_mem_usage(p->pid, &p->mem);
 	get_io_usage(p->pid, &p->io);
-	get_wd(p);
 
 	return 0;
 }
 
 int monitor_wd_once(struct wdir_info *d)
 {
-	debug(D_DEBUG, "monitoring %s\n", d->path);
+	debug(D_DEBUG, "monitoring dir %s\n", d->path);
 
 	d->wall_time = usecs_since_epoch();
 	get_wd_usage(d);
@@ -900,14 +867,16 @@ void monitor_final_summary()
 
 void monitor_track_process(pid_t pid)
 {
+	char *newpath;
 	struct process_info *p = malloc(sizeof(struct process_info));
 	p->pid = pid;
 	p->running = 0;
-	p->wd = NULL;
+
+	newpath = getcwd(NULL, 0);
+	p->wd   = lookup_or_create_wd(NULL, newpath);
+	free(newpath);
 
 	itable_insert(processes, p->pid, (void *) p);
-
-	monitor_process_once(p);
 
 	p->running = 1;
 }
@@ -916,7 +885,6 @@ void monitor_untrack_process(uint64_t pid)
 {
 	struct process_info *p = itable_lookup(processes, pid);
 	p->running = 0;
-	list_push_tail(zombies, p);
 }
 void ping_processes(void)
 {
@@ -967,8 +935,13 @@ void cleanup_zombie(struct process_info *p)
 
 void cleanup_zombies(void)
 {
-	while(list_size(zombies) > 0)
-		cleanup_zombie(list_pop_head(zombies));
+	uint64_t pid;
+	struct process_info *p;
+
+	itable_firstkey(processes);
+	while(itable_nextkey(processes, &pid, (void **) &p))
+		if(!p->running)
+			cleanup_zombie(p);
 }
 
 // Return the pid of the child that sent the signal, without removing the
@@ -1031,7 +1004,7 @@ void monitor_final_cleanup(int signum)
 		signal(SIGCHLD, SIG_DFL);
 		kill(first_process_pid, signum);
 
-		list_push_tail(zombies, p);
+		monitor_untrack_process(p->pid);
 	}
 
 	cleanup_zombies();
@@ -1052,9 +1025,13 @@ void monitor_final_cleanup(int signum)
 void monitor_dispatch_msg(void)
 {
 	struct monitor_msg msg;
+	struct process_info *p;
+
 	recv_monitor_msg(monitor_queue_fd, &msg);
 
 	debug(D_DEBUG,"message \"%s\" from %d\n", str_msgtype(msg.type), msg.origin);
+
+	p = itable_lookup(processes, (uint64_t) msg.origin);
 
 	switch(msg.type)
 	{
@@ -1065,6 +1042,7 @@ void monitor_dispatch_msg(void)
 			monitor_untrack_process(msg.data.p);
 			break;
 		case CHDIR:
+			p->wd = lookup_or_create_wd(p->wd, msg.data.s);
 			break;
 		case OPEN:
 			break;
@@ -1293,7 +1271,6 @@ int main(int argc, char **argv) {
 	processes    = itable_create(0);
 	wdirs = hash_table_create(0,0);
 	filesysms    = itable_create(0);
-	zombies      = list_create();
 	
 	wdirs_rc = itable_create(0);
 	filesys_rc      = itable_create(0);
