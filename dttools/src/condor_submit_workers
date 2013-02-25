@@ -64,7 +64,7 @@ then
 	exit 1
 fi
 
-mkdir /tmp/${USER}-workers
+[ -d /tmp/$USER-workers ] || mkdir /tmp/${USER}-workers
 cd /tmp/${USER}-workers
 cp $worker .
 
