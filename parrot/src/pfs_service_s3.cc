@@ -174,9 +174,12 @@ public:
 		sprintf(path, "%s:%s", bucket, name->rest);
 
 		if( !(local_name = (char*)hash_table_lookup(s3_file_cache, path)) ) {
+			int fd;
 			local_name = new char[L_tmpnam];
 			strcpy(local_name, "local_name-XXXXXX");
-			mkstemp(local_name);
+			fd = mkstemp(local_name); 
+			close(fd);               // Ensures the local_name is reserved.
+
 			hash_table_insert(s3_file_cache, path, local_name);
 			local_exists = 1;
 		}
