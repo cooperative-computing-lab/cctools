@@ -225,6 +225,12 @@ struct process_info
 	struct wdir_info *wd;
 };
 
+char *resources[15] = { "wall_time", 
+						"num_processes", "cpu_time", "memory", 
+						"io", 
+						"vnodes", "bytes", "fs_nodes", 
+						NULL };
+
 struct tree_info
 {
 	int64_t  wall_time;
@@ -234,11 +240,15 @@ struct tree_info
 	int64_t  io;
 	int64_t  vnodes;
 	int64_t  bytes;
-	int64_t  nodes;
+	int64_t  fs_nodes;
+
+	char    *over_limit_str;
 };
 
 struct tree_info     tree_max;
 struct tree_info     tree_min;
+
+struct tree_info     tree_limits;
 
 /*** 
  * Utility functions (open log files, proc files, measure time)
@@ -323,6 +333,9 @@ int get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value)
 	int not_found = 1;
 	int n = strlen(attribute);
 
+	if(!fstatus)
+		return not_found;
+
 	proc_attr_line[PATH_MAX - 1] = '\0';
 
 	rewind(fstatus);
@@ -345,6 +358,27 @@ int get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value)
 	return not_found;
 }
 
+#define parse_limit(file, tr, fld) tr->fld = INTMAX_MAX;\
+											  get_int_attribute(file, #fld ":", (uint64_t *) &tr->fld);
+
+void parse_limits_file(char *path, struct tree_info *tree)
+{
+	FILE *flimits = fopen(path, "r");
+	
+	parse_limit(flimits, tree, wall_time);
+	parse_limit(flimits, tree, num_processes);
+	parse_limit(flimits, tree, cpu_time);
+	parse_limit(flimits, tree, memory);
+	parse_limit(flimits, tree, io);
+	parse_limit(flimits, tree, vnodes);
+	parse_limit(flimits, tree, bytes);
+	parse_limit(flimits, tree, fs_nodes);
+
+	if(tree->wall_time != INTMAX_MAX)           //Check wall_time was specified
+		if(tree->wall_time + usecs_initial > 0) //Check for overflow 
+			tree->wall_time += usecs_initial;   //Find absolute maximu time
+}
+
 /***
  * Reference count for filesystems and working directories auxiliary functions.
  ***/
@@ -359,7 +393,7 @@ int itable_addto_count(struct itable *table, void *key, int value)
 	else if(count == 0)
 		itable_remove(table, (uintptr_t) key);
 	else
-		fatal("Negative reference count!\n");
+		debug(D_DEBUG, "Negative reference count!\n");
 
 	return count;
 }
@@ -524,6 +558,8 @@ int get_cpu_time_usage(pid_t pid, struct cpu_time_info *cpu)
 
 	cpu->user_time   = clicks_to_usecs(user);	
 	cpu->kernel_time = clicks_to_usecs(kernel);	
+
+	fclose(fstat);
 
 	return 0;
 }
@@ -770,12 +806,11 @@ void monitor_fss_once(struct filesys_info *acc)
 
 void monitor_summary_header()
 {
-	char *headings[15] = { "wall-time", "no.proc", "cpu-time", "memory", "io-rw", "file+dir", "bytes", "fr_vnodes", NULL };
 	int i;
 
 	fprintf(log_file, "#");
-	for(i = 0; headings[i]; i++)
-		fprintf(log_file, "%10s\t", headings[i]);
+	for(i = 0; resources[i]; i++)
+		fprintf(log_file, "%10s\t", resources[i]);
 
 	fprintf(log_file, "\n");
 }
@@ -791,7 +826,7 @@ void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct w
 	tr->vnodes        = (int64_t) (d->files + d->directories);
 	tr->bytes         = (int64_t) d->byte_count;
 
-	tr->nodes         = (int64_t) f->disk.f_ffree;
+	tr->fs_nodes         = (int64_t) f->disk.f_ffree;
 }
 
 //Computes result = op(result, tr, arg), per field.
@@ -806,7 +841,7 @@ void monitor_update_tree(struct tree_info *result, struct tree_info *tr, void *a
 	result->vnodes        = op(result->vnodes, tr->vnodes, arg);
 	result->bytes         = op(result->bytes, tr->bytes, arg);
 
-	result->nodes         = op(result->nodes, tr->nodes, arg);
+	result->fs_nodes      = op(result->fs_nodes, tr->fs_nodes, arg);
 }
 
 int64_t maxop(int64_t a, int64_t b, void *arg)
@@ -844,11 +879,14 @@ void monitor_summary_log(struct tree_info *tr)
 	fprintf(log_file, "%12" PRId64 "\t", tr->vnodes);
 	fprintf(log_file, "%12" PRId64 "\t", tr->bytes);
                                
-	fprintf(log_file, "%12" PRId64 "\n", tr->nodes);
+	fprintf(log_file, "%12" PRId64 "\n", tr->fs_nodes);
 }
 
 void monitor_final_summary()
 {
+	if(tree_limits.over_limit_str)
+		fprintf(log_file_summary, "monitor-watch-end: %s\n", tree_limits.over_limit_str);
+
 	fprintf(log_file_summary, "%12s\t%12s\t%12s\n", "        ", "max", "min");
 	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "processes:", tree_max.num_processes, tree_min.num_processes);
 	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12s\n", "cpu_time:", tree_max.cpu_time, "-");
@@ -856,7 +894,7 @@ void monitor_final_summary()
 	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12s\n", "io-chars:", tree_max.io, "-");
 	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "vnodes:", tree_max.vnodes, tree_min.vnodes);
 	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "bytes:", tree_max.bytes, tree_min.bytes);
-	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "nodes:", tree_max.nodes, tree_min.nodes);
+	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "fs_nodes:", tree_max.fs_nodes, tree_min.fs_nodes);
 
 }
 
@@ -991,30 +1029,69 @@ void monitor_check_child(const int signal)
 	}
 }
 
-//SIGINT, SIGQUIT signal handler.
+//SIGINT, SIGQUIT, SIGTERM signal handler.
 void monitor_final_cleanup(int signum)
 {
+	uint64_t pid;
 	struct process_info *p;
-	if(itable_lookup(processes, first_process_pid))
+
+	signal(SIGCHLD, SIG_DFL);
+
+	//ask politely to quit
+	itable_firstkey(processes);
+	while(itable_nextkey(processes, &pid, (void **) &p))
 	{
-		p = itable_lookup(processes, first_process_pid);
+		debug(D_DEBUG, "sending %s to process %d.\n", strsignal(signum), pid);
 
-		debug(D_DEBUG, "sending %s to first process (%d).\n", strsignal(signum), first_process_pid);
+		kill(pid, signum);
+	}
 
-		signal(SIGCHLD, SIG_DFL);
-		kill(first_process_pid, signum);
+	sleep(2);
+	ping_processes();
+	cleanup_zombies();
 
-		monitor_untrack_process(p->pid);
+	//we did ask...
+	itable_firstkey(processes);
+	while(itable_nextkey(processes, &pid, (void **) &p))
+	{
+		debug(D_DEBUG, "sending %s to process %d.\n", strsignal(SIGKILL), pid);
+
+		kill(pid, SIGKILL);
+
+		monitor_untrack_process(pid);
 	}
 
 	cleanup_zombies();
-
 	monitor_final_summary();
 
 	fclose(log_file);
 	fclose(log_file_summary);
 
 	exit(0);
+}
+
+#define over_limit_check(tr, fld)\
+	if(tree_limits.fld - tr->fld < 0)\
+	{\
+		tree_limits.over_limit_str = string_format(#fld " %"PRId64" > %"PRId64, tr->fld,tree_limits.fld);\
+		return 0;\
+	}
+
+/* return 0 means above limit, 1 means limist ok */
+int monitor_check_limits(struct tree_info *tr)
+{
+	tr->over_limit_str = NULL;
+
+	over_limit_check(tr, wall_time);
+	over_limit_check(tr, num_processes);
+	over_limit_check(tr, cpu_time);
+	over_limit_check(tr, memory);
+	over_limit_check(tr, io);
+	over_limit_check(tr, vnodes);
+	over_limit_check(tr, bytes);
+	over_limit_check(tr, fs_nodes);
+	
+	return 1;
 }
 
 /***
@@ -1139,7 +1216,7 @@ struct process_info *spawn_first_process(const char *cmd)
 	pid_t pid;
 
 	fprintf(log_file_summary, "command: %s\n", cmd);
-	fprintf(log_file_summary, "start:\t%" PRIu64 " %s", usecs_since_epoch(), current_time());
+	fprintf(log_file_summary, "start:\t%" PRIu64 " %s", usecs_initial, current_time());
 
 	pid = monitor_fork();
 
@@ -1172,6 +1249,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "Use: %s [options] command-line-and-options\n", cmd);
 	fprintf(stdout, "-i <n>			Interval bewteen observations, in seconds. (default=%d)\n", DEFAULT_INTERVAL);
 	fprintf(stdout, "-d <subsystem>		Enable debugging for this subsystem.\n");
+	fprintf(stdout, "-l <maxfile>		Use maxfile with list of var: value pairs for resource limits.");
 	fprintf(stdout, "-o <logfile>		Write log to logfile (default=log-PID-XXXXXX)\n");
 }
 
@@ -1215,6 +1293,9 @@ int monitor_resources(long int interval /*in seconds */)
 
 		monitor_summary_log(&tree_now);
 
+		if(!monitor_check_limits(&tree_now))
+			monitor_final_cleanup(SIGTERM);
+
 		cleanup_zombies();
 		//If no more process are alive, break out of loop.
 		if(itable_size(processes) < 1)
@@ -1238,14 +1319,16 @@ int main(int argc, char **argv) {
 	char c;
 	uint64_t interval = DEFAULT_INTERVAL;
 	char *log_path = NULL;
+	char *limits_path = NULL;
 
 	debug_config(argv[0]);
 
 	signal(SIGCHLD, monitor_check_child);
-	signal(SIGINT, monitor_final_cleanup);
+	signal(SIGINT,  monitor_final_cleanup);
 	signal(SIGQUIT, monitor_final_cleanup);
+	signal(SIGTERM, monitor_final_cleanup);
 
-	while((c = getopt(argc, argv, "d:i:o:")) > 0)
+	while((c = getopt(argc, argv, "d:i:l:o:")) > 0)
 	{
 		switch (c) {
 			case 'd':
@@ -1259,6 +1342,9 @@ int main(int argc, char **argv) {
 			case 'o':
 				log_path = xxstrdup(optarg);
 				break;
+			case 'l':
+				limits_path = xxstrdup(optarg);
+				break;
 			default:
 				show_help(argv[0]);
 				return 1;
@@ -1266,7 +1352,10 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	usecs_initial = usecs_since_epoch();
+
 	monitor_helper_init("./librmonitor_helper.so", &monitor_queue_fd);
+	parse_limits_file(limits_path, &tree_limits);
 
 	processes    = itable_create(0);
 	wdirs = hash_table_create(0,0);
@@ -1276,21 +1365,27 @@ int main(int argc, char **argv) {
 	filesys_rc      = itable_create(0);
 
 	//this is ugly, concatenating command and arguments
-	for(i = optind; i < argc; i++)
+	if(optind < argc)
 	{
-		strcat(cmd, argv[i]);
-		strcat(cmd, " ");
+		for(i = optind; i < argc; i++)
+		{
+			strcat(cmd, argv[i]);
+			strcat(cmd, " ");
+		}
+	}
+	else
+	{
+		show_help(argv[0]);
+		return 1;
 	}
 	
 	open_log_files(log_path);
-
-	usecs_initial = usecs_since_epoch();
 
 	spawn_first_process(cmd);
 
 	monitor_resources(interval);
 
-	monitor_final_cleanup(0);
+	monitor_final_cleanup(SIGTERM);
 
 	return 0;
 }

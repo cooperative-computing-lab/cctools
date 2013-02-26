@@ -1,0 +1,42 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <math.h>
+
+double eps = 1e-10;
+
+double msqrt(double n, double eps)
+{
+	int max = 100000000;
+	double x = n;
+
+	while(fabs(x*x - n) > eps && max > 0)
+	{
+		max--;
+		x = 0.5 * (x + (n/x));
+	}
+
+	return x;
+}
+
+int main(int argc, char **argv)
+{
+	int    n = 200;
+	double r = 1;
+
+	if( argc > 1 )
+		n = atoi(argv[1]);
+
+	while(n--)
+	{
+		r *= 1.2;
+
+		if(fork())
+		{
+			double x = msqrt(r, eps);
+			printf("child %d %lf %lf %lf\n", getpid(), r, x, x*x - r);
+			wait(NULL);
+			exit(0);
+		}
+	}
+}

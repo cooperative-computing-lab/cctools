@@ -142,6 +142,7 @@ int send_monitor_msg(struct monitor_msg *msg)
 	debug(D_DEBUG, "message sent from %d to port %d. %d bytes.\n", getpid(), port, count);
 
 	freeaddrinfo(addr);
+	close(fd);
 
 	return count;
 }

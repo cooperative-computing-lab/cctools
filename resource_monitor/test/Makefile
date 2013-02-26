@@ -3,13 +3,17 @@ CCTOOLS_HOME = ../..
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
-all: hogmem
+TARGETS=hogmem msqrt
 
-hogmem: hogmem.c
+all: ${TARGETS}
+
+hogmem: hogmem.c 
+
+msqrt: msqrt.c
 
 test:
 
 clean:
-	-rm *.o hogmem
+	-rm *.o ${TARGETS}
 
 install:
