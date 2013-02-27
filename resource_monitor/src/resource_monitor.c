@@ -118,6 +118,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "debug.h"
 #include "xxmalloc.h"
+#include "copy_stream.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -149,7 +150,7 @@ See the file COPYING for details.
 #endif
 
 #include "rmonitor_helper_comm.h"
-
+#include "rmonitor_piggyback.h"
 
 #define DEFAULT_INTERVAL 1 /* in seconds */
 
@@ -161,11 +162,17 @@ pid_t  first_process_pid;      /* pid of the process given at the command line *
 uint64_t usecs_initial;        /* Time at which monitoring started, in usecs. */
 
 
-struct itable *processes;        /* Maps the pid of a process to a unique struct process_info. */
-struct hash_table *wdirs; /* Maps paths to working directory structures. */
-struct itable *filesysms;        /* Maps st_dev ids (from stat syscall) to filesystem structures. */
-struct itable *wdirs_rc;  /* Counts how many process_info use a wdir_info. */
-struct itable *filesys_rc;       /* Counts how many wdir_info use a filesys_info. */
+struct itable *processes;       /* Maps the pid of a process to a unique struct process_info. */
+struct hash_table *wdirs;       /* Maps paths to working directory structures. */
+struct itable *filesysms;       /* Maps st_dev ids (from stat syscall) to filesystem structures. */
+struct itable *wdirs_rc;        /* Counts how many process_info use a wdir_info. */
+struct itable *filesys_rc;      /* Counts how many wdir_info use a filesys_info. */
+
+
+char *lib_helper_name = "librmonitor_helper.so";	/* Name of the helper library that is 
+													   automatically extracted */	
+int lib_helper_extracted;		/* Boolean flag to indicate whether the bundled helper library 
+								   was automatically extracted */ 
 
 //time in usecs, no seconds:
 struct cpu_time_info
@@ -910,15 +917,26 @@ void monitor_final_summary()
  * cleanup of processes in the zombie state.
  ***/
 
+int ping_process(pid_t pid)
+{
+	return (kill(pid, 0) == 0);
+}
+
+
 void monitor_track_process(pid_t pid)
 {
 	char *newpath;
-	struct process_info *p = itable_lookup(processes, pid);
+	struct process_info *p; 
+	
+	if(!ping_process(pid))
+		return;
+
+	p = itable_lookup(processes, pid);
 
 	if(p)
 		return;
-	else
-		p = malloc(sizeof(struct process_info));
+
+	p = malloc(sizeof(struct process_info));
 
 	p->pid = pid;
 	p->running = 0;
@@ -947,7 +965,7 @@ void ping_processes(void)
 
 	itable_firstkey(processes);
 	while(itable_nextkey(processes, &pid, (void **) &p))
-		if(kill(pid, 0) != 0)
+		if(!ping_process(pid))
 		{
 			debug(D_DEBUG, "cannot find %d process.\n", pid);
 			monitor_untrack_process(pid);
@@ -1078,6 +1096,10 @@ void monitor_final_cleanup(int signum)
 	}
 
 	cleanup_zombies();
+
+	if(lib_helper_extracted)
+		unlink(lib_helper_name);
+
 	monitor_final_summary();
 
 	fclose(log_file);
@@ -1114,6 +1136,31 @@ int monitor_check_limits(struct tree_info *tr)
  * Functions that communicate with the helper library,
  * (un)tracking resources as messages arrive.
 ***/
+
+void write_helper_lib(void)
+{	
+	FILE *flib;
+	uint64_t n;
+
+	if(access(lib_helper_name, R_OK | X_OK) == 0)
+	{
+		lib_helper_extracted = 0;
+		return;
+	}
+
+	flib = fopen(lib_helper_name, "w");
+	if(!flib)
+		return;
+
+	n = sizeof(lib_helper_data);
+
+	copy_buffer_to_stream(lib_helper_data, flib, n);
+	fclose(flib);
+
+	chmod(lib_helper_name, 0777);
+
+	lib_helper_extracted = 1;
+}
 
 void monitor_dispatch_msg(void)
 {
@@ -1220,7 +1267,7 @@ pid_t monitor_fork(void)
 	}
 	else
 	{
-		sigsuspend(&set);
+		//sigsuspend(&set);
 		signal(SIGCONT, prev_handler);
 	}
 
@@ -1370,7 +1417,11 @@ int main(int argc, char **argv) {
 
 	usecs_initial = usecs_since_epoch();
 
+#ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB
+	write_helper_lib();
 	monitor_helper_init("./librmonitor_helper.so", &monitor_queue_fd);
+#endif
+
 	parse_limits_file(limits_path, &tree_limits);
 
 	processes    = itable_create(0);

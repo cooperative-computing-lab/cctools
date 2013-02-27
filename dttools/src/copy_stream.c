@@ -131,6 +131,27 @@ int copy_fd_to_stream(int fd, FILE * output)
 	}
 }
 
+int copy_buffer_to_stream(char * buffer, FILE * output, int buffer_size)
+{
+	int actual_write = 0;
+	int total = 0;
+
+	while(total < buffer_size)
+	{
+		actual_write = full_fwrite(output, buffer, buffer_size);
+		if(actual_write < 1)
+			total = -1;
+			break;
+		total += actual_write;
+	}
+
+	if(actual_write < 0 && total == 0) {
+		return -1;
+	} else {
+		return total;
+	}
+}
+
 static int keepgoing = 0;
 
 static void stop_working(int sig)

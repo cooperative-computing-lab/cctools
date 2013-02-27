@@ -33,7 +33,7 @@ struct monitor_msg
 	}                     data;
 };
 
-int monitor_helper_init(const char *path_from_cmdline, int *fd);
+int monitor_helper_init(char *path_from_cmdline, int *fd);
 
 const char *str_msgtype(enum monitor_msg_type n);
 

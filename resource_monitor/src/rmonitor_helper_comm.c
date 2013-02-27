@@ -56,30 +56,45 @@ const char *str_msgtype(enum monitor_msg_type n)
 	};
 }
 
-char *monitor_helper_locate(const char *path_from_cmdline)
+char *monitor_helper_locate(char *path_from_cmdline)
 {
-	char *helper_path, *path_from_env;
+	char *helper_path;
 
 	debug(D_DEBUG,"locating helper library...\n");
 
-	path_from_env = getenv(RMONITOR_HELPER_ENV_VAR);
-	if(path_from_cmdline)	
+	helper_path = path_from_cmdline;
+	if(helper_path)
 	{
-		helper_path = xxstrdup(path_from_cmdline);
 		debug(D_DEBUG,"trying library from path provided at command line.\n");
-	}
-	else if(path_from_env)
-	{
-		helper_path = xxstrdup(path_from_env);
-		debug(D_DEBUG,"trying library from $%s.\n", RMONITOR_HELPER_ENV_VAR);
-	} 
-	else 
-	{
-		helper_path = string_format("%s/lib/libmonitor_helper.so", INSTALL_PATH);
-		debug(D_DEBUG,"trying library at default location.\n");
+		if(access(helper_path, R_OK|X_OK) == 0)	
+			return xxstrdup(helper_path);	
 	}
 
-	return helper_path;
+	helper_path = getenv(RMONITOR_HELPER_ENV_VAR);
+	if(helper_path)
+	{
+		debug(D_DEBUG,"trying library from $%s.\n", RMONITOR_HELPER_ENV_VAR);
+		if(helper_path && access(helper_path, R_OK|X_OK) == 0)	
+			return xxstrdup(helper_path);	
+	}
+
+	helper_path = string_format("./librmonitor_helper.so");
+	if(helper_path)
+	{
+		debug(D_DEBUG,"trying library at local directory.\n");
+		if(helper_path && access(helper_path, R_OK|X_OK) == 0)	
+			return helper_path;	
+	}
+
+	helper_path = string_format("%s/lib/librmonitor_helper.so", INSTALL_PATH);
+	if(helper_path)
+	{
+		debug(D_DEBUG,"trying library at default location.\n");
+		if(helper_path && access(helper_path, R_OK|X_OK) == 0)	
+			return helper_path;	
+	}
+
+	return NULL;
 }
 
 int recv_monitor_msg(int fd, struct monitor_msg *msg)
@@ -191,7 +206,7 @@ int monitor_open_socket(int *fd, int *port)
 
  /* We use datagrams to send information to the monitor from the
   * great grandchildren processes */
-int monitor_helper_init(const char *libpath_from_cmdline, int *fd)
+int monitor_helper_init(char *libpath_from_cmdline, int *fd)
 {
 	int  port;
 	char *helper_path = monitor_helper_locate(libpath_from_cmdline);
