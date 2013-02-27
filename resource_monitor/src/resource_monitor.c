@@ -390,10 +390,8 @@ int itable_addto_count(struct itable *table, void *key, int value)
 
 	if(count > 0)
 		itable_insert(table, (uintptr_t) key, (void *) count);
-	else if(count == 0)
-		itable_remove(table, (uintptr_t) key);
 	else
-		debug(D_DEBUG, "Negative reference count!\n");
+		itable_remove(table, (uintptr_t) key);
 
 	return count;
 }
@@ -427,7 +425,7 @@ int inc_wd_count(struct wdir_info *d)
 {
 	int count = itable_addto_count(wdirs_rc, d, 1);
 
-	debug(D_DEBUG, "working directory %s reference count +1, now %d references.\n", d->path, count); 
+	debug(D_DEBUG, "working directory '%s' reference count +1, now %d references.\n", d->path, count); 
 
 	return count;
 }
@@ -436,11 +434,13 @@ int dec_wd_count(struct wdir_info *d)
 {
 	int count = itable_addto_count(wdirs_rc, d, -1);
 
-	debug(D_DEBUG, "working directory %s reference count -1, now %d references.\n", d->path, count); 
+	debug(D_DEBUG, "working directory '%s' reference count -1, now %d references.\n", d->path, count); 
 
 	if(count < 1)
 	{
-		debug(D_DEBUG, "working directory %s is not monitored anymore.\n", d->path);
+		debug(D_DEBUG, "working directory '%s' is not monitored anymore.\n", d->path);
+
+		hash_table_remove(wdirs, d->path); 
 
 		dec_fs_count((void *) d->fs);
 		free(d->path);
@@ -641,7 +641,7 @@ int get_device_id(char *path)
 
 	if(stat(path, &dinfo) != 0)
 	{
-		debug(D_DEBUG, "stat call on %s failed : %s\n", path, strerror(errno));
+		debug(D_DEBUG, "stat call on '%s' failed : %s\n", path, strerror(errno));
 		return -1;
 	}
 
@@ -671,11 +671,18 @@ struct filesys_info *lookup_or_create_fs(char *path)
 
 struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
 {
-	struct wdir_info *inventory = hash_table_lookup(wdirs, path);
+	struct wdir_info *inventory; 
+
+	debug(D_DEBUG, "working directory '%s' strlen: %d.\n", path, strlen(path));
+
+	if(strlen(path) < 1 || access(path, F_OK) != 0)
+		return previous;
+
+	inventory = hash_table_lookup(wdirs, path);
 
 	if(!inventory) 
 	{
-		debug(D_DEBUG, "working directory %s added to monitor.\n", path);
+		debug(D_DEBUG, "working directory '%s' added to monitor.\n", path);
 
 		inventory = (struct wdir_info *) malloc(sizeof(struct wdir_info));
 		inventory->path = xxstrdup(path);
@@ -906,7 +913,13 @@ void monitor_final_summary()
 void monitor_track_process(pid_t pid)
 {
 	char *newpath;
-	struct process_info *p = malloc(sizeof(struct process_info));
+	struct process_info *p = itable_lookup(processes, pid);
+
+	if(p)
+		return;
+	else
+		p = malloc(sizeof(struct process_info));
+
 	p->pid = pid;
 	p->running = 0;
 
@@ -922,8 +935,11 @@ void monitor_track_process(pid_t pid)
 void monitor_untrack_process(uint64_t pid)
 {
 	struct process_info *p = itable_lookup(processes, pid);
-	p->running = 0;
+
+	if(p)
+		p->running = 0;
 }
+
 void ping_processes(void)
 {
 	uint64_t pid;
