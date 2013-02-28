@@ -366,25 +366,87 @@ int get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value)
 	return not_found;
 }
 
-#define parse_limit(file, tr, fld) tr->fld = INTMAX_MAX;\
-											  get_int_attribute(file, #fld ":", (uint64_t *) &tr->fld);
+void initialize_limits_tree(struct tree_info *tree, int64_t val)
+{
+	tree->wall_time     = val;
+	tree->num_processes = val;
+	tree->cpu_time      = val;
+	tree->memory        = val;
+	tree->io            = val;
+	tree->vnodes        = val;
+	tree->bytes         = val;
+	tree->fs_nodes      = val;
+}
 
+
+//BUG from hash table!! what if resource is set to zero?
+//BUG the parsing limit functions are ugly
+//BUG there is no error checking of unknown vars or malformed
+//values
+/* The limits string has format "var: value[, var: value]*" */
+#define parse_limit_string(vars, tr, fld) if(hash_table_lookup(vars, #fld)){\
+												tr->fld = (uintptr_t) hash_table_lookup(vars, #fld);\
+											    debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", #fld, tr->fld);}
+
+void parse_limits_string(char *str, struct tree_info *tree)
+{
+	struct hash_table *vars = hash_table_create(0,0);
+	char *line              = xxstrdup(str);
+	char *var, *value;
+
+	var = strtok(line, ":");
+	while(var)
+	{
+		var = string_trim_spaces(xxstrdup(var));
+		value = strtok(NULL, ",");
+		if(value)
+		{
+			uintptr_t v = atoi(value);
+			hash_table_insert(vars, var, (uintptr_t *) v);
+		}
+		else
+			break;
+
+		var = strtok(NULL, ":");
+	}
+
+	parse_limit_string(vars, tree, wall_time);
+	parse_limit_string(vars, tree, num_processes);
+	parse_limit_string(vars, tree, cpu_time);
+	parse_limit_string(vars, tree, memory);
+	parse_limit_string(vars, tree, io);
+	parse_limit_string(vars, tree, vnodes);
+	parse_limit_string(vars, tree, bytes);
+	parse_limit_string(vars, tree, fs_nodes);
+
+	if(hash_table_lookup(vars, "wall_time"))     //Check wall_time was specified
+		if(tree->wall_time + usecs_initial > 0) //Check for overflow 
+		{
+			tree->wall_time += usecs_initial;   //Find absolute maximu time
+			debug(D_DEBUG, "Added initial usecs to wall_time limit: %" PRId64 "\n", tree->wall_time);
+		}
+}
+
+/* Every line of the limits file has the format resource: value */
+#define parse_limit_file(file, tr, fld) if(!get_int_attribute(file, #fld ":", (uint64_t *) &tr->fld))\
+											debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", #fld, tr->fld);
 void parse_limits_file(char *path, struct tree_info *tree)
 {
 	FILE *flimits = fopen(path, "r");
 	
-	parse_limit(flimits, tree, wall_time);
-	parse_limit(flimits, tree, num_processes);
-	parse_limit(flimits, tree, cpu_time);
-	parse_limit(flimits, tree, memory);
-	parse_limit(flimits, tree, io);
-	parse_limit(flimits, tree, vnodes);
-	parse_limit(flimits, tree, bytes);
-	parse_limit(flimits, tree, fs_nodes);
+	parse_limit_file(flimits, tree, wall_time);
+	parse_limit_file(flimits, tree, num_processes);
+	parse_limit_file(flimits, tree, cpu_time);
+	parse_limit_file(flimits, tree, memory);
+	parse_limit_file(flimits, tree, io);
+	parse_limit_file(flimits, tree, vnodes);
+	parse_limit_file(flimits, tree, bytes);
+	parse_limit_file(flimits, tree, fs_nodes);
 
-	if(tree->wall_time != INTMAX_MAX)           //Check wall_time was specified
+	uint64_t dummy;
+	if(!get_int_attribute(flimits, "wall_time:" , &dummy))           //Check if wall_time was specified
 		if(tree->wall_time + usecs_initial > 0) //Check for overflow 
-			tree->wall_time += usecs_initial;   //Find absolute maximu time
+			tree->wall_time += usecs_initial;   //Find absolute maximum time
 }
 
 /***
@@ -1384,7 +1446,6 @@ int main(int argc, char **argv) {
 	char c;
 	uint64_t interval = DEFAULT_INTERVAL;
 	char *log_path = NULL;
-	char *limits_path = NULL;
 
 	debug_config(argv[0]);
 
@@ -1393,7 +1454,10 @@ int main(int argc, char **argv) {
 	signal(SIGQUIT, monitor_final_cleanup);
 	signal(SIGTERM, monitor_final_cleanup);
 
-	while((c = getopt(argc, argv, "d:i:l:o:")) > 0)
+	usecs_initial = usecs_since_epoch();
+	initialize_limits_tree(&tree_limits, INTMAX_MAX);
+
+	while((c = getopt(argc, argv, "d:i:L:l:o:")) > 0)
 	{
 		switch (c) {
 			case 'd':
@@ -1408,7 +1472,10 @@ int main(int argc, char **argv) {
 				log_path = xxstrdup(optarg);
 				break;
 			case 'l':
-				limits_path = xxstrdup(optarg);
+				parse_limits_file(optarg, &tree_limits);
+				break;
+			case 'L':
+				parse_limits_string(optarg, &tree_limits);
 				break;
 			default:
 				show_help(argv[0]);
@@ -1417,14 +1484,10 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	usecs_initial = usecs_since_epoch();
-
 #ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB
 	write_helper_lib();
 	monitor_helper_init("./librmonitor_helper.so", &monitor_queue_fd);
 #endif
-
-	parse_limits_file(limits_path, &tree_limits);
 
 	processes    = itable_create(0);
 	wdirs = hash_table_create(0,0);
