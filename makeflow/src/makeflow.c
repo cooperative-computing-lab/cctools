@@ -92,7 +92,7 @@ static int output_len_check = 0;
 static char *makeflow_exe = NULL;
 static char *monitor_exe  = NULL;
 
-static int  monitor_interval = 1;
+static int  monitor_interval = 250;                               // in miliseconds  
 
 int dag_depth(struct dag *d);
 int dag_width_uniform_task(struct dag *d);
@@ -1365,8 +1365,7 @@ void dag_parse_node_set_command(struct dag_parse *bk, struct dag_node *n, char *
 int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 {
 	char *log_name;
-	char *command;
-
+	char *command = line;
 
 	while(*command && isspace(*command))
 		command++;
@@ -1994,6 +1993,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
 	fprintf(stdout, " -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
 	fprintf(stdout, " -m <email>     Send summary of workflow to this email address upon success or failure.\n");
+	fprintf(stdout, " -M <#>         Enable the resource monitor with intervals of <#> miliseconds.\n");
 	fprintf(stdout, " -N <project>   Set the project name to <project>\n");
 	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
 	fprintf(stdout, " -O             Show output files.\n");

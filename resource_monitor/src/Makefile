@@ -46,9 +46,8 @@ endif
 piggybacker: piggybacker.o
 	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
 
-
 clean:
-	rm -f core *~ *.o *.a *.so resource_monitor_pb.* rmonitor_piggyback.h piggybacker ${TARGETS} 
+	rm -f core *~ *.o *.a *.so resource_monitor_pb.* rmonitor_piggyback.h* piggybacker resource_monitor resource_monitorv
 
 test: all
 

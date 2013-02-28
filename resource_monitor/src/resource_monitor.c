@@ -13,9 +13,10 @@ See the file COPYING for details.
  *
  * Use as:
  *
- * resource_monitor -i 120 -- some-command-line-and-options
+ * resource_monitor -i 120000 -- some-command-line-and-options
  *
- * to monitor some-command-line at two minutes intervals.
+ * to monitor some-command-line at two minutes intervals (120000
+ * miliseconds).
  *
  * Each monitor target resource has two functions:
  * get_RESOURCE_usage, and acc_RESOURCE_usage. For example, for memory we have
@@ -83,7 +84,7 @@ See the file COPYING for details.
  * the first processes it created, and cleans up the monitoring
  * tables.
  *
- * monitor takes the -i<seconds> flag, which indicates how often
+ * monitor takes the -i<miliseconds> flag, which indicates how often
  * the resources are checked. The logic is there to allow, say,
  * memory to be checked twice as often as disk, but right now all
  * the resources are checked at each interval.
@@ -152,7 +153,7 @@ See the file COPYING for details.
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_piggyback.h"
 
-#define DEFAULT_INTERVAL 1 /* in seconds */
+#define DEFAULT_INTERVAL 250 /* in miliseconds */
 
 FILE  *log_file;               /* All monitoring information of all processes is written here. */
 FILE  *log_file_summary;       /* Final statistics are written to this file. */
@@ -680,8 +681,6 @@ struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
 {
 	struct wdir_info *inventory; 
 
-	debug(D_DEBUG, "working directory '%s' strlen: %d.\n", path, strlen(path));
-
 	if(strlen(path) < 1 || access(path, F_OK) != 0)
 		return previous;
 
@@ -1080,9 +1079,11 @@ void monitor_final_cleanup(int signum)
 		kill(pid, signum);
 	}
 
-	sleep(2);
 	ping_processes();
 	cleanup_zombies();
+
+	if(itable_size(processes) > 0)
+		sleep(5);
 
 	//we did ask...
 	itable_firstkey(processes);
@@ -1199,11 +1200,11 @@ int wait_for_messages(int interval)
 {
 	struct timeval timeout;
 
-	/* wait for interval seconds. */
+	/* wait for interval miliseconds. */
 	timeout.tv_sec  = 0;
 	timeout.tv_usec = 0;
 
-	debug(D_DEBUG, "sleeping for: %ld seconds\n", interval);
+	debug(D_DEBUG, "sleeping for: %ld miliseconds\n", interval);
 
 	//If grandchildren processes cannot talk to us, simply wait.
 	//Else, wait, and check socket for messages.
@@ -1219,7 +1220,8 @@ int wait_for_messages(int interval)
 			fd_set rset;
 			FD_ZERO(&rset);
 			FD_SET(monitor_queue_fd, &rset);
-			timeout.tv_sec  = interval;
+			timeout.tv_sec  = (interval * 1000)/1000000;
+			timeout.tv_usec  = interval * 1000;
 			interval = 0;                     //Next loop we do not wait at all
 			count = select(monitor_queue_fd + 1, &rset, NULL, NULL, &timeout);
 
@@ -1310,14 +1312,14 @@ struct process_info *spawn_first_process(const char *cmd)
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] command-line-and-options\n", cmd);
-	fprintf(stdout, "-i <n>			Interval bewteen observations, in seconds. (default=%d)\n", DEFAULT_INTERVAL);
+	fprintf(stdout, "-i <n>			Interval bewteen observations, in miliseconds. (default=%d)\n", DEFAULT_INTERVAL);
 	fprintf(stdout, "-d <subsystem>		Enable debugging for this subsystem.\n");
 	fprintf(stdout, "-l <maxfile>		Use maxfile with list of var: value pairs for resource limits.");
-	fprintf(stdout, "-o <logfile>		Write log to logfile (default=log-PID-XXXXXX)\n");
+	fprintf(stdout, "-o <logfile>		Write log to logfile (default=log-PID)\n");
 }
 
 
-int monitor_resources(long int interval /*in seconds */)
+int monitor_resources(long int interval /*in miliseconds */)
 {
 	uint64_t round;
 
@@ -1400,7 +1402,7 @@ int main(int argc, char **argv) {
 			case 'i':
 				interval = strtoll(optarg, NULL, 10);
 				if(interval < 1)
-					fatal("interval cannot be set to less than one second.");
+					fatal("interval cannot be set to less than one milisecond.");
 				break;
 			case 'o':
 				log_path = xxstrdup(optarg);

@@ -3,11 +3,13 @@
 #include <unistd.h>
 #include <math.h>
 
+#include <sys/select.h>
+
 double eps = 1e-10;
 
 double msqrt(double n, double eps)
 {
-	int max = 100000000;
+	int max = 1000000000;
 	double x = n;
 
 	while(fabs(x*x - n) > eps && max > 0)
@@ -38,5 +40,8 @@ int main(int argc, char **argv)
 			wait(NULL);
 			exit(0);
 		}
+
+		struct timeval ts = {.tv_sec = 0, .tv_usec = 100000};
+		select(0, NULL, NULL, NULL, &ts);
 	}
 }
