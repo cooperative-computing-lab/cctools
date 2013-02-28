@@ -47,7 +47,7 @@ build_host=`uname -n`
 build_sys=`uname -s | tr \[a-z\] \[A-Z\] | awk -F_ '{print $1}'`
 build_cpu=`uname -m | tr \[a-z\] \[A-Z\]`
 
-if [ "${build_cpu}" = unknown ]
+if [ "${build_cpu}" = UNKNOWN ]
 then
 	build_cpu=`uname -p | tr \[a-z\] \[A-Z\]`
 fi
