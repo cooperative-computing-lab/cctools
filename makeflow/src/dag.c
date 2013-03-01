@@ -64,15 +64,19 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n = malloc(sizeof(struct dag_node));
 	memset(n, 0, sizeof(struct dag_node));
+	n->d = d;
 	n->linenum = linenum;
 	n->state = DAG_NODE_STATE_WAITING;
 	n->nodeid = d->nodeid_counter++;
 	n->variables = hash_table_create(0, 0);
 
+	n->source_files = list_create(0);
+	n->target_files = list_create(0);
+
 	return n;
 }
 
-struct dag_file *dag_file_create(const char *filename, char *remotename, struct dag_file *next)
+struct dag_file *dag_file_create(struct dag_node *n, const char *filename, char *remotename)
 {
 	struct dag_file *f = malloc(sizeof(*f));
 	f->filename = xxstrdup(filename);
@@ -81,7 +85,6 @@ struct dag_file *dag_file_create(const char *filename, char *remotename, struct 
 	} else {
 		f->remotename = NULL;
 	}
-	f->next = next;
 	return f;
 }
 
@@ -94,7 +97,8 @@ struct hash_table *dag_input_files(struct dag *d)
 	ih = hash_table_create(0,0);
 	for(n = d->nodes; n; n = n->next) {
 		//for each source file, see if it is a target file of another node
-		for(f = n->source_files; f; f = f->next) {
+		list_first_item(n->source_files);
+		while( (f = list_next_item(n->source_files)) ) {
 			// d->file_table contains all target files
 			// get the node (tmp) that outputs current source file
 			tmp = hash_table_lookup(d->file_table, f->filename);
@@ -168,12 +172,14 @@ const char *dag_node_state_name(dag_node_state_t state)
 
 void dag_node_add_source_file(struct dag_node *n, const char *filename, char *remotename)
 {
-	n->source_files = dag_file_create(filename, remotename, n->source_files);
+	struct dag_file *source = dag_file_create(n, filename, remotename);
+	list_push_head(n->source_files, source);
 }
 
 void dag_node_add_target_file(struct dag_node *n, const char *filename, char *remotename)
 {
-	n->target_files = dag_file_create(filename, remotename, n->target_files);
+	struct dag_file *target = dag_file_create(n, filename, remotename);
+	list_push_head(n->target_files, target);
 }
 
 void dag_count_states(struct dag *d)

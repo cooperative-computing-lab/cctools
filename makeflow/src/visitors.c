@@ -53,19 +53,15 @@ int dag_to_file_exports(const struct dag *d, FILE *dag_stream)
 
 /* Writes a list of files to the the stream, using remotename
  * instead of filename if available */
-int dag_to_file_files(const struct dag_file *fs, FILE *dag_stream)
+int dag_to_file_files(struct list *fs, FILE *dag_stream)
 {
 	//here we may want to call the linker renaming function,
 	//instead of using f->remotename
 	
 	const struct dag_file *f;
-	for(f = fs; f; f = f->next)
-	{
-		fprintf(dag_stream, "%s", f->remotename ? f->remotename : f->filename);
-
-		if(f->next)
-			fprintf(dag_stream, " ");
-	}
+	list_first_item(fs);
+	while( (f = list_next_item(fs)) )
+		fprintf(dag_stream, "%s ", f->remotename ? f->remotename : f->filename);
 
 	return 0;
 }
@@ -207,8 +203,9 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size)
 
 	g = hash_table_create(0,0);
 
-	for(n = d->nodes; n; n = n->next){
-		for (f = n->source_files; f; f = f->next){
+	for(n = d->nodes; n; n = n->next) {
+		list_first_item(n->source_files);
+		while ( (f = list_next_item(n->source_files)) ) {
 			fn = f->filename;
 			e = hash_table_lookup(g, fn);
 			if (!e) {
@@ -222,7 +219,8 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size)
 				hash_table_insert(g, fn, e);
 			}
 		}
-		for (f = n->target_files; f; f = f->next){
+		list_first_item(n->target_files);
+		while ( (f = list_next_item(n->target_files)) ) {
 			fn = f->filename;
                         e = hash_table_lookup(g, fn);
                         if (!e) {
@@ -267,11 +265,14 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size)
                 t = hash_table_lookup(h, label);
 
 
-		for(f = n->source_files; f; f = f->next) {
+		list_first_item(n->source_files);
+		while ( (f = list_next_item(n->source_files)) ) {
 			e = hash_table_lookup(g, f->filename);
 			fprintf(stdout, "F%d -> N%d;\n", e->id, condense_display?t->id:n->nodeid);
 		}
-		for(f = n->target_files; f; f = f->next) {
+
+		list_first_item(n->target_files);
+		while ( (f = list_next_item(n->target_files)) ) {
 			e = hash_table_lookup(g, f->filename);
 			fprintf(stdout, "N%d -> F%d;\n", condense_display?t->id:n->nodeid, e->id);
 		}

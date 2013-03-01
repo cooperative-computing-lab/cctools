@@ -55,16 +55,20 @@ struct dag_parse {
 };
 
 
-/* struct dag_file implements a linked list of files. filename is
- * the path given in the makeflow file, and remotename is a
- * unique slash-less pathname that is resolved to filename, but
- * that can easily be sent to a remote batch system. remotename
- * is obtained from filename with the translate_filename
- * function. */
+/* struct dag_file represents a file, inpur or output, of the
+ * workflow. filename is the path given in the makeflow file, and
+ * remotename is a unique slash-less pathname that is resolved to
+ * filename, but that can easily be sent to a remote batch
+ * system. remotename is obtained from filename with the
+ * translate_filename function.
+ *
+ * (Eventually, all references to a filename are guaranteed to
+ * have the same struct dag_file, and remotename will come from
+ * a hash_table defined per node) */
+
 struct dag_file {
 	const char *filename;
 	char *remotename;
-	struct dag_file *next;
 };
 
 /* struct dag_node implements a linked list of nodes. A dag_node
@@ -78,6 +82,7 @@ struct dag_file {
  * being sets of source/target files (that is, a file may be part
  * of different nodes).*/
 struct dag_node {
+	struct dag *d;
 	int only_my_children;
 	time_t previous_completion;
 	int linenum;
@@ -91,8 +96,8 @@ struct dag_node {
 	const char *makeflow_cwd;
 	const char *makeflow_dag;
 	const char *symbol;
-	struct dag_file *source_files;
-	struct dag_file *target_files;
+	struct list *source_files;
+	struct list *target_files;
 	int source_file_names_size;
 	int target_file_names_size;
 	batch_job_id_t jobid;
@@ -111,7 +116,7 @@ struct dag_lookup_set {
 
 struct dag_node *dag_node_create(struct dag *d, int linenum);
 struct dag *dag_create();
-struct dag_file *dag_file_create(const char *filename, char *remotename, struct dag_file *next);
+struct dag_file *dag_file_create(struct dag_node *d, const char *filename, char *remotename);
 
 struct hash_table *dag_input_files(struct dag *d);
 

@@ -136,7 +136,8 @@ int dag_width_guaranteed_max(struct dag *d)
 		nodeid = -1;
 		m = 0;
 		// for each source file, see if it is a target file of another node
-		for(f = n->source_files; f; f = f->next) {
+		list_first_item(n->source_files);
+		while( (f = list_next_item(n->source_files)) ) {
 			// d->file_table contains all target files
 			// get the node (tmp) that outputs current source file
 			tmp = hash_table_lookup(d->file_table, f->filename);
@@ -180,7 +181,8 @@ int dag_depth(struct dag *d)
 	struct list *level_unsolved_nodes = list_create();
 	for(n = d->nodes; n != NULL; n = n->next) {
 		n->level = 0;
-		for(f = n->source_files; f != NULL; f = f->next) {
+		list_first_item(n->source_files);
+		while ( (f = list_next_item(n->source_files)) ) {
 			if((parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename)) != NULL) {
 				n->level = -1;
 				list_push_tail(level_unsolved_nodes, n);
@@ -191,7 +193,8 @@ int dag_depth(struct dag *d)
 
 	int max_level = 0;
 	while((n = (struct dag_node *) list_pop_head(level_unsolved_nodes)) != NULL) {
-		for(f = n->source_files; f != NULL; f = f->next) {
+		list_first_item(n->source_files);
+		while( (f = list_next_item(n->source_files)) ) {
 			if((parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename)) != NULL) {
 				if(parent->level == -1) {
 					n->level = -1;
@@ -322,7 +325,8 @@ int dag_width(struct dag *d, int nested_jobs)
 
 	for(n = d->nodes; n != NULL; n = n->next) {
 		n->level = 0; // initialize 'level' value to 0 because other functions might have modified this value.
-		for(f = n->source_files; f != NULL; f = f->next) {
+		list_first_item(n->source_files);
+		while( (f = list_next_item(n->source_files)) ) {
 			parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename);
 			if(parent)
 				parent->children++;
@@ -349,7 +353,8 @@ int dag_width(struct dag *d, int nested_jobs)
 	while(list_size(leaves) > 0) {
 		struct dag_node *n = (struct dag_node *) list_pop_head(leaves);
 
-		for(f = n->source_files; f != NULL; f = f->next) {
+		list_first_item(n->source_files);
+		while ( (f = list_next_item(n->source_files)) ) {
 			parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename);
 			if(!parent)
 				continue;
@@ -444,8 +449,8 @@ void file_clean(const char *filename, int silent)
 void dag_node_clean(struct dag *d, struct dag_node *n)
 {
 	struct dag_file *f;
-	for(f = n->target_files; f; f = f->next) {
-
+	list_first_item(n->target_files);
+	while( (f = list_next_item(n->target_files)) ) {
 		file_clean(f->filename, 0);
 
 		/* Make sure to clobber the original file too if it exists */
@@ -520,7 +525,9 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 		goto rerun;
 	}
 	// Rerun if an input file has been updated since the last execution.
-	for(f = n->source_files; f; f = f->next) {
+	list_first_item(n->source_files);
+	while( (f = list_next_item(n->source_files)) )
+	{
 		if(stat(f->filename, &filestat) >= 0) {
 			if(S_ISDIR(filestat.st_mode))
 				continue;
@@ -543,7 +550,8 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	}
 
 	// Rerun if an output file is missing.
-	for(f = n->target_files; f; f = f->next) {
+	list_first_item(n->target_files);
+	while( (f = list_next_item(n->target_files)) ) {
 		if(stat(f->filename, &filestat) < 0) {
 			/* If output file is missing, but node completed and file was garbage, then avoid rerunning. */
 			if(n->state == DAG_NODE_STATE_COMPLETE && hash_table_lookup(d->collect_table, f->filename)) {
@@ -592,7 +600,8 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 	dag_node_state_change(d, n, DAG_NODE_STATE_WAITING);
 
 	// For each parent node, rerun it if input file was garbage collected
-	for(f1 = n->source_files; f1; f1 = f1->next) {
+	list_first_item(n->source_files);
+	while( (f1 = list_next_item(n->source_files)) ) {
 		if(hash_table_lookup(d->collect_table, f1->filename) == NULL)
 			continue;
 
@@ -604,10 +613,13 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 	}
 
 	// For each child node, rerun it
-	for(f1 = n->target_files; f1; f1 = f1->next) {
+	list_first_item(n->target_files);
+	while( (f1 = list_next_item(n->target_files)) ) {
 		for(p = d->nodes; p; p = p->next) {
 			child_node_found = 0;
-			for(f2 = p->source_files; f2; f2 = f2->next) {
+
+			list_first_item(p->source_files);
+			while( (f2 = list_next_item(n->source_files)) ) {
 				if(!strcmp(f1->filename, f2->filename)) {
 					child_node_found = 1;
 					break;
@@ -683,7 +695,8 @@ void dag_log_recover(struct dag *d, const char *filename)
 
 			/* Record node parents to log */
 			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
-			for(f = n->source_files; f; f = f->next) {
+			list_first_item(n->source_files);
+			while( (f = list_next_item(n->source_files)) ) {
 				p = hash_table_lookup(d->file_table, f->filename);
 				if(p)
 					fprintf(d->logfile, "\t%d", p->nodeid);
@@ -692,14 +705,16 @@ void dag_log_recover(struct dag *d, const char *filename)
 
 			/* Record node inputs to log */
 			fprintf(d->logfile, "# SOURCES\t%d", n->nodeid);
-			for(f = n->source_files; f; f = f->next) {
+			list_first_item(n->source_files);
+			while( (f = list_next_item(n->source_files)) ) {
 				fprintf(d->logfile, "\t%s", f->filename);
 			}
 			fputc('\n', d->logfile);
 
 			/* Record node outputs to log */
 			fprintf(d->logfile, "# TARGETS\t%d", n->nodeid);
-			for(f = n->target_files; f; f = f->next) {
+			list_first_item(n->target_files);
+			while( (f = list_next_item(n->target_files)) ) {
 				fprintf(d->logfile, "\t%s", f->filename);
 			}
 			fputc('\n', d->logfile);
@@ -964,7 +979,8 @@ int dag_check_dependencies(struct dag *d)
 	/* Walk list of nodes and associate target files with the nodes that
 	 * generate them. */
 	for(n = d->nodes; n; n = n->next) {
-		for(f = n->target_files; f; f = f->next) {
+		list_first_item(n->target_files);
+		while( (f = list_next_item(n->target_files)) ) {
 			m = hash_table_lookup(d->file_table, f->filename);
 			if(m) {
 				fprintf(stderr, "makeflow: %s is defined multiple times at %s:%d and %s:%d\n", f->filename, d->filename, n->linenum, d->filename, m->linenum);
@@ -1002,8 +1018,11 @@ void dag_prepare_gc(struct dag *d)
 	struct dag_node *n;
 	struct dag_file *f;
 	for(n = d->nodes; n; n = n->next)
-		for(f = n->source_files; f; f = f->next)
+	{
+		list_first_item(n->source_files);
+		while( (f = list_next_item(n->source_files)) ) 
 			dag_gc_ref_incr(d, f->filename, 1);
+	}
 }
 
 void dag_prepare_nested_jobs(struct dag *d)
@@ -1246,24 +1265,20 @@ int dag_parse_node_filelist(struct dag_parse *bk, struct dag_node *n, char *file
 
 }
 
-int dag_prepare_for_batch_system(struct dag *d) {
-
-	struct dag_node *n;
+int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, int source_flag)
+{
 	struct dag_file *f;
-	int source;
 	int rv;
-	
-	for(n = d->nodes; n; n = n->next) {
-		source = 1;
-		for(f = n->source_files; f; ) {
-			switch(batch_queue_type) {
-			
+
+	list_first_item(files);
+	while( (f = list_next_item(files)) ) {
+		switch(batch_queue_type) {
+
 			case BATCH_QUEUE_TYPE_CONDOR:
-				
 				rv = 0;
 				if(strchr(f->filename, '/') && !f->remotename) {
-					rv = translate_filename(d, f->filename, &(f->remotename));
-					if(source) {
+					rv = translate_filename(n->d, f->filename, &(f->remotename));
+					if(source_flag) {
 						n->source_file_names_size += strlen(f->remotename);
 					} else {
 						n->target_file_names_size += strlen(f->remotename);
@@ -1271,7 +1286,7 @@ int dag_prepare_for_batch_system(struct dag *d) {
 				} else if(f->remotename) {
 					rv = 1;
 				}
-				
+
 				if(rv) {
 					debug(D_DEBUG,"creating symlink \"./%s\" for file \"%s\"\n", f->remotename, f->filename);
 					rv = symlink(f->filename, f->remotename);
@@ -1282,7 +1297,7 @@ int dag_prepare_for_batch_system(struct dag *d) {
 						} else {
 							int link_size = strlen(f->filename)+2;
 							char *link_contents = malloc(link_size);
-							
+
 							link_size = readlink(f->remotename, link_contents, link_size);
 							if(!link_size || strncmp(f->filename, link_contents, link_size)) {
 								fprintf(stderr, "makeflow: symbolic link %s points to wrong file (\"%s\" instead of \"%s\")\n", f->remotename, link_contents, f->filename);
@@ -1292,11 +1307,11 @@ int dag_prepare_for_batch_system(struct dag *d) {
 							free(link_contents);
 						}
 					} else {
-						list_push_tail(d->symlinks_created, f->remotename);
+						list_push_tail(n->d->symlinks_created, f->remotename);
 					}
-	
+
 					/* Create symlink target stub for output files, otherwise Condor will fail on write-back */
-					if(!source && access(f->filename, R_OK) < 0) {
+					if(!source_flag && access(f->filename, R_OK) < 0) {
 						int fd = open(f->filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
 						if(fd < 0) {
 							fprintf(stderr, "makeflow: could not create symbolic link target (%s): %s\n", f->filename, strerror(errno));
@@ -1305,24 +1320,24 @@ int dag_prepare_for_batch_system(struct dag *d) {
 						close(fd);
 					}
 				}
-				 
+
 				break;
-	
+
 			case BATCH_QUEUE_TYPE_WORK_QUEUE:
-				
+
 				if(f->filename[0] == '/' && !f->remotename) {
 					/* Translate only explicit absolute paths for Work Queue tasks.*/
-					translate_filename(d, f->filename, &(f->remotename));
+					translate_filename(n->d, f->filename, &(f->remotename));
 					debug(D_DEBUG, "translating work queue absolute path (%s) -> (%s)", f->filename, f->remotename);
-					
-					if(source) {
+
+					if(source_flag) {
 						n->source_file_names_size += strlen(f->remotename);
 					} else {
 						n->target_file_names_size += strlen(f->remotename);
 					}
 				}
 				break;
-				
+
 			default:
 
 				if(f->remotename) {
@@ -1330,20 +1345,28 @@ int dag_prepare_for_batch_system(struct dag *d) {
 					goto failure;
 				}
 				break;
-				
-			}
 
-			f = f->next;
-			
-			/* If we're done with the source files, switch to checking target files */
-			if(!f && source) {
-				f = n->target_files;
-				source = 0;
-			}
 		}
 	}
+
+	return 1;
+
 failure:
 	return 0;
+}
+
+int dag_prepare_for_batch_system(struct dag *d) {
+
+	struct dag_node *n;
+	
+	for(n = d->nodes; n; n = n->next) {
+		if( !dag_prepare_for_batch_system_files(n, n->source_files, 1 /* source_flag */) )
+			return 0;
+		if( !dag_prepare_for_batch_system_files(n, n->target_files, 0) )
+			return 0;
+	}
+
+	return 1;
 }
 
 void dag_parse_node_set_command(struct dag_parse *bk, struct dag_node *n, char *command)
@@ -1510,7 +1533,8 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 	input_files = malloc((n->source_file_names_size + 1) * sizeof(char));
 	memset(input_files, 0, n->source_file_names_size + 1);
-	for(f = n->source_files; f; f = f->next) {
+	list_first_item(n->source_files);
+	while( (f = list_next_item(n->source_files)) ) {
 		switch(batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
 			strcat(input_files, f->filename);
@@ -1535,7 +1559,9 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 	output_files = malloc((n->target_file_names_size + 1) * sizeof(char));
 	memset(output_files, 0, n->target_file_names_size + 1);
-	for(f = n->target_files; f; f = f->next) {
+
+	list_first_item(n->target_files);
+	while( (f = list_next_item(n->target_files)) ) {
 		switch(batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
 			if(f->remotename) {
@@ -1635,7 +1661,8 @@ int dag_node_ready(struct dag *d, struct dag_node *n)
 			return 0;
 	}
 
-	for(f = n->source_files; f; f = f->next) {
+	list_first_item(n->source_files);
+	while( (f = list_next_item(n->source_files)) ) {
 		if(hash_table_lookup(d->completed_files, f->filename)) {
 			continue;
 		} else {
@@ -1678,7 +1705,8 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 	}
 
 	if(info->exited_normally && info->exit_code == 0) {
-		for(f = n->target_files; f; f = f->next) {
+		list_first_item(n->target_files);
+		while( (f = list_next_item(n->target_files)) ) {
 			if(access(f->filename, R_OK) != 0) {
 				fprintf(stderr,"%s did not create file %s\n", n->command, f->filename);
 				job_failed = 1;
@@ -1718,13 +1746,15 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 		}
 	} else {
 		/* Record which target files have been generated by this node. */
-		for(f = n->target_files; f; f = f->next) {
+		list_first_item(n->target_files);
+		while( (f = list_next_item(n->target_files)) ) {
 			hash_table_insert(d->completed_files, f->filename, f->filename);
 		}
 
 		/* Mark source files that have been used by this node and
 		 * perform collection if we are doing reference counting. */
-		for(f = n->source_files; f; f = f->next) {
+		list_first_item(n->source_files);
+		while( (f = list_next_item(n->source_files)) ) {
 			dag_gc_ref_incr(d, f->filename, -1);
 			if (dag_gc_method == DAG_GC_REF_COUNT) {
 				dag_gc_ref_count(d, f->filename);
@@ -1743,7 +1773,8 @@ int dag_check(struct dag *d)
 	debug(D_DEBUG, "checking rules for consistency...\n");
 
 	for(n = d->nodes; n; n = n->next) {
-		for(f = n->source_files; f; f = f->next) {
+		list_first_item(n->source_files);
+		while( (f = list_next_item(n->source_files)) ) {
 			if(hash_table_lookup(d->completed_files, f->filename)) {
 				continue;
 			}
@@ -2080,7 +2111,8 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 			tasks_aborted++;
 		else if (state == DAG_NODE_STATE_COMPLETE){
 			tasks_completed++;
-			for (f = n->source_files; f; f = f->next){
+			list_first_item(n->source_files);
+			while((f = list_next_item(n->source_files)) ) {
 				fn = f->filename;
 				if (!list_find(output_files, (int (*) (void *, const void*)) string_equal, (void*)fn)) list_push_tail(output_files, (void*)fn);
 			}
@@ -2560,8 +2592,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(dag_prepare_for_batch_system(d)) {
-		return 1;
+	if(!dag_prepare_for_batch_system(d)) {
+		fatal("Could not prepare for submission to batch system.\n");
 	}
 
 	dag_prepare_gc(d);
