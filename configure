@@ -286,7 +286,7 @@ do
 			;;
 		--tcp-high-port)
 			shift
-			ccflags="${ccflags} -DHIGH_LOW_PORT_DEFAULT=$1"
+			ccflags="${ccflags} -DTCP_HIGH_PORT_DEFAULT=$1"
 			;;
 		-h | -help | --h | --help)
 			cat <<EOF
