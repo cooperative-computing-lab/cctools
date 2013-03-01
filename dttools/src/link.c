@@ -36,6 +36,14 @@ See the file COPYING for details.
 #include <time.h>
 #include <sys/poll.h>
 
+#ifndef TCP_LOW_PORT_DEFAULT
+#define TCP_LOW_PORT_DEFAULT 1024
+#endif
+
+#ifndef TCP_HIGH_PORT_DEFAULT
+#define TCP_HIGH_PORT_DEFAULT 32767
+#endif
+
 #define BUFFER_SIZE 65536
 
 struct link {
@@ -292,8 +300,8 @@ struct link *link_serve_address(const char *addr, int port)
 		address.sin_addr.s_addr = htonl(INADDR_ANY);
 	}
 
-	int low = 1024;
-	int high = 32767;
+	int low = TCP_LOW_PORT_DEFAULT;
+	int high = TCP_HIGH_PORT_DEFAULT;
 	if(port == 0) {
 		const char *lowstr = getenv("TCP_LOW_PORT");
 		if (lowstr)

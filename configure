@@ -280,6 +280,14 @@ do
 			echo "ignoring unknown package $1"
 			shift
 			;;
+		--tcp-low-port)
+			shift
+			ccflags="${ccflags} -DTCP_LOW_PORT_DEFAULT=$1"
+			;;
+		--tcp-high-port)
+			shift
+			ccflags="${ccflags} -DHIGH_LOW_PORT_DEFAULT=$1"
+			;;
 		-h | -help | --h | --help)
 			cat <<EOF
 Use: configure [options]
@@ -289,6 +297,8 @@ Where options are:
   --strict
   --globus-flavor      <flavor>
   --xrootd-arch        <arch>
+  --tcp-low-port       <port>
+  --tcp-high-port      <port>
   --with-PACKAGE-path  <path>
   --without-system-SYSTEM
 
