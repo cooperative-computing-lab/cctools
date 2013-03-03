@@ -160,6 +160,7 @@ FILE  *log_file_summary;       /* Final statistics are written to this file. */
 
 int    monitor_queue_fd;       /* File descriptor of a datagram socket to which (great)* grandchildren processes report to the monitor. */
 pid_t  first_process_pid;      /* pid of the process given at the command line */
+pid_t  first_process_exit_status;      /* exit status of the process given at the command line */
 uint64_t usecs_initial;        /* Time at which monitoring started, in usecs. */
 
 
@@ -180,6 +181,9 @@ struct cpu_time_info
 {
 	uint64_t user_time;
 	uint64_t kernel_time;
+
+	uint64_t delta_user_time;
+	uint64_t delta_kernel_time;
 };
 
 struct mem_info
@@ -196,6 +200,9 @@ struct io_info
 {
 	uint64_t chars_read;
 	uint64_t chars_written;
+
+	uint64_t delta_chars_read;
+	uint64_t delta_chars_written;
 };
 
 struct wdir_info
@@ -626,6 +633,9 @@ int get_cpu_time_usage(pid_t pid, struct cpu_time_info *cpu)
 			/* .... */,
 			&kernel, &user);
 
+	cpu->delta_user_time   = clicks_to_usecs(user)   - cpu->user_time;	 
+	cpu->delta_kernel_time = clicks_to_usecs(kernel) - cpu->kernel_time;	
+
 	cpu->user_time   = clicks_to_usecs(user);	
 	cpu->kernel_time = clicks_to_usecs(kernel);	
 
@@ -636,8 +646,8 @@ int get_cpu_time_usage(pid_t pid, struct cpu_time_info *cpu)
 
 void acc_cpu_time_usage(struct cpu_time_info *acc, struct cpu_time_info *other)
 {
-	acc->user_time   += other->user_time;
-	acc->kernel_time += other->kernel_time;
+	acc->delta_user_time   += other->delta_user_time;
+	acc->delta_kernel_time += other->delta_kernel_time;
 }
 
 int get_mem_usage(pid_t pid, struct mem_info *mem)
@@ -678,27 +688,33 @@ int get_io_usage(pid_t pid, struct io_info *io)
 	// lost, as if the process did not read or write any characters.
 
 	FILE *fio = open_proc_file(pid, "io");
+	uint64_t cread, cwritten;
 	int rstatus, wstatus;
 
 	if(!fio)
 		return 1;
 
-	rstatus = get_int_attribute(fio, "rchar", &io->chars_read);
-	wstatus = get_int_attribute(fio, "wchar", &io->chars_written);
+	rstatus = get_int_attribute(fio, "rchar", &cread);
+	wstatus = get_int_attribute(fio, "wchar", &cwritten);
 
 	fclose(fio);
 
 	if(rstatus || wstatus)
 		return 1;
-	else
-		return 0;
 
+	io->delta_chars_read    = cread - io->chars_read;
+	io->delta_chars_written = cwritten - io->chars_written;
+
+	io->chars_read = cread;
+	io->chars_written = cwritten;
+
+	return 0;
 }
 
 void acc_io_usage(struct io_info *acc, struct io_info *other)
 {
-	acc->chars_read    += other->chars_read;
-	acc->chars_written += other->chars_written;
+	acc->delta_chars_read    += other->delta_chars_read;
+	acc->delta_chars_written += other->delta_chars_written;
 }
 
 /***
@@ -894,9 +910,9 @@ void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct w
 {
 	tr->wall_time     = (int64_t) p->wall_time;
 	tr->num_processes = (int64_t) itable_size(processes);
-	tr->cpu_time      = (int64_t) (p->cpu.user_time + p->cpu.kernel_time);
+	tr->cpu_time      = (int64_t) (p->cpu.delta_user_time + p->cpu.delta_kernel_time) + tr->cpu_time;
 	tr->memory        = (int64_t) p->mem.virtual;
-	tr->io            = (int64_t) (p->io.chars_read + p->io.chars_written);
+	tr->io            = (int64_t) (p->io.delta_chars_read + p->io.delta_chars_written) + tr->io;
 
 	tr->vnodes        = (int64_t) (d->files + d->directories);
 	tr->bytes         = (int64_t) d->byte_count;
@@ -957,10 +973,15 @@ void monitor_summary_log(struct tree_info *tr)
 	fprintf(log_file, "%12" PRId64 "\n", tr->fs_nodes);
 }
 
-void monitor_final_summary()
+int monitor_final_summary()
 {
+	int status = 0;
+
 	if(tree_limits.over_limit_str)
+	{
+		status = -1;
 		fprintf(log_file_summary, "monitor-watch-end: %s\n", tree_limits.over_limit_str);
+	}
 
 	fprintf(log_file_summary, "%12s\t%12s\t%12s\n", "        ", "max", "min");
 	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "processes:", tree_max.num_processes, tree_min.num_processes);
@@ -971,6 +992,10 @@ void monitor_final_summary()
 	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "bytes:", tree_max.bytes, tree_min.bytes);
 	fprintf(log_file_summary, "%12s\t%12" PRId64 "\t%12" PRId64 "\n", "fs_nodes:", tree_max.fs_nodes, tree_min.fs_nodes);
 
+	if(status && !first_process_exit_status)
+		return status;
+	else
+		return first_process_exit_status;
 }
 
 /***
@@ -998,6 +1023,7 @@ void monitor_track_process(pid_t pid)
 		return;
 
 	p = malloc(sizeof(struct process_info));
+	bzero(p, sizeof(struct process_info));
 
 	p->pid = pid;
 	p->running = 0;
@@ -1042,22 +1068,26 @@ void cleanup_zombie(struct process_info *p)
 	//die zombie die
 	waitpid(p->pid, &status, WNOHANG);
 
+	first_process_exit_status = WEXITSTATUS(status);
+
 	if(p->pid == first_process_pid)
+	{
 		fprintf(log_file_summary, "end:\t%" PRIu64 " %s", (uint64_t) usecs_since_epoch(), current_time());
 
-	if( WIFEXITED(status) )
-	{
-		debug(D_DEBUG, "process %d finished: %d.\n", p->pid, WEXITSTATUS(status) );
-		if(p->pid == first_process_pid)
-			fprintf(log_file_summary, "exit-type:\tnormal\nexit-status:\t%d\n", WEXITSTATUS(status) );
-	} 
-	else if ( WIFSIGNALED(status) )
-	{
-		debug(D_DEBUG, "process %d terminated: %s.\n", p->pid, strsignal(WTERMSIG(status)) );
-		if(p->pid == first_process_pid)
-			fprintf(log_file_summary, "exit-type:\tsignal %d %s\nexit-status:\t%d\n", 
-					WTERMSIG(status), strsignal(WTERMSIG(status)), WEXITSTATUS(status));
-	} 
+		if( WIFEXITED(status) )
+		{
+			debug(D_DEBUG, "process %d finished: %d.\n", p->pid, first_process_exit_status );
+			if(p->pid == first_process_pid)
+				fprintf(log_file_summary, "exit-type:\tnormal\nexit-status:\t%d\n", first_process_exit_status );
+		} 
+		else if ( WIFSIGNALED(status) )
+		{
+			debug(D_DEBUG, "process %d terminated: %s.\n", p->pid, strsignal(WTERMSIG(status)) );
+			if(p->pid == first_process_pid)
+				fprintf(log_file_summary, "exit-type:\tsignal %d %s\nexit-status:\t%d\n", 
+						WTERMSIG(status), strsignal(WTERMSIG(status)), first_process_exit_status);
+		} 
+	}
 
 	if(p->wd)
 		dec_wd_count(p->wd);
@@ -1128,7 +1158,8 @@ void monitor_check_child(const int signal)
 void monitor_final_cleanup(int signum)
 {
 	uint64_t pid;
-	struct process_info *p;
+	struct   process_info *p;
+	int      status;
 
 	signal(SIGCHLD, SIG_DFL);
 
@@ -1163,16 +1194,16 @@ void monitor_final_cleanup(int signum)
 	if(lib_helper_extracted)
 		unlink(lib_helper_name);
 
-	monitor_final_summary();
+	status = monitor_final_summary();
 
 	fclose(log_file);
 	fclose(log_file_summary);
 
-	exit(0);
+	exit(status);
 }
 
 #define over_limit_check(tr, fld)\
-	if(tree_limits.fld - tr->fld < 0)\
+	if(tr->fld > 0 && tree_limits.fld - tr->fld < 0)\
 	{\
 		tree_limits.over_limit_str = string_format(#fld " %"PRId64" > %"PRId64, tr->fld,tree_limits.fld);\
 		return 0;\
@@ -1390,6 +1421,7 @@ int monitor_resources(long int interval /*in miliseconds */)
 	struct filesys_info  f;
 
 	struct tree_info     tree_now;
+	bzero(&tree_now, sizeof(struct tree_info));
 
 	// Loop while there are processes to monitor, that is 
 	// itable_size(processes) > 0). The check is done again in a
