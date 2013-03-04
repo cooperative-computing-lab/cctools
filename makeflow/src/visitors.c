@@ -83,7 +83,10 @@ int dag_to_file_node(const struct dag_node *n, FILE *dag_stream)
 	fprintf(dag_stream, ": ");
 	dag_to_file_files(n->source_files, dag_stream);
 	fprintf(dag_stream, "\n");
-	fprintf(dag_stream, "\t%s\n", n->command);
+	if (n->local_job)
+		fprintf(dag_stream, "\tLOCAL %s", n->command);
+	else
+		fprintf(dag_stream, "\t%s\n", n->command);
 	fprintf(dag_stream, "\n");
 
 	return 0;
