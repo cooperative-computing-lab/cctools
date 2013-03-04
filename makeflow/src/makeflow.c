@@ -283,13 +283,22 @@ void collect_input_files(struct dag *d, char* destination)
 	char *key;
 	void *value;
 	char file_destination[PATH_MAX];
+	char directory[PATH_MAX];
 
 	hash_table_firstkey(ih);
 	while(hash_table_nextkey(ih, &key, &value)) {
 		from = fopen(key, "r");
 		if(!value)
 			value = key;
+		char *first = NULL;
+		first = string_front((char *)value, 1);
+		if(!strcmp(first, "/")){
+			value = (void *) string_basename((char *)value);
+		}
+		fprintf(stderr, "%s\n", first);
 		sprintf(file_destination, "%s/%s", destination, (char *) value);
+		string_dirname(file_destination, directory);
+		create_dir(directory, 0777);
 		to = fopen(file_destination, "w");
 		copy_stream_to_stream(from, to);
 		fclose(from);

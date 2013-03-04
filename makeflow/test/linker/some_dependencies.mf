@@ -1,0 +1,2 @@
+out.txt : simple.mf
+	touch out.txt
