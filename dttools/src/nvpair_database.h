@@ -102,7 +102,7 @@ void nvpair_database_firstkey( struct nvpair_database *db );
 This function returns the next primary key and object in the iteration.
 @param db The database to access.
 @param key A pointer to an unset char pointer, which will be made to point to the primary key.
-@param value A pointer to an unset nvpair pointer, which will be made to point to the next object.
+@param nv A pointer to an unset nvpair pointer, which will be made to point to the next object.
 @return Zero if there are no more elements to visit, non-zero otherwise.
 */
 

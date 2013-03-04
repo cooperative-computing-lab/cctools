@@ -133,7 +133,7 @@ struct work_queue_task *work_queue_task_create(const char *full_command);
 @param flags	May be zero to indicate no special handling or any of the following or'd together:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
-@return 1 if the task file is successfully specified, 0 if either of @param t, @param local_name, or @param remote_name is null or @param remote_name is an absolute path.
+@return 1 if the task file is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
 int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags);
 
@@ -149,7 +149,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 @param flags	May be zero to indicate no special handling or any of the following or'd together:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
-@return 1 if the task file piece is successfully specified, 0 if either of @param t, @param local_name, or @param remote_name is null or @param remote_name is an absolute path.
+@return 1 if the task file piece is successfully specified, 0 if either of @a t, @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
 int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags);
 
@@ -161,7 +161,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 @param flags	May be zero to indicate no special handling or any of the following or'd together:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
-@return 1 if the task file is successfully specified, 0 if either of @param t or @param remote_name is null or @param remote_name is an absolute path.
+@return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
 */
 int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags);
 
@@ -175,7 +175,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 @param flags	May be zero to indicate no special handling or any of the following or'd together:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
-@return 1 if the task command file is successfully specified, 0 if either of @param t, @param cmd, or @param remote_name is null or @param remote_name is an absolute path.
+@return 1 if the task command file is successfully specified, 0 if either of @a t, @a cmd, or @a remote_name is null or @a remote_name is an absolute path.
 */
 int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags);
 
@@ -395,13 +395,13 @@ void work_queue_specify_log(struct work_queue *q, const char *logfile);
 
 /** Change the keepalive interval for a given queue.
 @param q A work queue object.
-@param seconds The minimum number of seconds to wait before sending new keepalive checks to workers.
+@param interval The minimum number of seconds to wait before sending new keepalive checks to workers.
 */
 void work_queue_specify_keepalive_interval(struct work_queue *q, int interval);
 
 /** Change the keepalive timeout for identifying dead workers for a given queue.
 @param q A work queue object.
-@param seconds The minimum number of seconds to wait for a keepalive response from worker before marking it as dead.
+@param timeout The minimum number of seconds to wait for a keepalive response from worker before marking it as dead.
 */
 void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout);
 //@}
@@ -415,7 +415,7 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout);
 @param buf A pointer to the data buffer to send to the worker to be available to the commands.
 @param length The number of bytes of data in the buffer
 @param rname The name of the file in which to store the buffer data on the worker
-@return 1 if the input buffer is successfully specified, 0 if either of @param t or @param rname is null or @param rname is an absolute path.
+@return 1 if the input buffer is successfully specified, 0 if either of @a t or @a rname is null or @a rname is an absolute path.
 @deprecated Use @ref work_queue_task_specify_buffer instead.
 */
 int work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf, int length, const char *rname);
@@ -424,7 +424,7 @@ int work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf
 @param t The task to which to add parameters
 @param fname The name of the data file to send to the worker to be available to the commands.
 @param rname The name of the file in which to store the buffer data on the worker.
-@return 1 if the input file is successfully specified, 0 if either of @param t, @param fname, or @param rname is null or @param rname is an absolute path.
+@return 1 if the input file is successfully specified, 0 if either of @a t, @a fname, or @a rname is null or @a rname is an absolute path.
 @deprecated See @ref work_queue_task_specify_file instead.
 */
 int work_queue_task_specify_input_file(struct work_queue_task *t, const char *fname, const char *rname);
@@ -433,7 +433,7 @@ int work_queue_task_specify_input_file(struct work_queue_task *t, const char *fn
 @param t The task to which to add parameters
 @param fname The name of the data file to send to the worker to be available to the commands.
 @param rname The name of the file in which to store the buffer data on the worker.
-@return 1 if the input file is successfully specified, 0 if either of @param t, @param fname, or @param rname is null or @param rname is an absolute path.
+@return 1 if the input file is successfully specified, 0 if either of @a t, @a fname, or @a rname is null or @a rname is an absolute path.
 @deprecated See @ref work_queue_task_specify_file instead.
 */
 int work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, const char *fname, const char *rname);
@@ -442,7 +442,7 @@ int work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, c
 @param t The task to which to add parameters
 @param rname The name of a file created by the program when it runs.
 @param fname The name of the file local target for copying rname back.
-@return 1 if the output file is successfully specified, 0 if either of @param t, @param fname, or @param rname is null or @param rname is an absolute path.
+@return 1 if the output file is successfully specified, 0 if either of @a t, @a fname, or @a rname is null or @a rname is an absolute path.
 @deprecated See @ref work_queue_task_specify_file instead.
 */
 int work_queue_task_specify_output_file(struct work_queue_task *t, const char *rname, const char *fname);
@@ -451,7 +451,7 @@ int work_queue_task_specify_output_file(struct work_queue_task *t, const char *r
 @param t The task to which to add parameters
 @param rname The name of a file created by the program when it runs.
 @param fname The name of the file local target for copying rname back.
-@return 1 if the output file is successfully specified, 0 if either of @param t, @param fname, or @param rname is null or @param rname is an absolute path.
+@return 1 if the output file is successfully specified, 0 if either of @a t, @a fname, or @a rname is null or @a rname is an absolute path.
 @deprecated See @ref work_queue_task_specify_file instead.
 */
 int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname);
