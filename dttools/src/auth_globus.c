@@ -34,7 +34,7 @@ static int read_token(void *link, void **bufp, size_t * sizep)
 		*bufp = malloc(*sizep);
 		if(*bufp) {
 			result = link_read(link, *bufp, *sizep, stoptime);
-			if(result == *sizep) {
+			if(result == (int) *sizep) {
 				return GLOBUS_SUCCESS;
 			}
 			free(*bufp);
@@ -49,7 +49,7 @@ static int write_token(void *link, void *buf, size_t size)
 	time_t stoptime = time(0) + 3600;
 
 	link_putfstring(link, "%zu\n", stoptime, size);
-	if(link_putlstring(link, buf, size, stoptime) == size) {
+	if(link_putlstring(link, buf, size, stoptime) == (int) size) {
 		return GLOBUS_SUCCESS;
 	} else {
 		return GLOBUS_GSS_ASSIST_TOKEN_EOF;
