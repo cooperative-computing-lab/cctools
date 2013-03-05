@@ -31,7 +31,7 @@ INT64_T string_metric_parse(const char *str);
 int string_time_parse(const char *str);
 int string_split(char *str, int *argc, char ***argv);
 int string_split_quotes(char *str, int *argc, char ***argv);
-char *string_pad_right(char *str, int length);
+char *string_pad_right(char *str, unsigned int length);
 char *string_pad_left(char *str, int length);
 void string_cookie(char *str, int length);
 char *string_subst(char *value, string_subst_lookup_t lookup, void *arg);

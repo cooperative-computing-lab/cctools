@@ -445,9 +445,9 @@ int string_split_quotes(char *str, int *argc, char ***argv)
 	return 1;
 }
 
-char *string_pad_right(char *old, int length)
+char *string_pad_right(char *old, unsigned int length)
 {
-	int i;
+	unsigned int i;
 	char *s = malloc(length + 1);
 	if(!s)
 		return 0;
@@ -845,7 +845,7 @@ void string_replace_backslash_codes(const char *a, char *b)
 int strpos(const char *str, char c)
 {
 
-	int i;
+	unsigned int i;
 	if(str != NULL) {
 		for(i = 0; i < strlen(str); i++) {
 			if(str[i] == c)

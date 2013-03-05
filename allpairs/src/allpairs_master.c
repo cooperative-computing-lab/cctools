@@ -164,7 +164,7 @@ char * text_list_string( struct text_list *t, int a, int b )
 		const char *str = text_list_get(t,i);
 		if(!str) break;
 		str = string_basename(str);
-		while((strlen(str) + buffer_pos + 3)>= buffer_size) {
+		while( (int) (strlen(str) + buffer_pos + 3) >= buffer_size) {
 			buffer_size *= 2;
 			buffer = realloc(buffer,buffer_size);
 		}

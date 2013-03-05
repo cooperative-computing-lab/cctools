@@ -684,7 +684,7 @@ int link_write(struct link *link, const char *data, size_t count, time_t stoptim
 
 int link_putlstring(struct link *link, const char *data, size_t count, time_t stoptime)
 {
-	size_t total = 0;
+	ssize_t total = 0;
 	ssize_t written = 0;
 
 	while(count > 0 && (written = link_write(link, data, count, stoptime)) > 0) {
@@ -698,7 +698,7 @@ int link_putlstring(struct link *link, const char *data, size_t count, time_t st
 int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va)
 {
 	va_list va2;
-	size_t size = 65536;
+	ssize_t size = 65536;
 	char buffer[size];
 	char *b = buffer;
 
@@ -838,7 +838,7 @@ INT64_T link_stream_to_fd(struct link * link, int fd, INT64_T length, time_t sto
 	INT64_T ractual, wactual;
 
 	while(length > 0) {
-		INT64_T chunk = MIN(sizeof(buffer), length);
+		INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 		ractual = link_read(link, buffer, chunk, stoptime);
 		if(ractual <= 0)
@@ -864,7 +864,7 @@ INT64_T link_stream_to_file(struct link * link, FILE * file, INT64_T length, tim
 	INT64_T ractual, wactual;
 
 	while(length > 0) {
-		INT64_T chunk = MIN(sizeof(buffer), length);
+		INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 		ractual = link_read(link, buffer, chunk, stoptime);
 		if(ractual <= 0)
@@ -890,7 +890,7 @@ INT64_T link_stream_from_fd(struct link * link, int fd, INT64_T length, time_t s
 	INT64_T ractual, wactual;
 
 	while(length > 0) {
-		INT64_T chunk = MIN(sizeof(buffer), length);
+		INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 		ractual = full_read(fd, buffer, chunk);
 		if(ractual <= 0)
@@ -916,7 +916,7 @@ INT64_T link_stream_from_file(struct link * link, FILE * file, INT64_T length, t
 	INT64_T ractual, wactual;
 
 	while(1) {
-		INT64_T chunk = MIN(sizeof(buffer), length);
+		INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 		ractual = full_fread(file, buffer, chunk);
 		if(ractual <= 0)
@@ -942,7 +942,7 @@ INT64_T link_soak(struct link * link, INT64_T length, time_t stoptime)
 	INT64_T ractual;
 
 	while(length > 0) {
-		INT64_T chunk = MIN(sizeof(buffer), length);
+		INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 		ractual = link_read(link, buffer, chunk, stoptime);
 		if(ractual <= 0)

@@ -95,8 +95,8 @@ static const char *safe_username = 0;
 static uid_t safe_uid = 0;
 static gid_t safe_gid = 0;
 static int dont_dump_core = 0;
-static INT64_T minimum_space_free = 0;
-static INT64_T root_quota = 0;
+static UINT64_T minimum_space_free = 0;
+static UINT64_T root_quota = 0;
 static int did_explicit_auth = 0;
 static int max_child_procs = 0;
 static int total_child_procs = 0;
@@ -980,7 +980,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				break;
 			}
 		} else if(sscanf(line, "whoami %" SCNd64 , &length) == 1) {
-			if(strlen(esubject) < length)
+			if((int) strlen(esubject) < length)
 				length = strlen(esubject);
 			dataout = malloc(length);
 			if(dataout) {
@@ -1309,7 +1309,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			void *data = malloc(xattrsize);
 			if(data) {
 				int actual = link_read(l, data, xattrsize, stalltime);
-				if(actual != xattrsize) {
+				if(actual != (int) xattrsize) {
 					free(data);
 					break;
 				}
@@ -1475,7 +1475,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			void *data = malloc(xattrsize);
 			if(data) {
 				int actual = link_read(l, data, xattrsize, stalltime);
-				if(actual != xattrsize) {
+				if(actual != (int) xattrsize) {
 					free(data);
 					break;
 				}
@@ -1506,7 +1506,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			void *data = malloc(xattrsize);
 			if(data) {
 				int actual = link_read(l, data, xattrsize, stalltime);
-				if(actual != xattrsize) {
+				if(actual != (int) xattrsize) {
 					free(data);
 					break;
 				}

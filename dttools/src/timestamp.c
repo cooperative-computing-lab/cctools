@@ -38,7 +38,7 @@ int timestamp_fmt(char *buf, size_t size, const char *fmt, timestamp_t ts)
 	time_t tv_sec; 
 	struct tm *tp;
 
-	if(buf == NULL || size < 0) return 0;
+	if(buf == NULL) return 0;
 
 	tv_sec = ts / 1000000;
 

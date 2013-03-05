@@ -33,7 +33,7 @@ static struct nvpair_header headers[] = {
 	{"version","VERSION", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
 	{"total",  "TOTAL",   NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
 	{"avail",  "AVAIL",   NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
-	{0,}
+	{0,0,0,0,0}
 };
 
 static void show_help(const char *cmd)

@@ -585,7 +585,7 @@ INT64_T chirp_client_ticket_register(struct chirp_client * c, const char *name, 
 	}
 	result = link_write(c->link, ticket, length, stoptime);
 	free(ticket);
-	if(result != length) {
+	if(result != (int) length) {
 		c->broken = 1;
 		errno = ECONNRESET;
 		return -1;
@@ -1567,7 +1567,7 @@ INT64_T chirp_client_getxattr(struct chirp_client *c, const char *path, const ch
     if (result < 0) {
 		if (errno == EINVAL) errno = ENOATTR;
         return result;
-	} else if (result > size) {
+	} else if (result > (int) size) {
 		link_soak(c->link, result, stoptime);
         errno = ERANGE;
         return result;
@@ -1588,7 +1588,7 @@ INT64_T chirp_client_fgetxattr(struct chirp_client *c, INT64_T fd, const char *n
     if (result < 0) { 
 		if (errno == EINVAL) errno = ENOATTR;
         return result;
-	} else if (result > size) {
+	} else if (result > (int) size) {
 		link_soak(c->link, result, stoptime);
         errno = ERANGE;
         return result;
@@ -1610,7 +1610,7 @@ INT64_T chirp_client_lgetxattr(struct chirp_client *c, const char *path, const c
     if (result < 0) {
 		if (errno == EINVAL) errno = ENOATTR;
         return result;
-	} else if (result > size) {
+	} else if (result > (int) size) {
 		link_soak(c->link, result, stoptime);
         errno = ERANGE;
         return result;
@@ -1631,7 +1631,7 @@ INT64_T chirp_client_listxattr(struct chirp_client *c, const char *path, char *l
 	result = get_result(c, stoptime);
     if (result < 0) 
         return result;
-    if (result > size) {
+    if (result > (int) size) {
 		link_soak(c->link, result, stoptime);
         errno = ERANGE;
         return result;
@@ -1650,7 +1650,7 @@ INT64_T chirp_client_flistxattr(struct chirp_client *c, INT64_T fd, char *list, 
 	result = get_result(c, stoptime);
     if (result < 0) 
         return result;
-    if (result > size) {
+    if (result > (int) size) {
 		link_soak(c->link, result, stoptime);
         errno = ERANGE;
         return result;
@@ -1671,7 +1671,7 @@ INT64_T chirp_client_llistxattr(struct chirp_client *c, const char *path, char *
 	result = get_result(c, stoptime);
     if (result < 0) 
         return result;
-    if (result > size) {
+    if (result > (int) size) {
 		link_soak(c->link, result, stoptime);
         errno = ERANGE;
         return result;
@@ -1691,7 +1691,7 @@ INT64_T chirp_client_setxattr(struct chirp_client *c, const char *path, const ch
         return result;
 
 	result = link_putlstring(c->link, data, size, stoptime);
-	if(result != size) {
+	if(result != (int) size) {
 		c->broken = 1;
 		errno = ECONNRESET;
 		return -1;
@@ -1713,7 +1713,7 @@ INT64_T chirp_client_fsetxattr(struct chirp_client *c, INT64_T fd, const char *n
         return result;
 
 	result = link_putlstring(c->link, data, size, stoptime);
-	if(result != size) {
+	if(result != (int) size) {
 		c->broken = 1;
 		errno = ECONNRESET;
 		return -1;
@@ -1737,7 +1737,7 @@ INT64_T chirp_client_lsetxattr(struct chirp_client *c, const char *path, const c
         return result;
 
 	result = link_putlstring(c->link, data, size, stoptime);
-	if(result != size) {
+	if(result != (int) size) {
 		c->broken = 1;
 		errno = ECONNRESET;
 		return -1;

@@ -284,7 +284,7 @@ static struct nvpair_header html_headers[] = {
 	{"avail", "AVAIL", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 0},
 	{"load5", "LOAD5", NVPAIR_MODE_STRING, NVPAIR_ALIGN_RIGHT, 0},
 	{"version", "VERSION", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
-	{0,}
+	{0,0,0,0,0}
 };
 
 static void handle_query(struct link *query_link)

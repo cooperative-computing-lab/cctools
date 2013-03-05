@@ -85,7 +85,7 @@ static struct pool_table_header headers[] = {
 	{"worker_need", TABLE_ALIGN_RIGHT, 15},
 	{"worker_active", TABLE_ALIGN_RIGHT, 15},
 	{"worker_assign", TABLE_ALIGN_RIGHT, 15},
-	{NULL,}
+	{0,0,0}
 };
 
 static void fill_string(const char *str, char *buf, int buflen, table_align_t align)
@@ -579,7 +579,7 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 			sum_capacity += m->capacity > 0 ? m->capacity : m->tasks_waiting; 
 		}
 
-		int workers_submitted = itable_size(job_table);
+		unsigned int workers_submitted = itable_size(job_table);
 
 		time_t now = time(0);
 		if(now - last_log_time >= LOG_INTERVAL && logfile) {	
@@ -870,7 +870,7 @@ int decide_worker_distribution(struct list *matched_masters, struct pool_config 
 				m->workers_need = MIN(m->workers_need, m->tasks_waiting);
 			} else {
 				if(pc->default_capacity > 0) {
-					m->workers_need = MIN(pc->default_capacity - m->workers, m->tasks_waiting); 
+					m->workers_need = MIN( (int) (pc->default_capacity - m->workers), m->tasks_waiting); 
 					if(m->workers_need < 0) {
 						m->workers_need = 0;
 					}

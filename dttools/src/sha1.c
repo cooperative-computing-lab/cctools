@@ -274,7 +274,7 @@ static void longReverse(UINT32_T * buffer, int byteCount, int Endianness)
 void sha1_update(sha1_context_t * shsInfo, const unsigned char *buffer, unsigned int count)
 {
 	UINT32_T tmp;
-	int dataCount;
+	unsigned int dataCount;
 
 	/* Update bitcount */
 	tmp = shsInfo->countLo;

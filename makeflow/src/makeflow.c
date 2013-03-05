@@ -1380,7 +1380,7 @@ int dag_prepare_for_batch_system(struct dag *d) {
 
 void dag_parse_node_set_command(struct dag_parse *bk, struct dag_node *n, char *command)
 {
-	struct dag_lookup_set s = {bk->d, n};
+	struct dag_lookup_set s = {bk->d, n, NULL};
 	char *local = dag_lookup_set("BATCH_LOCAL", &s);
 
 	if (local) {

@@ -149,8 +149,8 @@ struct work_queue {
 	struct hash_table *workers_by_pool;
 
 	FILE *logfile;
-	int keepalive_interval;
-	int keepalive_timeout;
+	unsigned int keepalive_interval;
+	unsigned int keepalive_timeout;
 };
 
 struct work_queue_worker {

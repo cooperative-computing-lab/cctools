@@ -1007,7 +1007,7 @@ static struct command list[] = {
 	{"xattr_get", 1, 2, 2, "<file> <attribute>", do_xattr_get},
 	{"xattr_list", 1, 1, 1, "<file>", do_xattr_list},
 	{"xattr_set", 1, 2, 3, "<file> <attribute> [value]", do_xattr_set},
-	{0, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0},
 };
 
 static int process_command(int argc, char **argv)

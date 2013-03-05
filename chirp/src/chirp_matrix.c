@@ -40,7 +40,8 @@ struct chirp_matrix {
 struct chirp_matrix *chirp_matrix_create(const char *host, const char *path, int width, int height, int element_size, int nhosts, time_t stoptime)
 {
 	char host_file[CHIRP_LINE_MAX];
-	int result, i;
+	int result;
+	unsigned int i;
 	char **hosts;
 
 	int nfiles = nhosts;
@@ -94,7 +95,7 @@ struct chirp_matrix *chirp_matrix_create(const char *host, const char *path, int
 
 	hosts = malloc(sizeof(*hosts) * nhosts);
 
-	for(i = 0; i < nhosts; i++) {
+	for(i = 0; (int) i < nhosts; i++) {
 		if(!fgets(line, sizeof(line), file)) {
 			rewind(file);
 			fgets(line, sizeof(line), file);
@@ -122,7 +123,7 @@ struct chirp_matrix *chirp_matrix_create(const char *host, const char *path, int
 	sprintf(datapath2, "/%s/matrixdata", username);
 	sprintf(datapath3, "/%s/matrixdata/%s", username, cookie);
 
-	for(i = 0; i < nfiles; i++) {
+	for(i = 0; (int) i < nfiles; i++) {
 		const char *datahost = hosts[i % nhosts];
 		result = chirp_reli_mkdir(datahost, datapath1, 0700, stoptime);
 		result = chirp_reli_mkdir(datahost, datapath2, 0700, stoptime);
@@ -131,7 +132,7 @@ struct chirp_matrix *chirp_matrix_create(const char *host, const char *path, int
 		sprintf(&line[strlen(line)], "%s %s/data.%d\n", datahost, datapath3, i);
 	}
 
-	for(i = 0; i < nhosts; i++) {
+	for(i = 0; (int) i < nhosts; i++) {
 		free(hosts[i]);
 	}
 	free(hosts);
@@ -383,7 +384,7 @@ int chirp_matrix_setacl(const char *host, const char *path, const char *subject,
 
 	char *matpathdir = xxmalloc((strlen(path) + 1) * sizeof(char));
 	strcpy(matpathdir, path);
-	for(j = 1; j < strlen(matpathdir); j++)
+	for(j = 1; j < (int) strlen(matpathdir); j++)
 		if(matpathdir[j] == '/') {
 			matpathdir[j] = '\0';
 			result = chirp_reli_setacl(host, matpathdir, subject, rights, stoptime);
@@ -401,7 +402,7 @@ int chirp_matrix_setacl(const char *host, const char *path, const char *subject,
 		char *fpath = strtok(NULL, SEPCHARS);
 		matpathdir = xxmalloc((strlen(fpath) + 1) * sizeof(char));
 		strcpy(matpathdir, fpath);
-		for(j = 1; j < strlen(matpathdir); j++)
+		for(j = 1; j < (int) strlen(matpathdir); j++)
 			if(matpathdir[j] == '/') {
 				matpathdir[j] = '\0';
 				result = chirp_reli_setacl(fhost, matpathdir, subject, rights, stoptime);

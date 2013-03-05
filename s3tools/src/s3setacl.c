@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
 	char *bucket, *filename, *handle, *aclstr, *id;
 	char remotename[FILENAME_MAX];
 	char owner[FILENAME_MAX];
-	int i;
+	unsigned int i;
 	unsigned char mask = 0;
 
 	s3_initialize(&argc, argv);
