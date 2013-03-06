@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include <string.h>
 
 #define DEFAULT_SIZE 127
+#define DEFAULT_LOAD 0.75
 #define DEFAULT_FUNC hash_string
 
 struct entry {
@@ -32,7 +33,6 @@ struct hash_table {
 struct hash_table *hash_table_create(int bucket_count, hash_func_t func)
 {
 	struct hash_table *h;
-	int i;
 
 	h = (struct hash_table *) malloc(sizeof(struct hash_table));
 	if(!h)
@@ -46,14 +46,10 @@ struct hash_table *hash_table_create(int bucket_count, hash_func_t func)
 	h->size = 0;
 	h->hash_func = func;
 	h->bucket_count = bucket_count;
-	h->buckets = (struct entry **) malloc(sizeof(struct entry *) * bucket_count);
+	h->buckets = (struct entry **) calloc(bucket_count, sizeof(struct entry *));
 	if(!h->buckets) {
 		free(h);
 		return 0;
-	}
-
-	for(i = 0; i < bucket_count; i++) {
-		h->buckets[i] = 0;
 	}
 
 	return h;
@@ -102,10 +98,56 @@ int hash_table_size(struct hash_table *h)
 	return h->size;
 }
 
+static int hash_table_double_buckets(struct hash_table *h)
+{
+	struct hash_table *hn = hash_table_create(2 * h->bucket_count, h->hash_func);
+
+	if(!hn)
+		return 0;
+
+	/* Move pairs to new hash */
+	char *key;
+	void *value;
+	hash_table_firstkey(h);
+	while(hash_table_nextkey(h, &key, &value))
+		if(!hash_table_insert(hn, key, value))
+		{
+			hash_table_delete(hn);
+			return 0;
+		}
+
+	/* Delete all old pairs */
+	struct entry *e, *f;
+	int i;
+	for(i = 0; i < h->bucket_count; i++) {
+		e = h->buckets[i];
+		while(e) {
+			f = e->next;
+			free(e->key);
+			free(e);
+			e = f;
+		}
+	}
+
+	/* Make the old point to the new */
+	free(h->buckets);
+	h->buckets      = hn->buckets;
+	h->bucket_count = hn->bucket_count;
+	h->size         = hn->size;
+	
+	/* Delete reference to new, so old is safe */
+	free(hn);
+
+	return 1;
+}
+
 int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 {
 	struct entry *e;
 	unsigned hash, index;
+
+	if( ((float) h->size / h->bucket_count) > DEFAULT_LOAD )
+		hash_table_double_buckets(h);
 
 	hash = h->hash_func(key);
 	index = hash % h->bucket_count;
