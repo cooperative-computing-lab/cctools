@@ -13,6 +13,8 @@ See the file COPYING for details.
 #include <signal.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #define COPY_BUFFER_SIZE 65536
 
@@ -236,6 +238,9 @@ int copy_file_to_file(const char *input, const char *output)
 
 	fclose(in);
 	fclose(out);
-
+	
+	struct stat st;
+	stat(input, &st);
+	chmod(output, st.st_mode);
 	return count;	
 }
