@@ -10,6 +10,9 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+#define DEFAULT_SIZE 127
+#define DEFAULT_LOAD 0.75
+
 struct entry {
 	UINT64_T key;
 	void *value;
@@ -27,24 +30,19 @@ struct itable {
 struct itable *itable_create(int bucket_count)
 {
 	struct itable *h;
-	int i;
 
 	h = (struct itable *) malloc(sizeof(struct itable));
 	if(!h)
 		return 0;
 
 	if(bucket_count == 0)
-		bucket_count = 127;
+		bucket_count = DEFAULT_SIZE;
 
 	h->bucket_count = bucket_count;
-	h->buckets = (struct entry **) malloc(sizeof(struct entry *) * bucket_count);
+	h->buckets = (struct entry **) calloc(bucket_count, sizeof(struct entry *));
 	if(!h->buckets) {
 		free(h);
 		return 0;
-	}
-
-	for(i = 0; i < bucket_count; i++) {
-		h->buckets[i] = 0;
 	}
 
 	h->size = 0;
@@ -93,10 +91,55 @@ void *itable_lookup(struct itable *h, UINT64_T key)
 	return 0;
 }
 
+static int itable_double_buckets(struct itable *h)
+{
+	struct itable *hn = itable_create(2 * h->bucket_count);
+
+	if(!hn)
+		return 0;
+
+	/* Move pairs to new hash */
+	uint64_t key;
+	void *value;
+	itable_firstkey(h);
+	while(itable_nextkey(h, &key, &value))
+		if(!itable_insert(hn, key, value))
+		{
+			itable_delete(hn);
+			return 0;
+		}
+
+	/* Delete all old pairs */
+	struct entry *e, *f;
+	int i;
+	for(i = 0; i < h->bucket_count; i++) {
+		e = h->buckets[i];
+		while(e) {
+			f = e->next;
+			free(e);
+			e = f;
+		}
+	}
+
+	/* Make the old point to the new */
+	free(h->buckets);
+	h->buckets      = hn->buckets;
+	h->bucket_count = hn->bucket_count;
+	h->size         = hn->size;
+	
+	/* Delete reference to new, so old is safe */
+	free(hn);
+
+	return 1;
+}
+
 int itable_insert(struct itable *h, UINT64_T key, const void *value)
 {
 	struct entry *e;
 	UINT64_T index;
+
+	if( ((float) h->size / h->bucket_count) > DEFAULT_LOAD )
+		itable_double_buckets(h);
 
 	index = key % h->bucket_count;
 	e = h->buckets[index];
