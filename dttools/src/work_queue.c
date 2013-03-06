@@ -2350,6 +2350,8 @@ struct work_queue *work_queue_create(int port)
 		envstring = getenv("WORK_QUEUE_PORT");
 		if(envstring) {
 			port = atoi(envstring);
+		} else {
+			port = WORK_QUEUE_DEFAULT_PORT;
 		}
 	}
 

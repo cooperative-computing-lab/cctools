@@ -223,7 +223,7 @@ If the queue has a project name, then queue statistics and information will be
 reported to a catalog server.  To specify the catalog server, the user may set
 the <b>CATALOG_HOST</b> and <b>CATALOG_PORT</b> environmental variables as described in @ref catalog_query_create.
 
-@param port The port number to listen on.  If zero is specified, then the default is chosen, and if -1 is specified, a random port is chosen.  
+@param port The port number to listen on.  If zero is specified, then the default is chosen (WORK_QUEUE_DEFAULT_PORT unless overridden by the <b>WORK_QUEUE_PORT</b> environment variable), and if -1 is specified, the first unused port between <b>WORK_QUEUE_LOW_PORT</b> and <b>WORK_QUEUE_HIGH_PORT</b> (1024 and 32767 by default) is chosen.
 @return A new work queue, or null if it could not be created.
 */
 struct work_queue *work_queue_create(int port);
