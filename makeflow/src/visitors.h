@@ -11,7 +11,7 @@ See the file COPYING for details.
  * file, using the remotename names generated from
  * translate_filename, rather than the original filenames.
  */
-int dag_to_file(const struct dag *d, const char *dag_file);
+int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename)(struct dag_node *d, const char *filename));
 
 
 /* The dag_to_dot function write a struct dag in memory to a dot

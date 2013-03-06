@@ -5,6 +5,9 @@ See the file COPYING for details.
 */
 
 #include <stdio.h>
+
+#include "itable.h"
+
 #include "timestamp.h"
 #include "batch_job.h"
 
@@ -30,8 +33,6 @@ struct dag {
 	struct itable *remote_job_table;		// Mapping from unique integers dag_node->jobid  to nodes.
 	struct hash_table *file_table;			// Mapping filenames to dag_nodes (answers: which production rule has filename as a target?)
 	struct hash_table *completed_files;		// Records which target files have been updated/generated.
-	struct hash_table *filename_translation_fwd;	// Mapping renaming filenames to slash-less filenames. This is needed for some remote file systems.
-	struct hash_table *filename_translation_rev;	// Mapping from slash-less filenames to the original filenames.
 	struct list *symlinks_created;			// Remote filenames for which a symlink was created (used now only for Condor, and only for the final cleanup).
 	struct hash_table *variables;			// Mappings between variables defined in the makeflow file and their substitution.
 	struct hash_table *collect_table;		// Keeps the reference counts of filenames of files that are garbage collectable.
@@ -68,7 +69,6 @@ struct dag_parse {
 
 struct dag_file {
 	const char *filename;
-	char *remotename;
 };
 
 /* struct dag_node implements a linked list of nodes. A dag_node
@@ -91,15 +91,21 @@ struct dag_node {
 	int nested_job;
 	int failure_count;
 	dag_node_state_t state;
+
 	const char *command;
 	const char *original_command;
+
 	const char *makeflow_cwd;
 	const char *makeflow_dag;
 	const char *symbol;
-	struct list *source_files;
-	struct list *target_files;
-	int source_file_names_size;
-	int target_file_names_size;
+
+	struct itable *remote_names;                     // Mapping from struct *dag_files to remotenames (char *)
+	struct hash_table *remote_names_inv;	         // Mapping from remote filenames to dag_file representing the local file.
+	struct hash_table *file_table;                    // From local names to dag_files (this will be in struct dag soon).
+
+	struct list   *source_files;
+	struct list   *target_files;
+
 	batch_job_id_t jobid;
 	struct dag_node *next;
 	int children;
@@ -116,15 +122,22 @@ struct dag_lookup_set {
 
 struct dag_node *dag_node_create(struct dag *d, int linenum);
 struct dag *dag_create();
-struct dag_file *dag_file_create(struct dag_node *d, const char *filename, char *remotename);
+struct dag_file *dag_file_create(struct dag_node *n, const char *filename, const char *remotename);
 
-struct hash_table *dag_input_files(struct dag *d);
+struct list *dag_input_files(struct dag *d);
 
 void dag_node_add_source_file(struct dag_node *n, const char *filename, char *remotename);
 void dag_node_add_target_file(struct dag_node *n, const char *filename, char *remotename);
+
+const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, const char *remotename);
+
 void dag_count_states(struct dag *d);
 const char *dag_node_state_name(dag_node_state_t state);
 void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate);
+char *dag_node_translate_filename(struct dag_node *n, const char *filename);
+
+char *dag_file_remote_name(struct dag_node *n, const char *filename);
+int dag_file_isabsolute(const struct dag_file *f);
 
 char *dag_lookup(const char *name, void *arg);
 char *dag_lookup_set(const char *name, void *arg);

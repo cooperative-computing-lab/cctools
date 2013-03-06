@@ -53,7 +53,7 @@ int dag_to_file_exports(const struct dag *d, FILE *dag_stream)
 
 /* Writes a list of files to the the stream, using remotename
  * instead of filename if available */
-int dag_to_file_files(struct list *fs, FILE *dag_stream)
+int dag_to_file_files(struct dag_node *n, struct list *fs, FILE *dag_stream, char *(*rename)(struct dag_node *n, const char *filename))
 {
 	//here we may want to call the linker renaming function,
 	//instead of using f->remotename
@@ -61,7 +61,10 @@ int dag_to_file_files(struct list *fs, FILE *dag_stream)
 	const struct dag_file *f;
 	list_first_item(fs);
 	while( (f = list_next_item(fs)) )
-		fprintf(dag_stream, "%s ", f->remotename ? f->remotename : f->filename);
+		if(rename)
+			fprintf(dag_stream, "%s ", rename(n, f->filename));
+		else
+			fprintf(dag_stream, "%s ", (f->filename == dag_file_remote_name(n, f->filename) ? f->filename : dag_file_remote_name(n, f->filename)));
 
 	return 0;
 }
@@ -76,12 +79,12 @@ int dag_to_file_files(struct list *fs, FILE *dag_stream)
  *
  * The entry function is dag_to_file(dag, filename).
  * */
-int dag_to_file_node(const struct dag_node *n, FILE *dag_stream)
+int dag_to_file_node(struct dag_node *n, FILE *dag_stream, char *(*rename)(struct dag_node *n, const char *filename))
 {
 	fprintf(dag_stream, "\n");
-	dag_to_file_files(n->target_files, dag_stream);
+	dag_to_file_files(n, n->target_files, dag_stream, rename);
 	fprintf(dag_stream, ": ");
-	dag_to_file_files(n->source_files, dag_stream);
+	dag_to_file_files(n, n->source_files, dag_stream, rename);
 	fprintf(dag_stream, "\n");
 	if (n->local_job)
 		fprintf(dag_stream, "\tLOCAL %s", n->command);
@@ -93,28 +96,31 @@ int dag_to_file_node(const struct dag_node *n, FILE *dag_stream)
 }
 
 /* Writes all the rules to the stream */
-int dag_to_file_nodes(const struct dag *d, FILE *dag_stream)
+int dag_to_file_nodes(const struct dag *d, FILE *dag_stream, char *(*rename)(struct dag_node *n, const char *filename))
 {
 	struct dag_node *n;
 
 	for(n = d->nodes;  n; n = n->next)
-		dag_to_file_node(n, dag_stream);
+		dag_to_file_node(n, dag_stream, rename);
 
 	return 0;
 }
 
 /* Entry point of the dag_to_file* functions. Writes a dag as an
  * equivalent makeflow file. */
-int dag_to_file(const struct dag *d, const char *dag_file)
+int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename)(struct dag_node *n, const char *filename))
 {
 	FILE *dag_stream = fopen(dag_file, "w");
 
 	if(!dag_stream)
 		return 1;
 
+	if(!rename)
+		rename = dag_node_translate_filename;
+
 	dag_to_file_vars(d, dag_stream);
 	dag_to_file_exports(d, dag_stream);
-	dag_to_file_nodes(d, dag_stream);
+	dag_to_file_nodes(d, dag_stream, rename);
 
 	fclose(dag_stream);
 

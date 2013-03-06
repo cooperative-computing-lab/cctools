@@ -261,51 +261,40 @@ void dag_show_analysis(struct dag *d) {
 
 void dag_show_input_files(struct dag *d)
 {
-	char *key;
-	void *value;
-	struct hash_table *ih;
-	ih = dag_input_files(d);
-	hash_table_firstkey(ih);
-	while(hash_table_nextkey(ih, &key, &value)) {
-		printf("%s\n", key);
-	}
+	struct dag_file *f;	
+	struct list *il;
 
-	hash_table_delete(ih);
+	il = dag_input_files(d);
+	list_first_item(il);
+	while( (f = list_next_item(il)) )
+		printf("%s\n", f->filename);
+
+	list_delete(il);
 }
 
-void collect_input_files(struct dag *d, char* destination)
+
+void collect_input_files(struct dag *d, char* bundle_dir, char *(*rename)(struct dag_node *d, const char *filename))
 {
-	FILE *from=NULL, *to=NULL;
-
-	struct hash_table *ih;
-	ih = dag_input_files(d);
-
-	char *key;
-	void *value;
 	char file_destination[PATH_MAX];
-	char directory[PATH_MAX];
+	char *new_name;
 
-	hash_table_firstkey(ih);
-	while(hash_table_nextkey(ih, &key, &value)) {
-		from = fopen(key, "r");
-		if(!value)
-			value = key;
-		char *first = NULL;
-		first = string_front((char *)value, 1);
-		if(!strcmp(first, "/")){
-			value = (void *) string_basename((char *)value);
-		}
-		fprintf(stderr, "%s\n", first);
-		sprintf(file_destination, "%s/%s", destination, (char *) value);
-		string_dirname(file_destination, directory);
-		create_dir(directory, 0777);
-		to = fopen(file_destination, "w");
-		copy_stream_to_stream(from, to);
-		fclose(from);
-		fclose(to);
+	struct list *il;
+	il = dag_input_files(d);
+
+	struct dag_file *f;
+
+	if(!rename)
+		rename = dag_node_translate_filename;
+
+	list_first_item(il);
+	while( (f = list_next_item(il)) ) {
+		new_name = rename(NULL, f->filename);
+		sprintf(file_destination, "%s/%s", bundle_dir, new_name);
+		copy_file_to_file(f->filename, file_destination);
+		free(new_name);
 	}
 
-	hash_table_delete(ih);
+	list_delete(il);	
 }
 
 void dag_show_output_files(struct dag *d)
@@ -463,7 +452,7 @@ void dag_node_clean(struct dag *d, struct dag_node *n)
 		file_clean(f->filename, 0);
 
 		/* Make sure to clobber the original file too if it exists */
-		char *name = (char *) hash_table_lookup(d->filename_translation_rev, f->filename);
+		char *name = (char *) hash_table_lookup(n->remote_names_inv, f->filename);
 
 		if(name)
 			file_clean(name, 0);
@@ -524,13 +513,13 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	// If a job was submitted to Condor, then just reconnect to it.
 	if(n->state == DAG_NODE_STATE_RUNNING && !n->local_job && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
 		// Reconnect the Condor jobs
-		printf("rule still running: %s\n", n->command);
+		fprintf(stderr, "rule still running: %s\n", n->command);
 		itable_insert(d->remote_job_table, n->jobid, n);
 		d->remote_jobs_running++;
 
 		// Otherwise, we cannot reconnect to the job, so rerun it
 	} else if(n->state == DAG_NODE_STATE_RUNNING || n->state == DAG_NODE_STATE_FAILED || n->state == DAG_NODE_STATE_ABORTED) {
-		printf("will retry failed rule: %s\n", n->command);
+		fprintf(stderr, "will retry failed rule: %s\n", n->command);
 		goto rerun;
 	}
 	// Rerun if an input file has been updated since the last execution.
@@ -745,81 +734,7 @@ void dag_log_recover(struct dag *d, const char *filename)
 	}
 }
 
-static int translate_filename(struct dag *d, const char *filename, char **newname_ptr)
-{
-	/* The purpose of this function is to translate an absolute path
-	   filename into a unique slash-less name to allow for the sending
-	   of any file to remote systems. Function returns 1 on success, 0 if
-	   filename has already been translated. */
-
-	if(!newname_ptr)
-		return 0;
-
-	/* If there are no slashes in path, then we don't need to translate. */
-	if(!strchr(filename, '/')) {
-		*newname_ptr = NULL;
-		return 0;
-	}
-
-	/* If the filename is in the current directory and doesn't contain any
-	 * additional slashes, then we can also skip translation.
-	 *
-	 * Note: this doesn't handle redundant ./'s such as ./././././foo/bar */
-	if(!strncmp(filename, "./", 2) && !strchr(filename + 2, '/')) {
-		*newname_ptr = NULL;
-		return 0;
-	}
-
-	/* First check for if the filename has already been translated-- if so,
-	   use that translation */
-
-	char *newname;
-	newname = (char *) hash_table_lookup(d->filename_translation_fwd, filename);
-
-	if(newname) {		/* Filename has been translated before */
-		char *temp = newname;
-		newname = xxstrdup(temp);
-		*newname_ptr = newname;
-		return 0;
-	}
-
-	newname = xxstrdup(filename);
-	char *c;
-
-	for(c = newname; *c; ++c) {
-		if(*c == '/')
-			*c = '_';
-	}
-
-	for(c = newname; *c == '.'; ++c) {
-		*c = '_';
-	}
-
-	while(!hash_table_insert(d->filename_translation_rev, newname, xxstrdup(filename))) {
-		/* It's not 100% collision-proof, technically, but the odds of
-		   an unresolvable collision are unbelievably slim. */
-
-		c = strchr(newname, '_');
-		if(c) {
-			*c = '~';
-		} else {
-			c = strchr(newname, '~');
-			if(c) {
-				*c = '-';
-			} else {
-				*newname_ptr = NULL;
-				return 0;
-			}
-		}
-	}
-
-	hash_table_insert(d->filename_translation_fwd, filename, xxstrdup(newname));
-
-	*newname_ptr = newname;
-	return 1;
-}
-
-static char *translate_command(struct dag *d, char *old_command, int is_local)
+static char *translate_command(struct dag_node *n, char *old_command, int is_local)
 {
 	char *new_command;
 	char *sp;
@@ -863,7 +778,7 @@ static char *translate_command(struct dag *d, char *old_command, int is_local)
 		int len;
 
 		if(!is_local)
-			val = (char *) hash_table_lookup(d->filename_translation_fwd, token);
+			val = dag_file_remote_name(n, token);
 
 		if(!first) {
 			strncat(new_command + current_length, " ", 1);
@@ -1260,14 +1175,10 @@ int dag_parse_node_filelist(struct dag_parse *bk, struct dag_node *n, char *file
 			newname+=2;
 		}
 		
-		if(source) {
+		if(source)
 			dag_node_add_source_file(n, filename, newname);
-			n->source_file_names_size += strlen(filename) + (newname?strlen(newname):0) + 2;
-		} else {
+		else
 			dag_node_add_target_file(n, filename, newname);
-			n->target_file_names_size += strlen(filename) + (newname?strlen(newname):0) + 2;
-		}
-		
 	}
 	free(argv);
 	return 1;
@@ -1277,91 +1188,64 @@ int dag_parse_node_filelist(struct dag_parse *bk, struct dag_node *n, char *file
 int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, int source_flag)
 {
 	struct dag_file *f;
-	int rv;
-
 	list_first_item(files);
+
 	while( (f = list_next_item(files)) ) {
+		const char *remotename = dag_file_remote_name(n, f->filename);
+
 		switch(batch_queue_type) {
-
 			case BATCH_QUEUE_TYPE_CONDOR:
-				rv = 0;
-				if(strchr(f->filename, '/') && !f->remotename) {
-					rv = translate_filename(n->d, f->filename, &(f->remotename));
-					if(source_flag) {
-						n->source_file_names_size += strlen(f->remotename);
-					} else {
-						n->target_file_names_size += strlen(f->remotename);
-					}
-				} else if(f->remotename) {
-					rv = 1;
-				}
+				if(strchr(f->filename, '/') && !remotename) 
+					remotename = dag_node_add_remote_name(n, f->filename, NULL);
 
-				if(rv) {
-					debug(D_DEBUG,"creating symlink \"./%s\" for file \"%s\"\n", f->remotename, f->filename);
-					rv = symlink(f->filename, f->remotename);
-					if(rv < 0) {
+				if(remotename) {
+					debug(D_DEBUG,"creating symlink \"./%s\" for file \"%s\"\n", remotename, f->filename);
+					if(symlink(f->filename, remotename) < 0) {
 						if(errno != EEXIST) {
-							fprintf(stderr, "makeflow: could not create symbolic link (%s)\n", strerror(errno));
-							goto failure;
+							fatal("makeflow: could not create symbolic link (%s)\n", strerror(errno));
 						} else {
 							int link_size = strlen(f->filename)+2;
 							char *link_contents = malloc(link_size);
 
-							link_size = readlink(f->remotename, link_contents, link_size);
+							link_size = readlink(remotename, link_contents, link_size);
 							if(!link_size || strncmp(f->filename, link_contents, link_size)) {
-								fprintf(stderr, "makeflow: symbolic link %s points to wrong file (\"%s\" instead of \"%s\")\n", f->remotename, link_contents, f->filename);
 								free(link_contents);
-								goto failure;
+								fatal("makeflow: symbolic link %s points to wrong file (\"%s\" instead of \"%s\")\n", remotename, link_contents, f->filename);
 							}
 							free(link_contents);
 						}
 					} else {
-						list_push_tail(n->d->symlinks_created, f->remotename);
+						list_push_tail(n->d->symlinks_created, (void *) remotename);
 					}
 
-					/* Create symlink target stub for output files, otherwise Condor will fail on write-back */
+					/* Create symlink target  stub for output files, otherwise Condor will fail on write-back */
 					if(!source_flag && access(f->filename, R_OK) < 0) {
 						int fd = open(f->filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
 						if(fd < 0) {
-							fprintf(stderr, "makeflow: could not create symbolic link target (%s): %s\n", f->filename, strerror(errno));
-							goto failure;
+							fatal("makeflow: could not create symbolic link target (%s): %s\n", f->filename, strerror(errno));
 						}
 						close(fd);
 					}
 				}
-
 				break;
 
 			case BATCH_QUEUE_TYPE_WORK_QUEUE:
 
-				if(f->filename[0] == '/' && !f->remotename) {
+				if(f->filename[0] == '/' && !remotename) {
 					/* Translate only explicit absolute paths for Work Queue tasks.*/
-					translate_filename(n->d, f->filename, &(f->remotename));
-					debug(D_DEBUG, "translating work queue absolute path (%s) -> (%s)", f->filename, f->remotename);
-
-					if(source_flag) {
-						n->source_file_names_size += strlen(f->remotename);
-					} else {
-						n->target_file_names_size += strlen(f->remotename);
-					}
+					remotename = dag_node_add_remote_name(n, f->filename, NULL);
+					debug(D_DEBUG, "translating work queue absolute path (%s) -> (%s)", f->filename, remotename);
 				}
 				break;
 
 			default:
-
-				if(f->remotename) {
-					fprintf(stderr, "makeflow: automatic file renaming (%s=%s) only works with Condor or Work Queue drivers\n", f->filename, f->remotename);
-					goto failure;
-				}
+				if(remotename)
+					fprintf(stderr, "makeflow: automatic file renaming (%s->%s) only works with Condor or Work Queue drivers\n", f->filename, remotename);
 				break;
 
 		}
 	}
-
 	return 1;
-
-failure:
-	return 0;
 }
 
 int dag_prepare_for_batch_system(struct dag *d) {
@@ -1390,7 +1274,7 @@ void dag_parse_node_set_command(struct dag_parse *bk, struct dag_node *n, char *
 	}
 
 	n->original_command = xxstrdup(command);
-	n->command = translate_command(bk->d, command, n->local_job);
+	n->command = translate_command(n, command, n->local_job);
 	debug(D_DEBUG, "node command=%s", n->command);
 }
 
@@ -1529,6 +1413,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	char *input_files = NULL;
 	char *output_files = NULL;
 	struct dag_file *f;
+	const char *remotename;
 
 	struct batch_queue *thequeue;
 
@@ -1540,56 +1425,53 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 	printf("%s\n", n->command);
 
-	input_files = malloc((n->source_file_names_size + 1) * sizeof(char));
-	memset(input_files, 0, n->source_file_names_size + 1);
+	int len = 0, len_temp;
+	char *tmp;
+
 	list_first_item(n->source_files);
 	while( (f = list_next_item(n->source_files)) ) {
+		remotename = dag_file_remote_name(n, f->filename);
+		if(!remotename)
+			remotename = f->filename;
+
 		switch(batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			strcat(input_files, f->filename);
-			if(f->remotename) {
-				strcat(input_files, "=");
-				strcat(input_files, f->remotename);
-			}
+			tmp = string_format("%s=%s,", f->filename, remotename);
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:
-			if(f->remotename) {
-				strcat(input_files, f->remotename);
-			} else {
-				strcat(input_files, f->filename);
-			}
+			tmp = string_format("%s,", remotename);
 			break;
 		default:
-			strcat(input_files, f->filename);
+			tmp = string_format("%s,", f->filename);
 		}
-		
-		strcat(input_files, ",");
+		len_temp = strlen(tmp);
+		input_files = realloc(input_files, (len + len_temp + 1) * sizeof(char));
+		memcpy(input_files + len, tmp, len_temp + 1);
+		len += len_temp;
 	}
 
-	output_files = malloc((n->target_file_names_size + 1) * sizeof(char));
-	memset(output_files, 0, n->target_file_names_size + 1);
 
+	len = 0;
 	list_first_item(n->target_files);
 	while( (f = list_next_item(n->target_files)) ) {
+		remotename = dag_file_remote_name(n, f->filename);
+		if(!remotename)
+			remotename = f->filename;
+
 		switch(batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			if(f->remotename) {
-				strcat(output_files, f->remotename);
-				strcat(output_files, "=");
-			}
-			strcat(output_files, f->filename);
+			tmp = string_format("%s=%s,", remotename, f->filename);
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:
-			if(f->remotename) {
-				strcat(output_files, f->remotename);
-			} else {
-				strcat(output_files, f->filename);
-			}
+			tmp = string_format("%s,", remotename);
 			break;
 		default:
-			strcat(output_files, f->filename);
+			tmp = string_format("%s,", f->filename);
 		}
-		strcat(output_files, ",");
+		len_temp = strlen(tmp);
+		output_files = realloc(output_files, (len + len_temp + 1) * sizeof(char));
+		memcpy(output_files + len, tmp, len_temp + 1);
+		len += len_temp;
 	}
 
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
@@ -2546,12 +2428,12 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "COMPLETE\n");
 
 		dag_show_input_files(d);
-		collect_input_files(d, bundle_directory);
+		collect_input_files(d, bundle_directory, NULL);
 
 		char output_makeflow[PATH_MAX];
 		sprintf(output_makeflow, "%s/%s", bundle_directory, dagfile);
 		fprintf(stderr, "Writing workflow, %s, to %s\n", dagfile, output_makeflow);
-		dag_to_file(d, output_makeflow);
+		dag_to_file(d, output_makeflow, NULL);
 		free(bundle_directory);
 		exit(0);
 	}

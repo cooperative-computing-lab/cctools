@@ -44,8 +44,6 @@ struct dag *dag_create()
 		d->remote_jobs_running = 0;
 		d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 		d->nodeid_counter = 0;
-		d->filename_translation_rev = hash_table_create(0, 0);
-		d->filename_translation_fwd = hash_table_create(0, 0);
 		d->collect_table = hash_table_create(0, 0);
 		d->export_list = list_create();
 
@@ -73,28 +71,114 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->source_files = list_create(0);
 	n->target_files = list_create(0);
 
+	n->remote_names     = itable_create(0);
+	n->remote_names_inv = hash_table_create(0,0);
+	n->file_table       = hash_table_create(0,0); // This will be in dag_create
+
 	return n;
 }
 
-struct dag_file *dag_file_create(struct dag_node *n, const char *filename, char *remotename)
+struct dag_file *dag_file_from_name(struct dag_node *n, const char *filename)
+{
+	return (struct dag_file *) hash_table_lookup(n->file_table, filename);
+}
+
+char *dag_file_remote_name(struct dag_node *n, const char *filename)
+{
+	struct dag_file *f;
+	char *name;
+
+	f = dag_file_from_name(n, filename);
+	name = (char *) itable_lookup(n->remote_names, (uintptr_t) f);
+
+	return name;
+}
+
+int dag_file_isabsolute(const struct dag_file *f)
+{
+	return f->filename[0] == '/';
+}
+
+char *dag_node_translate_filename(struct dag_node *n, const char *filename)
+{
+	/* The purpose of this function is to translate an absolute path
+	   filename into a unique slash-less name to allow for the sending
+	   of any file to remote systems. */
+
+	int len;
+	char *newname_ptr;
+
+	len = strlen(filename);
+
+	/* If there are no slashes in path, then we don't need to translate. */
+	if(!strchr(filename, '/')) {
+		newname_ptr = xxstrdup(filename);
+		return newname_ptr;
+	}
+
+	/* If the filename is in the current directory and doesn't contain any
+	 * additional slashes, then we can also skip translation.
+	 *
+	 * Note: this doesn't handle redundant ./'s such as ./././././foo/bar */
+	if(!strncmp(filename, "./", 2) && !strchr(filename + 2, '/')) {
+		newname_ptr = xxstrdup(filename);
+		return newname_ptr;
+	}
+
+	/* Make space for the new filename + a hyphen + a number to
+	 * handle upto a million name collisions */
+	newname_ptr = calloc(len + 8, sizeof(char));
+	strcpy(newname_ptr, filename);
+
+	char *c;
+	for(c = newname_ptr; *c; ++c) {
+		switch(*c)
+		{
+			case '/':
+			case '.':
+				*c = '_';
+				break;
+			default:
+				break;
+		}
+	}
+
+	if(!n)
+		return newname_ptr;
+
+	int i = 0;
+	char *newname_org = xxstrdup(newname_ptr);
+	while(hash_table_lookup(n->remote_names_inv, newname_ptr))
+	{
+		sprintf(newname_ptr, "%06d-%s", i, newname_org);
+		i++;
+	}
+
+	free(newname_org);
+
+	return newname_ptr;
+}
+
+struct dag_file *dag_file_create(struct dag_node *n, const char *filename, const char *remotename)
 {
 	struct dag_file *f = malloc(sizeof(*f));
 	f->filename = xxstrdup(filename);
-	if(remotename) {
-		f->remotename = xxstrdup(remotename);
-	} else {
-		f->remotename = NULL;
-	}
+
+	hash_table_insert(n->file_table, f->filename, (void *) f);
+
+	if(remotename)
+		dag_node_add_remote_name(n, filename, remotename);
+
 	return f;
 }
 
-struct hash_table *dag_input_files(struct dag *d)
+struct list *dag_input_files(struct dag *d)
 {
 	struct dag_node *n, *tmp;
 	struct dag_file *f;
-	struct hash_table *ih;
+	struct list *il;
 
-	ih = hash_table_create(0,0);
+	il = list_create(0);
 	for(n = d->nodes; n; n = n->next) {
 		//for each source file, see if it is a target file of another node
 		list_first_item(n->source_files);
@@ -105,12 +189,12 @@ struct hash_table *dag_input_files(struct dag *d)
 			// if a source file is also a target file
 			if(!tmp) {
 				debug(D_DEBUG, "Found independent input file: %s", f->filename);
-				hash_table_insert(ih, f->filename, (void *) f->remotename);
+				list_push_tail(il, f);
 			}
 		}
 	}
 
-	return ih;
+	return il;
 }
 
 char *dag_lookup(const char *name, void *arg)
@@ -169,6 +253,27 @@ const char *dag_node_state_name(dag_node_state_t state)
 	}
 }
 
+
+const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, const char *remotename)
+{
+	char *oldname;
+	struct dag_file *f = dag_file_from_name(n, remotename);
+
+	if(!remotename)
+		remotename = dag_node_translate_filename(n, filename);
+	else
+		remotename = xxstrdup(remotename);
+
+	oldname = hash_table_lookup(n->remote_names_inv, remotename);
+
+	if(oldname && strcmp(oldname, filename) == 0)
+		fatal("Remote name %s for %s already in use for %s\n", remotename, filename, oldname);
+
+	itable_insert(n->remote_names, (uintptr_t) f, remotename); 
+	hash_table_insert(n->remote_names_inv, remotename, (void *) f);
+
+	return remotename;
+}
 
 void dag_node_add_source_file(struct dag_node *n, const char *filename, char *remotename)
 {
