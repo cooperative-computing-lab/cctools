@@ -286,11 +286,16 @@ void collect_input_files(struct dag *d, char* bundle_dir, char *(*rename)(struct
 	if(!rename)
 		rename = dag_node_translate_filename;
 
+	struct stat st;
+
 	list_first_item(il);
 	while( (f = list_next_item(il)) ) {
 		new_name = rename(NULL, f->filename);
 		sprintf(file_destination, "%s/%s", bundle_dir, new_name);
 		copy_file_to_file(f->filename, file_destination);
+		stat(f->filename, &st);
+		chmod(file_destination, st.st_mode);
+		
 		free(new_name);
 	}
 
