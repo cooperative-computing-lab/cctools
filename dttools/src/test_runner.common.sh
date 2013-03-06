@@ -64,10 +64,21 @@ wait_for_file_modification()
 	filename=$1
 	timeout=${2:-5}
 
+	declare -i mtime
+
+    case `uname -s` in
+    	Darwin)
+			args="-f %m $filename"
+		;;
+		*)
+			args="-c %Y $filename"
+    	;;
+	esac
+
 	while true; do
 		sleep 1
 		[ ! -f $filename ] && exit 1
-		mtime=`stat -c "%Y" $filename`
+		mtime=`stat $args`
 		now=`date +"%s"`
 		delta=$(($now - $mtime))
 		[  $delta -gt 3 ] && break
