@@ -24,7 +24,7 @@ double msqrt(double n, double eps)
 int main(int argc, char **argv)
 {
 	int    n = 200;
-	double r = 1;
+	double r = 10000;
 
 	if( argc > 1 )
 		n = atoi(argv[1]);
