@@ -73,14 +73,13 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->remote_names     = itable_create(0);
 	n->remote_names_inv = hash_table_create(0,0);
-	n->file_table       = hash_table_create(0,0); // This will be in dag_create
 
 	return n;
 }
 
-struct dag_file *dag_file_from_name(struct dag_node *n, const char *filename)
+struct dag_file *dag_file_from_name(struct dag *d, const char *filename)
 {
-	return (struct dag_file *) hash_table_lookup(n->file_table, filename);
+	return (struct dag_file *) hash_table_lookup(d->file_table, filename);
 }
 
 char *dag_file_remote_name(struct dag_node *n, const char *filename)
@@ -88,7 +87,7 @@ char *dag_file_remote_name(struct dag_node *n, const char *filename)
 	struct dag_file *f;
 	char *name;
 
-	f = dag_file_from_name(n, filename);
+	f = dag_file_from_name(n->d, filename);
 	name = (char *) itable_lookup(n->remote_names, (uintptr_t) f);
 
 	return name;
@@ -159,40 +158,42 @@ char *dag_node_translate_filename(struct dag_node *n, const char *filename)
 	return newname_ptr;
 }
 
-struct dag_file *dag_file_create(struct dag_node *n, const char *filename, const char *remotename)
+struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
 {
-	struct dag_file *f = malloc(sizeof(*f));
-	f->filename = xxstrdup(filename);
+	struct dag_file *f;
 
-	hash_table_insert(n->file_table, f->filename, (void *) f);
+	f = hash_table_lookup(d->file_table, filename);
 
-	if(remotename)
-		dag_node_add_remote_name(n, filename, remotename);
+	if(f)
+		return f;
+
+	f = malloc(sizeof(struct dag_file));
+
+	f->filename  = xxstrdup(filename);
+	f->needed_by = list_create(0);
+	f->target_of = NULL;
+
+	hash_table_insert(d->file_table, f->filename, (void *) f);
 
 	return f;
 }
 
+
 struct list *dag_input_files(struct dag *d)
 {
-	struct dag_node *n, *tmp;
 	struct dag_file *f;
-	struct list *il;
+	char            *filename;
+	struct list     *il;
 
 	il = list_create(0);
-	for(n = d->nodes; n; n = n->next) {
-		//for each source file, see if it is a target file of another node
-		list_first_item(n->source_files);
-		while( (f = list_next_item(n->source_files)) ) {
-			// d->file_table contains all target files
-			// get the node (tmp) that outputs current source file
-			tmp = hash_table_lookup(d->file_table, f->filename);
-			// if a source file is also a target file
-			if(!tmp) {
-				debug(D_DEBUG, "Found independent input file: %s", f->filename);
-				list_push_tail(il, f);
-			}
+
+	hash_table_firstkey(d->file_table);
+	while( (hash_table_nextkey(d->file_table, &filename, (void **) &f)) )
+		if(!f->target_of)
+		{
+			debug(D_DEBUG, "Found independent input file: %s", f->filename);
+			list_push_tail(il, f);
 		}
-	}
 
 	return il;
 }
@@ -257,7 +258,10 @@ const char *dag_node_state_name(dag_node_state_t state)
 const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, const char *remotename)
 {
 	char *oldname;
-	struct dag_file *f = dag_file_from_name(n, remotename);
+	struct dag_file *f = dag_file_from_name(n->d, filename);
+
+	if(!f)
+		fatal("trying to add remote name %s to unknown file %s.\n", remotename, filename);
 
 	if(!remotename)
 		remotename = dag_node_translate_filename(n, filename);
@@ -275,16 +279,43 @@ const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, c
 	return remotename;
 }
 
+struct dag_file *dag_node_add_file(struct dag_node *n, const char *filename, const char *remotename)
+{
+	struct dag_file *f = dag_file_lookup_or_create(n->d, filename); 
+
+
+	return f;
+}
+
 void dag_node_add_source_file(struct dag_node *n, const char *filename, char *remotename)
 {
-	struct dag_file *source = dag_file_create(n, filename, remotename);
+	struct dag_file *source = dag_file_lookup_or_create(n->d, filename);
+
+	if(remotename)
+		dag_node_add_remote_name(n, filename, remotename);
+
+	/* register this file as a source of the node */
 	list_push_head(n->source_files, source);
+
+	/* register this file as a requirement of the node */
+	list_push_head(source->needed_by, n);
 }
 
 void dag_node_add_target_file(struct dag_node *n, const char *filename, char *remotename)
 {
-	struct dag_file *target = dag_file_create(n, filename, remotename);
+	struct dag_file *target = dag_file_lookup_or_create(n->d, filename);
+
+	if(target->target_of && target->target_of != n)
+		fatal("%s is defined multiple times at %s:%d and %s:%d\n", filename, filename, target->target_of->linenum, filename, n->linenum);
+
+	if(remotename)
+		dag_node_add_remote_name(n, filename, remotename);
+
+	/* register this file as a target of the node */
 	list_push_head(n->target_files, target);
+
+	/* register this node as the creator of the file */
+	target->target_of = n;
 }
 
 void dag_count_states(struct dag *d)

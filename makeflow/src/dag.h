@@ -31,7 +31,7 @@ struct dag {
 	struct itable *node_table;			// Mapping from unique integers dag_node->nodeid to nodes.
 	struct itable *local_job_table;			// Mapping from unique integers dag_node->jobid  to nodes, rules with prefix LOCAL.
 	struct itable *remote_job_table;		// Mapping from unique integers dag_node->jobid  to nodes.
-	struct hash_table *file_table;			// Mapping filenames to dag_nodes (answers: which production rule has filename as a target?)
+	struct hash_table *file_table;			// Maps every filename to a struct dag_file.
 	struct hash_table *completed_files;		// Records which target files have been updated/generated.
 	struct list *symlinks_created;			// Remote filenames for which a symlink was created (used now only for Condor, and only for the final cleanup).
 	struct hash_table *variables;			// Mappings between variables defined in the makeflow file and their substitution.
@@ -56,31 +56,14 @@ struct dag_parse {
 };
 
 
-/* struct dag_file represents a file, inpur or output, of the
- * workflow. filename is the path given in the makeflow file, and
- * remotename is a unique slash-less pathname that is resolved to
- * filename, but that can easily be sent to a remote batch
- * system. remotename is obtained from filename with the
- * translate_filename function.
- *
- * (Eventually, all references to a filename are guaranteed to
- * have the same struct dag_file, and remotename will come from
- * a hash_table defined per node) */
-
-struct dag_file {
-	const char *filename;
-};
-
 /* struct dag_node implements a linked list of nodes. A dag_node
  * represents a production rule from source files to target
  * files. The actual dag structure is given implicitly by the
  * source_files and target_files members (i.e., a dag_node has no
  * explicit knowledge of its logical dag_node ascendants or descendants).
- * For a given filename, we can test if it is a sink of the dag d
- * with a lookup on the hash table d->file_table. In fact,
- * dag_node acts more like the edge of the dag, with the nodes
- * being sets of source/target files (that is, a file may be part
- * of different nodes).*/
+ * In fact, dag_node acts more like the edge of the dag, with the
+ * nodes being sets of source/target files (that is, a file may
+ * be part of different nodes).*/
 struct dag_node {
 	struct dag *d;
 	int only_my_children;
@@ -101,7 +84,6 @@ struct dag_node {
 
 	struct itable *remote_names;                     // Mapping from struct *dag_files to remotenames (char *)
 	struct hash_table *remote_names_inv;	         // Mapping from remote filenames to dag_file representing the local file.
-	struct hash_table *file_table;                    // From local names to dag_files (this will be in struct dag soon).
 
 	struct list   *source_files;
 	struct list   *target_files;
@@ -112,6 +94,17 @@ struct dag_node {
 	int children_remaining;
 	int level;
 	struct hash_table *variables;
+};
+
+/* struct dag_file represents a file, inpur or output, of the
+ * workflow. filename is the path given in the makeflow file.
+ */
+
+struct dag_file {
+	const char *filename;
+
+	struct list     *needed_by;              /* List of nodes that have this file as a source */
+	struct dag_node *target_of;              /* The node (if any) that created the file */
 };
 
 struct dag_lookup_set {

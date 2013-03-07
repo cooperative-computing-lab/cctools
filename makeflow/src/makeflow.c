@@ -138,9 +138,8 @@ int dag_width_guaranteed_max(struct dag *d)
 		// for each source file, see if it is a target file of another node
 		list_first_item(n->source_files);
 		while( (f = list_next_item(n->source_files)) ) {
-			// d->file_table contains all target files
 			// get the node (tmp) that outputs current source file
-			tmp = hash_table_lookup(d->file_table, f->filename);
+			tmp = f->target_of;
 			// if a source file is also a target file
 			if(tmp) {
 				debug(D_DEBUG, "%d depends on %d", n->nodeid, tmp->nodeid);
@@ -183,7 +182,7 @@ int dag_depth(struct dag *d)
 		n->level = 0;
 		list_first_item(n->source_files);
 		while ( (f = list_next_item(n->source_files)) ) {
-			if((parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename)) != NULL) {
+			if((parent = f->target_of) != NULL) {
 				n->level = -1;
 				list_push_tail(level_unsolved_nodes, n);
 				break;
@@ -195,7 +194,7 @@ int dag_depth(struct dag *d)
 	while((n = (struct dag_node *) list_pop_head(level_unsolved_nodes)) != NULL) {
 		list_first_item(n->source_files);
 		while( (f = list_next_item(n->source_files)) ) {
-			if((parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename)) != NULL) {
+			if((parent = f->target_of) != NULL) {
 				if(parent->level == -1) {
 					n->level = -1;
 					list_push_tail(level_unsolved_nodes, n);
@@ -299,19 +298,18 @@ void collect_input_files(struct dag *d, char* bundle_dir, char *(*rename)(struct
 
 void dag_show_output_files(struct dag *d)
 {
-	char *key;
-	void *value;
+	struct dag_file *f;
+	char            *filename;
 
 	hash_table_firstkey(d->file_table);
-
-	while(hash_table_nextkey(d->file_table, &key, &value)) {
-		printf("%s\n", key);
+	while(hash_table_nextkey(d->file_table, &filename, (void **) &f)) {
+		if(f->target_of)
+			fprintf(stdout, "%s\n", filename);
 	}
 }
 
 /** 
- * Code added by kparting to compute the width of the graph. Original algorithm
- * by pbui, with improvements by kparting.
+ * Computes the width of the graph
  */
 int dag_width(struct dag *d, int nested_jobs)
 {
@@ -325,7 +323,7 @@ int dag_width(struct dag *d, int nested_jobs)
 		n->level = 0; // initialize 'level' value to 0 because other functions might have modified this value.
 		list_first_item(n->source_files);
 		while( (f = list_next_item(n->source_files)) ) {
-			parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename);
+			parent = f->target_of;
 			if(parent)
 				parent->children++;
 		}
@@ -353,7 +351,7 @@ int dag_width(struct dag *d, int nested_jobs)
 
 		list_first_item(n->source_files);
 		while ( (f = list_next_item(n->source_files)) ) {
-			parent = (struct dag_node *) hash_table_lookup(d->file_table, f->filename);
+			parent = f->target_of;
 			if(!parent)
 				continue;
 
@@ -533,7 +531,7 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 				goto rerun;	// rerun this node
 			}
 		} else {
-			if(!hash_table_lookup(d->file_table, f->filename)) {
+			if(!f->target_of) {
 				fprintf(stderr, "makeflow: input file %s does not exist and is not created by any rule.\n", f->filename);
 				exit(1);
 			} else {
@@ -603,7 +601,7 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 		if(hash_table_lookup(d->collect_table, f1->filename) == NULL)
 			continue;
 
-		p = hash_table_lookup(d->file_table, f1->filename);
+		p = f1->target_of;
 		if (p) {
 			dag_node_force_rerun(rerun_table, d, p);
 			dag_gc_ref_incr(d, f1->filename, 1);
@@ -695,7 +693,7 @@ void dag_log_recover(struct dag *d, const char *filename)
 			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
 			list_first_item(n->source_files);
 			while( (f = list_next_item(n->source_files)) ) {
-				p = hash_table_lookup(d->file_table, f->filename);
+				p = f->target_of;
 				if(p)
 					fprintf(d->logfile, "\t%d", p->nodeid);
 			}
@@ -887,36 +885,12 @@ int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode)
 	}
 //ok:
 	free(bk);
-	return dag_check_dependencies(d);
+	return 1;
 
 failure:
 	free(line);
 	free(bk);
 	return 0;
-}
-
-int dag_check_dependencies(struct dag *d)
-{
-	struct dag_node *n, *m;
-	struct dag_file *f;
-
-	/* Walk list of nodes and associate target files with the nodes that
-	 * generate them. */
-	for(n = d->nodes; n; n = n->next) {
-		list_first_item(n->target_files);
-		while( (f = list_next_item(n->target_files)) ) {
-			m = hash_table_lookup(d->file_table, f->filename);
-			if(m) {
-				fprintf(stderr, "makeflow: %s is defined multiple times at %s:%d and %s:%d\n", f->filename, d->filename, n->linenum, d->filename, m->linenum);
-				errno = EINVAL;
-				return 0;
-			} else {
-				hash_table_insert(d->file_table, f->filename, n);
-			}
-		}
-	}
-
-	return 1;
 }
 
 void dag_prepare_gc(struct dag *d)
@@ -1675,7 +1649,7 @@ int dag_check(struct dag *d)
 				continue;
 			}
 
-			if(hash_table_lookup(d->file_table, f->filename)) {
+			if(f->target_of) {
 				continue;
 			}
 
