@@ -51,8 +51,7 @@ int dag_to_file_exports(const struct dag *d, FILE *dag_stream)
 
 }
 
-/* Writes a list of files to the the stream, using remotename
- * instead of filename if available */
+/* Writes a list of files to the the stream */
 int dag_to_file_files(struct dag_node *n, struct list *fs, FILE *dag_stream, char *(*rename)(struct dag_node *n, const char *filename))
 {
 	//here we may want to call the linker renaming function,
@@ -64,7 +63,13 @@ int dag_to_file_files(struct dag_node *n, struct list *fs, FILE *dag_stream, cha
 		if(rename)
 			fprintf(dag_stream, "%s ", rename(n, f->filename));
 		else
-			fprintf(dag_stream, "%s ", (f->filename == dag_file_remote_name(n, f->filename) ? f->filename : dag_file_remote_name(n, f->filename)));
+		{
+			char *remotename = dag_file_remote_name(n, f->filename); 
+			if(remotename)
+				fprintf(dag_stream, "%s->%s ", f->filename, remotename); 
+			else
+				fprintf(dag_stream, "%s ", f->filename);
+		}
 
 	return 0;
 }
@@ -114,9 +119,6 @@ int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename)(struc
 
 	if(!dag_stream)
 		return 1;
-
-	if(!rename)
-		rename = dag_node_translate_filename;
 
 	dag_to_file_vars(d, dag_stream);
 	dag_to_file_exports(d, dag_stream);
