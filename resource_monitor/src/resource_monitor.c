@@ -153,7 +153,7 @@ See the file COPYING for details.
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_piggyback.h"
 
-#define DEFAULT_INTERVAL 250 /* in miliseconds */
+#define DEFAULT_INTERVAL       1        /* in seconds */
 
 #define ONE_MEGABYTE 1048576  /* this many bytes */
 #define ONE_SECOND   1000000  /* this many usecs */    
@@ -161,9 +161,13 @@ See the file COPYING for details.
 FILE  *log_file;               /* All monitoring information of all processes is written here. */
 FILE  *log_file_summary;       /* Final statistics are written to this file. */
 
-int    monitor_queue_fd;       /* File descriptor of a datagram socket to which (great)* grandchildren processes report to the monitor. */
-pid_t  first_process_pid;      /* pid of the process given at the command line */
+int    monitor_queue_fd;       /* File descriptor of a datagram socket to which (great)
+								  grandchildren processes report to the monitor. */
+
+pid_t  first_process_pid;              /* pid of the process given at the command line */
 pid_t  first_process_exit_status;      /* exit status of the process given at the command line */
+char  *over_limit_str = NULL;          /* string to report the limits exceeded */
+
 double secs_initial;                   /* Time at which monitoring started, in secs. */
 
 
@@ -262,11 +266,9 @@ struct tree_info
 
 	int64_t  fs_nodes;
 
-	char    *over_limit_str;
 };
 
 struct tree_info     tree_max;
-struct tree_info     tree_min;
 
 struct tree_info     tree_limits;
 
@@ -922,32 +924,37 @@ void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct w
 	tr->fs_nodes                 = (int64_t) f->disk.f_ffree;
 }
 
-//Computes result = op(result, tr, arg), per field.
-#define tree_update_op(op, result, other, fld) (result)->fld = op((result)->fld, (other)->fld);
-
-void monitor_update_tree(struct tree_info *result, struct tree_info *tr, void *arg, int64_t (*op)(int64_t, int64_t))
+void monitor_find_max_tree(struct tree_info *result, struct tree_info *tr)
 {
-	tree_update_op(op, result, tr, wall_time);
-	tree_update_op(op, result, tr, max_concurrent_processes);
-	tree_update_op(op, result, tr, cpu_time);
-	tree_update_op(op, result, tr, virtual_memory);
-	tree_update_op(op, result, tr, resident_memory);
-	tree_update_op(op, result, tr, bytes_read);
-	tree_update_op(op, result, tr, bytes_written);
-	tree_update_op(op, result, tr, workdir_number_files_dirs);
-	tree_update_op(op, result, tr, workdir_footprint);
-	tree_update_op(op, result, tr, fs_nodes);
+	if(result->wall_time < tr->wall_time)
+		result->wall_time = tr->wall_time;
 
-}
+	if(result->max_concurrent_processes < tr->max_concurrent_processes)
+		result->max_concurrent_processes = tr->max_concurrent_processes;
 
-int64_t maxop(int64_t a, int64_t b)
-{
-	return ( a > b ? a : b);
-}
+	if(result->cpu_time < tr->cpu_time)
+		result->cpu_time = tr->cpu_time;
 
-int64_t minop(int64_t a, int64_t b)
-{
-	return ( a < b ? a : b);
+	if(result->virtual_memory < tr->virtual_memory)
+		result->virtual_memory = tr->virtual_memory;
+
+	if(result->resident_memory < tr->resident_memory)
+		result->resident_memory = tr->resident_memory;
+
+	if(result->bytes_read < tr->bytes_read)
+		result->bytes_read = tr->bytes_read;
+
+	if(result->bytes_written < tr->bytes_written)
+		result->bytes_written = tr->bytes_written;
+
+	if(result->workdir_number_files_dirs < tr->workdir_number_files_dirs)
+		result->workdir_number_files_dirs = tr->workdir_number_files_dirs;
+
+	if(result->workdir_footprint < tr->workdir_footprint)
+		result->workdir_footprint = tr->workdir_footprint;
+
+	if(result->fs_nodes < tr->fs_nodes)
+		result->fs_nodes = tr->fs_nodes;
 }
 
 void monitor_log_row(struct tree_info *tr)
@@ -973,7 +980,7 @@ int monitor_final_summary()
 {
 	int status = 0;
 
-	if(tree_limits.over_limit_str)
+	if(over_limit_str)
 		status = -1;
 
 	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", tree_max.max_concurrent_processes);
@@ -1066,7 +1073,12 @@ void cleanup_zombie(struct process_info *p)
 	{
 		first_process_exit_status = WEXITSTATUS(status);
 
-		fprintf(log_file_summary, "%-30s\t%lf\n", "end:", secs_since_epoch());
+		/* BUG: Need to add a call to getrusage here */
+		/* BUG: end and wall_time should be computed in a final
+		 * summary, not here */
+		tree_max.wall_time = secs_since_epoch() - secs_initial;
+
+		fprintf(log_file_summary, "%-30s\t%lf\n", "end:", tree_max.wall_time + secs_initial);
 
 		if( WIFEXITED(status) )
 		{
@@ -1077,10 +1089,10 @@ void cleanup_zombie(struct process_info *p)
 		{
 			debug(D_DEBUG, "process %d terminated: %s.\n", p->pid, strsignal(WTERMSIG(status)) );
 
-			if(tree_limits.over_limit_str)
+			if(over_limit_str)
 			{
 				fprintf(log_file_summary, "%-30s\tlimit\n", "exit_type:");
-				fprintf(log_file_summary, "%-30s\t%s\n", "limits_exceeded:", tree_limits.over_limit_str);
+				fprintf(log_file_summary, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
 			}
 			else
 			{
@@ -1211,20 +1223,20 @@ void monitor_final_cleanup(int signum)
 	if(tr->fld > 0 && tree_limits.fld - tr->fld < 0)\
 	{\
 		char *tmp;\
-		if(tree_limits.over_limit_str)\
+		if(over_limit_str)\
 		{\
-			tmp = string_format("%s, " #fld " %" fmt " > %" fmt, tree_limits.over_limit_str, (tr)->fld, tree_limits.fld);\
-			free(tree_limits.over_limit_str);\
-			tree_limits.over_limit_str = tmp;\
+			tmp = string_format("%s, " #fld " %" fmt " > %" fmt, over_limit_str, (tr)->fld, tree_limits.fld);\
+			free(over_limit_str);\
+			over_limit_str = tmp;\
 		}\
 		else\
-			tree_limits.over_limit_str = string_format(#fld " %" fmt " > %" fmt, (tr)->fld, tree_limits.fld);\
+			over_limit_str = string_format(#fld " %" fmt " > %" fmt, (tr)->fld, tree_limits.fld);\
 	}
 
 /* return 0 means above limit, 1 means limist ok */
 int monitor_check_limits(struct tree_info *tr)
 {
-	tree_limits.over_limit_str = NULL;
+	over_limit_str = NULL;
 
 	over_limit_check(tr, wall_time, "lf");
 	over_limit_check(tr, max_concurrent_processes, PRId64);
@@ -1236,7 +1248,7 @@ int monitor_check_limits(struct tree_info *tr)
 	over_limit_check(tr, workdir_number_files_dirs, PRId64);
 	over_limit_check(tr, workdir_footprint, PRId64);
 
-	if(tree_limits.over_limit_str)
+	if(over_limit_str)
 		return 0;
 	else
 		return 1;
@@ -1283,10 +1295,18 @@ void monitor_dispatch_msg(void)
 
 	p = itable_lookup(processes, (uint64_t) msg.origin);
 
+	if(!p && msg.type != BRANCH)
+	/* We either got a malformed message, or a message that
+	 * recently terminated. There is not much we can do right
+	 * now, but to ignore the message */
+		return;
+
 	switch(msg.type)
 	{
 		case BRANCH:
 			monitor_track_process(msg.origin);
+			if(tree_max.max_concurrent_processes < itable_size(processes))
+				tree_max.max_concurrent_processes = itable_size(processes);
 			break;
 		case END:
 			monitor_untrack_process(msg.data.p);
@@ -1303,6 +1323,9 @@ void monitor_dispatch_msg(void)
 		default:
 			break;
 	};
+
+	if(!monitor_check_limits(&tree_max))
+		monitor_final_cleanup(SIGTERM);
 }
 
 int wait_for_messages(int interval)
@@ -1313,7 +1336,7 @@ int wait_for_messages(int interval)
 	timeout.tv_sec  = 0;
 	timeout.tv_usec = 0;
 
-	debug(D_DEBUG, "sleeping for: %ld miliseconds\n", interval);
+	debug(D_DEBUG, "sleeping for: %ld seconds\n", interval);
 
 	//If grandchildren processes cannot talk to us, simply wait.
 	//Else, wait, and check socket for messages.
@@ -1329,8 +1352,8 @@ int wait_for_messages(int interval)
 			fd_set rset;
 			FD_ZERO(&rset);
 			FD_SET(monitor_queue_fd, &rset);
-			timeout.tv_sec  = (interval * 1000)/1000000;
-			timeout.tv_usec  = interval * 1000;
+			timeout.tv_sec   = interval;
+			timeout.tv_usec  = 0;
 			interval = 0;                     //Next loop we do not wait at all
 			count = select(monitor_queue_fd + 1, &rset, NULL, NULL, &timeout);
 
@@ -1421,14 +1444,14 @@ struct process_info *spawn_first_process(const char *cmd)
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] command-line-and-options\n", cmd);
-	fprintf(stdout, "-i <n>			Interval bewteen observations, in miliseconds. (default=%d)\n", DEFAULT_INTERVAL);
+	fprintf(stdout, "-i <n>			Interval bewteen observations, in seconds. (default=%d)\n", DEFAULT_INTERVAL);
 	fprintf(stdout, "-d <subsystem>		Enable debugging for this subsystem.\n");
 	fprintf(stdout, "-l <maxfile>		Use maxfile with list of var: value pairs for resource limits.");
 	fprintf(stdout, "-o <logfile>		Write log to logfile (default=log-PID)\n");
 }
 
 
-int monitor_resources(long int interval /*in miliseconds */)
+int monitor_resources(long int interval /*in seconds */)
 {
 	uint64_t round;
 
@@ -1456,15 +1479,9 @@ int monitor_resources(long int interval /*in miliseconds */)
 		monitor_collate_tree(&tree_now, &p, &d, &f);
 
 		if(round == 1)
-		{
 			memcpy(&tree_max, &tree_now, sizeof(struct tree_info));
-			memcpy(&tree_min, &tree_now, sizeof(struct tree_info));
-		}
 		else
-		{
-			monitor_update_tree(&tree_max, &tree_now, NULL, maxop);
-			monitor_update_tree(&tree_min, &tree_now, NULL, minop);
-		}
+			monitor_find_max_tree(&tree_max, &tree_now);
 
 		monitor_log_row(&tree_now);
 
@@ -1514,7 +1531,7 @@ int main(int argc, char **argv) {
 			case 'i':
 				interval = strtoll(optarg, NULL, 10);
 				if(interval < 1)
-					fatal("interval cannot be set to less than one milisecond.");
+					fatal("interval cannot be set to less than one second.");
 				break;
 			case 'o':
 				log_path = xxstrdup(optarg);
