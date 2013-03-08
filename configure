@@ -115,7 +115,13 @@ globus_flavor=auto
 ccompiler=gcc
 cxxcompiler=g++
 mpicompiler=mpicc
+
 ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
+
+if [ "${type}" = TRUNK ]
+then
+	ccflags="${ccflags} -Werror"
+fi
 
 if [ ${build_sys} != CYGWIN ]
 then
