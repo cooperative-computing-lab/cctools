@@ -174,6 +174,8 @@ double secs_initial;                   /* Time at which monitoring started, in s
 struct itable *processes;       /* Maps the pid of a process to a unique struct process_info. */
 struct hash_table *wdirs;       /* Maps paths to working directory structures. */
 struct itable *filesysms;       /* Maps st_dev ids (from stat syscall) to filesystem structures. */
+struct hash_table *files;       /* Keeps track of which files have been opened. */
+
 struct itable *wdirs_rc;        /* Counts how many process_info use a wdir_info. */
 struct itable *filesys_rc;      /* Counts how many wdir_info use a filesys_info. */
 
@@ -207,8 +209,12 @@ struct io_info
 	uint64_t chars_read;
 	uint64_t chars_written;
 
+	uint64_t bytes_faulted;
+
 	uint64_t delta_chars_read;
 	uint64_t delta_chars_written;
+
+	uint64_t delta_bytes_faulted;
 };
 
 struct wdir_info
@@ -348,7 +354,7 @@ FILE *open_proc_file(pid_t pid, char *filename)
 }
 
 /* Parse a /proc file looking for line attribute: value */
-int get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value)
+int get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value, int rewind_flag)
 {
 	char proc_attr_line[PATH_MAX];
 	int not_found = 1;
@@ -359,7 +365,9 @@ int get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value)
 
 	proc_attr_line[PATH_MAX - 1] = '\0';
 
-	rewind(fstatus);
+	if(rewind_flag)
+		rewind(fstatus);
+
 	while( fgets(proc_attr_line, PATH_MAX - 2, fstatus) )
 	{
 		if(strncmp(attribute, proc_attr_line, n) == 0)
@@ -439,7 +447,7 @@ void parse_limits_string(char *str, struct tree_info *tree)
 }
 
 /* Every line of the limits file has the format resource: value */
-#define parse_limit_file(file, tr, fld) if(!get_int_attribute(file, #fld ":", (uint64_t *) &tr->fld))\
+#define parse_limit_file(file, tr, fld) if(!get_int_attribute(file, #fld ":", (uint64_t *) &tr->fld, 1))\
 											debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", #fld, tr->fld);
 void parse_limits_file(char *path, struct tree_info *tree)
 {
@@ -618,6 +626,9 @@ int get_cpu_time_usage(pid_t pid, struct cpu_time_info *cpu)
 	/* /dev/proc/[pid]/stat */
 
 	uint64_t kernel, user;
+
+	cpu->delta_user_time   = 0;
+	cpu->delta_kernel_time = 0;
 	
 	FILE *fstat = open_proc_file(pid, "stat");
 	if(!fstat)
@@ -683,27 +694,35 @@ void acc_mem_usage(struct mem_info *acc, struct mem_info *other)
 		acc->data     += other->data;
 }
 
-int get_io_usage(pid_t pid, struct io_info *io)
+int get_sys_io_usage(pid_t pid, struct io_info *io)
 {
-	// /proc/[pid]/io: if process dies before we read the file, then info is
-	// lost, as if the process did not read or write any characters.
-
+	/* /proc/[pid]/io: if process dies before we read the file,
+	 then info is lost, as if the process did not read or write
+	 any characters.
+	 */
+	
 	FILE *fio = open_proc_file(pid, "io");
 	uint64_t cread, cwritten;
 	int rstatus, wstatus;
 
+	io->delta_chars_read = 0;
+	io->delta_chars_written = 0;
+
 	if(!fio)
 		return 1;
 
-	rstatus = get_int_attribute(fio, "rchar", &cread);
-	wstatus = get_int_attribute(fio, "wchar", &cwritten);
+	/* We really want "bytes_read", but there are issues with
+	 * distributed filesystems. Instead, we also count page
+	 * faulting in another function below. */
+	rstatus  = get_int_attribute(fio, "rchar", &cread, 1);
+	wstatus  = get_int_attribute(fio, "write_bytes", &cwritten, 1);
 
 	fclose(fio);
 
 	if(rstatus || wstatus)
 		return 1;
 
-	io->delta_chars_read    = cread - io->chars_read;
+	io->delta_chars_read    = cread    - io->chars_read;
 	io->delta_chars_written = cwritten - io->chars_written;
 
 	io->chars_read = cread;
@@ -712,10 +731,44 @@ int get_io_usage(pid_t pid, struct io_info *io)
 	return 0;
 }
 
-void acc_io_usage(struct io_info *acc, struct io_info *other)
+void acc_sys_io_usage(struct io_info *acc, struct io_info *other)
 {
 	acc->delta_chars_read    += other->delta_chars_read;
 	acc->delta_chars_written += other->delta_chars_written;
+}
+
+int get_map_io_usage(pid_t pid, struct io_info *io)
+{
+	/* /dev/proc/[pid]/smaps */
+
+	uint64_t kbytes_resident_accum;
+	uint64_t kbytes_resident;
+
+	kbytes_resident_accum    = 0;
+	io->delta_bytes_faulted = 0;
+
+	FILE *fsmaps = open_proc_file(pid, "smaps");
+	if(!fsmaps)
+	{
+		return 1;
+	}
+	
+	while(get_int_attribute(fsmaps, "Rss:", &kbytes_resident, 0) == 0)
+		kbytes_resident_accum += kbytes_resident;
+
+	if((kbytes_resident_accum * 1024) > io->bytes_faulted)
+		io->delta_bytes_faulted = (kbytes_resident_accum * 1024) - io->bytes_faulted;
+	
+	io->bytes_faulted = (kbytes_resident_accum * 1024);
+
+	fclose(fsmaps);
+
+	return 0;
+}
+
+void acc_map_io_usage(struct io_info *acc, struct io_info *other)
+{
+	acc->delta_bytes_faulted += other->delta_bytes_faulted;
 }
 
 /***
@@ -801,7 +854,8 @@ int monitor_process_once(struct process_info *p)
 
 	get_cpu_time_usage(p->pid, &p->cpu);
 	get_mem_usage(p->pid, &p->mem);
-	get_io_usage(p->pid, &p->io);
+	get_sys_io_usage(p->pid, &p->io);
+	get_map_io_usage(p->pid, &p->io);
 
 	return 0;
 }
@@ -853,7 +907,8 @@ void monitor_processes_once(struct process_info *acc)
 		
 		acc_cpu_time_usage(&acc->cpu, &p->cpu);
 
-		acc_io_usage(&acc->io, &p->io);
+		acc_sys_io_usage(&acc->io, &p->io);
+		acc_map_io_usage(&acc->io, &p->io);
 	}
 }
 
@@ -913,10 +968,14 @@ void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct w
 
 	tr->max_concurrent_processes = (int64_t) itable_size(processes);
 	tr->cpu_time                 = (p->cpu.delta_user_time + p->cpu.delta_kernel_time) + tr->cpu_time;
+
 	tr->virtual_memory           = (int64_t) p->mem.virtual;
 	tr->resident_memory          = (int64_t) p->mem.resident;
+
 	tr->bytes_read               = (int64_t) (p->io.delta_chars_read + tr->bytes_read);
+	tr->bytes_read              += (int64_t)  p->io.delta_bytes_faulted;
 	tr->bytes_written            = (int64_t) (p->io.delta_chars_written + tr->bytes_written);
+
 	tr->workdir_number_files_dirs = (int64_t) (d->files + d->directories);
 	tr->workdir_footprint         = (int64_t) d->byte_count;
 
@@ -1234,6 +1293,16 @@ void monitor_final_cleanup(int signum)
 
 	status = monitor_final_summary();
 
+	/* make a function for this... 
+	 * write opened files at the end of the log, as comments so
+	 * gnuplot ignores them */
+	char *fname;
+	void *dummy;
+	fprintf(log_file, "\n\n# opened files:\n#\n");
+	hash_table_firstkey(files);
+	while(hash_table_nextkey(files, &fname, &dummy))
+		fprintf(log_file, "# %s\n", fname);
+
 	fclose(log_file);
 	fclose(log_file_summary);
 
@@ -1338,6 +1407,8 @@ void monitor_dispatch_msg(void)
 			p->wd = lookup_or_create_wd(p->wd, msg.data.s);
 			break;
 		case OPEN:
+			debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
+			hash_table_insert(files, msg.data.s, NULL);
 			break;
 		case READ:
 			break;
@@ -1585,9 +1656,10 @@ int main(int argc, char **argv) {
 	monitor_helper_init("./librmonitor_helper.so", &monitor_queue_fd);
 #endif
 
-	processes    = itable_create(0);
-	wdirs = hash_table_create(0,0);
-	filesysms    = itable_create(0);
+	processes = itable_create(0);
+	wdirs     = hash_table_create(0,0);
+	filesysms = itable_create(0);
+	files     = hash_table_create(0,0); 
 	
 	wdirs_rc = itable_create(0);
 	filesys_rc      = itable_create(0);
