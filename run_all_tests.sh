@@ -13,36 +13,35 @@ export CCTOOLS_TEST_LOG
 
 rm -f $CCTOOLS_TEST_LOG $CCTOOLS_TEST_RESULTS > /dev/null 2>&1
 
-success=1
+nsuccess=0
+nfail=0
+
 start_time=`date +%s`
 
-echo "Running all tests ..."
 for p in ${CCTOOLS_PACKAGES}; do 
-    echo -n "    Running $p tests ... "
-    cd $p > /dev/null
-    if make -s test >> $CCTOOLS_TEST_RESULTS 2> /dev/null; then
-    	echo ok
-    else
-    	echo fail
-    	success=0
-    fi
-    cd .. > /dev/null
+	if [ -d ${p}/test ]
+	then
+		cd ${p}/test
+		for t in `find . -name TR\*.sh | sort`
+		do
+			if  ../../dttools/src/test_runner.sh $t
+			then
+				((nsuccess++))
+			else
+				((nfail++))
+			fi
+		done
+		cd ../..
+	fi
 done
 stop_time=`date +%s`
 
-nfail=`grep '... fail' $CCTOOLS_TEST_RESULTS | wc -l`
-ntotal=`grep testing $CCTOOLS_TEST_RESULTS | wc -l`
+((ntotal=$nsuccess+$nfail))
+
+((elapsed=$stop_time-$start_time))
 
 echo ""
-echo "Results:"
-echo "    Total running time: $(($stop_time - $start_time)) seconds"
-echo "    $nfail of $ntotal tests failed:"
-for t in `grep '... fail' $CCTOOLS_TEST_RESULTS | awk '{print $2}'`; do
-    echo "         $t"
-done
-
+echo "Test Results: $nfail of $ntotal tests failed in $elapsed seconds."
 echo ""
-echo "Test logs are stored in $CCTOOLS_TEST_LOG"
-echo "Test results are stored in $CCTOOLS_TEST_RESULTS"
 
-exit $success
+exit $nfail

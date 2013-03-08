@@ -50,6 +50,8 @@ int parse_catalog_server_description(char *server_string, char **host, int *port
 	*host = strdup(server_string);
 	*port = atoi(colon + 1);
 
+	*colon = ':';
+
 	// if (*port) == 0, parsing failed, thus return 0
 	return *port;
 }
@@ -130,7 +132,7 @@ struct work_queue_master *parse_work_queue_master_nvpair(struct nvpair *nv)
 	strncpy(m->addr, nvpair_lookup_string(nv, "address"), LINK_ADDRESS_MAX);
 	strncpy(m->proj, nvpair_lookup_string(nv, "project"), WORK_QUEUE_NAME_MAX);
 	m->port = nvpair_lookup_integer(nv, "port");
-	m->start_time = nvpair_lookup_integer(nv, "start_time");
+	m->start_time = nvpair_lookup_integer(nv, "starttime");
 	m->priority = nvpair_lookup_integer(nv, "priority");
 	if(m->priority < 0) m->priority = 0;
 	m->capacity = nvpair_lookup_integer(nv, "capacity");
@@ -283,7 +285,7 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 	static time_t last_update_time = 0;
 
 	if(!now) {
-		if(time(0) - last_update_time < WORK_QUEUE_CATALOG_UPDATE_INTERVAL) return 1;
+		if(time(0) - last_update_time < WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL) return 1;
 	}
 
 	if(!outgoing_datagram) {
@@ -300,7 +302,7 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 
 	buffer = buffer_create();
 
-	buffer_printf(buffer, "type wq_master\nproject %s\nstart_time %llu\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntask_running %d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nworkers_by_pool %s\ncapacity %d\nversion %d.%d.%d\nowner %s", project_name, s->start_time, s->priority, s->port, WORK_QUEUE_CATALOG_LIFETIME, s->tasks_waiting, s->total_tasks_complete, s->workers_busy, s->total_tasks_dispatched, s->workers_init, s->workers_ready, s->workers_busy, s->workers_ready + s->workers_busy, workers_by_pool, s->capacity, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
+	buffer_printf(buffer, "type wq_master\nproject %s\nstarttime %llu\npriority %d\nport %d\nlifetime %d\ntasks_waiting %d\ntasks_complete %d\ntasks_running %d\ntotal_tasks_dispatched %d\nworkers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nworkers_by_pool %s\ncapacity %d\nversion %d.%d.%d\nowner %s", project_name, (s->start_time)/1000000, s->priority, s->port, WORK_QUEUE_CATALOG_MASTER_AD_LIFETIME, s->tasks_waiting, s->total_tasks_complete, s->workers_busy, s->total_tasks_dispatched, s->workers_init, s->workers_ready, s->workers_busy, s->workers_ready + s->workers_busy, workers_by_pool, s->capacity, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
 
 	text = buffer_tostring(buffer, &text_size);
 	if(domain_name_cache_lookup(catalog_host, address)) {
@@ -358,7 +360,7 @@ int get_pool_decisions_from_catalog(const char *catalog_host, int catalog_port, 
 	return 1;
 }
 
-int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_port, const char *pool_name, const char *decision)
+int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_port, const char *pool_name, pid_t pid, time_t start_time, const char *decision, int workers_requested)
 {
 	char address[DATAGRAM_ADDRESS_MAX];
 	char owner[USERNAME_MAX];
@@ -368,7 +370,7 @@ int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_por
 
 	static time_t last_update_time = 0;
 
-	if(time(0) - last_update_time < WORK_QUEUE_CATALOG_UPDATE_INTERVAL) return 1;
+	if(time(0) - last_update_time < WORK_QUEUE_CATALOG_POOL_UPDATE_INTERVAL) return 1;
 
 	if(!outgoing_datagram) {
 		outgoing_datagram = datagram_create(0);
@@ -382,8 +384,13 @@ int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_por
 		strcpy(owner,"unknown");
 	}
 
+	// port = MAX_TCP_PORT + process id, this is for the catalog server to
+	// distinguish the worker pools from the same host. See make_hash_key()
+	// function in catalog_server.c
+	INT64_T port = 65535 + pid; 
+
 	buffer = buffer_create();
-	buffer_printf(buffer, "type wq_pool\npool_name %s\ndecision %s\nowner %s", pool_name, decision, owner);
+	buffer_printf(buffer, "type wq_pool\npool_name %s\nport %lld\nstarttime %llu\ndecision %s\nworkers_requested %d\nowner %s\nlifetime %d", pool_name, port, start_time, decision, workers_requested, owner, WORK_QUEUE_CATALOG_POOL_AD_LIFETIME);
 
 	text = buffer_tostring(buffer, &text_size);
 	debug(D_WQ, "Pool AD: \n%s\n", text);
@@ -406,7 +413,7 @@ void debug_print_masters(struct list *ml)
 
 	list_first_item(ml);
 	while((m = (struct work_queue_master *) list_next_item(ml))) {
-		if(timestamp_fmt(timestr, sizeof(timestr), "%R %b %d, %Y", m->start_time) == 0) {
+		if(timestamp_fmt(timestr, sizeof(timestr), "%R %b %d, %Y", (timestamp_t)(m->start_time)*1000000) == 0) {
 			strcpy(timestr, "unknown time");
 		}
 		debug(D_WQ, "%d:\t%s@%s:%d started on %s\n", ++count, m->proj, m->addr, m->port, timestr);

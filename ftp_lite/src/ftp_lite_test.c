@@ -63,7 +63,7 @@ static struct command list[] =
 {"noop",    1, 0, 0, "",                         do_nop},
 {"help",    0, 0, 0, "",                         do_help},
 {"quit",    0, 0, 0, "",                         do_quit},
-{0,0,0,0,0},
+{0,0,0,0,0,0},
 };
 
 int main( int argc, char *argv[] )

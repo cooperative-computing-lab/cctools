@@ -24,7 +24,7 @@ run()
 {
     cd $test_dir
     if ./makeflow -g none -d all; then
-    	exec diff ../$test_output _collect.7
+    	exec diff -w ../$test_output _collect.7
     else
     	exit 1
     fi

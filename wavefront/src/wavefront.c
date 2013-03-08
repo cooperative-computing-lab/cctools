@@ -10,8 +10,8 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <string.h>
 #include <sys/wait.h>
+#include <limits.h>
 
 #include "cctools.h"
 #include "list.h"
@@ -22,8 +22,8 @@ See the file COPYING for details.
 #include "load_average.h"
 #include "macros.h"
 #include "timestamp.h"
-
-#define PATH_MAX 256
+#include "stringtools.h"
+#include "getopt_aux.h"
 
 #define WAVEFRONT_TASK_STATE_COMPLETE   MAKE_RGBA(0,0,255,0)
 #define WAVEFRONT_TASK_STATE_RUNNING    MAKE_RGBA(0,255,0,0)
@@ -43,7 +43,7 @@ static int progress_bitmap_interval = 5;
 static FILE * progress_log_file = 0;
 static int abort_mode = 0;
 static int block_size = 1;
-static int batch_system_type = BATCH_QUEUE_TYPE_CONDOR;
+static int batch_system_type = BATCH_QUEUE_TYPE_LOCAL;
 static int verify_mode = 0;
 static struct batch_queue * batch_q = 0;
 
@@ -107,45 +107,48 @@ int wavefront_task_submit_recursive( struct wavefront_task *n )
 {
 	int i,j;
 
-	char extra_input_files[PATH_MAX*100];
-	char extra_output_files[PATH_MAX];
 	char command[PATH_MAX];
 	char filename[PATH_MAX];
+	char extra_output_files[PATH_MAX];
+	char *extra_input_files=NULL;
 
-	sprintf(command,"./wavefront -M -X %d -Y %d ./%s %d %d >output.%d.%d 2>&1",n->x,n->y,function,n->width,n->height,n->x,n->y);
-	sprintf(extra_output_files,"output.%d.%d",n->x,n->y);
-	sprintf(extra_input_files,"wavefront,%s",function);
+	string_nformat(command, PATH_MAX, "./wavefront -M -X %d -Y %d ./%s %d %d >output.%d.%d 2>&1", n->x,n->y,function,n->width,n->height,n->x,n->y);
+	string_nformat(extra_output_files, PATH_MAX, "output.%d.%d",n->x,n->y);
+	extra_input_files = string_format("wavefront,%s",function);
 
 	for(i=-1;i<n->width;i++) {
-		strcat(extra_input_files,",");
-		sprintf(filename,"R.%d.%d",n->x+i,n->y-1);
-		strcat(extra_input_files,filename);
+		string_nformat(filename, PATH_MAX, "R.%d.%d", n->x+i,n->y-1);
+		extra_input_files=string_combine(extra_input_files, ",");
+		extra_input_files=string_combine(extra_input_files, filename);
 	}
 
 	for(j=0;j<n->height;j++) {
-		strcat(extra_input_files,",");
-		sprintf(filename,"R.%d.%d",n->x-1,n->y+j);
-		strcat(extra_input_files,filename);
+		string_nformat(filename, PATH_MAX, "R.%d.%d",n->x-1,n->y+j);
+		extra_input_files=string_combine(extra_input_files, ",");
+		extra_input_files=string_combine(extra_input_files, filename);
 	}
 
-	return batch_job_submit_simple(batch_q,command,extra_input_files,extra_output_files);
+	batch_job_id_t job_id = batch_job_submit_simple(batch_q,command,extra_input_files,extra_output_files);
+	free(extra_input_files);
+	
+	return job_id;
 }
 
 int wavefront_task_submit_single( struct wavefront_task *n )
 {
-	char command[PATH_MAX];
+	char command[PATH_MAX * 5]; //Ugly, fix, should be the value from sysconf(ARG_MAX)
 	char leftfile[PATH_MAX];
 	char bottomfile[PATH_MAX];
 	char diagfile[PATH_MAX];
 	char extra_input_files[PATH_MAX*4];
 
-	sprintf(leftfile,"R.%d.%d",n->x-1,n->y);
-	sprintf(bottomfile,"R.%d.%d",n->x,n->y-1);
-	sprintf(diagfile,"R.%d.%d",n->x-1,n->y-1);
+	string_nformat(leftfile,   PATH_MAX, "R.%d.%d", n->x-1, n->y);
+	string_nformat(bottomfile, PATH_MAX, "R.%d.%d", n->x,   n->y-1);
+	string_nformat(diagfile,   PATH_MAX, "R.%d.%d", n->x-1, n->y-1);
 
-	sprintf(extra_input_files,"%s,%s,%s,%s",function,leftfile,bottomfile,diagfile);
+	string_nformat(extra_input_files, PATH_MAX*4, "%s,%s,%s,%s", function,leftfile,bottomfile,diagfile);
 
-	sprintf(command,"./%s %s %s %s >R.%d.%d",function,leftfile,bottomfile,diagfile,n->x,n->y);
+	string_nformat(command, PATH_MAX * 5, "./%s %s %s %s >R.%d.%d", function,leftfile,bottomfile,diagfile,n->x,n->y);
 
 	return batch_job_submit_simple(batch_q,command,extra_input_files,0);
 }
@@ -288,25 +291,25 @@ static int check_configuration( const char *function, int xsize, int ysize )
 	printf("Checking for presence of function %s...\n",function);
 
 	if(access(function,R_OK|X_OK)!=0) {
-		printf("Error: Cannot access %s: %s\n",function,strerror(errno));
-		printf("You must provide an executable program named %s\n",function);
+		fprintf(stderr, "Error: Cannot access %s: %s\n",function,strerror(errno));
+		fprintf(stderr, "You must provide an executable program named %s\n",function);
 		return 0;
 	}
 
 	printf("Checking for initial data files...\n");
 
 	for(i=0;i<=xsize;i++) {
-		sprintf(path,"R.%d.%d",xstart+i-1,ystart-1);
+		string_nformat(path,PATH_MAX,"R.%d.%d",xstart+i-1,ystart-1);
 		if(access(path,R_OK)!=0) {
-			printf("Cannot access initial file %s: %s\n",path,strerror(errno));
+			fprintf(stderr, "Cannot access initial file %s: %s\n",path,strerror(errno));
 			return 0;
 		}
 	}
 
 	for(i=0;i<=ysize;i++) {
-		sprintf(path,"R.%d.%d",xstart-1,ystart+i-1);
+		string_nformat(path,PATH_MAX,"R.%d.%d",xstart-1,ystart+i-1);
 		if(access(path,R_OK)!=0) {
-			printf("Cannot access initial file %s: %s\n",path,strerror(errno));
+			fprintf(stderr, "Cannot access initial file %s: %s\n",path,strerror(errno));
 			return 0;
 		}
 	}  
@@ -371,8 +374,7 @@ static void show_help(const char *cmd)
 	printf(" -t <secs>      Interval between image writes, in seconds. (default=%d)\n",progress_bitmap_interval);
 	printf(" -A             Automatically choose between multicore and batch mode.\n");
 	printf(" -M             Run the whole problem locally in multicore mode. (default)\n");
-	printf(" -D             Run the whole problem in distributed mode.\n");
-	printf(" -T <type>      Type of batch system: %s\n",batch_queue_type_string());
+	printf(" -T <type>      Run in distributed mode with <type> batch system: %s. (default=%s)\n",batch_queue_type_string(), batch_queue_type_to_string(batch_system_type));
 	printf(" -V             Verify mode: check the configuration and then exit.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -421,10 +423,8 @@ int main( int argc, char *argv[] )
 			case 'M':
 				wavefront_mode = WAVEFRONT_MODE_MULTICORE;
 				break;
-			case 'D':
-				wavefront_mode = WAVEFRONT_MODE_DISTRIBUTED;
-				break;
 			case 'T':
+				wavefront_mode = WAVEFRONT_MODE_DISTRIBUTED;
 				batch_system_type = batch_queue_type_from_string(optarg);
 				if(batch_system_type==BATCH_QUEUE_TYPE_UNKNOWN) {
 					fprintf(stderr,"unknown batch system type: %s\n",optarg);
@@ -583,7 +583,7 @@ int main( int argc, char *argv[] )
 
 					wavefront_task_complete(b,ready_list,task);
 				} else {
-					printf("job %llu failed, aborting this workload\n",jobid);
+					printf("job %" PRIu64 " failed, aborting this workload\n",jobid);
 					abort_mode = 1;
 				}
 			}

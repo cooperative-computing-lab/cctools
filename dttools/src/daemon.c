@@ -40,9 +40,9 @@ static int fd_max (void)
 	return max;
 }
 
-void daemonize (int cdroot)
+void daemonize (int cdroot, const char *pidfile)
 {
-	/* Become seesion leader and lose controlling terminal */
+	/* Become session leader and lose controlling terminal */
 	pid_t pid = fork();
 	if (pid < 0) {
 		debug(D_DEBUG, "could not fork: %s", strerror(errno));
@@ -66,6 +66,12 @@ void daemonize (int cdroot)
 		exit(EXIT_SUCCESS); /* exit parent */
 	}
 
+	if (pidfile) {
+		FILE *file = fopen(pidfile, "w");
+		fprintf(file, "%ld", (long)getpid());
+		fclose(file);
+	}
+
 	if (cdroot){
 		int status = chdir("/");
 		if (status == -1) {
@@ -77,19 +83,26 @@ void daemonize (int cdroot)
 	umask(0);
 
 	int fd, max = fd_max();
-	for (fd = 0; fd < max; fd++) {
+	for (fd = STDERR_FILENO+1; fd < max; fd++) {
 		if (close(fd) == -1 && errno != EBADF) {
 			debug(D_DEBUG, "could not close open file descriptor: %s", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	int fd0 = open("/dev/null", O_RDONLY);
-	int fd1 = open("/dev/null", O_WRONLY);
-	int fd2 = open("/dev/null", O_WRONLY);
-
-	if (!(fd0 == STDIN_FILENO && fd1 == STDOUT_FILENO && fd2 == STDERR_FILENO)) {
-		debug(D_DEBUG, "could not open `/dev/null': %d %d %d: %s", fd0, fd1, fd2, strerror(errno));
-		exit(EXIT_FAILURE);
-	}
+    FILE *file0 = freopen("/dev/null", "r", stdin);
+    if (file0 == NULL) {
+        debug(D_DEBUG, "could not reopen stdin: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    FILE *file1 = freopen("/dev/null", "w", stdout);
+    if (file1 == NULL) {
+        debug(D_DEBUG, "could not reopen stdout: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    FILE *file2 = freopen("/dev/null", "w", stderr);
+    if (file2 == NULL) {
+        debug(D_DEBUG, "could not reopen stderr: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
 }

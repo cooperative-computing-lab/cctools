@@ -1,72 +1,83 @@
 #!/usr/bin/perl
 #Programmer: Andrew Thrasher
 #Date: 10/12/2009
+#Updated: 9/17/2012, need to deal with the added comments throughout the log for events like aborts and restarts
 #Purpose: Parse makeflow log files to generate useful logs
 
 $log = $ARGV[0];
 
 open(LOGFILE, "<", $log);
 open(SUMMARY, ">", $log.".summary");
-
+open(OUT, ">", "$log.clean"); 
 $line = <LOGFILE>;
 #ignore makeflow structure information at the top of the log file and only deal with actual log data
 while($line =~ /^#/){
 	$line = <LOGFILE>;
 }
-
+chomp $line; 
 #get start time from the first line
 @fields = split(/ /, $line);
 $timestart = $fields[0];
+$prior_time = $timestart;
+$fields[0] = $fields[0] / 1000000; 
+foreach $f (@fields){
+	print OUT "$f "; 
+}
+print OUT "\n"; 
 
-#get end time from the last line
-$lastline = `tail -n 1 $log`;
-@lastfields = split(/ /, $lastline);
-$timeend = $lastfields[0];
-
-$totaltime = $timeend - $timestart;
-
-print SUMMARY "Elapsed Time: ", int($totaltime/(24*60*60)),"+", ($totaltime/(60*60))%24,":", ($totaltime/60)%60,":", $totaltime%60, "\n";
-print SUMMARY "Jobs Submitted: ", $fields[9], "\n";
-print SUMMARY "Jobs Completed: ", $lastfields[6], "\n";
 $goodput;
 $badput;
 
-#$line = <LOGFILE>;
-#@fields = split(/ /, $line);
 $num_tasks = $fields[9];
 @tasks[$num_tasks]; 
-#print "First task: ", $fields[1], "\n";
 if($fields[2] == 1)
 {
-	#entered running state, store timestamp
-	#print "task number: ", $fields[1], " running \n";
-	$tasks[$fields[1]] = $fields[0];
+	#entered running state, store elapsed time (in this case it is the first entry so no time has elapsed
+	$tasks[$fields[1]] = 0; #$fields[0];
 }
 elsif($fields[2] == 2)
 {
 	#completed
-	#print "task number: ", $fields[1], " completed, with run time: ", int($fields[0]) - int($tasks[$fields[1]]), "\n";
 	$goodput += ($fields[0] - $tasks[$fields[1]]);
 }
 elsif($fields[2] == 3 || $fields[2] == 4)
 {
 	#failed or aborted
-	#print "task number: ", $fields[1], " failed or aborted \n";
 	$badput += ($fields[0] - $tasks[$fields[1]]);
 }
 else
 {
 	#went back to waiting
-	#print $fields[1], "\n";	
 }
 
 
 #Need to determine the total CPU time
 #use number of tasks as indices to each task
-
+$err = 0;
+$totaltime = 0; 
+$err_time;  
 while($line = <LOGFILE>)
 {
+	chomp $line; 
+	if($line =~ /^#/){
+		#we're on a restart, abort, etc. 
+		#we need to change the prior time so that we don't count the elapsed time while the makeflow was inactive
+		$err = 1; 
+		next; 
+	}
+
 	@fields = split(/ /, $line);
+	$time = $fields[0]; 
+	
+	if($err){
+		#the prior line was an error status
+		#therefore we need to reset the prior time
+		$err_time += ($time - $prior_time); 
+		$last_err = ($time - $prior_time); 
+		$err = 0; 
+		
+	}
+	$totaltime += ($time - $prior_time); 
 
 	#fields: timestamp, work item #, new state, jobID (random id returned by worker), # of nodes waiting, # of nodes running, # of nodes completed, # of nodes failed, # of nodes aborted, # of jobs counter
 
@@ -74,21 +85,18 @@ while($line = <LOGFILE>)
 	if($fields[2] == 1)
 	{
 	        #entered running state, store timestamp
-		#print "task number: ", $fields[1], " running \n";
-	        $tasks[$fields[1]] = $fields[0];
+		#instead of storing the timestamp, store the elapsed time
+		$tasks[$fields[1]] = $totaltime; 
 	}
 	elsif($fields[2] == 2)
 	{
 	        #completed
-		#print "task number: ", $fields[1], " completed, with run time: ", int($fields[0]) - int($tasks[$fields[1]]), "\n";
-	        #print "Begin time: ", $tasks[$fields[1]], " End Time: ", $fields[0], "\n";
-		$goodput += ($fields[0] - $tasks[$fields[1]]);
+		$goodput += (($totaltime - $tasks[$fields[1]]) - $last_err); 
 	}
 	elsif($fields[2] == 3 || $fields[2] == 4)
 	{
 	        #failed or aborted
-		#print "task number: ", $fields[1], " failed or aborted \n";
-	        $badput += ($fields[0] - $tasks[$fields[1]]);
+	        $badput += ($totaltime - $tasks[$fields[1]] - $last_err); 
 	}
 	else
 	{
@@ -96,9 +104,22 @@ while($line = <LOGFILE>)
 
 	}
 
+	$prior_time = $time; 
+	$fields[0] = $fields[0] / 1000000; 
+	foreach $f (@fields){
+		print OUT "$f "; 
+	}
+	print OUT "\n"; 
+
 
 }
-
+$totaltime -= $err_time; 
+$totaltime = $totaltime /1000000;
+$goodput = $goodput / 1000000; 
+$badput = $badput / 1000000;  
+print SUMMARY "Elapsed Time: ", int($totaltime/(24*60*60)),"+", ($totaltime/(60*60))%24,":", ($totaltime/60)%60,":", $totaltime%60, "\n";
+print SUMMARY "Jobs Submitted: ", $fields[9], "\n";
+print SUMMARY "Jobs Completed: ", $fields[6], "\n";
 print SUMMARY "Goodput: ", int($goodput/(24*60*60)),"+", ($goodput/(60*60))%24,":", ($goodput/60)%60,":", $goodput%60, "\n";
 print SUMMARY "Badput: ",  int($badput/(24*60*60)),"+", ($badput/(60*60))%24,":", ($badput/60)%60,":", $badput%60, "\n";
 $cpu = $goodput + $badput;
@@ -106,6 +127,7 @@ print SUMMARY "Total CPU time: ",  int($cpu/(24*60*60)),"+", ($cpu/(60*60))%24,"
 
 
 open (GNUPLOT, "|gnuplot");
+#open (GNUPLOT, ">", "$log.gnuplot"); 
 print GNUPLOT <<EOPLOT;
 set terminal postscript solid eps 24 color
 set size 2.5,1
@@ -118,8 +140,6 @@ set bmargin 4
 set style line 1 
 set key outside
 set timefmt "%s"
-plot "$log" using 1:(\$6+\$7+\$8+\$9) title "Submitted" with lines lw 5, "" using 1:6 title "Running" with lines lw 5, "" using 1:7 title "Complete" with lines lw 5
+plot "$log.clean" using 1:(\$6+\$7+\$8+\$9) title "Submitted" with lines lw 5, "" using 1:6 title "Running" with lines lw 5, "" using 1:7 title "Complete" with lines lw 5
 EOPLOT
 close(GNUPLOT);
-
-#plot "$log.makeflowlog" using 1:(\$5+\$6+\$7+\$8+\$9) title "Submitted" with lines lw 5, "" using 1:6 title "Running" with lines lw 5 axes x1y2, "" using 1:7 title "Complete" with lines lw 5

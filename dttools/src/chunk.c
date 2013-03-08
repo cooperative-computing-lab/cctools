@@ -146,7 +146,7 @@ char *chunk_read(struct chunk_set *chunk_set, const char *file_name, int *size)
 
 	char *content = malloc(the_chunk->len);
 
-	size_t amt = fread(content, sizeof(*content), the_chunk->len, fp);
+	ssize_t amt = fread(content, sizeof(*content), the_chunk->len, fp);
 
 	if(amt != the_chunk->len && ferror(fp)) {
 		/* error reading stream */

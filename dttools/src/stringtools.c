@@ -445,9 +445,9 @@ int string_split_quotes(char *str, int *argc, char ***argv)
 	return 1;
 }
 
-char *string_pad_right(char *old, int length)
+char *string_pad_right(char *old, unsigned int length)
 {
-	int i;
+	unsigned int i;
 	char *s = malloc(length + 1);
 	if(!s)
 		return 0;
@@ -624,29 +624,23 @@ char *strsep(char **stringp, const char *delim)
 
 #endif
 
-char *string_combine(char *a, char *b)
+char *string_combine(char *a, const char *b)
 {
-	char *r;
+	char *r = NULL;
+	size_t a_len = strlen(a);
 
 	if(a && b) {
-		r = malloc(strlen(a) + strlen(b) + 1);
-		if(r) {
-			strcpy(r, a);
-			strcat(r, b);
-		}
-	} else {
-		r = 0;
+		r = realloc(a, (a_len + strlen(b) + 1) * sizeof(char));
 	}
 
-	if(a)
-		free(a);
-	if(b)
-		free(b);
+	if(r)
+		strcat(r, b);
+	else
+		fatal("Cannot allocate memory for string concatenation.\n");
+
 
 	return r;
 }
-
-
 
 char *string_combine_multi(char *r, ...)
 {
@@ -851,7 +845,7 @@ void string_replace_backslash_codes(const char *a, char *b)
 int strpos(const char *str, char c)
 {
 
-	int i;
+	unsigned int i;
 	if(str != NULL) {
 		for(i = 0; i < strlen(str); i++) {
 			if(str[i] == c)
@@ -926,6 +920,19 @@ char *string_format(const char *fmt, ...)
 	return str;
 }
 
+int string_nformat (char *str, const size_t max, const char *fmt, ...)
+{
+	va_list(va);
+	va_start(va, fmt);
+	size_t n = vsnprintf(str, max, fmt, va);
+	va_end(va);
+
+	if( max <= n )
+		fatal("String '%30s...' is %zd (greater than the %zd limit).", str, n, max);
+
+	return n;
+}
+
 char *string_getcwd(void)
 {
 	char *result = NULL;
@@ -989,6 +996,10 @@ char *string_trim_quotes(char *s)
 int string_istrue(char *s)
 {
 	return (strcasecmp(s, "true") == 0) || (strcasecmp(s, "yes") == 0) || (atoi(s) > 0);
+}
+
+int string_equal(const char *str1, const char *str2){
+	return !strcmp(str1, str2);
 }
 
 /* vim: set sts=8 sw=8 ts=8 ft=c: */

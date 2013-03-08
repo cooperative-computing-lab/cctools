@@ -48,9 +48,18 @@ int main(int argc, char *argv[])
 		sprintf(command, "./gzip < %s > %s", infile, outfile);
 
 		t = work_queue_task_create(command);
-		work_queue_task_specify_file(t, "/usr/bin/gzip", "gzip", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
-		work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
-		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+		if (!work_queue_task_specify_file(t, "/usr/bin/gzip", "gzip", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)) {
+			printf("task_specify_file() failed for /usr/bin/gzip: check if arguments are null or remote name is an absolute path.\n");
+			return 1; 	
+		}
+		if (!work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE)) {
+			printf("task_specify_file() failed for %s: check if arguments are null or remote name is an absolute path.\n", infile);
+			return 1; 	
+		}
+		if (!work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE)) {
+			printf("task_specify_file() failed for %s: check if arguments are null or remote name is an absolute path.\n", outfile);
+			return 1; 	
+		}	
 		taskid = work_queue_submit(q, t);
 
 		printf("submitted task (id# %d): %s\n", taskid, t->command_line);

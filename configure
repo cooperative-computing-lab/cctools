@@ -12,7 +12,7 @@ fi
 save_arguments $0 $@
 
 major=3
-minor=6
+minor=8
 micro=0
 
 # On a release, type would be changed from TRUNK to RELEASE.  TRUNK is a useful
@@ -47,7 +47,7 @@ build_host=`uname -n`
 build_sys=`uname -s | tr \[a-z\] \[A-Z\] | awk -F_ '{print $1}'`
 build_cpu=`uname -m | tr \[a-z\] \[A-Z\]`
 
-if [ "${build_cpu}" = unknown ]
+if [ "${build_cpu}" = UNKNOWN ]
 then
 	build_cpu=`uname -p | tr \[a-z\] \[A-Z\]`
 fi
@@ -72,7 +72,7 @@ include_package_makeflow="makeflow"
 include_package_ftplite="ftp_lite"
 include_package_s3tools="s3tools"
 include_package_chirp="chirp"
-include_package_apps="apps"
+include_package_resource_monitor="resource_monitor"
 include_package_doc="doc"
 
 work_queue_bindings=""
@@ -115,7 +115,7 @@ globus_flavor=auto
 ccompiler=gcc
 cxxcompiler=g++
 mpicompiler=mpicc
-ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
+ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
 
 if [ ${build_sys} != CYGWIN ]
 then
@@ -266,8 +266,8 @@ do
 		--without-system-parrot)
 			include_package_parrot=""
 			;;
-		--without-system-apps)
-			include_package_apps=""
+		--without-system-resource_monitor)
+			include_package_resource_monitor=""
 			;;
 		--without-system-doc)
 			include_package_doc=""
@@ -280,6 +280,14 @@ do
 			echo "ignoring unknown package $1"
 			shift
 			;;
+		--tcp-low-port)
+			shift
+			ccflags="${ccflags} -DTCP_LOW_PORT_DEFAULT=$1"
+			;;
+		--tcp-high-port)
+			shift
+			ccflags="${ccflags} -DTCP_HIGH_PORT_DEFAULT=$1"
+			;;
 		-h | -help | --h | --help)
 			cat <<EOF
 Use: configure [options]
@@ -289,6 +297,8 @@ Where options are:
   --strict
   --globus-flavor      <flavor>
   --xrootd-arch        <arch>
+  --tcp-low-port       <port>
+  --tcp-high-port      <port>
   --with-PACKAGE-path  <path>
   --without-system-SYSTEM
 
@@ -317,7 +327,7 @@ And SYSTEM may be:
     s3tools
     chirp
     parrot
-    apps
+    resource_monitor
     doc
 EOF
 			exit 1
@@ -333,7 +343,7 @@ done
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} ${include_package_doc} ${include_package_apps}"
+potential_packages="dttools ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_doc}"
 
 check_multiarch
 
@@ -614,8 +624,11 @@ then
 
 	if [ $build_sys = LINUX ]
 	then
+		# Remove the -lreadline that was added by "library_search readline" above
+		ldflags=`echo $ldflags | sed "s/-lreadline//"`
+
+		# Put the readline flags in a separate variable to be used only where needed.
 		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
-		ldflags=`echo $ldflags | sed "s/-lreadline/$cctools_readline_ldflags/"`
 	else 
 		library_search ncurses ${readline_path}
 		library_search termcap ${readline_path}
@@ -690,10 +703,10 @@ then
 
 	if [ $perl != 0 ]
 	then
-		perl_version=`perl -e 'printf "%vd\n",$^V;'`
+		perl_version=`${perl} -e 'printf "%vd\n",$^V;'`
 		echo "perl version is ${perl_version}"
-		perl_ccflags=`perl -MExtUtils::Embed -e ccopts`
-		perl_ldflags=`perl -MExtUtils::Embed -e ldopts`
+		perl_ccflags=`${perl} -MExtUtils::Embed -e ccopts`
+		perl_ldflags=`${perl} -MExtUtils::Embed -e ldopts`
 		work_queue_bindings="$work_queue_bindings perl"
 	else
                 if [ $config_perl_path = yes ]
@@ -736,7 +749,7 @@ then
 				python_ccflags_file=`mktemp tmp.XXXXXX`
 				python_ldflags_file=`mktemp tmp.XXXXXX`
 
-				${python} > $python_ccflags_file <<EOF
+				env HOME=/var/empty ${python} > $python_ccflags_file <<EOF
 from distutils import sysconfig
 flags = ['-I' + sysconfig.get_python_inc(),
 	 '-I' + sysconfig.get_python_inc(plat_specific=True)]
@@ -745,7 +758,7 @@ if not syscfgflags is None:
     flags.extend(syscfgflags.split())
 print ' '.join(flags)
 EOF
-				${python} > $python_ldflags_file <<EOF
+				env HOME=/var/empty ${python} > $python_ldflags_file <<EOF
 from distutils import sysconfig
 libs = sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
 if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
@@ -909,6 +922,7 @@ else
 fi
 
 ccflags="${ccflags} -DINSTALL_PATH='\"${install_path}\"' $debug_flag -D_REENTRANT -D_GNU_SOURCE -DBUILD_USER='\"$build_user\"' -DBUILD_HOST='\"$build_host\"' -DCCTOOLS_VERSION_MAJOR=$major -DCCTOOLS_VERSION_MINOR=$minor -DCCTOOLS_VERSION_MICRO=$micro -DCCTOOLS_VERSION='\"$version\"' -DCCTOOLS_RELEASE_DATE='\"$release_date\"' -DCCTOOLS_CONFIGURE_ARGUMENTS='\"$configure_arguments\"' -DCCTOOLS_SYSTEM_INFORMATION='\"$system_information\"' -DCCTOOLS_OPSYS_${build_sys} -DCCTOOLS_CPU_${build_cpu}"
+ldflags="${ldflags} ${debug_flag}"
 
 echo "Creating Makefile.config..."
 

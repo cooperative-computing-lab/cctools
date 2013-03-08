@@ -15,6 +15,9 @@ proj="load1"
 workload="5:10:5:800"
 unit="M"
 
+# Whether to start a worker pool automatically
+auto_worker_pool="no"
+
 # The directory to store input files
 dir_input="input"
 
@@ -23,21 +26,18 @@ dir_input="input"
 # behavior.
 shared_input="no"
 
-# Additional arguments added to makeflow.  Format: "symbolic_name:real
-# arguments". All results related to one "real argument" would be stored under
-# the directory that contains the correspoinding symbolic name
-#makeflow_args=( "fcfs:-z fcfs"
-#				"fd:-z fd" )
-makeflow_args=( "ad:-Z adaptive" )
+# Additional arguments added to makeflow.  Format:
+# "symbolic_name:real_arguments". All results related to one "real_argument"
+# would be stored under the directory that contains the correspoinding
+# symbolic_name
+makeflow_args=( "capacity:-E" )
 
 # Max retry times when makeflow jobs fail
 retry_max=30
 
-# Number of workers for each run
+# Number of workers to start for each run (if auto_worker_pool == "yes")
 workers=( 100 )
 
-# Capacity tolerance for work queue master
-capacity_tolerance=5
 # yrange max in the work queue log plot
 yrange_max=$((`echo ${workers[@]} | tr ' ' '\n' | sort -nr | head -1 ` + 50))
 if [ "$yrange_max" -lt "120" ] ; then
@@ -170,10 +170,13 @@ run_experiments () {
 
 		for i in "${workers[@]}"; do
 			name=lyu2-$proj-$i
-			#work_queue_pool -T condor -f -a -C cclweb01.cse.nd.edu:9097 -N $name $i
-			#makeflow -T wq -d all -a -e -C cclweb01.cse.nd.edu:9097 -N $name -r $retry_max $arg $makeflow &> $makeflow.stdout.stderr
-			work_queue_pool -T condor -f -a -N $name $i
-			makeflow -T wq -d all -a -e -N $name -r $retry_max $arg -t $capacity_tolerance $makeflow &> $makeflow.stdout.stderr
+			if [ "$auto_worker_pool" = "yes" ]; then
+				work_queue_pool -T condor -f -a -N $name $i
+			fi
+			makeflow -T wq -d all -a -N $name -r $retry_max $arg $makeflow &> $makeflow.stdout.stderr
+			# Custom catalog server version: (replace the above 2 commands with the below ones)
+			# work_queue_pool -T condor -f -a -C cclweb01.cse.nd.edu:9097 -N $name $i
+			# makeflow -T wq -d all -a -C cclweb01.cse.nd.edu:9097 -N $name -r $retry_max $arg $makeflow &> $makeflow.stdout.stderr
 
 			# Get turnaround time
 			started=`grep 'STARTED' $makeflowlog | awk '{print $3}'`

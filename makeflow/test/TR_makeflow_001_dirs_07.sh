@@ -2,21 +2,13 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-prepare()
-{
-    clean $@
-}
+# second rule should not have to create 'mydir' in its command
+MAKE_FILE=dirs/testcase.subdir.07.makeflow
 
-run()
-{
-    exec ../src/makeflow -d all -T wq -p `cat worker.port` dirs/testcase.subdir.${i}.makeflow
-}
+PRODUCTS="mydir/1.txt mydir/2.txt mydir/3.txt"
 
-clean()
-{
-    exec ../src/makeflow -c dirs/testcase.subdir.${i}.makeflow
-}
-
-i=07
+. ./makeflow_dirs_test_common.sh
 
 dispatch $@
+
+

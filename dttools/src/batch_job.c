@@ -33,7 +33,7 @@ See the file COPYING for details.
 
 const char *batch_queue_type_string()
 {
-	return "local, condor, sge, moab, cluster, wq, hadoop, mpi-queue";
+	return "local, condor, sge, moab, torque, cluster, wq, hadoop, mpi-queue";
 }
 
 batch_queue_type_t batch_queue_type_from_string(const char *str)
@@ -95,6 +95,19 @@ const char *batch_queue_type_to_string(batch_queue_type_t t)
 	default:
 		return "unknown";
 	}
+}
+
+struct work_queue *batch_queue_get_work_queue(struct batch_queue *q) {
+	if(!q) {
+		debug(D_BATCH, "error: batch queue has not been created yet.\n");
+		return NULL;
+	}
+	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE || q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
+		return q->work_queue;
+	} else {
+		debug(D_BATCH, "error: batch queue type is not Work Queue.\n");
+	}
+	return NULL;
 }
 
 struct batch_queue *batch_queue_create(batch_queue_type_t type)
@@ -206,6 +219,11 @@ void batch_queue_set_options(struct batch_queue *q, const char *options_text)
 	} else {
 		q->options_text = NULL;
 	}
+}
+
+batch_queue_type_t batch_queue_get_type(struct batch_queue *q)
+{
+	return q->type;	
 }
 
 char *batch_queue_options(struct batch_queue *q)

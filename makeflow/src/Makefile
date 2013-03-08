@@ -10,8 +10,8 @@ LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
 all: ${TARGETS}
 
-makeflow: makeflow.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	${CCTOOLS_LD} makeflow.o ${LOCAL_LDFLAGS} -o $@
+makeflow: dag.o visitors.o makeflow.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
+	${CCTOOLS_LD} dag.o visitors.o makeflow.o ${LOCAL_LDFLAGS} -o $@
 
 clean:
 	rm -f core *~ *.o *.a ${TARGETS} 

@@ -19,7 +19,7 @@ margin: 20px;
 }
 </style>
 <h1>Makeflow User's Manual</h1>
-<b>Last Updated Febuary 2011</b>
+<b>Last Updated September 2012</b>
 <p>
 Makeflow is Copyright (C) 2009 The University of Notre Dame.
 This software is distributed under the GNU General Public License.
@@ -249,6 +249,13 @@ then you can generate an image of your workload like this:
 % makeflow -D example.makeflow | dot -T gif > example.gif
 </pre>
 
+<h3>Total number of tasks in a Makeflow</h3>
+The following command parses Makeflow's '-D' option output and returns the
+total number of tasks in the given Makeflow script:
+<pre>
+% makeflow -D example.makeflow | grep '^N[0-9]\+ \[label=' | wc -l
+</pre>
+
 <h2>Running Makeflow with Work Queue</h2>
 With the '-T wq' option, Makeflow runs as a master process that dispatches
 tasks to remote worker processes. 
@@ -327,6 +334,112 @@ The full list of supported Makeflow drivers include
 	<li>Cluster - execution on a high-performance cluster using a user-defined cluster manager</li>
 	<li>Work Queue - execution on a lightweight, scalable master-worker <a href="http://cse.nd.edu/~ccl/software/workqueue/">framework</a> managed directly by Makeflow</li>
 	<li>Hadoop - execution on a cluster managed by the <a href="http://hadoop.apache.org/">Hadoop</a> framework, using data stored in <a href="http://hadoop.apache.org/hdfs">HDFS</a>.</li>
+</ul>
+
+<h2>Makeflow Log File Format</h2>
+After you  have executed the <tt>example.makeflow</tt> Makeflow script, you
+should see a log file named <tt>example.makeflow.makeflowlog</tt> under the
+directory where you ran the <tt>makeflow</tt> command.  The Makeflow log file
+records all the tasks that Makeflow tries to run and how the tasks status
+change during the previous executions.  
+
+<p>
+In Makeflow, each task is called a node. You can think of it as a tree node in
+a tree structure of the target workflow. There is a unique id, a positive
+integer, associated with each node. This id is referred as node id. The
+Makeflow log file starts with a list of node (task) descriptions where each
+task is specified in the following format:
+
+<pre>
+# NODE node_id original_command
+# SYMBOL node_id symbol
+# PARENTS node_id parent_node_id_1 parent_node_id_2 ... parent_node_id_n
+# SOURCES node_id source_file_1 source_file_2 ... source_file_n
+# TARGETS node_id target_file_1 target_file_2 ... target_file_n
+# COMMAND node_id translated_command
+</pre>
+
+These annotation lines all start with '#' and will be treated as comments by
+Makeflow. When Makeflow tries to resume the execution of a Makeflow script from
+a existing Makeflow log file, it will skip the scanning of these commented
+lines. Also, annotations being commented out allows third-party applications,
+such as gnuplot, to skip them when plotting data.
+
+<p>
+The body sections of a Makeflow log file come after the node specificiation
+section. The following is a snippet from <tt>example.makeflow.makeflowlog</tt>:
+<pre>
+# STARTED timestamp
+1347281321284638 5 1 9206 5 1 0 0 0 6
+1347281321348488 5 2 9206 5 0 1 0 0 6
+1347281321348760 4 1 9207 4 1 1 0 0 6
+1347281321348958 3 1 9208 3 2 1 0 0 6
+1347281321629802 4 2 9207 3 1 2 0 0 6
+1347281321630005 2 1 9211 2 2 2 0 0 6
+1347281321635236 3 2 9208 2 1 3 0 0 6
+1347281321635463 1 1 9212 1 2 3 0 0 6
+1347281321742870 2 2 9211 1 1 4 0 0 6
+1347281321752857 1 2 9212 1 0 5 0 0 6
+1347281321753064 0 1 9215 0 1 5 0 0 6
+1347281325731146 0 2 9215 0 0 6 0 0 6
+# COMPLETED timestamp
+</pre>
+
+If a Makeflow execution is completed without errors, a body section of the log
+consists of a series of node (task) status change lines (the 10 column line)
+surrounded by a pair of "# STARTED" and "# COMPLETED" lines which record the
+start and end unix time of that execution.  A node status change line has the
+following form: 
+<pre>
+timestamp node_id new_state job_id nodes_waiting nodes_running nodes_complete nodes_failed nodes_aborted node_id_counter
+</pre>
+Here is the column specificiation:
+<ul>
+	<li><b>timestamp</b> - the unix time (in microseconds) when this line is written to the log file. </li>
+	<li><b>node_id</b> - the id of this node (task). </li>
+	<li><b>new_state</b> - a integer represents the new state this node (whose id is in the node_id column) has just entered. The value of the integer ranges from 0 to 4 and the states they are representing are:</li>
+	<ol start="0">
+		<li> waiting </li>
+		<li> running </li>
+		<li> complete </li>
+		<li> failed </li>
+		<li> aborted </li>
+	</ol>
+	<li><b>job_id</b> - the job id of this node in the underline execution
+	system (local or batch system). If the Makeflow is executed locally, the
+	job id would be the process id of the process that executes this node. If
+	the underline execution system is a batch system, such as Condor or SGE,
+	the job id would be the job id assigned by the batch system when the task
+	was sent to the batch system for execution.</li>
+	<li><b>nodes_waiting</b> - the number of nodes are waiting to be executed.</li>
+	<li><b>nodes_running</b> - the number of nodes are being executed.</li>
+	<li><b>nodes_complete</b> - the number of nodes has been completed.</li>
+	<li><b>nodes_failed</b> - the number of nodes has failed.</li>
+	<li><b>nodes_aborted</b> - the number of nodes has been aborted.</li>
+	<li><b>node_id_counter</b> - total number of nodes in this Makeflow</li>
+</ul>
+
+You might also see the following two lines in the Makeflow log file if the
+Makeflow is aborted or failed during a execution. The unix time at which such
+event occured is recorded:
+<pre>
+# ABORTED timestamp
+# FAILED timestamp
+</pre>
+
+<tt>Makeflow</tt> garbage-collects system memory associate with each task at
+runtime. The Makeflow log file also logs the garbage collection activities. You
+will find garbage collection related lines start with the '# GC' prefix:
+<pre>
+# GC timestamp collected time_spent dag_gc_collected
+</pre>
+Each garbage collection line records the garbage collection statistics during a
+garbage collection cycle: 
+<ul>
+	<li><b>timestamp</b> - the unix time (in microseconds) when this line is written to the log file. </li>
+	<li><b>collected</b> - the number of files were collected in this garbage collection cycle.</li>
+	<li><b>time_spent</b> - the length of time this cycle took.</li>
+	<li><b>dag_gc_collected</b> - the total number of files has been collected so far since the start this Makeflow execution.</li>
 </ul>
 
 <h2>For More Information</h2>

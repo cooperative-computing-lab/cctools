@@ -9,13 +9,15 @@ See the file COPYING for details.
 #define NVPAIR_H
 
 #include <stdio.h>
+
 #include "int_sizes.h"
+#include "hash_table.h"
 
 /** @file nvpair.h
 An nvpair object is a collection of name-value pairs that might
 describe a complex object such as a host or a job.  An nvpair object
 is a subset of the full generality of an XML document or a ClassAd.
-In fact, and nvpair can easily be exported into these and other formats.
+In fact, an nvpair can easily be exported into these and other formats.
 We use an nvapir object instead of these other database, because it
 has a dramatically simpler implementation that these other complex datatypes
 and removes any dependence on external software.
@@ -57,6 +59,12 @@ int nvpair_print(struct nvpair *n, char *text, int length);
 @return The actual number of bytes written.
 */
 int nvpair_print_alloc(struct nvpair *n, char **text);
+
+/** Remove a property from an nvpair.
+@param n The nvpair to modify.
+@param name The name of the property to remove.
+*/
+void nvpair_remove( struct nvpair *n, const char *name );
 
 /** Insert a property in string form.
 @param n The nvpair to modify.

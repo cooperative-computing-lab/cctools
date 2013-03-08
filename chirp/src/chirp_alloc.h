@@ -71,4 +71,17 @@ INT64_T chirp_alloc_search(const char *subject, const char *dir, const char *pat
 char *chirp_stat_string(struct chirp_stat *info);
 char *chirp_statfs_string(struct chirp_statfs *info);
 
+INT64_T chirp_alloc_getxattr (const char *path, const char *name, void *data, size_t size);
+INT64_T chirp_alloc_fgetxattr (int fd, const char *name, void *data, size_t size);
+INT64_T chirp_alloc_lgetxattr (const char *path, const char *name, void *data, size_t size);
+INT64_T chirp_alloc_listxattr (const char *path, char *list, size_t size);
+INT64_T chirp_alloc_flistxattr (int fd, char *list, size_t size);
+INT64_T chirp_alloc_llistxattr (const char *path, char *list, size_t size);
+INT64_T chirp_alloc_setxattr (const char *path, const char *name, const void *data, size_t size, int flags);
+INT64_T chirp_alloc_fsetxattr (int fd, const char *name, const void *data, size_t size, int flags);
+INT64_T chirp_alloc_lsetxattr (const char *path, const char *name, const void *data, size_t size, int flags);
+INT64_T chirp_alloc_removexattr (const char *path, const char *name);
+INT64_T chirp_alloc_fremovexattr (int fd, const char *name);
+INT64_T chirp_alloc_lremovexattr (const char *path, const char *name);
+
 #endif

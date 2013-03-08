@@ -34,9 +34,16 @@ for i in range(1, len(sys.argv)):
     
     t = Task(command)
     
-    t.specify_file("/usr/bin/gzip", "gzip", WORK_QUEUE_INPUT, cache=True)
-    t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=False)
-    t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=False)
+    if not t.specify_file("/usr/bin/gzip", "gzip", WORK_QUEUE_INPUT, cache=True):
+        print "specify_file() failed for /usr/bin/gzip: check if arguments are null or remote name is an absolute path." 
+        sys.exit(1) 
+    if not t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=False):
+        print "specify_file() failed for %s: check if arguments are null or remote name is an absolute path." % infile 
+        sys.exit(1) 
+    if not t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=False):
+        print "specify_file() failed for %s: check if arguments are null or remote name is an absolute path." % outfile 
+        sys.exit(1) 
+    
     taskid = q.submit(t)
 
     print "submitted task (id# %d): %s" % (taskid, t.command)

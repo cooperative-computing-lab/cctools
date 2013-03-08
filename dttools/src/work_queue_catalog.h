@@ -35,8 +35,11 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#define WORK_QUEUE_CATALOG_UPDATE_INTERVAL 60
-#define	WORK_QUEUE_CATALOG_LIFETIME	300
+#define WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL 30 
+#define	WORK_QUEUE_CATALOG_MASTER_AD_LIFETIME 300 
+
+#define WORK_QUEUE_CATALOG_POOL_UPDATE_INTERVAL 15 
+#define	WORK_QUEUE_CATALOG_POOL_AD_LIFETIME 180 
 
 #define WORK_QUEUE_NAME_MAX 256
 #define WORK_QUEUE_PROTOCOL_BLANK_FIELD "-"
@@ -46,7 +49,7 @@ struct work_queue_master {
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 	char proj[WORK_QUEUE_NAME_MAX];
-	timestamp_t start_time;
+	time_t start_time;
 	int priority;
 	int capacity;
 	int tasks_waiting;
@@ -61,7 +64,8 @@ struct work_queue_master {
 	char owner[USERNAME_MAX];
 	int default_max_workers_from_pool;
 	int workers_need;
-	int workers_from_this_pool;
+	int workers_need_from_pool;
+	int workers_connected_from_pool;
 	int target_workers_from_pool;
 };
 
@@ -101,5 +105,5 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 
 int get_pool_decisions_from_catalog(const char *catalog_host, int catalog_port, const char *proj, struct list *decisions);
 
-int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_port, const char *pool_name, const char *decision);
+int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_port, const char *pool_name, pid_t pid, time_t pool_start_time, const char *decision, int workers_requested);
 #endif

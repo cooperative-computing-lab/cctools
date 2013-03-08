@@ -9,7 +9,7 @@ See the file COPYING for details.
 #include "catalog_server.h"
 #include "datagram.h"
 #include "link.h"
-#include "hash_cache.h"
+#include "nvpair_database.h"
 #include "debug.h"
 #include "getopt.h"
 #include "nvpair.h"
@@ -40,7 +40,7 @@ See the file COPYING for details.
 #define HANDLE_QUERY_TIMEOUT 15
 
 /* The table of nvpairs, hashed on address:port */
-static struct hash_cache *table = 0;
+static struct nvpair_database *table = 0;
 
 /* An array of nvpais used to sort for display */
 static struct nvpair *array[MAX_TABLE_SIZE];
@@ -48,10 +48,19 @@ static struct nvpair *array[MAX_TABLE_SIZE];
 /* The time for which updated data lives before automatic deletion */
 static int lifetime = 1800;
 
+/* Time when the table was most recently cleaned of expired items. */
+static time_t last_clean_time = 0;
+
+/* How frequently to clean out expired items. */
+static time_t clean_interval = 60;
+
 /* The port upon which to listen. */
 static int port = CATALOG_PORT_DEFAULT;
 
-/* This machine's canonical name. */
+/* The preferred hostname set on the command line. */
+static const char *preferred_hostname = 0;
+
+/* This machine's canonical hostname. */
 static char hostname[DOMAIN_NAME_MAX];
 
 /* This process's owner */
@@ -78,6 +87,9 @@ static INT64_T max_server_size = 0;
 /* Logfile for new updates. */
 static FILE *logfile = 0;
 static char *logfilename = 0;
+
+/* Location of the history file. */
+static const char * history_dir = 0;
 
 /* debug filename */
 static char *debug_filename = 0;
@@ -124,7 +136,42 @@ int compare_nvpair(const void *a, const void *b)
 	return strcasecmp(sa, sb);
 }
 
-int update_one_catalog(void *outgoing_host, const void *text)
+static void remove_expired_records()
+{
+	struct nvpair *nv;
+	char *key;
+
+	time_t current = time(0);
+
+	// Only clean every clean_interval seconds.
+	if((current-last_clean_time)<clean_interval) return;
+
+	// After restarting, all records will have appear to be stale.
+	// Run for a minimum of lifetime seconds before cleaning anything up.
+	if((current-starttime)<lifetime ) return;
+
+	nvpair_database_firstkey(table);
+	while(nvpair_database_nextkey(table, &key, &nv)) {
+		time_t lastheardfrom = nvpair_lookup_integer(nv,"lastheardfrom");
+
+		int this_lifetime = nvpair_lookup_integer(nv,"lifetime");
+		if(this_lifetime>0) {
+			this_lifetime = MIN(lifetime,this_lifetime);
+		} else {
+			this_lifetime = lifetime;
+		}
+
+		if( (current-lastheardfrom) > this_lifetime ) {
+		    	nv = nvpair_database_remove(table,key);
+			if(nv) nvpair_delete(nv);
+		}
+	}
+
+	last_clean_time = current;
+}
+
+
+static int update_one_catalog(void *outgoing_host, const void *text)
 {
 	char addr[DATAGRAM_ADDRESS_MAX];
 	if(domain_name_cache_lookup(outgoing_host, addr)) {
@@ -137,12 +184,9 @@ int update_one_catalog(void *outgoing_host, const void *text)
 static void update_all_catalogs(struct datagram *outgoing_dgram)
 {
 	char text[DATAGRAM_PAYLOAD_MAX];
-	unsigned uptime;
 	int length;
 
-	uptime = time(0) - starttime;
-
-	length = sprintf(text, "type catalog\nversion %d.%d.%d\nurl http://%s:%d\nname %s\nowner %s\nuptime %u\nport %d\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, owner, uptime, port);
+	length = sprintf(text, "type catalog\nversion %d.%d.%d\nurl http://%s:%d\nname %s\nowner %s\nstarttime %lu\nport %d\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, preferred_hostname, port, preferred_hostname, owner, (long)starttime, port);
 
 	if(!length)
 		return;
@@ -175,7 +219,6 @@ static void handle_updates(struct datagram *update_port)
 	char key[LINE_MAX];
 	int port;
 	int result;
-	int timeout;
 	struct nvpair *nv;
 
 	while(1) {
@@ -217,21 +260,16 @@ static void handle_updates(struct datagram *update_port)
 			nvpair_insert_string(nv, "name", addr);
 		}
 
-		timeout = nvpair_lookup_integer(nv, "lifetime");
-		if(!timeout)
-			timeout = lifetime;
-		timeout = MIN(timeout, lifetime);
-
 		make_hash_key(nv, key);
 
 		if(logfile) {
-			if(!hash_cache_lookup(table,key)) {
+			if(!nvpair_database_lookup(table,key)) {
 				nvpair_print_text(nv,logfile);
 				fflush(logfile);
 			}
 		}
 
-		hash_cache_insert(table, key, nv, timeout);
+		nvpair_database_insert(table, key, nv);
 
 		debug(D_DEBUG, "received udp update from %s", key);
 	}
@@ -246,7 +284,7 @@ static struct nvpair_header html_headers[] = {
 	{"avail", "AVAIL", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 0},
 	{"load5", "LOAD5", NVPAIR_MODE_STRING, NVPAIR_ALIGN_RIGHT, 0},
 	{"version", "VERSION", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
-	{0,}
+	{0,0,0,0,0}
 };
 
 static void handle_query(struct link *query_link)
@@ -312,8 +350,8 @@ static void handle_query(struct link *query_link)
 	/* load the hash table entries into one big array */
 
 	n = 0;
-	hash_cache_firstkey(table);
-	while(hash_cache_nextkey(table, &hkey, (void **) &nv)) {
+	nvpair_database_firstkey(table);
+	while(nvpair_database_nextkey(table, &hkey, &nv)) {
 		array[n] = nv;
 		n++;
 	}
@@ -352,22 +390,22 @@ static void handle_query(struct link *query_link)
 	} else if(sscanf(path, "/detail/%s", key) == 1) {
 		struct nvpair *nv;
 		fprintf(stream, "Content-type: text/html\n\n");
-		nv = hash_cache_lookup(table, key);
+		nv = nvpair_database_lookup(table, key);
 		if(nv) {
 			const char *name = nvpair_lookup_string(nv, "name");
 			if(!name)
 				name = "unknown";
-			fprintf(stream, "<title>%s storage catalog: %s</title>\n", hostname, name);
+			fprintf(stream, "<title>%s catalog server: %s</title>\n", preferred_hostname, name);
 			fprintf(stream, "<center>\n");
-			fprintf(stream, "<h1>%s storage catalog</h1>\n", hostname);
+			fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
 			fprintf(stream, "<h2>%s</h2>\n", name);
 			fprintf(stream, "<p><a href=/>return to catalog view</a><p>\n");
 			nvpair_print_html_solo(nv, stream);
 			fprintf(stream, "</center>\n");
 		} else {
-			fprintf(stream, "<title>%s storage catalog</title>\n", hostname);
+			fprintf(stream, "<title>%s catalog server</title>\n", preferred_hostname);
 			fprintf(stream, "<center>\n");
-			fprintf(stream, "<h1>%s storage catalog</h1>\n", hostname);
+			fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
 			fprintf(stream, "<h2>Unknown Item!</h2>\n");
 			fprintf(stream, "</center>\n");
 		}
@@ -379,9 +417,9 @@ static void handle_query(struct link *query_link)
 		INT64_T sum_devices = 0;
 
 		fprintf(stream, "Content-type: text/html\n\n");
-		fprintf(stream, "<title>%s storage catalog</title>\n", hostname);
+		fprintf(stream, "<title>%s catalog server</title>\n", preferred_hostname);
 		fprintf(stream, "<center>\n");
-		fprintf(stream, "<h1>%s storage catalog</h1>\n", hostname);
+		fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
 		fprintf(stream, "<a href=/query.text>text</a> - ");
 		fprintf(stream, "<a href=/query.html>html</a> - ");
 		fprintf(stream, "<a href=/query.xml>xml</a> - ");
@@ -418,20 +456,24 @@ static void show_help(const char *cmd)
 {
 	printf("Use: %s [options]\n", cmd);
 	printf("where options are:\n");
-	printf(" -p <port>      Port number to listen on (default is %d)\n", port);
-	printf(" -l <secs>      Lifetime of data, in seconds (default is %d)\n", lifetime);
+	printf(" -b             Run as a daemon.\n");
+	printf(" -B <file>      Write process identifier (PID) to file.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem\n");
+	printf(" -h             Show this help screen\n");
+	printf(" -H <file>      Record catalog history to this directory.\n");
+	printf(" -l <secs>      Lifetime of data, in seconds (default is %d)\n", lifetime);
+	printf(" -L <file>      Log new updates to this file.\n");
+	printf(" -m <n>         Maximum number of child processes.  (default is %d)\n",child_procs_max);
+	printf(" -M <size>      Maximum size of a server to be believed.  (default is any)\n");
+	printf(" -n <name>      Preferred host name of this server.\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -O <bytes>     Rotate debug file once it reaches this size.\n");
-	printf(" -u <host>      Send status updates to this host. (default is %s)\n", CATALOG_HOST_DEFAULT);
-	printf(" -m <n>         Maximum number of child processes.  (default is %d)\n",child_procs_max);
-	printf(" -T <time>	Maximum time to allow a query process to run.  (default is %ds)\n",child_procs_timeout);
-	printf(" -M <size>      Maximum size of a server to be believed.  (default is any)\n");
-	printf(" -U <time>      Send status updates at this interval. (default is 5m)\n");
-	printf(" -L <file>      Log new updates to this file.\n");
+	printf(" -p <port>      Port number to listen on (default is %d)\n", port);
 	printf(" -S             Single process mode; do not work on queries.\n");
+	printf(" -T <time>	Maximum time to allow a query process to run.  (default is %ds)\n",child_procs_timeout);
+	printf(" -u <host>      Send status updates to this host. (default is %s)\n", CATALOG_HOST_DEFAULT);
+	printf(" -U <time>      Send status updates at this interval. (default is 5m)\n");
 	printf(" -v             Show version string\n");
-	printf(" -h             Show this help screen\n");
 }
 
 int main(int argc, char *argv[])
@@ -440,18 +482,36 @@ int main(int argc, char *argv[])
 	char ch;
 	time_t current;
 	int is_daemon = 0;
+	char *pidfile = NULL;
 
 	outgoing_host_list = list_create();
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "bp:l:L:m:M:d:o:O:u:U:SThv")) != (char) -1) {
+	while((ch = getopt(argc, argv, "bB:d:hH:l:L:m:M:n:o:O:p:ST:u:U:v")) != (char) -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
 				break;
+			case 'B':
+				free(pidfile);
+				pidfile = strdup(optarg);
+				break;
 			case 'd':
 				debug_flags_set(optarg);
+				break;
+			case 'h':
+			default:
+				show_help(argv[0]);
+				return 1;
+			case 'l':
+				lifetime = string_time_parse(optarg);
+				break;
+			case 'L':
+				logfilename = strdup(optarg);
+				break;
+			case 'H':
+				history_dir = strdup(optarg);
 				break;
 			case 'm':
 				child_procs_max = atoi(optarg);
@@ -459,8 +519,8 @@ int main(int argc, char *argv[])
 			case 'M':
 				max_server_size = string_metric_parse(optarg);
 				break;
-			case 'p':
-				port = atoi(optarg);
+			case 'n':
+				preferred_hostname = optarg;
 				break;
 			case 'o':
 				free(debug_filename);
@@ -469,18 +529,8 @@ int main(int argc, char *argv[])
 			case 'O':
 				debug_config_file_size(string_metric_parse(optarg));
 				break;
-			case 'u':
-				list_push_head(outgoing_host_list, xxstrdup(optarg));
-				break;
-			case 'U':
-				outgoing_timeout = string_time_parse(optarg);
-				break;
-			case 'l':
-				lifetime = string_time_parse(optarg);
-				break;
-			case 'L':
-				free(logfilename);
-				logfilename = strdup(optarg);
+			case 'p':
+				port = atoi(optarg);
 				break;
 			case 'S':
 				fork_mode = 0;
@@ -488,17 +538,19 @@ int main(int argc, char *argv[])
 			case 'T':
 				child_procs_timeout = string_time_parse(optarg);
 				break;
+			case 'u':
+				list_push_head(outgoing_host_list, xxstrdup(optarg));
+				break;
+			case 'U':
+				outgoing_timeout = string_time_parse(optarg);
+				break;
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
-			case 'h':
-			default:
-				show_help(argv[0]);
-				return 1;
 			}
 	}
 
-	if (is_daemon) daemonize(0);
+	if (is_daemon) daemonize(0, pidfile);
 
 	debug_config_file(debug_filename);
 
@@ -524,13 +576,17 @@ int main(int argc, char *argv[])
 	install_handler(SIGQUIT, shutdown_clean);
 	install_handler(SIGALRM, shutdown_clean);
 
-	domain_name_cache_guess(hostname);
+	if(!preferred_hostname) {
+		domain_name_cache_guess(hostname);
+		preferred_hostname = hostname;
+	}
+
 	username_get(owner);
 	starttime = time(0);
 
-	table = hash_cache_create(127, hash_string, (hash_cache_cleanup_t) nvpair_delete);
+	table = nvpair_database_create(history_dir);
 	if(!table)
-		fatal("couldn't make hash table");
+		fatal("couldn't create directory %s: %s\n",history_dir,strerror(errno));
 
 	update_dgram = datagram_create(port);
 	if(!update_dgram)
@@ -550,6 +606,8 @@ int main(int argc, char *argv[])
 		int lfd = link_fd(list_port);
 		int result, maxfd;
 		struct timeval timeout;
+
+		remove_expired_records();
 
 		if(time(0) > outgoing_alarm) {
 			update_all_catalogs(outgoing_dgram);

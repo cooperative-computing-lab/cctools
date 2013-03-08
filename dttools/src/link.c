@@ -36,7 +36,18 @@ See the file COPYING for details.
 #include <time.h>
 #include <sys/poll.h>
 
+#ifndef TCP_LOW_PORT_DEFAULT
+#define TCP_LOW_PORT_DEFAULT 1024
+#endif
+
+#ifndef TCP_HIGH_PORT_DEFAULT
+#define TCP_HIGH_PORT_DEFAULT 32767
+#endif
+
 #define BUFFER_SIZE 65536
+
+#define LINK_TYPE_STANDARD  1
+#define LINK_TYPE_FILE      2
 
 struct link {
 	int fd;
@@ -48,6 +59,7 @@ struct link {
 	size_t buffer_length;
 	char raddr[LINK_ADDRESS_MAX];
 	int rport;
+	int type;
 };
 
 static int link_send_window = 65536;
@@ -62,6 +74,10 @@ void link_window_set(int send_buffer, int recv_buffer)
 
 void link_window_get(struct link *l, int *send_buffer, int *recv_buffer)
 {
+	if(l->type == LINK_TYPE_FILE) {
+		return;
+	}
+
 	socklen_t length = sizeof(*send_buffer);
 	getsockopt(l->fd, SOL_SOCKET, SO_SNDBUF, (void *) send_buffer, &length);
 	getsockopt(l->fd, SOL_SOCKET, SO_RCVBUF, (void *) recv_buffer, &length);
@@ -70,6 +86,11 @@ void link_window_get(struct link *l, int *send_buffer, int *recv_buffer)
 static void link_window_configure(struct link *l)
 {
 	const char *s = getenv("TCP_WINDOW_SIZE");
+
+	if(l->type == LINK_TYPE_FILE) {
+		return;
+	}
+
 	if(s) {
 		link_send_window = atoi(s);
 		link_recv_window = atoi(s);
@@ -100,6 +121,10 @@ static int link_squelch()
 
 int link_keepalive(struct link *link, int onoff) {
 	int result, value;
+
+	if(link->type == LINK_TYPE_FILE) {
+		return 0;
+	}
 
 	if(onoff > 0) {
 		value = 1;
@@ -233,6 +258,7 @@ static struct link *link_create()
 	link->buffer_length = 0;
 	link->raddr[0] = 0;
 	link->rport = 0;
+	link->type = LINK_TYPE_STANDARD;
 
 	return link;
 }
@@ -253,6 +279,35 @@ struct link *link_attach(int fd)
 		link_close(l);
 		return 0;
 	}
+}
+
+struct link *link_attach_to_file(FILE *f)
+{
+	struct link *l = link_create();
+	int fd = fileno(f);
+	
+	if(fd < 0) {
+		link_close(l);
+		return NULL;
+	}
+
+	l->fd = fd;
+	l->type = LINK_TYPE_FILE;
+	return l;
+}
+
+struct link *link_attach_to_fd(int fd)
+{
+	struct link *l = link_create();
+	
+	if(fd < 0) {
+		link_close(l);
+		return NULL;
+	}
+
+	l->fd = fd;
+	l->type = LINK_TYPE_FILE;
+	return l;
 }
 
 struct link *link_serve(int port)
@@ -292,9 +347,9 @@ struct link *link_serve_address(const char *addr, int port)
 		address.sin_addr.s_addr = htonl(INADDR_ANY);
 	}
 
-	int low = 1024;
-	int high = 32767;
-	if(port == 0) {
+	int low = TCP_LOW_PORT_DEFAULT;
+	int high = TCP_HIGH_PORT_DEFAULT;
+	if(port < 1) {
 		const char *lowstr = getenv("TCP_LOW_PORT");
 		if (lowstr)
 			low = atoi(lowstr);
@@ -345,6 +400,10 @@ struct link *link_serve_address(const char *addr, int port)
 struct link *link_accept(struct link *master, time_t stoptime)
 {
 	struct link *link = 0;
+
+	if(master->type == LINK_TYPE_FILE) {
+		return NULL;
+	}
 
 	link = link_create();
 	if(!link)
@@ -413,34 +472,44 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 	debug(D_TCP, "connecting to %s:%d", addr, port);
 
-	do {
+	while(1) {
+		// First attempt a non-blocking connect
 		result = connect(link->fd, (struct sockaddr *) &address, sizeof(address));
 
-		/* On some platforms, errno is not set correctly. */
-		/* If the remote address can be found, then we are really connected. */
-		/* Also, on bsd-derived systems, failure to connect is indicated by a second connect returning EINVAL. */
+		// On many platforms, non-blocking connect sets errno in unexpected ways:
 
-		/* On OSX, the following is a possible way of indicating a successful connection: */
+		// On OSX, result=-1 and errno==EISCONN indicates a successful connection.
 		if(result<0 && errno==EISCONN) result=0;
 
-		if(result < 0) {
-			if(!errno_is_temporary(errno)) {
-				if(errno == EINVAL)
-					errno = ECONNREFUSED;
-				break;
-			} else {
-				debug(D_TCP, "connection to %s:%d not made yet: %s", addr, port, strerror(errno));
-			}
-		} else {
-			if(link_address_remote(link, link->raddr, &link->rport)) {
-				debug(D_TCP, "made connection to %s:%d", link->raddr, link->rport);
+		// On BSD-derived systems, failure to connect is indicated by errno = EINVAL.
+		// Set it to something more explanatory.
+	       	if(result<0 && errno==EINVAL) errno=ECONNREFUSED;
+
+		// Otherwise, a non-temporary errno should cause us to bail out.
+		if(result<0 && !errno_is_temporary(errno)) break;
+
+		// If the remote address is valid, we are connected no matter what.
+		if(link_address_remote(link, link->raddr, &link->rport)) {
+			debug(D_TCP, "made connection to %s:%d", link->raddr, link->rport);
 #ifdef CCTOOLS_OPSYS_CYGWIN
-				link_nonblocking(link, 1);
+			link_nonblocking(link, 1);
 #endif
-				return link;
-			}
-		} 
-	} while(link_sleep(link, stoptime, 0, 1));
+			return link;
+		}
+
+		// if the time has expired, bail out
+		if( time(0) >= stoptime ) {
+			errno = ETIMEDOUT;
+			break;
+		}
+
+		// wait for some activity on the socket.
+		link_sleep(link, stoptime, 0, 1);
+
+		// No matter how the sleep ends, we want to go back to the top
+		// and call connect again to get a proper errno.
+	}
+
 
 	debug(D_TCP, "connection to %s:%d failed (%s)", addr, port, strerror(errno));
 
@@ -607,10 +676,10 @@ int link_readline(struct link *link, char *line, size_t length, time_t stoptime)
 			*line = link->buffer[link->buffer_start];
 			link->buffer_start++;
 			link->buffer_length--;
-			if(*line == 10) {
-				*line = 0;
+			if(*line == '\n') {
+				*line = '\0';
 				return 1;
-			} else if(*line == 13) {
+			} else if(*line == '\r') {
 				continue;
 			} else {
 				line++;
@@ -666,7 +735,7 @@ int link_write(struct link *link, const char *data, size_t count, time_t stoptim
 
 int link_putlstring(struct link *link, const char *data, size_t count, time_t stoptime)
 {
-	size_t total = 0;
+	ssize_t total = 0;
 	ssize_t written = 0;
 
 	while(count > 0 && (written = link_write(link, data, count, stoptime)) > 0) {
@@ -680,7 +749,7 @@ int link_putlstring(struct link *link, const char *data, size_t count, time_t st
 int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va)
 {
 	va_list va2;
-	size_t size = 65536;
+	ssize_t size = 65536;
 	char buffer[size];
 	char *b = buffer;
 
@@ -732,6 +801,13 @@ void link_close(struct link *link)
 	}
 }
 
+void link_detach(struct link *link)
+{
+	if(link) {
+		free(link);
+	}
+}
+
 int link_fd(struct link *link)
 {
 	return link->fd;
@@ -751,6 +827,10 @@ int link_address_local(struct link *link, char *addr, int *port)
 	SOCKLEN_T length;
 	int result;
 
+	if(link->type == LINK_TYPE_FILE) {
+		return 0;
+	}
+
 	length = sizeof(iaddr);
 	result = getsockname(link->fd, (struct sockaddr *) &iaddr, &length);
 	if(result != 0)
@@ -767,6 +847,10 @@ int link_address_remote(struct link *link, char *addr, int *port)
 	struct sockaddr_in iaddr;
 	SOCKLEN_T length;
 	int result;
+
+	if(link->type == LINK_TYPE_FILE) {
+		return 0;
+	}
 
 	length = sizeof(iaddr);
 	result = getpeername(link->fd, (struct sockaddr *) &iaddr, &length);
@@ -820,7 +904,7 @@ INT64_T link_stream_to_fd(struct link * link, int fd, INT64_T length, time_t sto
 	INT64_T ractual, wactual;
 
 	while(length > 0) {
-		INT64_T chunk = MIN(sizeof(buffer), length);
+		INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 		ractual = link_read(link, buffer, chunk, stoptime);
 		if(ractual <= 0)
@@ -846,7 +930,7 @@ INT64_T link_stream_to_file(struct link * link, FILE * file, INT64_T length, tim
 	INT64_T ractual, wactual;
 
 	while(length > 0) {
-		INT64_T chunk = MIN(sizeof(buffer), length);
+		INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 		ractual = link_read(link, buffer, chunk, stoptime);
 		if(ractual <= 0)
@@ -872,7 +956,7 @@ INT64_T link_stream_from_fd(struct link * link, int fd, INT64_T length, time_t s
 	INT64_T ractual, wactual;
 
 	while(length > 0) {
-		INT64_T chunk = MIN(sizeof(buffer), length);
+		INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 		ractual = full_read(fd, buffer, chunk);
 		if(ractual <= 0)
@@ -898,7 +982,7 @@ INT64_T link_stream_from_file(struct link * link, FILE * file, INT64_T length, t
 	INT64_T ractual, wactual;
 
 	while(1) {
-		INT64_T chunk = MIN(sizeof(buffer), length);
+		INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 		ractual = full_fread(file, buffer, chunk);
 		if(ractual <= 0)
@@ -924,7 +1008,7 @@ INT64_T link_soak(struct link * link, INT64_T length, time_t stoptime)
 	INT64_T ractual;
 
 	while(length > 0) {
-		INT64_T chunk = MIN(sizeof(buffer), length);
+		INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 		ractual = link_read(link, buffer, chunk, stoptime);
 		if(ractual <= 0)
@@ -941,6 +1025,10 @@ int link_tune(struct link *link, link_tune_t mode)
 {
 	int onoff;
 	int success;
+
+	if(link->type == LINK_TYPE_FILE) {
+		return 0;
+	}
 
 	switch (mode) {
 	case LINK_TUNE_INTERACTIVE:
@@ -993,6 +1081,9 @@ int link_poll(struct link_info *links, int nlinks, int msec)
 	for(i = 0; i < nlinks; i++) {
 		fds[i].fd = links[i].link->fd;
 		fds[i].events = link_to_poll(links[i].events);
+		if(links[i].link->buffer_length) {  // If there's data already waiting, don't sit in the poll
+			msec = 0;
+		}
 	}
 
 	result = poll(fds, nlinks, msec);
@@ -1000,6 +1091,10 @@ int link_poll(struct link_info *links, int nlinks, int msec)
 	if(result >= 0) {
 		for(i = 0; i < nlinks; i++) {
 			links[i].revents = poll_to_link(fds[i].revents);
+			if(links[i].link->buffer_length) {
+				links[i].revents |= LINK_READ;
+				result++;
+			}
 		}
 	}
 

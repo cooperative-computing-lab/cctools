@@ -41,7 +41,7 @@ the number of bytes in each object that are different.
 
 static void allpairs_compare_BITWISE( const char *name1, const char *data1, int size1, const char *name2, const char *data2, int size2 )
 {
-	int i, count = 0;
+	unsigned int i, count = 0;
 	unsigned int minsize;
 
 	minsize = size1 - size2 ? size2 : size1;

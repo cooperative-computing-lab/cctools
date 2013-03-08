@@ -8,19 +8,24 @@ PORT_FILE=chirp_server.port
 
 prepare()
 {
-    mkdir foo
-    ln -s ..//.//./..///foo/ foo/foo
-    ../src/chirp_server -r $PWD/foo -Z $PORT_FILE &
-    # give the server a little time to write the port file
-    sleep 5
-    pid=$!
+	rm -rf foo bar
 
-    if ps ux | awk '{print $2}' | grep "^$pid$"; then
+	rm -f $PORT_FILE	
+	../src/chirp_server -Z $PORT_FILE &
+	pid=$!
 	echo $pid > $PID_FILE
-	exit 0
-    else
-    	exit 1
-    fi
+
+	for i in 1 2 3 4 5
+	do
+		if [ -f $PORT_FILE ]
+		then
+			exit 0
+		else
+			sleep 1
+		fi
+	done
+
+	exit 1
 }
 
 run()
@@ -29,6 +34,7 @@ run()
     exec ../src/chirp localhost:$port <<EOF
 help
 df -g
+mkdir foo
 mkdir bar
 mv foo bar/foo
 ls bar/foo
@@ -51,7 +57,11 @@ EOF
 
 clean()
 {
-    kill -9 `cat $PID_FILE`
+	if [ -f $PID_FILE ]
+	then
+		kill -9 `cat $PID_FILE`
+	fi
+
     rm -rf foo _test .__acl $PID_FILE $PORT_FILE $TEST_FILE
     exit 0
 }

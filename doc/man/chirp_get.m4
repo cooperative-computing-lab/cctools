@@ -18,11 +18,11 @@ BOLD(chirp_get) also can stream data which can be useful in a shell pipeline.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_PAIR(-a,mode) Require this authentication mode.
-OPTION_PAIR(-d,subsystem) Enable debugging for this subsystem.
-OPTION_PAIR(-t,time) Timeout for failure. (default is 3600s)
-OPTION_ITEM(-v) Show program version.
-OPTION_ITEM(-h) Show help text.
+OPTION_PAIR(-a,mode)Require this authentication mode.
+OPTION_PAIR(-d,subsystem)Enable debugging for this subsystem.
+OPTION_PAIR(-t,time)Timeout for failure. (default is 3600s)
+OPTION_ITEM(-v)Show program version.
+OPTION_ITEM(-h)Show help text.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)

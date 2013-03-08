@@ -24,7 +24,7 @@ run()
 {
     cd $test_dir
     if ./makeflow -g incr_time -G 1 -d all; then
-    	exec diff ../$test_output _collect.7
+    	exec diff -w ../$test_output _collect.7
     else
     	exit 1
     fi

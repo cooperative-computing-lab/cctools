@@ -25,6 +25,7 @@ SECTION(OPTIONS)
 
 OPTIONS_BEGIN
 OPTION_PAIR(-p, port)Port number for queue master to listen on.
+OPTION_PAIR(-Z,file)Select port at random and write it to this file.  (default is disabled)
 OPTION_PAIR(-d, subsystem)Enable debugging for this subsystem. (Try -d all to start.)
 OPTION_PAIR(-o, file)Send debugging to this file.
 OPTION_ITEM(-v)Show version string

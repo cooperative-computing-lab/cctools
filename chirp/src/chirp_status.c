@@ -33,7 +33,7 @@ static struct nvpair_header headers[] = {
 	{"version","VERSION", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
 	{"total",  "TOTAL",   NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
 	{"avail",  "AVAIL",   NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
-	{0,}
+	{0,0,0,0,0}
 };
 
 static void show_help(const char *cmd)
@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
 		table[count++] = n;
 	}
 
-	qsort(table, count, sizeof(*table), (void *) compare_entries);
+	qsort(table, count, sizeof(*table), (int (*)(const void *, const void *)) compare_entries);
 
 	for(i = 0; i < count; i++) {
 		const char *etype = nvpair_lookup_string(table[i],"type");

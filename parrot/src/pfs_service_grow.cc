@@ -200,7 +200,7 @@ struct grow_dirent * grow_dirent_create_from_file( FILE *file, struct grow_diren
 		linkname[0] = 0;
 
 		/* old large file format */
-		int fields = sscanf(line,"%c %[^\t]\t%d %*d %lld %*d %*d %ld %*d %s %[^\n]",
+		int fields = sscanf(line,"%c %[^\t]\t%d %*d %" PRId64 " %*d %*d %ld %*d %s %[^\n]",
                         &type,
                         name,
                         &d->mode,
@@ -211,7 +211,7 @@ struct grow_dirent * grow_dirent_create_from_file( FILE *file, struct grow_diren
 
 		if(fields<6) {
 		  /* new more compact file format */
-		fields = sscanf(line,"%c %[^\t]\t%u %llu %ld %s %[^\n]",
+		fields = sscanf(line,"%c %[^\t]\t%u %" PRIu64 " %ld %s %[^\n]",
 			&type,
 			name,
 			&d->mode,

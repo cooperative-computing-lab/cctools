@@ -18,15 +18,15 @@ block-by-block.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(-f) Forcibly remove target before copying.
-OPTION_ITEM(-i) Interactive mode: ask before overwriting.
+OPTION_ITEM(-f)Forcibly remove target before copying.
+OPTION_ITEM(-i)Interactive mode: ask before overwriting.
 OPTION_ITEM(-r)
-OPTION_ITEM(-R) Recursively copy directories.
-OPTION_ITEM(-s) Make symbolic links instead of copying files.
-OPTION_ITEM(-l) Make hard links instead of copying files.
-OPTION_ITEM(-u) Update mode: Copy only if source is newer than target.
-OPTION_ITEM(-v) Verbose mode: Show names of files copied.
-OPTION_ITEM(-h) Help: Show these options.
+OPTION_ITEM(-R)Recursively copy directories.
+OPTION_ITEM(-s)Make symbolic links instead of copying files.
+OPTION_ITEM(-l)Make hard links instead of copying files.
+OPTION_ITEM(-u)Update mode: Copy only if source is newer than target.
+OPTION_ITEM(-v)Verbose mode: Show names of files copied.
+OPTION_ITEM(-h)Help: Show these options.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

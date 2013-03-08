@@ -18,8 +18,10 @@ See the file COPYING for details.
 #include "cctools.h"
 #include "debug.h"
 #include "work_queue.h"
+#include "xxmalloc.h"
 #include "text_array.h"
 #include "macros.h"
+#include "getopt_aux.h"
 
 #define WAVEFRONT_LINE_MAX 1024
 
@@ -28,7 +30,8 @@ static struct text_array *array = 0;
 static struct work_queue *queue = 0;
 static int xsize = 0;
 static int ysize = 0;
-static int port = 9068;
+static int port = WORK_QUEUE_DEFAULT_PORT;
+static const char *port_file = NULL;
 static const char *infile;
 static const char *outfile;
 static FILE *logfile;
@@ -96,11 +99,16 @@ static void show_help(const char *cmd)
 {
 	printf("Use: %s [options] <command> <xsize> <ysize> <inputdata> <outputdata>\n", cmd);
 	printf("where options are:\n");
-	printf(" -p <port>      Port number for queue master to listen on.\n");
+	printf(" -p <port>      Port number for queue master to listen on. Default is 9068.\n");
+	printf(" -a             Advertise the master information to a catalog server.\n");
+	printf(" -N <project>   Set the project name to <project>\n");
+	printf(" -P <integer>   Priority. Higher the value, higher the priority.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
+	printf(" -Z <file>      Select port at random and write it to this file.\n");
+
 }
 
 static void display_progress( struct work_queue *q )
@@ -117,18 +125,35 @@ static void display_progress( struct work_queue *q )
 int main( int argc, char *argv[] )
 {
 	char c;
+	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+	char *project = NULL;
+	int priority = 0;
 
 	const char *progname = "wavefront";
 
 	debug_config(progname);
 
-	while((c=getopt(argc,argv,"p:Pd:o:vh"))!=(char)-1) {
+	while((c=getopt(argc,argv,"ad:hN:p:P:o:v:Z:"))!=(char)-1) {
 		switch(c) {
-			case 'p':
-				port = atoi(optarg);
+	    	case 'a':
+				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 				break;
 			case 'd':
 				debug_flags_set(optarg);
+				break;
+			case 'h':
+				show_help(progname);
+				exit(0);
+				break;
+			case 'N':
+				free(project);
+				project = xxstrdup(optarg);
+				break;
+			case 'p':
+				port = atoi(optarg);
+				break;
+			case 'P':
+				priority = atoi(optarg);
 				break;
 			case 'o':
 				debug_config_file(optarg);
@@ -137,10 +162,13 @@ int main( int argc, char *argv[] )
 				cctools_version_print(stdout, progname);
 				exit(0);
 				break;
-			case 'h':
-				show_help(progname);
-				exit(0);
+			case 'Z':
+				port_file = optarg;
+				port = 0;
 				break;
+			default:
+				show_help(progname);
+				return 1;
 		}
 	}
 
@@ -180,7 +208,32 @@ int main( int argc, char *argv[] )
 		return 1;
 	}
 
+	if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
+		fprintf(stderr, "wavefront: wavefront master running in catalog mode. Please use '-N' option to specify the name of this project.\n");
+		fprintf(stderr, "wavefront: Run \"%s -h\" for help with options.\n", argv[0]);
+		return 1;
+	}
+
 	queue = work_queue_create(port);
+
+	//Read the port the queue is actually running, in case we just called
+	//work_queue_create(LINK_PORT_ANY)
+	port  = work_queue_port(queue); 
+
+	if(!queue) {
+		fprintf(stderr,"%s: could not create work queue on port %d: %s\n",progname,port,strerror(errno));
+		return 1;
+	}
+
+	if(port_file)
+		opts_write_port_file(port_file, port);
+
+	// advanced work queue options
+	work_queue_specify_master_mode(queue, work_queue_master_mode);
+	work_queue_specify_name(queue, project);
+	work_queue_specify_priority(queue, priority);
+
+	fprintf(stdout, "%s: listening for workers on port %d...\n",progname,work_queue_port(queue));
 
 	task_prime();
 

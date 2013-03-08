@@ -306,18 +306,6 @@ Gets a simple directory listing from a Chirp server, and then calls the callback
 
 INT64_T chirp_reli_getdir(const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime);
 
-/** Get an access control list.
-Gets an access control list from a Chirp server, and then calls the callback once for each element in the list.
-  This is a low-level function, you may find @ref chirp_reli_opendir easier to use.
-@param host The name and port of the Chirp server to access.
-@param path The pathname of the directory to access.
-@param callback The function to be called for each element in the listing.
-@param arg An optional convenience pointer that will be passed to the callback function.
-@param stoptime The absolute time at which to abort.
-@see chirp_reli_opendir
-@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
-*/
-
 /**
 Open a directory for listing.  This function returns a pointer to an opened directory.
 You may then call @ref chirp_reli_readdir to read directory elements one by one.
@@ -658,6 +646,19 @@ This only has an effect if the server backend supports replication, currently on
 */
 
 INT64_T chirp_reli_setrep(const char *host, const char *path, int nreps, time_t stoptime );
+
+INT64_T chirp_reli_getxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime);
+INT64_T chirp_reli_fgetxattr(struct chirp_file *file, const char *name, void *data, size_t size, time_t stoptime);
+INT64_T chirp_reli_lgetxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime);
+INT64_T chirp_reli_listxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime);
+INT64_T chirp_reli_flistxattr(struct chirp_file *file, char *list, size_t size, time_t stoptime);
+INT64_T chirp_reli_llistxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime);
+INT64_T chirp_reli_setxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime);
+INT64_T chirp_reli_fsetxattr(struct chirp_file *file, const char *name, const void *data, size_t size, int flags, time_t stoptime);
+INT64_T chirp_reli_lsetxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime);
+INT64_T chirp_reli_removexattr(const char *host, const char *path, const char *name, time_t stoptime);
+INT64_T chirp_reli_fremovexattr(struct chirp_file *file, const char *name, time_t stoptime);
+INT64_T chirp_reli_lremovexattr(const char *host, const char *path, const char *name, time_t stoptime);
 
 /** Set the debug options on the remote server.
 @param host The name and port of the Chirp server to access.

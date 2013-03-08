@@ -5,6 +5,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include <stdlib.h>
+
 #ifndef STRINGTOOLS_H
 #define STRINGTOOLS_H
 
@@ -29,11 +31,18 @@ INT64_T string_metric_parse(const char *str);
 int string_time_parse(const char *str);
 int string_split(char *str, int *argc, char ***argv);
 int string_split_quotes(char *str, int *argc, char ***argv);
-char *string_pad_right(char *str, int length);
+char *string_pad_right(char *str, unsigned int length);
 char *string_pad_left(char *str, int length);
 void string_cookie(char *str, int length);
 char *string_subst(char *value, string_subst_lookup_t lookup, void *arg);
-char *string_combine(char *first, char *second);
+
+/** Appends second to first, both null terminated strings. Returns the new
+  formed string. First argument is reallocated with realloc.
+  @param first Null terminated string.
+  @param second Null terminated string.
+  @return Null terminated string concatenating second to first.
+  */
+char *string_combine(char *first, const char *second);
 char *string_combine_multi(char *first, ...);
 char *string_signal(int sig);
 void string_split_path(const char *str, char *first, char *rest);
@@ -44,6 +53,7 @@ void string_toupper(char *str);
 int string_isspace(const char *str);
 int string_is_integer(const char *str);
 void string_replace_backslash_codes(const char *instr, char *outstr);
+int string_equal(const char *str1, const char *str2);
 
 int strpos(const char *str, char c);
 int strrpos(const char *str, char c);
@@ -54,8 +64,19 @@ int string_null_or_empty(const char *str);
     @param fmt Format string passed to sprintf.
 	@param ... Variable arguments passed to sprintf.
 	@return The formatted string.
- */
+*/
 char *string_format (const char *fmt, ...);
+
+/** Writes a string formatted using snprintf. It is an error if the string is longer than the buffer provided.
+  @param str Output string buffer, passed as first argument of snprintf.
+  @param max Maximum number of characters to write to str, counting the final '\0'.
+  @param fmt Format string passed to snprintf.
+  @param ... Variable arguments passed to snprintf
+  @return The number of character written, not counting the final '\0'.
+ */
+
+int string_nformat(char *str, const size_t max, const char *fmt, ...);
+
 
 /** Returns a heap allocated freeable string for the current working directory.
 	@return The current working directory.

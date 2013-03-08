@@ -24,19 +24,19 @@ is performed by MANPAGE(sand_filter_kernel,1) on each machine.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_PAIR(-p,port) Port number for queue master to listen on. (default: 9123)
-OPTION_PAIR(-s,size) Number of sequences in each filtering task. (default: 1000)
-OPTION_PAIR(-r,file) A meryl file of repeat mers to be filtered out.
-OPTION_PAIR(-R,n) Automatically retry failed jobs up to n times. (default: 100)
-OPTION_PAIR(-k,size) The k-mer size to use in candidate selection (default is 22).
-OPTION_PAIR(-w,size) The minimizer window size. (default is 22).
-OPTION_ITEM(-u) If set, do not unlink temporary binary output files.
-OPTION_PAIR(-c,file) Checkpoint filename; will be created if necessary.
-OPTION_PAIR(-d,flag) Enable debugging for this subsystem.  (Try BOLD(-d all) to start.)
-OPTION_PAIR(-F,number) Work Queue fast abort multiplier.     (default is 10.)
-OPTION_PAIR(-o,file) Send debugging to this file.
-OPTION_ITEM(-v) Show version string
-OPTION_ITEM(-h) Show this help screen
+OPTION_PAIR(-p,port)Port number for queue master to listen on. (default: 9123)
+OPTION_PAIR(-s,size)Number of sequences in each filtering task. (default: 1000)
+OPTION_PAIR(-r,file)A meryl file of repeat mers to be filtered out.
+OPTION_PAIR(-R,n)Automatically retry failed jobs up to n times. (default: 100)
+OPTION_PAIR(-k,size)The k-mer size to use in candidate selection (default is 22).
+OPTION_PAIR(-w,size)The minimizer window size. (default is 22).
+OPTION_ITEM(-u)If set, do not unlink temporary binary output files.
+OPTION_PAIR(-c,file)Checkpoint filename; will be created if necessary.
+OPTION_PAIR(-d,flag)Enable debugging for this subsystem.  (Try BOLD(-d all) to start.)
+OPTION_PAIR(-F,number)Work Queue fast abort multiplier.     (default is 10.)
+OPTION_PAIR(-o,file)Send debugging to this file.
+OPTION_ITEM(-v)Show version string
+OPTION_ITEM(-h)Show this help screen
 OPTIONS_END
 
 SECTION(EXIT STATUS)

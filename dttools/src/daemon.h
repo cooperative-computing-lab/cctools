@@ -13,9 +13,13 @@
  * All open file descriptors are closed. stdin, stdout, and stderr
  * are opened to "/dev/null".
  *
+ * daemonize writes the daemon process ID to pidfile before changing
+ * directories.
+ *
  * @param cdroot Change to root directory of filesystem.
+ * @param pidfile PID file for daemon.
  *
  */
-void daemonize (int cdroot);
+void daemonize (int cdroot, const char *pidfile);
 
 #endif /* DAEMONIZE_H */

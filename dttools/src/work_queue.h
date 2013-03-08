@@ -8,13 +8,13 @@ See the file COPYING for details.
 #define WORK_QUEUE_H
 
 /** @file work_queue.h A master-worker library.
- The work queue provides an implementation of the master-worker computing
-model using TCP sockets, Unix applications, and files as intermediate buffers.
-A master process uses @ref work_queue_create to create a queue, then
-@ref work_queue_submit to submit tasks.  Once tasks are running, call
-@ref work_queue_wait to wait for completion.  The generic <tt>worker</tt>
-program can be run on any machine, and simply needs to be told the host
-and port of the master.
+ The work queue provides an implementation of the master-worker computing model
+ using TCP sockets, Unix applications, and files as intermediate buffers.  A
+ master process uses @ref work_queue_create to create a queue, then @ref
+ work_queue_submit to submit tasks.  Once tasks are running, call @ref
+ work_queue_wait to wait for completion. A generic worker program, named
+ <tt>work_queue_worker</tt>, can be run on any machine, and simply needs to be
+ told the host and port of the master.
 */
 
 #include <sys/types.h>
@@ -45,6 +45,9 @@ and port of the master.
 
 #define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
 #define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
+
+#define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
+#define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler;	/**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
@@ -130,8 +133,9 @@ struct work_queue_task *work_queue_task_create(const char *full_command);
 @param flags	May be zero to indicate no special handling or any of the following or'd together:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
+@return 1 if the task file is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-void work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags);
+int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags);
 
 /** Add a file piece to a task.
 @param t A task object.
@@ -145,8 +149,9 @@ void work_queue_task_specify_file(struct work_queue_task *t, const char *local_n
 @param flags	May be zero to indicate no special handling or any of the following or'd together:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
+@return 1 if the task file piece is successfully specified, 0 if either of @a t, @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-void work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags);
+int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags);
 
 /** Add an input buffer to a task.
 @param t A task object.
@@ -156,8 +161,9 @@ void work_queue_task_specify_file_piece(struct work_queue_task *t, const char *l
 @param flags	May be zero to indicate no special handling or any of the following or'd together:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
+@return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
 */
-void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags);
+int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags);
 
 /** Add a file created or handled by an arbitrary command to a task (eg: wget, ftp, chirp_get|put).
 @param t A task object.
@@ -169,8 +175,9 @@ void work_queue_task_specify_buffer(struct work_queue_task *t, const char *data,
 @param flags	May be zero to indicate no special handling or any of the following or'd together:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
+@return 1 if the task command file is successfully specified, 0 if either of @a t, @a cmd, or @a remote_name is null or @a remote_name is an absolute path.
 */
-void work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags);
+int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags);
 
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the work queue, but is provided for the user's convenience
@@ -216,7 +223,7 @@ If the queue has a project name, then queue statistics and information will be
 reported to a catalog server.  To specify the catalog server, the user may set
 the <b>CATALOG_HOST</b> and <b>CATALOG_PORT</b> environmental variables as described in @ref catalog_query_create.
 
-@param port The port number to listen on.  If zero is specified, then the default is chosen, and if -1 is specified, a random port is chosen.  
+@param port The port number to listen on.  If zero is specified, then the port stored in the <b>WORK_QUEUE_PORT</b> environment variable is used if available. If it isn't, or if -1 is specified, the first unused port between <b>WORK_QUEUE_LOW_PORT</b> and <b>WORK_QUEUE_HIGH_PORT</b> (1024 and 32767 by default) is chosen.
 @return A new work queue, or null if it could not be created.
 */
 struct work_queue *work_queue_create(int port);
@@ -243,7 +250,7 @@ If the task could not, then the <tt>result</tt> field will be non-zero and the
 
 @param q A work queue object.
 @param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref WORK_QUEUE_WAITFORTASK to block until a task has completed.
-@returns A completed task description, or null if the queue is empty or the timeout was reached without a completed task.
+@returns A completed task description, or null if the queue is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
 */
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout);
 
@@ -340,6 +347,12 @@ void work_queue_specify_name(struct work_queue *q, const char *name);
 */
 void work_queue_specify_priority(struct work_queue *q, int priority);
 
+/** Change whether to estimate master capacity for a given queue.
+@param q A work queue object.
+@param estimate_capacity_on if the value of this parameter is 1, then work queue should estimate the master capacity. If the value is 0, then work queue would not estimate its master capacity.
+*/
+void work_queue_specify_estimate_capacity_on(struct work_queue *q, int estimate_capacity_on);
+
 /** Specify the master mode for a given queue. 
 @param q A work queue object.
 @param mode 
@@ -380,6 +393,17 @@ void work_queue_delete(struct work_queue *q);
 */
 void work_queue_specify_log(struct work_queue *q, const char *logfile);
 
+/** Change the keepalive interval for a given queue.
+@param q A work queue object.
+@param interval The minimum number of seconds to wait before sending new keepalive checks to workers.
+*/
+void work_queue_specify_keepalive_interval(struct work_queue *q, int interval);
+
+/** Change the keepalive timeout for identifying dead workers for a given queue.
+@param q A work queue object.
+@param timeout The minimum number of seconds to wait for a keepalive response from worker before marking it as dead.
+*/
+void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout);
 //@}
 
 /** @name Functions - Deprecated */
@@ -391,41 +415,46 @@ void work_queue_specify_log(struct work_queue *q, const char *logfile);
 @param buf A pointer to the data buffer to send to the worker to be available to the commands.
 @param length The number of bytes of data in the buffer
 @param rname The name of the file in which to store the buffer data on the worker
+@return 1 if the input buffer is successfully specified, 0 if either of @a t or @a rname is null or @a rname is an absolute path.
 @deprecated Use @ref work_queue_task_specify_buffer instead.
 */
-void work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf, int length, const char *rname);
+int work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf, int length, const char *rname);
 
 /** Add an input file to a task.
 @param t The task to which to add parameters
 @param fname The name of the data file to send to the worker to be available to the commands.
 @param rname The name of the file in which to store the buffer data on the worker.
+@return 1 if the input file is successfully specified, 0 if either of @a t, @a fname, or @a rname is null or @a rname is an absolute path.
 @deprecated See @ref work_queue_task_specify_file instead.
 */
-void work_queue_task_specify_input_file(struct work_queue_task *t, const char *fname, const char *rname);
+int work_queue_task_specify_input_file(struct work_queue_task *t, const char *fname, const char *rname);
 
 /** Add an input file to a task, without caching.
 @param t The task to which to add parameters
 @param fname The name of the data file to send to the worker to be available to the commands.
 @param rname The name of the file in which to store the buffer data on the worker.
+@return 1 if the input file is successfully specified, 0 if either of @a t, @a fname, or @a rname is null or @a rname is an absolute path.
 @deprecated See @ref work_queue_task_specify_file instead.
 */
-void work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, const char *fname, const char *rname);
+int work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, const char *fname, const char *rname);
 
 /** Add an output file to a task.
 @param t The task to which to add parameters
 @param rname The name of a file created by the program when it runs.
 @param fname The name of the file local target for copying rname back.
+@return 1 if the output file is successfully specified, 0 if either of @a t, @a fname, or @a rname is null or @a rname is an absolute path.
 @deprecated See @ref work_queue_task_specify_file instead.
 */
-void work_queue_task_specify_output_file(struct work_queue_task *t, const char *rname, const char *fname);
+int work_queue_task_specify_output_file(struct work_queue_task *t, const char *rname, const char *fname);
 
 /** Add an output file to a task without caching.
 @param t The task to which to add parameters
 @param rname The name of a file created by the program when it runs.
 @param fname The name of the file local target for copying rname back.
+@return 1 if the output file is successfully specified, 0 if either of @a t, @a fname, or @a rname is null or @a rname is an absolute path.
 @deprecated See @ref work_queue_task_specify_file instead.
 */
-void work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname);
+int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname);
 
 //@}
 

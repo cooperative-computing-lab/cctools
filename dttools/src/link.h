@@ -66,10 +66,23 @@ link_close(link);
 */
 struct link *link_connect(const char *addr, int port, time_t stoptime);
 
+/** Turn a FILE* into a link.  Useful when trying to poll both remote and local connections using @ref link_poll
+@param file File to create the link from.
+@return On success, returns a pointer to a link object.  On failure, returns a null pointer with errno set appropriately.
+*/
+struct link *link_attach_to_file(FILE *file);
+
+/** Turn an fd into a link.  Useful when trying to poll both remote and local connections using @ref link_poll
+@param fd File descriptor to create the link from.
+@return On success, returns a pointer to a link object.  On failure, returns a null pointer with errno set appropriately.
+*/
+struct link *link_attach_to_fd(int fd);
+
+
 /** Prepare to accept connections.
 @ref link_serve will accept connections on any network interface,
 which is usually what you want.
-@param port The port number to listen on.
+@param port The port number to listen on.  If less than 1, the first unused port between TCP_LOW_PORT and TCP_HIGH_PORT will be selected.
 @return link A server endpoint that can be passed to @ref link_accept, or null on failure.
 */
 struct link *link_serve(int port);
@@ -85,7 +98,7 @@ struct link *link_serve_range(int low, int high);
 /** Prepare to accept connections on one network interface.
 Functions like @ref link_serve, except that the server will only be visible on the given network interface.
 @param addr IP address of the network interface.
-@param port The port number to listen on.
+@param port The port number to listen on.  If less than 1, the first unused port between TCP_LOW_PORT and TCP_HIGH_PORT will be selected.
 @return link A server endpoint that can be passed to @ref link_accept, or null on failure.
 */
 struct link *link_serve_address(const char *addr, int port);
@@ -207,6 +220,13 @@ int link_sleep(struct link *link, time_t stoptime, int reading, int writing);
 @param link The connection to close.
 */
 void link_close(struct link *link);
+
+
+/** Detach a link from the underlying file descriptor.
+ *  Deletes the link structure.
+@param link The link to detach.
+*/
+void link_detach(struct link *link);
 
 /** Set the TCP window size to be used for all links.
 Takes effect on future calls to @ref link_connect or @ref link_accept.

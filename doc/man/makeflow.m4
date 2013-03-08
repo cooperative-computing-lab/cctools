@@ -33,11 +33,14 @@ execution engine.
 
 SUBSECTION(Commands)
 OPTIONS_BEGIN
+OPTION_ITEM(-b)Create portable bundle of workflow.
 OPTION_ITEM(-c)Clean up: remove logfile and all targets.
 OPTION_ITEM(-D)Display the Makefile as a Dot graph.
+OPTION_ITEM(-f)Write summary of workflow to file.
 OPTION_ITEM(-k)Syntax check.
 OPTION_ITEM(-h)Show this help screen.
 OPTION_ITEM(-I)Show input files.
+OPTION_ITEM(-m)Email summary of workflow to address.
 OPTION_ITEM(-O)Show output files.
 OPTION_ITEM(-v)Show version string.
 OPTIONS_END
@@ -49,6 +52,7 @@ OPTION_PAIR(-j, #)Max number of local jobs to run at once. (default is # of core
 OPTION_PAIR(-J, #)Max number of remote jobs to run at once. (default is 100)
 OPTION_PAIR(-l, logfile)Use this file for the makeflow log. (default is X.makeflowlog)
 OPTION_PAIR(-L, logfile)Use this file for the batch system log. (default is X.PARAM(type)log)
+OPTION_ITEM(-R)Automatically retry failed batch jobs up to 100 times.
 OPTION_PAIR(-r, n)Automatically retry failed batch jobs up to n times.
 OPTION_PAIR(-S, timeout)Time to retry failed batch job submission. (default is 3600s)
 OPTION_PAIR(-T, type)Batch system type: local, condor, sge, moab, cluster, wq, hadoop, mpi-queue. (default is local)
@@ -56,8 +60,8 @@ OPTIONS_END
 
 SUBSECTION(Debugging Options)
 OPTIONS_BEGIN
-OPTION_PAIR(-d, subsystem) Enable debugging for this subsystem.
-OPTION_PAIR(-o, file) Send debugging to this file.
+OPTION_PAIR(-d, subsystem)Enable debugging for this subsystem.
+OPTION_PAIR(-o, file)Send debugging to this file.
 OPTIONS_END
 
 SUBSECTION(WorkQueue Options)
@@ -67,6 +71,7 @@ OPTION_PAIR(-C, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:P
 OPTION_PAIR(-F, #)WorkQueue fast abort multiplier. (default is deactivated)
 OPTION_PAIR(-N, project)Set the project name to PARAM(project).
 OPTION_PAIR(-p, port)Port number to use with WorkQueue. (default is 9123, 0=arbitrary)
+OPTION_PAIR(-Z,file)Select port at random and write it to this file.  (default is disabled)
 OPTION_PAIR(-P, integer)Priority. Higher the value, higher the priority.
 OPTION_PAIR(-w, mode)Auto WorkQueue mode. Mode is either 'width' or 'group' (DAG [width] or largest [group] of tasks).
 OPTION_PAIR(-W, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
@@ -116,7 +121,7 @@ Run makeflow locally with debugging:
 LONGCODE_BEGIN
 makeflow -d all Makeflow
 LONGCODE_END
-   
+
 Run makeflow on Condor will special requirements:
 LONGCODE_BEGIN
 makeflow -T condor -B "requirements = MachineGroup == 'ccl'" Makeflow

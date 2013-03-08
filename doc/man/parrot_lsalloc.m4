@@ -20,7 +20,7 @@ If none is given, the current directory is assumed.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(-h) Show help text.
+OPTION_ITEM(-h)Show help text.
 OPTIONS_END
 
 

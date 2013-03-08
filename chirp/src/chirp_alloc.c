@@ -104,7 +104,7 @@ static struct alloc_state *alloc_state_load(const char *path)
 		}
 	}
 
-	fscanf(s->file, "%lld %lld", &s->size, &s->inuse);
+	fscanf(s->file, "%" SCNd64 " %" SCNd64, &s->size, &s->inuse);
 
 	s->dirty = 0;
 
@@ -129,7 +129,7 @@ static void alloc_state_save(const char *path, struct alloc_state *s)
 	if(s->dirty) {
 		ftruncate(fileno(s->file), 0);
 		fseek(s->file, 0, SEEK_SET);
-		fprintf(s->file, "%lld\n%lld\n", s->size, s->inuse);
+		fprintf(s->file, "%" PRId64 "\n%" PRId64 "\n", s->size, s->inuse);
 	}
 	fclose(s->file);
 	free(s);
@@ -142,7 +142,7 @@ static int alloc_state_create(const char *path, INT64_T size)
 	sprintf(statepath, "%s/.__alloc", path);
 	file = fopen(statepath, "w");
 	if(file) {
-		fprintf(file, "%lld 0\n", size);
+		fprintf(file, "%" PRId64 " 0\n", size);
 		fclose(file);
 		return 1;
 	} else {
@@ -551,7 +551,7 @@ struct chirp_dirent * chirp_alloc_readdir( struct chirp_dir *dir )
 
 void chirp_alloc_closedir( struct chirp_dir *dir )
 {
-	return cfs->closedir(dir);
+	cfs->closedir(dir);
 }
 
 INT64_T chirp_alloc_getfile(const char *path, struct link * link, time_t stoptime)
@@ -993,8 +993,8 @@ char *chirp_stat_string(struct chirp_stat *info)
 {
 	static char line[CHIRP_LINE_MAX];
 
-	sprintf(line, "%lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld", (long long) info->cst_dev, (long long) info->cst_ino, (long long) info->cst_mode, (long long) info->cst_nlink, (long long) info->cst_uid, (long long) info->cst_gid,
-		(long long) info->cst_rdev, (long long) info->cst_size, (long long) info->cst_blksize, (long long) info->cst_blocks, (long long) info->cst_atime, (long long) info->cst_mtime, (long long) info->cst_ctime);
+	sprintf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 ,  info->cst_dev,  info->cst_ino,  info->cst_mode,  info->cst_nlink,  info->cst_uid,  info->cst_gid,
+		 info->cst_rdev,  info->cst_size,  info->cst_blksize,  info->cst_blocks,  info->cst_atime,  info->cst_mtime,  info->cst_ctime);
 
 	return line;
 }
@@ -1003,7 +1003,73 @@ char *chirp_statfs_string(struct chirp_statfs *info)
 {
 	static char line[CHIRP_LINE_MAX];
 
-	sprintf(line, "%lld %lld %lld %lld %lld %lld %lld", (long long) info->f_type, (long long) info->f_bsize, (long long) info->f_blocks, (long long) info->f_bfree, (long long) info->f_bavail, (long long) info->f_files, (long long) info->f_ffree);
+	sprintf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 ,  info->f_type,  info->f_bsize,  info->f_blocks,  info->f_bfree,  info->f_bavail,  info->f_files,  info->f_ffree);
 
 	return line;
+}
+
+INT64_T chirp_alloc_getxattr (const char *path, const char *name, void *data, size_t size)
+{
+	return cfs->getxattr(path, name, data, size);
+}
+
+INT64_T chirp_alloc_fgetxattr (int fd, const char *name, void *data, size_t size)
+{
+	return cfs->fgetxattr(fd, name, data, size);
+}
+
+INT64_T chirp_alloc_lgetxattr (const char *path, const char *name, void *data, size_t size)
+{
+	return cfs->lgetxattr(path, name, data, size);
+}
+
+INT64_T chirp_alloc_listxattr (const char *path, char *list, size_t size)
+{
+	return cfs->listxattr(path, list, size);
+}
+
+INT64_T chirp_alloc_flistxattr (int fd, char *list, size_t size)
+{
+	return cfs->flistxattr(fd, list, size);
+}
+
+INT64_T chirp_alloc_llistxattr (const char *path, char *list, size_t size)
+{
+	return cfs->listxattr(path, list, size);
+}
+
+INT64_T chirp_alloc_setxattr (const char *path, const char *name, const void *data, size_t size, int flags)
+{
+	/* FIXME check allocated */
+	return cfs->setxattr(path, name, data, size, flags);
+}
+
+INT64_T chirp_alloc_fsetxattr (int fd, const char *name, const void *data, size_t size, int flags)
+{
+	/* FIXME check allocated */
+	return cfs->fsetxattr(fd, name, data, size, flags);
+}
+
+INT64_T chirp_alloc_lsetxattr (const char *path, const char *name, const void *data, size_t size, int flags)
+{
+	/* FIXME check allocated */
+	return cfs->lsetxattr(path, name, data, size, flags);
+}
+
+INT64_T chirp_alloc_removexattr (const char *path, const char *name)
+{
+	/* FIXME check allocated */
+	return cfs->removexattr(path, name);
+}
+
+INT64_T chirp_alloc_fremovexattr (int fd, const char *name)
+{
+	/* FIXME check allocated */
+	return cfs->fremovexattr(fd, name);
+}
+
+INT64_T chirp_alloc_lremovexattr (const char *path, const char *name)
+{
+	/* FIXME check allocated */
+	return cfs->lremovexattr(path, name);
 }

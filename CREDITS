@@ -1,16 +1,17 @@
 
-This package is developed primarily by:
+This package is developed primarily by member of the
+Cooperative Computing Lab at the University of Notre Dame.
 
-	Douglas Thain
-	Cooperative Computing Lab
-	University of Notre Dame
-	http://www.cse.nd.edu/~ccl
-
-Many thanks go a host of contributors and colleagues, in alphabetical order.
+Many people have contributed features, bug fixes, documentation,
+and other items.  In alphabetical order:
 
 	Michael Albrecht
 	University of Notre Dame
 	Created the Parrot-S3 module and contributed to Work Queue and Makeflow.
+
+	Chris Bauschka
+	Purdue University
+	Contributed to Work Queue and the Sweeper abstraction.
 
 	John Bent
 	University of Wisconsin
@@ -18,7 +19,7 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 
 	Dan Bradley
 	University of Wisconsin
-	Contributed the Parrot-CVMFS module.
+	Contributed the Parrot-CVMFS module and a variety of bug fixes.
 
 	Christophe Blanchet
 	IBCP
@@ -42,8 +43,12 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 
 	Patrick Donnelly
 	University of Notre Dame
-	Created the chirp_filesystem backend and the Chirp-HDFS module.
+	Contributed to Chirp, Parrot, HDFS Support, and ticket authentication.
 	
+	Iheanyi Ekuchuku
+	University of Notre Dame
+	Contributed to Work Queue and the Sweeper abstraction.
+
 	Michael Ernst, Patrick Fuhrmann, and Tigran Mkrtchyan
 	Fermi National Labs and DESY
 	Provided invaluable help installing, configuring, and using dcache
@@ -72,11 +77,15 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 
 	Kevin Partington
 	University of Notre Dame
-	COntributed features to Makeflow and Work Queue.
+	Contributed features to Makeflow and Work Queue.
 
 	Francesco Prelz
 	INFN Milan
 	Contributed numerous bug fixes and performance improvements to Parrot.
+
+	Dinesh Rajan
+	University of Notre Dame
+	Contributed to Work Queue and multiple elastic applications.
 
 	Sander Klous
 	NIKHEF
@@ -120,7 +129,7 @@ Many thanks go a host of contributors and colleagues, in alphabetical order.
 
 	Andrew Thrasher
 	University of Notre Dame
-	Contributed to the design and implementation of SAND
+	Contributed to SAND and several Work Queue applications.
 
 	Li Yu
 	Notre Dame

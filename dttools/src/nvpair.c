@@ -6,6 +6,8 @@ See the file COPYING for details.
 */
 
 #include "nvpair.h"
+#include "nvpair_private.h"
+
 #include "hash_table.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -16,10 +18,6 @@ See the file COPYING for details.
 #include <string.h>
 
 #define NVPAIR_LINE_MAX 1024
-
-struct nvpair {
-	struct hash_table *table;
-};
 
 struct nvpair *nvpair_create()
 {
@@ -33,6 +31,8 @@ void nvpair_delete(struct nvpair *n)
 {
 	char *key;
 	void *value;
+
+	if(!n) return;
 
 	hash_table_firstkey(n->table);
 	while(hash_table_nextkey(n->table, &key, &value)) {
@@ -127,7 +127,13 @@ int nvpair_print_alloc(struct nvpair *n, char **text)
 		nvpair_print(n, *text, needed + 1);
 	}
 
-	return 1;
+	return needed;
+}
+
+void nvpair_remove( struct nvpair *n, const char *name )
+{
+	char * old = hash_table_remove(n->table,name);
+	if(old) free(old);
 }
 
 void nvpair_insert_string(struct nvpair *n, const char *name, const char *value)
@@ -289,7 +295,7 @@ void nvpair_print_html_header(FILE * s, struct nvpair_header *h)
 
 void nvpair_print_html(struct nvpair *n, FILE * s, struct nvpair_header *h)
 {
-	return nvpair_print_html_with_link(n, s, h, 0, 0);
+	nvpair_print_html_with_link(n, s, h, 0, 0);
 }
 
 void nvpair_print_html_with_link(struct nvpair *n, FILE * s, struct nvpair_header *h, const char *linkname, const char *linktext)
@@ -374,7 +380,7 @@ void nvpair_print_table(struct nvpair *n, FILE * s, struct nvpair_header *h)
 			line = xxmalloc(h->width);
 			timestamp_t ts;
 			int ret = 0;
-			if(sscanf(text, "%llu", &ts) == 1) {
+			if(sscanf(text, "%" SCNu64, &ts) == 1) {
 				if(h->mode == NVPAIR_MODE_TIME) {
 					ts *= 1000000;
 				}

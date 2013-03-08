@@ -227,6 +227,7 @@ optional_include()
 	echo -n "checking for header $1..."
 
 cat > .configure.tmp.c << EOF
+#include <stdlib.h>
 #include <$1>
 EOF
 	if gcc .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1 

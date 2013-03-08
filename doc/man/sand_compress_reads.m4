@@ -21,11 +21,11 @@ line of sequences and bytes compressed.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(-q) Quiet mode: suppress summary line.
-OPTION_ITEM(-c) Remove Celera read ids if data came from the Celera gatekeeper.
-OPTION_ITEM(-i) Remove Celera read ids but leave internal ids if the data came from the Celera gatekeeper.
-OPTION_ITEM(-h) Display version information.
-OPTION_ITEM(-v) Show help text.
+OPTION_ITEM(-q)Quiet mode: suppress summary line.
+OPTION_ITEM(-c)Remove Celera read ids if data came from the Celera gatekeeper.
+OPTION_ITEM(-i)Remove Celera read ids but leave internal ids if the data came from the Celera gatekeeper.
+OPTION_ITEM(-h)Display version information.
+OPTION_ITEM(-v)Show help text.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

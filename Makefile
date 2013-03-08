@@ -1,8 +1,11 @@
 include Makefile.config
 include Makefile.rules
 
-all test clean: Makefile.config
+all clean: Makefile.config
 	for p in ${CCTOOLS_PACKAGES} ; do cd $$p && ${MAKE} $@ && cd .. ; done
+
+test: Makefile.config
+	./run_all_tests.sh
 
 install: all Makefile.config
 	for p in ${CCTOOLS_PACKAGES} ; do cd $$p && ${MAKE} $@ && cd .. ; done

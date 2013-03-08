@@ -31,6 +31,7 @@ extern "C" {
 #include "chirp_global.h"
 #include "chirp_ticket.h"
 #include "ftp_lite.h"
+#include "int_sizes.h"
 }
 
 #include <stdlib.h>
@@ -261,7 +262,7 @@ of our children for its consideration.
 
 static void pass_through( int sig )
 {
-	pfs_process_raise(root_pid,sig,1);
+	pfs_process_raise(root_pid, sig, 1 /* really send it */);
 }
 
 /*
@@ -739,9 +740,9 @@ int main( int argc, char *argv[] )
 
 	if(pfs_syscall_totals32) {
 		printf("\nParrot System Call Summary:\n");
-		printf("%lld syscalls\n",pfs_syscall_count);
-		printf("%lld bytes read\n",pfs_read_count);
-		printf("%lld bytes written\n",pfs_write_count);
+		printf("%" PRId64 " syscalls\n",pfs_syscall_count);
+		printf("%" PRId64 " bytes read\n",pfs_read_count);
+		printf("%" PRId64 " bytes written\n",pfs_write_count);
 
 		printf("\n32-bit System Calls:\n");
 		for(i=0;i<SYSCALL32_MAX;i++) {

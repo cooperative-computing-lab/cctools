@@ -347,7 +347,7 @@ int tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, int l
 	UINT32_T total = 0;
 	UINT32_T wordsize = sizeof(long);
 	long word;
-	int i;
+	unsigned int i;
 
 	while(length>0) {
 		word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0);

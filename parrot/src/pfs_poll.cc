@@ -23,16 +23,6 @@ extern "C" {
 #include <stdio.h>
 #include <signal.h>
 
-/*
-This code has a race condition that is unavoidable.
-We want to select on a number of file descriptors,
-but be woken up if a sigchild comes in.  Sadly, Linux
-has no atomic pselect.  To combat this, we put an
-upper bound on the select sleep time, and check an
-integer shortly before selecting.  Not much else
-to do.
-*/
-
 #define POLL_TIME_MAX 1
 
 #define POLL_TABLE_MAX 4096
@@ -90,7 +80,7 @@ void pfs_poll_sleep()
 {
 	struct timeval curtime;
 	struct timeval stoptime;
-	struct timeval sleeptime;
+	struct timespec sleeptime;
 	fd_set rfds, wfds, efds;
 	struct sleep_entry *s;
 	struct poll_entry *p;
@@ -133,25 +123,23 @@ void pfs_poll_sleep()
 	}
 
 	sleeptime.tv_sec = stoptime.tv_sec - curtime.tv_sec;
-	sleeptime.tv_usec = stoptime.tv_usec - curtime.tv_usec;
+	sleeptime.tv_nsec = 1000 * (stoptime.tv_usec - curtime.tv_usec);
 
-	while(sleeptime.tv_usec<0) {
-		sleeptime.tv_usec += 1000000;
+	while(sleeptime.tv_nsec<0) {
+		sleeptime.tv_nsec += 1000000000;
 		sleeptime.tv_sec -= 1;
 	}
 
-	CRITICAL_END
-
-	if(!poll_abort_now && sleeptime.tv_sec>0) usleep(1);
-
 	if(sleeptime.tv_sec<0 || poll_abort_now) {
 		sleeptime.tv_sec = 0;
-		sleeptime.tv_usec = 0;
+		sleeptime.tv_nsec = 0;
 	}
 
-	result = select(maxfd,&rfds,&wfds,&efds,&sleeptime);
+	sigset_t childmask;
+	sigemptyset(&childmask);
+	sigaddset(&childmask, SIGPIPE);
 
-	CRITICAL_BEGIN
+	result = pselect(maxfd,&rfds,&wfds,&efds,&sleeptime,&childmask);
 
 	if(result>0) {
 		if ((pfs_watchdog_fd > 0) && FD_ISSET(pfs_watchdog_fd, &rfds)) {

@@ -6,6 +6,7 @@ See the file COPYING for details.
 */
 
 #include "domain_name.h"
+#include "link.h"
 #include "stringtools.h"
 #include "debug.h"
 
@@ -31,44 +32,65 @@ See the file COPYING for details.
 
 int domain_name_lookup_reverse(const char *addr, char *name)
 {
-	struct hostent *h;
 	struct in_addr iaddr;
+	int err;
+
+	struct sockaddr_in saddr; //replace with sockaddr_in6 for ipv6
+	char host[DOMAIN_NAME_MAX];
 
 	debug(D_DNS, "looking up addr %s", addr);
 
 	if(!string_to_ip_address(addr, (unsigned char *) &iaddr)) {
-		debug(D_DNS, "%s is not a valid addr");
+		debug(D_DNS, "%s is not a valid addr", addr);
 		return 0;
 	}
+	saddr.sin_addr = iaddr;
+	saddr.sin_family = AF_INET;
 
-	h = gethostbyaddr((char *) &iaddr, sizeof(iaddr), AF_INET);
-	if(h)
-		strcpy(name, h->h_name);
-
-	if(h) {
-		debug(D_DNS, "%s is %s", addr, name);
-		return 1;
-	} else {
-		debug(D_DNS, "couldn't lookup %s: %s", addr, strerror(errno));
+	if ((err = getnameinfo((struct sockaddr *) &saddr, sizeof(saddr), host, sizeof(host), NULL, 0, 0)) != 0){
+		debug(D_DNS, "couldn't look up %s: %s", addr, gai_strerror(err));
 		return 0;
 	}
+	strcpy(name, host);
+	debug(D_DNS, "%s is %s", addr, name);
+	
+	return 1;
 }
 
 int domain_name_lookup(const char *name, char *addr)
 {
-	struct hostent *h;
-
+	struct addrinfo hints;
+	struct addrinfo *result, *resultptr;
+	char ipstr[LINK_ADDRESS_MAX];
+	int err;
+	
 	debug(D_DNS, "looking up name %s", name);
+	
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
 
-	h = gethostbyname(name);
-	if(h)
-		string_from_ip_address((const unsigned char *) h->h_addr, addr);
-
-	if(h) {
-		debug(D_DNS, "%s is %s", name, addr);
-		return 1;
-	} else {
-		debug(D_DNS, "couldn't look up %s: %s", name, strerror(errno));
+	if ((err = getaddrinfo(name, NULL, &hints, &result)) != 0) {
+		debug(D_DNS, "couldn't look up %s: %s", name, gai_strerror(err));
 		return 0;
 	}
+
+	for (resultptr = result; resultptr != NULL; resultptr = resultptr->ai_next) {
+		void *ipaddr;
+		
+		/* For ipv4 use struct sockaddr_in and sin_addr field;
+		   for ipv6 use struct sockaddr_in6 and sin6_addr field. */
+		// But right now, only find ipv4 address.
+		if (resultptr->ai_family == AF_INET) { 
+			struct sockaddr_in *addr_ipv4 = (struct sockaddr_in *)resultptr->ai_addr;
+			ipaddr = &(addr_ipv4->sin_addr);
+			inet_ntop(resultptr->ai_family, ipaddr, ipstr, sizeof(ipstr));
+			debug(D_DNS, "%s is %s", name, ipstr);
+			break;	
+		}
+	}
+	strcpy(addr, ipstr);
+	freeaddrinfo(result);
+	
+	return 1;
 }

@@ -38,6 +38,15 @@ See the file COPYING for details.
 #include <sys/param.h>
 #include <sys/mount.h>
 
+#if defined(HAS_ATTR_XATTR_H)
+#include <attr/xattr.h>
+#elif defined(HAS_SYS_XATTR_H)
+#include <sys/xattr.h>
+#endif
+#ifndef ENOATTR
+#define ENOATTR  EINVAL
+#endif
+
 /* Cygwin does not have 64-bit I/O, while Darwin has it by default. */
 
 #if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD
@@ -324,11 +333,7 @@ static INT64_T chirp_fs_local_rmdir(const char *path)
 		chirp_fs_local_closedir(dir);
 
 		if(empty) {
-			if(delete_dir(path)) {
-				return 0;
-			} else {
-				return -1;
-			}
+			return delete_dir(path);
 		} else {
 			errno = ENOTEMPTY;
 			return -1;
@@ -632,6 +637,116 @@ static INT64_T chirp_fs_local_setrep( const char *path, int nreps )
 	return -1;
 }
 
+#if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
+static INT64_T chirp_fs_local_getxattr ( const char *path, const char *name, void *data, size_t size )
+{
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return getxattr(path, name, data, size, 0, 0);
+#else
+	return getxattr(path, name, data, size);
+#endif
+}
+
+static INT64_T chirp_fs_local_fgetxattr ( int fd, const char *name, void *data, size_t size )
+{
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return fgetxattr(fd, name, data, size, 0, 0);
+#else
+	return fgetxattr(fd, name, data, size);
+#endif
+}
+
+static INT64_T chirp_fs_local_lgetxattr ( const char *path, const char *name, void *data, size_t size )
+{
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return getxattr(path, name, data, size, 0, XATTR_NOFOLLOW);
+#else
+	return lgetxattr(path, name, data, size);
+#endif
+}
+
+static INT64_T chirp_fs_local_listxattr ( const char *path, char *list, size_t size )
+{
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return listxattr(path, list, size, 0);
+#else
+	return listxattr(path, list, size);
+#endif
+}
+
+static INT64_T chirp_fs_local_flistxattr ( int fd, char *list, size_t size )
+{
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return flistxattr(fd, list, size, 0);
+#else
+	return flistxattr(fd, list, size);
+#endif
+}
+
+static INT64_T chirp_fs_local_llistxattr ( const char *path, char *list, size_t size )
+{
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return listxattr(path, list, size, XATTR_NOFOLLOW);
+#else
+	return llistxattr(path, list, size);
+#endif
+}
+
+static INT64_T chirp_fs_local_setxattr ( const char *path, const char *name, const void *data, size_t size, int flags )
+{
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return setxattr(path, name, data, size, 0, flags);
+#else
+	return setxattr(path, name, data, size, flags);
+#endif
+}
+
+static INT64_T chirp_fs_local_fsetxattr ( int fd, const char *name, const void *data, size_t size, int flags )
+{
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return fsetxattr(fd, name, data, size, 0, flags);
+#else
+	return fsetxattr(fd, name, data, size, flags);
+#endif
+}
+
+static INT64_T chirp_fs_local_lsetxattr ( const char *path, const char *name, const void *data, size_t size, int flags )
+{
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return setxattr(path, name, data, size, 0, XATTR_NOFOLLOW|flags);
+#else
+	return lsetxattr(path, name, data, size, flags);
+#endif
+}
+
+static INT64_T chirp_fs_local_removexattr ( const char *path, const char *name )
+{
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return removexattr(path, name, 0);
+#else
+	return removexattr(path, name);
+#endif
+}
+
+static INT64_T chirp_fs_local_fremovexattr ( int fd, const char *name )
+{
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return fremovexattr(fd, name, 0);
+#else
+	return fremovexattr(fd, name);
+#endif
+}
+
+static INT64_T chirp_fs_local_lremovexattr ( const char *path, const char *name )
+{
+#ifdef CCTOOLS_OPSYS_DARWIN
+	return removexattr(path, name, XATTR_NOFOLLOW);
+#else
+	return lremovexattr(path, name);
+#endif
+}
+#endif
+
 static int chirp_fs_do_acl_check()
 {
 	return 1;
@@ -682,6 +797,34 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_utime,
 	cfs_basic_md5,
 	chirp_fs_local_setrep,
+
+#if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
+	chirp_fs_local_getxattr,
+	chirp_fs_local_fgetxattr,
+	chirp_fs_local_lgetxattr,
+	chirp_fs_local_listxattr,
+	chirp_fs_local_flistxattr,
+	chirp_fs_local_llistxattr,
+	chirp_fs_local_setxattr,
+	chirp_fs_local_fsetxattr,
+	chirp_fs_local_lsetxattr,
+	chirp_fs_local_removexattr,
+	chirp_fs_local_fremovexattr,
+	chirp_fs_local_lremovexattr,
+#else
+	cfs_stub_getxattr,
+	cfs_stub_fgetxattr,
+	cfs_stub_lgetxattr,
+	cfs_stub_listxattr,
+	cfs_stub_flistxattr,
+	cfs_stub_llistxattr,
+	cfs_stub_setxattr,
+	cfs_stub_fsetxattr,
+	cfs_stub_lsetxattr,
+	cfs_stub_removexattr,
+	cfs_stub_fremovexattr,
+	cfs_stub_lremovexattr,
+#endif
 
 	chirp_fs_do_acl_check,
 };

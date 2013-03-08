@@ -16,6 +16,7 @@ Portable routines for high resolution timing.
 #include <time.h>
 
 /** A type to hold the current time, in microseconds since January 1st, 1970. */
+
 typedef UINT64_T timestamp_t;
 
 #define TIMESTAMP_FORMAT UINT64_FORMAT

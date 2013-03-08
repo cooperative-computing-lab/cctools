@@ -1,0 +1,12 @@
+TR_allpairs_composite.sh
+
+Computes the list of composite numbers by brute force. We form the
+pairs of all numbers from 2 to 50, and check if the first one is
+properly divisible by the second one.
+
+TR_allpairs_bitwise.sh
+
+Compare the source of allpairs with the hard coded BITWISE function.
+This test could be better, since we only count the number of lines
+generated.
+
