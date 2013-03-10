@@ -528,7 +528,7 @@ static int search_directory (const char *subject, const char *base, char *dir, c
                         if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0 || strncmp(name, ".__", 3) == 0) continue;
                         sprintf(current, "/%s", name);
 
-                        if (search_match_file(pattern, name) /*&& chirp_fs_local_access(dir, access_flags) == 0*/) {
+                        if (search_match_file(pattern, name) && chirp_fs_local_access(dir, access_flags) == 0) {
 				char *match_name = includeroot ? dir : name; 
 
 				if (metadata) {

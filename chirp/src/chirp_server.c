@@ -1814,8 +1814,6 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			write(config_pipe[1],line,strlen(line));
 			debug_flags_set(debug_flag);
 		} else if(sscanf(line, "search %s %s %" PRId64, pattern, path, &flags)==3) {
-                        int has_search = 0;
-
 			link_putliteral(l, "0\n", stalltime);
 			char fixed[CHIRP_PATH_MAX];
 			char *ps = path, *pe;
