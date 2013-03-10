@@ -63,8 +63,6 @@ See the file COPYING for details.
 #include <sys/wait.h>
 #include <sys/select.h>
 
-#include <searchent.h>
-
 #if defined(HAS_ATTR_XATTR_H)
 #include <attr/xattr.h>
 #elif defined(HAS_SYS_XATTR_H)
@@ -1816,44 +1814,35 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			write(config_pipe[1],line,strlen(line));
 			debug_flags_set(debug_flag);
 		} else if(sscanf(line, "search %s %s %" PRId64, pattern, path, &flags)==3) {
-
                         int has_search = 0;
 
-                        if (has_search) {
-				SEARCH *s = opensearch(path, pattern, flags, "chirp_server");
-                                char *sp = s->data;
-                                for (; *sp != '\0'; sp++) if (*sp == ':') *sp = '|';
-				link_putfstring(l, "%s\n", s->data);
-                        } else {
+			link_putliteral(l, "0\n", stalltime);
+			char fixed[CHIRP_PATH_MAX];
+			char *ps = path, *pe;
+	
+			for (;;) {
+				if((pe = strchr(ps, CHIRP_SEARCH_DELIMITER)) != NULL) 
+					*pe = '\0';
 
-				link_putliteral(l, "0\n", stalltime);
-				char fixed[CHIRP_PATH_MAX];
-				char *ps = path, *pe;
-		
-				for (;;) {
-					if((pe = strchr(ps, CHIRP_SEARCH_DELIMITER)) != NULL) 
-						*pe = '\0';
+				strcpy(fixed, ps);
+				chirp_path_fix(fixed);
 
-					strcpy(fixed, ps);
-					chirp_path_fix(fixed);
-
-					if(access(fixed, F_OK) == -1) {
-						link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
-					} else if(!chirp_acl_check(fixed, subject, CHIRP_ACL_WRITE)) {
-						link_putfstring(l, "%d:%d:%s:\n", stalltime, EPERM, CHIRP_SEARCH_ERR_OPEN, fixed);
-					} else {
-						int found = chirp_alloc_search(subject, fixed, pattern, flags, l, stalltime);
-						if (found && (flags & CHIRP_SEARCH_STOPATFIRST))
-							break;
-					}
-
-					if (pe != NULL) {
-						ps = pe + 1;
-						*pe = CHIRP_SEARCH_DELIMITER; 
-					} else
+				if(access(fixed, F_OK) == -1) {
+					link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
+				} else if(!chirp_acl_check(fixed, subject, CHIRP_ACL_WRITE)) {
+					link_putfstring(l, "%d:%d:%s:\n", stalltime, EPERM, CHIRP_SEARCH_ERR_OPEN, fixed);
+				} else {
+					int found = chirp_alloc_search(subject, fixed, pattern, flags, l, stalltime);
+					if (found && (flags & CHIRP_SEARCH_STOPATFIRST))
 						break;
 				}
-                        }
+
+				if (pe != NULL) {
+					ps = pe + 1;
+					*pe = CHIRP_SEARCH_DELIMITER; 
+				} else
+					break;
+			}
 	
 			do_getdir_result = 1;
 			result = 0;
