@@ -1090,14 +1090,10 @@ int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode, int mon
 	{
 		log_name = monitor_log_name(n->nodeid);
 		debug(D_DEBUG, "adding monitor %s and %s{,-summary,-opened} to rule %d.\n", monitor_exe, log_name, n->nodeid);
-
-		/* use remotename syntax to map log path names in
-		 * the remote working directory to the file
-		 * inside monitor_log_dir */
-		line = string_format("%s/%s-summary->%s-summary %s/%s-opened->%s-opened %s/%s->%s %s %s",
-				monitor_log_dir, log_name, log_name, 
-				monitor_log_dir, log_name, log_name, 
-				monitor_log_dir, log_name, log_name, 
+		line = string_format("%s/%s-summary %s/%s-opened %s/%s %s %s",
+				monitor_log_dir, log_name, 
+				monitor_log_dir, log_name, 
+				monitor_log_dir, log_name, 
 				line_org, monitor_exe);
 	}
 	else
@@ -1298,10 +1294,11 @@ int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 		return dag_parse_node_makeflow_command(bk, n, command + 9);
 	}
 
+	/* BUG: Monitor code should not be here! */
 	if(monitor_exe)
 	{
 		log_name = monitor_log_name(n->nodeid);
-		command = string_format("./%s -o %s -i %d -- %s", monitor_exe, log_name, monitor_interval, command);
+		command = string_format("./%s -o %s/%s -i %d -- %s", monitor_exe, monitor_log_dir, log_name, monitor_interval, command);
 	}
 
 	dag_parse_node_set_command(bk, n, command);
@@ -2483,8 +2480,6 @@ int main(int argc, char *argv[])
 			struct tm *tm = localtime(&now);
 			monitor_log_dir = string_format("monitor-logs-%04d_%02d_%02d_%02d-%02d", 1900 + tm->tm_year, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min);
 		}
-
-		create_dir(monitor_log_dir, 0755);
 
 		atexit(monitor_delete_exe);
 	}

@@ -121,6 +121,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "copy_stream.h"
 #include "getopt.h"
+#include "create_dir.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -318,6 +319,12 @@ void open_log_files(const char *filename)
 	char *flog_path;
 	char *flog_path_summary;
 	char *flog_path_opened;
+
+	char *dirname = xxstrdup(filename);
+
+	string_dirname(filename, dirname);
+
+	create_dir(dirname, 0755);
 
 	if(filename)
 		flog_path         = xxstrdup(filename);
