@@ -1224,7 +1224,7 @@ static int worker_handle_master(struct link *master) {
 	char filename[WORK_QUEUE_LINE_MAX];
 	char path[WORK_QUEUE_LINE_MAX];
 	INT64_T length;
-	UINT64_T taskid = 0;
+	INT64_T taskid = 0;
 	int mode, r, n;
 
 	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {

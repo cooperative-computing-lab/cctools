@@ -154,8 +154,8 @@ struct work_queue {
 	struct hash_table *workers_by_pool;
 
 	FILE *logfile;
-	int keepalive_interval;
-	int keepalive_timeout;
+	timestamp_t keepalive_interval;
+	timestamp_t keepalive_timeout;
 };
 
 struct work_queue_worker {
