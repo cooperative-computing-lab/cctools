@@ -120,6 +120,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "xxmalloc.h"
 #include "copy_stream.h"
+#include "getopt.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -162,7 +163,7 @@ FILE  *log_file;               /* All monitoring information of all processes is
 FILE  *log_file_summary;       /* Final statistics are written to this file. */
 FILE  *log_file_opened;        /* List of opened files is written to this file. */
 
-int    monitor_queue_fd;       /* File descriptor of a datagram socket to which (great)
+int    monitor_queue_fd = -1;  /* File descriptor of a datagram socket to which (great)
 								  grandchildren processes report to the monitor. */
 
 pid_t  first_process_pid;              /* pid of the process given at the command line */
@@ -1438,7 +1439,7 @@ int wait_for_messages(int interval)
 	struct timeval timeout;
 
 	/* wait for interval miliseconds. */
-	timeout.tv_sec  = 0;
+	timeout.tv_sec  = interval;
 	timeout.tv_usec = 0;
 
 	debug(D_DEBUG, "sleeping for: %ld seconds\n", interval);
@@ -1447,7 +1448,7 @@ int wait_for_messages(int interval)
 	//Else, wait, and check socket for messages.
 	if(monitor_queue_fd < 0)
 	{
-		select(0, NULL, NULL, NULL, &timeout);
+		select(1, NULL, NULL, NULL, &timeout);
 	}
 	else
 	{
@@ -1548,12 +1549,12 @@ struct process_info *spawn_first_process(const char *cmd)
 
 static void show_help(const char *cmd)
 {
-	fprintf(stdout, "Use: %s [options] command-line-and-options\n", cmd);
-	fprintf(stdout, "-i <n>			Interval bewteen observations, in seconds. (default=%d)\n", DEFAULT_INTERVAL);
-	fprintf(stdout, "-d <subsystem>		Enable debugging for this subsystem.\n");
-	fprintf(stdout, "-l <maxfile>		Use maxfile with list of var: value pairs for resource limits.");
-	fprintf(stdout, "-L <string>		Use string of the form \"var: value, var: value\" to specify resource limits.");
-	fprintf(stdout, "-o <logfile>		Write log to logfile (default=log-PID)\n");
+	fprintf(stdout, "Use: %s [options] -- command-line-and-options\n", cmd);
+	fprintf(stdout, "-i,--interval=<n>		Interval bewteen observations, in seconds. (default=%d)\n", DEFAULT_INTERVAL);
+	fprintf(stdout, "-d,--debug=<subsystem>		Enable debugging for this subsystem.\n");
+	fprintf(stdout, "-l,--limits-file=<maxfile>	Use maxfile with list of var: value pairs for resource limits.\n");
+	fprintf(stdout, "-L,--limits=<string>		Use string of the form \"var: value, var: value\" to specify resource limits.\n");
+	fprintf(stdout, "-o,--log-name=<logfile>		Write log to logfile (default=log-PID)\n");
 }
 
 
@@ -1635,7 +1636,18 @@ int main(int argc, char **argv) {
 	secs_initial = secs_since_epoch();
 	initialize_limits_tree(tree_limits, INTMAX_MAX);
 
-	while((c = getopt(argc, argv, "d:i:L:l:o:")) > 0)
+	struct option long_options[] =
+	{
+		{"debug",      required_argument, 0, 'd'},
+		{"help",       required_argument, 0, 'h'},
+		{"interval",   required_argument, 0, 'i'},
+		{"log-name",   required_argument, 0, 'o'},
+		{"limits",     required_argument, 0, 'L'},
+		{"limits-file",required_argument, 0, 'l'},
+		{0, 0, 0, 0}
+	};
+
+	while((c = getopt_long(argc, argv, "d:hi:L:l:o:", long_options, NULL)) > 0)
 	{
 		switch (c) {
 			case 'd':
@@ -1654,6 +1666,9 @@ int main(int argc, char **argv) {
 				break;
 			case 'L':
 				parse_limits_string(optarg, tree_limits);
+				break;
+			case 'h':
+				show_help(argv[0]);
 				break;
 			default:
 				show_help(argv[0]);

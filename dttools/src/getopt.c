@@ -1087,6 +1087,19 @@ getopt (int argc, char *const *argv, const char *optstring)
 			   0);
 }
 
+int
+getopt_long (int argc, char *const *argv, const char *optstring, const struct option *longopts, int *indexptr)
+{
+	return _getopt_internal (argc, argv, optstring, longopts, indexptr, 0);
+}
+
+int
+getopt_long_only (int argc, char *const *argv, const char *optstring, const struct option *longopts, int *indexptr)
+{
+	return _getopt_internal (argc, argv, optstring, longopts, indexptr, 1);
+}
+
+
 
 #ifdef TEST
 
