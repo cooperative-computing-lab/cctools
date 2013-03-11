@@ -787,6 +787,12 @@ INT64_T chirp_reli_lsalloc( const char *host, const char *path, char *allocpath,
 	RETRY_ATOMIC( result = chirp_client_lsalloc(client,path,allocpath,total,inuse,stoptime); )
 }
 
+CHIRP_SEARCH *chirp_reli_opensearch( const char *host, const char *paths, const char *pattern, int flags, time_t stoptime )
+{
+	struct chirp_client *client = connect_to_host(host, stoptime);
+	return chirp_client_opensearch(client, paths, pattern, flags, stoptime);
+}
+
 struct chirp_dir {
        struct chirp_dirent *head;
        struct chirp_dirent *current;

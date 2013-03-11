@@ -900,6 +900,42 @@ static INT64_T do_matrix_delete(int argc, char **argv)
 	return chirp_matrix_delete(current_host, path, stoptime);
 }
 
+static char *strerrsource(int errsource) {
+        switch (errsource) {
+                case CHIRP_SEARCH_ERR_OPEN: return "Open";
+                case CHIRP_SEARCH_ERR_READ: return "Read";
+                case CHIRP_SEARCH_ERR_CLOSE: return "Close";
+                case CHIRP_SEARCH_ERR_STAT: return "Stat";
+                default: return "Unknown";
+        }
+}
+
+static INT64_T do_search(int argc, char **argv)
+{	
+	int flags = CHIRP_SEARCH_METADATA|CHIRP_SEARCH_INCLUDEROOT|CHIRP_SEARCH_PERIOD;
+	CHIRP_SEARCH *s = chirp_reli_opensearch(current_host, argv[1], argv[2], flags, stoptime);
+	struct chirp_searchent *res;
+
+        while ((res = chirp_client_readsearch(s)) != NULL) {
+
+                if (res->err) {
+                        printf("%s error on %s: %s\n", strerrsource(res->errsource), res->path, strerror(res->err));
+                        continue;
+                }
+
+                printf("%-30s", res->path);
+
+                if (flags & CHIRP_SEARCH_METADATA)
+                        printf("\t" INT64_FORMAT "\t" INT64_FORMAT "\n", res->info->cst_size, res->info->cst_ino);
+                else
+                        printf("\n");
+        }
+
+        chirp_client_closesearch(s);
+
+	return 0;
+}
+
 static INT64_T do_xattr_get(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
@@ -991,6 +1027,7 @@ static struct command list[] = {
 	{"resetacl", 1, 2, 2, "<remotepath> <rwldax>", do_resetacl},
 	{"rm", 1, 1, 1, "<file>", do_rm},
 	{"rmdir", 1, 1, 1, "<dir>", do_rmdir},
+	{"search", 1, 2, 2, "<directory> <pattern>", do_search},
 	{"setacl", 1, 3, 3, "<remotepath> <user> <rwldax>", do_setacl},
 	{"setrep", 1, 2, 2, "<path> <nreps>", do_setrep},
 	{"stat", 1, 1, 1, "<file>", do_stat},

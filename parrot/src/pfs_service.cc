@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "pfs_service.h"
 #include "pfs_dir.h"
 #include "pfs_process.h"
+#include "pfs_search.h"
 
 extern "C" {
 #include "chirp_reli.h"
@@ -280,6 +281,12 @@ int pfs_service::lsalloc( pfs_name *name, char *alloc_name, pfs_ssize_t *size, p
 }
 
 int pfs_service::whoami( pfs_name *name, char *buf, int size )
+{
+	errno = ENOSYS;
+	return -1;
+}
+
+int pfs_service::search( pfs_name *name, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i )
 {
 	errno = ENOSYS;
 	return -1;

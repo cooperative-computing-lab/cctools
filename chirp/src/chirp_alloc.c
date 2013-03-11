@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "macros.h"
+#include "chirp_acl.h"
 #include "chirp_alloc.h"
 #include "chirp_protocol.h"
 #include "chirp_filesystem.h"
@@ -18,19 +19,25 @@ See the file COPYING for details.
 #include "delete_dir.h"
 #include "debug.h"
 
-#include <assert.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+
+#include <dirent.h>
+#include <fnmatch.h>
+
+#include <assert.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 static struct hash_table *alloc_table = 0;
 static struct hash_table *root_table = 0;
 static struct itable *fd_table = 0;
 static int recovery_in_progress = 0;
 static int alloc_enabled = 0;
+
+extern char *chirp_root_path;
 
 struct alloc_state {
 	FILE *file;
@@ -353,6 +360,11 @@ int chirp_alloc_flush_needed()
 time_t chirp_alloc_last_flush_time()
 {
 	return last_flush_time;
+}
+
+INT64_T chirp_alloc_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime)
+{
+	return cfs->search(subject, dir, patt, flags, l, stoptime);
 }
 
 INT64_T chirp_alloc_open(const char *path, INT64_T flags, INT64_T mode)
@@ -975,6 +987,25 @@ INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode)
 	}
 
 	return result;
+}
+
+char *chirp_stat_string(struct chirp_stat *info)
+{
+	static char line[CHIRP_LINE_MAX];
+
+	sprintf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 ,  info->cst_dev,  info->cst_ino,  info->cst_mode,  info->cst_nlink,  info->cst_uid,  info->cst_gid,
+		 info->cst_rdev,  info->cst_size,  info->cst_blksize,  info->cst_blocks,  info->cst_atime,  info->cst_mtime,  info->cst_ctime);
+
+	return line;
+}
+
+char *chirp_statfs_string(struct chirp_statfs *info)
+{
+	static char line[CHIRP_LINE_MAX];
+
+	sprintf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 ,  info->f_type,  info->f_bsize,  info->f_blocks,  info->f_bfree,  info->f_bavail,  info->f_files,  info->f_ffree);
+
+	return line;
 }
 
 INT64_T chirp_alloc_getxattr (const char *path, const char *name, void *data, size_t size)

@@ -11,6 +11,9 @@ See the file COPYING for details.
 
 extern "C" {
 #include "chirp_global.h"
+#include "chirp_types.h"
+#include "chirp_reli.h"
+#include "chirp_client.h"
 #include "stringtools.h"
 #include "debug.h"
 #include "xxmalloc.h"
@@ -205,6 +208,79 @@ public:
 		} else {
 			return 0;
 		}
+	}
+
+	static int search_chirp_stat_pack( struct chirp_stat c_info, char *buffer, size_t *i, size_t buffer_length ) {
+		struct stat info;	
+		COPY_CSTAT(c_info, info);
+		size_t n = snprintf(
+			buffer + *i,
+			buffer_length - *i,
+			"|%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld",
+			(long)info.st_dev,
+			(long)info.st_ino,
+			(long)info.st_mode,
+			(long)info.st_nlink,
+			(long)info.st_uid,
+			(long)info.st_gid,
+			(long)info.st_rdev,
+			(long)info.st_size,
+			(long)info.st_atime,
+			(long)info.st_mtime,
+			(long)info.st_ctime,
+			(long)info.st_blksize,
+			(long)info.st_blocks
+		);
+
+		if (n>=buffer_length-*i) {
+			return -1;
+		} else {
+			*i += n;
+			return 0;
+		}
+	}
+
+	virtual int search( pfs_name *name, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i )
+	{
+		if (strlen(name->rest)==0) {
+			sprintf(name->rest, "/");
+		}
+
+		CHIRP_SEARCH *s = chirp_reli_opensearch(name->hostport, name->rest, pattern, flags, time(0)+pfs_master_timeout);
+		struct chirp_searchent *res;
+		size_t l;
+
+		while ((res = chirp_client_readsearch(s)) != NULL) {
+			if (res->err) 
+				l = snprintf(buffer+*i, buffer_length-*i,  "%s%d|%d|%s", *i==0 ? "" : "|", res->err, res->errsource, res->path); 
+			else 
+				l = snprintf(buffer+*i, buffer_length-*i, "%s0|%s", *i==0 ? "" : "|", res->path);
+
+			if (l >= buffer_length-*i) {
+				errno = ERANGE;
+				return -1;
+			}
+
+			*i += l;
+
+			if (res->err == 0) {
+				if (flags & PFS_SEARCH_METADATA && res->info != NULL) {
+					if (search_chirp_stat_pack(*(res->info), buffer, i, buffer_length) == -1) {
+						errno = ERANGE;
+						return -1;
+					}
+				} else {
+					if ((size_t)snprintf(buffer+*i, buffer_length-*i, "|") >= buffer_length-*i) {
+						errno = ERANGE;
+						return -1;
+					}
+					(*i)++;
+				}
+			}
+		}
+
+		chirp_client_closesearch(s);
+		return buffer==NULL ? 0 : strlen(buffer);
 	}
 
 	virtual pfs_dir * getdir( pfs_name *name ) {

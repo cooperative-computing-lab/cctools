@@ -7,6 +7,8 @@ See the file COPYING for details.
 #include "chirp_filesystem.h"
 #include "chirp_fs_local.h"
 #include "chirp_protocol.h"
+#include "chirp_alloc.h"
+#include "chirp_acl.h"
 
 #include "create_dir.h"
 #include "hash_table.h"
@@ -21,6 +23,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <string.h>
 #include <dirent.h>
+#include <fnmatch.h>
 #include <utime.h>
 #include <unistd.h>
 #include <sys/fcntl.h>
@@ -388,6 +391,196 @@ static INT64_T chirp_fs_local_access(const char *path, INT64_T mode)
 	return access(path, mode);
 }
 
+static int search_to_access (int flags)
+{
+	int access_flags = F_OK;
+	if (flags & CHIRP_SEARCH_R_OK)
+		access_flags |= R_OK;
+	if (flags & CHIRP_SEARCH_W_OK)
+		access_flags |= W_OK;
+	if (flags & CHIRP_SEARCH_X_OK)
+		access_flags |= X_OK;
+
+	return access_flags;
+}
+
+static int search_match_file(const char *pattern, const char *name) 
+{
+	char *subpat, *subend;
+
+	do {
+		subend = strchr(pattern, '|');
+
+		if (subend == NULL) {
+			subpat = (char*) alloca(strlen(pattern)+1);
+			strcpy(subpat, pattern);
+		} else {
+			subpat = (char*) alloca(subend-pattern+1);
+			strncpy(subpat, pattern, subend-pattern);
+			subpat[subend-pattern] = '\0';
+		}
+
+		char *filepat = strrchr(subpat, '/');
+
+		if (filepat<=subpat) {
+			filepat = (filepat==subpat) ? filepat+1 : subpat;
+
+			if (fnmatch(filepat, name, FNM_PATHNAME)==0) {
+				return 1;
+			}
+		}
+	
+		pattern = subend + 1;
+
+	} while(subend != NULL);
+
+	return 0;
+}
+
+
+static int search_match_dir(const char *pattern, char *npattern, const char *name) 
+{
+	int recursive, match = 0;
+	char *subpat, *subend;
+	size_t i = 0;
+
+	/* FIXME: npattern buffer bounds checks */
+	do {
+		/* Retrieve the next subpattern */
+		subend = strchr(pattern, '|');
+
+		if (subend == NULL) {
+			subpat = (char*) alloca(strlen(pattern)+1);
+			strcpy(subpat, pattern);
+		} else {
+			subpat = (char*) alloca(subend-pattern+1);
+			strncpy(subpat, pattern, subend-pattern);
+			subpat[subend-pattern] = '\0';
+		}
+
+		/* Retrieve the top directory of the subpattern */
+		if (*subpat == '/') {
+			recursive = 0;
+			subpat++;
+		} else
+			recursive = 1;
+
+		char *toppat, *topend = strchr(subpat, '/');
+
+		if (topend==NULL)
+			toppat = subpat;
+		else {
+			toppat = (char*) alloca(topend-subpat+1);
+			strncpy(toppat, subpat, topend-subpat);
+			toppat[topend-subpat] = '\0';
+		}
+
+		/* Check for a match and build the new pattern string */
+		if (fnmatch(toppat, name, FNM_PATHNAME)==0) {
+			match = 1;
+
+			if (recursive) {
+				i += sprintf(npattern+i, "%s", i==0 ? "" : "|");
+				i += sprintf(npattern+i, "%s", subpat);
+				if (topend!=NULL) 
+					i += sprintf(npattern+i, "|%s", topend);
+			} else if (topend!=NULL) {
+				i += sprintf(npattern+i, "%s", i==0 ? "" : "|");
+				i += sprintf(npattern+i, "%s", topend);
+			}
+		} else if (recursive) {
+			match = 1;
+			i += sprintf(npattern+i, "%s%s", i==0 ? "" : "|", subpat); 
+		}
+
+		pattern = subend + 1;
+
+		if (!recursive) subpat--;
+
+	} while(subend != NULL);
+
+	if (i==0) *npattern = '\0';
+
+	return match;
+}
+
+
+static int search_directory (const char *subject, const char *base, char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
+{
+        if (strlen(pattern)==0) return 0;
+
+	int metadata    = flags & CHIRP_SEARCH_METADATA;
+	int stopatfirst = flags & CHIRP_SEARCH_STOPATFIRST;
+	int includeroot = flags & CHIRP_SEARCH_INCLUDEROOT;
+
+        void *dirp = chirp_fs_local_opendir(dir);
+        char *current = dir + strlen(dir); /* point to end to current directory */
+	char npattern[CHIRP_PATH_MAX];
+
+        if (dirp) {
+		errno = 0;
+                struct chirp_dirent *entry;
+                struct chirp_stat *stat_buf = alloca(sizeof(struct chirp_stat));
+                while ((entry = chirp_fs_local_readdir(dirp))) {
+                        int access_flags = search_to_access(flags);
+			char *name = entry->name;
+
+                        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0 || strncmp(name, ".__", 3) == 0) continue;
+                        sprintf(current, "/%s", name);
+
+                        if (search_match_file(pattern, name) && chirp_fs_local_access(dir, access_flags) == 0) {
+				char *match_name = includeroot ? dir : name; 
+
+				if (metadata) {
+
+					/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
+					if ((chirp_fs_local_stat(dir, stat_buf)) == -1) {
+                                		link_putfstring(l, "0:%s::\n", stoptime, match_name);
+						link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, match_name);
+					} else
+						link_putfstring(l, "0:%s:%s:\n", stoptime, match_name, chirp_stat_string(stat_buf));
+				} else
+					link_putfstring(l, "0:%s::\n", stoptime, match_name);
+				if (stopatfirst)
+					return 1;
+                        }
+
+                        if (cfs_isdir(dir) && search_match_dir(pattern, npattern, name)) {
+				if (chirp_acl_check_dir(dir, subject, CHIRP_ACL_LIST)) {
+                                	int found = search_directory(subject, base, dir, npattern, flags, l, stoptime);
+					if (stopatfirst && found)
+						return 1;
+				} else
+					link_putfstring(l, "%d:%d:%s:\n", stoptime, EPERM, CHIRP_SEARCH_ERR_OPEN, dir);
+                        }
+                        *current = '\0'; /* clear current entry */
+			errno = 0;
+                }
+
+		// Read error
+		if (errno) link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_READ, dir);
+
+		errno = 0;
+		chirp_alloc_closedir(dirp);
+
+		// Close error
+		if (errno) link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, dir);
+
+	} else 
+		link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_OPEN, dir);
+
+	return 0;
+}
+
+/* Note we need the subject because we must check the ACL for any nested directories. */
+static INT64_T chirp_fs_local_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime)
+{
+        char directory[CHIRP_PATH_MAX];	
+        string_collapse_path(dir, directory, 0);	
+
+        return search_directory(subject, directory+strlen(directory), directory, patt, flags, l, stoptime);
+}
+
 static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
 {
 	struct chirp_stat info;
@@ -574,6 +767,8 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_fchmod,
 	chirp_fs_local_ftruncate,
 	chirp_fs_local_fsync,
+
+	chirp_fs_local_search,
 
 	chirp_fs_local_opendir,
 	chirp_fs_local_readdir,

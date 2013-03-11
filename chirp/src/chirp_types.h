@@ -64,6 +64,47 @@ struct chirp_dirent {
 	struct chirp_dirent *next;
 };
 
+/** Describes a result from a search operation */
+
+struct chirp_searchent {
+	char *path;			/**< Path of the matching file. */
+	struct chirp_stat *info;	/**< The properties of the matching file. */
+	int errsource;
+	int err;
+};
+
+/** Keeps track of the state of a search stream */
+
+struct chirp_searchstream {
+        struct chirp_searchent *entry;
+        char *data;
+        int i;
+};
+
+#define CHIRP_SEARCH struct chirp_searchstream
+
+/** Bit flags for the search operation */
+
+#define CHIRP_SEARCH_STOPATFIRST (1<<0)
+#define CHIRP_SEARCH_METADATA    (1<<1)
+#define CHIRP_SEARCH_INCLUDEROOT (1<<2)
+#define CHIRP_SEARCH_PERIOD 	 (1<<3)
+#define CHIRP_SEARCH_R_OK        (1<<4)
+#define CHIRP_SEARCH_W_OK        (1<<5)
+#define CHIRP_SEARCH_X_OK        (1<<6)
+
+/** Streaming errors for the search operation */
+
+#define CHIRP_SEARCH_ERR_OPEN    1
+#define CHIRP_SEARCH_ERR_READ    2
+#define CHIRP_SEARCH_ERR_CLOSE   3
+#define CHIRP_SEARCH_ERR_STAT    4
+
+/** Options for the search operation */
+
+#define CHIRP_SEARCH_DELIMITER   '|'
+#define CHIRP_SEARCH_DEPTH_MAX   200
+
 /** Describes the type of a bulk I/O operation. Used by @ref chirp_bulkio */
 
 typedef enum {

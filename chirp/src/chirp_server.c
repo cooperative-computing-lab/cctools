@@ -106,6 +106,7 @@ static const char *listen_on_interface = 0;
 static const char *chirp_root_url = ".";
 static const char *chirp_root_path = 0;
 static char *chirp_debug_file = NULL;
+static int sim_latency = 0;
 
 char *chirp_transient_path = NULL;	/* local file system stuff */
 extern const char *chirp_ticket_path;
@@ -385,7 +386,7 @@ int main(int argc, char *argv[])
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c_input = getopt(argc, argv, "A:a:bB:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:Z:")) != (char)-1) {
+	while((c_input = getopt(argc, argv, "A:a:bB:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:Z:l:")) != (char)-1) {
 		c = (char) c_input;
 		switch (c) {
 		case 'A':
@@ -510,6 +511,9 @@ int main(int argc, char *argv[])
 	    case 'Z':
 			port_file = optarg;
 			port = 0;
+			break;
+		case 'l':
+			sim_latency = atoi(optarg);
 			break;
 		case 'h':
 		default:
@@ -797,25 +801,6 @@ static int chirp_path_fix(char *path)
 	return 1;
 }
 
-static char *chirp_stat_string(struct chirp_stat *info)
-{
-	static char line[CHIRP_LINE_MAX];
-
-	sprintf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 ,  info->cst_dev,  info->cst_ino,  info->cst_mode,  info->cst_nlink,  info->cst_uid,  info->cst_gid,
-		 info->cst_rdev,  info->cst_size,  info->cst_blksize,  info->cst_blocks,  info->cst_atime,  info->cst_mtime,  info->cst_ctime);
-
-	return line;
-}
-
-static char *chirp_statfs_string(struct chirp_statfs *info)
-{
-	static char line[CHIRP_LINE_MAX];
-
-	sprintf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 ,  info->f_type,  info->f_bsize,  info->f_blocks,  info->f_bfree,  info->f_bavail,  info->f_files,  info->f_ffree);
-
-	return line;
-}
-
 /*
   A note on integers:
   Various operating systems employ integers of different sizes
@@ -860,6 +845,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		int xattrflags;
 
 		char debug_flag[CHIRP_LINE_MAX];
+		char pattern[CHIRP_LINE_MAX];
 
 		INT64_T fd, length, flags, offset, actual;
 		INT64_T uid, gid, mode;
@@ -892,6 +878,14 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		chirp_stats_report(config_pipe[1],addr,subject,advertise_alarm);
 
 		chirp_stats_update(1,0,0);
+
+		// Simulate network latency
+		if (sim_latency > 0) {
+			struct timeval tv;
+			tv.tv_sec = 0;
+			tv.tv_usec = sim_latency;
+			select(0, NULL, NULL, NULL, &tv);
+		}
 
 		debug(D_CHIRP, "%s", line);
 
@@ -1819,6 +1813,37 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			strcat(line,"\n");
 			write(config_pipe[1],line,strlen(line));
 			debug_flags_set(debug_flag);
+		} else if(sscanf(line, "search %s %s %" PRId64, pattern, path, &flags)==3) {
+			link_putliteral(l, "0\n", stalltime);
+			char fixed[CHIRP_PATH_MAX];
+			char *ps = path, *pe;
+	
+			for (;;) {
+				if((pe = strchr(ps, CHIRP_SEARCH_DELIMITER)) != NULL) 
+					*pe = '\0';
+
+				strcpy(fixed, ps);
+				chirp_path_fix(fixed);
+
+				if(access(fixed, F_OK) == -1) {
+					link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
+				} else if(!chirp_acl_check(fixed, subject, CHIRP_ACL_WRITE)) {
+					link_putfstring(l, "%d:%d:%s:\n", stalltime, EPERM, CHIRP_SEARCH_ERR_OPEN, fixed);
+				} else {
+					int found = chirp_alloc_search(subject, fixed, pattern, flags, l, stalltime);
+					if (found && (flags & CHIRP_SEARCH_STOPATFIRST))
+						break;
+				}
+
+				if (pe != NULL) {
+					ps = pe + 1;
+					*pe = CHIRP_SEARCH_DELIMITER; 
+				} else
+					break;
+			}
+	
+			do_getdir_result = 1;
+			result = 0;
 		} else {
 			result = -1;
 			errno = ENOSYS;
@@ -1827,7 +1852,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		if(do_no_result) {
 			/* nothing */
 		} else if(result < 0) {
-		      failure:
+			failure:
 			result = errno_to_chirp(errno);
 			sprintf(line, "%" PRId64 "\n", result);
 		} else if(do_stat_result) {

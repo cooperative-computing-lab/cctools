@@ -2546,6 +2546,35 @@ void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
+		case SYSCALL32_search:
+                        if (entering) {
+                                char location[PFS_PATH_MAX];
+                                tracer_copy_in(p->tracer, location, POINTER(args[5]), sizeof(location));
+                                debug(D_SYSCALL, "search %s", location);
+
+                                char path[2*PFS_PATH_MAX];
+                                char pattern[PFS_PATH_MAX];
+                                int flags = args[2];
+                                int buffer_length = args[4];
+                                char *buffer = (char*) malloc(buffer_length);
+
+                                if (!buffer) {
+                                        p->syscall_result = -ENOMEM;
+                                        break;
+                                }
+
+                                size_t i = 0;
+                                tracer_copy_in_string(p->tracer, path, POINTER(args[0]), sizeof(path));
+                                tracer_copy_in_string(p->tracer, pattern, POINTER(args[1]), sizeof(pattern));
+                                p->syscall_result = pfs_search(path, pattern, flags, buffer, buffer_length, &i);
+
+                                if (i==0) *buffer = '\0';
+
+                                tracer_copy_out(p->tracer, buffer, POINTER(args[3]), i+1); 
+                                divert_to_dummy(p,p->syscall_result);
+                        }
+                        break;
+
 		case SYSCALL32_parrot_setacl:
 			if(entering) {
 				char path[PFS_PATH_MAX];

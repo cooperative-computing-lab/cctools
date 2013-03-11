@@ -9,6 +9,7 @@ See the file COPYING for details.
 #define PFS_SYS_H
 
 #include "pfs_types.h"
+#include "pfs_search.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -134,6 +135,8 @@ int		pfs_get_full_name( int fd, char *name );
 int		pfs_get_local_name( const char *rpath, char *lpath, char *firstline, int length );
 int		pfs_is_nonblocking( int fd );
 int		pfs_resolve_name( const char *path, struct pfs_name *pname );
+
+int		pfs_search( const char *path, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i);
 
   pfs_size_t	pfs_mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
 int		pfs_mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );

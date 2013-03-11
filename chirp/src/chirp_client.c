@@ -22,10 +22,12 @@ See the file COPYING for details.
 #include "debug.h"
 #include "copy_stream.h"
 #include "list.h"
+#include "string_array.h"
 #include "url_encode.h"
 #include "xxmalloc.h"
 
 #include <assert.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -1555,6 +1557,124 @@ INT64_T chirp_client_lsalloc(struct chirp_client * c, char const *path, char *al
 	return result;
 }
 
+CHIRP_SEARCH *chirp_client_opensearch(struct chirp_client *c, const char *path, const char *pattern, int flags, time_t stoptime) {
+	INT64_T result = simple_command(c, stoptime, "search %s %s %d\n", pattern, path, flags);
+	char p[CHIRP_PATH_MAX];
+        size_t buffer_size = 2048;
+        char *buffer = malloc(buffer_size);
+	size_t l, i=0;
+
+	if (result == 0) {
+		while (link_readline(c->link, p, sizeof(p), stoptime)) {
+	                if (strcmp(p, "") == 0) break;
+			while ((l = (size_t)snprintf(buffer+i, buffer_size-i, p)) >= buffer_size-i) {
+				buffer_size *= 2;
+				char *rbuffer = (char*) realloc(buffer, buffer_size);
+				if (rbuffer==NULL) return NULL;
+				buffer = rbuffer;
+			}
+			i += l;
+		}
+
+		if (i==0) *buffer = '\0';
+
+		CHIRP_SEARCH *result = malloc(sizeof(CHIRP_SEARCH));
+		result->entry = (struct chirp_searchent*) malloc(sizeof(struct chirp_searchent));
+		result->entry->info = NULL;
+		result->entry->path = NULL;
+		result->data = buffer;
+		result->i = 0;
+		return result;
+	} else 
+		return NULL;
+}
+
+static char *readsearch_next(char *data, int *i) {
+	data += *i;
+	char *tail = strchr(data, ':');
+	ptrdiff_t length = (tail==NULL) ? (ptrdiff_t)strlen(data) : tail - data;
+
+	if (length==0) {
+		(*i)++;
+		return NULL;
+	}
+
+	char *next = malloc(length + 1);
+	strncpy(next, data, length);
+	next[length] = '\0';
+	*i += length + 1;
+
+	return next;
+}
+
+static struct chirp_stat *readsearch_unpack_stat(char *stat_str) {
+	if (stat_str==NULL) return NULL;
+
+	struct chirp_stat *info = (struct chirp_stat*) malloc(sizeof(struct chirp_stat));
+	sscanf(
+		stat_str,
+        "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " "
+        "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " "
+        "%" PRId64 " %" PRId64 " %" PRId64,
+		&info->cst_dev,
+		&info->cst_ino,
+		&info->cst_mode,
+		&info->cst_nlink,
+		&info->cst_uid,
+		&info->cst_gid,
+		&info->cst_rdev,
+		&info->cst_size,
+		&info->cst_atime,
+		&info->cst_mtime,
+		&info->cst_ctime,
+		&info->cst_blksize,
+		&info->cst_blocks
+	);
+
+	free(stat_str);
+	return info;
+}
+
+struct chirp_searchent *chirp_client_readsearch(CHIRP_SEARCH *search) {
+
+        int i = search->i;
+        char *data = search->data;
+        char *err_str = readsearch_next(data, &i);
+        free(search->entry->path);
+        free(search->entry->info);
+
+        if (err_str==NULL) return NULL;
+
+        char *path;
+        struct chirp_stat *info;
+        int err = atoi(err_str), errsource;
+
+        if (err) {
+                errsource = atoi(readsearch_next(data, &i));
+                path = readsearch_next(data, &i);
+                info = NULL;
+        } else {
+                errsource = 0;
+                path = readsearch_next(data, &i);
+                info = readsearch_unpack_stat(readsearch_next(data, &i));
+        }
+
+        search->entry->path = path;
+        search->entry->info = info;
+        search->entry->errsource = errsource;
+        search->entry->err = err;
+        search->i = i;
+
+        return search->entry;
+}
+
+int chirp_client_closesearch(CHIRP_SEARCH *search) {
+        free(search->entry);
+        free(search->data);
+        free(search);
+	return 0;
+}
+
 INT64_T chirp_client_getxattr(struct chirp_client *c, const char *path, const char *name, void *data, size_t size, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
@@ -1562,7 +1682,6 @@ INT64_T chirp_client_getxattr(struct chirp_client *c, const char *path, const ch
 	INT64_T result = send_command(c, stoptime, "getxattr %s %s\n", safepath, name);
     if (result < 0)
         return result;
-
 	result = get_result(c, stoptime);
     if (result < 0) {
 		if (errno == EINVAL) errno = ENOATTR;
