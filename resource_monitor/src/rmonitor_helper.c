@@ -14,9 +14,10 @@ See the file COPYING for details.
 #endif
 
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
+#include <unistd.h>
 #include <fcntl.h>
 #include <dlfcn.h>
 #include <sys/types.h>
@@ -147,4 +148,54 @@ int fchdir(int fd)
 	return status;
 }
 
+FILE *fopen(const char *path, const char *mode)
+{
+	FILE *file;
+	typeof(fopen) *original_fopen = dlsym(RTLD_NEXT, "fopen");
+
+	debug(D_DEBUG, "fopen from %d.\n", getpid());
+	file = original_fopen(path, mode);
+
+	if(file)
+	{
+		struct monitor_msg msg;
+
+		msg.type   = OPEN;
+		msg.origin = getpid();
+		strcpy(msg.data.s, path);
+
+		send_monitor_msg(&msg);
+	}
+
+	return file;
+}
+
+int open(const char *path, int flags, ...)
+{
+	va_list ap;
+	int     fd;
+	mode_t  mode;
+
+	typeof(open) *original_open = dlsym(RTLD_NEXT, "open");
+
+	va_start(ap, flags);
+	mode = va_arg(ap, mode_t);
+	va_end(ap);
+
+	debug(D_DEBUG, "open from %d.\n", getpid());
+	fd = original_open(path, flags, mode);
+
+	if(fd > -1)
+	{
+		struct monitor_msg msg;
+
+		msg.type   = OPEN;
+		msg.origin = getpid();
+		strcpy(msg.data.s, path);
+
+		send_monitor_msg(&msg);
+	}
+
+	return fd;
+}
 
