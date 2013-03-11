@@ -176,6 +176,10 @@ static int link_internal_sleep(struct link *link, struct timeval *timeout, int r
 		msec = -1;
 	}
 
+	if(reading && link->buffer_length) {
+		return 1;		
+	}
+
 	while (1) {
 		pfd.fd = link->fd;
 		pfd.revents = 0;
