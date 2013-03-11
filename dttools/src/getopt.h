@@ -19,10 +19,7 @@
    02111-1307 USA.  */
 
 #ifndef _GETOPT_H
-
-#ifndef __need_getopt
-# define _GETOPT_H 1
-#endif
+#define _GETOPT_H 1
 
 /* If __GNU_LIBRARY__ is not already defined, either we are being used
    standalone, or this is the first header included in the source file.
@@ -81,7 +78,6 @@ extern int opterr;
 
 extern int optopt;
 
-#ifndef __need_getopt
 /* Describe the long-named options requested by the application.
    The LONG_OPTIONS argument to getopt_long or getopt_long_only is a vector
    of `struct option' terminated by an element containing a name which is
@@ -118,8 +114,6 @@ struct option
 # define no_argument		0
 # define required_argument	1
 # define optional_argument	2
-#endif	/* need getopt */
-
 
 /* Get definitions and prototypes for functions to process the
    arguments in ARGV (ARGC of them, minus the program name) for
@@ -145,6 +139,7 @@ struct option
    arguments to the option '\0'.  This behavior is specific to the GNU
    `getopt'.  */
 
+#if defined (__STDC__) && __STDC__
 #ifdef __GNU_LIBRARY__
 /* Many other libraries have conflicting prototypes for getopt, with
    differences in the consts, in stdlib.h.  To avoid compilation
@@ -154,8 +149,6 @@ extern int getopt (int ___argc, char *const *___argv, const char *__shortopts)
 #else /* not __GNU_LIBRARY__ */
 extern int getopt ();
 #endif /* __GNU_LIBRARY__ */
-
-#ifndef __need_getopt
 extern int getopt_long (int ___argc, char *const *___argv,
 			const char *__shortopts,
 		        const struct option *__longopts, int *__longind)
@@ -164,14 +157,14 @@ extern int getopt_long_only (int ___argc, char *const *___argv,
 			     const char *__shortopts,
 		             const struct option *__longopts, int *__longind)
        __THROW;
-
-#endif
+#else /* not __STDC__ */
+extern int getopt ();
+extern int getopt_long ();
+extern int getopt_long_only ();
+#endif /* __STDC__ */
 
 #ifdef	__cplusplus
 }
 #endif
-
-/* Make sure we later can get all the definitions and declarations.  */
-#undef __need_getopt
 
 #endif /* getopt.h */

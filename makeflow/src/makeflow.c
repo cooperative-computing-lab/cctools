@@ -72,7 +72,6 @@ static int dag_submit_timeout = 3600;
 static int dag_retry_flag = 0;
 static int dag_retry_max = 100;
 
-
 static dag_gc_method_t dag_gc_method = DAG_GC_NONE;
 static int dag_gc_param = -1;
 static int dag_gc_collected = 0;
@@ -107,9 +106,9 @@ void dag_gc_ref_count(struct dag *d, const char *file);
 void dag_export_variables(struct dag *d, struct dag_node *n);
 
 char *dag_parse_readline(struct dag_parse *bk, struct dag_node *n);
-int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode);
+int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode);
 int dag_parse_variable(struct dag_parse *bk, struct dag_node *n, char *line);
-int dag_parse_node(struct dag_parse *bk, char *line, int clean_mode);
+int dag_parse_node(struct dag_parse *bk, char *line, int clean_mode, int monitor_mode);
 int dag_parse_node_filelist(struct dag_parse *bk, struct dag_node *n, char *filelist, int source, int clean_mode);
 int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line);
 int dag_parse_node_makeflow_command(struct dag_parse *bk, struct dag_node *n, char *line);
@@ -294,6 +293,18 @@ void collect_input_files(struct dag *d, char* bundle_dir, char *(*rename)(struct
 	}
 
 	list_delete(il);	
+}
+
+char* bundler_rename(struct dag_node *d, const char *filename)
+{
+	if (filename[0] == '/'){
+		const char *new_filename;
+		new_filename = (char *)malloc(PATH_MAX * sizeof (*new_filename)); 
+		new_filename = string_basename(filename);
+		return xxstrdup(new_filename);
+	}
+	else
+		return xxstrdup(filename);
 }
 
 void dag_show_output_files(struct dag *d)
@@ -822,7 +833,7 @@ static char *translate_command(struct dag_node *n, char *old_command, int is_loc
 
 /* Returns a pointer to a new struct dag described by filename. Return NULL on
  * failure. */
-struct dag *dag_from_file(const char *filename, int clean_mode)
+struct dag *dag_from_file(const char *filename, int clean_mode, int monitor_mode)
 {
 	FILE *dagfile;
 	struct dag *d = NULL;
@@ -834,7 +845,7 @@ struct dag *dag_from_file(const char *filename, int clean_mode)
 	{	
 		d = dag_create();
 		d->filename = xxstrdup(filename);
-		if(!dag_parse(d, dagfile, clean_mode))
+		if(!dag_parse(d, dagfile, clean_mode, monitor_mode))
 		{
 			free(d);
 			d = NULL;
@@ -846,7 +857,7 @@ struct dag *dag_from_file(const char *filename, int clean_mode)
 	return d;
 }
 
-int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode)
+int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode)
 {
 	char *line = NULL;
 	struct dag_parse *bk = calloc(1, sizeof(struct dag_parse)); //Taking advantage that calloc zeroes memory
@@ -872,7 +883,7 @@ int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode)
 				goto failure;
 			}
 		} else if(strstr(line, ":")) {
-			if(!dag_parse_node(bk, line, clean_mode)) {
+			if(!dag_parse_node(bk, line, clean_mode, monitor_mode)) {
 				dag_parse_error(bk, "node");
 				goto failure;
 			}
@@ -1052,7 +1063,7 @@ char *monitor_log_name(int nodeid)
 	return string_format(RESOURCE_MONITOR_LOG_FORMAT, nodeid);
 }
 
-int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode)
+int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode, int monitor_mode)
 {
 	struct dag *d = bk->d;
 	char *line;
@@ -1063,12 +1074,11 @@ int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode)
 
 	n = dag_node_create(bk->d, bk->linenum);
 
-	if(monitor_exe)
+	if(monitor_mode || clean_mode)
 	{
 		log_name = monitor_log_name(n->nodeid);
-		debug(D_DEBUG, "adding monitor %s and log %s{,-summary} to rule %d.\n", monitor_exe, log_name, n->nodeid);
-
-		line = string_format("%s %s-summary %s %s", log_name, log_name, line_org, monitor_exe);
+		debug(D_DEBUG, "adding monitor %s and log %s{,-summary,-opened} to rule %d.\n", monitor_exe ? monitor_exe : "", log_name, n->nodeid);
+		line = string_format("%s %s-summary %s-opened %s %s", log_name, log_name, log_name, line_org, monitor_exe ? monitor_exe : "");
 	}
 	else
 	{
@@ -2081,6 +2091,7 @@ int main(int argc, char *argv[])
 	char *batchlogfilename = NULL;
 	char *bundle_directory = NULL;
 	int clean_mode = 0;
+	int monitor_mode = 0;
 	int display_mode = 0;
 	int condense_display = 0;
 	int change_size = 0;
@@ -2230,6 +2241,7 @@ int main(int argc, char *argv[])
 				email_summary_to = xxstrdup(optarg);
 				break;
 			case 'M':
+				monitor_mode     = 1;
 				monitor_exe      = monitor_copy_to_wd( NULL );
 				monitor_interval = atoi(optarg);
 				atexit(monitor_delete_exe);
@@ -2373,7 +2385,7 @@ int main(int argc, char *argv[])
 	}
 
 	int no_symlinks = (clean_mode || syntax_check || display_mode);
-	struct dag *d = dag_from_file(dagfile, no_symlinks);
+	struct dag *d = dag_from_file(dagfile, no_symlinks, monitor_mode);
 	if(!d) {
 		free(logfilename);
 		free(batchlogfilename);
@@ -2402,7 +2414,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "COMPLETE\n");
 
 		dag_show_input_files(d);
-		collect_input_files(d, bundle_directory, NULL);
+		collect_input_files(d, bundle_directory, bundler_rename);
 
 		char output_makeflow[PATH_MAX];
 		sprintf(output_makeflow, "%s/%s", bundle_directory, dagfile);

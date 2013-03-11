@@ -1,0 +1,216 @@
+<html>
+
+<head>
+<title>AWE User's Manual</title>
+</head>
+
+<body>
+
+<style type="text/css">
+pre {
+background: #ffffcc;
+font-family: monospace;
+font-size: 75%
+font-align: left;
+white-space: pre;
+border: solid 1px black;
+padding: 5px;
+margin: 20px;
+}
+
+table {
+border: 2px solid black;
+border-collapse: collapse;
+width: 75%;
+}
+th {
+border-width: 1px;
+padding:6px;
+border-style:solid;
+background-color: #DAD8D8;
+}
+td {
+border-width: 2px;
+padding:5px;
+border-style:solid;
+}
+</style>
+<h1>AWE User's Manual</h1>
+<b>Last Updated March 2013</b>
+<p>
+AWE is Copyright (C) 2013- The University of Notre Dame.
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+<p>
+<h2>Overview</h2>
+
+Adaptive Weighted Ensemble or AWE package provides a Python library for adaptive
+sampling of molecular dynamics. The framework decomposes the resampling
+computations and the molecular dynamics simulations into tasks that are
+dispatched to <a href="http://www.cse.nd.edu/~ccl/software/workqueue/">Work
+Queue</a> for execution on resources allocated from clusters, clouds, grids, or
+any idle machines.
+
+<p>AWE is part of the <a href=http://www.cse.nd.edu/~ccl/software>Cooperating
+Computing Tools</a>. It is available in the CCTools Source Package which can be
+downloaded from <a href=http://www.cse.nd.edu/~ccl/software/download>this web
+page</a>.
+
+<h2>Software Requirements</h2>
+AWE currently uses the GROMACS molecular dynamics simulation package. So it
+requires an installation of GROMACS 4.5 or above and its installed location
+added to PATH. It also requires the GROMACS XTC library for operation. 
+
+<p>
+The software requirements of AWE are summarized below along with how AWE finds
+and accesses them:
+
+<table>
+<tr>
+<th>Software</th><th>Version</th><th>Accessed using</th>
+</tr>
+<tr>
+<td><a href="http://python.org">Python</a></td><td>2.6 or higher</td><td>PATH</td>
+</tr>
+<tr>
+<td><a href="http://www.gromacs.org">GROMACS</a></td><td>4.5 or higher</td><td>PATH</td>
+</tr>
+<tr>
+<td><a
+href="http://www.gromacs.org/Developer_Zone/Programming_Guide/XTC_Library">GROMACS XTC Library</a></td><td>1.1 or higher</td><td>LD_LIBRARY_PATH</td>
+</tr>
+<tr>
+<td><a href="http://www.numpy.org">Numpy</a></td><td>1.5 or higher</td><td>PYTHONPATH</td>
+</tr>
+<tr>
+<td><a href="http://www.csb.pitt.edu/prody">Prody</a></td><td>1.4.1 or higher</td><td>PYTHONPATH</td>
+</tr>
+<tr>
+<td><a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a></td><td>1.15 or higher</td><td>LD_LIBRARY_PATH</td>
+</tr>
+<tr>
+<td><a href="http://matplotlib.org">Matplotlib</a></td><td>1.2.0 or higher</td><td>PYTHONPATH</td>
+</tr>
+</table> 
+
+<h2>Building and Installing AWE</h2>
+Download the CCTools source package from this <a
+href="http://www.cse.nd.edu/~ccl/software/download">web page</a> and install
+using the steps <a href="http://www.nd.edu/~ccl/software/manuals/install.html">here</a>. 
+
+<p> 
+To build and install AWE, use the following recipe.
+
+First, determine the location where AWE is to be installed. For example:
+<pre>
+% export AWE_INSTALL_PATH=$HOME/awe
+</pre>
+
+Compile and install AWE in the location pointed by $AWE_INSTALL_PATH using:
+<pre>
+% cd cctools-xxx-src
+% cd apps/awe
+% ./configure --prefix $AWE_INSTALL_PATH
+% make install
+</pre>
+
+Now set PATH to include the installed AWE binaries:
+<pre>
+% export PATH=${PATH}:${AWE_INSTALL_PATH}:${PATH}
+</pre>
+
+Finally, set PYTHONPATH to include the installed AWE Python modules:
+<pre>
+% export PYTHONPATH=${PYTHONPATH}:${AWE_INSTALL_PATH}/lib/python2.6/site-packages
+</pre>
+
+You can also check if AWE was correctly installed by running:
+<pre>
+% awe-verify
+</pre>
+
+<h2>Running AWE</h2>
+
+To run AWE to sample a protein molecule, you will need to have the files
+describing the topology of atoms in that molecule, the coordinates of the
+walkers, and the coordinates of the cells. 
+
+<p>In addition, AWE transfers the executables from the GROMACS package required for
+running the simulations of each walker. This can be fetched to the current
+working directory by running 
+ 
+<pre>
+% awe-prepare
+</pre>
+
+<p>This will create a directory named <tt>awe-generic-data</tt> and copy files that
+all AWE runs will require (namely the binaries and Gromacs forcefield files).
+
+<p>The AWE source also includes an example program that samples the state
+transitions for the Alanine Dipeptide protein. To run this example, do
+
+<pre>
+% python example.py
+</pre>
+
+<p> You will see this right away:
+<pre>
+ Running on port 9123...
+ Loading cells and walkers
+</pre>
+
+The AWE master program successfully started and is loading the cells and walkers
+for running the simulations. After that, the master waits for workers to connect
+so it can dispatch the simulation tasks for execution by the connected workers.
+
+Now, start a worker for this master on the same machine:
+<pre>
+% work_queue_worker localhost 9123
+</pre>
+
+However, to run a really large sampling, you will need to run as many workers as
+possible.  A simple (but tiresome) way of doing so is to <tt>ssh</tt> into
+several machines and manually run <tt>work_queue_worker</tt> as above.  But, if
+you have access to a batch system like <a
+href=http://www.cs.wisc.edu/condor>Condor</a> or <a
+href=http://www.sun.com/software/sge>SGE</a>, you can use them to start many
+workers with a single submit command.
+
+<p>
+We have provided some scripts to make this easy.  For example, to submit 10
+workers to your local Condor pool:
+
+<pre>
+% condor_submit_workers master.somewhere.edu 9123 10
+Submitting job(s)..........
+Logging submit event(s)..........
+10 job(s) submitted to cluster 298.
+</pre>
+
+Or, to submit 10 worker processes to your SGE cluster:
+<pre>
+% sge_submit_workers master.somewhere.edu 9123 10
+Your job 1054781 ("worker.sh") has been submitted
+Your job 1054782 ("worker.sh") has been submitted
+Your job 1054783 ("worker.sh") has been submitted
+...
+</pre>
+
+Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>
+are simple shell scripts, so you can edit them directly if you would
+like to change batch options or other details.
+<p>
+Once the workers begin running, the AWE master can dispatch tasks to
+each one very quickly.  It's ok if a machine running a worker crashes
+or is turned off; the work will be silently sent elsewhere to run.
+<p>
+When the AWE master process completes, your workers will
+still be available, so you can either run another master with the
+same workers, remove them from the batch system, or wait for them to
+expire.  If you do nothing for 15 minutes, they will automatically exit.
+
+<h2>For More Information</h2>
+
+For the latest information about AWE, please visit our <a href=http://www.cse.nd.edu/~ccl/software/awe>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
+</body>
+</html>
