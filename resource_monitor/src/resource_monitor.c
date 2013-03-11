@@ -1647,7 +1647,7 @@ int main(int argc, char **argv) {
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "d:hi:L:l:o:", long_options, NULL)) > 0)
+	while((c = getopt_long(argc, argv, "d:hi:L:l:o:", long_options, NULL)) >= 0)
 	{
 		switch (c) {
 			case 'd':

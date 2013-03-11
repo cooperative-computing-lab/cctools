@@ -55,8 +55,16 @@ See the file COPYING for details.
 #define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
 #define MAKEFLOW_GC_MIN_THRESHOLD 1
 
-#define RESOURCE_MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
-#define RESOURCE_MONITOR_LOG_FORMAT "log-rule-%06.6d"
+#define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
+
+#define DEFAULT_MONITOR_LOG_FORMAT "log-rule-%06.6d"
+#define DEFAULT_MONITOR_INTERVAL   1
+
+/* Unique integers for long options. To add a new option, use
+ * ('z' + i), where i is the next unused integer. */
+#define LONG_OPT_MONITOR_INTERVAL ('z' + 1)
+#define LONG_OPT_MONITOR_LOG_NAME ('z' + 2)
+#define LONG_OPT_MONITOR_LOG_DIR  ('z' + 3)
 
 typedef enum {
 	DAG_GC_NONE,
@@ -91,7 +99,9 @@ static int output_len_check = 0;
 static char *makeflow_exe = NULL;
 static char *monitor_exe  = NULL;
 
-static int  monitor_interval = 250;                               // in miliseconds  
+static int  monitor_interval = 1;                               // in seconds  
+static char *monitor_log_format=NULL;
+static char *monitor_log_dir=NULL;
 
 int dag_depth(struct dag *d);
 int dag_width_uniform_task(struct dag *d);
@@ -1060,7 +1070,7 @@ int dag_parse_variable(struct dag_parse *bk, struct dag_node *n, char *line)
 
 char *monitor_log_name(int nodeid)
 {
-	return string_format(RESOURCE_MONITOR_LOG_FORMAT, nodeid);
+	return string_format(monitor_log_format, nodeid);
 }
 
 int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode, int monitor_mode)
@@ -1074,11 +1084,21 @@ int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode, int mon
 
 	n = dag_node_create(bk->d, bk->linenum);
 
-	if(monitor_mode || clean_mode)
+	/* BUG: We need a more general solution to wrapping nodes
+	 * while parsing. The monitor code should not be here. */
+	if(monitor_mode)
 	{
 		log_name = monitor_log_name(n->nodeid);
-		debug(D_DEBUG, "adding monitor %s and log %s{,-summary,-opened} to rule %d.\n", monitor_exe ? monitor_exe : "", log_name, n->nodeid);
-		line = string_format("%s %s-summary %s-opened %s %s", log_name, log_name, log_name, line_org, monitor_exe ? monitor_exe : "");
+		debug(D_DEBUG, "adding monitor %s and %s{,-summary,-opened} to rule %d.\n", monitor_exe, log_name, n->nodeid);
+
+		/* use remotename syntax to map log path names in
+		 * the remote working directory to the file
+		 * inside monitor_log_dir */
+		line = string_format("%s/%s-summary->%s-summary %s/%s-opened->%s-opened %s/%s->%s %s %s",
+				monitor_log_dir, log_name, log_name, 
+				monitor_log_dir, log_name, log_name, 
+				monitor_log_dir, log_name, log_name, 
+				line_org, monitor_exe);
 	}
 	else
 	{
@@ -1875,45 +1895,54 @@ static void handle_abort(int sig)
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
-	fprintf(stdout, "Frequently used options:\n");
-	fprintf(stdout, "-c             Clean up: remove logfile and all targets.\n");
-	fprintf(stdout, "-T <type>      Batch system type: %s. (default is local)\n", batch_queue_type_string());
-	fprintf(stdout, "Where options are:\n");
-	fprintf(stdout, " -a             Advertise the master information to a catalog server.\n");
-	fprintf(stdout, " -A             Disable the check for AFS.                  (experts only.)\n");;
-	fprintf(stdout, " -b <directory> Create portable bundle of workflow in <directory>\n");            
-	fprintf(stdout, " -B <options>   Add these options to all batch submit files.\n");
-	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem\n");
-	fprintf(stdout, " -D             Display the Makefile as a Dot graph. Additional options 'c' to condense similar boxes, 's' to change the size of the boxes proportional to file size, else type 'none' for full expansion\n");
-	fprintf(stdout, " -E             Enable master capacity estimation in Work Queue. Estimated master capacity may be viewed in the Work Queue log file.\n");
-	fprintf(stdout, " -f <file>      Write summary of workflow to this file upon success or failure.\n");
-	fprintf(stdout, " -F <#>         Work Queue fast abort multiplier.           (default is deactivated)\n");
-	fprintf(stdout, " -h             Show this help screen.\n");
-	fprintf(stdout, " -i             Show the pre-execution analysis of the Makeflow script - <dagfile>.\n");
-	fprintf(stdout, " -I             Show input files.\n");
-	fprintf(stdout, " -j <#>         Max number of local jobs to run at once.    (default is # of cores)\n");
-	fprintf(stdout, " -J <#>         Max number of remote jobs to run at once.   (default is 100)\n");
-	fprintf(stdout, " -k             Syntax check.\n");
-	fprintf(stdout, " -K             Preserve (i.e., do not clean) intermediate symbolic links\n");
-	fprintf(stdout, " -l <logfile>   Use this file for the makeflow log.         (default is X.makeflowlog)\n");
-	fprintf(stdout, " -L <logfile>   Use this file for the batch system log.     (default is X.condorlog)\n");
-	fprintf(stdout, " -m <email>     Send summary of workflow to this email address upon success or failure.\n");
-	fprintf(stdout, " -M <#>         Enable the resource monitor with intervals of <#> miliseconds.\n");
-	fprintf(stdout, " -N <project>   Set the project name to <project>\n");
-	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
-	fprintf(stdout, " -O             Show output files.\n");
-	fprintf(stdout, " -p <port>      Port number to use with Work Queue.         (default is %d, 0=arbitrary)\n", WORK_QUEUE_DEFAULT_PORT);
-	fprintf(stdout, " -P <integer>   Priority. Higher the value, higher the priority.\n");
-	fprintf(stdout, " -R             Automatically retry failed batch jobs up to %d times.\n", dag_retry_max);
-	fprintf(stdout, " -r <n>         Automatically retry failed batch jobs up to n times.\n");
-	fprintf(stdout, " -S <timeout>   Time to retry failed batch job submission.  (default is %ds)\n", dag_submit_timeout);
-	fprintf(stdout, " -t <timeout>   Work Queue keepalive timeout.           (default is %ds)\n", WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
-	fprintf(stdout, " -u <interval>  Work Queue keepalive interval.           (default is %ds)\n", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
-	fprintf(stdout, " -v             Show version string\n");
-	fprintf(stdout, " -W <mode>      Work Queue scheduling algorithm.            (time|files|fcfs)\n");
-	fprintf(stdout, " -z             Force failure on zero-length output files \n");
-	fprintf(stdout, " -Z <file>      Select port at random and write it to this file.\n");
+	fprintf(stdout, "Frequently used options:\n\n");
+	fprintf(stdout, " %-30s Clean up: remove logfile and all targets.\n", "-c,--clean");
+	fprintf(stdout, " %-30s Batch system type: (default is local)\n", "-T,--batch-type=<type>");
+	fprintf(stdout, " %-30s %s\n\n", "", batch_queue_type_string());
+	fprintf(stdout, "Other options are:\n");
+	fprintf(stdout, " %-30s Advertise the master information to a catalog server.\n", "-a,--advertise");
+	fprintf(stdout, " %-30s Disable the check for AFS. (experts only.)\n", "-A,--disable-afs-check");
+	fprintf(stdout, " %-30s Create portable bundle of workflow in <directory>\n", "-b,--bundle-dir=<directory>");            
+	fprintf(stdout, " %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
+	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog-server=<catalog>");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
+	fprintf(stdout, " %-30s Display the Makefile as a Dot graph. \n", "-D,--dot-graph=<opt>");
+	fprintf(stdout, " %-30s Additional options:\n", ""); 
+	fprintf(stdout, " %-40s c condense similar boxes\n", "");
+	fprintf(stdout, " %-40s s change the size of the boxes proportional to file size\n", "");
+	fprintf(stdout, " %-40s else type 'none' for full expansion\n", "");
+	fprintf(stdout, " %-30s Enable master capacity estimation in Work Queue.\n", "-E,--wq-estimate-capacity"); 
+	fprintf(stdout, " %-30s Estimated master capacity may be viewed in the Work Queue log file.\n", "");
+	fprintf(stdout, " %-30s Write summary of workflow to this file upon success or failure.\n", "-f,--summary-log=<file>");
+	fprintf(stdout, " %-30s Work Queue fast abort multiplier.           (default is deactivated)\n", "-F,--wq-fast-abort=<#>");
+	fprintf(stdout, " %-30s Show this help screen.\n", "-h,--help");
+	fprintf(stdout, " %-30s Show the pre-execution analysis of the Makeflow script - <dagfile>.\n", "-i,--analyze-exec");
+	fprintf(stdout, " %-30s Show input files.\n", "-I,--show-input");
+	fprintf(stdout, " %-30s Max number of local jobs to run at once.    (default is # of cores)\n", "-j,--max-local=<#>");
+	fprintf(stdout, " %-30s Max number of remote jobs to run at once.   (default is 100)\n", "-J,--max-remote=<#>");
+	fprintf(stdout, " %-30s Syntax check.\n", "-k,--syntax-check");
+	fprintf(stdout, " %-30s Preserve (i.e., do not clean intermediate symbolic links)\n", "-K,--preserve-links");
+	fprintf(stdout, " %-30s Use this file for the makeflow log.         (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
+	fprintf(stdout, " %-30s Use this file for the batch system log.     (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
+	fprintf(stdout, " %-30s Send summary of workflow to this email address upon success or failure.\n", "-m,--email=<email>");
+	fprintf(stdout, " %-30s Enable the resource monitor\n", "-M,--monitor");
+	fprintf(stdout, " %-30s Set monitor interval to <#> seconds.\n", "--monitor-interval=<#>");
+	fprintf(stdout, " %-30s Format for monitor logs. (default %s, %%d -> rule number)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
+	fprintf(stdout, " %-30s Set monitor output directory. (default monitor-logs-<date>)\n", "--monitor-log-dir=<dir>");
+	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
+	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-output=<file>");
+	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
+	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--port=<port>", WORK_QUEUE_DEFAULT_PORT);
+	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
+	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", dag_retry_max);
+	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to n times.\n", "-r,--retry-count=<n>");
+	fprintf(stdout, " %-30s Time to retry failed batch job submission.  (default is %ds)\n", "-S,--submission-timeout=<#>", dag_submit_timeout);
+	fprintf(stdout, " %-30s Work Queue keepalive timeout.               (default is %ds)\n", "-t,--wq-keepalive-timeout=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
+	fprintf(stdout, " %-30s Work Queue keepalive interval.              (default is %ds)\n", "-u,--wq-keepalive-interval=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
+	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
+	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
+	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
+	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--wq-random-port=<file>");
 }
 
 
@@ -2034,7 +2063,7 @@ char *monitor_locate(const char *path_from_cmdline)
 
 	debug(D_DEBUG,"locating monitor executable...");
 
-	path_from_env = getenv(RESOURCE_MONITOR_ENV_VAR);
+	path_from_env = getenv(MONITOR_ENV_VAR);
 	if(path_from_cmdline)
 	{
 		monitor_path = xxstrdup(path_from_cmdline);
@@ -2043,7 +2072,7 @@ char *monitor_locate(const char *path_from_cmdline)
 	else if(path_from_env)
 	{
 		monitor_path = xxstrdup(path_from_env);
-		debug(D_DEBUG,"trying monitor from $%s.", RESOURCE_MONITOR_ENV_VAR);
+		debug(D_DEBUG,"trying monitor from $%s.", MONITOR_ENV_VAR);
 	}
 	else
 	{
@@ -2139,7 +2168,53 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	while((c = getopt(argc, argv, "aAb:B:cC:d:D:E:f:F:g:G:hiIj:J:kKl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:")) != (char) -1) {
+	struct option long_options[] =
+	{
+		{"debug",      required_argument, 0, 'd'},
+		{"help",       no_argument, 0, 'h'},
+		{"clean",      no_argument, 0, 'c'},
+		{"batch-type", required_argument, 0, 'T'},
+		{"advertise",  no_argument, 0, 'a'},
+		{"disable-afs-check", no_argument, 0, 'A'},
+		{"bundle-dir",        required_argument, 0, 'b'},
+		{"batch-options",     required_argument, 0, 'B'},
+		{"catalog-server",    required_argument, 0, 'C'},
+		{"dot-graph",         required_argument, 0, 'D'},
+		{"wq-estimate-capacity", no_argument,   0, 'E'},
+		{"summary-log",       no_argument,   0, 'f'},
+		{"wq-fast-abort", required_argument,   0, 'F'},
+		{"analyze-exec",  no_argument, 0, 'i'},
+		{"show-input",    no_argument, 0, 'I'},
+		{"max-local",     required_argument, 0, 'j'},
+		{"max-remote",    required_argument, 0, 'J'},
+		{"syntax-check",  no_argument, 0, 'k'},
+		{"preserve-links", no_argument, 0, 'K'},
+		{"makeflow-log",   required_argument, 0, 'l'},
+		{"batch-log",      required_argument, 0, 'L'},
+		{"email",          required_argument, 0, 'm'},
+		{"monitor",        no_argument,       0, 'M'},
+		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
+		{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
+		{"monitor-log-dir",  required_argument, 0, LONG_OPT_MONITOR_LOG_DIR},
+		{"project-name",     required_argument, 0, 'N'},
+		{"debug-output",     required_argument, 0, 'o'},
+		{"show-output",     no_argument, 0, 'O'},
+		{"wq-port",          required_argument, 0, 'p'},
+		{"priority",         required_argument, 0, 'P'},
+		{"retry",            no_argument, 0, 'R'},
+		{"retry-count",      required_argument, 0, 'r'},
+		{"submission-timeout",    required_argument, 0, 'S'},
+		{"wq-keepalive-timeout",  required_argument, 0, 't'},
+		{"wq-keepalive-interval", required_argument, 0, 'u'},
+		{"version", no_argument, 0, 'v'},
+		{"wq-schedule", required_argument, 0, 'W'},
+		{"zero-length-error", no_argument, 0, 'z'},
+		{"wq-random-port", required_argument, 0, 'Z'},
+		{0,0,0,0}
+	};
+
+
+	while((c = getopt_long(argc, argv, "aAb:B:cC:d:D:E:f:F:g:G:hiIj:J:kKl:L:m:MN:o:Op:P:r:RS:t:T:u:vW:zZ:", long_options, NULL)) >= 0) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2241,10 +2316,7 @@ int main(int argc, char *argv[])
 				email_summary_to = xxstrdup(optarg);
 				break;
 			case 'M':
-				monitor_mode     = 1;
-				monitor_exe      = monitor_copy_to_wd( NULL );
-				monitor_interval = atoi(optarg);
-				atexit(monitor_delete_exe);
+				monitor_mode = 1;
 				break;
 			case 'N':
 				free(project);
@@ -2308,6 +2380,18 @@ int main(int argc, char *argv[])
 				port_file = optarg;
 				port = 0;
 				port_set = 1; //WQ is going to set the port, so we continue as if already set.
+				break;
+			case LONG_OPT_MONITOR_INTERVAL:
+				monitor_mode = 1;
+				monitor_interval = atoi(optarg);
+				break;
+			case LONG_OPT_MONITOR_LOG_NAME:
+				monitor_mode = 1;
+				monitor_log_format = xxstrdup(optarg);
+				break;
+			case LONG_OPT_MONITOR_LOG_DIR:
+				monitor_mode = 1;
+				monitor_log_dir = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);
@@ -2382,6 +2466,27 @@ int main(int argc, char *argv[])
 			file_clean(cleanlog, 0);
 			free(cleanlog);
 		}
+	}
+
+	if(monitor_mode) {
+		monitor_exe      = monitor_copy_to_wd( NULL );
+
+		if(monitor_interval < 1)
+			monitor_interval = DEFAULT_MONITOR_INTERVAL;
+
+		if(!monitor_log_format)
+			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
+
+		if(!monitor_log_dir)
+		{
+			time_t now = time(NULL);
+			struct tm *tm = localtime(&now);
+			monitor_log_dir = string_format("monitor-logs-%04d_%02d_%02d_%02d-%02d", 1900 + tm->tm_year, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min);
+		}
+
+		create_dir(monitor_log_dir, 0755);
+
+		atexit(monitor_delete_exe);
 	}
 
 	int no_symlinks = (clean_mode || syntax_check || display_mode);
