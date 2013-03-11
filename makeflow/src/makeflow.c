@@ -295,6 +295,18 @@ void collect_input_files(struct dag *d, char* bundle_dir, char *(*rename)(struct
 	list_delete(il);	
 }
 
+char* bundler_rename(struct dag_node *d, const char *filename)
+{
+	if (filename[0] == '/'){
+		char *new_filename;
+		new_filename = (char *)malloc(PATH_MAX * sizeof (*new_filename)); 
+		new_filename = string_basename(filename);
+		return xxstrdup(new_filename);
+	}
+	else
+		return xxstrdup(filename);
+}
+
 void dag_show_output_files(struct dag *d)
 {
 	struct dag_file *f;
@@ -2402,7 +2414,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "COMPLETE\n");
 
 		dag_show_input_files(d);
-		collect_input_files(d, bundle_directory, NULL);
+		collect_input_files(d, bundle_directory, bundler_rename);
 
 		char output_makeflow[PATH_MAX];
 		sprintf(output_makeflow, "%s/%s", bundle_directory, dagfile);
