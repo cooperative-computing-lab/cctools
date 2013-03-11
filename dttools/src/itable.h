@@ -46,6 +46,13 @@ while(itable_nextkey(h,&key,&value)) {
 
 struct itable *itable_create(int buckets);
 
+/** Remove all entries from an integer table.
+Note that this function will not delete all of the objects contained within the integer table.
+@param h The integer table to delete.
+*/
+
+void itable_clear(struct itable *h);
+
 /** Delete an integer table.
 Note that this function will not delete all of the objects contained within the integer table.
 @param h The integer table to delete.

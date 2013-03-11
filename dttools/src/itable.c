@@ -50,7 +50,7 @@ struct itable *itable_create(int bucket_count)
 	return h;
 }
 
-void itable_delete(struct itable *h)
+void itable_clear(struct itable *h)
 {
 	struct entry *e, *f;
 	int i;
@@ -63,7 +63,15 @@ void itable_delete(struct itable *h)
 			e = f;
 		}
 	}
+	
+	for(i = 0; i < h->bucket_count; i++) {
+		h->buckets[i] = 0;
+	}
+}
 
+void itable_delete(struct itable *h)
+{
+	itable_clear(h);
 	free(h->buckets);
 	free(h);
 }
