@@ -160,6 +160,7 @@ See the file COPYING for details.
 
 FILE  *log_file;               /* All monitoring information of all processes is written here. */
 FILE  *log_file_summary;       /* Final statistics are written to this file. */
+FILE  *log_file_opened;        /* List of opened files is written to this file. */
 
 int    monitor_queue_fd;       /* File descriptor of a datagram socket to which (great)
 								  grandchildren processes report to the monitor. */
@@ -315,6 +316,7 @@ void open_log_files(const char *filename)
 {
 	char *flog_path;
 	char *flog_path_summary;
+	char *flog_path_opened;
 
 	if(filename)
 		flog_path         = xxstrdup(filename);
@@ -322,6 +324,7 @@ void open_log_files(const char *filename)
 		flog_path = string_format("log-monitor-%d", getpid());
 
 	flog_path_summary = string_format("%s-summary", flog_path); 
+	flog_path_opened  = string_format("%s-opened",  flog_path); 
 
 	if((log_file = fopen(flog_path, "w")) == NULL)
 	{
@@ -333,8 +336,14 @@ void open_log_files(const char *filename)
 		fatal("could not open log file %s : %s\n", flog_path_summary, strerror(errno));
 	}
 
+	if((log_file_opened  = fopen(flog_path_opened, "w")) == NULL)
+	{
+		fatal("could not open log file %s : %s\n", flog_path_opened, strerror(errno));
+	}
+
 	free(flog_path);
 	free(flog_path_summary);
+	free(flog_path_opened);
 }
 
 FILE *open_proc_file(pid_t pid, char *filename)
@@ -1060,6 +1069,15 @@ int monitor_final_summary()
 		return first_process_exit_status;
 }
 
+void monitor_write_open_file(char *filename)
+{
+	/* Perhaps here we can do something more to the files, like a
+	 * final stat */
+
+	fprintf(log_file_opened, "%s\n", filename);
+
+}
+
 /***
  * Functions that modify the processes tracking table, and
  * cleanup of processes in the zombie state.
@@ -1293,18 +1311,10 @@ void monitor_final_cleanup(int signum)
 
 	status = monitor_final_summary();
 
-	/* make a function for this... 
-	 * write opened files at the end of the log, as comments so
-	 * gnuplot ignores them */
-	char *fname;
-	void *dummy;
-	fprintf(log_file, "\n\n# opened files:\n#\n");
-	hash_table_firstkey(files);
-	while(hash_table_nextkey(files, &fname, &dummy))
-		fprintf(log_file, "# %s\n", fname);
 
 	fclose(log_file);
 	fclose(log_file_summary);
+	fclose(log_file_opened);
 
 	exit(status);
 }
@@ -1408,6 +1418,7 @@ void monitor_dispatch_msg(void)
 			break;
 		case OPEN:
 			debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
+			monitor_write_open_file(msg.data.s);
 			hash_table_insert(files, msg.data.s, NULL);
 			break;
 		case READ:
