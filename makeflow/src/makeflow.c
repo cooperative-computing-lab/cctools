@@ -298,7 +298,7 @@ void collect_input_files(struct dag *d, char* bundle_dir, char *(*rename)(struct
 char* bundler_rename(struct dag_node *d, const char *filename)
 {
 	if (filename[0] == '/'){
-		char *new_filename;
+		const char *new_filename;
 		new_filename = (char *)malloc(PATH_MAX * sizeof (*new_filename)); 
 		new_filename = string_basename(filename);
 		return xxstrdup(new_filename);

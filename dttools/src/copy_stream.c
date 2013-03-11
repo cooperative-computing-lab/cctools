@@ -7,6 +7,8 @@ See the file COPYING for details.
 
 #include "copy_stream.h"
 #include "full_io.h"
+#include "create_dir.h"
+#include "stringtools.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -222,12 +224,18 @@ void copy_fd_pair(int leftin, int leftout, int rightin, int rightout)
 int copy_file_to_file(const char *input, const char *output)
 {
 	int count;
+	struct stat st;
+	stat(input, &st);
 
 	FILE *in, *out;
 
 	in  = fopen(input, "r");
 	if(!in)
 		return -1;
+	
+	char out_dir[COPY_BUFFER_SIZE];
+	string_dirname(output, out_dir);
+	create_dir(out_dir, st.st_mode);
 
 	out = fopen(output, "w");
 	if(!out)
@@ -239,8 +247,6 @@ int copy_file_to_file(const char *input, const char *output)
 	fclose(in);
 	fclose(out);
 	
-	struct stat st;
-	stat(input, &st);
 	chmod(output, st.st_mode);
 	return count;	
 }
