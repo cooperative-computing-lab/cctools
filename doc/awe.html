@@ -67,7 +67,7 @@ and accesses them:
 
 <table>
 <tr>
-<th>Software</th><th>Version</th><th>Accessed using</th>
+<th>Software</th><th>Version</th><th>Accessed in</th>
 </tr>
 <tr>
 <td><a href="http://python.org">Python</a></td><td>2.6 or higher</td><td>PATH</td>
@@ -208,6 +208,40 @@ When the AWE master process completes, your workers will
 still be available, so you can either run another master with the
 same workers, remove them from the batch system, or wait for them to
 expire.  If you do nothing for 15 minutes, they will automatically exit.
+
+<h2> Analysis </h2>
+
+After running the example, a Ramachandran plot (free energy landscape on phi-psi
+space) can be generated according to AWE output
+<tt>resample/cell-weights.csv</tt> with the following command.
+
+<pre>
+% python awe-rama-ala.py -w <project dir>/resample/cell-weights.csv -p <projectdir>/testinput/state0.pdb -c <project dir>/testinput/cells.dat -n 100
+</pre>
+
+This produces an output file named <tt>awe-rama-ala.png</tt>
+
+<p>To generate and visualize forward and backward fluxes from the output file
+<tt>transitions.dat</tt>, use the script <tt>awe-flux.py</tt>.
+
+<pre>
+% python awe-flux.py -i <project dir>/transitions.dat -l 0.01 -o flux
+</pre>
+							
+This will produce the following outputs:		
+<ul>
+<li>instan-forward-flux.dat: instantaneous forward flux</li>
+<li>instan-backward-flux.dat: instantaneous backward flux</li>
+<li>forward-flux.png: plot of forward flux</li>
+<li>backward-flux.png: plot of backward flux</li>
+</ul>
+
+<p>To generate transition probability matrix from AWE output, run the script
+<tt>awe-transMatrix.py</tt>
+
+<pre>
+% python awe-transMatrix.py -p <project dir>/resample/walker-history.dat -w <project dir>/resample/walker-weights.dat -t 1 -n 100
+</pre>
 
 <h2>For More Information</h2>
 
