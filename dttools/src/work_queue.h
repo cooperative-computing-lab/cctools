@@ -43,6 +43,9 @@ See the file COPYING for details.
 #define WORK_QUEUE_THIRDGET 8	/* Access the file on the client from a shared filesystem */
 #define WORK_QUEUE_THIRDPUT 8	/* Access the file on the client from a shared filesystem (included for readability) */
 
+#define WORK_QUEUE_RESET_ALL        0  /**< When resetting, clear out all tasks and files */
+#define WORK_QUEUE_RESET_KEEP_TASKS 1  /**< When resetting, keep the current list of tasks */
+
 #define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
 #define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
 
@@ -87,22 +90,22 @@ struct work_queue_task {
 struct work_queue_stats {
 	int port;
 	int priority;
-	int workers_init;		/**< Number of workers initializing. */
-	int workers_ready;		/**< Number of workers ready for tasks. */
-	int workers_busy;		/**< Number of workers running tasks. */
-	int workers_cancelling;	/**< Number of workers aborting their tasks. */
-	int tasks_running;		/**< Number of tasks currently running. */
-	int tasks_waiting;		/**< Number of tasks waiting for a CPU. */
-	int tasks_complete;		/**< Number of tasks waiting to be returned to user. */
-	int total_tasks_dispatched;	/**< Total number of tasks dispatch to workers. */
-	int total_tasks_complete;	/**< Total number of tasks returned complete. */
-	int total_workers_joined;	/**< Total number of times a worker joined the queue. */
-	int total_workers_removed;	/**< Total number of times a worker was removed from the queue. */
-	INT64_T total_bytes_sent;	/**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
-	INT64_T total_bytes_received;	/**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
-	timestamp_t start_time;		/**< Absolute time at which the master started. */
-	timestamp_t total_send_time;	/**< Total time in microseconds spent in sending data to workers. */
-	timestamp_t total_receive_time;	/**< Total time in microseconds spent in receiving data from workers. */
+	int workers_init;               /**< Number of workers initializing. */
+	int workers_ready;              /**< Number of workers ready for tasks. */
+	int workers_busy;               /**< Number of workers running tasks. */
+	int workers_full;               /**< Number of workers with no slots remaining. */
+	int tasks_running;              /**< Number of tasks currently running. */
+	int tasks_waiting;              /**< Number of tasks waiting for a CPU. */
+	int tasks_complete;             /**< Number of tasks waiting to be returned to user. */
+	int total_tasks_dispatched;     /**< Total number of tasks dispatch to workers. */
+	int total_tasks_complete;       /**< Total number of tasks returned complete. */
+	int total_workers_joined;       /**< Total number of times a worker joined the queue. */
+	int total_workers_removed;      /**< Total number of times a worker was removed from the queue. */
+	INT64_T total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
+	INT64_T total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
+	timestamp_t start_time;         /**< Absolute time at which the master started. */
+	timestamp_t total_send_time;    /**< Total time in microseconds spent in sending data to workers. */
+	timestamp_t total_receive_time; /**< Total time in microseconds spent in receiving data from workers. */
 	double efficiency;
 	double idle_percentage;
 	int capacity;
@@ -284,12 +287,6 @@ Rather than assuming a specific port, the user should simply call this function 
 */
 int work_queue_port(struct work_queue *q);
 
-/** Get the project name of the queue.
-@param q A work queue object.
-@return The project name of the queue.
-*/
-const char *work_queue_name(struct work_queue *q);
-
 /** Get queue statistics.
 @param q A work queue object.
 @param s A pointer to a buffer that will be filed with statistics.
@@ -335,6 +332,12 @@ it should be assigned to.
 */
 void work_queue_specify_task_order(struct work_queue *q, int order);
 
+/** Get the project name of the queue.
+@param q A work queue object.
+@return The project name of the queue.
+*/
+const char *work_queue_name(struct work_queue *q);
+
 /** Change the project name for a given queue.
 @param q A work queue object.
 @param name The new project name.
@@ -361,6 +364,13 @@ void work_queue_specify_estimate_capacity_on(struct work_queue *q, int estimate_
 */
 void work_queue_specify_master_mode(struct work_queue *q, int mode);
 
+/** Specify the catalog server the master should report to.
+@param q A work queue object.
+@param hostname The catalog server's hostname.
+@param port The port the catalog server is listening on.
+*/
+void work_queue_specify_catalog_server(struct work_queue *q, const char *hostname, int port);
+
 /** Cancel a submitted task using its task id and remove it from queue.
 @param q A work queue object.
 @param id The taskid returned from @ref work_queue_submit.
@@ -374,6 +384,14 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int id
 @return The task description of the cancelled task, or null if the task was not found in queue. The returned task must be deleted with @ref work_queue_task_delete or resubmitted with @ref work_queue_submit.
 */
 struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const char *tag);
+
+/** Reset a work queue and all attached workers.
+@param q A work queue object.
+@param flags Flags to indicate what to reset:
+ - @ref WORK_QUEUE_RESET_ALL - cleans up each attached worker and deletes all submitted tasks.
+ - @ref WORK_QUEUE_RESET_KEEP_TASKS - cleans up each attached worker but retains incomplete tasks.  Tasks will be resubmitted to workers at the next call to @ref work_queue_wait.
+*/
+void work_queue_reset(struct work_queue *q, int flags);
 
 /** Shut down workers connected to the work_queue system. Gives a best effort and then returns the number of workers given the shut down order.
 @param q A work queue object.
