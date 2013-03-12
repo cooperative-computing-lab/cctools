@@ -2478,7 +2478,7 @@ int main(int argc, char *argv[])
 		{
 			time_t now = time(NULL);
 			struct tm *tm = localtime(&now);
-			monitor_log_dir = string_format("monitor-logs-%04d_%02d_%02d_%02d-%02d", 1900 + tm->tm_year, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min);
+			monitor_log_dir = string_format("monitor-logs-%04d_%02d_%02d_%02d-%02d", 1900 + tm->tm_year, 1 + tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min);
 		}
 
 		atexit(monitor_delete_exe);
