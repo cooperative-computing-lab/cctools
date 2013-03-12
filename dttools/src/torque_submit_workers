@@ -6,7 +6,8 @@ show_help()
 	echo "where options are:"
 	echo "  -a               Enable auto mode."
 	echo "  -s               Run as a shared worker."
-	echo "  -N <name>        Preferred project name for worker."
+	echo "  -M <name>        Name of the preferred master for worker."
+	echo "  -N <name>        Same as -M (backwards compatibility)."
 	echo "  -C <catalog>     Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
 	echo "  -t <time>        Abort after this amount of idle time. (default=900s)"
 	echo "  -j               Use job array to submit workers."	
@@ -20,14 +21,15 @@ use_auto=0
 use_jobarray=0
 parameters=""
 
-while getopts aC:hjN:p:st: opt 
+while getopts aC:hjM:N:p:st: opt 
 do
 	case "$opt" in
 		a)  arguments="$arguments -a"; use_auto=1;;
 		C)  arguments="$arguments -C $OPTARG";;
 		h)  show_help;;
 		j)  use_jobarray=1;;
-		N)  arguments="$arguments -N $OPTARG";;
+		M)  arguments="$arguments -M $OPTARG";;
+		N)  arguments="$arguments -M $OPTARG";;
 		p)  parameters="$parameters $OPTARG";;
 		s)  arguments="$arguments -s";;
 		t)  arguments="$arguments -t $OPTARG";;
