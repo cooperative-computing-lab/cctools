@@ -319,17 +319,17 @@ void open_log_files(const char *filename)
 	char *flog_path;
 	char *flog_path_summary;
 	char *flog_path_opened;
-
-	char *dirname = xxstrdup(filename);
-
-	string_dirname(filename, dirname);
-
-	create_dir(dirname, 0755);
+	char *dirname;
 
 	if(filename)
 		flog_path         = xxstrdup(filename);
 	else
 		flog_path = string_format("log-monitor-%d", getpid());
+
+	dirname = xxstrdup(flog_path);
+	string_dirname(flog_path, dirname);
+
+	create_dir(dirname, 0755);
 
 	flog_path_summary = string_format("%s-summary", flog_path); 
 	flog_path_opened  = string_format("%s-opened",  flog_path); 
@@ -1684,19 +1684,6 @@ int main(int argc, char **argv) {
 		}
 	}
 
-#ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB
-	write_helper_lib();
-	monitor_helper_init("./librmonitor_helper.so", &monitor_queue_fd);
-#endif
-
-	processes = itable_create(0);
-	wdirs     = hash_table_create(0,0);
-	filesysms = itable_create(0);
-	files     = hash_table_create(0,0); 
-	
-	wdirs_rc = itable_create(0);
-	filesys_rc      = itable_create(0);
-
 	//this is ugly, concatenating command and arguments
 	if(optind < argc)
 	{
@@ -1711,7 +1698,29 @@ int main(int argc, char **argv) {
 		show_help(argv[0]);
 		return 1;
 	}
+
+
+	if(getenv(RMONITOR_INFO_ENV_VAR))
+	{
+		debug(D_DEBUG, "using upstream monitor. executing: %s\n", cmd);
+		execlp("sh", "sh", "-c", cmd, (char *) NULL);
+		//We get here only if execlp fails.
+		fatal("error executing %s:\n", cmd, strerror(errno));
+	}
+
+#ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB
+	write_helper_lib();
+	monitor_helper_init("./librmonitor_helper.so", &monitor_queue_fd);
+#endif
+
+	processes = itable_create(0);
+	wdirs     = hash_table_create(0,0);
+	filesysms = itable_create(0);
+	files     = hash_table_create(0,0); 
 	
+	wdirs_rc = itable_create(0);
+	filesys_rc      = itable_create(0);
+
 	open_log_files(log_path);
 
 	spawn_first_process(cmd);
