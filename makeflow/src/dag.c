@@ -271,7 +271,7 @@ const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, c
 	oldname = hash_table_lookup(n->remote_names_inv, remotename);
 
 	if(oldname && strcmp(oldname, filename) == 0)
-		fatal("Remote name %s for %s already in use for %s\n", remotename, filename, oldname);
+		debug(D_DEBUG, "Remote name %s for %s already in use for %s\n", remotename, filename, oldname);
 
 	itable_insert(n->remote_names, (uintptr_t) f, remotename); 
 	hash_table_insert(n->remote_names_inv, remotename, (void *) f);
