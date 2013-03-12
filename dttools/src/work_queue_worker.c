@@ -1664,6 +1664,12 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
+	if(worker_mode != WORKER_MODE_FOREMAN && foreman_name) {
+		if(foreman_name) { // for backwards compatibility with the old syntax for specifying a worker's project name
+			list_push_tail(preferred_masters, foreman_name);
+		}
+	}
+
 	check_arguments(argc, argv);
 
 	signal(SIGTERM, handle_abort);
@@ -1692,9 +1698,6 @@ int main(int argc, char *argv[])
 		}
 		unfinished_tasks = itable_create(0);
 	} else {
-		if(foreman_name) { // for backwards compatibility with the old syntax for specifying a worker's project name
-			list_push_tail(preferred_masters, foreman_name);
-		}
 		active_tasks = itable_create(0);
 		stored_tasks = itable_create(0);
 	}
