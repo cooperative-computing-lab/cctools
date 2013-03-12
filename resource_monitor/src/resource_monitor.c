@@ -171,7 +171,7 @@ pid_t  first_process_pid;              /* pid of the process given at the comman
 pid_t  first_process_exit_status;      /* exit status of the process given at the command line */
 char  *over_limit_str = NULL;          /* string to report the limits exceeded */
 
-double secs_initial;                   /* Time at which monitoring started, in secs. */
+uint64_t usecs_initial;                /* Time at which monitoring started, in usecs. */
 
 
 struct itable *processes;       /* Maps the pid of a process to a unique struct process_info. */
@@ -191,11 +191,11 @@ int lib_helper_extracted;		/* Boolean flag to indicate whether the bundled helpe
 //time in usecs, no seconds:
 struct cpu_time_info
 {
-	double user_time;
-	double kernel_time;
+	uint64_t user_time;
+	uint64_t kernel_time;
 
-	double delta_user_time;
-	double delta_kernel_time;
+	uint64_t delta_user_time;
+	uint64_t delta_kernel_time;
 };
 
 struct mem_info
@@ -243,7 +243,7 @@ struct filesys_info
 
 struct process_info
 {
-	double      wall_time;
+	uint64_t    wall_time;
 	pid_t       pid;
 	const char *cmd;
 	int         running;
@@ -261,20 +261,22 @@ char *resources[15] = { "wall_clock(seconds)",
 						"workdir_number_files_dirs", "workdir_footprint(MB)",
 						NULL };
 
+// These fields are defined as signed integers, even though they
+// will only contain positive numbers. This is to conversion to
+// signed quantities when comparing to maximum limits.
 struct tree_info
 {
-	double   wall_time;
-	int64_t  max_concurrent_processes;
-	double   cpu_time;
-	int64_t  virtual_memory; 
-	int64_t  resident_memory; 
-	int64_t  bytes_read;
-	int64_t  bytes_written;
-	int64_t  workdir_number_files_dirs;
-	int64_t  workdir_footprint;
+	int64_t wall_time;
+	int64_t max_concurrent_processes;
+	int64_t cpu_time;
+	int64_t virtual_memory; 
+	int64_t resident_memory; 
+	int64_t bytes_read;
+	int64_t bytes_written;
+	int64_t workdir_number_files_dirs;
+	int64_t workdir_footprint;
 
 	int64_t  fs_nodes;
-
 };
 
 struct tree_info *tree_max;
@@ -284,34 +286,27 @@ struct tree_info *tree_limits;
  * Utility functions (open log files, proc files, measure time)
  ***/
 
-char *current_time(void)
+double usecs_since_epoch()
 {
-	time_t secs = time(NULL);
-
-	return ctime(&secs);
-}
-
-double secs_since_epoch()
-{
-	double secs;
+	uint64_t usecs;
 	struct timeval time; 
 
 	gettimeofday(&time, NULL);
 
-	secs  = time.tv_sec;
-	secs += ((double) time.tv_usec / ONE_SECOND);
+	usecs  = time.tv_sec * ONE_SECOND;
+	usecs += time.tv_usec;
 
-	return secs;
+	return usecs;
 }
 
-double secs_since_launched()
+double usecs_since_launched()
 {
-	return (secs_since_epoch() - secs_initial);
+	return (usecs_since_epoch() - usecs_initial);
 }
 
-double clicks_to_secs(uint64_t clicks)
+double clicks_to_usecs(uint64_t clicks)
 {
-	return ((double) clicks / sysconf(_SC_CLK_TCK));
+	return ((clicks * ONE_SECOND) / sysconf(_SC_CLK_TCK));
 }
 
 void open_log_files(const char *filename)
@@ -662,11 +657,11 @@ int get_cpu_time_usage(pid_t pid, struct cpu_time_info *cpu)
 			/* .... */,
 			&kernel, &user);
 
-	cpu->delta_user_time   = clicks_to_secs(user)   - cpu->user_time;	 
-	cpu->delta_kernel_time = clicks_to_secs(kernel) - cpu->kernel_time;	
+	cpu->delta_user_time   = clicks_to_usecs(user)   - cpu->user_time;	 
+	cpu->delta_kernel_time = clicks_to_usecs(kernel) - cpu->kernel_time;	
 
-	cpu->user_time   = clicks_to_secs(user);	
-	cpu->kernel_time = clicks_to_secs(kernel);	
+	cpu->user_time   = clicks_to_usecs(user);	
+	cpu->kernel_time = clicks_to_usecs(kernel);	
 
 	fclose(fstat);
 
@@ -913,7 +908,7 @@ void monitor_processes_once(struct process_info *acc)
 
 	bzero(acc, sizeof( struct process_info ));
 
-	acc->wall_time = secs_since_launched();
+	acc->wall_time = usecs_since_launched();
 
 	itable_firstkey(processes);
 	while(itable_nextkey(processes, &pid, (void **) &p))
@@ -936,7 +931,7 @@ void monitor_wds_once(struct wdir_info *acc)
 
 	bzero(acc, sizeof( struct wdir_info ));
 
-	acc->wall_time = secs_since_launched();
+	acc->wall_time = usecs_since_launched();
 
 	hash_table_firstkey(wdirs);
 	while(hash_table_nextkey(wdirs, &path, (void **) &d))
@@ -953,7 +948,7 @@ void monitor_fss_once(struct filesys_info *acc)
 
 	bzero(acc, sizeof( struct filesys_info ));
 
-	acc->wall_time = secs_since_launched();
+	acc->wall_time = usecs_since_launched();
 
 	itable_firstkey(filesysms);
 	while(itable_nextkey(filesysms, &dev_id, (void **) &f))
@@ -981,7 +976,7 @@ void monitor_summary_header()
 
 void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct wdir_info *d, struct filesys_info *f)
 {
-	tr->wall_time                = secs_since_launched();
+	tr->wall_time                = usecs_since_launched();
 
 	tr->max_concurrent_processes = (int64_t) itable_size(processes);
 	tr->cpu_time                 = (p->cpu.delta_user_time + p->cpu.delta_kernel_time) + tr->cpu_time;
@@ -1037,16 +1032,16 @@ void monitor_find_max_tree(struct tree_info *result, struct tree_info *tr)
 
 void monitor_log_row(struct tree_info *tr)
 {
-	fprintf(log_file, "%lf\t", tr->wall_time + secs_initial);
+	fprintf(log_file, "%" PRId64 "\t", tr->wall_time + usecs_initial);
 	fprintf(log_file, "%" PRId64 "\t", tr->max_concurrent_processes);
-	fprintf(log_file, "%lf\t", tr->cpu_time);
+	fprintf(log_file, "%" PRId64 "\t", tr->cpu_time);
 	fprintf(log_file, "%" PRId64 "\t", tr->virtual_memory);
 	fprintf(log_file, "%" PRId64 "\t", tr->resident_memory);
 	fprintf(log_file, "%" PRId64 "\t", tr->bytes_read);
 	fprintf(log_file, "%" PRId64 "\t", tr->bytes_written);
                                
 	fprintf(log_file, "%" PRId64 "\t", tr->workdir_number_files_dirs);
-	fprintf(log_file, "%lf\n", ((double) tr->workdir_footprint / ONE_MEGABYTE));
+	fprintf(log_file, "%" PRId64 "\n", tr->workdir_footprint);
                                
 	/* are we going to keep monitoring the whole filesystem? */
 	// fprintf(log_file, "%" PRId64 "\n", tr->fs_nodes);
@@ -1062,13 +1057,18 @@ int monitor_final_summary()
 		status = -1;
 
 	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", tree_max->max_concurrent_processes);
-	fprintf(log_file_summary, "%-30s\t%lf\n",         "wall_time:", tree_max->wall_time);
-	fprintf(log_file_summary, "%-30s\t%lf\n",         "cpu_time:", tree_max->cpu_time);
+
+	//Print time in seconds, rather than microseconds.
+	fprintf(log_file_summary, "%-30s\t%lf\n",         "wall_time:", ((double) tree_max->wall_time / ONE_SECOND));
+	fprintf(log_file_summary, "%-30s\t%lf\n",         "cpu_time:",  ((double) tree_max->cpu_time  / ONE_SECOND));
+
 	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "virtual_memory:", tree_max->virtual_memory);
 	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "resident_memory:", tree_max->resident_memory);
 	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "bytes_read:", tree_max->bytes_read);
 	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "bytes_written:", tree_max->bytes_written);
 	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", tree_max->workdir_number_files_dirs);
+
+	//Print the footprint in megabytes, rather than of bytes.
 	fprintf(log_file_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
 
 	if(status && !first_process_exit_status)
@@ -1162,9 +1162,10 @@ void cleanup_zombie(struct process_info *p)
 
 		/* BUG: end and wall_time should be computed in a final
 		 * summary, not here */
-		tree_max->wall_time = secs_since_epoch() - secs_initial;
+		tree_max->wall_time = usecs_since_epoch() - usecs_initial;
 
-		fprintf(log_file_summary, "%-30s\t%lf\n", "end:", tree_max->wall_time + secs_initial);
+		fprintf(log_file_summary, "%-30s\t%lf\n", "end:", 
+				(double) (tree_max->wall_time + usecs_initial) / ONE_SECOND);
 
 		if( WIFEXITED(status) )
 		{
@@ -1238,8 +1239,8 @@ struct tree_info *monitor_rusage_tree(void)
 	if(getrusage(RUSAGE_CHILDREN, &usg) != 0)
 		return NULL;
 
-	tr_usg->cpu_time        = (double) (usg.ru_utime.tv_sec + usg.ru_stime.tv_sec);
-	tr_usg->cpu_time       += (usg.ru_utime.tv_usec + usg.ru_stime.tv_usec) / ((double) ONE_SECOND); 
+	tr_usg->cpu_time       = (usg.ru_utime.tv_sec  + usg.ru_stime.tv_sec) * ONE_SECOND;
+	tr_usg->cpu_time      += (usg.ru_utime.tv_usec + usg.ru_stime.tv_usec);
 	tr_usg->resident_memory = usg.ru_maxrss;
 
 	return tr_usg;
@@ -1526,7 +1527,7 @@ struct process_info *spawn_first_process(const char *cmd)
 	pid_t pid;
 
 	fprintf(log_file_summary, "command: %s\n", cmd);
-	fprintf(log_file_summary, "%-30s\t%lf\n", "start:", secs_initial);
+	fprintf(log_file_summary, "%-30s\t%lf\n", "start:", ((double) usecs_initial / ONE_SECOND));
 
 	pid = monitor_fork();
 
@@ -1640,7 +1641,7 @@ int main(int argc, char **argv) {
 	tree_max    = calloc(1, sizeof(struct tree_info));
 	tree_limits = calloc(1, sizeof(struct tree_info));
 
-	secs_initial = secs_since_epoch();
+	usecs_initial = usecs_since_epoch();
 	initialize_limits_tree(tree_limits, INTMAX_MAX);
 
 	struct option long_options[] =
