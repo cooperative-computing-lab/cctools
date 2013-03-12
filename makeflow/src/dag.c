@@ -77,11 +77,13 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	return n;
 }
 
+/* Returns the struct dag_file for the local filename */
 struct dag_file *dag_file_from_name(struct dag *d, const char *filename)
 {
 	return (struct dag_file *) hash_table_lookup(d->file_table, filename);
 }
 
+/* Returns the remotename used in rule n for local name filename */
 char *dag_file_remote_name(struct dag_node *n, const char *filename)
 {
 	struct dag_file *f;
@@ -93,17 +95,16 @@ char *dag_file_remote_name(struct dag_node *n, const char *filename)
 	return name;
 }
 
+/* True if the local file is specified as an absolute path */
 int dag_file_isabsolute(const struct dag_file *f)
 {
 	return f->filename[0] == '/';
 }
 
+/* Translate an absolute filename into a unique slash-less name to allow for the
+   sending of any file to remote systems. The function allows for upto a million name collisions. */
 char *dag_node_translate_filename(struct dag_node *n, const char *filename)
 {
-	/* The purpose of this function is to translate an absolute path
-	   filename into a unique slash-less name to allow for the sending
-	   of any file to remote systems. */
-
 	int len;
 	char *newname_ptr;
 
@@ -158,6 +159,8 @@ char *dag_node_translate_filename(struct dag_node *n, const char *filename)
 	return newname_ptr;
 }
 
+/* Return the dag_file associated with the local name filename.
+ * If one does not exist, it is created. */
 struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
 {
 	struct dag_file *f;
@@ -178,7 +181,8 @@ struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
 	return f;
 }
 
-
+/* Returns the list of dag_file's which are not the target of any
+ * node */
 struct list *dag_input_files(struct dag *d)
 {
 	struct dag_file *f;
@@ -198,6 +202,8 @@ struct list *dag_input_files(struct dag *d)
 	return il;
 }
 
+/* Constructs the dictionary of environment variables for a dag
+ * */
 char *dag_lookup(const char *name, void *arg)
 {
 	struct dag_lookup_set s = {(struct dag *)arg, NULL, NULL};
@@ -254,7 +260,11 @@ const char *dag_node_state_name(dag_node_state_t state)
 	}
 }
 
-
+/* Adds remotename to the local name filename in the namespace of
+ * the given node. If remotename is NULL, then a new name is
+ * found using dag_node_translate_filename. If the remotename
+ * given is different from a previosly specified, a warning is
+ * written to the debug output, but otherwise this is ignored. */
 const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, const char *remotename)
 {
 	char *oldname;
@@ -279,14 +289,9 @@ const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, c
 	return remotename;
 }
 
-struct dag_file *dag_node_add_file(struct dag_node *n, const char *filename, const char *remotename)
-{
-	struct dag_file *f = dag_file_lookup_or_create(n->d, filename); 
-
-
-	return f;
-}
-
+/* Adds the local name to the list of source files of the node,
+ * and adds the node as a dependant of the file. If remotename is
+ * not NULL, it is added to the namespace of the node. */
 void dag_node_add_source_file(struct dag_node *n, const char *filename, char *remotename)
 {
 	struct dag_file *source = dag_file_lookup_or_create(n->d, filename);
@@ -301,6 +306,9 @@ void dag_node_add_source_file(struct dag_node *n, const char *filename, char *re
 	list_push_head(source->needed_by, n);
 }
 
+/* Adds the local name as a target of the node, and register the
+ * node as the producer of the file. If remotename is not NULL,
+ * it is added to the namespace of the node. */
 void dag_node_add_target_file(struct dag_node *n, const char *filename, char *remotename)
 {
 	struct dag_file *target = dag_file_lookup_or_create(n->d, filename);

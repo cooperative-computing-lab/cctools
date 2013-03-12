@@ -97,7 +97,10 @@ struct dag_node {
 };
 
 /* struct dag_file represents a file, inpur or output, of the
- * workflow. filename is the path given in the makeflow file.
+ * workflow. filename is the path given in the makeflow file,
+ * that is the local name of the file. Additionaly, dag_file
+ * keeps track which nodes use the file as a source, and the
+ * unique node, if any, that produces the file.
  */
 
 struct dag_file {
@@ -113,8 +116,8 @@ struct dag_lookup_set {
 	struct hash_table *table;
 };
 
-struct dag_node *dag_node_create(struct dag *d, int linenum);
 struct dag *dag_create();
+struct dag_node *dag_node_create(struct dag *d, int linenum);
 struct dag_file *dag_file_create(struct dag_node *n, const char *filename, const char *remotename);
 
 struct list *dag_input_files(struct dag *d);
