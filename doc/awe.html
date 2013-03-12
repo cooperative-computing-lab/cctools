@@ -67,29 +67,30 @@ and accesses them:
 
 <table>
 <tr>
-<th>Software</th><th>Version</th><th>Accessed in</th>
+<th>Software</th><th>Version</th><th>Present in</th>
 </tr>
 <tr>
-<td><a href="http://python.org">Python</a></td><td>2.6 or higher</td><td>PATH</td>
+<td><a href="http://python.org">Python</a></td><td>2.6 or 2.7</td><td>PATH and LD_LIBRARY_PATH</td>
 </tr>
 <tr>
 <td><a href="http://www.gromacs.org">GROMACS</a></td><td>4.5 or higher</td><td>PATH</td>
 </tr>
 <tr>
 <td><a
-href="http://www.gromacs.org/Developer_Zone/Programming_Guide/XTC_Library">GROMACS XTC Library</a></td><td>1.1 or higher</td><td>LD_LIBRARY_PATH</td>
+href="http://www.gromacs.org/Developer_Zone/Programming_Guide/XTC_Library">GROMACS
+XTC Library</a></td><td>1.1 or higher</td><td>LD_LIBRARY_PATH and INCLUDE_PATH</td>
 </tr>
 <tr>
 <td><a href="http://www.numpy.org">Numpy</a></td><td>1.5 or higher</td><td>PYTHONPATH</td>
 </tr>
 <tr>
-<td><a href="http://www.csb.pitt.edu/prody">Prody</a></td><td>1.4.1 or higher</td><td>PYTHONPATH</td>
+<td><a href="http://www.csb.pitt.edu/prody">Prody</a></td><td>0.9.4 or higher</td><td>PYTHONPATH</td>
 </tr>
 <tr>
-<td><a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a></td><td>1.15 or higher</td><td>LD_LIBRARY_PATH</td>
+<td><a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a></td><td>1.15 or higher</td><td>LD_LIBRARY_PATH and INCLUDE_PATH</td>
 </tr>
 <tr>
-<td><a href="http://matplotlib.org">Matplotlib</a></td><td>1.2.0 or higher</td><td>PYTHONPATH</td>
+<td><a href="http://matplotlib.org">Matplotlib</a></td><td>1.1.0 or higher</td><td>PYTHONPATH</td>
 </tr>
 </table> 
 
@@ -159,9 +160,10 @@ transitions for the Alanine Dipeptide protein. To run this example, do
  Loading cells and walkers
 </pre>
 
-The AWE master program successfully started and is loading the cells and walkers
-for running the simulations. After that, the master waits for workers to connect
-so it can dispatch the simulation tasks for execution by the connected workers.
+The AWE master program successfully started and began loading the cells and
+walkers for running the simulations. After that, the master waits for workers to
+connect so it can dispatch the simulation tasks for execution by the connected
+workers.
 
 Now, start a worker for this master on the same machine:
 <pre>
@@ -196,10 +198,6 @@ Your job 1054783 ("worker.sh") has been submitted
 ...
 </pre>
 
-Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>
-are simple shell scripts, so you can edit them directly if you would
-like to change batch options or other details.
-<p>
 Once the workers begin running, the AWE master can dispatch tasks to
 each one very quickly.  It's ok if a machine running a worker crashes
 or is turned off; the work will be silently sent elsewhere to run.
@@ -209,14 +207,22 @@ still be available, so you can either run another master with the
 same workers, remove them from the batch system, or wait for them to
 expire.  If you do nothing for 15 minutes, they will automatically exit.
 
-<h2> Analysis </h2>
+<h2> Output of AWE</h2>
 
-After running the example, a Ramachandran plot (free energy landscape on phi-psi
-space) can be generated according to AWE output
-<tt>resample/cell-weights.csv</tt> with the following command.
+The AWE master creates the following output files on completion:
+<ul>
+<li><tt>cell-weights.csv</tt> describing the weight of the cells </li>
+<li><tt>walker-history.csv</tt> describing the cells that were visited by the walkers </li>
+<li><tt>color-transition-matrix.csv</tt> that describes the transitions of each
+walker through their visited cells </li> 
+<li><tt>walker-weights.csv</tt> that describes the weights of the walkers</li>
+</ul>
 
+You can use these output files to generate different plots that visualize the
+output of the AWE run. To generate a Ramachandran plot (free energy landscape on
+phi-psi space) using <tt>cell-weights.csv</tt>, run the following command.
 <pre>
-% python awe-rama-ala.py -w <project dir>/resample/cell-weights.csv -p <projectdir>/testinput/state0.pdb -c <project dir>/testinput/cells.dat -n 100
+% python awe-rama-ala.py -w cell-weights.csv -p awe-instance-data/testinput/state0.pdb -c awe-instance-data/testinput/cells.dat -n 100
 </pre>
 
 This produces an output file named <tt>awe-rama-ala.png</tt>
@@ -225,7 +231,7 @@ This produces an output file named <tt>awe-rama-ala.png</tt>
 <tt>transitions.dat</tt>, use the script <tt>awe-flux.py</tt>.
 
 <pre>
-% python awe-flux.py -i <project dir>/transitions.dat -l 0.01 -o flux
+% python awe-flux.py -i transitions.dat -l 0.01 
 </pre>
 							
 This will produce the following outputs:		
@@ -240,7 +246,7 @@ This will produce the following outputs:
 <tt>awe-transMatrix.py</tt>
 
 <pre>
-% python awe-transMatrix.py -p <project dir>/resample/walker-history.dat -w <project dir>/resample/walker-weights.dat -t 1 -n 100
+% python awe-transMatrix.py -p walker-history.csv -w walker-weights.dat -t 1 -n 100
 </pre>
 
 <h2>For More Information</h2>
