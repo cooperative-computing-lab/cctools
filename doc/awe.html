@@ -24,14 +24,14 @@ border-collapse: collapse;
 width: 75%;
 }
 th {
-border-width: 1px;
-padding:6px;
+border-width: 2px;
+padding:4px;
 border-style:solid;
 background-color: #DAD8D8;
 }
 td {
 border-width: 2px;
-padding:5px;
+padding:4px;
 border-style:solid;
 }
 </style>
@@ -67,18 +67,17 @@ and accesses them:
 
 <table>
 <tr>
-<th>Software</th><th>Version</th><th>Present in</th>
+<th>Software</th><th>Version</th><th>Must be present in environment variable</th>
 </tr>
 <tr>
-<td><a href="http://python.org">Python</a></td><td>2.6 or 2.7</td><td>PATH and LD_LIBRARY_PATH</td>
+<td><a href="http://python.org">Python</a></td><td>2.6 or 2.7</td><td>PATH and PYTHONPATH</td>
 </tr>
 <tr>
 <td><a href="http://www.gromacs.org">GROMACS</a></td><td>4.5 or higher</td><td>PATH</td>
 </tr>
 <tr>
 <td><a
-href="http://www.gromacs.org/Developer_Zone/Programming_Guide/XTC_Library">GROMACS
-XTC Library</a></td><td>1.1 or higher</td><td>LD_LIBRARY_PATH and INCLUDE_PATH</td>
+href="http://www.gromacs.org/Developer_Zone/Programming_Guide/XTC_Library">GROMACS XTC Library</a></td><td>1.1 or higher</td><td>C_INCLUDE_PATH and LD_LIBRARY_PATH</td>
 </tr>
 <tr>
 <td><a href="http://www.numpy.org">Numpy</a></td><td>1.5 or higher</td><td>PYTHONPATH</td>
@@ -87,7 +86,7 @@ XTC Library</a></td><td>1.1 or higher</td><td>LD_LIBRARY_PATH and INCLUDE_PATH</
 <td><a href="http://www.csb.pitt.edu/prody">Prody</a></td><td>0.9.4 or higher</td><td>PYTHONPATH</td>
 </tr>
 <tr>
-<td><a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a></td><td>1.15 or higher</td><td>LD_LIBRARY_PATH and INCLUDE_PATH</td>
+<td><a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a></td><td>1.15 or higher</td><td>C_INCLUDE_PATH and LD_LIBRARY_PATH</td>
 </tr>
 <tr>
 <td><a href="http://matplotlib.org">Matplotlib</a></td><td>1.1.0 or higher</td><td>PYTHONPATH</td>
@@ -117,12 +116,12 @@ Compile and install AWE in the location pointed by $AWE_INSTALL_PATH using:
 
 Now set PATH to include the installed AWE binaries:
 <pre>
-% export PATH=${PATH}:${AWE_INSTALL_PATH}:${PATH}
+% export PATH=${AWE_INSTALL_PATH}/bin:${PATH}
 </pre>
 
 Finally, set PYTHONPATH to include the installed AWE Python modules:
 <pre>
-% export PYTHONPATH=${PYTHONPATH}:${AWE_INSTALL_PATH}/lib/python2.6/site-packages
+% export PYTHONPATH=${AWE_INSTALL_PATH}/lib/python2.6/site-packages:${PYTHONPATH}
 </pre>
 
 You can also check if AWE was correctly installed by running:
@@ -134,7 +133,7 @@ You can also check if AWE was correctly installed by running:
 
 To run AWE to sample a protein molecule, you will need to have the files
 describing the topology of atoms in that molecule, the coordinates of the
-walkers, and the coordinates of the cells. 
+/binwalkers, and the coordinates of the cells. 
 
 <p>In addition, AWE transfers the executables from the GROMACS package required for
 running the simulations of each walker. This can be fetched to the current
@@ -151,7 +150,7 @@ all AWE runs will require (namely the binaries and Gromacs forcefield files).
 transitions for the Alanine Dipeptide protein. To run this example, do
 
 <pre>
-% python example.py
+% python awe-ala.py
 </pre>
 
 <p> You will see this right away:
@@ -213,8 +212,8 @@ The AWE master creates the following output files on completion:
 <ul>
 <li><tt>cell-weights.csv</tt> describing the weight of the cells </li>
 <li><tt>walker-history.csv</tt> describing the cells that were visited by the walkers </li>
-<li><tt>color-transition-matrix.csv</tt> that describes the transitions of each
-walker through their visited cells </li> 
+<li><tt>color-transition-matrix.csv</tt> that describes the number of
+transitions between the defined cell groups</li> 
 <li><tt>walker-weights.csv</tt> that describes the weights of the walkers</li>
 </ul>
 
@@ -236,10 +235,10 @@ This produces an output file named <tt>awe-rama-ala.png</tt>
 							
 This will produce the following outputs:		
 <ul>
-<li>instan-forward-flux.dat: instantaneous forward flux</li>
-<li>instan-backward-flux.dat: instantaneous backward flux</li>
-<li>forward-flux.png: plot of forward flux</li>
-<li>backward-flux.png: plot of backward flux</li>
+<li><tt>instan-forward-flux.dat</tt>: instantaneous forward flux</li>
+<li><tt>instan-backward-flux.dat</tt>: instantaneous backward flux</li>
+<li><tt>forward-flux.png</tt>: plot of forward flux</li>
+<li><tt>backward-flux.png</tt>: plot of backward flux</li>
 </ul>
 
 <p>To generate transition probability matrix from AWE output, run the script
@@ -248,6 +247,30 @@ This will produce the following outputs:
 <pre>
 % python awe-transMatrix.py -p walker-history.csv -w walker-weights.dat -t 1 -n 100
 </pre>
+This prints the matrix to a file called <tt>trans.csv</tt>.
+
+<h2> Running AWE on Different Protein Systems</h2>
+One protocol to run AWE is as follows:
+<ol>
+<li> Sample the conformations space (eg, ensemble simulations, replica exchange). </li>
+<li> Cluster the data to obtain the cell definitions.</li>
+<li> Extract j conformations from each cluster. These are your walkers.</li>
+</ol>
+To run AWE on a different protein system than the Alanine Dipeptide in the above
+example, you need to do the following:
+
+<ol>
+<li> Describe the topology of the system in <tt>topol.pdb</tt>.
+<li> Prepare the state definitions and list them in <tt>cells.dat</tt> </li>
+<li> Select the subset of atoms from the cell definitions <tt>cells.dat</tt> and list
+them in <tt>CellIndices.dat</tt></li>
+<li> Select the subset of atoms from the walker topology file <tt>topol.pdb</tt>
+and list them in <tt>StructureIndices.dat</tt></li>
+<li> Define the initial coordinates for the walkers in <tt>State$i-$j.pdb</tt>
+where <tt>i</tt> is the index of the cell and <tt>j</tt> is the index of the walker.</li>
+<li> Specify the parameters for the walker simulation by GROMACS in
+<tt>sim.mdp</tt>. 
+</ol>
 
 <h2>For More Information</h2>
 
