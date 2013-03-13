@@ -432,6 +432,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 			list_push_head(q->ready_list, t);
 		}
 		itable_remove(q->running_tasks, t->taskid);
+		itable_remove(q->finished_tasks, t->taskid);
 		itable_remove(q->worker_task_map, t->taskid);
 	}
 	itable_clear(w->current_tasks);
