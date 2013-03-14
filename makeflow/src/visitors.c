@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "xxmalloc.h"
 #include "list.h"
+#include "stringtools.h"
 
 #include "visitors.h"
 
@@ -30,7 +31,8 @@ int dag_to_file_vars(const struct dag *d, FILE *dag_stream)
 
 	hash_table_firstkey(vars);
 	while(hash_table_nextkey(vars, &var, &value)) {
-		fprintf(dag_stream, "%s=\"%s\"\n", var, (char *) value);
+		if(!string_null_or_empty(value) && strcmp(var, "_MAKEFLOW_COLLECT_LIST"))
+			fprintf(dag_stream, "%s=\"%s\"\n", var, (char *) value);
 	}
 
 	return 0;
