@@ -172,11 +172,12 @@ static int errno_is_temporary(int e)
 	}
 }
 
-static int link_internal_sleep(struct link *link, struct timeval *timeout, int reading, int writing)
+static int link_internal_sleep(struct link *link, struct timeval *timeout, sigset_t *mask, int reading, int writing)
 {
 	int result;
 	struct pollfd pfd;
 	int msec;
+	sigset_t cmask;
 
 	if(timeout) {
 		msec = (timeout->tv_sec * 1000.0) + (timeout->tv_usec/1000.0);
@@ -194,7 +195,11 @@ static int link_internal_sleep(struct link *link, struct timeval *timeout, int r
 
 		if (reading) pfd.events = POLLIN;
 		if (writing) pfd.events = POLLOUT;
+		
+		sigprocmask(SIG_UNBLOCK, mask, &cmask);
 		result = poll(&pfd, 1, msec);
+		sigprocmask(SIG_SETMASK, &cmask, NULL);
+		
 		if (result > 0) {
 			if (reading && (pfd.revents & POLLIN)) {
 				return 1;
@@ -207,6 +212,8 @@ static int link_internal_sleep(struct link *link, struct timeval *timeout, int r
 			}
 			continue;
 		} else if (result == 0) {
+			return 0;
+		} else if (mask && errno == EINTR) {
 			return 0;
 		} else if (errno_is_temporary(errno)) {
 			continue;
@@ -234,7 +241,7 @@ int link_sleep(struct link *link, time_t stoptime, int reading, int writing)
 		tptr = &tm;
 	}
 
-	return link_internal_sleep(link, tptr, reading, writing);
+	return link_internal_sleep(link, tptr, NULL, reading, writing);
 }
 
 int link_usleep(struct link *link, int usec, int reading, int writing)
@@ -244,7 +251,22 @@ int link_usleep(struct link *link, int usec, int reading, int writing)
 	tm.tv_sec = 0;
 	tm.tv_usec = usec;
 
-	return link_internal_sleep(link, &tm, reading, writing);
+	return link_internal_sleep(link, &tm, NULL, reading, writing);
+}
+
+int link_usleep_mask(struct link *link, int usec, sigset_t *mask, int reading, int writing) {
+	struct timeval tm;
+	sigset_t emptymask;
+
+	tm.tv_sec = 0;
+	tm.tv_usec = usec;
+	
+	if(!mask) {
+		sigemptyset(&emptymask);
+		mask = &emptymask;
+	}
+
+	return link_internal_sleep(link, &tm, mask, reading, writing);
 }
 
 static struct link *link_create()

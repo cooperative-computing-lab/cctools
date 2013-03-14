@@ -179,7 +179,7 @@ static void report_worker_ready(struct link *master)
 	name_of_master = actual_master ? actual_master->proj : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
 	name_of_pool = pool_name ? pool_name : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
 
-	link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s %s %s %s\n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, name_of_master, name_of_pool, os_name, arch_name, workspace, CCTOOLS_VERSION);
+	link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s %s %s %s \n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, name_of_master, name_of_pool, os_name, arch_name, workspace, CCTOOLS_VERSION);
 	
 	if(worker_mode == WORKER_MODE_WORKER || worker_mode == WORKER_MODE_FOREMAN) {	
 		current_worker_tasks = max_worker_tasks;
@@ -1170,7 +1170,7 @@ static void abort_worker() {
 }
 
 static void update_worker_status(struct link *master) {
-	if(current_worker_tasks < max_worker_tasks) {
+	if(current_worker_tasks != max_worker_tasks) {
 		current_worker_tasks = max_worker_tasks;
 		link_putfstring(master, "update slots %d\n", time(0)+active_timeout, max_worker_tasks);
 	}
@@ -1302,6 +1302,7 @@ static int worker_handle_master(struct link *master) {
 
 static void work_for_master(struct link *master) {
 	int result;
+	sigset_t mask;
 
 	if(!master) {
 		return;
@@ -1309,6 +1310,9 @@ static void work_for_master(struct link *master) {
 
 	debug(D_WQ, "working for master at %s:%d.\n", actual_addr, actual_port);
 
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGCHLD);
+	
 	time_t idle_stoptime = time(0) + idle_timeout;
 	// Start serving masters
 	while(!abort_flag) {
@@ -1318,7 +1322,7 @@ static void work_for_master(struct link *master) {
 			break;
 		}
 
-		result = link_usleep(master, 5000, 1, 0);
+		result = link_usleep_mask(master, 5000, &mask, 1, 0);
 
 		if(result < 0) {
 			abort_flag = 1;
@@ -1470,6 +1474,11 @@ static void foreman_for_master(struct link *master) {
 static void handle_abort(int sig)
 {
 	abort_flag = 1;
+}
+
+static void handle_sigchld(int sig)
+{
+	return;
 }
 
 static void show_help(const char *cmd)
@@ -1675,6 +1684,7 @@ int main(int argc, char *argv[])
 	signal(SIGTERM, handle_abort);
 	signal(SIGQUIT, handle_abort);
 	signal(SIGINT, handle_abort);
+	signal(SIGCHLD, handle_sigchld);
 
 	srand((unsigned int) (getpid() ^ time(NULL)));
 	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t)free_work_queue_master);

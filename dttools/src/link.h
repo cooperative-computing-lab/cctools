@@ -47,6 +47,7 @@ link_close(link);
 #include <limits.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <signal.h>
 #include <sys/types.h>
 
 /** Maximum number of characters in the text representation of a link address.  This must be large enough to accomodate ipv6 in the future. */
@@ -206,6 +207,8 @@ int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_lis
 @return One if the link becomes readable or writable before the timeout expires, zero otherwise.
 */
 int link_usleep(struct link *link, int usec, int reading, int writing);
+
+int link_usleep_mask(struct link *link, int usec, sigset_t *mask, int reading, int writing);
 
 /** Block until a link is readable or writable.
 @param link The link to wait on.
