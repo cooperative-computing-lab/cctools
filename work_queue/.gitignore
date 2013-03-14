@@ -1,0 +1,6 @@
+src/perl/work_queue.pm
+src/perl/work_queue.so
+src/perl/work_queue_wrap.c
+src/python/_work_queue.so
+src/python/work_queue.py
+src/python/work_queue_wrap.c

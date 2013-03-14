@@ -1,0 +1,12 @@
+libsandtools.a
+sand_align_kernel
+sand_align_master
+sand_banded_alignment
+sand_compress_reads
+sand_filter_kernel
+sand_filter_master
+sand_filter_mer_seq
+sand_sw_alignment
+sand_ucopy
+sand_uncompress_reads
+

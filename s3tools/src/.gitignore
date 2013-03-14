@@ -1,0 +1,11 @@
+s3stat
+s3setacl
+s3mkdir
+s3rmdir
+s3rm
+s3ls
+s3get
+libs3client.a
+s3getacl
+s3put
+

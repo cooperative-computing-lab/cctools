@@ -1,0 +1,17 @@
+libparrot_helper.so
+parrot_cp
+parrot_getacl
+parrot_locate
+parrot_lsalloc
+parrot_md5
+parrot_mkalloc
+parrot_run
+parrot_search
+parrot_setacl
+parrot_timeout
+parrot_whoami
+tracer.table.c
+tracer.table.h
+tracer.table64.c
+tracer.table64.h
+
