@@ -17,10 +17,12 @@
 
 #define MAX_LINE 1024
 
+#define DEFAULT_MAX_CLUSTERS 4
+
 #define RULE_PREFIX "log-rule-"
 #define RULE_SUFFIX "-summary"
 
-enum fields { WALL_TIME = 1, PROCESSES = 2, CPU_TIME = 4, VIRTUAL = 8, RESIDENT = 16, B_READ = 32, B_WRITTEN = 64, WDIR_FILES = 128, WDIR_FOOTPRINT = 256 };
+enum fields { WALL_TIME = 1, PROCESSES = 2, CPU_TIME = 4, VIRTUAL = 8, RESIDENT = 16, B_READ = 32, B_WRITTEN = 64, WDIR_FILES = 128, WDIR_FOOTPRINT = 256, RULE = 512 };
 
 struct summary
 {
@@ -59,7 +61,6 @@ struct cluster
 int fields_flags = 0xffffffff;
 
 struct summary *max_values;
-
 
 #define assign_field_summ(s, field, key, value)\
 	if(!strcmp(key, #field)){\
@@ -116,18 +117,18 @@ struct summary *parse_summary_file(char *filename)
 	return s;
 }
 
-void print_summary_file(FILE *stream, struct summary *s)
+void print_summary_file(FILE *stream, struct summary *s, int include_field)
 {
-	fprintf(stream, "%d ", s->rule);
-	if( WALL_TIME      & fields_flags ) fprintf(stream, "t: %lf ", s->wall_time);
-	if( PROCESSES      & fields_flags ) fprintf(stream, "p: %lf ", s->max_concurrent_processes);
-	if( CPU_TIME       & fields_flags ) fprintf(stream, "c: %lf ", s->cpu_time);
-	if( VIRTUAL        & fields_flags ) fprintf(stream, "v: %lf ", s->virtual_memory);
-	if( RESIDENT       & fields_flags ) fprintf(stream, "m: %lf ", s->resident_memory);
-	if( B_READ         & fields_flags ) fprintf(stream, "r: %lf ", s->bytes_read);
-	if( B_WRITTEN      & fields_flags ) fprintf(stream, "w: %lf ", s->bytes_written);
-	if( WDIR_FILES     & fields_flags ) fprintf(stream, "n: %lf ", s->workdir_number_files_dirs);
-	if( WDIR_FOOTPRINT & fields_flags ) fprintf(stream, "z: %lf ", s->workdir_footprint);
+	if( RULE           & fields_flags ) fprintf(stream, "%d ", s->rule);
+	if( WALL_TIME      & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "t: " : "", s->wall_time);
+	if( PROCESSES      & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "p: " : "", s->max_concurrent_processes);
+	if( CPU_TIME       & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "c: " : "", s->cpu_time);
+	if( VIRTUAL        & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "v: " : "", s->virtual_memory);
+	if( RESIDENT       & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "m: " : "", s->resident_memory);
+	if( B_READ         & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "r: " : "", s->bytes_read);
+	if( B_WRITTEN      & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "w: " : "", s->bytes_written);
+	if( WDIR_FILES     & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "n: " : "", s->workdir_number_files_dirs);
+	if( WDIR_FOOTPRINT & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "z: " : "", s->workdir_footprint);
 	fprintf(stream, "\n");
 }
 
@@ -395,6 +396,8 @@ struct cluster *cluster_create(struct summary *s)
 	return c;
 }
 
+/* We keep track of cluster merges in a tree structure. The
+ * centroids of leaves are the actual data clustered. */
 struct cluster *cluster_merge(struct cluster *left, struct cluster *right)
 {
 	struct cluster *c = calloc(1, sizeof(struct cluster));
@@ -410,6 +413,39 @@ struct cluster *cluster_merge(struct cluster *left, struct cluster *right)
 	return c;
 }
 
+static int summary_cmp_rule(const void *a, const void *b)
+{
+	const struct summary **sa = (void *) a;
+	const struct summary **sb = (void *) b;
+
+	return ((*sa)->rule - (*sb)->rule); 
+}
+
+void cluster_collect_summaries_recursive(struct cluster *c, struct list *accum)
+{
+	if( !c->right && !c->left)
+		list_push_head(accum, c->centroid);
+
+	if( c->left )
+		cluster_collect_summaries_recursive(c->left, accum);
+
+	if( c->right )
+		cluster_collect_summaries_recursive(c->right, accum);
+}
+
+struct list *cluster_collect_summaries(struct cluster *c)
+{
+	struct list *summaries = list_create(0);
+
+	cluster_collect_summaries_recursive(c, summaries);
+
+			//BUG: rules incorrectly sorted
+	summaries = list_sort(summaries, summary_cmp_rule);
+
+	return summaries;
+}
+
+
 struct cluster *nearest_neighbor_clustering(struct list *initial_clusters)
 {
 	struct cluster *top, *closest, *subtop;
@@ -419,21 +455,27 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters)
 
 	int merge = 0;
 
-	stack = list_create(0);
-	top   = NULL;
+	list_first_item(initial_clusters);
+	top = list_next_item(initial_clusters);
 
+	/* Return immediately if top is NULL, or there is a unique
+	 * initial cluster */
 	if(list_size(initial_clusters) < 2)
 		return top;
 
-	list_first_item(initial_clusters);
-	list_push_head(stack, list_next_item(initial_clusters));
+	stack = list_create(0);
+	list_push_head(stack, top);
 
+	/* Add all of the initial clusters as active clusters. */
 	active_clusters = itable_create(0);
 	while( (top = list_next_item(initial_clusters)) ) 
 		itable_insert(active_clusters, (uintptr_t) top, (void *) top);
 
 	do
 	{
+		/* closest might be NULL if all of the clusters are in
+		 * the stack now. subtop might be NULL if top was the
+		 * only cluster in the stack */
 		top     = list_pop_head( stack );
 		closest = cluster_nearest_neighbor(active_clusters, top);
 		subtop  = list_peek_head( stack );
@@ -447,11 +489,17 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters)
 		if(subtop)
 			dsubtop = cluster_ward_distance(top, subtop);
 
+		/* The nearest neighbor of top is either one of the
+		 * remaining active clusters, or the second topmost
+		 * cluster in the stack */
 		if( closest && subtop )
+		{
+			/* Use pointer address to systematically break ties. */
 			if(dclosest < dsubtop || ((dclosest == dsubtop) && (uintptr_t)closest < (uintptr_t)subtop)) 
 				merge = 0;
 			else 
 				merge = 1;
+		}
 		else if( subtop )
 			merge = 1;
 		else if( closest )
@@ -461,11 +509,16 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters)
 
 		if(merge)
 		{
+			/* If the two topmost clusters in the stack are
+			 * mutual nearest neighbors, merge them into a single
+			 * cluster */
 			subtop = list_pop_head( stack );
 			list_push_head(stack, cluster_merge(top, subtop));
 		}
 		else
 		{
+			/* Otherwise, push the nearest neighbor of top to the
+			 * stack */
 			itable_remove(active_clusters, (uintptr_t) closest);
 			list_push_head(stack, top);
 			list_push_head(stack, closest);
@@ -474,6 +527,10 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters)
 		debug(D_DEBUG, "stack: %d  active: %d  closest: %lf subtop: %lf\n", 
 				list_size(stack), itable_size(active_clusters), dclosest, dsubtop);
 
+		/* If there are no more active_clusters, but there is not
+		 * a single cluster in the stack, we try again,
+		 * converting the clusters in the stack into new active
+		 * clusters. */
 		if(itable_size(active_clusters) == 0 && list_size(stack) > 3)
 		{
 			itable_delete(active_clusters);
@@ -482,6 +539,8 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters)
 
 	}while( !(itable_size(active_clusters) == 0 && list_size(stack) == 1) );
 
+	/* top is now the root of a cluster hierarchy, of
+	 * cluster->right, cluster->left. */
 	top = list_pop_head(stack);
 
 	list_delete(stack);
@@ -490,31 +549,33 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters)
 	return top;
 }
 
-void report_clusters(FILE *freport, struct cluster *final, int max_clusters)
+struct list *collect_final_clusters(struct cluster *final, int max_clusters)
 {
 	int count;
 	struct list *clusters, *clusters_next;
 	struct cluster *c, *cmax;
+	double dmax;
 
 	clusters = list_create(0);
 	list_push_head(clusters, final);
 
-	denormalize_summary(final->centroid);
-	for(count = 1; count <= max_clusters && count == list_size(clusters); count++)
+	/* At each count, we split the cluster with the maximal
+	 * distance between left and right. The iteration stops when
+	 * the maximum number of clusters is reached, or when no more
+	 * clusters can be split. */
+	for(count = 1; count < max_clusters && count == list_size(clusters); count++)
 	{
-		fprintf(freport, "----- %d clusters ------\n", list_size(clusters));
 		clusters_next = list_create(0);
 		list_first_item(clusters);
 
-		int i = 1;
-		double dmax = 0;
 		cmax = NULL;
-
+		dmax = 0;
+				
+		list_first_item(clusters);
 		while( (c = list_next_item(clusters)) )
 		{
-			fprintf(freport, "cluster %d: count: %d \n", i++, c->count);
-			print_summary_file(freport, c->centroid);
-
+			/* Find out if we need to split this cluster for next
+			 * round */
 			if(!cmax || c->internal_conflict > dmax)
 			{
 				dmax = c->internal_conflict;
@@ -522,38 +583,93 @@ void report_clusters(FILE *freport, struct cluster *final, int max_clusters)
 			}
 		}
 
+		/* Iterate through the clusters again. If the cluster has
+		 * the maximal internal conflict, add its left and right
+		 * to the next iteration, otherwise add the cluster to
+		 * the next iteration with no change. */
 		list_first_item(clusters);
 		while( (c = list_next_item(clusters)) )
 		{
 			if(c == cmax)
 			{
 				if( c->right ) 
-				{
-					denormalize_summary(c->right->centroid);
-					list_push_head(clusters_next, c->right);
-				}
+					list_push_tail(clusters_next, c->right);
 
 				if( c->left ) 
-				{
-					denormalize_summary(c->left->centroid);
-					list_push_head(clusters_next, c->left);
-				}
+					list_push_tail(clusters_next, c->left);
 
-				if( !c->left && !c->right ) 
-					list_push_head(clusters_next, c);
+				if( !c->left || !c->right ) 
+					list_push_tail(clusters_next, c);
 			}
 			else
-					list_push_head(clusters_next, c);
+					list_push_tail(clusters_next, c);
 		}
 
 		list_delete(clusters);
 		clusters = clusters_next;
 	}
 
+	return clusters;
+}
+
+void report_clusters_centroids(FILE *freport, struct list *clusters)
+{
+	struct cluster *c;
+
+	list_first_item(clusters);
+	while( (c = list_next_item(clusters)) )
+	{
+		print_summary_file(freport, c->centroid, 0);
+	}
+
+}
+
+void report_clusters_rules(FILE *freport, struct list *clusters)
+{
+	struct cluster *c;
+	int i = 1;
+
+	fprintf(freport, "# %d clusters ------\n", list_size(clusters));
+
+	list_first_item(clusters);
+	while( (c = list_next_item(clusters)) )
+	{
+		/* Centroids are denormalized just for show, so that the
+		 * report shows the actual units. */
+		denormalize_summary(c->centroid);
+
+		/* Print cluster header and centroid */
+		fprintf(freport, "cluster %d count %d \ncenter ", i++, c->count);
+		print_summary_file(freport, c->centroid, 1);
+
+		/* Print rule numbers in this cluster */
+		fprintf(freport, "rules ");
+		struct list *summaries = cluster_collect_summaries(c);
+		struct summary *s;
+		list_first_item(summaries);
+		while( (s = list_next_item(summaries)) )
+			fprintf(freport, "%d ", s->rule);
+		list_delete(summaries);
+		fprintf(freport, "\n\n");
+
+		/* Normalize again. Is the precision we are losing significant? */
+		normalize_summary(c->centroid);
+	}
+
 	list_delete(clusters);
 }
 
+struct list *create_initial_clusters(struct list *summaries)
+{
+	struct summary *s;
+	struct list *initial_clusters = list_create(0);
 
+	list_first_item(summaries);
+	while( (s = list_next_item(summaries)) )
+		list_push_head(initial_clusters, cluster_create(s));
+
+	return initial_clusters;
+}
 
 int parse_fields_options(char *field_str)
 {
@@ -603,10 +719,12 @@ int parse_fields_options(char *field_str)
 
 int main(int argc, char **argv)
 {
-	char       *report_filename = NULL;
-	char       *input_directory;
-	FILE       *freport;
-	struct list *summaries;
+	char           *report_filename = NULL;
+	char           *input_directory;
+	FILE           *freport;
+	int             max_clusters = DEFAULT_MAX_CLUSTERS; 
+	struct list    *summaries, *initial_clusters, *final_clusters;
+	struct cluster *final;
 
 	if(argc < 2)
 	{
@@ -617,18 +735,23 @@ int main(int argc, char **argv)
 	debug_config(argv[0]);
 
 	char c;
-	while( (c = getopt(argc, argv, "d:o:f:")) >= 0 )
+	while( (c = getopt(argc, argv, "d:f:m:o:")) >= 0 )
 	{
 		switch(c)
 		{
 			case 'd':
 				debug_flags_set(optarg);
 				break;
-			case 'o':
-				report_filename = xxstrdup(optarg);
-				break;
 			case 'f':
 				fields_flags = parse_fields_options(optarg);
+				break;
+			case 'm':
+				max_clusters = atoi(optarg);
+				if(max_clusters < 1)
+					fatal("The number of clusters cannot be less than one.\n");
+				break;
+			case 'o':
+				report_filename = xxstrdup(optarg);
 				break;
 			default:
 				/* BUG: show usage here */
@@ -659,23 +782,17 @@ int main(int argc, char **argv)
 
 	normalize_summaries(summaries);
 
-	//Move the followint to its own function
-	struct list *initial_clusters = list_create(0);
-	struct summary *s;
-	list_first_item(summaries);
-	while( (s = list_next_item(summaries)) )
-		list_push_head(initial_clusters, cluster_create(s));
+	initial_clusters = create_initial_clusters(summaries);
 
-
-	struct cluster *final;
 	final = nearest_neighbor_clustering(initial_clusters);
-	
+
+	final_clusters = collect_final_clusters(final, max_clusters);
+
+	report_clusters_centroids(freport, final_clusters);
+
 	denormalize_summaries(summaries);
 
-	report_clusters(freport, final, 5);
-
 	fclose(freport);
-
 
 	return 0;
 }

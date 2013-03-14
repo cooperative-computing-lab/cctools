@@ -5,5 +5,7 @@ src/resource_monitorv
 src/resource_monitor_pb.c
 src/rmonitor_piggyback.h
 src/rmonitor_piggyback.h.gch
+test/cluster
+test/clusters.txt
 test/hogmem
 test/msqrt
