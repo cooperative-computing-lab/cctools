@@ -58,7 +58,7 @@ struct cluster
 };
 
 
-int fields_flags = 0xffffffff;
+int fields_flags = 511;
 
 struct summary *max_values;
 
@@ -619,9 +619,45 @@ void report_clusters_centroids(FILE *freport, struct list *clusters)
 	list_first_item(clusters);
 	while( (c = list_next_item(clusters)) )
 	{
+		fprintf(freport, "%d ", c->count);
 		print_summary_file(freport, c->centroid, 0);
 	}
 
+}
+
+#define add_plot_column(stream, column, flag, title)\
+	if( flag & fields_flags )\
+	{\
+		if(column == 2)\
+			fprintf(stream, " using %d:xticlabels(1) title '%s'", column, title);\
+		else\
+			fprintf(stream, ", '' using %d title '%s'", column, title);\
+		column++;\
+	}
+
+
+/* It would be nice to have a function flag to title */
+void report_clusters_histograms(char *plot_cmd_file, char *clusters_file)
+{
+	FILE *fplot;
+
+	fplot = fopen(plot_cmd_file, "w");
+	if(!fplot)
+		fatal("cannot open file for plot command.\n");
+
+	int column = 2;
+
+	fprintf(fplot, "plot '%s' ", clusters_file);
+
+	add_plot_column(fplot, column, WALL_TIME,      "wall time");      
+	add_plot_column(fplot, column, PROCESSES,      "concurrent processes");
+	add_plot_column(fplot, column, CPU_TIME,       "cpu time");      
+	add_plot_column(fplot, column, VIRTUAL,        "virtual memory");       
+	add_plot_column(fplot, column, RESIDENT,       "resident memory");
+	add_plot_column(fplot, column, B_READ,         "bytes read");        
+	add_plot_column(fplot, column, B_WRITTEN,      "bytes written");     
+	add_plot_column(fplot, column, WDIR_FILES,     "inodes");    
+	add_plot_column(fplot, column, WDIR_FOOTPRINT, "disk footprint");
 }
 
 void report_clusters_rules(FILE *freport, struct list *clusters)
@@ -632,6 +668,7 @@ void report_clusters_rules(FILE *freport, struct list *clusters)
 	fprintf(freport, "# %d clusters ------\n", list_size(clusters));
 
 	list_first_item(clusters);
+	
 	while( (c = list_next_item(clusters)) )
 	{
 		/* Centroids are denormalized just for show, so that the
@@ -789,6 +826,8 @@ int main(int argc, char **argv)
 	final_clusters = collect_final_clusters(final, max_clusters);
 
 	report_clusters_centroids(freport, final_clusters);
+
+	report_clusters_histograms("clusters_plot_cmd", report_filename);
 
 	denormalize_summaries(summaries);
 
