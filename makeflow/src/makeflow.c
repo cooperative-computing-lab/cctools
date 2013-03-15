@@ -2318,6 +2318,7 @@ int main(int argc, char *argv[])
 			case 'N':
 				free(project);
 				project = xxstrdup(optarg);
+				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 				break;
 			case 'o':
 				debug_config_file(optarg);
