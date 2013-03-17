@@ -145,9 +145,10 @@ See the file COPYING for details.
 #include <inttypes.h>
 #include <sys/types.h>
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 	#include <sys/param.h>
     #include <sys/mount.h>
+	#include <sys/resource.h>
 #else
 	#include  <sys/vfs.h>
 #endif
@@ -353,7 +354,11 @@ FILE *open_proc_file(pid_t pid, char *filename)
 {
 		FILE *fproc;
 		char fproc_path[PATH_MAX];	
-		
+
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
+		return NULL;
+#endif
+
 		sprintf(fproc_path, "/proc/%d/%s", pid, filename);
 
 		if((fproc = fopen(fproc_path, "r")) == NULL)
@@ -1215,7 +1220,7 @@ pid_t waiting_child()
 {
 	pid_t pid;
 	
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 	int status;
 	pid = wait4(-1, &status, WNOWAIT, NULL);
 #else
@@ -1233,8 +1238,6 @@ struct tree_info *monitor_rusage_tree(void)
 {
 	struct rusage usg;
 	struct tree_info *tr_usg = calloc(1, sizeof(struct tree_info));
-
-	return NULL;
 
 	if(getrusage(RUSAGE_CHILDREN, &usg) != 0)
 		return NULL;
