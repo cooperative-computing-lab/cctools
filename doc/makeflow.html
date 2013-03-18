@@ -447,7 +447,7 @@ garbage collection cycle:
 
 Currently, <tt>Makeflow</tt> copies all of the files specified as dependencies by the rules in the makeflow file, including scripts and data files. Some of the files not collected are dynamically linked libraries, executables not listed as dependencies (<tt>python</tt>, <tt>perl</tt>), and configuration files (<tt>mail.rc</tt>).
 
-To avoid naming conflicts some files are renamed when copied into the bundle.
+To avoid naming conflicts, files which would otherwise have an identical path are renamed when copied into the bundle
 <ul>
   <li>All file paths are relative to the top level directory.</li>
   <li>The makeflow file is rewritten with the new file locations and placed in the top level directory.</li>
