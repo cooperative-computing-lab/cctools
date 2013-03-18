@@ -1300,7 +1300,7 @@ int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 	if(bk->monitor_mode)
 	{
 		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
-		command = string_format("./%s -o %s -i %d -- %s", monitor_exe, log_name, monitor_interval, command);
+		command = resource_monitor_rewrite_command(command, log_name, RMONITOR_DEFAULT_NAME, RMONITOR_DEFAULT_NAME); 
 	}
 
 	dag_parse_node_set_command(bk, n, command);
