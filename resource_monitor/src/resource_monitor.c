@@ -1240,7 +1240,10 @@ struct tree_info *monitor_rusage_tree(void)
 	struct tree_info *tr_usg = calloc(1, sizeof(struct tree_info));
 
 	if(getrusage(RUSAGE_CHILDREN, &usg) != 0)
+	{
+		debug(D_DEBUG, "getrusage failed: %s\n", strerror(errno));
 		return NULL;
+	}
 
 	tr_usg->cpu_time       = (usg.ru_utime.tv_sec  + usg.ru_stime.tv_sec) * ONE_SECOND;
 	tr_usg->cpu_time      += (usg.ru_utime.tv_usec + usg.ru_stime.tv_usec);

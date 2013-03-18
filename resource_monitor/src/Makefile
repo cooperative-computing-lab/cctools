@@ -34,7 +34,7 @@ resource_monitor.o: rmonitor_piggyback.h resource_monitor.c
 
 ifeq (${UNAME}, FreeBSD)
 librmonitor_helper.so: rmonitor_helper.o rmonitor_helper_comm.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	${CCTOOLS_CC} -shared -fPIC $^ -o $@
+	${CCTOOLS_CC} -shared -Wl,-soname,$@ -lc -fPIC $^ -o $@
 else
 librmonitor_helper.so: rmonitor_helper.o rmonitor_helper_comm.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
 	${CCTOOLS_CC} -shared -ldl -fPIC $^ -o $@

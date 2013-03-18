@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <fcntl.h>
 #include <dlfcn.h>
+#include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/ipc.h>
@@ -38,13 +39,14 @@ See the file COPYING for details.
 
 pid_t waitpid(pid_t pid, int *status, int options)
 {
+	int status_; //status might be NULL, thus we use status_ to retrive the state.
 	pid_t pidb;
 	typeof(waitpid) *original_waitpid = dlsym(RTLD_NEXT, "waitpid");
 
 	debug(D_DEBUG, "waiting from %d.\n", getpid());
-	pidb = original_waitpid(pid, status, options);
+	pidb = original_waitpid(pid, &status_, options);
 
-	if(WIFEXITED(status) || WIFSIGNALED(status))
+	if(WIFEXITED(status_) || WIFSIGNALED(status_))
 	{
 		struct monitor_msg msg;
 		msg.type   = END;
@@ -53,6 +55,9 @@ pid_t waitpid(pid_t pid, int *status, int options)
 
 		send_monitor_msg(&msg);
 	}
+
+	if(status)
+		*status = status_;
 
 	return pid;
 }
@@ -174,12 +179,12 @@ int open(const char *path, int flags, ...)
 {
 	va_list ap;
 	int     fd;
-	mode_t  mode;
+	int     mode;
 
 	typeof(open) *original_open = dlsym(RTLD_NEXT, "open");
 
 	va_start(ap, flags);
-	mode = va_arg(ap, mode_t);
+	mode = va_arg(ap, int);
 	va_end(ap);
 
 	debug(D_DEBUG, "open from %d.\n", getpid());
