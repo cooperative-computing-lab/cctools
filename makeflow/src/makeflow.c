@@ -118,7 +118,7 @@ void dag_export_variables(struct dag *d, struct dag_node *n);
 char *dag_parse_readline(struct dag_parse *bk, struct dag_node *n);
 int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode);
 int dag_parse_variable(struct dag_parse *bk, struct dag_node *n, char *line);
-int dag_parse_node(struct dag_parse *bk, char *line, int clean_mode, int monitor_mode);
+int dag_parse_node(struct dag_parse *bk, char *line, int clean_mode);
 int dag_parse_node_filelist(struct dag_parse *bk, struct dag_node *n, char *filelist, int source, int clean_mode);
 int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line);
 int dag_parse_node_makeflow_command(struct dag_parse *bk, struct dag_node *n, char *line);
@@ -874,6 +874,7 @@ int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode)
 
 	bk->d = d;
 	bk->dag_stream = dag_stream;
+	bk->monitor_mode = monitor_mode;
 
 	while((line = dag_parse_readline(bk, NULL)) != NULL) {
 		
@@ -893,7 +894,7 @@ int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode)
 				goto failure;
 			}
 		} else if(strstr(line, ":")) {
-			if(!dag_parse_node(bk, line, clean_mode, monitor_mode)) {
+			if(!dag_parse_node(bk, line, clean_mode)) {
 				dag_parse_error(bk, "node");
 				goto failure;
 			}
@@ -1073,7 +1074,7 @@ char *monitor_log_name(int nodeid)
 	return string_format(monitor_log_format, nodeid);
 }
 
-int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode, int monitor_mode)
+int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode)
 {
 	struct dag *d = bk->d;
 	char *line;
@@ -1086,7 +1087,7 @@ int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode, int mon
 
 	/* BUG: We need a more general solution to wrapping nodes
 	 * while parsing. The monitor code should not be here. */
-	if(monitor_mode)
+	if(bk->monitor_mode)
 	{
 		log_name = monitor_log_name(n->nodeid);
 		debug(D_DEBUG, "adding monitor %s and %s{,-series,-opened} to rule %d.\n", monitor_exe, log_name, n->nodeid);
@@ -1295,7 +1296,7 @@ int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 	}
 
 	/* BUG: Monitor code should not be here! */
-	if(monitor_exe)
+	if(bk->monitor_mode)
 	{
 		log_name = monitor_log_name(n->nodeid);
 		command = string_format("./%s -o %s/%s -i %d -- %s", monitor_exe, monitor_log_dir, log_name, monitor_interval, command);
@@ -1303,7 +1304,7 @@ int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 
 	dag_parse_node_set_command(bk, n, command);
 
-	if(monitor_exe)
+	if(bk->monitor_mode)
 		free(command);
 
 	return 1;
