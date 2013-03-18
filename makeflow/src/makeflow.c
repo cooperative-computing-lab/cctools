@@ -306,16 +306,62 @@ void collect_input_files(struct dag *d, char* bundle_dir, char *(*rename)(struct
 	list_delete(il);	
 }
 
-char* bundler_rename(struct dag_node *d, const char *filename)
+char* bundler_translate_name(const char *filename, int offset)
 {
-	if (filename[0] == '/'){
-		const char *new_filename;
-		new_filename = (char *)malloc(PATH_MAX * sizeof (*new_filename)); 
-		new_filename = string_basename(filename);
-		return xxstrdup(new_filename);
+	static struct hash_table *previous_names = NULL;
+	static struct hash_table *reverse_names = NULL;
+	if ( !previous_names )
+		previous_names = hash_table_create(0, NULL);
+	if ( !reverse_names )
+		reverse_names = hash_table_create(0, NULL);
+
+	if (offset){
+		filename = string_format("%s%d",filename,offset);
 	}
-	else
+
+	const char *new_filename;
+	new_filename = (char *)malloc(PATH_MAX * sizeof (*new_filename)); 
+	new_filename = hash_table_lookup(previous_names, filename);
+	if ( new_filename )
+		return (char *)new_filename;
+
+	new_filename = hash_table_lookup(reverse_names, filename);
+	if ( new_filename ){
+		offset++;
+		return bundler_translate_name(filename, offset);
+	}
+	if (filename[0] == '/'){
+		new_filename = string_basename(filename);
+		if(hash_table_lookup(previous_names, new_filename)){
+			offset++;
+			return bundler_translate_name(filename, offset);
+		}
+		else if(hash_table_lookup(reverse_names, new_filename)){
+			offset++;
+			return bundler_translate_name(filename, offset);
+		}
+		else {
+			hash_table_insert(reverse_names, new_filename, filename);
+			hash_table_insert(previous_names, filename, new_filename);
+			return xxstrdup(new_filename);
+		}
+	}
+	else {
+		hash_table_insert(previous_names, filename, filename);
+		hash_table_insert(reverse_names, filename, filename);
 		return xxstrdup(filename);
+	}
+}
+
+char* bundler_rename(struct dag_node *n, const char *filename){
+
+	if (n) {
+		struct list *input_files = dag_input_files(n->d);
+		if(list_find(input_files, (int (*) (void *, const void *)) string_equal, (void*)filename))
+			return xxstrdup(filename);
+	}
+	char *a = bundler_translate_name(filename, 0);
+	return a;
 }
 
 void dag_show_output_files(struct dag *d)
