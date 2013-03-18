@@ -161,9 +161,11 @@ See the file COPYING for details.
 #define ONE_MEGABYTE 1048576  /* this many bytes */
 #define ONE_SECOND   1000000  /* this many usecs */    
 
-FILE  *log_file;             /* Final statistics are written to this file. */
-FILE  *log_file_series;      /* Resource events and samples are written to this file. */
-FILE  *log_file_opened;      /* List of opened files is written to this file. */
+#define DEFAULT_LOG_NAME "monitor-log-%d"     /* %d is used for the value of getpid() */
+
+FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
+FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
+FILE  *log_opened  = NULL;      /* List of opened files is written to this file. */
 
 int    monitor_queue_fd = -1;  /* File descriptor of a datagram socket to which (great)
 								  grandchildren processes report to the monitor. */
@@ -310,44 +312,54 @@ double clicks_to_usecs(uint64_t clicks)
 	return ((clicks * ONE_SECOND) / sysconf(_SC_CLK_TCK));
 }
 
-void open_log_files(const char *filename)
+char *default_summary_name(void)
 {
-	char *flog_path;
-	char *flog_path_series;
-	char *flog_path_opened;
+	return string_format(DEFAULT_LOG_NAME, getpid());
+}
+
+char *default_series_name(char *summary_path)
+{
+	if(summary_path)
+		return string_format("%s-series", summary_path);
+	else
+		return string_format(DEFAULT_LOG_NAME "-series", getpid());
+}
+
+char *default_opened_name(char *summary_path)
+{
+	if(summary_path)
+		return string_format("%s-opened", summary_path);
+	else
+		return string_format(DEFAULT_LOG_NAME "-opened", getpid());
+}
+
+FILE *open_log_file(const char *log_path)
+{
+	FILE *log_file;
 	char *dirname;
 
-	if(filename)
-		flog_path         = xxstrdup(filename);
+	if(log_path)
+	{
+		dirname = xxstrdup(log_path);
+		string_dirname(log_path, dirname);
+		if(!create_dir(dirname, 0755))
+			fatal("could not create directory %s : %s\n", dirname, strerror(errno));
+
+		if((log_file = fopen(log_path, "w")) == NULL)
+			fatal("could not open log file %s : %s\n", log_path, strerror(errno));
+
+		free(dirname);
+	}
 	else
-		flog_path = string_format("log-monitor-%d", getpid());
-
-	dirname = xxstrdup(flog_path);
-	string_dirname(flog_path, dirname);
-
-	create_dir(dirname, 0755);
-
-	flog_path_series = string_format("%s-series", flog_path); 
-	flog_path_opened = string_format("%s-opened",  flog_path); 
-
-	if((log_file = fopen(flog_path, "w")) == NULL)
 	{
-		fatal("could not open log file %s : %s\n", flog_path, strerror(errno));
+		/* Cheating, we write to /dev/null, thus the log file is
+		 * not created, but we do not have to change the rest of
+		 * the code. */
+		if((log_file = fopen("/dev/null", "w")) == NULL)
+			fatal("could not open log file %s : %s\n", "/dev/null", strerror(errno));
 	}
 
-	if((log_file_series = fopen(flog_path_series, "w")) == NULL)
-	{
-		fatal("could not open log file %s : %s\n", flog_path_series, strerror(errno));
-	}
-	
-	if((log_file_opened = fopen(flog_path_opened, "w")) == NULL)
-	{
-		fatal("could not open log file %s : %s\n", flog_path_opened, strerror(errno));
-	}
-
-	free(flog_path);
-	free(flog_path_series);
-	free(flog_path_opened);
+	return log_file;
 }
 
 FILE *open_proc_file(pid_t pid, char *filename)
@@ -972,11 +984,11 @@ void monitor_summary_header()
 {
 	int i;
 
-	fprintf(log_file_series, "#");
+	fprintf(log_series, "#");
 	for(i = 0; resources[i]; i++)
-		fprintf(log_file_series, "%s\t", resources[i]);
+		fprintf(log_series, "%s\t", resources[i]);
 
-	fprintf(log_file_series, "\n");
+	fprintf(log_series, "\n");
 }
 
 void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct wdir_info *d, struct filesys_info *f)
@@ -1037,19 +1049,19 @@ void monitor_find_max_tree(struct tree_info *result, struct tree_info *tr)
 
 void monitor_log_row(struct tree_info *tr)
 {
-	fprintf(log_file_series, "%" PRId64 "\t", tr->wall_time + usecs_initial);
-	fprintf(log_file_series, "%" PRId64 "\t", tr->max_concurrent_processes);
-	fprintf(log_file_series, "%" PRId64 "\t", tr->cpu_time);
-	fprintf(log_file_series, "%" PRId64 "\t", tr->virtual_memory);
-	fprintf(log_file_series, "%" PRId64 "\t", tr->resident_memory);
-	fprintf(log_file_series, "%" PRId64 "\t", tr->bytes_read);
-	fprintf(log_file_series, "%" PRId64 "\t", tr->bytes_written);
+	fprintf(log_series, "%" PRId64 "\t", tr->wall_time + usecs_initial);
+	fprintf(log_series, "%" PRId64 "\t", tr->max_concurrent_processes);
+	fprintf(log_series, "%" PRId64 "\t", tr->cpu_time);
+	fprintf(log_series, "%" PRId64 "\t", tr->virtual_memory);
+	fprintf(log_series, "%" PRId64 "\t", tr->resident_memory);
+	fprintf(log_series, "%" PRId64 "\t", tr->bytes_read);
+	fprintf(log_series, "%" PRId64 "\t", tr->bytes_written);
 
-	fprintf(log_file_series, "%" PRId64 "\t", tr->workdir_number_files_dirs);
-	fprintf(log_file_series, "%" PRId64 "\n", tr->workdir_footprint);
+	fprintf(log_series, "%" PRId64 "\t", tr->workdir_number_files_dirs);
+	fprintf(log_series, "%" PRId64 "\n", tr->workdir_footprint);
                                
 	/* are we going to keep monitoring the whole filesystem? */
-	// fprintf(log_file_series "%" PRId64 "\n", tr->fs_nodes);
+	// fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
 
 }
 
@@ -1061,20 +1073,20 @@ int monitor_final_summary()
 	if(over_limit_str)
 		status = -1;
 
-	fprintf(log_file, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", tree_max->max_concurrent_processes);
+	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", tree_max->max_concurrent_processes);
 
 	//Print time in seconds, rather than microseconds.
-	fprintf(log_file, "%-30s\t%lf\n",         "wall_time:", ((double) tree_max->wall_time / ONE_SECOND));
-	fprintf(log_file, "%-30s\t%lf\n",         "cpu_time:",  ((double) tree_max->cpu_time  / ONE_SECOND));
+	fprintf(log_summary, "%-30s\t%lf\n",         "wall_time:", ((double) tree_max->wall_time / ONE_SECOND));
+	fprintf(log_summary, "%-30s\t%lf\n",         "cpu_time:",  ((double) tree_max->cpu_time  / ONE_SECOND));
 
-	fprintf(log_file, "%-30s\t%" PRId64 "\n", "virtual_memory:", tree_max->virtual_memory);
-	fprintf(log_file, "%-30s\t%" PRId64 "\n", "resident_memory:", tree_max->resident_memory);
-	fprintf(log_file, "%-30s\t%" PRId64 "\n", "bytes_read:", tree_max->bytes_read);
-	fprintf(log_file, "%-30s\t%" PRId64 "\n", "bytes_written:", tree_max->bytes_written);
-	fprintf(log_file, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", tree_max->workdir_number_files_dirs);
+	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "virtual_memory:", tree_max->virtual_memory);
+	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "resident_memory:", tree_max->resident_memory);
+	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_read:", tree_max->bytes_read);
+	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_written:", tree_max->bytes_written);
+	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", tree_max->workdir_number_files_dirs);
 
 	//Print the footprint in megabytes, rather than of bytes.
-	fprintf(log_file, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
+	fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
 
 	if(status && !first_process_exit_status)
 		return status;
@@ -1087,7 +1099,7 @@ void monitor_write_open_file(char *filename)
 	/* Perhaps here we can do something more to the files, like a
 	 * final stat */
 
-	fprintf(log_file_opened, "%s\n", filename);
+	fprintf(log_opened, "%s\n", filename);
 
 }
 
@@ -1169,13 +1181,13 @@ void cleanup_zombie(struct process_info *p)
 		 * summary, not here */
 		tree_max->wall_time = usecs_since_epoch() - usecs_initial;
 
-		fprintf(log_file, "%-30s\t%lf\n", "end:", 
+		fprintf(log_summary, "%-30s\t%lf\n", "end:", 
 				(double) (tree_max->wall_time + usecs_initial) / ONE_SECOND);
 
 		if( WIFEXITED(status) )
 		{
 			debug(D_DEBUG, "process %d finished: %d.\n", p->pid, first_process_exit_status );
-			fprintf(log_file, "%-30s\tnormal\n", "exit_type:");
+			fprintf(log_summary, "%-30s\tnormal\n", "exit_type:");
 		} 
 		else if ( WIFSIGNALED(status) )
 		{
@@ -1183,17 +1195,17 @@ void cleanup_zombie(struct process_info *p)
 
 			if(over_limit_str)
 			{
-				fprintf(log_file, "%-30s\tlimit\n", "exit_type:");
-				fprintf(log_file, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
+				fprintf(log_summary, "%-30s\tlimit\n", "exit_type:");
+				fprintf(log_summary, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
 			}
 			else
 			{
-				fprintf(log_file, "%-30s\tsignal\n", "exit_type:");
-				fprintf(log_file, "%-30s\t%d %s\n", "signal:", WTERMSIG(status), strsignal(WTERMSIG(status)));
+				fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
+				fprintf(log_summary, "%-30s\t%d %s\n", "signal:", WTERMSIG(status), strsignal(WTERMSIG(status)));
 			}
 		} 
 
-		fprintf(log_file, "%-30s\t%d\n", "exit_status:", first_process_exit_status);
+		fprintf(log_summary, "%-30s\t%d\n", "exit_status:", first_process_exit_status);
 	}
 
 	if(p->wd)
@@ -1327,9 +1339,9 @@ void monitor_final_cleanup(int signum)
 	status = monitor_final_summary();
 
 
-	fclose(log_file);
-	fclose(log_file_series);
-	fclose(log_file_opened);
+	fclose(log_summary);
+	fclose(log_series);
+	fclose(log_opened);
 
 	exit(status);
 }
@@ -1532,9 +1544,9 @@ struct process_info *spawn_first_process(const char *cmd)
 {
 	pid_t pid;
 
-	fprintf(log_file, "command: %s\n", cmd);
-	fprintf(log_file, "%-30s\t%lf\n", "start:", ((double) usecs_initial / ONE_SECOND));
-
+	fprintf(log_summary, "command: %s\n", cmd);
+	fprintf(log_summary, "%-30s\t%lf\n", "start:", ((double) usecs_initial / ONE_SECOND));
+  
 	pid = monitor_fork();
 
 	monitor_summary_header();
@@ -1563,12 +1575,23 @@ struct process_info *spawn_first_process(const char *cmd)
 
 static void show_help(const char *cmd)
 {
-	fprintf(stdout, "Use: %s [options] -- command-line-and-options\n", cmd);
-	fprintf(stdout, "-i,--interval=<n>		Interval bewteen observations, in seconds. (default=%d)\n", DEFAULT_INTERVAL);
-	fprintf(stdout, "-d,--debug=<subsystem>		Enable debugging for this subsystem.\n");
-	fprintf(stdout, "-l,--limits-file=<maxfile>	Use maxfile with list of var: value pairs for resource limits.\n");
-	fprintf(stdout, "-L,--limits=<string>		Use string of the form \"var: value, var: value\" to specify resource limits.\n");
-	fprintf(stdout, "-o,--with-summary=<logfile>		Write summary file to (default=resources-PID)\n");
+	fprintf(stdout, "\nUse: %s [options] -- command-line-and-options\n\n", cmd);
+	fprintf(stdout, "%-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
+	fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
+	fprintf(stdout, "\n");
+	fprintf(stdout, "%-30s Interval bewteen observations, in seconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
+	fprintf(stdout, "\n");
+	fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
+	fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify\n", "-L,--limits=<string>");
+	fprintf(stdout, "%-30s resource limits.\n", "");
+	fprintf(stdout, "\n");
+	fprintf(stdout, "%-30s Write resource summary to <file>     (default=resources-PID)\n", "-o,--with-summary-file=<file>");
+	fprintf(stdout, "%-30s Write resource time series to <file> (default=<summary-file>-log)\n", "--with-time-series=<file>");
+	fprintf(stdout, "%-30s Write list of opened files to <file> (default=<summary-file>-opened)\n", "--with-opened-files=<file>");
+	fprintf(stdout, "\n");
+	fprintf(stdout, "%-30s Do not write the summary log file.\n", "--without-summary-file"); 
+	fprintf(stdout, "%-30s Do not write the time series log file.\n", "--without-time-series"); 
+	fprintf(stdout, "%-30s Do not write the list of opened files.\n", "--without-opened-files"); 
 }
 
 
@@ -1635,7 +1658,14 @@ int main(int argc, char **argv) {
 	char cmd[1024] = {'\0'};
 	char c;
 	uint64_t interval = DEFAULT_INTERVAL;
-	char *log_path = NULL;
+
+	char *summary_path = NULL;
+	char *series_path  = NULL;
+	char *opened_path  = NULL;
+
+	int use_summary = 1;
+	int use_series  = 1;
+	int use_opened  = 1;
 
 	debug_config(argv[0]);
 
@@ -1655,9 +1685,17 @@ int main(int argc, char **argv) {
 		{"debug",      required_argument, 0, 'd'},
 		{"help",       required_argument, 0, 'h'},
 		{"interval",   required_argument, 0, 'i'},
-		{"with-summary", required_argument, 0, 'o'},
 		{"limits",     required_argument, 0, 'L'},
 		{"limits-file",required_argument, 0, 'l'},
+
+		{"with-summary",      required_argument, 0, 'o'},
+		{"with-time-series",  required_argument, 0,  0 }, 
+		{"with-opened-files", required_argument, 0,  1 },
+
+		{"without-summary",      no_argument, 0, 2},
+		{"without-time-series",  no_argument, 0, 3}, 
+		{"without-opened-files", no_argument, 0, 4},
+
 		{0, 0, 0, 0}
 	};
 
@@ -1672,9 +1710,6 @@ int main(int argc, char **argv) {
 				if(interval < 1)
 					fatal("interval cannot be set to less than one second.");
 				break;
-			case 'o':
-				log_path = xxstrdup(optarg);
-				break;
 			case 'l':
 				parse_limits_file(optarg, tree_limits);
 				break;
@@ -1683,6 +1718,42 @@ int main(int argc, char **argv) {
 				break;
 			case 'h':
 				show_help(argv[0]);
+				break;
+			case 'o':
+				if(summary_path)
+					free(summary_path);
+				summary_path = xxstrdup(optarg);
+				use_summary = 1;
+				break;
+			case  0:
+				if(series_path)
+					free(series_path);
+				series_path = xxstrdup(optarg);
+				use_series  = 1;
+				break;
+			case  1:
+				if(opened_path)
+					free(opened_path);
+				opened_path = xxstrdup(optarg);
+				use_opened  = 1;
+				break;
+			case  2:
+				if(summary_path)
+					free(summary_path);
+				summary_path = NULL;
+				use_summary = 0;
+				break;
+			case  3:
+				if(series_path)
+					free(series_path);
+				series_path = NULL;
+				use_series  = 0;
+				break;
+			case  4:
+				if(opened_path)
+					free(opened_path);
+				opened_path = NULL;
+				use_opened  = 0;
 				break;
 			default:
 				show_help(argv[0]);
@@ -1725,10 +1796,19 @@ int main(int argc, char **argv) {
 	filesysms = itable_create(0);
 	files     = hash_table_create(0,0); 
 	
-	wdirs_rc = itable_create(0);
-	filesys_rc      = itable_create(0);
+	wdirs_rc   = itable_create(0);
+	filesys_rc = itable_create(0);
 
-	open_log_files(log_path);
+	if(use_summary && !summary_path)
+		summary_path = default_summary_name();
+	if(use_series && !series_path)
+		series_path = default_series_name(summary_path);
+	if(use_opened && !opened_path)
+		opened_path = default_opened_name(summary_path);
+
+	log_summary = open_log_file(summary_path);
+	log_series  = open_log_file(series_path);
+	log_opened  = open_log_file(opened_path);
 
 	spawn_first_process(cmd);
 
