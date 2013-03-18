@@ -57,7 +57,7 @@ See the file COPYING for details.
 
 #define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 
-#define DEFAULT_MONITOR_LOG_FORMAT "log-rule-%06.6d"
+#define DEFAULT_MONITOR_LOG_FORMAT "rule-%06.6d"
 #define DEFAULT_MONITOR_INTERVAL   1
 
 /* Unique integers for long options. To add a new option, use
@@ -1089,8 +1089,8 @@ int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode, int mon
 	if(monitor_mode)
 	{
 		log_name = monitor_log_name(n->nodeid);
-		debug(D_DEBUG, "adding monitor %s and %s{,-summary,-opened} to rule %d.\n", monitor_exe, log_name, n->nodeid);
-		line = string_format("%s/%s-summary %s/%s-opened %s/%s %s %s",
+		debug(D_DEBUG, "adding monitor %s and %s{,-series,-opened} to rule %d.\n", monitor_exe, log_name, n->nodeid);
+		line = string_format("%s/%s-series %s/%s-opened %s/%s %s %s",
 				monitor_log_dir, log_name, 
 				monitor_log_dir, log_name, 
 				monitor_log_dir, log_name, 

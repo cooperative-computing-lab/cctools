@@ -161,9 +161,9 @@ See the file COPYING for details.
 #define ONE_MEGABYTE 1048576  /* this many bytes */
 #define ONE_SECOND   1000000  /* this many usecs */    
 
-FILE  *log_file;               /* All monitoring information of all processes is written here. */
-FILE  *log_file_summary;       /* Final statistics are written to this file. */
-FILE  *log_file_opened;        /* List of opened files is written to this file. */
+FILE  *log_file;             /* Final statistics are written to this file. */
+FILE  *log_file_series;      /* Resource events and samples are written to this file. */
+FILE  *log_file_opened;      /* List of opened files is written to this file. */
 
 int    monitor_queue_fd = -1;  /* File descriptor of a datagram socket to which (great)
 								  grandchildren processes report to the monitor. */
@@ -313,7 +313,7 @@ double clicks_to_usecs(uint64_t clicks)
 void open_log_files(const char *filename)
 {
 	char *flog_path;
-	char *flog_path_summary;
+	char *flog_path_series;
 	char *flog_path_opened;
 	char *dirname;
 
@@ -327,26 +327,26 @@ void open_log_files(const char *filename)
 
 	create_dir(dirname, 0755);
 
-	flog_path_summary = string_format("%s-summary", flog_path); 
-	flog_path_opened  = string_format("%s-opened",  flog_path); 
+	flog_path_series = string_format("%s-series", flog_path); 
+	flog_path_opened = string_format("%s-opened",  flog_path); 
 
 	if((log_file = fopen(flog_path, "w")) == NULL)
 	{
 		fatal("could not open log file %s : %s\n", flog_path, strerror(errno));
 	}
-	
-	if((log_file_summary = fopen(flog_path_summary, "w")) == NULL)
-	{
-		fatal("could not open log file %s : %s\n", flog_path_summary, strerror(errno));
-	}
 
-	if((log_file_opened  = fopen(flog_path_opened, "w")) == NULL)
+	if((log_file_series = fopen(flog_path_series, "w")) == NULL)
+	{
+		fatal("could not open log file %s : %s\n", flog_path_series, strerror(errno));
+	}
+	
+	if((log_file_opened = fopen(flog_path_opened, "w")) == NULL)
 	{
 		fatal("could not open log file %s : %s\n", flog_path_opened, strerror(errno));
 	}
 
 	free(flog_path);
-	free(flog_path_summary);
+	free(flog_path_series);
 	free(flog_path_opened);
 }
 
@@ -972,11 +972,11 @@ void monitor_summary_header()
 {
 	int i;
 
-	fprintf(log_file, "#");
+	fprintf(log_file_series, "#");
 	for(i = 0; resources[i]; i++)
-		fprintf(log_file, "%s\t", resources[i]);
+		fprintf(log_file_series, "%s\t", resources[i]);
 
-	fprintf(log_file, "\n");
+	fprintf(log_file_series, "\n");
 }
 
 void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct wdir_info *d, struct filesys_info *f)
@@ -1037,19 +1037,19 @@ void monitor_find_max_tree(struct tree_info *result, struct tree_info *tr)
 
 void monitor_log_row(struct tree_info *tr)
 {
-	fprintf(log_file, "%" PRId64 "\t", tr->wall_time + usecs_initial);
-	fprintf(log_file, "%" PRId64 "\t", tr->max_concurrent_processes);
-	fprintf(log_file, "%" PRId64 "\t", tr->cpu_time);
-	fprintf(log_file, "%" PRId64 "\t", tr->virtual_memory);
-	fprintf(log_file, "%" PRId64 "\t", tr->resident_memory);
-	fprintf(log_file, "%" PRId64 "\t", tr->bytes_read);
-	fprintf(log_file, "%" PRId64 "\t", tr->bytes_written);
-                               
-	fprintf(log_file, "%" PRId64 "\t", tr->workdir_number_files_dirs);
-	fprintf(log_file, "%" PRId64 "\n", tr->workdir_footprint);
+	fprintf(log_file_series, "%" PRId64 "\t", tr->wall_time + usecs_initial);
+	fprintf(log_file_series, "%" PRId64 "\t", tr->max_concurrent_processes);
+	fprintf(log_file_series, "%" PRId64 "\t", tr->cpu_time);
+	fprintf(log_file_series, "%" PRId64 "\t", tr->virtual_memory);
+	fprintf(log_file_series, "%" PRId64 "\t", tr->resident_memory);
+	fprintf(log_file_series, "%" PRId64 "\t", tr->bytes_read);
+	fprintf(log_file_series, "%" PRId64 "\t", tr->bytes_written);
+
+	fprintf(log_file_series, "%" PRId64 "\t", tr->workdir_number_files_dirs);
+	fprintf(log_file_series, "%" PRId64 "\n", tr->workdir_footprint);
                                
 	/* are we going to keep monitoring the whole filesystem? */
-	// fprintf(log_file, "%" PRId64 "\n", tr->fs_nodes);
+	// fprintf(log_file_series "%" PRId64 "\n", tr->fs_nodes);
 
 }
 
@@ -1061,20 +1061,20 @@ int monitor_final_summary()
 	if(over_limit_str)
 		status = -1;
 
-	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", tree_max->max_concurrent_processes);
+	fprintf(log_file, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", tree_max->max_concurrent_processes);
 
 	//Print time in seconds, rather than microseconds.
-	fprintf(log_file_summary, "%-30s\t%lf\n",         "wall_time:", ((double) tree_max->wall_time / ONE_SECOND));
-	fprintf(log_file_summary, "%-30s\t%lf\n",         "cpu_time:",  ((double) tree_max->cpu_time  / ONE_SECOND));
+	fprintf(log_file, "%-30s\t%lf\n",         "wall_time:", ((double) tree_max->wall_time / ONE_SECOND));
+	fprintf(log_file, "%-30s\t%lf\n",         "cpu_time:",  ((double) tree_max->cpu_time  / ONE_SECOND));
 
-	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "virtual_memory:", tree_max->virtual_memory);
-	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "resident_memory:", tree_max->resident_memory);
-	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "bytes_read:", tree_max->bytes_read);
-	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "bytes_written:", tree_max->bytes_written);
-	fprintf(log_file_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", tree_max->workdir_number_files_dirs);
+	fprintf(log_file, "%-30s\t%" PRId64 "\n", "virtual_memory:", tree_max->virtual_memory);
+	fprintf(log_file, "%-30s\t%" PRId64 "\n", "resident_memory:", tree_max->resident_memory);
+	fprintf(log_file, "%-30s\t%" PRId64 "\n", "bytes_read:", tree_max->bytes_read);
+	fprintf(log_file, "%-30s\t%" PRId64 "\n", "bytes_written:", tree_max->bytes_written);
+	fprintf(log_file, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", tree_max->workdir_number_files_dirs);
 
 	//Print the footprint in megabytes, rather than of bytes.
-	fprintf(log_file_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
+	fprintf(log_file, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
 
 	if(status && !first_process_exit_status)
 		return status;
@@ -1169,13 +1169,13 @@ void cleanup_zombie(struct process_info *p)
 		 * summary, not here */
 		tree_max->wall_time = usecs_since_epoch() - usecs_initial;
 
-		fprintf(log_file_summary, "%-30s\t%lf\n", "end:", 
+		fprintf(log_file, "%-30s\t%lf\n", "end:", 
 				(double) (tree_max->wall_time + usecs_initial) / ONE_SECOND);
 
 		if( WIFEXITED(status) )
 		{
 			debug(D_DEBUG, "process %d finished: %d.\n", p->pid, first_process_exit_status );
-			fprintf(log_file_summary, "%-30s\tnormal\n", "exit_type:");
+			fprintf(log_file, "%-30s\tnormal\n", "exit_type:");
 		} 
 		else if ( WIFSIGNALED(status) )
 		{
@@ -1183,17 +1183,17 @@ void cleanup_zombie(struct process_info *p)
 
 			if(over_limit_str)
 			{
-				fprintf(log_file_summary, "%-30s\tlimit\n", "exit_type:");
-				fprintf(log_file_summary, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
+				fprintf(log_file, "%-30s\tlimit\n", "exit_type:");
+				fprintf(log_file, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
 			}
 			else
 			{
-				fprintf(log_file_summary, "%-30s\tsignal\n", "exit_type:");
-				fprintf(log_file_summary, "%-30s\t%d %s\n", "signal:", WTERMSIG(status), strsignal(WTERMSIG(status)));
+				fprintf(log_file, "%-30s\tsignal\n", "exit_type:");
+				fprintf(log_file, "%-30s\t%d %s\n", "signal:", WTERMSIG(status), strsignal(WTERMSIG(status)));
 			}
 		} 
 
-		fprintf(log_file_summary, "%-30s\t%d\n", "exit_status:", first_process_exit_status);
+		fprintf(log_file, "%-30s\t%d\n", "exit_status:", first_process_exit_status);
 	}
 
 	if(p->wd)
@@ -1328,7 +1328,7 @@ void monitor_final_cleanup(int signum)
 
 
 	fclose(log_file);
-	fclose(log_file_summary);
+	fclose(log_file_series);
 	fclose(log_file_opened);
 
 	exit(status);
@@ -1532,8 +1532,8 @@ struct process_info *spawn_first_process(const char *cmd)
 {
 	pid_t pid;
 
-	fprintf(log_file_summary, "command: %s\n", cmd);
-	fprintf(log_file_summary, "%-30s\t%lf\n", "start:", ((double) usecs_initial / ONE_SECOND));
+	fprintf(log_file, "command: %s\n", cmd);
+	fprintf(log_file, "%-30s\t%lf\n", "start:", ((double) usecs_initial / ONE_SECOND));
 
 	pid = monitor_fork();
 
@@ -1568,7 +1568,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "-d,--debug=<subsystem>		Enable debugging for this subsystem.\n");
 	fprintf(stdout, "-l,--limits-file=<maxfile>	Use maxfile with list of var: value pairs for resource limits.\n");
 	fprintf(stdout, "-L,--limits=<string>		Use string of the form \"var: value, var: value\" to specify resource limits.\n");
-	fprintf(stdout, "-o,--log-name=<logfile>		Write log to logfile (default=log-PID)\n");
+	fprintf(stdout, "-o,--with-summary=<logfile>		Write summary file to (default=resources-PID)\n");
 }
 
 
@@ -1655,7 +1655,7 @@ int main(int argc, char **argv) {
 		{"debug",      required_argument, 0, 'd'},
 		{"help",       required_argument, 0, 'h'},
 		{"interval",   required_argument, 0, 'i'},
-		{"log-name",   required_argument, 0, 'o'},
+		{"with-summary", required_argument, 0, 'o'},
 		{"limits",     required_argument, 0, 'L'},
 		{"limits-file",required_argument, 0, 'l'},
 		{0, 0, 0, 0}
