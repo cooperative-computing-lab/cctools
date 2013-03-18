@@ -442,6 +442,26 @@ garbage collection cycle:
 	<li><b>dag_gc_collected</b> - the total number of files has been collected so far since the start this Makeflow execution.</li>
 </ul>
 
+<h2>Linking Workflow Dependencies</h2>
+<tt>Makeflow</tt> provides a tool to collect all of the dependencies for a given workflow into one directory. By collecting all of the input files and programs contained in a workflow it is possible to run the workflow on other machines.
+
+Currently, <tt>Makeflow</tt> copies all of the files specified as dependencies by the rules in the makeflow file, including scripts and data files. Some of the files not collected are dynamically linked libraries, executables not listed as dependencies (<tt>python</tt>, <tt>perl</tt>), and configuration files (<tt>mail.rc</tt>).
+
+To avoid naming conflicts, files which would otherwise have an identical path are renamed when copied into the bundle
+<ul>
+  <li>All file paths are relative to the top level directory.</li>
+  <li>The makeflow file is rewritten with the new file locations and placed in the top level directory.</li>
+  <li>Files originally specified with an absolute path are placed into the top level directory.</li>
+  <li>Files with the same path are appended with a unique number</li>
+</ul>
+
+Example usage:
+<pre>
+% makeflow -b some_output_directory example.makeflow
+</pre>
+
+
+
 <h2>For More Information</h2>
 
 For the latest information about Makeflow, please visit our <a href=http://www.cse.nd.edu/~ccl/software/makeflow>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
