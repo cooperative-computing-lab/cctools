@@ -317,40 +317,42 @@ char* bundler_translate_name(const char *filename, int collision_counter)
 	if ( !reverse_names )
 		reverse_names = hash_table_create(0, NULL);
 
+	char fn[PATH_MAX];
 	if (collision_counter){
-		filename = string_format("%s%d",filename,collision_counter);
-	}
+		sprintf(fn, "%s%d",filename,collision_counter);
+	}else
+		sprintf(fn, "%s", filename);
 
-	const char *new_filename = malloc(PATH_MAX * sizeof (*new_filename)); 
-	new_filename = hash_table_lookup(previous_names, filename);
+	const char *new_filename = malloc(PATH_MAX * sizeof (char)); 
+	new_filename = hash_table_lookup(previous_names, fn);
 	if ( new_filename )
 		return xxstrdup(new_filename);
 
-	new_filename = hash_table_lookup(reverse_names, filename);
+	new_filename = hash_table_lookup(reverse_names, fn);
 	if ( new_filename ){
 		collision_counter++;
-		return bundler_translate_name(filename, collision_counter);
+		return bundler_translate_name(fn, collision_counter);
 	}
 	if (filename[0] == '/'){
-		new_filename = string_basename(filename);
+		new_filename = string_basename(fn);
 		if(hash_table_lookup(previous_names, new_filename)){
 			collision_counter++;
-			return bundler_translate_name(filename, collision_counter);
+			return bundler_translate_name(fn, collision_counter);
 		}
 		else if(hash_table_lookup(reverse_names, new_filename)){
 			collision_counter++;
-			return bundler_translate_name(filename, collision_counter);
+			return bundler_translate_name(fn, collision_counter);
 		}
 		else {
-			hash_table_insert(reverse_names, new_filename, filename);
-			hash_table_insert(previous_names, filename, new_filename);
+			hash_table_insert(reverse_names, new_filename, fn);
+			hash_table_insert(previous_names, fn, new_filename);
 			return xxstrdup(new_filename);
 		}
 	}
 	else {
-		hash_table_insert(previous_names, filename, filename);
-		hash_table_insert(reverse_names, filename, filename);
-		return xxstrdup(filename);
+		hash_table_insert(previous_names, fn, fn);
+		hash_table_insert(reverse_names, fn, fn);
+		return xxstrdup(fn);
 	}
 }
 
