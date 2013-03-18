@@ -40,6 +40,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "xxmalloc.h"
 #include "getopt_aux.h"
+#include "rmonitor_hooks.h"
 
 #include "dag.h"
 #include "visitors.h"
@@ -1069,9 +1070,13 @@ int dag_parse_variable(struct dag_parse *bk, struct dag_node *n, char *line)
 	return 1;
 }
 
-char *monitor_log_name(int nodeid)
+char *monitor_log_name(char *dirname, int nodeid)
 {
-	return string_format(monitor_log_format, nodeid);
+	char *name = string_format(monitor_log_format, nodeid);
+	char *path = string_format("%s/%s", dirname, name);
+	free(name);
+
+	return path;
 }
 
 int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode)
@@ -1089,13 +1094,9 @@ int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode)
 	 * while parsing. The monitor code should not be here. */
 	if(bk->monitor_mode)
 	{
-		log_name = monitor_log_name(n->nodeid);
-		debug(D_DEBUG, "adding monitor %s and %s{,-series,-opened} to rule %d.\n", monitor_exe, log_name, n->nodeid);
-		line = string_format("%s/%s-series %s/%s-opened %s/%s %s %s",
-				monitor_log_dir, log_name, 
-				monitor_log_dir, log_name, 
-				monitor_log_dir, log_name, 
-				line_org, monitor_exe);
+		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
+		debug(D_DEBUG, "adding monitor and %s{,-series,-opened} to rule %d.\n", log_name, n->nodeid);
+		line = string_format("%s-series %s-opened %s %s %s", log_name, log_name, log_name, line_org, monitor_exe);
 	}
 	else
 	{
@@ -1298,8 +1299,8 @@ int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 	/* BUG: Monitor code should not be here! */
 	if(bk->monitor_mode)
 	{
-		log_name = monitor_log_name(n->nodeid);
-		command = string_format("./%s -o %s/%s -i %d -- %s", monitor_exe, monitor_log_dir, log_name, monitor_interval, command);
+		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
+		command = string_format("./%s -o %s -i %d -- %s", monitor_exe, log_name, monitor_interval, command);
 	}
 
 	dag_parse_node_set_command(bk, n, command);
@@ -2054,63 +2055,6 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 	}
 }
 
-char *monitor_locate(const char *path_from_cmdline)
-{
-	char *path_from_env;
-	char *monitor_path;
-
-	debug(D_DEBUG,"locating monitor executable...");
-
-	path_from_env = getenv(MONITOR_ENV_VAR);
-	if(path_from_cmdline)
-	{
-		monitor_path = xxstrdup(path_from_cmdline);
-		debug(D_DEBUG,"trying monitor path provided at command line: %s\n", path_from_cmdline);
-	}
-	else if(path_from_env)
-	{
-		monitor_path = xxstrdup(path_from_env);
-		debug(D_DEBUG,"trying monitor from $%s.", MONITOR_ENV_VAR);
-	}
-	else
-	{
-		monitor_path = string_format("%s/bin/resource_monitor", INSTALL_PATH);
-		debug(D_DEBUG,"trying monitor at default location %s.\n", monitor_path);
-	}
-
-	return monitor_path;
-}
-
-char *monitor_copy_to_wd(char *path_from_cmdline)
-{
-	char *mon_unique;
-	char *monitor_org;
-	monitor_org = monitor_locate(path_from_cmdline);
-
-	if(!monitor_org)
-		fatal("Monitor program could not be found.\n");
-
-	mon_unique = string_format("monitor-%d", getpid());
-
-	debug(D_DEBUG,"copying monitor %s to %s.\n", monitor_org, mon_unique);
-
-	if(copy_file_to_file(monitor_org, mon_unique) < 0)
-		fatal("Could not copy monitor %s to %s in local directory: %s\n", 
-				monitor_org, mon_unique, strerror(errno));
-
-	chmod(mon_unique, 0777);
-
-	return mon_unique;
-}
-
-//atexit handler
-void monitor_delete_exe(void)
-{
-	debug(D_DEBUG, "unlinking %s\n", monitor_exe);
-	unlink(monitor_exe);
-}
-
-
 int main(int argc, char *argv[])
 {
 	char c;
@@ -2468,7 +2412,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(monitor_mode) {
-		monitor_exe      = monitor_copy_to_wd( NULL );
+		monitor_exe = resource_monitor_copy_to_wd( NULL );
 
 		if(monitor_interval < 1)
 			monitor_interval = DEFAULT_MONITOR_INTERVAL;
@@ -2476,14 +2420,15 @@ int main(int argc, char *argv[])
 		if(!monitor_log_format)
 			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
 
+		/* If we did not get a directory to write the
+		 * logs, create one with the current date + time.
+		 * */
 		if(!monitor_log_dir)
 		{
 			time_t now = time(NULL);
 			struct tm *tm = localtime(&now);
 			monitor_log_dir = string_format("monitor-logs-%04d_%02d_%02d_%02d-%02d", 1900 + tm->tm_year, 1 + tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min);
 		}
-
-		atexit(monitor_delete_exe);
 	}
 
 	int no_symlinks = (clean_mode || syntax_check || display_mode);

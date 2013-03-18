@@ -63,6 +63,7 @@ SOURCES = auth.c  \
           password_cache.c  \
           preadwrite.c  \
           process.c  \
+          rmonitor_hooks.c \
           sha1.c  \
           sleeptools.c  \
           sort_dir.c  \
@@ -91,6 +92,7 @@ PUBLIC_HEADERS = auth.h  \
                  batch_job.h  \
                  debug.h  \
                  int_sizes.h  \
+                 rmonitor_hooks.h \
                  timestamp.h  \
                  work_queue.h
 

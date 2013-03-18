@@ -1778,7 +1778,7 @@ int main(int argc, char **argv) {
 	}
 
 
-	if(getenv(RMONITOR_INFO_ENV_VAR))
+	if(getenv(RESOURCE_MONITOR_INFO_ENV_VAR))
 	{
 		debug(D_DEBUG, "using upstream monitor. executing: %s\n", cmd);
 		execlp("sh", "sh", "-c", cmd, (char *) NULL);
