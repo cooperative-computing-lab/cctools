@@ -29,8 +29,8 @@ do
         case "$opt" in
                 a)  arguments="$arguments -a"; use_auto=1;;
                 s)  arguments="$arguments -s";;
-                M)  arguments="$arguments -M $OPTARG";;
-                N)  arguments="$arguments -M $OPTARG";;
+                M)  arguments="$arguments -M $OPTARG"; use_auto=1;;
+                N)  arguments="$arguments -M $OPTARG"; use_auto=1;;
                 C)  arguments="$arguments -C $OPTARG";;
                 t)  arguments="$arguments -t $OPTARG";;
                 d)  arguments="$arguments -d $OPTARG";;
