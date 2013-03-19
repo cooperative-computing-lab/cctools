@@ -1949,8 +1949,6 @@ static int search_directory(pfs_table *t, const char *base, char *dir, const cha
 		struct pfs_stat statbuf;
                 sprintf(current, "/%s", name);
 
-		if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
-
 		if (flags & PFS_SEARCH_METADATA || recursive_pattern) {
 			int stat_r = t->stat(dir, &statbuf);
 
