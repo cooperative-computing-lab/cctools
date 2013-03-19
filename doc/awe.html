@@ -231,7 +231,7 @@ You can use these output files to generate different plots that visualize the
 output of the AWE run. To generate a Ramachandran plot (free energy landscape on
 phi-psi space) using <tt>cell-weights.csv</tt>, run the following command.
 <pre>
-% python awe-rama-ala.py -w cell-weights.csv -p awe-instance-data/testinput/state0.pdb -c awe-instance-data/testinput/cells.dat -n 100
+% python awe-rama-ala.py -w cell-weights.csv -p awe-instance-data/topol.pdb -c awe-instance-data/cells.dat -n 100
 </pre>
 
 This produces an output file named <tt>awe-rama-ala.png</tt>
@@ -240,7 +240,7 @@ This produces an output file named <tt>awe-rama-ala.png</tt>
 <tt>transitions.dat</tt>, use the script <tt>awe-flux.py</tt>.
 
 <pre>
-% python awe-flux.py -i transitions.dat -l 0.01 
+% python awe-flux.py -i color-transition-matrix.csv -l 0.01
 </pre>
 							
 This will produce the following outputs:		
@@ -255,9 +255,9 @@ This will produce the following outputs:
 <tt>awe-transMatrix.py</tt>
 
 <pre>
-% python awe-transMatrix.py -p walker-history.csv -w walker-weights.dat -t 1 -n 100
+% python awe-transMatrix.py -p walker-history.dat -w walker-weights.dat -t 1 -n 100
 </pre>
-This prints the matrix to a file called <tt>trans.csv</tt>.
+This prints the matrix to a file called <tt>trans-probability-matrix.csv</tt>.
 
 <h2> Running AWE on Different Protein Systems</h2>
 One protocol to run AWE is as follows:
