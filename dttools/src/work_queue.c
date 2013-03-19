@@ -867,10 +867,17 @@ static void delete_uncacheable_files(struct work_queue_task *t, struct work_queu
 
 void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_task *t)
 {
-	char *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
-	FILE *fsummary;
+	struct flock lock;
+	FILE        *fsummary;
+	char        *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
+	char        *msg; 
 
-	char *msg; 
+	lock.l_type   = F_WRLCK;
+	lock.l_start  = 0;
+	lock.l_whence = SEEK_SET;
+	lock.l_len    = 0;
+
+	fcntl(q->monitor_fd, F_SETLKW, &lock);
 	
 	msg = string_format("Work Queue pid: %d Task: %d\n", getpid(), t->taskid);
 	write(q->monitor_fd, msg, strlen(msg));
@@ -878,7 +885,7 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 
 	if( (fsummary = fopen(summary, "r")) == NULL )
 	{
-		msg = string_format("Summary for task %d is not available.\n", t->taskid);
+		msg = string_format("Summary for task %d:%d is not available.\n", getpid(), t->taskid);
 		write(q->monitor_fd, msg, strlen(msg));
 		free(msg);
 	}
@@ -889,6 +896,9 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 	}
 
 	write(q->monitor_fd, "\n\n", 2);
+
+	lock.l_type   = F_ULOCK;
+	fcntl(q->monitor_fd, F_SETLK, &lock);
 
 	if(unlink(summary) != 0)
 		debug(D_NOTICE, "Summary %s could not be removed.\n", summary);
@@ -2586,7 +2596,7 @@ struct work_queue *work_queue_create_monitoring(int port, char *monitor_summary_
 	else
 		monitor_summary_file = string_format("wq-%d-resource-usage", getpid());
 
-	q->monitor_fd = open(monitor_summary_file, O_CREAT | O_TRUNC | O_WRONLY, 00666);
+	q->monitor_fd = open(monitor_summary_file, O_CREAT | O_WRONLY | O_APPEND, 00666);
 	free(monitor_summary_file);
 
 	if(q->monitor_fd < 0)
