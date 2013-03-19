@@ -231,6 +231,11 @@ the <b>CATALOG_HOST</b> and <b>CATALOG_PORT</b> environmental variables as descr
 */
 struct work_queue *work_queue_create(int port);
 
+/** As work_queue_create, but creates also generates the log file
+ * wq-<pid>-resource-usage with summaries of the resources used
+ * by each task. */
+struct work_queue *work_queue_create_monitoring(int port);
+
 /** Submit a task to a queue.
 Once a task is submitted to a queue, it is not longer under the user's
 control and should not be inspected until returned via @ref work_queue_wait.
