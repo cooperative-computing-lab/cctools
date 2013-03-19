@@ -32,8 +32,13 @@ resource_monitor_pb.o: rmonitor_piggyback.h resource_monitor_pb.c
 resource_monitor.o: rmonitor_piggyback.h resource_monitor.c 
 	${CCTOOLS_CC} -g ${CCTOOLS_INTERNAL_CCFLAGS} $^ -c
 
+ifeq (${UNAME}, FreeBSD)
+librmonitor_helper.so: rmonitor_helper.o rmonitor_helper_comm.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
+	${CCTOOLS_CC} -shared -Wl,-soname,$@ -lc -fPIC $^ -o $@
+else
 librmonitor_helper.so: rmonitor_helper.o rmonitor_helper_comm.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
 	${CCTOOLS_CC} -shared -ldl -fPIC $^ -o $@
+endif
 
 ifeq (${UNAME}, Darwin)
 rmonitor_piggyback.h: piggybacker

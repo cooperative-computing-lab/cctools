@@ -132,6 +132,12 @@ LONGCODE_BEGIN
 makeflow -T wq -a -N project.name Makeflow
 LONGCODE_END
 
+Create a directory containing all of the dependencies required to run the
+specified makeflow
+LONGCODE_BEGIN
+makeflow -b bundle Makeflow
+LONGCODE_END
+
 SECTION(COPYRIGHT)
 
 COPYRIGHT_BOILERPLATE

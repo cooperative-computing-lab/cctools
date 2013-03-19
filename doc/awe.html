@@ -131,23 +131,33 @@ You can also check if AWE was correctly installed by running:
 
 <h2>Running AWE</h2>
 
-To run AWE to sample a protein molecule, you will need to have the files
-describing the topology of atoms in that molecule, the coordinates of the
-/binwalkers, and the coordinates of the cells. 
+First, create a directory from which you want to instantiate and run the AWE
+program. In this manual, we are going to use and run AWE on the Alanine
+Dipeptide protein using the code in <tt>awe-ala.py</tt>.  
+<pre>
+% cd $HOME
+% mkdir awe-alanine 
+% cd awe-alanine 
+</pre>
 
-<p>In addition, AWE transfers the executables from the GROMACS package required for
-running the simulations of each walker. This can be fetched to the current
-working directory by running 
+<p>To run AWE to sample a protein molecule, you will need to have the files
+describing the topology of atoms in that molecule, the coordinates of the
+walkers, and the coordinates of the cells.  In addition, AWE transfers the
+executables from the GROMACS package required for running the simulations of
+each walker. 
+
+<p>These files and executables can be fetched to the current working directory by running 
  
 <pre>
 % awe-prepare
 </pre>
 
 <p>This will create a directory named <tt>awe-generic-data</tt> and copy files that
-all AWE runs will require (namely the binaries and Gromacs forcefield files).
+all AWE runs will require (namely the binaries and Gromacs forcefield files). 
+It will also transfer the example program provided in the AWE source that that
+samples the state transitions for the Alanine Dipeptide protein. 
 
-<p>The AWE source also includes an example program that samples the state
-transitions for the Alanine Dipeptide protein. To run this example, do
+<p>To run this example, do
 
 <pre>
 % python awe-ala.py

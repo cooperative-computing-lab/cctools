@@ -25,7 +25,7 @@ See the file COPYING for details.
 #include "rmonitor_helper_comm.h"
 
 //#define debug fprintf
-//#define D_DEBUG stderr
+//#define D_RMON stderr
 
 
 const char *str_msgtype(enum monitor_msg_type n)
@@ -60,39 +60,34 @@ char *monitor_helper_locate(char *path_from_cmdline)
 {
 	char *helper_path;
 
-	debug(D_DEBUG,"locating helper library...\n");
+	debug(D_RMON,"locating helper library...\n");
 
 	helper_path = path_from_cmdline;
 	if(helper_path)
 	{
-		debug(D_DEBUG,"trying library from path provided at command line.\n");
+		debug(D_RMON,"trying library from path provided at command line.\n");
 		if(access(helper_path, R_OK|X_OK) == 0)	
 			return xxstrdup(helper_path);	
 	}
 
-	helper_path = getenv(RMONITOR_HELPER_ENV_VAR);
+	helper_path = getenv(RESOURCE_MONITOR_HELPER_ENV_VAR);
 	if(helper_path)
 	{
-		debug(D_DEBUG,"trying library from $%s.\n", RMONITOR_HELPER_ENV_VAR);
-		if(helper_path && access(helper_path, R_OK|X_OK) == 0)	
+		debug(D_RMON,"trying library from $%s.\n", RESOURCE_MONITOR_HELPER_ENV_VAR);
+		if(access(helper_path, R_OK|X_OK) == 0)	
 			return xxstrdup(helper_path);	
 	}
 
+	debug(D_RMON,"trying library at local directory.\n");
 	helper_path = string_format("./librmonitor_helper.so");
-	if(helper_path)
-	{
-		debug(D_DEBUG,"trying library at local directory.\n");
-		if(helper_path && access(helper_path, R_OK|X_OK) == 0)	
-			return helper_path;	
-	}
+	if(access(helper_path, R_OK|X_OK) == 0)	
+		return helper_path;	
 
+	debug(D_RMON,"trying library at default location.\n");
+	free(helper_path);
 	helper_path = string_format("%s/lib/librmonitor_helper.so", INSTALL_PATH);
-	if(helper_path)
-	{
-		debug(D_DEBUG,"trying library at default location.\n");
-		if(helper_path && access(helper_path, R_OK|X_OK) == 0)	
-			return helper_path;	
-	}
+	if(access(helper_path, R_OK|X_OK) == 0)	
+		return helper_path;	
 
 	return NULL;
 }
@@ -117,7 +112,7 @@ int find_localhost_addr(int port, struct addrinfo **addr)
 
 	int status = getaddrinfo(hostname, portname, &info, &res);
 	if( status != 0)
-		debug(D_DEBUG, "couldn't resolve socket address: %s\n", strerror(errno));
+		debug(D_RMON, "couldn't resolve socket address: %s\n", strerror(errno));
 
 	*addr = res;
 
@@ -132,29 +127,29 @@ int send_monitor_msg(struct monitor_msg *msg)
 	char *socket_info;
 	struct addrinfo *addr;
 
-	socket_info = getenv(RMONITOR_INFO_ENV_VAR);
+	socket_info = getenv(RESOURCE_MONITOR_INFO_ENV_VAR);
 	if(!socket_info)
 	{
-		debug(D_DEBUG,"couldn't find socket info.\n");
+		debug(D_RMON,"couldn't find socket info.\n");
 		return -1;
 	}
 
 	sscanf(socket_info, "%d", &port); 
-	debug(D_DEBUG, "found socket info at %d.\n", port);
+	debug(D_RMON, "found socket info at %d.\n", port);
 
 	find_localhost_addr(port, &addr);
 
 	fd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
 	if(fd < 0)
 	{
-		debug(D_DEBUG,"couldn't open socket for writing.");
+		debug(D_RMON,"couldn't open socket for writing.");
 		return -1;
 	}
 
 	int count;
-	debug(D_DEBUG, "sending message from %d to port %d\n", getpid(), port);
+	debug(D_RMON, "sending message from %d to port %d\n", getpid(), port);
 	count = sendto(fd, msg, sizeof(struct monitor_msg), 0, addr->ai_addr, addr->ai_addrlen);
-	debug(D_DEBUG, "message sent from %d to port %d. %d bytes.\n", getpid(), port, count);
+	debug(D_RMON, "message sent from %d to port %d. %d bytes.\n", getpid(), port, count);
 
 	freeaddrinfo(addr);
 	close(fd);
@@ -178,14 +173,14 @@ int monitor_open_socket(int *fd, int *port)
 
     if(high < low)
 	{
-		debug(D_DEBUG, "high port %d is less than low port %d in range", high, low);
+		debug(D_RMON, "high port %d is less than low port %d in range", high, low);
 		return 0;
 	}
 
 	*fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(*fd < 0)
 	{
-		debug(D_DEBUG,"couldn't open socket for reading.");
+		debug(D_RMON,"couldn't open socket for reading.");
 		return 0;
 	}
 
@@ -194,12 +189,12 @@ int monitor_open_socket(int *fd, int *port)
 
 		if(!bind(*fd, addr->ai_addr, addr->ai_addrlen))
 		{
-			debug(D_DEBUG,"socket open at port %d\n", *port);
+			debug(D_RMON,"socket open at port %d\n", *port);
 			return *port;
 		}
 	}
 
-		debug(D_DEBUG,"couldn't find open port for socket.");
+		debug(D_RMON,"couldn't find open port for socket.");
 
 		return 0;
 }
@@ -213,11 +208,11 @@ int monitor_helper_init(char *libpath_from_cmdline, int *fd)
 	char *monitor_port;
 
 	if(access(helper_path,R_OK|X_OK)==0) {
-		debug(D_DEBUG, "found helper in %s\n", helper_path);
+		debug(D_RMON, "found helper in %s\n", helper_path);
 		monitor_open_socket(fd, &port);
 	}
 	else {
-		debug(D_DEBUG,"couldn't find helper library %s but continuing anyway.", helper_path);
+		debug(D_RMON,"couldn't find helper library %s but continuing anyway.", helper_path);
 		port = -1;
 	}
 
@@ -225,11 +220,11 @@ int monitor_helper_init(char *libpath_from_cmdline, int *fd)
 	{
 		monitor_port = string_format("%d", port);
 
-		debug(D_DEBUG,"setting LD_PRELOAD to %s\n", helper_path);
+		debug(D_RMON,"setting LD_PRELOAD to %s\n", helper_path);
 		setenv("LD_PRELOAD", helper_path, 1);
 
-		debug(D_DEBUG,"setting %s to %s\n", RMONITOR_INFO_ENV_VAR, monitor_port);
-		setenv(RMONITOR_INFO_ENV_VAR, monitor_port, 1);
+		debug(D_RMON,"setting %s to %s\n", RESOURCE_MONITOR_INFO_ENV_VAR, monitor_port);
+		setenv(RESOURCE_MONITOR_INFO_ENV_VAR, monitor_port, 1);
 
 		free(monitor_port);
 	}

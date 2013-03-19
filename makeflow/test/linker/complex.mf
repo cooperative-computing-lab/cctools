@@ -1,0 +1,7 @@
+VARIABLE = "testing"
+
+: out.put
+	echo ""
+
+out.put : /tmp/makeflow_test_complex_path /tmp/a/b/x/y
+	touch out.put

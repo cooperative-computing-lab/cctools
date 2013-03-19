@@ -51,6 +51,7 @@ struct dag_parse {
 	struct dag *d;
 	FILE *dag_stream;
 	char *linetext;
+	int monitor_mode;
 	int colnum;
 	int linenum;
 };

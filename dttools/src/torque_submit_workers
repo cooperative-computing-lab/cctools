@@ -28,8 +28,8 @@ do
 		C)  arguments="$arguments -C $OPTARG";;
 		h)  show_help;;
 		j)  use_jobarray=1;;
-		M)  arguments="$arguments -M $OPTARG";;
-		N)  arguments="$arguments -M $OPTARG";;
+		M)  arguments="$arguments -M $OPTARG"; use_auto=1;;
+		N)  arguments="$arguments -M $OPTARG"; use_auto=1;;
 		p)  parameters="$parameters $OPTARG";;
 		s)  arguments="$arguments -s";;
 		t)  arguments="$arguments -t $OPTARG";;

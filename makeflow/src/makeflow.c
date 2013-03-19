@@ -40,6 +40,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "xxmalloc.h"
 #include "getopt_aux.h"
+#include "rmonitor_hooks.h"
 
 #include "dag.h"
 #include "visitors.h"
@@ -57,7 +58,7 @@ See the file COPYING for details.
 
 #define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 
-#define DEFAULT_MONITOR_LOG_FORMAT "log-rule-%06.6d"
+#define DEFAULT_MONITOR_LOG_FORMAT "rule-%06.6d"
 #define DEFAULT_MONITOR_INTERVAL   1
 
 /* Unique integers for long options. To add a new option, use
@@ -118,7 +119,7 @@ void dag_export_variables(struct dag *d, struct dag_node *n);
 char *dag_parse_readline(struct dag_parse *bk, struct dag_node *n);
 int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode);
 int dag_parse_variable(struct dag_parse *bk, struct dag_node *n, char *line);
-int dag_parse_node(struct dag_parse *bk, char *line, int clean_mode, int monitor_mode);
+int dag_parse_node(struct dag_parse *bk, char *line, int clean_mode);
 int dag_parse_node_filelist(struct dag_parse *bk, struct dag_node *n, char *filelist, int source, int clean_mode);
 int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line);
 int dag_parse_node_makeflow_command(struct dag_parse *bk, struct dag_node *n, char *line);
@@ -305,16 +306,64 @@ void collect_input_files(struct dag *d, char* bundle_dir, char *(*rename)(struct
 	list_delete(il);	
 }
 
-char* bundler_rename(struct dag_node *d, const char *filename)
+/* When a collision is detected (a file with an absolute path has the same base name as a relative file) a
+ * counter is appended to the filename and the name translation is retried */
+char* bundler_translate_name(const char *filename, int collision_counter)
 {
-	if (filename[0] == '/'){
-		const char *new_filename;
-		new_filename = (char *)malloc(PATH_MAX * sizeof (*new_filename)); 
-		new_filename = string_basename(filename);
+	static struct hash_table *previous_names = NULL;
+	static struct hash_table *reverse_names = NULL;
+	if ( !previous_names )
+		previous_names = hash_table_create(0, NULL);
+	if ( !reverse_names )
+		reverse_names = hash_table_create(0, NULL);
+
+	char fn[PATH_MAX];
+	if (collision_counter){
+		sprintf(fn, "%s%d",filename,collision_counter);
+	}else
+		sprintf(fn, "%s", filename);
+
+	const char *new_filename = malloc(PATH_MAX * sizeof (char)); 
+	new_filename = hash_table_lookup(previous_names, fn);
+	if ( new_filename )
 		return xxstrdup(new_filename);
+
+	new_filename = hash_table_lookup(reverse_names, fn);
+	if ( new_filename ){
+		collision_counter++;
+		return bundler_translate_name(fn, collision_counter);
 	}
-	else
-		return xxstrdup(filename);
+	if (filename[0] == '/'){
+		new_filename = string_basename(fn);
+		if(hash_table_lookup(previous_names, new_filename)){
+			collision_counter++;
+			return bundler_translate_name(fn, collision_counter);
+		}
+		else if(hash_table_lookup(reverse_names, new_filename)){
+			collision_counter++;
+			return bundler_translate_name(fn, collision_counter);
+		}
+		else {
+			hash_table_insert(reverse_names, new_filename, fn);
+			hash_table_insert(previous_names, fn, new_filename);
+			return xxstrdup(new_filename);
+		}
+	}
+	else {
+		hash_table_insert(previous_names, fn, fn);
+		hash_table_insert(reverse_names, fn, fn);
+		return xxstrdup(fn);
+	}
+}
+
+char* bundler_rename(struct dag_node *n, const char *filename){
+
+	if (n) {
+		struct list *input_files = dag_input_files(n->d);
+		if(list_find(input_files, (int (*) (void *, const void *)) string_equal, (void*)filename))
+			return xxstrdup(filename);
+	}
+	return bundler_translate_name(filename, 0); /* no collisions yet -> 0 */
 }
 
 void dag_show_output_files(struct dag *d)
@@ -874,6 +923,7 @@ int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode)
 
 	bk->d = d;
 	bk->dag_stream = dag_stream;
+	bk->monitor_mode = monitor_mode;
 
 	while((line = dag_parse_readline(bk, NULL)) != NULL) {
 		
@@ -893,7 +943,7 @@ int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode)
 				goto failure;
 			}
 		} else if(strstr(line, ":")) {
-			if(!dag_parse_node(bk, line, clean_mode, monitor_mode)) {
+			if(!dag_parse_node(bk, line, clean_mode)) {
 				dag_parse_error(bk, "node");
 				goto failure;
 			}
@@ -1068,12 +1118,16 @@ int dag_parse_variable(struct dag_parse *bk, struct dag_node *n, char *line)
 	return 1;
 }
 
-char *monitor_log_name(int nodeid)
+char *monitor_log_name(char *dirname, int nodeid)
 {
-	return string_format(monitor_log_format, nodeid);
+	char *name = string_format(monitor_log_format, nodeid);
+	char *path = string_format("%s/%s", dirname, name);
+	free(name);
+
+	return path;
 }
 
-int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode, int monitor_mode)
+int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode)
 {
 	struct dag *d = bk->d;
 	char *line;
@@ -1086,15 +1140,11 @@ int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode, int mon
 
 	/* BUG: We need a more general solution to wrapping nodes
 	 * while parsing. The monitor code should not be here. */
-	if(monitor_mode)
+	if(bk->monitor_mode)
 	{
-		log_name = monitor_log_name(n->nodeid);
-		debug(D_DEBUG, "adding monitor %s and %s{,-summary,-opened} to rule %d.\n", monitor_exe, log_name, n->nodeid);
-		line = string_format("%s/%s-summary %s/%s-opened %s/%s %s %s",
-				monitor_log_dir, log_name, 
-				monitor_log_dir, log_name, 
-				monitor_log_dir, log_name, 
-				line_org, monitor_exe);
+		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
+		debug(D_DEBUG, "adding monitor and %s{,-series,-opened} to rule %d.\n", log_name, n->nodeid);
+		line = string_format("%s-series %s-opened %s %s %s", log_name, log_name, log_name, line_org, monitor_exe);
 	}
 	else
 	{
@@ -1295,15 +1345,15 @@ int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 	}
 
 	/* BUG: Monitor code should not be here! */
-	if(monitor_exe)
+	if(bk->monitor_mode)
 	{
-		log_name = monitor_log_name(n->nodeid);
-		command = string_format("./%s -o %s/%s -i %d -- %s", monitor_exe, monitor_log_dir, log_name, monitor_interval, command);
+		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
+		command = resource_monitor_rewrite_command(command, log_name, RMONITOR_DEFAULT_NAME, RMONITOR_DEFAULT_NAME); 
 	}
 
 	dag_parse_node_set_command(bk, n, command);
 
-	if(monitor_exe)
+	if(bk->monitor_mode)
 		free(command);
 
 	return 1;
@@ -2053,63 +2103,6 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 	}
 }
 
-char *monitor_locate(const char *path_from_cmdline)
-{
-	char *path_from_env;
-	char *monitor_path;
-
-	debug(D_DEBUG,"locating monitor executable...");
-
-	path_from_env = getenv(MONITOR_ENV_VAR);
-	if(path_from_cmdline)
-	{
-		monitor_path = xxstrdup(path_from_cmdline);
-		debug(D_DEBUG,"trying monitor path provided at command line: %s\n", path_from_cmdline);
-	}
-	else if(path_from_env)
-	{
-		monitor_path = xxstrdup(path_from_env);
-		debug(D_DEBUG,"trying monitor from $%s.", MONITOR_ENV_VAR);
-	}
-	else
-	{
-		monitor_path = string_format("%s/bin/resource_monitor", INSTALL_PATH);
-		debug(D_DEBUG,"trying monitor at default location %s.\n", monitor_path);
-	}
-
-	return monitor_path;
-}
-
-char *monitor_copy_to_wd(char *path_from_cmdline)
-{
-	char *mon_unique;
-	char *monitor_org;
-	monitor_org = monitor_locate(path_from_cmdline);
-
-	if(!monitor_org)
-		fatal("Monitor program could not be found.\n");
-
-	mon_unique = string_format("monitor-%d", getpid());
-
-	debug(D_DEBUG,"copying monitor %s to %s.\n", monitor_org, mon_unique);
-
-	if(copy_file_to_file(monitor_org, mon_unique) < 0)
-		fatal("Could not copy monitor %s to %s in local directory: %s\n", 
-				monitor_org, mon_unique, strerror(errno));
-
-	chmod(mon_unique, 0777);
-
-	return mon_unique;
-}
-
-//atexit handler
-void monitor_delete_exe(void)
-{
-	debug(D_DEBUG, "unlinking %s\n", monitor_exe);
-	unlink(monitor_exe);
-}
-
-
 int main(int argc, char *argv[])
 {
 	char c;
@@ -2318,6 +2311,7 @@ int main(int argc, char *argv[])
 			case 'N':
 				free(project);
 				project = xxstrdup(optarg);
+				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 				break;
 			case 'o':
 				debug_config_file(optarg);
@@ -2466,7 +2460,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(monitor_mode) {
-		monitor_exe      = monitor_copy_to_wd( NULL );
+		monitor_exe = resource_monitor_copy_to_wd( NULL );
 
 		if(monitor_interval < 1)
 			monitor_interval = DEFAULT_MONITOR_INTERVAL;
@@ -2474,14 +2468,15 @@ int main(int argc, char *argv[])
 		if(!monitor_log_format)
 			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
 
+		/* If we did not get a directory to write the
+		 * logs, create one with the current date + time.
+		 * */
 		if(!monitor_log_dir)
 		{
 			time_t now = time(NULL);
 			struct tm *tm = localtime(&now);
 			monitor_log_dir = string_format("monitor-logs-%04d_%02d_%02d_%02d-%02d", 1900 + tm->tm_year, 1 + tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min);
 		}
-
-		atexit(monitor_delete_exe);
 	}
 
 	int no_symlinks = (clean_mode || syntax_check || display_mode);

@@ -1622,9 +1622,11 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'M':
+			auto_worker = 1;
 			list_push_tail(preferred_masters, strdup(optarg));
 			break;
 		case 'N':
+			auto_worker = 1;
 			if(foreman_name) { // for backward compatibility with old syntax for specifying a worker's project name
 				list_push_tail(preferred_masters, foreman_name);
 			}
