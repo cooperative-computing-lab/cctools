@@ -1688,7 +1688,7 @@ int main(int argc, char **argv) {
 		{"limits",     required_argument, 0, 'L'},
 		{"limits-file",required_argument, 0, 'l'},
 
-		{"with-summary",      required_argument, 0, 'o'},
+		{"with-summary-file", required_argument, 0, 'o'},
 		{"with-time-series",  required_argument, 0,  0 }, 
 		{"with-opened-files", required_argument, 0,  1 },
 

@@ -29,6 +29,8 @@ See the file COPYING for details.
 #include "buffer.h"
 #include "link_nvpair.h"
 #include "get_canonical_path.h"
+#include "rmonitor_hooks.h"
+#include "copy_stream.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -93,6 +95,8 @@ static const char * work_queue_state_names[] = {"init","ready","busy","cancel","
 #define WORKER_ADDRPORT_MAX 32
 #define WORKER_HASHKEY_MAX 32
 
+#define RESOURCE_MONITOR_TASK_SUMMARY_NAME "cctools-work-queue-%d-resource-monitor-task-%d"
+
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 int wq_minimum_transfer_timeout = 3;
@@ -156,6 +160,10 @@ struct work_queue {
 	FILE *logfile;
 	timestamp_t keepalive_interval;
 	timestamp_t keepalive_timeout;
+
+	int monitor_mode;
+	int monitor_fd;
+	char *monitor_exe;
 };
 
 struct work_queue_worker {
@@ -857,6 +865,45 @@ static void delete_uncacheable_files(struct work_queue_task *t, struct work_queu
 	delete_worker_files(w, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 }
 
+void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_task *t)
+{
+	struct flock lock;
+	FILE        *fsummary;
+	char        *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
+	char        *msg; 
+
+	lock.l_type   = F_WRLCK;
+	lock.l_start  = 0;
+	lock.l_whence = SEEK_SET;
+	lock.l_len    = 0;
+
+	fcntl(q->monitor_fd, F_SETLKW, &lock);
+	
+	msg = string_format("Work Queue pid: %d Task: %d\n", getpid(), t->taskid);
+	write(q->monitor_fd, msg, strlen(msg));
+	free(msg);
+
+	if( (fsummary = fopen(summary, "r")) == NULL )
+	{
+		msg = string_format("Summary for task %d:%d is not available.\n", getpid(), t->taskid);
+		write(q->monitor_fd, msg, strlen(msg));
+		free(msg);
+	}
+	else
+	{
+		copy_stream_to_fd(fsummary, q->monitor_fd);
+		fclose(fsummary);	
+	}
+
+	write(q->monitor_fd, "\n\n", 2);
+
+	lock.l_type   = F_ULOCK;
+	fcntl(q->monitor_fd, F_SETLK, &lock);
+
+	if(unlink(summary) != 0)
+		debug(D_NOTICE, "Summary %s could not be removed.\n", summary);
+}
+
 static int fetch_output_from_worker(struct work_queue *q, struct work_queue_worker *w, int taskid)
 {
 	struct work_queue_task *t;
@@ -887,6 +934,12 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	list_push_head(q->complete_list, t);
 	itable_remove(w->current_tasks, t->taskid);
 	t->time_task_finish = timestamp_get();
+
+	/* if q is monitoring, append the task summary to the single
+	 * queue summary, and delete the task summary. */
+	if(q->monitor_mode)
+		work_queue_monitor_append_report(q, t);
+
 
 	// Record statistics information for capacity estimation
 	if(q->estimate_capacity_on) {
@@ -2510,6 +2563,8 @@ struct work_queue *work_queue_create(int port)
 	
 	q->keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
 	q->keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT; 
+
+	q->monitor_mode   =  0;
 	
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
@@ -2518,6 +2573,40 @@ failure:
 	debug(D_NOTICE, "Could not create work_queue on port %i.", port);
 	free(q);
 	return 0;
+}
+
+struct work_queue *work_queue_create_monitoring(int port, char *monitor_summary_file)
+{
+	struct work_queue *q = work_queue_create(port);
+
+	q->monitor_mode = 0;
+
+	if(!q)
+		return 0;
+
+	q->monitor_exe = resource_monitor_copy_to_wd(NULL);
+	if(!q->monitor_exe)
+	{
+		debug(D_NOTICE, "Could not find the resource monitor executable. Disabling monitor mode.\n");
+		return q;
+	}
+
+	if(monitor_summary_file)
+		monitor_summary_file = xxstrdup(monitor_summary_file);
+	else
+		monitor_summary_file = string_format("wq-%d-resource-usage", getpid());
+
+	q->monitor_fd = open(monitor_summary_file, O_CREAT | O_WRONLY | O_APPEND, 00666);
+	free(monitor_summary_file);
+
+	if(q->monitor_fd < 0)
+	{
+		debug(D_NOTICE, "Could not open monitor log file. Disabling monitor mode.\n");
+		return q;
+	}
+
+	q->monitor_mode = 1;
+	return q;
 }
 
 int work_queue_activate_fast_abort(struct work_queue *q, double multiplier)
@@ -2649,6 +2738,25 @@ void work_queue_delete(struct work_queue *q)
 	}
 }
 
+int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
+{
+	char *wrap_cmd; 
+	char *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
+	
+	wrap_cmd = resource_monitor_rewrite_command(t->command_line, summary, RMONITOR_DONT_GENERATE, RMONITOR_DONT_GENERATE);
+
+	//BUG: what if user changes current working directory?
+	work_queue_task_specify_file(t, q->monitor_exe, q->monitor_exe, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+	work_queue_task_specify_file(t, summary, summary, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+
+	free(summary);
+	free(t->command_line);
+
+	t->command_line = wrap_cmd;
+
+	return 0;
+}
+
 int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 {
 	static int next_taskid = 1;
@@ -2672,6 +2780,9 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	
 	//Increment taskid. So we get a unique taskid for every submit.
 	t->taskid = next_taskid++;
+
+	if(q->monitor_mode)
+		work_queue_monitor_wrap(q, t);
 
 	/* Then, add it to the ready list and mark it as submitted. */
 	if (q->task_ordering == WORK_QUEUE_TASK_ORDER_LIFO){

@@ -21,9 +21,11 @@ COPYING for details.
 
 static char *monitor_exe  = NULL;
 
+//BUG: Too much code repetition!
 char *resource_monitor_locate(char *path_from_cmdline)
 {
 	char *monitor_path;
+	struct stat buf;	
 
 	debug(D_RMON,"locating resource monitor executable...\n");
 
@@ -31,40 +33,47 @@ char *resource_monitor_locate(char *path_from_cmdline)
 	if(monitor_path)
 	{
 		debug(D_RMON,"trying executable from path provided at command line.\n");
-		if(access(monitor_path, R_OK|X_OK) == 0)	
-			return xxstrdup(monitor_path);	
+		if(stat(monitor_path, &buf) == 0)
+			if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
+				return xxstrdup(monitor_path);	
 	}
 
 	monitor_path = getenv(RESOURCE_MONITOR_ENV_VAR);
 	if(monitor_path)
 	{
 		debug(D_RMON,"trying executable from $%s.\n", RESOURCE_MONITOR_ENV_VAR);
-		if(access(monitor_path, R_OK|X_OK) == 0)	
-			return xxstrdup(monitor_path);	
+		if(stat(monitor_path, &buf) == 0)
+			if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
+				return xxstrdup(monitor_path);	
 	}
 
 	debug(D_RMON,"trying executable at local directory.\n");
 	//LD_CONFIG version.
 	monitor_path = string_format("./resource_monitor");
-	if(access(monitor_path, R_OK|X_OK) == 0)	
-		return monitor_path;	
+	if(stat(monitor_path, &buf) == 0)
+		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
+			return xxstrdup(monitor_path);	
 
 	//static "vanilla" version
 	free(monitor_path);
 	monitor_path = string_format("./resource_monitorv");
-	if(access(monitor_path, R_OK|X_OK) == 0)	
-			return monitor_path;	
+	if(stat(monitor_path, &buf) == 0)
+		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
+			return xxstrdup(monitor_path);	
 
 	debug(D_RMON,"trying executable at installed path location.\n");
 	//LD_CONFIG version.
+	free(monitor_path);
 	monitor_path = string_format("%s/bin/resource_monitor", INSTALL_PATH);
-	if(access(monitor_path, R_OK|X_OK) == 0)	
-		return monitor_path;	
+	if(stat(monitor_path, &buf) == 0)
+		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
+			return xxstrdup(monitor_path);	
 	
 	free(monitor_path);
 	monitor_path = string_format("%s/bin/resource_monitorv", INSTALL_PATH);
-	if(access(monitor_path, R_OK|X_OK) == 0)	
-			return monitor_path;	
+	if(stat(monitor_path, &buf) == 0)
+		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
+			return xxstrdup(monitor_path);	
 
 	return NULL;
 }
@@ -89,7 +98,7 @@ char *resource_monitor_copy_to_wd(char *path_from_cmdline)
 
 	debug(D_RMON,"copying monitor %s to %s.\n", monitor_org, mon_unique);
 
-	if(copy_file_to_file(monitor_org, mon_unique) < 0)
+	if(copy_file_to_file(monitor_org, mon_unique) == 0)
 		fatal("Could not copy monitor %s to %s in local directory: %s\n",
 				monitor_org, mon_unique, strerror(errno));
 
@@ -127,15 +136,17 @@ char *resource_monitor_rewrite_command(char *cmdline, char *summary, char *time_
 			index += sprintf(cmd_builder + index, "--with-time-series=%s ", time_series);
 	}
 	else
-		index += sprintf(cmd_builder + index, "--without-time-series");
+		index += sprintf(cmd_builder + index, "--without-time-series ");
 
 	if(opened_files != RMONITOR_DONT_GENERATE)
 	{	
 		if(strcmp(opened_files, RMONITOR_DEFAULT_NAME) != 0)
-			index += sprintf(cmd_builder + index, "--with-opened_files=%s ", opened_files);
+			index += sprintf(cmd_builder + index, "--with-opened-files=%s ", opened_files);
 	}
 	else
-		index += sprintf(cmd_builder + index, "--without-opened_files");
+		index += sprintf(cmd_builder + index, "--without-opened-files ");
+
+	sprintf(cmd_builder + index, "-- %s", cmdline);
 
 	return xxstrdup(cmd_builder);
 }

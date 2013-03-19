@@ -1582,7 +1582,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aB:C:d:f:t:j:o:p:M:N:w:i:b:z:A:O:s:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "aB:C:d:f:t:j:o:p:m:M:N:w:i:b:z:A:O:s:vh")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
@@ -1613,13 +1613,14 @@ int main(int argc, char *argv[])
 			debug_config_file(optarg);
 			break;
 		case 'm':
-			if(!strncmp("foreman", optarg, 4) || optarg[0] == 'f') {
+			if(!strncmp("foreman", optarg, 7) || optarg[0] == 'f') {
 				worker_mode = WORKER_MODE_FOREMAN;
 			} else if(!strncmp("worker", optarg, 6) || optarg[0] == 'w') {
 				worker_mode = WORKER_MODE_WORKER;
 			} else if(!strncmp("classic", optarg, 7) || optarg[0] == 'c') {
 				worker_mode = WORKER_MODE_CLASSIC;
 			}
+			break;
 		case 'M':
 			auto_worker = 1;
 			list_push_tail(preferred_masters, strdup(optarg));
@@ -1707,6 +1708,7 @@ int main(int argc, char *argv[])
 		foreman_q = work_queue_create(foreman_port);
 		if(foreman_name) {
 			work_queue_specify_name(foreman_q, foreman_name);
+			work_queue_specify_master_mode(foreman_q, WORK_QUEUE_MASTER_MODE_CATALOG);
 		}
 		unfinished_tasks = itable_create(0);
 	} else {

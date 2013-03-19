@@ -306,16 +306,64 @@ void collect_input_files(struct dag *d, char* bundle_dir, char *(*rename)(struct
 	list_delete(il);	
 }
 
-char* bundler_rename(struct dag_node *d, const char *filename)
+/* When a collision is detected (a file with an absolute path has the same base name as a relative file) a
+ * counter is appended to the filename and the name translation is retried */
+char* bundler_translate_name(const char *filename, int collision_counter)
 {
-	if (filename[0] == '/'){
-		const char *new_filename;
-		new_filename = (char *)malloc(PATH_MAX * sizeof (*new_filename)); 
-		new_filename = string_basename(filename);
+	static struct hash_table *previous_names = NULL;
+	static struct hash_table *reverse_names = NULL;
+	if ( !previous_names )
+		previous_names = hash_table_create(0, NULL);
+	if ( !reverse_names )
+		reverse_names = hash_table_create(0, NULL);
+
+	char fn[PATH_MAX];
+	if (collision_counter){
+		sprintf(fn, "%s%d",filename,collision_counter);
+	}else
+		sprintf(fn, "%s", filename);
+
+	const char *new_filename = malloc(PATH_MAX * sizeof (char)); 
+	new_filename = hash_table_lookup(previous_names, fn);
+	if ( new_filename )
 		return xxstrdup(new_filename);
+
+	new_filename = hash_table_lookup(reverse_names, fn);
+	if ( new_filename ){
+		collision_counter++;
+		return bundler_translate_name(fn, collision_counter);
 	}
-	else
-		return xxstrdup(filename);
+	if (filename[0] == '/'){
+		new_filename = string_basename(fn);
+		if(hash_table_lookup(previous_names, new_filename)){
+			collision_counter++;
+			return bundler_translate_name(fn, collision_counter);
+		}
+		else if(hash_table_lookup(reverse_names, new_filename)){
+			collision_counter++;
+			return bundler_translate_name(fn, collision_counter);
+		}
+		else {
+			hash_table_insert(reverse_names, new_filename, fn);
+			hash_table_insert(previous_names, fn, new_filename);
+			return xxstrdup(new_filename);
+		}
+	}
+	else {
+		hash_table_insert(previous_names, fn, fn);
+		hash_table_insert(reverse_names, fn, fn);
+		return xxstrdup(fn);
+	}
+}
+
+char* bundler_rename(struct dag_node *n, const char *filename){
+
+	if (n) {
+		struct list *input_files = dag_input_files(n->d);
+		if(list_find(input_files, (int (*) (void *, const void *)) string_equal, (void*)filename))
+			return xxstrdup(filename);
+	}
+	return bundler_translate_name(filename, 0); /* no collisions yet -> 0 */
 }
 
 void dag_show_output_files(struct dag *d)
@@ -1300,7 +1348,7 @@ int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 	if(bk->monitor_mode)
 	{
 		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
-		command = string_format("./%s -o %s -i %d -- %s", monitor_exe, log_name, monitor_interval, command);
+		command = resource_monitor_rewrite_command(command, log_name, RMONITOR_DEFAULT_NAME, RMONITOR_DEFAULT_NAME); 
 	}
 
 	dag_parse_node_set_command(bk, n, command);
