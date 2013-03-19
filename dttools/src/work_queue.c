@@ -59,7 +59,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_STATE_NONE  4
 #define WORKER_STATE_MAX   (WORKER_STATE_NONE+1)
 
-static const char * work_queue_state_names[] = {"init","ready","busy","cancel","none"};
+static const char *work_queue_state_names[] = {"init","ready","busy","full","none"};
 
 // FIXME: These internal error flags should be clearly distinguished
 // from the task result codes given by work_queue_wait.
@@ -3144,7 +3144,7 @@ void work_queue_specify_log(struct work_queue *q, const char *logfile)
 		setvbuf(q->logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
 		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
 			"timestamp", "start_time",
-			"workers_init", "workers_ready", "workers_active", "workers_cancelling", // workers
+			"workers_init", "workers_ready", "workers_active", "workers_full", // workers
 			"tasks_waiting", "tasks_running", "tasks_complete", // tasks
 			"total_tasks_dispatched", "total_tasks_complete", "total_workers_joined", "total_workers_connected", // totals
 			"total_workers_removed", "total_bytes_sent", "total_bytes_received", "total_send_time", "total_receive_time",
