@@ -99,8 +99,6 @@ href="http://www.cse.nd.edu/~ccl/software/download">web page</a> and install
 using the steps <a href="http://www.nd.edu/~ccl/software/manuals/install.html">here</a>. 
 
 <p> 
-To build and install AWE, use the following recipe.
-
 First, determine the location where AWE is to be installed. For example:
 <pre>
 % export AWE_INSTALL_PATH=$HOME/awe
@@ -114,7 +112,7 @@ Compile and install AWE in the location pointed by $AWE_INSTALL_PATH using:
 % make install
 </pre>
 
-Now set PATH to include the installed AWE binaries:
+Next, set PATH to include the installed AWE binaries:
 <pre>
 % export PATH=${AWE_INSTALL_PATH}/bin:${PATH}
 </pre>
@@ -124,7 +122,7 @@ Finally, set PYTHONPATH to include the installed AWE Python modules:
 % export PYTHONPATH=${AWE_INSTALL_PATH}/lib/python2.6/site-packages:${PYTHONPATH}
 </pre>
 
-You can also check if AWE was correctly installed by running:
+You can check if AWE was correctly installed by running:
 <pre>
 % awe-verify
 </pre>
@@ -132,9 +130,8 @@ You can also check if AWE was correctly installed by running:
 <h2>Running AWE</h2>
 
 First, create a directory from which you want to instantiate and run the AWE
-program. In this manual, we are going to use and run AWE on the Alanine
-Dipeptide protein using the code in <tt>awe-ala.py</tt>.  
-<pre>
+program. In this manual, we are going to run AWE to sample the state transitions
+of the Alanine Dipeptide protein using the code in <tt>awe-ala.py</tt>.  <pre>
 % cd $HOME
 % mkdir awe-alanine 
 % cd awe-alanine 
@@ -154,11 +151,13 @@ each walker.
 
 <p>This will create two directories named <tt>awe-generic-data</tt> and
 <tt>awe-instance-data</tt>. <tt>awe-generic-data</tt> will contain files that
-all AWE runs will require (such as the executables and Gromacs forcefield
-files).  <tt>awe-instance-data</tt> will contain the input files for sampling
-the Alanine Dipeptide protein molecule. Further, <tt>awe-prepare</tt> will also
-copy the example program <tt>awe-ala.py</tt> provided in the AWE source that
-samples the state transitions for the Alanine Dipeptide protein. 
+all AWE runs will require, such as the task executables and Gromacs forcefield
+files. <tt>awe-instance-data</tt> will contain files that are particular to a
+protein system such as the state definitions, initial protein coordinates, etc.
+Note that <tt>awe-prepare</tt>, by default, will transfer the files for the
+Alanine Dipeptide protein molecule. Further, <tt>awe-prepare</tt> will also copy
+the example program <tt>awe-ala.py</tt> provided in the AWE source that samples
+the state transitions for the Alanine Dipeptide protein. 
 
 <p>To run the example in <tt>awe-ala.py</tt>, do
 
@@ -166,7 +165,7 @@ samples the state transitions for the Alanine Dipeptide protein.
 % python awe-ala.py
 </pre>
 
-<p> You will see this right away:
+<p> You will see this output right away:
 <pre>
  Running on port 9123...
  Loading cells and walkers
@@ -237,15 +236,24 @@ phi-psi space) using <tt>cell-weights.csv</tt>, run the following command.
 % python awe-rama-ala.py -w cell-weights.csv -p awe-instance-data/topol.pdb -c awe-instance-data/cells.dat -n 100
 </pre>
 
-This produces an output file named <tt>awe-rama-ala.png</tt>
+where, <tt>-w</tt> specifies the csv file recording cell weights, <tt>-p</tt>
+the structure file of simulation target, <tt>-c</tt> the data file recording
+coordinates of cell centers, and <tt>-n</tt> the number of cells
+
+This produces an output file named <tt>awe-rama-ala.png</tt> that contains the
+Ramachandran plot.
 
 <p>To generate and visualize forward and backward fluxes from the output file
-<tt>transitions.dat</tt>, use the script <tt>awe-flux.py</tt>.
+<tt>color-transition-matrix.dat</tt>, use the script <tt>awe-flux.py</tt>.
 
 <pre>
 % python awe-flux.py -i color-transition-matrix.csv -l 0.01
 </pre>
-							
+
+where <tt>-i</tt> specifies the data file recording transitions at every
+iteration, <tt>-l</tt> specifies the scale iteration length to actual unit and
+(nano/pico/femto-seconds).
+
 This will produce the following outputs:		
 <ul>
 <li><tt>instan-forward-flux.dat</tt>: instantaneous forward flux</li>
@@ -254,13 +262,18 @@ This will produce the following outputs:
 <li><tt>backward-flux.png</tt>: plot of backward flux</li>
 </ul>
 
-<p>To generate transition probability matrix from AWE output, run the script
-<tt>awe-transMatrix.py</tt>
+<p>Finally, to generate transition probability matrix from AWE output, run the
+script <tt>awe-transMatrix.py</tt>
 
 <pre>
 % python awe-transMatrix.py -p walker-history.dat -w walker-weights.dat -t 1 -n 100
 </pre>
-This prints the matrix to a file called <tt>trans-probability-matrix.csv</tt>.
+where <tt>-p</tt> specifies the data file recording dependencies of walkers,
+<tt>-w</tt> specifies the data file recording weights and cell ID of walkers,
+<tt>-t</tt> specifies the time lag (number of iterations) for calculating,
+transition matrix, and <tt>-n</tt> specifies the number of cells
+
+<p>This prints the matrix to a file called <tt>trans-probability-matrix.csv</tt>.
 
 <h2> Running AWE on Different Protein Systems</h2>
 You can run AWE to sample a different protein system by following the steps
