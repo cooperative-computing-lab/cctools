@@ -30,6 +30,7 @@ See the file COPYING for details.
 #include "link_nvpair.h"
 #include "get_canonical_path.h"
 #include "rmonitor_hooks.h"
+#include "copy_stream.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -864,6 +865,35 @@ static void delete_uncacheable_files(struct work_queue_task *t, struct work_queu
 	delete_worker_files(w, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 }
 
+void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_task *t)
+{
+	char *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
+	FILE *fsummary;
+
+	char *msg; 
+	
+	msg = string_format("Work Queue pid: %d Task: %d\n", getpid(), t->taskid);
+	write(q->monitor_fd, msg, strlen(msg));
+	free(msg);
+
+	if( (fsummary = fopen(summary, "r")) == NULL )
+	{
+		msg = string_format("Summary for task %d is not available.\n", t->taskid);
+		write(q->monitor_fd, msg, strlen(msg));
+		free(msg);
+	}
+	else
+	{
+		copy_stream_to_fd(fsummary, q->monitor_fd);
+		fclose(fsummary);	
+	}
+
+	write(q->monitor_fd, "\n\n", 2);
+
+	if(unlink(summary) != 0)
+		debug(D_NOTICE, "Summary %s could not be removed.\n", summary);
+}
+
 static int fetch_output_from_worker(struct work_queue *q, struct work_queue_worker *w, int taskid)
 {
 	struct work_queue_task *t;
@@ -894,6 +924,12 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	list_push_head(q->complete_list, t);
 	itable_remove(w->current_tasks, t->taskid);
 	t->time_task_finish = timestamp_get();
+
+	/* if q is monitoring, append the task summary to the single
+	 * queue summary, and delete the task summary. */
+	if(q->monitor_mode)
+		work_queue_monitor_append_report(q, t);
+
 
 	// Record statistics information for capacity estimation
 	if(q->estimate_capacity_on) {
@@ -2529,10 +2565,9 @@ failure:
 	return 0;
 }
 
-struct work_queue *work_queue_create_monitoring(int port)
+struct work_queue *work_queue_create_monitoring(int port, char *monitor_summary_file)
 {
 	struct work_queue *q = work_queue_create(port);
-	//char *log_name;
 
 	q->monitor_mode = 0;
 
@@ -2546,8 +2581,21 @@ struct work_queue *work_queue_create_monitoring(int port)
 		return q;
 	}
 
-	q->monitor_mode = 1;
+	if(monitor_summary_file)
+		monitor_summary_file = xxstrdup(monitor_summary_file);
+	else
+		monitor_summary_file = string_format("wq-%d-resource-usage", getpid());
 
+	q->monitor_fd = open(monitor_summary_file, O_CREAT | O_TRUNC | O_WRONLY, 00666);
+	free(monitor_summary_file);
+
+	if(q->monitor_fd < 0)
+	{
+		debug(D_NOTICE, "Could not open monitor log file. Disabling monitor mode.\n");
+		return q;
+	}
+
+	q->monitor_mode = 1;
 	return q;
 }
 
@@ -2679,7 +2727,6 @@ void work_queue_delete(struct work_queue *q)
 		free(q);
 	}
 }
-
 
 int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 {
