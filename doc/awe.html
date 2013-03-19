@@ -152,12 +152,15 @@ each walker.
 % awe-prepare
 </pre>
 
-<p>This will create a directory named <tt>awe-generic-data</tt> and copy files that
-all AWE runs will require (namely the binaries and Gromacs forcefield files). 
-It will also transfer the example program provided in the AWE source that that
+<p>This will create two directories named <tt>awe-generic-data</tt> and
+<tt>awe-instance-data</tt>. <tt>awe-generic-data</tt> will contain files that
+all AWE runs will require (such as the executables and Gromacs forcefield
+files).  <tt>awe-instance-data</tt> will contain the input files for sampling
+the Alanine Dipeptide protein molecule. Further, <tt>awe-prepare</tt> will also
+copy the example program <tt>awe-ala.py</tt> provided in the AWE source that
 samples the state transitions for the Alanine Dipeptide protein. 
 
-<p>To run this example, do
+<p>To run the example in <tt>awe-ala.py</tt>, do
 
 <pre>
 % python awe-ala.py
@@ -260,14 +263,17 @@ This will produce the following outputs:
 This prints the matrix to a file called <tt>trans-probability-matrix.csv</tt>.
 
 <h2> Running AWE on Different Protein Systems</h2>
-One protocol to run AWE is as follows:
+You can run AWE to sample a different protein system by following the steps
+below:
+
 <ol>
-<li> Sample the conformations space (eg, ensemble simulations, replica exchange). </li>
+<li> Sample the conformations space of the protein using ensemble simulations, replica
+exchange, etc. </li>
 <li> Cluster the data to obtain the cell definitions.</li>
-<li> Extract j conformations from each cluster. These are your walkers.</li>
+<li> Extract the conformations from each cluster as individual walkers.</li>
 </ol>
-To run AWE on a different protein system than the Alanine Dipeptide in the above
-example, you need to do the following:
+
+Specifically, these steps translate to the following:
 
 <ol>
 <li> Describe the topology of the system in <tt>topol.pdb</tt>.
