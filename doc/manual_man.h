@@ -25,6 +25,10 @@ define(OPTION_PAIR,.TP
 .BI \$1 \ PARAM($2)
 .
 )dnl
+define(OPTION_TRIPLET,.TP
+.BR \$1`,  '-\-$2 \ PARAM($3)
+.
+)dnl
 define(OPTIONS_END)dnl
 define(LONGCODE_BEGIN,.fam C
 .nf

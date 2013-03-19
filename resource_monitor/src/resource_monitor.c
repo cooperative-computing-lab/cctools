@@ -1579,13 +1579,13 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "%-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
 	fprintf(stdout, "\n");
-	fprintf(stdout, "%-30s Interval bewteen observations, in seconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
+	fprintf(stdout, "%-30s Interval between observations, in seconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
 	fprintf(stdout, "\n");
 	fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
 	fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify\n", "-L,--limits=<string>");
 	fprintf(stdout, "%-30s resource limits.\n", "");
 	fprintf(stdout, "\n");
-	fprintf(stdout, "%-30s Write resource summary to <file>     (default=resources-PID)\n", "-o,--with-summary-file=<file>");
+	fprintf(stdout, "%-30s Write resource summary to <file>     (default=monitor-log-<pid>)\n", "-o,--with-summary-file=<file>");
 	fprintf(stdout, "%-30s Write resource time series to <file> (default=<summary-file>-log)\n", "--with-time-series=<file>");
 	fprintf(stdout, "%-30s Write list of opened files to <file> (default=<summary-file>-opened)\n", "--with-opened-files=<file>");
 	fprintf(stdout, "\n");
