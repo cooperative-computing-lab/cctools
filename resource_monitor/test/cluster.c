@@ -346,7 +346,7 @@ double cluster_ward_distance(struct cluster *a, struct cluster *b)
 	return accum;
 }
 
-struct cluster *cluster_nearest_neighbor(struct itable *active_clusters, struct cluster *c)
+struct cluster *cluster_nearest_neighbor(struct itable *active_clusters, struct cluster *c, double (*cmp)(struct cluster *, struct cluster *))
 {
 	uint64_t        ptr;
 	struct cluster *nearest = NULL;
@@ -356,7 +356,7 @@ struct cluster *cluster_nearest_neighbor(struct itable *active_clusters, struct 
 	itable_firstkey(active_clusters);
 	while( itable_nextkey( active_clusters, &ptr, (void *) &other ) )
 	{
-		dtest = cluster_ward_distance(c, other);
+		dtest = cmp(c, other);
 
 		if( !nearest || dtest < dmin )
 		{
@@ -446,7 +446,7 @@ struct list *cluster_collect_summaries(struct cluster *c)
 }
 
 
-struct cluster *nearest_neighbor_clustering(struct list *initial_clusters)
+struct cluster *nearest_neighbor_clustering(struct list *initial_clusters, double (*cmp)(struct cluster *, struct cluster *))
 {
 	struct cluster *top, *closest, *subtop;
 	struct list   *stack;
@@ -477,7 +477,7 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters)
 		 * the stack now. subtop might be NULL if top was the
 		 * only cluster in the stack */
 		top     = list_pop_head( stack );
-		closest = cluster_nearest_neighbor(active_clusters, top);
+		closest = cluster_nearest_neighbor(active_clusters, top, cmp);
 		subtop  = list_peek_head( stack );
 
 		dclosest = -1;
@@ -534,7 +534,7 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters)
 		if(itable_size(active_clusters) == 0 && list_size(stack) > 3)
 		{
 			itable_delete(active_clusters);
-			return nearest_neighbor_clustering(stack);
+			return nearest_neighbor_clustering(stack, cmp);
 		}
 
 	}while( !(itable_size(active_clusters) == 0 && list_size(stack) == 1) );
@@ -821,7 +821,7 @@ int main(int argc, char **argv)
 
 	initial_clusters = create_initial_clusters(summaries);
 
-	final = nearest_neighbor_clustering(initial_clusters);
+	final = nearest_neighbor_clustering(initial_clusters, cluster_ward_distance);
 
 	final_clusters = collect_final_clusters(final, max_clusters);
 
