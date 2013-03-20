@@ -33,55 +33,55 @@ execution engine.
 
 SUBSECTION(Commands)
 OPTIONS_BEGIN
-OPTION_ITEM(-b)Create portable bundle of workflow.
-OPTION_ITEM(-c)Clean up: remove logfile and all targets.
-OPTION_ITEM(-D)Display the Makefile as a Dot graph.
-OPTION_ITEM(-f)Write summary of workflow to file.
-OPTION_ITEM(-k)Syntax check.
-OPTION_ITEM(-h)Show this help screen.
-OPTION_ITEM(-I)Show input files.
-OPTION_ITEM(-m)Email summary of workflow to address.
-OPTION_ITEM(-O)Show output files.
-OPTION_ITEM(-v)Show version string.
+OPTION_TRIPLET(-b, bundle-dir, directory)Create portable bundle of workflow.
+OPTION_ITEM(`-c, --clean')Clean up: remove logfile and all targets.
+OPTION_TRIPLET(-D, dot-graph, opt)Display the Makefile as a Dot graph.
+OPTION_TRIPLET(-f, summary-log, file)Write summary of workflow to file.
+OPTION_ITEM(`-h, --help')Show this help screen.
+OPTION_ITEM(`-I, --show-input')Show input files.
+OPTION_TRIPLET(-m, email, email)Email summary of workflow to address.
+OPTION_ITEM(`-O, --show-output')Show output files.
+OPTION_ITEM(`-v, --version')Show version string.
 OPTIONS_END
 
 SUBSECTION(Batch Options)
 OPTIONS_BEGIN
-OPTION_PAIR(-B, options)Add these options to all batch submit files.
-OPTION_PAIR(-j, #)Max number of local jobs to run at once. (default is # of cores)
-OPTION_PAIR(-J, #)Max number of remote jobs to run at once. (default is 100)
-OPTION_PAIR(-l, logfile)Use this file for the makeflow log. (default is X.makeflowlog)
-OPTION_PAIR(-L, logfile)Use this file for the batch system log. (default is X.PARAM(type)log)
-OPTION_ITEM(-R)Automatically retry failed batch jobs up to 100 times.
-OPTION_PAIR(-r, n)Automatically retry failed batch jobs up to n times.
-OPTION_PAIR(-S, timeout)Time to retry failed batch job submission. (default is 3600s)
-OPTION_PAIR(-T, type)Batch system type: local, condor, sge, moab, cluster, wq, hadoop, mpi-queue. (default is local)
+OPTION_TRIPLET(-B, batch-options, options)Add these options to all batch submit files.
+OPTION_TRIPLET(-j, max-local, #)Max number of local jobs to run at once. (default is # of cores)
+OPTION_TRIPLET(-J, max-remote, #)Max number of remote jobs to run at once. (default is 100)
+OPTION_TRIPLET(-l, makeflow-log, logfile)Use this file for the makeflow log. (default is X.makeflowlog)
+OPTION_TRIPLET(-L, batch-log, logfile)Use this file for the batch system log. (default is X.PARAM(type)log)
+OPTION_ITEM(`-R, --retry')Automatically retry failed batch jobs up to 100 times.
+OPTION_TRIPLET(-r, retry-count, n)Automatically retry failed batch jobs up to n times.
+OPTION_TRIPLET(-S, submission-timeout, timeout)Time to retry failed batch job submission. (default is 3600s)
+OPTION_TRIPLET(-T, batch-type, type)Batch system type: local, condor, sge, moab, cluster, wq, hadoop, mpi-queue. (default is local)
 OPTIONS_END
 
 SUBSECTION(Debugging Options)
 OPTIONS_BEGIN
-OPTION_PAIR(-d, subsystem)Enable debugging for this subsystem.
-OPTION_PAIR(-o, file)Send debugging to this file.
+OPTION_TRIPLET(-d, debug, subsystem)Enable debugging for this subsystem.
+OPTION_TRIPLET(-o, debug-output, file)Send debugging to this file.
 OPTIONS_END
 
 SUBSECTION(WorkQueue Options)
 OPTIONS_BEGIN
-OPTION_ITEM(-a)Advertise the master information to a catalog server.
-OPTION_PAIR(-C, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
-OPTION_PAIR(-F, #)WorkQueue fast abort multiplier. (default is deactivated)
-OPTION_PAIR(-N, project)Set the project name to PARAM(project).
-OPTION_PAIR(-p, port)Port number to use with WorkQueue. (default is 9123, 0=arbitrary)
-OPTION_PAIR(-Z,file)Select port at random and write it to this file.  (default is disabled)
-OPTION_PAIR(-P, integer)Priority. Higher the value, higher the priority.
+OPTION_ITEM(`-a, --advertise')Advertise the master information to a catalog server.
+OPTION_TRIPLET(-C, catalog-server, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
+OPTION_TRIPLET(-F, wq-fast-abort, #)WorkQueue fast abort multiplier. (default is deactivated)
+OPTION_TRIPLET(-N, project-name, project)Set the project name to PARAM(project).
+OPTION_TRIPLET(-p, port, port)Port number to use with WorkQueue. (default is 9123, 0=arbitrary)
+OPTION_TRIPLET(-Z, wq-random-port, file)Select port at random and write it to this file.  (default is disabled)
+OPTION_TRIPLET(-P, priority, integer)Priority. Higher the value, higher the priority.
 OPTION_PAIR(-w, mode)Auto WorkQueue mode. Mode is either 'width' or 'group' (DAG [width] or largest [group] of tasks).
-OPTION_PAIR(-W, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
+OPTION_TRIPLET(-W, wq-schedule, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
 OPTIONS_END
 
 SUBSECTION(Other Options)
 OPTIONS_BEGIN
-OPTION_ITEM(-A)Disable the check for AFS. (experts only)
-OPTION_ITEM(-K)Preserve (i.e., do not clean) intermediate symbolic links.
-OPTION_ITEM(-z)Force failure on zero-length output files.
+OPTION_ITEM(`-A, --disable-afs-check')Disable the check for AFS. (experts only)
+OPTION_ITEM(`-k, --syntax-check')Syntax check.
+OPTION_ITEM(`-K, --preserve-links')Preserve (i.e., do not clean) intermediate symbolic links.
+OPTION_ITEM(`-z, --zero-length-error')Force failure on zero-length output files.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)
