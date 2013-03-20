@@ -19,7 +19,7 @@ micro=0
 # signal that the user is not using a blessed (tagged) release.
 type="TRUNK"
 
-version="$major.$minor.$micro $type"
+version="$major.$minor.$micro-$type"
 
 # The release date is set automatically at configure time (the default).
 # For a tagged release, this should be the hard-coded date of the release.
