@@ -323,7 +323,7 @@ char* bundler_translate_name(const char *filename, int collision_counter)
 	}else
 		sprintf(fn, "%s", filename);
 
-	const char *new_filename = malloc(PATH_MAX * sizeof (char)); 
+	const char *new_filename;
 	new_filename = hash_table_lookup(previous_names, fn);
 	if ( new_filename )
 		return xxstrdup(new_filename);
