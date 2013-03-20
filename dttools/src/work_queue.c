@@ -983,8 +983,8 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 	if(!q || !w || !line) return 0;
 
 	//Format: hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, proj_name, pool_name, os, arch, workspace, version
-	char items[11][WORK_QUEUE_PROTOCOL_FIELD_MAX];
-	int n = sscanf(line, "ready %s %s %s %s %s %s %s %s %s %s %s %s\n", items[0], items[1], items[2], items[3], items[4], items[5], items[6], items[7], items[8], items[9], items[10], items[11]);
+	char items[12][WORK_QUEUE_PROTOCOL_FIELD_MAX];
+	int n = sscanf(line, "ready %s %s %s %s %s %s %s %s %s %s %s %s", items[0], items[1], items[2], items[3], items[4], items[5], items[6], items[7], items[8], items[9], items[10], items[11]);
 
 	if(n < 6) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
@@ -1053,7 +1053,7 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 		w->async_tasks = 0;
 		w->nslots = 1;
 	}
-	
+
 	if(w->state == WORKER_STATE_INIT) {
 		change_worker_state(q, w, WORKER_STATE_READY);
 		//list_push_tail(q->ready_workers, w);
@@ -1062,7 +1062,7 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 	}
 	
 	if(strcmp(CCTOOLS_VERSION, w->version)) {
-		debug(D_DEBUG, "Warning: potential worker version mismatch: worker %s (%s) is version %s.", w->hostname, w->addrport, w->version);
+		debug(D_DEBUG, "Warning: potential worker version mismatch: worker %s (%s) is version %s, and master is version %s", w->hostname, w->addrport, w->version, CCTOOLS_VERSION);
 	}
 	
 
