@@ -933,6 +933,7 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	itable_remove(q->finished_tasks, t->taskid);
 	list_push_head(q->complete_list, t);
 	itable_remove(w->current_tasks, t->taskid);
+	itable_remove(q->worker_task_map, t->taskid);
 	t->time_task_finish = timestamp_get();
 
 	/* if q is monitoring, append the task summary to the single
@@ -2237,6 +2238,7 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 		send_worker_msg(w, "%s %d\n", time(0) + short_timeout, "kill", t->taskid);
 		//update table.
 		itable_remove(q->running_tasks, t->taskid);
+		itable_remove(q->finished_tasks, t->taskid);
 		itable_remove(q->worker_task_map, t->taskid);
 
 		if (t->tag)
@@ -2257,25 +2259,37 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 	return 0;
 }
 
-static struct work_queue_task *find_running_task_by_id(struct itable *running_tasks, int taskid) {
+static struct work_queue_task *find_running_task_by_id(struct work_queue *q, int taskid) {
 	
 	struct work_queue_task *t;
 
-	t=itable_lookup(running_tasks, taskid);
+	t=itable_lookup(q->running_tasks, taskid);
 	if (t){
+		return t;
+	}
+	
+	t = itable_lookup(q->finished_tasks, taskid);
+	if(t) {
 		return t;
 	}
 	
 	return NULL;
 }
 
-static struct work_queue_task *find_running_task_by_tag(struct itable *running_tasks, const char *tasktag) {
+static struct work_queue_task *find_running_task_by_tag(struct work_queue *q, const char *tasktag) {
 	
 	struct work_queue_task *t;
 	UINT64_T taskid;
 
-	itable_firstkey(running_tasks);
-	while(itable_nextkey(running_tasks, &taskid, (void**)&t)) {
+	itable_firstkey(q->running_tasks);
+	while(itable_nextkey(q->running_tasks, &taskid, (void**)&t)) {
+		if (tasktag_comparator(t, tasktag)) {
+			return t;
+		}
+	}
+
+	itable_firstkey(q->finished_tasks);
+	while(itable_nextkey(q->finished_tasks, &taskid, (void**)&t)) {
 		if (tasktag_comparator(t, tasktag)) {
 			return t;
 		}
@@ -2981,8 +2995,8 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int ta
 	struct work_queue_task *matched_task;
 
 	if (taskid > 0){
-		//see if task is executing at a worker.
-		if ((matched_task = find_running_task_by_id(q->running_tasks, taskid))) {
+		//see if task is executing at a worker (in running_tasks or finished_tasks).
+		if ((matched_task = find_running_task_by_id(q, taskid))) {
 			if (cancel_running_task(q, matched_task)) {
 				return matched_task;
 			}	
@@ -3010,8 +3024,8 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 	struct work_queue_task *matched_task;
 
 	if (tasktag){
-		//see if task is executing at a worker.
-		if ((matched_task = find_running_task_by_tag(q->running_tasks, tasktag))) {
+		//see if task is executing at a worker (in running_tasks or finished_tasks).
+		if ((matched_task = find_running_task_by_tag(q, tasktag))) {
 			if (cancel_running_task(q, matched_task)) {
 				return matched_task;
 			}
