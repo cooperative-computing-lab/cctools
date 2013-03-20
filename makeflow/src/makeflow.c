@@ -323,7 +323,7 @@ char* bundler_translate_name(const char *filename, int collision_counter)
 	}else
 		sprintf(fn, "%s", filename);
 
-	const char *new_filename = malloc(PATH_MAX * sizeof (char)); 
+	const char *new_filename;
 	new_filename = hash_table_lookup(previous_names, fn);
 	if ( new_filename )
 		return xxstrdup(new_filename);
@@ -361,6 +361,7 @@ char* bundler_rename(struct dag_node *n, const char *filename){
 	if (n) {
 		struct list *input_files = dag_input_files(n->d);
 		if(list_find(input_files, (int (*) (void *, const void *)) string_equal, (void*)filename))
+			list_free(input_files);
 			return xxstrdup(filename);
 	}
 	return bundler_translate_name(filename, 0); /* no collisions yet -> 0 */
