@@ -72,7 +72,6 @@ OPTION_TRIPLET(-N, project-name, project)Set the project name to PARAM(project).
 OPTION_TRIPLET(-p, port, port)Port number to use with WorkQueue. (default is 9123, 0=arbitrary)
 OPTION_TRIPLET(-Z, wq-random-port, file)Select port at random and write it to this file.  (default is disabled)
 OPTION_TRIPLET(-P, priority, integer)Priority. Higher the value, higher the priority.
-OPTION_PAIR(-w, mode)Auto WorkQueue mode. Mode is either 'width' or 'group' (DAG [width] or largest [group] of tasks).
 OPTION_TRIPLET(-W, wq-schedule, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
 OPTIONS_END
 
