@@ -47,6 +47,8 @@ struct dag *dag_create()
 		d->collect_table = hash_table_create(0, 0);
 		d->export_list = list_create();
 
+		d->task_categories = hash_table_create(0, 0);
+
 		/* Add _MAKEFLOW_COLLECT_LIST to variables table to ensure it is in
 		 * global DAG scope. */
 		hash_table_insert(d->variables, "_MAKEFLOW_COLLECT_LIST", xxstrdup(""));
@@ -373,3 +375,14 @@ void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate)
 	fprintf(d->logfile, "%" PRIu64 " %d %d %d %d %d %d %d %d %d\n", timestamp_get(), n->nodeid, newstate, n->jobid, d->node_states[0], d->node_states[1], d->node_states[2], d->node_states[3], d->node_states[4], d->nodeid_counter);
 }
 
+struct dag_task_category *dag_task_category_create(struct dag *d, const char *label)
+{
+	struct dag_task_category *category = malloc(sizeof(struct dag_task_category));
+
+	category->label = xxstrdup(label);
+	category->count = 0;
+
+	hash_table_insert(d->task_categories, label, category);
+	
+	return category;
+}
