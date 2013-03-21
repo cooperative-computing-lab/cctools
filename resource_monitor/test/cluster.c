@@ -63,7 +63,7 @@ struct cluster
 	
 };
 
-int fields_flags = ~0x0;
+int fields_flags = 511; /* all but rule number */
 
 struct summary *max_values;
 
@@ -787,42 +787,54 @@ void report_clusters_centroids(FILE *freport, struct list *clusters)
 
 	/* We print two blank lines to signal the end of the data set
 	 * in gnuplot */
-	fprintf(freport, "\n\n");
+	fprintf(freport, "\n\n\n");
 }
 
 #define add_plot_column(stream, column, flag, title)\
 	if( flag & fields_flags )\
 	{\
 		if(column == 2)\
-			fprintf(stream, " using %d:xticlabels(1) title '%s'", column, title);\
+			fprintf(stream, " index clusters_index using %d:xticlabels(1) title '%s'", column, title);\
 		else\
-			fprintf(stream, ", '' using %d title '%s'", column, title);\
+			fprintf(stream, ", '' index clusters_index using %d title '%s'", column, title);\
 		column++;\
 	}
 
 
 /* It would be nice to have a function flag to title */
-void report_clusters_histograms(char *plot_cmd_file, char *clusters_file)
+void report_clusters_histograms(char *plot_cmd_file, char *clusters_file, int max_clusters)
 {
 	FILE *fplot;
+	int   column;
 
 	fplot = fopen(plot_cmd_file, "w");
 	if(!fplot)
 		fatal("cannot open file for plot command.\n");
 
-	int column = 2;
+		column = 2;
 
-	fprintf(fplot, "plot '%s' ", clusters_file);
+		fprintf(fplot, "foutput = sprintf(\"clusters_%%03d.jpg\", 1 + clusters_index)\n");
+		fprintf(fplot, "set terminal push\n");
+		fprintf(fplot, "set terminal jpeg size 1024,768\n");
+		fprintf(fplot, "set output foutput\n");
+		fprintf(fplot, "set multiplot\n");
+		fprintf(fplot, "plot '%s' ", clusters_file);
+		add_plot_column(fplot, column, field_flag(WALL_TIME),      "wall time");      
+		add_plot_column(fplot, column, field_flag(PROCESSES),      "concurrent processes");
+		add_plot_column(fplot, column, field_flag(CPU_TIME),       "cpu time");      
+		add_plot_column(fplot, column, field_flag(VIRTUAL),        "virtual memory");       
+		add_plot_column(fplot, column, field_flag(RESIDENT),       "resident memory");
+		add_plot_column(fplot, column, field_flag(B_READ),         "bytes read");        
+		add_plot_column(fplot, column, field_flag(B_WRITTEN),      "bytes written");     
+		add_plot_column(fplot, column, field_flag(WDIR_FILES),     "inodes");    
+		add_plot_column(fplot, column, field_flag(WDIR_FOOTPRINT), "disk footprint");
 
-	add_plot_column(fplot, column, WALL_TIME,      "wall time");      
-	add_plot_column(fplot, column, PROCESSES,      "concurrent processes");
-	add_plot_column(fplot, column, CPU_TIME,       "cpu time");      
-	add_plot_column(fplot, column, VIRTUAL,        "virtual memory");       
-	add_plot_column(fplot, column, RESIDENT,       "resident memory");
-	add_plot_column(fplot, column, B_READ,         "bytes read");        
-	add_plot_column(fplot, column, B_WRITTEN,      "bytes written");     
-	add_plot_column(fplot, column, WDIR_FILES,     "inodes");    
-	add_plot_column(fplot, column, WDIR_FOOTPRINT, "disk footprint");
+		fprintf(fplot, "\n");
+		fprintf(fplot, "unset multiplot\n");
+		fprintf(fplot, "clusters_index = clusters_index + 1\n");
+		fprintf(fplot, "if (clusters_index < %d) reread\n", max_clusters);
+
+		fprintf(fplot, "\n");
 }
 
 void report_clusters_rules(FILE *freport, struct list *clusters)
@@ -1005,7 +1017,7 @@ int main(int argc, char **argv)
 		list_delete(final_clusters);
 	}
 
-	report_clusters_histograms("clusters_plot_cmd", report_filename);
+	report_clusters_histograms("gnuplot-plot-cmd", report_filename, max_clusters);
 
 	denormalize_summaries(summaries);
 
