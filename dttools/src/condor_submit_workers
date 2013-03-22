@@ -15,7 +15,7 @@ show_help()
 	echo "  -b <time>           Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)"
 	echo "  -z <size>           Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)"
 	echo "  -A <arch>           Set architecture string for the worker to report to master instead of the value in uname."
-	echo "	-O <os>             Set operating system string for the worker to report to master instead of the value in uname."
+	echo "  -O <os>             Set operating system string for the worker to report to master instead of the value in uname."
 	echo "  -s <path>           Set the location for creating the working directory of the worker."
 	echo "  -r <requirements>   Condor requirements ClassAd."
 	echo "  -h                  Show this help message."
