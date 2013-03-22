@@ -56,6 +56,10 @@ See the file COPYING for details.
 #define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
 #define MAKEFLOW_GC_MIN_THRESHOLD 1
 
+#define MAKEFLOW_TASK_CATEGORY "MAKEFLOW_TASK_CATEGORY"  /* The value of this variable in the Makeflow
+							    file indicates the task category of the
+							    rules to follow */ 
+
 #define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 
 #define DEFAULT_MONITOR_LOG_FORMAT "rule-%06.6d"
@@ -1068,6 +1072,36 @@ char *dag_parse_readline(struct dag_parse *bk, struct dag_node *n)
 	return NULL;
 }
 
+void dag_parse_process_special_variable(struct dag_parse *bk, struct dag_node *n, char *name, char *value)
+{
+	struct dag *d = bk->d;
+
+	if(strcmp(MAKEFLOW_TASK_CATEGORY, name) == 0)
+	{
+		/* If we have never seen this label, then create
+		 * a new category, otherwise retrieve the category. */
+		struct dag_task_category *category = dag_task_category_lookup_or_create(d, value);
+
+		/* If we are parsing inside a node, make category
+		 * the category of the node, but do not update
+		 * the global task_category. Else, update the
+		 * glogal task category. */
+		if(n)
+		{
+			/* Decrement the count from previous */
+			n->category->count--;
+			n->category = category;
+			n->category->count++;
+			debug(D_DEBUG, "Updating category '%s' for rule %d.\n", value, n->nodeid);
+		}
+		else
+			bk->category     = category;
+
+
+	}
+	/* else if some other special variable .... */
+}
+
 int dag_parse_variable(struct dag_parse *bk, struct dag_node *n, char *line)
 {
 	struct dag *d = bk->d;
@@ -1115,6 +1149,8 @@ int dag_parse_variable(struct dag_parse *bk, struct dag_node *n, char *line)
 		hash_table_insert((n ? n->variables : d->variables), name, xxstrdup(value));
 	}
 
+        dag_parse_process_special_variable(bk, n, name, value);
+
 	debug(D_DEBUG, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
 	return 1;
 }
@@ -1138,6 +1174,13 @@ int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode)
 	struct dag_node *n;
 
 	n = dag_node_create(bk->d, bk->linenum);
+
+	if(!bk->category)
+		bk->category = dag_task_category_lookup_or_create(d, "without_explicit_category");
+
+	n->category = bk->category;
+	n->category->count++;
+	debug(D_DEBUG, "Setting category '%s' for rule %d.\n", n->category->label, n->nodeid);
 
 	/* BUG: We need a more general solution to wrapping nodes
 	 * while parsing. The monitor code should not be here. */

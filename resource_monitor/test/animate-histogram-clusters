@@ -3,10 +3,10 @@
 
 counter=1
 
-for count in {1..50}; do
+for count in {1..10}; do
 	name=`printf "cl%2.2d.jpg" $count`
 	echo $name
 	./cluster -m$count .
-	gnuplot profile-gnuplot > $name
+	gnuplot gnuplot-clusters > $name
 done
 
