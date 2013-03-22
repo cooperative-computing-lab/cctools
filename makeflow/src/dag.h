@@ -28,11 +28,11 @@ typedef enum {
 struct dag {
     char *filename;                          /* Source makeflow file path. */
     struct dag_node *nodes;                  /* Linked list of all production rules, without ordering. */
-    struct itable *node_tab                  /* Mapping from unique integers dag_node->nodeid 
+    struct itable *node_table;               /* Mapping from unique integers dag_node->nodeid 
                                                 to nodes. */
     struct itable *local_job_table;          /* Mapping from unique integers dag_node->jobid  
                                                 to nodes, rules with prefix LOCAL. */
-    struct itable *remote_job_table          /* Mapping from unique integers dag_node->jobid  
+    struct itable *remote_job_table;         /* Mapping from unique integers dag_node->jobid  
                                                 to nodes. */
     struct hash_table *file_table;           /* Maps every filename to a struct dag_file. */
     struct hash_table *completed_files;      /* Records which target files have been 
