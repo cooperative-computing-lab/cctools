@@ -1078,13 +1078,9 @@ void dag_parse_process_special_variable(struct dag_parse *bk, struct dag_node *n
 
 	if(strcmp(MAKEFLOW_TASK_CATEGORY, name) == 0)
 	{
-		struct dag_task_category *category;
-		category = hash_table_lookup(d->task_categories, value);
-
 		/* If we have never seen this label, then create
-		 * a new category. */
-		if(!category)
-			category = dag_task_category_create(d, value);
+		 * a new category, otherwise retrieve the category. */
+		struct dag_task_category *category = dag_task_category_lookup_or_create(d, value);
 
 		/* If we are parsing inside a node, make category
 		 * the category of the node, but do not update
@@ -1180,7 +1176,7 @@ int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode)
 	n = dag_node_create(bk->d, bk->linenum);
 
 	if(!bk->category)
-		bk->category = dag_task_category_create(d, "without_explicit_category");
+		bk->category = dag_task_category_lookup_or_create(d, "without_explicit_category");
 
 	n->category = bk->category;
 	n->category->count++;
