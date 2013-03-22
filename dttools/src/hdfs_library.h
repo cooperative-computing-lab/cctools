@@ -24,7 +24,7 @@ typedef UINT16_T tPort;
 
 typedef enum tObjectKind {
 	kObjectKindFile = 'F',
-	kObjectKindDirectory = 'D',
+	kObjectKindDirectory = 'D'
 } tObjectKind;
 
 typedef void *hdfsFS;

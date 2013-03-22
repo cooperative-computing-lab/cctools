@@ -18,7 +18,7 @@
 #define INT16_FORMAT "%" PRId16
 #define INT32_FORMAT "%" PRId32
 #define INT64_FORMAT "%" PRId64
-#define PTR_FORMAT   "%zd"
+#define PTR_FORMAT   "%" PRIxPTR
 
 #define UINT8_T   uint8_t
 #define UINT16_T  uint16_t
@@ -30,6 +30,6 @@
 #define UINT16_FORMAT "%" PRIu16
 #define UINT32_FORMAT "%" PRIu32
 #define UINT64_FORMAT "%" PRIu64
-#define UPTR_FORMAT   "%zu"
+#define UPTR_FORMAT   "%" UPRIxPTR
 
 #endif

@@ -113,7 +113,7 @@ typedef enum {
 	CHIRP_BULKIO_SREAD,  /**< Perform a chirp_reli_sread.*/
 	CHIRP_BULKIO_SWRITE, /**< Perform a chirp_reli_swrite.*/
 	CHIRP_BULKIO_FSTAT,  /**< Perform a chirp_reli_fstat.*/
-	CHIRP_BULKIO_FSYNC,   /**< Perform a chirp_reli_fsync.*/
+	CHIRP_BULKIO_FSYNC   /**< Perform a chirp_reli_fsync.*/
 } chirp_bulkio_t;
 
 /** Describes a bulk I/O operation.

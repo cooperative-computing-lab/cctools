@@ -515,7 +515,7 @@ PTRINT_T pfs_process_scratch_address( struct pfs_process *p )
 
 PTRINT_T pfs_process_heap_address( struct pfs_process *p )
 {
-	PTRINT_T start, end, offset;
+	UPTRINT_T start, end, offset;
 	int major, minor,inode;
 	char flagstring[5];
 	FILE *file;
@@ -534,7 +534,7 @@ PTRINT_T pfs_process_heap_address( struct pfs_process *p )
 
 	while(fgets(line,sizeof(line),file)) {
 		debug(D_PROCESS,"line: %s",line);
-		fields = sscanf(line,PTR_FORMAT "-" PTR_FORMAT " %s " PTR_FORMAT "%d:%d %d",
+		fields = sscanf(line, "%" SCNxPTR "-%" SCNxPTR " %s %" SCNxPTR "%d:%d %d",
 			&start,&end,flagstring,&offset,&major,&minor,&inode);
 
 		if(fields==7 && inode==0 && flagstring[0]=='r' && flagstring[1]=='w' && flagstring[3]=='p') {
