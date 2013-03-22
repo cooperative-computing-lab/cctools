@@ -447,7 +447,11 @@ int  pfs_process_raise( pid_t pid, int sig, int really_sendit )
 				debug(D_PROCESS,"ignoring attempt to send signal to parrot itself.");
 				result = 0;
 			} else {
-				result = kill(pid,sig);
+				if (really_sendit) {
+					result = kill(pid,sig);
+				} else {
+					result = 0;
+				}
 			}
 		}
 	} else {

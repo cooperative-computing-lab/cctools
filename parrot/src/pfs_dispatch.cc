@@ -2408,7 +2408,6 @@ void decode_syscall( struct pfs_process *p, int entering )
 				debug(D_PROCESS,"%s %d %d %d",tracer_syscall32_name(p->syscall),args[0],args[1],args[2]);
 				p->syscall_result = pfs_process_raise(args[0],args[1],0);
 				if (p->syscall_result == -1) p->syscall_result = -errno;
-				divert_to_dummy(p,p->syscall_result);
 			}
 			break;
 
@@ -2418,7 +2417,6 @@ void decode_syscall( struct pfs_process *p, int entering )
 				debug(D_PROCESS,"tgkill %d %d %d",args[0],args[1],args[2]);
 				p->syscall_result = pfs_process_raise(args[1],args[2],0);
 				if (p->syscall_result == -1) p->syscall_result = -errno;
-				divert_to_dummy(p,p->syscall_result);
 			}
 			break;
 
