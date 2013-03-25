@@ -417,6 +417,13 @@ void work_queue_delete(struct work_queue *q);
 */
 void work_queue_specify_log(struct work_queue *q, const char *logfile);
 
+/** Add a mandatory password that each worker must present.
+@param q A work queue object.
+@param password The password to require.
+*/
+
+void work_queue_specify_password( struct work_queue *q, const char *password );
+
 /** Change the keepalive interval for a given queue.
 @param q A work queue object.
 @param interval The minimum number of seconds to wait before sending new keepalive checks to workers.

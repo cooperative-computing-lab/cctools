@@ -70,6 +70,7 @@ See the file COPYING for details.
 #define LONG_OPT_MONITOR_INTERVAL ('z' + 1)
 #define LONG_OPT_MONITOR_LOG_NAME ('z' + 2)
 #define LONG_OPT_MONITOR_LOG_DIR  ('z' + 3)
+#define LONG_OPT_PASSWORD      ('z' + 4)
 
 typedef enum {
 	DAG_GC_NONE,
@@ -107,6 +108,8 @@ static char *monitor_exe  = NULL;
 static int  monitor_interval = 1;                               // in seconds  
 static char *monitor_log_format=NULL;
 static char *monitor_log_dir=NULL;
+
+static char *wq_password = 0;
 
 int dag_depth(struct dag *d);
 int dag_width_uniform_task(struct dag *d);
@@ -2028,6 +2031,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
 	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-output=<file>");
 	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
+	fprintf(stdout, " %-30s Password file for authenticating workers.\n","   --password");
 	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--port=<port>", WORK_QUEUE_DEFAULT_PORT);
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", dag_retry_max);
@@ -2235,6 +2239,7 @@ int main(int argc, char *argv[])
 		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
 		{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
 		{"monitor-log-dir",  required_argument, 0, LONG_OPT_MONITOR_LOG_DIR},
+		{"password", required_argument, 0, LONG_OPT_PASSWORD }, 
 		{"project-name",     required_argument, 0, 'N'},
 		{"debug-output",     required_argument, 0, 'o'},
 		{"show-output",     no_argument, 0, 'O'},
@@ -2385,6 +2390,7 @@ int main(int argc, char *argv[])
 			case 'S':
 				dag_submit_timeout = atoi(optarg);
 				break;
+
 			case 't':
 				work_queue_keepalive_timeout = atoi(optarg);
 				break;
@@ -2433,6 +2439,13 @@ int main(int argc, char *argv[])
 				monitor_mode = 1;
 				monitor_log_dir = xxstrdup(optarg);
 				break;
+			case LONG_OPT_PASSWORD:
+				wq_password = copy_file_to_buffer(optarg);
+				if(!wq_password) {
+					fprintf(stderr,"makeflow: couldn't open %s: %s\n",optarg,strerror(errno));
+					return 1;
+				}
+				break;
 			default:
 				show_help(argv[0]);
 				return 1;
@@ -2477,6 +2490,7 @@ int main(int argc, char *argv[])
 			setenv("WORK_QUEUE_PORT", value, 1);
 			free(value);
 		}
+
 	}
 
 	if(!logfilename)
@@ -2683,6 +2697,7 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
+		if(wq_password) work_queue_specify_password(q,wq_password);
 		work_queue_specify_master_mode(q, work_queue_master_mode);
 		work_queue_specify_name(q, project);
 		work_queue_specify_priority(q, priority);

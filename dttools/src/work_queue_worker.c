@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "disk_info.h"
 #include "hash_cache.h"
 #include "link.h"
+#include "link_auth.h"
 #include "list.h"
 #include "xxmalloc.h"
 #include "debug.h"
@@ -129,6 +130,8 @@ static UINT64_T disk_avail_threshold = 100;
 // Use case: hourly charge resource such as Amazon EC2
 static int terminate_boundary = 0;
 
+// Password shared between master and worker.
+static char *password = 0;
 
 // Basic worker global variables
 static int worker_mode = WORKER_MODE_CLASSIC;
@@ -587,7 +590,7 @@ static struct link *auto_link_connect(char *addr, int *port)
 		return NULL;
 	}
 	debug_print_masters(ml);
-	
+
 	while((m = (struct work_queue_master *)select_master(ml, pool))) {
 		master = link_connect(m->addr, m->port, time(0) + master_timeout);
 		if(master) {
@@ -729,6 +732,18 @@ static struct link *connect_master(time_t stoptime) {
 			master = link_connect(actual_addr, actual_port, time(0) + master_timeout);
 		}
 
+		if(master) {
+			link_tune(master,LINK_TUNE_INTERACTIVE);
+			if(password) {
+				debug(D_WQ,"authenticating to master");
+				if(!link_auth_password(master,password,time(0) + master_timeout)) {
+					fprintf(stderr,"work_queue_worker: wrong password for master %s:%d\n",actual_addr,actual_port);
+					link_close(master);
+					master = 0;
+				}
+			}
+		}
+
 		if(!master) {
 			if (backoff_interval > max_backoff_interval) {
 				backoff_interval = max_backoff_interval;
@@ -739,7 +754,6 @@ static struct link *connect_master(time_t stoptime) {
 			continue;
 		}
 
-		link_tune(master, LINK_TUNE_INTERACTIVE);
 		report_worker_ready(master);
 
 		//reset backoff interval after connection to master.
@@ -1284,6 +1298,9 @@ static int worker_handle_master(struct link *master) {
 			r = send_keepalive(master);
 		} else if(!strncmp(line, "reset", 5)) {
 			r = do_reset();
+		} else if(!strncmp(line, "auth", 4)) {
+			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
+			r = 0;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
@@ -1402,6 +1419,9 @@ static int foreman_handle_master(struct link *master) {
 			r = send_keepalive(master);
 		} else if(!strncmp(line, "reset", 5)) {
 			r = do_reset();
+		} else if(!strncmp(line, "auth", 4)) {
+			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
+			r = 0;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
@@ -1492,6 +1512,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -m <mode>      Choose worker mode.  Can be [w]orker, [f]oreman, [c]lassic, or [a]uto (default=auto).\n");
 	fprintf(stdout, " -M <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
 	fprintf(stdout, " -N <project>   When in Foreman mode, the name of the project to advertise as.  In worker/classic/auto mode acts as '-M'.\n");
+	fprintf(stdout, " --password <pwfile> Password file for authenticating to the master.\n");
 	fprintf(stdout, " -t <time>      Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
 	fprintf(stdout, " -w <size>      Set TCP window size.\n");
 	fprintf(stdout, " -i <time>      Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
@@ -1555,7 +1576,12 @@ static int setup_workspace() {
 	return 1;
 }
 
+#define LONG_OPT_PASSWORD ('z'+1)
 
+struct option long_options[] = {
+	{"password",	required_argument,	0,	LONG_OPT_PASSWORD},
+	{0,0,0,0}
+};
 
 int main(int argc, char *argv[])
 {
@@ -1582,7 +1608,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aB:C:d:f:t:j:o:p:m:M:N:w:i:b:z:A:O:s:vh")) != (char) -1) {
+	while((c = getopt_long(argc, argv, "aB:C:d:f:t:j:o:p:m:M:N:P:w:i:b:z:A:O:s:vh", long_options, 0)) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
@@ -1667,6 +1693,14 @@ int main(int argc, char *argv[])
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
 			exit(EXIT_SUCCESS);
+			break;
+		case LONG_OPT_PASSWORD:
+			password = copy_file_to_buffer(optarg);
+		  	if(!password) {
+				fprintf(stderr,"work_queue_worker: couldn't load password from %s: %s\n",optarg,strerror(errno));
+				return 1;
+			}
+			break;
 		case 'h':
 		default:
 			show_help(argv[0]);

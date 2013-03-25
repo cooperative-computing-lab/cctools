@@ -73,6 +73,7 @@ OPTION_TRIPLET(-p, port, port)Port number to use with WorkQueue. (default is 912
 OPTION_TRIPLET(-Z, wq-random-port, file)Select port at random and write it to this file.  (default is disabled)
 OPTION_TRIPLET(-P, priority, integer)Priority. Higher the value, higher the priority.
 OPTION_TRIPLET(-W, wq-schedule, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
+OPTION_TRIPLET(-s, password, pwfile)Password file for authenticating workers.
 OPTIONS_END
 
 SUBSECTION(Other Options)
