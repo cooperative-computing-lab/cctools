@@ -1251,15 +1251,22 @@ struct tree_info *monitor_rusage_tree(void)
 	struct rusage usg;
 	struct tree_info *tr_usg = calloc(1, sizeof(struct tree_info));
 
+    debug(D_DEBUG, "calling getrusage.\n");
+
 	if(getrusage(RUSAGE_CHILDREN, &usg) != 0)
 	{
 		debug(D_DEBUG, "getrusage failed: %s\n", strerror(errno));
 		return NULL;
 	}
 
+    /* Here we add the maximum recorded + the io from memory maps */
+    tr_usg->bytes_read     =  tree_max->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
+
 	tr_usg->cpu_time       = (usg.ru_utime.tv_sec  + usg.ru_stime.tv_sec) * ONE_SECOND;
 	tr_usg->cpu_time      += (usg.ru_utime.tv_usec + usg.ru_stime.tv_usec);
 	tr_usg->resident_memory = usg.ru_maxrss;
+
+    debug(D_DEBUG, "rusage faults: %d resident memory: %d.\n", usg.ru_majflt, usg.ru_maxrss);
 
 	return tr_usg;
 }
