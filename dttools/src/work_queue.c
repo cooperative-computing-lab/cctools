@@ -11,6 +11,7 @@ See the file COPYING for details.
 
 #include "int_sizes.h"
 #include "link.h"
+#include "link_auth.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "catalog_query.h"
@@ -164,6 +165,8 @@ struct work_queue {
 	int monitor_mode;
 	int monitor_fd;
 	char *monitor_exe;
+
+	const char *password;
 };
 
 struct work_queue_worker {
@@ -558,32 +561,44 @@ static int add_worker(struct work_queue *q)
 	int port;
 
 	link = link_accept(q->master_link, time(0) + short_timeout);
-	if(link) {
-		link_keepalive(link, 1);
-		link_tune(link, LINK_TUNE_INTERACTIVE);
-		if(link_address_remote(link, addr, &port)) {
-			w = malloc(sizeof(*w));
-			memset(w, 0, sizeof(*w));
-			w->state = WORKER_STATE_NONE;
-			w->link = link;
-			w->current_files = hash_table_create(0, 0);
-			w->current_tasks = itable_create(0);
-			w->start_time = timestamp_get();
-			link_to_hash_key(link, w->hashkey);
-			sprintf(w->addrport, "%s:%d", addr, port);
-			hash_table_insert(q->worker_table, w->hashkey, w);
-			change_worker_state(q, w, WORKER_STATE_INIT);
-			debug(D_WQ, "worker %s added", w->addrport);
-			debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
-			q->total_workers_joined++;
-			
-			return 1;
-		} else {
+	if(!link) return 0;
+
+	link_keepalive(link, 1);
+	link_tune(link, LINK_TUNE_INTERACTIVE);
+
+	if(!link_address_remote(link, addr, &port)) {
+		link_close(link);
+		return 0;
+	}
+
+	debug(D_WQ,"worker %s:%d connected",addr,port);
+
+	if(q->password) {
+		debug(D_WQ,"worker %s:%d authenticating",addr,port);
+		if(!link_auth_password(link,q->password,time(0)+short_timeout)) {
+			debug(D_WQ|D_NOTICE,"worker %s:%d presented the wrong password",addr,port);
 			link_close(link);
+			return 0;
 		}
 	}
 
-	return 0;
+	w = malloc(sizeof(*w));
+	memset(w, 0, sizeof(*w));
+	w->state = WORKER_STATE_NONE;
+	w->link = link;
+	w->current_files = hash_table_create(0, 0);
+	w->current_tasks = itable_create(0);
+	w->start_time = timestamp_get();
+	link_to_hash_key(link, w->hashkey);
+	sprintf(w->addrport, "%s:%d", addr, port);
+	hash_table_insert(q->worker_table, w->hashkey, w);
+	change_worker_state(q, w, WORKER_STATE_INIT);
+
+	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
+
+	q->total_workers_joined++;
+
+	return 1;
 }
 
 /**
@@ -2579,6 +2594,7 @@ struct work_queue *work_queue_create(int port)
 	q->keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT; 
 
 	q->monitor_mode   =  0;
+	q->password = 0;
 	
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
@@ -2711,6 +2727,11 @@ void work_queue_specify_catalog_server(struct work_queue *q, const char *hostnam
 	}
 }
 
+void work_queue_specify_password( struct work_queue *q, const char *password )
+{
+	q->password = xxstrdup(password);
+}
+
 void work_queue_delete(struct work_queue *q)
 {
 	if(q) {
@@ -2811,6 +2832,19 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	return (t->taskid);
 }
 
+static void print_password_warning( struct work_queue *q )
+{
+	static int did_password_warning = 0;
+
+	if(did_password_warning) return;
+
+       	if(!q->password && q->master_mode==WORK_QUEUE_MASTER_MODE_CATALOG) {
+       		fprintf(stderr,"warning: this work queue master is visible to the public.\n");
+	       	fprintf(stderr,"warning: you should set a password with the --password option.\n");
+		did_password_warning = 1;
+	}
+}
+
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 {
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
@@ -2824,6 +2858,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	static timestamp_t last_left_time = 0;
 	static int last_left_status = 0;	// 0 -- did not return any done task; 1 -- returned done task 
 	static time_t next_pool_decision_enforcement = 0;
+
+	print_password_warning(q);
 
 	update_app_time(q, last_left_time, last_left_status);
 

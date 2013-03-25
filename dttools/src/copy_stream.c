@@ -250,3 +250,26 @@ int copy_file_to_file(const char *input, const char *output)
 	chmod(output, st.st_mode);
 	return count;	
 }
+
+char * copy_file_to_buffer( const char *filename )
+{
+	FILE *file = fopen(filename,"r");
+	if(!file) return 0;
+
+	fseek(file,0,SEEK_END);
+	long length = ftell(file);
+	fseek(file,0,SEEK_SET);
+
+	char *buffer = malloc(length+1);
+	if(!buffer) {
+		fclose(file);
+		return 0;
+	}
+
+	full_fread(file,buffer,length);
+	buffer[length] = 0;
+
+	fclose(file);
+
+	return buffer;
+}

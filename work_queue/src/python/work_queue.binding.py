@@ -1,4 +1,4 @@
-## @package WorkQueuePython
+\## @package WorkQueuePython
 #
 # Python Work Queue bindings.
 #
@@ -549,6 +549,15 @@ class WorkQueue(_object):
     # @param logfile  Filename. 
     def specify_log(self, logfile):
         return work_queue_specify_log(self._work_queue, logfile)
+    
+    ##
+    # Add a mandatory password that each worker must present.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param password  The password.
+
+    def specify_password_file(self, password):
+        return work_queue_specify_password(self._work_queue, password)
     
     ##
     # Cancel task identified by its taskid and remove from the given queue. 

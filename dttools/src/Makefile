@@ -51,6 +51,7 @@ SOURCES = auth.c  \
           http_query.c  \
           itable.c  \
           link.c  \
+          link_auth.c  \
           link_nvpair.c \
           list.c  \
           load_average.c  \

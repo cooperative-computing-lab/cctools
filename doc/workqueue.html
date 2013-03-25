@@ -30,7 +30,7 @@ padding: 0.3%;
 <body>
 
 <h1>Work Queue User's Manual</h1>
-<b>Last Updated August 2012</b>
+<b>Last Updated March 2013</b>
 <p>
 Work Queue is Copyright (C) 2009 The University of Notre Dame.
 This software is distributed under the GNU General Public License.
@@ -328,6 +328,43 @@ When all is done, delete the queue:
 
 Full details of all of the Work Queue functions can be found in
 the <a href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">Work Queue API</a>.
+
+<h2>Security</h2>
+
+By default, Work Queue does <b>not</b> perform any authentication,
+so any workers will be able to connect to your master, and
+vice versa.  This may be ok for a short running anonymous application,
+but is not safe for a long running application with a public name.
+<p>
+We recommend that you enable a password for your applications.
+Create a file called <b>mypassword</b> that contains any password
+(or other long phrase) that you like.  The password will be particular
+to your application and should not match any other passwords that
+you own.
+<p>
+Then, modify your master program to load the password:
+<p>
+<div class="code_area">
+<h4 class="code_header">C/Perl</h4>
+<pre class="code_snip">
+ work_queue_task_specify_password(q,"mypassword");
+</pre>
+<h4 class="code_header">Python</h4>
+<pre class="code_snip">
+ q.specify_password("mypassword");
+</pre>
+</div>
+
+And give the --password option to give the same password to your workers:
+
+<pre>
+% work_queue_worker <b>--password mypassword</b> ...
+</pre>
+
+With this option enabled, both the master and the workers will
+verify that the other has the matching password before proceeding.
+The password is not sent in the clear, but is securely verified
+through a SHA1-based challenge-response protocol.
 
 <h2>Advanced Usage</h2>
 
