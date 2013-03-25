@@ -21,6 +21,7 @@ prepare()
 
 	./gen_ints.sh $TEST_INPUT 50
 
+    ln -s ../src/allpairs_multicore .
     ../src/allpairs_master -x 1 -y 1 -o $TEST_OUTPUT_STEP -Z $PORT_FILE $TEST_INPUT $TEST_INPUT ./divisible.sh &
 
     pid=$!
