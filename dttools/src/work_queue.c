@@ -229,8 +229,6 @@ struct work_queue_file {
 
 static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
 
-static int put_file(struct work_queue_file *, const char *, struct work_queue *, struct work_queue_worker *, int taskid, INT64_T *);
-
 static struct task_statistics *task_statistics_init();
 static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t duration, int type, timestamp_t * accumulated_time, struct list *time_list);
 static void add_task_report(struct work_queue *q, struct work_queue_task *t);
@@ -1424,16 +1422,107 @@ static int build_poll_table(struct work_queue *q, struct list *aux_links)
 	return n;
 }
 
-static int put_directory(const char *dirname, const char *remote_name, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T * total_bytes)
-{
+static int put_file_whole(const char *localname, const char *remotename, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T * total_bytes) {
+	struct stat local_info;
+	time_t stoptime;
+	INT64_T actual = 0;
+	INT64_T bytes_to_send = 0;
+
+	if(stat(localname, &local_info) < 0)
+		return 0;
+	
+	/* normalize the mode so as not to set up invalid permissions */
+	local_info.st_mode |= 0600;
+	local_info.st_mode &= 0777;
+
+	debug(D_WQ, "%s (%s) needs file %s", w->hostname, w->addrport, localname);
+	int fd = open(localname, O_RDONLY, 0);
+	if(fd < 0)
+		return 0;
+	
+	bytes_to_send = (INT64_T) local_info.st_size;
+	
+	struct work_queue_task *t = itable_lookup(q->running_tasks, taskid);
+	stoptime = time(0) + get_transfer_wait_time(q, t, bytes_to_send);
+	send_worker_msg(w, "put %s %lld 0%o %lld\n", time(0) + short_timeout, remotename, bytes_to_send, local_info.st_mode, taskid);
+	actual = link_stream_from_fd(w->link, fd, bytes_to_send, stoptime);
+	close(fd); 
+	
+	if(actual != bytes_to_send)
+		return 0;
+	
+	*total_bytes += actual;
+	return 1;
+}
+
+static int put_file_piece(const char *localname, const char *remotename, off_t startbyte, off_t endbyte, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T *total_bytes){
+	struct stat local_info;
+	time_t stoptime;
+	INT64_T actual = 0;
+	INT64_T bytes_to_send = 0;
+	
+	if(stat(localname, &local_info) < 0)
+		return 0;
+
+	/* normalize the mode so as not to set up invalid permissions */
+	local_info.st_mode |= 0600;
+	local_info.st_mode &= 0777;
+	
+	debug(D_WQ, "%s (%s) needs file piece %s from byte offset %lld to %lld", w->hostname, w->addrport, localname, startbyte, endbyte);
+	int fd = open(localname, O_RDONLY, 0);
+	if(fd < 0)
+		return 0;
+
+	//We want to send bytes starting from startbyte. So seek to it first.
+	if (startbyte >= 0 && endbyte < local_info.st_size && startbyte <= endbyte) {
+		if(lseek(fd, startbyte, SEEK_SET) == -1) {	
+			close(fd); 
+			return 0;	
+		}
+	} else {
+		debug(D_NOTICE, "File piece specification for %s is invalid", localname);
+		close(fd); 
+		return 0;	
+	}
+	bytes_to_send = (INT64_T) (endbyte - startbyte + 1);
+		
+	struct work_queue_task *t = itable_lookup(q->running_tasks, taskid);
+	stoptime = time(0) + get_transfer_wait_time(q, t, bytes_to_send);
+	send_worker_msg(w, "put %s %lld 0%o %lld\n", time(0) + short_timeout, remotename, bytes_to_send, local_info.st_mode, taskid);
+	actual = link_stream_from_fd(w->link, fd, bytes_to_send, stoptime);
+	close(fd); 
+	
+	if(actual != bytes_to_send)
+		return 0;
+	
+	*total_bytes += actual;
+	return 1;
+}
+
+static int put_directory(const char *dirname, const char *remotedirname, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T * total_bytes) {
 	DIR *dir = opendir(dirname);
 	if(!dir)
 		return 0;
 
 	struct dirent *file;
-	struct work_queue_file tf;
-
 	char buffer[WORK_QUEUE_LINE_MAX];
+	char *localname, *remotename;
+	int result;
+
+	struct stat local_info;
+	if(stat(dirname, &local_info) < 0)
+		return 0;
+
+	/* normalize the mode so as not to set up invalid permissions */
+	local_info.st_mode |= 0700;
+	local_info.st_mode &= 0777;
+
+	// If mkdir fails, the future calls to put_file/directory() to place files
+	// in that directory won't suceed. Such failure will eventually be captured
+	// in 'start_tasks' function and in 'start_tasks' function the corresponding
+	// worker will be removed.
+	debug(D_WQ, "%s (%s) needs directory %s", w->hostname, w->addrport, dirname);
+	send_worker_msg(w, "mkdir %s %o %lld\n", time(0) + short_timeout, remotedirname, local_info.st_mode, taskid);
 
 	while((file = readdir(dir))) {
 		char *filename = file->d_name;
@@ -1443,39 +1532,43 @@ static int put_directory(const char *dirname, const char *remote_name, struct wo
 			continue;
 		}
 
-		tf.type = WORK_QUEUE_FILE;
-		tf.flags = WORK_QUEUE_CACHE;
-
 		*buffer = '\0';
 		len = sprintf(buffer, "%s/%s", dirname, filename);
-		tf.length = len;
-		tf.payload = xxstrdup(buffer);
+		localname = xxstrdup(buffer);
 
 		*buffer = '\0';
-		len = sprintf(buffer, "%s/%s", remote_name, filename);
-		tf.remote_name = xxstrdup(buffer);
-
-		if(!put_file(&tf, NULL, q, w, taskid, total_bytes)) {
+		len = sprintf(buffer, "%s/%s", remotedirname, filename);
+		remotename = xxstrdup(buffer);
+	
+		if(stat(localname, &local_info) < 0) {
+			closedir(dir);
+			return 0;
+		}	
+		
+		if(local_info.st_mode & S_IFDIR)  {
+			result = put_directory(localname, remotename, q, w, taskid, total_bytes);	
+		} else {
+			result = put_file_whole(localname, remotename, q, w, taskid, total_bytes);	
+		}	
+		if(result == 0) {
 			closedir(dir);
 			return 0;
 		}
+		free(localname);
+		free(remotename);
 	}
-
+	
 	closedir(dir);
 	return 1;
 }
 
-static int put_file(struct work_queue_file *tf, const char *expanded_payload, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T * total_bytes)
-{
+static int put_input_item(struct work_queue_file *tf, const char *expanded_payload, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T * total_bytes) {
 	struct stat local_info;
 	struct stat *remote_info;
 	char *hash_name;
-	time_t stoptime;
-	INT64_T actual = 0;
-	INT64_T bytes_to_send = 0;
 	int dir = 0;
 	char *payload;
-
+	
 	if(expanded_payload) {
 		payload = xxstrdup(expanded_payload);
 	} else {
@@ -1486,17 +1579,9 @@ static int put_file(struct work_queue_file *tf, const char *expanded_payload, st
 		return 0;
 	if(local_info.st_mode & S_IFDIR)
 		dir = 1;
-	/* normalize the mode so as not to set up invalid permissions */
-	if(dir) {
-		local_info.st_mode |= 0700;
-	} else {
-		local_info.st_mode |= 0600;
-	}
-	local_info.st_mode &= 0777;
-
+	
 	hash_name = (char *) malloc((strlen(payload) + strlen(tf->remote_name) + 2) * sizeof(char));
 	sprintf(hash_name, "%s-%s", payload, tf->remote_name);
-
 	remote_info = hash_table_lookup(w->current_files, hash_name);
 
 	if(!remote_info || remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size) {
@@ -1505,57 +1590,24 @@ static int put_file(struct work_queue_file *tf, const char *expanded_payload, st
 			free(remote_info);
 		}
 
-		debug(D_WQ, "%s (%s) needs file %s", w->hostname, w->addrport, payload);
 		if(dir) {
-			// If mkdir fails, the future calls to 'put_file' function to place
-			// files in that directory won't suceed. Such failure would
-			// eventually be captured in 'start_tasks' function and in the
-			// 'start_tasks' function the corresponding worker would be removed.
-			send_worker_msg(w, "mkdir %s %o %lld\n", time(0) + short_timeout, tf->remote_name, local_info.st_mode, taskid);
-
 			if(!put_directory(payload, tf->remote_name, q, w, taskid, total_bytes))
 				return 0;
-
-			return 1;
-		}
-
-		int fd = open(payload, O_RDONLY, 0);
-		if(fd < 0)
-			return 0;
-		
-		if (tf->type == WORK_QUEUE_FILE_PIECE) {
-			//We want to send bytes starting from start_byte. So seek to it first.
-			if (tf->start_byte >= 0 && tf->end_byte < local_info.st_size && tf->start_byte <= tf->end_byte) {
-				if(lseek(fd, tf->start_byte, SEEK_SET) == -1) {	
-					close(fd); 
-					return 0;	
-				}
-			} else {
-				debug(D_NOTICE, "File piece specification for %s is invalid", payload);
-				close(fd); 
-				return 0;	
-			}
-			bytes_to_send = (INT64_T) (tf->end_byte - tf->start_byte + 1);
 		} else {
-			bytes_to_send = (INT64_T) local_info.st_size;
+			if (tf->type == WORK_QUEUE_FILE_PIECE) {
+				if(!put_file_piece(payload, tf->remote_name, tf->start_byte, tf->end_byte, q, w, taskid, total_bytes))
+					return 0;
+			} else {
+				if(!put_file_whole(payload, tf->remote_name, q, w, taskid, total_bytes))
+				return 0;
+			}	
 		}
-		
-		struct work_queue_task *t = itable_lookup(q->running_tasks, taskid);
-		stoptime = time(0) + get_transfer_wait_time(q, t, bytes_to_send);
-		send_worker_msg(w, "put %s %lld 0%o %lld\n", time(0) + short_timeout, tf->remote_name, bytes_to_send, local_info.st_mode, taskid);
-		actual = link_stream_from_fd(w->link, fd, bytes_to_send, stoptime);
-		close(fd); 
-		
-		if(actual != bytes_to_send)
-			return 0;
-		
+
 		if(tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = malloc(sizeof(*remote_info));
 			memcpy(remote_info, &local_info, sizeof(local_info));
 			hash_table_insert(w->current_files, hash_name, remote_info);
 		}
-
-		*total_bytes += actual;
 	} else {
 		// TODO: Send message announcing what the job needs (put with 0 length?)
 	}
@@ -1728,7 +1780,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 					} else {
 						expanded_payload = xxstrdup(tf->payload);
 					}
-					if(!put_file(tf, expanded_payload, q, w, t->taskid, &total_bytes)) {
+					if(!put_input_item(tf, expanded_payload, q, w, t->taskid, &total_bytes)) {
 						free(expanded_payload);
 						goto failure;
 					}
