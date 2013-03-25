@@ -34,17 +34,21 @@ run()
 	wait_for_file_creation $TEST_OUTPUT 5
 	wait_for_file_modification $TEST_OUTPUT 3
 
-	#This is a horrible, horrible way to test things. Need to find a simple
-	#example to actually test that the output is generated correctly.
-	
-	in_lines=`wc -l $TEST_INPUT | sed -n 's/\([[:digit:]]*\).*/\1/p'`
-	[ -z $in_lines ] && exit 1
-		
-	in_lines=$(($in_lines * $in_lines))
-	out_lines=`wc -l $TEST_OUTPUT | sed -n 's/\([[:digit:]]*\).*/\1/p'`
+	in_files=`cat "$TEST_INPUT" | awk -F"/" '{print $3}'`
+	howmany() { echo $#;}
+	num_files=$(howmany $in_files)
+	for i in $in_files; do
+	  count=`awk '{print $1}' $TEST_OUTPUT | grep -c $i`
+	  if [[ $num_files != $count ]]; then
+	    exit 1
+	  fi
+	  count=`awk '{print $2}' $TEST_OUTPUT | grep -c $i`
+	  if [[ $num_files != $count ]]; then
+	    exit 1
+	  fi
+	done
 
-	exit $(($out_lines - $in_lines))
-
+	exit 0
 }
 
 clean()
