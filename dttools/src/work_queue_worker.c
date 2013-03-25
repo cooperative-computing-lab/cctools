@@ -1258,7 +1258,9 @@ static int worker_handle_master(struct link *master) {
 			r = 1;
 		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %" SCNd64, filename, &length, &mode, &taskid)) >= 3) {
 			if(path_within_workspace(filename, workspace)) {
-				r = do_put(master, filename, length, mode);
+				if(length >= 0) {
+					r = do_put(master, filename, length, mode);
+				}
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
@@ -1382,7 +1384,9 @@ static int foreman_handle_master(struct link *master) {
 			r = foreman_finish_task(master, taskid, length);
 		} else if(sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 , filename, &length, &mode, &taskid) == 4) {
 			if(path_within_workspace(filename, workspace)) {
-				r = do_put(master, filename, length, mode);
+				if(length >= 0) {
+					r = do_put(master, filename, length, mode);
+				}
 				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_INPUT);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);

@@ -1626,6 +1626,9 @@ static int put_input_item(struct work_queue_file *tf, const char *expanded_paylo
 		}
 	} else {
 		// TODO: Send message announcing what the job needs (put with 0 length?)
+		if(w->async_tasks) {
+			send_worker_msg(w, "put %s -1 0%o %lld\n", time(0) + short_timeout, tf->remote_name, local_info.st_mode, taskid);
+		}
 	}
 
 	free(payload);
