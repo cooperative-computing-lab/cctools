@@ -25,9 +25,10 @@ run()
 
 clean()
 {
-    rm -f $TEST_INPUT
+	rm -f $TEST_INPUT
 	rm -f out.all
-    exit 0
+	rm -f syntax/export.external.makeflow.makeflowlog
+	exit 0
 }
 
 dispatch $@

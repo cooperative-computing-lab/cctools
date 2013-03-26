@@ -13,7 +13,11 @@ LIBRARIES =
 TARGETS = resource_monitorv
 endif
 
+ifeq (${UNAME}, FreeBSD)
+LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS} -lkvm
+else
 LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+endif
 
 all: ${TARGETS} ${LIBRARIES}
 
