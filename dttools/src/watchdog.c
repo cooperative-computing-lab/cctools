@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "cctools.h"
 #include "debug.h"
+#include "random_init.h"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -197,7 +198,7 @@ int main(int argc, char *argv[])
 {
 	char c;
 
-	srand(time(0));
+	random_init();
 
 	install_handler(SIGINT, handle_signal);
 	install_handler(SIGTERM, handle_signal);

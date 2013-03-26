@@ -51,6 +51,7 @@ SOURCES = auth.c  \
           http_query.c  \
           itable.c  \
           link.c  \
+          link_auth.c  \
           link_nvpair.c \
           list.c  \
           load_average.c  \
@@ -63,6 +64,7 @@ SOURCES = auth.c  \
           password_cache.c  \
           preadwrite.c  \
           process.c  \
+	  random_init.c \
           rmonitor_hooks.c \
           sha1.c  \
           sleeptools.c  \

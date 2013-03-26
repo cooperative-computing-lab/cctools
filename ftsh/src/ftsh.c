@@ -91,7 +91,7 @@ static int ftsh_main( int argc, char *argv[] )
 	sigaction(SIGCHLD,&sa,0);
 	sigaction(SIGALRM,&sa,0);
 
-	srand(getpid());
+	random_init();
 
 	/* First, get settings from the environment */
 

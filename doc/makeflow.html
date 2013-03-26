@@ -257,25 +257,27 @@ total number of tasks in the given Makeflow script:
 </pre>
 
 <h2>Running Makeflow with Work Queue</h2>
-With the '-T wq' option, Makeflow runs as a master process that dispatches
-tasks to remote worker processes. 
 
-<h3>Change master port</h3>
-The master process listens on a port which the remote workers would connect to.
+With the '-T wq' option, Makeflow runs as a master process that dispatches
+tasks to remote worker processes using the <a href=workqueue.html>Work Queue</a> framework.
+
+<h3>Selecting a Port</h3>
+
+Makeflow listens on a port which the remote workers would connect to.
 The default port number is 9123.  Sometimes, however, the port number might be
 not available on your system. You can change the default port via the '-p
 &lt;port number&gt;' option. For example, if you want the master to listen on port
 9567 by default, you can run the following command: 
 
 <pre>
-% makeflow -T wq -p 9567 exmaple.makeflow
+% makeflow -T wq -p 9567 example.makeflow
 </pre>
 
-<h3>Master Worker Matching</h3>
-Explicitly specifying the hostname:port is the default way for a worker to
-locate a master. A simpler way to match workers to masters is to use the
-project name matching. You can give the master a project name with the -N
-option:
+<h3>Project Names</h3>
+
+A simpler way to match workers to masters is to use the
+project name matching. You can give the master a project name with the -N option.
+
 <pre> 
 % makeflow -T wq -a -N MyProj example.makeflow 
 </pre> 
@@ -296,7 +298,6 @@ Dame catalog server:
 The '-a' option enables the catalog mode on the worker, which tells the worker
 to contact a catalog server to find out a project's (specified by -N option)
 hostname and port.  
-
 <p>
 You can also give multiple -N options to a worker. The worker will find out
 which ones of the specified projects are running from the catalog server and
@@ -308,20 +309,33 @@ specifying multiple projects:
 % work_queue_worker -a -N proj1 -N proj2 -N proj3
 </pre>
 
+<h3>Setting a Password</h3>
+
+We recommend that any workflow that uses a project name also set
+a password.  To do this, select any passphrase and write it to
+a file called <tt>mypassword</tt>.  Then, run Makeflow and each
+worker with the <tt>--password</tt> option to indicate the password file:
+
+<pre>
+% makeflow <b>--password</b> mypassword ...
+% work_queue_worker <b>--password</b> mypassword ...
+</pre>
+</pre>
+
+<h3>Catalog Server</h3>
+
 <p>
 Now let's look at how to set up your own catalog server. Say you want to run
-your catalog server on a machine named barney.nd.edu (the default port that the
-catalog server will be listening on is 9097, you can change it via the '-p'
-option), do:
+your catalog server on a machine named <tt>catalog.somewhere.edu</tt>.  Tthe default port that the catalog server will be listening on is 9097, you can change it via the '-p' option.
 <pre>
-barney% catalog_server
+% catalog_server
 </pre>
-Now you have a catalog server listening at barney.nd.edu:9097. To make your
+Now you have a catalog server listening at catalog.somewhere.edu:9097. To make your
 masters and workers contact this catalog server, simply add the '-C
 hostname:port' option to both of your master and worker: 
 <pre>
-% makeflow -T wq -C barney.nd.edu:9097 -N MyProj example.makeflow
-% work_queue_worker -C barney.nd.edu:9097 -a -N MyProj 
+% makeflow -T wq -C catalog.somewhere.edu:9097 -N MyProj example.makeflow
+% work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj 
 </pre>
 
 <h3>Supported Makeflow Drivers</h3>
