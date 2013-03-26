@@ -272,8 +272,6 @@ int copy_file_to_buffer(const char *filename, char **buffer)
 
 	fclose(file);
 
-    fprintf(stderr, "%s\n", *buffer);
-
     if(count < length)
       return -1;
 
