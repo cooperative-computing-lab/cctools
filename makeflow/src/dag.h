@@ -121,10 +121,6 @@ struct dag_node {
     const char *makeflow_dag;
     const char *makeflow_cwd;           
 
-    const char *symbol;                 /* A label for the node. # SYMBOL\tlabel, just before 
-                                           the command line in the node
-                                           definition. */
-
     struct itable *remote_names;        /* Mapping from struct *dag_files to remotenames (char *) */
     struct hash_table *remote_names_inv;/* Mapping from remote filenames to dag_file representing 
                                            the local file. */

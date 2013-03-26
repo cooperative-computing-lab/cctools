@@ -759,10 +759,8 @@ void dag_log_recover(struct dag *d, const char *filename)
 			/* Record node information to log */
 			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->original_command);
 
-			/* Record node symbol to log */
-			if(n->symbol) {
-				fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->symbol);
-			}
+			/* Record the node category to the log */
+                        fprintf(d->logfile, "# CATEGORY\t%d\t%s\n", n->nodeid, n->category->label);
 
 			/* Record node parents to log */
 			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
@@ -1208,15 +1206,7 @@ int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode)
 	dag_parse_node_filelist(bk, n, inputs, 1, clean_mode);
 
 	while((line = dag_parse_readline(bk, n)) != NULL) {
-		if(line[0] == '#') {
-			if(strncmp(line, "# SYMBOL", 8) == 0) {
-				char *symbol = strchr(line, '\t');
-				if(symbol) {
-					n->symbol = xxstrdup(symbol + 1);
-					debug(D_DEBUG, "node symbol=%s", n->symbol);
-				}
-			}
-		} else if(line[0] == '@' && strchr(line, '=')) {
+		if(line[0] == '@' && strchr(line, '=')) {
 			if(!dag_parse_variable(bk, n, line)) {
 				dag_parse_error(bk, "node variable");
 				free(line);
