@@ -21,6 +21,7 @@ The -X option will delete the directory from all of the named hosts.
 #include "stringtools.h"
 #include "timestamp.h"
 #include "macros.h"
+#include "random_init.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -202,13 +203,9 @@ int main(int argc, char *argv[])
 	int server_count = 0;
 	int cluster_count = 0;
 
-	srand(time(0));
+	random_init();
 
 	debug_config(argv[0]);
-
-	debug(D_CHIRP, "HELLO");
-
-	//start_time = time(0);
 
 	while(((c = getopt(argc, argv, "a:d:DF:i:N:p:Rt:T:vXYh")) != (char) -1)) {
 		switch (c) {

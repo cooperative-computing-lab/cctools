@@ -32,6 +32,7 @@ See the file COPYING for details.
 #include "get_canonical_path.h"
 #include "rmonitor_hooks.h"
 #include "copy_stream.h"
+#include "random_init.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -2002,8 +2003,6 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q)
 	int num_workers_ready;
 	int random_ready_worker, ready_worker_count = 1;
 
-	srand(time(0));
-
 	num_workers_ready = q->workers_in_state[WORKER_STATE_READY];
 
 	if(num_workers_ready > 0) {
@@ -2532,6 +2531,8 @@ struct work_queue *work_queue_create(int port)
 {
 	struct work_queue *q = malloc(sizeof(*q));
 	char *envstring;
+
+	random_init();
 
 	memset(q, 0, sizeof(*q));
 

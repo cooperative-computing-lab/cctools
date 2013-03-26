@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "timestamp.h"
 #include "macros.h"
+#include "random_init.h"
 
 #include <time.h>
 #include <stdio.h>
@@ -25,9 +26,7 @@ int main(int argc, char *argv[])
 	auth_register_byname("hostname");
 
 	debug_config(argv[0]);
-	srand(time(0));
-
-	//debug_flags_set("chirp");
+	random_init();
 
 	if(argc != 7) {
 		printf("use: %s <host> <path> <width> <height> <nhosts> <ops>\n", argv[0]);

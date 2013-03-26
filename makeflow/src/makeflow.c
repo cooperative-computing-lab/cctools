@@ -41,6 +41,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "getopt_aux.h"
 #include "rmonitor_hooks.h"
+#include "random_init.h"
 
 #include "dag.h"
 #include "visitors.h"
@@ -2180,6 +2181,8 @@ int main(int argc, char *argv[])
 	timestamp_t runtime = 0;
 	timestamp_t time_completed = 0;
 	char *s;
+
+	random_init();
 
 	debug_config(argv[0]);
 
