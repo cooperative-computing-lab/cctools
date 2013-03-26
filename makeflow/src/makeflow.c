@@ -233,7 +233,7 @@ int dag_depth(struct dag *d)
  * during a certain point of the execution of the workflow. 
  *
  * The following algorithm first determines the level (depth) of each node by
- * calling the dag_depth() function and then count how many nodes are there at
+ * calling the dag_depth() function and then counts how many nodes are there at
  * each level. Then it returns the maximum of the numbers of nodes at each
  * level.
  */
@@ -1384,6 +1384,8 @@ int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 		n->local_job = 1;
 		command += 6;
 	}
+
+        /* Is this node a recursive call to makeflow? */
 	if(strncmp(command, "MAKEFLOW ", 9) == 0) {
 		return dag_parse_node_makeflow_command(bk, n, command + 9);
 	}
@@ -1402,6 +1404,19 @@ int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
 
 	return 1;
 }
+
+/* Support for recursive calls to makeflow. A recursive call is indicated in
+ * the makeflow file with the following syntax:
+ * \tMAKEFLOW some-makeflow-file [working-directory [wrapper]]
+ *
+ * If wrapper is not given, it defaults to an empty string.
+ * If working-directory is not given, it defaults to ".".
+ *
+ * The call is then as:
+ *
+ * cd working-directory && wrapper makeflow_exe some-makeflow-file
+ *
+ * */
 
 int dag_parse_node_makeflow_command(struct dag_parse *bk, struct dag_node *n, char *line)
 {
