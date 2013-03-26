@@ -251,25 +251,31 @@ int copy_file_to_file(const char *input, const char *output)
 	return count;	
 }
 
-char * copy_file_to_buffer( const char *filename )
+int copy_file_to_buffer(const char *filename, char **buffer)
 {
 	FILE *file = fopen(filename,"r");
-	if(!file) return 0;
+	if(!file) return -1;
 
 	fseek(file,0,SEEK_END);
 	long length = ftell(file);
 	fseek(file,0,SEEK_SET);
 
-	char *buffer = malloc(length+1);
-	if(!buffer) {
+	*buffer = malloc(length+1);
+
+	if(!*buffer) {
 		fclose(file);
-		return 0;
+		return -1;
 	}
 
-	full_fread(file,buffer,length);
-	buffer[length] = 0;
+	int count = full_fread(file, *buffer, length);
+    (*buffer)[count] = 0;
 
 	fclose(file);
 
-	return buffer;
+    fprintf(stderr, "%s\n", *buffer);
+
+    if(count < length)
+      return -1;
+
+	return count;
 }

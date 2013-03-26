@@ -2443,8 +2443,7 @@ int main(int argc, char *argv[])
 				monitor_log_dir = xxstrdup(optarg);
 				break;
 			case LONG_OPT_PASSWORD:
-				wq_password = copy_file_to_buffer(optarg);
-				if(!wq_password) {
+				if(copy_file_to_buffer(optarg, &wq_password) < 0) {
 					fprintf(stderr,"makeflow: couldn't open %s: %s\n",optarg,strerror(errno));
 					return 1;
 				}

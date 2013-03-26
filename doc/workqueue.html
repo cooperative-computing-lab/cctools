@@ -336,11 +336,13 @@ so any workers will be able to connect to your master, and
 vice versa.  This may be ok for a short running anonymous application,
 but is not safe for a long running application with a public name.
 <p>
-We recommend that you enable a password for your applications.
-Create a file called <b>mypassword</b> that contains any password
-(or other long phrase) that you like.  The password will be particular
-to your application and should not match any other passwords that
-you own.
+We recommend that you enable a password for your applications.  Create
+a file (e.g. <b>mypwfile</b>) that contains any password (or other
+long phrase) that you like (e.g. <b>mypassword</b>).  The password
+will be particular to your application and should not match any other
+passwords that you own.  Note that the contents of the file are taken
+verbatim as the password; this means that any new line character at
+the end of the phrase will be considered as part of the password.
 <p>
 Then, modify your master program to load the password:
 <p>
@@ -358,7 +360,7 @@ Then, modify your master program to load the password:
 And give the --password option to give the same password to your workers:
 
 <pre>
-% work_queue_worker <b>--password mypassword</b> ...
+% work_queue_worker <b>--password mypwfile</b> ...
 </pre>
 
 With this option enabled, both the master and the workers will
