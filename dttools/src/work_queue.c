@@ -2658,38 +2658,44 @@ failure:
 	return 0;
 }
 
-struct work_queue *work_queue_create_monitoring(int port, char *monitor_summary_file)
+int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_file)
 {
-	struct work_queue *q = work_queue_create(port);
+  if(!q)
+    return 0;
 
-	q->monitor_mode = 0;
+  if(q->monitor_mode)
+  {
+    debug(D_NOTICE, "Monitoring already enabled. Closing old logfile and opening (perhaps) new one.\n");
+    if(close(q->monitor_fd))
+      debug(D_NOTICE, "Error closing logfile: %s\n", strerror(errno));
+  }
 
-	if(!q)
-		return 0;
+  q->monitor_mode = 0;
 
-	q->monitor_exe = resource_monitor_copy_to_wd(NULL);
-	if(!q->monitor_exe)
-	{
-		debug(D_NOTICE, "Could not find the resource monitor executable. Disabling monitor mode.\n");
-		return q;
-	}
+  q->monitor_exe = resource_monitor_copy_to_wd(NULL);
+  if(!q->monitor_exe)
+  {
+    debug(D_NOTICE, "Could not find the resource monitor executable. Disabling monitor mode.\n");
+    return 0;
+  }
 
-	if(monitor_summary_file)
-		monitor_summary_file = xxstrdup(monitor_summary_file);
-	else
-		monitor_summary_file = string_format("wq-%d-resource-usage", getpid());
+  if(monitor_summary_file)
+    monitor_summary_file = xxstrdup(monitor_summary_file);
+  else
+    monitor_summary_file = string_format("wq-%d-resource-usage", getpid());
 
-	q->monitor_fd = open(monitor_summary_file, O_CREAT | O_WRONLY | O_APPEND, 00666);
-	free(monitor_summary_file);
+  q->monitor_fd = open(monitor_summary_file, O_CREAT | O_WRONLY | O_APPEND, 00666);
+  free(monitor_summary_file);
 
-	if(q->monitor_fd < 0)
-	{
-		debug(D_NOTICE, "Could not open monitor log file. Disabling monitor mode.\n");
-		return q;
-	}
+  if(q->monitor_fd < 0)
+  {
+    debug(D_NOTICE, "Could not open monitor log file. Disabling monitor mode.\n");
+    return 0;
+  }
 
 	q->monitor_mode = 1;
-	return q;
+
+	return 1;
 }
 
 int work_queue_activate_fast_abort(struct work_queue *q, double multiplier)

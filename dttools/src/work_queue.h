@@ -231,11 +231,14 @@ the <b>CATALOG_HOST</b> and <b>CATALOG_PORT</b> environmental variables as descr
 */
 struct work_queue *work_queue_create(int port);
 
-/** As work_queue_create, but creates also generates the log file
- * indicated by monitor_summary_file (wq-<pid>-resource-usage if
- * NULL) with all the summaries of the resources used by each
- * task. */
-struct work_queue *work_queue_create_monitoring(int port, char *monitor_summary_file);
+/** Enables resource monitoring on the give work queue.
+It generates the log file indicated by monitor_summary_file with all the
+summaries of the resources used by each task.
+@param q A work queue object.
+@param monitor_summary_file The filename of the log (If NULL, it defaults to wq-<pid>-resource-usage).
+@return 1 on success, 0 if monitoring was not enabled.
+*/
+int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_file);
 
 /** Submit a task to a queue.
 Once a task is submitted to a queue, it is not longer under the user's
