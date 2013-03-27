@@ -167,7 +167,7 @@ struct work_queue {
 	int monitor_fd;
 	char *monitor_exe;
 
-	const char *password;
+	char *password;
 };
 
 struct work_queue_worker {
@@ -2783,6 +2783,11 @@ void work_queue_specify_catalog_server(struct work_queue *q, const char *hostnam
 void work_queue_specify_password( struct work_queue *q, const char *password )
 {
 	q->password = xxstrdup(password);
+}
+
+int work_queue_specify_password_file( struct work_queue *q, const char *file )
+{
+	return copy_file_to_buffer(file,&(q->password))>0;
 }
 
 void work_queue_delete(struct work_queue *q)

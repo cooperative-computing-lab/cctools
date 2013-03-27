@@ -424,6 +424,14 @@ void work_queue_specify_log(struct work_queue *q, const char *logfile);
 
 void work_queue_specify_password( struct work_queue *q, const char *password );
 
+/** Add a mandatory password file that each worker must present.
+@param q A work queue object.
+@param file The name of the file containing the password.
+@return True if the password was loaded, false otherwise.
+*/
+
+int work_queue_specify_password_file( struct work_queue *q, const char *file );
+
 /** Change the keepalive interval for a given queue.
 @param q A work queue object.
 @param interval The minimum number of seconds to wait before sending new keepalive checks to workers.
