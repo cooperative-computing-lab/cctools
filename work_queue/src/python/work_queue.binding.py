@@ -560,6 +560,15 @@ class WorkQueue(_object):
         return work_queue_specify_password(self._work_queue, password)
     
     ##
+    # Add a mandatory password file that each worker must present.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param file      Name of the file containing the password.
+
+    def specify_password_file(self, file):
+        return work_queue_specify_password_file(self._work_queue, file)
+    
+    ##
     # Cancel task identified by its taskid and remove from the given queue. 
     #
     # @param self   Reference to the current work queue object.

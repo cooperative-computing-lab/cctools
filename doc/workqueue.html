@@ -338,26 +338,26 @@ but is not safe for a long running application with a public name.
 <p>
 We recommend that you enable a password for your applications.  Create
 a file (e.g. <b>mypwfile</b>) that contains any password (or other
-long phrase) that you like (e.g. <b>mypassword</b>).  The password
+long phrase) that you like (e.g. <b>This is my password</b>).  The password
 will be particular to your application and should not match any other
 passwords that you own.  Note that the contents of the file are taken
 verbatim as the password; this means that any new line character at
 the end of the phrase will be considered as part of the password.
 <p>
-Then, modify your master program to load the password:
+Then, modify your master program to use the password:
 <p>
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
- work_queue_specify_password(q,"mypassword");
+work_queue_specify_password_file(q,mypwfile);
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- q.specify_password("mypassword");
+ q.specify_password_file(mypwfile);
 </pre>
 </div>
 
-And give the --password option to give the same password to your workers:
+And give the --password option to give the same password file to your workers:
 
 <pre>
 % work_queue_worker <b>--password mypwfile</b> ...
