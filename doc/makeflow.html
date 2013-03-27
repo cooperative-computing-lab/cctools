@@ -313,12 +313,12 @@ specifying multiple projects:
 
 We recommend that any workflow that uses a project name also set
 a password.  To do this, select any passphrase and write it to
-a file called <tt>mypassword</tt>.  Then, run Makeflow and each
+a file called <tt>mypwfile</tt>.  Then, run Makeflow and each
 worker with the <tt>--password</tt> option to indicate the password file:
 
 <pre>
-% makeflow <b>--password</b> mypassword ...
-% work_queue_worker <b>--password</b> mypassword ...
+% makeflow <b>--password</b> mypwfile ...
+% work_queue_worker <b>--password</b> mypwfile ...
 </pre>
 </pre>
 
