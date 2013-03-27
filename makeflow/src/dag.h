@@ -177,6 +177,11 @@ void dag_node_add_target_file(struct dag_node *n, const char *filename, char *re
 
 const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, const char *remotename);
 
+int dag_file_is_source(struct dag_file *f);
+int dag_file_is_sink(struct dag_file *f);
+int dag_node_is_source(struct dag_node *n);
+int dag_node_is_sink(struct dag_node *n);
+
 void dag_count_states(struct dag *d);
 const char *dag_node_state_name(dag_node_state_t state);
 void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate);

@@ -391,3 +391,52 @@ struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, cons
 	
 	return category;
 }
+
+int dag_file_is_source(struct dag_file *f)
+{
+    if( f->target_of )
+      return 0;
+    else
+      return 1;
+}
+
+int dag_file_is_sink(struct dag_file *f)
+{
+    if( list_size(f->needed_by) > 0 )
+      return 0;
+    else
+      return 1;
+}
+
+int dag_node_is_source(struct dag_node *n)
+{
+  int is_source = 1;
+  struct dag_file *f;
+
+  list_first_item(n->source_files);
+  while( (f = list_next_item(n->source_files)) )
+    if( !dag_file_is_source(f) )
+    {
+      is_source = 0;
+      break;
+    }
+
+  return is_source;
+}
+
+int dag_node_is_sink(struct dag_node *n)
+{
+  int is_sink = 1;
+  struct dag_file *f;
+
+  list_first_item(n->target_files);
+  while( (f = list_next_item(n->target_files)) )
+    if( !dag_file_is_sink(f) )
+    {
+      is_sink = 0;
+      break;
+    }
+
+  return is_sink;
+}
+
