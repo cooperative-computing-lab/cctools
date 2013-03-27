@@ -22,7 +22,6 @@ See the file COPYING for details.
 #include "itable.h"
 #include "list.h"
 #include "macros.h"
-#include "process.h"
 #include "username.h"
 #include "create_dir.h"
 #include "xxmalloc.h"
@@ -427,8 +426,8 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 	while(hash_table_nextkey(w->current_files, &key, (void **) &value)) {
 		hash_table_remove(w->current_files, key);
 		free(value);
+		hash_table_firstkey(w->current_files);
 	}
-	hash_table_delete(w->current_files);
 
 	itable_firstkey(w->current_tasks);
 	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
@@ -481,6 +480,9 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	change_worker_state(q, w, WORKER_STATE_NONE);
 	if(w->link)
 		link_close(w->link);
+
+	itable_delete(w->current_tasks);
+	hash_table_delete(w->current_files);
 	free(w);
 
 	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
@@ -1618,7 +1620,16 @@ static int put_input_item(struct work_queue_file *tf, const char *expanded_paylo
 				return 0;
 			}	
 		}
-
+		
+		struct work_queue_task *t = itable_lookup(q->running_tasks, taskid);
+		stoptime = time(0) + get_transfer_wait_time(q, t, bytes_to_send);
+		send_worker_msg(w, "put %s %lld 0%o %lld %d\n", time(0) + short_timeout, tf->remote_name, bytes_to_send, local_info.st_mode, taskid, tf->flags);
+		actual = link_stream_from_fd(w->link, fd, bytes_to_send, stoptime);
+		close(fd); 
+		
+		if(actual != bytes_to_send)
+			return 0;
+		
 		if(tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = malloc(sizeof(*remote_info));
 			memcpy(remote_info, &local_info, sizeof(local_info));
@@ -1627,7 +1638,7 @@ static int put_input_item(struct work_queue_file *tf, const char *expanded_paylo
 	} else {
 		// TODO: Send message announcing what the job needs (put with 0 length?)
 		if(w->async_tasks) {
-			send_worker_msg(w, "put %s -1 0%o %lld\n", time(0) + short_timeout, tf->remote_name, local_info.st_mode, taskid);
+			send_worker_msg(w, "put %s -1 0%o %lld %d\n", time(0) + short_timeout, tf->remote_name, local_info.st_mode, taskid, tf->flags);
 		}
 	}
 
@@ -1712,7 +1723,7 @@ static int send_output_files(struct work_queue_task *t, struct work_queue_worker
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((tf = list_next_item(t->output_files))) {
-			send_worker_msg(w, "need %lld %s\n", time(0) + short_timeout, t->taskid, tf->remote_name);
+			send_worker_msg(w, "need %lld %s %d\n", time(0) + short_timeout, t->taskid, tf->remote_name, tf->flags);
 		}
 	}
 
@@ -1763,7 +1774,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 
 				stoptime = time(0) + get_transfer_wait_time(q, t, (INT64_T) fl);
 				open_time = timestamp_get();
-				send_worker_msg(w, "put %s %lld %o %lld\n", time(0) + short_timeout, tf->remote_name, (INT64_T) fl, 0777, t->taskid);
+				send_worker_msg(w, "put %s %lld %o %lld %d\n", time(0) + short_timeout, tf->remote_name, (INT64_T) fl, 0777, t->taskid, tf->flags);
 				actual = link_putlstring(w->link, tf->payload, fl, stoptime);
 				close_time = timestamp_get();
 				if(actual != (fl))

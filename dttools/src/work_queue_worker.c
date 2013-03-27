@@ -352,7 +352,7 @@ static int foreman_finish_task(struct link *master, int taskid, int length) {
 	return 1;
 }
 
-static int foreman_add_file_to_task(const char *filename, int taskid, int type) {
+static int foreman_add_file_to_task(const char *filename, int taskid, int type, int flags) {
 	struct work_queue_task *t;
 
 	t = (struct work_queue_task *)itable_lookup(unfinished_tasks, taskid);
@@ -361,7 +361,7 @@ static int foreman_add_file_to_task(const char *filename, int taskid, int type) 
 		itable_insert(unfinished_tasks, taskid, t);
 	}
 
-	work_queue_task_specify_file(t, filename, filename, type, WORK_QUEUE_CACHE);
+	work_queue_task_specify_file(t, filename, filename, type, flags);
 	return 1;
 }
 
@@ -1239,6 +1239,7 @@ static int worker_handle_master(struct link *master) {
 	char path[WORK_QUEUE_LINE_MAX];
 	INT64_T length;
 	INT64_T taskid = 0;
+	int flags = WORK_QUEUE_NOCACHE;
 	int mode, r, n;
 
 	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
@@ -1254,12 +1255,14 @@ static int worker_handle_master(struct link *master) {
 			r = do_stat(master, filename);
 		} else if(sscanf(line, "symlink %s %s", path, filename) == 2) {
 			r = do_symlink(path, filename);
-		} else if(sscanf(line, "need %" SCNd64 " %s", &taskid, filename) == 2) {
+		} else if(sscanf(line, "need %" SCNd64 " %s %d", &taskid, filename, &flags) == 3) {
 			r = 1;
-		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %" SCNd64, filename, &length, &mode, &taskid)) >= 3) {
+		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags)) >= 3) {
 			if(path_within_workspace(filename, workspace)) {
 				if(length >= 0) {
 					r = do_put(master, filename, length, mode);
+				} else {
+					r = 1;
 				}
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
@@ -1376,25 +1379,27 @@ static int foreman_handle_master(struct link *master) {
 	char path[WORK_QUEUE_LINE_MAX];
 	INT64_T length;
 	INT64_T taskid;
-	int mode, r;
+	int mode, flags, r;
 
 	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
 		debug(D_WQ, "received command: %s.\n", line);
 		if(sscanf(line, "work %" SCNd64 "%" SCNd64, &length, &taskid) == 2) {
 			r = foreman_finish_task(master, taskid, length);
-		} else if(sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 , filename, &length, &mode, &taskid) == 4) {
+		} else if(sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags) == 5) {
 			if(path_within_workspace(filename, workspace)) {
 				if(length >= 0) {
 					r = do_put(master, filename, length, mode);
+				} else {
+					r = 1;
 				}
-				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_INPUT);
+				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_INPUT, flags);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
 			}
-		} else if(sscanf(line, "need %" SCNd64 " %s", &taskid, filename) == 2) {
+		} else if(sscanf(line, "need %" SCNd64 " %s %d", &taskid, filename, &flags) == 3) {
 			if(path_within_workspace(filename, workspace)) {
-				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_OUTPUT);
+				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_OUTPUT, flags);
 				r=1;
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
@@ -1440,6 +1445,7 @@ static int foreman_handle_master(struct link *master) {
 
 static void foreman_for_master(struct link *master) {
 	static struct list *master_link = NULL;
+	static struct link *current_master = NULL;
 	static struct list *master_link_active = NULL;
 	struct work_queue_stats s;
 
@@ -1449,8 +1455,13 @@ static void foreman_for_master(struct link *master) {
 
 	if(!master_link) {
 		master_link = list_create();
-		list_push_tail(master_link, master);
 		master_link_active = list_create();
+	}
+	
+	if(master != current_master) {
+		while(list_pop_head(master_link));
+		list_push_tail(master_link, master);
+		current_master = master;
 	}
 
 	debug(D_WQ, "working for master at %s:%d as foreman.\n", actual_addr, actual_port);
@@ -1486,6 +1497,7 @@ static void foreman_for_master(struct link *master) {
 
 		if(!result) {
 			disconnect_master(master);
+			current_master = NULL;
 			break;
 		}
 		
