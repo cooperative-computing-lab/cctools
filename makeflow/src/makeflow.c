@@ -962,6 +962,7 @@ int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode)
 		free(line);
 	}
 //ok:
+        dag_compile_ancestors(d);
 	free(bk);
 	return 1;
 

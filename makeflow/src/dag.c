@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include "itable.h"
 #include "hash_table.h"
 #include "list.h"
+#include "set.h"
 
 #include "dag.h"
 
@@ -58,6 +59,30 @@ struct dag *dag_create()
 	}
 }
 
+void dag_compile_ancestors(struct dag *d)
+{
+  struct dag_node *n, *m;
+  struct dag_file *f; 
+  char  *name;
+
+  hash_table_firstkey(d->file_table);
+  while( hash_table_nextkey(d->file_table, &name, (void **) &f) )
+  {
+    m = f->target_of;
+    
+    if(!m)
+      continue;
+
+    list_first_item(f->needed_by);
+    while( (n = list_next_item(f->needed_by)) )
+    {
+      debug(D_DEBUG, "rule %d ancestor of %d\n", m->nodeid, n->nodeid);
+      set_insert(m->descendants, n);
+      set_insert(n->ancestors,   m);
+    }
+  }
+}
+
 struct dag_node *dag_node_create(struct dag *d, int linenum)
 {
 	struct dag_node *n;
@@ -75,6 +100,9 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->remote_names     = itable_create(0);
 	n->remote_names_inv = hash_table_create(0,0);
+
+    n->descendants = set_create(0);
+    n->ancestors   = set_create(0);
 
 	return n;
 }
@@ -410,33 +438,11 @@ int dag_file_is_sink(struct dag_file *f)
 
 int dag_node_is_source(struct dag_node *n)
 {
-  int is_source = 1;
-  struct dag_file *f;
-
-  list_first_item(n->source_files);
-  while( (f = list_next_item(n->source_files)) )
-    if( !dag_file_is_source(f) )
-    {
-      is_source = 0;
-      break;
-    }
-
-  return is_source;
+  return (set_size(n->ancestors) == 0);
 }
 
 int dag_node_is_sink(struct dag_node *n)
 {
-  int is_sink = 1;
-  struct dag_file *f;
-
-  list_first_item(n->target_files);
-  while( (f = list_next_item(n->target_files)) )
-    if( !dag_file_is_sink(f) )
-    {
-      is_sink = 0;
-      break;
-    }
-
-  return is_sink;
+  return (set_size(n->descendants) == 0);
 }
 

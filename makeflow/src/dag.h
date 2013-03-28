@@ -111,6 +111,8 @@ struct dag_node {
 
     int local_job;                      /* Flag: does this node runs locally? */
 
+    struct set *descendants;           /* The nodes this node is an immediate ancestor */
+    struct set *ancestors;             /* The nodes this node is an immediate descendant */ 
 
     /* Support for recursive calls to makeflow. If this node calls makeflow
      * recursively, makeflow_dag is the name of the makeflow file to run, and
@@ -176,6 +178,8 @@ void dag_node_add_source_file(struct dag_node *n, const char *filename, char *re
 void dag_node_add_target_file(struct dag_node *n, const char *filename, char *remotename);
 
 const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, const char *remotename);
+
+void dag_compile_ancestors(struct dag *d);
 
 int dag_file_is_source(struct dag_file *f);
 int dag_file_is_sink(struct dag_file *f);
