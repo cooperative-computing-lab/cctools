@@ -64,8 +64,9 @@ SOURCES = auth.c  \
           password_cache.c  \
           preadwrite.c  \
           process.c  \
-	  random_init.c \
+          random_init.c \
           rmonitor_hooks.c \
+          set.c \
           sha1.c  \
           sleeptools.c  \
           sort_dir.c  \
