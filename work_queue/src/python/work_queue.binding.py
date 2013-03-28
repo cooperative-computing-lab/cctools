@@ -468,6 +468,15 @@ class WorkQueue(_object):
         work_queue_get_stats(self._work_queue, self._stats)
         return self._stats
 
+    ## Enables resource monitoring of tasks in the queue. And writes a summary of the monitored information to a file.
+    #
+    #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
+    #	
+    # @param q A work queue object.
+    # @param summaryfile Filename for the summary log (If NULL, writes to wq-<pid>-resource-usage).
+    def enable_monitoring(self, summaryfile):
+        return work_queue_enable_monitoring(self._work_queue, summaryfile)	
+
     ##
     # Turn on or off fast abort functionality for a given queue.
     #
@@ -543,6 +552,15 @@ class WorkQueue(_object):
         return work_queue_specify_master_mode(self._work_queue, mode)
 
     ##
+    # Specify the catalog server the master should report to.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param hostname   The hostname of the catalog server.
+    # @param port       The port the catalog server is listening on.
+    def specify_catalog_server(self, hostname, port):
+        return work_queue_specify_catalog_server(self._work_queue, hostname, port) 
+
+    ##
     # Specify a log file that records the states of connected workers and submitted tasks. 
     #
     # @param self     Reference to the current work queue object.
@@ -613,6 +631,17 @@ class WorkQueue(_object):
         return work_queue_specify_keepalive_timeout(self._work_queue, timeout)
 
     ##
+    # Reset a work queue and all attached workers.
+    #
+    # @param self   Reference to the current work queue object.
+    # @param flags  Flags to indicate what to reset:
+    #                 - @ref WORK_QUEUE_RESET_ALL 
+    #                 - @ref WORK_QUEUE_RESET_KEEP_TASKS
+    #                 - 
+    def reset(self, flags):
+        return work_queue_reset(self._work_queue, flags)
+
+    ##
     # Submit a task to the queue.
     #
     # It is safe to re-submit a task returned by @ref wait.
@@ -620,9 +649,9 @@ class WorkQueue(_object):
     # @param self   Reference to the current work queue object.
     # @param task   A task description created from @ref work_queue::Task.
     def submit(self, task):
-		taskid = work_queue_submit(self._work_queue, task._task)
-		self._task_table[taskid] = task
-		return taskid 
+        taskid = work_queue_submit(self._work_queue, task._task)
+        self._task_table[taskid] = task
+        return taskid 
 
     ##
     # Wait for tasks to complete.
@@ -634,9 +663,9 @@ class WorkQueue(_object):
     #                   before returning.  Use an integer to set the timeout or the constant @ref
     #                   WORK_QUEUE_WAITFORTASK to block until a task has completed.
     def wait(self, timeout=WORK_QUEUE_WAITFORTASK):
-		task_pointer = work_queue_wait(self._work_queue, timeout)
-		if task_pointer:
-			task = self._task_table[int(task_pointer.taskid)]
-			del(self._task_table[task_pointer.taskid])
-			return task
-		return None
+        task_pointer = work_queue_wait(self._work_queue, timeout)
+        if task_pointer:
+            task = self._task_table[int(task_pointer.taskid)]
+            del(self._task_table[task_pointer.taskid])
+            return task
+        return None
