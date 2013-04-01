@@ -279,24 +279,24 @@ char *dag_lookup(const char *name, void *arg)
 	struct dag_lookup_set *s = (struct dag_lookup_set *)arg;
 	const char *value;
 
-	if(!s)
-		return NULL;
-
-	/* Try node variables table */
-	if(s->node) {
-		value = (const char *)hash_table_lookup(s->node->variables, name);
-		if(value) {
-			s->table = s->node->variables;
-			return xxstrdup(value);
+	if(s)
+	{
+		/* Try node variables table */
+		if(s->node) {
+			value = (const char *)hash_table_lookup(s->node->variables, name);
+			if(value) {
+				s->table = s->node->variables;
+				return xxstrdup(value);
+			}
 		}
-	}
 
-	/* Try dag variables table */
-	if(s->dag) {
-		value = (const char *)hash_table_lookup(s->dag->variables, name);
-		if(value) {
-			s->table = s->dag->variables;
-			return xxstrdup(value);
+		/* Try dag variables table */
+		if(s->dag) {
+			value = (const char *)hash_table_lookup(s->dag->variables, name);
+			if(value) {
+				s->table = s->dag->variables;
+				return xxstrdup(value);
+			}
 		}
 	}
 
