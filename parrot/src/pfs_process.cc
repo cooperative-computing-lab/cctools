@@ -145,6 +145,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 	child->nsyscalls = 0;
 	child->heap_address = 0;
 	child->break_address = 0;
+	child->completing_execve = 0;
 
 	actual_parent = pfs_process_lookup(actual_ppid);
 

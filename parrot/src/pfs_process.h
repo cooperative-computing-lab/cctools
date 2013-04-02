@@ -58,6 +58,7 @@ struct pfs_process {
 	INT64_T syscall_args_changed;
 	INT64_T actual_result;
 
+	int completing_execve;
 	int did_stream_warning;
 	int diverted_length;
 	int signal_interruptible[256];

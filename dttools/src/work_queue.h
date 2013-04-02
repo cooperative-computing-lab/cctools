@@ -447,7 +447,7 @@ int work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, c
 */
 int work_queue_task_specify_output_file(struct work_queue_task *t, const char *rname, const char *fname);
 
-/** Add an output file to a task without caching.
+ /** Add an output file to a task without caching.
 @param t The task to which to add parameters
 @param rname The name of a file created by the program when it runs.
 @param fname The name of the file local target for copying rname back.
