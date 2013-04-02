@@ -13,11 +13,12 @@ save_arguments $0 $@
 
 major=3
 minor=7
-micro=2
+micro=2rc1
 
 # On a release, type would be changed from TRUNK to RELEASE.  TRUNK is a useful
 # signal that the user is not using a blessed (tagged) release.
 type="RELEASE"
+ '(custom-safe-themes (quote ("9c5d25b093f992817fa63b996875b681ac0bf8290570f18a7162151d4409dffc" "65220bafb87ff5172e4aebe36d9f500e209dcc815e41ac48fe32a12c79fac4d7" "a30a1c224d9519e148f9e2abb1da1a34d679235aaa511d723b83af295da6608b" "eeb500ad30ed3aa257b3d66898cf909e2553c83fc9d1dfb58912db3f891d1e98" default)))
 
 version="$major.$minor.$micro $type"
 
