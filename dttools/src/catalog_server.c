@@ -142,7 +142,7 @@ static void update_all_catalogs(struct datagram *outgoing_dgram)
 
 	uptime = time(0) - starttime;
 
-	length = sprintf(text, "type catalog\nversion %d.%d.%d\nurl http://%s:%d\nname %s\nowner %s\nuptime %u\nport %d\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, owner, uptime, port);
+	length = sprintf(text, "type catalog\nversion %d.%d.%s\nurl http://%s:%d\nname %s\nowner %s\nuptime %u\nport %d\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, owner, uptime, port);
 
 	if(!length)
 		return;

@@ -906,7 +906,7 @@ else
 	debug_flag="-g"
 fi
 
-ccflags="${ccflags} -DINSTALL_PATH='\"${install_path}\"' $debug_flag -D_REENTRANT -D_GNU_SOURCE -DBUILD_USER='\"$build_user\"' -DBUILD_HOST='\"$build_host\"' -DCCTOOLS_VERSION_MAJOR=$major -DCCTOOLS_VERSION_MINOR=$minor -DCCTOOLS_VERSION_MICRO=$micro -DCCTOOLS_VERSION='\"$version\"' -DCCTOOLS_RELEASE_DATE='\"$release_date\"' -DCCTOOLS_CONFIGURE_ARGUMENTS='\"$configure_arguments\"' -DCCTOOLS_SYSTEM_INFORMATION='\"$system_information\"' -DCCTOOLS_OPSYS_${build_sys} -DCCTOOLS_CPU_${build_cpu}"
+ccflags="${ccflags} -DINSTALL_PATH='\"${install_path}\"' $debug_flag -D_REENTRANT -D_GNU_SOURCE -DBUILD_USER='\"$build_user\"' -DBUILD_HOST='\"$build_host\"' -DCCTOOLS_VERSION_MAJOR=$major -DCCTOOLS_VERSION_MINOR=$minor -DCCTOOLS_VERSION_MICRO='\"$micro\"' -DCCTOOLS_VERSION='\"$version\"' -DCCTOOLS_RELEASE_DATE='\"$release_date\"' -DCCTOOLS_CONFIGURE_ARGUMENTS='\"$configure_arguments\"' -DCCTOOLS_SYSTEM_INFORMATION='\"$system_information\"' -DCCTOOLS_OPSYS_${build_sys} -DCCTOOLS_CPU_${build_cpu}"
 ldflags="${ldflags} ${debug_flag}"
 
 echo "Creating Makefile.config..."
