@@ -991,12 +991,28 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 	int   scratch_size  = PFS_SCRATCH_SIZE;
 	char *scratch_avail = scratch_addr;
 
+	// KNOWN BUG: For a very very small process with little heap usage,
+	// there may not be enough room on the heap to re-write the execve()
+	// arguments in the scratch area.  In this case, the final execve()
+	// fails with EFAULT.  So far, this has been observed with one-line
+	// test cases, but not with real applications (yet).
+
 	if(args[0]==0) {
-		debug(D_PROCESS,"execve: %s executing ",p->name);
+		debug(D_PROCESS,"execve %s complete in 32 bit mode",p->new_logical_name);	
+		debug(D_PSTREE,"%d exec %s",p->pid,p->new_logical_name);
+
 		p->state = PFS_PROCESS_STATE_USER;
+		p->completing_execve = 0;
+
 	} else if(entering) {
+
+		/* Otherwise this is the process starting a new execve(). */
+
 		char path[PFS_PATH_MAX];
 		char firstline[PFS_PATH_MAX];
+
+		debug(D_PROCESS,"execve: %s setting up in 32 bit mode",p->name);
+		debug(D_PROCESS,"execve: scratch addr: %x",scratch_addr);
 
 		tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
 
@@ -1065,7 +1081,6 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 				debug(D_PROCESS,"execve: instead do %s %s",interp,scriptarg);
 			}
 
-
 			/* make sure the new interp is loaded */
 			strcpy(p->new_logical_name,interp);
 			if(pfs_get_local_name(interp,p->new_physical_name,0,0)!=0) {
@@ -1075,6 +1090,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 
 			/* the physical name of the interp is next */
 			ext_physical_name = ext_scriptarg + strlen(scriptarg) + 1;
+
 			/* make sure redirect_ldso doesn't clobber arguments */
 			scratch_avail = ext_physical_name;
 
@@ -1093,6 +1109,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			if(interparg) tracer_copy_out(p->tracer,interparg,ext_interparg,strlen(interparg)+1);
 			tracer_copy_out(p->tracer,scriptarg,ext_scriptarg,strlen(scriptarg)+1);
 			tracer_copy_out(p->tracer,p->new_physical_name,ext_physical_name,strlen(p->new_physical_name)+1);
+
 			/* rebuild the argv copy it out */
 			for(i=argc-1+shiftargs;i>0;i--) argv[i] = argv[i-shiftargs];
 			argc+=shiftargs;
@@ -1111,7 +1128,9 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			/* change the registers to reflect argv */
 			args[0] = (PTRINT_T) ext_physical_name;
 			args[1] = (PTRINT_T) ext_argv;
-			tracer_args_set(p->tracer,p->syscall,args,3); /* BUG? Why 3 ? */
+
+			/* up to three arguments (args[0-2]) were modified. */
+			tracer_args_set(p->tracer,p->syscall,args,3);
 		} else {
 			debug(D_PROCESS,"execve: %s is an ordinary executable",p->new_logical_name);
 
@@ -1123,45 +1142,45 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 
 			/* set the new program name to the logical name */
 			args[0] = (PTRINT_T) scratch_addr;
-			tracer_args_set(p->tracer,p->syscall,args,3); /* BUG? Why 3 ? */
+
+			/* only the first argument was modified. */
+			tracer_args_set(p->tracer,p->syscall,args,1);
 		}
+
 		if (pfs_ldso_path) {
 			redirect_ldso(p, pfs_ldso_path, args, scratch_avail);
 		}
-		debug(D_PROCESS,"execve: %s attempting",p->new_logical_name);
 
-		/* FIXME: It would be nice if we could test whether the D_PROCESS */
-		/* debug flag is set. */
-		if (1) {
-			typedef unsigned int argv32;
-			argv32 argv[PFS_ARG_MAX];
-			char debug_argv[256];
-			int argc;
-			tracer_copy_in(p->tracer,argv,POINTER(args[1]),sizeof(argv));
-			for(argc=0;argv[argc] && argc<PFS_ARG_MAX;argc++) {
-				debug_argv[sizeof(debug_argv)-1] = 0;
-				tracer_copy_in(p->tracer,debug_argv,POINTER(argv[argc]),sizeof(debug_argv)-1);
-				debug(D_PROCESS,"execve: argv[%d] == \"%s\"", argc, debug_argv);
-			}
-		}
+		/* This forces the next call to return to decode_execve, see comment at top of decode_syscall */
+		p->completing_execve = 1;
+
+		debug(D_PROCESS,"execve: %s about to start",p->new_logical_name);
 	} else {
 		INT64_T actual_result;
 		tracer_result_get(p->tracer,&actual_result);
+
 		if(actual_result==0) {
-			debug(D_PROCESS,"execve: %s working",p->new_logical_name);
+			debug(D_PROCESS,"execve: %s succeeded in 32 bit mode",p->new_logical_name);
 			strcpy(p->name,p->new_logical_name);
+
 			/* after a successful exec, signal handlers are reset */
 			memset(p->signal_interruptible,0,sizeof(p->signal_interruptible));
+
 			/* and certain files in the file table are closed */
 			p->table->close_on_exec();
+
 			/* and our knowledge of the address space is gone. */
 			p->heap_address = 0;
 			p->break_address = 0;
-			debug(D_PSTREE,"%d exec %s",p->pid,p->new_logical_name);
-		} else if(p->new_logical_name[0]) {
-			debug(D_PROCESS,"execve: %s failed",p->new_logical_name);
-			debug(D_PROCESS,"execve: restoring scratch area");
+		} else {
+			/* If we did not succeed and we are not entering, then the exec must have failed. */
+
+			debug(D_PROCESS,"execve: %s failed: %s",p->new_logical_name,strerror(-actual_result));
+			debug(D_PROCESS,"execve: restoring scratch area at %x",scratch_addr);
+
 			tracer_copy_out(p->tracer,p->scratch_data,(void*)scratch_addr,scratch_size);
+
+			p->completing_execve = 0;
 		}
 	}
 }
@@ -1323,6 +1342,20 @@ void decode_syscall( struct pfs_process *p, int entering )
 		p->state = PFS_PROCESS_STATE_KERNEL;
 		p->syscall_dummy = 0;
 		tracer_args_get(p->tracer,&p->syscall,p->syscall_args);
+
+		/*
+		SYSCALL_execve has a different value in 32 and 64 bit modes.
+		When an execve forces a switch between execution modes, the
+		old system call number is retained, even though the mode has
+		changed.  So, we must explicitly check for this condition
+		and fix up the system call number to end up in the right code.
+		*/
+
+		if(p->completing_execve) {
+			p->syscall = SYSCALL32_execve;
+			p->completing_execve = 0;
+		}
+
 		debug(D_SYSCALL,"%s",tracer_syscall_name(p->tracer,p->syscall));
 		p->syscall_original = p->syscall;
 		pfs_syscall_count++;
@@ -1338,9 +1371,6 @@ void decode_syscall( struct pfs_process *p, int entering )
 	args = p->syscall_args;
 
 	switch(p->syscall) {
-		case SYSCALL32_oldolduname:
-			p->syscall = SYSCALL32_execve;
-
 		case SYSCALL32_execve:
 			decode_execve(p,entering,p->syscall,args);
 			break;
@@ -2711,6 +2741,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 				if(p->syscall_result==0) {
 					if(p->syscall_args[0]!=0) {
 						p->break_address = p->syscall_args[0];
+						debug(D_PROCESS,"break_address: %x",p->break_address);
 					}
 				}
 			}
