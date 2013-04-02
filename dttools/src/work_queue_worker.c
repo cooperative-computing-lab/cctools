@@ -272,50 +272,50 @@ static int read_task_stdout(time_t stoptime) {
 }
 
 static void get_task_stdout(char **task_output, INT64_T *task_output_length) {
-	// flush stdout buffer to stdout file if needed
-	if(stdout_in_file) {
-		if(full_write(stdout_file_fd, stdout_buffer, stdout_buffer_used) == -1) {
-			debug(D_WQ, "Task stdout truncated: failed to write contents to file - %s.\n", stdout_file);
-		}
+    // flush stdout buffer to stdout file if needed
+    if(stdout_in_file) {
+	if(full_write(stdout_file_fd, stdout_buffer, stdout_buffer_used) == -1) {
+	    debug(D_WQ, "Task stdout truncated: failed to write contents to file - %s.\n", stdout_file);
 	}
-	close(stdout_file_fd);
+    }
+    close(stdout_file_fd);
 
-	// Record stdout of the child process
-	char *output;
-	INT64_T length;
-	if(stdout_in_file) { 
-		// Task stdout is in a file on disk. Extract the file contents into a buffer.
-		FILE *stream = fopen(stdout_file, "r");
-		if(stream) {
-			length = copy_stream_to_buffer(stream, &output);
-			if(length <= 0) {
-				length = 0;
-				if(output) {
-					free(output);
-				}
-				output = NULL;
-			}
-			fclose(stream);
-		} else {
-			debug(D_WQ, "Couldn't open the file that stores the standard output: %s\n", strerror(errno));
-			length = 0;
-			output = NULL;
-		}
-		unlink(stdout_file);
-		stdout_in_file = 0;
-	} else { 
-		// Task stdout is all in a buffer
-		length = stdout_buffer_used;
-		output = malloc(length);
+    // Record stdout of the child process
+    char *output;
+    INT64_T length;
+    if(stdout_in_file) { 
+	// Task stdout is in a file on disk. Extract the file contents into a buffer.
+	FILE *stream = fopen(stdout_file, "r");
+	if(stream) {
+	    length = copy_stream_to_buffer(stream, &output);
+	    if(length <= 0) {
+		length = 0;
 		if(output) {
-			memcpy(output, stdout_buffer, length); 
-		} else {
-			length = 0;
+		    free(output);
 		}
+		output = NULL;
+	    }
+	    fclose(stream);
+	} else {
+	    debug(D_WQ, "Couldn't open the file that stores the standard output: %s\n", strerror(errno));
+	    length = 0;
+	    output = NULL;
 	}
+	unlink(stdout_file);
+	stdout_in_file = 0;
+    } else { 
+	// Task stdout is all in a buffer
+	length = stdout_buffer_used;
+	output = malloc(length);
+	if(output) {
+	    memcpy(output, stdout_buffer, length); 
+	} else {
+	    length = 0;
+	}
+    }
 
-	*task_output = output;
-	*task_output_length = length;
+    *task_output = output;
+    *task_output_length = length;
 }
 
 
@@ -393,19 +393,26 @@ static void make_hash_key(const char *addr, int port, char *key)
 	sprintf(key, "%s:%d", addr, port);
 }
 
-static int have_enough_disk_space() {
-	UINT64_T disk_avail, disk_total;
+static int check_disk_space_for_filesize(INT64_T file_size) {
+    UINT64_T disk_avail, disk_total;
 
-	// Check available disk space
-	if(disk_avail_threshold > 0) {
-		disk_info_get(".", &disk_avail, &disk_total);
-		if(disk_avail < disk_avail_threshold) {
-			debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, disk_avail_threshold);
-			return 0;
-		}
-	}
+    // Check available disk space
+    if(disk_avail_threshold > 0) {
+	disk_info_get(".", &disk_avail, &disk_total);
+	if(file_size > 0) {	
+	    if((UINT64_T)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
+		debug(D_WQ, "Incoming file of size %lld will lower available disk space (%llu) below threshold (%llu).\n", file_size, disk_avail, disk_avail_threshold);
+		return 0;
+	    }
+	} else {
+	    if(disk_avail < disk_avail_threshold) {
+		debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, disk_avail_threshold);
+		return 0;
+	    }	
+	}	
+    }
 
-	return 1;
+    return 1;
 }
 
 /**
@@ -921,7 +928,7 @@ static int do_symlink(const char *path, char *filename) {
 
 static int do_put(struct link *master, char *filename, INT64_T length, int mode) {
 
-	if(!have_enough_disk_space()) {
+	if(!check_disk_space_for_filesize(length)) {
 		return 0;
 	}
 
@@ -1522,8 +1529,8 @@ int main(int argc, char *argv[])
 
 	// change to workspace
 	chdir(workspace);
-
-	if(!have_enough_disk_space()) {
+	
+	if(!check_disk_space_for_filesize(0)) {
 		goto abort;
 	}
 
