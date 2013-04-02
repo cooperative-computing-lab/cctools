@@ -314,7 +314,7 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 			"tasks_waiting %d\ntasks_complete %d\ntasks_running %d\ntotal_tasks_dispatched %d\n"
 			"workers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nworkers_by_pool %s\n"
 			"capacity %d\n"
-			"version %d.%d.%d\nowner %s", 
+			"version %d.%d.%s\nowner %s", 
 			project_name, (s->start_time)/1000000, s->priority, 
 			s->port, WORK_QUEUE_CATALOG_MASTER_AD_LIFETIME, 
 			s->tasks_waiting, s->total_tasks_complete, s->tasks_running, s->total_tasks_dispatched, 
