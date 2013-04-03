@@ -1,0 +1,2 @@
+/Users/kc/Documents/programming/cctools/makeflow/test/linker/linker_dirs_out
+a/b/x	a/b/x

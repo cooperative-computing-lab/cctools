@@ -1,0 +1,3 @@
+/Users/kc/Documents/programming/cctools/makeflow/test/linker/linker_collision_out
+/tmp/asdf	asdf
+asdf	asdf1
