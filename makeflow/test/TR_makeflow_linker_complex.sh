@@ -20,53 +20,18 @@ prepare() {
 
 run() {
   cd linker
-  ../../src/makeflow -b "$out_dir" complex.mf
+  ../../src/makeflow -b "$out_dir" complex.mf &> tmp
 
-  if [ ! -f "$out_dir"/makeflow_test_complex_path ]; then
-    exit 1
-  fi
-
-  filename="$out_dir"/y
-  if [ ! -f $filename ]; then
-    exit 1
-  fi
-
-  case `uname -s` in
-    Darwin)
-        cmd=`stat $filename | awk '{print $3}'`
-      ;;
-    *)
-        cmd=`stat -c %A $filename`
-  ;;
-  esac
-
-  if [ ! "-rwxrwxrwx" = "$cmd" ]
-  then
-    exit 1
-  fi
-
-  first_line=`head -n 1 $out_dir/complex.mf`
-  if [ $? != 0 ]
-  then
-    exit 1
-  fi
-  if [ ! "VARIABLE=\"testing\"" = "$first_line" ]
-  then
-    exit 1
-  fi
-
-  exit 0
+  `diff tmp expected/complex.mf`
+  exit $?
 }
 
 clean() {
   cd linker
-  rm -rf "$out_dir"
-  if [ -w /tmp/makeflow_test_complex ]; then
-	  rm -rf /tmp/makeflow_test_complex
-  fi
-  if [ -w /tmp/makeflow_test_complex_path ]; then
-	  rm -rf /tmp/makeflow_test_complex_path
-  fi
+  rm -r "$out_dir"
+  rm -r /tmp/a
+  rm -r /tmp/makeflow_test_complex_path
+  rm tmp
   exit 0
 }
 
