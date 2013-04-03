@@ -328,8 +328,7 @@ void collect_input_files(struct dag *d, char *bundle_dir, char *(*rename) (struc
 		}
 
 		sprintf(file_destination, "%s/%s", bundle_dir, new_name);
-
-		copy_file_to_file(f->filename, file_destination);
+		printf("%s\t%s\n", f->filename, new_name);
 		free(new_name);
 	}
 
@@ -2745,26 +2744,24 @@ int main(int argc, char *argv[])
 
 	if(bundle_directory) {
 		//Create Bundle!
-		fprintf(stderr, "Creating workflow bundle...\n");
 
 		struct stat s;
 		if(!stat(bundle_directory, &s)) {
 			fprintf(stderr, "Target directory, %s, already exists.\n", bundle_directory);
 			exit(1);
 		}
-		fprintf(stderr, "Creating new directory, %s ..........", bundle_directory);
-		if(!create_dir(bundle_directory, 0755)) {
-			fprintf(stderr, "FAILED\n");
+		if(!create_dir(bundle_directory, 0777)) {
+			fprintf(stderr, "Could not create directory.\n");
 			exit(1);
 		}
-		fprintf(stderr, "COMPLETE\n");
-
-		dag_show_input_files(d);
+		
+		char expanded_path[PATH_MAX];
+		if(realpath(bundle_directory, expanded_path)) fprintf(stderr, "%s\n", expanded_path);
+		
 		collect_input_files(d, bundle_directory, bundler_rename);
 
 		char output_makeflow[PATH_MAX];
 		sprintf(output_makeflow, "%s/%s", bundle_directory, dagfile);
-		fprintf(stderr, "Writing workflow, %s, to %s\n", dagfile, output_makeflow);
 		dag_to_file(d, output_makeflow, bundler_rename);
 		free(bundle_directory);
 		exit(0);
