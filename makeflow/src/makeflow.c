@@ -325,42 +325,39 @@ char* bundler_translate_name(const char *filename, int collision_counter)
 	if ( !reverse_names )
 		reverse_names = hash_table_create(0, NULL);
 
-	char fn[PATH_MAX];
-	if (collision_counter){
-		sprintf(fn, "%s%d",filename,collision_counter);
-	}else
-		sprintf(fn, "%s", filename);
+	if (collision_counter)
+		filename = string_format("%s%d", filename, collision_counter);
 
 	const char *new_filename;
-	new_filename = hash_table_lookup(previous_names, fn);
+	new_filename = hash_table_lookup(previous_names, filename);
 	if ( new_filename )
 		return xxstrdup(new_filename);
 
-	new_filename = hash_table_lookup(reverse_names, fn);
+	new_filename = hash_table_lookup(reverse_names, filename);
 	if ( new_filename ){
 		collision_counter++;
-		return bundler_translate_name(fn, collision_counter);
+		return bundler_translate_name(filename, collision_counter);
 	}
 	if (filename[0] == '/'){
-		new_filename = string_basename(fn);
+		new_filename = string_basename(filename);
 		if(hash_table_lookup(previous_names, new_filename)){
 			collision_counter++;
-			return bundler_translate_name(fn, collision_counter);
+			return bundler_translate_name(filename, collision_counter);
 		}
 		else if(hash_table_lookup(reverse_names, new_filename)){
 			collision_counter++;
-			return bundler_translate_name(fn, collision_counter);
+			return bundler_translate_name(filename, collision_counter);
 		}
 		else {
-			hash_table_insert(reverse_names, new_filename, fn);
-			hash_table_insert(previous_names, fn, new_filename);
-			return xxstrdup(new_filename);
+			hash_table_insert(reverse_names, new_filename, filename);
+			hash_table_insert(previous_names, filename, new_filename);
+			return strdup(new_filename);
 		}
 	}
 	else {
-		hash_table_insert(previous_names, fn, fn);
-		hash_table_insert(reverse_names, fn, fn);
-		return xxstrdup(fn);
+		hash_table_insert(previous_names, filename, filename);
+		hash_table_insert(reverse_names, filename, filename);
+		return xxstrdup(filename);
 	}
 }
 
@@ -368,9 +365,10 @@ char* bundler_rename(struct dag_node *n, const char *filename){
 
 	if (n) {
 		struct list *input_files = dag_input_files(n->d);
-		if(list_find(input_files, (int (*) (void *, const void *)) string_equal, (void*)filename))
+		if(list_find(input_files, (int (*) (void *, const void *)) string_equal, (void*)filename)){
 			list_free(input_files);
 			return xxstrdup(filename);
+		}
 	}
 	return bundler_translate_name(filename, 0); /* no collisions yet -> 0 */
 }
