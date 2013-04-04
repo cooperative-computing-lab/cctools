@@ -32,9 +32,12 @@ class Task(_object):
     # @param command    The shell command line to be exected by the task.
     def __init__(self, command):
         self._task = work_queue_task_create(command)
+        if not self._task:
+            raise Exception('Unable to create internal Task structure')
  
     def __del__(self):
-        work_queue_task_delete(self._task)
+        if hasattr(self, '_task'):
+            work_queue_task_delete(self._task)
 
     @staticmethod
     def _determine_file_flags(flags, cache):
@@ -415,7 +418,7 @@ class WorkQueue(_object):
         self._shutdown   = shutdown
         self._work_queue = work_queue_create(port)
         if not self._work_queue:
-            raise 
+            raise Exception('Unable to create internal Work Queue structure')
 
         self._stats      = work_queue_stats()
         self._task_table = {}
@@ -426,9 +429,10 @@ class WorkQueue(_object):
         work_queue_specify_master_mode(self._work_queue, catalog)
 
     def __del__(self):
-        if self._shutdown:
-            self.shutdown_workers(0)
-        work_queue_delete(self._work_queue)
+        if hasattr(self, '_work_queue'):
+            if self._shutdown:
+                self.shutdown_workers(0)
+            work_queue_delete(self._work_queue)
     
     ##
     # Get the project name of the queue. 
