@@ -31,10 +31,18 @@ class Task(_object):
     # @param self       Reference to the current task object.
     # @param command    The shell command line to be exected by the task.
     def __init__(self, command):
-        self._task = work_queue_task_create(command)
+        self._task = None
+
+        try:
+            self._task = work_queue_task_create(command)
+            if not self._task:
+                raise
+        except:
+            raise Exception('Unable to create internal Task structure')
  
     def __del__(self):
-        work_queue_task_delete(self._task)
+        if self._task:
+            work_queue_task_delete(self._task)
 
     @staticmethod
     def _determine_file_flags(flags, cache):
@@ -413,22 +421,28 @@ class WorkQueue(_object):
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
     def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=False, exclusive=True, shutdown=False):
         self._shutdown   = shutdown
-        self._work_queue = work_queue_create(port)
-        if not self._work_queue:
-            raise 
-
-        self._stats      = work_queue_stats()
+        self._work_queue = None
+        self._stats      = None
         self._task_table = {}
 
-        if name:
-            work_queue_specify_name(self._work_queue, name)
+        try:
+            self._work_queue = work_queue_create(port)
+            self._stats      = work_queue_stats()
+            if not self._work_queue:
+                raise Exception('Could not create work_queue on port %d' % port)
 
-        work_queue_specify_master_mode(self._work_queue, catalog)
+            if name:
+                work_queue_specify_name(self._work_queue, name)
+
+            work_queue_specify_master_mode(self._work_queue, catalog)
+        except Exception, e:
+            raise Exception('Unable to create internal Work Queue structure: %s' % e)
 
     def __del__(self):
-        if self._shutdown:
-            self.shutdown_workers(0)
-        work_queue_delete(self._work_queue)
+        if self._work_queue:
+            if self._shutdown:
+                self.shutdown_workers(0)
+            work_queue_delete(self._work_queue)
     
     ##
     # Get the project name of the queue. 
