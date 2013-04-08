@@ -4,17 +4,17 @@
 #include <sys/types.h>
 #include <limits.h>
 
+#include "hash_table.h"
+
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 #define MAKEFLOW_FILE_FLAG "-f "
 
-int main(void){
+void initialize(char *output_directory, char *input_file, struct hash_table *ht, struct graph *g){
 	pid_t pid;
 
-	char *output = "output_dir";
-	char *input = "test.mf";
 	char expanded_input[PATH_MAX];
-	realpath(input, expanded_input);
+	realpath(input_file, expanded_input);
 
 	pid = fork();
 	if ( pid < 0 ) {
@@ -23,12 +23,26 @@ int main(void){
 	}
 	if ( pid == 0 ) {
 		/* Child process */
-		char * const args[6] = { "linking makeflow" , MAKEFLOW_BUNDLE_FLAG, output, MAKEFLOW_FILE_FLAG, expanded_input, NULL};
+		char * const args[6] = { "linking makeflow" , MAKEFLOW_BUNDLE_FLAG, output_directory, MAKEFLOW_FILE_FLAG, expanded_input, NULL};
 
 		execvp(MAKEFLOW_PATH, args); 
 	}
 	else {
 		/* Parent process */
 	}
+}
+
+int main(void){
+	char *output = "output_dir";
+	char *input = "test.mf";
+
+	struct hash_table *names;
+	names = hash_table_create(0, NULL);
+	
+	struct graph *dependencies;
+	dependencies = graph_create();
+
+	initialize(output, input, names, dependencies);
+
 	return 0;
 }
