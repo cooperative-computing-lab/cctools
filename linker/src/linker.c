@@ -33,6 +33,35 @@ void initialize( char *output_directory, char *input_file, struct hash_table *ht
 		exit(1);
 	default:
 		/* Parent process */
+		close(pipefd[1]);
+		char next;
+		char *buffer = (char *) malloc(sizeof(char));
+		char *original_name;
+		int size = 0;
+		while (read(pipefd[0], &next, sizeof(next)) != 0){
+			switch ( next ){
+				case '\t':
+					original_name = (char *)realloc((void *)buffer,size+1);
+					*(original_name+size) = '\0';
+					buffer = (char *) malloc(sizeof(char));
+					size = 0;
+					break;
+				case '\n':
+					buffer = realloc(buffer, size+1);
+					*(buffer+size) = '\0';
+					hash_table_insert(ht, original_name, (void *) buffer);
+					size = 0;
+					free(original_name);
+					original_name = NULL;
+					buffer = NULL;
+					break;
+				case '\0':
+				default:
+					buffer = realloc(buffer, size+1);
+					*(buffer+size) = next;
+					size++;
+			}
+		}
 	}
 }
 
