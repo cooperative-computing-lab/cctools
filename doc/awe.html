@@ -44,17 +44,16 @@ See the file COPYING for details.
 <p>
 <h2>Overview</h2>
 
-Adaptive Weighted Ensemble or AWE package provides a Python library for adaptive
+Accelerated Weighted Ensemble or AWE package provides a Python library for adaptive
 sampling of molecular dynamics. The framework decomposes the resampling
 computations and the molecular dynamics simulations into tasks that are
-dispatched to <a href="http://www.nd.edu/~ccl/software/workqueue/">Work
-Queue</a> for execution on resources allocated from clusters, clouds, grids, or
+dispatched for execution on resources allocated from clusters, clouds, grids, or
 any idle machines.
 
-<p>AWE is part of the <a href=http://www.nd.edu/~ccl/software>Cooperating
-Computing Tools</a>. It is available in the CCTools Source Package which can be
-downloaded from <a href=http://www.nd.edu/~ccl/software/download>this web
-page</a>.
+<p>AWE uses Work Queue, which is part of the Cooperating Computing Tools (CCTools)
+package, for dispatching jobs for execution on allocated resources.
+Documentation on downloading, installing, and using Work Queue can be found 
+<a href="http://www.nd.edu/~ccl/software/manuals/workqueue.html">here</a>. 
 
 <h2>Software Requirements</h2>
 AWE currently uses the GROMACS molecular dynamics simulation package. So it
@@ -122,7 +121,14 @@ Finally, set PYTHONPATH to include the installed AWE Python modules:
 % export PYTHONPATH=${AWE_INSTALL_PATH}/lib/python2.6/site-packages:${PYTHONPATH}
 </pre>
 
-You can check if AWE was correctly installed by running:
+Note that the AWE Python modules will be built for the version of Python
+accessible in your installed environment. The installation script creates a
+directory (under <tt>$AWE_INSTALL_PATH/lib</tt>) named with the version of Python for
+which the modules are built and copies the modules to this directory. So if your
+environment has a Python version different from 2.6, replace the version string
+accordingly when setting <tt>PYTHONPATH</tt>.
+
+<p>You can check if AWE was correctly installed by running:
 <pre>
 % awe-verify
 </pre>
