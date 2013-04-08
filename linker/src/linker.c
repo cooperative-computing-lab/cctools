@@ -11,17 +11,22 @@
 
 void initialize( char *output_directory, char *input_file, struct hash_table *ht){
 	pid_t pid;
+	int pipefd[2];
+	pipe(pipefd);
 
 	char expanded_input[PATH_MAX];
 	realpath(input_file, expanded_input);
 
-	char ch;
+
 	switch ( pid = fork() ){
 	case -1:
 		fprintf( stderr, "Cannot fork. Exiting...\n" );
 		exit(1);
 	case 0:
 		/* Child process */
+		close(pipefd[0]);
+		dup2(pipefd[1], 1);
+		close(pipefd[1]);
 
 		char * const args[5] = { "linking makeflow" , MAKEFLOW_BUNDLE_FLAG, output_directory, expanded_input, NULL };
 		execvp(MAKEFLOW_PATH, args); 
