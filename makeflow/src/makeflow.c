@@ -328,7 +328,7 @@ void collect_input_files(struct dag *d, char *bundle_dir, char *(*rename) (struc
 		}
 
 		sprintf(file_destination, "%s/%s", bundle_dir, new_name);
-		printf("%s\t%s\n", f->filename, new_name);
+		fprintf(stdout, "%s\t%s\n", f->filename, new_name);
 		free(new_name);
 	}
 
@@ -2756,7 +2756,7 @@ int main(int argc, char *argv[])
 		}
 		
 		char expanded_path[PATH_MAX];
-		if(realpath(bundle_directory, expanded_path)) fprintf(stderr, "%s\n", expanded_path);
+		if(realpath(bundle_directory, expanded_path)) fprintf(stdout, "%s\n", expanded_path);
 		
 		collect_input_files(d, bundle_directory, bundler_rename);
 
