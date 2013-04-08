@@ -10,24 +10,24 @@
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 #define MAKEFLOW_FILE_FLAG "-f "
 
-void initialize(char *output_directory, char *input_file, struct hash_table *ht, struct graph *g){
+void initialize( char *output_directory, char *input_file, struct hash_table *ht, struct graph *g ){
 	pid_t pid;
 
 	char expanded_input[PATH_MAX];
 	realpath(input_file, expanded_input);
 
-	pid = fork();
-	if ( pid < 0 ) {
-		fprintf(stderr, "Cannot fork. Exiting...\n");
+	char ch;
+	switch ( pid = fork() ){
+	case -1:
+		fprintf( stderr, "Cannot fork. Exiting...\n" );
 		exit(1);
-	}
-	if ( pid == 0 ) {
+	case 0:
 		/* Child process */
-		char * const args[6] = { "linking makeflow" , MAKEFLOW_BUNDLE_FLAG, output_directory, MAKEFLOW_FILE_FLAG, expanded_input, NULL};
 
+		char * const args[6] = { "linking makeflow" , MAKEFLOW_BUNDLE_FLAG, output_directory, MAKEFLOW_FILE_FLAG, expanded_input, NULL };
 		execvp(MAKEFLOW_PATH, args); 
-	}
-	else {
+		exit(1);
+	default:
 		/* Parent process */
 	}
 }
