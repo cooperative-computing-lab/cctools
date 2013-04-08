@@ -8,7 +8,6 @@
 
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
-#define MAKEFLOW_FILE_FLAG "-f "
 
 void initialize( char *output_directory, char *input_file, struct hash_table *ht, struct graph *g ){
 	pid_t pid;
@@ -24,7 +23,7 @@ void initialize( char *output_directory, char *input_file, struct hash_table *ht
 	case 0:
 		/* Child process */
 
-		char * const args[6] = { "linking makeflow" , MAKEFLOW_BUNDLE_FLAG, output_directory, MAKEFLOW_FILE_FLAG, expanded_input, NULL };
+		char * const args[5] = { "linking makeflow" , MAKEFLOW_BUNDLE_FLAG, output_directory, expanded_input, NULL };
 		execvp(MAKEFLOW_PATH, args); 
 		exit(1);
 	default:
