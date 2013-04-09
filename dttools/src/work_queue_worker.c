@@ -842,6 +842,7 @@ static int do_symlink(const char *path, char *filename) {
 static int do_put(struct link *master, char *filename, INT64_T length, int mode) {
 
 	if(!check_disk_space_for_filesize(length)) {
+		debug(D_WQ, "Could not put file %s, not enough disk space (%lld bytes needed)\n", filename, length);
 		return 0;
 	}
 
@@ -1077,10 +1078,10 @@ static void kill_all_tasks() {
 	// Clear out the stored tasks list if any are left.
 	itable_firstkey(stored_tasks);
 	while(itable_nextkey(stored_tasks, &taskid, (void**)&ti)) {
-		itable_remove(stored_tasks, taskid);
 		clear_task_info(ti);
 		free(ti);
 	}
+	itable_clear(stored_tasks);
 }
 
 static int do_kill(int taskid) {
@@ -1141,6 +1142,7 @@ static void disconnect_master(struct link *master) {
 		while(itable_nextkey(unfinished_tasks, &taskid, (void**)&t)) {
 			work_queue_task_delete(t);
 		}
+		itable_clear(unfinished_tasks);
 	}
 	
 	if(released_by_master) {
@@ -1374,7 +1376,7 @@ static void work_for_master(struct link *master) {
 			break;
 		}
 
-		if(result != 0) {
+		if(result != 0 || itable_size(active_tasks)) {
 			idle_stoptime = time(0) + idle_timeout;
 		}
 	}
@@ -1426,7 +1428,12 @@ static int foreman_handle_master(struct link *master) {
 		} else if(sscanf(line, "get %s", filename) == 1) {	// for backward compatibility
 			r = do_get(master, filename);
 		} else if(sscanf(line, "kill %" SCNd64 , &taskid) == 1){
-			r = do_kill(taskid);
+			struct work_queue_task *t;
+			t = work_queue_cancel_by_taskid(foreman_q, taskid);
+			if(t) {
+				work_queue_task_delete(t);
+			}
+			r = 1;
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
 		} else if(!strncmp(line, "exit", 5)) {
@@ -1494,7 +1501,7 @@ static void foreman_for_master(struct link *master) {
 		}
 
 		work_queue_get_stats(foreman_q, &s);
-		max_worker_tasks = s.total_workers_connected;
+		max_worker_tasks = s.workers_ready + s.workers_busy + s.workers_full;
 
 		update_worker_status(master);
 		
