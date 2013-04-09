@@ -308,7 +308,7 @@ static int send_worker_msg(struct work_queue_worker *w, const char *fmt, time_t 
 	sprintf(debug_msg, "Message to worker %s (%s): ", w->hostname, w->addrport);
 	strcat(debug_msg, fmt);
 	va_copy(debug_va, va);
-	debug(D_WQ, debug_msg, debug_va);
+	vdebug(D_WQ, debug_msg, debug_va);
 	
 	//call link_putvfstring to send the message on the link
 	int result = link_putvfstring(w->link, fmt, stoptime, va);	
