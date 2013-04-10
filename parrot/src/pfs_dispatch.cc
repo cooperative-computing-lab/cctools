@@ -1352,7 +1352,11 @@ void decode_syscall( struct pfs_process *p, int entering )
 		*/
 
 		if(p->completing_execve) {
+          if(p->syscall != SYSCALL32_execve)
+          {
+            debug(D_PROCESS, "Changing execve code number from 64 to 32 bit mode.\n"); 
 			p->syscall = SYSCALL32_execve;
+          }
 			p->completing_execve = 0;
 		}
 
