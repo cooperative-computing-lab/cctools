@@ -1709,8 +1709,7 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'z':
-			disk_avail_threshold = string_metric_parse(optarg);
-			disk_avail_threshold *= 1024 * 1024; //convert MB to Bytes.
+			disk_avail_threshold = atoll(optarg) * MEGA;
 			break;
 		case 'A':
 			free(arch_name); //free the arch string obtained from uname
