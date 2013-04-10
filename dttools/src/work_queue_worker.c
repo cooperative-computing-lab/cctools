@@ -33,6 +33,7 @@ See the file COPYING for details.
 #include "create_dir.h"
 #include "delete_dir.h"
 #include "itable.h"
+#include "random_init.h"
 
 #include <unistd.h>
 
@@ -118,6 +119,9 @@ static int init_backoff_interval = 1;
 
 // Maximum value for backoff interval (in seconds) when worker fails to connect to a master.
 static int max_backoff_interval = 60; 
+
+// Chance that a worker will decide to shut down each minute without warning, to simulate failure.
+static double worker_volatility = 0.0;
 
 // Flag gets set on receipt of a terminal signal.
 static int abort_flag = 0;
@@ -1345,12 +1349,23 @@ static void work_for_master(struct link *master) {
 	sigaddset(&mask, SIGCHLD);
 	
 	time_t idle_stoptime = time(0) + idle_timeout;
+	time_t volatile_stoptime = time(0) + 60;
 	// Start serving masters
 	while(!abort_flag) {
 		if(time(0) > idle_stoptime && itable_size(stored_tasks) == 0) {
 			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			abort_flag = 1;
 			break;
+		}
+		
+		if(worker_volatility && time(0) > volatile_stoptime) {
+			if( (double)rand()/(double)RAND_MAX < worker_volatility) {
+				debug(D_NOTICE, "work_queue_worker: aborting due to volatility check.\n");
+				abort_flag = 1;
+				break;
+			} else {
+				volatile_stoptime = time(0) + 60;
+			}
 		}
 
 		result = link_usleep_mask(master, 5000, &mask, 1, 0);
@@ -1545,7 +1560,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "                       Can be [w]orker, [f]oreman, [c]lassic, or [a]uto (default=auto).\n");
 	fprintf(stdout, " -M <project>          Name of a preferred project. A worker can have multiple preferred projects.\n");
 	fprintf(stdout, " -N <project>          When in Foreman mode, the name of the project to advertise as.  In worker/classic/auto mode acts as '-M'.\n");
-	fprintf(stdout, "-P,--password <pwfile> Password file for authenticating to the master.\n");
+	fprintf(stdout, " -P,--password <pwfile> Password file for authenticating to the master.\n");
 	fprintf(stdout, " -t <time>             Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
 	fprintf(stdout, " -w <size>             Set TCP window size.\n");
 	fprintf(stdout, " -i <time>             Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
@@ -1555,6 +1570,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -O <os>               Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
 	fprintf(stdout, " -s <path>             Set the location for creating the working directory of the worker.\n");
 	fprintf(stdout, " -v                    Show version string\n");
+	fprintf(stdout, " --volatility          Set the percent chance a worker will decide to shut down every minute.\n");
 	fprintf(stdout, " -h                    Show this help screen\n");
 }
 
@@ -1610,10 +1626,12 @@ static int setup_workspace() {
 }
 
 #define LONG_OPT_DEBUG_FILESIZE 'z'+1
+#define LONG_OPT_VOLATILITY 'z'+2
 
 struct option long_options[] = {
 	{"password",        required_argument,  0,  'P'},
 	{"debug-file-size", required_argument,  0,   LONG_OPT_DEBUG_FILESIZE},
+	{"volatility",      required_argument,  0,   LONG_OPT_VOLATILITY},
 	{0,0,0,0}
 };
 
@@ -1737,6 +1755,9 @@ int main(int argc, char *argv[])
 				return 1;
 			}
 			break;
+		case LONG_OPT_VOLATILITY:
+			worker_volatility = atof(optarg);
+			break;
 		case 'h':
 		default:
 			show_help(argv[0]);
@@ -1759,7 +1780,7 @@ int main(int argc, char *argv[])
 	signal(SIGINT, handle_abort);
 	signal(SIGCHLD, handle_sigchld);
 
-	srand((unsigned int) (getpid() ^ time(NULL)));
+	random_init();
 	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t)free_work_queue_master);
 	
 	if(!setup_workspace()) {
