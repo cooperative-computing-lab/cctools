@@ -33,6 +33,7 @@ See the file COPYING for details.
 #include "create_dir.h"
 #include "delete_dir.h"
 #include "itable.h"
+#include "macros.h"
 
 #include <unistd.h>
 
@@ -315,25 +316,25 @@ static void make_hash_key(const char *addr, int port, char *key)
 }
 
 static int check_disk_space_for_filesize(INT64_T file_size) {
-	UINT64_T disk_avail, disk_total;
+    UINT64_T disk_avail, disk_total;
 
-	// Check available disk space
-	if(disk_avail_threshold > 0) {
-		disk_info_get(".", &disk_avail, &disk_total);
-		if(file_size > 0) {	
-			if((UINT64_T)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
-				debug(D_WQ, "Incoming file of size %lld will lower available disk space (%llu) below threshold (%llu).\n", file_size, disk_avail, disk_avail_threshold);
-				return 0;
-			}
-		} else {
-			if(disk_avail < disk_avail_threshold) {
-				debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, disk_avail_threshold);
-				return 0;
-			}	
-		}	
-	}
+    // Check available disk space
+    if(disk_avail_threshold > 0) {
+	disk_info_get(".", &disk_avail, &disk_total);
+	if(file_size > 0) {	
+	    if((UINT64_T)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
+		debug(D_WQ, "Incoming file of size %lld MB will lower available disk space (%llu MB) below threshold (%llu MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
+		return 0;
+	    }
+	} else {
+	    if(disk_avail < disk_avail_threshold) {
+		debug(D_WQ, "Available disk space (%llu MB) lower than threshold (%llu MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
+		return 0;
+	    }	
+	}	
+    }
 
-	return 1;
+    return 1;
 }
 
 static int foreman_finish_task(struct link *master, int taskid, int length) {
