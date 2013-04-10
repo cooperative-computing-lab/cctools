@@ -1371,6 +1371,8 @@ static void work_for_master(struct link *master) {
 
 		ok &= handle_tasks(master);
 
+		ok &= check_disk_space_for_filesize(0);
+
 		if(!ok) {
 			disconnect_master(master);
 			break;
