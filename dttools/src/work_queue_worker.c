@@ -29,6 +29,7 @@ See the file COPYING for details.
 #include "full_io.h"
 #include "create_dir.h"
 #include "delete_dir.h"
+#include "macros.h"
 
 #include <unistd.h>
 
@@ -401,12 +402,12 @@ static int check_disk_space_for_filesize(INT64_T file_size) {
 	disk_info_get(".", &disk_avail, &disk_total);
 	if(file_size > 0) {	
 	    if((UINT64_T)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
-		debug(D_WQ, "Incoming file of size %lld will lower available disk space (%llu) below threshold (%llu).\n", file_size, disk_avail, disk_avail_threshold);
+		debug(D_WQ, "Incoming file of size %lld MB will lower available disk space (%llu MB) below threshold (%llu MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
 		return 0;
 	    }
 	} else {
 	    if(disk_avail < disk_avail_threshold) {
-		debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, disk_avail_threshold);
+		debug(D_WQ, "Available disk space (%llu MB) lower than threshold (%llu MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
 		return 0;
 	    }	
 	}	
