@@ -1540,6 +1540,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -C <catalog>          Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	fprintf(stdout, " -d <subsystem>        Enable debugging for this subsystem.\n");
 	fprintf(stdout, " -o <file>             Send debugging to this file.\n");
+	fprintf(stdout, " --debug-file-size     Set the maximum size of the debug log (default 10M, 0 disables).\n");
 	fprintf(stdout, " -m <mode>             Choose worker mode.\n");
 	fprintf(stdout, "                       Can be [w]orker, [f]oreman, [c]lassic, or [a]uto (default=auto).\n");
 	fprintf(stdout, " -M <project>          Name of a preferred project. A worker can have multiple preferred projects.\n");
@@ -1608,8 +1609,11 @@ static int setup_workspace() {
 	return 1;
 }
 
+#define LONG_OPT_DEBUG_FILESIZE 'z'+1
+
 struct option long_options[] = {
-	{"password",	required_argument,	0,	'P'},
+	{"password",        required_argument,  0,  'P'},
+	{"debug-file-size", required_argument,  0,   LONG_OPT_DEBUG_FILESIZE},
 	{0,0,0,0}
 };
 
@@ -1654,6 +1658,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case LONG_OPT_DEBUG_FILESIZE:
+			debug_config_file_size(MAX(0, string_metric_parse(optarg)));
 			break;
 		case 'f':
 			worker_mode = WORKER_MODE_FOREMAN;
