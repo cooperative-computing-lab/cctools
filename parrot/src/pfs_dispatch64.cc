@@ -701,7 +701,7 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 			interp = &firstline[2];
 			while(isspace(*interp)) interp++;
 			ext_interp = scratch_addr;
-			
+
 			/* interparg points to the internal argument */
 			/* scriptarg points to the script itself */
 			interparg = strchr(interp,' ');
@@ -795,7 +795,7 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 		p->completing_execve = 1;
 
 		debug(D_PROCESS,"execve: %s about to start",p->new_logical_name);
-	} else {
+	} else { /* That is, we are not entering */
 		INT64_T actual_result;
 		tracer_result_get(p->tracer,&actual_result);
 
@@ -812,8 +812,12 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 			/* and our knowledge of the address space is gone. */
 			p->heap_address = 0;
 			p->break_address = 0;
-		} else {
-			/* If we did not succeed and we are not entering, then the exec must have failed. */
+		} else if(p->new_physical_name[0]){
+			/* If we did not succeed and we are not
+			entering, then the exec must have
+			failed. Since new_physical_name is defined,
+			that means the scratch was modified too, so we
+			need to restore it. */
 
 			debug(D_PROCESS,"execve: %s failed: %s",p->new_logical_name,strerror(-actual_result));
 			debug(D_PROCESS,"execve: restoring scratch area at %x",scratch_addr);
@@ -821,10 +825,23 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 			tracer_copy_out(p->tracer,p->scratch_data,(void*)scratch_addr,scratch_size);
 
 			p->completing_execve = 0;
+		} else {
+
+			/* If we get here, then we are not entering,
+			   and p->new_logical_name was never set because
+			   is_executable(path) failed. This could
+			   happen when the executable is being
+			   searched in the PATH directories. Here we
+			   do nothing, as nothing has been modified,
+			   and the third call to execve never occurs,
+			   from which parrot concludes there was an
+			   error. */
+
+			p->completing_execve = 0;
 		}
+
 	}
 }
-
 /*
 Memory mapped files are loaded into the channel,
 the whole file regardless of what portion is actually
@@ -947,11 +964,11 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		*/
 
 		if(p->completing_execve) {
-          if(p->syscall != SYSCALL64_execve)
-          {
-            debug(D_PROCESS, "Changing execve code number from 32 to 64 bit mode.\n"); 
-			p->syscall = SYSCALL64_execve;
-          }
+			if(p->syscall != SYSCALL64_execve)
+			{
+				debug(D_PROCESS, "Changing execve code number from 32 to 64 bit mode.\n"); 
+				p->syscall = SYSCALL64_execve;
+			}
 			p->completing_execve = 0;
 		}
 

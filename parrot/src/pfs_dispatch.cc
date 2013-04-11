@@ -1172,19 +1172,36 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			/* and our knowledge of the address space is gone. */
 			p->heap_address = 0;
 			p->break_address = 0;
-		} else {
-			/* If we did not succeed and we are not entering, then the exec must have failed. */
+		} else if(p->new_physical_name[0]){
+			/* If we did not succeed and we are not
+			entering, then the exec must have
+			failed. Since new_physical_name is defined,
+			that means the scratch was modified too, so we
+			need to restore it. */
 
 			debug(D_PROCESS,"execve: %s failed: %s",p->new_logical_name,strerror(-actual_result));
 			debug(D_PROCESS,"execve: restoring scratch area at %x",scratch_addr);
-
+			
 			tracer_copy_out(p->tracer,p->scratch_data,(void*)scratch_addr,scratch_size);
 
 			p->completing_execve = 0;
+		} else {
+
+			/* If we get here, then we are not entering,
+			   and p->new_logical_name was never set because
+			   is_executable(path) failed. This could
+			   happen when the executable is being
+			   searched in the PATH directories. Here we
+			   do nothing, as nothing has been modified,
+			   and the third call to execve never occurs,
+			   from which parrot concludes there was an
+			   error. */
+
+			p->completing_execve = 0;
 		}
+
 	}
 }
-
 
 /*
 Memory mapped files are loaded into the channel,
@@ -1352,11 +1369,11 @@ void decode_syscall( struct pfs_process *p, int entering )
 		*/
 
 		if(p->completing_execve) {
-          if(p->syscall != SYSCALL32_execve)
-          {
-            debug(D_PROCESS, "Changing execve code number from 64 to 32 bit mode.\n"); 
-			p->syscall = SYSCALL32_execve;
-          }
+			if(p->syscall != SYSCALL32_execve)
+			{
+				debug(D_PROCESS, "Changing execve code number from 64 to 32 bit mode.\n"); 
+				p->syscall = SYSCALL32_execve;
+			}
 			p->completing_execve = 0;
 		}
 
