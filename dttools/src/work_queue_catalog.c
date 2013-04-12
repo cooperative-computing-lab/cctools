@@ -130,7 +130,15 @@ struct work_queue_master *parse_work_queue_master_nvpair(struct nvpair *nv)
 	m = xxmalloc(sizeof(struct work_queue_master));
 
 	strncpy(m->addr, nvpair_lookup_string(nv, "address"), LINK_ADDRESS_MAX);
-	strncpy(m->proj, nvpair_lookup_string(nv, "project"), WORK_QUEUE_NAME_MAX);
+
+	const char *project;
+	project = nvpair_lookup_string(nv, "project");
+	if(project) {
+		strncpy(m->proj, project, WORK_QUEUE_NAME_MAX);
+	} else {
+		strncpy(m->proj, "unknown", WORK_QUEUE_NAME_MAX);
+	}
+
 	m->port = nvpair_lookup_integer(nv, "port");
 	m->start_time = nvpair_lookup_integer(nv, "starttime");
 	m->priority = nvpair_lookup_integer(nv, "priority");
