@@ -238,7 +238,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t);
 static void update_app_time(struct work_queue *q, timestamp_t last_left_time, int last_left_status);
 
 static int process_ready(struct work_queue *q, struct work_queue_worker *w, const char *line);
-static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
+static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_worker_update(struct work_queue *q, struct work_queue_worker *w, const char *line); 
 
@@ -346,7 +346,7 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	} else if(string_prefix_is(line, "ready")) {
 		process_ready(q, w, line);
 	} else if (string_prefix_is(line,"result")) {
-		process_result(q, w, line);
+		process_result(q, w, line, stoptime);
 	} else if (string_prefix_is(line,"worker_status") || string_prefix_is(line, "queue_status") || string_prefix_is(line, "task_status")) {
 		process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "update")) {
@@ -1098,7 +1098,7 @@ reject:
 	return 0;
 }
 
-static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line) {
+static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime) {
 
 	if(!q || !w || !line) return 0; 
 
@@ -1108,7 +1108,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	timestamp_t execution_time;
 	struct work_queue_task *t;
 	int actual;
-	timestamp_t stoptime, observed_execution_time;
+	timestamp_t observed_execution_time;
 
 	//Format: result, output length, execution time, taskid
 	char items[3][WORK_QUEUE_PROTOCOL_FIELD_MAX];
@@ -1131,8 +1131,9 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	}
 	
 	if(!t) {
-		debug(D_WQ, "Invalid task result from worker %s (%s): no task %d assigned to worker", w->hostname, w->addrport, taskid);
-		return 0;
+		debug(D_WQ, "Unknown task result from worker %s (%s): no task %d assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
+		link_soak(w->link, output_length, stoptime);
+		return 1;
 	}
 	
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
@@ -1147,7 +1148,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	t->output = malloc(output_length + 1);
 	if(output_length > 0) {
 		debug(D_WQ, "Receiving stdout of task %d (size: %lld bytes) from %s (%s) ...", taskid, output_length, w->addrport, w->hostname);
-		stoptime = time(0) + get_transfer_wait_time(q, t, (INT64_T) output_length);
+		stoptime = MAX((timestamp_t)stoptime, time(0) + get_transfer_wait_time(q, t, (INT64_T) output_length));
 		actual = link_read(w->link, t->output, output_length, stoptime);
 		if(actual != output_length) {
 			debug(D_WQ, "Failure: actual received stdout size (%lld bytes) is different from expected (%lld bytes).", actual, output_length);
