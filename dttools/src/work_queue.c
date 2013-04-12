@@ -1130,6 +1130,11 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		t = itable_lookup(w->current_tasks, taskid);
 	}
 	
+	if(!t) {
+		debug(D_WQ, "Invalid task result from worker %s (%s): no task %d assigned to worker", w->hostname, w->addrport, taskid);
+		return 0;
+	}
+	
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
 
 	if(n >= 3) {
