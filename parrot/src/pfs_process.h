@@ -96,6 +96,7 @@ extern "C" void pfs_process_kill_everyone(int);
 
 PTRINT_T pfs_process_heap_address( struct pfs_process *p );
 PTRINT_T pfs_process_scratch_address( struct pfs_process *p );
+int pfs_process_verify_break_rw_address( struct pfs_process *p );
 
 extern struct pfs_process *pfs_current;
 
