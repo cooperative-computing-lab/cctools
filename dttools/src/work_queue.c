@@ -376,14 +376,14 @@ static double get_idle_percentage(struct work_queue *q)
 	return (long double) (q->accumulated_idle_time + q->idle_time) / (timestamp_get() - accumulated_idle_start);
 }
 
-static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_task *t, INT64_T length)
+static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T length)
 {
 	timestamp_t timeout;
-	struct work_queue_worker *w;
 	long double avg_queue_transfer_rate, avg_worker_transfer_rate, retry_transfer_rate, tolerable_transfer_rate;
 	INT64_T total_tasks_complete, total_tasks_running, total_tasks_waiting, num_of_free_workers;
-
-	w = itable_lookup(q->worker_task_map, t->taskid);
+	struct work_queue_task *t = NULL;
+	
+	t = itable_lookup(w->current_tasks, taskid);
 
 	if(w->total_transfer_time) {
 		avg_worker_transfer_rate = (long double) w->total_bytes_transferred / w->total_transfer_time * 1000000;
@@ -398,7 +398,7 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 	total_tasks_waiting = list_size(q->ready_list);
 	if(total_tasks_complete > total_tasks_running && num_of_free_workers > total_tasks_waiting) {
 		// The master has already tried most of the workers connected and has free workers for retrying slow workers
-		if(t->total_bytes_transferred) {
+		if(t && t->total_bytes_transferred) {
 			avg_queue_transfer_rate = (long double) (q->total_bytes_sent + q->total_bytes_received) / (q->total_send_time + q->total_receive_time) * 1000000;
 			retry_transfer_rate = (long double) length / t->total_bytes_transferred * avg_queue_transfer_rate;
 		}
@@ -687,7 +687,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 						debug(D_NOTICE, "Cannot open file %s for writing: %s", tmp_local_name, strerror(errno));
 						goto failure;
 					}
-					stoptime = time(0) + get_transfer_wait_time(q, t, length);
+					stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, length);
 					actual = link_stream_to_fd(w->link, fd, length, stoptime);
 					close(fd);
 					if(actual != length) {
@@ -1132,6 +1132,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	
 	if(!t) {
 		debug(D_WQ, "Unknown task result from worker %s (%s): no task %d assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
+		stoptime = time(0) + get_transfer_wait_time(q, w, -1, (INT64_T) output_length);
 		link_soak(w->link, output_length, stoptime);
 		return 1;
 	}
@@ -1148,7 +1149,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	t->output = malloc(output_length + 1);
 	if(output_length > 0) {
 		debug(D_WQ, "Receiving stdout of task %d (size: %lld bytes) from %s (%s) ...", taskid, output_length, w->addrport, w->hostname);
-		stoptime = MAX((timestamp_t)stoptime, time(0) + get_transfer_wait_time(q, t, (INT64_T) output_length));
+		stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, (INT64_T) output_length);
 		actual = link_read(w->link, t->output, output_length, stoptime);
 		if(actual != output_length) {
 			debug(D_WQ, "Failure: actual received stdout size (%lld bytes) is different from expected (%lld bytes).", actual, output_length);
@@ -1488,7 +1489,7 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 	}
 	
 	struct work_queue_task *t = itable_lookup(q->running_tasks, taskid);
-	stoptime = time(0) + get_transfer_wait_time(q, t, length);
+	stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, length);
 	send_worker_msg(w, "put %s %lld 0%o %lld %d\n", time(0) + short_timeout, remotename, length, local_info.st_mode, taskid, flags);
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd); 
@@ -1741,7 +1742,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 				debug(D_WQ, "%s (%s) needs literal as %s", w->hostname, w->addrport, tf->remote_name);
 				fl = tf->length;
 
-				stoptime = time(0) + get_transfer_wait_time(q, t, (INT64_T) fl);
+				stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, (INT64_T) fl);
 				open_time = timestamp_get();
 				send_worker_msg(w, "put %s %lld %o %lld %d\n", time(0) + short_timeout, tf->remote_name, (INT64_T) fl, 0777, t->taskid, tf->flags);
 				actual = link_putlstring(w->link, tf->payload, fl, stoptime);
