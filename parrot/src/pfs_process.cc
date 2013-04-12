@@ -583,7 +583,7 @@ int pfs_process_verify_break_rw_address( struct pfs_process *p )
         {
           fclose(file);
           if(fields==7 && inode==0 && flagstring[0]=='r' && flagstring[1]=='w' && flagstring[3]=='p') {
-		  debug(D_PROCESS,"break address 0x%x is valid.", p->break_address);
+		  debug(D_DEBUG,"break address 0x%x is valid.", p->break_address);
 			return 1;
           }
           else
