@@ -1361,8 +1361,8 @@ static void work_for_master(struct link *master) {
 		
 		if(worker_volatility && time(0) > volatile_stoptime) {
 			if( (double)rand()/(double)RAND_MAX < worker_volatility) {
-				debug(D_NOTICE, "work_queue_worker: aborting due to volatility check.\n");
-				abort_flag = 1;
+				debug(D_NOTICE, "work_queue_worker: disconnect from master due to volatility check.\n");
+				disconnect_master(master);
 				break;
 			} else {
 				volatile_stoptime = time(0) + 60;
