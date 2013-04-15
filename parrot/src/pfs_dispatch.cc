@@ -853,7 +853,7 @@ static int is_executable( const char *path )
 	if(buf.st_mode&S_IXUSR || buf.st_mode&S_IXGRP || buf.st_mode&S_IXOTH) {
 		return 1;
 	} else {
-		errno = ENOEXEC;
+		errno = EACCES;
 		return 0;
 	}
 }
