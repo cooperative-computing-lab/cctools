@@ -2551,6 +2551,12 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						debug(D_PROCESS,"break address: %x",p->break_address);
 					}
 				}
+				else 
+				{
+					/* On brk error, our knowledge of the address space might be incorrect. */
+					p->break_address = 0;
+					p->heap_address = 0;
+				}
 			}
 			break;
 

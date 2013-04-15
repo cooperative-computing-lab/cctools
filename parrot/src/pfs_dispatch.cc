@@ -2733,12 +2733,17 @@ void decode_syscall( struct pfs_process *p, int entering )
 				if(p->syscall_result==0) {
 					if(p->syscall_args[0]!=0) {
 						p->break_address = p->syscall_args[0];
-						debug(D_PROCESS,"break_address: %x",p->break_address);
+						debug(D_PROCESS,"break address: %x",p->break_address);
 					}
+				}
+				else 
+				{
+					/* On brk error, our knowledge of the address space might be incorrect. */
+					p->break_address = 0;
+					p->heap_address = 0;
 				}
 			}
 			break;
-
 		/*
 		These things are not currently permitted.
 		*/
