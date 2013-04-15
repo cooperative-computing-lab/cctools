@@ -1018,16 +1018,19 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 
 		p->new_logical_name[0] = 0;
 		p->new_physical_name[0] = 0;
-
-		if(!is_executable(path)) {
-			divert_to_dummy(p,-errno);
-			return;
-		}
-
 		firstline[0] = 0;
+
 		strcpy(p->new_logical_name,path);
-		if(pfs_get_local_name(path,p->new_physical_name,firstline,sizeof(firstline))<0) {
-			divert_to_dummy(p,-errno);
+
+		/* If path is not executable, we simply return, as the
+		next call to exec will fail with the correct error
+		message. The previous behaviour called
+		divert_to_dummy, but this caused the error message to
+		be lost. */
+
+		if(!is_executable(path) ||
+		   (pfs_get_local_name(path,p->new_physical_name,firstline,sizeof(firstline))<0)) {
+			p->completing_execve = 1;
 			return;
 		}
 
