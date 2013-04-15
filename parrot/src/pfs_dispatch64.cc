@@ -656,16 +656,19 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 
 		p->new_logical_name[0] = 0;
 		p->new_physical_name[0] = 0;
-
-		if(!is_executable(path)) {
-			divert_to_dummy(p,-errno);
-			return;
-		}
-
 		firstline[0] = 0;
+
 		strcpy(p->new_logical_name,path);
-		if(pfs_get_local_name(path,p->new_physical_name,firstline,sizeof(firstline))<0) {
-			divert_to_dummy(p,-errno);
+
+		/* If path is not executable, we simply return, as the
+		next call to exec will fail with the correct error
+		message. The previous behaviour called
+		divert_to_dummy, but this caused the error message to
+		be lost. */
+
+		if(!is_executable(path) ||
+		   (pfs_get_local_name(path,p->new_physical_name,firstline,sizeof(firstline))<0)) {
+			p->completing_execve = 1;
 			return;
 		}
 
@@ -828,7 +831,7 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 		} else {
 
 			/* If we get here, then we are not entering,
-			   and p->new_logical_name was never set because
+			   and p->new_physical_name was never set because
 			   is_executable(path) failed. This could
 			   happen when the executable is being
 			   searched in the PATH directories. Here we
@@ -838,6 +841,7 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 			   error. */
 
 			p->completing_execve = 0;
+			debug(D_PROCESS,"execve: %s failed: %s\n",p->new_logical_name,strerror(-actual_result));
 		}
 
 	}
