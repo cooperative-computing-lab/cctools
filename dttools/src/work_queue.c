@@ -187,6 +187,8 @@ struct work_queue_worker {
 	struct hash_table *current_files;
 	struct link *link;
 	struct itable *current_tasks;
+	int running_tasks;
+	int finished_tasks;
 	INT64_T total_tasks_complete;
 	INT64_T total_bytes_transferred;
 	timestamp_t total_task_time;
@@ -597,6 +599,7 @@ static int add_worker(struct work_queue *q)
 	w->link = link;
 	w->current_files = hash_table_create(0, 0);
 	w->current_tasks = itable_create(0);
+	w->running_tasks = w->finished_tasks = 0;
 	w->start_time = timestamp_get();
 	link_to_hash_key(link, w->hashkey);
 	sprintf(w->addrport, "%s:%d", addr, port);
@@ -958,6 +961,7 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	list_push_head(q->complete_list, t);
 	itable_remove(w->current_tasks, t->taskid);
 	itable_remove(q->worker_task_map, t->taskid);
+	w->finished_tasks--;
 	t->time_task_finish = timestamp_get();
 
 	/* if q is monitoring, append the task summary to the single
@@ -973,15 +977,6 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	
 		
 	// Change worker state and do some performance statistics
-	if(!itable_size(w->current_tasks)) {
-		change_worker_state(q, w, WORKER_STATE_READY);
-	} else if(itable_size(w->current_tasks) < w->nslots) {
-		change_worker_state(q, w, WORKER_STATE_BUSY);
-	} else {
-		change_worker_state(q, w, WORKER_STATE_FULL);
-	}
-
-
 	q->total_tasks_complete++;
 	w->total_tasks_complete++;
 
@@ -1171,7 +1166,17 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	q->total_execute_time += t->cmd_execution_time;
 	itable_remove(q->running_tasks, taskid);
 	itable_insert(q->finished_tasks, taskid, (void*)t);
-	
+	w->running_tasks--;
+	w->finished_tasks++;
+
+	if(!w->running_tasks) {
+		change_worker_state(q, w, WORKER_STATE_READY);
+	} else if(w->running_tasks < w->nslots) {
+		change_worker_state(q, w, WORKER_STATE_BUSY);
+	} else {
+		change_worker_state(q, w, WORKER_STATE_FULL);
+	}
+
 	return 1;
 }
 
@@ -1994,7 +1999,7 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->state == WORKER_STATE_READY) {
+		if(w->running_tasks < w->nslots) {
 			task_cached_bytes = 0;
 			list_first_item(t->input_files);
 			while((tf = list_next_item(t->input_files))) {
@@ -2024,7 +2029,7 @@ static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q)
 	struct work_queue_worker *w;
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		if(w->state == WORKER_STATE_BUSY || w->state == WORKER_STATE_READY) {
+		if(w->running_tasks < w->nslots) {
 			return w;
 		}
 	}
@@ -2039,7 +2044,7 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q)
 	int num_workers_ready;
 	int random_ready_worker, ready_worker_count = 1;
 
-	num_workers_ready = q->workers_in_state[WORKER_STATE_READY];
+	num_workers_ready = q->workers_in_state[WORKER_STATE_READY]+q->workers_in_state[WORKER_STATE_BUSY];
 
 	if(num_workers_ready > 0) {
 		random_ready_worker = (rand() % num_workers_ready) + 1;
@@ -2049,10 +2054,10 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q)
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->state == WORKER_STATE_READY && ready_worker_count == random_ready_worker) {
+		if(w->running_tasks < w->nslots && ready_worker_count == random_ready_worker) {
 			return w;
 		}
-		if(w->state == WORKER_STATE_READY) {
+		if(w->running_tasks < w->nslots) {
 			ready_worker_count++;
 		}
 	}
@@ -2069,7 +2074,7 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q)
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->state == WORKER_STATE_READY || w->state == WORKER_STATE_BUSY) {
+		if(w->running_tasks < w->nslots) {
 			if(w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
 				if(!best_worker || t < best_time) {
@@ -2122,6 +2127,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 	itable_insert(w->current_tasks, t->taskid, t);
 	itable_insert(q->running_tasks, t->taskid, t); 
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
+	w->running_tasks++;
 
 	if(start_one_task(q, w, t)) {
 		
@@ -2938,13 +2944,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			return t;
 		}
 
-		debug(D_WQ, "workers_in_state[BUSY] = %d, workers_in_state[FULL] = %d, list_size(ready_list) = %d, aux_links = %x, list_size(aux_links) = %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_FULL], list_size(q->ready_list), aux_links, aux_links?list_size(aux_links):0);
+//		debug(D_WQ, "workers_in_state[BUSY] = %d, workers_in_state[FULL] = %d, list_size(ready_list) = %d, aux_links = %x, list_size(aux_links) = %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_FULL], list_size(q->ready_list), aux_links, aux_links?list_size(aux_links):0);
 
 		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !(aux_links && list_size(aux_links)))
 			break;
-
-		debug(D_WQ, "starting tasks");
-		start_tasks(q);
 
 		int n = build_poll_table(q, aux_links);
 
@@ -2962,14 +2965,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		link_poll_end = timestamp_get();	
 		q->idle_time += link_poll_end - link_poll_start;
 
-		// If nothing was awake, restart the loop or return without a task.
-		if(result <= 0) {
-			if(stoptime && time(0) >= stoptime) {
-				break;
-			} else {
-				continue;
-			}
-		}
 
 		// If the master link was awake, then accept as many workers as possible.
 		if(q->poll_table[0].revents) {
@@ -2997,6 +2992,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}
 		}
 		
+		// Start tasks on ready workers
+		start_tasks(q);
+		
 		// If any worker has sent a results message, retrieve the output files.
 		if(itable_size(q->finished_tasks)) {
 			struct work_queue_worker *w;
@@ -3017,6 +3015,15 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// If any of the passed-in auxiliary links are active then break so the caller can handle them.
 		if(aux_links && list_size(active_aux_links)) {
 			break;
+		}
+		
+		// If nothing was awake, restart the loop or return without a task.
+		if(result <= 0) {
+			if(stoptime && time(0) >= stoptime) {
+				break;
+			} else {
+				continue;
+			}
 		}
 	}
 
