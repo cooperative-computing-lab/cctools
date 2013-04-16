@@ -167,6 +167,7 @@ struct work_queue {
 	char *monitor_exe;
 
 	char *password;
+	double bandwidth;
 };
 
 struct work_queue_worker {
@@ -624,6 +625,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 	int fd;
 	INT64_T actual, length;
 	time_t stoptime;
+	time_t effective_stoptime = 0;
 	char type[256];
 	char tmp_remote_name[WORK_QUEUE_LINE_MAX], tmp_local_name[WORK_QUEUE_LINE_MAX];
 	char *cur_pos, *tmp_pos;
@@ -690,6 +692,10 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 						debug(D_NOTICE, "Cannot open file %s for writing: %s", tmp_local_name, strerror(errno));
 						goto failure;
 					}
+					
+					if(q->bandwidth) {
+						effective_stoptime = (length * 8)/q->bandwidth + time(0);
+					}
 					stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, length);
 					actual = link_stream_to_fd(w->link, fd, length, stoptime);
 					close(fd);
@@ -699,6 +705,9 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 						goto failure;
 					}
 					*total_bytes += length;
+					if(effective_stoptime) {
+						sleep(effective_stoptime - time(0));
+					}
 
 					hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
 				} else {
@@ -767,6 +776,7 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 	timestamp_t open_time = 0;
 	timestamp_t close_time = 0;
 	timestamp_t sum_time;
+	time_t effective_stoptime = 0;
 
 	// Start transfer ...
 	received_items = hash_table_create(0, 0);
@@ -818,9 +828,12 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 				}
 				close_time = timestamp_get();
 				sum_time += (close_time - open_time);
-			} else {
+			} else {	
 				open_time = timestamp_get();
 				get_output_item(tf->remote_name, tf->payload, q, w, t, received_items, &total_bytes);
+				if(effective_stoptime) {
+					sleep(effective_stoptime - time(0));
+				}
 				close_time = timestamp_get();
 				if(t->result & WORK_QUEUE_RESULT_OUTPUT_FAIL) {
 					return 0;
@@ -856,7 +869,6 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 				hash_table_insert(w->current_files, hash_name, remote_info);
 				free(hash_name);
 			}
-
 		}
 
 	}
@@ -1104,6 +1116,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	struct work_queue_task *t;
 	int actual;
 	timestamp_t observed_execution_time;
+	time_t effective_stoptime = 0;
 
 	//Format: result, output length, execution time, taskid
 	char items[3][WORK_QUEUE_PROTOCOL_FIELD_MAX];
@@ -1133,6 +1146,10 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	}
 	
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
+	
+	if(q->bandwidth) {
+		effective_stoptime = (output_length * 8)/q->bandwidth + time(0);
+	}
 
 	if(n >= 3) {
 		execution_time = atoll(items[2]);
@@ -1152,7 +1169,11 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 			t->output = 0;
 			return 0;
 		}
+		if(effective_stoptime) {
+			sleep(effective_stoptime - time(0));
+		}
 		debug(D_WQ, "Got %d bytes from %s (%s)", actual, w->hostname, w->addrport);
+		
 	} else {
 		actual = 0;
 	}
@@ -1463,6 +1484,7 @@ static int build_poll_table(struct work_queue *q, struct list *aux_links)
 static int put_file(const char *localname, const char *remotename, off_t offset, INT64_T length, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T *total_bytes, int flags){
 	struct stat local_info;
 	time_t stoptime;
+	time_t effective_stoptime = 0;
 	INT64_T actual = 0;
 	
 	if(stat(localname, &local_info) < 0)
@@ -1494,13 +1516,22 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 	}
 	
 	struct work_queue_task *t = itable_lookup(q->running_tasks, taskid);
+	
+	if(q->bandwidth) {
+		effective_stoptime = (length * 8)/q->bandwidth + time(0);
+	}
+	
 	stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, length);
 	send_worker_msg(w, "put %s %lld 0%o %lld %d\n", time(0) + short_timeout, remotename, length, local_info.st_mode, taskid, flags);
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
-	close(fd); 
+	close(fd);
 	
 	if(actual != length)
 		return 0;
+		
+	if(effective_stoptime) {
+		sleep(effective_stoptime - time(0));
+	}
 	
 	*total_bytes += actual;
 	return 1;
@@ -1744,13 +1775,21 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 		list_first_item(t->input_files);
 		while((tf = list_next_item(t->input_files))) {
 			if(tf->type == WORK_QUEUE_BUFFER) {
+				time_t effective_stoptime = 0;
 				debug(D_WQ, "%s (%s) needs literal as %s", w->hostname, w->addrport, tf->remote_name);
 				fl = tf->length;
 
+				if(q->bandwidth) {
+					effective_stoptime = (tf->length * 8)/q->bandwidth + time(0);
+				}
+				
 				stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, (INT64_T) fl);
 				open_time = timestamp_get();
 				send_worker_msg(w, "put %s %lld %o %lld %d\n", time(0) + short_timeout, tf->remote_name, (INT64_T) fl, 0777, t->taskid, tf->flags);
 				actual = link_putlstring(w->link, tf->payload, fl, stoptime);
+				if(effective_stoptime) {
+					sleep(effective_stoptime - time(0));
+				}
 				close_time = timestamp_get();
 				if(actual != (fl))
 					goto failure;
@@ -2609,8 +2648,6 @@ struct work_queue *work_queue_create(int port)
 
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
-	//q->busy_workers = list_create();
-	//q->ready_workers = list_create();
 	
 	// The poll table is initially null, and will be created
 	// (and resized) as needed by build_poll_table.
@@ -2638,6 +2675,10 @@ struct work_queue *work_queue_create(int port)
 
 	q->monitor_mode   =  0;
 	q->password = 0;
+	
+	if( (envstring  = getenv("WORK_QUEUE_BANDWIDTH")) ) {
+		q->bandwidth = atof(envstring);
+	}
 	
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;

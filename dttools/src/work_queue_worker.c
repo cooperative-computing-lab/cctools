@@ -1573,7 +1573,8 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -O <os>               Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
 	fprintf(stdout, " -s <path>             Set the location for creating the working directory of the worker.\n");
 	fprintf(stdout, " -v                    Show version string\n");
-	fprintf(stdout, " --volatility          Set the percent chance a worker will decide to shut down every minute.\n");
+	fprintf(stdout, " --volatility <chance> Set the percent chance a worker will decide to shut down every minute.\n");
+	fprintf(stdout, " --bandwidth <mult>    Set the multiplier for how long outgoing and incoming data transfers will take.\n");
 	fprintf(stdout, " -h                    Show this help screen\n");
 }
 
@@ -1629,12 +1630,14 @@ static int setup_workspace() {
 }
 
 #define LONG_OPT_DEBUG_FILESIZE 'z'+1
-#define LONG_OPT_VOLATILITY 'z'+2
+#define LONG_OPT_VOLATILITY     'z'+2
+#define LONG_OPT_BANDWIDTH      'z'+3
 
 struct option long_options[] = {
 	{"password",        required_argument,  0,  'P'},
 	{"debug-file-size", required_argument,  0,   LONG_OPT_DEBUG_FILESIZE},
 	{"volatility",      required_argument,  0,   LONG_OPT_VOLATILITY},
+	{"bandwidth",       required_argument,  0,   LONG_OPT_BANDWIDTH},
 	{0,0,0,0}
 };
 
@@ -1759,6 +1762,9 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_VOLATILITY:
 			worker_volatility = atof(optarg);
+			break;
+		case LONG_OPT_BANDWIDTH:
+			setenv("WORK_QUEUE_BANDWIDTH", optarg, 1);
 			break;
 		case 'h':
 		default:
