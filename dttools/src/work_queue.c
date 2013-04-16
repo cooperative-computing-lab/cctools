@@ -1080,6 +1080,7 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 	if(n >= 12 && field_set(items[11])) { // version
 		strncpy(w->version, items[11], WORKER_VERSION_NAME_MAX);
 		w->async_tasks = 1;
+		send_worker_msg(w, "update\n", time(0)+short_timeout);
 	} else {
 		strncpy(w->version, "unknown", 8);
 		w->async_tasks = 0;
@@ -2170,7 +2171,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 
 	if(start_one_task(q, w, t)) {
 		
-		if(w->nslots <= itable_size(w->current_tasks)) {
+		if(w->nslots <= w->running_tasks) {
 			change_worker_state(q, w, WORKER_STATE_FULL);
 		} else {
 			change_worker_state(q, w, WORKER_STATE_BUSY);

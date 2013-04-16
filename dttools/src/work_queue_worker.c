@@ -140,6 +140,7 @@ char *password = 0;
 
 // Basic worker global variables
 static int worker_mode = WORKER_MODE_CLASSIC;
+static int worker_mode_default = WORKER_MODE_CLASSIC;
 static char actual_addr[LINK_ADDRESS_MAX];
 static int actual_port;
 static char workspace[WORKER_WORKSPACE_NAME_MAX];
@@ -1150,6 +1151,8 @@ static void disconnect_master(struct link *master) {
 		itable_clear(unfinished_tasks);
 	}
 	
+	worker_mode = worker_mode_default;
+	
 	if(released_by_master) {
 		released_by_master = 0;
 	} else {
@@ -1320,6 +1323,10 @@ static int worker_handle_master(struct link *master) {
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
+		} else if(!strncmp(line, "update", 6)) {
+			worker_mode = WORKER_MODE_WORKER;
+			update_worker_status(master);
+			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
@@ -1463,6 +1470,9 @@ static int foreman_handle_master(struct link *master) {
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
+		} else if(!strncmp(line, "update", 6)) {
+			update_worker_status(master);
+			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
@@ -1701,11 +1711,11 @@ int main(int argc, char *argv[])
 			break;
 		case 'm':
 			if(!strncmp("foreman", optarg, 7) || optarg[0] == 'f') {
-				worker_mode = WORKER_MODE_FOREMAN;
+				worker_mode = worker_mode_default = WORKER_MODE_FOREMAN;
 			} else if(!strncmp("worker", optarg, 6) || optarg[0] == 'w') {
-				worker_mode = WORKER_MODE_WORKER;
+				worker_mode = worker_mode_default = WORKER_MODE_WORKER;
 			} else if(!strncmp("classic", optarg, 7) || optarg[0] == 'c') {
-				worker_mode = WORKER_MODE_CLASSIC;
+				worker_mode = worker_mode_default = WORKER_MODE_CLASSIC;
 			}
 			break;
 		case 'M':
