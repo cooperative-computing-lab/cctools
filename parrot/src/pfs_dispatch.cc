@@ -1031,6 +1031,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 		if(!is_executable(path) ||
 		   (pfs_get_local_name(path,p->new_physical_name,firstline,sizeof(firstline))<0)) {
 			p->completing_execve = 1;
+			p->new_physical_name[0] = 0;
 			return;
 		}
 
@@ -1087,7 +1088,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			/* make sure the new interp is loaded */
 			strcpy(p->new_logical_name,interp);
 			if(pfs_get_local_name(interp,p->new_physical_name,0,0)!=0) {
-				divert_to_dummy(p,-errno);
+				p->new_physical_name[0] = 0;
 				return;
 			}
 
