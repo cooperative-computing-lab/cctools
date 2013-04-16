@@ -157,7 +157,8 @@ static struct itable *unfinished_tasks = NULL;
 // Forked task related
 static int task_status= TASK_NONE;
 static int max_worker_tasks = 1;
-static int current_worker_tasks = 1;
+static int max_worker_tasks_default = 1;
+static int current_worker_tasks = 0;
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
 
@@ -1152,6 +1153,8 @@ static void disconnect_master(struct link *master) {
 	}
 	
 	worker_mode = worker_mode_default;
+	current_worker_tasks = 0;
+	max_worker_tasks = max_worker_tasks_default;
 	
 	if(released_by_master) {
 		released_by_master = 0;
@@ -1704,7 +1707,7 @@ int main(int argc, char *argv[])
 			idle_timeout = string_time_parse(optarg);
 			break;
 		case 'j':
-			max_worker_tasks = atoi(optarg);
+			max_worker_tasks = max_worker_tasks_default = atoi(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);

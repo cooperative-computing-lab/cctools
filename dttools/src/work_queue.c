@@ -3191,7 +3191,7 @@ void work_queue_reset(struct work_queue *q, int flags) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 		if(w->async_tasks) {
-			send_worker_msg(w, "reset", time(0)+short_timeout);
+			send_worker_msg(w, "reset\n", time(0)+short_timeout);
 			cleanup_worker(q, w);
 		} else {
 			release_worker(q, w);
