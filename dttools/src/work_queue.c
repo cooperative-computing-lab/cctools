@@ -456,6 +456,8 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		itable_remove(q->worker_task_map, t->taskid);
 	}
 	itable_clear(w->current_tasks);
+	w->running_tasks = 0;
+	w->finished_tasks = 0;
 }
 
 static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
@@ -947,7 +949,7 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 {
 	struct work_queue_task *t;
 
-	t = itable_lookup(w->current_tasks, taskid);
+	t = itable_remove(w->current_tasks, taskid);
 	if(!t)
 		goto failure;
 
@@ -964,14 +966,8 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 
 	// At this point, a task is completed.
 
-/*	if(itable_size(w->current_tasks) == w->nslots) {
-		list_remove(q->busy_workers, w);
-		list_push_tail(q->ready_workers, w);
-	}
-*/
 	itable_remove(q->finished_tasks, t->taskid);
 	list_push_head(q->complete_list, t);
-	itable_remove(w->current_tasks, t->taskid);
 	itable_remove(q->worker_task_map, t->taskid);
 	w->finished_tasks--;
 	t->time_task_finish = timestamp_get();
@@ -1381,19 +1377,12 @@ static int process_worker_update(struct work_queue *q, struct work_queue_worker 
 	}
 	
 	if(!strcmp(category, "slots")) {
-		
 		w->nslots = atoi(arg);
 		
-		if(w->nslots > itable_size(w->current_tasks)) {
-/*			if(list_remove(q->busy_workers, w)) {
-				list_push_tail(q->ready_workers, w);
-			}
-*/			change_worker_state(q, w, itable_size(w->current_tasks)?WORKER_STATE_BUSY:WORKER_STATE_READY);
-		} else if(w->nslots <= itable_size(w->current_tasks)) {
-/*			if(list_remove(q->ready_workers, w)) {
-				list_push_tail(q->busy_workers, w);
-			}
-*/			change_worker_state(q, w, WORKER_STATE_FULL);
+		if(w->nslots > w->running_tasks) {
+			change_worker_state(q, w, w->running_tasks?WORKER_STATE_BUSY:WORKER_STATE_READY);
+		} else {
+			change_worker_state(q, w, WORKER_STATE_FULL);
 		}
 	} else if(!strcmp(category, "cpus")) {
 		w->ncpus = atoi(arg);
@@ -2347,8 +2336,9 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 		//Delete all output files since they are not needed as the task was aborted.
 		delete_worker_files(w, t->output_files, 0);
 		
-		change_worker_state(q, w, WORKER_STATE_READY);
+		change_worker_state(q, w, w->running_tasks?WORKER_STATE_BUSY:WORKER_STATE_READY);
 		itable_remove(w->current_tasks, t->taskid);
+		w->running_tasks--;
 		return 1;
 	}
 	
