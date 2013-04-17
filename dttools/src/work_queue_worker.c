@@ -1566,29 +1566,31 @@ static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] <masterhost> <port>\n", cmd);
 	fprintf(stdout, "where options are:\n");
-	fprintf(stdout, " -a                    Enable auto mode. In this mode the worker\n");
-	fprintf(stdout, "                       would ask a catalog server for available masters.\n");
-	fprintf(stdout, " -C <catalog>          Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	fprintf(stdout, " -d <subsystem>        Enable debugging for this subsystem.\n");
-	fprintf(stdout, " -o <file>             Send debugging to this file.\n");
-	fprintf(stdout, " --debug-file-size     Set the maximum size of the debug log (default 10M, 0 disables).\n");
-	fprintf(stdout, " -m <mode>             Choose worker mode.\n");
-	fprintf(stdout, "                       Can be [w]orker, [f]oreman, [c]lassic, or [a]uto (default=auto).\n");
-	fprintf(stdout, " -M <project>          Name of a preferred project. A worker can have multiple preferred projects.\n");
-	fprintf(stdout, " -N <project>          When in Foreman mode, the name of the project to advertise as.  In worker/classic/auto mode acts as '-M'.\n");
-	fprintf(stdout, " -P,--password <pwfile> Password file for authenticating to the master.\n");
-	fprintf(stdout, " -t <time>             Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
-	fprintf(stdout, " -w <size>             Set TCP window size.\n");
-	fprintf(stdout, " -i <time>             Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
-	fprintf(stdout, " -b <time>             Set maxmimum value for backoff interval when worker fails to connect to a master. (default=%ds)\n", max_backoff_interval);
-	fprintf(stdout, " -z <size>             Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%" PRIu64 "MB)\n", disk_avail_threshold);
-	fprintf(stdout, " -A <arch>             Set architecture string for the worker to report to master instead of the value in uname (%s).\n", arch_name);
-	fprintf(stdout, " -O <os>               Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
-	fprintf(stdout, " -s <path>             Set the location for creating the working directory of the worker.\n");
-	fprintf(stdout, " -v                    Show version string\n");
-	fprintf(stdout, " --volatility <chance> Set the percent chance a worker will decide to shut down every minute.\n");
-	fprintf(stdout, " --bandwidth <mult>    Set the multiplier for how long outgoing and incoming data transfers will take.\n");
-	fprintf(stdout, " -h                    Show this help screen\n");
+	fprintf(stdout, " -a                      Enable auto mode. In this mode the worker\n");
+	fprintf(stdout, "                         would ask a catalog server for available masters.\n");
+	fprintf(stdout, " -C <catalog>            Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
+	fprintf(stdout, " -d <subsystem>          Enable debugging for this subsystem.\n");
+	fprintf(stdout, " -o <file>               Send debugging to this file.\n");
+	fprintf(stdout, " --debug-file-size       Set the maximum size of the debug log (default 10M, 0 disables).\n");
+	fprintf(stdout, " -m <mode>               Choose worker mode.\n");
+	fprintf(stdout, "                         Can be [w]orker, [f]oreman, [c]lassic, or [a]uto (default=auto).\n");
+	fprintf(stdout, " -f <port>[:<high_port>] Set the port for the foreman to listen on.  If <highport> is specified\n");
+	fprintf(stdout, "                         the port is chosen from the range port:highport\n");
+	fprintf(stdout, " -M <project>            Name of a preferred project. A worker can have multiple preferred projects.\n");
+	fprintf(stdout, " -N <project>            When in Foreman mode, the name of the project to advertise as.  In worker/classic/auto mode acts as '-M'.\n");
+	fprintf(stdout, " -P,--password <pwfile>  Password file for authenticating to the master.\n");
+	fprintf(stdout, " -t <time>               Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
+	fprintf(stdout, " -w <size>               Set TCP window size.\n");
+	fprintf(stdout, " -i <time>               Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
+	fprintf(stdout, " -b <time>               Set maxmimum value for backoff interval when worker fails to connect to a master. (default=%ds)\n", max_backoff_interval);
+	fprintf(stdout, " -z <size>               Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%" PRIu64 "MB)\n", disk_avail_threshold);
+	fprintf(stdout, " -A <arch>               Set architecture string for the worker to report to master instead of the value in uname (%s).\n", arch_name);
+	fprintf(stdout, " -O <os>                 Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
+	fprintf(stdout, " -s <path>               Set the location for creating the working directory of the worker.\n");
+	fprintf(stdout, " -v                      Show version string\n");
+	fprintf(stdout, " --volatility <chance>   Set the percent chance a worker will decide to shut down every minute.\n");
+	fprintf(stdout, " --bandwidth <mult>      Set the multiplier for how long outgoing and incoming data transfers will take.\n");
+	fprintf(stdout, " -h                      Show this help screen\n");
 }
 
 static void check_arguments(int argc, char **argv) {
@@ -1700,9 +1702,23 @@ int main(int argc, char *argv[])
 			debug_config_file_size(MAX(0, string_metric_parse(optarg)));
 			break;
 		case 'f':
+		{	char *low_port = optarg;
+			char *high_port= strchr(optarg, ':');
+			
 			worker_mode = WORKER_MODE_FOREMAN;
-			foreman_port = atoi(optarg);
+			
+			if(high_port) {
+				*high_port = '\0';
+				high_port++;
+			} else {
+				foreman_port = atoi(low_port);
+				break;
+			} 
+			setenv("WORK_QUEUE_LOW_PORT", low_port, 0);
+			setenv("WORK_QUEUE_HIGH_PORT", high_port, 0);
+			foreman_port = -1;
 			break;
+		}
 		case 't':
 			idle_timeout = string_time_parse(optarg);
 			break;
@@ -1818,6 +1834,12 @@ int main(int argc, char *argv[])
 		sprintf(foreman_string, "%s-foreman", argv[0]);
 		debug_config(foreman_string);
 		foreman_q = work_queue_create(foreman_port);
+		
+		if(!foreman_q) {
+			fprintf(stderr, "work_queue_worker-foreman: failed to create foreman queue.  Terminating.\n");
+			exit(1);
+		}
+		
 		if(foreman_name) {
 			work_queue_specify_name(foreman_q, foreman_name);
 			work_queue_specify_master_mode(foreman_q, WORK_QUEUE_MASTER_MODE_CATALOG);
