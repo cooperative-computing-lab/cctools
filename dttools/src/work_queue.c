@@ -326,9 +326,9 @@ static int send_worker_msg(struct work_queue_worker *w, const char *fmt, time_t 
  * This function receives a message from worker and records the time a message is successfully 
  * received. This timestamp is used in keepalive timeout computations. 
  * Its return value is:
- * -1 : failure to read from link
- *  0 : a keepalive message was received and message is processed 
- *  1 : a non-keepalive message was received but NOT processed 
+ *  0 : a message was received and processed 
+ *  1 : a message was received but NOT processed 
+ * -1 : failure to read from link or in processing received message
  */
 static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, char *line, size_t length, time_t stoptime) 
 {
@@ -347,19 +347,19 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	if(string_prefix_is(line, "alive")) {
 		debug(D_WQ, "Received keepalive response from %s (%s)", w->hostname, w->addrport);
 	} else if(string_prefix_is(line, "ready")) {
-		process_ready(q, w, line);
+		result = process_ready(q, w, line);
 	} else if (string_prefix_is(line,"result")) {
-		process_result(q, w, line, stoptime);
+		result = process_result(q, w, line, stoptime);
 	} else if (string_prefix_is(line,"worker_status") || string_prefix_is(line, "queue_status") || string_prefix_is(line, "task_status")) {
-		process_queue_status(q, w, line, stoptime);
+		result = process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "update")) {
-		process_worker_update(q, w, line);
+		result = process_worker_update(q, w, line);
 	} else {
 		// Message is not a status update: return it to the user.
 		return 1;
 	}
-	
-	return 0;
+
+	return result; 
 }
 
 static double get_idle_percentage(struct work_queue *q)
@@ -1012,7 +1012,7 @@ static int field_set(const char *field) {
 }
 
 static int process_ready(struct work_queue *q, struct work_queue_worker *w, const char *line) {
-	if(!q || !w || !line) return 0;
+	if(!q || !w || !line) return -1;
 
 	//Format: hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, proj_name, pool_name, os, arch, workspace, version
 	char items[12][WORK_QUEUE_PROTOCOL_FIELD_MAX];
@@ -1020,7 +1020,7 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 
 	if(n < 6) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-		return 0;
+		return -1;
 	}
 
 	// Copy basic fields 
@@ -1099,16 +1099,16 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 	}
 	
 
-	return 1;
+	return 0;
 
 reject:
 	debug(D_NOTICE, "%s (%s) is rejected: the worker's intended project name (%s) does not match the master's (%s).", w->hostname, w->addrport, items[7], q->name);
-	return 0;
+	return -1;
 }
 
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime) {
 
-	if(!q || !w || !line) return 0; 
+	if(!q || !w || !line) return -1; 
 
 	int result;
 	UINT64_T taskid;
@@ -1126,7 +1126,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	if(n < 2) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-		return 0;
+		return -1;
 	}
 	
 	result = atoi(items[0]);
@@ -1143,7 +1143,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		debug(D_WQ, "Unknown task result from worker %s (%s): no task %d assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
 		stoptime = time(0) + get_transfer_wait_time(q, w, -1, (INT64_T) output_length);
 		link_soak(w->link, output_length, stoptime);
-		return 1;
+		return 0;
 	}
 	
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
@@ -1168,7 +1168,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 			debug(D_WQ, "Failure: actual received stdout size (%lld bytes) is different from expected (%lld bytes).", actual, output_length);
 			free(t->output);
 			t->output = 0;
-			return 0;
+			return -1;
 		}
 		if(effective_stoptime) {
 			sleep(effective_stoptime - time(0));
@@ -1199,7 +1199,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		change_worker_state(q, w, WORKER_STATE_FULL);
 	}
 
-	return 1;
+	return 0;
 }
 
 static struct nvpair * queue_to_nvpair( struct work_queue *q )
@@ -1377,7 +1377,7 @@ static int process_worker_update(struct work_queue *q, struct work_queue_worker 
 	char arg[WORK_QUEUE_LINE_MAX];
 	
 	if(sscanf(line, "update %s %s", category, arg) != 2) {
-		return 0;
+		return -1;
 	}
 	
 	if(!strcmp(category, "slots")) {
@@ -1401,7 +1401,7 @@ static int process_worker_update(struct work_queue *q, struct work_queue_worker 
 	} else if(!strcmp(category, "memory")) {
 	}
 	
-	return 1;
+	return 0;
 }
 
 
