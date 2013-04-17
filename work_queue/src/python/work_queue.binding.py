@@ -645,6 +645,14 @@ class WorkQueue(_object):
         return work_queue_specify_keepalive_timeout(self._work_queue, timeout)
 
     ##
+    # Turn on master capacity measurements.
+    #
+    # @param self     Reference to the current work queue object.
+    #                 
+    def estimate_capacity(self):
+        return work_queue_specify_estimate_capacity_on(self._work_queue, 1)
+
+    ##
     # Reset a work queue and all attached workers.
     #
     # @param self   Reference to the current work queue object.
