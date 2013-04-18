@@ -83,6 +83,38 @@ void dag_compile_ancestors(struct dag *d)
   }
 }
 
+int get_ancestor_depth(struct dag_node *n){
+	int group_number = -1;
+	struct dag_node *ancestor = NULL;
+
+	debug(D_DEBUG, "n->ancestor_depth: %d", n->ancestor_depth);
+
+	if(n->ancestor_depth >= 0)
+	{	return n->ancestor_depth;	}
+
+	set_first_element(n->ancestors);
+	while( (ancestor = set_next_element(n->ancestors)) ) {
+		
+		group_number = get_ancestor_depth(ancestor);
+		debug(D_DEBUG, "group: %d, n->ancestor_depth: %d", group_number, n->ancestor_depth);
+		if (group_number > n->ancestor_depth)
+		{	n->ancestor_depth = group_number;	}
+	}
+
+	n->ancestor_depth++;
+	return n->ancestor_depth;
+}
+
+void dag_find_ancestor_depth(struct dag *d){
+	UINT64_T key;
+	struct dag_node *n;
+
+	itable_firstkey(d->node_table);
+	while(itable_nextkey(d->node_table, &key, (void **)&n)) {
+		get_ancestor_depth(n);
+	}
+}
+
 struct dag_node *dag_node_create(struct dag *d, int linenum)
 {
 	struct dag_node *n;
@@ -101,8 +133,10 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->remote_names     = itable_create(0);
 	n->remote_names_inv = hash_table_create(0,0);
 
-    n->descendants = set_create(0);
-    n->ancestors   = set_create(0);
+        n->descendants = set_create(0);
+        n->ancestors   = set_create(0);
+
+	n->ancestor_depth = -1;
 
 	return n;
 }

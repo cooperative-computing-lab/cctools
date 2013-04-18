@@ -14,8 +14,12 @@ See the file COPYING for details.
 int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename)(struct dag_node *d, const char *filename));
 
 
-/* The dag_to_dot function write a struct dag in memory to a dot
+/* The dag_to_dot function writes a struct dag in memory to a dot
  * file (graphviz), giving the graphical presentation of the makeflow.
  */
 void dag_to_dot(struct dag *d, int condense_display, int change_size);
 
+/* The dag_to_ppm function writes a struct dag in memory to a ppm
+ * file, giving a graphical presentation of the makeflow
+ */
+void dag_to_ppm(struct dag *d);

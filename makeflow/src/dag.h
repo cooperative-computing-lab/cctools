@@ -113,6 +113,7 @@ struct dag_node {
 
     struct set *descendants;           /* The nodes this node is an immediate ancestor */
     struct set *ancestors;             /* The nodes this node is an immediate descendant */ 
+    int ancestor_depth;                /* The depth of the ancestor tree for this node */
 
     /* Support for recursive calls to makeflow. If this node calls makeflow
      * recursively, makeflow_dag is the name of the makeflow file to run, and
@@ -180,6 +181,7 @@ void dag_node_add_target_file(struct dag_node *n, const char *filename, char *re
 const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, const char *remotename);
 
 void dag_compile_ancestors(struct dag *d);
+void dag_find_ancestor_depth(struct dag *d);
 
 int dag_file_is_source(struct dag_file *f);
 int dag_file_is_sink(struct dag_file *f);
