@@ -127,8 +127,7 @@ int main(int argc, char *argv[]) {
 			*value++ = 0;
 		}
 
-		text = buffer_tostring(b, &text_size);
-		buffer_printf(b, "%s%s %s\n", text, name, value);
+		buffer_printf(b, "%s %s\n", name, value);
 	}
 
         text = buffer_tostring(b, &text_size);

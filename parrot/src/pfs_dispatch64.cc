@@ -510,7 +510,7 @@ static int is_executable( const char *path )
 	if(buf.st_mode&S_IXUSR || buf.st_mode&S_IXGRP || buf.st_mode&S_IXOTH) {
 		return 1;
 	} else {
-		errno = ENOEXEC;
+		errno = EACCES;
 		return 0;
 	}
 }
@@ -642,57 +642,34 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 	char *scratch_avail = scratch_addr;
 
 	if(args[0]==0) {
-		debug(D_PROCESS,"execve: %s executing ",p->name);
+		debug(D_PROCESS,"execve: %s complete in 64 bit mode",p->name);
+		debug(D_PSTREE,"%d exec %s",p->pid,p->new_logical_name);
+
 		p->state = PFS_PROCESS_STATE_USER;
+		p->completing_execve = 0;
+
 	} else if(entering) {
 		char path[PFS_PATH_MAX];
 		char firstline[PFS_PATH_MAX];
 
 		tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
 
-        /* debug arguments/environment */
-		{
-			int argc = 0, n = 0;
-			debug(D_SYSCALL,"execve(");
-			debug(D_SYSCALL,"\t%s,",path);
-			debug(D_SYSCALL,"\t[");
-			while (1) {
-				char arg[4096];
-				char *argp;
-				tracer_copy_in(p->tracer, &argp, ((char **)args[1])+argc, sizeof(argp));
-				if (argp == NULL) break;
-				tracer_copy_in_string(p->tracer, arg, argp, sizeof(arg));
-				arg[4096-1] = '\0';
-				debug(D_SYSCALL,"\t\"%s\",",arg);
-				argc++;
-			}
-			debug(D_SYSCALL,"\t],");
-			debug(D_SYSCALL,"\t[");
-			while (1) {
-				char var[4096];
-				char *varp;
-				tracer_copy_in(p->tracer, &varp, ((char **)args[2])+n, sizeof(varp));
-				if (varp == NULL) break;
-				tracer_copy_in_string(p->tracer, var, varp, sizeof(var));
-				var[4096-1] = '\0';
-				debug(D_SYSCALL,"\t\"%s\",",var);
-				n++;
-			}
-			debug(D_SYSCALL,"\t])");
-        }
-
 		p->new_logical_name[0] = 0;
 		p->new_physical_name[0] = 0;
-
-		if(!is_executable(path)) {
-			divert_to_dummy(p,-errno);
-			return;
-		}
-
 		firstline[0] = 0;
+
 		strcpy(p->new_logical_name,path);
-		if(pfs_get_local_name(path,p->new_physical_name,firstline,sizeof(firstline))<0) {
-			divert_to_dummy(p,-errno);
+
+		/* If path is not executable, we simply return, as the
+		next call to exec will fail with the correct error
+		message. The previous behaviour called
+		divert_to_dummy, but this caused the error message to
+		be lost. */
+
+		if(!is_executable(path) ||
+		   (pfs_get_local_name(path,p->new_physical_name,firstline,sizeof(firstline))<0)) {
+			p->new_physical_name[0] = 0;
+			p->completing_execve = 1;
 			return;
 		}
 
@@ -728,7 +705,7 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 			interp = &firstline[2];
 			while(isspace(*interp)) interp++;
 			ext_interp = scratch_addr;
-			
+
 			/* interparg points to the internal argument */
 			/* scriptarg points to the script itself */
 			interparg = strchr(interp,' ');
@@ -754,7 +731,7 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 			/* make sure the new interp is loaded */
 			strcpy(p->new_logical_name,interp);
 			if(pfs_get_local_name(interp,p->new_physical_name,0,0)!=0) {
-				divert_to_dummy(p,-errno);
+				p->new_physical_name[0] = 0;
 				return;
 			}
 
@@ -809,34 +786,67 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 
 			/* set the new program name to the logical name */
 			args[0] = (INT64_T) scratch_addr;
+
+			/* up to three arguments (args[0-2]) were modified. */
 			tracer_args_set(p->tracer,p->syscall,args,3);
 		}
+
 		if (pfs_ldso_path) {
 			redirect_ldso(p, pfs_ldso_path, args, scratch_avail);
 		}
-		debug(D_PROCESS,"execve: %s attempting",p->new_logical_name);
-	} else {
+
+		/* This forces the next call to return to decode_execve, see comment at top of decode_syscall */
+		p->completing_execve = 1;
+
+		debug(D_PROCESS,"execve: %s about to start",p->new_logical_name);
+	} else { /* That is, we are not entering */
 		INT64_T actual_result;
 		tracer_result_get(p->tracer,&actual_result);
+
 		if(actual_result==0) {
-			debug(D_PROCESS,"execve: %s working",p->new_logical_name);
+			debug(D_PROCESS,"execve: %s succeeded in 64 bit mode",p->new_logical_name);
 			strcpy(p->name,p->new_logical_name);
+
 			/* after a successful exec, signal handlers are reset */
 			memset(p->signal_interruptible,0,sizeof(p->signal_interruptible));
+
 			/* and certain files in the file table are closed */
 			p->table->close_on_exec();
+
 			/* and our knowledge of the address space is gone. */
 			p->heap_address = 0;
 			p->break_address = 0;
-			debug(D_PSTREE,"%d exec %s",p->pid,p->new_logical_name);
-		} else if(p->new_logical_name[0]) {
-			debug(D_PROCESS,"execve: %s failed",p->new_logical_name);
-			debug(D_PROCESS,"execve: restoring scratch area");
-			tracer_copy_out(p->tracer,p->scratch_data,scratch_addr,scratch_size);
+		} else if(p->new_physical_name[0]){
+			/* If we did not succeed and we are not
+			entering, then the exec must have
+			failed. Since new_physical_name is defined,
+			that means the scratch was modified too, so we
+			need to restore it. */
+
+			debug(D_PROCESS,"execve: %s failed: %s",p->new_logical_name,strerror(-actual_result));
+			debug(D_PROCESS,"execve: restoring scratch area at %x",scratch_addr);
+			
+			tracer_copy_out(p->tracer,p->scratch_data,(void*)scratch_addr,scratch_size);
+
+			p->completing_execve = 0;
+		} else {
+
+			/* If we get here, then we are not entering,
+			   and p->new_physical_name was never set because
+			   is_executable(path) failed. This could
+			   happen when the executable is being
+			   searched in the PATH directories. Here we
+			   do nothing, as nothing has been modified,
+			   and the third call to execve never occurs,
+			   from which parrot concludes there was an
+			   error. */
+
+			p->completing_execve = 0;
+			debug(D_PROCESS,"execve: %s failed: %s\n",p->new_logical_name,strerror(-actual_result));
 		}
+
 	}
 }
-
 /*
 Memory mapped files are loaded into the channel,
 the whole file regardless of what portion is actually
@@ -949,6 +959,25 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		p->state = PFS_PROCESS_STATE_KERNEL;
 		p->syscall_dummy = 0;
 		tracer_args_get(p->tracer,&p->syscall,p->syscall_args);
+
+		/*
+		SYSCALL_execve has a different value in 32 and 64 bit modes.
+		When an execve forces a switch between execution modes, the
+		old system call number is retained, even though the mode has
+		changed.  So, we must explicitly check for this condition
+		and fix up the system call number to end up in the right code.
+		*/
+
+		if(p->completing_execve) {
+			if(p->syscall != SYSCALL64_execve)
+			{
+				debug(D_PROCESS, "Changing execve code number from 32 to 64 bit mode.\n"); 
+				p->syscall = SYSCALL64_execve;
+			}
+			p->completing_execve = 0;
+		}
+
+
 		debug(D_SYSCALL,"%s",tracer_syscall_name(p->tracer,p->syscall));
 		p->syscall_original = p->syscall;
 		pfs_syscall_count++;
@@ -2553,7 +2582,14 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				if(p->syscall_result==0) {
 					if(p->syscall_args[0]!=0) {
 						p->break_address = p->syscall_args[0];
+						debug(D_PROCESS,"break address: %x",p->break_address);
 					}
+				}
+				else 
+				{
+					/* On brk error, our knowledge of the address space might be incorrect. */
+					p->break_address = 0;
+					p->heap_address = 0;
 				}
 			}
 			break;
