@@ -279,6 +279,9 @@ char *dag_lookup(const char *name, void *arg)
 	struct dag_lookup_set *s = (struct dag_lookup_set *)arg;
 	const char *value;
 
+	if(!s)
+		return NULL;
+
 	/* Try node variables table */
 	if(s->node) {
 		value = (const char *)hash_table_lookup(s->node->variables, name);
