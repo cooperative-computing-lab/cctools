@@ -13,10 +13,6 @@ all: ${TARGETS}
 makeflow: dag.o visitors.o makeflow.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
 	${CCTOOLS_LD} dag.o visitors.o makeflow.o ${LOCAL_LDFLAGS} -o $@
 
-lexer: lexer.o dag.o
-	${CCTOOLS_LD} dag.o lexer.o ${LOCAL_LDFLAGS} -o $@
-
-
 clean:
 	rm -f core *~ *.o *.a ${TARGETS} 
 

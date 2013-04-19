@@ -124,14 +124,14 @@ void dag_gc_ref_incr(struct dag *d, const char *file, int increment);
 void dag_gc_ref_count(struct dag *d, const char *file);
 void dag_export_variables(struct dag *d, struct dag_node *n);
 
-char *dag_parse_readline(struct dag_parse *bk, struct dag_node *n);
+char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n);
 int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode);
-int dag_parse_variable(struct dag_parse *bk, struct dag_node *n, char *line);
-int dag_parse_node(struct dag_parse *bk, char *line, int clean_mode);
-int dag_parse_node_filelist(struct dag_parse *bk, struct dag_node *n, char *filelist, int source, int clean_mode);
-int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line);
-int dag_parse_node_makeflow_command(struct dag_parse *bk, struct dag_node *n, char *line);
-int dag_parse_export(struct dag_parse *bk, char *line);
+int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line);
+int dag_parse_node(struct lexer_book *bk, char *line, int clean_mode);
+int dag_parse_node_filelist(struct lexer_book *bk, struct dag_node *n, char *filelist, int source, int clean_mode);
+int dag_parse_node_command(struct lexer_book *bk, struct dag_node *n, char *line);
+int dag_parse_node_makeflow_command(struct lexer_book *bk, struct dag_node *n, char *line);
+int dag_parse_export(struct lexer_book *bk, char *line);
 
 /** 
  * If the return value is x, a positive integer, that means at least x tasks
@@ -893,7 +893,7 @@ static char *translate_command(struct dag_node *n, char *old_command, int is_loc
 
 
 #define dag_parse_error(bk, type) \
-	fprintf(stderr, "makeflow: invalid " type " in file %s at line %d, column %d:\n%s\n", (bk)->d->filename, (bk)->linenum, (bk)->colnum, (bk)->linetext ? (bk)->linetext : "");
+	fprintf(stderr, "makeflow: invalid " type " in file %s at line %ld, column %ld\n", (bk)->d->filename, (bk)->line_number, (bk)->column_number);
 
 /* Returns a pointer to a new struct dag described by filename. Return NULL on
  * failure. */
@@ -924,10 +924,10 @@ struct dag *dag_from_file(const char *filename, int clean_mode, int monitor_mode
 int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode)
 {
 	char *line = NULL;
-	struct dag_parse *bk = calloc(1, sizeof(struct dag_parse)); //Taking advantage that calloc zeroes memory
+	struct lexer_book *bk = calloc(1, sizeof(struct lexer_book)); //Taking advantage that calloc zeroes memory
 
 	bk->d = d;
-	bk->dag_stream = dag_stream;
+	bk->stream = dag_stream;
 	bk->monitor_mode = monitor_mode;
 
 	while((line = dag_parse_readline(bk, NULL)) != NULL) {
@@ -1024,25 +1024,25 @@ void dag_prepare_nested_jobs(struct dag *d)
 	}
 }
 
-char *dag_parse_readline(struct dag_parse *bk, struct dag_node *n)
+char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 {
 	struct dag *d = bk->d;
 	struct dag_lookup_set s = {d, n, NULL};
-	char *raw_line = get_line(bk->dag_stream);
+	char *raw_line = get_line(bk->stream);
 
 	if(raw_line) {
-		bk->colnum = 1;
-		bk->linenum++;
+		bk->column_number = 1;
+		bk->line_number++;
 
-		if(bk->linenum % 1000 == 0) {
-			debug(D_DEBUG, "read line %d\n", bk->linenum);
+		if(bk->line_number % 1000 == 0) {
+			debug(D_DEBUG, "read line %d\n", bk->line_number);
 		}
 
 		/* Strip whitespace */
 		string_chomp(raw_line);
 		while(isspace(*raw_line)) {
 			raw_line++;
-			bk->colnum++;
+			bk->column_number++;
 		}
 
 		/* Chop off comments
@@ -1073,7 +1073,7 @@ char *dag_parse_readline(struct dag_parse *bk, struct dag_node *n)
 	return NULL;
 }
 
-void dag_parse_process_special_variable(struct dag_parse *bk, struct dag_node *n, char *name, char *value)
+void dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *n, char *name, char *value)
 {
 	struct dag *d = bk->d;
 
@@ -1103,7 +1103,7 @@ void dag_parse_process_special_variable(struct dag_parse *bk, struct dag_node *n
 	/* else if some other special variable .... */
 }
 
-int dag_parse_variable(struct dag_parse *bk, struct dag_node *n, char *line)
+int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 {
 	struct dag *d = bk->d;
 	char *name  = line + (n ? 1 : 0); /* Node variables require offset of 1 */
@@ -1165,7 +1165,7 @@ char *monitor_log_name(char *dirname, int nodeid)
 	return path;
 }
 
-int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode)
+int dag_parse_node(struct lexer_book *bk, char *line_org, int clean_mode)
 {
 	struct dag *d = bk->d;
 	char *line;
@@ -1174,7 +1174,7 @@ int dag_parse_node(struct dag_parse *bk, char *line_org, int clean_mode)
 	char *log_name;
 	struct dag_node *n;
 
-	n = dag_node_create(bk->d, bk->linenum);
+	n = dag_node_create(bk->d, bk->line_number);
 
 	if(!bk->category)
 		bk->category = dag_task_category_lookup_or_create(d, "without_explicit_category");
@@ -1243,7 +1243,7 @@ Parse through a list of input or output files, adding each as a source or target
 @param source a flag for whether the files are source or target files.  1 indicates source files, 0 indicates targets
 @param clean_mode a flag for whether the DAG is being constructed for cleaning or running.
 */
-int dag_parse_node_filelist(struct dag_parse *bk, struct dag_node *n, char *filelist, int source, int clean_mode)
+int dag_parse_node_filelist(struct lexer_book *bk, struct dag_node *n, char *filelist, int source, int clean_mode)
 {
 	char *filename;
 	char *newname;
@@ -1349,7 +1349,7 @@ int dag_prepare_for_batch_system(struct dag *d) {
 	return 1;
 }
 
-void dag_parse_node_set_command(struct dag_parse *bk, struct dag_node *n, char *command)
+void dag_parse_node_set_command(struct lexer_book *bk, struct dag_node *n, char *command)
 {
 	struct dag_lookup_set s = {bk->d, n, NULL};
 	char *local = dag_lookup("BATCH_LOCAL", &s);
@@ -1365,7 +1365,7 @@ void dag_parse_node_set_command(struct dag_parse *bk, struct dag_node *n, char *
 	debug(D_DEBUG, "node command=%s", n->command);
 }
 
-int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
+int dag_parse_node_command(struct lexer_book *bk, struct dag_node *n, char *line)
 {
 	char *log_name;
 	char *command = line;
@@ -1411,7 +1411,7 @@ int dag_parse_node_command(struct dag_parse *bk, struct dag_node *n, char *line)
  *
  * */
 
-int dag_parse_node_makeflow_command(struct dag_parse *bk, struct dag_node *n, char *line)
+int dag_parse_node_makeflow_command(struct lexer_book *bk, struct dag_node *n, char *line)
 {
 	int argc;
 	char **argv;
@@ -1454,7 +1454,7 @@ failure:
 	return 0;
 }
 
-int dag_parse_export(struct dag_parse *bk, char *line)
+int dag_parse_export(struct lexer_book *bk, char *line)
 {
 	int i, argc;
 	char *end_export, *equal;
