@@ -149,6 +149,7 @@ static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
 static time_t worker_start_time = 0;
 static UINT64_T current_taskid = 0;
+static char *base_debug_filename = NULL;
 
 // Foreman mode global variables
 static struct work_queue *foreman_q = NULL;
@@ -172,6 +173,7 @@ static struct work_queue_master *actual_master = NULL;
 static struct list *preferred_masters = NULL;
 static struct hash_cache *bad_masters = NULL;
 static int released_by_master = 0;
+static char *current_project = NULL;
 
 static void report_worker_ready(struct link *master)
 {
@@ -615,6 +617,9 @@ static struct link *auto_link_connect(char *addr, int *port)
 			debug(D_WQ, "priority:\t%d\n", m->priority);
 			debug(D_WQ, "\n");
 
+			if(current_project) free(current_project);
+			current_project = strdup(m->proj);
+			
 			strncpy(addr, m->addr, LINK_ADDRESS_MAX);
 			(*port) = m->port;
 
@@ -773,6 +778,7 @@ static struct link *connect_master(time_t stoptime) {
 		//reset backoff interval after connection to master.
 		backoff_interval = init_backoff_interval; 
 
+		debug(D_WQ, "connected to master %s:%d", actual_addr, actual_port);
 		return master;
 	}
 
@@ -1099,6 +1105,16 @@ static int do_kill(int taskid) {
 
 static int do_release() {
 	debug(D_WQ, "released by master at %s:%d.\n", actual_addr, actual_port);
+
+	if(base_debug_filename && getenv("WORK_QUEUE_RESET_DEBUG_FILE")) {
+		char debug_filename[WORK_QUEUE_LINE_MAX];
+		
+		sprintf(debug_filename, "%s.%s", base_debug_filename, current_project);
+		debug_config_file(NULL);
+		rename(base_debug_filename, debug_filename);
+		debug_config_file(base_debug_filename);
+	}
+	
 	released_by_master = 1;
 	return 0;
 }
@@ -1572,6 +1588,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -d <subsystem>          Enable debugging for this subsystem.\n");
 	fprintf(stdout, " -o <file>               Send debugging to this file.\n");
 	fprintf(stdout, " --debug-file-size       Set the maximum size of the debug log (default 10M, 0 disables).\n");
+	fprintf(stdout, " --debug-release-reset   Debug file will be closed, renamed, and a new one opened after being released from a master.\n");
 	fprintf(stdout, " -m <mode>               Choose worker mode.\n");
 	fprintf(stdout, "                         Can be [w]orker, [f]oreman, [c]lassic, or [a]uto (default=auto).\n");
 	fprintf(stdout, " -f <port>[:<high_port>] Set the port for the foreman to listen on.  If <highport> is specified\n");
@@ -1647,12 +1664,14 @@ static int setup_workspace() {
 #define LONG_OPT_DEBUG_FILESIZE 'z'+1
 #define LONG_OPT_VOLATILITY     'z'+2
 #define LONG_OPT_BANDWIDTH      'z'+3
+#define LONG_OPT_DEBUG_RELEASE  'z'+4
 
 struct option long_options[] = {
-	{"password",        required_argument,  0,  'P'},
-	{"debug-file-size", required_argument,  0,   LONG_OPT_DEBUG_FILESIZE},
-	{"volatility",      required_argument,  0,   LONG_OPT_VOLATILITY},
-	{"bandwidth",       required_argument,  0,   LONG_OPT_BANDWIDTH},
+	{"password",            required_argument,  0,  'P'},
+	{"debug-file-size",     required_argument,  0,   LONG_OPT_DEBUG_FILESIZE},
+	{"volatility",          required_argument,  0,   LONG_OPT_VOLATILITY},
+	{"bandwidth",           required_argument,  0,   LONG_OPT_BANDWIDTH},
+	{"debug-release-reset", no_argument,        0,   LONG_OPT_DEBUG_RELEASE},
 	{0,0,0,0}
 };
 
@@ -1727,6 +1746,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'o':
 			debug_config_file(optarg);
+			base_debug_filename = strdup(optarg);
 			break;
 		case 'm':
 			if(!strncmp("foreman", optarg, 7) || optarg[0] == 'f') {
@@ -1794,6 +1814,9 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_BANDWIDTH:
 			setenv("WORK_QUEUE_BANDWIDTH", optarg, 1);
+			break;
+		case LONG_OPT_DEBUG_RELEASE:
+			setenv("WORK_QUEUE_RESET_DEBUG_FILE", "yes", 1);
 			break;
 		case 'h':
 		default:

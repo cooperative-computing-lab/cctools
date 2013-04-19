@@ -2669,6 +2669,9 @@ struct work_queue *work_queue_create(int port)
 	
 	if( (envstring  = getenv("WORK_QUEUE_BANDWIDTH")) ) {
 		q->bandwidth = string_metric_parse(envstring);
+		if(q->bandwidth < 0) {
+			q->bandwidth = 0;
+		}
 	}
 	
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
