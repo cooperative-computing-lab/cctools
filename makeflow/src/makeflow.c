@@ -1132,7 +1132,7 @@ int dag_parse_variable(struct dag_parse *bk, struct dag_node *n, char *line)
 	}
 
 	struct dag_lookup_set s = {d, n, NULL};
-	char *old_value = (char *)dag_lookup_set(name, &s);
+	char *old_value = (char *) dag_lookup(name, &s);
 	if(append && old_value) {
 		char *new_value = NULL;
 		if(s.table) {
@@ -1352,7 +1352,7 @@ int dag_prepare_for_batch_system(struct dag *d) {
 void dag_parse_node_set_command(struct dag_parse *bk, struct dag_node *n, char *command)
 {
 	struct dag_lookup_set s = {bk->d, n, NULL};
-	char *local = dag_lookup_set("BATCH_LOCAL", &s);
+	char *local = dag_lookup("BATCH_LOCAL", &s);
 
 	if (local) {
 		if(string_istrue(local))
@@ -1503,7 +1503,7 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 
 	list_first_item(d->export_list);
 	while((key = list_next_item(d->export_list))) {
-		char *value = dag_lookup_set(key, &s);
+		char *value = dag_lookup(key, &s);
 		if(value) {
 			setenv(key, value, 1);
 			debug(D_DEBUG, "export %s=%s", key, value);
@@ -1581,7 +1581,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	 * variable), we must save the previous global queue value, and then
 	 * restore it after we submit. */
 	struct dag_lookup_set s = {d, n, NULL};
-	char *batch_submit_options = dag_lookup_set("BATCH_OPTIONS", &s);
+	char *batch_submit_options = dag_lookup("BATCH_OPTIONS", &s);
 	char *old_batch_submit_options = NULL;
 
 	if(batch_submit_options) {
