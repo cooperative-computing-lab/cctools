@@ -186,7 +186,7 @@ static void update_all_catalogs(struct datagram *outgoing_dgram)
 	char text[DATAGRAM_PAYLOAD_MAX];
 	int length;
 
-	length = sprintf(text, "type catalog\nversion %d.%d.%d\nurl http://%s:%d\nname %s\nowner %s\nstarttime %lu\nport %d\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, preferred_hostname, port, preferred_hostname, owner, (long)starttime, port);
+	length = sprintf(text, "type catalog\nversion %d.%d.%s\nurl http://%s:%d\nname %s\nowner %s\nstarttime %lu\nport %d\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, preferred_hostname, port, preferred_hostname, owner, (long)starttime, port);
 
 	if(!length)
 		return;

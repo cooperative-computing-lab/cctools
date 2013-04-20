@@ -4,15 +4,22 @@ show_help()
 {
 	echo "Use: sge_submit_workers [options] <servername> <port> <num-workers>"
 	echo "where options are:"
-	echo "  -a               Enable auto mode."
-	echo "  -s               Run as a shared worker."
-	echo "  -M <name>        Name of the preferred master for worker."
-	echo "  -N <name>        Same as -M (backwards compatibility)."
-	echo "  -C <catalog>     Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
-	echo "  -t <time>        Abort after this amount of idle time. (default=900s)"
-	echo "  -j               Use job array to submit workers."	
-	echo "  -p <parameters>  SGE qsub parameters."
-	echo "  -h               Show this help message."
+	echo "  -a              Enable auto mode."
+	echo "  -M <name>       Name of the preferred master for worker."
+	echo "  -N <name>       Same as -M (backwards compatibility)."
+	echo "  -C <catalog>    Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
+	echo "  -t <time>       Abort after this amount of idle time. (default=900s)."
+	echo "  -d <subsystem>  Enable debugging on worker for this subsystem (try -d all to start)."
+	echo "  -w <size>       Set TCP window size."
+	echo "  -i <time>       Set initial value for backoff interval when worker fails to connect to a master. (default=1s)"
+	echo "  -b <time>       Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)"
+	echo "  -z <size>       Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)"
+	echo "  -A <arch>       Set architecture string for the worker to report to master instead of the value in uname."
+	echo "  -O <os>         Set operating system string for the worker to report to master instead of the value in uname."
+	echo "  -s <path>       Set the location for creating the working directory of the worker."
+	echo "  -j              Use job array to submit workers."	
+	echo "  -p <parameters> SGE qsub parameters."
+	echo "  -h              Show this help message."
 	exit 1
 }
 
@@ -21,15 +28,22 @@ use_auto=0
 use_jobarray=0
 parameters=""
 
-while getopts asM:N:t:jp:h opt 
+while getopts aM:N:C:t:d:w:i:b:z:A:O:s:jp:h opt 
 do
 	case "$opt" in
 		a)  arguments="$arguments -a"; use_auto=1;;
-		s)  arguments="$arguments -s";;
 		M)  arguments="$arguments -M $OPTARG"; use_auto=1;;
 		N)  arguments="$arguments -M $OPTARG"; use_auto=1;;
 		C)  arguments="$arguments -C $OPTARG";;
 		t)  arguments="$arguments -t $OPTARG";;
+		d)  arguments="$arguments -d $OPTARG";;
+		w)  arguments="$arguments -w $OPTARG";;
+		i)  arguments="$arguments -i $OPTARG";;
+		b)  arguments="$arguments -b $OPTARG";;
+		z)  arguments="$arguments -z $OPTARG";;
+		A)  arguments="$arguments -A $OPTARG";;
+		O)  arguments="$arguments -O $OPTARG";;
+		s)  arguments="$arguments -s $OPTARG";;
 		j)  use_jobarray=1;;
 		p)  parameters="$parameters $OPTARG";;
 		h)  show_help;;

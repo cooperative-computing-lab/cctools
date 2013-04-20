@@ -31,10 +31,18 @@ class Task(_object):
     # @param self       Reference to the current task object.
     # @param command    The shell command line to be exected by the task.
     def __init__(self, command):
-        self._task = work_queue_task_create(command)
+        self._task = None
+
+        try:
+            self._task = work_queue_task_create(command)
+            if not self._task:
+                raise
+        except:
+            raise Exception('Unable to create internal Task structure')
  
     def __del__(self):
-        work_queue_task_delete(self._task)
+        if self._task:
+            work_queue_task_delete(self._task)
 
     @staticmethod
     def _determine_file_flags(flags, cache):
@@ -413,22 +421,28 @@ class WorkQueue(_object):
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
     def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=False, exclusive=True, shutdown=False):
         self._shutdown   = shutdown
-        self._work_queue = work_queue_create(port)
-        if not self._work_queue:
-            raise 
-
-        self._stats      = work_queue_stats()
+        self._work_queue = None
+        self._stats      = None
         self._task_table = {}
 
-        if name:
-            work_queue_specify_name(self._work_queue, name)
+        try:
+            self._work_queue = work_queue_create(port)
+            self._stats      = work_queue_stats()
+            if not self._work_queue:
+                raise Exception('Could not create work_queue on port %d' % port)
 
-        work_queue_specify_master_mode(self._work_queue, catalog)
+            if name:
+                work_queue_specify_name(self._work_queue, name)
+
+            work_queue_specify_master_mode(self._work_queue, catalog)
+        except Exception, e:
+            raise Exception('Unable to create internal Work Queue structure: %s' % e)
 
     def __del__(self):
-        if self._shutdown:
-            self.shutdown_workers(0)
-        work_queue_delete(self._work_queue)
+        if self._work_queue:
+            if self._shutdown:
+                self.shutdown_workers(0)
+            work_queue_delete(self._work_queue)
     
     ##
     # Get the project name of the queue. 
@@ -467,6 +481,15 @@ class WorkQueue(_object):
     def stats(self):
         work_queue_get_stats(self._work_queue, self._stats)
         return self._stats
+
+    ## Enables resource monitoring of tasks in the queue. And writes a summary of the monitored information to a file.
+    #
+    #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
+    #	
+    # @param q A work queue object.
+    # @param summaryfile Filename for the summary log (If NULL, writes to wq-<pid>-resource-usage).
+    def enable_monitoring(self, summaryfile):
+        return work_queue_enable_monitoring(self._work_queue, summaryfile)	
 
     ##
     # Turn on or off fast abort functionality for a given queue.
@@ -543,12 +566,39 @@ class WorkQueue(_object):
         return work_queue_specify_master_mode(self._work_queue, mode)
 
     ##
+    # Specify the catalog server the master should report to.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param hostname   The hostname of the catalog server.
+    # @param port       The port the catalog server is listening on.
+    def specify_catalog_server(self, hostname, port):
+        return work_queue_specify_catalog_server(self._work_queue, hostname, port) 
+
+    ##
     # Specify a log file that records the states of connected workers and submitted tasks. 
     #
     # @param self     Reference to the current work queue object.
     # @param logfile  Filename. 
     def specify_log(self, logfile):
         return work_queue_specify_log(self._work_queue, logfile)
+    
+    ##
+    # Add a mandatory password that each worker must present.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param password  The password.
+
+    def specify_password_file(self, password):
+        return work_queue_specify_password(self._work_queue, password)
+    
+    ##
+    # Add a mandatory password file that each worker must present.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param file      Name of the file containing the password.
+
+    def specify_password_file(self, file):
+        return work_queue_specify_password_file(self._work_queue, file)
     
     ##
     # Cancel task identified by its taskid and remove from the given queue. 
@@ -595,6 +645,25 @@ class WorkQueue(_object):
         return work_queue_specify_keepalive_timeout(self._work_queue, timeout)
 
     ##
+    # Turn on master capacity measurements.
+    #
+    # @param self     Reference to the current work queue object.
+    #                 
+    def estimate_capacity(self):
+        return work_queue_specify_estimate_capacity_on(self._work_queue, 1)
+
+    ##
+    # Reset a work queue and all attached workers.
+    #
+    # @param self   Reference to the current work queue object.
+    # @param flags  Flags to indicate what to reset:
+    #                 - @ref WORK_QUEUE_RESET_ALL 
+    #                 - @ref WORK_QUEUE_RESET_KEEP_TASKS
+    #                 - 
+    def reset(self, flags):
+        return work_queue_reset(self._work_queue, flags)
+
+    ##
     # Submit a task to the queue.
     #
     # It is safe to re-submit a task returned by @ref wait.
@@ -602,9 +671,9 @@ class WorkQueue(_object):
     # @param self   Reference to the current work queue object.
     # @param task   A task description created from @ref work_queue::Task.
     def submit(self, task):
-		taskid = work_queue_submit(self._work_queue, task._task)
-		self._task_table[taskid] = task
-		return taskid 
+        taskid = work_queue_submit(self._work_queue, task._task)
+        self._task_table[taskid] = task
+        return taskid 
 
     ##
     # Wait for tasks to complete.
@@ -616,9 +685,9 @@ class WorkQueue(_object):
     #                   before returning.  Use an integer to set the timeout or the constant @ref
     #                   WORK_QUEUE_WAITFORTASK to block until a task has completed.
     def wait(self, timeout=WORK_QUEUE_WAITFORTASK):
-		task_pointer = work_queue_wait(self._work_queue, timeout)
-		if task_pointer:
-			task = self._task_table[int(task_pointer.taskid)]
-			del(self._task_table[task_pointer.taskid])
-			return task
-		return None
+        task_pointer = work_queue_wait(self._work_queue, timeout)
+        if task_pointer:
+            task = self._task_table[int(task_pointer.taskid)]
+            del(self._task_table[task_pointer.taskid])
+            return task
+        return None

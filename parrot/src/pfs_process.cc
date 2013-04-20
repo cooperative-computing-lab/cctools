@@ -145,6 +145,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 	child->nsyscalls = 0;
 	child->heap_address = 0;
 	child->break_address = 0;
+	child->completing_execve = 0;
 
 	actual_parent = pfs_process_lookup(actual_ppid);
 
@@ -447,7 +448,11 @@ int  pfs_process_raise( pid_t pid, int sig, int really_sendit )
 				debug(D_PROCESS,"ignoring attempt to send signal to parrot itself.");
 				result = 0;
 			} else {
-				result = kill(pid,sig);
+				if (really_sendit) {
+					result = kill(pid,sig);
+				} else {
+					result = 0;
+				}
 			}
 		}
 	} else {
@@ -502,8 +507,8 @@ void pfs_process_killall()
 
 PTRINT_T pfs_process_scratch_address( struct pfs_process *p )
 {
-	if(p->break_address) {
-		return p->break_address - 4096;
+	if(p->break_address && pfs_process_verify_break_rw_address(p)) {
+		return p->break_address - sysconf(_SC_PAGESIZE);
 	} else {
 		return pfs_process_heap_address(p);
 	}
@@ -511,7 +516,7 @@ PTRINT_T pfs_process_scratch_address( struct pfs_process *p )
 
 PTRINT_T pfs_process_heap_address( struct pfs_process *p )
 {
-	PTRINT_T start, end, offset;
+	UPTRINT_T start, end, offset;
 	int major, minor,inode;
 	char flagstring[5];
 	FILE *file;
@@ -530,7 +535,8 @@ PTRINT_T pfs_process_heap_address( struct pfs_process *p )
 
 	while(fgets(line,sizeof(line),file)) {
 		debug(D_PROCESS,"line: %s",line);
-		fields = sscanf(line,PTR_FORMAT "-" PTR_FORMAT " %s " PTR_FORMAT "%d:%d %d",
+
+		fields = sscanf(line, "%" SCNxPTR "-%" SCNxPTR " %s %" SCNxPTR "%d:%d %d",
 			&start,&end,flagstring,&offset,&major,&minor,&inode);
 
 		if(fields==7 && inode==0 && flagstring[0]=='r' && flagstring[1]=='w' && flagstring[3]=='p') {
@@ -547,4 +553,51 @@ PTRINT_T pfs_process_heap_address( struct pfs_process *p )
 	return 0;
 }
 
+
+/* Verify that p->break_address falls into a writable address. 
+ * 0 it does not, 1 it does */
+int pfs_process_verify_break_rw_address( struct pfs_process *p )
+{
+	PTRINT_T start, end, offset;
+	int major, minor,inode;
+	char flagstring[5];
+	FILE *file;
+	char line[1024];
+	int fields;
+
+	if(!p->break_address) return p->heap_address;
+
+	sprintf(line,"/proc/%d/maps",p->pid);
+
+	file  = fopen(line,"r");
+	if(!file) {
+		debug(D_PROCESS,"couldn't open %s: %s",line,strerror(errno));
+		return 0;
+	}
+
+	while(fgets(line,sizeof(line),file)) {
+		fields = sscanf(line,PTR_FORMAT "-" PTR_FORMAT " %s " PTR_FORMAT "%d:%d %d",
+			&start,&end,flagstring,&offset,&major,&minor,&inode);
+
+        if( start <= p->break_address && p->break_address <= end )
+        {
+          fclose(file);
+          if(fields==7 && inode==0 && flagstring[0]=='r' && flagstring[1]=='w' && flagstring[3]=='p') {
+		  debug(D_DEBUG,"break address 0x%x is valid.", p->break_address);
+			return 1;
+          }
+          else
+          {
+			debug(D_PROCESS,"cannot read/write at break address, or break address is not private 0x%x",p->break_address);
+            return 0;
+          }
+		}
+	}
+
+	fclose(file);
+
+	debug(D_PROCESS,"break address 0x%x is invalid.", p->break_address);
+
+	return 0;
+}
 

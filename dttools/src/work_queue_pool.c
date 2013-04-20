@@ -57,6 +57,7 @@ static struct itable *job_table = NULL;
 static char *decision_string = NULL;
 static int make_decision_only = 0;
 static int worker_timeout = 0;
+static char extra_worker_args[PATH_MAX] = "";
 static int retry_count = 20;
 static int last_decision_amount = 0;
 static time_t last_decision_time = 0;
@@ -530,9 +531,9 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 			}
 
 			if(worker_timeout > 0) {
-				snprintf(cmd, PATH_MAX, "./work_queue_worker -a -B %d -C %s:%d -t %d -p %s", pc->worker_terminate_boundary, catalog_host, catalog_port, worker_timeout, name_of_this_pool);
+				snprintf(cmd, PATH_MAX, "./work_queue_worker -a -B %d -C %s:%d -t %d -p %s %s", pc->worker_terminate_boundary, catalog_host, catalog_port, worker_timeout, name_of_this_pool, extra_worker_args);
 			} else {
-				snprintf(cmd, PATH_MAX, "./work_queue_worker -a -B %d -C %s:%d -p %s", pc->worker_terminate_boundary, catalog_host, catalog_port, name_of_this_pool);
+				snprintf(cmd, PATH_MAX, "./work_queue_worker -a -B %d -C %s:%d -p %s %s", pc->worker_terminate_boundary, catalog_host, catalog_port, name_of_this_pool, extra_worker_args);
 			}
 			snprintf(input_files, PATH_MAX, "work_queue_worker");
 		}
@@ -1300,6 +1301,7 @@ static void show_help(const char *cmd)
 	printf("  -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
 	printf("  -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
 	printf("  -o <file>      Send worker debugging output to this file.\n");
+	printf("  -E <options>   Extra options that should be added to the worker.\n");
 }
 
 int main(int argc, char *argv[])
@@ -1372,7 +1374,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAc:C:d:hm:l:L:N:o:O:Pqr:S:t:T:vW:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAc:C:d:E:hm:l:L:N:o:O:Pqr:S:t:T:vW:")) != (char) -1) {
 		switch (c) {
 		case 'a':
 			strcat(worker_args, " -a");
@@ -1391,6 +1393,10 @@ int main(int argc, char *argv[])
 
 			strcat(worker_args, " -C ");
 			strcat(worker_args, optarg);
+			break;
+		case 'E':
+			// for use in start_serving_masters function
+			strcat(extra_worker_args, optarg); 
 			break;
 		case 'N':
 			strcat(worker_args, " -N ");
@@ -1652,11 +1658,11 @@ int main(int argc, char *argv[])
 
 	// Set start worker command and specify the required input files
 	if(!workers_per_job) {
-		snprintf(worker_cmd, PATH_MAX, "./work_queue_worker %s", worker_args);
+		snprintf(worker_cmd, PATH_MAX, "./work_queue_worker %s %s", worker_args, extra_worker_args);
 		snprintf(worker_input_files, PATH_MAX, "work_queue_worker");
 	} else {
 		// Create multiple local workers
-		snprintf(worker_cmd, PATH_MAX, "./work_queue_pool %s %d", worker_args, workers_per_job);
+		snprintf(worker_cmd, PATH_MAX, "./work_queue_pool %s -E %s %d", worker_args, extra_worker_args, workers_per_job);
 		snprintf(worker_input_files, PATH_MAX, "work_queue_worker,work_queue_pool");
 	}
 

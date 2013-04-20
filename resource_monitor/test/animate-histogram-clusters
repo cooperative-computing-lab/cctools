@@ -1,0 +1,12 @@
+#! /usr/bin/env zsh
+
+
+counter=1
+
+for count in {1..10}; do
+	name=`printf "cl%2.2d.jpg" $count`
+	echo $name
+	./cluster -m$count .
+	gnuplot gnuplot-clusters > $name
+done
+

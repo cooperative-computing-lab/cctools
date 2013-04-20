@@ -248,7 +248,7 @@ batch_job_id_t batch_job_wait_work_queue(struct batch_queue * q, struct batch_jo
 	char * workers_by_pool = work_queue_get_worker_summary(q->work_queue);
 
 	fprintf(logfile, "QUEUE %" PRIu64 " ", timestamp_get());
-	fprintf(logfile, "%d %d %d ", s.workers_init,  s.workers_ready, s.workers_busy); 
+	fprintf(logfile, "%d %d %d ", s.workers_init,  s.workers_ready, s.workers_busy + s.workers_full); 
 	fprintf(logfile, "%d %d %d ", s.tasks_running, s.tasks_waiting, s.tasks_complete); 
 	fprintf(logfile, "%d %d ",    s.total_tasks_dispatched, s.total_tasks_complete); 
 	fprintf(logfile, "%d %d ",    s.total_workers_joined,   s.total_workers_removed); 

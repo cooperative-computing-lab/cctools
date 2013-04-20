@@ -1,6 +1,5 @@
 /*
 Copyright (C) 2009- The University of Notre Dame
-Originally written by Kevin Partington (27 January 2009)
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -10,17 +9,12 @@ See the file COPYING for details.
 #include <string.h>
 
 #include "get_line.h"
+#include "xxmalloc.h"
 
 char *get_line(FILE * fp)
 {
-	static char *other = NULL;
 	static char buffer[LARGE_LINE_MAX];
-
-	/* Free the other buffer, if we have used it. */
-	if(other) {
-		free(other);
-		other = NULL;
-	}
+	char *other = NULL;
 
 	if(!fgets(buffer, LARGE_LINE_MAX, fp)) {
 		return NULL;
@@ -59,7 +53,7 @@ char *get_line(FILE * fp)
 				   (including one on the end of the file
 				   itself). If you don't write newlines at the
 				   end of your text files, you should be
-				   ashamed of yourself! -KP
+				   ashamed of yourself!
 				 */
 				return other;
 			}
@@ -71,6 +65,9 @@ char *get_line(FILE * fp)
 		return other;
 
 	} else {
-		return buffer;
+	    return xxstrdup(buffer);
 	}
 }
+
+
+

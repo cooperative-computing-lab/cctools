@@ -59,6 +59,7 @@ struct work_queue_master {
 	int workers_init;
 	int workers_ready;
 	int workers_busy;
+	int workers_full;
 	int workers;
 	char *workers_by_pool;
 	char owner[USERNAME_MAX];

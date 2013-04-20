@@ -416,7 +416,7 @@ tree without manually populating every directory with ACLs.  Simply
 create an ACL in an external file, and then use the -A option to
 tell the Chirp server to use that file as the default ACL.
 
-<h2>Reservation</h2>
+<h3>Reservation</h3>
 
 The <b>v - reserve</b> right is an important concept that deserves
 its own discussion.
@@ -479,7 +479,42 @@ hostname:ws1.somewhere.edu rwlda
 globus:/O=Univ_of_Somewhere/CN=Betty rwla
 </pre>
 
-<h2>Notes on Authentication</h2>
+<h3>Simple Group Management</h3>
+
+Chirp currently supports a simple group management system based on files.
+Create a directory on your local filesystem in which to store
+the groups.  Each file in the directory will have the name of the
+desired groups, and contain a list of the members of the group in
+plain text format.  Then, give your Chirp server the -G argument
+to indicate the URL of the group directory.  Once the groups are
+defined, you can refer to them in access control lists using the
+<tt>group:</tt> prefix.
+
+<p>
+For example, suppose you wish to have two groups named <tt>group:students</tt> and <tt>group:faculty</tt>.  You could define the groups in the <tt>/data/groups</tt> directory as follows:
+<p>
+<pre>
+/data/groups/students:
+unix:astudent
+unix:bstudent
+
+/data/groups/faculty:
+unix:aprof
+unix:bprof
+</pre>
+
+Then, run the chirp server with the option <tt>-G file:///data/groups</tt>.  (Notice the URL syntax.)  Then, to make a directory <tt>/homework</tt> that is readable by students and writable by faculty, do this:
+
+<pre>
+chirp:bigwig> mkdir /homework
+chirp:bigwig> setacl /homework group:students rl
+chirp:bigwig> setacl /homework group:faculty  rwld
+</pre>
+
+If the groups are to be shared among many Chirp servers, place
+the group directory on a web server and refer to it via an <tt>http</tt> URL.
+
+<h3>Notes on Authentication</h3>
 
 Each of the authentication types has a few things you should know:
 <p>

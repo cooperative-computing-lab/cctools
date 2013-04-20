@@ -35,6 +35,7 @@ OPTION_ITEM(-s)Run as a shared worker. By default the worker would only work on 
 OPTION_PAIR(-d, subsystem)Enable debugging for the given subsystem. Try -d all as a start.
 OPTION_PAIR(-o, file)Send debugging to this file.
 OPTION_PAIR(-N, project)Set the project name to PARAM(project).
+OPTION_PAIR(-P, pwfile)Password file for authenticating to the master.
 OPTION_PAIR(-t, time)Abort after this amount of idle time. (default=900s)
 OPTION_PAIR(-w, size)Set TCP window size.
 OPTION_PAIR(-i, time)Set initial value for backoff interval when worker fails to connect to a master. (default=1s)

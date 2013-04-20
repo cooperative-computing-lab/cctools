@@ -33,6 +33,7 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 */
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <sys/types.h>
 
@@ -112,6 +113,15 @@ Logs a debugging message, if the given flags are active.
 */
 
 void debug(INT64_T flags, const char *fmt, ...);
+
+/** Emit a debugging message.
+Logs a debugging message, if the given flags are active, using a va_list instead of a list of arguments.
+@param flags Any of the standard debugging flags OR-ed together.
+@param fmt A printf-style formatting string.
+@param args A va_list containing the arguments.
+*/
+
+void vdebug(INT64_T flags, const char *fmt, va_list args);
 
 /** Emit a warning message.
 Logs a warning message, regardless of if given flags are active.

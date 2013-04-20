@@ -44,17 +44,16 @@ See the file COPYING for details.
 <p>
 <h2>Overview</h2>
 
-Adaptive Weighted Ensemble or AWE package provides a Python library for adaptive
+Accelerated Weighted Ensemble or AWE package provides a Python library for adaptive
 sampling of molecular dynamics. The framework decomposes the resampling
 computations and the molecular dynamics simulations into tasks that are
-dispatched to <a href="http://www.cse.nd.edu/~ccl/software/workqueue/">Work
-Queue</a> for execution on resources allocated from clusters, clouds, grids, or
+dispatched for execution on resources allocated from clusters, clouds, grids, or
 any idle machines.
 
-<p>AWE is part of the <a href=http://www.cse.nd.edu/~ccl/software>Cooperating
-Computing Tools</a>. It is available in the CCTools Source Package which can be
-downloaded from <a href=http://www.cse.nd.edu/~ccl/software/download>this web
-page</a>.
+<p>AWE uses Work Queue, which is part of the Cooperating Computing Tools (CCTools)
+package, for dispatching jobs for execution on allocated resources.
+Documentation on downloading, installing, and using Work Queue can be found 
+<a href="http://www.nd.edu/~ccl/software/manuals/workqueue.html">here</a>. 
 
 <h2>Software Requirements</h2>
 AWE currently uses the GROMACS molecular dynamics simulation package. So it
@@ -95,12 +94,10 @@ href="http://www.gromacs.org/Developer_Zone/Programming_Guide/XTC_Library">GROMA
 
 <h2>Building and Installing AWE</h2>
 Download the CCTools source package from this <a
-href="http://www.cse.nd.edu/~ccl/software/download">web page</a> and install
+href="http://www.nd.edu/~ccl/software/download">web page</a> and install
 using the steps <a href="http://www.nd.edu/~ccl/software/manuals/install.html">here</a>. 
 
 <p> 
-To build and install AWE, use the following recipe.
-
 First, determine the location where AWE is to be installed. For example:
 <pre>
 % export AWE_INSTALL_PATH=$HOME/awe
@@ -114,7 +111,7 @@ Compile and install AWE in the location pointed by $AWE_INSTALL_PATH using:
 % make install
 </pre>
 
-Now set PATH to include the installed AWE binaries:
+Next, set PATH to include the installed AWE binaries:
 <pre>
 % export PATH=${AWE_INSTALL_PATH}/bin:${PATH}
 </pre>
@@ -124,7 +121,14 @@ Finally, set PYTHONPATH to include the installed AWE Python modules:
 % export PYTHONPATH=${AWE_INSTALL_PATH}/lib/python2.6/site-packages:${PYTHONPATH}
 </pre>
 
-You can also check if AWE was correctly installed by running:
+Note that the AWE Python modules will be built for the version of Python
+accessible in your installed environment. The installation script creates a
+directory (under <tt>$AWE_INSTALL_PATH/lib</tt>) named with the version of Python for
+which the modules are built and copies the modules to this directory. So if your
+environment has a Python version different from 2.6, replace the version string
+accordingly when setting <tt>PYTHONPATH</tt>.
+
+<p>You can check if AWE was correctly installed by running:
 <pre>
 % awe-verify
 </pre>
@@ -132,9 +136,8 @@ You can also check if AWE was correctly installed by running:
 <h2>Running AWE</h2>
 
 First, create a directory from which you want to instantiate and run the AWE
-program. In this manual, we are going to use and run AWE on the Alanine
-Dipeptide protein using the code in <tt>awe-ala.py</tt>.  
-<pre>
+program. In this manual, we are going to run AWE to sample the state transitions
+of the Alanine Dipeptide protein using the code in <tt>awe-ala.py</tt>.  <pre>
 % cd $HOME
 % mkdir awe-alanine 
 % cd awe-alanine 
@@ -152,18 +155,23 @@ each walker.
 % awe-prepare
 </pre>
 
-<p>This will create a directory named <tt>awe-generic-data</tt> and copy files that
-all AWE runs will require (namely the binaries and Gromacs forcefield files). 
-It will also transfer the example program provided in the AWE source that that
-samples the state transitions for the Alanine Dipeptide protein. 
+<p>This will create two directories named <tt>awe-generic-data</tt> and
+<tt>awe-instance-data</tt>. <tt>awe-generic-data</tt> will contain files that
+all AWE runs will require, such as the task executables and Gromacs forcefield
+files. <tt>awe-instance-data</tt> will contain files that are particular to a
+protein system such as the state definitions, initial protein coordinates, etc.
+Note that <tt>awe-prepare</tt>, by default, will transfer the files for the
+Alanine Dipeptide protein molecule. Further, <tt>awe-prepare</tt> will also copy
+the example program <tt>awe-ala.py</tt> provided in the AWE source that samples
+the state transitions for the Alanine Dipeptide protein. 
 
-<p>To run this example, do
+<p>To run the example in <tt>awe-ala.py</tt>, do
 
 <pre>
 % python awe-ala.py
 </pre>
 
-<p> You will see this right away:
+<p> You will see this output right away:
 <pre>
  Running on port 9123...
  Loading cells and walkers
@@ -231,18 +239,27 @@ You can use these output files to generate different plots that visualize the
 output of the AWE run. To generate a Ramachandran plot (free energy landscape on
 phi-psi space) using <tt>cell-weights.csv</tt>, run the following command.
 <pre>
-% python awe-rama-ala.py -w cell-weights.csv -p awe-instance-data/testinput/state0.pdb -c awe-instance-data/testinput/cells.dat -n 100
+% python awe-rama-ala.py -w cell-weights.csv -p awe-instance-data/topol.pdb -c awe-instance-data/cells.dat -n 100
 </pre>
 
-This produces an output file named <tt>awe-rama-ala.png</tt>
+where, <tt>-w</tt> specifies the csv file recording cell weights, <tt>-p</tt>
+the structure file of simulation target, <tt>-c</tt> the data file recording
+coordinates of cell centers, and <tt>-n</tt> the number of cells
+
+This produces an output file named <tt>awe-rama-ala.png</tt> that contains the
+Ramachandran plot.
 
 <p>To generate and visualize forward and backward fluxes from the output file
-<tt>transitions.dat</tt>, use the script <tt>awe-flux.py</tt>.
+<tt>color-transition-matrix.dat</tt>, use the script <tt>awe-flux.py</tt>.
 
 <pre>
-% python awe-flux.py -i transitions.dat -l 0.01 
+% python awe-flux.py -i color-transition-matrix.csv -l 0.01
 </pre>
-							
+
+where <tt>-i</tt> specifies the data file recording transitions at every
+iteration, <tt>-l</tt> specifies the scale iteration length to actual unit and
+(nano/pico/femto-seconds).
+
 This will produce the following outputs:		
 <ul>
 <li><tt>instan-forward-flux.dat</tt>: instantaneous forward flux</li>
@@ -251,23 +268,31 @@ This will produce the following outputs:
 <li><tt>backward-flux.png</tt>: plot of backward flux</li>
 </ul>
 
-<p>To generate transition probability matrix from AWE output, run the script
-<tt>awe-transMatrix.py</tt>
+<p>Finally, to generate transition probability matrix from AWE output, run the
+script <tt>awe-transMatrix.py</tt>
 
 <pre>
-% python awe-transMatrix.py -p walker-history.csv -w walker-weights.dat -t 1 -n 100
+% python awe-transMatrix.py -p walker-history.dat -w walker-weights.dat -t 1 -n 100
 </pre>
-This prints the matrix to a file called <tt>trans.csv</tt>.
+where <tt>-p</tt> specifies the data file recording dependencies of walkers,
+<tt>-w</tt> specifies the data file recording weights and cell ID of walkers,
+<tt>-t</tt> specifies the time lag (number of iterations) for calculating,
+transition matrix, and <tt>-n</tt> specifies the number of cells
+
+<p>This prints the matrix to a file called <tt>trans-probability-matrix.csv</tt>.
 
 <h2> Running AWE on Different Protein Systems</h2>
-One protocol to run AWE is as follows:
+You can run AWE to sample a different protein system by following the steps
+below:
+
 <ol>
-<li> Sample the conformations space (eg, ensemble simulations, replica exchange). </li>
+<li> Sample the conformations space of the protein using ensemble simulations, replica
+exchange, etc. </li>
 <li> Cluster the data to obtain the cell definitions.</li>
-<li> Extract j conformations from each cluster. These are your walkers.</li>
+<li> Extract the conformations from each cluster as individual walkers.</li>
 </ol>
-To run AWE on a different protein system than the Alanine Dipeptide in the above
-example, you need to do the following:
+
+Specifically, these steps translate to the following:
 
 <ol>
 <li> Describe the topology of the system in <tt>topol.pdb</tt>.
@@ -284,6 +309,8 @@ where <tt>i</tt> is the index of the cell and <tt>j</tt> is the index of the wal
 
 <h2>For More Information</h2>
 
-For the latest information about AWE, please visit our <a href=http://www.cse.nd.edu/~ccl/software/awe>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
+For the latest information about AWE, please visit our <a
+href=http://www.nd.edu/~ccl/software/awe>web site</a> and subscribe to our <a
+href=http://www.nd.edu/~ccl/software/help.shtml>mailing list</a>.
 </body>
 </html>

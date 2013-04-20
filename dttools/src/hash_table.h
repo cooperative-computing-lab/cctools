@@ -49,6 +49,14 @@ typedef unsigned (*hash_func_t) (const char *key);
 
 struct hash_table *hash_table_create(int buckets, hash_func_t func);
 
+/** Remove all entries from an hash table.
+Note that this function will not delete all of the objects contained within the hash table.
+@param h The hash table to delete.
+*/
+
+void hash_table_clear(struct hash_table *h);
+
+
 /** Delete a hash table.
 Note that this function will not delete all of the objects contained within the hash table.
 @param h The hash table to delete.

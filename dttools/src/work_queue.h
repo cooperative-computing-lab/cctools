@@ -231,6 +231,15 @@ the <b>CATALOG_HOST</b> and <b>CATALOG_PORT</b> environmental variables as descr
 */
 struct work_queue *work_queue_create(int port);
 
+/** Enables resource monitoring on the give work queue.
+It generates the log file indicated by monitor_summary_file with all the
+summaries of the resources used by each task.
+@param q A work queue object.
+@param monitor_summary_file The filename of the log (If NULL, it defaults to wq-<pid>-resource-usage).
+@return 1 on success, 0 if monitoring was not enabled.
+*/
+int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_file);
+
 /** Submit a task to a queue.
 Once a task is submitted to a queue, it is not longer under the user's
 control and should not be inspected until returned via @ref work_queue_wait.
@@ -410,6 +419,21 @@ void work_queue_delete(struct work_queue *q);
 @param logfile The filename.
 */
 void work_queue_specify_log(struct work_queue *q, const char *logfile);
+
+/** Add a mandatory password that each worker must present.
+@param q A work queue object.
+@param password The password to require.
+*/
+
+void work_queue_specify_password( struct work_queue *q, const char *password );
+
+/** Add a mandatory password file that each worker must present.
+@param q A work queue object.
+@param file The name of the file containing the password.
+@return True if the password was loaded, false otherwise.
+*/
+
+int work_queue_specify_password_file( struct work_queue *q, const char *file );
 
 /** Change the keepalive interval for a given queue.
 @param q A work queue object.

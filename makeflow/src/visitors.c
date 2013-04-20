@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "xxmalloc.h"
 #include "list.h"
+#include "stringtools.h"
 
 #include "visitors.h"
 
@@ -30,7 +31,8 @@ int dag_to_file_vars(const struct dag *d, FILE *dag_stream)
 
 	hash_table_firstkey(vars);
 	while(hash_table_nextkey(vars, &var, &value)) {
-		fprintf(dag_stream, "%s=\"%s\"\n", var, (char *) value);
+		if(!string_null_or_empty(value) && strcmp(var, "_MAKEFLOW_COLLECT_LIST"))
+			fprintf(dag_stream, "%s=\"%s\"\n", var, (char *) value);
 	}
 
 	return 0;
@@ -308,3 +310,111 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size)
 	hash_table_delete(g);
 	hash_table_delete(h);
 }
+
+void dag_to_ppm (struct dag *d){
+
+	int count, count_width, max_ancestor = 0, max_size = 0;
+	UINT64_T key;
+	struct dag_node *n;
+
+        char *name;
+        char *label;
+	
+	struct hash_table *h;
+
+	dag_find_ancestor_depth(d);	
+
+	h = hash_table_create(0, 0);
+
+	itable_firstkey (d->node_table);
+	while(itable_nextkey(d->node_table, &key, (void **)&n)) {
+
+                name = xxstrdup(n->command);
+                label = strtok(name, " \t\n");
+
+
+		if (max_ancestor < n->ancestor_depth) max_ancestor = n->ancestor_depth;
+
+		sprintf(name, "%d", n->nodeid);
+
+		hash_table_insert(h, name, n);
+
+	}
+
+	struct list ** ancestor_count_list = malloc((max_ancestor+1)*sizeof(struct list*)); //pointer to a list of pointers
+
+	//initialize all of the lists
+	for(count = 0; count <= max_ancestor; count++){
+		ancestor_count_list[count] = list_create();
+	}
+
+	hash_table_firstkey(h);
+	while(hash_table_nextkey(h, &label, (void **)&n)){
+		list_push_tail(ancestor_count_list[n->ancestor_depth], n);
+		if (list_size(ancestor_count_list[n->ancestor_depth]) > max_size) max_size = list_size(ancestor_count_list[n->ancestor_depth]);
+	}
+
+	//Multiplier - get more pixels
+	int multiplier = 20;
+	//row and column multipliers, for screen size or file size based adjustments
+	int row_multiplier = (800/multiplier)/max_ancestor;
+	if(row_multiplier < 1) row_multiplier = 1;
+	int column_multiplier = (800/multiplier)/max_size;
+	if(column_multiplier < 1) column_multiplier = 1;
+	int mult_count;
+
+	//calculate the column size so that we can center the data
+	
+	int x_length = max_size*multiplier*column_multiplier; //x length
+	int y_length = (max_ancestor+1)*multiplier*row_multiplier; //y length
+	int ancestor_level_height = row_multiplier*multiplier; //y length of each line
+
+	int white_space_left;
+	int white_space_right;
+
+	int current_ancestor_width;
+
+	fprintf(stdout, "P3\n"); //"Magic Number", don't change
+	fprintf(stdout, "%d %d\n", x_length, y_length); //Width and Height
+	fprintf(stdout, "1\n"); //maximum color value
+
+	int color_array[3];
+
+	for(count = 0; count <= max_ancestor; count++){ //each ancestor depth in the dag
+
+		//set the color of this particular depth
+		memset(color_array, 0, 3*sizeof(int));
+		color_array[count % 3] = 1;
+
+		current_ancestor_width = list_size(ancestor_count_list[count]); //the width of this particular level of the dag
+		current_ancestor_width = current_ancestor_width*multiplier*column_multiplier; //expands the current_ancestor width to its size in the image
+
+		//set whitespace on left and right of this level's graphical output
+		white_space_left = (x_length-current_ancestor_width)/2;
+		white_space_right = x_length - white_space_left;
+
+		for(mult_count = 0; mult_count < ancestor_level_height; mult_count++){ //each pixel row
+
+			for (count_width = 0; count_width < x_length; count_width++){
+				if ((count_width >= white_space_left) && (count_width <= white_space_right)) {
+					fprintf(stdout, " %d %d %d ", color_array[0], color_array[1], color_array[2]);
+				} else {
+					fprintf(stdout, " 1 1 1 ");
+				}
+			}
+			fprintf(stdout, "\n");
+		}
+
+	}
+
+	hash_table_firstkey(h);
+	//this doesn't cause a memory leak, right?
+        while(hash_table_nextkey(h, &label ,(void **)&n)) {
+                hash_table_remove(h, label);
+        }
+
+	hash_table_delete(h);
+	free(ancestor_count_list);
+
+}
+

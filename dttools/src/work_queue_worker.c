@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "disk_info.h"
 #include "hash_cache.h"
 #include "link.h"
+#include "link_auth.h"
 #include "list.h"
 #include "xxmalloc.h"
 #include "debug.h"
@@ -32,6 +33,8 @@ See the file COPYING for details.
 #include "create_dir.h"
 #include "delete_dir.h"
 #include "itable.h"
+#include "random_init.h"
+#include "macros.h"
 
 #include <unistd.h>
 
@@ -118,6 +121,9 @@ static int init_backoff_interval = 1;
 // Maximum value for backoff interval (in seconds) when worker fails to connect to a master.
 static int max_backoff_interval = 60; 
 
+// Chance that a worker will decide to shut down each minute without warning, to simulate failure.
+static double worker_volatility = 0.0;
+
 // Flag gets set on receipt of a terminal signal.
 static int abort_flag = 0;
 
@@ -129,9 +135,12 @@ static UINT64_T disk_avail_threshold = 100;
 // Use case: hourly charge resource such as Amazon EC2
 static int terminate_boundary = 0;
 
+// Password shared between master and worker.
+char *password = 0;
 
 // Basic worker global variables
 static int worker_mode = WORKER_MODE_CLASSIC;
+static int worker_mode_default = WORKER_MODE_CLASSIC;
 static char actual_addr[LINK_ADDRESS_MAX];
 static int actual_port;
 static char workspace[WORKER_WORKSPACE_NAME_MAX];
@@ -148,7 +157,8 @@ static struct itable *unfinished_tasks = NULL;
 // Forked task related
 static int task_status= TASK_NONE;
 static int max_worker_tasks = 1;
-static int current_worker_tasks = 1;
+static int max_worker_tasks_default = 1;
+static int current_worker_tasks = 0;
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
 
@@ -311,19 +321,26 @@ static void make_hash_key(const char *addr, int port, char *key)
 	sprintf(key, "%s:%d", addr, port);
 }
 
-static int have_enough_disk_space() {
-	UINT64_T disk_avail, disk_total;
+static int check_disk_space_for_filesize(INT64_T file_size) {
+    UINT64_T disk_avail, disk_total;
 
-	// Check available disk space
-	if(disk_avail_threshold > 0) {
-		disk_info_get(".", &disk_avail, &disk_total);
-		if(disk_avail < disk_avail_threshold) {
-			debug(D_WQ, "Available disk space (%llu) lower than threshold (%llu).\n", disk_avail, disk_avail_threshold);
-			return 0;
-		}
-	}
+    // Check available disk space
+    if(disk_avail_threshold > 0) {
+	disk_info_get(".", &disk_avail, &disk_total);
+	if(file_size > 0) {	
+	    if((UINT64_T)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
+		debug(D_WQ, "Incoming file of size %lld MB will lower available disk space (%llu MB) below threshold (%llu MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
+		return 0;
+	    }
+	} else {
+	    if(disk_avail < disk_avail_threshold) {
+		debug(D_WQ, "Available disk space (%llu MB) lower than threshold (%llu MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
+		return 0;
+	    }	
+	}	
+    }
 
-	return 1;
+    return 1;
 }
 
 static int foreman_finish_task(struct link *master, int taskid, int length) {
@@ -349,7 +366,7 @@ static int foreman_finish_task(struct link *master, int taskid, int length) {
 	return 1;
 }
 
-static int foreman_add_file_to_task(const char *filename, int taskid, int type) {
+static int foreman_add_file_to_task(const char *filename, int taskid, int type, int flags) {
 	struct work_queue_task *t;
 
 	t = (struct work_queue_task *)itable_lookup(unfinished_tasks, taskid);
@@ -358,7 +375,7 @@ static int foreman_add_file_to_task(const char *filename, int taskid, int type) 
 		itable_insert(unfinished_tasks, taskid, t);
 	}
 
-	work_queue_task_specify_file(t, filename, filename, type, WORK_QUEUE_CACHE);
+	work_queue_task_specify_file(t, filename, filename, type, flags);
 	return 1;
 }
 
@@ -587,7 +604,7 @@ static struct link *auto_link_connect(char *addr, int *port)
 		return NULL;
 	}
 	debug_print_masters(ml);
-	
+
 	while((m = (struct work_queue_master *)select_master(ml, pool))) {
 		master = link_connect(m->addr, m->port, time(0) + master_timeout);
 		if(master) {
@@ -729,6 +746,18 @@ static struct link *connect_master(time_t stoptime) {
 			master = link_connect(actual_addr, actual_port, time(0) + master_timeout);
 		}
 
+		if(master) {
+			link_tune(master,LINK_TUNE_INTERACTIVE);
+			if(password) {
+				debug(D_WQ,"authenticating to master");
+				if(!link_auth_password(master,password,time(0) + master_timeout)) {
+					fprintf(stderr,"work_queue_worker: wrong password for master %s:%d\n",actual_addr,actual_port);
+					link_close(master);
+					master = 0;
+				}
+			}
+		}
+
 		if(!master) {
 			if (backoff_interval > max_backoff_interval) {
 				backoff_interval = max_backoff_interval;
@@ -739,7 +768,6 @@ static struct link *connect_master(time_t stoptime) {
 			continue;
 		}
 
-		link_tune(master, LINK_TUNE_INTERACTIVE);
 		report_worker_ready(master);
 
 		//reset backoff interval after connection to master.
@@ -820,7 +848,8 @@ static int do_symlink(const char *path, char *filename) {
 
 static int do_put(struct link *master, char *filename, INT64_T length, int mode) {
 
-	if(!have_enough_disk_space()) {
+	if(!check_disk_space_for_filesize(length)) {
+		debug(D_WQ, "Could not put file %s, not enough disk space (%lld bytes needed)\n", filename, length);
 		return 0;
 	}
 
@@ -1056,10 +1085,10 @@ static void kill_all_tasks() {
 	// Clear out the stored tasks list if any are left.
 	itable_firstkey(stored_tasks);
 	while(itable_nextkey(stored_tasks, &taskid, (void**)&ti)) {
-		itable_remove(stored_tasks, taskid);
 		clear_task_info(ti);
 		free(ti);
 	}
+	itable_clear(stored_tasks);
 }
 
 static int do_kill(int taskid) {
@@ -1120,7 +1149,12 @@ static void disconnect_master(struct link *master) {
 		while(itable_nextkey(unfinished_tasks, &taskid, (void**)&t)) {
 			work_queue_task_delete(t);
 		}
+		itable_clear(unfinished_tasks);
 	}
+	
+	worker_mode = worker_mode_default;
+	current_worker_tasks = 0;
+	max_worker_tasks = max_worker_tasks_default;
 	
 	if(released_by_master) {
 		released_by_master = 0;
@@ -1225,6 +1259,7 @@ static int worker_handle_master(struct link *master) {
 	char path[WORK_QUEUE_LINE_MAX];
 	INT64_T length;
 	INT64_T taskid = 0;
+	int flags = WORK_QUEUE_NOCACHE;
 	int mode, r, n;
 
 	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
@@ -1240,11 +1275,15 @@ static int worker_handle_master(struct link *master) {
 			r = do_stat(master, filename);
 		} else if(sscanf(line, "symlink %s %s", path, filename) == 2) {
 			r = do_symlink(path, filename);
-		} else if(sscanf(line, "need %" SCNd64 " %s", &taskid, filename) == 2) {
+		} else if(sscanf(line, "need %" SCNd64 " %s %d", &taskid, filename, &flags) == 3) {
 			r = 1;
-		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %" SCNd64, filename, &length, &mode, &taskid)) >= 3) {
+		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags)) >= 3) {
 			if(path_within_workspace(filename, workspace)) {
-				r = do_put(master, filename, length, mode);
+				if(length >= 0) {
+					r = do_put(master, filename, length, mode);
+				} else {
+					r = 1;
+				}
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
@@ -1284,6 +1323,13 @@ static int worker_handle_master(struct link *master) {
 			r = send_keepalive(master);
 		} else if(!strncmp(line, "reset", 5)) {
 			r = do_reset();
+		} else if(!strncmp(line, "auth", 4)) {
+			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
+			r = 0;
+		} else if(!strncmp(line, "update", 6)) {
+			worker_mode = WORKER_MODE_WORKER;
+			update_worker_status(master);
+			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
@@ -1314,12 +1360,23 @@ static void work_for_master(struct link *master) {
 	sigaddset(&mask, SIGCHLD);
 	
 	time_t idle_stoptime = time(0) + idle_timeout;
+	time_t volatile_stoptime = time(0) + 60;
 	// Start serving masters
 	while(!abort_flag) {
 		if(time(0) > idle_stoptime && itable_size(stored_tasks) == 0) {
 			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			abort_flag = 1;
 			break;
+		}
+		
+		if(worker_volatility && time(0) > volatile_stoptime) {
+			if( (double)rand()/(double)RAND_MAX < worker_volatility) {
+				debug(D_NOTICE, "work_queue_worker: disconnect from master due to volatility check.\n");
+				disconnect_master(master);
+				break;
+			} else {
+				volatile_stoptime = time(0) + 60;
+			}
 		}
 
 		result = link_usleep_mask(master, 5000, &mask, 1, 0);
@@ -1340,12 +1397,14 @@ static void work_for_master(struct link *master) {
 
 		ok &= handle_tasks(master);
 
+		ok &= check_disk_space_for_filesize(0);
+
 		if(!ok) {
 			disconnect_master(master);
 			break;
 		}
 
-		if(result != 0) {
+		if(result != 0 || itable_size(active_tasks)) {
 			idle_stoptime = time(0) + idle_timeout;
 		}
 	}
@@ -1357,23 +1416,27 @@ static int foreman_handle_master(struct link *master) {
 	char path[WORK_QUEUE_LINE_MAX];
 	INT64_T length;
 	INT64_T taskid;
-	int mode, r;
+	int mode, flags, r;
 
 	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
 		debug(D_WQ, "received command: %s.\n", line);
 		if(sscanf(line, "work %" SCNd64 "%" SCNd64, &length, &taskid) == 2) {
 			r = foreman_finish_task(master, taskid, length);
-		} else if(sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 , filename, &length, &mode, &taskid) == 4) {
+		} else if(sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags) == 5) {
 			if(path_within_workspace(filename, workspace)) {
-				r = do_put(master, filename, length, mode);
-				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_INPUT);
+				if(length >= 0) {
+					r = do_put(master, filename, length, mode);
+				} else {
+					r = 1;
+				}
+				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_INPUT, flags);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
 			}
-		} else if(sscanf(line, "need %" SCNd64 " %s", &taskid, filename) == 2) {
+		} else if(sscanf(line, "need %" SCNd64 " %s %d", &taskid, filename, &flags) == 3) {
 			if(path_within_workspace(filename, workspace)) {
-				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_OUTPUT);
+				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_OUTPUT, flags);
 				r=1;
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
@@ -1393,7 +1456,12 @@ static int foreman_handle_master(struct link *master) {
 		} else if(sscanf(line, "get %s", filename) == 1) {	// for backward compatibility
 			r = do_get(master, filename);
 		} else if(sscanf(line, "kill %" SCNd64 , &taskid) == 1){
-			r = do_kill(taskid);
+			struct work_queue_task *t;
+			t = work_queue_cancel_by_taskid(foreman_q, taskid);
+			if(t) {
+				work_queue_task_delete(t);
+			}
+			r = 1;
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
 		} else if(!strncmp(line, "exit", 5)) {
@@ -1402,6 +1470,12 @@ static int foreman_handle_master(struct link *master) {
 			r = send_keepalive(master);
 		} else if(!strncmp(line, "reset", 5)) {
 			r = do_reset();
+		} else if(!strncmp(line, "auth", 4)) {
+			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
+			r = 0;
+		} else if(!strncmp(line, "update", 6)) {
+			update_worker_status(master);
+			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
@@ -1416,6 +1490,7 @@ static int foreman_handle_master(struct link *master) {
 
 static void foreman_for_master(struct link *master) {
 	static struct list *master_link = NULL;
+	static struct link *current_master = NULL;
 	static struct list *master_link_active = NULL;
 	struct work_queue_stats s;
 
@@ -1425,8 +1500,13 @@ static void foreman_for_master(struct link *master) {
 
 	if(!master_link) {
 		master_link = list_create();
-		list_push_tail(master_link, master);
 		master_link_active = list_create();
+	}
+	
+	if(master != current_master) {
+		while(list_pop_head(master_link));
+		list_push_tail(master_link, master);
+		current_master = master;
 	}
 
 	debug(D_WQ, "working for master at %s:%d as foreman.\n", actual_addr, actual_port);
@@ -1452,7 +1532,7 @@ static void foreman_for_master(struct link *master) {
 		}
 
 		work_queue_get_stats(foreman_q, &s);
-		max_worker_tasks = s.total_workers_connected;
+		max_worker_tasks = s.workers_ready + s.workers_busy + s.workers_full;
 
 		update_worker_status(master);
 		
@@ -1462,6 +1542,7 @@ static void foreman_for_master(struct link *master) {
 
 		if(!result) {
 			disconnect_master(master);
+			current_master = NULL;
 			break;
 		}
 		
@@ -1485,23 +1566,31 @@ static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] <masterhost> <port>\n", cmd);
 	fprintf(stdout, "where options are:\n");
-	fprintf(stdout, " -a             Enable auto mode. In this mode the worker would ask a catalog server for available masters.\n");
-	fprintf(stdout, " -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	fprintf(stdout, " -d <subsystem> Enable debugging for this subsystem.\n");
-	fprintf(stdout, " -o <file>      Send debugging to this file.\n");
-	fprintf(stdout, " -m <mode>      Choose worker mode.  Can be [w]orker, [f]oreman, [c]lassic, or [a]uto (default=auto).\n");
-	fprintf(stdout, " -M <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
-	fprintf(stdout, " -N <project>   When in Foreman mode, the name of the project to advertise as.  In worker/classic/auto mode acts as '-M'.\n");
-	fprintf(stdout, " -t <time>      Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
-	fprintf(stdout, " -w <size>      Set TCP window size.\n");
-	fprintf(stdout, " -i <time>      Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
-	fprintf(stdout, " -b <time>      Set maxmimum value for backoff interval when worker fails to connect to a master. (default=%ds)\n", max_backoff_interval);
-	fprintf(stdout, " -z <size>      Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%" PRIu64 "MB)\n", disk_avail_threshold);
-	fprintf(stdout, " -A <arch>      Set architecture string for the worker to report to master instead of the value in uname (%s).\n", arch_name);
-	fprintf(stdout, " -O <os>        Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
-	fprintf(stdout, " -s <path>      Set the location for creating the working directory of the worker.\n");
-	fprintf(stdout, " -v             Show version string\n");
-	fprintf(stdout, " -h             Show this help screen\n");
+	fprintf(stdout, " -a                      Enable auto mode. In this mode the worker\n");
+	fprintf(stdout, "                         would ask a catalog server for available masters.\n");
+	fprintf(stdout, " -C <catalog>            Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
+	fprintf(stdout, " -d <subsystem>          Enable debugging for this subsystem.\n");
+	fprintf(stdout, " -o <file>               Send debugging to this file.\n");
+	fprintf(stdout, " --debug-file-size       Set the maximum size of the debug log (default 10M, 0 disables).\n");
+	fprintf(stdout, " -m <mode>               Choose worker mode.\n");
+	fprintf(stdout, "                         Can be [w]orker, [f]oreman, [c]lassic, or [a]uto (default=auto).\n");
+	fprintf(stdout, " -f <port>[:<high_port>] Set the port for the foreman to listen on.  If <highport> is specified\n");
+	fprintf(stdout, "                         the port is chosen from the range port:highport\n");
+	fprintf(stdout, " -M <project>            Name of a preferred project. A worker can have multiple preferred projects.\n");
+	fprintf(stdout, " -N <project>            When in Foreman mode, the name of the project to advertise as.  In worker/classic/auto mode acts as '-M'.\n");
+	fprintf(stdout, " -P,--password <pwfile>  Password file for authenticating to the master.\n");
+	fprintf(stdout, " -t <time>               Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
+	fprintf(stdout, " -w <size>               Set TCP window size.\n");
+	fprintf(stdout, " -i <time>               Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
+	fprintf(stdout, " -b <time>               Set maxmimum value for backoff interval when worker fails to connect to a master. (default=%ds)\n", max_backoff_interval);
+	fprintf(stdout, " -z <size>               Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%" PRIu64 "MB)\n", disk_avail_threshold);
+	fprintf(stdout, " -A <arch>               Set architecture string for the worker to report to master instead of the value in uname (%s).\n", arch_name);
+	fprintf(stdout, " -O <os>                 Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
+	fprintf(stdout, " -s <path>               Set the location for creating the working directory of the worker.\n");
+	fprintf(stdout, " -v                      Show version string\n");
+	fprintf(stdout, " --volatility <chance>   Set the percent chance a worker will decide to shut down every minute.\n");
+	fprintf(stdout, " --bandwidth <mult>      Set the multiplier for how long outgoing and incoming data transfers will take.\n");
+	fprintf(stdout, " -h                      Show this help screen\n");
 }
 
 static void check_arguments(int argc, char **argv) {
@@ -1555,7 +1644,17 @@ static int setup_workspace() {
 	return 1;
 }
 
+#define LONG_OPT_DEBUG_FILESIZE 'z'+1
+#define LONG_OPT_VOLATILITY     'z'+2
+#define LONG_OPT_BANDWIDTH      'z'+3
 
+struct option long_options[] = {
+	{"password",        required_argument,  0,  'P'},
+	{"debug-file-size", required_argument,  0,   LONG_OPT_DEBUG_FILESIZE},
+	{"volatility",      required_argument,  0,   LONG_OPT_VOLATILITY},
+	{"bandwidth",       required_argument,  0,   LONG_OPT_BANDWIDTH},
+	{0,0,0,0}
+};
 
 int main(int argc, char *argv[])
 {
@@ -1582,7 +1681,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aB:C:d:f:t:j:o:p:M:N:w:i:b:z:A:O:s:vh")) != (char) -1) {
+	while((c = getopt_long(argc, argv, "aB:C:d:f:t:j:o:p:m:M:N:P:w:i:b:z:A:O:s:vh", long_options, 0)) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
@@ -1599,27 +1698,45 @@ int main(int argc, char *argv[])
 		case 'd':
 			debug_flags_set(optarg);
 			break;
-		case 'f':
-			worker_mode = WORKER_MODE_FOREMAN;
-			foreman_port = atoi(optarg);
+		case LONG_OPT_DEBUG_FILESIZE:
+			debug_config_file_size(MAX(0, string_metric_parse(optarg)));
 			break;
+		case 'f':
+		{	char *low_port = optarg;
+			char *high_port= strchr(optarg, ':');
+			
+			worker_mode = WORKER_MODE_FOREMAN;
+			
+			if(high_port) {
+				*high_port = '\0';
+				high_port++;
+			} else {
+				foreman_port = atoi(low_port);
+				break;
+			} 
+			setenv("WORK_QUEUE_LOW_PORT", low_port, 0);
+			setenv("WORK_QUEUE_HIGH_PORT", high_port, 0);
+			foreman_port = -1;
+			break;
+		}
 		case 't':
 			idle_timeout = string_time_parse(optarg);
 			break;
 		case 'j':
-			max_worker_tasks = atoi(optarg);
+			max_worker_tasks = max_worker_tasks_default = atoi(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
 			break;
 		case 'm':
-			if(!strncmp("foreman", optarg, 4) || optarg[0] == 'f') {
-				worker_mode = WORKER_MODE_FOREMAN;
+			if(!strncmp("foreman", optarg, 7) || optarg[0] == 'f') {
+				worker_mode = worker_mode_default = WORKER_MODE_FOREMAN;
 			} else if(!strncmp("worker", optarg, 6) || optarg[0] == 'w') {
-				worker_mode = WORKER_MODE_WORKER;
+				worker_mode = worker_mode_default = WORKER_MODE_WORKER;
 			} else if(!strncmp("classic", optarg, 7) || optarg[0] == 'c') {
-				worker_mode = WORKER_MODE_CLASSIC;
+				worker_mode = worker_mode_default = WORKER_MODE_CLASSIC;
 			}
+			break;
 		case 'M':
 			auto_worker = 1;
 			list_push_tail(preferred_masters, strdup(optarg));
@@ -1649,8 +1766,7 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'z':
-			disk_avail_threshold = string_metric_parse(optarg);
-			disk_avail_threshold *= 1024 * 1024; //convert MB to Bytes.
+			disk_avail_threshold = atoll(optarg) * MEGA;
 			break;
 		case 'A':
 			free(arch_name); //free the arch string obtained from uname
@@ -1666,6 +1782,19 @@ int main(int argc, char *argv[])
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
 			exit(EXIT_SUCCESS);
+			break;
+		case 'P':
+		  	if(copy_file_to_buffer(optarg, &password) < 0) {
+              fprintf(stderr,"work_queue_worker: couldn't load password from %s: %s\n",optarg,strerror(errno));
+				return 1;
+			}
+			break;
+		case LONG_OPT_VOLATILITY:
+			worker_volatility = atof(optarg);
+			break;
+		case LONG_OPT_BANDWIDTH:
+			setenv("WORK_QUEUE_BANDWIDTH", optarg, 1);
+			break;
 		case 'h':
 		default:
 			show_help(argv[0]);
@@ -1688,7 +1817,7 @@ int main(int argc, char *argv[])
 	signal(SIGINT, handle_abort);
 	signal(SIGCHLD, handle_sigchld);
 
-	srand((unsigned int) (getpid() ^ time(NULL)));
+	random_init();
 	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t)free_work_queue_master);
 	
 	if(!setup_workspace()) {
@@ -1705,8 +1834,15 @@ int main(int argc, char *argv[])
 		sprintf(foreman_string, "%s-foreman", argv[0]);
 		debug_config(foreman_string);
 		foreman_q = work_queue_create(foreman_port);
+		
+		if(!foreman_q) {
+			fprintf(stderr, "work_queue_worker-foreman: failed to create foreman queue.  Terminating.\n");
+			exit(1);
+		}
+		
 		if(foreman_name) {
 			work_queue_specify_name(foreman_q, foreman_name);
+			work_queue_specify_master_mode(foreman_q, WORK_QUEUE_MASTER_MODE_CATALOG);
 		}
 		unfinished_tasks = itable_create(0);
 	} else {
@@ -1720,8 +1856,8 @@ int main(int argc, char *argv[])
 
 	// change to workspace
 	chdir(workspace);
-
-	if(!have_enough_disk_space()) {
+	
+	if(!check_disk_space_for_filesize(0)) {
 		goto abort;
 	}
 

@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "variable.h"
 #include "stringtools.h"
 #include "hash_table.h"
+#include "random_init.h"
 
 #include <time.h>
 #include <sys/wait.h>
@@ -364,7 +365,7 @@ static int ast_forall_execute( struct ast_forloop *f, time_t stoptime, const cha
 
 	pid = multi_fork(argc,s,stoptime,f->for_line);
 	if(pid>=0) {
-		srand(getpid());
+		random_init();
 		if(stoptime && (time(0)>stoptime)) _exit(1);
 
 		ftsh_error(FTSH_ERROR_STRUCTURE,f->for_line,"%s=%s starting",name,argv[pid]);

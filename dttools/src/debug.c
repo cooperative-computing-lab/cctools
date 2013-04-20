@@ -203,6 +203,15 @@ void debug(INT64_T flags, const char *fmt, ...)
 	va_end(args);
 }
 
+void vdebug(INT64_T flags, const char *fmt, va_list args)
+{
+	if(flags & debug_flags) {
+		int save_errno = errno;
+		do_debug(0, flags, fmt, args);
+		errno = save_errno;
+	}
+}
+
 void warn(INT64_T flags, const char *fmt, ...)
 {
 	va_list args;
