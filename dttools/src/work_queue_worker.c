@@ -1304,9 +1304,9 @@ static int worker_handle_master(struct link *master) {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
 			}
-		} else if(sscanf(line, "unlink %s", path) == 1) {
+		} else if(sscanf(line, "unlink %s", filename) == 1) {
 			if(path_within_workspace(filename, workspace)) {
-				r = do_unlink(path);
+				r = do_unlink(filename);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
@@ -1429,7 +1429,6 @@ static void work_for_master(struct link *master) {
 static int foreman_handle_master(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
-	char path[WORK_QUEUE_LINE_MAX];
 	INT64_T length;
 	INT64_T taskid;
 	int mode, flags, r;
@@ -1458,9 +1457,9 @@ static int foreman_handle_master(struct link *master) {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r=0;
 			}
-		} else if(sscanf(line, "unlink %s", path) == 1) {
+		} else if(sscanf(line, "unlink %s", filename) == 1) {
 			if(path_within_workspace(filename, workspace)) {
-				r = do_unlink(path);
+				r = do_unlink(filename);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
