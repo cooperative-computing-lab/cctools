@@ -569,6 +569,13 @@ int main(int argc, char *argv[])
 	if(run_in_child_process(backend_setup,chirp_root_url,"backend setup")!=0) {
 		fatal("couldn't setup %s",chirp_root_url);
 	}
+	else
+	{	
+		chirp_root_path = cfs->init(chirp_root_url);
+		if(!chirp_root_path)
+			fatal("could not initialize %s backend filesystem: %s", chirp_root_url, strerror(errno));
+	}
+
 
 	if(!list_size(catalog_host_list)) {
 		list_push_head(catalog_host_list, CATALOG_HOST);
@@ -726,11 +733,7 @@ static void chirp_receive(struct link *link)
 
 	change_process_title("chirp_server [authenticating]");
 
-	chirp_root_path = cfs->init(chirp_root_url);
 	chirp_ticket_path = chirp_root_path;
-
-        if(!chirp_root_path)
-		fatal("could not initialize backend filesystem: %s", strerror(errno));
 
 	if(cfs->chdir(chirp_root_path) != 0)
 		fatal("couldn't move to %s: %s\n", chirp_root_path, strerror(errno));
