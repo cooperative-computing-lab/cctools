@@ -60,21 +60,41 @@ struct dag {
     struct hash_table *task_categories;      /* Mapping from labels to category structures. */
 };
 
-/* Bookkeeping for parsing a makeflow file */
-struct dag_parse {
-    struct dag *d;                      /* The dag been built. */
-    FILE  *dag_stream;                  /* The file pointer the rules are been read. */
-    char  *linetext;                    /* The line just read from dag_stream. */
-    int    monitor_mode;                /* Whether we need to wrap the monitor, boolean. */
-    int    linenum;                     /* The line number of linetext in dag_stream. */
-    int    colnum;                      /* The column number linetext starts. */
-    struct dag_task_category *category; /* Indicates the category to which the rules belong. The
-                                           idea is to have rules that perform similar tasks, or
-                                           use about the same resources, to belong to the
-                                           same category. task_category is updated every time the
-                                           value of the variable described in the macro
-                                           MAKEFLOW_TASK_CATEGORY is changed in the makeflow file. */
+struct lexer_book
+{
+	struct dag *d;                      /* The dag being built. */
+	int    monitor_mode;                /* Whether we need to wrap the monitor, boolean. */
+
+	struct dag_task_category *category; /* Indicates the category to which the rules belong. The
+					       idea is to have rules that perform similar tasks, or
+					       use about the same resources, to belong to the
+					       same category. task_category is updated every time the
+					       value of the variable described in the macro
+					       MAKEFLOW_TASK_CATEGORY is changed in the makeflow file.
+					    */
+
+	FILE  *stream;                  /* The file pointer the rules are been read. */
+	char *lexeme_end;
+
+	char *lexeme;
+	uint64_t lexeme_max; 
+	uint64_t lexeme_size; 
+
+	int   chunk_last_loaded;
+	char *buffer;
+
+	int substitution_mode;
+	int eof;
+
+	long int   line_number;
+	long int   column_number;
+	struct list *column_numbers;
+
+	struct list *token_queue; 
+
+	char *linetext;   //This member will be removed once the new lexer is integrated.
 };
+
 
 /* Information of task categories. Right now we only record the
  * name of the category (label), but in the future we can add
