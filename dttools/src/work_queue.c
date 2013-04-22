@@ -100,7 +100,7 @@ static const char *work_queue_state_names[] = {"init","ready","busy","full","non
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
-int wq_minimum_transfer_timeout = 3;
+int wq_minimum_transfer_timeout = 600;
 
 struct work_queue {
 	char *name;
@@ -949,7 +949,7 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 {
 	struct work_queue_task *t;
 
-	t = itable_remove(w->current_tasks, taskid);
+	t = itable_lookup(w->current_tasks, taskid);
 	if(!t)
 		goto failure;
 
@@ -965,7 +965,7 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	delete_uncacheable_files(t, w);
 
 	// At this point, a task is completed.
-
+	itable_remove(w->current_tasks, taskid);
 	itable_remove(q->finished_tasks, t->taskid);
 	list_push_head(q->complete_list, t);
 	itable_remove(q->worker_task_map, t->taskid);
