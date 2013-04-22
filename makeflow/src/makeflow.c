@@ -974,7 +974,7 @@ void dag_prepare_gc(struct dag *d)
 {
 	/* Parse _MAKEFLOW_COLLECT_LIST and record which target files should be
 	 * garbage collected. */
-	char *collect_list = dag_lookup("_MAKEFLOW_COLLECT_LIST", d);
+	char *collect_list = dag_lookup_set("_MAKEFLOW_COLLECT_LIST", d);
 	if(collect_list == NULL)
 		return;
 
@@ -1053,7 +1053,7 @@ char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 		}
 
 		char *subst_line = xxstrdup(raw_line);
-		subst_line = string_subst(subst_line, dag_lookup_set, &s);
+		subst_line = string_subst(subst_line, dag_lookup, &s);
 
 		free(bk->linetext);
 		bk->linetext = xxstrdup(subst_line);

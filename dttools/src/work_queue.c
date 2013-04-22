@@ -708,7 +708,8 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					}
 					*total_bytes += length;
 					if(effective_stoptime) {
-						sleep(effective_stoptime - time(0));
+						INT64_T sleeptime = effective_stoptime - time(0);
+						sleep(sleeptime > 0?sleeptime:0);
 					}
 
 					hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
@@ -778,7 +779,6 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 	timestamp_t open_time = 0;
 	timestamp_t close_time = 0;
 	timestamp_t sum_time;
-	time_t effective_stoptime = 0;
 
 	// Start transfer ...
 	received_items = hash_table_create(0, 0);
@@ -830,12 +830,9 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 				}
 				close_time = timestamp_get();
 				sum_time += (close_time - open_time);
-			} else {	
+			} else {
 				open_time = timestamp_get();
 				get_output_item(tf->remote_name, tf->payload, q, w, t, received_items, &total_bytes);
-				if(effective_stoptime) {
-					sleep(effective_stoptime - time(0));
-				}
 				close_time = timestamp_get();
 				if(t->result & WORK_QUEUE_RESULT_OUTPUT_FAIL) {
 					return 0;
@@ -1167,7 +1164,8 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 			return -1;
 		}
 		if(effective_stoptime) {
-			sleep(effective_stoptime - time(0));
+			INT64_T sleeptime = effective_stoptime - time(0);
+			sleep(sleeptime > 0?sleeptime:0);
 		}
 		debug(D_WQ, "Got %d bytes from %s (%s)", actual, w->hostname, w->addrport);
 		
@@ -1520,7 +1518,8 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 		return 0;
 		
 	if(effective_stoptime) {
-		sleep(effective_stoptime - time(0));
+		INT64_T sleeptime = effective_stoptime - time(0);
+		sleep(sleeptime > 0?sleeptime:0);
 	}
 	
 	*total_bytes += actual;
@@ -1778,7 +1777,8 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 				send_worker_msg(w, "put %s %lld %o %lld %d\n", time(0) + short_timeout, tf->remote_name, (INT64_T) fl, 0777, t->taskid, tf->flags);
 				actual = link_putlstring(w->link, tf->payload, fl, stoptime);
 				if(effective_stoptime) {
-					sleep(effective_stoptime - time(0));
+					INT64_T sleeptime = effective_stoptime - time(0);
+					sleep(sleeptime > 0?sleeptime:0);
 				}
 				close_time = timestamp_get();
 				if(actual != (fl))
@@ -2668,7 +2668,10 @@ struct work_queue *work_queue_create(int port)
 	q->password = 0;
 	
 	if( (envstring  = getenv("WORK_QUEUE_BANDWIDTH")) ) {
-		q->bandwidth = atof(envstring);
+		q->bandwidth = string_metric_parse(envstring);
+		if(q->bandwidth < 0) {
+			q->bandwidth = 0;
+		}
 	}
 	
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
