@@ -100,7 +100,7 @@ static const char *work_queue_state_names[] = {"init","ready","busy","full","non
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
-int wq_minimum_transfer_timeout = 600;
+int wq_minimum_transfer_timeout = 3;
 
 struct work_queue {
 	char *name;
