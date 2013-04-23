@@ -346,6 +346,7 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	// Check for status updates that can be consumed here.
 	if(string_prefix_is(line, "alive")) {
 		debug(D_WQ, "Received keepalive response from %s (%s)", w->hostname, w->addrport);
+		result = 0;	
 	} else if(string_prefix_is(line, "ready")) {
 		result = process_ready(q, w, line);
 	} else if (string_prefix_is(line,"result")) {
@@ -950,7 +951,7 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 {
 	struct work_queue_task *t;
 
-	t = itable_remove(w->current_tasks, taskid);
+	t = itable_lookup(w->current_tasks, taskid);
 	if(!t)
 		goto failure;
 
@@ -964,7 +965,7 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	delete_uncacheable_files(t, w);
 
 	// At this point, a task is completed.
-
+	itable_remove(w->current_tasks, taskid);
 	itable_remove(q->finished_tasks, t->taskid);
 	list_push_head(q->complete_list, t);
 	itable_remove(q->worker_task_map, t->taskid);
