@@ -125,10 +125,10 @@ void dag_gc_ref_count(struct dag *d, const char *file);
 void dag_export_variables(struct dag *d, struct dag_node *n);
 
 char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n);
-int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode);
+int dag_parse(struct dag *d, FILE *dag_stream, int monitor_mode);
 int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line);
-int dag_parse_node(struct lexer_book *bk, char *line, int clean_mode);
-int dag_parse_node_filelist(struct lexer_book *bk, struct dag_node *n, char *filelist, int source, int clean_mode);
+int dag_parse_node(struct lexer_book *bk, char *line);
+int dag_parse_node_filelist(struct lexer_book *bk, struct dag_node *n, char *filelist, int source);
 int dag_parse_node_command(struct lexer_book *bk, struct dag_node *n, char *line);
 int dag_parse_node_makeflow_command(struct lexer_book *bk, struct dag_node *n, char *line);
 int dag_parse_export(struct lexer_book *bk, char *line);
@@ -897,7 +897,7 @@ static char *translate_command(struct dag_node *n, char *old_command, int is_loc
 
 /* Returns a pointer to a new struct dag described by filename. Return NULL on
  * failure. */
-struct dag *dag_from_file(const char *filename, int clean_mode, int monitor_mode)
+struct dag *dag_from_file(const char *filename, int monitor_mode)
 {
 	FILE *dagfile;
 	struct dag *d = NULL;
@@ -909,7 +909,7 @@ struct dag *dag_from_file(const char *filename, int clean_mode, int monitor_mode
 	{	
 		d = dag_create();
 		d->filename = xxstrdup(filename);
-		if(!dag_parse(d, dagfile, clean_mode, monitor_mode))
+		if(!dag_parse(d, dagfile, monitor_mode))
 		{
 			free(d);
 			d = NULL;
@@ -921,7 +921,7 @@ struct dag *dag_from_file(const char *filename, int clean_mode, int monitor_mode
 	return d;
 }
 
-int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode)
+int dag_parse(struct dag *d, FILE *dag_stream, int monitor_mode)
 {
 	char *line = NULL;
 	struct lexer_book *bk = calloc(1, sizeof(struct lexer_book)); //Taking advantage that calloc zeroes memory
@@ -948,7 +948,7 @@ int dag_parse(struct dag *d, FILE *dag_stream, int clean_mode, int monitor_mode)
 				goto failure;
 			}
 		} else if(strstr(line, ":")) {
-			if(!dag_parse_node(bk, line, clean_mode)) {
+			if(!dag_parse_node(bk, line)) {
 				dag_parse_error(bk, "node");
 				goto failure;
 			}
@@ -1165,7 +1165,7 @@ char *monitor_log_name(char *dirname, int nodeid)
 	return path;
 }
 
-int dag_parse_node(struct lexer_book *bk, char *line_org, int clean_mode)
+int dag_parse_node(struct lexer_book *bk, char *line_org)
 {
 	struct dag *d = bk->d;
 	char *line;
@@ -1205,8 +1205,8 @@ int dag_parse_node(struct lexer_book *bk, char *line_org, int clean_mode)
 	inputs  = string_trim_spaces(inputs); 
 	outputs = string_trim_spaces(outputs);
 
-	dag_parse_node_filelist(bk, n, outputs, 0, clean_mode);
-	dag_parse_node_filelist(bk, n, inputs, 1, clean_mode);
+	dag_parse_node_filelist(bk, n, outputs, 0);
+	dag_parse_node_filelist(bk, n, inputs, 1);
 
 	while((line = dag_parse_readline(bk, n)) != NULL) {
 		if(line[0] == '@' && strchr(line, '=')) {
@@ -1241,9 +1241,8 @@ Parse through a list of input or output files, adding each as a source or target
 @param n The node that the files are being added to
 @param filelist The list of files, separated by whitespace
 @param source a flag for whether the files are source or target files.  1 indicates source files, 0 indicates targets
-@param clean_mode a flag for whether the DAG is being constructed for cleaning or running.
 */
-int dag_parse_node_filelist(struct lexer_book *bk, struct dag_node *n, char *filelist, int source, int clean_mode)
+int dag_parse_node_filelist(struct lexer_book *bk, struct dag_node *n, char *filelist, int source)
 {
 	char *filename;
 	char *newname;
@@ -1443,7 +1442,7 @@ int dag_parse_node_makeflow_command(struct lexer_book *bk, struct dag_node *n, c
 	command = xxmalloc(sizeof(char) * (strlen(n->makeflow_cwd) + strlen(wrapper) + strlen(makeflow_exe) + strlen(n->makeflow_dag) + 20));
 	sprintf(command, "cd %s && %s %s %s", n->makeflow_cwd, wrapper, makeflow_exe, n->makeflow_dag);
 
-	dag_parse_node_filelist(bk, n, argv[0], 1, 0);
+	dag_parse_node_filelist(bk, n, argv[0], 1);
 	dag_parse_node_set_command(bk, n, command);
 
 	free(argv);
@@ -2545,8 +2544,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	int no_symlinks = (clean_mode || syntax_check || display_mode);
-	struct dag *d = dag_from_file(dagfile, no_symlinks, monitor_mode);
+	struct dag *d = dag_from_file(dagfile, monitor_mode);
 	if(!d) {
 		free(logfilename);
 		free(batchlogfilename);
