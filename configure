@@ -13,18 +13,17 @@ save_arguments $0 $@
 
 major=3
 minor=7
-micro=2
+micro=3
 
 # On a release, type would be changed from TRUNK to RELEASE.  TRUNK is a useful
 # signal that the user is not using a blessed (tagged) release.
-type="RELEASE"
+type="TRUNK"
 
 version="$major.$minor.$micro $type"
 
 # The release date is set automatically at configure time (the default).
 # For a tagged release, this should be the hard-coded date of the release.
-# release_date=`date +%m/%d/%Y`
-release_date="04/23/2013"
+release_date=`date +%m/%d/%Y`
 
 # Bourne shell is tricky when you use backtick command substitution backslash
 # has special meaning even when surrounded by single-quotes. It is necessary to
