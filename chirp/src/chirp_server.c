@@ -593,14 +593,6 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	// XXX move allocation handling to the side.
-	if(root_quota > 0) {
-		if(cfs == &chirp_fs_hdfs)	/* using HDFS? Can't do quotas : / */
-			fatal("Cannot use quotas with HDFS\n");
-		else
-			chirp_alloc_init(chirp_root_path, root_quota);
-	}
-
 	link = link_serve_address(listen_on_interface, port);
 
 	if(!link) {
@@ -726,11 +718,23 @@ static void chirp_receive(struct link *link)
 
 	change_process_title("chirp_server [authenticating]");
 
+	/* Chirp's backend file system must be loaded here. HDFS loads in the JVM
+	 * which does not play nicely with fork. So, we only manipulate the backend
+	 * file system in a child process which actually handles client requests.
+	 * */
 	chirp_root_path = cfs->init(chirp_root_url);
+	if(!chirp_root_path)
+		fatal("could not initialize %s backend filesystem: %s", chirp_root_url, strerror(errno));
+
 	chirp_ticket_path = chirp_root_path;
 
-        if(!chirp_root_path)
-		fatal("could not initialize backend filesystem: %s", strerror(errno));
+	if(root_quota > 0) {
+		if(cfs == &chirp_fs_hdfs)
+			/* FIXME: why can't HDFS do quotas? original comment: "using HDFS? Can't do quotas : /" */
+			fatal("Cannot use quotas with HDFS\n");
+		else
+			chirp_alloc_init(chirp_root_path, root_quota);
+	}
 
 	if(cfs->chdir(chirp_root_path) != 0)
 		fatal("couldn't move to %s: %s\n", chirp_root_path, strerror(errno));
