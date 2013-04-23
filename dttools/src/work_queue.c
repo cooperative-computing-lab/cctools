@@ -346,6 +346,7 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	// Check for status updates that can be consumed here.
 	if(string_prefix_is(line, "alive")) {
 		debug(D_WQ, "Received keepalive response from %s (%s)", w->hostname, w->addrport);
+		result = 0;	
 	} else if(string_prefix_is(line, "ready")) {
 		result = process_ready(q, w, line);
 	} else if (string_prefix_is(line,"result")) {
