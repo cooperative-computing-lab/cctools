@@ -1923,8 +1923,9 @@ static int search_is_recursive(const char *pattern)
 	} 
 }
 
-static int search_directory(pfs_table *t, const char *base, char *dir, const char *pattern, char *buffer, size_t buffer_length, size_t *i, int flags)
+static int search_directory(pfs_table *t, char *dir, const char *pattern, char *buffer, size_t buffer_length, size_t *i, int flags)
 {
+
 	if (strlen(pattern)==0) return 0;
 
 	int found = 0;
@@ -2004,7 +2005,7 @@ static int search_directory(pfs_table *t, const char *base, char *dir, const cha
 
 		if ((recursive_pattern && S_ISDIR(statbuf.st_mode) && search_match_dir(pattern, npattern, name))
 		     || (!recursive_pattern && search_match_dir(pattern, npattern, name))) {
-			
+
 			if (!recursive_pattern) {
 				int stat_r = t->stat(dir, &statbuf);
 
@@ -2018,8 +2019,10 @@ static int search_directory(pfs_table *t, const char *base, char *dir, const cha
 				}
 			}
 
-			if (recursive_pattern || S_ISDIR(statbuf.st_mode)) {
-				int result = search_directory(t, base, dir, npattern, buffer, buffer_length, i, flags);
+			if ((recursive_pattern || S_ISDIR(statbuf.st_mode)) 
+			     && (strcmp(name, ".") * strcmp(name, "..") != 0)) {
+				
+				int result = search_directory(t, dir, npattern, buffer, buffer_length, i, flags);
 
 				if (result == -1)
 					return -1;
@@ -2109,6 +2112,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 		char path[PFS_PATH_MAX+1];
 		char directory[PFS_PATH_MAX+1];
 		end = strchr(start, PFS_SEARCH_DELIMITER);
+
 		if (end) {
 			if (start == end) { /* "::" ? */
 				strcpy(path, ".");
@@ -2123,7 +2127,9 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 			done = 1;
 		}
 
-		string_collapse_path(path, directory, 0);
+		if (realpath(path, directory) == NULL) {
+			return -1;
+		}
 
 		if (exact_match && *pattern == '/') {
 			struct pfs_stat statbuf;
@@ -2171,10 +2177,9 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 		} else {
 			/* Check to see if search is implemented in the service */
 			if(resolve_name(path, &pname)) {
-				if ( 0 || (result = pname.service->search(&pname, pattern, flags, buffer, buffer_length, i))==-1) {
+				if ((result = pname.service->search(&pname, pattern, flags, buffer, buffer_length, i))==-1) {
 					result = search_directory(
 						this,	
-						directory+strlen(directory), 
 						directory, 
 						pattern, 
 						buffer, 
