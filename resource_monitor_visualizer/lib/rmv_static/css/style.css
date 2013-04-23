@@ -1,0 +1,122 @@
+html, body, div, span, h1, h2, h3, h4, h5, h6, p, a, img, table, td, th, tr, section {
+  padding: 0;
+  margin: 0;
+  font-size: 100%;
+  vertical-align: baseline;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+body { background: #f6f6f6 url('../img/subtle_grunge.png') repeat; }
+
+.content {
+  margin: 0 auto;
+  max-width: 1270px;
+  width: 90%;
+}
+
+section.summary {
+  width: 100%;
+  position: relative;
+  float: left
+}
+
+section.summary img {
+  margin: 0 auto;
+  display: block;
+  max-width: 1250px;
+  width: 100%;
+}
+
+img.center {
+  display: block;
+  margin: 0 auto;
+}
+
+table {
+  display: block;
+  width: 50%;
+  margin: 0 auto;
+}
+
+td {
+  padding: 0.2em;
+  text-align: right;
+}
+
+.slides_container {
+  width: 1250px;
+  height: 500px;
+  display:none;
+  margin: 0 auto;
+}
+
+.slides_container div.slide {
+  width: 1250px;
+  height: 500px;
+  display:block;
+}
+
+.item {
+  width: 1250px;
+  height: 500px;
+  float: left;
+}
+
+#slides .next,#slides .prev {
+  position: relative;
+  margin: 0 auto;
+  top: -280px;
+  width:24px;
+  height:43px;
+  display:block;
+  z-index:101;
+}
+
+#slides .prev {
+  left: -637px;
+}
+
+#slides .next {
+  top: -323px;
+  left: 637px;
+}
+
+.pagination {
+  margin:0 auto;
+  width:10em;
+  position: relative;
+  top: -50px;
+}
+
+.pagination li {
+  float:left;
+  margin:0 1px;
+  list-style: none;
+}
+
+.pagination li a {
+  display:block;
+  width:12px;
+  height:0;
+  padding-top:12px;
+  background-image:url(../img/pagination.png);
+  background-position:0 0;
+  float:left;
+  overflow:hidden;
+}
+
+.pagination li.current a {
+  background-position:0 -12px;
+}
+
+@media (min-width: 1280px) {
+  .content {
+    max-width: 2350px;
+  }
+}
+
+td {
+  vertical-align: middle;
+}

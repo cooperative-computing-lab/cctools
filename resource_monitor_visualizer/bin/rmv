@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+
+min_release = "1.9.3"
+abort "Resource Monitor Visualizer requires Ruby version #{min_release} or greater.\nUpgrade and try again." if RUBY_VERSION < min_release
+
+$:.unshift File.expand_path("../../lib",__FILE__)
+
+require_relative '../lib/rmv'
+
+runner = RMV::Runner.new ARGV
+runner.run
