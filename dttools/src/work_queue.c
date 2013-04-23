@@ -449,6 +449,10 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 			t->total_bytes_transferred = 0;
 			t->total_transfer_time = 0;
 			t->cmd_execution_time = 0;
+			if(t->output) {
+				free(t->output);
+			}
+			t->output = 0;
 			list_push_head(q->ready_list, t);
 		}
 		itable_remove(q->running_tasks, t->taskid);
@@ -953,8 +957,6 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	// Receiving output ...
 	t->time_receive_output_start = timestamp_get();
 	if(!get_output_files(t, w, q)) {
-		free(t->output);
-		t->output = 0;
 		goto failure;
 	}
 	t->time_receive_output_finish = timestamp_get();
@@ -1159,8 +1161,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		actual = link_read(w->link, t->output, output_length, stoptime);
 		if(actual != output_length) {
 			debug(D_WQ, "Failure: actual received stdout size (%lld bytes) is different from expected (%lld bytes).", actual, output_length);
-			free(t->output);
-			t->output = 0;
+			t->output[actual] = '\0';
 			return -1;
 		}
 		if(effective_stoptime) {

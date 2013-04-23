@@ -275,10 +275,16 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		link_putfstring(master, "result %d %lld %llu %d\n", time(0) + active_timeout, ti->status, output_length, ti->execution_end-ti->execution_start, ti->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
 	} else if(t) {
-		output_length = strlen(t->output);
+		if(t->output) {
+			output_length = strlen(t->output);
+		} else {
+			output_length = 0;
+		}
 		debug(D_WQ, "Task complete: result %d %lld %llu %d", t->return_status, output_length, t->cmd_execution_time, t->taskid);
 		link_putfstring(master, "result %d %lld %llu %d\n", time(0) + active_timeout, t->return_status, output_length, t->cmd_execution_time, t->taskid);
-		link_putlstring(master, t->output, output_length, time(0)+active_timeout);
+		if(output_length) {
+			link_putlstring(master, t->output, output_length, time(0)+active_timeout);
+		}
 	}
 }
 
