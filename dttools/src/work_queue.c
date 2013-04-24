@@ -2204,7 +2204,7 @@ static void do_keepalive_checks(struct work_queue *q) {
 	
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->state == WORKER_STATE_BUSY) {
+		if(w->state == WORKER_STATE_BUSY || w->state == WORKER_STATE_FULL) {
 			timestamp_t keepalive_elapsed_time = (current - w->last_msg_sent_time)/1000000;
 			// send new keepalive check only (1) if we received a response since last keepalive check AND 
 			// (2) we are past keepalive interval 
