@@ -359,8 +359,7 @@ static int foreman_finish_task(struct link *master, int taskid, int length) {
 	if(!t) {
 		t = work_queue_task_create(cmd);
 	} else {
-		free(t->command_line);
-		t->command_line = cmd;
+		work_queue_task_specify_command(t,cmd);
 	}
 
 	work_queue_submit(foreman_q, t);

@@ -2408,6 +2408,12 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	return t;
 }
 
+void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd )
+{
+	if(t->command_line) free(t->command_line);
+	t->command_line = xxstrdup(t->command_line);
+}
+
 void work_queue_task_specify_memory( struct work_queue_task *t, int memory )
 {
 	t->memory = memory;

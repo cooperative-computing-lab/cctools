@@ -125,10 +125,18 @@ struct work_queue_stats {
 /** Create a new task object.
 Once created and elaborated with functions such as @ref work_queue_task_specify_file
 and @ref work_queue_task_specify_buffer, the task should be passed to @ref work_queue_submit.
-@param full_command The shell command line to be executed by the task.
+@param full_command The shell command line to be executed by the task.  If null,
+the command will be given later by @ref work_queue_task_specify_command
 @return A new task object.
 */
 struct work_queue_task *work_queue_task_create(const char *full_command);
+
+/** Indicate the command to be executed.
+@param t A task object.
+@param cmd The command to be executed.  This string will be duplicated by this call, so the argument may be freed or re-used afterward.
+*/
+
+void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd );
 
 /** Add a file to a task.
 @param t A task object.
