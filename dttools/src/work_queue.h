@@ -83,6 +83,10 @@ struct work_queue_task {
 	INT64_T total_bytes_transferred;/**< Number of bytes transferred since task has last started transferring input data. */
 	timestamp_t total_transfer_time;    /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
 	timestamp_t cmd_execution_time;	   /**< Time spent in microseconds for executing the command on the worker. */
+
+	int memory;
+	int disk;
+	int cores;
 };
 
 /** Statistics describing a work queue. */
@@ -181,6 +185,27 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 @return 1 if the task command file is successfully specified, 0 if either of @a t, @a cmd, or @a remote_name is null or @a remote_name is an absolute path.
 */
 int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags);
+
+/** Specify the amount of memory required by a task.
+@param t A task object.
+@param memory The amount of memory required by the task, in megabytes.
+*/
+
+void work_queue_task_specify_memory( struct work_queue_task *t, int memory );
+
+/** Specify the amount of disk space required by a task.
+@param t A task object.
+@param memory The amount of disk space required by the task, in megabytes.
+*/
+
+void work_queue_task_specify_disk( struct work_queue_task *t, int disk );
+
+/** Specify the number of cores required by a task.
+@param t A task object.
+@param cores The number of cores required by the task.
+*/
+
+void work_queue_task_specify_cores( struct work_queue_task *t, int cores );
 
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the work queue, but is provided for the user's convenience

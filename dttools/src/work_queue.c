@@ -2398,7 +2398,29 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->output_files = list_create();
 	t->return_status = -1;
 	t->result = WORK_QUEUE_RESULT_UNSET;
+
+	/* In the absence of additional information, a task requires one core and no other resources. */
+
+	t->memory = 0;
+	t->disk = 0;
+	t->cores = 1;
+
 	return t;
+}
+
+void work_queue_task_specify_memory( struct work_queue_task *t, int memory )
+{
+	t->memory = memory;
+}
+
+void work_queue_task_specify_disk( struct work_queue_task *t, int disk )
+{
+	t->disk = disk;
+}
+
+void work_queue_task_specify_cores( struct work_queue_task *t, int cores )
+{
+	t->cores = cores;
 }
 
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
