@@ -1375,14 +1375,16 @@ static int process_worker_update(struct work_queue *q, struct work_queue_worker 
 {
 	char category[WORK_QUEUE_LINE_MAX];
 	char arg[WORK_QUEUE_LINE_MAX];
-	
+	int worker_nslots_prev;
+
 	if(sscanf(line, "update %s %s", category, arg) != 2) {
 		return -1;
 	}
 	
 	if(!strcmp(category, "slots")) {
+		worker_nslots_prev = w->nslots;
 		w->nslots = atoi(arg);
-		q->total_worker_slots += w->nslots;	
+		q->total_worker_slots += (w->nslots - worker_nslots_prev);	
 		if(w->nslots > w->running_tasks) {
 			change_worker_state(q, w, w->running_tasks?WORKER_STATE_BUSY:WORKER_STATE_READY);
 		} else {
