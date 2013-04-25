@@ -1683,7 +1683,7 @@ struct option long_options[] = {
 	{"debug-release-reset", no_argument,        0,   LONG_OPT_DEBUG_RELEASE},
 	{"measure-capacity",    no_argument,        0,   'c'},
 	{"fast-abort",          required_argument,  0,   'F'},
-	{"debug-file-size",     required_argument,  0,   LONG_OPT_SPECIFY_LOG},
+	{"specify-log",         required_argument,  0,   LONG_OPT_SPECIFY_LOG},
 	{0,0,0,0}
 };
 
