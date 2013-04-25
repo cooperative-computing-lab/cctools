@@ -1386,6 +1386,7 @@ static int process_worker_update(struct work_queue *q, struct work_queue_worker 
 		worker_nslots_prev = w->nslots;
 		w->nslots = atoi(arg);
 		q->total_worker_slots += (w->nslots - worker_nslots_prev);	
+		debug(D_WQ, "Total worker slots currently seen: %d", q->total_worker_slots);
 		if(w->nslots > w->running_tasks) {
 			change_worker_state(q, w, w->running_tasks?WORKER_STATE_BUSY:WORKER_STATE_READY);
 		} else {
