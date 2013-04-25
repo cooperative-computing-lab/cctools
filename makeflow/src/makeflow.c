@@ -2173,6 +2173,7 @@ int main(int argc, char *argv[])
 	int skip_afs_check = 0;
 	int preserve_symlinks = 0;
 	int ppm_mode = 0;
+	char *ppm_option = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	int work_queue_estimate_capacity_on = 0;
@@ -2293,6 +2294,9 @@ int main(int argc, char *argv[])
 				debug_flags_set(optarg);
 				break;
 			case 'D':
+				if (ppm_mode) {
+					ppm_option = optarg;
+				}
 				if (strcasecmp(optarg, "c") == 0) condense_display = 1;
 				if (strcasecmp(optarg, "s") == 0) change_size = 1;
 				if (strcasecmp(optarg, "ppm") == 0) ppm_mode = 1;
@@ -2654,7 +2658,7 @@ int main(int argc, char *argv[])
 		free(logfilename);
 		free(batchlogfilename);
 		if (ppm_mode) {
-			dag_to_ppm(d);
+			dag_to_ppm(d, ppm_option);
 		} else {
 			dag_to_dot(d, condense_display, change_size);
 		}
