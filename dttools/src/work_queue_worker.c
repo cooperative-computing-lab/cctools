@@ -1600,6 +1600,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "                         the port is chosen from the range port:highport\n");
 	fprintf(stdout, "c, --measure-capacity	  Enable the measurement of foreman capacity to handle new workers (default=disabled).\n");
 	fprintf(stdout, "F, --fast-abort <mult>	  Set the fast abort multiplier for foreman (default=disabled).\n");
+	fprintf(stdout, "--specify-log <logfile>  Send statistics about foreman to this file.\n");
 	fprintf(stdout, " -M <project>            Name of a preferred project. A worker can have multiple preferred projects.\n");
 	fprintf(stdout, " -N <project>            When in Foreman mode, the name of the project to advertise as.  In worker/classic/auto mode acts as '-M'.\n");
 	fprintf(stdout, " -P,--password <pwfile>  Password file for authenticating to the master.\n");
@@ -1672,6 +1673,7 @@ static int setup_workspace() {
 #define LONG_OPT_VOLATILITY     'z'+2
 #define LONG_OPT_BANDWIDTH      'z'+3
 #define LONG_OPT_DEBUG_RELEASE  'z'+4
+#define LONG_OPT_SPECIFY_LOG    'z'+5
 
 struct option long_options[] = {
 	{"password",            required_argument,  0,  'P'},
@@ -1681,6 +1683,7 @@ struct option long_options[] = {
 	{"debug-release-reset", no_argument,        0,   LONG_OPT_DEBUG_RELEASE},
 	{"measure-capacity",    no_argument,        0,   'c'},
 	{"fast-abort",          required_argument,  0,   'F'},
+	{"debug-file-size",     required_argument,  0,   LONG_OPT_SPECIFY_LOG},
 	{0,0,0,0}
 };
 
@@ -1694,6 +1697,7 @@ int main(int argc, char *argv[])
 	struct link *master = NULL;
 	int enable_capacity = 0;
 	double fast_abort_multiplier = 0;
+	char *foreman_stats_filename = NULL;
 
 	worker_start_time = time(0);
 
@@ -1754,6 +1758,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'F':
 			fast_abort_multiplier = atof(optarg); 
+			break;
+		case LONG_OPT_SPECIFY_LOG:
+			foreman_stats_filename = xxstrdup(optarg); 
 			break;
 		case 't':
 			idle_timeout = string_time_parse(optarg);
@@ -1886,6 +1893,8 @@ int main(int argc, char *argv[])
 		}
 		work_queue_specify_estimate_capacity_on(foreman_q, enable_capacity);
 		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);	
+		work_queue_specify_log(foreman_q, foreman_stats_filename);
+		
 		unfinished_tasks = itable_create(0);
 	} else {
 		active_tasks = itable_create(0);
