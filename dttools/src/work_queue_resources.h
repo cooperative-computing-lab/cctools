@@ -2,6 +2,7 @@
 #define WORK_QUEUE_RESOURCES_H
 
 #include "link.h"
+#include "nvpair.h"
 
 struct work_queue_resource {
 	int inuse;
@@ -23,5 +24,6 @@ void work_queue_resources_measure( struct work_queue_resources *r, const char *w
 void work_queue_resources_send( struct link *master, struct work_queue_resources *r, time_t stoptime );
 void work_queue_resources_clear( struct work_queue_resources *r );
 void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r );
+void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct nvpair *nv );
 
 #endif

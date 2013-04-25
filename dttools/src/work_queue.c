@@ -169,8 +169,6 @@ struct work_queue {
 
 	char *password;
 	double bandwidth;
-
-	int total_worker_slots;
 };
 
 struct work_queue_worker {
@@ -183,16 +181,12 @@ struct work_queue_worker {
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 	struct work_queue_resources *resources;
-	int ncpus;
-	int nslots;
-	INT64_T memory_avail;
-	INT64_T memory_total;
-	INT64_T disk_avail;
-	INT64_T disk_total;
+	int cores_allocated;
+	int memory_allocated;
+	int disk_allocated;
 	struct hash_table *current_files;
 	struct link *link;
 	struct itable *current_tasks;
-	int running_tasks;
 	int finished_tasks;
 	INT64_T total_tasks_complete;
 	INT64_T total_bytes_transferred;
@@ -466,7 +460,6 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		itable_remove(q->worker_task_map, t->taskid);
 	}
 	itable_clear(w->current_tasks);
-	w->running_tasks = 0;
 	w->finished_tasks = 0;
 }
 
@@ -613,7 +606,7 @@ static int add_worker(struct work_queue *q)
 	w->link = link;
 	w->current_files = hash_table_create(0, 0);
 	w->current_tasks = itable_create(0);
-	w->running_tasks = w->finished_tasks = 0;
+	w->finished_tasks = 0;
 	w->start_time = timestamp_get();
 	w->resources = work_queue_resources_create();
 	link_to_hash_key(link, w->hashkey);
@@ -1028,12 +1021,9 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 
 	// Copy basic fields 
 	strncpy(w->hostname, items[0], DOMAIN_NAME_MAX);
-	w->ncpus = atoi(items[1]);
-	w->nslots = 0;
-	w->memory_avail = atoll(items[2]);
-	w->memory_total = atoll(items[3]);
-	w->disk_avail = atoll(items[4]);
-	w->disk_total = atoll(items[5]);
+
+	// Items 1-6 were basic information about cores, memory and disk,
+	// but have been superseded by the resource update messages.
 
 	if(n >= 7 && field_set(items[6])) { // intended project name
 		if(q->name) {
@@ -1087,8 +1077,6 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 	} else {
 		strncpy(w->version, "unknown", 8);
 		w->async_tasks = 0;
-		w->nslots = 1;
-		q->total_worker_slots += w->nslots;	
 	}
 
 	if(w->state == WORKER_STATE_INIT) {
@@ -1192,12 +1180,16 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	q->total_execute_time += t->cmd_execution_time;
 	itable_remove(q->running_tasks, taskid);
 	itable_insert(q->finished_tasks, taskid, (void*)t);
-	w->running_tasks--;
+
+	w->cores_allocated -= t->cores;
+	w->memory_allocated -= t->memory;
+	w->disk_allocated -= t->disk;
+
 	w->finished_tasks++;
 
-	if(!w->running_tasks) {
+	if(!w->cores_allocated) {
 		change_worker_state(q, w, WORKER_STATE_READY);
-	} else if(w->running_tasks < w->nslots) {
+	} else if(w->cores_allocated < w->resources->cores.total ) {
 		change_worker_state(q, w, WORKER_STATE_BUSY);
 	} else {
 		change_worker_state(q, w, WORKER_STATE_FULL);
@@ -1236,6 +1228,10 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q )
 	nvpair_insert_integer(nv,"total_send_time",info.total_send_time);
 	nvpair_insert_integer(nv,"total_receive_time",info.total_receive_time);
 
+	struct work_queue_resources r;
+	work_queue_get_resources(q,&r);
+	work_queue_resources_add_to_nvpair(&r,nv);
+
 	return nv;
 }
 
@@ -1250,17 +1246,14 @@ struct nvpair * worker_to_nvpair( struct work_queue_worker *w )
 	nvpair_insert_string(nv,"arch",w->arch);
 	nvpair_insert_string(nv,"working_dir",w->workspace);
 	nvpair_insert_string(nv,"address_port",w->addrport);
-	nvpair_insert_integer(nv,"ncpus",w->ncpus);
-	nvpair_insert_integer(nv,"memory_avail",w->memory_avail);
-	nvpair_insert_integer(nv,"memory_total",w->memory_total);
-	nvpair_insert_integer(nv,"disk_avail",w->disk_avail);
-	nvpair_insert_integer(nv,"disk_total",w->disk_total);
+	nvpair_insert_integer(nv,"ncpus",w->resources->cores.total);
 	nvpair_insert_integer(nv,"total_tasks_complete",w->total_tasks_complete);
 	nvpair_insert_integer(nv,"total_bytes_transferred",w->total_bytes_transferred);
 	nvpair_insert_integer(nv,"total_transfer_time",w->total_transfer_time);
-
 	nvpair_insert_integer(nv,"start_time",w->start_time);
 	nvpair_insert_integer(nv,"current_time",timestamp_get()); 
+
+	work_queue_resources_add_to_nvpair(w->resources,nv);
 
 	struct work_queue_task *t;
 	UINT64_T taskid;
@@ -1384,15 +1377,14 @@ static int process_worker_update(struct work_queue *q, struct work_queue_worker 
 
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
-			w->nslots = r.total;
 		} else if(!strcmp(category,"memory")) {
 			w->resources->memory = r;
 		} else if(!strcmp(category,"disk")) {
 			w->resources->disk = r;
 		}
 
-		if(w->nslots > w->running_tasks) {
-			change_worker_state(q, w, w->running_tasks?WORKER_STATE_BUSY:WORKER_STATE_READY);
+		if(w->resources->cores.total > w->cores_allocated) {
+			change_worker_state(q, w, w->cores_allocated?WORKER_STATE_BUSY:WORKER_STATE_READY);
 		} else {
 			change_worker_state(q, w, WORKER_STATE_FULL);
 		}
@@ -2038,7 +2030,7 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->running_tasks < w->nslots) {
+		if(w->cores_allocated < w->resources->cores.total) {
 			task_cached_bytes = 0;
 			list_first_item(t->input_files);
 			while((tf = list_next_item(t->input_files))) {
@@ -2068,7 +2060,7 @@ static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q)
 	struct work_queue_worker *w;
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		if(w->running_tasks < w->nslots) {
+		if(w->cores_allocated < w->resources->cores.total) {
 			return w;
 		}
 	}
@@ -2093,10 +2085,10 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q)
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->running_tasks < w->nslots && ready_worker_count == random_ready_worker) {
+		if(w->cores_allocated < w->resources->cores.total && ready_worker_count == random_ready_worker) {
 			return w;
 		}
-		if(w->running_tasks < w->nslots) {
+		if(w->cores_allocated < w->resources->cores.total) {
 			ready_worker_count++;
 		}
 	}
@@ -2113,7 +2105,7 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q)
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->running_tasks < w->nslots) {
+		if(w->cores_allocated < w->resources->cores.total) {
 			if(w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
 				if(!best_worker || t < best_time) {
@@ -2166,11 +2158,13 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 	itable_insert(w->current_tasks, t->taskid, t);
 	itable_insert(q->running_tasks, t->taskid, t); 
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
-	w->running_tasks++;
+
+	w->cores_allocated  += t->cores;
+	w->memory_allocated += t->memory;
+	w->disk_allocated   += t->disk;
 
 	if(start_one_task(q, w, t)) {
-		
-		if(w->nslots <= w->running_tasks) {
+		if(w->resources->cores.total <= w->cores_allocated) {
 			change_worker_state(q, w, WORKER_STATE_FULL);
 		} else {
 			change_worker_state(q, w, WORKER_STATE_BUSY);
@@ -2343,12 +2337,17 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 			
 		//Delete any input files that are not to be cached.
 		delete_worker_files(w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+
 		//Delete all output files since they are not needed as the task was aborted.
 		delete_worker_files(w, t->output_files, 0);
 		
-		change_worker_state(q, w, w->running_tasks?WORKER_STATE_BUSY:WORKER_STATE_READY);
+		change_worker_state(q, w, w->cores_allocated?WORKER_STATE_BUSY:WORKER_STATE_READY);
 		itable_remove(w->current_tasks, t->taskid);
-		w->running_tasks--;
+
+		w->cores_allocated -= t->cores;
+		w->memory_allocated -= t->memory;
+		w->disk_allocated -= t->disk;
+
 		return 1;
 	}
 	
@@ -3110,7 +3109,7 @@ int work_queue_hungry(struct work_queue *q)
 	if(q->total_tasks_submitted < 100)
 		return (100 - q->total_tasks_submitted);
 
-	// TODO: fix this so that it actually looks at the number of slots available.
+	//BUG: fix this so that it actually looks at the number of cores available.
 
 	int i, j, workers_init, workers_ready, workers_busy, workers_full;
 	workers_init = q->workers_in_state[WORKER_STATE_INIT];
@@ -3313,7 +3312,8 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->capacity = q->capacity;
 	s->avg_capacity = q->avg_capacity;
 	s->total_workers_connected = q->total_workers_connected;
-	s->total_worker_slots = q->total_worker_slots;
+	// BUG: this should be the sum of the worker cpus
+	s->total_worker_slots = s->total_workers_connected;
 }
 
 void work_queue_get_resources( struct work_queue *q, struct work_queue_resources *total )

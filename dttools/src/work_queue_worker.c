@@ -789,6 +789,8 @@ static struct link *connect_master(time_t stoptime) {
 	return NULL;
 }
 
+// BUG: worker always starts a task on request.
+// It should only start tasks until all cores are used up.
 
 static int do_work(struct link *master, int taskid, INT64_T length) {
 	char *cmd = malloc(length + 10);
@@ -1223,7 +1225,7 @@ static void abort_worker() {
 
 static void send_resource_update(struct link *master)
 {
-	if(!memcmp(local_resources_last,local_resources,sizeof(*local_resources))) {
+	if(memcmp(local_resources_last,local_resources,sizeof(*local_resources))) {
 		work_queue_resources_send(master,local_resources,time(0)+short_timeout);
 		memcpy(local_resources_last,local_resources,sizeof(*local_resources));
 	}

@@ -6,6 +6,7 @@
 #include "disk_info.h"
 #include "macros.h"
 #include "debug.h"
+#include "nvpair.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -70,7 +71,7 @@ static void work_queue_resource_add( struct work_queue_resource *total, struct w
 	total->inuse += r->inuse;
 	total->total += r->total;
 	total->smallest = MIN(total->smallest,r->smallest);
-	total->largest = MIN(total->smallest,r->largest);
+	total->largest = MAX(total->smallest,r->largest);
 }
 
 void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r )
@@ -79,3 +80,20 @@ void work_queue_resources_add( struct work_queue_resources *total, struct work_q
 	work_queue_resource_add(&total->memory,&r->memory);
 	work_queue_resource_add(&total->disk,&r->disk);
 }
+
+void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct nvpair *nv )
+{
+	nvpair_insert_integer(nv,"cores_inuse",r->cores.inuse);
+	nvpair_insert_integer(nv,"cores_total",r->cores.total);
+	nvpair_insert_integer(nv,"cores_smallest",r->cores.smallest);
+	nvpair_insert_integer(nv,"cores_largest",r->cores.largest);
+	nvpair_insert_integer(nv,"memory_inuse",r->memory.inuse);
+	nvpair_insert_integer(nv,"memory_total",r->memory.total);
+	nvpair_insert_integer(nv,"memory_smallest",r->memory.smallest);
+	nvpair_insert_integer(nv,"memory_largest",r->memory.largest);
+	nvpair_insert_integer(nv,"disk_inuse",r->disk.inuse);
+	nvpair_insert_integer(nv,"disk_total",r->disk.total);
+	nvpair_insert_integer(nv,"disk_smallest",r->disk.smallest);
+	nvpair_insert_integer(nv,"disk_largest",r->disk.largest);
+}
+
