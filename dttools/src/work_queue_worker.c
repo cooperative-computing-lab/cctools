@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "work_queue.h"
 #include "work_queue_protocol.h"
 #include "work_queue_internal.h"
+#include "work_queue_resources.h"
 
 #include "cctools.h"
 #include "macros.h"
@@ -151,6 +152,13 @@ static time_t worker_start_time = 0;
 static UINT64_T current_taskid = 0;
 static char *base_debug_filename = NULL;
 
+// Local resource controls
+static struct work_queue_resources * local_resources = 0;
+static int local_resources_changed = 1;
+static int manual_cores_option = 0;
+static int manual_disk_option = 0;
+static int manual_memory_option = 0;
+
 // Foreman mode global variables
 static struct work_queue *foreman_q = NULL;
 static struct itable *unfinished_tasks = NULL;
@@ -162,7 +170,6 @@ static int max_worker_tasks_default = 1;
 static int current_worker_tasks = 0;
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
-
 
 // Catalog mode control variables
 static char *catalog_server_host = NULL;
@@ -1218,10 +1225,11 @@ static void abort_worker() {
 	delete_dir(workspace);
 }
 
-static void update_worker_status(struct link *master) {
-	if(current_worker_tasks != max_worker_tasks) {
-		current_worker_tasks = max_worker_tasks;
-		link_putfstring(master, "update slots %d\n", time(0)+active_timeout, max_worker_tasks);
+static void update_worker_status(struct link *master)
+{
+	if(local_resources_changed) {
+		work_queue_resources_send(master,local_resources,time(0)+short_timeout);
+		local_resources_changed = 0;
 	}
 }
 
@@ -1605,6 +1613,9 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -v                      Show version string\n");
 	fprintf(stdout, " --volatility <chance>   Set the percent chance a worker will decide to shut down every minute.\n");
 	fprintf(stdout, " --bandwidth <mult>      Set the multiplier for how long outgoing and incoming data transfers will take.\n");
+	fprintf(stdout, " --cores <n>             Manually set the number of cores reported by this worker.\n");
+	fprintf(stdout, " --memory <mb>           Manually set the amonut of memory (in MB) reported by this worker.\n");
+	fprintf(stdout, " --disk   <mb>           Manually set the amount of disk (in MB) reported by this worker.\n");
 	fprintf(stdout, " -h                      Show this help screen\n");
 }
 
@@ -1663,6 +1674,9 @@ static int setup_workspace() {
 #define LONG_OPT_VOLATILITY     'z'+2
 #define LONG_OPT_BANDWIDTH      'z'+3
 #define LONG_OPT_DEBUG_RELEASE  'z'+4
+#define LONG_OPT_CORES          'z'+5
+#define LONG_OPT_MEMORY         'z'+6
+#define LONG_OPT_DISK           'z'+7
 
 struct option long_options[] = {
 	{"password",            required_argument,  0,  'P'},
@@ -1670,12 +1684,15 @@ struct option long_options[] = {
 	{"volatility",          required_argument,  0,   LONG_OPT_VOLATILITY},
 	{"bandwidth",           required_argument,  0,   LONG_OPT_BANDWIDTH},
 	{"debug-release-reset", no_argument,        0,   LONG_OPT_DEBUG_RELEASE},
+	{"cores",               required_argument,  0,   LONG_OPT_CORES},
+	{"memory",              required_argument,  0,   LONG_OPT_MEMORY},
+	{"disk",                required_argument,  0,   LONG_OPT_DISK},
 	{0,0,0,0}
 };
 
 int main(int argc, char *argv[])
 {
-	char c;
+	int c;
 	int w;
 	int foreman_port = -1;
 	char * foreman_name = NULL;
@@ -1816,6 +1833,15 @@ int main(int argc, char *argv[])
 		case LONG_OPT_DEBUG_RELEASE:
 			setenv("WORK_QUEUE_RESET_DEBUG_FILE", "yes", 1);
 			break;
+		case LONG_OPT_CORES:
+			manual_cores_option = atoi(optarg);
+			break;
+		case LONG_OPT_MEMORY:
+			manual_memory_option = atoi(optarg);
+			break;
+		case LONG_OPT_DISK:
+			manual_disk_option = atoi(optarg);
+			break;
 		case 'h':
 		default:
 			show_help(argv[0]);
@@ -1839,6 +1865,7 @@ int main(int argc, char *argv[])
 	signal(SIGCHLD, handle_sigchld);
 
 	random_init();
+
 	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t)free_work_queue_master);
 	
 	if(!setup_workspace()) {
@@ -1881,6 +1908,16 @@ int main(int argc, char *argv[])
 	if(!check_disk_space_for_filesize(0)) {
 		goto abort;
 	}
+
+	local_resources = work_queue_resources_create();
+	work_queue_resources_measure(local_resources,workspace);
+
+	if(manual_cores_option)  local_resources->cores.total  = manual_cores_option;
+	if(manual_disk_option)   local_resources->disk.total   = manual_disk_option;
+	if(manual_memory_option) local_resources->memory.total = manual_memory_option;
+
+	debug(D_WQ,"local resources:");
+	work_queue_resources_debug(local_resources);
 
 	while(!abort_flag) {
 		if((master = connect_master(time(0) + idle_timeout)) == NULL) {

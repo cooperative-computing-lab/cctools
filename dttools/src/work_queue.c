@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "work_queue_protocol.h"
 #include "work_queue_internal.h"
 #include "work_queue_catalog.h"
+#include "work_queue_resources.h"
 
 #include "int_sizes.h"
 #include "link.h"
@@ -179,6 +180,7 @@ struct work_queue_worker {
 	char arch[WORKER_ARCH_NAME_MAX];
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
+	struct work_queue_resources *resources;
 	int ncpus;
 	int nslots;
 	INT64_T memory_avail;
@@ -496,6 +498,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	itable_delete(w->current_tasks);
 	hash_table_delete(w->current_files);
+	work_queue_resources_delete(w->resources);
 	free(w);
 
 	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
@@ -604,6 +607,7 @@ static int add_worker(struct work_queue *q)
 	w->current_tasks = itable_create(0);
 	w->running_tasks = w->finished_tasks = 0;
 	w->start_time = timestamp_get();
+	w->resources = work_queue_resources_create();
 	link_to_hash_key(link, w->hashkey);
 	sprintf(w->addrport, "%s:%d", addr, port);
 	hash_table_insert(q->worker_table, w->hashkey, w);
@@ -1368,29 +1372,29 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 static int process_worker_update(struct work_queue *q, struct work_queue_worker *w, const char *line)
 {
 	char category[WORK_QUEUE_LINE_MAX];
-	char arg[WORK_QUEUE_LINE_MAX];
+	struct work_queue_resource r;
 	
-	if(sscanf(line, "update %s %s", category, arg) != 2) {
-		return -1;
-	}
-	
-	if(!strcmp(category, "slots")) {
-		w->nslots = atoi(arg);
-		
+	if(sscanf(line, "update %s %d %d %d %d", category, &r.inuse,&r.total,&r.smallest,&r.largest)==5) {
+
+		if(!strcmp(category,"cores")) {
+			w->resources->cores = r;
+			w->nslots = r.total;
+		} else if(!strcmp(category,"memory")) {
+			w->resources->memory = r;
+		} else if(!strcmp(category,"disk")) {
+			w->resources->disk = r;
+		}
+
 		if(w->nslots > w->running_tasks) {
 			change_worker_state(q, w, w->running_tasks?WORKER_STATE_BUSY:WORKER_STATE_READY);
 		} else {
 			change_worker_state(q, w, WORKER_STATE_FULL);
 		}
-	} else if(!strcmp(category, "cpus")) {
-		w->ncpus = atoi(arg);
-	} else if(!strcmp(category, "disk")) {
-	} else if(!strcmp(category, "memory")) {
+
 	}
-	
+
 	return 0;
 }
-
 
 static void handle_worker(struct work_queue *q, struct link *l)
 {
@@ -3303,6 +3307,24 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->capacity = q->capacity;
 	s->avg_capacity = q->avg_capacity;
 	s->total_workers_connected = q->total_workers_connected;
+}
+
+void work_queue_get_resources( struct work_queue *q, struct work_queue_resources *total )
+{
+	struct work_queue_worker *w;
+	char *key;
+	int first = 1;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+		if(first) {
+			*total = *w->resources;
+			first = 0;
+		} else {
+			work_queue_resources_add(total,w->resources);
+		}
+	}
+
 }
 
 void work_queue_specify_log(struct work_queue *q, const char *logfile)
