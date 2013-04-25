@@ -154,7 +154,7 @@ static char *base_debug_filename = NULL;
 
 // Local resource controls
 static struct work_queue_resources * local_resources = 0;
-static int local_resources_changed = 1;
+static struct work_queue_resources * local_resources_last = 0;
 static int manual_cores_option = 0;
 static int manual_disk_option = 0;
 static int manual_memory_option = 0;
@@ -165,9 +165,6 @@ static struct itable *unfinished_tasks = NULL;
 
 // Forked task related
 static int task_status= TASK_NONE;
-static int max_worker_tasks = 1;
-static int max_worker_tasks_default = 1;
-static int current_worker_tasks = 0;
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
 
@@ -199,11 +196,6 @@ static void report_worker_ready(struct link *master)
 	name_of_pool = pool_name ? pool_name : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
 
 	link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s %s %s %s \n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, name_of_master, name_of_pool, os_name, arch_name, workspace, CCTOOLS_VERSION);
-	
-	if(worker_mode == WORKER_MODE_WORKER || worker_mode == WORKER_MODE_FOREMAN) {	
-		current_worker_tasks = max_worker_tasks;
-		link_putfstring(master, "update slots %d\n", time(0)+active_timeout, max_worker_tasks);
-	}
 }
 
 static void clear_task_info(struct task_info *ti)
@@ -1175,8 +1167,6 @@ static void disconnect_master(struct link *master) {
 	}
 	
 	worker_mode = worker_mode_default;
-	current_worker_tasks = 0;
-	max_worker_tasks = max_worker_tasks_default;
 	
 	if(released_by_master) {
 		released_by_master = 0;
@@ -1225,11 +1215,11 @@ static void abort_worker() {
 	delete_dir(workspace);
 }
 
-static void update_worker_status(struct link *master)
+static void send_resource_update(struct link *master)
 {
-	if(local_resources_changed) {
+	if(!memcmp(local_resources_last,local_resources,sizeof(*local_resources))) {
 		work_queue_resources_send(master,local_resources,time(0)+short_timeout);
-		local_resources_changed = 0;
+		memcpy(local_resources_last,local_resources,sizeof(*local_resources));
 	}
 }
 
@@ -1351,7 +1341,7 @@ static int worker_handle_master(struct link *master) {
 			r = 0;
 		} else if(!strncmp(line, "update", 6)) {
 			worker_mode = WORKER_MODE_WORKER;
-			update_worker_status(master);
+			send_resource_update(master);
 			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
@@ -1410,7 +1400,7 @@ static void work_for_master(struct link *master) {
 		}
 		
 		if(worker_mode == WORKER_MODE_WORKER) {
-			update_worker_status(master);
+			send_resource_update(master);
 		}
 		
 		int ok = 1;
@@ -1496,7 +1486,7 @@ static int foreman_handle_master(struct link *master) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
 		} else if(!strncmp(line, "update", 6)) {
-			update_worker_status(master);
+			send_resource_update(master);
 			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
@@ -1514,7 +1504,6 @@ static void foreman_for_master(struct link *master) {
 	static struct list *master_link = NULL;
 	static struct link *current_master = NULL;
 	static struct list *master_link_active = NULL;
-	struct work_queue_stats s;
 
 	if(!master) {
 		return;
@@ -1553,10 +1542,10 @@ static void foreman_for_master(struct link *master) {
 			result = 1;
 		}
 
-		work_queue_get_stats(foreman_q, &s);
-		max_worker_tasks = s.workers_ready + s.workers_busy + s.workers_full;
-
-		update_worker_status(master);
+		// BUG: we currently report the sum of disk space.
+		// Should be reporting the disk space available at the foreman.
+		work_queue_get_resources(foreman_q,local_resources);
+		send_resource_update(master);
 		
 		if(list_size(master_link_active)) {
 			result &= foreman_handle_master(list_pop_head(master_link_active));
@@ -1757,7 +1746,7 @@ int main(int argc, char *argv[])
 			idle_timeout = string_time_parse(optarg);
 			break;
 		case 'j':
-			max_worker_tasks = max_worker_tasks_default = atoi(optarg);
+			manual_cores_option = atoi(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -1910,6 +1899,7 @@ int main(int argc, char *argv[])
 	}
 
 	local_resources = work_queue_resources_create();
+	local_resources_last = work_queue_resources_create();
 	work_queue_resources_measure(local_resources,workspace);
 
 	if(manual_cores_option)  local_resources->cores.total  = manual_cores_option;
