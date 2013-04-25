@@ -2038,17 +2038,13 @@ static struct work_queue_worker *find_best_worker(struct work_queue *q, struct w
 
 	switch (a) {
 	case WORK_QUEUE_SCHEDULE_FILES:
-		debug(D_WQ, "Finding worker by Files");
 		return find_worker_by_files(q, t);
 	case WORK_QUEUE_SCHEDULE_TIME:
-		debug(D_WQ, "Finding worker by Time");
 		return find_worker_by_time(q);
 	case WORK_QUEUE_SCHEDULE_RAND:
-		debug(D_WQ, "Finding worker by Random");
 		return find_worker_by_random(q);
 	case WORK_QUEUE_SCHEDULE_FCFS:
 	default:
-		debug(D_WQ, "Finding worker by FCFS");
 		return find_worker_by_fcfs(q);
 	}
 }
@@ -2088,13 +2084,7 @@ static void start_tasks(struct work_queue *q)
 
 	while(list_size(q->ready_list) && (q->workers_in_state[WORKER_STATE_READY] || q->workers_in_state[WORKER_STATE_BUSY])) {
 		t = list_peek_head(q->ready_list);
-		debug(D_WQ, "finding worker for task %d", t->taskid);
 		w = find_best_worker(q, t);
-		if(w) {
-			debug(D_WQ, "Worker %s (%s) found for task %d.", w->hostname, w->addrport, t->taskid);
-		} else {
-			debug(D_WQ, "No worker found for task %d.", t->taskid);
-		}
 		if(w) {
 			start_task_on_worker(q, w);
 		} else {
@@ -2234,10 +2224,7 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 		itable_remove(q->finished_tasks, t->taskid);
 		itable_remove(q->worker_task_map, t->taskid);
 
-		if (t->tag)
-			debug(D_WQ, "Task with tag %s and id %d is aborted at worker %s (%s) and removed.", t->tag, t->taskid, w->hostname, w->addrport);
-		else
-			debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
+		debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
 			
 		//Delete any input files that are not to be cached.
 		delete_worker_files(w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
