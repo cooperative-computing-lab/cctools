@@ -168,6 +168,8 @@ struct work_queue {
 
 	char *password;
 	double bandwidth;
+
+	int total_worker_slots;
 };
 
 struct work_queue_worker {
@@ -272,6 +274,7 @@ static void log_worker_states(struct work_queue *q)
 	fprintf(q->logfile, "%25f %25f ", s.efficiency, s.idle_percentage);
 	fprintf(q->logfile, "%25d %25d ", s.capacity, s.avg_capacity);
 	fprintf(q->logfile, "%25d %25d ", s.port, s.priority);
+	fprintf(q->logfile, "%25d ", s.total_worker_slots);
 	fprintf(q->logfile, "\n");
 }
 
@@ -1081,6 +1084,7 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 		strncpy(w->version, "unknown", 8);
 		w->async_tasks = 0;
 		w->nslots = 1;
+		q->total_worker_slots += w->nslots;	
 	}
 
 	if(w->state == WORKER_STATE_INIT) {
@@ -1378,7 +1382,7 @@ static int process_worker_update(struct work_queue *q, struct work_queue_worker 
 	
 	if(!strcmp(category, "slots")) {
 		w->nslots = atoi(arg);
-		
+		q->total_worker_slots += w->nslots;	
 		if(w->nslots > w->running_tasks) {
 			change_worker_state(q, w, w->running_tasks?WORKER_STATE_BUSY:WORKER_STATE_READY);
 		} else {
@@ -3277,6 +3281,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->capacity = q->capacity;
 	s->avg_capacity = q->avg_capacity;
 	s->total_workers_connected = q->total_workers_connected;
+	s->total_worker_slots = q->total_worker_slots;
 }
 
 void work_queue_specify_log(struct work_queue *q, const char *logfile)
@@ -3284,14 +3289,14 @@ void work_queue_specify_log(struct work_queue *q, const char *logfile)
 	q->logfile = fopen(logfile, "a");
 	if(q->logfile) {
 		setvbuf(q->logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
-		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
+		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
 			"timestamp", "start_time",
 			"workers_init", "workers_ready", "workers_active", "workers_full", // workers
 			"tasks_waiting", "tasks_running", "tasks_complete", // tasks
 			"total_tasks_dispatched", "total_tasks_complete", "total_workers_joined", "total_workers_connected", // totals
 			"total_workers_removed", "total_bytes_sent", "total_bytes_received", "total_send_time", "total_receive_time",
 			"efficiency", "idle_percentage", "capacity", "avg_capacity", // other
-			"port", "priority");
+			"port", "priority", "total_worker_slots");
 		log_worker_states(q);
 	}
 	debug(D_WQ, "log enabled and is being written to %s\n", logfile);
