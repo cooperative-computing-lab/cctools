@@ -86,8 +86,6 @@ static const char *work_queue_state_names[] = {"init","ready","busy","full","non
 #define TIME_SLOT_MASTER_IDLE 2
 #define TIME_SLOT_APPLICATION 3
 
-#define POOL_DECISION_ENFORCEMENT_INTERVAL_DEFAULT 60
-
 #define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
 
 // work_queue_worker struct related
@@ -157,7 +155,6 @@ struct work_queue {
 
 	char catalog_host[DOMAIN_NAME_MAX];
 	int catalog_port;
-	struct hash_table *workers_by_pool;
 
 	FILE *logfile;
 	timestamp_t keepalive_interval;
@@ -193,8 +190,6 @@ struct work_queue_worker {
 	timestamp_t total_task_time;
 	timestamp_t total_transfer_time;
 	timestamp_t start_time;
-	char pool_name[WORK_QUEUE_POOL_NAME_MAX];
-	char workspace[WORKER_WORKSPACE_NAME_MAX];
 	timestamp_t last_msg_sent_time;
 	timestamp_t last_msg_recv_time;
 	timestamp_t keepalive_check_sent_time;
@@ -346,7 +341,7 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	if(string_prefix_is(line, "alive")) {
 		debug(D_WQ, "Received keepalive response from %s (%s)", w->hostname, w->addrport);
 		result = 0;	
-	} else if(string_prefix_is(line, "ready")) {
+	} else if(string_prefix_is(line, "workqueue")) {
 		result = process_ready(q, w, line);
 	} else if (string_prefix_is(line,"result")) {
 		result = process_result(q, w, line, stoptime);
@@ -467,11 +462,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	if(!q || !w) return;
 
-	if((w->pool_name)[0]) {
-		debug(D_WQ, "worker %s (%s) from pool \"%s\" removed", w->hostname, w->addrport, w->pool_name);
-	} else {
-		debug(D_WQ, "worker %s (%s) removed", w->hostname, w->addrport);
-	}
+	debug(D_WQ, "worker %s (%s) removed", w->hostname, w->addrport);
 
 	q->total_workers_removed++;
 
@@ -479,20 +470,6 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	hash_table_remove(q->worker_table, w->hashkey);
 	
-	if((w->pool_name)[0]) {
-		struct pool_info *pi;
-		pi = hash_table_lookup(q->workers_by_pool, w->pool_name);
-		if(!pi) {
-			debug(D_WQ, "Error: removing worker from pool \"%s\" but failed to find out how many workers are from that pool.", w->pool_name);
-		} else {
-			if(pi->count == 0) {
-				debug(D_WQ, "Error: removing worker from pool \"%s\" but record indicates no workers from that pool are connected.", w->pool_name);
-			} else {
-				pi->count -= 1;
-			}
-		}
-	}
-
 	change_worker_state(q, w, WORKER_STATE_NONE);
 	if(w->link)
 		link_close(w->link);
@@ -512,63 +489,6 @@ static int release_worker(struct work_queue *q, struct work_queue_worker *w)
 	send_worker_msg(w, "%s\n", time(0) + short_timeout, "release");
 	remove_worker(q, w);
 	return 1;
-}
-
-static int remove_workers_from_pool(struct work_queue *q, const char *pool_name, int workers_to_release) {
-	struct work_queue_worker *w;
-	char *key;
-	int i = 0;
-
-	if(!q)
-		return -1;
-
-	// send worker the "exit" msg
-	hash_table_firstkey(q->worker_table);
-	while(i < workers_to_release && hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(!strncmp(w->pool_name, pool_name, WORK_QUEUE_POOL_NAME_MAX)) {
-			release_worker(q, w);
-			i++;
-		}
-	}
-
-	return i;
-}
-
-static void enforce_pool_decisions(struct work_queue *q) {
-	struct list *decisions;
-
-	debug(D_WQ, "Get pool decision from catalog server.\n");
-	decisions = list_create();
-	if(!decisions) {
-		debug(D_WQ, "Failed to create list to store worker pool decisions!\n");
-		return;
-	}
-	if(!get_pool_decisions_from_catalog(q->catalog_host, q->catalog_port, q->name, decisions)) {
-		debug(D_WQ, "Failed to receive pool decisions from the catalog server(%s@%d)!\n", q->catalog_host, q->catalog_port);
-		return;
-	}
-
-	if(!list_size(decisions)) {
-		return;
-	}
-
-	struct pool_info *d;
-	list_first_item(decisions);
-	while((d = (struct pool_info *)list_next_item(decisions))) {
-		struct pool_info *pi;
-		pi = hash_table_lookup(q->workers_by_pool, d->name);
-		if(pi) {
-			debug(D_WQ, "Workers from pool %s: %d; Pool decison: %d\n", pi->name, pi->count, d->count);
-			int workers_to_release = pi->count - d->count;
-			if(workers_to_release > 0) {
-				int k = remove_workers_from_pool(q, pi->name, workers_to_release);
-				debug(D_WQ, "%d worker(s) has been rejected to enforce the pool decison.\n", k);
-			}
-		} 
-	}
-
-	list_free(decisions);
-	list_delete(decisions);
 }
 
 static int add_worker(struct work_queue *q)
@@ -1007,7 +927,8 @@ static int field_set(const char *field) {
 	return 1;
 }
 
-static int process_ready(struct work_queue *q, struct work_queue_worker *w, const char *line) {
+static int process_ready(struct work_queue *q, struct work_queue_worker *w, const char *line)
+{
 	if(!q || !w || !line) return -1;
 
 	//Format: hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, proj_name, pool_name, os, arch, workspace, version
@@ -1035,22 +956,7 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 		}
 	}
 
-	if(n >= 8 && field_set(items[7])) { // worker pool name
-		strncpy(w->pool_name, items[7], WORK_QUEUE_POOL_NAME_MAX);
-	} else {
-		strcpy(w->pool_name, "unmanaged");
-	}
-
-	struct pool_info *pi;
-	pi = hash_table_lookup(q->workers_by_pool, w->pool_name);
-	if(!pi) {
-		pi = xxmalloc(sizeof(*pi));
-		strncpy(pi->name, w->pool_name, WORK_QUEUE_POOL_NAME_MAX);
-		pi->count = 1;
-		hash_table_insert(q->workers_by_pool, w->pool_name, pi);
-	} else {
-		pi->count += 1;
-	}
+	// worker pool name was items[7]
 
 	if(n >= 9 && field_set(items[8])) { // operating system
 		strncpy(w->os, items[8], WORKER_OS_NAME_MAX);
@@ -1064,11 +970,8 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 		strcpy(w->arch, "unknown");
 	}
 
-	if(n >= 11 && field_set(items[10])) { // workspace
-		strncpy(w->workspace, items[10], WORKER_WORKSPACE_NAME_MAX);
-	} else {
-		strcpy(w->workspace, "unknown");
-	}
+	// workspace was items[10]
+        // the worker has no reason to reveal this.
 	
 	if(n >= 12 && field_set(items[11])) { // version
 		strncpy(w->version, items[11], WORKER_VERSION_NAME_MAX);
@@ -1198,6 +1101,9 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	return 0;
 }
 
+void work_queue_get_resources( struct work_queue *q, struct work_queue_resources *r );
+
+
 static struct nvpair * queue_to_nvpair( struct work_queue *q )
 {
 	struct nvpair *nv = nvpair_create();
@@ -1244,7 +1150,6 @@ struct nvpair * worker_to_nvpair( struct work_queue_worker *w )
 	nvpair_insert_string(nv,"hostname",w->hostname);
 	nvpair_insert_string(nv,"os",w->os);
 	nvpair_insert_string(nv,"arch",w->arch);
-	nvpair_insert_string(nv,"working_dir",w->workspace);
 	nvpair_insert_string(nv,"address_port",w->addrport);
 	nvpair_insert_integer(nv,"ncpus",w->resources->cores.total);
 	nvpair_insert_integer(nv,"total_tasks_complete",w->total_tasks_complete);
@@ -1318,7 +1223,6 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 					// Include detailed information on where the task is running:
 					// address and port, workspace
 					nvpair_insert_string(nv, "address_port", w->addrport);
-					nvpair_insert_string(nv, "working_dir", w->workspace);
 
 					// Timestamps on running task related events 
 					nvpair_insert_integer(nv, "submit_to_queue_time", t->time_task_submit); 
@@ -2696,8 +2600,6 @@ struct work_queue *work_queue_create(int port)
 	q->idle_times = list_create();
 	q->task_statistics = task_statistics_init();
 
-	q->workers_by_pool = hash_table_create(0,0);
-	
 	q->keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
 	q->keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT; 
 
@@ -2861,7 +2763,6 @@ int work_queue_specify_password_file( struct work_queue *q, const char *file )
 void work_queue_delete(struct work_queue *q)
 {
 	if(q) {
-		struct pool_info *pi;
 		struct work_queue_worker *w;
 		char *key;
 
@@ -2884,12 +2785,6 @@ void work_queue_delete(struct work_queue *q)
 		list_delete(q->idle_times);
 		task_statistics_destroy(q->task_statistics);
  
-		hash_table_firstkey(q->workers_by_pool);
-		while(hash_table_nextkey(q->workers_by_pool, &key, (void **) &pi)) {
-			free(pi);
-		}
-		hash_table_delete(q->workers_by_pool);
-		
 		free(q->poll_table);
 		link_close(q->master_link);
 		if(q->logfile) {
@@ -2983,16 +2878,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 	static timestamp_t last_left_time = 0;
 	static int last_left_status = 0;	// 0 -- did not return any done task; 1 -- returned done task 
-	static time_t next_pool_decision_enforcement = 0;
 
 	print_password_warning(q);
 
 	update_app_time(q, last_left_time, last_left_status);
-
-	if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && next_pool_decision_enforcement < time(0)) {
-		enforce_pool_decisions(q);
-		next_pool_decision_enforcement = time(0) + POOL_DECISION_ENFORCEMENT_INTERVAL_DEFAULT;
-	}
 
 	if(timeout == WORK_QUEUE_WAITFORTASK) {
 		stoptime = 0;
@@ -3255,28 +3144,7 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 
 char * work_queue_get_worker_summary( struct work_queue *q )
 {
-	char *key;
-	struct pool_info *pi;
-
-	struct buffer_t *b = buffer_create();
-
-	hash_table_firstkey(q->workers_by_pool);
-	while(hash_table_nextkey(q->workers_by_pool, &key, (void **) &pi)) {
-		buffer_printf(b,"%s:%d ",pi->name,pi->count);
-	}
-
-	size_t length;
-	char *result;
-	const char * buffer_string = buffer_tostring(b,&length);
-	if(buffer_string) {
-		result = xxstrdup(buffer_string);
-	} else {
-		result = xxmalloc(4 * sizeof(char));
-		strncpy(result, "n/a", 4);
-	}
-
-	buffer_delete(b);
-	return result;
+	return strdup("n/a");
 }
 
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
