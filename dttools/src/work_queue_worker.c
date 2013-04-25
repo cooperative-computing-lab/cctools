@@ -1598,6 +1598,8 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "                         Can be [w]orker, [f]oreman, [c]lassic, or [a]uto (default=auto).\n");
 	fprintf(stdout, " -f <port>[:<high_port>] Set the port for the foreman to listen on.  If <highport> is specified\n");
 	fprintf(stdout, "                         the port is chosen from the range port:highport\n");
+	fprintf(stdout, "c, --measure-capacity	  Enable the measurement of foreman capacity to handle new workers (default=disabled).\n");
+	fprintf(stdout, "F, --fast-abort <mult>	  Set the fast abort multiplier for foreman (default=disabled).\n");
 	fprintf(stdout, " -M <project>            Name of a preferred project. A worker can have multiple preferred projects.\n");
 	fprintf(stdout, " -N <project>            When in Foreman mode, the name of the project to advertise as.  In worker/classic/auto mode acts as '-M'.\n");
 	fprintf(stdout, " -P,--password <pwfile>  Password file for authenticating to the master.\n");
@@ -1677,6 +1679,8 @@ struct option long_options[] = {
 	{"volatility",          required_argument,  0,   LONG_OPT_VOLATILITY},
 	{"bandwidth",           required_argument,  0,   LONG_OPT_BANDWIDTH},
 	{"debug-release-reset", no_argument,        0,   LONG_OPT_DEBUG_RELEASE},
+	{"measure-capacity",    no_argument,        0,   'c'},
+	{"fast-abort",          required_argument,  0,   'F'},
 	{0,0,0,0}
 };
 
@@ -1688,7 +1692,9 @@ int main(int argc, char *argv[])
 	char * foreman_name = NULL;
 	struct utsname uname_data;
 	struct link *master = NULL;
-	
+	int enable_capacity = 0;
+	double fast_abort_multiplier = 0;
+
 	worker_start_time = time(0);
 
 	preferred_masters = list_create();
@@ -1705,7 +1711,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt_long(argc, argv, "aB:C:d:f:t:j:o:p:m:M:N:P:w:i:b:z:A:O:s:vh", long_options, 0)) != (char) -1) {
+	while((c = getopt_long(argc, argv, "aB:cC:d:f:F:t:j:o:p:m:M:N:P:w:i:b:z:A:O:s:vh", long_options, 0)) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
@@ -1743,6 +1749,12 @@ int main(int argc, char *argv[])
 			foreman_port = -1;
 			break;
 		}
+		case 'c':
+			enable_capacity = 1; 
+			break;
+		case 'F':
+			fast_abort_multiplier = atof(optarg); 
+			break;
 		case 't':
 			idle_timeout = string_time_parse(optarg);
 			break;
@@ -1872,6 +1884,8 @@ int main(int argc, char *argv[])
 			work_queue_specify_name(foreman_q, foreman_name);
 			work_queue_specify_master_mode(foreman_q, WORK_QUEUE_MASTER_MODE_CATALOG);
 		}
+		work_queue_specify_estimate_capacity_on(foreman_q, enable_capacity);
+		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);	
 		unfinished_tasks = itable_create(0);
 	} else {
 		active_tasks = itable_create(0);
