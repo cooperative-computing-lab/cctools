@@ -169,6 +169,8 @@ struct work_queue {
 
 	char *password;
 	double bandwidth;
+
+	int total_worker_slots;
 };
 
 struct work_queue_worker {
@@ -274,6 +276,7 @@ static void log_worker_states(struct work_queue *q)
 	fprintf(q->logfile, "%25f %25f ", s.efficiency, s.idle_percentage);
 	fprintf(q->logfile, "%25d %25d ", s.capacity, s.avg_capacity);
 	fprintf(q->logfile, "%25d %25d ", s.port, s.priority);
+	fprintf(q->logfile, "%25d ", s.total_worker_slots);
 	fprintf(q->logfile, "\n");
 }
 
@@ -348,6 +351,7 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	// Check for status updates that can be consumed here.
 	if(string_prefix_is(line, "alive")) {
 		debug(D_WQ, "Received keepalive response from %s (%s)", w->hostname, w->addrport);
+		result = 0;	
 	} else if(string_prefix_is(line, "ready")) {
 		result = process_ready(q, w, line);
 	} else if (string_prefix_is(line,"result")) {
@@ -451,6 +455,10 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 			t->total_bytes_transferred = 0;
 			t->total_transfer_time = 0;
 			t->cmd_execution_time = 0;
+			if(t->output) {
+				free(t->output);
+			}
+			t->output = 0;
 			list_push_head(q->ready_list, t);
 		}
 		itable_remove(q->running_tasks, t->taskid);
@@ -950,15 +958,13 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 {
 	struct work_queue_task *t;
 
-	t = itable_remove(w->current_tasks, taskid);
+	t = itable_lookup(w->current_tasks, taskid);
 	if(!t)
 		goto failure;
 
 	// Receiving output ...
 	t->time_receive_output_start = timestamp_get();
 	if(!get_output_files(t, w, q)) {
-		free(t->output);
-		t->output = 0;
 		goto failure;
 	}
 	t->time_receive_output_finish = timestamp_get();
@@ -966,7 +972,7 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	delete_uncacheable_files(t, w);
 
 	// At this point, a task is completed.
-
+	itable_remove(w->current_tasks, taskid);
 	itable_remove(q->finished_tasks, t->taskid);
 	list_push_head(q->complete_list, t);
 	itable_remove(q->worker_task_map, t->taskid);
@@ -1082,6 +1088,7 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 		strncpy(w->version, "unknown", 8);
 		w->async_tasks = 0;
 		w->nslots = 1;
+		q->total_worker_slots += w->nslots;	
 	}
 
 	if(w->state == WORKER_STATE_INIT) {
@@ -1163,8 +1170,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		actual = link_read(w->link, t->output, output_length, stoptime);
 		if(actual != output_length) {
 			debug(D_WQ, "Failure: actual received stdout size (%lld bytes) is different from expected (%lld bytes).", actual, output_length);
-			free(t->output);
-			t->output = 0;
+			t->output[actual] = '\0';
 			return -1;
 		}
 		if(effective_stoptime) {
@@ -2206,7 +2212,7 @@ static void do_keepalive_checks(struct work_queue *q) {
 	
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->state == WORKER_STATE_BUSY) {
+		if(w->state == WORKER_STATE_BUSY || w->state == WORKER_STATE_FULL) {
 			timestamp_t keepalive_elapsed_time = (current - w->last_msg_sent_time)/1000000;
 			// send new keepalive check only (1) if we received a response since last keepalive check AND 
 			// (2) we are past keepalive interval 
@@ -3307,6 +3313,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->capacity = q->capacity;
 	s->avg_capacity = q->avg_capacity;
 	s->total_workers_connected = q->total_workers_connected;
+	s->total_worker_slots = q->total_worker_slots;
 }
 
 void work_queue_get_resources( struct work_queue *q, struct work_queue_resources *total )
@@ -3332,15 +3339,15 @@ void work_queue_specify_log(struct work_queue *q, const char *logfile)
 	q->logfile = fopen(logfile, "a");
 	if(q->logfile) {
 		setvbuf(q->logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
-		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
+		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
 			"timestamp", "start_time",
 			"workers_init", "workers_ready", "workers_active", "workers_full", // workers
 			"tasks_waiting", "tasks_running", "tasks_complete", // tasks
 			"total_tasks_dispatched", "total_tasks_complete", "total_workers_joined", "total_workers_connected", // totals
 			"total_workers_removed", "total_bytes_sent", "total_bytes_received", "total_send_time", "total_receive_time",
 			"efficiency", "idle_percentage", "capacity", "avg_capacity", // other
-			"port", "priority");
+			"port", "priority", "total_worker_slots");
 		log_worker_states(q);
+		debug(D_WQ, "log enabled and is being written to %s\n", logfile);
 	}
-	debug(D_WQ, "log enabled and is being written to %s\n", logfile);
 }
