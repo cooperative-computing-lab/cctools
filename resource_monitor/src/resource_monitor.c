@@ -178,7 +178,7 @@ int    monitor_queue_fd = -1;  /* File descriptor of a datagram socket to which 
                                   grandchildren processes report to the monitor. */
 
 pid_t  first_process_pid;              /* pid of the process given at the command line */
-pid_t  first_process_exit_status;      /* exit status of the process given at the command line */
+pid_t  first_process_exit_status;      /* exit status flags of the process given at the command line */
 char  *over_limit_str = NULL;          /* string to report the limits exceeded */
 
 uint64_t usecs_initial;                /* Time at which monitoring started, in usecs. */
@@ -838,6 +838,7 @@ void acc_sys_io_usage(struct io_info *acc, struct io_info *other)
     acc->delta_chars_written += other->delta_chars_written;
 }
 
+/* This function is not correct. Better to read /proc/[pid]/maps */
 int get_map_io_usage(pid_t pid, struct io_info *io)
 {
     /* /dev/proc/[pid]/smaps */
@@ -1136,6 +1137,40 @@ void monitor_log_row(struct tree_info *tr)
 
 }
 
+void report_zombie_status(void)
+{
+  /* BUG: end and wall_time should be computed in a final
+   * summary, not here */
+  tree_max->wall_time = usecs_since_epoch() - usecs_initial;
+
+  fprintf(log_summary, "%-30s\t%lf\n", "end:", 
+      (double) (tree_max->wall_time + usecs_initial) / ONE_SECOND);
+
+  if( WIFEXITED(first_process_exit_status) )
+  {
+    debug(D_DEBUG, "process %d finished: %d.\n", first_process_exit_status, WEXITSTATUS(first_process_exit_status));
+    fprintf(log_summary, "%-30s\tnormal\n", "exit_type:");
+  } 
+  else if ( WIFSIGNALED(first_process_exit_status) )
+  {
+    debug(D_DEBUG, "process %d terminated: %s.\n", first_process_exit_status, strsignal(WTERMSIG(first_process_exit_status)) );
+
+    if(over_limit_str)
+    {
+      fprintf(log_summary, "%-30s\tlimit\n", "exit_type:");
+      fprintf(log_summary, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
+    }
+    else
+    {
+      fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
+      fprintf(log_summary, "%-30s\t%d %s\n", "signal:", 
+          WTERMSIG(first_process_exit_status), 
+          strsignal(WTERMSIG(first_process_exit_status)));
+    }
+  } 
+
+  fprintf(log_summary, "%-30s\t%d\n", "exit_status:", WEXITSTATUS(first_process_exit_status));
+}
 
 int monitor_final_summary()
 {
@@ -1143,6 +1178,8 @@ int monitor_final_summary()
 
     if(over_limit_str)
         status = -1;
+
+    report_zombie_status();
 
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", tree_max->max_concurrent_processes);
 
@@ -1159,10 +1196,10 @@ int monitor_final_summary()
     //Print the footprint in megabytes, rather than of bytes.
     fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
 
-    if(status && !first_process_exit_status)
+    if(status && !WEXITSTATUS(first_process_exit_status))
         return status;
     else
-        return first_process_exit_status;
+        return WEXITSTATUS(first_process_exit_status);
 }
 
 void monitor_write_open_file(char *filename)
@@ -1184,7 +1221,31 @@ int ping_process(pid_t pid)
     return (kill(pid, 0) == 0);
 }
 
+void cleanup_zombie(struct process_info *p)
+{
+  debug(D_DEBUG, "cleaning process: %d\n", p->pid);
 
+  if(p->pid == first_process_pid)
+    report_zombie_status();
+
+  if(p->wd)
+    dec_wd_count(p->wd);
+
+  itable_remove(processes, p->pid);
+  free(p);
+}
+
+void cleanup_zombies(void)
+{
+  uint64_t pid;
+  struct process_info *p;
+
+  itable_firstkey(processes);
+  while(itable_nextkey(processes, &pid, (void **) &p))
+    if(!p->running)
+      cleanup_zombie(p);
+}
+     
 void monitor_track_process(pid_t pid)
 {
     char *newpath;
@@ -1235,88 +1296,6 @@ void ping_processes(void)
         }
 }
 
-void cleanup_zombie(struct process_info *p)
-{
-    int status;
-
-    debug(D_DEBUG, "cleaning process: %d\n", p->pid);
-
-    //die zombie die
-    waitpid(p->pid, &status, WNOHANG);
-
-    if(p->pid == first_process_pid)
-    {
-        first_process_exit_status = WEXITSTATUS(status);
-
-        /* BUG: end and wall_time should be computed in a final
-         * summary, not here */
-        tree_max->wall_time = usecs_since_epoch() - usecs_initial;
-
-        fprintf(log_summary, "%-30s\t%lf\n", "end:", 
-                (double) (tree_max->wall_time + usecs_initial) / ONE_SECOND);
-
-        if( WIFEXITED(status) )
-        {
-            debug(D_DEBUG, "process %d finished: %d.\n", p->pid, first_process_exit_status );
-            fprintf(log_summary, "%-30s\tnormal\n", "exit_type:");
-        } 
-        else if ( WIFSIGNALED(status) )
-        {
-            debug(D_DEBUG, "process %d terminated: %s.\n", p->pid, strsignal(WTERMSIG(status)) );
-
-            if(over_limit_str)
-            {
-                fprintf(log_summary, "%-30s\tlimit\n", "exit_type:");
-                fprintf(log_summary, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
-            }
-            else
-            {
-                fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
-                fprintf(log_summary, "%-30s\t%d %s\n", "signal:", WTERMSIG(status), strsignal(WTERMSIG(status)));
-            }
-        } 
-
-        fprintf(log_summary, "%-30s\t%d\n", "exit_status:", first_process_exit_status);
-    }
-
-    if(p->wd)
-        dec_wd_count(p->wd);
-
-    itable_remove(processes, p->pid);
-    free(p);
-}
-
-void cleanup_zombies(void)
-{
-    uint64_t pid;
-    struct process_info *p;
-
-    itable_firstkey(processes);
-    while(itable_nextkey(processes, &pid, (void **) &p))
-        if(!p->running)
-            cleanup_zombie(p);
-}
-
-// Return the pid of the child that sent the signal, without removing the
-// waitable state.
-pid_t waiting_child()
-{
-    pid_t pid;
-    
-#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
-    int status;
-    pid = wait4(-1, &status, WNOWAIT, NULL);
-#else
-    siginfo_t cinfo;
-    if(waitid(P_ALL, 0, &cinfo, WEXITED | WNOWAIT) == 0)
-        pid = cinfo.si_pid;
-    else
-        return -1;
-#endif
-
-    return pid;
-}
-
 struct tree_info *monitor_rusage_tree(void)
 {
     struct rusage usg;
@@ -1345,33 +1324,40 @@ struct tree_info *monitor_rusage_tree(void)
 /* sigchild signal handler */
 void monitor_check_child(const int signal)
 {
-    uint64_t pid;
+    uint64_t pid = waitpid(first_process_pid, &first_process_exit_status, 
+                           WNOHANG | WCONTINUED | WUNTRACED);
 
-    //zombie, tell us who you were!
-    pid = waiting_child();
+    debug(D_DEBUG, "SIGCHLD from %d : ", pid);
 
-    debug(D_DEBUG, "SIGCHLD from %d\n", pid);
-    struct process_info *p = itable_lookup(processes, pid);
-    if(!p)
-        return;
-
-    if(p->pid == first_process_pid)
+    if(WIFEXITED(first_process_exit_status))
     {
-        debug(D_DEBUG, "adding all processes to cleanup list.\n");
-        itable_firstkey(processes);
-        while(itable_nextkey(processes, &pid, (void **) &p))
-            monitor_untrack_process(pid);
-
-        /* get the peak values from getrusage */
-        struct tree_info *tr_usg = monitor_rusage_tree();
-        monitor_find_max_tree(tree_max, tr_usg);
-        free(tr_usg);
+        debug(D_DEBUG, "exit\n");
     }
-    else
+    else if(WIFSIGNALED(first_process_exit_status))
     {
-        debug(D_DEBUG, "adding process %d to cleanup list.\n", pid);
-        monitor_untrack_process(p->pid);
+      debug(D_DEBUG, "signal\n");
     }
+    else if(WIFSTOPPED(first_process_exit_status))
+    {
+      debug(D_DEBUG, "stop\n");
+      return;
+    }
+    else if(WIFCONTINUED(first_process_exit_status))
+    {
+      debug(D_DEBUG, "continue\n");
+      return;
+    }
+
+    struct process_info *p;
+    debug(D_DEBUG, "adding all processes to cleanup list.\n");
+    itable_firstkey(processes);
+    while(itable_nextkey(processes, &pid, (void **) &p))
+      monitor_untrack_process(pid);
+
+    /* get the peak values from getrusage */
+    struct tree_info *tr_usg = monitor_rusage_tree();
+    monitor_find_max_tree(tree_max, tr_usg);
+    free(tr_usg);
 }
 
 //SIGINT, SIGQUIT, SIGTERM signal handler.
@@ -1415,7 +1401,6 @@ void monitor_final_cleanup(int signum)
         unlink(lib_helper_name);
 
     status = monitor_final_summary();
-
 
     fclose(log_summary);
     fclose(log_series);
