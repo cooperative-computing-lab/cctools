@@ -178,20 +178,6 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 */
 int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags);
 
-/** Add a file created or handled by an arbitrary command to a task (eg: wget, ftp, chirp_get|put).
-@param t A task object.
-@param remote_name The name of the file at the execution site.
-@param cmd The command to run on the remote node to retrieve or store the file.
-@param type Must be one of the following values:
-- @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
-- @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
-@param flags	May be zero to indicate no special handling or any of the following or'd together:
-- @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
-- @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
-@return 1 if the task command file is successfully specified, 0 if either of @a t, @a cmd, or @a remote_name is null or @a remote_name is an absolute path.
-*/
-int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags);
-
 /** Specify the amount of memory required by a task.
 @param t A task object.
 @param memory The amount of memory required by the task, in megabytes.
