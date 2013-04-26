@@ -19,6 +19,10 @@ when the total cores, tasks, and memory are within the specified limits.
 
 - A protocol version string should be sent at startup, so as
 to reject incompatible workers/masters.
+
+- When run with --cores greater than one and the work queue example
+app, there are regular pauses of five seconds, instead of a constant
+stream of results.
 */
 
 

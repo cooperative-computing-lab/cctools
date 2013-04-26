@@ -4,6 +4,23 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+/*
+The following major problems must be fixed before this code
+can be released:
+
+- Internally, the code relies on tracking workers in one
+of a handful of states.  This no longer makes sense when
+a single worker may run a handful of jobs.  Instead,
+we should simply be summing up the available resources
+and making decisions about that.  For example:
+
+- The capacity code assumes one task per worker.
+
+- The log specification need to be updated.
+
+- The details reported to the catalog should be examined.
+*/
+
 #include "work_queue.h"
 #include "work_queue_protocol.h"
 #include "work_queue_internal.h"
