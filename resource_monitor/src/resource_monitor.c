@@ -178,7 +178,7 @@ int    monitor_queue_fd = -1;  /* File descriptor of a datagram socket to which 
                                   grandchildren processes report to the monitor. */
 
 pid_t  first_process_pid;              /* pid of the process given at the command line */
-pid_t  first_process_exit_status;      /* exit status flags of the process given at the command line */
+pid_t  first_process_sigchild_status;      /* exit status flags of the process given at the command line */
 char  *over_limit_str = NULL;          /* string to report the limits exceeded */
 
 uint64_t usecs_initial;                /* Time at which monitoring started, in usecs. */
@@ -1146,14 +1146,14 @@ void report_zombie_status(void)
 	fprintf(log_summary, "%-30s\t%lf\n", "end:", 
 		(double) (tree_max->wall_time + usecs_initial) / ONE_SECOND);
 
-	if( WIFEXITED(first_process_exit_status) )
+	if( WIFEXITED(first_process_sigchild_status) )
 	{
-		debug(D_DEBUG, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(first_process_exit_status));
+		debug(D_DEBUG, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(first_process_sigchild_status));
 		fprintf(log_summary, "%-30s\tnormal\n", "exit_type:");
 	} 
-	else if ( WIFSIGNALED(first_process_exit_status) )
+	else if ( WIFSIGNALED(first_process_sigchild_status) )
 	{
-		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WTERMSIG(first_process_exit_status)) );
+		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WTERMSIG(first_process_sigchild_status)) );
 
 		if(over_limit_str)
 		{
@@ -1164,20 +1164,20 @@ void report_zombie_status(void)
 		{
 			fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
 			fprintf(log_summary, "%-30s\t%d %s\n", "signal:", 
-				WTERMSIG(first_process_exit_status), 
-				strsignal(WTERMSIG(first_process_exit_status)));
+				WTERMSIG(first_process_sigchild_status), 
+				strsignal(WTERMSIG(first_process_sigchild_status)));
 		}
 	} 
-	else if ( WIFSTOPPED(first_process_exit_status) )
+	else if ( WIFSTOPPED(first_process_sigchild_status) )
 	{
-		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WSTOPSIG(first_process_exit_status)) );
+		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WSTOPSIG(first_process_sigchild_status)) );
 		fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
 		fprintf(log_summary, "%-30s\t%d %s\n", "signal:", 
-			WSTOPSIG(first_process_exit_status), 
-			strsignal(WSTOPSIG(first_process_exit_status)));
+			WSTOPSIG(first_process_sigchild_status), 
+			strsignal(WSTOPSIG(first_process_sigchild_status)));
 	}
 
-	fprintf(log_summary, "%-30s\t%d\n", "exit_status:", WEXITSTATUS(first_process_exit_status));
+	fprintf(log_summary, "%-30s\t%d\n", "exit_status:", WEXITSTATUS(first_process_sigchild_status));
 }
 
 int monitor_final_summary()
@@ -1204,10 +1204,10 @@ int monitor_final_summary()
     //Print the footprint in megabytes, rather than of bytes.
     fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
 
-    if(status && !WEXITSTATUS(first_process_exit_status))
+    if(status && !WEXITSTATUS(first_process_sigchild_status))
         return status;
     else
-        return WEXITSTATUS(first_process_exit_status);
+        return WEXITSTATUS(first_process_sigchild_status);
 }
 
 void monitor_write_open_file(char *filename)
@@ -1329,24 +1329,24 @@ struct tree_info *monitor_rusage_tree(void)
 /* sigchild signal handler */
 void monitor_check_child(const int signal)
 {
-    uint64_t pid = waitpid(first_process_pid, &first_process_exit_status, 
+    uint64_t pid = waitpid(first_process_pid, &first_process_sigchild_status, 
                            WNOHANG | WCONTINUED | WUNTRACED);
 
     debug(D_DEBUG, "SIGCHLD from %d : ", pid);
 
-    if(WIFEXITED(first_process_exit_status))
+    if(WIFEXITED(first_process_sigchild_status))
     {
         debug(D_DEBUG, "exit\n");
     }
-    else if(WIFSIGNALED(first_process_exit_status))
+    else if(WIFSIGNALED(first_process_sigchild_status))
     {
       debug(D_DEBUG, "signal\n");
     }
-    else if(WIFSTOPPED(first_process_exit_status))
+    else if(WIFSTOPPED(first_process_sigchild_status))
     {
       debug(D_DEBUG, "stop\n");
 
-      switch(WSTOPSIG(first_process_exit_status))
+      switch(WSTOPSIG(first_process_sigchild_status))
       {
         case SIGTTIN: 
           debug(D_NOTICE, "Process asked for input from the terminal, but currently the resource monitor does not support interactive applications.\n");
@@ -1359,7 +1359,7 @@ void monitor_check_child(const int signal)
           break;
       }
     }
-    else if(WIFCONTINUED(first_process_exit_status))
+    else if(WIFCONTINUED(first_process_sigchild_status))
     {
       debug(D_DEBUG, "continue\n");
       return;
