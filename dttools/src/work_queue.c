@@ -236,7 +236,7 @@ static void update_app_time(struct work_queue *q, timestamp_t last_left_time, in
 static int process_ready(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
-static int process_worker_update(struct work_queue *q, struct work_queue_worker *w, const char *line); 
+static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line); 
 
 static int short_timeout = 5;
 
@@ -347,8 +347,8 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 		result = process_result(q, w, line, stoptime);
 	} else if (string_prefix_is(line,"worker_status") || string_prefix_is(line, "queue_status") || string_prefix_is(line, "task_status")) {
 		result = process_queue_status(q, w, line, stoptime);
-	} else if (string_prefix_is(line, "update")) {
-		result = process_worker_update(q, w, line);
+	} else if (string_prefix_is(line, "resource")) {
+		result = process_resource(q, w, line);
 	} else {
 		// Message is not a status update: return it to the user.
 		return 1;
@@ -920,71 +920,26 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	return 0;
 }
 
-static int field_set(const char *field) {
-	if(strncmp(field, WORK_QUEUE_PROTOCOL_BLANK_FIELD, strlen(WORK_QUEUE_PROTOCOL_BLANK_FIELD) + 1) == 0) {
-		return 0;
-	}
-	return 1;
-}
+/*
+A ready message indicates all of the resource updates
+have been sent, adn the worker is ready to start doing work.
+The message contains nothing else.
+*/
 
 static int process_ready(struct work_queue *q, struct work_queue_worker *w, const char *line)
 {
-	if(!q || !w || !line) return -1;
+	char items[4][WORK_QUEUE_LINE_MAX];
 
-	//Format: hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, proj_name, pool_name, os, arch, workspace, version
-	char items[12][WORK_QUEUE_PROTOCOL_FIELD_MAX];
-	int n = sscanf(line, "ready %s %s %s %s %s %s %s %s %s %s %s %s", items[0], items[1], items[2], items[3], items[4], items[5], items[6], items[7], items[8], items[9], items[10], items[11]);
+	int n = sscanf(line,"ready %s %s %s %s",items[0],items[1],items[2],items[3]);
+	if(n!=4) return -1;
 
-	if(n < 6) {
-		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-		return -1;
-	}
-
-	// Copy basic fields 
-	strncpy(w->hostname, items[0], DOMAIN_NAME_MAX);
-
-	// Items 1-6 were basic information about cores, memory and disk,
-	// but have been superseded by the resource update messages.
-
-	if(n >= 7 && field_set(items[6])) { // intended project name
-		if(q->name) {
-			if(strncmp(q->name, items[6], WORK_QUEUE_NAME_MAX) != 0) {
-				goto reject;
-			}
-		} else {
-			goto reject;
-		}
-	}
-
-	// worker pool name was items[7]
-
-	if(n >= 9 && field_set(items[8])) { // operating system
-		strncpy(w->os, items[8], WORKER_OS_NAME_MAX);
-	} else {
-		strcpy(w->os, "unknown");
-	}
-
-	if(n >= 10 && field_set(items[9])) { // architecture
-		strncpy(w->arch, items[9], WORKER_ARCH_NAME_MAX);
-	} else {
-		strcpy(w->arch, "unknown");
-	}
-
-	// workspace was items[10]
-        // the worker has no reason to reveal this.
-	
-	if(n >= 12 && field_set(items[11])) { // version
-		strncpy(w->version, items[11], WORKER_VERSION_NAME_MAX);
-		w->async_tasks = 1;
-		send_worker_msg(w, "update\n", time(0)+short_timeout);
-	} else {
-		strncpy(w->version, "unknown", 8);
-		w->async_tasks = 0;
-	}
+	strncpy(w->hostname,items[0],DOMAIN_NAME_MAX);
+	strncpy(w->os,items[1],WORKER_OS_NAME_MAX);
+	strncpy(w->arch,items[2],WORKER_ARCH_NAME_MAX);
+	strncpy(w->version,items[3],WORKER_VERSION_NAME_MAX);
 
 	if(w->state == WORKER_STATE_INIT) {
 		change_worker_state(q, w, WORKER_STATE_READY);
-		//list_push_tail(q->ready_workers, w);
 		q->total_workers_connected++;
 		debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
 	}
@@ -993,12 +948,7 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 		debug(D_DEBUG, "Warning: potential worker version mismatch: worker %s (%s) is version %s, and master is version %s", w->hostname, w->addrport, w->version, CCTOOLS_VERSION);
 	}
 	
-
 	return 0;
-
-reject:
-	debug(D_NOTICE, "%s (%s) is rejected: the worker's intended project name (%s) does not match the master's (%s).", w->hostname, w->addrport, items[7], q->name);
-	return -1;
 }
 
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime) {
@@ -1272,12 +1222,12 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	return 0;
 }
 
-static int process_worker_update(struct work_queue *q, struct work_queue_worker *w, const char *line)
+static int process_resource( struct work_queue *q, struct work_queue_worker *w, const char *line )
 {
 	char category[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
 	
-	if(sscanf(line, "update %s %d %d %d %d", category, &r.inuse,&r.total,&r.smallest,&r.largest)==5) {
+	if(sscanf(line, "resource %s %d %d %d %d", category, &r.inuse,&r.total,&r.smallest,&r.largest)==5) {
 
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;

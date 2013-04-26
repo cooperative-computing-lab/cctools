@@ -45,7 +45,7 @@ void work_queue_resources_measure( struct work_queue_resources *r, const char *d
 
 static void work_queue_resource_send( struct link *master, struct work_queue_resource *r, const char *name, time_t stoptime )
 {
-	link_putfstring(master, "update %s %d %d %d %d\n", stoptime, name, r->inuse, r->total, r->smallest, r->largest );
+	link_putfstring(master, "resource %s %d %d %d %d\n", stoptime, name, r->inuse, r->total, r->smallest, r->largest );
 }
 
 void work_queue_resources_send( struct link *master, struct work_queue_resources *r, time_t stoptime )

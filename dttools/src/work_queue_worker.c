@@ -65,14 +65,8 @@ See the file COPYING for details.
 extern int setenv(const char *name, const char *value, int overwrite);
 #endif
 
-#define STDOUT_BUFFER_SIZE 1048576        
-
 #define MIN_TERMINATE_BOUNDARY 0 
 #define TERMINATE_BOUNDARY_LEEWAY 30
-
-#define PIPE_ACTIVE 1
-#define LINK_ACTIVE 2
-#define POLL_FAIL 4
 
 #define TASK_NONE 0
 #define TASK_RUNNING 1
@@ -81,7 +75,6 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_MODE_CLASSIC 1
 #define WORKER_MODE_WORKER  2
 #define WORKER_MODE_FOREMAN 3
-
 
 struct task_info {
 	int taskid;
@@ -179,23 +172,23 @@ static struct hash_cache *bad_masters = NULL;
 static int released_by_master = 0;
 static char *current_project = NULL;
 
-static void report_worker_ready(struct link *master)
+static void send_resource_update( struct link *master, int force_update )
+{
+	time_t stoptime = time(0) + short_timeout;
+
+	if(force_update || memcmp(local_resources_last,local_resources,sizeof(*local_resources))) {
+		work_queue_resources_send(master,local_resources,stoptime);
+		memcpy(local_resources_last,local_resources,sizeof(*local_resources));
+	}
+}
+
+static void report_worker_ready( struct link *master )
 {
 	char hostname[DOMAIN_NAME_MAX];
-	UINT64_T memory_avail, memory_total;
-	UINT64_T disk_avail, disk_total;
-	int ncpus;
-	char *name_of_master;
-	char *name_of_pool;
-
+	time_t stoptime = time(0) + short_timeout;
 	domain_name_cache_guess(hostname);
-	ncpus = load_average_get_cpus();
-	memory_info_get(&memory_avail, &memory_total);
-	disk_info_get(".", &disk_avail, &disk_total);
-	name_of_master = actual_master ? actual_master->proj : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
-	name_of_pool = pool_name ? pool_name : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
-
-	link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s %s %s %s \n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, name_of_master, name_of_pool, os_name, arch_name, workspace, CCTOOLS_VERSION);
+	link_putfstring(master,"ready %s %s %s %s\n",stoptime,hostname,os_name,arch_name,CCTOOLS_VERSION);
+	send_resource_update(master,1);
 }
 
 static void clear_task_info(struct task_info *ti)
@@ -1223,14 +1216,6 @@ static void abort_worker() {
 	delete_dir(workspace);
 }
 
-static void send_resource_update(struct link *master)
-{
-	if(memcmp(local_resources_last,local_resources,sizeof(*local_resources))) {
-		work_queue_resources_send(master,local_resources,time(0)+short_timeout);
-		memcpy(local_resources_last,local_resources,sizeof(*local_resources));
-	}
-}
-
 static int path_within_workspace(const char *path, const char *workspace) {
 	if(!path) return 0;
 
@@ -1347,10 +1332,6 @@ static int worker_handle_master(struct link *master) {
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
-		} else if(!strncmp(line, "update", 6)) {
-			worker_mode = WORKER_MODE_WORKER;
-			send_resource_update(master);
-			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
@@ -1408,7 +1389,7 @@ static void work_for_master(struct link *master) {
 		}
 		
 		if(worker_mode == WORKER_MODE_WORKER) {
-			send_resource_update(master);
+			send_resource_update(master,0);
 		}
 		
 		int ok = 1;
@@ -1493,9 +1474,6 @@ static int foreman_handle_master(struct link *master) {
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
-		} else if(!strncmp(line, "update", 6)) {
-			send_resource_update(master);
-			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
@@ -1553,7 +1531,7 @@ static void foreman_for_master(struct link *master) {
 		// BUG: we currently report the sum of disk space.
 		// Should be reporting the disk space available at the foreman.
 		work_queue_get_resources(foreman_q,local_resources);
-		send_resource_update(master);
+		send_resource_update(master,0);
 		
 		if(list_size(master_link_active)) {
 			result &= foreman_handle_master(list_pop_head(master_link_active));
