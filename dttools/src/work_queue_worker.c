@@ -1902,6 +1902,11 @@ int main(int argc, char *argv[])
 	debug(D_WQ,"local resources:");
 	work_queue_resources_debug(local_resources);
 
+	printf("work_queue_worker: %d cores, %d MB memory, %d MB disk available\n",
+	       local_resources->cores.total,
+	       local_resources->memory.total,
+	       local_resources->disk.total);
+
 	while(!abort_flag) {
 		if((master = connect_master(time(0) + idle_timeout)) == NULL) {
 			break;
