@@ -314,12 +314,11 @@ static int send_worker_msg(struct work_queue_worker *w, const char *fmt, time_t 
 	
 	va_start(va, stoptime);
 	
-	sprintf(debug_msg, "Message to worker %s (%s): ", w->hostname, w->addrport);
+	sprintf(debug_msg, "%s (%s) <-- ", w->hostname, w->addrport);
 	strcat(debug_msg, fmt);
 	va_copy(debug_va, va);
 	vdebug(D_WQ, debug_msg, debug_va);
 	
-	//call link_putvfstring to send the message on the link
 	int result = link_putvfstring(w->link, fmt, stoptime, va);	
 	if (result > 0) 
 		w->last_msg_sent_time = timestamp_get();		
@@ -347,11 +346,10 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	
 	w->last_msg_recv_time = timestamp_get();
 
-	debug(D_WQ, "Received message from %s (%s): %s", w->hostname, w->addrport, line);
+	debug(D_WQ, "%s (%s) --> %s", w->hostname, w->addrport, line);
 	
 	// Check for status updates that can be consumed here.
 	if(string_prefix_is(line, "alive")) {
-		debug(D_WQ, "Received keepalive response from %s (%s)", w->hostname, w->addrport);
 		result = 0;	
 	} else if(string_prefix_is(line, "workqueue")) {
 		result = process_workqueue(q, w, line);
@@ -615,7 +613,6 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 			strcat(tmp_local_name, &(tmp_remote_name[remote_name_len]));
 
 			if(strncmp(type, "dir", 3) == 0) {
-				debug(D_WQ, "%s (%s) dir %s", w->hostname, w->addrport, tmp_local_name);
 				if(!create_dir(tmp_local_name, 0700)) {
 					debug(D_WQ, "Cannot create directory - %s (%s)", tmp_local_name, strerror(errno));
 					goto failure;
@@ -846,7 +843,6 @@ static void delete_worker_files(struct work_queue_worker *w, struct list *files,
 	list_first_item(files);
 	while((tf = list_next_item(files))) {
 		if(!(tf->flags & except_flags)) {
-			debug(D_WQ, "%s (%s) unlink %s", w->hostname, w->addrport, tf->remote_name);
 			send_worker_msg(w, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
 		}
 	}
