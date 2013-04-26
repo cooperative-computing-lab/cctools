@@ -167,6 +167,30 @@ static struct hash_cache *bad_masters = NULL;
 static int released_by_master = 0;
 static char *current_project = NULL;
 
+static void send_master_message( struct link *master, const char *fmt, ... )
+{
+	char debug_msg[2*WORK_QUEUE_LINE_MAX];
+	va_list va;
+	va_list debug_va;
+	
+	va_start(va,fmt);
+
+	sprintf(debug_msg, "<-- %s", fmt);
+	va_copy(debug_va, va);
+
+	vdebug(D_WQ, debug_msg, debug_va);
+	link_putvfstring(master, fmt, time(0)+active_timeout, va);	
+
+	va_end(va);
+}
+
+static int recv_master_message( struct link *master, char *line, int length, time_t stoptime )
+{
+	int result = link_readline(master,line,length,time(0)+active_timeout);
+	if(result) debug(D_WQ,"--> %s",line);
+	return result;
+}
+
 static void send_resource_update( struct link *master, int force_update )
 {
 	time_t stoptime = time(0) + active_timeout;
@@ -180,9 +204,8 @@ static void send_resource_update( struct link *master, int force_update )
 static void report_worker_ready( struct link *master )
 {
 	char hostname[DOMAIN_NAME_MAX];
-	time_t stoptime = time(0) + active_timeout;
 	domain_name_cache_guess(hostname);
-	link_putfstring(master,"ready %s %s %s %s\n",stoptime,hostname,os_name,arch_name,CCTOOLS_VERSION);
+	send_master_message(master,"ready %s %s %s %s\n",hostname,os_name,arch_name,CCTOOLS_VERSION);
 	send_resource_update(master,1);
 }
 
@@ -258,8 +281,7 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		fstat(ti->output_fd, &st);
 		output_length = st.st_size;
 		lseek(ti->output_fd, 0, SEEK_SET);
-		debug(D_WQ, "Task complete: result %d %lld %llu %d", ti->status, output_length, ti->execution_end - ti->execution_start, ti->taskid);
-		link_putfstring(master, "result %d %lld %llu %d\n", time(0) + active_timeout, ti->status, output_length, ti->execution_end-ti->execution_start, ti->taskid);
+		send_master_message(master, "result %d %lld %llu %d\n", ti->status, output_length, ti->execution_end-ti->execution_start, ti->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
 	} else if(t) {
 		if(t->output) {
@@ -267,8 +289,7 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		} else {
 			output_length = 0;
 		}
-		debug(D_WQ, "Task complete: result %d %lld %llu %d", t->return_status, output_length, t->cmd_execution_time, t->taskid);
-		link_putfstring(master, "result %d %lld %llu %d\n", time(0) + active_timeout, t->return_status, output_length, t->cmd_execution_time, t->taskid);
+		send_master_message(master, "result %d %lld %llu %d\n",t->return_status, output_length, t->cmd_execution_time, t->taskid);
 		if(output_length) {
 			link_putlstring(master, t->output, output_length, time(0)+active_timeout);
 		}
@@ -651,7 +672,7 @@ static int stream_output_item(struct link *master, const char *filename)
 		if(!dir) {
 			goto failure;
 		}
-		link_putfstring(master, "dir %s %lld\n", time(0) + active_timeout, filename, (INT64_T) 0);
+		send_master_message(master, "dir %s %lld\n", filename, (INT64_T) 0);
 
 		while((dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
@@ -666,7 +687,7 @@ static int stream_output_item(struct link *master, const char *filename)
 		fd = open(filename, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = (INT64_T) info.st_size;
-			link_putfstring(master, "file %s %lld\n", time(0) + active_timeout, filename, length);
+			send_master_message(master, "file %s %lld\n", filename, length);
 			actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
 			close(fd);
 			if(actual != length) {
@@ -681,8 +702,7 @@ static int stream_output_item(struct link *master, const char *filename)
 	return 1;
 
 failure:
-	fprintf(stderr, "Failed to transfer ouput item - %s. (%s)\n", filename, strerror(errno));
-	link_putfstring(master, "missing %s %d\n", time(0) + active_timeout, filename, errno);
+	send_master_message(master, "missing %s %d\n", filename, errno);
 	return 0;
 }
 
@@ -754,12 +774,13 @@ static int do_task( struct link *master, UINT64_T taskid )
 	char filename[WORK_QUEUE_LINE_MAX];
 	int n, flags, length;
 
-	while(link_readline(master,line,sizeof(line),stoptime)) {
+	while(recv_master_message(master,line,sizeof(line),stoptime)) {
 	  	if(sscanf(line,"cmd %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(master,cmd,length,stoptime);
 			cmd[length] = 0;
 			work_queue_task_specify_command(task,cmd);
+			debug(D_WQ,"--> %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %d",filename,&flags)) {
 		       	work_queue_task_specify_file(task,filename,filename,WORK_QUEUE_INPUT,flags);
@@ -815,11 +836,9 @@ static int do_task( struct link *master, UINT64_T taskid )
 static int do_stat(struct link *master, const char *filename) {
 	struct stat st;
 	if(!stat(filename, &st)) {
-		debug(D_WQ, "result 1 %lu %lu", (unsigned long int) st.st_size, (unsigned long int) st.st_mtime);
-		link_putfstring(master, "result 1 %lu %lu\n", time(0) + active_timeout, (unsigned long int) st.st_size, (unsigned long int) st.st_mtime);
+		send_master_message(master, "result 1 %lu %lu\n",(unsigned long int) st.st_size, (unsigned long int) st.st_mtime);
 	} else {
-		debug(D_WQ, "result 0 0 0");
-		link_putliteral(master, "result 0 0 0\n", time(0) + active_timeout);
+		send_master_message(master, "result 0 0 0\n");
 	}
 	return 1;
 }
@@ -914,7 +933,7 @@ static int do_mkdir(const char *filename, int mode) {
 
 static int do_rget(struct link *master, const char *filename) {
 	stream_output_item(master, filename);
-	link_putliteral(master, "end\n", time(0) + active_timeout);
+	send_master_message(master, "end\n");
 	return 1;
 }
 
@@ -930,7 +949,7 @@ static int do_get(struct link *master, const char *filename) {
 	fd = open(filename, O_RDONLY, 0);
 	if(fd >= 0) {
 		length = (INT64_T) info.st_size;
-		link_putfstring(master, "%lld\n", time(0) + active_timeout, length);
+		send_master_message(master, "%lld\n",length);
 		INT64_T actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
 		close(fd);
 		if(actual != length) {
@@ -1027,7 +1046,7 @@ static int do_thirdput(struct link *master, int mode, const char *filename, cons
 		}
 		break;
 	}
-	link_putliteral(master, "thirdput complete\n", time(0) + active_timeout);
+	send_master_message(master, "thirdput complete\n");
 	return 1;
 
 }
@@ -1130,8 +1149,7 @@ static int do_reset() {
 }
 
 static int send_keepalive(struct link *master){
-	link_putliteral(master, "alive\n", time(0) + active_timeout);
-	debug(D_WQ, "sent response to keepalive check from master at %s:%d.\n", actual_addr, actual_port);
+	send_master_message(master, "alive\n");
 	return 1;
 }
 
@@ -1243,8 +1261,7 @@ static int worker_handle_master(struct link *master) {
 	int flags = WORK_QUEUE_NOCACHE;
 	int mode, r, n;
 
-	if(link_readline(master, line, sizeof(line), time(0)+active_timeout)) {
-		debug(D_WQ, "received command: %s.\n", line);
+	if(recv_master_message(master, line, sizeof(line), time(0)+active_timeout)) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(master,taskid);
 		} else if(sscanf(line, "stat %s", filename) == 1) {
@@ -1387,8 +1404,7 @@ static int foreman_handle_master(struct link *master) {
 	INT64_T taskid;
 	int mode, flags, r;
 
-	if(link_readline(master, line, sizeof(line), time(0)+active_timeout)) {
-		debug(D_WQ, "received command: %s.\n", line);
+	if(recv_master_message(master, line, sizeof(line), time(0)+active_timeout)) {
 		if(sscanf(line, "task %" SCNd64 ,&taskid)==1) {
 			r = do_task(master,taskid);
 		} else if(sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags) == 5) {
