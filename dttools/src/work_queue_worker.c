@@ -12,6 +12,8 @@ before it can be released:
 with the same filenames will not interfere.  This should be done
 by creating a directory in do_task, allowing for a put command
 in the middle of the task transaction, and symlinking in common files.
+Then, when the master is done with a task, it should send a cancel
+task message, which causes the directory and all to be cleaned up.
 
 - Currently, all tasks sent are started immediately.  Instead, the
 worker should queue up all tasks sent, and only start them
