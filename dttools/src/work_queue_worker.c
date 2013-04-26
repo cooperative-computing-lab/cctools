@@ -169,7 +169,7 @@ static char *current_project = NULL;
 
 static void send_resource_update( struct link *master, int force_update )
 {
-	time_t stoptime = time(0) + short_timeout;
+	time_t stoptime = time(0) + active_timeout;
 
 	if(force_update || memcmp(local_resources_last,local_resources,sizeof(*local_resources))) {
 		work_queue_resources_send(master,local_resources,stoptime);
@@ -180,7 +180,7 @@ static void send_resource_update( struct link *master, int force_update )
 static void report_worker_ready( struct link *master )
 {
 	char hostname[DOMAIN_NAME_MAX];
-	time_t stoptime = time(0) + short_timeout;
+	time_t stoptime = time(0) + active_timeout;
 	domain_name_cache_guess(hostname);
 	link_putfstring(master,"ready %s %s %s %s\n",stoptime,hostname,os_name,arch_name,CCTOOLS_VERSION);
 	send_resource_update(master,1);
@@ -1243,7 +1243,7 @@ static int worker_handle_master(struct link *master) {
 	int flags = WORK_QUEUE_NOCACHE;
 	int mode, r, n;
 
-	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
+	if(link_readline(master, line, sizeof(line), time(0)+active_timeout)) {
 		debug(D_WQ, "received command: %s.\n", line);
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(master,taskid);
@@ -1387,7 +1387,7 @@ static int foreman_handle_master(struct link *master) {
 	INT64_T taskid;
 	int mode, flags, r;
 
-	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
+	if(link_readline(master, line, sizeof(line), time(0)+active_timeout)) {
 		debug(D_WQ, "received command: %s.\n", line);
 		if(sscanf(line, "task %" SCNd64 ,&taskid)==1) {
 			r = do_task(master,taskid);
