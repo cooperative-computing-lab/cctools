@@ -89,9 +89,6 @@ static const char *work_queue_state_names[] = {"init","ready","busy","full","non
 #define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
 
 // work_queue_worker struct related
-#define WORKER_VERSION_NAME_MAX 128
-#define WORKER_OS_NAME_MAX 65
-#define WORKER_ARCH_NAME_MAX 65
 #define WORKER_ADDRPORT_MAX 32
 #define WORKER_HASHKEY_MAX 32
 
@@ -171,10 +168,10 @@ struct work_queue {
 struct work_queue_worker {
 	int state;
 	int async_tasks;  // Can this worker support asynchronous tasks? (aka is it a new worker?)
-	char hostname[DOMAIN_NAME_MAX];
-	char version[WORKER_VERSION_NAME_MAX];
-	char os[WORKER_OS_NAME_MAX];
-	char arch[WORKER_ARCH_NAME_MAX];
+	char *hostname;
+	char *os;
+	char *arch;
+	char *version;
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 	struct work_queue_resources *resources;
@@ -477,6 +474,10 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	itable_delete(w->current_tasks);
 	hash_table_delete(w->current_files);
 	work_queue_resources_delete(w->resources);
+	free(w->hostname);
+	free(w->os);
+	free(w->arch);
+	free(w->version);
 	free(w);
 
 	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
@@ -522,6 +523,10 @@ static int add_worker(struct work_queue *q)
 
 	w = malloc(sizeof(*w));
 	memset(w, 0, sizeof(*w));
+	w->hostname = strdup("unknown");
+	w->os = strdup("unknown");
+	w->arch = strdup("unknown");
+	w->version = strdup("unknown");
 	w->state = WORKER_STATE_NONE;
 	w->link = link;
 	w->current_files = hash_table_create(0, 0);
@@ -920,12 +925,6 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	return 0;
 }
 
-/*
-A ready message indicates all of the resource updates
-have been sent, adn the worker is ready to start doing work.
-The message contains nothing else.
-*/
-
 static int process_ready(struct work_queue *q, struct work_queue_worker *w, const char *line)
 {
 	char items[4][WORK_QUEUE_LINE_MAX];
@@ -933,10 +932,10 @@ static int process_ready(struct work_queue *q, struct work_queue_worker *w, cons
 	int n = sscanf(line,"ready %s %s %s %s",items[0],items[1],items[2],items[3]);
 	if(n!=4) return -1;
 
-	strncpy(w->hostname,items[0],DOMAIN_NAME_MAX);
-	strncpy(w->os,items[1],WORKER_OS_NAME_MAX);
-	strncpy(w->arch,items[2],WORKER_ARCH_NAME_MAX);
-	strncpy(w->version,items[3],WORKER_VERSION_NAME_MAX);
+	w->hostname = strdup(items[0]);
+	w->os       = strdup(items[1]);
+	w->arch     = strdup(items[2]);
+	w->version  = strdup(items[3]);
 
 	if(w->state == WORKER_STATE_INIT) {
 		change_worker_state(q, w, WORKER_STATE_READY);
