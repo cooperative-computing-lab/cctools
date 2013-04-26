@@ -2240,7 +2240,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	struct work_queue_task *t = malloc(sizeof(*t));
 	memset(t, 0, sizeof(*t));
 
-	if(t->command_line) t->command_line = xxstrdup(command_line);
+	if(command_line) t->command_line = xxstrdup(command_line);
 
 	t->worker_selection_algorithm = WORK_QUEUE_SCHEDULE_UNSET;
 	t->input_files = list_create();
