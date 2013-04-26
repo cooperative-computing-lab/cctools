@@ -19,9 +19,6 @@ task message, which causes the directory and all to be cleaned up.
 worker should queue up all tasks sent, and only start them
 when the total cores, tasks, and memory are within the specified limits.
 
-- A protocol version string should be sent at startup, so as
-to reject incompatible workers/masters.
-
 - When run with --cores greater than one and the work queue example
 app, there are regular pauses of five seconds, instead of a constant
 stream of results.
@@ -229,7 +226,7 @@ static void report_worker_ready( struct link *master )
 {
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
-	send_master_message(master,"ready %s %s %s %s\n",hostname,os_name,arch_name,CCTOOLS_VERSION);
+	send_master_message(master,"workqueue %d %s %s %s %s\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION);
 	send_resource_update(master,1);
 }
 
@@ -775,12 +772,12 @@ static struct link *connect_master(time_t stoptime) {
 			continue;
 		}
 
-		report_worker_ready(master);
-
 		//reset backoff interval after connection to master.
 		backoff_interval = init_backoff_interval; 
 
 		debug(D_WQ, "connected to master %s:%d", actual_addr, actual_port);
+		report_worker_ready(master);
+
 		return master;
 	}
 

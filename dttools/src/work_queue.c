@@ -244,10 +244,11 @@ static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t d
 static void add_task_report(struct work_queue *q, struct work_queue_task *t);
 static void update_app_time(struct work_queue *q, timestamp_t last_left_time, int last_left_status);
 
-static int process_ready(struct work_queue *q, struct work_queue_worker *w, const char *line);
+static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line); 
+static int process_ready(struct work_queue *q, struct work_queue_worker *w, const char *line);
 
 static int short_timeout = 5;
 
@@ -352,14 +353,16 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	if(string_prefix_is(line, "alive")) {
 		debug(D_WQ, "Received keepalive response from %s (%s)", w->hostname, w->addrport);
 		result = 0;	
-	} else if(string_prefix_is(line, "ready")) {
-		result = process_ready(q, w, line);
+	} else if(string_prefix_is(line, "workqueue")) {
+		result = process_workqueue(q, w, line);
 	} else if (string_prefix_is(line,"result")) {
 		result = process_result(q, w, line, stoptime);
 	} else if (string_prefix_is(line,"worker_status") || string_prefix_is(line, "queue_status") || string_prefix_is(line, "task_status")) {
 		result = process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
+	} else if (string_prefix_is(line,"ready")) {
+		result = process_ready(q, w, line);
 	} else {
 		// Message is not a status update: return it to the user.
 		return 1;
@@ -948,12 +951,24 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	return 0;
 }
 
-static int process_ready(struct work_queue *q, struct work_queue_worker *w, const char *line)
+static int process_ready( struct work_queue *q, struct work_queue_worker *w, const char *line )
+{
+	debug(D_WQ|D_NOTICE,"%s (%s) is an older worker that is not compatible with this master.",w->hostname,w->addrport);
+	return -1;
+}
+
+static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line)
 {
 	char items[4][WORK_QUEUE_LINE_MAX];
+	int worker_protocol;
 
-	int n = sscanf(line,"ready %s %s %s %s",items[0],items[1],items[2],items[3]);
-	if(n!=4) return -1;
+	int n = sscanf(line,"workqueue %d %s %s %s %s",&worker_protocol,items[0],items[1],items[2],items[3]);
+	if(n!=5) return -1;
+
+	if(worker_protocol!=WORK_QUEUE_PROTOCOL_VERSION) {
+		debug(D_WQ|D_NOTICE,"worker (%s) is using work queue protocol %d, but I am using protocol %d",w->addrport,worker_protocol,WORK_QUEUE_PROTOCOL_VERSION);
+		return -1;
+	}
 
 	w->hostname = strdup(items[0]);
 	w->os       = strdup(items[1]);
