@@ -102,7 +102,7 @@ struct task_info {
 	pid_t pid;
 	int status;
 	
-	struct rusage *rusage;
+	struct rusage rusage;
 	timestamp_t execution_start;
 	timestamp_t execution_end;
 	
@@ -233,22 +233,27 @@ static void report_worker_ready( struct link *master )
 	send_resource_update(master,1);
 }
 
-static void clear_task_info(struct task_info *ti)
+static struct task_info * task_info_create( int taskid )
+{
+	struct task_info *ti = malloc(sizeof(*ti));
+	memset(ti,0,sizeof(*ti));
+	ti->taskid = taskid;
+	return ti;
+}
+
+static void task_info_delete( struct task_info *ti )
 {
 	if(ti->output_fd) {
 		close(ti->output_fd);
 		unlink(ti->output_file_name);
 	}
-	if(ti->rusage) {
-		free(ti->rusage);
-	}
-	
-	memset(ti, 0, sizeof(*ti));
+
+	free(ti);
 }
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
-static pid_t execute_task(const char *cmd, struct task_info *ti)
+static pid_t task_info_execute(const char *cmd, struct task_info *ti)
 {
 	fflush(NULL); /* why is this necessary? */
 
@@ -327,8 +332,7 @@ static int handle_tasks(struct link *master) {
 	
 	itable_firstkey(active_tasks);
 	while(itable_nextkey(active_tasks, (UINT64_T*)&pid, (void**)&ti)) {
-		struct rusage rusage;
-		result = wait4(pid, &ti->status, WNOHANG, &rusage);
+		result = wait4(pid, &ti->status, WNOHANG, &ti->rusage);
 		if(result) {
 			if(result < 0) {
 				debug(D_WQ, "Error checking on child process (%d).", ti->pid);
@@ -339,8 +343,6 @@ static int handle_tasks(struct link *master) {
 				debug(D_WQ, "Task (process %d) did not exit normally.\n", ti->pid);
 			}
 			
-			ti->rusage = malloc(sizeof(rusage));
-			memcpy(ti->rusage, &rusage, sizeof(rusage));
 			ti->execution_end = timestamp_get();
 			
 			itable_remove(active_tasks, ti->pid);
@@ -348,8 +350,7 @@ static int handle_tasks(struct link *master) {
 			itable_firstkey(active_tasks);
 			
 			report_task_complete(master, ti, NULL);
-			clear_task_info(ti);
-			free(ti);
+			task_info_delete(ti);
 		}
 		
 	}
@@ -836,14 +837,13 @@ static int do_task( struct link *master, UINT64_T taskid )
 		// BUG: should instead queue up the task and start it later
 		// when we know there are enough resources.
 
-		struct task_info *ti = malloc(sizeof(*ti));
-		ti->taskid = task->taskid;
-		execute_task(task->command_line,ti);
+		struct task_info *ti = task_info_create(taskid);
+		task_info_execute(task->command_line,ti);
 		work_queue_task_delete(task);
 	
 		if(ti->pid < 0) {
 			fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
-			free(ti);
+			task_info_delete(ti);
 			abort_flag = 1;
 			return 0;
 		}
@@ -1095,8 +1095,8 @@ static void kill_task(struct task_info *ti) {
 	// Clean up the task info structure.
 	itable_remove(stored_tasks, ti->taskid);
 	itable_remove(active_tasks, ti->pid);
-	clear_task_info(ti);
-	free(ti);
+
+	task_info_delete(ti);
 }
 
 static void kill_all_tasks() {
@@ -1121,16 +1121,14 @@ static void kill_all_tasks() {
 		ti = itable_remove(active_tasks, pid);
 		if(ti) {
 			itable_remove(stored_tasks, ti->taskid);
-			clear_task_info(ti);
-			free(ti);
+			task_info_delete(ti);
 		}
 	}
 	
 	// Clear out the stored tasks list if any are left.
 	itable_firstkey(stored_tasks);
 	while(itable_nextkey(stored_tasks, &taskid, (void**)&ti)) {
-		clear_task_info(ti);
-		free(ti);
+		task_info_delete(ti);
 	}
 	itable_clear(stored_tasks);
 }
