@@ -63,7 +63,7 @@ See the file COPYING for details.
 
 #define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 
-#define DEFAULT_MONITOR_LOG_FORMAT "rule-%06.6d"
+#define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
 #define DEFAULT_MONITOR_INTERVAL   1
 
 /* Unique integers for long options. To add a new option, use
@@ -1188,8 +1188,8 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 	if(bk->monitor_mode)
 	{
 		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
-		debug(D_DEBUG, "adding monitor and %s{,-series,-opened} to rule %d.\n", log_name, n->nodeid);
-		line = string_format("%s-series %s-opened %s %s %s", log_name, log_name, log_name, line_org, monitor_exe);
+		debug(D_DEBUG, "adding monitor and %s{.summary,.series,.files} to rule %d.\n", log_name, n->nodeid);
+		line = string_format("%s.summary %s.series %s.files %s %s", log_name, log_name, log_name, line_org, monitor_exe);
 	}
 	else
 	{
@@ -1386,7 +1386,7 @@ int dag_parse_node_command(struct lexer_book *bk, struct dag_node *n, char *line
 	if(bk->monitor_mode)
 	{
 		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
-		command = resource_monitor_rewrite_command(command, log_name, RMONITOR_DEFAULT_NAME, RMONITOR_DEFAULT_NAME); 
+		command = resource_monitor_rewrite_command(command, log_name, RMONITOR_DEFAULT_NAME, RMONITOR_DEFAULT_NAME, RMONITOR_DEFAULT_NAME); 
 	}
 
 	dag_parse_node_set_command(bk, n, command);

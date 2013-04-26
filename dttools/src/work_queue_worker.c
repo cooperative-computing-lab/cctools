@@ -1565,9 +1565,9 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "                         Can be [w]orker, [f]oreman, [c]lassic, or [a]uto (default=auto).\n");
 	fprintf(stdout, " -f <port>[:<high_port>] Set the port for the foreman to listen on.  If <highport> is specified\n");
 	fprintf(stdout, "                         the port is chosen from the range port:highport\n");
-	fprintf(stdout, "c, --measure-capacity	  Enable the measurement of foreman capacity to handle new workers (default=disabled).\n");
-	fprintf(stdout, "F, --fast-abort <mult>	  Set the fast abort multiplier for foreman (default=disabled).\n");
-	fprintf(stdout, "--specify-log <logfile>  Send statistics about foreman to this file.\n");
+	fprintf(stdout, " -c, --measure-capacity  Enable the measurement of foreman capacity to handle new workers (default=disabled).\n");
+	fprintf(stdout, " -F, --fast-abort <mult> Set the fast abort multiplier for foreman (default=disabled).\n");
+	fprintf(stdout, " --specify-log <logfile> Send statistics about foreman to this file.\n");
 	fprintf(stdout, " -M <project>            Name of a preferred project. A worker can have multiple preferred projects.\n");
 	fprintf(stdout, " -N <project>            When in Foreman mode, the name of the project to advertise as.  In worker/classic/auto mode acts as '-M'.\n");
 	fprintf(stdout, " -P,--password <pwfile>  Password file for authenticating to the master.\n");
@@ -1656,7 +1656,7 @@ struct option long_options[] = {
 	{"debug-release-reset", no_argument,        0,   LONG_OPT_DEBUG_RELEASE},
 	{"measure-capacity",    no_argument,        0,   'c'},
 	{"fast-abort",          required_argument,  0,   'F'},
-	{"debug-file-size",     required_argument,  0,   LONG_OPT_SPECIFY_LOG},
+	{"specify-log",         required_argument,  0,   LONG_OPT_SPECIFY_LOG},
 	{"cores",               required_argument,  0,   LONG_OPT_CORES},
 	{"memory",              required_argument,  0,   LONG_OPT_MEMORY},
 	{"disk",                required_argument,  0,   LONG_OPT_DISK},

@@ -484,6 +484,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	debug(D_WQ, "worker %s (%s) removed", w->hostname, w->addrport);
 
+	q->total_worker_slots -= w->nslots;	
 	q->total_workers_removed++;
 
 	cleanup_worker(q, w);
@@ -2750,7 +2751,7 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 	char *wrap_cmd; 
 	char *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
 	
-	wrap_cmd = resource_monitor_rewrite_command(t->command_line, summary, RMONITOR_DONT_GENERATE, RMONITOR_DONT_GENERATE);
+	wrap_cmd = resource_monitor_rewrite_command(t->command_line, NULL, summary, RMONITOR_DONT_GENERATE, RMONITOR_DONT_GENERATE);
 
 	//BUG: what if user changes current working directory?
 	work_queue_task_specify_file(t, q->monitor_exe, q->monitor_exe, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
