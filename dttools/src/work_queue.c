@@ -1484,9 +1484,6 @@ static int put_input_item(struct work_queue_file *tf, const char *expanded_paylo
 			memcpy(remote_info, &local_info, sizeof(local_info));
 			hash_table_insert(w->current_files, hash_name, remote_info);
 		}
-	} else {
-		// TODO: Send message announcing what the job needs (put with 0 length?)
-		send_worker_msg(w, "put %s -1 0%o %lld %d\n", time(0) + short_timeout, tf->remote_name, local_info.st_mode, taskid, tf->flags);
 	}
 
 	free(payload);

@@ -1270,11 +1270,7 @@ static int worker_handle_master(struct link *master) {
 			r = do_symlink(path, filename);
 		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags)) >= 3) {
 			if(path_within_workspace(filename, workspace)) {
-				if(length >= 0) {
-					r = do_put(master, filename, length, mode);
-				} else {
-					r = 1;
-				}
+				r = do_put(master, filename, length, mode);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
@@ -1409,11 +1405,7 @@ static int foreman_handle_master(struct link *master) {
 			r = do_task(master,taskid);
 		} else if(sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags) == 5) {
 			if(path_within_workspace(filename, workspace)) {
-				if(length >= 0) {
-					r = do_put(master, filename, length, mode);
-				} else {
-					r = 1;
-				}
+				r = do_put(master, filename, length, mode);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
