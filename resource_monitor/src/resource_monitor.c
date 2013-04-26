@@ -1139,37 +1139,45 @@ void monitor_log_row(struct tree_info *tr)
 
 void report_zombie_status(void)
 {
-  /* BUG: end and wall_time should be computed in a final
-   * summary, not here */
-  tree_max->wall_time = usecs_since_epoch() - usecs_initial;
+	/* BUG: end and wall_time should be computed in a final
+	 * summary, not here */
+	tree_max->wall_time = usecs_since_epoch() - usecs_initial;
 
-  fprintf(log_summary, "%-30s\t%lf\n", "end:", 
-      (double) (tree_max->wall_time + usecs_initial) / ONE_SECOND);
+	fprintf(log_summary, "%-30s\t%lf\n", "end:", 
+		(double) (tree_max->wall_time + usecs_initial) / ONE_SECOND);
 
-  if( WIFEXITED(first_process_exit_status) )
-  {
-    debug(D_DEBUG, "process %d finished: %d.\n", first_process_exit_status, WEXITSTATUS(first_process_exit_status));
-    fprintf(log_summary, "%-30s\tnormal\n", "exit_type:");
-  } 
-  else if ( WIFSIGNALED(first_process_exit_status) )
-  {
-    debug(D_DEBUG, "process %d terminated: %s.\n", first_process_exit_status, strsignal(WTERMSIG(first_process_exit_status)) );
+	if( WIFEXITED(first_process_exit_status) )
+	{
+		debug(D_DEBUG, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(first_process_exit_status));
+		fprintf(log_summary, "%-30s\tnormal\n", "exit_type:");
+	} 
+	else if ( WIFSIGNALED(first_process_exit_status) )
+	{
+		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WTERMSIG(first_process_exit_status)) );
 
-    if(over_limit_str)
-    {
-      fprintf(log_summary, "%-30s\tlimit\n", "exit_type:");
-      fprintf(log_summary, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
-    }
-    else
-    {
-      fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
-      fprintf(log_summary, "%-30s\t%d %s\n", "signal:", 
-          WTERMSIG(first_process_exit_status), 
-          strsignal(WTERMSIG(first_process_exit_status)));
-    }
-  } 
+		if(over_limit_str)
+		{
+			fprintf(log_summary, "%-30s\tlimit\n", "exit_type:");
+			fprintf(log_summary, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
+		}
+		else
+		{
+			fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
+			fprintf(log_summary, "%-30s\t%d %s\n", "signal:", 
+				WTERMSIG(first_process_exit_status), 
+				strsignal(WTERMSIG(first_process_exit_status)));
+		}
+	} 
+	else if ( WIFSTOPPED(first_process_exit_status) )
+	{
+		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WSTOPSIG(first_process_exit_status)) );
+		fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
+		fprintf(log_summary, "%-30s\t%d %s\n", "signal:", 
+			WSTOPSIG(first_process_exit_status), 
+			strsignal(WSTOPSIG(first_process_exit_status)));
+	}
 
-  fprintf(log_summary, "%-30s\t%d\n", "exit_status:", WEXITSTATUS(first_process_exit_status));
+	fprintf(log_summary, "%-30s\t%d\n", "exit_status:", WEXITSTATUS(first_process_exit_status));
 }
 
 int monitor_final_summary()
@@ -1224,9 +1232,6 @@ int ping_process(pid_t pid)
 void cleanup_zombie(struct process_info *p)
 {
   debug(D_DEBUG, "cleaning process: %d\n", p->pid);
-
-  if(p->pid == first_process_pid)
-    report_zombie_status();
 
   if(p->wd)
     dec_wd_count(p->wd);
@@ -1340,7 +1345,19 @@ void monitor_check_child(const int signal)
     else if(WIFSTOPPED(first_process_exit_status))
     {
       debug(D_DEBUG, "stop\n");
-      return;
+
+      switch(WSTOPSIG(first_process_exit_status))
+      {
+        case SIGTTIN: 
+          debug(D_NOTICE, "Process asked for input from the terminal, but currently the resource monitor does not support interactive applications.\n");
+          break;
+        case SIGTTOU:
+          debug(D_NOTICE, "Process wants to write to the standard output, but the current terminal settings do not allow this. The monitor currently does not support interactive applications.\n");
+          break;
+        default:
+          return;
+          break;
+      }
     }
     else if(WIFCONTINUED(first_process_exit_status))
     {
