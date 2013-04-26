@@ -2296,9 +2296,7 @@ int main(int argc, char *argv[])
 			debug_flags_set(optarg);
 			break;
 		case 'D':
-			if (ppm_mode) {
-				ppm_option = optarg;
-			}
+			if (ppm_mode) ppm_option = optarg;
 			if (strcasecmp(optarg, "c") == 0) condense_display = 1;
 			if (strcasecmp(optarg, "s") == 0) change_size = 1;
 			if (strcasecmp(optarg, "ppm") == 0) ppm_mode = 1;

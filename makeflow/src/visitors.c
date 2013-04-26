@@ -430,7 +430,7 @@ void dag_to_ppm (struct dag *d, char *ppm_option){
 	if (node_width < 5) node_width = 5;
 
 	for (i = 0; i <= max_ancestor; i++) {
-		node_num_rows += ((node_width*list_size(ancestor_count_list[i])) - 1)/(max_image_width) + 1;
+		node_num_rows = node_num_rows + ((node_width*list_size(ancestor_count_list[i])) - 1)/(max_image_width) + 1;
 	}	
 
 	int max_image_height = 800;
@@ -439,8 +439,8 @@ void dag_to_ppm (struct dag *d, char *ppm_option){
 
 	//calculate the column size so that we can center the data
 	
-	int x_length = node_width*max_size; //x length
-	int y_length = row_height*(max_ancestor+1); //y length
+	int x_length = (max_image_width/node_width)*node_width; //x length
+	int y_length = row_height*(node_num_rows); //y length
 
 	int current_depth_width;
 	int current_depth_nodesPrinted;
@@ -459,6 +459,8 @@ void dag_to_ppm (struct dag *d, char *ppm_option){
 	int whitespace_right;
 	int whitespace_on;
 
+//	printf("%d %d %d\n", node_width, max_size, node_num_rows);
+
 	fprintf(stdout, "P3\n"); //"Magic Number", don't change
 	fprintf(stdout, "%d %d\n", x_length, y_length); //Width and Height
 	fprintf(stdout, "1\n\n"); //maximum color value
@@ -468,12 +470,14 @@ void dag_to_ppm (struct dag *d, char *ppm_option){
 	for(count_row = 0; count_row <= max_ancestor; count_row++){ //each ancestor depth in the dag
 		current_depth_width = list_size(ancestor_count_list[count_row]); //the width of this particular level of the dag
 		current_depth_numRows = (node_width*current_depth_width - 1)/(x_length) + 1;
-
 		current_depth_nodesPrinted = 0;
+//		printf("nodes total: %d\n", current_depth_width);
 		for (numRows = 0; numRows < current_depth_numRows; numRows++){
 
 			if ((current_depth_width - current_depth_nodesPrinted) < nodesCanBePrinted) current_depth_nodesCanBePrinted = current_depth_width - current_depth_nodesPrinted;
 			else current_depth_nodesCanBePrinted = nodesCanBePrinted;
+
+//			printf("nodes to be printed: %d\n", current_depth_nodesCanBePrinted);
 
 			whitespace = x_length-(current_depth_nodesCanBePrinted*node_width);
 			whitespace_left = whitespace/2;
@@ -491,6 +495,7 @@ void dag_to_ppm (struct dag *d, char *ppm_option){
 						if ((pixel_count_col-whitespace_left-(current_depth_pixel_nodesPrinted*node_width))==0) {
 							n = list_next_item(ancestor_count_list[count_row]);
 							current_depth_pixel_nodesPrinted++;
+							if (pixel_count_height == 0) current_depth_nodesPrinted++;
 						}
 					}
 					ppm_color_parser(n, color_array, ppm_option, count_row, whitespace_on);
