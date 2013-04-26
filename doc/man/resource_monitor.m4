@@ -33,6 +33,11 @@ In contrast, BOLD(resource_monitorv) disables this wrapping,
 which means, among others, that it can only monitor the root
 process, but not its descendants.
 
+Currently, the monitor does not support interactive applications. That
+is, if a process issues a read call from standard input, and standard
+input has not been redirected, then the tree process is
+terminated. This is likely to change in future versions of the tool.
+
 BOLD(resource_monitor) generates up to three log files: a summary
 file with the maximum values of resource used, a time-series that
 shows the resources used at given time intervals, and a list of
@@ -55,6 +60,7 @@ wall_time:                 [seconds spent during execution, end - start,        
 cpu_time:                  [user + system time of the execution, in seconds,    float]
 virtual_memory:            [maximum virtual memory across all processes, in KB,   int]
 resident_memory:           [maximum resident size across all processes, in KB,    int]
+swap_memory:               [maximum swap usage across all processes, in KB,       int]
 bytes_read:                [number of bytes read from disk,                       int]
 bytes_written:             [number of bytes written to disk,                      int]
 workdir_number_files_dirs: [total maximum number of files and directories of 
@@ -70,6 +76,7 @@ concurrent_processes      [concurrent processes at the time of the sample,      
 cpu_time                  [accumulated user + kernel time, in microseconds,        int]
 virtual_memory            [current virtual memory size, in KB,                     int]
 resident_memory           [current resident memory size, in KB,                    int]   
+swap_memory               [current swap usage, in KB,                              int]   
 bytes_read                [accumulated number of bytes read,                       int]
 bytes_written             [accumulated number of bytes written,                    int]
 workdir_number_files_dirs [current number of files and directories, across all
@@ -85,8 +92,8 @@ OPTION_TRIPLET(-i,interval,n)Interval between observations, in seconds (default=
 OPTION_TRIPLET(-l,limits-file,file)Use maxfile with list of var: value pairs for resource limits.
 OPTION_TRIPLET(-L,limits,string)se string of the form `"var: value, var: value\' to specify resource limits.
 OPTION_TRIPLET(-o,with-summary-file,file)Write resource summary to <file> (default=monitor-log-<pid>).
-OPTION_TRIPLET(,with-time-series,file)Write resource time series to <file> (default=<summary-file>-log).
-OPTION_TRIPLET(,with-opened-files,file)Write list of opened files to <file> (default=<summary>-opened).
+OPTION_PAIR(with-time-series,file)Write resource time series to <file> (default=<summary-file>-log).
+OPTION_PAIR(with-opened-files,file)Write list of opened files to <file> (default=<summary>-opened).
 OPTION_ITEM(--without-summary-file)Do not write the summary log file.
 OPTION_ITEM(--without-time-series)Do not write the time-series log file.
 OPTION_ITEM(--without-opened-files)Do not write the list of opened files.
@@ -103,7 +110,7 @@ defined for the summary file:
 
 CODE(max_concurrent_processes), 
 CODE(`wall_time, cpu_time'),
-CODE(`virtual_memory, resident_memory'), 
+CODE(`virtual_memory, resident_memory, swap_memory'), 
 CODE(`bytes_read, bytes_written'), 
 CODE(`workdir_number_files_dirs, workdir_footprint')
 

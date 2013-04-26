@@ -13,10 +13,10 @@ See the file COPYING for details.
  *
  * Use as:
  *
- * resource_monitor -i 120000 -- some-command-line-and-options
+ * resource_monitor -i 120 -- some-command-line-and-options
  *
- * to monitor some-command-line at two minutes intervals (120000
- * miliseconds).
+ * to monitor some-command-line at two minutes intervals (120
+ * seconds).
  *
  * Each monitor target resource has two functions:
  * get_RESOURCE_usage, and acc_RESOURCE_usage. For example, for memory we have
@@ -40,26 +40,22 @@ See the file COPYING for details.
  *
  * Currently, the columns are:
  * 
- * wall:      wall time (in usecs).
- * no.proc:   number of processes
- * cpu-time:  user-mode time + kernel-mode time.
- * vmem:      current total memory size (virtual).
- * io:        read chars count using *read system calls + writen char count using *write system calls.
- * files+dir  total file + directory count of all working directories.
- * bytes      total byte count of all working directories.
- * nodes      total occupied nodes of all the filesystems used by working directories since the start of the task. 
+ * wall:          wall time (in usecs).
+ * no.proc:       number of processes
+ * cpu-time:      user-mode time + kernel-mode time.
+ * vmem:          current total memory size (virtual).
+ * rss:           current total resident size.
+ * swap:          current total swap usage.
+ * bytes_read:    read chars count using *read system calls
+ * bytes_written: writen char count using *write system calls.
+ * files+dir      total file + directory count of all working directories.
+ * footprint      total byte count of all working directories.
  *
  * The log file is written to the home directory of the monitor
  * process. A flag will be added later to indicate a prefered
  * output file. Additionally, a summary log file is written at
  * the end, reporting the command run, starting and ending times,
  * and maximum, minimum, and average of the resources monitored.
- *
- * While all the logic supports the monitoring of several
- * processes by the same monitor, only one monitor can
- * be specified at the command line. This is because we plan to
- * wrap the calls to fork and clone in the monitor such that we
- * can also monitor the process children.
  *
  * Each monitored process gets a 'struct process_info', itself
  * composed of 'struct mem_info', 'struct cpu_time_info', etc. There
@@ -84,7 +80,7 @@ See the file COPYING for details.
  * the first processes it created, and cleans up the monitoring
  * tables.
  *
- * monitor takes the -i<miliseconds> flag, which indicates how often
+ * monitor takes the -i<seconds> flag, which indicates how often
  * the resources are checked. The logic is there to allow, say,
  * memory to be checked twice as often as disk, but right now all
  * the resources are checked at each interval.
@@ -96,7 +92,7 @@ See the file COPYING for details.
  * LOTS of code repetition that probably can be eliminated with
  * calls to function pointers and some macros.
  *
- * BSDs: kvm interface is not implemented.
+ * BSDs: kvm interface for swap is not implemented.
  *
  * io: may report zero if process ends before we read
  * /proc/[pid]/io.
@@ -1574,7 +1570,7 @@ int wait_for_messages(int interval)
 {
     struct timeval timeout;
 
-    /* wait for interval miliseconds. */
+    /* wait for interval seconds. */
     timeout.tv_sec  = interval;
     timeout.tv_usec = 0;
 
