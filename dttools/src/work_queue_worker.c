@@ -4,6 +4,24 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+/*
+The following major problems must be fixed in the worker
+before it can be released:
+
+- Each task must have its own namespace so that independent tasks
+with the same filenames will not interfere.  This should be done
+by creating a directory in do_task, allowing for a put command
+in the middle of the task transaction, and symlinking in common files.
+
+- Currently, all tasks sent are started immediately.  Instead, the
+worker should queue up all tasks sent, and only start them
+when the total cores, tasks, and memory are within the specified limits.
+
+- A protocol version string should be sent at startup, so as
+to reject incompatible workers/masters.
+*/
+
+
 #include "work_queue.h"
 #include "work_queue_protocol.h"
 #include "work_queue_internal.h"
