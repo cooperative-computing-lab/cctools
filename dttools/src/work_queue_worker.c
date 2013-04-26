@@ -68,9 +68,6 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define MIN_TERMINATE_BOUNDARY 0 
 #define TERMINATE_BOUNDARY_LEEWAY 30
 
-#define TASK_NONE 0
-#define TASK_RUNNING 1
-
 #define WORKER_MODE_AUTO    0
 #define WORKER_MODE_CLASSIC 1
 #define WORKER_MODE_WORKER  2
@@ -157,7 +154,6 @@ static struct work_queue *foreman_q = NULL;
 static struct itable *unfinished_tasks = NULL;
 
 // Forked task related
-static int task_status= TASK_NONE;
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
 
@@ -810,7 +806,7 @@ static int do_work(struct link *master, int taskid, INT64_T length) {
 
 	//snprintf(ti->output_file_name, 50, "%d.task.stdout.tmp", ti->pid);
 
-	task_status = ti->status = TASK_RUNNING;
+	ti->status = 0;
 	itable_insert(stored_tasks, taskid, ti);
 	itable_insert(active_tasks, ti->pid, ti);
 	return 1;
@@ -1514,7 +1510,7 @@ static void foreman_for_master(struct link *master) {
 		int result = 1;
 		struct work_queue_task *task = NULL;
 
-		if(time(0) > idle_stoptime && task_status == TASK_NONE) {
+		if(time(0) > idle_stoptime && (itable_size(active_tasks)+itable_size(stored_tasks))==0) {
 			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			abort_flag = 1;
 			break;
