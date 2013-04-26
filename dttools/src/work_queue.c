@@ -1042,7 +1042,6 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	return 0;
 }
 
-void work_queue_get_resources( struct work_queue *q, struct work_queue_resources *r );
 
 
 static struct nvpair * queue_to_nvpair( struct work_queue *q )
