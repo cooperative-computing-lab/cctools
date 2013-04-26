@@ -484,7 +484,6 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	debug(D_WQ, "worker %s (%s) removed", w->hostname, w->addrport);
 
-	q->total_worker_slots -= w->nslots;	
 	q->total_workers_removed++;
 
 	cleanup_worker(q, w);
