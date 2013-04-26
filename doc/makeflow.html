@@ -19,7 +19,7 @@ margin: 20px;
 }
 </style>
 <h1>Makeflow User's Manual</h1>
-<b>Last Updated September 2012</b>
+<b>Last Updated April 2013</b>
 <p>
 Makeflow is Copyright (C) 2009 The University of Notre Dame.
 This software is distributed under the GNU General Public License.
@@ -238,6 +238,36 @@ When using SGE, the string will be added to the qsub options.  For example, to s
 <pre>
 BATCH_OPTIONS = -q devel
 </pre>
+
+<h3>Remote File Renaming</h3>
+
+With the Work Queue and Condor batch systems, Makeflow has a
+feature called remote file renaming. For example:
+
+<pre>
+local_name->remote_name
+</pre>
+
+indicates that the file <tt>local_name</tt> is called
+<tt>remote_name</tt> in the remote system. Consider the following
+example:
+
+<pre>
+b.out: a.in myprog
+        LOCAL myprog a.in > b.out 
+
+c.out->out: a.in->in1 b.out myprog->prog
+        prog in1 b.out > out
+</pre>
+
+The first rule runs locally, using the executable <tt>myprog</tt>
+and the local file <tt>a.in</tt> to locally create <tt>b.out</tt>.
+The second rule runs remotely, but the remote system
+expects <tt>a.in</tt> to be named <tt>in1</tt>, <tt>c.out</tt>,
+to be named <tt>out</tt> and so on. Note that we did not need to
+rename the file <tt>b.out</tt>. Without remote file renaming, we
+would have to create either a symbolic link, or a copy of the
+files with the expected correct names. 
 
 <h3>Displaying a Makeflow</h3>
 
