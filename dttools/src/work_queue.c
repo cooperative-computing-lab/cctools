@@ -88,7 +88,6 @@ static const char *work_queue_state_names[] = {"init","ready","busy","full","non
 
 #define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
 
-// work_queue_worker struct related
 #define WORKER_ADDRPORT_MAX 32
 #define WORKER_HASHKEY_MAX 32
 
@@ -167,7 +166,6 @@ struct work_queue {
 
 struct work_queue_worker {
 	int state;
-	int async_tasks;  // Can this worker support asynchronous tasks? (aka is it a new worker?)
 	char *hostname;
 	char *os;
 	char *arch;
@@ -968,7 +966,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	int n = sscanf(line, "result %s %s %s %" SCNd64, items[0], items[1], items[2], &taskid);
 
 
-	if(n < 2) {
+	if(n < 4) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		return -1;
 	}
@@ -976,13 +974,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	result = atoi(items[0]);
 	output_length = atoll(items[1]);
 	
-	if(n < 4 && !w->async_tasks) {
-		itable_firstkey(w->current_tasks);
-		itable_nextkey(w->current_tasks, &taskid, (void **)&t);
-	} else {
-		t = itable_lookup(w->current_tasks, taskid);
-	}
-	
+	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
 		debug(D_WQ, "Unknown task result from worker %s (%s): no task %d assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
 		stoptime = time(0) + get_transfer_wait_time(q, w, -1, (INT64_T) output_length);
@@ -1487,9 +1479,7 @@ static int put_input_item(struct work_queue_file *tf, const char *expanded_paylo
 		}
 	} else {
 		// TODO: Send message announcing what the job needs (put with 0 length?)
-		if(w->async_tasks) {
-			send_worker_msg(w, "put %s -1 0%o %lld %d\n", time(0) + short_timeout, tf->remote_name, local_info.st_mode, taskid, tf->flags);
-		}
+		send_worker_msg(w, "put %s -1 0%o %lld %d\n", time(0) + short_timeout, tf->remote_name, local_info.st_mode, taskid, tf->flags);
 	}
 
 	free(payload);
@@ -1565,11 +1555,6 @@ static int send_output_files(struct work_queue_task *t, struct work_queue_worker
 {
 	struct work_queue_file *tf;
 	
-	if(!w->async_tasks) {
-		// If the worker has not indicated that it is version 2.0 or higher, don't try sending "need" messages
-		return 1;
-	}
-
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((tf = list_next_item(t->output_files))) {
@@ -3045,12 +3030,8 @@ void work_queue_reset(struct work_queue *q, int flags) {
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-		if(w->async_tasks) {
-			send_worker_msg(w, "reset\n", time(0)+short_timeout);
-			cleanup_worker(q, w);
-		} else {
-			release_worker(q, w);
-		}
+		send_worker_msg(w, "reset\n", time(0)+short_timeout);
+		cleanup_worker(q, w);
 	}
 	
 	if(flags & WORK_QUEUE_RESET_KEEP_TASKS) {
