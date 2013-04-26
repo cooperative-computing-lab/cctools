@@ -95,7 +95,7 @@ int set_lookup(struct set *s, void *element);
 
 /** Remove a element.
 @param s A pointer to a set.
-@param key A pointer to remove.
+@param element A pointer to remove.
 @return If found 1, otherwise 0.
 */
 

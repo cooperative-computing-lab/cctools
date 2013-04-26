@@ -187,7 +187,7 @@ void work_queue_task_specify_memory( struct work_queue_task *t, int memory );
 
 /** Specify the amount of disk space required by a task.
 @param t A task object.
-@param memory The amount of disk space required by the task, in megabytes.
+@param disk The amount of disk space required by the task, in megabytes.
 */
 
 void work_queue_task_specify_disk( struct work_queue_task *t, int disk );
@@ -252,7 +252,7 @@ struct work_queue *work_queue_create(int port);
 It generates the log file indicated by monitor_summary_file with all the
 summaries of the resources used by each task.
 @param q A work queue object.
-@param monitor_summary_file The filename of the log (If NULL, it defaults to wq-<pid>-resource-usage).
+@param monitor_summary_file The filename of the log (If NULL, it defaults to wq-pid-resource-usage).
 @return 1 on success, 0 if monitoring was not enabled.
 */
 int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_file);
