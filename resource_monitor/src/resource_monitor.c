@@ -25,12 +25,6 @@ See the file COPYING for details.
  * exception are function that open files, which return NULL on
  * failure, or a file pointer on success.
  *
- * The get_RESOURCE_usage functions are called at given intervals.
- * Between each interval, the monitor does nothing. All processes
- * monitored write to the same text log file. If no file name is provided,
- * for the log, then the log file is written to a file called
- * log-monitor-PID, in which PID is the pid of the monitor.
- *
  * The acc_RESOURCE_usage(accum, other) adds the contents of
  * other, field by field, to accum.
  *
@@ -164,7 +158,7 @@ See the file COPYING for details.
 #define ONE_MEGABYTE 1048576  /* this many bytes */
 #define ONE_SECOND   1000000  /* this many usecs */    
 
-#define DEFAULT_LOG_NAME "monitor-log-%d"     /* %d is used for the value of getpid() */
+#define DEFAULT_LOG_NAME "resource-pid-%d"     /* %d is used for the value of getpid() */
 
 FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
 FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
@@ -320,25 +314,28 @@ double clicks_to_usecs(uint64_t clicks)
     return ((clicks * ONE_SECOND) / sysconf(_SC_CLK_TCK));
 }
 
-char *default_summary_name(void)
+char *default_summary_name(char *template_path)
 {
-    return string_format(DEFAULT_LOG_NAME, getpid());
+	if(template_path)
+		return string_format("%s.summary", template_path);
+	else
+		return string_format(DEFAULT_LOG_NAME ".summary", getpid());
 }
 
-char *default_series_name(char *summary_path)
+char *default_series_name(char *template_path)
 {
-    if(summary_path)
-        return string_format("%s-series", summary_path);
+    if(template_path)
+        return string_format("%s.series", template_path);
     else
-        return string_format(DEFAULT_LOG_NAME "-series", getpid());
+        return string_format(DEFAULT_LOG_NAME ".series", getpid());
 }
 
-char *default_opened_name(char *summary_path)
+char *default_opened_name(char *template_path)
 {
-    if(summary_path)
-        return string_format("%s-opened", summary_path);
+    if(template_path)
+        return string_format("%s.files", template_path);
     else
-        return string_format(DEFAULT_LOG_NAME "-opened", getpid());
+        return string_format(DEFAULT_LOG_NAME ".files", getpid());
 }
 
 FILE *open_log_file(const char *log_path)
@@ -1691,9 +1688,10 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify\n", "-L,--limits=<string>");
     fprintf(stdout, "%-30s resource limits.\n", "");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Write resource summary to <file>     (default=monitor-log-<pid>)\n", "-o,--with-summary-file=<file>");
-    fprintf(stdout, "%-30s Write resource time series to <file> (default=<summary-file>-log)\n", "--with-time-series=<file>");
-    fprintf(stdout, "%-30s Write list of opened files to <file> (default=<summary-file>-opened)\n", "--with-opened-files=<file>");
+    fprintf(stdout, "%-30s Specify filename template for log files (default=resource-pid-<pid>)\n", "-o,--with-output-files=<file>");
+    fprintf(stdout, "%-30s Write resource summary to <file>        (default=<template>.summary)\n", "--with-summary-file=<file>");
+    fprintf(stdout, "%-30s Write resource time series to <file>    (default=<template>.series)\n", "--with-time-series=<file>");
+    fprintf(stdout, "%-30s Write list of opened files to <file>    (default=<template>.files)\n", "--with-opened-files=<file>");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Do not write the summary log file.\n", "--without-summary-file"); 
     fprintf(stdout, "%-30s Do not write the time series log file.\n", "--without-time-series"); 
@@ -1765,6 +1763,7 @@ int main(int argc, char **argv) {
     char c;
     uint64_t interval = DEFAULT_INTERVAL;
 
+    char *template_path = NULL;
     char *summary_path = NULL;
     char *series_path  = NULL;
     char *opened_path  = NULL;
@@ -1793,14 +1792,16 @@ int main(int argc, char **argv) {
         {"interval",   required_argument, 0, 'i'},
         {"limits",     required_argument, 0, 'L'},
         {"limits-file",required_argument, 0, 'l'},
+	
+        {"with-output-files", required_argument, 0,  'o'},
 
-        {"with-summary-file", required_argument, 0, 'o'},
-        {"with-time-series",  required_argument, 0,  0 }, 
-        {"with-opened-files", required_argument, 0,  1 },
+        {"with-summary-file", required_argument, 0,  0},
+        {"with-time-series",  required_argument, 0,  1 }, 
+        {"with-opened-files", required_argument, 0,  2 },
 
-        {"without-summary",      no_argument, 0, 2},
-        {"without-time-series",  no_argument, 0, 3}, 
-        {"without-opened-files", no_argument, 0, 4},
+        {"without-summary",      no_argument, 0, 3},
+        {"without-time-series",  no_argument, 0, 4}, 
+        {"without-opened-files", no_argument, 0, 5},
 
         {0, 0, 0, 0}
     };
@@ -1826,36 +1827,60 @@ int main(int argc, char **argv) {
                 show_help(argv[0]);
                 break;
             case 'o':
+		    if(template_path)
+			    free(template_path);
+		    if(summary_path)
+		    {
+			    free(summary_path);
+			    summary_path = NULL;
+		    }
+		    if(series_path)
+		    {
+			    free(series_path);
+			    series_path = NULL;
+		    }
+		    if(opened_path)
+		    {
+			    free(opened_path);
+			    opened_path = NULL;
+		    }
+		    template_path = xxstrdup(optarg);
+		    use_summary = 1;
+		    use_series  = 1;
+		    use_opened  = 1;
+		    break;
+
+	case 0:
                 if(summary_path)
-                    free(summary_path);
+			free(summary_path);
                 summary_path = xxstrdup(optarg);
                 use_summary = 1;
                 break;
-            case  0:
+            case  1:
                 if(series_path)
                     free(series_path);
                 series_path = xxstrdup(optarg);
                 use_series  = 1;
                 break;
-            case  1:
+            case  2:
                 if(opened_path)
                     free(opened_path);
                 opened_path = xxstrdup(optarg);
                 use_opened  = 1;
                 break;
-            case  2:
+            case  3:
                 if(summary_path)
                     free(summary_path);
                 summary_path = NULL;
                 use_summary = 0;
                 break;
-            case  3:
+            case  4:
                 if(series_path)
                     free(series_path);
                 series_path = NULL;
                 use_series  = 0;
                 break;
-            case  4:
+            case  5:
                 if(opened_path)
                     free(opened_path);
                 opened_path = NULL;
@@ -1910,11 +1935,11 @@ int main(int argc, char **argv) {
     filesys_rc = itable_create(0);
 
     if(use_summary && !summary_path)
-        summary_path = default_summary_name();
+        summary_path = default_summary_name(template_path);
     if(use_series && !series_path)
-        series_path = default_series_name(summary_path);
+        series_path = default_series_name(template_path);
     if(use_opened && !opened_path)
-        opened_path = default_opened_name(summary_path);
+        opened_path = default_opened_name(template_path);
 
     log_summary = open_log_file(summary_path);
     log_series  = open_log_file(series_path);
