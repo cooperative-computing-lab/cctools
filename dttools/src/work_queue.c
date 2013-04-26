@@ -100,7 +100,6 @@ int wq_minimum_transfer_timeout = 3;
 struct work_queue {
 	char *name;
 	int port;
-	int master_mode;
 	int priority;
 
 	char workingdir[PATH_MAX];
@@ -149,7 +148,7 @@ struct work_queue {
 	int capacity;
 	int avg_capacity;
 
-	char catalog_host[DOMAIN_NAME_MAX];
+	char *catalog_host;
 	int catalog_port;
 
 	FILE *logfile;
@@ -409,6 +408,15 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 static void update_catalog(struct work_queue *q, int now)
 {
 	struct work_queue_stats s;
+
+	if(!q->catalog_host) {
+		q->catalog_host = strdup(CATALOG_HOST);
+	}
+
+	if(!q->catalog_port) {
+		q->catalog_port = CATALOG_PORT;
+	}
+
 	work_queue_get_stats(q, &s);
 	char * worker_summary = work_queue_get_worker_summary(q);
 	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, worker_summary, now);
@@ -2520,6 +2528,9 @@ struct work_queue *work_queue_create(int port)
 	q->idle_times = list_create();
 	q->task_statistics = task_statistics_init();
 
+	q->catalog_host = 0;
+	q->catalog_port = 0;
+
 	q->keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
 	q->keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT; 
 
@@ -2649,17 +2660,14 @@ void work_queue_specify_priority(struct work_queue *q, int priority)
 
 void work_queue_specify_master_mode(struct work_queue *q, int mode)
 {
-	q->master_mode = mode;
-	if(mode==WORK_QUEUE_MASTER_MODE_CATALOG) {
-		strncpy(q->catalog_host, CATALOG_HOST, DOMAIN_NAME_MAX);
-		q->catalog_port = CATALOG_PORT;
-	}
+	// Deprecated: Report to the catalog iff a name is given.
 }
 
 void work_queue_specify_catalog_server(struct work_queue *q, const char *hostname, int port)
 {
 	if(hostname) {
-		strncpy(q->catalog_host, hostname, DOMAIN_NAME_MAX);
+		if(q->catalog_host) free(q->catalog_host);
+		q->catalog_host = strdup(hostname);
 		setenv("CATALOG_HOST", hostname, 1);
 	}
 	if(port > 0) {
@@ -2690,9 +2698,10 @@ void work_queue_delete(struct work_queue *q)
 		while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 			release_worker(q, w);
 		}
-		if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
+		if(q->name) {
 			update_catalog(q, 1);
 		}
+		if(q->catalog_host) free(q->catalog_host);
 		hash_table_delete(q->worker_table);
 		itable_delete(q->worker_task_map);
 		
@@ -2779,7 +2788,7 @@ static void print_password_warning( struct work_queue *q )
 
 	if(did_password_warning) return;
 
-       	if(!q->password && q->master_mode==WORK_QUEUE_MASTER_MODE_CATALOG) {
+       	if(!q->password && q->name) {
        		fprintf(stderr,"warning: this work queue master is visible to the public.\n");
 	       	fprintf(stderr,"warning: you should set a password with the --password option.\n");
 		did_password_warning = 1;
@@ -2810,7 +2819,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	}
 
 	while(1) {
-		if(q->master_mode == WORK_QUEUE_MASTER_MODE_CATALOG) {
+		if(q->name) {
 			update_catalog(q, 0);
 		}
 		

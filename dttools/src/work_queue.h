@@ -46,9 +46,6 @@ See the file COPYING for details.
 #define WORK_QUEUE_RESET_ALL        0  /**< When resetting, clear out all tasks and files */
 #define WORK_QUEUE_RESET_KEEP_TASKS 1  /**< When resetting, keep the current list of tasks */
 
-#define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
-#define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
-
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
 
@@ -399,14 +396,6 @@ void work_queue_specify_priority(struct work_queue *q, int priority);
 */
 void work_queue_specify_estimate_capacity_on(struct work_queue *q, int estimate_capacity_on);
 
-/** Specify the master mode for a given queue. 
-@param q A work queue object.
-@param mode 
-- @ref WORK_QUEUE_MASTER_MODE_STANDALONE - standalone mode. In this mode the master would not report its information to a catalog server; 
-- @ref WORK_QUEUE_MASTER_MODE_CATALOG - catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
-*/
-void work_queue_specify_master_mode(struct work_queue *q, int mode);
-
 /** Specify the catalog server the master should report to.
 @param q A work queue object.
 @param hostname The catalog server's hostname.
@@ -485,6 +474,17 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout);
 /** @name Functions - Deprecated */
 
 //@{
+
+#define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
+#define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
+
+/** Specify the master mode for a given queue. 
+@param q A work queue object.
+@param mode 
+- @ref WORK_QUEUE_MASTER_MODE_STANDALONE - standalone mode. In this mode the master would not report its information to a catalog server; 
+- @ref WORK_QUEUE_MASTER_MODE_CATALOG - catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
+*/
+void work_queue_specify_master_mode(struct work_queue *q, int mode);
 
 /** Add an input buffer to a task.
 @param t The task to which to add parameters
