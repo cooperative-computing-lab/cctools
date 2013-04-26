@@ -214,6 +214,7 @@ struct mem_info
 {
     uint64_t virtual; 
     uint64_t resident;
+    uint64_t swap;
     uint64_t shared;
     uint64_t text;
     uint64_t data;
@@ -268,7 +269,8 @@ struct process_info
 };
 
 char *resources[15] = { "wall_clock(seconds)", 
-                        "concurrent_processes", "cpu_time(seconds)", "virtual_memory(kB)", "resident_memory(kB)", 
+                        "concurrent_processes", "cpu_time(seconds)",
+			"virtual_memory(kB)", "resident_memory(kB)", "swap_memory(kB)", 
                         "bytes_read", "bytes_written", 
                         "workdir_number_files_dirs", "workdir_footprint(MB)",
                         NULL };
@@ -283,6 +285,7 @@ struct tree_info
     int64_t cpu_time;
     int64_t virtual_memory; 
     int64_t resident_memory; 
+    int64_t swap_memory; 
     int64_t bytes_read;
     int64_t bytes_written;
     int64_t workdir_number_files_dirs;
@@ -432,6 +435,7 @@ void initialize_limits_tree(struct tree_info *tree, int64_t val)
     tree->cpu_time                 = val;
     tree->virtual_memory           = val;
     tree->resident_memory          = val;
+    tree->swap_memory              = val;
     tree->bytes_read               = val;
     tree->bytes_written            = val;
     tree->workdir_number_files_dirs = val;
@@ -476,6 +480,7 @@ void parse_limits_string(char *str, struct tree_info *tree)
     parse_limit_string(vars, tree, cpu_time);
     parse_limit_string(vars, tree, virtual_memory);
     parse_limit_string(vars, tree, resident_memory);
+    parse_limit_string(vars, tree, swap_memory);
     parse_limit_string(vars, tree, bytes_read);
     parse_limit_string(vars, tree, bytes_written);
     parse_limit_string(vars, tree, workdir_number_files_dirs);
@@ -495,7 +500,7 @@ void parse_limits_file(char *path, struct tree_info *tree)
     parse_limit_file(flimits, tree, max_concurrent_processes);
     parse_limit_file(flimits, tree, cpu_time);
     parse_limit_file(flimits, tree, virtual_memory);
-    parse_limit_file(flimits, tree, resident_memory);
+    parse_limit_file(flimits, tree, swap_memory);
     parse_limit_file(flimits, tree, bytes_read);
     parse_limit_file(flimits, tree, bytes_written);
     parse_limit_file(flimits, tree, workdir_number_files_dirs);
@@ -731,6 +736,21 @@ void acc_cpu_time_usage(struct cpu_time_info *acc, struct cpu_time_info *other)
     acc->delta += other->delta;
 }
 
+int get_swap_linux(pid_t pid, struct mem_info *mem)
+{
+    FILE *fsmaps = open_proc_file(pid, "smaps");
+    if(!fsmaps)
+        return 1;
+
+    uint64_t accum = 0;
+    uint64_t value = 0;
+
+    while(get_int_attribute(fsmaps, "Swap:", &value, 0) == 0)
+	    accum += value; 
+
+    return accum;
+}
+
 int get_mem_linux(pid_t pid, struct mem_info *mem)
 {
     // /dev/proc/[pid]/statm: 
@@ -749,6 +769,8 @@ int get_mem_linux(pid_t pid, struct mem_info *mem)
             &mem->data);
 
     mem->shared *= sysconf(_SC_PAGESIZE); //Multiply pages by pages size.
+
+    get_swap_linux(pid, mem);
 
     fclose(fmem);
 
@@ -793,6 +815,7 @@ void acc_mem_usage(struct mem_info *acc, struct mem_info *other)
         acc->resident += other->resident;
         acc->shared   += other->shared;
         acc->data     += other->data;
+        acc->swap     += other->swap;
 }
 
 int get_sys_io_usage(pid_t pid, struct io_info *io)
@@ -1072,6 +1095,7 @@ void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct w
     tr->cpu_time                 = p->cpu.delta + tr->cpu_time;
     tr->virtual_memory           = (int64_t) p->mem.virtual;
     tr->resident_memory          = (int64_t) p->mem.resident;
+    tr->swap_memory              = (int64_t) p->mem.swap;
 
     tr->bytes_read               = (int64_t) (p->io.delta_chars_read + tr->bytes_read);
     tr->bytes_read              += (int64_t)  p->io.delta_bytes_faulted;
@@ -1103,6 +1127,9 @@ void monitor_find_max_tree(struct tree_info *result, struct tree_info *tr)
     if(result->resident_memory < tr->resident_memory)
         result->resident_memory = tr->resident_memory;
 
+    if(result->swap_memory < tr->swap_memory)
+        result->swap_memory = tr->swap_memory;
+
     if(result->bytes_read < tr->bytes_read)
         result->bytes_read = tr->bytes_read;
 
@@ -1126,6 +1153,7 @@ void monitor_log_row(struct tree_info *tr)
     fprintf(log_series, "%" PRId64 "\t", tr->cpu_time);
     fprintf(log_series, "%" PRId64 "\t", tr->virtual_memory);
     fprintf(log_series, "%" PRId64 "\t", tr->resident_memory);
+    fprintf(log_series, "%" PRId64 "\t", tr->swap_memory);
     fprintf(log_series, "%" PRId64 "\t", tr->bytes_read);
     fprintf(log_series, "%" PRId64 "\t", tr->bytes_written);
 
@@ -1197,6 +1225,7 @@ int monitor_final_summary()
 
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "virtual_memory:", tree_max->virtual_memory);
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "resident_memory:", tree_max->resident_memory);
+    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "swap_memory:", tree_max->swap_memory);
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_read:", tree_max->bytes_read);
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_written:", tree_max->bytes_written);
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", tree_max->workdir_number_files_dirs);
@@ -1452,6 +1481,7 @@ int monitor_check_limits(struct tree_info *tr)
     over_limit_check(tr, cpu_time, "lf");
     over_limit_check(tr, virtual_memory, PRId64);
     over_limit_check(tr, resident_memory, PRId64);
+    over_limit_check(tr, swap_memory, PRId64);
     over_limit_check(tr, bytes_read, PRId64);
     over_limit_check(tr, bytes_written, PRId64);
     over_limit_check(tr, workdir_number_files_dirs, PRId64);
