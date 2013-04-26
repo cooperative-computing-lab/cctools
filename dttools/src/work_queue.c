@@ -1558,21 +1558,6 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 	return expanded_name;
 }
 
-static int send_output_files(struct work_queue_task *t, struct work_queue_worker *w, struct work_queue *q)
-{
-	struct work_queue_file *tf;
-	
-	if(t->output_files) {
-		list_first_item(t->output_files);
-		while((tf = list_next_item(t->output_files))) {
-			send_worker_msg(w, "need %lld %s %d\n", time(0) + short_timeout, t->taskid, tf->remote_name, tf->flags);
-		}
-	}
-
-	return 1;
-
-}
-
 static int send_input_files(struct work_queue_task *t, struct work_queue_worker *w, struct work_queue *q)
 {
 	struct work_queue_file *tf;
@@ -1702,14 +1687,35 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 	t->time_send_input_start = q->time_last_task_start = timestamp_get();
 	if(!send_input_files(t, w, q))
 		return 0;
-	if(!send_output_files(t, w, q))
-		return 0;
 	t->time_send_input_finish = timestamp_get();
 	t->time_execute_cmd_start = timestamp_get();
 	t->hostname = xxstrdup(w->hostname);
 	t->host = xxstrdup(w->addrport);
 	
-	send_worker_msg(w, "work %zu %lld\n%s", time(0) + short_timeout, strlen(t->command_line), t->taskid, t->command_line);
+	send_worker_msg(w, "task %lld\n",  time(0) + short_timeout, (long long) t->taskid);
+	send_worker_msg(w, "cmd %lld\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
+	send_worker_msg(w, "cores %d\n",   time(0) + short_timeout, t->cores );
+	send_worker_msg(w, "memory %d\n",  time(0) + short_timeout, t->memory );
+	send_worker_msg(w, "disk %d\n",    time(0) + short_timeout, t->disk );
+
+	if(t->input_files) {
+		struct work_queue_file *tf;
+		list_first_item(t->input_files);
+		while((tf = list_next_item(t->input_files))) {
+			send_worker_msg(w, "infile %s %d\n", time(0) + short_timeout, tf->remote_name, tf->flags);
+		}
+	}
+
+	if(t->output_files) {
+		struct work_queue_file *tf;
+		list_first_item(t->output_files);
+		while((tf = list_next_item(t->output_files))) {
+			send_worker_msg(w, "outfile %s %d\n", time(0) + short_timeout, tf->remote_name, tf->flags);
+		}
+	}
+
+	send_worker_msg(w, "end\n", time(0) + short_timeout );
+
 	debug(D_WQ, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
 	return 1;
 }
@@ -2233,7 +2239,9 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 {
 	struct work_queue_task *t = malloc(sizeof(*t));
 	memset(t, 0, sizeof(*t));
-	t->command_line = xxstrdup(command_line);
+
+	if(t->command_line) t->command_line = xxstrdup(command_line);
+
 	t->worker_selection_algorithm = WORK_QUEUE_SCHEDULE_UNSET;
 	t->input_files = list_create();
 	t->output_files = list_create();
@@ -2252,7 +2260,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd )
 {
 	if(t->command_line) free(t->command_line);
-	t->command_line = xxstrdup(t->command_line);
+	t->command_line = xxstrdup(cmd);
 }
 
 void work_queue_task_specify_memory( struct work_queue_task *t, int memory )

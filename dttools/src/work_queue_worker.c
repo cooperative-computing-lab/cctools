@@ -151,7 +151,6 @@ static int manual_memory_option = 0;
 
 // Foreman mode global variables
 static struct work_queue *foreman_q = NULL;
-static struct itable *unfinished_tasks = NULL;
 
 // Forked task related
 static struct itable *active_tasks = NULL;
@@ -337,41 +336,6 @@ static int check_disk_space_for_filesize(INT64_T file_size) {
     }
 
     return 1;
-}
-
-static int foreman_finish_task(struct link *master, int taskid, int length) {
-	struct work_queue_task *t;
-	char * cmd;
-
-	cmd = malloc((length+1) * sizeof(*cmd));
-	memset(cmd, 0, length+1);
-
-	link_read(master, cmd, length, time(0) + active_timeout);
-	
-
-	t = (struct work_queue_task *)itable_remove(unfinished_tasks, taskid);
-	if(!t) {
-		t = work_queue_task_create(cmd);
-	} else {
-		work_queue_task_specify_command(t,cmd);
-	}
-
-	work_queue_submit(foreman_q, t);
-	t->taskid = taskid;
-	return 1;
-}
-
-static int foreman_add_file_to_task(const char *filename, int taskid, int type, int flags) {
-	struct work_queue_task *t;
-
-	t = (struct work_queue_task *)itable_lookup(unfinished_tasks, taskid);
-	if(!t) {
-		t = work_queue_task_create("");
-		itable_insert(unfinished_tasks, taskid, t);
-	}
-
-	work_queue_task_specify_file(t, filename, filename, type, flags);
-	return 1;
 }
 
 /**
@@ -778,38 +742,74 @@ static struct link *connect_master(time_t stoptime) {
 	return NULL;
 }
 
-// BUG: worker always starts a task on request.
-// It should only start tasks until all cores are used up.
+static int do_task( struct link *master, UINT64_T taskid )
+{
+	time_t stoptime = time(0) + active_timeout;
 
-static int do_work(struct link *master, int taskid, INT64_T length) {
-	char *cmd = malloc(length + 10);
-	struct task_info *ti;
+	struct work_queue_task *task = work_queue_task_create(0);
 
-	link_read(master, cmd, length, time(0) + active_timeout);
-	cmd[length] = 0;
+	task->taskid = taskid;
 
-	debug(D_WQ, "%s", cmd);
-	
-	ti = malloc(sizeof(*ti));
-	memset(ti, 0, sizeof(*ti));
-	
-	ti->taskid = taskid;
-	execute_task(cmd, ti);
-	free(cmd);
-	
-	if(ti->pid < 0) {
-		fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
-		free(ti);
-		abort_flag = 1;
-		return 0;
+	char line[WORK_QUEUE_LINE_MAX];
+	char filename[WORK_QUEUE_LINE_MAX];
+	int n, flags, length;
+
+	while(link_readline(master,line,sizeof(line),stoptime)) {
+	  	if(sscanf(line,"cmd %d",&length)==1) {
+			char *cmd = malloc(length+1);
+			link_read(master,cmd,length,stoptime);
+			cmd[length] = 0;
+			work_queue_task_specify_command(task,cmd);
+			free(cmd);
+		} else if(sscanf(line,"infile %s %d",filename,&flags)) {
+		       	work_queue_task_specify_file(task,filename,filename,WORK_QUEUE_INPUT,flags);
+		} else if(sscanf(line,"outfile %s %d",filename,&flags)) {
+		       	work_queue_task_specify_file(task,filename,filename,WORK_QUEUE_OUTPUT,flags);
+		} else if(sscanf(line,"cores %d",&n)) {
+		       	work_queue_task_specify_cores(task,n);
+		} else if(sscanf(line,"memory %d",&n)) {
+		       	work_queue_task_specify_memory(task,n);
+		} else if(sscanf(line,"disk %d",&n)) {
+		       	work_queue_task_specify_disk(task,n);
+		} else if(!strcmp(line,"end")) {
+		       	break;
+		} else {
+			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
+			work_queue_task_delete(task);
+			return 0;
+		}
 	}
 
-	//snprintf(ti->output_file_name, 50, "%d.task.stdout.tmp", ti->pid);
+	// If this is a foreman, just send the task structure along.
+	// If it is a local worker, create a task_info, start the task, and discard the temporary work_queue_task.
 
-	ti->status = 0;
-	itable_insert(stored_tasks, taskid, ti);
-	itable_insert(active_tasks, ti->pid, ti);
-	return 1;
+	if(foreman_q) {
+		work_queue_submit(foreman_q,task);
+		return 1;
+	} else {
+
+		// BUG: should instead queue up the task and start it later
+		// when we know there are enough resources.
+
+		struct task_info *ti = malloc(sizeof(*ti));
+		ti->taskid = task->taskid;
+		execute_task(task->command_line,ti);
+		work_queue_task_delete(task);
+	
+		if(ti->pid < 0) {
+			fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
+			free(ti);
+			abort_flag = 1;
+			return 0;
+		}
+
+		ti->status = 0;
+
+		itable_insert(stored_tasks, taskid, ti);
+		itable_insert(active_tasks, ti->pid, ti);
+
+		return 1;
+	}
 }
 
 static int do_stat(struct link *master, const char *filename) {
@@ -1152,17 +1152,6 @@ static void disconnect_master(struct link *master) {
 	// Remove the contents of the workspace.
 	delete_dir_contents(workspace);
 
-	// Clean up any remaining tasks.
-	if(unfinished_tasks) {
-		UINT64_T taskid;
-		struct work_queue_task *t;
-		itable_firstkey(unfinished_tasks);
-		while(itable_nextkey(unfinished_tasks, &taskid, (void**)&t)) {
-			work_queue_task_delete(t);
-		}
-		itable_clear(unfinished_tasks);
-	}
-	
 	worker_mode = worker_mode_default;
 	
 	if(released_by_master) {
@@ -1188,16 +1177,6 @@ static void abort_worker() {
 
 	if(foreman_q) {
 		work_queue_delete(foreman_q);
-	}
-	
-	if(unfinished_tasks) {
-		UINT64_T taskid;
-		struct work_queue_task *t;
-		itable_firstkey(unfinished_tasks);
-		while(itable_nextkey(unfinished_tasks, &taskid, (void**)&t)) {
-			work_queue_task_delete(t);
-		}
-		itable_delete(unfinished_tasks);
 	}
 	
 	if(active_tasks) {
@@ -1266,19 +1245,12 @@ static int worker_handle_master(struct link *master) {
 
 	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
 		debug(D_WQ, "received command: %s.\n", line);
-		if((n = sscanf(line, "work %" SCNd64 "%" SCNd64, &length, &taskid))) {
-			if(n < 2) {
-				current_taskid++;
-				r = do_work(master, current_taskid, length);
-			} else {
-				r = do_work(master, taskid, length);
-			}
+		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
+			r = do_task(master,taskid);
 		} else if(sscanf(line, "stat %s", filename) == 1) {
 			r = do_stat(master, filename);
 		} else if(sscanf(line, "symlink %s %s", path, filename) == 2) {
 			r = do_symlink(path, filename);
-		} else if(sscanf(line, "need %" SCNd64 " %s %d", &taskid, filename, &flags) == 3) {
-			r = 1;
 		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags)) >= 3) {
 			if(path_within_workspace(filename, workspace)) {
 				if(length >= 0) {
@@ -1417,8 +1389,8 @@ static int foreman_handle_master(struct link *master) {
 
 	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
 		debug(D_WQ, "received command: %s.\n", line);
-		if(sscanf(line, "work %" SCNd64 "%" SCNd64, &length, &taskid) == 2) {
-			r = foreman_finish_task(master, taskid, length);
+		if(sscanf(line, "task %" SCNd64 ,&taskid)==1) {
+			r = do_task(master,taskid);
 		} else if(sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags) == 5) {
 			if(path_within_workspace(filename, workspace)) {
 				if(length >= 0) {
@@ -1426,18 +1398,9 @@ static int foreman_handle_master(struct link *master) {
 				} else {
 					r = 1;
 				}
-				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_INPUT, flags);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
-			}
-		} else if(sscanf(line, "need %" SCNd64 " %s %d", &taskid, filename, &flags) == 3) {
-			if(path_within_workspace(filename, workspace)) {
-				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_OUTPUT, flags);
-				r=1;
-			} else {
-				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
-				r=0;
 			}
 		} else if(sscanf(line, "unlink %s", filename) == 1) {
 			if(path_within_workspace(filename, workspace)) {
@@ -1885,8 +1848,6 @@ int main(int argc, char *argv[])
 		work_queue_specify_estimate_capacity_on(foreman_q, enable_capacity);
 		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);	
 		work_queue_specify_log(foreman_q, foreman_stats_filename);
-		
-		unfinished_tasks = itable_create(0);
 	} else {
 		active_tasks = itable_create(0);
 		stored_tasks = itable_create(0);
