@@ -22,7 +22,7 @@ See the file COPYING for details.
  * get_RESOURCE_usage, and acc_RESOURCE_usage. For example, for memory we have
  * get_mem_usage, and acc_mem_usage. In general, all functions
  * return 0 on success, or some other integer on failure. The
- * exception are function that open files, which return NULL on
+* exception are function that open files, which return NULL on
  * failure, or a file pointer on success.
  *
  * The acc_RESOURCE_usage(accum, other) adds the contents of
@@ -435,6 +435,8 @@ void initialize_limits_tree(struct tree_info *tree, int64_t val)
     tree->bytes_written            = val;
     tree->workdir_number_files_dirs = val;
     tree->workdir_footprint         = val;
+
+
 }
 
 
@@ -481,6 +483,12 @@ void parse_limits_string(char *str, struct tree_info *tree)
     parse_limit_string(vars, tree, workdir_number_files_dirs);
     parse_limit_string(vars, tree, workdir_footprint);
 
+    if(tree->wall_time < INTMAX_MAX/ONE_SECOND)
+	    tree->wall_time *= ONE_SECOND;
+
+    if(tree->cpu_time < INTMAX_MAX/ONE_SECOND)
+	    tree->cpu_time *= ONE_SECOND;
+
     hash_table_delete(vars);
 }
 
@@ -501,6 +509,11 @@ void parse_limits_file(char *path, struct tree_info *tree)
     parse_limit_file(flimits, tree, workdir_number_files_dirs);
     parse_limit_file(flimits, tree, workdir_footprint);
 
+    if(tree->wall_time < INTMAX_MAX/ONE_SECOND)
+	    tree->wall_time *= ONE_SECOND;
+
+    if(tree->cpu_time < INTMAX_MAX/ONE_SECOND)
+	    tree->cpu_time *= ONE_SECOND;
 }
 
 /***
@@ -1460,35 +1473,35 @@ void monitor_final_cleanup(int signum)
 
 // The following keeps getting uglier and uglier! Rethink how to do it!
 //
-#define over_limit_check(tr, fld, fmt)\
-    if((tr)->fld > 0 && tree_limits->fld - (tr)->fld < 0)\
-    {\
-        char *tmp;\
-        if(over_limit_str)\
-        {\
-            tmp = string_format("%s, " #fld " %" fmt " > %" fmt, over_limit_str, (tr)->fld, tree_limits->fld);\
-            free(over_limit_str);\
-            over_limit_str = tmp;\
-        }\
-        else\
-            over_limit_str = string_format(#fld " %" fmt " > %" fmt, (tr)->fld, tree_limits->fld);\
-    }
+#define over_limit_check(tr, fld, mult, fmt)				\
+	if((tr)->fld > 0 && tree_limits->fld - (tr)->fld < 0)		\
+	{								\
+		char *tmp;						\
+		if(over_limit_str)					\
+		{							\
+			tmp = string_format("%s, " #fld " %" fmt " > %" fmt, over_limit_str, mult * (tr)->fld, mult * tree_limits->fld); \
+			free(over_limit_str);				\
+			over_limit_str = tmp;				\
+		}							\
+		else							\
+			over_limit_str = string_format(#fld " %" fmt " > %" fmt, mult * (tr)->fld, mult * tree_limits->fld); \
+	}
 
 /* return 0 means above limit, 1 means limist ok */
 int monitor_check_limits(struct tree_info *tr)
 {
     over_limit_str = NULL;
 
-    over_limit_check(tr, wall_time, "lf");
-    over_limit_check(tr, max_concurrent_processes, PRId64);
-    over_limit_check(tr, cpu_time, "lf");
-    over_limit_check(tr, virtual_memory, PRId64);
-    over_limit_check(tr, resident_memory, PRId64);
-    over_limit_check(tr, swap_memory, PRId64);
-    over_limit_check(tr, bytes_read, PRId64);
-    over_limit_check(tr, bytes_written, PRId64);
-    over_limit_check(tr, workdir_number_files_dirs, PRId64);
-    over_limit_check(tr, workdir_footprint, PRId64);
+    over_limit_check(tr, wall_time, 1.0/ONE_SECOND, "lf");
+    over_limit_check(tr, max_concurrent_processes, 1, PRId64);
+    over_limit_check(tr, cpu_time, 1.0/ONE_SECOND, "lf");
+    over_limit_check(tr, virtual_memory, 1, PRId64);
+    over_limit_check(tr, resident_memory, 1, PRId64);
+    over_limit_check(tr, swap_memory, 1, PRId64);
+    over_limit_check(tr, bytes_read, 1, PRId64);
+    over_limit_check(tr, bytes_written, 1, PRId64);
+    over_limit_check(tr, workdir_number_files_dirs, 1, PRId64);
+    over_limit_check(tr, workdir_footprint, 1, PRId64);
 
     if(over_limit_str)
         return 0;
