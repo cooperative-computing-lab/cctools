@@ -22,6 +22,11 @@ when the total cores, tasks, and memory are within the specified limits.
 - When run with --cores greater than one and the work queue example
 app, there are regular pauses of five seconds, instead of a constant
 stream of results.
+
+- When the user does not specify any resources explicitly for a
+task, both the master and the worker should assume that the task
+occupies the entire resources of a given worker.
+
 */
 
 
@@ -1872,6 +1877,11 @@ int main(int argc, char *argv[])
 			work_queue_specify_name(foreman_q, foreman_name);
 			work_queue_specify_master_mode(foreman_q, WORK_QUEUE_MASTER_MODE_CATALOG);
 		}
+
+		if(password) {
+			work_queue_specify_password(foreman_q,password);
+		}
+
 		work_queue_specify_estimate_capacity_on(foreman_q, enable_capacity);
 		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);	
 		work_queue_specify_log(foreman_q, foreman_stats_filename);
