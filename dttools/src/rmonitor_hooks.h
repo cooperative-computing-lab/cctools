@@ -6,27 +6,19 @@ COPYING for details.
 
 #define RESOURCE_MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 
-#define RMONITOR_DEFAULT_NAME  "\001"     /* Tells resource_monitor_rewrite_command to use the default
-											 name of the log file. It does not look pretty, but
-											 allows us to have a single argument per log file. It does
-											 not work in the event that the user want to name a file
-											 with the octal character "\001". */
-
-#define RMONITOR_DONT_GENERATE  NULL     /* Tells resource_monitor_rewrite_command not to add the
-											corresponding log file. */
-
 /** Wraps a command line with the resource monitor.
 The command line is rewritten to be run inside the monitor with
 the corresponding log file options.
 @param cmdline A command line.
-@param template The filename template for all the log files, used when RMONITOR_DEFAULT_NAME is specified for the parameters below.
-@param summary The name of the summary file to be generated. If RMONITOR_DEFAULT_NAME, use the default name from resource_monitor. If RMONITOR_DONT_GENERATE, then it tells the monitor no to generate the summary file.
-@param time_series The name of the time-series log to be generated. Use RMONITOR_DEFAULT_NAME and RMONITOR_DONT_GENERATE as with summary.
-@param opened_files The name of the list of opened files log to be generated. Use RMONITOR_DEFAULT_NAME and RMONITOR_DONT_GENERATE as with summary.
+@param template The filename template for all the log files, used when NULL is specified for the parameters below.
+@param limits The name of the resource limits file. NULL if no limits are going to be specified.
+@param summary The name of the summary file to be generated. If NULL, but template is specified, then generate with default name. If NULL, and template also NULL, then it is not generated.
+@param time_series The name of the time-series log to be generated (same rules as summary).
+@param opened_files The name of the list of opened files log to be generated. (same rules as summary).
 @return A new command line that runs the original command line wrapped with the resource monitor.
 */
 
-char *resource_monitor_rewrite_command(char *cmdline, char *template, char *summary, char *time_series, char *opened_files);
+char *resource_monitor_rewrite_command(char *cmdline, char *template_filename, char *limits_filename, char *summary, char *time_series, char *opened_files);
 
 /** Looks for a resource monitor executable, and makes a copy in
 current working directory.
