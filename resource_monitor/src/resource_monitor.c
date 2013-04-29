@@ -168,7 +168,9 @@ int    monitor_queue_fd = -1;  /* File descriptor of a datagram socket to which 
                                   grandchildren processes report to the monitor. */
 
 pid_t  first_process_pid;              /* pid of the process given at the command line */
-pid_t  first_process_sigchild_status;      /* exit status flags of the process given at the command line */
+pid_t  first_process_sigchild_status;  /* exit status flags of the process given at the command line */
+pid_t  first_process_already_waited = 0;  /* exit status flags of the process given at the command line */
+
 char  *over_limit_str = NULL;          /* string to report the limits exceeded */
 
 uint64_t usecs_initial;                /* Time at which monitoring started, in usecs. */
@@ -1258,6 +1260,8 @@ void cleanup_zombie(struct process_info *p)
   if(p->wd)
     dec_wd_count(p->wd);
 
+  kill(p->pid, SIGTERM);
+
   itable_remove(processes, p->pid);
   free(p);
 }
@@ -1387,6 +1391,8 @@ void monitor_check_child(const int signal)
       return;
     }
 
+    first_process_already_waited = 1;
+
     struct process_info *p;
     debug(D_DEBUG, "adding all processes to cleanup list.\n");
     itable_firstkey(processes);
@@ -1406,7 +1412,6 @@ void monitor_final_cleanup(int signum)
     struct   process_info *p;
     int      status;
 
-    signal(SIGCHLD, SIG_DFL);
 
     //ask politely to quit
     itable_firstkey(processes);
@@ -1422,6 +1427,11 @@ void monitor_final_cleanup(int signum)
 
     if(itable_size(processes) > 0)
         sleep(1);
+
+    if(!first_process_already_waited)
+	    monitor_check_child(signum);
+
+    signal(SIGCHLD, SIG_DFL);
 
     //we did ask...
     itable_firstkey(processes);
