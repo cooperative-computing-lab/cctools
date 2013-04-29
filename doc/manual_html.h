@@ -21,6 +21,7 @@ define(PARAM,<i>&lt;$1&gt;</i>)
 define(OPTIONS_BEGIN,<table>)dnl
 define(OPTION_ITEM,<tr><td> BOLD(CODE($1)) <td>)dnl
 define(OPTION_PAIR,<tr><td colspan=2> BOLD(CODE($1 PARAM($2)))<tr><td><td>)dnl
+define(OPTION_TRIPLET,<tr><td colspan=2> BOLD(CODE($1)``,''BOLD(CODE(--$2)) BOLD(CODE(PARAM($3))))<tr><td><td>)dnl
 define(OPTIONS_END,</table>)dnl
 
 define(LONGCODE_BEGIN,<pre>)
