@@ -288,6 +288,7 @@ struct tree_info
 
 struct tree_info *tree_max;
 struct tree_info *tree_limits;
+struct tree_info *tree_flags;
 
 /*** 
  * Utility functions (open log files, proc files, measure time)
@@ -1165,8 +1166,13 @@ void monitor_log_row(struct tree_info *tr)
     fprintf(log_series, "%" PRId64 "\t", tr->bytes_read);
     fprintf(log_series, "%" PRId64 "\t", tr->bytes_written);
 
-    fprintf(log_series, "%" PRId64 "\t", tr->workdir_number_files_dirs);
-    fprintf(log_series, "%" PRId64 "\n", tr->workdir_footprint);
+    if(tree_flags->workdir_footprint)
+    {
+	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_number_files_dirs);
+	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_footprint);
+    }
+
+    fprintf(log_series, "\n");
                                
     /* are we going to keep monitoring the whole filesystem? */
     // fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
@@ -1236,10 +1242,14 @@ int monitor_final_summary()
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "swap_memory:", tree_max->swap_memory);
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_read:", tree_max->bytes_read);
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_written:", tree_max->bytes_written);
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", tree_max->workdir_number_files_dirs);
+    
+    if(tree_flags->workdir_footprint)
+    {
+	    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", tree_max->workdir_number_files_dirs);
 
-    //Print the footprint in megabytes, rather than of bytes.
-    fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
+	    //Print the footprint in megabytes, rather than of bytes.
+	    fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
+    }
 
     if(status && !WEXITSTATUS(first_process_sigchild_status))
         return status;
@@ -1719,6 +1729,9 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Do not write the summary log file.\n", "--without-summary-file"); 
     fprintf(stdout, "%-30s Do not write the time series log file.\n", "--without-time-series"); 
     fprintf(stdout, "%-30s Do not write the list of opened files.\n", "--without-opened-files"); 
+    fprintf(stdout, "\n");
+    fprintf(stdout, "%-30s Measure working directory footprint (potentially slow).\n", "--with-disk-footprint"); 
+    fprintf(stdout, "%-30s Do not measure working directory footprint (default).\n", "--without-disk-footprint"); 
 }
 
 
@@ -1743,8 +1756,11 @@ int monitor_resources(long int interval /*in seconds */)
         ping_processes();
 
         monitor_processes_once(p);
-        monitor_wds_once(d);
-        monitor_fss_once(f);
+
+	if(tree_flags->workdir_footprint)
+		monitor_wds_once(d);
+
+	// monitor_fss_once(f); disabled until statfs fs id makes sense.
 
         monitor_collate_tree(tree_now, p, d, f);
 
@@ -1804,51 +1820,56 @@ int main(int argc, char **argv) {
 
     tree_max    = calloc(1, sizeof(struct tree_info));
     tree_limits = calloc(1, sizeof(struct tree_info));
+    tree_flags  = calloc(1, sizeof(struct tree_info));
 
     usecs_initial = usecs_since_epoch();
     initialize_limits_tree(tree_limits, INTMAX_MAX);
 
     struct option long_options[] =
-    {
-        {"debug",      required_argument, 0, 'd'},
-        {"help",       required_argument, 0, 'h'},
-        {"interval",   required_argument, 0, 'i'},
-        {"limits",     required_argument, 0, 'L'},
-        {"limits-file",required_argument, 0, 'l'},
+	    {
+		    /* Regular Options */
+		    {"debug",      required_argument, 0, 'd'},
+		    {"help",       required_argument, 0, 'h'},
+		    {"interval",   required_argument, 0, 'i'},
+		    {"limits",     required_argument, 0, 'L'},
+		    {"limits-file",required_argument, 0, 'l'},
 	
-        {"with-output-files", required_argument, 0,  'o'},
+		    {"with-output-files", required_argument, 0,  'o'},
 
-        {"with-summary-file", required_argument, 0,  0},
-        {"with-time-series",  required_argument, 0,  1 }, 
-        {"with-opened-files", required_argument, 0,  2 },
+		    {"with-summary-file", required_argument, 0,  0},
+		    {"with-time-series",  required_argument, 0,  1 }, 
+		    {"with-opened-files", required_argument, 0,  2 },
 
-        {"without-summary",      no_argument, 0, 3},
-        {"without-time-series",  no_argument, 0, 4}, 
-        {"without-opened-files", no_argument, 0, 5},
+		    {"without-summary",      no_argument, 0, 3},
+		    {"without-time-series",  no_argument, 0, 4}, 
+		    {"without-opened-files", no_argument, 0, 5},
 
-        {0, 0, 0, 0}
-    };
+		    {"with-disk-footprint",    no_argument, 0, 6},
+		    {"without-disk-footprint", no_argument, 0, 7},
+
+		    {0, 0, 0, 0}
+	    };
 
     while((c = getopt_long(argc, argv, "d:hi:L:l:o:", long_options, NULL)) >= 0)
     {
-        switch (c) {
+	    switch (c) {
             case 'd':
-                debug_flags_set(optarg);
-                break;
+		    debug_flags_set(optarg);
+		    break;
             case 'i':
-                interval = strtoll(optarg, NULL, 10);
-                if(interval < 1)
-                    fatal("interval cannot be set to less than one second.");
-                break;
+		    interval = strtoll(optarg, NULL, 10);
+		    if(interval < 1)
+			    fatal("interval cannot be set to less than one second.");
+		    break;
             case 'l':
-                parse_limits_file(optarg, tree_limits);
-                break;
+		    parse_limits_file(optarg, tree_limits);
+		    break;
             case 'L':
-                parse_limits_string(optarg, tree_limits);
-                break;
+		    parse_limits_string(optarg, tree_limits);
+		    break;
             case 'h':
-                show_help(argv[0]);
-                break;
+		    show_help(argv[0]);
+		    break;
             case 'o':
 		    if(template_path)
 			    free(template_path);
@@ -1873,47 +1894,53 @@ int main(int argc, char **argv) {
 		    use_opened  = 1;
 		    break;
 
-	case 0:
-                if(summary_path)
-			free(summary_path);
-                summary_path = xxstrdup(optarg);
-                use_summary = 1;
-                break;
+	    case 0:
+		    if(summary_path)
+			    free(summary_path);
+		    summary_path = xxstrdup(optarg);
+		    use_summary = 1;
+		    break;
             case  1:
-                if(series_path)
-                    free(series_path);
-                series_path = xxstrdup(optarg);
-                use_series  = 1;
-                break;
+		    if(series_path)
+			    free(series_path);
+		    series_path = xxstrdup(optarg);
+		    use_series  = 1;
+		    break;
             case  2:
-                if(opened_path)
-                    free(opened_path);
-                opened_path = xxstrdup(optarg);
-                use_opened  = 1;
-                break;
+		    if(opened_path)
+			    free(opened_path);
+		    opened_path = xxstrdup(optarg);
+		    use_opened  = 1;
+		    break;
             case  3:
-                if(summary_path)
-                    free(summary_path);
-                summary_path = NULL;
-                use_summary = 0;
-                break;
+		    if(summary_path)
+			    free(summary_path);
+		    summary_path = NULL;
+		    use_summary = 0;
+		    break;
             case  4:
-                if(series_path)
-                    free(series_path);
-                series_path = NULL;
-                use_series  = 0;
-                break;
+		    if(series_path)
+			    free(series_path);
+		    series_path = NULL;
+		    use_series  = 0;
+		    break;
             case  5:
-                if(opened_path)
-                    free(opened_path);
-                opened_path = NULL;
-                use_opened  = 0;
-                break;
+		    if(opened_path)
+			    free(opened_path);
+		    opened_path = NULL;
+		    use_opened  = 0;
+		    break;
+	    case 6:
+		    tree_flags->workdir_footprint = 1;
+		    break;
+	    case 7:
+		    tree_flags->workdir_footprint = 0;
+		    break;
             default:
-                show_help(argv[0]);
-                return 1;
-                break;
-        }
+		    show_help(argv[0]);
+		    return 1;
+		    break;
+	    }
     }
 
     //this is ugly, concatenating command and arguments
