@@ -762,22 +762,17 @@ int get_swap_linux(pid_t pid, struct mem_info *mem)
 
 int get_mem_linux(pid_t pid, struct mem_info *mem)
 {
-    // /dev/proc/[pid]/statm: 
-    // total-size resident shared-pages text unused data+stack unused
+    // /dev/proc/[pid]/status: 
     
-    FILE *fmem = open_proc_file(pid, "statm");
+    FILE *fmem = open_proc_file(pid, "status");
     if(!fmem)
         return 1;
 
-    fscanf(fmem, 
-            "%" SCNu64 " %" SCNu64 " %" SCNu64 " %" SCNu64 " %*s %" SCNu64 " %*s",
-            &mem->virtual, 
-            &mem->resident, 
-            &mem->shared, 
-            &mem->text,
-            &mem->data);
-
-    mem->shared *= sysconf(_SC_PAGESIZE); //Multiply pages by pages size.
+    get_int_attribute(fmem, "VmPeak:", &mem->virtual,  1);
+    get_int_attribute(fmem, "VmHWM:",  &mem->resident, 1);
+    get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
+    get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
+    get_int_attribute(fmem, "VmData:", &mem->data,     1);
 
     get_swap_linux(pid, mem);
 
