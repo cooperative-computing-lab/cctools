@@ -112,7 +112,7 @@ char *resource_monitor_copy_to_wd(char *path_from_cmdline)
 
 //Using default sampling interval. We may want to add an option
 //to change it.
-char *resource_monitor_rewrite_command(char *cmdline, char *summary, char *time_series, char *opened_files)
+char *resource_monitor_rewrite_command(char *cmdline, char *template_filename, char *limits_filename, char *summary, char *time_series, char *opened_files)
 {
 	char cmd_builder[PATH_MAX];
 	int  index;
@@ -122,29 +122,26 @@ char *resource_monitor_rewrite_command(char *cmdline, char *summary, char *time_
 
 	index = sprintf(cmd_builder, "./%s ", monitor_exe);
 
-	if(summary != RMONITOR_DONT_GENERATE)
-	{	
-		if(strcmp(summary, RMONITOR_DEFAULT_NAME) != 0)
-			index += sprintf(cmd_builder + index, "--with-summary-file=%s ", summary);
-	}
-	else
+	if(template_filename)
+		index += sprintf(cmd_builder + index, "--with-output-files=%s ", template_filename);
+
+	if(summary)
+		index += sprintf(cmd_builder + index, "--with-summary-file=%s ", summary);
+	else if(!template_filename)
 		index += sprintf(cmd_builder + index, "--without-summary-file ");
 
-	if(time_series != RMONITOR_DONT_GENERATE)
-	{	
-		if(strcmp(time_series, RMONITOR_DEFAULT_NAME) != 0)
-			index += sprintf(cmd_builder + index, "--with-time-series=%s ", time_series);
-	}
-	else
+	if(time_series)
+		index += sprintf(cmd_builder + index, "--with-time-series=%s ", time_series);
+	else if(!template_filename)
 		index += sprintf(cmd_builder + index, "--without-time-series ");
 
-	if(opened_files != RMONITOR_DONT_GENERATE)
-	{	
-		if(strcmp(opened_files, RMONITOR_DEFAULT_NAME) != 0)
-			index += sprintf(cmd_builder + index, "--with-opened-files=%s ", opened_files);
-	}
-	else
+	if(opened_files)
+		index += sprintf(cmd_builder + index, "--with-opened-files=%s ", opened_files);
+	else if(!template_filename)
 		index += sprintf(cmd_builder + index, "--without-opened-files ");
+
+	if(limits_filename)
+		index += sprintf(cmd_builder + index, "--limits-file=%s ", limits_filename);
 
 	sprintf(cmd_builder + index, "-- %s", cmdline);
 

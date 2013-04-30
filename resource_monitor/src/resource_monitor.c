@@ -13,23 +13,17 @@ See the file COPYING for details.
  *
  * Use as:
  *
- * resource_monitor -i 120000 -- some-command-line-and-options
+ * resource_monitor -i 120 -- some-command-line-and-options
  *
- * to monitor some-command-line at two minutes intervals (120000
- * miliseconds).
+ * to monitor some-command-line at two minutes intervals (120
+ * seconds).
  *
  * Each monitor target resource has two functions:
  * get_RESOURCE_usage, and acc_RESOURCE_usage. For example, for memory we have
  * get_mem_usage, and acc_mem_usage. In general, all functions
  * return 0 on success, or some other integer on failure. The
- * exception are function that open files, which return NULL on
+* exception are function that open files, which return NULL on
  * failure, or a file pointer on success.
- *
- * The get_RESOURCE_usage functions are called at given intervals.
- * Between each interval, the monitor does nothing. All processes
- * monitored write to the same text log file. If no file name is provided,
- * for the log, then the log file is written to a file called
- * log-monitor-PID, in which PID is the pid of the monitor.
  *
  * The acc_RESOURCE_usage(accum, other) adds the contents of
  * other, field by field, to accum.
@@ -40,26 +34,22 @@ See the file COPYING for details.
  *
  * Currently, the columns are:
  * 
- * wall:      wall time (in usecs).
- * no.proc:   number of processes
- * cpu-time:  user-mode time + kernel-mode time.
- * vmem:      current total memory size (virtual).
- * io:        read chars count using *read system calls + writen char count using *write system calls.
- * files+dir  total file + directory count of all working directories.
- * bytes      total byte count of all working directories.
- * nodes      total occupied nodes of all the filesystems used by working directories since the start of the task. 
+ * wall:          wall time (in usecs).
+ * no.proc:       number of processes
+ * cpu-time:      user-mode time + kernel-mode time.
+ * vmem:          current total memory size (virtual).
+ * rss:           current total resident size.
+ * swap:          current total swap usage.
+ * bytes_read:    read chars count using *read system calls
+ * bytes_written: writen char count using *write system calls.
+ * files+dir      total file + directory count of all working directories.
+ * footprint      total byte count of all working directories.
  *
  * The log file is written to the home directory of the monitor
  * process. A flag will be added later to indicate a prefered
  * output file. Additionally, a summary log file is written at
  * the end, reporting the command run, starting and ending times,
  * and maximum, minimum, and average of the resources monitored.
- *
- * While all the logic supports the monitoring of several
- * processes by the same monitor, only one monitor can
- * be specified at the command line. This is because we plan to
- * wrap the calls to fork and clone in the monitor such that we
- * can also monitor the process children.
  *
  * Each monitored process gets a 'struct process_info', itself
  * composed of 'struct mem_info', 'struct cpu_time_info', etc. There
@@ -84,7 +74,7 @@ See the file COPYING for details.
  * the first processes it created, and cleans up the monitoring
  * tables.
  *
- * monitor takes the -i<miliseconds> flag, which indicates how often
+ * monitor takes the -i<seconds> flag, which indicates how often
  * the resources are checked. The logic is there to allow, say,
  * memory to be checked twice as often as disk, but right now all
  * the resources are checked at each interval.
@@ -96,7 +86,7 @@ See the file COPYING for details.
  * LOTS of code repetition that probably can be eliminated with
  * calls to function pointers and some macros.
  *
- * BSDs: kvm interface is not implemented.
+ * BSDs: kvm interface for swap is not implemented.
  *
  * io: may report zero if process ends before we read
  * /proc/[pid]/io.
@@ -168,7 +158,7 @@ See the file COPYING for details.
 #define ONE_MEGABYTE 1048576  /* this many bytes */
 #define ONE_SECOND   1000000  /* this many usecs */    
 
-#define DEFAULT_LOG_NAME "monitor-log-%d"     /* %d is used for the value of getpid() */
+#define DEFAULT_LOG_NAME "resource-pid-%d"     /* %d is used for the value of getpid() */
 
 FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
 FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
@@ -178,7 +168,9 @@ int    monitor_queue_fd = -1;  /* File descriptor of a datagram socket to which 
                                   grandchildren processes report to the monitor. */
 
 pid_t  first_process_pid;              /* pid of the process given at the command line */
-pid_t  first_process_exit_status;      /* exit status of the process given at the command line */
+pid_t  first_process_sigchild_status;  /* exit status flags of the process given at the command line */
+pid_t  first_process_already_waited = 0;  /* exit status flags of the process given at the command line */
+
 char  *over_limit_str = NULL;          /* string to report the limits exceeded */
 
 uint64_t usecs_initial;                /* Time at which monitoring started, in usecs. */
@@ -214,6 +206,7 @@ struct mem_info
 {
     uint64_t virtual; 
     uint64_t resident;
+    uint64_t swap;
     uint64_t shared;
     uint64_t text;
     uint64_t data;
@@ -268,7 +261,8 @@ struct process_info
 };
 
 char *resources[15] = { "wall_clock(seconds)", 
-                        "concurrent_processes", "cpu_time(seconds)", "virtual_memory(kB)", "resident_memory(kB)", 
+                        "concurrent_processes", "cpu_time(seconds)",
+			"virtual_memory(kB)", "resident_memory(kB)", "swap_memory(kB)", 
                         "bytes_read", "bytes_written", 
                         "workdir_number_files_dirs", "workdir_footprint(MB)",
                         NULL };
@@ -283,6 +277,7 @@ struct tree_info
     int64_t cpu_time;
     int64_t virtual_memory; 
     int64_t resident_memory; 
+    int64_t swap_memory; 
     int64_t bytes_read;
     int64_t bytes_written;
     int64_t workdir_number_files_dirs;
@@ -293,6 +288,7 @@ struct tree_info
 
 struct tree_info *tree_max;
 struct tree_info *tree_limits;
+struct tree_info *tree_flags;
 
 /*** 
  * Utility functions (open log files, proc files, measure time)
@@ -321,25 +317,28 @@ double clicks_to_usecs(uint64_t clicks)
     return ((clicks * ONE_SECOND) / sysconf(_SC_CLK_TCK));
 }
 
-char *default_summary_name(void)
+char *default_summary_name(char *template_path)
 {
-    return string_format(DEFAULT_LOG_NAME, getpid());
+	if(template_path)
+		return string_format("%s.summary", template_path);
+	else
+		return string_format(DEFAULT_LOG_NAME ".summary", getpid());
 }
 
-char *default_series_name(char *summary_path)
+char *default_series_name(char *template_path)
 {
-    if(summary_path)
-        return string_format("%s-series", summary_path);
+    if(template_path)
+        return string_format("%s.series", template_path);
     else
-        return string_format(DEFAULT_LOG_NAME "-series", getpid());
+        return string_format(DEFAULT_LOG_NAME ".series", getpid());
 }
 
-char *default_opened_name(char *summary_path)
+char *default_opened_name(char *template_path)
 {
-    if(summary_path)
-        return string_format("%s-opened", summary_path);
+    if(template_path)
+        return string_format("%s.files", template_path);
     else
-        return string_format(DEFAULT_LOG_NAME "-opened", getpid());
+        return string_format(DEFAULT_LOG_NAME ".files", getpid());
 }
 
 FILE *open_log_file(const char *log_path)
@@ -432,10 +431,13 @@ void initialize_limits_tree(struct tree_info *tree, int64_t val)
     tree->cpu_time                 = val;
     tree->virtual_memory           = val;
     tree->resident_memory          = val;
+    tree->swap_memory              = val;
     tree->bytes_read               = val;
     tree->bytes_written            = val;
     tree->workdir_number_files_dirs = val;
     tree->workdir_footprint         = val;
+
+
 }
 
 
@@ -476,10 +478,17 @@ void parse_limits_string(char *str, struct tree_info *tree)
     parse_limit_string(vars, tree, cpu_time);
     parse_limit_string(vars, tree, virtual_memory);
     parse_limit_string(vars, tree, resident_memory);
+    parse_limit_string(vars, tree, swap_memory);
     parse_limit_string(vars, tree, bytes_read);
     parse_limit_string(vars, tree, bytes_written);
     parse_limit_string(vars, tree, workdir_number_files_dirs);
     parse_limit_string(vars, tree, workdir_footprint);
+
+    if(tree->wall_time < INTMAX_MAX/ONE_SECOND)
+	    tree->wall_time *= ONE_SECOND;
+
+    if(tree->cpu_time < INTMAX_MAX/ONE_SECOND)
+	    tree->cpu_time *= ONE_SECOND;
 
     hash_table_delete(vars);
 }
@@ -495,12 +504,17 @@ void parse_limits_file(char *path, struct tree_info *tree)
     parse_limit_file(flimits, tree, max_concurrent_processes);
     parse_limit_file(flimits, tree, cpu_time);
     parse_limit_file(flimits, tree, virtual_memory);
-    parse_limit_file(flimits, tree, resident_memory);
+    parse_limit_file(flimits, tree, swap_memory);
     parse_limit_file(flimits, tree, bytes_read);
     parse_limit_file(flimits, tree, bytes_written);
     parse_limit_file(flimits, tree, workdir_number_files_dirs);
     parse_limit_file(flimits, tree, workdir_footprint);
 
+    if(tree->wall_time < INTMAX_MAX/ONE_SECOND)
+	    tree->wall_time *= ONE_SECOND;
+
+    if(tree->cpu_time < INTMAX_MAX/ONE_SECOND)
+	    tree->cpu_time *= ONE_SECOND;
 }
 
 /***
@@ -731,24 +745,36 @@ void acc_cpu_time_usage(struct cpu_time_info *acc, struct cpu_time_info *other)
     acc->delta += other->delta;
 }
 
+int get_swap_linux(pid_t pid, struct mem_info *mem)
+{
+    FILE *fsmaps = open_proc_file(pid, "smaps");
+    if(!fsmaps)
+        return 1;
+
+    uint64_t accum = 0;
+    uint64_t value = 0;
+
+    while(get_int_attribute(fsmaps, "Swap:", &value, 0) == 0)
+	    accum += value; 
+
+    return accum;
+}
+
 int get_mem_linux(pid_t pid, struct mem_info *mem)
 {
-    // /dev/proc/[pid]/statm: 
-    // total-size resident shared-pages text unused data+stack unused
+    // /dev/proc/[pid]/status: 
     
-    FILE *fmem = open_proc_file(pid, "statm");
+    FILE *fmem = open_proc_file(pid, "status");
     if(!fmem)
         return 1;
 
-    fscanf(fmem, 
-            "%" SCNu64 " %" SCNu64 " %" SCNu64 " %" SCNu64 " %*s %" SCNu64 " %*s",
-            &mem->virtual, 
-            &mem->resident, 
-            &mem->shared, 
-            &mem->text,
-            &mem->data);
+    get_int_attribute(fmem, "VmPeak:", &mem->virtual,  1);
+    get_int_attribute(fmem, "VmHWM:",  &mem->resident, 1);
+    get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
+    get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
+    get_int_attribute(fmem, "VmData:", &mem->data,     1);
 
-    mem->shared *= sysconf(_SC_PAGESIZE); //Multiply pages by pages size.
+    get_swap_linux(pid, mem);
 
     fclose(fmem);
 
@@ -793,6 +819,7 @@ void acc_mem_usage(struct mem_info *acc, struct mem_info *other)
         acc->resident += other->resident;
         acc->shared   += other->shared;
         acc->data     += other->data;
+        acc->swap     += other->swap;
 }
 
 int get_sys_io_usage(pid_t pid, struct io_info *io)
@@ -838,6 +865,7 @@ void acc_sys_io_usage(struct io_info *acc, struct io_info *other)
     acc->delta_chars_written += other->delta_chars_written;
 }
 
+/* This function is not correct. Better to read /proc/[pid]/maps */
 int get_map_io_usage(pid_t pid, struct io_info *io)
 {
     /* /dev/proc/[pid]/smaps */
@@ -1071,6 +1099,7 @@ void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct w
     tr->cpu_time                 = p->cpu.delta + tr->cpu_time;
     tr->virtual_memory           = (int64_t) p->mem.virtual;
     tr->resident_memory          = (int64_t) p->mem.resident;
+    tr->swap_memory              = (int64_t) p->mem.swap;
 
     tr->bytes_read               = (int64_t) (p->io.delta_chars_read + tr->bytes_read);
     tr->bytes_read              += (int64_t)  p->io.delta_bytes_faulted;
@@ -1102,6 +1131,9 @@ void monitor_find_max_tree(struct tree_info *result, struct tree_info *tr)
     if(result->resident_memory < tr->resident_memory)
         result->resident_memory = tr->resident_memory;
 
+    if(result->swap_memory < tr->swap_memory)
+        result->swap_memory = tr->swap_memory;
+
     if(result->bytes_read < tr->bytes_read)
         result->bytes_read = tr->bytes_read;
 
@@ -1125,17 +1157,65 @@ void monitor_log_row(struct tree_info *tr)
     fprintf(log_series, "%" PRId64 "\t", tr->cpu_time);
     fprintf(log_series, "%" PRId64 "\t", tr->virtual_memory);
     fprintf(log_series, "%" PRId64 "\t", tr->resident_memory);
+    fprintf(log_series, "%" PRId64 "\t", tr->swap_memory);
     fprintf(log_series, "%" PRId64 "\t", tr->bytes_read);
     fprintf(log_series, "%" PRId64 "\t", tr->bytes_written);
 
-    fprintf(log_series, "%" PRId64 "\t", tr->workdir_number_files_dirs);
-    fprintf(log_series, "%" PRId64 "\n", tr->workdir_footprint);
+    if(tree_flags->workdir_footprint)
+    {
+	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_number_files_dirs);
+	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_footprint);
+    }
+
+    fprintf(log_series, "\n");
                                
     /* are we going to keep monitoring the whole filesystem? */
     // fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
 
 }
 
+void report_zombie_status(void)
+{
+	/* BUG: end and wall_time should be computed in a final
+	 * summary, not here */
+	tree_max->wall_time = usecs_since_epoch() - usecs_initial;
+
+	fprintf(log_summary, "%-30s\t%lf\n", "end:", 
+		(double) (tree_max->wall_time + usecs_initial) / ONE_SECOND);
+
+	if( WIFEXITED(first_process_sigchild_status) )
+	{
+		debug(D_DEBUG, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(first_process_sigchild_status));
+		fprintf(log_summary, "%-30s\tnormal\n", "exit_type:");
+	} 
+	else if ( WIFSIGNALED(first_process_sigchild_status) )
+	{
+		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WTERMSIG(first_process_sigchild_status)) );
+
+		if(over_limit_str)
+		{
+			fprintf(log_summary, "%-30s\tlimit\n", "exit_type:");
+			fprintf(log_summary, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
+		}
+		else
+		{
+			fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
+			fprintf(log_summary, "%-30s\t%d %s\n", "signal:", 
+				WTERMSIG(first_process_sigchild_status), 
+				strsignal(WTERMSIG(first_process_sigchild_status)));
+		}
+	} 
+	else if ( WIFSTOPPED(first_process_sigchild_status) )
+	{
+		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WSTOPSIG(first_process_sigchild_status)) );
+		fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
+		fprintf(log_summary, "%-30s\t%d %s\n", "signal:", 
+			WSTOPSIG(first_process_sigchild_status), 
+			strsignal(WSTOPSIG(first_process_sigchild_status)));
+	}
+
+	fprintf(log_summary, "%-30s\t%d\n", "exit_status:", WEXITSTATUS(first_process_sigchild_status));
+}
 
 int monitor_final_summary()
 {
@@ -1143,6 +1223,8 @@ int monitor_final_summary()
 
     if(over_limit_str)
         status = -1;
+
+    report_zombie_status();
 
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", tree_max->max_concurrent_processes);
 
@@ -1152,17 +1234,22 @@ int monitor_final_summary()
 
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "virtual_memory:", tree_max->virtual_memory);
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "resident_memory:", tree_max->resident_memory);
+    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "swap_memory:", tree_max->swap_memory);
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_read:", tree_max->bytes_read);
     fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_written:", tree_max->bytes_written);
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", tree_max->workdir_number_files_dirs);
+    
+    if(tree_flags->workdir_footprint)
+    {
+	    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", tree_max->workdir_number_files_dirs);
 
-    //Print the footprint in megabytes, rather than of bytes.
-    fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
+	    //Print the footprint in megabytes, rather than of bytes.
+	    fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
+    }
 
-    if(status && !first_process_exit_status)
+    if(status && !WEXITSTATUS(first_process_sigchild_status))
         return status;
     else
-        return first_process_exit_status;
+        return WEXITSTATUS(first_process_sigchild_status);
 }
 
 void monitor_write_open_file(char *filename)
@@ -1184,7 +1271,30 @@ int ping_process(pid_t pid)
     return (kill(pid, 0) == 0);
 }
 
+void cleanup_zombie(struct process_info *p)
+{
+  debug(D_DEBUG, "cleaning process: %d\n", p->pid);
 
+  if(p->wd)
+    dec_wd_count(p->wd);
+
+  kill(p->pid, SIGTERM);
+
+  itable_remove(processes, p->pid);
+  free(p);
+}
+
+void cleanup_zombies(void)
+{
+  uint64_t pid;
+  struct process_info *p;
+
+  itable_firstkey(processes);
+  while(itable_nextkey(processes, &pid, (void **) &p))
+    if(!p->running)
+      cleanup_zombie(p);
+}
+     
 void monitor_track_process(pid_t pid)
 {
     char *newpath;
@@ -1235,88 +1345,6 @@ void ping_processes(void)
         }
 }
 
-void cleanup_zombie(struct process_info *p)
-{
-    int status;
-
-    debug(D_DEBUG, "cleaning process: %d\n", p->pid);
-
-    //die zombie die
-    waitpid(p->pid, &status, WNOHANG);
-
-    if(p->pid == first_process_pid)
-    {
-        first_process_exit_status = WEXITSTATUS(status);
-
-        /* BUG: end and wall_time should be computed in a final
-         * summary, not here */
-        tree_max->wall_time = usecs_since_epoch() - usecs_initial;
-
-        fprintf(log_summary, "%-30s\t%lf\n", "end:", 
-                (double) (tree_max->wall_time + usecs_initial) / ONE_SECOND);
-
-        if( WIFEXITED(status) )
-        {
-            debug(D_DEBUG, "process %d finished: %d.\n", p->pid, first_process_exit_status );
-            fprintf(log_summary, "%-30s\tnormal\n", "exit_type:");
-        } 
-        else if ( WIFSIGNALED(status) )
-        {
-            debug(D_DEBUG, "process %d terminated: %s.\n", p->pid, strsignal(WTERMSIG(status)) );
-
-            if(over_limit_str)
-            {
-                fprintf(log_summary, "%-30s\tlimit\n", "exit_type:");
-                fprintf(log_summary, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
-            }
-            else
-            {
-                fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
-                fprintf(log_summary, "%-30s\t%d %s\n", "signal:", WTERMSIG(status), strsignal(WTERMSIG(status)));
-            }
-        } 
-
-        fprintf(log_summary, "%-30s\t%d\n", "exit_status:", first_process_exit_status);
-    }
-
-    if(p->wd)
-        dec_wd_count(p->wd);
-
-    itable_remove(processes, p->pid);
-    free(p);
-}
-
-void cleanup_zombies(void)
-{
-    uint64_t pid;
-    struct process_info *p;
-
-    itable_firstkey(processes);
-    while(itable_nextkey(processes, &pid, (void **) &p))
-        if(!p->running)
-            cleanup_zombie(p);
-}
-
-// Return the pid of the child that sent the signal, without removing the
-// waitable state.
-pid_t waiting_child()
-{
-    pid_t pid;
-    
-#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
-    int status;
-    pid = wait4(-1, &status, WNOWAIT, NULL);
-#else
-    siginfo_t cinfo;
-    if(waitid(P_ALL, 0, &cinfo, WEXITED | WNOWAIT) == 0)
-        pid = cinfo.si_pid;
-    else
-        return -1;
-#endif
-
-    return pid;
-}
-
 struct tree_info *monitor_rusage_tree(void)
 {
     struct rusage usg;
@@ -1345,33 +1373,54 @@ struct tree_info *monitor_rusage_tree(void)
 /* sigchild signal handler */
 void monitor_check_child(const int signal)
 {
-    uint64_t pid;
+    uint64_t pid = waitpid(first_process_pid, &first_process_sigchild_status, 
+                           WNOHANG | WCONTINUED | WUNTRACED);
 
-    //zombie, tell us who you were!
-    pid = waiting_child();
+    debug(D_DEBUG, "SIGCHLD from %d : ", pid);
 
-    debug(D_DEBUG, "SIGCHLD from %d\n", pid);
-    struct process_info *p = itable_lookup(processes, pid);
-    if(!p)
-        return;
-
-    if(p->pid == first_process_pid)
+    if(WIFEXITED(first_process_sigchild_status))
     {
-        debug(D_DEBUG, "adding all processes to cleanup list.\n");
-        itable_firstkey(processes);
-        while(itable_nextkey(processes, &pid, (void **) &p))
-            monitor_untrack_process(pid);
-
-        /* get the peak values from getrusage */
-        struct tree_info *tr_usg = monitor_rusage_tree();
-        monitor_find_max_tree(tree_max, tr_usg);
-        free(tr_usg);
+        debug(D_DEBUG, "exit\n");
     }
-    else
+    else if(WIFSIGNALED(first_process_sigchild_status))
     {
-        debug(D_DEBUG, "adding process %d to cleanup list.\n", pid);
-        monitor_untrack_process(p->pid);
+      debug(D_DEBUG, "signal\n");
     }
+    else if(WIFSTOPPED(first_process_sigchild_status))
+    {
+      debug(D_DEBUG, "stop\n");
+
+      switch(WSTOPSIG(first_process_sigchild_status))
+      {
+        case SIGTTIN: 
+          debug(D_NOTICE, "Process asked for input from the terminal, but currently the resource monitor does not support interactive applications.\n");
+          break;
+        case SIGTTOU:
+          debug(D_NOTICE, "Process wants to write to the standard output, but the current terminal settings do not allow this. The monitor currently does not support interactive applications.\n");
+          break;
+        default:
+          return;
+          break;
+      }
+    }
+    else if(WIFCONTINUED(first_process_sigchild_status))
+    {
+      debug(D_DEBUG, "continue\n");
+      return;
+    }
+
+    first_process_already_waited = 1;
+
+    struct process_info *p;
+    debug(D_DEBUG, "adding all processes to cleanup list.\n");
+    itable_firstkey(processes);
+    while(itable_nextkey(processes, &pid, (void **) &p))
+      monitor_untrack_process(pid);
+
+    /* get the peak values from getrusage */
+    struct tree_info *tr_usg = monitor_rusage_tree();
+    monitor_find_max_tree(tree_max, tr_usg);
+    free(tr_usg);
 }
 
 //SIGINT, SIGQUIT, SIGTERM signal handler.
@@ -1381,7 +1430,6 @@ void monitor_final_cleanup(int signum)
     struct   process_info *p;
     int      status;
 
-    signal(SIGCHLD, SIG_DFL);
 
     //ask politely to quit
     itable_firstkey(processes);
@@ -1397,6 +1445,11 @@ void monitor_final_cleanup(int signum)
 
     if(itable_size(processes) > 0)
         sleep(1);
+
+    if(!first_process_already_waited)
+	    monitor_check_child(signum);
+
+    signal(SIGCHLD, SIG_DFL);
 
     //we did ask...
     itable_firstkey(processes);
@@ -1416,7 +1469,6 @@ void monitor_final_cleanup(int signum)
 
     status = monitor_final_summary();
 
-
     fclose(log_summary);
     fclose(log_series);
     fclose(log_opened);
@@ -1426,34 +1478,35 @@ void monitor_final_cleanup(int signum)
 
 // The following keeps getting uglier and uglier! Rethink how to do it!
 //
-#define over_limit_check(tr, fld, fmt)\
-    if((tr)->fld > 0 && tree_limits->fld - (tr)->fld < 0)\
-    {\
-        char *tmp;\
-        if(over_limit_str)\
-        {\
-            tmp = string_format("%s, " #fld " %" fmt " > %" fmt, over_limit_str, (tr)->fld, tree_limits->fld);\
-            free(over_limit_str);\
-            over_limit_str = tmp;\
-        }\
-        else\
-            over_limit_str = string_format(#fld " %" fmt " > %" fmt, (tr)->fld, tree_limits->fld);\
-    }
+#define over_limit_check(tr, fld, mult, fmt)				\
+	if((tr)->fld > 0 && tree_limits->fld - (tr)->fld < 0)		\
+	{								\
+		char *tmp;						\
+		if(over_limit_str)					\
+		{							\
+			tmp = string_format("%s, " #fld " %" fmt " > %" fmt, over_limit_str, mult * (tr)->fld, mult * tree_limits->fld); \
+			free(over_limit_str);				\
+			over_limit_str = tmp;				\
+		}							\
+		else							\
+			over_limit_str = string_format(#fld " %" fmt " > %" fmt, mult * (tr)->fld, mult * tree_limits->fld); \
+	}
 
 /* return 0 means above limit, 1 means limist ok */
 int monitor_check_limits(struct tree_info *tr)
 {
     over_limit_str = NULL;
 
-    over_limit_check(tr, wall_time, "lf");
-    over_limit_check(tr, max_concurrent_processes, PRId64);
-    over_limit_check(tr, cpu_time, "lf");
-    over_limit_check(tr, virtual_memory, PRId64);
-    over_limit_check(tr, resident_memory, PRId64);
-    over_limit_check(tr, bytes_read, PRId64);
-    over_limit_check(tr, bytes_written, PRId64);
-    over_limit_check(tr, workdir_number_files_dirs, PRId64);
-    over_limit_check(tr, workdir_footprint, PRId64);
+    over_limit_check(tr, wall_time, 1.0/ONE_SECOND, "lf");
+    over_limit_check(tr, max_concurrent_processes, 1, PRId64);
+    over_limit_check(tr, cpu_time, 1.0/ONE_SECOND, "lf");
+    over_limit_check(tr, virtual_memory, 1, PRId64);
+    over_limit_check(tr, resident_memory, 1, PRId64);
+    over_limit_check(tr, swap_memory, 1, PRId64);
+    over_limit_check(tr, bytes_read, 1, PRId64);
+    over_limit_check(tr, bytes_written, 1, PRId64);
+    over_limit_check(tr, workdir_number_files_dirs, 1, PRId64);
+    over_limit_check(tr, workdir_footprint, 1, PRId64);
 
     if(over_limit_str)
         return 0;
@@ -1542,7 +1595,7 @@ int wait_for_messages(int interval)
 {
     struct timeval timeout;
 
-    /* wait for interval miliseconds. */
+    /* wait for interval seconds. */
     timeout.tv_sec  = interval;
     timeout.tv_usec = 0;
 
@@ -1663,13 +1716,17 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify\n", "-L,--limits=<string>");
     fprintf(stdout, "%-30s resource limits.\n", "");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Write resource summary to <file>     (default=monitor-log-<pid>)\n", "-o,--with-summary-file=<file>");
-    fprintf(stdout, "%-30s Write resource time series to <file> (default=<summary-file>-log)\n", "--with-time-series=<file>");
-    fprintf(stdout, "%-30s Write list of opened files to <file> (default=<summary-file>-opened)\n", "--with-opened-files=<file>");
+    fprintf(stdout, "%-30s Specify filename template for log files (default=resource-pid-<pid>)\n", "-o,--with-output-files=<file>");
+    fprintf(stdout, "%-30s Write resource summary to <file>        (default=<template>.summary)\n", "--with-summary-file=<file>");
+    fprintf(stdout, "%-30s Write resource time series to <file>    (default=<template>.series)\n", "--with-time-series=<file>");
+    fprintf(stdout, "%-30s Write list of opened files to <file>    (default=<template>.files)\n", "--with-opened-files=<file>");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Do not write the summary log file.\n", "--without-summary-file"); 
     fprintf(stdout, "%-30s Do not write the time series log file.\n", "--without-time-series"); 
     fprintf(stdout, "%-30s Do not write the list of opened files.\n", "--without-opened-files"); 
+    fprintf(stdout, "\n");
+    fprintf(stdout, "%-30s Measure working directory footprint (potentially slow).\n", "--with-disk-footprint"); 
+    fprintf(stdout, "%-30s Do not measure working directory footprint (default).\n", "--without-disk-footprint"); 
 }
 
 
@@ -1694,8 +1751,11 @@ int monitor_resources(long int interval /*in seconds */)
         ping_processes();
 
         monitor_processes_once(p);
-        monitor_wds_once(d);
-        monitor_fss_once(f);
+
+	if(tree_flags->workdir_footprint)
+		monitor_wds_once(d);
+
+	// monitor_fss_once(f); disabled until statfs fs id makes sense.
 
         monitor_collate_tree(tree_now, p, d, f);
 
@@ -1737,6 +1797,7 @@ int main(int argc, char **argv) {
     char c;
     uint64_t interval = DEFAULT_INTERVAL;
 
+    char *template_path = NULL;
     char *summary_path = NULL;
     char *series_path  = NULL;
     char *opened_path  = NULL;
@@ -1754,90 +1815,127 @@ int main(int argc, char **argv) {
 
     tree_max    = calloc(1, sizeof(struct tree_info));
     tree_limits = calloc(1, sizeof(struct tree_info));
+    tree_flags  = calloc(1, sizeof(struct tree_info));
 
     usecs_initial = usecs_since_epoch();
     initialize_limits_tree(tree_limits, INTMAX_MAX);
 
     struct option long_options[] =
-    {
-        {"debug",      required_argument, 0, 'd'},
-        {"help",       required_argument, 0, 'h'},
-        {"interval",   required_argument, 0, 'i'},
-        {"limits",     required_argument, 0, 'L'},
-        {"limits-file",required_argument, 0, 'l'},
+	    {
+		    /* Regular Options */
+		    {"debug",      required_argument, 0, 'd'},
+		    {"help",       required_argument, 0, 'h'},
+		    {"interval",   required_argument, 0, 'i'},
+		    {"limits",     required_argument, 0, 'L'},
+		    {"limits-file",required_argument, 0, 'l'},
+	
+		    {"with-output-files", required_argument, 0,  'o'},
 
-        {"with-summary-file", required_argument, 0, 'o'},
-        {"with-time-series",  required_argument, 0,  0 }, 
-        {"with-opened-files", required_argument, 0,  1 },
+		    {"with-summary-file", required_argument, 0,  0},
+		    {"with-time-series",  required_argument, 0,  1 }, 
+		    {"with-opened-files", required_argument, 0,  2 },
 
-        {"without-summary",      no_argument, 0, 2},
-        {"without-time-series",  no_argument, 0, 3}, 
-        {"without-opened-files", no_argument, 0, 4},
+		    {"without-summary",      no_argument, 0, 3},
+		    {"without-time-series",  no_argument, 0, 4}, 
+		    {"without-opened-files", no_argument, 0, 5},
 
-        {0, 0, 0, 0}
-    };
+		    {"with-disk-footprint",    no_argument, 0, 6},
+		    {"without-disk-footprint", no_argument, 0, 7},
+
+		    {0, 0, 0, 0}
+	    };
 
     while((c = getopt_long(argc, argv, "d:hi:L:l:o:", long_options, NULL)) >= 0)
     {
-        switch (c) {
+	    switch (c) {
             case 'd':
-                debug_flags_set(optarg);
-                break;
+		    debug_flags_set(optarg);
+		    break;
             case 'i':
-                interval = strtoll(optarg, NULL, 10);
-                if(interval < 1)
-                    fatal("interval cannot be set to less than one second.");
-                break;
+		    interval = strtoll(optarg, NULL, 10);
+		    if(interval < 1)
+			    fatal("interval cannot be set to less than one second.");
+		    break;
             case 'l':
-                parse_limits_file(optarg, tree_limits);
-                break;
+		    parse_limits_file(optarg, tree_limits);
+		    break;
             case 'L':
-                parse_limits_string(optarg, tree_limits);
-                break;
+		    parse_limits_string(optarg, tree_limits);
+		    break;
             case 'h':
-                show_help(argv[0]);
-                break;
+		    show_help(argv[0]);
+		    break;
             case 'o':
-                if(summary_path)
-                    free(summary_path);
-                summary_path = xxstrdup(optarg);
-                use_summary = 1;
-                break;
-            case  0:
-                if(series_path)
-                    free(series_path);
-                series_path = xxstrdup(optarg);
-                use_series  = 1;
-                break;
+		    if(template_path)
+			    free(template_path);
+		    if(summary_path)
+		    {
+			    free(summary_path);
+			    summary_path = NULL;
+		    }
+		    if(series_path)
+		    {
+			    free(series_path);
+			    series_path = NULL;
+		    }
+		    if(opened_path)
+		    {
+			    free(opened_path);
+			    opened_path = NULL;
+		    }
+		    template_path = xxstrdup(optarg);
+		    use_summary = 1;
+		    use_series  = 1;
+		    use_opened  = 1;
+		    break;
+
+	    case 0:
+		    if(summary_path)
+			    free(summary_path);
+		    summary_path = xxstrdup(optarg);
+		    use_summary = 1;
+		    break;
             case  1:
-                if(opened_path)
-                    free(opened_path);
-                opened_path = xxstrdup(optarg);
-                use_opened  = 1;
-                break;
+		    if(series_path)
+			    free(series_path);
+		    series_path = xxstrdup(optarg);
+		    use_series  = 1;
+		    break;
             case  2:
-                if(summary_path)
-                    free(summary_path);
-                summary_path = NULL;
-                use_summary = 0;
-                break;
+		    if(opened_path)
+			    free(opened_path);
+		    opened_path = xxstrdup(optarg);
+		    use_opened  = 1;
+		    break;
             case  3:
-                if(series_path)
-                    free(series_path);
-                series_path = NULL;
-                use_series  = 0;
-                break;
+		    if(summary_path)
+			    free(summary_path);
+		    summary_path = NULL;
+		    use_summary = 0;
+		    break;
             case  4:
-                if(opened_path)
-                    free(opened_path);
-                opened_path = NULL;
-                use_opened  = 0;
-                break;
+		    if(series_path)
+			    free(series_path);
+		    series_path = NULL;
+		    use_series  = 0;
+		    break;
+            case  5:
+		    if(opened_path)
+			    free(opened_path);
+		    opened_path = NULL;
+		    use_opened  = 0;
+		    break;
+	    case 6:
+		    tree_flags->workdir_footprint = 1;
+		    break;
+	    case 7:
+		    tree_flags->workdir_footprint = 0;
+		    break;
             default:
-                show_help(argv[0]);
-                return 1;
-                break;
-        }
+		    show_help(argv[0]);
+		    return 1;
+		    break;
+	    }
     }
 
     //this is ugly, concatenating command and arguments
@@ -1882,11 +1980,11 @@ int main(int argc, char **argv) {
     filesys_rc = itable_create(0);
 
     if(use_summary && !summary_path)
-        summary_path = default_summary_name();
+        summary_path = default_summary_name(template_path);
     if(use_series && !series_path)
-        series_path = default_series_name(summary_path);
+        series_path = default_series_name(template_path);
     if(use_opened && !opened_path)
-        opened_path = default_opened_name(summary_path);
+        opened_path = default_opened_name(template_path);
 
     log_summary = open_log_file(summary_path);
     log_series  = open_log_file(series_path);

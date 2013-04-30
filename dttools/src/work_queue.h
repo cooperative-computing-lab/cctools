@@ -111,6 +111,7 @@ struct work_queue_stats {
 	int capacity;
 	int avg_capacity;
 	int total_workers_connected;
+	int total_worker_slots;			
 };
 
 
