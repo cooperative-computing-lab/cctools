@@ -3196,6 +3196,7 @@ void work_queue_reset(struct work_queue *q, int flags) {
 		if(w->async_tasks) {
 			send_worker_msg(w, "reset\n", time(0)+short_timeout);
 			cleanup_worker(q, w);
+			change_worker_state(q, w, WORKER_STATE_NONE);
 		} else {
 			release_worker(q, w);
 		}
