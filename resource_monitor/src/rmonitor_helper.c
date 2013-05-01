@@ -37,13 +37,16 @@ See the file COPYING for details.
 
 #define BUFFER_MAX 1024
 
+//#define debug fprintf
+//#define D_DEBUG stderr
+
 pid_t waitpid(pid_t pid, int *status, int options)
 {
 	int status_; //status might be NULL, thus we use status_ to retrive the state.
 	pid_t pidb;
 	typeof(waitpid) *original_waitpid = dlsym(RTLD_NEXT, "waitpid");
 
-	debug(D_DEBUG, "waiting from %d.\n", getpid());
+	debug(D_DEBUG, "waiting from %d for %d.\n", getpid(), pid);
 	pidb = original_waitpid(pid, &status_, options);
 
 	if(WIFEXITED(status_) || WIFSIGNALED(status_))
@@ -59,12 +62,32 @@ pid_t waitpid(pid_t pid, int *status, int options)
 	if(status)
 		*status = status_;
 
-	return pid;
+	return pidb;
 }
 
 pid_t wait(int *status)
 {
-	return waitpid(-1, status, 0);
+	int status_; //status might be NULL, thus we use status_ to retrive the state.
+	pid_t pid;
+	typeof(wait) *original_wait = dlsym(RTLD_NEXT, "wait");
+
+	debug(D_DEBUG, "waiting from %d.\n", getpid());
+    pid = original_wait(&status_);
+
+	if(WIFEXITED(status_) || WIFSIGNALED(status_))
+	{
+		struct monitor_msg msg;
+		msg.type   = END;
+		msg.origin = getpid();
+		msg.data.p = pid;
+
+		send_monitor_msg(&msg);
+	}
+
+	if(status)
+		*status = status_;
+
+	return pid;
 }
 
 pid_t fork()
