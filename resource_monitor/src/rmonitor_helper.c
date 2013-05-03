@@ -67,27 +67,7 @@ pid_t waitpid(pid_t pid, int *status, int options)
 
 pid_t wait(int *status)
 {
-	int status_; //status might be NULL, thus we use status_ to retrive the state.
-	pid_t pid;
-	typeof(wait) *original_wait = dlsym(RTLD_NEXT, "wait");
-
-	debug(D_DEBUG, "waiting from %d.\n", getpid());
-    pid = original_wait(&status_);
-
-	if(WIFEXITED(status_) || WIFSIGNALED(status_))
-	{
-		struct monitor_msg msg;
-		msg.type   = END;
-		msg.origin = getpid();
-		msg.data.p = pid;
-
-		send_monitor_msg(&msg);
-	}
-
-	if(status)
-		*status = status_;
-
-	return pid;
+	return waitpid(-1, status, 0);
 }
 
 pid_t fork()
