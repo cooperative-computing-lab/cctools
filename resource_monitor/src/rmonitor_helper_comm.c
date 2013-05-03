@@ -56,24 +56,16 @@ const char *str_msgtype(enum monitor_msg_type n)
 	};
 }
 
-char *monitor_helper_locate(char *path_from_cmdline)
+char *monitor_helper_locate(void)
 {
 	char *helper_path;
 
 	debug(D_RMON,"locating helper library...\n");
 
-	helper_path = path_from_cmdline;
-	if(helper_path)
-	{
-		debug(D_RMON,"trying library from path provided at command line.\n");
-		if(access(helper_path, R_OK|X_OK) == 0)	
-			return xxstrdup(helper_path);	
-	}
-
+	debug(D_RMON,"trying library from $%s.\n", RESOURCE_MONITOR_HELPER_ENV_VAR);
 	helper_path = getenv(RESOURCE_MONITOR_HELPER_ENV_VAR);
-	if(helper_path)
+	if(helper_path) 
 	{
-		debug(D_RMON,"trying library from $%s.\n", RESOURCE_MONITOR_HELPER_ENV_VAR);
 		if(access(helper_path, R_OK|X_OK) == 0)	
 			return xxstrdup(helper_path);	
 	}
@@ -204,11 +196,14 @@ int monitor_open_socket(int *fd, int *port)
 int monitor_helper_init(char *libpath_from_cmdline, int *fd)
 {
 	int  port;
-	char *helper_path = monitor_helper_locate(libpath_from_cmdline);
+	char *helper_path = monitor_helper_locate();
+	char helper_absolute[PATH_MAX + 1];
 	char *monitor_port;
 
-	if(access(helper_path,R_OK|X_OK)==0) {
-		debug(D_RMON, "found helper in %s\n", helper_path);
+	realpath(helper_path, helper_absolute);
+
+	if(access(helper_absolute,R_OK|X_OK)==0) {
+		debug(D_RMON, "found helper in %s\n", helper_absolute);
 		monitor_open_socket(fd, &port);
 	}
 	else {
@@ -220,8 +215,8 @@ int monitor_helper_init(char *libpath_from_cmdline, int *fd)
 	{
 		monitor_port = string_format("%d", port);
 
-		debug(D_RMON,"setting LD_PRELOAD to %s\n", helper_path);
-		setenv("LD_PRELOAD", helper_path, 1);
+		debug(D_RMON,"setting LD_PRELOAD to %s\n", helper_absolute);
+		setenv("LD_PRELOAD", helper_absolute, 1);
 
 		debug(D_RMON,"setting %s to %s\n", RESOURCE_MONITOR_INFO_ENV_VAR, monitor_port);
 		setenv(RESOURCE_MONITOR_INFO_ENV_VAR, monitor_port, 1);
@@ -234,7 +229,6 @@ int monitor_helper_init(char *libpath_from_cmdline, int *fd)
 	}
 
 	free(helper_path);
-
 	return port;
 }
 
