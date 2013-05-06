@@ -650,6 +650,11 @@ class pfs_service_cvmfs:public pfs_service {
 			return 0;
 		}
 
+		/* cvmfs_open does not work with directories (it gives a 'fail to fetch' error). */
+		if(S_ISDIR(d.mode)) {
+			return 0;
+		}
+
 		int fd = cvmfs_open(name->rest);
 		if(fd == -1) {
 			return 0;
