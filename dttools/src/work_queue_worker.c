@@ -1525,11 +1525,12 @@ static void work_for_master(struct link *master) {
 		ok &= check_disk_space_for_filesize(0);
 
 		if(ok) {
-			struct work_queue_task *t;
-			t = list_pop_head(waiting_tasks);
-			if(t) start_task(t);
+			if(list_size(waiting_tasks) && itable_size(active_tasks) < local_resources->cores.total) {
+				struct work_queue_task *t;
+				t = list_pop_head(waiting_tasks);
+				if(t) start_task(t);
+			}
 		}
-
 
 		if(!ok) {
 			disconnect_master(master);
