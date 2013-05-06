@@ -110,6 +110,7 @@ struct task_info {
 	
 	char *output_file_name;
 	int output_fd;
+	struct work_queue_task *task;
 };
 
 struct distribution_node {
@@ -181,6 +182,7 @@ static struct work_queue *foreman_q = NULL;
 // Forked task related
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
+static struct list *waiting_tasks = NULL;
 
 // Catalog mode control variables
 static char *catalog_server_host = NULL;
@@ -253,12 +255,92 @@ static void task_info_delete( struct task_info *ti )
 	free(ti);
 }
 
+
+
+int link_file_in_workspace(char *localname, char *taskname, char *workspace, int into) {
+	int result = 1;
+	struct stat st;
+	char targetname[WORK_QUEUE_LINE_MAX];
+	
+	if(into) {
+		sprintf(targetname, "%s", localname);
+	} else {
+		sprintf(targetname, "%s/%s", workspace, taskname);
+	}
+
+	if(stat((char*)targetname, &st)) {
+		return 0;
+	}
+	
+	if(S_ISDIR(st.st_mode)) {
+		DIR *targetdir = opendir(targetname);
+		struct dirent *d;
+		char dir_localname[WORK_QUEUE_LINE_MAX];
+		char dir_taskname[WORK_QUEUE_LINE_MAX];
+		
+		sprintf(dir_taskname, "%s/%s", workspace, taskname);
+		mkdir(dir_taskname, 0700);
+		
+		while((d = readdir(targetdir))) {
+			if(!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
+			{	continue;	}
+			
+			sprintf(dir_localname, "%s/%s", localname, d->d_name);
+			sprintf(dir_taskname, "%s/%s", taskname, d->d_name);
+			result &= link_file_in_workspace(dir_localname, dir_taskname, workspace, into);
+		}
+	} else {
+		char *cur_pos, *tmp_pos;
+		sprintf(targetname, "%s/%s", workspace, taskname);
+		
+		debug(D_WQ, "linking file %s %s workspace %s with %s\n", localname, into?"into":"from", workspace, targetname);
+
+		if(into) {
+			cur_pos = targetname;
+		} else {
+			cur_pos = localname;
+		}
+
+		cur_pos = targetname;
+		if(!strncmp(cur_pos, "./", 2)) {
+			cur_pos += 2;
+		}
+
+		tmp_pos = strrchr(cur_pos, '/');
+		if(tmp_pos) {
+			*tmp_pos = '\0';
+			if(!create_dir(cur_pos, 0700)) {
+				debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
+				return 0;
+			}
+			*tmp_pos = '/';
+		}
+		
+		if(into) {
+			
+			if(link(localname, targetname)) {
+				return 0;
+			}
+		} else {
+			if(link(targetname, localname)) {
+				return 0;
+			}
+		}
+	}
+	
+	return result;
+}
+
+
+
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
 static pid_t task_info_execute(const char *cmd, struct task_info *ti)
 {
+	char working_dir[1024];
 	fflush(NULL); /* why is this necessary? */
-
+	
+	sprintf(working_dir, "%d", ti->taskid);
 	ti->output_file_name = strdup(task_output_template);
 	ti->output_fd = mkstemp(ti->output_file_name);
 	if (ti->output_fd == -1) {
@@ -284,6 +366,10 @@ static pid_t task_info_execute(const char *cmd, struct task_info *ti)
 		close(ti->output_fd);
 		return ti->pid;
 	} else {
+		if(chdir(working_dir)) {
+			fatal("could not change directory into %s: %s", working_dir, strerror(errno));
+		}
+		
 		int fd = open("/dev/null", O_RDONLY);
 		if (fd == -1) fatal("could not open /dev/null: %s", strerror(errno));
 		int result = dup2(fd, STDIN_FILENO);
@@ -301,6 +387,26 @@ static pid_t task_info_execute(const char *cmd, struct task_info *ti)
 		_exit(127);	// Failed to execute the cmd.
 	}
 	return 0;
+}
+
+static int start_task(struct work_queue_task *task) {
+		struct task_info *ti = task_info_create(task->taskid);
+		ti->task = task;
+		task_info_execute(task->command_line,ti);
+	
+		if(ti->pid < 0) {
+			fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
+			task_info_delete(ti);
+			abort_flag = 1;
+			return 0;
+		}
+
+		ti->status = 0;
+
+		itable_insert(stored_tasks, task->taskid, ti);
+		itable_insert(active_tasks, ti->pid, ti);
+
+		return 1;
 }
 
 static void report_task_complete(struct link *master, struct task_info *ti, struct work_queue_task *t)
@@ -331,6 +437,8 @@ static int handle_tasks(struct link *master) {
 	struct task_info *ti;
 	pid_t pid;
 	int result = 0;
+	struct work_queue_file *tf;
+	char dirname[WORK_QUEUE_LINE_MAX];
 	
 	itable_firstkey(active_tasks);
 	while(itable_nextkey(active_tasks, (UINT64_T*)&pid, (void**)&ti)) {
@@ -351,7 +459,17 @@ static int handle_tasks(struct link *master) {
 			itable_remove(stored_tasks, ti->taskid);
 			itable_firstkey(active_tasks);
 			
+			sprintf(dirname, "./%d", ti->taskid);
+			
+			list_first_item(ti->task->output_files);
+			while((tf = (struct work_queue_file *)list_next_item(ti->task->output_files))) {
+				if(!link_file_in_workspace(tf->payload, tf->remote_name, dirname, 0)) {
+					debug(D_NOTICE, "File %s does not exist and is output of task %d.", (char*)tf->remote_name, ti->taskid);
+				}
+			}
+			
 			report_task_complete(master, ti, NULL);
+			work_queue_task_delete(ti->task);
 			task_info_delete(ti);
 		}
 		
@@ -791,15 +909,18 @@ static struct link *connect_master(time_t stoptime) {
 
 static int do_task( struct link *master, UINT64_T taskid )
 {
+	char line[WORK_QUEUE_LINE_MAX];
+	char filename[WORK_QUEUE_LINE_MAX];
+	char taskname[WORK_QUEUE_LINE_MAX];
+	char dirname[WORK_QUEUE_LINE_MAX];
+	int n, flags, length;
 	time_t stoptime = time(0) + active_timeout;
-
 	struct work_queue_task *task = work_queue_task_create(0);
 
 	task->taskid = taskid;
 
-	char line[WORK_QUEUE_LINE_MAX];
-	char filename[WORK_QUEUE_LINE_MAX];
-	int n, flags, length;
+	sprintf(dirname, "./%" SCNd64 , taskid);
+	mkdir(dirname, 0700);
 
 	while(recv_master_message(master,line,sizeof(line),stoptime)) {
 	  	if(sscanf(line,"cmd %d",&length)==1) {
@@ -809,16 +930,16 @@ static int do_task( struct link *master, UINT64_T taskid )
 			work_queue_task_specify_command(task,cmd);
 			debug(D_WQ,"--> %s",cmd);
 			free(cmd);
-		} else if(sscanf(line,"infile %s %d",filename,&flags)) {
-		       	work_queue_task_specify_file(task,filename,filename,WORK_QUEUE_INPUT,flags);
-		} else if(sscanf(line,"outfile %s %d",filename,&flags)) {
-		       	work_queue_task_specify_file(task,filename,filename,WORK_QUEUE_OUTPUT,flags);
+		} else if(sscanf(line,"infile %s %s %d", filename, taskname, &flags)) {
+		       	work_queue_task_specify_file(task, filename, taskname, WORK_QUEUE_INPUT, flags);
+		} else if(sscanf(line,"outfile %s %s %d", filename, taskname, &flags)) {
+		       	work_queue_task_specify_file(task, filename, taskname, WORK_QUEUE_OUTPUT, flags);
 		} else if(sscanf(line,"cores %d",&n)) {
-		       	work_queue_task_specify_cores(task,n);
+		       	work_queue_task_specify_cores(task, n);
 		} else if(sscanf(line,"memory %d",&n)) {
-		       	work_queue_task_specify_memory(task,n);
+		       	work_queue_task_specify_memory(task, n);
 		} else if(sscanf(line,"disk %d",&n)) {
-		       	work_queue_task_specify_disk(task,n);
+		       	work_queue_task_specify_disk(task, n);
 		} else if(!strcmp(line,"end")) {
 		       	break;
 		} else {
@@ -835,28 +956,17 @@ static int do_task( struct link *master, UINT64_T taskid )
 		work_queue_submit(foreman_q,task);
 		return 1;
 	} else {
-
-		// BUG: should instead queue up the task and start it later
-		// when we know there are enough resources.
-
-		struct task_info *ti = task_info_create(taskid);
-		task_info_execute(task->command_line,ti);
-		work_queue_task_delete(task);
-	
-		if(ti->pid < 0) {
-			fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
-			task_info_delete(ti);
-			abort_flag = 1;
-			return 0;
+		struct work_queue_file *tf;
+		list_first_item(task->input_files);
+		while((tf = list_next_item(task->input_files))) {
+			if(!link_file_in_workspace((char*)tf->payload, tf->remote_name, dirname, 1)) {
+				debug(D_NOTICE, "File %s does not exist and is needed by task %d.", (char*)tf->payload, task->taskid);
+				return 0;
+			}
 		}
-
-		ti->status = 0;
-
-		itable_insert(stored_tasks, taskid, ti);
-		itable_insert(active_tasks, ti->pid, ti);
-
-		return 1;
+		list_push_tail(waiting_tasks, task);
 	}
+	return 1;
 }
 
 static int do_stat(struct link *master, const char *filename) {
@@ -894,6 +1004,7 @@ static int do_symlink(const char *path, char *filename) {
 
 static int do_put(struct link *master, char *filename, INT64_T length, int mode) {
 
+	debug(D_WQ, "Putting file %s into workspace\n", filename);
 	if(!check_disk_space_for_filesize(length)) {
 		debug(D_WQ, "Could not put file %s, not enough disk space (%lld bytes needed)\n", filename, length);
 		return 0;
@@ -920,6 +1031,7 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode)
 
 	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(fd < 0) {
+		debug(D_WQ, "Could not open %s for writing\n", filename);
 		return 0;
 	}
 
@@ -1137,7 +1249,13 @@ static void kill_all_tasks() {
 
 static int do_kill(int taskid) {
 	struct task_info *ti = itable_lookup(stored_tasks, taskid);
-	kill_task(ti);
+	if(itable_lookup(active_tasks, ti->pid)) {
+		kill_task(ti);
+	} else {
+		char dirname[1024];
+		sprintf(dirname, "%d", ti->pid);
+		delete_dir(dirname);
+	}
 	return 1;
 }
 
@@ -1405,6 +1523,13 @@ static void work_for_master(struct link *master) {
 		ok &= handle_tasks(master);
 
 		ok &= check_disk_space_for_filesize(0);
+
+		if(ok) {
+			struct work_queue_task *t;
+			t = list_pop_head(waiting_tasks);
+			if(t) start_task(t);
+		}
+
 
 		if(!ok) {
 			disconnect_master(master);
@@ -1888,6 +2013,7 @@ int main(int argc, char *argv[])
 	} else {
 		active_tasks = itable_create(0);
 		stored_tasks = itable_create(0);
+		waiting_tasks = list_create();
 	}
 
 	// set $WORK_QUEUE_SANDBOX to workspace.

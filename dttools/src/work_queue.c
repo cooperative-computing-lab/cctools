@@ -227,16 +227,6 @@ struct task_report {
 	int capacity;
 };
 
-struct work_queue_file {
-	int type;		// WORK_QUEUE_FILE, WORK_QUEUE_BUFFER, WORK_QUEUE_REMOTECMD, WORK_QUEUE_FILE_PIECE
-	int flags;		// WORK_QUEUE_CACHE or others in the future.
-	int length;		// length of payload
-	off_t offset;		// file offset for WORK_QUEUE_FILE_PIECE
-	off_t piece_length;	// file piece length for WORK_QUEUE_FILE_PIECE
-	void *payload;		// name on master machine or buffer of data.
-	char *remote_name;	// name on remote machine.
-};
-
 static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
 
 static struct task_statistics *task_statistics_init();
@@ -784,8 +774,16 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 				close_time = timestamp_get();
 				sum_time += (close_time - open_time);
 			} else {
+				char remote_name[WORK_QUEUE_LINE_MAX];
+				
+				if(!(tf->flags & WORK_QUEUE_CACHE)) {
+					sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
+				} else {
+					sprintf(remote_name, "%s", tf->remote_name);
+				}
+				
 				open_time = timestamp_get();
-				get_output_item(tf->remote_name, tf->payload, q, w, t, received_items, &total_bytes);
+				get_output_item(remote_name, tf->payload, q, w, t, received_items, &total_bytes);
 				close_time = timestamp_get();
 				if(t->result & WORK_QUEUE_RESULT_OUTPUT_FAIL) {
 					return 0;
@@ -1368,7 +1366,7 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 		length = local_info.st_size;
 	}
 	
-	debug(D_WQ, "%s (%s) needs file %s bytes %lld:%lld", w->hostname, w->addrport, localname, offset, offset+length);
+	debug(D_WQ, "%s (%s) needs file %s bytes %lld:%lld as '%s'", w->hostname, w->addrport, localname, offset, offset+length, remotename);
 	int fd = open(localname, O_RDONLY, 0);
 	if(fd < 0)
 		return 0;
@@ -1494,16 +1492,24 @@ static int put_input_item(struct work_queue_file *tf, const char *expanded_paylo
 	remote_info = hash_table_lookup(w->current_files, hash_name);
 
 	if(!remote_info || remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size) {
+		char remote_name[WORK_QUEUE_LINE_MAX];
+		
 		if(remote_info) {
 			hash_table_remove(w->current_files, hash_name);
 			free(remote_info);
 		}
+		
+		if(!(tf->flags & WORK_QUEUE_CACHE)) {
+			sprintf(remote_name, "%s.%d", tf->remote_name, taskid);
+		} else {
+			sprintf(remote_name, "%s", tf->remote_name);
+		}
 
 		if(dir) {
-			if(!put_directory(payload, tf->remote_name, q, w, taskid, total_bytes, tf->flags))
+			if(!put_directory(payload, remote_name, q, w, taskid, total_bytes, tf->flags))
 				return 0;
 		} else {
-			if(!put_file(payload, tf->remote_name, tf->offset, tf->piece_length, q, w, taskid, total_bytes, tf->flags))
+			if(!put_file(payload, remote_name, tf->offset, tf->piece_length, q, w, taskid, total_bytes, tf->flags))
 				return 0;
 		}
 		
@@ -1727,7 +1733,14 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 		struct work_queue_file *tf;
 		list_first_item(t->input_files);
 		while((tf = list_next_item(t->input_files))) {
-			send_worker_msg(w, "infile %s %d\n", time(0) + short_timeout, tf->remote_name, tf->flags);
+			char remote_name[WORK_QUEUE_LINE_MAX];
+			if(!(tf->flags & WORK_QUEUE_CACHE)) {
+				sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
+			} else {
+				sprintf(remote_name, "%s", tf->remote_name);
+			}
+			
+			send_worker_msg(w, "infile %s %s %d\n", time(0) + short_timeout, remote_name, tf->remote_name, tf->flags);
 		}
 	}
 
@@ -1735,7 +1748,13 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 		struct work_queue_file *tf;
 		list_first_item(t->output_files);
 		while((tf = list_next_item(t->output_files))) {
-			send_worker_msg(w, "outfile %s %d\n", time(0) + short_timeout, tf->remote_name, tf->flags);
+			char remote_name[WORK_QUEUE_LINE_MAX];
+			if(!(tf->flags & WORK_QUEUE_CACHE)) {
+				sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
+			} else {
+				sprintf(remote_name, "%s", tf->remote_name);
+			}
+			send_worker_msg(w, "outfile %s %s %d\n", time(0) + short_timeout, remote_name, tf->remote_name, tf->flags);
 		}
 	}
 
