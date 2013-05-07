@@ -636,7 +636,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 	int fd;
 	INT64_T actual, length;
 	time_t stoptime;
-	time_t effective_stoptime = 0;
+	timestamp_t effective_stoptime = 0;
 	char type[256];
 	char tmp_remote_name[WORK_QUEUE_LINE_MAX], tmp_local_name[WORK_QUEUE_LINE_MAX];
 	char *cur_pos, *tmp_pos;
@@ -705,7 +705,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					}
 					
 					if(q->bandwidth) {
-						effective_stoptime = (length * 8)/q->bandwidth + time(0);
+						effective_stoptime = ((length * 8)/q->bandwidth)*1000000 + timestamp_get();
 					}
 					stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, length);
 					actual = link_stream_to_fd(w->link, fd, length, stoptime);
@@ -717,8 +717,8 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					}
 					*total_bytes += length;
 					if(effective_stoptime) {
-						INT64_T sleeptime = effective_stoptime - time(0);
-						sleep(sleeptime > 0?sleeptime:0);
+						timestamp_t sleeptime = effective_stoptime - timestamp_get();
+						usleep(sleeptime > 0?sleeptime:0);
 					}
 
 					hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
@@ -1118,7 +1118,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	struct work_queue_task *t;
 	int actual;
 	timestamp_t observed_execution_time;
-	time_t effective_stoptime = 0;
+	timestamp_t effective_stoptime = 0;
 
 	//Format: result, output length, execution time, taskid
 	char items[3][WORK_QUEUE_PROTOCOL_FIELD_MAX];
@@ -1150,7 +1150,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
 	
 	if(q->bandwidth) {
-		effective_stoptime = (output_length * 8)/q->bandwidth + time(0);
+		effective_stoptime = ((output_length * 8)/q->bandwidth)*1000000 + timestamp_get();
 	}
 
 	if(n >= 3) {
@@ -1171,8 +1171,8 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 			return -1;
 		}
 		if(effective_stoptime) {
-			INT64_T sleeptime = effective_stoptime - time(0);
-			sleep(sleeptime > 0?sleeptime:0);
+			timestamp_t sleeptime = effective_stoptime - timestamp_get();
+			usleep(sleeptime > 0?sleeptime:0);
 		}
 		debug(D_WQ, "Got %d bytes from %s (%s)", actual, w->hostname, w->addrport);
 		
@@ -1482,7 +1482,7 @@ static int build_poll_table(struct work_queue *q, struct list *aux_links)
 static int put_file(const char *localname, const char *remotename, off_t offset, INT64_T length, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T *total_bytes, int flags){
 	struct stat local_info;
 	time_t stoptime;
-	time_t effective_stoptime = 0;
+	timestamp_t effective_stoptime = 0;
 	INT64_T actual = 0;
 	
 	if(stat(localname, &local_info) < 0)
@@ -1516,7 +1516,7 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 	struct work_queue_task *t = itable_lookup(q->running_tasks, taskid);
 	
 	if(q->bandwidth) {
-		effective_stoptime = (length * 8)/q->bandwidth + time(0);
+		effective_stoptime = ((length * 8)/q->bandwidth)*1000000 + timestamp_get();
 	}
 	
 	stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, length);
@@ -1528,8 +1528,8 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 		return 0;
 		
 	if(effective_stoptime) {
-		INT64_T sleeptime = effective_stoptime - time(0);
-		sleep(sleeptime > 0?sleeptime:0);
+		timestamp_t sleeptime = effective_stoptime - timestamp_get();
+		usleep(sleeptime > 0?sleeptime:0);
 	}
 	
 	*total_bytes += actual;
@@ -1774,12 +1774,12 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 		list_first_item(t->input_files);
 		while((tf = list_next_item(t->input_files))) {
 			if(tf->type == WORK_QUEUE_BUFFER) {
-				time_t effective_stoptime = 0;
+				timestamp_t effective_stoptime = 0;
 				debug(D_WQ, "%s (%s) needs literal as %s", w->hostname, w->addrport, tf->remote_name);
 				fl = tf->length;
 
 				if(q->bandwidth) {
-					effective_stoptime = (tf->length * 8)/q->bandwidth + time(0);
+					effective_stoptime = ((tf->length * 8)/q->bandwidth)*1000000 + timestamp_get();
 				}
 				
 				stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, (INT64_T) fl);
@@ -1787,8 +1787,8 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 				send_worker_msg(w, "put %s %lld %o %lld %d\n", time(0) + short_timeout, tf->remote_name, (INT64_T) fl, 0777, t->taskid, tf->flags);
 				actual = link_putlstring(w->link, tf->payload, fl, stoptime);
 				if(effective_stoptime) {
-					INT64_T sleeptime = effective_stoptime - time(0);
-					sleep(sleeptime > 0?sleeptime:0);
+					timestamp_t sleeptime = effective_stoptime - timestamp_get();
+					usleep(sleeptime > 0?sleeptime:0);
 				}
 				close_time = timestamp_get();
 				if(actual != (fl))
