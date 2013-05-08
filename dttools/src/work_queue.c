@@ -717,8 +717,8 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					}
 					*total_bytes += length;
 					timestamp_t current_time = timestamp_get();
-					if(effective_stoptime && current_time > effective_stoptime) {
-						usleep(current_time - effective_stoptime);
+					if(effective_stoptime && effective_stoptime > current_time) {
+						usleep(effective_stoptime - current_time);
 					}
 
 					hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
@@ -1171,8 +1171,8 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 			return -1;
 		}
 		timestamp_t current_time = timestamp_get();
-		if(effective_stoptime && current_time > effective_stoptime) {
-			usleep(current_time - effective_stoptime);
+		if(effective_stoptime && effective_stoptime > current_time) {
+			usleep(effective_stoptime - current_time);
 		}
 		debug(D_WQ, "Got %d bytes from %s (%s)", actual, w->hostname, w->addrport);
 		
@@ -1528,8 +1528,8 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 		return 0;
 		
 	timestamp_t current_time = timestamp_get();
-	if(effective_stoptime && current_time > effective_stoptime) {
-		usleep(current_time - effective_stoptime);
+	if(effective_stoptime && effective_stoptime > current_time) {
+		usleep(effective_stoptime - current_time);
 	}
 	
 	*total_bytes += actual;
@@ -1787,8 +1787,8 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 				send_worker_msg(w, "put %s %lld %o %lld %d\n", time(0) + short_timeout, tf->remote_name, (INT64_T) fl, 0777, t->taskid, tf->flags);
 				actual = link_putlstring(w->link, tf->payload, fl, stoptime);
 				timestamp_t current_time = timestamp_get();
-				if(effective_stoptime && current_time > effective_stoptime) {
-					usleep(current_time - effective_stoptime);
+				if(effective_stoptime && effective_stoptime > current_time) {
+					usleep(effective_stoptime - current_time);
 				}
 				close_time = timestamp_get();
 				if(actual != (fl))
