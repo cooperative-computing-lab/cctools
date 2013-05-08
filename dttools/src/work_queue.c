@@ -716,9 +716,9 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 						goto failure;
 					}
 					*total_bytes += length;
-					if(effective_stoptime) {
-						timestamp_t sleeptime = effective_stoptime - timestamp_get();
-						usleep(sleeptime > 0?sleeptime:0);
+					timestamp_t current_time = timestamp_get();
+					if(effective_stoptime && current_time > effective_stoptime) {
+						usleep(current_time - effective_stoptime);
 					}
 
 					hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
@@ -1170,9 +1170,9 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 			t->output[actual] = '\0';
 			return -1;
 		}
-		if(effective_stoptime) {
-			timestamp_t sleeptime = effective_stoptime - timestamp_get();
-			usleep(sleeptime > 0?sleeptime:0);
+		timestamp_t current_time = timestamp_get();
+		if(effective_stoptime && current_time > effective_stoptime) {
+			usleep(current_time - effective_stoptime);
 		}
 		debug(D_WQ, "Got %d bytes from %s (%s)", actual, w->hostname, w->addrport);
 		
@@ -1527,9 +1527,9 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 	if(actual != length)
 		return 0;
 		
-	if(effective_stoptime) {
-		timestamp_t sleeptime = effective_stoptime - timestamp_get();
-		usleep(sleeptime > 0?sleeptime:0);
+	timestamp_t current_time = timestamp_get();
+	if(effective_stoptime && current_time > effective_stoptime) {
+		usleep(current_time - effective_stoptime);
 	}
 	
 	*total_bytes += actual;
@@ -1786,9 +1786,9 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 				open_time = timestamp_get();
 				send_worker_msg(w, "put %s %lld %o %lld %d\n", time(0) + short_timeout, tf->remote_name, (INT64_T) fl, 0777, t->taskid, tf->flags);
 				actual = link_putlstring(w->link, tf->payload, fl, stoptime);
-				if(effective_stoptime) {
-					timestamp_t sleeptime = effective_stoptime - timestamp_get();
-					usleep(sleeptime > 0?sleeptime:0);
+				timestamp_t current_time = timestamp_get();
+				if(effective_stoptime && current_time > effective_stoptime) {
+					usleep(current_time - effective_stoptime);
 				}
 				close_time = timestamp_get();
 				if(actual != (fl))
