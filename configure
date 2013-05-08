@@ -710,11 +710,28 @@ then
 	if [ $perl != 0 ]
 	then
 		perl_version=`${perl} -e 'printf "%vd\n",$^V;'`
-		echo "perl version is ${perl_version}"
+		if [ $? = 0 ]
+		then
+			echo "perl version is ${perl_version}"
+		else
+			perl=0
+		fi
+	fi
+
+	if [ $perl != 0 ]
+	then
 		perl_ccflags=`${perl} -MExtUtils::Embed -e ccopts`
 		perl_ldflags=`${perl} -MExtUtils::Embed -e ldopts`
-		work_queue_bindings="$work_queue_bindings perl"
-	else
+		if [ $? = 0 ]
+		then
+			work_queue_bindings="$work_queue_bindings perl"
+		else
+			perl=0
+		fi
+	fi
+
+	if [ $perl = 0 ]
+	then
                 if [ $config_perl_path = yes ]
                 then
                         echo "*** Sorry, I couldn't find the perl libraries in $perl_path"
