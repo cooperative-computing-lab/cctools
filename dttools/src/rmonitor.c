@@ -9,6 +9,7 @@ COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
+#include <stddef.h>
 
 #include <sys/stat.h>
 
@@ -17,7 +18,7 @@ COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 
-#include "rmonitor_hooks.h"
+#include "rmonitor.h"
 
 static char *monitor_exe  = NULL;
 
@@ -147,5 +148,9 @@ char *resource_monitor_rewrite_command(char *cmdline, char *template_filename, c
 
 	return xxstrdup(cmd_builder);
 }
+
+
+
+
 
 

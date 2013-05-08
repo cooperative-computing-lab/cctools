@@ -61,8 +61,8 @@ See the file COPYING for details.
  * filesys_info' ('filesysms').
  *
  * The process tree is summarized from the struct *_info into
- * struct tree_info. For each time interval there are three
- * struct tree_info: current, maximum, and minimum. 
+ * struct rmsummary. For each time interval there are three
+ * struct rmsummary: current, maximum, and minimum. 
  *
  * Grandchildren processes are tracked via the helper library,
  * which wraps the family of fork functions.
@@ -103,17 +103,6 @@ See the file COPYING for details.
  *
  */
 
-#include "cctools.h"
-#include "hash_table.h"
-#include "itable.h"
-#include "list.h"
-#include "stringtools.h"
-#include "debug.h"
-#include "xxmalloc.h"
-#include "copy_stream.h"
-#include "getopt.h"
-#include "create_dir.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -150,6 +139,19 @@ See the file COPYING for details.
   #include <sys/user.h>
   #include <kvm.h>
 #endif
+
+#include "cctools.h"
+#include "hash_table.h"
+#include "itable.h"
+#include "list.h"
+#include "stringtools.h"
+#include "debug.h"
+#include "xxmalloc.h"
+#include "copy_stream.h"
+#include "getopt.h"
+#include "create_dir.h"
+
+#include "rmonitor.h"
 
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_piggyback.h"
@@ -271,28 +273,9 @@ char *resources[15] = { "wall_clock(seconds)",
                         "workdir_number_files_dirs", "workdir_footprint(MB)",
                         NULL };
 
-// These fields are defined as signed integers, even though they
-// will only contain positive numbers. This is to conversion to
-// signed quantities when comparing to maximum limits.
-struct tree_info
-{
-    int64_t wall_time;
-    int64_t max_concurrent_processes;
-    int64_t cpu_time;
-    int64_t virtual_memory; 
-    int64_t resident_memory; 
-    int64_t swap_memory; 
-    int64_t bytes_read;
-    int64_t bytes_written;
-    int64_t workdir_number_files_dirs;
-    int64_t workdir_footprint;
-
-    int64_t  fs_nodes;
-};
-
-struct tree_info *tree_max;
-struct tree_info *tree_limits;
-struct tree_info *tree_flags;
+struct rmsummary *resources_max;
+struct rmsummary *resources_limits;
+struct rmsummary *resources_flags;
 
 /*** 
  * Utility functions (open log files, proc files, measure time)
@@ -428,7 +411,7 @@ int get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value, int rewin
     return not_found;
 }
 
-void initialize_limits_tree(struct tree_info *tree, int64_t val)
+void initialize_limits_tree(struct rmsummary *tree, int64_t val)
 {
     tree->wall_time                = val;
     tree->max_concurrent_processes = val;
@@ -455,7 +438,7 @@ void initialize_limits_tree(struct tree_info *tree, int64_t val)
                                                 tr->fld = (uintptr_t) hash_table_lookup(vars, #fld);\
                                                 debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", #fld, tr->fld);}
 
-void parse_limits_string(char *str, struct tree_info *tree)
+void parse_limits_string(char *str, struct rmsummary *tree)
 {
     struct hash_table *vars = hash_table_create(0,0);
     char *line              = xxstrdup(str);
@@ -500,7 +483,7 @@ void parse_limits_string(char *str, struct tree_info *tree)
 /* Every line of the limits file has the format resource: value */
 #define parse_limit_file(file, tr, fld) if(!get_int_attribute(file, #fld ":", (uint64_t *) &tr->fld, 1))\
                                             debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", #fld, tr->fld);
-void parse_limits_file(char *path, struct tree_info *tree)
+void parse_limits_file(char *path, struct rmsummary *tree)
 {
     FILE *flimits = fopen(path, "r");
     
@@ -1088,7 +1071,7 @@ void monitor_fss_once(struct filesys_info *acc)
 
 /***
  * Logging functions. The process tree is summarized in struct
- * tree_info's, computing current value, maximum, and minimums.
+ * rmsummary's, computing current value, maximum, and minimums.
 ***/
 
 void monitor_summary_header()
@@ -1102,7 +1085,7 @@ void monitor_summary_header()
     fprintf(log_series, "\n");
 }
 
-void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct wdir_info *d, struct filesys_info *f)
+void monitor_collate_tree(struct rmsummary *tr, struct process_info *p, struct wdir_info *d, struct filesys_info *f)
 {
     tr->wall_time                = usecs_since_launched();
 
@@ -1122,7 +1105,7 @@ void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct w
     tr->fs_nodes                 = (int64_t) f->disk.f_ffree;
 }
 
-void monitor_find_max_tree(struct tree_info *result, struct tree_info *tr)
+void monitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
 {
     if(!tr)
         return;
@@ -1161,7 +1144,7 @@ void monitor_find_max_tree(struct tree_info *result, struct tree_info *tr)
         result->fs_nodes = tr->fs_nodes;
 }
 
-void monitor_log_row(struct tree_info *tr)
+void monitor_log_row(struct rmsummary *tr)
 {
     fprintf(log_series, "%" PRId64 "\t", tr->wall_time + usecs_initial);
     fprintf(log_series, "%" PRId64 "\t", tr->max_concurrent_processes);
@@ -1172,7 +1155,7 @@ void monitor_log_row(struct tree_info *tr)
     fprintf(log_series, "%" PRId64 "\t", tr->bytes_read);
     fprintf(log_series, "%" PRId64 "\t", tr->bytes_written);
 
-    if(tree_flags->workdir_footprint)
+    if(resources_flags->workdir_footprint)
     {
 	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_number_files_dirs);
 	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_footprint);
@@ -1189,10 +1172,10 @@ void report_zombie_status(void)
 {
 	/* BUG: end and wall_time should be computed in a final
 	 * summary, not here */
-	tree_max->wall_time = usecs_since_epoch() - usecs_initial;
+	resources_max->wall_time = usecs_since_epoch() - usecs_initial;
 
 	fprintf(log_summary, "%-30s\t%lf\n", "end:", 
-		(double) (tree_max->wall_time + usecs_initial) / ONE_SECOND);
+		(double) (resources_max->wall_time + usecs_initial) / ONE_SECOND);
 
 	if( WIFEXITED(first_process_sigchild_status) )
 	{
@@ -1237,24 +1220,24 @@ int monitor_final_summary()
 
     report_zombie_status();
 
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", tree_max->max_concurrent_processes);
+    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", resources_max->max_concurrent_processes);
 
     //Print time in seconds, rather than microseconds.
-    fprintf(log_summary, "%-30s\t%lf\n",         "wall_time:", ((double) tree_max->wall_time / ONE_SECOND));
-    fprintf(log_summary, "%-30s\t%lf\n",         "cpu_time:",  ((double) tree_max->cpu_time  / ONE_SECOND));
+    fprintf(log_summary, "%-30s\t%lf\n",         "wall_time:", ((double) resources_max->wall_time / ONE_SECOND));
+    fprintf(log_summary, "%-30s\t%lf\n",         "cpu_time:",  ((double) resources_max->cpu_time  / ONE_SECOND));
 
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "virtual_memory:", tree_max->virtual_memory);
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "resident_memory:", tree_max->resident_memory);
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "swap_memory:", tree_max->swap_memory);
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_read:", tree_max->bytes_read);
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_written:", tree_max->bytes_written);
+    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "virtual_memory:", resources_max->virtual_memory);
+    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "resident_memory:", resources_max->resident_memory);
+    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "swap_memory:", resources_max->swap_memory);
+    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_read:", resources_max->bytes_read);
+    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_written:", resources_max->bytes_written);
     
-    if(tree_flags->workdir_footprint)
+    if(resources_flags->workdir_footprint)
     {
-	    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", tree_max->workdir_number_files_dirs);
+	    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", resources_max->workdir_number_files_dirs);
 
 	    //Print the footprint in megabytes, rather than of bytes.
-	    fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
+	    fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) resources_max->workdir_footprint/ONE_MEGABYTE));
     }
 
     if(status && !WEXITSTATUS(first_process_sigchild_status))
@@ -1373,10 +1356,10 @@ void ping_processes(void)
         }
 }
 
-struct tree_info *monitor_rusage_tree(void)
+struct rmsummary *monitor_rusage_tree(void)
 {
     struct rusage usg;
-    struct tree_info *tr_usg = calloc(1, sizeof(struct tree_info));
+    struct rmsummary *tr_usg = calloc(1, sizeof(struct rmsummary));
 
     debug(D_DEBUG, "calling getrusage.\n");
 
@@ -1387,7 +1370,7 @@ struct tree_info *monitor_rusage_tree(void)
     }
 
     /* Here we add the maximum recorded + the io from memory maps */
-    tr_usg->bytes_read     =  tree_max->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
+    tr_usg->bytes_read     =  resources_max->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
 
     tr_usg->resident_memory = usg.ru_maxrss;
 
@@ -1447,8 +1430,8 @@ void monitor_check_child(const int signal)
       monitor_untrack_process(pid);
 
     /* get the peak values from getrusage */
-    struct tree_info *tr_usg = monitor_rusage_tree();
-    monitor_find_max_tree(tree_max, tr_usg);
+    struct rmsummary *tr_usg = monitor_rusage_tree();
+    monitor_find_max_tree(resources_max, tr_usg);
     free(tr_usg);
 }
 
@@ -1508,21 +1491,21 @@ void monitor_final_cleanup(int signum)
 // The following keeps getting uglier and uglier! Rethink how to do it!
 //
 #define over_limit_check(tr, fld, mult, fmt)				\
-	if((tr)->fld > 0 && tree_limits->fld - (tr)->fld < 0)		\
+	if((tr)->fld > 0 && resources_limits->fld - (tr)->fld < 0)		\
 	{								\
 		char *tmp;						\
 		if(over_limit_str)					\
 		{							\
-			tmp = string_format("%s, " #fld " %" fmt " > %" fmt, over_limit_str, mult * (tr)->fld, mult * tree_limits->fld); \
+			tmp = string_format("%s, " #fld " %" fmt " > %" fmt, over_limit_str, mult * (tr)->fld, mult * resources_limits->fld); \
 			free(over_limit_str);				\
 			over_limit_str = tmp;				\
 		}							\
 		else							\
-			over_limit_str = string_format(#fld " %" fmt " > %" fmt, mult * (tr)->fld, mult * tree_limits->fld); \
+			over_limit_str = string_format(#fld " %" fmt " > %" fmt, mult * (tr)->fld, mult * resources_limits->fld); \
 	}
 
 /* return 0 means above limit, 1 means limist ok */
-int monitor_check_limits(struct tree_info *tr)
+int monitor_check_limits(struct rmsummary *tr)
 {
     over_limit_str = NULL;
 
@@ -1599,8 +1582,8 @@ void monitor_dispatch_msg(void)
 	{
         case BRANCH:
 		monitor_track_process(msg.origin);
-		if(tree_max->max_concurrent_processes < itable_size(processes))
-			tree_max->max_concurrent_processes = itable_size(processes);
+		if(resources_max->max_concurrent_processes < itable_size(processes))
+			resources_max->max_concurrent_processes = itable_size(processes);
 		break;
         case WAIT:
 		p->waiting = 1;
@@ -1624,8 +1607,9 @@ void monitor_dispatch_msg(void)
 		break;
 	};
 
-	if(!monitor_check_limits(tree_max))
+	if(!monitor_check_limits(resources_max))
 		monitor_final_cleanup(SIGTERM);
+
 }
 
 int wait_for_messages(int interval)
@@ -1776,7 +1760,7 @@ int monitor_resources(long int interval /*in microseconds */)
     struct wdir_info     *d = malloc(sizeof(struct wdir_info));
     struct filesys_info  *f = malloc(sizeof(struct filesys_info));
 
-    struct tree_info    *tree_now = calloc(1, sizeof(struct tree_info)); //Automatic zeroed.
+    struct rmsummary    *resources_now = calloc(1, sizeof(struct rmsummary)); //Automatic zeroed.
 
     // Loop while there are processes to monitor, that is 
     // itable_size(processes) > 0). The check is done again in a
@@ -1790,21 +1774,21 @@ int monitor_resources(long int interval /*in microseconds */)
 
         monitor_processes_once(p);
 
-	if(tree_flags->workdir_footprint)
+	if(resources_flags->workdir_footprint)
 		monitor_wds_once(d);
 
 	// monitor_fss_once(f); disabled until statfs fs id makes sense.
 
-        monitor_collate_tree(tree_now, p, d, f);
+        monitor_collate_tree(resources_now, p, d, f);
 
         if(round == 1)
-            memcpy(tree_max, tree_now, sizeof(struct tree_info));
+            memcpy(resources_max, resources_now, sizeof(struct rmsummary));
         else
-            monitor_find_max_tree(tree_max, tree_now);
+            monitor_find_max_tree(resources_max, resources_now);
 
-        monitor_log_row(tree_now);
+        monitor_log_row(resources_now);
 
-        if(!monitor_check_limits(tree_now))
+        if(!monitor_check_limits(resources_now))
             monitor_final_cleanup(SIGTERM);
 
 	release_waiting_processes();
@@ -1823,7 +1807,7 @@ int monitor_resources(long int interval /*in microseconds */)
         round++;
     }
 
-    free(tree_now);
+    free(resources_now);
     free(p);
     free(d);
     free(f);
@@ -1853,12 +1837,12 @@ int main(int argc, char **argv) {
     signal(SIGQUIT, monitor_final_cleanup);
     signal(SIGTERM, monitor_final_cleanup);
 
-    tree_max    = calloc(1, sizeof(struct tree_info));
-    tree_limits = calloc(1, sizeof(struct tree_info));
-    tree_flags  = calloc(1, sizeof(struct tree_info));
+    resources_max    = calloc(1, sizeof(struct rmsummary));
+    resources_limits = calloc(1, sizeof(struct rmsummary));
+    resources_flags  = calloc(1, sizeof(struct rmsummary));
 
     usecs_initial = usecs_since_epoch();
-    initialize_limits_tree(tree_limits, INTMAX_MAX);
+    initialize_limits_tree(resources_limits, INTMAX_MAX);
 
     struct option long_options[] =
 	    {
@@ -1905,10 +1889,10 @@ int main(int argc, char **argv) {
 			    fatal("interval cannot be set to less than one microsecond.");
 		    break;
             case 'l':
-		    parse_limits_file(optarg, tree_limits);
+		    parse_limits_file(optarg, resources_limits);
 		    break;
             case 'L':
-		    parse_limits_string(optarg, tree_limits);
+		    parse_limits_string(optarg, resources_limits);
 		    break;
             case 'o':
 		    if(template_path)
@@ -1971,10 +1955,10 @@ int main(int argc, char **argv) {
 		    use_opened  = 0;
 		    break;
 	    case 6:
-		    tree_flags->workdir_footprint = 1;
+		    resources_flags->workdir_footprint = 1;
 		    break;
 	    case 7:
-		    tree_flags->workdir_footprint = 0;
+		    resources_flags->workdir_footprint = 0;
 		    break;
             default:
 		    show_help(argv[0]);

@@ -29,7 +29,7 @@ See the file COPYING for details.
 #include "buffer.h"
 #include "link_nvpair.h"
 #include "get_canonical_path.h"
-#include "rmonitor_hooks.h"
+#include "rmonitor.h"
 #include "copy_stream.h"
 #include "random_init.h"
 
@@ -926,7 +926,7 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 
 	fcntl(q->monitor_fd, F_SETLKW, &lock);
 	
-	msg = string_format("Work Queue pid: %d Task: %d\n", getpid(), t->taskid);
+	msg = string_format("# Work Queue pid: %d Task: %d\n", getpid(), t->taskid);
 	write(q->monitor_fd, msg, strlen(msg));
 	free(msg);
 
