@@ -73,6 +73,10 @@ See the file COPYING for details.
 #define LONG_OPT_MONITOR_LOG_DIR  ('z' + 3)
 #define LONG_OPT_PASSWORD         ('z' + 4)
 #define LONG_OPT_MONITOR_LIMITS   ('z' + 5)
+#define LONG_OPT_PPM_ROW          ('z' + 6)
+#define LONG_OPT_PPM_FILE         ('z' + 7)
+#define LONG_OPT_PPM_EXE          ('z' + 8)
+#define LONG_OPT_PPM_LEVELS       ('z' + 9)
 
 typedef enum {
 	DAG_GC_NONE,
@@ -2006,11 +2010,16 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog-server=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
-	fprintf(stdout, " %-30s Display the Makefile as a Dot graph. \n", "-D,--dot-graph=<opt>");
-	fprintf(stdout, " %-30s Additional options:\n", ""); 
-	fprintf(stdout, " %-40s c condense similar boxes\n", "");
-	fprintf(stdout, " %-40s s change the size of the boxes proportional to file size\n", "");
-	fprintf(stdout, " %-40s else type 'none' for full expansion\n", "");
+	fprintf(stdout, " %-30s Display the Makefile as a Dot graph or a PPM completion graph.\n", "-D,--dot-graph=<opt>");
+	fprintf(stdout, " %-40s If <opt> is:\n", ""); 
+	fprintf(stdout, " %-40s Standard Dot graph\n", "<no opt>");
+	fprintf(stdout, " %-40s condense similar boxes\n", "c");
+	fprintf(stdout, " %-40s change the size of the boxes proportional to file size\n", "s");
+	fprintf(stdout, " %-40s display a completion graph in PPM format\n", "ppm");
+	fprintf(stdout, " %-30s Highlight row <row> in completion grap\n", "--ppm-highlight-row=<row>");
+	fprintf(stdout, " %-30s Highlight node that creates file <filename> in completion graph\n", "--ppm-highlight-file=<filename>");
+	fprintf(stdout, " %-30s Highlight executable <exe> in completion grap\n", "--ppm-highlight-exe=<exe>");
+	fprintf(stdout, " %-30s Display different levels of depth in completion graph\n", "--ppm-show-levels");
 	fprintf(stdout, " %-30s Enable master capacity estimation in Work Queue.\n", "-E,--wq-estimate-capacity"); 
 	fprintf(stdout, " %-30s Estimated master capacity may be viewed in the Work Queue log file.\n", "");
 	fprintf(stdout, " %-30s Write summary of workflow to this file upon success or failure.\n", "-f,--summary-log=<file>");
@@ -2159,7 +2168,7 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 
 int main(int argc, char *argv[])
 {
-	char c;
+	int c;
 	char *logfilename = NULL;
 	char *batchlogfilename = NULL;
 	char *bundle_directory = NULL;
@@ -2228,7 +2237,11 @@ int main(int argc, char *argv[])
 		{"batch-options",     required_argument, 0, 'B'},
 		{"catalog-server",    required_argument, 0, 'C'},
 		{"dot-graph",         required_argument, 0, 'D'},
-		{"ppm-advanced",	required_argument, 0, 'D'},
+		{"display-mode",	required_argument, 0, 'D'},
+		{"ppm-highlight-row",   required_argument, 0, LONG_OPT_PPM_ROW},
+		{"ppm-highlight-exe",	required_argument, 0, LONG_OPT_PPM_EXE},
+		{"ppm-highlight-file",  required_argument, 0, LONG_OPT_PPM_FILE},
+		{"ppm-show-levels",	no_argument, 0, LONG_OPT_PPM_LEVELS},
 		{"wq-estimate-capacity", no_argument,   0, 'E'},
 		{"summary-log",       no_argument,   0, 'f'},
 		{"wq-fast-abort", required_argument,   0, 'F'},
@@ -2297,10 +2310,28 @@ int main(int argc, char *argv[])
 			debug_flags_set(optarg);
 			break;
 		case 'D':
-			if (ppm_mode) ppm_option = optarg;
 			if (strcasecmp(optarg, "c") == 0) condense_display = 1;
 			if (strcasecmp(optarg, "s") == 0) change_size = 1;
 			if (strcasecmp(optarg, "ppm") == 0) ppm_mode = 1;
+			display_mode = 1;
+			break;
+		case LONG_OPT_PPM_EXE:
+			ppm_option = optarg;
+                        ppm_mode = 2;
+                        display_mode = 1;
+                        break;
+		case LONG_OPT_PPM_FILE:
+			ppm_option = optarg;
+                        ppm_mode = 3;
+                        display_mode = 1;
+                        break;
+                case LONG_OPT_PPM_ROW:
+                        ppm_option = optarg;
+                        ppm_mode = 4;
+                        display_mode = 1;
+                        break;
+		case LONG_OPT_PPM_LEVELS:
+			ppm_mode = 5;
 			display_mode = 1;
 			break;
 		case 'E':
@@ -2665,11 +2696,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	dag_log_recover(d, logfilename);
+
 	if(display_mode) {
 		free(logfilename);
 		free(batchlogfilename);
 		if (ppm_mode) {
-			dag_to_ppm(d, ppm_option);
+			dag_to_ppm(d, ppm_mode, ppm_option);
 		} else {
 			dag_to_dot(d, condense_display, change_size);
 		}
@@ -2741,7 +2774,6 @@ int main(int argc, char *argv[])
 	if(port > 0)
 		printf("listening for workers on port %d.\n", port);
 
-	dag_log_recover(d, logfilename);
 
 	signal(SIGINT, handle_abort);
 	signal(SIGQUIT, handle_abort);

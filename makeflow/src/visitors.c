@@ -313,7 +313,7 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size)
 	hash_table_delete(h);
 }
 
-void ppm_color_parser(struct dag_node *n, int *color_array, char (*ppm_option), int current_level, int whitespace_on){
+void ppm_color_parser(struct dag_node *n, int *color_array, int ppm_mode, char (*ppm_option), int current_level, int whitespace_on){
 
 	if (whitespace_on){
 		color_array[0] = 1;
@@ -324,62 +324,80 @@ void ppm_color_parser(struct dag_node *n, int *color_array, char (*ppm_option), 
 
 	struct dag_file *f;
 
-	int highlightRow = 1;
-	int highlightName = 0;
-	int i;
 	int ppm_option_int;
 	char *name, *label;
 
 	memset(color_array, 0, 3*sizeof(int));
 
-	color_array[current_level%3] = 1;
-
-	if (ppm_option != NULL) {
-		for (i = 0; (unsigned)i < strlen(ppm_option); i++){
-			if (!isdigit(ppm_option[i])){
-				highlightRow = 0;
-				highlightName = 1;
+	if (ppm_mode == 1) {
+		switch(n->state){
+		case DAG_NODE_STATE_WAITING:
+			break;
+		case DAG_NODE_STATE_RUNNING:
+			color_array[0] = 1;
+                        color_array[1] = 1;
+                        color_array[2] = 0;
+			break;
+		case DAG_NODE_STATE_COMPLETE:
+			color_array[0] = 0;
+                        color_array[1] = 1;
+                        color_array[2] = 0;
+			break;
+		case DAG_NODE_STATE_FAILED:
+			color_array[0] = 1;
+                        color_array[1] = 0;
+                        color_array[2] = 0;
+			break;
+		case DAG_NODE_STATE_ABORTED:
+			color_array[0] = 1;
+                        color_array[1] = 0;
+                        color_array[2] = 0;
+			break;
+		default:
+			color_array[0] = 0;
+                        color_array[1] = 0;
+                        color_array[2] = 1;
+			break;
+		}
+	}
+	if(ppm_mode == 2){
+		name = xxstrdup(n->command);
+		label = strtok(name, " \t\n");
+		if (strcmp(label, ppm_option) == 0) {
+			//node name is matched, set to yellow
+			color_array[0] = 0;
+                        color_array[1] = 1;
+                        color_array[2] = 1;
+		}
+	}
+	if(ppm_mode == 3){
+		//searches the files for a result file named such
+		list_first_item(n->target_files);
+		while ( (f = list_next_item(n->target_files)) ) {
+			if (strcmp(f->filename, ppm_option) == 0){
+				//makes this file, set to purple
+				color_array[0] = 1;
+				color_array[1] = 0;
+				color_array[2] = 1;
 				break;
 			}
 		}
-
-		if (highlightName){
-			name = xxstrdup(n->command);
-			label = strtok(name, " \t\n");
-			if (strcmp(label, ppm_option) == 0) {
-				//node name is matched, set to yellow
-				color_array[0] = 1;
-                                color_array[1] = 1;
-                                color_array[2] = 0;
-			} else {
-				//searches the files for a result file named such
-				list_first_item(n->target_files);
-				while ( (f = list_next_item(n->target_files)) ) {
-					if (strcmp(f->filename, ppm_option) == 0){
-						//makes this file, set to purple
-						color_array[0] = 1;
-						color_array[1] = 0;
-						color_array[2] = 1;
-						break;
-					}
-				}
-			}
-		}
-		if (highlightRow) {
-			ppm_option_int = atoi(ppm_option);
-			if (current_level == ppm_option_int){
-				//sets everything at that level to yellow
-				color_array[0] = 1;
-				color_array[1] = 1;
-				color_array[2] = 0;
-			}
-		}
-
 	}
-
+	if (ppm_mode == 4){ 
+		ppm_option_int = atoi(ppm_option);
+		if (current_level == ppm_option_int){
+			//sets everything at that level to yellow
+			color_array[0] = 0;
+			color_array[1] = 1;
+			color_array[2] = 1;
+		}
+	}
+	if (ppm_mode == 5){
+		color_array[current_level%3] = 1;
+	}
 }
 
-void dag_to_ppm (struct dag *d, char *ppm_option){
+void dag_to_ppm (struct dag *d, int ppm_mode, char *ppm_option){
 
 	int count, count_row, max_ancestor = 0, max_size = 0;
 	UINT64_T key;
@@ -498,7 +516,7 @@ void dag_to_ppm (struct dag *d, char *ppm_option){
 							if (pixel_count_height == 0) current_depth_nodesPrinted++;
 						}
 					}
-					ppm_color_parser(n, color_array, ppm_option, count_row, whitespace_on);
+					ppm_color_parser(n, color_array, ppm_mode, ppm_option, count_row, whitespace_on);
 					fprintf(stdout, "%d %d %d ", color_array[0], color_array[1], color_array[2]);
 				}
 				fprintf(stdout, "\n");
