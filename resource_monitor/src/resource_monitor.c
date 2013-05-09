@@ -153,10 +153,11 @@ See the file COPYING for details.
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_piggyback.h"
 
-#define DEFAULT_INTERVAL       1        /* in seconds */
 
 #define ONE_MEGABYTE 1048576  /* this many bytes */
 #define ONE_SECOND   1000000  /* this many usecs */    
+
+#define DEFAULT_INTERVAL       ONE_SECOND        /* in useconds */
 
 #define DEFAULT_LOG_NAME "resource-pid-%d"     /* %d is used for the value of getpid() */
 
@@ -248,16 +249,17 @@ struct filesys_info
 
 struct process_info
 {
-    uint64_t    wall_time;
-    pid_t       pid;
-    const char *cmd;
-    int         running;
+	uint64_t    wall_time;
+	pid_t       pid;
+	const char *cmd;
+	int         running;
+	int         waiting;
 
-    struct mem_info      mem;
-    struct cpu_time_info cpu;
-    struct io_info       io;
+	struct mem_info      mem;
+	struct cpu_time_info cpu;
+	struct io_info       io;
 
-    struct wdir_info *wd;
+	struct wdir_info *wd;
 };
 
 char *resources[15] = { "wall_clock(seconds)", 
@@ -756,6 +758,8 @@ int get_swap_linux(pid_t pid, struct mem_info *mem)
 
     while(get_int_attribute(fsmaps, "Swap:", &value, 0) == 0)
 	    accum += value; 
+
+    fclose(fsmaps);
 
     return accum;
 }
@@ -1271,6 +1275,43 @@ int ping_process(pid_t pid)
     return (kill(pid, 0) == 0);
 }
 
+void monitor_track_process(pid_t pid)
+{
+	char *newpath;
+	struct process_info *p; 
+    
+	if(!ping_process(pid))
+		return;
+
+	p = itable_lookup(processes, pid);
+
+	if(p)
+		return;
+
+	p = malloc(sizeof(struct process_info));
+	bzero(p, sizeof(struct process_info));
+
+	p->pid = pid;
+	p->running = 0;
+
+	newpath = getcwd(NULL, 0);
+	p->wd   = lookup_or_create_wd(NULL, newpath);
+	free(newpath);
+
+	itable_insert(processes, p->pid, (void *) p);
+
+	p->running = 1;
+	p->waiting = 0;
+}
+
+void monitor_untrack_process(uint64_t pid)
+{
+	struct process_info *p = itable_lookup(processes, pid);
+
+	if(p)
+		p->running = 0;
+}
+
 void cleanup_zombie(struct process_info *p)
 {
   debug(D_DEBUG, "cleaning process: %d\n", p->pid);
@@ -1294,42 +1335,18 @@ void cleanup_zombies(void)
     if(!p->running)
       cleanup_zombie(p);
 }
+
+void release_waiting_processes(void)
+{
+	uint64_t pid;
+	struct process_info *p;
+
+	itable_firstkey(processes);
+	while(itable_nextkey(processes, &pid, (void **) &p))
+		if(p->waiting)
+			kill(pid, SIGCONT);
+}
      
-void monitor_track_process(pid_t pid)
-{
-    char *newpath;
-    struct process_info *p; 
-    
-    if(!ping_process(pid))
-        return;
-
-    p = itable_lookup(processes, pid);
-
-    if(p)
-        return;
-
-    p = malloc(sizeof(struct process_info));
-    bzero(p, sizeof(struct process_info));
-
-    p->pid = pid;
-    p->running = 0;
-
-    newpath = getcwd(NULL, 0);
-    p->wd   = lookup_or_create_wd(NULL, newpath);
-    free(newpath);
-
-    itable_insert(processes, p->pid, (void *) p);
-
-    p->running = 1;
-}
-
-void monitor_untrack_process(uint64_t pid)
-{
-    struct process_info *p = itable_lookup(processes, pid);
-
-    if(p)
-        p->running = 0;
-}
 
 void ping_processes(void)
 {
@@ -1361,8 +1378,6 @@ struct tree_info *monitor_rusage_tree(void)
     /* Here we add the maximum recorded + the io from memory maps */
     tr_usg->bytes_read     =  tree_max->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
 
-    tr_usg->cpu_time       = (usg.ru_utime.tv_sec  + usg.ru_stime.tv_sec) * ONE_SECOND;
-    tr_usg->cpu_time      += (usg.ru_utime.tv_usec + usg.ru_stime.tv_usec);
     tr_usg->resident_memory = usg.ru_maxrss;
 
     debug(D_DEBUG, "rusage faults: %d resident memory: %d.\n", usg.ru_majflt, usg.ru_maxrss);
@@ -1376,7 +1391,10 @@ void monitor_check_child(const int signal)
     uint64_t pid = waitpid(first_process_pid, &first_process_sigchild_status, 
                            WNOHANG | WCONTINUED | WUNTRACED);
 
-    debug(D_DEBUG, "SIGCHLD from %d : ", pid);
+    if(pid != (uint64_t) first_process_pid)
+	    return;
+
+    debug(D_DEBUG, "SIGCHLD from %d : ", first_process_pid);
 
     if(WIFEXITED(first_process_sigchild_status))
     {
@@ -1546,60 +1564,63 @@ void write_helper_lib(void)
 
 void monitor_dispatch_msg(void)
 {
-    struct monitor_msg msg;
-    struct process_info *p;
+	struct monitor_msg msg;
+	struct process_info *p;
 
-    recv_monitor_msg(monitor_queue_fd, &msg);
+	recv_monitor_msg(monitor_queue_fd, &msg);
 
-    debug(D_DEBUG,"message \"%s\" from %d\n", str_msgtype(msg.type), msg.origin);
+	debug(D_DEBUG,"message \"%s\" from %d\n", str_msgtype(msg.type), msg.origin);
 
-    p = itable_lookup(processes, (uint64_t) msg.origin);
+	p = itable_lookup(processes, (uint64_t) msg.origin);
 
-    if(!p && msg.type != BRANCH)
-    /* We either got a malformed message, or a message that
-     * recently terminated. There is not much we can do right
-     * now, but to ignore the message */
-        return;
+	if(!p && msg.type != BRANCH)
+		/* We either got a malformed message, or a message that
+		 * recently terminated. There is not much we can do right
+		 * now, but to ignore the message */
+		return;
 
-    switch(msg.type)
-    {
+	switch(msg.type)
+	{
         case BRANCH:
-            monitor_track_process(msg.origin);
-            if(tree_max->max_concurrent_processes < itable_size(processes))
-                tree_max->max_concurrent_processes = itable_size(processes);
-            break;
+		monitor_track_process(msg.origin);
+		if(tree_max->max_concurrent_processes < itable_size(processes))
+			tree_max->max_concurrent_processes = itable_size(processes);
+		break;
+        case WAIT:
+		p->waiting = 1;
+		break;
         case END:
-            monitor_untrack_process(msg.data.p);
-            break;
+		monitor_untrack_process(msg.data.p);
+		break;
         case CHDIR:
-            p->wd = lookup_or_create_wd(p->wd, msg.data.s);
-            break;
+		p->wd = lookup_or_create_wd(p->wd, msg.data.s);
+		break;
         case OPEN:
-            debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
-            monitor_write_open_file(msg.data.s);
-            hash_table_insert(files, msg.data.s, NULL);
-            break;
+		debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
+		monitor_write_open_file(msg.data.s);
+		hash_table_insert(files, msg.data.s, NULL);
+		break;
         case READ:
-            break;
+		break;
         case WRITE:
-            break;
+		break;
         default:
-            break;
-    };
+		break;
+	};
 
-    if(!monitor_check_limits(tree_max))
-        monitor_final_cleanup(SIGTERM);
+	if(!monitor_check_limits(tree_max))
+		monitor_final_cleanup(SIGTERM);
 }
 
 int wait_for_messages(int interval)
 {
     struct timeval timeout;
 
-    /* wait for interval seconds. */
-    timeout.tv_sec  = interval;
-    timeout.tv_usec = 0;
+    /* wait for interval. */
+    timeout.tv_sec  = 0;
+    timeout.tv_usec = interval;
 
-    debug(D_DEBUG, "sleeping for: %ld seconds\n", interval);
+    debug(D_DEBUG, "sleeping for: %lf seconds\n", ((double) interval / ONE_SECOND));
 
     //If grandchildren processes cannot talk to us, simply wait.
     //Else, wait, and check socket for messages.
@@ -1615,8 +1636,8 @@ int wait_for_messages(int interval)
             fd_set rset;
             FD_ZERO(&rset);
             FD_SET(monitor_queue_fd, &rset);
-            timeout.tv_sec   = interval;
-            timeout.tv_usec  = 0;
+            timeout.tv_sec   = 0;
+            timeout.tv_usec  = interval;
             interval = 0;                     //Next loop we do not wait at all
             count = select(monitor_queue_fd + 1, &rset, NULL, NULL, &timeout);
 
@@ -1710,7 +1731,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
     fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Interval between observations, in seconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
+    fprintf(stdout, "%-30s Interval between observations, in microseconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
     fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify\n", "-L,--limits=<string>");
@@ -1730,7 +1751,7 @@ static void show_help(const char *cmd)
 }
 
 
-int monitor_resources(long int interval /*in seconds */)
+int monitor_resources(long int interval /*in microseconds */)
 {
     uint64_t round;
 
@@ -1768,6 +1789,8 @@ int monitor_resources(long int interval /*in seconds */)
 
         if(!monitor_check_limits(tree_now))
             monitor_final_cleanup(SIGTERM);
+
+	release_waiting_processes();
 
         cleanup_zombies();
         //If no more process are alive, break out of loop.
@@ -1854,7 +1877,7 @@ int main(int argc, char **argv) {
             case 'i':
 		    interval = strtoll(optarg, NULL, 10);
 		    if(interval < 1)
-			    fatal("interval cannot be set to less than one second.");
+			    fatal("interval cannot be set to less than one microsecond.");
 		    break;
             case 'l':
 		    parse_limits_file(optarg, tree_limits);
