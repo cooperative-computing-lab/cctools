@@ -9,6 +9,8 @@ See the file COPYING for details.
 #include <string.h>
 #include <sys/stat.h>
 
+#include <ctype.h>
+
 #include "hash_table.h"
 #include "xxmalloc.h"
 #include "list.h"
@@ -311,9 +313,93 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size)
 	hash_table_delete(h);
 }
 
-void dag_to_ppm (struct dag *d){
+void ppm_color_parser(struct dag_node *n, int *color_array, int ppm_mode, char (*ppm_option), int current_level, int whitespace_on){
 
-	int count, count_width, max_ancestor = 0, max_size = 0;
+	if (whitespace_on){
+		color_array[0] = 1;
+		color_array[1] = 1;
+		color_array[2] = 1;
+		return;
+	}
+
+	struct dag_file *f;
+
+	int ppm_option_int;
+	char *name, *label;
+
+	memset(color_array, 0, 3*sizeof(int));
+
+	if (ppm_mode == 1) {
+		switch(n->state){
+		case DAG_NODE_STATE_WAITING:
+			break;
+		case DAG_NODE_STATE_RUNNING:
+			color_array[0] = 1;
+                        color_array[1] = 1;
+                        color_array[2] = 0;
+			break;
+		case DAG_NODE_STATE_COMPLETE:
+			color_array[0] = 0;
+                        color_array[1] = 1;
+                        color_array[2] = 0;
+			break;
+		case DAG_NODE_STATE_FAILED:
+			color_array[0] = 1;
+                        color_array[1] = 0;
+                        color_array[2] = 0;
+			break;
+		case DAG_NODE_STATE_ABORTED:
+			color_array[0] = 1;
+                        color_array[1] = 0;
+                        color_array[2] = 0;
+			break;
+		default:
+			color_array[0] = 0;
+                        color_array[1] = 0;
+                        color_array[2] = 1;
+			break;
+		}
+	}
+	if(ppm_mode == 2){
+		name = xxstrdup(n->command);
+		label = strtok(name, " \t\n");
+		if (strcmp(label, ppm_option) == 0) {
+			//node name is matched, set to yellow
+			color_array[0] = 0;
+                        color_array[1] = 1;
+                        color_array[2] = 1;
+		}
+	}
+	if(ppm_mode == 3){
+		//searches the files for a result file named such
+		list_first_item(n->target_files);
+		while ( (f = list_next_item(n->target_files)) ) {
+			if (strcmp(f->filename, ppm_option) == 0){
+				//makes this file, set to purple
+				color_array[0] = 1;
+				color_array[1] = 0;
+				color_array[2] = 1;
+				break;
+			}
+		}
+	}
+	if (ppm_mode == 4){ 
+		ppm_option_int = atoi(ppm_option);
+		if (current_level == ppm_option_int){
+			//sets everything at that level to yellow
+			color_array[0] = 0;
+			color_array[1] = 1;
+			color_array[2] = 1;
+		}
+	}
+	if (ppm_mode == 5){
+		color_array[current_level%3] = 1;
+	}
+}
+
+void dag_to_ppm (struct dag *d, int ppm_mode, char *ppm_option){
+
+	int count, count_row, max_ancestor = 0, max_size = 0;
 	UINT64_T key;
 	struct dag_node *n;
 
@@ -354,59 +440,91 @@ void dag_to_ppm (struct dag *d){
 		if (list_size(ancestor_count_list[n->ancestor_depth]) > max_size) max_size = list_size(ancestor_count_list[n->ancestor_depth]);
 	}
 
-	//Multiplier - get more pixels
-	int multiplier = 20;
-	//row and column multipliers, for screen size or file size based adjustments
-	int row_multiplier = (800/multiplier)/max_ancestor;
-	if(row_multiplier < 1) row_multiplier = 1;
-	int column_multiplier = (800/multiplier)/max_size;
-	if(column_multiplier < 1) column_multiplier = 1;
-	int mult_count;
+	int i;
+	int node_num_rows = 0;
+
+	int max_image_width = 1200;
+	int node_width = max_image_width/max_size;
+	if (node_width < 5) node_width = 5;
+
+	for (i = 0; i <= max_ancestor; i++) {
+		node_num_rows = node_num_rows + ((node_width*list_size(ancestor_count_list[i])) - 1)/(max_image_width) + 1;
+	}	
+
+	int max_image_height = 800;
+	int row_height = max_image_height/node_num_rows;
+	if (row_height < 5) row_height = 5;
 
 	//calculate the column size so that we can center the data
 	
-	int x_length = max_size*multiplier*column_multiplier; //x length
-	int y_length = (max_ancestor+1)*multiplier*row_multiplier; //y length
-	int ancestor_level_height = row_multiplier*multiplier; //y length of each line
+	int x_length = (max_image_width/node_width)*node_width; //x length
+	int y_length = row_height*(node_num_rows); //y length
 
-	int white_space_left;
-	int white_space_right;
+	int current_depth_width;
+	int current_depth_nodesPrinted;
+	int current_depth_pixel_nodesPrinted;
+	int nodesCanBePrinted = x_length/node_width;
+	int current_depth_nodesCanBePrinted;
+	int current_depth_numRows;
 
-	int current_ancestor_width;
+	int numRows;
+
+	int pixel_count_col;
+	int pixel_count_height;
+
+	int whitespace;
+	int whitespace_left;
+	int whitespace_right;
+	int whitespace_on;
+
+//	printf("%d %d %d\n", node_width, max_size, node_num_rows);
 
 	fprintf(stdout, "P3\n"); //"Magic Number", don't change
 	fprintf(stdout, "%d %d\n", x_length, y_length); //Width and Height
-	fprintf(stdout, "1\n"); //maximum color value
+	fprintf(stdout, "1\n\n"); //maximum color value
 
 	int color_array[3];
 
-	for(count = 0; count <= max_ancestor; count++){ //each ancestor depth in the dag
+	for(count_row = 0; count_row <= max_ancestor; count_row++){ //each ancestor depth in the dag
+		current_depth_width = list_size(ancestor_count_list[count_row]); //the width of this particular level of the dag
+		current_depth_numRows = (node_width*current_depth_width - 1)/(x_length) + 1;
+		current_depth_nodesPrinted = 0;
+//		printf("nodes total: %d\n", current_depth_width);
+		for (numRows = 0; numRows < current_depth_numRows; numRows++){
 
-		//set the color of this particular depth
-		memset(color_array, 0, 3*sizeof(int));
-		color_array[count % 3] = 1;
+			if ((current_depth_width - current_depth_nodesPrinted) < nodesCanBePrinted) current_depth_nodesCanBePrinted = current_depth_width - current_depth_nodesPrinted;
+			else current_depth_nodesCanBePrinted = nodesCanBePrinted;
 
-		current_ancestor_width = list_size(ancestor_count_list[count]); //the width of this particular level of the dag
-		current_ancestor_width = current_ancestor_width*multiplier*column_multiplier; //expands the current_ancestor width to its size in the image
+//			printf("nodes to be printed: %d\n", current_depth_nodesCanBePrinted);
 
-		//set whitespace on left and right of this level's graphical output
-		white_space_left = (x_length-current_ancestor_width)/2;
-		white_space_right = x_length - white_space_left;
+			whitespace = x_length-(current_depth_nodesCanBePrinted*node_width);
+			whitespace_left = whitespace/2;
+			whitespace_right = x_length-(whitespace-whitespace_left);
 
-		for(mult_count = 0; mult_count < ancestor_level_height; mult_count++){ //each pixel row
-
-			for (count_width = 0; count_width < x_length; count_width++){
-				if ((count_width >= white_space_left) && (count_width <= white_space_right)) {
-					fprintf(stdout, " %d %d %d ", color_array[0], color_array[1], color_array[2]);
-				} else {
-					fprintf(stdout, " 1 1 1 ");
+			for (pixel_count_height = 0; pixel_count_height < row_height; pixel_count_height++){//each pixel row of said ancestor height
+	
+				list_first_item(ancestor_count_list[count_row]);
+				current_depth_pixel_nodesPrinted = 0;
+				for (pixel_count_col = 0; pixel_count_col < x_length; pixel_count_col++){ //for each node in the width
+					if ((pixel_count_col < whitespace_left) || (pixel_count_col >= whitespace_right)){
+						whitespace_on = 1;
+					} else {
+						whitespace_on = 0;
+						if ((pixel_count_col-whitespace_left-(current_depth_pixel_nodesPrinted*node_width))==0) {
+							n = list_next_item(ancestor_count_list[count_row]);
+							current_depth_pixel_nodesPrinted++;
+							if (pixel_count_height == 0) current_depth_nodesPrinted++;
+						}
+					}
+					ppm_color_parser(n, color_array, ppm_mode, ppm_option, count_row, whitespace_on);
+					fprintf(stdout, "%d %d %d ", color_array[0], color_array[1], color_array[2]);
 				}
+				fprintf(stdout, "\n");
 			}
-			fprintf(stdout, "\n");
 		}
 
 	}
-
+	
 	hash_table_firstkey(h);
 	//this doesn't cause a memory leak, right?
         while(hash_table_nextkey(h, &label ,(void **)&n)) {

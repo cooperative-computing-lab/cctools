@@ -22,4 +22,4 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size);
 /* The dag_to_ppm function writes a struct dag in memory to a ppm
  * file, giving a graphical presentation of the makeflow
  */
-void dag_to_ppm(struct dag *d);
+void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option);
