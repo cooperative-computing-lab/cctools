@@ -288,3 +288,13 @@ pid_t wait(int *status)
 {
 	return waitpid(-1, status, 0);
 }
+
+
+/* wrap main ensuring wait_wrapper_preamble for one final monitoring
+   checks gets called at least once */
+
+#if defined(__clang__) || defined(__GNUC__)
+void __attribute__((destructor)) init() {
+	wait_wrapper_preamble();
+}
+#endif

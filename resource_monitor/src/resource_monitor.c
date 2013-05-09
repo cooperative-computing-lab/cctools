@@ -1336,6 +1336,11 @@ void cleanup_zombies(void)
       cleanup_zombie(p);
 }
 
+void release_waiting_process(pid_t pid)
+{
+	kill(pid, SIGCONT);
+}
+
 void release_waiting_processes(void)
 {
 	uint64_t pid;
@@ -1344,7 +1349,7 @@ void release_waiting_processes(void)
 	itable_firstkey(processes);
 	while(itable_nextkey(processes, &pid, (void **) &p))
 		if(p->waiting)
-			kill(pid, SIGCONT);
+			release_waiting_process(pid);
 }
      
 
@@ -1573,11 +1578,16 @@ void monitor_dispatch_msg(void)
 
 	p = itable_lookup(processes, (uint64_t) msg.origin);
 
-	if(!p && msg.type != BRANCH)
-		/* We either got a malformed message, or a message that
-		 * recently terminated. There is not much we can do right
-		 * now, but to ignore the message */
-		return;
+	if(!p)
+	{
+		/* We either got a malformed message, message from a
+		process we are not tracking anymore, or a message from
+		a newly created process.  */
+		if( msg.type == WAIT )
+			release_waiting_process(msg.origin);
+		else if(msg.type != BRANCH)
+			return;
+	}
 
 	switch(msg.type)
 	{
