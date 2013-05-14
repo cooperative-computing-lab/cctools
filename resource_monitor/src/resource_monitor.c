@@ -1897,6 +1897,7 @@ int main(int argc, char **argv) {
 		    break;
             case 'h':
 		    show_help(argv[0]);
+		    return 0;
 		    break;
             case 'o':
 		    if(template_path)
