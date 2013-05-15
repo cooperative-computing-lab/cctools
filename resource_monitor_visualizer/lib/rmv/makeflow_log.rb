@@ -1,4 +1,4 @@
-require_relative '../rmv'
+require 'rmv'
 
 module RMV
   class MakeflowLog

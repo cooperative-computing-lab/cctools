@@ -1,4 +1,4 @@
-require_relative '../rmv'
+require 'rmv'
 
 require 'pathname'
 require 'yaml'
@@ -6,12 +6,12 @@ require 'open3'
 
 module RMV
   class Runner
-    attr_reader :debug, :source, :destination, :overwrite, :time_series, :resources, :workspace, :name, :tasks, :writer
+    attr_reader :debug, :source, :overwrite, :time_series, :resources, :workspace, :name, :tasks, :writer
 
     def initialize argv
       options = Options.new argv
       process_arguments options
-      initialize_writer
+      initialize_writers
     end
 
     def run
@@ -20,7 +20,7 @@ module RMV
       create_histograms
       create_group_resource_summaries
       make_combined_time_series
-      plot_makeflow_log source + 'Makeflow.makeflowlog'
+      @makeflow_log_exists = plot_makeflow_log source + 'Makeflow.makeflowlog'
       make_index [[1250,500]], [[600,600],[250,250]]
       copy_static_files
       remove_temp_files unless debug
@@ -31,12 +31,13 @@ module RMV
         `rm -rf #{workspace}`
       end
 
-      def initialize_writer
-        @writer = Writer.new workspace, destination, overwrite
+      def initialize_writers
+        @destination_writer = Writer.new @destination, overwrite
+        @workspace_writer = Writer.new workspace, overwrite
       end
 
       def make_directories
-        @groups.product(resources).map { |g, r| (destination + "#{g}" + "#{r}").mkpath }
+        @groups.product(resources).map { |g, r| (@destination + "#{g}" + "#{r}").mkpath }
       end
 
       def create_group_resource_summaries histogram_size=[600,600]
@@ -52,9 +53,9 @@ module RMV
 
           tasks.select{ |t| t.executable_name == g }.sort_by{ |t| t.grab r.name }.each do |t|
             rule_path = "#{g}/#{t.rule_id}.html"
-            run_if_not_exist(destination+rule_path) { create_rule_page t, rule_path }
+            create_rule_page t, rule_path
             scaled_resource, _ = resources.scale r, (t.grab r.name)
-            page << "<tr><td><a href=\"../#{t.rule_id}.html\">#{t.rule_id}</a></td><td>#{scaled_resource.round 3}</td></tr>\n"
+            page << "<tr><td><a href=\"../#{t.rule_id}.html\">#{t.rule_id}</a></td><td>#{(scaled_resource*1000).round/1000.0}</td></tr>\n"
           end
 
           page << "</table>\n"
@@ -63,8 +64,15 @@ module RMV
         end
       end
 
-      def write path, content
-        writer.file path, content
+      def write path, content, location=:destination
+        case location
+        when :destination
+          @destination_writer.file path, content
+        when :workspace
+          @workspace_writer.file path, content
+        else
+          STDERR.puts "Cannot write to #{location}."
+        end
       end
 
       def run_if_not_exist path
@@ -97,24 +105,13 @@ module RMV
         <table>
         INDEX
 
-        scratch_file = @workspace + "#{task.rule_id}.scaled"
-        run_if_not_exist(scratch_file) { scale_time_series task, scratch_file }
-
-        resources.each_with_index do |r,i|
-          next if i == 0
-          out = @destination + "#{task.executable_name}" + "#{r.name}"
-          out.mkpath
-          out += "#{task.rule_id}.png"
-          run_if_not_exist(out) do
-            gnuplot {|io| io.puts time_series_format(600, 300, r, scratch_file, out, i+1, nil )}
-          end
-        end
+        plot_task_timeseries task
 
         page << "<tr><td>command</td><td>#{task.grab "command"}</td></tr>\n"
         resources.each_with_index do |r, i|
           value, unit = resources.scale r, task.grab(r.name)
           img_path = "#{r.name}/#{task.rule_id}.png"
-          page << "<tr><td><a href=\"#{r.name}/index.html\">#{r.name}</a></td><td>#{value.round 3} #{unit}</td>"
+          page << "<tr><td><a href=\"#{r.name}/index.html\">#{r.name}</a></td><td>#{(value*1000).round/1000.0} #{unit}</td>"
           page << "<td><img src=\"#{img_path}\" /></td>" if i > 0
           page << "</tr>\n"
         end
@@ -122,6 +119,24 @@ module RMV
         page << "</table>\n"
 
         write path, page
+      end
+
+      def plot_task_timeseries task
+        scratch_file = @workspace + "#{task.rule_id}.scaled"
+        run_if_not_exist(scratch_file) { scale_time_series task, scratch_file }
+
+        resources.each_with_index {|r,i| task_resource_timeseries_plot r, i, task, scratch_file}
+      end
+
+      def task_resource_timeseries_plot resource, column, task, scratch_file
+        unless column == 0
+          out = @destination + "#{task.executable_name}" + "#{resource.name}"
+          out.mkpath
+          out += "#{task.rule_id}.png"
+          run_if_not_exist(out) do
+            gnuplot {|io| io.puts time_series_format(600, 300, resource, scratch_file, out, column+1, nil )}
+          end
+        end
       end
 
       def find_start_time
@@ -143,11 +158,11 @@ module RMV
           path = "aggregate_#{u.first.to_s}"
           output = []
           u.last.each {|k,v| output << "#{k}\t#{v}"}
-          output.sort_by! do |a|
+          output = output.sort_by do |a|
             a = a.split(/\t/)
             a[0].to_i
           end
-          write path, output
+          write path, output, :workspace
         end
       end
 
@@ -231,13 +246,8 @@ module RMV
       def find_files
         time_series_paths = []
         summary_paths = []
-        Pathname.glob(@source + "log-rule*") do |path|
-          if path.to_s.match /.*summary/
-            summary_paths << path
-          else
-            time_series_paths << path
-          end
-        end
+        Pathname.glob(@source + "*.series")  { |p| time_series_paths << p }
+        Pathname.glob(@source + "*.summary") { |p| summary_paths     << p }
         @time_series = time_series_paths
         @tasks = TaskCollection.new summary_paths, time_series_paths
       end
@@ -249,7 +259,7 @@ module RMV
       end
 
       def create_histograms
-        builder = HistogramBuilder.new resources, workspace, destination, tasks
+        builder = HistogramBuilder.new resources, workspace, @destination, tasks
         @groups = builder.find_groups
         builder.build([[600,600],[250,250]]).map do |b|
           gnuplot { |io| io.puts b }
@@ -261,11 +271,11 @@ module RMV
         page = Page.new "#{name} Workflow"
         page << " <h1>#{name} Workflow</h1>"
 
-        summary_sizes.sort_by!{|s| s.first}
+        summary_sizes = summary_sizes.sort_by{|s| s.first}
         summary_large = summary_sizes.last
         page << slides(summary_large.first, summary_large.last)
 
-        histogram_sizes.sort_by! {|s| s.first}
+        histogram_sizes = histogram_sizes.sort_by {|s| s.first}
         hist_small = histogram_sizes.first
         hist_large = histogram_sizes.last
         @groups.each_with_index do |g, i|
@@ -288,8 +298,8 @@ module RMV
         <section class="summary">
           <div id="slides">
             <div class="slides_container">
-              <div class="slide"><div class="item"><img src="makeflowlog_1250x500.png" /></div></div>
         INDEX
+        result << %Q{<div class="slide"><div class="item"><img src="makeflowlog_1250x500.png" /></div></div>} if @makeflow_log_exists
 
         resources.each_with_index do |r, i|
           result << %Q{ <div class="slide"><div class="item"><img src="#{r.to_s}_#{height}x#{width}_aggregate.png" /></div></div>\n} unless i == 0
@@ -318,13 +328,12 @@ module RMV
       end
 
       def plot_makeflow_log log_file
-        output_path = destination + 'makeflowlog.png'
-        mflog = MakeflowLog.from_file log_file
-        summary_data_file = workspace + "summarydata"
-        run_if_not_exist output_path do
-          summary_data_file.open("w:UTF-8") { |f| f.puts mflog }
-          gnuplot {|io| io.puts mflog.gnuplot_format(1250, 500, summary_data_file, destination) }
+        if log_file.exist?
+          mflog = MakeflowLog.from_file log_file
+          write "summarydata", mflog, :workspace
+          gnuplot {|io| io.puts mflog.gnuplot_format(1250, 500, workspace + "summarydata", @destination) }
         end
+        log_file.exist?
       end
   end
 end

@@ -1,4 +1,4 @@
-require_relative '../rmv'
+require 'rmv'
 
 require 'yaml'
 
@@ -10,16 +10,16 @@ module RMV
 
     def each
       paths.each do |p|
-        yield (Summary.from_file p)
+        yield(Summary.from_file p)
       end
     end
 
     def last
-      Summary.from_file paths.last
+      Summary.from_file(paths.last)
     end
 
     def first
-      Summary.from_file paths.first
+      Summary.from_file(paths.first)
     end
 
     private

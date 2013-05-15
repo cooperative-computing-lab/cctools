@@ -1,4 +1,4 @@
-require_relative '../rmv'
+require 'rmv'
 
 require 'optparse'
 require 'pathname'
@@ -7,12 +7,12 @@ module RMV
   class Options
 
     def initialize argv
-      @config = {source: nil,
-                 debug: false,
-                 destination: nil,
-                 name: "",
-                 overwrite: false,
-                 workspace: Pathname.new("/tmp/rmv")}
+      @config = {:source => nil,
+                 :debug => false,
+                 :destination => nil,
+                 :name => "",
+                 :overwrite => false,
+                 :workspace => Pathname.new("/tmp/rmv")}
       parse argv
       mandatory = [:source, :destination]
       missing = mandatory.select { |param| config[param].nil? }

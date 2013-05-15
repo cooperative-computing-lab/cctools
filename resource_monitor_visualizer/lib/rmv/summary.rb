@@ -1,4 +1,4 @@
-require_relative '../rmv'
+require 'rmv'
 
 require 'yaml'
 
@@ -6,7 +6,7 @@ module RMV
   class Summary
     class << self
       def from_file path
-         Summary.new (YAML.load_file path)
+         Summary.new(YAML.load_file path)
       end
 
     end
