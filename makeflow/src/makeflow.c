@@ -2010,6 +2010,16 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog-server=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
+	fprintf(stdout, " %-30s Display the Makefile as a Dot graph or a PPM completion graph.\n", "-D,--dot-graph=<opt>");
+	fprintf(stdout, " %-40s If <opt> is:\n", ""); 
+	fprintf(stdout, " %-40s Standard Dot graph\n", "n");
+	fprintf(stdout, " %-40s condense similar boxes\n", "c");
+	fprintf(stdout, " %-40s change the size of the boxes proportional to file size\n", "s");
+	fprintf(stdout, " %-40s display a completion graph in PPM format\n", "ppm");
+	fprintf(stdout, " %-30s Highlight row <row> in completion grap\n", "--ppm-highlight-row=<row>");
+	fprintf(stdout, " %-30s Highlight node that creates file <filename> in completion graph\n", "--ppm-highlight-file=<filename>");
+	fprintf(stdout, " %-30s Highlight executable <exe> in completion grap\n", "--ppm-highlight-exe=<exe>");
+	fprintf(stdout, " %-30s Display different levels of depth in completion graph\n", "--ppm-show-levels");
 	fprintf(stdout, " %-30s Enable master capacity estimation in Work Queue.\n", "-E,--wq-estimate-capacity"); 
 	fprintf(stdout, " %-30s Estimated master capacity may be viewed in the Work Queue log file.\n", "");
 	fprintf(stdout, " %-30s Write summary of workflow to this file upon success or failure.\n", "-f,--summary-log=<file>");
@@ -2237,6 +2247,10 @@ int main(int argc, char *argv[])
 		{"bundle-dir",        required_argument, 0, 'b'},
 		{"batch-options",     required_argument, 0, 'B'},
 		{"catalog-server",    required_argument, 0, 'C'},
+<<<<<<< HEAD
+		{"dot-graph",         required_argument, 0, 'D'},
+=======
+>>>>>>> f90e346ca22e7f04d7487d24abc6dadfc685c2c4
 		{"display-mode",	required_argument, 0, 'D'},
 		{"ppm-highlight-row",   required_argument, 0, LONG_OPT_PPM_ROW},
 		{"ppm-highlight-exe",	required_argument, 0, LONG_OPT_PPM_EXE},
