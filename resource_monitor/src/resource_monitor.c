@@ -869,7 +869,7 @@ void acc_sys_io_usage(struct io_info *acc, struct io_info *other)
     acc->delta_chars_written += other->delta_chars_written;
 }
 
-/* This function is not correct. Better to read /proc/[pid]/maps */
+/* We compute the resident memory changes from mmap files. */
 int get_map_io_usage(pid_t pid, struct io_info *io)
 {
     /* /dev/proc/[pid]/smaps */
@@ -885,9 +885,13 @@ int get_map_io_usage(pid_t pid, struct io_info *io)
     {
         return 1;
     }
+
+    char dummy_line[1024];
     
-    while(get_int_attribute(fsmaps, "Rss:", &kbytes_resident, 0) == 0)
-        kbytes_resident_accum += kbytes_resident;
+    /* Look for next mmap file */
+    while( !strchr(fgets(dummy_line, 1024, fsmaps), '/') ) 
+	    if(get_int_attribute(fsmaps, "Rss:", &kbytes_resident, 0) == 0)
+		    kbytes_resident_accum += kbytes_resident;
 
     if((kbytes_resident_accum * 1024) > io->bytes_faulted)
         io->delta_bytes_faulted = (kbytes_resident_accum * 1024) - io->bytes_faulted;
@@ -1351,7 +1355,6 @@ void release_waiting_processes(void)
 		if(p->waiting)
 			release_waiting_process(pid);
 }
-     
 
 void ping_processes(void)
 {
