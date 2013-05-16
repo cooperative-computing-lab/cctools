@@ -23,13 +23,10 @@ struct dag *dag_create()
 {
 	struct dag *d = malloc(sizeof(*d));
 
-	if(!d)
-	{
+	if(!d) {
 		debug(D_DEBUG, "makeflow: could not allocate new dag : %s\n", strerror(errno));
 		return NULL;
-	}
-	else
-	{
+	} else {
 		memset(d, 0, sizeof(*d));
 		d->nodes = 0;
 		d->filename = NULL;
@@ -61,56 +58,58 @@ struct dag *dag_create()
 
 void dag_compile_ancestors(struct dag *d)
 {
-  struct dag_node *n, *m;
-  struct dag_file *f; 
-  char  *name;
+	struct dag_node *n, *m;
+	struct dag_file *f;
+	char *name;
 
-  hash_table_firstkey(d->file_table);
-  while( hash_table_nextkey(d->file_table, &name, (void **) &f) )
-  {
-    m = f->target_of;
-    
-    if(!m)
-      continue;
+	hash_table_firstkey(d->file_table);
+	while(hash_table_nextkey(d->file_table, &name, (void **) &f)) {
+		m = f->target_of;
 
-    list_first_item(f->needed_by);
-    while( (n = list_next_item(f->needed_by)) )
-    {
-      debug(D_DEBUG, "rule %d ancestor of %d\n", m->nodeid, n->nodeid);
-      set_insert(m->descendants, n);
-      set_insert(n->ancestors,   m);
-    }
-  }
+		if(!m)
+			continue;
+
+		list_first_item(f->needed_by);
+		while((n = list_next_item(f->needed_by))) {
+			debug(D_DEBUG, "rule %d ancestor of %d\n", m->nodeid, n->nodeid);
+			set_insert(m->descendants, n);
+			set_insert(n->ancestors, m);
+		}
+	}
 }
 
-int get_ancestor_depth(struct dag_node *n){
+int get_ancestor_depth(struct dag_node *n)
+{
 	int group_number = -1;
 	struct dag_node *ancestor = NULL;
 
 	debug(D_DEBUG, "n->ancestor_depth: %d", n->ancestor_depth);
 
-	if(n->ancestor_depth >= 0)
-	{	return n->ancestor_depth;	}
+	if(n->ancestor_depth >= 0) {
+		return n->ancestor_depth;
+	}
 
 	set_first_element(n->ancestors);
-	while( (ancestor = set_next_element(n->ancestors)) ) {
-		
+	while((ancestor = set_next_element(n->ancestors))) {
+
 		group_number = get_ancestor_depth(ancestor);
 		debug(D_DEBUG, "group: %d, n->ancestor_depth: %d", group_number, n->ancestor_depth);
-		if (group_number > n->ancestor_depth)
-		{	n->ancestor_depth = group_number;	}
+		if(group_number > n->ancestor_depth) {
+			n->ancestor_depth = group_number;
+		}
 	}
 
 	n->ancestor_depth++;
 	return n->ancestor_depth;
 }
 
-void dag_find_ancestor_depth(struct dag *d){
+void dag_find_ancestor_depth(struct dag *d)
+{
 	UINT64_T key;
 	struct dag_node *n;
 
 	itable_firstkey(d->node_table);
-	while(itable_nextkey(d->node_table, &key, (void **)&n)) {
+	while(itable_nextkey(d->node_table, &key, (void **) &n)) {
 		get_ancestor_depth(n);
 	}
 }
@@ -130,11 +129,11 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->source_files = list_create(0);
 	n->target_files = list_create(0);
 
-	n->remote_names     = itable_create(0);
-	n->remote_names_inv = hash_table_create(0,0);
+	n->remote_names = itable_create(0);
+	n->remote_names_inv = hash_table_create(0, 0);
 
-        n->descendants = set_create(0);
-        n->ancestors   = set_create(0);
+	n->descendants = set_create(0);
+	n->ancestors = set_create(0);
 
 	n->ancestor_depth = -1;
 
@@ -196,14 +195,13 @@ char *dag_node_translate_filename(struct dag_node *n, const char *filename)
 
 	char *c;
 	for(c = newname_ptr; *c; ++c) {
-		switch(*c)
-		{
-			case '/':
-			case '.':
-				*c = '_';
-				break;
-			default:
-				break;
+		switch (*c) {
+		case '/':
+		case '.':
+			*c = '_';
+			break;
+		default:
+			break;
 		}
 	}
 
@@ -212,8 +210,7 @@ char *dag_node_translate_filename(struct dag_node *n, const char *filename)
 
 	int i = 0;
 	char *newname_org = xxstrdup(newname_ptr);
-	while(hash_table_lookup(n->remote_names_inv, newname_ptr))
-	{
+	while(hash_table_lookup(n->remote_names_inv, newname_ptr)) {
 		sprintf(newname_ptr, "%06d-%s", i, newname_org);
 		i++;
 	}
@@ -236,7 +233,7 @@ struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
 
 	f = malloc(sizeof(struct dag_file));
 
-	f->filename  = xxstrdup(filename);
+	f->filename = xxstrdup(filename);
 	f->needed_by = list_create(0);
 	f->target_of = NULL;
 
@@ -250,15 +247,14 @@ struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
 struct list *dag_input_files(struct dag *d)
 {
 	struct dag_file *f;
-	char            *filename;
-	struct list     *il;
+	char *filename;
+	struct list *il;
 
 	il = list_create(0);
 
 	hash_table_firstkey(d->file_table);
-	while( (hash_table_nextkey(d->file_table, &filename, (void **) &f)) )
-		if(!f->target_of)
-		{
+	while((hash_table_nextkey(d->file_table, &filename, (void **) &f)))
+		if(!f->target_of) {
 			debug(D_DEBUG, "Found independent input file: %s", f->filename);
 			list_push_tail(il, f);
 		}
@@ -270,20 +266,19 @@ struct list *dag_input_files(struct dag *d)
  * */
 char *dag_lookup_set(const char *name, void *arg)
 {
-	struct dag_lookup_set s = {(struct dag *)arg, NULL, NULL};
+	struct dag_lookup_set s = { (struct dag *) arg, NULL, NULL };
 	return dag_lookup(name, &s);
 }
 
 char *dag_lookup(const char *name, void *arg)
 {
-	struct dag_lookup_set *s = (struct dag_lookup_set *)arg;
+	struct dag_lookup_set *s = (struct dag_lookup_set *) arg;
 	const char *value;
 
-	if(s)
-	{
+	if(s) {
 		/* Try node variables table */
 		if(s->node) {
-			value = (const char *)hash_table_lookup(s->node->variables, name);
+			value = (const char *) hash_table_lookup(s->node->variables, name);
 			if(value) {
 				s->table = s->node->variables;
 				return xxstrdup(value);
@@ -292,7 +287,7 @@ char *dag_lookup(const char *name, void *arg)
 
 		/* Try dag variables table */
 		if(s->dag) {
-			value = (const char *)hash_table_lookup(s->dag->variables, name);
+			value = (const char *) hash_table_lookup(s->dag->variables, name);
 			if(value) {
 				s->table = s->dag->variables;
 				return xxstrdup(value);
@@ -350,7 +345,7 @@ const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, c
 	if(oldname && strcmp(oldname, filename) == 0)
 		debug(D_DEBUG, "Remote name %s for %s already in use for %s\n", remotename, filename, oldname);
 
-	itable_insert(n->remote_names, (uintptr_t) f, remotename); 
+	itable_insert(n->remote_names, (uintptr_t) f, remotename);
 	hash_table_insert(n->remote_names_inv, remotename, (void *) f);
 
 	return remotename;
@@ -417,7 +412,7 @@ void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate)
 	n->state = newstate;
 	d->node_states[n->state]++;
 
-        /**
+	/**
 	 * Line format : timestamp node_id new_state job_id nodes_waiting nodes_running nodes_complete nodes_failed nodes_aborted node_id_counter
 	 *
 	 * timestamp - the unix time (in microseconds) when this line is written to the log file.
@@ -444,42 +439,40 @@ struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, cons
 {
 	struct dag_task_category *category;
 
-    category = hash_table_lookup(d->task_categories, label);
-	if(!category)
-    {
-		category = malloc(sizeof(struct dag_task_category)); 
-        category->label = xxstrdup(label);
-        category->count = 0;
+	category = hash_table_lookup(d->task_categories, label);
+	if(!category) {
+		category = malloc(sizeof(struct dag_task_category));
+		category->label = xxstrdup(label);
+		category->count = 0;
 
-        hash_table_insert(d->task_categories, label, category);
-    }
-	
+		hash_table_insert(d->task_categories, label, category);
+	}
+
 	return category;
 }
 
 int dag_file_is_source(struct dag_file *f)
 {
-    if( f->target_of )
-      return 0;
-    else
-      return 1;
+	if(f->target_of)
+		return 0;
+	else
+		return 1;
 }
 
 int dag_file_is_sink(struct dag_file *f)
 {
-    if( list_size(f->needed_by) > 0 )
-      return 0;
-    else
-      return 1;
+	if(list_size(f->needed_by) > 0)
+		return 0;
+	else
+		return 1;
 }
 
 int dag_node_is_source(struct dag_node *n)
 {
-  return (set_size(n->ancestors) == 0);
+	return (set_size(n->ancestors) == 0);
 }
 
 int dag_node_is_sink(struct dag_node *n)
 {
-  return (set_size(n->descendants) == 0);
+	return (set_size(n->descendants) == 0);
 }
-
