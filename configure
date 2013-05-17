@@ -947,6 +947,36 @@ fi
 ccflags="${ccflags} -DINSTALL_PATH='\"${install_path}\"' $debug_flag -D_REENTRANT -D_GNU_SOURCE -DBUILD_USER='\"$build_user\"' -DBUILD_HOST='\"$build_host\"' -DCCTOOLS_VERSION_MAJOR=$major -DCCTOOLS_VERSION_MINOR=$minor -DCCTOOLS_VERSION_MICRO='\"$micro\"' -DCCTOOLS_VERSION='\"$version\"' -DCCTOOLS_RELEASE_DATE='\"$release_date\"' -DCCTOOLS_CONFIGURE_ARGUMENTS='\"$configure_arguments\"' -DCCTOOLS_SYSTEM_INFORMATION='\"$system_information\"' -DCCTOOLS_OPSYS_${build_sys} -DCCTOOLS_CPU_${build_cpu}"
 ldflags="${ldflags} ${debug_flag}"
 
+if [ $include_package_parrot = "parrot" ]
+then
+
+	cat <<EOF > libparrot.test.c
+int main() { return 0; }
+EOF
+	echo -n "testing creation of 64-bit libparrot_helper.so..."
+	$ccompiler $internal_ccflags -m64 libparrot.test.c -o libparrot.test > /dev/null 2>&1 
+	if [ $? == 0 ]
+	then
+		build_lib64parrot_helper="yes"
+	else
+		build_lib64parrot_helper="no"
+	fi
+	echo $build_lib64parrot_helper
+
+	echo -n "testing creation of 32-bit libparrot_helper.so..."
+	$ccompiler $internal_ccflags -m32 libparrot.test.c -o libparrot.test > /dev/null 2>&1 
+	if [ $? == 0 ]
+	then
+		build_lib32parrot_helper="yes"
+	else
+		build_lib32parrot_helper="no"
+	fi
+	echo $build_lib32parrot_helper
+
+	rm -f libparrot.test.c libparrot.test
+fi
+
+
 echo "Creating Makefile.config..."
 
 cat <<EOF >>Makefile.config
@@ -1006,6 +1036,9 @@ CCTOOLS_WORK_QUEUE_BINDINGS=${work_queue_bindings}
 CCTOOLS_DOCTARGETS=${cctools_doctargets}
 
 CCTOOLS_M4_ARGS=-DCCTOOLS_VERSION=${major}.${minor}.${micro} -DCCTOOLS_RELEASE_DATE=${release_date}
+
+CCTOOLS_BUILD_LIB64PARROT_HELPER=${build_lib64parrot_helper}
+CCTOOLS_BUILD_LIB32PARROT_HELPER=${build_lib32parrot_helper}
 
 EOF
 

@@ -150,7 +150,7 @@ static void pfs_helper_init( const char *argv0 )
 		debug(D_DEBUG,"PARROT_HELPER is not set");
 	}
 
-	if(access(helper_path,R_OK)==0) {
+	if(access(helper_path,R_OK)==0 || strstr(helper_path, "/$LIB/")) {
 		debug(D_DEBUG,"found helper in %s",helper_path);
 		setenv("LD_PRELOAD",helper_path,1);
 	} else {
