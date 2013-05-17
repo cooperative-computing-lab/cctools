@@ -5,7 +5,6 @@ show_help()
 	echo "Use: pbs_submit_workers [options] <servername> <port> <num-workers>"
 	echo "where options are:"
 	echo "  -a               Enable auto mode."
-	echo "  -s               Run as a shared worker."
 	echo "  -N <name>        Preferred master name."
 	echo "  -C <catalog>     Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
 	echo "  -t <time>        Abort after this amount of idle time. (default=900s)"
@@ -29,7 +28,6 @@ do
 		j)  use_jobarray=1;;
 		N)  arguments="$arguments -N $OPTARG";;
 		p)  parameters="$parameters $OPTARG";;
-		s)  arguments="$arguments -s";;
 		t)  arguments="$arguments -t $OPTARG";;
 		\?) show_help;;
 	esac

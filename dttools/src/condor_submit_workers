@@ -5,7 +5,6 @@ show_help()
 	echo "Use: condor_submit_workers [options] <servername> <port> <num-workers>"
 	echo "where options are:"
 	echo "  -a              Enable auto mode."
-	echo "  -s              Run as a shared worker."
 	echo "  -N <name>       Preferred project name for worker."
 	echo "  -C <catalog>    Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
 	echo "  -t <time>       Abort after this amount of idle time. (default=900s)"

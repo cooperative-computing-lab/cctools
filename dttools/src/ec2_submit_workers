@@ -5,7 +5,6 @@ show_help()
         echo "Use: ec2_submit_workers [options] <servername> <port> <ec2-key-name> <ec2-key-file> <num-workers>"
         echo "where options are:"
         echo "  -a                  Enable auto mode."
-        echo "  -s                  Run as a shared worker."
         echo "  -N <name>           Preferred project name for worker."
         echo "  -C <catalog>        Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
         echo "  -t <time>           Abort after this amount of idle time. (default=900s)."
@@ -27,7 +26,6 @@ while getopts asN:C:t:d:i:z:p:h opt
 do
         case "$opt" in
                 a)  arguments="$arguments -a"; use_auto=1;;
-                s)  arguments="$arguments -s";;
                 N)  arguments="$arguments -N $OPTARG";;
                 C)  arguments="$arguments -C $OPTARG";;
                 t)  arguments="$arguments -t $OPTARG";;

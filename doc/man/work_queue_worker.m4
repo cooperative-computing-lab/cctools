@@ -31,7 +31,6 @@ SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_ITEM(-a)Enable auto mode. In this mode the worker would ask a catalog server for available masters.
 OPTION_PAIR(-C, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
-OPTION_ITEM(-s)Run as a shared worker. By default the worker would only work on preferred projects.
 OPTION_PAIR(-d, subsystem)Enable debugging for the given subsystem. Try -d all as a start.
 OPTION_PAIR(-o, file)Send debugging to this file.
 OPTION_PAIR(-N, project)Set the project name to PARAM(project).
@@ -40,6 +39,7 @@ OPTION_PAIR(-w, size)Set TCP window size.
 OPTION_PAIR(-i, time)Set initial value for backoff interval when worker fails to connect to a master. (default=1s)
 OPTION_PAIR(-b, time)Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)
 OPTION_PAIR(-z, size)Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
+OPTION_PAIR(-s, path)Set the location for creating the working directory of the worker.
 OPTION_ITEM(-v)Show version string.
 OPTION_ITEM(-h)Show this help message.
 OPTIONS_END
