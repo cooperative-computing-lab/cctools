@@ -4,9 +4,36 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+/*
+The following major problems must be fixed in the worker
+before it can be released:
+
+- Each task must have its own namespace so that independent tasks
+with the same filenames will not interfere.  This should be done
+by creating a directory in do_task, allowing for a put command
+in the middle of the task transaction, and symlinking in common files.
+Then, when the master is done with a task, it should send a cancel
+task message, which causes the directory and all to be cleaned up.
+
+- Currently, all tasks sent are started immediately.  Instead, the
+worker should queue up all tasks sent, and only start them
+when the total cores, tasks, and memory are within the specified limits.
+
+- When run with --cores greater than one and the work queue example
+app, there are regular pauses of five seconds, instead of a constant
+stream of results.
+
+- When the user does not specify any resources explicitly for a
+task, both the master and the worker should assume that the task
+occupies the entire resources of a given worker.
+
+*/
+
+
 #include "work_queue.h"
 #include "work_queue_protocol.h"
 #include "work_queue_internal.h"
+#include "work_queue_resources.h"
 
 #include "cctools.h"
 #include "macros.h"
@@ -64,35 +91,26 @@ See the file COPYING for details.
 extern int setenv(const char *name, const char *value, int overwrite);
 #endif
 
-#define STDOUT_BUFFER_SIZE 1048576        
-
 #define MIN_TERMINATE_BOUNDARY 0 
 #define TERMINATE_BOUNDARY_LEEWAY 30
-
-#define PIPE_ACTIVE 1
-#define LINK_ACTIVE 2
-#define POLL_FAIL 4
-
-#define TASK_NONE 0
-#define TASK_RUNNING 1
 
 #define WORKER_MODE_AUTO    0
 #define WORKER_MODE_CLASSIC 1
 #define WORKER_MODE_WORKER  2
 #define WORKER_MODE_FOREMAN 3
 
-
 struct task_info {
 	int taskid;
 	pid_t pid;
 	int status;
 	
-	struct rusage *rusage;
+	struct rusage rusage;
 	timestamp_t execution_start;
 	timestamp_t execution_end;
 	
 	char *output_file_name;
 	int output_fd;
+	struct work_queue_task *task;
 };
 
 struct distribution_node {
@@ -151,18 +169,20 @@ static time_t worker_start_time = 0;
 static UINT64_T current_taskid = 0;
 static char *base_debug_filename = NULL;
 
+// Local resource controls
+static struct work_queue_resources * local_resources = 0;
+static struct work_queue_resources * local_resources_last = 0;
+static int manual_cores_option = 0;
+static int manual_disk_option = 0;
+static int manual_memory_option = 0;
+
 // Foreman mode global variables
 static struct work_queue *foreman_q = NULL;
-static struct itable *unfinished_tasks = NULL;
 
 // Forked task related
-static int task_status= TASK_NONE;
-static int max_worker_tasks = 1;
-static int max_worker_tasks_default = 1;
-static int current_worker_tasks = 0;
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
-
+static struct list *waiting_tasks = NULL;
 
 // Catalog mode control variables
 static char *catalog_server_host = NULL;
@@ -175,49 +195,152 @@ static struct hash_cache *bad_masters = NULL;
 static int released_by_master = 0;
 static char *current_project = NULL;
 
-static void report_worker_ready(struct link *master)
+static void send_master_message( struct link *master, const char *fmt, ... )
 {
-	char hostname[DOMAIN_NAME_MAX];
-	UINT64_T memory_avail, memory_total;
-	UINT64_T disk_avail, disk_total;
-	int ncpus;
-	char *name_of_master;
-	char *name_of_pool;
-
-	domain_name_cache_guess(hostname);
-	ncpus = load_average_get_cpus();
-	memory_info_get(&memory_avail, &memory_total);
-	disk_info_get(".", &disk_avail, &disk_total);
-	name_of_master = actual_master ? actual_master->proj : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
-	name_of_pool = pool_name ? pool_name : WORK_QUEUE_PROTOCOL_BLANK_FIELD;
-
-	link_putfstring(master, "ready %s %d %llu %llu %llu %llu %s %s %s %s %s %s \n", time(0) + active_timeout, hostname, ncpus, memory_avail, memory_total, disk_avail, disk_total, name_of_master, name_of_pool, os_name, arch_name, workspace, CCTOOLS_VERSION);
+	char debug_msg[2*WORK_QUEUE_LINE_MAX];
+	va_list va;
+	va_list debug_va;
 	
-	if(worker_mode == WORKER_MODE_WORKER || worker_mode == WORKER_MODE_FOREMAN) {	
-		current_worker_tasks = max_worker_tasks;
-		link_putfstring(master, "update slots %d\n", time(0)+active_timeout, max_worker_tasks);
+	va_start(va,fmt);
+
+	sprintf(debug_msg, "<-- %s", fmt);
+	va_copy(debug_va, va);
+
+	vdebug(D_WQ, debug_msg, debug_va);
+	link_putvfstring(master, fmt, time(0)+active_timeout, va);	
+
+	va_end(va);
+}
+
+static int recv_master_message( struct link *master, char *line, int length, time_t stoptime )
+{
+	int result = link_readline(master,line,length,time(0)+active_timeout);
+	if(result) debug(D_WQ,"--> %s",line);
+	return result;
+}
+
+static void send_resource_update( struct link *master, int force_update )
+{
+	time_t stoptime = time(0) + active_timeout;
+
+	if(force_update || memcmp(local_resources_last,local_resources,sizeof(*local_resources))) {
+		work_queue_resources_send(master,local_resources,stoptime);
+		memcpy(local_resources_last,local_resources,sizeof(*local_resources));
 	}
 }
 
-static void clear_task_info(struct task_info *ti)
+static void report_worker_ready( struct link *master )
+{
+	char hostname[DOMAIN_NAME_MAX];
+	domain_name_cache_guess(hostname);
+	send_master_message(master,"workqueue %d %s %s %s %s\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION);
+	send_resource_update(master,1);
+}
+
+static struct task_info * task_info_create( int taskid )
+{
+	struct task_info *ti = malloc(sizeof(*ti));
+	memset(ti,0,sizeof(*ti));
+	ti->taskid = taskid;
+	return ti;
+}
+
+static void task_info_delete( struct task_info *ti )
 {
 	if(ti->output_fd) {
 		close(ti->output_fd);
 		unlink(ti->output_file_name);
 	}
-	if(ti->rusage) {
-		free(ti->rusage);
+
+	free(ti);
+}
+
+
+
+int link_file_in_workspace(char *localname, char *taskname, char *workspace, int into) {
+	int result = 1;
+	struct stat st;
+	char targetname[WORK_QUEUE_LINE_MAX];
+	
+	if(into) {
+		sprintf(targetname, "%s", localname);
+	} else {
+		sprintf(targetname, "%s/%s", workspace, taskname);
+	}
+
+	if(stat((char*)targetname, &st)) {
+		return 0;
 	}
 	
-	memset(ti, 0, sizeof(*ti));
+	if(S_ISDIR(st.st_mode)) {
+		DIR *targetdir = opendir(targetname);
+		struct dirent *d;
+		char dir_localname[WORK_QUEUE_LINE_MAX];
+		char dir_taskname[WORK_QUEUE_LINE_MAX];
+		
+		sprintf(dir_taskname, "%s/%s", workspace, taskname);
+		mkdir(dir_taskname, 0700);
+		
+		while((d = readdir(targetdir))) {
+			if(!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
+			{	continue;	}
+			
+			sprintf(dir_localname, "%s/%s", localname, d->d_name);
+			sprintf(dir_taskname, "%s/%s", taskname, d->d_name);
+			result &= link_file_in_workspace(dir_localname, dir_taskname, workspace, into);
+		}
+	} else {
+		char *cur_pos, *tmp_pos;
+		sprintf(targetname, "%s/%s", workspace, taskname);
+		
+		debug(D_WQ, "linking file %s %s workspace %s with %s\n", localname, into?"into":"from", workspace, targetname);
+
+		if(into) {
+			cur_pos = targetname;
+		} else {
+			cur_pos = localname;
+		}
+
+		cur_pos = targetname;
+		if(!strncmp(cur_pos, "./", 2)) {
+			cur_pos += 2;
+		}
+
+		tmp_pos = strrchr(cur_pos, '/');
+		if(tmp_pos) {
+			*tmp_pos = '\0';
+			if(!create_dir(cur_pos, 0700)) {
+				debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
+				return 0;
+			}
+			*tmp_pos = '/';
+		}
+		
+		if(into) {
+			
+			if(link(localname, targetname)) {
+				return 0;
+			}
+		} else {
+			if(link(targetname, localname)) {
+				return 0;
+			}
+		}
+	}
+	
+	return result;
 }
+
+
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
-static pid_t execute_task(const char *cmd, struct task_info *ti)
+static pid_t task_info_execute(const char *cmd, struct task_info *ti)
 {
+	char working_dir[1024];
 	fflush(NULL); /* why is this necessary? */
-
+	
+	sprintf(working_dir, "%d", ti->taskid);
 	ti->output_file_name = strdup(task_output_template);
 	ti->output_fd = mkstemp(ti->output_file_name);
 	if (ti->output_fd == -1) {
@@ -243,6 +366,10 @@ static pid_t execute_task(const char *cmd, struct task_info *ti)
 		close(ti->output_fd);
 		return ti->pid;
 	} else {
+		if(chdir(working_dir)) {
+			fatal("could not change directory into %s: %s", working_dir, strerror(errno));
+		}
+		
 		int fd = open("/dev/null", O_RDONLY);
 		if (fd == -1) fatal("could not open /dev/null: %s", strerror(errno));
 		int result = dup2(fd, STDIN_FILENO);
@@ -262,6 +389,26 @@ static pid_t execute_task(const char *cmd, struct task_info *ti)
 	return 0;
 }
 
+static int start_task(struct work_queue_task *task) {
+		struct task_info *ti = task_info_create(task->taskid);
+		ti->task = task;
+		task_info_execute(task->command_line,ti);
+	
+		if(ti->pid < 0) {
+			fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
+			task_info_delete(ti);
+			abort_flag = 1;
+			return 0;
+		}
+
+		ti->status = 0;
+
+		itable_insert(stored_tasks, task->taskid, ti);
+		itable_insert(active_tasks, ti->pid, ti);
+
+		return 1;
+}
+
 static void report_task_complete(struct link *master, struct task_info *ti, struct work_queue_task *t)
 {
 	INT64_T output_length;
@@ -271,8 +418,7 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		fstat(ti->output_fd, &st);
 		output_length = st.st_size;
 		lseek(ti->output_fd, 0, SEEK_SET);
-		debug(D_WQ, "Task complete: result %d %lld %llu %d", ti->status, output_length, ti->execution_end - ti->execution_start, ti->taskid);
-		link_putfstring(master, "result %d %lld %llu %d\n", time(0) + active_timeout, ti->status, output_length, ti->execution_end-ti->execution_start, ti->taskid);
+		send_master_message(master, "result %d %lld %llu %d\n", ti->status, output_length, ti->execution_end-ti->execution_start, ti->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
 	} else if(t) {
 		if(t->output) {
@@ -280,8 +426,7 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		} else {
 			output_length = 0;
 		}
-		debug(D_WQ, "Task complete: result %d %lld %llu %d", t->return_status, output_length, t->cmd_execution_time, t->taskid);
-		link_putfstring(master, "result %d %lld %llu %d\n", time(0) + active_timeout, t->return_status, output_length, t->cmd_execution_time, t->taskid);
+		send_master_message(master, "result %d %lld %llu %d\n",t->return_status, output_length, t->cmd_execution_time, t->taskid);
 		if(output_length) {
 			link_putlstring(master, t->output, output_length, time(0)+active_timeout);
 		}
@@ -292,11 +437,12 @@ static int handle_tasks(struct link *master) {
 	struct task_info *ti;
 	pid_t pid;
 	int result = 0;
+	struct work_queue_file *tf;
+	char dirname[WORK_QUEUE_LINE_MAX];
 	
 	itable_firstkey(active_tasks);
 	while(itable_nextkey(active_tasks, (UINT64_T*)&pid, (void**)&ti)) {
-		struct rusage rusage;
-		result = wait4(pid, &ti->status, WNOHANG, &rusage);
+		result = wait4(pid, &ti->status, WNOHANG, &ti->rusage);
 		if(result) {
 			if(result < 0) {
 				debug(D_WQ, "Error checking on child process (%d).", ti->pid);
@@ -307,17 +453,24 @@ static int handle_tasks(struct link *master) {
 				debug(D_WQ, "Task (process %d) did not exit normally.\n", ti->pid);
 			}
 			
-			ti->rusage = malloc(sizeof(rusage));
-			memcpy(ti->rusage, &rusage, sizeof(rusage));
 			ti->execution_end = timestamp_get();
 			
 			itable_remove(active_tasks, ti->pid);
 			itable_remove(stored_tasks, ti->taskid);
 			itable_firstkey(active_tasks);
 			
+			sprintf(dirname, "./%d", ti->taskid);
+			
+			list_first_item(ti->task->output_files);
+			while((tf = (struct work_queue_file *)list_next_item(ti->task->output_files))) {
+				if(!link_file_in_workspace(tf->payload, tf->remote_name, dirname, 0)) {
+					debug(D_NOTICE, "File %s does not exist and is output of task %d.", (char*)tf->remote_name, ti->taskid);
+				}
+			}
+			
 			report_task_complete(master, ti, NULL);
-			clear_task_info(ti);
-			free(ti);
+			work_queue_task_delete(ti->task);
+			task_info_delete(ti);
 		}
 		
 	}
@@ -349,42 +502,6 @@ static int check_disk_space_for_filesize(INT64_T file_size) {
     }
 
     return 1;
-}
-
-static int foreman_finish_task(struct link *master, int taskid, int length) {
-	struct work_queue_task *t;
-	char * cmd;
-
-	cmd = malloc((length+1) * sizeof(*cmd));
-	memset(cmd, 0, length+1);
-
-	link_read(master, cmd, length, time(0) + active_timeout);
-	
-
-	t = (struct work_queue_task *)itable_remove(unfinished_tasks, taskid);
-	if(!t) {
-		t = work_queue_task_create(cmd);
-	} else {
-		free(t->command_line);
-		t->command_line = cmd;
-	}
-
-	work_queue_submit(foreman_q, t);
-	t->taskid = taskid;
-	return 1;
-}
-
-static int foreman_add_file_to_task(const char *filename, int taskid, int type, int flags) {
-	struct work_queue_task *t;
-
-	t = (struct work_queue_task *)itable_lookup(unfinished_tasks, taskid);
-	if(!t) {
-		t = work_queue_task_create("");
-		itable_insert(unfinished_tasks, taskid, t);
-	}
-
-	work_queue_task_specify_file(t, filename, filename, type, flags);
-	return 1;
 }
 
 /**
@@ -700,7 +817,7 @@ static int stream_output_item(struct link *master, const char *filename)
 		if(!dir) {
 			goto failure;
 		}
-		link_putfstring(master, "dir %s %lld\n", time(0) + active_timeout, filename, (INT64_T) 0);
+		send_master_message(master, "dir %s %lld\n", filename, (INT64_T) 0);
 
 		while((dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
@@ -715,7 +832,7 @@ static int stream_output_item(struct link *master, const char *filename)
 		fd = open(filename, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = (INT64_T) info.st_size;
-			link_putfstring(master, "file %s %lld\n", time(0) + active_timeout, filename, length);
+			send_master_message(master, "file %s %lld\n", filename, length);
 			actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
 			close(fd);
 			if(actual != length) {
@@ -730,8 +847,7 @@ static int stream_output_item(struct link *master, const char *filename)
 	return 1;
 
 failure:
-	fprintf(stderr, "Failed to transfer ouput item - %s. (%s)\n", filename, strerror(errno));
-	link_putfstring(master, "missing %s %d\n", time(0) + active_timeout, filename, errno);
+	send_master_message(master, "missing %s %d\n", filename, errno);
 	return 0;
 }
 
@@ -779,58 +895,86 @@ static struct link *connect_master(time_t stoptime) {
 			continue;
 		}
 
-		report_worker_ready(master);
-
 		//reset backoff interval after connection to master.
 		backoff_interval = init_backoff_interval; 
 
 		debug(D_WQ, "connected to master %s:%d", actual_addr, actual_port);
+		report_worker_ready(master);
+
 		return master;
 	}
 
 	return NULL;
 }
 
+static int do_task( struct link *master, UINT64_T taskid )
+{
+	char line[WORK_QUEUE_LINE_MAX];
+	char filename[WORK_QUEUE_LINE_MAX];
+	char taskname[WORK_QUEUE_LINE_MAX];
+	char dirname[WORK_QUEUE_LINE_MAX];
+	int n, flags, length;
+	time_t stoptime = time(0) + active_timeout;
+	struct work_queue_task *task = work_queue_task_create(0);
 
-static int do_work(struct link *master, int taskid, INT64_T length) {
-	char *cmd = malloc(length + 10);
-	struct task_info *ti;
+	task->taskid = taskid;
 
-	link_read(master, cmd, length, time(0) + active_timeout);
-	cmd[length] = 0;
+	sprintf(dirname, "./%" SCNd64 , taskid);
+	mkdir(dirname, 0700);
 
-	debug(D_WQ, "%s", cmd);
-	
-	ti = malloc(sizeof(*ti));
-	memset(ti, 0, sizeof(*ti));
-	
-	ti->taskid = taskid;
-	execute_task(cmd, ti);
-	free(cmd);
-	
-	if(ti->pid < 0) {
-		fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
-		free(ti);
-		abort_flag = 1;
-		return 0;
+	while(recv_master_message(master,line,sizeof(line),stoptime)) {
+	  	if(sscanf(line,"cmd %d",&length)==1) {
+			char *cmd = malloc(length+1);
+			link_read(master,cmd,length,stoptime);
+			cmd[length] = 0;
+			work_queue_task_specify_command(task,cmd);
+			debug(D_WQ,"--> %s",cmd);
+			free(cmd);
+		} else if(sscanf(line,"infile %s %s %d", filename, taskname, &flags)) {
+		       	work_queue_task_specify_file(task, filename, taskname, WORK_QUEUE_INPUT, flags);
+		} else if(sscanf(line,"outfile %s %s %d", filename, taskname, &flags)) {
+		       	work_queue_task_specify_file(task, filename, taskname, WORK_QUEUE_OUTPUT, flags);
+		} else if(sscanf(line,"cores %d",&n)) {
+		       	work_queue_task_specify_cores(task, n);
+		} else if(sscanf(line,"memory %d",&n)) {
+		       	work_queue_task_specify_memory(task, n);
+		} else if(sscanf(line,"disk %d",&n)) {
+		       	work_queue_task_specify_disk(task, n);
+		} else if(!strcmp(line,"end")) {
+		       	break;
+		} else {
+			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
+			work_queue_task_delete(task);
+			return 0;
+		}
 	}
 
-	//snprintf(ti->output_file_name, 50, "%d.task.stdout.tmp", ti->pid);
+	// If this is a foreman, just send the task structure along.
+	// If it is a local worker, create a task_info, start the task, and discard the temporary work_queue_task.
 
-	task_status = ti->status = TASK_RUNNING;
-	itable_insert(stored_tasks, taskid, ti);
-	itable_insert(active_tasks, ti->pid, ti);
+	if(foreman_q) {
+		work_queue_submit(foreman_q,task);
+		return 1;
+	} else {
+		struct work_queue_file *tf;
+		list_first_item(task->input_files);
+		while((tf = list_next_item(task->input_files))) {
+			if(!link_file_in_workspace((char*)tf->payload, tf->remote_name, dirname, 1)) {
+				debug(D_NOTICE, "File %s does not exist and is needed by task %d.", (char*)tf->payload, task->taskid);
+				return 0;
+			}
+		}
+		list_push_tail(waiting_tasks, task);
+	}
 	return 1;
 }
 
 static int do_stat(struct link *master, const char *filename) {
 	struct stat st;
 	if(!stat(filename, &st)) {
-		debug(D_WQ, "result 1 %lu %lu", (unsigned long int) st.st_size, (unsigned long int) st.st_mtime);
-		link_putfstring(master, "result 1 %lu %lu\n", time(0) + active_timeout, (unsigned long int) st.st_size, (unsigned long int) st.st_mtime);
+		send_master_message(master, "result 1 %lu %lu\n",(unsigned long int) st.st_size, (unsigned long int) st.st_mtime);
 	} else {
-		debug(D_WQ, "result 0 0 0");
-		link_putliteral(master, "result 0 0 0\n", time(0) + active_timeout);
+		send_master_message(master, "result 0 0 0\n");
 	}
 	return 1;
 }
@@ -860,6 +1004,7 @@ static int do_symlink(const char *path, char *filename) {
 
 static int do_put(struct link *master, char *filename, INT64_T length, int mode) {
 
+	debug(D_WQ, "Putting file %s into workspace\n", filename);
 	if(!check_disk_space_for_filesize(length)) {
 		debug(D_WQ, "Could not put file %s, not enough disk space (%lld bytes needed)\n", filename, length);
 		return 0;
@@ -886,6 +1031,7 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode)
 
 	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(fd < 0) {
+		debug(D_WQ, "Could not open %s for writing\n", filename);
 		return 0;
 	}
 
@@ -925,7 +1071,7 @@ static int do_mkdir(const char *filename, int mode) {
 
 static int do_rget(struct link *master, const char *filename) {
 	stream_output_item(master, filename);
-	link_putliteral(master, "end\n", time(0) + active_timeout);
+	send_master_message(master, "end\n");
 	return 1;
 }
 
@@ -941,7 +1087,7 @@ static int do_get(struct link *master, const char *filename) {
 	fd = open(filename, O_RDONLY, 0);
 	if(fd >= 0) {
 		length = (INT64_T) info.st_size;
-		link_putfstring(master, "%lld\n", time(0) + active_timeout, length);
+		send_master_message(master, "%lld\n",length);
 		INT64_T actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
 		close(fd);
 		if(actual != length) {
@@ -1038,7 +1184,7 @@ static int do_thirdput(struct link *master, int mode, const char *filename, cons
 		}
 		break;
 	}
-	link_putliteral(master, "thirdput complete\n", time(0) + active_timeout);
+	send_master_message(master, "thirdput complete\n");
 	return 1;
 
 }
@@ -1063,8 +1209,8 @@ static void kill_task(struct task_info *ti) {
 	// Clean up the task info structure.
 	itable_remove(stored_tasks, ti->taskid);
 	itable_remove(active_tasks, ti->pid);
-	clear_task_info(ti);
-	free(ti);
+
+	task_info_delete(ti);
 }
 
 static void kill_all_tasks() {
@@ -1089,23 +1235,27 @@ static void kill_all_tasks() {
 		ti = itable_remove(active_tasks, pid);
 		if(ti) {
 			itable_remove(stored_tasks, ti->taskid);
-			clear_task_info(ti);
-			free(ti);
+			task_info_delete(ti);
 		}
 	}
 	
 	// Clear out the stored tasks list if any are left.
 	itable_firstkey(stored_tasks);
 	while(itable_nextkey(stored_tasks, &taskid, (void**)&ti)) {
-		clear_task_info(ti);
-		free(ti);
+		task_info_delete(ti);
 	}
 	itable_clear(stored_tasks);
 }
 
 static int do_kill(int taskid) {
 	struct task_info *ti = itable_lookup(stored_tasks, taskid);
-	kill_task(ti);
+	if(itable_lookup(active_tasks, ti->pid)) {
+		kill_task(ti);
+	} else {
+		char dirname[1024];
+		sprintf(dirname, "%d", ti->pid);
+		delete_dir(dirname);
+	}
 	return 1;
 }
 
@@ -1141,8 +1291,7 @@ static int do_reset() {
 }
 
 static int send_keepalive(struct link *master){
-	link_putliteral(master, "alive\n", time(0) + active_timeout);
-	debug(D_WQ, "sent response to keepalive check from master at %s:%d.\n", actual_addr, actual_port);
+	send_master_message(master, "alive\n");
 	return 1;
 }
 
@@ -1163,20 +1312,7 @@ static void disconnect_master(struct link *master) {
 	// Remove the contents of the workspace.
 	delete_dir_contents(workspace);
 
-	// Clean up any remaining tasks.
-	if(unfinished_tasks) {
-		UINT64_T taskid;
-		struct work_queue_task *t;
-		itable_firstkey(unfinished_tasks);
-		while(itable_nextkey(unfinished_tasks, &taskid, (void**)&t)) {
-			work_queue_task_delete(t);
-		}
-		itable_clear(unfinished_tasks);
-	}
-	
 	worker_mode = worker_mode_default;
-	current_worker_tasks = 0;
-	max_worker_tasks = max_worker_tasks_default;
 	
 	if(released_by_master) {
 		released_by_master = 0;
@@ -1203,16 +1339,6 @@ static void abort_worker() {
 		work_queue_delete(foreman_q);
 	}
 	
-	if(unfinished_tasks) {
-		UINT64_T taskid;
-		struct work_queue_task *t;
-		itable_firstkey(unfinished_tasks);
-		while(itable_nextkey(unfinished_tasks, &taskid, (void**)&t)) {
-			work_queue_task_delete(t);
-		}
-		itable_delete(unfinished_tasks);
-	}
-	
 	if(active_tasks) {
 		itable_delete(active_tasks);
 	}
@@ -1223,13 +1349,6 @@ static void abort_worker() {
 	// Remove workspace. 
 	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
 	delete_dir(workspace);
-}
-
-static void update_worker_status(struct link *master) {
-	if(current_worker_tasks != max_worker_tasks) {
-		current_worker_tasks = max_worker_tasks;
-		link_putfstring(master, "update slots %d\n", time(0)+active_timeout, max_worker_tasks);
-	}
 }
 
 static int path_within_workspace(const char *path, const char *workspace) {
@@ -1284,28 +1403,16 @@ static int worker_handle_master(struct link *master) {
 	int flags = WORK_QUEUE_NOCACHE;
 	int mode, r, n;
 
-	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
-		debug(D_WQ, "received command: %s.\n", line);
-		if((n = sscanf(line, "work %" SCNd64 "%" SCNd64, &length, &taskid))) {
-			if(n < 2) {
-				current_taskid++;
-				r = do_work(master, current_taskid, length);
-			} else {
-				r = do_work(master, taskid, length);
-			}
+	if(recv_master_message(master, line, sizeof(line), time(0)+active_timeout)) {
+		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
+			r = do_task(master,taskid);
 		} else if(sscanf(line, "stat %s", filename) == 1) {
 			r = do_stat(master, filename);
 		} else if(sscanf(line, "symlink %s %s", path, filename) == 2) {
 			r = do_symlink(path, filename);
-		} else if(sscanf(line, "need %" SCNd64 " %s %d", &taskid, filename, &flags) == 3) {
-			r = 1;
 		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags)) >= 3) {
 			if(path_within_workspace(filename, workspace)) {
-				if(length >= 0) {
-					r = do_put(master, filename, length, mode);
-				} else {
-					r = 1;
-				}
+				r = do_put(master, filename, length, mode);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
@@ -1348,10 +1455,6 @@ static int worker_handle_master(struct link *master) {
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
-		} else if(!strncmp(line, "update", 6)) {
-			worker_mode = WORKER_MODE_WORKER;
-			update_worker_status(master);
-			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
@@ -1409,7 +1512,7 @@ static void work_for_master(struct link *master) {
 		}
 		
 		if(worker_mode == WORKER_MODE_WORKER) {
-			update_worker_status(master);
+			send_resource_update(master,0);
 		}
 		
 		int ok = 1;
@@ -1420,6 +1523,14 @@ static void work_for_master(struct link *master) {
 		ok &= handle_tasks(master);
 
 		ok &= check_disk_space_for_filesize(0);
+
+		if(ok) {
+			if(list_size(waiting_tasks) && itable_size(active_tasks) < local_resources->cores.total) {
+				struct work_queue_task *t;
+				t = list_pop_head(waiting_tasks);
+				if(t) start_task(t);
+			}
+		}
 
 		if(!ok) {
 			disconnect_master(master);
@@ -1439,29 +1550,15 @@ static int foreman_handle_master(struct link *master) {
 	INT64_T taskid;
 	int mode, flags, r;
 
-	if(link_readline(master, line, sizeof(line), time(0)+short_timeout)) {
-		debug(D_WQ, "received command: %s.\n", line);
-		if(sscanf(line, "work %" SCNd64 "%" SCNd64, &length, &taskid) == 2) {
-			r = foreman_finish_task(master, taskid, length);
+	if(recv_master_message(master, line, sizeof(line), time(0)+active_timeout)) {
+		if(sscanf(line, "task %" SCNd64 ,&taskid)==1) {
+			r = do_task(master,taskid);
 		} else if(sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags) == 5) {
 			if(path_within_workspace(filename, workspace)) {
-				if(length >= 0) {
-					r = do_put(master, filename, length, mode);
-				} else {
-					r = 1;
-				}
-				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_INPUT, flags);
+				r = do_put(master, filename, length, mode);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
-			}
-		} else if(sscanf(line, "need %" SCNd64 " %s %d", &taskid, filename, &flags) == 3) {
-			if(path_within_workspace(filename, workspace)) {
-				foreman_add_file_to_task(filename, taskid, WORK_QUEUE_OUTPUT, flags);
-				r=1;
-			} else {
-				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
-				r=0;
 			}
 		} else if(sscanf(line, "unlink %s", filename) == 1) {
 			if(path_within_workspace(filename, workspace)) {
@@ -1494,9 +1591,6 @@ static int foreman_handle_master(struct link *master) {
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
-		} else if(!strncmp(line, "update", 6)) {
-			update_worker_status(master);
-			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
@@ -1513,7 +1607,6 @@ static void foreman_for_master(struct link *master) {
 	static struct list *master_link = NULL;
 	static struct link *current_master = NULL;
 	static struct list *master_link_active = NULL;
-	struct work_queue_stats s;
 
 	if(!master) {
 		return;
@@ -1538,7 +1631,7 @@ static void foreman_for_master(struct link *master) {
 		int result = 1;
 		struct work_queue_task *task = NULL;
 
-		if(time(0) > idle_stoptime && task_status == TASK_NONE) {
+		if(time(0) > idle_stoptime && (itable_size(active_tasks)+itable_size(stored_tasks))==0) {
 			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			abort_flag = 1;
 			break;
@@ -1552,10 +1645,10 @@ static void foreman_for_master(struct link *master) {
 			result = 1;
 		}
 
-		work_queue_get_stats(foreman_q, &s);
-		max_worker_tasks = s.workers_ready + s.workers_busy + s.workers_full;
-
-		update_worker_status(master);
+		// BUG: we currently report the sum of disk space.
+		// Should be reporting the disk space available at the foreman.
+		work_queue_get_resources(foreman_q,local_resources);
+		send_resource_update(master,0);
 		
 		if(list_size(master_link_active)) {
 			result &= foreman_handle_master(list_pop_head(master_link_active));
@@ -1615,6 +1708,9 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -v                      Show version string\n");
 	fprintf(stdout, " --volatility <chance>   Set the percent chance a worker will decide to shut down every minute.\n");
 	fprintf(stdout, " --bandwidth <mult>      Set the multiplier for how long outgoing and incoming data transfers will take.\n");
+	fprintf(stdout, " --cores <n>             Manually set the number of cores reported by this worker.\n");
+	fprintf(stdout, " --memory <mb>           Manually set the amonut of memory (in MB) reported by this worker.\n");
+	fprintf(stdout, " --disk   <mb>           Manually set the amount of disk (in MB) reported by this worker.\n");
 	fprintf(stdout, " -h                      Show this help screen\n");
 }
 
@@ -1674,6 +1770,9 @@ static int setup_workspace() {
 #define LONG_OPT_BANDWIDTH      'z'+3
 #define LONG_OPT_DEBUG_RELEASE  'z'+4
 #define LONG_OPT_SPECIFY_LOG    'z'+5
+#define LONG_OPT_CORES          'z'+6
+#define LONG_OPT_MEMORY         'z'+7
+#define LONG_OPT_DISK           'z'+8
 
 struct option long_options[] = {
 	{"password",            required_argument,  0,  'P'},
@@ -1684,12 +1783,15 @@ struct option long_options[] = {
 	{"measure-capacity",    no_argument,        0,   'c'},
 	{"fast-abort",          required_argument,  0,   'F'},
 	{"specify-log",         required_argument,  0,   LONG_OPT_SPECIFY_LOG},
+	{"cores",               required_argument,  0,   LONG_OPT_CORES},
+	{"memory",              required_argument,  0,   LONG_OPT_MEMORY},
+	{"disk",                required_argument,  0,   LONG_OPT_DISK},
 	{0,0,0,0}
 };
 
 int main(int argc, char *argv[])
 {
-	char c;
+	int c;
 	int w;
 	int foreman_port = -1;
 	char * foreman_name = NULL;
@@ -1766,7 +1868,7 @@ int main(int argc, char *argv[])
 			idle_timeout = string_time_parse(optarg);
 			break;
 		case 'j':
-			max_worker_tasks = max_worker_tasks_default = atoi(optarg);
+			manual_cores_option = atoi(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -1842,6 +1944,15 @@ int main(int argc, char *argv[])
 		case LONG_OPT_DEBUG_RELEASE:
 			setenv("WORK_QUEUE_RESET_DEBUG_FILE", "yes", 1);
 			break;
+		case LONG_OPT_CORES:
+			manual_cores_option = atoi(optarg);
+			break;
+		case LONG_OPT_MEMORY:
+			manual_memory_option = atoi(optarg);
+			break;
+		case LONG_OPT_DISK:
+			manual_disk_option = atoi(optarg);
+			break;
 		case 'h':
 		default:
 			show_help(argv[0]);
@@ -1865,6 +1976,7 @@ int main(int argc, char *argv[])
 	signal(SIGCHLD, handle_sigchld);
 
 	random_init();
+
 	bad_masters = hash_cache_create(127, hash_string, (hash_cache_cleanup_t)free_work_queue_master);
 	
 	if(!setup_workspace()) {
@@ -1891,14 +2003,18 @@ int main(int argc, char *argv[])
 			work_queue_specify_name(foreman_q, foreman_name);
 			work_queue_specify_master_mode(foreman_q, WORK_QUEUE_MASTER_MODE_CATALOG);
 		}
+
+		if(password) {
+			work_queue_specify_password(foreman_q,password);
+		}
+
 		work_queue_specify_estimate_capacity_on(foreman_q, enable_capacity);
 		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);	
 		work_queue_specify_log(foreman_q, foreman_stats_filename);
-		
-		unfinished_tasks = itable_create(0);
 	} else {
 		active_tasks = itable_create(0);
 		stored_tasks = itable_create(0);
+		waiting_tasks = list_create();
 	}
 
 	// set $WORK_QUEUE_SANDBOX to workspace.
@@ -1911,6 +2027,22 @@ int main(int argc, char *argv[])
 	if(!check_disk_space_for_filesize(0)) {
 		goto abort;
 	}
+
+	local_resources = work_queue_resources_create();
+	local_resources_last = work_queue_resources_create();
+	work_queue_resources_measure(local_resources,workspace);
+
+	if(manual_cores_option)  local_resources->cores.total  = manual_cores_option;
+	if(manual_disk_option)   local_resources->disk.total   = manual_disk_option;
+	if(manual_memory_option) local_resources->memory.total = manual_memory_option;
+
+	debug(D_WQ,"local resources:");
+	work_queue_resources_debug(local_resources);
+
+	printf("work_queue_worker: %d cores, %d MB memory, %d MB disk available\n",
+	       local_resources->cores.total,
+	       local_resources->memory.total,
+	       local_resources->disk.total);
 
 	while(!abort_flag) {
 		if((master = connect_master(time(0) + idle_timeout)) == NULL) {

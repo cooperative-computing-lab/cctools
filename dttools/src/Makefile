@@ -80,6 +80,7 @@ SOURCES = auth.c  \
           username.c  \
           work_queue.c  \
           work_queue_catalog.c  \
+          work_queue_resources.c  \
           xxmalloc.c
 
 EXTRA_HEADERS = batch_job_internal.h \

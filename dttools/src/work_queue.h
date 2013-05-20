@@ -46,9 +46,6 @@ See the file COPYING for details.
 #define WORK_QUEUE_RESET_ALL        0  /**< When resetting, clear out all tasks and files */
 #define WORK_QUEUE_RESET_KEEP_TASKS 1  /**< When resetting, keep the current list of tasks */
 
-#define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
-#define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
-
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
 
@@ -83,6 +80,10 @@ struct work_queue_task {
 	INT64_T total_bytes_transferred;/**< Number of bytes transferred since task has last started transferring input data. */
 	timestamp_t total_transfer_time;    /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
 	timestamp_t cmd_execution_time;	   /**< Time spent in microseconds for executing the command on the worker. */
+
+	int memory;
+	int disk;
+	int cores;
 };
 
 /** Statistics describing a work queue. */
@@ -122,10 +123,18 @@ struct work_queue_stats {
 /** Create a new task object.
 Once created and elaborated with functions such as @ref work_queue_task_specify_file
 and @ref work_queue_task_specify_buffer, the task should be passed to @ref work_queue_submit.
-@param full_command The shell command line to be executed by the task.
+@param full_command The shell command line to be executed by the task.  If null,
+the command will be given later by @ref work_queue_task_specify_command
 @return A new task object.
 */
 struct work_queue_task *work_queue_task_create(const char *full_command);
+
+/** Indicate the command to be executed.
+@param t A task object.
+@param cmd The command to be executed.  This string will be duplicated by this call, so the argument may be freed or re-used afterward.
+*/
+
+void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd );
 
 /** Add a file to a task.
 @param t A task object.
@@ -169,19 +178,26 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 */
 int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags);
 
-/** Add a file created or handled by an arbitrary command to a task (eg: wget, ftp, chirp_get|put).
+/** Specify the amount of memory required by a task.
 @param t A task object.
-@param remote_name The name of the file at the execution site.
-@param cmd The command to run on the remote node to retrieve or store the file.
-@param type Must be one of the following values:
-- @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
-- @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
-@param flags	May be zero to indicate no special handling or any of the following or'd together:
-- @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
-- @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
-@return 1 if the task command file is successfully specified, 0 if either of @a t, @a cmd, or @a remote_name is null or @a remote_name is an absolute path.
+@param memory The amount of memory required by the task, in megabytes.
 */
-int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags);
+
+void work_queue_task_specify_memory( struct work_queue_task *t, int memory );
+
+/** Specify the amount of disk space required by a task.
+@param t A task object.
+@param disk The amount of disk space required by the task, in megabytes.
+*/
+
+void work_queue_task_specify_disk( struct work_queue_task *t, int disk );
+
+/** Specify the number of cores required by a task.
+@param t A task object.
+@param cores The number of cores required by the task.
+*/
+
+void work_queue_task_specify_cores( struct work_queue_task *t, int cores );
 
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the work queue, but is provided for the user's convenience
@@ -236,7 +252,7 @@ struct work_queue *work_queue_create(int port);
 It generates the log file indicated by monitor_summary_file with all the
 summaries of the resources used by each task.
 @param q A work queue object.
-@param monitor_summary_file The filename of the log (If NULL, it defaults to wq-<pid>-resource-usage).
+@param monitor_summary_file The filename of the log (If NULL, it defaults to wq-pid-resource-usage).
 @return 1 on success, 0 if monitoring was not enabled.
 */
 int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_file);
@@ -366,14 +382,6 @@ void work_queue_specify_priority(struct work_queue *q, int priority);
 */
 void work_queue_specify_estimate_capacity_on(struct work_queue *q, int estimate_capacity_on);
 
-/** Specify the master mode for a given queue. 
-@param q A work queue object.
-@param mode 
-- @ref WORK_QUEUE_MASTER_MODE_STANDALONE - standalone mode. In this mode the master would not report its information to a catalog server; 
-- @ref WORK_QUEUE_MASTER_MODE_CATALOG - catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
-*/
-void work_queue_specify_master_mode(struct work_queue *q, int mode);
-
 /** Specify the catalog server the master should report to.
 @param q A work queue object.
 @param hostname The catalog server's hostname.
@@ -452,6 +460,17 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout);
 /** @name Functions - Deprecated */
 
 //@{
+
+#define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
+#define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
+
+/** Specify the master mode for a given queue. 
+@param q A work queue object.
+@param mode 
+- @ref WORK_QUEUE_MASTER_MODE_STANDALONE - standalone mode. In this mode the master would not report its information to a catalog server; 
+- @ref WORK_QUEUE_MASTER_MODE_CATALOG - catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
+*/
+void work_queue_specify_master_mode(struct work_queue *q, int mode);
 
 /** Add an input buffer to a task.
 @param t The task to which to add parameters
