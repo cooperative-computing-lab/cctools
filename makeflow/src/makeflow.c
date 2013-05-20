@@ -48,7 +48,7 @@ See the file COPYING for details.
 
 #define SHOW_INPUT_FILES 2
 #define SHOW_OUTPUT_FILES 3
-#define SHOW_MAKEFLOW_ANALYSIS 4 
+#define SHOW_MAKEFLOW_ANALYSIS 4
 #define RANDOM_PORT_RETRY_TIME 300
 
 #define MAKEFLOW_AUTO_WIDTH 1
@@ -57,9 +57,9 @@ See the file COPYING for details.
 #define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
 #define MAKEFLOW_GC_MIN_THRESHOLD 1
 
-#define MAKEFLOW_TASK_CATEGORY "MAKEFLOW_TASK_CATEGORY"  /* The value of this variable in the Makeflow
-							    file indicates the task category of the
-							    rules to follow */ 
+#define MAKEFLOW_TASK_CATEGORY "MAKEFLOW_TASK_CATEGORY"	/* The value of this variable in the Makeflow
+							   file indicates the task category of the
+							   rules to follow */
 
 #define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 
@@ -73,6 +73,10 @@ See the file COPYING for details.
 #define LONG_OPT_MONITOR_LOG_DIR  ('z' + 3)
 #define LONG_OPT_PASSWORD         ('z' + 4)
 #define LONG_OPT_MONITOR_LIMITS   ('z' + 5)
+#define LONG_OPT_PPM_ROW          ('z' + 6)
+#define LONG_OPT_PPM_FILE         ('z' + 7)
+#define LONG_OPT_PPM_EXE          ('z' + 8)
+#define LONG_OPT_PPM_LEVELS       ('z' + 9)
 
 typedef enum {
 	DAG_GC_NONE,
@@ -105,12 +109,12 @@ static const char *port_file = NULL;
 static int output_len_check = 0;
 
 static char *makeflow_exe = NULL;
-static char *monitor_exe  = NULL;
+static char *monitor_exe = NULL;
 
 static char *monitor_limits_name = NULL;
-static int   monitor_interval = 1;                               // in seconds  
-static char *monitor_log_format=NULL;
-static char *monitor_log_dir=NULL;
+static int monitor_interval = 1;	// in seconds  
+static char *monitor_log_format = NULL;
+static char *monitor_log_dir = NULL;
 
 static char *wq_password = 0;
 
@@ -119,7 +123,7 @@ int dag_width_uniform_task(struct dag *d);
 int dag_width_guaranteed_max(struct dag *d);
 int dag_width(struct dag *d, int nested_jobs);
 void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info);
-int dag_check (struct dag *d);
+int dag_check(struct dag *d);
 int dag_check_dependencies(struct dag *d);
 
 void dag_gc_ref_incr(struct dag *d, const char *file, int increment);
@@ -127,7 +131,7 @@ void dag_gc_ref_count(struct dag *d, const char *file);
 void dag_export_variables(struct dag *d, struct dag_node *n);
 
 char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n);
-int dag_parse(struct dag *d, FILE *dag_stream, int monitor_mode);
+int dag_parse(struct dag *d, FILE * dag_stream, int monitor_mode);
 int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line);
 int dag_parse_node(struct lexer_book *bk, char *line);
 int dag_parse_node_filelist(struct lexer_book *bk, struct dag_node *n, char *filelist, int source);
@@ -157,7 +161,7 @@ int dag_width_guaranteed_max(struct dag *d)
 		m = 0;
 		// for each source file, see if it is a target file of another node
 		list_first_item(n->source_files);
-		while( (f = list_next_item(n->source_files)) ) {
+		while((f = list_next_item(n->source_files))) {
 			// get the node (tmp) that outputs current source file
 			tmp = f->target_of;
 			// if a source file is also a target file
@@ -201,7 +205,7 @@ int dag_depth(struct dag *d)
 	for(n = d->nodes; n != NULL; n = n->next) {
 		n->level = 0;
 		list_first_item(n->source_files);
-		while ( (f = list_next_item(n->source_files)) ) {
+		while((f = list_next_item(n->source_files))) {
 			if((parent = f->target_of) != NULL) {
 				n->level = -1;
 				list_push_tail(level_unsolved_nodes, n);
@@ -213,7 +217,7 @@ int dag_depth(struct dag *d)
 	int max_level = 0;
 	while((n = (struct dag_node *) list_pop_head(level_unsolved_nodes)) != NULL) {
 		list_first_item(n->source_files);
-		while( (f = list_next_item(n->source_files)) ) {
+		while((f = list_next_item(n->source_files))) {
 			if((parent = f->target_of) != NULL) {
 				if(parent->level == -1) {
 					n->level = -1;
@@ -223,13 +227,13 @@ int dag_depth(struct dag *d)
 					int tmp_level = parent->level + 1;
 					n->level = n->level > tmp_level ? n->level : tmp_level;
 					max_level = n->level > max_level ? n->level : max_level;
-				}	
+				}
 			}
 		}
 	}
 	list_delete(level_unsolved_nodes);
-	
-	return max_level+1;
+
+	return max_level + 1;
 }
 
 /** 
@@ -271,7 +275,8 @@ int dag_width_uniform_task(struct dag *d)
 	return max;
 }
 
-void dag_show_analysis(struct dag *d) {
+void dag_show_analysis(struct dag *d)
+{
 	printf("num_of_tasks\t%d\n", itable_size(d->node_table));
 	printf("depth\t%d\n", dag_depth(d));
 	printf("width_uniform_task\t%d\n", dag_width_uniform_task(d));
@@ -280,19 +285,19 @@ void dag_show_analysis(struct dag *d) {
 
 void dag_show_input_files(struct dag *d)
 {
-	struct dag_file *f;	
+	struct dag_file *f;
 	struct list *il;
 
 	il = dag_input_files(d);
 	list_first_item(il);
-	while( (f = list_next_item(il)) )
+	while((f = list_next_item(il)))
 		printf("%s\n", f->filename);
 
 	list_delete(il);
 }
 
 
-void collect_input_files(struct dag *d, char* bundle_dir, char *(*rename)(struct dag_node *d, const char *filename))
+void collect_input_files(struct dag *d, char *bundle_dir, char *(*rename) (struct dag_node * d, const char *filename))
 {
 	char file_destination[PATH_MAX];
 	char *new_name;
@@ -306,79 +311,77 @@ void collect_input_files(struct dag *d, char* bundle_dir, char *(*rename)(struct
 		rename = dag_node_translate_filename;
 
 	list_first_item(il);
-	while( (f = list_next_item(il)) ) {
+	while((f = list_next_item(il))) {
 		new_name = rename(NULL, f->filename);
 		sprintf(file_destination, "%s/%s", bundle_dir, new_name);
 		copy_file_to_file(f->filename, file_destination);
 		free(new_name);
 	}
 
-	list_delete(il);	
+	list_delete(il);
 }
 
 /* When a collision is detected (a file with an absolute path has the same base name as a relative file) a
  * counter is appended to the filename and the name translation is retried */
-char* bundler_translate_name(const char *filename, int collision_counter)
+char *bundler_translate_name(const char *filename, int collision_counter)
 {
 	static struct hash_table *previous_names = NULL;
 	static struct hash_table *reverse_names = NULL;
-	if ( !previous_names )
+	if(!previous_names)
 		previous_names = hash_table_create(0, NULL);
-	if ( !reverse_names )
+	if(!reverse_names)
 		reverse_names = hash_table_create(0, NULL);
 
-	if (collision_counter)
+	if(collision_counter)
 		filename = string_format("%s%d", filename, collision_counter);
 
 	const char *new_filename;
 	new_filename = hash_table_lookup(previous_names, filename);
-	if ( new_filename )
+	if(new_filename)
 		return xxstrdup(new_filename);
 
 	new_filename = hash_table_lookup(reverse_names, filename);
-	if ( new_filename ){
+	if(new_filename) {
 		collision_counter++;
 		return bundler_translate_name(filename, collision_counter);
 	}
-	if (filename[0] == '/'){
+	if(filename[0] == '/') {
 		new_filename = string_basename(filename);
-		if(hash_table_lookup(previous_names, new_filename)){
+		if(hash_table_lookup(previous_names, new_filename)) {
 			collision_counter++;
 			return bundler_translate_name(filename, collision_counter);
-		}
-		else if(hash_table_lookup(reverse_names, new_filename)){
+		} else if(hash_table_lookup(reverse_names, new_filename)) {
 			collision_counter++;
 			return bundler_translate_name(filename, collision_counter);
-		}
-		else {
+		} else {
 			hash_table_insert(reverse_names, new_filename, filename);
 			hash_table_insert(previous_names, filename, new_filename);
 			return strdup(new_filename);
 		}
-	}
-	else {
+	} else {
 		hash_table_insert(previous_names, filename, filename);
 		hash_table_insert(reverse_names, filename, filename);
 		return xxstrdup(filename);
 	}
 }
 
-char* bundler_rename(struct dag_node *n, const char *filename){
+char *bundler_rename(struct dag_node *n, const char *filename)
+{
 
-	if (n) {
+	if(n) {
 		struct list *input_files = dag_input_files(n->d);
-		if(list_find(input_files, (int (*) (void *, const void *)) string_equal, (void*)filename)){
+		if(list_find(input_files, (int (*)(void *, const void *)) string_equal, (void *) filename)) {
 			list_free(input_files);
 			return xxstrdup(filename);
 		}
 	}
-	return bundler_translate_name(filename, 0); /* no collisions yet -> 0 */
+	return bundler_translate_name(filename, 0);	/* no collisions yet -> 0 */
 }
 
 void dag_show_output_files(struct dag *d)
 {
 	struct dag_file *f;
-	char            *filename;
+	char *filename;
 
 	hash_table_firstkey(d->file_table);
 	while(hash_table_nextkey(d->file_table, &filename, (void **) &f)) {
@@ -399,9 +402,9 @@ int dag_width(struct dag *d, int nested_jobs)
 	   determine leaves by adding nodes with children==0 to list. */
 
 	for(n = d->nodes; n != NULL; n = n->next) {
-		n->level = 0; // initialize 'level' value to 0 because other functions might have modified this value.
+		n->level = 0;	// initialize 'level' value to 0 because other functions might have modified this value.
 		list_first_item(n->source_files);
-		while( (f = list_next_item(n->source_files)) ) {
+		while((f = list_next_item(n->source_files))) {
 			parent = f->target_of;
 			if(parent)
 				parent->children++;
@@ -429,7 +432,7 @@ int dag_width(struct dag *d, int nested_jobs)
 		struct dag_node *n = (struct dag_node *) list_pop_head(leaves);
 
 		list_first_item(n->source_files);
-		while ( (f = list_next_item(n->source_files)) ) {
+		while((f = list_next_item(n->source_files))) {
 			parent = f->target_of;
 			if(!parent)
 				continue;
@@ -457,7 +460,7 @@ int dag_width(struct dag *d, int nested_jobs)
 	memset(level_count, 0, level_count_size);
 
 	for(n = d->nodes; n != NULL; n = n->next) {
-		if (nested_jobs && !n->nested_job)
+		if(nested_jobs && !n->nested_job)
 			continue;
 		level_count[n->level]++;
 	}
@@ -509,7 +512,7 @@ void file_clean(const char *filename, int silent)
 		} else if(errno == EISDIR) {
 			if(delete_dir(filename) != 0) {
 				if(!silent)
-					fprintf(stderr,"couldn't delete directory %s: %s\n", filename, strerror(errno));
+					fprintf(stderr, "couldn't delete directory %s: %s\n", filename, strerror(errno));
 			} else {
 				if(!silent)
 					printf("deleted directory %s\n", filename);
@@ -525,7 +528,7 @@ void dag_node_clean(struct dag *d, struct dag_node *n)
 {
 	struct dag_file *f;
 	list_first_item(n->target_files);
-	while( (f = list_next_item(n->target_files)) ) {
+	while((f = list_next_item(n->target_files))) {
 		file_clean(f->filename, 0);
 
 		/* Make sure to clobber the original file too if it exists */
@@ -601,8 +604,7 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	}
 	// Rerun if an input file has been updated since the last execution.
 	list_first_item(n->source_files);
-	while( (f = list_next_item(n->source_files)) )
-	{
+	while((f = list_next_item(n->source_files))) {
 		if(stat(f->filename, &filestat) >= 0) {
 			if(S_ISDIR(filestat.st_mode))
 				continue;
@@ -626,7 +628,7 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 
 	// Rerun if an output file is missing.
 	list_first_item(n->target_files);
-	while( (f = list_next_item(n->target_files)) ) {
+	while((f = list_next_item(n->target_files))) {
 		if(stat(f->filename, &filestat) < 0) {
 			/* If output file is missing, but node completed and file was garbage, then avoid rerunning. */
 			if(n->state == DAG_NODE_STATE_COMPLETE && hash_table_lookup(d->collect_table, f->filename)) {
@@ -676,12 +678,12 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 
 	// For each parent node, rerun it if input file was garbage collected
 	list_first_item(n->source_files);
-	while( (f1 = list_next_item(n->source_files)) ) {
+	while((f1 = list_next_item(n->source_files))) {
 		if(hash_table_lookup(d->collect_table, f1->filename) == NULL)
 			continue;
 
 		p = f1->target_of;
-		if (p) {
+		if(p) {
 			dag_node_force_rerun(rerun_table, d, p);
 			dag_gc_ref_incr(d, f1->filename, 1);
 		}
@@ -689,12 +691,12 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 
 	// For each child node, rerun it
 	list_first_item(n->target_files);
-	while( (f1 = list_next_item(n->target_files)) ) {
+	while((f1 = list_next_item(n->target_files))) {
 		for(p = d->nodes; p; p = p->next) {
 			child_node_found = 0;
 
 			list_first_item(p->source_files);
-			while( (f2 = list_next_item(n->source_files)) ) {
+			while((f2 = list_next_item(n->source_files))) {
 				if(!strcmp(f1->filename, f2->filename)) {
 					child_node_found = 1;
 					break;
@@ -764,12 +766,12 @@ void dag_log_recover(struct dag *d, const char *filename)
 			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->original_command);
 
 			/* Record the node category to the log */
-                        fprintf(d->logfile, "# CATEGORY\t%d\t%s\n", n->nodeid, n->category->label);
+			fprintf(d->logfile, "# CATEGORY\t%d\t%s\n", n->nodeid, n->category->label);
 
 			/* Record node parents to log */
 			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
 			list_first_item(n->source_files);
-			while( (f = list_next_item(n->source_files)) ) {
+			while((f = list_next_item(n->source_files))) {
 				p = f->target_of;
 				if(p)
 					fprintf(d->logfile, "\t%d", p->nodeid);
@@ -779,7 +781,7 @@ void dag_log_recover(struct dag *d, const char *filename)
 			/* Record node inputs to log */
 			fprintf(d->logfile, "# SOURCES\t%d", n->nodeid);
 			list_first_item(n->source_files);
-			while( (f = list_next_item(n->source_files)) ) {
+			while((f = list_next_item(n->source_files))) {
 				fprintf(d->logfile, "\t%s", f->filename);
 			}
 			fputc('\n', d->logfile);
@@ -787,7 +789,7 @@ void dag_log_recover(struct dag *d, const char *filename)
 			/* Record node outputs to log */
 			fprintf(d->logfile, "# TARGETS\t%d", n->nodeid);
 			list_first_item(n->target_files);
-			while( (f = list_next_item(n->target_files)) ) {
+			while((f = list_next_item(n->target_files))) {
 				fprintf(d->logfile, "\t%s", f->filename);
 			}
 			fputc('\n', d->logfile);
@@ -907,12 +909,10 @@ struct dag *dag_from_file(const char *filename, int monitor_mode)
 	dagfile = fopen(filename, "r");
 	if(dagfile == NULL)
 		debug(D_DEBUG, "makeflow: unable to open file %s: %s\n", filename, strerror(errno));
-	else
-	{	
+	else {
 		d = dag_create();
 		d->filename = xxstrdup(filename);
-		if(!dag_parse(d, dagfile, monitor_mode))
-		{
+		if(!dag_parse(d, dagfile, monitor_mode)) {
 			free(d);
 			d = NULL;
 		}
@@ -923,18 +923,18 @@ struct dag *dag_from_file(const char *filename, int monitor_mode)
 	return d;
 }
 
-int dag_parse(struct dag *d, FILE *dag_stream, int monitor_mode)
+int dag_parse(struct dag *d, FILE * dag_stream, int monitor_mode)
 {
 	char *line = NULL;
-	struct lexer_book *bk = calloc(1, sizeof(struct lexer_book)); //Taking advantage that calloc zeroes memory
+	struct lexer_book *bk = calloc(1, sizeof(struct lexer_book));	//Taking advantage that calloc zeroes memory
 
 	bk->d = d;
 	bk->stream = dag_stream;
 	bk->monitor_mode = monitor_mode;
 
 	while((line = dag_parse_readline(bk, NULL)) != NULL) {
-		
-		if (strlen(line) == 0  || line[0] == '#' ) {
+
+		if(strlen(line) == 0 || line[0] == '#') {
 			/* Skip blank lines and comments */
 			free(line);
 			continue;
@@ -962,11 +962,11 @@ int dag_parse(struct dag *d, FILE *dag_stream, int monitor_mode)
 		free(line);
 	}
 //ok:
-        dag_compile_ancestors(d);
+	dag_compile_ancestors(d);
 	free(bk);
 	return 1;
 
-failure:
+      failure:
 	free(line);
 	free(bk);
 	return 0;
@@ -985,7 +985,7 @@ void dag_prepare_gc(struct dag *d)
 	string_split_quotes(collect_list, &argc, &argv);
 	for(i = 0; i < argc; i++) {
 		/* Must initialize to non-zero for hash_table functions to work properly. */
-		hash_table_insert(d->collect_table, argv[i], (void *)MAKEFLOW_GC_MIN_THRESHOLD);
+		hash_table_insert(d->collect_table, argv[i], (void *) MAKEFLOW_GC_MIN_THRESHOLD);
 		debug(D_DEBUG, "Added %s to garbage collection list", argv[i]);
 	}
 	free(argv);
@@ -994,10 +994,9 @@ void dag_prepare_gc(struct dag *d)
 	 * detect when it is safe to remove a garbage file. */
 	struct dag_node *n;
 	struct dag_file *f;
-	for(n = d->nodes; n; n = n->next)
-	{
+	for(n = d->nodes; n; n = n->next) {
 		list_first_item(n->source_files);
-		while( (f = list_next_item(n->source_files)) ) 
+		while((f = list_next_item(n->source_files)))
 			dag_gc_ref_incr(d, f->filename, 1);
 	}
 }
@@ -1019,7 +1018,7 @@ void dag_prepare_nested_jobs(struct dag *d)
 			if(n->nested_job && (n->local_job || batch_queue_type == BATCH_QUEUE_TYPE_LOCAL)) {
 				char *command = xxmalloc(strlen(n->command) + 20);
 				sprintf(command, "%s -j %d", n->command, d->local_jobs_max / dag_nested_width);
-				free((char *)n->command);
+				free((char *) n->command);
 				n->command = command;
 			}
 		}
@@ -1029,7 +1028,7 @@ void dag_prepare_nested_jobs(struct dag *d)
 char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 {
 	struct dag *d = bk->d;
-	struct dag_lookup_set s = {d, n, NULL};
+	struct dag_lookup_set s = { d, n, NULL };
 	char *raw_line = get_line(bk->stream);
 
 	if(raw_line) {
@@ -1050,7 +1049,7 @@ char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 		/* Chop off comments
 		 * TODO: this will break if we use # in a string. */
 		char *hash = strrchr(raw_line, '#');
-		if (hash && hash != raw_line) {
+		if(hash && hash != raw_line) {
 			*hash = 0;
 		}
 
@@ -1062,11 +1061,11 @@ char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 
 		/* Expand backslash-escaped characters. */
 		/* NOTE: This function call is responsible for translating escape
-		character sequences such as \n, \t, etc. which are found in the
-		makeflow file into their ASCII character equivalents. Such escape
-		sequences are necessary for assigning values to variables which
-		contain multiple lines of text, since the entire assignment
-		statement must be contained on one line. */
+		   character sequences such as \n, \t, etc. which are found in the
+		   makeflow file into their ASCII character equivalents. Such escape
+		   sequences are necessary for assigning values to variables which
+		   contain multiple lines of text, since the entire assignment
+		   statement must be contained on one line. */
 		string_replace_backslash_codes(subst_line, subst_line);
 
 		return subst_line;
@@ -1079,8 +1078,7 @@ void dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *
 {
 	struct dag *d = bk->d;
 
-	if(strcmp(MAKEFLOW_TASK_CATEGORY, name) == 0)
-	{
+	if(strcmp(MAKEFLOW_TASK_CATEGORY, name) == 0) {
 		/* If we have never seen this label, then create
 		 * a new category, otherwise retrieve the category. */
 		struct dag_task_category *category = dag_task_category_lookup_or_create(d, value);
@@ -1089,16 +1087,14 @@ void dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *
 		 * the category of the node, but do not update
 		 * the global task_category. Else, update the
 		 * glogal task category. */
-		if(n)
-		{
+		if(n) {
 			/* Decrement the count from previous */
 			n->category->count--;
 			n->category = category;
 			n->category->count++;
 			debug(D_DEBUG, "Updating category '%s' for rule %d.\n", value, n->nodeid);
-		}
-		else
-			bk->category     = category;
+		} else
+			bk->category = category;
 
 
 	}
@@ -1108,7 +1104,7 @@ void dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *
 int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 {
 	struct dag *d = bk->d;
-	char *name  = line + (n ? 1 : 0); /* Node variables require offset of 1 */
+	char *name = line + (n ? 1 : 0);	/* Node variables require offset of 1 */
 	char *value = NULL;
 	char *equal = NULL;
 	int append = 0;
@@ -1116,15 +1112,15 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 	equal = strchr(line, '=');
 	if((value = strstr(line, "+=")) && value < equal) {
 		*value = 0;
-		value  = value + 2;
+		value = value + 2;
 		append = 1;
 	} else {
-		value  = equal;
+		value = equal;
 		*value = 0;
-		value  = value + 1;
+		value = value + 1;
 	}
 
-	name  = string_trim_spaces(name);
+	name = string_trim_spaces(name);
 	value = string_trim_spaces(value);
 	value = string_trim_quotes(value);
 
@@ -1133,7 +1129,7 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 		return 0;
 	}
 
-	struct dag_lookup_set s = {d, n, NULL};
+	struct dag_lookup_set s = { d, n, NULL };
 	char *old_value = (char *) dag_lookup(name, &s);
 	if(append && old_value) {
 		char *new_value = NULL;
@@ -1152,7 +1148,7 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 		hash_table_insert((n ? n->variables : d->variables), name, xxstrdup(value));
 	}
 
-        dag_parse_process_special_variable(bk, n, name, value);
+	dag_parse_process_special_variable(bk, n, name, value);
 
 	debug(D_DEBUG, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
 	return 1;
@@ -1172,7 +1168,7 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 	struct dag *d = bk->d;
 	char *line;
 	char *outputs = NULL;
-	char *inputs  = NULL;
+	char *inputs = NULL;
 	char *log_name;
 	struct dag_node *n;
 
@@ -1187,24 +1183,21 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 
 	/* BUG: We need a more general solution to wrapping nodes
 	 * while parsing. The monitor code should not be here. */
-	if(bk->monitor_mode)
-	{
+	if(bk->monitor_mode) {
 		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
 		debug(D_DEBUG, "adding monitor and %s{.summary,.series,.files} to rule %d.\n", log_name, n->nodeid);
-		line = string_format("%s.summary %s.series %s.files %s %s %s",log_name, log_name, log_name, line_org, monitor_exe, monitor_limits_name ? monitor_limits_name : "");
-	}
-	else
-	{
+		line = string_format("%s.summary %s.series %s.files %s %s %s", log_name, log_name, log_name, line_org, monitor_exe, monitor_limits_name ? monitor_limits_name : "");
+	} else {
 		line = xxstrdup(line_org);
 	}
 
 	outputs = line;
 
-	inputs  = strchr(line, ':');
+	inputs = strchr(line, ':');
 	*inputs = 0;
-	inputs  = inputs + 1;
+	inputs = inputs + 1;
 
-	inputs  = string_trim_spaces(inputs); 
+	inputs = string_trim_spaces(inputs);
 	outputs = string_trim_spaces(outputs);
 
 	dag_parse_node_filelist(bk, n, outputs, 0);
@@ -1252,17 +1245,17 @@ int dag_parse_node_filelist(struct lexer_book *bk, struct dag_node *n, char *fil
 	int i, argc;
 
 	string_split_quotes(filelist, &argc, &argv);
-	for (i = 0; i < argc; i++) {
+	for(i = 0; i < argc; i++) {
 		filename = argv[i];
-		newname  = NULL;
+		newname = NULL;
 		debug(D_DEBUG, "node %s file=%s", (source ? "input" : "output"), filename);
 
 		// remote renaming
 		if((newname = strstr(filename, "->"))) {
 			*newname = '\0';
-			newname+=2;
+			newname += 2;
 		}
-		
+
 		if(source)
 			dag_node_add_source_file(n, filename, newname);
 		else
@@ -1278,72 +1271,73 @@ int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, i
 	struct dag_file *f;
 	list_first_item(files);
 
-	while( (f = list_next_item(files)) ) {
+	while((f = list_next_item(files))) {
 		const char *remotename = dag_file_remote_name(n, f->filename);
 
-		switch(batch_queue_type) {
-			case BATCH_QUEUE_TYPE_CONDOR:
-				if(strchr(f->filename, '/') && !remotename) 
-					remotename = dag_node_add_remote_name(n, f->filename, NULL);
+		switch (batch_queue_type) {
+		case BATCH_QUEUE_TYPE_CONDOR:
+			if(strchr(f->filename, '/') && !remotename)
+				remotename = dag_node_add_remote_name(n, f->filename, NULL);
 
-				if(remotename) {
-					debug(D_DEBUG,"creating symlink \"./%s\" for file \"%s\"\n", remotename, f->filename);
-					if(symlink(f->filename, remotename) < 0) {
-						if(errno != EEXIST) {
-							fatal("makeflow: could not create symbolic link (%s)\n", strerror(errno));
-						} else {
-							int link_size = strlen(f->filename)+2;
-							char *link_contents = malloc(link_size);
-
-							link_size = readlink(remotename, link_contents, link_size);
-							if(!link_size || strncmp(f->filename, link_contents, link_size)) {
-								free(link_contents);
-								fatal("makeflow: symbolic link %s points to wrong file (\"%s\" instead of \"%s\")\n", remotename, link_contents, f->filename);
-							}
-							free(link_contents);
-						}
+			if(remotename) {
+				debug(D_DEBUG, "creating symlink \"./%s\" for file \"%s\"\n", remotename, f->filename);
+				if(symlink(f->filename, remotename) < 0) {
+					if(errno != EEXIST) {
+						fatal("makeflow: could not create symbolic link (%s)\n", strerror(errno));
 					} else {
-						list_push_tail(n->d->symlinks_created, (void *) remotename);
-					}
+						int link_size = strlen(f->filename) + 2;
+						char *link_contents = malloc(link_size);
 
-					/* Create symlink target  stub for output files, otherwise Condor will fail on write-back */
-					if(!source_flag && access(f->filename, R_OK) < 0) {
-						int fd = open(f->filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
-						if(fd < 0) {
-							fatal("makeflow: could not create symbolic link target (%s): %s\n", f->filename, strerror(errno));
+						link_size = readlink(remotename, link_contents, link_size);
+						if(!link_size || strncmp(f->filename, link_contents, link_size)) {
+							free(link_contents);
+							fatal("makeflow: symbolic link %s points to wrong file (\"%s\" instead of \"%s\")\n", remotename, link_contents, f->filename);
 						}
-						close(fd);
+						free(link_contents);
 					}
+				} else {
+					list_push_tail(n->d->symlinks_created, (void *) remotename);
 				}
-				break;
 
-			case BATCH_QUEUE_TYPE_WORK_QUEUE:
-
-				if(f->filename[0] == '/' && !remotename) {
-					/* Translate only explicit absolute paths for Work Queue tasks.*/
-					remotename = dag_node_add_remote_name(n, f->filename, NULL);
-					debug(D_DEBUG, "translating work queue absolute path (%s) -> (%s)", f->filename, remotename);
+				/* Create symlink target  stub for output files, otherwise Condor will fail on write-back */
+				if(!source_flag && access(f->filename, R_OK) < 0) {
+					int fd = open(f->filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
+					if(fd < 0) {
+						fatal("makeflow: could not create symbolic link target (%s): %s\n", f->filename, strerror(errno));
+					}
+					close(fd);
 				}
-				break;
+			}
+			break;
 
-			default:
-				if(remotename)
-					fprintf(stderr, "makeflow: automatic file renaming (%s->%s) only works with Condor or Work Queue drivers\n", f->filename, remotename);
-				break;
+		case BATCH_QUEUE_TYPE_WORK_QUEUE:
+
+			if(f->filename[0] == '/' && !remotename) {
+				/* Translate only explicit absolute paths for Work Queue tasks. */
+				remotename = dag_node_add_remote_name(n, f->filename, NULL);
+				debug(D_DEBUG, "translating work queue absolute path (%s) -> (%s)", f->filename, remotename);
+			}
+			break;
+
+		default:
+			if(remotename)
+				fprintf(stderr, "makeflow: automatic file renaming (%s->%s) only works with Condor or Work Queue drivers\n", f->filename, remotename);
+			break;
 
 		}
 	}
 	return 1;
 }
 
-int dag_prepare_for_batch_system(struct dag *d) {
+int dag_prepare_for_batch_system(struct dag *d)
+{
 
 	struct dag_node *n;
-	
+
 	for(n = d->nodes; n; n = n->next) {
-		if( !dag_prepare_for_batch_system_files(n, n->source_files, 1 /* source_flag */) )
+		if(!dag_prepare_for_batch_system_files(n, n->source_files, 1 /* source_flag */ ))
 			return 0;
-		if( !dag_prepare_for_batch_system_files(n, n->target_files, 0) )
+		if(!dag_prepare_for_batch_system_files(n, n->target_files, 0))
 			return 0;
 	}
 
@@ -1352,10 +1346,10 @@ int dag_prepare_for_batch_system(struct dag *d) {
 
 void dag_parse_node_set_command(struct lexer_book *bk, struct dag_node *n, char *command)
 {
-	struct dag_lookup_set s = {bk->d, n, NULL};
+	struct dag_lookup_set s = { bk->d, n, NULL };
 	char *local = dag_lookup("BATCH_LOCAL", &s);
 
-	if (local) {
+	if(local) {
 		if(string_istrue(local))
 			n->local_job = 1;
 		free(local);
@@ -1379,16 +1373,15 @@ int dag_parse_node_command(struct lexer_book *bk, struct dag_node *n, char *line
 		command += 6;
 	}
 
-        /* Is this node a recursive call to makeflow? */
+	/* Is this node a recursive call to makeflow? */
 	if(strncmp(command, "MAKEFLOW ", 9) == 0) {
 		return dag_parse_node_makeflow_command(bk, n, command + 9);
 	}
 
 	/* BUG: Monitor code should not be here! */
-	if(bk->monitor_mode)
-	{
+	if(bk->monitor_mode) {
 		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
-		command = resource_monitor_rewrite_command(command, log_name, monitor_limits_name, NULL, NULL, NULL); 
+		command = resource_monitor_rewrite_command(command, log_name, monitor_limits_name, NULL, NULL, NULL);
 	}
 
 	dag_parse_node_set_command(bk, n, command);
@@ -1421,23 +1414,23 @@ int dag_parse_node_makeflow_command(struct lexer_book *bk, struct dag_node *n, c
 
 	n->nested_job = 1;
 	string_split_quotes(line, &argc, &argv);
-	switch(argc) {
-		case 1:
-			n->makeflow_dag = xxstrdup(argv[0]);
-			n->makeflow_cwd = xxstrdup(".");
-			break;
-		case 2:
-			n->makeflow_dag = xxstrdup(argv[0]);
-			n->makeflow_cwd = xxstrdup(argv[1]);
-			break;
-		case 3:
-			n->makeflow_dag = xxstrdup(argv[0]);
-			n->makeflow_cwd = xxstrdup(argv[1]);
-			wrapper = argv[2];
-			break;
-		default:
-			dag_parse_error(bk, "node makeflow command");
-			goto failure;
+	switch (argc) {
+	case 1:
+		n->makeflow_dag = xxstrdup(argv[0]);
+		n->makeflow_cwd = xxstrdup(".");
+		break;
+	case 2:
+		n->makeflow_dag = xxstrdup(argv[0]);
+		n->makeflow_cwd = xxstrdup(argv[1]);
+		break;
+	case 3:
+		n->makeflow_dag = xxstrdup(argv[0]);
+		n->makeflow_cwd = xxstrdup(argv[1]);
+		wrapper = argv[2];
+		break;
+	default:
+		dag_parse_error(bk, "node makeflow command");
+		goto failure;
 	}
 
 	wrapper = wrapper ? wrapper : "";
@@ -1450,7 +1443,7 @@ int dag_parse_node_makeflow_command(struct lexer_book *bk, struct dag_node *n, c
 	free(argv);
 	free(command);
 	return 1;
-failure:
+      failure:
 	free(argv);
 	return 0;
 }
@@ -1477,16 +1470,12 @@ int dag_parse_export(struct lexer_book *bk, char *line)
 	string_split_quotes(end_export, &argc, &argv);
 	for(i = 0; i < argc; i++) {
 		equal = strchr(argv[i], '=');
-		if(equal)
-		{
-			if(!dag_parse_variable(bk, NULL, argv[i]))
-			{
+		if(equal) {
+			if(!dag_parse_variable(bk, NULL, argv[i])) {
 				return 0;
-			}
-			else
-			{
+			} else {
 				*equal = '\0';
-				setenv(argv[i], equal + 1, 1); //this shouldn't be here...
+				setenv(argv[i], equal + 1, 1);	//this shouldn't be here...
 			}
 		}
 		list_push_tail(bk->d->export_list, xxstrdup(argv[i]));
@@ -1499,7 +1488,7 @@ int dag_parse_export(struct lexer_book *bk, char *line)
 
 void dag_export_variables(struct dag *d, struct dag_node *n)
 {
-	struct dag_lookup_set s = {d, n, NULL};
+	struct dag_lookup_set s = { d, n, NULL };
 	char *key;
 
 	list_first_item(d->export_list);
@@ -1533,12 +1522,12 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	char *tmp;
 
 	list_first_item(n->source_files);
-	while( (f = list_next_item(n->source_files)) ) {
+	while((f = list_next_item(n->source_files))) {
 		remotename = dag_file_remote_name(n, f->filename);
 		if(!remotename)
 			remotename = f->filename;
 
-		switch(batch_queue_get_type(thequeue)) {
+		switch (batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
 			tmp = string_format("%s=%s,", f->filename, remotename);
 			break;
@@ -1557,12 +1546,12 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 	len = 0;
 	list_first_item(n->target_files);
-	while( (f = list_next_item(n->target_files)) ) {
+	while((f = list_next_item(n->target_files))) {
 		remotename = dag_file_remote_name(n, f->filename);
 		if(!remotename)
 			remotename = f->filename;
 
-		switch(batch_queue_get_type(thequeue)) {
+		switch (batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
 			tmp = string_format("%s=%s,", remotename, f->filename);
 			break;
@@ -1581,7 +1570,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
 	 * restore it after we submit. */
-	struct dag_lookup_set s = {d, n, NULL};
+	struct dag_lookup_set s = { d, n, NULL };
 	char *batch_submit_options = dag_lookup("BATCH_OPTIONS", &s);
 	char *old_batch_submit_options = NULL;
 
@@ -1604,10 +1593,10 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		if(n->jobid >= 0)
 			break;
 
-		fprintf(stderr,"couldn't submit batch job, still trying...\n");
+		fprintf(stderr, "couldn't submit batch job, still trying...\n");
 
 		if(time(0) > stoptime) {
-			fprintf(stderr,"unable to submit job after %d seconds!\n", dag_submit_timeout);
+			fprintf(stderr, "unable to submit job after %d seconds!\n", dag_submit_timeout);
 			break;
 		}
 
@@ -1618,7 +1607,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	}
 
 	/* Restore old batch job options. */
-	if (old_batch_submit_options) {
+	if(old_batch_submit_options) {
 		batch_queue_set_options(thequeue, old_batch_submit_options);
 		free(old_batch_submit_options);
 	}
@@ -1657,7 +1646,7 @@ int dag_node_ready(struct dag *d, struct dag_node *n)
 	}
 
 	list_first_item(n->source_files);
-	while( (f = list_next_item(n->source_files)) ) {
+	while((f = list_next_item(n->source_files))) {
 		if(hash_table_lookup(d->completed_files, f->filename)) {
 			continue;
 		} else {
@@ -1701,9 +1690,9 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 
 	if(info->exited_normally && info->exit_code == 0) {
 		list_first_item(n->target_files);
-		while( (f = list_next_item(n->target_files)) ) {
+		while((f = list_next_item(n->target_files))) {
 			if(access(f->filename, R_OK) != 0) {
-				fprintf(stderr,"%s did not create file %s\n", n->command, f->filename);
+				fprintf(stderr, "%s did not create file %s\n", n->command, f->filename);
 				job_failed = 1;
 			} else {
 				if(output_len_check) {
@@ -1718,9 +1707,9 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 		}
 	} else {
 		if(info->exited_normally) {
-			fprintf(stderr,"%s failed with exit code %d\n", n->command, info->exit_code);
+			fprintf(stderr, "%s failed with exit code %d\n", n->command, info->exit_code);
 		} else {
-			fprintf(stderr,"%s crashed with signal %d (%s)\n", n->command, info->exit_signal, strsignal(info->exit_signal));
+			fprintf(stderr, "%s crashed with signal %d (%s)\n", n->command, info->exit_signal, strsignal(info->exit_signal));
 		}
 		job_failed = 1;
 	}
@@ -1730,10 +1719,10 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 		if(dag_retry_flag || info->exit_code == 101) {
 			n->failure_count++;
 			if(n->failure_count > dag_retry_max) {
-				fprintf(stderr,"job %s failed too many times.\n", n->command);
+				fprintf(stderr, "job %s failed too many times.\n", n->command);
 				dag_failed_flag = 1;
 			} else {
-				fprintf(stderr,"will retry failed job %s\n", n->command);
+				fprintf(stderr, "will retry failed job %s\n", n->command);
 				dag_node_state_change(d, n, DAG_NODE_STATE_WAITING);
 			}
 		} else {
@@ -1742,16 +1731,16 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 	} else {
 		/* Record which target files have been generated by this node. */
 		list_first_item(n->target_files);
-		while( (f = list_next_item(n->target_files)) ) {
+		while((f = list_next_item(n->target_files))) {
 			hash_table_insert(d->completed_files, f->filename, f->filename);
 		}
 
 		/* Mark source files that have been used by this node and
 		 * perform collection if we are doing reference counting. */
 		list_first_item(n->source_files);
-		while( (f = list_next_item(n->source_files)) ) {
+		while((f = list_next_item(n->source_files))) {
 			dag_gc_ref_incr(d, f->filename, -1);
-			if (dag_gc_method == DAG_GC_REF_COUNT) {
+			if(dag_gc_method == DAG_GC_REF_COUNT) {
 				dag_gc_ref_count(d, f->filename);
 			}
 		}
@@ -1769,7 +1758,7 @@ int dag_check(struct dag *d)
 
 	for(n = d->nodes; n; n = n->next) {
 		list_first_item(n->source_files);
-		while( (f = list_next_item(n->source_files)) ) {
+		while((f = list_next_item(n->source_files))) {
 			if(hash_table_lookup(d->completed_files, f->filename)) {
 				continue;
 			}
@@ -1783,7 +1772,7 @@ int dag_check(struct dag *d)
 				continue;
 			}
 
-			if (!error){
+			if(!error) {
 				fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
 			}
 			error = 1;
@@ -1820,8 +1809,8 @@ void dag_gc_all(struct dag *d, int threshold, int maxfiles, time_t stoptime)
 	 * that are below or equal to the threshold. */
 	start_time = timestamp_get();
 	hash_table_firstkey(d->collect_table);
-	while(hash_table_nextkey(d->collect_table, &key, (void **)&value) && time(0) < stoptime && collected < maxfiles) {
-		if(value <= threshold && dag_gc_file(d, key, (int)value))
+	while(hash_table_nextkey(d->collect_table, &key, (void **) &value) && time(0) < stoptime && collected < maxfiles) {
+		if(value <= threshold && dag_gc_file(d, key, (int) value))
 			collected++;
 	}
 	stop_time = timestamp_get();
@@ -1844,17 +1833,17 @@ void dag_gc_all(struct dag *d, int threshold, int maxfiles, time_t stoptime)
 void dag_gc_ref_incr(struct dag *d, const char *file, int increment)
 {
 	/* Increment the garbage file by specified amount */
-	PTRINT_T ref_count = (PTRINT_T)hash_table_remove(d->collect_table, file);
+	PTRINT_T ref_count = (PTRINT_T) hash_table_remove(d->collect_table, file);
 	if(ref_count) {
 		ref_count = ref_count + increment;
-		hash_table_insert(d->collect_table, file, (void *)ref_count);
+		hash_table_insert(d->collect_table, file, (void *) ref_count);
 		debug(D_DEBUG, "Marked file %s references (%d)", file, ref_count - 1);
 	}
 }
 
 void dag_gc_ref_count(struct dag *d, const char *file)
 {
-	PTRINT_T ref_count = (PTRINT_T)hash_table_remove(d->collect_table, file);
+	PTRINT_T ref_count = (PTRINT_T) hash_table_remove(d->collect_table, file);
 	if(ref_count && ref_count <= MAKEFLOW_GC_MIN_THRESHOLD) {
 		timestamp_t start_time, stop_time;
 		start_time = timestamp_get();
@@ -1904,24 +1893,24 @@ void dag_gc(struct dag *d)
 {
 	char cwd[PATH_MAX];
 
-	switch(dag_gc_method) {
-		case DAG_GC_INCR_FILE:
-			debug(D_DEBUG, "Performing incremental file (%d) garbage collection", dag_gc_param);
-			dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, dag_gc_param, INT_MAX);
-			break;
-		case DAG_GC_INCR_TIME:
-			debug(D_DEBUG, "Performing incremental time (%d) garbage collection", dag_gc_param);
-			dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, INT_MAX, time(0) + dag_gc_param);
-			break;
-		case DAG_GC_ON_DEMAND:
-			getcwd(cwd, PATH_MAX);
-			if(directory_inode_count(cwd) >= dag_gc_param || directory_low_disk(cwd)) {
-				debug(D_DEBUG, "Performing on demand (%d) garbage collection", dag_gc_param);
-				dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, INT_MAX, INT_MAX);
-			}
-			break;
-		default:
-			break;
+	switch (dag_gc_method) {
+	case DAG_GC_INCR_FILE:
+		debug(D_DEBUG, "Performing incremental file (%d) garbage collection", dag_gc_param);
+		dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, dag_gc_param, INT_MAX);
+		break;
+	case DAG_GC_INCR_TIME:
+		debug(D_DEBUG, "Performing incremental time (%d) garbage collection", dag_gc_param);
+		dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, INT_MAX, time(0) + dag_gc_param);
+		break;
+	case DAG_GC_ON_DEMAND:
+		getcwd(cwd, PATH_MAX);
+		if(directory_inode_count(cwd) >= dag_gc_param || directory_low_disk(cwd)) {
+			debug(D_DEBUG, "Performing on demand (%d) garbage collection", dag_gc_param);
+			dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, INT_MAX, INT_MAX);
+		}
+		break;
+	default:
+		break;
 	}
 }
 
@@ -1974,7 +1963,7 @@ void dag_run(struct dag *d)
 		dag_gc_barrier--;
 		if(dag_gc_barrier == 0) {
 			dag_gc(d);
-			dag_gc_barrier = MAX(d->nodeid_counter*dag_gc_task_ratio, 1);
+			dag_gc_barrier = MAX(d->nodeid_counter * dag_gc_task_ratio, 1);
 		}
 	}
 
@@ -2002,16 +1991,11 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "Other options are:\n");
 	fprintf(stdout, " %-30s Advertise the master information to a catalog server.\n", "-a,--advertise");
 	fprintf(stdout, " %-30s Disable the check for AFS. (experts only.)\n", "-A,--disable-afs-check");
-	fprintf(stdout, " %-30s Create portable bundle of workflow in <directory>\n", "-b,--bundle-dir=<directory>");            
+	fprintf(stdout, " %-30s Create portable bundle of workflow in <directory>\n", "-b,--bundle-dir=<directory>");
 	fprintf(stdout, " %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog-server=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
-	fprintf(stdout, " %-30s Display the Makefile as a Dot graph. \n", "-D,--dot-graph=<opt>");
-	fprintf(stdout, " %-30s Additional options:\n", ""); 
-	fprintf(stdout, " %-40s c condense similar boxes\n", "");
-	fprintf(stdout, " %-40s s change the size of the boxes proportional to file size\n", "");
-	fprintf(stdout, " %-40s else type 'none' for full expansion\n", "");
-	fprintf(stdout, " %-30s Enable master capacity estimation in Work Queue.\n", "-E,--wq-estimate-capacity"); 
+	fprintf(stdout, " %-30s Enable master capacity estimation in Work Queue.\n", "-E,--wq-estimate-capacity");
 	fprintf(stdout, " %-30s Estimated master capacity may be viewed in the Work Queue log file.\n", "");
 	fprintf(stdout, " %-30s Write summary of workflow to this file upon success or failure.\n", "-f,--summary-log=<file>");
 	fprintf(stdout, " %-30s Work Queue fast abort multiplier.           (default is deactivated)\n", "-F,--wq-fast-abort=<#>");
@@ -2032,7 +2016,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
 	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-output=<file>");
 	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
-	fprintf(stdout, " %-30s Password file for authenticating workers.\n","   --password");
+	fprintf(stdout, " %-30s Password file for authenticating workers.\n", "   --password");
 	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--port=<port>", WORK_QUEUE_DEFAULT_PORT);
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", dag_retry_max);
@@ -2044,31 +2028,45 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
 	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--wq-random-port=<file>");
+	fprintf(stdout, "\n*Display Options:\n");
+	fprintf(stdout, " %-30s Display the Makefile as a Dot graph or a PPM completion graph.\n", "-D,--display=<opt>");
+	fprintf(stdout, " %-30s Where <opt> is:\n", "");
+	fprintf(stdout, " %-35s <no opt> Standard Dot graph\n", "");
+	fprintf(stdout, " %-35s c        Condense similar boxes\n", "");
+	fprintf(stdout, " %-35s s        Change the size of the boxes proportional to file size\n", "");
+	fprintf(stdout, " %-35s ppm      Display a completion graph in PPM format\n", "");
+	fprintf(stdout, " %-30s Highlight row <row> in completion grap\n", "--ppm-highlight-row=<row>");
+	fprintf(stdout, " %-30s Highlight node that creates file <file> in completion graph\n", "--ppm-highlight-file=<file>");
+	fprintf(stdout, " %-30s Highlight executable <exe> in completion grap\n", "--ppm-highlight-exe=<exe>");
+	fprintf(stdout, " %-30s Display different levels of depth in completion graph\n", "--ppm-show-levels");
 }
 
 
 
 
-static void summarize(FILE *file, FILE *email, const char *format, ...){
+static void summarize(FILE * file, FILE * email, const char *format, ...)
+{
 	va_list args;
-	if(file){
+	if(file) {
 		va_start(args, format);
 		vfprintf(file, format, args);
 		va_end(args);
 	}
-	if(email){
+	if(email) {
 		va_start(args, format);
 		vfprintf(email, format, args);
 		va_end(args);
 	}
 }
 
-static void create_summary(struct dag *d, const char *write_summary_to, const char *email_summary_to, timestamp_t runtime, timestamp_t time_completed, int argc, char *argv[], const char *dagfile){
+static void create_summary(struct dag *d, const char *write_summary_to, const char *email_summary_to, timestamp_t runtime, timestamp_t time_completed, int argc, char *argv[], const char *dagfile)
+{
 	char buffer[50];
 	FILE *summary_file = NULL;
 	FILE *summary_email = NULL;
-	if(write_summary_to) summary_file = fopen(write_summary_to, "w");
-	if(email_summary_to){
+	if(write_summary_to)
+		summary_file = fopen(write_summary_to, "w");
+	if(email_summary_to) {
 		summary_email = popen("sendmail -t", "w");
 		fprintf(summary_email, "To: %s\n", email_summary_to);
 		timestamp_fmt(buffer, 50, "%c", time_completed);
@@ -2076,20 +2074,24 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 	}
 
 	int i;
-	for(i=0; i<argc; i++) summarize(summary_file, summary_email, "%s ", argv[i]);
+	for(i = 0; i < argc; i++)
+		summarize(summary_file, summary_email, "%s ", argv[i]);
 	summarize(summary_file, summary_email, "\n");
 
-	if(dag_abort_flag)       summarize(summary_file, summary_email, "Workflow aborted:\t ");
-	else if(dag_failed_flag) summarize(summary_file, summary_email, "Workflow failed:\t ");
-	else                     summarize(summary_file, summary_email, "Workflow completed:\t ");
+	if(dag_abort_flag)
+		summarize(summary_file, summary_email, "Workflow aborted:\t ");
+	else if(dag_failed_flag)
+		summarize(summary_file, summary_email, "Workflow failed:\t ");
+	else
+		summarize(summary_file, summary_email, "Workflow completed:\t ");
 	timestamp_fmt(buffer, 50, "%c\n", time_completed);
 	summarize(summary_file, summary_email, "%s", buffer);
 
 	int seconds = runtime / 1000000;
-	int hours = seconds/3600;
-	int minutes = (seconds - hours*3600)/60;
-	seconds = seconds - hours*3600 - minutes*60;
-	summarize(summary_file, summary_email, "Total runtime:\t\t %d:%02d:%02d\n",hours, minutes, seconds);
+	int hours = seconds / 3600;
+	int minutes = (seconds - hours * 3600) / 60;
+	seconds = seconds - hours * 3600 - minutes * 60;
+	summarize(summary_file, summary_email, "Total runtime:\t\t %d:%02d:%02d\n", hours, minutes, seconds);
 
 	summarize(summary_file, summary_email, "Workflow file:\t\t %s\n", dagfile);
 
@@ -2097,7 +2099,7 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 	struct dag_file *f;
 	const char *fn;
 	struct stat st;
-	const char* size;
+	const char *size;
 	dag_node_state_t state;
 	struct list *output_files;
 	output_files = list_create();
@@ -2108,35 +2110,39 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 	int tasks_aborted = 0;
 	int tasks_unrun = 0;
 
-	for (n = d->nodes; n; n = n->next){
+	for(n = d->nodes; n; n = n->next) {
 		state = n->state;
-		if (state == DAG_NODE_STATE_FAILED && !list_find(failed_tasks, (int (*) (void *, const void *)) string_equal, (void*)fn))
-			list_push_tail(failed_tasks, (void*)n->command);
-		else if (state == DAG_NODE_STATE_ABORTED)
+		if(state == DAG_NODE_STATE_FAILED && !list_find(failed_tasks, (int (*)(void *, const void *)) string_equal, (void *) fn))
+			list_push_tail(failed_tasks, (void *) n->command);
+		else if(state == DAG_NODE_STATE_ABORTED)
 			tasks_aborted++;
-		else if (state == DAG_NODE_STATE_COMPLETE){
+		else if(state == DAG_NODE_STATE_COMPLETE) {
 			tasks_completed++;
 			list_first_item(n->source_files);
-			while((f = list_next_item(n->source_files)) ) {
+			while((f = list_next_item(n->source_files))) {
 				fn = f->filename;
-				if (!list_find(output_files, (int (*) (void *, const void*)) string_equal, (void*)fn)) list_push_tail(output_files, (void*)fn);
+				if(!list_find(output_files, (int (*)(void *, const void *)) string_equal, (void *) fn))
+					list_push_tail(output_files, (void *) fn);
 			}
-		}
-		else tasks_unrun++;
+		} else
+			tasks_unrun++;
 	}
-	
-	summarize(summary_file, summary_email, "Number of tasks:\t %d\n", total_tasks); 
+
+	summarize(summary_file, summary_email, "Number of tasks:\t %d\n", total_tasks);
 	summarize(summary_file, summary_email, "Completed tasks:\t %d/%d\n", tasks_completed, total_tasks);
-	if (tasks_aborted != 0) summarize(summary_file, summary_email, "Aborted tasks:\t %d/%d\n", tasks_aborted, total_tasks);
-	if (tasks_unrun != 0) summarize(summary_file, summary_email, "Tasks not run:\t\t %d/%d\n", tasks_unrun, total_tasks);
-	if (list_size(failed_tasks) > 0) summarize(summary_file, summary_email, "Failed tasks:\t\t %d/%d\n", list_size(failed_tasks),total_tasks);
-	for (list_first_item(failed_tasks); (fn = list_next_item(failed_tasks)) != NULL;)
+	if(tasks_aborted != 0)
+		summarize(summary_file, summary_email, "Aborted tasks:\t %d/%d\n", tasks_aborted, total_tasks);
+	if(tasks_unrun != 0)
+		summarize(summary_file, summary_email, "Tasks not run:\t\t %d/%d\n", tasks_unrun, total_tasks);
+	if(list_size(failed_tasks) > 0)
+		summarize(summary_file, summary_email, "Failed tasks:\t\t %d/%d\n", list_size(failed_tasks), total_tasks);
+	for(list_first_item(failed_tasks); (fn = list_next_item(failed_tasks)) != NULL;)
 		summarize(summary_file, summary_email, "\t%s\n", fn);
 
-	if (list_size(output_files) > 0){
+	if(list_size(output_files) > 0) {
 		summarize(summary_file, summary_email, "Output files:\n");
-		for (list_first_item(output_files); (fn = list_next_item(output_files)) != NULL;){
-			stat(fn,&st);
+		for(list_first_item(output_files); (fn = list_next_item(output_files)) != NULL;) {
+			stat(fn, &st);
 			size = string_metric(st.st_size, -1, NULL);
 			summarize(summary_file, summary_email, "\t%s\t%s\n", fn, size);
 		}
@@ -2147,11 +2153,11 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 	list_free(failed_tasks);
 	list_delete(failed_tasks);
 
-	if(write_summary_to){
+	if(write_summary_to) {
 		fprintf(stderr, "writing summary to %s.\n", write_summary_to);
 		fclose(summary_file);
 	}
-	if(email_summary_to){
+	if(email_summary_to) {
 		fprintf(stderr, "emailing summary to %s.\n", email_summary_to);
 		fclose(summary_email);
 	}
@@ -2159,7 +2165,7 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 
 int main(int argc, char *argv[])
 {
-	char c;
+	int c;
 	char *logfilename = NULL;
 	char *batchlogfilename = NULL;
 	char *bundle_directory = NULL;
@@ -2175,6 +2181,7 @@ int main(int argc, char *argv[])
 	int skip_afs_check = 0;
 	int preserve_symlinks = 0;
 	int ppm_mode = 0;
+	char *ppm_option = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	int work_queue_estimate_capacity_on = 0;
@@ -2215,51 +2222,54 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	struct option long_options[] =
-	{
-		{"debug",      required_argument, 0, 'd'},
-		{"help",       no_argument, 0, 'h'},
-		{"clean",      no_argument, 0, 'c'},
+	struct option long_options[] = {
+		{"debug", required_argument, 0, 'd'},
+		{"help", no_argument, 0, 'h'},
+		{"clean", no_argument, 0, 'c'},
 		{"batch-type", required_argument, 0, 'T'},
-		{"advertise",  no_argument, 0, 'a'},
+		{"advertise", no_argument, 0, 'a'},
 		{"disable-afs-check", no_argument, 0, 'A'},
-		{"bundle-dir",        required_argument, 0, 'b'},
-		{"batch-options",     required_argument, 0, 'B'},
-		{"catalog-server",    required_argument, 0, 'C'},
-		{"dot-graph",         required_argument, 0, 'D'},
-		{"wq-estimate-capacity", no_argument,   0, 'E'},
-		{"summary-log",       no_argument,   0, 'f'},
-		{"wq-fast-abort", required_argument,   0, 'F'},
-		{"analyze-exec",  no_argument, 0, 'i'},
-		{"show-input",    no_argument, 0, 'I'},
-		{"max-local",     required_argument, 0, 'j'},
-		{"max-remote",    required_argument, 0, 'J'},
-		{"syntax-check",  no_argument, 0, 'k'},
+		{"bundle-dir", required_argument, 0, 'b'},
+		{"batch-options", required_argument, 0, 'B'},
+		{"catalog-server", required_argument, 0, 'C'},
+		{"display-mode", required_argument, 0, 'D'},
+		{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
+		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
+		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
+		{"ppm-show-levels", no_argument, 0, LONG_OPT_PPM_LEVELS},
+		{"wq-estimate-capacity", no_argument, 0, 'E'},
+		{"summary-log", no_argument, 0, 'f'},
+		{"wq-fast-abort", required_argument, 0, 'F'},
+		{"analyze-exec", no_argument, 0, 'i'},
+		{"show-input", no_argument, 0, 'I'},
+		{"max-local", required_argument, 0, 'j'},
+		{"max-remote", required_argument, 0, 'J'},
+		{"syntax-check", no_argument, 0, 'k'},
 		{"preserve-links", no_argument, 0, 'K'},
-		{"makeflow-log",   required_argument, 0, 'l'},
-		{"batch-log",      required_argument, 0, 'L'},
-		{"email",          required_argument, 0, 'm'},
-		{"monitor",        no_argument,       0, 'M'},
+		{"makeflow-log", required_argument, 0, 'l'},
+		{"batch-log", required_argument, 0, 'L'},
+		{"email", required_argument, 0, 'm'},
+		{"monitor", no_argument, 0, 'M'},
 		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
 		{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
-		{"monitor-log-dir",  required_argument, 0, LONG_OPT_MONITOR_LOG_DIR},
-		{"monitor-limits",   required_argument, 0, LONG_OPT_MONITOR_LIMITS},
-		{"password", required_argument, 0, LONG_OPT_PASSWORD }, 
-		{"project-name",     required_argument, 0, 'N'},
-		{"debug-output",     required_argument, 0, 'o'},
-		{"show-output",     no_argument, 0, 'O'},
-		{"wq-port",          required_argument, 0, 'p'},
-		{"priority",         required_argument, 0, 'P'},
-		{"retry",            no_argument, 0, 'R'},
-		{"retry-count",      required_argument, 0, 'r'},
-		{"submission-timeout",    required_argument, 0, 'S'},
-		{"wq-keepalive-timeout",  required_argument, 0, 't'},
+		{"monitor-log-dir", required_argument, 0, LONG_OPT_MONITOR_LOG_DIR},
+		{"monitor-limits", required_argument, 0, LONG_OPT_MONITOR_LIMITS},
+		{"password", required_argument, 0, LONG_OPT_PASSWORD},
+		{"project-name", required_argument, 0, 'N'},
+		{"debug-output", required_argument, 0, 'o'},
+		{"show-output", no_argument, 0, 'O'},
+		{"wq-port", required_argument, 0, 'p'},
+		{"priority", required_argument, 0, 'P'},
+		{"retry", no_argument, 0, 'R'},
+		{"retry-count", required_argument, 0, 'r'},
+		{"submission-timeout", required_argument, 0, 'S'},
+		{"wq-keepalive-timeout", required_argument, 0, 't'},
 		{"wq-keepalive-interval", required_argument, 0, 'u'},
 		{"version", no_argument, 0, 'v'},
 		{"wq-schedule", required_argument, 0, 'W'},
 		{"zero-length-error", no_argument, 0, 'z'},
 		{"wq-random-port", required_argument, 0, 'Z'},
-		{0,0,0,0}
+		{0, 0, 0, 0}
 	};
 
 
@@ -2286,19 +2296,40 @@ int main(int argc, char *argv[])
 				exit(1);
 			}
 			setenv("CATALOG_HOST", catalog_host, 1);
-	
+
 			char *value = string_format("%d", catalog_port);
 			setenv("CATALOG_PORT", value, 1);
 			free(value);
-	
 			break;
 		case 'd':
 			debug_flags_set(optarg);
 			break;
 		case 'D':
-			if (strcasecmp(optarg, "c") == 0) condense_display = 1;
-			if (strcasecmp(optarg, "s") == 0) change_size = 1;
-			if (strcasecmp(optarg, "ppm") == 0) ppm_mode = 1;
+			if(strcasecmp(optarg, "c") == 0)
+				condense_display = 1;
+			if(strcasecmp(optarg, "s") == 0)
+				change_size = 1;
+			if(strcasecmp(optarg, "ppm") == 0)
+				ppm_mode = 1;
+			display_mode = 1;
+			break;
+		case LONG_OPT_PPM_EXE:
+			ppm_option = optarg;
+			ppm_mode = 2;
+			display_mode = 1;
+			break;
+		case LONG_OPT_PPM_FILE:
+			ppm_option = optarg;
+			ppm_mode = 3;
+			display_mode = 1;
+			break;
+		case LONG_OPT_PPM_ROW:
+			ppm_option = optarg;
+			ppm_mode = 4;
+			display_mode = 1;
+			break;
+		case LONG_OPT_PPM_LEVELS:
+			ppm_mode = 5;
 			display_mode = 1;
 			break;
 		case 'E':
@@ -2311,22 +2342,22 @@ int main(int argc, char *argv[])
 			wq_option_fast_abort_multiplier = atof(optarg);
 			break;
 		case 'g':
-			if (strcasecmp(optarg, "none") == 0) {
+			if(strcasecmp(optarg, "none") == 0) {
 				dag_gc_method = DAG_GC_NONE;
-			} else if (strcasecmp(optarg, "ref_count") == 0) {
+			} else if(strcasecmp(optarg, "ref_count") == 0) {
 				dag_gc_method = DAG_GC_REF_COUNT;
-			} else if (strcasecmp(optarg, "incr_file") == 0) {
+			} else if(strcasecmp(optarg, "incr_file") == 0) {
 				dag_gc_method = DAG_GC_INCR_FILE;
-				if (dag_gc_param < 0)
+				if(dag_gc_param < 0)
 					dag_gc_param = 16;	/* Try to collect at most 16 files. */
-			} else if (strcasecmp(optarg, "incr_time") == 0) {
+			} else if(strcasecmp(optarg, "incr_time") == 0) {
 				dag_gc_method = DAG_GC_INCR_TIME;
-				if (dag_gc_param < 0)
+				if(dag_gc_param < 0)
 					dag_gc_param = 5;	/* Timeout of 5. */
-			} else if (strcasecmp(optarg, "on_demand") == 0) {
+			} else if(strcasecmp(optarg, "on_demand") == 0) {
 				dag_gc_method = DAG_GC_ON_DEMAND;
-				if (dag_gc_param < 0)
-					dag_gc_param = 1 << 14; /* Inode threshold of 2^14. */
+				if(dag_gc_param < 0)
+					dag_gc_param = 1 << 14;	/* Inode threshold of 2^14. */
 			} else {
 				fprintf(stderr, "makeflow: invalid garbage collection method: %s\n", optarg);
 				exit(1);
@@ -2339,7 +2370,7 @@ int main(int argc, char *argv[])
 			show_help(argv[0]);
 			return 0;
 		case 'i':
-			display_mode = SHOW_MAKEFLOW_ANALYSIS;	
+			display_mode = SHOW_MAKEFLOW_ANALYSIS;
 			break;
 		case 'I':
 			display_mode = SHOW_INPUT_FILES;
@@ -2431,7 +2462,7 @@ int main(int argc, char *argv[])
 		case 'Z':
 			port_file = optarg;
 			port = 0;
-			port_set = 1; //WQ is going to set the port, so we continue as if already set.
+			port_set = 1;	//WQ is going to set the port, so we continue as if already set.
 			break;
 		case LONG_OPT_MONITOR_INTERVAL:
 			monitor_mode = 1;
@@ -2457,7 +2488,7 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_PASSWORD:
 			if(copy_file_to_buffer(optarg, &wq_password) < 0) {
-				fprintf(stderr,"makeflow: couldn't open %s: %s\n",optarg,strerror(errno));
+				fprintf(stderr, "makeflow: couldn't open %s: %s\n", optarg, strerror(errno));
 				return 1;
 			}
 			break;
@@ -2490,10 +2521,9 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
 			return 1;
 		}
-
-			// Use Work Queue default port in standalone mode when port is not
-			// specified with -p option. In Work Queue catalog mode, Work Queue
-			// would choose an arbitrary port when port is not explicitly specified.
+		// Use Work Queue default port in standalone mode when port is not
+		// specified with -p option. In Work Queue catalog mode, Work Queue
+		// would choose an arbitrary port when port is not explicitly specified.
 		if(!port_set && work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE) {
 			port_set = 1;
 			port = WORK_QUEUE_DEFAULT_PORT;
@@ -2538,7 +2568,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(monitor_mode) {
-		monitor_exe = resource_monitor_copy_to_wd( NULL );
+		monitor_exe = resource_monitor_copy_to_wd(NULL);
 
 		if(monitor_interval < 1)
 			monitor_interval = DEFAULT_MONITOR_INTERVAL;
@@ -2549,8 +2579,7 @@ int main(int argc, char *argv[])
 		/* If we did not get a directory to write the
 		 * logs, create one with the current date + time.
 		 * */
-		if(!monitor_log_dir)
-		{
+		if(!monitor_log_dir) {
 			time_t now = time(NULL);
 			struct tm *tm = localtime(&now);
 			monitor_log_dir = string_format("monitor-logs-%04d_%02d_%02d_%02d-%02d", 1900 + tm->tm_year, 1 + tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min);
@@ -2569,12 +2598,12 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-	if(bundle_directory){
+	if(bundle_directory) {
 		//Create Bundle!
 		fprintf(stderr, "Creating workflow bundle...\n");
 
 		struct stat s;
-		if(!stat(bundle_directory, &s)){
+		if(!stat(bundle_directory, &s)) {
 			fprintf(stderr, "Target directory, %s, already exists.\n", bundle_directory);
 			exit(1);
 		}
@@ -2663,11 +2692,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	dag_log_recover(d, logfilename);
+
 	if(display_mode) {
 		free(logfilename);
 		free(batchlogfilename);
-		if (ppm_mode) {
-			dag_to_ppm(d);
+		if(ppm_mode) {
+			dag_to_ppm(d, ppm_mode, ppm_option);
 		} else {
 			dag_to_dot(d, condense_display, change_size);
 		}
@@ -2714,7 +2745,8 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
-		if(wq_password) work_queue_specify_password(q,wq_password);
+		if(wq_password)
+			work_queue_specify_password(q, wq_password);
 		work_queue_specify_master_mode(q, work_queue_master_mode);
 		work_queue_specify_name(q, project);
 		work_queue_specify_priority(q, priority);
@@ -2739,7 +2771,6 @@ int main(int argc, char *argv[])
 	if(port > 0)
 		printf("listening for workers on port %d.\n", port);
 
-	dag_log_recover(d, logfilename);
 
 	signal(SIGINT, handle_abort);
 	signal(SIGQUIT, handle_abort);
@@ -2758,7 +2789,8 @@ int main(int argc, char *argv[])
 		clean_symlinks(d, 0);
 	}
 
-	if(write_summary_to || email_summary_to) create_summary(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile);
+	if(write_summary_to || email_summary_to)
+		create_summary(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile);
 	free(logfilename);
 	free(batchlogfilename);
 	free(write_summary_to);

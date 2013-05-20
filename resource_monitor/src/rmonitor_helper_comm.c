@@ -38,6 +38,9 @@ const char *str_msgtype(enum monitor_msg_type n)
 		case END:
 			return "end";
 			break;
+		case WAIT:
+			return "wait";
+			break;
 		case CHDIR:
 			return "chdir";
 			break;

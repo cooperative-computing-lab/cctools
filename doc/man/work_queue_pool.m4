@@ -52,7 +52,6 @@ OPTION_ITEM(-a)Enable auto mode. In this mode the workers would ask a catalog se
 OPTION_PAIR(-t, time)Abort after this amount of idle time.
 OPTION_PAIR(-C, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT 
 OPTION_PAIR(-N, project)Name of a preferred project. A worker can have multiple preferred projects.
-OPTION_ITEM(-s)Run as a shared worker. By default the workers would only work for preferred projects.
 OPTION_PAIR(-o, file)Send debugging to this file.
 OPTIONS_END
 

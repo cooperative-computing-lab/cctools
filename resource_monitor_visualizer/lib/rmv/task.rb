@@ -1,4 +1,4 @@
-require_relative '../rmv'
+require 'rmv'
 
 module RMV
   class Task
@@ -9,7 +9,7 @@ module RMV
     end
 
     def rule_id
-      summary_path.to_s.match(/log-rule-(\d+)-summary/)[1]
+      summary_path.basename.to_s.split('.')[0]
     end
 
     def executable_name
@@ -32,7 +32,7 @@ module RMV
       attr_reader :summary, :summary_path, :time_series_path
 
       def load_summary
-        Summary.new (YAML.load_file summary_path)
+        Summary.new(YAML.load_file summary_path)
       end
   end
 end
