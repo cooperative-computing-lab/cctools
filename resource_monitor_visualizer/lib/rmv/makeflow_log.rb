@@ -30,7 +30,7 @@ module RMV
           unless comment? line
             l = line.split(' ')
             time = scale_time(l[0]) - start
-            submitted = l[5..8].map{|a| a.to_i}.inject(:+)
+            submitted = l[5..8].map{|a| a.to_i}.inject(0){|sum, n| sum + n}
             running = l[5]
             complete = l[6]
             "#{time} #{submitted} #{running} #{complete}"
