@@ -59,7 +59,7 @@ const char *str_msgtype(enum monitor_msg_type n)
 	};
 }
 
-char *monitor_helper_locate(void)
+char *monitor_helper_locate(char *default_path)
 {
 	char *helper_path;
 
@@ -73,10 +73,12 @@ char *monitor_helper_locate(void)
 			return xxstrdup(helper_path);	
 	}
 
-	debug(D_RMON,"trying library at local directory.\n");
-	helper_path = string_format("./librmonitor_helper.so");
-	if(access(helper_path, R_OK|X_OK) == 0)	
-		return helper_path;	
+	if(default_path)
+	{
+		debug(D_RMON,"trying library at default path...\n");
+		if(access(default_path, R_OK|X_OK) == 0)	
+			return xxstrdup(default_path);
+	}
 
 	debug(D_RMON,"trying library at default location.\n");
 	free(helper_path);
@@ -196,10 +198,10 @@ int monitor_open_socket(int *fd, int *port)
 
  /* We use datagrams to send information to the monitor from the
   * great grandchildren processes */
-int monitor_helper_init(char *libpath_from_cmdline, int *fd)
+int monitor_helper_init(char *lib_default_path, int *fd)
 {
 	int  port;
-	char *helper_path = monitor_helper_locate();
+	char *helper_path = monitor_helper_locate(lib_default_path);
 	char helper_absolute[PATH_MAX + 1];
 	char *monitor_port;
 

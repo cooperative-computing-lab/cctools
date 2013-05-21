@@ -187,8 +187,9 @@ struct itable *wdirs_rc;        /* Counts how many process_info use a wdir_info.
 struct itable *filesys_rc;      /* Counts how many wdir_info use a filesys_info. */
 
 
-char *lib_helper_name = "librmonitor_helper.so";  /* Name of the helper library that is 
-                                                     automatically extracted */
+char *lib_helper_name = NULL;  /* Name of the helper library that is 
+                                                            automatically extracted */
+
 int lib_helper_extracted;       /* Boolean flag to indicate whether the bundled
                                    helper library was automatically extracted
                                    */ 
@@ -1548,8 +1549,9 @@ int monitor_check_limits(struct tree_info *tr)
 
 void write_helper_lib(void)
 {    
-    FILE *flib;
     uint64_t n;
+
+    lib_helper_name = xxstrdup("librmonitor_helper.so.XXXXXX");
 
     if(access(lib_helper_name, R_OK | X_OK) == 0)
     {
@@ -1557,14 +1559,13 @@ void write_helper_lib(void)
         return;
     }
 
-    flib = fopen(lib_helper_name, "w");
-    if(!flib)
+    int flib = mkstemp(lib_helper_name);
+    if(flib == -1)
         return;
 
     n = sizeof(lib_helper_data);
-
-    copy_buffer_to_stream(lib_helper_data, flib, n);
-    fclose(flib);
+    write(flib, lib_helper_data, n);
+    close(flib);
 
     chmod(lib_helper_name, 0777);
 
@@ -2007,7 +2008,7 @@ int main(int argc, char **argv) {
 
 #ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB
     write_helper_lib();
-    monitor_helper_init("./librmonitor_helper.so", &monitor_queue_fd);
+    monitor_helper_init(lib_helper_name, &monitor_queue_fd);
 #endif
 
 #if defined(CCTOOLS_OPSYS_FREEBSD)
