@@ -112,27 +112,27 @@ struct rmsummary *rmsummary_parse_file_single(char *filename)
 
 void rmsummary_print(FILE *stream, struct rmsummary *s)
 {
-	fprintf(stream, "%s:\t%s\n",  "command", s->command);
-	fprintf(stream, "%s:\t%lf\n", "start", s->start / 1000000e0);
-	fprintf(stream, "%s:\t%lf\n", "end",   s->end   / 1000000e0);
-	fprintf(stream, "%s:\t%s\n",  "exit_type", s->exit_type);
-	fprintf(stream, "%s:\t%" PRId64 "\n",  "exit_status", s->exit_status);
+	fprintf(stream, "%-30s%s\n",  "command:", s->command);
+	fprintf(stream, "%-30s%lf\n", "start:", s->start / 1000000e0);
+	fprintf(stream, "%-30s%lf\n", "end:",   s->end   / 1000000e0);
+	fprintf(stream, "%-30s%s\n",  "exit_type:", s->exit_type);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "exit_status:", s->exit_status);
 
 	if( strcmp(s->exit_type, "signal") == 0 )
-		fprintf(stream, "%s:\t%" PRId64 "\n",  "signal", s->signal);
+		fprintf(stream, "%-30s%" PRId64 "\n",  "signal:", s->signal);
 	else if( strcmp(s->exit_type, "limits") == 0 )
-		fprintf(stream, "%s:\t%s\n",  "limits_exceeded", s->limits_exceeded);
+		fprintf(stream, "%-30s%s\n",  "limits_exceeded:", s->limits_exceeded);
 
-	fprintf(stream, "%s:\t%lf\n", "wall_time", s->wall_time / 1000000e0);
-	fprintf(stream, "%s:\t%" PRId64 "\n",  "max_concurrent_processes", s->max_concurrent_processes);
-	fprintf(stream, "%s:\t%lf\n", "cpu_time", s->cpu_time / 1000000e0);
-	fprintf(stream, "%s:\t%" PRId64 "\n",  "virtual_memory", s->virtual_memory);
-	fprintf(stream, "%s:\t%" PRId64 "\n",  "resident_memory", s->resident_memory);
-	fprintf(stream, "%s:\t%" PRId64 "\n",  "swap_memory", s->swap_memory);
-	fprintf(stream, "%s:\t%" PRId64 "\n",  "bytes_read", s->bytes_read);
-	fprintf(stream, "%s:\t%" PRId64 "\n",  "bytes_written", s->bytes_written);
-	fprintf(stream, "%s:\t%" PRId64 "\n",  "workdir_number_files_dirs", s->workdir_number_files_dirs);
-	fprintf(stream, "%s:\t%" PRId64 "\n",  "workdir_footprint", s->workdir_footprint);
+	fprintf(stream, "%-30s%lf\n", "wall_time:", s->wall_time / 1000000e0);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "max_concurrent_processes:", s->max_concurrent_processes);
+	fprintf(stream, "%-30s%lf\n", "cpu_time:", s->cpu_time / 1000000e0);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "virtual_memory:", s->virtual_memory);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "resident_memory:", s->resident_memory);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "swap_memory:", s->swap_memory);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "bytes_read:", s->bytes_read);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "bytes_written:", s->bytes_written);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "workdir_number_files_dirs:", s->workdir_number_files_dirs);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "workdir_footprint:", s->workdir_footprint);
 }
 
 struct list *rmsummary_parse_file_multiple(char *filename)

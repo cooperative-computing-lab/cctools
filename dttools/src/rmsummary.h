@@ -54,5 +54,8 @@ struct rmsummary_field
 /**  Reads a single summary file from filename **/
 struct rmsummary *resource_monitor_parse_summary_file(char *filename);
 
+void rmsummary_print(FILE *stream, struct rmsummary *s);
+
+
 
 #endif

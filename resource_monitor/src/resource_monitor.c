@@ -614,82 +614,48 @@ void monitor_log_row(struct rmsummary *tr)
 
 }
 
-void report_zombie_status(void)
+void decode_zombie_status(struct rmsummary *summary, int wait_status)
 {
-	if( WIFEXITED(first_process_sigchild_status) )
+	if( WIFEXITED(wait_status) )
 	{
-		debug(D_DEBUG, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(first_process_sigchild_status));
-		fprintf(log_summary, "%-30s\tnormal\n", "exit_type:");
+		debug(D_DEBUG, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(wait_status));
+		summary->exit_type = xxstrdup("normal");
+		summary->exit_status = WEXITSTATUS(first_process_sigchild_status);
 	} 
-	else if ( WIFSIGNALED(first_process_sigchild_status) )
+	else if ( WIFSIGNALED(wait_status) || WIFSTOPPED(wait_status) )
 	{
-		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WTERMSIG(first_process_sigchild_status)) );
+		debug(D_DEBUG, "process %d terminated: %s.\n",
+		      first_process_pid,
+		      strsignal(WIFSIGNALED(wait_status) ? WTERMSIG(wait_status) : WSTOPSIG(wait_status)));
 
 		if(summary->limits_exceeded)
-		{
-			fprintf(log_summary, "%-30s\tlimit\n", "exit_type:");
-			fprintf(log_summary, "%-30s\t%s\n", "limits_exceeded:", summary->limits_exceeded);
-		}
+			summary->exit_type = xxstrdup("limits");
 		else
-		{
-			fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
-			fprintf(log_summary, "%-30s\t%d %s\n", "signal:", 
-				WTERMSIG(first_process_sigchild_status), 
-				strsignal(WTERMSIG(first_process_sigchild_status)));
-		}
-	} 
-	else if ( WIFSTOPPED(first_process_sigchild_status) )
-	{
-		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WSTOPSIG(first_process_sigchild_status)) );
-		fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
-		fprintf(log_summary, "%-30s\t%d %s\n", "signal:", 
-			WSTOPSIG(first_process_sigchild_status), 
-			strsignal(WSTOPSIG(first_process_sigchild_status)));
-	}
+			summary->exit_type = xxstrdup("signal");
 
-	fprintf(log_summary, "%-30s\t%d\n", "exit_status:", WEXITSTATUS(first_process_sigchild_status));
+		if(WIFSIGNALED(wait_status))
+			summary->signal    = WTERMSIG(wait_status);
+		else
+			summary->signal    = WSTOPSIG(wait_status);
+
+		summary->exit_status = -1;
+	} 
+
 }
 
 int monitor_final_summary()
 {
-	int status = 0;
+	decode_zombie_status(summary, first_process_sigchild_status);
 
-	if(summary->limits_exceeded)
-		status = -1;
+	summary->end       = usecs_since_epoch();
+	summary->wall_time = summary->end - summary->start;
+	
+	rmsummary_print(log_summary, summary);
 
-	/* BUG: end and wall_time should be computed in a final
-	 * summary, not here */
-	double final_time = usecs_since_epoch();
-	summary->wall_time = final_time - summary->start;
-
-	fprintf(log_summary, "%-30s\t%lf\n", "end:", final_time / ONE_SECOND);
-
-	report_zombie_status();
-
-	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", summary->max_concurrent_processes);
-
-	//Print time in seconds, rather than microseconds.
-	fprintf(log_summary, "%-30s\t%lf\n",         "wall_time:", ((double) summary->wall_time / ONE_SECOND));
-	fprintf(log_summary, "%-30s\t%lf\n",         "cpu_time:",  ((double) summary->cpu_time  / ONE_SECOND));
-
-	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "virtual_memory:", summary->virtual_memory);
-	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "resident_memory:", summary->resident_memory);
-	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "swap_memory:", summary->swap_memory);
-	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_read:", summary->bytes_read);
-	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_written:", summary->bytes_written);
-    
-	if(resources_flags->workdir_footprint)
-	{
-		fprintf(log_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", summary->workdir_number_files_dirs);
-
-		//Print the footprint in megabytes, rather than of bytes.
-		fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) summary->workdir_footprint/ONE_MEGABYTE));
-	}
-
-	if(status && !WEXITSTATUS(first_process_sigchild_status))
-		return status;
+	if(summary->limits_exceeded && summary->exit_status == 0)
+		return -1;
 	else
-		return WEXITSTATUS(first_process_sigchild_status);
+		return summary->exit_status;
 }
 
 void monitor_write_open_file(char *filename)
@@ -1142,9 +1108,6 @@ struct process_info *spawn_first_process(const char *cmd)
 {
     pid_t pid;
 
-    fprintf(log_summary, "command: %s\n", cmd);
-    fprintf(log_summary, "%-30s\t%lf\n", "start:", ((double) summary->start / ONE_SECOND));
-  
     pid = monitor_fork();
 
     monitor_summary_header();
@@ -1461,6 +1424,7 @@ int main(int argc, char **argv) {
     log_series  = open_log_file(series_path);
     log_opened  = open_log_file(opened_path);
 
+    summary->command = xxstrdup(cmd);
     summary->start = usecs_since_epoch();
 
     spawn_first_process(cmd);
