@@ -103,6 +103,7 @@ See the file COPYING for details.
  *
  */
 
+#include "cctools.h"
 #include "hash_table.h"
 #include "itable.h"
 #include "list.h"
@@ -1743,6 +1744,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "\nUse: %s [options] -- command-line-and-options\n\n", cmd);
     fprintf(stdout, "%-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
     fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
+    fprintf(stdout, "%-30s Show version string\n", "-v,--version");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Interval between observations, in microseconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
     fprintf(stdout, "\n");
@@ -1861,6 +1863,7 @@ int main(int argc, char **argv) {
 		    /* Regular Options */
 		    {"debug",      required_argument, 0, 'd'},
 		    {"help",       required_argument, 0, 'h'},
+		    {"version",    no_argument,       0, 'v'},
 		    {"interval",   required_argument, 0, 'i'},
 		    {"limits",     required_argument, 0, 'L'},
 		    {"limits-file",required_argument, 0, 'l'},
@@ -1881,12 +1884,19 @@ int main(int argc, char **argv) {
 		    {0, 0, 0, 0}
 	    };
 
-    while((c = getopt_long(argc, argv, "d:hi:L:l:o:", long_options, NULL)) >= 0)
+    while((c = getopt_long(argc, argv, "d:hvi:L:l:o:", long_options, NULL)) >= 0)
     {
 	    switch (c) {
             case 'd':
 		    debug_flags_set(optarg);
 		    break;
+            case 'h':
+		    show_help(argv[0]);
+		    return 0;
+		    break;
+	    case 'v':
+		    cctools_version_print(stdout, argv[0]);
+		    return 0;
             case 'i':
 		    interval = strtoll(optarg, NULL, 10);
 		    if(interval < 1)
@@ -1897,10 +1907,6 @@ int main(int argc, char **argv) {
 		    break;
             case 'L':
 		    parse_limits_string(optarg, tree_limits);
-		    break;
-            case 'h':
-		    show_help(argv[0]);
-		    return 0;
 		    break;
             case 'o':
 		    if(template_path)
