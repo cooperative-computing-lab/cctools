@@ -175,8 +175,6 @@ pid_t  first_process_pid;              /* pid of the process given at the comman
 pid_t  first_process_sigchild_status;  /* exit status flags of the process given at the command line */
 pid_t  first_process_already_waited = 0;  /* exit status flags of the process given at the command line */
 
-char  *over_limit_str = NULL;          /* string to report the limits exceeded */
-
 struct itable *processes;       /* Maps the pid of a process to a unique struct process_info. */
 struct hash_table *wdirs;       /* Maps paths to working directory structures. */
 struct itable *filesysms;       /* Maps st_dev ids (from stat syscall) to filesystem structures. */
@@ -204,7 +202,7 @@ char *resources[15] = { "wall_clock(seconds)",
                         "workdir_number_files_dirs", "workdir_footprint(MB)",
                         NULL };
 
-struct rmsummary *resources_max;
+struct rmsummary *summary;
 struct rmsummary *resources_limits;
 struct rmsummary *resources_flags;
 
@@ -227,7 +225,7 @@ uint64_t usecs_since_epoch()
 
 uint64_t usecs_since_launched()
 {
-	return (usecs_since_epoch() - resources_max->start);
+	return (usecs_since_epoch() - summary->start);
 }
 
 char *default_summary_name(char *template_path)
@@ -535,7 +533,7 @@ void monitor_summary_header()
 
 void monitor_collate_tree(struct rmsummary *tr, struct process_info *p, struct wdir_info *d, struct filesys_info *f)
 {
-    tr->wall_time                = usecs_since_epoch() - resources_max->start;
+    tr->wall_time                = usecs_since_epoch() - summary->start;
 
     tr->max_concurrent_processes = (int64_t) itable_size(processes);
     tr->cpu_time                 = p->cpu.delta + tr->cpu_time;
@@ -594,7 +592,7 @@ void monitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
 
 void monitor_log_row(struct rmsummary *tr)
 {
-    fprintf(log_series, "%" PRId64 "\t", tr->wall_time + resources_max->start);
+    fprintf(log_series, "%" PRId64 "\t", tr->wall_time + summary->start);
     fprintf(log_series, "%" PRId64 "\t", tr->max_concurrent_processes);
     fprintf(log_series, "%" PRId64 "\t", tr->cpu_time);
     fprintf(log_series, "%" PRId64 "\t", tr->virtual_memory);
@@ -627,10 +625,10 @@ void report_zombie_status(void)
 	{
 		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WTERMSIG(first_process_sigchild_status)) );
 
-		if(over_limit_str)
+		if(summary->limits_exceeded)
 		{
 			fprintf(log_summary, "%-30s\tlimit\n", "exit_type:");
-			fprintf(log_summary, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
+			fprintf(log_summary, "%-30s\t%s\n", "limits_exceeded:", summary->limits_exceeded);
 		}
 		else
 		{
@@ -656,36 +654,36 @@ int monitor_final_summary()
 {
 	int status = 0;
 
-	if(over_limit_str)
+	if(summary->limits_exceeded)
 		status = -1;
 
 	/* BUG: end and wall_time should be computed in a final
 	 * summary, not here */
 	double final_time = usecs_since_epoch();
-	resources_max->wall_time = final_time - resources_max->start;
+	summary->wall_time = final_time - summary->start;
 
 	fprintf(log_summary, "%-30s\t%lf\n", "end:", final_time / ONE_SECOND);
 
 	report_zombie_status();
 
-	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", resources_max->max_concurrent_processes);
+	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", summary->max_concurrent_processes);
 
 	//Print time in seconds, rather than microseconds.
-	fprintf(log_summary, "%-30s\t%lf\n",         "wall_time:", ((double) resources_max->wall_time / ONE_SECOND));
-	fprintf(log_summary, "%-30s\t%lf\n",         "cpu_time:",  ((double) resources_max->cpu_time  / ONE_SECOND));
+	fprintf(log_summary, "%-30s\t%lf\n",         "wall_time:", ((double) summary->wall_time / ONE_SECOND));
+	fprintf(log_summary, "%-30s\t%lf\n",         "cpu_time:",  ((double) summary->cpu_time  / ONE_SECOND));
 
-	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "virtual_memory:", resources_max->virtual_memory);
-	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "resident_memory:", resources_max->resident_memory);
-	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "swap_memory:", resources_max->swap_memory);
-	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_read:", resources_max->bytes_read);
-	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_written:", resources_max->bytes_written);
+	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "virtual_memory:", summary->virtual_memory);
+	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "resident_memory:", summary->resident_memory);
+	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "swap_memory:", summary->swap_memory);
+	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_read:", summary->bytes_read);
+	fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_written:", summary->bytes_written);
     
 	if(resources_flags->workdir_footprint)
 	{
-		fprintf(log_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", resources_max->workdir_number_files_dirs);
+		fprintf(log_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", summary->workdir_number_files_dirs);
 
 		//Print the footprint in megabytes, rather than of bytes.
-		fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) resources_max->workdir_footprint/ONE_MEGABYTE));
+		fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) summary->workdir_footprint/ONE_MEGABYTE));
 	}
 
 	if(status && !WEXITSTATUS(first_process_sigchild_status))
@@ -818,7 +816,7 @@ struct rmsummary *monitor_rusage_tree(void)
     }
 
     /* Here we add the maximum recorded + the io from memory maps */
-    tr_usg->bytes_read     =  resources_max->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
+    tr_usg->bytes_read     =  summary->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
 
     tr_usg->resident_memory = usg.ru_maxrss;
 
@@ -879,7 +877,7 @@ void monitor_check_child(const int signal)
 
     /* get the peak values from getrusage */
     struct rmsummary *tr_usg = monitor_rusage_tree();
-    monitor_find_max_tree(resources_max, tr_usg);
+    monitor_find_max_tree(summary, tr_usg);
     free(tr_usg);
 }
 
@@ -939,23 +937,23 @@ void monitor_final_cleanup(int signum)
 // The following keeps getting uglier and uglier! Rethink how to do it!
 //
 #define over_limit_check(tr, fld, mult, fmt)				\
-	if((tr)->fld > 0 && resources_limits->fld - (tr)->fld < 0)		\
+	if((tr)->fld > 0 && resources_limits->fld - (tr)->fld < 0)	\
 	{								\
 		char *tmp;						\
-		if(over_limit_str)					\
+		if((tr)->limits_exceeded)                               \
 		{							\
-			tmp = string_format("%s, " #fld " %" fmt " > %" fmt, over_limit_str, mult * (tr)->fld, mult * resources_limits->fld); \
-			free(over_limit_str);				\
-			over_limit_str = tmp;				\
+			tmp = string_format("%s, " #fld ": %" fmt, mult * resources_limits->fld); \
+			free((tr)->limits_exceeded);			\
+			(tr)->limits_exceeded = tmp;			\
 		}							\
 		else							\
-			over_limit_str = string_format(#fld " %" fmt " > %" fmt, mult * (tr)->fld, mult * resources_limits->fld); \
+			(tr)->limits_exceeded = string_format(#fld ": %" fmt, mult * resources_limits->fld); \
 	}
 
 /* return 0 means above limit, 1 means limist ok */
 int monitor_check_limits(struct rmsummary *tr)
 {
-    over_limit_str = NULL;
+    tr->limits_exceeded = NULL;
 
     over_limit_check(tr, wall_time, 1.0/ONE_SECOND, "lf");
     over_limit_check(tr, max_concurrent_processes, 1, PRId64);
@@ -968,7 +966,7 @@ int monitor_check_limits(struct rmsummary *tr)
     over_limit_check(tr, workdir_number_files_dirs, 1, PRId64);
     over_limit_check(tr, workdir_footprint, 1, PRId64);
 
-    if(over_limit_str)
+    if(tr->limits_exceeded)
         return 0;
     else
         return 1;
@@ -1030,8 +1028,8 @@ void monitor_dispatch_msg(void)
 	{
         case BRANCH:
 		monitor_track_process(msg.origin);
-		if(resources_max->max_concurrent_processes < itable_size(processes))
-			resources_max->max_concurrent_processes = itable_size(processes);
+		if(summary->max_concurrent_processes < itable_size(processes))
+			summary->max_concurrent_processes = itable_size(processes);
 		break;
         case WAIT:
 		p->waiting = 1;
@@ -1055,7 +1053,7 @@ void monitor_dispatch_msg(void)
 		break;
 	};
 
-	if(!monitor_check_limits(resources_max))
+	if(!monitor_check_limits(summary))
 		monitor_final_cleanup(SIGTERM);
 
 }
@@ -1145,7 +1143,7 @@ struct process_info *spawn_first_process(const char *cmd)
     pid_t pid;
 
     fprintf(log_summary, "command: %s\n", cmd);
-    fprintf(log_summary, "%-30s\t%lf\n", "start:", ((double) resources_max->start / ONE_SECOND));
+    fprintf(log_summary, "%-30s\t%lf\n", "start:", ((double) summary->start / ONE_SECOND));
   
     pid = monitor_fork();
 
@@ -1229,11 +1227,11 @@ int monitor_resources(long int interval /*in microseconds */)
 
         monitor_collate_tree(resources_now, p_acc, d_acc, f_acc);
 
-	monitor_find_max_tree(resources_max, resources_now);
+	monitor_find_max_tree(summary, resources_now);
 
         monitor_log_row(resources_now);
 
-        if(!monitor_check_limits(resources_now))
+        if(!monitor_check_limits(summary))
             monitor_final_cleanup(SIGTERM);
 
 	release_waiting_processes();
@@ -1282,7 +1280,7 @@ int main(int argc, char **argv) {
     signal(SIGQUIT, monitor_final_cleanup);
     signal(SIGTERM, monitor_final_cleanup);
 
-    resources_max    = calloc(1, sizeof(struct rmsummary));
+    summary    = calloc(1, sizeof(struct rmsummary));
     resources_limits = calloc(1, sizeof(struct rmsummary));
     resources_flags  = calloc(1, sizeof(struct rmsummary));
 
@@ -1463,7 +1461,7 @@ int main(int argc, char **argv) {
     log_series  = open_log_file(series_path);
     log_opened  = open_log_file(opened_path);
 
-    resources_max->start = usecs_since_epoch();
+    summary->start = usecs_since_epoch();
 
     spawn_first_process(cmd);
 

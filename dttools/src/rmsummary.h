@@ -27,15 +27,15 @@ struct rmsummary
 	int64_t  exit_status;
 
 	int64_t  wall_time;
-	int64_t max_concurrent_processes;
+	int64_t  max_concurrent_processes;
 	int64_t  cpu_time;
-	int64_t virtual_memory; 
-	int64_t resident_memory; 
-	int64_t swap_memory; 
-	int64_t bytes_read;
-	int64_t bytes_written;
-	int64_t workdir_number_files_dirs;
-	int64_t workdir_footprint;
+	int64_t  virtual_memory; 
+	int64_t  resident_memory; 
+	int64_t  swap_memory; 
+	int64_t  bytes_read;
+	int64_t  bytes_written;
+	int64_t  workdir_number_files_dirs;
+	int64_t  workdir_footprint;
 
 	int64_t  fs_nodes;
 };
