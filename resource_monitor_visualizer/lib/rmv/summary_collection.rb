@@ -10,7 +10,7 @@ module RMV
 
     def each
       paths.each do |p|
-        yield(Summary.from_file p)
+        yield(Summary.from_file(p))
       end
     end
 

@@ -103,6 +103,7 @@ See the file COPYING for details.
  *
  */
 
+#include "cctools.h"
 #include "hash_table.h"
 #include "itable.h"
 #include "list.h"
@@ -186,8 +187,9 @@ struct itable *wdirs_rc;        /* Counts how many process_info use a wdir_info.
 struct itable *filesys_rc;      /* Counts how many wdir_info use a filesys_info. */
 
 
-char *lib_helper_name = "librmonitor_helper.so";  /* Name of the helper library that is 
-                                                     automatically extracted */
+char *lib_helper_name = NULL;  /* Name of the helper library that is 
+                                                            automatically extracted */
+
 int lib_helper_extracted;       /* Boolean flag to indicate whether the bundled
                                    helper library was automatically extracted
                                    */ 
@@ -1547,8 +1549,9 @@ int monitor_check_limits(struct tree_info *tr)
 
 void write_helper_lib(void)
 {    
-    FILE *flib;
     uint64_t n;
+
+    lib_helper_name = xxstrdup("librmonitor_helper.so.XXXXXX");
 
     if(access(lib_helper_name, R_OK | X_OK) == 0)
     {
@@ -1556,14 +1559,13 @@ void write_helper_lib(void)
         return;
     }
 
-    flib = fopen(lib_helper_name, "w");
-    if(!flib)
+    int flib = mkstemp(lib_helper_name);
+    if(flib == -1)
         return;
 
     n = sizeof(lib_helper_data);
-
-    copy_buffer_to_stream(lib_helper_data, flib, n);
-    fclose(flib);
+    write(flib, lib_helper_data, n);
+    close(flib);
 
     chmod(lib_helper_name, 0777);
 
@@ -1743,6 +1745,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "\nUse: %s [options] -- command-line-and-options\n\n", cmd);
     fprintf(stdout, "%-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
     fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
+    fprintf(stdout, "%-30s Show version string\n", "-v,--version");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Interval between observations, in microseconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
     fprintf(stdout, "\n");
@@ -1861,6 +1864,7 @@ int main(int argc, char **argv) {
 		    /* Regular Options */
 		    {"debug",      required_argument, 0, 'd'},
 		    {"help",       required_argument, 0, 'h'},
+		    {"version",    no_argument,       0, 'v'},
 		    {"interval",   required_argument, 0, 'i'},
 		    {"limits",     required_argument, 0, 'L'},
 		    {"limits-file",required_argument, 0, 'l'},
@@ -1881,12 +1885,19 @@ int main(int argc, char **argv) {
 		    {0, 0, 0, 0}
 	    };
 
-    while((c = getopt_long(argc, argv, "d:hi:L:l:o:", long_options, NULL)) >= 0)
+    while((c = getopt_long(argc, argv, "d:hvi:L:l:o:", long_options, NULL)) >= 0)
     {
 	    switch (c) {
             case 'd':
 		    debug_flags_set(optarg);
 		    break;
+            case 'h':
+		    show_help(argv[0]);
+		    return 0;
+		    break;
+	    case 'v':
+		    cctools_version_print(stdout, argv[0]);
+		    return 0;
             case 'i':
 		    interval = strtoll(optarg, NULL, 10);
 		    if(interval < 1)
@@ -1897,10 +1908,6 @@ int main(int argc, char **argv) {
 		    break;
             case 'L':
 		    parse_limits_string(optarg, tree_limits);
-		    break;
-            case 'h':
-		    show_help(argv[0]);
-		    return 0;
 		    break;
             case 'o':
 		    if(template_path)
@@ -2001,7 +2008,7 @@ int main(int argc, char **argv) {
 
 #ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB
     write_helper_lib();
-    monitor_helper_init("./librmonitor_helper.so", &monitor_queue_fd);
+    monitor_helper_init(lib_helper_name, &monitor_queue_fd);
 #endif
 
 #if defined(CCTOOLS_OPSYS_FREEBSD)

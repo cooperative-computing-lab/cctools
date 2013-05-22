@@ -13,7 +13,7 @@ module RMV
       out_path = compute_resultant_path path
       content = set_paths content, out_path
       run_if_not_exist out_path do
-        out_path.open("w:UTF-8") { |f| f.puts content }
+        out_path.open("w") { |f| f.puts content }
       end
     end
 

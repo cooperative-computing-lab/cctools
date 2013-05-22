@@ -15,7 +15,7 @@ module RMV
       results = []
       @grouped_maximums.each_with_index do |g, i|
         write_maximum_values(g, i){|a,b| scale_maximum a, b}
-        results.concat(format_histograms sizes, i, groups[i])
+        results.concat(format_histograms(sizes, i, groups[i]))
       end
       results
     end
@@ -37,7 +37,8 @@ module RMV
       end
 
       def find_maximums group
-        max = Hash[ @resources.map {|r| [r,[]] }]
+        max = Hash.new
+        @resources.each { |r| max[r] = [] }
         tasks.each do |t|
           resources.each do |r|
             if group_heuristic(t) == group
@@ -61,7 +62,7 @@ module RMV
         base_path.mkpath
         maximum_list.each do |m|
           path = base_path + m.first.name.to_s
-          File.open(path, 'w:UTF-8') do |f|
+          File.open(path, 'w') do |f|
             m.last.each do |line|
               line = yield( m.first.name, line) if block_given?
               f.puts line
