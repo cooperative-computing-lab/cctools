@@ -27,7 +27,8 @@ struct rmsummary
 	int64_t  exit_status;
 
 	int64_t  wall_time;
-	int64_t  max_concurrent_processes;
+	int64_t  max_processes;
+	int64_t  num_processes;
 	int64_t  cpu_time;
 	int64_t  virtual_memory; 
 	int64_t  resident_memory; 

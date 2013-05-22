@@ -44,7 +44,8 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 	rmsummary_assign_as_string_field(s, key, value, limits_exceeded);
 	rmsummary_assign_as_int_field   (s, key, value, exit_status);
 	rmsummary_assign_as_time_field  (s, key, value, wall_time);
-	rmsummary_assign_as_int_field   (s, key, value, max_concurrent_processes);
+	rmsummary_assign_as_int_field   (s, key, value, max_processes);
+	rmsummary_assign_as_int_field   (s, key, value, num_processes);
 	rmsummary_assign_as_time_field  (s, key, value, cpu_time);
 	rmsummary_assign_as_int_field   (s, key, value, virtual_memory);
 	rmsummary_assign_as_int_field   (s, key, value, resident_memory);
@@ -124,7 +125,8 @@ void rmsummary_print(FILE *stream, struct rmsummary *s)
 		fprintf(stream, "%-30s%s\n",  "limits_exceeded:", s->limits_exceeded);
 
 	fprintf(stream, "%-30s%lf\n", "wall_time:", s->wall_time / 1000000e0);
-	fprintf(stream, "%-30s%" PRId64 "\n",  "max_concurrent_processes:", s->max_concurrent_processes);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "max_processes:", s->max_processes);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "num_processes:", s->num_processes);
 	fprintf(stream, "%-30s%lf\n", "cpu_time:", s->cpu_time / 1000000e0);
 	fprintf(stream, "%-30s%" PRId64 "\n",  "virtual_memory:", s->virtual_memory);
 	fprintf(stream, "%-30s%" PRId64 "\n",  "resident_memory:", s->resident_memory);

@@ -196,7 +196,7 @@ kvm_t *kd_fbsd;
 #endif
 
 char *resources[15] = { "wall_clock(seconds)", 
-                        "concurrent_processes", "cpu_time(seconds)",
+                        "concurrent_processes", "num_process_accum", "cpu_time(seconds)",
 			"virtual_memory(kB)", "resident_memory(kB)", "swap_memory(kB)", 
                         "bytes_read", "bytes_written", 
                         "workdir_number_files_dirs", "workdir_footprint(MB)",
@@ -284,7 +284,8 @@ FILE *open_log_file(const char *log_path)
 void initialize_limits_tree(struct rmsummary *tree, int64_t val)
 {
     tree->wall_time                = val;
-    tree->max_concurrent_processes = val;
+    tree->max_processes            = val;
+    tree->num_processes            = val;
     tree->cpu_time                 = val;
     tree->virtual_memory           = val;
     tree->resident_memory          = val;
@@ -331,7 +332,8 @@ void parse_limits_string(char *str, struct rmsummary *tree)
     }
 
     parse_limit_string(vars, tree, wall_time);
-    parse_limit_string(vars, tree, max_concurrent_processes);
+    parse_limit_string(vars, tree, max_processes);
+    parse_limit_string(vars, tree, num_processes);
     parse_limit_string(vars, tree, cpu_time);
     parse_limit_string(vars, tree, virtual_memory);
     parse_limit_string(vars, tree, resident_memory);
@@ -358,7 +360,8 @@ void parse_limits_file(char *path, struct rmsummary *tree)
     FILE *flimits = fopen(path, "r");
     
     parse_limit_file(flimits, tree, wall_time);
-    parse_limit_file(flimits, tree, max_concurrent_processes);
+    parse_limit_file(flimits, tree, max_processes);
+    parse_limit_file(flimits, tree, num_processes);
     parse_limit_file(flimits, tree, cpu_time);
     parse_limit_file(flimits, tree, virtual_memory);
     parse_limit_file(flimits, tree, swap_memory);
@@ -535,7 +538,9 @@ void monitor_collate_tree(struct rmsummary *tr, struct process_info *p, struct w
 {
     tr->wall_time                = usecs_since_epoch() - summary->start;
 
-    tr->max_concurrent_processes = (int64_t) itable_size(processes);
+    tr->max_processes            = (int64_t) itable_size(processes);
+    tr->num_processes            = summary->num_processes;
+
     tr->cpu_time                 = p->cpu.delta + tr->cpu_time;
     tr->virtual_memory           = (int64_t) p->mem.virtual;
     tr->resident_memory          = (int64_t) p->mem.resident;
@@ -559,8 +564,8 @@ void monitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
     if(result->wall_time < tr->wall_time)
         result->wall_time = tr->wall_time;
 
-    if(result->max_concurrent_processes < tr->max_concurrent_processes)
-        result->max_concurrent_processes = tr->max_concurrent_processes;
+    if(result->max_processes < tr->max_processes)
+        result->max_processes = tr->max_processes;
 
     if(result->cpu_time < tr->cpu_time)
         result->cpu_time = tr->cpu_time;
@@ -593,7 +598,8 @@ void monitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
 void monitor_log_row(struct rmsummary *tr)
 {
     fprintf(log_series, "%" PRId64 "\t", tr->wall_time + summary->start);
-    fprintf(log_series, "%" PRId64 "\t", tr->max_concurrent_processes);
+    fprintf(log_series, "%" PRId64 "\t", tr->max_processes);
+    fprintf(log_series, "%" PRId64 "\t", tr->num_processes);
     fprintf(log_series, "%" PRId64 "\t", tr->cpu_time);
     fprintf(log_series, "%" PRId64 "\t", tr->virtual_memory);
     fprintf(log_series, "%" PRId64 "\t", tr->resident_memory);
@@ -704,6 +710,8 @@ void monitor_track_process(pid_t pid)
 
 	p->running = 1;
 	p->waiting = 0;
+
+	summary->num_processes++;
 }
 
 void monitor_untrack_process(uint64_t pid)
@@ -922,7 +930,8 @@ int monitor_check_limits(struct rmsummary *tr)
     tr->limits_exceeded = NULL;
 
     over_limit_check(tr, wall_time, 1.0/ONE_SECOND, "lf");
-    over_limit_check(tr, max_concurrent_processes, 1, PRId64);
+    over_limit_check(tr, max_processes, 1, PRId64);
+    over_limit_check(tr, num_processes, 1, PRId64);
     over_limit_check(tr, cpu_time, 1.0/ONE_SECOND, "lf");
     over_limit_check(tr, virtual_memory, 1, PRId64);
     over_limit_check(tr, resident_memory, 1, PRId64);
@@ -994,8 +1003,8 @@ void monitor_dispatch_msg(void)
 	{
         case BRANCH:
 		monitor_track_process(msg.origin);
-		if(summary->max_concurrent_processes < itable_size(processes))
-			summary->max_concurrent_processes = itable_size(processes);
+		if(summary->max_processes < itable_size(processes))
+			summary->max_processes = itable_size(processes);
 		break;
         case WAIT:
 		p->waiting = 1;
