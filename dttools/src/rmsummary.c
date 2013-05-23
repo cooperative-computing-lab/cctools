@@ -52,7 +52,7 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 	rmsummary_assign_as_int_field   (s, key, value, swap_memory);
 	rmsummary_assign_as_int_field   (s, key, value, bytes_read);
 	rmsummary_assign_as_int_field   (s, key, value, bytes_written);
-	rmsummary_assign_as_int_field   (s, key, value, workdir_number_files_dirs);
+	rmsummary_assign_as_int_field   (s, key, value, workdir_num_files);
 	rmsummary_assign_as_int_field   (s, key, value, workdir_footprint);
 	rmsummary_assign_as_int_field   (s, key, value, fs_nodes);
 
@@ -133,7 +133,7 @@ void rmsummary_print(FILE *stream, struct rmsummary *s)
 	fprintf(stream, "%-30s%" PRId64 "\n",  "swap_memory:", s->swap_memory);
 	fprintf(stream, "%-30s%" PRId64 "\n",  "bytes_read:", s->bytes_read);
 	fprintf(stream, "%-30s%" PRId64 "\n",  "bytes_written:", s->bytes_written);
-	fprintf(stream, "%-30s%" PRId64 "\n",  "workdir_number_files_dirs:", s->workdir_number_files_dirs);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "workdir_num_files:", s->workdir_num_files);
 	fprintf(stream, "%-30s%" PRId64 "\n",  "workdir_footprint:", s->workdir_footprint);
 }
 

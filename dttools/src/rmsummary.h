@@ -35,7 +35,7 @@ struct rmsummary
 	int64_t  swap_memory; 
 	int64_t  bytes_read;
 	int64_t  bytes_written;
-	int64_t  workdir_number_files_dirs;
+	int64_t  workdir_num_files;
 	int64_t  workdir_footprint;
 
 	int64_t  fs_nodes;

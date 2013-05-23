@@ -283,17 +283,17 @@ FILE *open_log_file(const char *log_path)
 
 void initialize_limits_tree(struct rmsummary *tree, int64_t val)
 {
-    tree->wall_time                = val;
-    tree->max_processes            = val;
-    tree->num_processes            = val;
-    tree->cpu_time                 = val;
-    tree->virtual_memory           = val;
-    tree->resident_memory          = val;
-    tree->swap_memory              = val;
-    tree->bytes_read               = val;
-    tree->bytes_written            = val;
-    tree->workdir_number_files_dirs = val;
-    tree->workdir_footprint         = val;
+    tree->wall_time         = val;
+    tree->max_processes     = val;
+    tree->num_processes     = val;
+    tree->cpu_time          = val;
+    tree->virtual_memory    = val;
+    tree->resident_memory   = val;
+    tree->swap_memory       = val;
+    tree->bytes_read        = val;
+    tree->bytes_written     = val;
+    tree->workdir_num_files = val;
+    tree->workdir_footprint = val;
 
 
 }
@@ -340,7 +340,7 @@ void parse_limits_string(char *str, struct rmsummary *tree)
     parse_limit_string(vars, tree, swap_memory);
     parse_limit_string(vars, tree, bytes_read);
     parse_limit_string(vars, tree, bytes_written);
-    parse_limit_string(vars, tree, workdir_number_files_dirs);
+    parse_limit_string(vars, tree, workdir_num_files);
     parse_limit_string(vars, tree, workdir_footprint);
 
     if(tree->wall_time < INTMAX_MAX/ONE_SECOND)
@@ -367,7 +367,7 @@ void parse_limits_file(char *path, struct rmsummary *tree)
     parse_limit_file(flimits, tree, swap_memory);
     parse_limit_file(flimits, tree, bytes_read);
     parse_limit_file(flimits, tree, bytes_written);
-    parse_limit_file(flimits, tree, workdir_number_files_dirs);
+    parse_limit_file(flimits, tree, workdir_num_files);
     parse_limit_file(flimits, tree, workdir_footprint);
 
     if(tree->wall_time < INTMAX_MAX/ONE_SECOND)
@@ -536,24 +536,24 @@ void monitor_summary_header()
 
 void monitor_collate_tree(struct rmsummary *tr, struct process_info *p, struct wdir_info *d, struct filesys_info *f)
 {
-    tr->wall_time                = usecs_since_epoch() - summary->start;
+	tr->wall_time         = usecs_since_epoch() - summary->start;
 
-    tr->max_processes            = (int64_t) itable_size(processes);
-    tr->num_processes            = summary->num_processes;
+	tr->max_processes     = (int64_t) itable_size(processes);
+	tr->num_processes     = summary->num_processes;
 
-    tr->cpu_time                 = p->cpu.delta + tr->cpu_time;
-    tr->virtual_memory           = (int64_t) p->mem.virtual;
-    tr->resident_memory          = (int64_t) p->mem.resident;
-    tr->swap_memory              = (int64_t) p->mem.swap;
+	tr->cpu_time          = p->cpu.delta + tr->cpu_time;
+	tr->virtual_memory    = (int64_t) p->mem.virtual;
+	tr->resident_memory   = (int64_t) p->mem.resident;
+	tr->swap_memory       = (int64_t) p->mem.swap;
 
-    tr->bytes_read               = (int64_t) (p->io.delta_chars_read + tr->bytes_read);
-    tr->bytes_read              += (int64_t)  p->io.delta_bytes_faulted;
-    tr->bytes_written            = (int64_t) (p->io.delta_chars_written + tr->bytes_written);
+	tr->bytes_read        = (int64_t) (p->io.delta_chars_read + tr->bytes_read);
+	tr->bytes_read       += (int64_t)  p->io.delta_bytes_faulted;
+	tr->bytes_written     = (int64_t) (p->io.delta_chars_written + tr->bytes_written);
 
-    tr->workdir_number_files_dirs = (int64_t) (d->files + d->directories);
-    tr->workdir_footprint         = (int64_t) d->byte_count;
+	tr->workdir_num_files = (int64_t) (d->files + d->directories);
+	tr->workdir_footprint = (int64_t) d->byte_count;
 
-    tr->fs_nodes                 = (int64_t) f->disk.f_ffree;
+	tr->fs_nodes          = (int64_t) f->disk.f_ffree;
 }
 
 void monitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
@@ -585,8 +585,8 @@ void monitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
     if(result->bytes_written < tr->bytes_written)
         result->bytes_written = tr->bytes_written;
 
-    if(result->workdir_number_files_dirs < tr->workdir_number_files_dirs)
-        result->workdir_number_files_dirs = tr->workdir_number_files_dirs;
+    if(result->workdir_num_files < tr->workdir_num_files)
+        result->workdir_num_files = tr->workdir_num_files;
 
     if(result->workdir_footprint < tr->workdir_footprint)
         result->workdir_footprint = tr->workdir_footprint;
@@ -609,7 +609,7 @@ void monitor_log_row(struct rmsummary *tr)
 
     if(resources_flags->workdir_footprint)
     {
-	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_number_files_dirs);
+	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_num_files);
 	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_footprint);
     }
 
@@ -938,7 +938,7 @@ int monitor_check_limits(struct rmsummary *tr)
     over_limit_check(tr, swap_memory, 1, PRId64);
     over_limit_check(tr, bytes_read, 1, PRId64);
     over_limit_check(tr, bytes_written, 1, PRId64);
-    over_limit_check(tr, workdir_number_files_dirs, 1, PRId64);
+    over_limit_check(tr, workdir_num_files, 1, PRId64);
     over_limit_check(tr, workdir_footprint, 1, PRId64);
 
     if(tr->limits_exceeded)
@@ -1174,11 +1174,11 @@ int monitor_resources(long int interval /*in microseconds */)
 {
     uint64_t round;
 
-    struct process_info  *p_acc = malloc(sizeof(struct process_info));
-    struct wdir_info     *d_acc = malloc(sizeof(struct wdir_info));
-    struct filesys_info  *f_acc = malloc(sizeof(struct filesys_info));
+    struct process_info  *p_acc = calloc(1, sizeof(struct process_info)); //Automatic zeroed.
+    struct wdir_info     *d_acc = calloc(1, sizeof(struct wdir_info));
+    struct filesys_info  *f_acc = calloc(1, sizeof(struct filesys_info));
 
-    struct rmsummary    *resources_now = calloc(1, sizeof(struct rmsummary)); //Automatic zeroed.
+    struct rmsummary    *resources_now = calloc(1, sizeof(struct rmsummary));
 
     // Loop while there are processes to monitor, that is 
     // itable_size(processes) > 0). The check is done again in a
