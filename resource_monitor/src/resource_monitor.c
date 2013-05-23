@@ -891,9 +891,10 @@ int get_map_io_usage(pid_t pid, struct io_info *io)
     char dummy_line[1024];
     
     /* Look for next mmap file */
-    while( !strchr(fgets(dummy_line, 1024, fsmaps), '/') ) 
-	    if(get_int_attribute(fsmaps, "Rss:", &kbytes_resident, 0) == 0)
-		    kbytes_resident_accum += kbytes_resident;
+    while((fgets(dummy_line, 1024, fsmaps))) 
+      if(strchr(dummy_line, '/'))
+        if(get_int_attribute(fsmaps, "Rss:", &kbytes_resident, 0) == 0)
+          kbytes_resident_accum += kbytes_resident;
 
     if((kbytes_resident_accum * 1024) > io->bytes_faulted)
         io->delta_bytes_faulted = (kbytes_resident_accum * 1024) - io->bytes_faulted;
