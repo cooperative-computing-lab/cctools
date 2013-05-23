@@ -189,7 +189,7 @@ static void show_use()
 int main(int argc, char *argv[])
 {
 	INT64_T result;
-	char c;
+	signed char c;
 	char *sourcehost, *sourcepath;
 	struct target_info *targets;
 	struct server_info *servers;
@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while(((c = getopt(argc, argv, "a:d:DF:i:N:p:Rt:T:vXYh")) != (char) -1)) {
+	while(((c = getopt(argc, argv, "a:d:DF:i:N:p:Rt:T:vXYh")) > -1)) {
 		switch (c) {
 		case 'R':
 			randomize_mode = 1;

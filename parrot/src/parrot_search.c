@@ -28,9 +28,9 @@ int main( int argc, char *argv[] )
 	const char *paths = NULL;
 	const char *pattern;
 	int flags = 0;
-	char c;
+	signed char c;
 
-        while((c = getopt(argc, argv, "+smi")) != (char) -1) {
+        while((c = getopt(argc, argv, "+smi")) > -1) {
                 switch (c) {
                 	case 's': 
 				flags |= PFS_SEARCH_STOPATFIRST;

@@ -27,7 +27,7 @@ void printUsage(char* cmd) {
 }
 
 int main(int argc, char** argv) {
-    char cl;
+    signed char cl;
     int did_explicit_auth = 0;
     int download,rm_local,rm_remote,rm_mat,file_provided;
     int rm_remote_error = 0;
@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
     
     download=rm_local=rm_remote=rm_mat=file_provided=0;
 
-    while((cl=getopt(argc,argv,"+a:d:hD:LRMF:"))!=(char)-1) {
+    while((cl=getopt(argc,argv,"+a:d:hD:LRMF:")) > -1) {
 	switch(cl) {
 	case 'a':
 	    auth_register_byname(optarg);

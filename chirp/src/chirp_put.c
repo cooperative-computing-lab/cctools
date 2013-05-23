@@ -60,12 +60,12 @@ int main(int argc, char *argv[])
 	const char *hostname, *source_file, *target_file;
 	time_t stoptime;
 	FILE *file;
-	char c;
+	signed char c;
 	char *tickets = NULL;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:b:d:fi:t:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:b:d:fi:t:vh")) > -1) {
 		switch (c) {
 		case 'a':
 			auth_register_byname(optarg);

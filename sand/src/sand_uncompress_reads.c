@@ -29,11 +29,11 @@ int main(int argc, char ** argv)
 	FILE * infile;
 	FILE * outfile;
 	struct cseq *c;
-	char d;
+	signed char d;
 	int quiet_mode = 0;
 	int count = 0;
 
-        while((d=getopt(argc,argv,"qhi"))!=(char)-1) {
+        while((d=getopt(argc,argv,"qhi")) > -1) {
                 switch(d) {
 		case 'q':
 			quiet_mode = 1;

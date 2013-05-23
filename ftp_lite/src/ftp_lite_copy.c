@@ -37,12 +37,12 @@ int main( int argc, char *argv[] )
 	char *source_host=0, *source_file=0;
 	char *target_host=0, *target_file=0;
 	FILE *source_fp=0, *target_fp=0, *data=0;
-	char c;
+	signed char c;
 	int source_port=0, target_port=0;
 
 	debug_config(argv[0]);
 
-	while((c=getopt(argc,argv,"S:s:T:t:P:p:dh"))!=(char)-1) {
+	while((c=getopt(argc,argv,"S:s:T:t:P:p:dh")) > -1) {
 		switch(c) {
 			case 'S':
 				source_host = optarg;

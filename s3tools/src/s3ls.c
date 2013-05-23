@@ -17,13 +17,13 @@ int main(int argc, char** argv) {
 	struct list *dirents;
 	struct s3_dirent_object *d;
 	char long_list = 0;
-	char c;
+	signed char c;
 	int i;
 
 	opterr = 0;
 	s3_initialize(&argc, argv);
 
-	while( (c = getopt(argc, argv, "l")) != (char)-1 ) {
+	while((c = getopt(argc, argv, "l")) > -1) {
 		switch(c) {
 			case 'l':
 				long_list = 1;

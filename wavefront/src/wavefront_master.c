@@ -124,7 +124,7 @@ static void display_progress( struct work_queue *q )
 
 int main( int argc, char *argv[] )
 {
-	char c;
+	signed char c;
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	char *project = NULL;
 	int priority = 0;
@@ -133,7 +133,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(progname);
 
-	while((c=getopt(argc,argv,"ad:hN:p:P:o:v:Z:"))!=(char)-1) {
+	while((c=getopt(argc,argv,"ad:hN:p:P:o:v:Z:")) > -1) {
 		switch(c) {
 	    	case 'a':
 				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;

@@ -273,12 +273,12 @@ static int main_loop_program( const char *funcpath, struct text_list *seta, stru
 
 int main(int argc, char *argv[])
 {
-	char c;
+	signed char c;
 	int result;
 
 	debug_config(progname);
 
-	while((c = getopt(argc, argv, "b:c:e:d:vh")) != (char)-1) {
+	while((c = getopt(argc, argv, "b:c:e:d:vh")) > -1) {
 		switch (c) {
 		case 'b':
 			block_size = atoi(optarg);

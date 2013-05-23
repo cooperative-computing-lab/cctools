@@ -77,7 +77,8 @@ static int ftsh_main( int argc, char *argv[] )
 	int kill_timeout = 30;
 	char *kill_mode = "strong";
 	FILE *stream;
-	char c, *s;
+	char *s;
+    signed char c;
 	char env[1024];
 	int result;
 	struct sigaction sa;
@@ -124,7 +125,7 @@ static int ftsh_main( int argc, char *argv[] )
 
 	/* Now, process the arguments and let them override the environment settings */
 
-	while( (c=getopt(argc,argv,"+f:l:t:Dk:npPvh"))!=(char)-1 ) {
+	while( (c=getopt(argc,argv,"+f:l:t:Dk:npPvh")) > -1 ) {
 		switch(c) {
 			case 'f':
 				log_file = optarg;

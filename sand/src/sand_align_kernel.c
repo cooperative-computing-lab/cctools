@@ -47,11 +47,11 @@ int main(int argc, char ** argv)
 	FILE * input;
 	struct seq *s1=0, *s2=0;
 	char ori;
-	char c;
+	signed char c;
 	int fileindex;
 	int del_input=0;
 
-	while((c = getopt(argc, argv, "a:o:k:m:q:xd:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:o:k:m:q:xd:vh")) > -1) {
 		switch (c) {
 		case 'a':
 			align_type = optarg;

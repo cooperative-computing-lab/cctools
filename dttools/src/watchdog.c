@@ -196,7 +196,7 @@ void show_help(const char *cmd)
 
 int main(int argc, char *argv[])
 {
-	char c;
+	signed char c;
 
 	random_init();
 
@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while(((c = getopt(argc, argv, "+d:o:O:m:M:s:S:vh")) != (char) -1)) {
+	while(((c = getopt(argc, argv, "+d:o:O:m:M:s:S:vh")) > -1)) {
 		switch (c) {
 		case 'c':
 			check_interval = string_time_parse(optarg);

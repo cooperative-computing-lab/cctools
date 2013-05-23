@@ -66,9 +66,9 @@ static void show_help(const char *cmd)
 
 static void get_options(int argc, char **argv, const char *progname)
 {
-	char c;
+	signed char c;
 
-	while((c = getopt(argc, argv, "d:r:s:k:w:f:o:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "d:r:s:k:w:f:o:vh")) > -1) {
 		switch (c) {
 		case 'r':
 			repeat_filename = optarg;

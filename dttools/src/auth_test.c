@@ -38,14 +38,14 @@ int main(int argc, char *argv[])
 	char *subject = 0, *type = 0;
 	time_t stoptime;
 	char line[1024];
-	char c;
+	signed char c;
 	int portnum = 30000;
 	char *hostname = 0;
 	int timeout = 30;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:p:r:d:o:O:")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:p:r:d:o:O:")) > -1) {
 		switch (c) {
 		case 'p':
 			portnum = atoi(optarg);

@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 	int did_explicit_auth = 0;
 	int follow_mode = 0;
 	time_t stoptime;
-	char c;
+	signed char c;
 
 	int setAindex, setBindex;	// funcindex;
 	FILE *setA = NULL;
@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:b:d:ft:vhw:i:e:n:x:y:p:q:r:s:X:Y:c:")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:b:d:ft:vhw:i:e:n:x:y:p:q:r:s:X:Y:c:")) > -1) {
 		switch (c) {
 		case 'a':
 			auth_register_byname(optarg);

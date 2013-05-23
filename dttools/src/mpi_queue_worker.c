@@ -539,7 +539,7 @@ int main(int argc, char *argv[])
 	const char *host = NULL;
 	int port = MPI_QUEUE_DEFAULT_PORT;
 	char addr[LINK_ADDRESS_MAX];
-	char c;
+	signed char c;
 	int w, rank;
 
 	signal(SIGTERM, handle_abort);
@@ -550,7 +550,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "d:ho:t:w:v")) != (char) -1) {
+	while((c = getopt(argc, argv, "d:ho:t:w:v")) > -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);

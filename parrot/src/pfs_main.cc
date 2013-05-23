@@ -373,7 +373,7 @@ int main( int argc, char *argv[] )
 	int i;
 	int chose_auth=0;
 	struct rusage usage;
-	char c;
+	signed char c;
 	char *tickets = NULL;
 
 	srand(time(0)*(getpid()+getuid()));

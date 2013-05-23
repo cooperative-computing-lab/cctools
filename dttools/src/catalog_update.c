@@ -40,8 +40,8 @@ int main(int argc, char *argv[]) {
 	char *host = CATALOG_HOST;
 	int   port = CATALOG_PORT;
 
-	int c;
-	while ((c = getopt(argc, argv, "c:")) != -1) {
+	signed int c;
+	while ((c = getopt(argc, argv, "c:")) > -1) {
 		switch (c) {
 			case 'c':
 				host = optarg;

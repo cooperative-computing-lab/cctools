@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 {
 	int did_explicit_auth = 0;
 	time_t stoptime;
-	char c;
+	signed char c;
 	int i, srcindex, nstreams;
 	FILE *localfile;
 	struct chirp_stream *stream[argc - 2];
@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:b:d:i:t:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:b:d:i:t:vh")) > -1) {
 		switch (c) {
 		case 'a':
 			auth_register_byname(optarg);
