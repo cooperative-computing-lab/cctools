@@ -121,7 +121,7 @@ char *resource_monitor_rewrite_command(char *cmdline, char *template_filename, c
 	if(!monitor_exe)
 		monitor_exe = resource_monitor_copy_to_wd(NULL);
 
-	index = sprintf(cmd_builder, "./%s ", monitor_exe);
+	index = sprintf(cmd_builder, "./%s --with-disk-footprint ", monitor_exe);
 
 	if(template_filename)
 		index += sprintf(cmd_builder + index, "--with-output-files=%s ", template_filename);
