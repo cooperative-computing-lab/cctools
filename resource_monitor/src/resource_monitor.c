@@ -129,6 +129,7 @@ See the file COPYING for details.
 
 #include <sys/select.h>
 #include <sys/wait.h>
+#include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/times.h>
 #include <sys/stat.h>
@@ -139,7 +140,6 @@ See the file COPYING for details.
 #if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
   #include <sys/param.h>
   #include <sys/mount.h>
-  #include <sys/resource.h>
 #else
   #include  <sys/vfs.h>
 #endif
