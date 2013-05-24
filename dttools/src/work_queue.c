@@ -1563,18 +1563,17 @@ static int put_directory(const char *dirname, const char *remotedirname, struct 
 
 	while((file = readdir(dir))) {
 		char *filename = file->d_name;
-		int len;
 
 		if(!strcmp(filename, ".") || !strcmp(filename, "..")) {
 			continue;
 		}
 
 		*buffer = '\0';
-		len = sprintf(buffer, "%s/%s", dirname, filename);
+		sprintf(buffer, "%s/%s", dirname, filename);
 		localname = xxstrdup(buffer);
 
 		*buffer = '\0';
-		len = sprintf(buffer, "%s/%s", remotedirname, filename);
+		sprintf(buffer, "%s/%s", remotedirname, filename);
 		remotename = xxstrdup(buffer);
 	
 		if(stat(localname, &local_info) < 0) {
