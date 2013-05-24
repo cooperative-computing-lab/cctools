@@ -537,7 +537,7 @@ int irods_reli_getdir( const char *host, const char *path, void (*callback) ( co
 
 int irods_reli_statfs   ( const char *host, const char *path, struct pfs_statfs *info )
 {
-	memset(info,0,sizeof(info));
+	memset(info,0,sizeof(*info));
 
 	info->f_blocks = 10000000;
 	info->f_bavail = 10000000;
