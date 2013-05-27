@@ -2,7 +2,7 @@
 
 show_help() 
 {
-        echo "Use: ec2_submit_workers [options] <servername> <port> <ec2-key-name> <ec2-key-file> <num-workers>"
+        echo "Use: ec2_submit_workers [options] <servername> <port> <ec2-key-name> <ec2-key-file> <num-ec2-instances>"
         echo "where options are:"
         echo "  -a                  Enable auto mode."
         echo "  -M <name>           Name of the preferred master for worker."
@@ -17,6 +17,7 @@ show_help()
         echo "  -A <arch>           Set architecture string for the worker to report to master instead of the value in uname."
         echo "  -O <os>             Set operating system string for the worker to report to master instead of the value in uname."
         echo "  -s <path>           Set the location for creating the working directory of the worker."
+        echo "  -n <number>         Set the number of workers to start on each EC2 instance. (default=1)"
         echo "  -I <image_id>       EC2 OS image ID. Default = ami-fa01f193 (Ubuntu 10.04 x86_64)."
         echo "  -Z <instance_size>  EC2 instance size. Default = m1.large."
         echo "  -p <parameters>     Set parameters for ec2-run-instances."
@@ -29,8 +30,9 @@ use_auto=0
 image=ami-fa01f193
 instance_size=m1.large
 parameters=""
+workers_per_instance=1
 
-while getopts aM:N:C:t:d:i:b:z:A:O:s:I:Z:p:h opt 
+while getopts aM:N:C:t:d:i:b:z:A:O:s:n:I:Z:p:h opt 
 do
         case "$opt" in
                 a)  arguments="$arguments -a"; use_auto=1;;
@@ -46,6 +48,7 @@ do
                 A)  arguments="$arguments -A $OPTARG";;	 
                 O)  arguments="$arguments -O $OPTARG";;	 
                 s)  arguments="$arguments -s $OPTARG";;	 
+                n)  workers_per_instance="$OPTARG";; 
                 I)  image="$OPTARG";;
                 Z)  instance_size="$OPTARG";;
                 p)  parameters="$parameters $OPTARG";;
@@ -96,10 +99,11 @@ cp $worker .
 
 cat >worker.sh <<EOF
 #!/bin/sh
-PATH=".:"$PATH
-export PATH
 
-./work_queue_worker $arguments $host $port 
+for i in `eval echo {1..$workers_per_instance}`
+ do
+	./work_queue_worker $arguments $host $port &
+done
 EOF
 
 chmod 755 worker.sh
