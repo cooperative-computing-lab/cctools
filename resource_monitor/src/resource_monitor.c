@@ -259,100 +259,53 @@ FILE *open_log_file(const char *log_path)
     return log_file;
 }
 
-void initialize_limits_tree(struct rmsummary *tree, int64_t val)
+void parse_limits_report(struct rmsummary *s)
 {
-    tree->wall_time         = val;
-    tree->max_processes     = val;
-    tree->num_processes     = val;
-    tree->cpu_time          = val;
-    tree->virtual_memory    = val;
-    tree->resident_memory   = val;
-    tree->swap_memory       = val;
-    tree->bytes_read        = val;
-    tree->bytes_written     = val;
-    tree->workdir_num_files = val;
-    tree->workdir_footprint = val;
-
-
+	/* Bug, times and footprint to correct units */
+	if(s->wall_time != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "wall_time", s->wall_time);
+	if(s->max_processes != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "max_processes", s->max_processes);
+	if(s->num_processes != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "num_processes", s->num_processes);
+	if(s->cpu_time != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "cpu_time", s->cpu_time);
+	if(s->virtual_memory != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "virtual_memory", s->virtual_memory);
+	if(s->resident_memory != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "resident_memory", s->resident_memory);
+	if(s->swap_memory != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "swap_memory", s->swap_memory);
+	if(s->bytes_read != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "bytes_read", s->bytes_read);
+	if(s->bytes_written != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "bytes_written", s->bytes_written);
+	if(s->workdir_num_files != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "workdir_num_files", s->workdir_num_files);
+	if(s->workdir_footprint != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "workdir_footprint", s->workdir_footprint);
 }
 
-
-//BUG from hash table!! what if resource is set to zero?
-//BUG the parsing limit functions are ugly
-//BUG there is no error checking of unknown vars or malformed
-//values
-//BUG it is assumed that the values given are integers
-/* The limits string has format "var: value[, var: value]*" */
-#define parse_limit_string(vars, tr, fld) if(hash_table_lookup(vars, #fld)){\
-                                                tr->fld = (uintptr_t) hash_table_lookup(vars, #fld);\
-                                                debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", #fld, tr->fld);}
-
-void parse_limits_string(char *str, struct rmsummary *tree)
+struct rmsummary *parse_limits_string(char *str)
 {
-    struct hash_table *vars = hash_table_create(0,0);
-    char *line              = xxstrdup(str);
-    char *var, *value;
+	struct rmsummary *s;
 
-    var = strtok(line, ":");
-    while(var)
-    {
-        var = string_trim_spaces(xxstrdup(var));
-        value = strtok(NULL, ",");
-        if(value)
-        {
-            uintptr_t v = atoi(value);
-            hash_table_insert(vars, var, (uintptr_t *) v);
-        }
-        else
-            break;
+	s = rmsummary_parse_single(str, ',');
 
-        var = strtok(NULL, ":");
-    }
+	parse_limits_report(s);
 
-    parse_limit_string(vars, tree, wall_time);
-    parse_limit_string(vars, tree, max_processes);
-    parse_limit_string(vars, tree, num_processes);
-    parse_limit_string(vars, tree, cpu_time);
-    parse_limit_string(vars, tree, virtual_memory);
-    parse_limit_string(vars, tree, resident_memory);
-    parse_limit_string(vars, tree, swap_memory);
-    parse_limit_string(vars, tree, bytes_read);
-    parse_limit_string(vars, tree, bytes_written);
-    parse_limit_string(vars, tree, workdir_num_files);
-    parse_limit_string(vars, tree, workdir_footprint);
-
-    if(tree->wall_time < INTMAX_MAX/ONE_SECOND)
-	    tree->wall_time *= ONE_SECOND;
-
-    if(tree->cpu_time < INTMAX_MAX/ONE_SECOND)
-	    tree->cpu_time *= ONE_SECOND;
-
-    hash_table_delete(vars);
+	return s;
 }
 
-/* Every line of the limits file has the format resource: value */
-#define parse_limit_file(file, tr, fld) if(!get_int_attribute(file, #fld ":", (uint64_t *) &tr->fld, 1))\
-                                            debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", #fld, tr->fld);
-void parse_limits_file(char *path, struct rmsummary *tree)
+struct rmsummary *parse_limits_file(char *path)
 {
-    FILE *flimits = fopen(path, "r");
-    
-    parse_limit_file(flimits, tree, wall_time);
-    parse_limit_file(flimits, tree, max_processes);
-    parse_limit_file(flimits, tree, num_processes);
-    parse_limit_file(flimits, tree, cpu_time);
-    parse_limit_file(flimits, tree, virtual_memory);
-    parse_limit_file(flimits, tree, swap_memory);
-    parse_limit_file(flimits, tree, bytes_read);
-    parse_limit_file(flimits, tree, bytes_written);
-    parse_limit_file(flimits, tree, workdir_num_files);
-    parse_limit_file(flimits, tree, workdir_footprint);
+	struct rmsummary *s;
 
-    if(tree->wall_time < INTMAX_MAX/ONE_SECOND)
-	    tree->wall_time *= ONE_SECOND;
+	s = rmsummary_parse_file_single(path);
 
-    if(tree->cpu_time < INTMAX_MAX/ONE_SECOND)
-	    tree->cpu_time *= ONE_SECOND;
+	parse_limits_report(s);
+
+	return s;
 }
 
 /***
@@ -886,9 +839,12 @@ void monitor_final_cleanup(int signum)
 
     status = monitor_final_summary();
 
-    fclose(log_summary);
-    fclose(log_series);
-    fclose(log_opened);
+    if(log_summary)
+	    fclose(log_summary);
+    if(log_series)
+	    fclose(log_series);
+    if(log_opened)
+	    fclose(log_opened);
 
     exit(status);
 }
@@ -896,12 +852,13 @@ void monitor_final_cleanup(int signum)
 // The following keeps getting uglier and uglier! Rethink how to do it!
 //
 #define over_limit_check(tr, fld, mult, fmt)				\
-	if((tr)->fld > 0 && resources_limits->fld - (tr)->fld < 0)	\
+	if(resources_limits->fld > -1 && (tr)->fld > 0 && resources_limits->fld - (tr)->fld < 0)\
 	{								\
+		debug(D_DEBUG, "Limit " #fld " broken.\n");		\
 		char *tmp;						\
 		if((tr)->limits_exceeded)                               \
 		{							\
-			tmp = string_format("%s, " #fld ": %" fmt, mult * resources_limits->fld); \
+			tmp = string_format("%s, " #fld ": %" fmt, (tr)->limits_exceeded, mult * resources_limits->fld); \
 			free((tr)->limits_exceeded);			\
 			(tr)->limits_exceeded = tmp;			\
 		}							\
@@ -912,24 +869,29 @@ void monitor_final_cleanup(int signum)
 /* return 0 means above limit, 1 means limist ok */
 int monitor_check_limits(struct rmsummary *tr)
 {
-    tr->limits_exceeded = NULL;
+	tr->limits_exceeded = NULL;
 
-    over_limit_check(tr, wall_time, 1.0/ONE_SECOND, "lf");
-    over_limit_check(tr, max_processes, 1, PRId64);
-    over_limit_check(tr, num_processes, 1, PRId64);
-    over_limit_check(tr, cpu_time, 1.0/ONE_SECOND, "lf");
-    over_limit_check(tr, virtual_memory, 1, PRId64);
-    over_limit_check(tr, resident_memory, 1, PRId64);
-    over_limit_check(tr, swap_memory, 1, PRId64);
-    over_limit_check(tr, bytes_read, 1, PRId64);
-    over_limit_check(tr, bytes_written, 1, PRId64);
-    over_limit_check(tr, workdir_num_files, 1, PRId64);
-    over_limit_check(tr, workdir_footprint, 1, PRId64);
+	if(!resources_limits)
+		return 1;
 
-    if(tr->limits_exceeded)
-        return 0;
-    else
-        return 1;
+	over_limit_check(tr, start, 1.0/ONE_SECOND, "lf");
+	over_limit_check(tr, end,   1.0/ONE_SECOND, "lf");
+	over_limit_check(tr, wall_time, 1.0/ONE_SECOND, "lf");
+	over_limit_check(tr, cpu_time,  1.0/ONE_SECOND, "lf");
+	over_limit_check(tr, max_processes,   1, PRId64);
+	over_limit_check(tr, num_processes,   1, PRId64);
+	over_limit_check(tr, virtual_memory,  1, PRId64);
+	over_limit_check(tr, resident_memory, 1, PRId64);
+	over_limit_check(tr, swap_memory,     1, PRId64);
+	over_limit_check(tr, bytes_read,      1, PRId64);
+	over_limit_check(tr, bytes_written,   1, PRId64);
+	over_limit_check(tr, workdir_num_files, 1, PRId64);
+	over_limit_check(tr, workdir_footprint, 1.0/ONE_MEGABYTE, "lf");
+
+	if(tr->limits_exceeded)
+		return 0;
+	else
+		return 1;
 }
 
 /***
@@ -1238,10 +1200,8 @@ int main(int argc, char **argv) {
     signal(SIGTERM, monitor_final_cleanup);
 
     summary    = calloc(1, sizeof(struct rmsummary));
-    resources_limits = calloc(1, sizeof(struct rmsummary));
+    resources_limits = NULL;
     resources_flags  = calloc(1, sizeof(struct rmsummary));
-
-    initialize_limits_tree(resources_limits, INTMAX_MAX);
 
     struct option long_options[] =
 	    {
@@ -1288,10 +1248,20 @@ int main(int argc, char **argv) {
 			    fatal("interval cannot be set to less than one microsecond.");
 		    break;
             case 'l':
-		    parse_limits_file(optarg, resources_limits);
+		    if(resources_limits)
+		    {
+			    debug(D_NOTICE, "You can only specify the flags -l or -L once. Discarding previous limits.\n"); 
+			    free(resources_limits);
+		    }
+		    resources_limits = parse_limits_file(optarg);
 		    break;
             case 'L':
-		    parse_limits_string(optarg, resources_limits);
+		    if(resources_limits)
+		    {
+			    debug(D_NOTICE, "You can only specify the flags -l or -L once. Discarding previous limits.\n"); 
+			    free(resources_limits);
+		    }
+		    resources_limits = parse_limits_string(optarg);
 		    break;
             case 'o':
 		    if(template_path)
