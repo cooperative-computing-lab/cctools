@@ -120,24 +120,9 @@ See the file COPYING for details.
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/times.h>
-#include <sys/stat.h>
 
 #include <inttypes.h>
 #include <sys/types.h>
-
-#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
-  #include <sys/param.h>
-  #include <sys/mount.h>
-#else
-  #include  <sys/vfs.h>
-#endif
-
-#if defined(CCTOOLS_OPSYS_FREEBSD)
-  #include <sys/file.h>
-  #include <sys/sysctl.h>
-  #include <sys/user.h>
-  #include <kvm.h>
-#endif
 
 #include "cctools.h"
 #include "hash_table.h"
@@ -170,7 +155,6 @@ FILE  *log_opened  = NULL;      /* List of opened files is written to this file.
 
 int    monitor_queue_fd = -1;  /* File descriptor of a datagram socket to which (great)
                                   grandchildren processes report to the monitor. */
-
 pid_t  first_process_pid;              /* pid of the process given at the command line */
 pid_t  first_process_sigchild_status;  /* exit status flags of the process given at the command line */
 pid_t  first_process_already_waited = 0;  /* exit status flags of the process given at the command line */
@@ -185,7 +169,7 @@ struct itable *filesys_rc;      /* Counts how many wdir_info use a filesys_info.
 
 
 char *lib_helper_name = NULL;  /* Name of the helper library that is 
-                                                            automatically extracted */
+                                  automatically extracted */
 
 int lib_helper_extracted;       /* Boolean flag to indicate whether the bundled
                                    helper library was automatically extracted
@@ -270,13 +254,7 @@ FILE *open_log_file(const char *log_path)
         free(dirname);
     }
     else
-    {
-        /* Cheating, we write to /dev/null, thus the log file is
-         * not created, but we do not have to change the rest of
-         * the code. */
-        if((log_file = fopen("/dev/null", "w")) == NULL)
-            fatal("could not open log file %s : %s\n", "/dev/null", strerror(errno));
-    }
+	    return NULL;
 
     return log_file;
 }
@@ -527,11 +505,14 @@ void monitor_summary_header()
 {
     int i;
 
-    fprintf(log_series, "#");
-    for(i = 0; resources[i]; i++)
-        fprintf(log_series, "%s\t", resources[i]);
+    if(log_series)
+    {
+	    fprintf(log_series, "#");
+	    for(i = 0; resources[i]; i++)
+		    fprintf(log_series, "%s\t", resources[i]);
 
-    fprintf(log_series, "\n");
+	    fprintf(log_series, "\n");
+    }
 }
 
 void monitor_collate_tree(struct rmsummary *tr, struct process_info *p, struct wdir_info *d, struct filesys_info *f)
@@ -597,27 +578,29 @@ void monitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
 
 void monitor_log_row(struct rmsummary *tr)
 {
-    fprintf(log_series, "%" PRId64 "\t", tr->wall_time + summary->start);
-    fprintf(log_series, "%" PRId64 "\t", tr->max_processes);
-    fprintf(log_series, "%" PRId64 "\t", tr->num_processes);
-    fprintf(log_series, "%" PRId64 "\t", tr->cpu_time);
-    fprintf(log_series, "%" PRId64 "\t", tr->virtual_memory);
-    fprintf(log_series, "%" PRId64 "\t", tr->resident_memory);
-    fprintf(log_series, "%" PRId64 "\t", tr->swap_memory);
-    fprintf(log_series, "%" PRId64 "\t", tr->bytes_read);
-    fprintf(log_series, "%" PRId64 "\t", tr->bytes_written);
+	if(log_series)
+	{
+		fprintf(log_series, "%" PRId64 "\t", tr->wall_time + summary->start);
+		fprintf(log_series, "%" PRId64 "\t", tr->max_processes);
+		fprintf(log_series, "%" PRId64 "\t", tr->num_processes);
+		fprintf(log_series, "%" PRId64 "\t", tr->cpu_time);
+		fprintf(log_series, "%" PRId64 "\t", tr->virtual_memory);
+		fprintf(log_series, "%" PRId64 "\t", tr->resident_memory);
+		fprintf(log_series, "%" PRId64 "\t", tr->swap_memory);
+		fprintf(log_series, "%" PRId64 "\t", tr->bytes_read);
+		fprintf(log_series, "%" PRId64 "\t", tr->bytes_written);
 
-    if(resources_flags->workdir_footprint)
-    {
-	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_num_files);
-	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_footprint);
-    }
+		if(resources_flags->workdir_footprint)
+		{
+			fprintf(log_series, "%" PRId64 "\t", tr->workdir_num_files);
+			fprintf(log_series, "%" PRId64 "\t", tr->workdir_footprint);
+		}
 
-    fprintf(log_series, "\n");
+		fprintf(log_series, "\n");
                                
-    /* are we going to keep monitoring the whole filesystem? */
-    // fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
-
+		/* are we going to keep monitoring the whole filesystem? */
+		// fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
+	}
 }
 
 void decode_zombie_status(struct rmsummary *summary, int wait_status)
@@ -669,8 +652,10 @@ void monitor_write_open_file(char *filename)
     /* Perhaps here we can do something more to the files, like a
      * final stat */
 
-    fprintf(log_opened, "%s\n", filename);
-
+	if(log_opened)
+	{
+		fprintf(log_opened, "%s\n", filename);
+	}
 }
 
 /***
@@ -1327,9 +1312,6 @@ int main(int argc, char **argv) {
 			    opened_path = NULL;
 		    }
 		    template_path = xxstrdup(optarg);
-		    use_summary = 1;
-		    use_series  = 1;
-		    use_opened  = 1;
 		    break;
 
 	    case 0:
