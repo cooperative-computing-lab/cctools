@@ -34,11 +34,6 @@
 		s->field = strtoll(value, NULL, 10);		\
 		return 1;}
 
-#define rmsummary_assign_as_to_mb_field(s, key, value, field)	\
-	if(!strcmp(#field, key)){				\
-		s->field = strtod(value, NULL) * ONE_MEGABYTE;	\
-		return 1;}
-
 //From seconds to microseconds
 #define rmsummary_assign_as_time_field(s, key, value, field)		\
 	if(!strcmp(#field, key)){					\
@@ -69,8 +64,7 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 	rmsummary_assign_as_int_field   (s, key, value, bytes_read);
 	rmsummary_assign_as_int_field   (s, key, value, bytes_written);
 	rmsummary_assign_as_int_field   (s, key, value, workdir_num_files);
-	rmsummary_assign_as_to_mb_field (s, key, value, workdir_footprint);
-	rmsummary_assign_as_int_field   (s, key, value, fs_nodes);
+	rmsummary_assign_as_int_field   (s, key, value, workdir_footprint);
 
 	return 0;
 }
@@ -215,8 +209,8 @@ void rmsummary_print(FILE *stream, struct rmsummary *s)
 	fprintf(stream, "%-30s%" PRId64 "\n",  "bytes_read:", s->bytes_read);
 	fprintf(stream, "%-30s%" PRId64 "\n",  "bytes_written:", s->bytes_written);
 	fprintf(stream, "%-30s%" PRId64 "\n",  "workdir_num_files:", s->workdir_num_files);
-	fprintf(stream, "%-30s%lf\n",  "workdir_footprint:",
-		s->workdir_footprint >= 0 ? ((double) s->workdir_footprint/ONE_MEGABYTE) : -1);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "workdir_footprint:",
+		s->workdir_footprint >= 0 ? s->workdir_footprint : -1);
 }
 
 struct list *rmsummary_parse_file_multiple(char *filename)

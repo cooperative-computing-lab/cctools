@@ -169,14 +169,14 @@ names, and the sampling intervals:
 	max_concurrent_processes:  [the maximum number of processes running concurrently, int]
 	wall_time:                 [seconds spent during execution, end - start,        float]
 	cpu_time:                  [user + system time of the execution, in seconds,    float]
-	virtual_memory:            [maximum virtual memory across all processes, in KB,   int]
-	resident_memory:           [maximum resident size across all processes, in KB,    int]
-	swap_memory:               [maximum swap usage across all processes, in KB,       int]
+	virtual_memory:            [maximum virtual memory across all processes, in MB,   int]
+	resident_memory:           [maximum resident size across all processes, in MB,    int]
+	swap_memory:               [maximum swap usage across all processes, in MB,       int]
 	bytes_read:                [number of bytes read from disk,                       int]
 	bytes_written:             [number of bytes written to disk,                      int]
 	workdir_number_files_dirs: [total maximum number of files and directories of
 	                            all the working directories in the tree,              int]
-	workdir_footprint:         [size in bytes of all working directories in the tree, int]
+	workdir_footprint:         [size in MB of all working directories in the tree,    int]
 	</pre>
 
       The time-series log has a row per time sample. For each row, the columns have the following meaning:
@@ -185,14 +185,14 @@ names, and the sampling intervals:
 	wall_clock                [the sample time, since the epoch, in microseconds,      int]
 	concurrent_processes      [concurrent processes at the time of the sample,         int]
 	cpu_time                  [accumulated user + kernel time, in microseconds,        int]
-	virtual_memory            [current virtual memory size, in KB,                     int]
-	resident_memory           [current resident memory size, in KB,                    int]
-	swap_memory               [current swap usage, in KB,                              int]
+	virtual_memory            [current virtual memory size, in MB,                     int]
+	resident_memory           [current resident memory size, in MB,                    int]
+	swap_memory               [current swap usage, in MB,                              int]
 	bytes_read                [accumulated number of bytes read,                       int]
 	bytes_written             [accumulated number of bytes written,                    int]
 	workdir_number_files_dirs [current number of files and directories, across all
 	                           working directories in the tree,                        int]
-	workdir_footprint         [current byte size of working directories in the tree,   int]
+	workdir_footprint         [current size of working directories in the tree, in MB  int]
 	</pre>
       
       <h2>Specifying Resource Limits</h2>

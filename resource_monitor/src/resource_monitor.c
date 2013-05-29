@@ -181,7 +181,7 @@ kvm_t *kd_fbsd;
 
 char *resources[15] = { "wall_clock(seconds)", 
                         "concurrent_processes", "num_process_accum", "cpu_time(seconds)",
-			"virtual_memory(kB)", "resident_memory(kB)", "swap_memory(kB)", 
+			"virtual_memory(MB)", "resident_memory(MB)", "swap_memory(MB)", 
                         "bytes_read", "bytes_written", 
                         "workdir_number_files_dirs", "workdir_footprint(MB)",
                         NULL };
@@ -485,7 +485,7 @@ void monitor_collate_tree(struct rmsummary *tr, struct process_info *p, struct w
 	tr->bytes_written     = (int64_t) (p->io.delta_chars_written + tr->bytes_written);
 
 	tr->workdir_num_files = (int64_t) (d->files + d->directories);
-	tr->workdir_footprint = (int64_t) d->byte_count;
+	tr->workdir_footprint = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 
 	tr->fs_nodes          = (int64_t) f->disk.f_ffree;
 }
@@ -730,7 +730,7 @@ struct rmsummary *monitor_rusage_tree(void)
     /* Here we add the maximum recorded + the io from memory maps */
     tr_usg->bytes_read     =  summary->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
 
-    tr_usg->resident_memory = usg.ru_maxrss;
+    tr_usg->resident_memory = (usg.ru_maxrss + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 
     debug(D_DEBUG, "rusage faults: %d resident memory: %d.\n", usg.ru_majflt, usg.ru_maxrss);
 
@@ -886,7 +886,7 @@ int monitor_check_limits(struct rmsummary *tr)
 	over_limit_check(tr, bytes_read,      1, PRId64);
 	over_limit_check(tr, bytes_written,   1, PRId64);
 	over_limit_check(tr, workdir_num_files, 1, PRId64);
-	over_limit_check(tr, workdir_footprint, 1.0/ONE_MEGABYTE, "lf");
+	over_limit_check(tr, workdir_footprint, 1, PRId64);
 
 	if(tr->limits_exceeded)
 		return 0;

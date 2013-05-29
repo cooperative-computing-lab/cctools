@@ -14,6 +14,12 @@ See the file COPYING for details.
 #include "rmonitor_poll.h"
 
 /***
+ * Helper functions
+***/
+
+#define div_round_up(a, b) (((a) + (b) - 1) / (b))
+
+/***
  * Functions to track the whole process tree.  They call the
  * functions defined just above, accumulating the resources of
  * all the processes.
@@ -276,13 +282,21 @@ int get_mem_linux(pid_t pid, struct mem_info *mem)
 	if(!fmem)
 		return 1;
 
+	/* in kB */
 	get_int_attribute(fmem, "VmPeak:", &mem->virtual,  1);
 	get_int_attribute(fmem, "VmHWM:",  &mem->resident, 1);
 	get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
 	get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
 	get_int_attribute(fmem, "VmData:", &mem->data,     1);
-
 	get_swap_linux(pid, mem);
+
+	/* in MB */
+	mem->virtual  = div_round_up(mem->virtual,  1024);
+	mem->resident = div_round_up(mem->resident, 1024);
+	mem->shared   = div_round_up(mem->shared,   1024);
+	mem->text     = div_round_up(mem->text,     1024);
+	mem->data     = div_round_up(mem->data,     1024);
+	mem->swap     = div_round_up(mem->swap,     1024);
 
 	fclose(fmem);
 
@@ -297,9 +311,10 @@ int get_mem_freebsd(pid_t pid, struct mem_info *mem)
 
 	if((kp == NULL) || (count < 1))
 		return 1;
-
-	mem->resident = kp->ki_rssize * sysconf(_SC_PAGESIZE) / 1024; //Multiply pages by pages size.
-	mem->virtual = kp->ki_size / 1024;
+	
+	/* in MB */
+	mem->resident = kp->ki_rssize * sysconf(_SC_PAGESIZE); //Multiply pages by pages size.
+	mem->virtual = kp->ki_size;
 
 	return 0;
 }
@@ -401,6 +416,7 @@ int get_map_io_usage(pid_t pid, struct io_info *io)
 	if((kbytes_resident_accum * 1024) > io->bytes_faulted)
 		io->delta_bytes_faulted = (kbytes_resident_accum * 1024) - io->bytes_faulted;
     
+	/* in bytes */
 	io->bytes_faulted = (kbytes_resident_accum * 1024);
 
 	fclose(fsmaps);
