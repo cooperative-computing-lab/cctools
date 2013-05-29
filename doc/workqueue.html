@@ -368,6 +368,38 @@ verify that the other has the matching password before proceeding.
 The password is not sent in the clear, but is securely verified
 through a SHA1-based challenge-response protocol.
 
+<h2>Work Queue Foremen</h2>
+<p>
+A <b>foreman</b> represents a tree of workers.  The foreman connects to the master and accepts tasks as though it were a worker, while
+allowing workers to connect to it as if it were a master.  As the foreman receives files and tasks from its supervisor, it stores the files on the local disk and
+queues the tasks up for dispatch to its subordinates.  Cacheable common files that are stored at the foreman can be transmitted to its subordinates without incurring
+any additional load on the master.  As workers connect to the foreman, or when connected workers fail or are removed, the foreman reports these resource
+changes to the master, allowing the master to appropriately allocate tasks.
+</p>
+
+<p>
+Foremen are especially useful when harnessing resources from multiple computer clusters.
+A foreman can be run on each cluster and act as a single communications hub for all of
+the workers in that cluster.  This reduces the number of network connections leaving the
+cluster proper, provides a convenient control and monitoring point for the resources used
+by the cluster, and minimizes the transfer cost (in both time and sometimes money) for sending
+data into the cluster over inter-cluster networks.
+</p>
+
+<p>
+To run the <b>work_queue_worker</b> as a foreman, use the <b>-m foreman</b> argument.  The foreman's master
+is set the same way as a normal work_queue_worker, using either hostname and port or the <b>-M project_name</b>
+argument.  To acquire workers the foreman can advertise itself as a separate project using the <b>-N foreman_name</b>
+flag, and the port it should listen on can be set with <b>-f port</b>.
+</p>
+
+<p>
+For example, to run a foreman working for project_A and advertising itself as foreman_A1 while listening on port 9123 you would use:
+<pre>
+% work_queue_worker -m foreman -M project_A -N foreman_A1 -f 9123
+</pre>
+</p>
+
 <h2>Advanced Usage</h2>
 
 The technique described above is suitable for distributed programs of
