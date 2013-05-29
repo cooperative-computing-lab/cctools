@@ -61,8 +61,8 @@ See the file COPYING for details.
  * filesys_info' ('filesysms').
  *
  * The process tree is summarized from the struct *_info into
- * struct tree_info. For each time interval there are three
- * struct tree_info: current, maximum, and minimum. 
+ * struct rmsummary. For each time interval there are three
+ * struct rmsummary: current, maximum, and minimum. 
  *
  * Grandchildren processes are tracked via the helper library,
  * which wraps the family of fork functions.
@@ -103,17 +103,6 @@ See the file COPYING for details.
  *
  */
 
-#include "cctools.h"
-#include "hash_table.h"
-#include "itable.h"
-#include "list.h"
-#include "stringtools.h"
-#include "debug.h"
-#include "xxmalloc.h"
-#include "copy_stream.h"
-#include "getopt.h"
-#include "create_dir.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -125,31 +114,29 @@ See the file COPYING for details.
 #include <signal.h>
 #include <errno.h>
 #include <limits.h>
-#include <fts.h>
 
 #include <sys/select.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/times.h>
-#include <sys/stat.h>
 
 #include <inttypes.h>
 #include <sys/types.h>
 
-#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
-  #include <sys/param.h>
-  #include <sys/mount.h>
-#else
-  #include  <sys/vfs.h>
-#endif
+#include "cctools.h"
+#include "hash_table.h"
+#include "itable.h"
+#include "list.h"
+#include "stringtools.h"
+#include "debug.h"
+#include "xxmalloc.h"
+#include "copy_stream.h"
+#include "getopt.h"
+#include "create_dir.h"
 
-#if defined(CCTOOLS_OPSYS_FREEBSD)
-  #include <sys/file.h>
-  #include <sys/sysctl.h>
-  #include <sys/user.h>
-  #include <kvm.h>
-#endif
+#include "rmonitor.h"
+#include "rmonitor_poll.h"
 
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_piggyback.h"
@@ -168,15 +155,9 @@ FILE  *log_opened  = NULL;      /* List of opened files is written to this file.
 
 int    monitor_queue_fd = -1;  /* File descriptor of a datagram socket to which (great)
                                   grandchildren processes report to the monitor. */
-
 pid_t  first_process_pid;              /* pid of the process given at the command line */
 pid_t  first_process_sigchild_status;  /* exit status flags of the process given at the command line */
 pid_t  first_process_already_waited = 0;  /* exit status flags of the process given at the command line */
-
-char  *over_limit_str = NULL;          /* string to report the limits exceeded */
-
-uint64_t usecs_initial;                /* Time at which monitoring started, in usecs. */
-
 
 struct itable *processes;       /* Maps the pid of a process to a unique struct process_info. */
 struct hash_table *wdirs;       /* Maps paths to working directory structures. */
@@ -188,7 +169,7 @@ struct itable *filesys_rc;      /* Counts how many wdir_info use a filesys_info.
 
 
 char *lib_helper_name = NULL;  /* Name of the helper library that is 
-                                                            automatically extracted */
+                                  automatically extracted */
 
 int lib_helper_extracted;       /* Boolean flag to indicate whether the bundled
                                    helper library was automatically extracted
@@ -198,107 +179,22 @@ int lib_helper_extracted;       /* Boolean flag to indicate whether the bundled
 kvm_t *kd_fbsd;
 #endif
 
-//time in usecs, no seconds:
-struct cpu_time_info
-{
-    uint64_t accumulated;
-    uint64_t delta;
-};
-
-struct mem_info
-{
-    uint64_t virtual; 
-    uint64_t resident;
-    uint64_t swap;
-    uint64_t shared;
-    uint64_t text;
-    uint64_t data;
-};
-
-struct io_info
-{
-    uint64_t chars_read;
-    uint64_t chars_written;
-
-    uint64_t bytes_faulted;
-
-    uint64_t delta_chars_read;
-    uint64_t delta_chars_written;
-
-    uint64_t delta_bytes_faulted;
-};
-
-struct wdir_info
-{
-    double   wall_time;
-    char     *path;
-    int      files;
-    int      directories;
-    off_t    byte_count;
-    blkcnt_t block_count;
-
-    struct filesys_info *fs;
-};
-
-struct filesys_info
-{
-    double          wall_time;
-    int             id;
-    char           *path;            // Sample path on the filesystem.
-    struct statfs   disk;            // Current result of statfs call minus disk_initial.
-    struct statfs   disk_initial;   // Result of the first time we call statfs.
-};
-
-struct process_info
-{
-	uint64_t    wall_time;
-	pid_t       pid;
-	const char *cmd;
-	int         running;
-	int         waiting;
-
-	struct mem_info      mem;
-	struct cpu_time_info cpu;
-	struct io_info       io;
-
-	struct wdir_info *wd;
-};
-
 char *resources[15] = { "wall_clock(seconds)", 
-                        "concurrent_processes", "cpu_time(seconds)",
+                        "concurrent_processes", "num_process_accum", "cpu_time(seconds)",
 			"virtual_memory(kB)", "resident_memory(kB)", "swap_memory(kB)", 
                         "bytes_read", "bytes_written", 
                         "workdir_number_files_dirs", "workdir_footprint(MB)",
                         NULL };
 
-// These fields are defined as signed integers, even though they
-// will only contain positive numbers. This is to conversion to
-// signed quantities when comparing to maximum limits.
-struct tree_info
-{
-    int64_t wall_time;
-    int64_t max_concurrent_processes;
-    int64_t cpu_time;
-    int64_t virtual_memory; 
-    int64_t resident_memory; 
-    int64_t swap_memory; 
-    int64_t bytes_read;
-    int64_t bytes_written;
-    int64_t workdir_number_files_dirs;
-    int64_t workdir_footprint;
-
-    int64_t  fs_nodes;
-};
-
-struct tree_info *tree_max;
-struct tree_info *tree_limits;
-struct tree_info *tree_flags;
+struct rmsummary *summary;
+struct rmsummary *resources_limits;
+struct rmsummary *resources_flags;
 
 /*** 
  * Utility functions (open log files, proc files, measure time)
  ***/
 
-double usecs_since_epoch()
+uint64_t usecs_since_epoch()
 {
     uint64_t usecs;
     struct timeval time; 
@@ -311,14 +207,9 @@ double usecs_since_epoch()
     return usecs;
 }
 
-double usecs_since_launched()
+uint64_t usecs_since_launched()
 {
-    return (usecs_since_epoch() - usecs_initial);
-}
-
-double clicks_to_usecs(uint64_t clicks)
-{
-    return ((clicks * ONE_SECOND) / sysconf(_SC_CLK_TCK));
+	return (usecs_since_epoch() - summary->start);
 }
 
 char *default_summary_name(char *template_path)
@@ -363,162 +254,58 @@ FILE *open_log_file(const char *log_path)
         free(dirname);
     }
     else
-    {
-        /* Cheating, we write to /dev/null, thus the log file is
-         * not created, but we do not have to change the rest of
-         * the code. */
-        if((log_file = fopen("/dev/null", "w")) == NULL)
-            fatal("could not open log file %s : %s\n", "/dev/null", strerror(errno));
-    }
+	    return NULL;
 
     return log_file;
 }
 
-FILE *open_proc_file(pid_t pid, char *filename)
+void parse_limits_report(struct rmsummary *s)
 {
-        FILE *fproc;
-        char fproc_path[PATH_MAX];    
-
-#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
-        return NULL;
-#endif
-
-        sprintf(fproc_path, "/proc/%d/%s", pid, filename);
-
-        if((fproc = fopen(fproc_path, "r")) == NULL)
-        {
-                debug(D_DEBUG, "could not process file %s : %s\n", fproc_path, strerror(errno));
-                return NULL;
-        }
-
-        return fproc;
+	/* Bug, times and footprint to correct units */
+	if(s->wall_time != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "wall_time", s->wall_time);
+	if(s->max_processes != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "max_processes", s->max_processes);
+	if(s->num_processes != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "num_processes", s->num_processes);
+	if(s->cpu_time != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "cpu_time", s->cpu_time);
+	if(s->virtual_memory != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "virtual_memory", s->virtual_memory);
+	if(s->resident_memory != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "resident_memory", s->resident_memory);
+	if(s->swap_memory != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "swap_memory", s->swap_memory);
+	if(s->bytes_read != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "bytes_read", s->bytes_read);
+	if(s->bytes_written != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "bytes_written", s->bytes_written);
+	if(s->workdir_num_files != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "workdir_num_files", s->workdir_num_files);
+	if(s->workdir_footprint != -1)
+		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "workdir_footprint", s->workdir_footprint);
 }
 
-/* Parse a /proc file looking for line attribute: value */
-int get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value, int rewind_flag)
+struct rmsummary *parse_limits_string(char *str)
 {
-    char proc_attr_line[PATH_MAX];
-    int not_found = 1;
-    int n = strlen(attribute);
+	struct rmsummary *s;
 
-    if(!fstatus)
-        return not_found;
+	s = rmsummary_parse_single(str, ',');
 
-    proc_attr_line[PATH_MAX - 1] = '\0';
+	parse_limits_report(s);
 
-    if(rewind_flag)
-        rewind(fstatus);
-
-    while( fgets(proc_attr_line, PATH_MAX - 2, fstatus) )
-    {
-        if(strncmp(attribute, proc_attr_line, n) == 0)
-        {
-            //We make sure that fgets got a whole line
-            if(proc_attr_line[PATH_MAX - 2] == '\n')
-                proc_attr_line[PATH_MAX - 2] = '\0';
-            if(strlen(proc_attr_line) == PATH_MAX - 2)
-                return -1;
-
-            sscanf(proc_attr_line, "%*s %" SCNu64, value);
-            not_found = 0;
-            break;
-        }
-    }
-
-    return not_found;
+	return s;
 }
 
-void initialize_limits_tree(struct tree_info *tree, int64_t val)
+struct rmsummary *parse_limits_file(char *path)
 {
-    tree->wall_time                = val;
-    tree->max_concurrent_processes = val;
-    tree->cpu_time                 = val;
-    tree->virtual_memory           = val;
-    tree->resident_memory          = val;
-    tree->swap_memory              = val;
-    tree->bytes_read               = val;
-    tree->bytes_written            = val;
-    tree->workdir_number_files_dirs = val;
-    tree->workdir_footprint         = val;
+	struct rmsummary *s;
 
+	s = rmsummary_parse_file_single(path);
 
-}
+	parse_limits_report(s);
 
-
-//BUG from hash table!! what if resource is set to zero?
-//BUG the parsing limit functions are ugly
-//BUG there is no error checking of unknown vars or malformed
-//values
-//BUG it is assumed that the values given are integers
-/* The limits string has format "var: value[, var: value]*" */
-#define parse_limit_string(vars, tr, fld) if(hash_table_lookup(vars, #fld)){\
-                                                tr->fld = (uintptr_t) hash_table_lookup(vars, #fld);\
-                                                debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", #fld, tr->fld);}
-
-void parse_limits_string(char *str, struct tree_info *tree)
-{
-    struct hash_table *vars = hash_table_create(0,0);
-    char *line              = xxstrdup(str);
-    char *var, *value;
-
-    var = strtok(line, ":");
-    while(var)
-    {
-        var = string_trim_spaces(xxstrdup(var));
-        value = strtok(NULL, ",");
-        if(value)
-        {
-            uintptr_t v = atoi(value);
-            hash_table_insert(vars, var, (uintptr_t *) v);
-        }
-        else
-            break;
-
-        var = strtok(NULL, ":");
-    }
-
-    parse_limit_string(vars, tree, wall_time);
-    parse_limit_string(vars, tree, max_concurrent_processes);
-    parse_limit_string(vars, tree, cpu_time);
-    parse_limit_string(vars, tree, virtual_memory);
-    parse_limit_string(vars, tree, resident_memory);
-    parse_limit_string(vars, tree, swap_memory);
-    parse_limit_string(vars, tree, bytes_read);
-    parse_limit_string(vars, tree, bytes_written);
-    parse_limit_string(vars, tree, workdir_number_files_dirs);
-    parse_limit_string(vars, tree, workdir_footprint);
-
-    if(tree->wall_time < INTMAX_MAX/ONE_SECOND)
-	    tree->wall_time *= ONE_SECOND;
-
-    if(tree->cpu_time < INTMAX_MAX/ONE_SECOND)
-	    tree->cpu_time *= ONE_SECOND;
-
-    hash_table_delete(vars);
-}
-
-/* Every line of the limits file has the format resource: value */
-#define parse_limit_file(file, tr, fld) if(!get_int_attribute(file, #fld ":", (uint64_t *) &tr->fld, 1))\
-                                            debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", #fld, tr->fld);
-void parse_limits_file(char *path, struct tree_info *tree)
-{
-    FILE *flimits = fopen(path, "r");
-    
-    parse_limit_file(flimits, tree, wall_time);
-    parse_limit_file(flimits, tree, max_concurrent_processes);
-    parse_limit_file(flimits, tree, cpu_time);
-    parse_limit_file(flimits, tree, virtual_memory);
-    parse_limit_file(flimits, tree, swap_memory);
-    parse_limit_file(flimits, tree, bytes_read);
-    parse_limit_file(flimits, tree, bytes_written);
-    parse_limit_file(flimits, tree, workdir_number_files_dirs);
-    parse_limit_file(flimits, tree, workdir_footprint);
-
-    if(tree->wall_time < INTMAX_MAX/ONE_SECOND)
-	    tree->wall_time *= ONE_SECOND;
-
-    if(tree->cpu_time < INTMAX_MAX/ONE_SECOND)
-	    tree->cpu_time *= ONE_SECOND;
+	return s;
 }
 
 /***
@@ -593,325 +380,6 @@ int dec_wd_count(struct wdir_info *d)
 }
 
 /***
- * Low level resource monitor functions.
- ***/
-
-int get_dsk_usage(const char *path, struct statfs *disk)
-{
-    char cwd[PATH_MAX];
-
-    debug(D_DEBUG, "statfs on path: %s\n", path);
-
-    if(statfs(path, disk) > 0)
-    {
-        debug(D_DEBUG, "could statfs on %s : %s\n", cwd, strerror(errno));
-        return 1;
-    }
-
-    return 0;
-}
-
-void acc_dsk_usage(struct statfs *acc, struct statfs *other)
-{
-    acc->f_bfree  += other->f_bfree;
-    acc->f_bavail += other->f_bavail;
-    acc->f_ffree  += other->f_ffree;
-}
-
-int get_wd_usage(struct wdir_info *d)
-{
-    char *argv[] = {d->path, NULL};
-    FTS *hierarchy;
-    FTSENT *entry;
-
-    d->files = 0;
-    d->directories = 0;
-    d->byte_count = 0;
-    d->block_count = 0;
-
-    hierarchy = fts_open(argv, FTS_PHYSICAL, NULL);
-
-    if(!hierarchy)
-    {
-        debug(D_DEBUG, "fts_open error: %s\n", strerror(errno));
-        return 1;
-    }
-
-    while( (entry = fts_read(hierarchy)) )
-    {
-        switch(entry->fts_info)
-        {
-            case FTS_D:
-                d->directories++;
-                break;
-            case FTS_DC:
-            case FTS_DP:
-                break;
-            case FTS_SL:
-            case FTS_DEFAULT:
-                d->files++;
-                break;
-            case FTS_F:
-                d->files++;
-                d->byte_count  += entry->fts_statp->st_size;
-                d->block_count += entry->fts_statp->st_blocks;
-                break;
-            case FTS_ERR:
-                debug(D_DEBUG, "fts_read error %s: %s\n", entry->fts_name, strerror(errno));
-                break;
-            default:
-                break;
-        }
-    }
-
-    fts_close(hierarchy);
-
-    return 0;
-}
-
-void acc_wd_usage(struct wdir_info *acc, struct wdir_info *other)
-{
-    acc->files       += other->files;
-    acc->directories += other->directories;
-    acc->byte_count  += other->byte_count;
-    acc->block_count += other->block_count;
-}
-
-int get_cpu_time_linux(pid_t pid, uint64_t *accum)
-{
-    /* /dev/proc/[pid]/stat */
-
-    uint64_t kernel, user;
-
-    FILE *fstat = open_proc_file(pid, "stat");
-    if(!fstat)
-        return 1;
-
-    fscanf(fstat,
-            "%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
-            "%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
-            "%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s" /* faults */
-            "%" SCNu64 /* user mode time (in clock ticks) */
-            "%" SCNu64 /* kernel mode time (in clock ticks) */
-            /* .... */,
-            &kernel, &user);
-
-    *accum = clicks_to_usecs(kernel) + clicks_to_usecs(user); 
-
-    fclose(fstat);
-
-    return 0;
-}
-
-#if defined(CCTOOLS_OPSYS_FREEBSD)
-int get_cpu_time_freebsd(pid_t pid, uint64_t *accum)
-{
-    int count;
-    struct kinfo_proc *kp = kvm_getprocs(kd_fbsd, KERN_PROC_PID, pid, &count);
-
-    if((kp == NULL) || (count < 1))
-        return 1;
-
-     /* According to ps(1): * This counts time spent handling interrupts.  We
-      * could * fix this, but it is not 100% trivial (and interrupt * time
-      * fractions only work on the sparc anyway).   XXX */
-
-    *accum  = kp->ki_runtime;
-
-    return 0;
-}
-#endif
-
-int get_cpu_time_usage(pid_t pid, struct cpu_time_info *cpu)
-{
-    uint64_t accum;
-
-    cpu->delta = 0;
-
-#if   defined(CCTOOLS_OPSYS_LINUX)
-    if(get_cpu_time_linux(pid, &accum) != 0)
-        return 1;
-#elif defined(CCTOOLS_OPSYS_FREEBSD)
-    if(get_cpu_time_freebsd(pid, &accum) != 0)
-        return 1;
-#else
-    return 0;
-#endif
-
-    cpu->delta       = accum  - cpu->accumulated;
-    cpu->accumulated = accum;
-
-    return 0;
-}
-
-void acc_cpu_time_usage(struct cpu_time_info *acc, struct cpu_time_info *other)
-{
-    acc->delta += other->delta;
-}
-
-int get_swap_linux(pid_t pid, struct mem_info *mem)
-{
-    FILE *fsmaps = open_proc_file(pid, "smaps");
-    if(!fsmaps)
-        return 1;
-
-    uint64_t accum = 0;
-    uint64_t value = 0;
-
-    while(get_int_attribute(fsmaps, "Swap:", &value, 0) == 0)
-	    accum += value; 
-
-    fclose(fsmaps);
-
-    return accum;
-}
-
-int get_mem_linux(pid_t pid, struct mem_info *mem)
-{
-    // /dev/proc/[pid]/status: 
-    
-    FILE *fmem = open_proc_file(pid, "status");
-    if(!fmem)
-        return 1;
-
-    get_int_attribute(fmem, "VmPeak:", &mem->virtual,  1);
-    get_int_attribute(fmem, "VmHWM:",  &mem->resident, 1);
-    get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
-    get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
-    get_int_attribute(fmem, "VmData:", &mem->data,     1);
-
-    get_swap_linux(pid, mem);
-
-    fclose(fmem);
-
-    return 0;
-}
-
-#if defined(CCTOOLS_OPSYS_FREEBSD)
-int get_mem_freebsd(pid_t pid, struct mem_info *mem)
-{
-    int count;
-    struct kinfo_proc *kp = kvm_getprocs(kd_fbsd, KERN_PROC_PID, pid, &count);
-
-    if((kp == NULL) || (count < 1))
-        return 1;
-
-    mem->resident = kp->ki_rssize * sysconf(_SC_PAGESIZE) / 1024; //Multiply pages by pages size.
-    mem->virtual = kp->ki_size / 1024;
-
-    return 0;
-}
-#endif
-
-int get_mem_usage(pid_t pid, struct mem_info *mem)
-{
-#if   defined(CCTOOLS_OPSYS_LINUX)
-    if(get_mem_linux(pid, mem) != 0)
-        return 1;
-#elif defined(CCTOOLS_OPSYS_FREEBSD)
-    if(get_mem_freebsd(pid, mem) != 0)
-        return 1;
-#else
-    return 0;
-#endif
-
-
-    return 0;
-}
-
-void acc_mem_usage(struct mem_info *acc, struct mem_info *other)
-{
-        acc->virtual  += other->virtual;
-        acc->resident += other->resident;
-        acc->shared   += other->shared;
-        acc->data     += other->data;
-        acc->swap     += other->swap;
-}
-
-int get_sys_io_usage(pid_t pid, struct io_info *io)
-{
-    /* /proc/[pid]/io: if process dies before we read the file,
-     then info is lost, as if the process did not read or write
-     any characters.
-     */
-    
-    FILE *fio = open_proc_file(pid, "io");
-    uint64_t cread, cwritten;
-    int rstatus, wstatus;
-
-    io->delta_chars_read = 0;
-    io->delta_chars_written = 0;
-
-    if(!fio)
-        return 1;
-
-    /* We really want "bytes_read", but there are issues with
-     * distributed filesystems. Instead, we also count page
-     * faulting in another function below. */
-    rstatus  = get_int_attribute(fio, "rchar", &cread, 1);
-    wstatus  = get_int_attribute(fio, "write_bytes", &cwritten, 1);
-
-    fclose(fio);
-
-    if(rstatus || wstatus)
-        return 1;
-
-    io->delta_chars_read    = cread    - io->chars_read;
-    io->delta_chars_written = cwritten - io->chars_written;
-
-    io->chars_read = cread;
-    io->chars_written = cwritten;
-
-    return 0;
-}
-
-void acc_sys_io_usage(struct io_info *acc, struct io_info *other)
-{
-    acc->delta_chars_read    += other->delta_chars_read;
-    acc->delta_chars_written += other->delta_chars_written;
-}
-
-/* We compute the resident memory changes from mmap files. */
-int get_map_io_usage(pid_t pid, struct io_info *io)
-{
-    /* /dev/proc/[pid]/smaps */
-
-    uint64_t kbytes_resident_accum;
-    uint64_t kbytes_resident;
-
-    kbytes_resident_accum    = 0;
-    io->delta_bytes_faulted = 0;
-
-    FILE *fsmaps = open_proc_file(pid, "smaps");
-    if(!fsmaps)
-    {
-        return 1;
-    }
-
-    char dummy_line[1024];
-    
-    /* Look for next mmap file */
-    while((fgets(dummy_line, 1024, fsmaps))) 
-      if(strchr(dummy_line, '/'))
-        if(get_int_attribute(fsmaps, "Rss:", &kbytes_resident, 0) == 0)
-          kbytes_resident_accum += kbytes_resident;
-
-    if((kbytes_resident_accum * 1024) > io->bytes_faulted)
-        io->delta_bytes_faulted = (kbytes_resident_accum * 1024) - io->bytes_faulted;
-    
-    io->bytes_faulted = (kbytes_resident_accum * 1024);
-
-    fclose(fsmaps);
-
-    return 0;
-}
-
-void acc_map_io_usage(struct io_info *acc, struct io_info *other)
-{
-    acc->delta_bytes_faulted += other->delta_bytes_faulted;
-}
-
-/***
  * Functions to track a working directory, or filesystem.
  ***/
 
@@ -982,147 +450,47 @@ struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
 }
 
 /***
- * Functions to track a single process, workind directory, or
- * filesystem.
- ***/
-
-int monitor_process_once(struct process_info *p)
-{
-    debug(D_DEBUG, "monitoring process: %d\n", p->pid);
-
-    p->wall_time = 0;
-
-    get_cpu_time_usage(p->pid, &p->cpu);
-    get_mem_usage(p->pid, &p->mem);
-    get_sys_io_usage(p->pid, &p->io);
-    get_map_io_usage(p->pid, &p->io);
-
-    return 0;
-}
-
-int monitor_wd_once(struct wdir_info *d)
-{
-    debug(D_DEBUG, "monitoring dir %s\n", d->path);
-
-    d->wall_time = 0;
-    get_wd_usage(d);
-
-    return 0;
-}
-
-int monitor_fs_once(struct filesys_info *f)
-{
-    f->wall_time = 0;
-
-    get_dsk_usage(f->path, &f->disk);
-
-    f->disk.f_bfree  = f->disk_initial.f_bfree  - f->disk.f_bfree;
-    f->disk.f_bavail = f->disk_initial.f_bavail - f->disk.f_bavail;
-    f->disk.f_ffree  = f->disk_initial.f_ffree  - f->disk.f_ffree;
-
-    return 0;
-}
-
-/***
- * Functions to track the whole process tree.  They call the
- * functions defined just above, accumulating the resources of
- * all the processes.
-***/
-
-void monitor_processes_once(struct process_info *acc)
-{
-    uint64_t pid;
-    struct process_info *p;
-
-    bzero(acc, sizeof( struct process_info ));
-
-    acc->wall_time = usecs_since_launched();
-
-    itable_firstkey(processes);
-    while(itable_nextkey(processes, &pid, (void **) &p))
-    {
-        monitor_process_once(p);
-
-        acc_mem_usage(&acc->mem, &p->mem);
-        
-        acc_cpu_time_usage(&acc->cpu, &p->cpu);
-
-        acc_sys_io_usage(&acc->io, &p->io);
-        acc_map_io_usage(&acc->io, &p->io);
-    }
-}
-
-void monitor_wds_once(struct wdir_info *acc)
-{
-    struct wdir_info *d;
-    char *path;
-
-    bzero(acc, sizeof( struct wdir_info ));
-
-    acc->wall_time = usecs_since_launched();
-
-    hash_table_firstkey(wdirs);
-    while(hash_table_nextkey(wdirs, &path, (void **) &d))
-    {
-        monitor_wd_once(d);
-        acc_wd_usage(acc, d);
-    }
-}
-
-void monitor_fss_once(struct filesys_info *acc)
-{
-    struct   filesys_info *f;
-    uint64_t dev_id;
-
-    bzero(acc, sizeof( struct filesys_info ));
-
-    acc->wall_time = usecs_since_launched();
-
-    itable_firstkey(filesysms);
-    while(itable_nextkey(filesysms, &dev_id, (void **) &f))
-    {
-        monitor_fs_once(f);
-        acc_dsk_usage(&acc->disk, &f->disk);
-    }
-}
-
-/***
  * Logging functions. The process tree is summarized in struct
- * tree_info's, computing current value, maximum, and minimums.
+ * rmsummary's, computing current value, maximum, and minimums.
 ***/
 
 void monitor_summary_header()
 {
     int i;
 
-    fprintf(log_series, "#");
-    for(i = 0; resources[i]; i++)
-        fprintf(log_series, "%s\t", resources[i]);
+    if(log_series)
+    {
+	    fprintf(log_series, "#");
+	    for(i = 0; resources[i]; i++)
+		    fprintf(log_series, "%s\t", resources[i]);
 
-    fprintf(log_series, "\n");
+	    fprintf(log_series, "\n");
+    }
 }
 
-void monitor_collate_tree(struct tree_info *tr, struct process_info *p, struct wdir_info *d, struct filesys_info *f)
+void monitor_collate_tree(struct rmsummary *tr, struct process_info *p, struct wdir_info *d, struct filesys_info *f)
 {
-    tr->wall_time                = usecs_since_launched();
+	tr->wall_time         = usecs_since_epoch() - summary->start;
 
-    tr->max_concurrent_processes = (int64_t) itable_size(processes);
-    tr->cpu_time                 = p->cpu.delta + tr->cpu_time;
-    tr->virtual_memory           = (int64_t) p->mem.virtual;
-    tr->resident_memory          = (int64_t) p->mem.resident;
-    tr->swap_memory              = (int64_t) p->mem.swap;
+	tr->max_processes     = (int64_t) itable_size(processes);
+	tr->num_processes     = summary->num_processes;
 
-    tr->bytes_read               = (int64_t) (p->io.delta_chars_read + tr->bytes_read);
-    tr->bytes_read              += (int64_t)  p->io.delta_bytes_faulted;
-    tr->bytes_written            = (int64_t) (p->io.delta_chars_written + tr->bytes_written);
+	tr->cpu_time          = p->cpu.delta + tr->cpu_time;
+	tr->virtual_memory    = (int64_t) p->mem.virtual;
+	tr->resident_memory   = (int64_t) p->mem.resident;
+	tr->swap_memory       = (int64_t) p->mem.swap;
 
-    tr->workdir_number_files_dirs = (int64_t) (d->files + d->directories);
-    tr->workdir_footprint         = (int64_t) d->byte_count;
+	tr->bytes_read        = (int64_t) (p->io.delta_chars_read + tr->bytes_read);
+	tr->bytes_read       += (int64_t)  p->io.delta_bytes_faulted;
+	tr->bytes_written     = (int64_t) (p->io.delta_chars_written + tr->bytes_written);
 
-    tr->fs_nodes                 = (int64_t) f->disk.f_ffree;
+	tr->workdir_num_files = (int64_t) (d->files + d->directories);
+	tr->workdir_footprint = (int64_t) d->byte_count;
+
+	tr->fs_nodes          = (int64_t) f->disk.f_ffree;
 }
 
-void monitor_find_max_tree(struct tree_info *result, struct tree_info *tr)
+void monitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
 {
     if(!tr)
         return;
@@ -1130,8 +498,8 @@ void monitor_find_max_tree(struct tree_info *result, struct tree_info *tr)
     if(result->wall_time < tr->wall_time)
         result->wall_time = tr->wall_time;
 
-    if(result->max_concurrent_processes < tr->max_concurrent_processes)
-        result->max_concurrent_processes = tr->max_concurrent_processes;
+    if(result->max_processes < tr->max_processes)
+        result->max_processes = tr->max_processes;
 
     if(result->cpu_time < tr->cpu_time)
         result->cpu_time = tr->cpu_time;
@@ -1151,8 +519,8 @@ void monitor_find_max_tree(struct tree_info *result, struct tree_info *tr)
     if(result->bytes_written < tr->bytes_written)
         result->bytes_written = tr->bytes_written;
 
-    if(result->workdir_number_files_dirs < tr->workdir_number_files_dirs)
-        result->workdir_number_files_dirs = tr->workdir_number_files_dirs;
+    if(result->workdir_num_files < tr->workdir_num_files)
+        result->workdir_num_files = tr->workdir_num_files;
 
     if(result->workdir_footprint < tr->workdir_footprint)
         result->workdir_footprint = tr->workdir_footprint;
@@ -1161,106 +529,75 @@ void monitor_find_max_tree(struct tree_info *result, struct tree_info *tr)
         result->fs_nodes = tr->fs_nodes;
 }
 
-void monitor_log_row(struct tree_info *tr)
+void monitor_log_row(struct rmsummary *tr)
 {
-    fprintf(log_series, "%" PRId64 "\t", tr->wall_time + usecs_initial);
-    fprintf(log_series, "%" PRId64 "\t", tr->max_concurrent_processes);
-    fprintf(log_series, "%" PRId64 "\t", tr->cpu_time);
-    fprintf(log_series, "%" PRId64 "\t", tr->virtual_memory);
-    fprintf(log_series, "%" PRId64 "\t", tr->resident_memory);
-    fprintf(log_series, "%" PRId64 "\t", tr->swap_memory);
-    fprintf(log_series, "%" PRId64 "\t", tr->bytes_read);
-    fprintf(log_series, "%" PRId64 "\t", tr->bytes_written);
+	if(log_series)
+	{
+		fprintf(log_series, "%" PRId64 "\t", tr->wall_time + summary->start);
+		fprintf(log_series, "%" PRId64 "\t", tr->max_processes);
+		fprintf(log_series, "%" PRId64 "\t", tr->num_processes);
+		fprintf(log_series, "%" PRId64 "\t", tr->cpu_time);
+		fprintf(log_series, "%" PRId64 "\t", tr->virtual_memory);
+		fprintf(log_series, "%" PRId64 "\t", tr->resident_memory);
+		fprintf(log_series, "%" PRId64 "\t", tr->swap_memory);
+		fprintf(log_series, "%" PRId64 "\t", tr->bytes_read);
+		fprintf(log_series, "%" PRId64 "\t", tr->bytes_written);
 
-    if(tree_flags->workdir_footprint)
-    {
-	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_number_files_dirs);
-	    fprintf(log_series, "%" PRId64 "\t", tr->workdir_footprint);
-    }
+		if(resources_flags->workdir_footprint)
+		{
+			fprintf(log_series, "%" PRId64 "\t", tr->workdir_num_files);
+			fprintf(log_series, "%" PRId64 "\t", tr->workdir_footprint);
+		}
 
-    fprintf(log_series, "\n");
+		fprintf(log_series, "\n");
                                
-    /* are we going to keep monitoring the whole filesystem? */
-    // fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
-
+		/* are we going to keep monitoring the whole filesystem? */
+		// fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
+	}
 }
 
-void report_zombie_status(void)
+void decode_zombie_status(struct rmsummary *summary, int wait_status)
 {
-	/* BUG: end and wall_time should be computed in a final
-	 * summary, not here */
-	tree_max->wall_time = usecs_since_epoch() - usecs_initial;
-
-	fprintf(log_summary, "%-30s\t%lf\n", "end:", 
-		(double) (tree_max->wall_time + usecs_initial) / ONE_SECOND);
-
-	if( WIFEXITED(first_process_sigchild_status) )
+	if( WIFEXITED(wait_status) )
 	{
-		debug(D_DEBUG, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(first_process_sigchild_status));
-		fprintf(log_summary, "%-30s\tnormal\n", "exit_type:");
+		debug(D_DEBUG, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(wait_status));
+		summary->exit_type = xxstrdup("normal");
+		summary->exit_status = WEXITSTATUS(first_process_sigchild_status);
 	} 
-	else if ( WIFSIGNALED(first_process_sigchild_status) )
+	else if ( WIFSIGNALED(wait_status) || WIFSTOPPED(wait_status) )
 	{
-		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WTERMSIG(first_process_sigchild_status)) );
+		debug(D_DEBUG, "process %d terminated: %s.\n",
+		      first_process_pid,
+		      strsignal(WIFSIGNALED(wait_status) ? WTERMSIG(wait_status) : WSTOPSIG(wait_status)));
 
-		if(over_limit_str)
-		{
-			fprintf(log_summary, "%-30s\tlimit\n", "exit_type:");
-			fprintf(log_summary, "%-30s\t%s\n", "limits_exceeded:", over_limit_str);
-		}
+		if(summary->limits_exceeded)
+			summary->exit_type = xxstrdup("limits");
 		else
-		{
-			fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
-			fprintf(log_summary, "%-30s\t%d %s\n", "signal:", 
-				WTERMSIG(first_process_sigchild_status), 
-				strsignal(WTERMSIG(first_process_sigchild_status)));
-		}
-	} 
-	else if ( WIFSTOPPED(first_process_sigchild_status) )
-	{
-		debug(D_DEBUG, "process %d terminated: %s.\n", first_process_pid, strsignal(WSTOPSIG(first_process_sigchild_status)) );
-		fprintf(log_summary, "%-30s\tsignal\n", "exit_type:");
-		fprintf(log_summary, "%-30s\t%d %s\n", "signal:", 
-			WSTOPSIG(first_process_sigchild_status), 
-			strsignal(WSTOPSIG(first_process_sigchild_status)));
-	}
+			summary->exit_type = xxstrdup("signal");
 
-	fprintf(log_summary, "%-30s\t%d\n", "exit_status:", WEXITSTATUS(first_process_sigchild_status));
+		if(WIFSIGNALED(wait_status))
+			summary->signal    = WTERMSIG(wait_status);
+		else
+			summary->signal    = WSTOPSIG(wait_status);
+
+		summary->exit_status = -1;
+	} 
+
 }
 
 int monitor_final_summary()
 {
-    int status = 0;
+	decode_zombie_status(summary, first_process_sigchild_status);
 
-    if(over_limit_str)
-        status = -1;
+	summary->end       = usecs_since_epoch();
+	summary->wall_time = summary->end - summary->start;
+	
+	rmsummary_print(log_summary, summary);
 
-    report_zombie_status();
-
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "max_concurrent_processes:", tree_max->max_concurrent_processes);
-
-    //Print time in seconds, rather than microseconds.
-    fprintf(log_summary, "%-30s\t%lf\n",         "wall_time:", ((double) tree_max->wall_time / ONE_SECOND));
-    fprintf(log_summary, "%-30s\t%lf\n",         "cpu_time:",  ((double) tree_max->cpu_time  / ONE_SECOND));
-
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "virtual_memory:", tree_max->virtual_memory);
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "resident_memory:", tree_max->resident_memory);
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "swap_memory:", tree_max->swap_memory);
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_read:", tree_max->bytes_read);
-    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "bytes_written:", tree_max->bytes_written);
-    
-    if(tree_flags->workdir_footprint)
-    {
-	    fprintf(log_summary, "%-30s\t%" PRId64 "\n", "workdir_number_files_dirs:", tree_max->workdir_number_files_dirs);
-
-	    //Print the footprint in megabytes, rather than of bytes.
-	    fprintf(log_summary, "%-30s\t%lf\n",         "workdir_footprint:", ((double) tree_max->workdir_footprint/ONE_MEGABYTE));
-    }
-
-    if(status && !WEXITSTATUS(first_process_sigchild_status))
-        return status;
-    else
-        return WEXITSTATUS(first_process_sigchild_status);
+	if(summary->limits_exceeded && summary->exit_status == 0)
+		return -1;
+	else
+		return summary->exit_status;
 }
 
 void monitor_write_open_file(char *filename)
@@ -1268,8 +605,10 @@ void monitor_write_open_file(char *filename)
     /* Perhaps here we can do something more to the files, like a
      * final stat */
 
-    fprintf(log_opened, "%s\n", filename);
-
+	if(log_opened)
+	{
+		fprintf(log_opened, "%s\n", filename);
+	}
 }
 
 /***
@@ -1309,6 +648,8 @@ void monitor_track_process(pid_t pid)
 
 	p->running = 1;
 	p->waiting = 0;
+
+	summary->num_processes++;
 }
 
 void monitor_untrack_process(uint64_t pid)
@@ -1373,10 +714,10 @@ void ping_processes(void)
         }
 }
 
-struct tree_info *monitor_rusage_tree(void)
+struct rmsummary *monitor_rusage_tree(void)
 {
     struct rusage usg;
-    struct tree_info *tr_usg = calloc(1, sizeof(struct tree_info));
+    struct rmsummary *tr_usg = calloc(1, sizeof(struct rmsummary));
 
     debug(D_DEBUG, "calling getrusage.\n");
 
@@ -1387,7 +728,7 @@ struct tree_info *monitor_rusage_tree(void)
     }
 
     /* Here we add the maximum recorded + the io from memory maps */
-    tr_usg->bytes_read     =  tree_max->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
+    tr_usg->bytes_read     =  summary->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
 
     tr_usg->resident_memory = usg.ru_maxrss;
 
@@ -1447,8 +788,8 @@ void monitor_check_child(const int signal)
       monitor_untrack_process(pid);
 
     /* get the peak values from getrusage */
-    struct tree_info *tr_usg = monitor_rusage_tree();
-    monitor_find_max_tree(tree_max, tr_usg);
+    struct rmsummary *tr_usg = monitor_rusage_tree();
+    monitor_find_max_tree(summary, tr_usg);
     free(tr_usg);
 }
 
@@ -1498,9 +839,12 @@ void monitor_final_cleanup(int signum)
 
     status = monitor_final_summary();
 
-    fclose(log_summary);
-    fclose(log_series);
-    fclose(log_opened);
+    if(log_summary)
+	    fclose(log_summary);
+    if(log_series)
+	    fclose(log_series);
+    if(log_opened)
+	    fclose(log_opened);
 
     exit(status);
 }
@@ -1508,39 +852,46 @@ void monitor_final_cleanup(int signum)
 // The following keeps getting uglier and uglier! Rethink how to do it!
 //
 #define over_limit_check(tr, fld, mult, fmt)				\
-	if((tr)->fld > 0 && tree_limits->fld - (tr)->fld < 0)		\
+	if(resources_limits->fld > -1 && (tr)->fld > 0 && resources_limits->fld - (tr)->fld < 0)\
 	{								\
+		debug(D_DEBUG, "Limit " #fld " broken.\n");		\
 		char *tmp;						\
-		if(over_limit_str)					\
+		if((tr)->limits_exceeded)                               \
 		{							\
-			tmp = string_format("%s, " #fld " %" fmt " > %" fmt, over_limit_str, mult * (tr)->fld, mult * tree_limits->fld); \
-			free(over_limit_str);				\
-			over_limit_str = tmp;				\
+			tmp = string_format("%s, " #fld ": %" fmt, (tr)->limits_exceeded, mult * resources_limits->fld); \
+			free((tr)->limits_exceeded);			\
+			(tr)->limits_exceeded = tmp;			\
 		}							\
 		else							\
-			over_limit_str = string_format(#fld " %" fmt " > %" fmt, mult * (tr)->fld, mult * tree_limits->fld); \
+			(tr)->limits_exceeded = string_format(#fld ": %" fmt, mult * resources_limits->fld); \
 	}
 
 /* return 0 means above limit, 1 means limist ok */
-int monitor_check_limits(struct tree_info *tr)
+int monitor_check_limits(struct rmsummary *tr)
 {
-    over_limit_str = NULL;
+	tr->limits_exceeded = NULL;
 
-    over_limit_check(tr, wall_time, 1.0/ONE_SECOND, "lf");
-    over_limit_check(tr, max_concurrent_processes, 1, PRId64);
-    over_limit_check(tr, cpu_time, 1.0/ONE_SECOND, "lf");
-    over_limit_check(tr, virtual_memory, 1, PRId64);
-    over_limit_check(tr, resident_memory, 1, PRId64);
-    over_limit_check(tr, swap_memory, 1, PRId64);
-    over_limit_check(tr, bytes_read, 1, PRId64);
-    over_limit_check(tr, bytes_written, 1, PRId64);
-    over_limit_check(tr, workdir_number_files_dirs, 1, PRId64);
-    over_limit_check(tr, workdir_footprint, 1, PRId64);
+	if(!resources_limits)
+		return 1;
 
-    if(over_limit_str)
-        return 0;
-    else
-        return 1;
+	over_limit_check(tr, start, 1.0/ONE_SECOND, "lf");
+	over_limit_check(tr, end,   1.0/ONE_SECOND, "lf");
+	over_limit_check(tr, wall_time, 1.0/ONE_SECOND, "lf");
+	over_limit_check(tr, cpu_time,  1.0/ONE_SECOND, "lf");
+	over_limit_check(tr, max_processes,   1, PRId64);
+	over_limit_check(tr, num_processes,   1, PRId64);
+	over_limit_check(tr, virtual_memory,  1, PRId64);
+	over_limit_check(tr, resident_memory, 1, PRId64);
+	over_limit_check(tr, swap_memory,     1, PRId64);
+	over_limit_check(tr, bytes_read,      1, PRId64);
+	over_limit_check(tr, bytes_written,   1, PRId64);
+	over_limit_check(tr, workdir_num_files, 1, PRId64);
+	over_limit_check(tr, workdir_footprint, 1.0/ONE_MEGABYTE, "lf");
+
+	if(tr->limits_exceeded)
+		return 0;
+	else
+		return 1;
 }
 
 /***
@@ -1599,8 +950,8 @@ void monitor_dispatch_msg(void)
 	{
         case BRANCH:
 		monitor_track_process(msg.origin);
-		if(tree_max->max_concurrent_processes < itable_size(processes))
-			tree_max->max_concurrent_processes = itable_size(processes);
+		if(summary->max_processes < itable_size(processes))
+			summary->max_processes = itable_size(processes);
 		break;
         case WAIT:
 		p->waiting = 1;
@@ -1624,8 +975,9 @@ void monitor_dispatch_msg(void)
 		break;
 	};
 
-	if(!monitor_check_limits(tree_max))
+	if(!monitor_check_limits(summary))
 		monitor_final_cleanup(SIGTERM);
+
 }
 
 int wait_for_messages(int interval)
@@ -1712,9 +1064,6 @@ struct process_info *spawn_first_process(const char *cmd)
 {
     pid_t pid;
 
-    fprintf(log_summary, "command: %s\n", cmd);
-    fprintf(log_summary, "%-30s\t%lf\n", "start:", ((double) usecs_initial / ONE_SECOND));
-  
     pid = monitor_fork();
 
     monitor_summary_header();
@@ -1772,11 +1121,11 @@ int monitor_resources(long int interval /*in microseconds */)
 {
     uint64_t round;
 
-    struct process_info  *p = malloc(sizeof(struct process_info));
-    struct wdir_info     *d = malloc(sizeof(struct wdir_info));
-    struct filesys_info  *f = malloc(sizeof(struct filesys_info));
+    struct process_info  *p_acc = calloc(1, sizeof(struct process_info)); //Automatic zeroed.
+    struct wdir_info     *d_acc = calloc(1, sizeof(struct wdir_info));
+    struct filesys_info  *f_acc = calloc(1, sizeof(struct filesys_info));
 
-    struct tree_info    *tree_now = calloc(1, sizeof(struct tree_info)); //Automatic zeroed.
+    struct rmsummary    *resources_now = calloc(1, sizeof(struct rmsummary));
 
     // Loop while there are processes to monitor, that is 
     // itable_size(processes) > 0). The check is done again in a
@@ -1788,23 +1137,20 @@ int monitor_resources(long int interval /*in microseconds */)
     { 
         ping_processes();
 
-        monitor_processes_once(p);
+        monitor_poll_all_processes_once(processes, p_acc);
 
-	if(tree_flags->workdir_footprint)
-		monitor_wds_once(d);
+	if(resources_flags->workdir_footprint)
+		monitor_poll_all_wds_once(wdirs, d_acc);
 
 	// monitor_fss_once(f); disabled until statfs fs id makes sense.
 
-        monitor_collate_tree(tree_now, p, d, f);
+        monitor_collate_tree(resources_now, p_acc, d_acc, f_acc);
 
-        if(round == 1)
-            memcpy(tree_max, tree_now, sizeof(struct tree_info));
-        else
-            monitor_find_max_tree(tree_max, tree_now);
+	monitor_find_max_tree(summary, resources_now);
 
-        monitor_log_row(tree_now);
+        monitor_log_row(resources_now);
 
-        if(!monitor_check_limits(tree_now))
+        if(!monitor_check_limits(summary))
             monitor_final_cleanup(SIGTERM);
 
 	release_waiting_processes();
@@ -1823,10 +1169,10 @@ int monitor_resources(long int interval /*in microseconds */)
         round++;
     }
 
-    free(tree_now);
-    free(p);
-    free(d);
-    free(f);
+    free(resources_now);
+    free(p_acc);
+    free(d_acc);
+    free(f_acc);
 
     return 0;
 }
@@ -1853,12 +1199,9 @@ int main(int argc, char **argv) {
     signal(SIGQUIT, monitor_final_cleanup);
     signal(SIGTERM, monitor_final_cleanup);
 
-    tree_max    = calloc(1, sizeof(struct tree_info));
-    tree_limits = calloc(1, sizeof(struct tree_info));
-    tree_flags  = calloc(1, sizeof(struct tree_info));
-
-    usecs_initial = usecs_since_epoch();
-    initialize_limits_tree(tree_limits, INTMAX_MAX);
+    summary    = calloc(1, sizeof(struct rmsummary));
+    resources_limits = NULL;
+    resources_flags  = calloc(1, sizeof(struct rmsummary));
 
     struct option long_options[] =
 	    {
@@ -1905,10 +1248,20 @@ int main(int argc, char **argv) {
 			    fatal("interval cannot be set to less than one microsecond.");
 		    break;
             case 'l':
-		    parse_limits_file(optarg, tree_limits);
+		    if(resources_limits)
+		    {
+			    debug(D_NOTICE, "You can only specify the flags -l or -L once. Discarding previous limits.\n"); 
+			    free(resources_limits);
+		    }
+		    resources_limits = parse_limits_file(optarg);
 		    break;
             case 'L':
-		    parse_limits_string(optarg, tree_limits);
+		    if(resources_limits)
+		    {
+			    debug(D_NOTICE, "You can only specify the flags -l or -L once. Discarding previous limits.\n"); 
+			    free(resources_limits);
+		    }
+		    resources_limits = parse_limits_string(optarg);
 		    break;
             case 'o':
 		    if(template_path)
@@ -1929,9 +1282,6 @@ int main(int argc, char **argv) {
 			    opened_path = NULL;
 		    }
 		    template_path = xxstrdup(optarg);
-		    use_summary = 1;
-		    use_series  = 1;
-		    use_opened  = 1;
 		    break;
 
 	    case 0:
@@ -1971,10 +1321,10 @@ int main(int argc, char **argv) {
 		    use_opened  = 0;
 		    break;
 	    case 6:
-		    tree_flags->workdir_footprint = 1;
+		    resources_flags->workdir_footprint = 1;
 		    break;
 	    case 7:
-		    tree_flags->workdir_footprint = 0;
+		    resources_flags->workdir_footprint = 0;
 		    break;
             default:
 		    show_help(argv[0]);
@@ -2034,6 +1384,9 @@ int main(int argc, char **argv) {
     log_summary = open_log_file(summary_path);
     log_series  = open_log_file(series_path);
     log_opened  = open_log_file(opened_path);
+
+    summary->command = xxstrdup(cmd);
+    summary->start = usecs_since_epoch();
 
     spawn_first_process(cmd);
 

@@ -40,7 +40,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "xxmalloc.h"
 #include "getopt_aux.h"
-#include "rmonitor_hooks.h"
+#include "rmonitor.h"
 #include "random_init.h"
 
 #include "dag.h"
