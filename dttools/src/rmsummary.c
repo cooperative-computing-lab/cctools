@@ -141,11 +141,7 @@ struct rmsummary *rmsummary_parse_single(char *buffer, char separator)
 
 	const char delim[] = { separator, '\n', '\0'}; 
 
-	struct rmsummary *s = malloc(sizeof(struct rmsummary));
-	memset(s, -1, sizeof(struct rmsummary));
-	s->command   = NULL;
-	s->exit_type = NULL;
-	s->limits_exceeded = NULL;
+	struct rmsummary *s = make_rmsummary(-1);
 
 	token = strtok_r(buffer, delim, &saveptr);
 	while(token)
@@ -240,3 +236,15 @@ struct list *rmsummary_parse_file_multiple(char *filename)
 	return lst;
 }
 
+
+struct rmsummary *make_rmsummary(int default_value)
+{
+	struct rmsummary *s = malloc(sizeof(struct rmsummary));
+	memset(s, default_value, sizeof(struct rmsummary));
+
+	s->command   = NULL;
+	s->exit_type = NULL;
+	s->limits_exceeded = NULL;
+
+	return s;
+}

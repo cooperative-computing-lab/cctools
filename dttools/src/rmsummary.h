@@ -38,6 +38,8 @@ struct rmsummary
 	int64_t  workdir_num_files;
 	int64_t  workdir_footprint;
 
+	/* these fields are not used when reading/printing summaries */ 
+	int64_t  cores;
 	int64_t  fs_nodes;
 };
 
@@ -56,9 +58,10 @@ struct rmsummary_field
 struct rmsummary *resource_monitor_parse_summary_file(char *filename);
 
 void rmsummary_print(FILE *stream, struct rmsummary *s);
+
 struct rmsummary *rmsummary_parse_single(char *buffer, char separator);
 struct rmsummary *rmsummary_parse_file_single(char *filename);
 
-
+struct rmsummary *make_rmsummary(int default_value);
 
 #endif

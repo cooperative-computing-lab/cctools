@@ -57,9 +57,9 @@ See the file COPYING for details.
 #define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
 #define MAKEFLOW_GC_MIN_THRESHOLD 1
 
-#define MAKEFLOW_TASK_CATEGORY "MAKEFLOW_TASK_CATEGORY"	/* The value of this variable in the Makeflow
-							   file indicates the task category of the
-							   rules to follow */
+#define RESOURCES_CATEGORY "RESOURCES_CATEGORY"	/* The value of this variable in the Makeflow
+						   file indicates the task category of the
+						   rules to follow */
 
 #define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 
@@ -932,6 +932,11 @@ int dag_parse(struct dag *d, FILE * dag_stream, int monitor_mode)
 	bk->stream = dag_stream;
 	bk->monitor_mode = monitor_mode;
 
+	bk->category = dag_task_category_lookup_or_create(d, "resources_default");
+
+	dag_task_category_get_env_resources(bk->category);
+
+
 	while((line = dag_parse_readline(bk, NULL)) != NULL) {
 
 		if(strlen(line) == 0 || line[0] == '#') {
@@ -1078,7 +1083,7 @@ void dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *
 {
 	struct dag *d = bk->d;
 
-	if(strcmp(MAKEFLOW_TASK_CATEGORY, name) == 0) {
+	if(strcmp(RESOURCES_CATEGORY, name) == 0) {
 		/* If we have never seen this label, then create
 		 * a new category, otherwise retrieve the category. */
 		struct dag_task_category *category = dag_task_category_lookup_or_create(d, value);
@@ -1086,7 +1091,7 @@ void dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *
 		/* If we are parsing inside a node, make category
 		 * the category of the node, but do not update
 		 * the global task_category. Else, update the
-		 * glogal task category. */
+		 * global task category. */
 		if(n) {
 			/* Decrement the count from previous */
 			n->category->count--;
@@ -1174,12 +1179,11 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 
 	n = dag_node_create(bk->d, bk->line_number);
 
-	if(!bk->category)
-		bk->category = dag_task_category_lookup_or_create(d, "without_explicit_category");
-
 	n->category = bk->category;
 	n->category->count++;
-	debug(D_DEBUG, "Setting category '%s' for rule %d.\n", n->category->label, n->nodeid);
+	debug(D_DEBUG, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
+
+	dag_task_category_print_debug_resources(n->category);
 
 	/* BUG: We need a more general solution to wrapping nodes
 	 * while parsing. The monitor code should not be here. */

@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <math.h>
 
 #include "debug.h"
 #include "xxmalloc.h"
@@ -16,6 +17,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "list.h"
 #include "set.h"
+#include "rmsummary.h"
 
 #include "dag.h"
 
@@ -444,11 +446,38 @@ struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, cons
 		category = malloc(sizeof(struct dag_task_category));
 		category->label = xxstrdup(label);
 		category->count = 0;
+		category->resources = make_rmsummary(-1);
 
 		hash_table_insert(d->task_categories, label, category);
 	}
 
 	return category;
+}
+
+void dag_task_category_get_env_resources(struct dag_task_category *category)
+{
+	if(category)
+	{
+		char *value;
+		if((value = getenv( RESOURCES_CORES  )))
+			category->resources->cores           = atoi(value);
+		if((value = getenv( RESOURCES_MEMORY )))
+			category->resources->resident_memory = atoi(value);
+
+		/* Megabytes to bytes */
+		if((value = getenv( RESOURCES_DISK )))
+			category->resources->workdir_footprint = ceil(strtod(value, NULL) * 1024 * 1024); 
+	}
+}
+
+void dag_task_category_print_debug_resources(struct dag_task_category *category)
+{
+	if( category->resources->cores > -1 )
+		debug(D_DEBUG, "minimum cores:  %d.\n", category->resources->cores);
+	if( category->resources->resident_memory > -1 )
+		debug(D_DEBUG, "minimum memory: %d MB.\n", category->resources->resident_memory);
+	if( category->resources->workdir_footprint > -1 )
+		debug(D_DEBUG, "minimum disk:   %lf MB.\n", category->resources->workdir_footprint);
 }
 
 int dag_file_is_source(struct dag_file *f)

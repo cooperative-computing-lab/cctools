@@ -16,6 +16,11 @@ See the file COPYING for details.
 
 #define MAX_REMOTE_JOBS_DEFAULT 100;
 
+#define RESOURCES_CATEGORY "RESOURCES_CATEGORY"
+#define RESOURCES_CORES  "CORES"
+#define RESOURCES_MEMORY "MEMORY"
+#define RESOURCES_DISK   "DISK"
+
 typedef enum {
 	DAG_NODE_STATE_WAITING = 0,
 	DAG_NODE_STATE_RUNNING = 1,
@@ -100,9 +105,9 @@ struct lexer_book
    category, and maximum resources allowed. */
 struct dag_task_category
 {
-    char *label;
-    int  count;
-
+	char *label;
+	struct rmsummary *resources;
+	int  count;
 };
 
 /* struct dag_node implements a linked list of nodes. A dag_node
@@ -220,4 +225,7 @@ char *dag_lookup(const char *name, void *arg);
 char *dag_lookup_set(const char *name, void *arg);
 
 struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label);
+void dag_task_category_get_env_resources(struct dag_task_category *category);
+void dag_task_category_print_debug_resources(struct dag_task_category *category);
+
 #endif
