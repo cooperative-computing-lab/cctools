@@ -254,15 +254,18 @@ int get_swap_linux(pid_t pid, struct mem_info *mem)
 	if(!fsmaps)
 		return 1;
 
+	/* in kB */
 	uint64_t accum = 0;
 	uint64_t value = 0;
 
 	while(get_int_attribute(fsmaps, "Swap:", &value, 0) == 0)
 		accum += value; 
 
+	mem->swap = accum;
+
 	fclose(fsmaps);
 
-	return accum;
+	return 0;
 }
 
 int get_mem_linux(pid_t pid, struct mem_info *mem)
