@@ -283,9 +283,15 @@ struct chirp_client *chirp_client_connect_condor(time_t stoptime)
 	int port;
 	int result;
 
+	/*
+        Older versions of Condor use chirp.config.
+	Start with Condor V8.X the file is .chirp.config.
+	https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=3353
+	*/
+
 	file = fopen("chirp.config", "r");
-	if(!file)
-		return 0;
+	if(!file) file = fopen(".chirp.config","r");
+	if(!file) return 0;
 
 	fields = fscanf(file, "%s %d %s", host, &port, cookie);
 	fclose(file);
