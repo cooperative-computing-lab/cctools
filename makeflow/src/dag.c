@@ -463,11 +463,11 @@ void dag_task_category_get_env_resources(struct dag_task_category *category)
 void dag_task_category_print_debug_resources(struct dag_task_category *category)
 {
 	if( category->resources->cores > -1 )
-		debug(D_DEBUG, "minimum cores:  %d.\n", category->resources->cores);
+		debug(D_DEBUG, "minimum # cores:  %d.\n",    category->resources->cores);
 	if( category->resources->resident_memory > -1 )
-		debug(D_DEBUG, "minimum memory: %d MB.\n", category->resources->resident_memory);
+		debug(D_DEBUG, "minimum memory:   %d MB.\n", category->resources->resident_memory);
 	if( category->resources->workdir_footprint > -1 )
-		debug(D_DEBUG, "minimum disk:   %lf MB.\n", category->resources->workdir_footprint);
+		debug(D_DEBUG, "minimum disk:     %d MB.\n", category->resources->workdir_footprint);
 }
 
 int dag_file_is_source(struct dag_file *f)

@@ -932,10 +932,9 @@ int dag_parse(struct dag *d, FILE * dag_stream, int monitor_mode)
 	bk->stream = dag_stream;
 	bk->monitor_mode = monitor_mode;
 
-	bk->category = dag_task_category_lookup_or_create(d, "resources_default");
+	bk->category = dag_task_category_lookup_or_create(d, "default");
 
 	dag_task_category_get_env_resources(bk->category);
-
 
 	while((line = dag_parse_readline(bk, NULL)) != NULL) {
 
@@ -1098,11 +1097,17 @@ void dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *
 			n->category = category;
 			n->category->count++;
 			debug(D_DEBUG, "Updating category '%s' for rule %d.\n", value, n->nodeid);
-		} else
+		}
+		else
 			bk->category = category;
-
-
 	}
+	else if(strcmp(RESOURCES_CORES,  name) == 0)
+		bk->category->resources->cores             = atoi(value);
+	else if(strcmp(RESOURCES_MEMORY, name) == 0)
+		bk->category->resources->resident_memory   = atoi(value);
+	else if(strcmp(RESOURCES_DISK,   name) == 0)
+		bk->category->resources->workdir_footprint = atoi(value);
+
 	/* else if some other special variable .... */
 }
 
@@ -1181,9 +1186,6 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 
 	n->category = bk->category;
 	n->category->count++;
-	debug(D_DEBUG, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
-
-	dag_task_category_print_debug_resources(n->category);
 
 	/* BUG: We need a more general solution to wrapping nodes
 	 * while parsing. The monitor code should not be here. */
@@ -1219,8 +1221,7 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 				n->next = d->nodes;
 				d->nodes = n;
 				itable_insert(d->node_table, n->nodeid, n);
-				free(line);
-				return 1;
+				break;
 			} else {
 				dag_parse_error(bk, "node command");
 				free(line);
@@ -1229,6 +1230,9 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 		}
 		free(line);
 	}
+
+	debug(D_DEBUG, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
+	dag_task_category_print_debug_resources(n->category);
 
 	free(line);
 	return 1;
