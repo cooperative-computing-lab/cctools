@@ -387,7 +387,7 @@ data into the cluster over inter-cluster networks.
 </p>
 
 <p>
-To run the <b>work_queue_worker</b> as a foreman, use the <b>-m foreman</b> argument.  The foreman's master
+To run the <b>work_queue_worker</b> as a foreman, use the <b>--foreman</b> argument.  The foreman's master
 is set the same way as a normal work_queue_worker, using either hostname and port or the <b>-M project_name</b>
 argument.  To acquire workers the foreman can advertise itself as a separate project using the <b>-N foreman_name</b>
 flag, and the port it should listen on can be set with <b>-f port</b>.
@@ -396,7 +396,7 @@ flag, and the port it should listen on can be set with <b>-f port</b>.
 <p>
 For example, to run a foreman working for project_A and advertising itself as foreman_A1 while listening on port 9123 you would use:
 <pre>
-% work_queue_worker -m foreman -M project_A -N foreman_A1 -f 9123
+% work_queue_worker --foreman -M project_A -N foreman_A1 -f 9123
 </pre>
 </p>
 
