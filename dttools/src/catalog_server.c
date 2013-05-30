@@ -369,7 +369,7 @@ static void handle_query(struct link *query_link)
 		fprintf(stream,"[\n");
 		for(i = 0; i < n; i++) {
 			nvpair_print_json(array[i], stream);
-			fprintf(stream,",\n");
+			if(i<(n-1)) fprintf(stream,",\n");
 		}
 		fprintf(stream,"]\n");
 	} else if(!strcmp(path, "/query.oldclassads")) {
