@@ -340,6 +340,7 @@ static void handle_query(struct link *query_link)
 	fprintf(stream, "Date: %s", ctime(&current));
 	fprintf(stream, "Server: catalog_server\n");
 	fprintf(stream, "Connection: close\n");
+	fprintf(stream, "Access-Control-Allow-Origin: *\n");
 
 	if(sscanf(url, "http://%[^/]%s", hostport, path) == 2) {
 		// continue on
