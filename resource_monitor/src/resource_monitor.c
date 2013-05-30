@@ -49,7 +49,7 @@ See the file COPYING for details.
  * process. A flag will be added later to indicate a prefered
  * output file. Additionally, a summary log file is written at
  * the end, reporting the command run, starting and ending times,
- * and maximum, minimum, and average of the resources monitored.
+ * and maximum, of the resources monitored.
  *
  * Each monitored process gets a 'struct process_info', itself
  * composed of 'struct mem_info', 'struct cpu_time_info', etc. There
@@ -259,53 +259,24 @@ FILE *open_log_file(const char *log_path)
     return log_file;
 }
 
-void parse_limits_report(struct rmsummary *s)
-{
-	/* Bug, times and footprint to correct units */
-	if(s->wall_time != -1)
-		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "wall_time", s->wall_time);
-	if(s->max_processes != -1)
-		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "max_processes", s->max_processes);
-	if(s->num_processes != -1)
-		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "num_processes", s->num_processes);
-	if(s->cpu_time != -1)
-		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "cpu_time", s->cpu_time);
-	if(s->virtual_memory != -1)
-		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "virtual_memory", s->virtual_memory);
-	if(s->resident_memory != -1)
-		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "resident_memory", s->resident_memory);
-	if(s->swap_memory != -1)
-		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "swap_memory", s->swap_memory);
-	if(s->bytes_read != -1)
-		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "bytes_read", s->bytes_read);
-	if(s->bytes_written != -1)
-		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "bytes_written", s->bytes_written);
-	if(s->workdir_num_files != -1)
-		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "workdir_num_files", s->workdir_num_files);
-	if(s->workdir_footprint != -1)
-		debug(D_DEBUG, "Limit %s set to %" PRId64 "\n", "workdir_footprint", s->workdir_footprint);
-}
-
-struct rmsummary *parse_limits_string(char *str)
+void parse_limits_string(struct rmsummary *limits, char *str)
 {
 	struct rmsummary *s;
-
 	s = rmsummary_parse_single(str, ',');
 
-	parse_limits_report(s);
+	rmsummary_merge_override(limits, s);
 
-	return s;
+	free(s);
 }
 
-struct rmsummary *parse_limits_file(char *path)
+void parse_limits_file(struct rmsummary *limits, char *path)
 {
 	struct rmsummary *s;
-
 	s = rmsummary_parse_file_single(path);
 
-	parse_limits_report(s);
+	rmsummary_merge_override(limits, s);
 
-	return s;
+	free(s);
 }
 
 /***
@@ -495,38 +466,7 @@ void monitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
     if(!tr)
         return;
 
-    if(result->wall_time < tr->wall_time)
-        result->wall_time = tr->wall_time;
-
-    if(result->max_processes < tr->max_processes)
-        result->max_processes = tr->max_processes;
-
-    if(result->cpu_time < tr->cpu_time)
-        result->cpu_time = tr->cpu_time;
-
-    if(result->virtual_memory < tr->virtual_memory)
-        result->virtual_memory = tr->virtual_memory;
-
-    if(result->resident_memory < tr->resident_memory)
-        result->resident_memory = tr->resident_memory;
-
-    if(result->swap_memory < tr->swap_memory)
-        result->swap_memory = tr->swap_memory;
-
-    if(result->bytes_read < tr->bytes_read)
-        result->bytes_read = tr->bytes_read;
-
-    if(result->bytes_written < tr->bytes_written)
-        result->bytes_written = tr->bytes_written;
-
-    if(result->workdir_num_files < tr->workdir_num_files)
-        result->workdir_num_files = tr->workdir_num_files;
-
-    if(result->workdir_footprint < tr->workdir_footprint)
-        result->workdir_footprint = tr->workdir_footprint;
-
-    if(result->fs_nodes < tr->fs_nodes)
-        result->fs_nodes = tr->fs_nodes;
+    rmsummary_merge_max(result, tr);
 }
 
 void monitor_log_row(struct rmsummary *tr)
@@ -1199,9 +1139,11 @@ int main(int argc, char **argv) {
     signal(SIGQUIT, monitor_final_cleanup);
     signal(SIGTERM, monitor_final_cleanup);
 
-    summary    = calloc(1, sizeof(struct rmsummary));
-    resources_limits = NULL;
-    resources_flags  = calloc(1, sizeof(struct rmsummary));
+    summary          = calloc(1, sizeof(struct rmsummary));
+    resources_limits = make_rmsummary(-1);
+    resources_flags  = make_rmsummary(0);
+
+    rmsummary_read_env_vars(resources_limits);
 
     struct option long_options[] =
 	    {
@@ -1248,20 +1190,10 @@ int main(int argc, char **argv) {
 			    fatal("interval cannot be set to less than one microsecond.");
 		    break;
             case 'l':
-		    if(resources_limits)
-		    {
-			    debug(D_NOTICE, "You can only specify the flags -l or -L once. Discarding previous limits.\n"); 
-			    free(resources_limits);
-		    }
-		    resources_limits = parse_limits_file(optarg);
+		    parse_limits_file(resources_limits, optarg);
 		    break;
             case 'L':
-		    if(resources_limits)
-		    {
-			    debug(D_NOTICE, "You can only specify the flags -l or -L once. Discarding previous limits.\n"); 
-			    free(resources_limits);
-		    }
-		    resources_limits = parse_limits_string(optarg);
+		    parse_limits_string(resources_limits, optarg);
 		    break;
             case 'o':
 		    if(template_path)
@@ -1333,6 +1265,8 @@ int main(int argc, char **argv) {
 	    }
     }
 
+    rmsummary_debug_report(resources_limits);
+
     //this is ugly, concatenating command and arguments
     if(optind < argc)
     {
@@ -1386,7 +1320,7 @@ int main(int argc, char **argv) {
     log_opened  = open_log_file(opened_path);
 
     summary->command = xxstrdup(cmd);
-    summary->start = usecs_since_epoch();
+    summary->start   = usecs_since_epoch();
 
     spawn_first_process(cmd);
 

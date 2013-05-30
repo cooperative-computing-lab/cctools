@@ -69,7 +69,9 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 	return 0;
 }
 
-/**  Reads a single summary from stream **/
+/** Reads a single summary from stream. Summaries are not parsed, here
+    we simply read between comments (#) and blank lines for the lines
+    describing the summary.**/
 char *rmsummary_read_single(FILE *stream)
 {
 	int nmax   = 1024;
@@ -126,8 +128,7 @@ char *rmsummary_read_single(FILE *stream)
 	return summ;
 }
 
-
-
+/* Parse a string for summary fields. Separator is usually '\n' or ',' */
 #define MAX_LINE 1024
 struct rmsummary *rmsummary_parse_single(char *buffer, char separator)
 {
@@ -152,8 +153,6 @@ struct rmsummary *rmsummary_parse_single(char *buffer, char separator)
 			char *value_trim = string_trim_spaces(value);
 			rmsummary_assign_field(s, key_trim, value_trim);
 		}
-		printf("%s %s %s\n", token, key, value);
-
 		token = strtok_r(NULL, delim, &saveptr);
 	}
 
@@ -162,6 +161,7 @@ struct rmsummary *rmsummary_parse_single(char *buffer, char separator)
 	return s;
 }
 
+/* Parse the file, assuming there is a single summary in it. */
 struct rmsummary *rmsummary_parse_file_single(char *filename)
 {
 	FILE *stream;
@@ -209,6 +209,8 @@ void rmsummary_print(FILE *stream, struct rmsummary *s)
 		s->workdir_footprint >= 0 ? s->workdir_footprint : -1);
 }
 
+/* Parse the file assuming there are multiple summaries in it. Summary
+   boundaries are lines starting with # */
 struct list *rmsummary_parse_file_multiple(char *filename)
 {
 	FILE *stream;
@@ -237,7 +239,9 @@ struct list *rmsummary_parse_file_multiple(char *filename)
 }
 
 
-struct rmsummary *make_rmsummary(int default_value)
+/* Create summary filling all numeric fields with default_value, and
+all string fields with NULL. Usual values are 0, or -1. */
+struct rmsummary *make_rmsummary(signed char default_value)
 {
 	struct rmsummary *s = malloc(sizeof(struct rmsummary));
 	memset(s, default_value, sizeof(struct rmsummary));
@@ -247,4 +251,94 @@ struct rmsummary *make_rmsummary(int default_value)
 	s->limits_exceeded = NULL;
 
 	return s;
+}
+
+void rmsummary_read_env_vars(struct rmsummary *s)
+{
+	char *value;
+	if((value = getenv( RESOURCES_CORES  )))
+		s->cores           = atoi(value);
+	if((value = getenv( RESOURCES_MEMORY )))
+		s->resident_memory = atoi(value);
+	if((value = getenv( RESOURCES_DISK )))
+		s->workdir_footprint = atoi(value);
+}
+
+#define rmsummary_apply_op(dest, src, fn, field) (dest)->field = fn((dest)->field, (src)->field)
+
+typedef int64_t (*rm_bin_op)(int64_t, int64_t);
+void rmsummary_bin_op(struct rmsummary *dest, struct rmsummary *src, rm_bin_op fn)
+{
+	rmsummary_apply_op(dest, src, fn, start);
+	rmsummary_apply_op(dest, src, fn, end);
+	rmsummary_apply_op(dest, src, fn, exit_status);
+	rmsummary_apply_op(dest, src, fn, wall_time);
+	rmsummary_apply_op(dest, src, fn, max_processes);
+	rmsummary_apply_op(dest, src, fn, num_processes);
+	rmsummary_apply_op(dest, src, fn, cpu_time);
+	rmsummary_apply_op(dest, src, fn, virtual_memory);
+	rmsummary_apply_op(dest, src, fn, resident_memory);
+	rmsummary_apply_op(dest, src, fn, swap_memory);
+	rmsummary_apply_op(dest, src, fn, bytes_read);
+	rmsummary_apply_op(dest, src, fn, bytes_written);
+	rmsummary_apply_op(dest, src, fn, workdir_num_files);
+	rmsummary_apply_op(dest, src, fn, workdir_footprint);
+
+	rmsummary_apply_op(dest, src, fn, cores);
+	rmsummary_apply_op(dest, src, fn, fs_nodes);
+}
+
+/* Copy the value for all the fields in src > -1 to dest */ 
+static int64_t override_field(int64_t d, int64_t s)
+{
+	return (s > -1) ? s : d; 
+}
+
+void rmsummary_merge_override(struct rmsummary *dest, struct rmsummary *src)
+{
+	rmsummary_bin_op(dest, src, override_field);
+}
+
+
+/* Select the max of the fields */
+static int64_t max_field(int64_t d, int64_t s)
+{
+	return (d > s) ? d : s; 
+}
+
+void rmsummary_merge_max(struct rmsummary *dest, struct rmsummary *src)
+{
+	rmsummary_bin_op(dest, src, max_field);
+}
+
+void rmsummary_debug_report(struct rmsummary *s)
+{
+	if(s->cores != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "cores", s->cores);
+	if(s->start != -1)
+		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "start", ((double) s->start / 1000000));
+	if(s->end != -1)
+		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "end",   ((double) s->end   / 1000000));
+	if(s->wall_time != -1)
+		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "wall_time", ((double) s->wall_time / 1000000));
+	if(s->max_processes != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "max_processes", s->max_processes);
+	if(s->num_processes != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "num_processes", s->num_processes);
+	if(s->cpu_time != -1)
+		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "cpu_time",  ((double) s->cpu_time  / 1000000));
+	if(s->virtual_memory != -1)
+		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "virtual_memory", s->virtual_memory);
+	if(s->resident_memory != -1)
+		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "resident_memory", s->resident_memory);
+	if(s->swap_memory != -1)
+		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "swap_memory", s->swap_memory);
+	if(s->bytes_read != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_read", s->bytes_read);
+	if(s->bytes_written != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_written", s->bytes_written);
+	if(s->workdir_num_files != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "workdir_num_files", s->workdir_num_files);
+	if(s->workdir_footprint != -1)
+		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "workdir_footprint", s->workdir_footprint);
 }

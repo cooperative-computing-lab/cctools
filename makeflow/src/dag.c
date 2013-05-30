@@ -457,17 +457,7 @@ struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, cons
 void dag_task_category_get_env_resources(struct dag_task_category *category)
 {
 	if(category)
-	{
-		char *value;
-		if((value = getenv( RESOURCES_CORES  )))
-			category->resources->cores           = atoi(value);
-		if((value = getenv( RESOURCES_MEMORY )))
-			category->resources->resident_memory = atoi(value);
-
-		/* Megabytes to bytes */
-		if((value = getenv( RESOURCES_DISK )))
-			category->resources->workdir_footprint = ceil(strtod(value, NULL) * 1024 * 1024); 
-	}
+		rmsummary_read_env_vars(category->resources);
 }
 
 void dag_task_category_print_debug_resources(struct dag_task_category *category)

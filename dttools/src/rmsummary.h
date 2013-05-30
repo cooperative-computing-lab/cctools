@@ -11,6 +11,11 @@ COPYING for details.
 
 #include "int_sizes.h"
 
+/* Environment variables names */
+#define RESOURCES_CORES  "CORES"
+#define RESOURCES_MEMORY "MEMORY"
+#define RESOURCES_DISK   "DISK"
+
 // These fields are defined as signed integers, even though they
 // will only contain positive numbers. This is to conversion to
 // signed quantities when comparing to maximum limits.
@@ -62,6 +67,12 @@ void rmsummary_print(FILE *stream, struct rmsummary *s);
 struct rmsummary *rmsummary_parse_single(char *buffer, char separator);
 struct rmsummary *rmsummary_parse_file_single(char *filename);
 
-struct rmsummary *make_rmsummary(int default_value);
+struct rmsummary *make_rmsummary(signed char default_value);
+void rmsummary_read_env_vars(struct rmsummary *s);
+
+
+void rmsummary_merge_override(struct rmsummary *dest, struct rmsummary *src);
+void rmsummary_merge_max(struct rmsummary *dest, struct rmsummary *src);
+void rmsummary_debug_report(struct rmsummary *s);
 
 #endif
