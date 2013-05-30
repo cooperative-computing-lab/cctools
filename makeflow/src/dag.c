@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "list.h"
 #include "set.h"
+#include "stringtools.h"
 #include "rmsummary.h"
 
 #include "dag.h"
@@ -447,7 +448,7 @@ struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, cons
 		category->label = xxstrdup(label);
 		category->count = 0;
 		category->resources = make_rmsummary(-1);
-
+		
 		hash_table_insert(d->task_categories, label, category);
 	}
 
@@ -468,6 +469,59 @@ void dag_task_category_print_debug_resources(struct dag_task_category *category)
 		debug(D_DEBUG, "minimum memory:   %d MB.\n", category->resources->resident_memory);
 	if( category->resources->workdir_footprint > -1 )
 		debug(D_DEBUG, "minimum disk:     %d MB.\n", category->resources->workdir_footprint);
+}
+
+char *dag_task_category_wrap_as_wq_options(struct dag_task_category *category, const char *default_options)
+{
+	struct rmsummary *s;
+
+	s = category->resources;
+
+	char *options = NULL;
+	char *opt;
+
+	if( s->cores > -1 )
+	{
+		opt = string_format("%s --cores %" PRId64 " ", options ? options : "", s->cores ); 
+		if(options)
+			free(options);
+		options = opt;
+	}
+	if( s->resident_memory > -1 )
+	{
+		opt = string_format("%s --memory %" PRId64 " ", options ? options : "", s->resident_memory ); 
+		if(options)
+			free(options);
+		options = opt;
+	}
+	if( s->workdir_footprint > -1 )
+	{
+		opt = string_format("%s --disk %" PRId64 " ", options ? options : "", s->workdir_footprint ); 
+		if(options)
+			free(options);
+		options = opt;
+	}
+	if(default_options)
+	{
+		opt = string_format("%s %s", options ? options : "", default_options);
+		if(options)
+			free(options);
+		options = opt;
+	}
+
+	return options;
+}
+
+char *dag_task_category_wrap_options(struct dag_task_category *category, const char *default_options, batch_queue_type_t batch_type)
+{
+        switch(batch_type)
+        {
+	case BATCH_QUEUE_TYPE_WORK_QUEUE:
+		return dag_task_category_wrap_as_wq_options(category, default_options);
+		break;
+	default:
+		return NULL;
+        }
 }
 
 int dag_file_is_source(struct dag_file *f)

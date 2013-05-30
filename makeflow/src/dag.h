@@ -222,6 +222,7 @@ char *dag_lookup(const char *name, void *arg);
 char *dag_lookup_set(const char *name, void *arg);
 
 struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label);
+char *dag_task_category_wrap_options(struct dag_task_category *category, const char *default_options, batch_queue_type_t batch_type);
 void dag_task_category_get_env_resources(struct dag_task_category *category);
 void dag_task_category_print_debug_resources(struct dag_task_category *category);
 

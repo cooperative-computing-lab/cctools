@@ -1579,9 +1579,11 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	 * variable), we must save the previous global queue value, and then
 	 * restore it after we submit. */
 	struct dag_lookup_set s = { d, n, NULL };
-	char *batch_submit_options = dag_lookup("BATCH_OPTIONS", &s);
+	char *batch_options_env    = dag_lookup("BATCH_OPTIONS", &s);
+	char *batch_submit_options = dag_task_category_wrap_options(n->category, batch_options_env, batch_queue_get_type(thequeue));
 	char *old_batch_submit_options = NULL;
 
+	free(batch_options_env);
 	if(batch_submit_options) {
 		old_batch_submit_options = batch_queue_options(thequeue);
 		batch_queue_set_options(thequeue, batch_submit_options);
