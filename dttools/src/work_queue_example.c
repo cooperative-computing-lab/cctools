@@ -11,6 +11,7 @@ Each file is compressed with gzip and returned to the user.
 */
 
 #include "work_queue.h"
+#include "debug.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +31,8 @@ int main(int argc, char *argv[])
 		printf("Each file given on the command line will be compressed using a remote worker.\n");
 		return 0;
 	}
+
+	debug_flags_set("all");
 
 	q = work_queue_create(port);
 	if(!q) {

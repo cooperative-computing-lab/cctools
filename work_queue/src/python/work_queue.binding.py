@@ -140,17 +140,19 @@ class Task(_object):
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
     ##
-    # Add a file created or handled by an arbitrary command to a task (eg: wget, ftp, chirp_get|put).
-    #
-    # @param self           Reference to the current task object.
-    # @param remote_name    The name of the remote file at the execution site.
-    # @param command        The contents of the buffer to pass as input.
-    # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
-    # @param flags          May take the same values as @ref specify_file.
-    # @param cache          Legacy parameter for setting file caching attribute. By default this is enabled.
-    def specify_file_command(self, remote_name, command, type, flags, cache=True):
-        flags = Task._determine_file_flags(flags, cache)
-        return work_queue_task_specify_file_command(self._task, remote_name, command, type, flags)
+    # Indicate the number of cores required by this task.
+    def specify_cores( self, cores ):
+        return work_queue_task_specify_cores(self._task,cores)
+
+    ##
+    # Indicate the memory (in MB) required by this task.
+    def specify_memory( self, memory ):
+        return work_queue_task_specify_memory(self._task,memory)
+
+    ##
+    # Indicate the disk space (in MB) required by this task.
+    def specify_disk( self, cores ):
+        return work_queue_task_specify_disk(self._task,disk)
 
     ##
     # Get the user-defined logical name for the task. 
