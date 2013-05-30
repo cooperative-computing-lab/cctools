@@ -45,12 +45,12 @@ int main(int argc, char *argv[])
 	time_t stoptime;
 	FILE *file;
 	INT64_T result;
-	char c;
+	signed char c;
 	char *tickets = NULL;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:d:i:t:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "a:d:i:t:vh")) > -1) {
 		switch (c) {
 		case 'a':
 			auth_register_byname(optarg);

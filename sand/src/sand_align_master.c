@@ -319,7 +319,7 @@ static struct work_queue_task *task_create(struct hash_table *sequence_table)
 
 int main(int argc, char *argv[])
 {
-	char c;
+	signed char c;
 
 	const char *progname = "sand_align_master";
 
@@ -332,7 +332,7 @@ int main(int argc, char *argv[])
 	// One can also set the fast_abort_multiplier by the '-f' option.
 	wq_option_fast_abort_multiplier = 10;
 
-	while((c = getopt(argc, argv, "e:F:N:C:p:P:n:d:o:vha")) != (char) -1) {
+	while((c = getopt(argc, argv, "e:F:N:C:p:P:n:d:o:vha")) > -1) {
 		switch (c) {
 		case 'p':
 			port = atoi(optarg);

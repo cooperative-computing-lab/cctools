@@ -99,9 +99,9 @@ int parse_catalog_server_description(char *server_string, char **host, int *port
 
 static void work_queue_status_parse_command_line_arguments(int argc, char *argv[])
 {
-	int c;
+	signed int c;
 
-	while((c = getopt(argc, argv, "QTWC:d:lo:O:t:vh")) != (char) -1) {
+	while((c = getopt(argc, argv, "QTWC:d:lo:O:t:vh")) > -1) {
 		switch (c) {
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {

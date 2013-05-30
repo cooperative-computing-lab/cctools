@@ -957,8 +957,8 @@ int main(int argc, char **argv)
 
 	debug_config(argv[0]);
 
-	char c;
-	while( (c = getopt(argc, argv, "d:f:m:o:")) >= 0 )
+	signed char c;
+	while( (c = getopt(argc, argv, "d:f:m:o:")) > -1 )
 	{
 		switch(c)
 		{

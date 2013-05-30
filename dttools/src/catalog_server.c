@@ -479,7 +479,7 @@ static void show_help(const char *cmd)
 int main(int argc, char *argv[])
 {
 	struct link *link, *list_port = 0;
-	char ch;
+	signed char ch;
 	time_t current;
 	int is_daemon = 0;
 	char *pidfile = NULL;
@@ -488,7 +488,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "bB:d:hH:l:L:m:M:n:o:O:p:ST:u:U:v")) != (char) -1) {
+	while((ch = getopt(argc, argv, "bB:d:hH:l:L:m:M:n:o:O:p:ST:u:U:v")) > -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;

@@ -1306,7 +1306,8 @@ static void show_help(const char *cmd)
 
 int main(int argc, char *argv[])
 {
-	int c, count;
+	int count;
+    signed char c;
 	FILE *fp;
 	int goal = 0;
 	char scratch_dir[PATH_MAX] = "";
@@ -1374,7 +1375,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAc:C:d:E:hm:l:L:N:o:O:Pqr:S:t:T:vW:")) != (char) -1) {
+	while((c = getopt(argc, argv, "aAc:C:d:E:hm:l:L:N:o:O:Pqr:S:t:T:vW:")) > -1) {
 		switch (c) {
 		case 'a':
 			strcat(worker_args, " -a");

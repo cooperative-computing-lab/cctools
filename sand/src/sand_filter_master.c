@@ -472,12 +472,12 @@ int main(int argc, char **argv)
 
 static void get_options(int argc, char **argv, const char *progname)
 {
-	char c;
+	signed char c;
 	char tmp[512];
 	char *catalog_host = NULL;
 	int catalog_port = 0;
 
-	while((c = getopt(argc, argv, "p:P:n:d:F:N:C:s:r:R:k:w:c:o:uxvha")) != (char) -1) {
+	while((c = getopt(argc, argv, "p:P:n:d:F:N:C:s:r:R:k:w:c:o:uxvha")) > -1) {
 		switch (c) {
 		case 'p':
 			port = atoi(optarg);

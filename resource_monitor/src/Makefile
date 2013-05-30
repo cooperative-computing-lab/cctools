@@ -21,15 +21,19 @@ endif
 
 all: ${TARGETS} ${LIBRARIES}
 
-resource_monitorv: rmonitor_helper_comm.o resource_monitor.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
+resource_monitorv: rmonitor_helper_comm.o resource_monitor.o librmonitor_poll.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
 	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
 
-resource_monitor: rmonitor_helper_comm.o resource_monitor_pb.o rmonitor_piggyback.h ${CCTOOLS_HOME}/dttools/src/libdttools.a
+resource_monitor: rmonitor_helper_comm.o resource_monitor_pb.o librmonitor_poll.a rmonitor_piggyback.h ${CCTOOLS_HOME}/dttools/src/libdttools.a
 	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
+
+librmonitor_poll.a: rmonitor_poll.o
+	${CCTOOLS_AR} rv $@ $^
+	ranlib $@
 
 resource_monitor_pb.c: resource_monitor.c
 	cp resource_monitor.c resource_monitor_pb.c
-	
+
 resource_monitor_pb.o: rmonitor_piggyback.h resource_monitor_pb.c 
 	${CCTOOLS_CC} -g -DCCTOOLS_USE_RMONITOR_HELPER_LIB ${CCTOOLS_INTERNAL_CCFLAGS} $^ -c
 

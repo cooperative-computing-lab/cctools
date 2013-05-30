@@ -261,7 +261,7 @@ void task_complete( struct work_queue_task *t )
 
 int main(int argc, char **argv)
 {
-	char c;
+	signed char c;
 	struct work_queue *q;
 	int port = WORK_QUEUE_DEFAULT_PORT;
 	static const char *port_file = NULL;
@@ -273,7 +273,7 @@ int main(int argc, char **argv)
 
 	extra_files_list = list_create();
 
-	while((c = getopt(argc, argv, "ad:e:f:hN:p:P:t:vx:y:Z:o:")) != (char) -1) {
+	while((c = getopt(argc, argv, "ad:e:f:hN:p:P:t:vx:y:Z:o:")) > -1) {
 		switch (c) {
 	    case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;

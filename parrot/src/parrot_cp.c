@@ -212,14 +212,14 @@ int main( int argc, char *argv[] )
 {
 
 	char *target;
-	char c;
+	signed char c;
 	int i;
 	int nerrors = 0;
 	int target_is_dir = 0;
 	struct stat statbuf;
 	char newtarget[PFS_PATH_MAX];
 	
-	while((c=getopt(argc,argv,"firRsluvh"))!=(char)-1) {
+	while((c=getopt(argc,argv,"firRsluvh")) > -1) {
 		switch(c) {
 		case 'f':
 			force_mode = 1;

@@ -96,13 +96,13 @@ struct lexer_book
 };
 
 
-/* Information of task categories. Right now we only record the
- * name of the category (label), but in the future we can add
- * resource usage statistics. */
+/* Information of task categories. Label, number of tasks in this
+   category, and maximum resources allowed. */
 struct dag_task_category
 {
     char *label;
     int  count;
+
 };
 
 /* struct dag_node implements a linked list of nodes. A dag_node

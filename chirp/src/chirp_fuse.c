@@ -575,7 +575,7 @@ static void show_help(const char *cmd)
 
 int main(int argc, char *argv[])
 {
-	char c;
+	signed char c;
 	int did_explicit_auth = 0;
 	char *tickets = NULL;
 	struct fuse_args fa;
@@ -585,7 +585,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:b:d:Dfhi:m:o:t:v")) != -1) {
+	while((c = getopt(argc, argv, "a:b:d:Dfhi:m:o:t:v")) > -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);

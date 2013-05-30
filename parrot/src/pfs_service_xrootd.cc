@@ -48,14 +48,13 @@ extern "C" {
 static char *translate_file_to_xrootd(pfs_name * name)
 {
 	char file_buf[PFS_PATH_MAX];
-	int string_length = 0;
 	int port_number = XROOTD_DEFAULT_PORT;
 
 	if(name->port != 0) {
 		port_number = name->port;
 	}
 
-	string_length = sprintf(file_buf, "root://%s:%i/%s", name->host, port_number, name->rest);
+	sprintf(file_buf, "root://%s:%i/%s", name->host, port_number, name->rest);
 
 	return strdup(file_buf);
 }

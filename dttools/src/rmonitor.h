@@ -4,7 +4,13 @@ distributed under the GNU General Public License.  See the file
 COPYING for details.
 */
 
+#ifndef __RMONITOR_H
+#define __RMONITOR_H
+
+#include "rmsummary.h"
+
 #define RESOURCE_MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
+
 
 /** Wraps a command line with the resource monitor.
 The command line is rewritten to be run inside the monitor with
@@ -29,3 +35,8 @@ The resource monitor executable is searched, in order, in the following location
 
 char *resource_monitor_copy_to_wd(char *path_from_cmdline);
 
+/**  Reads a single resources file from filename **/
+struct rmsummary *resident_monitor_parse_resources_file(char *filename);
+
+
+#endif

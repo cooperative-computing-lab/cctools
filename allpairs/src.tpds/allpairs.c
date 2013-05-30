@@ -546,7 +546,7 @@ int main(int argc, char** argv)
     ****************************************************************************************/
     
     int i; // multipurpose counters.
-    char cl; // command line argument selector
+    signed char cl; // command line argument selector
     int retval; // multipurpose return value
     int did_explicit_auth = 0; // flag for whether the command line specified a particular authentication method
     int LOCALorREMOTE = -1; // flag for whether the command line specified forced local computation or remote submission
@@ -635,7 +635,7 @@ int main(int argc, char** argv)
     /*
       Get and process command line options and arguments
     */
-    while((cl=getopt(argc,argv,"+a:d:t:LRx:y:p:q:r:s:l:H:P:hv"))!=(char)-1) {
+    while((cl=getopt(argc,argv,"+a:d:t:LRx:y:p:q:r:s:l:H:P:hv")) > -1) {
 	switch(cl) {
 	case 'a':
 	    auth_register_byname(optarg);

@@ -277,6 +277,10 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 		struct dirent *d;
 		char dir_localname[WORK_QUEUE_LINE_MAX];
 		char dir_taskname[WORK_QUEUE_LINE_MAX];
+		if(!targetdir) {
+			debug(D_WQ, "Could not open directory %s for reading (%s)\n", targetname, strerror(errno));
+			return 1;
+		}
 		
 		sprintf(dir_taskname, "%s/%s", workspace, taskname);
 		mkdir(dir_taskname, 0700);
@@ -289,9 +293,16 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 			sprintf(dir_taskname, "%s/%s", taskname, d->d_name);
 			result &= link_file_in_workspace(dir_localname, dir_taskname, workspace, into);
 		}
+		closedir(targetdir);
 	} else {
 		char *cur_pos, *tmp_pos;
-		sprintf(targetname, "%s/%s", workspace, taskname);
+		
+		cur_pos = taskname;
+		if(!strncmp(cur_pos, "./", 2)) {
+			cur_pos += 2;
+		}
+		
+		sprintf(targetname, "%s/%s", workspace, cur_pos);
 		
 		debug(D_WQ, "linking file %s %s workspace %s with %s\n", localname, into?"into":"from", workspace, targetname);
 
@@ -301,28 +312,24 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 			cur_pos = localname;
 		}
 
-		cur_pos = targetname;
-		if(!strncmp(cur_pos, "./", 2)) {
-			cur_pos += 2;
-		}
-
 		tmp_pos = strrchr(cur_pos, '/');
 		if(tmp_pos) {
 			*tmp_pos = '\0';
 			if(!create_dir(cur_pos, 0700)) {
 				debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
-				return 0;
+				return 1;
 			}
 			*tmp_pos = '/';
 		}
 		
 		if(into) {
-			
 			if(link(localname, targetname)) {
+				debug(D_WQ, "Could not link file %s -> %s (%s)\n", localname, targetname, strerror(errno));
 				return 0;
 			}
 		} else {
 			if(link(targetname, localname)) {
+				debug(D_WQ, "Could not link file %s -> %s (%s)\n", targetname, localname, strerror(errno));
 				return 0;
 			}
 		}
@@ -1190,6 +1197,7 @@ static int do_thirdput(struct link *master, int mode, const char *filename, cons
 }
 
 static void kill_task(struct task_info *ti) {
+	char dirname[1024];
 	
 	//make sure a few seconds have passed since child process was created to avoid sending a signal 
 	//before it has been fully initialized. Else, the signal sent to that process gets lost.	
@@ -1209,6 +1217,11 @@ static void kill_task(struct task_info *ti) {
 	// Clean up the task info structure.
 	itable_remove(stored_tasks, ti->taskid);
 	itable_remove(active_tasks, ti->pid);
+	
+	// Clean up the task's directory
+	sprintf(dirname, "%d", ti->taskid);
+	delete_dir(dirname);
+
 
 	task_info_delete(ti);
 }
@@ -1249,11 +1262,15 @@ static void kill_all_tasks() {
 
 static int do_kill(int taskid) {
 	struct task_info *ti = itable_lookup(stored_tasks, taskid);
-	if(itable_lookup(active_tasks, ti->pid)) {
+	if(ti && itable_lookup(active_tasks, ti->pid)) {
 		kill_task(ti);
 	} else {
 		char dirname[1024];
-		sprintf(dirname, "%d", ti->pid);
+		if(ti) {
+			itable_remove(stored_tasks, taskid);
+			task_info_delete(ti);
+		}
+		sprintf(dirname, "%d", taskid);
 		delete_dir(dirname);
 	}
 	return 1;
@@ -1434,7 +1451,7 @@ static int worker_handle_master(struct link *master) {
 			r = do_thirdget(mode, filename, path);
 		} else if(sscanf(line, "thirdput %o %s %[^\n]", &mode, filename, path) == 3) {
 			r = do_thirdput(master, mode, filename, path);
-		} else if(!strcmp("kill", line)){
+		} else if(!strncmp("kill", line, 4)){
 			if(sscanf(line, "kill %" SCNd64, &taskid) == 0) {
 				taskid = current_taskid;
 			}
@@ -1990,6 +2007,10 @@ int main(int argc, char *argv[])
 	
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		char foreman_string[WORK_QUEUE_LINE_MAX];
+		
+		free(os_name); //free the os string obtained from uname
+		os_name = xxstrdup("foreman");
+		
 		sprintf(foreman_string, "%s-foreman", argv[0]);
 		debug_config(foreman_string);
 		foreman_q = work_queue_create(foreman_port);

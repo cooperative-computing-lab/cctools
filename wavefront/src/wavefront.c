@@ -382,7 +382,7 @@ static void show_help(const char *cmd)
 
 int main( int argc, char *argv[] )
 {
-	char c;
+	signed char c;
 
 	const char *progname = "wavefront";
 
@@ -390,7 +390,7 @@ int main( int argc, char *argv[] )
 
 	progress_log_file = stdout;
 
-	while((c=getopt(argc,argv,"n:b:d:o:l:i:t:qAMDT:VX:Y:vh"))!=(char)-1) {
+	while((c=getopt(argc,argv,"n:b:d:o:l:i:t:qAMDT:VX:Y:vh")) > -1) {
 		switch(c) {
 			case 'n':
 				manual_max_jobs_running = atoi(optarg);

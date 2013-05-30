@@ -35,13 +35,13 @@ int main(int argc, char ** argv)
 	int quiet_mode = 0;
 	struct seq *s;
 	struct cseq *c;
-	char d;
+	signed char d;
 	int clip = 0;
 	int internal = 0; 
 	char tmp_id[128];
 	int count = 0;
 
-        while((d=getopt(argc,argv,"cvqhi"))!=(char)-1) {
+        while((d=getopt(argc,argv,"cvqhi")) > -1) {
                 switch(d) {
 		case 'c':
 			clip = 1;

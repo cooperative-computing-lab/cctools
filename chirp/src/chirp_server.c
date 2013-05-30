@@ -370,8 +370,7 @@ static void config_pipe_handler( int fd )
 int main(int argc, char *argv[])
 {
 	struct link *link;
-	char c;
-	int c_input;
+	signed char c;
 	time_t current;
 	int is_daemon = 0;
 	char *pidfile = NULL;
@@ -386,8 +385,7 @@ int main(int argc, char *argv[])
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c_input = getopt(argc, argv, "A:a:bB:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:Z:l:")) != (char)-1) {
-		c = (char) c_input;
+	while((c = getopt(argc, argv, "A:a:bB:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:Z:l:")) > -1) {
 		switch (c) {
 		case 'A':
 			chirp_acl_default(optarg);

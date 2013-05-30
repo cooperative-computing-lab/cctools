@@ -1098,12 +1098,12 @@ int main(int argc, char *argv[])
 	char line[CHIRP_LINE_MAX];
 	char **user_argv = 0;
 	int user_argc;
-	char c;
+	signed char c;
 	int result = 0;
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "+a:d:hi:lt:v")) != (char) -1) {
+	while((c = getopt(argc, argv, "+a:d:hi:lt:v")) > -1) {
 		switch (c) {
 		case 'a':
 			auth_register_byname(optarg);

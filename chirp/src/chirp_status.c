@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
 	struct nvpair *n;
 	time_t timeout = 60, stoptime;
 	const char *catalog_host = 0;
-	char c;
+	signed char c;
 	int i;
 	int count = 0;
 	int mode = MODE_TABLE;
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aA:c:d:t:o:O:sTlvh")) != (char) -1) {
+	while((c = getopt(argc, argv, "aA:c:d:t:o:O:sTlvh")) > -1) {
 		switch (c) {
 		case 'a':
 			show_all_types = 1;
