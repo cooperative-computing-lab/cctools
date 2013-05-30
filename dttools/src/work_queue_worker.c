@@ -94,10 +94,9 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define MIN_TERMINATE_BOUNDARY 0 
 #define TERMINATE_BOUNDARY_LEEWAY 30
 
-#define WORKER_MODE_AUTO    0
-#define WORKER_MODE_CLASSIC 1
-#define WORKER_MODE_WORKER  2
-#define WORKER_MODE_FOREMAN 3
+#define WORKER_MODE_NONE    0
+#define WORKER_MODE_WORKER  1
+#define WORKER_MODE_FOREMAN 2
 
 struct task_info {
 	int taskid;
@@ -157,8 +156,8 @@ static int terminate_boundary = 0;
 char *password = 0;
 
 // Basic worker global variables
-static int worker_mode = WORKER_MODE_CLASSIC;
-static int worker_mode_default = WORKER_MODE_CLASSIC;
+static int worker_mode = WORKER_MODE_WORKER;
+static int worker_mode_default = WORKER_MODE_WORKER;
 static char actual_addr[LINK_ADDRESS_MAX];
 static int actual_port;
 static char workspace[WORKER_WORKSPACE_NAME_MAX];
@@ -172,7 +171,7 @@ static char *base_debug_filename = NULL;
 // Local resource controls
 static struct work_queue_resources * local_resources = 0;
 static struct work_queue_resources * local_resources_last = 0;
-static int manual_cores_option = 0;
+static int manual_cores_option = 1;
 static int manual_disk_option = 0;
 static int manual_memory_option = 0;
 
@@ -1725,7 +1724,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -v                      Show version string\n");
 	fprintf(stdout, " --volatility <chance>   Set the percent chance a worker will decide to shut down every minute.\n");
 	fprintf(stdout, " --bandwidth <mult>      Set the multiplier for how long outgoing and incoming data transfers will take.\n");
-	fprintf(stdout, " --cores <n>             Manually set the number of cores reported by this worker.\n");
+	fprintf(stdout, " --cores <n>             Set the number of cores reported by this worker.  Set to 0 to have the worker automatically measure. (default=%d)\n", manual_cores_option);
 	fprintf(stdout, " --memory <mb>           Manually set the amonut of memory (in MB) reported by this worker.\n");
 	fprintf(stdout, " --disk   <mb>           Manually set the amount of disk (in MB) reported by this worker.\n");
 	fprintf(stdout, " -h                      Show this help screen\n");
@@ -1790,6 +1789,7 @@ static int setup_workspace() {
 #define LONG_OPT_CORES          'z'+6
 #define LONG_OPT_MEMORY         'z'+7
 #define LONG_OPT_DISK           'z'+8
+#define LONG_OPT_FOREMAN        'z'+9
 
 struct option long_options[] = {
 	{"password",            required_argument,  0,  'P'},
@@ -1803,6 +1803,7 @@ struct option long_options[] = {
 	{"cores",               required_argument,  0,   LONG_OPT_CORES},
 	{"memory",              required_argument,  0,   LONG_OPT_MEMORY},
 	{"disk",                required_argument,  0,   LONG_OPT_DISK},
+	{"foreman",             no_argument,        0,   LONG_OPT_FOREMAN},
 	{0,0,0,0}
 };
 
@@ -1830,11 +1831,11 @@ int main(int argc, char *argv[])
 	uname(&uname_data);
 	os_name = xxstrdup(uname_data.sysname);
 	arch_name = xxstrdup(uname_data.machine);
-	worker_mode = WORKER_MODE_AUTO;
+	worker_mode = WORKER_MODE_WORKER;
 
 	debug_config(argv[0]);
 
-	while((c = getopt_long(argc, argv, "aB:cC:d:f:F:t:j:o:p:m:M:N:P:w:i:b:z:A:O:s:vh", long_options, 0)) != (char) -1) {
+	while((c = getopt_long(argc, argv, "aB:cC:d:f:F:t:j:o:p:M:N:P:w:i:b:z:A:O:s:vh", long_options, 0)) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
@@ -1891,14 +1892,8 @@ int main(int argc, char *argv[])
 			debug_config_file(optarg);
 			base_debug_filename = strdup(optarg);
 			break;
-		case 'm':
-			if(!strncmp("foreman", optarg, 7) || optarg[0] == 'f') {
-				worker_mode = worker_mode_default = WORKER_MODE_FOREMAN;
-			} else if(!strncmp("worker", optarg, 6) || optarg[0] == 'w') {
-				worker_mode = worker_mode_default = WORKER_MODE_WORKER;
-			} else if(!strncmp("classic", optarg, 7) || optarg[0] == 'c') {
-				worker_mode = worker_mode_default = WORKER_MODE_CLASSIC;
-			}
+		case LONG_OPT_FOREMAN:
+			worker_mode = worker_mode_default = WORKER_MODE_FOREMAN;
 			break;
 		case 'M':
 			auto_worker = 1;
