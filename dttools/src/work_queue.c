@@ -46,7 +46,6 @@ and making decisions about that.  For example:
 #include "load_average.h"
 #include "buffer.h"
 #include "link_nvpair.h"
-#include "get_canonical_path.h"
 #include "rmonitor.h"
 #include "copy_stream.h"
 #include "random_init.h"
@@ -2627,7 +2626,7 @@ struct work_queue *work_queue_create(int port)
 		link_address_local(q->master_link, address, &q->port);
 	}
 
-	get_canonical_path(".", q->workingdir, PATH_MAX);
+	getcwd(q->workingdir,PATH_MAX);
 
 	q->ready_list = list_create();
 	q->running_tasks = itable_create(0);

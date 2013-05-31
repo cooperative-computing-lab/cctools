@@ -21,7 +21,6 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 #include "list.h"
 #include "get_line.h"
-#include "get_canonical_path.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -1354,8 +1353,8 @@ int main(int argc, char *argv[])
 	catalog_port = CATALOG_PORT;
 
 	set_pool_name(name_of_this_pool, WORK_QUEUE_POOL_NAME_MAX);
-	
-	get_canonical_path(".", starting_dir_canonical_path, PATH_MAX);
+
+	getcwd(starting_dir_canonical_path,PATH_MAX);
 	char *p;
 	int len = strlen(starting_dir_canonical_path);
 	if(len > 0) {

@@ -19,7 +19,6 @@ Each file is compressed with gzip and returned to the user.
 #include "itable.h"
 #include "list.h"
 #include "get_line.h"
-#include "get_canonical_path.h"
 
 #include <errno.h>
 #include <limits.h>

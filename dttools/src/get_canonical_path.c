@@ -24,6 +24,10 @@ However, we don't want to change our own cwd, as we
 may not be able to get it back.  So, fork a process,
 attempt to cwd, then get the cwd and write it back on
 a pipe.  Expensive but reliable.
+
+This function exists to handle a very narrow use case within
+the chirp_server.  Most of the time getcwd() is what you want
+to use.
 */
 
 int get_canonical_path(const char *path, char *canonical, int length)
