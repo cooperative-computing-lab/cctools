@@ -60,7 +60,7 @@ timed_exec_t timed_exec( int line, const char *path, char **argv, int fds[3], pi
 
 		/* Set the pipe to automatically close after exec. */
 
-		if( fcntl(pfds[1],F_SETFL,FD_CLOEXEC)==0 ) {
+		if( fcntl(pfds[1],F_SETFD,FD_CLOEXEC)==0 ) {
 			setsid();
 			execvp(path,argv);
 		}
