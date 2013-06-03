@@ -182,6 +182,7 @@ static struct work_queue *foreman_q = NULL;
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
 static struct list *waiting_tasks = NULL;
+static int cores_allocated = 0;
 
 // Catalog mode control variables
 static char *catalog_server_host = NULL;
@@ -249,6 +250,9 @@ static void task_info_delete( struct task_info *ti )
 	if(ti->output_fd) {
 		close(ti->output_fd);
 		unlink(ti->output_file_name);
+	}
+	if(ti->task) {
+		work_queue_task_delete(ti->task);
 	}
 
 	free(ti);
@@ -408,6 +412,7 @@ static int start_task(struct work_queue_task *task) {
 		}
 
 		ti->status = 0;
+		cores_allocated += task->cores;
 
 		itable_insert(stored_tasks, task->taskid, ti);
 		itable_insert(active_tasks, ti->pid, ti);
@@ -426,6 +431,7 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		lseek(ti->output_fd, 0, SEEK_SET);
 		send_master_message(master, "result %d %lld %llu %d\n", ti->status, output_length, ti->execution_end-ti->execution_start, ti->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
+		cores_allocated -= ti->task->cores;
 	} else if(t) {
 		if(t->output) {
 			output_length = strlen(t->output);
@@ -1221,6 +1227,7 @@ static void kill_task(struct task_info *ti) {
 	sprintf(dirname, "%d", ti->taskid);
 	delete_dir(dirname);
 
+	cores_allocated -= ti->task->cores;
 
 	task_info_delete(ti);
 }
@@ -1257,6 +1264,7 @@ static void kill_all_tasks() {
 		task_info_delete(ti);
 	}
 	itable_clear(stored_tasks);
+	cores_allocated = 0;
 }
 
 static int do_kill(int taskid) {
@@ -1541,10 +1549,17 @@ static void work_for_master(struct link *master) {
 		ok &= check_disk_space_for_filesize(0);
 
 		if(ok) {
-			if(list_size(waiting_tasks) && itable_size(active_tasks) < local_resources->cores.total) {
+			int visited = 0;
+			while(list_size(waiting_tasks) > visited && cores_allocated < local_resources->cores.total) {
 				struct work_queue_task *t;
+				
 				t = list_pop_head(waiting_tasks);
-				if(t) start_task(t);
+				if(t && t->cores + cores_allocated <= local_resources->cores.total) {
+					start_task(t);
+				} else {
+					list_push_tail(waiting_tasks, t);
+					visited++;
+				}
 			}
 		}
 
@@ -1957,21 +1972,21 @@ int main(int argc, char *argv[])
 			setenv("WORK_QUEUE_RESET_DEBUG_FILE", "yes", 1);
 			break;
 		case LONG_OPT_CORES:
-			if(!strncmp(optarg, "all")) {
+			if(!strncmp(optarg, "all", 3)) {
 				manual_cores_option = 0;
 			} else {
 				manual_cores_option = atoi(optarg);
 			}
 			break;
 		case LONG_OPT_MEMORY:
-			if(!strncmp(optarg, "all")) {
+			if(!strncmp(optarg, "all", 3)) {
 				manual_memory_option = 0;
 			} else {
 				manual_memory_option = atoi(optarg);
 			}
 			break;
 		case LONG_OPT_DISK:
-			if(!strncmp(optarg, "all")) {
+			if(!strncmp(optarg, "all", 3)) {
 				manual_disk_option = 0;
 			} else {
 				manual_disk_option = atoi(optarg);
