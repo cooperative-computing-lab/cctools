@@ -114,9 +114,9 @@ SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags)
 		}
 
 		#ifdef CCTOOLS_CPU_I386
-			err = syscall(SYSCALL32_search,path,pattern,flags,buffer,buffer_size);
+			err = syscall(SYSCALL32_search,path,pattern,flags,buffer,buffer_size,"parrot_opensearch");
 		#else
-			err = syscall(SYSCALL64_search,path,pattern,flags,buffer,buffer_size);
+			err = syscall(SYSCALL64_search,path,pattern,flags,buffer,buffer_size,"parrot_opensearch");
 		#endif	
 
 		buffer_size*=2;
