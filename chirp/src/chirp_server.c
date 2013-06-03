@@ -794,8 +794,8 @@ static int chirp_path_fix(char *path)
 	// Collapse dots, double dots, and the like:
 	string_collapse_path(decodepath,shortpath,1);
 
-	// Add the Chirp root and copy it back out.
-	sprintf(rootpath, "%s/%s", chirp_root_path, shortpath);
+	// Add the current directory to the root (backend file system changes directory to the root)
+	sprintf(rootpath, "./%s", shortpath);
 
 	// Collapse again...
 	string_collapse_path(rootpath, path, 1);
