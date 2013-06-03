@@ -27,7 +27,13 @@ run()
     $psearch fixtures/a "*/*r" >> $out
 
     failures=`diff --ignore-all-space $out $expected`
-    [ -z "$failures" ] && echo "all tests passed" || echo $failures
+    if [ -z "$failures" ]; then
+        echo "all tests passed"
+        exit 0
+    else
+        echo $failures
+        exit 1
+    fi
 }
 
 clean()
