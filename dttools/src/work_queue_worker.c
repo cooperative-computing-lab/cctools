@@ -183,6 +183,8 @@ static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
 static struct list *waiting_tasks = NULL;
 static int cores_allocated = 0;
+static timestamp_t total_task_execution_time = 0;
+static int total_tasks_executed = 0;
 
 // Catalog mode control variables
 static char *catalog_server_host = NULL;
@@ -250,9 +252,6 @@ static void task_info_delete( struct task_info *ti )
 	if(ti->output_fd) {
 		close(ti->output_fd);
 		unlink(ti->output_file_name);
-	}
-	if(ti->task) {
-		work_queue_task_delete(ti->task);
 	}
 
 	free(ti);
@@ -443,6 +442,9 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 			link_putlstring(master, t->output, output_length, time(0)+active_timeout);
 		}
 	}
+	
+	total_task_execution_time += (ti->execution_end - ti->execution_start);
+	total_tasks_executed++;
 }
 
 static int handle_tasks(struct link *master) {
@@ -1497,6 +1499,7 @@ static int worker_handle_master(struct link *master) {
 
 static void work_for_master(struct link *master) {
 	int result;
+	timestamp_t sleeptime;
 	sigset_t mask;
 
 	if(!master) {
@@ -1527,8 +1530,10 @@ static void work_for_master(struct link *master) {
 				volatile_stoptime = time(0) + 60;
 			}
 		}
+		
+		sleeptime = total_tasks_executed?MAX(100, total_task_execution_time/total_tasks_executed):100;
 
-		result = link_usleep_mask(master, 5000, &mask, 1, 0);
+		result = link_usleep_mask(master, sleeptime, &mask, 1, 0);
 
 		if(result < 0) {
 			abort_flag = 1;
