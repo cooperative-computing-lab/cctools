@@ -2601,9 +2601,9 @@ void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_search:
                         if (entering) {
-                                char location[PFS_PATH_MAX];
-                                tracer_copy_in(p->tracer, location, POINTER(args[5]), sizeof(location));
-                                debug(D_SYSCALL, "search %s", location);
+								char callsite[PFS_PATH_MAX];
+								tracer_copy_in_string(p->tracer, callsite, POINTER(args[5]), sizeof(callsite));
+								debug(D_SYSCALL, "search %s", callsite);
 
                                 char path[2*PFS_PATH_MAX];
                                 char pattern[PFS_PATH_MAX];
