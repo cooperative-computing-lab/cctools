@@ -1957,13 +1957,25 @@ int main(int argc, char *argv[])
 			setenv("WORK_QUEUE_RESET_DEBUG_FILE", "yes", 1);
 			break;
 		case LONG_OPT_CORES:
-			manual_cores_option = atoi(optarg);
+			if(!strncmp(optarg, "all")) {
+				manual_cores_option = 0;
+			} else {
+				manual_cores_option = atoi(optarg);
+			}
 			break;
 		case LONG_OPT_MEMORY:
-			manual_memory_option = atoi(optarg);
+			if(!strncmp(optarg, "all")) {
+				manual_memory_option = 0;
+			} else {
+				manual_memory_option = atoi(optarg);
+			}
 			break;
 		case LONG_OPT_DISK:
-			manual_disk_option = atoi(optarg);
+			if(!strncmp(optarg, "all")) {
+				manual_disk_option = 0;
+			} else {
+				manual_disk_option = atoi(optarg);
+			}
 			break;
 		case 'h':
 		default:
