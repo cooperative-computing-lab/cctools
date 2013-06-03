@@ -1647,7 +1647,9 @@ struct chirp_searchent *chirp_client_readsearch(CHIRP_SEARCH *search) {
         char *data = search->data;
         char *err_str = readsearch_next(data, &i);
         free(search->entry->path);
+        search->entry->path = NULL;
         free(search->entry->info);
+        search->entry->info = NULL;
 
         if (err_str==NULL) return NULL;
 
