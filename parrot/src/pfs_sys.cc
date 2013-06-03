@@ -620,7 +620,7 @@ int pfs_whoami( const char *path, char *buf, int size )
 int pfs_search( const char *paths, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i)
 {
 	BEGIN
-	debug(D_LIBCALL,"search %s %s %d %zu %d",paths,pattern,flags,buffer,buffer_length);
+	debug(D_LIBCALL,"search %s %s %d %p %zu",paths,pattern,flags,buffer,buffer_length);
 	result = pfs_current->table->search(paths,pattern,flags,buffer,buffer_length, i);
 	END
 }
