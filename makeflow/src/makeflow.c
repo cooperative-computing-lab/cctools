@@ -2289,7 +2289,7 @@ int main(int argc, char *argv[])
 	};
 
 
-	while((c = getopt_long(argc, argv, "aAb:B:cC:d:D:E:f:F:g:G:hiIj:J:kKl:L:m:MN:o:Op:P:r:RS:t:T:u:vW:zZ:", long_options, NULL)) >= 0) {
+	while((c = getopt_long(argc, argv, "aAb:B:cC:d:D:Ef:F:g:G:hiIj:J:kKl:L:m:MN:o:Op:P:r:RS:t:T:u:vW:zZ:", long_options, NULL)) >= 0) {
 		switch (c) {
 		case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
