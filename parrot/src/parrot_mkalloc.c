@@ -14,24 +14,24 @@ See the file COPYING for details.
 #include <string.h>
 #include <unistd.h>
 
-int main( int argc, char *argv[] )
+int main(int argc, char *argv[])
 {
 	INT64_T size;
 
-	if(argc!=3) {
+	if(argc != 3) {
 		printf("use: parrot_mkalloc <path> <size>\n");
 		return 0;
 	}
 
 	size = string_metric_parse(argv[2]);
 
-	if(parrot_mkalloc(argv[1],size,0777)==0) {
+	if(parrot_mkalloc(argv[1], size, 0777) == 0) {
 		return 0;
 	} else {
-		if(errno==ENOSYS || errno==EINVAL) {
-			fprintf(stderr,"parrot_mkalloc: This filesystem does not support allocations.\n");
+		if(errno == ENOSYS || errno == EINVAL) {
+			fprintf(stderr, "parrot_mkalloc: This filesystem does not support allocations.\n");
 		} else {
-			fprintf(stderr,"parrot_mkalloc: %s\n",strerror(errno));
+			fprintf(stderr, "parrot_mkalloc: %s\n", strerror(errno));
 		}
 		return 1;
 	}

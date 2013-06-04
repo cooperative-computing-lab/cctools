@@ -12,33 +12,33 @@ See the file COPYING for details.
 #include <string.h>
 #include <unistd.h>
 
-int main( int argc, char *argv[] )
+int main(int argc, char *argv[])
 {
 	const char *path;
 	char buf[4096];
 	int result;
 
-	if(argc<2) {
+	if(argc < 2) {
 		path = ".";
 	} else {
 		path = argv[1];
 	}
 
-	if(argc>2 || path[0]=='-') {
+	if(argc > 2 || path[0] == '-') {
 		printf("use: parrot_getacl [path]\n");
 		return 0;
 	}
 
-	result = parrot_getacl(path,buf,sizeof(buf));
-	if(result>=0) {
+	result = parrot_getacl(path, buf, sizeof(buf));
+	if(result >= 0) {
 		buf[result] = 0;
-		printf("%s",buf);
+		printf("%s", buf);
 		return 0;
 	} else {
-		if(errno==ENOSYS || errno==EINVAL) {
-			fprintf(stderr,"getacl: This filesystem does not support Parrot access controls.\n");
+		if(errno == ENOSYS || errno == EINVAL) {
+			fprintf(stderr, "getacl: This filesystem does not support Parrot access controls.\n");
 		} else {
-			fprintf(stderr,"getacl: %s\n",strerror(errno));
+			fprintf(stderr, "getacl: %s\n", strerror(errno));
 		}
 		return 1;
 	}

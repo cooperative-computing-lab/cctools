@@ -31,172 +31,166 @@ extern "C" {
 #include <stdlib.h>
 #include <errno.h>
 }
-
 #define LFN_URL_HEAD "lfn:"
-
-static int lfc_error_to_errno( int e )
+static int lfc_error_to_errno(int e)
 {
 	int r;
 
-	switch(e) {
-		case SENOSHOST:
-		case SENOSSERV:
-		case SENOTRFILE:
-		case SEENTRYNFND:
-			r=ENOENT;
-			break;
+	switch (e) {
+	case SENOSHOST:
+	case SENOSSERV:
+	case SENOTRFILE:
+	case SEENTRYNFND:
+		r = ENOENT;
+		break;
 
-		case SETIMEDOUT:
-			r=ETIMEDOUT;
-			break;
+	case SETIMEDOUT:
+		r = ETIMEDOUT;
+		break;
 
-		case SEBADFFORM:
-		case SEBADFOPT:
-		case SEINCFOPT:
-		case SENAMETOOLONG:
-		case SEUBUF2SMALL:
-		case SEBADVERSION:
-		case SEMSGINVRNO:
-		case SEUMSG2LONG:
-		case SENOCONFIG:
-			r=EINVAL;
-			break;
+	case SEBADFFORM:
+	case SEBADFOPT:
+	case SEINCFOPT:
+	case SENAMETOOLONG:
+	case SEUBUF2SMALL:
+	case SEBADVERSION:
+	case SEMSGINVRNO:
+	case SEUMSG2LONG:
+	case SENOCONFIG:
+		r = EINVAL;
+		break;
 
-		case SEINTERNAL:
-		case SECONNDROP:
-		case SEBADIFNAM:
-		case SECOMERR:
-		case SERTYEXHAUST:
-		case SECTHREADINIT:
-		case SECTHREADERR:
-		case SESYSERR:
-		case SEADNSINIT:
-		case SEADNSSUBMIT:
-		case SEADNS:
-		case SEADNSTOOMANY:
-			r=EIO;
-			break;
+	case SEINTERNAL:
+	case SECONNDROP:
+	case SEBADIFNAM:
+	case SECOMERR:
+	case SERTYEXHAUST:
+	case SECTHREADINIT:
+	case SECTHREADERR:
+	case SESYSERR:
+	case SEADNSINIT:
+	case SEADNSSUBMIT:
+	case SEADNS:
+	case SEADNSTOOMANY:
+		r = EIO;
+		break;
 
-		case SENOMAPDB:
-		case SENOMAPFND:
-		case SEUSERUNKN:
-			r=EACCES;
-			break;
+	case SENOMAPDB:
+	case SENOMAPFND:
+	case SEUSERUNKN:
+		r = EACCES;
+		break;
 
-		case SEOPNOTSUP:
-			r=ENOSYS;
-			break;
+	case SEOPNOTSUP:
+		r = ENOSYS;
+		break;
 
-		case SEWOULDBLOCK:
-			r=EWOULDBLOCK;
-			break;
+	case SEWOULDBLOCK:
+		r = EWOULDBLOCK;
+		break;
 
-		case SEINPROGRESS:
-			r=EINPROGRESS;
-			break;
+	case SEINPROGRESS:
+		r = EINPROGRESS;
+		break;
 
-		case SENOTADMIN:
-			r=EPERM;
-			break;
+	case SENOTADMIN:
+		r = EPERM;
+		break;
 
-		case SEENTRYEXISTS:
-			r=EEXIST;
-			break;
+	case SEENTRYEXISTS:
+		r = EEXIST;
+		break;
 
-		case SEGROUPUNKN:
-		case SECHECKSUM:
-			r=EINVAL;
-			break;
+	case SEGROUPUNKN:
+	case SECHECKSUM:
+		r = EINVAL;
+		break;
 
-		case SELOOP:
-			r=ELOOP;
-			break;
+	case SELOOP:
+		r = ELOOP;
+		break;
 
-		case ESEC_SYSTEM:
-		case ESEC_BAD_CREDENTIALS:
-		case ESEC_NO_CONTEXT:
-		case ESEC_BAD_MAGIC:
-		case ESEC_NO_USER:
-		case ESEC_NO_PRINC:
-		case ESEC_NO_SECMECH:
-		case ESEC_CTX_NOT_INITIALIZED:
-		case ESEC_PROTNOTSUPP:
-		case ESEC_NO_SVC_NAME:
-		case ESEC_NO_SVC_TYPE:
-		case ESEC_NO_SECPROT:
-		case ESEC_BAD_PEER_RESP:
-			r=EACCES;
-			break;
+	case ESEC_SYSTEM:
+	case ESEC_BAD_CREDENTIALS:
+	case ESEC_NO_CONTEXT:
+	case ESEC_BAD_MAGIC:
+	case ESEC_NO_USER:
+	case ESEC_NO_PRINC:
+	case ESEC_NO_SECMECH:
+	case ESEC_CTX_NOT_INITIALIZED:
+	case ESEC_PROTNOTSUPP:
+	case ESEC_NO_SVC_NAME:
+	case ESEC_NO_SVC_TYPE:
+	case ESEC_NO_SECPROT:
+	case ESEC_BAD_PEER_RESP:
+		r = EACCES;
+		break;
 
 		/* Most of the error numbers returned are valid Unix errnos. */
-		default:
-			r = e;
-			break;
+	default:
+		r = e;
+		break;
 
 	}
-	debug(D_LFC,"serror %d (%s) translates to unix errno %d (%s)",e,sstrerror(e),r,strerror(r));
+	debug(D_LFC, "serror %d (%s) translates to unix errno %d (%s)", e, sstrerror(e), r, strerror(r));
 	return r;
 }
 
-class pfs_service_lfc : public pfs_service {
-public:
+class pfs_service_lfc:public pfs_service {
+      public:
 
-	void free_replica_list( char **replicas )
-	{
+	void free_replica_list(char **replicas) {
 		int i;
 
-		for(i=0;replicas[i];i++) {
+		for(i = 0; replicas[i]; i++) {
 			free(replicas[i]);
-		}
-
-		free(replicas);
+		} free(replicas);
 	}
 
 	/*
-	Need a more clever replica choice.
-	This one simply picks one from random.
-	*/
+	   Need a more clever replica choice.
+	   This one simply picks one from random.
+	 */
 
-	int choose_replica_from_list( char ** replicas )
-	{
-		int n=0;
+	int choose_replica_from_list(char **replicas) {
+		int n = 0;
 		while(replicas[n]) {
-			debug(D_LFC,"replica: %s",replicas[n]);
+			debug(D_LFC, "replica: %s", replicas[n]);
 			n++;
 		}
-		return rand()%n;
+		return rand() % n;
 	}
 
-	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
+	virtual pfs_file *open(pfs_name * name, int flags, mode_t mode) {
 
 		char **replicas;
 
-		debug(D_LFC,"open: querying catalog for replicas");
+		debug(D_LFC, "open: querying catalog for replicas");
 
-		int result = lcg_lr(name->path+4,0,0,0,&replicas);
-		if(result<0) {
+		int result = lcg_lr(name->path + 4, 0, 0, 0, &replicas);
+		if(result < 0) {
 			/* lcg_lr sets errno, not serrno */
 			return 0;
 		}
 
 		int choice = choose_replica_from_list(replicas);
 
-		debug(D_LFC,"open: chose replica %s",replicas[choice]);
+		debug(D_LFC, "open: chose replica %s", replicas[choice]);
 
 		free_replica_list(replicas);
 
 		extern int pfs_force_cache;
-		return pfs_current->table->open_object(replicas[choice],flags,mode,pfs_force_cache);
+		return pfs_current->table->open_object(replicas[choice], flags, mode, pfs_force_cache);
 	}
 
-	virtual int stat( pfs_name *name, struct pfs_stat *buf ) {
+	virtual int stat(pfs_name * name, struct pfs_stat *buf) {
 		struct lfc_filestatg statbuf;
 
-		debug(D_LFC,"stat %s",name->path);
-		
-		pfs_service_emulate_stat(name,buf);
+		debug(D_LFC, "stat %s", name->path);
 
-		if(lfc_statg(name->path+4,NULL,&statbuf)<0) {
+		pfs_service_emulate_stat(name, buf);
+
+		if(lfc_statg(name->path + 4, NULL, &statbuf) < 0) {
 			errno = lfc_error_to_errno(serrno);
 			return -1;
 		}
@@ -213,14 +207,14 @@ public:
 		return 0;
 	}
 
-	virtual int lstat( pfs_name *name, struct pfs_stat *buf ) {
-		return this->stat(name,buf);
+	virtual int lstat(pfs_name * name, struct pfs_stat *buf) {
+		return this->stat(name, buf);
 	}
 
-	virtual int access( pfs_name *name, int mode ) {
-		debug(D_LFC,"access %d %d",name->path,mode);
+	virtual int access(pfs_name * name, int mode) {
+		debug(D_LFC, "access %d %d", name->path, mode);
 
-		if(lfc_access(name->path,mode)<0) {
+		if(lfc_access(name->path, mode) < 0) {
 			errno = lfc_error_to_errno(serrno);
 			return -1;
 		}
@@ -228,30 +222,30 @@ public:
 		return 0;
 	}
 
-	virtual int unlink( pfs_name *name ) {
-		debug(D_LFC,"unlink %s",name->path);
+	virtual int unlink(pfs_name * name) {
+		debug(D_LFC, "unlink %s", name->path);
 
-		if(lfc_unlink(name->path)<0) {
+		if(lfc_unlink(name->path) < 0) {
 			errno = lfc_error_to_errno(serrno);
 			return -1;
 		}
 		return 0;
 	}
 
-	virtual int chmod( pfs_name *name, mode_t mode ) {
-		debug(D_LFC,"chmod %d %d",name->path,mode);
+	virtual int chmod(pfs_name * name, mode_t mode) {
+		debug(D_LFC, "chmod %d %d", name->path, mode);
 
-		if(lfc_chmod(name->path,mode)<0) {
+		if(lfc_chmod(name->path, mode) < 0) {
 			errno = lfc_error_to_errno(serrno);
 			return -1;
 		}
 		return 0;
 	}
 
-	virtual int rename( pfs_name *oldname, pfs_name *newname ) {
-		debug(D_LFC,"rename %s %s",oldname->path,newname->path);
+	virtual int rename(pfs_name * oldname, pfs_name * newname) {
+		debug(D_LFC, "rename %s %s", oldname->path, newname->path);
 
-		if(lfc_rename(oldname->path+4,newname->path+4)<0) {
+		if(lfc_rename(oldname->path + 4, newname->path + 4) < 0) {
 			errno = lfc_error_to_errno(serrno);
 			return -1;
 		}
@@ -259,14 +253,14 @@ public:
 		return 0;
 	}
 
-	virtual pfs_dir * getdir( pfs_name *name ) {
+	virtual pfs_dir *getdir(pfs_name * name) {
 		struct lfc_direnstatg *d;
 		lfc_DIR *lfcdir;
 		pfs_dir *pfsdir = NULL;
 
-		debug(D_LFC,"getdir %s",name->path);
+		debug(D_LFC, "getdir %s", name->path);
 
-		lfcdir = lfc_opendirg(name->path+4,NULL);
+		lfcdir = lfc_opendirg(name->path + 4, NULL);
 		if(lfcdir) {
 			pfsdir = new pfs_dir(name);
 
@@ -282,22 +276,22 @@ public:
 		}
 	}
 
-	virtual int chdir( pfs_name *name, char *newpath, int size ) {
-		debug(D_LFC,"chdir %s",name->path);
+	virtual int chdir(pfs_name * name, char *newpath, int size) {
+		debug(D_LFC, "chdir %s", name->path);
 
-		if(lfc_chdir(name->path+4)<0) {
+		if(lfc_chdir(name->path + 4) < 0) {
 			errno = lfc_error_to_errno(serrno);
 			return -1;
 		}
 
-		strncpy(newpath,name->path,size);
+		strncpy(newpath, name->path, size);
 		return 0;
 	}
 
-	virtual int mkdir( pfs_name *name, mode_t mode ) {
-		debug(D_LFC,"mkdir %s %d",name->path,mode);
+	virtual int mkdir(pfs_name * name, mode_t mode) {
+		debug(D_LFC, "mkdir %s %d", name->path, mode);
 
-		if(lfc_mkdir(name->path+4,mode)<0) {
+		if(lfc_mkdir(name->path + 4, mode) < 0) {
 			errno = lfc_error_to_errno(serrno);
 			return -1;
 		}
@@ -305,9 +299,9 @@ public:
 		return 0;
 	}
 
-	virtual int rmdir( pfs_name *name ) {
-		debug(D_LFC,"rmdir %s",name->path);
-		if(lfc_rmdir(name->path+4)<0) {
+	virtual int rmdir(pfs_name * name) {
+		debug(D_LFC, "rmdir %s", name->path);
+		if(lfc_rmdir(name->path + 4) < 0) {
 			errno = lfc_error_to_errno(serrno);
 			return -1;
 		}

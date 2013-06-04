@@ -30,10 +30,10 @@ static void make_acl_name(const char *filename, int get_parent, char *aclname)
 	string_collapse_path(tmp, aclname, 1);
 }
 
-static int isdir( const char *path )
+static int isdir(const char *path)
 {
 	struct stat info;
-	if(stat(path,&info)<0) {
+	if(stat(path, &info) < 0) {
 		return 0;
 	} else {
 		return S_ISDIR(info.st_mode);
@@ -94,7 +94,7 @@ static int do_ibox_acl_check(const char *path, const char *subject, int flags, i
 	if(!isdir(path))
 		string_dirname(path, dirname);
 	else
-		strcpy(dirname,path);
+		strcpy(dirname, path);
 
 	return ibox_acl_check_dir(dirname, subject, flags);
 }
@@ -109,7 +109,8 @@ FILE *ibox_acl_open(const char *dirname)
 	char aclname[PFS_PATH_MAX];
 
 	if(!isdir(dirname)) {
-		if(errno == ENOTDIR) return NULL;
+		if(errno == ENOTDIR)
+			return NULL;
 		errno = ENOENT;
 		return 0;
 	} else {

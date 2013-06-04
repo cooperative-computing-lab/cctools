@@ -18,88 +18,88 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-int parrot_whoami( const char *path, char *buf, int size )
+int parrot_whoami(const char *path, char *buf, int size)
 {
 #ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_whoami,path,buf,size);
+	return syscall(SYSCALL32_parrot_whoami, path, buf, size);
 #else
-	return syscall(SYSCALL64_parrot_whoami,path,buf,size);
+	return syscall(SYSCALL64_parrot_whoami, path, buf, size);
 #endif
 }
 
-int parrot_locate( const char *path, char *buf, int size )
+int parrot_locate(const char *path, char *buf, int size)
 {
 #ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_locate,path,buf,size);
+	return syscall(SYSCALL32_parrot_locate, path, buf, size);
 #else
-	return syscall(SYSCALL64_parrot_locate,path,buf,size);
+	return syscall(SYSCALL64_parrot_locate, path, buf, size);
 #endif
 }
 
-int parrot_getacl( const char *path, char *buf, int size )
+int parrot_getacl(const char *path, char *buf, int size)
 {
 #ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_getacl,path,buf,size);
+	return syscall(SYSCALL32_parrot_getacl, path, buf, size);
 #else
-	return syscall(SYSCALL64_parrot_getacl,path,buf,size);
+	return syscall(SYSCALL64_parrot_getacl, path, buf, size);
 #endif
 }
 
-int parrot_setacl( const char *path, const char *subject, const char *rights )
+int parrot_setacl(const char *path, const char *subject, const char *rights)
 {
 #ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_setacl,path,subject,rights);
+	return syscall(SYSCALL32_parrot_setacl, path, subject, rights);
 #else
-	return syscall(SYSCALL64_parrot_setacl,path,subject,rights);
+	return syscall(SYSCALL64_parrot_setacl, path, subject, rights);
 #endif
 }
 
-int parrot_md5( const char *filename, unsigned char *digest )
+int parrot_md5(const char *filename, unsigned char *digest)
 {
 #ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_md5,filename,digest);
+	return syscall(SYSCALL32_parrot_md5, filename, digest);
 #else
-	return syscall(SYSCALL64_parrot_md5,filename,digest);
+	return syscall(SYSCALL64_parrot_md5, filename, digest);
 #endif
 }
 
-int parrot_cp( const char *source, const char *dest )
+int parrot_cp(const char *source, const char *dest)
 {
 #ifdef CCTOOLS_CPU_I386
-		return syscall(SYSCALL32_parrot_copyfile,source,dest);
+	return syscall(SYSCALL32_parrot_copyfile, source, dest);
 #else
-		return syscall(SYSCALL64_parrot_copyfile,source,dest);
+	return syscall(SYSCALL64_parrot_copyfile, source, dest);
 #endif
 }
 
-int parrot_mkalloc( const char *path, INT64_T size, mode_t mode )
+int parrot_mkalloc(const char *path, INT64_T size, mode_t mode)
 {
 #ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_mkalloc,path,&size,mode);
+	return syscall(SYSCALL32_parrot_mkalloc, path, &size, mode);
 #else
-	return syscall(SYSCALL64_parrot_mkalloc,path,&size,mode);
+	return syscall(SYSCALL64_parrot_mkalloc, path, &size, mode);
 #endif
 }
 
-int parrot_lsalloc( const char *path, char *alloc_path, INT64_T *total, INT64_T *inuse )
+int parrot_lsalloc(const char *path, char *alloc_path, INT64_T * total, INT64_T * inuse)
 {
 #ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_lsalloc,path,alloc_path,total,inuse);
+	return syscall(SYSCALL32_parrot_lsalloc, path, alloc_path, total, inuse);
 #else
-	return syscall(SYSCALL64_parrot_lsalloc,path,alloc_path,total,inuse);
+	return syscall(SYSCALL64_parrot_lsalloc, path, alloc_path, total, inuse);
 #endif
 }
 
-int parrot_timeout( const char *time )
+int parrot_timeout(const char *time)
 {
 #ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_timeout,time);
+	return syscall(SYSCALL32_parrot_timeout, time);
 #else
-	return syscall(SYSCALL64_parrot_timeout,time);
+	return syscall(SYSCALL64_parrot_timeout, time);
 #endif
 }
 
-SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags) 
+SEARCH *parrot_opensearch(const char *path, const char *pattern, int flags)
 {
 	int err;
 	size_t buffer_size = 16384;
@@ -108,42 +108,45 @@ SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags)
 	do {
 		buffer = malloc(buffer_size);
 
-		if (buffer==NULL) {
+		if(buffer == NULL) {
 			errno = ENOMEM;
 			return NULL;
 		}
+#ifdef CCTOOLS_CPU_I386
+		err = syscall(SYSCALL32_search, path, pattern, flags, buffer, buffer_size, "parrot_opensearch");
+#else
+		err = syscall(SYSCALL64_search, path, pattern, flags, buffer, buffer_size, "parrot_opensearch");
+#endif
 
-		#ifdef CCTOOLS_CPU_I386
-			err = syscall(SYSCALL32_search,path,pattern,flags,buffer,buffer_size,"parrot_opensearch");
-		#else
-			err = syscall(SYSCALL64_search,path,pattern,flags,buffer,buffer_size,"parrot_opensearch");
-		#endif	
+		buffer_size *= 2;
+	} while(err == -1 && errno == ERANGE);
 
-		buffer_size*=2;
-	} while (err==-1 && errno==ERANGE);
-
-	if (err==-1) return NULL;
-        if (err==0) *buffer = '\0';
+	if(err == -1)
+		return NULL;
+	if(err == 0)
+		*buffer = '\0';
 
 	SEARCH *result = malloc(sizeof(SEARCH));
-	result->entry = (struct searchent*) malloc(sizeof(struct searchent));
+	result->entry = (struct searchent *) malloc(sizeof(struct searchent));
 	result->entry->info = NULL;
 	result->entry->path = NULL;
 	result->data = buffer;
 	result->i = 0;
-	
+
 	return result;
 }
 
-static char *readsearch_next(char *data, int *i) {
+static char *readsearch_next(char *data, int *i)
+{
 	data += *i;
 
-	if (*data=='\0') return NULL;
+	if(*data == '\0')
+		return NULL;
 
 	char *tail = strchr(data, '|');
-	ptrdiff_t length = (tail==NULL) ? (ptrdiff_t)strlen(data) : tail - data;
+	ptrdiff_t length = (tail == NULL) ? (ptrdiff_t) strlen(data) : tail - data;
 
-	if (length==0) {
+	if(length == 0) {
 		(*i)++;
 		return NULL;
 	}
@@ -156,16 +159,14 @@ static char *readsearch_next(char *data, int *i) {
 	return next;
 }
 
-static struct stat *readsearch_unpack_stat(char *stat_str) {
-	if (stat_str==NULL) return NULL;
-	
-	struct stat *info = (struct stat*) calloc(1, sizeof(struct stat));
+static struct stat *readsearch_unpack_stat(char *stat_str)
+{
+	if(stat_str == NULL)
+		return NULL;
+
+	struct stat *info = (struct stat *) calloc(1, sizeof(struct stat));
 	long dev, ino, mode, nlink, uid, gid, rdev, size, atime, mtime, ctime, blksize, blocks;
-	sscanf(
-		stat_str, 
-		"%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld", 
-		&dev, &ino, &mode, &nlink, &uid, &gid, &rdev, &size, &atime, &mtime, &ctime, &blksize, &blocks
-	);
+	sscanf(stat_str, "%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld", &dev, &ino, &mode, &nlink, &uid, &gid, &rdev, &size, &atime, &mtime, &ctime, &blksize, &blocks);
 
 	info->st_dev = (dev_t) dev;
 	info->st_ino = (ino_t) ino;
@@ -185,20 +186,22 @@ static struct stat *readsearch_unpack_stat(char *stat_str) {
 	return info;
 }
 
-struct searchent *parrot_readsearch(SEARCH *search) {
+struct searchent *parrot_readsearch(SEARCH * search)
+{
 	int i = search->i;
 	char *data = search->data;
 	char *err_str = readsearch_next(data, &i);
 	free(search->entry->path);
 	free(search->entry->info);
 
-	if (err_str==NULL) return NULL;
+	if(err_str == NULL)
+		return NULL;
 
 	char *path;
 	struct stat *info;
 	int err = atoi(err_str), errsource;
 
-	if (err) {
+	if(err) {
 		errsource = atoi(readsearch_next(data, &i));
 		path = readsearch_next(data, &i);
 		info = NULL;
@@ -206,7 +209,7 @@ struct searchent *parrot_readsearch(SEARCH *search) {
 		errsource = 0;
 		path = readsearch_next(data, &i);
 		info = readsearch_unpack_stat(readsearch_next(data, &i));
-	} 
+	}
 
 	search->entry->path = path;
 	search->entry->info = info;
@@ -217,9 +220,10 @@ struct searchent *parrot_readsearch(SEARCH *search) {
 	return search->entry;
 }
 
-int parrot_closesearch(SEARCH *search) {
-        free(search->entry);
-        free(search->data);
-        free(search);
+int parrot_closesearch(SEARCH * search)
+{
+	free(search->entry);
+	free(search->data);
+	free(search);
 	return 0;
 }

@@ -12,17 +12,15 @@ extern "C" {
 #include "stringtools.h"
 #include "hash_table.h"
 }
-
 #include <unistd.h>
-#include <errno.h> 
+#include <errno.h>
 #include <stdlib.h>
 #include <dirent.h>
 #include <string.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
-
-pfs_dir::pfs_dir( pfs_name *n ) : pfs_file(n)
+pfs_dir::pfs_dir(pfs_name * n):pfs_file(n)
 {
 	data = 0;
 	length = 0;
@@ -31,57 +29,61 @@ pfs_dir::pfs_dir( pfs_name *n ) : pfs_file(n)
 
 pfs_dir::~pfs_dir()
 {
-	if(data) free(data);
+	if(data)
+		free(data);
 }
 
-int pfs_dir::fstat( struct pfs_stat *buf )
+int pfs_dir::fstat(struct pfs_stat *buf)
 {
-	return name.service->stat(&name,buf);
+	return name.service->stat(&name, buf);
 }
 
-int pfs_dir::fstatfs( struct pfs_statfs *buf )
+int pfs_dir::fstatfs(struct pfs_statfs *buf)
 {
-	return name.service->statfs(&name,buf);
+	return name.service->statfs(&name, buf);
 }
 
-int pfs_dir::fchmod( mode_t mode )
+int pfs_dir::fchmod(mode_t mode)
 {
-	return name.service->chmod(&name,mode);
+	return name.service->chmod(&name, mode);
 }
 
-int pfs_dir::fchown( uid_t uid, gid_t gid )
+int pfs_dir::fchown(uid_t uid, gid_t gid)
 {
-	return name.service->chown(&name,uid,gid);
+	return name.service->chown(&name, uid, gid);
 }
 
-struct dirent * pfs_dir::fdreaddir( pfs_off_t offset, pfs_off_t *next_offset )
+struct dirent *pfs_dir::fdreaddir(pfs_off_t offset, pfs_off_t * next_offset)
 {
 	static union {
 		struct dirent entry;
-		char padding[sizeof(struct dirent)+_POSIX_PATH_MAX];
+		char padding[sizeof(struct dirent) + _POSIX_PATH_MAX];
 	} d;
 
 	/*
-	Insane little hack: tcsh will not consider a directory
-	entry executable if its inode field happens to be zero.
-	*/
+	   Insane little hack: tcsh will not consider a directory
+	   entry executable if its inode field happens to be zero.
+	 */
 
 	errno = 0;
 
-	if(!data) return 0;
-	if(offset>=length) return 0;
-	if(offset<0) return 0;
+	if(!data)
+		return 0;
+	if(offset >= length)
+		return 0;
+	if(offset < 0)
+		return 0;
 
 	char *result = &data[offset];
 
-	memset(&d,0,sizeof(d));
-	strcpy(d.entry.d_name,result);
+	memset(&d, 0, sizeof(d));
+	strcpy(d.entry.d_name, result);
 	d.entry.d_ino = hash_string(d.entry.d_name);
 	d.entry.d_off = offset;
 	d.entry.d_reclen = sizeof(d.entry) + strlen(d.entry.d_name);
 	d.entry.d_type = 0;
 
-	*next_offset = offset + strlen(result)+1;
+	*next_offset = offset + strlen(result) + 1;
 
 	return &d.entry;
 }
@@ -94,40 +96,40 @@ int pfs_dir::is_seekable()
 	return 1;
 }
 
-int pfs_dir::append( const char *srcname )
+int pfs_dir::append(const char *srcname)
 {
 	char name[PFS_PATH_MAX];
 	char *s;
 
 	/* Clean up the insane names that systems give us */
-	strcpy(name,srcname);
+	strcpy(name, srcname);
 	string_chomp(name);
 
 	/* Some place the name of the listed directory in the listing itself, followed by a colon.  Sheesh. */
-	s = &name[strlen(name)-1];
-	if( (*s==':') || (*s==' ' && *(s-1)==':') ) {
+	s = &name[strlen(name) - 1];
+	if((*s == ':') || (*s == ' ' && *(s - 1) == ':')) {
 		return 1;
 	}
 
 	/* Some hose up directory names by adding slashes */
-	s = name + strlen(name)-1;
-	while( s>=name && *s=='/' ) {
+	s = name + strlen(name) - 1;
+	while(s >= name && *s == '/') {
 		*s = 0;
 		s--;
 	}
 
 	/* If that leaves nothing, then skip it */
-	if( s<name ) {
+	if(s < name) {
 		return 1;
 	}
 
 	/* Strip off any leading directory parts. */
-	s = strrchr(name,'/');
+	s = strrchr(name, '/');
 	if(s) {
 		int length;
 		s++;
 		length = strlen(s);
-		memmove(name,s,length);
+		memmove(name, s, length);
 		name[length] = 0;
 	}
 
@@ -135,19 +137,21 @@ int pfs_dir::append( const char *srcname )
 
 	if(!data) {
 		maxlength = 4096;
-		data = (char*) malloc(maxlength);
-		if(!data) return 0;
+		data = (char *) malloc(maxlength);
+		if(!data)
+			return 0;
 	}
 
-	if( ((int)(strlen(name)+length+1)) > (int)maxlength ) {
-		char *newdata = (char*) realloc(data,maxlength*2);
-		if(!newdata) return 0;
+	if(((int) (strlen(name) + length + 1)) > (int) maxlength) {
+		char *newdata = (char *) realloc(data, maxlength * 2);
+		if(!newdata)
+			return 0;
 		data = newdata;
-		maxlength*=2;
+		maxlength *= 2;
 	}
 
-	strcpy(&data[length],name);
-	length += strlen(name)+1;
+	strcpy(&data[length], name);
+	length += strlen(name) + 1;
 
 	return 1;
 }
