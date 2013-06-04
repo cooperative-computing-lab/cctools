@@ -8,13 +8,6 @@ See the file COPYING for details.
 The following major problems must be fixed in the worker
 before it can be released:
 
-- Each task must have its own namespace so that independent tasks
-with the same filenames will not interfere.  This should be done
-by creating a directory in do_task, allowing for a put command
-in the middle of the task transaction, and symlinking in common files.
-Then, when the master is done with a task, it should send a cancel
-task message, which causes the directory and all to be cleaned up.
-
 - Currently, all tasks sent are started immediately.  Instead, the
 worker should queue up all tasks sent, and only start them
 when the total cores, tasks, and memory are within the specified limits.
@@ -258,15 +251,33 @@ static void task_info_delete( struct task_info *ti )
 int link_file_in_workspace(char *localname, char *taskname, char *workspace, int into) {
 	int result = 1;
 	struct stat st;
-	char targetname[WORK_QUEUE_LINE_MAX];
+	
+	char cache_name[WORK_QUEUE_LINE_MAX];
+	char workspace_name[WORK_QUEUE_LINE_MAX];
+	
+	char *cur_pos = localname;
+	while(!strncmp(cur_pos, "./", 2)) {
+		cur_pos += 2;
+	}
+	sprintf(cache_name, "cache/%s", cur_pos);
+	
+	cur_pos = taskname;
+	while(!strncmp(cur_pos, "./", 2)) {
+		cur_pos += 2;
+	}
+	sprintf(workspace_name, "%s/%s", workspace, cur_pos);
+	
+	
+	char* targetname;
 	
 	if(into) {
-		sprintf(targetname, "%s", localname);
+		targetname = cache_name;
 	} else {
-		sprintf(targetname, "%s/%s", workspace, taskname);
+		targetname = workspace_name;
 	}
 
 	if(stat((char*)targetname, &st)) {
+		debug(D_WQ, "Could not link %s %s workspace (does not exist)", targetname, into?"into":"from");
 		return 0;
 	}
 	
@@ -293,41 +304,27 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 		}
 		closedir(targetdir);
 	} else {
-		char *cur_pos, *tmp_pos;
-		
-		cur_pos = taskname;
-		if(!strncmp(cur_pos, "./", 2)) {
-			cur_pos += 2;
-		}
-		
-		sprintf(targetname, "%s/%s", workspace, cur_pos);
-		
-		debug(D_WQ, "linking file %s %s workspace %s with %s\n", localname, into?"into":"from", workspace, targetname);
+		debug(D_WQ, "linking file %s %s workspace %s as %s\n", cache_name, into?"into":"from", workspace, workspace_name);
 
-		if(into) {
-			cur_pos = targetname;
-		} else {
-			cur_pos = localname;
-		}
 
-		tmp_pos = strrchr(cur_pos, '/');
-		if(tmp_pos) {
-			*tmp_pos = '\0';
-			if(!create_dir(cur_pos, 0700)) {
-				debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
+		cur_pos = strrchr(targetname, '/');
+		if(cur_pos) {
+			*cur_pos = '\0';
+			if(!create_dir(targetname, 0700)) {
+				debug(D_WQ, "Could not create directory - %s (%s)\n", targetname, strerror(errno));
 				return 1;
 			}
-			*tmp_pos = '/';
+			*cur_pos = '/';
 		}
 		
 		if(into) {
-			if(link(localname, targetname)) {
-				debug(D_WQ, "Could not link file %s -> %s (%s)\n", localname, targetname, strerror(errno));
+			if(link(cache_name, workspace_name)) {
+				debug(D_WQ, "Could not link file %s -> %s (%s)\n", cache_name, workspace_name, strerror(errno));
 				return 0;
 			}
 		} else {
-			if(link(targetname, localname)) {
-				debug(D_WQ, "Could not link file %s -> %s (%s)\n", targetname, localname, strerror(errno));
+			if(link(workspace_name, cache_name)) {
+				debug(D_WQ, "Could not link file %s -> %s (%s)\n", workspace_name, cache_name, strerror(errno));
 				return 0;
 			}
 		}
@@ -345,7 +342,7 @@ static pid_t task_info_execute(const char *cmd, struct task_info *ti)
 	char working_dir[1024];
 	fflush(NULL); /* why is this necessary? */
 	
-	sprintf(working_dir, "%d", ti->taskid);
+	sprintf(working_dir, "t.%d", ti->taskid);
 	ti->output_file_name = strdup(task_output_template);
 	ti->output_fd = mkstemp(ti->output_file_name);
 	if (ti->output_fd == -1) {
@@ -469,7 +466,7 @@ static int handle_tasks(struct link *master) {
 			itable_remove(stored_tasks, ti->taskid);
 			itable_firstkey(active_tasks);
 			
-			sprintf(dirname, "./%d", ti->taskid);
+			sprintf(dirname, "t.%d", ti->taskid);
 			
 			list_first_item(ti->task->output_files);
 			while((tf = (struct work_queue_file *)list_next_item(ti->task->output_files))) {
@@ -813,17 +810,20 @@ static int stream_output_item(struct link *master, const char *filename)
 	DIR *dir;
 	struct dirent *dent;
 	char dentline[WORK_QUEUE_LINE_MAX];
+	char cached_filename[WORK_QUEUE_LINE_MAX];
 	struct stat info;
 	INT64_T actual, length;
 	int fd;
 
-	if(stat(filename, &info) != 0) {
+	sprintf(cached_filename, "cache/%s", filename);
+
+	if(stat(cached_filename, &info) != 0) {
 		goto failure;
 	}
 
 	if(S_ISDIR(info.st_mode)) {
 		// stream a directory
-		dir = opendir(filename);
+		dir = opendir(cached_filename);
 		if(!dir) {
 			goto failure;
 		}
@@ -839,7 +839,7 @@ static int stream_output_item(struct link *master, const char *filename)
 		closedir(dir);
 	} else {
 		// stream a file
-		fd = open(filename, O_RDONLY, 0);
+		fd = open(cached_filename, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = (INT64_T) info.st_size;
 			send_master_message(master, "file %s %lld\n", filename, length);
@@ -929,7 +929,7 @@ static int do_task( struct link *master, UINT64_T taskid )
 
 	task->taskid = taskid;
 
-	sprintf(dirname, "./%" SCNd64 , taskid);
+	sprintf(dirname, "t.%" SCNd64 , taskid);
 	mkdir(dirname, 0700);
 
 	while(recv_master_message(master,line,sizeof(line),stoptime)) {
@@ -1013,33 +1013,37 @@ static int do_symlink(const char *path, char *filename) {
 }
 
 static int do_put(struct link *master, char *filename, INT64_T length, int mode) {
-
+	char cached_filename[WORK_QUEUE_LINE_MAX];
+	char *cur_pos;
+	
 	debug(D_WQ, "Putting file %s into workspace\n", filename);
 	if(!check_disk_space_for_filesize(length)) {
 		debug(D_WQ, "Could not put file %s, not enough disk space (%lld bytes needed)\n", filename, length);
 		return 0;
 	}
+	
 
 	mode = mode | 0600;
-	char *cur_pos, *tmp_pos;
 
 	cur_pos = filename;
 
-	if(!strncmp(cur_pos, "./", 2)) {
+	while(!strncmp(cur_pos, "./", 2)) {
 		cur_pos += 2;
 	}
 
-	tmp_pos = strrchr(cur_pos, '/');
-	if(tmp_pos) {
-		*tmp_pos = '\0';
-		if(!create_dir(cur_pos, mode | 0700)) {
-			debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
+	sprintf(cached_filename, "cache/%s", cur_pos);
+
+	cur_pos = strrchr(cached_filename, '/');
+	if(cur_pos) {
+		*cur_pos = '\0';
+		if(!create_dir(cached_filename, mode | 0700)) {
+			debug(D_WQ, "Could not create directory - %s (%s)\n", cached_filename, strerror(errno));
 			return 0;
 		}
-		*tmp_pos = '/';
+		*cur_pos = '/';
 	}
 
-	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
+	int fd = open(cached_filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(fd < 0) {
 		debug(D_WQ, "Could not open %s for writing\n", filename);
 		return 0;
@@ -1056,10 +1060,12 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode)
 }
 
 static int do_unlink(const char *path) {
+	char cached_path[WORK_QUEUE_LINE_MAX];
+	sprintf(cached_path, "cache/%s", path);
 	//Use delete_dir() since it calls unlink() if path is a file.	
-	if(delete_dir(path) != 0) { 
+	if(delete_dir(cached_path) != 0) { 
 		struct stat buf;
-		if(stat(path, &buf) != 0) {
+		if(stat(cached_path, &buf) != 0) {
 			if(errno == ENOENT) {
 				// If the path does not exist, return success
 				return 1;
@@ -1072,7 +1078,9 @@ static int do_unlink(const char *path) {
 }
 
 static int do_mkdir(const char *filename, int mode) {
-	if(!create_dir(filename, mode | 0700)) {
+	char cached_filename[WORK_QUEUE_LINE_MAX];
+	sprintf(cached_filename, "cache/%s", filename);
+	if(!create_dir(cached_filename, mode | 0700)) {
 		debug(D_WQ, "Could not create directory - %s (%s)\n", filename, strerror(errno));
 		return 0;
 	}
@@ -1222,7 +1230,7 @@ static void kill_task(struct task_info *ti) {
 	itable_remove(active_tasks, ti->pid);
 	
 	// Clean up the task's directory
-	sprintf(dirname, "%d", ti->taskid);
+	sprintf(dirname, "t.%d", ti->taskid);
 	delete_dir(dirname);
 
 	cores_allocated -= ti->task->cores;
@@ -1275,7 +1283,7 @@ static int do_kill(int taskid) {
 			itable_remove(stored_tasks, taskid);
 			task_info_delete(ti);
 		}
-		sprintf(dirname, "%d", taskid);
+		sprintf(dirname, "t.%d", taskid);
 		delete_dir(dirname);
 	}
 	return 1;
@@ -1727,15 +1735,17 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " -o <file>               Send debugging to this file.\n");
 	fprintf(stdout, " --debug-file-size       Set the maximum size of the debug log (default 10M, 0 disables).\n");
 	fprintf(stdout, " --debug-release-reset   Debug file will be closed, renamed, and a new one opened after being released from a master.\n");
-	fprintf(stdout, " -m <mode>               Choose worker mode.\n");
-	fprintf(stdout, "                         Can be [w]orker, [f]oreman, [c]lassic, or [a]uto (default=auto).\n");
-	fprintf(stdout, " -f <port>[:<high_port>] Set the port for the foreman to listen on.  If <highport> is specified\n");
-	fprintf(stdout, "                         the port is chosen from the range port:highport\n");
+	fprintf(stdout, " --foreman               Set worker to run as a foreman.\n");
+	fprintf(stdout, " -f, --foreman-port <port>[:<highport>]\n");
+	fprintf(stdout, "                         Set the port for the foreman to listen on.  If <highport> is specified\n");
+	fprintf(stdout, "                         the port is chosen from the range port:highport.  Implies --foreman.\n");
 	fprintf(stdout, " -c, --measure-capacity  Enable the measurement of foreman capacity to handle new workers (default=disabled).\n");
 	fprintf(stdout, " -F, --fast-abort <mult> Set the fast abort multiplier for foreman (default=disabled).\n");
 	fprintf(stdout, " --specify-log <logfile> Send statistics about foreman to this file.\n");
-	fprintf(stdout, " -M <project>            Name of a preferred project. A worker can have multiple preferred projects.\n");
-	fprintf(stdout, " -N <project>            When in Foreman mode, the name of the project to advertise as.  In worker/classic/auto mode acts as '-M'.\n");
+	fprintf(stdout, " -M,\n"); 
+	fprintf(stdout, " --master-name <name>    Name of a preferred project. A worker can have multiple preferred projects.\n");
+	fprintf(stdout, " -N,\n");
+	fprintf(stdout, " --name <name>           When in Foreman mode, this foreman will advertise to the catalog server as <name>.\n");
 	fprintf(stdout, " -P,--password <pwfile>  Password file for authenticating to the master.\n");
 	fprintf(stdout, " -t <time>               Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
 	fprintf(stdout, " -w <size>               Set TCP window size.\n");
@@ -1828,6 +1838,9 @@ struct option long_options[] = {
 	{"memory",              required_argument,  0,   LONG_OPT_MEMORY},
 	{"disk",                required_argument,  0,   LONG_OPT_DISK},
 	{"foreman",             no_argument,        0,   LONG_OPT_FOREMAN},
+	{"foreman-port",        required_argument,  0,   'f'},
+	{"name",                required_argument,  0,   'N'},
+	{"master-name",         required_argument,  0,   'M'},
 	{0,0,0,0}
 };
 
