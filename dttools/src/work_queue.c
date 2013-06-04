@@ -246,23 +246,6 @@ static long double minimum_allowed_transfer_rate = 100000;	// 100 KB/s
 /********** work_queue internal functions *************/
 /******************************************************/
 
-static void log_worker_states(struct work_queue *q)
-{
-	struct work_queue_stats s;
-	work_queue_get_stats(q, &s);
-	
-	fprintf(q->logfile, "%16" PRIu64 " %25" PRIu64 " ", timestamp_get(), s.start_time); // time
-	fprintf(q->logfile, "%25d %25d %25d %25d", s.workers_init, s.workers_ready, s.workers_busy + s.workers_full, 0);
-	fprintf(q->logfile, "%25d %25d %25d ", s.tasks_waiting, s.tasks_running, s.tasks_complete);
-	fprintf(q->logfile, "%25d %25d %25d %25d ", s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_connected);
-	fprintf(q->logfile, "%25d %25" PRId64 " %25" PRId64 " ", s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received); 
-	fprintf(q->logfile, "%25" PRIu64 " %25" PRIu64 " ", s.total_send_time, s.total_receive_time);
-	fprintf(q->logfile, "%25f %25f ", s.efficiency, s.idle_percentage);
-	fprintf(q->logfile, "%25d %25d ", s.capacity, s.avg_capacity);
-	fprintf(q->logfile, "%25d %25d ", s.port, s.priority);
-	fprintf(q->logfile, "%25d ", s.total_worker_slots);
-	fprintf(q->logfile, "\n");
-}
 
 static int get_worker_state(struct work_queue_worker *w) {
 	if(!strcmp(w->hostname, "unknown")) {
@@ -290,10 +273,9 @@ static void update_worker_states(struct work_queue *q) {
 }
 
 
-static void track_worker_state(struct work_queue *q, int old_state, int new_state)
+static void log_worker_states(struct work_queue *q)
 {
-	if(old_state == new_state) return;
-	
+	struct work_queue_stats s;
 	update_worker_states(q);
 	
 	debug(D_WQ, "workers status -- total: %d, init: %d, ready: %d, busy: %d, full: %d.",
@@ -302,10 +284,25 @@ static void track_worker_state(struct work_queue *q, int old_state, int new_stat
 		q->workers_in_state[WORKER_STATE_READY],
 		q->workers_in_state[WORKER_STATE_BUSY],
 		q->workers_in_state[WORKER_STATE_FULL]);
-	if(q->logfile) {
-		log_worker_states(q);
-	}
+		
+	if(!q->logfile) return;
+	
+	work_queue_get_stats(q, &s);
+	
+	fprintf(q->logfile, "%16" PRIu64 " %25" PRIu64 " ", timestamp_get(), s.start_time); // time
+	fprintf(q->logfile, "%25d %25d %25d %25d", s.workers_init, s.workers_ready, s.workers_busy + s.workers_full, 0);
+	fprintf(q->logfile, "%25d %25d %25d ", s.tasks_waiting, s.tasks_running, s.tasks_complete);
+	fprintf(q->logfile, "%25d %25d %25d %25d ", s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_connected);
+	fprintf(q->logfile, "%25d %25" PRId64 " %25" PRId64 " ", s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received); 
+	fprintf(q->logfile, "%25" PRIu64 " %25" PRIu64 " ", s.total_send_time, s.total_receive_time);
+	fprintf(q->logfile, "%25f %25f ", s.efficiency, s.idle_percentage);
+	fprintf(q->logfile, "%25d %25d ", s.capacity, s.avg_capacity);
+	fprintf(q->logfile, "%25d %25d ", s.port, s.priority);
+	fprintf(q->logfile, "%25d ", s.total_worker_slots);
+	fprintf(q->logfile, "\n");
 }
+
+
 
 static void link_to_hash_key(struct link *link, char *key)
 {
@@ -495,9 +492,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 
 static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 {
-	int old_state;
 	if(!q || !w) return;
-	old_state = get_worker_state(w);
 
 	debug(D_WQ, "worker %s (%s) removed", w->hostname, w->addrport);
 
@@ -507,7 +502,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	hash_table_remove(q->worker_table, w->hashkey);
 	
-	track_worker_state(q, old_state, WORKER_STATE_NONE);
+	log_worker_states(q);
 	
 	if(w->link)
 		link_close(w->link);
@@ -577,7 +572,7 @@ static int add_worker(struct work_queue *q)
 	link_to_hash_key(link, w->hashkey);
 	sprintf(w->addrport, "%s:%d", addr, port);
 	hash_table_insert(q->worker_table, w->hashkey, w);
-	track_worker_state(q, WORKER_STATE_NONE, WORKER_STATE_INIT);
+	log_worker_states(q);
 
 	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
 
@@ -998,7 +993,7 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 	w->arch     = strdup(items[2]);
 	w->version  = strdup(items[3]);
 
-	track_worker_state(q, WORKER_STATE_INIT, WORKER_STATE_READY);
+	log_worker_states(q);
 	q->total_workers_connected++;
 	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
 	
@@ -1086,7 +1081,6 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	itable_remove(q->running_tasks, taskid);
 	itable_insert(q->finished_tasks, taskid, (void*)t);
 
-	int old_state = get_worker_state(w);
 
 	w->cores_allocated -= t->cores;
 	w->memory_allocated -= t->memory;
@@ -1094,13 +1088,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	w->finished_tasks++;
 
-	if(!w->cores_allocated) {
-		track_worker_state(q, old_state, WORKER_STATE_READY);
-	} else if(w->cores_allocated < w->resources->cores.total ) {
-		track_worker_state(q, old_state, WORKER_STATE_BUSY);
-	} else {
-		track_worker_state(q, old_state, WORKER_STATE_FULL);
-	}
+	log_worker_states(q);
 
 	return 0;
 }
@@ -1282,7 +1270,6 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 {
 	char category[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
-	int old_state = get_worker_state(w);
 	
 	if(sscanf(line, "resource %s %d %d %d %d", category, &r.inuse,&r.total,&r.smallest,&r.largest)==5) {
 
@@ -1295,11 +1282,7 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 		}
 
 		if(w->cores_allocated) {
-			if(w->resources->cores.total > w->cores_allocated) {
-				track_worker_state(q, old_state, w->cores_allocated?WORKER_STATE_BUSY:WORKER_STATE_READY);
-			} else {
-				track_worker_state(q, old_state, WORKER_STATE_FULL);
-			}
+			log_worker_states(q);
 		}
 	}
 
@@ -1806,6 +1789,7 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 
 static int get_num_of_effective_workers(struct work_queue *q)
 {
+	update_worker_states(q);
 	return q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_READY] + q->workers_in_state[WORKER_STATE_FULL];
 }
 
@@ -1965,7 +1949,7 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->cores_allocated < w->resources->cores.total) {
+		if(w->cores_allocated + t->cores <= w->resources->cores.total) {
 			task_cached_bytes = 0;
 			list_first_item(t->input_files);
 			while((tf = list_next_item(t->input_files))) {
@@ -1989,49 +1973,51 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 	return best_worker;
 }
 
-static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q)
+static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
 	struct work_queue_worker *w;
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		if(w->cores_allocated < w->resources->cores.total) {
+		if(w->cores_allocated + t->cores <= w->resources->cores.total) {
 			return w;
 		}
 	}
 	return NULL;
 }
 
-static struct work_queue_worker *find_worker_by_random(struct work_queue *q)
+static struct work_queue_worker *find_worker_by_random(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
 	struct work_queue_worker *w;
-	struct work_queue_worker *best_worker = 0;
-	int num_workers_ready;
-	int random_ready_worker, ready_worker_count = 1;
+	int num_workers = hash_table_size(q->worker_table);
+	int random_worker;
 
-	num_workers_ready = q->workers_in_state[WORKER_STATE_READY]+q->workers_in_state[WORKER_STATE_BUSY];
-
-	if(num_workers_ready > 0) {
-		random_ready_worker = (rand() % num_workers_ready) + 1;
+	if(num_workers > 0) {
+		random_worker = (rand() % num_workers) + 1;
 	} else {
-		random_ready_worker = 0;
+		random_worker = 0;
 	}
 
 	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->cores_allocated < w->resources->cores.total && ready_worker_count == random_ready_worker) {
-			return w;
+	while(random_worker) {
+		hash_table_nextkey(q->worker_table, &key, (void **) &w);
+		if(!w) {
+			hash_table_firstkey(q->worker_table);
+			continue;
 		}
-		if(w->cores_allocated < w->resources->cores.total) {
-			ready_worker_count++;
+		
+		if(w->cores_allocated + t->cores <= w->resources->cores.total) {
+			random_worker--;
+		} else {
+			w = NULL;
 		}
 	}
 
-	return best_worker;
+	return w;
 }
 
-static struct work_queue_worker *find_worker_by_time(struct work_queue *q)
+static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
 	struct work_queue_worker *w;
@@ -2040,7 +2026,7 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q)
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->cores_allocated < w->resources->cores.total) {
+		if(w->cores_allocated + t->cores <= w->resources->cores.total) {
 			if(w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
 				if(!best_worker || t < best_time) {
@@ -2054,7 +2040,7 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q)
 	if(best_worker) {
 		return best_worker;
 	} else {
-		return find_worker_by_fcfs(q);
+		return find_worker_by_fcfs(q, t);
 	}
 }
 
@@ -2071,19 +2057,18 @@ static struct work_queue_worker *find_best_worker(struct work_queue *q, struct w
 	case WORK_QUEUE_SCHEDULE_FILES:
 		return find_worker_by_files(q, t);
 	case WORK_QUEUE_SCHEDULE_TIME:
-		return find_worker_by_time(q);
+		return find_worker_by_time(q, t);
 	case WORK_QUEUE_SCHEDULE_RAND:
-		return find_worker_by_random(q);
+		return find_worker_by_random(q, t);
 	case WORK_QUEUE_SCHEDULE_FCFS:
 	default:
-		return find_worker_by_fcfs(q);
+		return find_worker_by_fcfs(q, t);
 	}
 }
 
 static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	struct work_queue_task *t = list_pop_head(q->ready_list);
-	int old_state = get_worker_state(w);
 	if(!t)
 		return 0;
 
@@ -2096,11 +2081,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 	w->disk_allocated   += t->disk;
 
 	if(start_one_task(q, w, t)) {
-		if(w->cores_allocated < w->resources->cores.total) {
-			track_worker_state(q, old_state, WORKER_STATE_BUSY);
-		} else {
-			track_worker_state(q, old_state, WORKER_STATE_FULL);
-		}
+		log_worker_states(q);
 		return 1;
 	} else {
 		debug(D_WQ, "Failed to send task to worker %s (%s).", w->hostname, w->addrport);
@@ -2114,7 +2095,7 @@ static void start_tasks(struct work_queue *q)
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
-	while(list_size(q->ready_list) && (q->workers_in_state[WORKER_STATE_READY] || q->workers_in_state[WORKER_STATE_BUSY])) {
+	while(list_size(q->ready_list)) {
 		t = list_peek_head(q->ready_list);
 		w = find_best_worker(q, t);
 		if(w) {
@@ -2246,7 +2227,6 @@ static int tasktag_comparator(void *t, const void *r) {
 static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
 
 	struct work_queue_worker *w = itable_lookup(q->worker_task_map, t->taskid);
-	int old_state = get_worker_state(w);
 	
 	if (w) {
 		//send message to worker asking to kill its task.
@@ -2268,7 +2248,7 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 		w->memory_allocated -= t->memory;
 		w->disk_allocated -= t->disk;
 
-		track_worker_state(q, old_state, w->cores_allocated?WORKER_STATE_BUSY:WORKER_STATE_READY);
+		log_worker_states(q);
 		itable_remove(w->current_tasks, t->taskid);
 
 		return 1;
