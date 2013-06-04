@@ -179,13 +179,6 @@ int lib_helper_extracted;       /* Boolean flag to indicate whether the bundled
 kvm_t *kd_fbsd;
 #endif
 
-char *resources[15] = { "wall_clock(seconds)", 
-                        "concurrent_processes", "num_process_accum", "cpu_time(seconds)",
-			"virtual_memory(MB)", "resident_memory(MB)", "swap_memory(MB)", 
-                        "bytes_read", "bytes_written", 
-                        "workdir_number_files_dirs", "workdir_footprint(MB)",
-                        NULL };
-
 struct rmsummary *summary;
 struct rmsummary *resources_limits;
 struct rmsummary *resources_flags;
@@ -427,13 +420,30 @@ struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
 
 void monitor_summary_header()
 {
-    int i;
-
     if(log_series)
     {
+	    fprintf(log_series, "# Units:\n");
+	    fprintf(log_series, "# wall_clock and cpu_time in microseconds\n");
+	    fprintf(log_series, "# virtual, resident and swap memory in megabytes.\n");
+	    fprintf(log_series, "# footprint in megabytes.\n");
+	    fprintf(log_series, "# processes_so_far, cpu_time, bytes_read, and bytes_written show cummulative values.\n");
+	    fprintf(log_series, "# wall_clock, concurrent_processes, virtual, resident, swap, files, and footprint show values at the sample point.\n");
+
 	    fprintf(log_series, "#");
-	    for(i = 0; resources[i]; i++)
-		    fprintf(log_series, "%s\t", resources[i]);
+	    fprintf(log_series, "%19s", "wall_clock");
+	    fprintf(log_series, " %20s", "cpu_time");
+	    fprintf(log_series, " %10s", "concurrent");
+	    fprintf(log_series, " %10s", "virtual");
+	    fprintf(log_series, " %10s", "resident");
+	    fprintf(log_series, " %10s", "swap");
+	    fprintf(log_series, " %20s", "bytes_read");
+	    fprintf(log_series, " %20s", "bytes_written");
+
+	    if(resources_flags->workdir_footprint)
+	    {
+		    fprintf(log_series, " %10s", "files");
+		    fprintf(log_series, " %10s", "footprint");
+	    }
 
 	    fprintf(log_series, "\n");
     }
@@ -443,8 +453,8 @@ void monitor_collate_tree(struct rmsummary *tr, struct process_info *p, struct w
 {
 	tr->wall_time         = usecs_since_epoch() - summary->start;
 
-	tr->max_processes     = (int64_t) itable_size(processes);
-	tr->num_processes     = summary->num_processes;
+	tr->max_concurrent_processes     = (int64_t) itable_size(processes);
+	tr->total_processes     = summary->total_processes;
 
 	tr->cpu_time          = p->cpu.delta + tr->cpu_time;
 	tr->virtual_memory    = (int64_t) p->mem.virtual;
@@ -473,20 +483,19 @@ void monitor_log_row(struct rmsummary *tr)
 {
 	if(log_series)
 	{
-		fprintf(log_series, "%" PRId64 "\t", tr->wall_time + summary->start);
-		fprintf(log_series, "%" PRId64 "\t", tr->max_processes);
-		fprintf(log_series, "%" PRId64 "\t", tr->num_processes);
-		fprintf(log_series, "%" PRId64 "\t", tr->cpu_time);
-		fprintf(log_series, "%" PRId64 "\t", tr->virtual_memory);
-		fprintf(log_series, "%" PRId64 "\t", tr->resident_memory);
-		fprintf(log_series, "%" PRId64 "\t", tr->swap_memory);
-		fprintf(log_series, "%" PRId64 "\t", tr->bytes_read);
-		fprintf(log_series, "%" PRId64 "\t", tr->bytes_written);
+		fprintf(log_series,  "%20" PRId64, tr->wall_time + summary->start);
+		fprintf(log_series, " %20" PRId64, tr->cpu_time);
+		fprintf(log_series, " %10" PRId64, tr->max_concurrent_processes);
+		fprintf(log_series, " %10" PRId64, tr->virtual_memory);
+		fprintf(log_series, " %10" PRId64, tr->resident_memory);
+		fprintf(log_series, " %10" PRId64, tr->swap_memory);
+		fprintf(log_series, " %20" PRId64, tr->bytes_read);
+		fprintf(log_series, " %20" PRId64, tr->bytes_written);
 
 		if(resources_flags->workdir_footprint)
 		{
-			fprintf(log_series, "%" PRId64 "\t", tr->workdir_num_files);
-			fprintf(log_series, "%" PRId64 "\t", tr->workdir_footprint);
+			fprintf(log_series, " %10" PRId64, tr->workdir_num_files);
+			fprintf(log_series, " %10" PRId64, tr->workdir_footprint);
 		}
 
 		fprintf(log_series, "\n");
@@ -589,7 +598,7 @@ void monitor_track_process(pid_t pid)
 	p->running = 1;
 	p->waiting = 0;
 
-	summary->num_processes++;
+	summary->total_processes++;
 }
 
 void monitor_untrack_process(uint64_t pid)
@@ -818,8 +827,8 @@ int monitor_check_limits(struct rmsummary *tr)
 	over_limit_check(tr, end,   1.0/ONE_SECOND, "lf");
 	over_limit_check(tr, wall_time, 1.0/ONE_SECOND, "lf");
 	over_limit_check(tr, cpu_time,  1.0/ONE_SECOND, "lf");
-	over_limit_check(tr, max_processes,   1, PRId64);
-	over_limit_check(tr, num_processes,   1, PRId64);
+	over_limit_check(tr, max_concurrent_processes,   1, PRId64);
+	over_limit_check(tr, total_processes,   1, PRId64);
 	over_limit_check(tr, virtual_memory,  1, PRId64);
 	over_limit_check(tr, resident_memory, 1, PRId64);
 	over_limit_check(tr, swap_memory,     1, PRId64);
@@ -890,8 +899,8 @@ void monitor_dispatch_msg(void)
 	{
         case BRANCH:
 		monitor_track_process(msg.origin);
-		if(summary->max_processes < itable_size(processes))
-			summary->max_processes = itable_size(processes);
+		if(summary->max_concurrent_processes < itable_size(processes))
+			summary->max_concurrent_processes = itable_size(processes);
 		break;
         case WAIT:
 		p->waiting = 1;

@@ -46,7 +46,7 @@ files that were opened during execution.
 The summary file has the following format:
 
 LONGCODE_BEGIN
-command: [the command line given as an argument]
+command:                   [the command line given as an argument]
 start:                     [seconds at the start of execution, since the epoch, float]
 end:                       [seconds at the end of execution, since the epoch,   float]
 exit_type:                 [one of normal, signal or limit,                    string]
@@ -56,6 +56,7 @@ limits_exceeded:           [resources over the limit. Only present if
                             exit_type is limit,                                string]
 exit_status:               [final status of the parent process,                   int]
 max_concurrent_processes:  [the maximum number of processes running concurrently, int]
+total_processes:           [count of all of the processes created,                int]
 wall_time:                 [seconds spent during execution, end - start,        float]
 cpu_time:                  [user + system time of the execution, in seconds,    float]
 virtual_memory:            [maximum virtual memory across all processes, in MB,   int]
@@ -63,7 +64,7 @@ resident_memory:           [maximum resident size across all processes, in MB,  
 swap_memory:               [maximum swap usage across all processes, in MB,       int]
 bytes_read:                [number of bytes read from disk,                       int]
 bytes_written:             [number of bytes written to disk,                      int]
-workdir_number_files_dirs: [total maximum number of files and directories of 
+workdir_num_files:         [total maximum number of files and directories of 
                             all the working directories in the tree,              int]
 workdir_footprint:         [size in MB of all working directories in the tree,    int]
 LONGCODE_END
@@ -72,16 +73,16 @@ The time-series log has a row per time sample. For each row, the columns have th
 
 LONGCODE_BEGIN
 wall_clock                [the sample time, since the epoch, in microseconds,      int]
-concurrent_processes      [concurrent processes at the time of the sample,         int] 
 cpu_time                  [accumulated user + kernel time, in microseconds,        int]
-virtual_memory            [current virtual memory size, in MB,                     int]
-resident_memory           [current resident memory size, in MB,                    int]   
-swap_memory               [current swap usage, in MB,                              int]   
+concurrent                [concurrent processes at the time of the sample,         int] 
+virtual                   [current virtual memory size, in MB,                     int]
+resident                  [current resident memory size, in MB,                    int]   
+swap                      [current swap usage, in MB,                              int]   
 bytes_read                [accumulated number of bytes read,                       int]
 bytes_written             [accumulated number of bytes written,                    int]
-workdir_number_files_dirs [current number of files and directories, across all
+files                     [current number of files and directories, across all
                            working directories in the tree,                        int]
-workdir_footprint         [current size of working directories in the tree, in MB  int]
+footprint                 [current size of working directories in the tree, in MB  int]
 LONGCODE_END
 
 SECTION(OPTIONS)
@@ -98,6 +99,8 @@ OPTION_PAIR(`--with-opened-files',file)Write list of opened files to <file> (def
 OPTION_ITEM(--without-summary-file)Do not write the summary log file.
 OPTION_ITEM(--without-time-series)Do not write the time-series log file.
 OPTION_ITEM(--without-opened-files)Do not write the list of opened files.
+OPTION_ITEM(--with-disk-footprint)Measure working directory footprint (potentially slow).
+OPTION_ITEM(--without-disk-footprint)Do not measure working directory footprint (default).
 OPTIONS_END
 
 The limits file should contain lines of the form:
