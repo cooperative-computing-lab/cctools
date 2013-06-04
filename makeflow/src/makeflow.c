@@ -57,10 +57,6 @@ See the file COPYING for details.
 #define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
 #define MAKEFLOW_GC_MIN_THRESHOLD 1
 
-#define RESOURCES_CATEGORY "RESOURCES_CATEGORY"	/* The value of this variable in the Makeflow
-						   file indicates the task category of the
-						   rules to follow */
-
 #define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
