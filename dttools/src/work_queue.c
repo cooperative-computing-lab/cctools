@@ -277,13 +277,25 @@ static int get_worker_state(struct work_queue_worker *w) {
 	return WORKER_STATE_NONE;
 }
 
+static void update_worker_states(struct work_queue *q) {
+	struct work_queue_worker *w;
+	char* id;
+	
+	memset(q->workers_in_state, 0, sizeof(q->workers_in_state));
+	
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
+		q->workers_in_state[get_worker_state(w)]++;
+	}
+}
+
 
 static void track_worker_state(struct work_queue *q, int old_state, int new_state)
 {
 	if(old_state == new_state) return;
 	
-	q->workers_in_state[old_state]--;
-	q->workers_in_state[new_state]++;
+	update_worker_states(q);
+	
 	debug(D_WQ, "workers status -- total: %d, init: %d, ready: %d, busy: %d, full: %d.",
 		hash_table_size(q->worker_table),
 		q->workers_in_state[WORKER_STATE_INIT],
@@ -2956,6 +2968,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 
 //		debug(D_WQ, "workers_in_state[BUSY] = %d, workers_in_state[FULL] = %d, list_size(ready_list) = %d, aux_links = %x, list_size(aux_links) = %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_FULL], list_size(q->ready_list), aux_links, aux_links?list_size(aux_links):0);
+
+		update_worker_states(q);
 
 		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !(aux_links && list_size(aux_links)))
 			break;
