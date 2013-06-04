@@ -55,8 +55,8 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 	rmsummary_assign_as_string_field(s, key, value, limits_exceeded);
 	rmsummary_assign_as_int_field   (s, key, value, exit_status);
 	rmsummary_assign_as_time_field  (s, key, value, wall_time);
-	rmsummary_assign_as_int_field   (s, key, value, max_processes);
-	rmsummary_assign_as_int_field   (s, key, value, num_processes);
+	rmsummary_assign_as_int_field   (s, key, value, max_concurrent_processes);
+	rmsummary_assign_as_int_field   (s, key, value, total_processes);
 	rmsummary_assign_as_time_field  (s, key, value, cpu_time);
 	rmsummary_assign_as_int_field   (s, key, value, virtual_memory);
 	rmsummary_assign_as_int_field   (s, key, value, resident_memory);
@@ -196,8 +196,8 @@ void rmsummary_print(FILE *stream, struct rmsummary *s)
 		fprintf(stream, "%-30s%s\n",  "limits_exceeded:", s->limits_exceeded);
 
 	fprintf(stream, "%-30s%lf\n", "wall_time:", s->wall_time >= 0 ? s->wall_time / 1000000e0 : -1);
-	fprintf(stream, "%-30s%" PRId64 "\n",  "max_processes:", s->max_processes);
-	fprintf(stream, "%-30s%" PRId64 "\n",  "num_processes:", s->num_processes);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "max_concurrent_processes:", s->max_concurrent_processes);
+	fprintf(stream, "%-30s%" PRId64 "\n",  "total_processes:", s->total_processes);
 	fprintf(stream, "%-30s%lf\n", "cpu_time:", s->cpu_time   >= 0 ? s->cpu_time  / 1000000e0 : -1);
 	fprintf(stream, "%-30s%" PRId64 "\n",  "virtual_memory:", s->virtual_memory);
 	fprintf(stream, "%-30s%" PRId64 "\n",  "resident_memory:", s->resident_memory);
@@ -273,8 +273,8 @@ void rmsummary_bin_op(struct rmsummary *dest, struct rmsummary *src, rm_bin_op f
 	rmsummary_apply_op(dest, src, fn, end);
 	rmsummary_apply_op(dest, src, fn, exit_status);
 	rmsummary_apply_op(dest, src, fn, wall_time);
-	rmsummary_apply_op(dest, src, fn, max_processes);
-	rmsummary_apply_op(dest, src, fn, num_processes);
+	rmsummary_apply_op(dest, src, fn, max_concurrent_processes);
+	rmsummary_apply_op(dest, src, fn, total_processes);
 	rmsummary_apply_op(dest, src, fn, cpu_time);
 	rmsummary_apply_op(dest, src, fn, virtual_memory);
 	rmsummary_apply_op(dest, src, fn, resident_memory);
@@ -321,10 +321,10 @@ void rmsummary_debug_report(struct rmsummary *s)
 		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "end",   ((double) s->end   / 1000000));
 	if(s->wall_time != -1)
 		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "wall_time", ((double) s->wall_time / 1000000));
-	if(s->max_processes != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "max_processes", s->max_processes);
-	if(s->num_processes != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "num_processes", s->num_processes);
+	if(s->max_concurrent_processes != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "max_processes_processes", s->max_concurrent_processes);
+	if(s->total_processes != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "total_processes", s->total_processes);
 	if(s->cpu_time != -1)
 		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "cpu_time",  ((double) s->cpu_time  / 1000000));
 	if(s->virtual_memory != -1)
