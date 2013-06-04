@@ -41,10 +41,8 @@ extern "C" {
 #include <pfs_types.h>
 #include <string.h>
 #include <XrdPosix/XrdPosixExtern.hh>
-
 #define XROOTD_FILE_MODE (S_IFREG | 0555)
 #define XROOTD_DEFAULT_PORT 1094
-
 static char *translate_file_to_xrootd(pfs_name * name)
 {
 	char file_buf[PFS_PATH_MAX];
@@ -61,34 +59,33 @@ static char *translate_file_to_xrootd(pfs_name * name)
 
 
 class pfs_file_xrootd:public pfs_file {
-private:
+      private:
 	int file_handle;
 
-public:
-	pfs_file_xrootd(pfs_name * n, int file_handle):pfs_file(n) {
+      public:
+	  pfs_file_xrootd(pfs_name * n, int file_handle):pfs_file(n) {
 		this->file_handle = file_handle;
-	}
-
-	virtual int close() {
+	} virtual int close() {
 		debug(D_XROOTD, "close %i", this->file_handle);
 		return XrdPosix_Close(this->file_handle);
 	}
 
 	virtual pfs_ssize_t read(void *d, pfs_size_t length, pfs_off_t offset) {
-		debug(D_XROOTD, "pread %d %lu %lu",this->file_handle,length,offset);
-		return XrdPosix_Pread(this->file_handle,d,length,offset);
+		debug(D_XROOTD, "pread %d %lu %lu", this->file_handle, length, offset);
+		return XrdPosix_Pread(this->file_handle, d, length, offset);
 	}
 
 	virtual pfs_ssize_t write(const void *d, pfs_size_t length, pfs_off_t offset) {
-		debug(D_XROOTD, "pwrite %d %lu %lu",this->file_handle,length,offset);
-		return XrdPosix_Pwrite(this->file_handle,d,length,offset);
+		debug(D_XROOTD, "pwrite %d %lu %lu", this->file_handle, length, offset);
+		return XrdPosix_Pwrite(this->file_handle, d, length, offset);
 	}
 
 	virtual int fstat(struct pfs_stat *buf) {
-		debug(D_XROOTD, "fstat %d",this->file_handle);
+		debug(D_XROOTD, "fstat %d", this->file_handle);
 		struct stat lbuf;
 		int result = XrdPosix_Fstat(this->file_handle, &lbuf);
-		if(result == 0) COPY_STAT(lbuf, *buf);
+		if(result == 0)
+			COPY_STAT(lbuf, *buf);
 		return result;
 	}
 
@@ -105,12 +102,12 @@ public:
 };
 
 class pfs_service_xrootd:public pfs_service {
-public:
+      public:
 	virtual pfs_file * open(pfs_name * name, int flags, mode_t mode) {
 		int file_handle;
 		char *file_url = NULL;
 
-		debug(D_XROOTD, "Opening file: %s", name->rest);
+		  debug(D_XROOTD, "Opening file: %s", name->rest);
 
 		if((flags & O_ACCMODE) != O_RDONLY) {
 			errno = EROFS;
@@ -121,7 +118,7 @@ public:
 		file_handle = XrdPosix_Open(file_url, flags, mode);
 		free(file_url);
 
-		if(file_handle>=0) {
+		if(file_handle >= 0) {
 			return new pfs_file_xrootd(name, file_handle);
 		} else {
 			return 0;
@@ -129,14 +126,14 @@ public:
 
 	}
 
-	virtual pfs_dir * getdir( pfs_name *name ) {
+	virtual pfs_dir *getdir(pfs_name * name) {
 		DIR *dir;
 		struct dirent *d;
 
 		char *file_url = NULL;
 		file_url = translate_file_to_xrootd(name);
 
-		debug(D_XROOTD,"getdir %s",file_url);
+		debug(D_XROOTD, "getdir %s", file_url);
 
 		dir = XrdPosix_Opendir(file_url);
 		if(!dir) {
@@ -146,7 +143,7 @@ public:
 
 		pfs_dir *pdir = new pfs_dir(name);
 
-		while((d=XrdPosix_Readdir(dir))) {
+		while((d = XrdPosix_Readdir(dir))) {
 			pdir->append(d->d_name);
 		}
 		XrdPosix_Closedir(dir);
@@ -159,7 +156,7 @@ public:
 	virtual int statfs(pfs_name * name, struct pfs_statfs *buf) {
 		struct statfs lbuf;
 		char *file_url = translate_file_to_xrootd(name);
-		debug(D_XROOTD, "statfs %s",file_url);
+		debug(D_XROOTD, "statfs %s", file_url);
 		int result = XrdPosix_Statfs((const char *) file_url, &lbuf);
 		free(file_url);
 		COPY_STATFS(lbuf, *buf);
@@ -169,7 +166,7 @@ public:
 	virtual int stat(pfs_name * name, struct pfs_stat *buf) {
 		struct stat lbuf;
 		char *file_url = translate_file_to_xrootd(name);
-		debug(D_XROOTD, "stat %s",file_url);
+		debug(D_XROOTD, "stat %s", file_url);
 		int result = XrdPosix_Stat((const char *) file_url, &lbuf);
 		free(file_url);
 		COPY_STAT(lbuf, *buf);
@@ -180,35 +177,35 @@ public:
 		return this->stat(name, buf);
 	}
 
-	virtual int unlink( pfs_name *name ) {
+	virtual int unlink(pfs_name * name) {
 		char *file_url = translate_file_to_xrootd(name);
-		debug(D_XROOTD, "unlink %s",file_url);
+		debug(D_XROOTD, "unlink %s", file_url);
 		int result = XrdPosix_Unlink((const char *) file_url);
 		free(file_url);
 		return result;
 	}
 
-	virtual int access( pfs_name *name, mode_t mode ) {
+	virtual int access(pfs_name * name, mode_t mode) {
 		char *file_url = translate_file_to_xrootd(name);
-		debug(D_XROOTD, "access %s %o",file_url,mode);
-		int result = XrdPosix_Access((const char *) file_url,mode);
+		debug(D_XROOTD, "access %s %o", file_url, mode);
+		int result = XrdPosix_Access((const char *) file_url, mode);
 		free(file_url);
 		return result;
 	}
 
-	virtual int truncate( pfs_name *name, pfs_off_t length ) {
+	virtual int truncate(pfs_name * name, pfs_off_t length) {
 		char *file_url = translate_file_to_xrootd(name);
-		debug(D_XROOTD, "truncate %s %lld",file_url,length);
-		int result = XrdPosix_Truncate(file_url,length);
+		debug(D_XROOTD, "truncate %s %lld", file_url, length);
+		int result = XrdPosix_Truncate(file_url, length);
 		free(file_url);
 		return result;
 	}
 
-	virtual int chdir( pfs_name *name, char *newpath ) {
+	virtual int chdir(pfs_name * name, char *newpath) {
 		struct pfs_stat info;
-		if(this->stat(name,&info)>=0) {
+		if(this->stat(name, &info) >= 0) {
 			if(S_ISDIR(info.st_mode)) {
-				sprintf(newpath,"/%s/%s:%d%s",name->service_name,name->host,name->port,name->rest);
+				sprintf(newpath, "/%s/%s:%d%s", name->service_name, name->host, name->port, name->rest);
 				return 0;
 			} else {
 				errno = ENOTDIR;
@@ -219,12 +216,12 @@ public:
 		}
 	}
 
-	virtual int rename( pfs_name *oldname, pfs_name *newname ) {
+	virtual int rename(pfs_name * oldname, pfs_name * newname) {
 		char *old_url = translate_file_to_xrootd(oldname);
 		char *new_url = translate_file_to_xrootd(newname);
 
-		debug(D_XROOTD,"rename %s %s",old_url,new_url);
-		int result = XrdPosix_Rename(old_url,new_url);
+		debug(D_XROOTD, "rename %s %s", old_url, new_url);
+		int result = XrdPosix_Rename(old_url, new_url);
 
 		free(old_url);
 		free(new_url);
@@ -232,17 +229,17 @@ public:
 		return result;
 	}
 
-	virtual int mkdir( pfs_name *name, mode_t mode) {
+	virtual int mkdir(pfs_name * name, mode_t mode) {
 		char *file_url = translate_file_to_xrootd(name);
-		debug(D_XROOTD, "mkdir %s %o",file_url,mode);
-		int result = XrdPosix_Mkdir((const char *) file_url,mode);
+		debug(D_XROOTD, "mkdir %s %o", file_url, mode);
+		int result = XrdPosix_Mkdir((const char *) file_url, mode);
 		free(file_url);
 		return result;
 	}
 
-	virtual int rmdir( pfs_name *name ) {
+	virtual int rmdir(pfs_name * name) {
 		char *file_url = translate_file_to_xrootd(name);
-		debug(D_XROOTD, "rmdir %s",file_url);
+		debug(D_XROOTD, "rmdir %s", file_url);
 		int result = XrdPosix_Rmdir((const char *) file_url);
 		free(file_url);
 		return result;
