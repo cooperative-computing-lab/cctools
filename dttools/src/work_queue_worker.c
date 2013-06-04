@@ -19,10 +19,6 @@ task message, which causes the directory and all to be cleaned up.
 worker should queue up all tasks sent, and only start them
 when the total cores, tasks, and memory are within the specified limits.
 
-- When run with --cores greater than one and the work queue example
-app, there are regular pauses of five seconds, instead of a constant
-stream of results.
-
 - When the user does not specify any resources explicitly for a
 task, both the master and the worker should assume that the task
 occupies the entire resources of a given worker.
@@ -1499,7 +1495,7 @@ static int worker_handle_master(struct link *master) {
 
 static void work_for_master(struct link *master) {
 	int result;
-	timestamp_t sleeptime;
+	timestamp_t msec;
 	sigset_t mask;
 
 	if(!master) {
@@ -1531,9 +1527,17 @@ static void work_for_master(struct link *master) {
 			}
 		}
 		
-		sleeptime = total_tasks_executed?MAX(100, total_task_execution_time/total_tasks_executed):100;
+		// There is a race condition where if a child finishes while the worker is handling tasks, SIGCHLD is lost and does not interrupt
+		// the poll in link_usleep_mask().  For short-running tasks this can cause a drastic slowdown.  This adapts the amount of time
+		// spent in the link to be close to the average runtime for short tasks, so short-running tasks aren't unduly impacted.
+		if(total_tasks_executed > 0) {
+			msec = MAX(10, total_task_execution_time/total_tasks_executed);  // minimum check time of 10 milliseconds
+			msec = MIN(msec, 5000);  // maximum wait time of 5 seconds in between checks.
+		} else {
+			msec = 1000;
+		}
 
-		result = link_usleep_mask(master, sleeptime, &mask, 1, 0);
+		result = link_usleep_mask(master, msec, &mask, 1, 0);
 
 		if(result < 0) {
 			abort_flag = 1;

@@ -8,12 +8,6 @@ See the file COPYING for details.
 The following major problems must be fixed before this code
 can be released:
 
-- Internally, the code relies on tracking workers in one
-of a handful of states.  This no longer makes sense when
-a single worker may run a handful of jobs.  Instead,
-we should simply be summing up the available resources
-and making decisions about that.  For example:
-
 - The capacity code assumes one task per worker.
 
 - The log specification need to be updated.
@@ -2974,6 +2968,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			msec = MAX(0, (stoptime - time(0)) * 1000);
 		} else {
 			msec = 5000;
+		}
+		
+		// If workers are available and tasks waiting to be dispatched, don't wait on a message.
+		if( q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_READY] > 0 && list_size(q->ready_list) > 0 ) {
+			msec = 0;
 		}
 
 		// Poll all links for activity.
