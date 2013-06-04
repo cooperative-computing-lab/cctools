@@ -1280,12 +1280,27 @@ static int copy_executable(char *current_path, char *new_path)
 
 static void show_help(const char *cmd)
 {
+    /* Hack to remove wq from the list of available batch systems. Assumes wq
+     * is not the last in the list.*/
+    char *queue_types = xxstrdup(batch_queue_type_string());
+    char *wq          = strstr(queue_types, "wq, ");
+    if(wq)
+    {
+        *wq  = '\0';
+         wq += 4;
+    }
+
 	printf("Use: %s [options] <count>\n", cmd);
 	printf("where batch options are:\n");
 	printf("  -d <subsystem> Enable debugging for this subsystem.\n");
 	printf("  -l <path>      Log work_queue_pool status to a file whose path is <path>.\n");
 	printf("  -S <scratch>   Scratch directory. (default is /tmp/${USER}-workers)\n");
-	printf("  -T <type>      Batch system type: %s. (default is local)\n", batch_queue_type_string());
+
+    if(wq)
+        printf("  -T <type>      Batch system type: %s%s. (default is local)\n",queue_types, wq);
+    else
+        printf("  -T <type>      Batch system type: %s. (default is local)\n",queue_types);
+
 	printf("  -r <count>     Number of attemps to retry if failed to submit a worker.\n");
 	printf("  -m <count>     Each batch job will start <count> local workers. (default is 1.)\n");
 	printf("  -W <path>      Path to the work_queue_worker executable.\n");
