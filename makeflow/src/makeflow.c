@@ -46,9 +46,13 @@ See the file COPYING for details.
 #include "dag.h"
 #include "visitors.h"
 
-#define SHOW_INPUT_FILES 2
-#define SHOW_OUTPUT_FILES 3
-#define SHOW_MAKEFLOW_ANALYSIS 4
+/* Display options */
+enum { SHOW_INPUT_FILES = 2,
+       SHOW_OUTPUT_FILES,
+       SHOW_MAKEFLOW_ANALYSIS,
+       SHOW_DAG_DOT,
+       SHOW_DAG_PPM };
+
 #define RANDOM_PORT_RETRY_TIME 300
 
 #define MAKEFLOW_AUTO_WIDTH 1
@@ -62,17 +66,19 @@ See the file COPYING for details.
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
 #define DEFAULT_MONITOR_INTERVAL   1
 
-/* Unique integers for long options. To add a new option, use
- * ('z' + i), where i is the next unused integer. */
-#define LONG_OPT_MONITOR_INTERVAL ('z' + 1)
-#define LONG_OPT_MONITOR_LOG_NAME ('z' + 2)
-#define LONG_OPT_MONITOR_LOG_DIR  ('z' + 3)
-#define LONG_OPT_PASSWORD         ('z' + 4)
-#define LONG_OPT_MONITOR_LIMITS   ('z' + 5)
-#define LONG_OPT_PPM_ROW          ('z' + 6)
-#define LONG_OPT_PPM_FILE         ('z' + 7)
-#define LONG_OPT_PPM_EXE          ('z' + 8)
-#define LONG_OPT_PPM_LEVELS       ('z' + 9)
+/* Unique integers for long options. */
+
+enum { LONG_OPT_MONITOR_INTERVAL = 1,
+       LONG_OPT_MONITOR_LOG_NAME,
+       LONG_OPT_MONITOR_LOG_DIR,
+       LONG_OPT_PASSWORD,
+       LONG_OPT_MONITOR_LIMITS,
+       LONG_OPT_PPM_ROW,
+       LONG_OPT_PPM_FILE,
+       LONG_OPT_PPM_EXE,
+       LONG_OPT_PPM_LEVELS,
+       LONG_OPT_DOT_PROPORTIONAL,
+       LONG_OPT_DOT_CONDENSE };
 
 typedef enum {
 	DAG_GC_NONE,
@@ -2034,13 +2040,15 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
 	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--wq-random-port=<file>");
-	fprintf(stdout, "\n*Display Options:\n");
+	fprintf(stdout, "\n*Display Options:\n\n");
 	fprintf(stdout, " %-30s Display the Makefile as a Dot graph or a PPM completion graph.\n", "-D,--display=<opt>");
 	fprintf(stdout, " %-30s Where <opt> is:\n", "");
-	fprintf(stdout, " %-35s <no opt> Standard Dot graph\n", "");
-	fprintf(stdout, " %-35s c        Condense similar boxes\n", "");
-	fprintf(stdout, " %-35s s        Change the size of the boxes proportional to file size\n", "");
+	fprintf(stdout, " %-35s dot      Standard Dot graph\n", "");
 	fprintf(stdout, " %-35s ppm      Display a completion graph in PPM format\n", "");
+
+	fprintf(stdout, " %-30s Condense similar boxes.\n", "--dot-merge-similar");
+	fprintf(stdout, " %-30s Change the size of the boxes proportional to file size.\n", "--dot-proportional");
+	fprintf(stdout, "\nThe following options for ppm generation are mutually exclusive:\n\n");
 	fprintf(stdout, " %-30s Highlight row <row> in completion grap\n", "--ppm-highlight-row=<row>");
 	fprintf(stdout, " %-30s Highlight node that creates file <file> in completion graph\n", "--ppm-highlight-file=<file>");
 	fprintf(stdout, " %-30s Highlight executable <exe> in completion grap\n", "--ppm-highlight-exe=<exe>");
@@ -2239,6 +2247,8 @@ int main(int argc, char *argv[])
 		{"batch-options", required_argument, 0, 'B'},
 		{"catalog-server", required_argument, 0, 'C'},
 		{"display-mode", required_argument, 0, 'D'},
+		{"dot-merge-similar", no_argument, 0,  LONG_OPT_DOT_CONDENSE},
+		{"dot-proportional",  no_argument, 0,  LONG_OPT_DOT_PROPORTIONAL},
 		{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
 		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
 		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
@@ -2311,32 +2321,39 @@ int main(int argc, char *argv[])
 			debug_flags_set(optarg);
 			break;
 		case 'D':
-			if(strcasecmp(optarg, "c") == 0)
-				condense_display = 1;
-			if(strcasecmp(optarg, "s") == 0)
-				change_size = 1;
-			if(strcasecmp(optarg, "ppm") == 0)
-				ppm_mode = 1;
-			display_mode = 1;
+			if(strcasecmp(optarg, "dot") == 0)
+				display_mode = SHOW_DAG_DOT;
+			else if (strcasecmp(optarg, "ppm") == 0)
+				display_mode = SHOW_DAG_PPM;
+			else
+				fatal("Unknown display option: %s\n", optarg);
+			break;
+		case LONG_OPT_DOT_CONDENSE:
+			display_mode = SHOW_DAG_DOT;
+			condense_display = 1;
+			break;
+		case LONG_OPT_DOT_PROPORTIONAL:
+			display_mode = SHOW_DAG_DOT;
+			change_size = 1;
 			break;
 		case LONG_OPT_PPM_EXE:
+			display_mode = SHOW_DAG_PPM;
 			ppm_option = optarg;
 			ppm_mode = 2;
-			display_mode = 1;
 			break;
 		case LONG_OPT_PPM_FILE:
+			display_mode = SHOW_DAG_PPM;
 			ppm_option = optarg;
 			ppm_mode = 3;
-			display_mode = 1;
 			break;
 		case LONG_OPT_PPM_ROW:
+			display_mode = SHOW_DAG_PPM;
 			ppm_option = optarg;
 			ppm_mode = 4;
-			display_mode = 1;
 			break;
 		case LONG_OPT_PPM_LEVELS:
+			display_mode = SHOW_DAG_PPM;
 			ppm_mode = 5;
-			display_mode = 1;
 			break;
 		case 'E':
 			work_queue_estimate_capacity_on = 1;
@@ -2631,18 +2648,38 @@ int main(int argc, char *argv[])
 		exit(0);
 	}
 
-	if(display_mode == SHOW_INPUT_FILES) {
-		dag_show_input_files(d);
+	if(display_mode)
+	{
+		switch(display_mode)
+		{
+		case SHOW_INPUT_FILES:
+			dag_show_input_files(d);
+			break;
+
+		case SHOW_OUTPUT_FILES:
+			dag_show_output_files(d);
+			break;
+
+		case SHOW_MAKEFLOW_ANALYSIS:
+			dag_show_analysis(d);
+			break;
+
+		case SHOW_DAG_DOT:
+			dag_to_dot(d, condense_display, change_size);
+			break;
+
+		case SHOW_DAG_PPM:
+			dag_to_ppm(d, ppm_mode, ppm_option);
+			break;
+
+		default:
+			fatal("Unknown display option.");
+			break;
+		}
+
 		exit(0);
 	}
-	if(display_mode == SHOW_OUTPUT_FILES) {
-		dag_show_output_files(d);
-		exit(0);
-	}
-	if(display_mode == SHOW_MAKEFLOW_ANALYSIS) {
-		dag_show_analysis(d);
-		exit(0);
-	}
+
 
 	if(explicit_local_jobs_max) {
 		d->local_jobs_max = explicit_local_jobs_max;
@@ -2692,24 +2729,13 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-	if(!dag_check(d) && !display_mode) {
+	if(!dag_check(d)) {
 		free(logfilename);
 		free(batchlogfilename);
 		return 1;
 	}
 
 	dag_log_recover(d, logfilename);
-
-	if(display_mode) {
-		free(logfilename);
-		free(batchlogfilename);
-		if(ppm_mode) {
-			dag_to_ppm(d, ppm_mode, ppm_option);
-		} else {
-			dag_to_dot(d, condense_display, change_size);
-		}
-		return 0;
-	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
 		char *cwd = string_getcwd();
