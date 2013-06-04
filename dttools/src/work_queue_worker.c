@@ -427,6 +427,9 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		send_master_message(master, "result %d %lld %llu %d\n", ti->status, output_length, ti->execution_end-ti->execution_start, ti->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
 		cores_allocated -= ti->task->cores;
+
+		total_task_execution_time += (ti->execution_end - ti->execution_start);
+		total_tasks_executed++;
 	} else if(t) {
 		if(t->output) {
 			output_length = strlen(t->output);
@@ -437,10 +440,11 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		if(output_length) {
 			link_putlstring(master, t->output, output_length, time(0)+active_timeout);
 		}
+
+		total_task_execution_time += t->cmd_execution_time;
+		total_tasks_executed++;
 	}
 	
-	total_task_execution_time += (ti->execution_end - ti->execution_start);
-	total_tasks_executed++;
 }
 
 static int handle_tasks(struct link *master) {
