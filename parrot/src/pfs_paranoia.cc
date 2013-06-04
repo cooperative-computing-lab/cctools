@@ -19,7 +19,9 @@ See the file COPYING for details.
 extern "C" {
 #include "debug.h"
 }
-// Some global nasties static int paranoia_mode = 0;
+
+// Some global nasties
+static int paranoia_mode = 0;
 static pid_t *shared_table = NULL;
 static int to_parent_fd = -1;
 static int from_parent_fd = -1;

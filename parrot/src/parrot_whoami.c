@@ -12,33 +12,33 @@ See the file COPYING for details.
 #include <string.h>
 #include <unistd.h>
 
-int main(int argc, char *argv[])
+int main( int argc, char *argv[] )
 {
 	const char *path;
 	char buf[4096];
 	int result;
 
-	if(argc < 2) {
+	if(argc<2) {
 		path = ".";
 	} else {
 		path = argv[1];
 	}
 
-	if(argc > 2 || path[0] == '-') {
+	if(argc>2 || path[0]=='-') {
 		printf("use: parrot_whoami [path]\n");
 		return 0;
 	}
 
-	result = parrot_whoami(path, buf, sizeof(buf));
-	if(result >= 0) {
+	result = parrot_whoami(path,buf,sizeof(buf));
+	if(result>=0) {
 		buf[result] = 0;
-		printf("%s\n", buf);
+		printf("%s\n",buf);
 		return 0;
 	} else {
-		if(errno == ENOSYS || errno == EINVAL) {
-			fprintf(stderr, "whoami: This filesystem doesn't report your subject name\n");
+		if(errno==ENOSYS || errno==EINVAL) {
+			fprintf(stderr,"whoami: This filesystem doesn't report your subject name\n");
 		} else {
-			fprintf(stderr, "whoami: %s\n", strerror(errno));
+			fprintf(stderr,"whoami: %s\n",strerror(errno));
 		}
 		return 1;
 	}

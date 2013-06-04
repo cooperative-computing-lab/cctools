@@ -12,26 +12,26 @@ See the file COPYING for details.
 #include <string.h>
 #include <unistd.h>
 
-int main(int argc, char *argv[])
+int main( int argc, char *argv[] )
 {
 	const char *buf;
 	int result;
 
-	if(argc < 2) {
+	if(argc<2) {
 		buf = NULL;
 	} else {
 		buf = argv[1];
 	}
 
-	if(argc > 2 || (buf && buf[0] == '-')) {
+	if(argc>2 || (buf && buf[0]=='-')) {
 		printf("use: parrot_timeout [time]\n");
 		return 0;
 	}
 
 	result = parrot_timeout(buf);
 	if(result < 0) {
-		if(errno == ENOSYS || errno == EINVAL)
-			fprintf(stderr, "timeout: This filesystem doesn't support parrot_timeout\n");
+		if(errno==ENOSYS || errno==EINVAL)
+			fprintf(stderr,"timeout: This filesystem doesn't support parrot_timeout\n");
 		else
 			fprintf(stderr, "timeout: %s\n", strerror(errno));
 		return 1;

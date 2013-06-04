@@ -43,25 +43,25 @@ bugs in applications.  The solution here is to modify the program's
 definition of write to retry automatically.
 */
 
-ssize_t write(int fd, const void *vbuffer, size_t length)
+ssize_t write( int fd, const void *vbuffer, size_t length )
 {
 	ssize_t total = 0;
 	ssize_t actual = 0;
 	const char *buffer = vbuffer;
 
-	while(length > 0) {
-		actual = syscall(SYS_write, fd, buffer, length);
-		if(actual <= 0)
-			break;
+	while(length>0) {
+		actual = syscall(SYS_write,fd,buffer,length);
+		if(actual<=0) break;
 
 		total += actual;
 		buffer += actual;
 		length -= actual;
 	}
 
-	if(total > 0) {
+	if(total>0) {
 		return total;
 	} else {
 		return actual;
 	}
 }
+
