@@ -2317,8 +2317,13 @@ void decode_syscall( struct pfs_process *p, int entering )
 				if (args[2]) {
 					tracer_copy_in(p->tracer,times,POINTER(args[2]),sizeof(times));
 				} else {
+#ifdef UTIME_NOW
 					times[0].tv_nsec = UTIME_NOW;
 					times[1].tv_nsec = UTIME_NOW;
+#else
+					times[0].tv_sec = times[1].tv_sec = time(0);
+					times[0].tv_nsec = times[0].tv_nsec = 0;
+#endif
 				}
 				int flags = args[3];
 

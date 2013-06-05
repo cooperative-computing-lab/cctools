@@ -465,9 +465,19 @@ public:
 	virtual int utimens( pfs_name *name, const struct timespec times[2] ) {
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
-		debug(D_LOCAL,"utimens %s %p",name->rest,times);
 		assert(*name->rest == '/');
+#if _XOPEN_SOURCE >= 700 || _POSIX_C_SOURCE >= 200809L
+		debug(D_LOCAL,"utimens %s %p",name->rest,times);
 		result = ::utimensat(AT_FDCWD,name->rest,times,0);
+#else
+		debug(D_LOCAL,"(fallback) utime %s %p",name->rest,times);
+		{
+			struct utimbuf buf;
+			buf.actime = times[0].tv_sec;
+			buf.modtime = times[1].tv_sec;
+			result = ::utime(name->rest,&buf);
+		}
+#endif
 		END
 	}
 	virtual int lutimens( pfs_name *name, const struct timespec times[2] ) {
@@ -476,7 +486,18 @@ public:
 		debug(D_LOCAL,"lutimens %s %p",name->rest,times);
 		assert(*name->rest == '/');
 #ifdef AT_SYMLINK_NOFOLLOW
-		result = ::utimensat(AT_FDCWD,name->rest,times,AT_SYMLINK_NOFOLLOW);
+#  if _XOPEN_SOURCE >= 700 || _POSIX_C_SOURCE >= 200809L
+		debug(D_LOCAL,"utimens %s %p",name->rest,times);
+		result = ::utimensat(AT_FDCWD,name->rest,times,0);
+#  else
+		debug(D_LOCAL,"(fallback) utime %s %p",name->rest,times);
+		{
+			struct utimbuf buf;
+			buf.actime = times[0].tv_sec;
+			buf.modtime = times[1].tv_sec;
+			result = ::utime(name->rest,&buf);
+		}
+#  endif
 #else
 		result = -1;
 		errno = ENOSYS;
