@@ -268,33 +268,34 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 	sprintf(workspace_name, "%s/%s", workspace, cur_pos);
 	
 	
-	char* targetname;
+	char *targetname, *sourcename;
 	
 	if(into) {
-		targetname = cache_name;
-	} else {
+		sourcename = cache_name;
 		targetname = workspace_name;
+	} else {
+		sourcename = workspace_name;
+		targetname = cache_name;
 	}
 
-	if(stat((char*)targetname, &st)) {
-		debug(D_WQ, "Could not link %s %s workspace (does not exist)", targetname, into?"into":"from");
+	if(stat((char*)sourcename, &st)) {
+		debug(D_WQ, "Could not link %s %s workspace (does not exist)", sourcename, into?"into":"from");
 		return 0;
 	}
 	
 	if(S_ISDIR(st.st_mode)) {
-		DIR *targetdir = opendir(targetname);
+		DIR *sourcedir = opendir(sourcename);
 		struct dirent *d;
 		char dir_localname[WORK_QUEUE_LINE_MAX];
 		char dir_taskname[WORK_QUEUE_LINE_MAX];
-		if(!targetdir) {
+		if(!sourcedir) {
 			debug(D_WQ, "Could not open directory %s for reading (%s)\n", targetname, strerror(errno));
 			return 1;
 		}
 		
-		sprintf(dir_taskname, "%s/%s", workspace, taskname);
-		mkdir(dir_taskname, 0700);
+		mkdir(targetname, 0700);
 		
-		while((d = readdir(targetdir))) {
+		while((d = readdir(sourcedir))) {
 			if(!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
 			{	continue;	}
 			
@@ -302,7 +303,7 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 			sprintf(dir_taskname, "%s/%s", taskname, d->d_name);
 			result &= link_file_in_workspace(dir_localname, dir_taskname, workspace, into);
 		}
-		closedir(targetdir);
+		closedir(sourcedir);
 	} else {
 		debug(D_WQ, "linking file %s %s workspace %s as %s\n", cache_name, into?"into":"from", workspace, workspace_name);
 
@@ -317,16 +318,9 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 			*cur_pos = '/';
 		}
 		
-		if(into) {
-			if(link(cache_name, workspace_name)) {
-				debug(D_WQ, "Could not link file %s -> %s (%s)\n", cache_name, workspace_name, strerror(errno));
-				return 0;
-			}
-		} else {
-			if(link(workspace_name, cache_name)) {
-				debug(D_WQ, "Could not link file %s -> %s (%s)\n", workspace_name, cache_name, strerror(errno));
-				return 0;
-			}
+		if(link(sourcename, targetname)) {
+			debug(D_WQ, "Could not link file %s -> %s (%s)\n", sourcename, targetname, strerror(errno));
+			return 0;
 		}
 	}
 	
