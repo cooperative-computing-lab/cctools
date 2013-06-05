@@ -14,6 +14,7 @@ extern "C" {
 #include "ibox_acl.h"
 }
 
+#include <assert.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -459,6 +460,27 @@ public:
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"utime %s 0x%x",name->rest,buf);
 		result = ::utime(name->rest,buf);
+		END
+	}
+	virtual int utimens( pfs_name *name, const struct timespec times[2] ) {
+		int result;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
+		debug(D_LOCAL,"utimens %s %p",name->rest,times);
+		assert(*name->rest == '/');
+		result = ::utimensat(AT_FDCWD,name->rest,times,0);
+		END
+	}
+	virtual int lutimens( pfs_name *name, const struct timespec times[2] ) {
+		int result;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
+		debug(D_LOCAL,"lutimens %s %p",name->rest,times);
+		assert(*name->rest == '/');
+#ifdef AT_SYMLINK_NOFOLLOW
+		result = ::utimensat(AT_FDCWD,name->rest,times,AT_SYMLINK_NOFOLLOW);
+#else
+		result = -1;
+		errno = ENOSYS;
+#endif
 		END
 	}
 	virtual int unlink( pfs_name *name ) {

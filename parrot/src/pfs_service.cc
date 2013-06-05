@@ -214,6 +214,18 @@ int pfs_service::utime( pfs_name *name, struct utimbuf *buf )
 	return 0;
 }
 
+int pfs_service::utimens( pfs_name *name, const struct timespec times[2] )
+{
+	errno = ENOSYS;
+	return 0;
+}
+
+int pfs_service::lutimens( pfs_name *name, const struct timespec times[2] )
+{
+	errno = ENOSYS;
+	return 0;
+}
+
 int pfs_service::unlink( pfs_name *name )
 {
 	errno = ENOSYS;

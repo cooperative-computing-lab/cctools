@@ -199,18 +199,30 @@ Complete a path, starting with this fd assumed to be a directory.
 
 void pfs_table::complete_at_path( int dirfd, const char *path, char *full_path )
 {
-	if(path[0]=='/') {
-		strcpy(full_path,path);
+	if(path) {
+		if(path[0]=='/') {
+			strcpy(full_path,path);
+		} else {
+#ifdef AT_FDCWD
+			if(dirfd==AT_FDCWD) {
+				sprintf(full_path,"%s/%s",working_dir,path);
+			} else
+#endif
+			{
+				get_full_name(dirfd,full_path);
+				strcat(full_path,"/");
+				strcat(full_path,path);
+			}
+		}
 	} else {
+		/* some *at syscalls (see utimensat) allow path to be NULL, fill full_path with path of dirfd */
 #ifdef AT_FDCWD
 		if(dirfd==AT_FDCWD) {
-			sprintf(full_path,"%s/%s",working_dir,path);
+			strcpy(full_path,working_dir);
 		} else
 #endif
 		{
 			get_full_name(dirfd,full_path);
-			strcat(full_path,"/");
-			strcat(full_path,path);
 		}
 	}
 }
@@ -1427,6 +1439,31 @@ int pfs_table::utime( const char *n, struct utimbuf *buf )
 
 	return result;
 }
+
+int pfs_table::utimens( const char *n, const struct timespec times[2] )
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(n,&pname)) {
+		result = pname.service->utimens(&pname,times);
+	}
+
+	return result;
+}
+
+int pfs_table::lutimens( const char *n, const struct timespec times[2] )
+{
+	pfs_name pname;
+	int result=-1;
+
+	if(resolve_name(n,&pname,false)) {
+		result = pname.service->lutimens(&pname,times);
+	}
+
+	return result;
+}
+
 
 int pfs_table::unlink( const char *n )
 {
