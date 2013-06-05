@@ -62,6 +62,7 @@ int		pfs_chown( const char *name, uid_t uid, gid_t gid );
 int		pfs_lchown( const char *name, uid_t uid, gid_t gid );
 int		pfs_truncate( const char *path, pfs_off_t length );
 int		pfs_utime( const char *path, struct utimbuf *buf );
+int		pfs_utimensat( int dirfd, const char *pathname, const struct timespec times[2], int flags );
 int		pfs_unlink( const char *name );
 int		pfs_rename( const char *old_name, const char *new_name );
 int		pfs_link( const char *oldpath, const char *newpath );

@@ -39,6 +39,8 @@ public:
 	virtual int lchown( pfs_name *name, uid_t uid, gid_t gid );
 	virtual int truncate( pfs_name *name, pfs_off_t length );
 	virtual int utime( pfs_name *name, struct utimbuf *buf );
+	virtual int utimens( pfs_name *name, const struct timespec times[2] );
+	virtual int lutimens( pfs_name *name, const struct timespec times[2] );
 	virtual int rename( pfs_name *oldname, pfs_name *newname );
 	virtual int chdir( pfs_name *name, char *newpath );
 	virtual int link( pfs_name *oldname, pfs_name *newname );

@@ -802,6 +802,36 @@ int pfs_futimesat( int dirfd, const char *path, const struct timeval times[2] )
 	return pfs_utime(newpath,&ut);
 }
 
+static int pfs_utimens( const char *pathname, const struct timespec times[2] )
+{
+	BEGIN
+	debug(D_LIBCALL,"utimens `%s' %p",pathname,times);
+	result = pfs_current->table->utimens(pathname,times);
+	END
+}
+
+static int pfs_lutimens( const char *pathname, const struct timespec times[2] )
+{
+	BEGIN
+	debug(D_LIBCALL,"lutimens `%s' %p",pathname,times);
+	result = pfs_current->table->lutimens(pathname,times);
+	END
+}
+
+int pfs_utimensat( int dirfd, const char *pathname, const struct timespec times[2], int flags )
+{
+	char newpath[PFS_PATH_MAX];
+	pfs_current->table->complete_at_path(dirfd,pathname,newpath);
+
+	debug(D_LIBCALL,"utimensat %d `%s' %p %d",dirfd,pathname,times,flags);
+#ifdef AT_SYMLINK_NOFOLLOW
+	if (flags == AT_SYMLINK_NOFOLLOW)
+		return pfs_lutimens(newpath,times);
+	else
+#endif
+	return pfs_utimens(newpath,times);
+}
+
 int pfs_fstatat( int dirfd, const char *path, struct pfs_stat *buf, int flags )
 {
 	char newpath[PFS_PATH_MAX];
