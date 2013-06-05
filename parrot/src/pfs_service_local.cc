@@ -14,6 +14,7 @@ extern "C" {
 #include "ibox_acl.h"
 }
 
+#include <assert.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -459,6 +460,48 @@ public:
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"utime %s 0x%x",name->rest,buf);
 		result = ::utime(name->rest,buf);
+		END
+	}
+	virtual int utimens( pfs_name *name, const struct timespec times[2] ) {
+		int result;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
+		assert(*name->rest == '/');
+#if _XOPEN_SOURCE >= 700 || _POSIX_C_SOURCE >= 200809L
+		debug(D_LOCAL,"utimens %s %p",name->rest,times);
+		result = ::utimensat(AT_FDCWD,name->rest,times,0);
+#else
+		debug(D_LOCAL,"(fallback) utime %s %p",name->rest,times);
+		{
+			struct utimbuf buf;
+			buf.actime = times[0].tv_sec;
+			buf.modtime = times[1].tv_sec;
+			result = ::utime(name->rest,&buf);
+		}
+#endif
+		END
+	}
+	virtual int lutimens( pfs_name *name, const struct timespec times[2] ) {
+		int result;
+		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
+		debug(D_LOCAL,"lutimens %s %p",name->rest,times);
+		assert(*name->rest == '/');
+#ifdef AT_SYMLINK_NOFOLLOW
+#  if _XOPEN_SOURCE >= 700 || _POSIX_C_SOURCE >= 200809L
+		debug(D_LOCAL,"utimens %s %p",name->rest,times);
+		result = ::utimensat(AT_FDCWD,name->rest,times,0);
+#  else
+		debug(D_LOCAL,"(fallback) utime %s %p",name->rest,times);
+		{
+			struct utimbuf buf;
+			buf.actime = times[0].tv_sec;
+			buf.modtime = times[1].tv_sec;
+			result = ::utime(name->rest,&buf);
+		}
+#  endif
+#else
+		result = -1;
+		errno = ENOSYS;
+#endif
 		END
 	}
 	virtual int unlink( pfs_name *name ) {

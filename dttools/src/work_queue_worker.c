@@ -2027,6 +2027,17 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if(worker_mode == WORKER_MODE_FOREMAN && foreman_name){ //checks that the foreman has a unique name from the masters
+		char *masters_ptr = NULL; //initialize the temporary iterator
+		list_first_item(preferred_masters); //initialize the pointer
+		while((masters_ptr = (char*)list_next_item(preferred_masters))){ //while not at the end of the list
+			if(strcmp(foreman_name,(masters_ptr)) == 0){ //foreman's name matches a master's name
+				fprintf(stderr, "Foreman (%s) and Master (%s) share a name. Ensure that these are unique.\n",foreman_name,masters_ptr);
+				return 1;
+			}
+		}
+	}
+
 	check_arguments(argc, argv);
 
 	signal(SIGTERM, handle_abort);
