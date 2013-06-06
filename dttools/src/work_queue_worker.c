@@ -252,16 +252,15 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 	int result = 1;
 	struct stat st;
 	
-	char cache_name[WORK_QUEUE_LINE_MAX];
+	char *cache_name;
 	char workspace_name[WORK_QUEUE_LINE_MAX];
 	
-	char *cur_pos = localname;
-	while(!strncmp(cur_pos, "./", 2)) {
-		cur_pos += 2;
+	cache_name = localname;
+	while(!strncmp(cache_name, "./", 2)) {
+		cache_name += 2;
 	}
-	sprintf(cache_name, "cache/%s", cur_pos);
 	
-	cur_pos = taskname;
+	char *cur_pos = taskname;
 	while(!strncmp(cur_pos, "./", 2)) {
 		cur_pos += 2;
 	}
@@ -919,6 +918,7 @@ static int do_task( struct link *master, UINT64_T taskid )
 {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
+	char localname[WORK_QUEUE_LINE_MAX];
 	char taskname[WORK_QUEUE_LINE_MAX];
 	char dirname[WORK_QUEUE_LINE_MAX];
 	int n, flags, length;
@@ -939,9 +939,11 @@ static int do_task( struct link *master, UINT64_T taskid )
 			debug(D_WQ,"--> %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", filename, taskname, &flags)) {
-		       	work_queue_task_specify_file(task, filename, taskname, WORK_QUEUE_INPUT, flags);
+			sprintf(localname, "cache/%s", filename);
+		       	work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_INPUT, flags);
 		} else if(sscanf(line,"outfile %s %s %d", filename, taskname, &flags)) {
-		       	work_queue_task_specify_file(task, filename, taskname, WORK_QUEUE_OUTPUT, flags);
+			sprintf(localname, "cache/%s", filename);
+		       	work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags);
 		} else if(sscanf(line,"cores %d",&n)) {
 		       	work_queue_task_specify_cores(task, n);
 		} else if(sscanf(line,"memory %d",&n)) {
