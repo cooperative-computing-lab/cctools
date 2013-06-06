@@ -1,7 +1,7 @@
 /*
-Copyright (C) 2013- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
+  Copyright (C) 2013- The University of Notre Dame
+  This software is distributed under the GNU General Public License.
+  See the file COPYING for details.
 */
 
 /* We need RTLD_NEXT for find the libc implementation of fork(),
@@ -179,36 +179,37 @@ int open(const char *path, int flags, ...)
 
 void wakeup_pselect_from_exit(int signum)
 {
-    if(signum == SIGCONT)
-        signal(SIGCONT, SIG_DFL);
+	if(signum == SIGCONT)
+		signal(SIGCONT, SIG_DFL);
 }
 
-void wait_wrapper_preamble(void)
+void exit_wrapper_preamble(void)
 {
-	sigset_t set;
+	sigset_t set_cont, set_prev;
 	void (*prev_handler)(int signum);
-	struct timespec timeout = {.tv_sec = 10, .tv_nsec = 0}; 
+	struct timespec timeout = {.tv_sec = 0, .tv_nsec = 500000}; 
 
-	debug(D_DEBUG, "%s from %d.\n", str_msgtype(WAIT), getpid());
+	debug(D_DEBUG, "%s from %d.\n", str_msgtype(END_WAIT), getpid());
 
 	prev_handler = signal(SIGCONT, wakeup_pselect_from_exit);
-	sigfillset(&set);
-	sigdelset(&set, SIGCONT);
-
+	sigemptyset(&set_cont);
+	sigaddset(&set_cont, SIGCONT);
+	sigprocmask(SIG_BLOCK, &set_cont, &set_prev); //Adds SIGCONT to blocked signals.
 
 	struct monitor_msg msg;
-	msg.type   = WAIT;
+	msg.type   = END_WAIT;
 	msg.origin = getpid();
 	msg.data.p = getpid();
 
 	send_monitor_msg(&msg);
 
-	/* Wait at most timeout seconds for monitor to send SIGCONT */
+	/* Wait at most timeout for monitor to send SIGCONT */
 	debug(D_DEBUG, "Waiting for monitoring: %d.\n", getpid());
-	pselect(0, NULL, NULL, NULL, &timeout, &set);
-	debug(D_DEBUG, "Continue with %s: %d.\n", str_msgtype(WAIT), getpid());
-
+	pselect(0, NULL, NULL, NULL, &timeout, &set_prev);
 	signal(SIGCONT, prev_handler);
+	sigprocmask(SIG_SETMASK, &set_prev, NULL); 
+
+	debug(D_DEBUG, "Continue with %s: %d.\n", str_msgtype(END_WAIT), getpid());
 }
 
 void end_wrapper_epilogue(void)
@@ -226,14 +227,14 @@ void end_wrapper_epilogue(void)
 
 void exit(int status)
 {
-	wait_wrapper_preamble();
+	exit_wrapper_preamble();
 	end_wrapper_epilogue();
 
 	typeof(exit) *original_exit = dlsym(RTLD_NEXT, "exit");
 	original_exit(status);
 
-/* we exited in the above line. The next line is to make the compiler
-   happy with noreturn warnings. */
+	/* we exited in the above line. The next line is to make the compiler
+	   happy with noreturn warnings. */
 
 	exit(status);
 }
@@ -241,18 +242,18 @@ void exit(int status)
 void _exit(int status)
 {
 
-/* We may get two END messages, from exit and _exit, but the second
-   will be ignored as the processes would no longer in the
-   monitoring tables. */
+	/* We may get two END messages, from exit and _exit, but the second
+	   will be ignored as the processes would no longer in the
+	   monitoring tables. */
 
-	wait_wrapper_preamble();
+	exit_wrapper_preamble();
 	end_wrapper_epilogue();
 
 	typeof(_exit) *original_exit = dlsym(RTLD_NEXT, "_exit");
 	original_exit(status);
 
-/* we exit in the above line. The next line is to make the compiler
-   happy with noreturn warnings. */
+	/* we exit in the above line. The next line is to make the compiler
+	   happy with noreturn warnings. */
 
 	_exit(status);
 }
@@ -262,8 +263,6 @@ pid_t waitpid(pid_t pid, int *status, int options)
 	int status_; //status might be NULL, thus we use status_ to retrive the state.
 	pid_t pidb;
 	typeof(waitpid) *original_waitpid = dlsym(RTLD_NEXT, "waitpid");
-
-	wait_wrapper_preamble();
 
 	debug(D_DEBUG, "waiting from %d for %d.\n", getpid(), pid);
 	pidb = original_waitpid(pid, &status_, options);
@@ -290,11 +289,11 @@ pid_t wait(int *status)
 }
 
 
-/* wrap main ensuring wait_wrapper_preamble for one final monitoring
+/* wrap main ensuring exit_wrapper_preamble for one final monitoring
    checks gets called at least once */
 
 #if defined(__clang__) || defined(__GNUC__)
 void __attribute__((destructor)) init() {
-	wait_wrapper_preamble();
+	exit_wrapper_preamble();
 }
 #endif

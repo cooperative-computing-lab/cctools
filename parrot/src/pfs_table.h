@@ -74,6 +74,8 @@ public:
 	int	lchown( const char *name, uid_t uid, gid_t gid );
 	int	truncate( const char *path, pfs_off_t length );
 	int	utime( const char *path, struct utimbuf *buf );
+	int	utimens( const char *path, const struct timespec times[2] );
+	int	lutimens( const char *path, const struct timespec times[2] );
 	int	unlink( const char *name );
 	int	rename( const char *old_name, const char *new_name );
 	int	link( const char *oldpath, const char *newpath );

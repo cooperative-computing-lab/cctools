@@ -2132,6 +2132,31 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			}
 			break;
 
+		case SYSCALL64_utimensat:
+			if(entering) {
+				int dirfd = args[0];
+				if (POINTER(args[1])) /* pathname may be NULL */
+					tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				struct timespec times[2];
+				if (args[2]) {
+					tracer_copy_in(p->tracer,times,POINTER(args[2]),sizeof(times));
+				} else {
+#ifdef UTIME_NOW
+					times[0].tv_nsec = UTIME_NOW;
+					times[1].tv_nsec = UTIME_NOW;
+#else
+					times[0].tv_sec = times[1].tv_sec = time(0);
+					times[0].tv_nsec = times[0].tv_nsec = 0;
+#endif
+				}
+				int flags = args[3];
+
+				p->syscall_result = pfs_utimensat(dirfd,POINTER(args[1]) == NULL ? NULL : path,times,flags);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
 		case SYSCALL64_openat:
 			if(entering) {
 				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));

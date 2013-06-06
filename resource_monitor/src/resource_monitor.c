@@ -889,8 +889,11 @@ void monitor_dispatch_msg(void)
 		/* We either got a malformed message, message from a
 		process we are not tracking anymore, or a message from
 		a newly created process.  */
-		if( msg.type == WAIT )
+		if( msg.type == END_WAIT )
+        {
 			release_waiting_process(msg.origin);
+			return;
+        }
 		else if(msg.type != BRANCH)
 			return;
 	}
@@ -902,7 +905,7 @@ void monitor_dispatch_msg(void)
 		if(summary->max_concurrent_processes < itable_size(processes))
 			summary->max_concurrent_processes = itable_size(processes);
 		break;
-        case WAIT:
+        case END_WAIT:
 		p->waiting = 1;
 		break;
         case END:

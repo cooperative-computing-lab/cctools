@@ -21,7 +21,7 @@ struct work_queue_resources * work_queue_resources_create()
 {
 	struct work_queue_resources *r = malloc(sizeof(*r));
 	memset(r,0,sizeof(*r));
-	r->cores.total = 1;
+	//r->cores.total = 0;
 	return r;
 }
 
