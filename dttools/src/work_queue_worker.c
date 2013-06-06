@@ -2038,8 +2038,7 @@ int main(int argc, char *argv[])
 		list_first_item(preferred_masters); //initialize the pointer
 		while((masters_ptr = (char*)list_next_item(preferred_masters))){ //while not at the end of the list
 			if(strcmp(foreman_name,(masters_ptr)) == 0){ //foreman's name matches a master's name
-				fprintf(stderr, "Foreman (%s) and Master (%s) share a name. Ensure that these are unique.\n",foreman_name,masters_ptr);
-				return 1;
+				fatal("Foreman (%s) and Master (%s) share a name. Ensure that these are unique.\n",foreman_name,masters_ptr);
 			}
 		}
 	}
