@@ -456,6 +456,15 @@ void work_queue_specify_keepalive_interval(struct work_queue *q, int interval);
 */
 void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout);
 
+
+/** Set the amount of asynchrony to enable.
+Each worker will be treated as having a number of cores equal to (cores * @ref multiplier) + @ref modifier.
+@param q A work queue object.
+@param multiplier Set the multiplicative factor for the amount of asynchrony.  Between 1.0 and double_max.  (default=1.0)
+@param modifier Set the modifier for the amount of asynchony.  Between 0 and int_max.  (default=0)
+*/
+void work_queue_specify_asynchrony(struct work_queue *q, double multiplier, int modifier);
+
 //@}
 
 /** @name Functions - Deprecated */
