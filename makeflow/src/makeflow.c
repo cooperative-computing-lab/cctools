@@ -2785,6 +2785,7 @@ int main(int argc, char *argv[])
 		work_queue_specify_estimate_capacity_on(q, work_queue_estimate_capacity_on);
 		work_queue_specify_keepalive_interval(q, work_queue_keepalive_interval);
 		work_queue_specify_keepalive_timeout(q, work_queue_keepalive_timeout);
+		work_queue_enable_process_module(q);
 		port = work_queue_port(q);
 		if(port_file)
 			opts_write_port_file(port_file, port);

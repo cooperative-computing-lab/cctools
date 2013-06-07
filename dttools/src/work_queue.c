@@ -43,6 +43,7 @@ can be released:
 #include "rmonitor.h"
 #include "copy_stream.h"
 #include "random_init.h"
+#include "process.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -145,6 +146,7 @@ struct work_queue {
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;
 	int task_ordering;
+	int process_pending_check;
 
 	timestamp_t time_last_task_start;
 	timestamp_t idle_time;
@@ -2634,6 +2636,7 @@ struct work_queue *work_queue_create(int port)
 	q->fast_abort_multiplier = wq_option_fast_abort_multiplier;
 	q->worker_selection_algorithm = wq_option_scheduler;
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
+	q->process_pending_check = 0;
 
 	// Capacity estimation related
 	q->start_time = timestamp_get();
@@ -2946,6 +2949,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			last_left_status = 1;
 			return t;
 		}
+		
+		if( q->process_pending_check && process_pending() ) {
+			return NULL;
+		}
 
 //		debug(D_WQ, "workers_in_state[BUSY] = %d, workers_in_state[FULL] = %d, list_size(ready_list) = %d, aux_links = %x, list_size(aux_links) = %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_FULL], list_size(q->ready_list), aux_links, aux_links?list_size(aux_links):0);
 
@@ -3185,6 +3192,11 @@ void work_queue_specify_keepalive_interval(struct work_queue *q, int interval)
 void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout) 
 {
 	q->keepalive_timeout = timeout;
+}
+
+void work_queue_enable_process_module(struct work_queue *q)
+{
+	q->process_pending_check = 1;
 }
 
 char * work_queue_get_worker_summary( struct work_queue *q )
