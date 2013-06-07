@@ -456,14 +456,6 @@ void work_queue_specify_keepalive_interval(struct work_queue *q, int interval);
 */
 void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout);
 
-/** Enable use of the process module.
-This allows @ref work_queue_wait to call @ref process_pending from @ref process.h, exiting if a process has completed.
-Warning: this will reap any child processes, and their information can only be retrieved via @ref process_wait.
-@param q A work queue object.
-*/
-void work_queue_enable_process_module(struct work_queue *q);
-
-
 //@}
 
 /** @name Functions - Deprecated */

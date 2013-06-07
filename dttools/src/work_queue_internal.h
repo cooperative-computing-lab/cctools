@@ -23,4 +23,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 void work_queue_get_resources( struct work_queue *q, struct work_queue_resources *r );
 
+/** Enable use of the process module.
+This allows @ref work_queue_wait to call @ref process_pending from @ref process.h, exiting if a process has completed.
+Warning: this will reap any child processes, and their information can only be retrieved via @ref process_wait.
+@param q A work queue object.
+*/
+void work_queue_enable_process_module(struct work_queue *q);
+
 
