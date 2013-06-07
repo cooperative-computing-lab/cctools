@@ -32,6 +32,7 @@ See the file COPYING for details.
 #include "itable.h"
 #include "debug.h"
 #include "work_queue.h"
+#include "work_queue_internal.h"
 #include "delete_dir.h"
 #include "stringtools.h"
 #include "load_average.h"
