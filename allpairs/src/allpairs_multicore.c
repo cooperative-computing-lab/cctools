@@ -26,6 +26,7 @@ See the file COPYING for details.
 #include "load_average.h"
 #include "macros.h"
 #include "full_io.h"
+#include "getopt_aux.h"
 
 static const char *progname = "allpairs_multicore";
 static const char *extra_arguments = "";
