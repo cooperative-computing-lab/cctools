@@ -48,22 +48,22 @@ static int ystop = 0;
 
 static void show_help(const char *cmd)
 {
-	printf("Usage: %s [options] <set A> <set B> <compare function>\n", cmd);
-	printf("The most common options are:\n");
-	printf(" -p <port>		The port that the master will be listening on.\n");
-	printf(" -e <args>      Extra arguments to pass to the comparison function.\n");
-	printf(" -f <file>      Extra input file needed by the comparison function.  (may be given multiple times)\n");
-	printf(" -o <file>      Write output to this file (default to standard output)");
-	printf(" -t <seconds>   Estimated time to run one comparison.  (default chosen at runtime)\n");
-	printf(" -x <items>	Width of one work unit, in items to compare.  (default chosen at runtime)\n");
-	printf(" -y <items>	Height of one work unit, in items to compare.  (default chosen at runtime)\n");
-	printf(" -a             Advertise the master information to a catalog server.\n");
-	printf(" -N <project>   Set the project name to <project>\n");
-	printf(" -P <integer>   Priority. Higher the value, higher the priority.\n");
-	printf(" -d <flag>	Enable debugging for this subsystem.  (Try -d all to start.)\n");
-	printf(" -v         	Show program version.\n");
-	printf(" -h         	Display this message.\n");
-	printf(" -Z <file>      Select port at random and write it to this file.\n");
+	fprintf(stdout, "Usage: %s [options] <set A> <set B> <compare function>\n", cmd);
+	fprintf(stdout, "The most common options are:\n");
+	fprintf(stdout, " %-30s The port that the master will be listening on.\n", "-p,--port=<port>");
+	fprintf(stdout, " %-30s Extra arguments to pass to the comparison function.\n", "-e,--extra-args=<args>");
+	fprintf(stdout, " %-30s Extra input file needed by the comparison function. (may be given multiple times)\n", "-f,--input-file=<file>");
+	fprintf(stdout, " %-30s Write output to this file (default to standard output)\n", "-o,--output-file=<file>");
+	fprintf(stdout, " %-30s Estimated time to run one comparison. (default chosen at runtime)\n", "-t,--estimated-time=<seconds>");
+	fprintf(stdout, " %-30s Width of one work unit, in items to compare. (default chosen at runtime)\n", "-x,--width=<items>");
+	fprintf(stdout, " %-30s Height of one work unit, in items to compare. (default chosen at runtime)\n", "-y,--height=<items>");
+	fprintf(stdout, " %-30s Advertise the master information to a catalog server.\n", "-a,--advertise");
+	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
+	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.  (Try -d all to start.)\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
+	fprintf(stdout, " %-30s Display this message.\n", "-h,--help");
+	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--random-port=<file>");
 }
 
 /*
@@ -273,7 +273,25 @@ int main(int argc, char **argv)
 
 	extra_files_list = list_create();
 
-	while((c = getopt(argc, argv, "ad:e:f:hN:p:P:t:vx:y:Z:o:")) > -1) {
+	struct option long_options[] = {
+		{"debug", required_argument, 0, 'd'},
+		{"help",  no_argument, 0, 'h'},
+		{"version", no_argument, 0, 'v'},
+		{"port", required_argument, 0, 'p'},
+		{"random-port", required_argument, 0, 'Z'},
+		{"extra-args", required_argument, 0, 'e'},
+		{"width", required_argument, 0, 'x'},
+		{"height", required_argument, 0, 'y'},
+		{"advertise", no_argument, 0, 'a'},
+		{"project-name", required_argument, 0, 'N'},
+		{"output-file", required_argument, 0, 'o'},
+		{"input-file", required_argument, 0, 'f'},
+		{"estimated-time", required_argument, 0, 't'},
+		{"priority", required_argument, 0, 'P'}
+	};
+
+
+	while((c = getopt_long(argc, argv, "ad:e:f:hN:p:P:t:vx:y:Z:o:", long_options, NULL)) >= 0) {
 		switch (c) {
 	    case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -296,6 +314,7 @@ int main(int argc, char **argv)
 			exit(0);
 			break;
 		case 'N':
+			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			free(project);
 			project = xxstrdup(optarg);
 			break;
