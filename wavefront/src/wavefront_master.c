@@ -97,18 +97,16 @@ static void task_prime()
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s [options] <command> <xsize> <ysize> <inputdata> <outputdata>\n", cmd);
-	printf("where options are:\n");
-	printf(" -p <port>      Port number for queue master to listen on. Default is 9068.\n");
-	printf(" -a             Advertise the master information to a catalog server.\n");
-	printf(" -N <project>   Set the project name to <project>\n");
-	printf(" -P <integer>   Priority. Higher the value, higher the priority.\n");
-	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
-	printf(" -o <file>      Send debugging to this file.\n");
-	printf(" -v             Show version string\n");
-	printf(" -h             Show this help screen\n");
-	printf(" -Z <file>      Select port at random and write it to this file.\n");
-
+	fprintf(stdout, "Use: %s [options] <command> <xsize> <ysize> <inputdata> <outputdata>\n", cmd);
+	fprintf(stdout, " %-30s Display this message.\n", "-h,--help");
+	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.  (Try -d all to start.)\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Advertise the master information to a catalog server.\n", "-a,--advertise");
+	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
+	fprintf(stdout, " %-30s Send debugging information to this file. (default stdout)\n", "-o,--output-file=<file>");
+	fprintf(stdout, " %-30s The port that the master will be listening on. (default 9068)\n", "-p,--port=<port>");
+	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
+	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--random-port=<file>");
 }
 
 static void display_progress( struct work_queue *q )
@@ -133,10 +131,22 @@ int main( int argc, char *argv[] )
 
 	debug_config(progname);
 
-	while((c=getopt(argc,argv,"ad:hN:p:P:o:v:Z:")) > -1) {
+	struct option long_options[] = {
+		{"help",  no_argument, 0, 'h'},
+		{"version", no_argument, 0, 'v'},
+		{"debug", required_argument, 0, 'd'},
+		{"advertise", no_argument, 0, 'a'},
+		{"project-name", required_argument, 0, 'N'},
+		{"output-file", required_argument, 0, 'o'},
+		{"port", required_argument, 0, 'p'},
+		{"priority", required_argument, 0, 'P'},
+		{"estimated-time", required_argument, 0, 't'},
+		{"random-port", required_argument, 0, 'Z'}
+	};
+
+	while((c=getopt_long(argc,argv,"ad:hN:p:P:o:v:Z:", long_options, NULL)) >= 0) {
 		switch(c) {
 	    	case 'a':
-				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 				break;
 			case 'd':
 				debug_flags_set(optarg);
@@ -146,6 +156,7 @@ int main( int argc, char *argv[] )
 				exit(0);
 				break;
 			case 'N':
+				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 				free(project);
 				project = xxstrdup(optarg);
 				break;
