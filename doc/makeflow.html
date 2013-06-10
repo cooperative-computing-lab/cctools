@@ -376,12 +376,17 @@ The full list of supported Makeflow drivers include
 	<li>SGE - execution on a high-performance cluster using the <a href="http://www.oracle.com/us/products/tools/oracle-grid-engine-075549.html">Oracle Grid Engine</a> (formerly the Sun Grid Engine).</li>
 	<li>Moab - execution on a high-performance cluster using the <a href="http://www.adaptivecomputing.com/resources/docs/mwm/6-0/index.php">Moab Workload Manager</a></li>
 	<li>Cluster - execution on a high-performance cluster using a user-defined cluster manager</li>
-	<li>Work Queue - execution on a lightweight, scalable master-worker <a href="http://cse.nd.edu/~ccl/software/workqueue/">framework</a> managed directly by Makeflow</li>
+	<li>Work Queue - execution on a lightweight, scalable master-worker <a href="http://nd.edu/~ccl/software/workqueue/">framework</a> managed directly by Makeflow</li>
 	<li>Hadoop - execution on a cluster managed by the <a href="http://hadoop.apache.org/">Hadoop</a> framework, using data stored in <a href="http://hadoop.apache.org/hdfs">HDFS</a>.</li>
 </ul>
 
 <h4>User-defined Clusters</h4>
-For clusters using managers similar to SGE or Moab that are configured to preclude the use of our Work Queue system we have
+For clusters that are not directly supported by Makeflow we strongly suggest using the
+<a href="http://nd.edu/~ccl/software/workqueue">Work Queue</a> system and submitting workers
+via the cluster's normal submission mechanism.
+
+<p>
+For clusters using managers similar to SGE or Moab that are configured to preclude the use of Work Queue we have
 the "Cluster" custom driver.  To use the "Cluster" driver the Makeflow must be run in a parallel filesystem available to the
 entire cluster, and the following environment variables must be set.
 <ul>
