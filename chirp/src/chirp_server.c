@@ -119,47 +119,48 @@ struct chirp_filesystem *cfs = 0;
 
 static void show_help(const char *cmd)
 {
-	printf("use: %s [options]\n", cmd);
-	printf("The most common options are:\n");
-	printf(" -r <url>    URL of storage directory, like  file://path or hdfs://host:port/path\n");
-	printf(" -d <flag>   Enable debugging for this sybsystem\n");
-	printf(" -o <file>   Send debugging output to this file.\n");
-	printf(" -u <host>   Send status updates to this host. (default is %s)\n", CATALOG_HOST);
-	printf(" -v          Show version info.\n");
-	printf(" -h          This message.\n");
+	fprintf(stdout, "use: %s [options]\n", cmd);
+	fprintf(stdout, "The most common options are:\n");
+	fprintf(stdout, " %-30s URL of storage directory, like `file://path' or `hdfs://host:port/path'.\n", "-r,--root=<url>");
+	fprintf(stdout, " %-30s Enable debugging for this sybsystem.\n", "-d,--debug=<name>");
+	fprintf(stdout, " %-30s Send debugging output to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send status updates to this host. (default: `%s')\n", "-u,--advertise=<host>", CATALOG_HOST);
+	fprintf(stdout, " %-30s Show version info.\n", "-v,--version");
+	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 
-	printf("\nLess common options are:\n");
-	printf(" -A <file>   Use this file as the default ACL.\n");
-	printf(" -a <method> Enable this authentication method.\n");
-	printf(" -b          Run as a daemon.\n");
-	printf(" -B <file>   Write process identifier (PID) to file.\n");
-	printf(" -c <dir>    Challenge directory for unix filesystem authentication.\n");
-	printf(" -C          Do not create a core dump, even due to a crash.\n");
-	printf(" -E          Exit if parent process dies.\n");
-	printf(" -e <time>   Check for presence of parent at this interval. (default is %ds)\n", parent_check_timeout);
-	printf(" -F <size>   Leave this much space free in the filesystem.\n");
-	printf(" -G <url>    Base url for group lookups. (default: disabled)\n");
-	printf(" -I <addr>   Listen only on this network interface.\n");
-	printf(" -O <bytes>  Rotate debug file once it reaches this size.\n");
-	printf(" -n <name>   Use this name when reporting to the catalog.\n");
-	printf(" -M <count>  Set the maximum number of clients to accept at once. (default unlimited)\n");
-	printf(" -p <port>   Listen on this port (default is %d)\n", port);
-	printf(" -P <user>   Superuser for all directories. (default is none)\n");
-	printf(" -Q <size>   Enforce this root quota in software.\n");
-	printf(" -R          Read-only mode.\n");
-	printf(" -s <time>   Abort stalled operations after this long. (default is %ds)\n", stall_timeout);
-	printf(" -t <time>   Disconnect idle clients after this time. (default is %ds)\n", idle_timeout);
-	printf(" -T <time>   Maximum time to cache group information. (default is %ds)\n", chirp_group_cache_time);
-	printf(" -U <time>   Send status updates at this interval. (default is 5m)\n");
-	printf(" -w <name>   The name of this server's owner.  (default is username)\n");
-	printf(" -W <file>   Use alternate password file for unix authentication\n");
-	printf(" -y <dir>    Location of transient data (default is pwd).\n");
-	printf(" -z <time>   Set max timeout for unix filesystem authentication. (default is 5s)\n");
-	printf(" -Z <file>   Select port at random and write it to this file.  (default is disabled)\n");
-	printf("\n");
-	printf("Where debug flags are: ");
+	fprintf(stdout, "\nLess common options are:\n");
+	fprintf(stdout, " %-30s Use this file as the default ACL.\n", "-A,--default-acl=<file>");
+	fprintf(stdout, " %-30s Enable this authentication method.\n", "-a,--auth=<method>");
+	fprintf(stdout, " %-30s Write process identifier (PID) to file.\n", "-B,--pid-file=<file>");
+	fprintf(stdout, " %-30s Run as a daemon.\n", "-b,--daemon");
+	fprintf(stdout, " %-30s Do not create a core dump, even due to a crash.\n", "-C,--no-core-dump");
+	fprintf(stdout, " %-30s Challenge directory for unix filesystem authentication.\n", "-c,--challenge-dir=<dir>");
+	fprintf(stdout, " %-30s Exit if parent process dies.\n", "-E,--parent-death");
+	fprintf(stdout, " %-30s Check for presence of parent at this interval. (default: %ds)\n", "-e,--parent-check=<seconds>", parent_check_timeout);
+	fprintf(stdout, " %-30s Leave this much space free in the filesystem.\n", "-F,--free-space=<size>");
+	fprintf(stdout, " %-30s Base url for group lookups. (default: disabled)\n", "-G,--group-url=<url>");
+	fprintf(stdout, " %-30s Run as lower privilege user. (root protection)\n", "-i,--user=<user>");
+	fprintf(stdout, " %-30s Listen only on this network interface.\n", "-I,--interface=<addr>");
+	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--rotate-debug-max=<bytes>");
+	fprintf(stdout, " %-30s Use this name when reporting to the catalog.\n", "-n,--catalog-name=<name>");
+	fprintf(stdout, " %-30s Set the maximum number of clients to accept at once. (default unlimited)\n", "-M,--max-clients=<count>");
+	fprintf(stdout, " %-30s Superuser for all directories. (default: none)\n", "-P,--superuser=<user>");
+	fprintf(stdout, " %-30s Listen on this port. (default: %d)\n", "-p,--port=<port>", port);
+	fprintf(stdout, " %-30s Enforce this root quota in software.\n", "-Q,--root-quota=<size>");
+	fprintf(stdout, " %-30s Read-only mode.\n", "-R,--read-only");
+	fprintf(stdout, " %-30s Abort stalled operations after this long. (default: %ds)\n", "-s,--stalled=<time>", stall_timeout);
+	fprintf(stdout, " %-30s Maximum time to cache group information. (default: %ds)\n", "-T,--group-cache-exp=<time>", chirp_group_cache_time);
+	fprintf(stdout, " %-30s Disconnect idle clients after this time. (default: %ds)\n", "-t,--idle-clients=<time>", idle_timeout);
+	fprintf(stdout, " %-30s Send status updates at this interval. (default: 5m)\n", "-U,--catalog-update=<time>");
+	fprintf(stdout, " %-30s Use alternate password file for unix authentication.\n", "-W,--passwd=<file>");
+	fprintf(stdout, " %-30s The name of this server's owner. (default: `whoami`)\n", "-w,--owner=<user>");
+	fprintf(stdout, " %-30s Location of transient data. (default: `.')\n", "-y,--transient=<dir>");
+	fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
+	fprintf(stdout, " %-30s Set max timeout for unix filesystem authentication. (default: 5s)\n", "-z,--unix-timeout=<file>");
+	fprintf(stdout, "\n");
+	fprintf(stdout, "Where debug flags are: ");
 	debug_flags_print(stdout);
-	printf("\n\n");
+	fprintf(stdout, "\n\n");
 }
 
 void shutdown_clean(int sig)
@@ -367,6 +368,43 @@ static void config_pipe_handler( int fd )
 }
 
 
+static struct option long_options[] = {
+	{"advertise", required_argument, 0, 'u'},
+	{"auth", required_argument, 0, 'a'},
+	{"catalog-name", required_argument, 0, 'n'},
+	{"challenge-dir", required_argument, 0, 'c'},
+	{"catalog-update", required_argument, 0, 'U'},
+	{"daemon", no_argument, 0, 'b'},
+	{"debug", required_argument, 0, 'd'},
+	{"debug-file", required_argument, 0, 'o'},
+	{"default-acl", required_argument, 0, 'A'},
+	{"free-space", required_argument, 0, 'F'},
+	{"group-cache-exp", required_argument, 0, 'T'},
+	{"group-url", required_argument, 0, 'G'},
+	{"help", no_argument, 0, 'h'},
+	{"idle-clients", required_argument, 0, 't'},
+	{"interface", required_argument, 0, 'I'},
+	{"max-clients", required_argument, 0, 'M'},
+	{"no-core-dump", no_argument, 0, 'C'},
+	{"owner", required_argument, 0, 'w'},
+	{"parent-check", required_argument, 0, 'e'},
+	{"parent-death", no_argument, 0, 'E'},
+	{"passwd", required_argument, 0, 'W'},
+	{"pid-file", required_argument, 0, 'B'},
+	{"port", required_argument, 0, 'p'},
+	{"port-file", required_argument, 0, 'Z'},
+	{"read-only", no_argument, 0, 'R'},
+	{"root", required_argument, 0, 'r'},
+	{"root-quota", required_argument, 0, 'Q'},
+	{"rotate-debug-max", required_argument, 0, 'O'},
+	{"stalled", required_argument, 0, 's'},
+	{"superuser", required_argument, 0, 'P'},
+	{"transient", required_argument, 0, 'y'},
+	{"unix-timeout", required_argument, 0, 'z'},
+	{"user", required_argument, 0, 'i'},
+	{"version", no_argument, 0, 'v'}
+};
+
 int main(int argc, char *argv[])
 {
 	struct link *link;
@@ -385,7 +423,7 @@ int main(int argc, char *argv[])
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c = getopt(argc, argv, "A:a:bB:c:CEe:F:G:t:T:i:I:s:Sn:M:P:p:Q:r:Ro:O:d:vw:W:u:U:hXNL:f:y:x:z:Z:l:")) > -1) {
+	while((c = getopt_long(argc, argv, "A:a:B:bCc:Ee:F:G:I:l:M:n:O:o:P:p:Q:Rr:s:T:t:U:u:vW:w:y:Z:z:", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'A':
 			chirp_acl_default(optarg);
@@ -450,9 +488,6 @@ int main(int argc, char *argv[])
 		case 's':
 			stall_timeout = string_time_parse(optarg);
 			break;
-		case 'S':
-			/* deprecated */
-			break;
 		case 'r':
 			chirp_root_url = optarg;
 			break;
@@ -481,27 +516,12 @@ int main(int argc, char *argv[])
 		case 'W':
 			auth_unix_passwd_file(optarg);
 			break;
-		case 'X':
-			/* deprecated */
-			break;
-		case 'N':
-			/* deprecated */
-			break;
 		case 'I':
 			listen_on_interface = optarg;
-			break;
-		case 'L':
-			/* deprecated */
-			break;
-		case 'f':
-			fprintf(stderr,"chirp_server: option -f is deprecated, use -r with a URL instead.");
 			break;
 		case 'y':
 			free(chirp_transient_path);
 			chirp_transient_path = strdup(optarg);
-			break;
-		case 'x':
-			fprintf(stderr,"chirp_server: option -x is deprecated, use -r with a URL instead.");
 			break;
 		case 'z':
 			auth_unix_timeout_set(atoi(optarg));
@@ -511,6 +531,7 @@ int main(int argc, char *argv[])
 			port = 0;
 			break;
 		case 'l':
+			/* not documented, internal testing */
 			sim_latency = atoi(optarg);
 			break;
 		case 'h':
@@ -574,10 +595,10 @@ int main(int argc, char *argv[])
 
 	if(getuid() == 0) {
 		if(!safe_username) {
-			printf("Sorry, I refuse to run as root without certain safeguards.\n");
-			printf("Please give me a safe username with the -i <user> option.\n");
-			printf("After using root access to authenticate users,\n");
-			printf("I will use the safe username to access data on disk.\n");
+			fprintf(stdout, "Sorry, I refuse to run as root without certain safeguards.\n");
+			fprintf(stdout, "Please give me a safe username with the -i <user> option.\n");
+			fprintf(stdout, "After using root access to authenticate users,\n");
+			fprintf(stdout, "I will use the safe username to access data on disk.\n");
 			exit(1);
 		} else {
 			struct passwd *p = getpwnam(safe_username);
@@ -586,8 +607,8 @@ int main(int argc, char *argv[])
 			safe_gid = p->pw_gid;
 		}
 	} else if(safe_username) {
-		printf("Sorry, the -i option doesn't make sense\n");
-		printf("unless I am already running as root.\n");
+		fprintf(stdout, "Sorry, the -i option doesn't make sense\n");
+		fprintf(stdout, "unless I am already running as root.\n");
 		exit(1);
 	}
 
