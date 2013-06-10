@@ -363,21 +363,22 @@ static double measure_task_time()
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s [options] <command> <xsize> <ysize>\n", cmd);
-	printf("where options are:\n");
-	printf(" -n <njobs>     Manually set the number of process to run at once.\n");
-	printf(" -b <size>      Manually set the block size for batch mode.\n");
-	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
-	printf(" -o <file>      Send debugging to this file.\n");
-	printf(" -l <file>      Save progress log to this file.\n");
-	printf(" -i <file.bmp>  Save progress image to this file.\n");
-	printf(" -t <secs>      Interval between image writes, in seconds. (default=%d)\n",progress_bitmap_interval);
-	printf(" -A             Automatically choose between multicore and batch mode.\n");
-	printf(" -M             Run the whole problem locally in multicore mode. (default)\n");
-	printf(" -T <type>      Run in distributed mode with <type> batch system: %s. (default=%s)\n",batch_queue_type_string(), batch_queue_type_to_string(batch_system_type));
-	printf(" -V             Verify mode: check the configuration and then exit.\n");
-	printf(" -v             Show version string\n");
-	printf(" -h             Show this help screen\n");
+	fprintf(stdout, "Use: %s [options] <command> <xsize> <ysize>\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
+	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.  (Try -d all to start.)\n", "-d,--debug=<subsystem>");
+	fprintf(stdout, " %-30s Automatically choose between multicore and batch mode.\n", "-A,--auto");
+	fprintf(stdout, " %-30s Save progress image to this file.\n", "-i,--bitmap=<file.bmp>");
+	fprintf(stdout, " %-30s Save progress log to this file.\n", "-l,--log-file=<file>");
+	fprintf(stdout, " %-30s Manually set the block size for batch mode.\n", "-b,--block-size=<size>");
+	fprintf(stdout, " %-30s Run the whole problem locally in multicore mode. (default)\n", "-L,--multicore");
+	fprintf(stdout, " %-30s Manually set the number of process to run at once.\n", "-n,--jobs=<njobs>");
+	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--output-file=<file>");
+	fprintf(stdout, " %-30s Interval between image writes, in seconds. (default=%d)\n", "-t,--bitmap-interval=<secs>",progress_bitmap_interval);
+	fprintf(stdout, " %-30s Run in distributed mode with <type> batch system: (default=%s)\n", "-T,--batch-type=<type>", batch_queue_type_to_string(batch_system_type));
+	fprintf(stdout, " %-30s %s\n", "", batch_queue_type_string());
+	fprintf(stdout, " %-30s Verify mode: check the configuration and then exit.\n", "-V,--verify");
 }
 
 int main( int argc, char *argv[] )
@@ -390,7 +391,23 @@ int main( int argc, char *argv[] )
 
 	progress_log_file = stdout;
 
-	while((c=getopt(argc,argv,"n:b:d:o:l:i:t:qAMDT:VX:Y:vh")) > -1) {
+	struct option long_options[] = {
+		{"help",  no_argument, 0, 'h'},
+		{"version", no_argument, 0, 'v'},
+		{"debug", required_argument, 0, 'd'},
+		{"jobs", required_argument, 0, 'n'},
+		{"block-size", required_argument, 0, 'b'},
+		{"output-file", required_argument, 0, 'o'},
+		{"log-file", required_argument, 0, 'l'},
+		{"bitmap", required_argument, 0, 'B'},
+		{"bitmap-interval", required_argument, 0, 'i'},
+		{"auto", no_argument, 0, 'A'},
+		{"local", no_argument, 0, 'L'},
+		{"batch-type", no_argument, 0, 'T'},
+		{"verify", no_argument, 0, 'V'}
+	};
+
+	while((c=getopt_long(argc,argv,"n:b:d:o:l:B:i:qALDT:VX:Y:vh", long_options, NULL)) > -1) {
 		switch(c) {
 			case 'n':
 				manual_max_jobs_running = atoi(optarg);
@@ -404,10 +421,10 @@ int main( int argc, char *argv[] )
 			case 'o':
 				debug_config_file(optarg);
 				break;
-			case 'i':
+			case 'B':
 				progress_bitmap_file = optarg;
 				break;
-			case 't':
+			case 'i':
 				progress_bitmap_interval = atoi(optarg);
 				break;
 			case 'l':
@@ -420,7 +437,7 @@ int main( int argc, char *argv[] )
 			case 'A':
 				wavefront_mode = WAVEFRONT_MODE_AUTO;
 				break;
-			case 'M':
+			case 'L':
 				wavefront_mode = WAVEFRONT_MODE_MULTICORE;
 				break;
 			case 'T':

@@ -193,18 +193,18 @@ int copypath( const char *source, const char *target )
 	return nerrors;
 }
 
-void print_help()
+void show_help()
 {
-    	printf("Use: parrot_cp [OPTIONS]... SOURCES ... DEST\n");
-	printf("Where options are:\n");
-	printf("-f     Forcibly remove target before copying.\n");
-	printf("-i     Interactive mode: ask before overwriting.\n");
-	printf("-r -R  Recursively copy directories.\n");
-	printf("-s     Make symbolic links instead of copying files.\n");
-	printf("-l     Make hard links instead of copying files.\n");
-	printf("-u     Update mode: Copy only if source is newer than target.\n");
-	printf("-v     Verbose mode: Show names of files copied.\n");
-	printf("-h     Help: Show these options.\n");
+    	fprintf(stdout, "Use: parrot_cp [OPTIONS]... SOURCES ... DEST\n");
+	fprintf(stdout, "Where options are:\n");
+	fprintf(stdout, " %-30s Forcibly remove target before copying.\n", "-f,--force");
+	fprintf(stdout, " %-30s Interactive mode: ask before overwriting.\n", "-i,--interactive");
+	fprintf(stdout, " %-30s Recursively copy directories.\n", "-r,-R,--recursive");
+	fprintf(stdout, " %-30s Make symbolic links instead of copying files.\n", "-s,--symlinks");
+	fprintf(stdout, " %-30s Make hard links instead of copying files.\n", "-l,--hardlinks");
+	fprintf(stdout, " %-30s Update mode: Copy only if source is newer than target.\n", "-u,--update-only");
+	fprintf(stdout, " %-30s Verbose mode: Show names of files copied.\n", "-v,--verbose");
+	fprintf(stdout, " %-30s Help: Show these options.\n", "-h,--help");
 
 }
 
@@ -218,8 +218,19 @@ int main( int argc, char *argv[] )
 	int target_is_dir = 0;
 	struct stat statbuf;
 	char newtarget[PFS_PATH_MAX];
+
+	struct option long_options[] = {
+		{"help",  no_argument, 0, 'h'},
+		{"verbose", no_argument, 0, 'v'},
+		{"force", no_argument, 0, 'f'},
+		{"interactive", no_argument, 0, 'i'},
+		{"recursive", no_argument, 0, 'r'},
+		{"symlinks", no_argument, 0, 's'},
+		{"hardlinks", no_argument, 0, 'l'},
+		{"update-only", no_argument, 0, 'u'}
+	};
 	
-	while((c=getopt(argc,argv,"firRsluvh")) > -1) {
+	while((c=getopt_long(argc,argv,"firRsluvh", long_options, NULL)) > -1) {
 		switch(c) {
 		case 'f':
 			force_mode = 1;
@@ -244,7 +255,7 @@ int main( int argc, char *argv[] )
 			verbose_mode = 1;
 			break;
 		case 'h':
-			print_help();
+			show_help();
 			exit(0);
 			break;
 		}
@@ -253,7 +264,7 @@ int main( int argc, char *argv[] )
 	// Check for not enough arguments
 	if( (argc-optind)<2 ) {
 		printf("Insufficient number of arguments\n");
-		print_help();
+		show_help();
 		return 1;
 	}
 
