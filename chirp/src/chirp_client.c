@@ -1565,37 +1565,29 @@ INT64_T chirp_client_lsalloc(struct chirp_client * c, char const *path, char *al
 
 CHIRP_SEARCH *chirp_client_opensearch(struct chirp_client *c, const char *path, const char *pattern, int flags, time_t stoptime) {
 	INT64_T result = simple_command(c, stoptime, "search %s %s %d\n", pattern, path, flags);
-	char p[CHIRP_PATH_MAX];
-        size_t buffer_size = 2048;
-        char *buffer = malloc(buffer_size);
-	size_t l, i=0;
 
 	if (result == 0) {
-		while (link_readline(c->link, p, sizeof(p), stoptime)) {
-	                if (strcmp(p, "") == 0) break;
-			while ((l = (size_t)snprintf(buffer+i, buffer_size-i, p)) >= buffer_size-i) {
-				buffer_size *= 2;
-				char *rbuffer = (char*) realloc(buffer, buffer_size);
-				if (rbuffer==NULL) return NULL;
-				buffer = rbuffer;
-			}
-			i += l;
-		}
+		char line[CHIRP_LINE_MAX];
+		buffer_t *buffer;
 
-		if (i==0) *buffer = '\0';
+		buffer = buffer_create();
+		while (link_readline(c->link, line, sizeof(line), stoptime) && line[0]) {
+			buffer_printf(buffer, "%s", line);
+		}
 
 		CHIRP_SEARCH *result = malloc(sizeof(CHIRP_SEARCH));
 		result->entry = (struct chirp_searchent*) malloc(sizeof(struct chirp_searchent));
 		result->entry->info = NULL;
 		result->entry->path = NULL;
-		result->data = buffer;
+		result->buffer = buffer;
+		result->data = buffer_tostring(buffer, NULL);
 		result->i = 0;
 		return result;
 	} else 
 		return NULL;
 }
 
-static char *readsearch_next(char *data, int *i) {
+static char *readsearch_next(const char *data, int *i) {
 	data += *i;
 	char *tail = strchr(data, ':');
 	ptrdiff_t length = (tail==NULL) ? (ptrdiff_t)strlen(data) : tail - data;
@@ -1644,7 +1636,7 @@ static struct chirp_stat *readsearch_unpack_stat(char *stat_str) {
 struct chirp_searchent *chirp_client_readsearch(CHIRP_SEARCH *search) {
 
         int i = search->i;
-        char *data = search->data;
+        const char *data = search->data;
         char *err_str = readsearch_next(data, &i);
         free(search->entry->path);
         search->entry->path = NULL;
@@ -1677,9 +1669,9 @@ struct chirp_searchent *chirp_client_readsearch(CHIRP_SEARCH *search) {
 }
 
 int chirp_client_closesearch(CHIRP_SEARCH *search) {
-        free(search->entry);
-        free(search->data);
-        free(search);
+	buffer_delete(search->buffer);
+	free(search->entry);
+	free(search);
 	return 0;
 }
 
