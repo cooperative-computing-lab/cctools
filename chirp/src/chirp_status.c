@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "link.h"
 #include "stringtools.h"
 #include "debug.h"
+#include "getopt_aux.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,20 +39,20 @@ static struct nvpair_header headers[] = {
 
 static void show_help(const char *cmd)
 {
-	printf("chirp_status [options] [ <name> <value> ]\n");
-	printf("where options are:\n");
-	printf(" -c <host>  Query the catalog on this host.\n");
-	printf(" -d <flag>  Enable debugging for this sybsystem\n");
-	printf(" -o <file>  Send debugging output to this file.\n");
-	printf(" -O <bytes> Rotate file once it reaches this size.\n");
-	printf(" -A <size>  Only show servers with this space available. (example: -A 100MB)\n");
-	printf(" -a         Show all records, not just chirps and catalogs.\n");
-	printf(" -t <time>  Timeout.\n");
-	printf(" -s         Short output.\n");
-	printf(" -l         Long output.\n");
-	printf(" -T         Totals output.\n");
-	printf(" -h         This message.\n");
-	printf(" -v         Show version info.\n");
+	fprintf(stdout, "chirp_status [options] [ <name> <value> ]\n");
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " %-30s Query the catalog on this host.\n", "-c,--catalog=<host>");
+	fprintf(stdout, " %-30s Enable debugging for this sybsystem\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Send debugging output to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Rotate file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s Only show servers with this space available. (example: -A 100MB)\n", "-A,--server-space=<size>");
+	fprintf(stdout, " %-30s Show all records, not just chirps and catalogs.\n", "-a,--all");
+	fprintf(stdout, " %-30s Timeout.\n", "-t,--timeout=<time>");
+	fprintf(stdout, " %-30s Short output.\n", "-s,--brief");
+	fprintf(stdout, " %-30s Long output.\n", "-l,--verbose");
+	fprintf(stdout, " %-30s Totals output.\n", "-T,--totals");
+	fprintf(stdout, " %-30s Show version info.\n", "-v,--version");
+	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
 int compare_entries(struct nvpair **a, struct nvpair **b)
@@ -100,7 +101,22 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aA:c:d:t:o:O:sTlvh")) > -1) {
+
+    static struct option long_options[] = { 
+        {"catalog", required_argument, 0, 'c'},
+        {"debug", required_argument, 0, 'd'},
+        {"debug-file", required_argument, 0, 'o'},
+        {"debug-rotate-max", required_argument, 0, 'O'},
+        {"server-space", required_argument, 0, 'A'},
+        {"all", no_argument, 0, 'a'},
+        {"timeout", required_argument, 0, 't'},
+        {"brief", no_argument, 0, 's'},
+        {"verbose", no_argument, 0, 'l'},
+        {"totals", no_argument, 0, 'T'},
+        {"version", no_argument, 0, 'v'},
+        {"help", no_argument, 0, 'h'}};
+
+	while((c = getopt_long(argc, argv, "aA:c:d:t:o:O:sTlvh", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'a':
 			show_all_types = 1;

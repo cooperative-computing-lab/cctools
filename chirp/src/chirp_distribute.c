@@ -22,6 +22,7 @@ The -X option will delete the directory from all of the named hosts.
 #include "timestamp.h"
 #include "macros.h"
 #include "random_init.h"
+#include "getopt_aux.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -162,28 +163,28 @@ struct target_info {
 	int cid;
 };
 
-static void show_use()
+static void show_help()
 {
-	printf("Use: chirp_distribute [options] <sourcehost> <sourcepath> <host1> <host2> ...\n");
-	printf("where options are:\n");
-	printf(" -a <flag>  Require this authentication mode.\n");
-	printf(" -d <flag>  Enable debugging for this subsystem.\n");
-	printf(" -D         Show detailed location, time, and performance of each transfer.\n");
-	printf(" -F <file>  Write matrix of failures to this file.\n");
-	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
-	printf(" -N <num>   Stop after this number of successful copies.\n");
-	printf(" -p <num>   Maximum number of processes to run at once (default=%d)\n", maxprocs);
-	printf(" -R         Randomize order of target hosts given on command line.\n");
-	printf(" -t <time>  Timeout for for each copy. (default is %ds)\n", timeout);
-	printf(" -T <time>  Overall timeout for entire distribution. (default is %d)\n", overall_timeout);
-	printf(" -v         Show program version.\n");
-	printf(" -X         Delete data from all of the target hosts.\n");
-	printf(" -Y         Show confirmation of successful placements.\n");
-	printf(" -h         This message.\n");
-	printf("\nchirp_distribute copies a directory from one host to many hosts\n");
-	printf("by creating a spanning tree and then transferring data in parallel\n");
-	printf("using third party transfer.  The path of each newly created copy\n");
-	printf("is printed on stdout.  The -X option deletes all but one copy.\n\n");
+	fprintf(stdout, "Use: chirp_distribute [options] <sourcehost> <sourcepath> <host1> <host2> ...\n");
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " %-30s Require this authentication mode.\n", "-a,--auth=<flag>");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Show detailed location, time, and performance of each transfer.\n", "-D,--info-transfer");
+	fprintf(stdout, " %-30s Write matrix of failures to this file.\n", "-F,--failures-file=<file>");
+	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
+	fprintf(stdout, " %-30s Stop after this number of successful copies.\n", "-N,--copies-max=<num>");
+	fprintf(stdout, " %-30s Maximum number of processes to run at once (default=%d)\n", "-p,--jobs=<num>", maxprocs);
+	fprintf(stdout, " %-30s Randomize order of target hosts given on command line.\n", "-R,--randomize-hosts");
+	fprintf(stdout, " %-30s Timeout for for each copy. (default is %ds)\n", "-t,--timeout=<time>", timeout);
+	fprintf(stdout, " %-30s Overall timeout for entire distribution. (default is %d)\n", "-T,--timeout-all=<time>", overall_timeout);
+	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
+	fprintf(stdout, " %-30s Delete data from all of the target hosts.\n", "-X,--delete-target");
+	fprintf(stdout, " %-30s Show confirmation of successful placements.\n", "-Y,--info-success");
+	fprintf(stdout, " %-30s This message.\n", "-h,--help");
+	fprintf(stdout, "\nchirp_distribute copies a directory from one host to many hosts\n");
+	fprintf(stdout, "by creating a spanning tree and then transferring data in parallel\n");
+	fprintf(stdout, "using third party transfer.  The path of each newly created copy\n");
+	fprintf(stdout, "is printed on stdout.  The -X option deletes all but one copy.\n\n");
 }
 
 int main(int argc, char *argv[])
@@ -207,7 +208,23 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while(((c = getopt(argc, argv, "a:d:DF:i:N:p:Rt:T:vXYh")) > -1)) {
+    static struct option long_options[] = {
+        {"auth", required_argument, 0, 'a'},
+        {"debug", required_argument, 0, 'd'},
+        {"info-transfer", no_argument, 0, 'D'},
+        {"failures-file", required_argument, 0, 'F'},
+        {"tickets", required_argument, 0, 'i'},
+        {"copies-max", required_argument, 0, 'N'},
+        {"jobs", required_argument, 0, 'p'},
+        {"randomize-hosts", no_argument, 0, 'R'},
+        {"timeout", required_argument, 0, 't'},
+        {"timeout-all", required_argument, 0, 'T'},
+        {"version", no_argument, 0, 'v'},
+        {"delete-target", no_argument, 0, 'X'},
+        {"info-success", no_argument, 0, 'Y'},
+        {"help", no_argument, 0, 'h'} };
+
+	while(((c = getopt_long(argc, argv, "a:d:DF:i:N:p:Rt:T:vXYh", long_options, NULL)) > -1)) {
 		switch (c) {
 		case 'R':
 			randomize_mode = 1;
@@ -252,7 +269,7 @@ int main(int argc, char *argv[])
 			break;
 		default:
 		case 'h':
-			show_use();
+			show_help();
 			return 1;
 		}
 	}
@@ -271,7 +288,7 @@ int main(int argc, char *argv[])
 	}
 
 	if((argc - optind) < 2) {
-		show_use();
+		show_help();
 		return 1;
 	}
 

@@ -30,6 +30,7 @@ This module written by James Fitzgerald, B.S. 2006.
 #include "stringtools.h"
 #include "string_array.h"
 #include "xxmalloc.h"
+#include "getopt_aux.h"
 
 #include <errno.h>
 #include <signal.h>
@@ -558,19 +559,19 @@ static void exit_handler(int sig)
 
 static void show_help(const char *cmd)
 {
-	printf("use: %s <mountpath>\n", cmd);
-	printf("where options are:\n");
-	printf(" -a <flag>    Require this authentication mode.\n");
-	printf(" -b <bytes>   Block size for network I/O. (default is %ds)\n", (int) chirp_reli_blocksize_get());
-	printf(" -d <flag>    Enable debugging for this subsystem.\n");
-	printf(" -D           Disable small file optimizations such as recursive delete.\n");
-	printf(" -f           Run in foreground for debugging.\n");
-	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
-	printf(" -m <options> Mount options passed to FUSE.\n");
-	printf(" -o <file>    Send debugging output to this file.\n");
-	printf(" -t <timeout> Timeout for network operations. (default is %ds)\n", chirp_fuse_timeout);
-	printf(" -v           Show program version.\n");
-	printf(" -h           This message.\n");
+	fprintf(stdout, "use: %s <mountpath>\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " %-30s Require this authentication mode.\n", "-a,--auth=<flag>");
+	fprintf(stdout, " %-30s Block size for network I/O. (default is %ds)\n", "-b,--block-size=<bytes>", (int) chirp_reli_blocksize_get());
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Disable small file optimizations such as recursive delete.\n", "-D,--no-optimize");
+	fprintf(stdout, " %-30s Run in foreground for debugging.\n", "-f,--foreground");
+	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
+	fprintf(stdout, " %-30s Mount options passed to FUSE.\n", "-m,-mount-options=<options>");
+	fprintf(stdout, " %-30s Send debugging output to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Timeout for network operations. (default is %ds)\n", "-t,--timeout=<timeout>", chirp_fuse_timeout);
+	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
+	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
 int main(int argc, char *argv[])
@@ -585,7 +586,20 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:b:d:Dfhi:m:o:t:v")) > -1) {
+    static struct option long_options[] = {
+        {"auth", required_argument, 0, 'a'},
+        {"block-size", required_argument, 0, 'b'},
+        {"debug", required_argument, 0, 'd'},
+        {"no-optimize", no_argument, 0, 'D'},
+        {"foreground", no_argument, 0, 'f'},
+        {"tickets", required_argument, 0, 'i'},
+        {"mount-options", required_argument, 0, 'm'},
+        {"debug-file", required_argument, 0, 'o'},
+        {"timeout", required_argument, 0, 't'},
+        {"version", no_argument, 0, 'v'},
+        {"help", no_argument, 0, 'h'}};
+
+	while((c = getopt_long(argc, argv, "a:b:d:Dfhi:m:o:t:v", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);

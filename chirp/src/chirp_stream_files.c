@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "full_io.h"
 #include "auth_all.h"
 #include "stringtools.h"
+#include "getopt_aux.h"
 
 #define MODE_SPLIT 0
 #define MODE_COPY  1
@@ -29,20 +30,20 @@ static int stream_mode = MODE_SPLIT;
 
 static void show_help(const char *cmd)
 {
-	printf("use: %s [options] [copy|split|join] <local-file> { <hostname[:port]> <remote-file> }\n", cmd);
-	printf("where options are:\n");
-	printf(" -a <flag>  Require this authentication mode.\n");
-	printf(" -b <size>  Set transfer buffer size. (default is %d bytes)\n", buffer_size);
-	printf(" -d <flag>  Enable debugging for this subsystem.\n");
-	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
-	printf(" -t <time>  Timeout for failure. (default is %ds)\n", timeout);
-	printf(" -v         Show program version.\n");
-	printf(" -h         This message.\n");
-	printf("\nThis tool is used to move data between a single local file and multiple remote files.\n");
-	printf("'chirp_stream_files copy'  duplicates a single file to multiple hsots.\n");
-	printf("'chirp_stream_files split' sends the lines of a file to multiple hosts, round robin.\n");
-	printf("'chirp_stream_files join'  performs the opposite of split, joining multiple files to one.\n");
-	printf("A local file of '-' will use stdin for splitting or copying and stdout for joining.\n");
+	fprintf(stdout, "use: %s [options] [copy|split|join] <local-file> { <hostname[:port]> <remote-file> }\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " %-30s Require this authentication mode.\n", "-a,--auth=<flag>");
+	fprintf(stdout, " %-30s Set transfer buffer size. (default is %d bytes)\n", "-b,--block-size=<size>", buffer_size);
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
+	fprintf(stdout, " %-30s Timeout for failure. (default is %ds)\n", "-t,--timeout=<time>", timeout);
+	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
+	fprintf(stdout, " %-30s This message.\n", "-h,--help");
+	fprintf(stdout, "\nThis tool is used to move data between a single local file and multiple remote files.\n");
+	fprintf(stdout, "'chirp_stream_files copy'  duplicates a single file to multiple hsots.\n");
+	fprintf(stdout, "'chirp_stream_files split' sends the lines of a file to multiple hosts, round robin.\n");
+	fprintf(stdout, "'chirp_stream_files join'  performs the opposite of split, joining multiple files to one.\n");
+	fprintf(stdout, "A local file of '-' will use stdin for splitting or copying and stdout for joining.\n");
 }
 
 int main(int argc, char *argv[])
@@ -59,7 +60,16 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:b:d:i:t:vh")) > -1) {
+    static struct option long_options[] = {
+        {"auth", required_argument, 0, 'a'},
+        {"block-size", required_argument, 0, 'b'},
+        {"debug", required_argument, 0, 'd'},
+        {"tickets", required_argument, 0, 'i'},
+        {"timeout", required_argument, 0, 't'},
+        {"version", no_argument, 0, 'v'},
+        {"help", no_argument, 0, 'h'}};
+
+	while((c = getopt_long(argc, argv, "a:b:d:i:t:vh", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'a':
 			auth_register_byname(optarg);

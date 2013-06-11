@@ -37,6 +37,7 @@ See the file COPYING for details.
 #include "domain_name_cache.h"
 #include "md5.h"
 #include "sort_dir.h"
+#include "getopt_aux.h"
 
 #ifdef HAS_LIBREADLINE
 #include "readline/readline.h"
@@ -1077,16 +1078,16 @@ static int process_command(int argc, char **argv)
 
 static void show_help(const char *cmd)
 {
-	printf("use: %s [options] [hostname] [command]\n", cmd);
-	printf("where options are:\n");
-	printf(" -a <flag>  Require this authentication mode.\n");
-	printf(" -d <flag>  Enable debugging for this subsystem.\n");
-	printf(" -h         This message.\n");
-	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
-	printf(" -l         Long transfer information.\n");
-	printf(" -q         Quiet mode; supress messages and table headers.\n");
-	printf(" -t <time>  Set remote operation timeout.\n");
-	printf(" -v         Show program version.\n");
+	fprintf(stdout, "use: %s [options] [hostname] [command]\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " %-30s Require this authentication mode.\n", "-a,--auth=<flag>");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
+	fprintf(stdout, " %-30s Long transfer information.\n", "-l,--verbose");
+	fprintf(stdout, " %-30s Quiet mode; supress messages and table headers.\n", "-q,--quiet");
+	fprintf(stdout, " %-30s Set remote operation timeout.\n", "-t,--timeout=<time>");
+	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
+	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
 int main(int argc, char *argv[])
@@ -1103,7 +1104,17 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "+a:d:hi:lt:v")) > -1) {
+    static struct option long_options[] = {
+        {"auth", required_argument, 0, 'a'},
+        {"debug", required_argument, 0, 'd'},
+        {"tickets", required_argument, 0, 'i'},
+        {"verbose", no_argument, 0, 'l'},
+        {"quiet", no_argument, 0, 'q'},
+        {"timeout", required_argument, 0, 't'},
+        {"version", no_argument, 0, 'v'},
+        {"help", no_argument, 0, 'h'}};
+
+	while((c = getopt_long(argc, argv, "+a:d:hi:lt:v", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'a':
 			auth_register_byname(optarg);
