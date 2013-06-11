@@ -14,19 +14,12 @@ See the file COPYING for details.
 #include "memory_info.h"
 #include "stringtools.h"
 #include "username.h"
+#include "uptime.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/utsname.h>
-
-#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
-#include <sys/sysctl.h>
-#include <time.h>
-#else
-#include <sys/sysinfo.h>
-#endif
-
 
 #define DEFAULT_TYPE	"node"
 
@@ -80,22 +73,7 @@ int main(int argc, char *argv[]) {
 	load_average_get(load);
 	cpus = load_average_get_cpus();
 	memory_info_get(&memory_avail, &memory_total);
-#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)	
-	struct timeval boottime;
-	size_t len = sizeof(boottime);
-	int mib[2] = { CTL_KERN, KERN_BOOTTIME };
-	if( sysctl(mib, 2, &boottime, &len, NULL, 0) < 0 ) {
-		uptime = -1;
-	}
-	time_t bsec = boottime.tv_sec;
-	time_t csec = time(NULL);
-					
-	uptime = difftime(csec, bsec);
-#else
-	struct sysinfo info;
-	sysinfo(&info);
-	uptime = info.uptime;
-#endif
+	uptime = uptime_get();
 	username_get(owner);
 
 	buffer_printf(b, "type %s\nversion %d.%d.%d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nmemory_total %llu\nmemory_avail %llu\ncpus %d\nuptime %d\nowner %s\n",
