@@ -173,7 +173,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Enable file snapshot caching for all protocols.\n", "-F,--with-snapshots");
 	fprintf(stdout, " %-30s Disable following symlinks.\n", "-f,--no-follow-symlinks");
 	fprintf(stdout, " %-30s Fake this gid; Real gid stays the same.          (PARROT_GID)\n", "-G,--gid=<num>");
-	fprintf(stdout, " %-30s Disable use of helper library.\n", "-H,--no-libhelper");
+	fprintf(stdout, " %-30s Disable use of helper library.\n", "-H,--no-helper");
 	fprintf(stdout, " %-30s Show this screen.\n", "-h,--help");
 	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
 	fprintf(stdout, " %-30s Set the debug level output for the iRODS driver.\n", "-I,--debug-level-irods=<num>");
@@ -183,8 +183,8 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Use this file as a mountlist.             (PARROT_MOUNT_FILE)\n", "-m,--ftab-file=<file>");
 	fprintf(stdout, " %-30s Mount (redirect) /foo to /bar.         (PARROT_MOUNT_STRING)\n", "-M,--mount=/foo=/bar");
 	fprintf(stdout, " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
-	fprintf(stdout, " %-30s Send debugging messages to this file.     (PARROT_DEBUG_FILE)\n", "-o,--output-file=<file>");
-	fprintf(stdout, " %-30s Rotate debug files of this size.     (PARROT_DEBUG_FILE_SIZE)\n", "-O,--rotate-debug-max=<bytes>");
+	fprintf(stdout, " %-30s Send debugging messages to this file.     (PARROT_DEBUG_FILE)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Rotate debug files of this size.     (PARROT_DEBUG_FILE_SIZE)\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Use this proxy server for HTTP requests.         (HTTP_PROXY)\n", "-p,--proxy=<hst:p>");
 	fprintf(stdout, " %-30s Enable paranoid mode for identity boxing mode.\n", "-P,--paranoid");
 	fprintf(stdout, " %-30s Inhibit catalog queries to list /chirp.\n", "-Q,--no-chirp-catalog");
@@ -495,7 +495,7 @@ int main( int argc, char *argv[] )
 	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
 
 	struct option long_options[] = {
-		{"chirp-auth",  no_argument, 0, 'a'},
+		{"chirp-auth",  required_argument, 0, 'a'},
 		{"block-size", required_argument, 0, 'b'},
 		{"status-file", required_argument, 0, 'c'},
 		{"channel-auth", no_argument, 0, 'C'},
@@ -514,8 +514,8 @@ int main( int argc, char *argv[] )
 		{"tab-file", required_argument, 0, 'm'},
 		{"mount", required_argument, 0, 'M'},
 		{"hostname", required_argument, 0, 'N'},
-		{"output-file", required_argument, 0, 'o'},
-		{"rotate-debug-max", required_argument, 0, 'O'},
+		{"debug-file", required_argument, 0, 'o'},
+		{"debug-rotate-max", required_argument, 0, 'O'},
 		{"proxy", required_argument, 0, 'p'},
 		{"paranoid", no_argument, 0, 'P'},
 		{"no-chirp-catalog", no_argument, 0, 'Q'},
