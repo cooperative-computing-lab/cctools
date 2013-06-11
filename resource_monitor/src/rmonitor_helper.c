@@ -18,6 +18,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 #include <fcntl.h>
 #include <dlfcn.h>
 #include <sys/wait.h>
