@@ -426,23 +426,23 @@ void monitor_summary_header()
 	    fprintf(log_series, "# wall_clock and cpu_time in microseconds\n");
 	    fprintf(log_series, "# virtual, resident and swap memory in megabytes.\n");
 	    fprintf(log_series, "# footprint in megabytes.\n");
-	    fprintf(log_series, "# processes_so_far, cpu_time, bytes_read, and bytes_written show cummulative values.\n");
-	    fprintf(log_series, "# wall_clock, concurrent_processes, virtual, resident, swap, files, and footprint show values at the sample point.\n");
+	    fprintf(log_series, "# cpu_time, bytes_read, and bytes_written show cummulative values.\n");
+	    fprintf(log_series, "# wall_clock, max_concurrent_processes, virtual, resident, swap, files, and footprint show values at the sample point.\n");
 
 	    fprintf(log_series, "#");
-	    fprintf(log_series, "%19s", "wall_clock");
+	    fprintf(log_series,  "%-20s", "wall_clock");
 	    fprintf(log_series, " %20s", "cpu_time");
-	    fprintf(log_series, " %10s", "concurrent");
-	    fprintf(log_series, " %10s", "virtual");
-	    fprintf(log_series, " %10s", "resident");
-	    fprintf(log_series, " %10s", "swap");
-	    fprintf(log_series, " %20s", "bytes_read");
-	    fprintf(log_series, " %20s", "bytes_written");
+	    fprintf(log_series, " %25s", "max_concurrent_processes");
+	    fprintf(log_series, " %25s", "virtual_memory");
+	    fprintf(log_series, " %25s", "resident_memory");
+	    fprintf(log_series, " %25s", "swap_memory");
+	    fprintf(log_series, " %25s", "bytes_read");
+	    fprintf(log_series, " %25s", "bytes_written");
 
 	    if(resources_flags->workdir_footprint)
 	    {
-		    fprintf(log_series, " %10s", "files");
-		    fprintf(log_series, " %10s", "footprint");
+		    fprintf(log_series, " %25s", "workdir_num_files");
+		    fprintf(log_series, " %25s", "workdir_footprint");
 	    }
 
 	    fprintf(log_series, "\n");
@@ -483,19 +483,19 @@ void monitor_log_row(struct rmsummary *tr)
 {
 	if(log_series)
 	{
-		fprintf(log_series,  "%20" PRId64, tr->wall_time + summary->start);
+		fprintf(log_series,  "%-20" PRId64, tr->wall_time + summary->start);
 		fprintf(log_series, " %20" PRId64, tr->cpu_time);
-		fprintf(log_series, " %10" PRId64, tr->max_concurrent_processes);
-		fprintf(log_series, " %10" PRId64, tr->virtual_memory);
-		fprintf(log_series, " %10" PRId64, tr->resident_memory);
-		fprintf(log_series, " %10" PRId64, tr->swap_memory);
-		fprintf(log_series, " %20" PRId64, tr->bytes_read);
-		fprintf(log_series, " %20" PRId64, tr->bytes_written);
+		fprintf(log_series, " %25" PRId64, tr->max_concurrent_processes);
+		fprintf(log_series, " %25" PRId64, tr->virtual_memory);
+		fprintf(log_series, " %25" PRId64, tr->resident_memory);
+		fprintf(log_series, " %25" PRId64, tr->swap_memory);
+		fprintf(log_series, " %25" PRId64, tr->bytes_read);
+		fprintf(log_series, " %25" PRId64, tr->bytes_written);
 
 		if(resources_flags->workdir_footprint)
 		{
-			fprintf(log_series, " %10" PRId64, tr->workdir_num_files);
-			fprintf(log_series, " %10" PRId64, tr->workdir_footprint);
+			fprintf(log_series, " %25" PRId64, tr->workdir_num_files);
+			fprintf(log_series, " %25" PRId64, tr->workdir_footprint);
 		}
 
 		fprintf(log_series, "\n");
