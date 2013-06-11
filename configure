@@ -910,6 +910,7 @@ optional_include sys/statfs.h HAS_SYS_STATFS_H
 optional_include sys/statvfs.h HAS_SYS_STATVFS_H
 optional_include sys/xattr.h HAS_SYS_XATTR_H
 optional_include attr/xattr.h HAS_ATTR_XATTR_H
+optional_include fts.h HAS_FTS_H
 
 cctools_doctargets=
 

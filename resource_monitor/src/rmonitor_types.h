@@ -8,9 +8,10 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#ifdef HAS_FTS_H
 #include <fts.h>
-
-
+#endif
 
 #include "int_sizes.h"
 
