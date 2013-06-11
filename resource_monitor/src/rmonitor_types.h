@@ -9,6 +9,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#ifdef HAS_SYS_STATFS_H
+#include <sys/statfs.h>
+#endif
+
+#ifdef HAS_SYS_STATVFS_H
+#include <sys/statvfs.h>
+#endif
+
 #ifdef HAS_FTS_H
 #include <fts.h>
 #endif
