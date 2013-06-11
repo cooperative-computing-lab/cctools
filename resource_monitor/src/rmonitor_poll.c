@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <limits.h>
 
