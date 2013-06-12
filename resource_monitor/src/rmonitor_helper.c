@@ -139,7 +139,7 @@ FILE *fopen(const char *path, const char *mode)
 	FILE *file;
 	typeof(fopen) *original_fopen = dlsym(RTLD_NEXT, "fopen");
 
-	debug(D_DEBUG, "fopen from %d.\n", getpid());
+	debug(D_DEBUG, "fopen %s mode %s from %d.\n", path, mode, getpid());
 	file = original_fopen(path, mode);
 
 	if(file)
@@ -168,7 +168,7 @@ int open(const char *path, int flags, ...)
 	mode = va_arg(ap, int);
 	va_end(ap);
 
-	debug(D_DEBUG, "open from %d.\n", getpid());
+	debug(D_DEBUG, "open %s from %d.\n", path, getpid());
 	fd = original_open(path, flags, mode);
 
 	if(fd > -1)
@@ -184,6 +184,59 @@ int open(const char *path, int flags, ...)
 
 	return fd;
 }
+
+#if defined(__linux__) && defined(__USE_LARGEFILE64)
+FILE *fopen64(const char *path, const char *mode)
+{
+	FILE *file;
+	typeof(fopen64) *original_fopen64 = dlsym(RTLD_NEXT, "fopen64");
+	
+	debug(D_DEBUG, "fopen64 %s mode %s from %d.\n", path, mode, getpid());
+	file = original_fopen64(path, mode);
+	
+	if(file)
+	{
+		struct monitor_msg msg;
+			
+		msg.type   = OPEN;
+		msg.origin = getpid();
+		strcpy(msg.data.s, path);
+			
+		send_monitor_msg(&msg);
+	}
+	
+	return file;
+}
+
+int open64(const char *path, int flags, ...)
+{
+	va_list ap;
+	int     fd;
+	int     mode;
+	
+	typeof(open64) *original_open64 = dlsym(RTLD_NEXT, "open64");
+	
+	va_start(ap, flags);
+	mode = va_arg(ap, int);
+	va_end(ap);
+	
+	debug(D_DEBUG, "open64 %s from %d.\n", path, getpid());
+	fd = original_open64(path, flags, mode);
+	
+	if(fd > -1)
+	{
+		struct monitor_msg msg;
+			
+		msg.type   = OPEN;
+		msg.origin = getpid();
+		strcpy(msg.data.s, path);
+			
+		send_monitor_msg(&msg);
+	}
+	
+	return fd;
+}
+#endif /* defined linux && __USE_LARGEFILE64 */
 
 void wakeup_pselect_from_exit(int signum)
 {
