@@ -28,16 +28,16 @@ LINK(Chirp User's Manual,http://www.nd.edu/~ccl/software/manuals/chirp.html).
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_PAIR(-a,flag)Require this authentication mode.
-OPTION_PAIR(-b,bytes)Block size for network I/O. (default is 65536s)
-OPTION_PAIR(-d,flag)Enable debugging for this subsystem.
-OPTION_ITEM(-D)Disable small file optimizations such as recursive delete.
-OPTION_ITEM(-f)Run in foreground for debugging.
-OPTION_ITEM(-h)Give help information.
-OPTION_PAIR(-m,option)Pass mount option to FUSE. Can be specified multiple times.
-OPTION_PAIR(-o,file)Send debugging output to this file.
-OPTION_PAIR(-t,timeout)Timeout for network operations. (default is 60s)
-OPTION_ITEM(-v)Show program version.
+OPTION_TRIPLET(-a, auth,flag)Require this authentication mode.
+OPTION_TRIPLET(-b,block-size,bytes)Block size for network I/O. (default is 65536s)
+OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
+OPTION_ITEM(`-D, --no-optimize')Disable small file optimizations such as recursive delete.
+OPTION_ITEM(`-f, --foreground')Run in foreground for debugging.
+OPTION_ITEM(`-h, --help')Give help information.
+OPTION_TRIPLET(-m,mount-options,option)Pass mount option to FUSE. Can be specified multiple times.
+OPTION_TRIPLET(-o,debug-file,file)Send debugging output to this file.
+OPTION_TRIPLET(-t,timeout,timeout)Timeout for network operations. (default is 60s)
+OPTION_ITEM(`-v, --version')Show program version.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)

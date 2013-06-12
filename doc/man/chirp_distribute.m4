@@ -16,19 +16,19 @@ BOLD(chirp_distribute) also can clean up replicated data using -X option.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(-X)Delete data from all of the target hosts.
-OPTION_ITEM(-D)Show detailed location, time, and performance of each transfer.
-OPTION_ITEM(-Y)Show confirmation of successful placements.
-OPTION_PAIR(-F,file)Write matrix of failures to this file.
-OPTION_PAIR(-T,time)Overall timeout for entire distribution. (default is 3600).
-OPTION_ITEM(-R)Randomize order of target hosts given on command line.
-OPTION_PAIR(-N,num)Stop after this number of successful copies.
-OPTION_PAIR(-t,time)Timeout for for each copy. (default is 3600s)
-OPTION_PAIR(-p,num)Maximum number of processes to run at once (default=100)
-OPTION_PAIR(-a,mode)Require this authentication mode.
-OPTION_PAIR(-d,subsystem)Enable debugging for this subsystem.
-OPTION_ITEM(-v)Show program version.
-OPTION_ITEM(-h)Show help text.
+OPTION_ITEM(`-X, --delete-target')Delete data from all of the target hosts.
+OPTION_ITEM(`-D, --info-transfer')Show detailed location, time, and performance of each transfer.
+OPTION_ITEM(`-Y, --info-success')Show confirmation of successful placements.
+OPTION_TRIPLET(-F,failures-file,file)Write matrix of failures to this file.
+OPTION_TRIPLET(-T,timeout-all,time)Overall timeout for entire distribution. (default is 3600).
+OPTION_ITEM(`-R, --randomize-hosts')Randomize order of target hosts given on command line.
+OPTION_TRIPLET(-N, copies-max,num)Stop after this number of successful copies.
+OPTION_TRIPLET(-t,timeout,time)Timeout for for each copy. (default is 3600s)
+OPTION_TRIPLET(-p,jobs,num)Maximum number of processes to run at once (default=100)
+OPTION_TRIPLET(-a,auth,flag)Require this authentication mode.
+OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
+OPTION_ITEM(`-v, --verbose')Show program version.
+OPTION_ITEM(`-h, --help')Show help text.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)

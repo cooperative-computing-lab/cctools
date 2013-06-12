@@ -567,7 +567,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Disable small file optimizations such as recursive delete.\n", "-D,--no-optimize");
 	fprintf(stdout, " %-30s Run in foreground for debugging.\n", "-f,--foreground");
 	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
-	fprintf(stdout, " %-30s Mount options passed to FUSE.\n", "-m,-mount-options=<options>");
+	fprintf(stdout, " %-30s Mount options passed to FUSE.\n", "-m,--mount-options=<options>");
 	fprintf(stdout, " %-30s Send debugging output to this file.\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Timeout for network operations. (default is %ds)\n", "-t,--timeout=<timeout>", chirp_fuse_timeout);
 	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");

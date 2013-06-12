@@ -18,17 +18,17 @@ When using CODE(chirp_status) with long form option (-l), it lists additional in
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_PAIR(-c,host)Query the catalog on this host.
-OPTION_PAIR(-d,subsystem)Enable debugging for this subsystem.
-OPTION_PAIR(-o,file)Send debugging output to this file.
-OPTION_PAIR(-O,bytes)Rotate file once it reaches this size.
-OPTION_PAIR(-A,size)Only show servers with this space available. (example: -A 100MB).
-OPTION_PAIR(-t,time)Timeout.
-OPTION_ITEM(-s)Short output.
-OPTION_ITEM(-l)Long output.
-OPTION_ITEM(-T)Totals output.
-OPTION_ITEM(-v)Show program version.
-OPTION_ITEM(-h)Show help text.
+OPTION_TRIPLET(-c,catalog,host)Query the catalog on this host.
+OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
+OPTION_TRIPLET(-o,debug-file,file)Send debugging output to this file.
+OPTION_TRIPLET(-O,debug-rotate-max,bytes)Rotate file once it reaches this size.
+OPTION_TRIPLET(-A,server-space,size)Only show servers with this space available. (example: -A 100MB).
+OPTION_TRIPLET(-t,timeout,time)Timeout.
+OPTION_ITEM(`-s, --brief')Short output.
+OPTION_ITEM(`-l, --verbose')Long output.
+OPTION_ITEM(`-T, --totals')Totals output.
+OPTION_ITEM(`-v, --version')Show program version.
+OPTION_ITEM(`-h, --help')Show help text.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)
