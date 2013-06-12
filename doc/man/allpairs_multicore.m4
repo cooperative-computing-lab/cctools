@@ -26,12 +26,12 @@ please refer to the MANPAGE(allpairs_master,1) utility.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_PAIR(-b, items)Block size: number of items to hold in memory at once. (default: 50% of RAM)
-OPTION_PAIR(-c, cores)Number of cores to be used. (default: # of cores in machine)
-OPTION_PAIR(-e, args)Extra arguments to pass to the comparison program.
-OPTION_PAIR(-d, flag)Enable debugging for this subsystem.
-OPTION_ITEM(-v)Show program version.
-OPTION_ITEM(-h)Display this message.
+OPTION_TRIPLET(-b, block-size, items)Block size: number of items to hold in memory at once. (default: 50% of RAM)
+OPTION_TRIPLET(-c, cores, cores)Number of cores to be used. (default: # of cores in machine)
+OPTION_TRIPLET(-e, extra-args, args)Extra arguments to pass to the comparison program.
+OPTION_TRIPLET(-d, debug, flag)Enable debugging for this subsystem.
+OPTION_ITEM(`-v, --version')Show program version.
+OPTION_ITEM(`-h, --help')Display this message.
 OPTIONS_END
 
 SECTION(EXIT STATUS)
