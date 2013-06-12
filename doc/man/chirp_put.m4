@@ -16,13 +16,13 @@ BOLD(chirp_put) is a quick and simple way to copy a single local file PARAM(loca
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_PAIR(-a,mode)Require this authentication mode.
-OPTION_PAIR(-d,subsystem)Enable debugging for this subsystem.
-OPTION_PAIR(-b,size)Set transfer buffer size. (default is 65536 bytes).
-OPTION_PAIR(-t,time)Timeout for failure. (default is 3600s)
-OPTION_ITEM(-f)Follow input file like tail -f.
-OPTION_ITEM(-v)Show program version.
-OPTION_ITEM(-h)Show help text.
+OPTION_TRIPLET(-a,auth, flag)Require this authentication mode.
+OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
+OPTION_TRIPLET(-b,block-size,size)Set transfer buffer size. (default is 65536 bytes).
+OPTION_TRIPLET(-t,timeout, time)Timeout for failure. (default is 3600s)
+OPTION_ITEM(`-f, --follow')Follow input file like tail -f.
+OPTION_ITEM(`-v, --version')Show program version.
+OPTION_ITEM(`-h, --help')Show help text.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)
