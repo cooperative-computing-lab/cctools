@@ -26,15 +26,17 @@ See the file COPYING for details.
 void show_help(const char *cmd) {
 	fprintf(stdout, "Use: %s [options] <name=value> ...\n", cmd);
 	fprintf(stdout, "where options are:\n");
-	fprintf(stdout, " -c <catalog>\n");
+	fprintf(stdout, " -c,--catalog=<catalog>\n");
 }
 
 int main(int argc, char *argv[]) {
 	char *host = CATALOG_HOST;
 	int   port = CATALOG_PORT;
 
+	static struct option long_options[] = {{"catalog", required_argument, 0, 'c'}};
+
 	signed int c;
-	while ((c = getopt(argc, argv, "c:")) > -1) {
+	while ((c = getopt_long(argc, argv, "c:", long_options, NULL)) > -1) {
 		switch (c) {
 			case 'c':
 				host = optarg;

@@ -18,17 +18,22 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
-static void show_use(const char *cmd)
+static void show_help(const char *cmd)
 {
-	fprintf(stderr, "Use: %s [options]\n", cmd);
-	fprintf(stderr, "Where options are:\n");
-	fprintf(stderr, " -a <type> Allow this auth type\n");
-	fprintf(stderr, " -p <num>  Port number\n");
-	fprintf(stderr, " -r <host> Remote host\n");
-	fprintf(stderr, " -d <flag> Debugging\n");
-	fprintf(stderr, "Where debug flags arg: ");
+	fprintf(stdout, "Use: %s [options]\n", cmd);
+	fprintf(stdout, "Where options are:\n");
+	fprintf(stdout, " %-30s This message\n", "-h,--help=<flag>");
+	fprintf(stdout, " %-30s Debugging\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Write debug information to this file\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Rotate debug files of this size\n", "-O,--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s Allow this auth type\n", "-a,--auth=<type>");
+	fprintf(stdout, " %-30s Port number\n", "-p,--port=<num>");
+	fprintf(stdout, " %-30s Remote host\n", "-r,--host=<host>");
+	fprintf(stdout, "Where debug flags arg: ");
+
 	debug_flags_print(stderr);
-	fprintf(stderr, "\n");
+
+	fprintf(stdout, "\n");
 }
 
 
@@ -45,10 +50,24 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:p:r:d:o:O:")) > -1) {
+	static struct option long_options[] = {
+		{"auth", required_argument, 0, 'a'},
+		{"port", required_argument, 0, 'p'},
+		{"host", required_argument, 0, 'r'},
+		{"help", required_argument, 0, 'h'},
+		{"debug-file", required_argument, 0, 'o'},
+		{"debug-rotate-max", required_argument, 0, 'O'},
+		{"debug", required_argument, 0, 'd'}
+	};
+
+	while((c = getopt_long(argc, argv, "a:p:r:d:o:O:", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'p':
 			portnum = atoi(optarg);
+			break;
+		case 'h':
+			show_help(argv[0]);
+			exit(0);
 			break;
 		case 'r':
 			hostname = optarg;
@@ -69,6 +88,7 @@ int main(int argc, char *argv[])
 		default:
 			show_use(argv[0]);
 			exit(1);
+			break;
 		}
 	}
 
