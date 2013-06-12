@@ -78,18 +78,33 @@ include_package_doc="doc"
 
 work_queue_bindings=""
 
+echo "checking for package compatibility..."
+
 if [ -d parrot -a $build_sys = LINUX ]
 then
 	if [ $build_cpu = I386 -o $build_cpu = X86_64 ]
 	then
-		echo "including parrot, because this system is $build_sys and $build_cpu"
+		echo "parrot IS supported on ${build_sys} ${build_cpu}"
 		include_package_parrot="parrot"
 	else
-		echo "skipping parrot, because this cpu is ${build_cpu}, not I386"
+		echo "parrot is NOT supported on ${build_sys} ${build_cpu}"
 		include_package_parrot=""
 	fi
 else
-	echo "skipping parrot, because this system is ${build_sys}, not LINUX"
+	echo "parrot is NOT supported on ${build_sys} for any cpu type"
+	include_package_parrot=""
+fi
+
+if [ -d resource_monitor ]
+then
+	if [ $build_sys = LINUX -o $build_sys = DARWIN ]
+	then
+		echo "resource_monitor IS supported on ${build_sys}"
+		include_package_resource_monitor="resource_monitor"
+	else
+		echo "resource_monitor is NOT (yet) supported on ${build_sys}"
+		include_package_resource_monitor=""
+	fi
 fi
 
 install_path="$HOME/cctools"
