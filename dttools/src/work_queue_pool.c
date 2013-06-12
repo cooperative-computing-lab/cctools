@@ -215,7 +215,7 @@ void set_pool_name(char *pool_name, size_t size) {
 	domain_name_cache_guess(hostname);
 	pid = getpid();
 
-	snprintf(pool_name, size, "%s-%d", hostname, pid);
+	snprintf(pool_name, size, "%s-%d", hostname, (int)pid);
 }
 
 void destroy_pool_config(struct pool_config **ppc) {
@@ -1578,7 +1578,7 @@ int main(int argc, char *argv[])
 			return EXIT_FAILURE;
 		}
 
-		if(fprintf(fp, "%d\n", pid) < 0) {
+		if(fprintf(fp, "%d\n",(int)pid) < 0) {
 			fprintf(stderr, "Error: failed to write pid to file - '%s'.\n", pidfile_path); 
 			fclose(fp);
 			unlink(pidfile_path);
