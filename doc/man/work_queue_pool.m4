@@ -38,21 +38,25 @@ SECTION(OPTIONS)
 
 SUBSECTION(Batch Options)
 OPTIONS_BEGIN
-OPTION_PAIR(-d, subsystem)Enable debugging for this subsystem.
-OPTION_PAIR(-S, scratch)Scratch directory. (default is /tmp/${USER}-workers)
-OPTION_PAIR(-T, type)Batch system type: unix, condor, sge, workqueue, xgrid. (default is unix)
-OPTION_PAIR(-r, count)Number of attemps to retry if failed to submit a worker.
-OPTION_PAIR(-W, path)Path to the MANPAGE(work_queue_worker,1) executable.
-OPTION_ITEM(-h)Show this screen.
+OPTION_TRIPLET(-d, debug, flag)Enable debugging for this subsystem.
+OPTION_TRIPLET(-S, scratch, file)Scratch directory. (default is /tmp/${USER}-workers)
+OPTION_TRIPLET(-T, batch-type, type)Batch system type: unix, condor, sge, workqueue, xgrid. (default is unix)
+OPTION_TRIPLET(-r, retry, count)Number of attemps to retry if failed to submit a worker.
+OPTION_TRIPLET(-W, worker-executable, path)Path to the MANPAGE(work_queue_worker,1) executable.
+OPTION_TRIPLET(-m, workers-per-job, count)Each batch job will start <count> local workers. (default is 1)
+OPTION_ITEM(`-A, --auto-pool-feature')Enable auto worker pool feature.
+OPTION_ITEM(`-q, --one-shot')Gurantee <count> running workers and quit. The workers would terminate after their idle timeouts unless the user explicitly shuts them down.
+OPTION_ITEM(`-h, --help')Show this screen.
 OPTIONS_END
 
 SUBSECTION(Worker Options)
 OPTIONS_BEGIN
-OPTION_ITEM(-a)Enable auto mode. In this mode the workers would ask a catalog server for available masters.
-OPTION_PAIR(-t, time)Abort after this amount of idle time.
-OPTION_PAIR(-C, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT 
-OPTION_PAIR(-N, project)Name of a preferred project. A worker can have multiple preferred projects.
-OPTION_PAIR(-o, file)Send debugging to this file.
+OPTION_ITEM(`-a, --advertise')Enable auto mode. In this mode the workers would ask a catalog server for available masters.
+OPTION_TRIPLET(-t, timeout, time)Abort after this amount of idle time.
+OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
+OPTION_TRIPLET(-M, master-name, project)Name of a preferred project. A worker can have multiple preferred projects.
+OPTION_TRIPLET(-o, debug-file, file)Send debugging to this file.
+OPTION_ITEM(`-E, --extra-options')Extra options that should be added to the worker.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

@@ -1752,7 +1752,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s as <name>.\n", "");
 	fprintf(stdout, " %-30s Password file for authenticating to the master.\n", "-P,--password=<pwfile>");
 	fprintf(stdout, " %-30s Abort after this amount of idle time. (default=%ds)\n", "-t,--timeout=<time>", idle_timeout);
-	fprintf(stdout, " %-30s Set TCP window size.\n", "-w,-tcp-window-size=<size>");
+	fprintf(stdout, " %-30s Set TCP window size.\n", "-w,--tcp-window-size=<size>");
 	fprintf(stdout, " %-30s Set initial value for backoff interval when worker fails to connect\n", "-i,--min-backoff=<time>");
 	fprintf(stdout, " %-30s to a master. (default=%ds)\n", "", init_backoff_interval);
 	fprintf(stdout, " %-30s Set maximum value for backoff interval when worker fails to connect\n", "-b,--max-backoff=<time>");
