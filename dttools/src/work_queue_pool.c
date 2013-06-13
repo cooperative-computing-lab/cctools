@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 #include "list.h"
 #include "get_line.h"
+#include "getopt.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -1290,32 +1291,41 @@ static void show_help(const char *cmd)
          wq += 4;
     }
 
-	printf("Use: %s [options] <count>\n", cmd);
-	printf("where batch options are:\n");
-	printf("  -d <subsystem> Enable debugging for this subsystem.\n");
-	printf("  -l <path>      Log work_queue_pool status to a file whose path is <path>.\n");
-	printf("  -S <scratch>   Scratch directory. (default is /tmp/${USER}-workers)\n");
+    fprintf(stdout, "Use: %s [options] <count>\n", cmd);
+    fprintf(stdout, "where batch options are:\n");
+    fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
+    fprintf(stdout, " %-30s Log work_queue_pool status to a file whose path is <path>.\n", "-l,--logfile=<path>");
+    fprintf(stdout, " %-30s Scratch directory. (default is /tmp/${USER}-workers)\n", "-S,--scratch=<path>");
 
+    fprintf(stdout, " %-30s Batch system type. One of: (default is local)\n", "-T,--batch-type=<type>");
     if(wq)
-        printf("  -T <type>      Batch system type: %s%s. (default is local)\n",queue_types, wq);
+	    fprintf(stdout, " %-30s %s%s\n", "", queue_types, wq);
     else
-        printf("  -T <type>      Batch system type: %s. (default is local)\n",queue_types);
+	    fprintf(stdout, " %-30s %s\n", "", queue_types);
 
-	printf("  -r <count>     Number of attemps to retry if failed to submit a worker.\n");
-	printf("  -m <count>     Each batch job will start <count> local workers. (default is 1.)\n");
-	printf("  -W <path>      Path to the work_queue_worker executable.\n");
-	printf("  -A             Enable auto worker pool feature (experimental).\n");
-	printf("  -c <path>      Path to the work_queue_pool configuration file (default is work_queue_pool.conf). This option is only effective when '-A' is present.\n");
-	printf("  -q             Guarantee <count> running workers and quit. The workers would terminate after their idle timeouts unless the user explicitly shut them down. The user needs to manually delete the scratch directory, which is displayed on screen right before work_queue_pool exits. \n");
-	printf("  -h             Show this screen.\n");
-	printf("\n");
-	printf("where worker options are:\n");
-	printf("  -a             Enable auto mode. In this mode the workers would ask a catalog server for available masters.\n");
-	printf("  -t <time>      Abort after this amount of idle time.\n");
-	printf("  -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	printf("  -N <project>   Name of a preferred project. A worker can have multiple preferred projects.\n");
-	printf("  -o <file>      Send worker debugging output to this file.\n");
-	printf("  -E <options>   Extra options that should be added to the worker.\n");
+    fprintf(stdout, " %-30s Number of attemps to retry if failed to submit a worker.\n", "-r,--retry=<count>");
+    fprintf(stdout, " %-30s Each batch job will start <count> local workers. (default is 1.)\n", "-m,--workers-per-job=<count>");
+    fprintf(stdout, " %-30s Path to the work_queue_worker executable.\n", "-W,--worker-executable=<path>");
+    fprintf(stdout, " %-30s Enable auto worker pool feature.\n", "-A,--auto-pool-feature");
+    fprintf(stdout, " %-30s Path to the work_queue_pool configuration file. This option is only\n", "-c,--config=<path>");
+    fprintf(stdout, " %-30s effective when '-A' is present. (default is work_queue_pool.conf)\n", "");
+    fprintf(stdout, " %-30s Enable auto mode. In this mode the workers would ask a catalog\n", "-a,--advertise");
+    fprintf(stdout, " %-30s Guarantee <count> running workers and quit. The workers would terminate\n", "-q,--one-shot");
+    fprintf(stdout, " %-30s after their idle timeouts unless the user explicitly shut them down.\n", "");
+    fprintf(stdout, " %-30s The user needs to manually delete the scratch directory, which is.\n", "");
+    fprintf(stdout, " %-30s displayed on screen right before work_queue_pool exits.\n", "");
+    fprintf(stdout, " %-30s Show this screen.\n", "-h,--help");
+
+    fprintf(stdout, "\nwhere worker options are:\n");
+
+    fprintf(stdout, " %-30s server for available masters. (depreacate, implied by -M).\n", "");
+    fprintf(stdout, " %-30s Abort after this amount of idle time.\n", "-t,--timeout=<time>");
+    fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog=<catalog>");
+    fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-M,--master-name=<project>");
+    fprintf(stdout, " %-30s projects.\n", "");
+    fprintf(stdout, " %-30s Same as -M,--master-name (deprecated).\n", "-N");
+    fprintf(stdout, " %-30s Send worker debugging output to this file.\n", "-o,--debug-file=<file>");
+    fprintf(stdout, " %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
 }
 
 int main(int argc, char *argv[])
@@ -1389,7 +1399,28 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "aAc:C:d:E:hm:l:L:N:o:O:Pqr:S:t:T:vW:")) > -1) {
+	static struct option long_options[] = {
+		{"debug", required_argument, 0, 'd'},
+		{"logfile", required_argument, 0, 'l'},
+		{"scratch", required_argument, 0, 'S'},
+		{"batch-type", required_argument, 0, 'T'},
+		{"retry", required_argument, 0, 'r'},
+		{"workers-per-job", required_argument, 0, 'm'},
+		{"worker-executable", required_argument, 0, 'W'},
+		{"auto-pool-feature", no_argument,       0, 'A'},
+		{"config", required_argument, 0, 'c'},
+		{"advertise", no_argument,       0, 'a'},
+		{"timeout", required_argument, 0, 't'},
+		{"catalog", required_argument, 0, 'C'},
+		{"master-name", required_argument, 0, 'M'},
+		{"debug-file", required_argument, 0, 'o'},
+		{"extra-options", required_argument, 0, 'E'},
+		{"version", no_argument, 0, 'v'},
+		{"help", no_argument, 0, 'h'},
+		{0,0,0,0}
+	};
+
+	while((c = getopt_long(argc, argv, "aAc:C:d:E:hm:l:L:N:o:O:Pqr:S:t:T:vW:", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'a':
 			strcat(worker_args, " -a");
@@ -1414,6 +1445,7 @@ int main(int argc, char *argv[])
 			strcat(extra_worker_args, optarg); 
 			break;
 		case 'N':
+		case 'M':
 			strcat(worker_args, " -N ");
 			strcat(worker_args, optarg);
 			list_push_tail(regex_list, strdup(optarg));
@@ -1496,6 +1528,8 @@ int main(int argc, char *argv[])
 			cctools_version_print(stdout, argv[0]);
 			exit(EXIT_SUCCESS);
 		case 'h':
+			show_help(argv[0]);
+			exit(EXIT_SUCCESS);
 		default:
 			show_help(argv[0]);
 			return EXIT_FAILURE;

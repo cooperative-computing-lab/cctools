@@ -114,7 +114,8 @@ int main(int argc, char *argv[])
         {"verbose", no_argument, 0, 'l'},
         {"totals", no_argument, 0, 'T'},
         {"version", no_argument, 0, 'v'},
-        {"help", no_argument, 0, 'h'}};
+        {"help", no_argument, 0, 'h'},
+        {0,0,0,0}};
 
 	while((c = getopt_long(argc, argv, "aA:c:d:t:o:O:sTlvh", long_options, NULL)) > -1) {
 		switch (c) {

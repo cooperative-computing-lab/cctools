@@ -222,7 +222,8 @@ int main(int argc, char *argv[])
         {"version", no_argument, 0, 'v'},
         {"delete-target", no_argument, 0, 'X'},
         {"info-success", no_argument, 0, 'Y'},
-        {"help", no_argument, 0, 'h'} };
+        {"help", no_argument, 0, 'h'},
+        {0,0,0,0}};
 
 	while(((c = getopt_long(argc, argv, "a:d:DF:i:N:p:Rt:T:vXYh", long_options, NULL)) > -1)) {
 		switch (c) {

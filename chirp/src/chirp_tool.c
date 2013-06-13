@@ -1112,7 +1112,8 @@ int main(int argc, char *argv[])
         {"quiet", no_argument, 0, 'q'},
         {"timeout", required_argument, 0, 't'},
         {"version", no_argument, 0, 'v'},
-        {"help", no_argument, 0, 'h'}};
+        {"help", no_argument, 0, 'h'},
+        {0,0,0,0}};
 
 	while((c = getopt_long(argc, argv, "+a:d:hi:lt:v", long_options, NULL)) > -1) {
 		switch (c) {

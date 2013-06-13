@@ -1728,40 +1728,51 @@ static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] <masterhost> <port>\n", cmd);
 	fprintf(stdout, "where options are:\n");
-	fprintf(stdout, " -a                      Enable auto mode. In this mode the worker\n");
-	fprintf(stdout, "                         would ask a catalog server for available masters.\n");
-	fprintf(stdout, " -C <catalog>            Set catalog server to <catalog>. Format: HOSTNAME:PORT \n");
-	fprintf(stdout, " -d <subsystem>          Enable debugging for this subsystem.\n");
-	fprintf(stdout, " -o <file>               Send debugging to this file.\n");
-	fprintf(stdout, " --debug-file-size       Set the maximum size of the debug log (default 10M, 0 disables).\n");
-	fprintf(stdout, " --debug-release-reset   Debug file will be closed, renamed, and a new one opened after being released from a master.\n");
-	fprintf(stdout, " --foreman               Set worker to run as a foreman.\n");
-	fprintf(stdout, " -f, --foreman-port <port>[:<highport>]\n");
-	fprintf(stdout, "                         Set the port for the foreman to listen on.  If <highport> is specified\n");
-	fprintf(stdout, "                         the port is chosen from the range port:highport.  Implies --foreman.\n");
-	fprintf(stdout, " -c, --measure-capacity  Enable the measurement of foreman capacity to handle new workers (default=disabled).\n");
-	fprintf(stdout, " -F, --fast-abort <mult> Set the fast abort multiplier for foreman (default=disabled).\n");
-	fprintf(stdout, " --specify-log <logfile> Send statistics about foreman to this file.\n");
-	fprintf(stdout, " -M,\n"); 
-	fprintf(stdout, " --master-name <name>    Name of a preferred project. A worker can have multiple preferred projects.\n");
-	fprintf(stdout, " -N,\n");
-	fprintf(stdout, " --name <name>           When in Foreman mode, this foreman will advertise to the catalog server as <name>.\n");
-	fprintf(stdout, " -P,--password <pwfile>  Password file for authenticating to the master.\n");
-	fprintf(stdout, " -t <time>               Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
-	fprintf(stdout, " -w <size>               Set TCP window size.\n");
-	fprintf(stdout, " -i <time>               Set initial value for backoff interval when worker fails to connect to a master. (default=%ds)\n", init_backoff_interval);
-	fprintf(stdout, " -b <time>               Set maxmimum value for backoff interval when worker fails to connect to a master. (default=%ds)\n", max_backoff_interval);
-	fprintf(stdout, " -z <size>               Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=%" PRIu64 "MB)\n", disk_avail_threshold);
-	fprintf(stdout, " -A <arch>               Set architecture string for the worker to report to master instead of the value in uname (%s).\n", arch_name);
-	fprintf(stdout, " -O <os>                 Set operating system string for the worker to report to master instead of the value in uname (%s).\n", os_name);
-	fprintf(stdout, " -s <path>               Set the location for creating the working directory of the worker.\n");
-	fprintf(stdout, " -v                      Show version string\n");
-	fprintf(stdout, " --volatility <chance>   Set the percent chance a worker will decide to shut down every minute.\n");
-	fprintf(stdout, " --bandwidth <mult>      Set the multiplier for how long outgoing and incoming data transfers will take.\n");
-	fprintf(stdout, " --cores <n>             Set the number of cores reported by this worker.  Set to 0 to have the worker automatically measure. (default=%d)\n", manual_cores_option);
-	fprintf(stdout, " --memory <mb>           Manually set the amonut of memory (in MB) reported by this worker.\n");
-	fprintf(stdout, " --disk   <mb>           Manually set the amount of disk (in MB) reported by this worker.\n");
-	fprintf(stdout, " -h                      Show this help screen\n");
+	fprintf(stdout, " %-30s Enable auto mode. In this mode the worker\n", "-a,--advertise");
+	fprintf(stdout, " %-30s would ask a catalog server for available masters.\n", "");
+	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog=<catalog>");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
+	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n", "--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s Debug file will be closed, renamed, and a new one opened after being.\n", "--debug-release-reset");
+	fprintf(stdout, " %-30s released from a master.\n", "");
+	fprintf(stdout, " %-30s Set worker to run as a foreman.\n", "--foreman");
+	fprintf(stdout, " %-30s\n", "-f,");
+	fprintf(stdout, " %-30s\n", "--foreman-port=<port>[:<highport>]");
+	fprintf(stdout, " %-30s Set the port for the foreman to listen on.  If <highport> is specified\n", "");
+	fprintf(stdout, " %-30s the port is chosen from the range port:highport.  Implies --foreman.\n", "");
+	fprintf(stdout, " %-30s Enable the measurement of foreman capacity to handle new workers.\n","-c,--measure-capacity");
+	fprintf(stdout, " %-30s (default=disabled).\n", "");
+	fprintf(stdout, " %-30s Set the fast abort multiplier for foreman (default=disabled).\n", "-F,--fast-abort=<mult>");
+	fprintf(stdout, " %-30s Send statistics about foreman to this file.\n", "--specify-log=<logfile>");
+	fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-M,--master-name=<name>"); 
+	fprintf(stdout, " %-30s projects.\n", ""); 
+	
+	fprintf(stdout, " %-30s When in Foreman mode, this foreman will advertise to the catalog server\n", "-N,--name=<name>");
+	fprintf(stdout, " %-30s as <name>.\n", "");
+	fprintf(stdout, " %-30s Password file for authenticating to the master.\n", "-P,--password=<pwfile>");
+	fprintf(stdout, " %-30s Abort after this amount of idle time. (default=%ds)\n", "-t,--timeout=<time>", idle_timeout);
+	fprintf(stdout, " %-30s Set TCP window size.\n", "-w,-tcp-window-size=<size>");
+	fprintf(stdout, " %-30s Set initial value for backoff interval when worker fails to connect\n", "-i,--min-backoff=<time>");
+	fprintf(stdout, " %-30s to a master. (default=%ds)\n", "", init_backoff_interval);
+	fprintf(stdout, " %-30s Set maximum value for backoff interval when worker fails to connect\n", "-b,--max-backoff=<time>");
+	fprintf(stdout, " %-30s to a master. (default=%ds)\n", "", max_backoff_interval);
+	fprintf(stdout, " %-30s Set available disk space threshold (in MB). When exceeded worker will\n", "-z,--disk-threshold=<size>");
+	fprintf(stdout, " %-30s clean up and reconnect. (default=%" PRIu64 "MB)\n", "", disk_avail_threshold);
+	fprintf(stdout, " %-30s Set architecture string for the worker to report to master instead\n", "-A,--arch=<arch>");
+	fprintf(stdout, " %-30s of the value in uname (%s).\n", "", arch_name);
+	fprintf(stdout, " %-30s Set operating system string for the worker to report to master instead\n", "-O,--os=<os>");
+	fprintf(stdout, " %-30s of the value in uname (%s).\n", "", os_name);
+	fprintf(stdout, " %-30s Set the location for creating the working directory of the worker.\n", "-s,--workdir=<path>");
+	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
+	fprintf(stdout, " %-30s Set the percent chance a worker will decide to shut down every minute.\n", "--volatility=<chance>");
+	fprintf(stdout, " %-30s Set the multiplier for how long outgoing and incoming data transfers\n", "--bandwidth=<mult>");
+	fprintf(stdout, " %-30s take.\n", "");
+	fprintf(stdout, " %-30s Set the number of cores reported by this worker.  Set to 0 to have the\n", "--cores=<n>");
+	fprintf(stdout, " %-30s worker automatically measure. (default=%d)\n", "", manual_cores_option);
+	fprintf(stdout, " %-30s Manually set the amonut of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
+	fprintf(stdout, " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
+	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
 }
 
 static void check_arguments(int argc, char **argv) {
@@ -1815,32 +1826,41 @@ static int setup_workspace() {
 	return 1;
 }
 
-#define LONG_OPT_DEBUG_FILESIZE 'z'+1
-#define LONG_OPT_VOLATILITY     'z'+2
-#define LONG_OPT_BANDWIDTH      'z'+3
-#define LONG_OPT_DEBUG_RELEASE  'z'+4
-#define LONG_OPT_SPECIFY_LOG    'z'+5
-#define LONG_OPT_CORES          'z'+6
-#define LONG_OPT_MEMORY         'z'+7
-#define LONG_OPT_DISK           'z'+8
-#define LONG_OPT_FOREMAN        'z'+9
+
+enum {LONG_OPT_DEBUG_FILESIZE = 1, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
+      LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
+      LONG_OPT_DISK, LONG_OPT_FOREMAN};
 
 struct option long_options[] = {
+	{"advertise",           no_argument,        0,  'a'},
+	{"catalog",             required_argument,  0,  'C'},
+	{"debug",               required_argument,  0,  'd'},
+	{"debug-file",          required_argument,  0,  'o'},
+	{"debug-rotate-max",    required_argument,  0,  LONG_OPT_DEBUG_FILESIZE},
+	{"debug-release-reset", no_argument,        0,  LONG_OPT_DEBUG_RELEASE},
+	{"foreman",             no_argument,        0,  LONG_OPT_FOREMAN},
+	{"foreman-port",        required_argument,  0,  'f'},
+	{"measure-capacity",    no_argument,        0,  'c'},
+	{"fast-abort",          required_argument,  0,  'F'},
+	{"specify-log",         required_argument,  0,  LONG_OPT_SPECIFY_LOG},
+	{"master-name",         required_argument,  0,  'M'},
+	{"name",                required_argument,  0,  'N'},
 	{"password",            required_argument,  0,  'P'},
-	{"debug-file-size",     required_argument,  0,   LONG_OPT_DEBUG_FILESIZE},
-	{"volatility",          required_argument,  0,   LONG_OPT_VOLATILITY},
-	{"bandwidth",           required_argument,  0,   LONG_OPT_BANDWIDTH},
-	{"debug-release-reset", no_argument,        0,   LONG_OPT_DEBUG_RELEASE},
-	{"measure-capacity",    no_argument,        0,   'c'},
-	{"fast-abort",          required_argument,  0,   'F'},
-	{"specify-log",         required_argument,  0,   LONG_OPT_SPECIFY_LOG},
-	{"cores",               required_argument,  0,   LONG_OPT_CORES},
-	{"memory",              required_argument,  0,   LONG_OPT_MEMORY},
-	{"disk",                required_argument,  0,   LONG_OPT_DISK},
-	{"foreman",             no_argument,        0,   LONG_OPT_FOREMAN},
-	{"foreman-port",        required_argument,  0,   'f'},
-	{"name",                required_argument,  0,   'N'},
-	{"master-name",         required_argument,  0,   'M'},
+	{"timeout",             required_argument,  0,  't'},
+	{"tcp-window-size",     required_argument,  0,  'w'},
+	{"min-backoff",         required_argument,  0,  'i'},
+	{"max-mackoff",         required_argument,  0,  'b'},
+	{"disk-thershold",      required_argument,  0,  'z'},
+	{"arch",                required_argument,  0,  'A'},
+	{"os",                  required_argument,  0,  'O'},
+	{"workdir",             required_argument,  0,  's'},
+	{"volatility",          required_argument,  0,  LONG_OPT_VOLATILITY},
+	{"bandwidth",           required_argument,  0,  LONG_OPT_BANDWIDTH},
+	{"cores",               required_argument,  0,  LONG_OPT_CORES},
+	{"memory",              required_argument,  0,  LONG_OPT_MEMORY},
+	{"disk",                required_argument,  0,  LONG_OPT_DISK},
+	{"help",                no_argument,        0,  'h'},
+	{"version",             no_argument,        0,  'v'},
 	{0,0,0,0}
 };
 
@@ -2015,6 +2035,8 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'h':
+			show_help(argv[0]);
+			return 0;
 		default:
 			show_help(argv[0]);
 			return 1;

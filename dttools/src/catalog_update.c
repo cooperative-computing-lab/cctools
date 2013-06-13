@@ -34,7 +34,8 @@ int main(int argc, char *argv[]) {
 	char *host = CATALOG_HOST;
 	int   port = CATALOG_PORT;
 
-	static struct option long_options[] = {{"catalog", required_argument, 0, 'c'}};
+	static struct option long_options[] = {{"catalog", required_argument, 0, 'c'},
+                {0,0,0,0}};
 
 	signed int c;
 	while ((c = getopt_long(argc, argv, "c:", long_options, NULL)) > -1) {

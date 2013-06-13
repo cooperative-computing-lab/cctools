@@ -554,7 +554,8 @@ int main(int argc, char *argv[])
 		{"debug-file", required_argument, 0, 'o'},
 		{"version", required_argument, 0, 'v'},
 		{"tcp-window", required_argument, 0, 'w'},
-		{"help", required_argument, 0, 'h'}};
+		{"help", required_argument, 0, 'h'},
+        {0,0,0,0}};
 
 	debug_config(argv[0]);
 

@@ -404,7 +404,8 @@ int main( int argc, char *argv[] )
 		{"auto", no_argument, 0, 'A'},
 		{"local", no_argument, 0, 'L'},
 		{"batch-type", required_argument, 0, 'T'},
-		{"verify", no_argument, 0, 'V'}
+		{"verify", no_argument, 0, 'V'},
+        {0,0,0,0}
 	};
 
 	while((c=getopt_long(argc,argv,"n:b:d:o:l:B:i:qALDT:VX:Y:vh", long_options, NULL)) > -1) {

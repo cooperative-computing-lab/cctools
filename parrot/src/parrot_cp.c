@@ -227,7 +227,8 @@ int main( int argc, char *argv[] )
 		{"recursive", no_argument, 0, 'r'},
 		{"symlinks", no_argument, 0, 's'},
 		{"hardlinks", no_argument, 0, 'l'},
-		{"update-only", no_argument, 0, 'u'}
+		{"update-only", no_argument, 0, 'u'},
+        {0,0,0,0}
 	};
 	
 	while((c=getopt_long(argc,argv,"firRsluvh", long_options, NULL)) > -1) {

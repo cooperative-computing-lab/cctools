@@ -141,7 +141,8 @@ int main( int argc, char *argv[] )
 		{"port", required_argument, 0, 'p'},
 		{"priority", required_argument, 0, 'P'},
 		{"estimated-time", required_argument, 0, 't'},
-		{"random-port", required_argument, 0, 'Z'}
+		{"random-port", required_argument, 0, 'Z'},
+        {0,0,0,0}
 	};
 
 	while((c=getopt_long(argc,argv,"ad:hN:p:P:o:v:Z:", long_options, NULL)) >= 0) {

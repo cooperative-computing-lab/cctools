@@ -67,7 +67,8 @@ int main(int argc, char *argv[])
         {"tickets", required_argument, 0, 'i'},
         {"timeout", required_argument, 0, 't'},
         {"version", no_argument, 0, 'v'},
-        {"help", no_argument, 0, 'h'}};
+        {"help", no_argument, 0, 'h'},
+        {0,0,0,0}};
 
 	while((c = getopt_long(argc, argv, "a:b:d:i:t:vh", long_options, NULL)) > -1) {
 		switch (c) {

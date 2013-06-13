@@ -287,7 +287,8 @@ int main(int argc, char **argv)
 		{"debug-file", required_argument, 0, 'o'},
 		{"input-file", required_argument, 0, 'f'},
 		{"estimated-time", required_argument, 0, 't'},
-		{"priority", required_argument, 0, 'P'}
+		{"priority", required_argument, 0, 'P'},
+        {0,0,0,0}
 	};
 
 

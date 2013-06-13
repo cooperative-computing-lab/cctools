@@ -531,7 +531,8 @@ int main( int argc, char *argv[] )
 		{"work-dir", required_argument, 0, 'w'},
 		{"syscall-table", no_argument, 0, 'W'},
 		{"sync-write", no_argument, 0, 'Y'},
-		{"auto-decompress", no_argument, 0, 'Z'}
+		{"auto-decompress", no_argument, 0, 'Z'},
+        {0,0,0,0}
 	};
 
 	while((c=getopt_long(argc,argv,"+hA:a:b:B:c:Cd:DFfG:Hi:I:kKl:m:M:N:o:O:p:PQr:R:sSt:T:U:u:vw:WY", long_options, NULL)) > -1) {

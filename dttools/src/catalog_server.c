@@ -507,7 +507,8 @@ int main(int argc, char *argv[])
 		{"timeout", required_argument, 0, 'T'},
 		{"update-host", required_argument, 0, 'u'},
 		{"update-interval", required_argument, 0, 'U'},
-		{"version", no_argument, 0, 'v'}};
+		{"version", no_argument, 0, 'v'},
+        {0,0,0,0}};
 
 
 	while((ch = getopt_long(argc, argv, "bB:d:hH:l:L:m:M:n:o:O:p:ST:u:U:v", long_options, NULL)) > -1) {

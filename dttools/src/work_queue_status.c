@@ -110,7 +110,8 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 		{"catalog", required_argument, 0, 'C'},
 		{"debug", required_argument, 0, 'd'},
 		{"timeout", required_argument, 0, 't'},
-		{"help", no_argument, 0, 'h'}};
+		{"help", no_argument, 0, 'h'},
+        {0,0,0,0}};
 
 	while((c = getopt_long(argc, argv, "QTWC:d:lo:O:t:vh", long_options, NULL)) > -1) {
 		switch (c) {

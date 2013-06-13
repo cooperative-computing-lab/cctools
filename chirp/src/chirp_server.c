@@ -402,7 +402,8 @@ static struct option long_options[] = {
 	{"transient", required_argument, 0, 'y'},
 	{"unix-timeout", required_argument, 0, 'z'},
 	{"user", required_argument, 0, 'i'},
-	{"version", no_argument, 0, 'v'}
+	{"version", no_argument, 0, 'v'},
+    {0,0,0,0}
 };
 
 int main(int argc, char *argv[])
