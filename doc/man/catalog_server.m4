@@ -56,6 +56,7 @@ OPTION_TRIPLET(-T, timeout, time)Maximum time to allow a query process to run.  
 OPTION_TRIPLET(-u, update-host, host)Send status updates to this host. (default is catalog.cse.nd.edu)
 OPTION_TRIPLET(-U, update-interval, time)Send status updates at this interval. (default is 5m)
 OPTION_ITEM(`-v, --version')Show version string
+OPTION_TRIPLET(-Z,port-file,file)Select port at random and write it to this file.  (default is disabled)
 OPTIONS_END
  
 SECTION(ENVIRONMENT VARIABLES)

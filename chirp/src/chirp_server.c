@@ -424,7 +424,7 @@ int main(int argc, char *argv[])
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c = getopt_long(argc, argv, "A:a:B:bCc:d:Ee:F:G:I:l:M:n:O:o:P:p:Q:Rr:s:T:t:U:u:vW:w:y:Z:z:", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "A:a:B:bCc:d:Ee:F:G:hI:i:l:M:n:O:o:P:p:Q:Rr:s:T:t:U:u:vW:w:y:Z:z:", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'A':
 			chirp_acl_default(optarg);

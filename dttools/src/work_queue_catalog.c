@@ -284,7 +284,7 @@ struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port
 	return ml;
 }
 
-int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, const char *workers_by_pool, int now) {
+int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, struct work_queue_resources *r, const char *workers_by_pool, int now) {
 	char address[DATAGRAM_ADDRESS_MAX];
 	char owner[USERNAME_MAX];
 
@@ -315,18 +315,22 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 	int total_workers_working = s->workers_busy + s->workers_full;
 	int total_workers         = total_workers_working + s->workers_ready;
 
+	debug(D_WQ,"%s advertising resources to the Catalog -- cores:%d memory:%d disk:%d\n",project_name,r->cores.total,r->memory.total,r->disk.total); //debug to see if information is being passed
+
 	buffer_printf(buffer, 
 			"type wq_master\n"
 			"project %s\nstarttime %llu\npriority %d\n"
 			"port %d\nlifetime %d\n"
 			"tasks_waiting %d\ntasks_complete %d\ntasks_running %d\ntotal_tasks_dispatched %d\n"
 			"workers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nworkers_by_pool %s\n"
+			"cores_total %d\nmemory_total %d\ndisk_total %d\n"
 			"capacity %d\n"
 			"version %d.%d.%s\nowner %s", 
 			project_name, (s->start_time)/1000000, s->priority, 
 			s->port, WORK_QUEUE_CATALOG_MASTER_AD_LIFETIME, 
 			s->tasks_waiting, s->total_tasks_complete, s->tasks_running, s->total_tasks_dispatched, 
 			s->workers_init, s->workers_ready, total_workers_working, total_workers, workers_by_pool, 
+			r->cores.total, r->memory.total, r->disk.total,
 			s->capacity, 
 			CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
 
