@@ -138,6 +138,13 @@ See the file COPYING for details.
 #include "rmonitor.h"
 #include "rmonitor_poll.h"
 
+#define RESOURCE_MONITOR_USE_INOTIFY 1
+#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#include <sys/inotify.h>
+static int monitor_inotify_fd = -1;
+#include <sys/ioctl.h>
+#endif
+
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_piggyback.h"
 
@@ -163,6 +170,11 @@ struct itable *processes;       /* Maps the pid of a process to a unique struct 
 struct hash_table *wdirs;       /* Maps paths to working directory structures. */
 struct itable *filesysms;       /* Maps st_dev ids (from stat syscall) to filesystem structures. */
 struct hash_table *files;       /* Keeps track of which files have been opened. */
+
+#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+static char **inotify_watches;  /* Keeps track of created inotify watches. */
+static int alloced_inotify_watches = 0;
+#endif
 
 struct itable *wdirs_rc;        /* Counts how many process_info use a wdir_info. */
 struct itable *filesys_rc;      /* Counts how many wdir_info use a filesys_info. */
@@ -543,6 +555,29 @@ int monitor_final_summary()
 	
 	rmsummary_print(log_summary, summary);
 
+	if (monitor_inotify_fd >= 0)
+	{
+		char *fname;
+		struct file_info *finfo;
+
+		fprintf(log_summary, "I/O summaries:\n");
+		hash_table_firstkey(files);
+		while(hash_table_nextkey(files, &fname, (void **) &finfo))
+		{
+			fprintf(log_summary, "---%s:\n", fname);
+			fprintf(log_summary, "   device: %" PRId64 " size on first open: %" PRId64 " on last close: %" PRId64 "\n",
+				finfo->device,
+				finfo->size_on_open,
+				finfo->size_on_close);
+			fprintf(log_summary, "   n_opens: %" PRId64 " n_closes: %" PRId64 ,
+				finfo->n_opens,
+				finfo->n_closes);
+			fprintf(log_summary, " n_reads: %" PRId64 " n_writes: %" PRId64 "\n",
+				finfo->n_reads,
+				finfo->n_writes);
+		}
+	}
+
 	if(summary->limits_exceeded && summary->exit_status == 0)
 		return -1;
 	else
@@ -873,10 +908,61 @@ void write_helper_lib(void)
     lib_helper_extracted = 1;
 }
 
+void monitor_handle_inotify(void)
+{
+	struct inotify_event rev;
+	struct file_info *finfo;
+	struct stat fst;
+	char *fname;
+	int nbytes, evc, i;
+	if (monitor_inotify_fd >= 0)
+	{
+#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+		if (ioctl(monitor_inotify_fd, FIONREAD, &nbytes) >= 0)
+		{
+			evc = nbytes/sizeof(rev);
+			for(i = 0; i < evc; i++)
+			{
+				if (read(monitor_inotify_fd, &rev, sizeof(rev)) != sizeof(rev)) break;
+				if (rev.wd >= alloced_inotify_watches) continue;
+				if ((fname = inotify_watches[rev.wd]) == NULL) continue;
+				finfo = hash_table_lookup(files, fname);
+				if (finfo == NULL) continue;
+				if (rev.mask & IN_ACCESS) (finfo->n_reads)++;
+				if (rev.mask & IN_MODIFY) (finfo->n_writes)++;
+				if ((rev.mask & IN_CLOSE_WRITE) || 
+				    (rev.mask & IN_CLOSE_NOWRITE))
+				{
+					(finfo->n_closes)++;
+					if (stat(fname, &fst) >= 0)
+					{
+						finfo->size_on_close = fst.st_size;
+					}
+					/* Decrease reference count and remove watch of zero */
+					(finfo->n_references)--;
+					if (finfo->n_references == 0)
+					{
+						inotify_rm_watch(monitor_inotify_fd, rev.wd);
+						debug(D_DEBUG, "removed watch (id: %d) for file %s", rev.wd, fname);
+						free(fname);
+						inotify_watches[rev.wd] = NULL;
+					}
+				}
+			}
+		}
+#endif
+	}
+}
+
 void monitor_dispatch_msg(void)
 {
 	struct monitor_msg msg;
 	struct process_info *p;
+
+	struct file_info *finfo;
+	char **new_inotify_watches;
+	struct stat fst;
+	int iwd;
 
 	recv_monitor_msg(monitor_queue_fd, &msg);
 
@@ -916,8 +1002,58 @@ void monitor_dispatch_msg(void)
 		break;
         case OPEN:
 		debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
-		monitor_write_open_file(msg.data.s);
-		hash_table_insert(files, msg.data.s, NULL);
+		finfo = hash_table_lookup(files, msg.data.s);
+		if (finfo)
+		{
+			(finfo->n_references)++;
+			(finfo->n_opens)++;
+		} else {
+			monitor_write_open_file(msg.data.s);
+			finfo = calloc(1, sizeof(struct file_info));
+			if (finfo != NULL)
+			{
+				finfo->n_opens = 1;
+				finfo->size_on_open= -1;
+				finfo->size_on_close = -1;
+				if (stat(msg.data.s, &fst) >= 0)
+				{
+					finfo->size_on_open = fst.st_size;
+					finfo->device = fst.st_dev;
+				}
+			}
+			hash_table_insert(files, msg.data.s, finfo);
+			if (monitor_inotify_fd >= 0)
+			{
+				if ((iwd = inotify_add_watch(monitor_inotify_fd, 
+							     msg.data.s, 
+							     IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|
+							     IN_ACCESS|IN_MODIFY)) < 0)
+				{
+					debug(D_DEBUG, "inotify_add_watch for file %s fails: %s", msg.data.s, strerror(errno));
+				} else {
+					debug(D_DEBUG, "added watch (id: %d) for file %s", iwd, msg.data.s);
+					if (iwd >= alloced_inotify_watches)
+					{
+						new_inotify_watches = (char **)realloc(inotify_watches, (iwd+50) * (sizeof(char *)));
+						if (new_inotify_watches != NULL)
+						{
+							alloced_inotify_watches = iwd+50;
+							inotify_watches = new_inotify_watches;
+						} else {
+							debug(D_DEBUG, "Out of memory trying to expand inotify_watches");
+						}
+					}
+					if (iwd < alloced_inotify_watches)
+					{
+						inotify_watches[iwd] = strdup(msg.data.s);
+						if (finfo != NULL) finfo->n_references = 1;
+					} else {
+						debug(D_DEBUG, "Out of memory: Removing inotify watch for %s", msg.data.s);
+						inotify_rm_watch(monitor_inotify_fd, iwd);
+					}
+				} 
+			}
+		}
 		break;
         case READ:
 		break;
@@ -944,25 +1080,34 @@ int wait_for_messages(int interval)
 
     //If grandchildren processes cannot talk to us, simply wait.
     //Else, wait, and check socket for messages.
-    if(monitor_queue_fd < 0)
+    if ((monitor_queue_fd < 0) && (monitor_inotify_fd < 0))
     {
         select(1, NULL, NULL, NULL, &timeout);
     }
     else
     {
         int count = 1;
+
+	/* Figure out the number of file descriptors to pass to select */
+        int nfds = (monitor_queue_fd > monitor_inotify_fd ? monitor_queue_fd + 1 : monitor_inotify_fd + 1);
+
         while(count > 0)
         {
             fd_set rset;
             FD_ZERO(&rset);
-            FD_SET(monitor_queue_fd, &rset);
+            if (monitor_queue_fd > 0)   FD_SET(monitor_queue_fd, &rset);
+            if (monitor_inotify_fd > 0) FD_SET(monitor_inotify_fd, &rset);
+
             timeout.tv_sec   = 0;
             timeout.tv_usec  = interval;
             interval = 0;                     //Next loop we do not wait at all
-            count = select(monitor_queue_fd + 1, &rset, NULL, NULL, &timeout);
+            count = select(nfds, &rset, NULL, NULL, &timeout);
 
             if(count > 0)
-                monitor_dispatch_msg();
+	    {
+                if (FD_ISSET(monitor_queue_fd, &rset)) monitor_dispatch_msg();
+                if (FD_ISSET(monitor_inotify_fd, &rset)) monitor_handle_inotify();
+            }
         }
     }
 
@@ -1306,6 +1451,13 @@ int main(int argc, char **argv) {
 #ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB
     write_helper_lib();
     monitor_helper_init(lib_helper_name, &monitor_queue_fd);
+#endif
+
+#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+    monitor_inotify_fd = inotify_init();
+    alloced_inotify_watches = 100;
+    inotify_watches = (char **)(calloc(alloced_inotify_watches, sizeof(char *)));
+    if (inotify_watches == NULL) alloced_inotify_watches = 0;
 #endif
 
 #if defined(CCTOOLS_OPSYS_FREEBSD)

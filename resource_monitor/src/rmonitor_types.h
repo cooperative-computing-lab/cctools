@@ -59,6 +59,19 @@ struct io_info
 	uint64_t delta_bytes_faulted;
 };
 
+struct file_info
+{
+	uint64_t n_references;
+	uint64_t n_opens;
+	uint64_t n_closes;
+	uint64_t n_reads;
+	uint64_t n_writes;
+	off_t size_on_open;
+	off_t size_on_close;
+	dev_t device;
+};
+
+
 struct wdir_info
 {
 	char     *path;
