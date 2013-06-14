@@ -24,6 +24,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "full_io.h"
+#include "getopt_aux.h"
 
 #if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD
 #define fopen64 fopen
@@ -40,16 +41,16 @@ static int buffer_size = 65536;
 
 static void show_help(const char *cmd)
 {
-	printf("use: %s [options] <local-file> <hostname[:port]> <remote-file>\n", cmd);
-	printf("where options are:\n");
-	printf(" -a <flag>  Require this authentication mode.\n");
-	printf(" -b <size>  Set transfer buffer size. (default is %d bytes)\n", buffer_size);
-	printf(" -d <flag>  Enable debugging for this subsystem.\n");
-	printf(" -f         Follow input file like tail -f.\n");
-	printf(" -i <files> Comma-delimited list of tickets to use for authentication.\n");
-	printf(" -t <time>  Timeout for failure. (default is %ds)\n", timeout);
-	printf(" -v         Show program version.\n");
-	printf(" -h         This message.\n");
+	fprintf(stdout, "use: %s [options] <local-file> <hostname[:port]> <remote-file>\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " %-30s Require this authentication mode.\n", "-a,--auth=<flag>");
+	fprintf(stdout, " %-30s Set transfer buffer size. (default is %d bytes)\n", "-b,--block-size=<size>", buffer_size);
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug <flag>");
+	fprintf(stdout, " %-30s Follow input file like tail -f.\n", "-f,--follow");
+	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
+	fprintf(stdout, " %-30s Timeout for failure. (default is %ds)\n", "-t,--timeout=<time>", timeout);
+	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
+	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
 int main(int argc, char *argv[])
@@ -65,7 +66,18 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "a:b:d:fi:t:vh")) > -1) {
+    static struct option long_options[] = {
+        {"auth", required_argument, 0, 'a'},
+        {"block-size", required_argument, 0, 'b'},
+        {"debug", required_argument, 0, 'd'},
+        {"follow", no_argument, 0, 'f'},
+        {"tickets", required_argument, 0, 'i'},
+        {"timeout", required_argument, 0, 't'},
+        {"version", no_argument, 0, 'v'},
+        {"help", no_argument, 0, 'h'},
+        {0,0,0,0}};
+
+	while((c = getopt_long(argc, argv, "a:b:d:fi:t:vh", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'a':
 			auth_register_byname(optarg);

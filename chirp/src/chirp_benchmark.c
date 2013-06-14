@@ -9,6 +9,7 @@ See the file COPYING for details.
 
 #include "full_io.h"
 #include "auth_all.h"
+#include "getopt_aux.h"
 
 #include <stdio.h>
 #include <unistd.h>

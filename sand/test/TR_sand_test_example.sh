@@ -4,8 +4,7 @@
 
 prepare()
 {
-    cd ../src/; make
-    exit 0
+	exit 0
 }
 
 run()

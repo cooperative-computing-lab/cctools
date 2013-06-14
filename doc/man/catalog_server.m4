@@ -38,24 +38,25 @@ overwriting another service's record.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(-b)Run as a daemon.
-OPTION_PAIR(-B,file)Write process identifier (PID) to file.
-OPTION_PAIR(-d,subsystem)Enable debugging for this subsystem
-OPTION_ITEM(-h)Show this help screen
-OPTION_PAIR(-H,dir) Store catalog history in this directory.  Enables fast data recovery after a failure or restart.
-OPTION_PAIR(-l,secs)Lifetime of data, in seconds (default is 1800)
-OPTION_PAIR(-L,file)Log new updates to this file.
-OPTION_PAIR(-m,n)Maximum number of child processes.  (default is 50)
-OPTION_PAIR(-M,size)Maximum size of a server to be believed.  (default is any)
-OPTION_PAIR(-n,name)Set the preferred hostname of this server.
-OPTION_PAIR(-o,file)Send debugging to this file.
-OPTION_PAIR(-O,bytes)Rotate debug file once it reaches this size.
-OPTION_PAIR(-p,port)Port number to listen on (default is 9097)
-OPTION_ITEM(-S)Single process mode; do not fork on queries.
-OPTION_PAIR(-T,time)Maximum time to allow a query process to run.  (default is 60s)
-OPTION_PAIR(-u,host)Send status updates to this host. (default is catalog.cse.nd.edu)
-OPTION_PAIR(-U,time)Send status updates at this interval. (default is 5m)
-OPTION_ITEM(-v)Show version string
+OPTION_ITEM(`-b, --background')Run as a daemon.
+OPTION_TRIPLET(-B, pid-file,file)Write process identifier (PID) to file.
+OPTION_TRIPLET(-d, debug, flag)Enable debugging for this subsystem
+OPTION_ITEM(`-h, --help')Show this help screen
+OPTION_TRIPLET(-H, history,file) Store catalog history in this directory.  Enables fast data recovery after a failure or restart.
+OPTION_TRIPLET(-l, lifetime, secs)Lifetime of data, in seconds (default is 1800)
+OPTION_TRIPLET(-L, update-log,file)Log new updates to this file.
+OPTION_TRIPLET(-m, max-jobs,n)Maximum number of child processes.  (default is 50)
+OPTION_TRIPLET(-M, server-size, size)Maximum size of a server to be believed.  (default is any)
+OPTION_TRIPLET(-n, name, name)Set the preferred hostname of this server.
+OPTION_TRIPLET(-o, debug-file,file)Send debugging to this file.
+OPTION_TRIPLET(-O, debug-rotate-max, bytes)Rotate debug file once it reaches this size.
+OPTION_TRIPLET(-p,, port, port)Port number to listen on (default is 9097)
+OPTION_ITEM(`-S, --single')Single process mode; do not fork on queries.
+OPTION_TRIPLET(-T, timeout, time)Maximum time to allow a query process to run.  (default is 60s)
+OPTION_TRIPLET(-u, update-host, host)Send status updates to this host. (default is catalog.cse.nd.edu)
+OPTION_TRIPLET(-U, update-interval, time)Send status updates at this interval. (default is 5m)
+OPTION_ITEM(`-v, --version')Show version string
+OPTION_TRIPLET(-Z,port-file,file)Select port at random and write it to this file.  (default is disabled)
 OPTIONS_END
  
 SECTION(ENVIRONMENT VARIABLES)

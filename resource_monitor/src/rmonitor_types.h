@@ -8,9 +8,18 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#ifdef HAS_SYS_STATFS_H
+#include <sys/statfs.h>
+#endif
+
+#ifdef HAS_SYS_STATVFS_H
+#include <sys/statvfs.h>
+#endif
+
+#ifdef HAS_FTS_H
 #include <fts.h>
-
-
+#endif
 
 #include "int_sizes.h"
 
@@ -49,6 +58,19 @@ struct io_info
 
 	uint64_t delta_bytes_faulted;
 };
+
+struct file_info
+{
+	uint64_t n_references;
+	uint64_t n_opens;
+	uint64_t n_closes;
+	uint64_t n_reads;
+	uint64_t n_writes;
+	off_t size_on_open;            /* in bytes */
+	off_t size_on_close;           /* in bytes */
+	dev_t device;
+};
+
 
 struct wdir_info
 {

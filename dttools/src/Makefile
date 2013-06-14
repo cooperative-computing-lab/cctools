@@ -78,6 +78,7 @@ SOURCES = auth.c  \
           timestamp.c  \
           timer.c  \
           url_encode.c  \
+          uptime.c \
           username.c  \
           work_queue.c  \
           work_queue_catalog.c  \

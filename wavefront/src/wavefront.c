@@ -374,7 +374,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Manually set the block size for batch mode.\n", "-b,--block-size=<size>");
 	fprintf(stdout, " %-30s Run the whole problem locally in multicore mode. (default)\n", "-L,--multicore");
 	fprintf(stdout, " %-30s Manually set the number of process to run at once.\n", "-n,--jobs=<njobs>");
-	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--output-file=<file>");
+	fprintf(stdout, " %-30s Write debug information to this file.\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Interval between image writes, in seconds. (default=%d)\n", "-t,--bitmap-interval=<secs>",progress_bitmap_interval);
 	fprintf(stdout, " %-30s Run in distributed mode with <type> batch system: (default=%s)\n", "-T,--batch-type=<type>", batch_queue_type_to_string(batch_system_type));
 	fprintf(stdout, " %-30s %s\n", "", batch_queue_type_string());
@@ -397,14 +397,15 @@ int main( int argc, char *argv[] )
 		{"debug", required_argument, 0, 'd'},
 		{"jobs", required_argument, 0, 'n'},
 		{"block-size", required_argument, 0, 'b'},
-		{"output-file", required_argument, 0, 'o'},
+		{"debug-file", required_argument, 0, 'o'},
 		{"log-file", required_argument, 0, 'l'},
 		{"bitmap", required_argument, 0, 'B'},
 		{"bitmap-interval", required_argument, 0, 'i'},
 		{"auto", no_argument, 0, 'A'},
 		{"local", no_argument, 0, 'L'},
-		{"batch-type", no_argument, 0, 'T'},
-		{"verify", no_argument, 0, 'V'}
+		{"batch-type", required_argument, 0, 'T'},
+		{"verify", no_argument, 0, 'V'},
+        {0,0,0,0}
 	};
 
 	while((c=getopt_long(argc,argv,"n:b:d:o:l:B:i:qALDT:VX:Y:vh", long_options, NULL)) > -1) {

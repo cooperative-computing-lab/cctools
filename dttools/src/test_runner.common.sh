@@ -2,38 +2,23 @@
 
 dispatch() 
 {
-    case $1 in
-	prepare)
-	prepare $@
-	;;
-	run)
-	run $@
-	;;
-	clean)
-	clean $@
-	;;
-	*)
-	echo "unknown command: $1"
-	echo "use: $0 [prepare|run|clean]"
-	;;
-    esac
-
-    exit 1
-}
-
-find_free_port()
-{
-    case `uname -s` in
-    	Darwin)
-    	netstat -n -f inet | grep tcp | awk '{print $4}' | awk -F . '{print $5}' | sort -n | awk 'BEGIN {n = 9000} {if (n != $1) { print n; exit; } else { n = n+1; } }'
-    	;;
-    	Linux)
-    	netstat --numeric-ports --listening --numeric --protocol inet | grep tcp | awk '{print $4}' | grep 0.0.0.0 | awk -vFS=: '{print $2}' | sort --numeric-sort | awk 'BEGIN {n = 9000} {if (n != $1) { print n; exit; } else { n = n+1; } }'
-    	;;
-    	*)
-    	netstat --numeric-ports --listening --numeric --protocol inet | grep tcp | awk '{print $4}' | grep 0.0.0.0 | awk -vFS=: '{print $2}' | sort --numeric-sort | awk 'BEGIN {n = 9000} {if (n != $1) { print n; exit; } else { n = n+1; } }'
-    	;;
-    esac
+	case "$1" in
+		prepare)
+			prepare $@
+			;;
+		run)
+			run $@
+			;;
+		clean)
+			clean $@
+			;;
+		*)
+			echo "unknown command: $1"
+			echo "use: $0 [prepare|run|clean]"
+			exit 1
+			;;
+	esac
+	exit $?
 }
 
 # wait_for_file_creation(filename, timeout)
@@ -83,6 +68,38 @@ wait_for_file_modification()
 		delta=$(($now - $mtime))
 		[  $delta -gt 3 ] && break
 	done
+}
+
+run_local_worker()
+{
+	local port_file=$1
+	local timeout=15
+
+	echo "Waiting for master to be ready."
+	if wait_for_file_creation $port_file $timeout
+	then
+		echo "Master is ready on port `cat $port_file` "
+	else
+		echo "ERROR: Master failed to respond in $timeout seconds."
+		exit 1
+	fi
+	echo "Running worker."
+	work_queue_worker -t 2s -d all -o worker.log localhost `cat $port_file`
+	echo "Worker completed."
+	return 0
+}
+
+require_identical_files()
+{
+        echo "Comparing output $1 and $2"
+	if diff --brief $1 $2
+	then
+		echo "$1 and $2 are the same."
+		return 0
+	else
+		echo "ERROR: $1 and $2 differ!"
+		exit 1
+	fi
 }
 
 # For OS X

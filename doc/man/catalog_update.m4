@@ -16,7 +16,7 @@ catalog server via a short UDP packet.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_PAIR(-c,host)Send update to this catalog host.
+OPTION_TRIPLET(-c, catalog, host)Send update to this catalog host.
 
 PARA
 The CODE(catalog_update) tool also accepts a list of CODE(name)/CODE(value)

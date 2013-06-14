@@ -201,26 +201,32 @@ static bool write_cern_key()
 
 static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 {
+	static int did_warning = 0;
+
 	if(cvmfs_active_filesystem != f) {
 		if(cvmfs_active_filesystem != NULL) {
 
-			if(!allow_switching_cvmfs_repos) {
-				debug(D_CVMFS|D_NOTICE,
-					  "ERROR: using multiple CVMFS repositories in a single parrot session "
-					  "is not allowed.  Define PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES "
-					  "to enable experimental support, which could result in parrot crashing "
-					  "or performing poorly.");
-				return false;
-			} else {
-				debug(D_CVMFS|D_NOTICE,
-					  "ERROR: using multiple CVMFS repositories in a single parrot session "
-					  "is not fully supported.  PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES "
-					  "has been defined, so switching now from %s to %s.  "
-					  "Parrot may crash or perform poorly!",
-					  cvmfs_active_filesystem->host.c_str(),
-					  f->host.c_str());
-			}
+			if(!did_warning) {
 
+				did_warning = 1;
+
+				if(!allow_switching_cvmfs_repos) {
+					debug(D_CVMFS|D_NOTICE,
+						  "ERROR: using multiple CVMFS repositories in a single parrot session "
+						  "is not allowed.  Define PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES "
+						  "to enable experimental support, which could result in parrot crashing "
+						  "or performing poorly.");
+					return false;
+				} else {
+					debug(D_CVMFS|D_NOTICE,
+						  "ERROR: using multiple CVMFS repositories in a single parrot session "
+						  "is not fully supported.  PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES "
+						  "has been defined, so switching now from %s to %s.  "
+						  "Parrot may crash or perform poorly!",
+						  cvmfs_active_filesystem->host.c_str(),
+						  f->host.c_str());
+				}
+			}
 			cvmfs_fini();
 			cvmfs_active_filesystem = NULL;
 		}
@@ -667,6 +673,33 @@ class pfs_service_cvmfs:public pfs_service {
 
 		debug(D_CVMFS, "getdir(%s)", name->rest);
 
+		/*
+		If the root of the CVFMS filesystem is requested,
+		we must generate it internally, containing the
+		list of the known filesystems.
+		*/
+
+		if(!name->host[0]) {
+			pfs_dir *dir = new pfs_dir(name);
+			dir->append(".");
+			dir->append("..");
+			struct cvmfs_filesystem *f = cvmfs_filesystem_list;
+			while(f) {
+				/* If the host begins with dot, then it is a wildcard entry. */
+				/* Otherwise, it is a normal entry. */
+				const char *host = f->host.c_str();
+				if(host && host[0]!='.') {
+					dir->append(host);
+				}
+				f = f->next;
+			}
+			return dir;
+		}
+
+		/*
+		Otherwise, go to CVMFS for the directory liting.
+		*/
+
 		if(!d.lookup(name, 1)) {
 			return 0;
 		}
@@ -697,12 +730,25 @@ class pfs_service_cvmfs:public pfs_service {
 		return dir;
 	}
 
-	virtual int lstat(pfs_name * name, struct pfs_stat *info) {
+	virtual int anystat(pfs_name * name, struct pfs_stat *info, int follow_links ) {
 		struct cvmfs_dirent d;
 
-		debug(D_CVMFS, "lstat(%s)", name->rest);
+		/*
+		If we get stat("/cvmfs") then construct a dummy
+		entry that looks like a directory.
+		*/
 
-		if(!d.lookup(name, 0)) {
+		if(!name->host[0]) {
+                        pfs_service_emulate_stat(name,info);
+                        info->st_mode = S_IFDIR | 0555;
+			return 0;
+		}
+
+		/*
+		Otherwise, do the lookup in CVMFS itself.
+		*/
+
+		if(!d.lookup(name, follow_links)) {
 			return -1;
 		}
 
@@ -711,20 +757,14 @@ class pfs_service_cvmfs:public pfs_service {
 		return 0;
 	}
 
+	virtual int lstat(pfs_name * name, struct pfs_stat *info) {
+		debug(D_CVMFS, "lstat(%s)", name->rest);
+		return anystat(name,info,0);
+	}
+
 	virtual int stat(pfs_name * name, struct pfs_stat *info) {
-		struct cvmfs_dirent d;
-
-		if(!d.lookup(name, 1)) {
-			debug(D_CVMFS, "stat(%s) --> -1 (lookup failed)", name->rest);
-
-			return -1;
-		}
-
-		cvmfs_dirent_to_stat(&d, info);
-
-		debug(D_CVMFS, "stat(%s) --> (%d,%d,%d,%d) ISDIR=%d", name->rest, info->st_mode, info->st_size, info->st_mtime, info->st_ino, S_ISDIR(info->st_mode));
-
-		return 0;
+		debug(D_CVMFS, "stat(%s)", name->rest);
+		return anystat(name,info,0);
 	}
 
 	virtual int unlink(pfs_name * name) {
@@ -805,6 +845,22 @@ class pfs_service_cvmfs:public pfs_service {
 	}
 
 	virtual int readlink(pfs_name * name, char *buf, pfs_size_t bufsiz) {
+
+		debug(D_CVMFS, "readlink(%s)", name->rest);
+
+                /*
+                If we get readlink("/cvmfs"), return not-a-link.
+                */
+
+                if(!name->host[0]) {
+			errno = EINVAL;
+			return -1;
+                }
+
+                /*
+                Otherwise, do the lookup in CVMFS itself.
+                */
+
 		struct cvmfs_dirent d;
 
 		if(!d.lookup(name, 0)) {
@@ -813,14 +869,12 @@ class pfs_service_cvmfs:public pfs_service {
 
 		if(S_ISLNK(d.mode)) {
 			int rc = cvmfs_readlink(name->rest, buf, bufsiz);
-			debug(D_CVMFS, "readlink(%s) --> %d", name->rest, rc);
 			if(rc < 0) {
 				errno = -rc;
 				return -1;
 			}
 			return strlen(buf);
 		} else {
-			debug(D_CVMFS, "readlink(%s) --> -1 (not a link)", name->rest);
 			errno = EINVAL;
 			return -1;
 		}

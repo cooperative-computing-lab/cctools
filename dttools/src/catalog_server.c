@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "macros.h"
 #include "daemon.h"
+#include "getopt_aux.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -56,6 +57,9 @@ static time_t clean_interval = 60;
 
 /* The port upon which to listen. */
 static int port = CATALOG_PORT_DEFAULT;
+
+/* The file for writing out the port number. */
+const char *port_file = 0;
 
 /* The preferred hostname set on the command line. */
 static const char *preferred_hostname = 0;
@@ -455,26 +459,27 @@ static void handle_query(struct link *query_link)
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s [options]\n", cmd);
-	printf("where options are:\n");
-	printf(" -b             Run as a daemon.\n");
-	printf(" -B <file>      Write process identifier (PID) to file.\n");
-	printf(" -d <subsystem> Enable debugging for this subsystem\n");
-	printf(" -h             Show this help screen\n");
-	printf(" -H <file>      Record catalog history to this directory.\n");
-	printf(" -l <secs>      Lifetime of data, in seconds (default is %d)\n", lifetime);
-	printf(" -L <file>      Log new updates to this file.\n");
-	printf(" -m <n>         Maximum number of child processes.  (default is %d)\n",child_procs_max);
-	printf(" -M <size>      Maximum size of a server to be believed.  (default is any)\n");
-	printf(" -n <name>      Preferred host name of this server.\n");
-	printf(" -o <file>      Send debugging to this file.\n");
-	printf(" -O <bytes>     Rotate debug file once it reaches this size.\n");
-	printf(" -p <port>      Port number to listen on (default is %d)\n", port);
-	printf(" -S             Single process mode; do not work on queries.\n");
-	printf(" -T <time>	Maximum time to allow a query process to run.  (default is %ds)\n",child_procs_timeout);
-	printf(" -u <host>      Send status updates to this host. (default is %s)\n", CATALOG_HOST_DEFAULT);
-	printf(" -U <time>      Send status updates at this interval. (default is 5m)\n");
-	printf(" -v             Show version string\n");
+	fprintf(stdout, "Use: %s [options]\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " %-30s Run as a daemon.\n", "-b,--background");
+	fprintf(stdout, " %-30s Write process identifier (PID) to file.\n", "-B,--pid-file=<file>");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
+	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
+	fprintf(stdout, " %-30s Record catalog history to this directory.\n", "-H,--history=<file>");
+	fprintf(stdout, " %-30s Lifetime of data, in seconds (default is %d)\n", "-l,--lifetime=<secs>", lifetime);
+	fprintf(stdout, " %-30s Log new updates to this file.\n", "-L,--update-log=<file>");
+	fprintf(stdout, " %-30s Maximum number of child processes.  (default is %d)\n", "-m,--max-jobs=<n>",child_procs_max);
+	fprintf(stdout, " %-30s Maximum size of a server to be believed.  (default is any)\n", "-M,--server-size=<size>");
+	fprintf(stdout, " %-30s Preferred host name of this server.\n", "-n,--name=<name>");
+	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s Port number to listen on (default is %d)\n", "-p,--port=<port>", port);
+	fprintf(stdout, " %-30s Single process mode; do not work on queries.\n", "-S,--single");
+	fprintf(stdout, " %-30s Maximum time to allow a query process to run.  (default is %ds)\n", "-T,--timeout=<time>",child_procs_timeout);
+	fprintf(stdout, " %-30s Send status updates to this host. (default is %s)\n", "-u,--update-host=<host>", CATALOG_HOST_DEFAULT);
+	fprintf(stdout, " %-30s Send status updates at this interval. (default is 5m)\n", "-U,--update-interval=<time>");
+	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
+        fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
 }
 
 int main(int argc, char *argv[])
@@ -489,7 +494,30 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "bB:d:hH:l:L:m:M:n:o:O:p:ST:u:U:v")) > -1) {
+	static struct option long_options[] = {
+		{"background", no_argument, 0, 'b'},
+		{"pid-file", required_argument, 0, 'B'},
+		{"debug", required_argument, 0, 'd'},
+		{"help", no_argument, 0, 'h'},
+		{"history", required_argument, 0, 'H'},
+		{"lifetime", required_argument, 0, 'l'},
+		{"update-log", required_argument, 0, 'L'},
+		{"max-jobs", required_argument, 0, 'm'},
+		{"server-size", required_argument, 0, 'M'},
+		{"name", required_argument, 0, 'n'},
+		{"debug-file", required_argument, 0, 'o'},
+		{"debug-rotate-max", required_argument, 0, 'O'},
+		{"port", required_argument, 0, 'p'},
+		{"single", no_argument, 0, 'S'},
+		{"timeout", required_argument, 0, 'T'},
+		{"update-host", required_argument, 0, 'u'},
+		{"update-interval", required_argument, 0, 'U'},
+		{"version", no_argument, 0, 'v'},
+		{"port-file", required_argument, 0, 'Z'},
+        {0,0,0,0}};
+
+
+	while((ch = getopt_long(argc, argv, "bB:d:hH:l:L:m:M:n:o:O:p:ST:u:U:vZ:", long_options, NULL)) > -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
@@ -548,6 +576,10 @@ int main(int argc, char *argv[])
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
+			case 'Z':
+				port_file = optarg;
+				port = 0;
+				break;
 			}
 	}
 
@@ -589,17 +621,32 @@ int main(int argc, char *argv[])
 	if(!table)
 		fatal("couldn't create directory %s: %s\n",history_dir,strerror(errno));
 
-	update_dgram = datagram_create(port);
-	if(!update_dgram)
-		fatal("couldn't listen on udp port %d", port);
+	list_port = link_serve(port);
+	if(list_port) {
+		/*
+		If a port was chosen automatically, read it back
+		so that the same one can be used for the update port.
+		There is the possibility that the UDP listen will
+		fail because that port is in use.
+		*/
+	  
+		if(port==0) {
+			char addr[LINK_ADDRESS_MAX];
+			link_address_local(list_port,addr,&port);
+		}
+	} else {
+		fatal("couldn't listen on tcp port %d", port);
+	}
 
 	outgoing_dgram = datagram_create(0);
 	if(!outgoing_dgram)
 		fatal("couldn't create outgoing udp port");
 
-	list_port = link_serve(port);
-	if(!list_port)
-		fatal("couldn't listen on tcp port %d", port);
+	update_dgram = datagram_create(port);
+	if(!update_dgram)
+		fatal("couldn't listen on udp port %d", port);
+
+	opts_write_port_file(port_file,port);
 
 	while(1) {
 		fd_set rfds;

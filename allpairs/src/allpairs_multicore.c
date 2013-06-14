@@ -285,7 +285,8 @@ int main(int argc, char *argv[])
 		{"version", no_argument, 0, 'v'},
 		{"block-size", required_argument, 0, 'b'},
 		{"cores", required_argument, 0, 'c'},
-		{"extra-args", required_argument, 0, 'e'}
+		{"extra-args", required_argument, 0, 'e'},
+        {0,0,0,0}
 	};
 
 	while((c = getopt_long(argc, argv, "b:c:e:d:vh", long_options, NULL)) > -1) {

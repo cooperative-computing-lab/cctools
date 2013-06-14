@@ -103,6 +103,7 @@ double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 int wq_minimum_transfer_timeout = 3;
 int wq_foreman_transfer_timeout = 3600;
+int wq_worker_unready_timeout = 300; //used in remove_unready_workers()
 
 struct work_queue {
 	char *name;
@@ -452,10 +453,13 @@ static void update_catalog(struct work_queue *q, int now)
 	if(!q->catalog_port) {
 		q->catalog_port = CATALOG_PORT;
 	}
-
 	work_queue_get_stats(q, &s);
+	struct work_queue_resources r;
+	memset(&r, 0, sizeof(work_queue_get_resources));
+	work_queue_get_resources(q,&r);
+	debug(D_WQ,"Updating catalog with resource information -- cores:%d memory:%d disk:%d\n", r.cores.total,r.memory.total,r.disk.total); //see if information is being passed correctly
 	char * worker_summary = work_queue_get_worker_summary(q);
-	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, worker_summary, now);
+	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, &r, worker_summary, now);
 	free(worker_summary);
 }
 
@@ -2142,37 +2146,58 @@ static void start_tasks(struct work_queue *q)
 	}
 }
 
-static void do_keepalive_checks(struct work_queue *q) {
+//Check if worker sent ready message since connecting. If it hasn't for more than wq_worker_unready_timeout, remove it.
+static void do_ready_check(struct work_queue *q, struct work_queue_worker *w, timestamp_t current) {
+	int connection_elapsed_time;
+	if(!strcmp(w->hostname, "unknown")){
+		connection_elapsed_time = (int)(current - w->start_time)/1000000;
+		if(connection_elapsed_time >= wq_worker_unready_timeout) {
+			debug(D_WQ, "Removing worker %s (%s): hasn't sent ready message for more than %d s since connection.", w->hostname, w->addrport, wq_worker_unready_timeout);
+			remove_worker(q, w);
+		}
+	}
+}
+
+//Send keepalive to check if worker is still responsive after getting task(s) to run. If not, remove worker. 
+static void do_keepalive_check(struct work_queue *q, struct work_queue_worker *w, timestamp_t current) {
+	if(itable_size(w->current_tasks)) {
+		timestamp_t keepalive_elapsed_time = (current - w->last_msg_sent_time)/1000000;
+		// send new keepalive check only (1) if we received a response since last keepalive check AND 
+		// (2) we are past keepalive interval 
+		if(w->last_msg_recv_time >= w->keepalive_check_sent_time) {	
+			if(keepalive_elapsed_time >= q->keepalive_interval) {
+				if (send_worker_msg(w, "%s\n", time(0) + short_timeout, "check") < 0) {
+					debug(D_WQ, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
+					remove_worker(q, w);
+				} else {
+					debug(D_WQ, "Sent keepalive check to worker %s (%s)", w->hostname, w->addrport);
+					w->keepalive_check_sent_time = current;	
+				}	
+			}
+		} else { 
+			// we haven't received a message from worker since its last keepalive check. Check if time 
+			// since we last polled link for responses has exceeded keepalive timeout. If so, remove worker.
+			if (link_poll_end > w->keepalive_check_sent_time) {
+				if (((link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
+					debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
+					remove_worker(q, w);
+				}
+			}	
+		}
+	}
+}
+
+static void remove_unresponsive_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
 	char *key;
-	timestamp_t current = timestamp_get();
+	timestamp_t current_time = timestamp_get();
 	
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(itable_size(w->current_tasks)) {
-			timestamp_t keepalive_elapsed_time = (current - w->last_msg_sent_time)/1000000;
-			// send new keepalive check only (1) if we received a response since last keepalive check AND 
-			// (2) we are past keepalive interval 
-			if(w->last_msg_recv_time >= w->keepalive_check_sent_time) {	
-				if(keepalive_elapsed_time >= q->keepalive_interval) {
-					if (send_worker_msg(w, "%s\n", time(0) + short_timeout, "check") < 0) {
-						debug(D_WQ, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
-						remove_worker(q, w);
-					} else {
-						debug(D_WQ, "Sent keepalive check to worker %s (%s)", w->hostname, w->addrport);
-						w->keepalive_check_sent_time = current;	
-					}	
-				}
-			} else { 
-				// Here because we haven't received a message from worker since its last keepalive check. Check if time 
-				// since we last polled link for responses has exceeded keepalive timeout. If so, remove the worker.
-				if (link_poll_end > w->keepalive_check_sent_time) {
-					if (((link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
-						debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
-						remove_worker(q, w);
-					}
-				}	
-			}
+		do_ready_check(q, w, current_time);		
+		
+		if(q->keepalive_interval > 0) {
+			do_keepalive_check(q, w, current_time);
 		}
 	}
 }
@@ -3011,9 +3036,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			update_catalog(q, 0);
 		}
 		
-		if(q->keepalive_interval > 0) {
-			do_keepalive_checks(q);
-		}
+		remove_unresponsive_workers(q);	
 
 		t = list_pop_head(q->complete_list);
 		if(t) {
@@ -3100,7 +3123,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(q->fast_abort_multiplier > 0) {
 			abort_slow_workers(q);
 		}
-
+		
 		// If any of the passed-in auxiliary links are active then break so the caller can handle them.
 		if(aux_links && list_size(active_aux_links)) {
 			break;
@@ -3323,16 +3346,22 @@ void work_queue_get_resources( struct work_queue *q, struct work_queue_resources
 	struct work_queue_worker *w;
 	char *key;
 	int first = 1;
+	int wnum = 1;
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+
+		debug(D_WQ,"Worker #%d INFO - cores:%d memory:%d disk:%d\n", wnum,w->resources->cores.total,w->resources->memory.total,w->resources->disk.total); //see if information is being passed correctly
+
 		if(first) {
 			*total = *w->resources;
 			first = 0;
 		} else {
 			work_queue_resources_add(total,w->resources);
 		}
+		wnum++;
 	}
+
 
 }
 

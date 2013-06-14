@@ -141,7 +141,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Base url for group lookups. (default: disabled)\n", "-G,--group-url=<url>");
 	fprintf(stdout, " %-30s Run as lower privilege user. (root protection)\n", "-i,--user=<user>");
 	fprintf(stdout, " %-30s Listen only on this network interface.\n", "-I,--interface=<addr>");
-	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--rotate-debug-max=<bytes>");
+	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Use this name when reporting to the catalog.\n", "-n,--catalog-name=<name>");
 	fprintf(stdout, " %-30s Set the maximum number of clients to accept at once. (default unlimited)\n", "-M,--max-clients=<count>");
 	fprintf(stdout, " %-30s Superuser for all directories. (default: none)\n", "-P,--superuser=<user>");
@@ -396,13 +396,14 @@ static struct option long_options[] = {
 	{"read-only", no_argument, 0, 'R'},
 	{"root", required_argument, 0, 'r'},
 	{"root-quota", required_argument, 0, 'Q'},
-	{"rotate-debug-max", required_argument, 0, 'O'},
+	{"debug-rotate-max", required_argument, 0, 'O'},
 	{"stalled", required_argument, 0, 's'},
 	{"superuser", required_argument, 0, 'P'},
 	{"transient", required_argument, 0, 'y'},
 	{"unix-timeout", required_argument, 0, 'z'},
 	{"user", required_argument, 0, 'i'},
-	{"version", no_argument, 0, 'v'}
+	{"version", no_argument, 0, 'v'},
+    {0,0,0,0}
 };
 
 int main(int argc, char *argv[])
@@ -423,7 +424,7 @@ int main(int argc, char *argv[])
 	/* Ensure that all files are created private by default. */
 	umask(0077);
 
-	while((c = getopt_long(argc, argv, "A:a:B:bCc:Ee:F:G:I:l:M:n:O:o:P:p:Q:Rr:s:T:t:U:u:vW:w:y:Z:z:", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "A:a:B:bCc:d:Ee:F:G:hI:i:l:M:n:O:o:P:p:Q:Rr:s:T:t:U:u:vW:w:y:Z:z:", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'A':
 			chirp_acl_default(optarg);

@@ -103,7 +103,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.  (Try -d all to start.)\n", "-d,--debug=<flag>");
 	fprintf(stdout, " %-30s Advertise the master information to a catalog server.\n", "-a,--advertise");
 	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
-	fprintf(stdout, " %-30s Send debugging information to this file. (default stdout)\n", "-o,--output-file=<file>");
+	fprintf(stdout, " %-30s Write debug information to this file. (default stdout)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s The port that the master will be listening on. (default 9068)\n", "-p,--port=<port>");
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--random-port=<file>");
@@ -137,11 +137,12 @@ int main( int argc, char *argv[] )
 		{"debug", required_argument, 0, 'd'},
 		{"advertise", no_argument, 0, 'a'},
 		{"project-name", required_argument, 0, 'N'},
-		{"output-file", required_argument, 0, 'o'},
+		{"debug-file", required_argument, 0, 'o'},
 		{"port", required_argument, 0, 'p'},
 		{"priority", required_argument, 0, 'P'},
 		{"estimated-time", required_argument, 0, 't'},
-		{"random-port", required_argument, 0, 'Z'}
+		{"random-port", required_argument, 0, 'Z'},
+        {0,0,0,0}
 	};
 
 	while((c=getopt_long(argc,argv,"ad:hN:p:P:o:v:Z:", long_options, NULL)) >= 0) {
