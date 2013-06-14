@@ -30,6 +30,7 @@ OPTION_PAIR(-n,number)Maximum number of candidates per task. (default is 10000)
 OPTION_PAIR(-e,args)Extra arguments to pass to the alignment program.
 OPTION_PAIR(-d,subsystem)Enable debugging for this subsystem. (Try BOLD(-d all) to start.)
 OPTION_PAIR(-F,mult)Work Queue fast abort multiplier.(default is 10.)
+OPTION_PAIR(-Z,file)Select port at random and write it out to this file.
 OPTION_PAIR(-o,file)Send debugging to this file.
 OPTION_ITEM(-v)Show version string.
 OPTION_ITEM(-h)Show help text.

@@ -34,6 +34,7 @@ OPTION_ITEM(-u)If set, do not unlink temporary binary output files.
 OPTION_PAIR(-c,file)Checkpoint filename; will be created if necessary.
 OPTION_PAIR(-d,flag)Enable debugging for this subsystem.  (Try BOLD(-d all) to start.)
 OPTION_PAIR(-F,number)Work Queue fast abort multiplier.     (default is 10.)
+OPTION_PAIR(-Z,file)Select port at random and write it out to this file.
 OPTION_PAIR(-o,file)Send debugging to this file.
 OPTION_ITEM(-v)Show version string
 OPTION_ITEM(-h)Show this help screen
