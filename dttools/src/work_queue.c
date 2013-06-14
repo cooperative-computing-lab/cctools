@@ -2118,7 +2118,7 @@ static void start_tasks(struct work_queue *q)
 		}
 	}
 }
-		
+
 static void remove_unready_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
 	char *key;
@@ -2970,6 +2970,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			update_catalog(q, 0);
 		}
 		
+		//remove workers that connected but have not sent a ready message for more than wq_worker_unready_timeout.
 		remove_unready_workers(q);	
 
 		if(q->keepalive_interval > 0) {
