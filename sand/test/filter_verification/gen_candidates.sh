@@ -6,31 +6,18 @@
 
 . ../../../dttools/src/test_runner.common.sh
 
-port=`find_free_port`
-
 PATH=../../src:../../../dttools/src:$PATH
 export PATH
 
-error_state=0;
-
-rm -f random.cfa
-rm -f random.cand 
-rm -rf random.cand.output
-rm -f filter.log
-rm -f worker.log
+echo "Cleaning up..."
+rm -rf port.file random.cfa random.cand random.cand.output filter.log worker.log
 
 echo "Compressing reads ..."
 sand_compress_reads < random.fa > random.cfa
 
-echo "Starting worker for filtering ..."
-work_queue_worker -t 5s -d all -o worker.log localhost $port &
-wpid=$!
-echo "Worker is process $wpid"
-
 echo "Starting filter master ..."
-sand_filter_master -s 100 -k 22 -p $port -d all -o filter.log random.cfa random.cand || { echo "Error in filtering."; kill -9 $wpid; exit 1 ; }
+sand_filter_master -s 100 -k 22 -Z port.file -d all -o filter.log random.cfa random.cand &
 
-echo "Waiting for worker to exit"
-wait $wpid
+run_local_worker port.file
 
 exit 0;
