@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "macros.h"
 #include "daemon.h"
+#include "getopt_aux.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -56,6 +57,9 @@ static time_t clean_interval = 60;
 
 /* The port upon which to listen. */
 static int port = CATALOG_PORT_DEFAULT;
+
+/* The file for writing out the port number. */
+const char *port_file = 0;
 
 /* The preferred hostname set on the command line. */
 static const char *preferred_hostname = 0;
@@ -470,6 +474,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Port number to listen on (default is %d)\n", "-p,--port=<port>", port);
+        fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
 	fprintf(stdout, " %-30s Single process mode; do not work on queries.\n", "-S,--single");
 	fprintf(stdout, " %-30s Maximum time to allow a query process to run.  (default is %ds)\n", "-T,--timeout=<time>",child_procs_timeout);
 	fprintf(stdout, " %-30s Send status updates to this host. (default is %s)\n", "-u,-update-host=<host>", CATALOG_HOST_DEFAULT);
@@ -508,10 +513,11 @@ int main(int argc, char *argv[])
 		{"update-host", required_argument, 0, 'u'},
 		{"update-interval", required_argument, 0, 'U'},
 		{"version", no_argument, 0, 'v'},
+		{"port-file", required_argument, 0, 'Z'},
         {0,0,0,0}};
 
 
-	while((ch = getopt_long(argc, argv, "bB:d:hH:l:L:m:M:n:o:O:p:ST:u:U:v", long_options, NULL)) > -1) {
+	while((ch = getopt_long(argc, argv, "bB:d:hH:l:L:m:M:n:o:O:p:ST:u:U:vZ:", long_options, NULL)) > -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
@@ -570,6 +576,10 @@ int main(int argc, char *argv[])
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
+			case 'Z':
+				port_file = optarg;
+				port = 0;
+				break;
 			}
 	}
 
@@ -611,17 +621,32 @@ int main(int argc, char *argv[])
 	if(!table)
 		fatal("couldn't create directory %s: %s\n",history_dir,strerror(errno));
 
-	update_dgram = datagram_create(port);
-	if(!update_dgram)
-		fatal("couldn't listen on udp port %d", port);
+	list_port = link_serve(port);
+	if(list_port) {
+		/*
+		If a port was chosen automatically, read it back
+		so that the same one can be used for the update port.
+		There is the possibility that the UDP listen will
+		fail because that port is in use.
+		*/
+	  
+		if(port==0) {
+			char addr[LINK_ADDRESS_MAX];
+			link_address_local(list_port,addr,&port);
+		}
+	} else {
+		fatal("couldn't listen on tcp port %d", port);
+	}
 
 	outgoing_dgram = datagram_create(0);
 	if(!outgoing_dgram)
 		fatal("couldn't create outgoing udp port");
 
-	list_port = link_serve(port);
-	if(!list_port)
-		fatal("couldn't listen on tcp port %d", port);
+	update_dgram = datagram_create(port);
+	if(!update_dgram)
+		fatal("couldn't listen on udp port %d", port);
+
+	opts_write_port_file(port_file,port);
 
 	while(1) {
 		fd_set rfds;
