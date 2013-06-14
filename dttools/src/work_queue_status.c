@@ -11,7 +11,11 @@ See the file COPYING for details.
 #include "nvpair.h"
 #include "link_nvpair.h"
 #include "link.h"
+<<<<<<< HEAD
 #include "work_queue_catalog.h"
+=======
+#include "getopt.h"
+>>>>>>> 1b3751f67553fe246d8855c18ea77b6ad7bfb0d2
 
 #include <errno.h>
 #include <string.h>
@@ -73,28 +77,40 @@ static struct nvpair_header master_resource_headers[] = {
 	{NULL,}
 };
 
-static void work_queue_status_show_help(const char *progname)
+static void show_help(const char *progname)
 {
-	printf("usage: %s [master] [port]\n", progname);
-	printf("If a master and port are given, get data directly from that master.\n");
-	printf("Otherwise, contact the catalog server for summary data.\n");
-	printf("Options:\n");
-	printf(" -Q             Show queue summary statistics. (default)\n");
-	printf(" -W             List workers connected to the master.\n");
-	printf(" -T             List tasks of a given master.\n");
-	printf(" -R		Shows aggregated resources of all masters.\n");
-	printf(" -l             Long text output.\n");
-	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n");
-	printf(" -d <flag>      Enable debugging for this subsystem.\n");
-	printf(" -t <time>      RPC timeout (default is %ds).\n", work_queue_status_timeout);
-	printf(" -h             This message.\n");
+	fprintf(stdout, "usage: %s [master] [port]\n", progname);
+	fprintf(stdout, "If a master and port are given, get data directly from that master.\n");
+	fprintf(stdout, "Otherwise, contact the catalog server for summary data.\n");
+	fprintf(stdout, "Options:\n");
+	fprintf(stdout, " %-30s Show queue summary statistics. (default)\n", "-Q,--statistics");
+	fprintf(stdout, " %-30s List workers connected to the master.\n", "-W,--workers");
+	fprintf(stdout, " %-30s List tasks of a given master.\n", "-T,--tasks");
+	fprintf(stdout, " %-30s Show available resources for each master.\n", "-R,--resources");
+	fprintf(stdout, " %-30s Long text output.\n", "-l,--verbose");
+	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT\n", "-C,--catalog=<catalog>");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug <flag>");
+	fprintf(stdout, " %-30s RPC timeout (default is %ds).\n", "-t,--timeout=<time>", work_queue_status_timeout);
+	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
 static void work_queue_status_parse_command_line_arguments(int argc, char *argv[])
 {
 	signed int c;
+	static struct option long_options[] = {
+		{"statistics", no_argument, 0, 'Q'},
+		{"workers", no_argument, 0, 'W'},
+		{"tasks", no_argument, 0, 'T'},
+		{"verbose", no_argument, 0, 'l'},
+		{"catalog", required_argument, 0, 'C'},
+		{"debug", required_argument, 0, 'd'},
+		{"resources", no_argument, 0, 'R'},
+		{"timeout", required_argument, 0, 't'},
+		{"help", no_argument, 0, 'h'},
+        {0,0,0,0}};
 
-	while((c = getopt(argc, argv, "QTWC:d:lo:O:Rt:vh")) > -1) {
+	while((c = getopt_long(argc, argv, "QTWC:d:lo:O:Rt:vh", long_options, NULL)) > -1) {
+
 		switch (c) {
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
@@ -127,7 +143,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			work_queue_status_timeout = strtol(optarg, NULL, 10);
 			break;
 		case 'h':
-			work_queue_status_show_help(argv[0]);
+			show_help(argv[0]);
 			exit(EXIT_SUCCESS);
 			break;
 		case 'R':
@@ -138,7 +154,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			cctools_version_print(stdout, argv[0]);
 			exit(EXIT_SUCCESS);
 		default:
-			work_queue_status_show_help(argv[0]);
+			show_help(argv[0]);
 			exit(EXIT_FAILURE);
 			break;
 		}

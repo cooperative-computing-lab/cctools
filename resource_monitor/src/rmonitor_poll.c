@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <limits.h>
 
@@ -456,8 +457,20 @@ void acc_dsk_usage(struct statfs *acc, struct statfs *other)
 	acc->f_ffree  += other->f_ffree;
 }
 
+/*
+Most Unixes have fts_open/read/close, but Solaris does not.
+*/
+
 int get_wd_usage(struct wdir_info *d)
 {
+#if !defined(HAS_FTS_H)
+	static int did_message = 0;
+	if(!did_message) {
+		debug(D_NOTICE, "fts_open is not implemented on this platform.");
+		did_message = 1;
+	}
+	return 1;
+#else
 	char *argv[] = {d->path, NULL};
 	FTS *hierarchy;
 	FTSENT *entry;
@@ -505,6 +518,7 @@ int get_wd_usage(struct wdir_info *d)
 	fts_close(hierarchy);
 
 	return 0;
+#endif /* HAS_FTS_H */
 }
 
 void acc_wd_usage(struct wdir_info *acc, struct wdir_info *other)

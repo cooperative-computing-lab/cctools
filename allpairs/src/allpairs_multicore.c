@@ -26,6 +26,7 @@ See the file COPYING for details.
 #include "load_average.h"
 #include "macros.h"
 #include "full_io.h"
+#include "getopt_aux.h"
 
 static const char *progname = "allpairs_multicore";
 static const char *extra_arguments = "";
@@ -34,14 +35,14 @@ static int num_cores = 0;
 
 static void show_help(const char *cmd)
 {
-	printf("Usage: %s [options] <set A> <set B> <compare program>\n", cmd);
-	printf("where options are:\n");
-	printf(" -b <items>     Block size: number of items to hold in memory at once. (default: 50%% of RAM\n");
-	printf(" -c <cores>     Number of cores to be used. (default: # of cores in machine)\n");
-	printf(" -e <args>      Extra arguments to pass to the comparison program.\n");
-	printf(" -d <flag>	Enable debugging for this subsystem.\n");
-	printf(" -v         	Show program version.\n");
-	printf(" -h         	Display this message.\n");
+	fprintf(stdout, "Usage: %s [options] <set A> <set B> <compare program>\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " %-30s Block size: number of items to hold in memory at once. (default: 50%% of RAM\n", "-b,--block-size=<items>");
+	fprintf(stdout, " %-30s Number of cores to be used. (default: # of cores in machine)\n", "-c,--cores=<cores>");
+	fprintf(stdout, " %-30s Extra arguments to pass to the comparison program.\n", "-e,--extra-args=<args>");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
+	fprintf(stdout, " %-30s Display this message.\n", "-h,--help");
 }
 
 static int get_file_size( const char *path )
@@ -278,7 +279,17 @@ int main(int argc, char *argv[])
 
 	debug_config(progname);
 
-	while((c = getopt(argc, argv, "b:c:e:d:vh")) > -1) {
+	struct option long_options[] = {
+		{"debug", required_argument, 0, 'd'},
+		{"help",  no_argument, 0, 'h'},
+		{"version", no_argument, 0, 'v'},
+		{"block-size", required_argument, 0, 'b'},
+		{"cores", required_argument, 0, 'c'},
+		{"extra-args", required_argument, 0, 'e'},
+        {0,0,0,0}
+	};
+
+	while((c = getopt_long(argc, argv, "b:c:e:d:vh", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'b':
 			block_size = atoi(optarg);

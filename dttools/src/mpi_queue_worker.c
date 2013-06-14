@@ -523,14 +523,14 @@ int worker_main() {
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s <masterhost> <port>\n", cmd);
-	printf("where options are:\n");
-	printf(" -d <subsystem> Enable debugging for this subsystem.\n");
-	printf(" -t <time>      Abort after this amount of idle time. (default=%ds)\n", idle_timeout);
-	printf(" -o <file>      Send debugging to this file.\n");
-	printf(" -v             Show version string\n");
-	printf(" -w <size>      Set TCP window size.\n");
-	printf(" -h             Show this help screen\n");
+	fprintf(stdout, "Use: %s <masterhost> <port>\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
+	fprintf(stdout, " %-30s Abort after this amount of idle time. (default=%ds)\n", "-t,--timeout=<time>", idle_timeout);
+	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
+	fprintf(stdout, " %-30s Set TCP window size.\n", "-w,--tcp-window=<size>");
+	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
 }
 
 
@@ -548,9 +548,18 @@ int main(int argc, char *argv[])
 
 	MPI_Init(&argc, &argv);
 
+	static struct option long_options[] = {
+		{"debug", required_argument, 0, 'd'},
+		{"timeout", required_argument, 0, 't'},
+		{"debug-file", required_argument, 0, 'o'},
+		{"version", required_argument, 0, 'v'},
+		{"tcp-window", required_argument, 0, 'w'},
+		{"help", required_argument, 0, 'h'},
+        {0,0,0,0}};
+
 	debug_config(argv[0]);
 
-	while((c = getopt(argc, argv, "d:ho:t:w:v")) > -1) {
+	while((c = getopt_long(argc, argv, "d:ho:t:w:v", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);

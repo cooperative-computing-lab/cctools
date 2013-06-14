@@ -455,26 +455,26 @@ static void handle_query(struct link *query_link)
 
 static void show_help(const char *cmd)
 {
-	printf("Use: %s [options]\n", cmd);
-	printf("where options are:\n");
-	printf(" -b             Run as a daemon.\n");
-	printf(" -B <file>      Write process identifier (PID) to file.\n");
-	printf(" -d <subsystem> Enable debugging for this subsystem\n");
-	printf(" -h             Show this help screen\n");
-	printf(" -H <file>      Record catalog history to this directory.\n");
-	printf(" -l <secs>      Lifetime of data, in seconds (default is %d)\n", lifetime);
-	printf(" -L <file>      Log new updates to this file.\n");
-	printf(" -m <n>         Maximum number of child processes.  (default is %d)\n",child_procs_max);
-	printf(" -M <size>      Maximum size of a server to be believed.  (default is any)\n");
-	printf(" -n <name>      Preferred host name of this server.\n");
-	printf(" -o <file>      Send debugging to this file.\n");
-	printf(" -O <bytes>     Rotate debug file once it reaches this size.\n");
-	printf(" -p <port>      Port number to listen on (default is %d)\n", port);
-	printf(" -S             Single process mode; do not work on queries.\n");
-	printf(" -T <time>	Maximum time to allow a query process to run.  (default is %ds)\n",child_procs_timeout);
-	printf(" -u <host>      Send status updates to this host. (default is %s)\n", CATALOG_HOST_DEFAULT);
-	printf(" -U <time>      Send status updates at this interval. (default is 5m)\n");
-	printf(" -v             Show version string\n");
+	fprintf(stdout, "Use: %s [options]\n", cmd);
+	fprintf(stdout, "where options are:\n");
+	fprintf(stdout, " %-30s Run as a daemon.\n", "-b,--background");
+	fprintf(stdout, " %-30s Write process identifier (PID) to file.\n", "-B,pid-file=<file>");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
+	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
+	fprintf(stdout, " %-30s Record catalog history to this directory.\n", "-H,--history=<file>");
+	fprintf(stdout, " %-30s Lifetime of data, in seconds (default is %d)\n", "-l,--lifetime=<secs>", lifetime);
+	fprintf(stdout, " %-30s Log new updates to this file.\n", "-L,--update-log=<file>");
+	fprintf(stdout, " %-30s Maximum number of child processes.  (default is %d)\n", "-m,--max-jobs=<n>",child_procs_max);
+	fprintf(stdout, " %-30s Maximum size of a server to be believed.  (default is any)\n", "-M,--server-size=<size>");
+	fprintf(stdout, " %-30s Preferred host name of this server.\n", "-n,--name=<name>");
+	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s Port number to listen on (default is %d)\n", "-p,--port=<port>", port);
+	fprintf(stdout, " %-30s Single process mode; do not work on queries.\n", "-S,--single");
+	fprintf(stdout, " %-30s Maximum time to allow a query process to run.  (default is %ds)\n", "-T,--timeout=<time>",child_procs_timeout);
+	fprintf(stdout, " %-30s Send status updates to this host. (default is %s)\n", "-u,-update-host=<host>", CATALOG_HOST_DEFAULT);
+	fprintf(stdout, " %-30s Send status updates at this interval. (default is 5m)\n", "-U,--update-interval=<time>");
+	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
 }
 
 int main(int argc, char *argv[])
@@ -489,7 +489,29 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((ch = getopt(argc, argv, "bB:d:hH:l:L:m:M:n:o:O:p:ST:u:U:v")) > -1) {
+	static struct option long_options[] = {
+		{"background", no_argument, 0, 'b'},
+		{"pid-file", required_argument, 0, 'B'},
+		{"debug", required_argument, 0, 'd'},
+		{"help", no_argument, 0, 'h'},
+		{"history", required_argument, 0, 'H'},
+		{"lifetime", required_argument, 0, 'l'},
+		{"update-log", required_argument, 0, 'L'},
+		{"max-jobs", required_argument, 0, 'm'},
+		{"server-size", required_argument, 0, 'M'},
+		{"name", required_argument, 0, 'n'},
+		{"debug-file", required_argument, 0, 'o'},
+		{"debug-rotate-max", required_argument, 0, 'O'},
+		{"port", required_argument, 0, 'p'},
+		{"single", no_argument, 0, 'S'},
+		{"timeout", required_argument, 0, 'T'},
+		{"update-host", required_argument, 0, 'u'},
+		{"update-interval", required_argument, 0, 'U'},
+		{"version", no_argument, 0, 'v'},
+        {0,0,0,0}};
+
+
+	while((ch = getopt_long(argc, argv, "bB:d:hH:l:L:m:M:n:o:O:p:ST:u:U:v", long_options, NULL)) > -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;

@@ -43,6 +43,7 @@ can be released:
 #include "rmonitor.h"
 #include "copy_stream.h"
 #include "random_init.h"
+#include "process.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -145,6 +146,7 @@ struct work_queue {
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;
 	int task_ordering;
+	int process_pending_check;
 
 	timestamp_t time_last_task_start;
 	timestamp_t idle_time;
@@ -158,6 +160,9 @@ struct work_queue {
 	int estimate_capacity_on;
 	int capacity;
 	int avg_capacity;
+	
+	double asynchrony_multiplier;
+	int asynchrony_modifier;
 
 	char *catalog_host;
 	int catalog_port;
@@ -246,13 +251,20 @@ static long double minimum_allowed_transfer_rate = 100000;	// 100 KB/s
 /********** work_queue internal functions *************/
 /******************************************************/
 
+static int get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->cores.total)
+		return w->resources->cores.total * q->asynchrony_multiplier + q->asynchrony_modifier;
+	else
+		return 0;
+}
 
-static int get_worker_state(struct work_queue_worker *w) {
+
+static int get_worker_state(struct work_queue *q, struct work_queue_worker *w) {
 	if(!strcmp(w->hostname, "unknown")) {
 		return WORKER_STATE_INIT;
-	} else if(w->resources->cores.total && !w->cores_allocated ) {
+	} else if(get_worker_cores(q, w) && !w->cores_allocated ) {
 		return WORKER_STATE_READY;
-	} else if(w->cores_allocated < w->resources->cores.total) {
+	} else if(w->cores_allocated < get_worker_cores(q,w)) {
 		return WORKER_STATE_BUSY;
 	} else {
 		return WORKER_STATE_FULL;
@@ -268,7 +280,7 @@ static void update_worker_states(struct work_queue *q) {
 	
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
-		q->workers_in_state[get_worker_state(w)]++;
+		q->workers_in_state[get_worker_state(q, w)]++;
 	}
 }
 
@@ -1136,12 +1148,12 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q )
 
 
 
-struct nvpair * worker_to_nvpair( struct work_queue_worker *w )
+struct nvpair * worker_to_nvpair( struct work_queue *q, struct work_queue_worker *w )
 {
 	struct nvpair *nv = nvpair_create();
 	if(!nv) return 0;
 
-	nvpair_insert_string(nv,"state",work_queue_state_names[get_worker_state(w)]);
+	nvpair_insert_string(nv,"state",work_queue_state_names[get_worker_state(q, w)]);
 	nvpair_insert_string(nv,"hostname",w->hostname);
 	nvpair_insert_string(nv,"os",w->os);
 	nvpair_insert_string(nv,"arch",w->arch);
@@ -1257,7 +1269,7 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 		while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 			// If the worker has not been initializd, ignore it.
 			if(!strcmp(w->hostname, "unknown")) continue;
-			nv = worker_to_nvpair(w);
+			nv = worker_to_nvpair(q, w);
 			if(nv) {
 				link_nvpair_write(l,nv,stoptime);
 				nvpair_delete(nv);
@@ -1951,7 +1963,7 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->cores_allocated + t->cores <= w->resources->cores.total) {
+		if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
 			task_cached_bytes = 0;
 			list_first_item(t->input_files);
 			while((tf = list_next_item(t->input_files))) {
@@ -1981,7 +1993,7 @@ static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q, struc
 	struct work_queue_worker *w;
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		if(w->cores_allocated + t->cores <= w->resources->cores.total) {
+		if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
 			return w;
 		}
 	}
@@ -2009,7 +2021,7 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q, str
 			continue;
 		}
 		
-		if(w->cores_allocated + t->cores <= w->resources->cores.total) {
+		if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
 			random_worker--;
 		} else {
 			w = NULL;
@@ -2028,7 +2040,7 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->cores_allocated + t->cores <= w->resources->cores.total) {
+		if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
 			if(w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
 				if(!best_worker || t < best_time) {
@@ -2636,6 +2648,7 @@ struct work_queue *work_queue_create(int port)
 	q->fast_abort_multiplier = wq_option_fast_abort_multiplier;
 	q->worker_selection_algorithm = wq_option_scheduler;
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
+	q->process_pending_check = 0;
 
 	// Capacity estimation related
 	q->start_time = timestamp_get();
@@ -2651,6 +2664,9 @@ struct work_queue *work_queue_create(int port)
 
 	q->monitor_mode   =  0;
 	q->password = 0;
+	
+	q->asynchrony_multiplier = 1.0;
+	q->asynchrony_modifier = 0;
 	
 	if( (envstring  = getenv("WORK_QUEUE_BANDWIDTH")) ) {
 		q->bandwidth = string_metric_parse(envstring);
@@ -2948,6 +2964,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			last_left_status = 1;
 			return t;
 		}
+		
+		if( q->process_pending_check && process_pending() ) {
+			return NULL;
+		}
 
 //		debug(D_WQ, "workers_in_state[BUSY] = %d, workers_in_state[FULL] = %d, list_size(ready_list) = %d, aux_links = %x, list_size(aux_links) = %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_FULL], list_size(q->ready_list), aux_links, aux_links?list_size(aux_links):0);
 
@@ -3187,6 +3207,16 @@ void work_queue_specify_keepalive_interval(struct work_queue *q, int interval)
 void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout) 
 {
 	q->keepalive_timeout = timeout;
+}
+
+void work_queue_specify_asynchrony(struct work_queue *q, double multiplier, int modifier) {
+	q->asynchrony_multiplier = MAX(multiplier, 1.0);
+	q->asynchrony_modifier = MAX(modifier, 0);
+}
+
+void work_queue_enable_process_module(struct work_queue *q)
+{
+	q->process_pending_check = 1;
 }
 
 char * work_queue_get_worker_summary( struct work_queue *q )

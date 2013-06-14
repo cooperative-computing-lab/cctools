@@ -52,7 +52,7 @@ int buffer_printf(buffer_t * b, const char *format, ...);
     deleting the buffer. A final ASCII NUL character is guaranteed to terminate
     the string.
     @param b The buffer.
-    @param size The size of the string is placed in this variable.
+    @param size The size of the string is placed in this variable. Can be NULL.
     @return The buffer as a string with a NUL terminator.
   */
 const char *buffer_tostring(buffer_t * b, size_t * size);

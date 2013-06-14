@@ -1,7 +1,7 @@
 include ../Makefile.config
 include ../Makefile.rules
 
-SCRIPT = bin/rmv
+SCRIPT = bin/resource_monitor_visualizer
 
 test:
 

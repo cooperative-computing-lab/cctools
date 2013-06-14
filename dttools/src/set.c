@@ -8,6 +8,7 @@ See the file COPYING for details.
 
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #define DEFAULT_SIZE 127
 #define DEFAULT_LOAD 0.75

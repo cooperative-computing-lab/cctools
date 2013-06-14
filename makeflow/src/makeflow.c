@@ -32,6 +32,7 @@ See the file COPYING for details.
 #include "itable.h"
 #include "debug.h"
 #include "work_queue.h"
+#include "work_queue_internal.h"
 #include "delete_dir.h"
 #include "stringtools.h"
 #include "load_average.h"
@@ -2029,7 +2030,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-output=<file>");
 	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
 	fprintf(stdout, " %-30s Password file for authenticating workers.\n", "   --password");
-	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--port=<port>", WORK_QUEUE_DEFAULT_PORT);
+	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--wq-port=<port>", WORK_QUEUE_DEFAULT_PORT);
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", dag_retry_max);
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to n times.\n", "-r,--retry-count=<n>");
@@ -2785,6 +2786,7 @@ int main(int argc, char *argv[])
 		work_queue_specify_estimate_capacity_on(q, work_queue_estimate_capacity_on);
 		work_queue_specify_keepalive_interval(q, work_queue_keepalive_interval);
 		work_queue_specify_keepalive_timeout(q, work_queue_keepalive_timeout);
+		work_queue_enable_process_module(q);
 		port = work_queue_port(q);
 		if(port_file)
 			opts_write_port_file(port_file, port);

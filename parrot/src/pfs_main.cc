@@ -158,74 +158,74 @@ static void pfs_helper_init( const char *argv0 )
 	}
 }
 
-static void show_use( const char *cmd )
+static void show_help( const char *cmd )
 {
 		/* 80-column text marker */
                 /******************************************************************************/
-	printf("Use: %s [options] <command> ...\n",cmd);
-	printf("Where options and environment variables are:\n");
-	printf("  -a <list>  Use these Chirp authentication methods.   (PARROT_CHIRP_AUTH)\n");
-	printf("  -b <bytes> Set the I/O block size hint.              (PARROT_BLOCK_SIZE)\n");
-	printf("  -c <file>  Print exit status information to <file>.\n");
-	printf("  -C         Enable data channel authentication in GridFTP.\n");
-	printf("  -d <name>  Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n");
-	printf("  -D         Disable small file optimizations.\n");
-	printf("  -F         Enable file snapshot caching for all protocols.\n");
-	printf("  -f         Disable following symlinks.\n");
-	printf("  -G <num>   Fake this gid; Real gid stays the same.          (PARROT_GID)\n");
-	printf("  -H         Disable use of helper library.\n");
-	printf("  -h         Show this screen.\n");
-	printf("  -i <files> Comma-delimited list of tickets to use for authentication.\n");
-	printf("  -I <num>   Set the debug level output for the iRODS driver.\n");
-	printf("  -K         Checksum files where available.\n");
-	printf("  -k         Do not checksum files.\n");
-	printf("  -l <path>  Path to ld.so to use.                      (PARROT_LDSO_PATH)\n");
-	printf("  -m <file>  Use this file as a mountlist.             (PARROT_MOUNT_FILE)\n");
-	printf("  -M/foo=/bar Mount (redirect) /foo to /bar.         (PARROT_MOUNT_STRING)\n");
-	printf("  -N <name>  Pretend that this is my hostname.          (PARROT_HOST_NAME)\n");
-	printf("  -o <file>  Send debugging messages to this file.     (PARROT_DEBUG_FILE)\n");
-	printf("  -O <bytes> Rotate debug files of this size.     (PARROT_DEBUG_FILE_SIZE)\n");
-	printf("  -p <hst:p> Use this proxy server for HTTP requests.         (HTTP_PROXY)\n");
-	printf("  -P         Enable paranoid mode for identity boxing mode.\n");
-	printf("  -Q         Inhibit catalog queries to list /chirp.\n");
-	printf("  -r <repos> CVMFS repositories to enable.             (PARROT_CVMFS_REPO)\n");
-	printf("  -R <cksum> Enforce this root filesystem checksum, where available.\n");
-	printf("  -s         Use streaming protocols without caching.(PARROT_FORCE_STREAM)\n");
-	printf("  -S         Enable whole session caching for all protocols.\n");
-	printf("  -t <dir>   Where to store temporary files.             (PARROT_TEMP_DIR)\n");
-	printf("  -T <time>  Maximum amount of time to retry failures.    (PARROT_TIMEOUT)\n");
-	printf("  -U <num>   Fake this unix uid; Real uid stays the same.     (PARROT_UID)\n");
-	printf("  -u <name>  Use this extended username.                 (PARROT_USERNAME)\n");
-	printf("  -v         Display version number.\n");
-	printf("  -w         Initial working directory.\n");
-	printf("  -W         Display table of system calls trapped.\n");
-	printf("  -Y         Force synchronous disk writes.            (PARROT_FORCE_SYNC)\n");
-	printf("  -Z         Enable automatic decompression on .gz files.\n");
-	printf("\n");
-	printf("Known debugging sub-systems are: ");
+	fprintf(stdout, "Use: %s [options] <command> ...\n",cmd);
+	fprintf(stdout, "Where options and environment variables are:\n");
+	fprintf(stdout, " %-30s Use these Chirp authentication methods.   (PARROT_CHIRP_AUTH)\n", "-a,--chirp-auth=<list>");
+	fprintf(stdout, " %-30s Set the I/O block size hint.              (PARROT_BLOCK_SIZE)\n", "-b,--block-size=<bytes>");
+	fprintf(stdout, " %-30s Print exit status information to <file>.\n", "-c,--status-file=<file>");
+	fprintf(stdout, " %-30s Enable data channel authentication in GridFTP.\n", "-C,--channel-auth");
+	fprintf(stdout, " %-30s Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n", "-d,--debug=<name>");
+	fprintf(stdout, " %-30s Disable small file optimizations.\n", "-D,--no-optimize");
+	fprintf(stdout, " %-30s Enable file snapshot caching for all protocols.\n", "-F,--with-snapshots");
+	fprintf(stdout, " %-30s Disable following symlinks.\n", "-f,--no-follow-symlinks");
+	fprintf(stdout, " %-30s Fake this gid; Real gid stays the same.          (PARROT_GID)\n", "-G,--gid=<num>");
+	fprintf(stdout, " %-30s Disable use of helper library.\n", "-H,--no-helper");
+	fprintf(stdout, " %-30s Show this screen.\n", "-h,--help");
+	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
+	fprintf(stdout, " %-30s Set the debug level output for the iRODS driver.\n", "-I,--debug-level-irods=<num>");
+	fprintf(stdout, " %-30s Checksum files where available.\n", "-K,--with-checksums");
+	fprintf(stdout, " %-30s Do not checksum files.\n", "-k,--no-checksums");
+	fprintf(stdout, " %-30s Path to ld.so to use.                      (PARROT_LDSO_PATH)\n", "-l,--ld-path=<path>");
+	fprintf(stdout, " %-30s Use this file as a mountlist.             (PARROT_MOUNT_FILE)\n", "-m,--ftab-file=<file>");
+	fprintf(stdout, " %-30s Mount (redirect) /foo to /bar.         (PARROT_MOUNT_STRING)\n", "-M,--mount=/foo=/bar");
+	fprintf(stdout, " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
+	fprintf(stdout, " %-30s Send debugging messages to this file.     (PARROT_DEBUG_FILE)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Rotate debug files of this size.     (PARROT_DEBUG_FILE_SIZE)\n", "-O,--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s Use this proxy server for HTTP requests.         (HTTP_PROXY)\n", "-p,--proxy=<hst:p>");
+	fprintf(stdout, " %-30s Enable paranoid mode for identity boxing mode.\n", "-P,--paranoid");
+	fprintf(stdout, " %-30s Inhibit catalog queries to list /chirp.\n", "-Q,--no-chirp-catalog");
+	fprintf(stdout, " %-30s CVMFS repositories to enable.             (PARROT_CVMFS_REPO)\n", "-r,--cvmfs-repos=<repos>");
+	fprintf(stdout, " %-30s Enforce this root filesystem checksum, where available.\n", "-R,--root-checksum=<cksum>");
+	fprintf(stdout, " %-30s Use streaming protocols without caching.(PARROT_FORCE_STREAM)\n", "-s,--stream-no-cache");
+	fprintf(stdout, " %-30s Enable whole session caching for all protocols.\n", "-S,--session-caching");
+	fprintf(stdout, " %-30s Where to store temporary files.             (PARROT_TEMP_DIR)\n", "-t,--tempdir=<dir>");
+	fprintf(stdout, " %-30s Maximum amount of time to retry failures.    (PARROT_TIMEOUT)\n", "-T,--timeout=<time>");
+	fprintf(stdout, " %-30s Fake this unix uid; Real uid stays the same.     (PARROT_UID)\n", "-U,--uid=<num>");
+	fprintf(stdout, " %-30s Use this extended username.                 (PARROT_USERNAME)\n", "-u,--username=<name>");
+	fprintf(stdout, " %-30s Display version number.\n", "-v,--version");
+	fprintf(stdout, " %-30s Initial working directory.\n", "-w,--work-dir=<dir>");
+	fprintf(stdout, " %-30s Display table of system calls trapped.\n", "-W,--syscall-table");
+	fprintf(stdout, " %-30s Force synchronous disk writes.            (PARROT_FORCE_SYNC)\n", "-Y,--sync-write");
+	fprintf(stdout, " %-30s Enable automatic decompression on .gz files.\n", "-Z,--auto-decompress");
+	fprintf(stdout, "\n");
+	fprintf(stdout, "Known debugging sub-systems are: ");
 	debug_flags_print(stdout);
-	printf("\n");
-	printf("Enabled filesystems are:");
-	if(pfs_service_lookup("http"))		printf(" http");
-	if(pfs_service_lookup("grow"))		printf(" grow");
-	if(pfs_service_lookup("ftp"))		printf(" ftp");
-	if(pfs_service_lookup("anonftp"))	printf(" anonftp");
-	if(pfs_service_lookup("gsiftp"))	printf(" gsiftp");
-	if(pfs_service_lookup("nest"))		printf(" nest");
-	if(pfs_service_lookup("chirp"))		printf(" chirp");
-	if(pfs_service_lookup("gfal"))		printf(" gfal lfn guid srm");
-	if(pfs_service_lookup("rfio"))		printf(" rfio");
-	if(pfs_service_lookup("dcap"))		printf(" dcap");
-	if(pfs_service_lookup("glite"))		printf(" glite");
-	if(pfs_service_lookup("lfc"))		printf(" lfc");
-	if(pfs_service_lookup("irods"))		printf(" irods");
-	if(pfs_service_lookup("hdfs"))		printf(" hdfs");
-	if(pfs_service_lookup("bxgrid"))	printf(" bxgrid");
-	if(pfs_service_lookup("s3"))		printf(" s3");
-	if(pfs_service_lookup("root"))          printf(" root");
-	if(pfs_service_lookup("xrootd"))        printf(" xrootd");
-	if(pfs_service_lookup("cvmfs"))		printf(" cvmfs");
-	printf("\n");
+	fprintf(stdout, "\n");
+	fprintf(stdout, "Enabled filesystems are:");
+	if(pfs_service_lookup("http"))		fprintf(stdout, " http");
+	if(pfs_service_lookup("grow"))		fprintf(stdout, " grow");
+	if(pfs_service_lookup("ftp"))		fprintf(stdout, " ftp");
+	if(pfs_service_lookup("anonftp"))	fprintf(stdout, " anonftp");
+	if(pfs_service_lookup("gsiftp"))	fprintf(stdout, " gsiftp");
+	if(pfs_service_lookup("nest"))		fprintf(stdout, " nest");
+	if(pfs_service_lookup("chirp"))		fprintf(stdout, " chirp");
+	if(pfs_service_lookup("gfal"))		fprintf(stdout, " gfal lfn guid srm");
+	if(pfs_service_lookup("rfio"))		fprintf(stdout, " rfio");
+	if(pfs_service_lookup("dcap"))		fprintf(stdout, " dcap");
+	if(pfs_service_lookup("glite"))		fprintf(stdout, " glite");
+	if(pfs_service_lookup("lfc"))		fprintf(stdout, " lfc");
+	if(pfs_service_lookup("irods"))		fprintf(stdout, " irods");
+	if(pfs_service_lookup("hdfs"))		fprintf(stdout, " hdfs");
+	if(pfs_service_lookup("bxgrid"))	fprintf(stdout, " bxgrid");
+	if(pfs_service_lookup("s3"))		fprintf(stdout, " s3");
+	if(pfs_service_lookup("root"))      fprintf(stdout, " root");
+	if(pfs_service_lookup("xrootd"))    fprintf(stdout, " xrootd");
+	if(pfs_service_lookup("cvmfs"))		fprintf(stdout, " cvmfs");
+	fprintf(stdout, "\n");
 	exit(1);
 }
 
@@ -494,7 +494,48 @@ int main( int argc, char *argv[] )
 
 	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
 
-	while((c=getopt(argc,argv,"+hA:a:b:B:c:Cd:DFfG:Hi:I:kKl:m:M:N:o:O:p:PQr:R:sSt:T:U:u:vw:WY"))!=(char)-1) {
+	struct option long_options[] = {
+		{"chirp-auth",  required_argument, 0, 'a'},
+		{"block-size", required_argument, 0, 'b'},
+		{"status-file", required_argument, 0, 'c'},
+		{"channel-auth", no_argument, 0, 'C'},
+		{"debug", required_argument, 0, 'd'},
+		{"no-optimize", no_argument, 0, 'D'},
+		{"with-snapshots", no_argument, 0, 'F'},
+		{"no-follow-symlinks", no_argument, 0, 'f'},
+		{"gid", required_argument, 0, 'G'},
+		{"no-helper", no_argument, 0, 'H'},
+		{"help", no_argument, 0, 'h'},
+		{"tickets", required_argument, 0, 'i'},
+		{"debug-level-irods", required_argument, 0, 'I'},
+		{"with-checksums", no_argument, 0, 'K'},
+		{"no-checksums", no_argument, 0, 'k'},
+		{"ld-path", required_argument, 0, 'l'},
+		{"tab-file", required_argument, 0, 'm'},
+		{"mount", required_argument, 0, 'M'},
+		{"hostname", required_argument, 0, 'N'},
+		{"debug-file", required_argument, 0, 'o'},
+		{"debug-rotate-max", required_argument, 0, 'O'},
+		{"proxy", required_argument, 0, 'p'},
+		{"paranoid", no_argument, 0, 'P'},
+		{"no-chirp-catalog", no_argument, 0, 'Q'},
+		{"cvmfs-repos", required_argument, 0, 'r'},
+		{"root-checksum", required_argument, 0, 'R'},
+		{"stream-no-cache", no_argument, 0, 's'},
+		{"session-caching", no_argument, 0, 'S'},
+		{"tempdir", required_argument, 0, 't'},
+		{"timeout", required_argument, 0, 'T'},
+		{"uid", required_argument, 0, 'U'},
+		{"username", required_argument, 0, 'u'},
+		{"version", no_argument, 0, 'v'},
+		{"work-dir", required_argument, 0, 'w'},
+		{"syscall-table", no_argument, 0, 'W'},
+		{"sync-write", no_argument, 0, 'Y'},
+		{"auto-decompress", no_argument, 0, 'Z'},
+        {0,0,0,0}
+	};
+
+	while((c=getopt_long(argc,argv,"+hA:a:b:B:c:Cd:DFfG:Hi:I:kKl:m:M:N:o:O:p:PQr:R:sSt:T:U:u:vw:WY", long_options, NULL)) > -1) {
 		switch(c) {
 		case 'a':
 			if(!auth_register_byname(optarg)) {
@@ -517,7 +558,7 @@ int main( int argc, char *argv[] )
 			ftp_lite_data_channel_authentication = 1;
 			break;
 		case 'd':
-			if(!debug_flags_set(optarg)) show_use(argv[0]);
+			if(!debug_flags_set(optarg)) show_help(argv[0]);
 			break;
 		case 'D':
 			pfs_enable_small_file_optimizations = 0;
@@ -614,12 +655,12 @@ int main( int argc, char *argv[] )
 			pfs_syscall_totals64 = (int*) calloc(SYSCALL64_MAX,sizeof(int));
 			break;
 		default:
-			show_use(argv[0]);
+			show_help(argv[0]);
 			break;
 	}
 	}
 
-	if(optind>=argc) show_use(argv[0]);
+	if(optind>=argc) show_help(argv[0]);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 	get_linux_version(argv[0]);

@@ -12,6 +12,7 @@ All of the structure and type definitions used by the Chirp API.
 #ifndef CHIRP_TYPES_H
 #define CHIRP_TYPES_H
 
+#include "buffer.h"
 #include "int_sizes.h"
 #include "chirp_protocol.h"
 
@@ -76,9 +77,10 @@ struct chirp_searchent {
 /** Keeps track of the state of a search stream */
 
 struct chirp_searchstream {
-        struct chirp_searchent *entry;
-        char *data;
-        int i;
+	struct chirp_searchent *entry;
+	const char *data;
+	buffer_t *buffer;
+	int i;
 };
 
 #define CHIRP_SEARCH struct chirp_searchstream
