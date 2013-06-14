@@ -802,7 +802,7 @@ static struct link *auto_link_connect(char *addr, int *port)
  * end
  *
  */
-static int stream_output_item(struct link *master, const char *filename)
+static int stream_output_item(struct link *master, const char *filename, int recursive)
 {
 	DIR *dir;
 	struct dirent *dent;
@@ -825,12 +825,12 @@ static int stream_output_item(struct link *master, const char *filename)
 			goto failure;
 		}
 		send_master_message(master, "dir %s %lld\n", filename, (INT64_T) 0);
-
-		while((dent = readdir(dir))) {
+		
+		while(recursive && (dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
 				continue;
 			sprintf(dentline, "%s/%s", filename, dent->d_name);
-			stream_output_item(master, dentline);
+			stream_output_item(master, dentline, recursive);
 		}
 
 		closedir(dir);
@@ -914,7 +914,7 @@ static struct link *connect_master(time_t stoptime) {
 	return NULL;
 }
 
-static int do_task( struct link *master, UINT64_T taskid )
+static int do_task( struct link *master, int taskid )
 {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
@@ -927,7 +927,7 @@ static int do_task( struct link *master, UINT64_T taskid )
 
 	task->taskid = taskid;
 
-	sprintf(dirname, "t.%" SCNd64 , taskid);
+	sprintf(dirname, "t.%d" , taskid);
 	mkdir(dirname, 0700);
 
 	while(recv_master_message(master,line,sizeof(line),stoptime)) {
@@ -944,6 +944,8 @@ static int do_task( struct link *master, UINT64_T taskid )
 		} else if(sscanf(line,"outfile %s %s %d", filename, taskname, &flags)) {
 			sprintf(localname, "cache/%s", filename);
 		       	work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags);
+		} else if(sscanf(line, "dir %s", filename)) {
+			work_queue_task_specify_directory(task, filename, filename, WORK_QUEUE_INPUT, 0700, 0);
 		} else if(sscanf(line,"cores %d",&n)) {
 		       	work_queue_task_specify_cores(task, n);
 		} else if(sscanf(line,"memory %d",&n)) {
@@ -969,46 +971,19 @@ static int do_task( struct link *master, UINT64_T taskid )
 		struct work_queue_file *tf;
 		list_first_item(task->input_files);
 		while((tf = list_next_item(task->input_files))) {
-			if(!link_file_in_workspace((char*)tf->payload, tf->remote_name, dirname, 1)) {
+			if(tf->type == WORK_QUEUE_DIRECTORY) {
+				sprintf(taskname, "t.%d/%s", taskid, tf->remote_name);
+				if(!create_dir(taskname, 0700)) {
+					debug(D_NOTICE, "Directory %s could not be created and is needed by task %d.", taskname, taskid);
+					return 0;
+				}
+			} else if(!link_file_in_workspace((char*)tf->payload, tf->remote_name, dirname, 1)) {
 				debug(D_NOTICE, "File %s does not exist and is needed by task %d.", (char*)tf->payload, task->taskid);
 				return 0;
 			}
 		}
 		list_push_tail(waiting_tasks, task);
 	}
-	return 1;
-}
-
-static int do_stat(struct link *master, const char *filename) {
-	struct stat st;
-	if(!stat(filename, &st)) {
-		send_master_message(master, "result 1 %lu %lu\n",(unsigned long int) st.st_size, (unsigned long int) st.st_mtime);
-	} else {
-		send_master_message(master, "result 0 0 0\n");
-	}
-	return 1;
-}
-
-static int do_symlink(const char *path, char *filename) {
-	int mode = 0;
-	char *cur_pos, *tmp_pos;
-
-	cur_pos = filename;
-
-	if(!strncmp(cur_pos, "./", 2)) {
-		cur_pos += 2;
-	}
-
-	tmp_pos = strrchr(cur_pos, '/');
-	if(tmp_pos) {
-		*tmp_pos = '\0';
-		if(!create_dir(cur_pos, mode | 0700)) {
-			debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
-			return 0;
-		}
-		*tmp_pos = '/';
-	}
-	symlink(path, filename);
 	return 1;
 }
 
@@ -1077,52 +1052,16 @@ static int do_unlink(const char *path) {
 	return 1;
 }
 
-static int do_mkdir(const char *filename, int mode) {
-	char cached_filename[WORK_QUEUE_LINE_MAX];
-	sprintf(cached_filename, "cache/%s", filename);
-	if(!create_dir(cached_filename, mode | 0700)) {
-		debug(D_WQ, "Could not create directory - %s (%s)\n", filename, strerror(errno));
-		return 0;
-	}
-	return 1;
-}
-
-static int do_rget(struct link *master, const char *filename) {
-	stream_output_item(master, filename);
+static int do_get(struct link *master, const char *filename, int recursive) {
+	stream_output_item(master, filename, recursive);
 	send_master_message(master, "end\n");
-	return 1;
-}
-
-static int do_get(struct link *master, const char *filename) {
-	int fd;
-	INT64_T length;
-	struct stat info;
-	if(stat(filename, &info) != 0) {
-		fprintf(stderr, "Output file %s was not created. (%s)\n", filename, strerror(errno));
-		return 0;
-	}
-	// send back a single file
-	fd = open(filename, O_RDONLY, 0);
-	if(fd >= 0) {
-		length = (INT64_T) info.st_size;
-		send_master_message(master, "%lld\n",length);
-		INT64_T actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
-		close(fd);
-		if(actual != length) {
-			debug(D_WQ, "Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.\nEntering recovery process now ...\n", filename, length, actual);
-			return 0;
-		}
-	} else {
-		fprintf(stderr, "Could not open output file %s. (%s)\n", filename, strerror(errno));
-		return 0;
-	}
-
 	return 1;
 }
 
 static int do_thirdget(int mode, char *filename, const char *path) {
 	char cmd[WORK_QUEUE_LINE_MAX];
-	char *cur_pos, *tmp_pos;
+	char cached_filename[WORK_QUEUE_LINE_MAX];
+	char *cur_pos;
 
 	if(mode != WORK_QUEUE_FS_CMD) {
 		struct stat info;
@@ -1137,36 +1076,40 @@ static int do_thirdget(int mode, char *filename, const char *path) {
 	}
 
 	cur_pos = filename;
-	if(!strncmp(cur_pos, "./", 2)) {
+
+	while(!strncmp(cur_pos, "./", 2)) {
 		cur_pos += 2;
 	}
+	
+	sprintf(cached_filename, "cache/%s", cur_pos);
 
-	tmp_pos = strrchr(cur_pos, '/');
-	if(tmp_pos) {
-		*tmp_pos = '\0';
-		if(!create_dir(cur_pos, mode | 0700)) {
-			debug(D_WQ, "Could not create directory - %s (%s)\n", cur_pos, strerror(errno));
+	cur_pos = strrchr(cached_filename, '/');
+	if(cur_pos) {
+		*cur_pos = '\0';
+		if(!create_dir(cached_filename, mode | 0700)) {
+			debug(D_WQ, "Could not create directory - %s (%s)\n", cached_filename, strerror(errno));
 			return 0;
 		}
-		*tmp_pos = '/';
+		*cur_pos = '/';
 	}
 
 	switch (mode) {
 	case WORK_QUEUE_FS_SYMLINK:
-		if(symlink(path, filename) != 0) {
+		if(symlink(path, cached_filename) != 0) {
 			debug(D_WQ, "Could not thirdget %s, symlink (%s) failed. (%s)\n", filename, path, strerror(errno));
 			return 0;
 		}
 	case WORK_QUEUE_FS_PATH:
-		sprintf(cmd, "/bin/cp %s %s", path, filename);
+		sprintf(cmd, "/bin/cp %s %s", path, cached_filename);
 		if(system(cmd) != 0) {
 			debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (/bin/cp %s)\n", filename, path, filename, strerror(errno));
 			return 0;
 		}
 		break;
 	case WORK_QUEUE_FS_CMD:
-		if(system(path) != 0) {
-			debug(D_WQ, "Could not thirdget %s, command (%s) failed. (%s)\n", filename, path, strerror(errno));
+		sprintf(cmd, "%s > %s", path, cached_filename);
+		if(system(cmd) != 0) {
+			debug(D_WQ, "Could not thirdget %s, command (%s) failed. (%s)\n", filename, cmd, strerror(errno));
 			return 0;
 		}
 		break;
@@ -1177,33 +1120,50 @@ static int do_thirdget(int mode, char *filename, const char *path) {
 static int do_thirdput(struct link *master, int mode, const char *filename, const char *path) {
 	struct stat info;
 	char cmd[WORK_QUEUE_LINE_MAX];
+	char cached_filename[WORK_QUEUE_LINE_MAX];
+	const char *cur_pos;
+	int result = 1;
 
+	cur_pos = filename;
+
+	while(!strncmp(cur_pos, "./", 2)) {
+		cur_pos += 2;
+	}
+	
+	sprintf(cached_filename, "cache/%s", cur_pos);
+
+
+	if(stat(cached_filename, &info) != 0) {
+		debug(D_WQ, "File %s not accessible. (%s)\n", cached_filename, strerror(errno));
+		result = 0;
+	}
+
+	
 	switch (mode) {
 	case WORK_QUEUE_FS_SYMLINK:
 	case WORK_QUEUE_FS_PATH:
-		if(stat(filename, &info) != 0) {
-			debug(D_WQ, "File %s not accessible. (%s)\n", filename, strerror(errno));
-			return 0;
-		}
 		if(!strcmp(filename, path)) {
 			debug(D_WQ, "thirdput aborted: filename (%s) and path (%s) are the same\n", filename, path);
-			return 1;
+			result = 1;
 		}
-		sprintf(cmd, "/bin/cp %s %s", filename, path);
+		sprintf(cmd, "/bin/cp %s %s", cached_filename, path);
 		if(system(cmd) != 0) {
-			debug(D_WQ, "Could not thirdput %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
-			return 0;
+			debug(D_WQ, "Could not thirdput %s, copy (%s) failed. (%s)\n", cached_filename, path, strerror(errno));
+			result = 0;
 		}
 		break;
 	case WORK_QUEUE_FS_CMD:
-		if(system(path) != 0) {
-			debug(D_WQ, "Could not thirdput %s, command (%s) failed. (%s)\n", filename, path, strerror(errno));
-			return 0;
+		sprintf(cmd, "%s < %s", path, cached_filename);
+		if(system(cmd) != 0) {
+			debug(D_WQ, "Could not thirdput %s, command (%s) failed. (%s)\n", filename, cmd, strerror(errno));
+			result = 0;
 		}
 		break;
 	}
-	send_master_message(master, "thirdput complete\n");
-	return 1;
+	
+	send_master_message(master, "thirdput-complete %d\n", result);
+	
+	return result;
 
 }
 
@@ -1436,11 +1396,7 @@ static int worker_handle_master(struct link *master) {
 	if(recv_master_message(master, line, sizeof(line), time(0)+active_timeout)) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(master,taskid);
-		} else if(sscanf(line, "stat %s", filename) == 1) {
-			r = do_stat(master, filename);
-		} else if(sscanf(line, "symlink %s %s", path, filename) == 2) {
-			r = do_symlink(path, filename);
-		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags)) >= 3) {
+		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) >= 3) {
 			if(path_within_workspace(filename, workspace)) {
 				r = do_put(master, filename, length, mode);
 			} else {
@@ -1454,12 +1410,8 @@ static int worker_handle_master(struct link *master) {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
 			}
-		} else if(sscanf(line, "mkdir %s %o", filename, &mode) == 2) {
-			r = do_mkdir(filename, mode);
-		} else if(sscanf(line, "rget %s", filename) == 1) {
-			r = do_rget(master, filename);
-		} else if(sscanf(line, "get %s", filename) == 1) {	// for backward compatibility
-			r = do_get(master, filename);
+		} else if(sscanf(line, "get %s %d", filename, &mode) == 2) {
+			r = do_get(master, filename, mode);
 		} else if(sscanf(line, "thirdget %o %s %[^\n]", &mode, filename, path) == 3) {
 			r = do_thirdget(mode, filename, path);
 		} else if(sscanf(line, "thirdput %o %s %[^\n]", &mode, filename, path) == 3) {
@@ -1615,12 +1567,8 @@ static int foreman_handle_master(struct link *master) {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
 			}
-		} else if(sscanf(line, "mkdir %s %o", filename, &mode) == 2) {
-			r = do_mkdir(filename, mode);
-		} else if(sscanf(line, "rget %s", filename) == 1) {
-			r = do_rget(master, filename);
-		} else if(sscanf(line, "get %s", filename) == 1) {	// for backward compatibility
-			r = do_get(master, filename);
+		} else if(sscanf(line, "get %s %d", filename, &mode) == 2) {
+			r = do_get(master, filename, mode);
 		} else if(sscanf(line, "kill %" SCNd64 , &taskid) == 1){
 			struct work_queue_task *t;
 			t = work_queue_cancel_by_taskid(foreman_q, taskid);

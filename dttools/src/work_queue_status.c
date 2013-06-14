@@ -186,7 +186,7 @@ int do_catalog_query( time_t stoptime )
 int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 {
 	static struct nvpair_header *query_headers[3] = { queue_headers, task_headers, worker_headers };
-	static const char * query_strings[3] = {"queue_status","task_status","worker_status"};
+	static const char * query_strings[3] = {"queue","task","worker"};
 
 	struct nvpair_header *query_header = query_headers[query_mode];
 	const char * query_string = query_strings[query_mode];
@@ -207,7 +207,7 @@ int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 		return 1;
 	}
 
-	link_putfstring(l,"%s\n",stoptime,query_string);
+	link_putfstring(l,"status %s\n",stoptime,query_string);
 
 	if(format_mode==FORMAT_TABLE) {
 		nvpair_print_table_header(stdout, query_header);

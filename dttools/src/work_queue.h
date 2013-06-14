@@ -178,6 +178,21 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 */
 int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags);
 
+/** Add a directory to a task.
+@param t A task object.
+@param local_name The name of the directory on local disk or shared filesystem.  Optional if the directory is empty.
+@param remote_name The name of the directory at the remote execution site.
+@param type Must be one of the following values:
+- @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
+- @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
+@param flags	May be zero to indicate no special handling or any of the following or'd together:
+- @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
+- @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
+@param recursive indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
+@return 1 if the task directory is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
+*/
+int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags, int recursive);
+
 /** Specify the amount of memory required by a task.
 @param t A task object.
 @param memory The amount of memory required by the task, in megabytes.
