@@ -1307,9 +1307,8 @@ static void show_help(const char *cmd)
     fprintf(stdout, " %-30s Each batch job will start <count> local workers. (default is 1.)\n", "-m,--workers-per-job=<count>");
     fprintf(stdout, " %-30s Path to the work_queue_worker executable.\n", "-W,--worker-executable=<path>");
     fprintf(stdout, " %-30s Enable auto worker pool feature.\n", "-A,--auto-pool-feature");
-    fprintf(stdout, " %-30s Path to the work_queue_pool configuration file. This option is only\n", "-c,--config=<path>");
-    fprintf(stdout, " %-30s effective when '-A' is present. (default is work_queue_pool.conf)\n", "");
-    fprintf(stdout, " %-30s Enable auto mode. In this mode the workers would ask a catalog\n", "-a,--advertise");
+    fprintf(stdout, " %-30s Path to the pool configuration file. This option is only effective\n", "-c,--config=<path>");
+    fprintf(stdout, " %-30s when '-A' is present. (default is work_queue_pool.conf)\n", "");
     fprintf(stdout, " %-30s Guarantee <count> running workers and quit. The workers would terminate\n", "-q,--one-shot");
     fprintf(stdout, " %-30s after their idle timeouts unless the user explicitly shut them down.\n", "");
     fprintf(stdout, " %-30s The user needs to manually delete the scratch directory, which is.\n", "");
@@ -1318,6 +1317,7 @@ static void show_help(const char *cmd)
 
     fprintf(stdout, "\nwhere worker options are:\n");
 
+    fprintf(stdout, " %-30s Enable auto mode. In this mode the workers would ask a catalog\n", "-a,--advertise");
     fprintf(stdout, " %-30s server for available masters. (depreacate, implied by -M).\n", "");
     fprintf(stdout, " %-30s Abort after this amount of idle time.\n", "-t,--timeout=<time>");
     fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog=<catalog>");

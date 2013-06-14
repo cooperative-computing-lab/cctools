@@ -39,12 +39,14 @@ SECTION(OPTIONS)
 SUBSECTION(Batch Options)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for this subsystem.
+OPTION_TRIPLET(-l,logfile, logfile)Log work_queue_pool status to logfile. 
 OPTION_TRIPLET(-S, scratch, file)Scratch directory. (default is /tmp/${USER}-workers)
 OPTION_TRIPLET(-T, batch-type, type)Batch system type: unix, condor, sge, workqueue, xgrid. (default is unix)
 OPTION_TRIPLET(-r, retry, count)Number of attemps to retry if failed to submit a worker.
-OPTION_TRIPLET(-W, worker-executable, path)Path to the MANPAGE(work_queue_worker,1) executable.
 OPTION_TRIPLET(-m, workers-per-job, count)Each batch job will start <count> local workers. (default is 1)
+OPTION_TRIPLET(-W, worker-executable, path)Path to the MANPAGE(work_queue_worker,1) executable.
 OPTION_ITEM(`-A, --auto-pool-feature')Enable auto worker pool feature.
+OPTION_TRIPLET(-c, config, config)Path to the pool configuration file. This option is only effective when '-A' option is on. (default is work_queue_pool.conf)
 OPTION_ITEM(`-q, --one-shot')Gurantee <count> running workers and quit. The workers would terminate after their idle timeouts unless the user explicitly shuts them down.
 OPTION_ITEM(`-h, --help')Show this screen.
 OPTIONS_END
