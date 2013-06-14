@@ -2,23 +2,23 @@
 
 dispatch() 
 {
-    case $1 in
-	prepare)
-	prepare $@
-	;;
-	run)
-	run $@
-	;;
-	clean)
-	clean $@
-	;;
-	*)
-	echo "unknown command: $1"
-	echo "use: $0 [prepare|run|clean]"
-	;;
-    esac
-
-    exit 1
+	case "$1" in
+		prepare)
+			prepare $@
+			;;
+		run)
+			run $@
+			;;
+		clean)
+			clean $@
+			;;
+		*)
+			echo "unknown command: $1"
+			echo "use: $0 [prepare|run|clean]"
+			exit 1
+			;;
+	esac
+	exit $?
 }
 
 # wait_for_file_creation(filename, timeout)
