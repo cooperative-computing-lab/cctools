@@ -458,10 +458,13 @@ static void update_catalog(struct work_queue *q, int now)
 	if(!q->catalog_port) {
 		q->catalog_port = CATALOG_PORT;
 	}
-
 	work_queue_get_stats(q, &s);
+	struct work_queue_resources r;
+	memset(&r, 0, sizeof(work_queue_get_resources));
+	work_queue_get_resources(q,&r);
+	debug(D_WQ,"Updating catalog with resource information -- cores:%d memory:%d disk:%d\n", r.cores.total,r.memory.total,r.disk.total); //see if information is being passed correctly
 	char * worker_summary = work_queue_get_worker_summary(q);
-	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, worker_summary, now);
+	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, &r, worker_summary, now);
 	free(worker_summary);
 }
 
@@ -3285,16 +3288,22 @@ void work_queue_get_resources( struct work_queue *q, struct work_queue_resources
 	struct work_queue_worker *w;
 	char *key;
 	int first = 1;
+	int wnum = 1;
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+
+		debug(D_WQ,"Worker #%d INFO - cores:%d memory:%d disk:%d\n", wnum,w->resources->cores.total,w->resources->memory.total,w->resources->disk.total); //see if information is being passed correctly
+
 		if(first) {
 			*total = *w->resources;
 			first = 0;
 		} else {
 			work_queue_resources_add(total,w->resources);
 		}
+		wnum++;
 	}
+
 
 }
 

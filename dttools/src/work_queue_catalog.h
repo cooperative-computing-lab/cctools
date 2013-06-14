@@ -9,6 +9,7 @@ See the file COPYING for details.
 
 #include "work_queue.h"
 #include "work_queue_protocol.h"
+#include "work_queue_resources.h"
 
 #include "catalog_query.h"
 #include "catalog_server.h"
@@ -102,7 +103,7 @@ void free_work_queue_master_list(struct list *ml);
 
 struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port, struct list *regex_list);
 
-int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, const char *workers_summary, int now);
+int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, struct work_queue_resources *r, const char *workers_summary, int now);
 
 int get_pool_decisions_from_catalog(const char *catalog_host, int catalog_port, const char *proj, struct list *decisions);
 
