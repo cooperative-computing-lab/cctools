@@ -6,10 +6,11 @@ if [ ! -r Makefile.config ]; then
 fi
 
 CCTOOLS_PACKAGES="`grep CCTOOLS_PACKAGES Makefile.config | cut -d = -f 2`"
-CCTOOLS_TEST_LOG=`pwd`/cctools.test.log
+if [ -z "$CCTOOLS_TEST_LOG" ]; then
+    CCTOOLS_TEST_LOG=`pwd`/cctools.test.log
+    export CCTOOLS_TEST_LOG
+fi
 CCTOOLS_TEST_RESULTS=`pwd`/cctools.test.results
-
-export CCTOOLS_TEST_LOG
 
 rm -f $CCTOOLS_TEST_LOG $CCTOOLS_TEST_RESULTS > /dev/null 2>&1
 

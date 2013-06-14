@@ -15,7 +15,11 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 =======
 #include "getopt.h"
+<<<<<<< HEAD
 >>>>>>> 1b3751f67553fe246d8855c18ea77b6ad7bfb0d2
+=======
+#include "work_queue_catalog.h"
+>>>>>>> 824b19393d1ae36792394a5f3ed074b136e3d5c9
 
 #include <errno.h>
 #include <string.h>
@@ -74,7 +78,7 @@ static struct nvpair_header master_resource_headers[] = {
 	{"cores_total",	"CORES",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 13},
 	{"memory_total",	"MEMORY",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 13},
 	{"disk_total",	"DISK",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 13},
-	{NULL,}
+	{0,0,0,0,0}
 };
 
 static void show_help(const char *progname)
@@ -88,11 +92,14 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s List tasks of a given master.\n", "-T,--tasks");
 	fprintf(stdout, " %-30s Show available resources for each master.\n", "-R,--resources");
 	fprintf(stdout, " %-30s Long text output.\n", "-l,--verbose");
+	fprintf(stdout, " %-30s Shows aggregated resources of all masters.\n", "-R,--resources");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT\n", "-C,--catalog=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug <flag>");
 	fprintf(stdout, " %-30s RPC timeout (default is %ds).\n", "-t,--timeout=<time>", work_queue_status_timeout);
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
+
+
 
 static void work_queue_status_parse_command_line_arguments(int argc, char *argv[])
 {
@@ -102,6 +109,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 		{"workers", no_argument, 0, 'W'},
 		{"tasks", no_argument, 0, 'T'},
 		{"verbose", no_argument, 0, 'l'},
+		{"resources", no_argument, 0, 'R'},
 		{"catalog", required_argument, 0, 'C'},
 		{"debug", required_argument, 0, 'd'},
 		{"resources", no_argument, 0, 'R'},
