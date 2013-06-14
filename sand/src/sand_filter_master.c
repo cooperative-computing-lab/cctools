@@ -24,6 +24,8 @@ See the file COPYING for details.
 #include "delete_dir.h"
 #include "envtools.h"
 #include "stringtools.h"
+#include "getopt.h"
+#include "getopt_aux.h"
 
 #include "compressed_sequence.h"
 #include "sequence_filter.h"
@@ -50,6 +52,7 @@ static void task_complete(struct work_queue_task *t);
 static void display_progress();
 
 static int port = WORK_QUEUE_DEFAULT_PORT;
+static const char *port_file = 0;
 static char *project = NULL;
 static int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 static int priority = 0;
@@ -107,6 +110,7 @@ static void show_help(const char *cmd)
 	printf(" -N <project>   Set the project name to <project>\n");
 	printf(" -P <integer>   Priority. Higher the value, higher the priority.\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n");
+	printf(" -Z <file>      Select port at random and write it out to this file.\n");
 	printf(" -o <file>      Send debugging to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
@@ -405,6 +409,12 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	port = work_queue_port(q);
+
+	if(port_file) {
+		opts_write_port_file(port_file,port);
+	}
+
 	// advanced work queue options
 	work_queue_specify_master_mode(q, work_queue_master_mode);
 	work_queue_specify_name(q, project);
@@ -477,7 +487,7 @@ static void get_options(int argc, char **argv, const char *progname)
 	char *catalog_host = NULL;
 	int catalog_port = 0;
 
-	while((c = getopt(argc, argv, "p:P:n:d:F:N:C:s:r:R:k:w:c:o:uxvha")) > -1) {
+	while((c = getopt(argc, argv, "p:P:n:d:F:N:C:s:r:R:k:w:c:o:uxvhaZ:")) > -1) {
 		switch (c) {
 		case 'p':
 			port = atoi(optarg);
@@ -532,6 +542,10 @@ static void get_options(int argc, char **argv, const char *progname)
 			break;
 		case 'u':
 			do_not_unlink = 1;
+			break;
+		case 'Z':
+			port_file = optarg;
+			port = 0;
 			break;
 		case 'o':
 			debug_config_file(optarg);
