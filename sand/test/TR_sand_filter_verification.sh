@@ -4,16 +4,15 @@
 
 prepare()
 {
-    cd ../src/; make
-    cd ../test/filter_verification
-    ./gen_random_sequence.pl 1000
-    ./gen_random_reads.pl 1000
-    exec ./gen_candidates.sh
+	exit 0
 }
 
 run()
 {
     cd filter_verification
+    ./gen_random_sequence.pl 1000
+    ./gen_random_reads.pl 1000
+    ./gen_candidates.sh
     exec ./verify_candidates.pl
 }
 

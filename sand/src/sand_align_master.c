@@ -23,6 +23,8 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "macros.h"
 #include "envtools.h"
+#include "getopt.h"
+#include "getopt_aux.h"
 
 #include "sequence.h"
 #include "compressed_sequence.h"
@@ -30,6 +32,7 @@ See the file COPYING for details.
 static struct work_queue *queue = 0;
 static struct hash_table *sequence_table = 0;
 static int port = WORK_QUEUE_DEFAULT_PORT;
+static const char *port_file = 0;
 static char *project = NULL;
 static int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 static int priority = 0;
@@ -79,6 +82,7 @@ static void show_help(const char *cmd)
 	printf(" -P <integer>   Priority. Higher the value, higher the priority.\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n");
 	printf(" -o <file>      Send debugging to this file.\n");
+	printf(" -Z <file>      Select port at random and write it out to this file.\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
 }
@@ -332,7 +336,7 @@ int main(int argc, char *argv[])
 	// One can also set the fast_abort_multiplier by the '-f' option.
 	wq_option_fast_abort_multiplier = 10;
 
-	while((c = getopt(argc, argv, "e:F:N:C:p:P:n:d:o:vha")) > -1) {
+	while((c = getopt(argc, argv, "e:F:N:C:p:P:n:d:o:Z:vha")) > -1) {
 		switch (c) {
 		case 'p':
 			port = atoi(optarg);
@@ -375,6 +379,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'o':
 			debug_config_file(optarg);
+			break;
+		case 'Z':
+			port_file = optarg;
+			port = 0;
 			break;
 		case 'v':
 			cctools_version_print(stdout, progname);
@@ -433,6 +441,12 @@ int main(int argc, char *argv[])
 	if(!queue) {
 		fprintf(stderr, "%s: couldn't listen on port %d: %s\n", progname, port, strerror(errno));
 		return 1;
+	}
+
+	port = work_queue_port(queue);
+
+	if(port_file) {
+		opts_write_port_file(port_file,port);
 	}
 
 	// advanced work queue options
