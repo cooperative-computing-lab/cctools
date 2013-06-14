@@ -462,7 +462,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "Use: %s [options]\n", cmd);
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " %-30s Run as a daemon.\n", "-b,--background");
-	fprintf(stdout, " %-30s Write process identifier (PID) to file.\n", "-B,pid-file=<file>");
+	fprintf(stdout, " %-30s Write process identifier (PID) to file.\n", "-B,--pid-file=<file>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
 	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
 	fprintf(stdout, " %-30s Record catalog history to this directory.\n", "-H,--history=<file>");
@@ -474,12 +474,12 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Port number to listen on (default is %d)\n", "-p,--port=<port>", port);
-        fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
 	fprintf(stdout, " %-30s Single process mode; do not work on queries.\n", "-S,--single");
 	fprintf(stdout, " %-30s Maximum time to allow a query process to run.  (default is %ds)\n", "-T,--timeout=<time>",child_procs_timeout);
-	fprintf(stdout, " %-30s Send status updates to this host. (default is %s)\n", "-u,-update-host=<host>", CATALOG_HOST_DEFAULT);
+	fprintf(stdout, " %-30s Send status updates to this host. (default is %s)\n", "-u,--update-host=<host>", CATALOG_HOST_DEFAULT);
 	fprintf(stdout, " %-30s Send status updates at this interval. (default is 5m)\n", "-U,--update-interval=<time>");
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
+        fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
 }
 
 int main(int argc, char *argv[])
