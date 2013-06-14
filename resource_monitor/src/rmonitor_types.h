@@ -66,8 +66,8 @@ struct file_info
 	uint64_t n_closes;
 	uint64_t n_reads;
 	uint64_t n_writes;
-	off_t size_on_open;
-	off_t size_on_close;
+	off_t size_on_open;            /* in bytes */
+	off_t size_on_close;           /* in bytes */
 	dev_t device;
 };
 
