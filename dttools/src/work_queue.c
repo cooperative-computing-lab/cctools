@@ -108,6 +108,7 @@ double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 int wq_minimum_transfer_timeout = 3;
 int wq_foreman_transfer_timeout = 3600;
+int wq_worker_unready_timeout = 300; //used in remove_unready_workers()
 
 struct work_queue {
 	char *name;
@@ -2117,6 +2118,23 @@ static void start_tasks(struct work_queue *q)
 		}
 	}
 }
+		
+static void remove_unready_workers(struct work_queue *q) {
+	struct work_queue_worker *w;
+	char *key;
+	timestamp_t current = timestamp_get();
+	
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+		if(!strcmp(w->hostname, "unknown")){
+			int connection_elapsed_time = (int)(current - w->start_time)/1000000;
+			if(connection_elapsed_time >= wq_worker_unready_timeout) {
+				debug(D_WQ, "Removing worker %s (%s): hasn't sent ready message for more than %d s since connection.", w->hostname, w->addrport, wq_worker_unready_timeout);
+				remove_worker(q, w);
+			}
+		}
+	}
+}	
 
 static void do_keepalive_checks(struct work_queue *q) {
 	struct work_queue_worker *w;
@@ -2952,6 +2970,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			update_catalog(q, 0);
 		}
 		
+		remove_unready_workers(q);	
+
 		if(q->keepalive_interval > 0) {
 			do_keepalive_checks(q);
 		}
@@ -3041,7 +3061,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(q->fast_abort_multiplier > 0) {
 			abort_slow_workers(q);
 		}
-
+		
 		// If any of the passed-in auxiliary links are active then break so the caller can handle them.
 		if(aux_links && list_size(active_aux_links)) {
 			break;
