@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "nvpair.h"
 #include "link_nvpair.h"
 #include "link.h"
+#include "work_queue_catalog.h"
 
 #include <errno.h>
 #include <string.h>
@@ -25,6 +26,7 @@ typedef enum {
 	QUERY_QUEUE,
 	QUERY_TASKS,
 	QUERY_WORKERS,
+	QUERY_MASTER_RESOURCES
 } query_t;
 
 static format_t format_mode = FORMAT_TABLE;
@@ -32,6 +34,8 @@ static query_t query_mode = QUERY_QUEUE;
 static int work_queue_status_timeout = 300;
 static char *catalog_host = NULL;
 static int catalog_port = 0;
+static int resource_mode = 0;
+static int resource_timeout = 25;
 
 static struct nvpair_header queue_headers[] = {
 	{"project",       "PROJECT", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 18},
@@ -61,6 +65,14 @@ static struct nvpair_header worker_headers[] = {
 	{NULL,}
 };
 
+static struct nvpair_header master_resource_headers[] = {
+	{"project",	"MASTER",	NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 28},
+	{"cores_total",	"CORES",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 13},
+	{"memory_total",	"MEMORY",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 13},
+	{"disk_total",	"DISK",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 13},
+	{NULL,}
+};
+
 static void work_queue_status_show_help(const char *progname)
 {
 	printf("usage: %s [master] [port]\n", progname);
@@ -70,6 +82,7 @@ static void work_queue_status_show_help(const char *progname)
 	printf(" -Q             Show queue summary statistics. (default)\n");
 	printf(" -W             List workers connected to the master.\n");
 	printf(" -T             List tasks of a given master.\n");
+	printf(" -R		Shows aggregated resources of all masters.\n");
 	printf(" -l             Long text output.\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n");
 	printf(" -d <flag>      Enable debugging for this subsystem.\n");
@@ -77,31 +90,11 @@ static void work_queue_status_show_help(const char *progname)
 	printf(" -h             This message.\n");
 }
 
-int parse_catalog_server_description(char *server_string, char **host, int *port)
-{
-	char *colon;
-
-	colon = strchr(server_string, ':');
-
-	if(!colon) {
-		*host = NULL;
-		*port = 0;
-		return 0;
-	}
-
-	*colon = '\0';
-
-	*host = strdup(server_string);
-	*port = atoi(colon + 1);
-
-	return *port;
-}
-
 static void work_queue_status_parse_command_line_arguments(int argc, char *argv[])
 {
 	signed int c;
 
-	while((c = getopt(argc, argv, "QTWC:d:lo:O:t:vh")) > -1) {
+	while((c = getopt(argc, argv, "QTWC:d:lo:O:Rt:vh")) > -1) {
 		switch (c) {
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
@@ -137,6 +130,10 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			work_queue_status_show_help(argv[0]);
 			exit(EXIT_SUCCESS);
 			break;
+		case 'R':
+			query_mode = QUERY_MASTER_RESOURCES;
+			resource_mode = 1;
+			break;
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
 			exit(EXIT_SUCCESS);
@@ -163,16 +160,24 @@ int do_catalog_query( time_t stoptime )
 		fprintf(stderr, "failed to query catalog server %s:%d: %s \n",catalog_host,catalog_port,strerror(errno));
 		exit(EXIT_FAILURE);
 	}
-
-	if(format_mode == FORMAT_TABLE)
+	if(resource_mode == 0 && format_mode == FORMAT_TABLE){
 		nvpair_print_table_header(stdout, queue_headers);
-
+	}else if(resource_mode){
+		nvpair_print_table_header(stdout, master_resource_headers);
+	}
 	while((nv = catalog_query_read(cq,stoptime))) {
 		if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0) {
-			if(format_mode == FORMAT_TABLE)
+
+			if(resource_mode == 1) {
+				debug(D_WQ,"%s resources -- cores:%s memory:%s disk:%s\n",nvpair_lookup_string(nv,"project"),nvpair_lookup_string(nv,"cores_total"),nvpair_lookup_string(nv,"memory_total"),nvpair_lookup_string(nv,"disk_total")); //See if information is being passed correctly
+				nvpair_print_table(nv, stdout, master_resource_headers);
+			}
+			else if(format_mode == FORMAT_TABLE){
 				nvpair_print_table(nv, stdout, queue_headers);
+			}
 			else
 				nvpair_print_text(nv, stdout);
+			
 		}
 		nvpair_delete(nv);
 	}
@@ -185,8 +190,8 @@ int do_catalog_query( time_t stoptime )
 
 int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 {
-	static struct nvpair_header *query_headers[3] = { queue_headers, task_headers, worker_headers };
-	static const char * query_strings[3] = {"queue_status","task_status","worker_status"};
+	static struct nvpair_header *query_headers[4] = { queue_headers, task_headers, worker_headers, master_resource_headers };
+	static const char * query_strings[4] = {"queue_status","task_status","worker_status","master_resource_status"};
 
 	struct nvpair_header *query_header = query_headers[query_mode];
 	const char * query_string = query_strings[query_mode];
