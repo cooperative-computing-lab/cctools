@@ -3,14 +3,13 @@
 . ../../dttools/src/test_runner.common.sh
 
 psearch="../src/parrot_run ../src/parrot_search"
-out=output.txt
 expected=expected.txt
+
+out=output.txt
 
 prepare()
 {
-    touch $out
-    make -C ../src
-    exit 0
+    rm -f $out
 }
 
 run()
@@ -29,17 +28,16 @@ run()
     failures=`diff --ignore-all-space $out $expected`
     if [ -z "$failures" ]; then
         echo "all tests passed"
-        exit 0
+        return 0
     else
         echo $failures
-        exit 1
+        return 1
     fi
 }
 
 clean()
 {
     rm -f $out
-    exit 0
 }
 
 dispatch $@
