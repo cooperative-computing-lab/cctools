@@ -11,8 +11,15 @@ See the file COPYING for details.
 #include "nvpair.h"
 #include "link_nvpair.h"
 #include "link.h"
-#include "getopt.h"
+<<<<<<< HEAD
 #include "work_queue_catalog.h"
+=======
+#include "getopt.h"
+<<<<<<< HEAD
+>>>>>>> 1b3751f67553fe246d8855c18ea77b6ad7bfb0d2
+=======
+#include "work_queue_catalog.h"
+>>>>>>> 824b19393d1ae36792394a5f3ed074b136e3d5c9
 
 #include <errno.h>
 #include <string.h>
@@ -66,6 +73,14 @@ static struct nvpair_header worker_headers[] = {
 	{NULL,}
 };
 
+static struct nvpair_header master_resource_headers[] = {
+	{"project",	"MASTER",	NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 28},
+	{"cores_total",	"CORES",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 13},
+	{"memory_total",	"MEMORY",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 13},
+	{"disk_total",	"DISK",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 13},
+	{0,0,0,0,0}
+};
+
 static void show_help(const char *progname)
 {
 	fprintf(stdout, "usage: %s [master] [port]\n", progname);
@@ -75,6 +90,7 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s Show queue summary statistics. (default)\n", "-Q,--statistics");
 	fprintf(stdout, " %-30s List workers connected to the master.\n", "-W,--workers");
 	fprintf(stdout, " %-30s List tasks of a given master.\n", "-T,--tasks");
+	fprintf(stdout, " %-30s Show available resources for each master.\n", "-R,--resources");
 	fprintf(stdout, " %-30s Long text output.\n", "-l,--verbose");
 	fprintf(stdout, " %-30s Shows aggregated resources of all masters.\n", "-R,--resources");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT\n", "-C,--catalog=<catalog>");
@@ -83,19 +99,11 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
-static struct nvpair_header master_resource_headers[] = {
-	{"project",	"MASTER",	NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 28},
-	{"cores_total",	"CORES",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 13},
-	{"memory_total",	"MEMORY",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 13},
-	{"disk_total",	"DISK",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 13},
-	{0,0,0,0,0}
-};
 
 
 static void work_queue_status_parse_command_line_arguments(int argc, char *argv[])
 {
 	signed int c;
-
 	static struct option long_options[] = {
 		{"statistics", no_argument, 0, 'Q'},
 		{"workers", no_argument, 0, 'W'},
@@ -104,11 +112,13 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 		{"resources", no_argument, 0, 'R'},
 		{"catalog", required_argument, 0, 'C'},
 		{"debug", required_argument, 0, 'd'},
+		{"resources", no_argument, 0, 'R'},
 		{"timeout", required_argument, 0, 't'},
 		{"help", no_argument, 0, 'h'},
         {0,0,0,0}};
 
 	while((c = getopt_long(argc, argv, "QTWC:d:lo:O:Rt:vh", long_options, NULL)) > -1) {
+
 		switch (c) {
 		case 'C':
 			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
