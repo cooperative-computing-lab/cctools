@@ -816,10 +816,10 @@ void monitor_check_child(const int signal)
       switch(WSTOPSIG(first_process_sigchild_status))
       {
         case SIGTTIN: 
-          debug(D_NOTICE, "Process asked for input from the terminal, but currently the resource monitor does not support interactive applications.\n");
+          debug(D_NOTICE, "Process asked for input from the terminal, try the -f option to bring the child process in foreground.\n");
           break;
         case SIGTTOU:
-          debug(D_NOTICE, "Process wants to write to the standard output, but the current terminal settings do not allow this. The monitor currently does not support interactive applications.\n");
+          debug(D_NOTICE, "Process wants to write to the standard output, but the current terminal settings do not allow this. Please try the -f option to bring the child process in foreground.\n");
           break;
         default:
           return;
@@ -1178,7 +1178,7 @@ pid_t monitor_fork(void)
     return pid;
 }
 
-struct process_info *spawn_first_process(const char *cmd)
+struct process_info *spawn_first_process(const char *cmd, int child_in_foreground)
 {
     pid_t pid;
 
@@ -1192,6 +1192,24 @@ struct process_info *spawn_first_process(const char *cmd)
         close(STDIN_FILENO);
         close(STDOUT_FILENO);
         setpgid(pid, 0);
+
+        if (child_in_foreground)
+        {
+            int fdtty, retc;
+            fdtty = open("/dev/tty", O_RDWR);
+            if (fdtty >= 0)
+            {
+                /* Try bringing the child process to the session foreground */
+                retc = tcsetpgrp(fdtty, getpgid(pid));
+                if (retc < 0)
+                {
+                 fatal("error bringing process to the session foreground (tcsetpgrp): %s\n", strerror(errno));
+                }
+                close(fdtty);
+            } else {
+                fatal("error accessing controlling terminal (/dev/tty): %s\n", strerror(errno));
+            }
+        }
     }
     else if(pid < 0)
         fatal("fork failed: %s\n", strerror(errno));
@@ -1212,6 +1230,7 @@ static void show_help(const char *cmd)
 {
     fprintf(stdout, "\nUse: %s [options] -- command-line-and-options\n\n", cmd);
     fprintf(stdout, "%-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
+    fprintf(stdout, "%-30s Send debugging output to <file>.\n", "-g,--debug-file=<file>");
     fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
     fprintf(stdout, "%-30s Show version string\n", "-v,--version");
     fprintf(stdout, "\n");
@@ -1220,6 +1239,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
     fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify\n", "-L,--limits=<string>");
     fprintf(stdout, "%-30s resource limits.\n", "");
+    fprintf(stdout, "%-30s Keep the monitored process in foreground (for interactive use).\n", "-f,--child-in-foreground");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Specify filename template for log files (default=resource-pid-<pid>)\n", "-o,--with-output-files=<file>");
     fprintf(stdout, "%-30s Write resource summary to <file>        (default=<template>.summary)\n", "--with-summary-file=<file>");
@@ -1309,6 +1329,7 @@ int main(int argc, char **argv) {
     int use_summary = 1;
     int use_series  = 1;
     int use_opened  = 1;
+    int child_in_foreground = 0;
 
     debug_config(argv[0]);
 
@@ -1327,6 +1348,7 @@ int main(int argc, char **argv) {
 	    {
 		    /* Regular Options */
 		    {"debug",      required_argument, 0, 'd'},
+		    {"debug-file", required_argument, 0, 'g'},
 		    {"help",       required_argument, 0, 'h'},
 		    {"version",    no_argument,       0, 'v'},
 		    {"interval",   required_argument, 0, 'i'},
@@ -1349,11 +1371,14 @@ int main(int argc, char **argv) {
 		    {0, 0, 0, 0}
 	    };
 
-    while((c = getopt_long(argc, argv, "d:hvi:L:l:o:", long_options, NULL)) >= 0)
+    while((c = getopt_long(argc, argv, "d:fg:hi:L:l:o:v", long_options, NULL)) >= 0)
     {
 	    switch (c) {
             case 'd':
 		    debug_flags_set(optarg);
+		    break;
+	    case 'g':
+		    debug_config_file(optarg);
 		    break;
             case 'h':
 		    show_help(argv[0]);
@@ -1372,6 +1397,9 @@ int main(int argc, char **argv) {
 		    break;
             case 'L':
 		    parse_limits_string(resources_limits, optarg);
+		    break;
+            case 'f':
+		    child_in_foreground = 1;
 		    break;
             case 'o':
 		    if(template_path)
@@ -1518,7 +1546,7 @@ int main(int argc, char **argv) {
     }
 #endif
 
-    spawn_first_process(cmd);
+    spawn_first_process(cmd, child_in_foreground);
 
     monitor_resources(interval);
 
