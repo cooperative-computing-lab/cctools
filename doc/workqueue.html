@@ -30,7 +30,7 @@ padding: 0.3%;
 <body>
 
 <h1>Work Queue User's Manual</h1>
-<b>Last Updated March 2013</b>
+<b>Last Updated June 2013</b>
 <p>
 Work Queue is Copyright (C) 2009 The University of Notre Dame.
 This software is distributed under the GNU General Public License.
@@ -412,6 +412,12 @@ you may find the following features helpful.  All are described in the
 it may not be possible to submit all of the tasks, and then wait for all of them.  Instead,
 submit a small number of tasks, then alternate waiting and submiting to keep a constant
 number in the queue.  <tt>work_queue_hungry</tt> will tell you if more submission are warranted.
+<p>
+<li><b>Asynchronous transfer.</b> If you have tasks with a balanced or large
+computation-to-data ratio, this feature can help improve the CPU utilization and
+lower the runtime overheads incurred due to data transfer. This feature
+asynchronously streams the data inputs and outputs to and from the workers when
+they are executing tasks. See <tt>work_queue_specify_asynchrony</tt>.
 <p>
 <li><b>Fast Abort.</b>  A large computation can often be slowed down by stragglers.  If you have
 a large number of small tasks that take a short amount of time, then Fast Abort can help.
