@@ -19,6 +19,15 @@ struct work_queue_file {
 	char *remote_name;	// name on remote machine.
 };
 
+enum wq_file_types {
+	WORK_QUEUE_FILE = 1,
+	WORK_QUEUE_BUFFER,
+	WORK_QUEUE_REMOTECMD,
+	WORK_QUEUE_FILE_PIECE,
+	WORK_QUEUE_DIRECTORY
+};
+
+
 struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct list *aux_links, struct list *active_aux_links);
 
 void work_queue_get_resources( struct work_queue *q, struct work_queue_resources *r );

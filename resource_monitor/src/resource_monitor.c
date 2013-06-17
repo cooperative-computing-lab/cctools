@@ -149,7 +149,6 @@ static int monitor_inotify_fd = -1;
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_piggyback.h"
 
-
 #define ONE_MEGABYTE 1048576  /* this many bytes */
 #define ONE_SECOND   1000000  /* this many usecs */    
 
@@ -624,7 +623,8 @@ void monitor_inotify_add_watch(char *filename)
 		finfo->size_on_close = -1;
 		if (stat(filename, &fst) >= 0)
 		{
-			finfo->size_on_open = fst.st_size;
+			finfo->size_on_open  = fst.st_size;
+			finfo->size_on_close = fst.st_size;
 			finfo->device = fst.st_dev;
 		}
 	}
@@ -980,7 +980,7 @@ void write_helper_lib(void)
 void monitor_handle_inotify(void)
 {
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
-	struct inotify_event rev;
+	struct inotify_event *evdata;
 	struct file_info *finfo;
 	struct stat fst;
 	char *fname;
@@ -989,18 +989,25 @@ void monitor_handle_inotify(void)
 	{
 		if (ioctl(monitor_inotify_fd, FIONREAD, &nbytes) >= 0)
 		{
-			evc = nbytes/sizeof(rev);
+
+			evdata = (struct inotify_event *) malloc(nbytes);
+			if (evdata == NULL) return;
+			if (read(monitor_inotify_fd, evdata, nbytes) != nbytes)
+			{
+				free(evdata);
+				return;
+			}
+			evc = nbytes/sizeof(*evdata);
 			for(i = 0; i < evc; i++)
 			{
-				if (read(monitor_inotify_fd, &rev, sizeof(rev)) != sizeof(rev)) break;
-				if (rev.wd >= alloced_inotify_watches) continue;
-				if ((fname = inotify_watches[rev.wd]) == NULL) continue;
+				if (evdata[i].wd >= alloced_inotify_watches) continue;
+				if ((fname = inotify_watches[evdata[i].wd]) == NULL) continue;
 				finfo = hash_table_lookup(files, fname);
 				if (finfo == NULL) continue;
-				if (rev.mask & IN_ACCESS) (finfo->n_reads)++;
-				if (rev.mask & IN_MODIFY) (finfo->n_writes)++;
-				if ((rev.mask & IN_CLOSE_WRITE) || 
-				    (rev.mask & IN_CLOSE_NOWRITE))
+				if (evdata[i].mask & IN_ACCESS) (finfo->n_reads)++;
+				if (evdata[i].mask & IN_MODIFY) (finfo->n_writes)++;
+				if ((evdata[i].mask & IN_CLOSE_WRITE) || 
+				    (evdata[i].mask & IN_CLOSE_NOWRITE))
 				{
 					(finfo->n_closes)++;
 					if (stat(fname, &fst) >= 0)
@@ -1011,14 +1018,15 @@ void monitor_handle_inotify(void)
 					(finfo->n_references)--;
 					if (finfo->n_references == 0)
 					{
-						inotify_rm_watch(monitor_inotify_fd, rev.wd);
-						debug(D_DEBUG, "removed watch (id: %d) for file %s", rev.wd, fname);
+						inotify_rm_watch(monitor_inotify_fd, evdata[i].wd);
+						debug(D_DEBUG, "removed watch (id: %d) for file %s", evdata[i].wd, fname);
 						free(fname);
-						inotify_watches[rev.wd] = NULL;
+						inotify_watches[evdata[i].wd] = NULL;
 					}
 				}
 			}
 		}
+		free(evdata);
 	}
 #endif
 }
@@ -1464,6 +1472,13 @@ int main(int argc, char **argv) {
 #ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB
     write_helper_lib();
     monitor_helper_init(lib_helper_name, &monitor_queue_fd);
+#endif
+
+#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+    monitor_inotify_fd = inotify_init();
+    alloced_inotify_watches = 100;
+    inotify_watches = (char **)(calloc(alloced_inotify_watches, sizeof(char *)));
+    if (inotify_watches == NULL) alloced_inotify_watches = 0;
 #endif
 
 #if defined(CCTOOLS_OPSYS_FREEBSD)
