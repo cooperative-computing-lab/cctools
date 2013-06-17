@@ -312,9 +312,9 @@ with the task, delete it:
 </pre>
 </div>
 
-Continue submitting and waiting for tasks until all work is complete.
-You may check to make sure that the queue is empty with <tt>work_queue_empty</tt>
-When all is done, delete the queue:
+Continue submitting and waiting for tasks until all work is complete.  You may
+check to make sure that the queue is empty with <tt>work_queue_empty</tt>. When
+all is done, delete the queue:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
@@ -328,6 +328,61 @@ When all is done, delete the queue:
 
 Full details of all of the Work Queue functions can be found in
 the <a href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">Work Queue API</a>.
+
+<h2>Project names</h2>
+Keeping track of the master's hostname and port can get cumbersome, especially
+if there are multiple masters. To help with difficulty, we provide the project
+name feature to identify a Work Queue master with a more recognizable project
+name. Work Queue workers can then be started for their masters by providing the
+project names. 
+
+<p> The project name feature uses the <b>catalog server</b> to maintain and
+track the project names of masters and their respective locations. It works as
+follows: the master advertises its project name along with its hostname and port
+to the catalog server. Work Queue workers that are provided with the master's
+project name query the catalog server to find the hostname and port of the
+master with the given project name. So, to utilize this feature, the master
+must be specified to run in the <tt>WORK_QUEUE_MASTER_MODE_CATALOG</tt>. 
+
+<p>For example, to run a master that advertises its project name as
+<tt>myproject</tt>, do the following:
+<div class="code_area">
+<h4 class="code_header">C/Perl</h4>
+<pre class="code_snip">
+ work_queue_specify_master_mode(q, WORK_QUEUE_MASTER_MODE_CATALOG)
+ work_queue_specify_name(q, "myproject");
+</pre>
+<h4 class="code_header">Python</h4>
+<pre class="code_snip">
+ wq.specify_mode(WORK_QUEUE_MASTER_MODE_CATALOG)
+ wq.specify_name("myproject")
+</pre>
+</div>
+
+To start a worker for this master, specify the project name (<tt>myproject</tt>)
+to connect in the </tt>-N</tt> option:
+
+<div class ="code_area"><pre class="code_snip">
+work_queue_worker -N myproject 
+</pre></div>
+
+You can start ten workers for this master on Condor using
+<tt>condor_submit_workers</tt> by providing the same option arguments.:
+<div class ="code_area"><pre class="code_snip">
+% condor_submit_workers -N myproject 10 
+Submitting job(s).......... 
+Logging submit event(s).......... 
+10 job(s) submitted to cluster 298.
+</pre></div>
+
+Or similarly on SGE using <tt>sge_submit_workers</tt> as:
+<div class ="code_area"><pre class="code_snip">
+% sge_submit_workers -N myproject 10
+Your job 153097 ("worker.sh") has been submitted 
+Your job 153098 ("worker.sh") has been submitted 
+Your job 153099 ("worker.sh") has been submitted 
+...
+</pre></div>
 
 <h2>Security</h2>
 
