@@ -7,9 +7,12 @@ fi
 
 CCTOOLS_PACKAGES=$(grep CCTOOLS_PACKAGES Makefile.config | cut -d = -f 2)
 if [ -z "$CCTOOLS_TEST_LOG" ]; then
-	CCTOOLS_TEST_LOG="$(pwd)/cctools.test.log"
-	export CCTOOLS_TEST_LOG
+	CCTOOLS_TEST_LOG="./cctools.test.log"
 fi
+if [ "${CCTOOLS_TEST_LOG:0:1}" != "/" ]; then
+	CCTOOLS_TEST_LOG="$(pwd)/${CCTOOLS_TEST_LOG}"
+fi
+export CCTOOLS_TEST_LOG
 
 SUCCESS=0
 FAILURE=0
