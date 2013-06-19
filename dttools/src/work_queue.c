@@ -3251,6 +3251,48 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 	return NULL;
 }
 
+struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
+	struct list *l = list_create();
+	struct work_queue_task *t;
+	struct work_queue_worker *w;
+	UINT64_T taskid;
+	char *key;
+	
+	while( (t = list_pop_head(q->ready_list)) ) {
+		list_push_tail(l, t);
+	}
+	while( (t = list_pop_head(q->complete_list)) ) {
+		list_push_tail(l, t);
+	}
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+		
+		send_worker_msg(w, "%s %d\n", time(0) + short_timeout, "kill", -1);
+		
+		itable_firstkey(w->current_tasks);
+		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
+			itable_remove(q->running_tasks, taskid);
+			itable_remove(q->finished_tasks, taskid);
+			itable_remove(q->worker_task_map, taskid);
+			
+			//Delete any input files that are not to be cached.
+			delete_worker_files(w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+
+			//Delete all output files since they are not needed as the task was aborted.
+			delete_worker_files(w, t->output_files, 0);
+			
+			w->cores_allocated -= t->cores;
+			w->memory_allocated -= t->memory;
+			w->disk_allocated -= t->disk;
+			itable_remove(w->current_tasks, taskid);
+			
+			list_push_tail(l, t);
+		}
+	}
+	return l;
+}
+
 void work_queue_reset(struct work_queue *q, int flags) {
 	struct work_queue_worker *w;
 	struct work_queue_task *t;

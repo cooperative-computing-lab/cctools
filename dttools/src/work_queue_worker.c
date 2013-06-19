@@ -154,7 +154,6 @@ static char *os_name = NULL;
 static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
 static time_t worker_start_time = 0;
-static UINT64_T current_taskid = 0;
 static char *base_debug_filename = NULL;
 
 // Local resource controls
@@ -1203,6 +1202,17 @@ static void kill_all_tasks() {
 	pid_t pid;
 	UINT64_T taskid;
 	
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		struct list *l;
+		struct work_queue_task *t;
+		l = work_queue_cancel_all_tasks(foreman_q);
+		while((t = list_pop_head(l))) {
+			work_queue_task_delete(t);
+		}
+		list_delete(l);
+		return;
+	}
+	
 	// If there are no stored tasks, then there are no active tasks, return. 
 	if(!stored_tasks) return;
 	// If there are no active local tasks, return.
@@ -1234,7 +1244,19 @@ static void kill_all_tasks() {
 }
 
 static int do_kill(int taskid) {
-	struct task_info *ti = itable_lookup(stored_tasks, taskid);
+	struct task_info *ti;
+
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		struct work_queue_task *t;
+		t = work_queue_cancel_by_taskid(foreman_q, taskid);
+		if(t) {
+			work_queue_task_delete(t);
+		}
+		return 1;
+	}
+	
+	ti = itable_lookup(stored_tasks, taskid);
+	
 	if(ti && itable_lookup(active_tasks, ti->pid)) {
 		kill_task(ti);
 	} else {
@@ -1384,7 +1406,7 @@ static int path_within_workspace(const char *path, const char *workspace) {
 	return rv;
 }
 
-static int worker_handle_master(struct link *master) {
+static int handle_master(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
 	char path[WORK_QUEUE_LINE_MAX];
@@ -1395,7 +1417,7 @@ static int worker_handle_master(struct link *master) {
 
 	if(recv_master_message(master, line, sizeof(line), time(0)+active_timeout)) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
-			r = do_task(master,taskid);
+			r = do_task(master, taskid);
 		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) >= 3) {
 			if(path_within_workspace(filename, workspace)) {
 				r = do_put(master, filename, length, mode);
@@ -1416,10 +1438,7 @@ static int worker_handle_master(struct link *master) {
 			r = do_thirdget(mode, filename, path);
 		} else if(sscanf(line, "thirdput %o %s %[^\n]", &mode, filename, path) == 3) {
 			r = do_thirdput(master, mode, filename, path);
-		} else if(!strncmp("kill", line, 4)){
-			if(sscanf(line, "kill %" SCNd64, &taskid) == 0) {
-				taskid = current_taskid;
-			}
+		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
 			if(taskid >= 0) {
 				r = do_kill(taskid);
 			} else {
@@ -1442,9 +1461,6 @@ static int worker_handle_master(struct link *master) {
 			r = 0;
 		}
 		
-		if(!worker_mode && taskid) {
-			worker_mode = WORKER_MODE_WORKER;
-		}
 	} else {
 		debug(D_WQ, "Failed to read from master.\n");
 		r = 0;
@@ -1510,7 +1526,7 @@ static void work_for_master(struct link *master) {
 		
 		int ok = 1;
 		if(result) {
-			ok &= worker_handle_master(master);
+			ok &= handle_master(master);
 		}
 
 		ok &= handle_tasks(master);
@@ -1541,62 +1557,6 @@ static void work_for_master(struct link *master) {
 			idle_stoptime = time(0) + idle_timeout;
 		}
 	}
-}
-
-static int foreman_handle_master(struct link *master) {
-	char line[WORK_QUEUE_LINE_MAX];
-	char filename[WORK_QUEUE_LINE_MAX];
-	INT64_T length;
-	INT64_T taskid;
-	int mode, flags, r;
-
-	if(recv_master_message(master, line, sizeof(line), time(0)+active_timeout)) {
-		if(sscanf(line, "task %" SCNd64 ,&taskid)==1) {
-			r = do_task(master,taskid);
-		} else if(sscanf(line, "put %s %" SCNd64 " %o %" SCNd64 " %d", filename, &length, &mode, &taskid, &flags) == 5) {
-			if(path_within_workspace(filename, workspace)) {
-				r = do_put(master, filename, length, mode);
-			} else {
-				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
-				r= 0;
-			}
-		} else if(sscanf(line, "unlink %s", filename) == 1) {
-			if(path_within_workspace(filename, workspace)) {
-				r = do_unlink(filename);
-			} else {
-				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
-				r= 0;
-			}
-		} else if(sscanf(line, "get %s %d", filename, &mode) == 2) {
-			r = do_get(master, filename, mode);
-		} else if(sscanf(line, "kill %" SCNd64 , &taskid) == 1){
-			struct work_queue_task *t;
-			t = work_queue_cancel_by_taskid(foreman_q, taskid);
-			if(t) {
-				work_queue_task_delete(t);
-			}
-			r = 1;
-		} else if(!strncmp(line, "release", 8)) {
-			r = do_release();
-		} else if(!strncmp(line, "exit", 5)) {
-			r = 0;
-		} else if(!strncmp(line, "check", 6)) {
-			r = send_keepalive(master);
-		} else if(!strncmp(line, "reset", 5)) {
-			r = do_reset();
-		} else if(!strncmp(line, "auth", 4)) {
-			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
-			r = 0;
-		} else {
-			debug(D_WQ, "Unrecognized master message: %s.\n", line);
-			r = 0;
-		}
-	} else {
-		debug(D_WQ, "Failed to read from master.\n");
-		r = 0;
-	}
-
-	return r;
 }
 
 static void foreman_for_master(struct link *master) {
@@ -1647,7 +1607,7 @@ static void foreman_for_master(struct link *master) {
 		send_resource_update(master,0);
 		
 		if(list_size(master_link_active)) {
-			result &= foreman_handle_master(list_pop_head(master_link_active));
+			result &= handle_master(list_pop_head(master_link_active));
 		}
 
 		if(!result) {
