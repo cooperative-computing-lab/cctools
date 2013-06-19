@@ -917,23 +917,21 @@ static INT64_T do_search(int argc, char **argv)
 	CHIRP_SEARCH *s = chirp_reli_opensearch(current_host, argv[1], argv[2], flags, stoptime);
 	struct chirp_searchent *res;
 
-        while ((res = chirp_client_readsearch(s)) != NULL) {
+	while ((res = chirp_client_readsearch(s)) != NULL) {
+		if (res->err) {
+			printf("%s error on %s: %s\n", strerrsource(res->errsource), res->path, strerror(res->err));
+			continue;
+		}
 
-                if (res->err) {
-                        printf("%s error on %s: %s\n", strerrsource(res->errsource), res->path, strerror(res->err));
-                        continue;
-                }
+		printf("%-30s", res->path);
 
-                printf("%-30s", res->path);
+		if (flags & CHIRP_SEARCH_METADATA)
+			printf("\t" INT64_FORMAT "\t" INT64_FORMAT "\n", res->info->cst_size, res->info->cst_ino);
+		else
+			printf("\n");
+	}
 
-                if (flags & CHIRP_SEARCH_METADATA)
-                        printf("\t" INT64_FORMAT "\t" INT64_FORMAT "\n", res->info->cst_size, res->info->cst_ino);
-                else
-                        printf("\n");
-        }
-
-        chirp_client_closesearch(s);
-
+	chirp_client_closesearch(s);
 	return 0;
 }
 
