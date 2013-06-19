@@ -12,7 +12,7 @@ prepare()
 run()
 {
     ../src/starch -x date $sfxfile
-    exec $sfxfile
+    exec ./$sfxfile
 }
 
 clean()

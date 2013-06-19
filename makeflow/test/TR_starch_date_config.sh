@@ -16,7 +16,7 @@ EOF
 run()
 {
     ../src/starch -C $cfgfile $sfxfile
-    exec $sfxfile
+    exec ./$sfxfile
 }
 
 clean()

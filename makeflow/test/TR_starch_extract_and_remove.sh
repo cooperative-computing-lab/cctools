@@ -14,7 +14,7 @@ prepare()
 run()
 {
     ../src/starch -v -x tar -x rm -c 'for f in $@; do if ! tar xvf $f; then exit 1; fi ; done; rm $@' $sfxfile
-    exec $sfxfile $tarfile
+    exec ./$sfxfile $tarfile
 }
 
 clean()
