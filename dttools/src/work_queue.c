@@ -845,7 +845,7 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 					t->total_transfer_time += sum_time;
 					w->total_bytes_transferred += total_bytes;
 					w->total_transfer_time += sum_time;
-					debug(D_WQ, "Got %d bytes from %s (%s) in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps", total_bytes, w->hostname, w->addrport, sum_time / 1000000.0, ((8.0 * total_bytes) / sum_time),
+					debug(D_WQ, "Got %"PRId64" bytes from %s (%s) in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps", total_bytes, w->hostname, w->addrport, sum_time / 1000000.0, ((8.0 * total_bytes) / sum_time),
 					      (8.0 * w->total_bytes_transferred) / w->total_transfer_time);
 				}
 				total_bytes = 0;
@@ -1781,7 +1781,7 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 	t->host = xxstrdup(w->addrport);
 	
 	send_worker_msg(w, "task %lld\n",  time(0) + short_timeout, (long long) t->taskid);
-	send_worker_msg(w, "cmd %lld\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
+	send_worker_msg(w, "cmd %lld\n%s", time(0) + short_timeout, (long long) strlen(t->command_line), t->command_line);
 	send_worker_msg(w, "cores %d\n",   time(0) + short_timeout, t->cores );
 	send_worker_msg(w, "memory %d\n",  time(0) + short_timeout, t->memory );
 	send_worker_msg(w, "disk %d\n",    time(0) + short_timeout, t->disk );
