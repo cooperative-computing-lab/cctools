@@ -173,7 +173,17 @@ int chirp_acl_check_dir(const char *dirname, const char *subject, int flags)
 	if(cfs->do_acl_check()==0) return 1;
 
 	if(!do_chirp_acl_get(dirname, subject, &myflags)) {
-		errno = EACCES;
+		/*
+		Applications are very sensitive to this error condition.
+		A missing ACL file indicates permission denied,
+		but a missing directory entirely indicates no such entry.
+		*/
+
+		if(cfs_isdir(dirname)) {
+			errno = EACCES;
+		} else {
+			errno = ENOENT;
+		}
 		return 0;
 	}
 
