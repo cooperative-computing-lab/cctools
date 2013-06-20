@@ -525,7 +525,7 @@ static int search_directory(const char *subject, const char *base, char *dir, co
 	if(dirp) {
 		errno = 0;
 		struct chirp_dirent *entry;
-		struct chirp_stat *stat_buf = alloca(sizeof(struct chirp_stat));
+		struct chirp_stat buf;
 		while((entry = chirp_fs_local_readdir(dirp))) {
 			int access_flags = search_to_access(flags);
 			char *name = entry->name;
@@ -540,11 +540,11 @@ static int search_directory(const char *subject, const char *base, char *dir, co
 				if(metadata) {
 
 					/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
-					if((chirp_fs_local_stat(dir, stat_buf)) == -1) {
+					if((chirp_fs_local_stat(dir, &buf)) == -1) {
 						link_putfstring(l, "0:%s::\n", stoptime, match_name);
 						link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, match_name);
 					} else
-						link_putfstring(l, "0:%s:%s:\n", stoptime, match_name, chirp_stat_string(stat_buf));
+						link_putfstring(l, "0:%s:%s:\n", stoptime, match_name, chirp_stat_string(&buf));
 				} else
 					link_putfstring(l, "0:%s::\n", stoptime, match_name);
 				if(stopatfirst)
