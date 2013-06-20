@@ -418,6 +418,12 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int id
 */
 struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const char *tag);
 
+/** Cancel all submitted tasks and remove them from the queue.
+@param q A work queue object.
+@return A @ref list of all of the tasks submitted to q.  Each task must be deleted with @ref work_queue_task_delete or resubmitted with @ref work_queue_submit.
+*/
+struct list * work_queue_cancel_all_tasks(struct work_queue *q);
+
 /** Reset a work queue and all attached workers.
 @param q A work queue object.
 @param flags Flags to indicate what to reset:

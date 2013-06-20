@@ -228,7 +228,7 @@ int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 		return 1;
 	}
 
-	link_putfstring(l,"status %s\n",stoptime,query_string);
+	link_putfstring(l,"%s_status\n",stoptime,query_string);
 
 	if(format_mode==FORMAT_TABLE) {
 		nvpair_print_table_header(stdout, query_header);

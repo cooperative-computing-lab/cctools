@@ -30,7 +30,7 @@ padding: 0.3%;
 <body>
 
 <h1>Work Queue User's Manual</h1>
-<b>Last Updated March 2013</b>
+<b>Last Updated June 2013</b>
 <p>
 Work Queue is Copyright (C) 2009 The University of Notre Dame.
 This software is distributed under the GNU General Public License.
@@ -312,9 +312,9 @@ with the task, delete it:
 </pre>
 </div>
 
-Continue submitting and waiting for tasks until all work is complete.
-You may check to make sure that the queue is empty with <tt>work_queue_empty</tt>
-When all is done, delete the queue:
+Continue submitting and waiting for tasks until all work is complete.  You may
+check to make sure that the queue is empty with <tt>work_queue_empty</tt>. When
+all is done, delete the queue:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
@@ -329,23 +329,77 @@ When all is done, delete the queue:
 Full details of all of the Work Queue functions can be found in
 the <a href="http://www.cse.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">Work Queue API</a>.
 
+<h2>Project names</h2>
+Keeping track of the master's hostname and port can get cumbersome, especially
+if there are multiple masters. To help with difficulty, we provide the project
+name feature to identify a Work Queue master with a more recognizable project
+name. Work Queue workers can then be started for their masters by providing the
+project names. 
+
+<p> The project name feature uses the <b>catalog server</b> to maintain and
+track the project names of masters and their respective locations. It works as
+follows: the master advertises its project name along with its hostname and port
+to the catalog server. Work Queue workers that are provided with the master's
+project name query the catalog server to find the hostname and port of the
+master with the given project name. So, to utilize this feature, the master
+must be specified to run in the <tt>WORK_QUEUE_MASTER_MODE_CATALOG</tt>. 
+
+<p>For example, to run a master that advertises its project name as
+<tt>myproject</tt>, do the following:
+<div class="code_area">
+<h4 class="code_header">C/Perl</h4>
+<pre class="code_snip">
+ work_queue_specify_master_mode(q, WORK_QUEUE_MASTER_MODE_CATALOG)
+ work_queue_specify_name(q, "myproject");
+</pre>
+<h4 class="code_header">Python</h4>
+<pre class="code_snip">
+ wq.specify_mode(WORK_QUEUE_MASTER_MODE_CATALOG)
+ wq.specify_name("myproject")
+</pre>
+</div>
+
+To start a worker for this master, specify the project name (<tt>myproject</tt>)
+to connect in the </tt>-N</tt> option:
+
+<div class ="code_area"><pre class="code_snip">
+work_queue_worker -N myproject 
+</pre></div>
+
+You can start ten workers for this master on Condor using
+<tt>condor_submit_workers</tt> by providing the same option arguments.:
+<div class ="code_area"><pre class="code_snip">
+% condor_submit_workers -N myproject 10 
+Submitting job(s).......... 
+Logging submit event(s).......... 
+10 job(s) submitted to cluster 298.
+</pre></div>
+
+Or similarly on SGE using <tt>sge_submit_workers</tt> as:
+<div class ="code_area"><pre class="code_snip">
+% sge_submit_workers -N myproject 10
+Your job 153097 ("worker.sh") has been submitted 
+Your job 153098 ("worker.sh") has been submitted 
+Your job 153099 ("worker.sh") has been submitted 
+...
+</pre></div>
+
 <h2>Security</h2>
 
 By default, Work Queue does <b>not</b> perform any authentication,
 so any workers will be able to connect to your master, and
-vice versa.  This may be ok for a short running anonymous application,
+vice versa.  This may be fine for a short running anonymous application,
 but is not safe for a long running application with a public name.
 <p>
 We recommend that you enable a password for your applications.  Create
-a file (e.g. <b>mypwfile</b>) that contains any password (or other
-long phrase) that you like (e.g. <b>This is my password</b>).  The password
+a file (e.g. <tt>mypwfile</tt>) that contains any password (or other
+long phrase) that you like (e.g. <tt>This is my password</tt>).  The password
 will be particular to your application and should not match any other
 passwords that you own.  Note that the contents of the file are taken
 verbatim as the password; this means that any new line character at
 the end of the phrase will be considered as part of the password.
 <p>
 Then, modify your master program to use the password:
-<p>
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
@@ -356,49 +410,55 @@ work_queue_specify_password_file(q,mypwfile);
  q.specify_password_file(mypwfile);
 </pre>
 </div>
-
-And give the --password option to give the same password file to your workers:
-
-<pre>
-% work_queue_worker <b>--password mypwfile</b> ...
-</pre>
-
+<p>
+And give the <tt>--password</tt> option to give the same password file to your
+workers:
+<div class ="code_area"><pre class="code_snip">
+work_queue_worker --password mypwfile  MACHINENAME 9123 
+</pre></div>
+<p>
 With this option enabled, both the master and the workers will
 verify that the other has the matching password before proceeding.
 The password is not sent in the clear, but is securely verified
 through a SHA1-based challenge-response protocol.
 
 <h2>Work Queue Foremen</h2>
-<p>
-A <b>foreman</b> represents a tree of workers.  The foreman connects to the master and accepts tasks as though it were a worker, while
-allowing workers to connect to it as if it were a master.  As the foreman receives files and tasks from its supervisor, it stores the files on the local disk and
-queues the tasks up for dispatch to its subordinates.  Cacheable common files that are stored at the foreman can be transmitted to its subordinates without incurring
-any additional load on the master.  As workers connect to the foreman, or when connected workers fail or are removed, the foreman reports these resource
-changes to the master, allowing the master to appropriately allocate tasks.
-</p>
+<p>A Work Queue foreman allows Work Queue workers to be managed in an
+hierarchical manner. Each foreman connects to the Work Queue master and accepts
+tasks as though it were a worker. It then accepts connections from Work Queue
+workers and dispatches tasks to them as if it were the master.</p> 
 
-<p>
-Foremen are especially useful when harnessing resources from multiple computer clusters.
-A foreman can be run on each cluster and act as a single communications hub for all of
-the workers in that cluster.  This reduces the number of network connections leaving the
-cluster proper, provides a convenient control and monitoring point for the resources used
-by the cluster, and minimizes the transfer cost (in both time and sometimes money) for sending
-data into the cluster over inter-cluster networks.
-</p>
+<p>A setup using foremen is beneficial when there are common files that need to
+be transmitted to workers and cached for subsequent executions.  In this case,
+the foremen transfer the common files to their workers without requiring any
+intervention from the master, thereby lowering the communication and transfer
+overheads at the master. </p>
 
-<p>
-To run the <b>work_queue_worker</b> as a foreman, use the <b>--foreman</b> argument.  The foreman's master
-is set the same way as a normal work_queue_worker, using either hostname and port or the <b>-M project_name</b>
-argument.  To acquire workers the foreman can advertise itself as a separate project using the <b>-N foreman_name</b>
-flag, and the port it should listen on can be set with <b>-f port</b>.
-</p>
+<p>Foremen are also useful when harnessing resources from multiple clusters. A
+foreman can be run on the head node of a cluster acting as a single
+communications hub for the workers in that cluster.  This reduces the network
+connections leaving the cluster and minimizes the transfer costs for sending
+data into the cluster over wide area networks. </p>
 
-<p>
-For example, to run a foreman working for project_A and advertising itself as foreman_A1 while listening on port 9123 you would use:
-<pre>
-% work_queue_worker --foreman -M project_A -N foreman_A1 -f 9123
-</pre>
-</p>
+<p>To start a Work Queue foreman, invoke <tt>work_queue_worker</tt> with the
+<tt>--foreman</tt> argument. The foreman can advertise a project name using the
+<tt>-N</tt> option to enable workers to find and connect to it without being
+given its hostname and port.  On the other end, the foreman will connect to the
+master with the same project name specified in <tt>-M</tt> argument
+(alternatively, the hostname and port of the master can be provided instead of
+its project name).
+
+<p>For example, to run a foreman that works for a master with project name
+<tt>myproject</tt> and advertises itself as <tt>foreman_myproject</tt>:
+<div class ="code_area"><pre class="code_snip">
+% work_queue_worker --foreman -M myproject -N foreman_myproject 
+</pre></div>
+
+<p>To run a worker that connects to a foreman, specify the foreman's project name
+in the <tt>-N</tt> option. For example: 
+<div class ="code_area"><pre class="code_snip">
+% work_queue_worker -N foreman_myproject 
+</pre></div>
 
 <h2>Advanced Usage</h2>
 
@@ -412,6 +472,12 @@ you may find the following features helpful.  All are described in the
 it may not be possible to submit all of the tasks, and then wait for all of them.  Instead,
 submit a small number of tasks, then alternate waiting and submiting to keep a constant
 number in the queue.  <tt>work_queue_hungry</tt> will tell you if more submission are warranted.
+<p>
+<li><b>Asynchronous transfer.</b> If you have tasks with a balanced or large
+computation-to-data ratio, this feature can help improve the CPU utilization and
+lower the runtime overheads incurred due to data transfer. This feature
+asynchronously streams the data inputs and outputs to and from the workers when
+they are executing tasks. See <tt>work_queue_specify_asynchrony</tt>.
 <p>
 <li><b>Fast Abort.</b>  A large computation can often be slowed down by stragglers.  If you have
 a large number of small tasks that take a short amount of time, then Fast Abort can help.

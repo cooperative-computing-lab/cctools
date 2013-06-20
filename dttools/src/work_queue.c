@@ -369,7 +369,7 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 		result = process_workqueue(q, w, line);
 	} else if (string_prefix_is(line,"result")) {
 		result = process_result(q, w, line, stoptime);
-	} else if (string_prefix_is(line,"status")) {
+	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status")) {
 		result = process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
@@ -845,7 +845,7 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 					t->total_transfer_time += sum_time;
 					w->total_bytes_transferred += total_bytes;
 					w->total_transfer_time += sum_time;
-					debug(D_WQ, "Got %d bytes from %s (%s) in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps", total_bytes, w->hostname, w->addrport, sum_time / 1000000.0, ((8.0 * total_bytes) / sum_time),
+					debug(D_WQ, "Got %"PRId64" bytes from %s (%s) in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps", total_bytes, w->hostname, w->addrport, sum_time / 1000000.0, ((8.0 * total_bytes) / sum_time),
 					      (8.0 * w->total_bytes_transferred) / w->total_transfer_time);
 				}
 				total_bytes = 0;
@@ -1213,7 +1213,7 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	char request[WORK_QUEUE_LINE_MAX];
 	struct link *l = target->link;
 	
-	if(!sscanf(line, "status %s", request) == 1) {
+	if(!sscanf(line, "%[^_]_status", request) == 1) {
 		return -1;
 	}
 	
@@ -1781,7 +1781,7 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 	t->host = xxstrdup(w->addrport);
 	
 	send_worker_msg(w, "task %lld\n",  time(0) + short_timeout, (long long) t->taskid);
-	send_worker_msg(w, "cmd %lld\n%s", time(0) + short_timeout, strlen(t->command_line), t->command_line);
+	send_worker_msg(w, "cmd %lld\n%s", time(0) + short_timeout, (long long) strlen(t->command_line), t->command_line);
 	send_worker_msg(w, "cores %d\n",   time(0) + short_timeout, t->cores );
 	send_worker_msg(w, "memory %d\n",  time(0) + short_timeout, t->memory );
 	send_worker_msg(w, "disk %d\n",    time(0) + short_timeout, t->disk );
@@ -3249,6 +3249,48 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 	}
 	
 	return NULL;
+}
+
+struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
+	struct list *l = list_create();
+	struct work_queue_task *t;
+	struct work_queue_worker *w;
+	UINT64_T taskid;
+	char *key;
+	
+	while( (t = list_pop_head(q->ready_list)) ) {
+		list_push_tail(l, t);
+	}
+	while( (t = list_pop_head(q->complete_list)) ) {
+		list_push_tail(l, t);
+	}
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+		
+		send_worker_msg(w, "%s %d\n", time(0) + short_timeout, "kill", -1);
+		
+		itable_firstkey(w->current_tasks);
+		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
+			itable_remove(q->running_tasks, taskid);
+			itable_remove(q->finished_tasks, taskid);
+			itable_remove(q->worker_task_map, taskid);
+			
+			//Delete any input files that are not to be cached.
+			delete_worker_files(w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+
+			//Delete all output files since they are not needed as the task was aborted.
+			delete_worker_files(w, t->output_files, 0);
+			
+			w->cores_allocated -= t->cores;
+			w->memory_allocated -= t->memory;
+			w->disk_allocated -= t->disk;
+			itable_remove(w->current_tasks, taskid);
+			
+			list_push_tail(l, t);
+		}
+	}
+	return l;
 }
 
 void work_queue_reset(struct work_queue *q, int flags) {
