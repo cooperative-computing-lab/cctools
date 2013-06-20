@@ -538,7 +538,6 @@ static int search_directory(const char *subject, const char *base, char *dir, co
 				char *match_name = includeroot ? dir : name;
 
 				if(metadata) {
-
 					/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
 					if((chirp_fs_local_stat(dir, &buf)) == -1) {
 						link_putfstring(l, "0:%s::\n", stoptime, match_name);
