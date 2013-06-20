@@ -11,16 +11,8 @@ See the file COPYING for details.
 #include "nvpair.h"
 #include "link_nvpair.h"
 #include "link.h"
-<<<<<<< HEAD
-#include "work_queue_catalog.h"
-=======
 #include "getopt.h"
-<<<<<<< HEAD
->>>>>>> 1b3751f67553fe246d8855c18ea77b6ad7bfb0d2
-=======
 #include "work_queue_catalog.h"
->>>>>>> 824b19393d1ae36792394a5f3ed074b136e3d5c9
-
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>

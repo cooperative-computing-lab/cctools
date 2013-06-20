@@ -454,12 +454,8 @@ static void update_catalog(struct work_queue *q, int now)
 		q->catalog_port = CATALOG_PORT;
 	}
 	work_queue_get_stats(q, &s);
-<<<<<<< HEAD
-	struct work_queue_resources r = {0};
-=======
 	struct work_queue_resources r;
 	memset(&r, 0, sizeof(work_queue_get_resources));
->>>>>>> 824b19393d1ae36792394a5f3ed074b136e3d5c9
 	work_queue_get_resources(q,&r);
 	debug(D_WQ,"Updating catalog with resource information -- cores:%d memory:%d disk:%d\n", r.cores.total,r.memory.total,r.disk.total); //see if information is being passed correctly
 	char * worker_summary = work_queue_get_worker_summary(q);
@@ -3017,7 +3013,7 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
-struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct list *aux_links, struct list *active_aux_links)
+struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *master_link/*struct list *aux_links, struct list *active_aux_links*/)
 {
 	struct work_queue_task *t;
 	time_t stoptime;
