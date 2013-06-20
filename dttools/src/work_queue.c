@@ -438,7 +438,7 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 		timeout = MAX(wq_minimum_transfer_timeout, length / tolerable_transfer_rate);	// try at least wq_minimum_transfer_timeout seconds
 	}
 
-	debug(D_WQ, "%s (%s) will try up to %lld seconds for the transfer of this %.3Lf MB file.", w->hostname, w->addrport, timeout, (long double) length / 1000000);
+	debug(D_WQ, "%s (%s) will try up to %lld seconds for the transfer of this %.3Lf MB file.", w->hostname, w->addrport, (long long) timeout, (long double) length / 1000000);
 	return timeout;
 }
 
@@ -663,7 +663,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					}
 
 					// get the remote file and place it
-					debug(D_WQ, "Receiving file %s (size: %lld bytes) from %s (%s) ...", tmp_local_name, length, w->addrport, w->hostname);
+					debug(D_WQ, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", tmp_local_name, length, w->addrport, w->hostname);
 					fd = open(tmp_local_name, O_WRONLY | O_TRUNC | O_CREAT, 0700);
 					if(fd < 0) {
 						debug(D_NOTICE, "Cannot open file %s for writing: %s", tmp_local_name, strerror(errno));
@@ -677,7 +677,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					actual = link_stream_to_fd(w->link, fd, length, stoptime);
 					close(fd);
 					if(actual != length) {
-						debug(D_WQ, "Received item size (%lld) does not match the expected size - %lld bytes.", actual, length);
+						debug(D_WQ, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
 						unlink(local_name);
 						goto failure;
 					}
@@ -689,7 +689,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 
 					hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
 				} else {
-					debug(D_NOTICE, "%s on %s (%s) has invalid length: %lld", remote_name, w->addrport, w->hostname, length);
+					debug(D_NOTICE, "%s on %s (%s) has invalid length: %"PRId64, remote_name, w->addrport, w->hostname, length);
 					goto failure;
 				}
 			} else if(strncmp(type, "missing", 7) == 0) {
@@ -1075,11 +1075,11 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	t->output = malloc(output_length + 1);
 	if(output_length > 0) {
-		debug(D_WQ, "Receiving stdout of task %d (size: %lld bytes) from %s (%s) ...", taskid, output_length, w->addrport, w->hostname);
+		debug(D_WQ, "Receiving stdout of task %ld (size: %"PRId64" bytes) from %s (%s) ...", (long int)taskid, output_length, w->addrport, w->hostname);
 		stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, (INT64_T) output_length);
 		actual = link_read(w->link, t->output, output_length, stoptime);
 		if(actual != output_length) {
-			debug(D_WQ, "Failure: actual received stdout size (%lld bytes) is different from expected (%lld bytes).", actual, output_length);
+			debug(D_WQ, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, output_length);
 			t->output[actual] = '\0';
 			return -1;
 		}
@@ -1087,7 +1087,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		if(effective_stoptime && effective_stoptime > current_time) {
 			usleep(effective_stoptime - current_time);
 		}
-		debug(D_WQ, "Got %d bytes from %s (%s)", actual, w->hostname, w->addrport);
+		debug(D_WQ, "Got %"PRId64" bytes from %s (%s)", actual, w->hostname, w->addrport);
 		
 	} else {
 		actual = 0;
@@ -1405,7 +1405,7 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 		length = local_info.st_size;
 	}
 	
-	debug(D_WQ, "%s (%s) needs file %s bytes %lld:%lld as '%s'", w->hostname, w->addrport, localname, offset, offset+length, remotename);
+	debug(D_WQ, "%s (%s) needs file %s bytes %lld:%lld as '%s'", w->hostname, w->addrport, localname, (long long) offset, (long long) offset+length, remotename);
 	int fd = open(localname, O_RDONLY, 0);
 	if(fd < 0)
 		return 0;
@@ -1417,7 +1417,7 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 			return 0;
 		}
 	} else {
-		debug(D_NOTICE, "File specification %s (%lld:%lld) is invalid", localname, offset, offset+length);
+		debug(D_NOTICE, "File specification %s (%lld:%lld) is invalid", localname, (long long) offset, (long long) offset+length);
 		close(fd);
 		return 0;
 	}
@@ -1429,7 +1429,7 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 	}
 	
 	stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, length);
-	send_worker_msg(w, "put %s %lld 0%o %d\n", time(0) + short_timeout, remotename, length, local_info.st_mode, flags);
+	send_worker_msg(w, "put %s %"PRId64" 0%o %d\n", time(0) + short_timeout, remotename, length, local_info.st_mode, flags);
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
 	
@@ -1626,7 +1626,7 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 static int send_input_files(struct work_queue_task *t, struct work_queue_worker *w, struct work_queue *q)
 {
 	struct work_queue_file *tf;
-	int actual = 0;
+	INT64_T actual = 0;
 	INT64_T total_bytes = 0;
 	timestamp_t open_time = 0;
 	timestamp_t close_time = 0;
@@ -1683,7 +1683,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 				
 				stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, (INT64_T) fl);
 				open_time = timestamp_get();
-				send_worker_msg(w, "put %s %lld %o %d\n", time(0) + short_timeout, remote_name, (INT64_T) fl, 0777, tf->flags);
+				send_worker_msg(w, "put %s %"PRId64" %o %d\n", time(0) + short_timeout, remote_name, (INT64_T) fl, 0777, tf->flags);
 				actual = link_putlstring(w->link, tf->payload, fl, stoptime);
 				timestamp_t current_time = timestamp_get();
 				if(effective_stoptime && effective_stoptime > current_time) {
@@ -1751,7 +1751,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 		if(total_bytes > 0) {
 			q->total_bytes_sent += (INT64_T) total_bytes;
 			q->total_send_time += sum_time;
-			debug(D_WQ, "%s (%s) got %d bytes in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps", w->hostname, w->addrport, total_bytes, sum_time / 1000000.0, ((8.0 * total_bytes) / sum_time),
+			debug(D_WQ, "%s (%s) got %"PRId64" bytes in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps", w->hostname, w->addrport, total_bytes, sum_time / 1000000.0, ((8.0 * total_bytes) / sum_time),
 			      (8.0 * w->total_bytes_transferred) / w->total_transfer_time);
 		}
 	}
@@ -1760,9 +1760,9 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 
       failure:
 	if(tf->type == WORK_QUEUE_FILE || tf->type == WORK_QUEUE_FILE_PIECE)
-		debug(D_WQ, "%s (%s) failed to send %s (%i bytes received).", w->hostname, w->addrport, tf->payload, actual);
+		debug(D_WQ, "%s (%s) failed to send %s (%"PRId64" bytes received).", w->hostname, w->addrport, tf->payload, actual);
 	else
-		debug(D_WQ, "%s (%s) failed to send literal data (%i bytes received).", w->hostname, w->addrport, actual);
+		debug(D_WQ, "%s (%s) failed to send literal data (%"PRId64" bytes received).", w->hostname, w->addrport, actual);
 	t->result |= WORK_QUEUE_RESULT_INPUT_FAIL;
 	return 0;
 }
@@ -1953,7 +1953,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	avg_task_execution_time = ts->total_time_execute_cmd / num_of_reports;
 	avg_task_transfer_time = ts->total_time_transfer_data / num_of_reports;
 	avg_task_app_time = q->total_tasks_complete > 0 ? q->app_time / (q->total_tasks_complete + 1) : 0;
-	debug(D_WQ, "Avg task execution time: %lld; Avg task tranfer time: %lld; Avg task app time: %lld\n", avg_task_execution_time, avg_task_transfer_time, avg_task_app_time);
+	debug(D_WQ, "Avg task execution time: %lld; Avg task tranfer time: %lld; Avg task app time: %lld\n", (long long) avg_task_execution_time, (long long) avg_task_transfer_time, (long long) avg_task_app_time);
 
 
 	avg_task_time_at_master = avg_task_transfer_time + avg_task_app_time;
@@ -2240,7 +2240,7 @@ static void update_app_time(struct work_queue *q, timestamp_t last_left_time, in
 			// A simple way of discarding outliers that does not require much calculation.
 			// Works for workloads that has stable app times.
 			if(t1 > WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER * t2) {
-				debug(D_WQ, "Discarding outlier task app time: %lld\n", t1);
+				debug(D_WQ, "Discarding outlier task app time: %lld\n", (long long) t1);
 				q->app_time += t2;
 			} else {
 				q->app_time += t1;
