@@ -2736,8 +2736,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	dag_log_recover(d, logfilename);
-
 	if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
 		char *cwd = string_getcwd();
 		if(!strncmp(cwd, "/afs", 4)) {
@@ -2770,6 +2768,8 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "makeflow: perhaps port %d is already in use?\n", port);
 		exit(1);
 	}
+
+	dag_log_recover(d, logfilename);
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		struct work_queue *q = batch_queue_get_work_queue(remote_queue);

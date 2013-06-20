@@ -5,7 +5,8 @@ if [ ! -r Makefile.config ]; then
     exit 1
 fi
 
-CCTOOLS_PACKAGES=$(grep CCTOOLS_PACKAGES Makefile.config | cut -d = -f 2)
+#CCTOOLS_PACKAGES=$(grep CCTOOLS_PACKAGES Makefile.config | cut -d = -f 2)
+CCTOOLS_PACKAGES=makeflow
 if [ -z "$CCTOOLS_TEST_LOG" ]; then
 	CCTOOLS_TEST_LOG="./cctools.test.log"
 fi
