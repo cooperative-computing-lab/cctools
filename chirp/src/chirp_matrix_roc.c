@@ -272,7 +272,6 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Cannot open data set B list file - %s!\n", setBlistfile);
 		exit(1);
 	}
-
 	// Initialize position parameters and allocate memory for storing results of a block (sub matrix)
 	x_rel = y_rel = 0;	// relative to the sub-matrix we are actually working on
 

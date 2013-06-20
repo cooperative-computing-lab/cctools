@@ -27,14 +27,14 @@ static int show_all_types = 0;
 static INT64_T minavail = 0;
 
 static struct nvpair_header headers[] = {
-	{"type",   "TYPE",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
-	{"name",   "NAME",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 25},
-	{"port",   "PORT",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 5},
-	{"owner",  "OWNER",   NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 10},
-	{"version","VERSION", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
-	{"total",  "TOTAL",   NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
-	{"avail",  "AVAIL",   NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
-	{0,0,0,0,0}
+	{"type", "TYPE", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
+	{"name", "NAME", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 25},
+	{"port", "PORT", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 5},
+	{"owner", "OWNER", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 10},
+	{"version", "VERSION", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
+	{"total", "TOTAL", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
+	{"avail", "AVAIL", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
+	{0, 0, 0, 0, 0}
 };
 
 static void show_help(const char *cmd)
@@ -102,20 +102,21 @@ int main(int argc, char *argv[])
 	debug_config(argv[0]);
 
 
-    static struct option long_options[] = { 
-        {"catalog", required_argument, 0, 'c'},
-        {"debug", required_argument, 0, 'd'},
-        {"debug-file", required_argument, 0, 'o'},
-        {"debug-rotate-max", required_argument, 0, 'O'},
-        {"server-space", required_argument, 0, 'A'},
-        {"all", no_argument, 0, 'a'},
-        {"timeout", required_argument, 0, 't'},
-        {"brief", no_argument, 0, 's'},
-        {"verbose", no_argument, 0, 'l'},
-        {"totals", no_argument, 0, 'T'},
-        {"version", no_argument, 0, 'v'},
-        {"help", no_argument, 0, 'h'},
-        {0,0,0,0}};
+	static struct option long_options[] = {
+		{"catalog", required_argument, 0, 'c'},
+		{"debug", required_argument, 0, 'd'},
+		{"debug-file", required_argument, 0, 'o'},
+		{"debug-rotate-max", required_argument, 0, 'O'},
+		{"server-space", required_argument, 0, 'A'},
+		{"all", no_argument, 0, 'a'},
+		{"timeout", required_argument, 0, 't'},
+		{"brief", no_argument, 0, 's'},
+		{"verbose", no_argument, 0, 'l'},
+		{"totals", no_argument, 0, 'T'},
+		{"version", no_argument, 0, 'v'},
+		{"help", no_argument, 0, 'h'},
+		{0, 0, 0, 0}
+	};
 
 	while((c = getopt_long(argc, argv, "aA:c:d:t:o:O:sTlvh", long_options, NULL)) > -1) {
 		switch (c) {
@@ -193,10 +194,10 @@ int main(int argc, char *argv[])
 	qsort(table, count, sizeof(*table), (int (*)(const void *, const void *)) compare_entries);
 
 	for(i = 0; i < count; i++) {
-		const char *etype = nvpair_lookup_string(table[i],"type");
+		const char *etype = nvpair_lookup_string(table[i], "type");
 		if(!show_all_types) {
 			if(etype) {
-				if(!strcmp(etype,"chirp") || !strcmp(etype,"catalog")) {
+				if(!strcmp(etype, "chirp") || !strcmp(etype, "catalog")) {
 					/* ok, keep going */
 				} else {
 					continue;

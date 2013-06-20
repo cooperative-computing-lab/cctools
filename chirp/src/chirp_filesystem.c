@@ -38,17 +38,17 @@ extern struct chirp_filesystem chirp_fs_local;
 extern struct chirp_filesystem chirp_fs_hdfs;
 extern struct chirp_filesystem chirp_fs_chirp;
 
-struct chirp_filesystem * cfs_lookup( const char *url )
+struct chirp_filesystem *cfs_lookup(const char *url)
 {
-	if(!strchr(url,':') || !strncmp(url,"local:",6) || !strncmp(url,"file:",5)) {
+	if(!strchr(url, ':') || !strncmp(url, "local:", 6) || !strncmp(url, "file:", 5)) {
 		return &chirp_fs_local;
-	} else if(!strncmp(url,"hdfs:",5)) {
+	} else if(!strncmp(url, "hdfs:", 5)) {
 		return &chirp_fs_hdfs;
-	} else if(!strncmp(url,"chirp:",6)) {
+	} else if(!strncmp(url, "chirp:", 6)) {
 		return &chirp_fs_chirp;
 	} else {
 		return 0;
-	}	
+	}
 }
 
 
@@ -158,7 +158,7 @@ size_t cfs_fread(void *ptr, size_t size, size_t nitems, CHIRP_FILE * file)
 		if(t == -1 || t == 0)
 			return nitems_read;
 		file->offset += t;
-		ptr = (char *) ptr + size;   //Previously void arithmetic!
+		ptr = (char *) ptr + size;	//Previously void arithmetic!
 		nitems_read++;
 	}
 	return nitems_read;
@@ -268,7 +268,7 @@ int cfs_delete_dir(const char *path)
 	struct chirp_dir *dir;
 	struct chirp_dirent *d;
 
-	if (cfs->unlink(path) == 0) /* Handle files and symlinks here */
+	if(cfs->unlink(path) == 0)	/* Handle files and symlinks here */
 		return 0;
 
 	dir = cfs->opendir(path);
@@ -295,7 +295,7 @@ int cfs_freadall(CHIRP_FILE * f, char **s, size_t * l)
 	char *buffer = xxrealloc(NULL, 4096);
 	INT64_T n;
 	*l = 0;
-	while((n = cfs->pread(f->fd, buffer + (*l), sizeof(char)*4096, f->offset)) > 0) {
+	while((n = cfs->pread(f->fd, buffer + (*l), sizeof(char) * 4096, f->offset)) > 0) {
 		f->offset += n;
 		*l += n;
 		buffer = xxrealloc(buffer, (*l) + 4096);
@@ -336,7 +336,7 @@ int cfs_isdir(const char *filename)
 		} else {
 			errno = ENOTDIR;
 			return 0;
-		}  
+		}
 	} else {
 		return 0;
 	}
@@ -352,28 +352,28 @@ int cfs_isnotdir(const char *filename)
 			return 0;
 		} else {
 			return 1;
-		}  
+		}
 	} else {
 		return 1;
 	}
 }
 
-INT64_T cfs_file_size( const char *path )
+INT64_T cfs_file_size(const char *path)
 {
 	struct chirp_stat info;
 
-	if(cfs->stat(path,&info)>=0) {
+	if(cfs->stat(path, &info) >= 0) {
 		return info.cst_size;
 	} else {
 		return -1;
 	}
 }
 
-INT64_T cfs_fd_size( int fd )
+INT64_T cfs_fd_size(int fd)
 {
 	struct chirp_stat info;
 
-	if(cfs->fstat(fd,&info)>=0) {
+	if(cfs->fstat(fd, &info) >= 0) {
 		return info.cst_size;
 	} else {
 		return -1;
@@ -413,7 +413,7 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 			if(ractual <= 0)
 				break;
 
-			wactual = cfs->pwrite(fd,buffer,ractual,total);
+			wactual = cfs->pwrite(fd, buffer, ractual, total);
 			if(wactual != ractual) {
 				total = -1;
 				break;
@@ -445,7 +445,8 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
 	struct chirp_stat info;
 
 	result = cfs->stat(path, &info);
-	if(result<0) return result;
+	if(result < 0)
+		return result;
 
 	if(S_ISDIR(info.cst_mode)) {
 		errno = EISDIR;
@@ -464,7 +465,7 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
 		while(length > 0) {
 			INT64_T chunk = MIN((int) sizeof(buffer), length);
 
-			ractual = cfs->pread(fd,buffer,chunk,total);
+			ractual = cfs->pread(fd, buffer, chunk, total);
 			if(ractual <= 0)
 				break;
 
@@ -505,7 +506,7 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 	if(fd >= 0) {
 		char buffer[65536];
 		INT64_T ractual;
-		INT64_T total=0;
+		INT64_T total = 0;
 		INT64_T length = info.cst_size;
 		md5_context_t ctx;
 
@@ -514,8 +515,9 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 		while(length > 0) {
 			INT64_T chunk = MIN((int) sizeof(buffer), length);
 
-			ractual = cfs->pread(fd,buffer,chunk,total);
-			if(ractual <= 0) break;
+			ractual = cfs->pread(fd, buffer, chunk, total);
+			if(ractual <= 0)
+				break;
 
 			md5_update(&ctx, (unsigned char *) buffer, ractual);
 
@@ -608,73 +610,73 @@ INT64_T cfs_basic_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T st
 	}
 }
 
-INT64_T cfs_stub_getxattr ( const char *path, const char *name, void *data, size_t size )
+INT64_T cfs_stub_getxattr(const char *path, const char *name, void *data, size_t size)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_fgetxattr ( int fd, const char *name, void *data, size_t size )
+INT64_T cfs_stub_fgetxattr(int fd, const char *name, void *data, size_t size)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_lgetxattr ( const char *path, const char *name, void *data, size_t size )
+INT64_T cfs_stub_lgetxattr(const char *path, const char *name, void *data, size_t size)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_listxattr ( const char *path, char *list, size_t size )
+INT64_T cfs_stub_listxattr(const char *path, char *list, size_t size)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_flistxattr ( int fd, char *list, size_t size )
+INT64_T cfs_stub_flistxattr(int fd, char *list, size_t size)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_llistxattr ( const char *path, char *list, size_t size )
+INT64_T cfs_stub_llistxattr(const char *path, char *list, size_t size)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_setxattr ( const char *path, const char *name, const void *data, size_t size, int flags )
+INT64_T cfs_stub_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_fsetxattr ( int fd, const char *name, const void *data, size_t size, int flags )
+INT64_T cfs_stub_fsetxattr(int fd, const char *name, const void *data, size_t size, int flags)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_lsetxattr ( const char *path, const char *name, const void *data, size_t size, int flags )
+INT64_T cfs_stub_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_removexattr ( const char *path, const char *name )
+INT64_T cfs_stub_removexattr(const char *path, const char *name)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_fremovexattr ( int fd, const char *name )
+INT64_T cfs_stub_fremovexattr(int fd, const char *name)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_lremovexattr ( const char *path, const char *name )
+INT64_T cfs_stub_lremovexattr(const char *path, const char *name)
 {
 	errno = ENOSYS;
 	return -1;

@@ -77,7 +77,7 @@ static struct chirp_fs_hdfs_file {
 	hdfsFile file;
 } open_files[BASE_SIZE];	// = NULL;
 
-static const char* chirp_fs_hdfs_init( const char *url )
+static const char *chirp_fs_hdfs_init(const char *url)
 {
 	static const char *groups[] = { "supergroup" };
 	const char *path;
@@ -85,20 +85,23 @@ static const char* chirp_fs_hdfs_init( const char *url )
 	char *h, *p;
 
 	/* find the first slash after hdfs: */
-	h = strchr(url,'/');
+	h = strchr(url, '/');
 
 	/* skip over one or more slashes to get the hostname */
-	while(*h=='/') h++;
-	if(!h) return 0;
+	while(*h == '/')
+		h++;
+	if(!h)
+		return 0;
 
 	/* find the port following a colon */
-	p = strchr(h,':');
-	if(!p) fatal("couldn't find a port number in %s",url);
+	p = strchr(h, ':');
+	if(!p)
+		fatal("couldn't find a port number in %s", url);
 
-	chirp_fs_hdfs_port = atoi(p+1);
-	
+	chirp_fs_hdfs_port = atoi(p + 1);
+
 	/* now find the slash following the hostname */
-	p = strchr(h,'/');
+	p = strchr(h, '/');
 	if(p) {
 		path = strdup(p);
 	} else {
@@ -107,8 +110,9 @@ static const char* chirp_fs_hdfs_init( const char *url )
 
 	chirp_fs_hdfs_hostname = strdup(h);
 
-	p = strchr(chirp_fs_hdfs_hostname,':');
-	if(p) *p = 0;
+	p = strchr(chirp_fs_hdfs_hostname, ':');
+	if(p)
+		*p = 0;
 
 	int i;
 
@@ -126,7 +130,7 @@ static const char* chirp_fs_hdfs_init( const char *url )
 	debug(D_HDFS, "connecting to hdfs://%s:%u%s as '%s'\n", chirp_fs_hdfs_hostname, chirp_fs_hdfs_port, path, chirp_owner);
 	fs = hdfs_services->connect_as_user(chirp_fs_hdfs_hostname, chirp_fs_hdfs_port, chirp_owner, groups, 1);
 
-	if(fs == NULL) 
+	if(fs == NULL)
 		return 0;
 	else
 		return strdup(path);
@@ -157,7 +161,7 @@ static void copystat(struct chirp_stat *cs, hdfsFileInfo * hs, const char *path)
 	cs->cst_atime = cs->cst_mtime = cs->cst_ctime = hs->mLastMod;
 }
 
-static INT64_T chirp_fs_hdfs_stat(const char *path, struct chirp_stat * buf)
+static INT64_T chirp_fs_hdfs_stat(const char *path, struct chirp_stat *buf)
 {
 	hdfsFileInfo *file_info;
 
@@ -179,9 +183,9 @@ static INT64_T chirp_fs_hdfs_fstat(int fd, struct chirp_stat *buf)
 	return chirp_fs_hdfs_stat(open_files[fd].name, buf);
 }
 
-static INT64_T chirp_fs_hdfs_search( const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime )
+static INT64_T chirp_fs_hdfs_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime)
 {
-	return 1; //FIXME
+	return 1;		//FIXME
 }
 
 struct chirp_dir {
@@ -191,7 +195,7 @@ struct chirp_dir {
 	char *path;
 };
 
-static struct chirp_dir * chirp_fs_hdfs_opendir( const char *path )
+static struct chirp_dir *chirp_fs_hdfs_opendir(const char *path)
 {
 	struct chirp_dir *dir;
 
@@ -214,7 +218,7 @@ static struct chirp_dir * chirp_fs_hdfs_opendir( const char *path )
 	return dir;
 }
 
-static struct chirp_dirent * chirp_fs_hdfs_readdir( struct chirp_dir *dir )
+static struct chirp_dirent *chirp_fs_hdfs_readdir(struct chirp_dir *dir)
 {
 	static struct chirp_dirent d;
 
@@ -226,7 +230,7 @@ static struct chirp_dirent * chirp_fs_hdfs_readdir( struct chirp_dir *dir )
 			name--;
 
 		d.name = name;
-		copystat(&d.info,&dir->info[dir->i],dir->info[dir->i].mName);
+		copystat(&d.info, &dir->info[dir->i], dir->info[dir->i].mName);
 		dir->i++;
 		return &d;
 	} else {
@@ -234,7 +238,7 @@ static struct chirp_dirent * chirp_fs_hdfs_readdir( struct chirp_dir *dir )
 	}
 }
 
-static void chirp_fs_hdfs_closedir( struct chirp_dir *dir )
+static void chirp_fs_hdfs_closedir(struct chirp_dir *dir)
 {
 	debug(D_HDFS, "closedir %s", dir->path);
 	hdfs_services->free_stat(dir->info, dir->n);
@@ -254,7 +258,7 @@ static INT64_T get_fd(void)
 	return -1;
 }
 
-static INT64_T chirp_fs_hdfs_unlink( const char *path );
+static INT64_T chirp_fs_hdfs_unlink(const char *path);
 
 static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 {
@@ -267,8 +271,8 @@ static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 
 	int file_exists = (result == 0);
 
-    /* HDFS doesn't handle the errnos for this properly */
-	if (file_exists && S_ISDIR(info.cst_mode)) {
+	/* HDFS doesn't handle the errnos for this properly */
+	if(file_exists && S_ISDIR(info.cst_mode)) {
 		errno = EISDIR;
 		return -1;
 	}
@@ -473,14 +477,14 @@ static INT64_T chirp_fs_hdfs_fsync(int fd)
 	return hdfs_services->flush(fs, open_files[fd].file);
 }
 
-static INT64_T chirp_fs_hdfs_getfile(const char *path, struct link * link, time_t stoptime)
+static INT64_T chirp_fs_hdfs_getfile(const char *path, struct link *link, time_t stoptime)
 {
-	return cfs_basic_getfile(FIXPATH(path),link,stoptime);
+	return cfs_basic_getfile(FIXPATH(path), link, stoptime);
 }
 
-static INT64_T chirp_fs_hdfs_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime)
+static INT64_T chirp_fs_hdfs_putfile(const char *path, struct link *link, INT64_T length, INT64_T mode, time_t stoptime)
 {
-	return cfs_basic_putfile(FIXPATH(path),link,length,mode,stoptime);
+	return cfs_basic_putfile(FIXPATH(path), link, length, mode, stoptime);
 }
 
 /*
@@ -495,7 +499,8 @@ static INT64_T chirp_fs_hdfs_unlink(const char *path)
 
 	struct chirp_stat info;
 
-	if(chirp_fs_hdfs_stat(path,&info)<0) return -1;
+	if(chirp_fs_hdfs_stat(path, &info) < 0)
+		return -1;
 
 	if(S_ISDIR(info.cst_mode)) {
 		errno = EISDIR;
@@ -504,8 +509,8 @@ static INT64_T chirp_fs_hdfs_unlink(const char *path)
 
 	debug(D_HDFS, "unlink %s", path);
 
-	int result = hdfs_services->unlink(fs,path,0);
-	if(result<0) {
+	int result = hdfs_services->unlink(fs, path, 0);
+	if(result < 0) {
 		errno = EACCES;
 		return -1;
 	}
@@ -517,7 +522,7 @@ static INT64_T chirp_fs_hdfs_rmall(const char *path)
 {
 	path = FIXPATH(path);
 	debug(D_HDFS, "rmall %s", path);
-	return hdfs_services->unlink(fs, path,1);
+	return hdfs_services->unlink(fs, path, 1);
 }
 
 static INT64_T chirp_fs_hdfs_rename(const char *path, const char *newpath)
@@ -571,18 +576,18 @@ static INT64_T chirp_fs_hdfs_mkdir(const char *path, INT64_T mode)
 static INT64_T chirp_fs_hdfs_rmdir(const char *path)
 {
 	path = FIXPATH(path);
-	debug(D_HDFS,"rmdir %s", path);
-	return hdfs_services->unlink(fs,path,1);
+	debug(D_HDFS, "rmdir %s", path);
+	return hdfs_services->unlink(fs, path, 1);
 }
 
-static INT64_T chirp_fs_hdfs_lstat(const char *path, struct chirp_stat * buf)
+static INT64_T chirp_fs_hdfs_lstat(const char *path, struct chirp_stat *buf)
 {
 	path = FIXPATH(path);
 	debug(D_HDFS, "lstat %s", path);
 	return chirp_fs_hdfs_stat(path, buf);
 }
 
-static INT64_T chirp_fs_hdfs_statfs(const char *path, struct chirp_statfs * buf)
+static INT64_T chirp_fs_hdfs_statfs(const char *path, struct chirp_statfs *buf)
 {
 	path = FIXPATH(path);
 	debug(D_HDFS, "statfs %s", path);
@@ -603,7 +608,7 @@ static INT64_T chirp_fs_hdfs_statfs(const char *path, struct chirp_statfs * buf)
 	return 0;
 }
 
-static INT64_T chirp_fs_hdfs_fstatfs(int fd, struct chirp_statfs * buf)
+static INT64_T chirp_fs_hdfs_fstatfs(int fd, struct chirp_statfs *buf)
 {
 	return chirp_fs_hdfs_statfs(open_files[fd].name, buf);
 }
@@ -653,14 +658,14 @@ static INT64_T chirp_fs_hdfs_truncate(const char *path, INT64_T length)
 	debug(D_HDFS, "truncate %s %lld", path, length);
 	int result = chirp_fs_hdfs_stat(path, &info);
 	if(result < 0)
-		return -1; /* probably doesn't exist, return ENOENT... */
-	else if (length == 0) {
+		return -1;	/* probably doesn't exist, return ENOENT... */
+	else if(length == 0) {
 		/* FUSE is particularly obnoxious about changing open with O_TRUNC to
-		* truncate(path);
-		* open(path, ...);
-		*/
-		hdfs_services->unlink(fs, path,0);
-		hdfsFile file = hdfs_services->open(fs, path, O_WRONLY|O_CREAT, 0, 0, 0);
+		 * truncate(path);
+		 * open(path, ...);
+		 */
+		hdfs_services->unlink(fs, path, 0);
+		hdfsFile file = hdfs_services->open(fs, path, O_WRONLY | O_CREAT, 0, 0, 0);
 		hdfs_services->close(fs, file);
 		return 0;
 	} else {
@@ -678,7 +683,7 @@ static INT64_T chirp_fs_hdfs_utime(const char *path, time_t actime, time_t modti
 
 static INT64_T chirp_fs_hdfs_md5(const char *path, unsigned char digest[16])
 {
-	return cfs_basic_md5(FIXPATH(path),digest);
+	return cfs_basic_md5(FIXPATH(path), digest);
 }
 
 static INT64_T chirp_fs_hdfs_chdir(const char *path)
@@ -687,14 +692,14 @@ static INT64_T chirp_fs_hdfs_chdir(const char *path)
 	return hdfs_services->chdir(fs, path);
 }
 
-static INT64_T chirp_fs_hdfs_setrep( const char *path, int nreps )
+static INT64_T chirp_fs_hdfs_setrep(const char *path, int nreps)
 {
-	debug(D_HDFS,"setrep %s %d",path,nreps);
+	debug(D_HDFS, "setrep %s %d", path, nreps);
 
 	/* If the path is @@@, then it sets the replication factor for all newly created files in this session. Zero is valid and indicates the default value selected by HDFS. */
 
-	if(!strcmp(string_back(path,3),"@@@")) {
-		if(nreps>=0) {
+	if(!strcmp(string_back(path, 3), "@@@")) {
+		if(nreps >= 0) {
 			chirp_fs_hdfs_nreps = nreps;
 			return 0;
 		} else {
@@ -702,7 +707,7 @@ static INT64_T chirp_fs_hdfs_setrep( const char *path, int nreps )
 			return -1;
 		}
 	} else {
-		return hdfs_services->setrep(fs,path,nreps);
+		return hdfs_services->setrep(fs, path, nreps);
 	}
 }
 

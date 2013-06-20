@@ -58,7 +58,8 @@ See the file COPYING for details.
 
 static int timeout = 3600;
 static time_t stoptime = 0;
-static char current_host[CHIRP_PATH_MAX] = {0};
+static char current_host[CHIRP_PATH_MAX] = { 0 };
+
 static char current_local_dir[CHIRP_PATH_MAX];
 static char current_remote_dir[CHIRP_PATH_MAX];
 static char current_subject[CHIRP_LINE_MAX];
@@ -354,7 +355,7 @@ static INT64_T do_ticket_list(int argc, char **argv)
 	char **list;
 
 	INT64_T result;
-	if (argc == 1)
+	if(argc == 1)
 		result = chirp_reli_ticket_list(current_host, "self", &list, stoptime);
 	else
 		result = chirp_reli_ticket_list(current_host, argv[1], &list, stoptime);
@@ -462,9 +463,9 @@ static void long_ls_callback(const char *name, struct chirp_stat *info, void *ar
 		strftime(timestr, sizeof(timestr), "%b %d %H:%M", localtime(&t));
 	}
 
-	printf("%c%c%c%c%c%c%c%c%c%c %4" PRId64 " %8" PRId64 " %8" PRId64 " %8" PRId64 " %s %s\n", S_ISDIR(info->cst_mode) ? 'd' : '-', info->cst_mode & 0400 ? 'r' : '-', info->cst_mode & 0200 ? 'w' : '-', info->cst_mode & 0100 ? 'x' : '-', info->cst_mode & 0040 ? 'r' : '-',
-	       info->cst_mode & 0020 ? 'w' : '-', info->cst_mode & 0010 ? 'x' : '-', info->cst_mode & 0004 ? 'r' : '-', info->cst_mode & 0002 ? 'w' : '-', info->cst_mode & 0001 ? 'x' : '-', info->cst_nlink, info->cst_uid, info->cst_gid, info->cst_size,
-	       timestr, name);
+	printf("%c%c%c%c%c%c%c%c%c%c %4" PRId64 " %8" PRId64 " %8" PRId64 " %8" PRId64 " %s %s\n", S_ISDIR(info->cst_mode) ? 'd' : '-', info->cst_mode & 0400 ? 'r' : '-', info->cst_mode & 0200 ? 'w' : '-', info->cst_mode & 0100 ? 'x' : '-',
+	       info->cst_mode & 0040 ? 'r' : '-', info->cst_mode & 0020 ? 'w' : '-', info->cst_mode & 0010 ? 'x' : '-', info->cst_mode & 0004 ? 'r' : '-', info->cst_mode & 0002 ? 'w' : '-', info->cst_mode & 0001 ? 'x' : '-', info->cst_nlink, info->cst_uid,
+	       info->cst_gid, info->cst_size, timestr, name);
 }
 
 static void ls_callback(const char *name, void *arg)
@@ -718,7 +719,7 @@ static INT64_T do_setrep(int argc, char **argv)
 	complete_remote_path(argv[1], full_path);
 	int nreps = atoi(argv[2]);
 
-	return chirp_reli_setrep(current_host, full_path, nreps, stoptime );
+	return chirp_reli_setrep(current_host, full_path, nreps, stoptime);
 }
 
 static INT64_T do_localpath(int argc, char **argv)
@@ -901,31 +902,37 @@ static INT64_T do_matrix_delete(int argc, char **argv)
 	return chirp_matrix_delete(current_host, path, stoptime);
 }
 
-static char *strerrsource(int errsource) {
-        switch (errsource) {
-                case CHIRP_SEARCH_ERR_OPEN: return "Open";
-                case CHIRP_SEARCH_ERR_READ: return "Read";
-                case CHIRP_SEARCH_ERR_CLOSE: return "Close";
-                case CHIRP_SEARCH_ERR_STAT: return "Stat";
-                default: return "Unknown";
-        }
+static char *strerrsource(int errsource)
+{
+	switch (errsource) {
+	case CHIRP_SEARCH_ERR_OPEN:
+		return "Open";
+	case CHIRP_SEARCH_ERR_READ:
+		return "Read";
+	case CHIRP_SEARCH_ERR_CLOSE:
+		return "Close";
+	case CHIRP_SEARCH_ERR_STAT:
+		return "Stat";
+	default:
+		return "Unknown";
+	}
 }
 
 static INT64_T do_search(int argc, char **argv)
-{	
-	int flags = CHIRP_SEARCH_METADATA|CHIRP_SEARCH_INCLUDEROOT|CHIRP_SEARCH_PERIOD;
+{
+	int flags = CHIRP_SEARCH_METADATA | CHIRP_SEARCH_INCLUDEROOT | CHIRP_SEARCH_PERIOD;
 	CHIRP_SEARCH *s = chirp_reli_opensearch(current_host, argv[1], argv[2], flags, stoptime);
 	struct chirp_searchent *res;
 
-	while ((res = chirp_client_readsearch(s)) != NULL) {
-		if (res->err) {
+	while((res = chirp_client_readsearch(s)) != NULL) {
+		if(res->err) {
 			printf("%s error on %s: %s\n", strerrsource(res->errsource), res->path, strerror(res->err));
 			continue;
 		}
 
 		printf("%-30s", res->path);
 
-		if (flags & CHIRP_SEARCH_METADATA)
+		if(flags & CHIRP_SEARCH_METADATA)
 			printf("\t" INT64_FORMAT "\t" INT64_FORMAT "\n", res->info.cst_size, res->info.cst_ino);
 		else
 			printf("\n");
@@ -943,7 +950,7 @@ static INT64_T do_xattr_get(int argc, char **argv)
 	INT64_T size;
 
 	if((size = chirp_reli_getxattr(current_host, full_path, argv[2], data, sizeof(data), stoptime)) > 0) {
-		write(STDOUT_FILENO, data, (size_t)size);
+		write(STDOUT_FILENO, data, (size_t) size);
 		write(STDOUT_FILENO, "\n", 1);
 		return 0;
 	} else {
@@ -960,7 +967,7 @@ static INT64_T do_xattr_list(int argc, char **argv)
 
 	if((size = chirp_reli_listxattr(current_host, full_path, data, sizeof(data), stoptime)) > 0) {
 		char *current;
-		for(current = data; *current; current = current+strlen(current)+1) {
+		for(current = data; *current; current = current + strlen(current) + 1) {
 			write(STDOUT_FILENO, current, strlen(current));
 			write(STDOUT_FILENO, "\n", 1);
 		}
@@ -1102,16 +1109,17 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-    static struct option long_options[] = {
-        {"auth", required_argument, 0, 'a'},
-        {"debug", required_argument, 0, 'd'},
-        {"tickets", required_argument, 0, 'i'},
-        {"verbose", no_argument, 0, 'l'},
-        {"quiet", no_argument, 0, 'q'},
-        {"timeout", required_argument, 0, 't'},
-        {"version", no_argument, 0, 'v'},
-        {"help", no_argument, 0, 'h'},
-        {0,0,0,0}};
+	static struct option long_options[] = {
+		{"auth", required_argument, 0, 'a'},
+		{"debug", required_argument, 0, 'd'},
+		{"tickets", required_argument, 0, 'i'},
+		{"verbose", no_argument, 0, 'l'},
+		{"quiet", no_argument, 0, 'q'},
+		{"timeout", required_argument, 0, 't'},
+		{"version", no_argument, 0, 'v'},
+		{"help", no_argument, 0, 'h'},
+		{0, 0, 0, 0}
+	};
 
 	while((c = getopt_long(argc, argv, "+a:d:hi:lt:v", long_options, NULL)) > -1) {
 		switch (c) {

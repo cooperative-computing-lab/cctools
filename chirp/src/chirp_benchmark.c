@@ -105,7 +105,8 @@ int do_bandwidth(const char *file, int bytes, int blocksize, int do_write)
 	char *buffer = malloc(blocksize);
 	int i;
 
-    if (!buffer) return 0;
+	if(!buffer)
+		return 0;
 
 	for(i = 0; i < blocksize; i++)
 		buffer[i] = (char) i;
@@ -232,9 +233,7 @@ int main(int argc, char *argv[])
 	do_close(fd);
 
 	RUN_LOOP("stat", do_stat(fname, &buf));
-	RUN_LOOP("open", fd = do_open(fname, O_RDONLY | do_sync, 0777);
-		 do_close(fd);
-		);
+	RUN_LOOP("open", fd = do_open(fname, O_RDONLY | do_sync, 0777); do_close(fd););
 
 	if(bwloops == 0)
 		return 0;

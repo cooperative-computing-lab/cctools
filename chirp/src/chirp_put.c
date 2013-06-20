@@ -66,16 +66,17 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-    static struct option long_options[] = {
-        {"auth", required_argument, 0, 'a'},
-        {"block-size", required_argument, 0, 'b'},
-        {"debug", required_argument, 0, 'd'},
-        {"follow", no_argument, 0, 'f'},
-        {"tickets", required_argument, 0, 'i'},
-        {"timeout", required_argument, 0, 't'},
-        {"version", no_argument, 0, 'v'},
-        {"help", no_argument, 0, 'h'},
-        {0,0,0,0}};
+	static struct option long_options[] = {
+		{"auth", required_argument, 0, 'a'},
+		{"block-size", required_argument, 0, 'b'},
+		{"debug", required_argument, 0, 'd'},
+		{"follow", no_argument, 0, 'f'},
+		{"tickets", required_argument, 0, 'i'},
+		{"timeout", required_argument, 0, 't'},
+		{"version", no_argument, 0, 'v'},
+		{"help", no_argument, 0, 'h'},
+		{0, 0, 0, 0}
+	};
 
 	while((c = getopt_long(argc, argv, "a:b:d:fi:t:vh", long_options, NULL)) > -1) {
 		switch (c) {
