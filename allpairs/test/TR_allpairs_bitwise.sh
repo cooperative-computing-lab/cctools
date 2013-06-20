@@ -2,7 +2,7 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-TEST_INPUT=set.list
+TEST_INPUT="./set.list"
 TEST_OUTPUT=bitwise.output
 PIDMASTER_FILE=allpairs.pid
 PIDWORKER_FILE=worker.pid
@@ -17,7 +17,8 @@ prepare()
 
     ln -s ../src/allpairs_multicore .
 
-    ../src/allpairs_master -x 1 -y 1 -o $TEST_OUTPUT -Z $PORT_FILE $TEST_INPUT $TEST_INPUT BITWISE &
+    (PATH=.:$PATH ../src/allpairs_master -x 1 -y 1 -o $TEST_OUTPUT -Z $PORT_FILE $TEST_INPUT $TEST_INPUT BITWISE )&
+
     pid=$!
 	echo $pid > $PIDMASTER_FILE
 
