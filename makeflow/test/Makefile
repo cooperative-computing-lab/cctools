@@ -20,5 +20,7 @@ test-nd: test
 test: test-makeflow test-starch
 
 clean:
+	-rm dirs/*log
+	-rm syntax/*log
 
 install:
