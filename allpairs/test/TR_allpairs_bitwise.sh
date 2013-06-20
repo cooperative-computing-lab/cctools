@@ -15,11 +15,11 @@ prepare()
 	rm -f $PIDWORKER_FILE
 	rm -f $PORT_FILE
 
+    ln -s ../src/allpairs_multicore .
+
     ../src/allpairs_master -x 1 -y 1 -o $TEST_OUTPUT -Z $PORT_FILE $TEST_INPUT $TEST_INPUT BITWISE &
     pid=$!
 	echo $pid > $PIDMASTER_FILE
-
-    ln -s ../src/allpairs_multicore .
 
 	wait_for_file_creation $PORT_FILE 5
 	exit 0
