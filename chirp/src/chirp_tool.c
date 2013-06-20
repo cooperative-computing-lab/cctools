@@ -926,7 +926,7 @@ static INT64_T do_search(int argc, char **argv)
 		printf("%-30s", res->path);
 
 		if (flags & CHIRP_SEARCH_METADATA)
-			printf("\t" INT64_FORMAT "\t" INT64_FORMAT "\n", res->info->cst_size, res->info->cst_ino);
+			printf("\t" INT64_FORMAT "\t" INT64_FORMAT "\n", res->info.cst_size, res->info.cst_ino);
 		else
 			printf("\n");
 	}

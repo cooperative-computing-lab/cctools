@@ -2,38 +2,40 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-PSEARCH="../src/parrot_run ../src/parrot_search"
 EXPECTED=expected.txt
 
-cpid=cpid.txt
-debug=debug.txt
-out=output.txt
-port=port.txt
+chirp_debug=chirp.debug
+chirp_pid=chirp.pid
+chirp_port=chirp.port
+parrot_debug=parrot.debug
+search_output=search.txt
+
+psearch="../src/parrot_run -d all -o $parrot_debug ../src/parrot_search"
 
 prepare()
 {
-    ../../chirp/src/chirp_server -r ./fixtures/a -I 127.0.0.1 -Z $port -b -B $cpid -d all -o $debug
-	rm -f "$out"
+    ../../chirp/src/chirp_server -r ./fixtures/a -I 127.0.0.1 -Z $chirp_port -b -B $chirp_pid -d all -o $chirp_debug
+    rm -f "$search_output"
 }
 
 run()
 {
-    $PSEARCH /chirp/localhost:`cat $port`/ bar >> $out
-    $PSEARCH /chirp/localhost:`cat $port`/ /bar >> $out
-    $PSEARCH /chirp/localhost:`cat $port`/ c/bar >> $out
-    $PSEARCH /chirp/localhost:`cat $port`/ /c/bar >> $out
-    $PSEARCH /chirp/localhost:`cat $port`/ b/bar >> $out
-    $PSEARCH /chirp/localhost:`cat $port`/ /b/bar >> $out
-    $PSEARCH /chirp/localhost:`cat $port`/ b/foo >> $out
-    $PSEARCH /chirp/localhost:`cat $port`/ /b/foo >> $out
-    $PSEARCH /chirp/localhost:`cat $port`/ "/*/foo" >> $out
-    $PSEARCH /chirp/localhost:`cat $port`/ "*/*r" >> $out
+    $psearch /chirp/localhost:`cat $chirp_port`/ bar >> $search_output
+    $psearch /chirp/localhost:`cat $chirp_port`/ /bar >> $search_output
+    $psearch /chirp/localhost:`cat $chirp_port`/ c/bar >> $search_output
+    $psearch /chirp/localhost:`cat $chirp_port`/ /c/bar >> $search_output
+    $psearch /chirp/localhost:`cat $chirp_port`/ b/bar >> $search_output
+    $psearch /chirp/localhost:`cat $chirp_port`/ /b/bar >> $search_output
+    $psearch /chirp/localhost:`cat $chirp_port`/ b/foo >> $search_output
+    $psearch /chirp/localhost:`cat $chirp_port`/ /b/foo >> $search_output
+    $psearch /chirp/localhost:`cat $chirp_port`/ "/*/foo" >> $search_output
+    $psearch /chirp/localhost:`cat $chirp_port`/ "*/*r" >> $search_output
 
-    noerr=`cat $out | grep -v error`
-    rm -f $out
-    echo "$noerr" > $out
+    noerr=`cat $search_output | grep -v error`
+    rm -f $search_output
+    echo "$noerr" > $search_output
 
-    failures=`diff --ignore-all-space $out $EXPECTED`
+    failures=`diff --ignore-all-space $search_output $EXPECTED`
     if [ -n "$failures" ]; then
         echo $failures
         return 1
@@ -42,8 +44,8 @@ run()
 
 clean()
 {
-    kill -9 `cat $cpid`
-    rm -f $out $cpid $port $debug
+    kill -9 `cat $chirp_pid`
+    rm -f $chirp_debug $chirp_pid $chirp_port $parrot_debug $search_output
 }
 
 dispatch $@

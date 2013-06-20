@@ -1563,114 +1563,106 @@ INT64_T chirp_client_lsalloc(struct chirp_client * c, char const *path, char *al
 	return result;
 }
 
-CHIRP_SEARCH *chirp_client_opensearch(struct chirp_client *c, const char *path, const char *pattern, int flags, time_t stoptime) {
+CHIRP_SEARCH *chirp_client_opensearch (struct chirp_client *c, const char *path, const char *pattern, int flags, time_t stoptime) {
 	INT64_T result = simple_command(c, stoptime, "search %s %s %d\n", pattern, path, flags);
 
 	if (result == 0) {
 		char line[CHIRP_LINE_MAX];
 		buffer_t *buffer;
+		size_t n = 0;
 
 		buffer = buffer_create();
 		while (link_readline(c->link, line, sizeof(line), stoptime) && line[0]) {
 			buffer_printf(buffer, "%s", line);
+			n += strlen(line);
+		}
+		if (n == 0) {
+			buffer_printf(buffer, "");
 		}
 
 		CHIRP_SEARCH *result = malloc(sizeof(CHIRP_SEARCH));
-		result->entry = (struct chirp_searchent*) malloc(sizeof(struct chirp_searchent));
-		result->entry->info = NULL;
-		result->entry->path = NULL;
 		result->buffer = buffer;
-		result->data = buffer_tostring(buffer, NULL);
-		result->i = 0;
+		result->current = buffer_tostring(buffer, NULL);
 		return result;
-	} else 
+	} else {
 		return NULL;
+    }
 }
 
-static char *readsearch_next(const char *data, int *i) {
-	data += *i;
-	char *tail = strchr(data, ':');
-	ptrdiff_t length = (tail==NULL) ? (ptrdiff_t)strlen(data) : tail - data;
+static const char *search_readnext (const char *current, char **result) {
+	*result = NULL;
+	if (strlen(current)) {
+		ptrdiff_t length;
+		const char *tail = strchr(current, ':');
 
-	if (length==0) {
-		(*i)++;
-		return NULL;
+		if (tail)
+			length = tail-current;
+		else
+			length = strlen(current);
+
+		*result = xxmalloc(length + 1);
+		strncpy(*result, current, length);
+		(*result)[length] = '\0';
+		return current+length+1;
 	}
-
-	char *next = malloc(length + 1);
-	strncpy(next, data, length);
-	next[length] = '\0';
-	*i += length + 1;
-
-	return next;
+	return NULL;
 }
 
-static struct chirp_stat *readsearch_unpack_stat(char *stat_str) {
-	if (stat_str==NULL) return NULL;
-
-	struct chirp_stat *info = (struct chirp_stat*) malloc(sizeof(struct chirp_stat));
+static void search_unpackstat (const char *str, struct chirp_stat *info) {
 	sscanf(
-		stat_str,
+		str,
         "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " "
         "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " "
         "%" PRId64 " %" PRId64 " %" PRId64,
-		&info->cst_dev,
-		&info->cst_ino,
-		&info->cst_mode,
-		&info->cst_nlink,
-		&info->cst_uid,
-		&info->cst_gid,
-		&info->cst_rdev,
-		&info->cst_size,
-		&info->cst_atime,
-		&info->cst_mtime,
-		&info->cst_ctime,
-		&info->cst_blksize,
-		&info->cst_blocks
+		&info->cst_dev, &info->cst_ino, &info->cst_mode, &info->cst_nlink, &info->cst_uid,
+		&info->cst_gid,	&info->cst_rdev, &info->cst_size, &info->cst_atime, &info->cst_mtime,
+		&info->cst_ctime, &info->cst_blksize, &info->cst_blocks
 	);
-
-	free(stat_str);
-	return info;
 }
 
-struct chirp_searchent *chirp_client_readsearch(CHIRP_SEARCH *search) {
+struct chirp_searchent *chirp_client_readsearch (CHIRP_SEARCH *search) {
+		char *result;
+		const char *current = search_readnext(search->current, &result);
 
-        int i = search->i;
-        const char *data = search->data;
-        char *err_str = readsearch_next(data, &i);
-        free(search->entry->path);
-        search->entry->path = NULL;
-        free(search->entry->info);
-        search->entry->info = NULL;
+		if (current && result) {
+			search->entry.err = atoi(result);
+			free(result);
+			if (search->entry.err) {
+				current = search_readnext(current, &result);
+				assert(current && result);
+				search->entry.errsource = atoi(result);
+				free(result);
 
-        if (err_str==NULL) return NULL;
+				current = search_readnext(current, &result);
+				assert(current && result);
+				memset(search->entry.path, 0, CHIRP_PATH_MAX);
+				strncpy(search->entry.path, result, CHIRP_PATH_MAX-1);
+				free(result);
 
-        char *path;
-        struct chirp_stat *info;
-        int err = atoi(err_str), errsource;
+				memset(&search->entry.info, 0, sizeof(search->entry.info));
+			} else {
+				search->entry.errsource = 0;
 
-        if (err) {
-                errsource = atoi(readsearch_next(data, &i));
-                path = readsearch_next(data, &i);
-                info = NULL;
-        } else {
-                errsource = 0;
-                path = readsearch_next(data, &i);
-                info = readsearch_unpack_stat(readsearch_next(data, &i));
-        }
+				current = search_readnext(current, &result);
+				assert(current && result);
+				memset(search->entry.path, 0, CHIRP_PATH_MAX);
+				strncpy(search->entry.path, result, CHIRP_PATH_MAX-1);
+				free(result);
 
-        search->entry->path = path;
-        search->entry->info = info;
-        search->entry->errsource = errsource;
-        search->entry->err = err;
-        search->i = i;
-
-        return search->entry;
+				current = search_readnext(current, &result);
+				assert(current && result);
+				memset(&search->entry.info, 0, sizeof(search->entry.info));
+				search_unpackstat(current, &search->entry.info);
+				free(result);
+			}
+			search->current = current;
+            return &search->entry;
+		}
+        return NULL;
 }
 
-int chirp_client_closesearch(CHIRP_SEARCH *search) {
+int chirp_client_closesearch (CHIRP_SEARCH *search) {
 	buffer_delete(search->buffer);
-	free(search->entry);
 	free(search);
 	return 0;
 }
