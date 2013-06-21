@@ -824,6 +824,20 @@ EOF
 				rm $python_ccflags_file
 				rm $python_ldflags_file
 
+				# On OSX, the ExtUtils::Embed options contain options
+				# to generate triple-fat binaries, which fails when
+				# we attempt to bring in our thin binaries.
+
+				# To avoid this problem, remove all of the -arch XXX
+				# arguments, so that the compiler produces the default,
+				# which will be compatible with the other objects we compile.
+
+	                        if [ ${build_sys} = DARWIN ]
+				then
+					python_ccflags=`echo ${python_ccflags} | sed 's/-arch [^ ]* *//g'`
+					python_ldflags=`echo ${python_ldflags} | sed 's/-arch [^ ]* *//g'`
+				fi
+
 				if [ $build_sys = DARWIN ]
 				then
 				    python_ldflags="$python_ldflags -undefined dynamic_lookup"
