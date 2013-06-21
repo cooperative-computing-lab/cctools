@@ -1,3 +1,5 @@
+#if !defined(CCTOOLS_OPSYS_DARWIN)
+
 /* Getopt for GNU.
    NOTE: getopt is part of the C library, so if you don't know what
    "Keep this file name-space clean" means, talk to drepper@gnu.org
@@ -1170,3 +1172,5 @@ main (int argc, char **argv)
 }
 
 #endif /* TEST */
+
+#endif /* ! CCTOOLS_OPSYS_DARWIN */

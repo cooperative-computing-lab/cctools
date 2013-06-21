@@ -1,3 +1,15 @@
+/*
+We include a standard implementation of getopt.c,
+so as to support platforms where it is not available.
+Amazingly, this version appears to result in SIGBUS
+errors when used on Darwin.  In that case, we just
+make use of the local implementation.
+*/
+
+#if defined(CCTOOLS_OPSYS_DARWIN)
+#include </usr/include/getopt.h>
+#else
+
 /* Declarations for getopt.
    Copyright (C) 1989-1994,1996-1999,2001,2003,2004
    Free Software Foundation, Inc.
@@ -168,3 +180,6 @@ extern int getopt_long_only ();
 #endif
 
 #endif /* getopt.h */
+
+#endif /* ! CCTOOLS_OPSYS_DARWIN */
+
