@@ -737,8 +737,23 @@ then
 	then
 		perl_ccflags=`${perl} -MExtUtils::Embed -e ccopts`
 		perl_ldflags=`${perl} -MExtUtils::Embed -e ldopts`
+
 		if [ $? = 0 ]
 		then
+			# On OSX, the ExtUtils::Embed options contain options
+			# to generate triple-fat binaries, which fails when
+			# we attempt to bring in our thin binaries.
+
+			# To avoid this problem, remove all of the -arch XXX
+			# arguments, so that the compiler produces the default,
+			# which will be compatible with the other objects we compile.
+
+			if [ ${build_sys} = DARWIN ]
+			then
+				perl_ccflags=`echo ${perl_ccflags} | sed 's/-arch [^ ]* *//g'`
+				perl_ldflags=`echo ${perl_ldflags} | sed 's/-arch [^ ]* *//g'`
+			fi
+
 			work_queue_bindings="$work_queue_bindings perl"
 		else
 			perl=0
