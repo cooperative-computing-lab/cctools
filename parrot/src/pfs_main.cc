@@ -84,6 +84,7 @@ INT64_T pfs_read_count = 0;
 INT64_T pfs_write_count = 0;
 
 const char * pfs_cvmfs_repo_arg = 0;
+bool pfs_cvmfs_repo_switching = false;
 
 int pfs_irods_debug_level = 0;
 
@@ -96,6 +97,10 @@ our own exit status
 static pid_t root_pid = -1;
 static int root_exitstatus = 0;
 static int channel_size = 10;
+
+enum {
+	LONG_OPT_CVMFS_REPO_SWITCHING=500,
+};
 
 static void get_linux_version(const char *cmd)
 {
@@ -189,6 +194,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Enable paranoid mode for identity boxing mode.\n", "-P,--paranoid");
 	fprintf(stdout, " %-30s Inhibit catalog queries to list /chirp.\n", "-Q,--no-chirp-catalog");
 	fprintf(stdout, " %-30s CVMFS repositories to enable.             (PARROT_CVMFS_REPO)\n", "-r,--cvmfs-repos=<repos>");
+	fprintf(stdout, " %-30s Allow repository switching when using CVMFS.\n","   --cvmfs-repo-switching");
 	fprintf(stdout, " %-30s Enforce this root filesystem checksum, where available.\n", "-R,--root-checksum=<cksum>");
 	fprintf(stdout, " %-30s Use streaming protocols without caching.(PARROT_FORCE_STREAM)\n", "-s,--stream-no-cache");
 	fprintf(stdout, " %-30s Enable whole session caching for all protocols.\n", "-S,--session-caching");
@@ -373,7 +379,7 @@ int main( int argc, char *argv[] )
 	int i;
 	int chose_auth=0;
 	struct rusage usage;
-	signed char c;
+	int c;
 	char *tickets = NULL;
 
 	srand(time(0)*(getpid()+getuid()));
@@ -520,6 +526,7 @@ int main( int argc, char *argv[] )
 		{"paranoid", no_argument, 0, 'P'},
 		{"no-chirp-catalog", no_argument, 0, 'Q'},
 		{"cvmfs-repos", required_argument, 0, 'r'},
+		{"cvmfs-repo-switching", no_argument, 0, LONG_OPT_CVMFS_REPO_SWITCHING},
 		{"root-checksum", required_argument, 0, 'R'},
 		{"stream-no-cache", no_argument, 0, 's'},
 		{"session-caching", no_argument, 0, 'S'},
@@ -616,6 +623,9 @@ int main( int argc, char *argv[] )
 			break;
 		case 'r':
 			pfs_cvmfs_repo_arg = optarg;
+			break;
+		case LONG_OPT_CVMFS_REPO_SWITCHING:
+			pfs_cvmfs_repo_switching = true;
 			break;
 		case 'R':
 			pfs_root_checksum = optarg;
