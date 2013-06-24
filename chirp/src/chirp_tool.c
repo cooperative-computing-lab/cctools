@@ -1165,7 +1165,9 @@ int main(int argc, char *argv[])
 
 	getcwd(current_local_dir, CHIRP_PATH_MAX);
 
-	interactive_mode = isatty(0);
+	/* interactive mode if input is a TTY but we are not simply executing a
+	 * command from argv */
+	interactive_mode = isatty(0) && !((argc - optind) > 1);
 
 	if(optind < argc) {
 		stoptime = time(0) + timeout;
