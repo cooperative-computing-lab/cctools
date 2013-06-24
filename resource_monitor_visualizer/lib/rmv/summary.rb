@@ -12,25 +12,21 @@ module RMV
     end
 
     def initialize contents
-      @contents = translate_keys contents
+      @contents = contents
     end
 
     def executable_name
-      contents.fetch(:command).split(' ').first.split(/\.\//).last
+      contents.fetch("command").split(' ').first.split(/\.\//).last
     end
 
     private
       def method_missing m, *a, &b
-        contents.fetch(m) { super }
-      end
-
-      def translate_keys h
-        result = Hash.new
-        h.each do |k,v|
-          new_key = k.gsub /max_/, ''
-          result[new_key.to_sym] = v
+        if contents.include? m.to_s.gsub(/clock/, 'time')
+          value = contents.fetch(m.to_s).to_s.gsub(/clock/, 'time').split(' ')
+          Number.new value.first, value.last
+        else
+          super
         end
-        result
       end
 
       def contents

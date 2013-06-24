@@ -54,10 +54,23 @@ module RMV
             <tr><th>Rule Id</th><th>Maximum #{r}</th></tr>
             INDEX
 
-            tasks.select{ |t| t.executable_name == g }.sort_by{ |t| t.grab r.name }.each do |t|
+            tasks.select{ |t| t.executable_name == g }.sort_by{ |t| t.grab r }.each do |t|
               rule_path = "#{g}/#{t.rule_id}.html"
               create_rule_page t, rule_path
-              scaled_resource, _ = resources.scale r, (t.grab r.name)
+
+              unit = case r
+                     when /time/
+                       "s"
+                     when /bytes/
+                       "GB"
+                     when /footprint/
+                       "GB"
+                     when /memory/
+                       "MB"
+                     else
+                       ""
+                     end
+              scaled_resource = t.grab(r).in(unit)
               page << "<tr><td><a href=\"../#{t.rule_id}.html\">#{t.rule_id}</a></td><td>#{(scaled_resource*1000).round/1000.0}</td></tr>\n"
             end
 
@@ -94,7 +107,14 @@ module RMV
             start = l.first unless start
             l[0] = l.first - start
             resources.each_with_index do |r, i|
-              l[i], _ = resources.scale r, l[i]
+                l[i] /= case r
+                        when /bytes/
+                          1024**3
+                        when /footprint/
+                          1024.0
+                        else
+                          1
+                        end
             end
             f.puts l.join(" ")
           end
@@ -113,9 +133,21 @@ module RMV
 
         page << "<tr><td>command</td><td>#{task.grab "command"}</td></tr>\n"
         resources.each_with_index do |r, i|
-          value, unit = resources.scale r, task.grab(r.name)
-          img_path = "#{r.name}/#{task.rule_id}.png"
-          page << "<tr><td><a href=\"#{r.name}/index.html\">#{r.name}</a></td><td>#{(value*1000).round/1000.0} #{unit}</td>"
+          unit = case r
+                 when /time/
+                   "s"
+                 when /bytes/
+                   "GB"
+                 when /footprint/
+                   "GB"
+                 when /memory/
+                   "MB"
+                 else
+                   ""
+                 end
+          value = task.grab(r).in(unit)
+          img_path = "#{r}/#{task.rule_id}.png"
+          page << "<tr><td><a href=\"#{r}/index.html\">#{r}</a></td><td>#{(value*1000).round/1000.0} #{unit}</td>"
           page << "<td><img src=\"#{img_path}\" /></td>" if i > 0
           page << "</tr>\n"
         end
@@ -134,7 +166,7 @@ module RMV
 
       def task_resource_timeseries_plot resource, column, task, scratch_file
         unless column == 0
-          out = @destination + "#{task.executable_name}" + "#{resource.name}"
+          out = @destination + "#{task.executable_name}" + "#{resource}"
           out.mkpath
           out += "#{task.rule_id}.png"
           run_if_not_exist(out) do
@@ -148,7 +180,7 @@ module RMV
         lowest = t1.grab :start
         t2 = tasks.last
         highest = t2.grab :start
-        lowest < highest ? lowest : highest
+        lowest < highest ? lowest.in("u") : highest.in("u")
       end
 
       def make_combined_time_series
@@ -176,14 +208,23 @@ module RMV
           height = s.last
           @resources.each do |r|
             cpu_unit = nil
-            cpu_unit = "%" if r.name.match /cpu_time/
-            gnuplot {|io| io.puts time_series_format( width, height, r, workspace+"aggregate_#{r.name.to_s}", nil, 2, cpu_unit)}
+            cpu_unit = "%" if r.match /cpu_time/
+            gnuplot {|io| io.puts time_series_format( width, height, r, workspace+"aggregate_#{r.to_s}", nil, 2, cpu_unit)}
           end
         end
       end
 
       def time_series_format(width=1250, height=500, resource="", data_path="/tmp", outpath=nil, column=2, cpu_unit=nil)
-        _, unit = resources.scale(resource, 0) { |u| cpu_unit.nil? ? u : "%" }
+        unit = case resource
+        when /time/
+          "s"
+        when /footprint/
+          "GB"
+        when /memory/
+          "MB"
+        else
+          ""
+        end
         outpath = "#{@destination + resource.to_s}_#{width}x#{height}_aggregate.png" unless outpath
         %Q{set terminal png transparent size #{width},#{height}
         set bmargin 4
@@ -210,10 +251,18 @@ module RMV
             unless l.match /^#/
               data = l.split /\s+/
               interval = data[0].to_i - start if [0, nil].include? interval
-              adjusted_start = data[0].to_i - start
+              adjusted_start = (data[0].to_i - start)/10.0**6
               @resources.each_with_index do |r, i|
-                scaled_value, _ = resources.scale r, data[i].to_i
-                if r.name.match /cpu_time/
+                scaled_value = data[i].to_i
+                scaled_value /= case r
+                                when /bytes/
+                                  1024**3
+                                when /footprint/
+                                  1024.0
+                                else
+                                  1
+                                end
+                if r.match /cpu_time/
                   tmp = scaled_value
                   scaled_value -= previous_cpu
                   scaled_value /= interval if interval > 0
@@ -256,9 +305,18 @@ module RMV
       end
 
       def find_resources
-        header = time_series.first.open{|f| f.readline}.chomp
-        header = header[1..-1]
-        @resources = Resources.new header
+        @resources = %w[
+                        wall_time
+                        cpu_time
+                        max_concurrent_processes
+                        virtual_memory
+                        resident_memory
+                        swap_memory
+                        bytes_read
+                        bytes_written
+                        workdir_num_files
+                        workdir_footprint
+                       ]
       end
 
       def create_histograms
@@ -276,7 +334,7 @@ module RMV
 
         summary_sizes = summary_sizes.sort_by{|s| s.first}
         summary_large = summary_sizes.last
-        page << slides(summary_large.first, summary_large.last)
+        page << slides(summary_large.first, summary_large.last) if time_series.length > 0 or @makeflow_log_exists
 
         histogram_sizes = histogram_sizes.sort_by {|s| s.first}
         hist_small = histogram_sizes.first
@@ -306,7 +364,7 @@ module RMV
 
         resources.each_with_index do |r, i|
           result << %Q{ <div class="slide"><div class="item"><img src="#{r.to_s}_#{height}x#{width}_aggregate.png" /></div></div>\n} unless i == 0
-        end
+        end if time_series.length > 0
 
         result << <<-INDEX
            </div>
