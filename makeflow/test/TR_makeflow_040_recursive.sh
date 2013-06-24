@@ -26,20 +26,15 @@ prepare()
 
 	sed -e "s:^CONVERT.*:CONVERT=$CONVERT:" > $MAKE_FILE < $MAKE_FILE_ORG
 
-	ln -s ../../src/makeflow .
-	ln -s ../syntax/recursive.makeflow Makeflow
-	ln -s ../syntax/options.makeflow .
+	ln -sf ../syntax/recursive.makeflow Makeflow
+	ln -sf ../syntax/options.makeflow .
 	exit 0
 }
 
 run()
 {
     cd $test_dir
-    if ./makeflow; then
-    	exec ./makeflow -c
-    else
-    	exit 1
-    fi
+    exec ../../src/makeflow -dall
 }
 
 clean()

@@ -9,8 +9,8 @@ prepare()
 {
     mkdir $test_dir
     cd $test_dir
-    ln -s ../../src/makeflow .
-    ln -s ../syntax/collect.makeflow Makeflow
+    ln -sf ../../src/makeflow
+    ln -sf ../syntax/collect.makeflow Makeflow
 cat > ../$test_output <<EOF
 7
 7
@@ -23,7 +23,8 @@ EOF
 run()
 {
     cd $test_dir
-    if ./makeflow -g incr_file -G 1 -d all; then
+    ./makeflow -g incr_file -G 1 -d all	
+    if [ $? -eq 0 ]; then
     	exec diff -w ../$test_output _collect.7
     else
     	exit 1

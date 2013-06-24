@@ -1,4 +1,6 @@
-VAR1 = 1 # Global
+# Global
+VAR1 = 1
+
 out.0:
 	@VAR1=0
 	echo ${VAR1} > out.0 # Should display 0
