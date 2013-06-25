@@ -3,41 +3,48 @@
 . ../../dttools/src/test_runner.common.sh
 
 psearch="../src/parrot_run ../src/parrot_search"
-expected=expected.txt
 
-out=output.txt
+expected=expected.txt
+output=output.txt
 
 prepare()
 {
-    rm -f $out
+	cat > "$expected" <<EOF
+bar
+no results
+bar
+no results
+no results
+no results
+foo
+foo
+foo
+bar
+EOF
 }
 
 run()
 {
-    $psearch fixtures/a bar >> $out
-    $psearch fixtures/a /bar >> $out
-    $psearch fixtures/a c/bar >> $out
-    $psearch fixtures/a /c/bar >> $out
-    $psearch fixtures/a b/bar >> $out
-    $psearch fixtures/a /b/bar >> $out
-    $psearch fixtures/a b/foo >> $out
-    $psearch fixtures/a /b/foo >> $out
-    $psearch fixtures/a "/*/foo" >> $out
-    $psearch fixtures/a "*/*r" >> $out
+	{
+		$psearch fixtures/a 'bar'
+		$psearch fixtures/a '/bar'
+		$psearch fixtures/a 'c/bar'
+		$psearch fixtures/a '/c/bar'
+		$psearch fixtures/a 'b/bar'
+		$psearch fixtures/a '/b/bar'
+		$psearch fixtures/a 'b/foo'
+		$psearch fixtures/a '/b/foo'
+		$psearch fixtures/a '/*/foo'
+		$psearch fixtures/a '*/*r'
+	} > "$output"
 
-    failures=`diff --ignore-all-space $out $expected`
-    if [ -z "$failures" ]; then
-        echo "all tests passed"
-        return 0
-    else
-        echo $failures
-        return 1
-    fi
+	diff --ignore-all-space "$expected" "$output"
+	return $?
 }
 
 clean()
 {
-    rm -f $out
+    rm -f "$expected" "$output"
 }
 
 dispatch $@

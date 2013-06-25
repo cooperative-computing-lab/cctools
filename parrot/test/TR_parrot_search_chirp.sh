@@ -2,50 +2,89 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-EXPECTED=expected.txt
 
 chirp_debug=chirp.debug
 chirp_pid=chirp.pid
 chirp_port=chirp.port
 parrot_debug=parrot.debug
-search_output=search.txt
+
+expected=expected.txt
+output=output.txt
 
 psearch="../src/parrot_run -d all -o $parrot_debug ../src/parrot_search"
 
 prepare()
 {
-    ../../chirp/src/chirp_server -r ./fixtures/a -I 127.0.0.1 -Z $chirp_port -b -B $chirp_pid -d all -o $chirp_debug
-    rm -f "$search_output"
+	../../chirp/src/chirp_server -r ./fixtures -I 127.0.0.1 -Z "$chirp_port" -b -B "$chirp_pid" -d all -o "$chirp_debug"
+
+	cat > "$expected" <<EOF
+++
+/a/b/bar
+/a/b/c/bar
+++
+no results
+++
+/a/b/c/bar
+++
+no results
+++
+/a/b/bar
+++
+no results
+++
+/a/b/foo
+++
+no results
+++
+/a/b/foo
+++
+/a/b/bar
+/a/b/c/bar
+++
+EOF
+
+	wait_for_file_creation "$chirp_port" 5
+	wait_for_file_creation "$chirp_pid" 5
 }
 
 run()
 {
-    $psearch /chirp/localhost:`cat $chirp_port`/ bar >> $search_output
-    $psearch /chirp/localhost:`cat $chirp_port`/ /bar >> $search_output
-    $psearch /chirp/localhost:`cat $chirp_port`/ c/bar >> $search_output
-    $psearch /chirp/localhost:`cat $chirp_port`/ /c/bar >> $search_output
-    $psearch /chirp/localhost:`cat $chirp_port`/ b/bar >> $search_output
-    $psearch /chirp/localhost:`cat $chirp_port`/ /b/bar >> $search_output
-    $psearch /chirp/localhost:`cat $chirp_port`/ b/foo >> $search_output
-    $psearch /chirp/localhost:`cat $chirp_port`/ /b/foo >> $search_output
-    $psearch /chirp/localhost:`cat $chirp_port`/ "/*/foo" >> $search_output
-    $psearch /chirp/localhost:`cat $chirp_port`/ "*/*r" >> $search_output
+	{
+		echo ++
+		$psearch /chirp/localhost:`cat $chirp_port`/ 'bar' | sort
+		echo ++
+		$psearch /chirp/localhost:`cat $chirp_port`/ '/bar'
+		echo ++
+		$psearch /chirp/localhost:`cat $chirp_port`/ 'c/bar'
+		echo ++
+		$psearch /chirp/localhost:`cat $chirp_port`/ '/c/bar'
+		echo ++
+		$psearch /chirp/localhost:`cat $chirp_port`/ 'b/bar'
+		echo ++
+		$psearch /chirp/localhost:`cat $chirp_port`/ '/b/bar'
+		echo ++
+		$psearch /chirp/localhost:`cat $chirp_port`/ 'b/foo'
+#echo ++
+#$psearch /chirp/localhost:`cat $chirp_port`/ '/a/b/foo'
+		echo ++
+		$psearch /chirp/localhost:`cat $chirp_port`/ '/*/foo'
+		echo ++
+		$psearch /chirp/localhost:`cat $chirp_port`/ '/*/*/foo'
+		echo ++
+		$psearch /chirp/localhost:`cat $chirp_port`/ '*/*r' | sort
+		echo ++
+	} > "$output"
 
-    noerr=`cat $search_output | grep -v error`
-    rm -f $search_output
-    echo "$noerr" > $search_output
-
-    failures=`diff --ignore-all-space $search_output $EXPECTED`
-    if [ -n "$failures" ]; then
-        echo $failures
-        return 1
-    fi
+	diff --ignore-all-space "$expected" "$output"
+	return $?
 }
 
 clean()
 {
-    kill -9 `cat $chirp_pid`
-    rm -f $chirp_debug $chirp_pid $chirp_port $parrot_debug $search_output
+	if [ -r "$chirp_pid" ]; then
+		kill -9 `cat $chirp_pid`
+	fi
+	rm -f "$chirp_debug" "$chirp_pid" "$chirp_port" "$parrot_debug" "$expected" "$output"
 }
 
 dispatch $@
