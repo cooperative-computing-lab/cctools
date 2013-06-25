@@ -455,7 +455,7 @@ static void update_catalog(struct work_queue *q, int now)
 	}
 	work_queue_get_stats(q, &s);
 	struct work_queue_resources r;
-	memset(&r, 0, sizeof(work_queue_resources));
+	memset(&r, 0, sizeof(r));
 	work_queue_get_resources(q,&r);
 	debug(D_WQ,"Updating catalog with resource information -- cores:%d memory:%d disk:%d\n", r.cores.total,r.memory.total,r.disk.total); //see if information is being passed correctly
 	char * worker_summary = work_queue_get_worker_summary(q);
