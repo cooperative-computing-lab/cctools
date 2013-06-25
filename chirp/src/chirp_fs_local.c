@@ -499,6 +499,7 @@ static int search_directory(const char *subject, const char * const base, char *
 	int stopatfirst = flags & CHIRP_SEARCH_STOPATFIRST;
 	int includeroot = flags & CHIRP_SEARCH_INCLUDEROOT;
 
+	int result = 0;
 	void *dirp = chirp_fs_local_opendir(fullpath);
 	char *current = fullpath + strlen(fullpath);	/* point to end to current directory */
 
@@ -516,27 +517,34 @@ static int search_directory(const char *subject, const char * const base, char *
 			if(search_match_file(pattern, base) && chirp_fs_local_access(fullpath, access_flags) == 0) {
 				const char *match_name = includeroot ? fullpath+1 : base; /* fullpath+1 because chirp_root_path is always "./" !! */
 
+				result += 1;
 				if(metadata) {
 					/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
 					struct chirp_stat buf;
 					if((chirp_fs_local_stat(fullpath, &buf)) == -1) {
 						link_putfstring(l, "0:%s::\n", stoptime, match_name);
 						link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, match_name);
-					} else
+					} else {
 						link_putfstring(l, "0:%s:%s:\n", stoptime, match_name, chirp_stat_string(&buf));
 						if(stopatfirst) return 1;
-				} else
+					}
+				} else {
 					link_putfstring(l, "0:%s::\n", stoptime, match_name);
 					if(stopatfirst) return 1;
+				}
 			}
 
 			if(cfs_isdir(fullpath) && search_should_recurse(base, pattern)) {
 				if(chirp_acl_check_dir(fullpath, subject, CHIRP_ACL_LIST)) {
-					int found = search_directory(subject, base, fullpath, pattern, flags, l, stoptime);
-					if(stopatfirst && found)
-						return 1;
-				} else
+					int n = search_directory(subject, base, fullpath, pattern, flags, l, stoptime);
+					if(n > 0) {
+						result += n;
+						if(stopatfirst)
+							return result;
+					}
+				} else {
 					link_putfstring(l, "%d:%d:%s:\n", stoptime, EPERM, CHIRP_SEARCH_ERR_OPEN, fullpath);
+				}
 			}
 			*current = '\0';	/* clear current entry */
 			errno = 0;
@@ -553,10 +561,11 @@ static int search_directory(const char *subject, const char * const base, char *
 		if(errno)
 			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, fullpath);
 
-	} else
+	} else {
 		link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_OPEN, fullpath);
+    }
 
-	return 0;
+	return result;
 }
 
 /* Note we need the subject because we must check the ACL for any nested directories. */
