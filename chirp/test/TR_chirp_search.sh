@@ -62,7 +62,7 @@ run()
 	../src/chirp --quiet localhost:`cat "$chirp_port"` mkdir foo/b
 	../src/chirp --quiet localhost:`cat "$chirp_port"` mkdir foo/b/bar
 
-	(
+	{
 		echo ++
 		../src/chirp --quiet localhost:`cat "$chirp_port"` search     'foo' 'bar' | sort
 		echo ++
@@ -88,7 +88,7 @@ run()
 		echo ++
 		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  '/' '/foo/b/bar' | sort
 		echo ++
-	) | tr -d ' ' > "$output"
+	} | tr -d ' ' > "$output"
 	diff "$expected" "$output"
 	set +e
 	return $?
