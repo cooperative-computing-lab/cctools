@@ -920,11 +920,24 @@ static char *strerrsource(int errsource)
 
 static INT64_T do_search(int argc, char **argv)
 {
-	int flags = CHIRP_SEARCH_METADATA | CHIRP_SEARCH_INCLUDEROOT | CHIRP_SEARCH_PERIOD;
-	CHIRP_SEARCH *s = chirp_reli_opensearch(current_host, argv[1], argv[2], flags, stoptime);
+	CHIRP_SEARCH *S;
+	int flags = 0;
+	if (argc == 4 && *argv[1] == '-') {
+		if (strchr(argv[1], 'i'))
+			flags |= CHIRP_SEARCH_INCLUDEROOT;
+		if (strchr(argv[1], 'm'))
+			flags |= CHIRP_SEARCH_METADATA;
+		if (strchr(argv[1], 's'))
+			flags |= CHIRP_SEARCH_STOPATFIRST;
+	}
+
+	if (argc == 4)
+		S = chirp_reli_opensearch(current_host, argv[2], argv[3], flags, stoptime);
+	else
+		S = chirp_reli_opensearch(current_host, argv[1], argv[2], flags, stoptime);
 	struct chirp_searchent *res;
 
-	while((res = chirp_client_readsearch(s)) != NULL) {
+	while((res = chirp_client_readsearch(S)) != NULL) {
 		if(res->err) {
 			printf("%s error on %s: %s\n", strerrsource(res->errsource), res->path, strerror(res->err));
 			continue;
@@ -938,7 +951,7 @@ static INT64_T do_search(int argc, char **argv)
 			printf("\n");
 	}
 
-	chirp_client_closesearch(s);
+	chirp_client_closesearch(S);
 	return 0;
 }
 
@@ -1033,7 +1046,7 @@ static struct command list[] = {
 	{"resetacl", 1, 2, 2, "<remotepath> <rwldax>", do_resetacl},
 	{"rm", 1, 1, 1, "<file>", do_rm},
 	{"rmdir", 1, 1, 1, "<dir>", do_rmdir},
-	{"search", 1, 2, 2, "<directory> <pattern>", do_search},
+	{"search", 1, 2, 3, "[-ims] <directory> <pattern>", do_search},
 	{"setacl", 1, 3, 3, "<remotepath> <user> <rwldax>", do_setacl},
 	{"setrep", 1, 2, 2, "<path> <nreps>", do_setrep},
 	{"stat", 1, 1, 1, "<file>", do_stat},

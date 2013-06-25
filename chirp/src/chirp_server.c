@@ -1850,15 +1850,17 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			debug_flags_set(debug_flag);
 		} else if(sscanf(line, "search %s %s %" PRId64, pattern, path, &flags) == 3) {
 			link_putliteral(l, "0\n", stalltime);
-			char fixed[CHIRP_PATH_MAX];
-			char *ps = path, *pe;
+			char *start = path;
 
 			for(;;) {
-				if((pe = strchr(ps, CHIRP_SEARCH_DELIMITER)) != NULL)
-					*pe = '\0';
+				char fixed[CHIRP_PATH_MAX];
+				char *end;
+				if((end = strchr(start, CHIRP_SEARCH_DELIMITER)) != NULL)
+					*end = '\0';
 
-				strcpy(fixed, ps);
+				strcpy(fixed, start);
 				chirp_path_fix(fixed);
+				assert(strcmp(fixed, ".") == 0 || strncmp(fixed, "./", 2) == 0);
 
 				if(access(fixed, F_OK) == -1) {
 					link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
@@ -1870,9 +1872,9 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 						break;
 				}
 
-				if(pe != NULL) {
-					ps = pe + 1;
-					*pe = CHIRP_SEARCH_DELIMITER;
+				if(end != NULL) {
+					start = end + 1;
+					*end = CHIRP_SEARCH_DELIMITER;
 				} else
 					break;
 			}

@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "chirp_acl.h"
 
 #include "create_dir.h"
+#include "debug.h"
 #include "hash_table.h"
 #include "xxmalloc.h"
 #include "int_sizes.h"
@@ -408,111 +409,80 @@ static int search_to_access(int flags)
 
 static int search_match_file(const char *pattern, const char *name)
 {
-	char *subpat, *subend;
+	debug(D_DEBUG, "search_match_file(`%s', `%s')", pattern, name);
+	while (1) {
+		char atom[CHIRP_PATH_MAX];
+		const char *end = strchr(pattern, '|'); /* disjunction operator */
 
-	do {
-		subend = strchr(pattern, '|');
+		memset(atom, 0, sizeof(atom));
+		if (end)
+			strncpy(atom, pattern, (size_t)(end-pattern));
+		else
+			strcpy(atom, pattern);
 
-		if(subend == NULL) {
-			subpat = (char *) alloca(strlen(pattern) + 1);
-			strcpy(subpat, pattern);
-		} else {
-			subpat = (char *) alloca(subend - pattern + 1);
-			strncpy(subpat, pattern, subend - pattern);
-			subpat[subend - pattern] = '\0';
-		}
-
-		char *filepat = strrchr(subpat, '/');
-
-		if(filepat <= subpat) {
-			filepat = (filepat == subpat) ? filepat + 1 : subpat;
-
-			if(fnmatch(filepat, name, FNM_PATHNAME) == 0) {
+		const char *test = name;
+		do {
+			int result = fnmatch(atom, test, FNM_PATHNAME);
+			debug(D_DEBUG, "fnmatch(`%s', `%s', FNM_PATHNAME) = %d", atom, test, result);
+			if(result == 0) {
 				return 1;
 			}
-		}
+			test = strchr(test, '/');
+			if (test) test += 1;
+		} while (test);
 
-		pattern = subend + 1;
-
-	} while(subend != NULL);
+		if (end)
+			pattern = end+1;
+		else
+			break;
+	}
 
 	return 0;
 }
 
-
-static int search_match_dir(const char *pattern, char *npattern, const char *name)
+static int search_should_recurse(const char *base, const char *pattern)
 {
-	int recursive, match = 0;
-	char *subpat, *subend;
-	size_t i = 0;
+	debug(D_DEBUG, "search_should_recurse(base = `%s', pattern = `%s')", base, pattern);
+	while (1) {
+		char atom[CHIRP_PATH_MAX];
 
-	/* FIXME: npattern buffer bounds checks */
-	do {
-		/* Retrieve the next subpattern */
-		subend = strchr(pattern, '|');
+		if (*pattern != '/') return 1; /* unanchored pattern */
 
-		if(subend == NULL) {
-			subpat = (char *) alloca(strlen(pattern) + 1);
-			strcpy(subpat, pattern);
-		} else {
-			subpat = (char *) alloca(subend - pattern + 1);
-			strncpy(subpat, pattern, subend - pattern);
-			subpat[subend - pattern] = '\0';
-		}
+		const char *end = strchr(pattern, '|'); /* disjunction operator */
+		memset(atom, 0, sizeof(atom));
+		if (end)
+			strncpy(atom, pattern, (size_t)(end-pattern));
+		else
+			strcpy(atom, pattern);
 
-		/* Retrieve the top directory of the subpattern */
-		if(*subpat == '/') {
-			recursive = 0;
-			subpat++;
-		} else
-			recursive = 1;
-
-		char *toppat, *topend = strchr(subpat, '/');
-
-		if(topend == NULL)
-			toppat = subpat;
-		else {
-			toppat = (char *) alloca(topend - subpat + 1);
-			strncpy(toppat, subpat, topend - subpat);
-			toppat[topend - subpat] = '\0';
-		}
-
-		/* Check for a match and build the new pattern string */
-		if(fnmatch(toppat, name, FNM_PATHNAME) == 0) {
-			match = 1;
-
-			if(recursive) {
-				i += sprintf(npattern + i, "%s", i == 0 ? "" : "|");
-				i += sprintf(npattern + i, "%s", subpat);
-				if(topend != NULL)
-					i += sprintf(npattern + i, "|%s", topend);
-			} else if(topend != NULL) {
-				i += sprintf(npattern + i, "%s", i == 0 ? "" : "|");
-				i += sprintf(npattern + i, "%s", topend);
+		while (*atom) {
+			int result = fnmatch(atom, base, FNM_PATHNAME);
+			debug(D_DEBUG, "fnmatch(`%s', `%s', FNM_PATHNAME) = %d", atom, base, result);
+			if(result == 0) {
+				return 1;
 			}
-		} else if(recursive) {
-			match = 1;
-			i += sprintf(npattern + i, "%s%s", i == 0 ? "" : "|", subpat);
+			char *last = strrchr(atom, '/');
+			if (last) {
+				*last = '\0';
+			} else {
+				break;
+			}
 		}
 
-		pattern = subend + 1;
-
-		if(!recursive)
-			subpat--;
-
-	} while(subend != NULL);
-
-	if(i == 0)
-		*npattern = '\0';
-
-	return match;
+		if (end)
+			pattern = end+1;
+		else
+			break;
+	}
+	return 0;
 }
 
-
-static int search_directory(const char *subject, const char *base, char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
+static int search_directory(const char *subject, const char * const base, char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
 {
 	if(strlen(pattern) == 0)
 		return 0;
+
+	debug(D_DEBUG, "search_directory(subject = `%s', base = `%s', dir = `%s', pattern = `%s', flags = %d, ...)", subject, base, dir, pattern, flags);
 
 	int metadata = flags & CHIRP_SEARCH_METADATA;
 	int stopatfirst = flags & CHIRP_SEARCH_STOPATFIRST;
@@ -520,12 +490,10 @@ static int search_directory(const char *subject, const char *base, char *dir, co
 
 	void *dirp = chirp_fs_local_opendir(dir);
 	char *current = dir + strlen(dir);	/* point to end to current directory */
-	char npattern[CHIRP_PATH_MAX];
 
 	if(dirp) {
 		errno = 0;
 		struct chirp_dirent *entry;
-		struct chirp_stat buf;
 		while((entry = chirp_fs_local_readdir(dirp))) {
 			int access_flags = search_to_access(flags);
 			char *name = entry->name;
@@ -534,25 +502,26 @@ static int search_directory(const char *subject, const char *base, char *dir, co
 				continue;
 			sprintf(current, "/%s", name);
 
-			if(search_match_file(pattern, name) && chirp_fs_local_access(dir, access_flags) == 0) {
-				char *match_name = includeroot ? dir : name;
+			if(search_match_file(pattern, base) && chirp_fs_local_access(dir, access_flags) == 0) {
+				const char *match_name = includeroot ? dir+1 : base; /* dir+1 because chirp_root_path is always "./" !! */
 
 				if(metadata) {
 					/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
+					struct chirp_stat buf;
 					if((chirp_fs_local_stat(dir, &buf)) == -1) {
 						link_putfstring(l, "0:%s::\n", stoptime, match_name);
 						link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, match_name);
 					} else
 						link_putfstring(l, "0:%s:%s:\n", stoptime, match_name, chirp_stat_string(&buf));
+						if(stopatfirst) return 1;
 				} else
 					link_putfstring(l, "0:%s::\n", stoptime, match_name);
-				if(stopatfirst)
-					return 1;
+					if(stopatfirst) return 1;
 			}
 
-			if(cfs_isdir(dir) && search_match_dir(pattern, npattern, name)) {
+			if(cfs_isdir(dir) && search_should_recurse(base, pattern)) {
 				if(chirp_acl_check_dir(dir, subject, CHIRP_ACL_LIST)) {
-					int found = search_directory(subject, base, dir, npattern, flags, l, stoptime);
+					int found = search_directory(subject, base, dir, pattern, flags, l, stoptime);
 					if(stopatfirst && found)
 						return 1;
 				} else
@@ -580,12 +549,15 @@ static int search_directory(const char *subject, const char *base, char *dir, co
 }
 
 /* Note we need the subject because we must check the ACL for any nested directories. */
-static INT64_T chirp_fs_local_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime)
+static INT64_T chirp_fs_local_search(const char *subject, const char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
 {
-	char directory[CHIRP_PATH_MAX];
-	string_collapse_path(dir, directory, 0);
+	char pathname[CHIRP_PATH_MAX];
+	string_collapse_path(dir, pathname, 0);
 
-	return search_directory(subject, directory + strlen(directory), directory, patt, flags, l, stoptime);
+	debug(D_DEBUG, "chirp_fs_local_search(subject = `%s', dir = `%s', pattern = `%s', flags = %d, ...)", subject, dir, pattern, flags);
+
+	/* FIXME we should still check for literal paths to search since we can optimize that */
+	return search_directory(subject, pathname + strlen(pathname), pathname, pattern, flags, l, stoptime);
 }
 
 static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
