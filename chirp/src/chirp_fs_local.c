@@ -410,6 +410,7 @@ static int search_to_access(int flags)
 static int search_match_file(const char *pattern, const char *name)
 {
 	debug(D_DEBUG, "search_match_file(`%s', `%s')", pattern, name);
+	/* Decompose the pattern in atoms which are each matched against. */
 	while (1) {
 		char atom[CHIRP_PATH_MAX];
 		const char *end = strchr(pattern, '|'); /* disjunction operator */
@@ -420,6 +421,11 @@ static int search_match_file(const char *pattern, const char *name)
 		else
 			strcpy(atom, pattern);
 
+		/* Here we might have a pattern like '*' which matches any file so we
+		 * iteratively pull leading components off of `name' until we get a
+		 * match.  In the case of '*', we would pull off all leading components
+		 * until we reach the file name, which would always match '*'.
+		 */
 		const char *test = name;
 		do {
 			int result = fnmatch(atom, test, FNM_PATHNAME);
@@ -443,10 +449,11 @@ static int search_match_file(const char *pattern, const char *name)
 static int search_should_recurse(const char *base, const char *pattern)
 {
 	debug(D_DEBUG, "search_should_recurse(base = `%s', pattern = `%s')", base, pattern);
+	/* Decompose the pattern in atoms which are each matched against. */
 	while (1) {
 		char atom[CHIRP_PATH_MAX];
 
-		if (*pattern != '/') return 1; /* unanchored pattern */
+		if (*pattern != '/') return 1; /* unanchored pattern is always recursive */
 
 		const char *end = strchr(pattern, '|'); /* disjunction operator */
 		memset(atom, 0, sizeof(atom));
@@ -455,6 +462,10 @@ static int search_should_recurse(const char *base, const char *pattern)
 		else
 			strcpy(atom, pattern);
 
+		/* Here we want to determine if `base' matches earlier parts of
+		 * `pattern' to see if we should recurse in the directory `base'. To do
+		 * this, we strip off final parts of `pattern' until we get a match.
+		 */
 		while (*atom) {
 			int result = fnmatch(atom, base, FNM_PATHNAME);
 			debug(D_DEBUG, "fnmatch(`%s', `%s', FNM_PATHNAME) = %d", atom, base, result);

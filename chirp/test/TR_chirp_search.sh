@@ -8,6 +8,7 @@ chirp_port=chirp.port
 chirp_root=chirp.root
 
 expected=expected.txt
+output=output.txt
 
 prepare()
 {
@@ -16,7 +17,7 @@ prepare()
 /a/bar
 /b/bar
 ++
-/a/bar
+1
 ++
 /a/bar
 ++
@@ -63,31 +64,32 @@ run()
 
 	(
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     'foo' 'bar'
+		../src/chirp --quiet localhost:`cat "$chirp_port"` search     'foo' 'bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search -s  'foo' 'bar'
+		../src/chirp --quiet localhost:`cat "$chirp_port"` search -s  'foo' 'bar' | wc -l
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     'foo' 'a/bar'
+		../src/chirp --quiet localhost:`cat "$chirp_port"` search     'foo' 'a/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  'foo' 'a/bar'
+		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  'foo' 'a/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     'foo' '/foo/a/bar'
+		../src/chirp --quiet localhost:`cat "$chirp_port"` search     'foo' '/foo/a/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     '/' '/foo/a/bar'
+		../src/chirp --quiet localhost:`cat "$chirp_port"` search     '/' '/foo/a/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     '/' '/foo/*/bar'
+		../src/chirp --quiet localhost:`cat "$chirp_port"` search     '/' '/foo/*/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     '/foo' '/*/bar'
+		../src/chirp --quiet localhost:`cat "$chirp_port"` search     '/foo' '/*/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     '/foo' '*/bar'
+		../src/chirp --quiet localhost:`cat "$chirp_port"` search     '/foo' '*/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  '/foo' '*/bar'
+		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  '/foo' '*/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  '/foo' '*'
+		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  '/foo' '*' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  '/' '/foo/b/bar'
+		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  '/' '/foo/b/bar' | sort
 		echo ++
-	) | tr -d ' ' | diff "$expected" -
+	) | tr -d ' ' > "$output"
+	diff "$expected" "$output"
 	set +e
 	return $?
 }
@@ -98,7 +100,7 @@ clean()
 		kill -9 `cat "$chirp_pid"`
 	fi
 
-	rm -rf "$chirp_debug" "$chirp_pid" "$chirp_port" "$chirp_root" "$expected"
+	rm -rf "$chirp_debug" "$chirp_pid" "$chirp_port" "$chirp_root" "$expected" "$output"
 }
 
 dispatch $@
