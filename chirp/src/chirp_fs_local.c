@@ -488,19 +488,19 @@ static int search_should_recurse(const char *base, const char *pattern)
 	return 0;
 }
 
-static int search_directory(const char *subject, const char * const base, char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
+static int search_directory(const char *subject, const char * const base, char *fullpath, const char *pattern, int flags, struct link *l, time_t stoptime)
 {
 	if(strlen(pattern) == 0)
 		return 0;
 
-	debug(D_DEBUG, "search_directory(subject = `%s', base = `%s', dir = `%s', pattern = `%s', flags = %d, ...)", subject, base, dir, pattern, flags);
+	debug(D_DEBUG, "search_directory(subject = `%s', base = `%s', fullpath = `%s', pattern = `%s', flags = %d, ...)", subject, base, fullpath, pattern, flags);
 
 	int metadata = flags & CHIRP_SEARCH_METADATA;
 	int stopatfirst = flags & CHIRP_SEARCH_STOPATFIRST;
 	int includeroot = flags & CHIRP_SEARCH_INCLUDEROOT;
 
-	void *dirp = chirp_fs_local_opendir(dir);
-	char *current = dir + strlen(dir);	/* point to end to current directory */
+	void *dirp = chirp_fs_local_opendir(fullpath);
+	char *current = fullpath + strlen(fullpath);	/* point to end to current directory */
 
 	if(dirp) {
 		errno = 0;
@@ -513,13 +513,13 @@ static int search_directory(const char *subject, const char * const base, char *
 				continue;
 			sprintf(current, "/%s", name);
 
-			if(search_match_file(pattern, base) && chirp_fs_local_access(dir, access_flags) == 0) {
-				const char *match_name = includeroot ? dir+1 : base; /* dir+1 because chirp_root_path is always "./" !! */
+			if(search_match_file(pattern, base) && chirp_fs_local_access(fullpath, access_flags) == 0) {
+				const char *match_name = includeroot ? fullpath+1 : base; /* fullpath+1 because chirp_root_path is always "./" !! */
 
 				if(metadata) {
 					/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
 					struct chirp_stat buf;
-					if((chirp_fs_local_stat(dir, &buf)) == -1) {
+					if((chirp_fs_local_stat(fullpath, &buf)) == -1) {
 						link_putfstring(l, "0:%s::\n", stoptime, match_name);
 						link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, match_name);
 					} else
@@ -530,13 +530,13 @@ static int search_directory(const char *subject, const char * const base, char *
 					if(stopatfirst) return 1;
 			}
 
-			if(cfs_isdir(dir) && search_should_recurse(base, pattern)) {
-				if(chirp_acl_check_dir(dir, subject, CHIRP_ACL_LIST)) {
-					int found = search_directory(subject, base, dir, pattern, flags, l, stoptime);
+			if(cfs_isdir(fullpath) && search_should_recurse(base, pattern)) {
+				if(chirp_acl_check_dir(fullpath, subject, CHIRP_ACL_LIST)) {
+					int found = search_directory(subject, base, fullpath, pattern, flags, l, stoptime);
 					if(stopatfirst && found)
 						return 1;
 				} else
-					link_putfstring(l, "%d:%d:%s:\n", stoptime, EPERM, CHIRP_SEARCH_ERR_OPEN, dir);
+					link_putfstring(l, "%d:%d:%s:\n", stoptime, EPERM, CHIRP_SEARCH_ERR_OPEN, fullpath);
 			}
 			*current = '\0';	/* clear current entry */
 			errno = 0;
@@ -544,17 +544,17 @@ static int search_directory(const char *subject, const char * const base, char *
 
 		// Read error
 		if(errno)
-			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_READ, dir);
+			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_READ, fullpath);
 
 		errno = 0;
 		chirp_alloc_closedir(dirp);
 
 		// Close error
 		if(errno)
-			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, dir);
+			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, fullpath);
 
 	} else
-		link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_OPEN, dir);
+		link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_OPEN, fullpath);
 
 	return 0;
 }
