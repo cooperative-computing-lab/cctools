@@ -10,32 +10,56 @@ output=output.txt
 prepare()
 {
 	cat > "$expected" <<EOF
+++
 bar
-no results
 bar
-no results
-no results
-no results
-foo
-foo
-foo
+++
+noresults
+++
 bar
+++
+noresults
+++
+bar
+++
+bar
+++
+foo
+++
+foo
+++
+foo
+++
+bar
+bar
+++
 EOF
 }
 
 run()
 {
 	{
+		echo ++
 		$psearch fixtures/a 'bar'
+		echo ++
 		$psearch fixtures/a '/bar'
+		echo ++
 		$psearch fixtures/a 'c/bar'
+		echo ++
 		$psearch fixtures/a '/c/bar'
+		echo ++
 		$psearch fixtures/a 'b/bar'
+		echo ++
 		$psearch fixtures/a '/b/bar'
+		echo ++
 		$psearch fixtures/a 'b/foo'
+		echo ++
 		$psearch fixtures/a '/b/foo'
+		echo ++
 		$psearch fixtures/a '/*/foo'
+		echo ++
 		$psearch fixtures/a '*/*r'
+		echo ++
 	} > "$output"
 
 	diff --ignore-all-space "$expected" "$output"
