@@ -2,10 +2,14 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-psearch="../src/parrot_run ../src/parrot_search"
+parrot_debug=parrot.debug
 
 expected=expected.txt
 output=output.txt
+
+search() {
+  ../src/parrot_run --debug=all --debug-file="$parrot_debug" --debug-rotate-max=0 ../src/parrot_search "$@"
+}
 
 prepare()
 {
@@ -28,6 +32,8 @@ no results
 ++
 no results
 ++
+/a/b/foo
+++
 no results
 ++
 /a/b/foo
@@ -42,29 +48,29 @@ run()
 {
 	{
 		echo ++
-		$psearch fixtures 'bar' | sort
+		search fixtures 'bar' | sort
 		echo ++
-		$psearch fixtures '/bar'
+		search fixtures '/bar'
 		echo ++
-		$psearch fixtures 'c/bar'
+		search fixtures 'c/bar'
 		echo ++
-		$psearch fixtures '/c/bar'
+		search fixtures '/c/bar'
 		echo ++
-		$psearch fixtures 'b/bar'
+		search fixtures 'b/bar'
 		echo ++
-		$psearch fixtures '/b/bar'
+		search fixtures '/b/bar'
 		echo ++
-		$psearch fixtures 'b/foo'
+		search fixtures 'b/foo'
 		echo ++
-		$psearch fixtures '/b/foo'
+		search fixtures '/b/foo'
 		echo ++
-		$psearch fixtures '/a/b/foo'
+		search fixtures '/a/b/foo'
 		echo ++
-		$psearch fixtures '/*/foo'
+		search fixtures '/*/foo'
 		echo ++
-		$psearch fixtures '/*/*/foo'
+		search fixtures '/*/*/foo'
 		echo ++
-		$psearch fixtures '*/*r' | sort
+		search fixtures '*/*r' | sort
 		echo ++
 	} > "$output"
 
@@ -74,7 +80,7 @@ run()
 
 clean()
 {
-    rm -f "$expected" "$output"
+    rm -f "$parrot_debug" "$expected" "$output"
 }
 
 dispatch $@

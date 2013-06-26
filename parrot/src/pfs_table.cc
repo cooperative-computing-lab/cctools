@@ -2123,7 +2123,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 				if (flags & PFS_SEARCH_INCLUDEROOT)
 					matched = directory;
 				else
-					matched = strrchr(base, '/') + 1;
+					matched = base;
 
 				if (access_flags == F_OK || this->access(directory, access_flags) == 0) {
 					size_t l = snprintf(buffer+*i, buffer_length-*i, "%s0|%s", *i==0 ? "" : "|", matched);
