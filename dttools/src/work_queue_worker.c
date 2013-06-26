@@ -2003,6 +2003,8 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "work_queue_worker-foreman: failed to create foreman queue.  Terminating.\n");
 			exit(1);
 		}
+
+		fprintf(stdout, "work_queue_worker-foreman: listening on port %d\n", work_queue_port(foreman_q));
 		
 		if(foreman_name) {
 			work_queue_specify_name(foreman_q, foreman_name);
