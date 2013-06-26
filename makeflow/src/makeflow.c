@@ -340,7 +340,7 @@ void collect_input_files(struct dag *d, char *bundle_dir, char *(*rename) (struc
 
 /* When a collision is detected (a file with an absolute path has the same base name as a relative file) a
  * counter is appended to the filename and the name translation is retried */
-char *bundler_translate_name(const char *filename, int collision_counter)
+char *bundler_translate_name(const char *input_filename, int collision_counter)
 {
 	static struct hash_table *previous_names = NULL;
 	static struct hash_table *reverse_names = NULL;
@@ -349,8 +349,13 @@ char *bundler_translate_name(const char *filename, int collision_counter)
 	if(!reverse_names)
 		reverse_names = hash_table_create(0, NULL);
 
-	if(collision_counter)
-		filename = string_format("%s%d", filename, collision_counter);
+	char *filename = NULL;
+
+	if(collision_counter){
+		filename = string_format("%s%d", input_filename, collision_counter);
+	}else{
+		filename = xxstrdup(input_filename);
+	}
 
 	const char *new_filename;
 	new_filename = hash_table_lookup(previous_names, filename);
