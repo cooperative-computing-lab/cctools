@@ -29,11 +29,11 @@ extern "C" {
 extern int pfs_master_timeout;
 extern char pfs_temp_dir[];
 extern const char * pfs_cvmfs_repo_arg;
+extern bool pfs_cvmfs_repo_switching;
 
 static bool cvmfs_configured = false;
 static struct cvmfs_filesystem *cvmfs_filesystem_list = 0;
 static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
-static bool allow_switching_cvmfs_repos = false;
 
 #define CERN_KEY_PLACEHOLDER "<BUILTIN-cern.ch.pub>"
 
@@ -210,7 +210,7 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 
 				did_warning = 1;
 
-				if(!allow_switching_cvmfs_repos) {
+				if(!pfs_cvmfs_repo_switching) {
 					debug(D_CVMFS|D_NOTICE,
 						  "ERROR: using multiple CVMFS repositories in a single parrot session "
 						  "is not allowed.  Define PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES "
@@ -360,7 +360,7 @@ static void cvmfs_read_config()
 
 	char *allow_switching = getenv("PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES");
 	if( allow_switching && strcmp(allow_switching,"0")!=0) {
-		allow_switching_cvmfs_repos = true;
+		pfs_cvmfs_repo_switching = true;
 	}
 
 	const char *cvmfs_options = pfs_cvmfs_repo_arg;

@@ -2094,6 +2094,8 @@ static int search_directory(pfs_table *t, char *dir, const char *pattern, char *
 
 static int is_pattern (const char *pattern)
 {
+	if (*pattern != '/')
+		return 1; /* unrooted expressions are patterns */
 	for (; *pattern; pattern += 1) {
 		switch (*pattern) {
 			case '\\':
@@ -2136,10 +2138,8 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 	const char *pattern = patt;
 	int found = 0;
 	int result;
-	int exact_match = 0;
 
-	if (!is_pattern(pattern))
-		exact_match = 1;
+	debug(D_DEBUG, "%s(%s, %s, %d, %p, %zu, %p)", __FUNCTION__, paths, patt, flags, buffer, buffer_length, i);
 
 	int done = 0;
 
@@ -2164,14 +2164,16 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 			done = 1;
 		}
 
-		if (realpath(path, directory) == NULL) {
-			return -1;
-		}
+		string_collapse_path(path, directory, 0);
 
-		if (exact_match && *pattern == '/') {
+		debug(D_DEBUG, "searching directory `%s'", directory);
+
+		if (!is_pattern(pattern)) {
 			struct pfs_stat statbuf;
 			int access_flags = search_to_access(flags);
 			const char *base = directory + strlen(directory);
+
+			debug(D_DEBUG, "pattern `%s' will be exactly matched", pattern);
 
 			strcat(directory, pattern);
 
@@ -2214,17 +2216,12 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 		} else {
 			/* Check to see if search is implemented in the service */
 			if(resolve_name(path, &pname)) {
-				if ((result = pname.service->search(&pname, pattern, flags, buffer, buffer_length, i))==-1) {
-					result = search_directory(
-						this,	
-						directory, 
-						pattern, 
-						buffer, 
-						buffer_length, 
-						i, 
-						flags
-					);
+				debug(D_DEBUG, "attempting service `%s' search routine for path `%s'", pname.service_name, pname.path);
+				if ((result = pname.service->search(&pname, pattern, flags, buffer, buffer_length, i))==-1 && errno == ENOSYS) {
+					debug(D_DEBUG, "no service to search found: falling back to manual search `%s'", directory);
+					result = search_directory(this, directory, pattern, buffer, buffer_length, i, flags);
 				}
+				debug(D_DEBUG, "= %d (`%s' search)", result, pname.service_name);
 			} else 
 				result = -1;
 		}

@@ -362,7 +362,7 @@ time_t chirp_alloc_last_flush_time()
 	return last_flush_time;
 }
 
-INT64_T chirp_alloc_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime)
+INT64_T chirp_alloc_search(const char *subject, const char *dir, const char *patt, int flags, struct link * l, time_t stoptime)
 {
 	return cfs->search(subject, dir, patt, flags, l, stoptime);
 }
@@ -539,22 +539,22 @@ INT64_T chirp_alloc_fsync(int fd)
 	return cfs->fsync(fd);
 }
 
-struct chirp_dir * chirp_alloc_opendir( const char *path )
+struct chirp_dir *chirp_alloc_opendir(const char *path)
 {
 	return cfs->opendir(path);
 }
 
-struct chirp_dirent * chirp_alloc_readdir( struct chirp_dir *dir )
+struct chirp_dirent *chirp_alloc_readdir(struct chirp_dir *dir)
 {
 	return cfs->readdir(dir);
 }
 
-void chirp_alloc_closedir( struct chirp_dir *dir )
+void chirp_alloc_closedir(struct chirp_dir *dir)
 {
 	cfs->closedir(dir);
 }
 
-INT64_T chirp_alloc_getfile(const char *path, struct link * link, time_t stoptime)
+INT64_T chirp_alloc_getfile(const char *path, struct link *link, time_t stoptime)
 {
 	return cfs->getfile(path, link, stoptime);
 }
@@ -757,7 +757,8 @@ INT64_T chirp_alloc_mkdir(const char *path, INT64_T mode)
 
 INT64_T chirp_alloc_rmall(const char *path)
 {
-	if(!alloc_enabled) return cfs->rmall(path);
+	if(!alloc_enabled)
+		return cfs->rmall(path);
 
 	int result = chirp_alloc_unlink(path);
 	if(result == 0) {
@@ -924,7 +925,7 @@ INT64_T chirp_alloc_md5(const char *path, unsigned char digest[16])
 
 INT64_T chirp_alloc_setrep(const char *path, int nreps)
 {
-	return cfs->setrep(path,nreps);
+	return cfs->setrep(path, nreps);
 }
 
 INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total, INT64_T * inuse)
@@ -993,8 +994,8 @@ char *chirp_stat_string(struct chirp_stat *info)
 {
 	static char line[CHIRP_LINE_MAX];
 
-	sprintf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 ,  info->cst_dev,  info->cst_ino,  info->cst_mode,  info->cst_nlink,  info->cst_uid,  info->cst_gid,
-		 info->cst_rdev,  info->cst_size,  info->cst_blksize,  info->cst_blocks,  info->cst_atime,  info->cst_mtime,  info->cst_ctime);
+	sprintf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64, info->cst_dev, info->cst_ino, info->cst_mode, info->cst_nlink, info->cst_uid,
+		info->cst_gid, info->cst_rdev, info->cst_size, info->cst_blksize, info->cst_blocks, info->cst_atime, info->cst_mtime, info->cst_ctime);
 
 	return line;
 }
@@ -1003,72 +1004,72 @@ char *chirp_statfs_string(struct chirp_statfs *info)
 {
 	static char line[CHIRP_LINE_MAX];
 
-	sprintf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 ,  info->f_type,  info->f_bsize,  info->f_blocks,  info->f_bfree,  info->f_bavail,  info->f_files,  info->f_ffree);
+	sprintf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64, info->f_type, info->f_bsize, info->f_blocks, info->f_bfree, info->f_bavail, info->f_files, info->f_ffree);
 
 	return line;
 }
 
-INT64_T chirp_alloc_getxattr (const char *path, const char *name, void *data, size_t size)
+INT64_T chirp_alloc_getxattr(const char *path, const char *name, void *data, size_t size)
 {
 	return cfs->getxattr(path, name, data, size);
 }
 
-INT64_T chirp_alloc_fgetxattr (int fd, const char *name, void *data, size_t size)
+INT64_T chirp_alloc_fgetxattr(int fd, const char *name, void *data, size_t size)
 {
 	return cfs->fgetxattr(fd, name, data, size);
 }
 
-INT64_T chirp_alloc_lgetxattr (const char *path, const char *name, void *data, size_t size)
+INT64_T chirp_alloc_lgetxattr(const char *path, const char *name, void *data, size_t size)
 {
 	return cfs->lgetxattr(path, name, data, size);
 }
 
-INT64_T chirp_alloc_listxattr (const char *path, char *list, size_t size)
+INT64_T chirp_alloc_listxattr(const char *path, char *list, size_t size)
 {
 	return cfs->listxattr(path, list, size);
 }
 
-INT64_T chirp_alloc_flistxattr (int fd, char *list, size_t size)
+INT64_T chirp_alloc_flistxattr(int fd, char *list, size_t size)
 {
 	return cfs->flistxattr(fd, list, size);
 }
 
-INT64_T chirp_alloc_llistxattr (const char *path, char *list, size_t size)
+INT64_T chirp_alloc_llistxattr(const char *path, char *list, size_t size)
 {
 	return cfs->listxattr(path, list, size);
 }
 
-INT64_T chirp_alloc_setxattr (const char *path, const char *name, const void *data, size_t size, int flags)
+INT64_T chirp_alloc_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 	/* FIXME check allocated */
 	return cfs->setxattr(path, name, data, size, flags);
 }
 
-INT64_T chirp_alloc_fsetxattr (int fd, const char *name, const void *data, size_t size, int flags)
+INT64_T chirp_alloc_fsetxattr(int fd, const char *name, const void *data, size_t size, int flags)
 {
 	/* FIXME check allocated */
 	return cfs->fsetxattr(fd, name, data, size, flags);
 }
 
-INT64_T chirp_alloc_lsetxattr (const char *path, const char *name, const void *data, size_t size, int flags)
+INT64_T chirp_alloc_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 	/* FIXME check allocated */
 	return cfs->lsetxattr(path, name, data, size, flags);
 }
 
-INT64_T chirp_alloc_removexattr (const char *path, const char *name)
+INT64_T chirp_alloc_removexattr(const char *path, const char *name)
 {
 	/* FIXME check allocated */
 	return cfs->removexattr(path, name);
 }
 
-INT64_T chirp_alloc_fremovexattr (int fd, const char *name)
+INT64_T chirp_alloc_fremovexattr(int fd, const char *name)
 {
 	/* FIXME check allocated */
 	return cfs->fremovexattr(fd, name);
 }
 
-INT64_T chirp_alloc_lremovexattr (const char *path, const char *name)
+INT64_T chirp_alloc_lremovexattr(const char *path, const char *name)
 {
 	/* FIXME check allocated */
 	return cfs->lremovexattr(path, name);

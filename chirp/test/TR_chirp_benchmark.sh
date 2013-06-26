@@ -2,40 +2,32 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-TEST_FILE=chirp_benchmark.tmp
-PID_FILE=chirp_server.pid
-PORT_FILE=chirp_server.port
+chirp_debug=chirp.debug
+chirp_pid=chirp.pid
+chirp_port=chirp.port
+chirp_root=chirp.root
 
 prepare()
 {
-	rm -f $PORT_FILE	
-	../src/chirp_server -Z $PORT_FILE &
-	pid=$!
-	echo $pid > $PID_FILE
+	../src/chirp_server -r "$chirp_root" -I 127.0.0.1 -Z "$chirp_port" -b -B "$chirp_pid" -d all -o "$chirp_debug"
 
-	wait_for_file_creation $PORT_FILE 5
-
-	exit 0
+	wait_for_file_creation "$chirp_port" 5
+	wait_for_file_creation "$chirp_pid" 5
 }
 
 run()
 {
-    port=`cat $PORT_FILE`
-    exec ../src/chirp_benchmark localhost:$port $TEST_FILE 2 2 2
+	../src/chirp_benchmark localhost:`cat "$chirp_port"` foo 2 2 2
+	return $?
 }
 
 clean()
 {
-	if [ -f $PID_FILE ]
-	then
-		kill -9 `cat $PID_FILE`
+	if [ -r "$chirp_pid" ]; then
+		kill -9 `cat "$chirp_pid"`
 	fi
 
-    rm -f $TEST_FILE
-    rm -f $PID_FILE
-    rm -f $PORT_FILE
-    rm -f .__acl
-    exit 0
+	rm -rf "$chirp_debug" "$chirp_pid" "$chirp_port" "$chirp_root"
 }
 
 dispatch $@

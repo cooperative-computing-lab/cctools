@@ -152,8 +152,8 @@ static INT64_T get_stat_result(struct chirp_client *c, struct chirp_stat *info, 
 		return -1;
 	}
 
-	fields = sscanf(line, "%" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "\n", &info->cst_dev, &info->cst_ino, &info->cst_mode, &info->cst_nlink, &info->cst_uid, &info->cst_gid, &info->cst_rdev, &info->cst_size, &info->cst_blksize,
-			&info->cst_blocks, &info->cst_atime, &info->cst_mtime, &info->cst_ctime);
+	fields = sscanf(line, "%" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "\n", &info->cst_dev, &info->cst_ino, &info->cst_mode,
+			&info->cst_nlink, &info->cst_uid, &info->cst_gid, &info->cst_rdev, &info->cst_size, &info->cst_blksize, &info->cst_blocks, &info->cst_atime, &info->cst_mtime, &info->cst_ctime);
 
 	info->cst_dev = -1;
 	info->cst_rdev = 0;
@@ -203,7 +203,7 @@ static INT64_T get_result(struct chirp_client *c, time_t stoptime)
 		return -1;
 	}
 
-	fields = sscanf(line, "%" SCNd64 , &result);
+	fields = sscanf(line, "%" SCNd64, &result);
 	if(fields != 1) {
 		errno = ECONNRESET;
 		c->broken = 1;
@@ -284,14 +284,16 @@ struct chirp_client *chirp_client_connect_condor(time_t stoptime)
 	int result;
 
 	/*
-        Older versions of Condor use chirp.config.
-	Start with Condor V8.X the file is .chirp.config.
-	https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=3353
-	*/
+	   Older versions of Condor use chirp.config.
+	   Start with Condor V8.X the file is .chirp.config.
+	   https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=3353
+	 */
 
 	file = fopen("chirp.config", "r");
-	if(!file) file = fopen(".chirp.config","r");
-	if(!file) return 0;
+	if(!file)
+		file = fopen(".chirp.config", "r");
+	if(!file)
+		return 0;
 
 	fields = fscanf(file, "%s %d %s", host, &port, cookie);
 	fclose(file);
@@ -519,7 +521,7 @@ static int ticket_translate(const char *name, char *ticket_subject)
 		return 1;
 	}
 
-	char *pk = xxmalloc(65536); /* max size of public key */
+	char *pk = xxmalloc(65536);	/* max size of public key */
 	sprintf(command, "sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null", name);
 	FILE *pkf = popen(command, "r");
 	int length = fread(pk, sizeof(char), 65536, pkf);
@@ -745,7 +747,7 @@ INT64_T chirp_client_ticket_get(struct chirp_client * c, const char *name, char 
 				(*rights)[nrights * 2 + 2] = NULL;
 				(*rights)[nrights * 2 + 3] = NULL;
 				nrights++;
-			} else if(sscanf(line, "%" SCNd64 , &result) == 1 && result == 0) {
+			} else if(sscanf(line, "%" SCNd64, &result) == 1 && result == 0) {
 				break;
 			} else
 				goto failure;
@@ -1498,7 +1500,8 @@ INT64_T chirp_client_setrep(struct chirp_client * c, char const *path, int nreps
 
 INT64_T chirp_client_remote_debug(struct chirp_client * c, const char *flag, time_t stoptime)
 {
-	if(flag == NULL) flag = "*";
+	if(flag == NULL)
+		flag = "*";
 	return simple_command(c, stoptime, "debug %s\n", flag);
 }
 
@@ -1527,7 +1530,7 @@ INT64_T chirp_client_audit(struct chirp_client * c, const char *path, struct chi
 			errno = ECONNRESET;
 			break;
 		} else {
-			sscanf(line, "%s %" SCNd64 " %" SCNd64 " %" SCNd64 , entry->name, &entry->nfiles, &entry->ndirs, &entry->nbytes);
+			sscanf(line, "%s %" SCNd64 " %" SCNd64 " %" SCNd64, entry->name, &entry->nfiles, &entry->ndirs, &entry->nbytes);
 		}
 		entry++;
 	}
@@ -1553,7 +1556,7 @@ INT64_T chirp_client_lsalloc(struct chirp_client * c, char const *path, char *al
 	result = simple_command(c, stoptime, "lsalloc %s\n", safepath);
 	if(result == 0) {
 		if(link_readline(c->link, line, sizeof(line), stoptime)) {
-			sscanf(line, "%s %" SCNd64 " %" SCNd64 , allocpath, total, inuse);
+			sscanf(line, "%s %" SCNd64 " %" SCNd64, allocpath, total, inuse);
 		} else {
 			c->broken = 1;
 			errno = ECONNRESET;
@@ -1563,251 +1566,244 @@ INT64_T chirp_client_lsalloc(struct chirp_client * c, char const *path, char *al
 	return result;
 }
 
-CHIRP_SEARCH *chirp_client_opensearch(struct chirp_client *c, const char *path, const char *pattern, int flags, time_t stoptime) {
+CHIRP_SEARCH *chirp_client_opensearch(struct chirp_client * c, const char *path, const char *pattern, int flags, time_t stoptime)
+{
 	INT64_T result = simple_command(c, stoptime, "search %s %s %d\n", pattern, path, flags);
 
-	if (result == 0) {
+	if(result == 0) {
 		char line[CHIRP_LINE_MAX];
 		buffer_t *buffer;
+		size_t n = 0;
 
 		buffer = buffer_create();
-		while (link_readline(c->link, line, sizeof(line), stoptime) && line[0]) {
+		while(link_readline(c->link, line, sizeof(line), stoptime) && line[0]) {
 			buffer_printf(buffer, "%s", line);
+			n += strlen(line);
+		}
+		if(n == 0) {
+			buffer_printf(buffer, "");
 		}
 
 		CHIRP_SEARCH *result = malloc(sizeof(CHIRP_SEARCH));
-		result->entry = (struct chirp_searchent*) malloc(sizeof(struct chirp_searchent));
-		result->entry->info = NULL;
-		result->entry->path = NULL;
 		result->buffer = buffer;
-		result->data = buffer_tostring(buffer, NULL);
-		result->i = 0;
+		result->current = buffer_tostring(buffer, NULL);
 		return result;
-	} else 
-		return NULL;
-}
-
-static char *readsearch_next(const char *data, int *i) {
-	data += *i;
-	char *tail = strchr(data, ':');
-	ptrdiff_t length = (tail==NULL) ? (ptrdiff_t)strlen(data) : tail - data;
-
-	if (length==0) {
-		(*i)++;
+	} else {
 		return NULL;
 	}
-
-	char *next = malloc(length + 1);
-	strncpy(next, data, length);
-	next[length] = '\0';
-	*i += length + 1;
-
-	return next;
 }
 
-static struct chirp_stat *readsearch_unpack_stat(char *stat_str) {
-	if (stat_str==NULL) return NULL;
+static const char *search_readnext(const char *current, char **result)
+{
+	*result = NULL;
+	if(strlen(current)) {
+		ptrdiff_t length;
+		const char *tail = strchr(current, ':');
 
-	struct chirp_stat *info = (struct chirp_stat*) malloc(sizeof(struct chirp_stat));
-	sscanf(
-		stat_str,
-        "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " "
-        "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " "
-        "%" PRId64 " %" PRId64 " %" PRId64,
-		&info->cst_dev,
-		&info->cst_ino,
-		&info->cst_mode,
-		&info->cst_nlink,
-		&info->cst_uid,
-		&info->cst_gid,
-		&info->cst_rdev,
-		&info->cst_size,
-		&info->cst_atime,
-		&info->cst_mtime,
-		&info->cst_ctime,
-		&info->cst_blksize,
-		&info->cst_blocks
-	);
+		if(tail)
+			length = tail - current;
+		else
+			length = strlen(current);
 
-	free(stat_str);
-	return info;
+		*result = xxmalloc(length + 1);
+		strncpy(*result, current, length);
+		(*result)[length] = '\0';
+		return current + length + 1;
+	}
+	return NULL;
 }
 
-struct chirp_searchent *chirp_client_readsearch(CHIRP_SEARCH *search) {
-
-        int i = search->i;
-        const char *data = search->data;
-        char *err_str = readsearch_next(data, &i);
-        free(search->entry->path);
-        search->entry->path = NULL;
-        free(search->entry->info);
-        search->entry->info = NULL;
-
-        if (err_str==NULL) return NULL;
-
-        char *path;
-        struct chirp_stat *info;
-        int err = atoi(err_str), errsource;
-
-        if (err) {
-                errsource = atoi(readsearch_next(data, &i));
-                path = readsearch_next(data, &i);
-                info = NULL;
-        } else {
-                errsource = 0;
-                path = readsearch_next(data, &i);
-                info = readsearch_unpack_stat(readsearch_next(data, &i));
-        }
-
-        search->entry->path = path;
-        search->entry->info = info;
-        search->entry->errsource = errsource;
-        search->entry->err = err;
-        search->i = i;
-
-        return search->entry;
+static void search_unpackstat(const char *str, struct chirp_stat *info)
+{
+	sscanf(str, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " " "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " " "%" PRId64 " %" PRId64 " %" PRId64, &info->cst_dev, &info->cst_ino, &info->cst_mode, &info->cst_nlink,
+	       &info->cst_uid, &info->cst_gid, &info->cst_rdev, &info->cst_size, &info->cst_atime, &info->cst_mtime, &info->cst_ctime, &info->cst_blksize, &info->cst_blocks);
 }
 
-int chirp_client_closesearch(CHIRP_SEARCH *search) {
+struct chirp_searchent *chirp_client_readsearch(CHIRP_SEARCH * search)
+{
+	char *result;
+	const char *current = search_readnext(search->current, &result);
+
+	if(current && result) {
+		search->entry.err = atoi(result);
+		free(result);
+		if(search->entry.err) {
+			current = search_readnext(current, &result);
+			assert(current && result);
+			search->entry.errsource = atoi(result);
+			free(result);
+
+			current = search_readnext(current, &result);
+			assert(current && result);
+			memset(search->entry.path, 0, CHIRP_PATH_MAX);
+			strncpy(search->entry.path, result, CHIRP_PATH_MAX - 1);
+			free(result);
+
+			memset(&search->entry.info, 0, sizeof(search->entry.info));
+		} else {
+			search->entry.errsource = 0;
+
+			current = search_readnext(current, &result);
+			assert(current && result);
+			memset(search->entry.path, 0, CHIRP_PATH_MAX);
+			strncpy(search->entry.path, result, CHIRP_PATH_MAX - 1);
+			free(result);
+
+			current = search_readnext(current, &result);
+			assert(current && result);
+			memset(&search->entry.info, 0, sizeof(search->entry.info));
+			search_unpackstat(current, &search->entry.info);
+			free(result);
+		}
+		search->current = current;
+		return &search->entry;
+	}
+	return NULL;
+}
+
+int chirp_client_closesearch(CHIRP_SEARCH * search)
+{
 	buffer_delete(search->buffer);
-	free(search->entry);
 	free(search);
 	return 0;
 }
 
-INT64_T chirp_client_getxattr(struct chirp_client *c, const char *path, const char *name, void *data, size_t size, time_t stoptime)
+INT64_T chirp_client_getxattr(struct chirp_client * c, const char *path, const char *name, void *data, size_t size, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
 	url_encode(path, safepath, sizeof(safepath));
 	INT64_T result = send_command(c, stoptime, "getxattr %s %s\n", safepath, name);
-    if (result < 0)
-        return result;
+	if(result < 0)
+		return result;
 	result = get_result(c, stoptime);
-    if (result < 0) {
-		if (errno == EINVAL) errno = ENOATTR;
-        return result;
-	} else if (result > (int) size) {
+	if(result < 0) {
+		if(errno == EINVAL)
+			errno = ENOATTR;
+		return result;
+	} else if(result > (int) size) {
 		link_soak(c->link, result, stoptime);
-        errno = ERANGE;
-        return result;
-    }
+		errno = ERANGE;
+		return result;
+	}
 	if(!link_read(c->link, data, result, stoptime)) {
-        return -1;
-    }
-    return result;
+		return -1;
+	}
+	return result;
 }
 
-INT64_T chirp_client_fgetxattr(struct chirp_client *c, INT64_T fd, const char *name, void *data, size_t size, time_t stoptime)
+INT64_T chirp_client_fgetxattr(struct chirp_client * c, INT64_T fd, const char *name, void *data, size_t size, time_t stoptime)
 {
 	INT64_T result = send_command(c, stoptime, "fgetxattr %lld %s\n", fd, name);
-    if (result < 0)
-        return result;
+	if(result < 0)
+		return result;
 
 	result = get_result(c, stoptime);
-    if (result < 0) { 
-		if (errno == EINVAL) errno = ENOATTR;
-        return result;
-	} else if (result > (int) size) {
+	if(result < 0) {
+		if(errno == EINVAL)
+			errno = ENOATTR;
+		return result;
+	} else if(result > (int) size) {
 		link_soak(c->link, result, stoptime);
-        errno = ERANGE;
-        return result;
-    }
+		errno = ERANGE;
+		return result;
+	}
 	if(!link_read(c->link, data, result, stoptime)) {
-        return -1;
-    }
-    return result;
+		return -1;
+	}
+	return result;
 }
 
-INT64_T chirp_client_lgetxattr(struct chirp_client *c, const char *path, const char *name, void *data, size_t size, time_t stoptime)
+INT64_T chirp_client_lgetxattr(struct chirp_client * c, const char *path, const char *name, void *data, size_t size, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
 	url_encode(path, safepath, sizeof(safepath));
 	INT64_T result = send_command(c, stoptime, "lgetxattr %s %s\n", safepath, name);
-    if (result < 0)
-        return result;
+	if(result < 0)
+		return result;
 	result = get_result(c, stoptime);
-    if (result < 0) {
-		if (errno == EINVAL) errno = ENOATTR;
-        return result;
-	} else if (result > (int) size) {
+	if(result < 0) {
+		if(errno == EINVAL)
+			errno = ENOATTR;
+		return result;
+	} else if(result > (int) size) {
 		link_soak(c->link, result, stoptime);
-        errno = ERANGE;
-        return result;
-    }
+		errno = ERANGE;
+		return result;
+	}
 	if(!link_read(c->link, data, result, stoptime)) {
-        return -1;
-    }
-    return result;
+		return -1;
+	}
+	return result;
 }
 
-INT64_T chirp_client_listxattr(struct chirp_client *c, const char *path, char *list, size_t size, time_t stoptime)
+INT64_T chirp_client_listxattr(struct chirp_client * c, const char *path, char *list, size_t size, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
 	url_encode(path, safepath, sizeof(safepath));
 	INT64_T result = send_command(c, stoptime, "listxattr %s\n", safepath);
-    if (result < 0) 
-        return result;
+	if(result < 0)
+		return result;
 	result = get_result(c, stoptime);
-    if (result < 0) 
-        return result;
-    if (result > (int) size) {
+	if(result < 0)
+		return result;
+	if(result > (int) size) {
 		link_soak(c->link, result, stoptime);
-        errno = ERANGE;
-        return result;
-    }
+		errno = ERANGE;
+		return result;
+	}
 	if(!link_read(c->link, list, result, stoptime)) {
-        return -1;
-    }
-    return result;
+		return -1;
+	}
+	return result;
 }
 
-INT64_T chirp_client_flistxattr(struct chirp_client *c, INT64_T fd, char *list, size_t size, time_t stoptime)
+INT64_T chirp_client_flistxattr(struct chirp_client * c, INT64_T fd, char *list, size_t size, time_t stoptime)
 {
 	INT64_T result = send_command(c, stoptime, "flistxattr %lld\n", fd);
-    if (result < 0) 
-        return result;
+	if(result < 0)
+		return result;
 	result = get_result(c, stoptime);
-    if (result < 0) 
-        return result;
-    if (result > (int) size) {
+	if(result < 0)
+		return result;
+	if(result > (int) size) {
 		link_soak(c->link, result, stoptime);
-        errno = ERANGE;
-        return result;
-    }
+		errno = ERANGE;
+		return result;
+	}
 	if(!link_read(c->link, list, result, stoptime)) {
-        return -1;
-    }
-    return result;
+		return -1;
+	}
+	return result;
 }
 
-INT64_T chirp_client_llistxattr(struct chirp_client *c, const char *path, char *list, size_t size, time_t stoptime)
+INT64_T chirp_client_llistxattr(struct chirp_client * c, const char *path, char *list, size_t size, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
 	url_encode(path, safepath, sizeof(safepath));
 	INT64_T result = send_command(c, stoptime, "llistxattr %s\n", safepath);
-    if (result < 0) 
-        return result;
+	if(result < 0)
+		return result;
 	result = get_result(c, stoptime);
-    if (result < 0) 
-        return result;
-    if (result > (int) size) {
+	if(result < 0)
+		return result;
+	if(result > (int) size) {
 		link_soak(c->link, result, stoptime);
-        errno = ERANGE;
-        return result;
-    }
+		errno = ERANGE;
+		return result;
+	}
 	if(!link_read(c->link, list, result, stoptime)) {
-        return -1;
-    }
-    return result;
+		return -1;
+	}
+	return result;
 }
 
-INT64_T chirp_client_setxattr(struct chirp_client *c, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+INT64_T chirp_client_setxattr(struct chirp_client * c, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
 	url_encode(path, safepath, sizeof(safepath));
 	INT64_T result = send_command(c, stoptime, "setxattr %s %s %zu %d\n", safepath, name, size, flags);
-    if (result < 0)
-        return result;
+	if(result < 0)
+		return result;
 
 	result = link_putlstring(c->link, data, size, stoptime);
 	if(result != (int) size) {
@@ -1817,19 +1813,20 @@ INT64_T chirp_client_setxattr(struct chirp_client *c, const char *path, const ch
 	}
 
 	result = get_result(c, stoptime);
-    if (result < 0) {
-		if (errno == EINVAL) errno = ENOATTR;
-        return result;
+	if(result < 0) {
+		if(errno == EINVAL)
+			errno = ENOATTR;
+		return result;
 	}
 
-    return 0;
+	return 0;
 }
 
-INT64_T chirp_client_fsetxattr(struct chirp_client *c, INT64_T fd, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+INT64_T chirp_client_fsetxattr(struct chirp_client * c, INT64_T fd, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	INT64_T result = send_command(c, stoptime, "fsetxattr %s %s %zu %d\n", fd, name, size, flags);
-    if (result < 0) 
-        return result;
+	if(result < 0)
+		return result;
 
 	result = link_putlstring(c->link, data, size, stoptime);
 	if(result != (int) size) {
@@ -1839,21 +1836,22 @@ INT64_T chirp_client_fsetxattr(struct chirp_client *c, INT64_T fd, const char *n
 	}
 
 	result = get_result(c, stoptime);
-    if (result < 0) {
-		if (errno == EINVAL) errno = ENOATTR;
-        return result;
+	if(result < 0) {
+		if(errno == EINVAL)
+			errno = ENOATTR;
+		return result;
 	}
 
-    return 0;
+	return 0;
 }
 
-INT64_T chirp_client_lsetxattr(struct chirp_client *c, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+INT64_T chirp_client_lsetxattr(struct chirp_client * c, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
 	url_encode(path, safepath, sizeof(safepath));
 	INT64_T result = send_command(c, stoptime, "lsetxattr %s %s %zu %d\n", safepath, name, size, flags);
-    if (result < 0) 
-        return result;
+	if(result < 0)
+		return result;
 
 	result = link_putlstring(c->link, data, size, stoptime);
 	if(result != (int) size) {
@@ -1863,35 +1861,39 @@ INT64_T chirp_client_lsetxattr(struct chirp_client *c, const char *path, const c
 	}
 
 	result = get_result(c, stoptime);
-    if (result < 0) {
-		if (errno == EINVAL) errno = ENOATTR;
-        return result;
+	if(result < 0) {
+		if(errno == EINVAL)
+			errno = ENOATTR;
+		return result;
 	}
 
-    return 0;
+	return 0;
 }
 
-INT64_T chirp_client_removexattr(struct chirp_client *c, const char *path, const char *name, time_t stoptime)
+INT64_T chirp_client_removexattr(struct chirp_client * c, const char *path, const char *name, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
 	url_encode(path, safepath, sizeof(safepath));
 	INT64_T result = simple_command(c, stoptime, "removexattr %s %s\n", safepath, name);
-	if (result == -1 && errno == EINVAL) errno = ENOATTR;
+	if(result == -1 && errno == EINVAL)
+		errno = ENOATTR;
 	return result;
 }
 
-INT64_T chirp_client_fremovexattr(struct chirp_client *c, INT64_T fd, const char *name, time_t stoptime)
+INT64_T chirp_client_fremovexattr(struct chirp_client * c, INT64_T fd, const char *name, time_t stoptime)
 {
 	INT64_T result = simple_command(c, stoptime, "fremovexattr %lld %s\n", fd, name);
-	if (result == -1 && errno == EINVAL) errno = ENOATTR;
+	if(result == -1 && errno == EINVAL)
+		errno = ENOATTR;
 	return result;
 }
 
-INT64_T chirp_client_lremovexattr(struct chirp_client *c, const char *path, const char *name, time_t stoptime)
+INT64_T chirp_client_lremovexattr(struct chirp_client * c, const char *path, const char *name, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
 	url_encode(path, safepath, sizeof(safepath));
 	INT64_T result = simple_command(c, stoptime, "lremovexattr %s %s\n", safepath, name);
-	if (result == -1 && errno == EINVAL) errno = ENOATTR;
+	if(result == -1 && errno == EINVAL)
+		errno = ENOATTR;
 	return result;
 }

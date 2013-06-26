@@ -79,8 +79,8 @@ char *chirp_ticket_tostring(struct chirp_ticket *ct)
 	}
 
 	s = buffer_tostring(B, &n);
-	result = xxmalloc(n+1);
-    memset(result, 0, n+1);
+	result = xxmalloc(n + 1);
+	memset(result, 0, n + 1);
 	memcpy(result, s, n);
 
 	buffer_delete(B);
@@ -115,10 +115,10 @@ int chirp_ticket_read(const char *ticket, struct chirp_ticket *ct)
 	ct->nrights = 0;
 	ct->rights = NULL;
 	while(1) {
-		assert(buffer >= b && b+l >= buffer);
+		assert(buffer >= b && b + l >= buffer);
 		while(unsigned_isspace(*buffer))
 			buffer++;
-		assert(buffer >= b && b+l >= buffer);
+		assert(buffer >= b && b + l >= buffer);
 		if(strncmp(buffer, "subject", strlen("subject")) == 0) {
 			buffer += strlen("subject");
 			if(!readquote(&buffer, &s, &n))
@@ -185,17 +185,17 @@ void chirp_ticket_name(const char *pk, char *ticket_subject, char *ticket_filena
 	md5_update(&context, (const unsigned char *) pk, strlen(pk));
 	md5_final(digest, &context);
 	sprintf(ticket_subject, TICKET_SUBJECT_FORMAT, md5_string(digest));
-	sprintf(ticket_filename, "%s/"TICKET_FILENAME_FORMAT, chirp_ticket_path, md5_string(digest));
+	sprintf(ticket_filename, "%s/" TICKET_FILENAME_FORMAT, chirp_ticket_path, md5_string(digest));
 }
 
 void chirp_ticket_filename(char *ticket_filename, const char *ticket_subject, const char *digest)
 {
-	if (digest == NULL) {
+	if(digest == NULL) {
 		assert(ticket_subject);
 		int result = chirp_ticket_isticketsubject(ticket_subject, &digest);
 		assert(result);
 	}
-	sprintf(ticket_filename, "%s/"TICKET_FILENAME_FORMAT, chirp_ticket_path, digest);
+	sprintf(ticket_filename, "%s/" TICKET_FILENAME_FORMAT, chirp_ticket_path, digest);
 }
 
 void chirp_ticket_subject(char *ticket_subject, const char *ticket_filename)
@@ -239,5 +239,5 @@ const char *chirp_ticket_digest(const char *pk)
 	md5_init(&context);
 	md5_update(&context, (const unsigned char *) pk, strlen(pk));
 	md5_final(digest, &context);
-	return md5_string(digest); /* static memory */
+	return md5_string(digest);	/* static memory */
 }

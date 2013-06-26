@@ -4,18 +4,18 @@
 
 prepare()
 {
-    cd ../src/; make
-    exit 0
+	return 0
 }
 
 run()
 {
-    exec ../src/hmac_test
+	../src/someprog
+	return $?
 }
 
 clean()
 {
-    exit 0
+	return 0
 }
 
-dispatch $@
+dispatch "$@"

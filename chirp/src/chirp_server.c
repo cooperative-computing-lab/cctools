@@ -238,7 +238,7 @@ int update_one_catalog(void *catalog_host, const void *text)
 	return 1;
 }
 
-static int update_all_catalogs( const char *url )
+static int update_all_catalogs(const char *url)
 {
 	struct chirp_statfs info;
 	struct utsname name;
@@ -264,8 +264,9 @@ static int update_all_catalogs( const char *url )
 	memory_info_get(&memory_avail, &memory_total);
 
 	length = sprintf(text,
-			 "type chirp\nversion %d.%d.%s\nurl chirp://%s:%d\nname %s\nowner %s\ntotal %" PRIu64 "\navail %" PRIu64 "\nstarttime %lu\nport %d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nminfree %" PRIu64 "\nmemory_total %" PRIu64 "\nmemory_avail %" PRIu64 "\ncpus %d\nbackend %s\n",
-			 CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, chirp_owner, info.f_blocks * info.f_bsize, info.f_bavail * info.f_bsize, (unsigned long) starttime, port, name.machine, name.sysname, name.release, avg[0], avg[1], avg[2], minimum_space_free, memory_total, memory_avail, cpus, url);
+			 "type chirp\nversion %d.%d.%s\nurl chirp://%s:%d\nname %s\nowner %s\ntotal %" PRIu64 "\navail %" PRIu64 "\nstarttime %lu\nport %d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nminfree %" PRIu64
+			 "\nmemory_total %" PRIu64 "\nmemory_avail %" PRIu64 "\ncpus %d\nbackend %s\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, chirp_owner, info.f_blocks * info.f_bsize,
+			 info.f_bavail * info.f_bsize, (unsigned long) starttime, port, name.machine, name.sysname, name.release, avg[0], avg[1], avg[2], minimum_space_free, memory_total, memory_avail, cpus, url);
 
 	chirp_stats_summary(&text[length], DATAGRAM_PAYLOAD_MAX - length);
 	list_iterate(catalog_host_list, update_one_catalog, text);
@@ -273,28 +274,32 @@ static int update_all_catalogs( const char *url )
 	return 0;
 }
 
-static int backend_setup( const char *url )
+static int backend_setup(const char *url)
 {
 	const char *root_path;
 
 	root_path = cfs->init(url);
-	if(!root_path) fatal("couldn't initialize %s",url);
+	if(!root_path)
+		fatal("couldn't initialize %s", url);
 
-	int result = cfs_create_dir(root_path,0711);
-	if(!result) fatal("couldn't create root directory %s: %s",root_path,strerror(errno));
+	int result = cfs_create_dir(root_path, 0711);
+	if(!result)
+		fatal("couldn't create root directory %s: %s", root_path, strerror(errno));
 
 	chirp_acl_init_root(root_path);
 
 	result = cfs->chdir(root_path);
-	if(result<0) fatal("couldn't move to %s: %s",root_path,strerror(errno));
+	if(result < 0)
+		fatal("couldn't move to %s: %s", root_path, strerror(errno));
 
 	return 0;
 }
 
-static int gc_tickets( const char *url )
+static int gc_tickets(const char *url)
 {
-	const char * path = cfs->init(url);
-	if(!path) fatal("couldn't initialize %s",url);
+	const char *path = cfs->init(url);
+	if(!path)
+		fatal("couldn't initialize %s", url);
 
 	chirp_ticket_path = path;
 
@@ -303,26 +308,27 @@ static int gc_tickets( const char *url )
 	return 0;
 }
 
-static int run_in_child_process( int (*func) ( const char *a ), const char *args, const char *name )
+static int run_in_child_process(int (*func) (const char *a), const char *args, const char *name)
 {
-	debug(D_PROCESS,"*** %s starting ***",name);
+	debug(D_PROCESS, "*** %s starting ***", name);
 
 	pid_t pid = fork();
-	if(pid==0) {
+	if(pid == 0) {
 		_exit(func(args));
-	} else if(pid>0) {
+	} else if(pid > 0) {
 		int status;
-		while(waitpid(pid,&status,0)!=pid) { }
-		debug(D_PROCESS,"*** %s complete ***",name);
+		while(waitpid(pid, &status, 0) != pid) {
+		}
+		debug(D_PROCESS, "*** %s complete ***", name);
 		if(WIFEXITED(status)) {
 			return WEXITSTATUS(status);
 		} else {
 			return -1;
 		}
 	} else {
-		debug(D_PROCESS,"couldn't fork: %s",strerror(errno));
+		debug(D_PROCESS, "couldn't fork: %s", strerror(errno));
 		return -1;
-	}		
+	}
 }
 
 /*
@@ -335,7 +341,7 @@ are atomic, so here we expect a read to return one or
 more complete messages, each delimited by a newline.
 */
 
-static void config_pipe_handler( int fd )
+static void config_pipe_handler(int fd)
 {
 	char line[PIPE_BUF];
 	char flag[PIPE_BUF];
@@ -344,25 +350,26 @@ static void config_pipe_handler( int fd )
 	UINT64_T ops, bytes_read, bytes_written;
 
 	while(1) {
-		fcntl(fd,F_SETFL,O_NONBLOCK);
+		fcntl(fd, F_SETFL, O_NONBLOCK);
 
-		int length = read(fd,line,PIPE_BUF);
-		if(length<=0) return;
+		int length = read(fd, line, PIPE_BUF);
+		if(length <= 0)
+			return;
 
 		line[length] = 0;
 
-		const char *msg = strtok(line,"\n");
+		const char *msg = strtok(line, "\n");
 		while(msg) {
-			debug(D_DEBUG,"config message: %s",msg);
+			debug(D_DEBUG, "config message: %s", msg);
 
-			if(sscanf(msg,"debug %s",flag)==1) {
+			if(sscanf(msg, "debug %s", flag) == 1) {
 				debug_flags_set(flag);
-			} else if(sscanf(msg,"stats %s %s %" SCNu64 " %" SCNu64 " %" SCNu64 ,address,subject,&ops,&bytes_read,&bytes_written)==5) {
-				chirp_stats_collect(address,subject,ops,bytes_read,bytes_written);
+			} else if(sscanf(msg, "stats %s %s %" SCNu64 " %" SCNu64 " %" SCNu64, address, subject, &ops, &bytes_read, &bytes_written) == 5) {
+				chirp_stats_collect(address, subject, ops, bytes_read, bytes_written);
 			} else {
-				debug(D_NOTICE,"bad config message: %s\n",msg);
+				debug(D_NOTICE, "bad config message: %s\n", msg);
 			}
-			msg = strtok(0,"\n");
+			msg = strtok(0, "\n");
 		}
 	}
 }
@@ -403,7 +410,7 @@ static struct option long_options[] = {
 	{"unix-timeout", required_argument, 0, 'z'},
 	{"user", required_argument, 0, 'i'},
 	{"version", no_argument, 0, 'v'},
-    {0,0,0,0}
+	{0, 0, 0, 0}
 };
 
 int main(int argc, char *argv[])
@@ -527,7 +534,7 @@ int main(int argc, char *argv[])
 		case 'z':
 			auth_unix_timeout_set(atoi(optarg));
 			break;
-	    case 'Z':
+		case 'Z':
 			port_file = optarg;
 			port = 0;
 			break;
@@ -542,7 +549,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(is_daemon) daemonize(0, pidfile); /* don't chdir to "/" */
+	if(is_daemon)
+		daemonize(0, pidfile);	/* don't chdir to "/" */
 
 	/* Ensure that all files are created private by default (again because of daemonize). */
 	umask(0077);
@@ -553,17 +561,17 @@ int main(int argc, char *argv[])
 	cctools_version_debug(D_DEBUG, argv[0]);
 
 	/* if chirp_transient_path is NULL, use CWD */
-	if(chirp_transient_path == NULL){
+	if(chirp_transient_path == NULL) {
 		chirp_transient_path = realloc(chirp_transient_path, 8192);
-		if(getcwd(chirp_transient_path, 8192) == NULL){
+		if(getcwd(chirp_transient_path, 8192) == NULL) {
 			fatal("could not get current working directory: %s", strerror(errno));
 		}
 	} else if(!create_dir(chirp_transient_path, S_IRWXU)) {
 		fatal("could not create transient data directory '%s': %s", chirp_transient_path, strerror(errno));
 	}
 
-	if(pipe(config_pipe)<0)
-		fatal("could not create internal pipe: %s",strerror(errno));
+	if(pipe(config_pipe) < 0)
+		fatal("could not create internal pipe: %s", strerror(errno));
 
 	if(dont_dump_core) {
 		struct rlimit rl;
@@ -586,8 +594,8 @@ int main(int argc, char *argv[])
 
 	cfs = cfs_lookup(chirp_root_url);
 
-	if(run_in_child_process(backend_setup,chirp_root_url,"backend setup")!=0) {
-		fatal("couldn't setup %s",chirp_root_url);
+	if(run_in_child_process(backend_setup, chirp_root_url, "backend setup") != 0) {
+		fatal("couldn't setup %s", chirp_root_url);
 	}
 
 	if(!list_size(catalog_host_list)) {
@@ -603,7 +611,8 @@ int main(int argc, char *argv[])
 			exit(1);
 		} else {
 			struct passwd *p = getpwnam(safe_username);
-			if(!p) fatal("unknown user: %s", safe_username);
+			if(!p)
+				fatal("unknown user: %s", safe_username);
 			safe_uid = p->pw_uid;
 			safe_gid = p->pw_gid;
 		}
@@ -625,7 +634,7 @@ int main(int argc, char *argv[])
 
 	link_address_local(link, address, &port);
 
-	debug(D_DEBUG,"now listening port on port %d\n",port);
+	debug(D_DEBUG, "now listening port on port %d\n", port);
 
 	if(port_file)
 		opts_write_port_file(port_file, port);
@@ -659,19 +668,19 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		while((pid = waitpid(-1,0,WNOHANG))>0) {
-			debug(D_PROCESS,"pid %d completed (%d total child procs)",pid,total_child_procs);
+		while((pid = waitpid(-1, 0, WNOHANG)) > 0) {
+			debug(D_PROCESS, "pid %d completed (%d total child procs)", pid, total_child_procs);
 			total_child_procs--;
 		}
 
 		if(time(0) >= advertise_alarm) {
-			run_in_child_process(update_all_catalogs,chirp_root_url,"catalog update");
+			run_in_child_process(update_all_catalogs, chirp_root_url, "catalog update");
 			advertise_alarm = time(0) + advertise_timeout;
 			chirp_stats_cleanup();
 		}
 
 		if(time(0) >= gc_alarm) {
-			run_in_child_process(gc_tickets,chirp_root_url,"ticket cleanup");
+			run_in_child_process(gc_tickets, chirp_root_url, "ticket cleanup");
 			gc_alarm = time(0) + gc_timeout;
 		}
 
@@ -680,31 +689,33 @@ int main(int argc, char *argv[])
 
 		fd_set rfds;
 		FD_ZERO(&rfds);
-		FD_SET(config_pipe[0],&rfds);
-		if(max_child_procs==0 || total_child_procs < max_child_procs) {
-			FD_SET(link_fd(link),&rfds);
+		FD_SET(config_pipe[0], &rfds);
+		if(max_child_procs == 0 || total_child_procs < max_child_procs) {
+			FD_SET(link_fd(link), &rfds);
 		}
-		int maxfd = MAX(link_fd(link),config_pipe[0]) + 1;
+		int maxfd = MAX(link_fd(link), config_pipe[0]) + 1;
 
 		/* Sleep for the minimum of any periodic timers, but don't go negative. */
 
 		struct timeval timeout;
 		time_t current = time(0);
 		timeout.tv_usec = 0;
-		timeout.tv_sec = advertise_alarm-current;
-		timeout.tv_sec = MIN(timeout.tv_sec,gc_alarm-current);
-		timeout.tv_sec = MIN(timeout.tv_sec,parent_check_timeout);
-		timeout.tv_sec = MAX(0,timeout.tv_sec);
+		timeout.tv_sec = advertise_alarm - current;
+		timeout.tv_sec = MIN(timeout.tv_sec, gc_alarm - current);
+		timeout.tv_sec = MIN(timeout.tv_sec, parent_check_timeout);
+		timeout.tv_sec = MAX(0, timeout.tv_sec);
 
 		/* Wait for activity on the listening port or the config pipe */
 
-		if(select(maxfd,&rfds,0,0,&timeout)<0) continue;
+		if(select(maxfd, &rfds, 0, 0, &timeout) < 0)
+			continue;
 
 		/* If the network port is active, accept the connection and fork the handler. */
 
-		if(FD_ISSET(link_fd(link),&rfds)) {
-			l = link_accept(link, time(0) + 5 );
-			if(!l) continue;
+		if(FD_ISSET(link_fd(link), &rfds)) {
+			l = link_accept(link, time(0) + 5);
+			if(!l)
+				continue;
 
 			link_address_remote(l, addr, &port);
 
@@ -723,7 +734,7 @@ int main(int argc, char *argv[])
 
 		/* If the config pipe is active, read and process those messages. */
 
-		if(FD_ISSET(config_pipe[0],&rfds)) {
+		if(FD_ISSET(config_pipe[0], &rfds)) {
 			config_pipe_handler(config_pipe[0]);
 		}
 	}
@@ -790,7 +801,7 @@ static void chirp_receive(struct link *link)
 
 		chirp_handler(link, addr, typesubject);
 		chirp_alloc_flush();
-		chirp_stats_report(config_pipe[1],addr,typesubject,0);
+		chirp_stats_report(config_pipe[1], addr, typesubject, 0);
 
 		debug(D_LOGIN, "disconnected");
 	} else {
@@ -814,7 +825,7 @@ static int chirp_path_fix(char *path)
 	url_decode(path, decodepath, sizeof(decodepath));
 
 	// Collapse dots, double dots, and the like:
-	string_collapse_path(decodepath,shortpath,1);
+	string_collapse_path(decodepath, shortpath, 1);
 
 	// Add the current directory to the root (backend file system changes directory to the root)
 	sprintf(rootpath, "./%s", shortpath);
@@ -840,7 +851,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 	char line[CHIRP_LINE_MAX];
 	char *esubject;
 
-	if(!chirp_acl_whoami( subject, &esubject))
+	if(!chirp_acl_whoami(subject, &esubject))
 		return;
 
 	link_tune(l, LINK_TUNE_INTERACTIVE);
@@ -899,12 +910,12 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		if(line[0] == 4)
 			break;
 
-		chirp_stats_report(config_pipe[1],addr,subject,advertise_alarm);
+		chirp_stats_report(config_pipe[1], addr, subject, advertise_alarm);
 
-		chirp_stats_update(1,0,0);
+		chirp_stats_update(1, 0, 0);
 
 		// Simulate network latency
-		if (sim_latency > 0) {
+		if(sim_latency > 0) {
 			struct timeval tv;
 			tv.tv_sec = 0;
 			tv.tv_usec = sim_latency;
@@ -913,14 +924,14 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 
 		debug(D_CHIRP, "%s", line);
 
-		if(sscanf(line, "pread %" SCNd64 " %" SCNd64 " %" SCNd64 , &fd, &length, &offset) == 3) {
+		if(sscanf(line, "pread %" SCNd64 " %" SCNd64 " %" SCNd64, &fd, &length, &offset) == 3) {
 			length = MIN(length, MAX_BUFFER_SIZE);
 			dataout = malloc(length);
 			if(dataout) {
 				result = chirp_alloc_pread(fd, dataout, length, offset);
 				if(result >= 0) {
 					dataoutlength = result;
-					chirp_stats_update(0,result,0);
+					chirp_stats_update(0, result, 0);
 				} else {
 					free(dataout);
 					dataout = 0;
@@ -928,14 +939,14 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			} else {
 				errno = ENOMEM;
 			}
-		} else if(sscanf(line, "sread %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 , &fd, &length, &stride_length, &stride_skip, &offset) == 5) {
+		} else if(sscanf(line, "sread %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64, &fd, &length, &stride_length, &stride_skip, &offset) == 5) {
 			length = MIN(length, MAX_BUFFER_SIZE);
 			dataout = malloc(length);
 			if(dataout) {
 				result = chirp_alloc_sread(fd, dataout, length, stride_length, stride_skip, offset);
 				if(result >= 0) {
 					dataoutlength = result;
-					chirp_stats_update(0,result,0);
+					chirp_stats_update(0, result, 0);
 				} else {
 					free(dataout);
 					dataout = 0;
@@ -943,7 +954,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			} else {
 				errno = ENOMEM;
 			}
-		} else if(sscanf(line, "pwrite %" SCNd64 " %" SCNd64 " %" SCNd64 , &fd, &length, &offset) == 3) {
+		} else if(sscanf(line, "pwrite %" SCNd64 " %" SCNd64 " %" SCNd64, &fd, &length, &offset) == 3) {
 			INT64_T orig_length = length;
 			length = MIN(length, MAX_BUFFER_SIZE);
 			char *data = malloc(length);
@@ -962,7 +973,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				link_soak(l, (orig_length - length), stalltime);
 				free(data);
 				if(result > 0) {
-					chirp_stats_update(0,0,result);
+					chirp_stats_update(0, 0, result);
 				}
 			} else {
 				link_soak(l, orig_length, stalltime);
@@ -970,7 +981,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				errno = ENOMEM;
 				break;
 			}
-		} else if(sscanf(line, "swrite %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 , &fd, &length, &stride_length, &stride_skip, &offset) == 5) {
+		} else if(sscanf(line, "swrite %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64, &fd, &length, &stride_length, &stride_skip, &offset) == 5) {
 			INT64_T orig_length = length;
 			length = MIN(length, MAX_BUFFER_SIZE);
 			char *data = malloc(length);
@@ -989,7 +1000,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				link_soak(l, (orig_length - length), stalltime);
 				free(data);
 				if(result > 0) {
-					chirp_stats_update(0,0,result);
+					chirp_stats_update(0, 0, result);
 				}
 			} else {
 				link_soak(l, orig_length, stalltime);
@@ -997,7 +1008,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				errno = ENOMEM;
 				break;
 			}
-		} else if(sscanf(line, "whoami %" SCNd64 , &length) == 1) {
+		} else if(sscanf(line, "whoami %" SCNd64, &length) == 1) {
 			if((int) strlen(esubject) < length)
 				length = strlen(esubject);
 			dataout = malloc(length);
@@ -1008,7 +1019,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			} else {
 				result = -1;
 			}
-		} else if(sscanf(line, "whoareyou %s %" SCNd64 , hostname, &length) == 2) {
+		} else if(sscanf(line, "whoareyou %s %" SCNd64, hostname, &length) == 2) {
 			result = chirp_reli_whoami(hostname, newsubject, sizeof(newsubject), idletime);
 			if(result > 0) {
 				if(result > length)
@@ -1024,7 +1035,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			} else {
 				result = -1;
 			}
-		} else if(sscanf(line, "readlink %s %" SCNd64 , path, &length) == 2) {
+		} else if(sscanf(line, "readlink %s %" SCNd64, path, &length) == 2) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			if(!chirp_acl_check_link(path, subject, CHIRP_ACL_READ))
@@ -1057,7 +1068,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				while((d = chirp_alloc_readdir(dir))) {
 					if(!strncmp(d->name, ".__", 3))
 						continue;
-					link_putfstring(l, "%s\n%s\n", stalltime, d->name, chirp_stat_string(&d->info) );
+					link_putfstring(l, "%s\n%s\n", stalltime, d->name, chirp_stat_string(&d->info));
 				}
 				chirp_alloc_closedir(dir);
 				do_getdir_result = 1;
@@ -1126,9 +1137,9 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 
 			if(result >= 0) {
 				do_no_result = 1;
-				chirp_stats_update(0,length,0);
+				chirp_stats_update(0, length, 0);
 			}
-		} else if(sscanf(line, "putfile %s %" SCNd64 " %" SCNd64 , path, &mode, &length) == 3) {
+		} else if(sscanf(line, "putfile %s %" SCNd64 " %" SCNd64, path, &mode, &length) == 3) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			if(!cfs_isnotdir(path))
@@ -1153,7 +1164,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 
 			result = chirp_alloc_putfile(path, l, length, mode, stalltime);
 			if(result >= 0) {
-				chirp_stats_update(0,0,length);
+				chirp_stats_update(0, 0, length);
 			}
 		} else if(sscanf(line, "getstream %s", path) == 1) {
 			if(!chirp_path_fix(path))
@@ -1165,7 +1176,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 
 			result = chirp_alloc_getstream(path, l, stalltime);
 			if(result >= 0) {
-				chirp_stats_update(0,length,0);
+				chirp_stats_update(0, length, 0);
 				debug(D_CHIRP, "= %" SCNd64 " bytes streamed\n", result);
 				/* getstream indicates end by closing the connection */
 				break;
@@ -1193,7 +1204,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 
 			result = chirp_alloc_putstream(path, l, stalltime);
 			if(result >= 0) {
-				chirp_stats_update(0,0,length);
+				chirp_stats_update(0, 0, length);
 				debug(D_CHIRP, "= %" SCNd64 " bytes streamed\n", result);
 				/* putstream getstream indicates end by closing the connection */
 				break;
@@ -1208,7 +1219,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 
 			result = chirp_thirdput(subject, path, hostname, newpath, stalltime);
 
-		} else if(sscanf(line, "open %s %s %" SCNd64 , path, newpath, &mode) == 3) {
+		} else if(sscanf(line, "open %s %s %" SCNd64, path, newpath, &mode) == 3) {
 			flags = 0;
 
 			if(strchr(newpath, 'r')) {
@@ -1279,21 +1290,21 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			}
 
 
-		} else if(sscanf(line, "close %" SCNd64 , &fd) == 1) {
+		} else if(sscanf(line, "close %" SCNd64, &fd) == 1) {
 			result = chirp_alloc_close(fd);
-		} else if(sscanf(line, "fchmod %" SCNd64 " %" SCNd64 , &fd, &mode) == 2) {
+		} else if(sscanf(line, "fchmod %" SCNd64 " %" SCNd64, &fd, &mode) == 2) {
 			result = chirp_alloc_fchmod(fd, mode);
-		} else if(sscanf(line, "fchown %" SCNd64 " %" SCNd64 " %" SCNd64 , &fd, &uid, &gid) == 3) {
+		} else if(sscanf(line, "fchown %" SCNd64 " %" SCNd64 " %" SCNd64, &fd, &uid, &gid) == 3) {
 			result = 0;
-		} else if(sscanf(line, "fsync %" SCNd64 , &fd) == 1) {
+		} else if(sscanf(line, "fsync %" SCNd64, &fd) == 1) {
 			result = chirp_alloc_fsync(fd);
-		} else if(sscanf(line, "ftruncate %" SCNd64 " %" SCNd64 , &fd, &length) == 2) {
+		} else if(sscanf(line, "ftruncate %" SCNd64 " %" SCNd64, &fd, &length) == 2) {
 			result = chirp_alloc_ftruncate(fd, length);
 		} else if(sscanf(line, "fgetxattr %" SCNd64 " %s", &fd, xattrname) == 2) {
 			dataout = malloc(MAX_BUFFER_SIZE);
 			if(dataout) {
 				result = chirp_alloc_fgetxattr(fd, xattrname, dataout, MAX_BUFFER_SIZE);
-				if (result > 0) {
+				if(result > 0) {
 					dataoutlength = result;
 				} else {
 					assert(result == -1);
@@ -1304,11 +1315,11 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				errno = ENOMEM;
 				goto failure;
 			}
-		} else if(sscanf(line, "flistxattr %" SCNd64 , &fd) == 1) {
+		} else if(sscanf(line, "flistxattr %" SCNd64, &fd) == 1) {
 			dataout = malloc(MAX_BUFFER_SIZE);
 			if(dataout) {
 				result = chirp_alloc_flistxattr(fd, dataout, MAX_BUFFER_SIZE);
-				if (result >= 0) {
+				if(result >= 0) {
 					dataoutlength = result;
 				} else {
 					assert(result == -1);
@@ -1339,7 +1350,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				}
 				free(data);
 				if(result > 0) {
-					chirp_stats_update(0,0,result);
+					chirp_stats_update(0, 0, result);
 				}
 			} else {
 				link_soak(l, xattrsize, stalltime);
@@ -1357,19 +1368,19 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			} else {
 				goto failure;
 			}
-		} else if(sscanf(line, "access %s %" SCNd64 , path, &flags) == 2) {
+		} else if(sscanf(line, "access %s %" SCNd64, path, &flags) == 2) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			int chirp_flags = chirp_acl_from_access_flags(flags);
 			/* If filename is a directory, then we change execute flags to list flags. */
 			if(cfs_isdir(path) && (chirp_flags & CHIRP_ACL_EXECUTE)) {
-				chirp_flags ^= CHIRP_ACL_EXECUTE; /* remove execute flag */
-				chirp_flags |= CHIRP_ACL_LIST; /* change to list */
+				chirp_flags ^= CHIRP_ACL_EXECUTE;	/* remove execute flag */
+				chirp_flags |= CHIRP_ACL_LIST;	/* change to list */
 			}
 			if(!chirp_acl_check(path, subject, chirp_flags))
 				goto failure;
 			result = chirp_alloc_access(path, flags);
-		} else if(sscanf(line, "chmod %s %" SCNd64 , path, &mode) == 2) {
+		} else if(sscanf(line, "chmod %s %" SCNd64, path, &mode) == 2) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			if(chirp_acl_check_dir(path, subject, CHIRP_ACL_WRITE) || chirp_acl_check(path, subject, CHIRP_ACL_WRITE)) {
@@ -1377,19 +1388,19 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			} else {
 				goto failure;
 			}
-		} else if(sscanf(line, "chown %s %" SCNd64 " %" SCNd64 , path, &uid, &gid) == 3) {
+		} else if(sscanf(line, "chown %s %" SCNd64 " %" SCNd64, path, &uid, &gid) == 3) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = 0;
-		} else if(sscanf(line, "lchown %s %" SCNd64 " %" SCNd64 , path, &uid, &gid) == 3) {
+		} else if(sscanf(line, "lchown %s %" SCNd64 " %" SCNd64, path, &uid, &gid) == 3) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = 0;
-		} else if(sscanf(line, "truncate %s %" SCNd64 , path, &length) == 2) {
+		} else if(sscanf(line, "truncate %s %" SCNd64, path, &length) == 2) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
@@ -1413,7 +1424,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			dataout = malloc(MAX_BUFFER_SIZE);
 			if(dataout) {
 				result = chirp_alloc_getxattr(path, xattrname, dataout, MAX_BUFFER_SIZE);
-				if (result > 0) {
+				if(result > 0) {
 					dataoutlength = result;
 				} else {
 					assert(result == -1);
@@ -1432,7 +1443,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			dataout = malloc(MAX_BUFFER_SIZE);
 			if(dataout) {
 				result = chirp_alloc_lgetxattr(path, xattrname, dataout, MAX_BUFFER_SIZE);
-				if (result > 0) {
+				if(result > 0) {
 					dataoutlength = result;
 				} else {
 					assert(result == -1);
@@ -1451,7 +1462,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			dataout = malloc(MAX_BUFFER_SIZE);
 			if(dataout) {
 				result = chirp_alloc_listxattr(path, dataout, MAX_BUFFER_SIZE);
-				if (result >= 0) {
+				if(result >= 0) {
 					dataoutlength = result;
 				} else {
 					assert(result == -1);
@@ -1470,7 +1481,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			dataout = malloc(MAX_BUFFER_SIZE);
 			if(dataout) {
 				result = chirp_alloc_llistxattr(path, dataout, MAX_BUFFER_SIZE);
-				if (result >= 0) {
+				if(result >= 0) {
 					dataoutlength = result;
 				} else {
 					assert(result == -1);
@@ -1505,7 +1516,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				}
 				free(data);
 				if(result > 0) {
-					chirp_stats_update(0,0,result);
+					chirp_stats_update(0, 0, result);
 				}
 			} else {
 				link_soak(l, xattrsize, stalltime);
@@ -1536,7 +1547,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				}
 				free(data);
 				if(result > 0) {
-					chirp_stats_update(0,0,result);
+					chirp_stats_update(0, 0, result);
 				}
 			} else {
 				link_soak(l, xattrsize, stalltime);
@@ -1586,7 +1597,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if(!chirp_acl_check_dir(path, subject, CHIRP_ACL_ADMIN))
 				goto failure;
 			result = chirp_acl_set(path, subject, chirp_acl_text_to_flags(newacl) | CHIRP_ACL_ADMIN, 1);
-		} else if(sscanf(line, "ticket_register %s %s %" SCNd64 , newsubject, duration, &length) == 3) {
+		} else if(sscanf(line, "ticket_register %s %s %" SCNd64, newsubject, duration, &length) == 3) {
 			char *ticket;
 			ticket = malloc(length + 1);	/* room for NUL terminator */
 			if(ticket) {
@@ -1655,7 +1666,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				}
 				free(ticket_subjects);
 			}
-		} else if(sscanf(line, "mkdir %s %" SCNd64 , path, &mode) == 2) {
+		} else if(sscanf(line, "mkdir %s %" SCNd64, path, &mode) == 2) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			if(chirp_acl_check(path, subject, CHIRP_ACL_RESERVE)) {
@@ -1703,16 +1714,16 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			} else {
 				goto failure;
 			}
-		} else if(sscanf(line, "utime %s %" SCNd64 " %" SCNd64 , path, &actime, &modtime) == 3) {
+		} else if(sscanf(line, "utime %s %" SCNd64 " %" SCNd64, path, &actime, &modtime) == 3) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = chirp_alloc_utime(path, actime, modtime);
-		} else if(sscanf(line, "fstat %" SCNd64 , &fd) == 1) {
+		} else if(sscanf(line, "fstat %" SCNd64, &fd) == 1) {
 			result = chirp_alloc_fstat(fd, &statbuf);
 			do_stat_result = 1;
-		} else if(sscanf(line, "fstatfs %" SCNd64 , &fd) == 1) {
+		} else if(sscanf(line, "fstatfs %" SCNd64, &fd) == 1) {
 			result = chirp_alloc_fstatfs(fd, &statfsbuf);
 			do_statfs_result = 1;
 		} else if(sscanf(line, "statfs %s", path) == 1) {
@@ -1746,7 +1757,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				link_putfstring(l, "0\n%s %" SCNd64 " %" SCNd64 "\n", stalltime, &newpath[strlen(chirp_root_path) + 1], size, inuse);
 				do_no_result = 1;
 			}
-		} else if(sscanf(line, "mkalloc %s %" SCNd64 " %" SCNd64 , path, &size, &mode) == 3) {
+		} else if(sscanf(line, "mkalloc %s %" SCNd64 " %" SCNd64, path, &size, &mode) == 3) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			if(chirp_acl_check(path, subject, CHIRP_ACL_RESERVE)) {
@@ -1821,12 +1832,12 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			} else {
 				result = errno_to_chirp(errno);
 			}
-		} else if(sscanf(line, "setrep %s %d", path, &nreps)==2) {
+		} else if(sscanf(line, "setrep %s %d", path, &nreps) == 2) {
 			if(!chirp_path_fix(path))
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
-			result = chirp_alloc_setrep(path,nreps);
+			result = chirp_alloc_setrep(path, nreps);
 		} else if(sscanf(line, "debug %s", debug_flag) == 1) {
 			if(strcmp(esubject, chirp_super_user) != 0) {
 				errno = EPERM;
@@ -1834,20 +1845,22 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			}
 			result = 0;
 			// send this message to the parent for processing.
-			strcat(line,"\n");
-			write(config_pipe[1],line,strlen(line));
+			strcat(line, "\n");
+			write(config_pipe[1], line, strlen(line));
 			debug_flags_set(debug_flag);
-		} else if(sscanf(line, "search %s %s %" PRId64, pattern, path, &flags)==3) {
+		} else if(sscanf(line, "search %s %s %" PRId64, pattern, path, &flags) == 3) {
 			link_putliteral(l, "0\n", stalltime);
-			char fixed[CHIRP_PATH_MAX];
-			char *ps = path, *pe;
-	
-			for (;;) {
-				if((pe = strchr(ps, CHIRP_SEARCH_DELIMITER)) != NULL) 
-					*pe = '\0';
+			char *start = path;
 
-				strcpy(fixed, ps);
+			for(;;) {
+				char fixed[CHIRP_PATH_MAX];
+				char *end;
+				if((end = strchr(start, CHIRP_SEARCH_DELIMITER)) != NULL)
+					*end = '\0';
+
+				strcpy(fixed, start);
 				chirp_path_fix(fixed);
+				assert(strcmp(fixed, ".") == 0 || strncmp(fixed, "./", 2) == 0);
 
 				if(access(fixed, F_OK) == -1) {
 					link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
@@ -1855,17 +1868,17 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					link_putfstring(l, "%d:%d:%s:\n", stalltime, EPERM, CHIRP_SEARCH_ERR_OPEN, fixed);
 				} else {
 					int found = chirp_alloc_search(subject, fixed, pattern, flags, l, stalltime);
-					if (found && (flags & CHIRP_SEARCH_STOPATFIRST))
+					if(found && (flags & CHIRP_SEARCH_STOPATFIRST))
 						break;
 				}
 
-				if (pe != NULL) {
-					ps = pe + 1;
-					*pe = CHIRP_SEARCH_DELIMITER; 
+				if(end != NULL) {
+					start = end + 1;
+					*end = CHIRP_SEARCH_DELIMITER;
 				} else
 					break;
 			}
-	
+
 			do_getdir_result = 1;
 			result = 0;
 		} else {
@@ -1876,13 +1889,13 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		if(do_no_result) {
 			/* nothing */
 		} else if(result < 0) {
-			failure:
+		      failure:
 			result = errno_to_chirp(errno);
 			sprintf(line, "%" PRId64 "\n", result);
 		} else if(do_stat_result) {
-			sprintf(line, "%" PRId64 "\n%s\n",  result, chirp_stat_string(&statbuf));
+			sprintf(line, "%" PRId64 "\n%s\n", result, chirp_stat_string(&statbuf));
 		} else if(do_statfs_result) {
-			sprintf(line, "%" PRId64 "\n%s\n",  result, chirp_statfs_string(&statfsbuf));
+			sprintf(line, "%" PRId64 "\n%s\n", result, chirp_statfs_string(&statfsbuf));
 		} else if(do_getdir_result) {
 			sprintf(line, "\n");
 		} else {

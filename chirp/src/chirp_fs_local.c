@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "chirp_acl.h"
 
 #include "create_dir.h"
+#include "debug.h"
 #include "hash_table.h"
 #include "xxmalloc.h"
 #include "int_sizes.h"
@@ -96,19 +97,19 @@ See the file COPYING for details.
 	(b).cst_ctime = (a).st_ctime;
 #endif
 
-static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat * buf);
-static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat * buf);
+static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *buf);
+static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *buf);
 
 /*
 The provided url could have any of the following forms:
 local:/path, file:/path, or just /path.
 */
 
-static const char * chirp_fs_local_init( const char *url )
+static const char *chirp_fs_local_init(const char *url)
 {
-	char *c = strchr(url,':');
+	char *c = strchr(url, ':');
 	if(c) {
-		return strdup(c+1);
+		return strdup(c + 1);
 	} else {
 		return strdup(url);
 	}
@@ -147,7 +148,7 @@ static INT64_T chirp_fs_local_pwrite(int fd, const void *buffer, INT64_T length,
 	return result;
 }
 
-static INT64_T chirp_fs_local_fstat(int fd, struct chirp_stat * buf)
+static INT64_T chirp_fs_local_fstat(int fd, struct chirp_stat *buf)
 {
 	struct stat64 info;
 	int result;
@@ -158,7 +159,7 @@ static INT64_T chirp_fs_local_fstat(int fd, struct chirp_stat * buf)
 	return result;
 }
 
-static INT64_T chirp_fs_local_fstatfs(int fd, struct chirp_statfs * buf)
+static INT64_T chirp_fs_local_fstatfs(int fd, struct chirp_statfs *buf)
 {
 	struct statfs64 info;
 	int result;
@@ -212,7 +213,7 @@ struct chirp_dir {
 	DIR *dir;
 };
 
-static struct chirp_dir * chirp_fs_local_opendir( const char *path )
+static struct chirp_dir *chirp_fs_local_opendir(const char *path)
 {
 	DIR *dir = opendir(path);
 	if(dir) {
@@ -225,22 +226,22 @@ static struct chirp_dir * chirp_fs_local_opendir( const char *path )
 	}
 }
 
-static struct chirp_dirent * chirp_fs_local_readdir( struct chirp_dir *dir )
+static struct chirp_dirent *chirp_fs_local_readdir(struct chirp_dir *dir)
 {
 	struct dirent *d = readdir(dir->dir);
 	if(d) {
 		static struct chirp_dirent cd;
 		char subpath[CHIRP_PATH_MAX];
 		cd.name = d->d_name;
-		sprintf(subpath,"%s/%s",dir->path,cd.name);
-	       	chirp_fs_local_lstat(subpath,&cd.info);
+		sprintf(subpath, "%s/%s", dir->path, cd.name);
+		chirp_fs_local_lstat(subpath, &cd.info);
 		return &cd;
 	} else {
 		return 0;
 	}
 }
 
-static void chirp_fs_local_closedir( struct chirp_dir *dir )
+static void chirp_fs_local_closedir(struct chirp_dir *dir)
 {
 	free(dir->path);
 	closedir(dir->dir);
@@ -345,7 +346,7 @@ static INT64_T chirp_fs_local_rmdir(const char *path)
 	}
 }
 
-static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat * buf)
+static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *buf)
 {
 	struct stat64 info;
 	int result;
@@ -355,7 +356,7 @@ static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat * buf)
 	return result;
 }
 
-static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat * buf)
+static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *buf)
 {
 	struct stat64 info;
 	int result;
@@ -365,7 +366,7 @@ static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat * buf)
 	return result;
 }
 
-static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs * buf)
+static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs *buf)
 {
 	struct statfs64 info;
 	int result;
@@ -393,194 +394,181 @@ static INT64_T chirp_fs_local_access(const char *path, INT64_T mode)
 	return access(path, mode);
 }
 
-static int search_to_access (int flags)
+static int search_to_access(int flags)
 {
 	int access_flags = F_OK;
-	if (flags & CHIRP_SEARCH_R_OK)
+	if(flags & CHIRP_SEARCH_R_OK)
 		access_flags |= R_OK;
-	if (flags & CHIRP_SEARCH_W_OK)
+	if(flags & CHIRP_SEARCH_W_OK)
 		access_flags |= W_OK;
-	if (flags & CHIRP_SEARCH_X_OK)
+	if(flags & CHIRP_SEARCH_X_OK)
 		access_flags |= X_OK;
 
 	return access_flags;
 }
 
-static int search_match_file(const char *pattern, const char *name) 
+static int search_match_file(const char *pattern, const char *name)
 {
-	char *subpat, *subend;
+	debug(D_DEBUG, "search_match_file(`%s', `%s')", pattern, name);
+	/* Decompose the pattern in atoms which are each matched against. */
+	while (1) {
+		char atom[CHIRP_PATH_MAX];
+		const char *end = strchr(pattern, '|'); /* disjunction operator */
 
-	do {
-		subend = strchr(pattern, '|');
+		memset(atom, 0, sizeof(atom));
+		if (end)
+			strncpy(atom, pattern, (size_t)(end-pattern));
+		else
+			strcpy(atom, pattern);
 
-		if (subend == NULL) {
-			subpat = (char*) alloca(strlen(pattern)+1);
-			strcpy(subpat, pattern);
-		} else {
-			subpat = (char*) alloca(subend-pattern+1);
-			strncpy(subpat, pattern, subend-pattern);
-			subpat[subend-pattern] = '\0';
-		}
-
-		char *filepat = strrchr(subpat, '/');
-
-		if (filepat<=subpat) {
-			filepat = (filepat==subpat) ? filepat+1 : subpat;
-
-			if (fnmatch(filepat, name, FNM_PATHNAME)==0) {
+		/* Here we might have a pattern like '*' which matches any file so we
+		 * iteratively pull leading components off of `name' until we get a
+		 * match.  In the case of '*', we would pull off all leading components
+		 * until we reach the file name, which would always match '*'.
+		 */
+		const char *test = name;
+		do {
+			int result = fnmatch(atom, test, FNM_PATHNAME);
+			debug(D_DEBUG, "fnmatch(`%s', `%s', FNM_PATHNAME) = %d", atom, test, result);
+			if(result == 0) {
 				return 1;
 			}
-		}
-	
-		pattern = subend + 1;
+			test = strchr(test, '/');
+			if (test) test += 1;
+		} while (test);
 
-	} while(subend != NULL);
+		if (end)
+			pattern = end+1;
+		else
+			break;
+	}
 
 	return 0;
 }
 
-
-static int search_match_dir(const char *pattern, char *npattern, const char *name) 
+static int search_should_recurse(const char *base, const char *pattern)
 {
-	int recursive, match = 0;
-	char *subpat, *subend;
-	size_t i = 0;
+	debug(D_DEBUG, "search_should_recurse(base = `%s', pattern = `%s')", base, pattern);
+	/* Decompose the pattern in atoms which are each matched against. */
+	while (1) {
+		char atom[CHIRP_PATH_MAX];
 
-	/* FIXME: npattern buffer bounds checks */
-	do {
-		/* Retrieve the next subpattern */
-		subend = strchr(pattern, '|');
+		if (*pattern != '/') return 1; /* unanchored pattern is always recursive */
 
-		if (subend == NULL) {
-			subpat = (char*) alloca(strlen(pattern)+1);
-			strcpy(subpat, pattern);
-		} else {
-			subpat = (char*) alloca(subend-pattern+1);
-			strncpy(subpat, pattern, subend-pattern);
-			subpat[subend-pattern] = '\0';
-		}
+		const char *end = strchr(pattern, '|'); /* disjunction operator */
+		memset(atom, 0, sizeof(atom));
+		if (end)
+			strncpy(atom, pattern, (size_t)(end-pattern));
+		else
+			strcpy(atom, pattern);
 
-		/* Retrieve the top directory of the subpattern */
-		if (*subpat == '/') {
-			recursive = 0;
-			subpat++;
-		} else
-			recursive = 1;
-
-		char *toppat, *topend = strchr(subpat, '/');
-
-		if (topend==NULL)
-			toppat = subpat;
-		else {
-			toppat = (char*) alloca(topend-subpat+1);
-			strncpy(toppat, subpat, topend-subpat);
-			toppat[topend-subpat] = '\0';
-		}
-
-		/* Check for a match and build the new pattern string */
-		if (fnmatch(toppat, name, FNM_PATHNAME)==0) {
-			match = 1;
-
-			if (recursive) {
-				i += sprintf(npattern+i, "%s", i==0 ? "" : "|");
-				i += sprintf(npattern+i, "%s", subpat);
-				if (topend!=NULL) 
-					i += sprintf(npattern+i, "|%s", topend);
-			} else if (topend!=NULL) {
-				i += sprintf(npattern+i, "%s", i==0 ? "" : "|");
-				i += sprintf(npattern+i, "%s", topend);
+		/* Here we want to determine if `base' matches earlier parts of
+		 * `pattern' to see if we should recurse in the directory `base'. To do
+		 * this, we strip off final parts of `pattern' until we get a match.
+		 */
+		while (*atom) {
+			int result = fnmatch(atom, base, FNM_PATHNAME);
+			debug(D_DEBUG, "fnmatch(`%s', `%s', FNM_PATHNAME) = %d", atom, base, result);
+			if(result == 0) {
+				return 1;
 			}
-		} else if (recursive) {
-			match = 1;
-			i += sprintf(npattern+i, "%s%s", i==0 ? "" : "|", subpat); 
+			char *last = strrchr(atom, '/');
+			if (last) {
+				*last = '\0';
+			} else {
+				break;
+			}
 		}
 
-		pattern = subend + 1;
-
-		if (!recursive) subpat--;
-
-	} while(subend != NULL);
-
-	if (i==0) *npattern = '\0';
-
-	return match;
+		if (end)
+			pattern = end+1;
+		else
+			break;
+	}
+	return 0;
 }
 
-
-static int search_directory (const char *subject, const char *base, char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
+static int search_directory(const char *subject, const char * const base, char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
 {
-        if (strlen(pattern)==0) return 0;
+	if(strlen(pattern) == 0)
+		return 0;
 
-	int metadata    = flags & CHIRP_SEARCH_METADATA;
+	debug(D_DEBUG, "search_directory(subject = `%s', base = `%s', dir = `%s', pattern = `%s', flags = %d, ...)", subject, base, dir, pattern, flags);
+
+	int metadata = flags & CHIRP_SEARCH_METADATA;
 	int stopatfirst = flags & CHIRP_SEARCH_STOPATFIRST;
 	int includeroot = flags & CHIRP_SEARCH_INCLUDEROOT;
 
-        void *dirp = chirp_fs_local_opendir(dir);
-        char *current = dir + strlen(dir); /* point to end to current directory */
-	char npattern[CHIRP_PATH_MAX];
+	void *dirp = chirp_fs_local_opendir(dir);
+	char *current = dir + strlen(dir);	/* point to end to current directory */
 
-        if (dirp) {
+	if(dirp) {
 		errno = 0;
-                struct chirp_dirent *entry;
-                struct chirp_stat *stat_buf = alloca(sizeof(struct chirp_stat));
-                while ((entry = chirp_fs_local_readdir(dirp))) {
-                        int access_flags = search_to_access(flags);
+		struct chirp_dirent *entry;
+		while((entry = chirp_fs_local_readdir(dirp))) {
+			int access_flags = search_to_access(flags);
 			char *name = entry->name;
 
-                        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0 || strncmp(name, ".__", 3) == 0) continue;
-                        sprintf(current, "/%s", name);
+			if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0 || strncmp(name, ".__", 3) == 0)
+				continue;
+			sprintf(current, "/%s", name);
 
-                        if (search_match_file(pattern, name) && chirp_fs_local_access(dir, access_flags) == 0) {
-				char *match_name = includeroot ? dir : name; 
+			if(search_match_file(pattern, base) && chirp_fs_local_access(dir, access_flags) == 0) {
+				const char *match_name = includeroot ? dir+1 : base; /* dir+1 because chirp_root_path is always "./" !! */
 
-				if (metadata) {
-
+				if(metadata) {
 					/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
-					if ((chirp_fs_local_stat(dir, stat_buf)) == -1) {
-                                		link_putfstring(l, "0:%s::\n", stoptime, match_name);
+					struct chirp_stat buf;
+					if((chirp_fs_local_stat(dir, &buf)) == -1) {
+						link_putfstring(l, "0:%s::\n", stoptime, match_name);
 						link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, match_name);
 					} else
-						link_putfstring(l, "0:%s:%s:\n", stoptime, match_name, chirp_stat_string(stat_buf));
+						link_putfstring(l, "0:%s:%s:\n", stoptime, match_name, chirp_stat_string(&buf));
+						if(stopatfirst) return 1;
 				} else
 					link_putfstring(l, "0:%s::\n", stoptime, match_name);
-				if (stopatfirst)
-					return 1;
-                        }
+					if(stopatfirst) return 1;
+			}
 
-                        if (cfs_isdir(dir) && search_match_dir(pattern, npattern, name)) {
-				if (chirp_acl_check_dir(dir, subject, CHIRP_ACL_LIST)) {
-                                	int found = search_directory(subject, base, dir, npattern, flags, l, stoptime);
-					if (stopatfirst && found)
+			if(cfs_isdir(dir) && search_should_recurse(base, pattern)) {
+				if(chirp_acl_check_dir(dir, subject, CHIRP_ACL_LIST)) {
+					int found = search_directory(subject, base, dir, pattern, flags, l, stoptime);
+					if(stopatfirst && found)
 						return 1;
 				} else
 					link_putfstring(l, "%d:%d:%s:\n", stoptime, EPERM, CHIRP_SEARCH_ERR_OPEN, dir);
-                        }
-                        *current = '\0'; /* clear current entry */
+			}
+			*current = '\0';	/* clear current entry */
 			errno = 0;
-                }
+		}
 
 		// Read error
-		if (errno) link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_READ, dir);
+		if(errno)
+			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_READ, dir);
 
 		errno = 0;
 		chirp_alloc_closedir(dirp);
 
 		// Close error
-		if (errno) link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, dir);
+		if(errno)
+			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, dir);
 
-	} else 
+	} else
 		link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_OPEN, dir);
 
 	return 0;
 }
 
 /* Note we need the subject because we must check the ACL for any nested directories. */
-static INT64_T chirp_fs_local_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime)
+static INT64_T chirp_fs_local_search(const char *subject, const char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
 {
-        char directory[CHIRP_PATH_MAX];	
-        string_collapse_path(dir, directory, 0);	
+	char pathname[CHIRP_PATH_MAX];
+	string_collapse_path(dir, pathname, 0);
 
-        return search_directory(subject, directory+strlen(directory), directory, patt, flags, l, stoptime);
+	debug(D_DEBUG, "chirp_fs_local_search(subject = `%s', dir = `%s', pattern = `%s', flags = %d, ...)", subject, dir, pattern, flags);
+
+	/* FIXME we should still check for literal paths to search since we can optimize that */
+	return search_directory(subject, pathname + strlen(pathname), pathname, pattern, flags, l, stoptime);
 }
 
 static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
@@ -633,14 +621,14 @@ static INT64_T chirp_fs_local_utime(const char *path, time_t actime, time_t modt
 	return utime(path, &ut);
 }
 
-static INT64_T chirp_fs_local_setrep( const char *path, int nreps )
+static INT64_T chirp_fs_local_setrep(const char *path, int nreps)
 {
 	errno = EINVAL;
 	return -1;
 }
 
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
-static INT64_T chirp_fs_local_getxattr ( const char *path, const char *name, void *data, size_t size )
+static INT64_T chirp_fs_local_getxattr(const char *path, const char *name, void *data, size_t size)
 {
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return getxattr(path, name, data, size, 0, 0);
@@ -649,7 +637,7 @@ static INT64_T chirp_fs_local_getxattr ( const char *path, const char *name, voi
 #endif
 }
 
-static INT64_T chirp_fs_local_fgetxattr ( int fd, const char *name, void *data, size_t size )
+static INT64_T chirp_fs_local_fgetxattr(int fd, const char *name, void *data, size_t size)
 {
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return fgetxattr(fd, name, data, size, 0, 0);
@@ -658,7 +646,7 @@ static INT64_T chirp_fs_local_fgetxattr ( int fd, const char *name, void *data, 
 #endif
 }
 
-static INT64_T chirp_fs_local_lgetxattr ( const char *path, const char *name, void *data, size_t size )
+static INT64_T chirp_fs_local_lgetxattr(const char *path, const char *name, void *data, size_t size)
 {
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return getxattr(path, name, data, size, 0, XATTR_NOFOLLOW);
@@ -667,7 +655,7 @@ static INT64_T chirp_fs_local_lgetxattr ( const char *path, const char *name, vo
 #endif
 }
 
-static INT64_T chirp_fs_local_listxattr ( const char *path, char *list, size_t size )
+static INT64_T chirp_fs_local_listxattr(const char *path, char *list, size_t size)
 {
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return listxattr(path, list, size, 0);
@@ -676,7 +664,7 @@ static INT64_T chirp_fs_local_listxattr ( const char *path, char *list, size_t s
 #endif
 }
 
-static INT64_T chirp_fs_local_flistxattr ( int fd, char *list, size_t size )
+static INT64_T chirp_fs_local_flistxattr(int fd, char *list, size_t size)
 {
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return flistxattr(fd, list, size, 0);
@@ -685,7 +673,7 @@ static INT64_T chirp_fs_local_flistxattr ( int fd, char *list, size_t size )
 #endif
 }
 
-static INT64_T chirp_fs_local_llistxattr ( const char *path, char *list, size_t size )
+static INT64_T chirp_fs_local_llistxattr(const char *path, char *list, size_t size)
 {
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return listxattr(path, list, size, XATTR_NOFOLLOW);
@@ -694,7 +682,7 @@ static INT64_T chirp_fs_local_llistxattr ( const char *path, char *list, size_t 
 #endif
 }
 
-static INT64_T chirp_fs_local_setxattr ( const char *path, const char *name, const void *data, size_t size, int flags )
+static INT64_T chirp_fs_local_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return setxattr(path, name, data, size, 0, flags);
@@ -703,7 +691,7 @@ static INT64_T chirp_fs_local_setxattr ( const char *path, const char *name, con
 #endif
 }
 
-static INT64_T chirp_fs_local_fsetxattr ( int fd, const char *name, const void *data, size_t size, int flags )
+static INT64_T chirp_fs_local_fsetxattr(int fd, const char *name, const void *data, size_t size, int flags)
 {
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return fsetxattr(fd, name, data, size, 0, flags);
@@ -712,16 +700,16 @@ static INT64_T chirp_fs_local_fsetxattr ( int fd, const char *name, const void *
 #endif
 }
 
-static INT64_T chirp_fs_local_lsetxattr ( const char *path, const char *name, const void *data, size_t size, int flags )
+static INT64_T chirp_fs_local_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return setxattr(path, name, data, size, 0, XATTR_NOFOLLOW|flags);
+	return setxattr(path, name, data, size, 0, XATTR_NOFOLLOW | flags);
 #else
 	return lsetxattr(path, name, data, size, flags);
 #endif
 }
 
-static INT64_T chirp_fs_local_removexattr ( const char *path, const char *name )
+static INT64_T chirp_fs_local_removexattr(const char *path, const char *name)
 {
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return removexattr(path, name, 0);
@@ -730,7 +718,7 @@ static INT64_T chirp_fs_local_removexattr ( const char *path, const char *name )
 #endif
 }
 
-static INT64_T chirp_fs_local_fremovexattr ( int fd, const char *name )
+static INT64_T chirp_fs_local_fremovexattr(int fd, const char *name)
 {
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return fremovexattr(fd, name, 0);
@@ -739,7 +727,7 @@ static INT64_T chirp_fs_local_fremovexattr ( int fd, const char *name )
 #endif
 }
 
-static INT64_T chirp_fs_local_lremovexattr ( const char *path, const char *name )
+static INT64_T chirp_fs_local_lremovexattr(const char *path, const char *name)
 {
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return removexattr(path, name, XATTR_NOFOLLOW);

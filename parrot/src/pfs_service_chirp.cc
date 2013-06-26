@@ -247,10 +247,16 @@ public:
 		}
 
 		CHIRP_SEARCH *s = chirp_reli_opensearch(name->hostport, name->rest, pattern, flags, time(0)+pfs_master_timeout);
-		struct chirp_searchent *res;
-		size_t l;
+		if (!s)
+			return -1;
 
+		struct chirp_searchent *res;
+		int n = 0;
 		while ((res = chirp_client_readsearch(s)) != NULL) {
+			size_t l;
+
+			n += 1;
+
 			if (res->err) 
 				l = snprintf(buffer+*i, buffer_length-*i,  "%s%d|%d|%s", *i==0 ? "" : "|", res->err, res->errsource, res->path); 
 			else 
@@ -264,8 +270,8 @@ public:
 			*i += l;
 
 			if (res->err == 0) {
-				if (flags & PFS_SEARCH_METADATA && res->info != NULL) {
-					if (search_chirp_stat_pack(*(res->info), buffer, i, buffer_length) == -1) {
+				if (flags & PFS_SEARCH_METADATA) {
+					if (search_chirp_stat_pack(res->info, buffer, i, buffer_length) == -1) {
 						errno = ERANGE;
 						return -1;
 					}
@@ -280,7 +286,7 @@ public:
 		}
 
 		chirp_client_closesearch(s);
-		return buffer==NULL ? 0 : strlen(buffer);
+		return n;
 	}
 
 	virtual pfs_dir * getdir( pfs_name *name ) {

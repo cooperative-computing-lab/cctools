@@ -908,7 +908,7 @@ INT64_T chirp_global_getxattr(const char *host, const char *path, const char *na
 	}
 }
 
-INT64_T chirp_global_fgetxattr(struct chirp_file *file, const char *name, void *data, size_t size, time_t stoptime)
+INT64_T chirp_global_fgetxattr(struct chirp_file * file, const char *name, void *data, size_t size, time_t stoptime)
 {
 	return chirp_reli_fgetxattr(file, name, data, size, stoptime);
 }
@@ -955,7 +955,7 @@ INT64_T chirp_global_listxattr(const char *host, const char *path, char *list, s
 	}
 }
 
-INT64_T chirp_global_flistxattr(struct chirp_file *file, char *list, size_t size, time_t stoptime)
+INT64_T chirp_global_flistxattr(struct chirp_file * file, char *list, size_t size, time_t stoptime)
 {
 	return chirp_reli_flistxattr(file, list, size, stoptime);
 }
@@ -1002,7 +1002,7 @@ INT64_T chirp_global_setxattr(const char *host, const char *path, const char *na
 	}
 }
 
-INT64_T chirp_global_fsetxattr(struct chirp_file *file, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+INT64_T chirp_global_fsetxattr(struct chirp_file * file, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	return chirp_reli_fsetxattr(file, name, data, size, flags, stoptime);
 }
@@ -1049,7 +1049,7 @@ INT64_T chirp_global_removexattr(const char *host, const char *path, const char 
 	}
 }
 
-INT64_T chirp_global_fremovexattr(struct chirp_file *file, const char *name, time_t stoptime)
+INT64_T chirp_global_fremovexattr(struct chirp_file * file, const char *name, time_t stoptime)
 {
 	return chirp_reli_fremovexattr(file, name, stoptime);
 }

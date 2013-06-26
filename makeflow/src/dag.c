@@ -512,12 +512,104 @@ char *dag_task_category_wrap_as_wq_options(struct dag_task_category *category, c
 	return options;
 }
 
+/* works as realloc for the first argument */
+char *dag_task_category_add_condor_option(char *options, const char *expression, int64_t value)
+{
+	if(value < 0)
+		return options;
+
+	char *opt = NULL;
+	if(options)
+	{
+		opt = string_format("%s && (%s%" PRId64 ")", options, expression, value); 
+		free(options);
+		options = opt;
+	}
+	else
+	{
+		options = string_format("(%s%" PRId64 ")", expression, value); 
+	}
+
+	return options;
+}
+
+char *dag_task_category_wrap_as_condor_options(struct dag_task_category *category, const char *default_options)
+{
+	struct rmsummary *s;
+
+	s = category->resources;
+
+	char *options = NULL;
+	char *opt;
+
+	options = dag_task_category_add_condor_option(options, "Cores>=", s->cores); 
+	options = dag_task_category_add_condor_option(options, "Memory>=", s->resident_memory); 
+	options = dag_task_category_add_condor_option(options, "Disk>=", s->workdir_footprint); 
+
+	if(!options)
+		return xxstrdup(default_options);
+
+	if(!default_options)
+	{
+		opt = string_format("Requirements = %s\n", options);
+		free(options);
+		return opt;
+	}
+
+	/* else default_options && options */
+	char *scratch = xxstrdup(default_options);
+	char *req_pos = strstr(scratch, "Requirements");
+	if(!req_pos)
+		req_pos = strstr(scratch, "requirements");
+
+	if(!req_pos)
+	{
+		opt = string_format("Requirements = %s\n%s", options, scratch);
+		free(options);
+		free(scratch);
+		return opt;
+	}
+
+	/* else, requirements have been specified also at default_options*/
+	char *equal_sign = strchr(req_pos, '='); 
+	if(!equal_sign)
+	{
+	/* Possibly malformed, not much we can do. */
+		free(options);
+		free(scratch);
+		return xxstrdup(default_options);
+	}
+	
+	char *newline = strchr(scratch, '\n'); 
+	if(!newline)
+		newline = (scratch + strlen(default_options) - 1); /* end of string */
+
+	*req_pos    = '\0';
+	*equal_sign = '\0';
+	*newline    = '\0';
+
+	/* Now we have these different strings:
+	   scratch: from beginning of default_options to the 'R' in Requirements
+	   equal_sign: from the '=' after Requirements to a new line or end of default_options
+	   newline: from the end of original requirements to end of default_options
+	*/
+
+	opt = string_format("%s\nRequirements = (%s) && (%s)\n%s", scratch, (equal_sign + 1), options, (newline + 1));
+	free(scratch);
+	free(options);
+
+	return opt;
+}
+
 char *dag_task_category_wrap_options(struct dag_task_category *category, const char *default_options, batch_queue_type_t batch_type)
 {
         switch(batch_type)
         {
 	case BATCH_QUEUE_TYPE_WORK_QUEUE:
 		return dag_task_category_wrap_as_wq_options(category, default_options);
+		break;
+	case BATCH_QUEUE_TYPE_CONDOR:
+		return dag_task_category_wrap_as_condor_options(category, default_options);
 		break;
 	default:
 		return NULL;

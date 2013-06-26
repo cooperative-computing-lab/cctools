@@ -27,17 +27,23 @@ for package in $CCTOOLS_PACKAGES; do
 					set -e
 					echo "./${script}" prepare
 					"./${script}" prepare
+					set +e
 					echo "./${script}" run
 					"./${script}" run
+					result=$?
+					set -e
 					echo "./${script}" clean
 					"./${script}" clean
+					exit $result
 				) >> "$CCTOOLS_TEST_LOG" 2>&1
 				if [ "$?" -eq 0 ]; then
 					SUCCESS=$((SUCCESS+1))
 					echo "success."
+					echo "=== Test ${package}/test/${script}: success." >> $CCTOOLS_TEST_LOG
 				else
 					FAILURE=$((FAILURE+1))
 					echo "failure."
+					echo "=== Test ${package}/test/${script}: failure." >> $CCTOOLS_TEST_LOG
 				fi
 			fi
 		done

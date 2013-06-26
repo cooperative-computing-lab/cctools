@@ -732,11 +732,16 @@ void string_split_multipath(const char *input, char *first, char *rest)
 }
 
 
-/*
-Canonicalize a path name by removing duplicate
-slashes, dots, and so on.
+/* Canonicalize a pathname by stripping out duplicate slashes and redundant
+ * dots.
+ *
+ * A trailing slash is semantically important [1] in pathname resolution
+ * because it forces resolution of the final component and that final component
+ * must resolve to a directory. So, we allow a final trailing slash in
+ * the canonical path.
+ *
+ * [1] http://pubs.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap04.html
 */
-
 void string_collapse_path(const char *l, char *s, int remove_dotdot)
 {
 	char *start = s;
@@ -745,13 +750,10 @@ void string_collapse_path(const char *l, char *s, int remove_dotdot)
 		if((*l) == '/' && (*(l + 1)) == '/') {
 			l++;	/* skip double slash */
 		} else if((*l) == '/' && (*(l + 1)) == '.' && (*(l + 2)) == 0) {
-			l++;
-			l++;
+			*s++ = *l++;
+			break;
 		} else if((*l) == '/' && (*(l + 1)) == '.' && (*(l + 2)) == '/') {
-			l++;
-			l++;
-		} else if((*l) == '/' && (*(l + 1)) == 0) {
-			l++;
+			l += 2;
 		} else if(remove_dotdot && !strncmp(l, "/..", 3) && (l[3] == 0 || l[3] == '/')) {
 			if(s > start)
 				s--;
@@ -759,9 +761,7 @@ void string_collapse_path(const char *l, char *s, int remove_dotdot)
 				s--;
 			}
 			*s = 0;
-			l++;
-			l++;
-			l++;
+			l += 3;
 		} else {
 			*s++ = *l++;
 		}
@@ -769,11 +769,12 @@ void string_collapse_path(const char *l, char *s, int remove_dotdot)
 
 	*s = 0;
 
-	if(s == start) {
-		strcpy(s, "/");
-	} else {
-		string_remove_trailing_slashes(s);
-	}
+	if(s == start) strcpy(s, "/");
+
+	/* canonicalize certain final components */
+	if(strcmp(start, "./") == 0) strcpy(start, ".");
+	if(strcmp(start, "../") == 0) strcpy(start, "..");
+	if((s-start) > 4 && strcmp(s-4, "/../") == 0) *(s-1) = 0;
 }
 
 void string_tolower(char *s)

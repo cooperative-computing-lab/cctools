@@ -58,7 +58,7 @@ static void parsepath(const char *path, char *newpath, char *host)
 		// path is absolute
 		sscanf(path, "/%[^/]%s", host, newpath);
 		if(strcmp(newpath, "") == 0) {
-			strcpy(newpath, "/"); /* path = "/host[:port]" ; no final slash */
+			strcpy(newpath, "/");	/* path = "/host[:port]" ; no final slash */
 		}
 	} else {
 		// path is relative
@@ -325,15 +325,15 @@ static int chirp_fuse_access(const char *path, int flags)
 	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	if (flags & X_OK) {
+	if(flags & X_OK) {
 		struct chirp_stat buf;
 		/* FUSE calls access(dir, X_OK) for chdir calls. For compatibility with older chirp servers, we
 		 * check for list access rights on a directory by calling stat.
 		 */
-		if ((chirp_global_stat(host, newpath, &buf, time(0)+chirp_fuse_timeout) == 0) && S_ISDIR(buf.cst_mode)) {
+		if((chirp_global_stat(host, newpath, &buf, time(0) + chirp_fuse_timeout) == 0) && S_ISDIR(buf.cst_mode)) {
 			/* we've confirmed X_OK rights, now check others if they exist... */
 			flags ^= X_OK;
-			flags |= F_OK; /* make sure we have *some* flags; on GNU/Linux 0 is a valid value for flags (it is F_OK actually), others it may not be */
+			flags |= F_OK;	/* make sure we have *some* flags; on GNU/Linux 0 is a valid value for flags (it is F_OK actually), others it may not be */
 			result = chirp_global_access(host, newpath, flags, time(0) + chirp_fuse_timeout);
 		} else {
 			result = chirp_global_access(host, newpath, flags, time(0) + chirp_fuse_timeout);
@@ -472,7 +472,7 @@ static int chirp_fuse_mknod(const char *path, mode_t mode, dev_t rdev)
 	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	file = chirp_global_open(host, newpath, O_CREAT|O_WRONLY, mode, time(0) + chirp_fuse_timeout);
+	file = chirp_global_open(host, newpath, O_CREAT | O_WRONLY, mode, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
 	if(!file)
@@ -586,19 +586,20 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-    static struct option long_options[] = {
-        {"auth", required_argument, 0, 'a'},
-        {"block-size", required_argument, 0, 'b'},
-        {"debug", required_argument, 0, 'd'},
-        {"no-optimize", no_argument, 0, 'D'},
-        {"foreground", no_argument, 0, 'f'},
-        {"tickets", required_argument, 0, 'i'},
-        {"mount-options", required_argument, 0, 'm'},
-        {"debug-file", required_argument, 0, 'o'},
-        {"timeout", required_argument, 0, 't'},
-        {"version", no_argument, 0, 'v'},
-        {"help", no_argument, 0, 'h'},
-        {0,0,0,0}};
+	static struct option long_options[] = {
+		{"auth", required_argument, 0, 'a'},
+		{"block-size", required_argument, 0, 'b'},
+		{"debug", required_argument, 0, 'd'},
+		{"no-optimize", no_argument, 0, 'D'},
+		{"foreground", no_argument, 0, 'f'},
+		{"tickets", required_argument, 0, 'i'},
+		{"mount-options", required_argument, 0, 'm'},
+		{"debug-file", required_argument, 0, 'o'},
+		{"timeout", required_argument, 0, 't'},
+		{"version", no_argument, 0, 'v'},
+		{"help", no_argument, 0, 'h'},
+		{0, 0, 0, 0}
+	};
 
 	while((c = getopt_long(argc, argv, "a:b:d:Dfhi:m:o:t:v", long_options, NULL)) > -1) {
 		switch (c) {

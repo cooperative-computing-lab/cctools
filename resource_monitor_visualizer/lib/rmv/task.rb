@@ -25,7 +25,7 @@ module RMV
     end
 
     def time_series
-      time_series_path
+       time_series_path || RMV::BlackHole.new
     end
 
     private

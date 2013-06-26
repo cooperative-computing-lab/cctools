@@ -2441,34 +2441,34 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			}
 			break;
 
-                case SYSCALL64_search:
-                        if (entering) {
-								char callsite[PFS_PATH_MAX];
-								tracer_copy_in_string(p->tracer, callsite, POINTER(args[5]), sizeof(callsite));
-								debug(D_SYSCALL, "search %s", callsite);
+		case SYSCALL64_search:
+			if (entering) {
+				char callsite[PFS_PATH_MAX];
+				tracer_copy_in_string(p->tracer, callsite, POINTER(args[5]), sizeof(callsite));
+				debug(D_SYSCALL, "search %s", callsite);
 
-                                char path[2*PFS_PATH_MAX];
-                                char pattern[PFS_PATH_MAX];
-                                int flags = args[2];
-                                int buffer_length = args[4];
-                                char *buffer = (char*) malloc(buffer_length);
+				char path[2*PFS_PATH_MAX];
+				char pattern[PFS_PATH_MAX];
+				int flags = args[2];
+				int buffer_length = args[4];
+				char *buffer = (char*) malloc(buffer_length);
 
-                                if (!buffer) {
-                                        p->syscall_result = -ENOMEM;
-                                        break;
-                                }
+				if (!buffer) {
+					p->syscall_result = -ENOMEM;
+					break;
+				}
 
-                                size_t i = 0;
-                                tracer_copy_in_string(p->tracer, path, POINTER(args[0]), sizeof(path));
-                                tracer_copy_in_string(p->tracer, pattern, POINTER(args[1]), sizeof(pattern));
-                                p->syscall_result = pfs_search(path, pattern, flags, buffer, buffer_length, &i);
-				
+				size_t i = 0;
+				tracer_copy_in_string(p->tracer, path, POINTER(args[0]), sizeof(path));
+				tracer_copy_in_string(p->tracer, pattern, POINTER(args[1]), sizeof(pattern));
+				p->syscall_result = pfs_search(path, pattern, flags, buffer, buffer_length, &i);
+
 				if (i==0) *buffer = '\0';
 
-                                tracer_copy_out(p->tracer, buffer, POINTER(args[3]), i+1); 
-                                divert_to_dummy(p,p->syscall_result);
-                        }
-                        break;
+				tracer_copy_out(p->tracer, buffer, POINTER(args[3]), i+1);
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
 
 		case SYSCALL64_parrot_setacl:
 			if(entering) {

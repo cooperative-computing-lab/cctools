@@ -472,11 +472,12 @@ parrot_run -r '&lt;default-repositories&gt; my.repo:url=http://cvmfs.server.edu/
 specifying additional options using the syntax
 <nobr><tt>&lt;default-repositories&gt;:option1=value1,option2=value2</tt></nobr>.
 
-<p>Currently, there is a limitation of one active CVMFS repository per
-parrot session.  Attempts to access a second CVMFS repository in the
-same parrot session will be rejected.  Therefore, the utility of
-configuring multiple repositories is merely to provide the option of
-accessing any one of those repositories during a parrot session.
+<p>The CVMFS library can only support one active repository open at a time.
+If a program attempts to access more than one repository in a session,
+Parrot will emit an error.  If the optional argument --cvmfs-repo-switching
+is given to <tt>parrot_run</tt>, then Parrot will switch repositories at
+run-time by re-initializing the CVMFS library.  This feature is experimental.
+</p>
 
 <h3>Hadoop Distributed File System (HDFS)</h3>
 

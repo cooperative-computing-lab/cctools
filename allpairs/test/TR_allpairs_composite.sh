@@ -19,10 +19,10 @@ prepare()
 	rm -f $PIDWORKER_FILE
 	rm -f $PORT_FILE
 
-	./gen_ints.sh $TEST_INPUT 50
+	./gen_ints.sh $TEST_INPUT 20
 
     ln -s ../src/allpairs_multicore .
-    ../src/allpairs_master -x 1 -y 1 -o $TEST_OUTPUT_STEP -Z $PORT_FILE $TEST_INPUT $TEST_INPUT ./divisible.sh &
+    (PATH=.:$PATH ../src/allpairs_master -x 1 -y 1 -o $TEST_OUTPUT_STEP -Z $PORT_FILE $TEST_INPUT $TEST_INPUT ./divisible.sh )&
 
     pid=$!
 	echo $pid > $PIDMASTER_FILE

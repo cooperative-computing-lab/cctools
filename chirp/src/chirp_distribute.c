@@ -200,7 +200,7 @@ int main(int argc, char *argv[])
 	int nprocs = 0;
 	char *tickets = NULL;
 
-	int length;//, start_time, end_time;
+	int length;		//, start_time, end_time;
 	int server_count = 0;
 	int cluster_count = 0;
 
@@ -208,22 +208,23 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-    static struct option long_options[] = {
-        {"auth", required_argument, 0, 'a'},
-        {"debug", required_argument, 0, 'd'},
-        {"info-transfer", no_argument, 0, 'D'},
-        {"failures-file", required_argument, 0, 'F'},
-        {"tickets", required_argument, 0, 'i'},
-        {"copies-max", required_argument, 0, 'N'},
-        {"jobs", required_argument, 0, 'p'},
-        {"randomize-hosts", no_argument, 0, 'R'},
-        {"timeout", required_argument, 0, 't'},
-        {"timeout-all", required_argument, 0, 'T'},
-        {"version", no_argument, 0, 'v'},
-        {"delete-target", no_argument, 0, 'X'},
-        {"info-success", no_argument, 0, 'Y'},
-        {"help", no_argument, 0, 'h'},
-        {0,0,0,0}};
+	static struct option long_options[] = {
+		{"auth", required_argument, 0, 'a'},
+		{"debug", required_argument, 0, 'd'},
+		{"info-transfer", no_argument, 0, 'D'},
+		{"failures-file", required_argument, 0, 'F'},
+		{"tickets", required_argument, 0, 'i'},
+		{"copies-max", required_argument, 0, 'N'},
+		{"jobs", required_argument, 0, 'p'},
+		{"randomize-hosts", no_argument, 0, 'R'},
+		{"timeout", required_argument, 0, 't'},
+		{"timeout-all", required_argument, 0, 'T'},
+		{"version", no_argument, 0, 'v'},
+		{"delete-target", no_argument, 0, 'X'},
+		{"info-success", no_argument, 0, 'Y'},
+		{"help", no_argument, 0, 'h'},
+		{0, 0, 0, 0}
+	};
 
 	while(((c = getopt_long(argc, argv, "a:d:DF:i:N:p:Rt:T:vXYh", long_options, NULL)) > -1)) {
 		switch (c) {

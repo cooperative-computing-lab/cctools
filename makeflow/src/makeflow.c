@@ -316,7 +316,21 @@ void collect_input_files(struct dag *d, char *bundle_dir, char *(*rename) (struc
 	list_first_item(il);
 	while((f = list_next_item(il))) {
 		new_name = rename(NULL, f->filename);
+		char *dir = NULL;
+		dir = xxstrdup(new_name);
+		string_dirname(new_name, dir);
+		if(dir){
+			sprintf(file_destination, "%s/%s", bundle_dir, dir);
+			if(!create_dir(file_destination, 0755)) {
+				fprintf(stderr,  "Could not create %s. Check the permissions and try again.\n", file_destination);
+				free(dir);
+				exit(1);
+			}
+			free(dir);
+		}
+
 		sprintf(file_destination, "%s/%s", bundle_dir, new_name);
+
 		copy_file_to_file(f->filename, file_destination);
 		free(new_name);
 	}
@@ -2632,7 +2646,7 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 		fprintf(stderr, "Creating new directory, %s ..........", bundle_directory);
-		if(!create_dir(bundle_directory, 0777)) {
+		if(!create_dir(bundle_directory, 0755)) {
 			fprintf(stderr, "FAILED\n");
 			exit(1);
 		}
@@ -2736,8 +2750,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	dag_log_recover(d, logfilename);
-
 	if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
 		char *cwd = string_getcwd();
 		if(!strncmp(cwd, "/afs", 4)) {
@@ -2770,6 +2782,8 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "makeflow: perhaps port %d is already in use?\n", port);
 		exit(1);
 	}
+
+	dag_log_recover(d, logfilename);
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		struct work_queue *q = batch_queue_get_work_queue(remote_queue);

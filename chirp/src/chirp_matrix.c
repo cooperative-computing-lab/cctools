@@ -323,7 +323,7 @@ int chirp_matrix_get_col(struct chirp_matrix *a, int i, void *data, time_t stopt
 		struct chirp_bulkio *b = &a->bulkio[j];
 		b->type = CHIRP_BULKIO_SREAD;
 		b->file = a->rfiles[j];
-		b->buffer = (char *) data + j * length;       //Previously void arithmetic!
+		b->buffer = (char *) data + j * length;	//Previously void arithmetic!
 		b->length = a->n_row_per_file * a->element_size;
 		b->stride_length = a->element_size;
 		b->stride_skip = a->element_size * a->width;

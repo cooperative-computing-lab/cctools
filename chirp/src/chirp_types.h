@@ -68,8 +68,8 @@ struct chirp_dirent {
 /** Describes a result from a search operation */
 
 struct chirp_searchent {
-	char *path;			/**< Path of the matching file. */
-	struct chirp_stat *info;	/**< The properties of the matching file. */
+	char path[CHIRP_PATH_MAX];			/**< Path of the matching file. */
+	struct chirp_stat info;	/**< The properties of the matching file. */
 	int errsource;
 	int err;
 };
@@ -77,10 +77,9 @@ struct chirp_searchent {
 /** Keeps track of the state of a search stream */
 
 struct chirp_searchstream {
-	struct chirp_searchent *entry;
-	const char *data;
+	struct chirp_searchent entry;
+	const char *current;
 	buffer_t *buffer;
-	int i;
 };
 
 #define CHIRP_SEARCH struct chirp_searchstream

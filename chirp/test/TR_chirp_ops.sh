@@ -2,36 +2,22 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-TEST_FILE=chirp_benchmark.tmp
-PID_FILE=chirp_server.pid
-PORT_FILE=chirp_server.port
+chirp_debug=chirp.debug
+chirp_pid=chirp.pid
+chirp_port=chirp.port
+chirp_root=chirp.root
 
 prepare()
 {
-	rm -rf foo bar
+	../src/chirp_server -r "$chirp_root" -I 127.0.0.1 -Z "$chirp_port" -b -B "$chirp_pid" -d all -o "$chirp_debug"
 
-	rm -f $PORT_FILE	
-	../src/chirp_server -Z $PORT_FILE &
-	pid=$!
-	echo $pid > $PID_FILE
-
-	for i in 1 2 3 4 5
-	do
-		if [ -f $PORT_FILE ]
-		then
-			exit 0
-		else
-			sleep 1
-		fi
-	done
-
-	exit 1
+	wait_for_file_creation "$chirp_port" 5
+	wait_for_file_creation "$chirp_pid" 5
 }
 
 run()
 {
-    port=`cat $PORT_FILE`
-    exec ../src/chirp localhost:$port <<EOF
+	../src/chirp localhost:`cat "$chirp_port"` <<EOF
 help
 df -g
 mkdir foo
@@ -40,7 +26,7 @@ mv foo bar/foo
 ls bar/foo
 audit -r
 whoami
-whoareyou localhost:$port
+whoareyou localhost:`cat "$chirp_port"`
 ls
 mkdir _test
 ls
@@ -53,17 +39,16 @@ getacl
 localpath hosts.txt
 exit
 EOF
+	return $?
 }
 
 clean()
 {
-	if [ -f $PID_FILE ]
-	then
-		kill -9 `cat $PID_FILE`
+	if [ -r "$chirp_pid" ]; then
+		kill -9 `cat "$chirp_pid"`
 	fi
 
-    rm -rf foo _test .__acl $PID_FILE $PORT_FILE $TEST_FILE
-    exit 0
+	rm -rf "$chirp_debug" "$chirp_pid" "$chirp_port" "$chirp_root"
 }
 
 dispatch $@
