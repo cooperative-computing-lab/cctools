@@ -514,24 +514,26 @@ static int search_directory(const char *subject, const char * const base, char *
 				continue;
 			sprintf(current, "/%s", name);
 
-			if(search_match_file(pattern, base) && chirp_fs_local_access(fullpath, access_flags) == 0) {
-				const char *match_name = includeroot ? fullpath+1 : base; /* fullpath+1 because chirp_root_path is always "./" !! */
+			if(search_match_file(pattern, base)) {
+				const char *matched = includeroot ? fullpath+1 : base; /* fullpath+1 because chirp_root_path is always "./" !! */
 
 				result += 1;
-				if(metadata) {
-					/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
-					struct chirp_stat buf;
-					if((chirp_fs_local_stat(fullpath, &buf)) == -1) {
-						link_putfstring(l, "0:%s::\n", stoptime, match_name);
-						link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, match_name);
+				if (access_flags == F_OK || chirp_fs_local_access(fullpath, access_flags) == 0) {
+					if(metadata) {
+						/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
+						struct chirp_stat buf;
+						if((chirp_fs_local_stat(fullpath, &buf)) == -1) {
+							link_putfstring(l, "0:%s::\n", stoptime, matched); // FIXME is this a bug?
+							link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, matched);
+						} else {
+							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, chirp_stat_string(&buf));
+							if(stopatfirst) return 1;
+						}
 					} else {
-						link_putfstring(l, "0:%s:%s:\n", stoptime, match_name, chirp_stat_string(&buf));
+						link_putfstring(l, "0:%s::\n", stoptime, matched);
 						if(stopatfirst) return 1;
 					}
-				} else {
-					link_putfstring(l, "0:%s::\n", stoptime, match_name);
-					if(stopatfirst) return 1;
-				}
+				} /* FIXME access failure */
 			}
 
 			if(cfs_isdir(fullpath) && search_should_recurse(base, pattern)) {
@@ -550,17 +552,13 @@ static int search_directory(const char *subject, const char * const base, char *
 			errno = 0;
 		}
 
-		// Read error
 		if(errno)
 			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_READ, fullpath);
 
 		errno = 0;
 		chirp_alloc_closedir(dirp);
-
-		// Close error
 		if(errno)
 			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, fullpath);
-
 	} else {
 		link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_OPEN, fullpath);
     }
