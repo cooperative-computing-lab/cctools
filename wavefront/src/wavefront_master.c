@@ -22,8 +22,15 @@ See the file COPYING for details.
 #include "text_array.h"
 #include "macros.h"
 #include "getopt_aux.h"
+#include "bitmap.h"
 
 #define WAVEFRONT_LINE_MAX 1024
+
+#define WAVEFRONT_TASK_STATE_COMPLETE   MAKE_RGBA(0,0,255,0)
+#define WAVEFRONT_TASK_STATE_RUNNING    MAKE_RGBA(0,255,0,0)
+#define WAVEFRONT_TASK_STATE_READY      MAKE_RGBA(255,255,0,0)
+#define WAVEFRONT_TASK_STATE_NOTREADY   MAKE_RGBA(255,0,0,0)
+
 
 static const char *function = 0;
 static struct text_array *array = 0;
@@ -35,6 +42,8 @@ static const char *port_file = NULL;
 static const char *infile;
 static const char *outfile;
 static FILE *logfile;
+static const char * progress_bitmap_file = 0;
+static struct bitmap *bmap = 0;
 static int cells_total = 0;
 static int cells_complete = 0;
 static int tasks_done = 0;
@@ -55,7 +64,12 @@ static int task_consider( int x, int y )
 	if(x>=xsize) return 1;
 	if(y>=ysize) return 1;
 
-	if(text_array_get(array,x,y)) return 0;
+	if(text_array_get(array,x,y))
+	{
+		if(bmap)
+			bitmap_set(bmap, x, y, WAVEFRONT_TASK_STATE_COMPLETE);
+		return 0;
+	}
 
 	const char *left   = text_array_get(array,x-1,y);
 	const char *bottom = text_array_get(array,x,y-1);
@@ -73,6 +87,9 @@ static int task_consider( int x, int y )
 	work_queue_task_specify_input_buf(t, bottom, strlen(bottom), "yfile");
 	work_queue_task_specify_input_buf(t, diag, strlen(diag), "dfile");
 	work_queue_submit(queue,t);
+	
+	if(bmap)
+		bitmap_set(bmap, x, y, WAVEFRONT_TASK_STATE_READY);
 
 	return 1;
 }
@@ -82,6 +99,10 @@ static void task_complete( int x, int y )
 	cells_complete++;
 	task_consider(x+1,y);
 	task_consider(x,y+1);
+
+	
+	if(bmap)
+		bitmap_set(bmap, x, y, WAVEFRONT_TASK_STATE_COMPLETE);
 }
 
 static void task_prime()
@@ -113,11 +134,35 @@ static void display_progress( struct work_queue *q )
 {
         struct work_queue_stats info;
         time_t current = time(0);
+
         work_queue_get_stats(queue,&info);
-        if(current==start_time) current++;
+
+        if(current == start_time)
+		current++;
+
         double speedup = (sequential_run_time*tasks_done)/(current-start_time);
+
         printf("%2.02lf%% %6d %6ds %4d %4d %4d %4d %4d %4d %.02lf\n",100.0*cells_complete/cells_total,cells_complete,(int)(time(0)-start_time),info.workers_init,info.workers_ready,info.workers_busy,info.tasks_waiting,info.tasks_running,info.tasks_complete,speedup);
+
+	if(bmap)
+		bitmap_save_bmp(bmap,progress_bitmap_file);
+
         last_display_time = current;
+}
+
+void wavefront_bitmap_initialize( struct bitmap *b )
+{
+	int i, j;
+
+	bitmap_reset(b,WAVEFRONT_TASK_STATE_NOTREADY);
+
+	for(i=0;i<=xsize;i++) {
+		bitmap_set(b,i,0,WAVEFRONT_TASK_STATE_COMPLETE);
+	}
+
+	for(j=0;j<=ysize;j++) {
+		bitmap_set(b,0,j,WAVEFRONT_TASK_STATE_COMPLETE);
+	}
 }
 
 int main( int argc, char *argv[] )
@@ -142,45 +187,49 @@ int main( int argc, char *argv[] )
 		{"priority", required_argument, 0, 'P'},
 		{"estimated-time", required_argument, 0, 't'},
 		{"random-port", required_argument, 0, 'Z'},
-        {0,0,0,0}
+		{"bitmap", required_argument, 0, 'B'},
+		{0,0,0,0}
 	};
 
-	while((c=getopt_long(argc,argv,"ad:hN:p:P:o:v:Z:", long_options, NULL)) >= 0) {
+	while((c=getopt_long(argc,argv,"aB:d:hN:p:P:o:v:Z:", long_options, NULL)) >= 0) {
 		switch(c) {
 	    	case 'a':
-				break;
-			case 'd':
-				debug_flags_set(optarg);
-				break;
-			case 'h':
-				show_help(progname);
-				exit(0);
-				break;
-			case 'N':
-				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
-				free(project);
-				project = xxstrdup(optarg);
-				break;
-			case 'p':
-				port = atoi(optarg);
-				break;
-			case 'P':
-				priority = atoi(optarg);
-				break;
-			case 'o':
-				debug_config_file(optarg);
-				break;
-			case 'v':
-				cctools_version_print(stdout, progname);
-				exit(0);
-				break;
-			case 'Z':
-				port_file = optarg;
-				port = 0;
-				break;
-			default:
-				show_help(progname);
-				return 1;
+			break;
+		case 'd':
+			debug_flags_set(optarg);
+			break;
+		case 'h':
+			show_help(progname);
+			exit(0);
+			break;
+		case 'N':
+			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+			free(project);
+			project = xxstrdup(optarg);
+			break;
+		case 'p':
+			port = atoi(optarg);
+			break;
+		case 'P':
+			priority = atoi(optarg);
+			break;
+		case 'o':
+			debug_config_file(optarg);
+			break;
+		case 'v':
+			cctools_version_print(stdout, progname);
+			exit(0);
+			break;
+		case 'Z':
+			port_file = optarg;
+			port = 0;
+			break;
+		case 'B':
+			progress_bitmap_file = optarg;
+			break;
+		default:
+			show_help(progname);
+			return 1;
 		}
 	}
 
@@ -247,6 +296,13 @@ int main( int argc, char *argv[] )
 
 	fprintf(stdout, "%s: listening for workers on port %d...\n",progname,work_queue_port(queue));
 
+	if(progress_bitmap_file)
+	{
+		bmap = bitmap_create(xsize,ysize);
+		wavefront_bitmap_initialize(bmap);
+	}
+		
+
 	task_prime();
 
 	struct work_queue_task *t;
@@ -279,3 +335,8 @@ int main( int argc, char *argv[] )
 	display_progress(queue);
 	return 0;
 }
+
+
+
+
+
