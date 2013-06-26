@@ -495,9 +495,10 @@ static int search_directory(const char *subject, const char * const base, char *
 
 	debug(D_DEBUG, "search_directory(subject = `%s', base = `%s', fullpath = `%s', pattern = `%s', flags = %d, ...)", subject, base, fullpath, pattern, flags);
 
+	int access_flags = search_to_access(flags);
+	int includeroot = flags & CHIRP_SEARCH_INCLUDEROOT;
 	int metadata = flags & CHIRP_SEARCH_METADATA;
 	int stopatfirst = flags & CHIRP_SEARCH_STOPATFIRST;
-	int includeroot = flags & CHIRP_SEARCH_INCLUDEROOT;
 
 	int result = 0;
 	void *dirp = chirp_fs_local_opendir(fullpath);
@@ -507,7 +508,6 @@ static int search_directory(const char *subject, const char * const base, char *
 		errno = 0;
 		struct chirp_dirent *entry;
 		while((entry = chirp_fs_local_readdir(dirp))) {
-			int access_flags = search_to_access(flags);
 			char *name = entry->name;
 
 			if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0 || strncmp(name, ".__", 3) == 0)
