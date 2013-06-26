@@ -284,19 +284,13 @@ struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port
 	return ml;
 }
 
-int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, struct work_queue_resources *r, const char *workers_by_pool, int now) {
+int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, struct work_queue_resources *r, const char *workers_by_pool ) {
 	char address[DATAGRAM_ADDRESS_MAX];
 	char owner[USERNAME_MAX];
 
 	buffer_t *buffer = NULL;
 	const char *text;
 	size_t text_size;
-
-	static time_t last_update_time = 0;
-
-	if(!now) {
-		if(time(0) - last_update_time < WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL) return 1;
-	}
 
 	if(!outgoing_datagram) {
 		outgoing_datagram = datagram_create(0);
@@ -314,8 +308,6 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 
 	int total_workers_working = s->workers_busy + s->workers_full;
 	int total_workers         = total_workers_working + s->workers_ready;
-
-	debug(D_WQ,"%s advertising resources to the Catalog -- cores:%d memory:%d disk:%d\n",project_name,r->cores.total,r->memory.total,r->disk.total); //debug to see if information is being passed
 
 	buffer_printf(buffer, 
 			"type wq_master\n"
@@ -335,13 +327,14 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 			CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
 
 	text = buffer_tostring(buffer, &text_size);
+
 	if(domain_name_cache_lookup(catalog_host, address)) {
 		debug(D_WQ, "Advertising master status to the catalog server at %s:%d ...", catalog_host, catalog_port);
 		datagram_send(outgoing_datagram, text, strlen(text), address, catalog_port);
 	}
 
 	buffer_delete(buffer);
-	last_update_time = time(0);
+
 	return 1;
 }
 

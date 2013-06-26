@@ -442,9 +442,14 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 	return timeout;
 }
 
-static void update_catalog(struct work_queue *q, int now)
+static void update_catalog(struct work_queue *q, int force_update )
 {
 	struct work_queue_stats s;
+	static time_t last_update_time = 0;
+
+	if(!force_update) {
+		if(time(0) - last_update_time < WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL) return;
+	}
 
 	if(!q->catalog_host) {
 		q->catalog_host = strdup(CATALOG_HOST);
@@ -453,14 +458,16 @@ static void update_catalog(struct work_queue *q, int now)
 	if(!q->catalog_port) {
 		q->catalog_port = CATALOG_PORT;
 	}
+
 	work_queue_get_stats(q, &s);
 	struct work_queue_resources r;
 	memset(&r, 0, sizeof(r));
 	work_queue_get_resources(q,&r);
-	debug(D_WQ,"Updating catalog with resource information -- cores:%d memory:%d disk:%d\n", r.cores.total,r.memory.total,r.disk.total); //see if information is being passed correctly
 	char * worker_summary = work_queue_get_worker_summary(q);
-	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, &r, worker_summary, now);
+	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, &r, worker_summary);
 	free(worker_summary);
+
+	last_update_time = time(0);
 }
 
 static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
