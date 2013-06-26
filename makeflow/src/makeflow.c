@@ -365,25 +365,31 @@ char *bundler_translate_name(const char *input_filename, int collision_counter)
 	new_filename = hash_table_lookup(reverse_names, filename);
 	if(new_filename) {
 		collision_counter++;
-		return bundler_translate_name(filename, collision_counter);
+		char *tmp = bundler_translate_name(filename, collision_counter);
+		free(filename);
+		return tmp;
 	}
 	if(filename[0] == '/') {
 		new_filename = string_basename(filename);
 		if(hash_table_lookup(previous_names, new_filename)) {
 			collision_counter++;
-			return bundler_translate_name(filename, collision_counter);
+			char *tmp = bundler_translate_name(filename, collision_counter);
+			free(filename);
+			return tmp;
 		} else if(hash_table_lookup(reverse_names, new_filename)) {
 			collision_counter++;
-			return bundler_translate_name(filename, collision_counter);
+			char *tmp = bundler_translate_name(filename, collision_counter);
+			free(filename);
+			return tmp;
 		} else {
 			hash_table_insert(reverse_names, new_filename, filename);
 			hash_table_insert(previous_names, filename, new_filename);
-			return strdup(new_filename);
+			return xxstrdup(new_filename);
 		}
 	} else {
 		hash_table_insert(previous_names, filename, filename);
 		hash_table_insert(reverse_names, filename, filename);
-		return xxstrdup(filename);
+		return filename;
 	}
 }
 
