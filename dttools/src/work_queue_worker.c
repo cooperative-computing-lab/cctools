@@ -1560,23 +1560,10 @@ static void work_for_master(struct link *master) {
 }
 
 static void foreman_for_master(struct link *master) {
-	static struct list *master_link = NULL;
-	static struct link *current_master = NULL;
-	static struct list *master_link_active = NULL;
 
+	int master_active = 0;
 	if(!master) {
 		return;
-	}
-
-	if(!master_link) {
-		master_link = list_create();
-		master_link_active = list_create();
-	}
-	
-	if(master != current_master) {
-		while(list_pop_head(master_link));
-		list_push_tail(master_link, master);
-		current_master = master;
 	}
 
 	debug(D_WQ, "working for master at %s:%d as foreman.\n", actual_addr, actual_port);
@@ -1593,7 +1580,7 @@ static void foreman_for_master(struct link *master) {
 			break;
 		}
 
-		task = work_queue_wait_internal(foreman_q, short_timeout, master_link, master_link_active);
+		task = work_queue_wait_internal(foreman_q, short_timeout, master, &master_active);
 		
 		if(task) {
 			report_task_complete(master, NULL, task);
@@ -1606,13 +1593,12 @@ static void foreman_for_master(struct link *master) {
 		work_queue_get_resources(foreman_q,local_resources);
 		send_resource_update(master,0);
 		
-		if(list_size(master_link_active)) {
-			result &= handle_master(list_pop_head(master_link_active));
+		if(master_active) {
+			result &= handle_master(master);
 		}
 
 		if(!result) {
 			disconnect_master(master);
-			current_master = NULL;
 			break;
 		}
 		
