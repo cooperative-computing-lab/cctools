@@ -20,6 +20,7 @@ show_help()
 	echo "  -s <path>       Set the location for creating the working directory of the worker."
 	echo "  -j              Use job array to submit workers."	
 	echo "  -p <parameters> SGE qsub parameters."
+	echo "  -P <pwfile>         Password file to authenticate workers to master."
 	echo "  -h              Show this help message."
 	exit 1
 }
@@ -49,6 +50,7 @@ do
 		s)  arguments="$arguments -s $OPTARG";;
 		j)  use_jobarray=1;;
 		p)  parameters="$parameters $OPTARG";;
+	        P)  arguments="$arguments -P $OPTARG";;
 		h)  show_help;;
 		\?) show_help;;
 	esac
