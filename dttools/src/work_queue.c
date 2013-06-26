@@ -373,6 +373,9 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 		result = process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
+	} else if (string_prefix_is(line, "auth")) {
+		debug(D_WQ|D_NOTICE,"%s (%s) is attempting to use a password, but I do not have one.",w->hostname,w->addrport);
+		result = -1;
 	} else if (string_prefix_is(line,"ready")) {
 		debug(D_WQ|D_NOTICE,"%s (%s) is an older worker that is not compatible with this master.",w->hostname,w->addrport);
 		result = -1;
