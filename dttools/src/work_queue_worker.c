@@ -1649,8 +1649,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s\n", "--foreman-port=<port>[:<highport>]");
 	fprintf(stdout, " %-30s Set the port for the foreman to listen on.  If <highport> is specified\n", "");
 	fprintf(stdout, " %-30s the port is chosen from the range port:highport.  Implies --foreman.\n", "");
-	fprintf(stdout, " %-30s Enable the measurement of foreman capacity to handle new workers.\n","-c,--measure-capacity");
-	fprintf(stdout, " %-30s (default=disabled).\n", "");
 	fprintf(stdout, " %-30s Set the fast abort multiplier for foreman (default=disabled).\n", "-F,--fast-abort=<mult>");
 	fprintf(stdout, " %-30s Send statistics about foreman to this file.\n", "--specify-log=<logfile>");
 	fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-M,--master-name=<name>"); 
@@ -1780,7 +1778,7 @@ int main(int argc, char *argv[])
 	char * foreman_name = NULL;
 	struct utsname uname_data;
 	struct link *master = NULL;
-	int enable_capacity = 0;
+	int enable_capacity = 1; // enabled by default
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
 
@@ -1839,6 +1837,7 @@ int main(int argc, char *argv[])
 			break;
 		}
 		case 'c':
+			// This option is deprecated. Capacity estimation is now on by default for the foreman.
 			enable_capacity = 1; 
 			break;
 		case 'F':

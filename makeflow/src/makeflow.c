@@ -2022,8 +2022,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog-server=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
-	fprintf(stdout, " %-30s Enable master capacity estimation in Work Queue.\n", "-E,--wq-estimate-capacity");
-	fprintf(stdout, " %-30s Estimated master capacity may be viewed in the Work Queue log file.\n", "");
 	fprintf(stdout, " %-30s Write summary of workflow to this file upon success or failure.\n", "-f,--summary-log=<file>");
 	fprintf(stdout, " %-30s Work Queue fast abort multiplier.           (default is deactivated)\n", "-F,--wq-fast-abort=<#>");
 	fprintf(stdout, " %-30s Show this help screen.\n", "-h,--help");
@@ -2213,7 +2211,7 @@ int main(int argc, char *argv[])
 	char *ppm_option = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
-	int work_queue_estimate_capacity_on = 0;
+	int work_queue_estimate_capacity_on = 1; // capacity estimation is on by default
 	int work_queue_keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
 	int work_queue_keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
 	char *write_summary_to = NULL;
@@ -2371,6 +2369,7 @@ int main(int argc, char *argv[])
 			ppm_mode = 5;
 			break;
 		case 'E':
+			// This option is deprecated. Capacity estimation is now on by default.
 			work_queue_estimate_capacity_on = 1;
 			break;
 		case 'f':
