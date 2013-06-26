@@ -11,27 +11,29 @@ prepare()
 {
 	cat > "$expected" <<EOF
 ++
-bar
-bar
+/a/b/bar
+/a/b/c/bar
 ++
-noresults
+no results
 ++
-bar
+/a/b/c/bar
 ++
-noresults
+no results
 ++
-bar
+/a/b/bar
 ++
-bar
+no results
 ++
-foo
+/a/b/foo
 ++
-foo
+no results
 ++
-foo
+no results
 ++
-bar
-bar
+/a/b/foo
+++
+/a/b/bar
+/a/b/c/bar
 ++
 EOF
 }
@@ -40,25 +42,29 @@ run()
 {
 	{
 		echo ++
-		$psearch fixtures/a 'bar'
+		$psearch fixtures 'bar' | sort
 		echo ++
-		$psearch fixtures/a '/bar'
+		$psearch fixtures '/bar'
 		echo ++
-		$psearch fixtures/a 'c/bar'
+		$psearch fixtures 'c/bar'
 		echo ++
-		$psearch fixtures/a '/c/bar'
+		$psearch fixtures '/c/bar'
 		echo ++
-		$psearch fixtures/a 'b/bar'
+		$psearch fixtures 'b/bar'
 		echo ++
-		$psearch fixtures/a '/b/bar'
+		$psearch fixtures '/b/bar'
 		echo ++
-		$psearch fixtures/a 'b/foo'
+		$psearch fixtures 'b/foo'
 		echo ++
-		$psearch fixtures/a '/b/foo'
+		$psearch fixtures '/b/foo'
 		echo ++
-		$psearch fixtures/a '/*/foo'
+		$psearch fixtures '/a/b/foo'
 		echo ++
-		$psearch fixtures/a '*/*r'
+		$psearch fixtures '/*/foo'
+		echo ++
+		$psearch fixtures '/*/*/foo'
+		echo ++
+		$psearch fixtures '*/*r' | sort
 		echo ++
 	} > "$output"
 

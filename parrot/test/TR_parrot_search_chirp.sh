@@ -34,6 +34,8 @@ no results
 ++
 /a/b/foo
 ++
+/a/b/foo
+++
 no results
 ++
 /a/b/foo
@@ -64,8 +66,8 @@ run()
 		$psearch /chirp/localhost:`cat $chirp_port`/ '/b/bar'
 		echo ++
 		$psearch /chirp/localhost:`cat $chirp_port`/ 'b/foo'
-#echo ++
-#$psearch /chirp/localhost:`cat $chirp_port`/ '/a/b/foo'
+		echo ++
+		$psearch /chirp/localhost:`cat $chirp_port`/ '/a/b/foo'
 		echo ++
 		$psearch /chirp/localhost:`cat $chirp_port`/ '/*/foo'
 		echo ++
