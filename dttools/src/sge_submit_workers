@@ -7,7 +7,6 @@ show_help()
 	echo "  -a              Enable auto mode."
 	echo "  -M <name>       Name of the preferred master for worker."
 	echo "  -N <name>       Same as -M (backwards compatibility)."
-	echo "  -c <num>        Set the number of cores each worker should use (0=auto). (default=1)"
 	echo "  -C <catalog>    Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
 	echo "  -t <time>       Abort after this amount of idle time. (default=900s)."
 	echo "  -d <subsystem>  Enable debugging on worker for this subsystem (try -d all to start)."
@@ -18,6 +17,9 @@ show_help()
 	echo "  -A <arch>       Set architecture string for the worker to report to master instead of the value in uname."
 	echo "  -O <os>         Set operating system string for the worker to report to master instead of the value in uname."
 	echo "  -s <path>       Set the location for creating the working directory of the worker."
+	echo "  -c <num>        Set the number of cores each worker should use (0=auto). (default=1)"
+	echo "  -m <size>       Manually set the amonut of memory (in MB) reported by this worker."
+	echo "  -S <size>       Manually set the amount of disk (in MB) reported by this worker."
 	echo "  -j              Use job array to submit workers."	
 	echo "  -p <parameters> SGE qsub parameters."
 	echo "  -P <pwfile>         Password file to authenticate workers to master."
@@ -31,13 +33,12 @@ use_jobarray=0
 parameters=""
 cores=1
 
-while getopts aM:N:c:C:t:d:w:i:b:z:A:O:s:jp:h opt 
+while getopts aM:N:C:t:d:w:i:b:z:A:O:s:c:m:S:jp:h opt 
 do
 	case "$opt" in
 		a)  arguments="$arguments -a"; use_auto=1;;
 		M)  arguments="$arguments -M $OPTARG"; use_auto=1;;
 		N)  arguments="$arguments -M $OPTARG"; use_auto=1;;
-		c)  arguments="$arguments --cores $OPTARG"; cores=$OPTARG;;
 		C)  arguments="$arguments -C $OPTARG";;
 		t)  arguments="$arguments -t $OPTARG";;
 		d)  arguments="$arguments -d $OPTARG";;
@@ -48,6 +49,9 @@ do
 		A)  arguments="$arguments -A $OPTARG";;
 		O)  arguments="$arguments -O $OPTARG";;
 		s)  arguments="$arguments -s $OPTARG";;
+		c)  arguments="$arguments --cores $OPTARG"; cores=$OPTARG;;
+		m)  arguments="$arguments --memory $OPTARG";;
+		S)  arguments="$arguments --disk $OPTARG";;
 		j)  use_jobarray=1;;
 		p)  parameters="$parameters $OPTARG";;
 	        P)  arguments="$arguments -P $OPTARG";;
