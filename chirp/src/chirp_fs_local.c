@@ -561,7 +561,7 @@ static int search_directory(const char *subject, const char * const base, char *
 			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, fullpath);
 	} else {
 		link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_OPEN, fullpath);
-    }
+	}
 
 	return result;
 }
