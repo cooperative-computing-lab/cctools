@@ -2052,7 +2052,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
 	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
 	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
-	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--wq-random-port=<file>");
+	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
 	fprintf(stdout, "\n*Display Options:\n\n");
 	fprintf(stdout, " %-30s Display the Makefile as a Dot graph or a PPM completion graph.\n", "-D,--display=<opt>");
 	fprintf(stdout, " %-30s Where <opt> is:\n", "");
@@ -2297,7 +2297,7 @@ int main(int argc, char *argv[])
 		{"version", no_argument, 0, 'v'},
 		{"wq-schedule", required_argument, 0, 'W'},
 		{"zero-length-error", no_argument, 0, 'z'},
-		{"wq-random-port", required_argument, 0, 'Z'},
+		{"port-file", required_argument, 0, 'Z'},
 		{0, 0, 0, 0}
 	};
 

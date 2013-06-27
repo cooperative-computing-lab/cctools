@@ -1639,6 +1639,8 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " %-30s Enable auto mode. In this mode the worker\n", "-a,--advertise");
 	fprintf(stdout, " %-30s would ask a catalog server for available masters.\n", "");
+	fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-M,--master-name=<name>"); 
+	fprintf(stdout, " %-30s projects.\n", ""); 
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
@@ -1650,12 +1652,10 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s\n", "--foreman-port=<port>[:<highport>]");
 	fprintf(stdout, " %-30s Set the port for the foreman to listen on.  If <highport> is specified\n", "");
 	fprintf(stdout, " %-30s the port is chosen from the range port:highport.  Implies --foreman.\n", "");
-	fprintf(stdout, " %-30s Select port to listen to at random and write to this file.  Implies --foreman.\n", "-Z,--wq-random-port=<file>");
+	fprintf(stdout, " %-30s Select port to listen to at random and write to this file.  Implies --foreman.\n", "-Z,--foreman-port-file=<file>");
 	fprintf(stdout, " %-30s Set the fast abort multiplier for foreman (default=disabled).\n", "-F,--fast-abort=<mult>");
 	fprintf(stdout, " %-30s Send statistics about foreman to this file.\n", "--specify-log=<logfile>");
-	fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-M,--master-name=<name>"); 
-	fprintf(stdout, " %-30s projects.\n", ""); 
-	fprintf(stdout, " %-30s When in Foreman mode, this foreman will advertise to the catalog server\n", "-N,--name=<name>");
+	fprintf(stdout, " %-30s When in Foreman mode, this foreman will advertise to the catalog server\n", "-N,--foreman-name=<name>");
 	fprintf(stdout, " %-30s as <name>.\n", "");
 	fprintf(stdout, " %-30s Password file for authenticating to the master.\n", "-P,--password=<pwfile>");
 	fprintf(stdout, " %-30s Abort after this amount of idle time. (default=%ds)\n", "-t,--timeout=<time>", idle_timeout);
@@ -1747,12 +1747,12 @@ struct option long_options[] = {
 	{"debug-release-reset", no_argument,        0,  LONG_OPT_DEBUG_RELEASE},
 	{"foreman",             no_argument,        0,  LONG_OPT_FOREMAN},
 	{"foreman-port",        required_argument,  0,  'f'},
-	{"wq-random-port",      required_argument,  0,  'Z'},
+	{"foreman-port-file",   required_argument,  0,  'Z'},
+	{"foreman-name",        required_argument,  0,  'N'},
 	{"measure-capacity",    no_argument,        0,  'c'},
 	{"fast-abort",          required_argument,  0,  'F'},
 	{"specify-log",         required_argument,  0,  LONG_OPT_SPECIFY_LOG},
 	{"master-name",         required_argument,  0,  'M'},
-	{"name",                required_argument,  0,  'N'},
 	{"password",            required_argument,  0,  'P'},
 	{"timeout",             required_argument,  0,  't'},
 	{"tcp-window-size",     required_argument,  0,  'w'},
