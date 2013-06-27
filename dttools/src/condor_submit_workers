@@ -7,6 +7,7 @@ show_help()
 	echo "  -a                  Enable auto mode."
 	echo "  -M <name>           Name of the preferred master for worker."
 	echo "  -N <name>           Same as -M (backwards compatibility)."
+	echo "  -c <num>			Set the number of cores each worker should use (0=auto). (default=1)"
 	echo "  -C <catalog>        Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
 	echo "  -t <time>           Abort after this amount of idle time. (default=900s)."
 	echo "  -d <subsystem>      Enable debugging on worker for this subsystem (try -d all to start)."
@@ -35,12 +36,13 @@ use_auto=0
 transfer_input_files="work_queue_worker"
 pwfile=""
 
-while getopts aM:N:C:t:d:w:i:b:z:A:O:s:r:P:h opt 
+while getopts aM:N:c:C:t:d:w:i:b:z:A:O:s:r:P:h opt 
 do
 	case "$opt" in
 		a)  arguments="$arguments -a"; use_auto=1;;
 		M)  arguments="$arguments -M $OPTARG"; use_auto=1;;
 		N)  arguments="$arguments -M $OPTARG"; use_auto=1;;
+		c)  arguments="$arguments --cores $OPTARG";; 
 		C)  arguments="$arguments -C $OPTARG";;
 		t)  arguments="$arguments -t $OPTARG";;
 		d)  arguments="$arguments -d $OPTARG";;
@@ -52,8 +54,7 @@ do
 		O)  arguments="$arguments -O $OPTARG";;
 		s)  arguments="$arguments -s $OPTARG";;
 		r)  requirements="$requirments $OPTARG";;
-	        P)  pwfile=$OPTARG
-		    arguments="$arguments -P $pwfile";;
+		P)  pwfile=$OPTARG arguments="$arguments -P $pwfile";;
 		h)  show_help;;
 		\?) show_help;;
 	esac
