@@ -16,15 +16,12 @@ prepare()
 
 int main(int argc, char **argv)
 {
-	char **files = malloc(2 * sizeof(*files));
+	const char * const files[] = {
+	  "../src/chunk.c",
+	  "../src/chunk.h",
+	};
 
-	files[0] = malloc(8 * sizeof(*files[0]));
-	strcpy(files[0], "../src/chunk.c");
-
-	files[1] = malloc(8 * sizeof(*files[0]));
-	strcpy(files[1], "../src/chunk.h");
-
-	if(!chunk_concat(argv[1], (char **) files, 2, "> ", NULL)) {
+	if(!chunk_concat(argv[1], files, sizeof(files)/sizeof(char *), "> ", NULL)) {
 		fprintf(stderr, "chunk_test: chunk_concat failed\n");
 		exit(1);
 	}

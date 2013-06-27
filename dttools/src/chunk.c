@@ -85,6 +85,8 @@ struct chunk_set *chunk_parse_file(char *file_name, char *ln_prefix, char *fc_pr
 		fc_prefix_len = strlen(fc_prefix);
 
 	FILE *fp = fopen(file_name, "r");
+	if (fp == NULL) return NULL;
+
 	long pos = 0;
 	char *line;
 
@@ -160,7 +162,7 @@ char *chunk_read(struct chunk_set *chunk_set, const char *file_name, int *size)
 	return content;
 }
 
-int chunk_concat(const char *new_name, char **filenames, int num_files, char *ln_prefix, char *fc_prefix)
+int chunk_concat(const char *new_name, const char * const *filenames, int num_files, char *ln_prefix, char *fc_prefix)
 {
 	FILE *old_file, *new_file;
 	char *line;
@@ -179,8 +181,9 @@ int chunk_concat(const char *new_name, char **filenames, int num_files, char *ln
 
 	int i;
 	for(i = 0; i < num_files; ++i) {
-		char *current_file_name = filenames[i];
+		const char *current_file_name = filenames[i];
 		old_file = fopen(current_file_name, "r");
+		if (old_file == NULL) return 0;
 
 		fprintf(new_file, "%s%s\n", ln_prefix, current_file_name);
 
