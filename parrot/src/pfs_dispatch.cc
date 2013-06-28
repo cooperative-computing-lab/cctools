@@ -23,30 +23,32 @@ extern "C" {
 #include "debug.h"
 }
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
 #include <unistd.h>
-#include <signal.h>
-#include <time.h>
+
 #include <fcntl.h>
-#include <limits.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/statfs.h>
-#include <sys/file.h>
 #include <termios.h>
-#include <sys/time.h>
-#include <ctype.h>
-#include <sys/utsname.h>
-#include <sys/un.h>
-#include <net/if.h>
+
 #include <linux/sockios.h>
 
+#include <net/if.h>
+
+#include <sys/file.h>
+#include <sys/mman.h>
+#include <sys/personality.h>
+#include <sys/time.h>
 #include <sys/types.h>
-#include <unistd.h>
+#include <sys/un.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
+
+#include <ctype.h>
+#include <errno.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 extern struct pfs_process *pfs_current;
 extern char *pfs_temp_dir;
@@ -1533,6 +1535,21 @@ void decode_syscall( struct pfs_process *p, int entering )
 				}
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_personality:
+			if(entering) {
+				unsigned long persona = args[0];
+				switch (persona) {
+					case PER_LINUX:
+					case PER_LINUX_32BIT:
+					case 0xffffffff: /* get personality */
+						/* allow the call to go through to the kernel */
+						break;
+					default:
+						fatal("cannot execute program with personality %d", persona);
+				}
 			}
 			break;
 
