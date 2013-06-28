@@ -1538,7 +1538,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
-		case SYSCALL64_personality:
+		case SYSCALL32_personality:
 			if(entering) {
 				unsigned long persona = args[0];
 				switch (persona) {
