@@ -24,7 +24,8 @@ run() {
 
 clean() {
     cd linker
-    rm -r "$out_dir"
+    rm -rf /tmp/makeflow_test_absolute_path
+    rm -rf "$out_dir"
     exit 0
 }
 
