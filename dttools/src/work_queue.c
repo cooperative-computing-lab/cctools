@@ -2156,18 +2156,6 @@ static void start_tasks(struct work_queue *q)
 	}
 }
 
-//Check if worker sent ready message since connecting. If it hasn't for more than wq_worker_unready_timeout, remove it.
-static void do_ready_check(struct work_queue *q, struct work_queue_worker *w, timestamp_t current) {
-	int connection_elapsed_time;
-	if(!strcmp(w->hostname, "unknown")){
-		connection_elapsed_time = (int)(current - w->start_time)/1000000;
-		if(connection_elapsed_time >= wq_worker_unready_timeout) {
-			debug(D_WQ, "Removing worker %s (%s): hasn't sent ready message for more than %d s since connection.", w->hostname, w->addrport, wq_worker_unready_timeout);
-			remove_worker(q, w);
-		}
-	}
-}
-
 //Send keepalive to check if worker is still responsive after getting task(s) to run. If not, remove worker. 
 static void do_keepalive_check(struct work_queue *q, struct work_queue_worker *w, timestamp_t current) {
 	if(itable_size(w->current_tasks)) {
@@ -2204,9 +2192,14 @@ static void remove_unresponsive_workers(struct work_queue *q) {
 	
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		do_ready_check(q, w, current_time);		
 		
-		if(q->keepalive_interval > 0) {
+		if(!strcmp(w->hostname, "unknown")){
+			int connection_elapsed_time = (int)(current_time - w->start_time)/1000000;
+			if(connection_elapsed_time > wq_worker_unready_timeout) {
+				debug(D_WQ, "Removing worker (%s): hasn't sent ready message for more than %d s since connection.", w->addrport, wq_worker_unready_timeout);
+				remove_worker(q, w);
+			}
+		} else if(q->keepalive_interval > 0) {
 			do_keepalive_check(q, w, current_time);
 		}
 	}
