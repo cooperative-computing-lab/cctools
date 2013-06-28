@@ -3,7 +3,6 @@
 . ../../dttools/src/test_runner.common.sh
 
 sfxfile=example.sfx
-cfgfile=example.cfg
 
 prepare()
 {
@@ -12,6 +11,15 @@ prepare()
 
 run()
 {
+    case `uname -s` in
+        Darwin)
+            cfgfile=example.osx.cfg
+            ;;
+        *)
+            cfgfile=example.cfg
+            ;;
+    esac
+
     ../src/starch -C $cfgfile $sfxfile
     exec ./$sfxfile
 }
