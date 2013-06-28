@@ -34,6 +34,7 @@ extern "C" {
 
 #include <sys/file.h>
 #include <sys/mman.h>
+#include <sys/personality.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -1534,6 +1535,21 @@ void decode_syscall( struct pfs_process *p, int entering )
 				}
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL64_personality:
+			if(entering) {
+				unsigned long persona = args[0];
+				switch (persona) {
+					case PER_LINUX:
+					case PER_LINUX_32BIT:
+					case 0xffffffff: /* get personality */
+						/* allow the call to go through to the kernel */
+						break;
+					default:
+						fatal("cannot execute program with personality %d", persona);
+				}
 			}
 			break;
 
