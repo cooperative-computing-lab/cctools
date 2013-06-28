@@ -544,6 +544,28 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 }
 
 /*
+Remove trailing slashes from a path
+*/
+
+static void chomp_slashes( char *s )
+{
+        char *t = s;
+
+        if(!s) return;
+
+        while(*t) {
+                t++;
+        }
+
+        t--;
+
+        while(*t=='/' && t!=s ) {
+                *t=0;
+                t--;
+        }
+}
+
+/*
 Given a full PFS path name, search for an already-loaded
 filesystem record.  If it exists, then search it for the
 appropriate dirent.  If no filesystem record is found,
@@ -554,6 +576,14 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_symlinks)
 {
 	char const *subpath = NULL;
 	cvmfs_filesystem *f = lookup_filesystem(path, &subpath);
+
+	/*
+	If we attempt to lookup a directory name using a path
+	ending in a slash, CVMFS will *not* find it.
+	So, we clean that up manually.
+	*/
+
+	chomp_slashes(path->rest);
 
 	if(!f) {
 		return false;
@@ -580,6 +610,7 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_symlinks)
 	size = st.st_size;
 	inode = st.st_ino;
 	mtime = st.st_mtime;
+
 	return true;
 }
 
