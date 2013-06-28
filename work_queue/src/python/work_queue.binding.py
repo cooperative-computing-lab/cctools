@@ -488,8 +488,8 @@ class WorkQueue(_object):
     #
     #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #	
-    # @param q A work queue object.
-    # @param summaryfile Filename for the summary log (If NULL, writes to wq-<pid>-resource-usage).
+    # @param self 	Reference to the current work queue object.
+    # @param summaryfile Filename for the summary log (If NULL, writes to wq-\<pid\>-resource-usage).
     def enable_monitoring(self, summaryfile):
         return work_queue_enable_monitoring(self._work_queue, summaryfile)	
 
