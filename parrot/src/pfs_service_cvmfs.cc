@@ -547,7 +547,7 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 	with dot.
 	*/
  
-	if(name->host[0]=='.') {
+	if(name->host[0]!='.') {
 		debug(D_CVMFS|D_NOTICE, "PARROT_CVMFS_REPO does not contain an entry for the CVMFS repository '%s'",name->host);
 	}
 
