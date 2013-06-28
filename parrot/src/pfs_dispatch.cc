@@ -23,30 +23,31 @@ extern "C" {
 #include "debug.h"
 }
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
 #include <unistd.h>
-#include <signal.h>
-#include <time.h>
+
 #include <fcntl.h>
-#include <limits.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/statfs.h>
-#include <sys/file.h>
 #include <termios.h>
-#include <sys/time.h>
-#include <ctype.h>
-#include <sys/utsname.h>
-#include <sys/un.h>
-#include <net/if.h>
+
 #include <linux/sockios.h>
 
+#include <net/if.h>
+
+#include <sys/file.h>
+#include <sys/mman.h>
+#include <sys/time.h>
 #include <sys/types.h>
-#include <unistd.h>
+#include <sys/un.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
+
+#include <ctype.h>
+#include <errno.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 extern struct pfs_process *pfs_current;
 extern char *pfs_temp_dir;
