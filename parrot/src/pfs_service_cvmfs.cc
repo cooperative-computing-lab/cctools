@@ -538,9 +538,43 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 	}
 
 	debug(D_CVMFS, "lookup_filesystem(%s,%s) --> ENOENT", name->host, name->rest);
-	debug(D_CVMFS|D_NOTICE, "PARROT_CVMFS_REPO does not contain an entry for the CVMFS repository '%s'",name->host);
+
+	/*
+	It is common for various programs to search for config files
+	starting with dot in their parent directories, all the way up
+	to the root.  This unnecessarily triggers the following error
+	message.  Suppress the error message if the hostname begins
+	with dot.
+	*/
+ 
+	if(name->host[0]=='.') {
+		debug(D_CVMFS|D_NOTICE, "PARROT_CVMFS_REPO does not contain an entry for the CVMFS repository '%s'",name->host);
+	}
+
 	errno = ENOENT;
 	return 0;
+}
+
+/*
+Remove trailing slashes from a path
+*/
+
+static void chomp_slashes( char *s )
+{
+        char *t = s;
+
+        if(!s) return;
+
+        while(*t) {
+                t++;
+        }
+
+        t--;
+
+        while(*t=='/' && t!=s ) {
+                *t=0;
+                t--;
+        }
 }
 
 /*
@@ -554,6 +588,14 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_symlinks)
 {
 	char const *subpath = NULL;
 	cvmfs_filesystem *f = lookup_filesystem(path, &subpath);
+
+	/*
+	If we attempt to lookup a directory name using a path
+	ending in a slash, CVMFS will *not* find it.
+	So, we clean that up manually.
+	*/
+
+	chomp_slashes(path->rest);
 
 	if(!f) {
 		return false;
@@ -580,6 +622,7 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_symlinks)
 	size = st.st_size;
 	inode = st.st_ino;
 	mtime = st.st_mtime;
+
 	return true;
 }
 
