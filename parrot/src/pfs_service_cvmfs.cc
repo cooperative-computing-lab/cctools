@@ -538,7 +538,19 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 	}
 
 	debug(D_CVMFS, "lookup_filesystem(%s,%s) --> ENOENT", name->host, name->rest);
-	debug(D_CVMFS|D_NOTICE, "PARROT_CVMFS_REPO does not contain an entry for the CVMFS repository '%s'",name->host);
+
+	/*
+	It is common for various programs to search for config files
+	starting with dot in their parent directories, all the way up
+	to the root.  This unnecessarily triggers the following error
+	message.  Suppress the error message if the hostname begins
+	with dot.
+	*/
+ 
+	if(name->host[0]=='.') {
+		debug(D_CVMFS|D_NOTICE, "PARROT_CVMFS_REPO does not contain an entry for the CVMFS repository '%s'",name->host);
+	}
+
 	errno = ENOENT;
 	return 0;
 }
