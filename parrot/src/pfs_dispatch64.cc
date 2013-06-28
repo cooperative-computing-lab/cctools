@@ -12,7 +12,7 @@ See the file COPYING for details.
 
 int pfs_dispatch64( struct pfs_process *p, INT64_T signum )
 {
-  return 0;
+	return 0;
 }
 
 #else
