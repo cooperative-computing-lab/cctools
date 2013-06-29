@@ -282,10 +282,10 @@ of these signals, grab control of the terminal.
 static void control_terminal( int sig )
 {
 	if(sig==SIGTTOU) {
-		tcsetpgrp(1,getpid());
-		tcsetpgrp(2,getpid());
+		tcsetpgrp(1,getpgrp());
+		tcsetpgrp(2,getpgrp());
 	} else {
-		tcsetpgrp(0,getpid());
+		tcsetpgrp(0,getpgrp());
 	}
 }
 
