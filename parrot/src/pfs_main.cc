@@ -717,8 +717,12 @@ int main( int argc, char *argv[] )
 	*/
 
 	if(getsid(0)==getpid()) {
+		debug(D_PROCESS, "disconnecting from terminal");
 		::ioctl(0,TIOCNOTTY,0);
 	}
+
+	setpgrp();
+	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
 
 	if(pid==0) {
 		pid = fork();
