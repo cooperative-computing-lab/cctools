@@ -103,7 +103,6 @@ double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 int wq_minimum_transfer_timeout = 3;
 int wq_foreman_transfer_timeout = 3600;
-int wq_worker_unready_timeout = 300; //used in remove_unready_workers()
 
 struct work_queue {
 	char *name;
@@ -164,8 +163,8 @@ struct work_queue {
 	int catalog_port;
 
 	FILE *logfile;
-	timestamp_t keepalive_interval;
-	timestamp_t keepalive_timeout;
+	int keepalive_interval;
+	int keepalive_timeout;
 
 	int monitor_mode;
 	int monitor_fd;
@@ -195,7 +194,6 @@ struct work_queue_worker {
 	timestamp_t total_task_time;
 	timestamp_t total_transfer_time;
 	timestamp_t start_time;
-	timestamp_t last_msg_sent_time;
 	timestamp_t last_msg_recv_time;
 	timestamp_t keepalive_check_sent_time;
 };
@@ -334,8 +332,6 @@ static int send_worker_msg(struct work_queue_worker *w, const char *fmt, time_t 
 	vdebug(D_WQ, debug_msg, debug_va);
 	
 	int result = link_putvfstring(w->link, fmt, stoptime, va);	
-	if (result > 0) 
-		w->last_msg_sent_time = timestamp_get();		
 	va_end(va);
 
 	return result;  
@@ -2156,51 +2152,44 @@ static void start_tasks(struct work_queue *q)
 	}
 }
 
-//Send keepalive to check if worker is still responsive after getting task(s) to run. If not, remove worker. 
-static void do_keepalive_check(struct work_queue *q, struct work_queue_worker *w, timestamp_t current) {
-	if(itable_size(w->current_tasks)) {
-		timestamp_t keepalive_elapsed_time = (current - w->last_msg_sent_time)/1000000;
-		// send new keepalive check only (1) if we received a response since last keepalive check AND 
-		// (2) we are past keepalive interval 
-		if(w->last_msg_recv_time >= w->keepalive_check_sent_time) {	
-			if(keepalive_elapsed_time >= q->keepalive_interval) {
-				if (send_worker_msg(w, "%s\n", time(0) + short_timeout, "check") < 0) {
-					debug(D_WQ, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
-					remove_worker(q, w);
-				} else {
-					debug(D_WQ, "Sent keepalive check to worker %s (%s)", w->hostname, w->addrport);
-					w->keepalive_check_sent_time = current;	
-				}	
-			}
-		} else { 
-			// we haven't received a message from worker since its last keepalive check. Check if time 
-			// since we last polled link for responses has exceeded keepalive timeout. If so, remove worker.
-			if (link_poll_end > w->keepalive_check_sent_time) {
-				if (((link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
-					debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
-					remove_worker(q, w);
-				}
-			}	
-		}
-	}
-}
-
+//Sends keepalives to check if connected workers are responsive. If not, removes those workers. 
 static void remove_unresponsive_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
 	char *key;
+	int last_recv_elapsed_time;
 	timestamp_t current_time = timestamp_get();
 	
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		
-		if(!strcmp(w->hostname, "unknown")){
-			int connection_elapsed_time = (int)(current_time - w->start_time)/1000000;
-			if(connection_elapsed_time > wq_worker_unready_timeout) {
-				debug(D_WQ, "Removing worker (%s): hasn't sent ready message for more than %d s since connection.", w->addrport, wq_worker_unready_timeout);
-				remove_worker(q, w);
+		if(q->keepalive_interval > 0) {
+			if(!strcmp(w->hostname, "unknown")){ 
+				last_recv_elapsed_time = (int)(current_time - w->start_time)/1000000;
+			} else {
+				last_recv_elapsed_time = (int)(current_time - w->last_msg_recv_time)/1000000;
 			}
-		} else if(q->keepalive_interval > 0) {
-			do_keepalive_check(q, w, current_time);
+		
+			// send new keepalive check only (1) if we received a response since last keepalive check AND 
+			// (2) we are past keepalive interval 
+			if(w->last_msg_recv_time >= w->keepalive_check_sent_time) {	
+				if(last_recv_elapsed_time >= q->keepalive_interval) {
+					if (send_worker_msg(w, "%s\n", time(0) + short_timeout, "check") < 0) {
+						debug(D_WQ, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
+						remove_worker(q, w);
+					} else {
+						debug(D_WQ, "Sent keepalive check to worker %s (%s)", w->hostname, w->addrport);
+						w->keepalive_check_sent_time = current_time;	
+					}	
+				}
+			} else { 
+				// we haven't received a message from worker since its last keepalive check. Check if time 
+				// since we last polled link for responses has exceeded keepalive timeout. If so, remove worker.
+				if (link_poll_end > w->keepalive_check_sent_time) {
+					if ((int)((link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
+						debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
+						remove_worker(q, w);
+					}
+				}	
+			}
 		}
 	}
 }
