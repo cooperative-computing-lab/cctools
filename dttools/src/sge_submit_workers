@@ -2,28 +2,32 @@
 
 show_help() 
 {
+
 	echo "Use: sge_submit_workers [options] <servername> <port> <num-workers>"
-	echo "where options are:"
-	echo "  -a              Enable auto mode."
-	echo "  -M <name>       Name of the preferred master for worker."
-	echo "  -N <name>       Same as -M (backwards compatibility)."
-	echo "  -C <catalog>    Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
-	echo "  -t <time>       Abort after this amount of idle time. (default=900s)."
-	echo "  -d <subsystem>  Enable debugging on worker for this subsystem (try -d all to start)."
-	echo "  -w <size>       Set TCP window size."
-	echo "  -i <time>       Set initial value for backoff interval when worker fails to connect to a master. (default=1s)"
-	echo "  -b <time>       Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)"
-	echo "  -z <size>       Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)"
-	echo "  -A <arch>       Set architecture string for the worker to report to master instead of the value in uname."
-	echo "  -O <os>         Set operating system string for the worker to report to master instead of the value in uname."
-	echo "  -s <path>       Set the location for creating the working directory of the worker."
-	echo "  -c <num>        Set the number of cores each worker should use (0=auto). (default=1)"
-	echo "  -m <size>       Manually set the amonut of memory (in MB) reported by this worker."
-	echo "  -S <size>       Manually set the amount of disk (in MB) reported by this worker."
-	echo "  -j              Use job array to submit workers."	
-	echo "  -p <parameters> SGE qsub parameters."
-	echo "  -P <pwfile>         Password file to authenticate workers to master."
-	echo "  -h              Show this help message."
+	echo "         when auto mode is not enabled, or"  
+	echo "     sge_submit_workers [options] <num-workers>"
+	echo "         when auto mode is enabled."  
+	echo "Options:"
+	echo "  -a,--advertise           Enable auto mode."
+	echo "  -M,--master-name <name>  Name of the preferred master for worker. (auto mode enabled)"
+	echo "  -N,--name <name>         Same as -M (backwards compatibility). (auto mode enabled)"
+	echo "  -C,--catalog <catalog>   Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
+	echo "  -t,--timeout <time>      Abort after this amount of idle time. (default=900s)."
+	echo "  -d,--debug <subsystem>   Enable debugging on worker for this subsystem (try -d all to start)."
+	echo "  -w,--tcp-window-size <size>  Set TCP window size."
+	echo "  -i,--min-backoff <time>  Set initial value for backoff interval when worker fails to connect to a master. (default=1s)"
+	echo "  -b,--max-backoff <time>  Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)"
+	echo "  -z,--disk-threshold <size>   Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)"
+	echo "  -A,--arch <arch>         Set architecture string for the worker to report to master instead of the value in uname."
+	echo "  -O,--os <os>             Set operating system string for the worker to report to master instead of the value in uname."
+	echo "  -s,--workdir <path>      Set the location for creating the working directory of the worker."
+	echo "  -P,--password <pwfile>   Password file to authenticate workers to master."
+	echo "  --cores <num>            Set the number of cores each worker should use (0=auto). (default=1)"
+	echo "  --memory <size>          Manually set the amonut of memory (in MB) reported by this worker."
+	echo "  --disk <size>            Manually set the amount of disk (in MB) reported by this worker."
+	echo "  -j                       Use job array to submit workers."	
+	echo "  -p <parameters>          SGE qsub parameters."
+	echo "  -h,--help                Show this help message."
 	exit 1
 }
 
@@ -33,47 +37,115 @@ use_jobarray=0
 parameters=""
 cores=1
 
-while getopts aM:N:C:t:d:w:i:b:z:A:O:s:c:m:S:jp:h opt 
+# Used options (as in the getopts format):  aM:N:C:t:d:w:i:b:z:A:O:s:P:jp:h  
+
+while [ $# -gt 0 ]
 do
-	case "$opt" in
-		a)  arguments="$arguments -a"; use_auto=1;;
-		M)  arguments="$arguments -M $OPTARG"; use_auto=1;;
-		N)  arguments="$arguments -M $OPTARG"; use_auto=1;;
-		C)  arguments="$arguments -C $OPTARG";;
-		t)  arguments="$arguments -t $OPTARG";;
-		d)  arguments="$arguments -d $OPTARG";;
-		w)  arguments="$arguments -w $OPTARG";;
-		i)  arguments="$arguments -i $OPTARG";;
-		b)  arguments="$arguments -b $OPTARG";;
-		z)  arguments="$arguments -z $OPTARG";;
-		A)  arguments="$arguments -A $OPTARG";;
-		O)  arguments="$arguments -O $OPTARG";;
-		s)  arguments="$arguments -s $OPTARG";;
-		c)  arguments="$arguments --cores $OPTARG"; cores=$OPTARG;;
-		m)  arguments="$arguments --memory $OPTARG";;
-		S)  arguments="$arguments --disk $OPTARG";;
-		j)  use_jobarray=1;;
-		p)  parameters="$parameters $OPTARG";;
-	        P)  arguments="$arguments -P $OPTARG";;
-		h)  show_help;;
-		\?) show_help;;
+	case $1 in
+		-a | --advertise)
+			arguments="$arguments -a"
+			use_auto=1
+			;;
+		-M | --master-name)
+		    shift
+			arguments="$arguments -M $1"
+			use_auto=1
+			;;
+		-N | --name)
+		    shift
+			arguments="$arguments -M $1"
+		   	use_auto=1
+			;;
+		-C | --catalog)  
+		    shift
+			arguments="$arguments -C $1"
+			;;
+		-t | --timeout)  
+		    shift
+			arguments="$arguments -t $1"
+			;;
+		-d | --debug)  
+			shift
+			arguments="$arguments -d $1"
+			;;
+		-w | --tcp-window-size)
+			shift
+	  		arguments="$arguments -w $1"
+			;;
+		-i | --min-backoff)
+			shift
+			arguments="$arguments -i $1"
+			;;
+		-b | --max-backoff)
+			shift
+		    arguments="$arguments -b $1"
+			;;
+		-z | --disk-threshold)
+			shift
+			arguments="$arguments -z $1"
+			;;
+		-A | --arch)
+			shift
+			arguments="$arguments -A $1"
+			;;
+		-O | --os)  
+			shift
+			arguments="$arguments -O $1"
+			;;
+		-s | --workdir)  
+			shift
+			arguments="$arguments -s $1"
+			;;
+		-P | --password)  
+			shift
+			pwfile=$1 
+			arguments="$arguments -P $pwfile"
+			;;
+		--cores)  
+			shift
+			cores=$1
+			arguments="$arguments --cores $cores"
+			;; 
+		--memory)  
+			shift
+			arguments="$arguments --memory $1"
+			;;
+		--disk)  
+			shift
+			arguments="$arguments --disk $1"
+			;;
+		-j)  
+			use_jobarray=1
+			;;
+		-p)  
+			shift
+			parameters="$parameters $1"
+			;;
+		-h | --help)
+		    show_help
+			;;
+		*)
+			break
+			;;
 	esac
+	shift
 done
 
-shift $(expr $OPTIND - 1)
-
 if [ $use_auto = 0 ]; then
-    if [ X$3 = X ]
-    then
-	show_help	
+    if [ $# -ne 3 ] ; then
+		echo "3 arguments (<servername> <port> <num-workers>) are expected while $# is present: \"$@\"."
+		echo "To view the help message, type: sge_submit_workers -h"
+		exit 1
     fi
     host=$1
     port=$2
     count=$3
 else
-    if [ X$1 = X ]
+    if [ $# -ne 1 ]
     then
-	show_help	
+		echo "1 argument (<num-workers>) is expected while $# is present: \"$@\"."
+		echo "To view the help message, type: sge_submit_workers -h"
+		exit 1
     fi
     host=
     port=
