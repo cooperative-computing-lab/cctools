@@ -282,10 +282,10 @@ of these signals, grab control of the terminal.
 static void control_terminal( int sig )
 {
 	if(sig==SIGTTOU) {
-		tcsetpgrp(1,getpid());
-		tcsetpgrp(2,getpid());
+		tcsetpgrp(1,getpgrp());
+		tcsetpgrp(2,getpgrp());
 	} else {
-		tcsetpgrp(0,getpid());
+		tcsetpgrp(0,getpgrp());
 	}
 }
 
@@ -717,8 +717,12 @@ int main( int argc, char *argv[] )
 	*/
 
 	if(getsid(0)==getpid()) {
+		debug(D_PROCESS, "disconnecting from terminal");
 		::ioctl(0,TIOCNOTTY,0);
 	}
+
+	setpgrp();
+	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
 
 	if(pid==0) {
 		pid = fork();
