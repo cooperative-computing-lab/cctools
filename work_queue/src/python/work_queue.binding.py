@@ -114,6 +114,29 @@ class Task(_object):
         return work_queue_task_specify_file(self._task, local_name, remote_name, type, flags)
 
     ##
+    # Add a file piece to the task.
+    #
+    # @param self           Reference to the current task object.
+    # @param local_name     The name of the file on local disk or shared filesystem.
+    # @param remote_name    The name of the file at the execution site.
+    # @param start_byte     The starting byte offset of the file piece to be transferred.
+    # @param end_byte       The ending byte offset of the file piece to be transferred. 
+    # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
+    # @param flags          May be zero to indicate no special handling, or any of the following or'd together:
+    #                       - @ref WORK_QUEUE_NOCACHE
+    #                       - @ref WORK_QUEUE_CACHE
+    # @param cache          Legacy parameter for setting file caching attribute.  By default this is enabled.
+    def specify_file_piece(self, local_name, remote_name=None, start_byte=0, end_byte, type=None, flags=None, cache=True):
+        if remote_name is None:
+            remote_name = os.path.basename(local_name)
+
+        if type is None:
+            type = WORK_QUEUE_INPUT
+
+        flags = Task._determine_file_flags(flags, cache)
+        return work_queue_task_specify_file_piece(self._task, local_name, remote_name, start_byte, end_byte, type, flags)
+
+    ##
     # Add a input file to the task.
     #
     # This is just a wrapper for @ref specify_file with type set to @ref WORK_QUEUE_INPUT.
