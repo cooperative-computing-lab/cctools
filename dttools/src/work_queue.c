@@ -2508,6 +2508,10 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 		return 0;
 	}
 
+	if(end_byte < start_byte) {
+		return 0;
+	}
+
 	if(type == WORK_QUEUE_INPUT) {
 		files = t->input_files;
 	} else {
