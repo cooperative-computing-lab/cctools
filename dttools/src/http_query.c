@@ -173,7 +173,7 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 						errno = EIO;
 						return 0;
 					} else {
-						return http_query(newurl, action, stoptime);
+						return http_query_size_via_proxy(proxy,newurl,action,size,stoptime,cache_reload);
 					}
 				} else {
 					errno = ENOENT;
