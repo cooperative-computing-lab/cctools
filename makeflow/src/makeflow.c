@@ -71,7 +71,6 @@ enum { SHOW_INPUT_FILES = 2,
 
 enum { LONG_OPT_MONITOR_INTERVAL = 1,
        LONG_OPT_MONITOR_LOG_NAME,
-       LONG_OPT_MONITOR_LOG_DIR,
        LONG_OPT_PASSWORD,
        LONG_OPT_MONITOR_LIMITS,
        LONG_OPT_PPM_ROW,
@@ -2045,15 +2044,14 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Use this file for the makeflow log.         (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
 	fprintf(stdout, " %-30s Use this file for the batch system log.     (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
 	fprintf(stdout, " %-30s Send summary of workflow to this email address upon success or failure.\n", "-m,--email=<email>");
-	fprintf(stdout, " %-30s Enable the resource monitor\n", "-M,--monitor");
+	fprintf(stdout, " %-30s Enable the resource monitor, and write the monitor logs to <dir>\n", "-M,--monitor=<dir>");
 	fprintf(stdout, " %-30s Set monitor interval to <#> seconds.\n", "--monitor-interval=<#>");
 	fprintf(stdout, " %-30s Format for monitor logs. (default %s, %%d -> rule number)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
-	fprintf(stdout, " %-30s Set monitor output directory. (default monitor-logs-<date>)\n", "--monitor-log-dir=<dir>");
 	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
 	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-output=<file>");
 	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
 	fprintf(stdout, " %-30s Password file for authenticating workers.\n", "   --password");
-	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--wq-port=<port>", WORK_QUEUE_DEFAULT_PORT);
+	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--port=<port>", WORK_QUEUE_DEFAULT_PORT);
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", dag_retry_max);
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to n times.\n", "-r,--retry-count=<n>");
@@ -2289,16 +2287,15 @@ int main(int argc, char *argv[])
 		{"makeflow-log", required_argument, 0, 'l'},
 		{"batch-log", required_argument, 0, 'L'},
 		{"email", required_argument, 0, 'm'},
-		{"monitor", no_argument, 0, 'M'},
+		{"monitor", required_argument, 0, 'M'},
 		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
 		{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
-		{"monitor-log-dir", required_argument, 0, LONG_OPT_MONITOR_LOG_DIR},
 		{"monitor-limits", required_argument, 0, LONG_OPT_MONITOR_LIMITS},
 		{"password", required_argument, 0, LONG_OPT_PASSWORD},
 		{"project-name", required_argument, 0, 'N'},
 		{"debug-output", required_argument, 0, 'o'},
 		{"show-output", no_argument, 0, 'O'},
-		{"wq-port", required_argument, 0, 'p'},
+		{"port", required_argument, 0, 'p'},
 		{"priority", required_argument, 0, 'P'},
 		{"retry", no_argument, 0, 'R'},
 		{"retry-count", required_argument, 0, 'r'},
@@ -2313,7 +2310,7 @@ int main(int argc, char *argv[])
 	};
 
 
-	while((c = getopt_long(argc, argv, "aAb:B:cC:d:D:Ef:F:g:G:hiIj:J:kKl:L:m:MN:o:Op:P:r:RS:t:T:u:vW:zZ:", long_options, NULL)) >= 0) {
+	while((c = getopt_long(argc, argv, "aAb:B:cC:d:D:Ef:F:g:G:hiIj:J:kKl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:", long_options, NULL)) >= 0) {
 		switch (c) {
 		case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2446,6 +2443,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'M':
 			monitor_mode = 1;
+			if(monitor_log_dir)
+				free(monitor_log_dir);
+			monitor_log_dir = xxstrdup(optarg);
 			break;
 		case 'N':
 			free(project);
@@ -2521,12 +2521,6 @@ int main(int argc, char *argv[])
 			if(monitor_log_format)
 				free(monitor_log_format);
 			monitor_log_format = xxstrdup(optarg);
-			break;
-		case LONG_OPT_MONITOR_LOG_DIR:
-			monitor_mode = 1;
-			if(monitor_log_dir)
-				free(monitor_log_dir);
-			monitor_log_dir = xxstrdup(optarg);
 			break;
 		case LONG_OPT_MONITOR_LIMITS:
 			monitor_mode = 1;
@@ -2624,14 +2618,6 @@ int main(int argc, char *argv[])
 		if(!monitor_log_format)
 			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
 
-		/* If we did not get a directory to write the
-		 * logs, create one with the current date + time.
-		 * */
-		if(!monitor_log_dir) {
-			time_t now = time(NULL);
-			struct tm *tm = localtime(&now);
-			monitor_log_dir = string_format("monitor-logs-%04d_%02d_%02d_%02d-%02d", 1900 + tm->tm_year, 1 + tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min);
-		}
 	}
 
 	struct dag *d = dag_from_file(dagfile, monitor_mode);
