@@ -70,10 +70,17 @@ OPTION_TRIPLET(-C, catalog-server, catalog)Set catalog server to PARAM(catalog).
 OPTION_TRIPLET(-F, wq-fast-abort, #)WorkQueue fast abort multiplier. (default is deactivated)
 OPTION_TRIPLET(-N, project-name, project)Set the project name to PARAM(project).
 OPTION_TRIPLET(-p, port, port)Port number to use with WorkQueue. (default is 9123, 0=arbitrary)
-OPTION_TRIPLET(-Z, wq-random-port, file)Select port at random and write it to this file.  (default is disabled)
+OPTION_TRIPLET(-Z, port-file, file)Select port at random and write it to this file.  (default is disabled)
 OPTION_TRIPLET(-P, priority, integer)Priority. Higher the value, higher the priority.
 OPTION_TRIPLET(-W, wq-schedule, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
 OPTION_TRIPLET(-s, password, pwfile)Password file for authenticating workers.
+OPTIONS_END
+
+SUBSECTION(Monitor Options)
+OPTIONS_BEGIN
+OPTION_TRIPLET(-M, monitor, dir)Enable the resource monitor, and write the monitor logs to <dir>
+OPTION_PAIR(--monitor-interval, #)Set monitor interval to <#> seconds. (default 1 second)
+OPTION_PAIR(--monitor-log-fmt, fmt)Format for monitor logs. (default resource-rule-%06.6d, %d -> rule number)
 OPTIONS_END
 
 SUBSECTION(Other Options)
