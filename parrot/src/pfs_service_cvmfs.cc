@@ -603,8 +603,17 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 
 		int rl = xpath->service->readlink(xpath, link_target, PFS_PATH_MAX - 1); 
 
-		if(rl > -1)
-		{
+		if(rl<0) {
+			if(errno==EINVAL) {
+				/* The prefix exists, but is not a link, so keep descending. */
+				continue;
+			} else {
+				/* For any other reason, do not descend any further. */
+				break;
+			}
+		} else {
+			/* The prefix is a link, so process it. */
+
 			if(link_target[0] != '/')
 			{
 				/* If link is relative, then we look
