@@ -897,7 +897,7 @@ class pfs_service_cvmfs:public pfs_service {
 	}
 
 	virtual int stat(pfs_name * name, struct pfs_stat *info) {
-		return anystat(name,info,0,1);
+		return anystat(name,info,1,1);
 	}
 
 	virtual int unlink(pfs_name * name) {
