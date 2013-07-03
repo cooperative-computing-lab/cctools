@@ -788,11 +788,17 @@ class pfs_service_cvmfs:public pfs_service {
 	virtual pfs_file *open(pfs_name * name, int flags, mode_t mode) {
 		struct cvmfs_dirent d;
 
-		if(!d.lookup(name, 1, 1)) return 0;
+		if(!d.lookup(name, 1, 1)) {
+			// errno is set by lookup()
+			return 0;
+		}
 
 		/* cvmfs_open does not work with directories (it gives a 'fail to fetch' error). */
-		if(S_ISDIR(d.mode)) return 0;
-		
+		if(S_ISDIR(d.mode)) {
+			errno = EISDIR;
+			return 0;
+		}
+
 		debug(D_CVMFS,"open(%s)",name->rest);
 		int fd = cvmfs_open(name->rest);
 
