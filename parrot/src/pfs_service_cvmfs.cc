@@ -89,7 +89,6 @@ class cvmfs_dirent {
 	bool lookup(pfs_name * name, bool follow_leaf_symlinks, bool expand_internal_symlinks);
 
 	char *name;
-	char *linkname;
 	unsigned mode;
 	UINT64_T size;
 	UINT64_T inode;
@@ -97,7 +96,7 @@ class cvmfs_dirent {
 };
 
 cvmfs_dirent::cvmfs_dirent():
-name(0), linkname(0), mode(0), size(0), inode(0), mtime(0)
+name(0), mode(0), size(0), inode(0), mtime(0)
 {
 }
 
@@ -105,9 +104,6 @@ cvmfs_dirent::~cvmfs_dirent()
 {
 	if(name) {
 		free(name);
-	}
-	if(linkname) {
-		free(linkname);
 	}
 }
 
