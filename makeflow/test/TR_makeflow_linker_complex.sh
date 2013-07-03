@@ -57,8 +57,12 @@ run() {
 clean() {
   cd linker
   rm -rf "$out_dir"
-  rm -rf /tmp/a
-  rm -rf /tmp/makeflow_test_complex_path
+  if [ -w /tmp/a ]; then
+	  rm -rf /tmp/a
+  fi
+  if [ -w /tmp/makeflow_test_complex_path ]; then
+	  rm -rf /tmp/makeflow_test_complex_path
+  fi
   exit 0
 }
 
