@@ -25,7 +25,7 @@ function detect_packages()
     echo "$0: Detecting packages ..."
 
     PACKAGES_CONFIG=""
-    for package in fuse irods mysql hdfs python globus openmpi swig xrootd cvmfs
+    for package in fuse irods mysql python globus openmpi swig xrootd cvmfs
     do
 	packagepath=$EXTERNAL/$package/`sys`_$subtype
 
@@ -42,10 +42,6 @@ function detect_packages()
                 PACKAGES_CONFIG="$PACKAGES_CONFIG --with-mpi-path $packagepath"
             else
                 PACKAGES_CONFIG="$PACKAGES_CONFIG --with-$package-path $packagepath"
-            fi
-            if [ $package = hdfs ]
-            then
-                export JAVA_HOME=$EXTERNAL/java/jdk
             fi
 	else
             echo "$package -> NOTFOUND"
