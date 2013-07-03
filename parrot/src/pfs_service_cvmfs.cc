@@ -1023,3 +1023,4 @@ static pfs_service_cvmfs pfs_service_cvmfs_instance;
 pfs_service *pfs_service_cvmfs = &pfs_service_cvmfs_instance;
 
 #endif
+
