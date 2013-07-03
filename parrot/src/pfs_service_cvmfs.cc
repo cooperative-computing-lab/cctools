@@ -669,7 +669,6 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_leaf_symlinks, bool expan
 	char const *subpath = NULL;
 
 	cvmfs_filesystem *f = lookup_filesystem(path, &subpath);
-
 	if(!f) {
 		return false;
 	}
