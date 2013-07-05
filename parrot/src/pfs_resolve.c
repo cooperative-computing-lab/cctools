@@ -194,7 +194,9 @@ static pfs_resolve_t mount_entry_check( const char *logical_name, const char *pr
 		} else {
 			strcpy(physical_name,redirect);
 			if(llen>plen) {
-				strcat(physical_name,"/");
+				if(logical_name[plen]!='/') {
+					strcat(physical_name,"/");
+				}
 				strcat(physical_name,&logical_name[plen]);
 			}
 			result = PFS_RESOLVE_CHANGED;
