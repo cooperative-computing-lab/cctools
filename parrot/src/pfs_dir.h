@@ -32,6 +32,7 @@ private:
 	char *data;
 	pfs_off_t length;
 	pfs_off_t maxlength;
+	int total_iterations;
 };
 
 #endif
