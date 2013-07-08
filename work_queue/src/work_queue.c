@@ -1983,6 +1983,46 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	debug(D_WQ, "Latest master capacity: %d; Avg master capacity: %d\n", q->capacity, q->avg_capacity);
 }
 
+static int check_worker_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
+	int cores_used, disk_used, mem_used, ok = 1;
+	
+	// If resources used have not been specified, treat the task as consuming the entire real worker
+	if(t->cores < 0) {
+		cores_used = MAX(w->resources->cores.total, 1);
+	} else {
+		cores_used = t->cores;
+	}
+	
+	if(t->memory < 0) {
+		mem_used = MAX(w->resources->memory.total, 0);
+	} else {
+		mem_used = t->memory;
+	}
+	
+	if(t->disk < 0) {
+		disk_used = MAX(w->resources->disk.total, 0);
+	} else {
+		disk_used = t->disk;
+	}
+	
+	
+	
+	if(w->cores_allocated + cores_used > get_worker_cores(q, w)) {
+		ok = 0;
+	}
+	
+	if(w->memory_allocated + mem_used > w->resources->memory.total) {
+		ok = 0;
+	}
+	
+	if(w->disk_allocated + disk_used > w->resources->disk.total) {
+		ok = 0;
+	}
+	
+	return ok;
+}
+
+
 static struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
@@ -1996,7 +2036,7 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
+		if( check_worker_against_task(q, w, t) ) {
 			task_cached_bytes = 0;
 			list_first_item(t->input_files);
 			while((tf = list_next_item(t->input_files))) {
@@ -2026,7 +2066,7 @@ static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q, struc
 	struct work_queue_worker *w;
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
+		if( check_worker_against_task(q, w, t) ) {
 			return w;
 		}
 	}
@@ -2035,34 +2075,35 @@ static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q, struc
 
 static struct work_queue_worker *find_worker_by_random(struct work_queue *q, struct work_queue_task *t)
 {
-	char *key;
-	struct work_queue_worker *w;
-	struct work_queue_worker *prev_avail_worker = NULL;
-	int num_workers = hash_table_size(q->worker_table);
-	int random_worker;
+    char *key;
+    struct work_queue_worker *w;
+    struct work_queue_worker *prev_avail_worker = NULL;
+    int num_workers = hash_table_size(q->worker_table);
+    int random_worker;
 
-	if(num_workers > 0) {
-		random_worker = (rand() % num_workers) + 1;
-	} else {
-		return NULL;
-	}
+    if(num_workers > 0) {
+        random_worker = (rand() % num_workers) + 1;
+    } else {
+        return NULL;
+    }
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if (random_worker > 0)
-			random_worker--;
+    hash_table_firstkey(q->worker_table);
+    while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+        if (random_worker > 0)
+            random_worker--;
 
-		if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
-			if(random_worker == 0) {
-				return w;
-			} else {
-				prev_avail_worker = w;
-			}
-		} 
-	}
-	
-	return prev_avail_worker;
+        if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
+            if(random_worker == 0) {
+                return w;
+            } else {
+                prev_avail_worker = w;
+            }
+        }
+    }
+
+    return prev_avail_worker;
 }
+
 
 static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struct work_queue_task *t)
 {
@@ -2073,7 +2114,7 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
+		if(check_worker_against_task(q, w, t)) {
 			if(w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
 				if(!best_worker || t < best_time) {
@@ -2123,11 +2164,25 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 	itable_insert(q->running_tasks, t->taskid, t); 
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
 
-	w->cores_allocated  += t->cores;
-	w->memory_allocated += t->memory;
-	w->disk_allocated   += t->disk;
+	
 
 	if(start_one_task(q, w, t)) {
+		
+		//If anything is unspecified, set it to the current value of the worker.
+		if(t->cores < 0) {
+			t->cores = w->resources->cores.total;
+		}
+		if(t->memory < 0) {
+			t->memory = w->resources->memory.total;
+		}
+		if(t->disk < 0) {
+			t->disk = w->resources->disk.total;
+		}
+		
+		w->cores_allocated += t->cores;
+		w->memory_allocated += t->memory;
+		w->disk_allocated += t->disk;
+		
 		log_worker_states(q);
 		return 1;
 	} else {
@@ -2367,11 +2422,11 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->return_status = -1;
 	t->result = WORK_QUEUE_RESULT_UNSET;
 
-	/* In the absence of additional information, a task requires one core and no other resources. */
+	/* In the absence of additional information, a task consumes an entire worker. */
 
-	t->memory = 0;
-	t->disk = 0;
-	t->cores = 1;
+	t->memory = -1;
+	t->disk = -1;
+	t->cores = -1;
 
 	return t;
 }
@@ -3282,6 +3337,7 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 			w->cores_allocated -= t->cores;
 			w->memory_allocated -= t->memory;
 			w->disk_allocated -= t->disk;
+			
 			itable_remove(w->current_tasks, taskid);
 			
 			list_push_tail(l, t);
