@@ -103,7 +103,6 @@ double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 int wq_minimum_transfer_timeout = 3;
 int wq_foreman_transfer_timeout = 3600;
-int wq_worker_unready_timeout = 300; //used in remove_unready_workers()
 
 struct work_queue {
 	char *name;
@@ -164,8 +163,8 @@ struct work_queue {
 	int catalog_port;
 
 	FILE *logfile;
-	timestamp_t keepalive_interval;
-	timestamp_t keepalive_timeout;
+	int keepalive_interval;
+	int keepalive_timeout;
 
 	int monitor_mode;
 	int monitor_fd;
@@ -195,7 +194,6 @@ struct work_queue_worker {
 	timestamp_t total_task_time;
 	timestamp_t total_transfer_time;
 	timestamp_t start_time;
-	timestamp_t last_msg_sent_time;
 	timestamp_t last_msg_recv_time;
 	timestamp_t keepalive_check_sent_time;
 };
@@ -334,8 +332,6 @@ static int send_worker_msg(struct work_queue_worker *w, const char *fmt, time_t 
 	vdebug(D_WQ, debug_msg, debug_va);
 	
 	int result = link_putvfstring(w->link, fmt, stoptime, va);	
-	if (result > 0) 
-		w->last_msg_sent_time = timestamp_get();		
 	va_end(va);
 
 	return result;  
@@ -373,8 +369,11 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 		result = process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
+	} else if (string_prefix_is(line, "auth")) {
+		debug(D_WQ|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);
+		result = -1;
 	} else if (string_prefix_is(line,"ready")) {
-		debug(D_WQ|D_NOTICE,"%s (%s) is an older worker that is not compatible with this master.",w->hostname,w->addrport);
+		debug(D_WQ|D_NOTICE,"worker (%s) is an older worker that is not compatible with this master.",w->addrport);
 		result = -1;
 	} else {
 		// Message is not a status update: return it to the user.
@@ -442,10 +441,21 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 	return timeout;
 }
 
+<<<<<<< HEAD
 static void update_catalog(struct work_queue *q, struct link *master, int now)
 {
 	struct work_queue_stats s;
 	char addrport[WORK_QUEUE_LINE_MAX];
+=======
+static void update_catalog(struct work_queue *q, int force_update )
+{
+	struct work_queue_stats s;
+	static time_t last_update_time = 0;
+
+	if(!force_update) {
+		if(time(0) - last_update_time < WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL) return;
+	}
+>>>>>>> 49e56669d61b1f9725f37ec61b74bfe1d0765498
 
 	if(!q->catalog_host) {
 		q->catalog_host = strdup(CATALOG_HOST);
@@ -454,12 +464,13 @@ static void update_catalog(struct work_queue *q, struct link *master, int now)
 	if(!q->catalog_port) {
 		q->catalog_port = CATALOG_PORT;
 	}
+
 	work_queue_get_stats(q, &s);
 	struct work_queue_resources r;
 	memset(&r, 0, sizeof(r));
 	work_queue_get_resources(q,&r);
-	debug(D_WQ,"Updating catalog with resource information -- cores:%d memory:%d disk:%d\n", r.cores.total,r.memory.total,r.disk.total); //see if information is being passed correctly
 	char * worker_summary = work_queue_get_worker_summary(q);
+<<<<<<< HEAD
 
 	if(master) {
 		int port;
@@ -470,7 +481,12 @@ static void update_catalog(struct work_queue *q, struct link *master, int now)
 	}
 
 	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, addrport, &s, &r, worker_summary, now);
+=======
+	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, &r, worker_summary);
+>>>>>>> 49e56669d61b1f9725f37ec61b74bfe1d0765498
 	free(worker_summary);
+
+	last_update_time = time(0);
 }
 
 static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
@@ -2147,58 +2163,44 @@ static void start_tasks(struct work_queue *q)
 	}
 }
 
-//Check if worker sent ready message since connecting. If it hasn't for more than wq_worker_unready_timeout, remove it.
-static void do_ready_check(struct work_queue *q, struct work_queue_worker *w, timestamp_t current) {
-	int connection_elapsed_time;
-	if(!strcmp(w->hostname, "unknown")){
-		connection_elapsed_time = (int)(current - w->start_time)/1000000;
-		if(connection_elapsed_time >= wq_worker_unready_timeout) {
-			debug(D_WQ, "Removing worker %s (%s): hasn't sent ready message for more than %d s since connection.", w->hostname, w->addrport, wq_worker_unready_timeout);
-			remove_worker(q, w);
-		}
-	}
-}
-
-//Send keepalive to check if worker is still responsive after getting task(s) to run. If not, remove worker. 
-static void do_keepalive_check(struct work_queue *q, struct work_queue_worker *w, timestamp_t current) {
-	if(itable_size(w->current_tasks)) {
-		timestamp_t keepalive_elapsed_time = (current - w->last_msg_sent_time)/1000000;
-		// send new keepalive check only (1) if we received a response since last keepalive check AND 
-		// (2) we are past keepalive interval 
-		if(w->last_msg_recv_time >= w->keepalive_check_sent_time) {	
-			if(keepalive_elapsed_time >= q->keepalive_interval) {
-				if (send_worker_msg(w, "%s\n", time(0) + short_timeout, "check") < 0) {
-					debug(D_WQ, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
-					remove_worker(q, w);
-				} else {
-					debug(D_WQ, "Sent keepalive check to worker %s (%s)", w->hostname, w->addrport);
-					w->keepalive_check_sent_time = current;	
-				}	
-			}
-		} else { 
-			// we haven't received a message from worker since its last keepalive check. Check if time 
-			// since we last polled link for responses has exceeded keepalive timeout. If so, remove worker.
-			if (link_poll_end > w->keepalive_check_sent_time) {
-				if (((link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
-					debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
-					remove_worker(q, w);
-				}
-			}	
-		}
-	}
-}
-
+//Sends keepalives to check if connected workers are responsive. If not, removes those workers. 
 static void remove_unresponsive_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
 	char *key;
+	int last_recv_elapsed_time;
 	timestamp_t current_time = timestamp_get();
 	
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		do_ready_check(q, w, current_time);		
-		
 		if(q->keepalive_interval > 0) {
-			do_keepalive_check(q, w, current_time);
+			if(!strcmp(w->hostname, "unknown")){ 
+				last_recv_elapsed_time = (int)(current_time - w->start_time)/1000000;
+			} else {
+				last_recv_elapsed_time = (int)(current_time - w->last_msg_recv_time)/1000000;
+			}
+		
+			// send new keepalive check only (1) if we received a response since last keepalive check AND 
+			// (2) we are past keepalive interval 
+			if(w->last_msg_recv_time >= w->keepalive_check_sent_time) {	
+				if(last_recv_elapsed_time >= q->keepalive_interval) {
+					if (send_worker_msg(w, "%s\n", time(0) + short_timeout, "check") < 0) {
+						debug(D_WQ, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
+						remove_worker(q, w);
+					} else {
+						debug(D_WQ, "Sent keepalive check to worker %s (%s)", w->hostname, w->addrport);
+						w->keepalive_check_sent_time = current_time;	
+					}	
+				}
+			} else { 
+				// we haven't received a message from worker since its last keepalive check. Check if time 
+				// since we last polled link for responses has exceeded keepalive timeout. If so, remove worker.
+				if (link_poll_end > w->keepalive_check_sent_time) {
+					if ((int)((link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
+						debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
+						remove_worker(q, w);
+					}
+				}	
+			}
 		}
 	}
 }
@@ -2514,6 +2516,10 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 	// @param remote_name should not be an absolute path. @see
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
+		return 0;
+	}
+
+	if(end_byte < start_byte) {
 		return 0;
 	}
 
@@ -3332,9 +3338,41 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 	q->keepalive_timeout = timeout;
 }
 
-void work_queue_specify_asynchrony(struct work_queue *q, double multiplier, int modifier) {
-	q->asynchrony_multiplier = MAX(multiplier, 1.0);
-	q->asynchrony_modifier = MAX(modifier, 0);
+int work_queue_tune(struct work_queue *q, const char *name, double value)
+{
+	
+	if(!strcmp(name, "asynchrony-multiplier")) {
+		q->asynchrony_multiplier = MAX(value, 1.0);
+		
+	} else if(!strcmp(name, "asynchrony-modifier")) {
+		q->asynchrony_modifier = MAX(value, 0);
+		
+	} else if(!strcmp(name, "min-transfer-timeout")) {
+		wq_minimum_transfer_timeout = (int)value;
+	
+	} else if(!strcmp(name, "foreman-transfer-timeout")) {
+		wq_foreman_transfer_timeout = (int)value;
+		
+	} else if(!strcmp(name, "fast-abort-multiplier")) {
+		if(value >= 1) {
+			q->fast_abort_multiplier = value;
+		} else if(value< 0) {
+			q->fast_abort_multiplier = value;
+		} else {
+			q->fast_abort_multiplier = -1.0;
+		}
+	} else if(!strcmp(name, "keepalive-interval")) {
+		q->keepalive_interval = MAX(0, (int)value);
+		
+	} else if(!strcmp(name, "keepalive-timeout")) {
+		q->keepalive_timeout = MAX(0, (int)value);
+		
+	} else {
+		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
+		return -1;
+	}
+	
+	return 0;
 }
 
 void work_queue_enable_process_module(struct work_queue *q)

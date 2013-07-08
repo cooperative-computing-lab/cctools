@@ -1,8 +1,8 @@
-#				/*
-				   Copyright (C) 2008- The University of Notre Dame
-				   This software is distributed under the GNU General Public License.
-				   See the file COPYING for details.
-				 */
+/*
+Copyright (C) 2008- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 
 #ifndef CHANGE_PROCESS_TITLE_H
 #define CHANGE_PROCESS_TITLE_H

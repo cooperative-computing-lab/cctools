@@ -78,7 +78,7 @@ int main (int argc, char *argv[])
 	return 0;
 }
 EOF
-	return 0
+	return $?
 }
 
 run()

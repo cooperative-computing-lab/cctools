@@ -30,9 +30,11 @@ run() {
 
 clean() {
   cd linker
-  rm -r "$out_dir"
-  rm /tmp/asdf
-  rm asdf
+  rm -rf "$out_dir"
+  if [ -w /tmp/asdf ]; then
+	  rm -f  /tmp/asdf
+  fi
+  rm -f  asdf
   exit 0
 }
 

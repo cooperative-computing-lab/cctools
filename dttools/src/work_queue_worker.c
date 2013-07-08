@@ -45,6 +45,7 @@ occupies the entire resources of a given worker.
 #include "load_average.h"
 #include "domain_name_cache.h"
 #include "getopt.h"
+#include "getopt_aux.h"
 #include "full_io.h"
 #include "create_dir.h"
 #include "delete_dir.h"
@@ -1624,6 +1625,8 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " %-30s Enable auto mode. In this mode the worker\n", "-a,--advertise");
 	fprintf(stdout, " %-30s would ask a catalog server for available masters.\n", "");
+	fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-M,--master-name=<name>"); 
+	fprintf(stdout, " %-30s projects.\n", ""); 
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
@@ -1635,14 +1638,10 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s\n", "--foreman-port=<port>[:<highport>]");
 	fprintf(stdout, " %-30s Set the port for the foreman to listen on.  If <highport> is specified\n", "");
 	fprintf(stdout, " %-30s the port is chosen from the range port:highport.  Implies --foreman.\n", "");
-	fprintf(stdout, " %-30s Enable the measurement of foreman capacity to handle new workers.\n","-c,--measure-capacity");
-	fprintf(stdout, " %-30s (default=disabled).\n", "");
+	fprintf(stdout, " %-30s Select port to listen to at random and write to this file.  Implies --foreman.\n", "-Z,--foreman-port-file=<file>");
 	fprintf(stdout, " %-30s Set the fast abort multiplier for foreman (default=disabled).\n", "-F,--fast-abort=<mult>");
 	fprintf(stdout, " %-30s Send statistics about foreman to this file.\n", "--specify-log=<logfile>");
-	fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-M,--master-name=<name>"); 
-	fprintf(stdout, " %-30s projects.\n", ""); 
-	
-	fprintf(stdout, " %-30s When in Foreman mode, this foreman will advertise to the catalog server\n", "-N,--name=<name>");
+	fprintf(stdout, " %-30s When in Foreman mode, this foreman will advertise to the catalog server\n", "-N,--foreman-name=<name>");
 	fprintf(stdout, " %-30s as <name>.\n", "");
 	fprintf(stdout, " %-30s Password file for authenticating to the master.\n", "-P,--password=<pwfile>");
 	fprintf(stdout, " %-30s Abort after this amount of idle time. (default=%ds)\n", "-t,--timeout=<time>", idle_timeout);
@@ -1734,11 +1733,12 @@ struct option long_options[] = {
 	{"debug-release-reset", no_argument,        0,  LONG_OPT_DEBUG_RELEASE},
 	{"foreman",             no_argument,        0,  LONG_OPT_FOREMAN},
 	{"foreman-port",        required_argument,  0,  'f'},
+	{"foreman-port-file",   required_argument,  0,  'Z'},
+	{"foreman-name",        required_argument,  0,  'N'},
 	{"measure-capacity",    no_argument,        0,  'c'},
 	{"fast-abort",          required_argument,  0,  'F'},
 	{"specify-log",         required_argument,  0,  LONG_OPT_SPECIFY_LOG},
 	{"master-name",         required_argument,  0,  'M'},
-	{"name",                required_argument,  0,  'N'},
 	{"password",            required_argument,  0,  'P'},
 	{"timeout",             required_argument,  0,  't'},
 	{"tcp-window-size",     required_argument,  0,  'w'},
@@ -1764,9 +1764,10 @@ int main(int argc, char *argv[])
 	int w;
 	int foreman_port = -1;
 	char * foreman_name = NULL;
+	char * port_file = NULL;
 	struct utsname uname_data;
 	struct link *master = NULL;
-	int enable_capacity = 0;
+	int enable_capacity = 1; // enabled by default
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
 
@@ -1786,7 +1787,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt_long(argc, argv, "aB:cC:d:f:F:t:j:o:p:M:N:P:w:i:b:z:A:O:s:vh", long_options, 0)) != (char) -1) {
+	while((c = getopt_long(argc, argv, "aB:cC:d:f:F:t:j:o:p:M:N:P:w:i:b:z:A:O:s:vZ:h", long_options, 0)) != (char) -1) {
 		switch (c) {
 		case 'a':
 			auto_worker = 1;
@@ -1825,6 +1826,7 @@ int main(int argc, char *argv[])
 			break;
 		}
 		case 'c':
+			// This option is deprecated. Capacity estimation is now on by default for the foreman.
 			enable_capacity = 1; 
 			break;
 		case 'F':
@@ -1897,6 +1899,10 @@ int main(int argc, char *argv[])
               fprintf(stderr,"work_queue_worker: couldn't load password from %s: %s\n",optarg,strerror(errno));
 				return 1;
 			}
+			break;
+		case 'Z':
+			port_file = optarg;
+			worker_mode = WORKER_MODE_FOREMAN;
 			break;
 		case LONG_OPT_VOLATILITY:
 			worker_volatility = atof(optarg);
@@ -1989,6 +1995,10 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "work_queue_worker-foreman: failed to create foreman queue.  Terminating.\n");
 			exit(1);
 		}
+
+		fprintf(stdout, "work_queue_worker-foreman: listening on port %d\n", work_queue_port(foreman_q));
+		if(port_file)
+		{	opts_write_port_file(port_file, work_queue_port(foreman_q));	}
 		
 		if(foreman_name) {
 			work_queue_specify_name(foreman_q, foreman_name);

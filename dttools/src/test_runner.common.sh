@@ -73,7 +73,12 @@ wait_for_file_modification()
 run_local_worker()
 {
 	local port_file=$1
+	local log=$2
 	local timeout=15
+
+	if [ -z "$log" ]; then
+		log=worker.log
+	fi
 
 	echo "Waiting for master to be ready."
 	if wait_for_file_creation $port_file $timeout
@@ -84,7 +89,7 @@ run_local_worker()
 		exit 1
 	fi
 	echo "Running worker."
-	work_queue_worker -t 2s -d all -o worker.log localhost `cat $port_file`
+	work_queue_worker -t 2s -d all -o "$log" localhost `cat $port_file`
 	echo "Worker completed."
 	return 0
 }

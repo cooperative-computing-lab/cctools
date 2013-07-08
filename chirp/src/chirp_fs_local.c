@@ -488,75 +488,82 @@ static int search_should_recurse(const char *base, const char *pattern)
 	return 0;
 }
 
-static int search_directory(const char *subject, const char * const base, char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
+static int search_directory(const char *subject, const char * const base, char *fullpath, const char *pattern, int flags, struct link *l, time_t stoptime)
 {
 	if(strlen(pattern) == 0)
 		return 0;
 
-	debug(D_DEBUG, "search_directory(subject = `%s', base = `%s', dir = `%s', pattern = `%s', flags = %d, ...)", subject, base, dir, pattern, flags);
+	debug(D_DEBUG, "search_directory(subject = `%s', base = `%s', fullpath = `%s', pattern = `%s', flags = %d, ...)", subject, base, fullpath, pattern, flags);
 
+	int access_flags = search_to_access(flags);
+	int includeroot = flags & CHIRP_SEARCH_INCLUDEROOT;
 	int metadata = flags & CHIRP_SEARCH_METADATA;
 	int stopatfirst = flags & CHIRP_SEARCH_STOPATFIRST;
-	int includeroot = flags & CHIRP_SEARCH_INCLUDEROOT;
 
-	void *dirp = chirp_fs_local_opendir(dir);
-	char *current = dir + strlen(dir);	/* point to end to current directory */
+	int result = 0;
+	void *dirp = chirp_fs_local_opendir(fullpath);
+	char *current = fullpath + strlen(fullpath);	/* point to end to current directory */
 
 	if(dirp) {
 		errno = 0;
 		struct chirp_dirent *entry;
 		while((entry = chirp_fs_local_readdir(dirp))) {
-			int access_flags = search_to_access(flags);
 			char *name = entry->name;
 
 			if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0 || strncmp(name, ".__", 3) == 0)
 				continue;
 			sprintf(current, "/%s", name);
 
-			if(search_match_file(pattern, base) && chirp_fs_local_access(dir, access_flags) == 0) {
-				const char *match_name = includeroot ? dir+1 : base; /* dir+1 because chirp_root_path is always "./" !! */
+			if(search_match_file(pattern, base)) {
+				const char *matched = includeroot ? fullpath+1 : base; /* fullpath+1 because chirp_root_path is always "./" !! */
 
-				if(metadata) {
-					/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
-					struct chirp_stat buf;
-					if((chirp_fs_local_stat(dir, &buf)) == -1) {
-						link_putfstring(l, "0:%s::\n", stoptime, match_name);
-						link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, match_name);
-					} else
-						link_putfstring(l, "0:%s:%s:\n", stoptime, match_name, chirp_stat_string(&buf));
+				result += 1;
+				if (access_flags == F_OK || chirp_fs_local_access(fullpath, access_flags) == 0) {
+					if(metadata) {
+						/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
+						struct chirp_stat buf;
+						if((chirp_fs_local_stat(fullpath, &buf)) == -1) {
+							link_putfstring(l, "0:%s::\n", stoptime, matched); // FIXME is this a bug?
+							link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, matched);
+						} else {
+							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, chirp_stat_string(&buf));
+							if(stopatfirst) return 1;
+						}
+					} else {
+						link_putfstring(l, "0:%s::\n", stoptime, matched);
 						if(stopatfirst) return 1;
-				} else
-					link_putfstring(l, "0:%s::\n", stoptime, match_name);
-					if(stopatfirst) return 1;
+					}
+				} /* FIXME access failure */
 			}
 
-			if(cfs_isdir(dir) && search_should_recurse(base, pattern)) {
-				if(chirp_acl_check_dir(dir, subject, CHIRP_ACL_LIST)) {
-					int found = search_directory(subject, base, dir, pattern, flags, l, stoptime);
-					if(stopatfirst && found)
-						return 1;
-				} else
-					link_putfstring(l, "%d:%d:%s:\n", stoptime, EPERM, CHIRP_SEARCH_ERR_OPEN, dir);
+			if(cfs_isdir(fullpath) && search_should_recurse(base, pattern)) {
+				if(chirp_acl_check_dir(fullpath, subject, CHIRP_ACL_LIST)) {
+					int n = search_directory(subject, base, fullpath, pattern, flags, l, stoptime);
+					if(n > 0) {
+						result += n;
+						if(stopatfirst)
+							return result;
+					}
+				} else {
+					link_putfstring(l, "%d:%d:%s:\n", stoptime, EPERM, CHIRP_SEARCH_ERR_OPEN, fullpath);
+				}
 			}
 			*current = '\0';	/* clear current entry */
 			errno = 0;
 		}
 
-		// Read error
 		if(errno)
-			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_READ, dir);
+			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_READ, fullpath);
 
 		errno = 0;
 		chirp_alloc_closedir(dirp);
-
-		// Close error
 		if(errno)
-			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, dir);
+			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, fullpath);
+	} else {
+		link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_OPEN, fullpath);
+	}
 
-	} else
-		link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_OPEN, dir);
-
-	return 0;
+	return result;
 }
 
 /* Note we need the subject because we must check the ACL for any nested directories. */

@@ -668,6 +668,24 @@ public:
 	}
 
 	pfs_dir * getdir( pfs_name *name ) {
+		/*
+		If the root of the GROW filesystem is requested,
+		generate it interally using the list of known filesystems.
+		*/
+
+		if(!name->host[0]) {
+			pfs_dir *dir = new pfs_dir(name);
+			dir->append(".");
+			dir->append("..");
+			struct grow_filesystem *f = grow_filesystem_list;
+			while(f) {
+				dir->append(f->hostport);
+				f = f->next;
+			}
+			return dir;
+		}
+
+
 		struct grow_dirent *d;
 
 		d = grow_dirent_lookup(name,1);
@@ -691,6 +709,14 @@ public:
 	}
 
 	virtual int lstat( pfs_name *name, struct pfs_stat *info ) {
+		/* If we get stat("/grow") then construct a dummy entry. */
+
+		if(!name->host[0]) {
+                        pfs_service_emulate_stat(name,info);
+                        info->st_mode = S_IFDIR | 0555;
+			return 0;
+		}
+
 		struct grow_dirent *d;
 
 		d = grow_dirent_lookup(name,0);
@@ -702,6 +728,14 @@ public:
 	}
 
 	virtual int stat( pfs_name *name, struct pfs_stat *info ) {
+		/* If we get stat("/grow") then construct a dummy entry. */
+
+		if(!name->host[0]) {
+                        pfs_service_emulate_stat(name,info);
+                        info->st_mode = S_IFDIR | 0555;
+			return 0;
+		}
+
 		struct grow_dirent *d;
 
 		d = grow_dirent_lookup(name,1);

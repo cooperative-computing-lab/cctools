@@ -8,11 +8,12 @@ prepare() {
   if [ -d "$out_dir" ]; then
     exit 1
   fi
+
   
   touch /tmp/makeflow_test_complex_path
-  mkdir -p /tmp/a/b/x
-  touch /tmp/a/b/x/y
-  chmod 777 /tmp/a/b/x/y
+  mkdir -p /tmp/makeflow_test_complex/a/b/x
+  touch /tmp/makeflow_test_complex/a/b/x/y
+  chmod 777 /tmp/makeflow_test_complex/a/b/x/y
   cd ../src/; make
   exit $?
 }
@@ -56,9 +57,13 @@ run() {
 
 clean() {
   cd linker
-  rm -r "$out_dir"
-  rm -r /tmp/a
-  rm -r /tmp/makeflow_test_complex_path
+  rm -rf "$out_dir"
+  if [ -w /tmp/makeflow_test_complex ]; then
+	  rm -rf /tmp/makeflow_test_complex
+  fi
+  if [ -w /tmp/makeflow_test_complex_path ]; then
+	  rm -rf /tmp/makeflow_test_complex_path
+  fi
   exit 0
 }
 

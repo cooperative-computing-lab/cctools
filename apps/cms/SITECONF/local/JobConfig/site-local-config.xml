@@ -1,0 +1,35 @@
+<site-local-config>
+ <site name="T2_US_Overflow">
+    <event-data>
+      <catalog url="trivialcatalog_file:/afs/hep.wisc.edu/home/dan/parrot_glidein_wrapper/test/var/cms_siteconf/SITECONF/local/PhEDEx/storage.xml?protocol=xrootd"/>
+    </event-data>
+    <source-config>
+        <cache-hint value="storage-only"/> 
+        <read-hint value="read-ahead-buffered"/> 
+        <ttree-cache-size value="33554432"/> 
+    </source-config>
+    <local-stage-out>
+      <command value="srmv2-lcg"/>
+      <catalog url="trivialcatalog_file:/afs/hep.wisc.edu/home/dan/parrot_glidein_wrapper/test/var/cms_siteconf/SITECONF/local/PhEDEx/storage.xml?protocol=srmv2"/>
+      <se-name value="cmssrm.hep.wisc.edu"/>
+    </local-stage-out>
+    <fallback-stage-out>
+      <se-name value="srm.unl.edu"/>
+      <lfn-prefix value="srm://dcache07.unl.edu:8443/srm/v2/server?SFN=/mnt/hadoop/user/uscms01/pnfs/unl.edu/data4/cms"/>
+      <command value="srmv2-lcg"/>
+    </fallback-stage-out>
+    <calib-data>
+      <frontier-connect>
+        <proxy url="http://cache01.hep.wisc.edu:3128"/>      
+        <failover toserver="no"/>
+        <proxy url="http://cache01.hep.wisc.edu:8000"/>
+        <proxy url="http://cache02.hep.wisc.edu:8000"/>
+        <server url="http://cmsfrontier.cern.ch:8000/FrontierInt"/>
+        <server url="http://cmsfrontier1.cern.ch:8000/FrontierInt"/>
+        <server url="http://cmsfrontier2.cern.ch:8000/FrontierInt"/>
+        <server url="http://cmsfrontier3.cern.ch:8000/FrontierInt"/>
+      </frontier-connect>
+    </calib-data>
+ </site>
+ </site-local-config>
+

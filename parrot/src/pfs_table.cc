@@ -1802,10 +1802,11 @@ static int search_to_access (int flags)
     return access_flags;
 }
 
-static int search_error (int err, int errsource, char *path, char *buffer, size_t *i, size_t buffer_length) {
-	size_t n = snprintf(buffer+*i, buffer_length-*i,  "%s%d|%d|%s", *i==0 ? "" : "|", err, errsource, path);
+static int search_error (int err, int errsource, char *path, char *buffer, size_t *i, size_t len) {
+	size_t n = snprintf(buffer+*i, len-*i,  "%s%d|%d|%s", *i==0 ? "" : "|", err, errsource, path);
 
-	if (n>=buffer_length-*i) {
+	if (n>=len-*i) {
+		errno = ERANGE;
 		return -1;
 	} else {
 		*i += n;
@@ -1813,13 +1814,14 @@ static int search_error (int err, int errsource, char *path, char *buffer, size_
 	}
 }
 
-static int search_stat_pack(struct pfs_stat p_info, char *buffer, size_t *i, size_t buffer_length) {
+static int search_stat_pack(const struct pfs_stat *p_info, char *buffer, size_t *i, size_t len) {
 	struct stat info;
-	COPY_STAT(p_info, info);
-	size_t n = snprintf(
-		buffer + *i,
-		buffer_length - *i,
-		"|%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld",
+	COPY_STAT(*p_info, info);
+	size_t n = snprintf(buffer + *i, len - *i,
+		"|%ld,%ld,%ld,%ld,"
+		 "%ld,%ld,%ld,%ld,"
+		 "%ld,%ld,%ld,%ld,"
+		 "%ld",
 		(long)info.st_dev,
 		(long)info.st_ino,
 		(long)info.st_mode,
@@ -1835,7 +1837,7 @@ static int search_stat_pack(struct pfs_stat p_info, char *buffer, size_t *i, siz
 		(long)info.st_blocks
 	);
 
-	if (n>=buffer_length-*i) {
+	if (n>=len-*i) {
 		return -1;
 	} else {
 		*i += n;
@@ -1843,253 +1845,191 @@ static int search_stat_pack(struct pfs_stat p_info, char *buffer, size_t *i, siz
 	}
 }
 
-static int search_match_file(const char *pattern, const char *name) 
+/* NOTICE: this function's logic should be kept in sync with function of same
+ * name in chirp_fs_local.c. */
+static int search_match_file(const char *pattern, const char *name)
 {
-	char *subpat;
-	const char *subend;
+	debug(D_DEBUG, "search_match_file(`%s', `%s')", pattern, name);
+	/* Decompose the pattern in atoms which are each matched against. */
+	while (1) {
+		char atom[PFS_PATH_MAX];
+		const char *end = strchr(pattern, '|'); /* disjunction operator */
 
-	do {
-		subend = strchr(pattern, '|');
+		memset(atom, 0, sizeof(atom));
+		if (end)
+			strncpy(atom, pattern, (size_t)(end-pattern));
+		else
+			strcpy(atom, pattern);
 
-		if (subend == NULL) {
-			subpat = (char*) alloca(strlen(pattern)+1);
-			strcpy(subpat, pattern);
-		} else {
-			subpat = (char*) alloca(subend-pattern+1);
-			strncpy(subpat, pattern, subend-pattern);
-			subpat[subend-pattern] = '\0';
-		}
-
-		char *filepat = strrchr(subpat, '/');
-
-		if (filepat<=subpat) {
-			filepat = (filepat==subpat) ? filepat+1 : subpat;
-
-			if (fnmatch(filepat, name, FNM_PATHNAME)==0) {
-				//free(subpat);
+		/* Here we might have a pattern like '*' which matches any file so we
+		 * iteratively pull leading components off of `name' until we get a
+		 * match.  In the case of '*', we would pull off all leading components
+		 * until we reach the file name, which would always match '*'.
+		 */
+		const char *test = name;
+		do {
+			int result = fnmatch(atom, test, FNM_PATHNAME);
+			debug(D_DEBUG, "fnmatch(`%s', `%s', FNM_PATHNAME) = %d", atom, test, result);
+			if(result == 0) {
 				return 1;
 			}
-		}
-	
-		pattern = subend + 1;
+			test = strchr(test, '/');
+			if (test) test += 1;
+		} while (test);
 
-	} while(subend != NULL);
+		if (end)
+			pattern = end+1;
+		else
+			break;
+	}
 
 	return 0;
 }
 
-static int search_match_dir(const char *pattern, char *npattern, const char *name) 
+/* NOTICE: this function's logic should be kept in sync with function of same
+ * name in chirp_fs_local.c. */
+static int search_should_recurse(const char *base, const char *pattern)
 {
-	int recursive, match = 0;
-	char *subpat;
-	const char *subend;
-	size_t i = 0;
+	debug(D_DEBUG, "search_should_recurse(base = `%s', pattern = `%s')", base, pattern);
+	/* Decompose the pattern in atoms which are each matched against. */
+	while (1) {
+		char atom[PFS_PATH_MAX];
 
-	/* FIXME: npattern buffer bounds checks */
-	do {
-		/* Retrieve the next subpattern */
-		subend = strchr(pattern, '|');
+		if (*pattern != '/') return 1; /* unanchored pattern is always recursive */
 
-		if (subend == NULL) {
-			subpat = (char*) alloca(strlen(pattern)+1);
-			strcpy(subpat, pattern);
-		} else {
-			subpat = (char*) alloca(subend-pattern+1);
-			strncpy(subpat, pattern, subend-pattern);
-			subpat[subend-pattern] = '\0';
-		}
+		const char *end = strchr(pattern, '|'); /* disjunction operator */
+		memset(atom, 0, sizeof(atom));
+		if (end)
+			strncpy(atom, pattern, (size_t)(end-pattern));
+		else
+			strcpy(atom, pattern);
 
-		/* Retrieve the top directory of the subpattern */
-		if (*subpat == '/') {
-			recursive = 0;
-			subpat++;
-		} else
-			recursive = 1;
-
-		char *toppat, *topend = strchr(subpat, '/');
-
-		if (topend==NULL)
-			toppat = subpat;
-		else {
-			toppat = (char*) alloca(topend-subpat+1);
-			strncpy(toppat, subpat, topend-subpat);
-			toppat[topend-subpat] = '\0';
-		}
-
-		/* Check for a match and build the new pattern string */
-		if (fnmatch(toppat, name, FNM_PATHNAME)==0) {
-			match = 1;
-
-			if (recursive) {
-				i += sprintf(npattern+i, "%s", i==0 ? "" : "|");
-				i += sprintf(npattern+i, "%s", subpat);
-				if (topend!=NULL) 
-					i += sprintf(npattern+i, "|%s", topend);
-			} else if (topend!=NULL) {
-				i += sprintf(npattern+i, "%s", i==0 ? "" : "|");
-				i += sprintf(npattern+i, "%s", topend);
+		/* Here we want to determine if `base' matches earlier parts of
+		 * `pattern' to see if we should recurse in the directory `base'. To do
+		 * this, we strip off final parts of `pattern' until we get a match.
+		 */
+		while (*atom) {
+			int result = fnmatch(atom, base, FNM_PATHNAME);
+			debug(D_DEBUG, "fnmatch(`%s', `%s', FNM_PATHNAME) = %d", atom, base, result);
+			if(result == 0) {
+				return 1;
 			}
-
-		} else if (recursive) {
-			match = 1;
-			i += sprintf(npattern+i, "%s%s", i==0 ? "" : "|", subpat); 
+			char *last = strrchr(atom, '/');
+			if (last) {
+				*last = '\0';
+			} else {
+				break;
+			}
 		}
 
-		pattern = subend + 1;
-
-		if (!recursive) subpat--;
-	} while(subend != NULL);
-
-	if (i==0) *npattern = '\0';
-
-	return match;
-}
-
-static int search_is_recursive(const char *pattern) 
-{
-	char *p = (char*) pattern;
-
-	for (;;) {
-		if (*p != '/') return 1;
-		p = strchr(p, '|');
-		
-		if (p == NULL)
-			return 0;
-		else 
-			p++;
-	} 
-}
-
-static int search_directory(pfs_table *t, char *dir, const char *pattern, char *buffer, size_t buffer_length, size_t *i, int flags)
-{
-
-	if (strlen(pattern)==0) return 0;
-
-	int found = 0;
-	int fd = t->open(dir, O_DIRECTORY|O_RDONLY, 0, 0);
-	char npattern[PFS_PATH_MAX];
-
-	if (fd==-1) {
-		if (search_error(errno, PFS_SEARCH_ERR_OPEN, dir, buffer, i, buffer_length) == -1) {
-			errno = ERANGE;
-			return -1;
-		}
-		return 0;
+		if (end)
+			pattern = end+1;
+		else
+			break;
 	}
+	return 0;
+}
 
-	errno = 0;
-	struct dirent *entry;
-	char *current = dir+strlen(dir); /* point to end to current directory */
-	int recursive_pattern = search_is_recursive(pattern);
+/* NOTICE: this function's logic should be kept in sync with function of same
+ * name in chirp_fs_local.c. */
+static int search_directory(pfs_table *t, const char * const base, char *fullpath, const char *pattern, int flags, char *buffer, size_t len, size_t *i)
+{
+	if(strlen(pattern) == 0)
+		return 0;
 
-	while ((entry = t->fdreaddir(fd))) {
-		const char *name = entry->d_name;
-		struct pfs_stat statbuf;
-                sprintf(current, "/%s", name);
+	debug(D_DEBUG, "search_directory(base = `%s', fullpath = `%s', pattern = `%s', flags = %d, ...)", base, fullpath, pattern, flags);
 
-		if (flags & PFS_SEARCH_METADATA || recursive_pattern) {
-			int stat_r = t->stat(dir, &statbuf);
+	int metadata = flags & PFS_SEARCH_METADATA;
+	int stopatfirst = flags & PFS_SEARCH_STOPATFIRST;
+	int includeroot = flags & PFS_SEARCH_INCLUDEROOT;
 
-			/* If the file cannot be statted and stat information was requested, return an error and no result. */
-			if (stat_r!=0 && flags & PFS_SEARCH_METADATA) {
-				if (search_error(errno, PFS_SEARCH_ERR_STAT, dir, buffer, i, buffer_length) == -1) {
-					errno = ERANGE;
-					return -1;
-				}
-				continue;
-			}
-		}
-	
-		if (search_match_file(pattern, name)) {
-			const char *matched;
+	int result = 0;
+	int fd = t->open(fullpath, O_DIRECTORY|O_RDONLY, 0, 0);
+	char *current = fullpath + strlen(fullpath);	/* point to end to current directory */
+
+	if(fd >= 0) {
+		errno = 0;
+		struct dirent *entry;
+		while((entry = t->fdreaddir(fd))) {
+			struct pfs_stat buf;
 			int access_flags = search_to_access(flags);
+			char *name = entry->d_name;
 
-			if (flags & PFS_SEARCH_INCLUDEROOT)
-				matched = dir;
-			else
-				matched = name;
+			if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+				continue;
+			sprintf(current, "/%s", name);
 
-			if (access_flags == F_OK || t->access(dir, access_flags) == 0) {
+			int stat_result = t->stat(fullpath, &buf);
 
-				size_t l = snprintf(buffer+*i, buffer_length-*i, "%s0|%s", *i==0 ? "" : "|", matched);
+			if(search_match_file(pattern, base)) {
+				const char *matched = includeroot ? fullpath+1 : base; /* fullpath+1 because chirp_root_path is always "./" !! */
 
-				if (l >= buffer_length-*i) {
-					errno = ERANGE;
-					return -1;
-				}
+				result += 1;
+				if(access_flags == F_OK || t->access(fullpath, access_flags) == 0) {
 
-				*i += l;
-
-				if (flags & PFS_SEARCH_METADATA) {
-					if (search_stat_pack(statbuf, buffer, i, buffer_length) == -1) {
-						errno = ERANGE;
-						return -1;
+					if(metadata) {
+						if(stat_result) {
+							if (search_error(errno, PFS_SEARCH_ERR_STAT, fullpath, buffer, i, len) == -1)
+								return -1;
+						} else {
+							size_t l = snprintf(buffer+*i, len-*i, "%s0|%s", *i==0 ? "" : "|", matched);
+							if (l >= len-*i) {
+								errno = ERANGE;
+								return -1;
+							}
+							*i += l;
+							if (search_stat_pack(&buf, buffer, i, len) == -1) {
+								errno = ERANGE;
+								return -1;
+							}
+							if(stopatfirst) return 1;
+						}
+					} else {
+						size_t l = snprintf(buffer+*i, len-*i, "%s0|%s|", *i == 0 ? "" : "|", matched);
+						if (l >= len-*i) {
+							errno = ERANGE;
+							return -1;
+						}
+						*i += l;
+						if(stopatfirst) return 1;
 					}
-				} else {
-					if ((size_t)snprintf(buffer+*i, buffer_length-*i, "|") >= buffer_length-*i) {
-						errno = ERANGE;
-						return -1;
-					}
-					(*i)++;
-				}
+				} /* FIXME access failure */
+			}
 
-				if (flags & PFS_SEARCH_STOPATFIRST)
-					return 1;
-				else
-					found += 1;
+			if(stat_result == 0 && S_ISDIR(buf.st_mode) && search_should_recurse(base, pattern)) {
+				int n = search_directory(t, base, fullpath, pattern, flags, buffer, len, i);
+				if(n > 0) {
+					result += n;
+					if(stopatfirst)
+						return result;
+				}
+			}
+			*current = '\0';	/* clear current entry */
+			errno = 0;
+		}
+
+		if (errno) {
+			if (search_error(errno, PFS_SEARCH_ERR_READ, fullpath, buffer, i, len) == -1) {
+				t->close(fd); /* can't report error anyway at this point */
+				errno = ERANGE;
+				return -1;
 			}
 		}
 
-		if ((recursive_pattern && S_ISDIR(statbuf.st_mode) && search_match_dir(pattern, npattern, name))
-		     || (!recursive_pattern && search_match_dir(pattern, npattern, name))) {
-
-			if (!recursive_pattern) {
-				int stat_r = t->stat(dir, &statbuf);
-
-				/* If the file cannot be statted and stat information was requested, return an error and no result. */
-				if (stat_r!=0 && flags & PFS_SEARCH_METADATA) {
-					if (search_error(errno, PFS_SEARCH_ERR_STAT, dir, buffer, i, buffer_length) == -1) {
-						errno = ERANGE;
-						return -1;
-					}
-					continue;
-				}
-			}
-
-			if ((recursive_pattern || S_ISDIR(statbuf.st_mode)) 
-			     && (strcmp(name, ".") * strcmp(name, "..") != 0)) {
-				
-				int result = search_directory(t, dir, npattern, buffer, buffer_length, i, flags);
-
-				if (result == -1)
-					return -1;
-				else if (flags & PFS_SEARCH_STOPATFIRST && result == 1)
-					return 1;
-				else
-					found += result;
+		if (t->close(fd) == -1) {
+			if (search_error(errno, PFS_SEARCH_ERR_CLOSE, fullpath, buffer, i, len) == -1) {
+				errno = ERANGE;
+				return -1;
 			}
 		}
- 
-		*current = '\0';
-	}
-
-	if (errno) {	
-		if (search_error(errno, PFS_SEARCH_ERR_READ, dir, buffer, i, buffer_length) == -1) {
+	} else {
+		if (search_error(errno, PFS_SEARCH_ERR_OPEN, fullpath, buffer, i, len) == -1) {
 			errno = ERANGE;
 			return -1;
 		}
-		return 0;
 	}
 
-	if (t->close(fd)==-1) {	
-		if (search_error(errno, PFS_SEARCH_ERR_CLOSE, dir, buffer, i, buffer_length) == -1) {
-			errno = ERANGE;
-			return -1;
-		}
-		return 0;
-	}
-
-	return found;
+	return result;
 }
 
 static int is_pattern (const char *pattern)
@@ -2183,7 +2123,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 				if (flags & PFS_SEARCH_INCLUDEROOT)
 					matched = directory;
 				else
-					matched = strrchr(base, '/') + 1;
+					matched = base;
 
 				if (access_flags == F_OK || this->access(directory, access_flags) == 0) {
 					size_t l = snprintf(buffer+*i, buffer_length-*i, "%s0|%s", *i==0 ? "" : "|", matched);
@@ -2196,7 +2136,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 					*i += l;
 
 					if (flags & PFS_SEARCH_METADATA) {
-						if (search_stat_pack(statbuf, buffer, i, buffer_length) == -1) {
+						if (search_stat_pack(&statbuf, buffer, i, buffer_length) == -1) {
 							errno = ERANGE;
 							return -1;
 						}
@@ -2219,7 +2159,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 				debug(D_DEBUG, "attempting service `%s' search routine for path `%s'", pname.service_name, pname.path);
 				if ((result = pname.service->search(&pname, pattern, flags, buffer, buffer_length, i))==-1 && errno == ENOSYS) {
 					debug(D_DEBUG, "no service to search found: falling back to manual search `%s'", directory);
-					result = search_directory(this, directory, pattern, buffer, buffer_length, i, flags);
+					result = search_directory(this, directory+strlen(directory), directory, pattern, flags, buffer, buffer_length, i);
 				}
 				debug(D_DEBUG, "= %d (`%s' search)", result, pname.service_name);
 			} else 

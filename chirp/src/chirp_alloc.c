@@ -994,9 +994,15 @@ char *chirp_stat_string(struct chirp_stat *info)
 {
 	static char line[CHIRP_LINE_MAX];
 
-	sprintf(line, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64, info->cst_dev, info->cst_ino, info->cst_mode, info->cst_nlink, info->cst_uid,
-		info->cst_gid, info->cst_rdev, info->cst_size, info->cst_blksize, info->cst_blocks, info->cst_atime, info->cst_mtime, info->cst_ctime);
-
+	sprintf(line,
+		 "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64
+		" %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64
+		" %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64
+		" %" PRId64,
+		info->cst_dev, info->cst_ino, info->cst_mode, info->cst_nlink,
+		info->cst_uid, info->cst_gid, info->cst_rdev, info->cst_size,
+		info->cst_blksize, info->cst_blocks, info->cst_atime, info->cst_mtime,
+		info->cst_ctime);
 	return line;
 }
 

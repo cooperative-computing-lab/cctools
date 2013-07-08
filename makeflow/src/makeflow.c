@@ -71,7 +71,6 @@ enum { SHOW_INPUT_FILES = 2,
 
 enum { LONG_OPT_MONITOR_INTERVAL = 1,
        LONG_OPT_MONITOR_LOG_NAME,
-       LONG_OPT_MONITOR_LOG_DIR,
        LONG_OPT_PASSWORD,
        LONG_OPT_MONITOR_LIMITS,
        LONG_OPT_PPM_ROW,
@@ -340,7 +339,7 @@ void collect_input_files(struct dag *d, char *bundle_dir, char *(*rename) (struc
 
 /* When a collision is detected (a file with an absolute path has the same base name as a relative file) a
  * counter is appended to the filename and the name translation is retried */
-char *bundler_translate_name(const char *filename, int collision_counter)
+char *bundler_translate_name(const char *input_filename, int collision_counter)
 {
 	static struct hash_table *previous_names = NULL;
 	static struct hash_table *reverse_names = NULL;
@@ -349,8 +348,13 @@ char *bundler_translate_name(const char *filename, int collision_counter)
 	if(!reverse_names)
 		reverse_names = hash_table_create(0, NULL);
 
-	if(collision_counter)
-		filename = string_format("%s%d", filename, collision_counter);
+	char *filename = NULL;
+
+	if(collision_counter){
+		filename = string_format("%s%d", input_filename, collision_counter);
+	}else{
+		filename = xxstrdup(input_filename);
+	}
 
 	const char *new_filename;
 	new_filename = hash_table_lookup(previous_names, filename);
@@ -360,25 +364,31 @@ char *bundler_translate_name(const char *filename, int collision_counter)
 	new_filename = hash_table_lookup(reverse_names, filename);
 	if(new_filename) {
 		collision_counter++;
-		return bundler_translate_name(filename, collision_counter);
+		char *tmp = bundler_translate_name(filename, collision_counter);
+		free(filename);
+		return tmp;
 	}
 	if(filename[0] == '/') {
 		new_filename = string_basename(filename);
 		if(hash_table_lookup(previous_names, new_filename)) {
 			collision_counter++;
-			return bundler_translate_name(filename, collision_counter);
+			char *tmp = bundler_translate_name(filename, collision_counter);
+			free(filename);
+			return tmp;
 		} else if(hash_table_lookup(reverse_names, new_filename)) {
 			collision_counter++;
-			return bundler_translate_name(filename, collision_counter);
+			char *tmp = bundler_translate_name(filename, collision_counter);
+			free(filename);
+			return tmp;
 		} else {
 			hash_table_insert(reverse_names, new_filename, filename);
 			hash_table_insert(previous_names, filename, new_filename);
-			return strdup(new_filename);
+			return xxstrdup(new_filename);
 		}
 	} else {
 		hash_table_insert(previous_names, filename, filename);
 		hash_table_insert(reverse_names, filename, filename);
-		return xxstrdup(filename);
+		return filename;
 	}
 }
 
@@ -2022,8 +2032,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog-server=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
-	fprintf(stdout, " %-30s Enable master capacity estimation in Work Queue.\n", "-E,--wq-estimate-capacity");
-	fprintf(stdout, " %-30s Estimated master capacity may be viewed in the Work Queue log file.\n", "");
 	fprintf(stdout, " %-30s Write summary of workflow to this file upon success or failure.\n", "-f,--summary-log=<file>");
 	fprintf(stdout, " %-30s Work Queue fast abort multiplier.           (default is deactivated)\n", "-F,--wq-fast-abort=<#>");
 	fprintf(stdout, " %-30s Show this help screen.\n", "-h,--help");
@@ -2036,15 +2044,14 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Use this file for the makeflow log.         (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
 	fprintf(stdout, " %-30s Use this file for the batch system log.     (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
 	fprintf(stdout, " %-30s Send summary of workflow to this email address upon success or failure.\n", "-m,--email=<email>");
-	fprintf(stdout, " %-30s Enable the resource monitor\n", "-M,--monitor");
+	fprintf(stdout, " %-30s Enable the resource monitor, and write the monitor logs to <dir>\n", "-M,--monitor=<dir>");
 	fprintf(stdout, " %-30s Set monitor interval to <#> seconds.\n", "--monitor-interval=<#>");
 	fprintf(stdout, " %-30s Format for monitor logs. (default %s, %%d -> rule number)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
-	fprintf(stdout, " %-30s Set monitor output directory. (default monitor-logs-<date>)\n", "--monitor-log-dir=<dir>");
 	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
 	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-output=<file>");
 	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
 	fprintf(stdout, " %-30s Password file for authenticating workers.\n", "   --password");
-	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--wq-port=<port>", WORK_QUEUE_DEFAULT_PORT);
+	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--port=<port>", WORK_QUEUE_DEFAULT_PORT);
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", dag_retry_max);
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to n times.\n", "-r,--retry-count=<n>");
@@ -2054,7 +2061,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
 	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
 	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
-	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--wq-random-port=<file>");
+	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
 	fprintf(stdout, "\n*Display Options:\n\n");
 	fprintf(stdout, " %-30s Display the Makefile as a Dot graph or a PPM completion graph.\n", "-D,--display=<opt>");
 	fprintf(stdout, " %-30s Where <opt> is:\n", "");
@@ -2213,7 +2220,7 @@ int main(int argc, char *argv[])
 	char *ppm_option = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
-	int work_queue_estimate_capacity_on = 0;
+	int work_queue_estimate_capacity_on = 1; // capacity estimation is on by default
 	int work_queue_keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
 	int work_queue_keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
 	char *write_summary_to = NULL;
@@ -2280,16 +2287,15 @@ int main(int argc, char *argv[])
 		{"makeflow-log", required_argument, 0, 'l'},
 		{"batch-log", required_argument, 0, 'L'},
 		{"email", required_argument, 0, 'm'},
-		{"monitor", no_argument, 0, 'M'},
+		{"monitor", required_argument, 0, 'M'},
 		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
 		{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
-		{"monitor-log-dir", required_argument, 0, LONG_OPT_MONITOR_LOG_DIR},
 		{"monitor-limits", required_argument, 0, LONG_OPT_MONITOR_LIMITS},
 		{"password", required_argument, 0, LONG_OPT_PASSWORD},
 		{"project-name", required_argument, 0, 'N'},
 		{"debug-output", required_argument, 0, 'o'},
 		{"show-output", no_argument, 0, 'O'},
-		{"wq-port", required_argument, 0, 'p'},
+		{"port", required_argument, 0, 'p'},
 		{"priority", required_argument, 0, 'P'},
 		{"retry", no_argument, 0, 'R'},
 		{"retry-count", required_argument, 0, 'r'},
@@ -2299,12 +2305,12 @@ int main(int argc, char *argv[])
 		{"version", no_argument, 0, 'v'},
 		{"wq-schedule", required_argument, 0, 'W'},
 		{"zero-length-error", no_argument, 0, 'z'},
-		{"wq-random-port", required_argument, 0, 'Z'},
+		{"port-file", required_argument, 0, 'Z'},
 		{0, 0, 0, 0}
 	};
 
 
-	while((c = getopt_long(argc, argv, "aAb:B:cC:d:D:Ef:F:g:G:hiIj:J:kKl:L:m:MN:o:Op:P:r:RS:t:T:u:vW:zZ:", long_options, NULL)) >= 0) {
+	while((c = getopt_long(argc, argv, "aAb:B:cC:d:D:Ef:F:g:G:hiIj:J:kKl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:", long_options, NULL)) >= 0) {
 		switch (c) {
 		case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2371,6 +2377,7 @@ int main(int argc, char *argv[])
 			ppm_mode = 5;
 			break;
 		case 'E':
+			// This option is deprecated. Capacity estimation is now on by default.
 			work_queue_estimate_capacity_on = 1;
 			break;
 		case 'f':
@@ -2436,6 +2443,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'M':
 			monitor_mode = 1;
+			if(monitor_log_dir)
+				free(monitor_log_dir);
+			monitor_log_dir = xxstrdup(optarg);
 			break;
 		case 'N':
 			free(project);
@@ -2511,12 +2521,6 @@ int main(int argc, char *argv[])
 			if(monitor_log_format)
 				free(monitor_log_format);
 			monitor_log_format = xxstrdup(optarg);
-			break;
-		case LONG_OPT_MONITOR_LOG_DIR:
-			monitor_mode = 1;
-			if(monitor_log_dir)
-				free(monitor_log_dir);
-			monitor_log_dir = xxstrdup(optarg);
 			break;
 		case LONG_OPT_MONITOR_LIMITS:
 			monitor_mode = 1;
@@ -2614,14 +2618,6 @@ int main(int argc, char *argv[])
 		if(!monitor_log_format)
 			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
 
-		/* If we did not get a directory to write the
-		 * logs, create one with the current date + time.
-		 * */
-		if(!monitor_log_dir) {
-			time_t now = time(NULL);
-			struct tm *tm = localtime(&now);
-			monitor_log_dir = string_format("monitor-logs-%04d_%02d_%02d_%02d-%02d", 1900 + tm->tm_year, 1 + tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min);
-		}
 	}
 
 	struct dag *d = dag_from_file(dagfile, monitor_mode);

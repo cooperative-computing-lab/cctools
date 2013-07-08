@@ -1,9 +1,18 @@
+#!/bin/sh
+
+. ../../dttools/src/test_runner.common.sh
+
+exe="hmac_test.test"
+
+prepare()
+{
+	gcc -g -o "$exe" -I ../src/ -x c - -x none ../src/libdttools.a -lm <<EOF
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "hmac.h"
 #include "md5.h"
-
 
 int main(int argc, char **argv)
 {
@@ -113,3 +122,19 @@ int main(int argc, char **argv)
 
 	return 0;
 }
+EOF
+	return $?
+}
+
+run()
+{
+	./"$exe" -v
+}
+
+clean()
+{
+	rm -f "$exe"
+	return 0
+}
+
+dispatch $@

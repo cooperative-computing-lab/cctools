@@ -12,7 +12,7 @@ See the file COPYING for details.
 
 int pfs_dispatch64( struct pfs_process *p, INT64_T signum )
 {
-  return 0;
+	return 0;
 }
 
 #else
@@ -34,30 +34,34 @@ extern "C" {
 #include "debug.h"
 }
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
 #include <unistd.h>
-#include <signal.h>
-#include <time.h>
+
 #include <fcntl.h>
-#include <limits.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/statfs.h>
-#include <sys/file.h>
 #include <termios.h>
-#include <sys/time.h>
-#include <ctype.h>
-#include <sys/utsname.h>
-#include <sys/un.h>
-#include <net/if.h>
+
 #include <linux/sockios.h>
 
+#include <net/if.h>
+
+#include <sys/file.h>
+#include <sys/mman.h>
+#include <sys/personality.h>
+#include <sys/stat.h>
+#include <sys/statfs.h>
+#include <sys/time.h>
 #include <sys/types.h>
-#include <unistd.h>
+#include <sys/un.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
+
+#include <ctype.h>
+#include <errno.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 extern struct pfs_process *pfs_current;
 extern char *pfs_temp_dir;
@@ -1121,6 +1125,21 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				}
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL64_personality:
+			if(entering) {
+				unsigned long persona = args[0];
+				switch (persona) {
+					case PER_LINUX:
+					case PER_LINUX_32BIT:
+					case 0xffffffff: /* get personality */
+						/* allow the call to go through to the kernel */
+						break;
+					default:
+						fatal("cannot execute program with personality %d", persona);
+				}
 			}
 			break;
 
@@ -2620,6 +2639,27 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			break;
 
 		/*
+		Because parrot is in control of the session
+		and the process parentage, it must do set/getpgid
+		on behalf of the child process.
+		*/
+		case SYSCALL64_getpgid:
+			if(entering) {	
+				p->syscall_result = getpgid(p->syscall_args[0]);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+               case SYSCALL64_setpgid:
+                        if(entering) {  
+                                p->syscall_result = setpgid(p->syscall_args[0],p->syscall_args[1]);
+                                if(p->syscall_result<0) p->syscall_result = -errno;
+                                divert_to_dummy(p,p->syscall_result);
+                        }
+                        break;
+
+		/*
 		These things are not currently permitted.
 		*/
 		case SYSCALL64_chroot:
@@ -2659,7 +2699,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_get_kernel_syms:
 		case SYSCALL64_getgroups:
 		case SYSCALL64_getitimer:
-		case SYSCALL64_getpgid:
 		case SYSCALL64_getpgrp:
 		case SYSCALL64_getpid:
 		case SYSCALL64_getpriority:
@@ -2707,7 +2746,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_setgroups:
 		case SYSCALL64_sethostname:
 		case SYSCALL64_setitimer:
-		case SYSCALL64_setpgid:
 		case SYSCALL64_setpriority:
 		case SYSCALL64_setrlimit:
 		case SYSCALL64_settimeofday:

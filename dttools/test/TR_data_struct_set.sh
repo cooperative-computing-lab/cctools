@@ -1,13 +1,16 @@
-/*
-Copyright (C) 2013- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
+#!/bin/sh
 
+. ../../dttools/src/test_runner.common.sh
+
+exe="data_struct_set.test"
+
+prepare()
+{
+	gcc -g -o "$exe" -I ../src/ -x c - -x none ../src/libdttools.a -lm <<EOF
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 #include "set.h"
 
@@ -61,4 +64,20 @@ int main(int argc, char **argv)
 
   return 0;
 }
+EOF
+	return $?
+}
 
+run()
+{
+	./"$exe"
+	return $?
+}
+
+clean()
+{
+	rm -f "$exe"
+	return 0
+}
+
+dispatch $@

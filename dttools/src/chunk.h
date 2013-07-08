@@ -29,4 +29,4 @@ char *chunk_read(struct chunk_set *chunk_set, const char *file_name, int *size);
 @param num_files The number of file names in the filenames array.
 */
 
-int chunk_concat(const char *new_name, char **filenames, int num_files, char *ln_prefix, char *fc_prefix);
+int chunk_concat(const char *new_name, const char * const *filenames, int num_files, char *ln_prefix, char *fc_prefix);

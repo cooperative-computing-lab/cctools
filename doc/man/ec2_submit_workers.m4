@@ -24,6 +24,7 @@ OPTIONS_BEGIN
 OPTION_ITEM(-a)Enable auto mode for work_queue_worker.
 OPTION_ITEM(-M, name)Name of the preferred master for worker.
 OPTION_PAIR(-N, name)Same as -M (backwards compatibility).
+OPTION_PAIR(-c, cores)Set the number of cores each worker should use (0=auto). (default=1) 
 OPTION_PAIR(-C, catalog)Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT.
 OPTION_PAIR(-t, seconds)Abort work_queue_worker after this amount of idle time (default=900s).
 OPTION_PAIR(-d, subsystem)Enable debugging on worker for this subsystem (try -d all to start).
