@@ -1,0 +1,7 @@
+<storage-mapping>
+  <lfn-to-pfn protocol="xrootd"
+    destination-match=".*" path-match="/+store/(.*)" result="root://xrootd.unl.edu//store/$1?source=non_cms"/>
+
+  <lfn-to-pfn protocol="srmv2"
+    path-match="/+store/(.*)" result="srm://cmssrm.hep.wisc.edu:8443/srm/v2/server?SFN=/hdfs/store/$1"/>
+</storage-mapping>

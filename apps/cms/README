@@ -1,0 +1,52 @@
+Thanks for Dan Bradley <dan@hep.wisc.edu> for providing this example.
+
+This is an example of running a CMS simulation job using
+the CVMFS filesystem accessed via Parrot.  It is typical of
+how CMS jobs are run on the Open Science Grid.   All of the
+bootstrap data is present here -- everything is is downloaded
+on demand using the CVMFS filesystem.
+
+In order to run the example correctly, you must have cctools
+build against the CVMFS filesystem, and also access to an
+HTTP proxy that is part of the CVMFS caching hierarchy.
+The code is meant to run on Scientific Linux 5 but appears
+to run correctly on RHEL5/6 as long as SCRAM_ARCH is set correctly.
+
+As written, the example relies upon a specific proxy
+(cache01.hep.wisc.edu) which is known to be accessible
+on the wisc.edu and nd.edu networks.  If you run it elsewhere,
+you will almost certainly have to change the HTTP_PROXY
+setting to point to your own proxy server.
+
+The SITECONF directory is a mandatory configuration directory
+found at all CMS data analysis sites under a fixed path.
+When the job runs elsewhere, we must provide our own SITECONF
+directory and mount it into the appropriate place using the
+-M option to Parrot.
+
+To run the example:
+
+./parrot.cmsjob.sh
+
+The example completes in about 5 minutes with a cold CVMFS cache,
+and about 1 minute with a warm cache.
+
+The correct output is:
+
+GEN,SIM,ENDJOB
+We have determined that this is simulation (if not, rerun cmsDriver.py
+with --data)
+duplicated definition of E8TeV_AVE_10_BX_50ns
+Step: GEN Spec:
+Loading generator fragment from Configuration.Generator.TTbar_Tauola_7TeV_cfi
+Step: SIM Spec:
+Step: ENDJOB Spec:
+Starting  cmsRun  TTbar_Tauola_7TeV_cfi_GEN_SIM.py
+     MSTU(12)       changed from              0 to          12345
+
+=============================================
+
+MessageLogger Summary
+
+Severity    # Occurrences   Total Occurrences
+--------    -------------   -----------------
