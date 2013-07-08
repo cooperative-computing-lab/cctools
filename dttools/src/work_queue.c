@@ -462,10 +462,10 @@ static void update_catalog(struct work_queue *q, struct link *master, int now)
 
 	if(master) {
 		int port;
-		link_address_local(master, addrport, &port);
+		link_address_remote(master, addrport, &port);
 		sprintf(addrport, "%s:%d", addrport, port);
 	} else {
-		addrport[0] = '\0';
+		sprintf(addrport, "127.0.0.1:-1"); //this master has no master
 	}
 
 	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, addrport, &s, &r, worker_summary, now);
@@ -3080,7 +3080,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// Consider the master link passed into the function and disregard if inactive.
 		if(master_link) {
 			if(q->poll_table[1].revents) {
-				*master_active = 1; //signal that this is foreman
+				*master_active = 1; //signal that the master link saw activity
+			} else {
+				*master_active = 0;
 			}
 			j++;
 		}
@@ -3088,11 +3090,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// Then consider all existing active workers and dispatch tasks.
 		for(i = j; i < n; i++) {
 			if(q->poll_table[i].revents) {
-			debug(D_WQ, "Dispatching job to worker", n,j,*master_active);
+			debug(D_WQ, "Dispatching job to worker");
 				handle_worker(q, q->poll_table[i].link);
 			}
 		}
-		debug(D_WQ, "Total poll table entries: %d j is: %d master_active:%d", n,j,*master_active);
 		// Start tasks on ready workers
 		start_tasks(q);
 		
