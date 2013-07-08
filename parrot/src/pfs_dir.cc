@@ -6,11 +6,13 @@ See the file COPYING for details.
 */
 
 #include "pfs_service.h"
+#include "pfs_process.h"
 #include "pfs_dir.h"
 
 extern "C" {
 #include "stringtools.h"
 #include "hash_table.h"
+#include "debug.h"
 }
 
 #include <unistd.h>
@@ -27,6 +29,7 @@ pfs_dir::pfs_dir( pfs_name *n ) : pfs_file(n)
 	data = 0;
 	length = 0;
 	maxlength = 0;
+	total_iterations = 0;
 }
 
 pfs_dir::~pfs_dir()
@@ -69,8 +72,24 @@ struct dirent * pfs_dir::fdreaddir( pfs_off_t offset, pfs_off_t *next_offset )
 	errno = 0;
 
 	if(!data) return 0;
-	if(offset>=length) return 0;
 	if(offset<0) return 0;
+
+	if(offset>=length) {
+		total_iterations++;
+		return 0;
+	}
+
+	/*
+	Hack: Newer versions of rm keep re-reading a directory until
+	all entries are gone.  Since Parrot generates a snapshot of
+	a directory at open-time, this results in an infinite loop.
+	*/
+
+	if(total_iterations>0 && (!strcmp(pfs_process_name(),"/bin/rm") || !strcmp(pfs_process_name(),"/usr/bin/rm")) ) {
+		debug(D_LIBCALL,"end of directory reached, shortcutting further iterations by rm");
+		return 0;
+	}
+
 
 	char *result = &data[offset];
 
