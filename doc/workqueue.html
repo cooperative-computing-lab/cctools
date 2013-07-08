@@ -344,8 +344,8 @@ project name query the catalog server to find the hostname and port of the
 master with the given project name. So, to utilize this feature, the master
 must be specified to run in the <tt>WORK_QUEUE_MASTER_MODE_CATALOG</tt>. 
 
-<p>For example, to run a master that advertises its project name as
-<tt>myproject</tt>, do the following:
+<p>For example, to have a Work Queue master advertise its project name as
+<tt>myproject</tt>, add the following code snippet after creating the queue:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
