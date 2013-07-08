@@ -896,11 +896,6 @@ class pfs_service_cvmfs:public pfs_service {
 		return anystat(name,info,1,1);
 	}
 
-	virtual int unlink(pfs_name * name) {
-		errno = EROFS;
-		return -1;
-	}
-
 	virtual int access(pfs_name * name, mode_t mode) {
 		struct pfs_stat info;
 		if(this->stat(name, &info) == 0) {
@@ -911,38 +906,52 @@ class pfs_service_cvmfs:public pfs_service {
 				return 0;
 			}
 		} else {
+			// errno set by stat
 			return -1;
 		}
 	}
 
+	/*
+	It matters to a few rare applications whether unlink
+	and other write operations on non-existent files return
+	ENOENT versus EROFS.  For these, we check for existence,
+	and return EROFS otherwise.
+	*/
+
+	virtual int unlink(pfs_name * name) {
+		return access(name,W_OK);
+	}
+
 	virtual int chmod(pfs_name * name, mode_t mode) {
-		errno = EROFS;
-		return -1;
+		return access(name,W_OK);
 	}
 
 	virtual int chown(pfs_name * name, uid_t uid, gid_t gid) {
-		errno = EROFS;
-		return -1;
+		return access(name,W_OK);
 	}
 
 	virtual int lchown(pfs_name * name, uid_t uid, gid_t gid) {
-		errno = EROFS;
-		return -1;
+		return access(name,W_OK);
 	}
 
 	virtual int truncate(pfs_name * name, pfs_off_t length) {
-		errno = EROFS;
-		return -1;
+		return access(name,W_OK);
 	}
 
 	virtual int utime(pfs_name * name, struct utimbuf *buf) {
-		errno = EROFS;
-		return -1;
+		return access(name,W_OK);
 	}
 
 	virtual int rename(pfs_name * oldname, pfs_name * newname) {
-		errno = EROFS;
-		return -1;
+		return access(oldname,W_OK);
+	}
+
+	virtual int link(pfs_name * oldname, pfs_name * newname) {
+		return access(newname,W_OK);
+	}
+
+	virtual int symlink(const char *linkname, pfs_name * newname) {
+		return access(newname,W_OK);
 	}
 
 	virtual int chdir(pfs_name * name, char *newpath) {
@@ -958,16 +967,6 @@ class pfs_service_cvmfs:public pfs_service {
 		} else {
 			return -1;
 		}
-	}
-
-	virtual int link(pfs_name * oldname, pfs_name * newname) {
-		errno = EROFS;
-		return -1;
-	}
-
-	virtual int symlink(const char *linkname, pfs_name * newname) {
-		errno = EROFS;
-		return -1;
 	}
 
 	virtual int readlink(pfs_name * name, char *buf, pfs_size_t bufsiz) {
