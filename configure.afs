@@ -2,29 +2,49 @@
 
 EXTERNAL="/afs/nd.edu/user37/ccl/software/external"
 
-# Taken from /afs/nd.edu/user37/ccl/software/scripts/cctools_export
+# Our external packages are installed in $EXTERNAL/packagename-version/$SYS
+# Where $SYS is the output of the AFS `sys` command, usually something
+# like amd64_linux26 or i686_darwin_100.  In some cases, the AFS sys
+# does not sufficiently discriminate, so we add a subtype like
+# redhat5 or redhat6.
 
 function detect_packages()
 {
     unset GLOBUS_LOCATION
     export GLOBUS_LOCATION
     
-    echo -n "Detecting packages ..."
+    echo "platform is `sys`"
+
+    if [ -f /etc/redhat-release ]
+    then
+        major=`cat /etc/redhat-release | awk '{print $7'} | awk -F. '{print $1}'`
+	subtype=redhat$major
+	echo "subtype is $subtype"
+    fi
+
+    echo "$0: Detecting packages ..."
 
     PACKAGES_CONFIG=""
-    for package in fuse irods mysql hdfs python globus openmpi swig xrootd cvmfs
+    for package in fuse irods mysql python globus openmpi swig xrootd cvmfs
     do
-        if [ -d $EXTERNAL/$package/`sys` ]; then
-            echo -n " $package"
-            if [ $package = openmpi ]; then
-                PACKAGES_CONFIG="$PACKAGES_CONFIG --with-mpi-path $EXTERNAL/$package"
-            else
-                PACKAGES_CONFIG="$PACKAGES_CONFIG --with-$package-path $EXTERNAL/$package"
-            fi
-            if [ $package = hdfs ]
+	packagepath=$EXTERNAL/$package/`sys`_$subtype
+
+	if [ ! -d $packagepath ]
+	then
+		packagepath=$EXTERNAL/$package/`sys`
+	fi
+
+	if [ -d $packagepath ]
+        then
+            echo "$package -> $packagepath"
+            if [ $package = openmpi ]
             then
-                export JAVA_HOME=$EXTERNAL/java/jdk
+                PACKAGES_CONFIG="$PACKAGES_CONFIG --with-mpi-path $packagepath"
+            else
+                PACKAGES_CONFIG="$PACKAGES_CONFIG --with-$package-path $packagepath"
             fi
+	else
+            echo "$package -> NOTFOUND"
         fi
     done
 

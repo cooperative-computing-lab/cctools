@@ -10,6 +10,7 @@ See the file COPYING for details.
 
 extern "C" {
 #include "debug.h"
+#include "stringtools.h"
 }
 
 #include <unistd.h>
@@ -85,10 +86,9 @@ class cvmfs_dirent {
 	cvmfs_dirent();
 	~cvmfs_dirent();
 
-	bool lookup(pfs_name * name, bool follow_symlinks);
+	bool lookup(pfs_name * name, bool follow_leaf_symlinks, bool expand_internal_symlinks);
 
 	char *name;
-	char *linkname;
 	unsigned mode;
 	UINT64_T size;
 	UINT64_T inode;
@@ -96,7 +96,7 @@ class cvmfs_dirent {
 };
 
 cvmfs_dirent::cvmfs_dirent():
-name(0), linkname(0), mode(0), size(0), inode(0), mtime(0)
+name(0), mode(0), size(0), inode(0), mtime(0)
 {
 }
 
@@ -104,9 +104,6 @@ cvmfs_dirent::~cvmfs_dirent()
 {
 	if(name) {
 		free(name);
-	}
-	if(linkname) {
-		free(linkname);
 	}
 }
 
@@ -204,6 +201,7 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 	static int did_warning = 0;
 
 	if(cvmfs_active_filesystem != f) {
+
 		if(cvmfs_active_filesystem != NULL) {
 
 			if(!did_warning) {
@@ -227,9 +225,13 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 						  f->host.c_str());
 				}
 			}
+
+			debug(D_CVMFS, "cvmfs_fini()");
 			cvmfs_fini();
 			cvmfs_active_filesystem = NULL;
 		}
+
+		debug(D_CVMFS,"activating repository %s",f->host.c_str());
 
 		// check for references to the built-in cern.ch.pub key
 		char const *cern_key_pos = strstr(f->cvmfs_options.c_str(),CERN_KEY_PLACEHOLDER);
@@ -244,11 +246,11 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 			f->cvmfs_options.replace(cern_key_pos-f->cvmfs_options.c_str(),strlen(CERN_KEY_PLACEHOLDER),cern_key_fname);
 		}
 
-		debug(D_CVMFS, "Initializing libcvmfs with the following options: %s", f->cvmfs_options.c_str());
-
 		cvmfs_set_log_fn(cvmfs_parrot_logger);
 
+		debug(D_CVMFS, "cvmfs_init(%s)", f->cvmfs_options.c_str());
 		int rc = cvmfs_init(f->cvmfs_options.c_str());
+		
 		if(rc != 0) {
 			return false;
 		}
@@ -478,10 +480,7 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 	struct cvmfs_filesystem *f;
 	const char *subpath;
 
-	debug(D_CVMFS, "lookup_filesystem(%s,%s)", name->host, name->rest);
-
 	if(!name->host[0]) {
-		debug(D_CVMFS, "lookup_filesystem(%s,%s) --> ENOENT", name->host, name->rest);
 		errno = ENOENT;
 		return 0;
 	}
@@ -490,6 +489,7 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 		cvmfs_configured = true;
 		cvmfs_read_config();
 	}
+
 	if( !cvmfs_filesystem_list ) {
 		errno = ENOENT;
 		return 0;
@@ -512,7 +512,6 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 		if(!subpath) {
 			subpath = compare_path_prefix(name->rest, f->path.c_str());
 			if(subpath) {
-				debug(D_CVMFS, "lookup_filesystem(%s,%s) --> ENOENT", name->host, name->rest);
 				errno = ENOENT;
 				return 0;
 			} else {
@@ -521,7 +520,6 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 		}
 
 		*subpath_result = subpath;
-		debug(D_CVMFS, "lookup_filesystem(%s,%s) --> %s,%s,%s", name->host, name->rest, f->host.c_str(), f->path.c_str(), subpath);
 
 		if( f->match_wildcard ) {
 			// create a new filesystem entry for this specific match of the pattern
@@ -536,8 +534,6 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 
 		return f;
 	}
-
-	debug(D_CVMFS, "lookup_filesystem(%s,%s) --> ENOENT", name->host, name->rest);
 
 	/*
 	It is common for various programs to search for config files
@@ -576,6 +572,86 @@ static void chomp_slashes( char *s )
                 t--;
         }
 }
+static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
+{
+
+        /* During each iteration path->rest is decomposed into
+	xpath->rest/path_head/path_tail. path_head is tried for
+	symlink expansion, and on failing, added to xpath->rest. */
+	   
+	char path_head[PFS_PATH_MAX];
+	char path_tail[PFS_PATH_MAX];
+	char link_target[PFS_PATH_MAX];
+
+	memcpy(xpath, path, sizeof(pfs_name));
+	xpath->rest[0] = '\0';
+	strncpy(path_tail, path->rest, PFS_PATH_MAX);
+
+	do
+	{
+		string_split_path(path_tail, path_head, path_tail);
+
+		int rest_len = strlen(xpath->rest);
+		xpath->rest[rest_len] = '/';
+		xpath->rest[rest_len + 1] = '\0';
+
+		strncat(xpath->rest, path_head, PFS_PATH_MAX - 1);
+
+		int rl = xpath->service->readlink(xpath, link_target, PFS_PATH_MAX - 1); 
+
+		if(rl<0) {
+			if(errno==EINVAL) {
+				/* The prefix exists, but is not a link, so keep descending. */
+				continue;
+			} else {
+				/* For any other reason, do not descend any further. */
+				break;
+			}
+		} else {
+			/* The prefix is a link, so process it. */
+
+			if(link_target[0] != '/')
+			{
+				/* If link is relative, then we look
+				for the rightmost slash, and subsitute
+				that path with the link contents,
+				collapsing if needed. */
+
+				char *last_d = strrchr(xpath->rest, '/');
+				if(last_d)
+				{
+					
+					char path_relative[PFS_PATH_MAX];
+					*(last_d + 1) = '\0';
+					
+					strncat(xpath->rest, link_target, PFS_PATH_MAX); 
+					string_collapse_path(xpath->rest, path_relative, 1);
+					snprintf(link_target, PFS_PATH_MAX, "/cvmfs/%s%s",
+						 xpath->host, path_relative); 
+				}
+			}
+
+			if(sscanf(link_target, "/cvmfs/%[^/]%[^\n]", xpath->host, path_head) < 1)
+			{
+				errno = EXDEV;
+				return false;
+			}
+
+			snprintf(xpath->rest, PFS_PATH_MAX, "%s%s", path_head, path_tail);
+			snprintf(xpath->path, PFS_PATH_MAX, "/cvmfs/%s%s", xpath->host, xpath->rest);
+			strcpy(xpath->logical_name, xpath->path);
+
+			debug(D_CVMFS, "expanding symlinks %s to %s\n", path->path, xpath->path);
+
+			return true;
+		}
+
+	} while(path_head[0]);
+
+	/* if we get here, then there was not an expansion and lookup fails */
+
+	return false;
+}
 
 /*
 Given a full PFS path name, search for an already-loaded
@@ -584,10 +660,14 @@ appropriate dirent.  If no filesystem record is found,
 then search for and load the needed filesystem.
 */
 
-bool cvmfs_dirent::lookup(pfs_name * path, bool follow_symlinks)
+bool cvmfs_dirent::lookup(pfs_name * path, bool follow_leaf_symlinks, bool expand_internal_symlinks)
 {
 	char const *subpath = NULL;
+
 	cvmfs_filesystem *f = lookup_filesystem(path, &subpath);
+	if(!f) {
+		return false;
+	}
 
 	/*
 	If we attempt to lookup a directory name using a path
@@ -597,10 +677,6 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_symlinks)
 
 	chomp_slashes(path->rest);
 
-	if(!f) {
-		return false;
-	}
-
 	if(!cvmfs_activate_filesystem(f)) {
 		errno = EIO;
 		return false;
@@ -608,15 +684,25 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_symlinks)
 
 	struct stat st;
 	int rc;
-	if( follow_symlinks ) {
+	if( follow_leaf_symlinks ) {
+		debug(D_CVMFS,"stat(%s)",path->rest);
 		rc = cvmfs_stat(path->rest, &st);
 	} else {
+		debug(D_CVMFS,"lstat(%s)",path->rest);
 		rc = cvmfs_lstat(path->rest, &st);
 	}
-	if(rc != 0) {
-		return false;
-	}
 
+	if(rc != 0) {
+		/* lookup may have failed because some of the path
+		   components are symlinks. In that case, we try each of the path
+		   components as symlinks. If we do not find one, lookup fails. */
+		struct pfs_name xpath;
+		if(expand_internal_symlinks && path_expand_symlink(path, &xpath))
+			return lookup(&xpath, follow_leaf_symlinks, 1);
+		else
+			return false;
+	}
+	
 	name = strdup(subpath);
 	mode = st.st_mode;
 	size = st.st_size;
@@ -638,7 +724,9 @@ class pfs_file_cvmfs:public pfs_file {
 		fd = fd_arg;
 		last_offset = 0;
 		cvmfs_dirent_to_stat(&d, &info);
-	} virtual int close() {
+	}
+
+	virtual int close() {
 		return cvmfs_close(fd);
 	}
 
@@ -680,7 +768,9 @@ class pfs_service_cvmfs:public pfs_service {
       public:
 	virtual int get_default_port() {
 		return 0;
-	} virtual int is_seekable() {
+	}
+
+	virtual int is_seekable() {
 		// CVMFS has its own cache, and the file descriptors returned
 		// by cvmfs_open are just handles to whole files in the CVMFS
 		// cache.  Telling parrot that the handle is seekable also
@@ -693,28 +783,27 @@ class pfs_service_cvmfs:public pfs_service {
 	virtual pfs_file *open(pfs_name * name, int flags, mode_t mode) {
 		struct cvmfs_dirent d;
 
-		debug(D_CVMFS, "open(%s,%d,%d)", name->rest, flags, mode);
-
-		if(!d.lookup(name, 1)) {
+		if(!d.lookup(name, 1, 1)) {
+			// errno is set by lookup()
 			return 0;
 		}
 
 		/* cvmfs_open does not work with directories (it gives a 'fail to fetch' error). */
 		if(S_ISDIR(d.mode)) {
+			errno = EISDIR;
 			return 0;
 		}
 
+		debug(D_CVMFS,"open(%s)",name->rest);
 		int fd = cvmfs_open(name->rest);
-		if(fd == -1) {
-			return 0;
-		}
+
+		if(fd<0) return 0;
+
 		return new pfs_file_cvmfs(name, fd, d);
 	}
 
 	pfs_dir *getdir(pfs_name * name) {
 		struct cvmfs_dirent d;
-
-		debug(D_CVMFS, "getdir(%s)", name->rest);
 
 		/*
 		If the root of the CVFMS filesystem is requested,
@@ -743,7 +832,7 @@ class pfs_service_cvmfs:public pfs_service {
 		Otherwise, go to CVMFS for the directory liting.
 		*/
 
-		if(!d.lookup(name, 1)) {
+		if(!d.lookup(name, 1, 1)) {
 			return 0;
 		}
 
@@ -757,11 +846,10 @@ class pfs_service_cvmfs:public pfs_service {
 		char **buf = NULL;
 		size_t buflen = 0;
 
+		debug(D_CVMFS, "getdir(%s)", name->rest);
 		int rc = cvmfs_listdir(name->rest, &buf, &buflen);
-		if(rc != 0) {
-			errno = -rc;
-			return 0;
-		}
+
+		if(rc<0) return 0;
 
 		int i;
 		for(i = 0; buf[i]; i++) {
@@ -773,7 +861,7 @@ class pfs_service_cvmfs:public pfs_service {
 		return dir;
 	}
 
-	virtual int anystat(pfs_name * name, struct pfs_stat *info, int follow_links ) {
+	virtual int anystat(pfs_name * name, struct pfs_stat *info, int follow_leaf_links, int expand_internal_symlinks ) {
 		struct cvmfs_dirent d;
 
 		/*
@@ -791,7 +879,7 @@ class pfs_service_cvmfs:public pfs_service {
 		Otherwise, do the lookup in CVMFS itself.
 		*/
 
-		if(!d.lookup(name, follow_links)) {
+		if(!d.lookup(name, follow_leaf_links, expand_internal_symlinks)) {
 			return -1;
 		}
 
@@ -801,23 +889,15 @@ class pfs_service_cvmfs:public pfs_service {
 	}
 
 	virtual int lstat(pfs_name * name, struct pfs_stat *info) {
-		debug(D_CVMFS, "lstat(%s)", name->rest);
-		return anystat(name,info,0);
+		return anystat(name,info,0,1);
 	}
 
 	virtual int stat(pfs_name * name, struct pfs_stat *info) {
-		debug(D_CVMFS, "stat(%s)", name->rest);
-		return anystat(name,info,0);
-	}
-
-	virtual int unlink(pfs_name * name) {
-		errno = EROFS;
-		return -1;
+		return anystat(name,info,1,1);
 	}
 
 	virtual int access(pfs_name * name, mode_t mode) {
 		struct pfs_stat info;
-		debug(D_CVMFS, "access(%s,%d)", name->rest, mode);
 		if(this->stat(name, &info) == 0) {
 			if(mode & W_OK) {
 				errno = EROFS;
@@ -826,44 +906,56 @@ class pfs_service_cvmfs:public pfs_service {
 				return 0;
 			}
 		} else {
+			// errno set by stat
 			return -1;
 		}
 	}
 
+	/*
+	It matters to a few rare applications whether unlink
+	and other write operations on non-existent files return
+	ENOENT versus EROFS.  For these, we check for existence,
+	and return EROFS otherwise.
+	*/
+
+	virtual int unlink(pfs_name * name) {
+		return access(name,W_OK);
+	}
+
 	virtual int chmod(pfs_name * name, mode_t mode) {
-		errno = EROFS;
-		return -1;
+		return access(name,W_OK);
 	}
 
 	virtual int chown(pfs_name * name, uid_t uid, gid_t gid) {
-		errno = EROFS;
-		return -1;
+		return access(name,W_OK);
 	}
 
 	virtual int lchown(pfs_name * name, uid_t uid, gid_t gid) {
-		errno = EROFS;
-		return -1;
+		return access(name,W_OK);
 	}
 
 	virtual int truncate(pfs_name * name, pfs_off_t length) {
-		errno = EROFS;
-		return -1;
+		return access(name,W_OK);
 	}
 
 	virtual int utime(pfs_name * name, struct utimbuf *buf) {
-		errno = EROFS;
-		return -1;
+		return access(name,W_OK);
 	}
 
 	virtual int rename(pfs_name * oldname, pfs_name * newname) {
-		errno = EROFS;
-		return -1;
+		return access(oldname,W_OK);
+	}
+
+	virtual int link(pfs_name * oldname, pfs_name * newname) {
+		return access(newname,W_OK);
+	}
+
+	virtual int symlink(const char *linkname, pfs_name * newname) {
+		return access(newname,W_OK);
 	}
 
 	virtual int chdir(pfs_name * name, char *newpath) {
 		struct pfs_stat info;
-
-		debug(D_CVMFS, "chdir(%s)", name->rest);
 
 		if(this->stat(name, &info) == 0) {
 			if(S_ISDIR(info.st_mode)) {
@@ -877,19 +969,7 @@ class pfs_service_cvmfs:public pfs_service {
 		}
 	}
 
-	virtual int link(pfs_name * oldname, pfs_name * newname) {
-		errno = EROFS;
-		return -1;
-	}
-
-	virtual int symlink(const char *linkname, pfs_name * newname) {
-		errno = EROFS;
-		return -1;
-	}
-
 	virtual int readlink(pfs_name * name, char *buf, pfs_size_t bufsiz) {
-
-		debug(D_CVMFS, "readlink(%s)", name->rest);
 
                 /*
                 If we get readlink("/cvmfs"), return not-a-link.
@@ -906,16 +986,16 @@ class pfs_service_cvmfs:public pfs_service {
 
 		struct cvmfs_dirent d;
 
-		if(!d.lookup(name, 0)) {
+		if(!d.lookup(name, 0, 0)) {
 			return -1;
 		}
 
 		if(S_ISLNK(d.mode)) {
+			debug(D_CVMFS, "readlink(%s)", name->rest);
 			int rc = cvmfs_readlink(name->rest, buf, bufsiz);
-			if(rc < 0) {
-				errno = -rc;
-				return -1;
-			}
+
+			if(rc < 0) return rc;
+
 			return strlen(buf);
 		} else {
 			errno = EINVAL;
@@ -938,3 +1018,4 @@ static pfs_service_cvmfs pfs_service_cvmfs_instance;
 pfs_service *pfs_service_cvmfs = &pfs_service_cvmfs_instance;
 
 #endif
+

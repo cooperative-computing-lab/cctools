@@ -27,8 +27,15 @@ int delete_dir(const char *dirname)
 	if(!dir) {
 		if(errno == ENOTDIR) 
 			return unlink(dirname);
-		else if(errno == ENOENT) 
+		else if(errno == ENOENT) {
+			/* 
+			 ENOENT also signals a dangling symlink. So call unlink anyway to
+			 remove any dangling symlinks. If not a dangling symlink, unlink
+			 will fail and keep errno set to ENOENT. We always return success. 
+			*/
+			unlink(dirname); 			
 			return 0;
+		}	
 		else 
 			return -1;
 	}
