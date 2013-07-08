@@ -1,5 +1,21 @@
 #!/usr/bin/env perl
 
+# wq_maker 
+#
+# Copyright (C) 2013- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+#
+# This program implements elastic genome annotation using the cctools work queue
+# framework and the MAKER annotation pipeline as described in the following
+# paper:
+#
+# Andrew Thrasher, Zachary Musgrave, Douglas Thain, Scott Emrich,
+# "Shifting the Bioinformatics Computing Paradigm: A Case Study in Parallelizing
+# Genome Annotation Using Maker and Work Queue", 
+# IEEE International Conference on Computational Advances in Bio and Medical
+# Sciences, February, 2012.
+
 use strict "vars";
 use strict "refs";
 use warnings;
