@@ -13,7 +13,7 @@ chirp_2_port=chirp.2.port
 chirp_2_root=chirp.2.root
 
 VOLUME="tank"
-VOLUME_KEY=`echo -n "$VOLUME" | sha1sum | awk '{print $1}'`
+VOLUME_KEY="b63ae12fe3c8708ecae4d3cba504f5705af1440e" # `echo -n "$VOLUME" | sha1sum | awk '{print $1}'`
 
 prepare()
 {
