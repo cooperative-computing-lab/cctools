@@ -465,7 +465,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Write process identifier (PID) to file.\n", "-B,--pid-file=<file>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
 	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
-	fprintf(stdout, " %-30s Record catalog history to this directory.\n", "-H,--history=<file>");
+	fprintf(stdout, " %-30s Record catalog history to this directory.\n", "-H,--history=<directory>");
 	fprintf(stdout, " %-30s Lifetime of data, in seconds (default is %d)\n", "-l,--lifetime=<secs>", lifetime);
 	fprintf(stdout, " %-30s Log new updates to this file.\n", "-L,--update-log=<file>");
 	fprintf(stdout, " %-30s Maximum number of child processes.  (default is %d)\n", "-m,--max-jobs=<n>",child_procs_max);
