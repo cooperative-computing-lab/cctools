@@ -284,14 +284,9 @@ struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port
 	return ml;
 }
 
-<<<<<<< HEAD
-int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, const char *master_address, struct work_queue_stats *s, struct work_queue_resources *r, const char *workers_by_pool, int now) {
-=======
-int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, struct work_queue_resources *r, const char *workers_by_pool ) {
->>>>>>> 49e56669d61b1f9725f37ec61b74bfe1d0765498
+int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, const char *master_address, struct work_queue_stats *s, struct work_queue_resources *r, const char *workers_by_pool ) {
 	char address[DATAGRAM_ADDRESS_MAX];
 	char owner[USERNAME_MAX];
-
 	buffer_t *buffer = NULL;
 	const char *text;
 	size_t text_size;

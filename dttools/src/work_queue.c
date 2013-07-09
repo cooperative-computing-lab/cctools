@@ -441,13 +441,7 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 	return timeout;
 }
 
-<<<<<<< HEAD
-static void update_catalog(struct work_queue *q, struct link *master, int now)
-{
-	struct work_queue_stats s;
-	char addrport[WORK_QUEUE_LINE_MAX];
-=======
-static void update_catalog(struct work_queue *q, int force_update )
+static void update_catalog(struct work_queue *q, struct link *master, int force_update )
 {
 	struct work_queue_stats s;
 	static time_t last_update_time = 0;
@@ -455,7 +449,6 @@ static void update_catalog(struct work_queue *q, int force_update )
 	if(!force_update) {
 		if(time(0) - last_update_time < WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL) return;
 	}
->>>>>>> 49e56669d61b1f9725f37ec61b74bfe1d0765498
 
 	if(!q->catalog_host) {
 		q->catalog_host = strdup(CATALOG_HOST);
@@ -470,8 +463,7 @@ static void update_catalog(struct work_queue *q, int force_update )
 	memset(&r, 0, sizeof(r));
 	work_queue_get_resources(q,&r);
 	char * worker_summary = work_queue_get_worker_summary(q);
-<<<<<<< HEAD
-
+	char addrport[1024];
 	if(master) {
 		int port;
 		link_address_remote(master, addrport, &port);
@@ -479,11 +471,7 @@ static void update_catalog(struct work_queue *q, int force_update )
 	} else {
 		sprintf(addrport, "127.0.0.1:-1"); //this master has no master
 	}
-
-	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, addrport, &s, &r, worker_summary, now);
-=======
-	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, &r, worker_summary);
->>>>>>> 49e56669d61b1f9725f37ec61b74bfe1d0765498
+	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, addrport, &s, &r, worker_summary);
 	free(worker_summary);
 
 	last_update_time = time(0);
