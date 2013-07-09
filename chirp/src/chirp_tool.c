@@ -1102,7 +1102,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<flag>");
 	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
 	fprintf(stdout, " %-30s Long transfer information.\n", "-l,--verbose");
-	fprintf(stdout, " %-30s Quiet mode; supress messages and table headers.\n", "-q,--quiet");
 	fprintf(stdout, " %-30s Set remote operation timeout.\n", "-t,--timeout=<time>");
 	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
@@ -1127,7 +1126,6 @@ int main(int argc, char *argv[])
 		{"debug", required_argument, 0, 'd'},
 		{"tickets", required_argument, 0, 'i'},
 		{"verbose", no_argument, 0, 'l'},
-		{"quiet", no_argument, 0, 'q'},
 		{"timeout", required_argument, 0, 't'},
 		{"version", no_argument, 0, 'v'},
 		{"help", no_argument, 0, 'h'},
