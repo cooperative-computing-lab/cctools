@@ -15,11 +15,13 @@ See the file COPYING for details.
 
 void opts_write_port_file(const char *port_file, const int port)
 {
-	FILE *file = fopen(port_file,"w");
+	if(port_file) {
+		FILE *file = fopen(port_file,"w");
 	
-	if(!file) 
-		fatal("couldn't write to %s: %s\n", port_file, strerror(errno));
+		if(!file)
+			fatal("couldn't write to %s: %s\n", port_file, strerror(errno));
 
-	fprintf(file, "%d\n", port);
-	fclose(file);
+		fprintf(file, "%d\n", port);
+		fclose(file);
+	}
 }
