@@ -79,6 +79,9 @@ OPTIONS_END
 SUBSECTION(Monitor Options)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-M, monitor, dir)Enable the resource monitor, and write the monitor logs to <dir>
+OPTION_PAIR(--monitor-limits, file)Use <file> as value-pairs for resource limits.
+OPTION_ITEM(`--monitor-with-time-series')Enable monitor time series.                 (default is disabled)
+OPTION_ITEM(`--monitor-with-opened-files')Enable monitoring of openened files.        (default is disabled)
 OPTION_PAIR(--monitor-interval, #)Set monitor interval to <#> seconds. (default 1 second)
 OPTION_PAIR(--monitor-log-fmt, fmt)Format for monitor logs. (default resource-rule-%06.6d, %d -> rule number)
 OPTIONS_END
