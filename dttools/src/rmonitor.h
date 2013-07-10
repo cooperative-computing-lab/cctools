@@ -16,15 +16,16 @@ COPYING for details.
 The command line is rewritten to be run inside the monitor with
 the corresponding log file options.
 @param cmdline A command line.
-@param template The filename template for all the log files, used when NULL is specified for the parameters below.
+@param template The filename template for all the log files.
 @param limits The name of the resource limits file. NULL if no limits are going to be specified.
-@param summary The name of the summary file to be generated. If NULL, but template is specified, then generate with default name. If NULL, and template also NULL, then it is not generated.
-@param time_series The name of the time-series log to be generated (same rules as summary).
-@param opened_files The name of the list of opened files log to be generated. (same rules as summary).
+@param summary Generate <template>.summary if not 0.
+@param time_series Generate <template>.series if not 0.
+@param opened_files Generate <template>.files if not 0.
 @return A new command line that runs the original command line wrapped with the resource monitor.
 */
 
-char *resource_monitor_rewrite_command(char *cmdline, char *template_filename, char *limits_filename, char *summary, char *time_series, char *opened_files);
+char *resource_monitor_rewrite_command(char *cmdline, char *template_filename, char *limits_filename,
+				       int summary, int time_series, int opened_files);
 
 /** Looks for a resource monitor executable, and makes a copy in
 current working directory.

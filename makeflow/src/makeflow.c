@@ -71,8 +71,10 @@ enum { SHOW_INPUT_FILES = 2,
 
 enum { LONG_OPT_MONITOR_INTERVAL = 1,
        LONG_OPT_MONITOR_LOG_NAME,
-       LONG_OPT_PASSWORD,
        LONG_OPT_MONITOR_LIMITS,
+       LONG_OPT_MONITOR_TIME_SERIES,
+       LONG_OPT_MONITOR_OPENED_FILES,
+       LONG_OPT_PASSWORD,
        LONG_OPT_PPM_ROW,
        LONG_OPT_PPM_FILE,
        LONG_OPT_PPM_EXE,
@@ -1218,8 +1220,19 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 	 * while parsing. The monitor code should not be here. */
 	if(bk->monitor_mode) {
 		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
-		debug(D_DEBUG, "adding monitor and %s{.summary,.series,.files} to rule %d.\n", log_name, n->nodeid);
-		line = string_format("%s.summary %s.series %s.files %s %s %s", log_name, log_name, log_name, line_org, monitor_exe, monitor_limits_name ? monitor_limits_name : "");
+		debug(D_DEBUG, "adding monitor and %s{.summary%s%s} to rule %d.\n",
+		      log_name,
+		      bk->monitor_mode & 02 ? ",.series" : "",
+		      bk->monitor_mode & 04 ? ",.files"  : "",
+		      n->nodeid);
+		line = string_format("%s.summary %s%s %s%s %s %s %s",
+				     log_name,
+				     bk->monitor_mode & 02 ? log_name   : "",
+				     bk->monitor_mode & 02 ? ".series" : "",
+				     bk->monitor_mode & 04 ? log_name   : "",
+				     bk->monitor_mode & 04 ? ".files"  : "",
+				     line_org, monitor_exe,
+				     monitor_limits_name ? monitor_limits_name : "");
 	} else {
 		line = xxstrdup(line_org);
 	}
@@ -1416,7 +1429,10 @@ int dag_parse_node_command(struct lexer_book *bk, struct dag_node *n, char *line
 	/* BUG: Monitor code should not be here! */
 	if(bk->monitor_mode) {
 		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
-		command = resource_monitor_rewrite_command(command, log_name, monitor_limits_name, NULL, NULL, NULL);
+		command = resource_monitor_rewrite_command(command, log_name, monitor_limits_name,
+							   bk->monitor_mode & 1,
+							   bk->monitor_mode & 2,
+							   bk->monitor_mode & 4);
 	}
 
 	dag_parse_node_set_command(bk, n, command);
@@ -2044,9 +2060,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Use this file for the makeflow log.         (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
 	fprintf(stdout, " %-30s Use this file for the batch system log.     (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
 	fprintf(stdout, " %-30s Send summary of workflow to this email address upon success or failure.\n", "-m,--email=<email>");
-	fprintf(stdout, " %-30s Enable the resource monitor, and write the monitor logs to <dir>\n", "-M,--monitor=<dir>");
-	fprintf(stdout, " %-30s Set monitor interval to <#> seconds.\n", "--monitor-interval=<#>");
-	fprintf(stdout, " %-30s Format for monitor logs. (default %s, %%d -> rule number)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
 	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
 	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-output=<file>");
 	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
@@ -2062,6 +2075,15 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
 	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
+
+	fprintf(stdout, "\n*Monitor Options:\n\n");
+	fprintf(stdout, " %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
+	fprintf(stdout, " %-30s Use <file> as value-pairs for resource limits.\n", "--monitor-limits=<file>");
+	fprintf(stdout, " %-30s Set monitor interval to <#> seconds.        (default is 1 second)\n", "--monitor-interval=<#>");
+	fprintf(stdout, " %-30s Enable monitor time series.                 (default is disabled)\n", "--monitor-with-time-series");
+	fprintf(stdout, " %-30s Enable monitoring of openened files.        (default is disabled)\n", "--monitor-with-opened-files");
+	fprintf(stdout, " %-30s Format for monitor logs.                    (default %s)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
+
 	fprintf(stdout, "\n*Display Options:\n\n");
 	fprintf(stdout, " %-30s Display the Makefile as a Dot graph or a PPM completion graph.\n", "-D,--display=<opt>");
 	fprintf(stdout, " %-30s Where <opt> is:\n", "");
@@ -2206,7 +2228,7 @@ int main(int argc, char *argv[])
 	char *batchlogfilename = NULL;
 	char *bundle_directory = NULL;
 	int clean_mode = 0;
-	int monitor_mode = 0;
+	int monitor_mode = 0; /* & 1 enabled, & 2 with time-series, & 4 whith opened-files */
 	int display_mode = 0;
 	int condense_display = 0;
 	int change_size = 0;
@@ -2290,7 +2312,9 @@ int main(int argc, char *argv[])
 		{"monitor", required_argument, 0, 'M'},
 		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
 		{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
-		{"monitor-limits", required_argument, 0, LONG_OPT_MONITOR_LIMITS},
+		{"monitor-limits", required_argument,   0, LONG_OPT_MONITOR_LIMITS},
+		{"monitor-with-time-series",  no_argument, 0, LONG_OPT_MONITOR_TIME_SERIES},
+		{"monitor-with-opened-files", no_argument, 0, LONG_OPT_MONITOR_OPENED_FILES},
 		{"password", required_argument, 0, LONG_OPT_PASSWORD},
 		{"project-name", required_argument, 0, 'N'},
 		{"debug-output", required_argument, 0, 'o'},
@@ -2441,12 +2465,6 @@ int main(int argc, char *argv[])
 		case 'm':
 			email_summary_to = xxstrdup(optarg);
 			break;
-		case 'M':
-			monitor_mode = 1;
-			if(monitor_log_dir)
-				free(monitor_log_dir);
-			monitor_log_dir = xxstrdup(optarg);
-			break;
 		case 'N':
 			free(project);
 			project = xxstrdup(optarg);
@@ -2512,21 +2530,33 @@ int main(int argc, char *argv[])
 			port = 0;
 			port_set = 1;	//WQ is going to set the port, so we continue as if already set.
 			break;
-		case LONG_OPT_MONITOR_INTERVAL:
-			monitor_mode = 1;
-			monitor_interval = atoi(optarg);
-			break;
-		case LONG_OPT_MONITOR_LOG_NAME:
-			monitor_mode = 1;
-			if(monitor_log_format)
-				free(monitor_log_format);
-			monitor_log_format = xxstrdup(optarg);
+		case 'M':
+			monitor_mode |= 01;
+			if(monitor_log_dir)
+				free(monitor_log_dir);
+			monitor_log_dir = xxstrdup(optarg);
 			break;
 		case LONG_OPT_MONITOR_LIMITS:
-			monitor_mode = 1;
+			monitor_mode |= 01;
 			if(monitor_limits_name)
 				free(monitor_limits_name);
 			monitor_limits_name = xxstrdup(optarg);
+			break;
+		case LONG_OPT_MONITOR_INTERVAL:
+			monitor_mode |= 01;
+			monitor_interval = atoi(optarg);
+			break;
+		case LONG_OPT_MONITOR_TIME_SERIES:
+			monitor_mode |= 02;
+			break;
+		case LONG_OPT_MONITOR_OPENED_FILES:
+			monitor_mode |= 04;
+			break;
+		case LONG_OPT_MONITOR_LOG_NAME:
+			monitor_mode |= 01;
+			if(monitor_log_format)
+				free(monitor_log_format);
+			monitor_log_format = xxstrdup(optarg);
 			break;
 		case LONG_OPT_PASSWORD:
 			if(copy_file_to_buffer(optarg, &wq_password) < 0) {
@@ -2610,14 +2640,19 @@ int main(int argc, char *argv[])
 	}
 
 	if(monitor_mode) {
+
+		if(!monitor_log_dir)
+		{
+			fatal("Monitor mode was enabled, but a log output directory was not specified (use -M<dir>)");
+		}
+
 		monitor_exe = resource_monitor_copy_to_wd(NULL);
 
 		if(monitor_interval < 1)
-			monitor_interval = DEFAULT_MONITOR_INTERVAL;
+			fatal("Monitoring interval should be non-negative.");
 
 		if(!monitor_log_format)
 			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
-
 	}
 
 	struct dag *d = dag_from_file(dagfile, monitor_mode);

@@ -2937,7 +2937,7 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 	char *wrap_cmd; 
 	char *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
 	
-	wrap_cmd = resource_monitor_rewrite_command(t->command_line, NULL, NULL, summary, NULL, NULL);
+	wrap_cmd = resource_monitor_rewrite_command(t->command_line, summary, NULL, 1, 0, 0);
 
 	//BUG: what if user changes current working directory?
 	work_queue_task_specify_file(t, q->monitor_exe, q->monitor_exe, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
