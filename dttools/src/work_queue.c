@@ -441,14 +441,10 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 	return timeout;
 }
 
-static void update_catalog(struct work_queue *q, int force_update )
+static void update_catalog(struct work_queue *q, struct link *master, int now)
 {
 	struct work_queue_stats s;
-	static time_t last_update_time = 0;
-
-	if(!force_update) {
-		if(time(0) - last_update_time < WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL) return;
-	}
+	char addrport[WORK_QUEUE_LINE_MAX];
 
 	if(!q->catalog_host) {
 		q->catalog_host = strdup(CATALOG_HOST);
@@ -463,10 +459,17 @@ static void update_catalog(struct work_queue *q, int force_update )
 	memset(&r, 0, sizeof(r));
 	work_queue_get_resources(q,&r);
 	char * worker_summary = work_queue_get_worker_summary(q);
-	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, &s, &r, worker_summary);
-	free(worker_summary);
 
-	last_update_time = time(0);
+	if(master) {
+		int port;
+		link_address_remote(master, addrport, &port);
+		sprintf(addrport, "%s:%d", addrport, port);
+	} else {
+		sprintf(addrport, "127.0.0.1:-1"); //this master has no master
+	}
+
+	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, addrport, &s, &r, worker_summary, now);
+	free(worker_summary);
 }
 
 static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
@@ -1343,16 +1346,11 @@ static void handle_worker(struct work_queue *q, struct link *l)
 	}
 }
 
-static int build_poll_table(struct work_queue *q, struct list *aux_links)
+static int build_poll_table(struct work_queue *q, struct link *master)
 {
 	int n = 0;
 	char *key;
 	struct work_queue_worker *w;
-
-	if(aux_links) {
-		if( list_size(aux_links) + 8 > q->poll_table_size )
-		{	q->poll_table_size = list_size(aux_links)+8;	}
-	}
 
 	// Allocate a small table, if it hasn't been done yet.
 	if(!q->poll_table) {
@@ -1364,15 +1362,11 @@ static int build_poll_table(struct work_queue *q, struct list *aux_links)
 	q->poll_table[0].revents = 0;
 	n = 1;
 
-	if(aux_links) {
-		struct link *lnk;
-		list_first_item(aux_links);
-		while((lnk = (struct link *)list_next_item(aux_links))) {
-			q->poll_table[n].link = lnk;
-			q->poll_table[n].events = LINK_READ;
-			q->poll_table[n].revents = 0;
-			n++;
-		}
+	if(master) {
+		q->poll_table[n].link = master;
+		q->poll_table[n].events = LINK_READ;
+		q->poll_table[n].revents = 0;
+		n++;
 	}
 
 	// For every worker in the hash table, add an item to the poll table
@@ -2908,7 +2902,7 @@ void work_queue_delete(struct work_queue *q)
 			release_worker(q, w);
 		}
 		if(q->name) {
-			update_catalog(q, 1);
+			update_catalog(q, NULL, 1);
 		}
 		if(q->catalog_host) free(q->catalog_host);
 		hash_table_delete(q->worker_table);
@@ -3009,7 +3003,7 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
-struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct list *aux_links, struct list *active_aux_links)
+struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *master_link, int *master_active)
 {
 	struct work_queue_task *t;
 	time_t stoptime;
@@ -3029,7 +3023,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 	while(1) {
 		if(q->name) {
-			update_catalog(q, 0);
+			update_catalog(q, master_link, 0);
 		}
 		
 		remove_unresponsive_workers(q);	
@@ -3049,10 +3043,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		update_worker_states(q);
 
-		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !(aux_links && list_size(aux_links)))
+		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !(master_link))
 			break;
 
-		int n = build_poll_table(q, aux_links);
+		int n = build_poll_table(q, master_link);
 
 		// Wait no longer than the caller's patience.
 		int msec;
@@ -3083,23 +3077,23 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		int i, j = 1;
 
-		// Consider any auxiliary links passed into the function and remove from the list any which are not active.
-		if(aux_links) {
-			j = list_size(aux_links)+1;
-			for(i = 1; i < j; i++) {
-				if(q->poll_table[i].revents) {
-					list_push_tail(active_aux_links, q->poll_table[i].link);
-				}
+		// Consider the master link passed into the function and disregard if inactive.
+		if(master_link) {
+			if(q->poll_table[1].revents) {
+				*master_active = 1; //signal that the master link saw activity
+			} else {
+				*master_active = 0;
 			}
+			j++;
 		}
 
 		// Then consider all existing active workers and dispatch tasks.
 		for(i = j; i < n; i++) {
 			if(q->poll_table[i].revents) {
+			debug(D_WQ, "Dispatching job to worker");
 				handle_worker(q, q->poll_table[i].link);
 			}
 		}
-		
 		// Start tasks on ready workers
 		start_tasks(q);
 		
@@ -3120,8 +3114,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			abort_slow_workers(q);
 		}
 		
-		// If any of the passed-in auxiliary links are active then break so the caller can handle them.
-		if(aux_links && list_size(active_aux_links)) {
+		// If the master link is active then break so the caller can handle it.
+		if(master_link) {
 			break;
 		}
 		

@@ -28,7 +28,7 @@ enum wq_file_types {
 };
 
 
-struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct list *aux_links, struct list *active_aux_links);
+struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *master_link, int *master_active);
 
 void work_queue_get_resources( struct work_queue *q, struct work_queue_resources *r );
 
