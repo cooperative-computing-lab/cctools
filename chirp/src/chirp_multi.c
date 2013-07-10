@@ -440,6 +440,19 @@ INT64_T chirp_multi_getdir(const char *volume, const char *path, chirp_dir_t cal
 	}
 }
 
+INT64_T chirp_multi_getlongdir(const char *volume, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime)
+{
+	char lpath[CHIRP_PATH_MAX];
+	if(!volume[0]) {
+		/* FIXME callbacks with "." and ".."? */
+		return 0;
+	} else if(!chirp_multi_lpath(volume, path, lpath, stoptime)) {
+		return -1;
+	} else {
+		return chirp_reli_getlongdir(current_volume->host, lpath, callback, arg, stoptime);
+	}
+}
+
 INT64_T chirp_multi_getacl(const char *volume, const char *path, chirp_dir_t callback, void *arg, time_t stoptime)
 {
 	char lpath[CHIRP_PATH_MAX];
