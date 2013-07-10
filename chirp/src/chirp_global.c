@@ -347,8 +347,10 @@ INT64_T chirp_global_putfile_buffer(const char *host, const char *path, const ch
 INT64_T chirp_global_getlongdir(const char *host, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime)
 {
 	if(is_multi_path(host)) {
-		errno = ENOSYS;
-		return -1;
+		char mhost[CHIRP_PATH_MAX];
+		char mpath[CHIRP_PATH_MAX];
+		parse_multi_path(path, mhost, mpath);
+		return chirp_multi_getlongdir(mhost, mpath, callback, arg, stoptime);
 	} else if(not_empty(path)) {
 		return chirp_reli_getlongdir(host, path, callback, arg, stoptime);
 	} else if(not_empty(host)) {
