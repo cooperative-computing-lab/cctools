@@ -79,6 +79,13 @@ void nvpair_insert_string(struct nvpair *n, const char *name, const char *value)
 @param value The value of the property to insert.
 */ void nvpair_insert_integer(struct nvpair *n, const char *name, INT64_T value);
 
+/** Insert a property in floating point form.
+@param n The nvpair to modify.
+@param name The name of the property to insert.
+@param value The value of the property to insert.
+*/
+void nvpair_insert_float(struct nvpair *n, const char *name, double value);
+
 /** Lookup a property in string form.
 @param n The nvpair to examine.
 @param name The name of the property to return.
@@ -89,9 +96,17 @@ const char *nvpair_lookup_string(struct nvpair *n, const char *name);
 /** Lookup a property in integer form.
 @param n The nvpair to examine.
 @param name The name of the property to return.
-@return The integer value of the property, or zero if not present or not an integer.
+@return The integer value of the property, or zero if not present or not a number.
 */
 INT64_T nvpair_lookup_integer(struct nvpair *n, const char *name);
+
+/** Lookup a property in floating point form.
+@param n The nvpair to examine.
+@param name The name of the property to return.
+@return The floating point value of the property, or zero if not present or not a number.
+*/
+double nvpair_lookup_float(struct nvpair *n, const char *name);
+
 
 typedef enum {
 	NVPAIR_MODE_STRING,
