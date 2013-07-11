@@ -10,10 +10,10 @@ LOCAL_LDFLAGS=-ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 all: ${PROGRAMS}
 
 
-wavefront: wavefront.o 
+wavefront: wavefront.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
 	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
 
-wavefront_master: wavefront_master.o 
+wavefront_master: wavefront_master.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
 	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
 
 test:

@@ -164,6 +164,11 @@ static int manual_cores_option = 1;
 static int manual_disk_option = 0;
 static int manual_memory_option = 0;
 
+static int cores_allocated = 0;
+static int memory_allocated = 0;
+static int disk_allocated = 0;
+
+
 // Foreman mode global variables
 static struct work_queue *foreman_q = NULL;
 
@@ -171,7 +176,6 @@ static struct work_queue *foreman_q = NULL;
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
 static struct list *waiting_tasks = NULL;
-static int cores_allocated = 0;
 static timestamp_t total_task_execution_time = 0;
 static int total_tasks_executed = 0;
 
@@ -384,10 +388,10 @@ static pid_t task_info_execute(const char *cmd, struct task_info *ti)
 	return 0;
 }
 
-static int start_task(struct work_queue_task *task) {
-		struct task_info *ti = task_info_create(task->taskid);
-		ti->task = task;
-		task_info_execute(task->command_line,ti);
+static int start_task(struct work_queue_task *t) {
+		struct task_info *ti = task_info_create(t->taskid);
+		ti->task = t;
+		task_info_execute(t->command_line,ti);
 	
 		if(ti->pid < 0) {
 			fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
@@ -397,9 +401,23 @@ static int start_task(struct work_queue_task *task) {
 		}
 
 		ti->status = 0;
-		cores_allocated += task->cores;
+		
+		if(t->cores < 0 && t->memory < 0 && t->disk < 0) {
+			t->cores = MAX((double)local_resources->cores.total/(double)local_resources->workers.total, 1);
+			t->memory = MAX((double)local_resources->memory.total/(double)local_resources->workers.total, 0);
+			t->disk = MAX((double)local_resources->disk.total/(double)local_resources->workers.total, 0);
+		} else {
+			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
+			t->cores = MAX(t->cores, 0);
+			t->memory = MAX(t->memory, 0);
+			t->disk = MAX(t->disk, 0);
+		}
 
-		itable_insert(stored_tasks, task->taskid, ti);
+		cores_allocated += t->cores;
+		memory_allocated += t->memory;
+		disk_allocated += t->disk;
+
+		itable_insert(stored_tasks, t->taskid, ti);
 		itable_insert(active_tasks, ti->pid, ti);
 
 		return 1;
@@ -416,7 +434,10 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		lseek(ti->output_fd, 0, SEEK_SET);
 		send_master_message(master, "result %d %lld %llu %d\n", ti->status, output_length, ti->execution_end-ti->execution_start, ti->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
+		
 		cores_allocated -= ti->task->cores;
+		memory_allocated -= ti->task->memory;
+		disk_allocated -= ti->task->disk;
 
 		total_task_execution_time += (ti->execution_end - ti->execution_start);
 		total_tasks_executed++;
@@ -1194,6 +1215,8 @@ static void kill_task(struct task_info *ti) {
 	delete_dir(dirname);
 
 	cores_allocated -= ti->task->cores;
+	memory_allocated -= ti->task->memory;
+	disk_allocated -= ti->task->disk;
 
 	task_info_delete(ti);
 }
@@ -1242,6 +1265,8 @@ static void kill_all_tasks() {
 	}
 	itable_clear(stored_tasks);
 	cores_allocated = 0;
+	memory_allocated = 0;
+	disk_allocated = 0;
 }
 
 static int do_kill(int taskid) {
@@ -1470,6 +1495,40 @@ static int handle_master(struct link *master) {
 	return r;
 }
 
+
+static int check_for_resources(struct work_queue_task *t) {
+	int cores_used, disk_used, mem_used, ok = 1;
+	
+	// If resources used have not been specified, treat the task as consuming the entire real worker
+	if(t->cores < 0 && t->memory < 0 && t->disk < 0) {
+		cores_used = MAX((double)local_resources->cores.total/(double)local_resources->workers.total, 1);
+		mem_used = MAX((double)local_resources->memory.total/(double)local_resources->workers.total, 0);
+		disk_used = MAX((double)local_resources->disk.total/(double)local_resources->workers.total, 0);
+	} else {
+		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
+		cores_used = MAX(t->cores, 0);
+		mem_used = MAX(t->memory, 0);
+		disk_used = MAX(t->disk, 0);
+	}
+	
+	
+	
+	if(cores_allocated + cores_used > local_resources->cores.total) {
+		ok = 0;
+	}
+	
+	if(memory_allocated + mem_used > local_resources->memory.total) {
+		ok = 0;
+	}
+	
+	if(disk_allocated + disk_used > local_resources->disk.total) {
+		ok = 0;
+	}
+	
+	return ok;
+	
+}
+
 static void work_for_master(struct link *master) {
 	int result;
 	timestamp_t msec;
@@ -1540,7 +1599,7 @@ static void work_for_master(struct link *master) {
 				struct work_queue_task *t;
 				
 				t = list_pop_head(waiting_tasks);
-				if(t && t->cores + cores_allocated <= local_resources->cores.total) {
+				if(t && check_for_resources(t)) {
 					start_task(t);
 				} else {
 					list_push_tail(waiting_tasks, t);
@@ -2033,14 +2092,15 @@ int main(int argc, char *argv[])
 	local_resources_last = work_queue_resources_create();
 	work_queue_resources_measure(local_resources,workspace);
 
-	if(manual_cores_option)  local_resources->cores.total  = manual_cores_option;
+	if(manual_cores_option)  local_resources->cores.total   = manual_cores_option;
 	if(manual_disk_option)   local_resources->disk.total   = manual_disk_option;
 	if(manual_memory_option) local_resources->memory.total = manual_memory_option;
 
 	debug(D_WQ,"local resources:");
 	work_queue_resources_debug(local_resources);
 
-	printf("work_queue_worker: %d cores, %d MB memory, %d MB disk available\n",
+	printf("work_queue_worker: %d workers, %d cores, %d MB memory, %d MB disk available\n",
+	       local_resources->workers.total,
 	       local_resources->cores.total,
 	       local_resources->memory.total,
 	       local_resources->disk.total);
