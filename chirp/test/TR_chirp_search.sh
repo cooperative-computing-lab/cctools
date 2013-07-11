@@ -56,37 +56,37 @@ EOF
 run()
 {
 	set -e
-	../src/chirp --quiet localhost:`cat "$chirp_port"` mkdir foo
-	../src/chirp --quiet localhost:`cat "$chirp_port"` mkdir foo/a
-	../src/chirp --quiet localhost:`cat "$chirp_port"` mkdir foo/a/bar
-	../src/chirp --quiet localhost:`cat "$chirp_port"` mkdir foo/b
-	../src/chirp --quiet localhost:`cat "$chirp_port"` mkdir foo/b/bar
+	../src/chirp localhost:`cat "$chirp_port"` mkdir foo
+	../src/chirp localhost:`cat "$chirp_port"` mkdir foo/a
+	../src/chirp localhost:`cat "$chirp_port"` mkdir foo/a/bar
+	../src/chirp localhost:`cat "$chirp_port"` mkdir foo/b
+	../src/chirp localhost:`cat "$chirp_port"` mkdir foo/b/bar
 
 	{
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     'foo' 'bar' | sort
+		../src/chirp localhost:`cat "$chirp_port"` search     'foo' 'bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search -s  'foo' 'bar' | wc -l
+		../src/chirp localhost:`cat "$chirp_port"` search -s  'foo' 'bar' | wc -l
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     'foo' 'a/bar' | sort
+		../src/chirp localhost:`cat "$chirp_port"` search     'foo' 'a/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  'foo' 'a/bar' | sort
+		../src/chirp localhost:`cat "$chirp_port"` search -i  'foo' 'a/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     'foo' '/foo/a/bar' | sort
+		../src/chirp localhost:`cat "$chirp_port"` search     'foo' '/foo/a/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     '/' '/foo/a/bar' | sort
+		../src/chirp localhost:`cat "$chirp_port"` search     '/' '/foo/a/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     '/' '/foo/*/bar' | sort
+		../src/chirp localhost:`cat "$chirp_port"` search     '/' '/foo/*/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     '/foo' '/*/bar' | sort
+		../src/chirp localhost:`cat "$chirp_port"` search     '/foo' '/*/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search     '/foo' '*/bar' | sort
+		../src/chirp localhost:`cat "$chirp_port"` search     '/foo' '*/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  '/foo' '*/bar' | sort
+		../src/chirp localhost:`cat "$chirp_port"` search -i  '/foo' '*/bar' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  '/foo' '*' | sort
+		../src/chirp localhost:`cat "$chirp_port"` search -i  '/foo' '*' | sort
 		echo ++
-		../src/chirp --quiet localhost:`cat "$chirp_port"` search -i  '/' '/foo/b/bar' | sort
+		../src/chirp localhost:`cat "$chirp_port"` search -i  '/' '/foo/b/bar' | sort
 		echo ++
 	} | tr -d ' ' > "$output"
 	diff "$expected" "$output"
