@@ -388,10 +388,10 @@ static pid_t task_info_execute(const char *cmd, struct task_info *ti)
 	return 0;
 }
 
-static int start_task(struct work_queue_task *task) {
-		struct task_info *ti = task_info_create(task->taskid);
-		ti->task = task;
-		task_info_execute(task->command_line,ti);
+static int start_task(struct work_queue_task *t) {
+		struct task_info *ti = task_info_create(t->taskid);
+		ti->task = t;
+		task_info_execute(t->command_line,ti);
 	
 		if(ti->pid < 0) {
 			fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
@@ -402,21 +402,22 @@ static int start_task(struct work_queue_task *task) {
 
 		ti->status = 0;
 		
-		if(task->cores < 0) {
-			task->cores = local_resources->cores.total;
-		}
-		if(task->memory < 0) {
-			task->memory = local_resources->memory.total;
-		}
-		if(task->disk < 0) {
-			task->disk = local_resources->disk.total;
+		if(t->cores < 0 && t->memory < 0 && t->disk < 0) {
+			t->cores = MAX((double)local_resources->cores.total/(double)local_resources->workers.total, 1);
+			t->memory = MAX((double)local_resources->memory.total/(double)local_resources->workers.total, 0);
+			t->disk = MAX((double)local_resources->disk.total/(double)local_resources->workers.total, 0);
+		} else {
+			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
+			t->cores = MAX(t->cores, 0);
+			t->memory = MAX(t->memory, 0);
+			t->disk = MAX(t->disk, 0);
 		}
 
-		cores_allocated += task->cores;
-		memory_allocated += task->memory;
-		disk_allocated += task->disk;
+		cores_allocated += t->cores;
+		memory_allocated += t->memory;
+		disk_allocated += t->disk;
 
-		itable_insert(stored_tasks, task->taskid, ti);
+		itable_insert(stored_tasks, t->taskid, ti);
 		itable_insert(active_tasks, ti->pid, ti);
 
 		return 1;
@@ -1499,22 +1500,15 @@ static int check_for_resources(struct work_queue_task *t) {
 	int cores_used, disk_used, mem_used, ok = 1;
 	
 	// If resources used have not been specified, treat the task as consuming the entire real worker
-	if(t->cores < 0) {
-		cores_used = local_resources->cores.total;
+	if(t->cores < 0 && t->memory < 0 && t->disk < 0) {
+		cores_used = MAX((double)local_resources->cores.total/(double)local_resources->workers.total, 1);
+		mem_used = MAX((double)local_resources->memory.total/(double)local_resources->workers.total, 0);
+		disk_used = MAX((double)local_resources->disk.total/(double)local_resources->workers.total, 0);
 	} else {
-		cores_used = t->cores;
-	}
-	
-	if(t->memory < 0) {
-		mem_used = local_resources->memory.total;
-	} else {
-		mem_used = t->memory;
-	}
-	
-	if(t->disk < 0) {
-		disk_used = local_resources->disk.total;
-	} else {
-		disk_used = t->disk;
+		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
+		cores_used = MAX(t->cores, 0);
+		mem_used = MAX(t->memory, 0);
+		disk_used = MAX(t->disk, 0);
 	}
 	
 	
@@ -2098,7 +2092,7 @@ int main(int argc, char *argv[])
 	local_resources_last = work_queue_resources_create();
 	work_queue_resources_measure(local_resources,workspace);
 
-	if(manual_cores_option)  local_resources->cores.total  = manual_cores_option;
+	if(manual_cores_option)  local_resources->cores.total   = manual_cores_option;
 	if(manual_disk_option)   local_resources->disk.total   = manual_disk_option;
 	if(manual_memory_option) local_resources->memory.total = manual_memory_option;
 

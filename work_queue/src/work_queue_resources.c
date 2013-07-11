@@ -21,7 +21,6 @@ struct work_queue_resources * work_queue_resources_create()
 {
 	struct work_queue_resources *r = malloc(sizeof(*r));
 	memset(r,0,sizeof(*r));
-	//r->cores.total = 0;
 	return r;
 }
 
@@ -41,6 +40,8 @@ void work_queue_resources_measure( struct work_queue_resources *r, const char *d
 
 	memory_info_get(&avail,&total);
 	r->memory.total = avail / (UINT64_T) MEGA;
+	
+	r->workers.total = 1;
 }
 
 static void work_queue_resource_send( struct link *master, struct work_queue_resource *r, const char *name, time_t stoptime )
@@ -50,6 +51,7 @@ static void work_queue_resource_send( struct link *master, struct work_queue_res
 
 void work_queue_resources_send( struct link *master, struct work_queue_resources *r, time_t stoptime )
 {
+	work_queue_resource_send(master,&r->workers,"workers",stoptime);
 	work_queue_resource_send(master,&r->cores,"cores",stoptime);
 	work_queue_resource_send(master,&r->disk,"disk",stoptime);
 	work_queue_resource_send(master,&r->memory,"memory",stoptime);
@@ -62,6 +64,7 @@ static void work_queue_resource_debug( struct work_queue_resource *r, const char
 
 void work_queue_resources_debug( struct work_queue_resources *r )
 {
+	work_queue_resource_debug(&r->workers,"workers");
 	work_queue_resource_debug(&r->cores,"cores");
 	work_queue_resource_debug(&r->disk,"disk");
 	work_queue_resource_debug(&r->memory,"memory");
@@ -82,6 +85,7 @@ static void work_queue_resource_add( struct work_queue_resource *total, struct w
 
 void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r )
 {
+	work_queue_resource_add(&total->workers,&r->workers);
 	work_queue_resource_add(&total->cores,&r->cores);
 	work_queue_resource_add(&total->memory,&r->memory);
 	work_queue_resource_add(&total->disk,&r->disk);
@@ -89,6 +93,10 @@ void work_queue_resources_add( struct work_queue_resources *total, struct work_q
 
 void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct nvpair *nv )
 {
+	nvpair_insert_integer(nv,"workers_inuse",r->workers.inuse);
+	nvpair_insert_integer(nv,"workers_total",r->workers.total);
+	nvpair_insert_integer(nv,"workers_smallest",r->workers.smallest);
+	nvpair_insert_integer(nv,"workers_largest",r->workers.largest);
 	nvpair_insert_integer(nv,"cores_inuse",r->cores.inuse);
 	nvpair_insert_integer(nv,"cores_total",r->cores.total);
 	nvpair_insert_integer(nv,"cores_smallest",r->cores.smallest);
