@@ -284,10 +284,9 @@ struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port
 	return ml;
 }
 
-int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, struct work_queue_stats *s, struct work_queue_resources *r, const char *workers_by_pool ) {
+int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, const char *master_address, struct work_queue_stats *s, struct work_queue_resources *r, const char *workers_by_pool ) {
 	char address[DATAGRAM_ADDRESS_MAX];
 	char owner[USERNAME_MAX];
-
 	buffer_t *buffer = NULL;
 	const char *text;
 	size_t text_size;
@@ -309,6 +308,8 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 	int total_workers_working = s->workers_busy + s->workers_full;
 	int total_workers         = total_workers_working + s->workers_ready;
 
+	debug(D_WQ,"%s advertising resources to the Catalog -- cores:%d memory:%d disk:%d\n",project_name,r->cores.total,r->memory.total,r->disk.total); //debug to see if information is being passed
+
 	buffer_printf(buffer, 
 			"type wq_master\n"
 			"project %s\nstarttime %llu\npriority %d\n"
@@ -317,6 +318,7 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 			"workers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nworkers_by_pool %s\n"
 			"cores_total %d\nmemory_total %d\ndisk_total %d\n"
 			"capacity %d\n"
+			"my_master %s\n"
 			"version %d.%d.%s\nowner %s", 
 			project_name, (s->start_time)/1000000, s->priority, 
 			s->port, WORK_QUEUE_CATALOG_MASTER_AD_LIFETIME, 
@@ -324,6 +326,7 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 			s->workers_init, s->workers_ready, total_workers_working, total_workers, workers_by_pool, 
 			r->cores.total, r->memory.total, r->disk.total,
 			s->capacity, 
+			master_address,
 			CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
 
 	text = buffer_tostring(buffer, &text_size);

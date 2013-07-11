@@ -552,6 +552,7 @@ int monitor_file_io_summaries()
 	if (monitor_inotify_fd >= 0)
 	{
 		char *fname;
+		struct stat buf;
 		struct file_info *finfo;
 
 		fprintf(log_opened, "%-15s\n%-15s %6s %20s %20s %6s %6s %6s %6s\n",
@@ -560,6 +561,11 @@ int monitor_file_io_summaries()
 		hash_table_firstkey(files);
 		while(hash_table_nextkey(files, &fname, (void **) &finfo))
 		{
+			/* If size_on_close is unknwon, perform a stat on the file. */
+
+			if(finfo->size_on_close < 0 && stat(fname, &buf) == 0)
+				finfo->size_on_close = buf.st_size;
+			
 			fprintf(log_opened, "%-15s\n%-15s ", fname, "");
 			fprintf(log_opened, "%6" PRId64 " %20lld %20lld",
 				finfo->device,
@@ -624,8 +630,7 @@ void monitor_inotify_add_watch(char *filename)
 		if (stat(filename, &fst) >= 0)
 		{
 			finfo->size_on_open  = fst.st_size;
-			finfo->size_on_close = fst.st_size;
-			finfo->device = fst.st_dev;
+			finfo->device        = fst.st_dev;
 		}
 	}
 
@@ -867,7 +872,7 @@ void monitor_final_cleanup(int signum)
     cleanup_zombies();
 
     if(itable_size(processes) > 0)
-        sleep(1);
+        sleep(5);
 
     if(!first_process_already_waited)
 	    monitor_check_child(signum);

@@ -28,6 +28,7 @@ INT64_T chirp_multi_getfile_buffer(const char *volume, const char *path, char **
 INT64_T chirp_multi_putfile(const char *volume, const char *path, FILE * stream, INT64_T mode, INT64_T length, time_t stoptime);
 INT64_T chirp_multi_putfile_buffer(const char *volume, const char *path, const char *buffer, INT64_T mode, INT64_T length, time_t stoptime);
 
+INT64_T chirp_multi_getlongdir(const char *volume, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime);
 INT64_T chirp_multi_getdir(const char *volume, const char *path, chirp_dir_t callback, void *arg, time_t stoptime);
 INT64_T chirp_multi_getacl(const char *volume, const char *path, chirp_dir_t callback, void *arg, time_t stoptime);
 INT64_T chirp_multi_setacl(const char *volume, const char *path, const char *subject, const char *rights, time_t stoptime);

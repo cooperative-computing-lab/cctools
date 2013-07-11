@@ -30,20 +30,23 @@ run()
 {
 	set -e
 
-	../src/chirp --quiet localhost:`cat "$chirp_1_port"` mkdir "$VOLUME"
-	../src/chirp --quiet localhost:`cat "$chirp_1_port"` mkdir "$VOLUME"/root
-	../src/chirp --quiet localhost:`cat "$chirp_1_port"` put /dev/stdin "$VOLUME"/hosts <<EOF
+	../src/chirp localhost:`cat "$chirp_1_port"` mkdir "$VOLUME"
+	../src/chirp localhost:`cat "$chirp_1_port"` mkdir "$VOLUME"/root
+	../src/chirp localhost:`cat "$chirp_1_port"` put /dev/stdin "$VOLUME"/hosts <<EOF
 127.0.0.1:`cat $chirp_1_port`
 127.0.0.1:`cat $chirp_2_port`
 EOF
-	../src/chirp --quiet localhost:`cat "$chirp_1_port"` put /dev/stdin "$VOLUME"/key <<EOF
+	../src/chirp localhost:`cat "$chirp_1_port"` put /dev/stdin "$VOLUME"/key <<EOF
 $VOLUME_KEY
 EOF
 
-	../../parrot/src/parrot_run ls -l /multi/127.0.0.1:`cat "$chirp_1_port"`@"$VOLUME"/
-	../../parrot/src/parrot_run df -h /multi/127.0.0.1:`cat "$chirp_1_port"`@"$VOLUME"/
-	../../parrot/src/parrot_run sh -c 'echo 1 > /multi/127.0.0.1:'`cat "$chirp_1_port"`'@'"$VOLUME"'/foo'
-	../../parrot/src/parrot_run sh -c 'echo 2 > /multi/127.0.0.1:'`cat "$chirp_1_port"`'@'"$VOLUME"'/bar'
+	# We can only test the multi interface through parrot...
+	if [ -x ../../parrot/src/parrot_run ]; then
+		../../parrot/src/parrot_run ls -l /multi/127.0.0.1:`cat "$chirp_1_port"`@"$VOLUME"/
+		../../parrot/src/parrot_run df -h /multi/127.0.0.1:`cat "$chirp_1_port"`@"$VOLUME"/
+		../../parrot/src/parrot_run sh -c 'echo 1 > /multi/127.0.0.1:'`cat "$chirp_1_port"`'@'"$VOLUME"'/foo'
+		../../parrot/src/parrot_run sh -c 'echo 2 > /multi/127.0.0.1:'`cat "$chirp_1_port"`'@'"$VOLUME"'/bar'
+	fi
 
 	set +e
 	return $?

@@ -6,28 +6,25 @@ See the file COPYING for details.
 */
 
 /*
-The chirp_global module provides a "global" view of the Chirp
-storage space, presenting multiple servers as one big file tree.
-It uses the catalog_query module to obtain the global list of servers
-and then uses chirp_reli to access the underlying file servers.
+The chirp_global module provides a "global" view of the Chirp storage space,
+presenting multiple servers as one big file tree.  It uses the catalog_query
+module to obtain the global list of servers and then uses chirp_reli to access
+the underlying file servers.
 
-So as to avoid many slow queries to the catalog server,
-queries are cached and sonsulted repeatedly.
-Each query pulls off the details of each server in the
-form of name-value pairs (nvpairs) that are placed into
-a hash table according to the server name and port.
-The catalog is not queried above once per minute.
-Note that no matter how often the catalog is queried,
-the data will be stale due to the propagation delay
-from servers to the catalog.  If you are using a catalog
-other than the default, set the environment variable CATALOG_HOST
-to point to it.
+So as to avoid many slow queries to the catalog server, queries are cached and
+sonsulted repeatedly.  Each query pulls off the details of each server in the
+form of name-value pairs (nvpairs) that are placed into a hash table according
+to the server name and port.  The catalog is not queried above once per minute.
+Note that no matter how often the catalog is queried, the data will be stale
+due to the propagation delay from servers to the catalog.  If you are using a
+catalog other than the default, set the environment variable CATALOG_HOST to
+point to it.
 
-Directory lists simply iterate through the hash table to obtain
-the global list.  Stat operations on file servers query the hash
-table in order to determine a few key stats, such as total storage
-in use and last time heard from.  This allows an ls -l through
-Parrot to show the last message time and the space used (in MB.)
+Directory lists simply iterate through the hash table to obtain the global
+list.  Stat operations on file servers query the hash table in order to
+determine a few key stats, such as total storage in use and last time heard
+from.  This allows an ls -l through Parrot to show the last message time and
+the space used (in MB.)
 */
 
 #include "chirp_global.h"
@@ -350,8 +347,10 @@ INT64_T chirp_global_putfile_buffer(const char *host, const char *path, const ch
 INT64_T chirp_global_getlongdir(const char *host, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime)
 {
 	if(is_multi_path(host)) {
-		errno = ENOSYS;
-		return -1;
+		char mhost[CHIRP_PATH_MAX];
+		char mpath[CHIRP_PATH_MAX];
+		parse_multi_path(path, mhost, mpath);
+		return chirp_multi_getlongdir(mhost, mpath, callback, arg, stoptime);
 	} else if(not_empty(path)) {
 		return chirp_reli_getlongdir(host, path, callback, arg, stoptime);
 	} else if(not_empty(host)) {
