@@ -2099,7 +2099,8 @@ int main(int argc, char *argv[])
 	debug(D_WQ,"local resources:");
 	work_queue_resources_debug(local_resources);
 
-	printf("work_queue_worker: %d cores, %d MB memory, %d MB disk available\n",
+	printf("work_queue_worker: %d workers, %d cores, %d MB memory, %d MB disk available\n",
+	       local_resources->workers.total,
 	       local_resources->cores.total,
 	       local_resources->memory.total,
 	       local_resources->disk.total);

@@ -44,22 +44,25 @@ void work_queue_resources_measure( struct work_queue_resources *r, const char *d
 	r->workers.total = 1;
 }
 
+static void work_queue_resource_debug( struct work_queue_resource *r, const char *name )
+{
+	debug(D_WQ,"%8s %6d inuse %6d total %6d smallest %6d largest",name, r->inuse, r->total, r->smallest, r->largest);
+}
+
+
 static void work_queue_resource_send( struct link *master, struct work_queue_resource *r, const char *name, time_t stoptime )
 {
+	work_queue_resource_debug(r, name);
 	link_putfstring(master, "resource %s %d %d %d %d\n", stoptime, name, r->inuse, r->total, r->smallest, r->largest );
 }
 
 void work_queue_resources_send( struct link *master, struct work_queue_resources *r, time_t stoptime )
 {
+	debug(D_WQ, "Sending resource description to master:");
 	work_queue_resource_send(master,&r->workers,"workers",stoptime);
 	work_queue_resource_send(master,&r->cores,"cores",stoptime);
 	work_queue_resource_send(master,&r->disk,"disk",stoptime);
 	work_queue_resource_send(master,&r->memory,"memory",stoptime);
-}
-
-static void work_queue_resource_debug( struct work_queue_resource *r, const char *name )
-{
-	debug(D_WQ,"%8s %6d inuse %6d total %6d smallest %6d largest",name, r->inuse, r->total, r->smallest, r->largest);
 }
 
 void work_queue_resources_debug( struct work_queue_resources *r )

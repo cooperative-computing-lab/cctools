@@ -1309,7 +1309,7 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 	char category[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
 	
-	if(sscanf(line, "resource %s %d %d %d %d", category, &r.inuse,&r.total,&r.smallest,&r.largest)==6) {
+	if(sscanf(line, "resource %s %d %d %d %d", category, &r.inuse,&r.total,&r.smallest,&r.largest)==5) {
 
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
