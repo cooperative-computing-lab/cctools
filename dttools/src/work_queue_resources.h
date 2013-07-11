@@ -18,6 +18,7 @@ struct work_queue_resource {
 };
 
 struct work_queue_resources {
+	struct work_queue_resource workers;
 	struct work_queue_resource disk;
 	struct work_queue_resource cores;
 	struct work_queue_resource memory;

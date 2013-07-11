@@ -1299,7 +1299,7 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 	char category[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
 	
-	if(sscanf(line, "resource %s %d %d %d %d", category, &r.inuse,&r.total,&r.smallest,&r.largest)==5) {
+	if(sscanf(line, "resource %s %d %d %d %d", category, &r.inuse,&r.total,&r.smallest,&r.largest)==6) {
 
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
@@ -1307,6 +1307,8 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 			w->resources->memory = r;
 		} else if(!strcmp(category,"disk")) {
 			w->resources->disk = r;
+		} else if(!strcmp(category,"workers")) {
+			w->resources->workers = r;
 		}
 
 		if(w->cores_allocated) {
@@ -1985,26 +1987,17 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 static int check_worker_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 	int cores_used, disk_used, mem_used, ok = 1;
 	
-	// If resources used have not been specified, treat the task as consuming the entire real worker
-	if(t->cores < 0) {
-		cores_used = MAX(w->resources->cores.total, 1);
+	// If none of the resources used have not been specified, treat the task as consuming an entire "average" worker
+	if(t->cores < 0 && t->memory < 0 && t->disk < 0) {
+		cores_used = MAX((double)w->resources->cores.total/(double)w->resources->workers.total, 1);
+		mem_used = MAX((double)w->resources->memory.total/(double)w->resources->workers.total, 0);
+		disk_used = MAX((double)w->resources->disk.total/(double)w->resources->workers.total, 0);
 	} else {
-		cores_used = t->cores;
+		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
+		cores_used = MAX(t->cores, 0);
+		mem_used = MAX(t->memory, 0);
+		disk_used = MAX(t->disk, 0);
 	}
-	
-	if(t->memory < 0) {
-		mem_used = MAX(w->resources->memory.total, 0);
-	} else {
-		mem_used = t->memory;
-	}
-	
-	if(t->disk < 0) {
-		disk_used = MAX(w->resources->disk.total, 0);
-	} else {
-		disk_used = t->disk;
-	}
-	
-	
 	
 	if(w->cores_allocated + cores_used > get_worker_cores(q, w)) {
 		ok = 0;
@@ -2166,15 +2159,16 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 
 	if(start_one_task(q, w, t)) {
 		
-		//If anything is unspecified, set it to the current value of the worker.
-		if(t->cores < 0) {
-			t->cores = w->resources->cores.total;
-		}
-		if(t->memory < 0) {
-			t->memory = w->resources->memory.total;
-		}
-		if(t->disk < 0) {
-			t->disk = w->resources->disk.total;
+		//If everything is unspecified, set it to the value of an "average" worker.
+		if(t->cores < 0 && t->memory < 0 && t->disk < 0) {
+			t->cores = MAX((double)w->resources->cores.total/(double)w->resources->workers.total, 1);
+			t->memory = MAX((double)w->resources->memory.total/(double)w->resources->workers.total, 0);
+			t->disk = MAX((double)w->resources->disk.total/(double)w->resources->workers.total, 0);
+		} else {
+			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
+			t->cores = MAX(t->cores, 0);
+			t->memory = MAX(t->memory, 0);
+			t->disk = MAX(t->disk, 0);
 		}
 		
 		w->cores_allocated += t->cores;
