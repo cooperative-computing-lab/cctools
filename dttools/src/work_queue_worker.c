@@ -1591,8 +1591,10 @@ static void foreman_for_master(struct link *master) {
 
 		// BUG: we currently report the sum of disk space.
 		// Should be reporting the disk space available at the foreman.
+		debug(D_WQ,"Before info - cores:%d memory:%d disk:%d\n", local_resources->cores.total,local_resources->memory.total,local_resources->disk.total);
 		work_queue_get_resources(foreman_q,local_resources);
 		send_resource_update(master,0);
+		debug(D_WQ,"After info - cores:%d memory:%d disk:%d\n", local_resources->cores.total,local_resources->memory.total,local_resources->disk.total);
 		
 		if(master_active) {
 			result &= handle_master(master);
@@ -2032,11 +2034,14 @@ int main(int argc, char *argv[])
 	local_resources = work_queue_resources_create();
 	local_resources_last = work_queue_resources_create();
 	work_queue_resources_measure(local_resources,workspace);
-
-	if(manual_cores_option)  local_resources->cores.total  = manual_cores_option;
+	if(worker_mode == WORKER_MODE_FOREMAN){
+		local_resources->cores.total = 0;
+		local_resources->memory.total = 0;
+	}else{
+		if(manual_cores_option)  local_resources->cores.total  = manual_cores_option;
+		if(manual_memory_option) local_resources->memory.total = manual_memory_option;
+	}
 	if(manual_disk_option)   local_resources->disk.total   = manual_disk_option;
-	if(manual_memory_option) local_resources->memory.total = manual_memory_option;
-
 	debug(D_WQ,"local resources:");
 	work_queue_resources_debug(local_resources);
 
