@@ -165,15 +165,15 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 
 void resize_catalog(int iteration)
 {
-	if(iteration == current_catalog_size)
+	if(iteration == (current_catalog_size-1))
 	{
 		struct nvpair **temp_ptr = NULL;
-		temp_ptr = realloc(global_catalog,(sizeof(*global_catalog)*current_catalog_size*2)); //double the catalog capacity
+		temp_ptr = realloc(global_catalog,(sizeof(*global_catalog)*current_catalog_size*2+1)); //double the catalog capacity
 		if(global_catalog != temp_ptr) //temp pointer points to a new memory block
 		{
 			global_catalog = temp_ptr; //make global catalog point to the new location
 		}
-		current_catalog_size *= 2; //double the catalog size
+		current_catalog_size = current_catalog_size*2 + 1; //double the catalog size
 	}
 }
 
@@ -189,9 +189,8 @@ int get_masters(time_t stoptime)
 
 	cq = catalog_query_create(catalog_host, catalog_port, stoptime );
 	if(!cq) {
-		fprintf(stderr, "failed to query catalog server %s:%d: %s \n",catalog_host,catalog_port,strerror(errno));
+		fatal("failed to query catalog server %s:%d: %s \n",catalog_host,catalog_port,strerror(errno));
 		exit(EXIT_FAILURE);
-		return 0;
 	}
 
 	while((nv = catalog_query_read(cq,stoptime))) {
@@ -203,7 +202,6 @@ int get_masters(time_t stoptime)
 			nvpair_delete(nv); //free the memory so something valid can take its place
 		}
 	}
-	resize_catalog(i);
 	global_catalog[i] = NULL;
 	catalog_query_delete(cq);
 
@@ -221,9 +219,9 @@ void global_catalog_cleanup()
 	}
 	free(global_catalog);
 }
-void space_relations(int n, char *buffer)
+void create_child_relation(int n, char *buffer)
 {
-	if(!(n <= 0)){
+	if(n > 0){
 		int i;
 		for(i=0;i<n;i++){
 			if(i == n-1) sprintf(buffer,"%s>",buffer);
@@ -232,10 +230,10 @@ void space_relations(int n, char *buffer)
 	}
 }
 
-int my_foreman(int *space, const char *host, int port, time_t stoptime)
+int find_children(int *space, const char *host, int port, time_t stoptime)
 {
 	int i = 0; //global_catalog iterator
-	char full_address[1024];
+	char full_address[LINK_ADDRESS_MAX];
 	if(!domain_name_cache_lookup(host, full_address) || !full_address)
 	{
 		debug(D_WQ,"Could not resolve %s into an ip address\n",host);
@@ -246,9 +244,9 @@ int my_foreman(int *space, const char *host, int port, time_t stoptime)
 	while(global_catalog[i] != NULL){
 		const char *temp_my_master = nvpair_lookup_string(global_catalog[i], "my_master");
 		if(temp_my_master && !strcmp(temp_my_master, full_address)){
-			char modified_proj[50];
+			char *modified_proj = malloc(sizeof(nvpair_lookup_string(global_catalog[i], "project") + *space + 1));
 			memset(modified_proj,0,sizeof(modified_proj));
-			space_relations(*space, modified_proj); //append '->' for proper recursive depth
+			create_child_relation(*space, modified_proj); //append '->' for proper recursive depth
 			sprintf(modified_proj,"%s%s",modified_proj,nvpair_lookup_string(global_catalog[i], "project")); //prepare modified project name with proper depth
 			nvpair_remove(global_catalog[i], nvpair_lookup_string(global_catalog[i], "project")); //remove old project look
 			nvpair_insert_string(global_catalog[i], "project", modified_proj); //replace with the modified relation version
@@ -257,8 +255,9 @@ int my_foreman(int *space, const char *host, int port, time_t stoptime)
 			}else if(format_mode == FORMAT_TABLE){
 				nvpair_print_table(global_catalog[i], stdout, queue_headers);
 			}
+			free(modified_proj);
 			int new_space = *space + 1; //so that spaces are preserved in recursive calls
-			my_foreman(&new_space,nvpair_lookup_string(global_catalog[i], "name"),atoi(nvpair_lookup_string(global_catalog[i], "port")),stoptime);
+			find_children(&new_space,nvpair_lookup_string(global_catalog[i], "name"),atoi(nvpair_lookup_string(global_catalog[i], "port")),stoptime);
 		}
 		i++;
 	}
@@ -286,7 +285,7 @@ int do_catalog_query( time_t stoptime )
 					nvpair_print_table(global_catalog[i], stdout, queue_headers);
 				}
 				int space = 1;
-				my_foreman(&space, nvpair_lookup_string(global_catalog[i], "name"), atoi(nvpair_lookup_string(global_catalog[i], "port")), stoptime);
+				find_children(&space, nvpair_lookup_string(global_catalog[i], "name"), atoi(nvpair_lookup_string(global_catalog[i], "port")), stoptime);
 			}
 		}
 		i++;	
