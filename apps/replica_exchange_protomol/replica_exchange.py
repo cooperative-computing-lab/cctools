@@ -295,9 +295,9 @@ def wq_main(wq, replica_list, replicas_to_run):
 
 			#Wait for tasks to complete.
 			if use_barrier:
-				replicas_to_run=wq_wait_barrier(wq, replica_list, replica_next_starting_step, 30)
+				replicas_to_run=wq_wait_barrier(wq, replica_list, replica_next_starting_step, 5)
 			else:
-				replicas_to_run=wq_wait_nobarrier(wq, replica_list, 30)
+				replicas_to_run=wq_wait_nobarrier(wq, replica_list, 5)
 				
 
 '''The barrier version where it waits for all replicas to finish a given MC step.
