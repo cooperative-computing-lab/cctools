@@ -126,7 +126,7 @@ class Task(_object):
     #                       - @ref WORK_QUEUE_NOCACHE
     #                       - @ref WORK_QUEUE_CACHE
     # @param cache          Legacy parameter for setting file caching attribute.  By default this is enabled.
-    def specify_file_piece(self, local_name, remote_name=None, start_byte=0, end_byte, type=None, flags=None, cache=True):
+    def specify_file_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, type=None, flags=None, cache=True):
         if remote_name is None:
             remote_name = os.path.basename(local_name)
 
