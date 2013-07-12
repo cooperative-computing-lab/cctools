@@ -2037,31 +2037,31 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q, str
 {
 	char *key;
 	struct work_queue_worker *w;
+	struct work_queue_worker *prev_avail_worker = NULL;
 	int num_workers = hash_table_size(q->worker_table);
 	int random_worker;
 
 	if(num_workers > 0) {
 		random_worker = (rand() % num_workers) + 1;
 	} else {
-		random_worker = 0;
+		return NULL;
 	}
 
 	hash_table_firstkey(q->worker_table);
-	while(random_worker) {
-		hash_table_nextkey(q->worker_table, &key, (void **) &w);
-		if(!w) {
-			hash_table_firstkey(q->worker_table);
-			continue;
-		}
-		
-		if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
+	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+		if (random_worker > 0)
 			random_worker--;
-		} else {
-			w = NULL;
-		}
-	}
 
-	return w;
+		if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
+			if(random_worker == 0) {
+				return w;
+			} else {
+				prev_avail_worker = w;
+			}
+		} 
+	}
+	
+	return prev_avail_worker;
 }
 
 static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struct work_queue_task *t)
@@ -3097,10 +3097,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// Then consider all existing active workers and dispatch tasks.
 		for(i = j; i < n; i++) {
 			if(q->poll_table[i].revents) {
-			debug(D_WQ, "Dispatching job to worker");
 				handle_worker(q, q->poll_table[i].link);
 			}
 		}
+		
 		// Start tasks on ready workers
 		start_tasks(q);
 		
