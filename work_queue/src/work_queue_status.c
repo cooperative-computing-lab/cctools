@@ -191,7 +191,6 @@ int get_masters(time_t stoptime)
 		fatal("failed to query catalog server %s:%d: %s \n",catalog_host,catalog_port,strerror(errno));
 
 	while((nv = catalog_query_read(cq,stoptime))) {
-
 		if(i == catalog_size)
 			resize_catalog( catalog_size * 2 );
 
@@ -204,8 +203,6 @@ int get_masters(time_t stoptime)
 	}
 
 	global_catalog[i] = NULL;
-	if(i == catalog_size)
-		resize_catalog( catalog_size * 2 );
 
 	catalog_query_delete(cq);
 
@@ -234,7 +231,7 @@ void add_child_relation(const char *name, int spaces, char *buffer, size_t max_s
 	buffer[spaces - 1] = '>';
 	buffer[spaces]     = '\0';
 
-	strncat(buffer, name, max_size);
+	strncat(buffer + spaces, name, max_size - spaces);
 }
 
 int find_child_relations(int spaces, const char *host, int port, time_t stoptime)
