@@ -1045,13 +1045,15 @@ static int file_from_url(const char *url, const char *filename) {
 
         debug(D_WQ, "Retrieving %s from (%s)\n", filename, url);
         char command[WORK_QUEUE_LINE_MAX];
-        snprintf(command, WORK_QUEUE_LINE_MAX, "curl -o \"%s\" \"%s\"", filename, url);
-        if (system(command) == 0) {
+        snprintf(command, WORK_QUEUE_LINE_MAX, "curl -f -o \"%s\" \"%s\"", filename, url);
+		
+	if (system(command) == 0) {
                 debug(D_WQ, "Success, file retrieved from %s\n", url);
         } else {
                 debug(D_WQ, "Failed to retrieve file from %s\n", url);
                 return 0;
         }
+
         return 1;
 }
 
@@ -1062,6 +1064,7 @@ static int do_url(struct link* master, const char *filename, int length, int mod
 
         char cache_name[WORK_QUEUE_LINE_MAX];
         snprintf(cache_name,WORK_QUEUE_LINE_MAX, "cache/%s", filename);
+
         return file_from_url(url, cache_name);
 }
 

@@ -1719,17 +1719,17 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 			case WORK_QUEUE_URL:
 			{
 				char remote_name[WORK_QUEUE_LINE_MAX];
-                                if(!(tf->flags & WORK_QUEUE_CACHE)) {
-                                        sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
-                                } else {
-                                        sprintf(remote_name, "%s", tf->remote_name);
-                                }
-                                debug(D_WQ, "%s (%s) needs %s from the url, %s %d", w->hostname, w->addrport, remote_name, tf->payload, tf->length);
-                                open_time = timestamp_get();
-                                send_worker_msg(w, "url %s %lld 0%o %d\n",time(0) + short_timeout, remote_name, tf->length, 0777, tf->flags);
-                                link_putlstring(w->link, tf->payload, tf->length, stoptime);
-                                close_time = timestamp_get();
-                                sum_time += (close_time - open_time);
+				if(!(tf->flags & WORK_QUEUE_CACHE)) {
+					sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
+				} else {
+					sprintf(remote_name, "%s", tf->remote_name);
+				}
+				debug(D_WQ, "%s (%s) needs %s from the url, %s %d", w->hostname, w->addrport, remote_name, tf->payload, tf->length);
+				open_time = timestamp_get();
+				send_worker_msg(w, "url %s %lld 0%o %d\n",time(0) + short_timeout, remote_name, tf->length, 0777, tf->flags);
+				link_putlstring(w->link, tf->payload, tf->length, stoptime);
+				close_time = timestamp_get();
+				sum_time += (close_time - open_time);
 
 				break;
 			}
@@ -3458,6 +3458,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 		
 	} else if(!strcmp(name, "keepalive-timeout")) {
 		q->keepalive_timeout = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "short-timeout")) {
+		short_timeout = MAX(1, (int)value);
 		
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
