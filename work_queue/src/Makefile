@@ -3,7 +3,9 @@ CCTOOLS_HOME = ../..
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
-SOURCES = work_queue_status.c
+SOURCES = work_queue_catalog.c \
+          work_queue_resources.c  \
+          work_queue_status.c
 
 PUBLIC_HEADERS = work_queue.h
 
@@ -11,8 +13,8 @@ LIBDTTOOLS = ${CCTOOLS_HOME}/dttools/src/libdttools.a
 
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
-#LIBRARIES = libwork_queue.a
-PROGRAMS = work_queue_worker work_queue_status work_queue_pool
+LIBRARIES = libwork_queue.a
+PROGRAMS = work_queue_worker work_queue_status work_queue_example work_queue_pool
 
 ifeq (${CCTOOLS_USE_MPI},true)
 	PROGRAMS += mpi_queue_worker
@@ -26,23 +28,27 @@ TEST_PROGRAMS = work_queue_example work_queue_workload_simulator
 
 all: ${LIBRARIES} $(PROGRAMS) $(TEST_PROGRAMS) bindings
 
-work_queue_worker: work_queue_worker.o ${LIBDTTOOLS}
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
+work_queue_worker: work_queue_worker.o ${LIBDTTOOLS} libwork_queue.a
+	${CCTOOLS_LD} work_queue_worker.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
 
-mpi_queue_worker: mpi_queue_worker.o ${LIBDTTOOLS}
-	${CCTOOLS_MPI_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
+mpi_queue_worker: mpi_queue_worker.o ${LIBDTTOOLS} libwork_queue.a
+	${CCTOOLS_MPI_LD} mpi_queue_worker ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
 
-work_queue_status: work_queue_status.c ${LIBDTTOOLS}
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} ${CCTOOLS_INTERNAL_CCFLAGS} -o $@
+work_queue_status: work_queue_status.o ${LIBDTTOOLS} libwork_queue.a
+	${CCTOOLS_LD} work_queue_status.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
 
-work_queue_pool: work_queue_pool.o ${LIBDTTOOLS}
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
+work_queue_example: work_queue_example.o ${LIBDTTOOLS} libwork_queue.a
+	${CCTOOLS_LD} work_queue_example.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
 
-work_queue_example: work_queue_example.c ${LIBDTTOOLS}
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} ${CCTOOLS_INTERNAL_CCFLAGS} -o $@
+work_queue_pool: work_queue_pool.o ${LIBDTTOOLS} libwork_queue.a
+	${CCTOOLS_LD} work_queue_pool.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
 
-work_queue_workload_simulator: work_queue_workload_simulator.o ${LIBDTTOOLS}
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
+work_queue_workload_simulator: work_queue_workload_simulator.o ${LIBDTTOOLS} libwork_queue.a
+	${CCTOOLS_LD} work_queue_workload_simulator.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
+
+libwork_queue.a: ${OBJECTS}
+	${CCTOOLS_AR} rv $@ $^
+	ranlib $@
 
 
 bindings:
@@ -57,8 +63,8 @@ install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/include
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/include/cctools
-	#chmod 755 ${SCRIPTS}
-	#cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
+	chmod 755 ${SCRIPTS}
+	cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
 	cp ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
 	cp ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
 	cp work_queue_example.c ${CCTOOLS_INSTALL_DIR}/doc

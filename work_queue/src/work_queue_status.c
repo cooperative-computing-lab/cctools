@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include <debug.h>
+#include "debug.h"
 #include "catalog_query.h"
 #include "catalog_server.h"
 #include "domain_name_cache.h"
