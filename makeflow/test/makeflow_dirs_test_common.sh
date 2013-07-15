@@ -27,7 +27,7 @@ run()
 
 	# launch the worker with the port found by makeflow.
 	port=`cat $PORT_FILE` 
-	../../dttools/src/work_queue_worker -t60 localhost $port &
+	../../work_queue/src/work_queue_worker -t60 localhost $port &
 
 	# wait at most one minute for makeflow to exit.
 	wait_for_file_creation $STATUS_FILE 60

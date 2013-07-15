@@ -33,16 +33,13 @@ work_queue_worker: work_queue_worker.o ${LIBDTTOOLS} libwork_queue.a
 	${CCTOOLS_LD} work_queue_worker.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
 
 mpi_queue_worker: mpi_queue_worker.o ${LIBDTTOOLS} libwork_queue.a
-	${CCTOOLS_MPI_LD} mpi_queue_worker ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
+	${CCTOOLS_MPI_LD} mpi_queue_worker.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
 
 work_queue_status: work_queue_status.o ${LIBDTTOOLS} libwork_queue.a
 	${CCTOOLS_LD} work_queue_status.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
 
 work_queue_example: work_queue_example.o ${LIBDTTOOLS} libwork_queue.a
 	${CCTOOLS_LD} work_queue_example.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
-
-work_queue_pool: work_queue_pool.o ${LIBDTTOOLS} libwork_queue.a
-	${CCTOOLS_LD} work_queue_pool.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
 
 work_queue_workload_simulator: work_queue_workload_simulator.o ${LIBDTTOOLS} libwork_queue.a
 	${CCTOOLS_LD} work_queue_workload_simulator.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@

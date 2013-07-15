@@ -139,5 +139,6 @@ install: all
 	cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
 	cp ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
 	for file in ${PUBLIC_HEADERS} ; do if [ -f $$file ] ; then cp $$file ${CCTOOLS_INSTALL_DIR}/include/cctools ; fi ; done
-	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then cp /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; 0
+	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then cp /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; done
+
 

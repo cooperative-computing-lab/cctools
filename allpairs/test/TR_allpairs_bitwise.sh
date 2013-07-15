@@ -28,7 +28,7 @@ prepare()
 
 run()
 {
-    ../../dttools/src/work_queue_worker localhost `cat $PORT_FILE` &
+    ../../work_queue/src/work_queue_worker localhost `cat $PORT_FILE` &
     pid=$!
 	echo $pid > $PIDWORKER_FILE
 
