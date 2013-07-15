@@ -105,15 +105,10 @@ PUBLIC_HEADERS = auth.h  \
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
 LIBRARIES = libdttools.a
-PROGRAMS = catalog_update catalog_server work_queue_worker work_queue_pool work_queue_status watchdog
+PROGRAMS = catalog_update catalog_server watchdog
 
-ifeq (${CCTOOLS_USE_MPI},true)
-	PROGRAMS += mpi_queue_worker
-endif
-
-TEST_PROGRAMS = work_queue_example work_queue_workload_simulator microbench multirun
+TEST_PROGRAMS = microbench multirun
 PROGRAM_SOURCES = ${PROGRAMS:%=%.c} ${TEST_PROGRAMS:%=%.c}
-SCRIPTS = condor_submit_workers sge_submit_workers torque_submit_workers pbs_submit_workers ec2_submit_workers ec2_remove_workers
 CYGWINLIB = cygwin1.dll cyggcc_s-1.dll cygintl-8.dll cygreadline7.dll cygncursesw-10.dll cygiconv-2.dll cygattr-1.dll sh.exe
 
 all: ${LIBRARIES} $(PROGRAMS) $(TEST_PROGRAMS)
@@ -136,24 +131,6 @@ microbench: microbench.o libdttools.a
 multirun: multirun.o libdttools.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-work_queue_worker: work_queue_worker.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-mpi_queue_worker: mpi_queue_worker.o libdttools.a
-	${CCTOOLS_MPI_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-work_queue_example: work_queue_example.c libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-work_queue_workload_simulator: work_queue_workload_simulator.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-work_queue_status: work_queue_status.c libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-work_queue_pool: work_queue_pool.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
 libdttools.a: ${OBJECTS}
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
@@ -169,10 +146,8 @@ install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/include
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/include/cctools
-	chmod 755 ${SCRIPTS}
 	cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
 	cp ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
-	cp ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
-	cp work_queue_example.c ${CCTOOLS_INSTALL_DIR}/doc
 	for file in ${PUBLIC_HEADERS} ; do if [ -f $$file ] ; then cp $$file ${CCTOOLS_INSTALL_DIR}/include/cctools ; fi ; done
 	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then cp /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; done
+
