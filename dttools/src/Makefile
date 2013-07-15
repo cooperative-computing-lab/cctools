@@ -11,13 +11,6 @@ SOURCES = auth.c  \
           auth_address.c  \
           auth_ticket.c  \
           b64_encode.c  \
-          batch_job.c  \
-          batch_job_condor.c  \
-          batch_job_hadoop.c  \
-          batch_job_local.c  \
-          batch_job_mpi_queue.c  \
-          batch_job_cluster.c  \
-          batch_job_work_queue.c  \
           bitmap.c  \
           buffer.c  \
           catalog_query.c  \
@@ -80,11 +73,11 @@ SOURCES = auth.c  \
           url_encode.c  \
           uptime.c \
           username.c  \
-          work_queue.c  \
           xxmalloc.c
 
 EXTRA_HEADERS = batch_job_internal.h \
                 macros.h
+
 PUBLIC_HEADERS = auth.h  \
                  auth_address.h  \
                  auth_all.h  \
@@ -97,8 +90,7 @@ PUBLIC_HEADERS = auth.h  \
                  debug.h  \
                  int_sizes.h  \
                  rmonitor_hooks.h \
-                 timestamp.h  \
-                 work_queue.h
+                 timestamp.h
 
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
@@ -147,5 +139,5 @@ install: all
 	cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
 	cp ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
 	for file in ${PUBLIC_HEADERS} ; do if [ -f $$file ] ; then cp $$file ${CCTOOLS_INSTALL_DIR}/include/cctools ; fi ; done
-	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then cp /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; done
+	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then cp /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; 0
 

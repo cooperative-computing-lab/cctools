@@ -2,8 +2,8 @@ CCTOOLS_HOME = ../../..
 
 include ${CCTOOLS_HOME}/Makefile.config
 
-ccflags=${CCTOOLS_PYTHON_CCFLAGS} -I${CCTOOLS_HOME}/dttools/src
-ldflags=${CCTOOLS_PYTHON_LDFLAGS} ${CCTOOLS_HOME}/dttools/src/libdttools.a
+ccflags=${CCTOOLS_PYTHON_CCFLAGS} -I${CCTOOLS_HOME}/work_queue/src -I${CCTOOLS_HOME}/dttools/src
+ldflags=${CCTOOLS_PYTHON_LDFLAGS}  ${CCTOOLS_HOME}/work_queue/src/libwork_queue.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
 
 # Python always uses 'so' for its modules (even on Darwin)
 CCTOOLS_DYNAMIC_SUFFIX=so

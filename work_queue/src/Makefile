@@ -3,9 +3,10 @@ CCTOOLS_HOME = ../..
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
-SOURCES = work_queue_catalog.c \
-          work_queue_resources.c  \
-          work_queue_status.c
+SOURCES = work_queue_catalog.c   \
+          work_queue_resources.c \
+          work_queue_status.c    \
+          work_queue.c
 
 PUBLIC_HEADERS = work_queue.h
 
@@ -14,7 +15,7 @@ LIBDTTOOLS = ${CCTOOLS_HOME}/dttools/src/libdttools.a
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
 LIBRARIES = libwork_queue.a
-PROGRAMS = work_queue_worker work_queue_status work_queue_example work_queue_pool
+PROGRAMS = work_queue_worker work_queue_status work_queue_example
 
 ifeq (${CCTOOLS_USE_MPI},true)
 	PROGRAMS += mpi_queue_worker

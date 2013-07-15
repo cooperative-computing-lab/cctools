@@ -2,8 +2,8 @@ CCTOOLS_HOME = ../../..
 
 include ${CCTOOLS_HOME}/Makefile.config
 
-ccflags=${CCTOOLS_PERL_CCFLAGS} -I${CCTOOLS_HOME}/dttools/src
-ldflags=${CCTOOLS_PERL_LDFLAGS} ${CCTOOLS_HOME}/dttools/src/libdttools.a
+ccflags=${CCTOOLS_PERL_CCFLAGS} -I${CCTOOLS_HOME}/dttools/src -I${CCTOOLS_HOME}/work_queue/src
+ldflags=${CCTOOLS_PERL_LDFLAGS} ${CCTOOLS_HOME}/work_queue/src/libwork_queue.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
 
 all: work_queue.pm work_queue.${CCTOOLS_DYNAMIC_SUFFIX}
 
