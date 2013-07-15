@@ -26,13 +26,13 @@ int main(int argc, char *argv[])
 	int taskid;
 	int i;
 
-	debug_f(argc < 3) {
+	if(argc < 3) {
                 printf("work_queue_example <executable> <url1> [url2] [url3] ...\n");
                 printf("Each url given on the command line will be downloaded and compressed using a remote worker.\n");
                 return 0;
         }
 
-	flags_set("all");
+	debug_flags_set("all");
 
 	q = work_queue_create(port);
 	if(!q) {
@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
 	for(i = 1; i < argc; i++) {
 
 
-		t = work_quear url[256], outfile[256], command[256];
+		char url[256], outfile[256], command[256];
                 char* infile;
 
                 infile = argv[i];

@@ -1717,6 +1717,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 				break;
 
 			case WORK_QUEUE_URL:
+			{
 				char remote_name[WORK_QUEUE_LINE_MAX];
                                 if(!(tf->flags & WORK_QUEUE_CACHE)) {
                                         sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
@@ -1731,7 +1732,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
                                 sum_time += (close_time - open_time);
 
 				break;
-			
+			}
 			case WORK_QUEUE_DIRECTORY:
 				// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as WORK_QUEUE_FILEs
 				break;
