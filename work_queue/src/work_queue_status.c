@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "debug.h"
+#include <debug.h>
 #include "catalog_query.h"
 #include "catalog_server.h"
 #include "domain_name_cache.h"
@@ -51,7 +51,7 @@ static struct nvpair_header queue_headers[] = {
 	{"workers_busy",  "BUSY",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 5},
 	{"tasks_complete","COMPLETE",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8},
 	{"workers",       "WORKERS", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
-	{NULL,}
+	{NULL,NULL,0,0,0}
 };
 
 static struct nvpair_header task_headers[] = {
@@ -59,7 +59,7 @@ static struct nvpair_header task_headers[] = {
 	{"state",        "STATE",   NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT,  8},
 	{"host",         "HOST",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 24},
 	{"command",      "COMMAND", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 38},
-	{NULL,}
+	{NULL,NULL,0,0,0}
 };
 
 static struct nvpair_header worker_headers[] = {
@@ -68,7 +68,7 @@ static struct nvpair_header worker_headers[] = {
 	{"total_tasks_complete",       "TASKS",   NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8 },
 	{"state",                "STATE",   NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT,8},
 	{"current_task_command", "TASK",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 28},
-	{NULL,}
+	{NULL,NULL,0,0,0}
 };
 
 static struct nvpair_header master_resource_headers[] = {
@@ -76,7 +76,7 @@ static struct nvpair_header master_resource_headers[] = {
 	{"cores_total",	"CORES",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 10},
 	{"memory_total",	"MEMORY",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 15},
 	{"disk_total",	"DISK",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 20},
-	{0,0,0,0,0}
+	{NULL,NULL,0,0,0}
 };
 
 static void show_help(const char *progname)

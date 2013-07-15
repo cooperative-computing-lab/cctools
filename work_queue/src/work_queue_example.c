@@ -10,8 +10,8 @@ It accepts a list of files on the command line.
 Each file is compressed with gzip and returned to the user.
 */
 
-#include "work_queue.h"
-#include "debug.h"
+#include <work_queue.h>
+#include <debug.h>
 
 #include <stdio.h>
 #include <stdlib.h>

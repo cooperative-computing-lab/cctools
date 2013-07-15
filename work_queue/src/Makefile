@@ -3,6 +3,8 @@ CCTOOLS_HOME = ../..
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
+SOURCES = work_queue_status.c
+
 PUBLIC_HEADERS = work_queue.h
 
 LIBDTTOOLS = ${CCTOOLS_HOME}/dttools/src/libdttools.a
@@ -10,7 +12,7 @@ LIBDTTOOLS = ${CCTOOLS_HOME}/dttools/src/libdttools.a
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
 #LIBRARIES = libwork_queue.a
-PROGRAMS = work_queue_worker
+PROGRAMS = work_queue_worker work_queue_status work_queue_pool
 
 ifeq (${CCTOOLS_USE_MPI},true)
 	PROGRAMS += mpi_queue_worker
@@ -20,6 +22,8 @@ PROGRAM_SOURCES = ${PROGRAMS:%=%.c} ${TEST_PROGRAMS:%=%.c}
 
 SCRIPTS = condor_submit_workers sge_submit_workers torque_submit_workers pbs_submit_workers ec2_submit_workers ec2_remove_workers
 
+TEST_PROGRAMS = work_queue_example work_queue_workload_simulator
+
 all: ${LIBRARIES} $(PROGRAMS) $(TEST_PROGRAMS) bindings
 
 work_queue_worker: work_queue_worker.o ${LIBDTTOOLS}
@@ -27,6 +31,19 @@ work_queue_worker: work_queue_worker.o ${LIBDTTOOLS}
 
 mpi_queue_worker: mpi_queue_worker.o ${LIBDTTOOLS}
 	${CCTOOLS_MPI_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
+
+work_queue_status: work_queue_status.c ${LIBDTTOOLS}
+	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} ${CCTOOLS_INTERNAL_CCFLAGS} -o $@
+
+work_queue_pool: work_queue_pool.o ${LIBDTTOOLS}
+	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
+
+work_queue_example: work_queue_example.c ${LIBDTTOOLS}
+	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} ${CCTOOLS_INTERNAL_CCFLAGS} -o $@
+
+work_queue_workload_simulator: work_queue_workload_simulator.o ${LIBDTTOOLS}
+	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
+
 
 bindings:
 	@for m in ${CCTOOLS_WORK_QUEUE_BINDINGS}; do cd $$m; $(MAKE) all; cd ..; done
