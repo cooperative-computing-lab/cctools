@@ -12,7 +12,7 @@ all: ${PROGRAMS}
 test: all
 
 ${PROGRAMS}: %: %.o libsandtools.a
-	${CCTOOLS_LD} -o $@ $< -L. -lsandtools -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+	${CCTOOLS_LD} -o $@ $< -L. -lsandtools -lwork_queue -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
 libsandtools.a: $(OBJECTS)
 	ar rv libsandtools.a $(OBJECTS)

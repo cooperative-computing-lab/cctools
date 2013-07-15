@@ -4,6 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+
+#include "cctools.h"
 #include "debug.h"
 #include "catalog_query.h"
 #include "catalog_server.h"
@@ -39,7 +41,6 @@ static int work_queue_status_timeout = 300;
 static char *catalog_host = NULL;
 static int catalog_port = 0;
 static int resource_mode = 0;
-static int resource_timeout = 25;
 int current_catalog_size = CATALOG_SIZE;
 static struct nvpair **global_catalog = NULL; //pointer to an array of nvpair pointers
 
@@ -51,7 +52,7 @@ static struct nvpair_header queue_headers[] = {
 	{"workers_busy",  "BUSY",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 5},
 	{"tasks_complete","COMPLETE",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8},
 	{"workers",       "WORKERS", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
-	{NULL,}
+	{NULL,NULL,0,0,0}
 };
 
 static struct nvpair_header task_headers[] = {
@@ -59,7 +60,7 @@ static struct nvpair_header task_headers[] = {
 	{"state",        "STATE",   NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT,  8},
 	{"host",         "HOST",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 24},
 	{"command",      "COMMAND", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 38},
-	{NULL,}
+	{NULL,NULL,0,0,0}
 };
 
 static struct nvpair_header worker_headers[] = {
@@ -68,7 +69,7 @@ static struct nvpair_header worker_headers[] = {
 	{"total_tasks_complete",       "TASKS",   NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8 },
 	{"state",                "STATE",   NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT,8},
 	{"current_task_command", "TASK",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 28},
-	{NULL,}
+	{NULL,NULL,0,0,0}
 };
 
 static struct nvpair_header master_resource_headers[] = {
@@ -76,7 +77,7 @@ static struct nvpair_header master_resource_headers[] = {
 	{"cores_total",	"CORES",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 10},
 	{"memory_total",	"MEMORY",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 15},
 	{"disk_total",	"DISK",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 20},
-	{0,0,0,0,0}
+	{NULL,NULL,0,0,0}
 };
 
 static void show_help(const char *progname)
@@ -236,7 +237,7 @@ int my_foreman(int *space, const char *host, int port, time_t stoptime)
 {
 	int i = 0; //global_catalog iterator
 	char full_address[1024];
-	if(!domain_name_cache_lookup(host, full_address) || !full_address)
+	if(!domain_name_cache_lookup(host, full_address))
 	{
 		debug(D_WQ,"Could not resolve %s into an ip address\n",host);
 		return 0;

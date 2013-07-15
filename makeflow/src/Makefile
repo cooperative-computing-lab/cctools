@@ -6,7 +6,7 @@ include ${CCTOOLS_HOME}/Makefile.rules
 TARGETS = makeflow
 SCRIPTS = condor_submit_makeflow makeflow_log_parser makeflow_monitor starch
 
-LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+LOCAL_LDFLAGS=-ldttools_batch -lwork_queue -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
 all: ${TARGETS}
 
