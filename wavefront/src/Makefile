@@ -5,7 +5,7 @@ include ${CCTOOLS_HOME}/Makefile.rules
 
 PROGRAMS =  wavefront wavefront_master
 
-LOCAL_LDFLAGS=-ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+LOCAL_LDFLAGS=-lwork_queue -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
 all: ${PROGRAMS}
 
