@@ -3458,6 +3458,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 		
 	} else if(!strcmp(name, "keepalive-timeout")) {
 		q->keepalive_timeout = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "short-timeout")) {
+		short_timeout = MAX(1, (int)value);
 		
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);

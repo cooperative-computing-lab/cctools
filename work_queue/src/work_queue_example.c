@@ -24,13 +24,18 @@ int main(int argc, char *argv[])
 	struct work_queue_task *t;
 	int port = WORK_QUEUE_DEFAULT_PORT;
 	int taskid;
-	int i;
+	int i, iterations;
+	char *url_base, *filename;
 
 	if(argc < 3) {
                 printf("work_queue_example <executable> <url1> [url2] [url3] ...\n");
                 printf("Each url given on the command line will be downloaded and compressed using a remote worker.\n");
                 return 0;
         }
+
+	url_base = argv[1];
+	filename = argv[2];
+	iterations = atoi(argv[3]);
 
 	debug_flags_set("all");
 
@@ -40,21 +45,19 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	work_queue_tune(q, "short-timeout", 60);
         work_queue_specify_name(q,"numbtest");
         work_queue_specify_master_mode(q,WORK_QUEUE_MASTER_MODE_CATALOG);
 
 	printf("listening on port %d...\n", work_queue_port(q));
 
-	for(i = 1; i < argc; i++) {
-
-
+	for(i = 0; i < iterations; i++) {
 		char url[256], outfile[256], command[256];
                 char* infile;
 
-                infile = argv[i];
-                sprintf(url, "%s/%s", argv[1], infile);
-                sprintf(outfile, "%s.gz", infile);                    
-                sprintf(command, "./gzip < %s > %s", infile, outfile);
+                sprintf(url, "%s/%s", url_base, filename);
+                sprintf(outfile, "%s.gz", filename);                    
+                sprintf(command, "./gzip < %s > %s", filename, outfile);
 
 		t = work_queue_task_create(command);	
 
@@ -66,7 +69,7 @@ int main(int argc, char *argv[])
                         printf("task_specify_file() failed for %s: check if arguments are null or remote name is an absolute path.\n", outfile);
                         return 1;
                 }
-                if (!work_queue_task_specify_url(t, url, infile, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE)) {
+                if (!work_queue_task_specify_url(t, url, filename, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE)) {
                         printf("task_specify_url() failed for %s: check if arguments are null or remote name is an absolute path.\n", url);
                         return 1;
                 }
