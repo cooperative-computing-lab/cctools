@@ -81,7 +81,7 @@ struct work_queue_task {
 	timestamp_t total_transfer_time;    /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
 	timestamp_t cmd_execution_time;	   /**< Time spent in microseconds for executing the command on the worker. */
 
-	int memory;
+	int memory;                       
 	int disk;
 	int cores;
 };
@@ -133,7 +133,6 @@ struct work_queue_task *work_queue_task_create(const char *full_command);
 @param t A task object.
 @param cmd The command to be executed.  This string will be duplicated by this call, so the argument may be freed or re-used afterward.
 */
-
 void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd );
 
 /** Add a file to a task.

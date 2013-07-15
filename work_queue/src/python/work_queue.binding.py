@@ -57,6 +57,14 @@ class Task(_object):
         return flags
    
     ##
+    # Set the command to be executed by the task.
+    #
+    # @param self       Reference to the current task object.
+    # @param command    The command to be executed. 
+    def specify_command(self, command):
+        return work_queue_task_specify_command(self._task, command)
+
+    ##
     # Set the worker selection algorithm for task.
     #
     # @param self       Reference to the current task object.
@@ -126,7 +134,7 @@ class Task(_object):
     #                       - @ref WORK_QUEUE_NOCACHE
     #                       - @ref WORK_QUEUE_CACHE
     # @param cache          Legacy parameter for setting file caching attribute.  By default this is enabled.
-    def specify_file_piece(self, local_name, remote_name=None, start_byte=0, end_byte, type=None, flags=None, cache=True):
+    def specify_file_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, type=None, flags=None, cache=True):
         if remote_name is None:
             remote_name = os.path.basename(local_name)
 
@@ -149,6 +157,20 @@ class Task(_object):
     # This is just a wrapper for @ref specify_file with type set to @ref WORK_QUEUE_OUTPUT.
     def specify_output_file(self, local_name, remote_name=None, flags=None, cache=True):
         return self.specify_file(local_name, remote_name, WORK_QUEUE_OUTPUT, flags, cache)
+
+    ##
+    # Add a directory to the task.
+    # @param self           Reference to the current task object.
+    # @param local_name     The name of the directory on local disk or shared filesystem. Optional if the directory is empty.
+    # @param remote_name    The name of the directory at the remote execution site.
+    # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
+    # @param flags          May be zero to indicate no special handling, or any of the following or'd together:
+    #                       - @ref WORK_QUEUE_NOCACHE
+    #                       - @ref WORK_QUEUE_CACHE
+    # @param recursive      Indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
+    # @return 1 if the task directory is successfully specified, 0 if either of @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
+    def specify_directory(self, local_name=None, remote_name=None, type=None, flags=None, recursive=0):
+        return self.specify_directory(local_name, remote_name, type, flags, recursive)
 
     ##
     # Add an input bufer to the task.
@@ -613,7 +635,7 @@ class WorkQueue(_object):
     # @param self      Reference to the current work queue object.
     # @param password  The password.
 
-    def specify_password_file(self, password):
+    def specify_password(self, password):
         return work_queue_specify_password(self._work_queue, password)
     
     ##
@@ -688,6 +710,24 @@ class WorkQueue(_object):
     def reset(self, flags):
         return work_queue_reset(self._work_queue, flags)
 
+    ##
+    # Tune advanced parameters for work queue.
+    # 
+    # @param self  Reference to the current work queue object.
+    # @param name  The name fo the parameter to tune. Can be one of following:
+    #              - "asynchrony-multiplier" Treat each worker as having (actual_cores * multiplier) total cores. (default = 1.0)
+    #              - "asynchrony-modifier" Treat each worker as having an additional "modifier" cores. (default=0)
+    #              - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=300)
+    #              - "foreman-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a foreman. (default=3600)
+    #              - "fast-abort-multiplier" Set the multiplier of the average task time at which point to abort; if negative or zero fast_abort is deactivated. (default=0)
+    #              - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
+    #              - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
+    # @param value The value to set the parameter to.
+    # @return 0 on succes, -1 on failure.
+    #
+    def tune(self, name, value):
+        return work_queue_tune(self._work_queue, name, value)
+           	
     ##
     # Submit a task to the queue.
     #
