@@ -17,9 +17,15 @@ def source_exists(path):
     print "source directory does not exist"
     sys.exit(1)
 
+def usage():
+  print "Usage: " + __file__ + " source destination name\n See man page for more information."
+
 def get_args():
+  if len(sys.argv) == 2 and (sys.argv[1] == "-h" or sys.argv[1] == "--help"):
+    usage()
+    sys.exit(0)
   if len(sys.argv) != 4:
-    print "Usage: " + __file__ + " source destination name"
+    usage()
     sys.exit(1)
 
   source = sys.argv[1]
@@ -403,7 +409,7 @@ def main():
 
   create_main_page(groups.keys(), name, resources, destination_directory, hist_small, hist_small, aggregate_height, aggregate_width, time_series_exist)
 
-  os.system("cp -r static/* " + destination_directory)
+  os.system("cp -r ../lib/resource_monitor_static/* " + destination_directory)
 
   os.system("rm -rf " + workspace)
 
