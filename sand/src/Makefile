@@ -13,8 +13,8 @@ all: ${PROGRAMS}
 
 test: all
 
-${PROGRAMS}: %: %.o libsandtools.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	${CCTOOLS_LD} -o $@ $< -L. -lsandtools -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+${PROGRAMS}: %: %.o libsandtools.a ${CCTOOLS_HOME}/dttools/src/libdttools.a ${CCTOOLS_HOME}/work_queue/src/libwork_queue.a
+	${CCTOOLS_LD} -o $@ $< -L. -lsandtools -lwork_queue -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
 libsandtools.a: $(OBJECTS)
 	ar rv libsandtools.a $(OBJECTS)

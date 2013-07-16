@@ -2069,32 +2069,38 @@ static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q, struc
 static struct work_queue_worker *find_worker_by_random(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
-	struct work_queue_worker *w;
+	struct work_queue_worker *w = NULL;
 	int num_workers = hash_table_size(q->worker_table);
-	int random_worker;
+	int random_worker, valid_worker = 0;
 
 	if(num_workers > 0) {
 		random_worker = (rand() % num_workers) + 1;
 	} else {
-		random_worker = 0;
+		return NULL;
 	}
 
 	hash_table_firstkey(q->worker_table);
 	while(random_worker) {
 		hash_table_nextkey(q->worker_table, &key, (void **) &w);
+		
 		if(!w) {
+			if(!valid_worker) return NULL;
 			hash_table_firstkey(q->worker_table);
 			continue;
 		}
 		
 		if(check_worker_against_task(q, w, t)) {
-			random_worker--;
-		} else {
-			w = NULL;
-		}
+			valid_worker = 1;
+			
+			if(!random_worker) {
+				return w;
+			} else {
+				random_worker--;
+			}
+		} 
 	}
-
-	return w;
+	
+	return NULL;
 }
 
 static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struct work_queue_task *t)
@@ -3145,10 +3151,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// Then consider all existing active workers and dispatch tasks.
 		for(i = j; i < n; i++) {
 			if(q->poll_table[i].revents) {
-			debug(D_WQ, "Dispatching job to worker");
 				handle_worker(q, q->poll_table[i].link);
 			}
 		}
+		
 		// Start tasks on ready workers
 		start_tasks(q);
 		

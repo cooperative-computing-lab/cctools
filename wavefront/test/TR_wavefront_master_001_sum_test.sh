@@ -33,7 +33,7 @@ run()
 	answer=1854882
 	port=`cat $PORT_FILE`
 
-	../../dttools/src/work_queue_worker -t60 localhost $port &
+	../../work_queue/src/work_queue_worker -t60 localhost $port &
 	pid=$!
 	echo $pid > $PIDWORKER_FILE
 

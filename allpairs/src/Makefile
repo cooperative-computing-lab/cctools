@@ -5,7 +5,7 @@ include ${CCTOOLS_HOME}/Makefile.rules
 
 TARGETS = allpairs_multicore allpairs_master
 
-LOCAL_LDFLAGS=../../sand/src/libsandtools.a -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+LOCAL_LDFLAGS=../../sand/src/libsandtools.a -lwork_queue -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
 all: ${TARGETS}
 
