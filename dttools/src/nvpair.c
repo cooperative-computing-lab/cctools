@@ -152,6 +152,13 @@ void nvpair_insert_integer(struct nvpair *n, const char *name, INT64_T ivalue)
 	nvpair_insert_string(n, name, (char *) value);
 }
 
+void nvpair_insert_float(struct nvpair *n, const char *name, double fvalue)
+{
+	char value[256];
+	sprintf(value, "%lf", fvalue);
+	nvpair_insert_string(n, name, (char *) value);
+}
+
 const char *nvpair_lookup_string(struct nvpair *n, const char *name)
 {
 	return hash_table_lookup(n->table, name);
@@ -163,6 +170,17 @@ INT64_T nvpair_lookup_integer(struct nvpair * n, const char *name)
 	value = hash_table_lookup(n->table, name);
 	if(value) {
 		return atoll(value);
+	} else {
+		return 0;
+	}
+}
+
+double nvpair_lookup_float(struct nvpair * n, const char *name)
+{
+	const char *value;
+	value = hash_table_lookup(n->table, name);
+	if(value) {
+		return atof(value);
 	} else {
 		return 0;
 	}
