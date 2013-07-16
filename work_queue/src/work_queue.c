@@ -2068,39 +2068,40 @@ static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q, struc
 
 static struct work_queue_worker *find_worker_by_random(struct work_queue *q, struct work_queue_task *t)
 {
-	char *key;
-	struct work_queue_worker *w;
-	struct work_queue_worker *prev_avail_worker = NULL;
-	int num_workers = hash_table_size(q->worker_table);
-	int random_worker;
+    char *key;
+    struct work_queue_worker *w;
+    struct work_queue_worker *prev_avail_worker = NULL;
+    int num_workers = hash_table_size(q->worker_table);
+    int random_worker;
 
-	if(num_workers > 0) {
-		random_worker = (rand() % num_workers) + 1;
-	} else {
-		return NULL;
-	}
+    if(num_workers > 0) {
+        random_worker = (rand() % num_workers) + 1;
+    } else {
+        return NULL;
+    }
 
-	hash_table_firstkey(q->worker_table);
-	while(random_worker) {
-		hash_table_nextkey(q->worker_table, &key, (void **) &w);
-		if(!w) {
-			hash_table_firstkey(q->worker_table);
-			continue;
-		}
-		
-		if(check_worker_against_task(q, w, t)) {
-			random_worker--;
+    hash_table_firstkey(q->worker_table);
+    while(random_worker) {
+        hash_table_nextkey(q->worker_table, &key, (void **) &w);
+        if(!w) {
+            hash_table_firstkey(q->worker_table);
+            continue;
+        }
 
-		if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
-			if(random_worker == 0) {
-				return w;
-			} else {
-				prev_avail_worker = w;
-			}
-		} 
-	}
-	
-	return prev_avail_worker;
+        if(check_worker_against_task(q, w, t)) {
+            random_worker--;
+
+            if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
+                if(random_worker == 0) {
+                    return w;
+                } else {
+                    prev_avail_worker = w;
+                }
+            } 
+        }
+    }
+
+    return prev_avail_worker;
 }
 
 static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struct work_queue_task *t)
@@ -3506,3 +3507,5 @@ void work_queue_specify_log(struct work_queue *q, const char *logfile)
 		debug(D_WQ, "log enabled and is being written to %s\n", logfile);
 	}
 }
+
+
