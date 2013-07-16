@@ -364,7 +364,7 @@ done
 IFS=" "
 export IFS
 
-potential_packages="dttools work_queue batch_interface ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_resource_monitor_visualizer} ${include_package_doc}"
+potential_packages="dttools work_queue ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_resource_monitor_visualizer} ${include_package_doc}"
 
 check_multiarch
 
