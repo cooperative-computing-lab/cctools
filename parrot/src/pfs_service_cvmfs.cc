@@ -22,6 +22,7 @@ extern "C" {
 #include <ctype.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
+#include <sys/file.h>
 #include <time.h>
 #include <assert.h>
 #include <string>
@@ -247,6 +248,28 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 		}
 
 		cvmfs_set_log_fn(cvmfs_parrot_logger);
+
+		// Internally, cvmfs will attempt to lock this file,
+		// and then block silently if it cannot run.  Since
+		// we are linked against cvmfs anyhow, we use the same
+		// routine to check here explicitly.  There is still
+		// a race condition here, but now the user has a good
+		// chance of getting a useful error message before
+		// cvmfs_init blocks.
+
+		char lockfile[PFS_PATH_MAX];
+		sprintf(lockfile,"%s/cvmfs/%s/lock.%s",pfs_temp_dir,f->host.c_str(),f->host.c_str());
+		debug(D_CVMFS,"checking lock file %s",lockfile);
+		int fd = open(lockfile,O_RDONLY|O_CREAT,0600);
+		if(fd>=0) {
+			int result = flock(fd,LOCK_EX|LOCK_NB);
+
+			close(fd);
+
+			if(result<0) {
+				debug(D_NOTICE|D_CVMFS,"waiting for another process to release cvmfs lock %s",lockfile);
+			}
+		}
 
 		debug(D_CVMFS, "cvmfs_init(%s)", f->cvmfs_options.c_str());
 		int rc = cvmfs_init(f->cvmfs_options.c_str());

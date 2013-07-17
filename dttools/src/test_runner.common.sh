@@ -89,7 +89,7 @@ run_local_worker()
 		exit 1
 	fi
 	echo "Running worker."
-	work_queue_worker -t 2s -d all -o "$log" localhost `cat $port_file`
+	../../work_queue/src/work_queue_worker -t 2s -d all -o "$log" localhost `cat $port_file`
 	echo "Worker completed."
 	return 0
 }
