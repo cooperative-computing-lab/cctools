@@ -409,7 +409,7 @@ def main():
 
   create_main_page(groups.keys(), name, resources, destination_directory, hist_small, hist_small, aggregate_height, aggregate_width, time_series_exist)
 
-  os.system("cp -r ../lib/resource_monitor_static/* " + destination_directory)
+  os.system("cp -r ../lib/resource_monitor_visualizer_static/* " + destination_directory)
 
   os.system("rm -rf " + workspace)
 
