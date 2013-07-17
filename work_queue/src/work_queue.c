@@ -367,7 +367,6 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 		result = process_result(q, w, line, stoptime);
 	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status")) {
 		result = process_queue_status(q, w, line, stoptime);
-		link_close(w->link);
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
 	} else if (string_prefix_is(line, "auth")) {
@@ -1302,6 +1301,7 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 		}
 	}
 
+	link_write(l, "\n", 1, stoptime);
 	return 0;
 }
 
