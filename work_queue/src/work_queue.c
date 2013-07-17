@@ -2069,40 +2069,33 @@ static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q, struc
 
 static struct work_queue_worker *find_worker_by_random(struct work_queue *q, struct work_queue_task *t)
 {
-    char *key;
-    struct work_queue_worker *w;
-    struct work_queue_worker *prev_avail_worker = NULL;
-    int num_workers = hash_table_size(q->worker_table);
-    int random_worker;
+	char *key;
+	struct work_queue_worker *w = NULL;
+	struct list *valid_workers = list_create();
+	int random_worker;
 
-    if(num_workers > 0) {
-        random_worker = (rand() % num_workers) + 1;
-    } else {
-        return NULL;
-    }
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+		if(check_worker_against_task(q, w, t)) {
+			list_push_tail(valid_workers, w);
+		}
+	}
 
-    hash_table_firstkey(q->worker_table);
-    while(random_worker) {
-        hash_table_nextkey(q->worker_table, &key, (void **) &w);
-        if(!w) {
-            hash_table_firstkey(q->worker_table);
-            continue;
-        }
+	if(list_size(valid_workers) > 0) {
+		random_worker = (rand() % list_size(valid_workers)) + 1;
+	} else {
+		list_delete(valid_workers);
+		return NULL;
+	}
 
-        if(check_worker_against_task(q, w, t)) {
-            random_worker--;
-
-            if(w->cores_allocated + t->cores <= get_worker_cores(q, w)) {
-                if(random_worker == 0) {
-                    return w;
-                } else {
-                    prev_avail_worker = w;
-                }
-            } 
-        }
-    }
-
-    return prev_avail_worker;
+	w = NULL;
+	while(random_worker && list_size(valid_workers)) {
+		w = list_pop_head(valid_workers);
+		random_worker--;
+	}
+	list_delete(valid_workers);
+	
+	return w;
 }
 
 static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struct work_queue_task *t)
