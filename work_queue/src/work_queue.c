@@ -2070,37 +2070,31 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q, str
 {
 	char *key;
 	struct work_queue_worker *w = NULL;
-	int num_workers = hash_table_size(q->worker_table);
-	int random_worker, valid_worker = 0;
+	struct list *valid_workers = list_create();
+	int random_worker;
 
-	if(num_workers > 0) {
-		random_worker = (rand() % num_workers) + 1;
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+		if(check_worker_against_task(q, w, t)) {
+			list_push_tail(valid_workers, w);
+		}
+	}
+
+	if(list_size(valid_workers) > 0) {
+		random_worker = (rand() % list_size(valid_workers)) + 1;
 	} else {
+		list_delete(valid_workers);
 		return NULL;
 	}
 
-	hash_table_firstkey(q->worker_table);
-	while(random_worker) {
-		hash_table_nextkey(q->worker_table, &key, (void **) &w);
-		
-		if(!w) {
-			if(!valid_worker) return NULL;
-			hash_table_firstkey(q->worker_table);
-			continue;
-		}
-		
-		if(check_worker_against_task(q, w, t)) {
-			valid_worker = 1;
-			
-			if(!random_worker) {
-				return w;
-			} else {
-				random_worker--;
-			}
-		} 
+	w = NULL;
+	while(random_worker && list_size(valid_workers)) {
+		w = list_pop_head(valid_workers);
+		random_worker--;
 	}
+	list_delete(valid_workers);
 	
-	return NULL;
+	return w;
 }
 
 static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struct work_queue_task *t)
