@@ -1301,6 +1301,7 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 		}
 	}
 
+	link_write(l, "\n", 1, stoptime);
 	return 0;
 }
 
