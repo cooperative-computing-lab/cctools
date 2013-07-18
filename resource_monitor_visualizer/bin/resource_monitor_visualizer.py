@@ -2,6 +2,7 @@
 
 import os
 import sys
+import tempfile
 import warnings
 
 def make_path(path):
@@ -188,9 +189,9 @@ def generate_time_series_plot(resource, unit, data_path, column, out_path, width
   commands = fill_in_time_series_format(resource, unit, data_path, column, out_path, width, height)
   gnuplot(commands)
 
-def scale_time_series(source_directory, data_file, units, aggregate_data):
+def scale_time_series(source_directory, data_file, units, aggregate_data, workspace):
   start = -1
-  out_file_path = '/tmp/rmv/' + data_file + '.scaled'
+  out_file_path = os.path.join(workspace, data_file + '.scaled')
   out_stream = open(out_file_path, 'w')
   data_stream = open(source_directory + '/' + data_file, 'r')
   for line in data_stream:
@@ -215,7 +216,7 @@ def scale_time_series(source_directory, data_file, units, aggregate_data):
   out_stream.close()
   return out_file_path, aggregate_data
 
-def create_individual_pages(groups, destination_directory, name, resources, units, source_directory):
+def create_individual_pages(groups, destination_directory, name, resources, units, source_directory, workspace):
   aggregate_data = {}
   for group_name in groups:
     for task in groups[group_name]:
@@ -223,7 +224,7 @@ def create_individual_pages(groups, destination_directory, name, resources, unit
       has_timeseries = False
       if timeseries_file != None:
         has_timeseries = True
-        data_path, aggregate_data = scale_time_series(source_directory, timeseries_file, units, aggregate_data)
+        data_path, aggregate_data = scale_time_series(source_directory, timeseries_file, units, aggregate_data, workspace)
         column = 1
         for r in resources:
           out_path = destination_directory + '/' + group_name + '/' + r + '/' + rule_id_for_task(task) + '.png'
@@ -356,74 +357,83 @@ def main():
 
   make_path(destination_directory)
 
-  workspace = '/tmp/rmv'
-  make_path(workspace)
+  workspace = tempfile.mkdtemp('rmv')
 
-  summary_paths = find_summary_paths(source_directory)
+  try:
+    summary_paths = find_summary_paths(source_directory)
 
-  resource_units = {"wall_time": "s",
-                    "cpu_time": "s",
-                    "max_concurrent_processes": " ",
-                    "virtual_memory":  "MB",
-                    "resident_memory": "MB",
-                    "swap_memory":     "MB",
-                    "bytes_read":      "GB",
-                    "bytes_written":   "GB",
-                    "workdir_num_files": " ",
-                    "workdir_footprint": "GB"
-                   }
-  resources = [ "wall_time",
-                "cpu_time",
-                "max_concurrent_processes",
-                "virtual_memory",
-                "resident_memory",
-                "swap_memory",
-                "bytes_read",
-                "bytes_written",
-                "workdir_num_files",
-                "workdir_footprint"
-              ]
+    resource_units = {"wall_time": "s",
+                      "cpu_time": "s",
+                      "max_concurrent_processes": " ",
+                      "virtual_memory":  "MB",
+                      "resident_memory": "MB",
+                      "swap_memory":     "MB",
+                      "bytes_read":      "GB",
+                      "bytes_written":   "GB",
+                      "workdir_num_files": " ",
+                      "workdir_footprint": "GB"
+                     }
+    resources = [ "wall_time",
+                  "cpu_time",
+                  "max_concurrent_processes",
+                  "virtual_memory",
+                  "resident_memory",
+                  "swap_memory",
+                  "bytes_read",
+                  "bytes_written",
+                  "workdir_num_files",
+                  "workdir_footprint"
+                ]
 
-  groups = load_summaries_by_group(summary_paths)
+    print "Reading summaries..."
+    groups = load_summaries_by_group(summary_paths)
 
-  hist_large = 600
-  hist_small = 250
-  for r in resources:
-    unit = resource_units.get(r)
-    for group_name in groups:
-      maximums = find_maximums(groups[group_name], r)
-      maximums = scale_maximums(maximums, unit)
-      data_path = write_maximums(maximums, r, group_name, workspace)
+    print "Plotting summaries histograms..."
+    hist_large = 600
+    hist_small = 250
+    for r in resources:
+      unit = resource_units.get(r)
+      for group_name in groups:
+        maximums = find_maximums(groups[group_name], r)
+        maximums = scale_maximums(maximums, unit)
+        data_path = write_maximums(maximums, r, group_name, workspace)
 
-      out_path = destination_directory + "/" + group_name
-      make_path(out_path)
-      binwidth = compute_binwidth(max(maximums))
+        out_path = destination_directory + "/" + group_name
+        make_path(out_path)
+        binwidth = compute_binwidth(max(maximums))
 
-      image_path = out_path + "/" + r + "_" + str(hist_large) + "x" + str(hist_large) + "_hist.png"
-      gnuplot_format = fill_histogram_template(hist_large, hist_large, image_path, binwidth, r, unit, data_path)
-      gnuplot(gnuplot_format)
+        image_path = out_path + "/" + r + "_" + str(hist_large) + "x" + str(hist_large) + "_hist.png"
+        gnuplot_format = fill_histogram_template(hist_large, hist_large, image_path, binwidth, r, unit, data_path)
+        gnuplot(gnuplot_format)
 
-      image_path = out_path + "/" + r + "_" + str(hist_small) + "x" + str(hist_small) + "_hist.png"
-      gnuplot_format = fill_histogram_template(hist_small, hist_small, image_path, binwidth, r, unit, data_path)
-      gnuplot(gnuplot_format)
+        image_path = out_path + "/" + r + "_" + str(hist_small) + "x" + str(hist_small) + "_hist.png"
+        gnuplot_format = fill_histogram_template(hist_small, hist_small, image_path, binwidth, r, unit, data_path)
+        gnuplot(gnuplot_format)
 
-      resource_group_page(name, group_name, r, hist_large, hist_large, groups[group_name], out_path)
+        resource_group_page(name, group_name, r, hist_large, hist_large, groups[group_name], out_path)
 
-  aggregate_height = 500
-  aggregate_width = 1250
-  aggregate_data = create_individual_pages(groups, destination_directory, name, resources, resource_units, source_directory)
+    aggregate_height = 500
+    aggregate_width = 1250
+    aggregate_data = create_individual_pages(groups, destination_directory, name, resources, resource_units, source_directory, workspace)
 
-  time_series_exist = False
-  if aggregate_data != {}:
-    time_series_exist = True
-    write_aggregate_data(aggregate_data, resources, workspace)
-    create_aggregate_plots(resources, resource_units, workspace, destination_directory)
+    time_series_exist = False
+    if aggregate_data != {}:
+      print "Aggregating time series..."
+      time_series_exist = True
+      write_aggregate_data(aggregate_data, resources, workspace)
+      print "Plotting time series..."
+      create_aggregate_plots(resources, resource_units, workspace, destination_directory)
 
-  create_main_page(groups.keys(), name, resources, destination_directory, hist_small, hist_small, aggregate_height, aggregate_width, time_series_exist)
-  
-  lib_static_home = os.path.normpath(os.path.join(visualizer_home, 'lib/resource_monitor_visualizer_static'))
+    create_main_page(groups.keys(), name, resources, destination_directory, hist_small, hist_small, aggregate_height, aggregate_width, time_series_exist)
+    
+    lib_static_home = os.path.normpath(os.path.join(visualizer_home, 'lib/resource_monitor_visualizer_static'))
 
-  os.system("cp -r " + lib_static_home + "/* " + destination_directory)
-  os.system("rm -rf " + workspace)
+  finally:
+    print "Cleaning up..."
+    os.system("cp -r " + lib_static_home + "/* " + destination_directory)
+    os.system("rm -rf " + workspace)
 
-main()
+
+if __name__ == "__main__":
+  main()
+
