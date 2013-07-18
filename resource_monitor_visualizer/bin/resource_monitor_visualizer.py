@@ -59,7 +59,10 @@ def load_summaries_by_group(paths):
       data = [x.strip() for x in data]
       key = data[0]
       value = data[1]
+      if key == 'bytes_written' or key == 'bytes_read':
+        value = str(scale_value(data[1], 'MB')) + ' MB'
       summary[key] = value
+
     summary['filename'] = os.path.basename(sp)
 
     group_name = summary.get('command').split(' ')[0]
@@ -89,14 +92,14 @@ def fill_histogram_template(width, height, image_path, binwidth, resource_name, 
   result += "binwidth=" + str(binwidth) + "\n"
   result += "set boxwidth binwidth*0.9 absolute\n"
   result += "set style fill solid 0.5\n"
-  result += "bin(x,width)=width*floor(x/width)\n"
+  result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
   result += "set yrange [0:*]\n"
   result += "set xrange [0:*]\n"
   result += "set xlabel \"" + resource_name.replace('_', ' ')
   if unit != " ":
     result += " (" + unit + ")"
   result += "\"\n"
-  result += "plot \"" + data_path + "\" using (bin($1,binwidth)):(1.0) smooth freq w boxes\n"
+  result += "plot \"" + data_path + "\" using (binc($1,binwidth)):(1.0) smooth freq w boxes\n"
   return result
 
 def rule_id_for_task(task):
@@ -194,7 +197,7 @@ def fill_in_time_series_format(resource, unit, data_path, column, out_path, widt
   commands += "set bmargin 4\n"
   commands += "unset key\n"
   commands += 'set xlabel "Time (seconds)" offset 0,-2 character' + "\n"
-  commands += 'set ylabel "' + resource + unit + '" offset 0,-2 character' + "\n"
+  commands += 'set ylabel "' + resource.replace('_', ' ') + unit + '" offset 0,-2 character' + "\n"
   commands += 'set output "' + out_path + '"' + "\n"
   commands += "set yrange [0:*]\n"
   commands += "set xrange [0:*]\n"
@@ -390,11 +393,12 @@ def main():
                       "virtual_memory":  "MB",
                       "resident_memory": "MB",
                       "swap_memory":     "MB",
-                      "bytes_read":      "GB",
-                      "bytes_written":   "GB",
+                      "bytes_read":      "MB",
+                      "bytes_written":   "MB",
                       "workdir_num_files": " ",
                       "workdir_footprint": "GB"
                      }
+
     resources = [ "wall_time",
                   "cpu_time",
                   "max_concurrent_processes",
