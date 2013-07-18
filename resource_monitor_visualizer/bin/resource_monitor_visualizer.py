@@ -108,17 +108,35 @@ def resource_group_page(name, group_name, resource, width, height, tasks, out_pa
   page  = "<!doctype html>\n"
   page += "<meta name=\"viewport\" content=\"initial-scale=1.0, width=device-width\" />\n"
   page += '<link rel="stylesheet" type="text/css" media="screen, projection" href="../../css/style.css" />' + "\n"
-  page += "<title>Workflow</title>\n"
+  page += "<title>" + name + "</title>\n"
   page += "<div class=\"content\">\n"
-  page += "<h1><a href=\"../../index.html\">" + name + "</a> - " + group_name + " - " + resource + "</h1>\n"
+  page += "<p> Showing <tt>" + resource.replace('_', ' ') + "</tt> for executable <tt>" + group_name + "</tt> in workflow <tt><a href=\"../../index.html\">" + name + "</a></tt>\n"
   page += "<img src=\"../" + resource + "_" + str(width) + "x" + str(height) + "_hist.png\" class=\"center\" />\n"
   page += "<table>\n"
-  page += "<tr><th>Rule Id</th><th>" + resource.replace('_', ' ') +  "</th></tr>\n"
+
+  columns = min(4, len(tasks))
+  header  = "<th>id</th><th>" + resource.replace('_', ' ') +  "</th>"
+
+  page += "<tr>"
+  page += header * columns
+  page += "</tr>\n"
+
   comp = lambda x,y: cmp(float(x.get(resource).split(' ')[0]), float(y.get(resource).split(' ')[0]))
   sorted_tasks = sorted(tasks, comp, reverse=True)
+
+  count = 0
   for d in sorted_tasks:
+    if(count % columns == 0):
+      page += "<tr>"
+
     rule_id = rule_id_for_task(d)
-    page += "<tr><td><a href=\"../" + rule_id + ".html\">" + rule_id + "</a></td><td>" + str(d.get(resource)) + "</td></tr>\n"
+    page += "<td><a href=\"../" + rule_id + ".html\">" + rule_id + "</a></td><td>" + str(d.get(resource)) + "</td>"
+
+    if(count % columns == (columns - 1)):
+      page += "</tr>\n"
+
+    count += 1
+
   page += "</table>\n"
   page += "</div>\n"
 
@@ -233,14 +251,18 @@ def create_individual_pages(groups, destination_directory, name, resources, unit
           column += 1
       page  = "<html>\n"
       page += '<link rel="stylesheet" type="text/css" media="screen, projection" href="../css/style.css" />' + "\n"
-      page += "<h1><a href=\"../index.html\">" + name + "</a> - " + group_name + " - " + rule_id_for_task(task) + "</h1>\n"
+
+      page += "<p> Showing task <tt>" + rule_id_for_task(task) + "</tt> in workflow <tt><a href=\"../index.html\">" + name + "</a></tt><br><br>\n"
+
       page += "<table>\n"
-      page += "<tr><td>command</td><td>" + task.get('command') + "</td></tr>\n"
+      page += "<tr><td>command</td><td></td><td>" + task.get('command') + "</td></tr>\n"
       for r in resources:
         page += "<tr><td><a href=\"" + r + "/index.html\">" + r + "</a></td><td>" + task.get(r) + "</td>"
         if has_timeseries and r != 'wall_time':
           image_path = r + '/' + rule_id_for_task(task) + '.png'
           page += '<td><img src="' + image_path +'" /></td>'
+        else:
+          page += '<td></td>'
         page += "</tr>\n"
       page += "</html>\n"
       f = open(destination_directory + "/" + group_name + "/" + rule_id_for_task(task) + ".html", "w")
@@ -427,10 +449,10 @@ def main():
     create_main_page(groups.keys(), name, resources, destination_directory, hist_small, hist_small, aggregate_height, aggregate_width, time_series_exist)
     
     lib_static_home = os.path.normpath(os.path.join(visualizer_home, 'lib/resource_monitor_visualizer_static'))
+    os.system("cp -r " + lib_static_home + "/* " + destination_directory)
 
   finally:
     print "Cleaning up..."
-    os.system("cp -r " + lib_static_home + "/* " + destination_directory)
     os.system("rm -rf " + workspace)
 
 
