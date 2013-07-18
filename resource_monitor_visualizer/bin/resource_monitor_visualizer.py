@@ -19,7 +19,12 @@ def source_exists(path):
     sys.exit(1)
 
 def usage():
-  print "Usage: " + __file__ + " source destination name\n See man page for more information."
+  print "\nUsage: " + __file__ + " data_path destination_path workflow_name"
+  print "\nWhere:"
+  print "\tdata_path\t\tThe path to the data recorded by the resource_monitor."
+  print "\tdestination_path\tThe path in which to store the visualization."
+  print "\tworkflow_name\t\tThe name of the workflow being visualized."
+  print ""
 
 def get_args():
   if len(sys.argv) == 2 and (sys.argv[1] == "-h" or sys.argv[1] == "--help"):
