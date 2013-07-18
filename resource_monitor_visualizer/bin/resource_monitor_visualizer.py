@@ -2,6 +2,7 @@
 
 import os
 import sys
+import warnings
 
 def make_path(path):
   try:
@@ -106,7 +107,7 @@ def resource_group_page(name, group_name, resource, width, height, tasks, out_pa
   page += "<h1><a href=\"../../index.html\">" + name + "</a> - " + group_name + " - " + resource + "</h1>\n"
   page += "<img src=\"../" + resource + "_" + str(width) + "x" + str(height) + "_hist.png\" class=\"center\" />\n"
   page += "<table>\n"
-  page += "<tr><th>Rule Id</th><th>Maximum " + resource +  "</th></tr>\n"
+  page += "<tr><th>Rule Id</th><th>" + resource.replace('_', ' ') +  "</th></tr>\n"
   comp = lambda x,y: cmp(float(x.get(resource).split(' ')[0]), float(y.get(resource).split(' ')[0]))
   sorted_tasks = sorted(tasks, comp, reverse=True)
   for d in sorted_tasks:
@@ -334,6 +335,8 @@ def scale_value(initial, target_unit=" "):
 
 
 def main():
+  warnings.filterwarnings("ignore", category=DeprecationWarning)
+
   GNUPLOT_VERSION = find_gnuplot_version()
 
   visualizer_home = os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
