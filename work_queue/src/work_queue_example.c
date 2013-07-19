@@ -28,8 +28,8 @@ int main(int argc, char *argv[])
 	char *url_base, *filename;
 
 	if(argc < 3) {
-                printf("work_queue_example <executable> <url1> [url2] [url3] ...\n");
-                printf("Each url given on the command line will be downloaded and compressed using a remote worker.\n");
+                printf("work_queue_example <executable> <url> [iterations]\n");
+                printf("The url given on the command line will be downloaded and compressed the given number of iterations\n using remote workers.\n");
                 return 0;
         }
 
@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
 	}
 
 	work_queue_tune(q, "short-timeout", 60);
-        work_queue_specify_name(q,"numbtest");
+        work_queue_specify_name(q,"test_url");
         work_queue_specify_master_mode(q,WORK_QUEUE_MASTER_MODE_CATALOG);
 
 	printf("listening on port %d...\n", work_queue_port(q));
@@ -56,8 +56,8 @@ int main(int argc, char *argv[])
                 char* infile;
 
                 sprintf(url, "%s/%s", url_base, filename);
-                sprintf(outfile, "%s.gz", filename);                    
-                sprintf(command, "./gzip < %s > %s", filename, outfile);
+                sprintf(outfile, "%s-%d.gz", filename, i);                    
+                sprintf(command, "./gzip < %s > %s && sleep 45s", filename, outfile);
 
 		t = work_queue_task_create(command);	
 
@@ -73,6 +73,7 @@ int main(int argc, char *argv[])
                         printf("task_specify_url() failed for %s: check if arguments are null or remote name is an absolute path.\n", url);
                         return 1;
                 }
+
 
 		taskid = work_queue_submit(q, t);
 
