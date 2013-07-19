@@ -196,7 +196,7 @@ class Task(_object):
 
     ##
     # Indicate the disk space (in MB) required by this task.
-    def specify_disk( self, cores ):
+    def specify_disk( self, disk ):
         return work_queue_task_specify_disk(self._task,disk)
 
     ##
