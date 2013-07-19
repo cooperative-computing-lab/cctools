@@ -2,6 +2,9 @@
 
 import os
 import sys
+import math
+import tempfile
+import warnings
 
 def make_path(path):
   try:
@@ -18,7 +21,12 @@ def source_exists(path):
     sys.exit(1)
 
 def usage():
-  print "Usage: " + __file__ + " source destination name\n See man page for more information."
+  print "\nUsage: " + __file__ + " data_path destination_path workflow_name"
+  print "\nWhere:"
+  print "\tdata_path\t\tThe path to the data recorded by the resource_monitor."
+  print "\tdestination_path\tThe path in which to store the visualization."
+  print "\tworkflow_name\t\tThe name of the workflow being visualized."
+  print ""
 
 def get_args():
   if len(sys.argv) == 2 and (sys.argv[1] == "-h" or sys.argv[1] == "--help"):
@@ -52,7 +60,10 @@ def load_summaries_by_group(paths):
       data = [x.strip() for x in data]
       key = data[0]
       value = data[1]
+      if key == 'bytes_written' or key == 'bytes_read':
+        value = str(scale_value(data[1], 'MB')) + ' MB'
       summary[key] = value
+
     summary['filename'] = os.path.basename(sp)
 
     group_name = summary.get('command').split(' ')[0]
@@ -74,22 +85,62 @@ def gnuplot(commands):
   child_stdout.close()
   child_stderr.close()
 
-def fill_histogram_template(width, height, image_path, binwidth, resource_name, unit, data_path):
+def fill_histogram_table_template(width, height, table_path, binwidth, resource_name, unit, data_path):
+  result  = "set table \"" + table_path + "\"\n"
+  result += "binwidth=" + str(binwidth) + "\n"
+  result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
+  result += "plot \"" + data_path + "\" using (binc($1,binwidth)):(1.0) smooth freq\n"
+  result += "unset table"
+  return result
+
+def fill_histogram_template(max_sorted, width, height, image_path, binwidth, resource_name, unit, data_path):
+  n     = len(max_sorted)
+  min_x = max_sorted[0]
+  max_x = max_sorted[-1]
+  nbins = math.floor((max_x - min_x)/binwidth) - 2
+  if(nbins < 2):
+    nbins = 1
+
   result  = "set terminal png transparent size " + str(width) + "," + str(height) + "\n"
   result += "unset key\n"
   result += "set ylabel \"Frequency\"\n"
   result += "set output \"" + image_path + "\"\n"
   result += "binwidth=" + str(binwidth) + "\n"
-  result += "set boxwidth binwidth*0.9 absolute\n"
   result += "set style fill solid 0.5\n"
-  result += "bin(x,width)=width*floor(x/width)\n"
+
+  if(n < 3 or nbins < 2): 
+    result += "set boxwidth binwidth*0.1 absolute\n"
+    result += "binc(x,w)=x\n"
+  elif(nbins > 40):
+    result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
+    result += "set boxwidth binwidth*5 absolute\n"
+  else:
+    result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
+    result += "set boxwidth binwidth*0.9 absolute\n"
+
+  result += "set tics nomirror\n"
   result += "set yrange [0:*]\n"
-  result += "set xrange [0:*]\n"
+
+  #handle corner cases for xrange
+  if n == 1 and min_x == 0:
+    result += "set xrange [-0.01:1]\n"
+    result += "set xtics (\"0\" 0, \"1\" 1)\n"
+  elif nbins < 2:
+    result += "set xrange [0:" + str(max_x + 0.25*max_x) + "]\n"
+    result += "set xtics (\"0\" 0, \"" + str(round(max_x)) + "\" " + str(max_x) + ")\n"
+  else:
+    quatr  = (max_x - min_x)/3
+    result += "set xrange [" + str(min_x - binwidth/10) + ":" + str(max_x + binwidth/10) + "]\n"
+    result += "set xtics (%3.1f, %3.1f, %3.1f, %3.1f)\n" % (min_x, quatr + min_x, max_x - quatr, max_x)
+
+
   result += "set xlabel \"" + resource_name.replace('_', ' ')
   if unit != " ":
     result += " (" + unit + ")"
   result += "\"\n"
-  result += "plot \"" + data_path + "\" using (bin($1,binwidth)):(1.0) smooth freq w boxes\n"
+
+
+  result += "plot \"" + data_path + "\" using (binc($1,binwidth)):(1.0) smooth freq w boxes\n"
   return result
 
 def rule_id_for_task(task):
@@ -101,17 +152,35 @@ def resource_group_page(name, group_name, resource, width, height, tasks, out_pa
   page  = "<!doctype html>\n"
   page += "<meta name=\"viewport\" content=\"initial-scale=1.0, width=device-width\" />\n"
   page += '<link rel="stylesheet" type="text/css" media="screen, projection" href="../../css/style.css" />' + "\n"
-  page += "<title>Workflow</title>\n"
+  page += "<title>" + name + "</title>\n"
   page += "<div class=\"content\">\n"
-  page += "<h1><a href=\"../../index.html\">" + name + "</a> - " + group_name + " - " + resource + "</h1>\n"
+  page += "<p> Showing <tt>" + resource.replace('_', ' ') + "</tt> for executable <tt>" + group_name + "</tt> in workflow <tt><a href=\"../../index.html\">" + name + "</a></tt>\n"
   page += "<img src=\"../" + resource + "_" + str(width) + "x" + str(height) + "_hist.png\" class=\"center\" />\n"
   page += "<table>\n"
-  page += "<tr><th>Rule Id</th><th>Maximum " + resource +  "</th></tr>\n"
+
+  columns = min(4, len(tasks))
+  header  = "<th>id</th><th>" + resource.replace('_', ' ') +  "</th>"
+
+  page += "<tr>"
+  page += header * columns
+  page += "</tr>\n"
+
   comp = lambda x,y: cmp(float(x.get(resource).split(' ')[0]), float(y.get(resource).split(' ')[0]))
   sorted_tasks = sorted(tasks, comp, reverse=True)
+
+  count = 0
   for d in sorted_tasks:
+    if(count % columns == 0):
+      page += "<tr>"
+
     rule_id = rule_id_for_task(d)
-    page += "<tr><td><a href=\"../" + rule_id + ".html\">" + rule_id + "</a></td><td>" + str(d.get(resource)) + "</td></tr>\n"
+    page += "<td><a href=\"../" + rule_id + ".html\">" + rule_id + "</a></td><td>" + str(d.get(resource)) + "</td>"
+
+    if(count % columns == (columns - 1)):
+      page += "</tr>\n"
+
+    count += 1
+
   page += "</table>\n"
   page += "</div>\n"
 
@@ -128,6 +197,16 @@ def compute_binwidth(maximum_value):
   else:
     binwidth = 1
   return binwidth
+
+def compute_binwidth_iqr(maximums):
+  n  = len(maximums)
+  q1 = math.ceil(n / 4.0) 
+  q3 = math.floor(n / 4.0) 
+
+  if(q1 >= q3):
+    return 1
+  else:
+    return 2*(q3 - q1)*math.pow(float(n), float(-1)/3)
 
 def find_maximums(tasks, resource):
   maximums = []
@@ -169,7 +248,7 @@ def fill_in_time_series_format(resource, unit, data_path, column, out_path, widt
   commands += "set bmargin 4\n"
   commands += "unset key\n"
   commands += 'set xlabel "Time (seconds)" offset 0,-2 character' + "\n"
-  commands += 'set ylabel "' + resource + unit + '" offset 0,-2 character' + "\n"
+  commands += 'set ylabel "' + resource.replace('_', ' ') + unit + '" offset 0,-2 character' + "\n"
   commands += 'set output "' + out_path + '"' + "\n"
   commands += "set yrange [0:*]\n"
   commands += "set xrange [0:*]\n"
@@ -182,9 +261,9 @@ def generate_time_series_plot(resource, unit, data_path, column, out_path, width
   commands = fill_in_time_series_format(resource, unit, data_path, column, out_path, width, height)
   gnuplot(commands)
 
-def scale_time_series(source_directory, data_file, units, aggregate_data):
+def scale_time_series(source_directory, data_file, units, aggregate_data, workspace):
   start = -1
-  out_file_path = '/tmp/rmv/' + data_file + '.scaled'
+  out_file_path = os.path.join(workspace, data_file + '.scaled')
   out_stream = open(out_file_path, 'w')
   data_stream = open(source_directory + '/' + data_file, 'r')
   for line in data_stream:
@@ -209,7 +288,7 @@ def scale_time_series(source_directory, data_file, units, aggregate_data):
   out_stream.close()
   return out_file_path, aggregate_data
 
-def create_individual_pages(groups, destination_directory, name, resources, units, source_directory):
+def create_individual_pages(groups, destination_directory, name, resources, units, source_directory, workspace):
   aggregate_data = {}
   for group_name in groups:
     for task in groups[group_name]:
@@ -217,7 +296,7 @@ def create_individual_pages(groups, destination_directory, name, resources, unit
       has_timeseries = False
       if timeseries_file != None:
         has_timeseries = True
-        data_path, aggregate_data = scale_time_series(source_directory, timeseries_file, units, aggregate_data)
+        data_path, aggregate_data = scale_time_series(source_directory, timeseries_file, units, aggregate_data, workspace)
         column = 1
         for r in resources:
           out_path = destination_directory + '/' + group_name + '/' + r + '/' + rule_id_for_task(task) + '.png'
@@ -226,14 +305,18 @@ def create_individual_pages(groups, destination_directory, name, resources, unit
           column += 1
       page  = "<html>\n"
       page += '<link rel="stylesheet" type="text/css" media="screen, projection" href="../css/style.css" />' + "\n"
-      page += "<h1><a href=\"../index.html\">" + name + "</a> - " + group_name + " - " + rule_id_for_task(task) + "</h1>\n"
+
+      page += "<p> Showing task <tt>" + rule_id_for_task(task) + "</tt> in workflow <tt><a href=\"../index.html\">" + name + "</a></tt><br><br>\n"
+
       page += "<table>\n"
-      page += "<tr><td>command</td><td>" + task.get('command') + "</td></tr>\n"
+      page += "<tr><td>command</td><td></td><td>" + task.get('command') + "</td></tr>\n"
       for r in resources:
         page += "<tr><td><a href=\"" + r + "/index.html\">" + r + "</a></td><td>" + task.get(r) + "</td>"
         if has_timeseries and r != 'wall_time':
           image_path = r + '/' + rule_id_for_task(task) + '.png'
           page += '<td><img src="' + image_path +'" /></td>'
+        else:
+          page += '<td></td>'
         page += "</tr>\n"
       page += "</html>\n"
       f = open(destination_directory + "/" + group_name + "/" + rule_id_for_task(task) + ".html", "w")
@@ -334,6 +417,8 @@ def scale_value(initial, target_unit=" "):
 
 
 def main():
+  warnings.filterwarnings("ignore", category=DeprecationWarning)
+
   GNUPLOT_VERSION = find_gnuplot_version()
 
   visualizer_home = os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
@@ -348,74 +433,93 @@ def main():
 
   make_path(destination_directory)
 
-  workspace = '/tmp/rmv'
-  make_path(workspace)
+  workspace = tempfile.mkdtemp('rmv')
 
-  summary_paths = find_summary_paths(source_directory)
+  try:
+    summary_paths = find_summary_paths(source_directory)
 
-  resource_units = {"wall_time": "s",
-                    "cpu_time": "s",
-                    "max_concurrent_processes": " ",
-                    "virtual_memory":  "MB",
-                    "resident_memory": "MB",
-                    "swap_memory":     "MB",
-                    "bytes_read":      "GB",
-                    "bytes_written":   "GB",
-                    "workdir_num_files": " ",
-                    "workdir_footprint": "GB"
-                   }
-  resources = [ "wall_time",
-                "cpu_time",
-                "max_concurrent_processes",
-                "virtual_memory",
-                "resident_memory",
-                "swap_memory",
-                "bytes_read",
-                "bytes_written",
-                "workdir_num_files",
-                "workdir_footprint"
-              ]
+    resource_units = {"wall_time": "s",
+                      "cpu_time": "s",
+                      "max_concurrent_processes": " ",
+                      "virtual_memory":  "MB",
+                      "resident_memory": "MB",
+                      "swap_memory":     "MB",
+                      "bytes_read":      "MB",
+                      "bytes_written":   "MB",
+                      "workdir_num_files": " ",
+                      "workdir_footprint": "MB"
+                     }
 
-  groups = load_summaries_by_group(summary_paths)
+    resources = [ "wall_time",
+                  "cpu_time",
+                  "max_concurrent_processes",
+                  "virtual_memory",
+                  "resident_memory",
+                  "swap_memory",
+                  "bytes_read",
+                  "bytes_written",
+                  "workdir_num_files",
+                  "workdir_footprint"
+                ]
 
-  hist_large = 600
-  hist_small = 250
-  for r in resources:
-    unit = resource_units.get(r)
-    for group_name in groups:
-      maximums = find_maximums(groups[group_name], r)
-      maximums = scale_maximums(maximums, unit)
-      data_path = write_maximums(maximums, r, group_name, workspace)
+    print "Reading summaries..."
+    groups = load_summaries_by_group(summary_paths)
 
-      out_path = destination_directory + "/" + group_name
-      make_path(out_path)
-      binwidth = compute_binwidth(max(maximums))
+    print "Plotting summaries histograms..."
+    hist_large = 600
+    hist_small = 250
+    for r in resources:
+      unit = resource_units.get(r)
+      for group_name in groups:
+        maximums = find_maximums(groups[group_name], r)
+        maximums = scale_maximums(maximums, unit)
+        max_sorted = sorted(maximums)
+        data_path = write_maximums(maximums, r, group_name, workspace)
 
-      image_path = out_path + "/" + r + "_" + str(hist_large) + "x" + str(hist_large) + "_hist.png"
-      gnuplot_format = fill_histogram_template(hist_large, hist_large, image_path, binwidth, r, unit, data_path)
-      gnuplot(gnuplot_format)
+        out_path = destination_directory + "/" + group_name
+        make_path(out_path)
+        binwidth = compute_binwidth_iqr(sorted(maximums))
 
-      image_path = out_path + "/" + r + "_" + str(hist_small) + "x" + str(hist_small) + "_hist.png"
-      gnuplot_format = fill_histogram_template(hist_small, hist_small, image_path, binwidth, r, unit, data_path)
-      gnuplot(gnuplot_format)
+        table_path = out_path + "/" + r + "_" + str(hist_large) + "x" + str(hist_large) + "_hist.dat"
+        gnuplot_format = fill_histogram_table_template(hist_large, hist_large, table_path, binwidth, r, unit, data_path)
+        gnuplot(gnuplot_format)
 
-      resource_group_page(name, group_name, r, hist_large, hist_large, groups[group_name], out_path)
+        table_path = out_path + "/" + r + "_" + str(hist_small) + "x" + str(hist_small) + "_hist.dat"
+        gnuplot_format = fill_histogram_table_template(hist_small, hist_small, table_path, binwidth, r, unit, data_path)
+        gnuplot(gnuplot_format)
 
-  aggregate_height = 500
-  aggregate_width = 1250
-  aggregate_data = create_individual_pages(groups, destination_directory, name, resources, resource_units, source_directory)
+        image_path = out_path + "/" + r + "_" + str(hist_large) + "x" + str(hist_large) + "_hist.png"
+        gnuplot_format = fill_histogram_template(max_sorted, hist_large, hist_large, image_path, binwidth, r, unit, data_path)
+        gnuplot(gnuplot_format)
 
-  time_series_exist = False
-  if aggregate_data != {}:
-    time_series_exist = True
-    write_aggregate_data(aggregate_data, resources, workspace)
-    create_aggregate_plots(resources, resource_units, workspace, destination_directory)
+        image_path = out_path + "/" + r + "_" + str(hist_small) + "x" + str(hist_small) + "_hist.png"
+        gnuplot_format = fill_histogram_template(max_sorted, hist_small, hist_small, image_path, binwidth, r, unit, data_path)
+        gnuplot(gnuplot_format)
 
-  create_main_page(groups.keys(), name, resources, destination_directory, hist_small, hist_small, aggregate_height, aggregate_width, time_series_exist)
-  
-  lib_static_home = os.path.normpath(os.path.join(visualizer_home, 'lib/resource_monitor_visualizer_static'))
+        resource_group_page(name, group_name, r, hist_large, hist_large, groups[group_name], out_path)
 
-  os.system("cp -r " + lib_static_home + "/* " + destination_directory)
-  os.system("rm -rf " + workspace)
+    aggregate_height = 500
+    aggregate_width = 1250
+    aggregate_data = create_individual_pages(groups, destination_directory, name, resources, resource_units, source_directory, workspace)
 
-main()
+    time_series_exist = False
+    if aggregate_data != {}:
+      print "Aggregating time series..."
+      time_series_exist = True
+      write_aggregate_data(aggregate_data, resources, workspace)
+      print "Plotting time series..."
+      create_aggregate_plots(resources, resource_units, workspace, destination_directory)
+
+    create_main_page(groups.keys(), name, resources, destination_directory, hist_small, hist_small, aggregate_height, aggregate_width, time_series_exist)
+    
+    lib_static_home = os.path.normpath(os.path.join(visualizer_home, 'lib/resource_monitor_visualizer_static'))
+    os.system("cp -r " + lib_static_home + "/* " + destination_directory)
+
+  finally:
+    print "Cleaning up..."
+    os.system("rm -rf " + workspace)
+
+
+if __name__ == "__main__":
+  main()
+
