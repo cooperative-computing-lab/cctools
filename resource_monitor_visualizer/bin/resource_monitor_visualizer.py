@@ -109,27 +109,37 @@ def fill_histogram_template(max_sorted, width, height, image_path, binwidth, res
   result += "set style fill solid 0.5\n"
 
   if(n < 3 or nbins < 2): 
-    result += "set boxwidth binwidth*0.25 absolute\n"
+    result += "set boxwidth binwidth*0.1 absolute\n"
     result += "binc(x,w)=x\n"
-  else:
-    result += "set boxwidth binwidth*0.9 absoulte\n"
+  elif(nbins > 40):
     result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
+    result += "set boxwidth binwidth*5 absolute\n"
+  else:
+    result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
+    result += "set boxwidth binwidth*0.9 absolute\n"
 
+  result += "set tics nomirror\n"
   result += "set yrange [0:*]\n"
 
   #handle corner cases for xrange
   if n == 1 and min_x == 0:
     result += "set xrange [-0.01:1]\n"
+    result += "set xtics (\"0\" 0, \"1\" 1)\n"
   elif nbins < 2:
     result += "set xrange [0:" + str(max_x + 0.25*max_x) + "]\n"
+    result += "set xtics (\"0\" 0, \"" + str(round(max_x)) + "\" " + str(max_x) + ")\n"
   else:
-    result += "set xrange [" + str(min_x-binwidth/100.0) + ":" + str(max_x+binwidth/100.0) + "]\n"
+    quatr  = (max_x - min_x)/3
+    result += "set xrange [" + str(min_x - binwidth/10) + ":" + str(max_x + binwidth/10) + "]\n"
+    result += "set xtics (%3.1f, %3.1f, %3.1f, %3.1f)\n" % (min_x, quatr + min_x, max_x - quatr, max_x)
+
 
   result += "set xlabel \"" + resource_name.replace('_', ' ')
-
   if unit != " ":
     result += " (" + unit + ")"
   result += "\"\n"
+
+
   result += "plot \"" + data_path + "\" using (binc($1,binwidth)):(1.0) smooth freq w boxes\n"
   return result
 
