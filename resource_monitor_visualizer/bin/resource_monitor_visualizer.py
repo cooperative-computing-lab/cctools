@@ -2,6 +2,7 @@
 
 import os
 import sys
+import math
 import tempfile
 import warnings
 
@@ -84,18 +85,48 @@ def gnuplot(commands):
   child_stdout.close()
   child_stderr.close()
 
-def fill_histogram_template(width, height, image_path, binwidth, resource_name, unit, data_path):
+def fill_histogram_table_template(width, height, table_path, binwidth, resource_name, unit, data_path):
+  result  = "set table \"" + table_path + "\"\n"
+  result += "binwidth=" + str(binwidth) + "\n"
+  result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
+  result += "plot \"" + data_path + "\" using (binc($1,binwidth)):(1.0) smooth freq\n"
+  result += "unset table"
+  return result
+
+def fill_histogram_template(max_sorted, width, height, image_path, binwidth, resource_name, unit, data_path):
+  n     = len(max_sorted)
+  min_x = max_sorted[0]
+  max_x = max_sorted[-1]
+  nbins = math.floor((max_x - min_x)/binwidth) - 2
+  if(nbins < 2):
+    nbins = 1
+
   result  = "set terminal png transparent size " + str(width) + "," + str(height) + "\n"
   result += "unset key\n"
   result += "set ylabel \"Frequency\"\n"
   result += "set output \"" + image_path + "\"\n"
   result += "binwidth=" + str(binwidth) + "\n"
-  result += "set boxwidth binwidth*0.9 absolute\n"
   result += "set style fill solid 0.5\n"
-  result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
+
+  if(n < 3 or nbins < 2): 
+    result += "set boxwidth binwidth*0.25 absolute\n"
+    result += "binc(x,w)=x\n"
+  else:
+    result += "set boxwidth binwidth*0.9 absoulte\n"
+    result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
+
   result += "set yrange [0:*]\n"
-  result += "set xrange [0:*]\n"
+
+  #handle corner cases for xrange
+  if n == 1 and min_x == 0:
+    result += "set xrange [-0.01:1]\n"
+  elif nbins < 2:
+    result += "set xrange [0:" + str(max_x + 0.25*max_x) + "]\n"
+  else:
+    result += "set xrange [" + str(min_x-binwidth/100.0) + ":" + str(max_x+binwidth/100.0) + "]\n"
+
   result += "set xlabel \"" + resource_name.replace('_', ' ')
+
   if unit != " ":
     result += " (" + unit + ")"
   result += "\"\n"
@@ -156,6 +187,16 @@ def compute_binwidth(maximum_value):
   else:
     binwidth = 1
   return binwidth
+
+def compute_binwidth_iqr(maximums):
+  n  = len(maximums)
+  q1 = math.ceil(n / 4.0) 
+  q3 = math.floor(n / 4.0) 
+
+  if(q1 >= q3):
+    return 1
+  else:
+    return 2*(q3 - q1)*math.pow(float(n), float(-1)/3)
 
 def find_maximums(tasks, resource):
   maximums = []
@@ -396,7 +437,7 @@ def main():
                       "bytes_read":      "MB",
                       "bytes_written":   "MB",
                       "workdir_num_files": " ",
-                      "workdir_footprint": "GB"
+                      "workdir_footprint": "MB"
                      }
 
     resources = [ "wall_time",
@@ -422,18 +463,27 @@ def main():
       for group_name in groups:
         maximums = find_maximums(groups[group_name], r)
         maximums = scale_maximums(maximums, unit)
+        max_sorted = sorted(maximums)
         data_path = write_maximums(maximums, r, group_name, workspace)
 
         out_path = destination_directory + "/" + group_name
         make_path(out_path)
-        binwidth = compute_binwidth(max(maximums))
+        binwidth = compute_binwidth_iqr(sorted(maximums))
+
+        table_path = out_path + "/" + r + "_" + str(hist_large) + "x" + str(hist_large) + "_hist.dat"
+        gnuplot_format = fill_histogram_table_template(hist_large, hist_large, table_path, binwidth, r, unit, data_path)
+        gnuplot(gnuplot_format)
+
+        table_path = out_path + "/" + r + "_" + str(hist_small) + "x" + str(hist_small) + "_hist.dat"
+        gnuplot_format = fill_histogram_table_template(hist_small, hist_small, table_path, binwidth, r, unit, data_path)
+        gnuplot(gnuplot_format)
 
         image_path = out_path + "/" + r + "_" + str(hist_large) + "x" + str(hist_large) + "_hist.png"
-        gnuplot_format = fill_histogram_template(hist_large, hist_large, image_path, binwidth, r, unit, data_path)
+        gnuplot_format = fill_histogram_template(max_sorted, hist_large, hist_large, image_path, binwidth, r, unit, data_path)
         gnuplot(gnuplot_format)
 
         image_path = out_path + "/" + r + "_" + str(hist_small) + "x" + str(hist_small) + "_hist.png"
-        gnuplot_format = fill_histogram_template(hist_small, hist_small, image_path, binwidth, r, unit, data_path)
+        gnuplot_format = fill_histogram_template(max_sorted, hist_small, hist_small, image_path, binwidth, r, unit, data_path)
         gnuplot(gnuplot_format)
 
         resource_group_page(name, group_name, r, hist_large, hist_large, groups[group_name], out_path)
