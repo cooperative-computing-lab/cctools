@@ -5,6 +5,7 @@ import sys
 import math
 import tempfile
 import warnings
+import subprocess
 
 def make_path(path):
   try:
@@ -79,21 +80,32 @@ def load_summaries_by_group(paths):
   return groups
 
 def gnuplot(commands):
-  (child_stdin, child_stdout, child_stderr) = os.popen3("gnuplot")
-  child_stdin.write("%s\n" % commands)
-  child_stdin.close()
-  child_stdout.close()
-  child_stderr.close()
+  child = subprocess.Popen("gnuplot", stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+  child.stdin.write("%s\n" % commands)
+  child.stdin.write("quit\n")
+  child.stdin.flush()
+  child.wait()
 
-def fill_histogram_table_template(width, height, table_path, binwidth, resource_name, unit, data_path):
+def fill_histogram_table_template(max_sorted, table_path, binwidth, data_path):
+  n     = len(max_sorted)
+  min_x = max_sorted[0]
+  max_x = max_sorted[-1]
+
+  nbins = math.floor((max_x - min_x)/binwidth) - 2
   result  = "set table \"" + table_path + "\"\n"
   result += "binwidth=" + str(binwidth) + "\n"
-  result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
+
+  if(n < 3 or nbins < 3):
+    result += "binc(x,w)=x\n"
+  else:
+    result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
+
   result += "plot \"" + data_path + "\" using (binc($1,binwidth)):(1.0) smooth freq\n"
-  result += "unset table"
+  result += "unset table\n\n"
+
   return result
 
-def fill_histogram_template(max_sorted, width, height, image_path, binwidth, resource_name, unit, data_path):
+def fill_histogram_template(max_sorted, width, height, image_path, binwidth, resource_name, unit, table_path):
   n     = len(max_sorted)
   min_x = max_sorted[0]
   max_x = max_sorted[-1]
@@ -110,13 +122,10 @@ def fill_histogram_template(max_sorted, width, height, image_path, binwidth, res
   result += "set style fill solid 0.5\n"
 
   if(n < 3 or nbins < 3):
-    result += "binc(x,w)=x\n"
     result += "set boxwidth 2.0 relative\n"
   elif(nbins > 50):
-    result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
     result += "set boxwidth 1.0 relative\n"
   else:
-    result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
     result += "set boxwidth 0.9*binwidth absolute\n"
 
   result += "set tics nomirror scale 0.25\n"
@@ -140,7 +149,7 @@ def fill_histogram_template(max_sorted, width, height, image_path, binwidth, res
     result += " (" + unit + ")"
   result += "\"\n"
 
-  result += "plot \"" + data_path + "\" using (binc($1,binwidth)):(1.0) smooth freq w boxes\n"
+  result += "plot \"" + table_path + "\" using 1:(stringcolumn(3) eq \"i\"? $2:1/0) w boxes\n"
   return result
 
 def rule_id_for_task(task):
