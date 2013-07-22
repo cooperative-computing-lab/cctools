@@ -17,9 +17,16 @@ border: solid 1px black;
 padding: 5px;
 margin: 20px;
 }
+
+td
+{
+    text-align: right;
+    border: 1px solid black
+}
+
 </style>
 <h1>Makeflow User's Manual</h1>
-<b>Last Updated April 2013</b>
+<b>Last Updated July 2013</b>
 <p>
 Makeflow is Copyright (C) 2009 The University of Notre Dame.
 This software is distributed under the GNU General Public License.
@@ -225,7 +232,102 @@ Makeflow does not support all of the syntax that you find in various versions of
 
 Certain jobs don't make much sense to distribute.  For example, if you have a very fast running job that consumes a large amount of data, then it should simply run on the same machine as Makeflow.  To force this, simply add the word <tt>LOCAL</tt> to the beginning of the command line in the rule.
 
+<h3>Jobs Categories</h3>
+
+Makeflow has the capability of automatically setting the cores, memory,
+and disk space requirements to the underlying batch system (currently this only
+works with Work Queue and Condor). Jobs are grouped into <em> job categories
+</em>, and jobs in the same category have the same cores, memory, and disk
+requirements.
+<br>
+<br>
+
+Job categories and resources are specified with variables.  Jobs are assigned
+to the category named in the value of the variable CATEGORY.  Likewise, the
+values of the variables CORES, MEMORY (in MB), and DISK (in MB) describe the
+resources requirements for the category specified in CATEGORY.
+<br>
+<br>
+
+Jobs without an explicit category are assigned to <tt>default_category</tt>.
+Jobs in the default category get their resource requirements from the value of
+the environment variables CORES, MEMORY, and DISK.
+<br>
+<br>
+
+Consider the following example:
+
+<pre>
+MEMORY=100
+one: src
+    cmd
+
+CATEGORY="potatoe"
+DISK=500
+
+CATEGORY="buzz"
+MEMORY=200
+DISK=200
+
+two: src
+    cmd
+
+three: src
+    cmd
+
+CATEGORY="potatoe"
+DISK=700
+four: src
+    cmd
+
+five: src
+@CATEGORY="buzz"
+    cmd
+
+six: src
+    cmd
+
+CATEGORY="woody"
+CORES=1
+MEMORY=400
+DISK=400
+
+seven: src
+    cmd
+</pre>
+
+<pre>
+export CORES=4
+makeflow ...
+</pre>
+
+<h6> Job categories (job named after its output): </h6>
+
+<dl>
+<dt> buzz: </dt>
+<dd> two, three, five </dd>
+<dt> potatoe: </dt>
+<dd> four, six </dd>
+<dt> woody: </dt>
+<dd> seven </dd>
+<dt> default_category: </dt>
+<dd> one </dd>
+<tr>
+
+<h6> Resources specified: </h6>
+<table>
+<th><tr><td> Category </td> <td> Cores </td> <td> Memory (MB) </td> <td> Disk (MB) </td> </tr></th>
+<tr><td> buzz </td> <td> - </td> <td> 200 </td> <td> 200 </td> </tr>
+<tr><td> potatoe </td> <td> - </td> <td> - </td> <td> 700 </td> </tr>
+<tr><td> woody </td> <td> 1 </td> <td> 400 </td> <td> 400 </td> </tr>
+<tr><td> default_category </td> <td> 4 </td> <td> - </td> <td> - </td> </tr>
+</table>
+
 <h3>Batch Job Refinement</h3>
+
+When executing jobs, Makeflow simply uses the default settings in your batch
+system.  If you need to pass additional options, use the <tt>BATCH_OPTIONS</tt>
+variable or the <tt>-B</tt> option to Makeflow.
 
 When executing jobs, Makeflow simply uses the default settings in your batch system.  If you need to pass additional options, use the <tt>BATCH_OPTIONS</tt> variable or the <tt>-B</tt> option to Makeflow.
 <p>
@@ -238,6 +340,7 @@ When using SGE, the string will be added to the qsub options.  For example, to s
 <pre>
 BATCH_OPTIONS = -q devel
 </pre>
+
 
 <h3>Remote File Renaming</h3>
 
