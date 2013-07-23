@@ -34,6 +34,7 @@ int string_split_quotes(char *str, int *argc, char ***argv);
 char *string_pad_right(char *str, unsigned int length);
 char *string_pad_left(char *str, int length);
 void string_cookie(char *str, int length);
+char *string_glob(const char *pattern);
 char *string_subst(char *value, string_subst_lookup_t lookup, void *arg);
 int string_prefix_is(const char *string, const char *prefix);
 

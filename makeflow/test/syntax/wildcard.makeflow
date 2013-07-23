@@ -1,0 +1,4 @@
+MAKEFLOW_SOURCE = $(wildcard *.makeflow)
+
+makeflow.list:	$(MAKEFLOW_SOURCE)
+	echo $(MAKEFLOW_SOURCE) > makeflow.list
