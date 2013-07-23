@@ -1245,6 +1245,10 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 
 	inputs = string_trim_spaces(inputs);
 	outputs = string_trim_spaces(outputs);
+	
+	/* Add implicit variables */
+	hash_table_insert(n->variables, "@", xxstrdup(outputs));
+	hash_table_insert(n->variables, "^", xxstrdup(inputs));
 
 	dag_parse_node_filelist(bk, n, outputs, 0);
 	dag_parse_node_filelist(bk, n, inputs, 1);
@@ -1270,6 +1274,10 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 		}
 		free(line);
 	}
+
+	/* Remove implicit variables */
+	free(hash_table_remove(n->variables, "@"));
+	free(hash_table_remove(n->variables, "^"));
 
 	debug(D_DEBUG, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
 	dag_task_category_print_debug_resources(n->category);

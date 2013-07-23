@@ -1,0 +1,4 @@
+MAKEFLOW_SOURCE = implicit.makeflow
+
+makeflow.list:	$(MAKEFLOW_SOURCE) /etc/hosts
+	echo $^ > $@

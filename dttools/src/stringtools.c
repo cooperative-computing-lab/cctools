@@ -559,10 +559,11 @@ char *string_subst(char *value, string_subst_lookup_t lookup, void *arg)
 		} else {
 			ldelim--;
 			rdelim = ldelim + 1;
-			while(isalnum((int) *rdelim) || *rdelim == '_')
+			while(isalnum((int) *rdelim) || *rdelim == '_' || *rdelim == '^' || *rdelim == '@') {
 				rdelim++;
+			}
 		}
-
+		
 		oldrdelim = *rdelim;
 		*rdelim = 0;
 
@@ -583,7 +584,7 @@ char *string_subst(char *value, string_subst_lookup_t lookup, void *arg)
 			free(value);
 			return 0;
 		}
-
+		
 		if(ldelim != dollar)
 			rdelim++;
 		*dollar = 0;
