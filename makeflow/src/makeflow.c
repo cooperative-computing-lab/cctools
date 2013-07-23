@@ -137,6 +137,7 @@ void dag_export_variables(struct dag *d, struct dag_node *n);
 char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n);
 int dag_parse(struct dag *d, FILE * dag_stream, int monitor_mode);
 int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line);
+int dag_parse_pattern(struct lexer_book *bk, char *line);
 int dag_parse_node(struct lexer_book *bk, char *line);
 int dag_parse_node_filelist(struct lexer_book *bk, struct dag_node *n, char *filelist, int source);
 int dag_parse_node_command(struct lexer_book *bk, struct dag_node *n, char *line);
@@ -982,6 +983,11 @@ int dag_parse(struct dag *d, FILE * dag_stream, int monitor_mode)
 				dag_parse_error(bk, "variable");
 				goto failure;
 			}
+		} else if(strstr(line, "%")) {
+			if(!dag_parse_pattern(bk, line)) {
+				dag_parse_error(bk, "pattern");
+				goto failure;
+			}
 		} else if(strstr(line, ":")) {
 			if(!dag_parse_node(bk, line)) {
 				dag_parse_error(bk, "node");
@@ -1202,13 +1208,125 @@ char *monitor_log_name(char *dirname, int nodeid)
 	return path;
 }
 
+char *attach_monitor_to_node(struct lexer_book *bk, struct dag_node *n, char *line)
+{
+	char *new_line;
+	char *log_name;
+
+	log_name = monitor_log_name(monitor_log_dir, n->nodeid);
+	debug(D_DEBUG, "adding monitor and %s{.summary%s%s} to rule %d.\n",
+			log_name,
+			bk->monitor_mode & 02 ? ",.series" : "",
+			bk->monitor_mode & 04 ? ",.files"  : "",
+			n->nodeid);
+	new_line = string_format("%s.summary %s%s %s%s %s %s %s",
+			log_name,
+			bk->monitor_mode & 02 ? log_name   : "",
+			bk->monitor_mode & 02 ? ".series" : "",
+			bk->monitor_mode & 04 ? log_name   : "",
+			bk->monitor_mode & 04 ? ".files"  : "",
+			line, monitor_exe,
+			monitor_limits_name ? monitor_limits_name : "");
+
+	return new_line;
+}
+
+void string_split_pair(char *s, char delim, char **prefix, char **suffix)
+{
+	*prefix	 = s;
+	*suffix	 = strchr(*prefix, '%'); 
+	**suffix = 0;
+	*prefix	 = string_trim_spaces(*prefix);
+	*suffix	 = string_trim_spaces(*suffix + 1);
+}
+
+int dag_parse_pattern(struct lexer_book *bk, char *line_org)
+{
+	char *input_pattern = NULL;
+	char *input_prefix = NULL;
+	char *input_suffix = NULL;
+	char *output_pattern = NULL;
+	char *output_prefix = NULL;
+	char *output_suffix = NULL;
+	char *stem_pattern = NULL;
+	char *filelist = NULL;
+	char *stem_prefix = NULL;
+	char *stem_suffix = NULL;
+	char **argv;
+	int i, argc;
+	int stream_pos = ftell(bk->stream);
+	int result = 1;
+
+	filelist = line_org;
+
+	/* Determine output pattern */
+	output_pattern  = strchr(filelist, ':');
+	*output_pattern = 0;
+	output_pattern	= string_trim_spaces(output_pattern + 1);
+	
+	/* Determine input pattern */
+	input_pattern   = strchr(output_pattern, ':');
+	*input_pattern  = 0;
+	input_pattern	= string_trim_spaces(input_pattern + 1);
+
+	/* Determine stem suffix and prefix */
+	stem_pattern	= xxstrdup(input_pattern);
+	string_split_quotes(stem_pattern, &argc, &argv);
+	for(i = 0; i < argc; i++) {
+		if (strchr(argv[0], '%')) {
+			string_split_pair(argv[0], '%', &stem_prefix, &stem_suffix);
+			break;
+		}
+	}
+	free(argv);
+	
+	debug(D_DEBUG, "pattern filelist=%s\n", filelist);
+	debug(D_DEBUG, "pattern output_pattern=%s\n", output_pattern);
+	debug(D_DEBUG, "pattern input_pattern=%s\n", input_pattern);
+	debug(D_DEBUG, "pattern stem_prefix=%s\n", stem_prefix);
+	debug(D_DEBUG, "pattern stem_suffix=%s\n", stem_suffix);
+		
+	string_split_pair(output_pattern, '%', &output_prefix, &output_suffix);
+	string_split_pair(input_pattern, '%', &input_prefix, &input_suffix);
+
+	string_split_quotes(filelist, &argc, &argv);
+	for(i = 0; i < argc && result; i++) {
+		char *stem	= NULL;
+		char *line	= NULL;
+		int stem_size	= 0;
+		
+		/* Determine stem */
+		stem_size = strlen(argv[i]) - strlen(stem_prefix) - strlen(stem_suffix) + 1;
+		stem = calloc(stem_size, sizeof(char));
+		strncpy(stem, argv[i] + strlen(stem_prefix), stem_size - 1);
+		
+		/* Build output */
+		line = string_format("%s%s%s: %s%s%s", output_prefix, stem, output_suffix, input_prefix, stem, input_suffix);
+
+		if(!dag_parse_node(bk, line)) {
+			result = 0;
+		}
+
+		if(i < (argc - 1)) {
+			fseek(bk->stream, stream_pos, SEEK_SET);
+		}
+
+		free(line);
+		free(stem);
+	}
+
+	free(argv);
+	free(stem_pattern);
+
+	return result;
+}
+
 int dag_parse_node(struct lexer_book *bk, char *line_org)
 {
 	struct dag *d = bk->d;
-	char *line;
 	char *outputs = NULL;
 	char *inputs = NULL;
-	char *log_name;
+	char *line;
 	struct dag_node *n;
 
 	n = dag_node_create(bk->d, bk->line_number);
@@ -1219,20 +1337,7 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 	/* BUG: We need a more general solution to wrapping nodes
 	 * while parsing. The monitor code should not be here. */
 	if(bk->monitor_mode) {
-		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
-		debug(D_DEBUG, "adding monitor and %s{.summary%s%s} to rule %d.\n",
-		      log_name,
-		      bk->monitor_mode & 02 ? ",.series" : "",
-		      bk->monitor_mode & 04 ? ",.files"  : "",
-		      n->nodeid);
-		line = string_format("%s.summary %s%s %s%s %s %s %s",
-				     log_name,
-				     bk->monitor_mode & 02 ? log_name   : "",
-				     bk->monitor_mode & 02 ? ".series" : "",
-				     bk->monitor_mode & 04 ? log_name   : "",
-				     bk->monitor_mode & 04 ? ".files"  : "",
-				     line_org, monitor_exe,
-				     monitor_limits_name ? monitor_limits_name : "");
+		line = attach_monitor_to_node(bk, n, line_org); 
 	} else {
 		line = xxstrdup(line_org);
 	}

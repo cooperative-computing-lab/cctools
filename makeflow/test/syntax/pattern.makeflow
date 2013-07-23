@@ -1,0 +1,7 @@
+MAKEFLOW_SOURCE = $(wildcard *.makeflow)
+
+$(MAKEFLOW_SOURCE): %.md5sum: %.makeflow
+	md5sum $^ > $@
+
+$(MAKEFLOW_SOURCE): stat.%: %.makeflow /etc/hosts
+	stat $^ > $@
