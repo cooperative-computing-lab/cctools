@@ -484,12 +484,13 @@ static int handle_tasks(struct link *master) {
 			itable_remove(stored_tasks, ti->taskid);
 			itable_firstkey(active_tasks);
 			
-			sprintf(dirname, "t.%d", ti->taskid);
-			
-			list_first_item(ti->task->output_files);
-			while((tf = (struct work_queue_file *)list_next_item(ti->task->output_files))) {
-				if(!link_file_in_workspace(tf->payload, tf->remote_name, dirname, 0)) {
-					debug(D_NOTICE, "File %s does not exist and is output of task %d.", (char*)tf->remote_name, ti->taskid);
+			if(WIFEXITED(ti->status)) {
+				sprintf(dirname, "t.%d", ti->taskid);
+				list_first_item(ti->task->output_files);
+				while((tf = (struct work_queue_file *)list_next_item(ti->task->output_files))) {
+					if(!link_file_in_workspace(tf->payload, tf->remote_name, dirname, 0)) {
+						debug(D_NOTICE, "File %s does not exist and is output of task %d.", (char*)tf->remote_name, ti->taskid);
+					}
 				}
 			}
 			
