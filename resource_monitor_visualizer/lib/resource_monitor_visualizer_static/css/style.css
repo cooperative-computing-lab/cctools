@@ -31,18 +31,35 @@ section.summary img {
 
 img.center {
   display: block;
-  margin: 0 auto;
+  margin-left:auto;
+  margin-right:auto;
+}
+
+h2 {
+  margin-left:auto;
+  margin-right:auto;
 }
 
 table {
-  display: block;
-  width: 50%;
-  margin: 0 auto;
+  width: 80%;
+  margin-left:auto;
+  margin-right:auto;
+  font-size: 80%;
+  border-collapse:collapse;
 }
+
+th {
+  padding: 0.5em;
+  text-align: center;
+  border: 1px solid #eee;
+}
+
+tr:nth-child(even) {background: #eee}
+tr:nth-child(odd)  {background: #fff}
 
 td {
   padding: 0.2em;
-  text-align: right;
+  text-align: center;
 }
 
 .slides_container {
