@@ -4,21 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-/*
-The following major problems must be fixed in the worker
-before it can be released:
-
-- Currently, all tasks sent are started immediately.  Instead, the
-worker should queue up all tasks sent, and only start them
-when the total cores, tasks, and memory are within the specified limits.
-
-- When the user does not specify any resources explicitly for a
-task, both the master and the worker should assume that the task
-occupies the entire resources of a given worker.
-
-*/
-
-
 #include "work_queue.h"
 #include "work_queue_protocol.h"
 #include "work_queue_internal.h"
