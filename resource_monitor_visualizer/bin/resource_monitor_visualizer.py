@@ -115,41 +115,56 @@ def fill_histogram_template(max_sorted, width, height, image_path, binwidth, res
     nbins = 1
 
   result  = "set terminal png transparent size " + str(width) + "," + str(height) + "\n"
+  result += "plot \"" + table_path + "\" using 1:(stringcolumn(3) eq \"i\"? $2:1/0) w boxes\n"
+  result += "min_x = GPVAL_DATA_X_MIN\n"
+  result += "max_x = GPVAL_DATA_X_MAX\n"
+  result += "min_y = GPVAL_DATA_Y_MIN\n"
+  result += "max_y = GPVAL_DATA_Y_MAX\n"
+
+  result += "reset"
+  result += "set terminal png transparent size " + str(width) + "," + str(height) + "\n"
   result += "unset key\n"
-  result += "set ylabel \"Frequency\"\n"
+  result += "unset border\n"
+  result += "set border 3\n"
   result += "set output \"" + image_path + "\"\n"
   result += "binwidth=" + str(binwidth) + "\n"
   result += "set style fill solid 0.5\n"
 
   if(n < 3 or nbins < 3):
     result += "set boxwidth 2.0 relative\n"
-  elif(nbins > 50):
-    result += "set boxwidth 1.0 relative\n"
   else:
     result += "set boxwidth 0.9*binwidth absolute\n"
 
   result += "set tics nomirror scale 0.25\n"
-  result += "set yrange [0:*]\n"
+  result += "set yrange [0:(max_y + max_y*0.1)]\n"
+  result += "set ytics  (max_y)\n"
 
   #handle corner cases for xrange
   if n == 1 and min_x < 0.0001:
-    result += "set xrange [-0.01:1]\n"
+    result += "set xrange [-0.1:1]\n"
     result += "set xtics (0, 1)\n"
-  elif nbins < 2:
-    result += "set xrange [0:" + str(max_x + 0.25*max_x) + "]\n"
-    result += "set xtics (0, \"" + str(round(max_x)) + "\" " + str(max_x) + ")\n"
+  elif nbins < 3:
+    result += "set xrange [0:(max_x + 0.25*max_x)]\n"
+    result += "set xtics (0, \"" + str(int(round(max_x))) + "\" " + str(max_x) + ")\n"
   else:
-    quatr  = (max_x - min_x)/3
-    cent   = (max_x - min_x)/50.0
+    cent   = (max_x - min_x)/10.0
+    quatr  = (max_x - min_x + cent)/3
     result += "set xrange [" + str(min_x - cent) + ":" + str(max_x + cent) + "]\n"
-    result += "set xtics (%3.1f, %3.1f, %3.1f, %3.1f)\n" % (math.floor(min_x), quatr + min_x, max_x - quatr, math.ceil(max_x))
+    result += "set xtics (%d, %d, %d, %d)\n" % (int(min_x), int(quatr + min_x), int(max_x - quatr), int(max_x))
 
   result += "set xlabel \"" + resource_name.replace('_', ' ')
   if unit != " ":
     result += " (" + unit + ")"
   result += "\"\n"
 
-  result += "plot \"" + table_path + "\" using 1:(stringcolumn(3) eq \"i\"? $2:1/0) w boxes\n"
+  result += "if (max_y < (100*min_y))"
+  result += "set ylabel \"Frequency\"; "
+  result += "plot \"" + table_path + "\" using 1:(stringcolumn(3) eq \"i\"? $2:1/0) w boxes;"
+  result += "else "
+  result += "set ylabel \"Frequency (log)\"; "
+  result += "set ytics  (\"1\" 0, sprintf(\"%d\", max_y) log10(max_y)); "
+  result += "set yrange [-0.001:(1.1*log10(max_y))]; "
+  result += "plot \"" + table_path + "\" using 1:((stringcolumn(3) eq \"i\" && $2 > 0) ? log10($2):1/0) w boxes\n"
   return result
 
 def rule_id_for_task(task):
@@ -488,20 +503,16 @@ def main():
         max_sorted = sorted(maximums)
         binwidth = compute_binwidth_iqr(max_sorted)
 
-        table_path = out_path + "/" + r + "_" + str(hist_large) + "x" + str(hist_large) + "_hist.dat"
-        gnuplot_format = fill_histogram_table_template(hist_large, hist_large, table_path, binwidth, r, unit, data_path)
-        gnuplot(gnuplot_format)
-
-        table_path = out_path + "/" + r + "_" + str(hist_small) + "x" + str(hist_small) + "_hist.dat"
-        gnuplot_format = fill_histogram_table_template(hist_small, hist_small, table_path, binwidth, r, unit, data_path)
+        table_path = out_path + "/" + r + "_hist.dat"
+        gnuplot_format = fill_histogram_table_template(max_sorted, table_path, binwidth, data_path)
         gnuplot(gnuplot_format)
 
         image_path = out_path + "/" + r + "_" + str(hist_large) + "x" + str(hist_large) + "_hist.png"
-        gnuplot_format = fill_histogram_template(max_sorted, hist_large, hist_large, image_path, binwidth, r, unit, data_path)
+        gnuplot_format = fill_histogram_template(max_sorted, hist_large, hist_large, image_path, binwidth, r, unit, table_path)
         gnuplot(gnuplot_format)
 
         image_path = out_path + "/" + r + "_" + str(hist_small) + "x" + str(hist_small) + "_hist.png"
-        gnuplot_format = fill_histogram_template(max_sorted, hist_small, hist_small, image_path, binwidth, r, unit, data_path)
+        gnuplot_format = fill_histogram_template(max_sorted, hist_small, hist_small, image_path, binwidth, r, unit, table_path)
         gnuplot(gnuplot_format)
 
         resource_group_page(name, group_name, r, hist_large, hist_large, groups[group_name], out_path)
