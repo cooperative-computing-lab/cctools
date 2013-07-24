@@ -64,7 +64,6 @@ case "$build_cpu" in
 	;;
 esac
 
-include_package_work_queue="work_queue"
 include_package_sand="sand"
 include_package_allpairs="allpairs"
 include_package_wavefront="wavefront"
@@ -866,6 +865,7 @@ EOF
 	fi
 fi
 
+found_swig=no
 if [ $config_swig_path != no ]
 then
 	swig=""
@@ -890,7 +890,7 @@ then
 			echo "*** skipping swig bindings for work queue"
 		elif [ `format_version $swig_version` -ge `format_version 1.3.29` ]
 		then
-			packages="${packages} ${include_package_work_queue}"
+			found_swig=yes
 		else
 			echo "*** Sorry, I need swig >= 1.3.29"
 			echo "*** skipping swig bindings for work queue"
@@ -905,6 +905,10 @@ else
 	else
 		echo "*** skipping swig bindings for work queue"
 	fi
+fi
+
+if [ $found_swig == "no" ]; then
+	work_queue_bindings=""
 fi
 
 
