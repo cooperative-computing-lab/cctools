@@ -262,10 +262,10 @@ MEMORY=100
 one: src
     cmd
 
-CATEGORY="potatoe"
+CATEGORY="simulation"
 DISK=500
 
-CATEGORY="buzz"
+CATEGORY="preprocessing"
 MEMORY=200
 DISK=200
 
@@ -275,19 +275,19 @@ two: src
 three: src
     cmd
 
-CATEGORY="potatoe"
+CATEGORY="simulation"
 DISK=700
 four: src
     cmd
 
 five: src
-@CATEGORY="buzz"
+@CATEGORY="preprocessing"
     cmd
 
 six: src
     cmd
 
-CATEGORY="woody"
+CATEGORY="analysis"
 CORES=1
 MEMORY=400
 DISK=400
@@ -304,11 +304,11 @@ makeflow ...
 <h6> Job categories (job named after its output): </h6>
 
 <dl>
-<dt> buzz: </dt>
+<dt> preprocessing: </dt>
 <dd> two, three, five </dd>
-<dt> potatoe: </dt>
+<dt> simulation: </dt>
 <dd> four, six </dd>
-<dt> woody: </dt>
+<dt> analysis: </dt>
 <dd> seven </dd>
 <dt> default_category: </dt>
 <dd> one </dd>
@@ -317,9 +317,9 @@ makeflow ...
 <h6> Resources specified: </h6>
 <table>
 <th><tr><td> Category </td> <td> Cores </td> <td> Memory (MB) </td> <td> Disk (MB) </td> </tr></th>
-<tr><td> buzz </td> <td> - </td> <td> 200 </td> <td> 200 </td> </tr>
-<tr><td> potatoe </td> <td> - </td> <td> - </td> <td> 700 </td> </tr>
-<tr><td> woody </td> <td> 1 </td> <td> 400 </td> <td> 400 </td> </tr>
+<tr><td> preprocessing </td> <td> - </td> <td> 200 </td> <td> 200 </td> </tr>
+<tr><td> simulation </td> <td> - </td> <td> - </td> <td> 700 </td> </tr>
+<tr><td> analysis </td> <td> 1 </td> <td> 400 </td> <td> 400 </td> </tr>
 <tr><td> default_category </td> <td> 4 </td> <td> - </td> <td> - </td> </tr>
 </table>
 
