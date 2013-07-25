@@ -907,10 +907,10 @@ else
 	fi
 fi
 
-if [ $found_swig == "no" ]; then
+if [ $found_swig != yes ]
+then
 	work_queue_bindings=""
 fi
-
 
 linker="gcc"
 
