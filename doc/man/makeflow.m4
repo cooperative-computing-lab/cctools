@@ -35,7 +35,6 @@ SUBSECTION(Commands)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-b, bundle-dir, directory)Create portable bundle of workflow.
 OPTION_ITEM(`-c, --clean')Clean up: remove logfile and all targets.
-OPTION_TRIPLET(-D, dot-graph, opt)Display the Makefile as a Dot graph.
 OPTION_TRIPLET(-f, summary-log, file)Write summary of workflow to file.
 OPTION_ITEM(`-h, --help')Show this help screen.
 OPTION_ITEM(`-I, --show-input')Show input files.
@@ -60,7 +59,7 @@ OPTIONS_END
 SUBSECTION(Debugging Options)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-d, debug, subsystem)Enable debugging for this subsystem.
-OPTION_TRIPLET(-o, debug-output, file)Send debugging to this file.
+OPTION_TRIPLET(-o, debug-file, file)Send debugging to this file.
 OPTIONS_END
 
 SUBSECTION(WorkQueue Options)
@@ -93,6 +92,21 @@ OPTION_ITEM(`-k, --syntax-check')Syntax check.
 OPTION_ITEM(`-K, --preserve-links')Preserve (i.e., do not clean) intermediate symbolic links.
 OPTION_ITEM(`-z, --zero-length-error')Force failure on zero-length output files.
 OPTIONS_END
+
+SUBSECTION(Display Options)
+OPTIONS_BEGIN
+OPTION_TRIPLET(-D, display, opt)Display the Makefile as a Dot graph or a PPM completion graph. <opt> is one of:
+   dot      Standard Dot graph
+   ppm      Display a completion graph in PPM format
+OPTION_ITEM(`--dot-merge-similar')Condense similar boxes
+OPTION_ITEM(`--dot-proportional')Change the size of the boxes proportional to file size
+OPTION_ITEM(` ')The following options for ppm generation are mutually exclusive:
+OPTION_PAIR(--ppm-highlight-row, row)Highlight row <row> in completion grap
+OPTION_PAIR(--ppm-highlight-file,file)Highlight node that creates file <file> in completion graph
+OPTION_PAIR(--ppm-highlight-executable,exe)Highlight executable <exe> in completion grap
+OPTION_ITEM(`--ppm-show-levels')Display different levels of depth in completion graph
+OPTIONS_END
+
 
 SECTION(ENVIRONMENT VARIABLES)
 

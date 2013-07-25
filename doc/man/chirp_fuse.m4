@@ -33,11 +33,12 @@ OPTION_TRIPLET(-b,block-size,bytes)Block size for network I/O. (default is 65536
 OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
 OPTION_ITEM(`-D, --no-optimize')Disable small file optimizations such as recursive delete.
 OPTION_ITEM(`-f, --foreground')Run in foreground for debugging.
-OPTION_ITEM(`-h, --help')Give help information.
+OPTION_TRIPLET(-i,tickets,files)Comma-delimited list of tickets to use for authentication.
 OPTION_TRIPLET(-m,mount-options,option)Pass mount option to FUSE. Can be specified multiple times.
 OPTION_TRIPLET(-o,debug-file,file)Send debugging output to this file.
 OPTION_TRIPLET(-t,timeout,timeout)Timeout for network operations. (default is 60s)
 OPTION_ITEM(`-v, --version')Show program version.
+OPTION_ITEM(`-h, --help')Give help information.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)

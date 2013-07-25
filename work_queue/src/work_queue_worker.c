@@ -1668,7 +1668,6 @@ static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] <masterhost> <port>\n", cmd);
 	fprintf(stdout, "where options are:\n");
-	fprintf(stdout, " %-30s Enable auto mode. In this mode the worker\n", "-a,--advertise");
 	fprintf(stdout, " %-30s would ask a catalog server for available masters.\n", "");
 	fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-M,--master-name=<name>"); 
 	fprintf(stdout, " %-30s projects.\n", ""); 
@@ -1704,7 +1703,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Set the location for creating the working directory of the worker.\n", "-s,--workdir=<path>");
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
 	fprintf(stdout, " %-30s Set the percent chance a worker will decide to shut down every minute.\n", "--volatility=<chance>");
-	fprintf(stdout, " %-30s Set the multiplier for how long outgoing and incoming data transfers\n", "--bandwidth=<mult>");
+	fprintf(stdout, " %-30s Set the maximum bandwidth the foreman will consume in Mbps. (default=unlimited)\n", "--bandwidth=<mbps>");
 	fprintf(stdout, " %-30s take.\n", "");
 	fprintf(stdout, " %-30s Set the number of cores reported by this worker.  Set to 0 to have the\n", "--cores=<n>");
 	fprintf(stdout, " %-30s worker automatically measure. (default=%d)\n", "", manual_cores_option);
@@ -1835,6 +1834,7 @@ int main(int argc, char *argv[])
 	while((c = getopt_long(argc, argv, "aB:cC:d:f:F:t:j:o:p:M:N:P:w:i:b:z:A:O:s:vZ:h", long_options, 0)) != (char) -1) {
 		switch (c) {
 		case 'a':
+            //Left here for backwards compatibility
 			auto_worker = 1;
 			break;
 		case 'B':

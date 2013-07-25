@@ -87,12 +87,13 @@ LONGCODE_END
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_ITEM(`-h,--help')Show help text.
 OPTION_TRIPLET(-d,debug,subsystem)Enable debugging for this subsystem.
+OPTION_TRIPLET(-o,debug-file,file)Send debugging output to <file>.
 OPTION_TRIPLET(-i,interval,n)Interval between observations, in seconds (default=1).
 OPTION_TRIPLET(-l,limits-file,file)Use maxfile with list of var: value pairs for resource limits.
 OPTION_TRIPLET(-L,limits,string)String of the form `"var: value, var: value\' to specify resource limits.
-OPTION_PAIR(--with-output-files,template)Specify template for log files (default=resource-pid-<pid>).
+OPTION_ITEM(`-f, --child-in-foreground')Keep the monitored process in foreground (for interactive use).
+OPTION_TRIPLET(-O,with-output-files,template)Specify template for log files (default=resource-pid-<pid>).
 OPTION_PAIR(--with-summary-file,file)Write resource summary to <file> (default=<template>.summary).
 OPTION_PAIR(--with-time-series,file)Write resource time series to <file> (default=<template>.series).
 OPTION_PAIR(`--with-opened-files',file)Write list of opened files to <file> (default=<template>.opened).
@@ -101,6 +102,8 @@ OPTION_ITEM(--without-time-series)Do not write the time-series log file.
 OPTION_ITEM(--without-opened-files)Do not write the list of opened files.
 OPTION_ITEM(--with-disk-footprint)Measure working directory footprint (potentially slow).
 OPTION_ITEM(--without-disk-footprint)Do not measure working directory footprint (default).
+OPTION_ITEM(`-v,--version')Show version string.
+OPTION_ITEM(`-h,--help')Show help text.
 OPTIONS_END
 
 The limits file should contain lines of the form:

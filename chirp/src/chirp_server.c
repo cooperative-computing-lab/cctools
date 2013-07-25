@@ -132,7 +132,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Use this file as the default ACL.\n", "-A,--default-acl=<file>");
 	fprintf(stdout, " %-30s Enable this authentication method.\n", "-a,--auth=<method>");
 	fprintf(stdout, " %-30s Write process identifier (PID) to file.\n", "-B,--pid-file=<file>");
-	fprintf(stdout, " %-30s Run as a daemon.\n", "-b,--daemon");
+	fprintf(stdout, " %-30s Run as a daemon.\n", "-b,--background");
 	fprintf(stdout, " %-30s Do not create a core dump, even due to a crash.\n", "-C,--no-core-dump");
 	fprintf(stdout, " %-30s Challenge directory for unix filesystem authentication.\n", "-c,--challenge-dir=<dir>");
 	fprintf(stdout, " %-30s Exit if parent process dies.\n", "-E,--parent-death");
@@ -141,9 +141,9 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Base url for group lookups. (default: disabled)\n", "-G,--group-url=<url>");
 	fprintf(stdout, " %-30s Run as lower privilege user. (root protection)\n", "-i,--user=<user>");
 	fprintf(stdout, " %-30s Listen only on this network interface.\n", "-I,--interface=<addr>");
-	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
-	fprintf(stdout, " %-30s Use this name when reporting to the catalog.\n", "-n,--catalog-name=<name>");
 	fprintf(stdout, " %-30s Set the maximum number of clients to accept at once. (default unlimited)\n", "-M,--max-clients=<count>");
+	fprintf(stdout, " %-30s Use this name when reporting to the catalog.\n", "-n,--catalog-name=<name>");
+	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Superuser for all directories. (default: none)\n", "-P,--superuser=<user>");
 	fprintf(stdout, " %-30s Listen on this port. (default: %d)\n", "-p,--port=<port>", port);
 	fprintf(stdout, " %-30s Enforce this root quota in software.\n", "-Q,--root-quota=<size>");
@@ -381,7 +381,7 @@ static struct option long_options[] = {
 	{"catalog-name", required_argument, 0, 'n'},
 	{"challenge-dir", required_argument, 0, 'c'},
 	{"catalog-update", required_argument, 0, 'U'},
-	{"daemon", no_argument, 0, 'b'},
+	{"background", no_argument, 0, 'b'},
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
 	{"default-acl", required_argument, 0, 'A'},

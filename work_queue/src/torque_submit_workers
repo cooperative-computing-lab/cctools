@@ -4,7 +4,6 @@ show_help()
 {
 	echo "Use: torque_submit_workers [options] <servername> <port> <num-workers>"
 	echo "where options are:"
-	echo "  -a               Enable auto mode."
 	echo "  -M <name>        Name of the preferred master for worker."
 	echo "  -N <name>        Same as -M (backwards compatibility)."
 	echo "  -c <num>         Set the number of cores each worker should use (0=auto). (default=1)"
@@ -33,7 +32,7 @@ cores=1
 while getopts aM:N:c:C:t:d:w:i:b:z:A:O:s:jp:h opt 
 do
 	case "$opt" in
-		a)  arguments="$arguments -a"; use_auto=1;;
+		a)  arguments="$arguments -a"; use_auto=1;; #left here for backwards compatibility
 		M)  arguments="$arguments -M $OPTARG"; use_auto=1;;
 		N)  arguments="$arguments -M $OPTARG"; use_auto=1;;
 		c)  arguments="$arguments --cores $OPTARG"; cores=$OPTARG;;

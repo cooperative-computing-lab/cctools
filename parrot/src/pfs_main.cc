@@ -542,7 +542,7 @@ int main( int argc, char *argv[] )
         {0,0,0,0}
 	};
 
-	while((c=getopt_long(argc,argv,"+hA:a:b:B:c:Cd:DFfG:Hi:I:kKl:m:M:N:o:O:p:PQr:R:sSt:T:U:u:vw:WY", long_options, NULL)) > -1) {
+	while((c=getopt_long(argc,argv,"+ha:b:B:c:Cd:DFfG:Hi:I:kKl:m:M:N:o:O:p:PQr:R:sSt:T:U:u:vw:WY", long_options, NULL)) > -1) {
 		switch(c) {
 		case 'a':
 			if(!auth_register_byname(optarg)) {

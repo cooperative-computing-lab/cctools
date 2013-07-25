@@ -53,10 +53,11 @@ OPTIONS_END
 
 SUBSECTION(Worker Options)
 OPTIONS_BEGIN
-OPTION_ITEM(`-a, --advertise')Enable auto mode. In this mode the workers would ask a catalog server for available masters.
+OPTION_ITEM(`-a, --advertise')Enable auto mode. In this mode the workers would ask a catalog server for available masters. (deprecated, implied by -M).
 OPTION_TRIPLET(-t, timeout, time)Abort after this amount of idle time.
 OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
 OPTION_TRIPLET(-M, master-name, project)Name of a preferred project. A worker can have multiple preferred projects.
+OPTION_ITEM(`-N')Same as -M,--master-name (deprecated).
 OPTION_TRIPLET(-o, debug-file, file)Send debugging to this file.
 OPTION_ITEM(`-E, --extra-options')Extra options that should be added to the worker.
 OPTIONS_END

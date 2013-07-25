@@ -26,18 +26,19 @@ process and begin executing tasks.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_PAIR(-p, port)The port that the master will be listening on.
-OPTION_PAIR(-Z,file)Select port at random and write it to this file.  (default is disabled)
-OPTION_PAIR(-e, args)Extra arguments to pass to the comparison function.
-OPTION_PAIR(-f, file)Extra input file needed by the comparison function. (may be given multiple times)
-OPTION_PAIR(-t, seconds)Estimated time to run one comparison. (default chosen at runtime)
-OPTION_PAIR(-x, item)Width of one work unit, in items to compare. (default chosen at runtime)
-OPTION_PAIR(-y, items)Height of one work unit, in items to compare. (default chosen at runtime)
-OPTION_PAIR(-N, project)Report the master information to a catalog server with the project name - PARAM(project)
-OPTION_PAIR(-E, priority)Priority. Higher the value, higher the priority.
-OPTION_PAIR(-d, flag)Enable debugging for this subsystem. (Try -d all to start.)
-OPTION_ITEM(-v)Show program version.
-OPTION_ITEM(-h)Display this message.
+OPTION_TRIPLET(-p,port,port)The port that the master will be listening on.
+OPTION_TRIPLET(-e,extra-args,args)Extra arguments to pass to the comparison function.
+OPTION_TRIPLET(-f,input-file,file)Extra input file needed by the comparison function. (may be given multiple times)
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file (default to standard output)
+OPTION_TRIPLET(-t,estimated-time,seconds)Estimated time to run one comparison. (default chosen at runtime)
+OPTION_TRIPLET(-x,width,item)Width of one work unit, in items to compare. (default chosen at runtime)
+OPTION_TRIPLET(-y,height,items)Height of one work unit, in items to compare. (default chosen at runtime)
+OPTION_TRIPLET(-N,project-name,project)Report the master information to a catalog server with the project name - PARAM(project)
+OPTION_TRIPLET(-P,priority,integer)Priority. Higher the value, higher the priority.
+OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem. (Try -d all to start.)
+OPTION_ITEM(`-v, --version')Show program version.
+OPTION_PAIR(`-h, --help')Display this message.
+OPTION_TRIPLET(-Z,port-file,file)Select port at random and write it to this file.  (default is disabled)
 OPTIONS_END
 
 SECTION(EXIT STATUS)

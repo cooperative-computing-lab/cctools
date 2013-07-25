@@ -24,12 +24,14 @@ then connect back to the master process and begin executing tasks.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_TRIPLET(-p, port, port)Port number for queue master to listen on.
-OPTION_TRIPLET(-Z, random-port, file)Select port at random and write it to this file.  (default is disabled)
-OPTION_TRIPLET(-d, debug, subsystem)Enable debugging for this subsystem. (Try -d all to start.)
-OPTION_TRIPLET(-o, output-file, file)Send debugging to this file.
-OPTION_ITEM(`-v, --version')Show version string
 OPTION_ITEM(`-h, --help')Show this help screen
+OPTION_ITEM(`-v, --version')Show version string
+OPTION_TRIPLET(-d, debug, subsystem)Enable debugging for this subsystem. (Try -d all to start.)
+OPTION_TRIPLET(-N, project-name, project)Set the project name to <project>
+OPTION_TRIPLET(-o, debug-file, file)Send debugging to this file.
+OPTION_TRIPLET(-p, port, port)Port number for queue master to listen on.
+OPTION_TRIPLET(-P, priority, num)Priority. Higher the value, higher the priority.
+OPTION_TRIPLET(-Z, port-file, file)Select port at random and write it to this file.  (default is disabled)
 OPTIONS_END
 
 SECTION(EXIT STATUS)

@@ -19,8 +19,9 @@ OPTIONS_BEGIN
 OPTION_TRIPLET(-a,auth, flag)Require this authentication mode.
 OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
 OPTION_TRIPLET(-b,block-size,size)Set transfer buffer size. (default is 65536 bytes).
-OPTION_TRIPLET(-t,timeout, time)Timeout for failure. (default is 3600s)
 OPTION_ITEM(`-f, --follow')Follow input file like tail -f.
+OPTION_TRIPLET(-i,tickets,files)Comma-delimited list of tickets to use for authentication.
+OPTION_TRIPLET(-t,timeout, time)Timeout for failure. (default is 3600s)
 OPTION_ITEM(`-v, --version')Show program version.
 OPTION_ITEM(`-h, --help')Show help text.
 OPTIONS_END

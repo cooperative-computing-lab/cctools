@@ -84,7 +84,7 @@ corresponding process id. Alternatively, we can specify the output
 names, and the sampling intervals:
 
       <pre>
-	% resource_monitor -o log-sleep -i 2 -- sleep 10 </pre>
+	% resource_monitor -O log-sleep -i 2 -- sleep 10 </pre>
 
       The previous command will monitor "sleep 10", at two second
       intervals, and will generate the
@@ -144,7 +144,7 @@ names, and the sampling intervals:
       <pre>
 	universe = vanilla
 	executable = /path/to/resource_monitor
-	arguments = -o echo-log -- /bin/echo hello condor
+	arguments = -O echo-log -- /bin/echo hello condor
 	output = test.output echo-log.summary echo-log.series echo-log.files
 	should_transfer_files = yes
 	when_to_transfer_output = on_exit
@@ -227,7 +227,7 @@ names, and the sampling intervals:
       <pre>
 	universe = vanilla
 	executable = matlab
-	arguments = -o matlab-script-log --limits-file=limits.txt -- matlab < script.m
+	arguments = -O matlab-script-log --limits-file=limits.txt -- matlab < script.m
 	output = matlab.output matlab-script-log.summary matlab-script-log.series matlab-script-log.files
 	transfer_input_files=script.m limits.txt
 	should_transfer_files = yes

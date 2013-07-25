@@ -8,7 +8,6 @@ show_help()
 	echo "     sge_submit_workers [options] <num-workers>"
 	echo "         when auto mode is enabled."  
 	echo "Options:"
-	echo "  -a,--advertise           Enable auto mode."
 	echo "  -M,--master-name <name>  Name of the preferred master for worker. (auto mode enabled)"
 	echo "  -N,--name <name>         Same as -M (backwards compatibility). (auto mode enabled)"
 	echo "  -C,--catalog <catalog>   Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
@@ -43,6 +42,7 @@ while [ $# -gt 0 ]
 do
 	case $1 in
 		-a | --advertise)
+            #left here for backwards compatibility
 			arguments="$arguments -a"
 			use_auto=1
 			;;

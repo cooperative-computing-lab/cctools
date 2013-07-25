@@ -21,7 +21,6 @@ containing the (private) key.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_ITEM(-a)Enable auto mode for work_queue_worker.
 OPTION_ITEM(-M, name)Name of the preferred master for worker.
 OPTION_PAIR(-N, name)Same as -M (backwards compatibility).
 OPTION_PAIR(-c, cores)Set the number of cores each worker should use (0=auto). (default=1) 

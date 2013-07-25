@@ -19,7 +19,6 @@ auto mode option is specified for work_queue_worker.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_ITEM(-a)Enable auto mode for work_queue_worker.
 OPTION_ITEM(-M, name)Name of the preferred master for worker.
 OPTION_PAIR(-N, name)Preferred project name for work_queue_worker to connect.
 OPTION_PAIR(-c, cores)Set the number of cores each worker should use (0=auto). (default=1) 

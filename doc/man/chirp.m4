@@ -43,12 +43,11 @@ SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-a, auth, flag)Require this authentication mode.
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for this subsystem.
-OPTION_ITEM(`-h, --help')Show help text.
 OPTION_TRIPLET(-i, tickets, files)Comma-delimited list of tickets to use for authentication.
 OPTION_ITEM(`-l, --verbose')Long transfer information.
-OPTION_ITEM(`-q, --quiet')Quiet mode; supress messages and table headers.
 OPTION_TRIPLET(-t, timeout, time)Set remote operation timeout.
 OPTION_ITEM(`-v, --version')Show program version.
+OPTION_ITEM(`-h, --help')Show help text.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)

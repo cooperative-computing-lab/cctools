@@ -461,7 +461,7 @@ static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options]\n", cmd);
 	fprintf(stdout, "where options are:\n");
-	fprintf(stdout, " %-30s Run as a daemon.\n", "-b,--daemon");
+	fprintf(stdout, " %-30s Run as a daemon.\n", "-b,--background");
 	fprintf(stdout, " %-30s Write process identifier (PID) to file.\n", "-B,--pid-file=<file>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
 	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
@@ -495,7 +495,7 @@ int main(int argc, char *argv[])
 	debug_config(argv[0]);
 
 	static struct option long_options[] = {
-		{"daemon", no_argument, 0, 'b'},
+		{"background", no_argument, 0, 'b'},
 		{"pid-file", required_argument, 0, 'B'},
 		{"debug", required_argument, 0, 'd'},
 		{"help", no_argument, 0, 'h'},
