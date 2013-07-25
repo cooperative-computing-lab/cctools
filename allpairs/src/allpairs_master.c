@@ -57,7 +57,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Estimated time to run one comparison. (default chosen at runtime)\n", "-t,--estimated-time=<seconds>");
 	fprintf(stdout, " %-30s Width of one work unit, in items to compare. (default chosen at runtime)\n", "-x,--width=<items>");
 	fprintf(stdout, " %-30s Height of one work unit, in items to compare. (default chosen at runtime)\n", "-y,--height=<items>");
-	fprintf(stdout, " %-30s Advertise the master information to a catalog server.\n", "-a,--advertise");
 	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.  (Try -d all to start.)\n", "-d,--debug=<flag>");
@@ -282,7 +281,7 @@ int main(int argc, char **argv)
 		{"extra-args", required_argument, 0, 'e'},
 		{"width", required_argument, 0, 'x'},
 		{"height", required_argument, 0, 'y'},
-		{"advertise", no_argument, 0, 'a'},
+		{"advertise", no_argument, 0, 'a'},    //deprecated, left here for backwards compatibility
 		{"project-name", required_argument, 0, 'N'},
 		{"debug-file", required_argument, 0, 'o'},
 		{"input-file", required_argument, 0, 'f'},

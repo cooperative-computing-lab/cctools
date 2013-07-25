@@ -25,14 +25,14 @@ LIST_END
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to <catalog>. Format: HOSTNAME:PORT
 OPTION_ITEM(`-Q, --statistics')Show summary information about queues. (default)
-OPTION_ITEM(`-T, --tasks')Show details of all tasks in the queue.
 OPTION_ITEM(`-W, --workers')Show details of all workers connected to the master.
+OPTION_ITEM(`-T, --tasks')Show details of all tasks in the queue.
+OPTION_ITEM(`-l, --verbose')Long output.
 OPTION_ITEM(`-R, --resources')Show available resources for each master.
+OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to <catalog>. Format: HOSTNAME:PORT
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
 OPTION_TRIPLET(-t, timeout, time)RPC timeout (default=300s).
-OPTION_ITEM(`-l, --verbose')Long output.
 OPTION_ITEM(`-h, --help')Show this help message.
 OPTIONS_END
 

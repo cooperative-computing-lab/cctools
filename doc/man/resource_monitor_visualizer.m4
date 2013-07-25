@@ -16,11 +16,11 @@ Currently, groups are determined by command name. Additionally, if time series
 data is recorded graphs are created to show the aggregate resource usage over
 time.
 
-SECTION(OPTIONS)
+SECTION(ARGUMENTS)
 OPTIONS_BEGIN
-OPTION_ITEM(`-data_path')The path to the data recorded by the resource_monitor.
-OPTION_ITEM(`-destination_path')The path in which to store the visualization.
-OPTION_ITEM(`-workflow_name')The name of the workflow being visualized.
+OPTION_ITEM(` data_path')The path to the data recorded by the resource_monitor.
+OPTION_ITEM(` destination_path')The path in which to store the visualization.
+OPTION_ITEM(` workflow_name')The name of the workflow being visualized.
 OPTIONS_END
 
 SECTION(EXAMPLES)

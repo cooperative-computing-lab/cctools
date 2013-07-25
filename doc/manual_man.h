@@ -26,7 +26,7 @@ define(OPTION_PAIR,.TP
 .
 )dnl
 define(OPTION_TRIPLET,.TP
-BOLD($1)`,' BOLD(-\-$2) \ ITALIC(PARAM($3))
+BOLD($1)`,' BOLD(-\-$2)`='ITALIC(PARAM($3))
 .
 )dnl
 define(OPTIONS_END)dnl

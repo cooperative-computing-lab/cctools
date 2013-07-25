@@ -1246,7 +1246,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s resource limits.\n", "");
     fprintf(stdout, "%-30s Keep the monitored process in foreground (for interactive use).\n", "-f,--child-in-foreground");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Specify filename template for log files (default=resource-pid-<pid>)\n", "-o,--with-output-files=<file>");
+    fprintf(stdout, "%-30s Specify filename template for log files (default=resource-pid-<pid>)\n", "-O,--with-output-files=<file>");
     fprintf(stdout, "%-30s Write resource summary to <file>        (default=<template>.summary)\n", "--with-summary-file=<file>");
     fprintf(stdout, "%-30s Write resource time series to <file>    (default=<template>.series)\n", "--with-time-series=<file>");
     fprintf(stdout, "%-30s Write list of opened files to <file>    (default=<template>.files)\n", "--with-opened-files=<file>");
@@ -1360,7 +1360,7 @@ int main(int argc, char **argv) {
 		    {"limits",     required_argument, 0, 'L'},
 		    {"limits-file",required_argument, 0, 'l'},
 	
-		    {"with-output-files", required_argument, 0,  'o'},
+		    {"with-output-files", required_argument, 0,  'O'},
 
 		    {"with-summary-file", required_argument, 0,  0},
 		    {"with-time-series",  required_argument, 0,  1 }, 
@@ -1406,7 +1406,7 @@ int main(int argc, char **argv) {
             case 'f':
 		    child_in_foreground = 1;
 		    break;
-            case 'o':
+            case 'O':
 		    if(template_path)
 			    free(template_path);
 		    if(summary_path)
