@@ -1,14 +1,14 @@
 /*
-Copyright (C) 2008- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
+ * Copyright (C) 2008- The University of Notre Dame
+ * This software is distributed under the GNU General Public License.
+ * See the file COPYING for details.
+ * */
 
 /*
-This program is a very simple example of how to use the Work Queue.
-It accepts a list of files on the command line.
-Each file is compressed with gzip and returned to the user.
-*/
+ * This program is a very simple example of how to use the Work Queue.
+ * It accepts a list of files on the command line.
+ * Each file is compressed with gzip and returned to the user.
+ * */
 
 #include <work_queue.h>
 #include <debug.h>
@@ -24,18 +24,13 @@ int main(int argc, char *argv[])
 	struct work_queue_task *t;
 	int port = WORK_QUEUE_DEFAULT_PORT;
 	int taskid;
-	int i, iterations;
-	char *url_base, *filename;
+	int i;
 
-	if(argc < 3) {
-                printf("work_queue_example <executable> <url> [iterations]\n");
-                printf("The url given on the command line will be downloaded and compressed the given number of iterations\n using remote workers.\n");
-                return 0;
-        }
-
-	url_base = argv[1];
-	filename = argv[2];
-	iterations = atoi(argv[3]);
+	if(argc < 2) {
+		printf("work_queue_example <executable> <file1> [file2] [file3] ...\n");
+		printf("Each file given on the command line will be compressed using a remote worker.\n");
+		return 0;
+	}
 
 	debug_flags_set("all");
 
@@ -45,36 +40,29 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	work_queue_tune(q, "short-timeout", 60);
-        work_queue_specify_name(q,"test_url");
-        work_queue_specify_master_mode(q,WORK_QUEUE_MASTER_MODE_CATALOG);
-
 	printf("listening on port %d...\n", work_queue_port(q));
 
-	for(i = 0; i < iterations; i++) {
-		char url[256], outfile[256], command[256];
-                char* infile;
+	for(i = 1; i < argc; i++) {
 
-                sprintf(url, "%s/%s", url_base, filename);
-                sprintf(outfile, "%s-%d.gz", filename, i);                    
-                sprintf(command, "./gzip < %s > %s && sleep 45s", filename, outfile);
+		char infile[256], outfile[256], command[256];
 
-		t = work_queue_task_create(command);	
+		sprintf(infile, "%s", argv[i]);
+		sprintf(outfile, "%s.gz", argv[i]);
+		sprintf(command, "./gzip < %s > %s", infile, outfile);
 
-	       if (!work_queue_task_specify_file(t, "/usr/bin/gzip", "gzip", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)) {
-                        printf("task_specify_URL() failed for /usr/bin/gzip: check if arguments are null or remote anme is an absolute path.\n");
-                        return 1;
-                }
-                if (!work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE)) {
-                        printf("task_specify_file() failed for %s: check if arguments are null or remote name is an absolute path.\n", outfile);
-                        return 1;
-                }
-                if (!work_queue_task_specify_url(t, url, filename, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE)) {
-                        printf("task_specify_url() failed for %s: check if arguments are null or remote name is an absolute path.\n", url);
-                        return 1;
-                }
-
-
+		t = work_queue_task_create(command);
+		if (!work_queue_task_specify_file(t, "/usr/bin/gzip", "gzip", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)) {
+			printf("task_specify_file() failed for /usr/bin/gzip: check if arguments are null or remote name is an absolute path.\n");
+			return 1; 	
+		}
+		if (!work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE)) {
+			printf("task_specify_file() failed for %s: check if arguments are null or remote name is an absolute path.\n", infile);
+			return 1; 	
+		}
+		if (!work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE)) {
+			printf("task_specify_file() failed for %s: check if arguments are null or remote name is an absolute path.\n", outfile);
+			return 1; 	
+		}	
 		taskid = work_queue_submit(q, t);
 
 		printf("submitted task (id# %d): %s\n", taskid, t->command_line);
