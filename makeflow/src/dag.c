@@ -603,17 +603,20 @@ char *dag_task_category_wrap_as_condor_options(struct dag_task_category *categor
 
 char *dag_task_category_wrap_options(struct dag_task_category *category, const char *default_options, batch_queue_type_t batch_type)
 {
-        switch(batch_type)
-        {
-	case BATCH_QUEUE_TYPE_WORK_QUEUE:
-		return dag_task_category_wrap_as_wq_options(category, default_options);
-		break;
-	case BATCH_QUEUE_TYPE_CONDOR:
-		return dag_task_category_wrap_as_condor_options(category, default_options);
-		break;
-	default:
-		return NULL;
-        }
+	switch(batch_type)
+	{
+		case BATCH_QUEUE_TYPE_WORK_QUEUE:
+			return dag_task_category_wrap_as_wq_options(category, default_options);
+			break;
+		case BATCH_QUEUE_TYPE_CONDOR:
+			return dag_task_category_wrap_as_condor_options(category, default_options);
+			break;
+		default:
+			if(default_options)
+				return xxstrdup(default_options);
+			else
+				return NULL;
+	}
 }
 
 int dag_file_is_source(struct dag_file *f)
