@@ -51,7 +51,7 @@ work_queue_example: work_queue_example.o ${LIBDTTOOLS} libwork_queue.a
 work_queue_workload_simulator: work_queue_workload_simulator.o ${LIBDTTOOLS} libwork_queue.a
 	${CCTOOLS_LD} work_queue_workload_simulator.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
 
-work_queue_pool: work_queue_pool.o ${LIBDTTOOLS} ${LIBWORK_QUEUE}
+work_queue_pool: work_queue_pool.o ${LIBDTTOOLS} libwork_queue.a
 	${CCTOOLS_LD} work_queue_pool.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -ldttools -lm -o $@
 
 libwork_queue.a: ${OBJECTS}
@@ -84,5 +84,5 @@ install: all
 test:
 
 clean: clean-bindings
-	rm -fr *.o
+	rm -fr *.o ${LIBRARIES} ${PROGRAMS} ${TEST_PROGRAMS}
 
