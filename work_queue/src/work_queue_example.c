@@ -1,14 +1,14 @@
 /*
-Copyright (C) 2008- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
+ * Copyright (C) 2008- The University of Notre Dame
+ * This software is distributed under the GNU General Public License.
+ * See the file COPYING for details.
+ * */
 
 /*
-This program is a very simple example of how to use the Work Queue.
-It accepts a list of files on the command line.
-Each file is compressed with gzip and returned to the user.
-*/
+ * This program is a very simple example of how to use the Work Queue.
+ * It accepts a list of files on the command line.
+ * Each file is compressed with gzip and returned to the user.
+ * */
 
 #include <work_queue.h>
 #include <debug.h>
