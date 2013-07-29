@@ -123,9 +123,7 @@ do
 	running_instances=$(ec2-describe-instances -F 'reservation-id'=$reservation_id | grep $image | grep running | wc -l)
 done
 
-declare -i inst_count
 inst_count=1
-
 while [ $inst_count -le $count ]
 do
 	instance=$(ec2-describe-instances -F 'reservation-id'=$reservation_id | grep running | awk 'NR==var{print $4 }' var="${inst_count}")
@@ -134,7 +132,7 @@ do
 	scp -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $keyfile $worker worker.sh ubuntu@$instance:.
 	ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $keyfile ubuntu@$instance './worker.sh 1>worker.log 2>&1 &'
 	return_status=$?
-	((inst_count=$inst_count+1))
+	inst_count=$((inst_count+1))
 done
 
 exit $return_status

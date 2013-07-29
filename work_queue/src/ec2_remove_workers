@@ -63,7 +63,8 @@ else
 	num_remove_instances=$count
 fi
 
-for (( i=1; i<=$num_remove_instances; i++ ))
+i=1
+while [ $i -le $num_remove_instances ]
 do
 	if [ $reservation ]
 	then
@@ -77,6 +78,7 @@ do
        	$ec2remove $instance
 		return_status=$?
 	fi
+	i=$((i+1))
 done
 
 exit $return_status
