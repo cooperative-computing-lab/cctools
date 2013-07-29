@@ -65,7 +65,6 @@ struct dag {
 struct lexer_book
 {
 	struct dag *d;                      /* The dag being built. */
-	int    monitor_mode;                /* Whether we need to wrap the monitor, boolean. */
 
 	struct dag_task_category *category; /* Indicates the category to which the rules belong. The
 					       idea is to have rules that perform similar tasks, or
@@ -223,6 +222,8 @@ char *dag_lookup_set(const char *name, void *arg);
 
 struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label);
 char *dag_task_category_wrap_options(struct dag_task_category *category, const char *default_options, batch_queue_type_t batch_type);
+char *dag_task_category_wrap_as_rmonitor_options(struct dag_task_category *category);
+
 void dag_task_category_get_env_resources(struct dag_task_category *category);
 void dag_task_category_print_debug_resources(struct dag_task_category *category);
 
