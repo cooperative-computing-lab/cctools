@@ -25,6 +25,7 @@ the corresponding log file options.
 */
 
 char *resource_monitor_rewrite_command(char *cmdline, char *template_filename, char *limits_filename,
+				       const char *extra_monitor_options,
 				       int summary, int time_series, int opened_files);
 
 /** Looks for a resource monitor executable, and makes a copy in
