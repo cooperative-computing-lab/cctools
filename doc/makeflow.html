@@ -279,8 +279,13 @@ makeflow ...
 <tr><td> preprocessing </td> <td> - </td> <td> 200 </td> <td> 200 </td> </tr>
 <tr><td> simulation </td> <td> - </td> <td> - </td> <td> 700 </td> </tr>
 <tr><td> analysis </td> <td> 1 </td> <td> 400 </td> <td> 400 </td> </tr>
-<tr><td> default_category </td> <td> 4 </td> <td> - </td> <td> - </td> </tr>
+<tr><td> default_category </td> <td> 4 </td> <td> 100 </td> <td> - </td> </tr>
 </table>
+
+<p> Note that in this example, in job <tt>five</tt>, the CATEGORY temporarily
+has the value of "preprocessing", and then it is re-established to "simulation"
+(so that <tt>four</tt> and <tt>six</tt> belong to the same category). This is
+done using rule lexical scoping, explained in the next section.
 
 <h2>The Fine Details</h2>
 
@@ -322,6 +327,31 @@ Makeflow does not support all of the syntax that you find in various versions of
 <h3>Local Job Execution</h3>
 
 Certain jobs don't make much sense to distribute.  For example, if you have a very fast running job that consumes a large amount of data, then it should simply run on the same machine as Makeflow.  To force this, simply add the word <tt>LOCAL</tt> to the beginning of the command line in the rule.
+
+<h3>Rule Lexical Scope</h3>
+
+Variables in Makeflow have global scope, that is, once defined,
+their value can be accessed from any rule. Sometimes it is useful to
+define a variable locally inside a rule, without affecting the global value. In
+Makeflow, this can be achieved by defining the variables after the rule's
+requirements, but before the rule's command, and prepending the name of the
+variable with <tt>@</tt>, as follows:
+
+<pre>
+SOME_VARIABLE=original_value
+
+#rule 1 target_1: source_1
+	command_1
+
+#rule 2 target_2: source_2
+@SOME_VARIABLE=local_value_for_2
+	command_2
+
+#rule 3 target_3: source_3
+	command_3 </pre>
+
+In this example, SOME_VARIABLE has the value 'original_value' for rules 1 and
+3, and the value 'local_value_for_2' for rule 2.
 
 
 <h3>Batch Job Refinement</h3>
