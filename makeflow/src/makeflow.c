@@ -1375,6 +1375,49 @@ int dag_prepare_for_batch_system(struct dag *d)
 	return 1;
 }
 
+int dag_prepare_for_monitoring(struct dag *d)
+{	
+	struct dag_node *n;
+
+	for(n = d->nodes; n; n = n->next)
+	{
+		if(monitor_mode)
+		{
+			char *log_name_prefix;
+			char *log_name;
+			log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
+			n->command = resource_monitor_rewrite_command((char *) n->command, log_name_prefix,
+					monitor_limits_name,
+					dag_task_category_wrap_as_rmonitor_options(n->category),
+					monitor_mode & 1,
+					monitor_mode & 2,
+					monitor_mode & 4);
+
+			dag_node_add_source_file(n, monitor_exe, NULL);
+
+			log_name = string_format("%s.summary", log_name_prefix);
+			dag_node_add_target_file(n, log_name, NULL);
+
+			free(log_name);
+			if(monitor_mode & 02)
+			{
+				log_name = string_format("%s.series", log_name_prefix);
+				dag_node_add_target_file(n, log_name, NULL);
+				free(log_name);
+			}
+
+			if(monitor_mode & 04)
+			{
+				log_name = string_format("%s.files", log_name_prefix);
+				dag_node_add_target_file(n, log_name, NULL);
+				free(log_name);
+			}
+		}
+	}
+
+	return 1;
+}
+
 void dag_parse_node_set_command(struct lexer_book *bk, struct dag_node *n, char *command)
 {
 	struct dag_lookup_set s = { bk->d, n, NULL };
@@ -1540,37 +1583,6 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 	int len = 0, len_temp;
 	char *tmp;
-
-	if(monitor_mode)
-	{
-		char *log_name_prefix;
-		char *log_name;
-		log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
-		n->command = resource_monitor_rewrite_command((char *) n->command, log_name_prefix,
-							   monitor_limits_name,
-							   dag_task_category_wrap_as_rmonitor_options(n->category),
-							   monitor_mode & 1,
-							   monitor_mode & 2,
-							   monitor_mode & 4);
-
-		log_name = string_format("%s.summary", log_name_prefix);
-		dag_node_add_target_file(n, log_name, NULL);
-		free(log_name);
-		if(monitor_mode & 02)
-		{
-			log_name = string_format("%s.series", log_name_prefix);
-			dag_node_add_target_file(n, log_name, NULL);
-			free(log_name);
-		}
-
-		if(monitor_mode & 04)
-		{
-			log_name = string_format("%s.files", log_name_prefix);
-			dag_node_add_target_file(n, log_name, NULL);
-			free(log_name);
-		}
-
-	}
 
 	printf("%s\n", n->command);
 
@@ -2759,6 +2771,10 @@ int main(int argc, char *argv[])
 		if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
 			d->remote_jobs_max = MIN(d->local_jobs_max, n);
 		}
+	}
+
+	if(!dag_prepare_for_monitoring(d)) {
+		fatal("Could not prepare for monitoring.\n");
 	}
 
 	if(!dag_prepare_for_batch_system(d)) {

@@ -139,6 +139,9 @@ char *resource_monitor_rewrite_command(char *cmdline, char *template_filename, c
 	if(limits_filename)
 		index += sprintf(cmd_builder + index, "--limits-file=%s ", limits_filename);
 
+	if(extra_monitor_options)
+		index += sprintf(cmd_builder + index, "%s ", extra_monitor_options);
+
 	sprintf(cmd_builder + index, "-- %s", cmdline);
 
 	return xxstrdup(cmd_builder);
