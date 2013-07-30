@@ -48,8 +48,8 @@ run()
 
 clean()
 {
-    kill -9 `cat $PIDMASTER_FILE`
-    kill -9 `cat $PIDWORKER_FILE`
+    /bin/kill -9 `cat $PIDMASTER_FILE`
+    /bin/kill -9 `cat $PIDWORKER_FILE`
 
 	xargs rm < $TEST_INPUT
 	

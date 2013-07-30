@@ -84,7 +84,7 @@ run()
 clean()
 {
 	if [ -r "$chirp_pid" ]; then
-		kill -9 `cat $chirp_pid`
+		/bin/kill -9 `cat $chirp_pid`
 	fi
 	rm -f "$chirp_debug" "$chirp_pid" "$chirp_port" "$parrot_debug" "$expected" "$output"
 }

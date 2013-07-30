@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 if [ ! -r Makefile.config ]; then
     echo "Please run ./configure && make before executing the test script" 
@@ -9,7 +9,9 @@ CCTOOLS_PACKAGES=$(grep CCTOOLS_PACKAGES Makefile.config | cut -d = -f 2)
 if [ -z "$CCTOOLS_TEST_LOG" ]; then
 	CCTOOLS_TEST_LOG="./cctools.test.log"
 fi
-if [ "${CCTOOLS_TEST_LOG:0:1}" != "/" ]; then
+
+#absolute path?
+if [ -z "$(echo $CCTOOLS_TEST_LOG | sed -n 's:^/.*$:x:p')" ]; then
 	CCTOOLS_TEST_LOG="$(pwd)/${CCTOOLS_TEST_LOG}"
 fi
 export CCTOOLS_TEST_LOG
@@ -55,4 +57,7 @@ STOP_TIME=$(date +%s)
 TOTAL=$((SUCCESS+FAILURE))
 ELAPSED=$((STOP_TIME-START_TIME))
 
-echo -ne "\nTest Results: ${FAILURE} of ${TOTAL} tests failed in ${ELAPSED} seconds.\n\n"
+echo ""
+echo "Test Results: ${FAILURE} of ${TOTAL} tests failed in ${ELAPSED} seconds."
+echo ""
+

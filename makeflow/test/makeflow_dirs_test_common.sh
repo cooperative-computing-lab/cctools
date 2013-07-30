@@ -1,3 +1,5 @@
+#! /bin/sh
+
 STATUS_FILE=makeflow.status
 PIDWORKER_FILE=worker.pid
 PORT_FILE=makeflow.port
@@ -55,7 +57,7 @@ clean()
 	rm -rf input
 	rm -rf mydir
 
-	[ -f $PIDWORKER_FILE ] && kill -9 `cat $PIDWORKER_FILE`
+	[ -f $PIDWORKER_FILE ] && /bin/kill -9 `cat $PIDWORKER_FILE`
 
 	exit 0
 }

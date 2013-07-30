@@ -40,15 +40,18 @@ run() {
   ;;
   esac
 
-  if [ ! "-rwxrwxrwx" == "$cmd" ]; then
+  if [ ! "-rwxrwxrwx" = "$cmd" ]
+  then
     exit 1
   fi
 
   first_line=`head -n 1 $out_dir/complex.mf`
-  if [ ! $? == 0 ]; then
+  if [ $? != 0 ]
+  then
     exit 1
   fi
-  if [ ! "VARIABLE=\"testing\"" == "$first_line" ]; then
+  if [ ! "VARIABLE=\"testing\"" = "$first_line" ]
+  then
     exit 1
   fi
 
