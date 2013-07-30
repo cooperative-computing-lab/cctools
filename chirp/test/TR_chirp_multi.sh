@@ -55,10 +55,10 @@ EOF
 clean()
 {
 	if [ -r "$chirp_1_pid" ]; then
-		kill -9 `cat "$chirp_1_pid"`
+		/bin/kill -9 `cat "$chirp_1_pid"`
 	fi
 	if [ -r "$chirp_2_pid" ]; then
-		kill -9 `cat "$chirp_2_pid"`
+		/bin/kill -9 `cat "$chirp_2_pid"`
 	fi
 
 	rm -rf "$chirp_1_debug" "$chirp_1_pid" "$chirp_1_port" "$chirp_1_root"

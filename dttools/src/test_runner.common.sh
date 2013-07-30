@@ -49,8 +49,6 @@ wait_for_file_modification()
 	filename=$1
 	timeout=${2:-5}
 
-	declare -i mtime
-
     case `uname -s` in
     	Darwin)
 			args="-f %m $filename"
@@ -65,7 +63,7 @@ wait_for_file_modification()
 		[ ! -f $filename ] && exit 1
 		mtime=`stat $args`
 		now=`date +"%s"`
-		delta=$(($now - $mtime))
+		delta=$(($now-$mtime))
 		[  $delta -gt 3 ] && break
 	done
 }

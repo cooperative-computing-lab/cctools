@@ -54,8 +54,8 @@ run()
 
 clean()
 {
-	[ -f $PIDWORKER_FILE ] && kill -9 `cat $PIDWORKER_FILE`
-	[ -f $PIDMASTER_FILE ] && kill -9 `cat $PIDMASTER_FILE`
+	[ -f $PIDWORKER_FILE ] && /bin/kill -9 `cat $PIDWORKER_FILE`
+	[ -f $PIDMASTER_FILE ] && /bin/kill -9 `cat $PIDMASTER_FILE`
 
 	rm -f $TEST_INPUT
 	rm -f $TEST_OUTPUT

@@ -11,7 +11,7 @@ I=0
 while [ $I -lt $N ]; do
 		echo "$I 0 $I" >> ${filename}
 		echo "0 $I $I" >> ${filename}
-		((I++))
+		I=$((I+1))
 done
 
 

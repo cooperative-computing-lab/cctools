@@ -1,9 +1,9 @@
-#!/bin/bash
+#! /bin/sh
 
 export ATLAS_LOCAL_ROOT_BASE=/cvmfs/atlas.cern.ch/repo/ATLASLocalRootBase
 
 echo "atlasLocalSetup"
-source ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh
+. ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh
 
 echo "cleaning up workspace"
 rm -rf athena/17.2.4
@@ -25,3 +25,4 @@ JOBOPTSEARCHPATH=/cvmfs/atlas.cern.ch/repo/sw/Generators/MC12JobOptions/latest/s
 
 echo "running simulation"
 Generate_trf.py ecmEnergy=8000. runNumber=105144 firstEvent=1 maxEvents=10 randomSeed=1324354657 jobConfig=MC12.147816.Pythia8_AU2CTEQ6L1_Zee.py outputEVNTFile=pythia.EVNT.pool.root
+
