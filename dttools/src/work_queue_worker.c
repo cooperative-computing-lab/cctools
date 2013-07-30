@@ -1571,6 +1571,10 @@ static void foreman_for_master(struct link *master) {
 
 	time_t idle_stoptime = time(0) + idle_timeout;
 
+	struct work_queue_resource disk_stats; //holds total and inuse info
+	disk_stats.total = local_resources->disk.total;
+	disk_stats.inuse = local_resources->disk.inuse;
+
 	while(!abort_flag) {
 		int result = 1;
 		struct work_queue_task *task = NULL;
@@ -1591,10 +1595,15 @@ static void foreman_for_master(struct link *master) {
 
 		// BUG: we currently report the sum of disk space.
 		// Should be reporting the disk space available at the foreman.
-		debug(D_WQ,"Before info - cores:%d memory:%d disk:%d\n", local_resources->cores.total,local_resources->memory.total,local_resources->disk.total);
+
+		
 		work_queue_get_resources(foreman_q,local_resources);
+		local_resources->disk.total = disk_stats.total; //overwrite to get foreman's important resources
+		local_resources->disk.inuse = disk_stats.inuse;
+
+		debug(D_WQ,"Foreman local disk inuse and total: %d %d\n",local_resources->disk.inuse,local_resources->disk.total);
+		debug(D_WQ,"Foreman workspace -- %s\n", workspace);
 		send_resource_update(master,0);
-		debug(D_WQ,"After info - cores:%d memory:%d disk:%d\n", local_resources->cores.total,local_resources->memory.total,local_resources->disk.total);
 		
 		if(master_active) {
 			result &= handle_master(master);
@@ -2034,6 +2043,7 @@ int main(int argc, char *argv[])
 	local_resources = work_queue_resources_create();
 	local_resources_last = work_queue_resources_create();
 	work_queue_resources_measure(local_resources,workspace);
+
 	if(worker_mode == WORKER_MODE_FOREMAN){
 		local_resources->cores.total = 0;
 		local_resources->memory.total = 0;
