@@ -1235,7 +1235,7 @@ static void show_help(const char *cmd)
 {
     fprintf(stdout, "\nUse: %s [options] -- command-line-and-options\n\n", cmd);
     fprintf(stdout, "%-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
-    fprintf(stdout, "%-30s Send debugging output to <file>.\n", "-g,--debug-file=<file>");
+    fprintf(stdout, "%-30s Send debugging output to <file>.\n", "-o,--debug-file=<file>");
     fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
     fprintf(stdout, "%-30s Show version string\n", "-v,--version");
     fprintf(stdout, "\n");
@@ -1353,7 +1353,7 @@ int main(int argc, char **argv) {
 	    {
 		    /* Regular Options */
 		    {"debug",      required_argument, 0, 'd'},
-		    {"debug-file", required_argument, 0, 'g'},
+		    {"debug-file", required_argument, 0, 'o'},
 		    {"help",       required_argument, 0, 'h'},
 		    {"version",    no_argument,       0, 'v'},
 		    {"interval",   required_argument, 0, 'i'},
@@ -1376,105 +1376,104 @@ int main(int argc, char **argv) {
 		    {0, 0, 0, 0}
 	    };
 
-    while((c = getopt_long(argc, argv, "d:fg:hi:L:l:o:v", long_options, NULL)) >= 0)
+    while((c = getopt_long(argc, argv, "d:fhi:L:l:o:O:v", long_options, NULL)) >= 0)
     {
-	    switch (c) {
-            case 'd':
-		    debug_flags_set(optarg);
-		    break;
-	    case 'g':
-		    debug_config_file(optarg);
-		    break;
-            case 'h':
-		    show_help(argv[0]);
-		    return 0;
-		    break;
-	    case 'v':
-		    cctools_version_print(stdout, argv[0]);
-		    return 0;
-            case 'i':
-		    interval = strtoll(optarg, NULL, 10);
-		    if(interval < 1)
-			    fatal("interval cannot be set to less than one microsecond.");
-		    break;
-            case 'l':
-		    parse_limits_file(resources_limits, optarg);
-		    break;
-            case 'L':
-		    parse_limits_string(resources_limits, optarg);
-		    break;
-            case 'f':
-		    child_in_foreground = 1;
-		    break;
-            case 'O':
-		    if(template_path)
-			    free(template_path);
-		    if(summary_path)
-		    {
-			    free(summary_path);
-			    summary_path = NULL;
-		    }
-		    if(series_path)
-		    {
-			    free(series_path);
-			    series_path = NULL;
-		    }
-		    if(opened_path)
-		    {
-			    free(opened_path);
-			    opened_path = NULL;
-		    }
-		    template_path = xxstrdup(optarg);
-		    break;
-
-	    case 0:
-		    if(summary_path)
-			    free(summary_path);
-		    summary_path = xxstrdup(optarg);
-		    use_summary = 1;
-		    break;
-            case  1:
-		    if(series_path)
-			    free(series_path);
-		    series_path = xxstrdup(optarg);
-		    use_series  = 1;
-		    break;
-            case  2:
-		    if(opened_path)
-			    free(opened_path);
-		    opened_path = xxstrdup(optarg);
-		    use_opened  = 1;
-		    break;
-            case  3:
-		    if(summary_path)
-			    free(summary_path);
-		    summary_path = NULL;
-		    use_summary = 0;
-		    break;
-            case  4:
-		    if(series_path)
-			    free(series_path);
-		    series_path = NULL;
-		    use_series  = 0;
-		    break;
-            case  5:
-		    if(opened_path)
-			    free(opened_path);
-		    opened_path = NULL;
-		    use_opened  = 0;
-		    break;
-	    case 6:
-		    resources_flags->workdir_footprint = 1;
-		    break;
-	    case 7:
-		    resources_flags->workdir_footprint = 0;
-		    break;
-            default:
-		    show_help(argv[0]);
-		    return 1;
-		    break;
-	    }
-    }
+		switch (c) {
+			case 'd':
+				debug_flags_set(optarg);
+				break;
+			case 'o':
+				debug_config_file(optarg);
+				break;
+			case 'h':
+				show_help(argv[0]);
+				return 0;
+				break;
+			case 'v':
+				cctools_version_print(stdout, argv[0]);
+				return 0;
+			case 'i':
+				interval = strtoll(optarg, NULL, 10);
+				if(interval < 1)
+					fatal("interval cannot be set to less than one microsecond.");
+				break;
+			case 'l':
+				parse_limits_file(resources_limits, optarg);
+				break;
+			case 'L':
+				parse_limits_string(resources_limits, optarg);
+				break;
+			case 'f':
+				child_in_foreground = 1;
+				break;
+			case 'O':
+				if(template_path)
+					free(template_path);
+				if(summary_path)
+				{
+					free(summary_path);
+					summary_path = NULL;
+				}
+				if(series_path)
+				{
+					free(series_path);
+					series_path = NULL;
+				}
+				if(opened_path)
+				{
+					free(opened_path);
+					opened_path = NULL;
+				}
+				template_path = xxstrdup(optarg);
+				break;
+			case 0:
+				if(summary_path)
+					free(summary_path);
+				summary_path = xxstrdup(optarg);
+				use_summary = 1;
+				break;
+			case  1:
+				if(series_path)
+					free(series_path);
+				series_path = xxstrdup(optarg);
+				use_series  = 1;
+				break;
+			case  2:
+				if(opened_path)
+					free(opened_path);
+				opened_path = xxstrdup(optarg);
+				use_opened  = 1;
+				break;
+			case  3:
+				if(summary_path)
+					free(summary_path);
+				summary_path = NULL;
+				use_summary = 0;
+				break;
+			case  4:
+				if(series_path)
+					free(series_path);
+				series_path = NULL;
+				use_series  = 0;
+				break;
+			case  5:
+				if(opened_path)
+					free(opened_path);
+				opened_path = NULL;
+				use_opened  = 0;
+				break;
+			case 6:
+				resources_flags->workdir_footprint = 1;
+				break;
+			case 7:
+				resources_flags->workdir_footprint = 0;
+				break;
+			default:
+				show_help(argv[0]);
+				return 1;
+				break;
+		}
+	}
 
     rmsummary_debug_report(resources_limits);
 
