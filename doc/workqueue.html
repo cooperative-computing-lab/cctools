@@ -403,11 +403,11 @@ Then, modify your master program to use the password:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
-work_queue_specify_password_file(q,mypwfile);
+ work_queue_specify_password_file(q,mypwfile);
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- q.specify_password_file(mypwfile);
+ q.specify_password_file(mypwfile)
 </pre>
 </div>
 <p>
@@ -460,6 +460,60 @@ in the <tt>-N</tt> option. For example:
 % work_queue_worker -N foreman_myproject 
 </pre></div>
 
+<h2>Multi-slot workers</h2>
+
+<p>The Work Queue workers, by default, advertise a single slot spanning a single
+core. As a result, the workers only execute a single core task by default.
+
+<p>The multi-slot feature enables workers to span across all available resources
+(cores, memory, disk) and simultaneously execute multiple tasks that can be
+accomodated within the available resource sizes.
+
+<p>To start a multi-slot worker, you can specify the worker to automatically
+report the number of cores present at its execution site as: 
+<div class ="code_area"><pre class="code_snip">
+% work_queue_worker --cores 0  MACHINENAME 9123
+</pre></div>
+
+<p>Note that the worker always reports the available memory and disk space
+observed at its execution site.
+
+<p>You can also manually specify the cores, memory, and disk that a worker
+should report back to the master as being available using the <tt>cores</tt>,
+<tt>memory</tt>, and <tt>disk</tt> command-line arguments. For example, to have
+a worker report 2 cores, 1 GB of memory, and 8 GB of disk as being available for
+task executions, do:
+<div class ="code_area"><pre class="code_snip">
+% work_queue_worker --cores 2 --memory 1000 --disk 8000  MACHINENAME 9123
+</pre></div>
+
+<p>To take advantage of the multi-slot workers, the tasks submitted to the Work
+Queue need to be annotated with their resource requirements in terms of cores,
+memory, and disk.
+
+<div class="code_area">
+<h4 class="code_header">C/Perl</h4>
+<pre class="code_snip">
+ work_queue_task_specify_cores(t, 2); //needs 2 cores 
+ work_queue_task_specify_memory(t, 100); //needs 100 MB memory
+ work_queue_task_specify_disk(t, 1000); //needs 1 GB disk
+
+</pre>
+<h4 class="code_header">Python</h4>
+<pre class="code_snip">
+ t.specify_cores(2) #needs 2 cores
+ t.specify_memory(100) #needs 100 MB memory
+ t.specify_disk(1000) #needs 1 GB disk
+</pre>
+</div>
+
+<p> Note that if no requirements are specified, a task consumes an entire
+worker. If one or more requirements are specified, a task is assumed to consume
+those requirements and the unlabeled resource requirements are assumed to be
+negligible.  For example, if you annotate a task as using 1 core, but don't
+specify its memory or disk requirements, then Work Queue will schedule two such
+tasks to a two-slot worker, regardless of their memory or disk usage.
+
 <h2>Advanced Usage</h2>
 
 The technique described above is suitable for distributed programs of
@@ -503,7 +557,7 @@ to the resolved file name. For example:
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- t.specify_file(t,"a.$OS.$ARCH","a",WORK_QUEUE_INPUT,cache=True)
+ t.specify_file("a.$OS.$ARCH","a",WORK_QUEUE_INPUT,cache=True)
 </pre>
 </div>
 This will transfer <tt>a.Linux.x86_64</tt> to workers running on a Linux system
