@@ -191,48 +191,7 @@ and <tt>torque_submit_workers</tt>.
 are simple shell scripts, so you can edit them directly if you would
 like to change batch options or other details.
 
-<h2>The Fine Details</h2>
-
-The Makeflow language is very similar to Make, but it does have a few important differences that you should be aware of.
-
-<h3>Get the Dependencies Right</h3>
-
-You must be careful to accurately specify <b>all of the files that a rule requires and creates</b>, including any custom executables.  This is because Makeflow requires all these information to construct the environment for a remote job.  For example, suppose that you have written a simulation program called <tt>mysim.exe</tt> that reads <tt>calib.data</tt> and then produces and output file.  The following rule won't work, because it doesn't inform Makeflow what files are neded to execute the simulation:
-<pre>
-# This is an incorrect rule.
-
-output.txt:
-        ./mysim.exe -c calib.data -o output.txt
-</pre>
-
-However, the following is correct, because the rule states all of the files needed to run the simulation.  Makeflow will use this information to
-construct a batch job that consists of <tt>mysim.exe</tt> and <tt>calib.data</tt> and uses it to produce <tt>output.txt</tt>:
-
-<pre>
-# This is a correct rule.
-
-output.txt: mysim.exe calib.data
-        ./mysim.exe -c calib.data -o output.txt
-</pre>
-When a regular file is specified as an input file, it means the command relies on the contents of that file. When a directory is specified as an input file, however, it could mean one of two things. First, the command depends on the contents inside the directory. Second, the command relies on the existence of the directory (for example, you just want to add more things into the directory later, it does not matter what's already in it). <b>Makeflow assumes that an input directory indicates that the command relies on the directory's existence</b>.
-
-<h3>No Phony Rules</h3>
-
-For a similar reason, you cannot have "phony" rules that don't actually
-create the specified files.  For example, it is common practice to define
-a <tt>clean</tt> rule in Make that deletes all derived files.  This doesn't
-make sense in Makeflow, because such a rule does not actually create 
-a file named <tt>clean</tt>.  Instead use the <tt>-c</tt> option as shown above.
-
-<h3>Just Plain Rules</h3>
-
-Makeflow does not support all of the syntax that you find in various versions of Make.  Each rule must have exactly one command to execute.  If you have multiple commands, simply join them together with semicolons.  Makeflow allows you to define and use variables, but it does not support  pattern rules, wildcards, or special variables like <tt>$&lt;</tt> or <tt>$@</tt>.  You simply have to write out the rules longhand, or write a script in your favorite language to generate a large Makeflow.
-
-<h3>Local Job Execution</h3>
-
-Certain jobs don't make much sense to distribute.  For example, if you have a very fast running job that consumes a large amount of data, then it should simply run on the same machine as Makeflow.  To force this, simply add the word <tt>LOCAL</tt> to the beginning of the command line in the rule.
-
-<h3>Jobs Categories</h3>
+<h2>Resources Categories</h2>
 
 Makeflow has the capability of automatically setting the cores, memory,
 and disk space requirements to the underlying batch system (currently this only
@@ -322,6 +281,48 @@ makeflow ...
 <tr><td> analysis </td> <td> 1 </td> <td> 400 </td> <td> 400 </td> </tr>
 <tr><td> default_category </td> <td> 4 </td> <td> - </td> <td> - </td> </tr>
 </table>
+
+<h2>The Fine Details</h2>
+
+The Makeflow language is very similar to Make, but it does have a few important differences that you should be aware of.
+
+<h3>Get the Dependencies Right</h3>
+
+You must be careful to accurately specify <b>all of the files that a rule requires and creates</b>, including any custom executables.  This is because Makeflow requires all these information to construct the environment for a remote job.  For example, suppose that you have written a simulation program called <tt>mysim.exe</tt> that reads <tt>calib.data</tt> and then produces and output file.  The following rule won't work, because it doesn't inform Makeflow what files are neded to execute the simulation:
+<pre>
+# This is an incorrect rule.
+
+output.txt:
+        ./mysim.exe -c calib.data -o output.txt
+</pre>
+
+However, the following is correct, because the rule states all of the files needed to run the simulation.  Makeflow will use this information to
+construct a batch job that consists of <tt>mysim.exe</tt> and <tt>calib.data</tt> and uses it to produce <tt>output.txt</tt>:
+
+<pre>
+# This is a correct rule.
+
+output.txt: mysim.exe calib.data
+        ./mysim.exe -c calib.data -o output.txt
+</pre>
+When a regular file is specified as an input file, it means the command relies on the contents of that file. When a directory is specified as an input file, however, it could mean one of two things. First, the command depends on the contents inside the directory. Second, the command relies on the existence of the directory (for example, you just want to add more things into the directory later, it does not matter what's already in it). <b>Makeflow assumes that an input directory indicates that the command relies on the directory's existence</b>.
+
+<h3>No Phony Rules</h3>
+
+For a similar reason, you cannot have "phony" rules that don't actually
+create the specified files.  For example, it is common practice to define
+a <tt>clean</tt> rule in Make that deletes all derived files.  This doesn't
+make sense in Makeflow, because such a rule does not actually create 
+a file named <tt>clean</tt>.  Instead use the <tt>-c</tt> option as shown above.
+
+<h3>Just Plain Rules</h3>
+
+Makeflow does not support all of the syntax that you find in various versions of Make.  Each rule must have exactly one command to execute.  If you have multiple commands, simply join them together with semicolons.  Makeflow allows you to define and use variables, but it does not support  pattern rules, wildcards, or special variables like <tt>$&lt;</tt> or <tt>$@</tt>.  You simply have to write out the rules longhand, or write a script in your favorite language to generate a large Makeflow.
+
+<h3>Local Job Execution</h3>
+
+Certain jobs don't make much sense to distribute.  For example, if you have a very fast running job that consumes a large amount of data, then it should simply run on the same machine as Makeflow.  To force this, simply add the word <tt>LOCAL</tt> to the beginning of the command line in the rule.
+
 
 <h3>Batch Job Refinement</h3>
 
