@@ -65,6 +65,7 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 	rmsummary_assign_as_int_field   (s, key, value, bytes_written);
 	rmsummary_assign_as_int_field   (s, key, value, workdir_num_files);
 	rmsummary_assign_as_int_field   (s, key, value, workdir_footprint);
+	rmsummary_assign_as_int_field   (s, key, value, cores);
 
 	return 0;
 }
