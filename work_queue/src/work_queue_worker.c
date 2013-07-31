@@ -449,18 +449,22 @@ static int handle_tasks(struct link *master) {
 	int result = 0;
 	struct work_queue_file *tf;
 	char dirname[WORK_QUEUE_LINE_MAX];
+	int status;
 	
 	itable_firstkey(active_tasks);
 	while(itable_nextkey(active_tasks, (UINT64_T*)&pid, (void**)&ti)) {
-		result = wait4(pid, &ti->status, WNOHANG, &ti->rusage);
+		result = wait4(pid, &status, WNOHANG, &ti->rusage);
 		if(result) {
 			if(result < 0) {
 				debug(D_WQ, "Error checking on child process (%d).", ti->pid);
 				abort_flag = 1;
 				return 0;
 			}
-			if (!WIFEXITED(ti->status)){
+			if (!WIFEXITED(status)){
 				debug(D_WQ, "Task (process %d) did not exit normally.\n", ti->pid);
+				ti->status = WTERMSIG(status);
+			} else {
+				ti->status = WEXITSTATUS(status);
 			}
 			
 			ti->execution_end = timestamp_get();
@@ -469,7 +473,7 @@ static int handle_tasks(struct link *master) {
 			itable_remove(stored_tasks, ti->taskid);
 			itable_firstkey(active_tasks);
 			
-			if(WIFEXITED(ti->status)) {
+			if(WIFEXITED(status)) {
 				sprintf(dirname, "t.%d", ti->taskid);
 				list_first_item(ti->task->output_files);
 				while((tf = (struct work_queue_file *)list_next_item(ti->task->output_files))) {
