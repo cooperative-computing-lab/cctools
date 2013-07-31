@@ -255,12 +255,14 @@ static int get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
 static int get_worker_state(struct work_queue *q, struct work_queue_worker *w) {
 	if(!strcmp(w->hostname, "unknown")) {
 		return WORKER_STATE_INIT;
-	} else if(get_worker_cores(q, w) && !w->cores_allocated ) {
+	} else if(get_worker_cores(q, w) && itable_size(w->current_tasks) == 0 ) {
 		return WORKER_STATE_READY;
-	} else if(w->cores_allocated < get_worker_cores(q,w)) {
-		return WORKER_STATE_BUSY;
-	} else {
-		return WORKER_STATE_FULL;
+	} else if(get_worker_cores(q, w) && itable_size(w->current_tasks) > 0) {
+		if(get_worker_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total < w->memory_allocated) {
+			return WORKER_STATE_BUSY;
+		} else {
+			return WORKER_STATE_FULL;
+		}
 	}
 	return WORKER_STATE_NONE;
 }
