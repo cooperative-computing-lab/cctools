@@ -533,22 +533,21 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 		      first_process_pid,
 		      strsignal(WIFSIGNALED(wait_status) ? WTERMSIG(wait_status) : WSTOPSIG(wait_status)));
 
-		if(summary->limits_exceeded)
-		{
-			summary->exit_type = xxstrdup("limits");
-			summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
-		}
-		else
-		{
-			summary->exit_type = xxstrdup("signal");
-			summary->exit_status = -1;
-		}
+		summary->exit_type = xxstrdup("signal");
+		summary->exit_status = -1;
 
 		if(WIFSIGNALED(wait_status))
 			summary->signal    = WTERMSIG(wait_status);
 		else
 			summary->signal    = WSTOPSIG(wait_status);
 	} 
+
+	if(summary->limits_exceeded)
+	{
+		free(summary->exit_type);
+		summary->exit_type = xxstrdup("limits");
+		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
+	}
 
 }
 
@@ -595,15 +594,15 @@ int monitor_final_summary()
 
 	summary->end       = usecs_since_epoch();
 	summary->wall_time = summary->end - summary->start;
+
+	if(summary->exit_status == 0 && summary->limits_exceeded)
+		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
 	
 	if(log_summary)
 		rmsummary_print(log_summary, summary);
 
 	if(log_opened)
 		monitor_file_io_summaries();
-
-	if(summary->limits_exceeded)
-		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
 
 	return summary->exit_status;
 }

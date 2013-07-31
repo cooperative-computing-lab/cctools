@@ -1412,6 +1412,8 @@ int dag_prepare_for_monitoring(struct dag *d)
 				dag_node_add_target_file(n, log_name, NULL);
 				free(log_name);
 			}
+
+			free(log_name_prefix);
 		}
 	}
 
@@ -1784,7 +1786,26 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 
 	if(job_failed) {
 		dag_node_state_change(d, n, DAG_NODE_STATE_FAILED);
-		if(dag_retry_flag || info->exit_code == 101) {
+		if(monitor_mode && info->exit_code == 147)
+		{
+			fprintf(stderr, "\nrule %d failed because it exceeded the resources limits.\n", n->nodeid);
+			char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
+			char *summary_name = string_format("%s.summary", log_name_prefix);
+			struct rmsummary *s = rmsummary_parse_limits_exceeded(summary_name);
+
+			if(s)
+			{
+				rmsummary_print(stderr, s);
+				free(s);
+				fprintf(stderr, "\n");
+			}
+
+			free(log_name_prefix);
+			free(summary_name);
+
+			dag_failed_flag = 1;
+		}
+		else if(dag_retry_flag || info->exit_code == 101) {
 			n->failure_count++;
 			if(n->failure_count > dag_retry_max) {
 				fprintf(stderr, "job %s failed too many times.\n", n->command);
@@ -1793,7 +1814,9 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 				fprintf(stderr, "will retry failed job %s\n", n->command);
 				dag_node_state_change(d, n, DAG_NODE_STATE_WAITING);
 			}
-		} else {
+		} 
+		else
+		{
 			dag_failed_flag = 1;
 		}
 	} else {
