@@ -464,11 +464,11 @@ void dag_task_category_get_env_resources(struct dag_task_category *category)
 void dag_task_category_print_debug_resources(struct dag_task_category *category)
 {
 	if( category->resources->cores > -1 )
-		debug(D_DEBUG, "minimum # cores:  %d.\n",    category->resources->cores);
+		debug(D_DEBUG, "cores:  %d.\n",    category->resources->cores);
 	if( category->resources->resident_memory > -1 )
-		debug(D_DEBUG, "minimum memory:   %d MB.\n", category->resources->resident_memory);
+		debug(D_DEBUG, "memory:   %d MB.\n", category->resources->resident_memory);
 	if( category->resources->workdir_footprint > -1 )
-		debug(D_DEBUG, "minimum disk:     %d MB.\n", category->resources->workdir_footprint);
+		debug(D_DEBUG, "disk:     %d MB.\n", category->resources->workdir_footprint);
 }
 
 char *dag_task_category_wrap_as_wq_options(struct dag_task_category *category, const char *default_options)
@@ -478,36 +478,12 @@ char *dag_task_category_wrap_as_wq_options(struct dag_task_category *category, c
 	s = category->resources;
 
 	char *options = NULL;
-	char *opt;
 
-	if( s->cores > -1 )
-	{
-		opt = string_format("%s --cores %" PRId64 " ", options ? options : "", s->cores ); 
-		if(options)
-			free(options);
-		options = opt;
-	}
-	if( s->resident_memory > -1 )
-	{
-		opt = string_format("%s --memory %" PRId64 " ", options ? options : "", s->resident_memory ); 
-		if(options)
-			free(options);
-		options = opt;
-	}
-	if( s->workdir_footprint > -1 )
-	{
-		opt = string_format("%s --disk %" PRId64 " ", options ? options : "", s->workdir_footprint ); 
-		if(options)
-			free(options);
-		options = opt;
-	}
-	if(default_options)
-	{
-		opt = string_format("%s %s", options ? options : "", default_options);
-		if(options)
-			free(options);
-		options = opt;
-	}
+	options = string_format("%s resources: cores: %" PRId64 ", resident_memory: %" PRId64 ", workdir_footprint: %" PRId64,
+			default_options           ? default_options      : "",
+			s->cores             > -1 ? s->cores             : -1,
+			s->resident_memory   > -1 ? s->resident_memory   : -1,
+			s->workdir_footprint > -1 ? s->workdir_footprint : -1);
 
 	return options;
 }
