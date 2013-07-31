@@ -4,6 +4,7 @@
 #include "debug.h"
 #include "stringtools.h"
 #include "macros.h"
+#include "rmsummary.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -117,6 +118,30 @@ void specify_work_queue_task_shared_files(struct work_queue_task *t, const char 
 	}
 }
 
+struct rmsummary *parse_batch_options_resources(char *options_text)
+{
+	char *resources = strstr(options_text, "resources:");
+
+	if(!resources)
+		return NULL;
+
+	resources = strchr(resources, ':') + 1;
+
+	return rmsummary_parse_single(resources, ',');
+}
+
+void work_queue_task_specify_resources(struct work_queue_task *t, struct rmsummary *resources)
+{
+		if(resources->cores > -1)
+			work_queue_task_specify_cores(t, resources->cores);
+
+		if(resources->resident_memory > -1)
+			work_queue_task_specify_memory(t, resources->resident_memory);
+
+		if(resources->workdir_footprint > -1)
+			work_queue_task_specify_disk(t, resources->workdir_footprint);
+}
+
 batch_job_id_t batch_job_submit_work_queue(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
 	char *command = string_format("%s %s", cmd, args);
@@ -146,6 +171,13 @@ batch_job_id_t batch_job_submit_work_queue(struct batch_queue *q, const char *cm
 		specify_work_queue_task_files(t, extra_input_files, extra_output_files);
 	}
 
+	struct rmsummary *resources = parse_batch_options_resources(q->options_text);
+	if(resources)
+	{
+		work_queue_task_specify_resources(t, resources);
+		free(resources);
+	}
+
 	work_queue_submit(q->work_queue, t);
 
 	if(outfile) {
@@ -165,6 +197,13 @@ batch_job_id_t batch_job_submit_simple_work_queue(struct batch_queue * q, const 
 		specify_work_queue_task_shared_files(t, extra_input_files, extra_output_files);
 	} else {
 		specify_work_queue_task_files(t, extra_input_files, extra_output_files);
+	}
+
+	struct rmsummary *resources = parse_batch_options_resources(q->options_text);
+	if(resources)
+	{
+		work_queue_task_specify_resources(t, resources);
+		free(resources);
 	}
 
 	work_queue_submit(q->work_queue, t);
