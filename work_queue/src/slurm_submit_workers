@@ -104,6 +104,11 @@ do
 		--cores)  
 			shift
 			cores=$1
+			if [ $cores = "0" ]; then
+			    parameters="$parameters --exclusive"
+			else
+			    parameters="$parameters --cpus-per-task $cores"
+			fi
 			arguments="$arguments --cores $cores"
 			;; 
 		--memory)  
@@ -168,15 +173,16 @@ fi
 
 mkdir -p ${USER}-workers
 cd ${USER}-workers
-cp $worker .
 
-cat >worker.sh <<EOF
-#!/bin/sh
-#SBATCH --partition sandyb,westmere --ntasks $cores
-./work_queue_worker $arguments $host $port
-EOF
+# cp $worker .
 
-chmod 755 worker.sh
+# cat >worker.sh <<EOF
+# #!/bin/sh
+# # #SBATCH --cpus-per-task $cores
+# ./work_queue_worker $arguments $host $port
+# EOF
+
+# chmod 755 worker.sh
 
 # if [ $use_jobarray = 1 ]
 # then
@@ -189,10 +195,12 @@ chmod 755 worker.sh
 # fi
 
 
-for n in `seq 1 $count`
-do
-    sbatch $parameters worker.sh
-done
+# srun --ntasks $count --nodes $count $parameters work_queue_worker $arguments $host $port
+
+sbatch --job-name wqWorker --ntasks $count --nodes $count $parameters <<EOF 
+#!/bin/sh
+srun work_queue_worker $arguments $host $port
+EOF
 
 return_status=$?
 
