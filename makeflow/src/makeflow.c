@@ -1177,19 +1177,23 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 		} else {
 			s.table = d->variables;
 		}
-		new_value = calloc(strlen(old_value) + strlen(value) + 2, sizeof(char));
-		new_value = strcpy(new_value, old_value);
-		new_value = strcat(new_value, " ");
-		free(old_value);
-		value = strcat(new_value, value);
-		hash_table_insert(s.table, name, value);
+		new_value = realloc(old_value, (strlen(old_value) + strlen(value) + 2) * sizeof(char));
+		if(!new_value)
+			fatal("Could not allocate memory for makeflow variable: %s\n", name);
+		strcat(new_value, " ");
+		strcat(new_value, value);
+		hash_table_insert(s.table, name, new_value);
 	} else {
 		hash_table_insert((n ? n->variables : d->variables), name, xxstrdup(value));
 	}
 
 	dag_parse_process_special_variable(bk, n, name, value);
 
-	debug(D_DEBUG, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
+	if(strcmp(name, "_MAKEFLOW_COLLECT_LIST") == 0)
+		debug(D_DEBUG, "updating _MAKEFLOW_COLLECT_LIST with: %s\n",  value);
+	else
+		debug(D_DEBUG, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
+
 	return 1;
 }
 

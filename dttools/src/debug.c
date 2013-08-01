@@ -154,10 +154,10 @@ static void do_debug(int is_fatal, INT64_T flags, const char *fmt, va_list args)
 	gettimeofday(&tv, 0);
 	tm = localtime(&tv.tv_sec);
 
-	sprintf(newfmt, "%04d/%02d/%02d %02d:%02d:%02d.%02ld [%d] %s: %s: %s", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (long) tv.tv_usec / 10000, (int) debug_getpid(), program_name,
+	snprintf(newfmt, 65536, "%04d/%02d/%02d %02d:%02d:%02d.%02ld [%d] %s: %s: %s", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (long) tv.tv_usec / 10000, (int) debug_getpid(), program_name,
 		is_fatal ? "fatal " : flag_to_name(flags), fmt);
 
-	vsprintf(buffer, newfmt, args);
+	vsnprintf(buffer, 65536, newfmt, args);
 	string_chomp(buffer);
 	strcat(buffer, "\n");
 	length = strlen(buffer);
