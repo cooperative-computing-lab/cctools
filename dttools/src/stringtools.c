@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 
 #include <assert.h>
+#include <glob.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -501,6 +502,25 @@ void string_cookie(char *s, int length)
 	s[length - 1] = 0;
 }
 
+char *string_glob(const char *pattern)
+{
+	char *result = strdup("");
+	glob_t globbuf;
+	size_t i;
+
+	if(glob(pattern, 0, NULL, &globbuf) == 0) {
+		for (i = 0; i < globbuf.gl_pathc; i++) {
+			if (i > 0) {
+				result = string_combine(result, " ");
+			}
+			result = string_combine(result, globbuf.gl_pathv[i]);
+		}
+	} 
+	globfree(&globbuf);
+	
+	return result;
+}
+
 char *string_subst(char *value, string_subst_lookup_t lookup, void *arg)
 {
 	char *subvalue, *newvalue;
@@ -539,16 +559,21 @@ char *string_subst(char *value, string_subst_lookup_t lookup, void *arg)
 		} else {
 			ldelim--;
 			rdelim = ldelim + 1;
-			while(isalnum((int) *rdelim) || *rdelim == '_')
+			while(isalnum((int) *rdelim) || *rdelim == '_' || *rdelim == '^' || *rdelim == '@') {
 				rdelim++;
+			}
 		}
-
+		
 		oldrdelim = *rdelim;
 		*rdelim = 0;
 
-		subvalue = lookup(ldelim + 1, arg);
-		if(!subvalue)
-			subvalue = strdup("");
+		if (strncmp("wildcard ", ldelim + 1, 9) == 0) {
+			subvalue = string_glob(ldelim + 10);
+		} else {
+			subvalue = lookup(ldelim + 1, arg);
+			if(!subvalue)
+				subvalue = strdup("");
+		}
 
 		*rdelim = oldrdelim;
 
@@ -559,7 +584,7 @@ char *string_subst(char *value, string_subst_lookup_t lookup, void *arg)
 			free(value);
 			return 0;
 		}
-
+		
 		if(ldelim != dollar)
 			rdelim++;
 		*dollar = 0;
