@@ -1602,7 +1602,7 @@ static void foreman_for_master(struct link *master) {
 		local_resources->disk.inuse = disk_stats.inuse;
 
 		debug(D_WQ,"Foreman local disk inuse and total: %d %d\n",local_resources->disk.inuse,local_resources->disk.total);
-		debug(D_WQ,"Foreman workspace -- %s\n", workspace);
+		//BUG::The workspace of a foreman is not the same as q->workingdir for that foreman so the resources reported are different
 		send_resource_update(master,0);
 		
 		if(master_active) {

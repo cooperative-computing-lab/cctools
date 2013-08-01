@@ -473,7 +473,7 @@ static void update_catalog(struct work_queue *q, struct link *master, int force_
 		work_queue_resources_measure(&local_resources, q->workingdir); //get foreman local resources
 		r.disk.total = local_resources.disk.total; //overwrite the resource struct with this correct disk information
 		r.disk.inuse = local_resources.disk.inuse;
-		debug(D_WQ,"Foreman -- inuse:%d total:%d workspace:%s\n", local_resources.disk.inuse, local_resources.disk.total,q->workingdir);
+		debug(D_WQ,"Foreman -- inuse:%d total:%d\n", local_resources.disk.inuse, local_resources.disk.total);
 	} else {
 		sprintf(addrport, "127.0.0.1:-1"); //this master has no master
 	}
