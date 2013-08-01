@@ -144,10 +144,10 @@ See the file COPYING for details.
 #include <sys/ioctl.h>
 #endif
 
-static int monitor_inotify_fd = -1;
-
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_piggyback.h"
+
+#define RESOURCES_EXCEEDED_EXIT_CODE 147
 
 #define ONE_MEGABYTE 1048576  /* this many bytes */
 #define ONE_SECOND   1000000  /* this many usecs */    
@@ -162,6 +162,8 @@ FILE  *log_opened  = NULL;      /* List of opened files is written to this file.
 
 int    monitor_queue_fd = -1;  /* File descriptor of a datagram socket to which (great)
                                   grandchildren processes report to the monitor. */
+static int monitor_inotify_fd = -1;
+
 pid_t  first_process_pid;              /* pid of the process given at the command line */
 pid_t  first_process_sigchild_status;  /* exit status flags of the process given at the command line */
 pid_t  first_process_already_waited = 0;  /* exit status flags of the process given at the command line */
@@ -531,18 +533,21 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 		      first_process_pid,
 		      strsignal(WIFSIGNALED(wait_status) ? WTERMSIG(wait_status) : WSTOPSIG(wait_status)));
 
-		if(summary->limits_exceeded)
-			summary->exit_type = xxstrdup("limits");
-		else
-			summary->exit_type = xxstrdup("signal");
+		summary->exit_type = xxstrdup("signal");
+		summary->exit_status = -1;
 
 		if(WIFSIGNALED(wait_status))
 			summary->signal    = WTERMSIG(wait_status);
 		else
 			summary->signal    = WSTOPSIG(wait_status);
-
-		summary->exit_status = -1;
 	} 
+
+	if(summary->limits_exceeded)
+	{
+		free(summary->exit_type);
+		summary->exit_type = xxstrdup("limits");
+		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
+	}
 
 }
 
@@ -589,6 +594,9 @@ int monitor_final_summary()
 
 	summary->end       = usecs_since_epoch();
 	summary->wall_time = summary->end - summary->start;
+
+	if(summary->exit_status == 0 && summary->limits_exceeded)
+		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
 	
 	if(log_summary)
 		rmsummary_print(log_summary, summary);
@@ -596,10 +604,7 @@ int monitor_final_summary()
 	if(log_opened)
 		monitor_file_io_summaries();
 
-	if(summary->limits_exceeded && summary->exit_status == 0)
-		return -1;
-	else
-		return summary->exit_status;
+	return summary->exit_status;
 }
 
 void monitor_inotify_add_watch(char *filename)

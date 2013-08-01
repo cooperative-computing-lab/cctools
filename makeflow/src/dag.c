@@ -488,6 +488,40 @@ char *dag_task_category_wrap_as_wq_options(struct dag_task_category *category, c
 	return options;
 }
 
+char *dag_task_category_wrap_as_rmonitor_options(struct dag_task_category *category)
+{
+	struct rmsummary *s;
+
+	s = category->resources;
+
+	char *options = NULL;
+	char *opt;
+
+	if( s->cores > -1 )
+	{
+		opt = string_format("%s -L'cores: %" PRId64 "' ", options ? options : "", s->cores ); 
+		if(options)
+			free(options);
+		options = opt;
+	}
+	if( s->resident_memory > -1 )
+	{
+		opt = string_format("%s -L'resident_memory: %" PRId64 "' ", options ? options : "", s->resident_memory ); 
+		if(options)
+			free(options);
+		options = opt;
+	}
+	if( s->workdir_footprint > -1 )
+	{
+		opt = string_format("%s -L'workdir_footprint: %" PRId64 "' ", options ? options : "", s->workdir_footprint ); 
+		if(options)
+			free(options);
+		options = opt;
+	}
+
+	return options;
+}
+
 /* works as realloc for the first argument */
 char *dag_task_category_add_condor_option(char *options, const char *expression, int64_t value)
 {

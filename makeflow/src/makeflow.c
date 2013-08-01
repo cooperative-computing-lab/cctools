@@ -115,6 +115,7 @@ static int output_len_check = 0;
 static char *makeflow_exe = NULL;
 static char *monitor_exe = NULL;
 
+static int monitor_mode = 0; /* & 1 enabled, & 2 with time-series, & 4 whith opened-files */
 static char *monitor_limits_name = NULL;
 static int monitor_interval = 1;	// in seconds  
 static char *monitor_log_format = NULL;
@@ -135,7 +136,7 @@ void dag_gc_ref_count(struct dag *d, const char *file);
 void dag_export_variables(struct dag *d, struct dag_node *n);
 
 char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n);
-int dag_parse(struct dag *d, FILE * dag_stream, int monitor_mode);
+int dag_parse(struct dag *d, FILE * dag_stream);
 int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line);
 int dag_parse_node(struct lexer_book *bk, char *line);
 int dag_parse_node_filelist(struct lexer_book *bk, struct dag_node *n, char *filelist, int source);
@@ -930,7 +931,7 @@ static char *translate_command(struct dag_node *n, char *old_command, int is_loc
 
 /* Returns a pointer to a new struct dag described by filename. Return NULL on
  * failure. */
-struct dag *dag_from_file(const char *filename, int monitor_mode)
+struct dag *dag_from_file(const char *filename)
 {
 	FILE *dagfile;
 	struct dag *d = NULL;
@@ -941,7 +942,7 @@ struct dag *dag_from_file(const char *filename, int monitor_mode)
 	else {
 		d = dag_create();
 		d->filename = xxstrdup(filename);
-		if(!dag_parse(d, dagfile, monitor_mode)) {
+		if(!dag_parse(d, dagfile)) {
 			free(d);
 			d = NULL;
 		}
@@ -952,14 +953,13 @@ struct dag *dag_from_file(const char *filename, int monitor_mode)
 	return d;
 }
 
-int dag_parse(struct dag *d, FILE * dag_stream, int monitor_mode)
+int dag_parse(struct dag *d, FILE * dag_stream)
 {
 	char *line = NULL;
 	struct lexer_book *bk = calloc(1, sizeof(struct lexer_book));	//Taking advantage that calloc zeroes memory
 
 	bk->d = d;
 	bk->stream = dag_stream;
-	bk->monitor_mode = monitor_mode;
 
 	bk->category = dag_task_category_lookup_or_create(d, "default");
 
@@ -1212,7 +1212,6 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 	char *line;
 	char *outputs = NULL;
 	char *inputs = NULL;
-	char *log_name;
 	struct dag_node *n;
 
 	n = dag_node_create(bk->d, bk->line_number);
@@ -1220,26 +1219,7 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 	n->category = bk->category;
 	n->category->count++;
 
-	/* BUG: We need a more general solution to wrapping nodes
-	 * while parsing. The monitor code should not be here. */
-	if(bk->monitor_mode) {
-		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
-		debug(D_DEBUG, "adding monitor and %s{.summary%s%s} to rule %d.\n",
-		      log_name,
-		      bk->monitor_mode & 02 ? ",.series" : "",
-		      bk->monitor_mode & 04 ? ",.files"  : "",
-		      n->nodeid);
-		line = string_format("%s.summary %s%s %s%s %s %s %s",
-				     log_name,
-				     bk->monitor_mode & 02 ? log_name   : "",
-				     bk->monitor_mode & 02 ? ".series" : "",
-				     bk->monitor_mode & 04 ? log_name   : "",
-				     bk->monitor_mode & 04 ? ".files"  : "",
-				     line_org, monitor_exe,
-				     monitor_limits_name ? monitor_limits_name : "");
-	} else {
-		line = xxstrdup(line_org);
-	}
+	line = xxstrdup(line_org);
 
 	outputs = line;
 
@@ -1278,7 +1258,6 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 	debug(D_DEBUG, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
 	dag_task_category_print_debug_resources(n->category);
 
-	free(line);
 	return 1;
 }
 
@@ -1396,6 +1375,51 @@ int dag_prepare_for_batch_system(struct dag *d)
 	return 1;
 }
 
+int dag_prepare_for_monitoring(struct dag *d)
+{	
+	struct dag_node *n;
+
+	for(n = d->nodes; n; n = n->next)
+	{
+		if(monitor_mode)
+		{
+			char *log_name_prefix;
+			char *log_name;
+			log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
+			n->command = resource_monitor_rewrite_command((char *) n->command, log_name_prefix,
+					monitor_limits_name,
+					dag_task_category_wrap_as_rmonitor_options(n->category),
+					monitor_mode & 1,
+					monitor_mode & 2,
+					monitor_mode & 4);
+
+			dag_node_add_source_file(n, monitor_exe, NULL);
+
+			log_name = string_format("%s.summary", log_name_prefix);
+			dag_node_add_target_file(n, log_name, NULL);
+
+			free(log_name);
+			if(monitor_mode & 02)
+			{
+				log_name = string_format("%s.series", log_name_prefix);
+				dag_node_add_target_file(n, log_name, NULL);
+				free(log_name);
+			}
+
+			if(monitor_mode & 04)
+			{
+				log_name = string_format("%s.files", log_name_prefix);
+				dag_node_add_target_file(n, log_name, NULL);
+				free(log_name);
+			}
+
+			free(log_name_prefix);
+		}
+	}
+
+	return 1;
+}
+
 void dag_parse_node_set_command(struct lexer_book *bk, struct dag_node *n, char *command)
 {
 	struct dag_lookup_set s = { bk->d, n, NULL };
@@ -1414,7 +1438,6 @@ void dag_parse_node_set_command(struct lexer_book *bk, struct dag_node *n, char 
 
 int dag_parse_node_command(struct lexer_book *bk, struct dag_node *n, char *line)
 {
-	char *log_name;
 	char *command = line;
 
 	while(*command && isspace(*command))
@@ -1430,19 +1453,7 @@ int dag_parse_node_command(struct lexer_book *bk, struct dag_node *n, char *line
 		return dag_parse_node_makeflow_command(bk, n, command + 9);
 	}
 
-	/* BUG: Monitor code should not be here! */
-	if(bk->monitor_mode) {
-		log_name = monitor_log_name(monitor_log_dir, n->nodeid);
-		command = resource_monitor_rewrite_command(command, log_name, monitor_limits_name,
-							   bk->monitor_mode & 1,
-							   bk->monitor_mode & 2,
-							   bk->monitor_mode & 4);
-	}
-
 	dag_parse_node_set_command(bk, n, command);
-
-	if(bk->monitor_mode)
-		free(command);
 
 	return 1;
 }
@@ -1571,10 +1582,11 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		thequeue = remote_queue;
 	}
 
-	printf("%s\n", n->command);
 
 	int len = 0, len_temp;
 	char *tmp;
+
+	printf("%s\n", n->command);
 
 	list_first_item(n->source_files);
 	while((f = list_next_item(n->source_files))) {
@@ -1774,7 +1786,26 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 
 	if(job_failed) {
 		dag_node_state_change(d, n, DAG_NODE_STATE_FAILED);
-		if(dag_retry_flag || info->exit_code == 101) {
+		if(monitor_mode && info->exit_code == 147)
+		{
+			fprintf(stderr, "\nrule %d failed because it exceeded the resources limits.\n", n->nodeid);
+			char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
+			char *summary_name = string_format("%s.summary", log_name_prefix);
+			struct rmsummary *s = rmsummary_parse_limits_exceeded(summary_name);
+
+			if(s)
+			{
+				rmsummary_print(stderr, s);
+				free(s);
+				fprintf(stderr, "\n");
+			}
+
+			free(log_name_prefix);
+			free(summary_name);
+
+			dag_failed_flag = 1;
+		}
+		else if(dag_retry_flag || info->exit_code == 101) {
 			n->failure_count++;
 			if(n->failure_count > dag_retry_max) {
 				fprintf(stderr, "job %s failed too many times.\n", n->command);
@@ -1783,7 +1814,9 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 				fprintf(stderr, "will retry failed job %s\n", n->command);
 				dag_node_state_change(d, n, DAG_NODE_STATE_WAITING);
 			}
-		} else {
+		} 
+		else
+		{
 			dag_failed_flag = 1;
 		}
 	} else {
@@ -2233,7 +2266,6 @@ int main(int argc, char *argv[])
 	char *batchlogfilename = NULL;
 	char *bundle_directory = NULL;
 	int clean_mode = 0;
-	int monitor_mode = 0; /* & 1 enabled, & 2 with time-series, & 4 whith opened-files */
 	int display_mode = 0;
 	int condense_display = 0;
 	int change_size = 0;
@@ -2660,7 +2692,7 @@ int main(int argc, char *argv[])
 			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
 	}
 
-	struct dag *d = dag_from_file(dagfile, monitor_mode);
+	struct dag *d = dag_from_file(dagfile);
 	if(!d) {
 		free(logfilename);
 		free(batchlogfilename);
@@ -2762,6 +2794,10 @@ int main(int argc, char *argv[])
 		if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
 			d->remote_jobs_max = MIN(d->local_jobs_max, n);
 		}
+	}
+
+	if(!dag_prepare_for_monitoring(d)) {
+		fatal("Could not prepare for monitoring.\n");
 	}
 
 	if(!dag_prepare_for_batch_system(d)) {
