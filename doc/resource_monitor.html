@@ -19,7 +19,7 @@
       }
     </style>
     <h1>Resource Monitor User's Manual</h1>
-    <b>Last Updated April 2013</b>
+    <b>Last Updated August 2013</b>
     <p>
       resource_monitor is Copyright (C) 2013 The University of Notre Dame.
       This software is distributed under the GNU General Public License.
@@ -99,22 +99,23 @@ names, and the sampling intervals:
 
       <h3> Makeflow mode </h3>
 
-      If you already have a makeflow file, you can activate the
-      resource_monitor by simply giving the <tt>-M</tt> to makeflow:
+	  If you already have a makeflow file, you can activate the
+	  resource_monitor by giving the <tt>-M</tt> flag to makeflow with a
+	  desired output directory, for example:
 
       <pre>
-	% makeflow -M Makeflow </pre>
+	% makeflow -Mmonitor_logs Makeflow </pre>
 
-      In this case, makeflow wraps every command line rule with the
-      monitor, and writes the resulting logs per rule in an
-      automatically created directory.
+	  In this case, makeflow wraps every command line rule with the monitor,
+	  and writes the resulting logs per rule in the directory
+	  <tt>monitor_logs</tt>.
 
       <h3> Work-queue mode </h3>
 
       From Work Queue:
 
       <pre>
-	q = work_queue_create_monitoring(port);
+	q = work_queue_create(port);
 	work_queue_enable_monitoring(q, some-log-file); </pre>
 
       wraps every task with the monitor, and appends all generated
@@ -220,7 +221,7 @@ names, and the sampling intervals:
       In <tt>makeflow</tt> we then specify:
 
       <pre>
-	makeflow -M --monitor-limits=limits.txt </pre>
+	makeflow -Mmonitor_logs --monitor-limits=limits.txt </pre>
 
       Or with <tt>condor:</tt>
 	
