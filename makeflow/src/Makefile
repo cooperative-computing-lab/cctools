@@ -10,7 +10,7 @@ LOCAL_LDFLAGS=-lwork_queue -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
 all: ${TARGETS}
 
-makeflow: dag.o visitors.o makeflow.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
+makeflow: dag.o visitors.o makeflow.o ${CCTOOLS_HOME}/dttools/src/libdttools.a ${CCTOOLS_HOME}/work_queue/src/libwork_queue.a
 	${CCTOOLS_LD} dag.o visitors.o makeflow.o ${LOCAL_LDFLAGS} -o $@
 
 clean:
