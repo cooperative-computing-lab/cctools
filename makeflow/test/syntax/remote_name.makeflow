@@ -1,8 +1,8 @@
 CURL=/usr/bin/curl
 URL=http://www.cse.nd.edu/~ccl/images/capitol.jpg
 
-capitol.montage.gif: capitol.jpg
-	cp capitol.jpg capitol.montage.gif
+capitol.montage.gif->montage.gif: capitol.jpg->campidoglio.jpg
+	cp campidoglio.jpg montage.gif
 
 capitol.jpg->capitolio.jpg:
 	$CURL -o capitolio.jpg $URL
