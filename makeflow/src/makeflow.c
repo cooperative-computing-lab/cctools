@@ -1620,7 +1620,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 		switch (batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			tmp = string_format("%s=%s,", remotename, f->filename);
+			tmp = string_format("%s=%s,", f->filename, remotename);
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:
 			tmp = string_format("%s,", remotename);
