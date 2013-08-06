@@ -190,6 +190,13 @@ struct dag_lookup_set {
     struct hash_table *table;
 };
 
+
+struct dag_variable_value {
+	int   size;                             /* memory size allocated for value */
+	int   len;                              /* records strlen(value) */
+	char *value;
+};
+
 struct dag *dag_create();
 struct dag_node *dag_node_create(struct dag *d, int linenum);
 struct dag_file *dag_file_create(struct dag_node *n, const char *filename, const char *remotename);
@@ -217,8 +224,13 @@ char *dag_node_translate_filename(struct dag_node *n, const char *filename);
 char *dag_file_remote_name(struct dag_node *n, const char *filename);
 int dag_file_isabsolute(const struct dag_file *f);
 
-char *dag_lookup(const char *name, void *arg);
+struct dag_variable_value *dag_lookup(const char *name, void *arg);
 char *dag_lookup_set(const char *name, void *arg);
+char *dag_lookup_str(const char *name, void *arg);
+
+struct dag_variable_value *dag_variable_value_create(const char *value);
+void dag_variable_value_free(struct dag_variable_value *v);
+struct dag_variable_value *dag_variable_value_append_or_create(struct dag_variable_value *v, const char *value);
 
 struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label);
 char *dag_task_category_wrap_options(struct dag_task_category *category, const char *default_options, batch_queue_type_t batch_type);

@@ -1087,7 +1087,7 @@ char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 		}
 
 		char *subst_line = xxstrdup(raw_line);
-		subst_line = string_subst(subst_line, dag_lookup, &s);
+		subst_line = string_subst(subst_line, dag_lookup_str, &s);
 
 		free(bk->linetext);
 		bk->linetext = xxstrdup(subst_line);
@@ -1169,22 +1169,16 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 	}
 
 	struct dag_lookup_set s = { d, n, NULL };
-	char *old_value = (char *) dag_lookup(name, &s);
-	if(append && old_value) {
-		char *new_value = NULL;
-		if(s.table) {
-			free(hash_table_remove(s.table, name));
-		} else {
+	struct dag_variable_value *v = dag_lookup(name, &s);
+	if(append && v) {
+		if(!s.table) {
 			s.table = d->variables;
 		}
-		new_value = realloc(old_value, (strlen(old_value) + strlen(value) + 2) * sizeof(char));
-		if(!new_value)
-			fatal("Could not allocate memory for makeflow variable: %s\n", name);
-		strcat(new_value, " ");
-		strcat(new_value, value);
-		hash_table_insert(s.table, name, new_value);
+		v = dag_variable_value_append_or_create(v, value);
+		hash_table_insert(s.table, name, v);
 	} else {
-		hash_table_insert((n ? n->variables : d->variables), name, xxstrdup(value));
+		v = dag_variable_value_create(value);
+		hash_table_insert((n ? n->variables : d->variables), name, v);
 	}
 
 	dag_parse_process_special_variable(bk, n, name, value);
@@ -1423,7 +1417,7 @@ int dag_prepare_for_monitoring(struct dag *d)
 void dag_parse_node_set_command(struct lexer_book *bk, struct dag_node *n, char *command)
 {
 	struct dag_lookup_set s = { bk->d, n, NULL };
-	char *local = dag_lookup("BATCH_LOCAL", &s);
+	char *local = dag_lookup_str("BATCH_LOCAL", &s);
 
 	if(local) {
 		if(string_istrue(local))
@@ -1559,7 +1553,7 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 
 	list_first_item(d->export_list);
 	while((key = list_next_item(d->export_list))) {
-		char *value = dag_lookup(key, &s);
+		char *value = dag_lookup_str(key, &s);
 		if(value) {
 			setenv(key, value, 1);
 			debug(D_DEBUG, "export %s=%s", key, value);
@@ -1638,7 +1632,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	 * variable), we must save the previous global queue value, and then
 	 * restore it after we submit. */
 	struct dag_lookup_set s = { d, n, NULL };
-	char *batch_options_env    = dag_lookup("BATCH_OPTIONS", &s);
+	char *batch_options_env    = dag_lookup_str("BATCH_OPTIONS", &s);
 	char *batch_submit_options = dag_task_category_wrap_options(n->category, batch_options_env, batch_queue_get_type(thequeue));
 	char *old_batch_submit_options = NULL;
 

@@ -27,14 +27,14 @@ See the file COPYING for details.
 int dag_to_file_vars(const struct dag *d, FILE * dag_stream)
 {
 	char *var;
-	void *value;
+	struct dag_variable_value *v;
 
 	struct hash_table *vars = d->variables;
 
 	hash_table_firstkey(vars);
-	while(hash_table_nextkey(vars, &var, &value)) {
-		if(!string_null_or_empty(value) && strcmp(var, "_MAKEFLOW_COLLECT_LIST"))
-			fprintf(dag_stream, "%s=\"%s\"\n", var, (char *) value);
+	while(hash_table_nextkey(vars, &var, (void *) &v)) {
+		if(!string_null_or_empty(v->value) && strcmp(var, "_MAKEFLOW_COLLECT_LIST"))
+			fprintf(dag_stream, "%s=\"%s\"\n", var, (char *) v->value);
 	}
 
 	return 0;

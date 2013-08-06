@@ -52,7 +52,7 @@ struct dag *dag_create()
 
 		/* Add _MAKEFLOW_COLLECT_LIST to variables table to ensure it is in
 		 * global DAG scope. */
-		hash_table_insert(d->variables, "_MAKEFLOW_COLLECT_LIST", xxstrdup(""));
+		hash_table_insert(d->variables, "_MAKEFLOW_COLLECT_LIST", dag_variable_value_create(""));
 
 		memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
 		return d;
@@ -270,41 +270,102 @@ struct list *dag_input_files(struct dag *d)
 char *dag_lookup_set(const char *name, void *arg)
 {
 	struct dag_lookup_set s = { (struct dag *) arg, NULL, NULL };
-	return dag_lookup(name, &s);
+	return dag_lookup_str(name, &s);
 }
 
-char *dag_lookup(const char *name, void *arg)
+struct dag_variable_value *dag_lookup(const char *name, void *arg)
 {
 	struct dag_lookup_set *s = (struct dag_lookup_set *) arg;
-	const char *value;
+	struct dag_variable_value *v;
 
 	if(s) {
 		/* Try node variables table */
 		if(s->node) {
-			value = (const char *) hash_table_lookup(s->node->variables, name);
-			if(value) {
-				s->table = s->node->variables;
-				return xxstrdup(value);
+			v = (struct dag_variable_value *) hash_table_lookup(s->node->variables, name);
+			if(v) {
+				s->table = s->node->variables; //why this line?
+				return v;
 			}
 		}
 
 		/* Try dag variables table */
 		if(s->dag) {
-			value = (const char *) hash_table_lookup(s->dag->variables, name);
-			if(value) {
+			v = (struct dag_variable_value *) hash_table_lookup(s->dag->variables, name);
+			if(v) {
 				s->table = s->dag->variables;
-				return xxstrdup(value);
+				return v;
 			}
 		}
 	}
 
 	/* Try environment */
-	value = getenv(name);
+	char *value = getenv(name);
 	if(value) {
-		return xxstrdup(value);
+		return dag_variable_value_create(value);
 	}
 
 	return NULL;
+}
+
+char *dag_lookup_str(const char *name, void *arg)
+{
+	struct dag_variable_value *v = dag_lookup(name, arg);
+
+	if(v)
+		return xxstrdup(v->value);
+	else
+		return NULL;
+}
+
+struct dag_variable_value *dag_variable_value_create(const char *value)
+{
+	struct dag_variable_value *v = malloc(sizeof(struct dag_variable_value));
+
+	v->len  = strlen(value);
+	v->size = v->len + 1;
+
+	v->value = malloc(v->size * sizeof(char));
+
+	strcpy(v->value, value);
+
+	return v;
+}
+
+void dag_variable_value_free(struct dag_variable_value *v)
+{
+	free(v->value);
+	free(v);
+}
+
+struct dag_variable_value *dag_variable_value_append_or_create(struct dag_variable_value *v, const char *value)
+{
+	if(!v)
+		return dag_variable_value_create(value);
+
+	int nlen = strlen(value);
+	int req  = v->len + nlen + 2;   // + 2 for ' ' and '\0'
+
+	if( req > v->size )
+	{
+		//make size for string to be appended, plus some more, so we do not
+		//need to reallocate for a while.
+		int nsize = req > 2*(v->size) ? 2*req : 2*(v->size);
+		char *new_val = realloc(v->value, nsize*sizeof(char));
+		if(!new_val)
+			fatal("Could not allocate memory for makeflow variable value: %s\n", value);
+
+		v->size  = nsize;
+		v->value = new_val;
+	}
+
+	//add separating space
+	*(v->value + v->len) = ' ';
+
+	//append new string
+	strcpy(v->value + v->len + 1, value);
+	v->len = v->len + nlen + 1;
+
+	return v;
 }
 
 const char *dag_node_state_name(dag_node_state_t state)
