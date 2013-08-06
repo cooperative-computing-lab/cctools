@@ -15,6 +15,7 @@
 void specify_work_queue_task_files(struct work_queue_task *t, const char *input_files, const char *output_files)
 {
 	char *f, *p, *files;
+	int caching;
 
 	if(input_files) {
 		files = strdup(input_files);
@@ -23,7 +24,12 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+				if(strcmp(f, p+1)) {
+					caching = WORK_QUEUE_NOCACHE;
+				} else {
+					caching = WORK_QUEUE_CACHE;
+				}
+				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, caching);
 				debug(D_BATCH, "local file %s is %s on remote system:", f, p + 1);
 				*p = '=';
 			} else {
@@ -41,7 +47,12 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_OUTPUT, WORK_QUEUE_CACHE);
+				if(strcmp(f, p+1)) {
+					caching = WORK_QUEUE_NOCACHE;
+				} else {
+					caching = WORK_QUEUE_CACHE;
+				}
+				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_OUTPUT, caching);
 				debug(D_BATCH, "remote file %s is %s on local system:", p + 1, f);
 				*p = '=';
 			} else {
