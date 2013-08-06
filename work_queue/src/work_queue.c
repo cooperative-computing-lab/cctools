@@ -509,6 +509,9 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 				free(t->output);
 			}
 			t->output = 0;
+			if(t->unlabeled) {
+				t->cores = t->memory = t->disk = -1;
+			}
 			list_push_head(q->ready_list, t);
 		}
 		itable_remove(q->running_tasks, t->taskid);
@@ -1125,6 +1128,10 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	w->cores_allocated -= t->cores;
 	w->memory_allocated -= t->memory;
 	w->disk_allocated -= t->disk;
+	
+	if(t->unlabeled) {
+		t->cores = t->memory = t->disk = -1;
+	}
 
 	w->finished_tasks++;
 
@@ -2257,7 +2264,7 @@ static void remove_unresponsive_workers(struct work_queue *q) {
 						debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
 						remove_worker(q, w);
 					}
-				}	
+				}
 			}
 		}
 	}
@@ -2369,6 +2376,10 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 		w->cores_allocated -= t->cores;
 		w->memory_allocated -= t->memory;
 		w->disk_allocated -= t->disk;
+		
+		if(t->unlabeled) {
+			t->cores = t->memory = t->disk = -1;
+		}
 
 		log_worker_states(q);
 		itable_remove(w->current_tasks, t->taskid);
@@ -2440,6 +2451,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->memory = -1;
 	t->disk = -1;
 	t->cores = -1;
+	t->unlabeled = 1;
 
 	return t;
 }
@@ -2453,16 +2465,19 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 void work_queue_task_specify_memory( struct work_queue_task *t, int memory )
 {
 	t->memory = memory;
+	t->unlabeled = 0;
 }
 
 void work_queue_task_specify_disk( struct work_queue_task *t, int disk )
 {
 	t->disk = disk;
+	t->unlabeled = 0;
 }
 
 void work_queue_task_specify_cores( struct work_queue_task *t, int cores )
 {
 	t->cores = cores;
+	t->unlabeled = 0;
 }
 
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
