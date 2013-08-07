@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "stringtools.h"
 
+#include "rmsummary.h"
 #include "visitors.h"
 
 /*
@@ -104,13 +105,45 @@ int dag_to_file_node(struct dag_node *n, FILE * dag_stream, char *(*rename) (str
 	return 0;
 }
 
-/* Writes all the rules to the stream */
-int dag_to_file_nodes(const struct dag *d, FILE * dag_stream, char *(*rename) (struct dag_node * n, const char *filename))
+int dag_to_file_category_variables(struct dag_task_category *c, FILE * dag_stream)
+{
+	struct rmsummary *s = c->resources;
+
+	fprintf(dag_stream, "\n");
+	fprintf(dag_stream, "CATEGORY=\"%s\"\n", c->label);
+
+	if(s->cores > -1)
+		fprintf(dag_stream, "CORES=%" PRId64 "\n", s->cores);
+	if(s->resident_memory > -1)
+		fprintf(dag_stream, "MEMORY=%" PRId64 "\n", s->resident_memory);
+	if(s->workdir_footprint > -1)
+		fprintf(dag_stream, "DISK=%" PRId64 "\n", s->workdir_footprint);
+
+	return 0;
+}
+
+/* Writes all the rules to the stream, per category, plus any variables from the category */
+int dag_to_file_category(struct dag_task_category *c, FILE * dag_stream, char *(*rename) (struct dag_node * n, const char *filename))
 {
 	struct dag_node *n;
 
-	for(n = d->nodes; n; n = n->next)
+	dag_to_file_category_variables(c, dag_stream);
+
+	list_first_item(c->nodes);
+	while((n = list_next_item(c->nodes)))
 		dag_to_file_node(n, dag_stream, rename);
+
+	return 0;
+}
+
+int dag_to_file_categories(const struct dag *d, FILE * dag_stream, char *(*rename) (struct dag_node * n, const char *filename))
+{
+	char *name;
+	struct dag_task_category *c;
+
+	hash_table_firstkey(d->task_categories);
+	while(hash_table_nextkey(d->task_categories, &name, (void *) &c))
+		dag_to_file_category(c, dag_stream, rename);
 
 	return 0;
 }
@@ -126,7 +159,7 @@ int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename) (stru
 
 	dag_to_file_vars(d->variables, dag_stream, "");
 	dag_to_file_exports(d, dag_stream);
-	dag_to_file_nodes(d, dag_stream, rename);
+	dag_to_file_categories(d, dag_stream, rename);
 
 	fclose(dag_stream);
 
