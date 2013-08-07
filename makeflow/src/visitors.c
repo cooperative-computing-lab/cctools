@@ -24,17 +24,15 @@ See the file COPYING for details.
  */
 
 /* Writes 'var=value' pairs from the dag to the stream */
-int dag_to_file_vars(const struct dag *d, FILE * dag_stream)
+int dag_to_file_vars(struct hash_table *vars, FILE * dag_stream, const char *prefix)
 {
 	char *var;
 	struct dag_variable_value *v;
 
-	struct hash_table *vars = d->variables;
-
 	hash_table_firstkey(vars);
 	while(hash_table_nextkey(vars, &var, (void *) &v)) {
 		if(!string_null_or_empty(v->value) && strcmp(var, "_MAKEFLOW_COLLECT_LIST"))
-			fprintf(dag_stream, "%s=\"%s\"\n", var, (char *) v->value);
+			fprintf(dag_stream, "%s%s=\"%s\"\n", prefix, var, (char *) v->value);
 	}
 
 	return 0;
@@ -94,6 +92,9 @@ int dag_to_file_node(struct dag_node *n, FILE * dag_stream, char *(*rename) (str
 	fprintf(dag_stream, ": ");
 	dag_to_file_files(n, n->source_files, dag_stream, rename);
 	fprintf(dag_stream, "\n");
+
+	dag_to_file_vars(n->variables, dag_stream, "@");
+
 	if(n->local_job)
 		fprintf(dag_stream, "\tLOCAL %s", n->command);
 	else
@@ -123,7 +124,7 @@ int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename) (stru
 	if(!dag_stream)
 		return 1;
 
-	dag_to_file_vars(d, dag_stream);
+	dag_to_file_vars(d->variables, dag_stream, "");
 	dag_to_file_exports(d, dag_stream);
 	dag_to_file_nodes(d, dag_stream, rename);
 
