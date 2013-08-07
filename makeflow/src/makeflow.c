@@ -1121,10 +1121,11 @@ void dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *
 		 * the global task_category. Else, update the
 		 * global task category. */
 		if(n) {
-			/* Decrement the count from previous */
-			n->category->count--;
+			/* Remove node from previous category...*/
+			list_pop_tail(n->category->nodes);
 			n->category = category;
-			n->category->count++;
+			/* and add it to the new one */
+			list_push_tail(n->category->nodes, n);
 			debug(D_DEBUG, "Updating category '%s' for rule %d.\n", value, n->nodeid);
 		}
 		else
@@ -1211,7 +1212,7 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 	n = dag_node_create(bk->d, bk->line_number);
 
 	n->category = bk->category;
-	n->category->count++;
+	list_push_tail(n->category->nodes, n);
 
 	line = xxstrdup(line_org);
 

@@ -103,7 +103,7 @@ struct dag_task_category
 {
 	char *label;
 	struct rmsummary *resources;
-	int  count;
+	struct list *nodes;
 };
 
 /* struct dag_node implements a linked list of nodes. A dag_node
