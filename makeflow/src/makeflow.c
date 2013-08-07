@@ -1061,7 +1061,7 @@ void dag_prepare_nested_jobs(struct dag *d)
 char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 {
 	struct dag *d = bk->d;
-	struct dag_lookup_set s = { d, n, NULL };
+	struct dag_lookup_set s = { d, bk->category, n, NULL };
 	char *raw_line = get_line(bk->stream);
 
 	if(raw_line) {
@@ -1108,7 +1108,7 @@ char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 }
 
 //return 1 if name is special variable, 0 otherwise
-int dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *n, char *name, char *value)
+int dag_parse_process_variable(struct lexer_book *bk, struct dag_node *n, struct hash_table *current_table, char *name, struct dag_variable_value *v)
 {
 	struct dag *d = bk->d;
 	int   special = 0;
@@ -1117,7 +1117,7 @@ int dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *n
 		special = 1;
 		/* If we have never seen this label, then create
 		 * a new category, otherwise retrieve the category. */
-		struct dag_task_category *category = dag_task_category_lookup_or_create(d, value);
+		struct dag_task_category *category = dag_task_category_lookup_or_create(d, v->value);
 
 		/* If we are parsing inside a node, make category
 		 * the category of the node, but do not update
@@ -1129,26 +1129,30 @@ int dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *n
 			n->category = category;
 			/* and add it to the new one */
 			list_push_tail(n->category->nodes, n);
-			debug(D_DEBUG, "Updating category '%s' for rule %d.\n", value, n->nodeid);
+			debug(D_DEBUG, "Updating category '%s' for rule %d.\n", v->value, n->nodeid);
 		}
 		else
 			bk->category = category;
 	}
 	else if(strcmp(RESOURCES_CORES,  name) == 0) {
 		special = 1;
-		bk->category->resources->cores             = atoi(value);
+		current_table = bk->category->variables;
+		bk->category->resources->cores             = atoi(v->value);
 	}
 	else if(strcmp(RESOURCES_MEMORY, name) == 0) {
 		special = 1;
-		bk->category->resources->resident_memory   = atoi(value);
+		current_table = bk->category->variables;
+		bk->category->resources->resident_memory   = atoi(v->value);
 	}
 	else if(strcmp(RESOURCES_DISK,   name) == 0) {
 		special = 1;
-		bk->category->resources->workdir_footprint = atoi(value);
+		current_table = bk->category->variables;
+		bk->category->resources->workdir_footprint = atoi(v->value);
 	}
-
 	/* else if some other special variable .... */
 	/* ... */
+
+	hash_table_insert(current_table, name, v);
 
 	return special;
 }
@@ -1181,7 +1185,7 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 		return 0;
 	}
 
-	struct dag_lookup_set s = { d, n, NULL };
+	struct dag_lookup_set s = { d, bk->category, n, NULL };
 	struct dag_variable_value *v = dag_lookup(name, &s);
 	struct hash_table *current_table = d->variables;
 
@@ -1195,9 +1199,7 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 		v = dag_variable_value_create(value);
 	}
 
-	//if var is not a special variable, then added to the current var table.
-	if(!dag_parse_process_special_variable(bk, n, name, value))
-		hash_table_insert(current_table, name, v);
+	dag_parse_process_variable(bk, n, current_table, name, v);
 
 	if(strcmp(name, "_MAKEFLOW_COLLECT_LIST") == 0)
 		debug(D_DEBUG, "updating _MAKEFLOW_COLLECT_LIST with: %s\n",  value);
@@ -1432,7 +1434,7 @@ int dag_prepare_for_monitoring(struct dag *d)
 
 void dag_parse_node_set_command(struct lexer_book *bk, struct dag_node *n, char *command)
 {
-	struct dag_lookup_set s = { bk->d, n, NULL };
+	struct dag_lookup_set s = { bk->d, bk->category, n, NULL };
 	char *local = dag_lookup_str("BATCH_LOCAL", &s);
 
 	if(local) {
@@ -1564,7 +1566,7 @@ int dag_parse_export(struct lexer_book *bk, char *line)
 
 void dag_export_variables(struct dag *d, struct dag_node *n)
 {
-	struct dag_lookup_set s = { d, n, NULL };
+	struct dag_lookup_set s = { d, n->category, n, NULL };
 	char *key;
 
 	list_first_item(d->export_list);
@@ -1647,7 +1649,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
 	 * restore it after we submit. */
-	struct dag_lookup_set s = { d, n, NULL };
+	struct dag_lookup_set s = { d, n->category, n, NULL };
 	char *batch_options_env    = dag_lookup_str("BATCH_OPTIONS", &s);
 	char *batch_submit_options = dag_task_category_wrap_options(n->category, batch_options_env, batch_queue_get_type(thequeue));
 	char *old_batch_submit_options = NULL;
