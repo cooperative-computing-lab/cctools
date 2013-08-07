@@ -1107,11 +1107,14 @@ char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 	return NULL;
 }
 
-void dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *n, char *name, char *value)
+//return 1 if name is special variable, 0 otherwise
+int dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *n, char *name, char *value)
 {
 	struct dag *d = bk->d;
+	int   special = 0;
 
 	if(strcmp(RESOURCES_CATEGORY, name) == 0) {
+		special = 1;
 		/* If we have never seen this label, then create
 		 * a new category, otherwise retrieve the category. */
 		struct dag_task_category *category = dag_task_category_lookup_or_create(d, value);
@@ -1131,14 +1134,23 @@ void dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *
 		else
 			bk->category = category;
 	}
-	else if(strcmp(RESOURCES_CORES,  name) == 0)
+	else if(strcmp(RESOURCES_CORES,  name) == 0) {
+		special = 1;
 		bk->category->resources->cores             = atoi(value);
-	else if(strcmp(RESOURCES_MEMORY, name) == 0)
+	}
+	else if(strcmp(RESOURCES_MEMORY, name) == 0) {
+		special = 1;
 		bk->category->resources->resident_memory   = atoi(value);
-	else if(strcmp(RESOURCES_DISK,   name) == 0)
+	}
+	else if(strcmp(RESOURCES_DISK,   name) == 0) {
+		special = 1;
 		bk->category->resources->workdir_footprint = atoi(value);
+	}
 
 	/* else if some other special variable .... */
+	/* ... */
+
+	return special;
 }
 
 int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
@@ -1171,18 +1183,21 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 
 	struct dag_lookup_set s = { d, n, NULL };
 	struct dag_variable_value *v = dag_lookup(name, &s);
+	struct hash_table *current_table = d->variables;
+
 	if(append && v) {
-		if(!s.table) {
-			s.table = d->variables;
-		}
+		if(s.table)
+			current_table = s.table;
 		v = dag_variable_value_append_or_create(v, value);
-		hash_table_insert(s.table, name, v);
 	} else {
+		if(n)
+			current_table = n->variables;
 		v = dag_variable_value_create(value);
-		hash_table_insert((n ? n->variables : d->variables), name, v);
 	}
 
-	dag_parse_process_special_variable(bk, n, name, value);
+	//if var is not a special variable, then added to the current var table.
+	if(!dag_parse_process_special_variable(bk, n, name, value))
+		hash_table_insert(current_table, name, v);
 
 	if(strcmp(name, "_MAKEFLOW_COLLECT_LIST") == 0)
 		debug(D_DEBUG, "updating _MAKEFLOW_COLLECT_LIST with: %s\n",  value);
