@@ -45,14 +45,15 @@ struct dag *dag_create()
 		d->remote_jobs_running = 0;
 		d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 		d->nodeid_counter = 0;
-		d->collect_table = hash_table_create(0, 0);
+		d->collect_table = set_create(0);
 		d->export_list = list_create();
 
 		d->task_categories = hash_table_create(0, 0);
 
-		/* Add _MAKEFLOW_COLLECT_LIST to variables table to ensure it is in
+		/* Add GC_*_LIST to variables table to ensure it is in
 		 * global DAG scope. */
-		hash_table_insert(d->variables, "_MAKEFLOW_COLLECT_LIST", dag_variable_value_create(""));
+		hash_table_insert(d->variables, "GC_COLLECT_LIST", dag_variable_value_create(""));
+		hash_table_insert(d->variables, "GC_PRESERVE_LIST", dag_variable_value_create(""));
 
 		memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
 		return d;
@@ -239,6 +240,8 @@ struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
 	f->filename = xxstrdup(filename);
 	f->needed_by = list_create(0);
 	f->target_of = NULL;
+
+	f->ref_count = 0;
 
 	hash_table_insert(d->file_table, f->filename, (void *) f);
 
@@ -439,6 +442,8 @@ void dag_node_add_source_file(struct dag_node *n, const char *filename, char *re
 
 	/* register this file as a requirement of the node */
 	list_push_head(source->needed_by, n);
+
+	source->ref_count++;
 }
 
 /* Adds the local name as a target of the node, and register the

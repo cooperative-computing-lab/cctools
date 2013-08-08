@@ -60,7 +60,6 @@ enum { SHOW_INPUT_FILES = 2,
 #define MAKEFLOW_AUTO_GROUP 2
 
 #define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
-#define MAKEFLOW_GC_MIN_THRESHOLD 1
 
 #define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 
@@ -85,8 +84,6 @@ enum { LONG_OPT_MONITOR_INTERVAL = 1,
 typedef enum {
 	DAG_GC_NONE,
 	DAG_GC_REF_COUNT,
-	DAG_GC_INCR_FILE,
-	DAG_GC_INCR_TIME,
 	DAG_GC_ON_DEMAND,
 } dag_gc_method_t;
 
@@ -131,8 +128,6 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 int dag_check(struct dag *d);
 int dag_check_dependencies(struct dag *d);
 
-void dag_gc_ref_incr(struct dag *d, const char *file, int increment);
-void dag_gc_ref_count(struct dag *d, const char *file);
 void dag_export_variables(struct dag *d, struct dag_node *n);
 
 char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n);
@@ -647,8 +642,8 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 				exit(1);
 			} else {
 				/* If input file is missing, but node completed and file was garbage, then avoid rerunning. */
-				if(n->state == DAG_NODE_STATE_COMPLETE && hash_table_lookup(d->collect_table, f->filename)) {
-					dag_gc_ref_incr(d, f->filename, -1);
+				if(n->state == DAG_NODE_STATE_COMPLETE && set_lookup(d->collect_table, f)) {
+					f->ref_count += -1;
 					continue;
 				}
 				goto rerun;
@@ -661,7 +656,7 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	while((f = list_next_item(n->target_files))) {
 		if(stat(f->filename, &filestat) < 0) {
 			/* If output file is missing, but node completed and file was garbage, then avoid rerunning. */
-			if(n->state == DAG_NODE_STATE_COMPLETE && hash_table_lookup(d->collect_table, f->filename)) {
+			if(n->state == DAG_NODE_STATE_COMPLETE && set_lookup(d->collect_table, f)) {
 				continue;
 			}
 			goto rerun;
@@ -709,13 +704,13 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 	// For each parent node, rerun it if input file was garbage collected
 	list_first_item(n->source_files);
 	while((f1 = list_next_item(n->source_files))) {
-		if(hash_table_lookup(d->collect_table, f1->filename) == NULL)
+		if(!set_lookup(d->collect_table, f1))
 			continue;
 
 		p = f1->target_of;
 		if(p) {
 			dag_node_force_rerun(rerun_table, d, p);
-			dag_gc_ref_incr(d, f1->filename, 1);
+			f1->ref_count += 1;
 		}
 	}
 
@@ -1007,31 +1002,59 @@ int dag_parse(struct dag *d, FILE * dag_stream)
 
 void dag_prepare_gc(struct dag *d)
 {
-	/* Parse _MAKEFLOW_COLLECT_LIST and record which target files should be
+	/* Files to be collected:
+	 * ((all_files \minus sink_files)) \union collect_list) \minus preserve_list) \minus source_files 
+	 */
+
+	/* Parse GC_*_LIST and record which target files should be
 	 * garbage collected. */
-	char *collect_list = dag_lookup_set("_MAKEFLOW_COLLECT_LIST", d);
-	if(collect_list == NULL)
-		return;
+	char *collect_list  = dag_lookup_set("GC_COLLECT_LIST", d);
+	char *preserve_list = dag_lookup_set("GC_PRESERVE_LIST", d);
+
+	struct dag_file *f;
+	char *filename;
+
+	/* add all files, but sink_files */
+	hash_table_firstkey(d->file_table);
+	while((hash_table_nextkey(d->file_table, &filename, (void **) &f)))
+		if(!dag_file_is_sink(f)) {
+			set_insert(d->collect_table, f);
+		}
 
 	int i, argc;
 	char **argv;
+
+	/* add collect_list, for sink_files that should be removed */
 	string_split_quotes(collect_list, &argc, &argv);
 	for(i = 0; i < argc; i++) {
-		/* Must initialize to non-zero for hash_table functions to work properly. */
-		hash_table_insert(d->collect_table, argv[i], (void *) MAKEFLOW_GC_MIN_THRESHOLD);
-		debug(D_DEBUG, "Added %s to garbage collection list", argv[i]);
+		f = dag_file_lookup_or_create(d, argv[i]);
+		set_insert(d->collect_table, f);
+		debug(D_DEBUG, "Added %s to garbage collection list", f->filename);
 	}
 	free(argv);
 
-	/* Mark garbage files with reference counts. This will be used to
-	 * detect when it is safe to remove a garbage file. */
-	struct dag_node *n;
-	struct dag_file *f;
-	for(n = d->nodes; n; n = n->next) {
-		list_first_item(n->source_files);
-		while((f = list_next_item(n->source_files)))
-			dag_gc_ref_incr(d, f->filename, 1);
+	/* remove files from preserve_list */
+	string_split_quotes(preserve_list, &argc, &argv);
+	for(i = 0; i < argc; i++) {
+		/* Must initialize to non-zero for hash_table functions to work properly. */
+		f = dag_file_lookup_or_create(d, argv[i]);
+		set_remove(d->collect_table, f);
+		debug(D_DEBUG, "Removed %s from garbage collection list", f->filename);
 	}
+	free(argv);
+
+	/* remove source_files from collect_table */
+	hash_table_firstkey(d->file_table);
+	while((hash_table_nextkey(d->file_table, &filename, (void **) &f)))
+		if(dag_file_is_source(f)) {
+			set_remove(d->collect_table, f);
+			debug(D_DEBUG, "Removed %s from garbage collection list", f->filename);
+		}
+
+	/* Print reference counts of files to be collected */
+	set_first_element(d->collect_table);
+	while((f = set_next_element(d->collect_table)))
+		debug(D_DEBUG, "Added %s to garbage collection list (%d)", f->filename, f->ref_count);
 }
 
 void dag_prepare_nested_jobs(struct dag *d)
@@ -1202,8 +1225,8 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 
 	dag_parse_process_variable(bk, n, current_table, name, v);
 
-	if(strcmp(name, "_MAKEFLOW_COLLECT_LIST") == 0)
-		debug(D_DEBUG, "updating _MAKEFLOW_COLLECT_LIST with: %s\n",  value);
+	if(append)
+		debug(D_DEBUG, "%s appending to variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
 	else
 		debug(D_DEBUG, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
 
@@ -1839,15 +1862,16 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 			hash_table_insert(d->completed_files, f->filename, f->filename);
 		}
 
-		/* Mark source files that have been used by this node and
-		 * perform collection if we are doing reference counting. */
+		/* Mark source files that have been used by this node */
 		list_first_item(n->source_files);
-		while((f = list_next_item(n->source_files))) {
-			dag_gc_ref_incr(d, f->filename, -1);
-			if(dag_gc_method == DAG_GC_REF_COUNT) {
-				dag_gc_ref_count(d, f->filename);
-			}
+		while((f = list_next_item(n->source_files)))
+			f->ref_count+= -1;
+
+		set_first_element(d->collect_table);
+		while((f = set_next_element(d->collect_table))) {
+			debug(D_DEBUG, "%s: %d\n", f->filename, f->ref_count);
 		}
+
 		dag_node_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
 }
@@ -1890,33 +1914,33 @@ int dag_check(struct dag *d)
 	return 1;
 }
 
-int dag_gc_file(struct dag *d, const char *file, int count)
+int dag_gc_file(struct dag *d, const struct dag_file *f)
 {
-	if(access(file, R_OK) == 0 && unlink(file) < 0) {
-		debug(D_NOTICE, "makeflow: unable to collect %s: %s", file, strerror(errno));
+	if(access(f->filename, R_OK) == 0 && unlink(f->filename) < 0) {
+		debug(D_NOTICE, "makeflow: unable to collect %s: %s", f->filename, strerror(errno));
 		return 0;
 	} else {
-		debug(D_DEBUG, "Garbage collected %s (%d)", file, count - 1);
-		hash_table_remove(d->collect_table, file);
+		debug(D_DEBUG, "Garbage collected %s\n", f->filename);
+		set_remove(d->collect_table, f);
 		return 1;
 	}
 }
 
-void dag_gc_all(struct dag *d, int threshold, int maxfiles, time_t stoptime)
+void dag_gc_all(struct dag *d, int maxfiles)
 {
 	int collected = 0;
-	char *key;
-	PTRINT_T value;
+	struct dag_file *f;
 	timestamp_t start_time, stop_time;
 
 	/* This will walk the table of files to collect and will remove any
 	 * that are below or equal to the threshold. */
 	start_time = timestamp_get();
-	hash_table_firstkey(d->collect_table);
-	while(hash_table_nextkey(d->collect_table, &key, (void **) &value) && time(0) < stoptime && collected < maxfiles) {
-		if(value <= threshold && dag_gc_file(d, key, (int) value))
+	set_first_element(d->collect_table);
+	while((f = set_next_element(d->collect_table)) && collected < maxfiles) {
+		if(f->ref_count < 1 && dag_gc_file(d, f))
 			collected++;
 	}
+
 	stop_time = timestamp_get();
 
 	/* Record total amount of files collected to Makeflowlog. */
@@ -1931,37 +1955,6 @@ void dag_gc_all(struct dag *d, int threshold, int maxfiles, time_t stoptime)
 		 *
 		 */
 		fprintf(d->logfile, "# GC\t%" PRIu64 "\t%d\t%" PRIu64 "\t%d\n", timestamp_get(), collected, stop_time - start_time, dag_gc_collected);
-	}
-}
-
-void dag_gc_ref_incr(struct dag *d, const char *file, int increment)
-{
-	/* Increment the garbage file by specified amount */
-	PTRINT_T ref_count = (PTRINT_T) hash_table_remove(d->collect_table, file);
-	if(ref_count) {
-		ref_count = ref_count + increment;
-		hash_table_insert(d->collect_table, file, (void *) ref_count);
-		debug(D_DEBUG, "Marked file %s references (%d)", file, ref_count - 1);
-	}
-}
-
-void dag_gc_ref_count(struct dag *d, const char *file)
-{
-	PTRINT_T ref_count = (PTRINT_T) hash_table_remove(d->collect_table, file);
-	if(ref_count && ref_count <= MAKEFLOW_GC_MIN_THRESHOLD) {
-		timestamp_t start_time, stop_time;
-		start_time = timestamp_get();
-		dag_gc_file(d, file, ref_count);
-		stop_time = timestamp_get();
-		/** Line format: # GC timestamp collected time_spent dag_gc_collected
-		 *
-		 * timestamp - the unix time (in microseconds) when this line is written to the log file.
-		 * collected - the number of files were collected in this garbage collection cycle.
-		 * time_spent - the length of time this cycle took.
-		 * dag_gc_collected - the total number of files has been collected so far since the start this makeflow execution.
-		 *
-		 */
-		fprintf(d->logfile, "# GC\t%" PRIu64 "\t%d\t%" PRIu64 "\t%d\n", timestamp_get(), 1, stop_time - start_time, ++dag_gc_collected);
 	}
 }
 
@@ -1998,19 +1991,15 @@ void dag_gc(struct dag *d)
 	char cwd[PATH_MAX];
 
 	switch (dag_gc_method) {
-	case DAG_GC_INCR_FILE:
+	case DAG_GC_REF_COUNT:
 		debug(D_DEBUG, "Performing incremental file (%d) garbage collection", dag_gc_param);
-		dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, dag_gc_param, INT_MAX);
-		break;
-	case DAG_GC_INCR_TIME:
-		debug(D_DEBUG, "Performing incremental time (%d) garbage collection", dag_gc_param);
-		dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, INT_MAX, time(0) + dag_gc_param);
+		dag_gc_all(d, dag_gc_param);
 		break;
 	case DAG_GC_ON_DEMAND:
 		getcwd(cwd, PATH_MAX);
 		if(directory_inode_count(cwd) >= dag_gc_param || directory_low_disk(cwd)) {
 			debug(D_DEBUG, "Performing on demand (%d) garbage collection", dag_gc_param);
-			dag_gc_all(d, MAKEFLOW_GC_MIN_THRESHOLD, INT_MAX, INT_MAX);
+			dag_gc_all(d, INT_MAX);
 		}
 		break;
 	default:
@@ -2075,7 +2064,7 @@ void dag_run(struct dag *d)
 		dag_abort_all(d);
 	} else {
 		if(!dag_failed_flag && dag_gc_method != DAG_GC_NONE) {
-			dag_gc_all(d, INT_MAX, INT_MAX, INT_MAX);
+			dag_gc_all(d, INT_MAX);
 		}
 	}
 }
@@ -2465,14 +2454,8 @@ int main(int argc, char *argv[])
 				dag_gc_method = DAG_GC_NONE;
 			} else if(strcasecmp(optarg, "ref_count") == 0) {
 				dag_gc_method = DAG_GC_REF_COUNT;
-			} else if(strcasecmp(optarg, "incr_file") == 0) {
-				dag_gc_method = DAG_GC_INCR_FILE;
 				if(dag_gc_param < 0)
 					dag_gc_param = 16;	/* Try to collect at most 16 files. */
-			} else if(strcasecmp(optarg, "incr_time") == 0) {
-				dag_gc_method = DAG_GC_INCR_TIME;
-				if(dag_gc_param < 0)
-					dag_gc_param = 5;	/* Timeout of 5. */
 			} else if(strcasecmp(optarg, "on_demand") == 0) {
 				dag_gc_method = DAG_GC_ON_DEMAND;
 				if(dag_gc_param < 0)

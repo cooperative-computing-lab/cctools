@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include <stdio.h>
 
 #include "itable.h"
+#include "set.h"
 
 #include "timestamp.h"
 #include "batch_job.h"
@@ -44,8 +45,7 @@ struct dag {
                                                 the final cleanup). */
     struct hash_table *variables;            /* Mappings between variables defined in the makeflow 
                                                 file and their substitution. */
-    struct hash_table *collect_table;        /* Keeps the reference counts of filenames of files 
-                                                that are garbage collectable. */
+    struct set *collect_table;               /* Keeps files that are garbage collectable. */
     struct list *export_list;                /* List of variables with prefix export. 
                                                 (these are setenv'ed eventually). */
     FILE *logfile;
@@ -183,6 +183,8 @@ struct dag_file {
 
     struct list     *needed_by;              /* List of nodes that have this file as a source */
     struct dag_node *target_of;              /* The node (if any) that created the file */
+
+	int    ref_count;                        /* How many nodes still to run need this file */
 };
 
 struct dag_lookup_set {
@@ -202,6 +204,7 @@ struct dag_variable_value {
 struct dag *dag_create();
 struct dag_node *dag_node_create(struct dag *d, int linenum);
 struct dag_file *dag_file_create(struct dag_node *n, const char *filename, const char *remotename);
+struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename);
 
 struct list *dag_input_files(struct dag *d);
 

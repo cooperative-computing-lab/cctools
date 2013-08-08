@@ -1,30 +1,23 @@
 _collect.0:
-	@_MAKEFLOW_COLLECT_LIST+=_collect.0
 	touch _collect.0 ; ls | wc -l > _collect.0 
 
 _collect.1:
-	@_MAKEFLOW_COLLECT_LIST+=_collect.1
 	touch _collect.1 ; ls | wc -l > _collect.1
 
 _collect.2:
-	@_MAKEFLOW_COLLECT_LIST+=_collect.2
 	touch _collect.2 ; ls | wc -l > _collect.2
 
 _collect.3: _collect.0 _collect.1 _collect.2
 	touch _collect.3 ; ls | wc -l > _collect.3
 
 _collect.4: _collect.3
-	@_MAKEFLOW_COLLECT_LIST+=_collect.3
 	touch _collect.4 ; ls | wc -l > _collect.4
 
 _collect.5: _collect.3 _collect.4
-	@_MAKEFLOW_COLLECT_LIST+=_collect.3 _collect.4
 	touch _collect.5 ; ls | wc -l > _collect.5
 
 _collect.6: _collect.3 _collect.4 _collect.5 
-	@_MAKEFLOW_COLLECT_LIST+=_collect.3 _collect.4 _collect.5
 	touch _collect.6 ; cat _collect.3 _collect.4 _collect.5 > _collect.6
 
 _collect.7: _collect.6
-	@_MAKEFLOW_COLLECT_LIST+=_collect.6
 	touch _collect.7 ; cat _collect.6 > _collect.7 ; ls | wc -l >> _collect.7

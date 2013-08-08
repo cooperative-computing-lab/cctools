@@ -13,8 +13,8 @@ prepare()
     ln -sf ../syntax/collect.makeflow .
 cat > ../$test_output <<EOF
 7
-5
-6
+7
+7
 7
 EOF
     exit 0
@@ -22,8 +22,9 @@ EOF
 
 run()
 {
+	echo $test_dir
     cd $test_dir
-    ./makeflow -g ref_count -d all collect.makeflow
+    ./makeflow -g ref_count -G 1 -d all collect.makeflow
     if [ $? -eq 0 ]; then
     	exec diff -w ../$test_output _collect.7
     else

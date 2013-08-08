@@ -32,7 +32,7 @@ int dag_to_file_vars(struct hash_table *vars, FILE * dag_stream, const char *pre
 
 	hash_table_firstkey(vars);
 	while(hash_table_nextkey(vars, &var, (void *) &v)) {
-		if(!string_null_or_empty(v->value) && strcmp(var, "_MAKEFLOW_COLLECT_LIST"))
+		if(!string_null_or_empty(v->value) && (strcmp(var, "GC_PRESERVE_LIST") || strcmp(var, "GC_COLLECT_LIST")))
 			fprintf(dag_stream, "%s%s=\"%s\"\n", prefix, var, (char *) v->value);
 	}
 
