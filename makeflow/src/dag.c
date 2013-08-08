@@ -269,7 +269,7 @@ struct list *dag_input_files(struct dag *d)
  * */
 char *dag_lookup_set(const char *name, void *arg)
 {
-	struct dag_lookup_set s = { (struct dag *) arg, NULL, NULL };
+	struct dag_lookup_set s = { (struct dag *) arg, NULL, NULL, NULL };
 	return dag_lookup_str(name, &s);
 }
 
@@ -284,6 +284,15 @@ struct dag_variable_value *dag_lookup(const char *name, void *arg)
 			v = (struct dag_variable_value *) hash_table_lookup(s->node->variables, name);
 			if(v) {
 				s->table = s->node->variables; //why this line?
+				return v;
+			}
+		}
+
+		/* Try variables from category */
+		if(s->category) {
+			v = (struct dag_variable_value *) hash_table_lookup(s->category->variables, name);
+			if(v) {
+				s->table = s->category->variables;
 				return v;
 			}
 		}
@@ -507,7 +516,8 @@ struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, cons
 	if(!category) {
 		category = malloc(sizeof(struct dag_task_category));
 		category->label = xxstrdup(label);
-		category->count = 0;
+		category->nodes = list_create();
+		category->variables = hash_table_create(0, 0);
 		category->resources = make_rmsummary(-1);
 		
 		hash_table_insert(d->task_categories, label, category);
@@ -715,3 +725,5 @@ int dag_node_is_sink(struct dag_node *n)
 {
 	return (set_size(n->descendants) == 0);
 }
+
+

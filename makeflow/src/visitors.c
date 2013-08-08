@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "stringtools.h"
 
+#include "rmsummary.h"
 #include "visitors.h"
 
 /*
@@ -24,17 +25,15 @@ See the file COPYING for details.
  */
 
 /* Writes 'var=value' pairs from the dag to the stream */
-int dag_to_file_vars(const struct dag *d, FILE * dag_stream)
+int dag_to_file_vars(struct hash_table *vars, FILE * dag_stream, const char *prefix)
 {
 	char *var;
 	struct dag_variable_value *v;
 
-	struct hash_table *vars = d->variables;
-
 	hash_table_firstkey(vars);
 	while(hash_table_nextkey(vars, &var, (void *) &v)) {
 		if(!string_null_or_empty(v->value) && strcmp(var, "_MAKEFLOW_COLLECT_LIST"))
-			fprintf(dag_stream, "%s=\"%s\"\n", var, (char *) v->value);
+			fprintf(dag_stream, "%s%s=\"%s\"\n", prefix, var, (char *) v->value);
 	}
 
 	return 0;
@@ -94,6 +93,9 @@ int dag_to_file_node(struct dag_node *n, FILE * dag_stream, char *(*rename) (str
 	fprintf(dag_stream, ": ");
 	dag_to_file_files(n, n->source_files, dag_stream, rename);
 	fprintf(dag_stream, "\n");
+
+	dag_to_file_vars(n->variables, dag_stream, "@");
+
 	if(n->local_job)
 		fprintf(dag_stream, "\tLOCAL %s", n->command);
 	else
@@ -103,13 +105,45 @@ int dag_to_file_node(struct dag_node *n, FILE * dag_stream, char *(*rename) (str
 	return 0;
 }
 
-/* Writes all the rules to the stream */
-int dag_to_file_nodes(const struct dag *d, FILE * dag_stream, char *(*rename) (struct dag_node * n, const char *filename))
+int dag_to_file_category_variables(struct dag_task_category *c, FILE * dag_stream)
+{
+	struct rmsummary *s = c->resources;
+
+	fprintf(dag_stream, "\n");
+	fprintf(dag_stream, "CATEGORY=\"%s\"\n", c->label);
+
+	if(s->cores > -1)
+		fprintf(dag_stream, "CORES=%" PRId64 "\n", s->cores);
+	if(s->resident_memory > -1)
+		fprintf(dag_stream, "MEMORY=%" PRId64 "\n", s->resident_memory);
+	if(s->workdir_footprint > -1)
+		fprintf(dag_stream, "DISK=%" PRId64 "\n", s->workdir_footprint);
+
+	return 0;
+}
+
+/* Writes all the rules to the stream, per category, plus any variables from the category */
+int dag_to_file_category(struct dag_task_category *c, FILE * dag_stream, char *(*rename) (struct dag_node * n, const char *filename))
 {
 	struct dag_node *n;
 
-	for(n = d->nodes; n; n = n->next)
+	dag_to_file_category_variables(c, dag_stream);
+
+	list_first_item(c->nodes);
+	while((n = list_next_item(c->nodes)))
 		dag_to_file_node(n, dag_stream, rename);
+
+	return 0;
+}
+
+int dag_to_file_categories(const struct dag *d, FILE * dag_stream, char *(*rename) (struct dag_node * n, const char *filename))
+{
+	char *name;
+	struct dag_task_category *c;
+
+	hash_table_firstkey(d->task_categories);
+	while(hash_table_nextkey(d->task_categories, &name, (void *) &c))
+		dag_to_file_category(c, dag_stream, rename);
 
 	return 0;
 }
@@ -123,9 +157,9 @@ int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename) (stru
 	if(!dag_stream)
 		return 1;
 
-	dag_to_file_vars(d, dag_stream);
+	dag_to_file_vars(d->variables, dag_stream, "");
 	dag_to_file_exports(d, dag_stream);
-	dag_to_file_nodes(d, dag_stream, rename);
+	dag_to_file_categories(d, dag_stream, rename);
 
 	fclose(dag_stream);
 
