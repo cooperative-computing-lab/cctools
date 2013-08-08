@@ -1152,6 +1152,7 @@ int dag_parse_process_variable(struct lexer_book *bk, struct dag_node *n, struct
 	/* else if some other special variable .... */
 	/* ... */
 
+	hash_table_remove(current_table, name); //memory leak...
 	hash_table_insert(current_table, name, v);
 
 	return special;
