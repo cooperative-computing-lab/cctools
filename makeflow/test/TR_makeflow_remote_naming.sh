@@ -12,6 +12,33 @@ prepare()
 {
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
+
+	CONVERT=`which convert`
+
+	if [ -z "$CONVERT" ]; then
+		if   [ -f /usr/bin/convert ]; then
+			CONVERT=/usr/bin/convert
+		elif [ -f /usr/local/bin/convert ]; then
+			CONVERT=/usr/local/bin/convert
+		elif [ -f /opt/local/bin/convert ]; then
+			CONVERT=/opt/local/bin/convert
+		fi
+	fi
+	cp $CONVERT ./convert
+
+	CURL=`which curl`
+
+	if [ -z "$CONVERT" ]; then
+		if   [ -f /usr/bin/curl ]; then
+			CURL=/usr/bin/curl
+		elif [ -f /usr/local/bin/curl ]; then
+			CURL=/usr/local/bin/curl
+		elif [ -f /opt/local/bin/curl ]; then
+			CURL=/opt/local/bin/curl
+		fi
+	fi
+	cp $CURL ./curl
+
 	exit 0
 }
 
@@ -36,6 +63,7 @@ clean()
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
 	rm -f $WORKER_LOG
+	rm -f ./convert ./curl
 
 	exit 0
 }

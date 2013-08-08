@@ -3,18 +3,18 @@ URL=http://www.cse.nd.edu/~ccl/images/capitol.jpg
 capitol.diff: capitol.0.jpg capitol.270.jpg
 	! diff --brief capitol.0.jpg capitol.270.jpg > capitol.diff;
 
-capitol.90.jpg->capitol.out.jpg: capitol.jpg
+capitol.90.jpg->capitol.out.jpg: capitol.jpg convert
 	convert -rotate 90 capitol.jpg capitol.out.jpg
 
-capitol.180.jpg->capitol.out.jpg: capitol.jpg
+capitol.180.jpg->capitol.out.jpg: capitol.jpg convert
 	convert -rotate 180 capitol.jpg capitol.out.jpg
 
-capitol.270.jpg->capitol.out.jpg: capitol.90.jpg->capitol.in.jpg
+capitol.270.jpg->capitol.out.jpg: capitol.90.jpg->capitol.in.jpg convert
 	convert -rotate 180 capitol.in.jpg capitol.out.jpg
 
-capitol.0.jpg->capitol.out.jpg: capitol.180.jpg->capitol.in.jpg
+capitol.0.jpg->capitol.out.jpg: capitol.180.jpg->capitol.in.jpg convert
 	convert -rotate 180 capitol.in.jpg capitol.out.jpg
 
-capitol.jpg:
+capitol.jpg: curl
 	curl -o capitol.jpg $URL
 
