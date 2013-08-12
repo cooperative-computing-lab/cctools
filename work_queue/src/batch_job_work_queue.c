@@ -131,6 +131,9 @@ void specify_work_queue_task_shared_files(struct work_queue_task *t, const char 
 
 struct rmsummary *parse_batch_options_resources(char *options_text)
 {
+	if(!options_text)
+		return NULL;
+	
 	char *resources = strstr(options_text, "resources:");
 
 	if(!resources)

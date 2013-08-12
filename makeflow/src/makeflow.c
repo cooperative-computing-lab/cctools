@@ -643,7 +643,6 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 			} else {
 				/* If input file is missing, but node completed and file was garbage, then avoid rerunning. */
 				if(n->state == DAG_NODE_STATE_COMPLETE && set_lookup(d->collect_table, f)) {
-					f->ref_count += -1;
 					continue;
 				}
 				goto rerun;
@@ -787,7 +786,7 @@ void dag_log_recover(struct dag *d, const char *filename)
 		struct dag_file *f;
 		struct dag_node *p;
 		for(n = d->nodes; n; n = n->next) {
-			/* Record node information to log */
+			/* record node information to log */
 			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->original_command);
 
 			/* Record the node category to the log */
@@ -833,6 +832,17 @@ void dag_log_recover(struct dag *d, const char *filename)
 			dag_node_decide_rerun(rerun_table, d, n);
 		}
 		itable_delete(rerun_table);
+	}
+
+	//Update file reference counts from nodes in log
+	for(n = d->nodes; n; n = n->next) {
+		if(n->state == DAG_NODE_STATE_COMPLETE)
+		{
+			struct dag_file *f;
+			list_first_item(n->source_files);
+			while((f = list_next_item(n->source_files)))
+				f->ref_count += -1;
+		}
 	}
 }
 
@@ -2054,7 +2064,7 @@ void dag_run(struct dag *d)
 		 * wait loop, perform garbage collection after a proportional
 		 * amount of tasks have passed. */
 		dag_gc_barrier--;
-		if(dag_gc_barrier == 0) {
+		if(dag_gc_method != DAG_GC_NONE && dag_gc_barrier == 0) {
 			dag_gc(d);
 			dag_gc_barrier = MAX(d->nodeid_counter * dag_gc_task_ratio, 1);
 		}
@@ -2800,7 +2810,9 @@ int main(int argc, char *argv[])
 		fatal("Could not prepare for submission to batch system.\n");
 	}
 
-	dag_prepare_gc(d);
+	if(dag_gc_method != DAG_GC_NONE)
+		dag_prepare_gc(d);
+
 	dag_prepare_nested_jobs(d);
 
 	if(clean_mode) {
