@@ -87,8 +87,10 @@ PUBLIC_HEADERS = auth.h  \
                  auth_ticket.h \
                  auth_unix.h  \
                  batch_job.h  \
+                 buffer.h  \
                  debug.h  \
                  int_sizes.h  \
+                 md5.h  \
                  rmonitor_hooks.h \
                  timestamp.h
 
