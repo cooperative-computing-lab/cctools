@@ -692,6 +692,7 @@ char *dag_task_category_wrap_options(struct dag_task_category *category, const c
 	switch(batch_type)
 	{
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
+		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 			return dag_task_category_wrap_as_wq_options(category, default_options);
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:

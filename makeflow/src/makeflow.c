@@ -1387,8 +1387,11 @@ int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, i
 			}
 			break;
 
-		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-
+                case BATCH_QUEUE_TYPE_WORK_QUEUE:
+                        /* Note we do not fall with
+                         * BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS here, since we
+                         * do not want to rename absolute paths in such case.
+                         * */
 			if(f->filename[0] == '/' && !remotename) {
 				/* Translate only explicit absolute paths for Work Queue tasks. */
 				remotename = dag_node_add_remote_name(n, f->filename, NULL);
@@ -1642,6 +1645,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 		switch (batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
+		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 			tmp = string_format("%s=%s,", f->filename, remotename);
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:
@@ -1666,6 +1670,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 		switch (batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
+		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 			tmp = string_format("%s=%s,", f->filename, remotename);
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:
@@ -2630,7 +2635,7 @@ int main(int argc, char *argv[])
 		dagfile = argv[optind];
 	}
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
 			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
@@ -2661,6 +2666,7 @@ int main(int argc, char *argv[])
 			batchlogfilename = string_format("%s.condorlog", dagfile);
 			break;
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
+		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 			batchlogfilename = string_format("%s.wqlog", dagfile);
 			break;
 		default:
@@ -2783,6 +2789,8 @@ int main(int argc, char *argv[])
 			d->remote_jobs_max = load_average_get_cpus();
 		} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 			d->remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
+		} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
+			d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 		} else {
 			d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 		}
@@ -2865,7 +2873,7 @@ int main(int argc, char *argv[])
 
 	dag_log_recover(d, logfilename);
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		struct work_queue *q = batch_queue_get_work_queue(remote_queue);
 		if(!q) {
 			fprintf(stderr, "makeflow: cannot get work queue object.\n");
