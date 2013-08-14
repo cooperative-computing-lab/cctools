@@ -1386,7 +1386,6 @@ int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, i
 				}
 			}
 			break;
-
                 case BATCH_QUEUE_TYPE_WORK_QUEUE:
                         /* Note we do not fall with
                          * BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS here, since we
@@ -1398,7 +1397,6 @@ int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, i
 				debug(D_DEBUG, "translating work queue absolute path (%s) -> (%s)", f->filename, remotename);
 			}
 			break;
-
 		default:
 			if(remotename)
 				fprintf(stderr, "makeflow: automatic file renaming (%s->%s) only works with Condor or Work Queue drivers\n", f->filename, remotename);
@@ -1618,10 +1616,14 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 
 void dag_node_submit(struct dag *d, struct dag_node *n)
 {
-	char *input_files = NULL;
+	char *input_files  = NULL;
 	char *output_files = NULL;
 	struct dag_file *f;
 	const char *remotename;
+
+	char current_dir[PATH_MAX];
+	char abs_name[PATH_MAX];
+	getcwd(current_dir, PATH_MAX);
 
 	struct batch_queue *thequeue;
 
@@ -1645,8 +1647,20 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 		switch (batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 			tmp = string_format("%s=%s,", f->filename, remotename);
+			break;
+		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
+			if(f->filename[0] == '/')
+			{
+				tmp = string_format("%s=%s,", f->filename, remotename);
+			}
+			else
+			{
+				char *tmp_name = string_format("%s/%s", current_dir, f->filename); 
+				string_collapse_path(tmp_name, abs_name, 1);
+				free(tmp_name);
+				tmp = string_format("%s=%s,", abs_name, remotename);
+			}
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:
 			tmp = string_format("%s,", remotename);
@@ -1670,8 +1684,20 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 		switch (batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 			tmp = string_format("%s=%s,", f->filename, remotename);
+			break;
+		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
+			if(f->filename[0] == '/')
+			{
+				tmp = string_format("%s=%s,", f->filename, remotename);
+			}
+			else
+			{
+				char *tmp_name = string_format("%s/%s", current_dir, f->filename); 
+				string_collapse_path(tmp_name, abs_name, 1);
+				free(tmp_name);
+				tmp = string_format("%s=%s,", abs_name, remotename);
+			}
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:
 			tmp = string_format("%s,", remotename);
