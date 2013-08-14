@@ -1183,11 +1183,11 @@ static int do_thirdget(int mode, char *filename, const char *path, int flags) {
 	return 1;
 }
 
-static int do_thirdput(struct link *master, int mode, const char *filename, const char *path, int flags) {
+static int do_thirdput(struct link *master, int mode, char *filename, const char *path, int flags) {
 	struct stat info;
 	char cmd[WORK_QUEUE_LINE_MAX];
 	char cached_filename[WORK_QUEUE_LINE_MAX];
-	const char *cur_pos;
+	char *cur_pos;
 	int result = 1;
 
 	cur_pos = filename;
@@ -1216,7 +1216,18 @@ static int do_thirdput(struct link *master, int mode, const char *filename, cons
 			debug(D_WQ, "thirdput aborted: filename (%s) and path (%s) are the same\n", filename, path);
 			result = 1;
 		}
-		sprintf(cmd, "/bin/cp %s %s", cached_filename, path);
+		cur_pos = strrchr(path, '/');
+		if(cur_pos) {
+			*cur_pos = '\0';
+			if(!create_dir(path, mode | 0700)) {
+				debug(D_WQ, "Could not create directory - %s (%s)\n", path, strerror(errno));
+				result = 0;
+				*cur_pos = '/';
+				break;
+			}
+			*cur_pos = '/';
+		}
+		sprintf(cmd, "/bin/cp -r %s %s", cached_filename, path);
 		if(system(cmd) != 0) {
 			debug(D_WQ, "Could not thirdput %s, copy (%s) failed. (%s)\n", cached_filename, path, strerror(errno));
 			result = 0;

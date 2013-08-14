@@ -1386,16 +1386,17 @@ int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, i
 				}
 			}
 			break;
-
-		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-
+                case BATCH_QUEUE_TYPE_WORK_QUEUE:
+                        /* Note we do not fall with
+                         * BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS here, since we
+                         * do not want to rename absolute paths in such case.
+                         * */
 			if(f->filename[0] == '/' && !remotename) {
 				/* Translate only explicit absolute paths for Work Queue tasks. */
 				remotename = dag_node_add_remote_name(n, f->filename, NULL);
 				debug(D_DEBUG, "translating work queue absolute path (%s) -> (%s)", f->filename, remotename);
 			}
 			break;
-
 		default:
 			if(remotename)
 				fprintf(stderr, "makeflow: automatic file renaming (%s->%s) only works with Condor or Work Queue drivers\n", f->filename, remotename);
@@ -1615,10 +1616,14 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 
 void dag_node_submit(struct dag *d, struct dag_node *n)
 {
-	char *input_files = NULL;
+	char *input_files  = NULL;
 	char *output_files = NULL;
 	struct dag_file *f;
 	const char *remotename;
+
+	char current_dir[PATH_MAX];
+	char abs_name[PATH_MAX];
+	getcwd(current_dir, PATH_MAX);
 
 	struct batch_queue *thequeue;
 
@@ -1644,6 +1649,19 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
 			tmp = string_format("%s=%s,", f->filename, remotename);
 			break;
+		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
+			if(f->filename[0] == '/')
+			{
+				tmp = string_format("%s=%s,", f->filename, remotename);
+			}
+			else
+			{
+				char *tmp_name = string_format("%s/%s", current_dir, f->filename); 
+				string_collapse_path(tmp_name, abs_name, 1);
+				free(tmp_name);
+				tmp = string_format("%s=%s,", abs_name, remotename);
+			}
+			break;
 		case BATCH_QUEUE_TYPE_CONDOR:
 			tmp = string_format("%s,", remotename);
 			break;
@@ -1667,6 +1685,19 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		switch (batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
 			tmp = string_format("%s=%s,", f->filename, remotename);
+			break;
+		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
+			if(f->filename[0] == '/')
+			{
+				tmp = string_format("%s=%s,", f->filename, remotename);
+			}
+			else
+			{
+				char *tmp_name = string_format("%s/%s", current_dir, f->filename); 
+				string_collapse_path(tmp_name, abs_name, 1);
+				free(tmp_name);
+				tmp = string_format("%s=%s,", abs_name, remotename);
+			}
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:
 			tmp = string_format("%s,", remotename);
@@ -2630,7 +2661,7 @@ int main(int argc, char *argv[])
 		dagfile = argv[optind];
 	}
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
 			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
@@ -2661,6 +2692,7 @@ int main(int argc, char *argv[])
 			batchlogfilename = string_format("%s.condorlog", dagfile);
 			break;
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
+		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 			batchlogfilename = string_format("%s.wqlog", dagfile);
 			break;
 		default:
@@ -2783,6 +2815,8 @@ int main(int argc, char *argv[])
 			d->remote_jobs_max = load_average_get_cpus();
 		} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 			d->remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
+		} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
+			d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 		} else {
 			d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 		}
@@ -2865,7 +2899,7 @@ int main(int argc, char *argv[])
 
 	dag_log_recover(d, logfilename);
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		struct work_queue *q = batch_queue_get_work_queue(remote_queue);
 		if(!q) {
 			fprintf(stderr, "makeflow: cannot get work queue object.\n");
