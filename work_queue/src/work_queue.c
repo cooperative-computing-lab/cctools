@@ -320,6 +320,7 @@ static void link_to_hash_key(struct link *link, char *key)
  * This function sends a message to the worker and records the time the message is 
  * successfully sent. This timestamp is used to determine when to send keepalive checks.
  */
+__attribute__ (( format(printf,2,4) ))
 static int send_worker_msg(struct work_queue_worker *w, const char *fmt, time_t stoptime, ...) 
 {
 	char debug_msg[2*WORK_QUEUE_LINE_MAX];
@@ -1735,7 +1736,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 				}
 				debug(D_WQ, "%s (%s) needs %s from the url, %s %d", w->hostname, w->addrport, remote_name, tf->payload, tf->length);
 				open_time = timestamp_get();
-				send_worker_msg(w, "url %s %lld 0%o %d\n",time(0) + short_timeout, remote_name, tf->length, 0777, tf->flags);
+				send_worker_msg(w, "url %s %d 0%o %d\n",time(0) + short_timeout, remote_name, tf->length, 0777, tf->flags);
 				link_putlstring(w->link, tf->payload, tf->length, stoptime);
 				close_time = timestamp_get();
 				sum_time += (close_time - open_time);
