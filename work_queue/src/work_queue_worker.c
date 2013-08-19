@@ -813,7 +813,7 @@ static struct link *auto_link_connect(char *addr, int *port)
  * end
  *
  */
-static int stream_output_item(struct link *master, const char *filename, int recursive, int flags)
+static int stream_output_item(struct link *master, const char *filename, int recursive)
 {
 	DIR *dir;
 	struct dirent *dent;
@@ -823,11 +823,7 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 	INT64_T actual, length;
 	int fd;
 
-	if(flags & WORK_QUEUE_CACHE) {
-		sprintf(cached_filename, "cache/%s", filename);
-	} else {
-		sprintf(cached_filename, "uncache/%s", filename);
-	}
+	sprintf(cached_filename, "cache/%s", filename);
 
 	if(stat(cached_filename, &info) != 0) {
 		goto failure;
@@ -845,7 +841,7 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
 				continue;
 			sprintf(dentline, "%s/%s", filename, dent->d_name);
-			stream_output_item(master, dentline, recursive, flags);
+			stream_output_item(master, dentline, recursive);
 		}
 
 		closedir(dir);
@@ -954,18 +950,10 @@ static int do_task( struct link *master, int taskid )
 			debug(D_WQ,"--> %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", filename, taskname, &flags)) {
-			if(flags & WORK_QUEUE_CACHE) {
-				sprintf(localname, "cache/%s", filename);
-			} else {
-				sprintf(localname, "uncache/%s", filename);
-			}
+			sprintf(localname, "cache/%s", filename);
 		       	work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_INPUT, flags);
 		} else if(sscanf(line,"outfile %s %s %d", filename, taskname, &flags)) {
-			if(flags & WORK_QUEUE_CACHE) {
-				sprintf(localname, "cache/%s", filename);
-			} else {
-				sprintf(localname, "uncache/%s", filename);
-			}
+			sprintf(localname, "cache/%s", filename);
 		       	work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags);
 		} else if(sscanf(line, "dir %s", filename)) {
 			work_queue_task_specify_directory(task, filename, filename, WORK_QUEUE_INPUT, 0700, 0);
@@ -1010,7 +998,7 @@ static int do_task( struct link *master, int taskid )
 	return 1;
 }
 
-static int do_put(struct link *master, char *filename, INT64_T length, int mode, int flags) {
+static int do_put(struct link *master, char *filename, INT64_T length, int mode) {
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	char *cur_pos;
 	
@@ -1029,11 +1017,7 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode,
 		cur_pos += 2;
 	}
 
-	if(flags & WORK_QUEUE_CACHE) {
-		sprintf(cached_filename, "cache/%s", cur_pos);
-	} else {
-		sprintf(cached_filename, "uncache/%s", cur_pos);
-	}
+	sprintf(cached_filename, "cache/%s", cur_pos);
 
 	cur_pos = strrchr(cached_filename, '/');
 	if(cur_pos) {
@@ -1077,28 +1061,20 @@ static int file_from_url(const char *url, const char *filename) {
         return 1;
 }
 
-static int do_url(struct link* master, const char *filename, int length, int mode, int flags) {
-	char url[WORK_QUEUE_LINE_MAX];
-	link_read(master, url, length, time(0) + active_timeout);
+static int do_url(struct link* master, const char *filename, int length, int mode) {
 
-	char cache_name[WORK_QUEUE_LINE_MAX];
-	
-	if(flags & WORK_QUEUE_CACHE) {
-		snprintf(cache_name, WORK_QUEUE_LINE_MAX, "cache/%s", filename);
-	} else {
-		snprintf(cache_name, WORK_QUEUE_LINE_MAX, "uncache/%s", filename);
-	}
+        char url[WORK_QUEUE_LINE_MAX];
+        link_read(master, url, length, time(0) + active_timeout);
 
-	return file_from_url(url, cache_name);
+        char cache_name[WORK_QUEUE_LINE_MAX];
+        snprintf(cache_name,WORK_QUEUE_LINE_MAX, "cache/%s", filename);
+
+        return file_from_url(url, cache_name);
 }
 
-static int do_unlink(const char *path, int flags) {
+static int do_unlink(const char *path) {
 	char cached_path[WORK_QUEUE_LINE_MAX];
-	if(flags & WORK_QUEUE_CACHE) {
-		sprintf(cached_path, "cache/%s", path);
-	} else {
-		sprintf(cached_path, "uncache/%s", path);
-	}
+	sprintf(cached_path, "cache/%s", path);
 	//Use delete_dir() since it calls unlink() if path is a file.	
 	if(delete_dir(cached_path) != 0) { 
 		struct stat buf;
@@ -1114,13 +1090,13 @@ static int do_unlink(const char *path, int flags) {
 	return 1;
 }
 
-static int do_get(struct link *master, const char *filename, int recursive, int flags) {
-	stream_output_item(master, filename, recursive, flags);
+static int do_get(struct link *master, const char *filename, int recursive) {
+	stream_output_item(master, filename, recursive);
 	send_master_message(master, "end\n");
 	return 1;
 }
 
-static int do_thirdget(int mode, char *filename, const char *path, int flags) {
+static int do_thirdget(int mode, char *filename, const char *path) {
 	char cmd[WORK_QUEUE_LINE_MAX];
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	char *cur_pos;
@@ -1143,11 +1119,7 @@ static int do_thirdget(int mode, char *filename, const char *path, int flags) {
 		cur_pos += 2;
 	}
 	
-	if(flags & WORK_QUEUE_CACHE) {
-		sprintf(cached_filename, "cache/%s", cur_pos);
-	} else {
-		sprintf(cached_filename, "uncache/%s", cur_pos);
-	}
+	sprintf(cached_filename, "cache/%s", cur_pos);
 
 	cur_pos = strrchr(cached_filename, '/');
 	if(cur_pos) {
@@ -1183,7 +1155,7 @@ static int do_thirdget(int mode, char *filename, const char *path, int flags) {
 	return 1;
 }
 
-static int do_thirdput(struct link *master, int mode, char *filename, const char *path, int flags) {
+static int do_thirdput(struct link *master, int mode, char *filename, const char *path) {
 	struct stat info;
 	char cmd[WORK_QUEUE_LINE_MAX];
 	char cached_filename[WORK_QUEUE_LINE_MAX];
@@ -1196,11 +1168,7 @@ static int do_thirdput(struct link *master, int mode, char *filename, const char
 		cur_pos += 2;
 	}
 	
-	if(flags & WORK_QUEUE_CACHE) {
-		sprintf(cached_filename, "cache/%s", cur_pos);
-	} else {
-		sprintf(cached_filename, "uncache/%s", cur_pos);
-	}
+	sprintf(cached_filename, "cache/%s", cur_pos);
 
 
 	if(stat(cached_filename, &info) != 0) {
@@ -1504,28 +1472,28 @@ static int handle_master(struct link *master) {
 	if(recv_master_message(master, line, sizeof(line), time(0)+active_timeout)) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(master, taskid);
-		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) >= 4) {
+		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) >= 3) {
 			if(path_within_workspace(filename, workspace)) {
-				r = do_put(master, filename, length, mode, flags);
+				r = do_put(master, filename, length, mode);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
 			}
-                } else if(sscanf(line, "url %s %" SCNd64 " %o %d", filename, &length, &mode, &flags) >= 4) {
-                        r = do_url(master, filename, length, mode, flags);
-		} else if(sscanf(line, "unlink %s %d", filename, &flags) >= 2) {
+                } else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
+                        r = do_url(master, filename, length, mode);
+		} else if(sscanf(line, "unlink %s", filename) == 1) {
 			if(path_within_workspace(filename, workspace)) {
-				r = do_unlink(filename, flags);
+				r = do_unlink(filename);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
 			}
-		} else if(sscanf(line, "get %s %d %d", filename, &mode, &flags) >= 3) {
-			r = do_get(master, filename, mode, flags);
-		} else if(sscanf(line, "thirdget %o %d %s %[^\n]", &mode, &flags, filename, path) >= 4) {
-			r = do_thirdget(mode, filename, path, flags);
-		} else if(sscanf(line, "thirdput %o %d %s %[^\n]", &mode, &flags, filename, path) >= 4) {
-			r = do_thirdput(master, mode, filename, path, flags);
+		} else if(sscanf(line, "get %s %d", filename, &mode) == 2) {
+			r = do_get(master, filename, mode);
+		} else if(sscanf(line, "thirdget %o %s %[^\n]", &mode, filename, path) == 3) {
+			r = do_thirdget(mode, filename, path);
+		} else if(sscanf(line, "thirdput %o %s %[^\n]", &mode, filename, path) == 3) {
+			r = do_thirdput(master, mode, filename, path);
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
 			if(taskid >= 0) {
 				r = do_kill(taskid);
