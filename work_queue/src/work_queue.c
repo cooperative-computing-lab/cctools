@@ -796,7 +796,7 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 			if(!(tf->flags & WORK_QUEUE_CACHE)) {
 				sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
 			} else {
-				sprintf(remote_name, "%s", tf->remote_name);
+				sprintf(remote_name, "%s.cached", tf->remote_name);
 			}
 
 			
@@ -1555,7 +1555,7 @@ static int put_input_item(struct work_queue_file *tf, const char *expanded_paylo
 		if(!(tf->flags & WORK_QUEUE_CACHE)) {
 			sprintf(remote_name, "%s.%d", tf->remote_name, taskid);
 		} else {
-			sprintf(remote_name, "%s", tf->remote_name);
+			sprintf(remote_name, "%s.cached", tf->remote_name);
 		}
 
 		if(dir) {
@@ -1685,7 +1685,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 			if(!(tf->flags & WORK_QUEUE_CACHE)) {
 				sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
 			} else {
-				sprintf(remote_name, "%s", tf->remote_name);
+				sprintf(remote_name, "%s.cached", tf->remote_name);
 			}
 			
 			
@@ -1731,7 +1731,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 				if(!(tf->flags & WORK_QUEUE_CACHE)) {
 					sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
 				} else {
-					sprintf(remote_name, "%s", tf->remote_name);
+					sprintf(remote_name, "%s.cached", tf->remote_name);
 				}
 				debug(D_WQ, "%s (%s) needs %s from the url, %s %d", w->hostname, w->addrport, remote_name, tf->payload, tf->length);
 				open_time = timestamp_get();
@@ -1836,7 +1836,7 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 			if(!(tf->flags & WORK_QUEUE_CACHE)) {
 				sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
 			} else {
-				sprintf(remote_name, "%s", tf->remote_name);
+				sprintf(remote_name, "%s.cached", tf->remote_name);
 			}
 			
 			send_worker_msg(w, "infile %s %s %d\n", time(0) + short_timeout, remote_name, tf->remote_name, tf->flags);
@@ -1851,7 +1851,7 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 			if(!(tf->flags & WORK_QUEUE_CACHE)) {
 				sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
 			} else {
-				sprintf(remote_name, "%s", tf->remote_name);
+				sprintf(remote_name, "%s.cached", tf->remote_name);
 			}
 			send_worker_msg(w, "outfile %s %s %d\n", time(0) + short_timeout, remote_name, tf->remote_name, tf->flags);
 		}
