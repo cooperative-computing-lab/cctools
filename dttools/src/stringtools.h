@@ -66,7 +66,8 @@ int string_null_or_empty(const char *str);
 	@param ... Variable arguments passed to sprintf.
 	@return The formatted string.
 */
-char *string_format (const char *fmt, ...);
+char *string_format (const char *fmt, ...)
+__attribute__ (( format(printf,1,2) ));
 
 /** Writes a string formatted using snprintf. It is an error if the string is longer than the buffer provided.
   @param str Output string buffer, passed as first argument of snprintf.
