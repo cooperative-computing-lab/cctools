@@ -187,7 +187,8 @@ int link_putlstring(struct link *link, const char *str, size_t len, time_t stopt
 @param ... Format arguments.
 @return The number of bytes actually written, or less than zero on error.
 */
-int link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...);
+int link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...)
+  __attribute__ (( format(printf,2,4) )) ;
 
 /** Write formatted data to a connection. All data is written until finished
   * or an error is encountered.

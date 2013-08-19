@@ -158,7 +158,7 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 						if(pid == 0)
 							break;
 
-						if(!link_putfstring(link, "%zu\n", stoptime, CHALLENGE_LENGTH))
+						if(!link_putfstring(link, "%d\n", stoptime, CHALLENGE_LENGTH))
 							break;
 						if(!link_stream_from_file(link, out, CHALLENGE_LENGTH, stoptime))
 							break;

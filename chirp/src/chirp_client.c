@@ -1581,7 +1581,7 @@ CHIRP_SEARCH *chirp_client_opensearch(struct chirp_client * c, const char *path,
 			n += strlen(line);
 		}
 		if(n == 0) {
-			buffer_printf(buffer, "");
+			buffer_printf(buffer, "%s", "" );
 		}
 
 		CHIRP_SEARCH *result = malloc(sizeof(CHIRP_SEARCH));
