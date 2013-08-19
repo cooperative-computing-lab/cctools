@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
 	uptime = uptime_get();
 	username_get(owner);
 
-	buffer_printf(b, "type %s\nversion %d.%d.%d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nmemory_total %llu\nmemory_avail %llu\ncpus %d\nuptime %d\nowner %s\n",
+	buffer_printf(b, "type %s\nversion %d.%d.%s\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nmemory_total %llu\nmemory_avail %llu\ncpus %d\nuptime %d\nowner %s\n",
 		DEFAULT_TYPE,
 		CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO,
 		name.machine,
@@ -89,8 +89,8 @@ int main(int argc, char *argv[]) {
 		load[0],
 		load[1],
 		load[2],
-		memory_avail,
-		memory_total,
+		(unsigned long long) memory_total,
+		(unsigned long long) memory_avail,
 		cpus,
 		uptime,
 		owner
