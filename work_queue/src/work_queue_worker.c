@@ -130,6 +130,9 @@ static int terminate_boundary = 0;
 // Password shared between master and worker.
 char *password = 0;
 
+// Allow worker to use symlinks when link() fails.  Enabled by default.
+static int symlinks_enabled = 1;
+
 // Basic worker global variables
 static int worker_mode = WORKER_MODE_WORKER;
 static int worker_mode_default = WORKER_MODE_WORKER;
@@ -308,7 +311,15 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 		
 		if(link(sourcename, targetname)) {
 			debug(D_WQ, "Could not link file %s -> %s (%s)\n", sourcename, targetname, strerror(errno));
-			return 0;
+			
+			if((errno == EXDEV || errno == EPERM) && symlinks_enabled) {
+				if(symlink(sourcename, targetname)) {
+					debug(D_WQ, "Could not symlink file %s -> %s (%s)\n", sourcename, targetname, strerror(errno));
+					return 0;
+				}
+			} else {
+				return 0;
+			}
 		}
 	}
 	
@@ -1742,6 +1753,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s worker automatically measure. (default=%d)\n", "", manual_cores_option);
 	fprintf(stdout, " %-30s Manually set the amonut of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
 	fprintf(stdout, " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
+	fprintf(stdout, " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
 }
 
@@ -1799,7 +1811,7 @@ static int setup_workspace() {
 
 enum {LONG_OPT_DEBUG_FILESIZE = 1, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
       LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
-      LONG_OPT_DISK, LONG_OPT_FOREMAN};
+      LONG_OPT_DISK, LONG_OPT_FOREMAN, LONG_OPT_DISABLE_SYMLINKS};
 
 struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1832,6 +1844,7 @@ struct option long_options[] = {
 	{"disk",                required_argument,  0,  LONG_OPT_DISK},
 	{"help",                no_argument,        0,  'h'},
 	{"version",             no_argument,        0,  'v'},
+	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
 	{0,0,0,0}
 };
 
@@ -2011,6 +2024,9 @@ int main(int argc, char *argv[])
 			} else {
 				manual_disk_option = atoi(optarg);
 			}
+			break;
+		case LONG_OPT_DISABLE_SYMLINKS:
+			symlinks_enabled = 0;
 			break;
 		case 'h':
 			show_help(argv[0]);
