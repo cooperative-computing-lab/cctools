@@ -2563,10 +2563,17 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 		files = t->output_files;
 	}
 	
-	list_first_item(files);
-	while((tf = (struct work_queue_file*)list_next_item(files))) {
+	list_first_item(t->input_files);
+	while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 		if(!strcmp(remote_name, tf->remote_name))
-		{	return 0;	}
+		{	fprintf(stderr, "Error: duplicate remote file names (%s).  All remote file names for a task (both input and output) must be unique.", remote_name);
+			return 0;	}
+	}
+	list_first_item(t->output_files);
+	while((tf = (struct work_queue_file*)list_next_item(t->output_files))) {
+		if(!strcmp(remote_name, tf->remote_name))
+		{	fprintf(stderr, "Error: duplicate remote file names (%s).  All remote file names for a task (both input and output) must be unique.", remote_name);
+			return 0;	}
 	}
 
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_FILE, flags);
