@@ -479,7 +479,7 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
 		INT64_T ractual, wactual;
 		INT64_T length = info.cst_size;
 
-		link_putfstring(link, "%lld\n", stoptime, length);
+		link_putfstring(link, "%" PRId64 "\n", stoptime, length);
 
 		while(length > 0) {
 			INT64_T chunk = MIN((int) sizeof(buffer), length);
