@@ -2224,6 +2224,8 @@ static void start_tasks(struct work_queue *q)
 		if(w) {
 			start_task_on_worker(q, w);
 		} else {
+			// Move the task to the end of the queue.  This prevents one resource-hungry task from clogging the entire queue.
+			list_push_tail(q->ready_list, list_pop_head(q->ready_list));
 			break;
 		}
 	}
