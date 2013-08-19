@@ -178,6 +178,7 @@ static struct hash_cache *bad_masters = NULL;
 static int released_by_master = 0;
 static char *current_project = NULL;
 
+__attribute__ (( format(printf,2,3) ))
 static void send_master_message( struct link *master, const char *fmt, ... )
 {
 	char debug_msg[2*WORK_QUEUE_LINE_MAX];
@@ -428,7 +429,7 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		fstat(ti->output_fd, &st);
 		output_length = st.st_size;
 		lseek(ti->output_fd, 0, SEEK_SET);
-		send_master_message(master, "result %d %lld %llu %d\n", ti->status, output_length, ti->execution_end-ti->execution_start, ti->taskid);
+		send_master_message(master, "result %d %lld %llu %d\n", ti->status, (long long) output_length, (unsigned long long) ti->execution_end-ti->execution_start, ti->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
 		
 		cores_allocated -= ti->task->cores;
@@ -443,7 +444,7 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		} else {
 			output_length = 0;
 		}
-		send_master_message(master, "result %d %lld %llu %d\n",t->return_status, output_length, t->cmd_execution_time, t->taskid);
+		send_master_message(master, "result %d %lld %llu %d\n",t->return_status, (long long) output_length, (unsigned long long) t->cmd_execution_time, t->taskid);
 		if(output_length) {
 			link_putlstring(master, t->output, output_length, time(0)+active_timeout);
 		}
@@ -846,7 +847,7 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 		if(!dir) {
 			goto failure;
 		}
-		send_master_message(master, "dir %s %lld\n", filename, (INT64_T) 0);
+		send_master_message(master, "dir %s 0\n", filename);
 		
 		while(recursive && (dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
@@ -860,8 +861,8 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 		// stream a file
 		fd = open(cached_filename, O_RDONLY, 0);
 		if(fd >= 0) {
-			length = (INT64_T) info.st_size;
-			send_master_message(master, "file %s %lld\n", filename, length);
+			length = info.st_size;
+			send_master_message(master, "file %s %lld\n", filename, (long long) length);
 			actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
 			close(fd);
 			if(actual != length) {
