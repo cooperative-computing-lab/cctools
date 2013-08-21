@@ -181,7 +181,7 @@ int master_main(const char *host, int port, const char *addr) {
 				link_putfstring(master, "num results %d\n", time(0) + active_timeout, list_size(complete_jobs));
 				while(list_size(complete_jobs)) {
 					job = list_pop_head(complete_jobs);
-					link_putfstring(master, "result %d %d %d %lld\n", time(0) + active_timeout, job->jobid, job->status, job->result, job->output_length);
+					link_putfstring(master, "result %d %d %d %d\n", time(0)+active_timeout, job->jobid, job->status, job->result, job->output_length);
 					if(job->output_length) {
 						link_write(master, job->output, job->output_length, time(0)+active_timeout);
 					}

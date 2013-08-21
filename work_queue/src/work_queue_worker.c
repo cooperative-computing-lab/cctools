@@ -517,12 +517,12 @@ static int check_disk_space_for_filesize(INT64_T file_size) {
 	disk_info_get(".", &disk_avail, &disk_total);
 	if(file_size > 0) {	
 	    if((UINT64_T)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
-		debug(D_WQ, "Incoming file of size %lld MB will lower available disk space (%llu MB) below threshold (%llu MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
+		debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
 		return 0;
 	    }
 	} else {
 	    if(disk_avail < disk_avail_threshold) {
-		debug(D_WQ, "Available disk space (%llu MB) lower than threshold (%llu MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
+		debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
 		return 0;
 	    }	
 	}	
@@ -862,11 +862,11 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 		fd = open(cached_filename, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = info.st_size;
-			send_master_message(master, "file %s %lld\n", filename, (long long) length);
+			send_master_message(master, "file %s %"PRId64"\n", filename, length);
 			actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
 			close(fd);
 			if(actual != length) {
-				debug(D_WQ, "Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.", filename, length, actual);
+				debug(D_WQ, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", filename, length, actual);
 				return 0;
 			}
 		} else {
@@ -1016,7 +1016,7 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode)
 	
 	debug(D_WQ, "Putting file %s into workspace\n", filename);
 	if(!check_disk_space_for_filesize(length)) {
-		debug(D_WQ, "Could not put file %s, not enough disk space (%lld bytes needed)\n", filename, length);
+		debug(D_WQ, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
 		return 0;
 	}
 	
@@ -1152,7 +1152,7 @@ static int do_thirdget(int mode, char *filename, const char *path) {
 	case WORK_QUEUE_FS_PATH:
 		sprintf(cmd, "/bin/cp %s %s", path, cached_filename);
 		if(system(cmd) != 0) {
-			debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (/bin/cp %s)\n", filename, path, filename, strerror(errno));
+			debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
 			return 0;
 		}
 		break;

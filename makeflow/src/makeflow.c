@@ -1070,7 +1070,7 @@ char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 		bk->line_number++;
 
 		if(bk->line_number % 1000 == 0) {
-			debug(D_DEBUG, "read line %d\n", bk->line_number);
+			debug(D_DEBUG, "read line %ld\n", bk->line_number);
 		}
 
 		/* Strip whitespace */

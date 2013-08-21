@@ -321,7 +321,7 @@ int dec_fs_count(struct filesys_info *f)
 
     if(count < 1)
     {
-        debug(D_DEBUG, "filesystem %d is not monitored anymore.\n", f->id, count);
+        debug(D_DEBUG, "filesystem %d is not monitored anymore.\n", f->id);
         free(f->path);
         free(f);    
     }
@@ -382,7 +382,7 @@ struct filesys_info *lookup_or_create_fs(char *path)
 
     if(!inventory) 
     {
-        debug(D_DEBUG, "filesystem %d added to monitor.\n", dev_id);
+        debug(D_DEBUG, "filesystem %"PRId64" added to monitor.\n", dev_id);
 
         inventory = (struct filesys_info *) malloc(sizeof(struct filesys_info));
         inventory->path = xxstrdup(path);
@@ -773,7 +773,7 @@ void ping_processes(void)
     while(itable_nextkey(processes, &pid, (void **) &p))
         if(!ping_process(pid))
         {
-            debug(D_DEBUG, "cannot find %d process.\n", pid);
+            debug(D_DEBUG, "cannot find %"PRId64" process.\n", pid);
             monitor_untrack_process(pid);
         }
 }
@@ -796,7 +796,7 @@ struct rmsummary *monitor_rusage_tree(void)
 
     tr_usg->resident_memory = (usg.ru_maxrss + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 
-    debug(D_DEBUG, "rusage faults: %d resident memory: %d.\n", usg.ru_majflt, usg.ru_maxrss);
+    debug(D_DEBUG, "rusage faults: %ld resident memory: %ld.\n", usg.ru_majflt, usg.ru_maxrss);
 
     return tr_usg;
 }
@@ -869,7 +869,7 @@ void monitor_final_cleanup(int signum)
     itable_firstkey(processes);
     while(itable_nextkey(processes, &pid, (void **) &p))
     {
-        debug(D_DEBUG, "sending %s to process %d.\n", strsignal(signum), pid);
+        debug(D_DEBUG, "sending %s to process %"PRId64".\n", strsignal(signum), pid);
 
         kill(pid, signum);
     }
@@ -889,7 +889,7 @@ void monitor_final_cleanup(int signum)
     itable_firstkey(processes);
     while(itable_nextkey(processes, &pid, (void **) &p))
     {
-        debug(D_DEBUG, "sending %s to process %d.\n", strsignal(SIGKILL), pid);
+        debug(D_DEBUG, "sending %s to process %"PRId64".\n", strsignal(SIGKILL), pid);
 
         kill(pid, SIGKILL);
 
@@ -1229,7 +1229,7 @@ struct process_info *spawn_first_process(const char *cmd, int child_in_foregroun
         debug(D_DEBUG, "executing: %s\n", cmd);
         execlp("sh", "sh", "-c", cmd, (char *) NULL);
         //We get here only if execlp fails.
-        fatal("error executing %s:\n", cmd, strerror(errno));
+        fatal("error executing %s: %s\n", cmd, strerror(errno));
     }
 
     return itable_lookup(processes, pid);
@@ -1504,7 +1504,7 @@ int main(int argc, char **argv) {
         debug(D_DEBUG, "using upstream monitor. executing: %s\n", cmd);
         execlp("sh", "sh", "-c", cmd, (char *) NULL);
         //We get here only if execlp fails.
-        fatal("error executing %s:\n", cmd, strerror(errno));
+        fatal("error executing %s: %s\n", cmd, strerror(errno));
     }
 
 #ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB

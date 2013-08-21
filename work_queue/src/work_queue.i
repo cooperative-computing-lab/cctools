@@ -10,6 +10,7 @@
 
 /* vdebug() takes va_list as arg but SWIG can't wrap such functions. */
 %ignore vdebug;  
+%ignore debug;
 
 %include "stdint.i"
 %include "debug.h"

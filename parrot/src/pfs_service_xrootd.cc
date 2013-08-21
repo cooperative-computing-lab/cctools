@@ -198,7 +198,7 @@ public:
 
 	virtual int truncate( pfs_name *name, pfs_off_t length ) {
 		char *file_url = translate_file_to_xrootd(name);
-		debug(D_XROOTD, "truncate %s %lld",file_url,length);
+		debug(D_XROOTD, "truncate %s %lld",file_url,(long long)length);
 		int result = XrdPosix_Truncate(file_url,length);
 		free(file_url);
 		return result;
