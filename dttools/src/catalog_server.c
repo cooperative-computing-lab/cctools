@@ -175,11 +175,11 @@ static void remove_expired_records()
 }
 
 
-static int update_one_catalog(void *outgoing_host, const void *text)
+static int update_one_catalog( void *outgoing_host, const void *text)
 {
 	char addr[DATAGRAM_ADDRESS_MAX];
 	if(domain_name_cache_lookup(outgoing_host, addr)) {
-		debug(D_DEBUG, "sending update to %s:%d", outgoing_host, CATALOG_PORT);
+		debug(D_DEBUG, "sending update to %s:%d", (char*) outgoing_host, CATALOG_PORT);
 		datagram_send(outgoing_dgram, text, strlen(text), addr, CATALOG_PORT);
 	}
 	return 1;

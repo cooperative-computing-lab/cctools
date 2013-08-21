@@ -756,7 +756,7 @@ class pfs_file_cvmfs:public pfs_file {
 	virtual pfs_ssize_t read(void *d, pfs_size_t length, pfs_off_t offset) {
 		pfs_ssize_t result;
 
-		debug(D_LOCAL, "read %d 0x%x %lld %lld", fd, d, length, offset);
+		debug(D_LOCAL, "read %d 0x%p %lld %lld", fd, d,(long long)length,(long long)offset);
 
 		if(offset != last_offset)
 			::lseek64(fd, offset, SEEK_SET);

@@ -88,7 +88,7 @@ pfs_ssize_t pfs_read( int fd, void *data, pfs_size_t length )
 {
 	pfs_ssize_t result;
 	retry:
-	debug(D_LIBCALL,"read %d 0x%x %lld",fd,data,length);
+	debug(D_LIBCALL,"read %d 0x%p %lld",fd,data,(long long) length);
 	result = pfs_current->table->read(fd,data,length);
 	END
 }
@@ -97,7 +97,7 @@ pfs_ssize_t pfs_write( int fd, const void *data, pfs_size_t length )
 {
 	pfs_ssize_t result;
 	retry:
-	debug(D_LIBCALL,"write %d 0x%x %lld",fd,data,length);
+	debug(D_LIBCALL,"write %d 0x%p %lld",fd,data,(long long) length);
 	result = pfs_current->table->write(fd,data,length);
 	END
 }
@@ -106,7 +106,7 @@ pfs_ssize_t pfs_pread( int fd, void *data, pfs_size_t length, pfs_off_t offset )
 {
 	pfs_ssize_t result;
 	retry:
-	debug(D_LIBCALL,"pread %d 0x%x %lld",fd,data,length);
+	debug(D_LIBCALL,"pread %d 0x%p %lld",fd,data,(long long)length);
 	result = pfs_current->table->pread(fd,data,length,offset);
 	END
 }
@@ -115,7 +115,7 @@ pfs_ssize_t pfs_pwrite( int fd, const void *data, pfs_size_t length, pfs_off_t o
 {
 	pfs_ssize_t result;
 	retry:
-	debug(D_LIBCALL,"pwrite %d 0x%x %lld",fd,data,length);
+	debug(D_LIBCALL,"pwrite %d 0x%p %lld",fd,data,(long long)length);
 	result = pfs_current->table->pwrite(fd,data,length,offset);
 	END
 }
@@ -124,7 +124,7 @@ pfs_ssize_t pfs_readv( int fd, const struct iovec *vector, int count )
 {
 	pfs_ssize_t result;
 	retry:
-	debug(D_LIBCALL,"readv %d 0x%x %d",fd,vector,count);
+	debug(D_LIBCALL,"readv %d 0x%p %d",fd,vector,count);
 	result = pfs_current->table->readv(fd,vector,count);
 	END
 }
@@ -133,7 +133,7 @@ pfs_ssize_t pfs_writev( int fd, const struct iovec *vector, int count )
 {
 	pfs_ssize_t result;
 	retry:
-	debug(D_LIBCALL,"writev %d 0x%x %d",fd,vector,count);
+	debug(D_LIBCALL,"writev %d 0x%p %d",fd,vector,count);
 	result = pfs_current->table->writev(fd,vector,count);
 	END
 }
@@ -142,7 +142,7 @@ pfs_off_t pfs_lseek( int fd, pfs_off_t offset, int whence )
 {
 	pfs_off_t result;
 	retry:
-	debug(D_LIBCALL,"lseek %d %lld %d",fd,offset,whence);
+	debug(D_LIBCALL,"lseek %d %lld %d",fd,(long long)offset,whence);
 	result = pfs_current->table->lseek(fd,offset,whence);
 	END
 }
@@ -150,7 +150,7 @@ pfs_off_t pfs_lseek( int fd, pfs_off_t offset, int whence )
 int pfs_ftruncate( int fd, pfs_off_t length )
 {
 	BEGIN
-	debug(D_LIBCALL,"ftruncate %d %lld",fd,length);
+	  debug(D_LIBCALL,"ftruncate %d %lld",fd,(long long)length);
 	result = pfs_current->table->ftruncate(fd,length);
 	END
 }
@@ -158,7 +158,7 @@ int pfs_ftruncate( int fd, pfs_off_t length )
 int pfs_fstat( int fd, struct pfs_stat *buf )
 {
 	BEGIN
-	debug(D_LIBCALL,"fstat %d %u",fd,buf);
+	debug(D_LIBCALL,"fstat %d %p",fd,buf);
 	result = pfs_current->table->fstat(fd,buf);
 	END
 }
@@ -166,7 +166,7 @@ int pfs_fstat( int fd, struct pfs_stat *buf )
 int pfs_fstatfs( int fd, struct pfs_statfs *buf )
 {
 	BEGIN
-	debug(D_LIBCALL,"fstatfs %d 0x%x",fd,buf);
+	debug(D_LIBCALL,"fstatfs %d 0x%p",fd,buf);
 	result = pfs_current->table->fstatfs(fd,buf);
 	END
 }
@@ -190,7 +190,7 @@ int pfs_fchdir( int fd )
 int pfs_fcntl( int fd, int cmd, void *arg )
 {
 	BEGIN
-	debug(D_LIBCALL,"fcntl %d %d 0x%x",fd,cmd,arg);
+	debug(D_LIBCALL,"fcntl %d %d 0x%p",fd,cmd,arg);
 	result = pfs_current->table->fcntl(fd,cmd,arg);
 	END
 }
@@ -198,7 +198,7 @@ int pfs_fcntl( int fd, int cmd, void *arg )
 int pfs_ioctl( int fd, int cmd, void *arg )
 {
 	BEGIN
-	debug(D_LIBCALL,"ioctl %d 0x%x 0x%x",fd,cmd,arg);
+	debug(D_LIBCALL,"ioctl %d 0x%x 0x%p",fd,cmd,arg);
 	result = pfs_current->table->ioctl(fd,cmd,arg);
 	END
 }
@@ -230,7 +230,7 @@ int pfs_flock( int fd, int op )
 int pfs_select( int n, fd_set *rfds, fd_set *wfds, fd_set *efds, struct timeval *timeout )
 {
 	BEGIN
-	debug(D_LIBCALL,"select %d 0x%x 0x%x 0x%x 0x%x",n,rfds,wfds,efds,timeout);
+	debug(D_LIBCALL,"select %d 0x%p 0x%p 0x%p 0x%p",n,rfds,wfds,efds,timeout);
 	result = pfs_current->table->select(n,rfds,wfds,efds,timeout);
 	END
 }
@@ -238,7 +238,7 @@ int pfs_select( int n, fd_set *rfds, fd_set *wfds, fd_set *efds, struct timeval 
 int pfs_poll( struct pollfd *ufds, unsigned nfds, int timeout )
 {
 	BEGIN
-	debug(D_LIBCALL,"poll 0x%x %d %d",ufds,nfds,timeout);
+	debug(D_LIBCALL,"poll 0x%p %d %d",ufds,nfds,timeout);
 	result = pfs_current->table->poll(ufds,nfds,timeout);
 	END
 }
@@ -254,7 +254,7 @@ int pfs_chdir( const char *path )
 char * pfs_getcwd( char *path, pfs_size_t size )
 {
 	char *result;
-	debug(D_LIBCALL,"getcwd 0x%x %d",path,size);
+	debug(D_LIBCALL,"getcwd 0x%p %d",path,(int)size);
 	result = pfs_current->table->getcwd(path,size);
 	debug(D_LIBCALL,"= %s",result ? result : "(null)");
 	return result;
@@ -279,7 +279,7 @@ int pfs_dup2( int old, int nfd )
 int pfs_stat( const char *path, struct pfs_stat *buf )
 {
 	BEGIN
-	debug(D_LIBCALL,"stat %s 0x%x",path,buf);
+	debug(D_LIBCALL,"stat %s 0x%p",path,buf);
 	result = pfs_current->table->stat(path,buf);
 	END
 }
@@ -287,7 +287,7 @@ int pfs_stat( const char *path, struct pfs_stat *buf )
 int pfs_statfs( const char *path, struct pfs_statfs *buf )
 {
 	BEGIN
-	debug(D_LIBCALL,"statfs %s 0x%x",path,buf);
+	debug(D_LIBCALL,"statfs %s 0x%p",path,buf);
 	result = pfs_current->table->statfs(path,buf);
 	END
 }
@@ -295,7 +295,7 @@ int pfs_statfs( const char *path, struct pfs_statfs *buf )
 int pfs_lstat( const char *path, struct pfs_stat *buf )
 {
 	BEGIN
-	debug(D_LIBCALL,"lstat %s 0x%x",path,buf);
+	debug(D_LIBCALL,"lstat %s 0x%p",path,buf);
 	result = pfs_current->table->lstat(path,buf);
 	END
 }
@@ -311,7 +311,7 @@ int pfs_access( const char *path, mode_t mode )
 int pfs_chmod( const char *path, mode_t mode )
 {
 	BEGIN
-	debug(D_LIBCALL,"chmod %s 0x%x",path,mode);
+	debug(D_LIBCALL,"chmod %s %o",path,mode);
 	result = pfs_current->table->chmod(path,mode);
 	END
 }
@@ -335,7 +335,7 @@ int pfs_lchown( const char *path, uid_t uid, gid_t gid )
 int pfs_truncate( const char *path, pfs_off_t length )
 {
 	BEGIN
-	debug(D_LIBCALL,"truncate %s %lld",path,length);
+	debug(D_LIBCALL,"truncate %s %lld",path,(long long)length);
 	result = pfs_current->table->truncate(path,length);
 	END
 }
@@ -343,7 +343,7 @@ int pfs_truncate( const char *path, pfs_off_t length )
 int pfs_utime( const char *path, struct utimbuf *buf )
 {
 	BEGIN
-	debug(D_LIBCALL,"utime %s 0x%x",path,buf);
+	debug(D_LIBCALL,"utime %s 0x%p",path,buf);
 	result = pfs_current->table->utime(path,buf);
 	END
 }
@@ -383,7 +383,7 @@ int pfs_symlink( const char *oldpath, const char *newpath )
 int pfs_readlink( const char *path, char *buf, pfs_size_t size )
 {
 	BEGIN
-	debug(D_LIBCALL,"readlink %s 0x%x %lld",path,buf,size);
+	  debug(D_LIBCALL,"readlink %s 0x%p %lld",path,buf,(long long)size);
 	result = pfs_current->table->readlink(path,buf,size);
 	END
 }
@@ -391,7 +391,7 @@ int pfs_readlink( const char *path, char *buf, pfs_size_t size )
 int pfs_mknod( const char *path, mode_t mode, dev_t dev )
 {
 	BEGIN
-	debug(D_LIBCALL,"mknod %s %d %d",path,mode,dev);
+	  debug(D_LIBCALL,"mknod %s %d %d",path,mode,(int)dev);
 	result = pfs_current->table->mknod(path,mode,dev);
 	END
 }
@@ -440,7 +440,7 @@ int pfs_socketpair( int domain, int type, int proto, int *fds)
 int pfs_accept( int fd, struct sockaddr *addr, int * addrlen )
 {
 	BEGIN
-	debug(D_LIBCALL,"accept %d 0x%x 0x%x",fd,addr,addrlen);
+	debug(D_LIBCALL,"accept %d 0x%p 0x%p",fd,addr,addrlen);
 	result = pfs_current->table->accept(fd,addr,addrlen);
 	END
 }
@@ -448,7 +448,7 @@ int pfs_accept( int fd, struct sockaddr *addr, int * addrlen )
 int pfs_bind( int fd, const struct sockaddr *addr, int addrlen )
 {
 	BEGIN
-	debug(D_LIBCALL,"bind %d 0x%x %d",fd,addr,addrlen);
+	debug(D_LIBCALL,"bind %d 0x%p %d",fd,addr,addrlen);
 	result = ::bind(pfs_current->table->get_real_fd(fd),addr,addrlen);
 	END
 }
@@ -456,7 +456,7 @@ int pfs_bind( int fd, const struct sockaddr *addr, int addrlen )
 int pfs_connect( int fd, const struct sockaddr *addr, int addrlen )
 {
 	BEGIN
-	debug(D_LIBCALL,"connect %d 0x%x %d",fd,addr,addrlen);
+	debug(D_LIBCALL,"connect %d 0x%p %d",fd,addr,addrlen);
 	result = ::connect(pfs_current->table->get_real_fd(fd),addr,addrlen);
 	END
 }
@@ -464,7 +464,7 @@ int pfs_connect( int fd, const struct sockaddr *addr, int addrlen )
 int pfs_getpeername( int fd, struct sockaddr *addr, int * addrlen )
 {
 	BEGIN
-	debug(D_LIBCALL,"getpeername %d 0x%x 0x%x",fd,addr,addrlen);
+	debug(D_LIBCALL,"getpeername %d 0x%p 0x%p",fd,addr,addrlen);
 	result = ::getpeername(pfs_current->table->get_real_fd(fd),addr,(socklen_t*)addrlen);
 	END
 }
@@ -472,7 +472,7 @@ int pfs_getpeername( int fd, struct sockaddr *addr, int * addrlen )
 int pfs_getsockname( int fd, struct sockaddr *addr, int * addrlen )
 {
 	BEGIN
-	debug(D_LIBCALL,"getsockname %d 0x%x 0x%x",fd,addr,addrlen);
+	debug(D_LIBCALL,"getsockname %d 0x%p 0x%p",fd,addr,addrlen);
 	result = ::getsockname(pfs_current->table->get_real_fd(fd),addr,(socklen_t*)addrlen);
 	END
 }
@@ -480,7 +480,7 @@ int pfs_getsockname( int fd, struct sockaddr *addr, int * addrlen )
 int pfs_getsockopt( int fd, int level, int option, void *value, int * length )
 {
 	BEGIN
-	debug(D_LIBCALL,"getsockopt %d %d %d 0x%x 0x%x",fd,level,option,value,length);
+	debug(D_LIBCALL,"getsockopt %d %d %d 0x%p 0x%p",fd,level,option,value,length);
 	result = ::getsockopt(pfs_current->table->get_real_fd(fd),level,option,value,(socklen_t*)length);
 	END
 }
@@ -496,7 +496,7 @@ int pfs_listen( int fd, int backlog )
 int pfs_recv( int fd, void *data, int length, int flags )
 {
 	BEGIN
-	debug(D_LIBCALL,"recv %d 0x%x %d %d",fd,data,length,flags);
+	debug(D_LIBCALL,"recv %d 0x%p %d %d",fd,data,length,flags);
 	result = ::recv(pfs_current->table->get_real_fd(fd),data,length,flags);
 	END
 }
@@ -504,7 +504,7 @@ int pfs_recv( int fd, void *data, int length, int flags )
 int pfs_recvfrom( int fd, void *data, int length, int flags, struct sockaddr *addr, int * addrlength)
 {
 	BEGIN
-	debug(D_LIBCALL,"recvfrom %d 0x%x %d %d 0x%x 0x%x",fd,data,length,flags,addr,addrlength);
+	debug(D_LIBCALL,"recvfrom %d 0x%p %d %d 0x%p 0x%p",fd,data,length,flags,addr,addrlength);
 	result = ::recvfrom(pfs_current->table->get_real_fd(fd),data,length,flags,addr,(socklen_t*)addrlength);
 	END
 }
@@ -512,7 +512,7 @@ int pfs_recvfrom( int fd, void *data, int length, int flags, struct sockaddr *ad
 int pfs_recvmsg( int fd,  struct msghdr *msg, int flags )
 {
 	BEGIN
-	debug(D_LIBCALL,"recvmsg %d 0x%x %d",fd,msg,flags);
+	debug(D_LIBCALL,"recvmsg %d 0x%p %d",fd,msg,flags);
 
 	result = ::recvmsg(pfs_current->table->get_real_fd(fd),msg,flags);
 
@@ -544,7 +544,7 @@ int pfs_recvmsg( int fd,  struct msghdr *msg, int flags )
 int pfs_send( int fd, const void *data, int length, int flags )
 {
 	BEGIN
-	debug(D_LIBCALL,"send %d 0x%x %d %d",fd,data,length,flags);
+	debug(D_LIBCALL,"send %d 0x%p %d %d",fd,data,length,flags);
 	result = ::send(pfs_current->table->get_real_fd(fd),data,length,flags);
 	END
 }
@@ -552,7 +552,7 @@ int pfs_send( int fd, const void *data, int length, int flags )
 int pfs_sendmsg( int fd, const struct msghdr *msg, int flags )
 {
 	BEGIN
-	debug(D_LIBCALL,"sendmsg %d 0x%x %d",fd,msg,flags);
+	debug(D_LIBCALL,"sendmsg %d 0x%p %d",fd,msg,flags);
 	result = ::sendmsg(pfs_current->table->get_real_fd(fd),msg,flags);
 	END
 }
@@ -560,7 +560,7 @@ int pfs_sendmsg( int fd, const struct msghdr *msg, int flags )
 int pfs_sendto( int fd, const void *data, int length, int flags, const struct sockaddr *addr, int addrlength )
 {
 	BEGIN
-	debug(D_LIBCALL,"sendto %d 0x%x %d %d 0x%x %d",fd,data,length,flags,addr,addrlength);
+	debug(D_LIBCALL,"sendto %d 0x%p %d %d 0x%p %d",fd,data,length,flags,addr,addrlength);
 	result = ::sendto(pfs_current->table->get_real_fd(fd),data,length,flags,addr,addrlength);
 	END
 }
@@ -568,7 +568,7 @@ int pfs_sendto( int fd, const void *data, int length, int flags, const struct so
 int pfs_setsockopt( int fd, int level, int option, const void *value, int length )
 {
 	BEGIN
-	debug(D_LIBCALL,"setsockopt %d %d %d 0x%x %d",fd,level,option,value,length);
+	debug(D_LIBCALL,"setsockopt %d %d %d 0x%p %d",fd,level,option,value,length);
 	result = ::setsockopt(pfs_current->table->get_real_fd(fd),level,option,value,length);
 	END
 }
@@ -596,7 +596,7 @@ int pfs_timeout( const char *str )
 int pfs_mkalloc( const char *path, pfs_ssize_t size, mode_t mode )
 {
 	BEGIN
-	debug(D_LIBCALL,"mkalloc %s %lld %d",path,size,mode);
+	  debug(D_LIBCALL,"mkalloc %s %lld %d",path,(long long)size,mode);
 	result = pfs_current->table->mkalloc(path,size,mode);
 	END
 }
@@ -612,7 +612,7 @@ int pfs_lsalloc( const char *path, char *alloc_path, pfs_ssize_t *total, pfs_ssi
 int pfs_whoami( const char *path, char *buf, int size )
 {
 	BEGIN
-	debug(D_LIBCALL,"whoami %s %x %d",path,buf,size);
+	debug(D_LIBCALL,"whoami %s %p %d",path,buf,size);
 	result = pfs_current->table->whoami(path,buf,size);
 	END
 }
@@ -628,7 +628,7 @@ int pfs_search( const char *paths, const char *pattern, int flags, char *buffer,
 int pfs_getacl( const char *path, char *buf, int size )
 {
 	BEGIN
-	debug(D_LIBCALL,"getacl %s %x %d",path,buf,size);
+	debug(D_LIBCALL,"getacl %s %p %d",path,buf,size);
 	result = pfs_current->table->getacl(path,buf,size);
 	END
 }
@@ -644,7 +644,7 @@ int pfs_setacl( const char *path, const char *subject, const char *rights )
 int pfs_locate( const char *path, char *buf, int size )
 {
 	BEGIN
-	debug(D_LIBCALL, "pfs_locate %s %x %d", path, buf, size);
+	debug(D_LIBCALL, "pfs_locate %s %p %d", path, buf, size);
 	result = pfs_current->table->locate(path,buf,size);
 	END
 }
@@ -684,7 +684,7 @@ int pfs_get_full_name( int fd, char *name )
 pfs_size_t pfs_mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags )
 {
 	BEGIN
-	debug(D_LIBCALL,"mmap_create %d %llx %llx %x %x",fd,file_offset,length,prot,flags);
+	debug(D_LIBCALL,"mmap_create %d %llx %llx %x %x",fd,(long long)file_offset,(long long)length,prot,flags);
 	result = pfs_current->table->mmap_create(fd,file_offset,length,prot,flags);
 	END
 }
@@ -692,7 +692,7 @@ pfs_size_t pfs_mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, i
 int	pfs_mmap_update( pfs_size_t logical_address, pfs_size_t channel_address )
 {
 	BEGIN
-	debug(D_LIBCALL,"mmap_update %llx %llx",logical_address,channel_address);
+	debug(D_LIBCALL,"mmap_update %llx %llx",(long long)logical_address,(long long)channel_address);
 	result = pfs_current->table->mmap_update(logical_address,channel_address);
 	END
 }
@@ -700,7 +700,7 @@ int	pfs_mmap_update( pfs_size_t logical_address, pfs_size_t channel_address )
 int	pfs_mmap_delete( pfs_size_t logical_address, pfs_size_t length )
 {
 	BEGIN
-	debug(D_LIBCALL,"mmap_delete %llx %llx",logical_address,length);
+	debug(D_LIBCALL,"mmap_delete %llx %llx",(long long)logical_address,(long long)length);
 	result = pfs_current->table->mmap_delete(logical_address,length);
 	END
 }

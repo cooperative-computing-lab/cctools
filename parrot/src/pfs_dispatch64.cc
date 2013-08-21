@@ -828,7 +828,7 @@ static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T sysc
 			need to restore it. */
 
 			debug(D_PROCESS,"execve: %s failed: %s",p->new_logical_name,strerror(-actual_result));
-			debug(D_PROCESS,"execve: restoring scratch area at %x",scratch_addr);
+			debug(D_PROCESS,"execve: restoring scratch area at %p",scratch_addr);
 			
 			tracer_copy_out(p->tracer,p->scratch_data,(void*)scratch_addr,scratch_size);
 
@@ -873,7 +873,7 @@ static void decode_mmap( struct pfs_process *p, INT64_T syscall, INT64_T enterin
 		fd = nargs[4];
 		source_offset = nargs[5];
 
-		debug(D_SYSCALL,"mmap addr=0x%x len=0x%x prot=0x%x flags=0x%x fd=%d offset=0x%llx",addr,length,prot,flags,fd,source_offset);
+		debug(D_SYSCALL,"mmap addr=0x%"PRIx64" len=0x%"PRIx64" prot=0x%"PRIx64" flags=0x%"PRIx64" fd=%"PRId64" offset=0x%"PRIx64,addr,length,prot,flags,fd,source_offset);
 
 		if(flags & MAP_ANONYMOUS) {
 			debug(D_SYSCALL,"mmap skipped b/c anonymous");
@@ -890,8 +890,8 @@ static void decode_mmap( struct pfs_process *p, INT64_T syscall, INT64_T enterin
 		nargs[4] = pfs_channel_fd();
 		nargs[5] = channel_offset+source_offset;
 
-		debug(D_SYSCALL,"channel_offset=0x%llx source_offset=0x%llx total=0x%x",channel_offset,source_offset,nargs[5]);
-		debug(D_SYSCALL,"mmap changed: fd=%d offset=0x%x",nargs[4],nargs[5]);
+		debug(D_SYSCALL,"channel_offset=0x%"PRIx64" source_offset=0x%"PRIx64" total=0x%"PRIx64,channel_offset,source_offset,nargs[5]);
+		debug(D_SYSCALL,"mmap changed: fd=%"PRId64" offset=0x%"PRIx64,nargs[4],nargs[5]);
 
 	      	tracer_args_set(p->tracer,p->syscall,nargs,6);
 		p->syscall_args_changed = 1;
@@ -1020,11 +1020,11 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					newargs[1] = 0;
 					newargs_count = 2;
 					p->syscall_args_changed = 1;
-					debug(D_SYSCALL,"converting fork into clone(%x)",newargs[0]);
+					debug(D_SYSCALL,"converting fork into clone(%"PRIx64")",newargs[0]);
 				} else {
 					newargs[0] = (args[0]&~0xff)|CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
 					newargs_count = 1;
-					debug(D_SYSCALL,"adjusting clone(%x,%x,%x,%x) -> clone(%x)",args[0],args[1],args[2],args[3],newargs[0]);
+					debug(D_SYSCALL,"adjusting clone(%"PRIx64",%"PRIx64",%"PRIx64",%"PRIx64") -> clone(%"PRIx64")",args[0],args[1],args[2],args[3],newargs[0]);
 				}
 				tracer_args_set(p->tracer,SYSCALL64_clone,newargs,newargs_count);
 				trace_this_pid = p->pid;
@@ -1059,7 +1059,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					} else {
 						child->state = PFS_PROCESS_STATE_USER;
 					}
-					debug(D_PROCESS,"%d created pid %d",p->pid,childpid);
+					debug(D_PROCESS,"%d created pid %"PRId64,p->pid,childpid);
 					/* now trace any process at all */
 					trace_this_pid = -1;
 				}
@@ -1138,7 +1138,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						/* allow the call to go through to the kernel */
 						break;
 					default:
-						fatal("cannot execute program with personality %d", persona);
+						fatal("cannot execute program with personality %lu", persona);
 				}
 			}
 			break;
@@ -1635,7 +1635,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 				if(cmd==PFS_TIOCGPGRP) {
 					pid_t newgrp = getpgid(pfs_current->pid);
-					debug(D_PROCESS,"tcgetpgrp(%d) changed from %d to %d",fd,*(pid_t*)buffer,newgrp);
+					debug(D_PROCESS,"tcgetpgrp(%d) changed from %d to %d",(int)fd,*(pid_t*)buffer,newgrp);
 					*(pid_t *)buffer = newgrp;
 				}
 
@@ -1671,7 +1671,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_fcntl:
 			if(entering) {
 				PTRINT_T pid;
-				INT64_T fd = args[0];
+				int fd = args[0];
 				INT64_T cmd = args[1];
 				void *uaddr = POINTER(args[2]);
 				struct flock fl;
@@ -1689,7 +1689,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						if(cmd==F_SETFL) {
 							INT64_T flags = (int)args[2];
 							if(flags&O_ASYNC) {
-								debug(D_PROCESS,"pid %d requests O_ASYNC on fd %d",pfs_current->pid,fd);
+							  debug(D_PROCESS,"pid %d requests O_ASYNC on fd %d",pfs_current->pid,fd);
 								p->flags |= PFS_PROCESS_FLAGS_ASYNC;
 							}
 						}
@@ -1715,7 +1715,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 					/* But we always get the signal. */
 					case F_SETOWN:
-						debug(D_PROCESS,"pid %d requests F_SETOWN on fd %d",pfs_current->pid,fd);
+					  debug(D_PROCESS,"pid %d requests F_SETOWN on fd %d",pfs_current->pid,fd);
 						p->flags |= PFS_PROCESS_FLAGS_ASYNC;
 						pid = getpid();
 						pfs_fcntl(fd,F_SETOWN,(void*)pid);
@@ -2335,7 +2335,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_kill:
 		case SYSCALL64_tkill:
 			if(entering) {
-				debug(D_PROCESS,"%s %d %d %d",tracer_syscall64_name(p->syscall),args[0],args[1],args[2]);
+			  debug(D_PROCESS,"%s %d %d",tracer_syscall64_name(p->syscall),(int)args[0],(int)args[1]);
 				p->syscall_result = pfs_process_raise(args[0],args[1],0);
 				if (p->syscall_result == -1) p->syscall_result = -errno;
 			}
@@ -2343,7 +2343,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 		case SYSCALL64_tgkill:
 			if(entering) {
-				debug(D_PROCESS,"tgkill %d %d %d",args[0],args[1],args[2]);
+				debug(D_PROCESS,"tgkill %d %d %d",(int)args[0],(int)args[1],(int)args[2]);
 				p->syscall_result = pfs_process_raise(args[1],args[2],0);
 				if (p->syscall_result == -1) p->syscall_result = -errno;
 			}
@@ -2626,7 +2626,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				if(p->syscall_result==0) {
 					if(p->syscall_args[0]!=0) {
 						p->break_address = p->syscall_args[0];
-						debug(D_PROCESS,"break address: %x",p->break_address);
+						debug(D_PROCESS,"break address: %"PRIx64"",p->break_address);
 					}
 				}
 				else 
@@ -3072,7 +3072,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 		default:
 			if(entering) {
-				debug(D_NOTICE,"warning: system call %d (%s) not supported for program %s",p->syscall,tracer_syscall_name(p->tracer,p->syscall),p->name);
+				debug(D_NOTICE,"warning: system call %"PRId64" (%s) not supported for program %s",p->syscall,tracer_syscall_name(p->tracer,p->syscall),p->name);
 				divert_to_dummy(p,-ENOSYS);
 			}
 			break;
@@ -3087,7 +3087,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		if(p->syscall_dummy) {
 			tracer_result_set(p->tracer,p->syscall_result);
 			p->syscall_dummy = 0;
-			debug(D_SYSCALL,"= %d %s",p->syscall_result,p->syscall_result<0 ? strerror(-p->syscall_result) : "" );
+			debug(D_SYSCALL,"= %"PRId64" %s",p->syscall_result,p->syscall_result<0 ? strerror(-p->syscall_result) : "" );
 		} else {
 			debug(D_SYSCALL,"= ");
 		}

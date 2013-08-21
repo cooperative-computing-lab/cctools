@@ -231,7 +231,7 @@ int pfs_paranoia_add_pid(pid_t pid)
 	debug(D_PROCESS, "shared table %p", shared_table);
 	debug(D_PROCESS, "initial value %d", *pid_ptr);
 	while((*pid_ptr != 0) && (*pid_ptr != 1)) {
-		debug(D_PROCESS, "pid count %d", pid_count);
+		debug(D_PROCESS, "pid count %lu", pid_count);
 		pid_count++;
 		pid_ptr++;
 	}

@@ -66,7 +66,7 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 			unsigned long length = strtoul(line, NULL, 10);
 			if(errno == ERANGE || errno == EINVAL)
 				return 0;	/* not a number? */
-			debug(D_AUTH, "receiving challenge of %d bytes", length);
+			debug(D_AUTH, "receiving challenge of %lu bytes", length);
 
 			FILE *in, *out;
 			static const char command_template[] = "T1=`mktemp`\n"	/* signed challenge */

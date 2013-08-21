@@ -258,7 +258,7 @@ static int irods_reli_lseek_if_needed( struct irods_file *file, INT64_T offset )
 	request.offset  = offset;
 	request.whence  = SEEK_SET;
 
-	debug(D_IRODS,"rcDataObjLseek %s %d %lld",file->host,file->fd,offset);
+	debug(D_IRODS,"rcDataObjLseek %s %d %lld",file->host,file->fd,(long long)offset);
 	result = rcDataObjLseek(server->conn,&request,&response);
 	debug(D_IRODS,"= %d",result);
 
