@@ -588,7 +588,7 @@ public:
 		d = grow_dirent_lookup(&name,1);
 
 		if(!d) {
-			debug(D_GROW,"%s is no longer valid, will reload...",name);
+			debug(D_GROW,"%s is no longer valid, will reload...",name.rest);
 			grow_filesystem_flush_all();
 			errno = EAGAIN;
 			return -1;

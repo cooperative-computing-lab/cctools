@@ -203,7 +203,7 @@ public:
 			errno = ECONNRESET;
 		}
 
-		debug(D_HDFS, "= %ld", fs);
+		debug(D_HDFS, "= %p", fs);
 		return fs;
 	}
 
@@ -261,7 +261,7 @@ public:
 
 		pfs_service_disconnect_cache(name, fs, (errno == HDFS_EINTERNAL));
 
-		debug(D_HDFS, "= %ld", file);
+		debug(D_HDFS, "= %p", file);
 		return file;
 	}
 

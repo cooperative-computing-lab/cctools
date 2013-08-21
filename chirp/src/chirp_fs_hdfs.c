@@ -285,7 +285,7 @@ static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 
 	switch (flags & O_ACCMODE) {
 	case O_RDONLY:
-		debug(D_HDFS, "opening file %s (flags: %o) for reading; mode: %o", path, flags, mode);
+		debug(D_HDFS, "opening file %s (flags: %"PRIo64") for reading; mode: %"PRIo64"", path, flags, mode);
 		if(!file_exists) {
 			errno = ENOENT;
 			return -1;
@@ -293,7 +293,7 @@ static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 		break;
 	case O_WRONLY:
 		// You may truncate the file by deleting it.
-		debug(D_HDFS, "opening file %s (flags: %o) for writing; mode: %o", path, flags, mode);
+		debug(D_HDFS, "opening file %s (flags: %"PRIo64") for writing; mode: %"PRIo64"", path, flags, mode);
 		if(flags & O_TRUNC) {
 			if(file_exists) {
 				chirp_fs_hdfs_unlink(path);
@@ -345,7 +345,7 @@ static INT64_T chirp_fs_hdfs_close(int fd)
 
 static INT64_T chirp_fs_hdfs_pread(int fd, void *buffer, INT64_T length, INT64_T offset)
 {
-	debug(D_HDFS, "pread %d %lld %lld", fd, length, offset);
+	debug(D_HDFS, "pread %d %"PRId64" %"PRId64"", fd, length, offset);
 	return hdfs_services->pread(fs, open_files[fd].file, offset, buffer, length);
 }
 
@@ -393,7 +393,7 @@ static void chirp_fs_hdfs_write_zeroes(int fd, INT64_T length)
 	char *zero = malloc(zero_size);
 	memset(zero, 0, zero_size);
 
-	debug(D_HDFS, "zero %d %d", fd, length);
+	debug(D_HDFS, "zero %d %"PRId64, fd, length);
 
 	while(length > 0) {
 		int chunksize = MIN(zero_size, length);
@@ -426,7 +426,7 @@ static INT64_T chirp_fs_hdfs_pwrite(int fd, const void *buffer, INT64_T length, 
 		chirp_fs_hdfs_write_zeroes(fd, offset - current);
 	}
 
-	debug(D_HDFS, "write %d %lld", fd, length);
+	debug(D_HDFS, "write %d %"PRId64"", fd, length);
 	return hdfs_services->write(fs, open_files[fd].file, buffer, length);
 }
 
@@ -456,7 +456,7 @@ static INT64_T chirp_fs_hdfs_fchmod(int fd, INT64_T mode)
 
 static INT64_T chirp_fs_hdfs_ftruncate(int fd, INT64_T length)
 {
-	debug(D_HDFS, "ftruncate %d %lld", fd, length);
+	debug(D_HDFS, "ftruncate %d %"PRId64, fd, length);
 
 	tOffset current = hdfs_services->tell(fs, open_files[fd].file);
 
@@ -553,7 +553,7 @@ static INT64_T chirp_fs_hdfs_symlink(const char *path, const char *newpath)
 static INT64_T chirp_fs_hdfs_readlink(const char *path, char *buf, INT64_T length)
 {
 	path = FIXPATH(path);
-	debug(D_HDFS, "readlink %s %lld", path, length);
+	debug(D_HDFS, "readlink %s %"PRId64"", path, length);
 	return (errno = EINVAL, -1);
 }
 
@@ -569,7 +569,7 @@ static INT64_T chirp_fs_hdfs_mkdir(const char *path, INT64_T mode)
 		return -1;
 	}
 
-	debug(D_HDFS, "mkdir %s %lld", path, mode);
+	debug(D_HDFS, "mkdir %s %d", path, (int) mode);
 	return hdfs_services->mkdir(fs, path);
 }
 
@@ -655,7 +655,7 @@ static INT64_T chirp_fs_hdfs_truncate(const char *path, INT64_T length)
 {
 	struct chirp_stat info;
 	path = FIXPATH(path);
-	debug(D_HDFS, "truncate %s %lld", path, length);
+	debug(D_HDFS, "truncate %s %"PRId64, path, length);
 	int result = chirp_fs_hdfs_stat(path, &info);
 	if(result < 0)
 		return -1;	/* probably doesn't exist, return ENOENT... */

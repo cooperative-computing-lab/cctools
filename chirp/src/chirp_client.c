@@ -212,9 +212,9 @@ static INT64_T get_result(struct chirp_client *c, time_t stoptime)
 
 	result = convert_result(result);
 	if(result >= 0) {
-		debug(D_CHIRP, " = %lld", result);
+		debug(D_CHIRP, " = %"PRId64 , result);
 	} else {
-		debug(D_CHIRP, " = %lld (%s)", result, strerror(errno));
+		debug(D_CHIRP, " = %"PRId64" (%s)", result, strerror(errno));
 	}
 
 	return result;
@@ -1581,7 +1581,7 @@ CHIRP_SEARCH *chirp_client_opensearch(struct chirp_client * c, const char *path,
 			n += strlen(line);
 		}
 		if(n == 0) {
-			buffer_printf(buffer, "");
+			buffer_printf(buffer, "%s", "" );
 		}
 
 		CHIRP_SEARCH *result = malloc(sizeof(CHIRP_SEARCH));
