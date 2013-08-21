@@ -212,9 +212,9 @@ static INT64_T get_result(struct chirp_client *c, time_t stoptime)
 
 	result = convert_result(result);
 	if(result >= 0) {
-		debug(D_CHIRP, " = %lld", result);
+		debug(D_CHIRP, " = %"PRId64 , result);
 	} else {
-		debug(D_CHIRP, " = %lld (%s)", result, strerror(errno));
+		debug(D_CHIRP, " = %"PRId64" (%s)", result, strerror(errno));
 	}
 
 	return result;

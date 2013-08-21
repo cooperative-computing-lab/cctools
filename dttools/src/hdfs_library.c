@@ -63,7 +63,7 @@ struct hdfs_library *hdfs_library_open()
 	if(!hs->libhdfs_handle) {
 		dlclose(hs->libjvm_handle);
 		free(hs);
-		debug(D_NOTICE | D_HDFS, "couldn't dlopen LIBHDFS_PATH=%s: %s", dlerror());
+		debug(D_NOTICE | D_HDFS, "couldn't dlopen LIBHDFS_PATH=%s: %s", libhdfs_path, dlerror());
 		return 0;
 	}
 

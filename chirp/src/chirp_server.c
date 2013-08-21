@@ -232,7 +232,7 @@ int update_one_catalog(void *catalog_host, const void *text)
 {
 	char addr[DATAGRAM_ADDRESS_MAX];
 	if(domain_name_cache_lookup(catalog_host, addr)) {
-		debug(D_DEBUG, "sending update to %s:%d", catalog_host, CATALOG_PORT);
+	  debug(D_DEBUG, "sending update to %s:%d", (char*) catalog_host, CATALOG_PORT);
 		datagram_send(catalog_port, text, strlen(text), addr, CATALOG_PORT);
 	}
 	return 1;

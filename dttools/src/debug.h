@@ -112,7 +112,11 @@ Logs a debugging message, if the given flags are active.
 @param fmt A printf-style formatting string, followed by the necessary arguments.
 */
 
-void debug(INT64_T flags, const char *fmt, ...);
+void debug(INT64_T flags, const char *fmt, ...)
+#ifndef SWIG
+__attribute__ (( format(printf,2,3) ))
+#endif
+;
 
 /** Emit a debugging message.
 Logs a debugging message, if the given flags are active, using a va_list instead of a list of arguments.

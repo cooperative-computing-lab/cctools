@@ -572,7 +572,7 @@ int pfs_table::select( int n, fd_set *r, fd_set *w, fd_set *e, struct timeval *t
 				debug(D_POLL,"select time expired");
 			} else {
 				timersub(&stoptime,&curtime,&timeleft);
-				debug(D_POLL,"select time remaining %d.%06d",timeleft.tv_sec,timeleft.tv_usec);
+				debug(D_POLL,"select time remaining %d.%06d",(int)timeleft.tv_sec,(int)timeleft.tv_usec);
 				pfs_poll_wakein(timeleft);
 				result = -1;
 				errno = EAGAIN;
@@ -2397,7 +2397,7 @@ void pfs_table::mmap_print()
 	debug(D_CHANNEL,"%12s %8s %8s %8s %4s %4s %s","address","length","foffset", "channel", "prot", "flag", "file");
 
 	for(m=mmap_list;m;m=m->next) {
-	  debug(D_CHANNEL,"%12x %8x %8x %8x %4x %4x %s",m->logical_addr,m->map_length,m->file_offset,m->channel_offset,m->prot,m->flags,m->file->get_name()->path);
+		debug(D_CHANNEL,"%12llx %8llx %8llx %8llx %4x %4x %s",(long long)m->logical_addr,(long long)m->map_length,(long long)m->file_offset,(long long)m->channel_offset,m->prot,m->flags,m->file->get_name()->path);
 	}
 }
 
@@ -2474,14 +2474,14 @@ pfs_size_t pfs_table::mmap_create_object( pfs_file *file, pfs_size_t file_offset
 			return -1;
 		}
 
-		debug(D_CHANNEL,"%s loading to channel %llx size %llx",file->get_name()->path,channel_offset,file_length);
+		debug(D_CHANNEL,"%s loading to channel %llx size %llx",file->get_name()->path,(long long)channel_offset,(long long)file_length);
 
 		if(!load_file_to_channel(file,file_length,channel_offset,1024*1024)) {
 			pfs_channel_free(channel_offset);
 			return -1;
 		}
 	} else {
-		debug(D_CHANNEL,"%s cached at channel %llx",file->get_name()->path,channel_offset);
+	  debug(D_CHANNEL,"%s cached at channel %llx",file->get_name()->path,(long long)channel_offset);
 	}
 
 	pfs_mmap *m;
@@ -2506,7 +2506,7 @@ int pfs_table::mmap_update( pfs_size_t logical_addr, pfs_size_t channel_offset )
 		return 0;
 	}
 
-	debug(D_NOTICE,"warning: mmap logical address (%llx) does not match any map with channel offset (%llx)",logical_addr,channel_offset);
+	debug(D_NOTICE,"warning: mmap logical address (%llx) does not match any map with channel offset (%llx)",(long long)logical_addr,(long long)channel_offset);
 
 	errno = ENOENT;
 	return -1;

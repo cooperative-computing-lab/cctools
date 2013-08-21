@@ -421,7 +421,7 @@ int main(int argc, char **argv)
 	work_queue_specify_priority(q, priority);
 
 	load_sequences(sequence_filename);
-	debug(D_DEBUG, "Sequence loaded.\n", curr_rect_y, curr_rect_x);
+	debug(D_DEBUG, "Sequence loaded.\n");
 
 	init_checkpoint();
 

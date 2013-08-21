@@ -208,8 +208,8 @@ struct task_statistics {
 	struct list *reports;
 	timestamp_t total_time_transfer_data;
 	timestamp_t total_time_execute_cmd;
-	INT64_T total_capacity;
-	INT64_T total_busy_workers;
+	int total_capacity;
+	int total_busy_workers;
 };
 
 struct task_report {
@@ -1009,8 +1009,12 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 
 	w->total_task_time += t->cmd_execution_time;
 
-	debug(D_WQ, "%s (%s) done in %.02lfs total tasks %d average %.02lfs", w->hostname, w->addrport, (t->time_receive_output_finish - t->time_send_input_start) / 1000000.0, w->total_tasks_complete,
-	      w->total_task_time / w->total_tasks_complete / 1000000.0);
+	debug(D_WQ, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
+		w->hostname,
+		w->addrport,
+		(t->time_receive_output_finish - t->time_send_input_start) / 1000000.0,
+		(long long) w->total_tasks_complete,
+		w->total_task_time / w->total_tasks_complete / 1000000.0);
 	return 1;
 
       failure:
@@ -1057,7 +1061,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	INT64_T output_length;
 	timestamp_t execution_time;
 	struct work_queue_task *t;
-	int actual;
+	INT64_T actual;
 	timestamp_t observed_execution_time;
 	timestamp_t effective_stoptime = 0;
 
@@ -1076,7 +1080,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
-		debug(D_WQ, "Unknown task result from worker %s (%s): no task %d assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
+	  debug(D_WQ, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
 		stoptime = time(0) + get_transfer_wait_time(q, w, -1, (INT64_T) output_length);
 		link_soak(w->link, output_length, stoptime);
 		return 0;
@@ -1097,7 +1101,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	t->output = malloc(output_length + 1);
 	if(output_length > 0) {
-		debug(D_WQ, "Receiving stdout of task %ld (size: %"PRId64" bytes) from %s (%s) ...", (long int)taskid, output_length, w->addrport, w->hostname);
+		debug(D_WQ, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", taskid, output_length, w->addrport, w->hostname);
 		stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, (INT64_T) output_length);
 		actual = link_read(w->link, t->output, output_length, stoptime);
 		if(actual != output_length) {
