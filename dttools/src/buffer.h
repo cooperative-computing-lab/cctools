@@ -16,6 +16,10 @@ See the file COPYING for details.
     string using buffer_tostring.
 */
 
+#if !(defined(__GNUC__) || defined(__clang__)) && !defined(__attribute__)
+#define __attribute__(x) /* do nothing */
+#endif
+
 /** buffer_t is an opaque object representing a buffer. */
 typedef struct buffer_t buffer_t;
 
