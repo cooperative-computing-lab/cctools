@@ -207,7 +207,7 @@ static void decode_write( struct pfs_process *p, int entering, int syscall, INT6
 		tracer_result_get(p->tracer,&actual_result);
 
 		if(actual_result!=args[2]) {
-			debug(D_NOTICE,"channel write returned %"PRId64" instead of %ld",actual_result,args[2]);
+			debug(D_NOTICE,"channel write returned %"PRId64" instead of %lld", actual_result, (long long int) args[2]);
 		}
 
 		if(actual_result>0) {
@@ -227,7 +227,7 @@ static void decode_write( struct pfs_process *p, int entering, int syscall, INT6
 
 			if(p->syscall_result>=0) {
 				if(p->syscall_result!=actual_result) {
-					debug(D_SYSCALL,"write returned %"PRId64" instead of %ld",p->syscall_result,actual_result);
+					debug(D_SYSCALL,"write returned %"PRId64" instead of %lld",p->syscall_result, (long long int) actual_result);
 				}
 				tracer_result_set(p->tracer,p->syscall_result);
 				pfs_channel_free(p->io_channel_offset);
@@ -1421,11 +1421,11 @@ void decode_syscall( struct pfs_process *p, int entering )
 					newargs[1] = 0;
 					newargs_count = 2;
 					p->syscall_args_changed = 1;
-					debug(D_SYSCALL,"converting fork into clone(%llx)",(long long)newargs[0]);
+					debug(D_SYSCALL,"converting fork into clone(%llu)", (long long unsigned int)newargs[0]);
 				} else {
 					newargs[0] = (args[0]&~0xff)|CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
 					newargs_count = 1;
-					debug(D_SYSCALL,"adjusting clone(%lx,%lx,%lx,%lx) -> clone(%lx)",args[0],args[1],args[2],args[3],newargs[0]);
+					debug(D_SYSCALL,"adjusting clone(%llu,%llu,%llu,%llu) -> clone(%llu)", (long long unsigned int) args[0], (long long unsigned int) args[1], (long long unsigned int) args[2], (long long unsigned int) args[3], (long long unsigned int) newargs[0]);
 				}
 				tracer_args_set(p->tracer,SYSCALL32_clone,newargs,newargs_count);
 				trace_this_pid = p->pid;
