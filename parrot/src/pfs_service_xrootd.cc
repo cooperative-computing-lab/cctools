@@ -75,12 +75,12 @@ public:
 	}
 
 	virtual pfs_ssize_t read(void *d, pfs_size_t length, pfs_off_t offset) {
-		debug(D_XROOTD, "pread %d %lu %lu",this->file_handle,length,offset);
+		debug(D_XROOTD, "pread %d %" PRId64 " %" PRId64,this->file_handle,length,offset);
 		return XrdPosix_Pread(this->file_handle,d,length,offset);
 	}
 
 	virtual pfs_ssize_t write(const void *d, pfs_size_t length, pfs_off_t offset) {
-		debug(D_XROOTD, "pwrite %d %lu %lu",this->file_handle,length,offset);
+		debug(D_XROOTD, "pwrite %d %" PRId64 " %" PRId64,this->file_handle,length,offset);
 		return XrdPosix_Pwrite(this->file_handle,d,length,offset);
 	}
 
