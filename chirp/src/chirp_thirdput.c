@@ -160,7 +160,7 @@ INT64_T chirp_thirdput(const char *subject, const char *lpath, const char *hostn
 		stop++;
 
 	if(result >= 0) {
-		debug(D_DEBUG, "thirdput: sent %lld bytes in %d seconds (%.1lfMB/s)", result, (int) (stop - start), result / (double) (stop - start));
+		debug(D_DEBUG, "thirdput: sent %"PRId64" bytes in %d seconds (%.1lfMB/s)", result, (int) (stop - start), result / (double) (stop - start));
 	} else {
 		debug(D_DEBUG, "thirdput: error: %s\n", strerror(errno));
 	}

@@ -224,7 +224,7 @@ void pfs_poll_wakein( struct timeval tv )
 	struct sleep_entry *s;
 	int i;
 
-	debug(D_POLL,"wake in time %d.%06d",tv.tv_sec,tv.tv_usec);
+	debug(D_POLL,"wake in time %d.%06d",(int)tv.tv_sec,(int)tv.tv_usec);
 
 	for(i=0;i<SLEEP_TABLE_MAX;i++) {
 		s = &sleep_table[i];
