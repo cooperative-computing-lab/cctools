@@ -178,6 +178,7 @@ static struct hash_cache *bad_masters = NULL;
 static int released_by_master = 0;
 static char *current_project = NULL;
 
+__attribute__ (( format(printf,2,3) ))
 static void send_master_message( struct link *master, const char *fmt, ... )
 {
 	char debug_msg[2*WORK_QUEUE_LINE_MAX];
@@ -428,7 +429,7 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		fstat(ti->output_fd, &st);
 		output_length = st.st_size;
 		lseek(ti->output_fd, 0, SEEK_SET);
-		send_master_message(master, "result %d %lld %llu %d\n", ti->status, output_length, ti->execution_end-ti->execution_start, ti->taskid);
+		send_master_message(master, "result %d %lld %llu %d\n", ti->status, (long long) output_length, (unsigned long long) ti->execution_end-ti->execution_start, ti->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
 		
 		cores_allocated -= ti->task->cores;
@@ -443,7 +444,7 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		} else {
 			output_length = 0;
 		}
-		send_master_message(master, "result %d %lld %llu %d\n",t->return_status, output_length, t->cmd_execution_time, t->taskid);
+		send_master_message(master, "result %d %lld %llu %d\n",t->return_status, (long long) output_length, (unsigned long long) t->cmd_execution_time, t->taskid);
 		if(output_length) {
 			link_putlstring(master, t->output, output_length, time(0)+active_timeout);
 		}
@@ -516,12 +517,12 @@ static int check_disk_space_for_filesize(INT64_T file_size) {
 	disk_info_get(".", &disk_avail, &disk_total);
 	if(file_size > 0) {	
 	    if((UINT64_T)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
-		debug(D_WQ, "Incoming file of size %lld MB will lower available disk space (%llu MB) below threshold (%llu MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
+		debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
 		return 0;
 	    }
 	} else {
 	    if(disk_avail < disk_avail_threshold) {
-		debug(D_WQ, "Available disk space (%llu MB) lower than threshold (%llu MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
+		debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
 		return 0;
 	    }	
 	}	
@@ -846,7 +847,7 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 		if(!dir) {
 			goto failure;
 		}
-		send_master_message(master, "dir %s %lld\n", filename, (INT64_T) 0);
+		send_master_message(master, "dir %s 0\n", filename);
 		
 		while(recursive && (dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
@@ -860,12 +861,12 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 		// stream a file
 		fd = open(cached_filename, O_RDONLY, 0);
 		if(fd >= 0) {
-			length = (INT64_T) info.st_size;
-			send_master_message(master, "file %s %lld\n", filename, length);
+			length = info.st_size;
+			send_master_message(master, "file %s %"PRId64"\n", filename, length);
 			actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
 			close(fd);
 			if(actual != length) {
-				debug(D_WQ, "Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.", filename, length, actual);
+				debug(D_WQ, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", filename, length, actual);
 				return 0;
 			}
 		} else {
@@ -1015,7 +1016,7 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode)
 	
 	debug(D_WQ, "Putting file %s into workspace\n", filename);
 	if(!check_disk_space_for_filesize(length)) {
-		debug(D_WQ, "Could not put file %s, not enough disk space (%lld bytes needed)\n", filename, length);
+		debug(D_WQ, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
 		return 0;
 	}
 	
@@ -1151,7 +1152,7 @@ static int do_thirdget(int mode, char *filename, const char *path) {
 	case WORK_QUEUE_FS_PATH:
 		sprintf(cmd, "/bin/cp %s %s", path, cached_filename);
 		if(system(cmd) != 0) {
-			debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (/bin/cp %s)\n", filename, path, filename, strerror(errno));
+			debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
 			return 0;
 		}
 		break;

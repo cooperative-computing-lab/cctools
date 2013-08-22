@@ -542,7 +542,7 @@ PTRINT_T pfs_process_heap_address( struct pfs_process *p )
 		if(fields==7 && inode==0 && flagstring[0]=='r' && flagstring[1]=='w' && flagstring[3]=='p') {
 			fclose(file);
 			p->heap_address = start;
-			debug(D_PROCESS,"heap address is 0x%x",start);
+			debug(D_PROCESS,"heap address is 0x%llx",(long long)start);
 			return p->heap_address;
 		}
 	}
@@ -576,27 +576,23 @@ int pfs_process_verify_break_rw_address( struct pfs_process *p )
 	}
 
 	while(fgets(line,sizeof(line),file)) {
-		fields = sscanf(line,PTR_FORMAT "-" PTR_FORMAT " %s " PTR_FORMAT "%d:%d %d",
-			&start,&end,flagstring,&offset,&major,&minor,&inode);
+		fields = sscanf(line,PTR_FORMAT "-" PTR_FORMAT " %s " PTR_FORMAT "%d:%d %d",&start,&end,flagstring,&offset,&major,&minor,&inode);
 
-        if( start <= p->break_address && p->break_address <= end )
-        {
-          fclose(file);
-          if(fields==7 && inode==0 && flagstring[0]=='r' && flagstring[1]=='w' && flagstring[3]=='p') {
-		  debug(D_DEBUG,"break address 0x%x is valid.", p->break_address);
-			return 1;
-          }
-          else
-          {
-			debug(D_PROCESS,"cannot read/write at break address, or break address is not private 0x%x",p->break_address);
-            return 0;
-          }
+		if( start <= p->break_address && p->break_address <= end ) {
+			fclose(file);
+			if(fields==7 && inode==0 && flagstring[0]=='r' && flagstring[1]=='w' && flagstring[3]=='p') {
+				debug(D_DEBUG,"break address 0x%llx is valid.",(long long)p->break_address);
+				return 1;
+			} else {
+				debug(D_PROCESS,"cannot read/write at break address, or break address is not private 0x%llx",(long long)p->break_address);
+				return 0;
+			}
 		}
 	}
 
 	fclose(file);
 
-	debug(D_PROCESS,"break address 0x%x is invalid.", p->break_address);
+	debug(D_PROCESS,"break address 0x%llx is invalid.", (long long)p->break_address);
 
 	return 0;
 }

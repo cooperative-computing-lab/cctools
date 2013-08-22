@@ -308,7 +308,7 @@ void chirp_alloc_init(const char *rootpath, INT64_T size)
 	chirp_alloc_flush();
 	stop = time(0);
 
-	debug(D_ALLOC, "### allocation recovery took %d seconds ###", stop - start);
+	debug(D_ALLOC, "### allocation recovery took %d seconds ###", (int) (stop-start) );
 
 	debug(D_ALLOC, "%sB total", string_metric(size, -1, 0));
 	debug(D_ALLOC, "%sB in use", string_metric(inuse, -1, 0));
@@ -814,7 +814,7 @@ INT64_T chirp_alloc_rmdir(const char *path)
 			if(cfs->rmdir(path) == 0) {
 				if(d != a) {
 					alloc_state_update(a, -d->size);
-					debug(D_ALLOC, "rmalloc %s %lld", path, d->size);
+					debug(D_ALLOC, "rmalloc %s %"PRId64, path, d->size);
 				}
 				chirp_alloc_flush();
 				result = 0;
@@ -973,7 +973,7 @@ INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode)
 			if(result == 0) {
 				if(alloc_state_create(path, size)) {
 					alloc_state_update(a, size);
-					debug(D_ALLOC, "mkalloc %s %lld", path, size);
+					debug(D_ALLOC, "mkalloc %s %"PRId64, path, size);
 					chirp_alloc_flush();
 				} else {
 					result = -1;

@@ -145,8 +145,8 @@ static void invalidate_host( const char *host )
 struct chirp_file * chirp_reli_open( const char *host, const char *path, INT64_T flags, INT64_T mode, time_t stoptime )
 {
 	struct chirp_file *file;
-	INT64_T delay=0;
-	INT64_T nexttry;
+	int     delay=0;
+	time_t  nexttry;
 	INT64_T result;
 	struct chirp_stat buf;
 	time_t current;
@@ -185,7 +185,7 @@ struct chirp_file * chirp_reli_open( const char *host, const char *path, INT64_T
 		debug(D_CHIRP,"couldn't talk to %s: %s\n",host,strerror(errno));
 		current = time(0);
 		nexttry = MIN(stoptime,current+delay);
-		debug(D_CHIRP,"try again in %d seconds\n",nexttry-current);
+		debug(D_CHIRP,"try again in %d seconds\n",(int)(nexttry-current));
 		sleep_until(nexttry);
 		if(delay==0) {
 			delay = 1;
@@ -210,8 +210,8 @@ INT64_T chirp_reli_close( struct chirp_file *file, time_t stoptime )
 }
 
 #define RETRY_FILE( ZZZ ) \
-	INT64_T delay=0; \
-	INT64_T nexttry; \
+	int delay=0; \
+	time_t nexttry; \
 	INT64_T result; \
 	time_t current; \
 	while(1) { \
@@ -236,7 +236,7 @@ INT64_T chirp_reli_close( struct chirp_file *file, time_t stoptime )
 		debug(D_CHIRP,"couldn't talk to %s: %s\n",file->host,strerror(errno)); \
 		current = time(0); \
 		nexttry = MIN(stoptime,current+delay); \
-		debug(D_CHIRP,"try again in %d seconds\n",nexttry-current); \
+		debug(D_CHIRP,"try again in %d seconds\n",(int)(nexttry-current)); \
 		sleep_until(nexttry); \
 		if(delay==0) {\
 			delay = 1;\
@@ -441,8 +441,8 @@ INT64_T chirp_reli_fsync( struct chirp_file *file, time_t stoptime )
 }
 
 #define RETRY_ATOMIC( ZZZ ) \
-	INT64_T delay=0; \
-	INT64_T nexttry; \
+	int delay=0; \
+	time_t nexttry; \
 	INT64_T result; \
 	time_t current; \
 	while(1) { \
@@ -464,7 +464,7 @@ INT64_T chirp_reli_fsync( struct chirp_file *file, time_t stoptime )
 		debug(D_CHIRP,"couldn't talk to %s: %s\n",host,strerror(errno)); \
 		current = time(0); \
 		nexttry = MIN(stoptime,current+delay); \
-		debug(D_CHIRP,"try again in %d seconds\n",nexttry-current); \
+		debug(D_CHIRP,"try again in %d seconds\n",(int)(nexttry-current)); \
 		sleep_until(nexttry); \
 		if(delay==0) {\
 			delay = 1;\
@@ -939,8 +939,8 @@ static INT64_T chirp_reli_bulkio_once( struct chirp_bulkio *v, int count, time_t
 
 INT64_T chirp_reli_bulkio( struct chirp_bulkio *v, int count, time_t stoptime )
 {
-	INT64_T delay=0;
-	INT64_T nexttry;
+	int delay=0;
+	time_t nexttry;
 	INT64_T result;
 	time_t current;
 
@@ -956,7 +956,7 @@ INT64_T chirp_reli_bulkio( struct chirp_bulkio *v, int count, time_t stoptime )
 		if(delay>=2) debug(D_NOTICE,"couldn't connect: still trying...\n");
 		current = time(0);
 		nexttry = MIN(stoptime,current+delay);
-		debug(D_CHIRP,"try again in %d seconds\n",nexttry-current);
+		debug(D_CHIRP,"try again in %d seconds\n",(int)(nexttry-current));
 		sleep_until(nexttry);
 		if(delay==0) {
 			delay = 1;

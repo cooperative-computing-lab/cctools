@@ -66,7 +66,7 @@ batch_job_id_t batch_job_submit_mpi_queue( struct batch_queue *q, const char *cm
 {
 	char *command = string_format("%s %s", cmd, args);
 	if(infile) {
-		char *new = string_format("%s <%s", infile);
+		char *new = string_format("%s <%s", cmd, infile);
 		free(command);
 		command = new;
 	}

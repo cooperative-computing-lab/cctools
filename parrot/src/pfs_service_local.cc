@@ -134,7 +134,7 @@ process to sleep and wait for actual input to become ready.
 	virtual pfs_ssize_t read( void *data, pfs_size_t length, pfs_off_t offset ) {
 		pfs_ssize_t result;
 
-		debug(D_LOCAL,"read %d 0x%x %lld %lld",fd,data,length,offset);
+		debug(D_LOCAL,"read %d 0x%p %lld %lld",fd,data,(long long)length,(long long)offset);
 
 		if(offset!=last_offset) ::lseek64(fd,offset,SEEK_SET);
 		result = ::read(fd,data,length);
@@ -164,7 +164,7 @@ process to sleep and wait for actual input to become ready.
 
 	virtual pfs_ssize_t write( const void *data, pfs_size_t length, pfs_off_t offset ) {
 		pfs_ssize_t result;
-		debug(D_LOCAL,"write %d 0x%x %lld %lld",fd,data,length,offset);
+		debug(D_LOCAL,"write %d 0x%p %lld %lld",fd,data,(long long)length,(long long)offset);
 		if(offset!=last_offset) ::lseek64(fd,offset,SEEK_SET);
 		result = ::write(fd,data,length);
 		if(result>0) last_offset = offset+result;
@@ -174,7 +174,7 @@ process to sleep and wait for actual input to become ready.
 	virtual int fstat( struct pfs_stat *buf ) {
 		int result;
 		struct stat64 lbuf;
-		debug(D_LOCAL,"fstat %d 0x%x",fd,buf);
+		debug(D_LOCAL,"fstat %d 0x%p",fd,buf);
 		result = ::fstat64(fd,&lbuf);
 		if(result>=0) COPY_STAT(lbuf,*buf);
 		END
@@ -183,7 +183,7 @@ process to sleep and wait for actual input to become ready.
 	virtual int fstatfs( struct pfs_statfs *buf ) {
 		int result;
 		struct statfs64 lbuf;
-		debug(D_LOCAL,"fstatfs %d 0x%x",fd,buf);
+		debug(D_LOCAL,"fstatfs %d 0x%p",fd,buf);
 		result = ::fstatfs64(fd,&lbuf);
 		if(result>=0) COPY_STATFS(lbuf,*buf);
 		END
@@ -191,7 +191,7 @@ process to sleep and wait for actual input to become ready.
 
 	virtual int ftruncate( pfs_size_t length ) {
 		int result;
-		debug(D_LOCAL,"truncate %d %lld",fd,length);
+		debug(D_LOCAL,"truncate %d %lld",fd,(long long)length);
 		result = ::ftruncate64(fd,length);
 		END
 	}
@@ -205,7 +205,7 @@ process to sleep and wait for actual input to become ready.
 
 	virtual int fcntl( int cmd, void *arg ) {
 		int result;
-		debug(D_LOCAL,"fcntl %d %d 0x%x",fd,cmd,arg);
+		debug(D_LOCAL,"fcntl %d %d 0x%p",fd,cmd,arg);
 		if(cmd==F_SETFL) arg = (void*)(((PTRINT_T)arg)|O_NONBLOCK);
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(CCTOOLS_CPU_X86_64)
 		if (cmd == PFS_GETLK64) cmd = F_GETLK;
@@ -218,7 +218,7 @@ process to sleep and wait for actual input to become ready.
 
 	virtual int ioctl( int cmd, void *arg ) {
 		int result;
-		debug(D_LOCAL,"ioctl %d 0x%x 0x%x",fd,cmd,arg);
+		debug(D_LOCAL,"ioctl %d 0x%x 0x%p",fd,cmd,arg);
 		result = ::ioctl(fd,cmd,arg);
 		END
 	}
@@ -294,7 +294,7 @@ process to sleep and wait for actual input to become ready.
 	virtual void * mmap( void *start, pfs_size_t length, int prot, int flags, off_t offset ) {
 		void *result;
 		result = ::mmap((caddr_t)start,length,prot,flags,fd,offset);
-		debug(D_LOCAL,"= %d %s",(PTRINT_T)result,(((PTRINT_T)result>=0) ? "" : strerror(errno)) );
+		debug(D_LOCAL,"= %p %s",result,(((PTRINT_T)result>=0) ? "" : strerror(errno)) );
 		return result;
 	}
 
@@ -397,7 +397,7 @@ public:
 		int result;
 		struct stat64 lbuf;
 		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
-		debug(D_LOCAL,"stat %s 0x%x",name->rest,buf);
+		debug(D_LOCAL,"stat %s 0x%p",name->rest,buf);
 		result = ::stat64(name->rest,&lbuf);
 		if(result>=0) COPY_STAT(lbuf,*buf);
 		END
@@ -406,7 +406,7 @@ public:
 		int result;
 		struct statfs64 lbuf;
 		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
-		debug(D_LOCAL,"statfs %s 0x%x",name->rest,buf);
+		debug(D_LOCAL,"statfs %s 0x%p",name->rest,buf);
 		result = ::statfs64(name->rest,&lbuf);
 		if(result>=0) COPY_STATFS(lbuf,*buf);
 		END
@@ -415,7 +415,7 @@ public:
 		int result;
 		struct stat64 lbuf;
 		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
-		debug(D_LOCAL,"lstat %s 0x%x",name->rest,buf);
+		debug(D_LOCAL,"lstat %s 0x%p",name->rest,buf);
 		result = ::lstat64(name->rest,&lbuf);
 		if(result>=0) COPY_STAT(lbuf,*buf);
 		END
@@ -451,14 +451,14 @@ public:
 	virtual int truncate( pfs_name *name, pfs_off_t length ) {
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
-		debug(D_LOCAL,"truncate %s %lld",name->rest,length);
+		debug(D_LOCAL,"truncate %s %lld",name->rest,(long long)length);
 		result = ::truncate64(name->rest,length);
 		END
 	}
 	virtual int utime( pfs_name *name, struct utimbuf *buf ) {
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
-		debug(D_LOCAL,"utime %s 0x%x",name->rest,buf);
+		debug(D_LOCAL,"utime %s 0x%p",name->rest,buf);
 		result = ::utime(name->rest,buf);
 		END
 	}
@@ -659,14 +659,14 @@ public:
 	virtual int readlink( pfs_name *name, char *buf, pfs_size_t size ) {
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
-		debug(D_LOCAL,"readlink %s 0x%x %d",name->rest,buf,size);
+		debug(D_LOCAL,"readlink %s 0x%p %d",name->rest,buf,(int)size);
 		result = ::readlink(name->rest,buf,size);
 		END
 	}
 	virtual int mknod( pfs_name *name, mode_t mode, dev_t dev ) {
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
-		debug(D_LOCAL,"mknod %s %d %d",name->rest,mode,dev);
+		debug(D_LOCAL,"mknod %s %d %d",name->rest,(int)mode,(int)dev);
 		result = ::mknod(name->rest,mode,dev);
 		END
 	}

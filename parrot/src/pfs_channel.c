@@ -167,7 +167,7 @@ int pfs_channel_alloc( const char *name, pfs_size_t length, pfs_size_t *start )
 			e = entry_create(name,channel_size,newsize-channel_size,tail,head);
 			channel_size = newsize;
 			channel_base = newbase;
-			debug(D_CHANNEL,"channel expanded to 0x%x bytes at base 0x%x",(PTRINT_T)newsize,newbase);
+			debug(D_CHANNEL,"channel expanded to 0x%" PRIu64 " bytes at base 0x%" PRIdPTR, newsize, (uintptr_t) newbase);
 			return pfs_channel_alloc(name,length,start);
 		}
 		ftruncate64(channel_fd,channel_size);
