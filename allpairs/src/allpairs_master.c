@@ -24,6 +24,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "timestamp.h"
 #include "getopt_aux.h"
+#include "path.h"
 
 #include "allpairs_compare.h"
 
@@ -84,7 +85,7 @@ double estimate_run_time( struct text_list *seta, struct text_list *setb )
 	for(x=0;x<xstop;x++) {
 		for(y=0;y<ystop;y++) {
 			sprintf(line,"./%s %s %s %s",
-				string_basename(allpairs_compare_program),
+				path_basename(allpairs_compare_program),
 				extra_arguments,
 				text_list_get(seta,x),
 				text_list_get(setb,y)
@@ -162,7 +163,7 @@ char * text_list_string( struct text_list *t, int a, int b )
 	for(i=a;i<b;i++) {
 		const char *str = text_list_get(t,i);
 		if(!str) break;
-		str = string_basename(str);
+		str = path_basename(str);
 		while( (int) (strlen(str) + buffer_pos + 3) >= buffer_size) {
 			buffer_size *= 2;
 			buffer = realloc(buffer,buffer_size);
@@ -195,19 +196,19 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 	if(ycurrent>=ystop) return 0;
 
 	char cmd[ALLPAIRS_LINE_MAX];
-	sprintf(cmd,"./%s -e \"%s\" A B %s%s",string_basename(allpairs_multicore_program),extra_arguments,use_external_program ? "./" : "",string_basename(allpairs_compare_program));
+	sprintf(cmd,"./%s -e \"%s\" A B %s%s",path_basename(allpairs_multicore_program),extra_arguments,use_external_program ? "./" : "",path_basename(allpairs_compare_program));
 	struct work_queue_task *task = work_queue_task_create(cmd);
 
 	if(use_external_program) {
-		work_queue_task_specify_file(task,allpairs_compare_program,string_basename(allpairs_compare_program),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+		work_queue_task_specify_file(task,allpairs_compare_program,path_basename(allpairs_compare_program),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
 	}
 
-	work_queue_task_specify_file(task,allpairs_multicore_program,string_basename(allpairs_multicore_program),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+	work_queue_task_specify_file(task,allpairs_multicore_program,path_basename(allpairs_multicore_program),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
 
 	const char *f;
 	list_first_item(extra_files_list);
 	while((f = list_next_item(extra_files_list))) {
-		work_queue_task_specify_file(task,f,string_basename(f),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+		work_queue_task_specify_file(task,f,path_basename(f),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
 	}
 
 	buf = text_list_string(seta,xcurrent,xcurrent+xblock);
@@ -221,13 +222,13 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 	for(x=xcurrent;x<(xcurrent+xblock);x++) {
 		name = text_list_get(seta,x);
 		if(!name) break;
-		work_queue_task_specify_file(task,name,string_basename(name),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+		work_queue_task_specify_file(task,name,path_basename(name),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
 	}
 
 	for(y=ycurrent;y<(ycurrent+yblock);y++) {
 		name = text_list_get(setb,y);
 		if(!name) break;
-		work_queue_task_specify_file(task,name,string_basename(name),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+		work_queue_task_specify_file(task,name,path_basename(name),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
 	}
 
 	/* advance to the next row/column */

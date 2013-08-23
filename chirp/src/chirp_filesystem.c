@@ -9,6 +9,7 @@ See the file COPYING for details.
 
 #include "macros.h"
 #include "buffer.h"
+#include "path.h"
 #include "xxmalloc.h"
 #include "md5.h"
 

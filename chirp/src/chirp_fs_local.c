@@ -15,7 +15,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "xxmalloc.h"
 #include "int_sizes.h"
-#include "stringtools.h"
+#include "path.h"
 #include "full_io.h"
 #include "delete_dir.h"
 
@@ -570,7 +570,7 @@ static int search_directory(const char *subject, const char * const base, char *
 static INT64_T chirp_fs_local_search(const char *subject, const char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
 {
 	char pathname[CHIRP_PATH_MAX];
-	string_collapse_path(dir, pathname, 0);
+	path_collapse(dir, pathname, 0);
 
 	debug(D_DEBUG, "chirp_fs_local_search(subject = `%s', dir = `%s', pattern = `%s', flags = %d, ...)", subject, dir, pattern, flags);
 
