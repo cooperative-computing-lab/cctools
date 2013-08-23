@@ -101,18 +101,42 @@ static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *buf);
 static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *buf);
 
 /*
-The provided url could have any of the following forms:
-local:/path, file:/path, or just /path.
-*/
-
+ * The provided url could have any of the following forms:
+ * o `local://path'
+ * o `file://path'
+ * o `path'
+ */
+#define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
 static const char *chirp_fs_local_init(const char *url)
 {
-	char *c = strchr(url, ':');
-	if(c) {
-		return strdup(c + 1);
-	} else {
-		return strdup(url);
+	static char root[CHIRP_PATH_MAX];
+	char tmp[CHIRP_PATH_MAX];
+
+	if (strlen(url) >= CHIRP_PATH_MAX) {
+		fatal("root path too long");
 	}
+
+	if (strprfx(url, "local://") || strprfx(url, "file://"))
+		strcpy(tmp, strstr(url, "//")+2);
+	else
+		strcpy(tmp, url);
+
+	if (tmp[0] != '/') {
+		/* relative path */
+		char pwd[CHIRP_PATH_MAX];
+		if (getcwd(pwd, sizeof(pwd)) == NULL) {
+			fatal("could not getcwd: %s", strerror(errno));
+		}
+		if (strlen(pwd) + strlen(tmp) >= CHIRP_PATH_MAX) {
+			fatal("root path too long");
+		}
+		memmove(tmp+strlen(pwd), tmp, strlen(pwd));
+		memcpy(tmp, pwd, strlen(pwd));
+	}
+
+	path_collapse(tmp, root, 1);
+
+	return root;
 }
 
 static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode)

@@ -17,6 +17,8 @@ typedef struct CHIRP_FILE CHIRP_FILE;
 
 struct chirp_filesystem * cfs_lookup( const char *url );
 
+void cfs_reinterpret ( char url[CHIRP_PATH_MAX] );
+
 CHIRP_FILE *cfs_fopen(const char *path, const char *mode);
 int    cfs_fclose(CHIRP_FILE * file);
 int    cfs_fflush(CHIRP_FILE * file);
