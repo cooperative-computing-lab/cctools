@@ -12,7 +12,7 @@
 #include "itable.h"
 #include "list.h"
 #include "xxmalloc.h"
-#include "stringtools.h"
+#include "path.h"
 #include "getopt_aux.h"
 
 #define MAX_LINE 1024
@@ -77,7 +77,7 @@ struct summary *max_values;
 int get_rule_number(char *filename)
 {
 	char  name[MAX_LINE];
-	const char *base =  string_basename(filename);
+	const char *base =  path_basename(filename);
 
 	sscanf(base, RULE_PREFIX "%6c" RULE_SUFFIX, name);
 	return atoi(name);

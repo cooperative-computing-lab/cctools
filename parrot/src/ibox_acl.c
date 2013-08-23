@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "stringtools.h"
 #include "delete_dir.h"
+#include "path.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -27,7 +28,7 @@ static void make_acl_name(const char *filename, int get_parent, char *aclname)
 {
 	char tmp[PFS_PATH_MAX];
 	sprintf(tmp, "%s/%s", filename, IBOX_ACL_BASE_NAME);
-	string_collapse_path(tmp, aclname, 1);
+	path_collapse(tmp, aclname, 1);
 }
 
 static int isdir( const char *path )
@@ -92,7 +93,7 @@ static int do_ibox_acl_check(const char *path, const char *subject, int flags, i
 	char dirname[PFS_PATH_MAX];
 
 	if(!isdir(path))
-		string_dirname(path, dirname);
+		path_dirname(path, dirname);
 	else
 		strcpy(dirname,path);
 

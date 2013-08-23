@@ -43,6 +43,7 @@ See the file COPYING for details.
 #include "getopt_aux.h"
 #include "rmonitor.h"
 #include "random_init.h"
+#include "path.h"
 
 #include "dag.h"
 #include "visitors.h"
@@ -320,7 +321,7 @@ void collect_input_files(struct dag *d, char *bundle_dir, char *(*rename) (struc
 		new_name = rename(NULL, f->filename);
 		char *dir = NULL;
 		dir = xxstrdup(new_name);
-		string_dirname(new_name, dir);
+		path_dirname(new_name, dir);
 		if(dir){
 			sprintf(file_destination, "%s/%s", bundle_dir, dir);
 			if(!create_dir(file_destination, 0755)) {
@@ -372,7 +373,7 @@ char *bundler_translate_name(const char *input_filename, int collision_counter)
 		return tmp;
 	}
 	if(filename[0] == '/') {
-		new_filename = string_basename(filename);
+		new_filename = path_basename(filename);
 		if(hash_table_lookup(previous_names, new_filename)) {
 			collision_counter++;
 			char *tmp = bundler_translate_name(filename, collision_counter);
@@ -2823,7 +2824,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
-		char *cwd = string_getcwd();
+		char *cwd = path_getcwd();
 		if(!strncmp(cwd, "/afs", 4)) {
 			fprintf(stderr, "makeflow: This won't work because Condor is not able to write to files in AFS.\n");
 			fprintf(stderr, "makeflow: Instead, run makeflow from a local disk like /tmp.\n");

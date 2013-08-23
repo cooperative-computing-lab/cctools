@@ -13,6 +13,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "hash_table.h"
+#include "path.h"
 #include "stringtools.h"
 #include "username.h"
 #include "xxmalloc.h"
@@ -49,7 +50,7 @@ static void make_acl_name(const char *filename, int get_parent, char *aclname)
 {
 	char tmp[CHIRP_PATH_MAX];
 	sprintf(tmp, "%s/%s", filename, CHIRP_ACL_BASE_NAME);
-	string_collapse_path(tmp, aclname, 1);
+	path_collapse(tmp, aclname, 1);
 }
 
 static int ticket_read(char *ticket_filename, struct chirp_ticket *ct)
@@ -130,7 +131,7 @@ static int do_chirp_acl_get(const char *dirname, const char *subject, int *total
 			char safewhere[CHIRP_PATH_MAX];
 			char where[CHIRP_PATH_MAX];
 			sprintf(safewhere, "%s/%s", chirp_ticket_path, ct.rights[i].directory);
-			string_collapse_path(safewhere, where, 1);
+			path_collapse(safewhere, where, 1);
 
 			if(strncmp(dirname, where, strlen(where)) == 0) {
 				if(strlen(where) > longest) {
@@ -225,7 +226,7 @@ static int do_chirp_acl_check(const char *filename, const char *subject, int fla
 
 			if(linkname[0] != '/') {
 				sprintf(temp, "%s/../%s", filename, linkname);
-				string_collapse_path(temp, linkname, 1);
+				path_collapse(temp, linkname, 1);
 			}
 
 			/* Use the linkname now to look up the ACL */
@@ -253,9 +254,9 @@ static int do_chirp_acl_check(const char *filename, const char *subject, int fla
 
 	/* Now get the name of the directory containing the file */
 
-	string_collapse_path(filename, temp, 1);
+	path_collapse(filename, temp, 1);
 	if(!cfs_isdir(temp))
-		string_dirname(temp, dirname);
+		path_dirname(temp, dirname);
 	else
 		strcpy(dirname, temp);
 
@@ -531,7 +532,7 @@ int chirp_acl_ticket_modify(const char *ticket_dir, const char *subject, const c
 			char safewhere[CHIRP_PATH_MAX];
 			char where[CHIRP_PATH_MAX];
 			sprintf(safewhere, "%s/%s", ticket_dir, ct.rights[n].directory);
-			string_collapse_path(safewhere, where, 1);
+			path_collapse(safewhere, where, 1);
 
 			if(strcmp(where, path) == 0) {
 				free(ct.rights[n].acl);
@@ -545,7 +546,7 @@ int chirp_acl_ticket_modify(const char *ticket_dir, const char *subject, const c
 			char directory[CHIRP_PATH_MAX];
 			char collapsed_directory[CHIRP_PATH_MAX];
 			sprintf(directory, "/%s", path + strlen(ticket_dir));
-			string_collapse_path(directory, collapsed_directory, 1);
+			path_collapse(directory, collapsed_directory, 1);
 			ct.rights[ct.nrights - 1].directory = xxstrdup(collapsed_directory);
 			ct.rights[ct.nrights - 1].acl = xxstrdup(chirp_acl_flags_to_text(flags));
 		}
@@ -901,7 +902,7 @@ int chirp_acl_init_reserve(const char *path, const char *subject)
 	if(!cfs->do_acl_check())
 		return 1;
 
-	string_dirname(path, dirname);
+	path_dirname(path, dirname);
 
 	if(!do_chirp_acl_get(dirname, subject, &aclflags))
 		return 0;

@@ -2,6 +2,7 @@
 #include "batch_job_internal.h"
 #include "work_queue.h"
 #include "debug.h"
+#include "path.h"
 #include "stringtools.h"
 #include "macros.h"
 #include "rmsummary.h"
@@ -77,7 +78,7 @@ void specify_work_queue_task_shared_files(struct work_queue_task *t, const char 
 			}
 
 			if(file[0] != '/') {
-				char *cwd = string_getcwd();
+				char *cwd = path_getcwd();
 				char *new = string_format("%s/%s", cwd, file);
 				free(file);
 				free(cwd);
@@ -108,7 +109,7 @@ void specify_work_queue_task_shared_files(struct work_queue_task *t, const char 
 			}
 
 			if(file[0] != '/') {
-				char *cwd = string_getcwd();
+				char *cwd = path_getcwd();
 				char *new = string_format("%s/%s", cwd, file);
 				free(file);
 				free(cwd);

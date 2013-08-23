@@ -2,7 +2,7 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-exe="string_collapse_path.test"
+exe="path_collapse.test"
 
 prepare()
 {
@@ -15,7 +15,7 @@ void test (const char *in, const char *expected, int dots)
 {
 	static char out[4096];
 	memset(out, 0, sizeof(out));
-	string_collapse_path(in, out, dots);
+	path_collapse(in, out, dots);
 	if (strcmp(out, expected) != 0) {
 		fprintf(stderr, "for %s, got %s expected %s (dots = %d)\n", in, out, expected, dots);
 		exit(EXIT_FAILURE);

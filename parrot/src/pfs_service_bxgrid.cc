@@ -14,6 +14,7 @@ extern "C" {
 #include "debug.h"
 #include "domain_name.h"
 #include "hash_table.h"
+#include "path.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 }
@@ -134,7 +135,7 @@ struct bxgrid_virtual_folder *bxgrid_bvf_find( const char *path )
 struct bxgrid_virtual_folder *bxgrid_bvf_find_base( const char *path ) 
 {
 	char dirname[PFS_PATH_MAX];
-	string_dirname(path, (char *)dirname);
+	path_dirname(path, (char *)dirname);
 	return bxgrid_bvf_find(dirname);
 }
 
@@ -207,7 +208,7 @@ int bxgrid_bvf_stat( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, struct
 	}
 
 	if (!file_info) { // Cache miss or no caching
-		BXGRID_QUERY_AND_CHECK(file_res, mysql_cxn, -1, bvf->stat_query, string_basename(file_path));
+		BXGRID_QUERY_AND_CHECK(file_res, mysql_cxn, -1, bvf->stat_query, path_basename(file_path));
 		BXGRID_FETCH_AND_CHECK(file_row, file_res, -1);
 		
 		if (bxgrid_cache_stat_query) {
@@ -435,11 +436,11 @@ pfs_file *bxgrid_bvf_open( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, 
 	int start_time;
 
 	if (strcmp(bvf->name, "/fileid") == 0) {
-		fileid    = string_basename(name->rest);
+		fileid    = path_basename(name->rest);
 		replicaid = bxgrid_lookup_replicaid(mysql_cxn, fileid, nattempt);
 	} else {
 		fileid    = NULL;
-		replicaid = string_basename(name->rest);
+		replicaid = path_basename(name->rest);
 	}
 
 	start_time = time(0);
@@ -622,7 +623,7 @@ public:
 			bvf = bxgrid_bvf_find_base(name->rest);
 			if (bvf) {
 				if (bvf->flags & BXGRID_FILE_LIST) {	// BXGRID_FILE_LIST
-					if (strstr(bvf->query, string_basename(name->rest))) {
+					if (strstr(bvf->query, path_basename(name->rest))) {
 						BXGRID_MAKE_DIR_STAT(name, buf);
 						result = 0;
 					} else {
@@ -730,7 +731,7 @@ public:
 				if (strcmp(bvf->name, "/fileid") == 0) {
 					int nid = 0;
 
-					fileid = string_basename(name->rest);
+					fileid = path_basename(name->rest);
 					while ((replicaid = bxgrid_lookup_replicaid(mysql_cxn, fileid, nid++))) {
 						if (bxgrid_lookup_replica_location(mysql_cxn, replicaid, host, path) >= 0) {
 							snprintf(location, PFS_PATH_MAX, "%s:%s", host, path);
@@ -738,7 +739,7 @@ public:
 						}
 					}
 				} else {
-					replicaid = string_basename(name->rest);
+					replicaid = path_basename(name->rest);
 					if (bxgrid_lookup_replica_location(mysql_cxn, replicaid, host, path) >= 0) {
 						snprintf(location, PFS_PATH_MAX, "%s:%s", host, path);
 						loc->append(location);

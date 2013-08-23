@@ -24,8 +24,6 @@ int string_match_regex(const char *text, char *pattern);
 int string_match(const char *pattern, const char *text);
 char *string_front(const char *str, int max);
 const char *string_back(const char *str, int max);
-const char *string_basename(const char *str);
-void string_dirname(const char *path, char *dir);
 char *string_metric(double invalue, int power_needed, char *buffer);
 INT64_T string_metric_parse(const char *str);
 int string_time_parse(const char *str);
@@ -46,9 +44,6 @@ int string_prefix_is(const char *string, const char *prefix);
 char *string_combine(char *first, const char *second);
 char *string_combine_multi(char *first, ...);
 char *string_signal(int sig);
-void string_split_path(const char *str, char *first, char *rest);
-void string_split_multipath(const char *input, char *first, char *rest);
-void string_collapse_path(const char *longpath, char *shortpath, int remove_dotdot);
 void string_tolower(char *str);
 void string_toupper(char *str);
 int string_isspace(const char *str);
@@ -77,12 +72,6 @@ char *string_format (const char *fmt, ...);
  */
 
 int string_nformat(char *str, const size_t max, const char *fmt, ...);
-
-
-/** Returns a heap allocated freeable string for the current working directory.
-	@return The current working directory.
- */
-char *string_getcwd (void);
 
 char *string_trim(char *s, int(func)(int));
 char *string_trim_spaces(char *s);

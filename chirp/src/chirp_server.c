@@ -41,6 +41,7 @@ See the file COPYING for details.
 #include "change_process_title.h"
 #include "url_encode.h"
 #include "get_canonical_path.h"
+#include "path.h"
 
 #include <assert.h>
 #include <stdio.h>
