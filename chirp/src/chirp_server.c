@@ -821,9 +821,9 @@ static int chirp_path_fix(char *path)
 	char absolute[CHIRP_PATH_MAX];
 
 	url_decode(path, decoded, sizeof(decoded)); /* remove the percent-hex encoding */
-	path_collapse(sanitized, decoded, 1); /* sanitize the decoded path */
+	path_collapse(decoded, sanitized, 1); /* sanitize the decoded path */
 	sprintf(absolute, "%s/%s", chirp_root_path, sanitized); /* add root prefix */
-	path_collapse(absolute, path, 1); /* sanitize again */
+	path_collapse(absolute, path, 1); /* cleanup extra '/' */
 
 	return 1;
 }
@@ -1852,7 +1852,6 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 
 				strcpy(fixed, start);
 				chirp_path_fix(fixed);
-				assert(strcmp(fixed, ".") == 0 || strncmp(fixed, "./", 2) == 0);
 
 				if(access(fixed, F_OK) == -1) {
 					link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);

@@ -97,6 +97,8 @@ See the file COPYING for details.
 	(b).cst_ctime = (a).st_ctime;
 #endif
 
+extern const char *chirp_root_path;
+
 static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *buf);
 static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *buf);
 
@@ -539,7 +541,7 @@ static int search_directory(const char *subject, const char * const base, char *
 			sprintf(current, "/%s", name);
 
 			if(search_match_file(pattern, base)) {
-				const char *matched = includeroot ? fullpath+1 : base; /* fullpath+1 because chirp_root_path is always "./" !! */
+				const char *matched = includeroot ? fullpath+strlen(chirp_root_path) : base; /* add strlen(chirp_root_path) to strip out */
 
 				result += 1;
 				if (access_flags == F_OK || chirp_fs_local_access(fullpath, access_flags) == 0) {
@@ -594,7 +596,8 @@ static int search_directory(const char *subject, const char * const base, char *
 static INT64_T chirp_fs_local_search(const char *subject, const char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
 {
 	char pathname[CHIRP_PATH_MAX];
-	path_collapse(dir, pathname, 0);
+	strcpy(pathname, dir);
+	path_remove_trailing_slashes(pathname); /* this prevents double slashes from appearing in paths we examine. */
 
 	debug(D_DEBUG, "chirp_fs_local_search(subject = `%s', dir = `%s', pattern = `%s', flags = %d, ...)", subject, dir, pattern, flags);
 
