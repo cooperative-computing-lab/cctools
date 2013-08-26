@@ -6,24 +6,24 @@ See the file COPYING for details.
 */
 
 #include "debug.h"
-#include "domain_name_cache.h"
-#include "macros.h"
+
+#include "full_io.h"
 #include "stringtools.h"
-#include "full_io.h"
 #include "xxmalloc.h"
-#include "full_io.h"
+
+#include <unistd.h>
+#include <fcntl.h>
+
+#include <sys/stat.h>
+#include <sys/time.h>
 
 #include <assert.h>
-#include <stdlib.h>
+#include <errno.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
-#include <signal.h>
-#include <sys/time.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <errno.h>
 #include <time.h>
 
 static int debug_fd = STDERR_FILENO;
