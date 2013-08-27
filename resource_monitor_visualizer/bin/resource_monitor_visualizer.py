@@ -42,7 +42,6 @@ def get_args():
   name = sys.argv[3]
   return source, destination, name
 
-
 def find_summary_paths(source):
   summary_paths = []
   for r, d, f in os.walk(source):
@@ -52,7 +51,8 @@ def find_summary_paths(source):
   return summary_paths
 
 def load_summaries_by_group(paths):
-  groups = {}
+  groups = { '(all)' : []  }
+
   for sp in paths:
     data_stream = open(sp, 'r')
     summary = {}
@@ -76,6 +76,8 @@ def load_summaries_by_group(paths):
     else:
       groups[group_name].append(summary)
 
+    groups['(all)'].append(summary)
+
     data_stream.close()
   return groups
 
@@ -86,6 +88,11 @@ def gnuplot(commands):
   child.stdin.flush()
   child.wait()
 
+def gnuplot_to_file(name, commands):
+  f = file(name, 'w')
+  f.write(commands)
+  f.close()
+
 def fill_histogram_table_template(max_sorted, table_path, binwidth, data_path):
   n     = len(max_sorted)
   min_x = max_sorted[0]
@@ -95,17 +102,17 @@ def fill_histogram_table_template(max_sorted, table_path, binwidth, data_path):
   result  = "set table \"" + table_path + "\"\n"
   result += "binwidth=" + str(binwidth) + "\n"
 
-  if(n < 3 or nbins < 3):
+  if(n < 4 or nbins < 4):
     result += "binc(x,w)=x\n"
   else:
-    result += "binc(x,w)=(w*floor(x/w) + 0.5)\n"
+    result += "binc(x,w)=(w*floor(x/w))\n"
 
   result += "plot \"" + data_path + "\" using (binc($1,binwidth)):(1.0) smooth freq\n"
   result += "unset table\n\n"
 
   return result
 
-def fill_histogram_template(max_sorted, width, height, image_path, binwidth, resource_name, unit, table_path):
+def fill_histogram_template(max_sorted, width, height, image_path, binwidth, resource_name, unit, data_path, table_path, axis_legends):
   n     = len(max_sorted)
   min_x = max_sorted[0]
   max_x = max_sorted[-1]
@@ -114,57 +121,72 @@ def fill_histogram_template(max_sorted, width, height, image_path, binwidth, res
   if nbins < 2:
     nbins = 1
 
-  result  = "set terminal png transparent size " + str(width) + "," + str(height) + "\n"
+  result  = "set terminal png size " + str(width) + "," + str(height) + "\n"
   result += "plot \"" + table_path + "\" using 1:(stringcolumn(3) eq \"i\"? $2:1/0) w boxes\n"
   result += "min_x = GPVAL_DATA_X_MIN\n"
   result += "max_x = GPVAL_DATA_X_MAX\n"
   result += "min_y = GPVAL_DATA_Y_MIN\n"
   result += "max_y = GPVAL_DATA_Y_MAX\n"
+  result += "reset\n"
 
-  result += "reset"
-  result += "set terminal png transparent size " + str(width) + "," + str(height) + "\n"
+  result += "set terminal png size " + str(width) + "," + str(height) + "\n"
+  result += "plot \"" + table_path + "\" using 1:((stringcolumn(3) eq \"i\") && ($2 == max_y) ? $2:1/0) w boxes\n"
+  result += "max_pos_x = GPVAL_DATA_X_MAX\n"
+  result += "reset\n"
+
+  result += "set terminal png transparent size " + str(width) + "," + str(height) + " enhanced font 'Times,10'\n"
   result += "unset key\n"
   result += "unset border\n"
-  result += "set border 3\n"
+  result += "set style line 1 lc 16\n"
+  result += "set border 1 lc 16\n"
   result += "set output \"" + image_path + "\"\n"
   result += "binwidth=" + str(binwidth) + "\n"
-  result += "set style fill solid 0.5\n"
+  result += "set style fill solid noborder 0.45\n"
 
-  if(n < 3 or nbins < 3):
-    result += "set boxwidth 2.0 relative\n"
-  else:
-    result += "set boxwidth 0.9*binwidth absolute\n"
+  result += "set boxwidth binwidth*0.8 absolute\n"
 
-  result += "set tics nomirror scale 0.25\n"
   result += "set yrange [0:(max_y + max_y*0.1)]\n"
-  result += "set ytics  (max_y)\n"
+  result += "unset tics\n"
 
   #handle corner cases for xrange
-  if n == 1 and min_x < 0.0001:
-    result += "set xrange [-0.1:1]\n"
-    result += "set xtics (0, 1)\n"
-  elif nbins < 3:
-    result += "set xrange [0:(max_x + 0.25*max_x)]\n"
-    result += "set xtics (0, \"" + str(int(round(max_x))) + "\" " + str(max_x) + ")\n"
+  if nbins == 1:
+    result += "set xrange [(min_x - 1):(max_x + 2)]\n"
   else:
-    cent   = (max_x - min_x)/10.0
+    cent   = (max_x - min_x)/5.0
     quatr  = (max_x - min_x + cent)/3
     result += "set xrange [" + str(min_x - cent) + ":" + str(max_x + cent) + "]\n"
-    result += "set xtics (%d, %d, %d, %d)\n" % (int(min_x), int(quatr + min_x), int(max_x - quatr), int(max_x))
+
+  result += "set xtics out nomirror scale 1\n"
+  result += "set xtics (floor(min_x), ceil(max_x))\n"
+  #result += "set xtics (" 
+  #result += ', '.join(['"" %.1f' % x for x in max_sorted])
+  #result += ")\n" 
 
   result += "set xlabel \"" + resource_name.replace('_', ' ')
   if unit != " ":
     result += " (" + unit + ")"
   result += "\"\n"
 
+  #result += 'set label gprintf("%%g", %.1f) at first %f, graph -0.2 center front nopoint\n' % (int(min_x), int(min_x))
+  #result += 'set label gprintf("%%g", %.1f) at first %f, graph -0.2 center front nopoint\n' % (int(max_x), int(max_x))
+
+  result += 'set label gprintf("%g", max_y) at max_pos_x,graph 1.0 tc ls 1 center front nopoint\n'
+
+  result += 'if (max_y < (100*min_y))'
+  result += 'set ylabel "Frequency\"; '
+  result += 'else '
+  result += 'set ylabel "Frequency (log)"\n'
+
+  if not axis_legends:
+    result += 'set xlabel\n'
+    result += 'set ylabel\n'
+
   result += "if (max_y < (100*min_y))"
-  result += "set ylabel \"Frequency\"; "
   result += "plot \"" + table_path + "\" using 1:(stringcolumn(3) eq \"i\"? $2:1/0) w boxes;"
   result += "else "
-  result += "set ylabel \"Frequency (log)\"; "
-  result += "set ytics  (\"1\" 0, sprintf(\"%d\", max_y) log10(max_y)); "
-  result += "set yrange [-0.001:(1.1*log10(max_y))]; "
+  result += "set yrange [-0.04:(1.1*log10(max_y))];"
   result += "plot \"" + table_path + "\" using 1:((stringcolumn(3) eq \"i\" && $2 > 0) ? log10($2):1/0) w boxes\n"
+
   return result
 
 def rule_id_for_task(task):
@@ -268,7 +290,7 @@ def task_has_timeseries(task, source_directory):
 def fill_in_time_series_format(resource, unit, data_path, column, out_path, width=1250, height=500):
   if unit != " ":
     unit = ' (' + unit + ')'
-  commands  = 'set terminal png transparent size ' + str(width) + ',' + str(height) + "\n"
+  commands  = 'set terminal png transparent size ' + str(width) + ',' + str(height) + "enhanced font 'Times,10'\n"
   commands += "set bmargin 4\n"
   commands += "unset key\n"
   commands += 'set xlabel "Time (seconds)" offset 0,-2 character' + "\n"
@@ -371,7 +393,7 @@ def create_aggregate_plots(resources, units, work_directory, destination_directo
     commands = fill_in_time_series_format(r, unit, data_path, column, out_path, 1250, 500)
     gnuplot(commands)
 
-def create_main_page(group_names, name, resources, destination, hist_height=600, hist_width=600, timeseries_height=1250, timeseries_width=500, has_timeseries=False):
+def create_main_page(group_names, name, resources, resource_units, destination, hist_width=600, hist_height=600, timeseries_height=1250, timeseries_width=500, has_timeseries=False):
   out_path = destination + "/index.html"
   f = open(out_path, "w")
   content  = "<!doctype html>\n"
@@ -397,11 +419,29 @@ def create_main_page(group_names, name, resources, destination, hist_height=600,
     content += '<a href="#" class="next"><img src="img/arrow-next.png" width="24" height="43" alt="Arrow Next"></a>' + "\n"
     content += "  </div>\n</section>\n"
 
+  content += '<table>\n'
+
+
+  content += '<tr>'
+  content += '<td></td>'
   for g in group_names:
-    content += '<h2>' + g + "</h2>\n"
-    for r in resources:
-      content += '<a href="' + g + '/' + r + '/index.html"><img src="' + g + "/" + r + "_" + str(hist_width) + "x" + str(hist_height) + '_hist.png" /></a>\n'
-    content += "<hr />\n\n"
+    content += '<td>' + g + '</td>'
+  content += '</tr>\n'
+
+  for r in resources:
+    unit = resource_units.get(r)
+
+    content += '<tr>\n'
+    content += '<td>'
+    content += r.replace('_', ' ')
+    if unit != " ":
+      content += '(' + unit + ')'
+    content += '</td>'
+
+    for g in group_names:
+        content += '<td><a href="' + g + '/' + r + '/index.html"><img src="' + g + "/" + r + "_" + str(hist_width) + "x" + str(hist_height) + '_hist.png" /></a></td>\n'
+    content += '</tr>\n'
+
   content += "</div>\n"
   f.write("%s\n" % content)
   f.close()
@@ -488,8 +528,12 @@ def main():
     groups = load_summaries_by_group(summary_paths)
 
     print "Plotting summaries histograms..."
-    hist_large = 600
-    hist_small = 250
+    hist_large_height = 600
+    hist_large_width  = int(1.5 * hist_large_height)
+
+    hist_small_height = 125
+    hist_small_width  = int(1.5 * hist_small_height)
+
     for r in resources:
       unit = resource_units.get(r)
       for group_name in groups:
@@ -505,20 +549,23 @@ def main():
 
         table_path = out_path + "/" + r + "_hist.dat"
         gnuplot_format = fill_histogram_table_template(max_sorted, table_path, binwidth, data_path)
+        gnuplot_to_file(table_path + ".gnuplot", gnuplot_format)
         gnuplot(gnuplot_format)
 
-        image_path = out_path + "/" + r + "_" + str(hist_large) + "x" + str(hist_large) + "_hist.png"
-        gnuplot_format = fill_histogram_template(max_sorted, hist_large, hist_large, image_path, binwidth, r, unit, table_path)
+        image_path = out_path + "/" + r + "_" + str(hist_large_width) + "x" + str(hist_large_height) + "_hist.png"
+        gnuplot_format = fill_histogram_template(max_sorted, hist_large_width, hist_large_height, image_path, binwidth, r, unit, data_path, table_path, True)
+        gnuplot_to_file(image_path + ".gnuplot", gnuplot_format)
         gnuplot(gnuplot_format)
 
-        image_path = out_path + "/" + r + "_" + str(hist_small) + "x" + str(hist_small) + "_hist.png"
-        gnuplot_format = fill_histogram_template(max_sorted, hist_small, hist_small, image_path, binwidth, r, unit, table_path)
+        image_path = out_path + "/" + r + "_" + str(hist_small_width) + "x" + str(hist_small_height) + "_hist.png"
+        gnuplot_format = fill_histogram_template(max_sorted, hist_small_width, hist_small_height, image_path, binwidth, r, unit, data_path, table_path, False)
+        gnuplot_to_file(image_path + ".gnuplot", gnuplot_format)
         gnuplot(gnuplot_format)
 
-        resource_group_page(name, group_name, r, hist_large, hist_large, groups[group_name], out_path)
+        resource_group_page(name, group_name, r, hist_large_width, hist_large_height, groups[group_name], out_path)
 
     aggregate_height = 500
-    aggregate_width = 1250
+    aggregate_width  = int(1.5 * aggregate_height)
     aggregate_data = create_individual_pages(groups, destination_directory, name, resources, resource_units, source_directory, workspace)
 
     time_series_exist = False
@@ -529,7 +576,7 @@ def main():
       print "Plotting time series..."
       create_aggregate_plots(resources, resource_units, workspace, destination_directory)
 
-    create_main_page(groups.keys(), name, resources, destination_directory, hist_small, hist_small, aggregate_height, aggregate_width, time_series_exist)
+    create_main_page(groups.keys(), name, resources, resource_units, destination_directory, hist_small_width, hist_small_height, aggregate_height, aggregate_width, time_series_exist)
     
     lib_static_home = os.path.normpath(os.path.join(visualizer_home, 'lib/resource_monitor_visualizer_static'))
     os.system("cp -r " + lib_static_home + "/* " + destination_directory)
