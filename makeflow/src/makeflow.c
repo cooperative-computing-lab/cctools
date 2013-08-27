@@ -1928,7 +1928,7 @@ void dag_gc_ref_incr(struct dag *d, const char *file, int increment)
 	if(ref_count) {
 		ref_count = ref_count + increment;
 		hash_table_insert(d->collect_table, file, (void *) ref_count);
-		debug(D_DEBUG, "Marked file %s references (%d)", file, ref_count - 1);
+		debug(D_DEBUG, "Marked file %s references (%d)", file, (int) ref_count - 1);
 	}
 }
 
