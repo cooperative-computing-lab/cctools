@@ -1,2 +1,2 @@
-: /tmp/makeflow_test_absolute_path
+: /bin/ls
 	echo ""
