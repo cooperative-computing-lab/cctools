@@ -59,6 +59,10 @@ clean()
 
 	[ -f $PIDWORKER_FILE ] && /bin/kill -9 `cat $PIDWORKER_FILE`
 
+	if [ `type -t "after_clean"` ]; then
+		after_clean
+	fi
+
 	exit 0
 }
 

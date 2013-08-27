@@ -22,6 +22,11 @@ sed -e "s:^CONVERT.*:CONVERT=$CONVERT:" > $MAKE_FILE < $MAKE_FILE_ORG
 
 PRODUCTS="capitol.montage.gif"
 
+after_clean()
+{
+  rm $MAKE_FILE
+}
+
 . ./makeflow_dirs_test_common.sh
 
 dispatch $@
