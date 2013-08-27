@@ -24,7 +24,7 @@ for package in $CCTOOLS_PACKAGES; do
 		cd "${package}/test"
 		for script in TR_*; do
 			if [ -x "$script" ]; then
-				printf "%-70s" "--- Testing ${package}/test/${script} ... "
+				printf "%-72s" "--- Testing ${package}/test/${script} ... "
 				(
 					set -e
 					echo "./${script}" prepare
