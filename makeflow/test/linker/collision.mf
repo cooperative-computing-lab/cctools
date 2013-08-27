@@ -1,2 +1,2 @@
-: asdf /tmp/asdf 
+: ls /bin/ls
 	echo ""
