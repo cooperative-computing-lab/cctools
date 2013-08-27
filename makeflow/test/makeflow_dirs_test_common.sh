@@ -59,6 +59,8 @@ clean()
 
 	[ -f $PIDWORKER_FILE ] && /bin/kill -9 `cat $PIDWORKER_FILE`
 
+	[ $DELETE_MAKE_FILE ] && rm -f $MAKE_FILE
+
 	exit 0
 }
 
