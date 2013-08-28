@@ -9,7 +9,7 @@
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
-void initialize( char *output_directory, char *input_file, struct hash_table *ht, struct graph *g ){
+void initialize( char *output_directory, char *input_file, struct hash_table *ht){
 	pid_t pid;
 	int pipefd[2];
 	pipe(pipefd);
@@ -72,10 +72,7 @@ int main(void){
 	struct hash_table *names;
 	names = hash_table_create(0, NULL);
 	
-	struct graph *dependencies;
-	dependencies = graph_create();
-
-	initialize(output, input, names, dependencies);
+	initialize(output, input, names);
 
 	return 0;
 }
