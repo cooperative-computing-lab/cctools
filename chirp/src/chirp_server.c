@@ -122,7 +122,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "use: %s [options]\n", cmd);
 	fprintf(stdout, "The most common options are:\n");
 	fprintf(stdout, " %-30s URL of storage directory, like `file://path' or `hdfs://host:port/path'.\n", "-r,--root=<url>");
-	fprintf(stdout, " %-30s Enable debugging for this sybsystem.\n", "-d,--debug=<name>");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<name>");
 	fprintf(stdout, " %-30s Send debugging output to this file.\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Send status updates to this host. (default: `%s')\n", "-u,--advertise=<host>", CATALOG_HOST);
 	fprintf(stdout, " %-30s Show version info.\n", "-v,--version");
