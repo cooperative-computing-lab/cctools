@@ -3,13 +3,21 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <limits.h>
+#include <string.h>
 
-#include "hash_table.h"
+#include "list.h"
 
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
-void initialize( char *output_directory, char *input_file, struct hash_table *ht){
+typedef enum {UNKNOWN, PYTHON} file_type;
+
+typedef struct {
+} dependency;
+
+char *python_extensions[2] = { "py", "pyc" };
+
+void initialize( char *output_directory, char *input_file, struct list *d){
 	pid_t pid;
 	int pipefd[2];
 	pipe(pipefd);
@@ -49,7 +57,8 @@ void initialize( char *output_directory, char *input_file, struct hash_table *ht
 				case '\n':
 					buffer = realloc(buffer, size+1);
 					*(buffer+size) = '\0';
-					hash_table_insert(ht, original_name, (void *) buffer);
+					dependency *new_dependency = (dependency *) malloc(sizeof(dependency));
+					list_push_tail(d, (void *) new_dependency);
 					size = 0;
 					free(original_name);
 					original_name = NULL;
@@ -65,14 +74,51 @@ void initialize( char *output_directory, char *input_file, struct hash_table *ht
 	}
 }
 
+const char *filename_extension(const char *filename) {
+	const char *dot = strrchr(filename, '.');
+	if(!dot || dot == filename) return "";
+	return dot + 1;
+}
+
+file_type file_extension_known(const char *filename){
+	const char *extension = filename_extension(filename);
+
+	int j;
+	for(j=0; j< 2; j++){
+		if(!strcmp(python_extensions[j], extension))
+			return PYTHON;
+	}
+
+	return UNKNOWN;
+}
+
+file_type find_driver_for(const char *name){
+	file_type type = UNKNOWN;
+
+	if((type = file_extension_known(name))){}
+
+	return type;
+}
+
+void find_drivers(struct list *d){
+	dependency *dep;
+	file_type my_type;
+	list_first_item(d);
+	while((dep = list_next_item(d))){
+		printf("%d\n", my_type);
+	}
+}
+
 int main(void){
 	char *output = "output_dir";
 	char *input = "test.mf";
 
-	struct hash_table *names;
-	names = hash_table_create(0, NULL);
+	struct list *dependencies;
+	dependencies = list_create();
 
-	initialize(output, input, names);
+	initialize(output, input, dependencies);
+
+	find_drivers(dependencies);
 
 	return 0;
 }
