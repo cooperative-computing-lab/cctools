@@ -65,6 +65,16 @@ void initialize( char *output_directory, char *input_file, struct hash_table *ht
 	}
 }
 
+void display_names(struct hash_table *ht){
+	char *key;
+	char *value;
+
+	hash_table_firstkey(ht);
+	while(hash_table_nextkey(ht, &key,(void **) &value)){
+		printf("%s -> %s\n", key, value);
+	}
+}
+
 int main(void){
 	char *output = "output_dir";
 	char *input = "test.mf";
@@ -73,6 +83,8 @@ int main(void){
 	names = hash_table_create(0, NULL);
 	
 	initialize(output, input, names);
+
+	display_names(names);
 
 	return 0;
 }
