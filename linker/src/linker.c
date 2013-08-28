@@ -3,11 +3,14 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <limits.h>
+#include <string.h>
 
 #include "hash_table.h"
 
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
+
+typedef enum {PERL, PYTHON, UNKNOWN} file_type;
 
 void initialize( char *output_directory, char *input_file, struct hash_table *ht){
 	pid_t pid;
@@ -75,16 +78,73 @@ void display_names(struct hash_table *ht){
 	}
 }
 
+const char *filename_extension(const char *filename) {
+	const char *dot = strrchr(filename, '.');
+	if(!dot || dot == filename) return "";
+	return dot + 1;
+}
+
+int file_extension_known(const char *filename, file_type *my_file){
+	const char *extension = filename_extension(filename);
+	char *python_extensions[2] = { "py", "pyc" };
+	int j;
+	for(j=0; j< 2; j++){
+		printf("%s -> %s ?= %s\n", filename, extension, python_extensions[j]);
+		if(!strcmp(python_extensions[j], extension)){
+			*my_file = PYTHON;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int shebang_known(const char *filename, file_type *my_file){
+	return 0;
+}
+
+int unix_file_known(const char *filename, file_type *my_file){
+	return 0;
+}
+
+file_type find_driver_for(const char *name){
+	file_type *type;
+	*type = UNKNOWN;
+
+	if(file_extension_known(name, type)){}
+	else if(shebang_known(name, type)){}
+	else if(unix_file_known(name, type)){}
+
+	file_type my_file = *type;
+	return my_file;
+}
+
+void find_drivers(struct hash_table *names, struct hash_table *drivers){
+	char *key;
+	char *value;
+	file_type my_type;
+	hash_table_firstkey(names);
+	while(hash_table_nextkey(names, &key, (void **) &value)){
+		my_type = find_driver_for(value);
+		hash_table_insert(drivers, value, (void **) my_type);
+	}
+}
+
 int main(void){
 	char *output = "output_dir";
 	char *input = "test.mf";
 
 	struct hash_table *names;
 	names = hash_table_create(0, NULL);
+
+	struct hash_table *drivers;
+	drivers = hash_table_create(0, NULL);
 	
 	initialize(output, input, names);
 
-	display_names(names);
+	find_drivers(names, drivers);
+	
+	display_names(drivers);
 
 	return 0;
 }
