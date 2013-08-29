@@ -5,14 +5,23 @@
 #include <limits.h>
 #include <string.h>
 
-#include "hash_table.h"
+#include "list.h"
 
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
-typedef enum {PERL, PYTHON, UNKNOWN} file_type;
+typedef enum {UNKNOWN, PERL, PYTHON} file_type;
 
-void initialize( char *output_directory, char *input_file, struct hash_table *ht){
+typedef struct{
+	char *original_name;
+	char *final_name;
+	char *parent;
+	char *superparent;
+	int  depth;
+	file_type type;
+} dependency;
+
+void initialize( char *output_directory, char *input_file, struct list *d){
 	pid_t pid;
 	int pipefd[2];
 	pipe(pipefd);
@@ -52,7 +61,10 @@ void initialize( char *output_directory, char *input_file, struct hash_table *ht
 				case '\n':
 					buffer = realloc(buffer, size+1);
 					*(buffer+size) = '\0';
-					hash_table_insert(ht, original_name, (void *) buffer);
+					dependency *new_dependency = (dependency *) malloc(sizeof(dependency));
+					new_dependency->original_name = original_name;
+					new_dependency->final_name = buffer;
+					list_push_tail(d, (void *) new_dependency);
 					size = 0;
 					free(original_name);
 					original_name = NULL;
@@ -68,13 +80,12 @@ void initialize( char *output_directory, char *input_file, struct hash_table *ht
 	}
 }
 
-void display_names(struct hash_table *ht){
-	char *key;
-	char *value;
+void display_names(struct list *d){
+	dependency *dep;
 
-	hash_table_firstkey(ht);
-	while(hash_table_nextkey(ht, &key,(void **) &value)){
-		printf("%s -> %s\n", key, value);
+	list_first_item(d);
+	while((dep = list_next_item(d))){
+		printf("%s\n", dep->original_name);
 	}
 }
 
@@ -84,49 +95,49 @@ const char *filename_extension(const char *filename) {
 	return dot + 1;
 }
 
-int file_extension_known(const char *filename, file_type *my_file){
+file_type file_extension_known(const char *filename){
 	const char *extension = filename_extension(filename);
 	char *python_extensions[2] = { "py", "pyc" };
+
+	file_type my_file = UNKNOWN;
+
 	int j;
 	for(j=0; j< 2; j++){
 		printf("%s -> %s ?= %s\n", filename, extension, python_extensions[j]);
 		if(!strcmp(python_extensions[j], extension)){
-			*my_file = PYTHON;
+			my_file = PYTHON;
 			return 1;
 		}
 	}
 
+	return my_file;
+}
+
+file_type shebang_known(const char *filename){
 	return 0;
 }
 
-int shebang_known(const char *filename, file_type *my_file){
-	return 0;
-}
-
-int unix_file_known(const char *filename, file_type *my_file){
+file_type unix_file_known(const char *filename){
 	return 0;
 }
 
 file_type find_driver_for(const char *name){
-	file_type *type;
-	*type = UNKNOWN;
+	file_type type = UNKNOWN;
 
-	if(file_extension_known(name, type)){}
-	else if(shebang_known(name, type)){}
-	else if(unix_file_known(name, type)){}
+	if((type = file_extension_known(name))){}
+	else if((type = shebang_known(name))){}
+	else if((type = unix_file_known(name))){}
 
-	file_type my_file = *type;
-	return my_file;
+	return type;
 }
 
-void find_drivers(struct hash_table *names, struct hash_table *drivers){
-	char *key;
-	char *value;
+void find_drivers(struct list *d){
+	dependency *dep;
 	file_type my_type;
-	hash_table_firstkey(names);
-	while(hash_table_nextkey(names, &key, (void **) &value)){
-		my_type = find_driver_for(value);
-		hash_table_insert(drivers, value, (void **) my_type);
+	list_first_item(d);
+	while((dep = list_next_item(d))){
+		my_type = find_driver_for(dep->final_name);
+		printf("%d\n", my_type);
 	}
 }
 
@@ -134,17 +145,14 @@ int main(void){
 	char *output = "output_dir";
 	char *input = "test.mf";
 
-	struct hash_table *names;
-	names = hash_table_create(0, NULL);
+	struct list *dependencies;
+	dependencies = list_create();
 
-	struct hash_table *drivers;
-	drivers = hash_table_create(0, NULL);
-	
-	initialize(output, input, names);
+	initialize(output, input, dependencies);
+	display_names(dependencies);
 
-	find_drivers(names, drivers);
+//	find_drivers(dependencies);
 	
-	display_names(drivers);
 
 	return 0;
 }
