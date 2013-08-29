@@ -25,6 +25,8 @@ typedef INT64_T pfs_ssize_t;
 typedef INT64_T pfs_size_t;
 typedef INT64_T pfs_off_t;
 
+#define PFS_SIZE_FORMAT "lld"
+
 struct pfs_stat {
 	INT64_T	st_dev;
 	INT64_T	st_ino;

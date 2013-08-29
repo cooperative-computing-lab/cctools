@@ -207,7 +207,7 @@ static void decode_write( struct pfs_process *p, int entering, int syscall, INT6
 		tracer_result_get(p->tracer,&actual_result);
 
 		if(actual_result!=args[2]) {
-			debug(D_NOTICE,"channel write returned %lld instead of %lld",actual_result,args[2]);
+			debug(D_NOTICE,"channel write returned %"PRId64" instead of %lld", actual_result, (long long int) args[2]);
 		}
 
 		if(actual_result>0) {
@@ -227,7 +227,7 @@ static void decode_write( struct pfs_process *p, int entering, int syscall, INT6
 
 			if(p->syscall_result>=0) {
 				if(p->syscall_result!=actual_result) {
-					debug(D_SYSCALL,"write returned %lld instead of %lld",p->syscall_result,actual_result);
+					debug(D_SYSCALL,"write returned %"PRId64" instead of %lld",p->syscall_result, (long long int) actual_result);
 				}
 				tracer_result_set(p->tracer,p->syscall_result);
 				pfs_channel_free(p->io_channel_offset);
@@ -874,7 +874,7 @@ static void redirect_ldso( struct pfs_process *p, const char *ldso, INT64_T *arg
 	char *ext_real_logical_name;
 	char *ext_ldso_physical_name;
 	char *ext_real_physical_name;
-	INT64_T i, argc;
+	int i, argc;
 
 	strcpy(real_physical_name, p->new_physical_name);
 	debug(D_PROCESS,"redirect_ldso: called on %s (%s)", p->new_logical_name, real_physical_name);
@@ -1014,7 +1014,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 		char firstline[PFS_PATH_MAX];
 
 		debug(D_PROCESS,"execve: %s setting up in 32 bit mode",p->name);
-		debug(D_PROCESS,"execve: scratch addr: %x",scratch_addr);
+		debug(D_PROCESS,"execve: scratch addr: %p",scratch_addr);
 
 		tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
 
@@ -1186,7 +1186,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			need to restore it. */
 
 			debug(D_PROCESS,"execve: %s failed: %s",p->new_logical_name,strerror(-actual_result));
-			debug(D_PROCESS,"execve: restoring scratch area at %x",scratch_addr);
+			debug(D_PROCESS,"execve: restoring scratch area at %p",scratch_addr);
 			
 			tracer_copy_out(p->tracer,p->scratch_data,(void*)scratch_addr,scratch_size);
 
@@ -1263,15 +1263,15 @@ void decode_mmap( struct pfs_process *p, int syscall, int entering, INT64_T *arg
 
 		#ifdef CCTOOLS_CPU_X86_64
 		if(p->syscall==SYSCALL32_mmap2 && (source_offset & 0x80000000 )) {
-			debug(D_SYSCALL,"detected kernel bug in ptrace: offset has suspicious value of 0x%llx",source_offset);
+		  debug(D_SYSCALL,"detected kernel bug in ptrace: offset has suspicious value of 0x%llx",(long long)source_offset);
 			tracer_has_args5_bug(p->tracer);
 			tracer_args_get(p->tracer,&p->syscall,p->syscall_args);
 			source_offset = args[5]*getpagesize();
-			debug(D_SYSCALL,"detected kernel bug in ptrace: new offset is 0x%llx",source_offset);
+			debug(D_SYSCALL,"detected kernel bug in ptrace: new offset is 0x%llx",(long long)source_offset);
 		}
 		#endif
 
-		debug(D_SYSCALL,"mmap addr=0x%x len=0x%x prot=0x%x flags=0x%x fd=%d offset=0x%llx",addr,length,prot,flags,fd,source_offset);
+		debug(D_SYSCALL,"mmap addr=0x%llx len=0x%llx prot=0x%x flags=0x%x fd=%d offset=0x%llx",(long long)addr,(long long)length,prot,flags,fd,(long long)source_offset);
 
 		if(flags&MAP_ANONYMOUS) {
 			debug(D_SYSCALL,"mmap skipped b/c anonymous");
@@ -1288,7 +1288,7 @@ void decode_mmap( struct pfs_process *p, int syscall, int entering, INT64_T *arg
 		nargs[4] = pfs_channel_fd();
 		nargs[5] = channel_offset+source_offset;
 
-		debug(D_SYSCALL,"channel_offset=0x%llx source_offset=0x%llx total=0x%x",channel_offset,source_offset,nargs[5]);
+		debug(D_SYSCALL,"channel_offset=0x%llx source_offset=0x%llx total=0x%x",(long long)channel_offset,(long long)source_offset,nargs[5]);
 
 		if(p->syscall==SYSCALL32_mmap) {
 			tracer_copy_out(p->tracer,nargs,POINTER(args[0]),sizeof(nargs));
@@ -1421,11 +1421,11 @@ void decode_syscall( struct pfs_process *p, int entering )
 					newargs[1] = 0;
 					newargs_count = 2;
 					p->syscall_args_changed = 1;
-					debug(D_SYSCALL,"converting fork into clone(%x)",newargs[0]);
+					debug(D_SYSCALL,"converting fork into clone(%llu)", (long long unsigned int)newargs[0]);
 				} else {
 					newargs[0] = (args[0]&~0xff)|CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
 					newargs_count = 1;
-					debug(D_SYSCALL,"adjusting clone(%llx,%llx,%llx,%llx) -> clone(%llx)",args[0],args[1],args[2],args[3],newargs[0]);
+					debug(D_SYSCALL,"adjusting clone(%llu,%llu,%llu,%llu) -> clone(%llu)", (long long unsigned int) args[0], (long long unsigned int) args[1], (long long unsigned int) args[2], (long long unsigned int) args[3], (long long unsigned int) newargs[0]);
 				}
 				tracer_args_set(p->tracer,SYSCALL32_clone,newargs,newargs_count);
 				trace_this_pid = p->pid;
@@ -1548,7 +1548,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 						/* allow the call to go through to the kernel */
 						break;
 					default:
-						fatal("cannot execute program with personality %d", persona);
+						fatal("cannot execute program with personality %lu", persona);
 				}
 			}
 			break;
@@ -2501,7 +2501,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_kill:
 		case SYSCALL32_tkill:
 			if(entering) {
-				debug(D_PROCESS,"%s %d %d %d",tracer_syscall32_name(p->syscall),args[0],args[1],args[2]);
+				debug(D_PROCESS,"%s %d %d",tracer_syscall32_name(p->syscall),(int)args[0],(int)args[1]);
 				p->syscall_result = pfs_process_raise(args[0],args[1],0);
 				if (p->syscall_result == -1) p->syscall_result = -errno;
 			}
@@ -2510,7 +2510,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_tgkill:
 			if(entering) {
-				debug(D_PROCESS,"tgkill %d %d %d",args[0],args[1],args[2]);
+				debug(D_PROCESS,"tgkill %d %d %d",(int)args[0],(int)args[1],(int)args[2]);
 				p->syscall_result = pfs_process_raise(args[1],args[2],0);
 				if (p->syscall_result == -1) p->syscall_result = -errno;
 			}
@@ -2807,7 +2807,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 				if(p->syscall_result==0) {
 					if(p->syscall_args[0]!=0) {
 						p->break_address = p->syscall_args[0];
-						debug(D_PROCESS,"break address: %x",p->break_address);
+						debug(D_PROCESS,"break address: %x",(int)p->break_address);
 					}
 				}
 				else 

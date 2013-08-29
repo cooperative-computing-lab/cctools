@@ -312,7 +312,9 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 
 	buffer_printf(buffer, 
 			"type wq_master\n"
-			"project %s\nstarttime %llu\npriority %d\n"
+			"project %s\n"
+		        "starttime " TIMESTAMP_FORMAT "\n"
+		        "priority %d\n"
 			"port %d\nlifetime %d\n"
 			"tasks_waiting %d\ntasks_complete %d\ntasks_running %d\ntotal_tasks_dispatched %d\n"
 			"workers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nworkers_by_pool %s\n"
@@ -320,7 +322,9 @@ int advertise_master_to_catalog(const char *catalog_host, int catalog_port, cons
 			"capacity %d\n"
 			"my_master %s\n"
 			"version %d.%d.%s\nowner %s", 
-			project_name, (s->start_time)/1000000, s->priority, 
+			project_name,
+		        (s->start_time)/1000000,
+		        s->priority, 
 			s->port, WORK_QUEUE_CATALOG_MASTER_AD_LIFETIME, 
 			s->tasks_waiting, s->total_tasks_complete, s->tasks_running, s->total_tasks_dispatched, 
 			s->workers_init, s->workers_ready, total_workers_working, total_workers, workers_by_pool, 
@@ -416,7 +420,7 @@ int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_por
 	INT64_T port = 65535 + pid; 
 
 	buffer = buffer_create();
-	buffer_printf(buffer, "type wq_pool\npool_name %s\nport %lld\nstarttime %llu\ndecision %s\nworkers_requested %d\nowner %s\nlifetime %d", pool_name, port, start_time, decision, workers_requested, owner, WORK_QUEUE_CATALOG_POOL_AD_LIFETIME);
+	buffer_printf(buffer, "type wq_pool\npool_name %s\nport %" PRId64 "\nstarttime %llu\ndecision %s\nworkers_requested %d\nowner %s\nlifetime %d", pool_name, port, (unsigned long long) start_time, decision, workers_requested, owner, WORK_QUEUE_CATALOG_POOL_AD_LIFETIME);
 
 	text = buffer_tostring(buffer, &text_size);
 	debug(D_WQ, "Pool AD: \n%s\n", text);

@@ -84,7 +84,7 @@ static void make_challenge_path(char *path)
 			if(errno == ENOENT) {
 				break;
 			} else {
-				debug(D_AUTH, "unix: %s is in use, still trying...");
+				debug(D_AUTH, "unix: %s is in use, still trying...",path);
 				continue;
 			}
 		}

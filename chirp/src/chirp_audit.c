@@ -132,7 +132,7 @@ struct hash_table *chirp_audit(const char *path)
 	stop = time(0);
 	if(stop == start)
 		stop++;
-	debug(D_LOCAL, "audit: completed %d items in %d seconds (%d items/sec)", audit_count, (int) (stop - start), audit_count / (stop - start));
+	debug(D_LOCAL, "audit: completed %d items in %d seconds (%d items/sec)", audit_count, (int) (stop - start), audit_count / (int) (stop - start));
 
 	if(result < 0) {
 		chirp_audit_delete(table);

@@ -8,7 +8,6 @@ prepare() {
     if [ -d "$out_dir" ]; then
         exit 1
     fi
-    touch /tmp/makeflow_test_absolute_path
     cd ../src/; make
     exit 0
 }
@@ -16,7 +15,7 @@ prepare() {
 run() {
     cd linker
     ../../src/makeflow -b "$out_dir" absolute.mf
-    if [ ! -f "$out_dir"/makeflow_test_absolute_path ]; then
+    if [ ! -f "$out_dir"/ls ]; then
         exit 1
     fi
     exit 0
@@ -24,9 +23,6 @@ run() {
 
 clean() {
     cd linker
-    if [ -w /tmp/makeflow_test_absolute_path ]; then
-        rm -rf /tmp/makeflow_test_absolute_path
-    fi
     rm -rf "$out_dir"
     exit 0
 }

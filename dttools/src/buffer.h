@@ -16,6 +16,10 @@ See the file COPYING for details.
     string using buffer_tostring.
 */
 
+#if !(defined(__GNUC__) || defined(__clang__)) && !defined(__attribute__)
+#define __attribute__(x) /* do nothing */
+#endif
+
 /** buffer_t is an opaque object representing a buffer. */
 typedef struct buffer_t buffer_t;
 
@@ -37,6 +41,7 @@ void buffer_delete(buffer_t * b);
     @param ap The variable argument list for the format string.
     @return Negative value on error.
   */
+
 int buffer_vprintf(buffer_t * b, const char *format, va_list ap);
 
 /** Appends the formatted output to the buffer. The format string follows the
@@ -46,7 +51,8 @@ int buffer_vprintf(buffer_t * b, const char *format, va_list ap);
     @param ... The variable arguments for the format string.
     @return Negative value on error.
   */
-int buffer_printf(buffer_t * b, const char *format, ...);
+int buffer_printf(buffer_t * b, const char *format, ...)
+__attribute__ (( format(printf,2,3) )) ;
 
 /** Returns the buffer as a string. The string is no longer valid after
     deleting the buffer. A final ASCII NUL character is guaranteed to terminate

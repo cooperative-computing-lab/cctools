@@ -75,12 +75,12 @@ public:
 	}
 
 	virtual pfs_ssize_t read(void *d, pfs_size_t length, pfs_off_t offset) {
-		debug(D_XROOTD, "pread %d %lu %lu",this->file_handle,length,offset);
+		debug(D_XROOTD, "pread %d %" PRId64 " %" PRId64,this->file_handle,length,offset);
 		return XrdPosix_Pread(this->file_handle,d,length,offset);
 	}
 
 	virtual pfs_ssize_t write(const void *d, pfs_size_t length, pfs_off_t offset) {
-		debug(D_XROOTD, "pwrite %d %lu %lu",this->file_handle,length,offset);
+		debug(D_XROOTD, "pwrite %d %" PRId64 " %" PRId64,this->file_handle,length,offset);
 		return XrdPosix_Pwrite(this->file_handle,d,length,offset);
 	}
 
@@ -198,7 +198,7 @@ public:
 
 	virtual int truncate( pfs_name *name, pfs_off_t length ) {
 		char *file_url = translate_file_to_xrootd(name);
-		debug(D_XROOTD, "truncate %s %lld",file_url,length);
+		debug(D_XROOTD, "truncate %s %lld",file_url,(long long)length);
 		int result = XrdPosix_Truncate(file_url,length);
 		free(file_url);
 		return result;

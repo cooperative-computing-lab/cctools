@@ -17,6 +17,7 @@ fi
 # example of makeflow provided with the source
 MAKE_FILE_ORG=../example/example.makeflow
 MAKE_FILE=example.makeflow
+DELETE_MAKE_FILE=yes
 
 sed -e "s:^CONVERT.*:CONVERT=$CONVERT:" > $MAKE_FILE < $MAKE_FILE_ORG
 

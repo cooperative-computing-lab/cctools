@@ -32,64 +32,65 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 </pre>
 */
 
-#include <stdio.h>
-#include <stdarg.h>
-#include <unistd.h>
-#include <sys/types.h>
-
 #include "int_sizes.h"
 
-#define D_SYSCALL  0x000000001	/**< Debug system calls in Parrot. */
-#define D_CHANNEL  0x000000002	/**< Debug the I/O channel in Parrot. */
-#define D_PROCESS  0x000000004	/**< Debug jobs and process. */
-#define D_NOTICE   0x000000008	/**< Indicates a message that is always shown. */
-#define D_RESOLVE  0x000000010	/**< Debug the file name resolver in Parrot. */
-#define D_LIBCALL  0x000000020	/**< Debug I/O library calls in Parrot. */
-#define D_LOCAL    0x000000040	/**< Debug the local I/O module in Parrot. */
-#define D_DNS      0x000000080	/**< Debug domain name lookups. */
-#define D_TCP      0x000000100	/**< Debug TCP connections and disconnections. */
-#define D_AUTH     0x000000200	/**< Debug authentication and authorization actions. */
-#define D_IRODS    0x000000400	/**< Debug the iRODS module in Parrot. */
-#define D_CVMFS    0x000000800	/**< Debug CVMFS module in Parrot. */
-#define D_HTTP     0x000001000	/**< Debug HTTP queries. */
-#define D_FTP      0x000002000	/**< Debug FTP operations. */
-#define D_NEST     0x000004000	/**< Debug the NEST module in Parrot. */
-#define D_GROW     0x000008000	/**< Debug the GROW filesystem in Parrot. */
-#define D_CHIRP    0x000010000	/**< Debug Chirp protocol operations. */
-#define D_DCAP     0x000020000	/**< Debug the DCAP module in Parrot. */
-#define D_RFIO     0x000040000	/**< Debug the RFIO module in Parrot. */
-#define D_GLITE    0x000080000	/**< Debug the gLite module in Parrot. */
-#define D_MULTI    0x000100000	/**< Debug Chirp Multi filesystems. */
-#define D_PSTREE   0x000200000	/**< Debug process trees in Parrot. */
-#define D_ALLOC    0x000400000	/**< Debug space allocations in the Chirp server. */
-#define D_LFC	   0x000800000	/**< Debug LFC file lookups in Parrot. */
-#define D_GFAL	   0x001000000	/**< Debug the GFAL module in Parrot. */
-#define D_SUMMARY  0x002000000	/**< Show I/O summary stats in Parrot. */
-#define D_DEBUG    0x004000000	/**< Show general debugging messages. */
-#define D_LOGIN    0x008000000	/**< Debug logins on the Chirp server. */
-#define D_CACHE    0x010000000	/**< Debug cache operations in Parrot. */
-#define D_POLL     0x020000000	/**< Debug FD polling in Parrot. */
-#define D_HDFS	   0x040000000	/**< Debug the HDFS module in Parrot. */
-#define D_WQ	   0x080000000	/**< Debug the Work Queue operations. */
-#define D_BXGRID   0x100000000LL  /**< Debug the BXGRID Module in Parrot. */
-#define D_USER	   0x200000000LL  /**< Debug custom user application. */
-#define D_XROOTD   0x400000000LL  /**< Debug Xrootd module in Parrot */
-#define D_MPI      0x800000000LL  /**< Debug MPI module for Makeflow */
-#define D_BATCH   0x1000000000LL  /**< Debug batch_job modules */
-#define D_RMON    0x2000000000LL  /**< Debug resource monitor */
+#include <unistd.h>
+
+#include <sys/types.h>
+
+#include <stdarg.h>
+#include <stdio.h>
+
+#define D_SYSCALL  (1LL<<0)  /**< Debug system calls in Parrot. */
+#define D_CHANNEL  (1LL<<1)  /**< Debug the I/O channel in Parrot. */
+#define D_PROCESS  (1LL<<2)  /**< Debug jobs and process. */
+#define D_NOTICE   (1LL<<3)  /**< Indicates a message that is always shown. */
+#define D_RESOLVE  (1LL<<4)  /**< Debug the file name resolver in Parrot. */
+#define D_LIBCALL  (1LL<<5)  /**< Debug I/O library calls in Parrot. */
+#define D_LOCAL    (1LL<<6)  /**< Debug the local I/O module in Parrot. */
+#define D_DNS      (1LL<<7)  /**< Debug domain name lookups. */
+#define D_TCP      (1LL<<8)  /**< Debug TCP connections and disconnections. */
+#define D_AUTH     (1LL<<9)  /**< Debug authentication and authorization actions. */
+#define D_IRODS    (1LL<<10)  /**< Debug the iRODS module in Parrot. */
+#define D_CVMFS    (1LL<<11)  /**< Debug CVMFS module in Parrot. */
+#define D_HTTP     (1LL<<12)  /**< Debug HTTP queries. */
+#define D_FTP      (1LL<<13)  /**< Debug FTP operations. */
+#define D_NEST     (1LL<<14)  /**< Debug the NEST module in Parrot. */
+#define D_GROW     (1LL<<15)  /**< Debug the GROW filesystem in Parrot. */
+#define D_CHIRP    (1LL<<16)  /**< Debug Chirp protocol operations. */
+#define D_DCAP     (1LL<<17)  /**< Debug the DCAP module in Parrot. */
+#define D_RFIO     (1LL<<18)  /**< Debug the RFIO module in Parrot. */
+#define D_GLITE    (1LL<<19)  /**< Debug the gLite module in Parrot. */
+#define D_MULTI    (1LL<<20)  /**< Debug Chirp Multi filesystems. */
+#define D_PSTREE   (1LL<<21)  /**< Debug process trees in Parrot. */
+#define D_ALLOC    (1LL<<22)  /**< Debug space allocations in the Chirp server. */
+#define D_LFC      (1LL<<23)  /**< Debug LFC file lookups in Parrot. */
+#define D_GFAL     (1LL<<24)  /**< Debug the GFAL module in Parrot. */
+#define D_SUMMARY  (1LL<<25)  /**< Show I/O summary stats in Parrot. */
+#define D_DEBUG    (1LL<<26)  /**< Show general debugging messages. */
+#define D_LOGIN    (1LL<<27)  /**< Debug logins on the Chirp server. */
+#define D_CACHE    (1LL<<28)  /**< Debug cache operations in Parrot. */
+#define D_POLL     (1LL<<29)  /**< Debug FD polling in Parrot. */
+#define D_HDFS     (1LL<<30)  /**< Debug the HDFS module in Parrot. */
+#define D_WQ       (1LL<<31)  /**< Debug the Work Queue operations. */
+#define D_BXGRID   (1LL<<32)  /**< Debug the BXGRID Module in Parrot. */
+#define D_USER     (1LL<<33)  /**< Debug custom user application. */
+#define D_XROOTD   (1LL<<34)  /**< Debug Xrootd module in Parrot */
+#define D_MPI      (1LL<<35)  /**< Debug MPI module for Makeflow */
+#define D_BATCH    (1LL<<36)  /**< Debug batch_job modules */
+#define D_RMON     (1LL<<37)  /**< Debug resource monitor */
 
 /** Debug all remote I/O operations. */
 #define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID|D_XROOTD|D_CVMFS)
 
 /** Show all debugging info. */
-#define D_ALL      ~(0LL)
+#define D_ALL      (~(0LL))
 
 /*
-It turns out that many libraries and tools make use of
-symbols like "debug" and "fatal".  This causes strange
-failures when we link against such codes.  Rather than change
-all of our code, we simply insert these defines to
-transparently modify the linker namespace we are using.
+It turns out that many libraries and tools make use of symbols like "debug" and
+"fatal".  This causes strange failures when we link against such codes.  Rather
+than change all of our code, we simply insert these defines to transparently
+modify the linker namespace we are using.
 */
 
 #define debug                  cctools_debug
@@ -112,7 +113,11 @@ Logs a debugging message, if the given flags are active.
 @param fmt A printf-style formatting string, followed by the necessary arguments.
 */
 
-void debug(INT64_T flags, const char *fmt, ...);
+void debug(INT64_T flags, const char *fmt, ...)
+#ifndef SWIG
+__attribute__ (( format(printf,2,3) ))
+#endif
+;
 
 /** Emit a debugging message.
 Logs a debugging message, if the given flags are active, using a va_list instead of a list of arguments.

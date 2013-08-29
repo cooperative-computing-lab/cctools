@@ -9,8 +9,7 @@ prepare() {
     exit 1
   fi
 
-  echo "t" > /tmp/asdf
-  echo "a" > linker/asdf
+  touch linker/ls
 
   cd ../src/; make
   exit $?
@@ -31,10 +30,7 @@ run() {
 clean() {
   cd linker
   rm -rf "$out_dir"
-  if [ -w /tmp/asdf ]; then
-	  rm -f  /tmp/asdf
-  fi
-  rm -f  asdf
+  rm -f ls
   exit 0
 }
 

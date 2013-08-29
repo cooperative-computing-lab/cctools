@@ -130,6 +130,9 @@ static int terminate_boundary = 0;
 // Password shared between master and worker.
 char *password = 0;
 
+// Allow worker to use symlinks when link() fails.  Enabled by default.
+static int symlinks_enabled = 1;
+
 // Basic worker global variables
 static int worker_mode = WORKER_MODE_WORKER;
 static int worker_mode_default = WORKER_MODE_WORKER;
@@ -175,6 +178,7 @@ static struct hash_cache *bad_masters = NULL;
 static int released_by_master = 0;
 static char *current_project = NULL;
 
+__attribute__ (( format(printf,2,3) ))
 static void send_master_message( struct link *master, const char *fmt, ... )
 {
 	char debug_msg[2*WORK_QUEUE_LINE_MAX];
@@ -308,7 +312,15 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 		
 		if(link(sourcename, targetname)) {
 			debug(D_WQ, "Could not link file %s -> %s (%s)\n", sourcename, targetname, strerror(errno));
-			return 0;
+			
+			if((errno == EXDEV || errno == EPERM) && symlinks_enabled) {
+				if(symlink(sourcename, targetname)) {
+					debug(D_WQ, "Could not symlink file %s -> %s (%s)\n", sourcename, targetname, strerror(errno));
+					return 0;
+				}
+			} else {
+				return 0;
+			}
 		}
 	}
 	
@@ -417,7 +429,7 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		fstat(ti->output_fd, &st);
 		output_length = st.st_size;
 		lseek(ti->output_fd, 0, SEEK_SET);
-		send_master_message(master, "result %d %lld %llu %d\n", ti->status, output_length, ti->execution_end-ti->execution_start, ti->taskid);
+		send_master_message(master, "result %d %lld %llu %d\n", ti->status, (long long) output_length, (unsigned long long) ti->execution_end-ti->execution_start, ti->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
 		
 		cores_allocated -= ti->task->cores;
@@ -432,7 +444,7 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		} else {
 			output_length = 0;
 		}
-		send_master_message(master, "result %d %lld %llu %d\n",t->return_status, output_length, t->cmd_execution_time, t->taskid);
+		send_master_message(master, "result %d %lld %llu %d\n",t->return_status, (long long) output_length, (unsigned long long) t->cmd_execution_time, t->taskid);
 		if(output_length) {
 			link_putlstring(master, t->output, output_length, time(0)+active_timeout);
 		}
@@ -505,12 +517,12 @@ static int check_disk_space_for_filesize(INT64_T file_size) {
 	disk_info_get(".", &disk_avail, &disk_total);
 	if(file_size > 0) {	
 	    if((UINT64_T)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
-		debug(D_WQ, "Incoming file of size %lld MB will lower available disk space (%llu MB) below threshold (%llu MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
+		debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
 		return 0;
 	    }
 	} else {
 	    if(disk_avail < disk_avail_threshold) {
-		debug(D_WQ, "Available disk space (%llu MB) lower than threshold (%llu MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
+		debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
 		return 0;
 	    }	
 	}	
@@ -813,7 +825,7 @@ static struct link *auto_link_connect(char *addr, int *port)
  * end
  *
  */
-static int stream_output_item(struct link *master, const char *filename, int recursive, int flags)
+static int stream_output_item(struct link *master, const char *filename, int recursive)
 {
 	DIR *dir;
 	struct dirent *dent;
@@ -823,11 +835,7 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 	INT64_T actual, length;
 	int fd;
 
-	if(flags & WORK_QUEUE_CACHE) {
-		sprintf(cached_filename, "cache/%s", filename);
-	} else {
-		sprintf(cached_filename, "uncache/%s", filename);
-	}
+	sprintf(cached_filename, "cache/%s", filename);
 
 	if(stat(cached_filename, &info) != 0) {
 		goto failure;
@@ -839,13 +847,13 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 		if(!dir) {
 			goto failure;
 		}
-		send_master_message(master, "dir %s %lld\n", filename, (INT64_T) 0);
+		send_master_message(master, "dir %s 0\n", filename);
 		
 		while(recursive && (dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
 				continue;
 			sprintf(dentline, "%s/%s", filename, dent->d_name);
-			stream_output_item(master, dentline, recursive, flags);
+			stream_output_item(master, dentline, recursive);
 		}
 
 		closedir(dir);
@@ -853,12 +861,12 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 		// stream a file
 		fd = open(cached_filename, O_RDONLY, 0);
 		if(fd >= 0) {
-			length = (INT64_T) info.st_size;
-			send_master_message(master, "file %s %lld\n", filename, length);
+			length = info.st_size;
+			send_master_message(master, "file %s %"PRId64"\n", filename, length);
 			actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
 			close(fd);
 			if(actual != length) {
-				debug(D_WQ, "Sending back output file - %s failed: bytes to send = %lld and bytes actually sent = %lld.", filename, length, actual);
+				debug(D_WQ, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", filename, length, actual);
 				return 0;
 			}
 		} else {
@@ -954,18 +962,10 @@ static int do_task( struct link *master, int taskid )
 			debug(D_WQ,"--> %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", filename, taskname, &flags)) {
-			if(flags & WORK_QUEUE_CACHE) {
-				sprintf(localname, "cache/%s", filename);
-			} else {
-				sprintf(localname, "uncache/%s", filename);
-			}
+			sprintf(localname, "cache/%s", filename);
 		       	work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_INPUT, flags);
 		} else if(sscanf(line,"outfile %s %s %d", filename, taskname, &flags)) {
-			if(flags & WORK_QUEUE_CACHE) {
-				sprintf(localname, "cache/%s", filename);
-			} else {
-				sprintf(localname, "uncache/%s", filename);
-			}
+			sprintf(localname, "cache/%s", filename);
 		       	work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags);
 		} else if(sscanf(line, "dir %s", filename)) {
 			work_queue_task_specify_directory(task, filename, filename, WORK_QUEUE_INPUT, 0700, 0);
@@ -1010,13 +1010,13 @@ static int do_task( struct link *master, int taskid )
 	return 1;
 }
 
-static int do_put(struct link *master, char *filename, INT64_T length, int mode, int flags) {
+static int do_put(struct link *master, char *filename, INT64_T length, int mode) {
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	char *cur_pos;
 	
 	debug(D_WQ, "Putting file %s into workspace\n", filename);
 	if(!check_disk_space_for_filesize(length)) {
-		debug(D_WQ, "Could not put file %s, not enough disk space (%lld bytes needed)\n", filename, length);
+		debug(D_WQ, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
 		return 0;
 	}
 	
@@ -1029,11 +1029,7 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode,
 		cur_pos += 2;
 	}
 
-	if(flags & WORK_QUEUE_CACHE) {
-		sprintf(cached_filename, "cache/%s", cur_pos);
-	} else {
-		sprintf(cached_filename, "uncache/%s", cur_pos);
-	}
+	sprintf(cached_filename, "cache/%s", cur_pos);
 
 	cur_pos = strrchr(cached_filename, '/');
 	if(cur_pos) {
@@ -1077,28 +1073,20 @@ static int file_from_url(const char *url, const char *filename) {
         return 1;
 }
 
-static int do_url(struct link* master, const char *filename, int length, int mode, int flags) {
-	char url[WORK_QUEUE_LINE_MAX];
-	link_read(master, url, length, time(0) + active_timeout);
+static int do_url(struct link* master, const char *filename, int length, int mode) {
 
-	char cache_name[WORK_QUEUE_LINE_MAX];
-	
-	if(flags & WORK_QUEUE_CACHE) {
-		snprintf(cache_name, WORK_QUEUE_LINE_MAX, "cache/%s", filename);
-	} else {
-		snprintf(cache_name, WORK_QUEUE_LINE_MAX, "uncache/%s", filename);
-	}
+        char url[WORK_QUEUE_LINE_MAX];
+        link_read(master, url, length, time(0) + active_timeout);
 
-	return file_from_url(url, cache_name);
+        char cache_name[WORK_QUEUE_LINE_MAX];
+        snprintf(cache_name,WORK_QUEUE_LINE_MAX, "cache/%s", filename);
+
+        return file_from_url(url, cache_name);
 }
 
-static int do_unlink(const char *path, int flags) {
+static int do_unlink(const char *path) {
 	char cached_path[WORK_QUEUE_LINE_MAX];
-	if(flags & WORK_QUEUE_CACHE) {
-		sprintf(cached_path, "cache/%s", path);
-	} else {
-		sprintf(cached_path, "uncache/%s", path);
-	}
+	sprintf(cached_path, "cache/%s", path);
 	//Use delete_dir() since it calls unlink() if path is a file.	
 	if(delete_dir(cached_path) != 0) { 
 		struct stat buf;
@@ -1114,13 +1102,13 @@ static int do_unlink(const char *path, int flags) {
 	return 1;
 }
 
-static int do_get(struct link *master, const char *filename, int recursive, int flags) {
-	stream_output_item(master, filename, recursive, flags);
+static int do_get(struct link *master, const char *filename, int recursive) {
+	stream_output_item(master, filename, recursive);
 	send_master_message(master, "end\n");
 	return 1;
 }
 
-static int do_thirdget(int mode, char *filename, const char *path, int flags) {
+static int do_thirdget(int mode, char *filename, const char *path) {
 	char cmd[WORK_QUEUE_LINE_MAX];
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	char *cur_pos;
@@ -1143,11 +1131,7 @@ static int do_thirdget(int mode, char *filename, const char *path, int flags) {
 		cur_pos += 2;
 	}
 	
-	if(flags & WORK_QUEUE_CACHE) {
-		sprintf(cached_filename, "cache/%s", cur_pos);
-	} else {
-		sprintf(cached_filename, "uncache/%s", cur_pos);
-	}
+	sprintf(cached_filename, "cache/%s", cur_pos);
 
 	cur_pos = strrchr(cached_filename, '/');
 	if(cur_pos) {
@@ -1168,7 +1152,7 @@ static int do_thirdget(int mode, char *filename, const char *path, int flags) {
 	case WORK_QUEUE_FS_PATH:
 		sprintf(cmd, "/bin/cp %s %s", path, cached_filename);
 		if(system(cmd) != 0) {
-			debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (/bin/cp %s)\n", filename, path, filename, strerror(errno));
+			debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
 			return 0;
 		}
 		break;
@@ -1183,11 +1167,11 @@ static int do_thirdget(int mode, char *filename, const char *path, int flags) {
 	return 1;
 }
 
-static int do_thirdput(struct link *master, int mode, const char *filename, const char *path, int flags) {
+static int do_thirdput(struct link *master, int mode, char *filename, const char *path) {
 	struct stat info;
 	char cmd[WORK_QUEUE_LINE_MAX];
 	char cached_filename[WORK_QUEUE_LINE_MAX];
-	const char *cur_pos;
+	char *cur_pos;
 	int result = 1;
 
 	cur_pos = filename;
@@ -1196,11 +1180,7 @@ static int do_thirdput(struct link *master, int mode, const char *filename, cons
 		cur_pos += 2;
 	}
 	
-	if(flags & WORK_QUEUE_CACHE) {
-		sprintf(cached_filename, "cache/%s", cur_pos);
-	} else {
-		sprintf(cached_filename, "uncache/%s", cur_pos);
-	}
+	sprintf(cached_filename, "cache/%s", cur_pos);
 
 
 	if(stat(cached_filename, &info) != 0) {
@@ -1216,7 +1196,18 @@ static int do_thirdput(struct link *master, int mode, const char *filename, cons
 			debug(D_WQ, "thirdput aborted: filename (%s) and path (%s) are the same\n", filename, path);
 			result = 1;
 		}
-		sprintf(cmd, "/bin/cp %s %s", cached_filename, path);
+		cur_pos = strrchr(path, '/');
+		if(cur_pos) {
+			*cur_pos = '\0';
+			if(!create_dir(path, mode | 0700)) {
+				debug(D_WQ, "Could not create directory - %s (%s)\n", path, strerror(errno));
+				result = 0;
+				*cur_pos = '/';
+				break;
+			}
+			*cur_pos = '/';
+		}
+		sprintf(cmd, "/bin/cp -r %s %s", cached_filename, path);
 		if(system(cmd) != 0) {
 			debug(D_WQ, "Could not thirdput %s, copy (%s) failed. (%s)\n", cached_filename, path, strerror(errno));
 			result = 0;
@@ -1493,28 +1484,28 @@ static int handle_master(struct link *master) {
 	if(recv_master_message(master, line, sizeof(line), time(0)+active_timeout)) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(master, taskid);
-		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) >= 4) {
+		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) >= 3) {
 			if(path_within_workspace(filename, workspace)) {
-				r = do_put(master, filename, length, mode, flags);
+				r = do_put(master, filename, length, mode);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
 			}
-                } else if(sscanf(line, "url %s %" SCNd64 " %o %d", filename, &length, &mode, &flags) >= 4) {
-                        r = do_url(master, filename, length, mode, flags);
-		} else if(sscanf(line, "unlink %s %d", filename, &flags) >= 2) {
+                } else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
+                        r = do_url(master, filename, length, mode);
+		} else if(sscanf(line, "unlink %s", filename) == 1) {
 			if(path_within_workspace(filename, workspace)) {
-				r = do_unlink(filename, flags);
+				r = do_unlink(filename);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
 			}
-		} else if(sscanf(line, "get %s %d %d", filename, &mode, &flags) >= 3) {
-			r = do_get(master, filename, mode, flags);
-		} else if(sscanf(line, "thirdget %o %d %s %[^\n]", &mode, &flags, filename, path) >= 4) {
-			r = do_thirdget(mode, filename, path, flags);
-		} else if(sscanf(line, "thirdput %o %d %s %[^\n]", &mode, &flags, filename, path) >= 4) {
-			r = do_thirdput(master, mode, filename, path, flags);
+		} else if(sscanf(line, "get %s %d", filename, &mode) == 2) {
+			r = do_get(master, filename, mode);
+		} else if(sscanf(line, "thirdget %o %s %[^\n]", &mode, filename, path) == 3) {
+			r = do_thirdget(mode, filename, path);
+		} else if(sscanf(line, "thirdput %o %s %[^\n]", &mode, filename, path) == 3) {
+			r = do_thirdput(master, mode, filename, path);
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
 			if(taskid >= 0) {
 				r = do_kill(taskid);
@@ -1774,6 +1765,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s worker automatically measure. (default=%d)\n", "", manual_cores_option);
 	fprintf(stdout, " %-30s Manually set the amonut of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
 	fprintf(stdout, " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
+	fprintf(stdout, " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
 }
 
@@ -1831,7 +1823,7 @@ static int setup_workspace() {
 
 enum {LONG_OPT_DEBUG_FILESIZE = 1, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
       LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
-      LONG_OPT_DISK, LONG_OPT_FOREMAN};
+      LONG_OPT_DISK, LONG_OPT_FOREMAN, LONG_OPT_DISABLE_SYMLINKS};
 
 struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1864,6 +1856,7 @@ struct option long_options[] = {
 	{"disk",                required_argument,  0,  LONG_OPT_DISK},
 	{"help",                no_argument,        0,  'h'},
 	{"version",             no_argument,        0,  'v'},
+	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
 	{0,0,0,0}
 };
 
@@ -2043,6 +2036,9 @@ int main(int argc, char *argv[])
 			} else {
 				manual_disk_option = atoi(optarg);
 			}
+			break;
+		case LONG_OPT_DISABLE_SYMLINKS:
+			symlinks_enabled = 0;
 			break;
 		case 'h':
 			show_help(argv[0]);

@@ -38,8 +38,9 @@ static struct cvmfs_filesystem *cvmfs_filesystem_list = 0;
 static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
 
 #define CERN_KEY_PLACEHOLDER "<BUILTIN-cern.ch.pub>"
+#define OASIS_KEY_PLACEHOLDER "<BUILTIN-opensciencegrid.org.pub>"
 
-static const char *default_cvmfs_repo = "*.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/*";
+static const char *default_cvmfs_repo = "*.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/* *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/*";
 
 static const char *cern_key_text = 
 "-----BEGIN PUBLIC KEY-----\n\
@@ -55,6 +56,21 @@ HQIDAQAB\n\
 
 static bool wrote_cern_key;
 static std::string cern_key_fname;
+
+static const char *oasis_key_text = 
+"-----BEGIN PUBLIC KEY-----\n\
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqQGYXTp9cRcMbGeDoijB\n\
+gKNTCEpIWB7XcqIHVXJjfxEkycQXMyZkB7O0CvV3UmmY2K7CQqTnd9ddcApn7BqQ\n\
+/7QGP0H1jfXLfqVdwnhyjIHxmV2x8GIHRHFA0wE+DadQwoi1G0k0SNxOVS5qbdeV\n\
+yiyKsoU4JSqy5l2tK3K/RJE4htSruPCrRCK3xcN5nBeZK5gZd+/ufPIG+hd78kjQ\n\
+Dy3YQXwmEPm7kAZwIsEbMa0PNkp85IDkdR1GpvRvDMCRmUaRHrQUPBwPIjs0akL+\n\
+qoTxJs9k6quV0g3Wd8z65s/k5mEZ+AnHHI0+0CL3y80wnuLSBYmw05YBtKyoa1Fb\n\
+FQIDAQAB\n\
+-----END PUBLIC KEY-----\n\
+";
+
+static bool wrote_oasis_key;
+static std::string oasis_key_fname;
 
 /*
 A cvmfs_filesystem structure represents an entire
@@ -162,38 +178,60 @@ static void cvmfs_parrot_logger(const char *msg)
 	debug(D_CVMFS, "%s", msg);
 }
 
-static bool write_cern_key()
+static bool write_key(char const *key_text,char const *key_basename,std::string &full_key_fname)
 {
-	if( wrote_cern_key ) {
-		return true;
+	full_key_fname = pfs_temp_dir;
+	full_key_fname += "/cvmfs";
+
+	if( mkdir(full_key_fname.c_str(),0755) != 0 && errno != EEXIST ) {
+		debug(D_CVMFS|D_NOTICE,"WARNING: failed to mkdir %s: errno=%d %s",
+			  full_key_fname.c_str(), errno, strerror(errno));
 	}
 
-	cern_key_fname = pfs_temp_dir;
-	cern_key_fname += "/cvmfs"; // same directory as parent of cvmfs cache
+	full_key_fname += "/";
+	full_key_fname += key_basename;
 
-	// if mkdir fails, just fall through and catch the error in fopen()
-	// (it is expected to fail if the dir already exists)
-	mkdir(cern_key_fname.c_str(),0755);
-
-	cern_key_fname += "/cern.ch.pub";
-	int key_fd = open(cern_key_fname.c_str(),O_WRONLY|O_CREAT|O_TRUNC|O_NOFOLLOW,0644);
+	int key_fd = open(full_key_fname.c_str(),O_WRONLY|O_CREAT|O_TRUNC|O_NOFOLLOW,0644);
 	if( key_fd == -1 ) {
 		debug(D_CVMFS|D_NOTICE,"ERROR: failed to open %s: errno=%d %s",
-			  cern_key_fname.c_str(), errno, strerror(errno));
+			  full_key_fname.c_str(), errno, strerror(errno));
 		return false;
 	}
 
-	int n_to_write = strlen(cern_key_text);
-	int n_written = write(key_fd,cern_key_text,n_to_write);
+	int n_to_write = strlen(key_text);
+	int n_written = write(key_fd,key_text,n_to_write);
 	if( n_written != n_to_write ) {
 		debug(D_CVMFS|D_NOTICE,"ERROR: failed to write to %s: errno=%d %s",
-			  cern_key_fname.c_str(), errno, strerror(errno));
+			  full_key_fname.c_str(), errno, strerror(errno));
 		close(key_fd);
 		return false;
 	}
 	close(key_fd);
 
+	return true;
+}
+
+static bool write_cern_key()
+{
+	if( wrote_cern_key ) {
+		return true;
+	}
+	if( !write_key(cern_key_text,"cern.ch.pub",cern_key_fname) ) {
+		return false;
+	}
 	wrote_cern_key = true;
+	return true;
+}
+
+static bool write_oasis_key()
+{
+	if( wrote_oasis_key ) {
+		return true;
+	}
+	if( !write_key(oasis_key_text,"opensciencegrid.org.pub",oasis_key_fname) ) {
+		return false;
+	}
+	wrote_oasis_key = true;
 	return true;
 }
 
@@ -245,6 +283,19 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 			}
 
 			f->cvmfs_options.replace(cern_key_pos-f->cvmfs_options.c_str(),strlen(CERN_KEY_PLACEHOLDER),cern_key_fname);
+		}
+
+		// check for references to the built-in opensciencegrid.org.pub key
+		char const *oasis_key_pos = strstr(f->cvmfs_options.c_str(),OASIS_KEY_PLACEHOLDER);
+		if( oasis_key_pos ) {
+			if( !write_oasis_key() ) {
+				debug(D_CVMFS|D_NOTICE,
+					  "ERROR: cannot load cvmfs repository %s, because failed to write opensciencegrid.org.pub",
+					  f->host.c_str());
+				return false;
+			}
+
+			f->cvmfs_options.replace(oasis_key_pos-f->cvmfs_options.c_str(),strlen(OASIS_KEY_PLACEHOLDER),oasis_key_fname);
 		}
 
 		cvmfs_set_log_fn(cvmfs_parrot_logger);
@@ -756,7 +807,7 @@ class pfs_file_cvmfs:public pfs_file {
 	virtual pfs_ssize_t read(void *d, pfs_size_t length, pfs_off_t offset) {
 		pfs_ssize_t result;
 
-		debug(D_LOCAL, "read %d 0x%x %lld %lld", fd, d, length, offset);
+		debug(D_LOCAL, "read %d 0x%p %lld %lld", fd, d,(long long)length,(long long)offset);
 
 		if(offset != last_offset)
 			::lseek64(fd, offset, SEEK_SET);

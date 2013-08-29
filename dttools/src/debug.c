@@ -6,29 +6,29 @@ See the file COPYING for details.
 */
 
 #include "debug.h"
-#include "domain_name_cache.h"
-#include "macros.h"
+
+#include "full_io.h"
 #include "stringtools.h"
-#include "full_io.h"
 #include "xxmalloc.h"
-#include "full_io.h"
+
+#include <unistd.h>
+#include <fcntl.h>
+
+#include <sys/stat.h>
+#include <sys/time.h>
 
 #include <assert.h>
-#include <stdlib.h>
+#include <errno.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
-#include <signal.h>
-#include <sys/time.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <errno.h>
 #include <time.h>
 
 static int debug_fd = STDERR_FILENO;
 static char *debug_file = NULL;
-static int debug_file_size = 10485760;
+static int debug_file_size = 1<<20;
 static const char *program_name = "";
 static INT64_T debug_flags = D_NOTICE;
 static pid_t(*debug_getpid) () = getpid;
@@ -76,7 +76,7 @@ static struct flag_info table[] = {
 	{"remote", D_REMOTE},
 	{"batch", D_BATCH},
 	{"rmonitor", D_RMON},
-	{"all", ~0},
+	{"all", D_ALL},
 	{"time", 0},		/* backwards compatibility */
 	{"pid", 0},		/* backwards compatibility */
 	{0, 0}
