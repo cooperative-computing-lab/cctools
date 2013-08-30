@@ -397,7 +397,8 @@ mirrored in multiple locations and accessed via groups of
 load-balanced web proxies, with fail-over between groups.
 
 <p>The CVMFS repositories hosted by the <a
-href=http://cernvm.cern.ch/>CernVM project</a> are enabled by default.
+href=http://cernvm.cern.ch/>CernVM project</a> and by
+Open Science Grid (OASIS) are enabled by default.
 To access a different repository, it is necessary to configure parrot
 to know how to access the repository.  This may be done with the
 <tt>-r</tt> option or with the <tt>PARROT_CVMFS_REPO</tt> environment
@@ -456,6 +457,7 @@ to the proxy used by parrot, if any.
 <tr><td><b>repo_name=NAME</b>         <td>Unique name of the mounted repository; default is the name used for this configuration entry
 <tr><td><b>mountpoint=PATH</b>        <td>Path to root of repository; default is /cvmfs/repo_name
 <tr><td><b>blacklist=FILE</b>         <td>Local blacklist for invalid certificates.  Has precedence over the whitelist.
+<tr><td><b>try_local_filesystem</b>   <td>If this cvmfs repository is mounted on the local filesystem, use that instead of Parrot's CVMFS client.
 </table>
 
 <p>Setting the CVMFS configuration overrides the default
@@ -467,6 +469,13 @@ configuration string.  Example:
 <pre>
 parrot_run -r '&lt;default-repositories&gt; my.repo:url=http://cvmfs.server.edu/cvmfs/my.repo.edu' ...
 </pre>
+
+<p><nobr><tt>&lt;default-repositories&gt;</tt></nobr> should
+come first, because it contains a catch-all clause
+<nobr><tt>*:try_local_filesystem</tt></nobr> that matches anything that
+isn't caught by later entries.  This clause allows access to locally
+mounted CVMFS repositories that Parrot is not configured to access
+internally.
 
 <p>The configuration of the default repositories may be modified by
 specifying additional options using the syntax
