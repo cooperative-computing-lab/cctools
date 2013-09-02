@@ -10,6 +10,7 @@ See the file COPYING for details.
 
 extern "C" {
 #include "debug.h"
+#include "path.h"
 #include "stringtools.h"
 }
 
@@ -682,7 +683,7 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 
 	do
 	{
-		string_split_path(path_tail, path_head, path_tail);
+		path_split(path_tail, path_head, path_tail);
 
 		int rest_len = strlen(xpath->rest);
 		xpath->rest[rest_len] = '/';
@@ -718,7 +719,7 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 					*(last_d + 1) = '\0';
 					
 					strncat(xpath->rest, link_target, PFS_PATH_MAX); 
-					string_collapse_path(xpath->rest, path_relative, 1);
+					path_collapse(xpath->rest, path_relative, 1);
 					snprintf(link_target, PFS_PATH_MAX, "/cvmfs/%s%s",
 						 xpath->host, path_relative); 
 				}

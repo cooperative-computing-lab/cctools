@@ -128,6 +128,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "itable.h"
 #include "list.h"
+#include "path.h"
 #include "stringtools.h"
 #include "debug.h"
 #include "xxmalloc.h"
@@ -251,7 +252,7 @@ FILE *open_log_file(const char *log_path)
     if(log_path)
     {
         dirname = xxstrdup(log_path);
-        string_dirname(log_path, dirname);
+        path_dirname(log_path, dirname);
         if(!create_dir(dirname, 0755))
             fatal("could not create directory %s : %s\n", dirname, strerror(errno));
 

@@ -22,7 +22,7 @@ Date:   5.10.2004
 extern "C" {
 #include "glite/data/io/client/ioclient.h"
 #include "glite/data/io/client/ioerrors.h"
-#include "stringtools.h"
+#include "path.h"
 #include "debug.h"
 }
 
@@ -50,7 +50,7 @@ private:
         void convert_cc_name( pfs_name *name, char * path ) {
                 char tmp[PFS_PATH_MAX];
 		sprintf(tmp,"/%s/%s",name->host,name->rest);
-		string_collapse_path(tmp, path, 1);
+		path_collapse(tmp, path, 1);
 		if(strlen(path)==0){
 		    path[0] = '/';
 		    path[1] = 0;
@@ -217,7 +217,7 @@ private:
                 char tmp[PFS_PATH_MAX];
                 char tmp2[PFS_PATH_MAX];
 		sprintf(tmp,"/%s/%s",name->host,name->rest);
-		string_collapse_path(tmp, tmp2, 1);
+		path_collapse(tmp, tmp2, 1);
 		if(strlen(tmp2)==0){
 		    tmp2[0] = '/';
 		    tmp2[1] = 0;
@@ -229,7 +229,7 @@ private:
         void convert_cc_name( pfs_name *name, char * path ) {
                 char tmp[PFS_PATH_MAX];
 		sprintf(tmp,"/%s/%s",name->host,name->rest);
-		string_collapse_path(tmp, path, 1);
+		path_collapse(tmp, path, 1);
 		if(strlen(path)==0){
 		    path[0] = '/';
 		    path[1] = 0;

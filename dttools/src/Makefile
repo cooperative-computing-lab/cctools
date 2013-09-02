@@ -54,6 +54,7 @@ SOURCES = auth.c  \
           mpi_queue.c  \
           nvpair.c  \
           nvpair_database.c  \
+          path.c \
           password_cache.c  \
           preadwrite.c  \
           process.c  \

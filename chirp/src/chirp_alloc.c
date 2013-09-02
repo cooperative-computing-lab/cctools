@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "xxmalloc.h"
 #include "int_sizes.h"
+#include "path.h"
 #include "stringtools.h"
 #include "full_io.h"
 #include "delete_dir.h"
@@ -231,7 +232,7 @@ static struct alloc_state *alloc_state_cache_exact(const char *path)
 static struct alloc_state *alloc_state_cache(const char *path)
 {
 	char dirname[CHIRP_PATH_MAX];
-	string_dirname(path, dirname);
+	path_dirname(path, dirname);
 	return alloc_state_cache_exact(dirname);
 }
 

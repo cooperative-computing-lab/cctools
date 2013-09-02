@@ -38,6 +38,7 @@ See the file COPYING for details.
 #include "md5.h"
 #include "sort_dir.h"
 #include "getopt_aux.h"
+#include "path.h"
 
 #ifdef HAS_LIBREADLINE
 #include "readline/readline.h"
@@ -129,7 +130,7 @@ static void complete_local_path(const char *file, char *full_path)
 	} else {
 		strcpy(temp, file);
 	}
-	string_collapse_path(temp, full_path, 1);
+	path_collapse(temp, full_path, 1);
 }
 
 static void complete_remote_path(const char *file, char *full_path)
@@ -140,7 +141,7 @@ static void complete_remote_path(const char *file, char *full_path)
 	} else {
 		strcpy(temp, file);
 	}
-	string_collapse_path(temp, full_path, 1);
+	path_collapse(temp, full_path, 1);
 }
 
 static INT64_T do_cat(int argc, char **argv)
@@ -169,7 +170,7 @@ static INT64_T do_cd(int argc, char **argv)
 		return -1;
 	} else {
 		if(S_ISDIR(info.cst_mode)) {
-			string_collapse_path(full_path, current_remote_dir, 1);
+			path_collapse(full_path, current_remote_dir, 1);
 			return 0;
 		} else {
 			errno = ENOTDIR;
@@ -211,7 +212,7 @@ static INT64_T do_get(int argc, char **argv)
 	INT64_T result;
 
 	if(!argv[2])
-		argv[2] = (char *) string_basename(argv[1]);
+		argv[2] = (char *) path_basename(argv[1]);
 
 	complete_remote_path(argv[1], source_full_path);
 	complete_local_path(argv[2], target_full_path);
@@ -239,7 +240,7 @@ static INT64_T do_put(int argc, char **argv)
 	INT64_T result;
 
 	if(!argv[2])
-		argv[2] = (char *) string_basename(argv[1]);
+		argv[2] = (char *) path_basename(argv[1]);
 
 	complete_local_path(argv[1], source_full_path);
 	complete_remote_path(argv[2], target_full_path);

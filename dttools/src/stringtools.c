@@ -199,64 +199,6 @@ const char *string_back(const char *str, int max)
 	}
 }
 
-const char *string_basename(const char *s)
-{
-	const char *b;
-
-	b = s + strlen(s) - 1;	/* points to last character in path */
-
-	while(*b == '/' && b > s)	/* path has "redundant" final slash(es) */
-		b--;
-
-	while(b >= s) {
-		if(*b == '/') {
-			b++;
-			break;
-		} else {
-			b--;
-		}
-	}
-
-	if(b < s)
-		b = s;
-
-	return b;
-}
-
-void string_remove_trailing_slashes(char *str)
-{
-	char *s = str;
-
-	/* find the end of the string */
-	while(*s)
-		s++;
-	s--;
-
-	/* remove slashes going backwards */
-	while(s > str && *s == '/') {
-		*s = 0;
-		s--;
-	}
-}
-
-void string_dirname(const char *path, char *dir)
-{
-	char *c;
-
-	strcpy(dir, path);
-	//string_remove_trailing_slashes(dir);
-
-	c = strrchr(dir, '/');
-	if(c) {
-		*c = 0;
-		if(dir[0] == 0)
-			strcpy(dir, "/");
-	} else {
-		strcpy(dir, ".");
-	}
-	//string_remove_trailing_slashes(dir);
-}
-
 char *string_metric(double invalue, int power_needed, char *buffer)
 {
 	static char localbuffer[100];
@@ -680,103 +622,6 @@ char *string_signal(int sig)
 #endif
 }
 
-void string_split_path(const char *input, char *first, char *rest)
-{
-	/* skip any leading slashes */
-	while(*input == '/') {
-		input++;
-	}
-
-	/* copy the first element up to slash or null */
-	while(*input && *input != '/') {
-		*first++ = *input++;
-	}
-	*first = 0;
-
-	/* make sure that rest starts with a slash */
-	if(*input != '/') {
-		*rest++ = '/';
-	}
-
-	/* copy the rest */
-	while(*input) {
-		*rest++ = *input++;
-	}
-	*rest = 0;
-}
-
-
-void string_split_multipath(const char *input, char *first, char *rest)
-{
-	/* skip any leading slashes */
-	while(*input == '/') {
-		input++;
-	}
-
-	/* copy the first element up to slash or @ or null */
-	while(*input && *input != '/' && *input != '@') {
-		*first++ = *input++;
-	}
-	*first = 0;
-
-	/* make sure that rest starts with a slash or @ */
-	if(*input != '/' && *input != '@') {
-		*rest++ = '/';
-	}
-
-	/* copy the rest */
-	while(*input) {
-		*rest++ = *input++;
-	}
-	*rest = 0;
-}
-
-
-/* Canonicalize a pathname by stripping out duplicate slashes and redundant
- * dots.
- *
- * A trailing slash is semantically important [1] in pathname resolution
- * because it forces resolution of the final component and that final component
- * must resolve to a directory. So, we allow a final trailing slash in
- * the canonical path.
- *
- * [1] http://pubs.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap04.html
-*/
-void string_collapse_path(const char *l, char *s, int remove_dotdot)
-{
-	char *start = s;
-
-	while(*l) {
-		if((*l) == '/' && (*(l + 1)) == '/') {
-			l++;	/* skip double slash */
-		} else if((*l) == '/' && (*(l + 1)) == '.' && (*(l + 2)) == 0) {
-			*s++ = *l++;
-			break;
-		} else if((*l) == '/' && (*(l + 1)) == '.' && (*(l + 2)) == '/') {
-			l += 2;
-		} else if(remove_dotdot && !strncmp(l, "/..", 3) && (l[3] == 0 || l[3] == '/')) {
-			if(s > start)
-				s--;
-			while(s > start && ((*s) != '/')) {
-				s--;
-			}
-			*s = 0;
-			l += 3;
-		} else {
-			*s++ = *l++;
-		}
-	}
-
-	*s = 0;
-
-	if(s == start) strcpy(s, "/");
-
-	/* canonicalize certain final components */
-	if(strcmp(start, "./") == 0) strcpy(start, ".");
-	if(strcmp(start, "../") == 0) strcpy(start, "..");
-	if((s-start) > 4 && strcmp(s-4, "/../") == 0) *(s-1) = 0;
-}
-
 void string_tolower(char *s)
 {
 	while(*s) {
@@ -945,24 +790,6 @@ int string_nformat (char *str, const size_t max, const char *fmt, ...)
 		fatal("String '%30s...' is %zd (greater than the %zd limit).", str, n, max);
 
 	return n;
-}
-
-char *string_getcwd(void)
-{
-	char *result = NULL;
-	size_t size = 1024;
-	result = xxrealloc(result, size);
-
-	while(getcwd(result, size) == NULL) {
-		if(errno == ERANGE) {
-			size *= 2;
-			result = xxrealloc(result, size);
-		} else {
-			fatal("couldn't getcwd: %s", strerror(errno));
-			return NULL;
-		}
-	}
-	return result;
 }
 
 char *string_trim(char *s, int func(int))
