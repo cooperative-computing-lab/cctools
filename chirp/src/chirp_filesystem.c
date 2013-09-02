@@ -7,8 +7,10 @@ See the file COPYING for details.
 #include "chirp_filesystem.h"
 #include "chirp_protocol.h"
 
+#include "debug.h"
 #include "macros.h"
 #include "buffer.h"
+#include "path.h"
 #include "xxmalloc.h"
 #include "md5.h"
 
@@ -38,19 +40,36 @@ extern struct chirp_filesystem chirp_fs_local;
 extern struct chirp_filesystem chirp_fs_hdfs;
 extern struct chirp_filesystem chirp_fs_chirp;
 
+#define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
 struct chirp_filesystem *cfs_lookup(const char *url)
 {
-	if(!strchr(url, ':') || !strncmp(url, "local:", 6) || !strncmp(url, "file:", 5)) {
-		return &chirp_fs_local;
-	} else if(!strncmp(url, "hdfs:", 5)) {
-		return &chirp_fs_hdfs;
-	} else if(!strncmp(url, "chirp:", 6)) {
+	if(strprfx(url, "chirp:")) {
 		return &chirp_fs_chirp;
+	} else if(strprfx(url, "hdfs:")) {
+		return &chirp_fs_hdfs;
 	} else {
-		return 0;
+		/* always interpret as a local url */
+		return &chirp_fs_local;
 	}
 }
 
+void cfs_reinterpret(char url[CHIRP_PATH_MAX])
+{
+	if(strprfx(url, "chirp:")) {
+		return;
+	} else if(strprfx(url, "hdfs:")) {
+		return;
+	} else {
+		char absolute[PATH_MAX];
+		if(strprfx(url, "file:") || strprfx(url, "local:"))
+			path_absolute(strstr(url, ":")+1, absolute, 0);
+		else
+			path_absolute(url, absolute, 0);
+		debug(D_CHIRP, "reinterpreting url `%s' as `local://%s'", url, absolute);
+		strcpy(url, "local://");
+		strcat(url, absolute);
+	}
+}
 
 CHIRP_FILE *cfs_fopen(const char *path, const char *mode)
 {

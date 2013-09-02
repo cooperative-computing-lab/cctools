@@ -10,7 +10,7 @@ See the file COPYING for details.
 
 extern "C" {
 #include "hash_table.h"
-#include "stringtools.h"
+#include "path.h"
 #include "xxmalloc.h"
 }
 
@@ -74,7 +74,7 @@ void pfs_dircache::insert( const char *name, struct pfs_stat *buf, pfs_dir *dir 
 	copy = (struct pfs_stat *)xxmalloc(sizeof(struct pfs_stat));
 	*copy = *buf;
 
-	sprintf(path, "%s/%s", dircache_path, string_basename(name));
+	sprintf(path, "%s/%s", dircache_path, path_basename(name));
 	hash_table_insert(dircache_table, path, copy);
 }
 

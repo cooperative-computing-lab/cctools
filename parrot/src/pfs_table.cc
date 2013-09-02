@@ -24,6 +24,7 @@ extern "C" {
 #include "macros.h"
 #include "full_io.h"
 #include "get_canonical_path.h"
+#include "path.h"
 #include "pfs_resolve.h"
 #include "pfs_channel.h"
 #include "md5.h"
@@ -173,7 +174,7 @@ int pfs_table::find_empty( int lowest )
 
 void pfs_table::collapse_path( const char *l, char *s, int remove_dotdot )
 {
-	string_collapse_path(l,s,remove_dotdot);
+	path_collapse(l,s,remove_dotdot);
 }
 
 /*
@@ -240,7 +241,7 @@ void pfs_table::follow_symlink( struct pfs_name *pname, int depth )
 		link_target[rlres] = '\000';
 		/* Is link target relative ? */
 		if (link_target[0] != '/') {
-			 const char *basename_start = string_basename(pname->path);
+			 const char *basename_start = path_basename(pname->path);
 			 if (basename_start) {
 				int dirname_len = basename_start - pname->path;
 				snprintf(absolute_link_target,
@@ -293,7 +294,7 @@ int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_
 		fatal("unable to resolve file %s",pname->logical_name);
 		return 0;
 	} else {
-		string_split_path(pname->path,pname->service_name,tmp);
+		path_split(pname->path,pname->service_name,tmp);
 		pname->service = pfs_service_lookup(pname->service_name);
 		if(!pname->service) {
 			pname->service = pfs_service_lookup_default();
@@ -304,9 +305,9 @@ int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_
 			pname->is_local = 1;
 		} else {
 			if(!strcmp(pname->service_name,"multi")) {// if we're dealing with a multivolume, split off at the @
-				string_split_multipath(tmp,pname->host,pname->rest);
+				path_split_multi(tmp,pname->host,pname->rest);
 			} else {
-				string_split_path(tmp,pname->host,pname->rest);
+				path_split(tmp,pname->host,pname->rest);
 			}
 			
 			if(!pname->host[0]) {
@@ -325,7 +326,7 @@ int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_
 		
 			if(!strcmp(pname->service_name,"multi")) {
 				strcpy(tmp,pname->rest);
-				string_split_path(tmp,&pname->hostport[strlen(pname->hostport)],pname->rest); // reconstruct hostport as host:port@volume; path goes in rest.
+				path_split(tmp,&pname->hostport[strlen(pname->hostport)],pname->rest); // reconstruct hostport as host:port@volume; path goes in rest.
 			}
 			if(pname->service->tilde_is_special() && !strncmp(pname->rest,"/~",2)) {
 				memmove(pname->rest,&pname->rest[1],strlen(pname->rest));
@@ -361,7 +362,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 	// cases, such as the use of openat in pwd, the flag
 	// is not set, set we detect it here.
 
-	const char *basename = string_basename(lname);
+	const char *basename = path_basename(lname);
 	if(!strcmp(basename,".") || !strcmp(basename,"..")) {
 		flags |= O_DIRECTORY;
 	}
@@ -2104,7 +2105,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 			done = 1;
 		}
 
-		string_collapse_path(path, directory, 0);
+		path_collapse(path, directory, 0);
 
 		debug(D_DEBUG, "searching directory `%s'", directory);
 

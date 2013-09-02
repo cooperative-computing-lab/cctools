@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "copy_stream.h"
 #include "full_io.h"
 #include "create_dir.h"
-#include "stringtools.h"
+#include "path.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -234,7 +234,7 @@ int copy_file_to_file(const char *input, const char *output)
 		return -1;
 	
 	char out_dir[COPY_BUFFER_SIZE];
-	string_dirname(output, out_dir);
+	path_dirname(output, out_dir);
 	create_dir(out_dir, st.st_mode);
 
 	out = fopen(output, "w");
