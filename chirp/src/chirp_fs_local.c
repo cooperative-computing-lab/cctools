@@ -123,19 +123,6 @@ static const char *chirp_fs_local_init(const char *url)
 	else
 		strcpy(tmp, url);
 
-	if (tmp[0] != '/') {
-		/* relative path */
-		char pwd[CHIRP_PATH_MAX];
-		if (getcwd(pwd, sizeof(pwd)) == NULL) {
-			fatal("could not getcwd: %s", strerror(errno));
-		}
-		if (strlen(pwd) + strlen(tmp) >= CHIRP_PATH_MAX) {
-			fatal("root path too long");
-		}
-		memmove(tmp+strlen(pwd), tmp, strlen(pwd));
-		memcpy(tmp, pwd, strlen(pwd));
-	}
-
 	path_collapse(tmp, root, 1);
 
 	return root;
