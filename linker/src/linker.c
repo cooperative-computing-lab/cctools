@@ -21,6 +21,9 @@ typedef struct{
 	file_type type;
 } dependency;
 
+char *python_extensions[2] = { "py", "pyc" };
+char *perl_extensions[2]   = { "pl", "pm" };
+
 void initialize( char *output_directory, char *input_file, struct list *d){
 	pid_t pid;
 	int pipefd[2];
@@ -97,19 +100,16 @@ const char *filename_extension(const char *filename) {
 
 file_type file_extension_known(const char *filename){
 	const char *extension = filename_extension(filename);
-	char *python_extensions[2] = { "py", "pyc" };
-
-	file_type my_file = UNKNOWN;
 
 	int j;
 	for(j=0; j< 2; j++){
-		if(!strcmp(python_extensions[j], extension)){
-			my_file = PYTHON;
-			return my_file;
-		}
+		if(!strcmp(python_extensions[j], extension))
+			return PYTHON;
+		if(!strcmp(perl_extensions[j], extension))
+			return PERL;
 	}
 
-	return my_file;
+	return UNKNOWN;
 }
 
 file_type shebang_known(const char *filename){
