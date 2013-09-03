@@ -116,6 +116,67 @@ file_type find_driver_for(const char *name){
 	return type;
 }
 
+void find_dependencies_for(dependency *dep){
+	pid_t pid;
+	int pipefd[2];
+	pipe(pipefd);
+
+	switch ( pid = fork() ){
+	case -1:
+		fprintf( stderr, "Cannot fork. Exiting...\n" );
+		exit(1);
+	case 0:
+		/* Child process */
+		close(pipefd[0]);
+		dup2(pipefd[1], 1);
+		close(pipefd[1]);
+
+		char * const args[3] = { "locating dependencies" , dep->original_name, NULL };
+		switch ( dep->type ){
+			case PYTHON:
+				execvp("./python_linker", args); 
+			case UNKNOWN:
+				break;
+		}
+		exit(1);
+	default:
+		/* Parent process */
+		close(pipefd[1]);
+		char next;
+		char *buffer = (char *) malloc(sizeof(char));
+		int size = 0;
+		while (read(pipefd[0], &next, sizeof(next)) != 0){
+			switch ( next ){
+				case '\n':
+					buffer = realloc(buffer, size+1);
+					*(buffer+size) = '\0';
+					dependency *new_dependency = (dependency *) malloc(sizeof(dependency));
+					new_dependency->original_name = buffer;
+					printf("%s\n", new_dependency->original_name);
+					size = 0;
+					buffer = NULL;
+					break;
+				case '\0':
+					break;
+				default:
+					buffer = realloc(buffer, size+1);
+					*(buffer+size) = next;
+					size++;
+			}
+		}
+	}
+	// Driver returns list of first order formal dependencies as absolute file paths
+	// Print each file path returned
+}
+
+void find_dependencies(struct list *d){
+	dependency *dep;
+	list_first_item(d);
+	while((dep = list_next_item(d))){
+		find_dependencies_for(dep);
+	}
+}
+
 void find_drivers(struct list *d){
 	dependency *dep;
 	list_first_item(d);
@@ -135,6 +196,8 @@ int main(void){
 
 	find_drivers(dependencies);
 	display_dependencies(dependencies);
+	
+	find_dependencies(dependencies);
 
 	return 0;
 }
