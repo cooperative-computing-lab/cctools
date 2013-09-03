@@ -904,38 +904,12 @@ then
 		python3_minor_version=`echo ${python3_version} | cut -d . -f 2 | cut -d . -f 1,2`
 		if [ "$python3_major_version" -eq 3 ]
 		then
-		python3_include=`${python3} -c 'from distutils import sysconfig; print(sysconfig.get_python_inc())'`
-			if check_file ${python3_include}/Python.h
+			python3_include=`${python3} -c 'from distutils import sysconfig; print(sysconfig.get_python_inc())'`
+			if check_file ${python3_include}/Python.h -a check_file ${python3}-config
 			then
 				echo "found python3 development libraries"
-				python3_ccflags_file=`mktemp tmp.XXXXXX`
-				python3_ldflags_file=`mktemp tmp.XXXXXX`
-
-				env HOME=/var/empty ${python3} > $python3_ccflags_file <<EOF
-import sysconfig
-getvar = sysconfig.get_config_var
-flags = ['-I' + sysconfig.get_path('include'),
-         '-I' + sysconfig.get_path('platinclude')]
-flags.extend(getvar('CFLAGS').split())
-print(' '.join(flags))
-EOF
-				env HOME=/var/empty ${python3} > $python3_ldflags_file <<EOF
-import sysconfig, sys
-pyver = sysconfig.get_config_var('VERSION')
-getvar = sysconfig.get_config_var
-libs = getvar('LIBS').split() + getvar('SYSLIBS').split()
-libs.append('-lpython' + pyver + sys.abiflags)
-# add the prefix/lib/pythonX.Y/config dir, but only if there is no
-# shared library in prefix/lib/.
-if not getvar('Py_ENABLE_SHARED'):
-    libs.insert(0, '-L' + getvar('LIBPL'))
-libs.extend(getvar('LINKFORSHARED').split())
-print(' '.join(libs))
-EOF
-				python3_ccflags=`cat $python3_ccflags_file`
-				python3_ldflags=`cat $python3_ldflags_file`
-				rm $python3_ccflags_file
-				rm $python3_ldflags_file
+				python3_ccflags=`${python3}-config --cflags`
+				python3_ldflags=`${python3}-config --ldflags`
 
 				# On OSX, the ExtUtils::Embed options contain options
 				# to generate triple-fat binaries, which fails when
@@ -1007,7 +981,7 @@ then
 			# Python 3 requires Swig version >= 2.0.4; cf.
 			# http://sourceforge.net/p/swig/bugs/1104/ and
 			# http://sourceforge.net/p/swig/news/?page=1
-			echo "*** Sorry, Swig $swig_version does not work with Python 3 version $python_version."
+			echo "*** Sorry, Swig $swig_version does not work with Python 3 version $python3_version."
 			echo "*** Specifically, Swig >= 2.0.4 is needed for Python 3 support."
 			echo "*** skipping swig bindings for work queue"
 		elif [ `format_version $swig_version` -ge `format_version 1.3.29` ]
