@@ -103,7 +103,6 @@ file_type file_extension_known(const char *filename){
 
 	int j;
 	for(j=0; j< 2; j++){
-		printf("%s -> %s ?= %s\n", filename, extension, python_extensions[j]);
 		if(!strcmp(python_extensions[j], extension)){
 			my_file = PYTHON;
 			return 1;
@@ -137,7 +136,6 @@ void find_drivers(struct list *d){
 	list_first_item(d);
 	while((dep = list_next_item(d))){
 		my_type = find_driver_for(dep->final_name);
-		printf("%d\n", my_type);
 	}
 }
 
