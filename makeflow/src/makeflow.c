@@ -2761,7 +2761,7 @@ int main(int argc, char *argv[])
 		collect_input_files(d, bundle_directory, bundler_rename);
 
 		char output_makeflow[PATH_MAX];
-		sprintf(output_makeflow, "%s/%s", expanded_path, string_basename(dagfile));
+		sprintf(output_makeflow, "%s/%s", expanded_path, path_basename(dagfile));
 		dag_to_file(d, output_makeflow, bundler_rename);
 		free(bundle_directory);
 		exit(0);
