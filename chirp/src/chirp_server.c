@@ -5,70 +5,70 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "chirp_protocol.h"
 #include "chirp_acl.h"
-#include "chirp_reli.h"
-#include "chirp_group.h"
-#include "chirp_stats.h"
 #include "chirp_alloc.h"
-#include "chirp_filesystem.h"
-#include "chirp_fs_local.h"
-#include "chirp_fs_hdfs.h"
-#include "chirp_fs_chirp.h"
 #include "chirp_audit.h"
+#include "chirp_filesystem.h"
+#include "chirp_fs_chirp.h"
+#include "chirp_fs_hdfs.h"
+#include "chirp_fs_local.h"
+#include "chirp_group.h"
+#include "chirp_protocol.h"
+#include "chirp_reli.h"
+#include "chirp_stats.h"
 #include "chirp_thirdput.h"
 
-#include "cctools.h"
-#include "daemon.h"
-#include "macros.h"
-#include "debug.h"
-#include "link.h"
-#include "getopt_aux.h"
 #include "auth_all.h"
-#include "stringtools.h"
-#include "full_io.h"
-#include "datagram.h"
-#include "username.h"
-#include "disk_info.h"
-#include "create_dir.h"
 #include "catalog_server.h"
-#include "domain_name_cache.h"
-#include "list.h"
-#include "xxmalloc.h"
-#include "md5.h"
-#include "load_average.h"
-#include "memory_info.h"
+#include "cctools.h"
 #include "change_process_title.h"
-#include "url_encode.h"
+#include "create_dir.h"
+#include "daemon.h"
+#include "datagram.h"
+#include "debug.h"
+#include "disk_info.h"
+#include "domain_name_cache.h"
+#include "full_io.h"
 #include "get_canonical_path.h"
+#include "getopt_aux.h"
+#include "link.h"
+#include "list.h"
+#include "load_average.h"
+#include "macros.h"
+#include "md5.h"
+#include "memory_info.h"
 #include "path.h"
+#include "stringtools.h"
+#include "url_encode.h"
+#include "username.h"
+#include "xxmalloc.h"
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <time.h>
-#include <unistd.h>
-#include <limits.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <dirent.h>
-#include <signal.h>
-#include <sys/wait.h>
+#include <fcntl.h>
 #include <pwd.h>
-#include <sys/time.h>
+#include <unistd.h>
+
 #include <sys/resource.h>
-#include <sys/utsname.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
 #include <sys/select.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
 
 #if defined(HAS_ATTR_XATTR_H)
 #include <attr/xattr.h>
 #elif defined(HAS_SYS_XATTR_H)
 #include <sys/xattr.h>
 #endif
+
+#include <assert.h>
+#include <errno.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
