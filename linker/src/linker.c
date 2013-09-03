@@ -105,7 +105,7 @@ file_type file_extension_known(const char *filename){
 	for(j=0; j< 2; j++){
 		if(!strcmp(python_extensions[j], extension)){
 			my_file = PYTHON;
-			return 1;
+			return my_file;
 		}
 	}
 
@@ -132,10 +132,9 @@ file_type find_driver_for(const char *name){
 
 void find_drivers(struct list *d){
 	dependency *dep;
-	file_type my_type;
 	list_first_item(d);
 	while((dep = list_next_item(d))){
-		my_type = find_driver_for(dep->final_name);
+		dep->type = find_driver_for(dep->final_name);
 	}
 }
 
