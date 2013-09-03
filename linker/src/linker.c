@@ -80,12 +80,12 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 	}
 }
 
-void display_names(struct list *d){
+void display_dependencies(struct list *d){
 	dependency *dep;
 
 	list_first_item(d);
 	while((dep = list_next_item(d))){
-		printf("%s\n", dep->original_name);
+		printf("%s %s %d %d\n", dep->original_name, dep->final_name, dep->depth, dep->type);
 	}
 }
 
@@ -149,10 +149,9 @@ int main(void){
 	dependencies = list_create();
 
 	initialize(output, input, dependencies);
-	display_names(dependencies);
 
-//	find_drivers(dependencies);
-	
+	find_drivers(dependencies);
+	display_dependencies(dependencies);
 
 	return 0;
 }
