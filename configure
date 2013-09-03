@@ -118,6 +118,7 @@ irods_path="/usr"
 mysql_path="/usr"
 perl_path="/usr"
 python_path="/usr"
+python3_path="/usr"
 xrootd_path="/usr"
 cvmfs_path="/usr"
 mpi_path="/usr/local"
@@ -145,6 +146,7 @@ config_fuse_path=auto
 config_mysql_path=auto
 config_perl_path=auto
 config_python_path=auto
+config_python3_path=auto
 config_zlib_path=yes
 
 config_krb5_path=no
@@ -227,6 +229,11 @@ do
 			shift
 			python_path=$1
 			config_python_path=yes
+			;;
+		--with-python3-path)
+			shift
+			python3_path=$1
+			config_python3_path=yes
 			;;
 		--with-xrootd-path)
 			shift
@@ -332,6 +339,7 @@ Where PACKAGE may be:
     mysql
     perl
     python
+    python3
     xrootd
     zlib
     cvmfs
@@ -865,6 +873,112 @@ EOF
 	fi
 fi
 
+if [ $config_python3_path != no ]
+then
+	if [ -n "$PYTHON3" ] && check_file ${PYTHON3}
+	then	
+		python3=${PYTHON3}
+	elif check_file ${python3_path}/bin/python3
+	then	
+		python3=${python3_path}/bin/python3
+	elif check_file ${python3_path}/bin/python
+ 	then
+		python3=${python3_path}/bin/python
+	else
+		python3=0
+	fi
+
+	if check_file ${python3_path}/bin/2to3
+	then
+		python3_2to3=${python3_path}/bin/2to3
+		echo "Set python3_2to3 to $python3_2to3"
+	else
+		python3=0
+	fi
+
+	if [ $python3 != 0 ]
+	then
+		python3_version=`${python3} -V 2>&1 | cut -d " " -f 2`
+		echo "python3 version is ${python3_version}"
+		python3_major_version=`echo ${python3_version} | cut -d . -f 1`
+		python3_minor_version=`echo ${python3_version} | cut -d . -f 2 | cut -d . -f 1,2`
+		if [ "$python3_major_version" -eq 3 ]
+		then
+		python3_include=`${python3} -c 'from distutils import sysconfig; print(sysconfig.get_python_inc())'`
+			if check_file ${python3_include}/Python.h
+			then
+				echo "found python3 development libraries"
+				python3_ccflags_file=`mktemp tmp.XXXXXX`
+				python3_ldflags_file=`mktemp tmp.XXXXXX`
+
+				env HOME=/var/empty ${python3} > $python3_ccflags_file <<EOF
+import sysconfig
+getvar = sysconfig.get_config_var
+flags = ['-I' + sysconfig.get_path('include'),
+         '-I' + sysconfig.get_path('platinclude')]
+flags.extend(getvar('CFLAGS').split())
+print(' '.join(flags))
+EOF
+				env HOME=/var/empty ${python3} > $python3_ldflags_file <<EOF
+import sysconfig, sys
+pyver = sysconfig.get_config_var('VERSION')
+getvar = sysconfig.get_config_var
+libs = getvar('LIBS').split() + getvar('SYSLIBS').split()
+libs.append('-lpython' + pyver + sys.abiflags)
+# add the prefix/lib/pythonX.Y/config dir, but only if there is no
+# shared library in prefix/lib/.
+if not getvar('Py_ENABLE_SHARED'):
+    libs.insert(0, '-L' + getvar('LIBPL'))
+libs.extend(getvar('LINKFORSHARED').split())
+print(' '.join(libs))
+EOF
+				python3_ccflags=`cat $python3_ccflags_file`
+				python3_ldflags=`cat $python3_ldflags_file`
+				rm $python3_ccflags_file
+				rm $python3_ldflags_file
+
+				# On OSX, the ExtUtils::Embed options contain options
+				# to generate triple-fat binaries, which fails when
+				# we attempt to bring in our thin binaries.
+
+				# To avoid this problem, remove all of the -arch XXX
+				# arguments, so that the compiler produces the default,
+				# which will be compatible with the other objects we compile.
+
+				if [ ${build_sys} = DARWIN ]
+				then
+					python3_ccflags=`echo ${python3_ccflags} | sed 's/-arch [^ ]* *//g'`
+					python3_ldflags=`echo ${python3_ldflags} | sed 's/-arch [^ ]* *//g'`
+				fi
+
+				if [ $build_sys = DARWIN ]
+				then
+				    python3_ldflags="$python3_ldflags -undefined dynamic_lookup"
+				fi
+
+				work_queue_bindings="$work_queue_bindings python3"
+			else
+				python3=0
+			fi
+		else
+			echo "*** Sorry, we require Python3 >= 3.0"
+			python3=0
+		fi
+	fi
+
+	if [ $python3 = 0 ]
+	then
+		if [ $config_python3_path = yes ]
+		then
+			echo "*** Sorry, I couldn't find the Python3 >= 3.0 libraries in $python3_path"
+			echo "*** Check --with-python3-path and try again."
+			exit 1
+		else
+			echo "*** skipping python3 support"
+		fi
+	fi
+fi
+
 found_swig=no
 if [ $config_swig_path != no ]
 then
@@ -887,6 +1001,14 @@ then
 		if [ "$python" != 1 -a ! \( "$python_major_version" -eq 2 -a "$python_minor_version" -eq 4 \) -a `format_version $swig_version` -eq `format_version 1.3.29` ]
 		then
 			echo "*** Sorry, Swig 1.3.29 does not work with Python $python_version."
+			echo "*** skipping swig bindings for work queue"
+		elif [ "$python3" != 0 -a `format_version $swig_version` -lt `format_version 2.0.4` ]
+		then
+			# Python 3 requires Swig version >= 2.0.4; cf.
+			# http://sourceforge.net/p/swig/bugs/1104/ and
+			# http://sourceforge.net/p/swig/news/?page=1
+			echo "*** Sorry, Swig $swig_version does not work with Python 3 version $python_version."
+			echo "*** Specifically, Swig >= 2.0.4 is needed for Python 3 support."
 			echo "*** skipping swig bindings for work queue"
 		elif [ `format_version $swig_version` -ge `format_version 1.3.29` ]
 		then
@@ -1079,6 +1201,12 @@ CCTOOLS_PYTHON=${python}
 CCTOOLS_PYTHON_CCFLAGS=${python_ccflags}
 CCTOOLS_PYTHON_LDFLAGS=${python_ldflags}
 CCTOOLS_PYTHON_VERSION=${python_major_version}.${python_minor_version}
+
+CCTOOLS_PYTHON3=${python3}
+CCTOOLS_PYTHON3_CCFLAGS=${python3_ccflags}
+CCTOOLS_PYTHON3_LDFLAGS=${python3_ldflags}
+CCTOOLS_PYTHON3_VERSION=${python3_major_version}.${python3_minor_version}
+CCTOOLS_PYTHON3_2TO3=${python3_2to3}
 
 CCTOOLS_WORK_QUEUE_BINDINGS=${work_queue_bindings}
 
