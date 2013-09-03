@@ -69,7 +69,6 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 					new_dependency->final_name = buffer;
 					list_push_tail(d, (void *) new_dependency);
 					size = 0;
-					free(original_name);
 					original_name = NULL;
 					buffer = NULL;
 					break;
