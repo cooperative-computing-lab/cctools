@@ -81,6 +81,15 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 	}
 }
 
+void display_dependencies(struct list *d){
+	dependency *dep;
+
+	list_first_item(d);
+	while((dep = list_next_item(d))){
+		printf("%s %s %d %d\n", dep->original_name, dep->final_name, dep->depth, dep->type);
+	}
+}
+
 const char *filename_extension(const char *filename) {
 	const char *dot = strrchr(filename, '.');
 	if(!dot || dot == filename) return "";
@@ -113,7 +122,6 @@ void find_drivers(struct list *d){
 	list_first_item(d);
 	while((dep = list_next_item(d))){
 		my_type = find_driver_for(dep->final_name);
-		printf("%d\n", my_type);
 	}
 }
 
@@ -127,6 +135,7 @@ int main(void){
 	initialize(output, input, dependencies);
 
 	find_drivers(dependencies);
+	display_dependencies(dependencies);
 
 	return 0;
 }
