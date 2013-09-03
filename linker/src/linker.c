@@ -118,10 +118,9 @@ file_type find_driver_for(const char *name){
 
 void find_drivers(struct list *d){
 	dependency *dep;
-	file_type my_type;
 	list_first_item(d);
 	while((dep = list_next_item(d))){
-		my_type = find_driver_for(dep->final_name);
+		dep->type = find_driver_for(dep->final_name);
 	}
 }
 
