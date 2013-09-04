@@ -1,9 +1,6 @@
-work_queue_wrap.*
-cctools.test.log
-work_queue.py
 __pycache__
 _work_queue.so
-work_queue.binding.py
-work_queue.binding.py.bak
-work_queue_example.py3
-work_queue_example.py3.bak
+work_queue.py
+work_queue.binding.py*
+work_queue_example.py3*
+work_queue_wrap.*
