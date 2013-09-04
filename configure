@@ -876,13 +876,13 @@ fi
 if [ $config_python3_path != no ]
 then
 	if [ -n "$PYTHON3" ] && check_file ${PYTHON3}
-	then	
+	then
 		python3=${PYTHON3}
 	elif check_file ${python3_path}/bin/python3
-	then	
+	then
 		python3=${python3_path}/bin/python3
 	elif check_file ${python3_path}/bin/python
- 	then
+	then
 		python3=${python3_path}/bin/python
 	else
 		python3=0

@@ -24,7 +24,7 @@ work_queue_wrap.o: work_queue_wrap.c
 # in the framework search path emitted by the Python configuration on macOS.
 
 _work_queue.${CCTOOLS_DYNAMIC_SUFFIX}: work_queue_wrap.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	@ln -sf /System/Library/Frameworks/Python.framework . 
+	@ln -sf /System/Library/Frameworks/Python.framework .
 	${CCTOOLS_LD} ${CCTOOLS_DYNAMIC_FLAG} $< -o $@ ${CCTOOLS_INTERNAL_LDFLAGS} ${ldflags}
 	@rm Python.framework
 
