@@ -129,7 +129,7 @@ file_type find_driver_for(const char *name){
 	return type;
 }
 
-void find_dependencies_for(dependency *dep){
+struct list *find_dependencies_for(dependency *dep){
 	pid_t pid;
 	int pipefd[2];
 	pipe(pipefd);
@@ -143,7 +143,6 @@ void find_dependencies_for(dependency *dep){
 		close(pipefd[0]);
 		dup2(pipefd[1], 1);
 		close(pipefd[1]);
-
 		char * const args[3] = { "locating dependencies" , dep->original_name, NULL };
 		switch ( dep->type ){
 			case PYTHON:
@@ -161,6 +160,8 @@ void find_dependencies_for(dependency *dep){
 		char *buffer = (char *) malloc(sizeof(char));
 		char *original_name;
 		int size = 0;
+		struct list *new_deps = list_create();
+
 		while (read(pipefd[0], &next, sizeof(next)) != 0){
 			switch ( next ){
 				case ' ':
@@ -175,8 +176,7 @@ void find_dependencies_for(dependency *dep){
 					dependency *new_dependency = (dependency *) malloc(sizeof(dependency));
 					new_dependency->original_name = original_name;
 					new_dependency->final_name = buffer;
-					printf("%s\n", new_dependency->original_name);
-					printf("%s\n", new_dependency->final_name);
+					list_push_tail(new_deps, new_dependency);
 					size = 0;
 					buffer = NULL;
 					break;
@@ -186,14 +186,23 @@ void find_dependencies_for(dependency *dep){
 					size++;
 			}
 		}
+		return new_deps;
 	}
 }
 
 void find_dependencies(struct list *d){
 	dependency *dep;
+	struct list *new;
+
 	list_first_item(d);
 	while((dep = list_next_item(d))){
-		find_dependencies_for(dep);
+		new = find_dependencies_for(dep);
+		list_first_item(new);
+		while((dep = list_next_item(new))){
+			list_push_tail(d, dep);
+		}
+		list_delete(new);
+		new = NULL;
 	}
 }
 
@@ -215,9 +224,9 @@ int main(void){
 	initialize(output, input, dependencies);
 
 	find_drivers(dependencies);
-	display_dependencies(dependencies);
 	
 	find_dependencies(dependencies);
+	display_dependencies(dependencies);
 
 	return 0;
 }
