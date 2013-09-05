@@ -63,6 +63,19 @@ const char *path_basename (const char *path)
 	return base;
 }
 
+/* Returns the filename extension.
+ *
+ * To extract multiple extensions (e.g. .tar.gz) call path_extension multiple
+ * times and concatenate the results.
+ */
+const char *path_extension (const char *path)
+{
+	const char *base = path_basename(path);
+	const char *dot = strrchr(base, '.');
+	if(!dot || dot == base) return NULL;
+	return dot + 1;
+}
+
 /* Canonicalize a pathname by stripping out duplicate slashes and redundant
  * dots.
  *
