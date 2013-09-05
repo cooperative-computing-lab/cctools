@@ -122,3 +122,5 @@ struct chirp_filesystem {
 extern struct chirp_filesystem *cfs;
 
 #endif /* CHIRP_FILESYSTEM_H */
+
+/* vim: set noexpandtab tabstop=4: */

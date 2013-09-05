@@ -35,3 +35,5 @@ int chirp_ticket_isticketsubject(const char *ticket_subject, const char **digest
 const char *chirp_ticket_digest(const char *pk);
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

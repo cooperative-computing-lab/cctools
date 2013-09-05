@@ -1897,3 +1897,5 @@ INT64_T chirp_client_lremovexattr(struct chirp_client * c, const char *path, con
 		errno = ENOATTR;
 	return result;
 }
+
+/* vim: set noexpandtab tabstop=4: */

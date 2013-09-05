@@ -302,3 +302,5 @@ INT64_T chirp_recursive_put(const char *hostport, const char *source_file, const
 
 	return result;
 }
+
+/* vim: set noexpandtab tabstop=4: */

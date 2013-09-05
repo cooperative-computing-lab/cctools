@@ -70,3 +70,5 @@ int chirp_acl_whoami(const char *subject, char **esubject);
 int is_a_directory(const char *filename);
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

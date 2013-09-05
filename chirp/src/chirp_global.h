@@ -74,3 +74,5 @@ INT64_T chirp_global_lremovexattr(const char *host, const char *path, const char
 void chirp_global_inhibit_catalog(int onoff);
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

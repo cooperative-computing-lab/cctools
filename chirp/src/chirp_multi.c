@@ -737,3 +737,5 @@ INT64_T chirp_multi_md5(const char *volume, const char *path, unsigned char dige
 		return -1;
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

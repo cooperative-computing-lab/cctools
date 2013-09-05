@@ -53,3 +53,5 @@ INT64_T chirp_multi_utime(const char *volume, const char *path, time_t actime, t
 INT64_T chirp_multi_md5(const char *volume, const char *path, unsigned char digest[16], time_t stoptime);
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

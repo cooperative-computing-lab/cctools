@@ -98,3 +98,5 @@ used by both the client and server implementations of the protocol.
 #define CHIRP_ERROR_UNKNOWN -127
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

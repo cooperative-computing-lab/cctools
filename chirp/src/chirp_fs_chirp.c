@@ -416,3 +416,5 @@ struct chirp_filesystem chirp_fs_chirp = {
 
 	chirp_fs_chirp_do_acl_check
 };
+
+/* vim: set noexpandtab tabstop=4: */

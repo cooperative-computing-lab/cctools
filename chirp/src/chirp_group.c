@@ -90,3 +90,5 @@ int chirp_group_lookup(const char *group, const char *subject)
 	fclose(file);
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

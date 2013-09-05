@@ -177,3 +177,5 @@ to display or otherwise act upon each location at which a given file is stored.
 typedef void (*chirp_loc_t) (const char *location, void *arg);
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

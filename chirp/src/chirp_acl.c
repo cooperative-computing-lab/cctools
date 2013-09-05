@@ -943,3 +943,5 @@ int chirp_acl_init_reserve(const char *path, const char *subject)
 		return 0;
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

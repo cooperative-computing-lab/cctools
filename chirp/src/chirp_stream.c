@@ -212,3 +212,5 @@ int chirp_stream_close(struct chirp_stream *s, time_t stoptime)
 	free(s);
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

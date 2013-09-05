@@ -700,3 +700,5 @@ INT64_T cfs_stub_lremovexattr(const char *path, const char *name)
 	errno = ENOSYS;
 	return -1;
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -85,3 +85,5 @@ INT64_T chirp_alloc_fremovexattr (int fd, const char *name);
 INT64_T chirp_alloc_lremovexattr (const char *path, const char *name);
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

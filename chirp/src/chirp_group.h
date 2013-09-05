@@ -11,3 +11,5 @@ See the file COPYING for details.
 int chirp_group_lookup(const char *group, const char *subject);
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

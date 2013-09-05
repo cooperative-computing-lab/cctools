@@ -129,3 +129,5 @@ INT64_T chirp_client_fsync_finish(struct chirp_client *c, INT64_T fd, time_t sto
 INT64_T chirp_client_fstat_begin(struct chirp_client *c, INT64_T fd, struct chirp_stat *buf, time_t stoptime);
 INT64_T chirp_client_fstat_finish(struct chirp_client *c, INT64_T fd, struct chirp_stat *buf, time_t stoptime);
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

@@ -13,3 +13,5 @@ See the file COPYING for details.
 INT64_T chirp_thirdput(const char *subject, const char *lpath, const char *hostname, const char *rpath, time_t stoptime);
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

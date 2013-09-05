@@ -716,3 +716,5 @@ int main(int argc, char *argv[])
 }
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

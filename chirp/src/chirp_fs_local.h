@@ -12,3 +12,5 @@ See the file COPYING for details.
 extern struct chirp_filesystem chirp_fs_local;
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

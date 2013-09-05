@@ -121,3 +121,5 @@ void chirp_stats_report(int pipefd, const char *addr, const char *subject, int i
 		child_report_time = time(0);
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

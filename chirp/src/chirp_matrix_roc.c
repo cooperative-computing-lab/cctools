@@ -495,3 +495,5 @@ INT64_T get_local_path(char *local_path, char *path, time_t stoptime)
 		return 0;
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -97,3 +97,5 @@ Note that a stream may buffer data internally, so the called does not know if al
 int chirp_stream_close(struct chirp_stream *stream, time_t stoptime);
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

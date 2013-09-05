@@ -777,3 +777,5 @@ After forking, each process will maintain its own connection to each Chirp serve
 void chirp_reli_cleanup_before_fork();
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

@@ -1968,3 +1968,5 @@ static int errno_to_chirp(int e)
 		return CHIRP_ERROR_UNKNOWN;
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

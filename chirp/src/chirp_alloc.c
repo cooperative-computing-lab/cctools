@@ -1081,3 +1081,5 @@ INT64_T chirp_alloc_lremovexattr(const char *path, const char *name)
 	/* FIXME check allocated */
 	return cfs->lremovexattr(path, name);
 }
+
+/* vim: set noexpandtab tabstop=4: */

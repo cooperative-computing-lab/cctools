@@ -39,3 +39,5 @@ to handle a number of failure cases.
 INT64_T chirp_recursive_get(const char *hostport, const char *sourcepath, const char *targetpath, time_t stoptime);
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */
