@@ -15,19 +15,27 @@ prepare()
 void test (const char *in, const char *expected)
 {
 	char *out = path_extension(in);
-	if (strcmp(out, expected) != 0) {
-		fprintf(stderr, "for %s, got %s expected %s\n", in, out, expected);
-		exit(EXIT_FAILURE);
+	if (expected) {
+		if (strcmp(out, expected) != 0) {
+			fprintf(stderr, "for %s, got %s expected %s\n", in, out, expected);
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		if (out){
+			fprintf(stderr, "for %s, got %s expected NULL\n", in, out);
+			exit(EXIT_FAILURE);
+		}
 	}
 }
 
 int main(int argc, char *argv[])
 {
-	test("foo", "");
+	test("foo", NULL);
 	test("foo.bar", "bar");
-	test(".foobar", "");
+	test(".foobar", NULL);
 	test("foobar.", "");
-
+	test("/foo.bar/baz", NULL);
+	test("foo.bar.baz", "baz");
 	return 0;
 }
 EOF

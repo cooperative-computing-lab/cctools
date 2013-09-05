@@ -70,8 +70,9 @@ const char *path_basename (const char *path)
  */
 const char *path_extension (const char *path)
 {
-	const char *dot = strrchr(path, '.');
-	if(!dot || dot == path) return "";
+	const char *base = path_basename(path);
+	const char *dot = strrchr(base, '.');
+	if(!dot || dot == base) return NULL;
 	return dot + 1;
 }
 
