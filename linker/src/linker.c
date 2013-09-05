@@ -12,14 +12,14 @@
 
 typedef enum {UNKNOWN, PERL, PYTHON} file_type;
 
-typedef struct Dependency{
+struct dependency{
 	char *original_name;
 	char *final_name;
-	struct Dependency *parent;
-	struct Dependency *superparent;
+	struct dependency *parent;
+	struct dependency *superparent;
 	int  depth;
 	file_type type;
-} Dependency;
+};
 
 char *python_extensions[2] = { "py", "pyc" };
 char *perl_extensions[2]   = { "pl", "pm" };
@@ -65,7 +65,7 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 				case '\n':
 					buffer = realloc(buffer, size+1);
 					*(buffer+size) = '\0';
-					Dependency *new_dependency = (Dependency *) malloc(sizeof(Dependency));
+					struct dependency *new_dependency = (struct dependency *) malloc(sizeof(struct dependency));
 					new_dependency->original_name = original_name;
 					new_dependency->final_name = buffer;
 					new_dependency->depth = depth;
@@ -87,7 +87,7 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 }
 
 void display_dependencies(struct list *d){
-	Dependency *dep;
+	struct dependency *dep;
 
 	list_first_item(d);
 	while((dep = list_next_item(d))){
@@ -137,7 +137,7 @@ file_type find_driver_for(const char *name){
 	return type;
 }
 
-struct list *find_dependencies_for(Dependency *dep){
+struct list *find_dependencies_for(struct dependency *dep){
 	pid_t pid;
 	int pipefd[2];
 	pipe(pipefd);
@@ -182,7 +182,7 @@ struct list *find_dependencies_for(Dependency *dep){
 				case '\n':
 					buffer = realloc(buffer, size+1);
 					*(buffer+size) = '\0';
-					Dependency *new_dependency = (Dependency *) malloc(sizeof(Dependency));
+					struct dependency *new_dependency = (struct dependency *) malloc(sizeof(struct dependency));
 					new_dependency->original_name = original_name;
 					new_dependency->final_name = buffer;
 					new_dependency->depth = depth;
@@ -207,7 +207,7 @@ struct list *find_dependencies_for(Dependency *dep){
 }
 
 void find_dependencies(struct list *d){
-	Dependency *dep;
+	struct dependency *dep;
 	struct list *new;
 
 	list_first_item(d);
@@ -224,7 +224,7 @@ void find_dependencies(struct list *d){
 }
 
 void find_drivers(struct list *d){
-	Dependency *dep;
+	struct dependency *dep;
 	list_first_item(d);
 	while((dep = list_next_item(d))){
 		dep->type = find_driver_for(dep->final_name);
