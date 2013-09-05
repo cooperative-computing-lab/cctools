@@ -10,6 +10,7 @@ See the file COPYING for details.
 
 extern "C" {
 #include "debug.h"
+#include "path.h"
 #include "stringtools.h"
 }
 
@@ -40,7 +41,7 @@ static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
 #define CERN_KEY_PLACEHOLDER "<BUILTIN-cern.ch.pub>"
 #define OASIS_KEY_PLACEHOLDER "<BUILTIN-opensciencegrid.org.pub>"
 
-static const char *default_cvmfs_repo = "*.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/* *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/*";
+static const char *default_cvmfs_repo = "*:try_local_filesystem *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/* *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/*";
 
 static const char *cern_key_text = 
 "-----BEGIN PUBLIC KEY-----\n\
@@ -89,6 +90,9 @@ public:
 	std::list<int> wildcard_subst;
 	int subst_offset;
 	bool match_wildcard;
+	bool try_local_filesystem; // test for locally mounted cvmfs filesystem
+	bool use_local_filesystem; // always use locally mounted cvmfs filesystem
+	bool cvmfs_not_configured; // only local access is possible
 
 	cvmfs_filesystem *createMatch(char const *repo_name) const;
 };
@@ -371,6 +375,22 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 			proxy ? proxy : "",
 			&f->subst_offset,
 			user_options);
+
+	f->use_local_filesystem = false;
+	f->try_local_filesystem = false;
+	char *try_local_filesystem_pos = strstr(buf,"try_local_filesystem");
+	if( try_local_filesystem_pos ) {
+		f->try_local_filesystem = true;
+		char *rest = try_local_filesystem_pos+strlen("try_local_filesystem");
+		memmove(try_local_filesystem_pos,rest,strlen(rest)+1);
+	}
+
+	// see if this entry is just for local filesystem access, or if it supports parrot cvmfs access
+	f->cvmfs_not_configured = true;
+	if( strstr(buf,"url") ) {
+		f->cvmfs_not_configured = false;
+	}
+
 	f->cvmfs_options = buf;
 
 	f->match_wildcard = wildcard;
@@ -663,7 +683,7 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 
 	do
 	{
-		string_split_path(path_tail, path_head, path_tail);
+		path_split(path_tail, path_head, path_tail);
 
 		int rest_len = strlen(xpath->rest);
 		xpath->rest[rest_len] = '/';
@@ -699,7 +719,7 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 					*(last_d + 1) = '\0';
 					
 					strncat(xpath->rest, link_target, PFS_PATH_MAX); 
-					string_collapse_path(xpath->rest, path_relative, 1);
+					path_collapse(xpath->rest, path_relative, 1);
 					snprintf(link_target, PFS_PATH_MAX, "/cvmfs/%s%s",
 						 xpath->host, path_relative); 
 				}
@@ -740,6 +760,39 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_leaf_symlinks, bool expan
 
 	cvmfs_filesystem *f = lookup_filesystem(path, &subpath);
 	if(!f) {
+		return false;
+	}
+	if( f->try_local_filesystem ) {
+		class pfs_service *local = pfs_service_lookup_default();
+		struct pfs_name local_fs;
+
+		snprintf(local_fs.rest,PFS_PATH_MAX,"/cvmfs/%s/%s",f->host.c_str(),f->path.c_str());
+		local_fs.rest[PFS_PATH_MAX-1] = '\0';
+		local_fs.is_local = 1;
+
+		struct pfs_stat st;
+		if( local->lstat(&local_fs,&st)==0 ) {
+			f->use_local_filesystem = true;
+			debug(D_CVMFS,"Found %s on local filesystem, so not using parrot cvmfs.",
+				  local_fs.rest);
+		}
+		else if( f->cvmfs_not_configured ) {
+			debug(D_CVMFS|D_NOTICE,"ERROR: Did not find %s on local filesystem (errno=%d %s), "
+				  "and parrot has not been configured to know how to access this CVMFS repository",
+				  local_fs.rest,errno,strerror(errno));
+			return false;
+		}
+		else {
+			debug(D_CVMFS,"Did not find %s on local filesystem (errno=%d %s), so using parrot cvmfs",
+				  local_fs.rest,errno,strerror(errno));
+		}
+		f->try_local_filesystem = false; // For efficiency, only test local access once.
+	}
+	if( f->use_local_filesystem ) {
+		// Tell caller to try again via the local filesystem.
+		strcpy(path->rest,path->logical_name);
+		path->is_local = 1;
+		errno = EAGAIN;
 		return false;
 	}
 
@@ -859,6 +912,10 @@ class pfs_service_cvmfs:public pfs_service {
 
 		if(!d.lookup(name, 1, 1)) {
 			// errno is set by lookup()
+			if( errno == EAGAIN ) {
+				class pfs_service *local = pfs_service_lookup_default();
+				return local->open(name,flags,mode);
+			}
 			return 0;
 		}
 
@@ -907,6 +964,10 @@ class pfs_service_cvmfs:public pfs_service {
 		*/
 
 		if(!d.lookup(name, 1, 1)) {
+			if( errno == EAGAIN ) {
+				class pfs_service *local = pfs_service_lookup_default();
+				return local->getdir(name);
+			}
 			return 0;
 		}
 
@@ -963,11 +1024,21 @@ class pfs_service_cvmfs:public pfs_service {
 	}
 
 	virtual int lstat(pfs_name * name, struct pfs_stat *info) {
-		return anystat(name,info,0,1);
+		int rc = anystat(name,info,0,1);
+		if( rc == -1 && errno == EAGAIN ) {
+			class pfs_service *local = pfs_service_lookup_default();
+			return local->lstat(name,info);
+		}
+		return rc;
 	}
 
 	virtual int stat(pfs_name * name, struct pfs_stat *info) {
-		return anystat(name,info,1,1);
+		int rc = anystat(name,info,1,1);
+		if( rc == -1 && errno == EAGAIN ) {
+			class pfs_service *local = pfs_service_lookup_default();
+			return local->stat(name,info);
+		}
+		return rc;
 	}
 
 	virtual int access(pfs_name * name, mode_t mode) {
@@ -1061,6 +1132,10 @@ class pfs_service_cvmfs:public pfs_service {
 		struct cvmfs_dirent d;
 
 		if(!d.lookup(name, 0, 0)) {
+			if( errno == EAGAIN ) {
+				class pfs_service *local = pfs_service_lookup_default();
+				return local->readlink(name,buf,bufsiz);
+			}
 			return -1;
 		}
 

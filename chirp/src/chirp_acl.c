@@ -13,6 +13,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "hash_table.h"
+#include "path.h"
 #include "stringtools.h"
 #include "username.h"
 #include "xxmalloc.h"
@@ -30,26 +31,26 @@ See the file COPYING for details.
 #include <dirent.h>
 
 static int read_only_mode = 0;
-static const char *default_acl = 0;
+static char default_acl[PATH_MAX];
 
 extern const char *chirp_super_user;
-extern const char *chirp_ticket_path;
+extern const char *chirp_root_path;
 
 void chirp_acl_force_readonly()
 {
 	read_only_mode = 1;
 }
 
-void chirp_acl_default(const char *d)
+void chirp_acl_default(const char *path)
 {
-	default_acl = d;
+	strcpy(default_acl, path);
 }
 
 static void make_acl_name(const char *filename, int get_parent, char *aclname)
 {
 	char tmp[CHIRP_PATH_MAX];
 	sprintf(tmp, "%s/%s", filename, CHIRP_ACL_BASE_NAME);
-	string_collapse_path(tmp, aclname, 1);
+	path_collapse(tmp, aclname, 1);
 }
 
 static int ticket_read(char *ticket_filename, struct chirp_ticket *ct)
@@ -116,7 +117,7 @@ static int do_chirp_acl_get(const char *dirname, const char *subject, int *total
 		/* open the ticket file, read the public key */
 		char ticket_filename[CHIRP_PATH_MAX];
 		struct chirp_ticket ct;
-		chirp_ticket_filename(ticket_filename, subject, NULL);
+		chirp_ticket_filename(chirp_root_path, ticket_filename, subject, NULL);
 		if(!ticket_read(ticket_filename, &ct))
 			return 0;
 		if(!do_chirp_acl_get(dirname, ct.subject, totalflags)) {
@@ -129,8 +130,8 @@ static int do_chirp_acl_get(const char *dirname, const char *subject, int *total
 		for(i = 0; i < ct.nrights; i++) {
 			char safewhere[CHIRP_PATH_MAX];
 			char where[CHIRP_PATH_MAX];
-			sprintf(safewhere, "%s/%s", chirp_ticket_path, ct.rights[i].directory);
-			string_collapse_path(safewhere, where, 1);
+			sprintf(safewhere, "%s/%s", chirp_root_path, ct.rights[i].directory);
+			path_collapse(safewhere, where, 1);
 
 			if(strncmp(dirname, where, strlen(where)) == 0) {
 				if(strlen(where) > longest) {
@@ -225,7 +226,7 @@ static int do_chirp_acl_check(const char *filename, const char *subject, int fla
 
 			if(linkname[0] != '/') {
 				sprintf(temp, "%s/../%s", filename, linkname);
-				string_collapse_path(temp, linkname, 1);
+				path_collapse(temp, linkname, 1);
 			}
 
 			/* Use the linkname now to look up the ACL */
@@ -253,9 +254,9 @@ static int do_chirp_acl_check(const char *filename, const char *subject, int fla
 
 	/* Now get the name of the directory containing the file */
 
-	string_collapse_path(filename, temp, 1);
+	path_collapse(filename, temp, 1);
 	if(!cfs_isdir(temp))
-		string_dirname(temp, dirname);
+		path_dirname(temp, dirname);
 	else
 		strcpy(dirname, temp);
 
@@ -279,7 +280,7 @@ char *chirp_acl_ticket_callback(const char *digest)
 	char path[CHIRP_PATH_MAX];
 	struct chirp_ticket ct;
 
-	chirp_ticket_filename(path, NULL, digest);
+	chirp_ticket_filename(chirp_root_path, path, NULL, digest);
 
 	if(ticket_read(path, &ct)) {
 		char *ticket = xxstrdup(ct.ticket);
@@ -305,7 +306,7 @@ int chirp_acl_ticket_delete(const char *ticket_dir, const char *subject, const c
 	if(!chirp_acl_whoami(subject, &esubject))
 		return -1;
 
-	chirp_ticket_filename(ticket_filename, ticket_subject, NULL);
+	chirp_ticket_filename(chirp_root_path, ticket_filename, ticket_subject, NULL);
 
 	if(!ticket_read(ticket_filename, &ct)) {
 		free(esubject);
@@ -337,7 +338,7 @@ int chirp_acl_ticket_get(const char *ticket_dir, const char *subject, const char
 
 	struct chirp_ticket ct;
 	char ticket_filename[CHIRP_PATH_MAX];
-	chirp_ticket_filename(ticket_filename, ticket_subject, NULL);
+	chirp_ticket_filename(chirp_root_path, ticket_filename, ticket_subject, NULL);
 	if(!ticket_read(ticket_filename, &ct)) {
 		free(esubject);
 		errno = EINVAL;
@@ -459,7 +460,7 @@ int chirp_acl_ticket_create(const char *ticket_dir, const char *subject, const c
 	 */
 	if(chirp_ticket_isticketsubject(subject, &digest)) {
 		struct chirp_ticket ct;
-		chirp_ticket_filename(ticket_filename, subject, NULL);
+		chirp_ticket_filename(chirp_root_path, ticket_filename, subject, NULL);
 		if(!ticket_read(ticket_filename, &ct))
 			return -1;
 		if(ct.expiration < now + offset) {
@@ -473,7 +474,7 @@ int chirp_acl_ticket_create(const char *ticket_dir, const char *subject, const c
 		return -1;
 	}
 
-	chirp_ticket_name(ticket, ticket_subject, ticket_filename);
+	chirp_ticket_name(chirp_root_path, ticket, ticket_subject, ticket_filename);
 
 	CHIRP_FILE *f = cfs_fopen(ticket_filename, "w");
 	if(!f) {
@@ -517,7 +518,7 @@ int chirp_acl_ticket_modify(const char *ticket_dir, const char *subject, const c
 	if(!chirp_acl_whoami(subject, &esubject))
 		return -1;
 
-	chirp_ticket_filename(ticket_filename, ticket_subject, NULL);
+	chirp_ticket_filename(chirp_root_path, ticket_filename, ticket_subject, NULL);
 
 	if(!ticket_read(ticket_filename, &ct)) {
 		free(esubject);
@@ -531,7 +532,7 @@ int chirp_acl_ticket_modify(const char *ticket_dir, const char *subject, const c
 			char safewhere[CHIRP_PATH_MAX];
 			char where[CHIRP_PATH_MAX];
 			sprintf(safewhere, "%s/%s", ticket_dir, ct.rights[n].directory);
-			string_collapse_path(safewhere, where, 1);
+			path_collapse(safewhere, where, 1);
 
 			if(strcmp(where, path) == 0) {
 				free(ct.rights[n].acl);
@@ -545,7 +546,7 @@ int chirp_acl_ticket_modify(const char *ticket_dir, const char *subject, const c
 			char directory[CHIRP_PATH_MAX];
 			char collapsed_directory[CHIRP_PATH_MAX];
 			sprintf(directory, "/%s", path + strlen(ticket_dir));
-			string_collapse_path(directory, collapsed_directory, 1);
+			path_collapse(directory, collapsed_directory, 1);
 			ct.rights[ct.nrights - 1].directory = xxstrdup(collapsed_directory);
 			ct.rights[ct.nrights - 1].acl = xxstrdup(chirp_acl_flags_to_text(flags));
 		}
@@ -567,7 +568,7 @@ int chirp_acl_whoami(const char *subject, char **esubject)
 		struct chirp_ticket ct;
 		char ticket_filename[CHIRP_PATH_MAX];
 
-		chirp_ticket_filename(ticket_filename, subject, NULL);
+		chirp_ticket_filename(chirp_root_path, ticket_filename, subject, NULL);
 		if(!ticket_read(ticket_filename, &ct))
 			return 0;
 		*esubject = xxstrdup(ct.subject);
@@ -604,7 +605,7 @@ int chirp_acl_set(const char *dirname, const char *subject, int flags, int reset
 
 		/* If the acl never existed, then we can simply create it. */
 		if(!aclfile && errno == ENOENT) {
-			if(default_acl) {
+			if(strlen(default_acl)) {
 				aclfile = cfs_fopen(default_acl, "r");
 			} else {
 				aclfile = cfs_fopen("/dev/null", "r");	/* use local... */
@@ -669,7 +670,7 @@ CHIRP_FILE *chirp_acl_open(const char *dirname)
 
 	make_acl_name(dirname, 0, aclname);
 	file = cfs_fopen(aclname, "r");
-	if(!file && default_acl)
+	if(!file && strlen(default_acl))
 		file = cfs_fopen(default_acl, "r");
 	return file;
 }
@@ -901,7 +902,7 @@ int chirp_acl_init_reserve(const char *path, const char *subject)
 	if(!cfs->do_acl_check())
 		return 1;
 
-	string_dirname(path, dirname);
+	path_dirname(path, dirname);
 
 	if(!do_chirp_acl_get(dirname, subject, &aclflags))
 		return 0;

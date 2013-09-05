@@ -15,7 +15,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "xxmalloc.h"
 #include "int_sizes.h"
-#include "stringtools.h"
+#include "path.h"
 #include "full_io.h"
 #include "delete_dir.h"
 
@@ -97,22 +97,35 @@ See the file COPYING for details.
 	(b).cst_ctime = (a).st_ctime;
 #endif
 
+extern const char *chirp_root_path;
+
 static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *buf);
 static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *buf);
 
 /*
-The provided url could have any of the following forms:
-local:/path, file:/path, or just /path.
-*/
-
+ * The provided url could have any of the following forms:
+ * o `local://path'
+ * o `file://path'
+ * o `path'
+ */
+#define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
 static const char *chirp_fs_local_init(const char *url)
 {
-	char *c = strchr(url, ':');
-	if(c) {
-		return strdup(c + 1);
-	} else {
-		return strdup(url);
+	static char root[CHIRP_PATH_MAX];
+	char tmp[CHIRP_PATH_MAX];
+
+	if (strlen(url) >= CHIRP_PATH_MAX) {
+		fatal("root path too long");
 	}
+
+	if (strprfx(url, "local://") || strprfx(url, "file://"))
+		strcpy(tmp, strstr(url, "//")+2);
+	else
+		strcpy(tmp, url);
+
+	path_collapse(tmp, root, 1);
+
+	return root;
 }
 
 static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode)
@@ -515,7 +528,7 @@ static int search_directory(const char *subject, const char * const base, char *
 			sprintf(current, "/%s", name);
 
 			if(search_match_file(pattern, base)) {
-				const char *matched = includeroot ? fullpath+1 : base; /* fullpath+1 because chirp_root_path is always "./" !! */
+				const char *matched = includeroot ? fullpath+strlen(chirp_root_path) : base; /* add strlen(chirp_root_path) to strip out */
 
 				result += 1;
 				if (access_flags == F_OK || chirp_fs_local_access(fullpath, access_flags) == 0) {
@@ -570,7 +583,8 @@ static int search_directory(const char *subject, const char * const base, char *
 static INT64_T chirp_fs_local_search(const char *subject, const char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
 {
 	char pathname[CHIRP_PATH_MAX];
-	string_collapse_path(dir, pathname, 0);
+	strcpy(pathname, dir);
+	path_remove_trailing_slashes(pathname); /* this prevents double slashes from appearing in paths we examine. */
 
 	debug(D_DEBUG, "chirp_fs_local_search(subject = `%s', dir = `%s', pattern = `%s', flags = %d, ...)", subject, dir, pattern, flags);
 
