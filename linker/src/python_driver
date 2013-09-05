@@ -48,5 +48,5 @@ for m in modules:
 	if imp.is_builtin(m_split[0]):
 		continue
 	m_path = imp.find_module(m_split[0])[1]
-	print m, ' ', m_path
+	print m, m_path
 

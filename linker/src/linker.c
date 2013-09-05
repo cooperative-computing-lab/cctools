@@ -147,7 +147,7 @@ void find_dependencies_for(dependency *dep){
 		char * const args[3] = { "locating dependencies" , dep->original_name, NULL };
 		switch ( dep->type ){
 			case PYTHON:
-				execvp("./python_linker", args); 
+				execvp("./python_driver", args);
 			case PERL: 
 				execvp("./perl_linker", args);
 			case UNKNOWN:
@@ -159,19 +159,26 @@ void find_dependencies_for(dependency *dep){
 		close(pipefd[1]);
 		char next;
 		char *buffer = (char *) malloc(sizeof(char));
+		char *original_name;
 		int size = 0;
 		while (read(pipefd[0], &next, sizeof(next)) != 0){
 			switch ( next ){
+				case ' ':
+					original_name = (char *)realloc((void *)buffer,size+1);
+					*(original_name+size) = '\0';
+					buffer = (char *) malloc(sizeof(char));
+					size = 0;
+					break;
 				case '\n':
 					buffer = realloc(buffer, size+1);
 					*(buffer+size) = '\0';
 					dependency *new_dependency = (dependency *) malloc(sizeof(dependency));
-					new_dependency->original_name = buffer;
+					new_dependency->original_name = original_name;
+					new_dependency->final_name = buffer;
 					printf("%s\n", new_dependency->original_name);
+					printf("%s\n", new_dependency->final_name);
 					size = 0;
 					buffer = NULL;
-					break;
-				case '\0':
 					break;
 				default:
 					buffer = realloc(buffer, size+1);
@@ -180,8 +187,6 @@ void find_dependencies_for(dependency *dep){
 			}
 		}
 	}
-	// Driver returns list of first order formal dependencies as absolute file paths
-	// Print each file path returned
 }
 
 void find_dependencies(struct list *d){
