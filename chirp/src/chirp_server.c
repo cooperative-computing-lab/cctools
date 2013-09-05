@@ -532,7 +532,7 @@ int main(int argc, char *argv[])
 			listen_on_interface = optarg;
 			break;
 		case 'y':
-			path_absolute(optarg, chirp_transient_path, 1);
+			path_absolute(optarg, chirp_transient_path, 0);
 			break;
 		case 'z':
 			auth_unix_timeout_set(atoi(optarg));
@@ -559,18 +559,22 @@ int main(int argc, char *argv[])
 	umask(0077);
 
 	/* open debug file now because daemonize closes all open fds */
-	debug_config_file(chirp_debug_file);
+	debug_config_file(strlen(chirp_debug_file) ? chirp_debug_file : NULL);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
 	cfs_reinterpret(chirp_root_url);
-	chdir("/"); /* we would like to do this in daemonize but it messes up debug output */
+	/* translate relative paths to absolute ones */
+	{
+		char path[PATH_MAX];
+		path_absolute(chirp_transient_path, path, 0);
+		strcpy(chirp_transient_path, path);
+		debug(D_CHIRP, "transient directory: `%s'", chirp_transient_path);
+	}
 
-	if(strcmp(chirp_transient_path, ".") == 0) {
-		if(getcwd(chirp_transient_path, PATH_MAX) == NULL) {
-			fatal("could not get current working directory: %s", strerror(errno));
-		}
-	} else if(!create_dir(chirp_transient_path, S_IRWXU)) {
+	chdir("/"); /* no more relative path access from this point on */
+
+	if(!create_dir(chirp_transient_path, S_IRWXU)) {
 		fatal("could not create transient data directory '%s': %s", chirp_transient_path, strerror(errno));
 	}
 
