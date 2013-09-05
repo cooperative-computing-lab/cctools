@@ -52,6 +52,7 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 		char *buffer = (char *) malloc(sizeof(char));
 		char *original_name;
 		int size = 0;
+		int depth = 1;
 		while (read(pipefd[0], &next, sizeof(next)) != 0){
 			switch ( next ){
 				case '\t':
@@ -66,6 +67,7 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 					dependency *new_dependency = (dependency *) malloc(sizeof(dependency));
 					new_dependency->original_name = original_name;
 					new_dependency->final_name = buffer;
+					new_dependency->depth = depth;
 					list_push_tail(d, (void *) new_dependency);
 					size = 0;
 					original_name = NULL;
@@ -145,6 +147,7 @@ struct list *find_dependencies_for(dependency *dep){
 		char *buffer = (char *) malloc(sizeof(char));
 		char *original_name;
 		int size = 0;
+		int depth = dep->depth  + 1;
 		struct list *new_deps = list_create();
 
 		while (read(pipefd[0], &next, sizeof(next)) != 0){
@@ -161,6 +164,7 @@ struct list *find_dependencies_for(dependency *dep){
 					dependency *new_dependency = (dependency *) malloc(sizeof(dependency));
 					new_dependency->original_name = original_name;
 					new_dependency->final_name = buffer;
+					new_dependency->depth = depth;
 					list_push_tail(new_deps, new_dependency);
 					size = 0;
 					buffer = NULL;
