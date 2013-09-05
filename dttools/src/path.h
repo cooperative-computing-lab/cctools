@@ -9,6 +9,7 @@
 
 void path_absolute (const char *src, char *dest, int exist);
 const char *path_basename (const char * path);
+const char *path_extension (const char *path);
 void path_collapse (const char *l, char *s, int remove_dotdot);
 void path_dirname (const char *path, char *dir);
 
