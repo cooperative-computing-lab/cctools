@@ -5,6 +5,9 @@
 #include <limits.h>
 #include <string.h>
 
+#include "copy_stream.h"
+#include "create_dir.h"
+#include "debug.h"
 #include "list.h"
 #include "path.h"
 #include "xxmalloc.h"
@@ -243,9 +246,30 @@ void determine_package_structure(struct list *d, char *output_dir){
 				sprintf(resolved_path, "%s/%s", resolved_path, path_basename(dep->final_name));
 				break;
 			default:
+				/* TODO: naming conflicts */
 				break;
 		}
 		dep->output_path = xxstrdup(resolved_path);
+	}
+}
+
+void build_package(struct list *d){
+	struct dependency *dep;
+	list_first_item(d);
+	while((dep = list_next_item(d))){
+		char tmp_path[PATH_MAX];
+		switch(dep->type){
+			case PYTHON:
+				if(!create_dir(dep->output_path, 0777)) fatal("Could not create directory.\n");
+				sprintf(tmp_path, "%s/__main__.py", dep->output_path);
+				copy_file_to_file(dep->final_name, tmp_path);
+				break;
+			default:
+				sprintf(tmp_path, "%s/%s", dep->output_path, dep->final_name);
+				printf("%s -> %s\n", dep->final_name, tmp_path);
+				copy_file_to_file(dep->final_name, tmp_path);
+				break;
+		}
 	}
 }
 
@@ -262,6 +286,7 @@ int main(void){
 	find_dependencies(dependencies);
 
 	determine_package_structure(dependencies, output);
+	build_package(dependencies);
 
 	display_dependencies(dependencies);
 
