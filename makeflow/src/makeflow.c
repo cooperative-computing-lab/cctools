@@ -2757,12 +2757,10 @@ int main(int argc, char *argv[])
 
 		struct stat s;
 		if(!stat(bundle_directory, &s)) {
-			fprintf(stderr, "Target directory, %s, already exists.\n", bundle_directory);
-			exit(1);
+			fatal("Target directory, %s, already exists.", bundle_directory);
 		}
 		if(!create_dir(bundle_directory, 0777)) {
-			fprintf(stderr, "Could not create directory.\n");
-			exit(1);
+			fatal("Could not create directory.\n");
 		}
 		
 		char expanded_path[PATH_MAX];
