@@ -21,8 +21,7 @@ run() {
 
 clean() {
     cd linker
-    rm -rf "$out_dir"
-    rm -r "$out_dir" tmp
+    rm -rf "$out_dir" tmp
     exit 0
 }
 
