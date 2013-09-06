@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "list.h"
+#include "path.h"
 
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
@@ -99,14 +100,8 @@ void display_dependencies(struct list *d){
 	}
 }
 
-const char *filename_extension(const char *filename) {
-	const char *dot = strrchr(filename, '.');
-	if(!dot || dot == filename) return "";
-	return dot + 1;
-}
-
 file_type file_extension_known(const char *filename){
-	const char *extension = filename_extension(filename);
+	const char *extension = path_extension(filename);
 
 	int j;
 	for(j=0; j< 2; j++){
