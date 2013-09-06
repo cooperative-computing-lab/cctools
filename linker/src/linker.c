@@ -7,6 +7,7 @@
 
 #include "list.h"
 #include "path.h"
+#include "xxmalloc.h"
 
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
@@ -18,6 +19,7 @@ struct dependency{
 	char *final_name;
 	struct dependency *parent;
 	struct dependency *superparent;
+	char *output_path;
 	int  depth;
 	file_type type;
 };
@@ -93,9 +95,9 @@ void display_dependencies(struct list *d){
 	list_first_item(d);
 	while((dep = list_next_item(d))){
 		if(dep->parent){
-			printf("%s %s %d %d %s %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->parent->final_name, dep->superparent->final_name);
+			printf("%s %s %d %d %s %s %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->parent->final_name, dep->superparent->final_name, dep->output_path);
 		} else {
-			printf("%s %s %d %d\n", dep->original_name, dep->final_name, dep->depth, dep->type);
+			printf("%s %s %d %d n/a n/a %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->output_path);
 		}
 	}
 }
@@ -226,6 +228,27 @@ void find_drivers(struct list *d){
 	}
 }
 
+void determine_package_structure(struct list *d, char *output_dir){
+	struct dependency *dep;
+	list_first_item(d);
+	while((dep = list_next_item(d))){
+		char resolved_path[PATH_MAX];
+		if(dep->parent && dep->parent->output_path){
+			sprintf(resolved_path, "%s", dep->parent->output_path);
+		} else {
+			sprintf(resolved_path, "%s", output_dir);
+		}
+		switch(dep->type){
+			case PYTHON:
+				sprintf(resolved_path, "%s/%s", resolved_path, path_basename(dep->final_name));
+				break;
+			default:
+				break;
+		}
+		dep->output_path = xxstrdup(resolved_path);
+	}
+}
+
 int main(void){
 	char *output = "output_dir";
 	char *input = "test.mf";
@@ -237,6 +260,8 @@ int main(void){
 
 	find_drivers(dependencies);
 	find_dependencies(dependencies);
+
+	determine_package_structure(dependencies, output);
 
 	display_dependencies(dependencies);
 
