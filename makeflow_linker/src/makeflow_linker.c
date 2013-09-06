@@ -34,8 +34,9 @@ struct dependency{
 static int use_explicit = 0;
 static char *workspace = NULL;
 
-char *python_extensions[2] = { "py", "pyc" };
-char *perl_extensions[2]   = { "pl", "pm"  };
+char *python_extensions[2]   = { "py", "pyc" };
+char *perl_extensions[2]     = { "pl", "pm" };
+char *makeflow_extensions[2] = { "mf", "makeflow" };
 
 void create_workspace(){
 	workspace = (char *) malloc(PATH_MAX * sizeof(char));
