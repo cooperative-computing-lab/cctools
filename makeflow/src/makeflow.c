@@ -2754,7 +2754,6 @@ int main(int argc, char *argv[])
 		}
 		
 		char expanded_path[PATH_MAX];
-		if(realpath(bundle_directory, expanded_path)) fprintf(stderr, "%s\n", expanded_path);
 		
 		collect_input_files(d, bundle_directory, bundler_rename);
 
