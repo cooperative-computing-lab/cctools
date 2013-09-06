@@ -151,7 +151,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 		close(pipefd[0]);
 		dup2(pipefd[1], 1);
 		close(pipefd[1]);
-		char * const args[3] = { "locating dependencies" , dep->final_name, NULL };
+		char * const args[3] = { "locating dependencies" , dep->original_name, NULL };
 		switch ( dep->type ){
 			case PYTHON:
 				execvp("./python_driver", args);
@@ -215,7 +215,7 @@ void find_dependencies(struct list *d){
 		new = find_dependencies_for(dep);
 		list_first_item(new);
 		while((dep = list_next_item(new))){
-			dep->type = find_driver_for(dep->final_name);
+			dep->type = find_driver_for(dep->original_name);
 			list_push_tail(d, dep);
 		}
 		list_delete(new);
@@ -227,7 +227,7 @@ void find_drivers(struct list *d){
 	struct dependency *dep;
 	list_first_item(d);
 	while((dep = list_next_item(d))){
-		dep->type = find_driver_for(dep->final_name);
+		dep->type = find_driver_for(dep->original_name);
 	}
 }
 
@@ -243,7 +243,7 @@ void determine_package_structure(struct list *d, char *output_dir){
 		}
 		switch(dep->type){
 			case PYTHON:
-				sprintf(resolved_path, "%s/%s", resolved_path, path_basename(dep->final_name));
+				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
 				break;
 			default:
 				/* TODO: naming conflicts */
@@ -267,7 +267,7 @@ void build_package(struct list *d){
 			default:
 				sprintf(tmp_path, "%s/%s", dep->output_path, dep->final_name);
 				printf("%s -> %s\n", dep->final_name, tmp_path);
-				copy_file_to_file(dep->final_name, tmp_path);
+				copy_file_to_file(dep->original_name, tmp_path);
 				break;
 		}
 	}
