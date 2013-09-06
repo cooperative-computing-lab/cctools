@@ -246,8 +246,11 @@ void build_package(struct list *d){
 		switch(dep->type){
 			case PYTHON:
 				if(!create_dir(dep->output_path, 0777)) fatal("Could not create directory.\n");
-				sprintf(tmp_path, "%s/__main__.py", dep->output_path);
-				copy_file_to_file(dep->final_name, tmp_path);
+				if(dep->depth > 1)
+					sprintf(tmp_path, "%s/__init__.py", dep->output_path);
+				else
+					sprintf(tmp_path, "%s/__main__.py", dep->output_path);
+				copy_file_to_file(dep->original_name, tmp_path);
 				break;
 			default:
 				sprintf(tmp_path, "%s/%s", dep->output_path, dep->final_name);
