@@ -386,7 +386,7 @@ char *bundler_translate_name(const char *input_filename, int collision_counter)
 	} else {
 		hash_table_insert(previous_names, filename, filename);
 		hash_table_insert(reverse_names, filename, filename);
-		return filename;
+		return xxstrdup(filename);
 	}
 }
 
