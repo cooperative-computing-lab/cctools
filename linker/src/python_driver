@@ -42,6 +42,7 @@ def find_module_names(filename):
 file_to_link = sys.argv[1]
 setup(file_to_link)
 
+print "*Python", sys.version.split(' ')[0]
 modules = find_module_names(file_to_link)
 for m in modules:
 	m_split = m.split('.')
@@ -49,4 +50,5 @@ for m in modules:
 		continue
 	m_path = imp.find_module(m_split[0])[1]
 	print m_path, m
+
 
