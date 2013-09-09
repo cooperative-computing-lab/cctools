@@ -11,12 +11,13 @@
 #include "getopt_aux.h"
 #include "list.h"
 #include "path.h"
+#include "stringtools.h"
 #include "xxmalloc.h"
 
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
-typedef enum {UNKNOWN, PYTHON} file_type;
+typedef enum {UNKNOWN, EXPLICIT, PYTHON} file_type;
 
 struct dependency{
 	char *original_name;
@@ -97,16 +98,20 @@ void display_dependencies(struct list *d){
 
 	list_first_item(d);
 	while((dep = list_next_item(d))){
-		if(dep->parent){
-			printf("%s %s %d %d %s %s %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->parent->final_name, dep->superparent->final_name, dep->output_path);
-		} else {
-			printf("%s %s %d %d n/a n/a %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->output_path);
+		if(dep->type != EXPLICIT){
+			if(dep->parent){
+				printf("%s %s %d %d %s %s %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->parent->final_name, dep->superparent->final_name, dep->output_path);
+			} else {
+				printf("%s %s %d %d n/a n/a %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->output_path);
+			}
 		}
 	}
 }
 
 file_type file_extension_known(const char *filename){
 	const char *extension = path_extension(filename);
+
+	if(!extension) extension = "";
 
 	int j;
 	for(j=0; j< 2; j++){
@@ -129,6 +134,11 @@ struct list *find_dependencies_for(struct dependency *dep){
 	pid_t pid;
 	int pipefd[2];
 	pipe(pipefd);
+
+	if(dep->type == EXPLICIT){
+		struct list *empty = list_create();
+		return empty;
+	}
 
 	switch ( pid = fork() ){
 	case -1:
@@ -158,21 +168,37 @@ struct list *find_dependencies_for(struct dependency *dep){
 		int size = 0;
 		int depth = dep->depth  + 1;
 		struct list *new_deps = list_create();
+		int explicit = 0;
 
 		while (read(pipefd[0], &next, sizeof(next)) != 0){
 			switch ( next ){
+				case '*':
+					explicit = 1;
+					break;
 				case ' ':
-					original_name = (char *)realloc((void *)buffer,size+1);
-					*(original_name+size) = '\0';
-					buffer = (char *) malloc(sizeof(char));
-					size = 0;
+					if(explicit){
+						buffer = realloc(buffer, size+1);
+						*(buffer+size) = next;
+						size++;
+					} else {
+						original_name = (char *)realloc((void *)buffer,size+1);
+						*(original_name+size) = '\0';
+						buffer = (char *) malloc(sizeof(char));
+						size = 0;
+					}
 					break;
 				case '\n':
 					buffer = realloc(buffer, size+1);
 					*(buffer+size) = '\0';
 					struct dependency *new_dependency = (struct dependency *) malloc(sizeof(struct dependency));
-					new_dependency->original_name = original_name;
-					new_dependency->final_name = buffer;
+					if(explicit){
+						new_dependency->original_name = buffer;
+						new_dependency->final_name = buffer;
+						new_dependency->type = EXPLICIT;
+					} else {
+						new_dependency->original_name = original_name;
+						new_dependency->final_name = buffer;
+					}
 					new_dependency->depth = depth;
 					new_dependency->parent = dep;
 					if(dep->superparent){
@@ -183,6 +209,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 					list_push_tail(new_deps, new_dependency);
 					size = 0;
 					buffer = NULL;
+					explicit = 0;
 					break;
 				default:
 					buffer = realloc(buffer, size+1);
@@ -203,7 +230,8 @@ void find_dependencies(struct list *d){
 		new = find_dependencies_for(dep);
 		list_first_item(new);
 		while((dep = list_next_item(new))){
-			dep->type = find_driver_for(dep->original_name);
+			if(dep->type != EXPLICIT)
+				dep->type = find_driver_for(dep->original_name);
 			list_push_tail(d, dep);
 		}
 		list_delete(new);
@@ -257,11 +285,40 @@ void build_package(struct list *d){
 				break;
 			default:
 				sprintf(tmp_path, "%s/%s", dep->output_path, dep->final_name);
-				printf("%s -> %s\n", dep->final_name, tmp_path);
 				copy_file_to_file(dep->original_name, tmp_path);
 				break;
 		}
 	}
+}
+
+struct list *list_explicit(struct list *d){
+	struct dependency *dep;
+	struct list *explicit_dependencies = list_create();
+
+	list_first_item(d);
+	while((dep = list_next_item(d))){
+		if(dep->type == EXPLICIT){
+			if(!list_find(explicit_dependencies, (int (*)(void *, const void *)) string_equal, (void *) dep->original_name))
+				list_push_tail(explicit_dependencies, dep->original_name);
+		}
+	}
+
+	return explicit_dependencies;
+}
+
+void write_explicit(struct list *l, const char *output){
+	char *path = string_format("%s/explicit", output);
+	FILE *fp = NULL;
+	char *dep;
+	if(list_size(l) > 0){
+		fp = fopen(path, "w");
+		list_first_item(l);
+		while((dep = list_next_item(l))){
+			fprintf(fp, "%s\n", dep);
+		}
+		fclose(fp);
+	}
+	free(path);
 }
 
 static void show_help(const char *cmd){
@@ -303,8 +360,6 @@ int main(int argc, char *argv[]){
 	
 	input = argv[optind];
 
-	printf("%s -> %s\n", input, output);
-
 	struct list *dependencies;
 	dependencies = list_create();
 
@@ -315,6 +370,9 @@ int main(int argc, char *argv[]){
 
 	determine_package_structure(dependencies, output);
 	build_package(dependencies);
+
+	struct list *l = list_explicit(dependencies);
+	write_explicit(l, output);
 
 	display_dependencies(dependencies);
 
