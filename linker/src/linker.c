@@ -8,6 +8,7 @@
 #include "copy_stream.h"
 #include "create_dir.h"
 #include "debug.h"
+#include "getopt_aux.h"
 #include "list.h"
 #include "path.h"
 #include "xxmalloc.h"
@@ -276,9 +277,46 @@ void build_package(struct list *d){
 	}
 }
 
-int main(void){
-	char *output = "output_dir";
-	char *input = "test.mf";
+static void show_help(const char *cmd){
+	fprintf(stdout, "Use: %s [options] <workflow_description>\n", cmd);
+	fprintf(stdout, "Frequently used options:\n");
+	fprintf(stdout, "%-30s Show this help screen.\n", "-h,--help");
+	fprintf(stdout, "%-30s Specify output directory, default:output_dir\n", "-o,--output");
+}
+
+int main(int argc, char *argv[]){
+	char *output = NULL;
+	char *input  = NULL;
+
+	int c;
+
+	struct option long_options[] = {
+		{"help", no_argument, 0, 'h'},
+		{"output", required_argument, 0, 'o'},
+		{0, 0, 0, 0}
+	};
+
+	while((c = getopt_long(argc, argv, "ho:", long_options, NULL)) >= 0){
+		switch(c){
+			case 'o':
+				output = xxstrdup(optarg);
+				break;
+			case 'h':
+				show_help(argv[0]);
+				return 0;
+			default:
+				show_help(argv[0]);
+				return 1;
+		}
+	}
+
+	if(!output) output = "output_dir";
+	if((argc - optind) != 1)
+		fatal("linker: No workflow description specified.\n");
+	
+	input = argv[optind];
+
+	printf("%s -> %s\n", input, output);
 
 	struct list *dependencies;
 	dependencies = list_create();
