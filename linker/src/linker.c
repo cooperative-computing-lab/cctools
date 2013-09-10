@@ -369,7 +369,7 @@ int main(int argc, char *argv[]){
 		}
 	}
 
-	if(!output) output = "output_dir";
+	if(!output) output = xxstrdup("output_dir");
 	if((argc - optind) != 1)
 		fatal("linker: No workflow description specified.\n");
 	
@@ -379,6 +379,14 @@ int main(int argc, char *argv[]){
 	dependencies = list_create();
 
 	initialize(output, input, dependencies);
+	char *tmp = output;
+	output = (char *) malloc(PATH_MAX * sizeof(char));
+	realpath(tmp, output);
+	free(tmp);
+
+	char input_wd[PATH_MAX];
+	path_dirname(input, input_wd);
+	chdir(input_wd); 
 
 	find_drivers(dependencies);
 	find_dependencies(dependencies);
@@ -388,8 +396,6 @@ int main(int argc, char *argv[]){
 
 	struct list *l = list_explicit(dependencies);
 	write_explicit(l, output);
-
-	display_dependencies(dependencies);
 
 	return 0;
 }
