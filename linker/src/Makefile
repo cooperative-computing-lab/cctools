@@ -4,6 +4,7 @@ include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
 TARGETS= linker
+DRIVERS= python_driver
 
 LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
@@ -19,5 +20,5 @@ test: all
 
 install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
-	cp linker ${CCTOOLS_INSTALL_DIR}/bin
+	cp linker ${DRIVERS} ${CCTOOLS_INSTALL_DIR}/bin
 

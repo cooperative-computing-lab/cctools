@@ -165,7 +165,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 		char * const args[3] = { "locating dependencies" , dep->original_name, NULL };
 		switch ( dep->type ){
 			case PYTHON:
-				execvp("./python_driver", args);
+				execvp("python_driver", args);
 			case PERL: 
 				execvp("./perl_linker", args);
 			case EXPLICIT:
