@@ -26,9 +26,9 @@ run()
 foo bar
 EOF
 
-    ../src/chirp -a unix localhost:`cat "$chirp_port"` ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` /data rwl
+	../src/chirp -d all -a unix localhost:`cat "$chirp_port"` ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` /data rwl
 
-    ../src/chirp -a ticket --tickets="$ticket" localhost:`cat "$chirp_port"` ls /data
+	../src/chirp -d all -a ticket --tickets="$ticket" localhost:`cat "$chirp_port"` ls /data
 
     set +e
     return $?
