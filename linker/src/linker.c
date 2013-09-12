@@ -122,20 +122,10 @@ file_type file_extension_known(const char *filename){
 	return UNKNOWN;
 }
 
-file_type shebang_known(const char *filename){
-	return 0;
-}
-
-file_type unix_file_known(const char *filename){
-	return 0;
-}
-
 file_type find_driver_for(const char *name){
 	file_type type = UNKNOWN;
 
 	if((type = file_extension_known(name))){}
-	else if((type = shebang_known(name))){}
-	else if((type = unix_file_known(name))){}
 
 	return type;
 }
