@@ -21,9 +21,14 @@ run()
 {
 	set -e
 
-    ../src/chirp -a unix localhost:`cat "$chirp_port"` mkdir /data
+	../src/chirp -a unix localhost:`cat "$chirp_port"` mkdir /data
+	../src/chirp -a unix localhost:`cat "$chirp_port"` put /dev/stdin /data/foo <<EOF
+foo bar
+EOF
 
-    ../src/chirp -a unix localhost:`cat "$chirp_port"` ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` /data rwl
+	../src/chirp -a unix localhost:`cat "$chirp_port"` ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` /data rwl
+
+	../src/chirp -a ticket --tickets="$ticket" localhost:`cat "$chirp_port"` ls /data
 
 	set +e
 	return $?
