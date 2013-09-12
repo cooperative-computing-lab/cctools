@@ -1,2 +1,1 @@
-/Users/kc/Documents/programming/cctools/makeflow/test/linker/linker_abs_out
-/tmp/makeflow_test_absolute_path	makeflow_test_absolute_path
+/bin/ls	ls

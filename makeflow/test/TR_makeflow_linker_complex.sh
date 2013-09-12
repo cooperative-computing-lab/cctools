@@ -9,7 +9,7 @@ prepare() {
     exit 1
   fi
 
-  
+
   touch /tmp/makeflow_test_complex_path
   mkdir -p /tmp/makeflow_test_complex/a/b/x
   touch /tmp/makeflow_test_complex/a/b/x/y
@@ -21,8 +21,9 @@ prepare() {
 run() {
   cd linker
   ../../src/makeflow -b "$out_dir" complex.mf &> tmp
+  cat tmp | awk '{print $2}' | sort > tmp2
 
-  `diff tmp expected/complex.mf`
+  `diff tmp2 expected/complex.mf`
   exit $?
 }
 
@@ -32,8 +33,9 @@ clean() {
   rm -r /tmp/a
   rm -r /tmp/makeflow_test_complex_path
   rm tmp
+  rm tmp2
   exit 0
 }
 
 dispatch $@
-  
+
