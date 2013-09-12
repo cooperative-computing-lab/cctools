@@ -28,7 +28,7 @@ See the file COPYING for details.
 
 #define unsigned_isspace(c) isspace((unsigned char) c)
 
-const char *chirp_ticket_path = ".";
+const char *chirp_ticket_path = "."; /* we chdir to chirp_root_path in chirp_server.c */
 
 static int readquote(const char **buffer, const char **s, size_t * l)
 {
