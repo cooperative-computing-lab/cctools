@@ -39,19 +39,23 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 				debug(D_AUTH, "could not access ticket %s: %s", ticket, strerror(errno));
 				continue;
 			}
+			assert(strlen(ticket) <= PATH_MAX+4096);
 
 			/* load the digest */
 			/* WARNING: openssl is *very* bad at giving sensible output. Use the last
 			 * 32 non-space characters as the MD5 sum.
 			 */
-			char command[PATH_MAX * 2 + 4096];
-			sprintf(command, "openssl rsa -in '%s' -pubout 2> /dev/null | openssl md5 2> /dev/null | tr -d '[:space:]' | tail -c 32", ticket);
-			FILE *digestf = popen(command, "r");
-			if(full_fread(digestf, digest, DIGEST_LENGTH) < DIGEST_LENGTH) {
+			{
+				static const char template[] = "openssl rsa -in '%s' -pubout 2> /dev/null | openssl md5 2> /dev/null | tr -d '[:space:]' | tail -c 32";
+				char command[sizeof(template) + PATH_MAX + 4096];
+				sprintf(command, template, ticket);
+				FILE *digestf = popen(command, "r");
+				if(full_fread(digestf, digest, DIGEST_LENGTH) < DIGEST_LENGTH) {
+					pclose(digestf);
+					return 0;
+				}
 				pclose(digestf);
-				return 0;
 			}
-			pclose(digestf);
 			debug(D_AUTH, "trying ticket %.*s", DIGEST_LENGTH, digest);
 			if(link_putlstring(link, digest, DIGEST_LENGTH, stoptime) <= 0)
 				return 0;
@@ -69,14 +73,30 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 			debug(D_AUTH, "receiving challenge of %lu bytes", length);
 
 			FILE *in, *out;
-			static const char command_template[] = "T1=`mktemp`\n"	/* signed challenge */
-				"T2=`mktemp`\n"	/* private key without comments */
-				"sed '/^\\s*#/d' < '%s' > \"$T2\"\n" "openssl rsautl -inkey \"$T2\" -sign > \"$T1\" 2> /dev/null\n" "R=\"$?\"\n" "if [ \"$R\" -ne 0 ]; then\n" "  rm -f \"$T1\" \"$T2\"\n" "  exit \"$R\"\n" "fi\n"
-				"ls -l \"$T1\" | awk '{ print $5 }'\n" "cat \"$T1\"\n" "rm -f \"$T1\" \"$T2\"\n";
-			sprintf(command, command_template, ticket);
-			pid_t pid = dpopen(command, &in, &out);
-			if(pid == 0)
-				return 0;
+			pid_t pid;
+			{
+				static const char template[] =
+					"umask 0177\n" /* files only readable/writable by owner */
+					"T1=`mktemp /tmp/tmp.XXXXXX`\n"	/* signed challenge */
+					"T2=`mktemp /tmp/tmp.XXXXXX`\n"	/* private key without comments */
+					"sed '/^\\s*#/d' < '%s' > \"$T2\"\n" /* remove ticket comments */
+					/* "tee /tmp/client.challenge | "  DEBUG */
+					"openssl rsautl -inkey \"$T2\" -sign > \"$T1\" 2> /dev/null\n" /* reads challenge from stdin */
+					"R=\"$?\"\n"
+					"if [ \"$R\" -ne 0 ]; then\n"
+					"  rm -f \"$T1\" \"$T2\"\n"
+					"  exit \"$R\"\n"
+					"fi\n"
+					"wc -c \"$T1\"\n" /* signed challenge size to stdout */
+					/* "cat \"$T1\" > /tmp/client.challenge.signed\n" DEBUG */
+					"cat \"$T1\"\n" /* signed challenge to stdout */
+					"rm -f \"$T1\" \"$T2\"\n";
+				char command[sizeof(template) + PATH_MAX + 4096];
+				sprintf(command, template, ticket);
+				pid = dpopen(command, &in, &out);
+				if(pid == 0)
+					return 0;
+			}
 			if(link_stream_to_file(link, in, length, stoptime) <= 0) {
 				dpclose(in, out, pid);
 				debug(D_AUTH, "openssl failed, your keysize may be too small");
@@ -96,10 +116,10 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 			if(link_readline(link, line, sizeof(line), stoptime) <= 0)
 				return 0;
 			if(strcmp(line, "success") == 0) {
-				debug(D_AUTH, "succeeded challenge for %.*s\n", DIGEST_LENGTH, digest);
+				debug(D_AUTH, "succeeded challenge for %.*s", DIGEST_LENGTH, digest);
 				return 1;
 			} else if(strcmp(line, "failure") == 0) {
-				debug(D_AUTH, "failed challenge for %.*s\n", DIGEST_LENGTH, digest);
+				debug(D_AUTH, "failed challenge for %.*s", DIGEST_LENGTH, digest);
 				errno = EINVAL;
 				return 0;
 			} else {
@@ -140,25 +160,37 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 					free(ticket); /* free previously allocated ticket string or NULL (noop) */
 					ticket = server_callback(ticket_digest);
 					if(ticket) {
-						static const char command_template[] = "T1=`mktemp`\n"	/* The RSA Public Key */
-							"T2=`mktemp`\n"	/* The Challenge */
-							"T3=`mktemp`\n"	/* The Signed Challenge */
-							"T4=`mktemp`\n"	/* The Decrypted (verified) Signed Challenge */
-							"echo -n '%s' > \"$T1\"\n" "dd if=/dev/urandom of=\"$T2\" bs=%u count=1 > /dev/null 2> /dev/null\n" "cat \"$T2\"\n"	/* to stdout */
-							"cat > \"$T3\"\n"	/* from stdin */
-							"openssl rsautl -inkey \"$T1\" -pubin -verify < \"$T3\" > \"$T4\" 2> /dev/null\n" "cmp \"$T2\" \"$T4\" > /dev/null 2> /dev/null\n" "R=\"$?\"\n"
-							"rm -f \"$T1\" \"$T2\" \"$T3\" \"$T4\" > /dev/null 2> /dev/null\n" "exit \"$R\"\n";
-
-						char *command = xxmalloc(sizeof(command_template) + strlen(ticket) + 64);
-						sprintf(command, command_template, ticket, CHALLENGE_LENGTH);
-
 						FILE *in, *out;
-						pid_t pid = dpopen(command, &in, &out);
-						free(command);
-						if(pid == 0)
-							break;
+						pid_t pid;
 
-						if(!link_putfstring(link, "%d\n", stoptime, CHALLENGE_LENGTH))
+						assert(strlen(ticket) <= PATH_MAX+4096);
+						{
+							static const char template[] =
+								"umask 0177\n" /* files only readable/writable by owner */
+								"T1=`mktemp /tmp/tmp.XXXXXX`\n"	/* The RSA Public Key */
+								"T2=`mktemp /tmp/tmp.XXXXXX`\n"	/* The Challenge */
+								"T3=`mktemp /tmp/tmp.XXXXXX`\n"	/* The Signed Challenge */
+								"T4=`mktemp /tmp/tmp.XXXXXX`\n"	/* The Decrypted (verified) Signed Challenge */
+								"printf '%%s' '%s' > \"$T1\"\n"
+								"dd if=/dev/urandom of=\"$T2\" bs=%u count=1 > /dev/null 2> /dev/null\n"
+								/* "cat < \"$T2\" > /tmp/server.challenge\n" DEBUG */
+								"cat < \"$T2\"\n"	/* to stdout */
+								"cat > \"$T3\"\n"	/* from stdin */
+								/* "cat < \"$T3\" > /tmp/server.challenge.encrypted\n" DEBUG */
+								"openssl rsautl -inkey \"$T1\" -pubin -verify < \"$T3\" > \"$T4\" 2> /dev/null\n"
+								/* "cat < \"$T4\" > /tmp/server.challenge.decrypted\n" DEBUG */
+								"cmp \"$T2\" \"$T4\" > /dev/null 2> /dev/null\n"
+								"R=\"$?\"\n"
+								"rm -f \"$T1\" \"$T2\" \"$T3\" \"$T4\" > /dev/null 2> /dev/null\n"
+								"exit \"$R\"\n";
+							char command[sizeof(template)+PATH_MAX+4096+64];
+							sprintf(command, template, ticket, CHALLENGE_LENGTH);
+							pid = dpopen(command, &in, &out);
+							if(pid == 0)
+								break;
+						}
+
+						if(!link_putfstring(link, "%u\n", stoptime, CHALLENGE_LENGTH))
 							break;
 						if(!link_stream_from_file(link, out, CHALLENGE_LENGTH, stoptime))
 							break;
@@ -170,16 +202,18 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 							break;	/* not a number? */
 						if(!link_stream_to_file(link, in, length, stoptime))
 							break;
+						fclose(in);
+						in = NULL;
 
 						int result = dpclose(in, out, pid);
 
 						if(result == 0) {
-							debug(D_AUTH, "succeeded challenge for %s\n", ticket_digest);
+							debug(D_AUTH, "succeeded challenge for %s", ticket_digest);
 							link_putliteral(link, "success\n", stoptime);
 							status = 1;
 							break;
 						} else {
-							debug(D_AUTH, "failed challenge for %s\n", ticket_digest);
+							debug(D_AUTH, "failed challenge for %s", ticket_digest);
 							link_putliteral(link, "failure\n", stoptime);
 							break;
 						}

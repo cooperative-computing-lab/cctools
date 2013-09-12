@@ -628,9 +628,10 @@ INT64_T chirp_client_ticket_register(struct chirp_client * c, const char *name, 
 INT64_T chirp_client_ticket_create(struct chirp_client * c, char name[CHIRP_PATH_MAX], unsigned bits, time_t stoptime)
 {
 	static const char command[] =
-		"T=`mktemp ticket.XXXXXX`\n"
-		"P=`mktemp ticket.pub.XXXXXX`\n"
-		"MD5=`mktemp ticket.md5.XXXXXX`\n"
+		"umask 0177\n" /* files only readable/writable by owner */
+		"T=`mktemp /tmp/ticket.XXXXXX`\n"
+		"P=`mktemp /tmp/ticket.pub.XXXXXX`\n"
+		"MD5=`mktemp /tmp/ticket.md5.XXXXXX`\n"
 		"echo \"# Chirp Ticket\" > \"$T\"\n"
 		"echo \"# `date`: Ticket Created.\" >> \"$T\"\n"
 		"openssl genrsa \"$CHIRP_BITS\" >> \"$T\" 2> /dev/null\n"
