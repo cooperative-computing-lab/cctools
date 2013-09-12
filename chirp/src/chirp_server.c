@@ -301,8 +301,6 @@ static int gc_tickets(const char *url)
 	if(!path)
 		fatal("couldn't initialize %s", url);
 
-	chirp_ticket_path = path;
-
 	chirp_acl_gctickets(path);
 
 	return 0;
@@ -756,8 +754,6 @@ static void chirp_receive(struct link *link)
 	chirp_root_path = cfs->init(chirp_root_url);
 	if(!chirp_root_path)
 		fatal("could not initialize %s backend filesystem: %s", chirp_root_url, strerror(errno));
-
-	chirp_ticket_path = chirp_root_path;
 
 	if(root_quota > 0) {
 		if(cfs == &chirp_fs_hdfs)
