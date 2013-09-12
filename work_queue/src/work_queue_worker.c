@@ -1662,7 +1662,6 @@ static void work_for_master(struct link *master) {
 }
 
 static void foreman_for_master(struct link *master) {
-
 	int master_active = 0;
 	if(!master) {
 		return;
@@ -1671,6 +1670,9 @@ static void foreman_for_master(struct link *master) {
 	debug(D_WQ, "working for master at %s:%d as foreman.\n", actual_addr, actual_port);
 
 	time_t idle_stoptime = time(0) + idle_timeout;
+
+	struct work_queue_resources foreman_local;
+	work_queue_resources_measure(&foreman_local, workspace);
 
 	while(!abort_flag) {
 		int result = 1;
@@ -1690,23 +1692,25 @@ static void foreman_for_master(struct link *master) {
 			result = 1;
 		}
 
-		// BUG: we currently report the sum of disk space.
-		// Should be reporting the disk space available at the foreman.
-		work_queue_get_resources(foreman_q,local_resources);
+		work_queue_get_resources(foreman_q, local_resources);
+
+		local_resources->disk.total = foreman_local.disk.total; //overwrite with foreman's local disk information
+		local_resources->disk.inuse = foreman_local.disk.inuse; 
+
+		debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", local_resources->disk.inuse, local_resources->disk.total);
+
 		send_resource_update(master,0);
 		
-		if(master_active) {
+		if(master_active)
 			result &= handle_master(master);
-		}
 
 		if(!result) {
 			disconnect_master(master);
 			break;
 		}
 		
-		if(result) {
+		if(result)
 			idle_stoptime = time(0) + idle_timeout;
-		}
 	}
 }
 
@@ -2118,6 +2122,7 @@ int main(int argc, char *argv[])
 		work_queue_specify_estimate_capacity_on(foreman_q, enable_capacity);
 		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);	
 		work_queue_specify_log(foreman_q, foreman_stats_filename);
+
 	} else {
 		active_tasks = itable_create(0);
 		stored_tasks = itable_create(0);
@@ -2130,7 +2135,7 @@ int main(int argc, char *argv[])
 
 	// change to workspace
 	chdir(workspace);
-	
+
 	if(!check_disk_space_for_filesize(0)) {
 		goto abort;
 	}
@@ -2139,14 +2144,23 @@ int main(int argc, char *argv[])
 	local_resources_last = work_queue_resources_create();
 	work_queue_resources_measure(local_resources,workspace);
 
-	if(manual_cores_option)  local_resources->cores.total   = manual_cores_option;
-	if(manual_disk_option)   local_resources->disk.total   = manual_disk_option;
-	if(manual_memory_option) local_resources->memory.total = manual_memory_option;
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		local_resources->cores.total = 0;
+		local_resources->memory.total = 0;
+	} else {
+		if(manual_cores_option)  
+			 local_resources->cores.total = manual_cores_option;
+		if(manual_memory_option) 
+			local_resources->memory.total = manual_memory_option;
+	}
+
+	if(manual_disk_option)   
+		local_resources->disk.total = manual_disk_option;
 
 	debug(D_WQ,"local resources:");
 	work_queue_resources_debug(local_resources);
 
-	printf("work_queue_worker: %d workers, %d cores, %d MB memory, %d MB disk available\n",
+	fprintf(stdout, "work_queue_worker: %d workers, %d cores, %d MB memory, %d MB disk available\n",
 	       local_resources->workers.total,
 	       local_resources->cores.total,
 	       local_resources->memory.total,

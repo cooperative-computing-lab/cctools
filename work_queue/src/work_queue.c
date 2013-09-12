@@ -450,32 +450,40 @@ static void update_catalog(struct work_queue *q, struct link *master, int force_
 	char addrport[WORK_QUEUE_LINE_MAX];
 	static time_t last_update_time = 0;
 
-	if(!force_update) {
-		if(time(0) - last_update_time < WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL) return;
-	}
+	if(!force_update && (time(0) - last_update_time) < WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL) 
+			return;
 
-	if(!q->catalog_host) {
+	if(!q->catalog_host)
 		q->catalog_host = strdup(CATALOG_HOST);
-	}
 
-	if(!q->catalog_port) {
+	if(!q->catalog_port)
 		q->catalog_port = CATALOG_PORT;
-	}
+
 	work_queue_get_stats(q, &s);
 	struct work_queue_resources r;
+	struct work_queue_resources local_resources; // holding the foreman's disk information
 	memset(&r, 0, sizeof(r));
-	work_queue_get_resources(q,&r);
-	debug(D_WQ,"Updating catalog with resource information -- cores:%d memory:%d disk:%d\n", r.cores.total,r.memory.total,r.disk.total); //see if information is being passed correctly
-	char * worker_summary = work_queue_get_worker_summary(q);
+	work_queue_get_resources(q, &r);
 
-	if(master) {
+	char *worker_summary = work_queue_get_worker_summary(q);
+
+	if(master) {                                 // a master with a master... therefore a foreman
 		int port;
+		char working_directory[PATH_MAX];
+
 		link_address_remote(master, addrport, &port);
 		sprintf(addrport, "%s:%d", addrport, port);
+
+		getcwd(working_directory, PATH_MAX);                               
+		work_queue_resources_measure(&local_resources, working_directory); // get foreman local resources
+		r.disk.total = local_resources.disk.total; // overwrite aggregates with local disk information
+		r.disk.inuse = local_resources.disk.inuse;
+
+		debug(D_WQ,"Foreman -- inuse:%d total:%d\n", local_resources.disk.inuse, local_resources.disk.total);
 	} else {
 		sprintf(addrport, "127.0.0.1:-1"); //this master has no master
 	}
-
+	debug(D_WQ,"Updating catalog with resource information -- cores:%d memory:%d disk:%d\n", r.cores.total,r.memory.total,r.disk.total); //see if information is being passed correctly
 	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, addrport, &s, &r, worker_summary);
 	free(worker_summary);
 
@@ -3563,7 +3571,7 @@ void work_queue_get_resources( struct work_queue *q, struct work_queue_resources
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 
-		debug(D_WQ,"Worker #%d INFO - cores:%d memory:%d disk:%d\n", wnum,w->resources->cores.total,w->resources->memory.total,w->resources->disk.total); //see if information is being passed correctly
+		debug(D_WQ,"Worker #%d INFO - cores:%d memory:%d disk:%d\n", wnum,w->resources->cores.total, w->resources->memory.total, w->resources->disk.total);
 
 		if(first) {
 			*total = *w->resources;
