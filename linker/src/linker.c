@@ -17,7 +17,7 @@
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
-typedef enum {UNKNOWN, EXPLICIT, PERL, PYTHON} file_type;
+typedef enum {UNKNOWN, EXPLICIT, PYTHON} file_type;
 
 struct dependency{
 	char *original_name;
@@ -30,7 +30,6 @@ struct dependency{
 };
 
 char *python_extensions[2] = { "py", "pyc" };
-char *perl_extensions[2]   = { "pl", "pm" };
 
 void initialize( char *output_directory, char *input_file, struct list *d){
 	pid_t pid;
@@ -118,8 +117,6 @@ file_type file_extension_known(const char *filename){
 	for(j=0; j< 2; j++){
 		if(!strcmp(python_extensions[j], extension))
 			return PYTHON;
-		if(!strcmp(perl_extensions[j], extension))
-			return PERL;
 	}
 
 	return UNKNOWN;
@@ -166,8 +163,6 @@ struct list *find_dependencies_for(struct dependency *dep){
 		switch ( dep->type ){
 			case PYTHON:
 				execvp("python_driver", args);
-			case PERL: 
-				execvp("./perl_linker", args);
 			case EXPLICIT:
 				break;
 			case UNKNOWN:
