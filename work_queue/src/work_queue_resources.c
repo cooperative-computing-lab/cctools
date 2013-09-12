@@ -29,7 +29,7 @@ void work_queue_resources_delete( struct work_queue_resources *r )
 	free(r);
 }
 
-void work_queue_resources_measure( struct work_queue_resources *r, const char *disk_path )
+void work_queue_resources_measure_locally( struct work_queue_resources *r, const char *disk_path )
 {
 	UINT64_T avail,total;
 

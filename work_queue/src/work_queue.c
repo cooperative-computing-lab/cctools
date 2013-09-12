@@ -463,7 +463,7 @@ static void update_catalog(struct work_queue *q, struct link *master, int force_
 	struct work_queue_resources r;
 	struct work_queue_resources local_resources; // holding the foreman's disk information
 	memset(&r, 0, sizeof(r));
-	work_queue_get_resources(q, &r);
+	aggregate_workers_resources(q, &r);
 
 	char *worker_summary = work_queue_get_worker_summary(q);
 
@@ -475,7 +475,9 @@ static void update_catalog(struct work_queue *q, struct link *master, int force_
 		sprintf(addrport, "%s:%d", addrport, port);
 
 		getcwd(working_directory, PATH_MAX);                               
-		work_queue_resources_measure(&local_resources, working_directory); // get foreman local resources
+
+		// get foreman local resources
+		work_queue_resources_measure_locally(&local_resources, working_directory);
 		r.disk.total = local_resources.disk.total; // overwrite aggregates with local disk information
 		r.disk.inuse = local_resources.disk.inuse;
 
@@ -1186,7 +1188,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q )
 	nvpair_insert_integer(nv,"total_receive_time",info.total_receive_time);
 
 	struct work_queue_resources r;
-	work_queue_get_resources(q,&r);
+	aggregate_workers_resources(q,&r);
 	work_queue_resources_add_to_nvpair(&r,nv);
 
 	return nv;
@@ -3561,7 +3563,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_worker_slots = s->total_workers_connected;
 }
 
-void work_queue_get_resources( struct work_queue *q, struct work_queue_resources *total )
+void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total )
 {
 	struct work_queue_worker *w;
 	char *key;
