@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "list.h"
 #include "itable.h"
+#include "set.h"
 #include "stringtools.h"
 
 #include "rmsummary.h"
@@ -241,7 +242,7 @@ void dag_to_dax_individual_node(const struct dag_node *n, UINT64_T node_id)
 	fprintf(stdout, "\t</job>\n");
 }
 
-/* Iterates over each node to output as xml */
+/* Iterates over each node to output as DAX */
 void dag_to_dax_nodes(const struct dag *d)
 {
 	struct dag_node *n;
@@ -252,9 +253,29 @@ void dag_to_dax_nodes(const struct dag *d)
 		dag_to_dax_individual_node(n, node_id);
 }
 
-/* Writes the xml version of each relationship in the dag */
+/* Writes the DAX for a node's parent relationships */
+void dag_to_dax_parents(const struct dag_node *n)
+{
+	struct dag_node *p;
+	
+	if(set_size(n->ancestors) > 0){
+		fprintf(stdout, "\t<child ref=\"ID%07d\">\n", n->nodeid);
+		set_first_element(n->ancestors);
+		while((p = set_next_element(n->ancestors)))
+			fprintf(stdout, "\t\t<parent ref=\"ID%07d\" />\n", p->nodeid);
+		fprintf(stdout, "\t</child>\n");
+	}
+}
+
+/* Writes the DAX version of each relationship in the dag */
 void dag_to_dax_relationships(const struct dag *d)
 {
+	struct dag_node *n;
+	UINT64_T node_id;
+	
+	itable_firstkey(d->node_table);
+	while(itable_nextkey(d->node_table, &node_id, (void *) &n))
+		dag_to_dax_parents(n);
 }
 
 /* Writes the xml footer for DAX */
