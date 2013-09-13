@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "xxmalloc.h"
 #include "list.h"
+#include "itable.h"
 #include "stringtools.h"
 
 #include "rmsummary.h"
@@ -198,6 +199,64 @@ void dag_to_dax_header(const char *name)
 	fprintf(stdout, "name=\"%s\">\n", name);
 }
 
+/* Write list of files in DAX format for a given node 
+ * @param type 0 for input 1 for output
+ */
+void dag_to_dax_files(const struct list *fs, int type)
+{
+	const struct dag_file *f;
+	list_first_item(fs);
+	while((f = list_next_item(fs))) {
+		if(type == 0)
+			fprintf(stdout, "\t\t<uses name=\"%s\" link=\"input\" />\n", f->filename);
+		else
+			fprintf(stdout, "\t\t<uses name=\"%s\" link=\"output\" register=\"false\" transfer=\"true\" />\n", f->filename);
+	}
+}
+
+/* Extract the executable from a node */
+const char *node_executable(const struct dag_node *n)
+{
+	int first_space = strpos(n->command, ' ');
+	char *executable_path = string_front(n->command, first_space);
+	int executable_path_length = strlen(executable_path);
+	int last_slash = strrpos(executable_path, '/');
+	return string_back(executable_path, executable_path_length - last_slash - 1);
+}
+
+const char *node_executable_arguments(const struct dag_node *n)
+{
+	int command_length = strlen(n->command);
+	int first_space = strpos(n->command, ' ');
+	return string_back(n->command, command_length - first_space - 1);
+}
+
+/* Writes the DAX representation of a node */
+void dag_to_dax_individual_node(const struct dag_node *n, UINT64_T node_id)
+{
+	fprintf(stdout, "\t<job id=\"ID%07llu\" name=\"%s\">\n", node_id, node_executable(n));
+	fprintf(stdout, "\t\t<argument>%s</argument>\n", node_executable_arguments(n));
+	dag_to_dax_files(n->source_files, 0);
+	dag_to_dax_files(n->target_files, 1);
+	fprintf(stdout, "\t</job>\n");
+}
+
+/* Iterates over each node to output as xml */
+void dag_to_dax_nodes(const struct dag *d)
+{
+	struct dag_node *n;
+	UINT64_T node_id;
+
+	itable_firstkey(d->node_table);
+	while(itable_nextkey(d->node_table, &node_id, (void *) &n))
+		dag_to_dax_individual_node(n, node_id);
+}
+
+/* Writes the xml version of each relationship in the dag */
+void dag_to_dax_relationships(const struct dag *d)
+{
+}
+
 /* Writes the xml footer for DAX */
 void dag_to_dax_footer()
 {
@@ -211,10 +270,8 @@ void dag_to_dax_footer()
 int dag_to_dax(const struct dag *d, const char *name)
 {
 	dag_to_dax_header(name);
-
-	// iterate over every node and export node in dax
-	// iterate over every node and list child -> parent relationships
-
+	dag_to_dax_nodes(d);
+	dag_to_dax_relationships(d);
 	dag_to_dax_footer();
 	return 0;
 }
