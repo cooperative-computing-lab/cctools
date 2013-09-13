@@ -13,7 +13,6 @@ show_help()
 
 	echo "  -j                       Use job array to submit workers."	
 	echo "  -p <parameters>          SGE qsub parameters."
-	exit 1
 }
 
 use_jobarray=0
