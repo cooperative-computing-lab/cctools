@@ -18,18 +18,48 @@ show_help()
 	echo "  -O <os>          Set operating system string for the worker to report to master instead of the value in uname."
 	echo "  -s <path>        Set the location for creating the working directory of the worker."
 	echo "  -j               Use job array to submit workers."
+	echo "  -f               SSH port forwarding enabled."
+	echo "  -n <nodes>       Number of compute nodes that this job will reserve."
 	echo "  -p <parameters>  PBS qsub parameters."
 	echo "  -h               Show this help message."
 	exit 1
 }
 
+# An tutorial for submitting workers with SSH port forwarding to work around firewalls, 
+# compute nodes without Internet connectivity, and similar situations.
+# --> denotes a command that you need to run.
+# The master is workstation.university.edu at port 9999.  
+# The head node is headnode.cluster.com.
+# 
+# Consider a case where workstation.university.edu can connect to headnode.cluster.com, but not vice versa.
+# On workstation.university.edu, I run the command:
+# --> ssh -o ServerAliveInterval=180 -N -f -R9998:workstation.university.edu:9999 headnode.cluster.com
+# This redirects host "localhost" port 9998 on headnode.cluster.com to host 
+# "workstation.university.edu" port 9999 (numbers chosen to be different for clarity).
+# 
+# Now I submit a worker with the command:
+# --> [pbs|torque|sge]_submit_workers -f headnode.cluster.com 9998
+# The worker process will run the following command before starting the worker:
+# ssh -o ServerAliveInterval=180 -N -f -L9998:localhost:9998 headnode.cluster.com
+# This redirects host "localhost" port 9998 on the compute node to "localhost" port 9998 on headnode.cluster.com,
+# which *then* gets redirected to host "workstation.univeresity.edu" port 9999.
+# The worker should then connect to the master successfully..
+# 
+# Now consider where headnode.cluster.com can connect to workstation.university.edu but not vice versa.
+# Repeat the above command, but on headnode.cluster.com I run the command:
+# --> ssh -o ServerAliveInterval=180 -N -f -L9998:workstation.university.edu:9999 workstation.university.edu
+# This redirects host "localhost" port 9998 on headnode.cluster.com to host "workstation.university.edu" port 9999.
+# Note now -L creates a "localhost" port LOCALLY while -R creates a "localhost" port REMOTELY.
+
 arguments=""
 use_auto=0
 use_jobarray=0
 parameters=""
+port_forward=0
+nodes=1
 cores=1
 
-while getopts aM:N:c:C:t:d:w:i:b:z:A:O:s:jp:h opt 
+while getopts aM:N:c:C:t:d:w:i:b:z:A:O:s:fn:jp:h opt 
 do
 	case "$opt" in
 		a)  arguments="$arguments -a"; use_auto=1;; # backwards compatibility
@@ -47,6 +77,8 @@ do
 		O)  arguments="$arguments -O $OPTARG";;
 		s)  arguments="$arguments -s $OPTARG";;
 		j)  use_jobarray=1;;
+        f)  port_forward=1;;
+        n)  nodes=$OPTARG;;
 		p)  parameters="$parameters $OPTARG";;
 		h)  show_help;;
 		\?) show_help;;
@@ -93,13 +125,35 @@ cp $worker .
 
 cat >worker.sh <<EOF
 #!/bin/sh
-#PBS -l nodes=1:ppn=$cores
+#PBS -l nodes=$nodes:ppn=$cores
 
+# In order to enable a single batch job running on multiple nodes,
+# the worker.sh script is split into two parts.
 cd $PWD
-./work_queue_worker $arguments $host $port
+if [ $numnodes -gt 1 ] ; then
+    pbsdsh -u -v ./worker1.sh
+else
+    ./worker1.sh
+fi
 EOF
 
-chmod 755 worker.sh
+cat >worker1.sh <<EOF
+#!/bin/bash
+# The pbsdsh command doesn't load the user environment on each node
+# so we manually load it here.
+. /etc/profile
+. /etc/bashrc
+. /home/$USER/.bashrc
+
+if [ $port_forward == 1 ]; then
+    ssh -o ServerAliveInterval=180 -N -f -L$port:localhost:$port $host
+    ./work_queue_worker $arguments localhost $port
+else
+    ./work_queue_worker $arguments $host $port
+fi
+EOF
+
+chmod 755 worker.sh worker1.sh
 
 if [ $use_jobarray = 1 ]
 then

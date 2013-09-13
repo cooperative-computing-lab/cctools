@@ -25,15 +25,43 @@ show_help()
 	echo "  --memory <size>          Manually set the amonut of memory (in MB) reported by this worker."
 	echo "  --disk <size>            Manually set the amount of disk (in MB) reported by this worker."
 	echo "  -j                       Use job array to submit workers."	
+	echo "  -f                       SSH port forwarding enabled."
 	echo "  -p <parameters>          SGE qsub parameters."
 	echo "  -h,--help                Show this help message."
 	exit 1
 }
 
+# An tutorial for submitting workers with SSH port forwarding to work around firewalls, 
+# compute nodes without Internet connectivity, and similar situations.
+# --> denotes a command that you need to run.
+# The master is workstation.university.edu at port 9999.  
+# The head node is headnode.cluster.com.
+# 
+# Consider a case where workstation.university.edu can connect to headnode.cluster.com, but not vice versa.
+# On workstation.university.edu, I run the command:
+# --> ssh -o ServerAliveInterval=180 -N -f -R9998:workstation.university.edu:9999 headnode.cluster.com
+# This redirects host "localhost" port 9998 on headnode.cluster.com to host 
+# "workstation.university.edu" port 9999 (numbers chosen to be different for clarity).
+# 
+# Now I submit a worker with the command:
+# --> [pbs|torque|sge]_submit_workers -f headnode.cluster.com 9998
+# The worker process will run the following command before starting the worker:
+# ssh -o ServerAliveInterval=180 -N -f -L9998:localhost:9998 headnode.cluster.com
+# This redirects host "localhost" port 9998 on the compute node to "localhost" port 9998 on headnode.cluster.com,
+# which *then* gets redirected to host "workstation.univeresity.edu" port 9999.
+# The worker should then connect to the master successfully..
+# 
+# Now consider where headnode.cluster.com can connect to workstation.university.edu but not vice versa.
+# Repeat the above command, but on headnode.cluster.com I run the command:
+# --> ssh -o ServerAliveInterval=180 -N -f -L9998:workstation.university.edu:9999 workstation.university.edu
+# This redirects host "localhost" port 9998 on headnode.cluster.com to host "workstation.university.edu" port 9999.
+# Note now -L creates a "localhost" port LOCALLY while -R creates a "localhost" port REMOTELY.
+
 arguments=""
 use_auto=0
 use_jobarray=0
 parameters=""
+port_forward=0
 cores=1
 
 # Used options (as in the getopts format):  aM:N:C:t:d:w:i:b:z:A:O:s:P:jp:h  
@@ -117,6 +145,9 @@ do
 		-j)  
 			use_jobarray=1
 			;;
+		-f)  
+			port_forward=1
+			;;
 		-p)  
 			shift
 			parameters="$parameters $1"
@@ -173,7 +204,13 @@ cp $worker .
 cat >worker.sh <<EOF
 #!/bin/sh
 #$ -pe smp $cores
-./work_queue_worker $arguments $host $port
+
+if [ $port_forward == 1 ]; then
+    ssh -o ServerAliveInterval=180 -N -f -L$port:localhost:$port $host
+    ./work_queue_worker $arguments localhost $port
+else
+    ./work_queue_worker $arguments $host $port
+fi
 EOF
 
 chmod 755 worker.sh
