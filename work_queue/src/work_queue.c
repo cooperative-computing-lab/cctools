@@ -2189,10 +2189,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 	itable_insert(q->running_tasks, t->taskid, t); 
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
 
-	
-
 	if(start_one_task(q, w, t)) {
-		
 		//If everything is unspecified, set it to the value of an "average" worker.
 		if(t->cores < 0 && t->memory < 0 && t->disk < 0) {
 			t->cores = MAX((double)w->resources->cores.total/(double)w->resources->workers.total, 1);
@@ -2229,8 +2226,11 @@ static void start_tasks(struct work_queue *q)
 		if(w) {
 			start_task_on_worker(q, w);
 		} else {
-			// Move the task to the end of the queue.  This prevents one resource-hungry task from clogging the entire queue.
-			list_push_tail(q->ready_list, list_pop_head(q->ready_list));
+			//Move task to the end of queue when there is at least one available worker.  
+			//This prevents a resource-hungry task from clogging the entire queue.
+			if(q->workers_in_state[WORKER_STATE_READY] > 0) {
+				list_push_tail(q->ready_list, list_pop_head(q->ready_list));
+			}	
 			break;
 		}
 	}
