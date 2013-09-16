@@ -73,7 +73,7 @@ include_package_s3tools="s3tools"
 include_package_chirp="chirp"
 include_package_resource_monitor="resource_monitor"
 include_package_resource_monitor_visualizer="resource_monitor_visualizer"
-include_package_linker="linker"
+include_package_makeflow_linker="makeflow_linker"
 include_package_doc="doc"
 
 work_queue_bindings=""
@@ -296,8 +296,8 @@ do
 		--without-system-resource_monitor_visualizer)
 			include_package_resource_monitor_visualizer=""
 			;;
-		--without-system-linker)
-			include_package_linker=""
+		--without-system-makeflow-linker)
+			include_package_makeflow_linker=""
 			;;
 		--without-system-doc)
 			include_package_doc=""
@@ -360,7 +360,7 @@ And SYSTEM may be:
     parrot
     resource_monitor
     resource_monitor_visualizer
-    linker
+    makeflow_linker
     doc
 EOF
 			exit 1
@@ -376,7 +376,7 @@ done
 IFS=" "
 export IFS
 
-potential_packages="dttools work_queue ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_resource_monitor_visualizer} ${include_package_linker} ${include_package_doc}"
+potential_packages="dttools work_queue ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_resource_monitor_visualizer} ${include_package_makeflow_linker} ${include_package_doc}"
 
 check_multiarch
 

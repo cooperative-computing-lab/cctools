@@ -3,7 +3,7 @@
 . ../../dttools/src/test_runner.common.sh
 
 
-out_dir=linker.shrimp.out
+out_dir=makeflow_linker.shrimp.out
 expected=shrimp
 workflow_description=shrimpmakeflow.mf
 
@@ -13,7 +13,7 @@ prepare() {
 }
 
 run() {
-	../src/linker -o $out_dir input/shrimp/$workflow_description
+	../src/makeflow_linker -o $out_dir input/shrimp/$workflow_description
 
 	diff -bur expected/$expected $out_dir
 
