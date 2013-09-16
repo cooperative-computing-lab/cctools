@@ -356,7 +356,7 @@ int main(int argc, char *argv[]){
 
 	if(!output) output = xxstrdup("output_dir");
 	if((argc - optind) != 1)
-		fatal("linker: No workflow description specified.\n");
+		fatal("makeflow_linker: No workflow description specified.\n");
 	
 	input = argv[optind];
 
