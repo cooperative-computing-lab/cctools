@@ -204,7 +204,7 @@ void dag_to_dax_header(const char *name)
 /* Write list of files in DAX format for a given node 
  * @param type 0 for input 1 for output
  */
-void dag_to_dax_files(const struct list *fs, int type)
+void dag_to_dax_files(struct list *fs, int type)
 {
 	const struct dag_file *f;
 	list_first_item(fs);
@@ -230,7 +230,10 @@ const char *node_executable_arguments(const struct dag_node *n)
 {
 	int command_length = strlen(n->command);
 	int first_space = strpos(n->command, ' ');
-	return string_back(n->command, command_length - first_space - 1);
+	const char *before_redirection = string_back(n->command, command_length - first_space - 1);
+	int first_redirect = strpos(n->command, '>');
+	if(first_redirect < 0) return before_redirection;
+	return string_trim_spaces(string_front(before_redirection, first_redirect - first_space - 1));
 }
 
 const char *node_executable_redirect(const struct dag_node *n)
