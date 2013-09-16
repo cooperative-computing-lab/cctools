@@ -235,11 +235,24 @@ const char *node_executable_arguments(const struct dag_node *n)
 	return string_trim_spaces(string_front(before_redirection, first_redirect - first_space - 1));
 }
 
+const char *node_executable_redirect(const struct dag_node *n)
+{
+	int command_length = strlen(n->command);
+	int last_redirect = strrpos(n->command, '>');
+	if(last_redirect < 0) return NULL;
+	char *raw_redirect = (char *) string_back(n->command, command_length - last_redirect - 1);
+	return string_trim_spaces(raw_redirect);
+}
+
 /* Writes the DAX representation of a node */
 void dag_to_dax_individual_node(const struct dag_node *n, UINT64_T node_id)
 {
 	fprintf(stdout, "\t<job id=\"ID%07llu\" name=\"%s\">\n", node_id, node_executable(n));
 	fprintf(stdout, "\t\t<argument>%s</argument>\n", node_executable_arguments(n));
+
+	const char *redirection = node_executable_redirect(n);
+	if(redirection) fprintf(stdout, "\t\t<stdout name=\"%s\" link=\"output\" />\n", redirection);
+
 	dag_to_dax_files(n->source_files, 0);
 	dag_to_dax_files(n->target_files, 1);
 	fprintf(stdout, "\t</job>\n");
