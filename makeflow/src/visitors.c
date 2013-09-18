@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <inttypes.h>
 
 #include <ctype.h>
 #include <pwd.h>
@@ -247,7 +248,7 @@ const char *node_executable_redirect(const struct dag_node *n)
 /* Writes the DAX representation of a node */
 void dag_to_dax_individual_node(const struct dag_node *n, UINT64_T node_id)
 {
-	fprintf(stdout, "\t<job id=\"ID%07llu\" name=\"%s\">\n", node_id, node_executable(n));
+	fprintf(stdout, "\t<job id=\"ID%" PRIu64 "\" name=\"%s\">\n", node_id, node_executable(n));
 	fprintf(stdout, "\t\t<argument>%s</argument>\n", node_executable_arguments(n));
 
 	const char *redirection = node_executable_redirect(n);
