@@ -50,7 +50,7 @@ show_help_common()
 
 parse_arguments()
 {
-	echo $*
+	echo "" > /dev/null
 }
 
 parse_arguments_common()

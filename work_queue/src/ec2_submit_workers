@@ -1,138 +1,130 @@
-#!/bin/sh
+#!/bin/sh 
+
+SUBMIT_COMMON=`which wq_submit_workers.common`
+if [ -z "$SUBMIT_COMMON" ];
+then
+	echo "Please add 'wq_submit_workers.common' to your file."
+else
+	. $SUBMIT_COMMON
+fi
+
 
 show_help() 
 {
         echo "Use: ec2_submit_workers [options] <servername> <port> <ec2-key-name> <ec2-key-file> <num-ec2-instances>"
         echo "where options are:"
-        echo "  -M <name>           Name of the preferred master for worker."
-        echo "  -N <name>           Same as -M (backwards compatibility)."
-        echo "  -c <num>            Set the number of cores each worker should use (0=auto). (default=1)"
-        echo "  -C <catalog>        Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
-        echo "  -t <time>           Abort after this amount of idle time. (default=900s)."
-        echo "  -d <subsystem>      Enable debugging on worker for this subsystem (try -d all to start)."
-        echo "  -w <size>           Set TCP window size."
-        echo "  -i <time>           Set initial value for backoff interval when worker fails to connect to a master. (default=1s)"
-        echo "  -b <time>           Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)"
-        echo "  -z <size>           Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)"
-        echo "  -A <arch>           Set architecture string for the worker to report to master instead of the value in uname."
-        echo "  -O <os>             Set operating system string for the worker to report to master instead of the value in uname."
-        echo "  -s <path>           Set the location for creating the working directory of the worker."
-        echo "  -n <number>         Set the number of workers to start on each EC2 instance. (default=1)"
-        echo "  -I <image_id>       EC2 OS image ID. Default = ami-fa01f193 (Ubuntu 10.04 x86_64)."
-        echo "  -Z <instance_size>  EC2 instance size. Default = m1.large."
-        echo "  -p <parameters>     Set parameters for ec2-run-instances."
-        echo "  -h                  Show this help message."
+		echo "  -k,--key-name <string>  Name of the EC2 key name. (required)"
+		echo "  -K,--key-file <path>    Path to the EC2 key file. (required)"
+        echo "  -n,--instances <number> Set the number of EC2 instances to launch. Each instance will"
+		echo "                          launch <num-workers> workers. (required)"
+        echo "  -I <image_id>           EC2 OS image ID. Default = ami-fa01f193 (Ubuntu 10.04 x86_64)."
+        echo "  -Z <instance_size>      EC2 instance size. Default = m1.large."
+        echo "  -p <parameters>         Set parameters for ec2-run-instances."
+        echo "  -h                      Show this help message."
         exit 1
 }
 
-arguments=""
-use_auto=0
 image=ami-fa01f193
 instance_size=m1.large
-parameters=""
-workers_per_instance=1
+ec2_parameters=""
+ec2_key_name=""
+ec2_key_path=""
+ec2_num_of_instances=""
 
-while getopts M:N:c:C:t:d:i:b:z:A:O:s:n:I:Z:p:h opt 
-do
-        case "$opt" in
-                a)  arguments="$arguments -a"; use_auto=1;; #backwards compatibility
-                M)  arguments="$arguments -M $OPTARG"; use_auto=1;;
-                N)  arguments="$arguments -M $OPTARG"; use_auto=1;;
-                c)  arguments="$arguments --cores $OPTARG"; cores=$OPTARG;;
-                C)  arguments="$arguments -C $OPTARG";;
-                t)  arguments="$arguments -t $OPTARG";;
-                d)  arguments="$arguments -d $OPTARG";;
-                w)  arguments="$arguments -w $OPTARG";;	 
-                i)  arguments="$arguments -i $OPTARG";;	 
-                b)  arguments="$arguments -b $OPTARG";;	 
-                z)  arguments="$arguments -z $OPTARG";;	 
-                A)  arguments="$arguments -A $OPTARG";;	 
-                O)  arguments="$arguments -O $OPTARG";;	 
-                s)  arguments="$arguments -s $OPTARG";;	 
-                n)  workers_per_instance="$OPTARG";; 
-                I)  image="$OPTARG";;
-                Z)  instance_size="$OPTARG";;
-                p)  parameters="$parameters $OPTARG";;
-                h)  show_help;;
-                \?) show_help;;
-        esac
-done
+parse_arguments()
+{
+	while [ $# -gt 0 ]
+	do
+		case $1 in
+			-n | --instances)
+			shift
+			ec2_num_of_instances=$1
+			;;
+			-k | --key-name)
+			shift
+			ec2_key_name=$1
+			;;
+			-K | --key-file)
+			shift
+			ec2_key_path=$1
+			;;
+			-p)
+			shift
+			ec2_parameters="$ec2_parameters $1"
+			;;
+			*)
+			break
+			;;
+		esac
+		shift
+	done
 
-shift $(expr $OPTIND - 1)
+	if [ -z $ec2_key_name ]
+	then
+		echo "A key name should be provided with the -k option."
+		exit 1
+	fi
 
-if [ $use_auto = 0 ]; then
-    if [ X$5 = X ]
-    then
-        show_help
-    fi
-    host=$1
-    port=$2
-    keyname=$3
-    keyfile=$4
-    count=$5
-else
-    if [ X$3 = X ]
-    then
-        show_help
-    fi
-    host=
-    port=
-    keyname=$1
-    keyfile=$2
-    count=$3
-fi
+	if [ -z $ec2_key_path ]
+	then
+		echo "A path to the key file should be provided with the -K option."
+		exit 1
+	fi
 
-worker=`which work_queue_worker 2>/dev/null`
-if [ $? != 0 ]
-then
-        echo "$0: please add 'work_queue_worker' to your PATH."
-        exit 1
-fi
+	if [ -z $ec2_num_of_instances ]
+	then
+		echo "The number of instances to launch should be provided with the -n option."
+		exit 1
+	fi
+}
 
-ec2run=`which ec2-run-instances 2>/dev/null`
-if [ $? != 0 ]
-then
-        echo "$0: please add 'ec2-run-instances' to your PATH."
-        exit 1
-fi
 
-cp $worker .
+submit_workers_command()
+{
+	ec2run=`which ec2-run-instances 2>/dev/null`
+	if [ $? != 0 ]
+	then
+		echo "$0: please add 'ec2-run-instances' to your PATH."
+		exit 1
+	fi
 
-cat >worker.sh <<EOF
+	cat >worker.sh <<EOF
 #!/bin/sh
 
-for i in `eval echo {1..$workers_per_instance}`
+for i in `eval echo {1..$count}`
  do
 	./work_queue_worker $arguments $host $port &
 done
 EOF
 
-chmod 755 worker.sh
+	chmod 755 worker.sh
 
-#Start EC2 instances of the required count.
-ec2run_out=$(ec2-run-instances $image --instance-type $instance_size -k $keyname $parameters -n $count)
-reservation_id=$(echo $ec2run_out | awk '{print $2}')
-echo "Created $count instance(s) under reservation $reservation_id."
-sleep 60
+	#Start EC2 instances of the required count.
+	ec2run_out=$(ec2-run-instances $image --instance-type $instance_size -k $keyname $parameters -n $count)
+	reservation_id=$(echo $ec2run_out | awk '{print $2}')
+	echo "Created $count instance(s) under reservation $reservation_id."
+	sleep 60
 
-#Wait until all of the requested instances come on-board..
-running_instances=0
-while [ $running_instances -lt $count ]
-do
-	sleep 20
-	running_instances=$(ec2-describe-instances -F 'reservation-id'=$reservation_id | grep $image | grep running | wc -l)
-done
+	#Wait until all of the requested instances come on-board..
+	running_instances=0
+	while [ $running_instances -lt $count ]
+	do
+		sleep 20
+		running_instances=$(ec2-describe-instances -F 'reservation-id'=$reservation_id | grep $image | grep running | wc -l)
+	done
 
-inst_count=1
-while [ $inst_count -le $count ]
-do
-	instance=$(ec2-describe-instances -F 'reservation-id'=$reservation_id | grep running | awk 'NR==var{print $4 }' var="${inst_count}")
-	echo "------------------------------------------------"
-	echo "Starting worker #$inst_count on $instance"
-	scp -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $keyfile $worker worker.sh ubuntu@$instance:.
-	ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $keyfile ubuntu@$instance './worker.sh 1>worker.log 2>&1 &'
-	return_status=$?
-	inst_count=$((inst_count+1))
-done
+	inst_count=1
+	while [ $inst_count -le $count ]
+	do
+		instance=$(ec2-describe-instances -F 'reservation-id'=$reservation_id | grep running | awk 'NR==var{print $4 }' var="${inst_count}")
+		echo "------------------------------------------------"
+		echo "Starting worker #$inst_count on $instance"
+		scp -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $keyfile $worker worker.sh ubuntu@$instance:.
+		ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -i $keyfile ubuntu@$instance './worker.sh 1>worker.log 2>&1 &'
+		return_status=$?
+		inst_count=$((inst_count+1))
+	done
+}
 
-exit $return_status
+submit_workers $*
+
