@@ -18,8 +18,9 @@ prepare() {
 run() {
   cd linker
   ../../src/makeflow -b "$out_dir" collision.mf &> tmp
+  cat tmp | awk '{print $2}' | sort > tmp2
 
-  `diff tmp expected/collision.mf`
+  `diff tmp2 expected/collision.mf`
   exit $?
 }
 
@@ -29,6 +30,7 @@ clean() {
   rm /tmp/asdf
   rm asdf
   rm tmp
+  rm tmp2
   exit 0
 }
 

@@ -1,2 +1,2 @@
-ls	ls
-/bin/ls	ls1
+ls
+ls1
