@@ -3420,25 +3420,32 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_worker_slots = s->total_workers_connected;
 }
 
+/*
+This function is a little roundabout, because work_queue_resources_add
+updates the min and max of each value as it goes.  So, we set total
+to the value of the first item, then use work_queue_resources_add.
+If there are no items, we must manually return zero.
+*/
+
 void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total )
 {
 	struct work_queue_worker *w;
 	char *key;
 	int first = 1;
-	int wnum = 1;
+
+	if(hash_table_size(q->worker_table)==0) {
+		memset(total,0,sizeof(*total));
+		return;
+	}
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-
-		debug(D_WQ,"Worker #%d INFO - cores:%d memory:%d disk:%d\n", wnum,w->resources->cores.total, w->resources->memory.total, w->resources->disk.total);
-
 		if(first) {
 			*total = *w->resources;
 			first = 0;
 		} else {
 			work_queue_resources_add(total,w->resources);
 		}
-		wnum++;
 	}
 }
 
