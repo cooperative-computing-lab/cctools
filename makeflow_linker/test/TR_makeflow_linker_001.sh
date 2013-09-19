@@ -15,9 +15,13 @@ prepare() {
 
 run() {
 	../src/makeflow_linker -o $out_dir input/001/$workflow_description
+	explicit_dependency=$(cat $out_dir/explicit | awk '{print $1}')
+	if [ "$explicit_dependency" != "Python" ]; then
+		exit 1
+	fi
+	rm $out_dir/explicit
 
 	diff -bur expected/$expected $out_dir
-
 	exit $?
 }
 
