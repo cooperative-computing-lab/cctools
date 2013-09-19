@@ -110,6 +110,7 @@ static int priority = 0;
 static int port = 0;
 static const char *port_file = NULL;
 static int output_len_check = 0;
+static int work_queue_disable_cache = 0;
 
 static char *makeflow_exe = NULL;
 static char *monitor_exe = NULL;
@@ -2643,6 +2644,7 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case LONG_OPT_DISABLE_WQ_CACHE:
+			work_queue_disable_cache = 1;
 			break;
 		default:
 			show_help(argv[0]);
