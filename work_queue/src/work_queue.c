@@ -18,7 +18,6 @@ can be released:
 #include "work_queue.h"
 #include "work_queue_protocol.h"
 #include "work_queue_internal.h"
-#include "work_queue_catalog.h"
 #include "work_queue_resources.h"
 
 #include "int_sizes.h"
@@ -91,6 +90,9 @@ static const char *work_queue_state_names[] = {"init","ready","busy","full","non
 // The minimum number of task reports to keep
 #define WORK_QUEUE_TASK_REPORT_MIN_SIZE 20
 
+// Seconds between updates to the catalog
+#define WORK_QUEUE_UPDATE_INTERVAL 60
+
 #define WORKER_ADDRPORT_MAX 32
 #define WORKER_HASHKEY_MAX 32
 
@@ -108,6 +110,7 @@ struct work_queue {
 
 	char workingdir[PATH_MAX];
 
+	struct datagram *update_port;
 	struct link *master_link;
 	struct link_info *poll_table;
 	int poll_table_size;
@@ -199,6 +202,9 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line); 
+
+static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *master_link );
+
 
 static int short_timeout = 5;
 
@@ -394,51 +400,41 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 	return timeout;
 }
 
-static void update_catalog(struct work_queue *q, struct link *master, int force_update )
+static void update_catalog(struct work_queue *q, struct link *master_link, int force_update )
 {
-	struct work_queue_stats s;
-	char addrport[WORK_QUEUE_LINE_MAX];
 	static time_t last_update_time = 0;
+	char address[LINK_ADDRESS_MAX];
 
-	if(!force_update && (time(0) - last_update_time) < WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL) 
-			return;
+	// Only advertise if we have a name.
+	if(!q->name) return;
 
-	if(!q->catalog_host)
-		q->catalog_host = strdup(CATALOG_HOST);
+	// Only advertise every last_update_time seconds.
+	if(!force_update && (time(0) - last_update_time) < WORK_QUEUE_UPDATE_INTERVAL) 
+		return;
 
-	if(!q->catalog_port)
-		q->catalog_port = CATALOG_PORT;
+	// If host and port are not set, pick defaults.
+	if(!q->catalog_host)	q->catalog_host = strdup(CATALOG_HOST);
+	if(!q->catalog_port)	q->catalog_port = CATALOG_PORT;
+	if(!q->update_port)	q->update_port = datagram_create(DATAGRAM_PORT_ANY);
 
-	work_queue_get_stats(q, &s);
-	struct work_queue_resources r;
-	struct work_queue_resources local_resources; // holding the foreman's disk information
-	memset(&r, 0, sizeof(r));
-	aggregate_workers_resources(q, &r);
-
-	char *worker_summary = work_queue_get_worker_summary(q);
-
-	if(master) {                                 // a master with a master... therefore a foreman
-		int port;
-		char working_directory[PATH_MAX];
-
-		link_address_remote(master, addrport, &port);
-		sprintf(addrport, "%s:%d", addrport, port);
-
-		getcwd(working_directory, PATH_MAX);                               
-
-		// get foreman local resources
-		work_queue_resources_measure_locally(&local_resources, working_directory);
-		r.disk.total = local_resources.disk.total; // overwrite aggregates with local disk information
-		r.disk.inuse = local_resources.disk.inuse;
-
-		debug(D_WQ,"Foreman -- inuse:%d total:%d\n", local_resources.disk.inuse, local_resources.disk.total);
-	} else {
-		sprintf(addrport, "127.0.0.1:-1"); //this master has no master
+	if(!domain_name_cache_lookup(q->catalog_host, address)) {
+		debug(D_WQ,"could not resolve address of catalog server %s!",q->catalog_host);
+		// don't try again until the next update period
+		last_update_time = time(0);
+		return;
 	}
-	debug(D_WQ,"Updating catalog with resource information -- cores:%d memory:%d disk:%d\n", r.cores.total,r.memory.total,r.disk.total); //see if information is being passed correctly
-	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, addrport, &s, &r, worker_summary);
-	free(worker_summary);
 
+	// Generate the master status in an nvpair, and print it to a buffer.
+	char buffer[DATAGRAM_PAYLOAD_MAX];
+	struct nvpair *nv = queue_to_nvpair(q,master_link);
+	nvpair_print(nv,buffer,sizeof(buffer));
+
+	// Send the buffer.
+	debug(D_WQ, "Advertising master status to the catalog server at %s:%d ...", q->catalog_host, q->catalog_port);
+	datagram_send(q->update_port, buffer, strlen(buffer), address, q->catalog_port);
+
+	// Clean up.
+	nvpair_delete(nv);
 	last_update_time = time(0);
 }
 
@@ -1101,17 +1097,23 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	return 0;
 }
 
-static struct nvpair * queue_to_nvpair( struct work_queue *q )
+/*
+queue_to_nvpair examines the overall queue status and creates
+an nvair which can be sent to the catalog or directly to the
+user that connects via work_queue_status.
+*/
+
+static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *master_link )
 {
 	struct nvpair *nv = nvpair_create();
 	if(!nv) return 0;
+
+	// Insert all properties from work_queue_stats
 
 	struct work_queue_stats info;
 	work_queue_get_stats(q,&info);
 
 	nvpair_insert_integer(nv,"port",info.port);
-	if(q->name) nvpair_insert_string(nv,"project",q->name);
-	nvpair_insert_string(nv,"working_dir",q->workingdir);
 	nvpair_insert_integer(nv,"priority",info.priority);
 	nvpair_insert_integer(nv,"workers",info.workers_ready+info.workers_busy+info.workers_full);
 	nvpair_insert_integer(nv,"workers_init",info.workers_init);
@@ -1120,9 +1122,11 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q )
 	nvpair_insert_integer(nv,"workers_full",info.workers_full);
 	nvpair_insert_integer(nv,"tasks_running",info.tasks_running);
 	nvpair_insert_integer(nv,"tasks_waiting",info.tasks_waiting);
-	nvpair_insert_integer(nv,"tasks_complete",info.total_tasks_complete);
-	nvpair_insert_integer(nv,"total_tasks_dispatched",info.total_tasks_dispatched);
+	// KNOWN HACK: The following line is inconsistent but kept for compatibility reasons.
+	// Everyone wants to know total_tasks_complete, but few are interested in tasks_complete.
+	nvpair_insert_integer(nv,"tasks_complete",info.total_tasks_complete); 
 	nvpair_insert_integer(nv,"total_tasks_complete",info.total_tasks_complete);
+	nvpair_insert_integer(nv,"total_tasks_dispatched",info.total_tasks_dispatched);
 	nvpair_insert_integer(nv,"total_workers_joined",info.total_workers_joined);
 	nvpair_insert_integer(nv,"total_workers_removed",info.total_workers_removed);
 	nvpair_insert_integer(nv,"total_bytes_sent",info.total_bytes_sent);
@@ -1136,9 +1140,41 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q )
 	nvpair_insert_integer(nv,"total_workers_connected",info.total_workers_connected);
 	nvpair_insert_integer(nv,"total_workers_connected",info.total_worker_slots);
 
+	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
 	aggregate_workers_resources(q,&r);
 	work_queue_resources_add_to_nvpair(&r,nv);
+
+	char owner[USERNAME_MAX];
+	username_get(owner);
+
+	// Add special properties expected by the catalog server
+	nvpair_insert_string(nv,"type","wq_master");
+	if(q->name) nvpair_insert_string(nv,"project",q->name);
+	nvpair_insert_integer(nv,"starttime",(q->start_time/1000000)); // catalog expects time_t not timestamp_t
+	nvpair_insert_integer(nv,"total_workers",info.workers_ready+info.workers_busy+info.workers_full);
+	nvpair_insert_integer(nv,"total_workers_working",info.workers_busy+info.workers_full);
+	nvpair_insert_string(nv,"working_dir",q->workingdir);
+	nvpair_insert_string(nv,"owner",owner);
+	nvpair_insert_string(nv,"version",CCTOOLS_VERSION);
+
+	// If this is a foreman, add the master address and the disk resources
+	if(master_link) {
+		int port;
+		char address[LINK_ADDRESS_MAX];
+		char addrport[WORK_QUEUE_LINE_MAX];
+
+		link_address_remote(master_link,address,&port);
+		sprintf(addrport,"%s:%d",address,port);
+		nvpair_insert_string(nv,"master_address",addrport);
+
+		// get foreman local resources and overwrite disk usage
+		struct work_queue_resources local_resources;
+		work_queue_resources_measure_locally(&local_resources,q->workingdir);
+		r.disk.total = local_resources.disk.total;
+		r.disk.inuse = local_resources.disk.inuse;
+		work_queue_resources_add_to_nvpair(&r,nv);
+	}
 
 	return nv;
 }
@@ -1207,7 +1243,7 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	}
 	
 	if(!strcmp(request, "queue")) {
-		struct nvpair *nv = queue_to_nvpair( q );
+		struct nvpair *nv = queue_to_nvpair( q, 0 );
 		if(nv) {
 			link_nvpair_write(l,nv,stoptime);
 			nvpair_delete(nv);
