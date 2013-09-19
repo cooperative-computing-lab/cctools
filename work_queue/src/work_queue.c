@@ -110,8 +110,8 @@ struct work_queue {
 
 	char workingdir[PATH_MAX];
 
-	struct datagram *update_port;
-	struct link *master_link;
+	struct datagram  *update_port;   // outgoing udp connection to catalog
+	struct link      *master_link;   // incoming tcp connection for workers.
 	struct link_info *poll_table;
 	int poll_table_size;
 
@@ -203,7 +203,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line); 
 
-static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *master_link );
+static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *foreman_uplink );
 
 
 static int short_timeout = 5;
@@ -400,7 +400,7 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 	return timeout;
 }
 
-static void update_catalog(struct work_queue *q, struct link *master_link, int force_update )
+static void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
 {
 	static time_t last_update_time = 0;
 	char address[LINK_ADDRESS_MAX];
@@ -426,7 +426,7 @@ static void update_catalog(struct work_queue *q, struct link *master_link, int f
 
 	// Generate the master status in an nvpair, and print it to a buffer.
 	char buffer[DATAGRAM_PAYLOAD_MAX];
-	struct nvpair *nv = queue_to_nvpair(q,master_link);
+	struct nvpair *nv = queue_to_nvpair(q,foreman_uplink);
 	nvpair_print(nv,buffer,sizeof(buffer));
 
 	// Send the buffer.
@@ -1103,7 +1103,7 @@ an nvair which can be sent to the catalog or directly to the
 user that connects via work_queue_status.
 */
 
-static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *master_link )
+static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *foreman_uplink )
 {
 	struct nvpair *nv = nvpair_create();
 	if(!nv) return 0;
@@ -1159,12 +1159,12 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *maste
 	nvpair_insert_string(nv,"version",CCTOOLS_VERSION);
 
 	// If this is a foreman, add the master address and the disk resources
-	if(master_link) {
+	if(foreman_uplink) {
 		int port;
 		char address[LINK_ADDRESS_MAX];
 		char addrport[WORK_QUEUE_LINE_MAX];
 
-		link_address_remote(master_link,address,&port);
+		link_address_remote(foreman_uplink,address,&port);
 		sprintf(addrport,"%s:%d",address,port);
 		nvpair_insert_string(nv,"master_address",addrport);
 
@@ -3013,7 +3013,7 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
-struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *master_link, int *master_active)
+struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
 {
 	struct work_queue_task *t;
 	time_t stoptime;
@@ -3033,7 +3033,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 	while(1) {
 		if(q->name) {
-			update_catalog(q, master_link, 0);
+			update_catalog(q, foreman_uplink, 0);
 		}
 		
 		remove_unresponsive_workers(q);	
@@ -3049,10 +3049,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		update_worker_states(q);
 
-		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !(master_link))
+		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !(foreman_uplink))
 			break;
 
-		int n = build_poll_table(q, master_link);
+		int n = build_poll_table(q, foreman_uplink);
 
 		// Wait no longer than the caller's patience.
 		int msec;
@@ -3083,12 +3083,12 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		int i, j = 1;
 
-		// Consider the master link passed into the function and disregard if inactive.
-		if(master_link) {
+		// Consider the foreman_uplink passed into the function and disregard if inactive.
+		if(foreman_uplink) {
 			if(q->poll_table[1].revents) {
-				*master_active = 1; //signal that the master link saw activity
+				*foreman_uplink_active = 1; //signal that the master link saw activity
 			} else {
-				*master_active = 0;
+				*foreman_uplink_active = 0;
 			}
 			j++;
 		}
@@ -3120,8 +3120,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			abort_slow_workers(q);
 		}
 		
-		// If the master link is active then break so the caller can handle it.
-		if(master_link) {
+		// If the foreman_uplink is active then break so the caller can handle it.
+		if(foreman_uplink) {
 			break;
 		}
 		
