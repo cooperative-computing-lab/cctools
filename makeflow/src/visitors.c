@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "list.h"
 #include "itable.h"
+#include "debug.h"
 #include "set.h"
 #include "stringtools.h"
 
@@ -240,7 +241,9 @@ const char *node_executable_redirect(const struct dag_node *n)
 {
 	int command_length = strlen(n->command);
 	int last_redirect = strrpos(n->command, '>');
+	int first_redirect = strpos(n->command, '>');
 	if(last_redirect < 0) return NULL;
+	if(last_redirect != first_redirect) fatal("makeflow: multiple redirects found\n");
 	char *raw_redirect = (char *) string_back(n->command, command_length - last_redirect - 1);
 	return string_trim_spaces(raw_redirect);
 }
