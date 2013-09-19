@@ -2,6 +2,7 @@
 
 . ../../dttools/src/test_runner.common.sh
 
+PATH=$(readlink -f ../src/):$(readlink -f ../../makeflow/src/):$PATH
 
 out_dir=makeflow_linker.001.out
 expected=001
