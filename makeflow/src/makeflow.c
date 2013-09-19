@@ -1388,11 +1388,11 @@ int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, i
 				}
 			}
 			break;
-                case BATCH_QUEUE_TYPE_WORK_QUEUE:
-                        /* Note we do not fall with
-                         * BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS here, since we
-                         * do not want to rename absolute paths in such case.
-                         * */
+		case BATCH_QUEUE_TYPE_WORK_QUEUE:
+				/* Note we do not fall with
+				 * BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS here, since we
+				 * do not want to rename absolute paths in such case.
+				 * */
 			if(f->filename[0] == '/' && !remotename) {
 				/* Translate only explicit absolute paths for Work Queue tasks. */
 				remotename = dag_node_add_remote_name(n, f->filename, NULL);
