@@ -74,6 +74,7 @@ enum { LONG_OPT_MONITOR_INTERVAL = 1,
        LONG_OPT_MONITOR_LIMITS,
        LONG_OPT_MONITOR_TIME_SERIES,
        LONG_OPT_MONITOR_OPENED_FILES,
+       LONG_OPT_DISABLE_WQ_CACHE,
        LONG_OPT_PASSWORD,
        LONG_OPT_PPM_ROW,
        LONG_OPT_PPM_FILE,
@@ -2156,6 +2157,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
 	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
+	fprintf(stdout, " %-30s Disable Work Queue caching.                 (default is false)\n", "--disable-wq-cache");
 
 	fprintf(stdout, "\n*Monitor Options:\n\n");
 	fprintf(stdout, " %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
@@ -2374,6 +2376,7 @@ int main(int argc, char *argv[])
 		{"display-mode", required_argument, 0, 'D'},
 		{"dot-merge-similar", no_argument, 0,  LONG_OPT_DOT_CONDENSE},
 		{"dot-proportional",  no_argument, 0,  LONG_OPT_DOT_PROPORTIONAL},
+		{"disable-wq-cache", no_argument, 0, LONG_OPT_DISABLE_WQ_CACHE},
 		{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
 		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
 		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
@@ -2642,6 +2645,8 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "makeflow: couldn't open %s: %s\n", optarg, strerror(errno));
 				return 1;
 			}
+			break;
+		case LONG_OPT_DISABLE_WQ_CACHE:
 			break;
 		default:
 			show_help(argv[0]);
