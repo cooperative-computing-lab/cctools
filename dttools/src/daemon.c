@@ -16,10 +16,8 @@
 #elif defined(_POSIX_OPEN_MAX)
 #define DAEMON_FD_MAX  _POSIX_OPEN_MAX
 #else
-#define DAEMON_FD_MAX  0
+#define DAEMON_FD_MAX  256  /* guess */
 #endif
-
-#define OPEN_MAX_GUESS  256
 
 static int fd_max (void)
 {
@@ -27,11 +25,7 @@ static int fd_max (void)
 	int max = (int) sysconf(_SC_OPEN_MAX);
 	if (max == -1) {
 		if (errno == 0) {
-			if (DAEMON_FD_MAX == 0) { /* indefinite limit */
-				max = OPEN_MAX_GUESS;
-			} else {
-				max = DAEMON_FD_MAX;
-			}
+			max = DAEMON_FD_MAX;
 		} else {
 			debug(D_DEBUG, "sysconf(_SC_OPEN_MAX) error: %s", strerror(errno));
 			exit(EXIT_FAILURE);
