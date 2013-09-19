@@ -27,7 +27,7 @@ char **string_array_new (void)
 	return data;
 }
 
-char **string_array_append (char **oarray, char *str)
+char **string_array_append (char **oarray, const char *str)
 {
 	char **narray, **tmp;
 	for (tmp = oarray; *tmp; tmp++) ;

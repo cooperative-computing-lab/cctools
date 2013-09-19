@@ -24,6 +24,6 @@ char **string_array_new (void);
 
     @return The possibly relocated string array.
   */
-char **string_array_append (char **oarray, char *str);
+char **string_array_append (char **oarray, const char *str);
 
 #endif /* STRING_ARRAY_H */
