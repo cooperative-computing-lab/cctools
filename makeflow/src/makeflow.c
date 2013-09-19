@@ -2926,6 +2926,8 @@ int main(int argc, char *argv[])
 		port = work_queue_port(q);
 		if(port_file)
 			opts_write_port_file(port_file, port);
+		if(work_queue_disable_cache)
+			debug(D_DEBUG, "Work Queue caching is disabled.\n");
 	}
 
 	if(batch_submit_options) {
