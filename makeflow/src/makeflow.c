@@ -1650,19 +1650,34 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 		switch (batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			tmp = string_format("%s=%s,", f->filename, remotename);
+			if(work_queue_disable_cache){
+				tmp = string_format("*%s=%s,", f->filename, remotename);
+			}
+			else {
+				tmp = string_format("%s=%s,", f->filename, remotename);
+			}
 			break;
 		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 			if(f->filename[0] == '/')
 			{
-				tmp = string_format("%s=%s,", f->filename, remotename);
+				if(work_queue_disable_cache){
+					tmp = string_format("*%s=%s,", f->filename, remotename);
+				}
+				else{
+					tmp = string_format("%s=%s,", f->filename, remotename);
+				}
 			}
 			else
 			{
 				char *tmp_name = string_format("%s/%s", current_dir, f->filename); 
 				path_collapse(tmp_name, abs_name, 1);
 				free(tmp_name);
-				tmp = string_format("%s=%s,", abs_name, remotename);
+				if(work_queue_disable_cache){
+					tmp = string_format("*%s=%s,", abs_name, remotename);
+				}
+				else{
+					tmp = string_format("%s=%s,", abs_name, remotename);
+				}
 			}
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:
@@ -1687,19 +1702,34 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 		switch (batch_queue_get_type(thequeue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			tmp = string_format("%s=%s,", f->filename, remotename);
+			if(work_queue_disable_cache){
+				tmp = string_format("*%s=%s,", f->filename, remotename);
+			}
+			else{
+				tmp = string_format("%s=%s,", f->filename, remotename);
+			}
 			break;
 		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 			if(f->filename[0] == '/')
 			{
-				tmp = string_format("%s=%s,", f->filename, remotename);
+				if(work_queue_disable_cache){
+					tmp = string_format("*%s=%s,", f->filename, remotename);
+				}
+				else{
+					tmp = string_format("%s=%s,", f->filename, remotename);
+				}
 			}
 			else
 			{
 				char *tmp_name = string_format("%s/%s", current_dir, f->filename); 
 				path_collapse(tmp_name, abs_name, 1);
 				free(tmp_name);
-				tmp = string_format("%s=%s,", abs_name, remotename);
+				if(work_queue_disable_cache){
+					tmp = string_format("*%s=%s,", abs_name, remotename);
+				}
+				else{
+					tmp = string_format("%s=%s,", abs_name, remotename);
+				}
 			}
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:
