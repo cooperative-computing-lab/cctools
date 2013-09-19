@@ -1,2 +1,2 @@
-/tmp/makeflow_test_complex/a/b/x/y	y
-/tmp/makeflow_test_complex_path	makeflow_test_complex_path
+makeflow_test_complex_path
+y
