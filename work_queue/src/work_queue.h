@@ -108,9 +108,9 @@ struct work_queue_stats {
 	timestamp_t start_time;         /**< Absolute time at which the master started. */
 	timestamp_t total_send_time;    /**< Total time in microseconds spent in sending data to workers. */
 	timestamp_t total_receive_time; /**< Total time in microseconds spent in receiving data from workers. */
-	double efficiency;
-	double idle_percentage;
-	int capacity;
+	double efficiency;		/**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */  
+	double idle_percentage;		/**< The fraction of time that the master is idle waiting for workers to respond. */
+	int capacity;			/**< The estimated number of workers that this master can effectively support. */
 	int avg_capacity;
 	int total_workers_connected;
 	int total_worker_slots;			
@@ -391,12 +391,6 @@ void work_queue_specify_name(struct work_queue *q, const char *name);
 */
 void work_queue_specify_priority(struct work_queue *q, int priority);
 
-/** Change whether to estimate master capacity for a given queue.
-@param q A work queue object.
-@param estimate_capacity_on if the value of this parameter is 1, then work queue should estimate the master capacity. If the value is 0, then work queue would not estimate its master capacity.
-*/
-void work_queue_specify_estimate_capacity_on(struct work_queue *q, int estimate_capacity_on);
-
 /** Specify the catalog server the master should report to.
 @param q A work queue object.
 @param hostname The catalog server's hostname.
@@ -507,8 +501,16 @@ int work_queue_tune(struct work_queue *q, const char *name, double value);
 @param mode 
 - @ref WORK_QUEUE_MASTER_MODE_STANDALONE - standalone mode. In this mode the master would not report its information to a catalog server; 
 - @ref WORK_QUEUE_MASTER_MODE_CATALOG - catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
+@deprecated Enabled automatically when @ref work_queue_specify_name is used.
 */
 void work_queue_specify_master_mode(struct work_queue *q, int mode);
+
+/** Change whether to estimate master capacity for a given queue.
+@param q A work queue object.
+@param estimate_capacity_on if the value of this parameter is 1, then work queue should estimate the master capacity. If the value is 0, then work queue would not estimate its master capacity.
+@deprecated This feature is always enabled.
+*/
+void work_queue_specify_estimate_capacity_on(struct work_queue *q, int estimate_capacity_on);
 
 /** Add an input buffer to a task.
 @param t The task to which to add parameters
