@@ -1441,31 +1441,14 @@ int dag_prepare_for_monitoring(struct dag *d)
 	{
 		if(monitor_mode)
 		{
-			char *log_name_prefix;
+			char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
 			char *log_name;
-
-			char *limits_str = dag_task_category_wrap_as_rmonitor_options(n->category);
-			char *extra_options = string_format("%s -V '%-15s%s'", 
-					limits_str ? limits_str : "", 
-					"category:",
-					n->category->label); 
-
-			log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
-			n->command = resource_monitor_rewrite_command((char *) n->command, log_name_prefix,
-					monitor_limits_name,
-					extra_options,
-					1,                           /* summaries always enabled */
-					monitor_enable_time_series,
-					monitor_enable_list_files);
 
 			dag_node_add_source_file(n, monitor_exe, NULL);
 
 			log_name = string_format("%s.summary", log_name_prefix);
 			dag_node_add_target_file(n, log_name, NULL);
-
 			free(log_name);
-			free(limits_str);
-			free(extra_options);
 
 			if(monitor_enable_time_series)
 			{
@@ -1619,7 +1602,6 @@ int dag_parse_export(struct lexer_book *bk, char *line)
 	return 1;
 }
 
-
 void dag_export_variables(struct dag *d, struct dag_node *n)
 {
 	struct dag_lookup_set s = { d, n->category, n, NULL };
@@ -1634,6 +1616,36 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 		}
 	}
 }
+
+const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
+{
+	char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
+
+	char *limits_str = dag_task_category_wrap_as_rmonitor_options(n->category);
+	char *extra_options = string_format("%s -V '%-15s%s'", 
+			limits_str ? limits_str : "", 
+			"category:",
+			n->category->label); 
+
+	log_name_prefix     = monitor_log_name(monitor_log_dir, n->nodeid);
+
+	if(n->monitor_command)
+		free(n->monitor_command);
+
+	n->monitor_command  = resource_monitor_rewrite_command((char *) n->command, log_name_prefix,
+			monitor_limits_name,
+			extra_options,
+			1,                           /* summaries always enabled */
+			monitor_enable_time_series,
+			monitor_enable_list_files);
+
+	free(log_name_prefix);
+	free(extra_options);
+	free(limits_str);
+
+	return n->monitor_command;
+}
+
 
 void dag_node_submit(struct dag *d, struct dag_node *n)
 {
@@ -1757,7 +1769,14 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	dag_export_variables(d, n);
 
 	while(1) {
-		n->jobid = batch_job_submit_simple(thequeue, n->command, input_files, output_files);
+		const char *command; 
+		
+		if(monitor_mode)
+			command = dag_node_rmonitor_wrap_command(n);
+		else
+			command = n->command;
+
+		n->jobid = batch_job_submit_simple(thequeue, command, input_files, output_files);
 		if(n->jobid >= 0)
 			break;
 
