@@ -2,7 +2,25 @@
 
 . ../../dttools/src/test_runner.common.sh
 
-PATH=$(readlink -f ../src/):$(readlink -f ../../makeflow/src/):$PATH
+function find_absolute_path() {
+	TARGET_FILE=$1
+
+	cd `dirname $TARGET_FILE`
+	TARGET_FILE=`basename $TARGET_FILE`
+
+	while [ -L "$TARGET_FILE" ]
+	do
+		TARGET_FILE=`readlink $TARGET_FILE`
+		cd `dirname $TARGET_FILE`
+		TARGET_FILE=`basename $TARGET_FILE`
+	done
+
+	PHYS_DIR=`pwd -P`
+	RESULT=$PHYS_DIR/$TARGET_FILE
+	echo "$RESULT"
+}
+
+PATH=$(find_absolute_path ../src/):$(find_absolute_path ../../makeflow/src/):$PATH
 
 out_dir=makeflow_linker.001.out
 expected=001
