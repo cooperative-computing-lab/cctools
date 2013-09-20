@@ -100,8 +100,6 @@ static const char *work_queue_state_names[] = {"init","ready","busy","full","non
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
-int wq_minimum_transfer_timeout = 3;
-int wq_foreman_transfer_timeout = 3600;
 
 struct work_queue {
 	char *name;
@@ -149,6 +147,11 @@ struct work_queue {
 
 	double asynchrony_multiplier;
 	int asynchrony_modifier;
+
+	int minimum_transfer_timeout;
+	int foreman_transfer_timeout;
+	int transfer_outlier_factor;
+	int default_transfer_rate;
 
 	char *catalog_host;
 	int catalog_port;
@@ -205,13 +208,8 @@ static int process_resource(struct work_queue *q, struct work_queue_worker *w, c
 
 static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *foreman_uplink );
 
-
 static int short_timeout = 5;
-
 static timestamp_t link_poll_end; //tracks when we poll link; used to timeout unacknowledged keepalive checks
-
-static int tolerable_transfer_rate_denominator = 10;
-static long double minimum_allowed_transfer_rate = 100000;	// 100 KB/s
 
 /******************************************************/
 /********** work_queue internal functions *************/
@@ -359,44 +357,59 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	return result; 
 }
 
+/*
+Select an appropriate timeout value for the transfer of a certain number of bytes.
+We do not know in advance how fast the system will perform.
+
+So do this by starting with an assumption of bandwidth taken from the worker,
+from the queue, or from a (slow) default number, depending on what information is available.
+The timeout is chosen to be a multiple of the expected transfer time from the assumed bandwidth.
+
+The overall effect is to reject transfers that are 10x slower than what has been seen before.
+
+Two exceptions are made:
+- The transfer time cannot be below a configurable minimum time.
+- A foreman must have a high minimum, because its attention is divided
+  between the master and the workers that it serves.
+*/
+
 static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T length)
 {
-	timestamp_t timeout;
-	long double avg_queue_transfer_rate, avg_worker_transfer_rate, retry_transfer_rate, tolerable_transfer_rate;
-	INT64_T total_tasks_complete, total_tasks_running, total_tasks_waiting, num_of_free_workers;
-	struct work_queue_task *t = NULL;
-	
-	t = itable_lookup(w->current_tasks, taskid);
+	double avg_transfer_rate; // bytes per second
+	const char *data_source;
 
-	if(w->total_transfer_time) {
-		avg_worker_transfer_rate = (long double) w->total_bytes_transferred / w->total_transfer_time * 1000000;
+	INT64_T     q_total_bytes_transferred = q->total_bytes_sent + q->total_bytes_received;
+	timestamp_t q_total_transfer_time     = q->total_send_time  + q->total_receive_time;
+
+	// Note total_transfer_time and q_total_transfer_time are timestamp_t with units of milliseconds.
+
+	if(w->total_transfer_time>1000000) {
+		avg_transfer_rate = 1000000 * w->total_bytes_transferred / w->total_transfer_time;
+		data_source = "worker's observed";
+	} else if(q_total_transfer_time>1000000) {
+		avg_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
+		data_source = "overall queue";
 	} else {
-		avg_worker_transfer_rate = 0;
+		avg_transfer_rate = q->default_transfer_rate;
+		data_source = "conservative default";
 	}
 
-	retry_transfer_rate = 0;
-	num_of_free_workers = q->workers_in_state[WORKER_STATE_INIT] + q->workers_in_state[WORKER_STATE_READY];
-	total_tasks_complete = q->total_tasks_complete;
-	total_tasks_running = itable_size(q->running_tasks) + itable_size(q->finished_tasks);
-	total_tasks_waiting = list_size(q->ready_list);
-	if(total_tasks_complete > total_tasks_running && num_of_free_workers > total_tasks_waiting) {
-		// The master has already tried most of the workers connected and has free workers for retrying slow workers
-		if(t && t->total_bytes_transferred) {
-			avg_queue_transfer_rate = (long double) (q->total_bytes_sent + q->total_bytes_received) / (q->total_send_time + q->total_receive_time) * 1000000;
-			retry_transfer_rate = (long double) length / t->total_bytes_transferred * avg_queue_transfer_rate;
-		}
-	}
+	debug(D_WQ,"%s (%s) using %s average transfer rate of %.2lf MB/s\n", w->hostname, w->addrport, data_source, avg_transfer_rate/MEGABYTE);
 
-	tolerable_transfer_rate = MAX(avg_worker_transfer_rate / tolerable_transfer_rate_denominator, retry_transfer_rate);
-	tolerable_transfer_rate = MAX(minimum_allowed_transfer_rate, tolerable_transfer_rate);
+	double tolerable_transfer_rate = avg_transfer_rate / q->transfer_outlier_factor; // bytes per second
+
+	int timeout = length / tolerable_transfer_rate;
 
 	if(!strcmp(w->os, "foreman")) {
-		timeout = MAX(wq_foreman_transfer_timeout, length / tolerable_transfer_rate);
+		// A foreman must have a much larger minimum timeout, b/c it does not respond immediately to the master.
+		timeout = MAX(q->foreman_transfer_timeout,timeout);
 	} else {
-		timeout = MAX(wq_minimum_transfer_timeout, length / tolerable_transfer_rate);	// try at least wq_minimum_transfer_timeout seconds
+		// An ordinary master has a lower minimum timeout b/c it responds immediately to the master.
+		timeout = MAX(q->minimum_transfer_timeout,timeout);
 	}
 
-	debug(D_WQ, "%s (%s) will try up to %lld seconds for the transfer of this %.3Lf MB file.", w->hostname, w->addrport, (long long) timeout, (long double) length / 1000000);
+	debug(D_WQ, "%s (%s) will try up to %d seconds for the transfer of this %.2lf MB file.", w->hostname, w->addrport, timeout, length/1000000.0);
+
 	return timeout;
 }
 
@@ -2751,6 +2764,11 @@ struct work_queue *work_queue_create(int port)
 	
 	q->asynchrony_multiplier = 1.0;
 	q->asynchrony_modifier = 0;
+
+	q->minimum_transfer_timeout = 10;
+	q->foreman_transfer_timeout = 3600;
+	q->transfer_outlier_factor = 10;
+	q->default_transfer_rate = 1*MEGABYTE;
 	
 	if( (envstring  = getenv("WORK_QUEUE_BANDWIDTH")) ) {
 		q->bandwidth = string_metric_parse(envstring);
@@ -3338,10 +3356,16 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 		q->asynchrony_modifier = MAX(value, 0);
 		
 	} else if(!strcmp(name, "min-transfer-timeout")) {
-		wq_minimum_transfer_timeout = (int)value;
+		q->minimum_transfer_timeout = (int)value;
 	
 	} else if(!strcmp(name, "foreman-transfer-timeout")) {
-		wq_foreman_transfer_timeout = (int)value;
+		q->foreman_transfer_timeout = (int)value;
+		
+	} else if(!strcmp(name, "default-transfer-rate")) {
+		q->default_transfer_rate = value;
+
+	} else if(!strcmp(name, "transfer-outlier-factor")) {
+		q->transfer_outlier_factor = value;
 		
 	} else if(!strcmp(name, "fast-abort-multiplier")) {
 		if(value >= 1) {

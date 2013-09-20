@@ -477,8 +477,10 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout);
 @param name The name of the parameter to tune
  - "asynchrony-multiplier" Treat each worker as having (actual_cores * multiplier) total cores. (default = 1.0)
  - "asynchrony-modifier" Treat each worker as having an additional "modifier" cores. (default=0)
- - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=300)
+ - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
  - "foreman-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a foreman. (default=3600)
+ - "transfer-outlier-factor" Transfer that are this many times slower than the average will be aborted.  (default=10x)
+ - "default-transfer-rate" The assumed network bandwidth used until sufficient data has been collected.  (1MB/s)
  - "fast-abort-multiplier" Set the multiplier of the average task time at which point to abort; if negative or zero fast_abort is deactivated. (default=0)
  - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
  - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
