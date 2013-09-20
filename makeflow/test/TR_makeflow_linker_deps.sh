@@ -14,8 +14,8 @@ prepare() {
 
 run() {
     cd linker
-    ../../src/makeflow -b "$out_dir" some_dependencies.mf
-    if [ ! -f "$out_dir"/simple.mf ]; then
+    out=`../../src/makeflow -b "$out_dir" some_dependencies.mf | grep simple.mf`
+    if [ -z "$out" ]; then
         exit 1
     fi
     exit 0
