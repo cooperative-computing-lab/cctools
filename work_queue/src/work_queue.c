@@ -1138,7 +1138,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 	nvpair_insert_float(nv,"idle_percentage",info.idle_percentage);
 	nvpair_insert_integer(nv,"capacity",info.capacity);
 	nvpair_insert_integer(nv,"total_workers_connected",info.total_workers_connected);
-	nvpair_insert_integer(nv,"total_workers_connected",info.total_worker_slots);
+	nvpair_insert_integer(nv,"total_worker_slots",info.total_worker_slots);
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
