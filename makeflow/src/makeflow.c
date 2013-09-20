@@ -2333,6 +2333,7 @@ int main(int argc, char *argv[])
 	timestamp_t runtime = 0;
 	timestamp_t time_completed = 0;
 	char *s;
+	int export_as_dax = 0;
 
 	random_init();
 
@@ -2378,6 +2379,7 @@ int main(int argc, char *argv[])
 		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
 		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
 		{"ppm-show-levels", no_argument, 0, LONG_OPT_PPM_LEVELS},
+		{"export-as-dax", no_argument, 0, 'e'},
 		{"wq-estimate-capacity", no_argument, 0, 'E'},
 		{"summary-log", no_argument, 0, 'f'},
 		{"wq-fast-abort", required_argument, 0, 'F'},
@@ -2415,7 +2417,7 @@ int main(int argc, char *argv[])
 	};
 
 
-	while((c = getopt_long(argc, argv, "aAb:B:cC:d:D:Ef:F:g:G:hiIj:J:kKl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:", long_options, NULL)) >= 0) {
+	while((c = getopt_long(argc, argv, "aAb:B:cC:d:D:eEf:F:g:G:hiIj:J:kKl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:", long_options, NULL)) >= 0) {
 		switch (c) {
 		case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2480,6 +2482,9 @@ int main(int argc, char *argv[])
 		case LONG_OPT_PPM_LEVELS:
 			display_mode = SHOW_DAG_PPM;
 			ppm_mode = 5;
+			break;
+		case 'e':
+			export_as_dax = 1;
 			break;
 		case 'E':
 			// This option is deprecated. Capacity estimation is now on by default.
@@ -2740,6 +2745,11 @@ int main(int argc, char *argv[])
 
 	if(syntax_check) {
 		fprintf(stdout, "%s: Syntax OK.\n", dagfile);
+		return 0;
+	}
+
+	if(export_as_dax) {
+		dag_to_dax(d, path_basename(dagfile));
 		return 0;
 	}
 
