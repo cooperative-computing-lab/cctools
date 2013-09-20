@@ -408,7 +408,7 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 		timeout = MAX(q->minimum_transfer_timeout,timeout);
 	}
 
-	debug(D_WQ, "%s (%s) will try up to %d seconds for the transfer of this %.2lf MB file.", w->hostname, w->addrport, timeout, length/1000000.0);
+	debug(D_WQ, "%s (%s) will try up to %d seconds to transfer this %.2lf MB file.", w->hostname, w->addrport, timeout, length/1000000.0);
 
 	return timeout;
 }
@@ -836,8 +836,7 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 					t->total_transfer_time += sum_time;
 					w->total_bytes_transferred += total_bytes;
 					w->total_transfer_time += sum_time;
-					debug(D_WQ, "Got %"PRId64" bytes from %s (%s) in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps", total_bytes, w->hostname, w->addrport, sum_time / 1000000.0, ((8.0 * total_bytes) / sum_time),
-					      (8.0 * w->total_bytes_transferred) / w->total_transfer_time);
+					debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 				}
 				total_bytes = 0;
 			}
@@ -1800,8 +1799,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 		if(total_bytes > 0) {
 			q->total_bytes_sent += (INT64_T) total_bytes;
 			q->total_send_time += sum_time;
-			debug(D_WQ, "%s (%s) got %"PRId64" bytes in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps", w->hostname, w->addrport, total_bytes, sum_time / 1000000.0, ((8.0 * total_bytes) / sum_time),
-			      (8.0 * w->total_bytes_transferred) / w->total_transfer_time);
+			debug(D_WQ, "%s (%s) received %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, (double) total_bytes/1000000.0, sum_time / 1000000.0, (double) total_bytes/sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 		}
 	}
 
