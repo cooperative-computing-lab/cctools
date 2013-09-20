@@ -13,6 +13,12 @@
 typedef enum {UNKNOWN, PYTHON} file_type;
 
 typedef struct {
+	char *original_name;
+	char *final_name;
+	char *parent;
+	char *superparent;
+	int  depth;
+	file_type type;
 } dependency;
 
 char *python_extensions[2] = { "py", "pyc" };
@@ -58,9 +64,10 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 					buffer = realloc(buffer, size+1);
 					*(buffer+size) = '\0';
 					dependency *new_dependency = (dependency *) malloc(sizeof(dependency));
+					new_dependency->original_name = original_name;
+					new_dependency->final_name = buffer;
 					list_push_tail(d, (void *) new_dependency);
 					size = 0;
-					free(original_name);
 					original_name = NULL;
 					buffer = NULL;
 					break;
@@ -105,6 +112,7 @@ void find_drivers(struct list *d){
 	file_type my_type;
 	list_first_item(d);
 	while((dep = list_next_item(d))){
+		my_type = find_driver_for(dep->final_name);
 		printf("%d\n", my_type);
 	}
 }
