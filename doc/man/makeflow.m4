@@ -88,6 +88,7 @@ OPTIONS_END
 SUBSECTION(Other Options)
 OPTIONS_BEGIN
 OPTION_ITEM(`-A, --disable-afs-check')Disable the check for AFS. (experts only)
+OPTION_ITEM(`-e, --export-as-dax')Export the DAG in DAX format. (Pegasus)
 OPTION_ITEM(`-k, --syntax-check')Syntax check.
 OPTION_ITEM(`-K, --preserve-links')Preserve (i.e., do not clean) intermediate symbolic links.
 OPTION_ITEM(`-z, --zero-length-error')Force failure on zero-length output files.
