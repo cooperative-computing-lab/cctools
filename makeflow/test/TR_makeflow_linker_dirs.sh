@@ -14,16 +14,15 @@ prepare() {
 
 run() {
     cd linker
-    ../../src/makeflow -b "$out_dir" directories.mf
-    if [ ! -f "$out_dir"/a/b/x ]; then
-        exit 1
-    fi
-    exit 0
+    ../../src/makeflow -b "$out_dir" directories.mf &> tmp
+	`diff tmp expected/directories.mf`
+    exit $?
 }
 
 clean() {
     cd linker
     rm -r "$out_dir"
+	rm tmp
     exit 0
 }
 

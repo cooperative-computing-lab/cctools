@@ -69,3 +69,11 @@ LIST_ITEM MANPAGE(sand_compress_reads,1)
 LIST_ITEM MANPAGE(sand_uncompress_reads,1)
 LIST_ITEM MANPAGE(work_queue_worker,1)
 LIST_END')dnl
+define(SEE_ALSO_LINKER,
+`LIST_BEGIN
+LIST_ITEM MANPAGE(makeflow,1)
+LIST_ITEM MANPAGE(perl,1)
+LIST_ITEM MANPAGE(python,1)
+LIST_ITEM MANPAGE(ldd, 1)
+LIST_END')dnl
+dnl
