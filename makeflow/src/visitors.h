@@ -13,6 +13,10 @@ See the file COPYING for details.
  */
 int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename)(struct dag_node *d, const char *filename));
 
+/* The dag_to_dax function writes a struct dag in memory to stdout
+ * using the DAX format
+ */
+int dag_to_dax(const struct dag *d, const char *name);
 
 /* The dag_to_dot function writes a struct dag in memory to a dot
  * file (graphviz), giving the graphical presentation of the makeflow.

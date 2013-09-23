@@ -328,8 +328,7 @@ void collect_input_files(struct dag *d, char *bundle_dir, char *(*rename) (struc
 		}
 
 		sprintf(file_destination, "%s/%s", bundle_dir, new_name);
-
-		copy_file_to_file(f->filename, file_destination);
+		fprintf(stdout, "%s\t%s\n", f->filename, new_name);
 		free(new_name);
 	}
 
@@ -387,7 +386,7 @@ char *bundler_translate_name(const char *input_filename, int collision_counter)
 	} else {
 		hash_table_insert(previous_names, filename, filename);
 		hash_table_insert(reverse_names, filename, filename);
-		return filename;
+		return xxstrdup(filename);
 	}
 }
 
@@ -2333,6 +2332,7 @@ int main(int argc, char *argv[])
 	timestamp_t runtime = 0;
 	timestamp_t time_completed = 0;
 	char *s;
+	int export_as_dax = 0;
 
 	random_init();
 
@@ -2378,6 +2378,7 @@ int main(int argc, char *argv[])
 		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
 		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
 		{"ppm-show-levels", no_argument, 0, LONG_OPT_PPM_LEVELS},
+		{"export-as-dax", no_argument, 0, 'e'},
 		{"wq-estimate-capacity", no_argument, 0, 'E'},
 		{"summary-log", no_argument, 0, 'f'},
 		{"wq-fast-abort", required_argument, 0, 'F'},
@@ -2415,7 +2416,7 @@ int main(int argc, char *argv[])
 	};
 
 
-	while((c = getopt_long(argc, argv, "aAb:B:cC:d:D:Ef:F:g:G:hiIj:J:kKl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:", long_options, NULL)) >= 0) {
+	while((c = getopt_long(argc, argv, "aAb:B:cC:d:D:eEf:F:g:G:hiIj:J:kKl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:", long_options, NULL)) >= 0) {
 		switch (c) {
 		case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -2480,6 +2481,9 @@ int main(int argc, char *argv[])
 		case LONG_OPT_PPM_LEVELS:
 			display_mode = SHOW_DAG_PPM;
 			ppm_mode = 5;
+			break;
+		case 'e':
+			export_as_dax = 1;
 			break;
 		case 'E':
 			// This option is deprecated. Capacity estimation is now on by default.
@@ -2743,28 +2747,29 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
+	if(export_as_dax) {
+		dag_to_dax(d, path_basename(dagfile));
+		return 0;
+	}
+
 	if(bundle_directory) {
 		//Create Bundle!
-		fprintf(stderr, "Creating workflow bundle...\n");
 
 		struct stat s;
 		if(!stat(bundle_directory, &s)) {
-			fprintf(stderr, "Target directory, %s, already exists.\n", bundle_directory);
-			exit(1);
+			fatal("Target directory, %s, already exists.", bundle_directory);
 		}
-		fprintf(stderr, "Creating new directory, %s ..........", bundle_directory);
-		if(!create_dir(bundle_directory, 0755)) {
-			fprintf(stderr, "FAILED\n");
-			exit(1);
+		if(!create_dir(bundle_directory, 0777)) {
+			fatal("Could not create directory.\n");
 		}
-		fprintf(stderr, "COMPLETE\n");
-
-		dag_show_input_files(d);
+		
+		char expanded_path[PATH_MAX];
+		
 		collect_input_files(d, bundle_directory, bundler_rename);
+		realpath(bundle_directory, expanded_path);
 
 		char output_makeflow[PATH_MAX];
-		sprintf(output_makeflow, "%s/%s", bundle_directory, dagfile);
-		fprintf(stderr, "Writing workflow, %s, to %s\n", dagfile, output_makeflow);
+		sprintf(output_makeflow, "%s/%s", expanded_path, path_basename(dagfile));
 		dag_to_file(d, output_makeflow, bundler_rename);
 		free(bundle_directory);
 		exit(0);

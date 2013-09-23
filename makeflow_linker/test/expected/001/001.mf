@@ -1,0 +1,6 @@
+
+CATEGORY="default"
+
+: c.sh a.py
+	echo ""
+
