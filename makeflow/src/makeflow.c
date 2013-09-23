@@ -44,7 +44,6 @@ See the file COPYING for details.
 #include "rmonitor.h"
 #include "random_init.h"
 #include "path.h"
-#include "batch_job_internal.h"
 
 #include "dag.h"
 #include "visitors.h"

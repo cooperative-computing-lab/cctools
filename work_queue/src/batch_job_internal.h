@@ -60,8 +60,5 @@ batch_job_id_t batch_job_submit_xgrid(struct batch_queue * q, const char *cmd, c
 batch_job_id_t batch_job_wait_xgrid(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime);
 int batch_job_remove_xgrid(struct batch_queue *q, batch_job_id_t jobid);
 
-int batch_job_enable_caching_work_queue(struct batch_queue * q);
-int batch_job_disable_caching_work_queue(struct batch_queue * q);
-
 #endif
 
