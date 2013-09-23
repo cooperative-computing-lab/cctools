@@ -17,15 +17,20 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 {
 	char *f, *p, *files;
 	int caching;
+	int caching_disabled=0;
 
 	if(input_files) {
 		files = strdup(input_files);
 		f = strtok(files, " \t,");
 		while(f) {
+			if(*f == '*'){
+				caching_disabled = 1;
+				f += 1;
+			}
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-				if(strcmp(f, p+1)) {
+				if(strcmp(f, p+1) || caching_disabled) {
 					caching = WORK_QUEUE_NOCACHE;
 				} else {
 					caching = WORK_QUEUE_CACHE;
@@ -34,7 +39,13 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 				debug(D_BATCH, "local file %s is %s on remote system:", f, p + 1);
 				*p = '=';
 			} else {
-				work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+				if(caching_disabled){
+					caching = WORK_QUEUE_NOCACHE;
+				}
+				else{
+					caching = WORK_QUEUE_CACHE;
+				}
+				work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, caching);
 			}
 			f = strtok(0, " \t,");
 		}
