@@ -189,4 +189,7 @@ Currently only relevant for the work queue implementation.
 */
 int batch_queue_port(struct batch_queue *q);
 
+//DEMO
+int numCores;
+
 #endif

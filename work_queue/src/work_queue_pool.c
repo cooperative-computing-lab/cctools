@@ -1420,8 +1420,15 @@ int main(int argc, char *argv[])
 		{0,0,0,0}
 	};
 
-	while((c = getopt_long(argc, argv, "aAc:C:d:E:hm:l:L:N:o:O:Pqr:S:t:T:vW:", long_options, NULL)) > -1) {
+	//DEMO
+	numCores = 1;
+
+	while((c = getopt_long(argc, argv, "aAc:C:d:E:hm:l:L:N:o:O:p:Pqr:S:t:T:vW:", long_options, NULL)) > -1) {
 		switch (c) {
+		case 'p':
+			//DEMO
+			numCores = atoi(optarg);
+			break;
 		case 'a':
 			strcat(worker_args, " -a");
 			auto_worker = 1;

@@ -91,6 +91,10 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname)
 	}
 
 	fprintf(file, "#!/bin/sh\n");
+	
+	//DEMO
+	fprintf(file, "#$ -pe smp %d\n", numCores);
+	
 	if(q->type == BATCH_QUEUE_TYPE_MOAB || q->type == BATCH_QUEUE_TYPE_TORQUE) {
 		fprintf(file, "CMD=${BATCH_JOB_COMMAND}\n");
 		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
