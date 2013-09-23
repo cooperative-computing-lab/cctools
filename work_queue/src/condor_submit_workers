@@ -1,195 +1,55 @@
 #!/bin/sh
 
+SUBMIT_COMMON=`which wq_submit_workers.common`
+if [ -z "$SUBMIT_COMMON" ];
+then
+	echo "Please add 'wq_submit_workers.common' to your file."
+else
+	. $SUBMIT_COMMON
+fi
+
+
 show_help() 
 {
-	echo "Use: condor_submit_workers [options] <servername> <port> <num-workers>"
-	echo "         when auto mode is not enabled, or"  
-	echo "     condor_submit_workers [options] <num-workers>"
-	echo "         when auto mode is enabled."  
-	echo "Options:"
-	echo "  -M,--master-name <name>  Name of the preferred master for worker. (auto mode enabled)"
-	echo "  -N,--name <name>         Same as -M (backwards compatibility). (auto mode enabled)"
-	echo "  -C,--catalog <catalog>   Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
-	echo "  -t,--timeout <time>      Abort after this amount of idle time. (default=900s)."
-	echo "  -d,--debug <subsystem>   Enable debugging on worker for this subsystem (try -d all to start)."
-	echo "  -w,--tcp-window-size <size>  Set TCP window size."
-	echo "  -i,--min-backoff <time>  Set initial value for backoff interval when worker fails to connect to a master. (default=1s)"
-	echo "  -b,--max-backoff <time>  Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)"
-	echo "  -z,--disk-threshold <size>   Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)"
-	echo "  -A,--arch <arch>         Set architecture string for the worker to report to master instead of the value in uname."
-	echo "  -O,--os <os>             Set operating system string for the worker to report to master instead of the value in uname."
-	echo "  -s,--workdir <path>      Set the location for creating the working directory of the worker."
-	echo "  -P,--password <pwfile>   Password file to authenticate workers to master."
-	echo "  --cores <num>            Set the number of cores each worker should use (0=auto). (default=1)"
-	echo "  --memory <size>          Manually set the amonut of memory (in MB) reported by this worker."
-	echo "  --disk <size>            Manually set the amount of disk (in MB) reported by this worker."
 	echo "  -r <requirements>        Condor requirements ClassAd."
-	echo "  -h,--help                Show this help message."
-	exit 1
 }
 
 # This dummy requirement inhibits Condor from adding its own Memory expression,
 # which causes long-running workers to eventually sit idle in the queue.
 # The user can still add their own expression via the -r option.
 
+
 requirements="(Memory>0)"
-
-submit_dir=/tmp/${USER}-workers
-arguments=""
-use_auto=0
 transfer_input_files="work_queue_worker"
-pwfile=""
 
-# Used options (as in the getopts format):  M:N:C:t:d:w:i:b:z:A:O:s:r:P:h  
-
-while [ $# -gt 0 ]
-do
-	case $1 in
-		-a | --advertise)
-            # Leave here for backwards compatibility
-			arguments="$arguments -a"
-			use_auto=1
-			;;
-		-M | --master-name)
-		    shift
-			arguments="$arguments -M $1"
-			use_auto=1
-			;;
-		-N | --name)
-		    shift
-			arguments="$arguments -M $1"
-		   	use_auto=1
-			;;
-		-C | --catalog)  
-		    shift
-			arguments="$arguments -C $1"
-			;;
-		-t | --timeout)  
-		    shift
-			arguments="$arguments -t $1"
-			;;
-		-d | --debug)  
-			shift
-			arguments="$arguments -d $1"
-			;;
-		-w | --tcp-window-size)
-			shift
-	  		arguments="$arguments -w $1"
-			;;
-		-i | --min-backoff)
-			shift
-			arguments="$arguments -i $1"
-			;;
-		-b | --max-backoff)
-			shift
-		    arguments="$arguments -b $1"
-			;;
-		-z | --disk-threshold)
-			shift
-			arguments="$arguments -z $1"
-			;;
-		-A | --arch)
-			shift
-			arguments="$arguments -A $1"
-			;;
-		-O | --os)  
-			shift
-			arguments="$arguments -O $1"
-			;;
-		-s | --workdir)  
-			shift
-			arguments="$arguments -s $1"
-			;;
-		-P | --password)  
-			shift
-			pwfile=$1 
-			arguments="$arguments -P $pwfile"
-			;;
-		--cores)  
-			shift
-			arguments="$arguments --cores $1"
-			;; 
-		--memory)  
-			shift
-			arguments="$arguments --memory $1"
-			;;
-		--disk)  
-			shift
-			arguments="$arguments --disk $1"
-			;;
-		-r)  
+parse_arguments()
+{
+	while [ $# -gt 0 ]
+	do
+		case $1 in
+			-r)  
 			shift
 			requirements="$requirments $1"
 			;;
-		-h | --help)
-		    show_help
-			;;
-		*)
+			*)
 			break
 			;;
-	esac
-	shift
-done
+		esac
+		shift
+	done
 
-if [ $use_auto = 0 ]; then
-    if [ $# -ne 3 ] ; then
-		echo "3 arguments (<servername> <port> <num-workers>) are expected while $# is present: \"$@\"."
-		echo "To view the help message, type: condor_submit_workers -h"
-		exit 1
-    fi
-    host=$1
-    port=$2
-    count=$3
-else
-    if [ $# -ne 1 ]
-    then
-		echo "1 argument (<num-workers>) is expected while $# is present: \"$@\"."
-		echo "To view the help message, type: condor_submit_workers -h"
-		exit 1
-    fi
-    host=
-    port=
-    count=$1
-fi
+	submit_dir=/tmp/${USER}-workers
 
-# Set up a local temporary directory to manage the log files.
-# home directories on shared filesystems are often not accessible
-# to Condor, so this saves some headaches for the user.
+}
 
-echo "Creating worker submit scripts in ${submit_dir}..."
-
-mkdir -p ${submit_dir}
-
-# If a password file has been selected, check for existence,
-# copy it into the submission directory, then add it to
-# the transfer input files list.
-
-if [ X${pwfile} != X ]
-then
-	if [ ! -f $pwfile ]
-	then
-		echo "condor_submit_workers: password file $pwfile not found"
-		exit 1
-	fi
-
-	cp $pwfile ${submit_dir}
+set_up_password_file()
+{
 	transfer_input_files="${transfer_input_files}, $pwfile"
-fi
+}
 
-# Copy the worker executable into the temporary directory,
-# for similar reasons.
-
-worker=`which work_queue_worker 2>/dev/null`
-if [ $? != 0 ]
-then
-	echo "$0: please add 'work_queue_worker' to your PATH."
-	exit 1
-fi
-
-cd ${submit_dir}
-cp $worker .
-
-condor_submit << EOF
+submit_workers_command()
+{
+	condor_submit << EOF
 universe = vanilla
 executable = work_queue_worker
 arguments = $arguments $host $port
@@ -203,5 +63,7 @@ getenv = true
 requirements = $requirements
 queue $count
 EOF
+}
 
-exit $?
+submit_workers $*
+
