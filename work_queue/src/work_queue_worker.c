@@ -1820,6 +1820,13 @@ static int setup_workspace() {
 		return 0;
 	} 
 
+	// set $WORK_QUEUE_SANDBOX to workspace.
+	debug(D_WQ, "WORK_QUEUE_SANDBOX set to %s.\n", workspace);
+	setenv("WORK_QUEUE_SANDBOX", workspace, 0);
+
+	// change to workspace
+	chdir(workspace);
+
 	fprintf(stdout, "work_queue_worker: working in %s\n", workspace);
 	return 1;
 }
@@ -2129,12 +2136,6 @@ int main(int argc, char *argv[])
 		waiting_tasks = list_create();
 	}
 
-	// set $WORK_QUEUE_SANDBOX to workspace.
-	debug(D_WQ, "WORK_QUEUE_SANDBOX set to %s.\n", workspace);
-	setenv("WORK_QUEUE_SANDBOX", workspace, 0);
-
-	// change to workspace
-	chdir(workspace);
 
 	if(!check_disk_space_for_filesize(0)) {
 		goto abort;
