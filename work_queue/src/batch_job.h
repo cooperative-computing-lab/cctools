@@ -189,4 +189,6 @@ Currently only relevant for the work queue implementation.
 */
 int batch_queue_port(struct batch_queue *q);
 
+int batch_job_enable_caching_work_queue(struct batch_queue * q);
+int batch_job_disable_caching_work_queue(struct batch_queue * q);
 #endif

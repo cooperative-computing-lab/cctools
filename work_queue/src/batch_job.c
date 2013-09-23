@@ -374,3 +374,16 @@ int batch_queue_port(struct batch_queue *q)
 	}
 }
 
+int batch_job_enable_caching_work_queue(struct batch_queue * q)
+{
+	if(!q) return 0;
+	q->caching = WORK_QUEUE_CACHE;
+	return 1;
+}
+
+int batch_job_disable_caching_work_queue(struct batch_queue * q)
+{
+	if(!q) return 0;
+	q->caching = WORK_QUEUE_NOCACHE;
+	return 1;
+}
