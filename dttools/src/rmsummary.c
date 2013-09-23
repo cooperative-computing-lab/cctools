@@ -220,38 +220,47 @@ void rmsummary_print(FILE *stream, struct rmsummary *s)
 			fprintf(stream, "%-20s%s\n",  "limits_exceeded:", s->limits_exceeded);
 	}
 
+	rmsummary_print_only_resources(stream, s, "");
+}
+
+void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix)
+{
+	if(s->cores > -1)
+		fprintf(stream, "%s%-20s%15" PRId64 "\n", prefix,  "cores:", s->cores);
+
+
 	if(s->wall_time > -1)
-		fprintf(stream, "%-20s%20lf s\n", "wall_time:", s->wall_time >= 0 ? s->wall_time / 1000000e0 : -1);
+		fprintf(stream, "%s%-20s%20lf s\n", prefix, "wall_time:", s->wall_time >= 0 ? s->wall_time / 1000000e0 : -1);
 
 	if(s->max_concurrent_processes > -1)
-		fprintf(stream, "%-20s%15" PRId64 " procs\n",  "max_concurrent_processes:", s->max_concurrent_processes);
+		fprintf(stream, "%s%-20s%15" PRId64 " procs\n",  prefix, "max_concurrent_processes:", s->max_concurrent_processes);
 
 	if(s->total_processes > -1)
-		fprintf(stream, "%-20s%20" PRId64 " procs\n",  "total_processes:", s->total_processes);
+		fprintf(stream, "%s%-20s%20" PRId64 " procs\n",  prefix, "total_processes:", s->total_processes);
 
 	if(s->cpu_time > -1)
-		fprintf(stream, "%-20s%20lf s\n", "cpu_time:", s->cpu_time   >= 0 ? s->cpu_time  / 1000000e0 : -1);
+		fprintf(stream, "%s%-20s%20lf s\n", prefix, "cpu_time:", s->cpu_time   >= 0 ? s->cpu_time  / 1000000e0 : -1);
 
 	if(s->virtual_memory > -1)
-		fprintf(stream, "%-20s%20" PRId64 " MB\n",  "virtual_memory:", s->virtual_memory);
+		fprintf(stream, "%s%-20s%20" PRId64 " MB\n",  prefix, "virtual_memory:", s->virtual_memory);
 
 	if(s->resident_memory > -1)
-		fprintf(stream, "%-20s%20" PRId64 " MB\n",  "resident_memory:", s->resident_memory);
+		fprintf(stream, "%s%-20s%20" PRId64 " MB\n",  prefix, "resident_memory:", s->resident_memory);
 
 	if(s->swap_memory > -1)
-		fprintf(stream, "%-20s%20" PRId64 " MB\n",  "swap_memory:", s->swap_memory);
+		fprintf(stream, "%s%-20s%20" PRId64 " MB\n",  prefix, "swap_memory:", s->swap_memory);
 
 	if(s->bytes_read > -1)
-		fprintf(stream, "%-20s%20" PRId64 " B\n",  "bytes_read:", s->bytes_read);
+		fprintf(stream, "%s%-20s%20" PRId64 " B\n",  prefix, "bytes_read:", s->bytes_read);
 
 	if(s->bytes_written > -1)
-		fprintf(stream, "%-20s%20" PRId64 " B\n",  "bytes_written:", s->bytes_written);
+		fprintf(stream, "%s%-20s%20" PRId64 " B\n",  prefix, "bytes_written:", s->bytes_written);
 
 	if(s->workdir_num_files > -1)
-		fprintf(stream, "%-20s%20" PRId64 " files+dirs\n",  "workdir_num_files:", s->workdir_num_files);
+		fprintf(stream, "%s%-20s%20" PRId64 " files+dirs\n",  prefix, "workdir_num_files:", s->workdir_num_files);
 
 	if(s->workdir_footprint > -1)
-		fprintf(stream, "%-20s%20" PRId64 " MB\n",  "workdir_footprint:", s->workdir_footprint);
+		fprintf(stream, "%s%-20s%20" PRId64 " MB\n", prefix, "workdir_footprint:", s->workdir_footprint);
 }
 
 /* Parse the file assuming there are multiple summaries in it. Summary

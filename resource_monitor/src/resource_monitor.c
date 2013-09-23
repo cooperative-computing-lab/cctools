@@ -600,7 +600,10 @@ int monitor_final_summary()
 		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
 	
 	if(log_summary)
+	{
 		rmsummary_print(log_summary, summary);
+		rmsummary_print_only_resources(log_summary, resources_limits, "limit_");
+	}
 
 	if(log_opened)
 		monitor_file_io_summaries();

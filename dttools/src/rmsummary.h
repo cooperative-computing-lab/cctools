@@ -65,6 +65,7 @@ struct rmsummary_field
 struct rmsummary *resource_monitor_parse_summary_file(char *filename);
 
 void rmsummary_print(FILE *stream, struct rmsummary *s);
+void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix);
 
 struct rmsummary *rmsummary_parse_single(char *buffer, char separator);
 struct rmsummary *rmsummary_parse_file_single(char *filename);
