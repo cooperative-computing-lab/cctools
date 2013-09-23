@@ -73,7 +73,7 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 /** Reads a single summary from stream. Summaries are not parsed, here
     we simply read between comments (#) and blank lines for the lines
     describing the summary.**/
-char *rmsummary_read_single(FILE *stream)
+char *rmsummary_read_single_chunk(FILE *stream)
 {
 	int nmax   = 1024;
 	int ntotal = 0;
@@ -108,7 +108,7 @@ char *rmsummary_read_single(FILE *stream)
 	while( (c = getc(stream)) != EOF )
 	{
 		ungetc(c, stream);
-		if(c == '#')
+		if(c == '#' || c == '\n')
 			break;
 		
 		fgets(line, nline, stream);
@@ -183,7 +183,7 @@ struct rmsummary *rmsummary_parse_file_single(char *filename)
 		return NULL;
 	}
 
-	char *buffer = rmsummary_read_single(stream);
+	char *buffer = rmsummary_read_single_chunk(stream);
 	struct rmsummary *s = rmsummary_parse_single(buffer, '\n');
 
 	free(buffer);
@@ -262,7 +262,6 @@ void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const cha
 	if(s->workdir_footprint > -1)
 		fprintf(stream, "%s%-20s%20" PRId64 " MB\n", prefix, "workdir_footprint:", s->workdir_footprint);
 }
-
 /* Parse the file assuming there are multiple summaries in it. Summary
    boundaries are lines starting with # */
 struct list *rmsummary_parse_file_multiple(char *filename)
@@ -277,12 +276,11 @@ struct list *rmsummary_parse_file_multiple(char *filename)
 
 	struct list      *lst = list_create(0);
 	struct rmsummary *s;
-	char             *buffer;
 
 	do
 	{
-		buffer = rmsummary_read_single(stream);
-		s      = rmsummary_parse_single(buffer, '\n');
+		s = rmsummary_parse_next(stream);
+
 		if(s)
 			list_push_tail(lst, s);
 	} while(s);
@@ -292,15 +290,24 @@ struct list *rmsummary_parse_file_multiple(char *filename)
 	return lst;
 }
 
-struct rmsummary *rmsummary_parse_limits_exceeded(char *filename)
+/* Parse the stream for the next summary */
+struct rmsummary *rmsummary_parse_next(FILE *stream)
 {
-	struct rmsummary *total = rmsummary_parse_file_single(filename);
+	struct rmsummary *s;
+	char             *buffer;
+
+	buffer = rmsummary_read_single_chunk(stream);
+	s      = rmsummary_parse_single(buffer, '\n');
+
+	return s;
+}
+
+struct rmsummary *rmsummary_parse_limits_exceeded(char *limits_exceeded)
+{
 	struct rmsummary *limits = NULL;
 
-	if(total->limits_exceeded)
-		limits = rmsummary_parse_single(total->limits_exceeded, ',');
-
-	free(total);
+	if(limits_exceeded)
+		limits = rmsummary_parse_single(limits_exceeded, ',');
 
 	return limits;
 }

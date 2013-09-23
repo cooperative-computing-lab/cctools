@@ -71,6 +71,9 @@ struct rmsummary *rmsummary_parse_single(char *buffer, char separator);
 struct rmsummary *rmsummary_parse_file_single(char *filename);
 struct rmsummary *rmsummary_parse_limits_exceeded(char *filename);
 
+/**  Reads a single summary from stream. summaries are separated by '#' or '\n'. **/
+struct rmsummary *rmsummary_parse_next(FILE *stream);
+
 struct rmsummary *make_rmsummary(signed char default_value);
 void rmsummary_read_env_vars(struct rmsummary *s);
 
