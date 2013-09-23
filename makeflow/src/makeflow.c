@@ -44,6 +44,7 @@ See the file COPYING for details.
 #include "rmonitor.h"
 #include "random_init.h"
 #include "path.h"
+#include "batch_job_internal.h"
 
 #include "dag.h"
 #include "visitors.h"
@@ -2931,8 +2932,13 @@ int main(int argc, char *argv[])
 		port = work_queue_port(q);
 		if(port_file)
 			opts_write_port_file(port_file, port);
-		if(work_queue_disable_cache)
+		if(work_queue_disable_cache){
+			batch_job_disable_caching_work_queue(remote_queue);
 			debug(D_DEBUG, "Work Queue caching is disabled.\n");
+		}
+		else {
+			batch_job_enable_caching_work_queue(remote_queue);
+		}
 	}
 
 	if(batch_submit_options) {
