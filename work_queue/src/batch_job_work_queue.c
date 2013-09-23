@@ -332,3 +332,17 @@ int batch_job_remove_work_queue(struct batch_queue *q, batch_job_id_t jobid)
 {
 	return 0;
 }
+
+int batch_job_enable_caching_work_queue(struct batch_queue * q)
+{
+	if(!q) return 0;
+	q->caching = WORK_QUEUE_CACHE;
+	return 1;
+}
+
+int batch_job_disable_caching_work_queue(struct batch_queue * q)
+{
+	if(!q) return 0;
+	q->caching = WORK_QUEUE_NOCACHE;
+	return 1;
+}
