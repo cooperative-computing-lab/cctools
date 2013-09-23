@@ -13,7 +13,7 @@
 #include <errno.h>
 
 
-void specify_work_queue_task_files(struct work_queue_task *t, const char *input_files, const char *output_files)
+void specify_work_queue_task_files(struct work_queue_task *t, const char *input_files, const char *output_files, int disable_caching)
 {
 	char *f, *p, *files;
 	int caching;
@@ -25,7 +25,7 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-				if(strcmp(f, p+1)) {
+				if(strcmp(f, p+1) || disable_caching) {
 					caching = WORK_QUEUE_NOCACHE;
 				} else {
 					caching = WORK_QUEUE_CACHE;
@@ -34,7 +34,9 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 				debug(D_BATCH, "local file %s is %s on remote system:", f, p + 1);
 				*p = '=';
 			} else {
-				work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+				if(disable_caching) caching = WORK_QUEUE_NOCACHE;
+				else                caching = WORK_QUEUE_CACHE;
+				work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, caching);
 			}
 			f = strtok(0, " \t,");
 		}
@@ -183,7 +185,7 @@ batch_job_id_t batch_job_submit_work_queue(struct batch_queue *q, const char *cm
 		if(cmd)
 			work_queue_task_specify_input_file(t, cmd, cmd);
 
-		specify_work_queue_task_files(t, extra_input_files, extra_output_files);
+		specify_work_queue_task_files(t, extra_input_files, extra_output_files, q->caching);
 	}
 
 	struct rmsummary *resources = parse_batch_options_resources(q->options_text);
@@ -211,7 +213,7 @@ batch_job_id_t batch_job_submit_simple_work_queue(struct batch_queue * q, const 
 	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		specify_work_queue_task_shared_files(t, extra_input_files, extra_output_files);
 	} else {
-		specify_work_queue_task_files(t, extra_input_files, extra_output_files);
+		specify_work_queue_task_files(t, extra_input_files, extra_output_files, q->caching);
 	}
 
 	struct rmsummary *resources = parse_batch_options_resources(q->options_text);

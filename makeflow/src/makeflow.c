@@ -74,6 +74,7 @@ enum { LONG_OPT_MONITOR_INTERVAL = 1,
        LONG_OPT_MONITOR_LIMITS,
        LONG_OPT_MONITOR_TIME_SERIES,
        LONG_OPT_MONITOR_OPENED_FILES,
+       LONG_OPT_DISABLE_WQ_CACHE,
        LONG_OPT_PASSWORD,
        LONG_OPT_PPM_ROW,
        LONG_OPT_PPM_FILE,
@@ -109,6 +110,7 @@ static int priority = 0;
 static int port = 0;
 static const char *port_file = NULL;
 static int output_len_check = 0;
+static int work_queue_disable_cache = 0;
 
 static char *makeflow_exe = NULL;
 static char *monitor_exe = NULL;
@@ -1386,11 +1388,11 @@ int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, i
 				}
 			}
 			break;
-                case BATCH_QUEUE_TYPE_WORK_QUEUE:
-                        /* Note we do not fall with
-                         * BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS here, since we
-                         * do not want to rename absolute paths in such case.
-                         * */
+		case BATCH_QUEUE_TYPE_WORK_QUEUE:
+				/* Note we do not fall with
+				 * BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS here, since we
+				 * do not want to rename absolute paths in such case.
+				 * */
 			if(f->filename[0] == '/' && !remotename) {
 				/* Translate only explicit absolute paths for Work Queue tasks. */
 				remotename = dag_node_add_remote_name(n, f->filename, NULL);
@@ -2156,6 +2158,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
 	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
+	fprintf(stdout, " %-30s Disable Work Queue caching.                 (default is false)\n", "--disable-wq-cache");
 
 	fprintf(stdout, "\n*Monitor Options:\n\n");
 	fprintf(stdout, " %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
@@ -2374,6 +2377,7 @@ int main(int argc, char *argv[])
 		{"display-mode", required_argument, 0, 'D'},
 		{"dot-merge-similar", no_argument, 0,  LONG_OPT_DOT_CONDENSE},
 		{"dot-proportional",  no_argument, 0,  LONG_OPT_DOT_PROPORTIONAL},
+		{"disable-wq-cache", no_argument, 0, LONG_OPT_DISABLE_WQ_CACHE},
 		{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
 		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
 		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
@@ -2642,6 +2646,9 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "makeflow: couldn't open %s: %s\n", optarg, strerror(errno));
 				return 1;
 			}
+			break;
+		case LONG_OPT_DISABLE_WQ_CACHE:
+			work_queue_disable_cache = 1;
 			break;
 		default:
 			show_help(argv[0]);
@@ -2924,6 +2931,13 @@ int main(int argc, char *argv[])
 		port = work_queue_port(q);
 		if(port_file)
 			opts_write_port_file(port_file, port);
+		if(work_queue_disable_cache){
+			batch_job_disable_caching_work_queue(remote_queue);
+			debug(D_DEBUG, "Work Queue caching is disabled.\n");
+		}
+		else {
+			batch_job_enable_caching_work_queue(remote_queue);
+		}
 	}
 
 	if(batch_submit_options) {
