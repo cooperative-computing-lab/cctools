@@ -3,7 +3,7 @@
 SUBMIT_COMMON=`which wq_submit_workers.common`
 if [ -z "$SUBMIT_COMMON" ];
 then
-	echo "Please add 'wq_submit_workers.common' to your file."
+	echo "Please add 'wq_submit_workers.common' to your PATH."
 else
 	. $SUBMIT_COMMON
 fi
