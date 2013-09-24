@@ -18,7 +18,6 @@ can be released:
 #include "work_queue.h"
 #include "work_queue_protocol.h"
 #include "work_queue_internal.h"
-#include "work_queue_catalog.h"
 #include "work_queue_resources.h"
 
 #include "int_sizes.h"
@@ -85,14 +84,14 @@ static const char *work_queue_state_names[] = {"init","ready","busy","full","non
 #define WORK_QUEUE_RESULT_OUTPUT_MISSING 16
 #define WORK_QUEUE_RESULT_LINK_FAIL 32
 
-#define MIN_TIME_LIST_SIZE 20
+// The default capacity reported before information is available.
+#define WORK_QUEUE_DEFAULT_CAPACITY 10
 
-#define TIME_SLOT_TASK_TRANSFER 0
-#define TIME_SLOT_TASK_EXECUTE 1
-#define TIME_SLOT_MASTER_IDLE 2
-#define TIME_SLOT_APPLICATION 3
+// The minimum number of task reports to keep
+#define WORK_QUEUE_TASK_REPORT_MIN_SIZE 20
 
-#define WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER 10
+// Seconds between updates to the catalog
+#define WORK_QUEUE_UPDATE_INTERVAL 60
 
 #define WORKER_ADDRPORT_MAX 32
 #define WORKER_HASHKEY_MAX 32
@@ -101,8 +100,6 @@ static const char *work_queue_state_names[] = {"init","ready","busy","full","non
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
-int wq_minimum_transfer_timeout = 3;
-int wq_foreman_transfer_timeout = 3600;
 
 struct work_queue {
 	char *name;
@@ -111,7 +108,8 @@ struct work_queue {
 
 	char workingdir[PATH_MAX];
 
-	struct link *master_link;
+	struct datagram  *update_port;   // outgoing udp connection to catalog
+	struct link      *master_link;   // incoming tcp connection for workers.
 	struct link_info *poll_table;
 	int poll_table_size;
 
@@ -143,21 +141,17 @@ struct work_queue {
 	int task_ordering;
 	int process_pending_check;
 
-	timestamp_t time_last_task_start;
-	timestamp_t idle_time;
-	timestamp_t accumulated_idle_time;
-	timestamp_t app_time;
+	struct list * task_reports;	// list of last N work_queue_task_reports
+	timestamp_t total_idle_time;	// sum of time spent waiting for workers
+	timestamp_t total_app_time;	// sum of time spend above work_queue_wait
 
-	struct list *idle_times;
-	double idle_percentage;
-	struct task_statistics *task_statistics;
-
-	int estimate_capacity_on;
-	int capacity;
-	int avg_capacity;
-	
 	double asynchrony_multiplier;
 	int asynchrony_modifier;
+
+	int minimum_transfer_timeout;
+	int foreman_transfer_timeout;
+	int transfer_outlier_factor;
+	int default_transfer_rate;
 
 	char *catalog_host;
 	int catalog_port;
@@ -198,47 +192,24 @@ struct work_queue_worker {
 	timestamp_t keepalive_check_sent_time;
 };
 
-struct time_slot {
-	timestamp_t start;
-	timestamp_t duration;
-	int type;
-};
-
-struct task_statistics {
-	struct list *reports;
-	timestamp_t total_time_transfer_data;
-	timestamp_t total_time_execute_cmd;
-	int total_capacity;
-	int total_busy_workers;
-};
-
-struct task_report {
-	timestamp_t time_transfer_data;
-	timestamp_t time_execute_cmd;
-	int busy_workers;
-	int capacity;
+struct work_queue_task_report {
+	timestamp_t transfer_time;
+	timestamp_t exec_time;
 };
 
 static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
 
-static struct task_statistics *task_statistics_init();
-static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t duration, int type, timestamp_t * accumulated_time, struct list *time_list);
-static void add_task_report(struct work_queue *q, struct work_queue_task *t);
-static void update_app_time(struct work_queue *q, timestamp_t last_left_time, int last_left_status);
+static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line); 
 
+static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *foreman_uplink );
+
 static int short_timeout = 5;
-
 static timestamp_t link_poll_end; //tracks when we poll link; used to timeout unacknowledged keepalive checks
-
-static int tolerable_transfer_rate_denominator = 10;
-static long double minimum_allowed_transfer_rate = 100000;	// 100 KB/s
-
-
 
 /******************************************************/
 /********** work_queue internal functions *************/
@@ -386,109 +357,97 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	return result; 
 }
 
-static double get_idle_percentage(struct work_queue *q)
-{
-	// Calculate the master's idle percentage for since the most recent
-	// finished Nth task where N equals the number of workers.
-	struct time_slot *ts;
-	timestamp_t accumulated_idle_start;
+/*
+Select an appropriate timeout value for the transfer of a certain number of bytes.
+We do not know in advance how fast the system will perform.
 
-	ts = (struct time_slot *) list_peek_head(q->idle_times);
-	if(ts) {
-		accumulated_idle_start = ts->start;
-	} else {
-		accumulated_idle_start = q->start_time;
-	}
+So do this by starting with an assumption of bandwidth taken from the worker,
+from the queue, or from a (slow) default number, depending on what information is available.
+The timeout is chosen to be a multiple of the expected transfer time from the assumed bandwidth.
 
-	return (long double) (q->accumulated_idle_time + q->idle_time) / (timestamp_get() - accumulated_idle_start);
-}
+The overall effect is to reject transfers that are 10x slower than what has been seen before.
+
+Two exceptions are made:
+- The transfer time cannot be below a configurable minimum time.
+- A foreman must have a high minimum, because its attention is divided
+  between the master and the workers that it serves.
+*/
 
 static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T length)
 {
-	timestamp_t timeout;
-	long double avg_queue_transfer_rate, avg_worker_transfer_rate, retry_transfer_rate, tolerable_transfer_rate;
-	INT64_T total_tasks_complete, total_tasks_running, total_tasks_waiting, num_of_free_workers;
-	struct work_queue_task *t = NULL;
-	
-	t = itable_lookup(w->current_tasks, taskid);
+	double avg_transfer_rate; // bytes per second
+	const char *data_source;
 
-	if(w->total_transfer_time) {
-		avg_worker_transfer_rate = (long double) w->total_bytes_transferred / w->total_transfer_time * 1000000;
+	INT64_T     q_total_bytes_transferred = q->total_bytes_sent + q->total_bytes_received;
+	timestamp_t q_total_transfer_time     = q->total_send_time  + q->total_receive_time;
+
+	// Note total_transfer_time and q_total_transfer_time are timestamp_t with units of milliseconds.
+
+	if(w->total_transfer_time>1000000) {
+		avg_transfer_rate = 1000000 * w->total_bytes_transferred / w->total_transfer_time;
+		data_source = "worker's observed";
+	} else if(q_total_transfer_time>1000000) {
+		avg_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
+		data_source = "overall queue";
 	} else {
-		avg_worker_transfer_rate = 0;
+		avg_transfer_rate = q->default_transfer_rate;
+		data_source = "conservative default";
 	}
 
-	retry_transfer_rate = 0;
-	num_of_free_workers = q->workers_in_state[WORKER_STATE_INIT] + q->workers_in_state[WORKER_STATE_READY];
-	total_tasks_complete = q->total_tasks_complete;
-	total_tasks_running = itable_size(q->running_tasks) + itable_size(q->finished_tasks);
-	total_tasks_waiting = list_size(q->ready_list);
-	if(total_tasks_complete > total_tasks_running && num_of_free_workers > total_tasks_waiting) {
-		// The master has already tried most of the workers connected and has free workers for retrying slow workers
-		if(t && t->total_bytes_transferred) {
-			avg_queue_transfer_rate = (long double) (q->total_bytes_sent + q->total_bytes_received) / (q->total_send_time + q->total_receive_time) * 1000000;
-			retry_transfer_rate = (long double) length / t->total_bytes_transferred * avg_queue_transfer_rate;
-		}
-	}
+	debug(D_WQ,"%s (%s) using %s average transfer rate of %.2lf MB/s\n", w->hostname, w->addrport, data_source, avg_transfer_rate/MEGABYTE);
 
-	tolerable_transfer_rate = MAX(avg_worker_transfer_rate / tolerable_transfer_rate_denominator, retry_transfer_rate);
-	tolerable_transfer_rate = MAX(minimum_allowed_transfer_rate, tolerable_transfer_rate);
+	double tolerable_transfer_rate = avg_transfer_rate / q->transfer_outlier_factor; // bytes per second
+
+	int timeout = length / tolerable_transfer_rate;
 
 	if(!strcmp(w->os, "foreman")) {
-		timeout = MAX(wq_foreman_transfer_timeout, length / tolerable_transfer_rate);
+		// A foreman must have a much larger minimum timeout, b/c it does not respond immediately to the master.
+		timeout = MAX(q->foreman_transfer_timeout,timeout);
 	} else {
-		timeout = MAX(wq_minimum_transfer_timeout, length / tolerable_transfer_rate);	// try at least wq_minimum_transfer_timeout seconds
+		// An ordinary master has a lower minimum timeout b/c it responds immediately to the master.
+		timeout = MAX(q->minimum_transfer_timeout,timeout);
 	}
 
-	debug(D_WQ, "%s (%s) will try up to %lld seconds for the transfer of this %.3Lf MB file.", w->hostname, w->addrport, (long long) timeout, (long double) length / 1000000);
+	debug(D_WQ, "%s (%s) will try up to %d seconds to transfer this %.2lf MB file.", w->hostname, w->addrport, timeout, length/1000000.0);
+
 	return timeout;
 }
 
-static void update_catalog(struct work_queue *q, struct link *master, int force_update )
+static void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
 {
-	struct work_queue_stats s;
-	char addrport[WORK_QUEUE_LINE_MAX];
 	static time_t last_update_time = 0;
+	char address[LINK_ADDRESS_MAX];
 
-	if(!force_update && (time(0) - last_update_time) < WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL) 
-			return;
+	// Only advertise if we have a name.
+	if(!q->name) return;
 
-	if(!q->catalog_host)
-		q->catalog_host = strdup(CATALOG_HOST);
+	// Only advertise every last_update_time seconds.
+	if(!force_update && (time(0) - last_update_time) < WORK_QUEUE_UPDATE_INTERVAL) 
+		return;
 
-	if(!q->catalog_port)
-		q->catalog_port = CATALOG_PORT;
+	// If host and port are not set, pick defaults.
+	if(!q->catalog_host)	q->catalog_host = strdup(CATALOG_HOST);
+	if(!q->catalog_port)	q->catalog_port = CATALOG_PORT;
+	if(!q->update_port)	q->update_port = datagram_create(DATAGRAM_PORT_ANY);
 
-	work_queue_get_stats(q, &s);
-	struct work_queue_resources r;
-	struct work_queue_resources local_resources; // holding the foreman's disk information
-	memset(&r, 0, sizeof(r));
-	aggregate_workers_resources(q, &r);
-
-	char *worker_summary = work_queue_get_worker_summary(q);
-
-	if(master) {                                 // a master with a master... therefore a foreman
-		int port;
-		char working_directory[PATH_MAX];
-
-		link_address_remote(master, addrport, &port);
-		sprintf(addrport, "%s:%d", addrport, port);
-
-		getcwd(working_directory, PATH_MAX);                               
-
-		// get foreman local resources
-		work_queue_resources_measure_locally(&local_resources, working_directory);
-		r.disk.total = local_resources.disk.total; // overwrite aggregates with local disk information
-		r.disk.inuse = local_resources.disk.inuse;
-
-		debug(D_WQ,"Foreman -- inuse:%d total:%d\n", local_resources.disk.inuse, local_resources.disk.total);
-	} else {
-		sprintf(addrport, "127.0.0.1:-1"); //this master has no master
+	if(!domain_name_cache_lookup(q->catalog_host, address)) {
+		debug(D_WQ,"could not resolve address of catalog server %s!",q->catalog_host);
+		// don't try again until the next update period
+		last_update_time = time(0);
+		return;
 	}
-	debug(D_WQ,"Updating catalog with resource information -- cores:%d memory:%d disk:%d\n", r.cores.total,r.memory.total,r.disk.total); //see if information is being passed correctly
-	advertise_master_to_catalog(q->catalog_host, q->catalog_port, q->name, addrport, &s, &r, worker_summary);
-	free(worker_summary);
 
+	// Generate the master status in an nvpair, and print it to a buffer.
+	char buffer[DATAGRAM_PAYLOAD_MAX];
+	struct nvpair *nv = queue_to_nvpair(q,foreman_uplink);
+	nvpair_print(nv,buffer,sizeof(buffer));
+
+	// Send the buffer.
+	debug(D_WQ, "Advertising master status to the catalog server at %s:%d ...", q->catalog_host, q->catalog_port);
+	datagram_send(q->update_port, buffer, strlen(buffer), address, q->catalog_port);
+
+	// Clean up.
+	nvpair_delete(nv);
 	last_update_time = time(0);
 }
 
@@ -877,8 +836,7 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 					t->total_transfer_time += sum_time;
 					w->total_bytes_transferred += total_bytes;
 					w->total_transfer_time += sum_time;
-					debug(D_WQ, "Got %"PRId64" bytes from %s (%s) in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps", total_bytes, w->hostname, w->addrport, sum_time / 1000000.0, ((8.0 * total_bytes) / sum_time),
-					      (8.0 * w->total_bytes_transferred) / w->total_transfer_time);
+					debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 				}
 				total_bytes = 0;
 			}
@@ -1006,12 +964,8 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	if(q->monitor_mode)
 		work_queue_monitor_append_report(q, t);
 
-
 	// Record statistics information for capacity estimation
-	if(q->estimate_capacity_on) {
-		add_task_report(q, t);
-	}
-	
+	add_task_report(q,t);
 		
 	// Change worker state and do some performance statistics
 	q->total_tasks_complete++;
@@ -1155,19 +1109,23 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	return 0;
 }
 
+/*
+queue_to_nvpair examines the overall queue status and creates
+an nvair which can be sent to the catalog or directly to the
+user that connects via work_queue_status.
+*/
 
-
-static struct nvpair * queue_to_nvpair( struct work_queue *q )
+static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *foreman_uplink )
 {
 	struct nvpair *nv = nvpair_create();
 	if(!nv) return 0;
+
+	// Insert all properties from work_queue_stats
 
 	struct work_queue_stats info;
 	work_queue_get_stats(q,&info);
 
 	nvpair_insert_integer(nv,"port",info.port);
-	if(q->name) nvpair_insert_string(nv,"project",q->name);
-	nvpair_insert_string(nv,"working_dir",q->workingdir);
 	nvpair_insert_integer(nv,"priority",info.priority);
 	nvpair_insert_integer(nv,"workers",info.workers_ready+info.workers_busy+info.workers_full);
 	nvpair_insert_integer(nv,"workers_init",info.workers_init);
@@ -1176,9 +1134,11 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q )
 	nvpair_insert_integer(nv,"workers_full",info.workers_full);
 	nvpair_insert_integer(nv,"tasks_running",info.tasks_running);
 	nvpair_insert_integer(nv,"tasks_waiting",info.tasks_waiting);
-	nvpair_insert_integer(nv,"tasks_complete",info.total_tasks_complete);
-	nvpair_insert_integer(nv,"total_tasks_dispatched",info.total_tasks_dispatched);
+	// KNOWN HACK: The following line is inconsistent but kept for compatibility reasons.
+	// Everyone wants to know total_tasks_complete, but few are interested in tasks_complete.
+	nvpair_insert_integer(nv,"tasks_complete",info.total_tasks_complete); 
 	nvpair_insert_integer(nv,"total_tasks_complete",info.total_tasks_complete);
+	nvpair_insert_integer(nv,"total_tasks_dispatched",info.total_tasks_dispatched);
 	nvpair_insert_integer(nv,"total_workers_joined",info.total_workers_joined);
 	nvpair_insert_integer(nv,"total_workers_removed",info.total_workers_removed);
 	nvpair_insert_integer(nv,"total_bytes_sent",info.total_bytes_sent);
@@ -1186,10 +1146,47 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q )
 	nvpair_insert_integer(nv,"start_time",info.start_time);
 	nvpair_insert_integer(nv,"total_send_time",info.total_send_time);
 	nvpair_insert_integer(nv,"total_receive_time",info.total_receive_time);
+	nvpair_insert_float(nv,"efficiency",info.efficiency);
+	nvpair_insert_float(nv,"idle_percentage",info.idle_percentage);
+	nvpair_insert_integer(nv,"capacity",info.capacity);
+	nvpair_insert_integer(nv,"total_workers_connected",info.total_workers_connected);
+	nvpair_insert_integer(nv,"total_worker_slots",info.total_worker_slots);
 
+	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
 	aggregate_workers_resources(q,&r);
 	work_queue_resources_add_to_nvpair(&r,nv);
+
+	char owner[USERNAME_MAX];
+	username_get(owner);
+
+	// Add special properties expected by the catalog server
+	nvpair_insert_string(nv,"type","wq_master");
+	if(q->name) nvpair_insert_string(nv,"project",q->name);
+	nvpair_insert_integer(nv,"starttime",(q->start_time/1000000)); // catalog expects time_t not timestamp_t
+	nvpair_insert_integer(nv,"total_workers",info.workers_ready+info.workers_busy+info.workers_full);
+	nvpair_insert_integer(nv,"total_workers_working",info.workers_busy+info.workers_full);
+	nvpair_insert_string(nv,"working_dir",q->workingdir);
+	nvpair_insert_string(nv,"owner",owner);
+	nvpair_insert_string(nv,"version",CCTOOLS_VERSION);
+
+	// If this is a foreman, add the master address and the disk resources
+	if(foreman_uplink) {
+		int port;
+		char address[LINK_ADDRESS_MAX];
+		char addrport[WORK_QUEUE_LINE_MAX];
+
+		link_address_remote(foreman_uplink,address,&port);
+		sprintf(addrport,"%s:%d",address,port);
+		nvpair_insert_string(nv,"master_address",addrport);
+
+		// get foreman local resources and overwrite disk usage
+		struct work_queue_resources local_resources;
+		work_queue_resources_measure_locally(&local_resources,q->workingdir);
+		r.disk.total = local_resources.disk.total;
+		r.disk.inuse = local_resources.disk.inuse;
+		work_queue_resources_add_to_nvpair(&r,nv);
+	}
 
 	return nv;
 }
@@ -1258,7 +1255,7 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	}
 	
 	if(!strcmp(request, "queue")) {
-		struct nvpair *nv = queue_to_nvpair( q );
+		struct nvpair *nv = queue_to_nvpair( q, 0 );
 		if(nv) {
 			link_nvpair_write(l,nv,stoptime);
 			nvpair_delete(nv);
@@ -1802,8 +1799,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 		if(total_bytes > 0) {
 			q->total_bytes_sent += (INT64_T) total_bytes;
 			q->total_send_time += sum_time;
-			debug(D_WQ, "%s (%s) got %"PRId64" bytes in %.03lfs (%.02lfs Mbps) average %.02lfs Mbps", w->hostname, w->addrport, total_bytes, sum_time / 1000000.0, ((8.0 * total_bytes) / sum_time),
-			      (8.0 * w->total_bytes_transferred) / w->total_transfer_time);
+			debug(D_WQ, "%s (%s) received %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, (double) total_bytes/1000000.0, sum_time / 1000000.0, (double) total_bytes/sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 		}
 	}
 
@@ -1820,10 +1816,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 
 int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
-	add_time_slot(q, q->time_last_task_start, q->idle_time, TIME_SLOT_MASTER_IDLE, &(q->accumulated_idle_time), q->idle_times);
-	q->idle_time = 0;
-
-	t->time_send_input_start = q->time_last_task_start = timestamp_get();
+	t->time_send_input_start = timestamp_get();
 	if(!send_input_files(t, w, q))
 		return 0;
 	t->time_send_input_finish = timestamp_get();
@@ -1878,153 +1871,64 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 	return 1;
 }
 
-static int get_num_of_effective_workers(struct work_queue *q)
+/*
+Store a report summarizing the performance of a completed task.
+Keep a list of reports equal to the number of workers connected.
+Used for computing queue capacity below.
+*/
+
+static void add_task_report( struct work_queue *q, struct work_queue_task *t )
 {
-	update_worker_states(q);
-	return q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_READY] + q->workers_in_state[WORKER_STATE_FULL];
-}
+	struct work_queue_task_report *tr;
 
-static struct task_statistics *task_statistics_init()
-{
-	struct task_statistics *ts;
+	// Create a new report object and add it to the list.
+	tr = malloc(sizeof(struct work_queue_task_report));
+	if(!tr) return;
+	tr->transfer_time = t->total_transfer_time;
+	tr->exec_time     = t->cmd_execution_time;
+	list_push_tail(q->task_reports,tr);
 
-	ts = (struct task_statistics *) malloc(sizeof(struct task_statistics));
-	if(ts) {
-		memset(ts, 0, sizeof(struct task_statistics));
-	}
-	return ts;
-}
-
-static void task_statistics_destroy(struct task_statistics *ts)
-{
-	if(!ts) return;
-	if(ts->reports) {
-		list_free(ts->reports);
-		list_delete(ts->reports);
-	}
-	free(ts);
-}
-
-static void add_time_slot(struct work_queue *q, timestamp_t start, timestamp_t duration, int type, timestamp_t * accumulated_time, struct list *time_list)
-{
-	struct time_slot *ts;
-	int count, effective_workers;
-
-	if(!time_list)
-		return;
-
-	ts = (struct time_slot *) malloc(sizeof(struct time_slot));
-	if(ts) {
-		ts->start = start;
-		ts->duration = duration;
-		ts->type = type;
-		*accumulated_time += ts->duration;
-		list_push_tail(time_list, ts);
-	} else {
-		debug(D_WQ, "Failed to record time slot of type %d.", type);
-	}
-
-	// trim time list
-	effective_workers = get_num_of_effective_workers(q);
-	count = MAX(MIN_TIME_LIST_SIZE, effective_workers);
-	while(list_size(time_list) > count) {
-		ts = list_pop_head(time_list);
-		*accumulated_time -= ts->duration;
-		free(ts);
+	// Trim the list to the current number of useful workers.
+	int count = MAX(WORK_QUEUE_TASK_REPORT_MIN_SIZE, hash_table_size(q->worker_table) );
+	while(list_size(q->task_reports) >= count) {
+	  tr = list_pop_head(q->task_reports);
+		free(tr);
 	}
 }
 
-static void add_task_report(struct work_queue *q, struct work_queue_task *t)
+/*
+Compute queue capacity based on stored task reports
+and the summary of master activity.
+*/
+
+static double compute_capacity( const struct work_queue *q )
 {
-	struct list *reports;
-	struct task_report *tr, *tmp_tr;
-	struct task_statistics *ts;
-	timestamp_t avg_task_execution_time;
-	timestamp_t avg_task_transfer_time;
-	timestamp_t avg_task_app_time;
-	timestamp_t avg_task_time_at_master;
-	int count, num_of_reports, effective_workers;
+	timestamp_t avg_transfer_time = 0;
+	timestamp_t avg_exec_time = 0;
+	int count = 0;
 
+	struct list_node *n;
 
-	if(!q || !t)
-		return;
-
-	// Record task statistics for master capacity estimation.
-	tr = (struct task_report *) malloc(sizeof(struct task_report));
-	if(!tr) {
-		return;
-	} else {
-		tr->time_transfer_data = t->total_transfer_time;
-		tr->time_execute_cmd = t->time_execute_cmd_finish - t->time_execute_cmd_start;
-		tr->busy_workers = q->workers_in_state[WORKER_STATE_BUSY];
+	// Sum up the task reports available.
+	for(n=q->task_reports->head;n;n=n->next) {
+		struct work_queue_task_report *tr = n->data;
+		avg_transfer_time += tr->transfer_time;
+		avg_exec_time += tr->exec_time;
+		count++;
 	}
 
-	ts = q->task_statistics;
-	if(!ts) {
-		ts = task_statistics_init();
-		if(!ts) {
-			free(tr);
-			return;
-		}
-		q->task_statistics = ts;
-	}
-	// Get task report list head
-	reports = ts->reports;
-	if(!reports) {
-		reports = list_create();
-		if(!reports) {
-			free(tr);
-			free(ts);
-			return;
-		}
-		ts->reports = reports;
-	}
-	// Update sums 
-	ts->total_time_transfer_data += tr->time_transfer_data;
-	ts->total_time_execute_cmd += tr->time_execute_cmd;
-	ts->total_busy_workers += tr->busy_workers;
-	debug(D_WQ, "+%d busy workers. Total busy workers: %d\n", tr->busy_workers, ts->total_busy_workers);
+	// Compute the average task properties.
+	if(count==0) return WORK_QUEUE_DEFAULT_CAPACITY;
+	avg_transfer_time /= count;
+	avg_exec_time /= count;
 
-	// Trim task report list size to N where N equals
-	// MAX(MIN_TIME_LIST_SIZE, effective_workers).
-	effective_workers = get_num_of_effective_workers(q);
-	count = MAX(MIN_TIME_LIST_SIZE, effective_workers);
-	while(list_size(reports) >= count) {
-		tmp_tr = (struct task_report *) list_pop_head(reports);
-		ts->total_time_transfer_data -= tmp_tr->time_transfer_data;
-		ts->total_time_execute_cmd -= tmp_tr->time_execute_cmd;
-		ts->total_busy_workers -= tmp_tr->busy_workers;
-		debug(D_WQ, "-%d busy workers. Total busy workers: %d\n", tmp_tr->busy_workers, ts->total_busy_workers);
-		ts->total_capacity -= tmp_tr->capacity;
-		free(tmp_tr);
-	}
+	// Compute the average time spent outside of work_queue_wait
+	if(q->total_tasks_complete==0) return WORK_QUEUE_DEFAULT_CAPACITY;
+	timestamp_t avg_app_time = q->total_app_time / q->total_tasks_complete;
 
-	num_of_reports = list_size(reports) + 1;	// The number of task reports in the list (after the new entry has been added)
-
-	avg_task_execution_time = ts->total_time_execute_cmd / num_of_reports;
-	avg_task_transfer_time = ts->total_time_transfer_data / num_of_reports;
-	avg_task_app_time = q->total_tasks_complete > 0 ? q->app_time / (q->total_tasks_complete + 1) : 0;
-	debug(D_WQ, "Avg task execution time: %lld; Avg task tranfer time: %lld; Avg task app time: %lld\n", (long long) avg_task_execution_time, (long long) avg_task_transfer_time, (long long) avg_task_app_time);
-
-
-	avg_task_time_at_master = avg_task_transfer_time + avg_task_app_time;
-	// This is the Master Capacity Equation:
-	if(avg_task_time_at_master > 0) {
-		tr->capacity = avg_task_execution_time / avg_task_time_at_master + 1;
-	} else {
-		tr->capacity = INT_MAX;
-	}
-
-	// Record the recent capacities' sum for quick calculation of the avg
-	ts->total_capacity += tr->capacity;
-
-	// Appending the task report to the list
-	list_push_tail(reports, tr);
-
-	// Update the lastest capacity and avg capacity variables
-	q->capacity = tr->capacity;
-	q->avg_capacity = ts->total_capacity / num_of_reports;
-	debug(D_WQ, "Latest master capacity: %d; Avg master capacity: %d\n", q->capacity, q->avg_capacity);
+	// Capacity is the ratio of task execution time to time spent in the master doing other things.
+	if(avg_transfer_time==0) return WORK_QUEUE_DEFAULT_CAPACITY;
+	return (double) avg_exec_time / (avg_transfer_time + avg_app_time);
 }
 
 static int check_worker_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
@@ -2311,36 +2215,9 @@ static void abort_slow_workers(struct work_queue *q)
 	}
 }
 
-static void update_app_time(struct work_queue *q, timestamp_t last_left_time, int last_left_status)
-{
-	if(!q) return;
-
-	timestamp_t t1, t2;
-
-	if(last_left_time && last_left_status == 1) {
-		t1 = timestamp_get() - last_left_time;
-
-		if(q->total_tasks_complete > MIN_TIME_LIST_SIZE) {
-			t2 = q->app_time / q->total_tasks_complete;
-			// A simple way of discarding outliers that does not require much calculation.
-			// Works for workloads that has stable app times.
-			if(t1 > WORK_QUEUE_APP_TIME_OUTLIER_MULTIPLIER * t2) {
-				debug(D_WQ, "Discarding outlier task app time: %lld\n", (long long) t1);
-				q->app_time += t2;
-			} else {
-				q->app_time += t1;
-			}
-		} else {
-			q->app_time += t1; 
-		}
-	}
-}
-
 static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)
 {
-	if(!w)
-		return 0;
-
+	if(!w) return 0;
 	send_worker_msg(w, "%s\n", time(0) + short_timeout, "exit");
 	remove_worker(q, w);
 	return 1;
@@ -2871,11 +2748,8 @@ struct work_queue *work_queue_create(int port)
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 	q->process_pending_check = 0;
 
-	// Capacity estimation related
 	q->start_time = timestamp_get();
-	q->time_last_task_start = q->start_time;
-	q->idle_times = list_create();
-	q->task_statistics = task_statistics_init();
+	q->task_reports = list_create();
 
 	q->catalog_host = 0;
 	q->catalog_port = 0;
@@ -2888,6 +2762,11 @@ struct work_queue *work_queue_create(int port)
 	
 	q->asynchrony_multiplier = 1.0;
 	q->asynchrony_modifier = 0;
+
+	q->minimum_transfer_timeout = 10;
+	q->foreman_transfer_timeout = 3600;
+	q->transfer_outlier_factor = 10;
+	q->default_transfer_rate = 1*MEGABYTE;
 	
 	if( (envstring  = getenv("WORK_QUEUE_BANDWIDTH")) ) {
 		q->bandwidth = string_metric_parse(envstring);
@@ -2964,8 +2843,7 @@ int work_queue_port(struct work_queue *q)
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 
-	if(!q)
-		return 0;
+	if(!q) return 0;
 
 	if(link_address_local(q->master_link, addr, &port)) {
 		return port;
@@ -2976,7 +2854,7 @@ int work_queue_port(struct work_queue *q)
 
 void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
 {
-	q->estimate_capacity_on = value;
+	// always on
 }
 
 void work_queue_specify_algorithm(struct work_queue *q, int alg)
@@ -3062,9 +2940,8 @@ void work_queue_delete(struct work_queue *q)
 		itable_delete(q->finished_tasks);
 		list_delete(q->complete_list);
 		
-		list_free(q->idle_times);
-		list_delete(q->idle_times);
-		task_statistics_destroy(q->task_statistics);
+		list_free(q->task_reports);
+		list_delete(q->task_reports);
  
 		free(q->poll_table);
 		link_close(q->master_link);
@@ -3152,17 +3029,17 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
-struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *master_link, int *master_active)
+struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
 {
 	struct work_queue_task *t;
 	time_t stoptime;
 
 	static timestamp_t last_left_time = 0;
-	static int last_left_status = 0;	// 0 -- did not return any done task; 1 -- returned done task 
+	if(last_left_time!=0) {
+		q->total_app_time += timestamp_get() - last_left_time;
+	}
 
 	print_password_warning(q);
-
-	update_app_time(q, last_left_time, last_left_status);
 
 	if(timeout == WORK_QUEUE_WAITFORTASK) {
 		stoptime = 0;
@@ -3172,7 +3049,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 	while(1) {
 		if(q->name) {
-			update_catalog(q, master_link, 0);
+			update_catalog(q, foreman_uplink, 0);
 		}
 		
 		remove_unresponsive_workers(q);	
@@ -3180,22 +3057,18 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		t = list_pop_head(q->complete_list);
 		if(t) {
 			last_left_time = timestamp_get();
-			last_left_status = 1;
 			return t;
 		}
 		
-		if( q->process_pending_check && process_pending() ) {
-			return NULL;
-		}
-
-//		debug(D_WQ, "workers_in_state[BUSY] = %d, workers_in_state[FULL] = %d, list_size(ready_list) = %d, aux_links = %x, list_size(aux_links) = %d", q->workers_in_state[WORKER_STATE_BUSY], q->workers_in_state[WORKER_STATE_FULL], list_size(q->ready_list), aux_links, aux_links?list_size(aux_links):0);
+		if( q->process_pending_check && process_pending() )
+			break;
 
 		update_worker_states(q);
 
-		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !(master_link))
+		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !(foreman_uplink))
 			break;
 
-		int n = build_poll_table(q, master_link);
+		int n = build_poll_table(q, foreman_uplink);
 
 		// Wait no longer than the caller's patience.
 		int msec;
@@ -3214,7 +3087,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		timestamp_t link_poll_start = timestamp_get();
 		int result = link_poll(q->poll_table, n, msec);
 		link_poll_end = timestamp_get();	
-		q->idle_time += link_poll_end - link_poll_start;
+		q->total_idle_time += link_poll_end - link_poll_start;
 
 
 		// If the master link was awake, then accept as many workers as possible.
@@ -3226,12 +3099,12 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		int i, j = 1;
 
-		// Consider the master link passed into the function and disregard if inactive.
-		if(master_link) {
+		// Consider the foreman_uplink passed into the function and disregard if inactive.
+		if(foreman_uplink) {
 			if(q->poll_table[1].revents) {
-				*master_active = 1; //signal that the master link saw activity
+				*foreman_uplink_active = 1; //signal that the master link saw activity
 			} else {
-				*master_active = 0;
+				*foreman_uplink_active = 0;
 			}
 			j++;
 		}
@@ -3263,8 +3136,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			abort_slow_workers(q);
 		}
 		
-		// If the master link is active then break so the caller can handle it.
-		if(master_link) {
+		// If the foreman_uplink is active then break so the caller can handle it.
+		if(foreman_uplink) {
 			break;
 		}
 		
@@ -3279,7 +3152,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	}
 
 	last_left_time = timestamp_get();
-	last_left_status = 0;
+
 	return 0;
 }
 
@@ -3481,10 +3354,16 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 		q->asynchrony_modifier = MAX(value, 0);
 		
 	} else if(!strcmp(name, "min-transfer-timeout")) {
-		wq_minimum_transfer_timeout = (int)value;
+		q->minimum_transfer_timeout = (int)value;
 	
 	} else if(!strcmp(name, "foreman-transfer-timeout")) {
-		wq_foreman_transfer_timeout = (int)value;
+		q->foreman_transfer_timeout = (int)value;
+		
+	} else if(!strcmp(name, "default-transfer-rate")) {
+		q->default_transfer_rate = value;
+
+	} else if(!strcmp(name, "transfer-outlier-factor")) {
+		q->transfer_outlier_factor = value;
 		
 	} else if(!strcmp(name, "fast-abort-multiplier")) {
 		if(value >= 1) {
@@ -3523,9 +3402,6 @@ char * work_queue_get_worker_summary( struct work_queue *q )
 
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 {
-	INT64_T effective_workers;
-	timestamp_t wall_clock_time;
-
 	memset(s, 0, sizeof(*s));
 	s->port = q->port;
 	s->priority = q->priority;
@@ -3545,43 +3421,53 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_bytes_received = q->total_bytes_received;
 	s->total_send_time = q->total_send_time;
 	s->total_receive_time = q->total_receive_time;
-	effective_workers = get_num_of_effective_workers(q);
 	s->start_time = q->start_time;
-	wall_clock_time = timestamp_get() - q->start_time;
 
-	if(effective_workers < 1 || wall_clock_time == 0)
-		s->efficiency = 0;
-	else
-		s->efficiency = (long double) (q->total_execute_time) / (wall_clock_time * effective_workers);
+	timestamp_t wall_clock_time = timestamp_get() - q->start_time;
 
-	s->idle_percentage = get_idle_percentage(q);
-	// Estimate master capacity, i.e. how many workers can this master handle
-	s->capacity = q->capacity;
-	s->avg_capacity = q->avg_capacity;
+	int effective_workers = hash_table_size(q->worker_table);
+
+	if(wall_clock_time>0 && effective_workers>0) {
+		s->efficiency = (double) (q->total_execute_time) / (wall_clock_time * effective_workers);
+	}
+
+	if(wall_clock_time>0) {
+		s->idle_percentage = (double) q->total_idle_time / wall_clock_time;
+	}
+
+	s->capacity = compute_capacity(q);
+
 	s->total_workers_connected = q->total_workers_connected;
 	// BUG: this should be the sum of the worker cpus
 	s->total_worker_slots = s->total_workers_connected;
 }
+
+/*
+This function is a little roundabout, because work_queue_resources_add
+updates the min and max of each value as it goes.  So, we set total
+to the value of the first item, then use work_queue_resources_add.
+If there are no items, we must manually return zero.
+*/
 
 void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total )
 {
 	struct work_queue_worker *w;
 	char *key;
 	int first = 1;
-	int wnum = 1;
+
+	if(hash_table_size(q->worker_table)==0) {
+		memset(total,0,sizeof(*total));
+		return;
+	}
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-
-		debug(D_WQ,"Worker #%d INFO - cores:%d memory:%d disk:%d\n", wnum,w->resources->cores.total, w->resources->memory.total, w->resources->disk.total);
-
 		if(first) {
 			*total = *w->resources;
 			first = 0;
 		} else {
 			work_queue_resources_add(total,w->resources);
 		}
-		wnum++;
 	}
 }
 
