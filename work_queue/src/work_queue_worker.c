@@ -155,6 +155,7 @@ static int manual_memory_option = 0;
 static int cores_allocated = 0;
 static int memory_allocated = 0;
 static int disk_allocated = 0;
+static int gpus_allocated = 0;
 
 
 // Foreman mode global variables
@@ -399,20 +400,23 @@ static int start_task(struct work_queue_task *t) {
 
 		ti->status = 0;
 		
-		if(t->cores < 0 && t->memory < 0 && t->disk < 0) {
+		if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
 			t->cores = MAX((double)aggregated_resources->cores.total/(double)aggregated_resources->workers.total, 1);
 			t->memory = MAX((double)aggregated_resources->memory.total/(double)aggregated_resources->workers.total, 0);
 			t->disk = MAX((double)aggregated_resources->disk.total/(double)aggregated_resources->workers.total, 0);
+			t->gpus = MAX((double)aggregated_resources->gpus.total/(double)aggregated_resources->workers.total, 0);
 		} else {
 			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 			t->cores = MAX(t->cores, 0);
 			t->memory = MAX(t->memory, 0);
 			t->disk = MAX(t->disk, 0);
+			t->gpus = MAX(t->gpus, 0);
 		}
 
 		cores_allocated += t->cores;
 		memory_allocated += t->memory;
 		disk_allocated += t->disk;
+		gpus_allocated += t->gpus;
 
 		itable_insert(stored_tasks, t->taskid, ti);
 		itable_insert(active_tasks, ti->pid, ti);
@@ -435,6 +439,7 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		cores_allocated -= ti->task->cores;
 		memory_allocated -= ti->task->memory;
 		disk_allocated -= ti->task->disk;
+		gpus_allocated -= ti->task->gpus;
 
 		total_task_execution_time += (ti->execution_end - ti->execution_start);
 		total_tasks_executed++;
@@ -1257,6 +1262,7 @@ static void kill_task(struct task_info *ti) {
 	cores_allocated -= ti->task->cores;
 	memory_allocated -= ti->task->memory;
 	disk_allocated -= ti->task->disk;
+	gpus_allocated -= ti->task->gpus;
 
 	task_info_delete(ti);
 }
@@ -1307,6 +1313,7 @@ static void kill_all_tasks() {
 	cores_allocated = 0;
 	memory_allocated = 0;
 	disk_allocated = 0;
+	gpus_allocated = 0;
 }
 
 static int do_kill(int taskid) {
@@ -1542,15 +1549,17 @@ static int check_for_resources(struct work_queue_task *t) {
 	int cores_used, disk_used, mem_used, ok = 1;
 	
 	// If resources used have not been specified, treat the task as consuming the entire real worker
-	if(t->cores < 0 && t->memory < 0 && t->disk < 0) {
+	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
 		cores_used = MAX((double)aggregated_resources->cores.total/(double)aggregated_resources->workers.total, 1);
 		mem_used = MAX((double)aggregated_resources->memory.total/(double)aggregated_resources->workers.total, 0);
 		disk_used = MAX((double)aggregated_resources->disk.total/(double)aggregated_resources->workers.total, 0);
+		gpus_used = MAX((double)aggregated_resources->gpus.total/(double)aggregated_resources->workers.total, 0);
 	} else {
 		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 		cores_used = MAX(t->cores, 0);
 		mem_used = MAX(t->memory, 0);
 		disk_used = MAX(t->disk, 0);
+		gpus_used = MAX(t->gpus, 0);
 	}
 	
 	
@@ -1564,6 +1573,10 @@ static int check_for_resources(struct work_queue_task *t) {
 	}
 	
 	if(disk_allocated + disk_used > aggregated_resources->disk.total) {
+		ok = 0;
+	}
+
+	if(gpus_allocated + gpus_used > aggregated_resources->gpus.total) {
 		ok = 0;
 	}
 	

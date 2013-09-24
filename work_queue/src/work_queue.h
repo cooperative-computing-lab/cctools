@@ -84,6 +84,7 @@ struct work_queue_task {
 	int memory;                       
 	int disk;
 	int cores;
+	int gpus;
 	int unlabeled;
 };
 
