@@ -1,97 +1,57 @@
 #!/bin/sh
 
+SUBMIT_COMMON=`which wq_submit_workers.common`
+if [ -z "$SUBMIT_COMMON" ];
+then
+	echo "Please add 'wq_submit_workers.common' to your PATH."
+else
+	. $SUBMIT_COMMON
+fi
+
 show_help() 
 {
-	echo "Use: pbs_submit_workers [options] <servername> <port> <num-workers>"
-	echo "where options are:"
-	echo "  -M <name>        Name of the preferred master for worker."
-	echo "  -N <name>        Same as -M (backwards compatibility)."
-	echo "  -c <num>         Set the number of cores each worker should use (0=auto). (default=1)"
-	echo "  -C <catalog>     Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
-	echo "  -t <time>        Abort after this amount of idle time. (default=900s)."
-	echo "  -d <subsystem>   Enable debugging on worker for this subsystem (try -d all to start)."
-	echo "  -w <size>        Set TCP window size."
-	echo "  -i <time>        Set initial value for backoff interval when worker fails to connect to a master. (default=1s)"
-	echo "  -b <time>        Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)"
-	echo "  -z <size>        Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)"
-	echo "  -A <arch>        Set architecture string for the worker to report to master instead of the value in uname."
-	echo "  -O <os>          Set operating system string for the worker to report to master instead of the value in uname."
-	echo "  -s <path>        Set the location for creating the working directory of the worker."
 	echo "  -j               Use job array to submit workers."
 	echo "  -p <parameters>  PBS qsub parameters."
-	echo "  -h               Show this help message."
-	exit 1
 }
 
-arguments=""
-use_auto=0
 use_jobarray=0
-parameters=""
-cores=1
+pbs_parameters=""
 
-while getopts aM:N:c:C:t:d:w:i:b:z:A:O:s:jp:h opt 
-do
-	case "$opt" in
-		a)  arguments="$arguments -a"; use_auto=1;; # backwards compatibility
-		M)  arguments="$arguments -M $OPTARG"; use_auto=1;;
-		N)  arguments="$arguments -M $OPTARG"; use_auto=1;;
-		c)  arguments="$arguments --cores $OPTARG"; cores=$OPTARG;;
-		C)  arguments="$arguments -C $OPTARG";;
-		t)  arguments="$arguments -t $OPTARG";;
-		d)  arguments="$arguments -d $OPTARG";;
-		w)  arguments="$arguments -w $OPTARG";;
-		i)  arguments="$arguments -i $OPTARG";;
-		b)  arguments="$arguments -b $OPTARG";;
-		z)  arguments="$arguments -z $OPTARG";;
-		A)  arguments="$arguments -A $OPTARG";;
-		O)  arguments="$arguments -O $OPTARG";;
-		s)  arguments="$arguments -s $OPTARG";;
-		j)  use_jobarray=1;;
-		p)  parameters="$parameters $OPTARG";;
-		h)  show_help;;
-		\?) show_help;;
-	esac
-done
+parse_arguments()
+{
+	if [ -z "$cores" -o $cores=0 ]
+	then
+		cores=1
+	fi
 
-shift $(expr $OPTIND - 1)
+	while [ $# -gt 0 ]
+	do
+		case $1 in
+			-j)
+			use_jobarray=1
+			;;
+			-p)
+			shift
+			pbs_parameters="$pbs_parameters $1"
+			;;
+			*)
+			break
+			;;
+		esac
+		shift
+	done
+}
 
-if [ $use_auto = 0 ]; then
-    if [ X$3 = X ]
-    then
-	show_help	
-    fi
-    host=$1
-    port=$2
-    count=$3
-else
-    if [ X$1 = X ]
-    then
-	show_help	
-    fi
-    host=
-    port=
-    count=$1
-fi
+submit_workers_command()
+{
+	qsub=`which qsub 2>/dev/null`
+	if [ $? != 0 ]
+	then
+		echo "$0: please add 'qsub' to your PATH."
+		exit 1
+	fi
 
-worker=`which work_queue_worker 2>/dev/null`
-if [ $? != 0 ]
-then
-	echo "$0: please add 'work_queue_worker' to your PATH."
-	exit 1
-fi
-
-qsub=`which qsub 2>/dev/null`
-if [ $? != 0 ]
-then
-	echo "$0: please add 'qsub' to your PATH."
-	exit 1
-fi
-
-mkdir -p ${USER}-workers
-cd ${USER}-workers
-cp $worker .
-
-cat >worker.sh <<EOF
+	cat >worker.sh <<EOF
 #!/bin/sh
 #PBS -l nodes=1:ppn=$cores
 
@@ -99,17 +59,18 @@ cd $PWD
 ./work_queue_worker $arguments $host $port
 EOF
 
-chmod 755 worker.sh
+	chmod 755 worker.sh
 
-if [ $use_jobarray = 1 ]
-then
-    qsub -J 1-$count:1 $parameters worker.sh
-else
-    for n in `seq 1 $count`
-    do
-        qsub $parameters worker.sh
-    done
-fi
-return_status=$?
+	if [ $use_jobarray = 1 ]
+	then
+		qsub -J 1-$count:1 $pbs_parameters worker.sh
+	else
+		for n in `seq 1 $count`
+		do
+			qsub $pbs_parameters worker.sh
+		done
+	fi
+}
 
-exit $return_status
+submit_workers $*
+
