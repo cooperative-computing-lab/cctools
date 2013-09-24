@@ -151,6 +151,7 @@ static struct work_queue_resources * aggregated_resources_last = 0;
 static int manual_cores_option = 1;
 static int manual_disk_option = 0;
 static int manual_memory_option = 0;
+static int manual_gpus_option = 0;
 
 static int cores_allocated = 0;
 static int memory_allocated = 0;
@@ -1546,7 +1547,7 @@ static int handle_master(struct link *master) {
 
 
 static int check_for_resources(struct work_queue_task *t) {
-	int cores_used, disk_used, mem_used, ok = 1;
+	int cores_used, disk_used, mem_used, gpus_used, ok = 1;
 	
 	// If resources used have not been specified, treat the task as consuming the entire real worker
 	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
@@ -1780,6 +1781,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s take.\n", "");
 	fprintf(stdout, " %-30s Set the number of cores reported by this worker.  Set to 0 to have the\n", "--cores=<n>");
 	fprintf(stdout, " %-30s worker automatically measure. (default=%d)\n", "", manual_cores_option);
+	fprintf(stdout, " %-30s Set the number of GPUs reported by this worker. (default=0)\n", "--gpus=<n>");
 	fprintf(stdout, " %-30s Manually set the amonut of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
 	fprintf(stdout, " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	fprintf(stdout, " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
@@ -1840,7 +1842,7 @@ static int setup_workspace() {
 
 enum {LONG_OPT_DEBUG_FILESIZE = 1, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
       LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
-      LONG_OPT_DISK, LONG_OPT_FOREMAN, LONG_OPT_DISABLE_SYMLINKS};
+      LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_DISABLE_SYMLINKS};
 
 struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1871,6 +1873,7 @@ struct option long_options[] = {
 	{"cores",               required_argument,  0,  LONG_OPT_CORES},
 	{"memory",              required_argument,  0,  LONG_OPT_MEMORY},
 	{"disk",                required_argument,  0,  LONG_OPT_DISK},
+	{"gpus",                required_argument,  0,  LONG_OPT_GPUS},
 	{"help",                no_argument,        0,  'h'},
 	{"version",             no_argument,        0,  'v'},
 	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
@@ -2054,6 +2057,13 @@ int main(int argc, char *argv[])
 				manual_disk_option = atoi(optarg);
 			}
 			break;
+		case LONG_OPT_GPUS:
+			if(!strncmp(optarg, "all", 3)) {
+				manual_gpus_option = 0;
+			} else {
+				manual_gpus_option = atoi(optarg);
+			}
+			break;
 		case LONG_OPT_DISABLE_SYMLINKS:
 			symlinks_enabled = 0;
 			break;
@@ -2160,11 +2170,14 @@ int main(int argc, char *argv[])
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		aggregated_resources->cores.total = 0;
 		aggregated_resources->memory.total = 0;
+		aggregated_resources->gpus.total = 0;
 	} else {
 		if(manual_cores_option)  
 			 aggregated_resources->cores.total = manual_cores_option;
 		if(manual_memory_option) 
 			aggregated_resources->memory.total = manual_memory_option;
+		if(manual_gpus_option)
+			aggregated_resources->gpus.total = manual_gpus_option;
 	}
 
 	if(manual_disk_option)   
@@ -2173,11 +2186,12 @@ int main(int argc, char *argv[])
 	debug(D_WQ,"local resources:");
 	work_queue_resources_debug(aggregated_resources);
 
-	fprintf(stdout, "work_queue_worker: %d workers, %d cores, %d MB memory, %d MB disk available\n",
+	fprintf(stdout, "work_queue_worker: %d workers, %d cores, %d MB memory, %d MB disk available, %d gpus\n",
 	       aggregated_resources->workers.total,
 	       aggregated_resources->cores.total,
 	       aggregated_resources->memory.total,
-	       aggregated_resources->disk.total);
+	       aggregated_resources->disk.total,
+		   aggregated_resources->gpus.total);
 
 	while(!abort_flag) {
 		if((master = connect_master(time(0) + idle_timeout)) == NULL) {
