@@ -47,6 +47,7 @@ struct rmsummary
 	/* these fields are not used when reading/printing summaries */ 
 	int64_t  cores;
 	int64_t  fs_nodes;
+	int64_t  gpus;
 };
 
 struct rmsummary_field
