@@ -545,6 +545,8 @@ void dag_task_category_print_debug_resources(struct dag_task_category *category)
 		debug(D_DEBUG, "memory:   %"PRId64" MB.\n", category->resources->resident_memory);
 	if( category->resources->workdir_footprint > -1 )
 		debug(D_DEBUG, "disk:     %"PRId64" MB.\n", category->resources->workdir_footprint);
+	if( category->resources->gpus > -1 )
+		debug(D_DEBUG, "gpus:  %"PRId64".\n", category->resources->gpus);
 }
 
 char *dag_task_category_wrap_as_wq_options(struct dag_task_category *category, const char *default_options)
