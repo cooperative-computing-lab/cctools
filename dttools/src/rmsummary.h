@@ -15,6 +15,7 @@ COPYING for details.
 #define RESOURCES_CORES  "CORES"
 #define RESOURCES_MEMORY "MEMORY"
 #define RESOURCES_DISK   "DISK"
+#define RESOURCES_GPUS   "GPUS"
 
 // These fields are defined as signed integers, even though they
 // will only contain positive numbers. This is to conversion to
