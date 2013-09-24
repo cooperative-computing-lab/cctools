@@ -284,67 +284,6 @@ struct list *get_masters_from_catalog(const char *catalog_host, int catalog_port
 	return ml;
 }
 
-int advertise_master_to_catalog(const char *catalog_host, int catalog_port, const char *project_name, const char *master_address, struct work_queue_stats *s, struct work_queue_resources *r, const char *workers_by_pool ) {
-	char address[DATAGRAM_ADDRESS_MAX];
-	char owner[USERNAME_MAX];
-	buffer_t *buffer = NULL;
-	const char *text;
-	size_t text_size;
-
-	if(!outgoing_datagram) {
-		outgoing_datagram = datagram_create(0);
-		if(!outgoing_datagram) {
-			fprintf(stderr, "Failed to advertise master to catalog server: couldn't create outgoing udp datagram!\n");
-			return 0;
-		}
-	}
-
-	if(!username_get(owner)) {
-		strcpy(owner,"unknown");
-	}
-
-	buffer = buffer_create();
-
-	int total_workers_working = s->workers_busy + s->workers_full;
-	int total_workers         = total_workers_working + s->workers_ready;
-
-	debug(D_WQ,"%s advertising resources to the Catalog -- cores:%d memory:%d disk:%d\n",project_name,r->cores.total,r->memory.total,r->disk.total); //debug to see if information is being passed
-
-	buffer_printf(buffer, 
-			"type wq_master\n"
-			"project %s\n"
-		        "starttime " TIMESTAMP_FORMAT "\n"
-		        "priority %d\n"
-			"port %d\nlifetime %d\n"
-			"tasks_waiting %d\ntasks_complete %d\ntasks_running %d\ntotal_tasks_dispatched %d\n"
-			"workers_init %d\nworkers_ready %d\nworkers_busy %d\nworkers %d\nworkers_by_pool %s\n"
-			"cores_total %d\nmemory_total %d\ndisk_total %d\n"
-			"capacity %d\n"
-			"my_master %s\n"
-			"version %d.%d.%s\nowner %s", 
-			project_name,
-		        (s->start_time)/1000000,
-		        s->priority, 
-			s->port, WORK_QUEUE_CATALOG_MASTER_AD_LIFETIME, 
-			s->tasks_waiting, s->total_tasks_complete, s->tasks_running, s->total_tasks_dispatched, 
-			s->workers_init, s->workers_ready, total_workers_working, total_workers, workers_by_pool, 
-			r->cores.total, r->memory.total, r->disk.total,
-			s->capacity, 
-			master_address,
-			CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, owner);
-
-	text = buffer_tostring(buffer, &text_size);
-
-	if(domain_name_cache_lookup(catalog_host, address)) {
-		debug(D_WQ, "Advertising master status to the catalog server at %s:%d ...", catalog_host, catalog_port);
-		datagram_send(outgoing_datagram, text, strlen(text), address, catalog_port);
-	}
-
-	buffer_delete(buffer);
-
-	return 1;
-}
-
 int get_pool_decisions_from_catalog(const char *catalog_host, int catalog_port, const char *proj, struct list *decisions) {
 	struct catalog_query *q;
 	struct nvpair *nv;

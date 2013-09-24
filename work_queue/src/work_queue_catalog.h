@@ -43,8 +43,6 @@ See the file COPYING for details.
 #define	WORK_QUEUE_CATALOG_POOL_AD_LIFETIME 180 
 
 #define WORK_QUEUE_NAME_MAX 256
-#define WORK_QUEUE_PROTOCOL_BLANK_FIELD "-"
-#define WORK_QUEUE_PROTOCOL_FIELD_MAX 256
 
 struct work_queue_master {
 	char addr[LINK_ADDRESS_MAX];

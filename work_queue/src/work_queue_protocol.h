@@ -24,4 +24,6 @@ This file should not be installed and should only be included by .c files.
 #define WORK_QUEUE_FS_PATH 2           /**< Indicates thirdput/thirdget refers to a path. */
 #define WORK_QUEUE_FS_SYMLINK 3        /**< Indicates thirdput/thirdget should create a symlink. */
 
+#define WORK_QUEUE_PROTOCOL_FIELD_MAX 256
+
 #endif
