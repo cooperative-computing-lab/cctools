@@ -63,6 +63,7 @@ void work_queue_resources_send( struct link *master, struct work_queue_resources
 	work_queue_resource_send(master,&r->cores,"cores",stoptime);
 	work_queue_resource_send(master,&r->disk,"disk",stoptime);
 	work_queue_resource_send(master,&r->memory,"memory",stoptime);
+	work_queue_resource_send(master,&r->gpus,"gpus",stoptime);
 }
 
 void work_queue_resources_debug( struct work_queue_resources *r )
@@ -71,6 +72,7 @@ void work_queue_resources_debug( struct work_queue_resources *r )
 	work_queue_resource_debug(&r->cores,"cores");
 	work_queue_resource_debug(&r->disk,"disk");
 	work_queue_resource_debug(&r->memory,"memory");
+	work_queue_resource_debug(&r->gpus,"gpus");
 }
 
 void work_queue_resources_clear( struct work_queue_resources *r )
@@ -92,6 +94,7 @@ void work_queue_resources_add( struct work_queue_resources *total, struct work_q
 	work_queue_resource_add(&total->cores,&r->cores);
 	work_queue_resource_add(&total->memory,&r->memory);
 	work_queue_resource_add(&total->disk,&r->disk);
+	work_queue_resource_add(&total->gpus,&r->gpus);
 }
 
 void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct nvpair *nv )
@@ -112,5 +115,9 @@ void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct 
 	nvpair_insert_integer(nv,"disk_total",r->disk.total);
 	nvpair_insert_integer(nv,"disk_smallest",r->disk.smallest);
 	nvpair_insert_integer(nv,"disk_largest",r->disk.largest);
+	nvpair_insert_integer(nv,"gpus_inuse",r->gpus.inuse);
+	nvpair_insert_integer(nv,"gpus_total",r->gpus.total);
+	nvpair_insert_integer(nv,"gpus_smallest",r->gpus.smallest);
+	nvpair_insert_integer(nv,"gpus_largest",r->gpus.largest);
 }
 
