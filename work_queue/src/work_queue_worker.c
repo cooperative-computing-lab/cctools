@@ -1782,7 +1782,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Set the number of cores reported by this worker.  Set to 0 to have the\n", "--cores=<n>");
 	fprintf(stdout, " %-30s worker automatically measure. (default=%d)\n", "", manual_cores_option);
 	fprintf(stdout, " %-30s Set the number of GPUs reported by this worker. (default=0)\n", "--gpus=<n>");
-	fprintf(stdout, " %-30s Manually set the amonut of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
+	fprintf(stdout, " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
 	fprintf(stdout, " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	fprintf(stdout, " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
