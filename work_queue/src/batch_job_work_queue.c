@@ -13,7 +13,7 @@
 #include <errno.h>
 
 
-void specify_work_queue_task_files(struct work_queue_task *t, const char *input_files, const char *output_files, int disable_caching)
+void specify_work_queue_task_files(struct work_queue_task *t, const char *input_files, const char *output_files, int caching_directive)
 {
 	char *f, *p, *files;
 	int caching;
@@ -25,7 +25,7 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-				if(strcmp(f, p+1) || disable_caching) {
+				if(strcmp(f, p+1) || caching_directive == WORK_QUEUE_NOCACHE) {
 					caching = WORK_QUEUE_NOCACHE;
 				} else {
 					caching = WORK_QUEUE_CACHE;
@@ -34,8 +34,8 @@ void specify_work_queue_task_files(struct work_queue_task *t, const char *input_
 				debug(D_BATCH, "local file %s is %s on remote system:", f, p + 1);
 				*p = '=';
 			} else {
-				if(disable_caching) caching = WORK_QUEUE_NOCACHE;
-				else                caching = WORK_QUEUE_CACHE;
+				if(caching_directive == WORK_QUEUE_NOCACHE) caching = WORK_QUEUE_NOCACHE;
+				else caching = WORK_QUEUE_CACHE;
 				work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, caching);
 			}
 			f = strtok(0, " \t,");
