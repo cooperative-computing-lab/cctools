@@ -73,7 +73,7 @@ OPTION_TRIPLET(-Z, port-file, file)Select port at random and write it to this fi
 OPTION_TRIPLET(-P, priority, integer)Priority. Higher the value, higher the priority.
 OPTION_TRIPLET(-W, wq-schedule, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
 OPTION_TRIPLET(-s, password, pwfile)Password file for authenticating workers.
-OPTION_ITEM(`--disable-wq-cache')Disable Work Queue caching. (default is false)
+OPTION_ITEM(`--disable-cache')Disable file caching (currently only Work Queue, default is false)
 OPTIONS_END
 
 SUBSECTION(Monitor Options)
