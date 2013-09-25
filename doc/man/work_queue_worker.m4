@@ -53,7 +53,7 @@ OPTION_TRIPLET(-s, workdir, path)Set the location where the worker should create
 OPTION_PAIR(--bandwidth, mbps)Set the maximum bandwidth the foreman will consume in Mbps. (default=unlimited)
 OPTION_PAIR(--volatility, chance)Set the percent chance a worker will decide to shut down every minute.
 OPTION_PAIR(--cores, n)Set the number of cores this worker should use.  Set it to 0 to have the worker use all of the available resources. (default=1)
-OPTION_PAIR(--gpus, n)Set the number of GPUs this worker should use.
+OPTION_PAIR(--gpus, n)Set the number of GPUs this worker should use. (default=0)
 OPTION_PAIR(--memory, mb)Manually set the amount of memory (in MB) reported by this worker.
 OPTION_PAIR(--disk, mb)Manually set the amount of disk space (in MB) reported by this worker.
 OPTION_ITEM(-v, --version')Show version string.
