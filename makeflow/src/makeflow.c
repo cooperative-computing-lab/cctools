@@ -74,7 +74,7 @@ enum { LONG_OPT_MONITOR_INTERVAL = 1,
        LONG_OPT_MONITOR_LIMITS,
        LONG_OPT_MONITOR_TIME_SERIES,
        LONG_OPT_MONITOR_OPENED_FILES,
-       LONG_OPT_DISABLE_WQ_CACHE,
+       LONG_OPT_DISABLE_BATCH_CACHE,
        LONG_OPT_PASSWORD,
        LONG_OPT_PPM_ROW,
        LONG_OPT_PPM_FILE,
@@ -110,7 +110,8 @@ static int priority = 0;
 static int port = 0;
 static const char *port_file = NULL;
 static int output_len_check = 0;
-static int work_queue_disable_cache = 0;
+
+static int cache_mode = 1;
 
 static char *makeflow_exe = NULL;
 static char *monitor_exe = NULL;
@@ -2377,7 +2378,7 @@ int main(int argc, char *argv[])
 		{"display-mode", required_argument, 0, 'D'},
 		{"dot-merge-similar", no_argument, 0,  LONG_OPT_DOT_CONDENSE},
 		{"dot-proportional",  no_argument, 0,  LONG_OPT_DOT_PROPORTIONAL},
-		{"disable-wq-cache", no_argument, 0, LONG_OPT_DISABLE_WQ_CACHE},
+		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
 		{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
 		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
 		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
@@ -2647,8 +2648,8 @@ int main(int argc, char *argv[])
 				return 1;
 			}
 			break;
-		case LONG_OPT_DISABLE_WQ_CACHE:
-			work_queue_disable_cache = 1;
+		case LONG_OPT_DISABLE_BATCH_CACHE:
+			cache_mode = 0;
 			break;
 		default:
 			show_help(argv[0]);
@@ -2931,12 +2932,12 @@ int main(int argc, char *argv[])
 		port = work_queue_port(q);
 		if(port_file)
 			opts_write_port_file(port_file, port);
-		if(work_queue_disable_cache){
-			batch_job_disable_caching_work_queue(remote_queue);
+		if(!cache_mode){
+			batch_job_disable_caching(remote_queue);
 			debug(D_DEBUG, "Work Queue caching is disabled.\n");
 		}
 		else {
-			batch_job_enable_caching_work_queue(remote_queue);
+			batch_job_enable_caching(remote_queue);
 		}
 	}
 
