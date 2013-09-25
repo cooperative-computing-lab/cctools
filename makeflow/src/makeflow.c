@@ -1184,6 +1184,11 @@ int dag_parse_process_variable(struct lexer_book *bk, struct dag_node *n, struct
 		current_table = bk->category->variables;
 		bk->category->resources->workdir_footprint = atoi(v->value);
 	}
+	else if(strcmp(RESOURCES_GPUS,   name) == 0) {
+		special = 1;
+		current_table = bk->category->variables;
+		bk->category->resources->gpus              = atoi(v->value);
+	}
 	/* else if some other special variable .... */
 	/* ... */
 
