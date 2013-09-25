@@ -2060,6 +2060,7 @@ int main(int argc, char *argv[])
 		case LONG_OPT_GPUS:
 			if(!strncmp(optarg, "all", 3)) {
 				manual_gpus_option = 0;
+				fatal("Currently the number of GPUS is not detected automatically. Please set it with the --gpus option.");
 			} else {
 				manual_gpus_option = atoi(optarg);
 			}
