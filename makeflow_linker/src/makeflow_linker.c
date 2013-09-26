@@ -17,7 +17,7 @@
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
-typedef enum {UNKNOWN, EXPLICIT, PYTHON} file_type;
+typedef enum {UNKNOWN, EXPLICIT, PERL, PYTHON} file_type;
 
 struct dependency{
 	char *original_name;
