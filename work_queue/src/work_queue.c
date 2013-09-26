@@ -1478,12 +1478,11 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 
 static int put_directory(const char *dirname, const char *remotedirname, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T * total_bytes, int flags) {
 	DIR *dir = opendir(dirname);
-	if(!dir)
-		return 0;
+	if(!dir) return 0;
 
-	struct dirent *file;
-	char buffer[WORK_QUEUE_LINE_MAX];
-	char *localname, *remotename;
+	struct dirent *d;
+	char localpath[WORK_QUEUE_LINE_MAX];
+	char remotepath[WORK_QUEUE_LINE_MAX];
 	int result;
 
 	struct stat local_info;
@@ -1497,37 +1496,29 @@ static int put_directory(const char *dirname, const char *remotedirname, struct 
 	// When putting a file its parent directories are automatically
 	// created by the worker, so no need to manually create them.
 
-	while((file = readdir(dir))) {
-		char *filename = file->d_name;
-
-		if(!strcmp(filename, ".") || !strcmp(filename, "..")) {
+	while((d = readdir(dir))) {
+		if(!strcmp(d->d_name, ".") || !strcmp(d->d_name, "..")) {
 			continue;
 		}
 
-		*buffer = '\0';
-		sprintf(buffer, "%s/%s", dirname, filename);
-		localname = xxstrdup(buffer);
-
-		*buffer = '\0';
-		sprintf(buffer, "%s/%s", remotedirname, filename);
-		remotename = xxstrdup(buffer);
+		sprintf(localpath, "%s/%s", dirname, d->d_name);
+		sprintf(remotepath, "%s/%s", remotedirname, d->d_name);
 	
-		if(stat(localname, &local_info) < 0) {
+		if(stat(localpath, &local_info) < 0) {
 			closedir(dir);
 			return 0;
 		}	
 		
 		if(local_info.st_mode & S_IFDIR)  {
-			result = put_directory(localname, remotename, q, w, taskid, total_bytes, flags);	
+			result = put_directory(localpath, remotepath, q, w, taskid, total_bytes, flags);
 		} else {
-			result = put_file(localname, remotename, 0, 0, q, w, taskid, total_bytes, flags);
+			result = put_file(localpath, remotepath, 0, 0, q, w, taskid, total_bytes, flags);
 		}	
+
 		if(result == 0) {
 			closedir(dir);
 			return 0;
 		}
-		free(localname);
-		free(remotename);
 	}
 	
 	closedir(dir);
