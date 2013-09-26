@@ -333,6 +333,7 @@ int main(int argc, char *argv[]){
 	char *input  = NULL;
 
 	int c;
+	int use_explicit = 0;
 
 	struct option long_options[] = {
 		{"help", no_argument, 0, 'h'},
@@ -340,8 +341,11 @@ int main(int argc, char *argv[]){
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "ho:", long_options, NULL)) >= 0){
+	while((c = getopt_long(argc, argv, "eho:", long_options, NULL)) >= 0){
 		switch(c){
+			case 'e':
+				use_explicit = 1;
+				break;
 			case 'o':
 				output = xxstrdup(optarg);
 				break;
