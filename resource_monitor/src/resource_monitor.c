@@ -1243,19 +1243,22 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
     fprintf(stdout, "%-30s Send debugging output to <file>.\n", "-o,--debug-file=<file>");
     fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
-    fprintf(stdout, "%-30s Show version string\n", "-v,--version");
+    fprintf(stdout, "%-30s Show version string.\n", "-v,--version");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Interval between observations, in microseconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
-    fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify\n", "-L,--limits=<string>");
-    fprintf(stdout, "%-30s resource limits.\n", "");
+    fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify.\n", "-L,--limits=<string>");
+    fprintf(stdout, "%-30s resource limits. (Could be specified multiple times.)\n", "");
+    fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Keep the monitored process in foreground (for interactive use).\n", "-f,--child-in-foreground");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Specify filename template for log files (default=resource-pid-<pid>)\n", "-O,--with-output-files=<file>");
-    fprintf(stdout, "%-30s Write resource summary to <file>        (default=<template>.summary)\n", "--with-summary-file=<file>");
-    fprintf(stdout, "%-30s Write resource time series to <file>    (default=<template>.series)\n", "--with-time-series=<file>");
-    fprintf(stdout, "%-30s Write list of opened files to <file>    (default=<template>.files)\n", "--with-opened-files=<file>");
+    fprintf(stdout, "%-30s Write resource summary to <file>.        (default=<template>.summary)\n", "--with-summary-file=<file>");
+    fprintf(stdout, "%-30s Write resource time series to <file>.    (default=<template>.series)\n", "--with-time-series=<file>");
+    fprintf(stdout, "%-30s Write list of opened files to <file>.    (default=<template>.files)\n", "--with-opened-files=<file>");
+    fprintf(stdout, "%-30s Include this string verbatim in a line in the summary. \n", "-V,--verbatim-to-summary=<str>");
+    fprintf(stdout, "%-30s (Could be specified multiple times.)\n", "");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Do not write the summary log file.\n", "--without-summary-file"); 
     fprintf(stdout, "%-30s Do not write the time series log file.\n", "--without-time-series"); 
@@ -1337,6 +1340,8 @@ int main(int argc, char **argv) {
     char *series_path  = NULL;
     char *opened_path  = NULL;
 
+	struct list *verbatim_summary_lines = list_create();
+
     int use_summary = 1;
     int use_series  = 1;
     int use_opened  = 1;
@@ -1365,6 +1370,8 @@ int main(int argc, char **argv) {
 		    {"interval",   required_argument, 0, 'i'},
 		    {"limits",     required_argument, 0, 'L'},
 		    {"limits-file",required_argument, 0, 'l'},
+
+		    {"verbatim-to-summary",required_argument, 0, 'V'},
 	
 		    {"with-output-files", required_argument, 0,  'O'},
 
@@ -1382,7 +1389,7 @@ int main(int argc, char **argv) {
 		    {0, 0, 0, 0}
 	    };
 
-    while((c = getopt_long(argc, argv, "d:fhi:L:l:o:O:v", long_options, NULL)) >= 0)
+    while((c = getopt_long(argc, argv, "d:fhi:L:l:o:O:vV:", long_options, NULL)) >= 0)
     {
 		switch (c) {
 			case 'd':
@@ -1408,6 +1415,9 @@ int main(int argc, char **argv) {
 				break;
 			case 'L':
 				parse_limits_string(resources_limits, optarg);
+				break;
+			case 'V':
+				list_push_tail(verbatim_summary_lines, optarg);
 				break;
 			case 'f':
 				child_in_foreground = 1;
@@ -1555,6 +1565,15 @@ int main(int argc, char **argv) {
 	    if (inotify_watches == NULL) alloced_inotify_watches = 0;
     }
 #endif
+
+
+	char *verbatim_line;
+	if(log_summary)
+	{
+		list_first_item(verbatim_summary_lines);
+		while((verbatim_line = list_next_item(verbatim_summary_lines)))
+			fprintf(log_summary, "%s\n", verbatim_line);
+	}
 
     spawn_first_process(cmd, child_in_foreground);
 
