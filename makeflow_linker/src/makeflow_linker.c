@@ -120,6 +120,8 @@ file_type file_extension_known(const char *filename){
 	for(j=0; j< 2; j++){
 		if(!strcmp(python_extensions[j], extension))
 			return PYTHON;
+		if(!strcmp(perl_extensions[j], extension))
+			return PERL;
 	}
 
 	return UNKNOWN;
