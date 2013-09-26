@@ -32,7 +32,7 @@ prepare() {
 }
 
 run() {
-	../src/makeflow_linker -o $out_dir input/001/$workflow_description
+	../src/makeflow_linker --use-explicit -o $out_dir input/001/$workflow_description
 	explicit_dependency=$(cat $out_dir/explicit | awk '{print $1}')
 	if [ "$explicit_dependency" != "Python" ]; then
 		exit 1
