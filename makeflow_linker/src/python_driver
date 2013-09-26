@@ -39,14 +39,18 @@ def find_module_names(filename):
 	return module_names
 
 
-file_to_link = sys.argv[1]
+file_to_link = sys.argv[-1]
 setup(file_to_link)
+
+use_explicit = False
+if len(sys.argv) > 2 and sys.argv[1] == '--use-explicit':
+	use_explicit = True
 
 print "*Python", sys.version.split(' ')[0]
 modules = find_module_names(file_to_link)
 for m in modules:
 	m_split = m.split('.')
-	if imp.is_builtin(m_split[0]):
+	if imp.is_builtin(m_split[0]) and use_explicit:
 		continue
 	m_path = imp.find_module(m_split[0])[1]
 	print m_path, m
