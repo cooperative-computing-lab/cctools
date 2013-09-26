@@ -116,7 +116,10 @@ static int cache_mode = 1;
 static char *makeflow_exe = NULL;
 static char *monitor_exe = NULL;
 
-static int monitor_mode = 0; /* & 1 enabled, & 2 with time-series, & 4 whith opened-files */
+static int monitor_mode = 0;
+static int monitor_enable_time_series = 0;
+static int monitor_enable_list_files  = 0;
+
 static char *monitor_limits_name = NULL;
 static int monitor_interval = 1;	// in seconds  
 static char *monitor_log_format = NULL;
@@ -1440,13 +1443,20 @@ int dag_prepare_for_monitoring(struct dag *d)
 		{
 			char *log_name_prefix;
 			char *log_name;
+
+			char *limits_str = dag_task_category_wrap_as_rmonitor_options(n->category);
+			char *extra_options = string_format("%s -V '%-15s%s'", 
+					limits_str ? limits_str : "", 
+					"category:",
+					n->category->label); 
+
 			log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
 			n->command = resource_monitor_rewrite_command((char *) n->command, log_name_prefix,
 					monitor_limits_name,
-					dag_task_category_wrap_as_rmonitor_options(n->category),
-					monitor_mode & 1,
-					monitor_mode & 2,
-					monitor_mode & 4);
+					extra_options,
+					1,                           /* summaries always enabled */
+					monitor_enable_time_series,
+					monitor_enable_list_files);
 
 			dag_node_add_source_file(n, monitor_exe, NULL);
 
@@ -1454,14 +1464,17 @@ int dag_prepare_for_monitoring(struct dag *d)
 			dag_node_add_target_file(n, log_name, NULL);
 
 			free(log_name);
-			if(monitor_mode & 02)
+			free(limits_str);
+			free(extra_options);
+
+			if(monitor_enable_time_series)
 			{
 				log_name = string_format("%s.series", log_name_prefix);
 				dag_node_add_target_file(n, log_name, NULL);
 				free(log_name);
 			}
 
-			if(monitor_mode & 04)
+			if(monitor_enable_list_files)
 			{
 				log_name = string_format("%s.files", log_name_prefix);
 				dag_node_add_target_file(n, log_name, NULL);
@@ -2620,29 +2633,31 @@ int main(int argc, char *argv[])
 			port_set = 1;	//WQ is going to set the port, so we continue as if already set.
 			break;
 		case 'M':
-			monitor_mode |= 01;
+			monitor_mode = 1;
 			if(monitor_log_dir)
 				free(monitor_log_dir);
 			monitor_log_dir = xxstrdup(optarg);
 			break;
 		case LONG_OPT_MONITOR_LIMITS:
-			monitor_mode |= 01;
+			monitor_mode = 1;
 			if(monitor_limits_name)
 				free(monitor_limits_name);
 			monitor_limits_name = xxstrdup(optarg);
 			break;
 		case LONG_OPT_MONITOR_INTERVAL:
-			monitor_mode |= 01;
+			monitor_mode = 1;
 			monitor_interval = atoi(optarg);
 			break;
 		case LONG_OPT_MONITOR_TIME_SERIES:
-			monitor_mode |= 02;
+			monitor_mode = 1;
+			monitor_enable_time_series = 1;
 			break;
 		case LONG_OPT_MONITOR_OPENED_FILES:
-			monitor_mode |= 04;
+			monitor_mode = 1;
+			monitor_enable_list_files = 1;
 			break;
 		case LONG_OPT_MONITOR_LOG_NAME:
-			monitor_mode |= 01;
+			monitor_mode = 1;
 			if(monitor_log_format)
 				free(monitor_log_format);
 			monitor_log_format = xxstrdup(optarg);

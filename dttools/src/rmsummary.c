@@ -195,10 +195,10 @@ struct rmsummary *rmsummary_parse_file_single(char *filename)
 void rmsummary_print(FILE *stream, struct rmsummary *s)
 {
 	if(s->command)
-		fprintf(stream, "%-20s%20s\n",  "command:", s->command);
+		fprintf(stream, "%-15s%s\n",  "command:", s->command);
 
 	if(s->cores > -1)
-		fprintf(stream, "%-20s%15" PRId64 "\n",  "cores:", s->cores);
+		fprintf(stream, "%-20s%20" PRId64 "\n",  "cores:", s->cores);
 
 	if(s->start > -1)
 		fprintf(stream, "%-20s%20lf s\n", "start:", s->start / 1000000e0);
