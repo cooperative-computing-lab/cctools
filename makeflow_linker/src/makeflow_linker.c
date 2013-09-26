@@ -29,6 +29,8 @@ struct dependency{
 	file_type type;
 };
 
+static int use_explicit = 0;
+
 char *python_extensions[2] = { "py", "pyc" };
 
 void initialize( char *output_directory, char *input_file, struct list *d){
@@ -334,7 +336,6 @@ int main(int argc, char *argv[]){
 	char *input  = NULL;
 
 	int c;
-	int use_explicit = 0;
 
 	struct option long_options[] = {
 		{"use-explicit", no_argument, 0, 'e'},
