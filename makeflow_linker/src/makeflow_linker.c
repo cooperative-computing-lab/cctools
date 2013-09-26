@@ -324,6 +324,7 @@ void write_explicit(struct list *l, const char *output){
 static void show_help(const char *cmd){
 	fprintf(stdout, "Use: %s [options] <workflow_description>\n", cmd);
 	fprintf(stdout, "Frequently used options:\n");
+	fprintf(stdout, "%-30s Do not copy files which are part of an explicit dependency, e.g. standard libraries\n", "-e, --use-explicit");
 	fprintf(stdout, "%-30s Show this help screen.\n", "-h,--help");
 	fprintf(stdout, "%-30s Specify output directory, default:output_dir\n", "-o,--output");
 }
