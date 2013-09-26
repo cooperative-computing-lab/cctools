@@ -336,6 +336,7 @@ int main(int argc, char *argv[]){
 	int use_explicit = 0;
 
 	struct option long_options[] = {
+		{"use-explicit", no_argument, 0, 'e'},
 		{"help", no_argument, 0, 'h'},
 		{"output", required_argument, 0, 'o'},
 		{0, 0, 0, 0}
