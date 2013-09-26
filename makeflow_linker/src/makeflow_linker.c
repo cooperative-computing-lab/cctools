@@ -151,7 +151,13 @@ struct list *find_dependencies_for(struct dependency *dep){
 		close(pipefd[0]);
 		dup2(pipefd[1], 1);
 		close(pipefd[1]);
-		char * const args[3] = { "locating dependencies" , dep->original_name, NULL };
+		char *args[] = { "locating dependencies" , NULL, NULL, NULL };
+		if(use_explicit){
+			args[1] = "--use-explicit";
+			args[2] = dep->original_name;
+		} else {
+			args[1] = dep->original_name;
+		}
 		switch ( dep->type ){
 			case PYTHON:
 				execvp("python_driver", args);
