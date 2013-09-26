@@ -32,6 +32,7 @@ struct dependency{
 static int use_explicit = 0;
 
 char *python_extensions[2] = { "py", "pyc" };
+char *perl_extensions[2]   = { "pl", "pm"  };
 
 void initialize( char *output_directory, char *input_file, struct list *d){
 	pid_t pid;
