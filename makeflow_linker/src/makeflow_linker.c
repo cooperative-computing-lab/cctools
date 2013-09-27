@@ -21,6 +21,8 @@
 
 typedef enum {UNKNOWN, EXPLICIT, MAKEFLOW, PERL, PYTHON} file_type;
 
+enum { LONG_OPT_DRY_RUN = 1 };
+
 struct dependency{
 	char *original_name;
 	char *final_name;
