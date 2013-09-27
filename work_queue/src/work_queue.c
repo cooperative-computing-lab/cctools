@@ -1547,11 +1547,11 @@ static int put_input_item(struct work_queue_file *tf, const char *expanded_local
 			free(remote_info);
 		}
 
-		char remote_name[WORK_QUEUE_LINE_MAX];
+		char *remote_name;
 		if(!(tf->flags & WORK_QUEUE_CACHE)) {
-			sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
+			remote_name = string_format("%s.%lld", tf->remote_name, (long long) t->taskid);
 		} else {
-			sprintf(remote_name, "%s.cached", tf->remote_name);
+			remote_name = string_format("%s.cached", tf->remote_name);
 		}
 
 		if(S_ISDIR(local_info.st_mode)) {
@@ -1559,6 +1559,8 @@ static int put_input_item(struct work_queue_file *tf, const char *expanded_local
 		} else {
 			result = put_file(q, w, t, expanded_local_name, remote_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
 		}
+
+		free(remote_name);
 
 		if(result && tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = malloc(sizeof(*remote_info));
