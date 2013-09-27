@@ -1419,7 +1419,8 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	return n;
 }
 
-static int put_file(const char *localname, const char *remotename, off_t offset, INT64_T length, struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, INT64_T *total_bytes, int flags){
+static int put_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, INT64_T length, INT64_T *total_bytes, int flags)
+{
 
 	struct stat local_info;
 	time_t stoptime;
@@ -1480,7 +1481,7 @@ Send a directory and all of its contentss.
 Returns true on success, false.
 */
 
-static int put_directory(const char *dirname, const char *remotedirname, struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, INT64_T * total_bytes, int flags)
+static int put_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *dirname, const char *remotedirname, INT64_T * total_bytes, int flags )
 {
 	DIR *dir = opendir(dirname);
 	if(!dir) return 0;
@@ -1500,9 +1501,9 @@ static int put_directory(const char *dirname, const char *remotedirname, struct 
 		struct stat local_info;
 		if(stat(localpath, &local_info)>=0) {
 			if(S_ISDIR(local_info.st_mode))  {
-				result = put_directory(localpath, remotepath, q, w, t, total_bytes, flags);
+				result = put_directory( q, w, t, localpath, remotepath, total_bytes, flags );
 			} else {
-				result = put_file(localpath, remotepath, 0, 0, q, w, t, total_bytes, flags);
+				result = put_file( q, w, t, localpath, remotepath, 0, 0, total_bytes, flags );
 			}	
 		} else {
 			result = 0;
@@ -1554,9 +1555,9 @@ static int put_input_item(struct work_queue_file *tf, const char *expanded_local
 		}
 
 		if(S_ISDIR(local_info.st_mode)) {
-			result = put_directory(expanded_local_name, remote_name, q, w, t, total_bytes, tf->flags);
+			result = put_directory(q, w, t, expanded_local_name, remote_name, total_bytes, tf->flags);
 		} else {
-			result = put_file(expanded_local_name, remote_name, tf->offset, tf->piece_length, q, w, t, total_bytes, tf->flags);
+			result = put_file(q, w, t, expanded_local_name, remote_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
 		}
 
 		if(result && tf->flags & WORK_QUEUE_CACHE) {
