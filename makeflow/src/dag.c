@@ -566,24 +566,6 @@ char *dag_task_category_wrap_as_wq_options(struct dag_task_category *category, c
 	return options;
 }
 
-#define add_monitor_field_int(options, s, field) \
-	if(s->field > -1) \
-	{ \
-		char *opt = string_format("%s -L'%s: %" PRId64 "' ", options ? options : "", #field, s->field);\
-		if(options)\
-			free(options);\
-		options = opt;\
-	}
-
-#define add_monitor_field_double(options, s, field) \
-	if(s->field > -1) \
-	{ \
-		char *opt = string_format("%s -L'%s: %lf' ", options ? options : "", #field, s->field/1000000.0);\
-		if(options)\
-			free(options);\
-		options = opt;\
-	}
-
 char *dag_task_category_wrap_as_rmonitor_options(struct dag_task_category *category)
 {
 	struct rmsummary *s;
@@ -591,18 +573,29 @@ char *dag_task_category_wrap_as_rmonitor_options(struct dag_task_category *categ
 	s = category->resources;
 
 	char *options = NULL;
+	char *opt;
 
-	add_monitor_field_double(options, s, wall_time);
-	add_monitor_field_int(options, s, max_concurrent_processes);
-	add_monitor_field_int(options, s, total_processes);
-	add_monitor_field_double(options, s, cpu_time);
-	add_monitor_field_int(options, s, virtual_memory);
-	add_monitor_field_int(options, s, resident_memory);
-	add_monitor_field_int(options, s, swap_memory);
-	add_monitor_field_int(options, s, bytes_read);
-	add_monitor_field_int(options, s, bytes_written);
-	add_monitor_field_int(options, s, workdir_num_files);
-	add_monitor_field_int(options, s, workdir_footprint);
+	if( s->cores > -1 )
+	{
+		opt = string_format("%s -L'cores: %" PRId64 "' ", options ? options : "", s->cores ); 
+		if(options)
+			free(options);
+		options = opt;
+	}
+	if( s->resident_memory > -1 )
+	{
+		opt = string_format("%s -L'resident_memory: %" PRId64 "' ", options ? options : "", s->resident_memory ); 
+		if(options)
+			free(options);
+		options = opt;
+	}
+	if( s->workdir_footprint > -1 )
+	{
+		opt = string_format("%s -L'workdir_footprint: %" PRId64 "' ", options ? options : "", s->workdir_footprint ); 
+		if(options)
+			free(options);
+		options = opt;
+	}
 
 	return options;
 }
