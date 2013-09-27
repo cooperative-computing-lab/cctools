@@ -1476,53 +1476,47 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 	return 1;
 }
 
-static int put_directory(const char *dirname, const char *remotedirname, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T * total_bytes, int flags) {
+/*
+Send a directory and all of its contentss.
+Returns true on success, false.
+*/
+
+static int put_directory(const char *dirname, const char *remotedirname, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T * total_bytes, int flags)
+{
 	DIR *dir = opendir(dirname);
 	if(!dir) return 0;
 
-	struct dirent *d;
-	char localpath[WORK_QUEUE_LINE_MAX];
-	char remotepath[WORK_QUEUE_LINE_MAX];
-	int result;
-
-	struct stat local_info;
-	if(stat(dirname, &local_info) < 0)
-		return 0;
-
-	/* normalize the mode so as not to set up invalid permissions */
-	local_info.st_mode |= 0700;
-	local_info.st_mode &= 0777;
+	int result=1;
 
 	// When putting a file its parent directories are automatically
 	// created by the worker, so no need to manually create them.
 
+	struct dirent *d;
 	while((d = readdir(dir))) {
-		if(!strcmp(d->d_name, ".") || !strcmp(d->d_name, "..")) {
-			continue;
-		}
+		if(!strcmp(d->d_name, ".") || !strcmp(d->d_name, "..")) continue;
 
-		sprintf(localpath, "%s/%s", dirname, d->d_name);
-		sprintf(remotepath, "%s/%s", remotedirname, d->d_name);
+		char *localpath = string_format("%s/%s",dirname,d->d_name);
+		char *remotepath = string_format("%s/%s",remotedirname,d->d_name);
 	
-		if(stat(localpath, &local_info) < 0) {
-			closedir(dir);
-			return 0;
-		}	
-		
-		if(local_info.st_mode & S_IFDIR)  {
-			result = put_directory(localpath, remotepath, q, w, taskid, total_bytes, flags);
+		struct stat local_info;
+		if(stat(localpath, &local_info)>=0) {
+			if(S_ISDIR(local_info.st_mode))  {
+				result = put_directory(localpath, remotepath, q, w, taskid, total_bytes, flags);
+			} else {
+				result = put_file(localpath, remotepath, 0, 0, q, w, taskid, total_bytes, flags);
+			}	
 		} else {
-			result = put_file(localpath, remotepath, 0, 0, q, w, taskid, total_bytes, flags);
-		}	
-
-		if(result == 0) {
-			closedir(dir);
-			return 0;
+			result = 0;
 		}
+
+		free(localpath);
+		free(remotepath);
+
+		if(!result) break;
 	}
 	
 	closedir(dir);
-	return 1;
+	return result;
 }
 
 /*
