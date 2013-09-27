@@ -1525,60 +1525,56 @@ static int put_directory(const char *dirname, const char *remotedirname, struct 
 	return 1;
 }
 
-static int put_input_item(struct work_queue_file *tf, const char *expanded_payload, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T * total_bytes) {
+/*
+Send a file or directory to a remote worker, if it is not already cached.
+The local file name should already have been expanded by the caller.
+Returns true on success, false on failure.
+*/
+
+static int put_input_item(struct work_queue_file *tf, const char *expanded_local_name, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T * total_bytes)
+{
 	struct stat local_info;
 	struct stat *remote_info;
-	char *hash_name;
-	int dir = 0;
-	char *payload;
-	
-	if(expanded_payload) {
-		payload = xxstrdup(expanded_payload);
-	} else {
-		payload = xxstrdup(tf->payload);
-	}
 
-	if(stat(payload, &local_info) < 0)
-		return 0;
-	if(local_info.st_mode & S_IFDIR)
-		dir = 1;
+	if(stat(expanded_local_name, &local_info) < 0) return 0;
 	
-	hash_name = (char *) malloc((strlen(payload) + strlen(tf->remote_name) + 2) * sizeof(char));
-	sprintf(hash_name, "%s-%s", payload, tf->remote_name);
+	int result = 1;
+
+	// Generate a hash key based on the combination of the local and remote name.
+	char *hash_name = string_format("%s-%s", expanded_local_name, tf->remote_name);
+
+	// Look in the current files hash to see if the file is already cached.
 	remote_info = hash_table_lookup(w->current_files, hash_name);
 
+	// If not cached, or the metadata has changed, then send the item.
 	if(!remote_info || remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size) {
-		char remote_name[WORK_QUEUE_LINE_MAX];
-		
 		if(remote_info) {
 			hash_table_remove(w->current_files, hash_name);
 			free(remote_info);
 		}
-		
+
+		char remote_name[WORK_QUEUE_LINE_MAX];
 		if(!(tf->flags & WORK_QUEUE_CACHE)) {
 			sprintf(remote_name, "%s.%d", tf->remote_name, taskid);
 		} else {
 			sprintf(remote_name, "%s.cached", tf->remote_name);
 		}
 
-		if(dir) {
-			if(!put_directory(payload, remote_name, q, w, taskid, total_bytes, tf->flags))
-				return 0;
+		if(S_ISDIR(local_info.st_mode)) {
+			result = put_directory(expanded_local_name, remote_name, q, w, taskid, total_bytes, tf->flags);
 		} else {
-			if(!put_file(payload, remote_name, tf->offset, tf->piece_length, q, w, taskid, total_bytes, tf->flags))
-				return 0;
+			result = put_file(expanded_local_name, remote_name, tf->offset, tf->piece_length, q, w, taskid, total_bytes, tf->flags);
 		}
-		
-		if(tf->flags & WORK_QUEUE_CACHE) {
+
+		if(result && tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = malloc(sizeof(*remote_info));
 			memcpy(remote_info, &local_info, sizeof(local_info));
 			hash_table_insert(w->current_files, hash_name, remote_info);
 		}
 	}
 
-	free(payload);
 	free(hash_name);
-	return 1;
+	return result;
 }
 
 /** 
