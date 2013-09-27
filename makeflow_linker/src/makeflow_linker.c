@@ -346,10 +346,13 @@ int main(int argc, char *argv[]){
 	char *output = NULL;
 	char *input  = NULL;
 
+	int dry_run = 0;
+
 	int c;
 
 	struct option long_options[] = {
 		{"use-explicit", no_argument, 0, 'e'},
+		{"dry-run", no_argument, 0, LONG_OPT_DRY_RUN},
 		{"help", no_argument, 0, 'h'},
 		{"output", required_argument, 0, 'o'},
 		{0, 0, 0, 0}
@@ -359,6 +362,9 @@ int main(int argc, char *argv[]){
 		switch(c){
 			case 'e':
 				use_explicit = 1;
+				break;
+			case LONG_OPT_DRY_RUN:
+				dry_run = 1;
 				break;
 			case 'o':
 				output = xxstrdup(optarg);
