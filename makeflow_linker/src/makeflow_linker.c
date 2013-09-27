@@ -402,10 +402,10 @@ int main(int argc, char *argv[]){
 	find_dependencies(dependencies);
 
 	determine_package_structure(dependencies, output);
-	build_package(dependencies);
+	if(!dry_run) build_package(dependencies);
 
 	struct list *l = list_explicit(dependencies);
-	write_explicit(l, output);
+	if(!dry_run) write_explicit(l, output);
 
 	cleanup();
 
