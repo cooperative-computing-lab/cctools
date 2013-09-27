@@ -373,7 +373,7 @@ Two exceptions are made:
   between the master and the workers that it serves.
 */
 
-static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T length)
+static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, INT64_T length)
 {
 	double avg_transfer_rate; // bytes per second
 	const char *data_source;
@@ -664,7 +664,7 @@ static int get_output_item(char *remote_name, char *local_name, struct work_queu
 					if(q->bandwidth) {
 						effective_stoptime = ((length * 8)/q->bandwidth)*1000000 + timestamp_get();
 					}
-					stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, length);
+					stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
 					actual = link_stream_to_fd(w->link, fd, length, stoptime);
 					close(fd);
 					if(actual != length) {
@@ -1045,7 +1045,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
 	  debug(D_WQ, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
-		stoptime = time(0) + get_transfer_wait_time(q, w, -1, (INT64_T) output_length);
+		stoptime = time(0) + get_transfer_wait_time(q, w, 0, output_length);
 		link_soak(w->link, output_length, stoptime);
 		return 0;
 	}
@@ -1066,7 +1066,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	t->output = malloc(output_length + 1);
 	if(output_length > 0) {
 		debug(D_WQ, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", taskid, output_length, w->addrport, w->hostname);
-		stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, (INT64_T) output_length);
+		stoptime = time(0) + get_transfer_wait_time(q, w, t, output_length);
 		actual = link_read(w->link, t->output, output_length, stoptime);
 		if(actual != output_length) {
 			debug(D_WQ, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, output_length);
@@ -1419,7 +1419,8 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	return n;
 }
 
-static int put_file(const char *localname, const char *remotename, off_t offset, INT64_T length, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T *total_bytes, int flags){
+static int put_file(const char *localname, const char *remotename, off_t offset, INT64_T length, struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, INT64_T *total_bytes, int flags){
+
 	struct stat local_info;
 	time_t stoptime;
 	timestamp_t effective_stoptime = 0;
@@ -1453,13 +1454,11 @@ static int put_file(const char *localname, const char *remotename, off_t offset,
 		return 0;
 	}
 	
-	struct work_queue_task *t = itable_lookup(q->running_tasks, taskid);
-	
 	if(q->bandwidth) {
 		effective_stoptime = ((length * 8)/q->bandwidth)*1000000 + timestamp_get();
 	}
 	
-	stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, length);
+	stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
 	send_worker_msg(w, "put %s %"PRId64" 0%o %d\n", time(0) + short_timeout, remotename, length, local_info.st_mode, flags);
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
@@ -1481,7 +1480,7 @@ Send a directory and all of its contentss.
 Returns true on success, false.
 */
 
-static int put_directory(const char *dirname, const char *remotedirname, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T * total_bytes, int flags)
+static int put_directory(const char *dirname, const char *remotedirname, struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, INT64_T * total_bytes, int flags)
 {
 	DIR *dir = opendir(dirname);
 	if(!dir) return 0;
@@ -1501,9 +1500,9 @@ static int put_directory(const char *dirname, const char *remotedirname, struct 
 		struct stat local_info;
 		if(stat(localpath, &local_info)>=0) {
 			if(S_ISDIR(local_info.st_mode))  {
-				result = put_directory(localpath, remotepath, q, w, taskid, total_bytes, flags);
+				result = put_directory(localpath, remotepath, q, w, t, total_bytes, flags);
 			} else {
-				result = put_file(localpath, remotepath, 0, 0, q, w, taskid, total_bytes, flags);
+				result = put_file(localpath, remotepath, 0, 0, q, w, t, total_bytes, flags);
 			}	
 		} else {
 			result = 0;
@@ -1525,7 +1524,7 @@ The local file name should already have been expanded by the caller.
 Returns true on success, false on failure.
 */
 
-static int put_input_item(struct work_queue_file *tf, const char *expanded_local_name, struct work_queue *q, struct work_queue_worker *w, int taskid, INT64_T * total_bytes)
+static int put_input_item(struct work_queue_file *tf, const char *expanded_local_name, struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, INT64_T * total_bytes)
 {
 	struct stat local_info;
 	struct stat *remote_info;
@@ -1549,15 +1548,15 @@ static int put_input_item(struct work_queue_file *tf, const char *expanded_local
 
 		char remote_name[WORK_QUEUE_LINE_MAX];
 		if(!(tf->flags & WORK_QUEUE_CACHE)) {
-			sprintf(remote_name, "%s.%d", tf->remote_name, taskid);
+			sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
 		} else {
 			sprintf(remote_name, "%s.cached", tf->remote_name);
 		}
 
 		if(S_ISDIR(local_info.st_mode)) {
-			result = put_directory(expanded_local_name, remote_name, q, w, taskid, total_bytes, tf->flags);
+			result = put_directory(expanded_local_name, remote_name, q, w, t, total_bytes, tf->flags);
 		} else {
-			result = put_file(expanded_local_name, remote_name, tf->offset, tf->piece_length, q, w, taskid, total_bytes, tf->flags);
+			result = put_file(expanded_local_name, remote_name, tf->offset, tf->piece_length, q, w, t, total_bytes, tf->flags);
 		}
 
 		if(result && tf->flags & WORK_QUEUE_CACHE) {
@@ -1693,7 +1692,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 					effective_stoptime = ((tf->length * 8)/q->bandwidth)*1000000 + timestamp_get();
 				}
 				
-				stoptime = time(0) + get_transfer_wait_time(q, w, t->taskid, (INT64_T) fl);
+				stoptime = time(0) + get_transfer_wait_time(q, w, t, fl );
 				open_time = timestamp_get();
 				send_worker_msg(w, "put %s %"PRId64" %o %d\n", time(0) + short_timeout, remote_name, (INT64_T) fl, 0777, tf->flags);
 				actual = link_putlstring(w->link, tf->payload, fl, stoptime);
@@ -1762,7 +1761,7 @@ static int send_input_files(struct work_queue_task *t, struct work_queue_worker 
 					} else {
 						expanded_payload = xxstrdup(tf->payload);
 					}
-					if(!put_input_item(tf, expanded_payload, q, w, t->taskid, &total_bytes)) {
+					if(!put_input_item(tf, expanded_payload, q, w, t, &total_bytes)) {
 						free(expanded_payload);
 						goto failure;
 					}
