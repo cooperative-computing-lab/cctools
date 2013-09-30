@@ -13,11 +13,11 @@ save_arguments $0 $@
 
 major=4
 minor=0
-micro=2
+micro=3rc1
 
 # On a release, type would be changed from TRUNK to RELEASE.  TRUNK is a useful
 # signal that the user is not using a blessed (tagged) release.
-type="RELEASE"
+type="TRUNK"
 
 version="$major.$minor.$micro-$type"
 
@@ -109,7 +109,7 @@ fi
 install_path="$HOME/cctools"
 
 krb5_path="/usr"
-readline_path="/usr"
+#readline_path="/usr"
 globus_path="/usr"
 fuse_path="/usr"
 rfio_path="/usr"
@@ -139,7 +139,7 @@ then
 fi
 
 
-config_readline_path=auto
+#config_readline_path=auto
 config_globus_path=auto
 config_fuse_path=auto
 config_mysql_path=auto
@@ -188,11 +188,11 @@ do
 			krb5_path=$1
 			config_krb5_path=yes
 			;;
-		--with-readline-path)
-			shift
-			readline_path=$1
-			config_readline_path=yes
-			;;
+   # 	--with-readline-path)
+   # 		shift
+   # 		readline_path=$1
+   # 		config_readline_path=yes
+   # 		;;
 		--with-fuse-path)
 			shift
 			fuse_path=$1
@@ -322,7 +322,6 @@ Where options are:
   --without-system-SYSTEM
 
 Where PACKAGE may be:
-    readline
     krb5
     fuse
     rfio
@@ -628,35 +627,35 @@ fi
 library_search_mode=prefer_dynamic
 ##########################################################################
 
-if [ $config_readline_path != no ] && library_search readline ${readline_path}
-then
-	if [ ${readline_path} != /usr ]
-	then
-		ccflags="${ccflags} -I${readline_path}/include"
-	fi
-	
-	ccflags="${ccflags} -DHAS_LIBREADLINE"
-
-	# We rely on the --as-needed flag to figure out what dynamic
-	# libraries are actually used by each executable.
-	# However, libreadline doesn't properly specify a dependency
-	# on ncurses, termcap, and history, so we must force them to link.
-
-	if [ $build_sys = LINUX ]
-	then
-		# Remove the -lreadline that was added by "library_search readline" above
-		ldflags=`echo $ldflags | sed "s/-lreadline//"`
-
-		# Put the readline flags in a separate variable to be used only where needed.
-		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
-	else 
-		library_search ncurses ${readline_path}
-		library_search termcap ${readline_path}
-		library_search history ${readline_path}
-	fi
-else	
-	echo "*** skipping readline..."
-fi
+# if [ $config_readline_path != no ] && library_search readline ${readline_path}
+# then
+# 	if [ ${readline_path} != /usr ]
+# 	then
+# 		ccflags="${ccflags} -I${readline_path}/include"
+# 	fi
+# 	
+# 	ccflags="${ccflags} -DHAS_LIBREADLINE"
+# 
+# 	# We rely on the --as-needed flag to figure out what dynamic
+# 	# libraries are actually used by each executable.
+# 	# However, libreadline doesn't properly specify a dependency
+# 	# on ncurses, termcap, and history, so we must force them to link.
+# 
+# 	if [ $build_sys = LINUX ]
+# 	then
+# 		# Remove the -lreadline that was added by "library_search readline" above
+# 		ldflags=`echo $ldflags | sed "s/-lreadline//"`
+# 
+# 		# Put the readline flags in a separate variable to be used only where needed.
+# 		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
+# 	else 
+# 		library_search ncurses ${readline_path}
+# 		library_search termcap ${readline_path}
+# 		library_search history ${readline_path}
+# 	fi
+# else	
+# 	echo "*** skipping readline..."
+# fi
 
 if [ $config_fuse_path != no ]
 then
@@ -1052,7 +1051,7 @@ CCTOOLS_LDFLAGS=-L\${CCTOOLS_INSTALL_DIR}/lib \${CCTOOLS_BASE_LDFLAGS}
 CCTOOLS_MPI_LD=@echo MPI_LINK \$@; ${mpilinker}
 CCTOOLS_USE_MPI=$usempi
 
-CCTOOLS_READLINE_LDFLAGS=${cctools_readline_ldflags}
+# CCTOOLS_READLINE_LDFLAGS=${cctools_readline_ldflags}
 
 CCTOOLS_DYNAMIC_SUFFIX=${cctools_dynamic_suffix}
 CCTOOLS_DYNAMIC_FLAG=${cctools_dynamic_flag}
