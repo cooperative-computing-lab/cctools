@@ -1000,6 +1000,11 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 		return -1;
 	}
 
+	if(w->hostname) free(w->hostname);
+	if(w->os)       free(w->os);
+	if(w->arch)     free(w->arch);
+	if(w->version)  free(w->version);
+
 	w->hostname = strdup(items[0]);
 	w->os       = strdup(items[1]);
 	w->arch     = strdup(items[2]);
