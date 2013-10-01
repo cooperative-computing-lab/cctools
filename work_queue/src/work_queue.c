@@ -1700,11 +1700,9 @@ static int put_object(struct work_queue *q, struct work_queue_worker *w, struct 
 			}
 		} else {
 			char *expanded_payload = expand_envnames(w, f->payload);
-			if(!put_file_or_directory(f, expanded_payload, q, w, t, &total_bytes)) {
-				free(expanded_payload);
-				goto failure;
-			}
+			int result = put_file_or_directory(f, expanded_payload, q, w, t, &total_bytes);
 			free(expanded_payload);
+			if(!result) goto failure;
 		}
 		break;
 	}
