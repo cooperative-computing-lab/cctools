@@ -1733,6 +1733,7 @@ static int put_object(struct work_queue *q, struct work_queue_worker *w, struct 
 		);
 	}
 
+	free(remote_name);
 	return 1;
 
 	failure:
@@ -1743,6 +1744,7 @@ static int put_object(struct work_queue *q, struct work_queue_worker *w, struct 
 		actual);
 
 	t->result |= WORK_QUEUE_RESULT_INPUT_FAIL;
+	free(remote_name);
 	return 0;
 }
 
