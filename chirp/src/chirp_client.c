@@ -1576,7 +1576,7 @@ CHIRP_SEARCH *chirp_client_opensearch(struct chirp_client * c, const char *path,
 		buffer_t *buffer;
 		size_t n = 0;
 
-		buffer = buffer_create();
+		buffer = buffer_create(NULL, 0, 0, 1);
 		while(link_readline(c->link, line, sizeof(line), stoptime) && line[0]) {
 			buffer_printf(buffer, "%s", line);
 			n += strlen(line);

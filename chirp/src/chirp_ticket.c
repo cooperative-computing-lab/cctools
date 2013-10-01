@@ -67,7 +67,7 @@ char *chirp_ticket_tostring(struct chirp_ticket *ct)
 	char *result;
 	buffer_t *B;
 
-	B = buffer_create();
+	B = buffer_create(NULL, 0, 0, 1);
 
 	buffer_printf(B, "subject \"%s\"\n", ct->subject);
 	buffer_printf(B, "ticket \"%s\"\n", ct->ticket);

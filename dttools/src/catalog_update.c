@@ -58,10 +58,7 @@ int main(int argc, char *argv[]) {
 	buffer_t *b;
 	const char *text;
 	size_t text_size;
-	b = buffer_create();
-	if (!b) {
-		fatal("could not create buffer!");
-	}
+	b = buffer_create(NULL, 0, 0, 1);
 
 	struct utsname name;
 	int cpus;

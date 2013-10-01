@@ -358,7 +358,7 @@ int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_por
 	// function in catalog_server.c
 	INT64_T port = 65535 + pid; 
 
-	buffer = buffer_create();
+	buffer = buffer_create(NULL, 0, 0, 1);
 	buffer_printf(buffer, "type wq_pool\npool_name %s\nport %" PRId64 "\nstarttime %llu\ndecision %s\nworkers_requested %d\nowner %s\nlifetime %d", pool_name, port, (unsigned long long) start_time, decision, workers_requested, owner, WORK_QUEUE_CATALOG_POOL_AD_LIFETIME);
 
 	text = buffer_tostring(buffer, &text_size);

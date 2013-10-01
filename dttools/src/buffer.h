@@ -24,9 +24,13 @@ See the file COPYING for details.
 typedef struct buffer_t buffer_t;
 
 /** Create a new buffer.
+    @param buf A buffer to initially use to avoid allocating memory on the heap. (can be NULL)
+    @param len The length of the buffer. (ignored if buf == NULL)
+    @param max The maximum amount of memory to allocate. (0 is unlimited)
+    @param abort_on_failure Kill the process on errors. (you no longer have to check returns, even this one)
     @return A new empty buffer object. Returns NULL when out of memory.
   */
-buffer_t *buffer_create(void);
+buffer_t *buffer_create(char *buf, size_t len, size_t max, int abort_on_failure);
 
 /** Delete a buffer.
     @param b The buffer to free.
@@ -53,6 +57,28 @@ int buffer_vprintf(buffer_t * b, const char *format, va_list ap);
   */
 int buffer_printf(buffer_t * b, const char *format, ...)
 __attribute__ (( format(printf,2,3) )) ;
+
+/** Appends the string to the end of the buffer.
+    @param b The buffer to fill.
+    @param str The string to append.
+    @param len The length of the string.
+    @return Negative value on error.
+  */
+int buffer_putlstring(buffer_t * b, const char *str, size_t len);
+
+/** Appends the string to the end of the buffer. Length derived via strlen.
+    @param b The buffer to fill.
+    @param str The string to append.
+    @return Negative value on error.
+  */
+#define buffer_putstring(b,s)  (buffer_putlstring(b,s,strlen(s)))
+
+/** Appends the string literal to the end of the buffer. Length derived via sizeof.
+    @param b The buffer to fill.
+    @param l The literal string to append.
+    @return Negative value on error.
+  */
+#define buffer_putliteral(b,l)  (buffer_putlstring(b,l "",sizeof(l)-1))
 
 /** Returns the buffer as a string. The string is no longer valid after
     deleting the buffer. A final ASCII NUL character is guaranteed to terminate
