@@ -1525,7 +1525,7 @@ The local file name should already have been expanded by the caller.
 Returns true on success, false on failure.
 */
 
-static int put_input_item(struct work_queue_file *tf, const char *expanded_local_name, struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, INT64_T * total_bytes)
+static int put_file_or_directory(struct work_queue_file *tf, const char *expanded_local_name, struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, INT64_T * total_bytes)
 {
 	struct stat local_info;
 	struct stat *remote_info;
@@ -1542,6 +1542,7 @@ static int put_input_item(struct work_queue_file *tf, const char *expanded_local
 
 	// If not cached, or the metadata has changed, then send the item.
 	if(!remote_info || remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size) {
+
 		if(remote_info) {
 			hash_table_remove(w->current_files, hash_name);
 			free(remote_info);
@@ -1637,171 +1638,163 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 	return expanded_name;
 }
 
-static int send_input_files(struct work_queue_task *t, struct work_queue_worker *w, struct work_queue *q)
+static int put_object(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f)
 {
-	struct work_queue_file *tf;
-	INT64_T actual = 0;
 	INT64_T total_bytes = 0;
-	timestamp_t open_time = 0;
-	timestamp_t close_time = 0;
-	timestamp_t sum_time = 0;
-	int fl;
-	time_t stoptime;
-	struct stat s;
-	char *expanded_payload = NULL;
+	INT64_T actual = 0;
+	char *remote_name;
 
-	// Check input existence
+	if(!(f->flags & WORK_QUEUE_CACHE)) {
+		remote_name = string_format("%s.%lld", f->remote_name,(long long) t->taskid);
+	} else {
+		remote_name = string_format("%s.cached", f->remote_name);
+	}
+
+	timestamp_t open_time = timestamp_get();
+
+	switch (f->type) {
+
+	case WORK_QUEUE_BUFFER:
+		debug(D_WQ, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
+		time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, f->length);
+		send_worker_msg(w, "put %s %d %o %d\n", time(0) + short_timeout, remote_name, f->length, 0777, f->flags);
+		actual = link_putlstring(w->link, f->payload, f->length, stoptime);
+		if(actual!=f->length) goto failure;
+		total_bytes = actual;
+		break;
+
+	case WORK_QUEUE_REMOTECMD:
+		debug(D_WQ, "%s (%s) needs %s from remote filesystem using %s", w->hostname, w->addrport, f->remote_name, f->payload);
+		send_worker_msg(w, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, remote_name, f->payload);
+		break;
+
+	case WORK_QUEUE_URL:
+		debug(D_WQ, "%s (%s) needs %s from the url, %s %d", w->hostname, w->addrport, remote_name, f->payload, f->length);
+		send_worker_msg(w, "url %s %d 0%o %d\n", time(0) + short_timeout, remote_name, f->length, 0777, f->flags);
+		link_putlstring(w->link, f->payload, f->length, time(0) + short_timeout);
+		break;
+
+	case WORK_QUEUE_DIRECTORY:
+		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as WORK_QUEUE_FILEs
+		break;
+
+	case WORK_QUEUE_FILE:
+	case WORK_QUEUE_FILE_PIECE:
+		if(f->flags & WORK_QUEUE_THIRDGET) {
+			debug(D_WQ, "%s (%s) needs %s from shared filesystem as %s", w->hostname, w->addrport, f->payload, f->remote_name);
+
+			if(!strcmp(f->remote_name, f->payload)) {
+				f->flags |= WORK_QUEUE_PREEXIST;
+			} else {
+				if(f->flags & WORK_QUEUE_SYMLINK) {
+					send_worker_msg(w, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_SYMLINK, remote_name, f->payload);
+				} else {
+					send_worker_msg(w, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, remote_name, f->payload);
+				}
+			}
+		} else {
+			char *expanded_payload;
+			if(strchr(f->payload, '$')) {
+				expanded_payload = expand_envnames(w, f->payload);
+			} else {
+				expanded_payload = xxstrdup(f->payload);
+			}
+			if(!put_file_or_directory(f, expanded_payload, q, w, t, &total_bytes)) {
+				free(expanded_payload);
+				goto failure;
+			}
+			free(expanded_payload);
+		}
+		break;
+	}
+
+	timestamp_t close_time = timestamp_get();
+	timestamp_t elapsed_time = close_time-open_time;
+
+	t->total_bytes_transferred += total_bytes;
+	t->total_transfer_time += elapsed_time;
+
+	w->total_bytes_transferred += total_bytes;
+	w->total_transfer_time += elapsed_time;
+
+	q->total_bytes_sent += total_bytes;
+	q->total_send_time += elapsed_time;
+
+	// Avoid division by zero below.
+	if(elapsed_time==0) elapsed_time = 1;
+
+	if(total_bytes > 0) {
+		debug(D_WQ, "%s (%s) received %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s",
+			w->hostname,
+			w->addrport,
+			total_bytes / 1000000.0,
+			elapsed_time / 1000000.0,
+			(double) total_bytes / elapsed_time,
+			(double) w->total_bytes_transferred / w->total_transfer_time
+		);
+	}
+
+	return 1;
+
+	failure:
+	debug(D_WQ, "%s (%s) failed to send %s (%" PRId64 " bytes sent).",
+		w->hostname,
+		w->addrport,
+		f->type == WORK_QUEUE_BUFFER ? "literal data" : f->payload,
+		actual);
+
+	t->result |= WORK_QUEUE_RESULT_INPUT_FAIL;
+	return 0;
+}
+
+static int send_input_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
+{
+	struct work_queue_file *f;
+	char *expanded_payload = NULL;
+	struct stat s;
+
+	// Check for existence of each input file first.
+	// If any one fails to exist, set the failure condition and return failure.
+
 	if(t->input_files) {
 		list_first_item(t->input_files);
-		while((tf = list_next_item(t->input_files))) {
-			if(tf->type == WORK_QUEUE_FILE || tf->type == WORK_QUEUE_FILE_PIECE) {
-				if(strchr(tf->payload, '$')) {
-					expanded_payload = expand_envnames(w, tf->payload);
-					debug(D_WQ, "File name %s expanded to %s for %s (%s).", tf->payload, expanded_payload, w->hostname, w->addrport);
+		while((f = list_next_item(t->input_files))) {
+			if(f->type == WORK_QUEUE_FILE || f->type == WORK_QUEUE_FILE_PIECE) {
+				if(strchr(f->payload, '$')) {
+					expanded_payload = expand_envnames(w, f->payload);
+					debug(D_WQ, "File name %s expanded to %s for %s (%s).", f->payload, expanded_payload, w->hostname, w->addrport);
 				} else {
-					expanded_payload = xxstrdup(tf->payload);
+					expanded_payload = xxstrdup(f->payload);
 				}
 				if(stat(expanded_payload, &s) != 0) {
 					debug(D_WQ,"Could not stat %s: %s\n", expanded_payload, strerror(errno));
 					free(expanded_payload);
-					goto failure;
+					t->result |= WORK_QUEUE_RESULT_INPUT_MISSING;
+					return 0;
 				}
 				free(expanded_payload);
 			}
 		}
 	}
-	// Start transfer ...
+
+	// Send each of the input files.
+	// If any one fails to be sent, return failure.
+
 	if(t->input_files) {
 		list_first_item(t->input_files);
-		while((tf = list_next_item(t->input_files))) {
-			char remote_name[WORK_QUEUE_LINE_MAX];
-			timestamp_t effective_stoptime;
-			
-			if(!(tf->flags & WORK_QUEUE_CACHE)) {
-				sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
-			} else {
-				sprintf(remote_name, "%s.cached", tf->remote_name);
-			}
-			
-			
-			switch(tf->type) {
-			
-			case WORK_QUEUE_BUFFER:
-				effective_stoptime = 0;
-				debug(D_WQ, "%s (%s) needs literal as %s", w->hostname, w->addrport, tf->remote_name);
-				fl = tf->length;
-
-				if(q->bandwidth) {
-					effective_stoptime = ((tf->length * 8)/q->bandwidth)*1000000 + timestamp_get();
-				}
-				
-				stoptime = time(0) + get_transfer_wait_time(q, w, t, fl );
-				open_time = timestamp_get();
-				send_worker_msg(w, "put %s %"PRId64" %o %d\n", time(0) + short_timeout, remote_name, (INT64_T) fl, 0777, tf->flags);
-				actual = link_putlstring(w->link, tf->payload, fl, stoptime);
-				timestamp_t current_time = timestamp_get();
-				if(effective_stoptime && effective_stoptime > current_time) {
-					usleep(effective_stoptime - current_time);
-				}
-				close_time = timestamp_get();
-				if(actual != (fl))
-					goto failure;
-				total_bytes += actual;
-				sum_time += (close_time - open_time);
-			
-				break;
-			
-			case WORK_QUEUE_REMOTECMD:
-				debug(D_WQ, "%s (%s) needs %s from remote filesystem using %s", w->hostname, w->addrport, tf->remote_name, tf->payload);
-				open_time = timestamp_get();
-				send_worker_msg(w, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, remote_name, tf->payload);
-				close_time = timestamp_get();
-				sum_time += (close_time - open_time);
-			
-				break;
-
-			case WORK_QUEUE_URL:
-			{
-				char remote_name[WORK_QUEUE_LINE_MAX];
-				if(!(tf->flags & WORK_QUEUE_CACHE)) {
-					sprintf(remote_name, "%s.%d", tf->remote_name, t->taskid);
-				} else {
-					sprintf(remote_name, "%s.cached", tf->remote_name);
-				}
-				debug(D_WQ, "%s (%s) needs %s from the url, %s %d", w->hostname, w->addrport, remote_name, tf->payload, tf->length);
-				open_time = timestamp_get();
-				send_worker_msg(w, "url %s %d 0%o %d\n",time(0) + short_timeout, remote_name, tf->length, 0777, tf->flags);
-				link_putlstring(w->link, tf->payload, tf->length, stoptime);
-				close_time = timestamp_get();
-				sum_time += (close_time - open_time);
-
-				break;
-			}
-			case WORK_QUEUE_DIRECTORY:
-				// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as WORK_QUEUE_FILEs
-				break;
-			
-			default:
-				if(tf->flags & WORK_QUEUE_THIRDGET) {
-					debug(D_WQ, "%s (%s) needs %s from shared filesystem as %s", w->hostname, w->addrport, tf->payload, tf->remote_name);
-
-					if(!strcmp(tf->remote_name, tf->payload)) {
-						tf->flags |= WORK_QUEUE_PREEXIST;
-					} else {
-						open_time = timestamp_get();
-						if(tf->flags & WORK_QUEUE_SYMLINK) {
-							send_worker_msg(w, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_SYMLINK, remote_name, tf->payload);
-						} else {
-							send_worker_msg(w, "thirdget %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, remote_name, tf->payload);
-						}
-						close_time = timestamp_get();
-						sum_time += (close_time - open_time);
-					}
-				} else {
-					open_time = timestamp_get();
-					if(strchr(tf->payload, '$')) {
-						expanded_payload = expand_envnames(w, tf->payload);
-					} else {
-						expanded_payload = xxstrdup(tf->payload);
-					}
-					if(!put_input_item(tf, expanded_payload, q, w, t, &total_bytes)) {
-						free(expanded_payload);
-						goto failure;
-					}
-					free(expanded_payload);
-					close_time = timestamp_get();
-					sum_time += (close_time - open_time);
-				}
-				break;
-			}
-		}
-		t->total_bytes_transferred += total_bytes;
-		t->total_transfer_time += sum_time;
-		w->total_bytes_transferred += total_bytes;
-		w->total_transfer_time += sum_time;
-		if(total_bytes > 0) {
-			q->total_bytes_sent += (INT64_T) total_bytes;
-			q->total_send_time += sum_time;
-			debug(D_WQ, "%s (%s) received %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, (double) total_bytes/1000000.0, sum_time / 1000000.0, (double) total_bytes/sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
+		while((f = list_next_item(t->input_files))) {
+			if(!put_object(q,w,t,f)) return 0;
 		}
 	}
 
 	return 1;
-
-      failure:
-	if(tf->type == WORK_QUEUE_FILE || tf->type == WORK_QUEUE_FILE_PIECE)
-		debug(D_WQ, "%s (%s) failed to send %s (%"PRId64" bytes received).", w->hostname, w->addrport, tf->payload, actual);
-	else
-		debug(D_WQ, "%s (%s) failed to send literal data (%"PRId64" bytes received).", w->hostname, w->addrport, actual);
-	t->result |= WORK_QUEUE_RESULT_INPUT_FAIL;
-	return 0;
 }
 
 int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
 	t->time_send_input_start = timestamp_get();
-	if(!send_input_files(t, w, q))
-		return 0;
+	if(!send_input_files(q, w, t)) return 0;
+
 	t->time_send_input_finish = timestamp_get();
 	t->time_execute_cmd_start = timestamp_get();
 	t->hostname = xxstrdup(w->hostname);
