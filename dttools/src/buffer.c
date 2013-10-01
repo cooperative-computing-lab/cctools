@@ -15,19 +15,6 @@
 
 #define inuse(b)  ((size_t)(b->end - b->buf))
 #define avail(b)  (b->len - inuse(b))
-struct buffer_t {
-	char *buf;
-	char *end;
-	size_t len; /* size of buffer */
-	size_t max; /* maximum size of buffer */
-	int abort_on_failure;
-
-	char initial[1<<12];
-	struct {
-		char *buf;
-		size_t len;
-	} ubuf;
-};
 
 #define checkerror(b,err,expr) \
 	do {\
@@ -40,33 +27,26 @@ struct buffer_t {
 		}\
 	} while (0)
 
-buffer_t *buffer_create(char *buf, size_t len, size_t max, int abort_on_failure)
+void buffer_init(buffer_t * b, char *buf, size_t len, size_t max, int abort_on_failure)
 {
-	buffer_t *b = malloc(sizeof(buffer_t));
-	if (b) {
-		if (buf && len >= sizeof(b->initial)) {
-			b->buf = b->end = b->ubuf.buf = buf;
-			b->len = b->ubuf.len = len;
-		} else {
-			b->buf = b->end = b->initial;
-			b->len = sizeof(b->initial);
-			b->ubuf.buf = NULL;
-			b->ubuf.len = 0;
-		}
-		b->max = max;
-		b->abort_on_failure = abort_on_failure;
-	} else if (abort_on_failure) {
-		fatal("[%s:%d]: %s", __FILE__, __LINE__, strerror(errno));
+	if (buf && len >= sizeof(b->initial)) {
+		b->buf = b->end = b->ubuf.buf = buf;
+		b->len = b->ubuf.len = len;
+	} else {
+		b->buf = b->end = b->initial;
+		b->len = sizeof(b->initial);
+		b->ubuf.buf = NULL;
+		b->ubuf.len = 0;
 	}
-	return b;
+	b->max = max;
+	b->abort_on_failure = abort_on_failure;
 }
 
-void buffer_delete(buffer_t * b)
+void buffer_free(buffer_t * b)
 {
 	if (!(b->buf == b->ubuf.buf || b->buf == b->initial)) {
 		free(b->buf);
 	}
-	free(b);
 }
 
 /* make room for at least n chars */

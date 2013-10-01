@@ -20,22 +20,39 @@ See the file COPYING for details.
 #define __attribute__(x) /* do nothing */
 #endif
 
-/** buffer_t is an opaque object representing a buffer. */
-typedef struct buffer_t buffer_t;
+typedef struct buffer {
+	char *buf;
+	char *end;
+	size_t len; /* size of buffer */
+	size_t max; /* maximum size of buffer */
+	int abort_on_failure;
 
-/** Create a new buffer.
-    @param buf A buffer to initially use to avoid allocating memory on the heap. (can be NULL)
+	char initial[1<<12];
+	struct {
+		char *buf;
+		size_t len;
+	} ubuf;
+} buffer_t;
+
+/** Initialize a buffer.
+
+    The buffer includes a reasonably sized buffer as part of its definition.
+    Usually this means for small strings being built, nothing is ever allocated
+    on the heap. You can specify a larger starting buffer if this is
+    inadequate.
+
+    @param b A buffer to initialize.
+    @param buf A starting buffer to initially use to avoid allocating memory on the heap. (can be NULL)
     @param len The length of the buffer. (ignored if buf == NULL)
     @param max The maximum amount of memory to allocate. (0 is unlimited)
-    @param abort_on_failure Kill the process on errors. (you no longer have to check returns, even this one)
-    @return A new empty buffer object. Returns NULL when out of memory.
+    @param abort_on_failure Kill the process on errors. (you no longer have to check returns)
   */
-buffer_t *buffer_create(char *buf, size_t len, size_t max, int abort_on_failure);
+void buffer_init(buffer_t *b, char *buf, size_t len, size_t max, int abort_on_failure);
 
-/** Delete a buffer.
+/** Free any resources and memory in use by a buffer.
     @param b The buffer to free.
   */
-void buffer_delete(buffer_t * b);
+void buffer_free(buffer_t * b);
 
 /** Print the formatted output to the buffer. The format string follows the
     same semantics as the UNIX vprintf function. buffer_vprintf does not call

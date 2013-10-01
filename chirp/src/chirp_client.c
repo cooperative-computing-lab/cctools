@@ -1573,21 +1573,21 @@ CHIRP_SEARCH *chirp_client_opensearch(struct chirp_client * c, const char *path,
 
 	if(result == 0) {
 		char line[CHIRP_LINE_MAX];
-		buffer_t *buffer;
 		size_t n = 0;
 
-		buffer = buffer_create(NULL, 0, 0, 1);
+		CHIRP_SEARCH *result = malloc(sizeof(CHIRP_SEARCH));
+		if (!result) return NULL;
+
+		buffer_init(&result->B, NULL, 0, 0, 1);
 		while(link_readline(c->link, line, sizeof(line), stoptime) && line[0]) {
-			buffer_printf(buffer, "%s", line);
+			buffer_putstring(&result->B, line);
 			n += strlen(line);
 		}
 		if(n == 0) {
-			buffer_printf(buffer, "%s", "" );
+			buffer_putliteral(&result->B, "");
 		}
 
-		CHIRP_SEARCH *result = malloc(sizeof(CHIRP_SEARCH));
-		result->buffer = buffer;
-		result->current = buffer_tostring(buffer, NULL);
+		result->current = buffer_tostring(&result->B, NULL);
 		return result;
 	} else {
 		return NULL;
@@ -1664,7 +1664,7 @@ struct chirp_searchent *chirp_client_readsearch(CHIRP_SEARCH * search)
 
 int chirp_client_closesearch(CHIRP_SEARCH * search)
 {
-	buffer_delete(search->buffer);
+	buffer_free(&search->B);
 	free(search);
 	return 0;
 }

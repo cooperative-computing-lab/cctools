@@ -24,7 +24,7 @@ prepare()
 
 int main (int argc, char *argv[])
 {
-	buffer_t *B;
+	buffer_t B;
 	int i;
 	size_t len;
 	static char test[1<<20];
@@ -32,77 +32,70 @@ int main (int argc, char *argv[])
 	char buf2[1<<12];
 	char buf3[1<<13];
 
-	B = buffer_create(buf1, sizeof(buf1), 0, 0);
-	if (!B) fatal("buffer_create fail: '%s'", strerror(errno));
-	check(0, buffer_putliteral(B, "a"));
-	check(0, buffer_putstring(B, "b"));
-	check(0, buffer_putlstring(B, "cd", 1));
-	check(0, buffer_putstring(B, "de"));
-	check(0, strcmp(buffer_tostring(B, NULL), "abcde"));
-	buffer_delete(B);
+	buffer_init(&B, buf1, sizeof(buf1), 0, 0);
+	check(0, buffer_putliteral(&B, "a"));
+	check(0, buffer_putstring(&B, "b"));
+	check(0, buffer_putlstring(&B, "cd", 1));
+	check(0, buffer_putstring(&B, "de"));
+	check(0, strcmp(buffer_tostring(&B, NULL), "abcde"));
+	buffer_free(&B);
 
 	/* small buffer shouldn't be used */
-	B = buffer_create(buf1, sizeof(buf1), 0, 0);
-	if (!B) fatal("buffer_create fail: '%s'", strerror(errno));
+	buffer_init(&B, buf1, sizeof(buf1), 0, 0);
 	strcpy(test, "");
 	for (i = 0; i < 1<<12; i++) {
-		check(0, buffer_putstring(B, "a"));
+		check(0, buffer_putstring(&B, "a"));
 		strcat(test, "a");
 	}
-	check(0, strcmp(buffer_tostring(B, &len), test));
-	buffer_delete(B);
+	check(0, strcmp(buffer_tostring(&B, &len), test));
+	buffer_free(&B);
 
 	/* this buffer is equal to initial and won't be used */
-	B = buffer_create(buf2, sizeof(buf2), 0, 0);
-	if (!B) fatal("buffer_create fail: '%s'", strerror(errno));
+	buffer_init(&B, buf2, sizeof(buf2), 0, 0);
 	strcpy(test, "");
 	for (i = 0; i < 1<<12; i++) {
-		check(0, buffer_putstring(B, "a"));
+		check(0, buffer_putstring(&B, "a"));
 		strcat(test, "a");
 	}
-	check(0, strcmp(buffer_tostring(B, &len), test));
-	buffer_delete(B);
+	check(0, strcmp(buffer_tostring(&B, &len), test));
+	buffer_free(&B);
 
 	/* testing max */
-	B = buffer_create(buf2, sizeof(buf2), 1<<12, 0);
-	if (!B) fatal("buffer_create fail: '%s'", strerror(errno));
+	buffer_init(&B, buf2, sizeof(buf2), 1<<12, 0);
 	for (i = 0; i < (1<<12)-1; i++) {
-		check(0, buffer_putstring(B, "a"));
+		check(0, buffer_putstring(&B, "a"));
 	}
-	check(-1, buffer_putstring(B, "a"));
-	buffer_delete(B);
+	check(-1, buffer_putstring(&B, "a"));
+	buffer_free(&B);
 
 	/* this buffer should be used */
-	B = buffer_create(buf3, sizeof(buf3), 1<<13, 0);
-	if (!B) fatal("buffer_create fail: '%s'", strerror(errno));
+	buffer_init(&B, buf3, sizeof(buf3), 1<<13, 0);
 	strcpy(test, "");
 	for (i = 0; i < 1<<12; i++) {
-		check(0, buffer_putstring(B, "a"));
+		check(0, buffer_putstring(&B, "a"));
 		strcat(test, "a");
 	}
-	check(0, strcmp(buffer_tostring(B, &len), test));
-	buffer_delete(B);
+	check(0, strcmp(buffer_tostring(&B, &len), test));
+	buffer_free(&B);
 
 	/* test max again */
-	B = buffer_create(buf3, sizeof(buf3), 1<<14, 0);
-	if (!B) fatal("buffer_create fail: '%s'", strerror(errno));
+	buffer_init(&B, buf3, sizeof(buf3), 1<<14, 0);
 	for (i = 0; i < (1<<14)-1; i++) {
-		check(0, buffer_putstring(B, "a"));
+		check(0, buffer_putstring(&B, "a"));
 	}
-	check(-1, buffer_putstring(B, "a"));
-	buffer_delete(B);
+	check(-1, buffer_putstring(&B, "a"));
+	buffer_free(&B);
 
 	/* testing heap growth */
-	B = buffer_create(buf3, sizeof(buf3), 0, 0);
-	if (!B) fatal("buffer_create fail: '%s'", strerror(errno));
+	buffer_init(&B, buf3, sizeof(buf3), 0, 0);
 	for (i = 0; i < 1<<20; i++)
 		test[i] = 'a';
 	for (i = 0; i < 1<<20; i++) {
-		check(0, buffer_putstring(B, "a"));
+		check(0, buffer_putstring(&B, "a"));
 	}
-	check(0, strcmp(buffer_tostring(B, &len), test));
+	check(0, strcmp(buffer_tostring(&B, &len), test));
 	check(1<<20, len);
-	buffer_delete(B);
+	buffer_free(&B);
 
 	return 0;
 }

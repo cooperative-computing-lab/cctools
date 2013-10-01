@@ -28,7 +28,7 @@ See the file COPYING for details.
 struct CHIRP_FILE {
 	INT64_T fd;
 	INT64_T offset;
-	buffer_t *b;
+	buffer_t B;
 	char read[CHIRP_FILESYSTEM_BUFFER];
 	INT64_T read_n;
 	int error;
@@ -101,7 +101,7 @@ CHIRP_FILE *cfs_fopen(const char *path, const char *mode)
 		return NULL;
 
 	file = xxmalloc(sizeof(CHIRP_FILE));
-	file->b = buffer_create(NULL, 0, 0, 1);
+	buffer_init(&file->B, NULL, 0, 0, 1);
 	file->fd = fd;
 	file->offset = file->read_n = 0;
 	file->error = 0;
@@ -117,7 +117,7 @@ int cfs_fflush(CHIRP_FILE * file)
 	if(file == &CHIRP_FILE_NULL)
 		return 0;
 
-	content = buffer_tostring(file->b, &size);
+	content = buffer_tostring(&file->B, &size);
 
 	while((INT64_T) size > file->offset) {	/* finish all writes */
 		int w = cfs->pwrite(file->fd, content, size, file->offset);
@@ -138,7 +138,7 @@ int cfs_fclose(CHIRP_FILE * file)
 	if(file == &CHIRP_FILE_NULL)
 		return 0;
 
-	buffer_delete(file->b);
+	buffer_free(&file->B);
 	cfs->close(file->fd);
 	free(file);
 
@@ -152,7 +152,7 @@ void cfs_fprintf(CHIRP_FILE * file, const char *format, ...)
 	if(file == &CHIRP_FILE_NULL)
 		return;
 	va_start(va, format);
-	buffer_vprintf(file->b, format, va);
+	buffer_vprintf(&file->B, format, va);
 	va_end(va);
 }
 
@@ -160,7 +160,7 @@ size_t cfs_fwrite(const void *ptr, size_t size, size_t nitems, CHIRP_FILE * file
 {
 	size_t bytes = 0, nbytes = size * nitems;
 	for(; bytes < nbytes; bytes++)
-		buffer_printf(file->b, "%c", (int) (((const char *) ptr)[bytes]));
+		buffer_printf(&file->B, "%c", (int) (((const char *) ptr)[bytes]));
 	return nbytes;
 }
 
