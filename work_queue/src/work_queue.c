@@ -1590,6 +1590,9 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 	char *delimtr = "$";
 	char *token;
 
+	// Shortcut: If no dollars anywhere, duplicate the whole string.
+	if(!strchr(payload,'$')) return strdup(payload);
+
 	str = xxstrdup(payload);
 
 	expanded_name = (char *) malloc(strlen(payload) + (50 * sizeof(char)));
@@ -1635,6 +1638,9 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 	}
 
 	free(str);
+
+	debug(D_WQ, "File name %s expanded to %s for %s (%s).", payload, expanded_name, w->hostname, w->addrport);
+
 	return expanded_name;
 }
 
@@ -1693,12 +1699,7 @@ static int put_object(struct work_queue *q, struct work_queue_worker *w, struct 
 				}
 			}
 		} else {
-			char *expanded_payload;
-			if(strchr(f->payload, '$')) {
-				expanded_payload = expand_envnames(w, f->payload);
-			} else {
-				expanded_payload = xxstrdup(f->payload);
-			}
+			char *expanded_payload = expand_envnames(w, f->payload);
 			if(!put_file_or_directory(f, expanded_payload, q, w, t, &total_bytes)) {
 				free(expanded_payload);
 				goto failure;
@@ -1750,7 +1751,6 @@ static int put_object(struct work_queue *q, struct work_queue_worker *w, struct 
 static int send_input_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
 	struct work_queue_file *f;
-	char *expanded_payload = NULL;
 	struct stat s;
 
 	// Check for existence of each input file first.
@@ -1760,12 +1760,7 @@ static int send_input_files( struct work_queue *q, struct work_queue_worker *w, 
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
 			if(f->type == WORK_QUEUE_FILE || f->type == WORK_QUEUE_FILE_PIECE) {
-				if(strchr(f->payload, '$')) {
-					expanded_payload = expand_envnames(w, f->payload);
-					debug(D_WQ, "File name %s expanded to %s for %s (%s).", f->payload, expanded_payload, w->hostname, w->addrport);
-				} else {
-					expanded_payload = xxstrdup(f->payload);
-				}
+				char * expanded_payload = expand_envnames(w, f->payload);
 				if(stat(expanded_payload, &s) != 0) {
 					debug(D_WQ,"Could not stat %s: %s\n", expanded_payload, strerror(errno));
 					free(expanded_payload);
