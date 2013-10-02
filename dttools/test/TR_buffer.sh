@@ -30,7 +30,12 @@ int main (int argc, char *argv[])
 	static char test[1<<20];
 	char buf1[4];
 	char buf2[1<<12];
-	char buf3[1<<13];
+	char buf3[1<<13] = "a";
+
+    /* test that buffer starts with empty string */
+	buffer_init(&B, buf3, sizeof(buf3), 0, 0);
+	check(0, strcmp(buffer_tostring(&B, NULL), ""));
+	buffer_free(&B);
 
 	buffer_init(&B, buf1, sizeof(buf1), 0, 0);
 	check(0, buffer_putliteral(&B, "a"));

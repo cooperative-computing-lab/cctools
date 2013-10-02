@@ -38,6 +38,7 @@ void buffer_init(buffer_t * b, char *buf, size_t len, size_t max, int abort_on_f
 		b->ubuf.buf = NULL;
 		b->ubuf.len = 0;
 	}
+	b->end[0] = '\0'; /* initialize with empty string */
 	b->max = max;
 	b->abort_on_failure = abort_on_failure;
 }
