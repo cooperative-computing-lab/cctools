@@ -101,7 +101,8 @@ CHIRP_FILE *cfs_fopen(const char *path, const char *mode)
 		return NULL;
 
 	file = xxmalloc(sizeof(CHIRP_FILE));
-	buffer_init(&file->B, NULL, 0, 0, 1);
+	buffer_init(&file->B);
+	buffer_abortonfailure(&file->B, 1);
 	file->fd = fd;
 	file->offset = file->read_n = 0;
 	file->error = 0;

@@ -27,20 +27,35 @@
 		}\
 	} while (0)
 
-void buffer_init(buffer_t * b, char *buf, size_t len, size_t max, int abort_on_failure)
+void buffer_init(buffer_t * b)
 {
+	b->buf = b->end = b->initial;
+	b->len = sizeof(b->initial);
+	b->ubuf.buf = NULL;
+	b->ubuf.len = 0;
+	b->end[0] = '\0'; /* initialize with empty string */
+	b->max = 0;
+	b->abort_on_failure = 0;
+}
+
+void buffer_ubuf(buffer_t * b, char *buf, size_t len)
+{
+	assert(b->buf == b->initial && b->buf == b->end);
 	if (buf && len >= sizeof(b->initial)) {
 		b->buf = b->end = b->ubuf.buf = buf;
 		b->len = b->ubuf.len = len;
-	} else {
-		b->buf = b->end = b->initial;
-		b->len = sizeof(b->initial);
-		b->ubuf.buf = NULL;
-		b->ubuf.len = 0;
+		b->end[0] = '\0'; /* initialize with empty string */
 	}
-	b->end[0] = '\0'; /* initialize with empty string */
+}
+
+void buffer_max(buffer_t * b, size_t max)
+{
 	b->max = max;
-	b->abort_on_failure = abort_on_failure;
+}
+
+void buffer_abortonfailure(buffer_t * b, int abortonfailure)
+{
+	b->abort_on_failure = abortonfailure;
 }
 
 void buffer_free(buffer_t * b)

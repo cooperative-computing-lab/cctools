@@ -58,7 +58,8 @@ int main(int argc, char *argv[]) {
 	buffer_t B;
 	const char *text;
 	size_t text_size;
-	buffer_init(&B, NULL, 0, 0, 1);
+	buffer_init(&B);
+	buffer_abortonfailure(&B, 1);
 
 	struct utsname name;
 	int cpus;

@@ -1578,7 +1578,8 @@ CHIRP_SEARCH *chirp_client_opensearch(struct chirp_client * c, const char *path,
 		CHIRP_SEARCH *result = malloc(sizeof(CHIRP_SEARCH));
 		if (!result) return NULL;
 
-		buffer_init(&result->B, NULL, 0, 0, 1);
+		buffer_init(&result->B);
+		buffer_abortonfailure(&result->B, 1);
 		while(link_readline(c->link, line, sizeof(line), stoptime) && line[0]) {
 			buffer_putstring(&result->B, line);
 			n += strlen(line);

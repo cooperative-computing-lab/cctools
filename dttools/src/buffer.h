@@ -21,13 +21,15 @@ See the file COPYING for details.
 #endif
 
 typedef struct buffer {
-	char *buf;
-	char *end;
-	size_t len; /* size of buffer */
+	char *buf; /* buf points to the start of the buffer, which may be a buffer on the stack or heap */
+	char *end; /* the current end of the buffer */
+	size_t len; /* current size of buffer */
 	size_t max; /* maximum size of buffer */
-	int abort_on_failure;
+	int abort_on_failure; /* call debug.c fatal(...) on error instead of returning  */
 
-	char initial[1<<12];
+	char initial[1<<12]; /* a reasonably sized buffer to use initially so we avoid (numerous) heap allocations */
+
+	/* a user provided buffer which replaces initial if larger */
 	struct {
 		char *buf;
 		size_t len;
@@ -36,18 +38,40 @@ typedef struct buffer {
 
 /** Initialize a buffer.
 
-    The buffer includes a reasonably sized buffer as part of its definition.
-    Usually this means for small strings being built, nothing is ever allocated
-    on the heap. You can specify a larger starting buffer if this is
-    inadequate.
+	The buffer includes a reasonably sized starting buffer as part of its
+	definition.  Usually this means for small strings being built, nothing is
+	ever allocated on the heap. You can specify a larger starting buffer if
+	this is inadequate.
 
-    @param b A buffer to initialize.
+    @param b The buffer to initialize.
+  */
+void buffer_init(buffer_t * b);
+
+/** Use the provided buffer as a starting buffer.
+
+	This function should only be called before any work is done on the buffer.
+	The user buffer is only used if it is larger than the internal starting
+	buffer.
+
+    @param b   The buffer.
     @param buf A starting buffer to initially use to avoid allocating memory on the heap. (can be NULL)
     @param len The length of the buffer. (ignored if buf == NULL)
+  */
+void buffer_ubuf(buffer_t * b, char *buf, size_t len);
+
+/** Set the maximum size of the buffer.
+
+    @param b   The buffer.
     @param max The maximum amount of memory to allocate. (0 is unlimited)
+  */
+void buffer_max(buffer_t * b, size_t max);
+
+/** Set the buffer to call fatal(...) on error instead of returning an error code.
+
+    @param b                The buffer.
     @param abort_on_failure Kill the process on errors. (you no longer have to check returns)
   */
-void buffer_init(buffer_t *b, char *buf, size_t len, size_t max, int abort_on_failure);
+void buffer_abortonfailure(buffer_t * b, int abortonfailure);
 
 /** Free any resources and memory in use by a buffer.
     @param b The buffer to free.
