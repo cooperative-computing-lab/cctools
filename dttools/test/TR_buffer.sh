@@ -32,12 +32,14 @@ int main (int argc, char *argv[])
 	char buf2[1<<12];
 	char buf3[1<<13] = "a";
 
-    /* test that buffer starts with empty string */
-	buffer_init(&B, buf3, sizeof(buf3), 0, 0);
+	/* test that buffer starts with empty string */
+	buffer_init(&B);
+	buffer_ubuf(&B, buf3, sizeof(buf3));
 	check(0, strcmp(buffer_tostring(&B, NULL), ""));
 	buffer_free(&B);
 
-	buffer_init(&B, buf1, sizeof(buf1), 0, 0);
+	buffer_init(&B);
+	buffer_ubuf(&B, buf1, sizeof(buf1));
 	check(0, buffer_putliteral(&B, "a"));
 	check(0, buffer_putstring(&B, "b"));
 	check(0, buffer_putlstring(&B, "cd", 1));
@@ -46,7 +48,8 @@ int main (int argc, char *argv[])
 	buffer_free(&B);
 
 	/* small buffer shouldn't be used */
-	buffer_init(&B, buf1, sizeof(buf1), 0, 0);
+	buffer_init(&B);
+	buffer_ubuf(&B, buf1, sizeof(buf1));
 	strcpy(test, "");
 	for (i = 0; i < 1<<12; i++) {
 		check(0, buffer_putstring(&B, "a"));
@@ -56,7 +59,8 @@ int main (int argc, char *argv[])
 	buffer_free(&B);
 
 	/* this buffer is equal to initial and won't be used */
-	buffer_init(&B, buf2, sizeof(buf2), 0, 0);
+	buffer_init(&B);
+	buffer_ubuf(&B, buf2, sizeof(buf2));
 	strcpy(test, "");
 	for (i = 0; i < 1<<12; i++) {
 		check(0, buffer_putstring(&B, "a"));
@@ -66,7 +70,9 @@ int main (int argc, char *argv[])
 	buffer_free(&B);
 
 	/* testing max */
-	buffer_init(&B, buf2, sizeof(buf2), 1<<12, 0);
+	buffer_init(&B);
+	buffer_ubuf(&B, buf2, sizeof(buf2));
+	buffer_max(&B, 1<<12);
 	for (i = 0; i < (1<<12)-1; i++) {
 		check(0, buffer_putstring(&B, "a"));
 	}
@@ -74,7 +80,9 @@ int main (int argc, char *argv[])
 	buffer_free(&B);
 
 	/* this buffer should be used */
-	buffer_init(&B, buf3, sizeof(buf3), 1<<13, 0);
+	buffer_init(&B);
+	buffer_ubuf(&B, buf3, sizeof(buf3));
+	buffer_max(&B, 1<<13);
 	strcpy(test, "");
 	for (i = 0; i < 1<<12; i++) {
 		check(0, buffer_putstring(&B, "a"));
@@ -84,7 +92,9 @@ int main (int argc, char *argv[])
 	buffer_free(&B);
 
 	/* test max again */
-	buffer_init(&B, buf3, sizeof(buf3), 1<<14, 0);
+	buffer_init(&B);
+	buffer_ubuf(&B, buf3, sizeof(buf3));
+	buffer_max(&B, 1<<14);
 	for (i = 0; i < (1<<14)-1; i++) {
 		check(0, buffer_putstring(&B, "a"));
 	}
@@ -92,7 +102,8 @@ int main (int argc, char *argv[])
 	buffer_free(&B);
 
 	/* testing heap growth */
-	buffer_init(&B, buf3, sizeof(buf3), 0, 0);
+	buffer_init(&B);
+	buffer_ubuf(&B, buf3, sizeof(buf3));
 	for (i = 0; i < 1<<20; i++)
 		test[i] = 'a';
 	for (i = 0; i < 1<<20; i++) {
