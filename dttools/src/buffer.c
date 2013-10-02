@@ -151,3 +151,14 @@ const char *buffer_tostring(buffer_t * b, size_t * size)
 		*size = inuse(b);
 	return b->buf;
 }
+
+size_t buffer_pos(buffer_t * b)
+{
+    return inuse(b);
+}
+
+void buffer_rewind(buffer_t * b, size_t n)
+{
+    assert(inuse(b) >= n);
+    b->end = b->buf+n;
+}

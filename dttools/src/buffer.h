@@ -130,4 +130,18 @@ int buffer_putlstring(buffer_t * b, const char *str, size_t len);
   */
 const char *buffer_tostring(buffer_t * b, size_t * size);
 
+/** Rewinds the buffer to position n.
+
+    @param b The buffer.
+    @param n The position to rewind to.
+  */
+void buffer_rewind(buffer_t * b, size_t n);
+
+/** Get the current position in the buffer.
+
+    @param b The buffer.
+    @return The current position.
+  */
+size_t buffer_pos(buffer_t * b);
+
 #endif /* BUFFER_H */
