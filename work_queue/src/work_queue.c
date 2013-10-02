@@ -1530,7 +1530,7 @@ The local file name should already have been expanded by the caller.
 Returns true on success, false on failure.
 */
 
-static int send_file_or_directory(struct work_queue_file *tf, const char *expanded_local_name, struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, INT64_T * total_bytes)
+static int send_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *tf, const char *expanded_local_name, INT64_T * total_bytes)
 {
 	struct stat local_info;
 	struct stat *remote_info;
@@ -1705,7 +1705,7 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 			}
 		} else {
 			char *expanded_payload = expand_envnames(w, f->payload);
-			int result = send_file_or_directory(f, expanded_payload, q, w, t, &total_bytes);
+			int result = send_file_or_directory(q,w,t,f,expanded_payload,&total_bytes);
 			free(expanded_payload);
 			if(!result) goto failure;
 		}
