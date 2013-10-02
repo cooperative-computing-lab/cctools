@@ -1424,7 +1424,7 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	return n;
 }
 
-static int put_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, INT64_T length, INT64_T *total_bytes, int flags)
+static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, INT64_T length, INT64_T *total_bytes, int flags)
 {
 
 	struct stat local_info;
@@ -1486,7 +1486,7 @@ Send a directory and all of its contentss.
 Returns true on success, false.
 */
 
-static int put_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *dirname, const char *remotedirname, INT64_T * total_bytes, int flags )
+static int send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *dirname, const char *remotedirname, INT64_T * total_bytes, int flags )
 {
 	DIR *dir = opendir(dirname);
 	if(!dir) return 0;
@@ -1506,9 +1506,9 @@ static int put_directory( struct work_queue *q, struct work_queue_worker *w, str
 		struct stat local_info;
 		if(stat(localpath, &local_info)>=0) {
 			if(S_ISDIR(local_info.st_mode))  {
-				result = put_directory( q, w, t, localpath, remotepath, total_bytes, flags );
+				result = send_directory( q, w, t, localpath, remotepath, total_bytes, flags );
 			} else {
-				result = put_file( q, w, t, localpath, remotepath, 0, 0, total_bytes, flags );
+				result = send_file( q, w, t, localpath, remotepath, 0, 0, total_bytes, flags );
 			}	
 		} else {
 			result = 0;
@@ -1530,7 +1530,7 @@ The local file name should already have been expanded by the caller.
 Returns true on success, false on failure.
 */
 
-static int put_file_or_directory(struct work_queue_file *tf, const char *expanded_local_name, struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, INT64_T * total_bytes)
+static int send_file_or_directory(struct work_queue_file *tf, const char *expanded_local_name, struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, INT64_T * total_bytes)
 {
 	struct stat local_info;
 	struct stat *remote_info;
@@ -1561,9 +1561,9 @@ static int put_file_or_directory(struct work_queue_file *tf, const char *expande
 		}
 
 		if(S_ISDIR(local_info.st_mode)) {
-			result = put_directory(q, w, t, expanded_local_name, remote_name, total_bytes, tf->flags);
+			result = send_directory(q, w, t, expanded_local_name, remote_name, total_bytes, tf->flags);
 		} else {
-			result = put_file(q, w, t, expanded_local_name, remote_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
+			result = send_file(q, w, t, expanded_local_name, remote_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
 		}
 
 		free(remote_name);
@@ -1649,7 +1649,7 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 	return expanded_name;
 }
 
-static int put_object(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f)
+static int send_input_file(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f)
 {
 	INT64_T total_bytes = 0;
 	INT64_T actual = 0;
@@ -1705,7 +1705,7 @@ static int put_object(struct work_queue *q, struct work_queue_worker *w, struct 
 			}
 		} else {
 			char *expanded_payload = expand_envnames(w, f->payload);
-			int result = put_file_or_directory(f, expanded_payload, q, w, t, &total_bytes);
+			int result = send_file_or_directory(f, expanded_payload, q, w, t, &total_bytes);
 			free(expanded_payload);
 			if(!result) goto failure;
 		}
@@ -1783,7 +1783,7 @@ static int send_input_files( struct work_queue *q, struct work_queue_worker *w, 
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
-			if(!put_object(q,w,t,f)) return 0;
+			if(!send_input_file(q,w,t,f)) return 0;
 		}
 	}
 
