@@ -79,7 +79,7 @@ struct chirp_searchent {
 struct chirp_searchstream {
 	struct chirp_searchent entry;
 	const char *current;
-	buffer_t *buffer;
+	buffer_t B;
 };
 
 #define CHIRP_SEARCH struct chirp_searchstream

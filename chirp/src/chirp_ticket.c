@@ -65,23 +65,24 @@ char *chirp_ticket_tostring(struct chirp_ticket *ct)
 	size_t n;
 	const char *s;
 	char *result;
-	buffer_t *B;
+	buffer_t B;
 
-	B = buffer_create();
+	buffer_init(&B);
+	buffer_abortonfailure(&B, 1);
 
-	buffer_printf(B, "subject \"%s\"\n", ct->subject);
-	buffer_printf(B, "ticket \"%s\"\n", ct->ticket);
-	buffer_printf(B, "expiration \"%lu\"\n", (unsigned long) ct->expiration);
+	buffer_printf(&B, "subject \"%s\"\n", ct->subject);
+	buffer_printf(&B, "ticket \"%s\"\n", ct->ticket);
+	buffer_printf(&B, "expiration \"%lu\"\n", (unsigned long) ct->expiration);
 	for(n = 0; n < ct->nrights; n++) {
-		buffer_printf(B, "rights \"%s\" \"%s\"\n", ct->rights[n].directory, ct->rights[n].acl);
+		buffer_printf(&B, "rights \"%s\" \"%s\"\n", ct->rights[n].directory, ct->rights[n].acl);
 	}
 
-	s = buffer_tostring(B, &n);
+	s = buffer_tostring(&B, &n);
 	result = xxmalloc(n + 1);
 	memset(result, 0, n + 1);
 	memcpy(result, s, n);
 
-	buffer_delete(B);
+	buffer_free(&B);
 
 	return result;
 }
