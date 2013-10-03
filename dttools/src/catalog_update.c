@@ -55,13 +55,11 @@ int main(int argc, char *argv[]) {
 		fatal("could not create datagram port!");
 	}
 
-	buffer_t *b;
+	buffer_t B;
 	const char *text;
 	size_t text_size;
-	b = buffer_create();
-	if (!b) {
-		fatal("could not create buffer!");
-	}
+	buffer_init(&B);
+	buffer_abortonfailure(&B, 1);
 
 	struct utsname name;
 	int cpus;
@@ -80,7 +78,7 @@ int main(int argc, char *argv[]) {
 	uptime = uptime_get();
 	username_get(owner);
 
-	buffer_printf(b, "type %s\nversion %d.%d.%s\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nmemory_total %llu\nmemory_avail %llu\ncpus %d\nuptime %d\nowner %s\n",
+	buffer_printf(&B, "type %s\nversion %d.%d.%s\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nmemory_total %llu\nmemory_avail %llu\ncpus %d\nuptime %d\nowner %s\n",
 		DEFAULT_TYPE,
 		CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO,
 		name.machine,
@@ -109,10 +107,10 @@ int main(int argc, char *argv[]) {
 			*value++ = 0;
 		}
 
-		buffer_printf(b, "%s %s\n", name, value);
+		buffer_printf(&B, "%s %s\n", name, value);
 	}
 
-        text = buffer_tostring(b, &text_size);
+        text = buffer_tostring(&B, &text_size);
 
 	char address[DATAGRAM_ADDRESS_MAX];
 	if (domain_name_cache_lookup(host, address)) {
@@ -121,7 +119,7 @@ int main(int argc, char *argv[]) {
 		fatal("unable to lookup address of host: %s", host);
 	}
 
-	buffer_delete(b);
+	buffer_free(&B);
 	datagram_delete(d);
 	return EXIT_SUCCESS;
 }

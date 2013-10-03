@@ -333,7 +333,7 @@ int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_por
 {
 	char address[DATAGRAM_ADDRESS_MAX];
 	char owner[USERNAME_MAX];
-	buffer_t *buffer = NULL;
+	buffer_t B;
 	const char *text;
 	size_t text_size;
 
@@ -358,10 +358,11 @@ int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_por
 	// function in catalog_server.c
 	INT64_T port = 65535 + pid; 
 
-	buffer = buffer_create();
-	buffer_printf(buffer, "type wq_pool\npool_name %s\nport %" PRId64 "\nstarttime %llu\ndecision %s\nworkers_requested %d\nowner %s\nlifetime %d", pool_name, port, (unsigned long long) start_time, decision, workers_requested, owner, WORK_QUEUE_CATALOG_POOL_AD_LIFETIME);
+	buffer_init(&B);
+	buffer_abortonfailure(&B, 1);
+	buffer_printf(&B, "type wq_pool\npool_name %s\nport %" PRId64 "\nstarttime %llu\ndecision %s\nworkers_requested %d\nowner %s\nlifetime %d", pool_name, port, (unsigned long long) start_time, decision, workers_requested, owner, WORK_QUEUE_CATALOG_POOL_AD_LIFETIME);
 
-	text = buffer_tostring(buffer, &text_size);
+	text = buffer_tostring(&B, &text_size);
 	debug(D_WQ, "Pool AD: \n%s\n", text);
 
 	if(domain_name_cache_lookup(catalog_host, address)) {
@@ -369,7 +370,7 @@ int advertise_pool_decision_to_catalog(const char *catalog_host, int catalog_por
 		datagram_send(outgoing_datagram, text, text_size, address, catalog_port);
 	}
 
-	buffer_delete(buffer);
+	buffer_free(&B);
 	last_update_time = time(0);
 	return 1;
 }
