@@ -1562,15 +1562,11 @@ static int send_file_or_directory( struct work_queue *q, struct work_queue_worke
 			free(remote_info);
 		}
 
-		char * cached_name = make_cached_name(t,tf);
-
 		if(S_ISDIR(local_info.st_mode)) {
 			result = send_directory(q, w, t, expanded_local_name, cached_name, total_bytes, tf->flags);
 		} else {
 			result = send_file(q, w, t, expanded_local_name, cached_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
 		}
-
-		free(cached_name);
 
 		if(result && tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = malloc(sizeof(*remote_info));
