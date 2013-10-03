@@ -65,10 +65,9 @@ static struct nvpair_header task_headers[] = {
 
 static struct nvpair_header worker_headers[] = {
 	{"hostname",             "HOST",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 24},
-	{"addrport",             "ADDRESS", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT,16},
-	{"total_tasks_complete",       "TASKS",   NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8 },
-	{"state",                "STATE",   NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT,8},
-	{"current_task_command", "TASK",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 28},
+	{"address_port",             "ADDRESS", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT,16},
+	{"total_tasks_complete",       "COMPLETED",   NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 9},
+	{"total_tasks_running",        "RUNNING",   NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT,8},
 	{NULL,NULL,0,0,0}
 };
 

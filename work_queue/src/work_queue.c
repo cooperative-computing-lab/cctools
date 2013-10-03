@@ -1210,6 +1210,7 @@ struct nvpair * worker_to_nvpair( struct work_queue *q, struct work_queue_worker
 	nvpair_insert_string(nv,"address_port",w->addrport);
 	nvpair_insert_integer(nv,"ncpus",w->resources->cores.total);
 	nvpair_insert_integer(nv,"total_tasks_complete",w->total_tasks_complete);
+	nvpair_insert_integer(nv,"total_tasks_running",itable_size(w->current_tasks));
 	nvpair_insert_integer(nv,"total_bytes_transferred",w->total_bytes_transferred);
 	nvpair_insert_integer(nv,"total_transfer_time",w->total_transfer_time);
 	nvpair_insert_integer(nv,"start_time",w->start_time);
