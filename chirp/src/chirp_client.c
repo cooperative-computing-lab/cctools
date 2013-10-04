@@ -119,7 +119,7 @@ static INT64_T convert_result(INT64_T result)
 		case CHIRP_ERROR_CROSS_DEVICE_LINK:
 			errno = EXDEV;
 			break;
-		case CHIRP_ERROR_NO_SUCH_PROCESS:
+		case CHIRP_ERROR_NO_SUCH_JOB:
 			errno = ESRCH;
 			break;
 		case CHIRP_ERROR_IS_A_PIPE:
@@ -1898,6 +1898,117 @@ INT64_T chirp_client_lremovexattr(struct chirp_client * c, const char *path, con
 	if(result == -1 && errno == EINVAL)
 		errno = ENOATTR;
 	return result;
+}
+
+INT64_T chirp_client_job_create (struct chirp_client *c, const char *json, chirp_jobid_t *id, time_t stoptime)
+{
+	INT64_T result;
+	size_t len = strlen(json);
+
+	if(len >= MAX_BUFFER_SIZE) {
+		errno = ENOMEM;
+		return -1;
+	}
+
+	result = send_command(c, stoptime, "job_create %zu\n", len);
+	if(result < 0)
+		return result;
+
+	result = link_putlstring(c->link, json, len, stoptime);
+	if(result != (INT64_T)len) {
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+	result = get_result(c, stoptime);
+	if (result > 0) {
+		*id = result;
+		result = 0;
+	}
+	return result;
+}
+
+INT64_T chirp_client_job_commit (struct chirp_client *c, chirp_jobid_t id, time_t stoptime)
+{
+	return simple_command(c, stoptime, "job_commit %" PRICHIRP_JOBID_T "\n", id);
+}
+
+INT64_T chirp_client_job_kill (struct chirp_client *c, chirp_jobid_t id, time_t stoptime)
+{
+	return simple_command(c, stoptime, "job_kill %" PRICHIRP_JOBID_T "\n", id);
+}
+
+INT64_T chirp_client_job_status (struct chirp_client *c, chirp_jobid_t id, char **status, time_t stoptime)
+{
+	INT64_T result;
+
+	result = simple_command(c, stoptime, "job_status %" PRICHIRP_JOBID_T "\n", id);
+	if(result > 0) {
+		INT64_T actual;
+
+		if(result >= MAX_BUFFER_SIZE || (*status = malloc(result)) == NULL) {
+			errno = ENOMEM;
+			return -1;
+		}
+
+		memset(*status, 0, result+1);
+		actual = link_read(c->link, *status, result, stoptime);
+		if(actual != result) {
+			free(*status);
+			errno = ECONNRESET;
+			return -1;
+		}
+	}
+
+	return result;
+}
+
+INT64_T chirp_client_job_wait (struct chirp_client *c, chirp_jobid_t id, INT64_T timeout, char **status, time_t stoptime)
+{
+	INT64_T result;
+
+	result = simple_command(c, stoptime, "job_wait %" PRICHIRP_JOBID_T " %" PRId64 "\n", id, timeout);
+	if(result > 0) {
+		INT64_T actual;
+
+		if(result >= MAX_BUFFER_SIZE || (*status = malloc(result+1)) == NULL) {
+			errno = ENOMEM;
+			return -1;
+		}
+
+		memset(*status, 0, result+1);
+		actual = link_read(c->link, *status, result, stoptime);
+		if(actual != result) {
+			free(*status);
+			errno = ECONNRESET;
+			return -1;
+		}
+	}
+
+	return result;
+}
+
+INT64_T chirp_client_job_reap (struct chirp_client *c, const char *json, time_t stoptime)
+{
+	INT64_T result;
+	size_t len = strlen(json);
+
+	if(len >= MAX_BUFFER_SIZE) {
+		errno = ENOMEM;
+		return -1;
+	}
+
+	result = send_command(c, stoptime, "job_reap %zu\n", len);
+	if(result < 0)
+		return result;
+
+	result = link_putlstring(c->link, json, len, stoptime);
+	if(result != (INT64_T)len) {
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+	return get_result(c, stoptime);
 }
 
 /* vim: set noexpandtab tabstop=4: */

@@ -12,6 +12,7 @@
 #include "chirp_fs_hdfs.h"
 #include "chirp_fs_local.h"
 #include "chirp_group.h"
+#include "chirp_job.h"
 #include "chirp_protocol.h"
 #include "chirp_reli.h"
 #include "chirp_stats.h"
@@ -30,6 +31,7 @@
 #include "domain_name_cache.h"
 #include "get_canonical_path.h"
 #include "getopt_aux.h"
+#include "json.h"
 #include "link.h"
 #include "list.h"
 #include "load_average.h"
@@ -74,8 +76,9 @@
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
+char        chirp_hostname[DOMAIN_NAME_MAX] = "";
 char        chirp_owner[USERNAME_MAX] = "";
-const char *chirp_super_user = "";
+int         chirp_port = CHIRP_PORT;
 char        chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
 
 static char        address[LINK_ADDRESS_MAX];
@@ -87,7 +90,6 @@ static char        hostname[DOMAIN_NAME_MAX];
 static int         idle_timeout = 60; /* one minute */
 static struct      list *catalog_host_list;
 static UINT64_T    minimum_space_free = 0;
-static int         port = CHIRP_PORT;
 static UINT64_T    root_quota = 0;
 static gid_t       safe_gid = 0;
 static uid_t       safe_uid = 0;
@@ -176,13 +178,13 @@ static int update_all_catalogs(const char *url)
 	buffer_abortonfailure(&B, 1);
 	buffer_putliteral(&B, "type chirp\n");
 	buffer_printf(&B, "version %d.%d.%s\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
-	buffer_printf(&B, "url chirp://%s:%d\n", hostname, port);
+	buffer_printf(&B, "url chirp://%s:%d\n", hostname, chirp_port);
 	buffer_printf(&B, "name %s\n", hostname);
 	buffer_printf(&B, "owner %s\n", chirp_owner);
 	buffer_printf(&B, "total %" PRIu64 "\n", info.f_blocks * info.f_bsize);
 	buffer_printf(&B, "avail %" PRIu64 "\n", info.f_bavail * info.f_bsize);
 	buffer_printf(&B, "starttime %lu\n", (unsigned long) starttime);
-	buffer_printf(&B, "port %d\n", port);
+	buffer_printf(&B, "port %d\n", chirp_port);
 	buffer_printf(&B, "cpu %s\n", name.machine);
 	buffer_printf(&B, "opsys %s\n", name.sysname);
 	buffer_printf(&B, "opsysversion %s\n", name.release);
@@ -339,7 +341,7 @@ static int errno_to_chirp(int e)
 	case EHOSTUNREACH:
 		return CHIRP_ERROR_GRP_UNREACHABLE;
 	case ESRCH:
-		return CHIRP_ERROR_NO_SUCH_PROCESS;
+		return CHIRP_ERROR_NO_SUCH_JOB;
 	case ESPIPE:
 		return CHIRP_ERROR_IS_A_PIPE;
 	case ENOTSUP:
@@ -525,10 +527,13 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		char debug_flag[CHIRP_LINE_MAX];
 		char pattern[CHIRP_LINE_MAX];
 
+		chirp_jobid_t id;
+
 		INT64_T fd, length, flags, offset, actual;
 		INT64_T uid, gid, mode;
 		INT64_T size, inuse;
 		INT64_T stride_length, stride_skip;
+		INT64_T job_wait_timeout;
 		int nreps;
 		struct chirp_stat statbuf;
 		struct chirp_statfs statfsbuf;
@@ -1580,6 +1585,133 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 
 			do_getdir_result = 1;
 			result = 0;
+		} else if(sscanf(line, "job_create %" PRId64, &length) == 1) {
+			char *json;
+			if (length < MAX_BUFFER_SIZE && (json = malloc(length))) {
+				actual = link_read(l, json, length, stalltime);
+				if (actual == length) {
+					debug(D_DEBUG, "job_create `%.*s'", (int)length, json);
+					json_value *J = json_parse(json, length);
+					free(json);
+					if (J) {
+						result = chirp_job_create(&id, J, subject);
+						debug(D_DEBUG, "create id = %" PRICHIRP_JOBID_T "; rc = %d: %s", id, (int)result, strerror(result));
+						json_value_free(J);
+						if (result) {
+							errno = result;
+							result = -1;
+						} else {
+							result = id;
+						}
+					} else {
+						result = -1;
+						errno = EINVAL;
+					}
+				} else {
+					free(json);
+					result = -1;
+					break;
+				}
+			} else {
+				link_soak(l, length, stalltime);
+				result = -1;
+				errno = ENOMEM;
+			}
+		} else if(sscanf(line, "job_commit %" SCNCHIRP_JOBID_T, &id) == 1) {
+			result = chirp_job_commit(id, subject);
+			debug(D_DEBUG, "commit id = %" PRICHIRP_JOBID_T "; rc = %d: %s", id, (int)result, strerror(result));
+			if (result) {
+				errno = result;
+				result = -1;
+			}
+		} else if(sscanf(line, "job_kill %" SCNCHIRP_JOBID_T, &id) == 1) {
+			result = chirp_job_kill(id, subject);
+			debug(D_DEBUG, "kill id = %" PRICHIRP_JOBID_T "; rc = %d: %s", id, (int)result, strerror(result));
+			if (result) {
+				errno = result;
+				result = -1;
+			}
+		} else if(sscanf(line, "job_status %" SCNCHIRP_JOBID_T, &id) == 1) {
+			buffer_t B;
+
+			buffer_init(&B);
+			buffer_max(&B, MAX_BUFFER_SIZE);
+			result = chirp_job_status(id, subject, &B);
+			if(result == 0) {
+				size_t len;
+				const char *status;
+
+				status = buffer_tostring(&B, &len);
+				if (len > 0) {
+					dataout = malloc(len);
+					if (dataout) {
+						memcpy(dataout, status, len);
+						dataoutlength = len;
+						result = len; /* result of job_status is number of bytes in status */
+					} else {
+						result = errno;
+					}
+				}
+			} else {
+				errno = result;
+				result = -1;
+			}
+			buffer_free(&B);
+		} else if(sscanf(line, "job_wait %" SCNCHIRP_JOBID_T " %" SCNd64, &id, &job_wait_timeout) == 2) {
+			buffer_t B;
+
+			buffer_init(&B);
+			buffer_max(&B, MAX_BUFFER_SIZE);
+			result = chirp_job_wait(id, subject, job_wait_timeout, &B);
+			if(result == 0) {
+				size_t len;
+				const char *status;
+
+				status = buffer_tostring(&B, &len);
+				if (len > 0) {
+					dataout = malloc(len);
+					if (dataout) {
+						memcpy(dataout, status, len);
+						dataoutlength = len;
+						result = len; /* result of job_wait is number of bytes in status */
+					} else {
+						result = errno;
+					}
+				}
+			} else {
+				errno = result;
+				result = -1;
+			}
+			buffer_free(&B);
+		} else if(sscanf(line, "job_reap %" PRId64, &length) == 1) {
+			char *json;
+			if (length < MAX_BUFFER_SIZE && (json = malloc(length))) {
+				actual = link_read(l, json, length, stalltime);
+				if (actual == length) {
+					debug(D_DEBUG, "job_reap `%.*s'", (int)length, json);
+					json_value *J = json_parse(json, length);
+					free(json);
+					if (J) {
+						result = chirp_job_reap(J, subject);
+						json_value_free(J);
+						if (result) {
+							errno = result;
+							result = -1;
+						}
+					} else {
+						result = -1;
+						errno = EINVAL;
+					}
+				} else {
+					free(json);
+					result = -1;
+					break;
+				}
+			} else {
+				link_soak(l, length, stalltime);
+				result = -1;
+				errno = ENOMEM;
+			}
 		} else {
 			result = -1;
 			errno = ENOSYS;
@@ -1729,8 +1861,6 @@ static void install_handler(int sig, void (*handler) (int sig))
 	sigaction(sig, &s, 0);
 }
 
-#define LONG_OPT_INHERIT_DEFAULT_ACL 255
-
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "use: %s [options]\n", cmd);
@@ -1755,11 +1885,13 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Base url for group lookups. (default: disabled)\n", "-G,--group-url=<url>");
 	fprintf(stdout, " %-30s Run as lower privilege user. (root protection)\n", "-i,--user=<user>");
 	fprintf(stdout, " %-30s Listen only on this network interface.\n", "-I,--interface=<addr>");
+	fprintf(stdout, " %-30s Maximum concurrent jobs. (default: %d)\n", "--job-concurrency", chirp_job_concurrency);
+	fprintf(stdout, " %-30s Execution time limit for jobs. (default: %ds)\n", "--job-time-limit", chirp_job_time_limit);
 	fprintf(stdout, " %-30s Set the maximum number of clients to accept at once. (default unlimited)\n", "-M,--max-clients=<count>");
 	fprintf(stdout, " %-30s Use this name when reporting to the catalog.\n", "-n,--catalog-name=<name>");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Superuser for all directories. (default: none)\n", "-P,--superuser=<user>");
-	fprintf(stdout, " %-30s Listen on this port. (default: %d)\n", "-p,--port=<port>", port);
+	fprintf(stdout, " %-30s Listen on this port. (default: %d)\n", "-p,--port=<port>", chirp_port);
 	fprintf(stdout, " %-30s Enforce this root quota in software.\n", "-Q,--root-quota=<size>");
 	fprintf(stdout, " %-30s Read-only mode.\n", "-R,--read-only");
 	fprintf(stdout, " %-30s Abort stalled operations after this long. (default: %ds)\n", "-s,--stalled=<time>", stall_timeout);
@@ -1779,6 +1911,12 @@ static void show_help(const char *cmd)
 
 int main(int argc, char *argv[])
 {
+	enum {
+		LONGOPT_JOB_CONCURRENCY = INT_MAX-0,
+		LONGOPT_JOB_TIME_LIMIT = INT_MAX-1,
+		LONGOPT_INHERIT_DEFAULT_ACL = INT_MAX-2,
+	};
+
 	static const struct option long_options[] = {
 		{"advertise", required_argument, 0, 'u'},
 		{"auth", required_argument, 0, 'a'},
@@ -1789,13 +1927,15 @@ int main(int argc, char *argv[])
 		{"debug", required_argument, 0, 'd'},
 		{"debug-file", required_argument, 0, 'o'},
 		{"default-acl", required_argument, 0, 'A'},
-		{"inherit-default-acl", no_argument, 0, LONG_OPT_INHERIT_DEFAULT_ACL},
+		{"inherit-default-acl", no_argument, 0, LONGOPT_INHERIT_DEFAULT_ACL},
 		{"free-space", required_argument, 0, 'F'},
 		{"group-cache-exp", required_argument, 0, 'T'},
 		{"group-url", required_argument, 0, 'G'},
 		{"help", no_argument, 0, 'h'},
 		{"idle-clients", required_argument, 0, 't'},
 		{"interface", required_argument, 0, 'I'},
+		{"job-concurrency", required_argument, 0, LONGOPT_JOB_CONCURRENCY},
+		{"job-time-limit", required_argument, 0, LONGOPT_JOB_TIME_LIMIT},
 		{"max-clients", required_argument, 0, 'M'},
 		{"no-core-dump", no_argument, 0, 'C'},
 		{"owner", required_argument, 0, 'w'},
@@ -1833,8 +1973,6 @@ int main(int argc, char *argv[])
 	int total_child_procs = 0;
 	int did_explicit_auth = 0;
 	char port_file[PATH_MAX];
-
-	char url[CHIRP_PATH_MAX] = "file://./";
 
 	change_process_title_init(argv);
 	change_process_title("chirp_server");
@@ -1898,7 +2036,7 @@ int main(int argc, char *argv[])
 			max_child_procs = atoi(optarg);
 			break;
 		case 'p':
-			port = atoi(optarg);
+			chirp_port = atoi(optarg);
 			break;
 		case 'P':
 			chirp_super_user = optarg;
@@ -1916,9 +2054,9 @@ int main(int argc, char *argv[])
 			stall_timeout = string_time_parse(optarg);
 			break;
 		case 'r':
-			if (strlen(optarg) >= sizeof(url))
+			if (strlen(optarg) >= sizeof(chirp_url))
 				fatal("root url too long");
-			strcpy(url, optarg);
+			strcpy(chirp_url, optarg);
 			break;
 		case 'R':
 			chirp_acl_force_readonly();
@@ -1959,14 +2097,20 @@ int main(int argc, char *argv[])
 			break;
 		case 'Z':
 			path_absolute(optarg, port_file, 0);
-			port = 0;
+			chirp_port = 0;
 			break;
 		case 'l':
 			/* not documented, internal testing */
 			sim_latency = atoi(optarg);
 			break;
-		case LONG_OPT_INHERIT_DEFAULT_ACL:
+		case LONGOPT_INHERIT_DEFAULT_ACL:
 			chirp_acl_inherit_default(1);
+			break;
+		case LONGOPT_JOB_CONCURRENCY:
+			chirp_job_concurrency = atoi(optarg);
+			break;
+		case LONGOPT_JOB_TIME_LIMIT:
+			chirp_job_time_limit = atoi(optarg);
 			break;
 		case 'h':
 		default:
@@ -1988,7 +2132,7 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
-	cfs_normalize(url);
+	cfs_normalize(chirp_url);
 	/* translate relative paths to absolute ones */
 	{
 		char path[PATH_MAX];
@@ -2025,10 +2169,10 @@ int main(int argc, char *argv[])
 		auth_register_all();
 	}
 
-	cfs = cfs_lookup(url);
+	cfs = cfs_lookup(chirp_url);
 
-	if(run_in_child_process(backend_setup, url, "backend setup") != 0) {
-		fatal("couldn't setup %s", url);
+	if(run_in_child_process(backend_setup, chirp_url, "backend setup") != 0) {
+		fatal("couldn't setup %s", chirp_url);
 	}
 
 	if(!list_size(catalog_host_list)) {
@@ -2055,22 +2199,22 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	link = link_serve_address(listen_on_interface, port);
+	link = link_serve_address(listen_on_interface, chirp_port);
 
 	if(!link) {
 		if(listen_on_interface) {
-			fatal("couldn't listen on interface %s port %d: %s", listen_on_interface, port, strerror(errno));
+			fatal("couldn't listen on interface %s port %d: %s", listen_on_interface, chirp_port, strerror(errno));
 		} else {
-			fatal("couldn't listen on port %d: %s", port, strerror(errno));
+			fatal("couldn't listen on port %d: %s", chirp_port, strerror(errno));
 		}
 	}
 
-	link_address_local(link, address, &port);
+	link_address_local(link, address, &chirp_port);
 
-	debug(D_DEBUG, "now listening port on port %d\n", port);
+	debug(D_DEBUG, "now listening port on port %d\n", chirp_port);
 
 	if(strlen(port_file))
-		opts_write_port_file(port_file, port);
+		opts_write_port_file(port_file, chirp_port);
 
 	starttime = time(0);
 	catalog_port = datagram_create(0);
@@ -2086,6 +2230,23 @@ int main(int argc, char *argv[])
 	install_handler(SIGINT, shutdown_clean);
 	install_handler(SIGTERM, shutdown_clean);
 	install_handler(SIGQUIT, shutdown_clean);
+
+	chirp_job_schedd = fork();
+	if (chirp_job_schedd == 0) {
+		int rc;
+		/* FIXME check for other things to init */
+		change_process_title("chirp_server [scheduler]");
+		if(cfs->init(chirp_url) == -1)
+			fatal("could not initialize %s backend filesystem: %s", chirp_url, strerror(errno));
+		rc = chirp_job_schedule();
+		fatal("schedule rc = %d: %s", rc, strerror(rc));
+		raise(SIGKILL);
+		_exit(EXIT_FAILURE);
+	} else if (chirp_job_schedd > 0) {
+		debug(D_CHIRP, "forked scheduler %d", (int)chirp_job_schedd);
+	} else {
+		fatal("could not start scheduler");
+	}
 
 	while(1) {
 		char addr[LINK_ADDRESS_MAX];
@@ -2109,13 +2270,13 @@ int main(int argc, char *argv[])
 		}
 
 		if(time(0) >= advertise_alarm) {
-			run_in_child_process(update_all_catalogs, url, "catalog update");
+			run_in_child_process(update_all_catalogs, chirp_url, "catalog update");
 			advertise_alarm = time(0) + advertise_timeout;
 			chirp_stats_cleanup();
 		}
 
 		if(time(0) >= gc_alarm) {
-			run_in_child_process(gc_tickets, url, "ticket cleanup");
+			run_in_child_process(gc_tickets, chirp_url, "ticket cleanup");
 			gc_alarm = time(0) + GC_TIMEOUT;
 		}
 
@@ -2148,7 +2309,7 @@ int main(int argc, char *argv[])
 
 			pid = fork();
 			if(pid == 0) {
-				chirp_receive(l, url);
+				chirp_receive(l, chirp_url);
 				_exit(0);
 			} else if(pid > 0) {
 				total_child_procs++;

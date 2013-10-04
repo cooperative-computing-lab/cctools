@@ -214,6 +214,13 @@ to display or otherwise act upon each location at which a given file is stored.
 
 typedef void (*chirp_loc_t) (const char *location, void *arg);
 
+
+/** The type of Chirp job identifiers. It is a 64 bit unsigned integer.
+ */
+typedef int64_t chirp_jobid_t;
+#define PRICHIRP_JOBID_T  PRId64
+#define SCNCHIRP_JOBID_T  SCNd64
+
 #endif
 
 /* vim: set noexpandtab tabstop=4: */

@@ -660,6 +660,13 @@ INT64_T chirp_reli_removexattr(const char *host, const char *path, const char *n
 INT64_T chirp_reli_fremovexattr(struct chirp_file *file, const char *name, time_t stoptime);
 INT64_T chirp_reli_lremovexattr(const char *host, const char *path, const char *name, time_t stoptime);
 
+INT64_T chirp_reli_job_create (const char *host, const char *json, chirp_jobid_t *id, time_t stoptime);
+INT64_T chirp_reli_job_commit (const char *host, chirp_jobid_t id, time_t stoptime);
+INT64_T chirp_reli_job_kill (const char *host, chirp_jobid_t id, time_t stoptime);
+INT64_T chirp_reli_job_status (const char *host, chirp_jobid_t id, char **status, time_t stoptime);
+INT64_T chirp_reli_job_wait (const char *host, chirp_jobid_t id, INT64_T timeout, char **status, time_t stoptime);
+INT64_T chirp_reli_job_reap (const char *host, const char *json, time_t stoptime);
+
 /** Set the debug options on the remote server.
 @param host The name and port of the Chirp server to access.
 @param flag A debug flag to set on the server. Pass NULL to not change. Pass "clear" to clear.

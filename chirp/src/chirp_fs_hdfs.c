@@ -801,6 +801,9 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	cfs_stub_lremovexattr,
 
 	chirp_fs_hdfs_do_acl_check,
+
+	cfs_stub_job_dbinit,
+	cfs_stub_job_schedule,
 };
 
 /* vim: set noexpandtab tabstop=4: */
