@@ -74,7 +74,7 @@ struct command {
 	int must_be_open;
 	int minargs, maxargs;
 	char *help;
-	  INT64_T(*handler) (int argc, char **argv);
+	INT64_T(*handler) (int argc, char **argv);
 };
 
 /* Standard C does not let:
