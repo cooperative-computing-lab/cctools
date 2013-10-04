@@ -44,6 +44,7 @@ SOURCES = auth.c  \
           hmac.c  \
           http_query.c  \
           itable.c  \
+          json.c  \
           link.c  \
           link_auth.c  \
           link_nvpair.c \
