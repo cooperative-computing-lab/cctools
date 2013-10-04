@@ -1,38 +1,16 @@
 #include "daemon.h"
 
 #include "debug.h"
+#include "fd.h"
 
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 
 #include <errno.h>
-#include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#if defined(OPEN_MAX)
-#define DAEMON_FD_MAX  OPEN_MAX
-#elif defined(_POSIX_OPEN_MAX)
-#define DAEMON_FD_MAX  _POSIX_OPEN_MAX
-#else
-#define DAEMON_FD_MAX  256  /* guess */
-#endif
-
-static int fd_max (void)
-{
-	errno = 0;
-	int max = (int) sysconf(_SC_OPEN_MAX);
-	if (max == -1) {
-		if (errno == 0) {
-			max = DAEMON_FD_MAX;
-		} else {
-			debug(D_DEBUG, "sysconf(_SC_OPEN_MAX) error: %s", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-	}
-	return max;
-}
 
 void daemonize (int cdroot, const char *pidfile)
 {
@@ -76,13 +54,7 @@ void daemonize (int cdroot, const char *pidfile)
 
 	umask(0);
 
-	int fd, max = fd_max();
-	for (fd = STDERR_FILENO+1; fd < max; fd++) {
-		if (close(fd) == -1 && errno != EBADF) {
-			debug(D_DEBUG, "could not close open file descriptor: %s", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-	}
+    fd_nonstd_close();
 
     FILE *file0 = freopen("/dev/null", "r", stdin);
     if (file0 == NULL) {

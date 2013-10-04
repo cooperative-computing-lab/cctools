@@ -31,6 +31,7 @@ SOURCES = auth.c  \
           dpopen.c  \
           envtools.c  \
           fast_popen.c  \
+          fd.c  \
           full_io.c  \
           file_cache.c  \
           get_canonical_path.c  \
