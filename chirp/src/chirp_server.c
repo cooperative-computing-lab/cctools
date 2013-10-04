@@ -1898,22 +1898,15 @@ failure:
 		}
 
 		debug(D_CHIRP, "= %s", line);
-		if(!do_no_result) {
-			length = strlen(line);
-			actual = link_putlstring(l, line, length, stalltime);
-
-			if(actual != length)
-				break;
+		if (!do_no_result) {
+			if (link_putlstring(l, line, strlen(line), stalltime) == -1) break;
 		}
 
 		if(dataout) {
-			actual = link_putlstring(l, dataout, dataoutlength, stalltime);
-			if(actual != dataoutlength)
-				break;
+			if (link_putlstring(l, dataout, dataoutlength, stalltime) == -1) break;
 			free(dataout);
 			dataout = 0;
 		}
-
 	}
 	free(esubject);
 }
