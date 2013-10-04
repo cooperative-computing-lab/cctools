@@ -1884,7 +1884,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		if(do_no_result) {
 			/* nothing */
 		} else if(result < 0) {
-		      failure:
+failure:
 			result = errno_to_chirp(errno);
 			sprintf(line, "%" PRId64 "\n", result);
 		} else if(do_stat_result) {
