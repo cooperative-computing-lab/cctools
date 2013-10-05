@@ -1857,7 +1857,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				strcpy(fixed, start);
 				chirp_path_fix(fixed);
 
-				if(access(fixed, F_OK) == -1) {
+				if(cfs->access(fixed, F_OK) == -1) {
 					link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
 				} else if(!chirp_acl_check(fixed, subject, CHIRP_ACL_WRITE)) {
 					link_putfstring(l, "%d:%d:%s:\n", stalltime, EPERM, CHIRP_SEARCH_ERR_OPEN, fixed);
