@@ -77,8 +77,6 @@
 const char *chirp_group_base_url = 0;
 int         chirp_group_cache_time = 900;
 char        chirp_owner[USERNAME_MAX] = "";
-const char *chirp_root_path = 0;
-char        chirp_root_url[CHIRP_PATH_MAX] = ".";
 const char *chirp_super_user = "";
 char        chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
 
@@ -120,7 +118,7 @@ static int space_available(INT64_T amount)
 
 	if((current - last_check) > check_interval) {
 		struct chirp_statfs buf;
-		if(cfs->statfs(chirp_root_path, &buf) < 0)
+		if(cfs->statfs("/", &buf) < 0)
 			return 0;
 		avail = buf.f_bsize * buf.f_bfree;
 		last_check = current;
@@ -162,9 +160,10 @@ static int update_all_catalogs(const char *url)
 	load_average_get(avg);
 	cpus = load_average_get_cpus();
 
-	const char *path = cfs->init(url);
+	if(cfs->init(url) == -1)
+		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
 
-	if(cfs->statfs(path, &info) < 0) {
+	if(cfs->statfs("/", &info) < 0) {
 		memset(&info, 0, sizeof(info));
 	}
 
@@ -183,28 +182,20 @@ static int update_all_catalogs(const char *url)
 
 static int backend_setup(const char *url)
 {
-	const char *root_path;
+	if(cfs->init(url) == -1)
+		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
 
-	root_path = cfs->init(url);
-	if(!root_path)
-		fatal("couldn't initialize %s", url);
-
-	int result = cfs_create_dir(root_path, 0711);
-	if(!result)
-		fatal("couldn't create root directory %s: %s", root_path, strerror(errno));
-
-	chirp_acl_init_root(root_path);
+	chirp_acl_init_root("/");
 
 	return 0;
 }
 
 static int gc_tickets(const char *url)
 {
-	chirp_root_path = cfs->init(url);
-	if(!chirp_root_path)
-		fatal("couldn't initialize %s", url);
+	if(cfs->init(url) == -1)
+		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
 
-	chirp_acl_gctickets(chirp_root_path);
+	chirp_acl_gctickets();
 
 	return 0;
 }
@@ -275,7 +266,8 @@ static void config_pipe_handler(int fd)
 static void path_fix(char path[CHIRP_PATH_MAX])
 {
 	char decoded[CHIRP_PATH_MAX];
-	url_decode(path, decoded, sizeof(decoded)); /* remove the percent-hex encoding */
+	decoded[0] = '/'; /* anchor all paths with root */
+	url_decode(path, decoded+1, sizeof(decoded)-1); /* remove the percent-hex encoding */
 	path_collapse(decoded, path, 1); /* sanitize the decoded path */
 }
 
@@ -1077,7 +1069,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					errno = EACCES;
 					goto failure;
 				}
-				result = chirp_acl_ticket_create(chirp_root_path, subject, newsubject, ticket, duration);
+				result = chirp_acl_ticket_create(subject, newsubject, ticket, duration);
 				free(ticket);
 			} else {
 				link_soak(l, length, stalltime);
@@ -1086,17 +1078,17 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				break;
 			}
 		} else if(sscanf(line, "ticket_delete %s", ticket_subject) == 1) {
-			result = chirp_acl_ticket_delete(chirp_root_path, subject, ticket_subject);
+			result = chirp_acl_ticket_delete(subject, ticket_subject);
 		} else if(sscanf(line, "ticket_modify %s %s %s", ticket_subject, path, newacl) == 3) {
 			path_fix(path);
-			result = chirp_acl_ticket_modify(chirp_root_path, subject, ticket_subject, path, chirp_acl_text_to_flags(newacl));
+			result = chirp_acl_ticket_modify(subject, ticket_subject, path, chirp_acl_text_to_flags(newacl));
 		} else if(sscanf(line, "ticket_get %s", ticket_subject) == 1) {
 			/* ticket_subject is ticket:MD5SUM */
 			char *ticket_esubject;
 			char *ticket;
 			time_t expiration;
 			char **ticket_rights;
-			result = chirp_acl_ticket_get(chirp_root_path, subject, ticket_subject, &ticket_esubject, &ticket, &expiration, &ticket_rights);
+			result = chirp_acl_ticket_get(subject, ticket_subject, &ticket_esubject, &ticket, &expiration, &ticket_rights);
 			if(result == 0) {
 				link_putliteral(l, "0\n", stalltime);
 				link_putfstring(l, "%zu\n%s%zu\n%s%llu\n", stalltime, strlen(ticket_esubject), ticket_esubject, strlen(ticket), ticket, (unsigned long long) expiration);
@@ -1120,7 +1112,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				errno = EACCES;
 				goto failure;
 			}
-			result = chirp_acl_ticket_list(chirp_root_path, ticket_subject, &ticket_subjects);
+			result = chirp_acl_ticket_list(subject, &ticket_subjects);
 			if(result == 0) {
 				link_putliteral(l, "0\n", stalltime);
 				char **ts = ticket_subjects;
@@ -1210,7 +1202,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			result = chirp_alloc_lsalloc(path, newpath, &size, &inuse);
 			if(result >= 0) {
-				link_putfstring(l, "0\n%s %" SCNd64 " %" SCNd64 "\n", stalltime, &newpath[strlen(chirp_root_path) + 1], size, inuse);
+				link_putfstring(l, "0\n%s %" SCNd64 " %" SCNd64 "\n", stalltime, newpath, size, inuse);
 				do_no_result = 1;
 			}
 		} else if(sscanf(line, "mkalloc %s %" SCNd64 " %" SCNd64, path, &size, &mode) == 3) {
@@ -1366,7 +1358,7 @@ failure:
 	free(esubject);
 }
 
-static void chirp_receive(struct link *link)
+static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 {
 	char *atype, *asubject;
 	char typesubject[AUTH_TYPE_MAX + AUTH_SUBJECT_MAX];
@@ -1379,9 +1371,8 @@ static void chirp_receive(struct link *link)
 	 * which does not play nicely with fork. So, we only manipulate the backend
 	 * file system in a child process which actually handles client requests.
 	 * */
-	chirp_root_path = cfs->init(chirp_root_url);
-	if(!chirp_root_path)
-		fatal("could not initialize %s backend filesystem: %s", chirp_root_url, strerror(errno));
+	if(cfs->init(url) == -1)
+		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
 
 	if(root_quota > 0) {
 		if(cfs == &chirp_fs_hdfs)
@@ -1403,7 +1394,7 @@ static void chirp_receive(struct link *link)
 			 */
 			fatal("Cannot use quotas with HDFS\n");
 		else
-			chirp_alloc_init(chirp_root_path, root_quota);
+			chirp_alloc_init("/", root_quota);
 	}
 
 	link_address_remote(link, addr, &port);
@@ -1418,8 +1409,8 @@ static void chirp_receive(struct link *link)
 		debug(D_LOGIN, "%s from %s:%d", typesubject, addr, port);
 
 		if(safe_username) {
-			cfs->chown(chirp_root_path, safe_uid, safe_gid);
-			cfs->chmod(chirp_root_path, 0700);
+			cfs->chown("/", safe_uid, safe_gid);
+			cfs->chmod("/", 0700);
 			debug(D_AUTH, "changing to uid %d gid %d", safe_uid, safe_gid);
 			setgid(safe_gid);
 			setuid(safe_uid);
@@ -1598,6 +1589,8 @@ int main(int argc, char *argv[])
 	int did_explicit_auth = 0;
 	char port_file[PATH_MAX];
 
+	char url[CHIRP_PATH_MAX] = "file://./";
+
 	change_process_title_init(argv);
 	change_process_title("chirp_server");
 
@@ -1678,7 +1671,9 @@ int main(int argc, char *argv[])
 			stall_timeout = string_time_parse(optarg);
 			break;
 		case 'r':
-			strcpy(chirp_root_url, optarg);
+			if (strlen(optarg) >= sizeof(url))
+				fatal("root url too long");
+			strcpy(url, optarg);
 			break;
 		case 'R':
 			chirp_acl_force_readonly();
@@ -1745,7 +1740,7 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
-	cfs_reinterpret(chirp_root_url);
+	cfs_reinterpret(url);
 	/* translate relative paths to absolute ones */
 	{
 		char path[PATH_MAX];
@@ -1782,10 +1777,10 @@ int main(int argc, char *argv[])
 		auth_register_all();
 	}
 
-	cfs = cfs_lookup(chirp_root_url);
+	cfs = cfs_lookup(url);
 
-	if(run_in_child_process(backend_setup, chirp_root_url, "backend setup") != 0) {
-		fatal("couldn't setup %s", chirp_root_url);
+	if(run_in_child_process(backend_setup, url, "backend setup") != 0) {
+		fatal("couldn't setup %s", url);
 	}
 
 	if(!list_size(catalog_host_list)) {
@@ -1861,13 +1856,13 @@ int main(int argc, char *argv[])
 		}
 
 		if(time(0) >= advertise_alarm) {
-			run_in_child_process(update_all_catalogs, chirp_root_url, "catalog update");
+			run_in_child_process(update_all_catalogs, url, "catalog update");
 			advertise_alarm = time(0) + advertise_timeout;
 			chirp_stats_cleanup();
 		}
 
 		if(time(0) >= gc_alarm) {
-			run_in_child_process(gc_tickets, chirp_root_url, "ticket cleanup");
+			run_in_child_process(gc_tickets, url, "ticket cleanup");
 			gc_alarm = time(0) + GC_TIMEOUT;
 		}
 
@@ -1900,7 +1895,7 @@ int main(int argc, char *argv[])
 
 			pid = fork();
 			if(pid == 0) {
-				chirp_receive(l);
+				chirp_receive(l, url);
 				_exit(0);
 			} else if(pid > 0) {
 				total_child_procs++;

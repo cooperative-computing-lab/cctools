@@ -10,7 +10,9 @@ See the file COPYING for details.
 #include "chirp_reli.h"
 
 #include "debug.h"
+#include "path.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -18,57 +20,72 @@ See the file COPYING for details.
 
 #define CHIRP_FS_FD_MAX 1024
 
-static int chirp_fs_chirp_timeout = 60;
-static struct chirp_file *chirp_fs_file_table[CHIRP_FS_FD_MAX] = { 0 };
+static char chirp_hostport[CHIRP_PATH_MAX];
+static char chirp_root[CHIRP_PATH_MAX];
+static int  chirp_timeout = 60;
 
-static const char *chirp_fs_chirp_hostport = 0;
+static struct chirp_file *open_files[CHIRP_FS_FD_MAX] = { 0 };
 
 #define SETUP_FILE \
 if(fd<0 || fd>=CHIRP_FS_FD_MAX) { errno = EBADF; return -1; }\
-struct chirp_file *file = chirp_fs_file_table[fd]; \
+struct chirp_file *file = open_files[fd]; \
 if(!fd) { errno = EBADF; return -1;}
 
-#define STOPTIME (time(0)+chirp_fs_chirp_timeout)
+#define RESOLVE(path) \
+char resolved_##path[CHIRP_PATH_MAX];\
+if (chirp_fs_chirp_resolve(path, resolved_##path) == -1) return -1;\
+path = resolved_##path;
 
-static const char *chirp_fs_chirp_init(const char *url)
+#define RESOLVENULL(path) \
+char resolved_##path[CHIRP_PATH_MAX];\
+if (chirp_fs_chirp_resolve(path, resolved_##path) == -1) return NULL;\
+path = resolved_##path;
+
+#define STOPTIME (time(0)+chirp_timeout)
+
+#define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
+static int chirp_fs_chirp_init(const char url[CHIRP_PATH_MAX])
 {
-	char *h, *p;
-	const char *path;
-
-	/* find the first slash after chirp: */
-	h = strchr(url, '/');
-
-	/* skip over one or more slashes to get the hostname */
-	while(*h == '/')
-		h++;
-	if(!h)
-		return 0;
-
-	/* now find the slash following the hostname */
-	p = strchr(h, '/');
-	if(p) {
-		path = strdup(p);
-	} else {
-		path = "/";
-	}
-
-	chirp_fs_chirp_hostport = strdup(h);
-
-	p = strchr(chirp_fs_chirp_hostport, '/');
-	if(p)
-		*p = 0;
+	char *path;
 
 	debug(D_CHIRP, "url: %s", url);
 
-	return path;
+	assert(strprfx(url, "chirp://"));
+	strcpy(chirp_hostport, url+strlen("chirp://"));
+	path = strchr(chirp_hostport, '/');
+	if (path) {
+		path_collapse(path, chirp_root, 1);
+		*path = '\0'; /* remove path from chirp_hostport */
+	} else {
+		strcpy(chirp_root, "/");
+	}
+
+	return cfs_create_dir("/", 0711);
+}
+
+static int chirp_fs_chirp_resolve (const char *path, char resolved[CHIRP_PATH_MAX])
+{
+	int n;
+	char collapse[CHIRP_PATH_MAX];
+	char absolute[CHIRP_PATH_MAX];
+	path_collapse(path, collapse, 1);
+	n = snprintf(absolute, sizeof(absolute), "%s/%s", chirp_root, collapse);
+	assert(n >= 0); /* this should never happen */
+	if ((size_t)n >= CHIRP_PATH_MAX) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	path_collapse(absolute, resolved, 1);
+	return 0;
 }
 
 static INT64_T chirp_fs_chirp_open(const char *path, INT64_T flags, INT64_T mode)
 {
 	int fd;
+	RESOLVE(path)
 
 	for(fd = 3; fd < CHIRP_FS_FD_MAX; fd++) {
-		if(!chirp_fs_file_table[fd])
+		if(!open_files[fd])
 			break;
 	}
 
@@ -77,9 +94,9 @@ static INT64_T chirp_fs_chirp_open(const char *path, INT64_T flags, INT64_T mode
 		return -1;
 	}
 
-	struct chirp_file *file = chirp_reli_open(chirp_fs_chirp_hostport, path, flags, mode, STOPTIME);
+	struct chirp_file *file = chirp_reli_open(chirp_hostport, path, flags, mode, STOPTIME);
 
-	chirp_fs_file_table[fd] = file;
+	open_files[fd] = file;
 
 	return fd;
 }
@@ -87,7 +104,7 @@ static INT64_T chirp_fs_chirp_open(const char *path, INT64_T flags, INT64_T mode
 static INT64_T chirp_fs_chirp_close(int fd)
 {
 	SETUP_FILE
-	chirp_fs_file_table[fd] = 0;
+	open_files[fd] = 0;
 	return chirp_reli_close(file, STOPTIME);
 }
 
@@ -159,7 +176,8 @@ static INT64_T chirp_fs_chirp_search(const char *subject, const char *dir, const
 
 static struct chirp_dir *chirp_fs_chirp_opendir(const char *path)
 {
-	return chirp_reli_opendir(chirp_fs_chirp_hostport, path, STOPTIME);
+	RESOLVENULL(path)
+	return chirp_reli_opendir(chirp_hostport, path, STOPTIME);
 }
 
 static struct chirp_dirent *chirp_fs_chirp_readdir(struct chirp_dir *dir)
@@ -174,121 +192,143 @@ static void chirp_fs_chirp_closedir(struct chirp_dir *dir)
 
 static INT64_T chirp_fs_chirp_getfile(const char *path, struct link *link, time_t stoptime)
 {
-	/* ignore for now */
-	errno = ENOSYS;
-	return -1;
+	/* N.B. This calls up to chirp_filesystem.c, no RESOLVE necessary. */
+	return cfs_basic_getfile(path, link, stoptime);
 }
 
 static INT64_T chirp_fs_chirp_putfile(const char *path, struct link *link, INT64_T length, INT64_T mode, time_t stoptime)
 {
-	/* ignore for now */
-	errno = ENOSYS;
-	return -1;
+	/* N.B. This calls up to chirp_filesystem.c, no RESOLVE necessary. */
+	return cfs_basic_putfile(path, link, length, mode, stoptime);
 }
 
 static INT64_T chirp_fs_chirp_unlink(const char *path)
 {
-	return chirp_reli_unlink(chirp_fs_chirp_hostport, path, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_unlink(chirp_hostport, path, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_rmall(const char *path)
 {
-	return chirp_reli_rmall(chirp_fs_chirp_hostport, path, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_rmall(chirp_hostport, path, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_rename(const char *path, const char *newpath)
 {
-	return chirp_reli_rename(chirp_fs_chirp_hostport, path, newpath, STOPTIME);
+	RESOLVE(path);
+	RESOLVE(newpath);
+	return chirp_reli_rename(chirp_hostport, path, newpath, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_link(const char *path, const char *newpath)
 {
-	return chirp_reli_link(chirp_fs_chirp_hostport, path, newpath, STOPTIME);
+	RESOLVE(path)
+	RESOLVE(newpath)
+	return chirp_reli_link(chirp_hostport, path, newpath, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_symlink(const char *path, const char *newpath)
 {
-	return chirp_reli_symlink(chirp_fs_chirp_hostport, path, newpath, STOPTIME);
+	RESOLVE(path)
+	RESOLVE(newpath)
+	return chirp_reli_symlink(chirp_hostport, path, newpath, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_readlink(const char *path, char *buf, INT64_T length)
 {
-	return chirp_reli_readlink(chirp_fs_chirp_hostport, path, buf, length, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_readlink(chirp_hostport, path, buf, length, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_chdir(const char *path)
 {
+	RESOLVE(path)
 	return 0;
 }
 
 static INT64_T chirp_fs_chirp_mkdir(const char *path, INT64_T mode)
 {
-	return chirp_reli_mkdir(chirp_fs_chirp_hostport, path, mode, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_mkdir(chirp_hostport, path, mode, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_rmdir(const char *path)
 {
-	return chirp_reli_rmdir(chirp_fs_chirp_hostport, path, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_rmdir(chirp_hostport, path, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_stat(const char *path, struct chirp_stat *buf)
 {
-	return chirp_reli_stat(chirp_fs_chirp_hostport, path, buf, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_stat(chirp_hostport, path, buf, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_lstat(const char *path, struct chirp_stat *buf)
 {
-	return chirp_reli_lstat(chirp_fs_chirp_hostport, path, buf, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_lstat(chirp_hostport, path, buf, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_statfs(const char *path, struct chirp_statfs *buf)
 {
-	return chirp_reli_statfs(chirp_fs_chirp_hostport, path, buf, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_statfs(chirp_hostport, path, buf, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_access(const char *path, INT64_T mode)
 {
-	return chirp_reli_access(chirp_fs_chirp_hostport, path, mode, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_access(chirp_hostport, path, mode, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_chmod(const char *path, INT64_T mode)
 {
-	return chirp_reli_chmod(chirp_fs_chirp_hostport, path, mode, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_chmod(chirp_hostport, path, mode, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_chown(const char *path, INT64_T uid, INT64_T gid)
 {
-	return chirp_reli_chown(chirp_fs_chirp_hostport, path, uid, gid, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_chown(chirp_hostport, path, uid, gid, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_lchown(const char *path, INT64_T uid, INT64_T gid)
 {
-	return chirp_reli_lchown(chirp_fs_chirp_hostport, path, uid, gid, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_lchown(chirp_hostport, path, uid, gid, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_truncate(const char *path, INT64_T length)
 {
-	return chirp_reli_truncate(chirp_fs_chirp_hostport, path, length, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_truncate(chirp_hostport, path, length, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_utime(const char *path, time_t actime, time_t modtime)
 {
-	return chirp_reli_utime(chirp_fs_chirp_hostport, path, actime, modtime, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_utime(chirp_hostport, path, actime, modtime, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_md5(const char *path, unsigned char digest[16])
 {
-	return chirp_reli_md5(chirp_fs_chirp_hostport, path, digest, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_md5(chirp_hostport, path, digest, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_setrep(const char *path, int nreps)
 {
-	return chirp_reli_setrep(chirp_fs_chirp_hostport, path, nreps, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_setrep(chirp_hostport, path, nreps, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_getxattr(const char *path, const char *name, void *data, size_t size)
 {
-	return chirp_reli_getxattr(chirp_fs_chirp_hostport, path, name, data, size, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_getxattr(chirp_hostport, path, name, data, size, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_fgetxattr(int fd, const char *name, void *data, size_t size)
@@ -299,12 +339,14 @@ static INT64_T chirp_fs_chirp_fgetxattr(int fd, const char *name, void *data, si
 
 static INT64_T chirp_fs_chirp_lgetxattr(const char *path, const char *name, void *data, size_t size)
 {
-	return chirp_reli_lgetxattr(chirp_fs_chirp_hostport, path, name, data, size, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_lgetxattr(chirp_hostport, path, name, data, size, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_listxattr(const char *path, char *list, size_t size)
 {
-	return chirp_reli_listxattr(chirp_fs_chirp_hostport, path, list, size, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_listxattr(chirp_hostport, path, list, size, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_flistxattr(int fd, char *list, size_t size)
@@ -315,12 +357,14 @@ static INT64_T chirp_fs_chirp_flistxattr(int fd, char *list, size_t size)
 
 static INT64_T chirp_fs_chirp_llistxattr(const char *path, char *list, size_t size)
 {
-	return chirp_reli_llistxattr(chirp_fs_chirp_hostport, path, list, size, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_llistxattr(chirp_hostport, path, list, size, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
-	return chirp_reli_setxattr(chirp_fs_chirp_hostport, path, name, data, size, flags, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_setxattr(chirp_hostport, path, name, data, size, flags, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_fsetxattr(int fd, const char *name, const void *data, size_t size, int flags)
@@ -331,12 +375,14 @@ static INT64_T chirp_fs_chirp_fsetxattr(int fd, const char *name, const void *da
 
 static INT64_T chirp_fs_chirp_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
-	return chirp_reli_lsetxattr(chirp_fs_chirp_hostport, path, name, data, size, flags, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_lsetxattr(chirp_hostport, path, name, data, size, flags, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_removexattr(const char *path, const char *name)
 {
-	return chirp_reli_removexattr(chirp_fs_chirp_hostport, path, name, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_removexattr(chirp_hostport, path, name, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_fremovexattr(int fd, const char *name)
@@ -347,7 +393,8 @@ static INT64_T chirp_fs_chirp_fremovexattr(int fd, const char *name)
 
 static INT64_T chirp_fs_chirp_lremovexattr(const char *path, const char *name)
 {
-	return chirp_reli_lremovexattr(chirp_fs_chirp_hostport, path, name, STOPTIME);
+	RESOLVE(path)
+	return chirp_reli_lremovexattr(chirp_hostport, path, name, STOPTIME);
 }
 
 static int chirp_fs_chirp_do_acl_check()

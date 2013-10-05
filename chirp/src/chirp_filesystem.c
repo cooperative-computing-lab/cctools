@@ -45,9 +45,9 @@ static CHIRP_FILE CHIRP_FILE_NULL;
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
 struct chirp_filesystem *cfs_lookup(const char *url)
 {
-	if(strprfx(url, "chirp:")) {
+	if(strprfx(url, "chirp://")) {
 		return &chirp_fs_chirp;
-	} else if(strprfx(url, "hdfs:")) {
+	} else if(strprfx(url, "hdfs://")) {
 		return &chirp_fs_hdfs;
 	} else {
 		/* always interpret as a local url */
