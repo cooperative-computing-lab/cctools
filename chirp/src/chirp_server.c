@@ -143,7 +143,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Listen only on this network interface.\n", "-I,--interface=<addr>");
 	fprintf(stdout, " %-30s Set the maximum number of clients to accept at once. (default unlimited)\n", "-M,--max-clients=<count>");
 	fprintf(stdout, " %-30s Use this name when reporting to the catalog.\n", "-n,--catalog-name=<name>");
-	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s Rotate debug file once it reaches this size (default 10M, 0 disables).\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Superuser for all directories. (default: none)\n", "-P,--superuser=<user>");
 	fprintf(stdout, " %-30s Listen on this port. (default: %d)\n", "-p,--port=<port>", port);
 	fprintf(stdout, " %-30s Enforce this root quota in software.\n", "-Q,--root-quota=<size>");

@@ -44,7 +44,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Query the catalog on this host.\n", "-c,--catalog=<host>");
 	fprintf(stdout, " %-30s Enable debugging for this sybsystem\n", "-d,--debug=<flag>");
 	fprintf(stdout, " %-30s Send debugging output to this file.\n", "-o,--debug-file=<file>");
-	fprintf(stdout, " %-30s Rotate file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s Rotate file once it reaches this size. (default 10M, 0 disables)\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Only show servers with this space available. (example: -A 100MB)\n", "-A,--server-space=<size>");
 	fprintf(stdout, " %-30s Show all records, not just chirps and catalogs.\n", "-a,--all");
 	fprintf(stdout, " %-30s Timeout.\n", "-t,--timeout=<time>");
