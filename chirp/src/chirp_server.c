@@ -1610,7 +1610,7 @@ int main(int argc, char *argv[])
 	};
 
 	struct link *link;
-	signed char c;
+	int c;
 	time_t current;
 	int is_daemon = 0;
 	char pidfile[PATH_MAX];
