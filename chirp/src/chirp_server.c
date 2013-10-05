@@ -1,8 +1,7 @@
-/*
-Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2005- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
+/* Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
+ * Copyright (C) 2005- The University of Notre Dame
+ * This software is distributed under the GNU General Public License.
+ * See the file COPYING for details.
 */
 
 #include "chirp_acl.h"
@@ -112,17 +111,12 @@ static const char *listen_on_interface = 0;
 static char chirp_debug_file[PATH_MAX];
 static int sim_latency = 0;
 
-
-/*
-space_available() is a simple mechanism to ensure that
-a runaway client does not use up every last drop of disk
-space on a machine.  This function returns false if
-consuming the given amount of space will leave less than
-a fixed amount of headroom on the disk.  Note that
-get_disk_info() is quite expensive, so we do not call
-it more than once per second.
-*/
-
+/* space_available() is a simple mechanism to ensure that a runaway client does
+ * not use up every last drop of disk space on a machine.  This function
+ * returns false if consuming the given amount of space will leave less than a
+ * fixed amount of headroom on the disk.  Note that get_disk_info() is quite
+ * expensive, so we do not call it more than once per second.
+ */
 static int space_available(INT64_T amount)
 {
 	static UINT64_T avail;
@@ -249,16 +243,13 @@ static int run_in_child_process(int (*func) (const char *a), const char *args, c
 	}
 }
 
-/*
-The parent Chirp server process maintains a pipe connected to
-all child processes.  When the child must update the global
-state, it is done by sending a message to the config pipe,
-which the parent reads and processes.  This code relies
-on the guarantee that all writes of less than PIPE_BUF size
-are atomic, so here we expect a read to return one or
-more complete messages, each delimited by a newline.
+/* The parent Chirp server process maintains a pipe connected to all child
+ * processes.  When the child must update the global state, it is done by
+ * sending a message to the config pipe, which the parent reads and processes.
+ * This code relies on the guarantee that all writes of less than PIPE_BUF size
+ * are atomic, so here we expect a read to return one or more complete
+ * messages, each delimited by a newline.
 */
-
 static void config_pipe_handler(int fd)
 {
 	char line[PIPE_BUF];
@@ -292,9 +283,8 @@ static void config_pipe_handler(int fd)
 	}
 }
 
-/*
-  Force a path to fall within the simulated root directory.
-*/
+/* Force a path to fall within the simulated root directory.
+ */
 static int chirp_path_fix(char *path)
 {
 	char decoded[CHIRP_PATH_MAX];
@@ -364,16 +354,14 @@ static int errno_to_chirp(int e)
 	}
 }
 
-/*
-  A note on integers:
-  Various operating systems employ integers of different sizes
-  for fields such as file size, user identity, and so forth.
-  Regardless of the operating system support, the Chirp protocol
-  must support integers up to 64 bits.  So, in the server handling
-  loop, we treat all integers as INT64_T.  What the operating system
-  does from there is out of our hands.
-*/
-
+/* A note on integers:
+ *
+ * Various operating systems employ integers of different sizes for fields such
+ * as file size, user identity, and so forth. Regardless of the operating
+ * system support, the Chirp protocol must support integers up to 64 bits. So,
+ * in the server handling loop, we treat all integers as INT64_T. What the
+ * operating system does from there is out of our hands.
+ */
 static void chirp_handler(struct link *l, const char *addr, const char *subject)
 {
 	char line[CHIRP_LINE_MAX];
