@@ -1497,28 +1497,52 @@ static void chirp_receive(struct link *link)
 	link_close(link);
 }
 
+void killeveryone (int sig)
+{
+	/* start with sig */
+	kill(-getpgrp(), sig);
+	sleep(1);
+	kill(-getpgrp(), SIGTERM);
+	sleep(1);
+	kill(-getpgrp(), SIGQUIT);
+	sleep(1);
+	kill(-getpgrp(), SIGKILL);
+	_exit(EXIT_FAILURE);
+}
+
 void shutdown_clean(int sig)
 {
-	exit(0);
-}
+	sigset_t set;
+	struct sigaction act;
+	pid_t pid;
 
-void ignore_signal(int sig)
-{
-}
+	pid = fork(); /* how perverse */
+	if (pid == 0) {
+		return killeveryone(sig);
+	} else if (pid == -1) {
+		return killeveryone(sig); /* do it ourselves */
+	}
 
-void handle_child(int sig)
-{
-/*
-Do nothing in this function, it only exists to catch a signal
-so that we are forced to break out of sleep(5) on a SIGCHLD below.
-*/
+	/* Now we want Chirp to terminate due to signal delivery. A good reason
+	 * for this is proper termination status to the parent. Additionally, some
+	 * signals (should) generate a core dump.
+	 */
+	act.sa_handler = SIG_DFL;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = 0;
+	sigaction(sig, &act, NULL);
+	sigemptyset(&set);
+	sigaddset(&set, sig);
+	sigprocmask(SIG_UNBLOCK, &set, NULL);
+	raise(sig); /* this should kill us */
+	_exit(EXIT_FAILURE); /* if it does not... */
 }
 
 static void install_handler(int sig, void (*handler) (int sig))
 {
 	struct sigaction s;
 	s.sa_handler = handler;
-	sigfillset(&s.sa_mask);
+	sigfillset(&s.sa_mask); /* block all signals during handler execution */
 	s.sa_flags = 0;
 	sigaction(sig, &s, 0);
 }
@@ -1855,13 +1879,12 @@ int main(int argc, char *argv[])
 		domain_name_cache_guess(hostname);
 	}
 
-	install_handler(SIGPIPE, ignore_signal);
-	install_handler(SIGHUP, ignore_signal);
-	install_handler(SIGCHLD, handle_child);
+	install_handler(SIGPIPE, SIG_IGN);
+	install_handler(SIGHUP, SIG_IGN);
+	install_handler(SIGXFSZ, SIG_IGN);
 	install_handler(SIGINT, shutdown_clean);
 	install_handler(SIGTERM, shutdown_clean);
 	install_handler(SIGQUIT, shutdown_clean);
-	install_handler(SIGXFSZ, ignore_signal);
 
 	while(1) {
 		char addr[LINK_ADDRESS_MAX];
@@ -1906,13 +1929,8 @@ int main(int argc, char *argv[])
 		/* Sleep for the minimum of any periodic timers, but don't go negative. */
 
 		struct timeval timeout;
-		time_t current = time(0);
-		timeout.tv_usec = 0;
-		timeout.tv_sec = advertise_alarm - current;
-		timeout.tv_sec = MIN(timeout.tv_sec, gc_alarm - current);
-		timeout.tv_sec = MIN(timeout.tv_sec, parent_check_timeout);
-		timeout.tv_sec = MAX(0, timeout.tv_sec);
-
+		timeout.tv_usec = 5000;
+		timeout.tv_sec = 0;
 		/* Wait for activity on the listening port or the config pipe */
 
 		if(select(maxfd, &rfds, 0, 0, &timeout) < 0)
