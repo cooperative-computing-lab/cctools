@@ -273,20 +273,11 @@ static void config_pipe_handler(int fd)
 	}
 }
 
-/* Force a path to fall within the simulated root directory.
- */
-static int chirp_path_fix(char *path)
+static void path_fix(char path[CHIRP_PATH_MAX])
 {
 	char decoded[CHIRP_PATH_MAX];
-	char sanitized[CHIRP_PATH_MAX];
-	char absolute[CHIRP_PATH_MAX];
-
 	url_decode(path, decoded, sizeof(decoded)); /* remove the percent-hex encoding */
-	path_collapse(decoded, sanitized, 1); /* sanitize the decoded path */
-	sprintf(absolute, "%s/%s", chirp_root_path, sanitized); /* add root prefix */
-	path_collapse(absolute, path, 1); /* cleanup extra '/' */
-
-	return 1;
+	path_collapse(decoded, path, 1); /* sanitize the decoded path */
 }
 
 static int errno_to_chirp(int e)
@@ -542,8 +533,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				result = -1;
 			}
 		} else if(sscanf(line, "readlink %s %" SCNd64, path, &length) == 2) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check_link(path, subject, CHIRP_ACL_READ))
 				goto failure;
 			dataout = malloc(length);
@@ -563,8 +553,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			struct chirp_dir *dir;
 			struct chirp_dirent *d;
 
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check_dir(path, subject, CHIRP_ACL_LIST))
 				goto failure;
 
@@ -586,8 +575,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			struct chirp_dir *dir;
 			struct chirp_dirent *d;
 
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check_dir(path, subject, CHIRP_ACL_LIST))
 				goto failure;
 
@@ -610,8 +598,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			int aclflags;
 			CHIRP_FILE *aclfile;
 
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 
 			// Previously, the LIST right was necessary to view the ACL.
 			// However, this has caused much confusion with debugging permissions problems.
@@ -632,8 +619,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				result = -1;
 			}
 		} else if(sscanf(line, "getfile %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!cfs_isnotdir(path))
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
@@ -646,8 +632,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				chirp_stats_update(0, length, 0);
 			}
 		} else if(sscanf(line, "putfile %s %" SCNd64 " %" SCNd64, path, &mode, &length) == 3) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!cfs_isnotdir(path))
 				goto failure;
 
@@ -673,8 +658,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				chirp_stats_update(0, 0, length);
 			}
 		} else if(sscanf(line, "getstream %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!cfs_isnotdir(path))
 				goto failure;
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
@@ -689,8 +673,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			}
 
 		} else if(sscanf(line, "putstream %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!cfs_isnotdir(path))
 				goto failure;
 
@@ -716,8 +699,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				break;
 			}
 		} else if(sscanf(line, "thirdput %s %s %s", path, hostname, newpath) == 3) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(cfs == &chirp_fs_hdfs)
 				goto failure;
 
@@ -751,8 +733,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				flags |= O_SYNC;
 #endif
 
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 
 			/*
 			   This is a little strange.
@@ -866,8 +847,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "fremovexattr %" SCNd64 " %s", &fd, xattrname) == 2) {
 			result = chirp_alloc_fremovexattr(fd, xattrname);
 		} else if(sscanf(line, "unlink %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(chirp_acl_check_link(path, subject, CHIRP_ACL_DELETE) || chirp_acl_check_dir(path, subject, CHIRP_ACL_DELETE)
 				) {
 				result = chirp_alloc_unlink(path);
@@ -875,8 +855,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			}
 		} else if(sscanf(line, "access %s %" SCNd64, path, &flags) == 2) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			int chirp_flags = chirp_acl_from_access_flags(flags);
 			/* If filename is a directory, then we change execute flags to list flags. */
 			if(cfs_isdir(path) && (chirp_flags & CHIRP_ACL_EXECUTE)) {
@@ -887,44 +866,37 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			result = chirp_alloc_access(path, flags);
 		} else if(sscanf(line, "chmod %s %" SCNd64, path, &mode) == 2) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(chirp_acl_check_dir(path, subject, CHIRP_ACL_WRITE) || chirp_acl_check(path, subject, CHIRP_ACL_WRITE)) {
 				result = chirp_alloc_chmod(path, mode);
 			} else {
 				goto failure;
 			}
 		} else if(sscanf(line, "chown %s %" SCNd64 " %" SCNd64, path, &uid, &gid) == 3) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = 0;
 		} else if(sscanf(line, "lchown %s %" SCNd64 " %" SCNd64, path, &uid, &gid) == 3) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = 0;
 		} else if(sscanf(line, "truncate %s %" SCNd64, path, &length) == 2) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = chirp_alloc_truncate(path, length);
 		} else if(sscanf(line, "rename %s %s", path, newpath) == 2) {
-			if(!chirp_path_fix(path))
-				goto failure;
-			if(!chirp_path_fix(newpath))
-				goto failure;
+			path_fix(path);
+			path_fix(newpath);
 			if(!chirp_acl_check_link(path, subject, CHIRP_ACL_READ | CHIRP_ACL_DELETE))
 				goto failure;
 			if(!chirp_acl_check(newpath, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = chirp_alloc_rename(path, newpath);
 		} else if(sscanf(line, "getxattr %s %s", path, xattrname) == 2) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
 			dataout = malloc(MAX_BUFFER_SIZE);
@@ -942,8 +914,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			}
 		} else if(sscanf(line, "lgetxattr %s %s", path, xattrname) == 2) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
 			dataout = malloc(MAX_BUFFER_SIZE);
@@ -961,8 +932,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			}
 		} else if(sscanf(line, "listxattr %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
 			dataout = malloc(MAX_BUFFER_SIZE);
@@ -980,8 +950,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			}
 		} else if(sscanf(line, "llistxattr %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
 			dataout = malloc(MAX_BUFFER_SIZE);
@@ -999,8 +968,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			}
 		} else if(sscanf(line, "setxattr %s %s %zu %d", path, xattrname, &xattrsize, &xattrflags) == 4) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			if(xattrsize > MAX_BUFFER_SIZE) {
@@ -1030,8 +998,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				errno = ENOMEM;
 			}
 		} else if(sscanf(line, "lsetxattr %s %s %zu %d", path, xattrname, &xattrsize, &xattrflags) == 4) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			if(xattrsize > MAX_BUFFER_SIZE) {
@@ -1061,45 +1028,38 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				errno = ENOMEM;
 			}
 		} else if(sscanf(line, "removexattr %s %s", path, xattrname) == 2) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = chirp_alloc_removexattr(path, xattrname);
 		} else if(sscanf(line, "lremovexattr %s %s", path, xattrname) == 2) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check_link(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = chirp_alloc_lremovexattr(path, xattrname);
 		} else if(sscanf(line, "link %s %s", path, newpath) == 2) {
 			/* Can only hard link to files on which you already have r/w perms */
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ | CHIRP_ACL_WRITE))
 				goto failure;
-			if(!chirp_path_fix(newpath))
-				goto failure;
+			path_fix(newpath);
 			if(!chirp_acl_check(newpath, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = chirp_alloc_link(path, newpath);
 		} else if(sscanf(line, "symlink %s %s", path, newpath) == 2) {
 			/* Note that the link target (path) may be any arbitrary data. */
 			/* Access permissions are checked when data is actually accessed. */
-			if(!chirp_path_fix(newpath))
-				goto failure;
+			path_fix(newpath);
 			if(!chirp_acl_check(newpath, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = chirp_alloc_symlink(path, newpath);
 		} else if(sscanf(line, "setacl %s %s %s", path, newsubject, newacl) == 3) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check_dir(path, subject, CHIRP_ACL_ADMIN))
 				goto failure;
 			result = chirp_acl_set(path, newsubject, chirp_acl_text_to_flags(newacl), 0);
 		} else if(sscanf(line, "resetacl %s %s", path, newacl) == 2) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check_dir(path, subject, CHIRP_ACL_ADMIN))
 				goto failure;
 			result = chirp_acl_set(path, subject, chirp_acl_text_to_flags(newacl) | CHIRP_ACL_ADMIN, 1);
@@ -1129,8 +1089,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "ticket_delete %s", ticket_subject) == 1) {
 			result = chirp_acl_ticket_delete(chirp_root_path, subject, ticket_subject);
 		} else if(sscanf(line, "ticket_modify %s %s %s", ticket_subject, path, newacl) == 3) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			result = chirp_acl_ticket_modify(chirp_root_path, subject, ticket_subject, path, chirp_acl_text_to_flags(newacl));
 		} else if(sscanf(line, "ticket_get %s", ticket_subject) == 1) {
 			/* ticket_subject is ticket:MD5SUM */
@@ -1173,8 +1132,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				free(ticket_subjects);
 			}
 		} else if(sscanf(line, "mkdir %s %" SCNd64, path, &mode) == 2) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(chirp_acl_check(path, subject, CHIRP_ACL_RESERVE)) {
 				result = chirp_alloc_mkdir(path, mode);
 				if(result == 0) {
@@ -1205,24 +1163,21 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			}
 		} else if(sscanf(line, "rmdir %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(chirp_acl_check_link(path, subject, CHIRP_ACL_DELETE) || chirp_acl_check_dir(path, subject, CHIRP_ACL_DELETE)) {
 				result = chirp_alloc_rmdir(path);
 			} else {
 				goto failure;
 			}
 		} else if(sscanf(line, "rmall %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(chirp_acl_check_link(path, subject, CHIRP_ACL_DELETE) || chirp_acl_check_dir(path, subject, CHIRP_ACL_DELETE)) {
 				result = chirp_alloc_rmall(path);
 			} else {
 				goto failure;
 			}
 		} else if(sscanf(line, "utime %s %" SCNd64 " %" SCNd64, path, &actime, &modtime) == 3) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = chirp_alloc_utime(path, actime, modtime);
@@ -1233,29 +1188,25 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			result = chirp_alloc_fstatfs(fd, &statfsbuf);
 			do_statfs_result = 1;
 		} else if(sscanf(line, "statfs %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_LIST))
 				goto failure;
 			result = chirp_alloc_statfs(path, &statfsbuf);
 			do_statfs_result = 1;
 		} else if(sscanf(line, "stat %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_LIST))
 				goto failure;
 			result = chirp_alloc_stat(path, &statbuf);
 			do_stat_result = 1;
 		} else if(sscanf(line, "lstat %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check_link(path, subject, CHIRP_ACL_LIST))
 				goto failure;
 			result = chirp_alloc_lstat(path, &statbuf);
 			do_stat_result = 1;
 		} else if(sscanf(line, "lsalloc %s", path) == 1) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check_link(path, subject, CHIRP_ACL_LIST))
 				goto failure;
 			result = chirp_alloc_lsalloc(path, newpath, &size, &inuse);
@@ -1264,8 +1215,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				do_no_result = 1;
 			}
 		} else if(sscanf(line, "mkalloc %s %" SCNd64 " %" SCNd64, path, &size, &mode) == 3) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(chirp_acl_check(path, subject, CHIRP_ACL_RESERVE)) {
 				result = chirp_alloc_mkalloc(path, size, mode);
 				if(result == 0) {
@@ -1293,8 +1243,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			}
 		} else if(sscanf(line, "localpath %s", path) == 1) {
 			struct chirp_stat info;
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_LIST) && !chirp_acl_check(path, "system:localuser", CHIRP_ACL_LIST))
 				goto failure;
 			result = chirp_alloc_stat(path, &info);
@@ -1309,8 +1258,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			struct chirp_audit *entry;
 			char *key;
 
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_ADMIN))
 				goto failure;
 
@@ -1329,8 +1277,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			}
 		} else if(sscanf(line, "md5 %s", path) == 1) {
 			dataout = xxmalloc(16);
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
 			if(chirp_alloc_md5(path, (unsigned char *) dataout) >= 0) {
@@ -1339,8 +1286,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				result = errno_to_chirp(errno);
 			}
 		} else if(sscanf(line, "setrep %s %d", path, &nreps) == 2) {
-			if(!chirp_path_fix(path))
-				goto failure;
+			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE))
 				goto failure;
 			result = chirp_alloc_setrep(path, nreps);
@@ -1365,7 +1311,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					*end = '\0';
 
 				strcpy(fixed, start);
-				chirp_path_fix(fixed);
+				path_fix(fixed);
 
 				if(cfs->access(fixed, F_OK) == -1) {
 					link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
