@@ -69,47 +69,37 @@
 #include <string.h>
 #include <time.h>
 
+#define GC_TIMEOUT  (86400)
+
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
-char chirp_root_url[CHIRP_PATH_MAX] = ".";
-const char *chirp_root_path = 0;
-char chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
-const char *chirp_super_user = "";
+struct      chirp_filesystem *cfs = 0;
 const char *chirp_group_base_url = 0;
-int chirp_group_cache_time = 900;
-char chirp_owner[USERNAME_MAX] = "";
-struct chirp_filesystem *cfs = 0;
+int         chirp_group_cache_time = 900;
+char        chirp_owner[USERNAME_MAX] = "";
+const char *chirp_root_path = 0;
+char        chirp_root_url[CHIRP_PATH_MAX] = ".";
+const char *chirp_super_user = "";
+char        chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
 
-static int port = CHIRP_PORT;
-static char port_file[PATH_MAX];
-static int idle_timeout = 60;	/* one minute */
-static int stall_timeout = 3600;	/* one hour */
-static int parent_check_timeout = 300;	/* five minutes */
-static int advertise_timeout = 300;	/* five minutes */
-static int gc_timeout = 86400;
-static time_t advertise_alarm = 0;
-static time_t gc_alarm = 0;
-static struct list *catalog_host_list;
-static time_t starttime;
-static struct datagram *catalog_port;
-static char hostname[DOMAIN_NAME_MAX];
-static const char *manual_hostname = 0;
-static char address[LINK_ADDRESS_MAX];
+static char        address[LINK_ADDRESS_MAX];
+static time_t      advertise_alarm = 0;
+static int         advertise_timeout = 300; /* five minutes */
+static int         config_pipe[2];
+static struct      datagram *catalog_port;
+static char        hostname[DOMAIN_NAME_MAX];
+static int         idle_timeout = 60; /* one minute */
+static struct      list *catalog_host_list;
+static UINT64_T    minimum_space_free = 0;
+static int         port = CHIRP_PORT;
+static UINT64_T    root_quota = 0;
+static gid_t       safe_gid = 0;
+static uid_t       safe_uid = 0;
 static const char *safe_username = 0;
-static uid_t safe_uid = 0;
-static gid_t safe_gid = 0;
-static int dont_dump_core = 0;
-static UINT64_T minimum_space_free = 0;
-static UINT64_T root_quota = 0;
-static int did_explicit_auth = 0;
-static int max_child_procs = 0;
-static int total_child_procs = 0;
-static int config_pipe[2];
-static int exit_if_parent_fails = 0;
-static const char *listen_on_interface = 0;
-static char chirp_debug_file[PATH_MAX];
-static int sim_latency = 0;
+static int         sim_latency = 0;
+static int         stall_timeout = 3600; /* one hour */
+static time_t      starttime;
 
 /* space_available() is a simple mechanism to ensure that a runaway client does
  * not use up every last drop of disk space on a machine.  This function
@@ -1566,7 +1556,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Do not create a core dump, even due to a crash.\n", "-C,--no-core-dump");
 	fprintf(stdout, " %-30s Challenge directory for unix filesystem authentication.\n", "-c,--challenge-dir=<dir>");
 	fprintf(stdout, " %-30s Exit if parent process dies.\n", "-E,--parent-death");
-	fprintf(stdout, " %-30s Check for presence of parent at this interval. (default: %ds)\n", "-e,--parent-check=<seconds>", parent_check_timeout);
 	fprintf(stdout, " %-30s Leave this much space free in the filesystem.\n", "-F,--free-space=<size>");
 	fprintf(stdout, " %-30s Base url for group lookups. (default: disabled)\n", "-G,--group-url=<url>");
 	fprintf(stdout, " %-30s Run as lower privilege user. (root protection)\n", "-i,--user=<user>");
@@ -1638,6 +1627,16 @@ int main(int argc, char *argv[])
 	time_t current;
 	int is_daemon = 0;
 	char pidfile[PATH_MAX];
+	int exit_if_parent_fails = 0;
+	int dont_dump_core = 0;
+	time_t gc_alarm = 0;
+	const char *manual_hostname = 0;
+	int max_child_procs = 0;
+	const char *listen_on_interface = 0;
+	char chirp_debug_file[PATH_MAX];
+	int total_child_procs = 0;
+	int did_explicit_auth = 0;
+	char port_file[PATH_MAX];
 
 	change_process_title_init(argv);
 	change_process_title("chirp_server");
@@ -1682,9 +1681,6 @@ int main(int argc, char *argv[])
 			debug_flags_set(optarg);
 			break;
 		case 'e':
-			parent_check_timeout = string_time_parse(optarg);
-			exit_if_parent_fails = 1;
-			break;
 		case 'E':
 			exit_if_parent_fails = 1;
 			break;
@@ -1892,11 +1888,9 @@ int main(int argc, char *argv[])
 		struct link *l;
 		pid_t pid;
 
-		if(exit_if_parent_fails) {
-			if(getppid() < 5) {
-				fatal("stopping because parent process died.");
-				exit(0);
-			}
+		if(exit_if_parent_fails && getppid() == 1) {
+			fatal("stopping because parent process died.");
+			exit(0);
 		}
 
 		while((pid = waitpid(-1, 0, WNOHANG)) > 0) {
@@ -1912,7 +1906,7 @@ int main(int argc, char *argv[])
 
 		if(time(0) >= gc_alarm) {
 			run_in_child_process(gc_tickets, chirp_root_url, "ticket cleanup");
-			gc_alarm = time(0) + gc_timeout;
+			gc_alarm = time(0) + GC_TIMEOUT;
 		}
 
 		/* Wait for action on one of two ports: the master TCP port, or the internal pipe. */
