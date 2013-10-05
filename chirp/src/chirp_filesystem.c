@@ -7,6 +7,10 @@ See the file COPYING for details.
 #include "chirp_filesystem.h"
 #include "chirp_protocol.h"
 
+#include "chirp_fs_chirp.h"
+#include "chirp_fs_hdfs.h"
+#include "chirp_fs_local.h"
+
 #include "debug.h"
 #include "macros.h"
 #include "buffer.h"
@@ -25,6 +29,8 @@ See the file COPYING for details.
 
 #define CHIRP_FILESYSTEM_BUFFER  65536
 
+struct chirp_filesystem *cfs = NULL;
+
 struct CHIRP_FILE {
 	INT64_T fd;
 	INT64_T offset;
@@ -35,10 +41,6 @@ struct CHIRP_FILE {
 };
 
 static CHIRP_FILE CHIRP_FILE_NULL;
-
-extern struct chirp_filesystem chirp_fs_local;
-extern struct chirp_filesystem chirp_fs_hdfs;
-extern struct chirp_filesystem chirp_fs_chirp;
 
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
 struct chirp_filesystem *cfs_lookup(const char *url)
