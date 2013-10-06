@@ -17,8 +17,8 @@ VOLUME_KEY="b63ae12fe3c8708ecae4d3cba504f5705af1440e" # `echo -n "$VOLUME" | sha
 
 prepare()
 {
-	../src/chirp_server -r "$chirp_1_root" -I 127.0.0.1 -Z "$chirp_1_port" -b -B "$chirp_1_pid" -d all -o "$chirp_1_debug"
-	../src/chirp_server -r "$chirp_2_root" -I 127.0.0.1 -Z "$chirp_2_port" -b -B "$chirp_2_pid" -d all -o "$chirp_2_debug"
+	../src/chirp_server --background --debug=all --debug-file="$chirp_1_debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$chirp_1_pid" --port-file="$chirp_1_port" --root="$chirp_1_root"
+	../src/chirp_server --background --debug=all --debug-file="$chirp_2_debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$chirp_2_pid" --port-file="$chirp_2_port" --root="$chirp_2_root"
 
 	wait_for_file_creation "$chirp_1_port" 5
 	wait_for_file_creation "$chirp_1_pid" 5
