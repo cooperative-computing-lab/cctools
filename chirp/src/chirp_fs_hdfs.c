@@ -104,7 +104,11 @@ static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX])
 		strcpy(hdfs_root, "/");
 	}
 
-	if (strchr(hdfs_host, ':')) {
+	if (strlen(hdfs_host) == 0) {
+		/* use default */
+		strcpy(hdfs_host, "default");
+		hdfs_port = 0;
+	} else if (strchr(hdfs_host, ':')) {
 		hdfs_port = atoi(strchr(hdfs_host, ':')+1);
 		*strchr(hdfs_host, ':') = '\0';
 	} else {
