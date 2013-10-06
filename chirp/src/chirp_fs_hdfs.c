@@ -419,19 +419,21 @@ static INT64_T chirp_fs_hdfs_sread(int fd, void *vbuffer, INT64_T length, INT64_
 
 static void chirp_fs_hdfs_write_zeroes(int fd, INT64_T length)
 {
-	int zero_size = 65536;
-	char *zero = malloc(zero_size);
-	memset(zero, 0, zero_size);
+	/* ANSI C standard requires this be initialized with 0.
+	 *
+	 * Also note, despite its large size, the executable size does not increase
+	 * as this is put in the "uninitialized" .bss section. [Putting it in
+	 * .rodata would increase the executable size.]
+	 */
+	static const char zero[1<<20];
 
 	debug(D_HDFS, "zero %d %"PRId64, fd, length);
 
 	while(length > 0) {
-		int chunksize = MIN(zero_size, length);
+		int chunksize = MIN(sizeof(zero), length);
 		hdfs_services->write(fs, open_files[fd].file, zero, chunksize);
 		length -= chunksize;
 	}
-
-	free(zero);
 }
 
 static INT64_T chirp_fs_hdfs_pwrite(int fd, const void *buffer, INT64_T length, INT64_T offset)
