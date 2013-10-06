@@ -569,7 +569,7 @@ static int search_directory(const char *subject, const char * const base, char *
 			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_READ, fullpath);
 
 		errno = 0;
-		chirp_alloc_closedir(dirp);
+		chirp_fs_local_closedir(dirp);
 		if(errno)
 			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, fullpath);
 	} else {
