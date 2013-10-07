@@ -358,6 +358,23 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 }
 
 /*
+Call recv_worker_msg and silently retry if the result indicates
+an asynchronous update message like 'keepalive' or 'resource'.
+Returns 1 or -1 (as above) but does not return zero.
+*/
+
+int recv_worker_msg_retry( struct work_queue *q, struct work_queue_worker *w, char *line, int length, time_t stoptime )
+{
+	int result=0;
+
+	do {
+		result = recv_worker_msg(q, w,line,length,stoptime);
+	} while(result==0);
+
+	return result;
+}
+
+/*
 Select an appropriate timeout value for the transfer of a certain number of bytes.
 We do not know in advance how fast the system will perform.
 
@@ -613,13 +630,8 @@ static int get_output_item( struct work_queue *q, struct work_queue_worker *w, s
 	local_name_len = strlen(local_name);
 
 	while(1) {
-		//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
-		do { 			
-			recv_msg_result = recv_worker_msg(q, w, line, sizeof(line), time(0) + short_timeout);
-		} while (recv_msg_result == 0);
-		if (recv_msg_result < 0) {
-			goto link_failure;
-		}
+		recv_msg_result = recv_worker_msg_retry(q, w, line, sizeof(line), time(0) + short_timeout);
+		if (recv_msg_result < 0) goto link_failure;
 		
 		if(sscanf(line, "%s %s %" SCNd64, type, tmp_remote_name, &length) == 3) {
 			tmp_local_name[local_name_len] = '\0';
@@ -770,12 +782,9 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 			char thirdput_result[WORK_QUEUE_LINE_MAX];
 			debug(D_WQ, "putting %s from %s (%s) to shared filesystem from %s", f->remote_name, w->hostname, w->addrport, f->payload);
 			send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, remote_name, f->payload);
-			//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
-			do {
-				recv_msg_result = recv_worker_msg(q, w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
-				if(recv_msg_result < 0)
-					return 0;
-			} while (recv_msg_result == 0);
+
+			recv_msg_result = recv_worker_msg_retry(q, w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+			if(recv_msg_result < 0) return 0;
 			
 			if(sscanf(thirdput_result, "thirdput-complete %d", &recv_msg_result)) {
 				if(!recv_msg_result) return 0;
@@ -788,13 +797,9 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 		char thirdput_result[WORK_QUEUE_LINE_MAX];
 		debug(D_WQ, "putting %s from %s (%s) to remote filesystem using %s", f->remote_name, w->hostname, w->addrport, f->payload);
 		send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, remote_name, f->payload);
-		//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
 
-		do {
-			recv_msg_result = recv_worker_msg(q, w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
-			if(recv_msg_result < 0)
-				return 0;
-		} while (recv_msg_result == 0);
+		recv_msg_result = recv_worker_msg_retry(q, w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+		if(recv_msg_result < 0) return 0;
 				
 		if(sscanf(thirdput_result, "thirdput-complete %d", &recv_msg_result)) {
 			if(!recv_msg_result) return 0;
