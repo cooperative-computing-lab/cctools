@@ -29,6 +29,8 @@ struct dependency{
 	file_type type;
 };
 
+static int use_explicit = 0;
+
 char *python_extensions[2] = { "py", "pyc" };
 
 void initialize( char *output_directory, char *input_file, struct list *d){
@@ -149,7 +151,13 @@ struct list *find_dependencies_for(struct dependency *dep){
 		close(pipefd[0]);
 		dup2(pipefd[1], 1);
 		close(pipefd[1]);
-		char * const args[3] = { "locating dependencies" , dep->original_name, NULL };
+		char *args[] = { "locating dependencies" , NULL, NULL, NULL };
+		if(use_explicit){
+			args[1] = "--use-explicit";
+			args[2] = dep->original_name;
+		} else {
+			args[1] = dep->original_name;
+		}
 		switch ( dep->type ){
 			case PYTHON:
 				execvp("python_driver", args);
@@ -324,6 +332,7 @@ void write_explicit(struct list *l, const char *output){
 static void show_help(const char *cmd){
 	fprintf(stdout, "Use: %s [options] <workflow_description>\n", cmd);
 	fprintf(stdout, "Frequently used options:\n");
+	fprintf(stdout, "%-30s Do not copy files which are part of an explicit dependency, e.g. standard libraries\n", "-e, --use-explicit");
 	fprintf(stdout, "%-30s Show this help screen.\n", "-h,--help");
 	fprintf(stdout, "%-30s Specify output directory, default:output_dir\n", "-o,--output");
 }
@@ -335,13 +344,17 @@ int main(int argc, char *argv[]){
 	int c;
 
 	struct option long_options[] = {
+		{"use-explicit", no_argument, 0, 'e'},
 		{"help", no_argument, 0, 'h'},
 		{"output", required_argument, 0, 'o'},
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "ho:", long_options, NULL)) >= 0){
+	while((c = getopt_long(argc, argv, "eho:", long_options, NULL)) >= 0){
 		switch(c){
+			case 'e':
+				use_explicit = 1;
+				break;
 			case 'o':
 				output = xxstrdup(optarg);
 				break;

@@ -6,6 +6,12 @@ import imp
 import errno
 import re
 
+def usage(name):
+	a  = "USAGE: %s [options] file_to_link\n" %name
+	a += "Where [options] is zero or more of the following:\n"
+	a += "\t-e, --use-explicit\tSkip builtin modules.\n"
+	return a
+
 def setup(input_filename):
 	sys.path.insert(0, os.path.dirname(os.path.abspath(file_to_link)))
 
@@ -38,15 +44,22 @@ def find_module_names(filename):
 	f.close()
 	return module_names
 
+if len(sys.argv) < 2:
+	print usage(sys.argv[0]);
+	exit(1)
 
-file_to_link = sys.argv[1]
+file_to_link = sys.argv[-1]
 setup(file_to_link)
+
+use_explicit = False
+if len(sys.argv) > 2 and sys.argv[1] == '--use-explicit':
+	use_explicit = True
 
 print "*Python", sys.version.split(' ')[0]
 modules = find_module_names(file_to_link)
 for m in modules:
 	m_split = m.split('.')
-	if imp.is_builtin(m_split[0]):
+	if imp.is_builtin(m_split[0]) and use_explicit:
 		continue
 	m_path = imp.find_module(m_split[0])[1]
 	print m_path, m

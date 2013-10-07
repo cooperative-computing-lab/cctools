@@ -16,6 +16,7 @@ BOLD(makeflow_linker) finds dependencies by static analysis. CODE(eval) and othe
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
+OPTION_ITEM(`-e, --use-explicit')Do not copy files which are part of an explicit dependency, e.g. standard libraries.
 OPTION_ITEM(`-h, --help')Show this help screen.
 OPTION_TRIPLET(-o, output, directory)Specify output directory
 OPTIONS_END
