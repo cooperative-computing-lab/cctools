@@ -600,24 +600,90 @@ static int add_worker(struct work_queue *q)
 	return 1;
 }
 
+/*
+Get a single file from a remote worker.
+Returns true on success, false on failure.
+*/
+
+static int get_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, char *local_name, INT64_T length, INT64_T * total_bytes)
+{
+	char *cur_pos, *tmp_pos;
+
+	// Create directories for the local path, if needed.
+
+	cur_pos = local_name;
+	if(!strncmp(cur_pos, "./", 2)) {
+		cur_pos += 2;
+	}
+
+	tmp_pos = strrchr(cur_pos, '/');
+	while(tmp_pos) {
+		*tmp_pos = '\0';
+		if(!create_dir(cur_pos, 0700)) {
+			debug(D_WQ, "Could not create directory - %s (%s)", cur_pos, strerror(errno));
+			return 0;
+		}
+		*tmp_pos = '/';
+		cur_pos = tmp_pos + 1;
+		tmp_pos = strrchr(cur_pos, '/');
+	}
+
+	// Create the local file.
+
+	debug(D_WQ, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
+	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0700);
+	if(fd < 0) {
+		debug(D_NOTICE, "Cannot open file %s for writing: %s", local_name, strerror(errno));
+		return 0;
+	}
+
+	// If a bandwidth limit is in effect, choose the effective stoptime.
+				
+	timestamp_t effective_stoptime = 0;
+	if(q->bandwidth) {
+		effective_stoptime = ((length * 8)/q->bandwidth)*1000000 + timestamp_get();
+	}
+
+	// Choose the actual stoptime and transfer the data.
+
+	time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
+	INT64_T actual = link_stream_to_fd(w->link, fd, length, stoptime);
+
+	close(fd);
+
+	if(actual != length) {
+		debug(D_WQ, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
+		unlink(local_name);
+		return 0;
+	}
+
+	*total_bytes += length;
+
+	// If the transfer was too fast, slow things down.
+
+	timestamp_t current_time = timestamp_get();
+	if(effective_stoptime && effective_stoptime > current_time) {
+		usleep(effective_stoptime - current_time);
+	}
+
+	return 1;
+}
+
 /**
  * This function implements the "get %s" protocol.
  * It reads a streamed item from a worker. For the stream format, please refer
  * to the stream_output_item function in worker.c
  */
-static int get_output_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *remote_name, const char *local_name, struct hash_table *received_items, INT64_T * total_bytes)
+static int get_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *remote_name, const char *local_name, struct hash_table *received_items, INT64_T * total_bytes)
 {
 	char line[WORK_QUEUE_LINE_MAX];
-	int fd;
-	INT64_T actual, length;
-	time_t stoptime;
-	timestamp_t effective_stoptime = 0;
+	INT64_T length;
 	char type[256];
 	char tmp_remote_name[WORK_QUEUE_LINE_MAX], tmp_local_name[WORK_QUEUE_LINE_MAX];
-	char *cur_pos, *tmp_pos;
 	int remote_name_len;
 	int local_name_len;
 	int recv_msg_result;
+	int result = 0;
 
 	if(hash_table_lookup(received_items, local_name))
 		return 1;
@@ -644,57 +710,9 @@ static int get_output_item( struct work_queue *q, struct work_queue_worker *w, s
 				}
 				hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
 			} else if(strncmp(type, "file", 4) == 0) {
-				// actually place the file
-				if(length >= 0) {
-					// create dirs in the filename path if needed
-					cur_pos = tmp_local_name;
-					if(!strncmp(cur_pos, "./", 2)) {
-						cur_pos += 2;
-					}
-
-					tmp_pos = strrchr(cur_pos, '/');
-					while(tmp_pos) {
-						*tmp_pos = '\0';
-						if(!create_dir(cur_pos, 0700)) {
-							debug(D_WQ, "Could not create directory - %s (%s)", cur_pos, strerror(errno));
-							goto failure;
-						}
-						*tmp_pos = '/';
-
-						cur_pos = tmp_pos + 1;
-						tmp_pos = strrchr(cur_pos, '/');
-					}
-
-					// get the remote file and place it
-					debug(D_WQ, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", tmp_local_name, length, w->addrport, w->hostname);
-					fd = open(tmp_local_name, O_WRONLY | O_TRUNC | O_CREAT, 0700);
-					if(fd < 0) {
-						debug(D_NOTICE, "Cannot open file %s for writing: %s", tmp_local_name, strerror(errno));
-						goto failure;
-					}
-					
-					if(q->bandwidth) {
-						effective_stoptime = ((length * 8)/q->bandwidth)*1000000 + timestamp_get();
-					}
-					stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
-					actual = link_stream_to_fd(w->link, fd, length, stoptime);
-					close(fd);
-					if(actual != length) {
-						debug(D_WQ, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
-						unlink(local_name);
-						goto failure;
-					}
-					*total_bytes += length;
-					timestamp_t current_time = timestamp_get();
-					if(effective_stoptime && effective_stoptime > current_time) {
-						usleep(effective_stoptime - current_time);
-					}
-
-					hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
-				} else {
-					debug(D_NOTICE, "%s on %s (%s) has invalid length: %"PRId64, remote_name, w->addrport, w->hostname, length);
-					goto failure;
-				}
+				result = get_file(q,w,t,tmp_local_name,length,total_bytes);
+				if(!result) break;
+				hash_table_insert(received_items,tmp_local_name, xxstrdup(local_name));
 			} else if(strncmp(type, "missing", 7) == 0) {
 				// now length holds the errno
 				debug(D_WQ, "Failed to retrieve %s from %s (%s): %s", remote_name, w->addrport, w->hostname, strerror(length));
@@ -801,7 +819,7 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 	} else if(f->type == WORK_QUEUE_REMOTECMD) {
 		result = do_thirdput(q,w,cached_name,f->payload,WORK_QUEUE_FS_CMD);
 	} else {
-		result = get_output_item(q, w, t, cached_name, f->payload, received_items, &total_bytes);
+		result = get_file_or_directory(q, w, t, cached_name, f->payload, received_items, &total_bytes);
 	}
 
 	timestamp_t close_time = timestamp_get();
