@@ -588,7 +588,7 @@ static int add_worker(struct work_queue *q)
  * It reads a streamed item from a worker. For the stream format, please refer
  * to the stream_output_item function in worker.c
  */
-static int get_output_item(char *remote_name, char *local_name, struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct hash_table *received_items, INT64_T * total_bytes)
+static int get_output_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, char *remote_name, char *local_name, struct hash_table *received_items, INT64_T * total_bytes)
 {
 	char line[WORK_QUEUE_LINE_MAX];
 	int fd;
@@ -741,7 +741,7 @@ static int filename_comparator(const void *a, const void *b)
 	return rv > 0 ? -1 : 1;
 }
 
-static int get_output_files(struct work_queue_task *t, struct work_queue_worker *w, struct work_queue *q)
+static int get_output_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
 	struct work_queue_file *tf;
 
@@ -836,7 +836,7 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 			} else {
 				
 				open_time = timestamp_get();
-				get_output_item(remote_name, tf->payload, q, w, t, received_items, &total_bytes);
+				get_output_item(q, w, t, remote_name, tf->payload, received_items, &total_bytes);
 				close_time = timestamp_get();
 				if(t->result & WORK_QUEUE_RESULT_OUTPUT_FAIL) {
 					return 0;
@@ -955,7 +955,7 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 
 	// Receiving output ...
 	t->time_receive_output_start = timestamp_get();
-	if(!get_output_files(t, w, q)) {
+	if(!get_output_files(q,w,t)) {
 		goto failure;
 	}
 	t->time_receive_output_finish = timestamp_get();
