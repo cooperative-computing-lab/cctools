@@ -1440,7 +1440,22 @@ static void chirp_receive(struct link *link)
 
 	if(root_quota > 0) {
 		if(cfs == &chirp_fs_hdfs)
-			/* FIXME: why can't HDFS do quotas? original comment: "using HDFS? Can't do quotas : /" */
+			/* On why HDFS can't do quotas (allocations) [1]:
+			 *
+			 * In the current implementation, quotas (allocations) do not work
+			 * with HDFS b/c the chirp_alloc module stores the allocation
+			 * information in the Unix filesystem and relies upon file locking
+			 * and signals to ensure mutual exclusion. Modifying the code to
+			 * store it in cfs instead of Unix would be easy, but hdfs still
+			 * doesn't support file locking. (Nor does any other distributed
+			 * file system.)
+			 *
+			 * An alternative approach would be to store the allocation data in
+			 * a database alongside the filesystem. This has some pros and cons
+			 * to be worked out.
+			 *
+			 * [1] https://github.com/batrick/cctools/commit/377377f54e7660c8571d3088487b00c8ad2d2d7d#commitcomment-4265178
+			 */
 			fatal("Cannot use quotas with HDFS\n");
 		else
 			chirp_alloc_init(chirp_root_path, root_quota);
