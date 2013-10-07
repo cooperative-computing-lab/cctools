@@ -1937,13 +1937,10 @@ int main(int argc, char *argv[])
 		}
 		int maxfd = MAX(link_fd(link), config_pipe[0]) + 1;
 
-		/* Sleep for the minimum of any periodic timers, but don't go negative. */
-
+		/* Wait for activity on the listening port or the config pipe */
 		struct timeval timeout;
 		timeout.tv_usec = 5000;
 		timeout.tv_sec = 0;
-		/* Wait for activity on the listening port or the config pipe */
-
 		if(select(maxfd, &rfds, 0, 0, &timeout) < 0)
 			continue;
 
