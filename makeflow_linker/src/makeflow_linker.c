@@ -7,6 +7,7 @@
 
 #include "copy_stream.h"
 #include "create_dir.h"
+#include "delete_dir.h"
 #include "debug.h"
 #include "getopt_aux.h"
 #include "list.h"
@@ -30,9 +31,11 @@ struct dependency{
 };
 
 static int use_explicit = 0;
+static char *workspace = NULL;
 
 char *python_extensions[2] = { "py", "pyc" };
 char *perl_extensions[2]   = { "pl", "pm"  };
+
 
 void initialize( char *output_directory, char *input_file, struct list *d){
 	pid_t pid;
@@ -344,6 +347,13 @@ static void show_help(const char *cmd){
 	fprintf(stdout, "%-30s Specify output directory, default:output_dir\n", "-o,--output");
 }
 
+void cleanup(){
+	if(workspace){
+		if(delete_dir(workspace) != 0) fprintf(stderr, "Could not delete workspace (%s)\n", workspace);
+		free(workspace);
+	}
+}
+
 int main(int argc, char *argv[]){
 	char *output = NULL;
 	char *input  = NULL;
@@ -401,6 +411,8 @@ int main(int argc, char *argv[]){
 
 	struct list *l = list_explicit(dependencies);
 	write_explicit(l, output);
+
+	cleanup();
 
 	return 0;
 }
