@@ -754,6 +754,30 @@ static int filename_comparator(const void *a, const void *b)
 }
 
 /*
+This function stores an output file from the remote cache directory
+to a third-party location, which can be either a remote filesystem
+(WORK_QUEUE_FS_PATH) or a command to run (WORK_QUEUE_FS_CMD).
+*/
+
+static int do_thirdput( struct work_queue *q, struct work_queue_worker *w,  const char *cached_name, const char *payload, int command )
+{
+	char line[WORK_QUEUE_LINE_MAX];
+	int result;
+
+	send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, command, cached_name, payload);
+
+	result = recv_worker_msg_retry(q, w, line, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+	if(result < 0) return 0;
+				
+	if(sscanf(line, "thirdput-complete %d", &result)) {
+		return result;
+	} else {
+		debug(D_WQ, "Error: invalid message received (%s)\n", line);
+		return 0;
+	}
+}
+
+/*
 Get a single output file, located at the worker under 'cached_name'.
 Returns true on success, false on failure.
 */
@@ -763,53 +787,21 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 	struct stat local_info;
 	struct stat *remote_info;
 	INT64_T total_bytes = 0;
-	int recv_msg_result = 0;
+	int result = 0;
 			
 	timestamp_t open_time = timestamp_get();
 
 	if(f->flags & WORK_QUEUE_THIRDPUT) {
-
-		debug(D_WQ, "thirdputting %s as %s", cached_name, f->payload);
-
 		if(!strcmp(cached_name, f->payload)) {
 			debug(D_WQ, "output file %s already on shared filesystem", cached_name);
 			f->flags |= WORK_QUEUE_PREEXIST;
 		} else {
-			char thirdput_result[WORK_QUEUE_LINE_MAX];
-			debug(D_WQ, "putting %s from %s (%s) to shared filesystem from %s", cached_name, w->hostname, w->addrport, f->payload);
-			send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, cached_name, f->payload);
-
-			recv_msg_result = recv_worker_msg_retry(q, w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
-			if(recv_msg_result < 0) return 0;
-			
-			if(sscanf(thirdput_result, "thirdput-complete %d", &recv_msg_result)) {
-				if(!recv_msg_result) return 0;
-			} else {
-				debug(D_WQ, "Error: invalid message received (%s)\n", thirdput_result);
-				return 0;
-			}
+			result = do_thirdput(q,w,cached_name,f->payload,WORK_QUEUE_FS_PATH);
 		}
 	} else if(f->type == WORK_QUEUE_REMOTECMD) {
-		char thirdput_result[WORK_QUEUE_LINE_MAX];
-		debug(D_WQ, "putting %s from %s (%s) to remote filesystem using %s", cached_name, w->hostname, w->addrport, f->payload);
-		send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, cached_name, f->payload);
-
-		recv_msg_result = recv_worker_msg_retry(q, w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
-		if(recv_msg_result < 0) return 0;
-				
-		if(sscanf(thirdput_result, "thirdput-complete %d", &recv_msg_result)) {
-			if(!recv_msg_result) return 0;
-		} else {
-			debug(D_WQ, "Error: invalid message received (%s)\n", thirdput_result);
-			return 0;
-		}
+		result = do_thirdput(q,w,cached_name,f->payload,WORK_QUEUE_FS_CMD);
 	} else {
-		get_output_item(q, w, t, cached_name, f->payload, received_items, &total_bytes);
-
-		if(t->result & WORK_QUEUE_RESULT_OUTPUT_FAIL) {
-			return 0;
-		}
-
+		result = get_output_item(q, w, t, cached_name, f->payload, received_items, &total_bytes);
 	}
 
 	timestamp_t close_time = timestamp_get();
@@ -825,20 +817,15 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 		debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 	}
 
-	// Add the output item to the hash table if its cacheable
-	if(f->flags & WORK_QUEUE_CACHE) {
-		if(stat(f->payload, &local_info) < 0) {
-			unlink(f->payload);
-			if(t->result & WORK_QUEUE_RESULT_OUTPUT_MISSING) return 1;
-			return 0;
-		}
+	// If the transfer was successful, make a record of it in the cache.
 
+	if(result && f->flags & WORK_QUEUE_CACHE) {
 		remote_info = malloc(sizeof(*remote_info));
 		memcpy(remote_info, &local_info, sizeof(local_info));
 		hash_table_insert(w->current_files, cached_name, remote_info);
 	}
 
-	return 1;
+	return result;
 }
 
 static int get_output_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
