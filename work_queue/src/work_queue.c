@@ -741,26 +741,119 @@ static int filename_comparator(const void *a, const void *b)
 	return rv > 0 ? -1 : 1;
 }
 
-static int get_output_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
+static int get_output_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f, struct hash_table *received_items )
 {
-	struct work_queue_file *tf;
-
-	// This may be where I can trigger output file cache
-	// Added by Anthony Canino
-	// Attempting to add output cacheing
 	struct stat local_info;
 	struct stat *remote_info;
-	char *key, *value;
-	struct hash_table *received_items;
 	INT64_T total_bytes = 0;
 	int recv_msg_result = 0;
 
 	timestamp_t open_time = 0;
 	timestamp_t close_time = 0;
-	timestamp_t sum_time;
+	timestamp_t sum_time = 0;
+		
+	// XXX It would be much cleaner to generate the remote name, use it, then free it below.
+	// However, that can wait until the code below is factored to remove the mess of early returns.
+			
+	char remote_name[WORK_QUEUE_LINE_MAX];
 
-	// Start transfer ...
-	received_items = hash_table_create(0, 0);
+	char *cached_name = make_cached_name(t,f);
+	strcpy(remote_name,cached_name);
+	free(cached_name);
+			
+	if(f->flags & WORK_QUEUE_THIRDPUT) {
+
+		debug(D_WQ, "thirdputting %s as %s", f->remote_name, f->payload);
+
+		if(!strcmp(f->remote_name, f->payload)) {
+			debug(D_WQ, "output file %s already on shared filesystem", f->remote_name);
+			f->flags |= WORK_QUEUE_PREEXIST;
+		} else {
+			char thirdput_result[WORK_QUEUE_LINE_MAX];
+			debug(D_WQ, "putting %s from %s (%s) to shared filesystem from %s", f->remote_name, w->hostname, w->addrport, f->payload);
+			open_time = timestamp_get();
+			send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, remote_name, f->payload);
+			//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
+			do {
+				recv_msg_result = recv_worker_msg(q, w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+				if(recv_msg_result < 0)
+					return 0;
+			} while (recv_msg_result == 0);
+			
+			if(sscanf(thirdput_result, "thirdput-complete %d", &recv_msg_result)) {
+				if(!recv_msg_result) return 0;
+			} else {
+				debug(D_WQ, "Error: invalid message received (%s)\n", thirdput_result);
+				return 0;
+			}
+			close_time = timestamp_get();
+			sum_time += (close_time - open_time);
+		}
+	} else if(f->type == WORK_QUEUE_REMOTECMD) {
+		char thirdput_result[WORK_QUEUE_LINE_MAX];
+		debug(D_WQ, "putting %s from %s (%s) to remote filesystem using %s", f->remote_name, w->hostname, w->addrport, f->payload);
+		open_time = timestamp_get();
+		send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, remote_name, f->payload);
+		//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
+
+		do {
+			recv_msg_result = recv_worker_msg(q, w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+			if(recv_msg_result < 0)
+				return 0;
+		} while (recv_msg_result == 0);
+				
+		if(sscanf(thirdput_result, "thirdput-complete %d", &recv_msg_result)) {
+			if(!recv_msg_result) return 0;
+		} else {
+			debug(D_WQ, "Error: invalid message received (%s)\n", thirdput_result);
+			return 0;
+		}
+					
+		close_time = timestamp_get();
+		sum_time += (close_time - open_time);
+	} else {
+				
+		open_time = timestamp_get();
+		get_output_item(q, w, t, remote_name, f->payload, received_items, &total_bytes);
+		close_time = timestamp_get();
+		if(t->result & WORK_QUEUE_RESULT_OUTPUT_FAIL) {
+			return 0;
+		}
+		if(total_bytes) {
+			sum_time = close_time - open_time;
+			q->total_bytes_received += total_bytes;
+			q->total_receive_time += sum_time;
+			t->total_bytes_transferred += total_bytes;
+			t->total_transfer_time += sum_time;
+			w->total_bytes_transferred += total_bytes;
+			w->total_transfer_time += sum_time;
+			debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
+		}
+		total_bytes = 0;
+	}
+
+	// Add the output item to the hash table if its cacheable
+	if(f->flags & WORK_QUEUE_CACHE) {
+		if(stat(f->payload, &local_info) < 0) {
+			unlink(f->payload);
+			if(t->result & WORK_QUEUE_RESULT_OUTPUT_MISSING) return 1;
+			return 0;
+		}
+
+		char * cached_name = make_cached_name(t,f);
+		remote_info = malloc(sizeof(*remote_info));
+		memcpy(remote_info, &local_info, sizeof(local_info));
+		hash_table_insert(w->current_files, cached_name, remote_info);
+		free(cached_name);
+	}
+
+	return 1;
+}
+
+static int get_output_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
+{
+	struct work_queue_file *f;
+	struct hash_table *received_items = hash_table_create(0, 0);
 
 	//  Sorting list will make sure that upper level dirs sit before their
 	//  contents(files/dirs) in the output files list. So, when we emit get
@@ -772,107 +865,14 @@ static int get_output_files( struct work_queue *q, struct work_queue_worker *w, 
 
 	if(t->output_files) {
 		list_first_item(t->output_files);
-		while((tf = list_next_item(t->output_files))) {
-			
-			// XXX It would be much cleaner to generate the remote name, use it, then free it below.
-		        // However, that can wait until the code below is factored to remove the mess of early returns.
-			
-			char remote_name[WORK_QUEUE_LINE_MAX];
-
-			char *cached_name = make_cached_name(t,tf);
-			strcpy(remote_name,cached_name);
-			free(cached_name);
-			
-			if(tf->flags & WORK_QUEUE_THIRDPUT) {
-
-				debug(D_WQ, "thirdputting %s as %s", tf->remote_name, tf->payload);
-
-				if(!strcmp(tf->remote_name, tf->payload)) {
-					debug(D_WQ, "output file %s already on shared filesystem", tf->remote_name);
-					tf->flags |= WORK_QUEUE_PREEXIST;
-				} else {
-					char thirdput_result[WORK_QUEUE_LINE_MAX];
-					debug(D_WQ, "putting %s from %s (%s) to shared filesystem from %s", tf->remote_name, w->hostname, w->addrport, tf->payload);
-					open_time = timestamp_get();
-					send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, remote_name, tf->payload);
-					//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
-					do {
-						recv_msg_result = recv_worker_msg(q, w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
-						if(recv_msg_result < 0)
-							return 0;
-					} while (recv_msg_result == 0);
-					
-					if(sscanf(thirdput_result, "thirdput-complete %d", &recv_msg_result)) {
-						if(!recv_msg_result) return 0;
-					} else {
-						debug(D_WQ, "Error: invalid message received (%s)\n", thirdput_result);
-						return 0;
-					}
-					close_time = timestamp_get();
-					sum_time += (close_time - open_time);
-				}
-			} else if(tf->type == WORK_QUEUE_REMOTECMD) {
-				char thirdput_result[WORK_QUEUE_LINE_MAX];
-				debug(D_WQ, "putting %s from %s (%s) to remote filesystem using %s", tf->remote_name, w->hostname, w->addrport, tf->payload);
-				open_time = timestamp_get();
-				send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, remote_name, tf->payload);
-				//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
-
-				do {
-					recv_msg_result = recv_worker_msg(q, w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
-					if(recv_msg_result < 0)
-						return 0;
-				} while (recv_msg_result == 0);
-				
-				if(sscanf(thirdput_result, "thirdput-complete %d", &recv_msg_result)) {
-					if(!recv_msg_result) return 0;
-				} else {
-					debug(D_WQ, "Error: invalid message received (%s)\n", thirdput_result);
-					return 0;
-				}
-					
-				close_time = timestamp_get();
-				sum_time += (close_time - open_time);
-			} else {
-				
-				open_time = timestamp_get();
-				get_output_item(q, w, t, remote_name, tf->payload, received_items, &total_bytes);
-				close_time = timestamp_get();
-				if(t->result & WORK_QUEUE_RESULT_OUTPUT_FAIL) {
-					return 0;
-				}
-				if(total_bytes) {
-					sum_time = close_time - open_time;
-					q->total_bytes_received += total_bytes;
-					q->total_receive_time += sum_time;
-					t->total_bytes_transferred += total_bytes;
-					t->total_transfer_time += sum_time;
-					w->total_bytes_transferred += total_bytes;
-					w->total_transfer_time += sum_time;
-					debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
-				}
-				total_bytes = 0;
-			}
-
-			// Add the output item to the hash table if its cacheable
-			if(tf->flags & WORK_QUEUE_CACHE) {
-				if(stat(tf->payload, &local_info) < 0) {
-					unlink(tf->payload);
-					if(t->result & WORK_QUEUE_RESULT_OUTPUT_MISSING)
-						continue;
-					return 0;
-				}
-
-				char * cached_name = make_cached_name(t,tf);
-				remote_info = malloc(sizeof(*remote_info));
-				memcpy(remote_info, &local_info, sizeof(local_info));
-				hash_table_insert(w->current_files, cached_name, remote_info);
-				free(cached_name);
-			}
+		while((f = list_next_item(t->output_files))) {
+			get_output_file(q,w,t,f,received_items);
 		}
 
 	}
+
 	// destroy received files hash table for this task
+	char *key, *value;
 	hash_table_firstkey(received_items);
 	while(hash_table_nextkey(received_items, &key, (void **) &value)) {
 		free(value);
