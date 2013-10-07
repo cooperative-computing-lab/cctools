@@ -168,7 +168,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 		close(pipefd[0]);
 		dup2(pipefd[1], 1);
 		close(pipefd[1]);
-		char *args[] = { "locating dependencies" , NULL, NULL, NULL };
+		char *args[] = { "locating dependencies" , NULL, NULL, NULL, NULL };
 		if(use_explicit){
 			args[1] = "--use-explicit";
 			args[2] = dep->original_name;
@@ -181,6 +181,12 @@ struct list *find_dependencies_for(struct dependency *dep){
 			case PYTHON:
 				execvp("python_driver", args);
 			case EXPLICIT:
+				break;
+			case MAKEFLOW:
+				args[1] = MAKEFLOW_BUNDLE_FLAG;
+				args[2] = workspace;
+				args[3] = dep->original_name;
+				execvp(MAKEFLOW_PATH, args);
 				break;
 			case UNKNOWN:
 				break;
