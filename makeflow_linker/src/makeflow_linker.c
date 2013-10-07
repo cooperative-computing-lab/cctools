@@ -17,7 +17,7 @@
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
-typedef enum {UNKNOWN, EXPLICIT, PYTHON} file_type;
+typedef enum {UNKNOWN, EXPLICIT, PERL, PYTHON} file_type;
 
 struct dependency{
 	char *original_name;
@@ -32,6 +32,7 @@ struct dependency{
 static int use_explicit = 0;
 
 char *python_extensions[2] = { "py", "pyc" };
+char *perl_extensions[2]   = { "pl", "pm"  };
 
 void initialize( char *output_directory, char *input_file, struct list *d){
 	pid_t pid;
@@ -119,6 +120,8 @@ file_type file_extension_known(const char *filename){
 	for(j=0; j< 2; j++){
 		if(!strcmp(python_extensions[j], extension))
 			return PYTHON;
+		if(!strcmp(perl_extensions[j], extension))
+			return PERL;
 	}
 
 	return UNKNOWN;
@@ -159,6 +162,8 @@ struct list *find_dependencies_for(struct dependency *dep){
 			args[1] = dep->original_name;
 		}
 		switch ( dep->type ){
+			case PERL:
+				execvp("perl_driver", args);
 			case PYTHON:
 				execvp("python_driver", args);
 			case EXPLICIT:
@@ -269,6 +274,7 @@ void determine_package_structure(struct list *d, char *output_dir){
 			case PYTHON:
 				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
 				break;
+			case PERL:
 			default:
 				/* TODO: naming conflicts */
 				break;
@@ -291,6 +297,7 @@ void build_package(struct list *d){
 					sprintf(tmp_path, "%s/__main__.py", dep->output_path);
 				copy_file_to_file(dep->original_name, tmp_path);
 				break;
+			case PERL:
 			default:
 				sprintf(tmp_path, "%s/%s", dep->output_path, dep->final_name);
 				copy_file_to_file(dep->original_name, tmp_path);

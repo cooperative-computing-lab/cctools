@@ -1,0 +1,43 @@
+#!/usr/bin/env perl
+
+print "*Perl $]\n";
+
+my $target = @ARGV[0];
+
+my @modules = ();
+
+open my $file_handle, $target or die "Could not open $target: $!";
+LINES: {
+	my $pod = 0;
+	while (my $line = <$file_handle>) {
+		if($pod){
+			if($line =~/=cut/){
+				$pod = 0;
+			}
+		}
+		else {
+			if ($line =~ /__END__/){
+				last LINES;
+			}
+			elsif ($line =~ /^=/){
+				$pod = 1;
+			}
+			elsif ($line =~ /use (\D\S*);/){
+				push(@modules, $1);
+			}
+		}
+	}
+}
+close $file_handle;
+
+while (my $current_module = shift(@modules)){
+	ITER: {
+		foreach $prefix (@INC) {
+			my $realfilename = "$prefix/$current_module.pm";
+			if (-f $realfilename) {
+				print "$realfilename $current_module\n";
+				last ITER;
+			}
+		}
+	}
+}
