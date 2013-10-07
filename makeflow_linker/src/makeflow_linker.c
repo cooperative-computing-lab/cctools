@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <limits.h>
 #include <string.h>
+#include <time.h>
 
 #include "copy_stream.h"
 #include "create_dir.h"
@@ -36,15 +37,22 @@ static char *workspace = NULL;
 char *python_extensions[2] = { "py", "pyc" };
 char *perl_extensions[2]   = { "pl", "pm"  };
 
+void create_workspace(){
+	workspace = (char *) malloc(PATH_MAX * sizeof(char));
+	snprintf(workspace, PATH_MAX, "/tmp/makeflow_linker_workspace_%d", rand()%2718 + 1);
+	if(!create_dir(workspace, 0777)) fatal("Could not create directory.\n");
+}
 
 void initialize( char *output_directory, char *input_file, struct list *d){
 	pid_t pid;
 	int pipefd[2];
 	pipe(pipefd);
 
+	srand(time(NULL));
+
 	char expanded_input[PATH_MAX];
 	realpath(input_file, expanded_input);
-
+	create_workspace();
 
 	switch ( pid = fork() ){
 	case -1:
