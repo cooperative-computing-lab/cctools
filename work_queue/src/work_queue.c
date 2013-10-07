@@ -747,10 +747,6 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 	struct stat *remote_info;
 	INT64_T total_bytes = 0;
 	int recv_msg_result = 0;
-
-	timestamp_t open_time = 0;
-	timestamp_t close_time = 0;
-	timestamp_t sum_time = 0;
 		
 	// XXX It would be much cleaner to generate the remote name, use it, then free it below.
 	// However, that can wait until the code below is factored to remove the mess of early returns.
@@ -761,6 +757,8 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 	strcpy(remote_name,cached_name);
 	free(cached_name);
 			
+	timestamp_t open_time = timestamp_get();
+
 	if(f->flags & WORK_QUEUE_THIRDPUT) {
 
 		debug(D_WQ, "thirdputting %s as %s", f->remote_name, f->payload);
@@ -771,7 +769,6 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 		} else {
 			char thirdput_result[WORK_QUEUE_LINE_MAX];
 			debug(D_WQ, "putting %s from %s (%s) to shared filesystem from %s", f->remote_name, w->hostname, w->addrport, f->payload);
-			open_time = timestamp_get();
 			send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, remote_name, f->payload);
 			//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
 			do {
@@ -786,13 +783,10 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 				debug(D_WQ, "Error: invalid message received (%s)\n", thirdput_result);
 				return 0;
 			}
-			close_time = timestamp_get();
-			sum_time += (close_time - open_time);
 		}
 	} else if(f->type == WORK_QUEUE_REMOTECMD) {
 		char thirdput_result[WORK_QUEUE_LINE_MAX];
 		debug(D_WQ, "putting %s from %s (%s) to remote filesystem using %s", f->remote_name, w->hostname, w->addrport, f->payload);
-		open_time = timestamp_get();
 		send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, remote_name, f->payload);
 		//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
 
@@ -808,28 +802,27 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 			debug(D_WQ, "Error: invalid message received (%s)\n", thirdput_result);
 			return 0;
 		}
-					
-		close_time = timestamp_get();
-		sum_time += (close_time - open_time);
 	} else {
-				
-		open_time = timestamp_get();
 		get_output_item(q, w, t, remote_name, f->payload, received_items, &total_bytes);
-		close_time = timestamp_get();
+
 		if(t->result & WORK_QUEUE_RESULT_OUTPUT_FAIL) {
 			return 0;
 		}
-		if(total_bytes) {
-			sum_time = close_time - open_time;
-			q->total_bytes_received += total_bytes;
-			q->total_receive_time += sum_time;
-			t->total_bytes_transferred += total_bytes;
-			t->total_transfer_time += sum_time;
-			w->total_bytes_transferred += total_bytes;
-			w->total_transfer_time += sum_time;
-			debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
-		}
-		total_bytes = 0;
+
+	}
+
+					
+	timestamp_t close_time = timestamp_get();
+	timestamp_t sum_time = close_time - open_time;
+
+	if(total_bytes>0) {
+		q->total_bytes_received += total_bytes;
+		q->total_receive_time += sum_time;
+		t->total_bytes_transferred += total_bytes;
+		t->total_transfer_time += sum_time;
+		w->total_bytes_transferred += total_bytes;
+		w->total_transfer_time += sum_time;
+		debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 	}
 
 	// Add the output item to the hash table if its cacheable
