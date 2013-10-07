@@ -134,6 +134,8 @@ file_type file_extension_known(const char *filename){
 			return PYTHON;
 		if(!strcmp(perl_extensions[j], extension))
 			return PERL;
+		if(!strcmp(makeflow_extensions[j], extension))
+			return MAKEFLOW;
 	}
 
 	return UNKNOWN;
