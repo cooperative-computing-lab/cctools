@@ -833,7 +833,7 @@ static int get_output_files( struct work_queue *q, struct work_queue_worker *w, 
 }
 
 // Sends "unlink file" for every file in the list except those that match one or more of the "except_flags"
-static void delete_worker_files(struct work_queue_worker *w, struct list *files, int except_flags) {
+static void delete_worker_files( struct work_queue_worker *w, struct work_queue_task *t, struct list *files, int except_flags ) {
 	struct work_queue_file *tf;
 	
 	if(!files) return;
@@ -841,7 +841,9 @@ static void delete_worker_files(struct work_queue_worker *w, struct list *files,
 	list_first_item(files);
 	while((tf = list_next_item(files))) {
 		if(!(tf->flags & except_flags)) {
-			send_worker_msg(w, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
+			char *cached_name = make_cached_name(t,tf);
+			send_worker_msg(w, "unlink %s\n", time(0) + short_timeout, cached_name);
+			free(cached_name);
 		}
 	}
 }
@@ -849,8 +851,8 @@ static void delete_worker_files(struct work_queue_worker *w, struct list *files,
 
 static void delete_uncacheable_files(struct work_queue_task *t, struct work_queue_worker *w)
 {
-	delete_worker_files(w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
-	delete_worker_files(w, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+	delete_worker_files(w, t, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+	delete_worker_files(w, t, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 }
 
 void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_task *t)
@@ -2167,10 +2169,10 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 		debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
 			
 		//Delete any input files that are not to be cached.
-		delete_worker_files(w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+		delete_worker_files(w, t, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 
 		//Delete all output files since they are not needed as the task was aborted.
-		delete_worker_files(w, t->output_files, 0);
+		delete_worker_files(w, t, t->output_files, 0);
 		
 		w->cores_allocated -= t->cores;
 		w->memory_allocated -= t->memory;
@@ -3194,10 +3196,10 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 			itable_remove(q->worker_task_map, taskid);
 			
 			//Delete any input files that are not to be cached.
-			delete_worker_files(w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+			delete_worker_files(w, t, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 
 			//Delete all output files since they are not needed as the task was aborted.
-			delete_worker_files(w, t->output_files, 0);
+			delete_worker_files(w, t, t->output_files, 0);
 			
 			w->cores_allocated -= t->cores;
 			w->memory_allocated -= t->memory;
