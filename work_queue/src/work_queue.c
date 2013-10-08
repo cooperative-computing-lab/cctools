@@ -766,8 +766,6 @@ Returns true on success, false on failure.
 
 static int get_output_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f, const char *cached_name )
 {
-	struct stat local_info;
-	struct stat *remote_info;
 	INT64_T total_bytes = 0;
 	int result = 0;
 			
@@ -802,9 +800,13 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 	// If the transfer was successful, make a record of it in the cache.
 
 	if(result && f->flags & WORK_QUEUE_CACHE) {
-		remote_info = malloc(sizeof(*remote_info));
-		memcpy(remote_info, &local_info, sizeof(local_info));
-		hash_table_insert(w->current_files, cached_name, remote_info);
+		struct stat local_info;
+		result = stat(f->payload,&local_info);
+		if(result==0) {
+			struct stat *remote_info = malloc(sizeof(*remote_info));
+			memcpy(remote_info, &local_info, sizeof(local_info));
+			hash_table_insert(w->current_files, cached_name, remote_info);
+		}
 	}
 
 	return result;
