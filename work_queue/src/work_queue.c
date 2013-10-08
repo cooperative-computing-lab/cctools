@@ -669,11 +669,8 @@ This makes it efficient to move deep directory hierarchies with
 high throughput and low latency.
 */
 
-static int get_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *remote_name, const char *local_name, struct hash_table *received_items, INT64_T * total_bytes)
+static int get_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *remote_name, const char *local_name, INT64_T * total_bytes)
 {
-	// If the file has already been transferred, don't send it again.
-	if(hash_table_lookup(received_items, local_name)) return 1;
-
 	// Remember the length of the specified remote path so it can be chopped from the result.
 	int remote_name_len = strlen(remote_name);
 
@@ -694,21 +691,13 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 		if(sscanf(line,"dir %s", tmp_remote_path)==1) {
 			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
 			result = create_dir(tmp_local_name,0700);
-			if(result) {
-				hash_table_insert(received_items, tmp_local_name, tmp_local_name);
-			} else {
-				free(tmp_local_name);
-				break;
-			}
+			free(tmp_local_name);
+			if(!result) break;
 		} else if(sscanf(line,"file %s %"SCNd64, tmp_remote_path, &length)==2) {
 			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
 			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
-			if(result) {
-				hash_table_insert(received_items, tmp_local_name, tmp_local_name);
-			} else {
-				free(tmp_local_name);
-				break;
-			}
+			free(tmp_local_name);
+			break;
 		} else if(sscanf(line,"missing %d",&errnum)==1) {
 			// If the output file is missing, we make a note of that in the task result,
 			// but we continue and consider the transfer a 'success' so that other
@@ -775,7 +764,7 @@ Get a single output file, located at the worker under 'cached_name'.
 Returns true on success, false on failure.
 */
 
-static int get_output_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f, const char *cached_name, struct hash_table *received_items )
+static int get_output_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f, const char *cached_name )
 {
 	struct stat local_info;
 	struct stat *remote_info;
@@ -794,7 +783,7 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 	} else if(f->type == WORK_QUEUE_REMOTECMD) {
 		result = do_thirdput(q,w,cached_name,f->payload,WORK_QUEUE_FS_CMD);
 	} else {
-		result = get_file_or_directory(q, w, t, cached_name, f->payload, received_items, &total_bytes);
+		result = get_file_or_directory(q, w, t, cached_name, f->payload, &total_bytes);
 	}
 
 	timestamp_t close_time = timestamp_get();
@@ -824,26 +813,17 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 static int get_output_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
 	struct work_queue_file *f;
-	struct hash_table *received_items = hash_table_create(0, 0);
 
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((f = list_next_item(t->output_files))) {
 			char * cached_name = make_cached_name(t,f);
-			get_output_file(q,w,t,f,cached_name,received_items);
+			get_output_file(q,w,t,f,cached_name);
 			free(cached_name);
 		}
 
 	}
 
-	// destroy received files hash table for this task
-	char *key, *value;
-	hash_table_firstkey(received_items);
-	while(hash_table_nextkey(received_items, &key, (void **) &value)) {
-		free(value);
-	}
-	hash_table_delete(received_items);
-	
 	// tell the worker you no longer need that task's output directory.
 	send_worker_msg(w, "kill %d\n", time(0) + short_timeout, t->taskid);
 
