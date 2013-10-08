@@ -43,6 +43,7 @@ can be released:
 #include "copy_stream.h"
 #include "random_init.h"
 #include "process.h"
+#include "path.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -605,27 +606,17 @@ Get a single file from a remote worker.
 Returns true on success, false on failure.
 */
 
-static int get_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, char *local_name, INT64_T length, INT64_T * total_bytes)
+static int get_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *local_name, INT64_T length, INT64_T * total_bytes)
 {
-	char *cur_pos, *tmp_pos;
+	// If necessary, create parent directories of the file.
 
-	// Create directories for the local path, if needed.
-
-	cur_pos = local_name;
-	if(!strncmp(cur_pos, "./", 2)) {
-		cur_pos += 2;
-	}
-
-	tmp_pos = strrchr(cur_pos, '/');
-	while(tmp_pos) {
-		*tmp_pos = '\0';
-		if(!create_dir(cur_pos, 0700)) {
-			debug(D_WQ, "Could not create directory - %s (%s)", cur_pos, strerror(errno));
+	if(strchr(local_name,'/')) {
+		char dirname[WORK_QUEUE_LINE_MAX];
+		path_dirname(local_name,dirname);
+		if(!create_dir(dirname, 0700)) {
+			debug(D_WQ, "Could not create directory - %s (%s)", dirname, strerror(errno));
 			return 0;
 		}
-		*tmp_pos = '/';
-		cur_pos = tmp_pos + 1;
-		tmp_pos = strrchr(cur_pos, '/');
 	}
 
 	// Create the local file.
@@ -669,79 +660,74 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 	return 1;
 }
 
-/**
- * This function implements the "get %s" protocol.
- * It reads a streamed item from a worker. For the stream format, please refer
- * to the stream_output_item function in worker.c
- */
+/*
+This function implements the recursive get protocol.
+The master sents a single get message, then the worker
+responds with a continuous stream of dir and file message
+that indicate the entire contents of the directory.
+This makes it efficient to move deep directory hierarchies with
+high throughput and low latency.
+*/
+
 static int get_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *remote_name, const char *local_name, struct hash_table *received_items, INT64_T * total_bytes)
 {
-	char line[WORK_QUEUE_LINE_MAX];
-	INT64_T length;
-	char type[256];
-	char tmp_remote_name[WORK_QUEUE_LINE_MAX], tmp_local_name[WORK_QUEUE_LINE_MAX];
-	int remote_name_len;
-	int local_name_len;
-	int recv_msg_result;
-	int result = 0;
+	// If the file has already been transferred, don't send it again.
+	if(hash_table_lookup(received_items, local_name)) return 1;
 
-	if(hash_table_lookup(received_items, local_name))
-		return 1;
+	// Remember the length of the specified remote path so it can be chopped from the result.
+	int remote_name_len = strlen(remote_name);
 
+	// Send the name of the file/dir name to fetch
 	debug(D_WQ, "%s (%s) sending back %s to %s", w->hostname, w->addrport, remote_name, local_name);
 	send_worker_msg(w, "get %s 1\n", time(0) + short_timeout, remote_name);
 
-	strcpy(tmp_local_name, local_name);
-	remote_name_len = strlen(remote_name);
-	local_name_len = strlen(local_name);
-
+	// Process the recursive file/dir responses as they are sent.
 	while(1) {
-		recv_msg_result = recv_worker_msg_retry(q, w, line, sizeof(line), time(0) + short_timeout);
-		if (recv_msg_result < 0) goto link_failure;
-		
-		if(sscanf(line, "%s %s %" SCNd64, type, tmp_remote_name, &length) == 3) {
-			tmp_local_name[local_name_len] = '\0';
-			strcat(tmp_local_name, &(tmp_remote_name[remote_name_len]));
+		char line[WORK_QUEUE_LINE_MAX];
+		char tmp_remote_path[WORK_QUEUE_LINE_MAX];
+		INT64_T length;
+		int errnum;
 
-			if(strncmp(type, "dir", 3) == 0) {
-				if(!create_dir(tmp_local_name, 0700)) {
-					debug(D_WQ, "Cannot create directory - %s (%s)", tmp_local_name, strerror(errno));
-					goto failure;
-				}
-				hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
-			} else if(strncmp(type, "file", 4) == 0) {
-				result = get_file(q,w,t,tmp_local_name,length,total_bytes);
-				if(!result) break;
-				hash_table_insert(received_items,tmp_local_name, xxstrdup(local_name));
-			} else if(strncmp(type, "missing", 7) == 0) {
-				// now length holds the errno
-				debug(D_WQ, "Failed to retrieve %s from %s (%s): %s", remote_name, w->addrport, w->hostname, strerror(length));
-				t->result |= WORK_QUEUE_RESULT_OUTPUT_MISSING;
+		int result = recv_worker_msg_retry(q, w, line, sizeof(line), time(0) + short_timeout);
+		if(result<0) break;
+
+		if(sscanf(line,"dir %s", tmp_remote_path)==1) {
+			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
+			result = create_dir(tmp_local_name,0700);
+			if(result) {
+				hash_table_insert(received_items, tmp_local_name, tmp_local_name);
 			} else {
-				debug(D_WQ, "Invalid output item type - %s\n", type);
-				goto failure;
-			}
-		} else if(sscanf(line, "%s", type) == 1) {
-			if(strncmp(type, "end", 3) == 0) {
+				free(tmp_local_name);
 				break;
-			} else {
-				debug(D_WQ, "Invalid get line - %s\n", line);
-				goto failure;
 			}
+		} else if(sscanf(line,"file %s %"SCNd64, tmp_remote_path, &length)==2) {
+			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
+			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
+			if(result) {
+				hash_table_insert(received_items, tmp_local_name, tmp_local_name);
+			} else {
+				free(tmp_local_name);
+				break;
+			}
+		} else if(sscanf(line,"missing %d",&errnum)==1) {
+			// If the output file is missing, we make a note of that in the task result,
+			// but we continue and consider the transfer a 'success' so that other
+			// outputs are transferred and the task is given back to the caller.
+			debug(D_WQ, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,remote_name,strerror(errnum));
+			t->result |= WORK_QUEUE_RESULT_OUTPUT_MISSING;
+		} else if(!strcmp(line,"end")) {
+			// The only successful return is via an end message.
+			return 1;
 		} else {
-			debug(D_WQ, "Invalid streaming output line - %s\n", line);
-			goto failure;
+			debug(D_WQ, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
+			break;
 		}
 	}
 
-	return 1;
-
-      link_failure:
-	debug(D_WQ, "Link to %s (%s) failed.\n", w->addrport, w->hostname);
-	t->result |= WORK_QUEUE_RESULT_LINK_FAIL;
-
-      failure:
-	debug(D_WQ, "%s (%s) failed to return %s to %s", w->addrport, w->hostname, remote_name, local_name);
+	// If we failed to *transfer* the output file, then that is a hard
+	// failure which causes this function to return failure and the task
+	// to be returned to the queue to be attempted elsewhere.
+	debug(D_WQ, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, remote_name, local_name);
 	t->result |= WORK_QUEUE_RESULT_OUTPUT_FAIL;
 	return 0;
 }
