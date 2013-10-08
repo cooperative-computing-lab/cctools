@@ -746,17 +746,6 @@ char * make_cached_name( struct work_queue_task *t, struct work_queue_file *f )
 	}
 }
 
-/**
- * Comparison function for sorting by file/dir names in the output files list
- * of a task
- */
-static int filename_comparator(const void *a, const void *b)
-{
-	int rv;
-	rv = strcmp(*(char *const *) a, *(char *const *) b);
-	return rv > 0 ? -1 : 1;
-}
-
 /*
 This function stores an output file from the remote cache directory
 to a third-party location, which can be either a remote filesystem
@@ -836,14 +825,6 @@ static int get_output_files( struct work_queue *q, struct work_queue_worker *w, 
 {
 	struct work_queue_file *f;
 	struct hash_table *received_items = hash_table_create(0, 0);
-
-	//  Sorting list will make sure that upper level dirs sit before their
-	//  contents(files/dirs) in the output files list. So, when we emit get
-	//  command, we would first encounter top level dirs. Also, we would record
-	//  every received files/dirs within those top level dirs. If any file/dir
-	//  in those top level dirs appears later in the output files list, we
-	//  won't transfer it again.
-	list_sort(t->output_files, filename_comparator);
 
 	if(t->output_files) {
 		list_first_item(t->output_files);
