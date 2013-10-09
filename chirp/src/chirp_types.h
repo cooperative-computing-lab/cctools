@@ -12,13 +12,17 @@ All of the structure and type definitions used by the Chirp API.
 #ifndef CHIRP_TYPES_H
 #define CHIRP_TYPES_H
 
-#include "buffer.h"
-#include "int_sizes.h"
 #include "chirp_protocol.h"
 
-#include <sys/types.h>
-#include <time.h>
+#include "buffer.h"
+#include "int_sizes.h"
+
 #include <fcntl.h>
+#include <sys/types.h>
+
+#include <inttypes.h>
+#include <stdint.h>
+#include <time.h>
 
 /** Describes the properties of a file, much like the Unix <tt>stat</tt> structure.
 Note that @ref cst_uid, @ref cst_gid, and @ref cst_mode are provided for backwards compatibility, but are

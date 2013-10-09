@@ -186,10 +186,10 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Do not checksum files.\n", "-k,--no-checksums");
 	fprintf(stdout, " %-30s Path to ld.so to use.                      (PARROT_LDSO_PATH)\n", "-l,--ld-path=<path>");
 	fprintf(stdout, " %-30s Use this file as a mountlist.             (PARROT_MOUNT_FILE)\n", "-m,--ftab-file=<file>");
-	fprintf(stdout, " %-30s Mount (redirect) /foo to /bar.         (PARROT_MOUNT_STRING)\n", "-M,--mount=/foo=/bar");
+	fprintf(stdout, " %-30s Mount (redirect) /foo to /bar.          (PARROT_MOUNT_STRING)\n", "-M,--mount=/foo=/bar");
 	fprintf(stdout, " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
 	fprintf(stdout, " %-30s Send debugging messages to this file.     (PARROT_DEBUG_FILE)\n", "-o,--debug-file=<file>");
-	fprintf(stdout, " %-30s Rotate debug files of this size.     (PARROT_DEBUG_FILE_SIZE)\n", "-O,--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s Rotate debug files of this size. (default 10M, 0 disables) (PARROT_DEBUG_FILE_SIZE)\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Use this proxy server for HTTP requests.         (HTTP_PROXY)\n", "-p,--proxy=<hst:p>");
 	fprintf(stdout, " %-30s Enable paranoid mode for identity boxing mode.\n", "-P,--paranoid");
 	fprintf(stdout, " %-30s Inhibit catalog queries to list /chirp.\n", "-Q,--no-chirp-catalog");

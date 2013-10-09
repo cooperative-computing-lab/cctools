@@ -1,8 +1,7 @@
-/*
-Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2005- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
+/* Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
+ * Copyright (C) 2005- The University of Notre Dame
+ * This software is distributed under the GNU General Public License.
+ * See the file COPYING for details.
 */
 
 #include "chirp_acl.h"
@@ -70,135 +69,44 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
+#define GC_TIMEOUT  (86400)
+
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
-static void chirp_receive(struct link *l);
-static void chirp_handler(struct link *l, const char *addr, const char *subject);
-static int errno_to_chirp(int e);
-
-static int port = CHIRP_PORT;
-static char port_file[PATH_MAX];
-static int idle_timeout = 60;	/* one minute */
-static int stall_timeout = 3600;	/* one hour */
-static int parent_check_timeout = 300;	/* five minutes */
-static int advertise_timeout = 300;	/* five minutes */
-static int gc_timeout = 86400;
-static time_t advertise_alarm = 0;
-static time_t gc_alarm = 0;
-static struct list *catalog_host_list;
-static time_t starttime;
-static struct datagram *catalog_port;
-static char hostname[DOMAIN_NAME_MAX];
-static const char *manual_hostname = 0;
-static char address[LINK_ADDRESS_MAX];
-static const char *safe_username = 0;
-static uid_t safe_uid = 0;
-static gid_t safe_gid = 0;
-static int dont_dump_core = 0;
-static UINT64_T minimum_space_free = 0;
-static UINT64_T root_quota = 0;
-static int did_explicit_auth = 0;
-static int max_child_procs = 0;
-static int total_child_procs = 0;
-static int config_pipe[2];
-static int exit_if_parent_fails = 0;
-static const char *listen_on_interface = 0;
-static char chirp_debug_file[PATH_MAX];
-static int sim_latency = 0;
-
-char chirp_root_url[CHIRP_PATH_MAX] = ".";
-const char *chirp_root_path = 0;
-char chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
-const char *chirp_super_user = "";
+struct      chirp_filesystem *cfs = 0;
 const char *chirp_group_base_url = 0;
-int chirp_group_cache_time = 900;
-char chirp_owner[USERNAME_MAX] = "";
+int         chirp_group_cache_time = 900;
+char        chirp_owner[USERNAME_MAX] = "";
+const char *chirp_root_path = 0;
+char        chirp_root_url[CHIRP_PATH_MAX] = ".";
+const char *chirp_super_user = "";
+char        chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
 
-struct chirp_filesystem *cfs = 0;
+static char        address[LINK_ADDRESS_MAX];
+static time_t      advertise_alarm = 0;
+static int         advertise_timeout = 300; /* five minutes */
+static int         config_pipe[2];
+static struct      datagram *catalog_port;
+static char        hostname[DOMAIN_NAME_MAX];
+static int         idle_timeout = 60; /* one minute */
+static struct      list *catalog_host_list;
+static UINT64_T    minimum_space_free = 0;
+static int         port = CHIRP_PORT;
+static UINT64_T    root_quota = 0;
+static gid_t       safe_gid = 0;
+static uid_t       safe_uid = 0;
+static const char *safe_username = 0;
+static int         sim_latency = 0;
+static int         stall_timeout = 3600; /* one hour */
+static time_t      starttime;
 
-static void show_help(const char *cmd)
-{
-	fprintf(stdout, "use: %s [options]\n", cmd);
-	fprintf(stdout, "The most common options are:\n");
-	fprintf(stdout, " %-30s URL of storage directory, like `file://path' or `hdfs://host:port/path'.\n", "-r,--root=<url>");
-	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<name>");
-	fprintf(stdout, " %-30s Send debugging output to this file.\n", "-o,--debug-file=<file>");
-	fprintf(stdout, " %-30s Send status updates to this host. (default: `%s')\n", "-u,--advertise=<host>", CATALOG_HOST);
-	fprintf(stdout, " %-30s Show version info.\n", "-v,--version");
-	fprintf(stdout, " %-30s This message.\n", "-h,--help");
-
-	fprintf(stdout, "\nLess common options are:\n");
-	fprintf(stdout, " %-30s Use this file as the default ACL.\n", "-A,--default-acl=<file>");
-	fprintf(stdout, " %-30s Enable this authentication method.\n", "-a,--auth=<method>");
-	fprintf(stdout, " %-30s Write process identifier (PID) to file.\n", "-B,--pid-file=<file>");
-	fprintf(stdout, " %-30s Run as a daemon.\n", "-b,--background");
-	fprintf(stdout, " %-30s Do not create a core dump, even due to a crash.\n", "-C,--no-core-dump");
-	fprintf(stdout, " %-30s Challenge directory for unix filesystem authentication.\n", "-c,--challenge-dir=<dir>");
-	fprintf(stdout, " %-30s Exit if parent process dies.\n", "-E,--parent-death");
-	fprintf(stdout, " %-30s Check for presence of parent at this interval. (default: %ds)\n", "-e,--parent-check=<seconds>", parent_check_timeout);
-	fprintf(stdout, " %-30s Leave this much space free in the filesystem.\n", "-F,--free-space=<size>");
-	fprintf(stdout, " %-30s Base url for group lookups. (default: disabled)\n", "-G,--group-url=<url>");
-	fprintf(stdout, " %-30s Run as lower privilege user. (root protection)\n", "-i,--user=<user>");
-	fprintf(stdout, " %-30s Listen only on this network interface.\n", "-I,--interface=<addr>");
-	fprintf(stdout, " %-30s Set the maximum number of clients to accept at once. (default unlimited)\n", "-M,--max-clients=<count>");
-	fprintf(stdout, " %-30s Use this name when reporting to the catalog.\n", "-n,--catalog-name=<name>");
-	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
-	fprintf(stdout, " %-30s Superuser for all directories. (default: none)\n", "-P,--superuser=<user>");
-	fprintf(stdout, " %-30s Listen on this port. (default: %d)\n", "-p,--port=<port>", port);
-	fprintf(stdout, " %-30s Enforce this root quota in software.\n", "-Q,--root-quota=<size>");
-	fprintf(stdout, " %-30s Read-only mode.\n", "-R,--read-only");
-	fprintf(stdout, " %-30s Abort stalled operations after this long. (default: %ds)\n", "-s,--stalled=<time>", stall_timeout);
-	fprintf(stdout, " %-30s Maximum time to cache group information. (default: %ds)\n", "-T,--group-cache-exp=<time>", chirp_group_cache_time);
-	fprintf(stdout, " %-30s Disconnect idle clients after this time. (default: %ds)\n", "-t,--idle-clients=<time>", idle_timeout);
-	fprintf(stdout, " %-30s Send status updates at this interval. (default: 5m)\n", "-U,--catalog-update=<time>");
-	fprintf(stdout, " %-30s Use alternate password file for unix authentication.\n", "-W,--passwd=<file>");
-	fprintf(stdout, " %-30s The name of this server's owner. (default: `whoami`)\n", "-w,--owner=<user>");
-	fprintf(stdout, " %-30s Location of transient data. (default: `.')\n", "-y,--transient=<dir>");
-	fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
-	fprintf(stdout, " %-30s Set max timeout for unix filesystem authentication. (default: 5s)\n", "-z,--unix-timeout=<file>");
-	fprintf(stdout, "\n");
-	fprintf(stdout, "Where debug flags are: ");
-	debug_flags_print(stdout);
-	fprintf(stdout, "\n\n");
-}
-
-void shutdown_clean(int sig)
-{
-	exit(0);
-}
-
-void ignore_signal(int sig)
-{
-}
-
-void handle_child(int sig)
-{
-/*
-Do nothing in this function, it only exists to catch a signal
-so that we are forced to break out of sleep(5) on a SIGCHLD below.
-*/
-}
-
-static void install_handler(int sig, void (*handler) (int sig))
-{
-	struct sigaction s;
-	s.sa_handler = handler;
-	sigfillset(&s.sa_mask);
-	s.sa_flags = 0;
-	sigaction(sig, &s, 0);
-}
-
-/*
-space_available() is a simple mechanism to ensure that
-a runaway client does not use up every last drop of disk
-space on a machine.  This function returns false if
-consuming the given amount of space will leave less than
-a fixed amount of headroom on the disk.  Note that
-get_disk_info() is quite expensive, so we do not call
-it more than once per second.
-*/
-
+/* space_available() is a simple mechanism to ensure that a runaway client does
+ * not use up every last drop of disk space on a machine.  This function
+ * returns false if consuming the given amount of space will leave less than a
+ * fixed amount of headroom on the disk.  Note that get_disk_info() is quite
+ * expensive, so we do not call it more than once per second.
+ */
 static int space_available(INT64_T amount)
 {
 	static UINT64_T avail;
@@ -325,16 +233,13 @@ static int run_in_child_process(int (*func) (const char *a), const char *args, c
 	}
 }
 
-/*
-The parent Chirp server process maintains a pipe connected to
-all child processes.  When the child must update the global
-state, it is done by sending a message to the config pipe,
-which the parent reads and processes.  This code relies
-on the guarantee that all writes of less than PIPE_BUF size
-are atomic, so here we expect a read to return one or
-more complete messages, each delimited by a newline.
+/* The parent Chirp server process maintains a pipe connected to all child
+ * processes.  When the child must update the global state, it is done by
+ * sending a message to the config pipe, which the parent reads and processes.
+ * This code relies on the guarantee that all writes of less than PIPE_BUF size
+ * are atomic, so here we expect a read to return one or more complete
+ * messages, each delimited by a newline.
 */
-
 static void config_pipe_handler(int fd)
 {
 	char line[PIPE_BUF];
@@ -368,456 +273,8 @@ static void config_pipe_handler(int fd)
 	}
 }
 
-
-static struct option long_options[] = {
-	{"advertise", required_argument, 0, 'u'},
-	{"auth", required_argument, 0, 'a'},
-	{"catalog-name", required_argument, 0, 'n'},
-	{"challenge-dir", required_argument, 0, 'c'},
-	{"catalog-update", required_argument, 0, 'U'},
-	{"background", no_argument, 0, 'b'},
-	{"debug", required_argument, 0, 'd'},
-	{"debug-file", required_argument, 0, 'o'},
-	{"default-acl", required_argument, 0, 'A'},
-	{"free-space", required_argument, 0, 'F'},
-	{"group-cache-exp", required_argument, 0, 'T'},
-	{"group-url", required_argument, 0, 'G'},
-	{"help", no_argument, 0, 'h'},
-	{"idle-clients", required_argument, 0, 't'},
-	{"interface", required_argument, 0, 'I'},
-	{"max-clients", required_argument, 0, 'M'},
-	{"no-core-dump", no_argument, 0, 'C'},
-	{"owner", required_argument, 0, 'w'},
-	{"parent-check", required_argument, 0, 'e'},
-	{"parent-death", no_argument, 0, 'E'},
-	{"passwd", required_argument, 0, 'W'},
-	{"pid-file", required_argument, 0, 'B'},
-	{"port", required_argument, 0, 'p'},
-	{"port-file", required_argument, 0, 'Z'},
-	{"read-only", no_argument, 0, 'R'},
-	{"root", required_argument, 0, 'r'},
-	{"root-quota", required_argument, 0, 'Q'},
-	{"debug-rotate-max", required_argument, 0, 'O'},
-	{"stalled", required_argument, 0, 's'},
-	{"superuser", required_argument, 0, 'P'},
-	{"transient", required_argument, 0, 'y'},
-	{"unix-timeout", required_argument, 0, 'z'},
-	{"user", required_argument, 0, 'i'},
-	{"version", no_argument, 0, 'v'},
-	{0, 0, 0, 0}
-};
-
-int main(int argc, char *argv[])
-{
-	struct link *link;
-	signed char c;
-	time_t current;
-	int is_daemon = 0;
-	char pidfile[PATH_MAX];
-
-	change_process_title_init(argv);
-	change_process_title("chirp_server");
-
-	catalog_host_list = list_create();
-
-	debug_config(argv[0]);
-
-	/* Ensure that all files are created private by default. */
-	umask(0077);
-
-	while((c = getopt_long(argc, argv, "A:a:B:bCc:d:Ee:F:G:hI:i:l:M:n:O:o:P:p:Q:Rr:s:T:t:U:u:vW:w:y:Z:z:", long_options, NULL)) > -1) {
-		switch (c) {
-		case 'A':
-			{
-				char path[PATH_MAX];
-				path_absolute(optarg, path, 1);
-				chirp_acl_default(path);
-			}
-			break;
-		case 'a':
-			auth_register_byname(optarg);
-			did_explicit_auth = 1;
-			break;
-		case 'b':
-			is_daemon = 1;
-			break;
-		case 'B':
-			path_absolute(optarg, pidfile, 0);
-			break;
-		case 'c':
-			{
-				char path[PATH_MAX];
-				path_absolute(optarg, path, 1);
-				auth_unix_challenge_dir(path);
-			}
-			break;
-		case 'C':
-			dont_dump_core = 1;
-			break;
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case 'e':
-			parent_check_timeout = string_time_parse(optarg);
-			exit_if_parent_fails = 1;
-			break;
-		case 'E':
-			exit_if_parent_fails = 1;
-			break;
-		case 'F':
-			minimum_space_free = string_metric_parse(optarg);
-			break;
-		case 'G':
-			chirp_group_base_url = optarg;
-			break;
-		case 'i':
-			safe_username = optarg;
-			break;
-		case 'n':
-			manual_hostname = optarg;
-			break;
-		case 'M':
-			max_child_procs = atoi(optarg);
-			break;
-		case 'p':
-			port = atoi(optarg);
-			break;
-		case 'P':
-			chirp_super_user = optarg;
-			break;
-		case 'Q':
-			root_quota = string_metric_parse(optarg);
-			break;
-		case 't':
-			idle_timeout = string_time_parse(optarg);
-			break;
-		case 'T':
-			chirp_group_cache_time = string_time_parse(optarg);
-			break;
-		case 's':
-			stall_timeout = string_time_parse(optarg);
-			break;
-		case 'r':
-			strcpy(chirp_root_url, optarg);
-			break;
-		case 'R':
-			chirp_acl_force_readonly();
-			break;
-		case 'o':
-			path_absolute(optarg, chirp_debug_file, 0);
-			break;
-		case 'O':
-			debug_config_file_size(string_metric_parse(optarg));
-			break;
-		case 'u':
-			list_push_head(catalog_host_list, strdup(optarg));
-			break;
-		case 'U':
-			advertise_timeout = string_time_parse(optarg);
-			break;
-		case 'v':
-			cctools_version_print(stdout, argv[0]);
-			return 1;
-		case 'w':
-			strcpy(chirp_owner, optarg);
-			break;
-		case 'W':
-			{
-				char path[PATH_MAX];
-				path_absolute(optarg, path, 1);
-				auth_unix_passwd_file(path);
-			}
-			break;
-		case 'I':
-			listen_on_interface = optarg;
-			break;
-		case 'y':
-			path_absolute(optarg, chirp_transient_path, 0);
-			break;
-		case 'z':
-			auth_unix_timeout_set(atoi(optarg));
-			break;
-		case 'Z':
-			path_absolute(optarg, port_file, 0);
-			port = 0;
-			break;
-		case 'l':
-			/* not documented, internal testing */
-			sim_latency = atoi(optarg);
-			break;
-		case 'h':
-		default:
-			show_help(argv[0]);
-			return 1;
-		}
-	}
-
-	if(is_daemon)
-		daemonize(0, pidfile);
-
-	/* Ensure that all files are created private by default (again because of daemonize). */
-	umask(0077);
-
-	/* open debug file now because daemonize closes all open fds */
-	debug_config_file(strlen(chirp_debug_file) ? chirp_debug_file : NULL);
-
-	cctools_version_debug(D_DEBUG, argv[0]);
-
-	cfs_reinterpret(chirp_root_url);
-	/* translate relative paths to absolute ones */
-	{
-		char path[PATH_MAX];
-		path_absolute(chirp_transient_path, path, 0);
-		strcpy(chirp_transient_path, path);
-		debug(D_CHIRP, "transient directory: `%s'", chirp_transient_path);
-	}
-
-	chdir("/"); /* no more relative path access from this point on */
-
-	if(!create_dir(chirp_transient_path, S_IRWXU)) {
-		fatal("could not create transient data directory '%s': %s", chirp_transient_path, strerror(errno));
-	}
-
-	if(pipe(config_pipe) < 0)
-		fatal("could not create internal pipe: %s", strerror(errno));
-
-	if(dont_dump_core) {
-		struct rlimit rl;
-		rl.rlim_cur = rl.rlim_max = 0;
-		setrlimit(RLIMIT_CORE, &rl);
-	}
-
-	current = time(0);
-	debug(D_ALL, "*** %s starting at %s", argv[0], ctime(&current));
-
-	if(!chirp_owner[0]) {
-		if(!username_get(chirp_owner)) {
-			strcpy(chirp_owner, "unknown");
-		}
-	}
-
-	if(!did_explicit_auth) {
-		auth_register_all();
-	}
-
-	cfs = cfs_lookup(chirp_root_url);
-
-	if(run_in_child_process(backend_setup, chirp_root_url, "backend setup") != 0) {
-		fatal("couldn't setup %s", chirp_root_url);
-	}
-
-	if(!list_size(catalog_host_list)) {
-		list_push_head(catalog_host_list, CATALOG_HOST);
-	}
-
-	if(getuid() == 0) {
-		if(!safe_username) {
-			fprintf(stdout, "Sorry, I refuse to run as root without certain safeguards.\n");
-			fprintf(stdout, "Please give me a safe username with the -i <user> option.\n");
-			fprintf(stdout, "After using root access to authenticate users,\n");
-			fprintf(stdout, "I will use the safe username to access data on disk.\n");
-			exit(1);
-		} else {
-			struct passwd *p = getpwnam(safe_username);
-			if(!p)
-				fatal("unknown user: %s", safe_username);
-			safe_uid = p->pw_uid;
-			safe_gid = p->pw_gid;
-		}
-	} else if(safe_username) {
-		fprintf(stdout, "Sorry, the -i option doesn't make sense\n");
-		fprintf(stdout, "unless I am already running as root.\n");
-		exit(1);
-	}
-
-	link = link_serve_address(listen_on_interface, port);
-
-	if(!link) {
-		if(listen_on_interface) {
-			fatal("couldn't listen on interface %s port %d: %s", listen_on_interface, port, strerror(errno));
-		} else {
-			fatal("couldn't listen on port %d: %s", port, strerror(errno));
-		}
-	}
-
-	link_address_local(link, address, &port);
-
-	debug(D_DEBUG, "now listening port on port %d\n", port);
-
-	if(strlen(port_file))
-		opts_write_port_file(port_file, port);
-
-	starttime = time(0);
-	catalog_port = datagram_create(0);
-	if(manual_hostname) {
-		strcpy(hostname, manual_hostname);
-	} else {
-		domain_name_cache_guess(hostname);
-	}
-
-	install_handler(SIGPIPE, ignore_signal);
-	install_handler(SIGHUP, ignore_signal);
-	install_handler(SIGCHLD, handle_child);
-	install_handler(SIGINT, shutdown_clean);
-	install_handler(SIGTERM, shutdown_clean);
-	install_handler(SIGQUIT, shutdown_clean);
-	install_handler(SIGXFSZ, ignore_signal);
-
-	while(1) {
-		char addr[LINK_ADDRESS_MAX];
-		int port;
-		struct link *l;
-		pid_t pid;
-
-		if(exit_if_parent_fails) {
-			if(getppid() < 5) {
-				fatal("stopping because parent process died.");
-				exit(0);
-			}
-		}
-
-		while((pid = waitpid(-1, 0, WNOHANG)) > 0) {
-			debug(D_PROCESS, "pid %d completed (%d total child procs)", pid, total_child_procs);
-			total_child_procs--;
-		}
-
-		if(time(0) >= advertise_alarm) {
-			run_in_child_process(update_all_catalogs, chirp_root_url, "catalog update");
-			advertise_alarm = time(0) + advertise_timeout;
-			chirp_stats_cleanup();
-		}
-
-		if(time(0) >= gc_alarm) {
-			run_in_child_process(gc_tickets, chirp_root_url, "ticket cleanup");
-			gc_alarm = time(0) + gc_timeout;
-		}
-
-		/* Wait for action on one of two ports: the master TCP port, or the internal pipe. */
-		/* If the limit of child procs has been reached, don't watch the TCP port. */
-
-		fd_set rfds;
-		FD_ZERO(&rfds);
-		FD_SET(config_pipe[0], &rfds);
-		if(max_child_procs == 0 || total_child_procs < max_child_procs) {
-			FD_SET(link_fd(link), &rfds);
-		}
-		int maxfd = MAX(link_fd(link), config_pipe[0]) + 1;
-
-		/* Sleep for the minimum of any periodic timers, but don't go negative. */
-
-		struct timeval timeout;
-		time_t current = time(0);
-		timeout.tv_usec = 0;
-		timeout.tv_sec = advertise_alarm - current;
-		timeout.tv_sec = MIN(timeout.tv_sec, gc_alarm - current);
-		timeout.tv_sec = MIN(timeout.tv_sec, parent_check_timeout);
-		timeout.tv_sec = MAX(0, timeout.tv_sec);
-
-		/* Wait for activity on the listening port or the config pipe */
-
-		if(select(maxfd, &rfds, 0, 0, &timeout) < 0)
-			continue;
-
-		/* If the network port is active, accept the connection and fork the handler. */
-
-		if(FD_ISSET(link_fd(link), &rfds)) {
-			l = link_accept(link, time(0) + 5);
-			if(!l)
-				continue;
-
-			link_address_remote(l, addr, &port);
-
-			pid = fork();
-			if(pid == 0) {
-				chirp_receive(l);
-				_exit(0);
-			} else if(pid > 0) {
-				total_child_procs++;
-				debug(D_PROCESS, "created pid %d (%d total child procs)", pid, total_child_procs);
-			} else {
-				debug(D_PROCESS, "couldn't fork: %s", strerror(errno));
-			}
-			link_close(l);
-		}
-
-		/* If the config pipe is active, read and process those messages. */
-
-		if(FD_ISSET(config_pipe[0], &rfds)) {
-			config_pipe_handler(config_pipe[0]);
-		}
-	}
-}
-
-static void chirp_receive(struct link *link)
-{
-	char *atype, *asubject;
-	char typesubject[AUTH_TYPE_MAX + AUTH_SUBJECT_MAX];
-	char addr[LINK_ADDRESS_MAX];
-	int port;
-
-	change_process_title("chirp_server [authenticating]");
-
-	/* Chirp's backend file system must be loaded here. HDFS loads in the JVM
-	 * which does not play nicely with fork. So, we only manipulate the backend
-	 * file system in a child process which actually handles client requests.
-	 * */
-	chirp_root_path = cfs->init(chirp_root_url);
-	if(!chirp_root_path)
-		fatal("could not initialize %s backend filesystem: %s", chirp_root_url, strerror(errno));
-
-	if(root_quota > 0) {
-		if(cfs == &chirp_fs_hdfs)
-			/* FIXME: why can't HDFS do quotas? original comment: "using HDFS? Can't do quotas : /" */
-			fatal("Cannot use quotas with HDFS\n");
-		else
-			chirp_alloc_init(chirp_root_path, root_quota);
-	}
-
-	link_address_remote(link, addr, &port);
-
-	auth_ticket_server_callback(chirp_acl_ticket_callback);
-
-	if(auth_accept(link, &atype, &asubject, time(0) + idle_timeout)) {
-		sprintf(typesubject, "%s:%s", atype, asubject);
-		free(atype);
-		free(asubject);
-
-		debug(D_LOGIN, "%s from %s:%d", typesubject, addr, port);
-
-		if(safe_username) {
-			cfs->chown(chirp_root_path, safe_uid, safe_gid);
-			cfs->chmod(chirp_root_path, 0700);
-			debug(D_AUTH, "changing to uid %d gid %d", safe_uid, safe_gid);
-			setgid(safe_gid);
-			setuid(safe_uid);
-		}
-		/* Enable only globus, hostname, and address authentication for third-party transfers. */
-		auth_clear();
-		if(auth_globus_has_delegated_credential()) {
-			auth_globus_use_delegated_credential(1);
-			auth_globus_register();
-		}
-		auth_hostname_register();
-		auth_address_register();
-
-		change_process_title("chirp_server [%s:%d] [%s]", addr, port, typesubject);
-
-		chirp_handler(link, addr, typesubject);
-		chirp_alloc_flush();
-		chirp_stats_report(config_pipe[1], addr, typesubject, 0);
-
-		debug(D_LOGIN, "disconnected");
-	} else {
-		debug(D_LOGIN, "authentication failed from %s:%d", addr, port);
-	}
-
-	link_close(link);
-}
-
-/*
-  Force a path to fall within the simulated root directory.
-*/
-
+/* Force a path to fall within the simulated root directory.
+ */
 static int chirp_path_fix(char *path)
 {
 	char decoded[CHIRP_PATH_MAX];
@@ -832,16 +289,69 @@ static int chirp_path_fix(char *path)
 	return 1;
 }
 
-/*
-  A note on integers:
-  Various operating systems employ integers of different sizes
-  for fields such as file size, user identity, and so forth.
-  Regardless of the operating system support, the Chirp protocol
-  must support integers up to 64 bits.  So, in the server handling
-  loop, we treat all integers as INT64_T.  What the operating system
-  does from there is out of our hands.
-*/
+static int errno_to_chirp(int e)
+{
+	switch (e) {
+	case EACCES:
+	case EPERM:
+	case EROFS:
+		return CHIRP_ERROR_NOT_AUTHORIZED;
+	case ENOENT:
+		return CHIRP_ERROR_DOESNT_EXIST;
+	case EEXIST:
+		return CHIRP_ERROR_ALREADY_EXISTS;
+	case EFBIG:
+		return CHIRP_ERROR_TOO_BIG;
+	case ENOSPC:
+	case EDQUOT:
+		return CHIRP_ERROR_NO_SPACE;
+	case ENOMEM:
+		return CHIRP_ERROR_NO_MEMORY;
+#ifdef ENOATTR
+	case ENOATTR:
+#endif
+	case ENOSYS:
+	case EINVAL:
+		return CHIRP_ERROR_INVALID_REQUEST;
+	case EMFILE:
+	case ENFILE:
+		return CHIRP_ERROR_TOO_MANY_OPEN;
+	case EBUSY:
+		return CHIRP_ERROR_BUSY;
+	case EAGAIN:
+		return CHIRP_ERROR_TRY_AGAIN;
+	case EBADF:
+		return CHIRP_ERROR_BAD_FD;
+	case EISDIR:
+		return CHIRP_ERROR_IS_DIR;
+	case ENOTDIR:
+		return CHIRP_ERROR_NOT_DIR;
+	case ENOTEMPTY:
+		return CHIRP_ERROR_NOT_EMPTY;
+	case EXDEV:
+		return CHIRP_ERROR_CROSS_DEVICE_LINK;
+	case EHOSTUNREACH:
+		return CHIRP_ERROR_GRP_UNREACHABLE;
+	case ESRCH:
+		return CHIRP_ERROR_NO_SUCH_PROCESS;
+	case ESPIPE:
+		return CHIRP_ERROR_IS_A_PIPE;
+	case ENOTSUP:
+		return CHIRP_ERROR_NOT_SUPPORTED;
+	default:
+		debug(D_CHIRP, "zoiks, I don't know how to transform error %d (%s)\n", errno, strerror(errno));
+		return CHIRP_ERROR_UNKNOWN;
+	}
+}
 
+/* A note on integers:
+ *
+ * Various operating systems employ integers of different sizes for fields such
+ * as file size, user identity, and so forth. Regardless of the operating
+ * system support, the Chirp protocol must support integers up to 64 bits. So,
+ * in the server handling loop, we treat all integers as INT64_T. What the
+ * operating system does from there is out of our hands.
+ */
 static void chirp_handler(struct link *l, const char *addr, const char *subject)
 {
 	char line[CHIRP_LINE_MAX];
@@ -1857,7 +1367,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				strcpy(fixed, start);
 				chirp_path_fix(fixed);
 
-				if(access(fixed, F_OK) == -1) {
+				if(cfs->access(fixed, F_OK) == -1) {
 					link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
 				} else if(!chirp_acl_check(fixed, subject, CHIRP_ACL_WRITE)) {
 					link_putfstring(l, "%d:%d:%s:\n", stalltime, EPERM, CHIRP_SEARCH_ERR_OPEN, fixed);
@@ -1884,7 +1394,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		if(do_no_result) {
 			/* nothing */
 		} else if(result < 0) {
-		      failure:
+failure:
 			result = errno_to_chirp(errno);
 			sprintf(line, "%" PRId64 "\n", result);
 		} else if(do_stat_result) {
@@ -1898,78 +1408,569 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		}
 
 		debug(D_CHIRP, "= %s", line);
-		if(!do_no_result) {
-			length = strlen(line);
-			actual = link_putlstring(l, line, length, stalltime);
-
-			if(actual != length)
-				break;
+		if (!do_no_result) {
+			if (link_putlstring(l, line, strlen(line), stalltime) == -1) break;
 		}
 
 		if(dataout) {
-			actual = link_putlstring(l, dataout, dataoutlength, stalltime);
-			if(actual != dataoutlength)
-				break;
+			if (link_putlstring(l, dataout, dataoutlength, stalltime) == -1) break;
 			free(dataout);
 			dataout = 0;
 		}
-
 	}
 	free(esubject);
 }
 
-static int errno_to_chirp(int e)
+static void chirp_receive(struct link *link)
 {
-	switch (e) {
-	case EACCES:
-	case EPERM:
-	case EROFS:
-		return CHIRP_ERROR_NOT_AUTHORIZED;
-	case ENOENT:
-		return CHIRP_ERROR_DOESNT_EXIST;
-	case EEXIST:
-		return CHIRP_ERROR_ALREADY_EXISTS;
-	case EFBIG:
-		return CHIRP_ERROR_TOO_BIG;
-	case ENOSPC:
-	case EDQUOT:
-		return CHIRP_ERROR_NO_SPACE;
-	case ENOMEM:
-		return CHIRP_ERROR_NO_MEMORY;
-#ifdef ENOATTR
-	case ENOATTR:
-#endif
-	case ENOSYS:
-	case EINVAL:
-		return CHIRP_ERROR_INVALID_REQUEST;
-	case EMFILE:
-	case ENFILE:
-		return CHIRP_ERROR_TOO_MANY_OPEN;
-	case EBUSY:
-		return CHIRP_ERROR_BUSY;
-	case EAGAIN:
-		return CHIRP_ERROR_TRY_AGAIN;
-	case EBADF:
-		return CHIRP_ERROR_BAD_FD;
-	case EISDIR:
-		return CHIRP_ERROR_IS_DIR;
-	case ENOTDIR:
-		return CHIRP_ERROR_NOT_DIR;
-	case ENOTEMPTY:
-		return CHIRP_ERROR_NOT_EMPTY;
-	case EXDEV:
-		return CHIRP_ERROR_CROSS_DEVICE_LINK;
-	case EHOSTUNREACH:
-		return CHIRP_ERROR_GRP_UNREACHABLE;
-	case ESRCH:
-		return CHIRP_ERROR_NO_SUCH_PROCESS;
-	case ESPIPE:
-		return CHIRP_ERROR_IS_A_PIPE;
-	case ENOTSUP:
-		return CHIRP_ERROR_NOT_SUPPORTED;
-	default:
-		debug(D_CHIRP, "zoiks, I don't know how to transform error %d (%s)\n", errno, strerror(errno));
-		return CHIRP_ERROR_UNKNOWN;
+	char *atype, *asubject;
+	char typesubject[AUTH_TYPE_MAX + AUTH_SUBJECT_MAX];
+	char addr[LINK_ADDRESS_MAX];
+	int port;
+
+	change_process_title("chirp_server [authenticating]");
+
+	/* Chirp's backend file system must be loaded here. HDFS loads in the JVM
+	 * which does not play nicely with fork. So, we only manipulate the backend
+	 * file system in a child process which actually handles client requests.
+	 * */
+	chirp_root_path = cfs->init(chirp_root_url);
+	if(!chirp_root_path)
+		fatal("could not initialize %s backend filesystem: %s", chirp_root_url, strerror(errno));
+
+	if(root_quota > 0) {
+		if(cfs == &chirp_fs_hdfs)
+			/* On why HDFS can't do quotas (allocations) [1]:
+			 *
+			 * In the current implementation, quotas (allocations) do not work
+			 * with HDFS b/c the chirp_alloc module stores the allocation
+			 * information in the Unix filesystem and relies upon file locking
+			 * and signals to ensure mutual exclusion. Modifying the code to
+			 * store it in cfs instead of Unix would be easy, but hdfs still
+			 * doesn't support file locking. (Nor does any other distributed
+			 * file system.)
+			 *
+			 * An alternative approach would be to store the allocation data in
+			 * a database alongside the filesystem. This has some pros and cons
+			 * to be worked out.
+			 *
+			 * [1] https://github.com/batrick/cctools/commit/377377f54e7660c8571d3088487b00c8ad2d2d7d#commitcomment-4265178
+			 */
+			fatal("Cannot use quotas with HDFS\n");
+		else
+			chirp_alloc_init(chirp_root_path, root_quota);
+	}
+
+	link_address_remote(link, addr, &port);
+
+	auth_ticket_server_callback(chirp_acl_ticket_callback);
+
+	if(auth_accept(link, &atype, &asubject, time(0) + idle_timeout)) {
+		sprintf(typesubject, "%s:%s", atype, asubject);
+		free(atype);
+		free(asubject);
+
+		debug(D_LOGIN, "%s from %s:%d", typesubject, addr, port);
+
+		if(safe_username) {
+			cfs->chown(chirp_root_path, safe_uid, safe_gid);
+			cfs->chmod(chirp_root_path, 0700);
+			debug(D_AUTH, "changing to uid %d gid %d", safe_uid, safe_gid);
+			setgid(safe_gid);
+			setuid(safe_uid);
+		}
+		/* Enable only globus, hostname, and address authentication for third-party transfers. */
+		auth_clear();
+		if(auth_globus_has_delegated_credential()) {
+			auth_globus_use_delegated_credential(1);
+			auth_globus_register();
+		}
+		auth_hostname_register();
+		auth_address_register();
+
+		change_process_title("chirp_server [%s:%d] [%s]", addr, port, typesubject);
+
+		chirp_handler(link, addr, typesubject);
+		chirp_alloc_flush();
+		chirp_stats_report(config_pipe[1], addr, typesubject, 0);
+
+		debug(D_LOGIN, "disconnected");
+	} else {
+		debug(D_LOGIN, "authentication failed from %s:%d", addr, port);
+	}
+
+	link_close(link);
+}
+
+void killeveryone (int sig)
+{
+	/* start with sig */
+	kill(-getpgrp(), sig);
+	sleep(1);
+	kill(-getpgrp(), SIGTERM);
+	sleep(1);
+	kill(-getpgrp(), SIGQUIT);
+	sleep(1);
+	kill(-getpgrp(), SIGKILL);
+	_exit(EXIT_FAILURE);
+}
+
+void shutdown_clean(int sig)
+{
+	sigset_t set;
+	struct sigaction act;
+	pid_t pid;
+
+	pid = fork(); /* how perverse */
+	if (pid == 0) {
+		return killeveryone(sig);
+	} else if (pid == -1) {
+		return killeveryone(sig); /* do it ourselves */
+	}
+
+	/* Now we want Chirp to terminate due to signal delivery. A good reason
+	 * for this is proper termination status to the parent. Additionally, some
+	 * signals (should) generate a core dump.
+	 */
+	act.sa_handler = SIG_DFL;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = 0;
+	sigaction(sig, &act, NULL);
+	sigemptyset(&set);
+	sigaddset(&set, sig);
+	sigprocmask(SIG_UNBLOCK, &set, NULL);
+	raise(sig); /* this should kill us */
+	_exit(EXIT_FAILURE); /* if it does not... */
+}
+
+static void install_handler(int sig, void (*handler) (int sig))
+{
+	struct sigaction s;
+	s.sa_handler = handler;
+	sigfillset(&s.sa_mask); /* block all signals during handler execution */
+	s.sa_flags = 0;
+	sigaction(sig, &s, 0);
+}
+
+static void show_help(const char *cmd)
+{
+	fprintf(stdout, "use: %s [options]\n", cmd);
+	fprintf(stdout, "The most common options are:\n");
+	fprintf(stdout, " %-30s URL of storage directory, like `file://path' or `hdfs://host:port/path'.\n", "-r,--root=<url>");
+	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<name>");
+	fprintf(stdout, " %-30s Send debugging output to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send status updates to this host. (default: `%s')\n", "-u,--advertise=<host>", CATALOG_HOST);
+	fprintf(stdout, " %-30s Show version info.\n", "-v,--version");
+	fprintf(stdout, " %-30s This message.\n", "-h,--help");
+	fprintf(stdout, "\n");
+	fprintf(stdout, "Less common options are:\n");
+	fprintf(stdout, " %-30s Use this file as the default ACL.\n", "-A,--default-acl=<file>");
+	fprintf(stdout, " %-30s Enable this authentication method.\n", "-a,--auth=<method>");
+	fprintf(stdout, " %-30s Write process identifier (PID) to file.\n", "-B,--pid-file=<file>");
+	fprintf(stdout, " %-30s Run as a daemon.\n", "-b,--background");
+	fprintf(stdout, " %-30s Do not create a core dump, even due to a crash.\n", "-C,--no-core-dump");
+	fprintf(stdout, " %-30s Challenge directory for unix filesystem authentication.\n", "-c,--challenge-dir=<dir>");
+	fprintf(stdout, " %-30s Exit if parent process dies.\n", "-E,--parent-death");
+	fprintf(stdout, " %-30s Leave this much space free in the filesystem.\n", "-F,--free-space=<size>");
+	fprintf(stdout, " %-30s Base url for group lookups. (default: disabled)\n", "-G,--group-url=<url>");
+	fprintf(stdout, " %-30s Run as lower privilege user. (root protection)\n", "-i,--user=<user>");
+	fprintf(stdout, " %-30s Listen only on this network interface.\n", "-I,--interface=<addr>");
+	fprintf(stdout, " %-30s Set the maximum number of clients to accept at once. (default unlimited)\n", "-M,--max-clients=<count>");
+	fprintf(stdout, " %-30s Use this name when reporting to the catalog.\n", "-n,--catalog-name=<name>");
+	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s Superuser for all directories. (default: none)\n", "-P,--superuser=<user>");
+	fprintf(stdout, " %-30s Listen on this port. (default: %d)\n", "-p,--port=<port>", port);
+	fprintf(stdout, " %-30s Enforce this root quota in software.\n", "-Q,--root-quota=<size>");
+	fprintf(stdout, " %-30s Read-only mode.\n", "-R,--read-only");
+	fprintf(stdout, " %-30s Abort stalled operations after this long. (default: %ds)\n", "-s,--stalled=<time>", stall_timeout);
+	fprintf(stdout, " %-30s Maximum time to cache group information. (default: %ds)\n", "-T,--group-cache-exp=<time>", chirp_group_cache_time);
+	fprintf(stdout, " %-30s Disconnect idle clients after this time. (default: %ds)\n", "-t,--idle-clients=<time>", idle_timeout);
+	fprintf(stdout, " %-30s Send status updates at this interval. (default: 5m)\n", "-U,--catalog-update=<time>");
+	fprintf(stdout, " %-30s Use alternate password file for unix authentication.\n", "-W,--passwd=<file>");
+	fprintf(stdout, " %-30s The name of this server's owner. (default: `whoami`)\n", "-w,--owner=<user>");
+	fprintf(stdout, " %-30s Location of transient data. (default: `.')\n", "-y,--transient=<dir>");
+	fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
+	fprintf(stdout, " %-30s Set max timeout for unix filesystem authentication. (default: 5s)\n", "-z,--unix-timeout=<file>");
+	fprintf(stdout, "\n");
+	fprintf(stdout, "Where debug flags are: ");
+	debug_flags_print(stdout);
+	fprintf(stdout, "\n\n");
+}
+
+int main(int argc, char *argv[])
+{
+	static const struct option long_options[] = {
+		{"advertise", required_argument, 0, 'u'},
+		{"auth", required_argument, 0, 'a'},
+		{"catalog-name", required_argument, 0, 'n'},
+		{"challenge-dir", required_argument, 0, 'c'},
+		{"catalog-update", required_argument, 0, 'U'},
+		{"background", no_argument, 0, 'b'},
+		{"debug", required_argument, 0, 'd'},
+		{"debug-file", required_argument, 0, 'o'},
+		{"default-acl", required_argument, 0, 'A'},
+		{"free-space", required_argument, 0, 'F'},
+		{"group-cache-exp", required_argument, 0, 'T'},
+		{"group-url", required_argument, 0, 'G'},
+		{"help", no_argument, 0, 'h'},
+		{"idle-clients", required_argument, 0, 't'},
+		{"interface", required_argument, 0, 'I'},
+		{"max-clients", required_argument, 0, 'M'},
+		{"no-core-dump", no_argument, 0, 'C'},
+		{"owner", required_argument, 0, 'w'},
+		{"parent-check", required_argument, 0, 'e'},
+		{"parent-death", no_argument, 0, 'E'},
+		{"passwd", required_argument, 0, 'W'},
+		{"pid-file", required_argument, 0, 'B'},
+		{"port", required_argument, 0, 'p'},
+		{"port-file", required_argument, 0, 'Z'},
+		{"read-only", no_argument, 0, 'R'},
+		{"root", required_argument, 0, 'r'},
+		{"root-quota", required_argument, 0, 'Q'},
+		{"debug-rotate-max", required_argument, 0, 'O'},
+		{"stalled", required_argument, 0, 's'},
+		{"superuser", required_argument, 0, 'P'},
+		{"transient", required_argument, 0, 'y'},
+		{"unix-timeout", required_argument, 0, 'z'},
+		{"user", required_argument, 0, 'i'},
+		{"version", no_argument, 0, 'v'},
+		{0, 0, 0, 0}
+	};
+
+	struct link *link;
+	int c;
+	time_t current;
+	int is_daemon = 0;
+	char pidfile[PATH_MAX];
+	int exit_if_parent_fails = 0;
+	int dont_dump_core = 0;
+	time_t gc_alarm = 0;
+	const char *manual_hostname = 0;
+	int max_child_procs = 0;
+	const char *listen_on_interface = 0;
+	char chirp_debug_file[PATH_MAX];
+	int total_child_procs = 0;
+	int did_explicit_auth = 0;
+	char port_file[PATH_MAX];
+
+	change_process_title_init(argv);
+	change_process_title("chirp_server");
+
+	catalog_host_list = list_create();
+
+	debug_config(argv[0]);
+
+	/* Ensure that all files are created private by default. */
+	umask(0077);
+
+	while((c = getopt_long(argc, argv, "A:a:B:bCc:d:Ee:F:G:hI:i:l:M:n:O:o:P:p:Q:Rr:s:T:t:U:u:vW:w:y:Z:z:", long_options, NULL)) > -1) {
+		switch (c) {
+		case 'A':
+			{
+				char path[PATH_MAX];
+				path_absolute(optarg, path, 1);
+				chirp_acl_default(path);
+			}
+			break;
+		case 'a':
+			auth_register_byname(optarg);
+			did_explicit_auth = 1;
+			break;
+		case 'b':
+			is_daemon = 1;
+			break;
+		case 'B':
+			path_absolute(optarg, pidfile, 0);
+			break;
+		case 'c':
+			{
+				char path[PATH_MAX];
+				path_absolute(optarg, path, 1);
+				auth_unix_challenge_dir(path);
+			}
+			break;
+		case 'C':
+			dont_dump_core = 1;
+			break;
+		case 'd':
+			debug_flags_set(optarg);
+			break;
+		case 'e':
+		case 'E':
+			exit_if_parent_fails = 1;
+			break;
+		case 'F':
+			minimum_space_free = string_metric_parse(optarg);
+			break;
+		case 'G':
+			chirp_group_base_url = optarg;
+			break;
+		case 'i':
+			safe_username = optarg;
+			break;
+		case 'n':
+			manual_hostname = optarg;
+			break;
+		case 'M':
+			max_child_procs = atoi(optarg);
+			break;
+		case 'p':
+			port = atoi(optarg);
+			break;
+		case 'P':
+			chirp_super_user = optarg;
+			break;
+		case 'Q':
+			root_quota = string_metric_parse(optarg);
+			break;
+		case 't':
+			idle_timeout = string_time_parse(optarg);
+			break;
+		case 'T':
+			chirp_group_cache_time = string_time_parse(optarg);
+			break;
+		case 's':
+			stall_timeout = string_time_parse(optarg);
+			break;
+		case 'r':
+			strcpy(chirp_root_url, optarg);
+			break;
+		case 'R':
+			chirp_acl_force_readonly();
+			break;
+		case 'o':
+			path_absolute(optarg, chirp_debug_file, 0);
+			break;
+		case 'O':
+			debug_config_file_size(string_metric_parse(optarg));
+			break;
+		case 'u':
+			list_push_head(catalog_host_list, strdup(optarg));
+			break;
+		case 'U':
+			advertise_timeout = string_time_parse(optarg);
+			break;
+		case 'v':
+			cctools_version_print(stdout, argv[0]);
+			return 1;
+		case 'w':
+			strcpy(chirp_owner, optarg);
+			break;
+		case 'W':
+			{
+				char path[PATH_MAX];
+				path_absolute(optarg, path, 1);
+				auth_unix_passwd_file(path);
+			}
+			break;
+		case 'I':
+			listen_on_interface = optarg;
+			break;
+		case 'y':
+			path_absolute(optarg, chirp_transient_path, 0);
+			break;
+		case 'z':
+			auth_unix_timeout_set(atoi(optarg));
+			break;
+		case 'Z':
+			path_absolute(optarg, port_file, 0);
+			port = 0;
+			break;
+		case 'l':
+			/* not documented, internal testing */
+			sim_latency = atoi(optarg);
+			break;
+		case 'h':
+		default:
+			show_help(argv[0]);
+			return 1;
+		}
+	}
+
+	if(is_daemon)
+		daemonize(0, pidfile);
+	if(is_daemon && exit_if_parent_fails)
+		fatal("daemon cannot check if parent has exit (-e)");
+
+	/* Ensure that all files are created private by default (again because of daemonize). */
+	umask(0077);
+
+	/* open debug file now because daemonize closes all open fds */
+	debug_config_file(strlen(chirp_debug_file) ? chirp_debug_file : NULL);
+
+	cctools_version_debug(D_DEBUG, argv[0]);
+
+	cfs_reinterpret(chirp_root_url);
+	/* translate relative paths to absolute ones */
+	{
+		char path[PATH_MAX];
+		path_absolute(chirp_transient_path, path, 0);
+		strcpy(chirp_transient_path, path);
+		debug(D_CHIRP, "transient directory: `%s'", chirp_transient_path);
+	}
+
+	chdir("/"); /* no more relative path access from this point on */
+
+	if(!create_dir(chirp_transient_path, S_IRWXU)) {
+		fatal("could not create transient data directory '%s': %s", chirp_transient_path, strerror(errno));
+	}
+
+	if(pipe(config_pipe) < 0)
+		fatal("could not create internal pipe: %s", strerror(errno));
+
+	if(dont_dump_core) {
+		struct rlimit rl;
+		rl.rlim_cur = rl.rlim_max = 0;
+		setrlimit(RLIMIT_CORE, &rl);
+	}
+
+	current = time(0);
+	debug(D_ALL, "*** %s starting at %s", argv[0], ctime(&current));
+
+	if(!chirp_owner[0]) {
+		if(!username_get(chirp_owner)) {
+			strcpy(chirp_owner, "unknown");
+		}
+	}
+
+	if(!did_explicit_auth) {
+		auth_register_all();
+	}
+
+	cfs = cfs_lookup(chirp_root_url);
+
+	if(run_in_child_process(backend_setup, chirp_root_url, "backend setup") != 0) {
+		fatal("couldn't setup %s", chirp_root_url);
+	}
+
+	if(!list_size(catalog_host_list)) {
+		list_push_head(catalog_host_list, CATALOG_HOST);
+	}
+
+	if(getuid() == 0) {
+		if(!safe_username) {
+			fprintf(stdout, "Sorry, I refuse to run as root without certain safeguards.\n");
+			fprintf(stdout, "Please give me a safe username with the -i <user> option.\n");
+			fprintf(stdout, "After using root access to authenticate users,\n");
+			fprintf(stdout, "I will use the safe username to access data on disk.\n");
+			exit(1);
+		} else {
+			struct passwd *p = getpwnam(safe_username);
+			if(!p)
+				fatal("unknown user: %s", safe_username);
+			safe_uid = p->pw_uid;
+			safe_gid = p->pw_gid;
+		}
+	} else if(safe_username) {
+		fprintf(stdout, "Sorry, the -i option doesn't make sense\n");
+		fprintf(stdout, "unless I am already running as root.\n");
+		exit(1);
+	}
+
+	link = link_serve_address(listen_on_interface, port);
+
+	if(!link) {
+		if(listen_on_interface) {
+			fatal("couldn't listen on interface %s port %d: %s", listen_on_interface, port, strerror(errno));
+		} else {
+			fatal("couldn't listen on port %d: %s", port, strerror(errno));
+		}
+	}
+
+	link_address_local(link, address, &port);
+
+	debug(D_DEBUG, "now listening port on port %d\n", port);
+
+	if(strlen(port_file))
+		opts_write_port_file(port_file, port);
+
+	starttime = time(0);
+	catalog_port = datagram_create(0);
+	if(manual_hostname) {
+		strcpy(hostname, manual_hostname);
+	} else {
+		domain_name_cache_guess(hostname);
+	}
+
+	install_handler(SIGPIPE, SIG_IGN);
+	install_handler(SIGHUP, SIG_IGN);
+	install_handler(SIGXFSZ, SIG_IGN);
+	install_handler(SIGINT, shutdown_clean);
+	install_handler(SIGTERM, shutdown_clean);
+	install_handler(SIGQUIT, shutdown_clean);
+
+	while(1) {
+		char addr[LINK_ADDRESS_MAX];
+		int port;
+		struct link *l;
+		pid_t pid;
+
+		if(exit_if_parent_fails && getppid() == 1) {
+			fatal("stopping because parent process died.");
+			exit(0);
+		}
+
+		while((pid = waitpid(-1, 0, WNOHANG)) > 0) {
+			debug(D_PROCESS, "pid %d completed (%d total child procs)", pid, total_child_procs);
+			total_child_procs--;
+		}
+
+		if(time(0) >= advertise_alarm) {
+			run_in_child_process(update_all_catalogs, chirp_root_url, "catalog update");
+			advertise_alarm = time(0) + advertise_timeout;
+			chirp_stats_cleanup();
+		}
+
+		if(time(0) >= gc_alarm) {
+			run_in_child_process(gc_tickets, chirp_root_url, "ticket cleanup");
+			gc_alarm = time(0) + GC_TIMEOUT;
+		}
+
+		/* Wait for action on one of two ports: the master TCP port, or the internal pipe. */
+		/* If the limit of child procs has been reached, don't watch the TCP port. */
+
+		fd_set rfds;
+		FD_ZERO(&rfds);
+		FD_SET(config_pipe[0], &rfds);
+		if(max_child_procs == 0 || total_child_procs < max_child_procs) {
+			FD_SET(link_fd(link), &rfds);
+		}
+		int maxfd = MAX(link_fd(link), config_pipe[0]) + 1;
+
+		/* Wait for activity on the listening port or the config pipe */
+		struct timeval timeout;
+		timeout.tv_usec = 5000;
+		timeout.tv_sec = 0;
+		if(select(maxfd, &rfds, 0, 0, &timeout) < 0)
+			continue;
+
+		/* If the network port is active, accept the connection and fork the handler. */
+
+		if(FD_ISSET(link_fd(link), &rfds)) {
+			l = link_accept(link, time(0) + 5);
+			if(!l)
+				continue;
+
+			link_address_remote(l, addr, &port);
+
+			pid = fork();
+			if(pid == 0) {
+				chirp_receive(l);
+				_exit(0);
+			} else if(pid > 0) {
+				total_child_procs++;
+				debug(D_PROCESS, "created pid %d (%d total child procs)", pid, total_child_procs);
+			} else {
+				debug(D_PROCESS, "couldn't fork: %s", strerror(errno));
+			}
+			link_close(l);
+		}
+
+		/* If the config pipe is active, read and process those messages. */
+
+		if(FD_ISSET(config_pipe[0], &rfds)) {
+			config_pipe_handler(config_pipe[0]);
+		}
 	}
 }
 
