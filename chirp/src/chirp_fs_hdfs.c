@@ -430,7 +430,7 @@ static void chirp_fs_hdfs_write_zeroes(int fd, INT64_T length)
 	debug(D_HDFS, "zero %d %"PRId64, fd, length);
 
 	while(length > 0) {
-		int chunksize = MIN(sizeof(zero), length);
+		int chunksize = MIN(sizeof(zero), (size_t)length);
 		hdfs_services->write(fs, open_files[fd].file, zero, chunksize);
 		length -= chunksize;
 	}
