@@ -17,6 +17,7 @@ prepare()
 
 	wait_for_file_creation "$chirp_port" 5
 	wait_for_file_creation "$chirp_pid" 5
+	return 0
 }
 
 run()
@@ -51,6 +52,7 @@ clean()
 	fi
 
 	rm -rf "$chirp_debug" "$chirp_pid" "$chirp_port" "$chirp_root" "$chirp_proxy_debug" "$chirp_proxy_pid" "$chirp_proxy_port"
+	return 0
 }
 
 dispatch $@
