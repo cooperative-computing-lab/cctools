@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include "full_io.h"
 #include "delete_dir.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -97,10 +98,17 @@ See the file COPYING for details.
 	(b).cst_ctime = (a).st_ctime;
 #endif
 
-extern const char *chirp_root_path;
+#define RESOLVE(path) \
+char resolved_##path[CHIRP_PATH_MAX];\
+if (chirp_fs_local_resolve(path, resolved_##path) == -1) return -1;\
+path = resolved_##path;
 
-static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *buf);
-static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *buf);
+#define RESOLVENULL(path) \
+char resolved_##path[CHIRP_PATH_MAX];\
+if (chirp_fs_local_resolve(path, resolved_##path) == -1) return NULL;\
+path = resolved_##path;
+
+static char local_root[CHIRP_PATH_MAX];
 
 /*
  * The provided url could have any of the following forms:
@@ -109,27 +117,39 @@ static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *buf);
  * o `path'
  */
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
-static const char *chirp_fs_local_init(const char *url)
+static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
 {
-	static char root[CHIRP_PATH_MAX];
 	char tmp[CHIRP_PATH_MAX];
-
-	if (strlen(url) >= CHIRP_PATH_MAX) {
-		fatal("root path too long");
-	}
 
 	if (strprfx(url, "local://") || strprfx(url, "file://"))
 		strcpy(tmp, strstr(url, "//")+2);
 	else
 		strcpy(tmp, url);
 
-	path_collapse(tmp, root, 1);
+	path_collapse(tmp, local_root, 1);
 
-	return root;
+	return cfs_create_dir("/", 0711);
+}
+
+static int chirp_fs_local_resolve (const char *path, char resolved[CHIRP_PATH_MAX])
+{
+	int n;
+	char collapse[CHIRP_PATH_MAX];
+	char absolute[CHIRP_PATH_MAX];
+	path_collapse(path, collapse, 1);
+	n = snprintf(absolute, sizeof(absolute), "%s/%s", local_root, collapse);
+	assert(n >= 0); /* this should never happen */
+	if ((size_t)n >= CHIRP_PATH_MAX) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	path_collapse(absolute, resolved, 1);
+	return 0;
 }
 
 static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode)
 {
+	RESOLVE(path)
 	mode = 0600 | (mode & 0100);
 	return open64(path, flags, (int) mode);
 }
@@ -221,48 +241,10 @@ static INT64_T chirp_fs_local_fsync(int fd)
 	return fsync(fd);
 }
 
-struct chirp_dir {
-	char *path;
-	DIR *dir;
-};
-
-static struct chirp_dir *chirp_fs_local_opendir(const char *path)
-{
-	DIR *dir = opendir(path);
-	if(dir) {
-		struct chirp_dir *cdir = malloc(sizeof(*cdir));
-		cdir->dir = dir;
-		cdir->path = strdup(path);
-		return cdir;
-	} else {
-		return 0;
-	}
-}
-
-static struct chirp_dirent *chirp_fs_local_readdir(struct chirp_dir *dir)
-{
-	struct dirent *d = readdir(dir->dir);
-	if(d) {
-		static struct chirp_dirent cd;
-		char subpath[CHIRP_PATH_MAX];
-		cd.name = d->d_name;
-		sprintf(subpath, "%s/%s", dir->path, cd.name);
-		chirp_fs_local_lstat(subpath, &cd.info);
-		return &cd;
-	} else {
-		return 0;
-	}
-}
-
-static void chirp_fs_local_closedir(struct chirp_dir *dir)
-{
-	free(dir->path);
-	closedir(dir->dir);
-	free(dir);
-}
-
 static INT64_T chirp_fs_local_unlink(const char *path)
 {
+	RESOLVE(path)
+
 	int result = unlink(path);
 
 	/*
@@ -293,31 +275,40 @@ static INT64_T chirp_fs_local_rmall(const char *path)
 
 static INT64_T chirp_fs_local_rename(const char *path, const char *newpath)
 {
+	RESOLVE(path)
+	RESOLVE(newpath)
 	return rename(path, newpath);
 }
 
 static INT64_T chirp_fs_local_link(const char *path, const char *newpath)
 {
+	RESOLVE(path)
+	RESOLVE(newpath)
 	return link(path, newpath);
 }
 
 static INT64_T chirp_fs_local_symlink(const char *path, const char *newpath)
 {
+	RESOLVE(path)
+	RESOLVE(newpath)
 	return symlink(path, newpath);
 }
 
 static INT64_T chirp_fs_local_readlink(const char *path, char *buf, INT64_T length)
 {
+	RESOLVE(path)
 	return readlink(path, buf, length);
 }
 
 static INT64_T chirp_fs_local_chdir(const char *path)
 {
+	RESOLVE(path)
 	return chdir(path);
 }
 
 static INT64_T chirp_fs_local_mkdir(const char *path, INT64_T mode)
 {
+	RESOLVE(path)
 	return mkdir(path, 0700);
 }
 
@@ -330,23 +321,23 @@ Only delete the directory if it contains only those files.
 
 static INT64_T chirp_fs_local_rmdir(const char *path)
 {
-	struct chirp_dir *dir;
-	struct chirp_dirent *d;
 	int empty = 1;
+	RESOLVE(path)
 
-	dir = chirp_fs_local_opendir(path);
+	DIR *dir = opendir(path);
 	if(dir) {
-		while((d = chirp_fs_local_readdir(dir))) {
-			if(!strcmp(d->name, "."))
+		struct dirent *d;
+		while((d = readdir(dir))) {
+			if(!strcmp(d->d_name, "."))
 				continue;
-			if(!strcmp(d->name, ".."))
+			if(!strcmp(d->d_name, ".."))
 				continue;
-			if(!strncmp(d->name, ".__", 3))
+			if(!strncmp(d->d_name, ".__", 3))
 				continue;
 			empty = 0;
 			break;
 		}
-		chirp_fs_local_closedir(dir);
+		closedir(dir);
 
 		if(empty) {
 			return delete_dir(path);
@@ -363,6 +354,7 @@ static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *buf)
 {
 	struct stat64 info;
 	int result;
+	RESOLVE(path)
 	result = stat64(path, &info);
 	if(result == 0)
 		COPY_CSTAT(info, *buf);
@@ -373,6 +365,7 @@ static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *buf)
 {
 	struct stat64 info;
 	int result;
+	RESOLVE(path)
 	result = lstat64(path, &info);
 	if(result == 0)
 		COPY_CSTAT(info, *buf);
@@ -383,6 +376,7 @@ static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs *buf)
 {
 	struct statfs64 info;
 	int result;
+	RESOLVE(path)
 	result = statfs64(path, &info);
 	if(result == 0) {
 		memset(buf, 0, sizeof(*buf));
@@ -404,8 +398,54 @@ static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs *buf)
 
 static INT64_T chirp_fs_local_access(const char *path, INT64_T mode)
 {
+	RESOLVE(path)
 	return access(path, mode);
 }
+
+struct chirp_dir {
+	char path[CHIRP_PATH_MAX];
+	DIR *dir;
+	struct chirp_dirent cd;
+};
+
+static struct chirp_dir *chirp_fs_local_opendir(const char *path)
+{
+	RESOLVENULL(path)
+	DIR *dir = opendir(path);
+	if(dir) {
+		struct chirp_dir *cdir = malloc(sizeof(*cdir));
+		cdir->dir = dir;
+		strcpy(cdir->path, path); /* N.B. readdir passes this to chirp_fs_local_lstat */
+		return cdir;
+	} else {
+		return 0;
+	}
+}
+
+static struct chirp_dirent *chirp_fs_local_readdir(struct chirp_dir *dir)
+{
+	struct dirent *d = readdir(dir->dir);
+	if(d) {
+		char path[CHIRP_PATH_MAX];
+		struct stat buf;
+		dir->cd.name = d->d_name;
+		sprintf(path, "%s/%s", dir->path, dir->cd.name);
+		memset(&dir->cd.info, 0, sizeof(dir->cd.info));
+		dir->cd.lstatus = lstat(path, &buf);
+		if(dir->cd.lstatus == 0)
+			COPY_CSTAT(buf, dir->cd.info);
+		return &dir->cd;
+	} else {
+		return 0;
+	}
+}
+
+static void chirp_fs_local_closedir(struct chirp_dir *dir)
+{
+	closedir(dir->dir);
+	free(dir);
+}
+
 
 static int search_to_access(int flags)
 {
@@ -501,7 +541,7 @@ static int search_should_recurse(const char *base, const char *pattern)
 	return 0;
 }
 
-static int search_directory(const char *subject, const char * const base, char *fullpath, const char *pattern, int flags, struct link *l, time_t stoptime)
+static int search_directory(const char *subject, const char * const base, char fullpath[CHIRP_PATH_MAX], const char *pattern, int flags, struct link *l, time_t stoptime)
 {
 	if(strlen(pattern) == 0)
 		return 0;
@@ -528,14 +568,23 @@ static int search_directory(const char *subject, const char * const base, char *
 			sprintf(current, "/%s", name);
 
 			if(search_match_file(pattern, base)) {
-				const char *matched = includeroot ? fullpath+strlen(chirp_root_path) : base; /* add strlen(chirp_root_path) to strip out */
+				const char *matched;
+				if (includeroot) {
+					if (base-fullpath == 1 && fullpath[0] == '/') {
+						matched = base;
+					} else {
+						matched = fullpath;
+					}
+				} else {
+					matched = base;
+				}
 
 				result += 1;
 				if (access_flags == F_OK || chirp_fs_local_access(fullpath, access_flags) == 0) {
 					if(metadata) {
 						/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
 						struct chirp_stat buf;
-						if((chirp_fs_local_stat(fullpath, &buf)) == -1) {
+						if(entry->lstatus == -1) {
 							link_putfstring(l, "0:%s::\n", stoptime, matched); // FIXME is this a bug?
 							link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, matched);
 						} else {
@@ -582,29 +631,28 @@ static int search_directory(const char *subject, const char * const base, char *
 /* Note we need the subject because we must check the ACL for any nested directories. */
 static INT64_T chirp_fs_local_search(const char *subject, const char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
 {
-	char pathname[CHIRP_PATH_MAX];
-	strcpy(pathname, dir);
-	path_remove_trailing_slashes(pathname); /* this prevents double slashes from appearing in paths we examine. */
+	char fullpath[CHIRP_PATH_MAX];
+	strcpy(fullpath, dir);
+	path_remove_trailing_slashes(fullpath); /* this prevents double slashes from appearing in paths we examine. */
 
 	debug(D_DEBUG, "chirp_fs_local_search(subject = `%s', dir = `%s', pattern = `%s', flags = %d, ...)", subject, dir, pattern, flags);
 
 	/* FIXME we should still check for literal paths to search since we can optimize that */
-	return search_directory(subject, pathname + strlen(pathname), pathname, pattern, flags, l, stoptime);
+	return search_directory(subject, fullpath + strlen(fullpath), fullpath, pattern, flags, l, stoptime);
 }
 
 static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
 {
-	struct chirp_stat info;
-
-	int result = chirp_fs_local_stat(path, &info);
-	if(result < 0)
-		return result;
+	struct stat buf;
+	RESOLVE(path)
 
 	// A remote user can change some of the permissions bits,
 	// which only affect local users, but we don't let them
 	// take away the owner bits, which would affect the Chirp server.
 
-	if(S_ISDIR(info.cst_mode)) {
+	if (stat(path, &buf) == -1)
+		return -1;
+	if(S_ISDIR(buf.st_mode)) {
 		// On a directory, the user cannot set the execute bit.
 		mode = 0700 | (mode & 0077);
 	} else {
@@ -631,12 +679,14 @@ static INT64_T chirp_fs_local_lchown(const char *path, INT64_T uid, INT64_T gid)
 
 static INT64_T chirp_fs_local_truncate(const char *path, INT64_T length)
 {
+	RESOLVE(path)
 	return truncate64(path, length);
 }
 
 static INT64_T chirp_fs_local_utime(const char *path, time_t actime, time_t modtime)
 {
 	struct utimbuf ut;
+	RESOLVE(path)
 	ut.actime = actime;
 	ut.modtime = modtime;
 	return utime(path, &ut);
@@ -651,6 +701,7 @@ static INT64_T chirp_fs_local_setrep(const char *path, int nreps)
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
 static INT64_T chirp_fs_local_getxattr(const char *path, const char *name, void *data, size_t size)
 {
+	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return getxattr(path, name, data, size, 0, 0);
 #else
@@ -669,6 +720,7 @@ static INT64_T chirp_fs_local_fgetxattr(int fd, const char *name, void *data, si
 
 static INT64_T chirp_fs_local_lgetxattr(const char *path, const char *name, void *data, size_t size)
 {
+	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return getxattr(path, name, data, size, 0, XATTR_NOFOLLOW);
 #else
@@ -678,6 +730,7 @@ static INT64_T chirp_fs_local_lgetxattr(const char *path, const char *name, void
 
 static INT64_T chirp_fs_local_listxattr(const char *path, char *list, size_t size)
 {
+	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return listxattr(path, list, size, 0);
 #else
@@ -696,6 +749,7 @@ static INT64_T chirp_fs_local_flistxattr(int fd, char *list, size_t size)
 
 static INT64_T chirp_fs_local_llistxattr(const char *path, char *list, size_t size)
 {
+	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return listxattr(path, list, size, XATTR_NOFOLLOW);
 #else
@@ -705,6 +759,7 @@ static INT64_T chirp_fs_local_llistxattr(const char *path, char *list, size_t si
 
 static INT64_T chirp_fs_local_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
+	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return setxattr(path, name, data, size, 0, flags);
 #else
@@ -723,6 +778,7 @@ static INT64_T chirp_fs_local_fsetxattr(int fd, const char *name, const void *da
 
 static INT64_T chirp_fs_local_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
+	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return setxattr(path, name, data, size, 0, XATTR_NOFOLLOW | flags);
 #else
@@ -732,6 +788,7 @@ static INT64_T chirp_fs_local_lsetxattr(const char *path, const char *name, cons
 
 static INT64_T chirp_fs_local_removexattr(const char *path, const char *name)
 {
+	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return removexattr(path, name, 0);
 #else
@@ -750,6 +807,7 @@ static INT64_T chirp_fs_local_fremovexattr(int fd, const char *name)
 
 static INT64_T chirp_fs_local_lremovexattr(const char *path, const char *name)
 {
+	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
 	return removexattr(path, name, XATTR_NOFOLLOW);
 #else

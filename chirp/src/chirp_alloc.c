@@ -38,8 +38,6 @@ static struct itable *fd_table = 0;
 static int recovery_in_progress = 0;
 static int alloc_enabled = 0;
 
-extern char *chirp_root_path;
-
 struct alloc_state {
 	FILE *file;
 	INT64_T size;
