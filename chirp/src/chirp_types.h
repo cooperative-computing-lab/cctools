@@ -65,6 +65,7 @@ struct chirp_statfs {
 
 struct chirp_dirent {
 	char *name;			/**< The name of the directory entry. */
+	int lstatus;		/**< The result of lstat on the entry. */
 	struct chirp_stat info;		/**< The properties of the directory entry. */
 	struct chirp_dirent *next;
 };

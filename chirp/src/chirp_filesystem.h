@@ -58,7 +58,7 @@ INT64_T cfs_stub_fremovexattr (int fd, const char *name);
 INT64_T cfs_stub_lremovexattr (const char *path, const char *name);
 
 struct chirp_filesystem {
-	const char * (*init) ( const char *url );
+	int (*init) ( const char url[CHIRP_PATH_MAX] );
 
 	INT64_T (*open)      ( const char *path, INT64_T flags, INT64_T mode );
 	INT64_T (*close)     ( int fd );
