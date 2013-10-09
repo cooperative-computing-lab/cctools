@@ -5,8 +5,6 @@ if [ ! -r Makefile.config ]; then
     exit 1
 fi
 
-echo "Testing on $(uname -a)"
-
 CCTOOLS_PACKAGES=$(grep CCTOOLS_PACKAGES Makefile.config | cut -d = -f 2)
 if [ -z "$CCTOOLS_TEST_LOG" ]; then
 	CCTOOLS_TEST_LOG="./cctools.test.log"
@@ -17,6 +15,8 @@ if [ -z "$(echo $CCTOOLS_TEST_LOG | sed -n 's:^/.*$:x:p')" ]; then
 	CCTOOLS_TEST_LOG="$(pwd)/${CCTOOLS_TEST_LOG}"
 fi
 export CCTOOLS_TEST_LOG
+
+echo "[$(date)] Testing on $(uname -a)." > "$CCTOOLS_TEST_LOG"
 
 SUCCESS=0
 FAILURE=0
