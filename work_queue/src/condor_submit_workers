@@ -19,7 +19,8 @@ show_help()
 # The user can still add their own expression via the -r option.
 
 
-requirements="(Memory>0)"
+requirements=""
+memory=0
 transfer_input_files="work_queue_worker"
 
 parse_arguments()
@@ -60,6 +61,7 @@ output = worker.\$(PROCESS).output
 error = worker.\$(PROCESS).error
 log = workers.log
 getenv = true
+request_memory = $memory
 requirements = $requirements
 queue $count
 EOF
