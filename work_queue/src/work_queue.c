@@ -1194,7 +1194,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 
 		link_address_remote(foreman_uplink,address,&port);
 		sprintf(addrport,"%s:%d",address,port);
-		nvpair_insert_string(nv,"master_address",addrport);
+		nvpair_insert_string(nv,"my_master",addrport);
 
 		// get foreman local resources and overwrite disk usage
 		struct work_queue_resources local_resources;
