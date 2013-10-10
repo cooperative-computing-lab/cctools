@@ -557,7 +557,12 @@ char *dag_task_category_wrap_as_condor_options(struct dag_task_category *categor
 	options = dag_task_category_add_condor_option(options, "Disk>=", s->workdir_footprint); 
 
 	if(!options)
-		return xxstrdup(default_options);
+	{
+		if(default_options)
+			return xxstrdup(default_options);
+		return
+			NULL;
+	}
 
 	if(!default_options)
 	{
