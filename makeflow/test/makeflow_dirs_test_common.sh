@@ -30,6 +30,7 @@ run()
 	# launch the worker with the port found by makeflow.
 	port=`cat $PORT_FILE` 
 	../../work_queue/src/work_queue_worker -t60 localhost $port &
+	echo $! > $PIDWORKER_FILE
 
 	# wait at most one minute for makeflow to exit.
 	wait_for_file_creation $STATUS_FILE 60
@@ -58,6 +59,8 @@ clean()
 	rm -rf mydir
 
 	[ -f $PIDWORKER_FILE ] && kill -9 `cat $PIDWORKER_FILE`
+
+	rm -f $PIDWORKER_FILE
 
 	[ $DELETE_MAKE_FILE ] && rm -f $MAKE_FILE
 
