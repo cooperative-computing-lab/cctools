@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "multi_fork.h"
 
 #include "cctools.h"
+#include "debug.h"
 #include "xxmalloc.h"
 #include "stringtools.h"
 #include "macros.h"
