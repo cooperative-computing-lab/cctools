@@ -1,11 +1,11 @@
 #!/bin/sh
 
-. ../../dttools/src/test_runner.common.sh
+set -e
 
-chirp_debug=chirp.debug
-chirp_pid=chirp.pid
-chirp_port=chirp.port
-chirp_root=chirp.root
+. ../../dttools/src/test_runner.common.sh
+. ./chirp-common.sh
+
+c="./hostport.$PPID"
 
 expected=expected.txt
 output=output.txt
@@ -47,60 +47,63 @@ prepare()
 ++
 EOF
 
-	../src/chirp_server --background --debug=all --debug-file="$chirp_debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$chirp_pid" --port-file="$chirp_port" --root="$chirp_root"
-
-	wait_for_file_creation "$chirp_port" 5
-	wait_for_file_creation "$chirp_pid" 5
+	chirp_start local
+	echo "$hostport" > "$c"
+	return 0
 }
 
 run()
 {
-	set -e
-	../src/chirp localhost:`cat "$chirp_port"` mkdir foo
-	../src/chirp localhost:`cat "$chirp_port"` mkdir foo/a
-	../src/chirp localhost:`cat "$chirp_port"` mkdir foo/a/bar
-	../src/chirp localhost:`cat "$chirp_port"` mkdir foo/b
-	../src/chirp localhost:`cat "$chirp_port"` mkdir foo/b/bar
+	if ! [ -s "$c" ]; then
+		return 0
+	fi
+	hostport=$(cat "$c")
+
+	../src/chirp "$hostport" mkdir foo
+	../src/chirp "$hostport" mkdir foo/a
+	../src/chirp "$hostport" mkdir foo/a/bar
+	../src/chirp "$hostport" mkdir foo/b
+	../src/chirp "$hostport" mkdir foo/b/bar
 
 	{
 		echo ++
-		../src/chirp localhost:`cat "$chirp_port"` search     'foo' 'bar' | sort
+		../src/chirp "$hostport" search     'foo' 'bar' | sort
 		echo ++
-		../src/chirp localhost:`cat "$chirp_port"` search -s  'foo' 'bar' | wc -l
+		../src/chirp "$hostport" search -s  'foo' 'bar' | wc -l
 		echo ++
-		../src/chirp localhost:`cat "$chirp_port"` search     'foo' 'a/bar' | sort
+		../src/chirp "$hostport" search     'foo' 'a/bar' | sort
 		echo ++
-		../src/chirp localhost:`cat "$chirp_port"` search -i  'foo' 'a/bar' | sort
+		../src/chirp "$hostport" search -i  'foo' 'a/bar' | sort
 		echo ++
-		../src/chirp localhost:`cat "$chirp_port"` search     'foo' '/foo/a/bar' | sort
+		../src/chirp "$hostport" search     'foo' '/foo/a/bar' | sort
 		echo ++
-		../src/chirp localhost:`cat "$chirp_port"` search     '/' '/foo/a/bar' | sort
+		../src/chirp "$hostport" search     '/' '/foo/a/bar' | sort
 		echo ++
-		../src/chirp localhost:`cat "$chirp_port"` search     '/' '/foo/*/bar' | sort
+		../src/chirp "$hostport" search     '/' '/foo/*/bar' | sort
 		echo ++
-		../src/chirp localhost:`cat "$chirp_port"` search     '/foo' '/*/bar' | sort
+		../src/chirp "$hostport" search     '/foo' '/*/bar' | sort
 		echo ++
-		../src/chirp localhost:`cat "$chirp_port"` search     '/foo' '*/bar' | sort
+		../src/chirp "$hostport" search     '/foo' '*/bar' | sort
 		echo ++
-		../src/chirp localhost:`cat "$chirp_port"` search -i  '/foo' '*/bar' | sort
+		../src/chirp "$hostport" search -i  '/foo' '*/bar' | sort
 		echo ++
-		../src/chirp localhost:`cat "$chirp_port"` search -i  '/foo' '*' | sort
+		../src/chirp "$hostport" search -i  '/foo' '*' | sort
 		echo ++
-		../src/chirp localhost:`cat "$chirp_port"` search -i  '/' '/foo/b/bar' | sort
+		../src/chirp "$hostport" search -i  '/' '/foo/b/bar' | sort
 		echo ++
 	} | tr -d ' ' > "$output"
 	diff "$expected" "$output"
-	set +e
-	return $?
+
+	return 0
 }
 
 clean()
 {
-	if [ -r "$chirp_pid" ]; then
-		/bin/kill -9 `cat "$chirp_pid"`
-	fi
-
-	rm -rf "$chirp_debug" "$chirp_pid" "$chirp_port" "$chirp_root" "$expected" "$output"
+	chirp_clean
+	rm -f "$c" "$output" "$expected"
+	return 0
 }
 
-dispatch $@
+dispatch "$@"
+
+# vim: set noexpandtab tabstop=4:
