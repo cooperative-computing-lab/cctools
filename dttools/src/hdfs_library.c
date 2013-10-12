@@ -97,7 +97,9 @@ struct hdfs_library *hdfs_library_open()
 
 	return hs;
 
-      failure:
+failure:
 	hdfs_library_close(hs);
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */
