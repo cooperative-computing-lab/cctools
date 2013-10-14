@@ -124,8 +124,10 @@ static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX])
 	debug(D_HDFS, "connecting to hdfs://%s:%u%s as '%s'\n", hdfs_host, hdfs_port, hdfs_root, chirp_owner);
 	assert(fs == NULL);
 	fs = hdfs_services->connect_as_user(hdfs_host, hdfs_port, chirp_owner, groups, 1);
-	if (fs == NULL)
+	if (fs == NULL) {
+		errno = EIO;
 		return -1;
+	}
 
 	memset(open_files, 0, sizeof(open_files));
 
