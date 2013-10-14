@@ -259,7 +259,7 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 						  "or performing poorly.");
 					return false;
 				} else {
-					debug(D_CVMFS|D_NOTICE,
+					debug(D_CVMFS,
 						  "ERROR: using multiple CVMFS repositories in a single parrot session "
 						  "is not fully supported.  PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES "
 						  "has been defined, so switching now from %s to %s.  "
