@@ -43,6 +43,7 @@ can be released:
 #include "copy_stream.h"
 #include "random_init.h"
 #include "process.h"
+#include "path.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -358,6 +359,23 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 }
 
 /*
+Call recv_worker_msg and silently retry if the result indicates
+an asynchronous update message like 'keepalive' or 'resource'.
+Returns 1 or -1 (as above) but does not return zero.
+*/
+
+int recv_worker_msg_retry( struct work_queue *q, struct work_queue_worker *w, char *line, int length, time_t stoptime )
+{
+	int result=0;
+
+	do {
+		result = recv_worker_msg(q, w,line,length,stoptime);
+	} while(result==0);
+
+	return result;
+}
+
+/*
 Select an appropriate timeout value for the transfer of a certain number of bytes.
 We do not know in advance how fast the system will perform.
 
@@ -583,135 +601,122 @@ static int add_worker(struct work_queue *q)
 	return 1;
 }
 
-/**
- * This function implements the "get %s" protocol.
- * It reads a streamed item from a worker. For the stream format, please refer
- * to the stream_output_item function in worker.c
- */
-static int get_output_item(char *remote_name, char *local_name, struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct hash_table *received_items, INT64_T * total_bytes)
+/*
+Get a single file from a remote worker.
+Returns true on success, false on failure.
+*/
+
+static int get_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *local_name, INT64_T length, INT64_T * total_bytes)
 {
-	char line[WORK_QUEUE_LINE_MAX];
-	int fd;
-	INT64_T actual, length;
-	time_t stoptime;
-	timestamp_t effective_stoptime = 0;
-	char type[256];
-	char tmp_remote_name[WORK_QUEUE_LINE_MAX], tmp_local_name[WORK_QUEUE_LINE_MAX];
-	char *cur_pos, *tmp_pos;
-	int remote_name_len;
-	int local_name_len;
-	int recv_msg_result;
+	// If necessary, create parent directories of the file.
 
-	if(hash_table_lookup(received_items, local_name))
-		return 1;
-
-	debug(D_WQ, "%s (%s) sending back %s to %s", w->hostname, w->addrport, remote_name, local_name);
-	send_worker_msg(w, "get %s 1\n", time(0) + short_timeout, remote_name);
-
-	strcpy(tmp_local_name, local_name);
-	remote_name_len = strlen(remote_name);
-	local_name_len = strlen(local_name);
-
-	while(1) {
-		//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
-		do { 			
-			recv_msg_result = recv_worker_msg(q, w, line, sizeof(line), time(0) + short_timeout);
-		} while (recv_msg_result == 0);
-		if (recv_msg_result < 0) {
-			goto link_failure;
-		}
-		
-		if(sscanf(line, "%s %s %" SCNd64, type, tmp_remote_name, &length) == 3) {
-			tmp_local_name[local_name_len] = '\0';
-			strcat(tmp_local_name, &(tmp_remote_name[remote_name_len]));
-
-			if(strncmp(type, "dir", 3) == 0) {
-				if(!create_dir(tmp_local_name, 0700)) {
-					debug(D_WQ, "Cannot create directory - %s (%s)", tmp_local_name, strerror(errno));
-					goto failure;
-				}
-				hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
-			} else if(strncmp(type, "file", 4) == 0) {
-				// actually place the file
-				if(length >= 0) {
-					// create dirs in the filename path if needed
-					cur_pos = tmp_local_name;
-					if(!strncmp(cur_pos, "./", 2)) {
-						cur_pos += 2;
-					}
-
-					tmp_pos = strrchr(cur_pos, '/');
-					while(tmp_pos) {
-						*tmp_pos = '\0';
-						if(!create_dir(cur_pos, 0700)) {
-							debug(D_WQ, "Could not create directory - %s (%s)", cur_pos, strerror(errno));
-							goto failure;
-						}
-						*tmp_pos = '/';
-
-						cur_pos = tmp_pos + 1;
-						tmp_pos = strrchr(cur_pos, '/');
-					}
-
-					// get the remote file and place it
-					debug(D_WQ, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", tmp_local_name, length, w->addrport, w->hostname);
-					fd = open(tmp_local_name, O_WRONLY | O_TRUNC | O_CREAT, 0700);
-					if(fd < 0) {
-						debug(D_NOTICE, "Cannot open file %s for writing: %s", tmp_local_name, strerror(errno));
-						goto failure;
-					}
-					
-					if(q->bandwidth) {
-						effective_stoptime = ((length * 8)/q->bandwidth)*1000000 + timestamp_get();
-					}
-					stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
-					actual = link_stream_to_fd(w->link, fd, length, stoptime);
-					close(fd);
-					if(actual != length) {
-						debug(D_WQ, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
-						unlink(local_name);
-						goto failure;
-					}
-					*total_bytes += length;
-					timestamp_t current_time = timestamp_get();
-					if(effective_stoptime && effective_stoptime > current_time) {
-						usleep(effective_stoptime - current_time);
-					}
-
-					hash_table_insert(received_items, tmp_local_name, xxstrdup(tmp_local_name));
-				} else {
-					debug(D_NOTICE, "%s on %s (%s) has invalid length: %"PRId64, remote_name, w->addrport, w->hostname, length);
-					goto failure;
-				}
-			} else if(strncmp(type, "missing", 7) == 0) {
-				// now length holds the errno
-				debug(D_WQ, "Failed to retrieve %s from %s (%s): %s", remote_name, w->addrport, w->hostname, strerror(length));
-				t->result |= WORK_QUEUE_RESULT_OUTPUT_MISSING;
-			} else {
-				debug(D_WQ, "Invalid output item type - %s\n", type);
-				goto failure;
-			}
-		} else if(sscanf(line, "%s", type) == 1) {
-			if(strncmp(type, "end", 3) == 0) {
-				break;
-			} else {
-				debug(D_WQ, "Invalid get line - %s\n", line);
-				goto failure;
-			}
-		} else {
-			debug(D_WQ, "Invalid streaming output line - %s\n", line);
-			goto failure;
+	if(strchr(local_name,'/')) {
+		char dirname[WORK_QUEUE_LINE_MAX];
+		path_dirname(local_name,dirname);
+		if(!create_dir(dirname, 0700)) {
+			debug(D_WQ, "Could not create directory - %s (%s)", dirname, strerror(errno));
+			return 0;
 		}
 	}
 
+	// Create the local file.
+
+	debug(D_WQ, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
+	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0700);
+	if(fd < 0) {
+		debug(D_NOTICE, "Cannot open file %s for writing: %s", local_name, strerror(errno));
+		return 0;
+	}
+
+	// If a bandwidth limit is in effect, choose the effective stoptime.
+				
+	timestamp_t effective_stoptime = 0;
+	if(q->bandwidth) {
+		effective_stoptime = ((length * 8)/q->bandwidth)*1000000 + timestamp_get();
+	}
+
+	// Choose the actual stoptime and transfer the data.
+
+	time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
+	INT64_T actual = link_stream_to_fd(w->link, fd, length, stoptime);
+
+	close(fd);
+
+	if(actual != length) {
+		debug(D_WQ, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
+		unlink(local_name);
+		return 0;
+	}
+
+	*total_bytes += length;
+
+	// If the transfer was too fast, slow things down.
+
+	timestamp_t current_time = timestamp_get();
+	if(effective_stoptime && effective_stoptime > current_time) {
+		usleep(effective_stoptime - current_time);
+	}
+
 	return 1;
+}
 
-      link_failure:
-	debug(D_WQ, "Link to %s (%s) failed.\n", w->addrport, w->hostname);
-	t->result |= WORK_QUEUE_RESULT_LINK_FAIL;
+/*
+This function implements the recursive get protocol.
+The master sents a single get message, then the worker
+responds with a continuous stream of dir and file message
+that indicate the entire contents of the directory.
+This makes it efficient to move deep directory hierarchies with
+high throughput and low latency.
+*/
 
-      failure:
-	debug(D_WQ, "%s (%s) failed to return %s to %s", w->addrport, w->hostname, remote_name, local_name);
+static int get_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *remote_name, const char *local_name, INT64_T * total_bytes)
+{
+	// Remember the length of the specified remote path so it can be chopped from the result.
+	int remote_name_len = strlen(remote_name);
+
+	// Send the name of the file/dir name to fetch
+	debug(D_WQ, "%s (%s) sending back %s to %s", w->hostname, w->addrport, remote_name, local_name);
+	send_worker_msg(w, "get %s 1\n", time(0) + short_timeout, remote_name);
+
+	// Process the recursive file/dir responses as they are sent.
+	while(1) {
+		char line[WORK_QUEUE_LINE_MAX];
+		char tmp_remote_path[WORK_QUEUE_LINE_MAX];
+		INT64_T length;
+		int errnum;
+
+		int result = recv_worker_msg_retry(q, w, line, sizeof(line), time(0) + short_timeout);
+		if(result<0) break;
+
+		if(sscanf(line,"dir %s", tmp_remote_path)==1) {
+			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
+			result = create_dir(tmp_local_name,0700);
+			free(tmp_local_name);
+			if(!result) break;
+		} else if(sscanf(line,"file %s %"SCNd64, tmp_remote_path, &length)==2) {
+			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
+			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
+			free(tmp_local_name);
+			if(!result) break;
+		} else if(sscanf(line,"missing %d",&errnum)==1) {
+			// If the output file is missing, we make a note of that in the task result,
+			// but we continue and consider the transfer a 'success' so that other
+			// outputs are transferred and the task is given back to the caller.
+			debug(D_WQ, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,remote_name,strerror(errnum));
+			t->result |= WORK_QUEUE_RESULT_OUTPUT_MISSING;
+		} else if(!strcmp(line,"end")) {
+			// The only successful return is via an end message.
+			return 1;
+		} else {
+			debug(D_WQ, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
+			break;
+		}
+	}
+
+	// If we failed to *transfer* the output file, then that is a hard
+	// failure which causes this function to return failure and the task
+	// to be returned to the queue to be attempted elsewhere.
+	debug(D_WQ, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, remote_name, local_name);
 	t->result |= WORK_QUEUE_RESULT_OUTPUT_FAIL;
 	return 0;
 }
@@ -730,155 +735,97 @@ char * make_cached_name( struct work_queue_task *t, struct work_queue_file *f )
 	}
 }
 
-/**
- * Comparison function for sorting by file/dir names in the output files list
- * of a task
- */
-static int filename_comparator(const void *a, const void *b)
+/*
+This function stores an output file from the remote cache directory
+to a third-party location, which can be either a remote filesystem
+(WORK_QUEUE_FS_PATH) or a command to run (WORK_QUEUE_FS_CMD).
+*/
+
+static int do_thirdput( struct work_queue *q, struct work_queue_worker *w,  const char *cached_name, const char *payload, int command )
 {
-	int rv;
-	rv = strcmp(*(char *const *) a, *(char *const *) b);
-	return rv > 0 ? -1 : 1;
+	char line[WORK_QUEUE_LINE_MAX];
+	int result;
+
+	send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, command, cached_name, payload);
+
+	result = recv_worker_msg_retry(q, w, line, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
+	if(result < 0) return 0;
+				
+	if(sscanf(line, "thirdput-complete %d", &result)) {
+		return result;
+	} else {
+		debug(D_WQ, "Error: invalid message received (%s)\n", line);
+		return 0;
+	}
 }
 
-static int get_output_files(struct work_queue_task *t, struct work_queue_worker *w, struct work_queue *q)
+/*
+Get a single output file, located at the worker under 'cached_name'.
+Returns true on success, false on failure.
+*/
+
+static int get_output_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f, const char *cached_name )
 {
-	struct work_queue_file *tf;
-
-	// This may be where I can trigger output file cache
-	// Added by Anthony Canino
-	// Attempting to add output cacheing
-	struct stat local_info;
-	struct stat *remote_info;
-	char *key, *value;
-	struct hash_table *received_items;
 	INT64_T total_bytes = 0;
-	int recv_msg_result = 0;
+	int result = 0;
+			
+	timestamp_t open_time = timestamp_get();
 
-	timestamp_t open_time = 0;
-	timestamp_t close_time = 0;
-	timestamp_t sum_time;
+	if(f->flags & WORK_QUEUE_THIRDPUT) {
+		if(!strcmp(cached_name, f->payload)) {
+			debug(D_WQ, "output file %s already on shared filesystem", cached_name);
+			f->flags |= WORK_QUEUE_PREEXIST;
+		} else {
+			result = do_thirdput(q,w,cached_name,f->payload,WORK_QUEUE_FS_PATH);
+		}
+	} else if(f->type == WORK_QUEUE_REMOTECMD) {
+		result = do_thirdput(q,w,cached_name,f->payload,WORK_QUEUE_FS_CMD);
+	} else {
+		result = get_file_or_directory(q, w, t, cached_name, f->payload, &total_bytes);
+	}
 
-	// Start transfer ...
-	received_items = hash_table_create(0, 0);
+	timestamp_t close_time = timestamp_get();
+	timestamp_t sum_time = close_time - open_time;
 
-	//  Sorting list will make sure that upper level dirs sit before their
-	//  contents(files/dirs) in the output files list. So, when we emit get
-	//  command, we would first encounter top level dirs. Also, we would record
-	//  every received files/dirs within those top level dirs. If any file/dir
-	//  in those top level dirs appears later in the output files list, we
-	//  won't transfer it again.
-	list_sort(t->output_files, filename_comparator);
+	if(total_bytes>0) {
+		q->total_bytes_received += total_bytes;
+		q->total_receive_time += sum_time;
+		t->total_bytes_transferred += total_bytes;
+		t->total_transfer_time += sum_time;
+		w->total_bytes_transferred += total_bytes;
+		w->total_transfer_time += sum_time;
+		debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
+	}
+
+	// If the transfer was successful, make a record of it in the cache.
+
+	if(result && f->flags & WORK_QUEUE_CACHE) {
+		struct stat local_info;
+		result = stat(f->payload,&local_info);
+		if(result==0) {
+			struct stat *remote_info = malloc(sizeof(*remote_info));
+			memcpy(remote_info, &local_info, sizeof(local_info));
+			hash_table_insert(w->current_files, cached_name, remote_info);
+		}
+	}
+
+	return result;
+}
+
+static int get_output_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
+{
+	struct work_queue_file *f;
 
 	if(t->output_files) {
 		list_first_item(t->output_files);
-		while((tf = list_next_item(t->output_files))) {
-			
-			// XXX It would be much cleaner to generate the remote name, use it, then free it below.
-		        // However, that can wait until the code below is factored to remove the mess of early returns.
-			
-			char remote_name[WORK_QUEUE_LINE_MAX];
-
-			char *cached_name = make_cached_name(t,tf);
-			strcpy(remote_name,cached_name);
+		while((f = list_next_item(t->output_files))) {
+			char * cached_name = make_cached_name(t,f);
+			get_output_file(q,w,t,f,cached_name);
 			free(cached_name);
-			
-			if(tf->flags & WORK_QUEUE_THIRDPUT) {
-
-				debug(D_WQ, "thirdputting %s as %s", tf->remote_name, tf->payload);
-
-				if(!strcmp(tf->remote_name, tf->payload)) {
-					debug(D_WQ, "output file %s already on shared filesystem", tf->remote_name);
-					tf->flags |= WORK_QUEUE_PREEXIST;
-				} else {
-					char thirdput_result[WORK_QUEUE_LINE_MAX];
-					debug(D_WQ, "putting %s from %s (%s) to shared filesystem from %s", tf->remote_name, w->hostname, w->addrport, tf->payload);
-					open_time = timestamp_get();
-					send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_PATH, remote_name, tf->payload);
-					//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
-					do {
-						recv_msg_result = recv_worker_msg(q, w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
-						if(recv_msg_result < 0)
-							return 0;
-					} while (recv_msg_result == 0);
-					
-					if(sscanf(thirdput_result, "thirdput-complete %d", &recv_msg_result)) {
-						if(!recv_msg_result) return 0;
-					} else {
-						debug(D_WQ, "Error: invalid message received (%s)\n", thirdput_result);
-						return 0;
-					}
-					close_time = timestamp_get();
-					sum_time += (close_time - open_time);
-				}
-			} else if(tf->type == WORK_QUEUE_REMOTECMD) {
-				char thirdput_result[WORK_QUEUE_LINE_MAX];
-				debug(D_WQ, "putting %s from %s (%s) to remote filesystem using %s", tf->remote_name, w->hostname, w->addrport, tf->payload);
-				open_time = timestamp_get();
-				send_worker_msg(w, "thirdput %d %s %s\n", time(0) + short_timeout, WORK_QUEUE_FS_CMD, remote_name, tf->payload);
-				//call recv_worker_msg until it returns non-zero which indicates failure or a non-keepalive message is left to consume
-
-				do {
-					recv_msg_result = recv_worker_msg(q, w, thirdput_result, WORK_QUEUE_LINE_MAX, time(0) + short_timeout);
-					if(recv_msg_result < 0)
-						return 0;
-				} while (recv_msg_result == 0);
-				
-				if(sscanf(thirdput_result, "thirdput-complete %d", &recv_msg_result)) {
-					if(!recv_msg_result) return 0;
-				} else {
-					debug(D_WQ, "Error: invalid message received (%s)\n", thirdput_result);
-					return 0;
-				}
-					
-				close_time = timestamp_get();
-				sum_time += (close_time - open_time);
-			} else {
-				
-				open_time = timestamp_get();
-				get_output_item(remote_name, tf->payload, q, w, t, received_items, &total_bytes);
-				close_time = timestamp_get();
-				if(t->result & WORK_QUEUE_RESULT_OUTPUT_FAIL) {
-					return 0;
-				}
-				if(total_bytes) {
-					sum_time = close_time - open_time;
-					q->total_bytes_received += total_bytes;
-					q->total_receive_time += sum_time;
-					t->total_bytes_transferred += total_bytes;
-					t->total_transfer_time += sum_time;
-					w->total_bytes_transferred += total_bytes;
-					w->total_transfer_time += sum_time;
-					debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
-				}
-				total_bytes = 0;
-			}
-
-			// Add the output item to the hash table if its cacheable
-			if(tf->flags & WORK_QUEUE_CACHE) {
-				if(stat(tf->payload, &local_info) < 0) {
-					unlink(tf->payload);
-					if(t->result & WORK_QUEUE_RESULT_OUTPUT_MISSING)
-						continue;
-					return 0;
-				}
-
-				char * cached_name = make_cached_name(t,tf);
-				remote_info = malloc(sizeof(*remote_info));
-				memcpy(remote_info, &local_info, sizeof(local_info));
-				hash_table_insert(w->current_files, cached_name, remote_info);
-				free(cached_name);
-			}
 		}
 
 	}
-	// destroy received files hash table for this task
-	hash_table_firstkey(received_items);
-	while(hash_table_nextkey(received_items, &key, (void **) &value)) {
-		free(value);
-	}
-	hash_table_delete(received_items);
-	
+
 	// tell the worker you no longer need that task's output directory.
 	send_worker_msg(w, "kill %d\n", time(0) + short_timeout, t->taskid);
 
@@ -886,7 +833,7 @@ static int get_output_files(struct work_queue_task *t, struct work_queue_worker 
 }
 
 // Sends "unlink file" for every file in the list except those that match one or more of the "except_flags"
-static void delete_worker_files(struct work_queue_worker *w, struct list *files, int except_flags) {
+static void delete_worker_files( struct work_queue_worker *w, struct work_queue_task *t, struct list *files, int except_flags ) {
 	struct work_queue_file *tf;
 	
 	if(!files) return;
@@ -894,7 +841,9 @@ static void delete_worker_files(struct work_queue_worker *w, struct list *files,
 	list_first_item(files);
 	while((tf = list_next_item(files))) {
 		if(!(tf->flags & except_flags)) {
-			send_worker_msg(w, "unlink %s\n", time(0) + short_timeout, tf->remote_name);
+			char *cached_name = make_cached_name(t,tf);
+			send_worker_msg(w, "unlink %s\n", time(0) + short_timeout, cached_name);
+			free(cached_name);
 		}
 	}
 }
@@ -902,8 +851,8 @@ static void delete_worker_files(struct work_queue_worker *w, struct list *files,
 
 static void delete_uncacheable_files(struct work_queue_task *t, struct work_queue_worker *w)
 {
-	delete_worker_files(w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
-	delete_worker_files(w, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+	delete_worker_files(w, t, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+	delete_worker_files(w, t, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 }
 
 void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_task *t)
@@ -955,7 +904,7 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 
 	// Receiving output ...
 	t->time_receive_output_start = timestamp_get();
-	if(!get_output_files(t, w, q)) {
+	if(!get_output_files(q,w,t)) {
 		goto failure;
 	}
 	t->time_receive_output_finish = timestamp_get();
@@ -2220,10 +2169,10 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 		debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
 			
 		//Delete any input files that are not to be cached.
-		delete_worker_files(w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+		delete_worker_files(w, t, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 
 		//Delete all output files since they are not needed as the task was aborted.
-		delete_worker_files(w, t->output_files, 0);
+		delete_worker_files(w, t, t->output_files, 0);
 		
 		w->cores_allocated -= t->cores;
 		w->memory_allocated -= t->memory;
@@ -3247,10 +3196,10 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 			itable_remove(q->worker_task_map, taskid);
 			
 			//Delete any input files that are not to be cached.
-			delete_worker_files(w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+			delete_worker_files(w, t, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 
 			//Delete all output files since they are not needed as the task was aborted.
-			delete_worker_files(w, t->output_files, 0);
+			delete_worker_files(w, t, t->output_files, 0);
 			
 			w->cores_allocated -= t->cores;
 			w->memory_allocated -= t->memory;
