@@ -1760,7 +1760,7 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
-	cfs_reinterpret(url);
+	cfs_normalize(url);
 	/* translate relative paths to absolute ones */
 	{
 		char path[PATH_MAX];

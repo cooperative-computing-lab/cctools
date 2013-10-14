@@ -55,7 +55,7 @@ struct chirp_filesystem *cfs_lookup(const char *url)
 	}
 }
 
-void cfs_reinterpret(char url[CHIRP_PATH_MAX])
+void cfs_normalize(char url[CHIRP_PATH_MAX])
 {
 	if(strprfx(url, "chirp:")) {
 		return;
@@ -67,7 +67,7 @@ void cfs_reinterpret(char url[CHIRP_PATH_MAX])
 			path_absolute(strstr(url, ":")+1, absolute, 0);
 		else
 			path_absolute(url, absolute, 0);
-		debug(D_CHIRP, "reinterpreting url `%s' as `local://%s'", url, absolute);
+		debug(D_CHIRP, "normalizing url `%s' as `local://%s'", url, absolute);
 		strcpy(url, "local://");
 		strcat(url, absolute);
 	}
