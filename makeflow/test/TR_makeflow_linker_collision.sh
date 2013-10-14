@@ -27,10 +27,7 @@ run() {
 clean() {
   cd linker
   rm -r "$out_dir"
-  rm /tmp/asdf
-  rm asdf
-  rm tmp
-  rm tmp2
+  rm -f /tmp/asdf asdf tmp tmp2 ls
   exit 0
 }
 
