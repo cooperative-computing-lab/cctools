@@ -137,7 +137,7 @@ int update_one_catalog(void *catalog_host, const void *text)
 {
 	char addr[DATAGRAM_ADDRESS_MAX];
 	if(domain_name_cache_lookup(catalog_host, addr)) {
-	  debug(D_DEBUG, "sending update to %s:%d", (char*) catalog_host, CATALOG_PORT);
+		debug(D_DEBUG, "sending update to %s:%d", (char*) catalog_host, CATALOG_PORT);
 		datagram_send(catalog_port, text, strlen(text), addr, CATALOG_PORT);
 	}
 	return 1;
@@ -145,10 +145,9 @@ int update_one_catalog(void *catalog_host, const void *text)
 
 static int update_all_catalogs(const char *url)
 {
+	buffer_t B;
 	struct chirp_statfs info;
 	struct utsname name;
-	char text[DATAGRAM_PAYLOAD_MAX];
-	int length;
 	int cpus;
 	double avg[3];
 	UINT64_T memory_total, memory_avail;
@@ -169,13 +168,34 @@ static int update_all_catalogs(const char *url)
 
 	memory_info_get(&memory_avail, &memory_total);
 
-	length = sprintf(text,
-			 "type chirp\nversion %d.%d.%s\nurl chirp://%s:%d\nname %s\nowner %s\ntotal %" PRIu64 "\navail %" PRIu64 "\nstarttime %lu\nport %d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nminfree %" PRIu64
-			 "\nmemory_total %" PRIu64 "\nmemory_avail %" PRIu64 "\ncpus %d\nbackend %s\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, hostname, port, hostname, chirp_owner, info.f_blocks * info.f_bsize,
-			 info.f_bavail * info.f_bsize, (unsigned long) starttime, port, name.machine, name.sysname, name.release, avg[0], avg[1], avg[2], minimum_space_free, memory_total, memory_avail, cpus, url);
+	buffer_init(&B);
+	buffer_max(&B, DATAGRAM_PAYLOAD_MAX);
+	buffer_abortonfailure(&B, 1);
+	buffer_putliteral(&B, "type chirp\n");
+	buffer_printf(&B, "version %d.%d.%s\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
+	buffer_printf(&B, "url chirp://%s:%d\n", hostname, port);
+	buffer_printf(&B, "name %s\n", hostname);
+	buffer_printf(&B, "owner %s\n", chirp_owner);
+	buffer_printf(&B, "total %" PRIu64 "\n", info.f_blocks * info.f_bsize);
+	buffer_printf(&B, "avail %" PRIu64 "\n", info.f_bavail * info.f_bsize);
+	buffer_printf(&B, "starttime %lu\n", (unsigned long) starttime);
+	buffer_printf(&B, "port %d\n", port);
+	buffer_printf(&B, "cpu %s\n", name.machine);
+	buffer_printf(&B, "opsys %s\n", name.sysname);
+	buffer_printf(&B, "opsysversion %s\n", name.release);
+	buffer_printf(&B, "load1 %0.02lf\n", avg[0]);
+	buffer_printf(&B, "load5 %0.02lf\n", avg[1]);
+	buffer_printf(&B, "load15 %0.02lf\n", avg[2]);
+	buffer_printf(&B, "minfree %" PRIu64 "\n", minimum_space_free);
+	buffer_printf(&B, "memory_total %" PRIu64 "\n", memory_total);
+	buffer_printf(&B, "memory_avail %" PRIu64 "\n", memory_avail);
+	buffer_printf(&B, "cpus %d\n", cpus);
+	buffer_printf(&B, "backend %s\n", url);
+	chirp_stats_summary(&B);
 
-	chirp_stats_summary(&text[length], DATAGRAM_PAYLOAD_MAX - length);
-	list_iterate(catalog_host_list, update_one_catalog, text);
+	list_iterate(catalog_host_list, update_one_catalog, buffer_tostring(&B, NULL));
+
+	buffer_free(&B);
 
 	return 0;
 }

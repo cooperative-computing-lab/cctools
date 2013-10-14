@@ -54,32 +54,24 @@ void chirp_stats_collect(const char *addr, const char *subject, UINT64_T ops, UI
 	total_bytes_written += bytes_written;
 }
 
-void chirp_stats_summary(char *buf, int length)
+void chirp_stats_summary(buffer_t *B)
 {
-	int chunk;
 	char *addr;
 	struct chirp_stats *s;
 
 	if(!stats_table)
 		stats_table = hash_table_create(0, 0);
 
-	chunk = snprintf(buf, length, "bytes_written %" PRIu64 "\nbytes_read %" PRIu64 "\ntotal_ops %" PRIu64 "\n", total_bytes_written, total_bytes_read, total_ops);
-	length -= chunk;
-	buf += chunk;
+	buffer_printf(B, "bytes_written %" PRIu64 "\n", total_bytes_written);
+	buffer_printf(B, "bytes_read %" PRIu64 "\n", total_bytes_read);
+	buffer_printf(B, "total_ops %" PRIu64 "\n", total_ops);
 
-	chunk = snprintf(buf, length, "clients ");
-
-	length -= chunk;
-	buf += chunk;
-
+	buffer_putliteral(B, "clients ");
 	hash_table_firstkey(stats_table);
 	while(hash_table_nextkey(stats_table, &addr, (void **) &s)) {
-		chunk = snprintf(buf, length, "%s,1,1,%" PRIu64 ",%" PRIu64 ",%" PRIu64 "; ", s->addr, s->ops, s->bytes_read, s->bytes_written);
-		buf += chunk;
-		length -= chunk;
+		buffer_printf(B, "%s,1,1,%" PRIu64 ",%" PRIu64 ",%" PRIu64 "; ", s->addr, s->ops, s->bytes_read, s->bytes_written);
 	}
-
-	snprintf(buf, length, "\n");
+	buffer_putliteral(B, "\n");
 }
 
 void chirp_stats_cleanup()

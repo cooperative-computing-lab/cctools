@@ -143,7 +143,7 @@ To force the expression-list interpretation, use this instead:
 #include "ast.h"
 #include "parser.h"
 #include "ftsh_error.h"
-#include "xmalloc.h"
+#include "xxmalloc.h"
 
 #include <string.h>
 #include <stdlib.h>
