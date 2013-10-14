@@ -160,6 +160,7 @@ struct work_queue {
 	FILE *logfile;
 	int keepalive_interval;
 	int keepalive_timeout;
+	timestamp_t link_poll_end;	//tracks when we poll link; used to timeout unacknowledged keepalive checks
 
 	int monitor_mode;
 	int monitor_fd;
@@ -210,7 +211,6 @@ static int process_resource(struct work_queue *q, struct work_queue_worker *w, c
 static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *foreman_uplink );
 
 static int short_timeout = 5;
-static timestamp_t link_poll_end; //tracks when we poll link; used to timeout unacknowledged keepalive checks
 
 /******************************************************/
 /********** work_queue internal functions *************/
@@ -2093,8 +2093,8 @@ static void remove_unresponsive_workers(struct work_queue *q) {
 			} else { 
 				// we haven't received a message from worker since its last keepalive check. Check if time 
 				// since we last polled link for responses has exceeded keepalive timeout. If so, remove worker.
-				if (link_poll_end > w->keepalive_check_sent_time) {
-					if ((int)((link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
+				if (q->link_poll_end > w->keepalive_check_sent_time) {
+					if ((int)((q->link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
 						debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
 						remove_worker(q, w);
 					}
@@ -2999,8 +2999,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// Poll all links for activity.
 		timestamp_t link_poll_start = timestamp_get();
 		int result = link_poll(q->poll_table, n, msec);
-		link_poll_end = timestamp_get();	
-		q->total_idle_time += link_poll_end - link_poll_start;
+		q->link_poll_end = timestamp_get();
+		q->total_idle_time += q->link_poll_end - link_poll_start;
 
 
 		// If the master link was awake, then accept as many workers as possible.
