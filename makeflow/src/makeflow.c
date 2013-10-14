@@ -2917,6 +2917,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	fprintf(stdout, "\r     Total rules: %d", d->nodeid_counter);
+	fprintf(stdout, "\nStarting execution of workflow: %s.\n", dagfile); 
+
 	if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
 		char *cwd = path_getcwd();
 		if(!strncmp(cwd, "/afs", 4)) {
