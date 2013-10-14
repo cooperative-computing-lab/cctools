@@ -17,6 +17,7 @@ sand_compress_reads < random.fa > random.cfa
 
 echo "Starting filter master ..."
 sand_filter_master -s 100 -k 22 -Z port.file -d all -o filter.log random.cfa random.cand &
+echo $! > $1 # write pid of sand_filter_master so the process can be reaped in cleanup
 
 run_local_worker port.file
 
