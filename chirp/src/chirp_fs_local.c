@@ -7,7 +7,6 @@ See the file COPYING for details.
 #include "chirp_filesystem.h"
 #include "chirp_fs_local.h"
 #include "chirp_protocol.h"
-#include "chirp_alloc.h"
 #include "chirp_acl.h"
 
 #include "create_dir.h"
@@ -588,7 +587,9 @@ static int search_directory(const char *subject, const char * const base, char f
 							link_putfstring(l, "0:%s::\n", stoptime, matched); // FIXME is this a bug?
 							link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, matched);
 						} else {
-							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, chirp_stat_string(&buf));
+							char statenc[CHIRP_STAT_MAXENCODING];
+							chirp_stat_encode(statenc, &buf);
+							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, statenc);
 							if(stopatfirst) return 1;
 						}
 					} else {

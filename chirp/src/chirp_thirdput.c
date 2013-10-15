@@ -28,7 +28,7 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 	int save_errno;
 	int my_target_acl = 0;
 
-	result = chirp_alloc_lstat(lpath, &info);
+	result = cfs->lstat(lpath, &info);
 	if(result < 0)
 		return result;
 
@@ -53,8 +53,8 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 			return result;
 
 		// transfer each of the directory contents recurisvely
-		dir = chirp_alloc_opendir(lpath);
-		while((d = chirp_alloc_readdir(dir))) {
+		dir = cfs->opendir(lpath);
+		while((d = cfs->readdir(dir))) {
 			if(!strcmp(d->name, "."))
 				continue;
 			if(!strcmp(d->name, ".."))
@@ -75,7 +75,7 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 
 		// finally, set the acl to duplicate the source directory,
 		// but do not take away permissions from me or the initiator
-		chirp_alloc_closedir(dir);
+		cfs->closedir(dir);
 
 		aclfile = chirp_acl_open(lpath);
 		if(!aclfile)
@@ -111,7 +111,7 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 	} else if(S_ISLNK(info.cst_mode)) {
 		if(!chirp_acl_check(lpath, subject, CHIRP_ACL_READ))
 			return -1;
-		result = chirp_alloc_readlink(lpath, newlpath, sizeof(newlpath));
+		result = cfs->readlink(lpath, newlpath, sizeof(newlpath));
 		if(result < 0)
 			return -1;
 		return chirp_reli_symlink(hostname, newlpath, rpath, stoptime);

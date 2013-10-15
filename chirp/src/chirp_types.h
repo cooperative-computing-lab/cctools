@@ -47,6 +47,26 @@ struct chirp_stat {
 	INT64_T cst_ctime;	/**< The last time the inode was changed, in <tt>time_t</tt> format. */
 };
 
+#define CHIRP_STAT_MAXENCODING  (4096)
+#define chirp_stat_encode(s, info) \
+do {\
+	int n = 0;\
+	n += sprintf((s)+n, "%" PRId64, (info)->cst_dev);\
+	n += sprintf((s)+n, " %" PRId64, (info)->cst_ino);\
+	n += sprintf((s)+n, " %" PRId64, (info)->cst_mode);\
+	n += sprintf((s)+n, " %" PRId64, (info)->cst_nlink);\
+	n += sprintf((s)+n, " %" PRId64, (info)->cst_uid);\
+	n += sprintf((s)+n, " %" PRId64, (info)->cst_gid);\
+	n += sprintf((s)+n, " %" PRId64, (info)->cst_rdev);\
+	n += sprintf((s)+n, " %" PRId64, (info)->cst_size);\
+	n += sprintf((s)+n, " %" PRId64, (info)->cst_blksize);\
+	n += sprintf((s)+n, " %" PRId64, (info)->cst_blocks);\
+	n += sprintf((s)+n, " %" PRId64, (info)->cst_atime);\
+	n += sprintf((s)+n, " %" PRId64, (info)->cst_mtime);\
+	n += sprintf((s)+n, " %" PRId64, (info)->cst_ctime);\
+} while (0)
+
+
 /** Describes the properties of a file system, much like the Unix <tt>statfs</tt> structure.
 @see chirp_reli_statfs, chirp_reli_fstatfs
 */
@@ -60,6 +80,19 @@ struct chirp_statfs {
 	INT64_T f_files;	/**< The maximum number of files (inodes) on the filesystem. */
 	INT64_T f_ffree;	/**< The number of files (inodes) currently in use. */
 };
+
+#define CHIRP_STATFS_MAXENCODING  (4096)
+#define chirp_statfs_encode(s, info) \
+do {\
+	int n = 0;\
+	n += sprintf((s)+n, "%" PRId64, (info)->f_type);\
+	n += sprintf((s)+n, " %" PRId64, (info)->f_bsize);\
+	n += sprintf((s)+n, " %" PRId64, (info)->f_blocks);\
+	n += sprintf((s)+n, " %" PRId64, (info)->f_bfree);\
+	n += sprintf((s)+n, " %" PRId64, (info)->f_bavail);\
+	n += sprintf((s)+n, " %" PRId64, (info)->f_files);\
+	n += sprintf((s)+n, " %" PRId64, (info)->f_ffree);\
+} while (0)
 
 /** Describes a directory entry returned by @ref chirp_reli_readdir */
 
