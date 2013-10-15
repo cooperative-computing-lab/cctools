@@ -44,70 +44,6 @@ void create_workspace(){
 	if(!create_dir(workspace, 0777)) fatal("Could not create directory.\n");
 }
 
-void initialize( char *output_directory, char *input_file, struct list *d){
-	pid_t pid;
-	int pipefd[2];
-	pipe(pipefd);
-
-	srand(time(NULL));
-
-	char expanded_input[PATH_MAX];
-	realpath(input_file, expanded_input);
-	create_workspace();
-
-	switch ( pid = fork() ){
-	case -1:
-		fprintf( stderr, "Cannot fork. Exiting...\n" );
-		exit(1);
-	case 0:
-		/* Child process */
-		close(pipefd[0]);
-		dup2(pipefd[1], 1);
-		close(pipefd[1]);
-
-		char * const args[5] = { "linking makeflow" , MAKEFLOW_BUNDLE_FLAG, output_directory, expanded_input, NULL };
-		execvp(MAKEFLOW_PATH, args); 
-		exit(1);
-	default:
-		/* Parent process */
-		close(pipefd[1]);
-		char next;
-		char *buffer = (char *) malloc(sizeof(char));
-		char *original_name;
-		int size = 0;
-		int depth = 1;
-		while (read(pipefd[0], &next, sizeof(next)) != 0){
-			switch ( next ){
-				case '\t':
-					original_name = (char *)realloc((void *)buffer,size+1);
-					*(original_name+size) = '\0';
-					buffer = (char *) malloc(sizeof(char));
-					size = 0;
-					break;
-				case '\n':
-					buffer = realloc(buffer, size+1);
-					*(buffer+size) = '\0';
-					struct dependency *new_dependency = (struct dependency *) malloc(sizeof(struct dependency));
-					new_dependency->original_name = original_name;
-					new_dependency->final_name = buffer;
-					new_dependency->depth = depth;
-					new_dependency->parent = NULL;
-					new_dependency->superparent = NULL;
-					list_push_tail(d, (void *) new_dependency);
-					size = 0;
-					original_name = NULL;
-					buffer = NULL;
-					break;
-				case '\0':
-				default:
-					buffer = realloc(buffer, size+1);
-					*(buffer+size) = next;
-					size++;
-			}
-		}
-	}
-}
-
 void display_dependencies(struct list *d){
 	struct dependency *dep;
 
@@ -147,6 +83,23 @@ file_type find_driver_for(const char *name){
 	if((type = file_extension_known(name))){}
 
 	return type;
+}
+
+void initialize( char *output_directory, char *input_file, struct list *d){
+	srand(time(NULL));
+	create_workspace();
+
+	char expanded_input[PATH_MAX];
+	realpath(input_file, expanded_input);
+
+	struct dependency *initial_dependency = (struct dependency *) malloc(sizeof(struct dependency));
+	initial_dependency->original_name = xxstrdup(expanded_input);
+	initial_dependency->final_name = xxstrdup(path_basename(expanded_input));
+	initial_dependency->type = find_driver_for(expanded_input);
+	initial_dependency->depth = 0;
+	initial_dependency->parent = NULL;
+	initial_dependency->superparent = NULL;
+	list_push_tail(d, (void *) initial_dependency);
 }
 
 struct list *find_dependencies_for(struct dependency *dep){
@@ -323,9 +276,8 @@ void build_package(struct list *d){
 				copy_file_to_file(dep->original_name, tmp_dest_path);
 				break;
 			case MAKEFLOW:
-				sprintf(tmp_from_path, "%s/%s", workspace, dep->original_name);
-				sprintf(tmp_dest_path, "%s/%s", dep->output_path, dep->final_name);
-				copy_file_to_file(tmp_from_path, tmp_dest_path);
+				sprintf(tmp_from_path, "%s/%s", workspace, dep->final_name);
+				copy_file_to_file(tmp_from_path, dep->output_path);
 				break;
 			case PERL:
 			default:
@@ -440,9 +392,7 @@ int main(int argc, char *argv[]){
 	struct list *l = list_explicit(dependencies);
 	write_explicit(l, output);
 
-	display_dependencies(dependencies);
-
-//	cleanup();
+	cleanup();
 
 	return 0;
 }
