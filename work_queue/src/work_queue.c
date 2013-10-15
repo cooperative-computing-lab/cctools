@@ -5,14 +5,9 @@ See the file COPYING for details.
 */
 
 /*
-The following major problems must be fixed before this code
-can be released:
-
+The following major problems must be fixed:
 - The capacity code assumes one task per worker.
-
 - The log specification need to be updated.
-
-- The details reported to the catalog should be examined.
 */
 
 #include "work_queue.h"
