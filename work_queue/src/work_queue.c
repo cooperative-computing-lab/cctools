@@ -1197,6 +1197,24 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 }
 
 
+void current_tasks_to_nvpair( struct nvpair *nv, struct work_queue_worker *w )
+{
+	struct work_queue_task *t;
+	UINT64_T taskid;
+	int n = 0;
+
+	itable_firstkey(w->current_tasks);
+	while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
+		char task_string[WORK_QUEUE_LINE_MAX];
+
+		sprintf(task_string, "current_task_%03d_id", n);
+		nvpair_insert_integer(nv,task_string,t->taskid);
+
+		sprintf(task_string, "current_task_%03d_command", n);
+		nvpair_insert_string(nv,task_string,t->command_line);
+		n++;
+	}
+}
 
 struct nvpair * worker_to_nvpair( struct work_queue *q, struct work_queue_worker *w )
 {
@@ -1216,23 +1234,10 @@ struct nvpair * worker_to_nvpair( struct work_queue *q, struct work_queue_worker
 	nvpair_insert_integer(nv,"start_time",w->start_time);
 	nvpair_insert_integer(nv,"current_time",timestamp_get()); 
 
+
 	work_queue_resources_add_to_nvpair(w->resources,nv);
 
-	struct work_queue_task *t;
-	UINT64_T taskid;
-	int n = 0;
-
-	itable_firstkey(w->current_tasks);
-	while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
-		char task_string[WORK_QUEUE_LINE_MAX];
-
-		sprintf(task_string, "current_task_%03d_id", n);
-		nvpair_insert_integer(nv,task_string,t->taskid);
-
-		sprintf(task_string, "current_task_%03d_command", n);
-		nvpair_insert_string(nv,task_string,t->command_line);
-		n++;
-	}
+	current_tasks_to_nvpair(nv, w);
 
 	return nv;
 }
