@@ -1157,26 +1157,8 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 }
 
 
-
-struct nvpair * worker_to_nvpair( struct work_queue *q, struct work_queue_worker *w )
+void current_tasks_to_nvpair( struct nvpair *nv, struct work_queue_worker *w )
 {
-	struct nvpair *nv = nvpair_create();
-	if(!nv) return 0;
-
-	nvpair_insert_string(nv,"state",work_queue_state_names[get_worker_state(q, w)]);
-	nvpair_insert_string(nv,"hostname",w->hostname);
-	nvpair_insert_string(nv,"os",w->os);
-	nvpair_insert_string(nv,"arch",w->arch);
-	nvpair_insert_string(nv,"address_port",w->addrport);
-	nvpair_insert_integer(nv,"ncpus",w->resources->cores.total);
-	nvpair_insert_integer(nv,"total_tasks_complete",w->total_tasks_complete);
-	nvpair_insert_integer(nv,"total_bytes_transferred",w->total_bytes_transferred);
-	nvpair_insert_integer(nv,"total_transfer_time",w->total_transfer_time);
-	nvpair_insert_integer(nv,"start_time",w->start_time);
-	nvpair_insert_integer(nv,"current_time",timestamp_get()); 
-
-	work_queue_resources_add_to_nvpair(w->resources,nv);
-
 	struct work_queue_task *t;
 	UINT64_T taskid;
 	int n = 0;
@@ -1192,6 +1174,30 @@ struct nvpair * worker_to_nvpair( struct work_queue *q, struct work_queue_worker
 		nvpair_insert_string(nv,task_string,t->command_line);
 		n++;
 	}
+}
+
+struct nvpair * worker_to_nvpair( struct work_queue *q, struct work_queue_worker *w )
+{
+	struct nvpair *nv = nvpair_create();
+	if(!nv) return 0;
+
+	nvpair_insert_string(nv,"state",work_queue_state_names[get_worker_state(q, w)]);
+	nvpair_insert_string(nv,"hostname",w->hostname);
+	nvpair_insert_string(nv,"os",w->os);
+	nvpair_insert_string(nv,"arch",w->arch);
+	nvpair_insert_string(nv,"address_port",w->addrport);
+	nvpair_insert_integer(nv,"ncpus",w->resources->cores.total);
+	nvpair_insert_integer(nv,"total_tasks_complete",w->total_tasks_complete);
+	nvpair_insert_integer(nv,"total_tasks_running",itable_size(w->current_tasks));
+	nvpair_insert_integer(nv,"total_bytes_transferred",w->total_bytes_transferred);
+	nvpair_insert_integer(nv,"total_transfer_time",w->total_transfer_time);
+	nvpair_insert_integer(nv,"start_time",w->start_time);
+	nvpair_insert_integer(nv,"current_time",timestamp_get()); 
+
+
+	work_queue_resources_add_to_nvpair(w->resources,nv);
+
+	current_tasks_to_nvpair(nv, w);
 
 	return nv;
 }
