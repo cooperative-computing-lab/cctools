@@ -4,27 +4,25 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "macros.h"
-#include "chirp_acl.h"
 #include "chirp_alloc.h"
-#include "chirp_protocol.h"
 #include "chirp_filesystem.h"
+#include "chirp_protocol.h"
 
-#include "itable.h"
+#include "debug.h"
+#include "delete_dir.h"
+#include "full_io.h"
 #include "hash_table.h"
-#include "xxmalloc.h"
 #include "int_sizes.h"
+#include "itable.h"
+#include "macros.h"
 #include "path.h"
 #include "stringtools.h"
-#include "full_io.h"
-#include "delete_dir.h"
-#include "debug.h"
-
-#include <unistd.h>
-#include <sys/stat.h>
+#include "xxmalloc.h"
 
 #include <dirent.h>
-#include <fnmatch.h>
+#include <unistd.h>
+
+#include <sys/stat.h>
 
 #include <assert.h>
 #include <errno.h>
