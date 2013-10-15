@@ -27,6 +27,7 @@ typedef enum {
 } format_t;
 
 typedef enum {
+	NO_QUERY,
 	QUERY_QUEUE,
 	QUERY_TASKS,
 	QUERY_WORKERS,
@@ -36,7 +37,7 @@ typedef enum {
 #define CATALOG_SIZE 50 //size of the array of nvpair pointers
 
 static format_t format_mode = FORMAT_TABLE;
-static query_t query_mode = QUERY_QUEUE;
+static query_t query_mode = NO_QUERY;
 static int work_queue_status_timeout = 300;
 static char *catalog_host = NULL;
 static int catalog_port = 0;
@@ -96,10 +97,8 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
-static void work_queue_status_parse_command_line_arguments(int argc, char *argv[])
+static void work_queue_status_parse_command_line_arguments(int argc, char *argv[], const char **master_host, int *master_port)
 {
-	signed int c;
-
 	static struct option long_options[] = {
 		{"statistics", no_argument, 0, 'Q'},
 		{"workers", no_argument, 0, 'W'},
@@ -111,6 +110,9 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 		{"timeout", required_argument, 0, 't'},
 		{"help", no_argument, 0, 'h'},
         {0,0,0,0}};
+
+	signed int c;
+	int needs_explicit_master = 0;
 
 	while((c = getopt_long(argc, argv, "QTWC:d:lo:O:Rt:vh", long_options, NULL)) > -1) {
 		switch (c) {
@@ -124,12 +126,21 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			debug_flags_set(optarg);
 			break;
 		case 'Q':
+			if(query_mode != NO_QUERY)
+				fatal("Options -Q, -T, and -W, are mutually exclusive, and can be specified only once.");
+			needs_explicit_master = 0;
 			query_mode = QUERY_QUEUE;
 			break;
 		case 'T':
+			if(query_mode != NO_QUERY)
+				fatal("Options -Q, -T, and -W, are mutually exclusive, and can be specified only once.");
+			needs_explicit_master = 1;
 			query_mode = QUERY_TASKS;
 			break;
 		case 'W':
+			if(query_mode != NO_QUERY)
+				fatal("Options -Q, -T, and -W, are mutually exclusive, and can be specified only once.");
+			needs_explicit_master = 1;
 			query_mode = QUERY_WORKERS;
 		  	break;
 		case 'l':
@@ -161,6 +172,28 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			break;
 		}
 	}
+
+	if(query_mode == NO_QUERY)
+		query_mode = QUERY_QUEUE;
+	
+	if(needs_explicit_master && optind >= argc)
+		fatal("Options -T and -W need an explicit master to query.");
+
+	if( optind < argc ) {
+		*master_host = argv[optind];
+		optind++;
+	}
+
+	if( optind < argc ) {
+		*master_port = atoi(argv[optind]);
+		optind++;
+	}
+
+	if(optind < argc) {
+		fprintf(stderr,"work_queue_status: Too many arguments.  Try the -h option for help.\n");
+		exit(EXIT_FAILURE);
+	}
+
 }
 
 void resize_catalog(size_t new_size)
@@ -317,8 +350,8 @@ int do_catalog_query( time_t stoptime )
 
 int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 {
-	static struct nvpair_header *query_headers[4] = { queue_headers, task_headers, worker_headers, master_resource_headers };
-	static const char * query_strings[4] = {"queue","task","worker", "master_resource"};
+	static struct nvpair_header *query_headers[] = { [QUERY_QUEUE] = queue_headers, task_headers, worker_headers, master_resource_headers };
+	static const char * query_strings[] = { [QUERY_QUEUE] = "queue","task","worker", "master_resource"};
 
 	struct nvpair_header *query_header = query_headers[query_mode];
 	const char * query_string = query_strings[query_mode];
@@ -368,24 +401,9 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	work_queue_status_parse_command_line_arguments(argc, argv);
+	work_queue_status_parse_command_line_arguments(argc, argv, &master_host, &master_port);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
-
-	if( optind < argc ) {
-		master_host = argv[optind];
-		optind++;
-	}
-
-	if( optind < argc ) {
-		master_port = atoi(argv[optind]);
-		optind++;
-	}
-
-	if(optind < argc) {
-		fprintf(stderr,"work_queue_status: Too many arguments.  Try the -h option for help.\n");
-		exit(EXIT_FAILURE);
-	}
 
 	time_t stoptime = time(0) + work_queue_status_timeout;
 
