@@ -25,7 +25,7 @@ capitol.360.jpg: capitol.jpg
 	$CONVERT -swirl 360 capitol.jpg capitol.360.jpg
 
 lala:
-	/bin/sleep 10000
+	/bin/sleep 10
 
 capitol.jpg: lala
 	$CURL -o capitol.jpg $URL
