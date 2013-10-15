@@ -208,6 +208,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 				case '*':
 					explicit = 1;
 					break;
+				case '\t':
 				case ' ':
 					if(explicit){
 						buffer = realloc(buffer, size+1);
@@ -285,7 +286,7 @@ void determine_package_structure(struct list *d, char *output_dir){
 	list_first_item(d);
 	while((dep = list_next_item(d))){
 		char resolved_path[PATH_MAX];
-		if(dep->parent && dep->parent->output_path){
+		if(dep->parent && dep->parent->type != MAKEFLOW && dep->parent->output_path){
 			sprintf(resolved_path, "%s", dep->parent->output_path);
 		} else {
 			sprintf(resolved_path, "%s", output_dir);
@@ -295,7 +296,8 @@ void determine_package_structure(struct list *d, char *output_dir){
 				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
 				break;
 			case MAKEFLOW:
-				sprintf(resolved_path, "%s/%s", resolved_path, dep->original_name);
+				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
+				break;
 			case PERL:
 			default:
 				/* TODO: naming conflicts */
@@ -309,24 +311,26 @@ void build_package(struct list *d){
 	struct dependency *dep;
 	list_first_item(d);
 	while((dep = list_next_item(d))){
-		char tmp_path[PATH_MAX];
+		char tmp_from_path[PATH_MAX];
+		char tmp_dest_path[PATH_MAX];
 		switch(dep->type){
 			case PYTHON:
 				if(!create_dir(dep->output_path, 0777)) fatal("Could not create directory.\n");
 				if(dep->depth > 1)
-					sprintf(tmp_path, "%s/__init__.py", dep->output_path);
+					sprintf(tmp_dest_path, "%s/__init__.py", dep->output_path);
 				else
-					sprintf(tmp_path, "%s/__main__.py", dep->output_path);
-				copy_file_to_file(dep->original_name, tmp_path);
+					sprintf(tmp_dest_path, "%s/__main__.py", dep->output_path);
+				copy_file_to_file(dep->original_name, tmp_dest_path);
 				break;
 			case MAKEFLOW:
-				sprintf(tmp_path, "%s/%s", workspace, dep->original_name);
-				copy_file_to_file(tmp_path, dep->output_path);
+				sprintf(tmp_from_path, "%s/%s", workspace, dep->original_name);
+				sprintf(tmp_dest_path, "%s/%s", dep->output_path, dep->final_name);
+				copy_file_to_file(tmp_from_path, tmp_dest_path);
 				break;
 			case PERL:
 			default:
-				sprintf(tmp_path, "%s/%s", dep->output_path, dep->final_name);
-				copy_file_to_file(dep->original_name, tmp_path);
+				sprintf(tmp_dest_path, "%s/%s", dep->output_path, dep->final_name);
+				copy_file_to_file(dep->original_name, tmp_dest_path);
 				break;
 		}
 	}
@@ -421,6 +425,7 @@ int main(int argc, char *argv[]){
 	output = (char *) malloc(PATH_MAX * sizeof(char));
 	realpath(tmp, output);
 	free(tmp);
+	if(!create_dir(output, 0777)) fatal("Could not create output directory.\n");
 
 	char input_wd[PATH_MAX];
 	path_dirname(input, input_wd);
@@ -435,7 +440,9 @@ int main(int argc, char *argv[]){
 	struct list *l = list_explicit(dependencies);
 	write_explicit(l, output);
 
-	cleanup();
+	display_dependencies(dependencies);
+
+//	cleanup();
 
 	return 0;
 }
