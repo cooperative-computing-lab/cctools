@@ -294,6 +294,8 @@ void determine_package_structure(struct list *d, char *output_dir){
 			case PYTHON:
 				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
 				break;
+			case MAKEFLOW:
+				sprintf(resolved_path, "%s/%s", resolved_path, dep->original_name);
 			case PERL:
 			default:
 				/* TODO: naming conflicts */
@@ -316,6 +318,10 @@ void build_package(struct list *d){
 				else
 					sprintf(tmp_path, "%s/__main__.py", dep->output_path);
 				copy_file_to_file(dep->original_name, tmp_path);
+				break;
+			case MAKEFLOW:
+				sprintf(tmp_path, "%s/%s", workspace, dep->original_name);
+				copy_file_to_file(tmp_path, dep->output_path);
 				break;
 			case PERL:
 			default:
