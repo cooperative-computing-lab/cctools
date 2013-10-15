@@ -15,7 +15,7 @@ See the file COPYING for details.
 #ifndef MAKEFLOW_DAG_H
 #define MAKEFLOW_DAG_H
 
-#define MAX_REMOTE_JOBS_DEFAULT 100;
+#define MAX_REMOTE_JOBS_DEFAULT 100
 
 #define RESOURCES_CATEGORY "CATEGORY"
 

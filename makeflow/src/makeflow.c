@@ -2175,7 +2175,8 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Show the pre-execution analysis of the Makeflow script - <dagfile>.\n", "-i,--analyze-exec");
 	fprintf(stdout, " %-30s Show input files.\n", "-I,--show-input");
 	fprintf(stdout, " %-30s Max number of local jobs to run at once.    (default is # of cores)\n", "-j,--max-local=<#>");
-	fprintf(stdout, " %-30s Max number of remote jobs to run at once.   (default is 100)\n", "-J,--max-remote=<#>");
+	fprintf(stdout, " %-30s Max number of remote jobs to run at once.\n", "-J,--max-remote=<#>");  
+	fprintf(stdout, "                                                            (default %d for -Twq, %d otherwise.)\n", 10*MAX_REMOTE_JOBS_DEFAULT, MAX_REMOTE_JOBS_DEFAULT );
 	fprintf(stdout, " %-30s Syntax check.\n", "-k,--syntax-check");
 	fprintf(stdout, " %-30s Preserve (i.e., do not clean intermediate symbolic links)\n", "-K,--preserve-links");
 	fprintf(stdout, " %-30s Use this file for the makeflow log.         (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
