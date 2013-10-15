@@ -86,8 +86,8 @@ static void show_help(const char *progname)
 	fprintf(stdout, "Otherwise, contact the catalog server for summary data.\n");
 	fprintf(stdout, "Options:\n");
 	fprintf(stdout, " %-30s Show queue summary statistics. (default)\n", "-Q,--statistics");
-	fprintf(stdout, " %-30s List workers connected to the master.\n", "-W,--workers");
-	fprintf(stdout, " %-30s List tasks of a given master.\n", "-T,--tasks");
+	fprintf(stdout, " %-30s List workers connected to the given master.\n", "-W,--workers");
+	fprintf(stdout, " %-30s List tasks of the given master.\n", "-T,--tasks");
 	fprintf(stdout, " %-30s Long text output.\n", "-l,--verbose");
 	fprintf(stdout, " %-30s Shows aggregated resources of all masters.\n", "-R,--resources");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT\n", "-C,--catalog=<catalog>");
