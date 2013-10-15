@@ -2009,6 +2009,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				if(p->syscall_result<0) {
 					p->syscall_result = -errno;
 				} else {
+					p->syscall_result = MIN(p->syscall_result, args[2]);
 					tracer_copy_out(p->tracer,path2,POINTER(args[1]),p->syscall_result);
 				}
 				divert_to_dummy(p,p->syscall_result);
@@ -2291,6 +2292,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				if(p->syscall_result<0) {
 					p->syscall_result = -errno;
 				} else {
+					p->syscall_result = MIN(p->syscall_result, args[2]);
 					tracer_copy_out(p->tracer,path2,POINTER(args[2]),p->syscall_result);
 				}
 				divert_to_dummy(p,p->syscall_result);
