@@ -19,7 +19,7 @@ LIST_ITEM()Hostname and port number of the application.
 LIST_ITEM()Number of waiting tasks.
 LIST_ITEM()Number of completed tasks.
 LIST_ITEM()Number of connected workers.
-LIST_ITEM()Number of busy workers currently executing a task.
+LIST_ITEM()Number of tasks currently being executed.
 LIST_ITEM()Timestamp of when there was last communication with the application.
 LIST_END
 
