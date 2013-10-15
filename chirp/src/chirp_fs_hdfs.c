@@ -91,6 +91,14 @@ static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX])
 	static const char *groups[] = { "supergroup" };
 	char *path;
 
+	if(!hdfs_services) {
+		if (hdfs_library_envinit() == -1)
+			return -1;
+		hdfs_services = hdfs_library_open();
+		if(!hdfs_services)
+			return -1;
+	}
+
 	debug(D_CHIRP, "url: %s", url);
 
 	assert(strprfx(url, "hdfs://"));
@@ -113,12 +121,6 @@ static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX])
 		*strchr(hdfs_host, ':') = '\0';
 	} else {
 		hdfs_port = 50070; /* default namenode port */
-	}
-
-	if(!hdfs_services) {
-		hdfs_services = hdfs_library_open();
-		if(!hdfs_services)
-			return -1;
 	}
 
 	debug(D_HDFS, "connecting to hdfs://%s:%u%s as '%s'\n", hdfs_host, hdfs_port, hdfs_root, chirp_owner);

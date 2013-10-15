@@ -14,6 +14,4 @@ chirp_migrate
 chirp_matrix_roc
 chirp_status
 chirp_partition_stream
-chirp_server_hdfs
 libchirp_client.so
-

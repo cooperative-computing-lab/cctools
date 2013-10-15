@@ -7,6 +7,8 @@
 #ifndef PATH_H
 #define PATH_H
 
+#include "buffer.h"
+
 void path_absolute (const char *src, char *dest, int exist);
 const char *path_basename (const char * path);
 const char *path_extension (const char *path);
@@ -21,5 +23,7 @@ char *path_getcwd (void);
 void path_remove_trailing_slashes (char *path);
 void path_split (const char *input, char *first, char *rest);
 void path_split_multi (const char *input, char *first, char *rest);
+
+int path_find (buffer_t *B, const char *dir, const char *pattern, int recursive);
 
 #endif

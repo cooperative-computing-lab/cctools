@@ -10,7 +10,7 @@ chirp_hdfs_root="hdfs:///users/$USER/$0.$(hostname).$PPID"
 prepare()
 {
 	set +e
-	../src/chirp_server_hdfs --background --debug=all --debug-file="$chirp_debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$chirp_pid" --port-file="$chirp_port" --root="$chirp_hdfs_root"
+	../src/chirp_server --background --debug=all --debug-file="$chirp_debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$chirp_pid" --port-file="$chirp_port" --root="$chirp_hdfs_root"
 
 	for ((i = 0; i < 30; i++)); do
 		if [ -r "$chirp_pid" -a -r "$chirp_port" ]; then
@@ -18,8 +18,8 @@ prepare()
 		fi
 		sleep 1
 	done
-	# Not all platforms can run chirp_server_hdfs, this is reflected in a fatal error during backend startup
-	echo "Failure to startup chirp_server_hdfs:"
+	# Not all platforms can run chirp_server w/ hdfs, this is reflected in a fatal error during backend startup
+	echo "Failure to startup chirp_server:"
 	cat "$chirp_debug"
 	return 0
 }

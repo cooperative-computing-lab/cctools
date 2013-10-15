@@ -74,7 +74,8 @@ struct hdfs_library {
 	int (*setrep) (hdfsFS fs, const char *path, UINT16_T nreps );
 };
 
-struct hdfs_library *hdfs_library_open();
+int hdfs_library_envinit(void);
+struct hdfs_library *hdfs_library_open(void);
 void hdfs_library_close(struct hdfs_library *hs);
 
 #endif

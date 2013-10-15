@@ -6,12 +6,16 @@
 
 #include "path.h"
 
+#include "buffer.h"
 #include "debug.h"
 #include "xxmalloc.h"
 
+#include <dirent.h>
 #include <fcntl.h>
+#include <fnmatch.h>
 
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #include <errno.h>
 #include <limits.h>
@@ -230,3 +234,54 @@ void path_split_multi (const char *input, char *first, char *rest)
 	}
 	*rest = 0;
 }
+
+static int find (buffer_t *B, const size_t base, buffer_t *path, const char *pattern, int recursive)
+{
+	int rc = 0;
+	DIR *D = opendir(buffer_tostring(path, NULL));
+	if (D) {
+		struct dirent *entry;
+		size_t current = buffer_pos(path);
+		while ((entry = readdir(D))) {
+			struct stat buf;
+
+			if (buffer_putstring(path, entry->d_name) == -1) goto failure;
+			/* N.B. We don't use FNM_PATHNAME, so `*.c' matches `foo/bar.c' */
+			if (fnmatch(pattern, buffer_tostring(path, NULL)+base, 0) == 0) {
+				if (buffer_printf(B, "%s%c", buffer_tostring(path, NULL), 0) == -1) goto failure; /* NUL padded */
+				rc += 1;
+			}
+			if (recursive && strcmp(entry->d_name, ".") && strcmp(entry->d_name, "..") && stat(buffer_tostring(path, NULL), &buf) == 0 && S_ISDIR(buf.st_mode)) {
+				if (buffer_putliteral(path, "/") == -1) goto failure;
+				int found = find(B, base, path, pattern, recursive);
+				if (found == -1)
+					goto failure;
+				else if (found > 0)
+					rc += found;
+			}
+			buffer_rewind(path, current);
+		}
+	} /* else skip */
+	goto out;
+failure:
+	rc = -1;
+	goto out;
+out:
+	if (D)
+		closedir(D);
+	return rc;
+}
+
+int path_find (buffer_t *B, const char *dir, const char *pattern, int recursive)
+{
+	int rc;
+	buffer_t path;
+	buffer_init(&path);
+	if (buffer_printf(&path, "%s/", dir) == -1) goto out;
+	rc = find(B, buffer_pos(&path), &path, pattern, recursive);
+out:
+	buffer_free(&path);
+	return rc;
+}
+
+/* vim: set noexpandtab tabstop=4: */

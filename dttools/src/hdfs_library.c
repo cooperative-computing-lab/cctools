@@ -4,16 +4,18 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "buffer.h"
+#include "debug.h"
 #include "hdfs_library.h"
+#include "path.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <dlfcn.h>
 #include <unistd.h>
-#include <errno.h>
 
-#include "debug.h"
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /* Use the cryptic *(void **)(&hs->lval) cast, rather than just
  hs->lval because we get a warning when converting an object
@@ -25,48 +27,142 @@ See the file COPYING for details.
 		goto failure; \
 	}
 
+int hdfs_library_envinit (void)
+{
+	buffer_t B;
+	const char *CLASSPATH;
+	const char *HADOOP_HOME;
+	const char *JAVA_HOME;
+	int rc = 0;
+
+	buffer_init(&B);
+	buffer_abortonfailure(&B, 1);
+
+	if ((JAVA_HOME = getenv("JAVA_HOME")) == NULL) {
+		debug(D_HDFS, "sorry, you must set JAVA_HOME to point to your Java installation.");
+		goto invalid;
+	}
+	debug(D_HDFS, "JAVA_HOME=`%s'", JAVA_HOME);
+	if ((HADOOP_HOME = getenv("HADOOP_HOME")) == NULL) {
+		debug(D_HDFS, "sorry, you must set HADOOP_HOME to point to your Java installation.");
+		goto invalid;
+	}
+	debug(D_HDFS, "HADOOP_HOME=`%s'", HADOOP_HOME);
+
+	if ((CLASSPATH = getenv("CLASSPATH"))) {
+		buffer_printf(&B, "%s:", CLASSPATH);
+	}
+	buffer_printf(&B, "%s/jdk/jre/lib", JAVA_HOME);
+	buffer_printf(&B, ":%s/conf", HADOOP_HOME);
+	{
+		const char *path;
+		buffer_t paths;
+
+		buffer_init(&paths);
+		buffer_abortonfailure(&paths, 1);
+		if (path_find(&paths, HADOOP_HOME, "*.jar", 1) == -1) {
+			debug(D_DEBUG, "failure to search `%s': %s", HADOOP_HOME, strerror(errno));
+			buffer_free(&paths);
+			goto failure;
+		}
+		/* NUL padded */
+		for (path = buffer_tostring(&paths, NULL); *path; path = path+strlen(path)+1) {
+			buffer_printf(&B, ":%s", path);
+		}
+		buffer_free(&paths);
+	}
+	rc = setenv("CLASSPATH", buffer_tostring(&B, NULL), 1);
+	debug(D_HDFS, "CLASSPATH=`%s'", buffer_tostring(&B, NULL));
+	if (rc == -1)
+		goto failure;
+
+	rc = 0;
+	goto out;
+invalid:
+	errno = EINVAL;
+	goto failure;
+failure:
+	/* errno already set */
+	rc = -1;
+	goto out;
+out:
+	buffer_free(&B);
+	return rc;
+}
+
+static int load_lib (void **handle, const char *envpath, const char *envhome, const char *name)
+{
+	int rc;
+	const char *HOME;
+	const char *PATH;
+	const char *path;
+	buffer_t B;
+
+	buffer_init(&B);
+
+	if ((HOME = getenv(envhome)) == NULL)
+		goto invalid;
+
+	if ((PATH = getenv(envpath))) {
+		debug(D_DEBUG, "%s set to explicitly load `%s'", envpath, PATH);
+		buffer_printf(&B, "%s%c", PATH, 0);
+	} else {
+		int found;
+		debug(D_DEBUG, "looking for all DSO that match `%s' in %s=`%s'", name, envhome, HOME);
+		found = path_find(&B, HOME, name, 1);
+		if (found == -1) {
+			debug(D_DEBUG, "failure to search `%s': %s", HOME, strerror(errno));
+			goto failure;
+		}
+	}
+
+	/* NUL padded */
+	for (path = buffer_tostring(&B, NULL); *path; path += strlen(path)+1) {
+		debug(D_HDFS, "trying to load `%s'", path);
+		*handle = dlopen(path, RTLD_LAZY);
+		if (*handle) {
+			rc = 0;
+			goto out;
+		} else {
+			debug(D_HDFS, "dlopen failed: %s", dlerror());
+		}
+	}
+	debug(D_NOTICE | D_HDFS, "could not find/load %s in %s=`%s'", name, envhome, HOME);
+	errno = ENOENT;
+	goto failure;
+invalid:
+	errno = EINVAL;
+	goto failure;
+failure:
+	/* errno already set */
+	rc = -1;
+	goto out;
+out:
+	buffer_free(&B);
+	return rc;
+}
+
 void hdfs_library_close(struct hdfs_library *hs)
 {
-	dlclose(hs->libhdfs_handle);
-	dlclose(hs->libjvm_handle);
+	if (hs->libhdfs_handle)
+		dlclose(hs->libhdfs_handle);
+	if (hs->libjvm_handle)
+		dlclose(hs->libjvm_handle);
 	free(hs);
 }
 
 struct hdfs_library *hdfs_library_open()
 {
-	static int did_warning = 0;
+	struct hdfs_library *hs;
 
-	if(!getenv("JAVA_HOME") || !getenv("HADOOP_HOME") || !getenv("CLASSPATH") || !getenv("LIBHDFS_PATH") || !getenv("LIBJVM_PATH")) {
-		if(!did_warning) {
-			debug(D_NOTICE | D_HDFS, "Sorry, to use HDFS, you need to set up Java and Hadoop first.\n");
-			debug(D_NOTICE | D_HDFS, "Please set JAVA_HOME and HADOOP_HOME appropriately,\n");
-			debug(D_NOTICE | D_HDFS, "then use chirp_server_hdfs or parrot_run_hdfs as needed.\n");
-			did_warning = 0;
-		}
-		errno = ENOSYS;
+	hs = malloc(sizeof(*hs));
+	if (hs == NULL)
 		return 0;
-	}
 
-	struct hdfs_library *hs = malloc(sizeof(*hs));
-
-	const char *libjvm_path = getenv("LIBJVM_PATH");
-	hs->libjvm_handle = dlopen(libjvm_path, RTLD_LAZY);
-	if(!hs->libjvm_handle) {
-		debug(D_NOTICE | D_HDFS, "couldn't dlopen LIBJVM_PATH=%s: %s", libjvm_path, dlerror());
-		free(hs);
-		return 0;
-	}
-
-
-	const char *libhdfs_path = getenv("LIBHDFS_PATH");
-	hs->libhdfs_handle = dlopen(libhdfs_path, RTLD_LAZY);
-	if(!hs->libhdfs_handle) {
-		dlclose(hs->libjvm_handle);
-		free(hs);
-		debug(D_NOTICE | D_HDFS, "couldn't dlopen LIBHDFS_PATH=%s: %s", libhdfs_path, dlerror());
-		return 0;
-	}
-
+	if (load_lib(&hs->libjvm_handle, "LIBJVM_PATH", "JAVA_HOME", "*/libjvm.so") == -1)
+		goto failure;
+	if (load_lib(&hs->libhdfs_handle, "LIBHDFS_PATH", "HADOOP_HOME", "*/libhdfs.so") == -1)
+		goto failure;
 
 	HDFS_LOAD_FUNC(connect, "hdfsConnect");
 	HDFS_LOAD_FUNC(connect_as_user, "hdfsConnectAsUser");
