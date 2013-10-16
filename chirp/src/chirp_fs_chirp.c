@@ -411,6 +411,7 @@ struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_pwrite,
 	chirp_fs_chirp_sread,
 	chirp_fs_chirp_swrite,
+	cfs_stub_lockf,
 	chirp_fs_chirp_fstat,
 	chirp_fs_chirp_fstatfs,
 	chirp_fs_chirp_fchown,

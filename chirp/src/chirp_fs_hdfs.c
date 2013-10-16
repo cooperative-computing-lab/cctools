@@ -59,7 +59,6 @@ such as creating symbolic links.
 file has already been created.
 */
 
-
 #define RESOLVE(path) \
 char resolved_##path[CHIRP_PATH_MAX];\
 if (chirp_fs_hdfs_resolve(path, resolved_##path) == -1) return -1;\
@@ -739,6 +738,7 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_pwrite,
 	chirp_fs_hdfs_sread,
 	chirp_fs_hdfs_swrite,
+	cfs_stub_lockf,
 	chirp_fs_hdfs_fstat,
 	chirp_fs_hdfs_fstatfs,
 	chirp_fs_hdfs_fchown,

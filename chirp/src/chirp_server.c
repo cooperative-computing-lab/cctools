@@ -16,6 +16,7 @@
 #include "chirp_reli.h"
 #include "chirp_stats.h"
 #include "chirp_thirdput.h"
+#include "chirp_types.h"
 
 #include "auth_all.h"
 #include "catalog_server.h"
@@ -27,7 +28,6 @@
 #include "debug.h"
 #include "disk_info.h"
 #include "domain_name_cache.h"
-#include "full_io.h"
 #include "get_canonical_path.h"
 #include "getopt_aux.h"
 #include "link.h"
@@ -118,8 +118,10 @@ static int space_available(INT64_T amount)
 
 	if((current - last_check) > check_interval) {
 		struct chirp_statfs buf;
-		if(cfs->statfs("/", &buf) < 0)
+
+		if(chirp_alloc_statfs("/", &buf) == -1) {
 			return 0;
+		}
 		avail = buf.f_bsize * buf.f_bfree;
 		last_check = current;
 	}
@@ -162,7 +164,10 @@ static int update_all_catalogs(const char *url)
 	if(cfs->init(url) == -1)
 		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
 
-	if(cfs->statfs("/", &info) < 0) {
+	if(chirp_alloc_init("/", root_quota) == -1)
+		fatal("could not initialize %s allocations: %s", url, strerror(errno));
+
+	if(chirp_alloc_statfs("/", &info) < 0) {
 		memset(&info, 0, sizeof(info));
 	}
 
@@ -1399,28 +1404,8 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 	if(cfs->init(url) == -1)
 		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
 
-	if(root_quota > 0) {
-		if(cfs == &chirp_fs_hdfs)
-			/* On why HDFS can't do quotas (allocations) [1]:
-			 *
-			 * In the current implementation, quotas (allocations) do not work
-			 * with HDFS b/c the chirp_alloc module stores the allocation
-			 * information in the Unix filesystem and relies upon file locking
-			 * and signals to ensure mutual exclusion. Modifying the code to
-			 * store it in cfs instead of Unix would be easy, but hdfs still
-			 * doesn't support file locking. (Nor does any other distributed
-			 * file system.)
-			 *
-			 * An alternative approach would be to store the allocation data in
-			 * a database alongside the filesystem. This has some pros and cons
-			 * to be worked out.
-			 *
-			 * [1] https://github.com/batrick/cctools/commit/377377f54e7660c8571d3088487b00c8ad2d2d7d#commitcomment-4265178
-			 */
-			fatal("Cannot use quotas with HDFS\n");
-		else
-			chirp_alloc_init("/", root_quota);
-	}
+	if(chirp_alloc_init("/", root_quota) == -1)
+		fatal("could not initialize %s allocations: %s", url, strerror(errno));
 
 	link_address_remote(link, addr, &port);
 

@@ -45,6 +45,7 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
 INT64_T cfs_basic_getstream(const char *path, struct link * l, time_t stoptime);
 INT64_T cfs_basic_md5(const char *path, unsigned char digest[16]);
 
+INT64_T cfs_stub_lockf (int fd, int cmd, INT64_T len);
 INT64_T cfs_stub_getxattr (const char *path, const char *name, void *data, size_t size);
 INT64_T cfs_stub_fgetxattr (int fd, const char *name, void *data, size_t size);
 INT64_T cfs_stub_lgetxattr (const char *path, const char *name, void *data, size_t size);
@@ -67,6 +68,7 @@ struct chirp_filesystem {
 	INT64_T (*pwrite)    ( int fd, const void *data, INT64_T length, INT64_T offset );
 	INT64_T (*sread)     ( int fd, void *data, INT64_T, INT64_T, INT64_T, INT64_T );
 	INT64_T (*swrite)    ( int fd, const void *data, INT64_T, INT64_T, INT64_T, INT64_T );
+	INT64_T (*lockf)     ( int fd, int cmd, INT64_T len);
 	INT64_T (*fstat)     ( int fd, struct chirp_stat *buf );
 	INT64_T (*fstatfs)   ( int fd, struct chirp_statfs *buf );
 	INT64_T (*fchown)    ( int fd, INT64_T uid, INT64_T gid );

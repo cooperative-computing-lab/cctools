@@ -180,6 +180,11 @@ static INT64_T chirp_fs_local_pwrite(int fd, const void *buffer, INT64_T length,
 	return result;
 }
 
+static INT64_T chirp_fs_local_lockf (int fd, int cmd, INT64_T len)
+{
+	return lockf(fd, cmd, len);
+}
+
 static INT64_T chirp_fs_local_fstat(int fd, struct chirp_stat *buf)
 {
 	struct stat64 info;
@@ -831,6 +836,7 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_pwrite,
 	cfs_basic_sread,
 	cfs_basic_swrite,
+	chirp_fs_local_lockf,
 	chirp_fs_local_fstat,
 	chirp_fs_local_fstatfs,
 	chirp_fs_local_fchown,

@@ -663,6 +663,12 @@ INT64_T cfs_basic_getstream(const char *path, struct link * l, time_t stoptime)
 	return total;
 }
 
+INT64_T cfs_stub_lockf(int fd, int cmd, INT64_T len)
+{
+	errno = ENOSYS;
+	return -1;
+}
+
 INT64_T cfs_stub_getxattr(const char *path, const char *name, void *data, size_t size)
 {
 	errno = ENOSYS;

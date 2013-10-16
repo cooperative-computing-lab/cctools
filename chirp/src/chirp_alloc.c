@@ -30,6 +30,26 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+/* On why HDFS can't do quotas (allocations) [1]:
+ *
+ * In the current implementation, quotas (allocations) do not work
+ * with HDFS b/c the chirp_alloc module stores the allocation
+ * information in the Unix filesystem and relies upon file locking
+ * and signals to ensure mutual exclusion. Modifying the code to
+ * store it in cfs instead of Unix would be easy, but hdfs still
+ * doesn't support file locking. (Nor does any other distributed
+ * file system.)
+ *
+ * An alternative approach would be to store the allocation data in
+ * a database alongside the filesystem. This has some pros and cons
+ * to be worked out.
+ *
+ * Addendum: flock is now part of CFS, but HDFS has a stub for it.
+ *
+ * [1] https://github.com/batrick/cctools/commit/377377f54e7660c8571d3088487b00c8ad2d2d7d#commitcomment-4265178
+ */
+
+
 static struct hash_table *alloc_table = 0;
 static struct hash_table *root_table = 0;
 static struct itable *fd_table = 0;
@@ -88,12 +108,12 @@ static struct alloc_state *alloc_state_load(const char *path)
 		return 0;
 	}
 
-	if(lockf(fileno(s->file), F_TLOCK, 0)) {
+	if(cfs->lockf(fileno(s->file), F_TLOCK, 0)) {
 		debug(D_ALLOC, "lock of %s blocked; flushing outstanding locks", path);
 		chirp_alloc_flush();
 		debug(D_ALLOC, "locking %s (retry)", path);
 
-		if(lockf(fileno(s->file), F_LOCK, 0)) {
+		if(cfs->lockf(fileno(s->file), F_LOCK, 0)) {
 			debug(D_ALLOC, "lock of %s failed: %s", path, strerror(errno));
 			fclose(s->file);
 			free(s);
@@ -274,12 +294,18 @@ static void recover(const char *path)
 	debug(D_ALLOC, "%s (%sB)", path, string_metric(a->inuse, -1, 0));
 }
 
-void chirp_alloc_init(const char *rootpath, INT64_T size)
+int chirp_alloc_init(const char *rootpath, INT64_T size)
 {
 	struct alloc_state *a;
 	time_t start, stop;
 	INT64_T inuse, avail;
 
+	alloc_enabled = 0;
+	if(size == 0) {
+		return 0;
+	} else if (cfs->lockf(-1, F_TEST, 0) == -1 && errno == ENOSYS) {
+		return -1;
+	}
 #ifdef CCTOOLS_OPSYS_CYGWIN
 	fatal("sorry, CYGWIN cannot employ space allocation because it does not support file locking.");
 #endif
@@ -289,12 +315,16 @@ void chirp_alloc_init(const char *rootpath, INT64_T size)
 
 	debug(D_ALLOC, "### begin allocation recovery scan ###");
 
-	if(!alloc_state_create(rootpath, size))
-		fatal("couldn't create allocation in %s: %s\n", rootpath, strerror(errno));
+	if(!alloc_state_create(rootpath, size)) {
+		debug(D_ALLOC, "couldn't create allocation in %s: %s\n", rootpath, strerror(errno));
+		return -1;
+	}
 
 	a = alloc_state_cache_exact(rootpath);
-	if(!a)
-		fatal("couldn't find allocation in %s: %s\n", rootpath, strerror(errno));
+	if(!a) {
+		debug(D_ALLOC, "couldn't find allocation in %s: %s\n", rootpath, strerror(errno));
+		return -1;
+	}
 
 
 	start = time(0);
@@ -312,6 +342,7 @@ void chirp_alloc_init(const char *rootpath, INT64_T size)
 	debug(D_ALLOC, "%sB available", string_metric(avail, -1, 0));
 
 	recovery_in_progress = 0;
+	return 0;
 }
 
 static time_t last_flush_time = 0;
