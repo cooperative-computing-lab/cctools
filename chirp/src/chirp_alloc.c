@@ -45,11 +45,12 @@ See the file COPYING for details.
  */
 
 
-static struct hash_table *alloc_table = 0;
-static struct hash_table *root_table = 0;
-static struct itable *fd_table = 0;
-static int recovery_in_progress = 0;
 static int alloc_enabled = 0;
+static struct hash_table *alloc_table = 0;
+static struct itable *fd_table = 0;
+static time_t last_flush_time = 0;
+static int recovery_in_progress = 0;
+static struct hash_table *root_table = 0;
 
 struct alloc_state {
 	FILE *file;
@@ -339,8 +340,6 @@ int chirp_alloc_init(const char *rootpath, INT64_T size)
 	recovery_in_progress = 0;
 	return 0;
 }
-
-static time_t last_flush_time = 0;
 
 void chirp_alloc_flush()
 {
