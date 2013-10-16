@@ -53,7 +53,11 @@ enum { SHOW_INPUT_FILES = 2,
        SHOW_OUTPUT_FILES,
        SHOW_MAKEFLOW_ANALYSIS,
        SHOW_DAG_DOT,
-       SHOW_DAG_PPM };
+       SHOW_DAG_PPM,
+       SHOW_DAG_FILE
+};
+
+
 
 #define RANDOM_PORT_RETRY_TIME 300
 
@@ -2268,10 +2272,11 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Format for monitor logs.                    (default %s)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
 
 	fprintf(stdout, "\n*Display Options:\n\n");
-	fprintf(stdout, " %-30s Display the Makefile as a Dot graph or a PPM completion graph.\n", "-D,--display=<opt>");
+	fprintf(stdout, " %-30s Display the Makefile as a Dot graph, a PPM completion graph, or print the Makefile to stdout\n", "-D,--display=<opt>");
 	fprintf(stdout, " %-30s Where <opt> is:\n", "");
 	fprintf(stdout, " %-35s dot      Standard Dot graph\n", "");
 	fprintf(stdout, " %-35s ppm      Display a completion graph in PPM format\n", "");
+	fprintf(stdout, " %-35s file     Display the file as interpreted by makeflow\n", "");
 
 	fprintf(stdout, " %-30s Condense similar boxes.\n", "--dot-merge-similar");
 	fprintf(stdout, " %-30s Change the size of the boxes proportional to file size.\n", "--dot-proportional");
@@ -2556,6 +2561,8 @@ int main(int argc, char *argv[])
 				display_mode = SHOW_DAG_DOT;
 			else if (strcasecmp(optarg, "ppm") == 0)
 				display_mode = SHOW_DAG_PPM;
+			else if (strcasecmp(optarg, "file") == 0)
+				display_mode = SHOW_DAG_FILE;
 			else
 				fatal("Unknown display option: %s\n", optarg);
 			break;
@@ -2903,6 +2910,10 @@ int main(int argc, char *argv[])
 
 		case SHOW_DAG_PPM:
 			dag_to_ppm(d, ppm_mode, ppm_option);
+			break;
+
+		case SHOW_DAG_FILE:
+			dag_to_file(d, NULL, NULL);
 			break;
 
 		default:
