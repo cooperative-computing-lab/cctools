@@ -31,31 +31,53 @@ See the file COPYING for details.
  * BUG: Integrate more with dttools (use DEBUG, etc.)
  */
 
-/* Writes 'var=value' pairs from the dag to the stream */
+/* Writes 'var=value' pairs for special vars to the stream */
 int dag_to_file_vars(struct hash_table *vars, FILE * dag_stream, const char *prefix)
 {
-	char *var;
-	struct dag_variable_value *v;
+	char *name;
+	char *var_names[] = {"GC_COLLECT_LIST", 
+		"GC_PRESERVE_LIST",
+		RESOURCES_CATEGORY,
+		RESOURCES_CORES,
+		RESOURCES_MEMORY,
+		RESOURCES_DISK,
+		RESOURCES_GPUS,
+		NULL
+	};
 
-	hash_table_firstkey(vars);
-	while(hash_table_nextkey(vars, &var, (void *) &v)) {
-		if(!string_null_or_empty(v->value) && (strcmp(var, "GC_PRESERVE_LIST") || strcmp(var, "GC_COLLECT_LIST")))
-			fprintf(dag_stream, "%s%s=\"%s\"\n", prefix, var, (char *) v->value);
+	int i = 0;
+	struct dag_variable_value *v;
+	for(name = var_names[i]; name; name = var_names[i++])
+	{
+		v = hash_table_lookup(vars, name);
+		if(v && !string_null_or_empty(v->value))
+			fprintf(dag_stream, "%s%s=\"%s\"\n", prefix, name, (char *) v->value);
 	}
 
 	return 0;
 }
 
 /* Writes 'export var' tokens from the dag to the stream */
-int dag_to_file_exports(const struct dag *d, FILE * dag_stream)
+int dag_to_file_exports(const struct dag *d, FILE * dag_stream, const char *prefix)
 {
-	char *var;
+	char *name;
 
 	struct list *vars = d->export_list;
 
+	struct dag_variable_value *v;
 	list_first_item(vars);
-	for(var = list_next_item(vars); var; var = list_next_item(vars))
-		fprintf(dag_stream, "export %s\n", var);
+	for(name = list_next_item(vars); name; name = list_next_item(vars))
+	{
+		v = hash_table_lookup(d->variables, name);
+		if(v)
+		{
+			fprintf(dag_stream, "%s%s=", prefix, name);
+			if(!string_null_or_empty(v->value))	
+					fprintf(dag_stream, "\"%s\"", (char *) v->value);
+			fprintf(dag_stream, "\n");
+		fprintf(dag_stream, "export %s\n", name);
+		}
+	}
 
 	return 0;
 
@@ -170,7 +192,7 @@ int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename) (stru
 		return 1;
 
 	dag_to_file_vars(d->variables, dag_stream, "");
-	dag_to_file_exports(d, dag_stream);
+	dag_to_file_exports(d, dag_stream, "");
 	dag_to_file_categories(d, dag_stream, rename);
 
 	if(dag_file)
