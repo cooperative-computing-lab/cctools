@@ -356,6 +356,15 @@ void *list_next_item(struct list *list)
 	}
 }
 
+void *list_current_item(struct list *list)
+{
+	if(list->iter) {
+		return list->iter->data;
+	} else {
+		return 0;
+	}
+}
+
 struct list *list_duplicate(struct list *list)
 {
 	struct list *list2;
