@@ -365,6 +365,11 @@ void *list_current_item(struct list *list)
 	}
 }
 
+void list_advance_iterator(struct list *list)
+{
+	if(list->iter) list->iter = list->iter->next;
+}
+
 struct list *list_duplicate(struct list *list)
 {
 	struct list *list2;
