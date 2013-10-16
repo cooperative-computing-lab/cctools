@@ -28,6 +28,7 @@ struct dependency{
 	struct dependency *superparent;
 	char *output_path;
 	int  depth;
+	int searched;
 	file_type type;
 };
 
@@ -99,6 +100,7 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 	initial_dependency->depth = 0;
 	initial_dependency->parent = NULL;
 	initial_dependency->superparent = NULL;
+	initial_dependency->searched = 0;
 	list_push_tail(d, (void *) initial_dependency);
 }
 
@@ -204,6 +206,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 					size++;
 			}
 		}
+		dep->searched = 1;
 		return new_deps;
 	}
 }
@@ -212,8 +215,12 @@ void find_dependencies(struct list *d){
 	struct dependency *dep;
 	struct list *new;
 
+	int all_processed = 1;
+
 	list_first_item(d);
 	while((dep = list_next_item(d))){
+		if(dep->searched) continue;
+		all_processed = 0;
 		new = find_dependencies_for(dep);
 		list_first_item(new);
 		while((dep = list_next_item(new))){
@@ -224,6 +231,8 @@ void find_dependencies(struct list *d){
 		list_delete(new);
 		new = NULL;
 	}
+
+	if(!all_processed) find_dependencies(d);
 }
 
 void find_drivers(struct list *d){
