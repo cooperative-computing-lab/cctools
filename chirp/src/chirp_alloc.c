@@ -189,9 +189,6 @@ static char *alloc_state_root_cached(const char *path)
 {
 	char *result;
 
-	if(!root_table)
-		root_table = hash_table_create(0, 0);
-
 	result = hash_table_lookup(root_table, path);
 	if(result)
 		return result;
@@ -224,9 +221,6 @@ static struct alloc_state *alloc_state_cache_exact(const char *path)
 	strcpy(dirname, d);
 
 	sprintf(statename, "%s/.__alloc", dirname);
-
-	if(!alloc_table)
-		alloc_table = hash_table_create(0, 0);
 
 	a = hash_table_lookup(alloc_table, dirname);
 	if(a)
@@ -322,6 +316,9 @@ int chirp_alloc_init(const char *rootpath, INT64_T size)
 		return -1;
 	}
 
+	alloc_table = hash_table_create(0, 0);
+	fd_table = itable_create(0);
+	root_table = hash_table_create(0, 0);
 
 	start = time(0);
 	recover(rootpath);
@@ -351,8 +348,6 @@ void chirp_alloc_flush()
 
 	debug(D_ALLOC, "flushing allocation states...");
 
-	if(!alloc_table)
-		alloc_table = hash_table_create(0, 0);
 
 	hash_table_firstkey(alloc_table);
 	while(hash_table_nextkey(alloc_table, &path, (void **) &s)) {
@@ -360,8 +355,6 @@ void chirp_alloc_flush()
 		hash_table_remove(alloc_table, path);
 	}
 
-	if(!root_table)
-		root_table = hash_table_create(0, 0);
 
 	hash_table_firstkey(root_table);
 	while(hash_table_nextkey(root_table, &path, (void **) &root)) {
@@ -400,8 +393,6 @@ INT64_T chirp_alloc_open(const char *path, INT64_T flags, INT64_T mode)
 
 		fd = cfs->open(path, flags, mode);
 		if(fd >= 0) {
-			if(!fd_table)
-				fd_table = itable_create(0);
 			itable_insert(fd_table, fd, xxstrdup(path));
 			if(flags & O_TRUNC) {
 				alloc_state_update(a, -space_consumed(filesize));
@@ -418,8 +409,6 @@ INT64_T chirp_alloc_close(int fd)
 	if(!alloc_enabled)
 		return cfs->close(fd);
 
-	if(!fd_table)
-		fd_table = itable_create(0);
 	char *path = itable_remove(fd_table, fd);
 	if(path)
 		free(path);
@@ -434,9 +423,6 @@ INT64_T chirp_alloc_pwrite(int fd, const void *data, INT64_T length, INT64_T off
 
 	if(!alloc_enabled)
 		return cfs->pwrite(fd, data, length, offset);
-
-	if(!fd_table)
-		fd_table = itable_create(0);
 
 	a = alloc_state_cache(itable_lookup(fd_table, fd));
 	if(a) {
@@ -475,9 +461,6 @@ INT64_T chirp_alloc_fstatfs(int fd, struct chirp_statfs * info)
 	if(!alloc_enabled)
 		return cfs->fstatfs(fd, info);
 
-	if(!fd_table)
-		fd_table = itable_create(0);
-
 	a = alloc_state_cache(itable_lookup(fd_table, fd));
 	if(a) {
 		result = cfs->fstatfs(fd, info);
@@ -500,9 +483,6 @@ INT64_T chirp_alloc_ftruncate(int fd, INT64_T length)
 
 	if(!alloc_enabled)
 		return cfs->ftruncate(fd, length);
-
-	if(!fd_table)
-		fd_table = itable_create(0);
 
 	a = alloc_state_cache(itable_lookup(fd_table, fd));
 	if(a) {
