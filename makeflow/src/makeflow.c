@@ -2801,16 +2801,6 @@ int main(int argc, char *argv[])
 	}
 
 	if(bundle_directory) {
-		//Create Bundle!
-
-		struct stat s;
-		if(!stat(bundle_directory, &s)) {
-			fatal("Target directory, %s, already exists.", bundle_directory);
-		}
-		if(!create_dir(bundle_directory, 0777)) {
-			fatal("Could not create directory.\n");
-		}
-		
 		char expanded_path[PATH_MAX];
 		
 		collect_input_files(d, bundle_directory, bundler_rename);

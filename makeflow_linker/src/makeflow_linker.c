@@ -19,7 +19,7 @@
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
-typedef enum {UNKNOWN, EXPLICIT, PERL, PYTHON} file_type;
+typedef enum {UNKNOWN, EXPLICIT, MAKEFLOW, PERL, PYTHON} file_type;
 
 struct dependency{
 	char *original_name;
@@ -28,83 +28,21 @@ struct dependency{
 	struct dependency *superparent;
 	char *output_path;
 	int  depth;
+	int searched;
 	file_type type;
 };
 
 static int use_explicit = 0;
 static char *workspace = NULL;
 
-char *python_extensions[2] = { "py", "pyc" };
-char *perl_extensions[2]   = { "pl", "pm"  };
+char *python_extensions[2]   = { "py", "pyc" };
+char *perl_extensions[2]     = { "pl", "pm" };
+char *makeflow_extensions[2] = { "mf", "makeflow" };
 
 void create_workspace(){
 	workspace = (char *) malloc(PATH_MAX * sizeof(char));
 	snprintf(workspace, PATH_MAX, "/tmp/makeflow_linker_workspace_%d", rand()%2718 + 1);
 	if(!create_dir(workspace, 0777)) fatal("Could not create directory.\n");
-}
-
-void initialize( char *output_directory, char *input_file, struct list *d){
-	pid_t pid;
-	int pipefd[2];
-	pipe(pipefd);
-
-	srand(time(NULL));
-
-	char expanded_input[PATH_MAX];
-	realpath(input_file, expanded_input);
-	create_workspace();
-
-	switch ( pid = fork() ){
-	case -1:
-		fprintf( stderr, "Cannot fork. Exiting...\n" );
-		exit(1);
-	case 0:
-		/* Child process */
-		close(pipefd[0]);
-		dup2(pipefd[1], 1);
-		close(pipefd[1]);
-
-		char * const args[5] = { "linking makeflow" , MAKEFLOW_BUNDLE_FLAG, output_directory, expanded_input, NULL };
-		execvp(MAKEFLOW_PATH, args); 
-		exit(1);
-	default:
-		/* Parent process */
-		close(pipefd[1]);
-		char next;
-		char *buffer = (char *) malloc(sizeof(char));
-		char *original_name;
-		int size = 0;
-		int depth = 1;
-		while (read(pipefd[0], &next, sizeof(next)) != 0){
-			switch ( next ){
-				case '\t':
-					original_name = (char *)realloc((void *)buffer,size+1);
-					*(original_name+size) = '\0';
-					buffer = (char *) malloc(sizeof(char));
-					size = 0;
-					break;
-				case '\n':
-					buffer = realloc(buffer, size+1);
-					*(buffer+size) = '\0';
-					struct dependency *new_dependency = (struct dependency *) malloc(sizeof(struct dependency));
-					new_dependency->original_name = original_name;
-					new_dependency->final_name = buffer;
-					new_dependency->depth = depth;
-					new_dependency->parent = NULL;
-					new_dependency->superparent = NULL;
-					list_push_tail(d, (void *) new_dependency);
-					size = 0;
-					original_name = NULL;
-					buffer = NULL;
-					break;
-				case '\0':
-				default:
-					buffer = realloc(buffer, size+1);
-					*(buffer+size) = next;
-					size++;
-			}
-		}
-	}
 }
 
 void display_dependencies(struct list *d){
@@ -133,6 +71,8 @@ file_type file_extension_known(const char *filename){
 			return PYTHON;
 		if(!strcmp(perl_extensions[j], extension))
 			return PERL;
+		if(!strcmp(makeflow_extensions[j], extension))
+			return MAKEFLOW;
 	}
 
 	return UNKNOWN;
@@ -144,6 +84,24 @@ file_type find_driver_for(const char *name){
 	if((type = file_extension_known(name))){}
 
 	return type;
+}
+
+void initialize( char *output_directory, char *input_file, struct list *d){
+	srand(time(NULL));
+	create_workspace();
+
+	char expanded_input[PATH_MAX];
+	realpath(input_file, expanded_input);
+
+	struct dependency *initial_dependency = (struct dependency *) malloc(sizeof(struct dependency));
+	initial_dependency->original_name = xxstrdup(expanded_input);
+	initial_dependency->final_name = xxstrdup(path_basename(expanded_input));
+	initial_dependency->type = find_driver_for(expanded_input);
+	initial_dependency->depth = 0;
+	initial_dependency->parent = NULL;
+	initial_dependency->superparent = NULL;
+	initial_dependency->searched = 0;
+	list_push_tail(d, (void *) initial_dependency);
 }
 
 struct list *find_dependencies_for(struct dependency *dep){
@@ -165,7 +123,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 		close(pipefd[0]);
 		dup2(pipefd[1], 1);
 		close(pipefd[1]);
-		char *args[] = { "locating dependencies" , NULL, NULL, NULL };
+		char *args[] = { "locating dependencies" , NULL, NULL, NULL, NULL };
 		if(use_explicit){
 			args[1] = "--use-explicit";
 			args[2] = dep->original_name;
@@ -178,6 +136,12 @@ struct list *find_dependencies_for(struct dependency *dep){
 			case PYTHON:
 				execvp("python_driver", args);
 			case EXPLICIT:
+				break;
+			case MAKEFLOW:
+				args[1] = MAKEFLOW_BUNDLE_FLAG;
+				args[2] = workspace;
+				args[3] = dep->original_name;
+				execvp(MAKEFLOW_PATH, args);
 				break;
 			case UNKNOWN:
 				break;
@@ -199,6 +163,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 				case '*':
 					explicit = 1;
 					break;
+				case '\t':
 				case ' ':
 					if(explicit){
 						buffer = realloc(buffer, size+1);
@@ -241,6 +206,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 					size++;
 			}
 		}
+		dep->searched = 1;
 		return new_deps;
 	}
 }
@@ -249,8 +215,12 @@ void find_dependencies(struct list *d){
 	struct dependency *dep;
 	struct list *new;
 
+	int all_processed = 1;
+
 	list_first_item(d);
 	while((dep = list_next_item(d))){
+		if(dep->searched) continue;
+		all_processed = 0;
 		new = find_dependencies_for(dep);
 		list_first_item(new);
 		while((dep = list_next_item(new))){
@@ -261,6 +231,8 @@ void find_dependencies(struct list *d){
 		list_delete(new);
 		new = NULL;
 	}
+
+	if(!all_processed) find_dependencies(d);
 }
 
 void find_drivers(struct list *d){
@@ -276,13 +248,16 @@ void determine_package_structure(struct list *d, char *output_dir){
 	list_first_item(d);
 	while((dep = list_next_item(d))){
 		char resolved_path[PATH_MAX];
-		if(dep->parent && dep->parent->output_path){
+		if(dep->parent && dep->parent->type != MAKEFLOW && dep->parent->output_path){
 			sprintf(resolved_path, "%s", dep->parent->output_path);
 		} else {
 			sprintf(resolved_path, "%s", output_dir);
 		}
 		switch(dep->type){
 			case PYTHON:
+				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
+				break;
+			case MAKEFLOW:
 				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
 				break;
 			case PERL:
@@ -298,20 +273,25 @@ void build_package(struct list *d){
 	struct dependency *dep;
 	list_first_item(d);
 	while((dep = list_next_item(d))){
-		char tmp_path[PATH_MAX];
+		char tmp_from_path[PATH_MAX];
+		char tmp_dest_path[PATH_MAX];
 		switch(dep->type){
 			case PYTHON:
 				if(!create_dir(dep->output_path, 0777)) fatal("Could not create directory.\n");
 				if(dep->depth > 1)
-					sprintf(tmp_path, "%s/__init__.py", dep->output_path);
+					sprintf(tmp_dest_path, "%s/__init__.py", dep->output_path);
 				else
-					sprintf(tmp_path, "%s/__main__.py", dep->output_path);
-				copy_file_to_file(dep->original_name, tmp_path);
+					sprintf(tmp_dest_path, "%s/__main__.py", dep->output_path);
+				copy_file_to_file(dep->original_name, tmp_dest_path);
+				break;
+			case MAKEFLOW:
+				sprintf(tmp_from_path, "%s/%s", workspace, dep->final_name);
+				copy_file_to_file(tmp_from_path, dep->output_path);
 				break;
 			case PERL:
 			default:
-				sprintf(tmp_path, "%s/%s", dep->output_path, dep->final_name);
-				copy_file_to_file(dep->original_name, tmp_path);
+				sprintf(tmp_dest_path, "%s/%s", dep->output_path, dep->final_name);
+				copy_file_to_file(dep->original_name, tmp_dest_path);
 				break;
 		}
 	}
@@ -406,6 +386,7 @@ int main(int argc, char *argv[]){
 	output = (char *) malloc(PATH_MAX * sizeof(char));
 	realpath(tmp, output);
 	free(tmp);
+	if(!create_dir(output, 0777)) fatal("Could not create output directory.\n");
 
 	char input_wd[PATH_MAX];
 	path_dirname(input, input_wd);
