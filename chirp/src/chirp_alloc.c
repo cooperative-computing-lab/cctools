@@ -9,8 +9,6 @@ See the file COPYING for details.
 #include "chirp_protocol.h"
 
 #include "debug.h"
-#include "delete_dir.h"
-#include "full_io.h"
 #include "hash_table.h"
 #include "int_sizes.h"
 #include "itable.h"
@@ -18,9 +16,6 @@ See the file COPYING for details.
 #include "path.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
-
-#include <dirent.h>
-#include <unistd.h>
 
 #include <sys/stat.h>
 
