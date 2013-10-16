@@ -347,13 +347,9 @@ void list_first_item(struct list *list)
 
 void *list_next_item(struct list *list)
 {
-	if(list->iter) {
-		void *v = list->iter->data;
-		list->iter = list->iter->next;
-		return v;
-	} else {
-		return 0;
-	}
+	void *v = list_current_item(list);
+	list_advance_iterator(list);
+	return v;
 }
 
 void *list_current_item(struct list *list)
