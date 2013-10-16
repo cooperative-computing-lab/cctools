@@ -12,10 +12,10 @@ See the file COPYING for details.
 
 #include <sys/types.h>
 
-int chirp_alloc_init(const char *rootpath, INT64_T size);
-void chirp_alloc_flush();
-int chirp_alloc_flush_needed();
-time_t chirp_alloc_last_flush_time();
+int    chirp_alloc_init(const char *rootpath, INT64_T size);
+void   chirp_alloc_flush(void);
+int    chirp_alloc_flush_needed(void);
+time_t chirp_alloc_last_flush_time(void);
 
 INT64_T chirp_alloc_open(const char *path, INT64_T flags, INT64_T mode);
 INT64_T chirp_alloc_close(int fd);
@@ -38,9 +38,6 @@ INT64_T chirp_alloc_statfs(const char *path, struct chirp_statfs *buf);
 
 INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total, INT64_T * inuse);
 INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode);
-
-INT64_T chirp_alloc_file_size(const char *path);
-INT64_T chirp_alloc_fd_size(int fd);
 
 #endif
 
