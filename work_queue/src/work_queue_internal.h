@@ -26,7 +26,6 @@ struct work_queue_file {
 	off_t piece_length;	// file piece length for WORK_QUEUE_FILE_PIECE
 	char *payload;		// name on master machine or buffer of data.
 	char *remote_name;	// name on remote machine.
-	long long fileid;	// internal unique integer for each file.
 };
 
 struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active);

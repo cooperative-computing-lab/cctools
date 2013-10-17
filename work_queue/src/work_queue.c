@@ -738,10 +738,7 @@ unique identifier where no name is available.
 char * make_cached_name( struct work_queue_task *t, struct work_queue_file *f )
 {
 	unsigned char digest[MD5_DIGEST_LENGTH];
-
-	if(f->type!=WORK_QUEUE_BUFFER) {
-		md5_buffer(f->payload,strlen(f->payload),digest);
-	}
+	md5_buffer(f->payload,strlen(f->payload),digest);
 
 	switch(f->type) {
 		case WORK_QUEUE_FILE:
@@ -759,7 +756,7 @@ char * make_cached_name( struct work_queue_task *t, struct work_queue_file *f )
 			break;
 		case WORK_QUEUE_BUFFER:
 		default:
-			return string_format("buffer-%lld",(long long) f->fileid);
+			return string_format("buffer-%s",md5_string(digest));
 			break;
 	}
 }
@@ -2325,7 +2322,6 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 
 struct work_queue_file * work_queue_file_create(const char * remote_name, int type, int flags)
 {
-	static long long next_fileid = 0;
 	struct work_queue_file *f;
 	
 	f = malloc(sizeof(*f));
@@ -2336,7 +2332,6 @@ struct work_queue_file * work_queue_file_create(const char * remote_name, int ty
 	f->remote_name = xxstrdup(remote_name);
 	f->type = type;
 	f->flags = flags;
-	f->fileid = next_fileid++;
 	
 	return f;
 }
