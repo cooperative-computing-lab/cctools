@@ -39,6 +39,12 @@ run() {
 	fi
 	cp expected/$expected/explicit $out_dir/explicit
 
+	if [ ! -d "$out_dir"/a.py/b/gzip ]; then
+		exit 1
+	fi
+
+	rm -rf $out_dir/a.py/b/gzip
+
 	diff -bur expected/$expected $out_dir
 	exit $?
 }
