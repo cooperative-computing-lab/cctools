@@ -695,7 +695,7 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
 			free(tmp_local_name);
 			if(!result) break;
-		} else if(sscanf(line,"missing %d",&errnum)==1) {
+		} else if(sscanf(line,"missing %s %d",tmp_remote_path,&errnum)==2) {
 			// If the output file is missing, we make a note of that in the task result,
 			// but we continue and consider the transfer a 'success' so that other
 			// outputs are transferred and the task is given back to the caller.
