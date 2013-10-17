@@ -1419,10 +1419,10 @@ int main(int argc, char *argv[])
 		{0,0,0,0}
 	};
 
-	while((c = getopt_long(argc, argv, "aAc:C:d:E:hm:l:L:N:o:O:Pqr:S:t:T:vW:", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "aAc:C:d:E:hm:l:L:M:N:o:O:Pqr:S:t:T:vW:", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'a':
-			strcat(worker_args, " -a");
+			//Backwards compatibility, -a is not needed anymore.
 			auto_worker = 1;
 			break;
 		case 'C':
@@ -1445,7 +1445,8 @@ int main(int argc, char *argv[])
 			break;
 		case 'N':
 		case 'M':
-			strcat(worker_args, " -N ");
+			auto_worker = 1;
+			strcat(worker_args, " -M ");
 			strcat(worker_args, optarg);
 			list_push_tail(regex_list, strdup(optarg));
 			break;
