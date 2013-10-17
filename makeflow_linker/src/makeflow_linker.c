@@ -35,6 +35,7 @@ struct dependency{
 };
 
 static int use_explicit = 0;
+static int dry_run = 0;
 static char *workspace = NULL;
 
 char *python_extensions[2]   = { "py", "pyc" };
@@ -42,21 +43,26 @@ char *perl_extensions[2]     = { "pl", "pm" };
 char *makeflow_extensions[2] = { "mf", "makeflow" };
 
 void create_workspace(){
+	if(dry_run) return;
 	workspace = (char *) malloc(PATH_MAX * sizeof(char));
 	snprintf(workspace, PATH_MAX, "/tmp/makeflow_linker_workspace_%d", rand()%2718 + 1);
 	if(!create_dir(workspace, 0777)) fatal("Could not create directory.\n");
 }
 
-void display_dependencies(struct list *d){
+void display_dependencies(struct list *d, int verbose){
 	struct dependency *dep;
 
 	list_first_item(d);
 	while((dep = list_next_item(d))){
 		if(dep->type != EXPLICIT){
-			if(dep->parent){
-				printf("%s %s %d %d %s %s %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->parent->final_name, dep->superparent->final_name, dep->output_path);
+			if(verbose) {
+				if(dep->parent){
+					printf("%s %s %d %d %s %s %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->parent->final_name, dep->superparent->final_name, dep->output_path);
+				} else {
+					printf("%s %s %d %d n/a n/a %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->output_path);
+				}
 			} else {
-				printf("%s %s %d %d n/a n/a %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->output_path);
+				printf("%s -> %s\n", dep->original_name, dep->output_path);
 			}
 		}
 	}
@@ -346,8 +352,6 @@ int main(int argc, char *argv[]){
 	char *output = NULL;
 	char *input  = NULL;
 
-	int dry_run = 0;
-
 	int c;
 
 	struct option long_options[] = {
@@ -406,6 +410,8 @@ int main(int argc, char *argv[]){
 
 	struct list *l = list_explicit(dependencies);
 	if(!dry_run) write_explicit(l, output);
+
+	if(dry_run) display_dependencies(dependencies, 0);
 
 	cleanup();
 
