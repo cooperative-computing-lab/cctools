@@ -215,12 +215,12 @@ void find_dependencies(struct list *d){
 	struct dependency *dep;
 	struct list *new;
 
-	int all_processed = 1;
-
 	list_first_item(d);
-	while((dep = list_next_item(d))){
+	do {
+		dep = list_peek_current(d);
+		if(!dep) break;
+
 		if(dep->searched) continue;
-		all_processed = 0;
 		new = find_dependencies_for(dep);
 		list_first_item(new);
 		while((dep = list_next_item(new))){
@@ -230,9 +230,7 @@ void find_dependencies(struct list *d){
 		}
 		list_delete(new);
 		new = NULL;
-	}
-
-	if(!all_processed) find_dependencies(d);
+	}while(list_next_item(d));
 }
 
 void find_drivers(struct list *d){
