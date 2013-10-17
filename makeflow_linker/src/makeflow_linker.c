@@ -21,6 +21,8 @@
 
 typedef enum {UNKNOWN, EXPLICIT, MAKEFLOW, PERL, PYTHON} file_type;
 
+enum { LONG_OPT_DRY_RUN = 1 };
+
 struct dependency{
 	char *original_name;
 	char *final_name;
@@ -33,6 +35,7 @@ struct dependency{
 };
 
 static int use_explicit = 0;
+static int dry_run = 0;
 static char *workspace = NULL;
 
 char *python_extensions[2]   = { "py", "pyc" };
@@ -41,20 +44,28 @@ char *makeflow_extensions[2] = { "mf", "makeflow" };
 
 void create_workspace(){
 	workspace = (char *) malloc(PATH_MAX * sizeof(char));
-	snprintf(workspace, PATH_MAX, "/tmp/makeflow_linker_workspace_%d", rand()%2718 + 1);
-	if(!create_dir(workspace, 0777)) fatal("Could not create directory.\n");
+	if(dry_run){
+		workspace = xxstrdup("*");
+	} else {
+		snprintf(workspace, PATH_MAX, "/tmp/makeflow_linker_workspace_%d", rand()%2718 + 1);
+		if(!create_dir(workspace, 0777)) fatal("Could not create directory.\n");
+	}
 }
 
-void display_dependencies(struct list *d){
+void display_dependencies(struct list *d, int verbose){
 	struct dependency *dep;
 
 	list_first_item(d);
 	while((dep = list_next_item(d))){
 		if(dep->type != EXPLICIT){
-			if(dep->parent){
-				printf("%s %s %d %d %s %s %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->parent->final_name, dep->superparent->final_name, dep->output_path);
+			if(verbose) {
+				if(dep->parent){
+					printf("%s %s %d %d %s %s %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->parent->final_name, dep->superparent->final_name, dep->output_path);
+				} else {
+					printf("%s %s %d %d n/a n/a %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->output_path);
+				}
 			} else {
-				printf("%s %s %d %d n/a n/a %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->output_path);
+				printf("%s -> %s\n", dep->original_name, dep->output_path);
 			}
 		}
 	}
@@ -348,6 +359,7 @@ int main(int argc, char *argv[]){
 
 	struct option long_options[] = {
 		{"use-explicit", no_argument, 0, 'e'},
+		{"dry-run", no_argument, 0, LONG_OPT_DRY_RUN},
 		{"help", no_argument, 0, 'h'},
 		{"output", required_argument, 0, 'o'},
 		{0, 0, 0, 0}
@@ -357,6 +369,9 @@ int main(int argc, char *argv[]){
 		switch(c){
 			case 'e':
 				use_explicit = 1;
+				break;
+			case LONG_OPT_DRY_RUN:
+				dry_run = 1;
 				break;
 			case 'o':
 				output = xxstrdup(optarg);
@@ -394,10 +409,12 @@ int main(int argc, char *argv[]){
 	find_dependencies(dependencies);
 
 	determine_package_structure(dependencies, output);
-	build_package(dependencies);
+	if(!dry_run) build_package(dependencies);
 
 	struct list *l = list_explicit(dependencies);
-	write_explicit(l, output);
+	if(!dry_run) write_explicit(l, output);
+
+	if(dry_run) display_dependencies(dependencies, 0);
 
 	cleanup();
 
