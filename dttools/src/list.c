@@ -271,6 +271,18 @@ void *list_peek_tail(struct list *l)
 	}
 }
 
+void *list_peek_current(struct list *l)
+{
+	if(!l)
+		return 0;
+
+	if(l->iter) {
+		return l->iter->data;
+	} else {
+		return 0;
+	}
+}
+
 void *list_remove(struct list *l, const void *value)
 {
 	struct list_node *n;

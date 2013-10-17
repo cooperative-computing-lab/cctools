@@ -24,6 +24,7 @@ transparently modify the linker namespace we are using.
 #define list_peek_head			cctools_list_peek_head
 #define list_pop_tail			cctools_list_pop_tail
 #define list_peek_tail			cctools_list_peek_tail
+#define list_peek_current		cctools_list_peek_current
 #define list_remove			cctools_list_remove
 #define list_find			cctools_list_find
 #define list_create			cctools_list_create
@@ -155,6 +156,12 @@ void *list_pop_tail(struct list *list);
 @return The item at the list tail, or null if list is empty.
 */
 void *list_peek_tail(struct list *list);
+
+/** Peek at the current element in the iteration.
+@param list The list to peek.
+@return The item at the list head, or null if list is empty.
+*/
+void *list_peek_current(struct list *list);
 
 /** Find an element within a list
 This function searches the list, comparing each element in the list to arg, and returns a pointer to the first matching element.
