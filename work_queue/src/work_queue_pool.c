@@ -187,7 +187,6 @@ struct pool_config {
 	int mode;
 };
 
-struct list *get_matched_masters(const char *catalog_host, int catalog_port, struct list *regex_list);
 static int submit_workers(const char *cmd, const char *input_files, int count);
 int decide_worker_distribution(struct list *matched_masters, struct pool_config *pc, const char *catalog_host, int catalog_port);
 UINT64_T get_current_billing_cycles(unsigned int);
