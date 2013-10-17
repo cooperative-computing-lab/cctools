@@ -9,8 +9,17 @@ See the file COPYING for details.
 
 #include "list.h"
 
+typedef enum {
+	WORK_QUEUE_FILE = 1,
+	WORK_QUEUE_BUFFER,
+	WORK_QUEUE_REMOTECMD,
+	WORK_QUEUE_FILE_PIECE,
+	WORK_QUEUE_DIRECTORY,
+	WORK_QUEUE_URL
+} work_queue_file_t;
+
 struct work_queue_file {
-	int type;		// WORK_QUEUE_FILE, WORK_QUEUE_BUFFER, WORK_QUEUE_REMOTECMD, WORK_QUEUE_FILE_PIECE
+	work_queue_file_t type;
 	int flags;		// WORK_QUEUE_CACHE or others in the future.
 	int length;		// length of payload, only used for non-file objects like buffers and urls
 	off_t offset;		// file offset for WORK_QUEUE_FILE_PIECE
@@ -18,16 +27,6 @@ struct work_queue_file {
 	char *payload;		// name on master machine or buffer of data.
 	char *remote_name;	// name on remote machine.
 };
-
-enum wq_file_types {
-	WORK_QUEUE_FILE = 1,
-	WORK_QUEUE_BUFFER,
-	WORK_QUEUE_REMOTECMD,
-	WORK_QUEUE_FILE_PIECE,
-	WORK_QUEUE_DIRECTORY,
-	WORK_QUEUE_URL
-};
-
 
 struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active);
 
