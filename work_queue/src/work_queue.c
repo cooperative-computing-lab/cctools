@@ -39,6 +39,7 @@ The following major problems must be fixed:
 #include "random_init.h"
 #include "process.h"
 #include "path.h"
+#include "md5.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -694,7 +695,7 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
 			free(tmp_local_name);
 			if(!result) break;
-		} else if(sscanf(line,"missing %d",&errnum)==1) {
+		} else if(sscanf(line,"missing %s %d",tmp_remote_path,&errnum)==2) {
 			// If the output file is missing, we make a note of that in the task result,
 			// but we continue and consider the transfer a 'success' so that other
 			// outputs are transferred and the task is given back to the caller.
@@ -720,14 +721,43 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 /*
 For a given task and file, generate the name under which the file
 should be stored in the remote cache directory.
+
+The basic strategy is to construct a name that is unique to the
+namespace from where the file is drawn, so that tasks sharing
+the same input file can share the same copy.
+
+In the common case of files, the cached name is based on the
+hash of the local path, with the basename of the local path
+included simply to assist with debugging.
+
+In each of the other file types, a similar approach is taken,
+including a hash and a name where one is known, or another
+unique identifier where no name is available.
 */
 
 char * make_cached_name( struct work_queue_task *t, struct work_queue_file *f )
 {
-	if(f->flags & WORK_QUEUE_CACHE) {
-		return string_format("%s.cached", f->remote_name);
-	} else {
-		return string_format("%s.%lld", f->remote_name, (long long) t->taskid);
+	unsigned char digest[MD5_DIGEST_LENGTH];
+	md5_buffer(f->payload,strlen(f->payload),digest);
+
+	switch(f->type) {
+		case WORK_QUEUE_FILE:
+		case WORK_QUEUE_DIRECTORY:
+			return string_format("file-%s-%s",md5_string(digest),path_basename(f->payload));
+			break;
+		case WORK_QUEUE_FILE_PIECE:
+			return string_format("piece-%s-%s-%lld-%lld",md5_string(digest),path_basename(f->payload),(long long)f->offset,(long long)f->piece_length);
+			break;
+		case WORK_QUEUE_REMOTECMD:
+			return string_format("cmd-%s",md5_string(digest));
+			break;
+		case WORK_QUEUE_URL:
+			return string_format("url-%s",md5_string(digest));
+			break;
+		case WORK_QUEUE_BUFFER:
+		default:
+			return string_format("buffer-%s",md5_string(digest));
+			break;
 	}
 }
 
