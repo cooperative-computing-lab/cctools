@@ -4,6 +4,8 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
+# perl_driver takes the name of a perl file and locates its dependencies via static analysis.
+# This is used directly by makeflow_linker and not meant to be invoked directly
 
 print "*Perl $]\n";
 
