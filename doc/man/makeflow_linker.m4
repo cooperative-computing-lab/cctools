@@ -30,6 +30,18 @@ LIST_ITEM The makeflow_linker does not check for naming collisions beyond the in
 LIST_ITEM The makeflow_linker relies on regex parsing of files, so some forms of import statements may be missing.
 LIST_END
 
+SECTION(EXAMPLES)
+
+Package a workflow:
+LONGCODE_BEGIN
+makeflow_linker -o example_mf example.mf
+LONGCODE_END
+
+Run packaged workflow:
+LONGCODE_BEGIN
+makeflow example_mf/example.mf
+LONGCODE_END
+
 SECTION(COPYRIGHT)
 
 COPYRIGHT_BOILERPLATE
