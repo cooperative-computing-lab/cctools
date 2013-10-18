@@ -254,7 +254,7 @@ static INT64_T do_put_one_fifo(const char *hostport, const char *source_file, co
 	if(!file)
 		return -1;
 
-	cf = chirp_reli_open(hostport, target_file, O_WRONLY, 0600, stoptime);
+	cf = chirp_reli_open(hostport, target_file, O_WRONLY|O_CREAT|O_TRUNC, 0600, stoptime);
 	if(cf) {
 		size_t n;
 		char buffer[65536];
