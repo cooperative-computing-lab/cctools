@@ -632,37 +632,6 @@ INT64_T cfs_basic_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T st
 	}
 }
 
-INT64_T cfs_basic_getstream(const char *path, struct link * l, time_t stoptime)
-{
-	INT64_T fd, total = 0;
-	char buffer[65536];
-
-	fd = cfs->open(path, O_RDONLY, 0700);
-	if(fd == -1)
-		return fd;
-
-	link_putliteral(l, "0\n", stoptime);
-
-	while(1) {
-		INT64_T result;
-		INT64_T actual;
-
-		result = cfs->pread(fd, buffer, sizeof(buffer), total);
-		if(result <= 0)
-			break;
-
-		actual = link_putlstring(l, buffer, result, stoptime);
-		if(actual != result)
-			break;
-
-		total += actual;
-	}
-
-	cfs->close(fd);
-
-	return total;
-}
-
 INT64_T cfs_stub_lockf(int fd, int cmd, INT64_T len)
 {
 	errno = ENOSYS;

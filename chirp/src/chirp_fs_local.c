@@ -109,6 +109,10 @@ path = resolved_##path;
 
 static char local_root[CHIRP_PATH_MAX];
 
+static struct {
+	char path[CHIRP_PATH_MAX];
+} open_files[CHIRP_FILESYSTEM_MAXFD];
+
 /*
  * The provided url could have any of the following forms:
  * o `local://path'
@@ -130,6 +134,16 @@ static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
 	return cfs_create_dir("/", 0711);
 }
 
+static int chirp_fs_local_fname (int fd, char path[CHIRP_PATH_MAX])
+{
+	if (fd < 0 || open_files[fd].path[0] == '\0') {
+		errno = EBADF;
+		return -1;
+	}
+	strcpy(path, open_files[fd].path);
+	return 0;
+}
+
 static int chirp_fs_local_resolve (const char *path, char resolved[CHIRP_PATH_MAX])
 {
 	int n;
@@ -148,14 +162,25 @@ static int chirp_fs_local_resolve (const char *path, char resolved[CHIRP_PATH_MA
 
 static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode)
 {
+	INT64_T fd;
+	const char *unresolved = path;
 	RESOLVE(path)
 	mode = 0600 | (mode & 0100);
-	return open64(path, flags, (int) mode);
+	fd = open64(path, flags, (int) mode);
+	if (fd >= 0) {
+		strcpy(open_files[fd].path, unresolved);
+	}
+	return fd;
 }
 
 static INT64_T chirp_fs_local_close(int fd)
 {
-	return close(fd);
+	INT64_T rc;
+	rc = close(fd);
+	if (rc == 0) {
+		open_files[fd].path[0] = '\0';
+	}
+	return rc;
 }
 
 static INT64_T chirp_fs_local_pread(int fd, void *buffer, INT64_T length, INT64_T offset)
@@ -829,6 +854,8 @@ static int chirp_fs_do_acl_check()
 
 struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_init,
+
+	chirp_fs_local_fname,
 
 	chirp_fs_local_open,
 	chirp_fs_local_close,

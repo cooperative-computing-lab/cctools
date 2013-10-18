@@ -5,7 +5,6 @@ See the file COPYING for details.
 */
 
 #include "chirp_reli.h"
-#include "chirp_alloc.h"
 #include "chirp_protocol.h"
 #include "chirp_thirdput.h"
 #include "chirp_acl.h"
@@ -118,17 +117,39 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 	} else if(S_ISREG(info.cst_mode)) {
 		if(!chirp_acl_check(lpath, subject, CHIRP_ACL_READ))
 			return -1;
-		int fd = chirp_alloc_open(lpath, O_RDONLY, 0);
+		int fd = cfs->open(lpath, O_RDONLY, 0);
 		if(fd >= 0) {
-			FILE *stream = fdopen(fd, "r");
-			if(stream) {
-				result = chirp_reli_putfile(hostname, rpath, stream, info.cst_mode, info.cst_size, stoptime);
+			struct chirp_file *F = chirp_reli_open(hostname, rpath, O_WRONLY|O_CREAT|O_TRUNC, info.cst_mode, stoptime);
+			if(F) {
+				char buffer[65536];
+				INT64_T offset = 0;
+				INT64_T nread;
+				while ((nread = cfs->pread(fd, buffer, sizeof(buffer), offset)) > 0) {
+					INT64_T nwritten = 0;
+					while (nwritten < nread) {
+						INT64_T nwrite = chirp_reli_pwrite(F, buffer+nwritten, nread-nwritten, offset, stoptime);
+						if (nwrite == -1) {
+							save_errno = errno;
+							cfs->close(fd);
+							chirp_reli_close(F, stoptime);
+							errno = save_errno;
+							return -1;
+						}
+						nwritten += nwrite;
+						offset += nwrite;
+					}
+				}
+				if(nread == -1) offset = -1;
 				save_errno = errno;
-				fclose(stream);
+				cfs->close(fd);
+				chirp_reli_close(F, stoptime);
 				errno = save_errno;
-				return result;
+				return offset;
 			} else {
-				result = -1;
+				save_errno = errno;
+				cfs->close(fd);
+				errno = save_errno;
+				return -1;
 			}
 		} else {
 			return -1;

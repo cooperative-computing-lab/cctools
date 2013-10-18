@@ -13,6 +13,10 @@ See the file COPYING for details.
 
 #include <sys/types.h>
 
+enum {
+	CHIRP_FILESYSTEM_MAXFD = 1024,
+};
+
 typedef struct CHIRP_FILE CHIRP_FILE;
 
 struct chirp_filesystem * cfs_lookup( const char *url );
@@ -42,7 +46,6 @@ INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_le
 INT64_T cfs_basic_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset);
 INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime);
 INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime);
-INT64_T cfs_basic_getstream(const char *path, struct link * l, time_t stoptime);
 INT64_T cfs_basic_md5(const char *path, unsigned char digest[16]);
 
 INT64_T cfs_stub_lockf (int fd, int cmd, INT64_T len);
@@ -61,6 +64,8 @@ INT64_T cfs_stub_lremovexattr (const char *path, const char *name);
 
 struct chirp_filesystem {
 	int (*init) ( const char url[CHIRP_PATH_MAX] );
+
+	int (*fname) ( int fd, char path[CHIRP_PATH_MAX] );
 
 	INT64_T (*open)      ( const char *path, INT64_T flags, INT64_T mode );
 	INT64_T (*close)     ( int fd );

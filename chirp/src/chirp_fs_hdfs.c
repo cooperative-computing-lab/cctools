@@ -78,11 +78,10 @@ static struct hdfs_library *hdfs_services = 0;
 static hdfsFS fs = NULL;
 
 /* Array of open HDFS Files */
-#define BASE_SIZE 1024
-static struct chirp_fs_hdfs_file {
+static struct {
 	char path[CHIRP_PATH_MAX];
 	hdfsFile file;
-} open_files[BASE_SIZE];	// = NULL;
+} open_files[CHIRP_FILESYSTEM_MAXFD];
 
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
 static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX])
@@ -133,6 +132,16 @@ static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX])
 	memset(open_files, 0, sizeof(open_files));
 
 	return cfs_create_dir("/", 0711);
+}
+
+static int chirp_fs_hdfs_fname (int fd, char path[CHIRP_PATH_MAX])
+{
+	if (fd < 0 || open_files[fd].path[0] == '\0') {
+		errno = EBADF;
+		return -1;
+	}
+	strcpy(path, open_files[fd].path);
+	return 0;
 }
 
 static int chirp_fs_hdfs_resolve (const char *path, char resolved[CHIRP_PATH_MAX])
@@ -261,7 +270,7 @@ static INT64_T get_fd(void)
 {
 	INT64_T fd;
 	/* find an unused file descriptor */
-	for(fd = 0; fd < BASE_SIZE; fd++)
+	for(fd = 0; fd < CHIRP_FILESYSTEM_MAXFD; fd++)
 		if(!open_files[fd].path[0])
 			return fd;
 	debug(D_HDFS, "too many files open");
@@ -731,6 +740,8 @@ static int chirp_fs_hdfs_do_acl_check()
 
 struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_init,
+
+	chirp_fs_hdfs_fname,
 
 	chirp_fs_hdfs_open,
 	chirp_fs_hdfs_close,

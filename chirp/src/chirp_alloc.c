@@ -47,13 +47,12 @@ See the file COPYING for details.
 
 static int alloc_enabled = 0;
 static struct hash_table *alloc_table = 0;
-static struct itable *fd_table = 0;
 static time_t last_flush_time = 0;
 static int recovery_in_progress = 0;
 static struct hash_table *root_table = 0;
 
 struct alloc_state {
-	FILE *file;
+	int fd;
 	INT64_T size;
 	INT64_T inuse;
 	INT64_T avail;
@@ -92,32 +91,36 @@ static struct alloc_state *alloc_state_load(const char *path)
 {
 	struct alloc_state *s = xxmalloc(sizeof(*s));
 	char statename[CHIRP_PATH_MAX];
+	char buffer[4096]; /* any .__alloc file is smaller than this */
 
 	debug(D_ALLOC, "locking %s", path);
 
 	sprintf(statename, "%s/.__alloc", path);
 
-	/* WARNING chirp_alloc assumes we are using the local filesystem */
-	s->file = fopen(statename, "r+");
-	if(!s->file) {
+	s->fd = cfs->open(statename, O_RDWR, 0600);
+	if(s->fd == -1) {
 		free(s);
 		return 0;
 	}
 
-	if(cfs->lockf(fileno(s->file), F_TLOCK, 0)) {
+	if(cfs->lockf(s->fd, F_TLOCK, 0)) {
 		debug(D_ALLOC, "lock of %s blocked; flushing outstanding locks", path);
 		chirp_alloc_flush();
 		debug(D_ALLOC, "locking %s (retry)", path);
 
-		if(cfs->lockf(fileno(s->file), F_LOCK, 0)) {
+		if(cfs->lockf(s->fd, F_LOCK, 0)) {
 			debug(D_ALLOC, "lock of %s failed: %s", path, strerror(errno));
-			fclose(s->file);
+			cfs->close(s->fd);
 			free(s);
 			return 0;
 		}
 	}
 
-	fscanf(s->file, "%" SCNd64 " %" SCNd64, &s->size, &s->inuse);
+	memset(buffer, 0, sizeof(buffer));
+	INT64_T result = cfs->pread(s->fd, buffer, sizeof(buffer), 0);
+	assert(0 < result && result < (INT64_T)sizeof(buffer));
+	result = sscanf(buffer, "%" SCNd64 " %" SCNd64, &s->size, &s->inuse);
+	assert(result == 2);
 
 	s->dirty = 0;
 
@@ -140,23 +143,31 @@ static void alloc_state_save(const char *path, struct alloc_state *s)
 	}
 
 	if(s->dirty) {
-		ftruncate(fileno(s->file), 0);
-		fseek(s->file, 0, SEEK_SET);
-		fprintf(s->file, "%" PRId64 "\n%" PRId64 "\n", s->size, s->inuse);
+		char buffer[4096];
+		cfs->ftruncate(s->fd, 0);
+		INT64_T result = sprintf(buffer, "%" PRId64 "\n%" PRId64 "\n", s->size, s->inuse);
+		assert(0 < result && result < 4096);
+		result = cfs->pwrite(s->fd, buffer, strlen(buffer), 0);
+		assert(result == (INT64_T)strlen(buffer));
 	}
-	fclose(s->file);
+	cfs->close(s->fd);
 	free(s);
 }
 
 static int alloc_state_create(const char *path, INT64_T size)
 {
 	char statepath[CHIRP_PATH_MAX];
-	FILE *file;
+	int fd;
+
 	sprintf(statepath, "%s/.__alloc", path);
-	file = fopen(statepath, "w");
-	if(file) {
-		fprintf(file, "%" PRId64 " 0\n", size);
-		fclose(file);
+	fd = cfs->open(statepath, O_WRONLY|O_CREAT|O_TRUNC, 0600);
+	if(fd >= 0) {
+		char buffer[4096];
+		INT64_T result = sprintf(buffer, "%" PRId64 " 0\n", size);
+		assert(0 < result && result < 4096);
+		result = cfs->pwrite(fd, buffer, strlen(buffer), 0);
+		assert(result == (INT64_T)strlen(buffer));
+		cfs->close(fd);
 		return 1;
 	} else {
 		return 0;
@@ -284,7 +295,7 @@ static void recover(const char *path)
 	debug(D_ALLOC, "%s (%sB)", path, string_metric(a->inuse, -1, 0));
 }
 
-int chirp_alloc_init(const char *rootpath, INT64_T size)
+int chirp_alloc_init(INT64_T size)
 {
 	struct alloc_state *a;
 	time_t start, stop;
@@ -303,25 +314,26 @@ int chirp_alloc_init(const char *rootpath, INT64_T size)
 	alloc_enabled = 1;
 	recovery_in_progress = 1;
 
-	debug(D_ALLOC, "### begin allocation recovery scan ###");
-
-	if(!alloc_state_create(rootpath, size)) {
-		debug(D_ALLOC, "couldn't create allocation in %s: %s\n", rootpath, strerror(errno));
-		return -1;
-	}
-
-	a = alloc_state_cache_exact(rootpath);
-	if(!a) {
-		debug(D_ALLOC, "couldn't find allocation in %s: %s\n", rootpath, strerror(errno));
-		return -1;
-	}
-
+	assert(alloc_table == NULL);
 	alloc_table = hash_table_create(0, 0);
-	fd_table = itable_create(0);
+	assert(root_table == NULL);
 	root_table = hash_table_create(0, 0);
 
+	debug(D_ALLOC, "### begin allocation recovery scan ###");
+
+	if(!alloc_state_create("/", size)) {
+		debug(D_ALLOC, "couldn't create allocation in `/': %s\n", strerror(errno));
+		return -1;
+	}
+
+	a = alloc_state_cache_exact("/");
+	if(!a) {
+		debug(D_ALLOC, "couldn't find allocation in `/': %s\n", strerror(errno));
+		return -1;
+	}
+
 	start = time(0);
-	recover(rootpath);
+	recover("/");
 	size = a->size;
 	inuse = a->inuse;
 	avail = a->avail;
@@ -377,264 +389,39 @@ time_t chirp_alloc_last_flush_time()
 	return last_flush_time;
 }
 
-INT64_T chirp_alloc_open(const char *path, INT64_T flags, INT64_T mode)
-{
-	struct alloc_state *a;
-	int fd = -1;
-
-	if(!alloc_enabled)
-		return cfs->open(path, flags, mode);
-
-	a = alloc_state_cache(path);
-	if(a) {
-		INT64_T filesize = cfs_file_size(path);
-		if(filesize < 0)
-			filesize = 0;
-
-		fd = cfs->open(path, flags, mode);
-		if(fd >= 0) {
-			itable_insert(fd_table, fd, xxstrdup(path));
-			if(flags & O_TRUNC) {
-				alloc_state_update(a, -space_consumed(filesize));
-			}
-		}
-	} else {
-		fd = -1;
-	}
-	return fd;
-}
-
-INT64_T chirp_alloc_close(int fd)
-{
-	if(!alloc_enabled)
-		return cfs->close(fd);
-
-	char *path = itable_remove(fd_table, fd);
-	if(path)
-		free(path);
-	cfs->close(fd);
-	return 0;
-}
-
-INT64_T chirp_alloc_pwrite(int fd, const void *data, INT64_T length, INT64_T offset)
+INT64_T chirp_alloc_realloc (const char *path, INT64_T change, INT64_T *current)
 {
 	struct alloc_state *a;
 	int result;
+	INT64_T dummy;
 
-	if(!alloc_enabled)
-		return cfs->pwrite(fd, data, length, offset);
+	if(!alloc_enabled) {
+		*current = 0;
+		return 0;
+	}
 
-	a = alloc_state_cache(itable_lookup(fd_table, fd));
+	if (current == NULL)
+		current = &dummy;
+
+	debug(D_ALLOC, "path `%s' change = %" PRId64, path, change);
+	a = alloc_state_cache(path);
 	if(a) {
-		INT64_T filesize = cfs_fd_size(fd);
-		if(filesize >= 0) {
-			INT64_T newfilesize = MAX(length + offset, filesize);
-			INT64_T alloc_change = space_consumed(newfilesize) - space_consumed(filesize);
-			if(a->avail >= alloc_change) {
-				result = cfs->pwrite(fd, data, length, offset);
-				if(result > 0)
+		/* FIXME this won't work with symlinks, problem existed before probably */
+		*current = cfs_file_size(path);
+		if(*current == -1 && errno == ENOENT)
+			*current = 0;
+		if(*current >= 0) {
+			if(change == *current) {
+				/* NOP */
+				result = 0;
+			} else {
+				INT64_T alloc_change = space_consumed(change) - space_consumed(*current);
+				debug(D_ALLOC, "path `%s' actual change = %" PRId64 " from current = %" PRId64, path, alloc_change, *current);
+				if(a->avail >= alloc_change) {
 					alloc_state_update(a, alloc_change);
-			} else {
-				errno = ENOSPC;
-				result = -1;
-			}
-		} else {
-			result = -1;
-		}
-	} else {
-		result = -1;
-	}
-	return result;
-}
-
-INT64_T chirp_alloc_swrite(int fd, const void *buffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
-{
-	/* FIXME why does this fall through? */
-	return cfs->swrite(fd, buffer, length, stride_length, stride_skip, offset);
-}
-
-INT64_T chirp_alloc_fstatfs(int fd, struct chirp_statfs * info)
-{
-	struct alloc_state *a;
-	int result;
-
-	if(!alloc_enabled)
-		return cfs->fstatfs(fd, info);
-
-	a = alloc_state_cache(itable_lookup(fd_table, fd));
-	if(a) {
-		result = cfs->fstatfs(fd, info);
-		if(result == 0) {
-			info->f_blocks = a->size / info->f_bsize;
-			info->f_bfree = a->avail / info->f_bsize;
-			info->f_bavail = a->avail / info->f_bsize;
-		}
-	} else {
-		result = -1;
-	}
-
-	return result;
-}
-
-INT64_T chirp_alloc_ftruncate(int fd, INT64_T length)
-{
-	struct alloc_state *a;
-	int result;
-
-	if(!alloc_enabled)
-		return cfs->ftruncate(fd, length);
-
-	a = alloc_state_cache(itable_lookup(fd_table, fd));
-	if(a) {
-		INT64_T filesize = cfs_fd_size(fd);
-		if(filesize >= 0) {
-			INT64_T alloc_change = space_consumed(length) - space_consumed(filesize);
-			if(a->avail >= alloc_change) {
-				result = cfs->ftruncate(fd, length);
-				if(result == 0)
-					alloc_state_update(a, alloc_change);
-			} else {
-				errno = ENOSPC;
-				result = -1;
-			}
-		} else {
-			result = -1;
-		}
-	} else {
-		result = -1;
-	}
-	return result;
-}
-
-
-/*
-Note that putfile is given in advance the size of a file.
-It checks the space available, and then guarantees that
-the file will either be delivered whole or not at all.
-*/
-
-INT64_T chirp_alloc_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime)
-{
-	struct alloc_state *a;
-	int result;
-
-	if(!alloc_enabled)
-		return cfs->putfile(path, link, length, mode, stoptime);
-
-	result = chirp_alloc_unlink(path);
-	if(result < 0 && errno != ENOENT)
-		return result;
-
-	a = alloc_state_cache(path);
-	if(a) {
-		if(a->avail > length) {
-			result = cfs->putfile(path, link, length, mode, stoptime);
-			if(result > 0) {
-				alloc_state_update(a, space_consumed(result));
-			} else {
-				cfs->unlink(path);
-			}
-		} else {
-			errno = ENOSPC;
-			result = -1;
-		}
-	} else {
-		result = -1;
-	}
-	return result;
-}
-
-/*
-In contrast, putstream does not know the size of the output in advance,
-and simply writes piece by piece, updating the allocation state as it goes.
-*/
-
-INT64_T chirp_alloc_putstream(const char *path, struct link * l, time_t stoptime)
-{
-	INT64_T fd, result, actual, total = 0;
-	int buffer_size = 65536;
-	char *buffer;
-
-	fd = chirp_alloc_open(path, O_CREAT | O_TRUNC | O_WRONLY, 0700);
-	if(fd < 0)
-		return fd;
-
-	link_putliteral(l, "0\n", stoptime);
-
-	buffer = malloc(buffer_size);
-
-	while(1) {
-		result = link_read(l, buffer, buffer_size, stoptime);
-		if(result <= 0)
-			break;
-
-		actual = chirp_alloc_pwrite(fd, buffer, result, total);
-		if(actual != result)
-			break;
-
-		total += actual;
-	}
-
-	free(buffer);
-
-	chirp_alloc_close(fd);
-
-	return total;
-}
-
-INT64_T chirp_alloc_unlink(const char *path)
-{
-	struct alloc_state *a;
-	int result;
-
-	if(!alloc_enabled)
-		return cfs->unlink(path);
-
-	a = alloc_state_cache(path);
-	if(a) {
-		INT64_T filesize = cfs_file_size(path);
-		if(filesize >= 0) {
-			result = cfs->unlink(path);
-			if(result == 0)
-				alloc_state_update(a, -space_consumed(filesize));
-		} else {
-			result = -1;
-		}
-	} else {
-		result = -1;
-	}
-	return result;
-}
-
-INT64_T chirp_alloc_rename(const char *oldpath, const char *newpath)
-{
-	struct alloc_state *a, *b;
-	int result = -1;
-
-	if(!alloc_enabled)
-		return cfs->rename(oldpath, newpath);
-
-	a = alloc_state_cache(oldpath);
-	if(a) {
-		b = alloc_state_cache(newpath);
-		if(b) {
-			if(a == b) {
-				result = rename(oldpath, newpath);
-			} else {
-				INT64_T filesize = cfs_file_size(oldpath);
-				if(filesize >= 0) {
-					if(b->avail >= filesize) {
-						result = cfs->rename(oldpath, newpath);
-						if(result == 0) {
-							alloc_state_update(a, -space_consumed(filesize));
-							alloc_state_update(b, space_consumed(filesize));
-						}
-						chirp_alloc_flush();
-					} else {
-						errno = ENOSPC;
-						result = -1;
-					}
+					result = 0;
 				} else {
+					errno = ENOSPC;
 					result = -1;
 				}
 			}
@@ -647,83 +434,11 @@ INT64_T chirp_alloc_rename(const char *oldpath, const char *newpath)
 	return result;
 }
 
-INT64_T chirp_alloc_link(const char *path, const char *newpath)
+INT64_T chirp_alloc_frealloc (int fd, INT64_T change, INT64_T *current)
 {
-	if(!alloc_enabled)
-		return cfs->link(path, newpath);
-	errno = EPERM;
-	return -1;
-}
-
-INT64_T chirp_alloc_rmall(const char *path)
-{
-	if(!alloc_enabled)
-		return cfs->rmall(path);
-
-	int result = chirp_alloc_unlink(path);
-	if(result == 0) {
-		return 0;
-	} else if(errno != EISDIR) {
-		return -1;
-	} else {
-		struct chirp_dir *dir;
-		struct chirp_dirent *d;
-		char subpath[CHIRP_PATH_MAX];
-
-		dir = cfs->opendir(path);
-		if(!dir)
-			return -1;
-
-		result = 0;
-
-		while((d = cfs->readdir(dir))) {
-			if(!strcmp(d->name, "."))
-				continue;
-			if(!strcmp(d->name, ".."))
-				continue;
-			if(!strncmp(d->name, ".__	", 3))
-				continue;
-			sprintf(subpath, "%s/%s", path, d->name);
-			result = chirp_alloc_rmall(subpath);
-			if(result != 0)
-				break;
-		}
-
-		cfs->closedir(dir);
-
-		if(result == 0) {
-			return chirp_alloc_rmdir(path);
-		} else {
-			return result;
-		}
-	}
-}
-
-INT64_T chirp_alloc_rmdir(const char *path)
-{
-	struct alloc_state *a, *d;
-	int result = -1;
-
-	if(!alloc_enabled)
-		return cfs->rmdir(path);
-
-	d = alloc_state_cache_exact(path);
-	if(d) {
-		a = alloc_state_cache(path);
-		if(a) {
-			if(cfs->rmdir(path) == 0) {
-				if(d != a) {
-					alloc_state_update(a, -d->size);
-					debug(D_ALLOC, "rmalloc %s %"PRId64, path, d->size);
-				}
-				chirp_alloc_flush();
-				result = 0;
-			} else {
-				result = -1;
-			}
-		}
-	}
-	return result;
+	char path[CHIRP_PATH_MAX];
+	if (cfs->fname(fd, path) == -1) return -1;
+	return chirp_alloc_realloc(path, change, current);
 }
 
 INT64_T chirp_alloc_statfs(const char *path, struct chirp_statfs * info)
@@ -753,34 +468,11 @@ INT64_T chirp_alloc_statfs(const char *path, struct chirp_statfs * info)
 	return result;
 }
 
-INT64_T chirp_alloc_truncate(const char *path, INT64_T newsize)
+INT64_T chirp_alloc_fstatfs(int fd, struct chirp_statfs *buf)
 {
-	struct alloc_state *a;
-	int result;
-
-	if(!alloc_enabled)
-		return cfs->truncate(path, newsize);
-
-	a = alloc_state_cache(path);
-	if(a) {
-		INT64_T filesize = cfs_file_size(path);
-		if(filesize >= 0) {
-			INT64_T alloc_change = space_consumed(newsize) - space_consumed(filesize);
-			if(a->avail >= alloc_change) {
-				result = cfs->truncate(path, newsize);
-				if(result == 0)
-					alloc_state_update(a, alloc_change);
-			} else {
-				errno = ENOSPC;
-				result = -1;
-			}
-		} else {
-			result = -1;
-		}
-	} else {
-		result = -1;
-	}
-	return result;
+	char path[CHIRP_PATH_MAX];
+	if (cfs->fname(fd, path) == -1) return -1;
+	return chirp_alloc_statfs(path, buf);
 }
 
 INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total, INT64_T * inuse)
