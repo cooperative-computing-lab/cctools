@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
+#include "cctools.h"
 #include "copy_stream.h"
 #include "create_dir.h"
 #include "delete_dir.h"
@@ -368,10 +369,11 @@ int main(int argc, char *argv[]){
 		{"dry-run", no_argument, 0, LONG_OPT_DRY_RUN},
 		{"help", no_argument, 0, 'h'},
 		{"output", required_argument, 0, 'o'},
+		{"version", no_argument, 0, 'v'},
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "eho:", long_options, NULL)) >= 0){
+	while((c = getopt_long(argc, argv, "eho:v", long_options, NULL)) >= 0){
 		switch(c){
 			case 'e':
 				use_explicit = 1;
@@ -384,6 +386,9 @@ int main(int argc, char *argv[]){
 				break;
 			case 'h':
 				show_help(argv[0]);
+				return 0;
+			case 'v':
+				cctools_version_print(stdout, argv[0]);
 				return 0;
 			default:
 				show_help(argv[0]);
