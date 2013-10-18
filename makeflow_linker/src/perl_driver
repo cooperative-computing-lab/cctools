@@ -1,5 +1,10 @@
 #!/usr/bin/env perl
 
+# Copyright (C) 2013- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
+
 print "*Perl $]\n";
 
 my $target = @ARGV[0];
