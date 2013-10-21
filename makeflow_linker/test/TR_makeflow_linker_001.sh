@@ -39,6 +39,11 @@ run() {
 	fi
 	cp expected/$expected/named $out_dir/named
 
+	if [ ! -f "$out_dir"/c.sh ]; then
+		exit 1
+	fi
+	rm -f "$out_dir"/c.sh
+
 	if [ ! -d "$out_dir"/a.py/b/gzip ]; then
 		exit 1
 	fi

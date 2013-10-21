@@ -26,8 +26,8 @@ See the file COPYING for details.
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
-typedef enum {UNKNOWN, NAMED, MAKEFLOW, PERL, PYTHON} file_type;
-static const char *file_type_strings[] = {"Unknown", "Named", "Makeflow", "Perl", "Python", NULL};
+typedef enum {UNKNOWN, EXE, NAMED, MAKEFLOW, PERL, PYTHON} file_type;
+static const char *file_type_strings[] = {"Unknown", "Executable", "Named", "Makeflow", "Perl", "Python", NULL};
 static const char *file_type_to_string(file_type type){
 	return file_type_strings[type];
 }
@@ -105,15 +105,32 @@ file_type file_extension_known(const char *filename){
 	return UNKNOWN;
 }
 
+file_type file_unix_file_known(const char *name){
+	char file[PATH_MAX+6];
+	sprintf(file, "file %s\n", name);
+
+	FILE *unix_file_pipe = popen(file, "r");
+	char *unix_file_output = (char *) malloc(1024 * sizeof(char));
+	fgets(unix_file_output, 1024*sizeof(char), unix_file_pipe);
+	pclose(unix_file_pipe);
+	if(strstr(unix_file_output, "executable")) return EXE;
+
+	return UNKNOWN;
+}
+
 file_type find_driver_for(const char *name){
 	file_type type = UNKNOWN;
 
-	if((type = file_extension_known(name))){
-		if(verbose) fprintf(stdout, "\n%s is a %s file.\n", name, file_type_to_string(type));
-	} else {
-		if(verbose) fprintf(stdout, "\n%s is an Unknown file.\n", name);
-	}
+	if((type = file_extension_known(name))) {}
+	else if((type = file_unix_file_known(name))){}
 
+	if(verbose){
+		if(type){
+			fprintf(stdout, "\n%s is a %s file.\n", name, file_type_to_string(type));
+		} else {
+			fprintf(stdout, "\n%s is an Unknown file.\n", name);
+		}
+	}
 	return type;
 }
 
@@ -153,7 +170,8 @@ struct list *find_dependencies_for(struct dependency *dep){
 		close(pipefd[0]);
 		dup2(pipefd[1], 1);
 		close(pipefd[1]);
-		char *args[] = { "locating dependencies" , NULL, NULL, NULL, NULL };
+		char *args[] = { "locating dependencies" , NULL, NULL, NULL, NULL, NULL, NULL };
+		char starch_output_path[PATH_MAX];
 		if(use_named){
 			args[1] = "--use-named";
 			args[2] = dep->original_name;
@@ -161,6 +179,15 @@ struct list *find_dependencies_for(struct dependency *dep){
 			args[1] = dep->original_name;
 		}
 		switch ( dep->type ){
+			case EXE:
+				sprintf(starch_output_path, "%s/%s", workspace, path_basename(dep->original_name));
+				args[1] = "-c";
+				args[2] = xxstrdup(path_basename(dep->original_name));
+				args[3] = "-x";
+				args[4] = xxstrdup(path_basename(dep->original_name));
+				args[5] = starch_output_path;
+				execvp("starch", args);
+				break;
 			case PERL:
 				execvp("perl_driver", args);
 			case PYTHON:
@@ -225,6 +252,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 					} else {
 						new_dependency->superparent = dep;
 					}
+					new_dependency->searched = 0;
 					list_push_tail(new_deps, new_dependency);
 					size = 0;
 					buffer = NULL;
@@ -287,6 +315,9 @@ void determine_package_structure(struct list *d, char *output_dir){
 			sprintf(resolved_path, "%s", output_dir);
 		}
 		switch(dep->type){
+			case EXE:
+				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
+				break;
 			case PYTHON:
 				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
 				break;
@@ -319,6 +350,10 @@ void build_package(struct list *d){
 				break;
 			case MAKEFLOW:
 				sprintf(tmp_from_path, "%s/%s", workspace, dep->final_name);
+				copy_file_to_file(tmp_from_path, dep->output_path);
+				break;
+			case EXE:
+				sprintf(tmp_from_path, "%s/%s", workspace, path_basename(dep->original_name));
 				copy_file_to_file(tmp_from_path, dep->output_path);
 				break;
 			case PERL:

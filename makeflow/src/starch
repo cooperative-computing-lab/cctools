@@ -329,8 +329,8 @@ def parse_command_line_options():
 
     parser = OptionParser('%prog [options] <sfx_path>')
 
-    parser.add_option('-A', dest = 'autodetect', action = 'store_false',
-        help = 'Do not automatically detect library dependencies (default: enabled).', default=True)
+    parser.add_option('-A', dest = 'autodetect_disable', action = 'store_true',
+        help = 'Disable automatic detection of library dependencies', default=False)
     parser.add_option('-C', dest = 'config', action = 'store',
         help = 'Use configuration file.', metavar = 'cfg', default = None)
     parser.add_option('-c', dest = 'command', action = 'store',
@@ -353,7 +353,7 @@ def parse_command_line_options():
         sys.exit(1)
 
     STARCH_VERBOSE    = options.verbose
-    STARCH_AUTODETECT = options.autodetect
+    STARCH_AUTODETECT = not(options.autodetect_disable)
     STARCH_PLATFORM   = os.uname()[0]
 
     if options.config:
