@@ -132,7 +132,6 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 	struct dependency *initial_dependency = (struct dependency *) malloc(sizeof(struct dependency));
 	initial_dependency->original_name = xxstrdup(expanded_input);
 	initial_dependency->final_name = xxstrdup(path_basename(expanded_input));
-	initial_dependency->type = find_driver_for(expanded_input);
 	initial_dependency->depth = 0;
 	initial_dependency->parent = NULL;
 	initial_dependency->superparent = NULL;
