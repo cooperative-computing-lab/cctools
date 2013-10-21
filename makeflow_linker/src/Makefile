@@ -20,5 +20,7 @@ test: all
 
 install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
-	cp ${TARGETS} ${DRIVERS} ${CCTOOLS_INSTALL_DIR}/bin
+	cp ${TARGETS} ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/libexec
+	cp ${DRIVERS} ${CCTOOLS_INSTALL_DIR}/libexec
 
