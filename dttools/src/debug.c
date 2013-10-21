@@ -71,6 +71,7 @@ static struct flag_info table[] = {
 	{"login", D_LOGIN},
 	{"irods", D_IRODS},
 	{"wq", D_WQ},
+	{"mpi", D_MPI},
 	{"user", D_USER},
 	{"xrootd", D_XROOTD},
 	{"remote", D_REMOTE},
