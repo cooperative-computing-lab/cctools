@@ -27,6 +27,15 @@ See the file COPYING for details.
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
 typedef enum {UNKNOWN, EXPLICIT, MAKEFLOW, PERL, PYTHON} file_type;
+static const char *file_type_strings[] = {"Unknown", "Explicit", "Makeflow", "Perl", "Python", NULL};
+static const char *file_type_to_string(int type){
+	if(type >= 0 && type < 5){
+		return file_type_strings[type];
+	}
+	else {
+		return "";
+	}
+}
 
 enum { LONG_OPT_DRY_RUN = 1,
        LONG_OPT_VERBOSE,
@@ -104,7 +113,11 @@ file_type file_extension_known(const char *filename){
 file_type find_driver_for(const char *name){
 	file_type type = UNKNOWN;
 
-	if((type = file_extension_known(name))){}
+	if((type = file_extension_known(name))){
+		if(verbose) fprintf(stdout, "%s is a %s file.\n", name, file_type_to_string(type));
+	} else {
+		if(verbose) fprintf(stdout, "%s is an Unknown file.\n", name);
+	}
 
 	return type;
 }
