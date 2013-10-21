@@ -108,12 +108,15 @@ file_type file_extension_known(const char *filename){
 file_type find_driver_for(const char *name){
 	file_type type = UNKNOWN;
 
-	if((type = file_extension_known(name))){
-		if(verbose) fprintf(stdout, "\n%s is a %s file.\n", name, file_type_to_string(type));
-	} else {
-		if(verbose) fprintf(stdout, "\n%s is an Unknown file.\n", name);
-	}
+	if((type = file_extension_known(name))) {}
 
+	if(verbose){
+		if(type){
+			fprintf(stdout, "\n%s is a %s file.\n", name, file_type_to_string(type));
+		} else {
+			fprintf(stdout, "\n%s is an Unknown file.\n", name);
+		}
+	}
 	return type;
 }
 
