@@ -105,10 +105,24 @@ file_type file_extension_known(const char *filename){
 	return UNKNOWN;
 }
 
+file_type file_unix_file_known(const char *name){
+	char file[PATH_MAX+6];
+	sprintf(file, "file %s\n", name);
+
+	FILE *unix_file_pipe = popen(file, "r");
+	char *unix_file_output = (char *) malloc(1024 * sizeof(char));
+	fgets(unix_file_output, 1024*sizeof(char), unix_file_pipe);
+	pclose(unix_file_pipe);
+	if(strstr(unix_file_output, "executable")) return EXE;
+
+	return UNKNOWN;
+}
+
 file_type find_driver_for(const char *name){
 	file_type type = UNKNOWN;
 
 	if((type = file_extension_known(name))) {}
+	else if((type = file_unix_file_known(name))){}
 
 	if(verbose){
 		if(type){
