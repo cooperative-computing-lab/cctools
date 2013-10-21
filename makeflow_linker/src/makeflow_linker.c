@@ -433,6 +433,7 @@ int main(int argc, char *argv[]){
 	realpath(tmp, output);
 	free(tmp);
 	if(!create_dir(output, 0777)) fatal("Could not create output directory.\n");
+	if(verbose) fprintf(stdout, "Using %s as output location.\n", output);
 
 	char input_wd[PATH_MAX];
 	path_dirname(input, input_wd);
