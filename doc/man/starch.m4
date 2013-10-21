@@ -19,7 +19,7 @@ operating system variants.
 
 SECTION(OPTIONS)
 
-To great a CODE(SFX), simply specify the name of the CODE(SFX) to create along
+To create a CODE(SFX), simply specify the name of the CODE(SFX) to create along
 with the PARAM(command) to execute and any other dependencies such as
 PARAM(executables), PARAM(libraries), PARAM(data), or PARAM(environment)
 scripts.
