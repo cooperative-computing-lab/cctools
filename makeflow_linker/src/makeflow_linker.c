@@ -28,7 +28,9 @@ See the file COPYING for details.
 
 typedef enum {UNKNOWN, EXPLICIT, MAKEFLOW, PERL, PYTHON} file_type;
 
-enum { LONG_OPT_DRY_RUN = 1 };
+enum { LONG_OPT_DRY_RUN = 1,
+       LONG_OPT_VERBOSE,
+     };
 
 struct dependency{
 	char *original_name;
@@ -43,6 +45,7 @@ struct dependency{
 
 static int use_explicit = 0;
 static int dry_run = 0;
+static int verbose = 0;
 static char *workspace = NULL;
 
 char *python_extensions[2]   = { "py", "pyc" };
@@ -369,6 +372,7 @@ int main(int argc, char *argv[]){
 		{"dry-run", no_argument, 0, LONG_OPT_DRY_RUN},
 		{"help", no_argument, 0, 'h'},
 		{"output", required_argument, 0, 'o'},
+		{"verbose", no_argument, 0, LONG_OPT_VERBOSE},
 		{"version", no_argument, 0, 'v'},
 		{0, 0, 0, 0}
 	};
@@ -390,6 +394,9 @@ int main(int argc, char *argv[]){
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
+			case LONG_OPT_VERBOSE:
+				verbose = 1;
+				break;
 			default:
 				show_help(argv[0]);
 				return 1;
