@@ -9,7 +9,13 @@
 
 print "*Perl $]\n";
 
+my $use_named = false;
+
 my $target = @ARGV[0];
+if(@ARGV[0] == "--use-named") {
+	$target = @ARGV[1];
+	$use_named = true;
+}
 
 my @modules = ();
 

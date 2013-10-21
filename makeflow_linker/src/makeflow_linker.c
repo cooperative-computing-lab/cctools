@@ -26,8 +26,8 @@ See the file COPYING for details.
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
-typedef enum {UNKNOWN, EXPLICIT, MAKEFLOW, PERL, PYTHON} file_type;
-static const char *file_type_strings[] = {"Unknown", "Explicit", "Makeflow", "Perl", "Python", NULL};
+typedef enum {UNKNOWN, NAMED, MAKEFLOW, PERL, PYTHON} file_type;
+static const char *file_type_strings[] = {"Unknown", "Named", "Makeflow", "Perl", "Python", NULL};
 static const char *file_type_to_string(int type){
 	if(type >= 0 && type < 5){
 		return file_type_strings[type];
@@ -52,7 +52,7 @@ struct dependency{
 	file_type type;
 };
 
-static int use_explicit = 0;
+static int use_named = 0;
 static int dry_run = 0;
 static int verbose = 0;
 static char *workspace = NULL;
@@ -78,7 +78,7 @@ void display_dependencies(struct list *d, int verbose){
 
 	list_first_item(d);
 	while((dep = list_next_item(d))){
-		if(dep->type != EXPLICIT){
+		if(dep->type != NAMED){
 			if(verbose) {
 				if(dep->parent){
 					printf("%s %s %d %d %s %s %s\n", dep->original_name, dep->final_name, dep->depth, dep->type, dep->parent->final_name, dep->superparent->final_name, dep->output_path);
@@ -144,7 +144,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 	int pipefd[2];
 	pipe(pipefd);
 
-	if(dep->type == EXPLICIT){
+	if(dep->type == NAMED){
 		struct list *empty = list_create();
 		return empty;
 	}
@@ -159,8 +159,8 @@ struct list *find_dependencies_for(struct dependency *dep){
 		dup2(pipefd[1], 1);
 		close(pipefd[1]);
 		char *args[] = { "locating dependencies" , NULL, NULL, NULL, NULL };
-		if(use_explicit){
-			args[1] = "--use-explicit";
+		if(use_named){
+			args[1] = "--use-named";
 			args[2] = dep->original_name;
 		} else {
 			args[1] = dep->original_name;
@@ -170,7 +170,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 				execvp("perl_driver", args);
 			case PYTHON:
 				execvp("python_driver", args);
-			case EXPLICIT:
+			case NAMED:
 				break;
 			case MAKEFLOW:
 				args[1] = MAKEFLOW_BUNDLE_FLAG;
@@ -191,16 +191,16 @@ struct list *find_dependencies_for(struct dependency *dep){
 		int size = 0;
 		int depth = dep->depth  + 1;
 		struct list *new_deps = list_create();
-		int explicit = 0;
+		int named = 0;
 
 		while (read(pipefd[0], &next, sizeof(next)) != 0){
 			switch ( next ){
 				case '*':
-					explicit = 1;
+					named = 1;
 					break;
 				case '\t':
 				case ' ':
-					if(explicit){
+					if(named){
 						buffer = realloc(buffer, size+1);
 						*(buffer+size) = next;
 						size++;
@@ -215,10 +215,10 @@ struct list *find_dependencies_for(struct dependency *dep){
 					buffer = realloc(buffer, size+1);
 					*(buffer+size) = '\0';
 					struct dependency *new_dependency = (struct dependency *) malloc(sizeof(struct dependency));
-					if(explicit){
+					if(named){
 						new_dependency->original_name = buffer;
 						new_dependency->final_name = buffer;
-						new_dependency->type = EXPLICIT;
+						new_dependency->type = NAMED;
 					} else {
 						new_dependency->original_name = original_name;
 						new_dependency->final_name = buffer;
@@ -233,7 +233,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 					list_push_tail(new_deps, new_dependency);
 					size = 0;
 					buffer = NULL;
-					explicit = 0;
+					named = 0;
 					break;
 				default:
 					buffer = realloc(buffer, size+1);
@@ -264,7 +264,7 @@ void find_dependencies(struct list *d){
 		}
 		list_first_item(new);
 		while((dep = list_next_item(new))){
-			if(dep->type != EXPLICIT)
+			if(dep->type != NAMED)
 				dep->type = find_driver_for(dep->original_name);
 			list_push_tail(d, dep);
 		}
@@ -335,23 +335,23 @@ void build_package(struct list *d){
 	}
 }
 
-struct list *list_explicit(struct list *d){
+struct list *list_named(struct list *d){
 	struct dependency *dep;
-	struct list *explicit_dependencies = list_create();
+	struct list *named_dependencies = list_create();
 
 	list_first_item(d);
 	while((dep = list_next_item(d))){
-		if(dep->type == EXPLICIT){
-			if(!list_find(explicit_dependencies, (int (*)(void *, const void *)) string_equal, (void *) dep->original_name))
-				list_push_tail(explicit_dependencies, dep->original_name);
+		if(dep->type == NAMED){
+			if(!list_find(named_dependencies, (int (*)(void *, const void *)) string_equal, (void *) dep->original_name))
+				list_push_tail(named_dependencies, dep->original_name);
 		}
 	}
 
-	return explicit_dependencies;
+	return named_dependencies;
 }
 
-void write_explicit(struct list *l, const char *output){
-	char *path = string_format("%s/explicit", output);
+void write_named(struct list *l, const char *output){
+	char *path = string_format("%s/named", output);
 	FILE *fp = NULL;
 	char *dep;
 	if(list_size(l) > 0){
@@ -368,8 +368,8 @@ void write_explicit(struct list *l, const char *output){
 static void show_help(const char *cmd){
 	fprintf(stdout, "Use: %s [options] <workflow_description>\n", cmd);
 	fprintf(stdout, "Frequently used options:\n");
-	fprintf(stdout, "%-30s Do not copy files which are part of an explicit dependency, e.g. standard libraries\n", "-e, --use-explicit");
 	fprintf(stdout, "%-30s Show this help screen.\n", "-h,--help");
+	fprintf(stdout, "%-30s Do not copy files which are part of a named dependency, e.g. standard libraries\n", "-e, --use-named");
 	fprintf(stdout, "%-30s Specify output directory, default:output_dir\n", "-o,--output");
 }
 
@@ -388,7 +388,7 @@ int main(int argc, char *argv[]){
 	int c;
 
 	struct option long_options[] = {
-		{"use-explicit", no_argument, 0, 'e'},
+		{"use-named", no_argument, 0, 'n'},
 		{"dry-run", no_argument, 0, LONG_OPT_DRY_RUN},
 		{"help", no_argument, 0, 'h'},
 		{"output", required_argument, 0, 'o'},
@@ -397,13 +397,13 @@ int main(int argc, char *argv[]){
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "eho:v", long_options, NULL)) >= 0){
+	while((c = getopt_long(argc, argv, "hno:v", long_options, NULL)) >= 0){
 		switch(c){
-			case 'e':
-				use_explicit = 1;
-				break;
 			case LONG_OPT_DRY_RUN:
 				dry_run = 1;
+				break;
+			case 'n':
+				use_named = 1;
 				break;
 			case 'o':
 				output = xxstrdup(optarg);
@@ -454,8 +454,8 @@ int main(int argc, char *argv[]){
 		build_package(dependencies);
 	}
 
-	struct list *l = list_explicit(dependencies);
-	if(!dry_run) write_explicit(l, output);
+	struct list *l = list_named(dependencies);
+	if(!dry_run) write_named(l, output);
 
 	if(dry_run) display_dependencies(dependencies, 0);
 

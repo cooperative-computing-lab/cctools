@@ -32,12 +32,12 @@ prepare() {
 }
 
 run() {
-	../src/makeflow_linker --use-explicit -o $out_dir input/001/$workflow_description
-	explicit_dependency=$(cat $out_dir/explicit | awk '{print $1}')
-	if [ "$explicit_dependency" != "Python" ]; then
+	../src/makeflow_linker --use-named -o $out_dir input/001/$workflow_description
+	named_dependency=$(cat $out_dir/named | awk '{print $1}')
+	if [ "$named_dependency" != "Python" ]; then
 		exit 1
 	fi
-	cp expected/$expected/explicit $out_dir/explicit
+	cp expected/$expected/named $out_dir/named
 
 	if [ ! -d "$out_dir"/a.py/b/gzip ]; then
 		exit 1
