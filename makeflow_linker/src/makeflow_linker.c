@@ -114,9 +114,9 @@ file_type find_driver_for(const char *name){
 	file_type type = UNKNOWN;
 
 	if((type = file_extension_known(name))){
-		if(verbose) fprintf(stdout, "%s is a %s file.\n", name, file_type_to_string(type));
+		if(verbose) fprintf(stdout, "\n%s is a %s file.\n", name, file_type_to_string(type));
 	} else {
-		if(verbose) fprintf(stdout, "%s is an Unknown file.\n", name);
+		if(verbose) fprintf(stdout, "\n%s is an Unknown file.\n", name);
 	}
 
 	return type;
@@ -257,6 +257,11 @@ void find_dependencies(struct list *d){
 
 		if(dep->searched) continue;
 		new = find_dependencies_for(dep);
+		if(list_size(new) > 0 && verbose){
+			fprintf(stdout, "%s has %d dependencies:\n", dep->original_name, list_size(new));
+			list_first_item(new);
+			while((dep = list_next_item(new))) fprintf(stdout, "\t%s\n", dep->original_name);
+		}
 		list_first_item(new);
 		while((dep = list_next_item(new))){
 			if(dep->type != EXPLICIT)
@@ -442,7 +447,7 @@ int main(int argc, char *argv[]){
 	find_drivers(dependencies);
 	find_dependencies(dependencies);
 
-	if(verbose) fprintf(stdout, "Determining package structure.\n");
+	if(verbose) fprintf(stdout, "\nDetermining package structure.\n");
 	determine_package_structure(dependencies, output);
 	if(!dry_run){
 		if(verbose) fprintf(stdout, "Building package.\n");
