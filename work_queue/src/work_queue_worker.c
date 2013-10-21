@@ -189,7 +189,7 @@ static void send_master_message( struct link *master, const char *fmt, ... )
 	
 	va_start(va,fmt);
 
-	sprintf(debug_msg, "<-- %s", fmt);
+	sprintf(debug_msg, "tx to master: %s", fmt);
 	va_copy(debug_va, va);
 
 	vdebug(D_WQ, debug_msg, debug_va);
@@ -201,7 +201,7 @@ static void send_master_message( struct link *master, const char *fmt, ... )
 static int recv_master_message( struct link *master, char *line, int length, time_t stoptime )
 {
 	int result = link_readline(master,line,length,time(0)+active_timeout);
-	if(result) debug(D_WQ,"--> %s",line);
+	if(result) debug(D_WQ,"rx from master: %s",line);
 	return result;
 }
 
@@ -965,7 +965,7 @@ static int do_task( struct link *master, int taskid )
 			link_read(master,cmd,length,stoptime);
 			cmd[length] = 0;
 			work_queue_task_specify_command(task,cmd);
-			debug(D_WQ,"--> %s",cmd);
+			debug(D_WQ,"rx from master: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", filename, taskname, &flags)) {
 			sprintf(localname, "cache/%s", filename);
