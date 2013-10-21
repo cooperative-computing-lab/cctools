@@ -16,7 +16,7 @@ import re
 def usage(name):
 	a  = "USAGE: %s [options] file_to_link\n" %name
 	a += "Where [options] is zero or more of the following:\n"
-	a += "\t-e, --use-explicit\tSkip builtin modules.\n"
+	a += "\t-e, --use-named\tSkip builtin modules.\n"
 	return a
 
 def setup(input_filename):
@@ -58,15 +58,15 @@ if len(sys.argv) < 2:
 file_to_link = sys.argv[-1]
 setup(file_to_link)
 
-use_explicit = False
-if len(sys.argv) > 2 and sys.argv[1] == '--use-explicit':
-	use_explicit = True
+use_named = False
+if len(sys.argv) > 2 and sys.argv[1] == '--use-named':
+	use_named = True
 
 print "*Python", sys.version.split(' ')[0]
 modules = find_module_names(file_to_link)
 for m in modules:
 	m_split = m.split('.')
-	if imp.is_builtin(m_split[0]) and use_explicit:
+	if imp.is_builtin(m_split[0]) and use_named:
 		continue
 	m_path = imp.find_module(m_split[0])[1]
 	print m_path, m
