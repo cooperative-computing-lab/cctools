@@ -252,6 +252,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 					} else {
 						new_dependency->superparent = dep;
 					}
+					new_dependency->searched = 0;
 					list_push_tail(new_deps, new_dependency);
 					size = 0;
 					buffer = NULL;
