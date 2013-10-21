@@ -298,7 +298,7 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
 
 	time_t stoptime = time(0) + q->short_timeout;
 	
-	sprintf(debug_msg, "%s (%s) <-- ", w->hostname, w->addrport);
+	sprintf(debug_msg, "tx to %s (%s): ", w->hostname, w->addrport);
 	strcat(debug_msg, fmt);
 	va_copy(debug_va, va);
 	vdebug(D_WQ, debug_msg, debug_va);
@@ -329,7 +329,7 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	
 	w->last_msg_recv_time = timestamp_get();
 
-	debug(D_WQ, "%s (%s) --> %s", w->hostname, w->addrport, line);
+	debug(D_WQ, "rx from %s (%s): %s", w->hostname, w->addrport, line);
 	
 	// Check for status updates that can be consumed here.
 	if(string_prefix_is(line, "alive")) {
