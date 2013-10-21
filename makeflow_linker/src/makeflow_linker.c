@@ -442,8 +442,12 @@ int main(int argc, char *argv[]){
 	find_drivers(dependencies);
 	find_dependencies(dependencies);
 
+	if(verbose) fprintf(stdout, "Determining package structure.\n");
 	determine_package_structure(dependencies, output);
-	if(!dry_run) build_package(dependencies);
+	if(!dry_run){
+		if(verbose) fprintf(stdout, "Building package.\n");
+		build_package(dependencies);
+	}
 
 	struct list *l = list_explicit(dependencies);
 	if(!dry_run) write_explicit(l, output);
