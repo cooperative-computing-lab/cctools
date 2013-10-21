@@ -27,8 +27,19 @@ See the file COPYING for details.
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
 typedef enum {UNKNOWN, EXPLICIT, MAKEFLOW, PERL, PYTHON} file_type;
+static const char *file_type_strings[] = {"Unknown", "Explicit", "Makeflow", "Perl", "Python", NULL};
+static const char *file_type_to_string(int type){
+	if(type >= 0 && type < 5){
+		return file_type_strings[type];
+	}
+	else {
+		return "";
+	}
+}
 
-enum { LONG_OPT_DRY_RUN = 1 };
+enum { LONG_OPT_DRY_RUN = 1,
+       LONG_OPT_VERBOSE,
+     };
 
 struct dependency{
 	char *original_name;
@@ -43,6 +54,7 @@ struct dependency{
 
 static int use_explicit = 0;
 static int dry_run = 0;
+static int verbose = 0;
 static char *workspace = NULL;
 
 char *python_extensions[2]   = { "py", "pyc" };
@@ -57,6 +69,8 @@ void create_workspace(){
 		snprintf(workspace, PATH_MAX, "/tmp/makeflow_linker_workspace_%d", rand()%2718 + 1);
 		if(!create_dir(workspace, 0777)) fatal("Could not create directory.\n");
 	}
+
+	if(verbose) fprintf(stdout, "Created temporary workspace: %s\n", workspace);
 }
 
 void display_dependencies(struct list *d, int verbose){
@@ -99,7 +113,11 @@ file_type file_extension_known(const char *filename){
 file_type find_driver_for(const char *name){
 	file_type type = UNKNOWN;
 
-	if((type = file_extension_known(name))){}
+	if((type = file_extension_known(name))){
+		if(verbose) fprintf(stdout, "\n%s is a %s file.\n", name, file_type_to_string(type));
+	} else {
+		if(verbose) fprintf(stdout, "\n%s is an Unknown file.\n", name);
+	}
 
 	return type;
 }
@@ -114,7 +132,6 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 	struct dependency *initial_dependency = (struct dependency *) malloc(sizeof(struct dependency));
 	initial_dependency->original_name = xxstrdup(expanded_input);
 	initial_dependency->final_name = xxstrdup(path_basename(expanded_input));
-	initial_dependency->type = find_driver_for(expanded_input);
 	initial_dependency->depth = 0;
 	initial_dependency->parent = NULL;
 	initial_dependency->superparent = NULL;
@@ -240,6 +257,11 @@ void find_dependencies(struct list *d){
 
 		if(dep->searched) continue;
 		new = find_dependencies_for(dep);
+		if(list_size(new) > 0 && verbose){
+			fprintf(stdout, "%s has %d dependencies:\n", dep->original_name, list_size(new));
+			list_first_item(new);
+			while((dep = list_next_item(new))) fprintf(stdout, "\t%s\n", dep->original_name);
+		}
 		list_first_item(new);
 		while((dep = list_next_item(new))){
 			if(dep->type != EXPLICIT)
@@ -354,6 +376,7 @@ static void show_help(const char *cmd){
 void cleanup(){
 	if(workspace){
 		if(delete_dir(workspace) != 0) fprintf(stderr, "Could not delete workspace (%s)\n", workspace);
+		if(verbose) fprintf(stdout, "Deleted temporary workspace: %s\n", workspace);
 		free(workspace);
 	}
 }
@@ -369,6 +392,7 @@ int main(int argc, char *argv[]){
 		{"dry-run", no_argument, 0, LONG_OPT_DRY_RUN},
 		{"help", no_argument, 0, 'h'},
 		{"output", required_argument, 0, 'o'},
+		{"verbose", no_argument, 0, LONG_OPT_VERBOSE},
 		{"version", no_argument, 0, 'v'},
 		{0, 0, 0, 0}
 	};
@@ -390,6 +414,9 @@ int main(int argc, char *argv[]){
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
+			case LONG_OPT_VERBOSE:
+				verbose = 1;
+				break;
 			default:
 				show_help(argv[0]);
 				return 1;
@@ -411,6 +438,7 @@ int main(int argc, char *argv[]){
 	realpath(tmp, output);
 	free(tmp);
 	if(!create_dir(output, 0777)) fatal("Could not create output directory.\n");
+	if(verbose) fprintf(stdout, "Using %s as output location.\n", output);
 
 	char input_wd[PATH_MAX];
 	path_dirname(input, input_wd);
@@ -419,8 +447,12 @@ int main(int argc, char *argv[]){
 	find_drivers(dependencies);
 	find_dependencies(dependencies);
 
+	if(verbose) fprintf(stdout, "\nDetermining package structure.\n");
 	determine_package_structure(dependencies, output);
-	if(!dry_run) build_package(dependencies);
+	if(!dry_run){
+		if(verbose) fprintf(stdout, "Building package.\n");
+		build_package(dependencies);
+	}
 
 	struct list *l = list_explicit(dependencies);
 	if(!dry_run) write_explicit(l, output);
