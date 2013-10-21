@@ -26,8 +26,8 @@ See the file COPYING for details.
 #define MAKEFLOW_PATH "makeflow"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
-typedef enum {UNKNOWN, NAMED, MAKEFLOW, PERL, PYTHON} file_type;
-static const char *file_type_strings[] = {"Unknown", "Named", "Makeflow", "Perl", "Python", NULL};
+typedef enum {UNKNOWN, EXE, NAMED, MAKEFLOW, PERL, PYTHON} file_type;
+static const char *file_type_strings[] = {"Unknown", "Executable", "Named", "Makeflow", "Perl", "Python", NULL};
 static const char *file_type_to_string(file_type type){
 	return file_type_strings[type];
 }
@@ -161,6 +161,8 @@ struct list *find_dependencies_for(struct dependency *dep){
 			args[1] = dep->original_name;
 		}
 		switch ( dep->type ){
+			case EXE:
+				break;
 			case PERL:
 				execvp("perl_driver", args);
 			case PYTHON:
@@ -287,6 +289,8 @@ void determine_package_structure(struct list *d, char *output_dir){
 			sprintf(resolved_path, "%s", output_dir);
 		}
 		switch(dep->type){
+			case EXE:
+				break;
 			case PYTHON:
 				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
 				break;
@@ -321,6 +325,7 @@ void build_package(struct list *d){
 				sprintf(tmp_from_path, "%s/%s", workspace, dep->final_name);
 				copy_file_to_file(tmp_from_path, dep->output_path);
 				break;
+			case EXE:
 			case PERL:
 			default:
 				sprintf(tmp_dest_path, "%s/%s", dep->output_path, dep->final_name);
