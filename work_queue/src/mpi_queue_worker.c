@@ -194,7 +194,7 @@ int master_main(const char *host, int port, const char *addr) {
 				op->type = MPI_QUEUE_OP_WORK;
 				op->buffer_length = length+1;
 				op->buffer = malloc(length+1);
-				op->buffer[op->buffer_length] = 0;
+				op->buffer[op->buffer_length-1] = 0;
 				link_read(master, op->buffer, length, time(0) + active_timeout);
 				op->result = -1;
 				
