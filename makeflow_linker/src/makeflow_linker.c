@@ -28,13 +28,8 @@ See the file COPYING for details.
 
 typedef enum {UNKNOWN, NAMED, MAKEFLOW, PERL, PYTHON} file_type;
 static const char *file_type_strings[] = {"Unknown", "Named", "Makeflow", "Perl", "Python", NULL};
-static const char *file_type_to_string(int type){
-	if(type >= 0 && type < 5){
-		return file_type_strings[type];
-	}
-	else {
-		return "";
-	}
+static const char *file_type_to_string(file_type type){
+	return file_type_strings[type];
 }
 
 enum { LONG_OPT_DRY_RUN = 1,
