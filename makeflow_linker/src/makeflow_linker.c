@@ -60,6 +60,8 @@ void create_workspace(){
 		snprintf(workspace, PATH_MAX, "/tmp/makeflow_linker_workspace_%d", rand()%2718 + 1);
 		if(!create_dir(workspace, 0777)) fatal("Could not create directory.\n");
 	}
+
+	if(verbose) fprintf(stdout, "Created temporary workspace: %s\n", workspace);
 }
 
 void display_dependencies(struct list *d, int verbose){
@@ -357,6 +359,7 @@ static void show_help(const char *cmd){
 void cleanup(){
 	if(workspace){
 		if(delete_dir(workspace) != 0) fprintf(stderr, "Could not delete workspace (%s)\n", workspace);
+		if(verbose) fprintf(stdout, "Deleted temporary workspace: %s\n", workspace);
 		free(workspace);
 	}
 }
