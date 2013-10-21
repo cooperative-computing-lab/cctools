@@ -2911,10 +2911,8 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 	return 0;
 }
 
-int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
+int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 {
-	static int next_taskid = 1;
-	
 	/* If the task has been used before, clear out accumlated state. */
 	if(t->output) {
 		free(t->output);
@@ -2932,9 +2930,6 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	t->cmd_execution_time = 0;
 	t->result = WORK_QUEUE_RESULT_UNSET;
 	
-	//Increment taskid. So we get a unique taskid for every submit.
-	t->taskid = next_taskid++;
-
 	if(q->monitor_mode)
 		work_queue_monitor_wrap(q, t);
 
@@ -2949,6 +2944,16 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	q->total_tasks_submitted++;
 
 	return (t->taskid);
+}
+
+int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
+{
+	static int next_taskid = 1;
+
+	//Increment taskid. So we get a unique taskid for every submit.
+	t->taskid = next_taskid++;
+
+	return work_queue_submit_internal(q, t);
 }
 
 static void print_password_warning( struct work_queue *q )

@@ -969,10 +969,10 @@ static int do_task( struct link *master, int taskid )
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", filename, taskname, &flags)) {
 			sprintf(localname, "cache/%s", filename);
-		       	work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_INPUT, flags);
+			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_INPUT, flags);
 		} else if(sscanf(line,"outfile %s %s %d", filename, taskname, &flags)) {
 			sprintf(localname, "cache/%s", filename);
-		       	work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags);
+			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags);
 		} else if(sscanf(line, "dir %s", filename)) {
 			work_queue_task_specify_directory(task, filename, filename, WORK_QUEUE_INPUT, 0700, 0);
 		} else if(sscanf(line,"cores %d",&n)) {
