@@ -170,7 +170,8 @@ struct list *find_dependencies_for(struct dependency *dep){
 		close(pipefd[0]);
 		dup2(pipefd[1], 1);
 		close(pipefd[1]);
-		char *args[] = { "locating dependencies" , NULL, NULL, NULL, NULL };
+		char *args[] = { "locating dependencies" , NULL, NULL, NULL, NULL, NULL, NULL };
+		char starch_output_path[PATH_MAX];
 		if(use_named){
 			args[1] = "--use-named";
 			args[2] = dep->original_name;
@@ -179,6 +180,13 @@ struct list *find_dependencies_for(struct dependency *dep){
 		}
 		switch ( dep->type ){
 			case EXE:
+				sprintf(starch_output_path, "%s/%s", workspace, path_basename(dep->original_name));
+				args[1] = "-c";
+				args[2] = xxstrdup(path_basename(dep->original_name));
+				args[3] = "-x";
+				args[4] = xxstrdup(path_basename(dep->original_name));
+				args[5] = starch_output_path;
+				execvp("starch", args);
 				break;
 			case PERL:
 				execvp("perl_driver", args);
@@ -307,6 +315,7 @@ void determine_package_structure(struct list *d, char *output_dir){
 		}
 		switch(dep->type){
 			case EXE:
+				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
 				break;
 			case PYTHON:
 				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
@@ -343,6 +352,9 @@ void build_package(struct list *d){
 				copy_file_to_file(tmp_from_path, dep->output_path);
 				break;
 			case EXE:
+				sprintf(tmp_from_path, "%s/%s", workspace, path_basename(dep->original_name));
+				copy_file_to_file(tmp_from_path, dep->output_path);
+				break;
 			case PERL:
 			default:
 				sprintf(tmp_dest_path, "%s/%s", dep->output_path, dep->final_name);
