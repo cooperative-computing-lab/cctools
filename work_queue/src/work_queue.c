@@ -137,7 +137,9 @@ struct work_queue {
 	int worker_selection_algorithm;
 	int task_ordering;
 	int process_pending_check;
+
 	int short_timeout;		// timeout to send/recv a brief message from worker
+	int long_timeout;		// timeout to send/recv a brief message from a foreman
 
 	struct list * task_reports;	// list of last N work_queue_task_reports
 	timestamp_t total_idle_time;	// sum of time spent waiting for workers
@@ -296,7 +298,13 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
 	
 	va_start(va,fmt);
 
-	time_t stoptime = time(0) + q->short_timeout;
+	time_t stoptime;
+
+	//If foreman, then we wait until foreman gives the master some attention.
+	if(!strcmp(w->os, "foreman"))
+		stoptime = time(0) + q->long_timeout;
+	else
+		stoptime = time(0) + q->short_timeout;
 	
 	sprintf(debug_msg, "%s (%s) <-- ", w->hostname, w->addrport);
 	strcat(debug_msg, fmt);
@@ -319,7 +327,13 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
  */
 static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, char *line, size_t length ) 
 {
-	time_t stoptime = time(0) + q->short_timeout;
+	time_t stoptime;
+	
+	//If foreman, then we wait until foreman gives the master some attention.
+	if(!strcmp(w->os, "foreman"))
+		stoptime = time(0) + q->long_timeout;
+	else
+		stoptime = time(0) + q->short_timeout;
 
 	int result = link_readline(w->link, line, length, stoptime);
 	
@@ -633,7 +647,6 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 	}
 
 	// Choose the actual stoptime and transfer the data.
-
 	time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
 	INT64_T actual = link_stream_to_fd(w->link, fd, length, stoptime);
 
@@ -2686,7 +2699,9 @@ struct work_queue *work_queue_create(int port)
 	q->worker_selection_algorithm = wq_option_scheduler;
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 	q->process_pending_check = 0;
+
 	q->short_timeout = 5;
+	q->long_timeout = 3600;
 
 	q->start_time = timestamp_get();
 	q->task_reports = list_create();
@@ -2911,10 +2926,8 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 	return 0;
 }
 
-int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
+int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 {
-	static int next_taskid = 1;
-	
 	/* If the task has been used before, clear out accumlated state. */
 	if(t->output) {
 		free(t->output);
@@ -2932,9 +2945,6 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	t->cmd_execution_time = 0;
 	t->result = WORK_QUEUE_RESULT_UNSET;
 	
-	//Increment taskid. So we get a unique taskid for every submit.
-	t->taskid = next_taskid++;
-
 	if(q->monitor_mode)
 		work_queue_monitor_wrap(q, t);
 
@@ -2949,6 +2959,16 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	q->total_tasks_submitted++;
 
 	return (t->taskid);
+}
+
+int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
+{
+	static int next_taskid = 1;
+
+	//Increment taskid. So we get a unique taskid for every submit.
+	t->taskid = next_taskid++;
+
+	return work_queue_submit_internal(q, t);
 }
 
 static void print_password_warning( struct work_queue *q )

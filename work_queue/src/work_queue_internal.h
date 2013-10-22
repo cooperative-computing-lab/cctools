@@ -40,4 +40,9 @@ Warning: this will reap any child processes, and their information can only be r
 */
 void work_queue_enable_process_module(struct work_queue *q);
 
+/** Does all the heavy lifting for submitting a task. work_queue_submit is
+simply a wrapper of this function that also generates a taskid.
+work_queue_submit_internal is the submit function used in foreman, where the
+taskid should not be modified.*/
+int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t);
 
