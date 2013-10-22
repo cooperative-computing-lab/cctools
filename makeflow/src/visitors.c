@@ -619,7 +619,7 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 
 	}
 
-	struct list **ancestor_count_list = malloc((max_ancestor + 1) * sizeof(struct list *));	//pointer to a list of pointers
+	struct list **ancestor_count_list = malloc((max_ancestor + 1) * sizeof(struct list *));
 
 	//initialize all of the lists
 	for(count = 0; count <= max_ancestor; count++) {
@@ -652,8 +652,8 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 
 	//calculate the column size so that we can center the data
 
-	int x_length = (max_image_width / node_width) * node_width;	//x length
-	int y_length = row_height * (node_num_rows);	//y length
+	int x_length = (max_image_width / node_width) * node_width;
+	int y_length = row_height * (node_num_rows);
 
 	int current_depth_width;
 	int current_depth_nodesPrinted;
@@ -672,8 +672,6 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 	int whitespace_right;
 	int whitespace_on;
 
-//      printf("%d %d %d\n", node_width, max_size, node_num_rows);
-
 	fprintf(stdout, "P3\n");	//"Magic Number", don't change
 	fprintf(stdout, "%d %d\n", x_length, y_length);	//Width and Height
 	fprintf(stdout, "1\n\n");	//maximum color value
@@ -684,7 +682,7 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 		current_depth_width = list_size(ancestor_count_list[count_row]);	//the width of this particular level of the dag
 		current_depth_numRows = (node_width * current_depth_width - 1) / (x_length) + 1;
 		current_depth_nodesPrinted = 0;
-//              printf("nodes total: %d\n", current_depth_width);
+
 		for(numRows = 0; numRows < current_depth_numRows; numRows++) {
 
 			if((current_depth_width - current_depth_nodesPrinted) < nodesCanBePrinted)
@@ -692,7 +690,6 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 			else
 				current_depth_nodesCanBePrinted = nodesCanBePrinted;
 
-//                      printf("nodes to be printed: %d\n", current_depth_nodesCanBePrinted);
 
 			whitespace = x_length - (current_depth_nodesCanBePrinted * node_width);
 			whitespace_left = whitespace / 2;
