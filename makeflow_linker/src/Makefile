@@ -4,7 +4,7 @@ include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
 TARGETS= makeflow_linker
-DRIVERS= python_driver perl_driver
+DRIVERS= makeflow_linker_python_driver makeflow_linker_perl_driver
 
 LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 

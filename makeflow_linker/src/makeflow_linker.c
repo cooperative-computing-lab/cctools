@@ -189,9 +189,9 @@ struct list *find_dependencies_for(struct dependency *dep){
 				execvp("starch", args);
 				break;
 			case PERL:
-				execvp("perl_driver", args);
+				execvp("makeflow_linker_perl_driver", args);
 			case PYTHON:
-				execvp("python_driver", args);
+				execvp("makeflow_linker_python_driver", args);
 			case NAMED:
 				break;
 			case MAKEFLOW:
