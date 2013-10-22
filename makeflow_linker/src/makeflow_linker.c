@@ -195,7 +195,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 				execvp("makeflow_linker_python_driver", args);
 				break;
 			case NAMED:
-				break;
+				exit(0);
 			case MAKEFLOW:
 				args[1] = MAKEFLOW_BUNDLE_FLAG;
 				args[2] = workspace;
@@ -203,7 +203,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 				execvp(MAKEFLOW_PATH, args);
 				break;
 			case UNKNOWN:
-				break;
+				exit(0);
 		}
 		exit(1);
 	default:
