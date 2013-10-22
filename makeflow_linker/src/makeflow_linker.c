@@ -190,8 +190,10 @@ struct list *find_dependencies_for(struct dependency *dep){
 				break;
 			case PERL:
 				execvp("makeflow_linker_perl_driver", args);
+				break;
 			case PYTHON:
 				execvp("makeflow_linker_python_driver", args);
+				break;
 			case NAMED:
 				break;
 			case MAKEFLOW:
