@@ -16,8 +16,12 @@ BOLD(makeflow_linker) finds dependencies by static analysis. CODE(eval) and othe
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
+OPTION_ITEM(`--dry-run')Run without creating directories or copying dependencies.
 OPTION_ITEM(`-h, --help')Show this help screen.
-OPTION_TRIPLET(-o, output, directory)Specify output directory
+OPTION_ITEM(`-n, --use-named')Do not copy files which are part of a named dependency, e.g. standard libraries.
+OPTION_TRIPLET(-o, output, directory)Specify output directory.
+OPTION_ITEM(`--verbose')Output status during run.
+OPTION_ITEM(`-v, --version')Display version information.
 OPTIONS_END
 
 SECTION(EXIT STATUS)
@@ -28,6 +32,18 @@ LIST_BEGIN
 LIST_ITEM The makeflow_linker does not check for naming collisions beyond the initial workflow inputs.
 LIST_ITEM The makeflow_linker relies on regex parsing of files, so some forms of import statements may be missing.
 LIST_END
+
+SECTION(EXAMPLES)
+
+Package a workflow:
+LONGCODE_BEGIN
+makeflow_linker -o example_mf example.mf
+LONGCODE_END
+
+Run packaged workflow:
+LONGCODE_BEGIN
+makeflow example_mf/example.mf
+LONGCODE_END
 
 SECTION(COPYRIGHT)
 
