@@ -81,6 +81,7 @@ enum { LONG_OPT_MONITOR_INTERVAL = 1,
        LONG_OPT_PPM_EXE,
        LONG_OPT_PPM_LEVELS,
        LONG_OPT_DOT_PROPORTIONAL,
+       LONG_OPT_VERBOSE,
        LONG_OPT_DOT_CONDENSE };
 
 typedef enum {
@@ -112,6 +113,8 @@ static const char *port_file = NULL;
 static int output_len_check = 0;
 
 static int cache_mode = 1;
+
+int verbose = 0;
 
 static char *makeflow_exe = NULL;
 static char *monitor_exe = NULL;
@@ -2451,6 +2454,7 @@ int main(int argc, char *argv[])
 		{"submission-timeout", required_argument, 0, 'S'},
 		{"wq-keepalive-timeout", required_argument, 0, 't'},
 		{"wq-keepalive-interval", required_argument, 0, 'u'},
+		{"verbose", no_argument, 0, LONG_OPT_VERBOSE},
 		{"version", no_argument, 0, 'v'},
 		{"wq-schedule", required_argument, 0, 'W'},
 		{"zero-length-error", no_argument, 0, 'z'},
@@ -2632,6 +2636,9 @@ int main(int argc, char *argv[])
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
 			return 0;
+		case LONG_OPT_VERBOSE:
+			verbose = 1;
+			break;
 		case 'W':
 			if(!strcmp(optarg, "files")) {
 				wq_option_scheduler = WORK_QUEUE_SCHEDULE_FILES;
@@ -2909,8 +2916,10 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	fprintf(stdout, "\r     Total rules: %d", d->nodeid_counter);
-	fprintf(stdout, "\nStarting execution of workflow: %s.\n", dagfile); 
+	if(verbose) {
+		fprintf(stdout, "\r     Total rules: %d", d->nodeid_counter);
+		fprintf(stdout, "\nStarting execution of workflow: %s.\n", dagfile);
+	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
 		char *cwd = path_getcwd();
