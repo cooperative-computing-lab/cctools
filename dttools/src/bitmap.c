@@ -516,13 +516,13 @@ static void swap_long(void *vdata, int length)
 struct bitmap *bitmap_load_sgi_rgb(const char *path)
 {
 	FILE *file = NULL;
-	struct bitmap *m;
+	struct bitmap *m = NULL;
 	struct sgi_rgb_header header;
 	int x, y, z, doswap = 0;
 	int *start_table = 0;
 	int *length_table = 0;
 	int table_length = 0;
-	unsigned char *line;
+	unsigned char *line = NULL;
 	file = fopen(path, "rb");
 	if(!file)
 		return 0;

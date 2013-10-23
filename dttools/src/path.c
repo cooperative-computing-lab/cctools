@@ -274,7 +274,7 @@ out:
 
 int path_find (buffer_t *B, const char *dir, const char *pattern, int recursive)
 {
-	int rc;
+	int rc=0;
 	buffer_t path;
 	buffer_init(&path);
 	if (buffer_printf(&path, "%s/", dir) == -1) goto out;
