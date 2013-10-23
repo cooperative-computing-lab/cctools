@@ -24,6 +24,8 @@ See the file COPYING for details.
 
 #define PARSING_RULE_MOD_COUNTER 250
 
+extern int verbose_parsing;
+
 struct dag *dag_create()
 {
 	struct dag *d = malloc(sizeof(*d));
@@ -143,7 +145,7 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->ancestor_depth = -1;
 
-	if(d->nodeid_counter % PARSING_RULE_MOD_COUNTER == 0)
+	if(verbose_parsing && d->nodeid_counter % PARSING_RULE_MOD_COUNTER == 0)
 	{
 		fprintf(stdout, "\rRules parsed: %d", d->nodeid_counter + 1);
 		fflush(stdout);
