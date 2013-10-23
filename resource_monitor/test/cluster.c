@@ -943,7 +943,7 @@ int parse_fields_options(char *field_str)
 int main(int argc, char **argv)
 {
 	char           *report_filename = NULL;
-	char           *input_directory;
+	char           *input_directory = NULL;
 	FILE           *freport;
 	int             max_clusters = DEFAULT_MAX_CLUSTERS; 
 	struct list    *summaries, *initial_clusters, *final_clusters;
