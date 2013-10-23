@@ -64,11 +64,10 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_STATE_INIT  0
 #define WORKER_STATE_READY 1
 #define WORKER_STATE_BUSY  2
-#define WORKER_STATE_FULL  3
-#define WORKER_STATE_NONE  4
+#define WORKER_STATE_NONE  3
 #define WORKER_STATE_MAX   (WORKER_STATE_NONE+1)
 
-static const char *work_queue_state_names[] = {"init","ready","busy","full","none"};
+static const char *work_queue_state_names[] = {"init","ready","busy","none"};
 
 // FIXME: These internal error flags should be clearly distinguished
 // from the task result codes given by work_queue_wait.
@@ -227,11 +226,7 @@ static int get_worker_state(struct work_queue *q, struct work_queue_worker *w) {
 	} else if(get_worker_cores(q, w) && itable_size(w->current_tasks) == 0 ) {
 		return WORKER_STATE_READY;
 	} else if(get_worker_cores(q, w) && itable_size(w->current_tasks) > 0) {
-		if(get_worker_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total < w->memory_allocated) {
-			return WORKER_STATE_BUSY;
-		} else {
-			return WORKER_STATE_FULL;
-		}
+		return WORKER_STATE_BUSY;
 	}
 	return WORKER_STATE_NONE;
 }
@@ -254,19 +249,18 @@ static void log_worker_states(struct work_queue *q)
 	struct work_queue_stats s;
 	update_worker_states(q);
 	
-	debug(D_WQ, "workers status -- total: %d, init: %d, ready: %d, busy: %d, full: %d.",
+	debug(D_WQ, "workers status -- total: %d, init: %d, ready: %d, busy: %d.",
 		hash_table_size(q->worker_table),
 		q->workers_in_state[WORKER_STATE_INIT],
 		q->workers_in_state[WORKER_STATE_READY],
-		q->workers_in_state[WORKER_STATE_BUSY],
-		q->workers_in_state[WORKER_STATE_FULL]);
+		q->workers_in_state[WORKER_STATE_BUSY]);
 		
 	if(!q->logfile) return;
 	
 	work_queue_get_stats(q, &s);
 	
 	fprintf(q->logfile, "%16" PRIu64 " %25" PRIu64 " ", timestamp_get(), s.start_time); // time
-	fprintf(q->logfile, "%25d %25d %25d %25d", s.workers_init, s.workers_ready, s.workers_busy + s.workers_full, 0);
+	fprintf(q->logfile, "%25d %25d %25d ", s.workers_init, s.workers_ready, s.workers_busy);
 	fprintf(q->logfile, "%25d %25d %25d ", s.tasks_waiting, s.tasks_running, s.tasks_complete);
 	fprintf(q->logfile, "%25d %25d %25d %25d ", s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_connected);
 	fprintf(q->logfile, "%25d %25" PRId64 " %25" PRId64 " ", s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received); 
@@ -1131,11 +1125,10 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 
 	nvpair_insert_integer(nv,"port",info.port);
 	nvpair_insert_integer(nv,"priority",info.priority);
-	nvpair_insert_integer(nv,"workers",info.workers_ready+info.workers_busy+info.workers_full);
+	nvpair_insert_integer(nv,"workers",info.workers_ready+info.workers_busy);
 	nvpair_insert_integer(nv,"workers_init",info.workers_init);
 	nvpair_insert_integer(nv,"workers_ready",info.workers_ready);
 	nvpair_insert_integer(nv,"workers_busy",info.workers_busy);
-	nvpair_insert_integer(nv,"workers_full",info.workers_full);
 	nvpair_insert_integer(nv,"tasks_running",info.tasks_running);
 	nvpair_insert_integer(nv,"tasks_waiting",info.tasks_waiting);
 	// KNOWN HACK: The following line is inconsistent but kept for compatibility reasons.
@@ -1168,8 +1161,8 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 	nvpair_insert_string(nv,"type","wq_master");
 	if(q->name) nvpair_insert_string(nv,"project",q->name);
 	nvpair_insert_integer(nv,"starttime",(q->start_time/1000000)); // catalog expects time_t not timestamp_t
-	nvpair_insert_integer(nv,"total_workers",info.workers_ready+info.workers_busy+info.workers_full);
-	nvpair_insert_integer(nv,"total_workers_working",info.workers_busy+info.workers_full);
+	nvpair_insert_integer(nv,"total_workers",info.workers_ready+info.workers_busy);
+	nvpair_insert_integer(nv,"total_workers_busy",info.workers_busy);
 	nvpair_insert_string(nv,"working_dir",q->workingdir);
 	nvpair_insert_string(nv,"owner",owner);
 	nvpair_insert_string(nv,"version",CCTOOLS_VERSION);
@@ -3025,7 +3018,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		update_worker_states(q);
 
-		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !(foreman_uplink))
+		if(q->workers_in_state[WORKER_STATE_BUSY] == 0 && list_size(q->ready_list) == 0 && !(foreman_uplink))
 			break;
 
 		int n = build_poll_table(q, foreman_uplink);
@@ -3123,16 +3116,15 @@ int work_queue_hungry(struct work_queue *q)
 
 	//BUG: fix this so that it actually looks at the number of cores available.
 
-	int i, j, workers_init, workers_ready, workers_busy, workers_full;
+	int i, j, workers_init, workers_ready, workers_busy;
 	workers_init = q->workers_in_state[WORKER_STATE_INIT];
 	workers_ready = q->workers_in_state[WORKER_STATE_READY];
 	workers_busy = q->workers_in_state[WORKER_STATE_BUSY];
-	workers_full = q->workers_in_state[WORKER_STATE_FULL];
 
 	//i = 1.1 * number of current workers
 	//j = # of queued tasks.
 	//i-j = # of tasks to queue to re-reach the status quo.
-	i = (1.1 * (workers_init + workers_ready + workers_busy + workers_full));
+	i = (1.1 * (workers_init + workers_ready + workers_busy));
 	j = list_size(q->ready_list);
 	return MAX(i - j, 0);
 }
@@ -3368,7 +3360,6 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->workers_init = q->workers_in_state[WORKER_STATE_INIT];
 	s->workers_ready = q->workers_in_state[WORKER_STATE_READY];
 	s->workers_busy = q->workers_in_state[WORKER_STATE_BUSY];
-	s->workers_full = q->workers_in_state[WORKER_STATE_FULL];
 
 	s->tasks_waiting = list_size(q->ready_list);
 	s->tasks_running = itable_size(q->running_tasks) + itable_size(q->finished_tasks);
@@ -3436,9 +3427,9 @@ void work_queue_specify_log(struct work_queue *q, const char *logfile)
 	q->logfile = fopen(logfile, "a");
 	if(q->logfile) {
 		setvbuf(q->logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
-		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
+		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
 			"timestamp", "start_time",
-			"workers_init", "workers_ready", "workers_active", "workers_full", // workers
+			"workers_init", "workers_ready", "workers_active",  // workers
 			"tasks_waiting", "tasks_running", "tasks_complete", // tasks
 			"total_tasks_dispatched", "total_tasks_complete", "total_workers_joined", "total_workers_connected", // totals
 			"total_workers_removed", "total_bytes_sent", "total_bytes_received", "total_send_time", "total_receive_time",
