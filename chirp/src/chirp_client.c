@@ -669,7 +669,7 @@ INT64_T chirp_client_ticket_create(struct chirp_client * c, char name[CHIRP_PATH
 		return -1;
 	ssize_t read;
 	char *buffer = name;
-	while((read = full_fread(shell, buffer, sizeof(name) - 1 - (name - buffer))) > 0)
+	while((read = full_fread(shell, buffer, CHIRP_PATH_MAX - 1 - (name - buffer))) > 0)
 		buffer += read;
 	pclose(shell);
 	if((buffer - name) <= 0) {
