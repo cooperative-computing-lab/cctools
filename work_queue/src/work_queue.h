@@ -102,8 +102,8 @@ struct work_queue_stats {
 	int tasks_complete;             /**< Number of tasks waiting to be returned to user. */
 	int total_tasks_dispatched;     /**< Total number of tasks dispatch to workers. */
 	int total_tasks_complete;       /**< Total number of tasks returned complete. */
-	int total_workers_joined;       /**< Total number of times a worker joined the queue. */
-	int total_workers_removed;      /**< Total number of times a worker was removed from the queue. */
+	int total_workers_connected;    /**< Total number of worker connections successfully established to the master. */
+	int total_workers_removed;      /**< Total number of worker connections that were terminated by the master. */
 	INT64_T total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
 	INT64_T total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
 	timestamp_t start_time;         /**< Absolute time at which the master started. */
@@ -112,9 +112,9 @@ struct work_queue_stats {
 	double efficiency;		/**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */  
 	double idle_percentage;		/**< The fraction of time that the master is idle waiting for workers to respond. */
 	int capacity;			/**< The estimated number of workers that this master can effectively support. */
-	int avg_capacity;
-	int total_workers_connected;
-	int total_worker_slots;			
+	int total_workers_joined;       /**< @deprecated: Use @ref total_workers_connected instead. */
+	int total_worker_slots;         /**< @deprecated: Use @ref tasks_running instead. */	
+	int avg_capacity;               /**< @deprecated: Use @ref capacity instead. */
 };
 
 

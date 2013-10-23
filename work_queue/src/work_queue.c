@@ -121,11 +121,9 @@ struct work_queue {
 
 	INT64_T total_tasks_submitted;
 	INT64_T total_tasks_complete;
-	INT64_T total_workers_joined;
-	INT64_T total_workers_removed;
 	INT64_T total_bytes_sent;
 	INT64_T total_bytes_received;
-	INT64_T total_workers_connected;
+	INT64_T total_workers_removed;
 
 	timestamp_t start_time;
 	timestamp_t total_send_time;
@@ -271,8 +269,6 @@ static void log_worker_states(struct work_queue *q)
 	fprintf(q->logfile, "%25d ", s.total_worker_slots);
 	fprintf(q->logfile, "\n");
 }
-
-
 
 static void link_to_hash_key(struct link *link, char *key)
 {
@@ -600,9 +596,7 @@ static int add_worker(struct work_queue *q)
 	log_worker_states(q);
 
 	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
-
-	q->total_workers_joined++;
-
+	
 	return 1;
 }
 
@@ -1004,7 +998,6 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 	w->version  = strdup(items[3]);
 
 	log_worker_states(q);
-	q->total_workers_connected++;
 	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
 	
 	if(strcmp(CCTOOLS_VERSION, w->version)) {
@@ -1125,7 +1118,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 
 	nvpair_insert_integer(nv,"port",info.port);
 	nvpair_insert_integer(nv,"priority",info.priority);
-	nvpair_insert_integer(nv,"workers",info.workers_ready+info.workers_busy);
+	nvpair_insert_integer(nv,"workers",info.workers_init+info.workers_ready+info.workers_busy);
 	nvpair_insert_integer(nv,"workers_init",info.workers_init);
 	nvpair_insert_integer(nv,"workers_ready",info.workers_ready);
 	nvpair_insert_integer(nv,"workers_busy",info.workers_busy);
@@ -1136,7 +1129,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 	nvpair_insert_integer(nv,"tasks_complete",info.total_tasks_complete); 
 	nvpair_insert_integer(nv,"total_tasks_complete",info.total_tasks_complete);
 	nvpair_insert_integer(nv,"total_tasks_dispatched",info.total_tasks_dispatched);
-	nvpair_insert_integer(nv,"total_workers_joined",info.total_workers_joined);
+	nvpair_insert_integer(nv,"total_workers_connected",info.total_workers_connected);
 	nvpair_insert_integer(nv,"total_workers_removed",info.total_workers_removed);
 	nvpair_insert_integer(nv,"total_bytes_sent",info.total_bytes_sent);
 	nvpair_insert_integer(nv,"total_bytes_received",info.total_bytes_received);
@@ -1146,8 +1139,6 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 	nvpair_insert_float(nv,"efficiency",info.efficiency);
 	nvpair_insert_float(nv,"idle_percentage",info.idle_percentage);
 	nvpair_insert_integer(nv,"capacity",info.capacity);
-	nvpair_insert_integer(nv,"total_workers_connected",info.total_workers_connected);
-	nvpair_insert_integer(nv,"total_worker_slots",info.total_worker_slots);
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
@@ -1161,8 +1152,6 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 	nvpair_insert_string(nv,"type","wq_master");
 	if(q->name) nvpair_insert_string(nv,"project",q->name);
 	nvpair_insert_integer(nv,"starttime",(q->start_time/1000000)); // catalog expects time_t not timestamp_t
-	nvpair_insert_integer(nv,"total_workers",info.workers_ready+info.workers_busy);
-	nvpair_insert_integer(nv,"total_workers_busy",info.workers_busy);
 	nvpair_insert_string(nv,"working_dir",q->workingdir);
 	nvpair_insert_string(nv,"owner",owner);
 	nvpair_insert_string(nv,"version",CCTOOLS_VERSION);
@@ -3366,7 +3355,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->tasks_complete = list_size(q->complete_list);
 	s->total_tasks_dispatched = q->total_tasks_submitted;
 	s->total_tasks_complete = q->total_tasks_complete;
-	s->total_workers_joined = q->total_workers_joined;
+	s->total_workers_connected = hash_table_size(q->worker_table);
 	s->total_workers_removed = q->total_workers_removed;
 	s->total_bytes_sent = q->total_bytes_sent;
 	s->total_bytes_received = q->total_bytes_received;
@@ -3388,9 +3377,9 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 
 	s->capacity = compute_capacity(q);
 
-	s->total_workers_connected = q->total_workers_connected;
-	// BUG: this should be the sum of the worker cpus
-	s->total_worker_slots = s->total_workers_connected;
+	//Deprecated values.
+	s->total_workers_joined = hash_table_size(q->worker_table);
+	s->total_worker_slots = itable_size(q->running_tasks); 
 }
 
 /*
