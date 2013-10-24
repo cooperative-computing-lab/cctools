@@ -2529,7 +2529,7 @@ int main(int argc, char *argv[])
 	debug_config(makeflow_exe);
 
 	runtime_mode modus_operandi = MAKEFLOW_RUN;
-	if(!strncmp("makeflow_util", makeflow_exe, 13)) modus_operandi = MAKEFLOW_UTIL;
+	if(!strncmp("makeflow_util", path_basename(makeflow_exe), 13)) modus_operandi = MAKEFLOW_UTIL;
 
 	cctools_version_debug(D_DEBUG, makeflow_exe);
 	const char *dagfile;

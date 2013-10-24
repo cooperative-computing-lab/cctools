@@ -4,17 +4,19 @@
 
 prepare()
 {
+    ln ../src/makeflow ../src/makeflow_util
     exit 0
 }
 
 run()
 {
-    ../src/makeflow -k syntax/test.makeflow && exit 0
+    ../src/makeflow_util -k syntax/test.makeflow && exit 0
     exit 1
 }
 
 clean()
 {
+    rm -f ../src/makeflow_util
     exit 0
 }
 

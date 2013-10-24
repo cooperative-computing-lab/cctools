@@ -27,6 +27,7 @@ expected=001
 workflow_description=001.mf
 
 prepare() {
+	ln ../../makeflow/src/makeflow ../../makeflow/src/makeflow_util
 	cd ../src; make
 	exit $?
 }
@@ -55,7 +56,7 @@ run() {
 }
 
 clean() {
-	rm -rf $out_dir
+	rm -rf $out_dir ../../makeflow/src/makeflow_util
 }
 
 dispatch "$@"

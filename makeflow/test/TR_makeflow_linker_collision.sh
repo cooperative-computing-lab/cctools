@@ -5,6 +5,7 @@
 out_dir="linker_collision_out"
 
 prepare() {
+  ln ../src/makeflow ../src/makeflow_util
   if [ -d "$out_dir" ]; then
     exit 1
   fi
@@ -17,7 +18,7 @@ prepare() {
 
 run() {
   cd linker
-  ../../src/makeflow -b "$out_dir" collision.mf &> tmp
+  ../../src/makeflow_util -b "$out_dir" collision.mf &> tmp
   cat tmp | awk '{print $2}' | sort > tmp2
 
   `diff tmp2 expected/collision.mf`

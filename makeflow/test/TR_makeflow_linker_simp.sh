@@ -5,6 +5,7 @@
 out_dir="linker_simp_out"
 
 prepare() {
+    ln ../src/makeflow ../src/makeflow_util
     cd linker
     if [ -d "$out_dir" ]; then
         exit 1
@@ -16,7 +17,7 @@ prepare() {
 
 run() {
     cd linker
-    ../../src/makeflow -b "$out_dir" simple.mf
+    ../../src/makeflow_util -b "$out_dir" simple.mf
 
     if [ ! -f "$out_dir"/simple.mf ]; then
         exit 1
@@ -25,6 +26,7 @@ run() {
 }
 
 clean() {
+    rm -rf ../src/makeflow_util
     cd linker
     rm -rf "$out_dir"
     exit 0
