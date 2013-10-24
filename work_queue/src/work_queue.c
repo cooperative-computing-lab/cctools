@@ -3027,7 +3027,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		update_worker_states(q);
 
-		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !(foreman_uplink))
+		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !foreman_uplink)
 			break;
 
 		int n = build_poll_table(q, foreman_uplink);
@@ -3098,7 +3098,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			abort_slow_workers(q);
 		}
 		
-		// If the foreman_uplink is active then break so the caller can handle it.
+		// If there is foreman_uplink then break so the caller can handle it.
 		if(foreman_uplink) {
 			break;
 		}

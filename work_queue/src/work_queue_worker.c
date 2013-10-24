@@ -1714,7 +1714,19 @@ static void foreman_for_master(struct link *master) {
 		debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
 
 		send_resource_update(master,0);
-		
+
+		if(!master_active)
+		{
+			//We listen here to the master.
+			//Sometimes work_queue_wait_internal misses when the link to master
+			//goes down, because many tasks are coming back to the foreman. We
+			//catch the master going down here to reduce wasted work.
+			if(link_usleep(master, 100, 1, 0))
+			{
+				master_active = 1;
+			}
+		}
+
 		if(master_active)
 			result &= handle_master(master);
 
