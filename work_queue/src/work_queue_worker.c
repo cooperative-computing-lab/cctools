@@ -1363,12 +1363,11 @@ static int do_release() {
 
 static int do_reset() {
 	
-	if(worker_mode == WORKER_MODE_FOREMAN) {
+	kill_all_tasks();
+
+	if(worker_mode == WORKER_MODE_FOREMAN)
 		work_queue_reset(foreman_q, 0);
-	} else {
-		kill_all_tasks();
-	}
-	
+
 	if(delete_dir_contents(workspace) < 0) {
 		return 0;
 	}
@@ -1389,14 +1388,7 @@ static void disconnect_master(struct link *master) {
 		record_bad_master(duplicate_work_queue_master(actual_master));
 	}
 
-	kill_all_tasks();
-
-	if(foreman_q) {
-		work_queue_reset(foreman_q, 0);
-	}
-
-	// Remove the contents of the workspace.
-	delete_dir_contents(workspace);
+	do_reset();
 
 	worker_mode = worker_mode_default;
 	
@@ -1711,8 +1703,6 @@ static void foreman_for_master(struct link *master) {
 		aggregated_resources->disk.total = foreman_local.disk.total; //overwrite with foreman's local disk information
 		aggregated_resources->disk.inuse = foreman_local.disk.inuse; 
 
-		debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
-
 		send_resource_update(master,0);
 
 		if(!master_active)
@@ -1730,14 +1720,21 @@ static void foreman_for_master(struct link *master) {
 		if(master_active)
 			result &= handle_master(master);
 
-		if(!result) {
+		if(result) 
+		{
+			idle_stoptime = time(0) + idle_timeout;
+
+			//Print debug message only when something interesting happened.
+			debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
+		}
+		else
+		{
 			disconnect_master(master);
 			break;
 		}
-		
-		if(result)
-			idle_stoptime = time(0) + idle_timeout;
 	}
+
+	do_reset();
 }
 
 static void handle_abort(int sig)
