@@ -559,6 +559,15 @@ static int release_worker(struct work_queue *q, struct work_queue_worker *w)
 	return 1;
 }
 
+static int reset_worker(struct work_queue *q, struct work_queue_worker *w)
+{
+	if(!w) return 0;
+	send_worker_msg(q,w,"reset\n");
+	remove_worker(q, w);
+	return 1;
+}
+
+
 static int add_worker(struct work_queue *q)
 {
 	struct link *link;
@@ -3278,8 +3287,7 @@ void work_queue_reset(struct work_queue *q, int flags) {
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-		send_worker_msg(q,w,"reset\n");
-		cleanup_worker(q, w);
+		reset_worker(q, w);
 	}
 	
 	if(flags & WORK_QUEUE_RESET_KEEP_TASKS) {
